@@ -65,7 +65,7 @@ enum ClipSourceSwap {
 
     /// 源时间整体平移：入点、关键帧、标记、音量曲线一起挪，时间线上的位置和长度不动。
     /// 入点不许小于 0（新文件比用到的范围晚起步不到一帧时，画面晚一帧起步，长度照旧）。
-    private static func shift(_ clip: inout EditClip, by delta: Double) {
+    static func shift(_ clip: inout EditClip, by delta: Double) {
         guard delta != 0 else { return }
         clip.sourceStart = max(0, clip.sourceStart + delta)
         clip.animation = clip.animation?.stretched(from: 0...1, to: delta...(delta + 1))
