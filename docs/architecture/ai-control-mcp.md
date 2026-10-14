@@ -477,7 +477,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **词**（`AIVoiceWords`，纯值）：标点也会被报成一个词，并进前一个词；词尾 = 下一个词的开头再往回收掉静音；写法照识别器
      （英文词带前面的空格、标点贴在后面）。
    - **字幕**（`subtitles=true`，`AIVoiceoverSubtitles`，纯值）：词直接喂 `SubtitleSegmenter.segment` + `assemble`（断句、去标点、一行多长、
-     显示时间都和生成字幕同一套），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
+     显示时间都和生成字幕同一套），**只是不按逗号拆小句**（`AIVoiceoverSubtitles.config` 关掉 `splitsAtClauses`：一句旁白是写稿时定好的一条，
+     放得下就整句一条、放不下才切；2026-10-14 以前在逗号处切出 0.3–1.1 秒的短条，[案例](../bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md)），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
      切不出句子不建空轨；新建的轨记成配音的语言。
 35. **SrtFlow 自己的声音（本机的 Kokoro-82M，CoreML；方案第 44、48–51 条）**：
    - **模块**：`Sources/SrtFlowKokoro/` 从 speech-swift（Apache 2.0，Copyright 2025 Ivan Digital）搬来改过，App 不加第三方依赖；
