@@ -14,7 +14,9 @@ signal(SIGPIPE, SIG_IGN)
 let connection = AppConnection.locate()
 let providersURL = connection.providersURL
 // 清单每回一次都重读那个小文件：用户中途添加 / 删掉 fal 的 Key，下一次就跟着变（方案第 36 条：没配就不列出来）。
-let core = MCPServerCore(serverVersion: connection.appVersion, providers: { MCPProviderMarker.read(at: providersURL) })
+let core = MCPServerCore(
+    serverVersion: connection.appVersion, providers: { MCPProviderMarker.read(at: providersURL) }, catalog: connection.catalog
+)
 let outputLock = NSLock()
 let inFlight = DispatchGroup()
 let callQueue = DispatchQueue(label: "srtflow-mcp.calls", attributes: .concurrent)
@@ -41,6 +43,12 @@ Thread.detachNewThread {
     }
 }
 
+/// 刚换上了 App 那份清单（App 升级过、这个会话里跑的还是旧小程序，`MCPCatalogSync`）：握过手的（老一代）客户端主动告诉它
+/// 清单变了，它会重新要一遍；新一代客户端靠清单上的缓存时间。
+func announceRefreshedCatalog() {
+    if connection.catalog.takeRefreshNotice(), core.hasLegacySession { send(MCPServerCore.toolListChangedNotification) }
+}
+
 /// 处理一条消息；工具调用放到后台去问 App，别的当场回。返回当场能给的回答（批量请求要攒起来）。
 func process(_ message: JSONValue, waitForTools: Bool) -> JSONValue? {
     switch core.handle(message) {
@@ -50,13 +58,15 @@ func process(_ message: JSONValue, waitForTools: Bool) -> JSONValue? {
         return nil
     case .callTool(let call):
         if waitForTools {
-            let result = connection.call(tool: call.name.rawValue, arguments: call.arguments, client: call.client)
+            let result = connection.call(tool: call.name, arguments: call.arguments, client: call.client)
+            announceRefreshedCatalog()
             return core.toolCallResponse(for: call, result: result)
         }
         inFlight.enter()
         callQueue.async {
-            let result = connection.call(tool: call.name.rawValue, arguments: call.arguments, client: call.client)
+            let result = connection.call(tool: call.name, arguments: call.arguments, client: call.client)
             send(core.toolCallResponse(for: call, result: result))
+            announceRefreshedCatalog()
             inFlight.leave()
         }
         return nil

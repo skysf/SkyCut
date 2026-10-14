@@ -153,7 +153,7 @@ enum AIVoiceoverTool {
         let placed = zip(plan.spoken, plan.starts).map { spoken, start in
             AITimelineEdits.PlannedClip(clip: spoken.clip, isAudio: true, target: plan.target, start: start)
         }
-        let config = SubtitleSegmentationConfig.generation(
+        let config = AIVoiceoverSubtitles.config(
             languageCode: plan.language, frameDuration: project.state.frameRate.secondsPerFrame,
             maxLineEms: SubtitleLineFit.ems(for: project.state, appWide: EncodeQueue.burnIn.burnInStyle,
                                             renderSize: project.renderSize)

@@ -132,7 +132,7 @@ enum ClipAnimator {
             state.opacity = r
 
         case .rise:
-            let e = eased(r, phase: phase)
+            let e = eased(r)
             state.opacity = e
             state.offset.y = (1 - e) * riseFraction(intensity: intensity, coversCanvas: coversCanvas)
                 * phase.riseSign
@@ -142,16 +142,16 @@ enum ClipAnimator {
             // 底下那层，而"弹"这件事本身就是缩放，没法靠补偿盖住。
             let amount = popAmount(intensity: intensity, coversCanvas: coversCanvas)
             let start = coversCanvas ? 1 + amount : 1 - amount
-            // 入场用带回弹的 back（冲过头一点再退回来），出场用 easeIn 直接收走
+            // 入场用带回弹的 back（冲过头一点再退回来），出场是不带回弹的入场倒着放：先慢后快直接收走
             // —— 出场再弹一下像没关紧的弹簧。
-            let curve = phase == .entrance ? TextEasing.easeOutBack(r) : TextEasing.easeInCubic(r)
+            let curve = phase == .entrance ? TextEasing.easeOutBack(r) : TextEasing.easeOutCubic(r)
             state.opacity = TextEasing.easeOutCubic(r)
             state.scale = start + (1 - start) * curve
 
         case .zoom:
             // 与 `rise` 同构，只是把"从下面来"换成"从大处来"：入场从 1+a 缓收到 1，
             // 出场继续往前推到 1+a（镜头一直在推，不倒车）。
-            let e = eased(r, phase: phase)
+            let e = eased(r)
             state.opacity = e
             state.scale = 1 + zoomAmount(intensity: intensity) * (1 - e)
 
@@ -162,9 +162,10 @@ enum ClipAnimator {
         }
     }
 
-    /// 入场先快后慢，出场先慢后快 —— 东西该"被抽走"，不是"慢慢停住"。
-    private static func eased(_ r: Double, phase: Phase) -> Double {
-        phase == .entrance ? TextEasing.easeOutCubic(r) : TextEasing.easeInCubic(r)
+    /// 入场先快后慢，出场先慢后快 —— 东西该"被抽走"，不是"慢慢停住"。出场是入场倒着放：`r` 在出场里从 1 倒数到 0，
+    /// 同一条 easeOutCubic 倒着走就是先慢后快（和文字、形状同口径，docs/bugfixes/2026-10-14-exit-animations-front-loaded.md）。
+    private static func eased(_ r: Double) -> Double {
+        TextEasing.easeOutCubic(r)
     }
 
     // MARK: - 预览切片边界

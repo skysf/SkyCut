@@ -75,7 +75,8 @@ private func checkShapeAnimator() {
     near(popEnd.scale, ShapeAnimator.popStartScale, "弹性缩放出场的最后：缩回起手的大小")
     near(popEnd.opacity, 0, "弹性缩放出场的最后：看不见")
     let popHalf = ShapeAnimator.state(for: shape, at: 13.5)
-    near(popHalf.scale, ShapeAnimator.popStartScale + (1 - ShapeAnimator.popStartScale) * TextEasing.easeInCubic(0.5), "出场一半：easeIn 收走")
+    near(popHalf.scale, ShapeAnimator.popStartScale + (1 - ShapeAnimator.popStartScale) * TextEasing.easeOutCubic(0.5),
+         "出场一半：不带回弹的入场倒着放（还没怎么缩）")
 
     shape.animation = ShapeAnimation(entrance: .pop, exit: .wipe, entranceDuration: 1, exitDuration: 1)
     check(ShapeAnimator.state(for: shape, at: 10.6).scale > 1.0001, "弹性缩放入场冲过头（> 1）再回弹")
@@ -161,3 +162,4 @@ private func checkShapeDrawing() {
     }
     check(faded.reveal == nil, "没在擦除也没在画：不裁")
 }
+

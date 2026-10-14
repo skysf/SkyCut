@@ -498,6 +498,7 @@ xcrun swiftc \
   checks/MCP/ScreenRecordingToolChecks.swift \
   checks/MCP/ProjectBindingChecks.swift \
   checks/MCP/HangChecks.swift \
+  checks/MCP/CatalogSyncChecks.swift \
   checks/MCP/VideoSizeChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \

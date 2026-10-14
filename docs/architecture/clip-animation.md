@@ -23,6 +23,10 @@ Inspector 里每个画面段的 **Animation** 区：In / Out 各选一种效果 
 | Zoom | 缩放（`easeOutCubic` 缓推） | 是 |
 | Wipe | 裁切矩形斜坡（横向揭开） | 否 |
 
+**出场是入场倒着放**：Rise / Pop / Zoom 的出场用和入场同一条 `easeOutCubic`，作用在倒数的进度上 —— 时间上先慢后快（被抽走，
+不是慢慢停住）；Pop 的出场不带回弹。和文字、形状同一个口径（2026-10-14 以前出场写成 easeIn(剩余进度)，反倒先快后慢，
+[案例](../bugfixes/2026-10-14-exit-animations-front-loaded.md)）。Fade 是线性的（和 ffmpeg 的 `fade` 逐帧对齐），两头本来就对称。
+
 **模糊 / 对焦不在列**：预览侧的图层指令没有逐帧滤镜这一说，要做只能自建
 `AVVideoCompositing` 合成器（轻量化原则那一档，需用户批准）。导出侧倒能用
 `sendcmd` 逐帧发 `gblur` 的 sigma 凑出来，但那样预览看不到模糊，违反同账。

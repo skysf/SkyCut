@@ -17,7 +17,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 
 1. **工具清单只有一份**（`MCPToolName`）。小程序回清单读它，App 分派也 switch 它 —— 两边都是穷举，
    加一个工具漏了哪一边编译不过。**清单必须由小程序给**：Claude 一启动就要清单，不能为了列清单把
-   SrtFlow 拉起来。
+   SrtFlow 拉起来。**App 升级之后会话里跑的还是旧小程序**（它是客户端开会话时启动的进程）：App 的每个回答带上自己清单的指纹
+   （`MCPBridge.Response.catalog` = `MCPCatalogSync.fingerprint`），小程序发现和自己的不一样就向 App 要它的清单（`MCPBridge.catalogTool`，
+   App 在收发线程上当场答、不经主线程），从此按它回 `tools/list`、认它的工具名（新工具照样转给 App），老一代客户端发一次 `list_changed`，
+   那一次的结果里说一句；总说明只在握手时给，换不了（[案例](../bugfixes/2026-10-14-stale-helper-tool-list.md)）。这只救得了带着这套逻辑的小程序：
+   这一版以前的小程序照旧要重开会话。
 2. **选项词表**（转场、滤镜、文字动画、画面比例、帧率、分辨率）小程序拿不到 App 的类型，只能在
    `MCPVocabulary` 里抄一份 —— 抄的就会漂，`scripts/check-mcp.sh` 逐项和 App 的 `allCases` 对账。
 3. **说明文字用英文，一个汉字都不夹**（模型读英文最准；AI 回用户时用用户的语言；2026-09-30 用户定：中文占 token，
@@ -477,7 +481,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **词**（`AIVoiceWords`，纯值）：标点也会被报成一个词，并进前一个词；词尾 = 下一个词的开头再往回收掉静音；写法照识别器
      （英文词带前面的空格、标点贴在后面）。
    - **字幕**（`subtitles=true`，`AIVoiceoverSubtitles`，纯值）：词直接喂 `SubtitleSegmenter.segment` + `assemble`（断句、去标点、一行多长、
-     显示时间都和生成字幕同一套），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
+     显示时间都和生成字幕同一套），**只是不按逗号拆小句**（`AIVoiceoverSubtitles.config` 关掉 `splitsAtClauses`：一句旁白是写稿时定好的一条，
+     放得下就整句一条、放不下才切；2026-10-14 以前在逗号处切出 0.3–1.1 秒的短条，[案例](../bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md)），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
      切不出句子不建空轨；新建的轨记成配音的语言。每句记下是哪段配音生成的（`CueMeta.provenance`）：联动开着时挪 / 删配音段，字幕跟着走
      （[联动](timeline-linkage.md) 规矩 11，[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)）。
 35. **SrtFlow 自己的声音（本机的 Kokoro-82M，CoreML；方案第 44、48–51 条）**：
