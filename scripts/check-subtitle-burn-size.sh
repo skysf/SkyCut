@@ -50,6 +50,8 @@ xcrun swiftc \
   Sources/SrtFlow/MediaFormatting.swift \
   Sources/SrtFlow/AppLanguage.swift \
   Sources/SrtFlow/FontCatalog.swift \
+  Sources/SrtFlow/SubtitleFont.swift \
+  Sources/SrtFlow/FontFamilyNames.swift \
   Sources/SrtFlow/FontCmapSanity.swift \
   checks/SubtitleBurnSize/CmapSanityChecks.swift \
   checks/SubtitleBurnSize/ShadowChecks.swift \

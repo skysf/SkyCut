@@ -101,6 +101,8 @@ echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} �
 # 路由、窗口、几个会话、App 卡住的扫描在单独一个文件里（这个脚本超过了 600 行的上限）；它定义的 ROUTER 下面还要用。
 # shellcheck source=checks/MCP/router-wiring.sh
 source checks/MCP/router-wiring.sh
+# shellcheck source=checks/MCP/tool-result-wiring.sh
+source checks/MCP/tool-result-wiring.sh
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -405,6 +407,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIKeyframes.swift \
   Sources/SrtFlow/AIShapeEdits.swift \
   Sources/SrtFlow/AIDuplicate.swift \
+  Sources/SrtFlow/AITransitionReport.swift \
+  Sources/SrtFlow/AIUnreadableVideo.swift \
   Sources/SrtFlow/AIMusicCredits.swift \
   Sources/SrtFlow/AudioLibraryManifest.swift \
   Sources/SrtFlow/AIEncodeOptions.swift \
@@ -435,6 +439,8 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditPlacementDefault.swift \
   Sources/SrtFlow/AISubtitleEdits.swift \
   Sources/SrtFlow/AISubtitleStyle.swift \
+  Sources/SrtFlow/SubtitleFont.swift \
+  Sources/SrtFlow/FontFamilyNames.swift \
   Sources/SrtFlow/AIClientConfigFiles.swift \
   Sources/SrtFlow/AIReadGrants.swift \
   Sources/SrtFlow/AIUndoGrouping.swift \
@@ -476,6 +482,8 @@ xcrun swiftc \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/DuplicateChecks.swift \
+  checks/MCP/TransitionReportChecks.swift \
+  checks/MCP/UnreadableVideoChecks.swift \
   checks/MCP/MusicLibraryChecks.swift \
   checks/MCP/EncodeChecks.swift \
   checks/MCP/TranscriptFormatChecks.swift \

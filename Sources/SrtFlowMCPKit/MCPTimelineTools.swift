@@ -133,7 +133,7 @@ public enum MCPTimelineTools {
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to copy.", minItems: 1),
                     "start": MCPSchema.number("Timeline time for the earliest copy.", minimum: 0),
-                    "track": MCPSchema.string("V1, V2… or A1, A2…: where the copied clips should go.")
+                    "track": MCPSchema.string("V1, V2… or A1, A2… (the next number opens a new track): where the copied clips should go.")
                 ], required: ["ids"])
             )
         case .setTransition:

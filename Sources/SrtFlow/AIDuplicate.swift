@@ -35,10 +35,11 @@ enum AIDuplicate {
         return selection
     }
 
-    /// 复制一份，最早的那一样落在 `start`（不给就紧接着这一批的结尾）。`pointing`：剪辑要放的轨（只有一组剪辑时才听它，
-    /// 同手动粘贴）。一样都没落下去就抛错。
+    /// 复制一份，最早的那一样落在 `start`（不给就紧接着这一批的结尾）。`track`：剪辑要放的轨（只有一组剪辑时才听它，
+    /// 同手动粘贴），名字同 add_clips —— V1、V2…、A1、A2… 是现有的轨，正好比现有的多一条（只有 A1 时写 A2）或
+    /// new_video / new_audio 就新开一条。一样都没落下去就抛错。
     static func apply(
-        _ selection: Selection, to state: inout TimelineState, at start: Double?, pointing: TrackSlot?
+        _ selection: Selection, to state: inout TimelineState, at start: Double?, track: String?
     ) throws -> TimelinePasteResult {
         guard let payload = TimelineClipboardPayload(
             copying: state, clips: selection.clips, shapes: selection.shapes, texts: selection.texts,
@@ -46,7 +47,30 @@ enum AIDuplicate {
         ), let end = payload.end else {
             throw AIToolError("There is nothing to duplicate in those ids.")
         }
+        var fresh: UUID?
+        var pointing: TrackSlot?
+        if let track {
+            // 新开的那条先放一条空轨指着它（粘贴只认现有的轨）；复制出来的没落在它上面（比如复制的是画面、指着的是
+            // 新音频轨），收尾时收掉，不留空轨。2026-10-06 盲测：写 A2 被当成「没有这条轨」、还叫人去用 set_track。
+            switch try AITrackName.target(track, in: state) {
+            case .main: pointing = .main
+            case .overlay(let index): pointing = .overlay(index)
+            case .audio(let index): pointing = .audio(index)
+            case .newOverlayTop:
+                fresh = state.insertLane(audio: false, at: state.overlayTracks.count, clips: [])
+                pointing = .overlay(state.overlayTracks.count - 1)
+            case .newAudioBottom:
+                fresh = state.insertLane(audio: true, at: state.audioTracks.count, clips: [])
+                pointing = .audio(state.audioTracks.count - 1)
+            default:
+                throw AIToolError("track must be V1, V2…, A1, A2…, new_video or new_audio.")
+            }
+        }
         let result = TimelinePaste.apply(payload, to: &state, at: max(0, start ?? end), pointing: pointing.map { .track($0) })
+        if let fresh {
+            state.overlayTracks.removeAll { $0.id == fresh && $0.clips.isEmpty }
+            state.audioTracks.removeAll { $0.id == fresh && $0.clips.isEmpty }
+        }
         guard !result.isEmpty else { throw AIToolError("SrtFlow could not place the copies.") }
         return result
     }

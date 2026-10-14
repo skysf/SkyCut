@@ -43,7 +43,9 @@ enum AILookShots {
             }
             scanned = AIShotScan.cached(target.url)
         }
-        guard let scanned else { throw AIToolError("SrtFlow could not find the shots in \(target.url.lastPathComponent).") }
+        guard let scanned else {
+            throw AIToolError(await AIUnreadableVideo.problem(for: target.url) ?? "SrtFlow could not find the shots in \(target.url.lastPathComponent).")
+        }
 
         let upper = min(target.range.upperBound, scanned.duration)
         let lower = min(target.range.lowerBound, upper)
