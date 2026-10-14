@@ -729,6 +729,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     守卫：`checks/MCP/ClipFileSwapChecks.swift`（换视频 / 图片 / 声音、关键帧和标记跟着平移、几种拒绝都不改段、伙伴不跟换文件）、
     `checks/MCP/clip-file-wiring.sh`（读参数、画面按换完的那段放、只在 AIClipEdit 落到段上）。
 
+49. **导出字幕文件（`export_subtitles`，2026-10-15 用户拍板：独立工具、第一版不做 ASS）**：导出面板「高级」里「导出字幕文件」的 AI 版
+    （以前 AI 只能在 export_video 里选烧不烧，要 .srt 只能叫用户去点）。规矩（`AISubtitleFileExport`，起名是纯值的 `AISubtitleFiles`）：
+    ① **一条轨一份**，`track` = original / translation / both（默认 both = 有句子的每一条）；点名的轨没有句子就报错并说该先用哪个工具。
+    双语合在一个文件里不做（那只给烧录用）。
+    ② **名字和导出面板同一个函数**：`<名字>.<语言>.<格式>`（`SubtitleExportPlanner.fileName`），名字默认工程名（同 export_video 的
+    `AIExportTools.defaultName`），AI 传导出的视频的名字就和视频配成一对、播放器自动挂上；默认放 export_video 的那个文件夹，`folder` 可改。
+    两份同一个语言标签（或都没有）时译文那份用 `translation`，免得同名互相盖掉。
+    ③ **从不覆盖**（第 34 条）：任何一份已经有了，整组换成 `<名字> 2`、`<名字> 3`……，几份还是一套；写盘走界面那一条
+    （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验 → 原子替换）。
+    ④ **和预览、烧录、界面导出同一份句子**（`subtitleDocument(for:)`）：藏起来的句子不写；时间是时间线秒，正好对上从这条时间线导出的视频。
+    ⑤ 不改工程：不是一步撤销、不摆窗口；碰工程（读它的字幕），所以照第 46 条核对会话的工程。格式词表 `MCPVocabulary.subtitleFileFormats`
+    （srt / vtt）是 `SubtitleFormat` 的扩展名。
+    守卫：`checks/MCP/SubtitleFileChecks.swift`（选哪几条轨、起名、同标签时译文叫 translation、撞名整组加编号、词表对账）、
+    `checks/MCP/tool-result-wiring.sh`（写盘只经 writeValidated、读去掉藏起来句子的那份、起名经 AISubtitleFiles）。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **一轮按时间划分**：服务器看不到对话。AI 开始改工程时开一轮、存一份时间线快照；30 秒没有新调用算结束，
@@ -903,6 +918,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
       再让 AI 压：AI 说要你先开始或移掉，你那条没被启动。
 - [ ] 让 AI 把一个 .srt 烧进对应的视频：字幕的样子和烧录页预览里一样；让 AI 把一批 .srt 转成 .vtt：`SrtFlow/导出` 里
       多出同名 .vtt，原来的文件没动。
+- [ ] 有原文和译文的工程，让 AI 导出视频再导出字幕文件（export_subtitles，name 用视频的名字）：`SrtFlow/导出` 里视频旁边多出
+      `<名字>.<语言>.srt` 两份，IINA / VLC 打开视频自动挂上、时间对得上；藏起来的句子不在里面；再导一次是 `<名字> 2.…`，前一套没被盖掉。
 - [ ] 让 AI 转写一节课（transcribe）：第一次回任务号、等完再调一次秒回；句子的时间点下去，预览里说的正是那句。
 - [ ] 让 AI 把一段口播的停顿缩短、去掉口头禅（cut_speech）：听起来不吞字、不切半个词，停顿处还留一点气口；⌘Z 一步整个回来；
       片段分离过声音时，画面和声音在同样的地方剪。
