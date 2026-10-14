@@ -4,7 +4,7 @@ import Foundation
 import SrtFlowCore
 
 // 二、真导出：黑底上一个白色圆环（描边），0.5 秒起、2 秒长，入场「画出来」0.8 秒、出场「淡出」0.6 秒，30fps。
-// 抽帧量四个钟点上的亮度：入场画到一半时只有右半圈、中间一整圈、出场淡到一半时只剩约一成亮、段外全黑。
+// 抽帧量四个钟点上的亮度：入场画到一半时只有右半圈、中间一整圈、出场淡到一半时还有近九成亮（先慢后快）、段外全黑。
 // 抽的帧离边界都隔着好几帧，差一帧也不会让结论翻转 —— 这里守的是「动画真的进了成片、落在对的那一截」，
 // 逐像素长什么样是 Parity.swift 的事（导出的每一帧就是 ShapePNGRenderer 那张图）。
 
@@ -146,9 +146,10 @@ func runExportChecks() async {
     // 中间（1.6 秒，第 48 帧）：一整圈。
     let whole = [twelve, three, six, nine].map { at($0, 48) }
     check(whole.allSatisfy { $0 > 0.7 }, "中间一整圈都亮（\(whole)）")
-    // 出场淡到一半（2.2 秒，第 66 帧）：不透明度 easeIn(0.5) = 0.125，量相对亮度（不管色彩范围怎么换算）。
+    // 出场淡到一半（2.2 秒，第 66 帧）：出场是入场倒着放、先慢后快，不透明度 easeOutCubic(0.5) = 0.875，量相对亮度
+    //（不管色彩范围怎么换算）。以前出场先快后慢，这一帧只剩一成。
     let dark = at(nine, 9), bright = at(twelve, 48), fading = at(twelve, 66)
     let relative = (fading - dark) / max(0.01, bright - dark)
-    check(relative > 0.05 && relative < 0.25, "出场淡到一半只剩一成左右的亮（相对亮度 \(relative)）")
+    check(relative > 0.75 && relative < 0.97, "出场淡到一半还有近九成的亮（相对亮度 \(relative)）")
     check(at(twelve, 81) < 0.15, "段结束之后（2.7 秒）没有圆环")
 }
