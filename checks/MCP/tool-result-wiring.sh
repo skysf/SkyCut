@@ -40,4 +40,11 @@ if [ "$(grep -c 'AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(i
   echo "✗ Sources/SrtFlow/AIPictureProbe.swift 去黑边没按每边的读数合起来" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来"
+# Kokoro 的语速按时长对准：先按 1 倍读一遍、再按 KokoroSpeedCalibration 调给模型的 speed（模型的 speed 按格取整、只慢一点点，
+# docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
+if [ "$(grep -c 'KokoroSpeedCalibration.next(target: target, tried: tried)' Sources/SrtFlow/KokoroVoiceSpeech.swift || true)" -ne 1 ] \
+   || [ "$(grep -c 'let normal = try renderOnce(text, language: language, voice: voice, speed: 1, engine: engine)' Sources/SrtFlow/KokoroVoiceSpeech.swift || true)" -ne 1 ]; then
+  echo "✗ Sources/SrtFlow/KokoroVoiceSpeech.swift 不按时长对准语速：要的 speed 原样给模型，读出来常常只慢一点点" >&2
+  exit 1
+fi
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；Kokoro 语速按时长对准"

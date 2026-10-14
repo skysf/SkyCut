@@ -375,6 +375,7 @@ xcrun swiftc \
   Sources/SrtFlow/KokoroVoicePieces.swift \
   Sources/SrtFlow/KokoroVoicePadding.swift \
   Sources/SrtFlow/KokoroVoiceAssembly.swift \
+  Sources/SrtFlow/KokoroSpeedCalibration.swift \
   Sources/SrtFlow/KokoroVoiceManifest.swift \
   Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIVoiceLevel.swift \
@@ -481,6 +482,7 @@ xcrun swiftc \
   checks/MCP/SubtitleStyleChecks.swift \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/KokoroChecks.swift \
+  checks/MCP/KokoroSpeedChecks.swift \
   checks/MCP/DuplicateChecks.swift \
   checks/MCP/TransitionReportChecks.swift \
   checks/MCP/UnreadableVideoChecks.swift \

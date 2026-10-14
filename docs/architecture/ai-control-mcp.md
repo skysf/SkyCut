@@ -462,7 +462,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      只有默认质量时结果里带「去系统设置哪儿下载」，总说明要求 AI 转告。Eloquence 那一族、老的 speech.synthesis.voice 那一族、新奇声音、
      个人声音都不用。也认系统声音的名字。活泼的音调略高（1.08）、沉稳的略低（0.94）。
    - **语速不是线性的**：`AVSpeechUtterance.rate` 0.5 = 正常，0.55 已经快 1.29 倍，0.3 只慢到 0.77 倍，中间有平台；和声音无关。按实测的表
-     （`AIVoiceChoice.measuredRates`）插值反查。
+     （`AIVoiceChoice.measuredRates`）插值反查。**Kokoro 也不线性**：模型把每个音的时长除以 speed 再取整到 25 毫秒一格、停顿不跟着变，要 0.85
+     常常只慢 5–7%，所以按时长对准（`KokoroSpeedCalibration`）：先按 1 倍读一遍，目标 = 1 倍的时长 ÷ speed，按读出来的长短调给模型的 speed，
+     差 3% 以内就停、最多再读四次（两边都有了就夹在中间插值，不外推；[案例](../bugfixes/2026-10-14-kokoro-speed-barely-changes.md)）。
    - **合成**（`AISpeechSynthesis`）：`AVSpeechSynthesizer.write` 读成 PCM（不出声）、存成 AAC 的 .m4a。**词的标记只从代理方法
      `speechSynthesizer(_:willSpeak:utterance:)` 来**，`write(_:toBufferCallback:toMarkerCallback:)` 那个回调在 macOS 26 上一次都没叫过；
      `byteSampleOffset` 是字节，除以每帧字节数（单声道 Float32 = 4）就是第几帧，和声音对得上（停顿后第一个词正好落在静音结束处）。
