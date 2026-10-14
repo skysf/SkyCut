@@ -12,6 +12,7 @@ func runVoiceChecks() {
     wordChecks()
     placementChecks()
     subtitleChecks()
+    wholeLineChecks()
 }
 
 private func voice(_ name: String, _ language: String, _ gender: AIVoiceChoice.Voice.Gender, _ quality: Int,
@@ -150,4 +151,29 @@ private func subtitleChecks() {
         language: "zh", config: config, to: &untouched
     )
     check(nothing.added.isEmpty && untouched.subtitle == nil, "no lines: no empty subtitle track is created")
+}
+
+/// 一句旁白一条字幕（2026-10-06 盲测：南极片的中文旁白在逗号处切成两条一秒出头的半句，
+/// docs/bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md）。词是 Kokoro 的 zm_yunxi 真读出来的时刻（2026-10-14 实测，
+/// 一个字一个词、逗号贴在前一个字后面）。生成字幕的老规矩（按逗号拆小句）不变，只是配音的字幕不拆；放不下（竖屏窄）才切，照样切在逗号后面。
+private func wholeLineChecks() {
+    let timed: [(String, Double, Double)] = [
+        ("在", 0.05, 0.20), ("地", 0.20, 0.28), ("球", 0.28, 0.45), ("的", 0.45, 0.57), ("最", 0.57, 0.75), ("南", 0.75, 0.90),
+        ("端，", 0.90, 1.10), ("冰", 1.27, 1.40), ("统", 1.40, 1.55), ("治", 1.55, 1.68), ("着", 1.68, 1.77), ("一", 1.80, 1.90),
+        ("切。", 1.90, 2.13)
+    ]
+    let words = timed.map { TimedWord(text: $0.0, start: $0.1, end: $0.2) }
+    let piece = AIVoiceoverSubtitles.Piece(clipID: UUID(), timelineStart: 0, duration: 2.345, laneRank: 1, words: words)
+    func texts(_ config: SubtitleSegmentationConfig) -> [String] {
+        var state = TimelineState()
+        _ = AIVoiceoverSubtitles.add([piece], language: "zh", config: config, to: &state)
+        return state.subtitleCues(of: .original).map(\.text)
+    }
+    let wide = AIVoiceoverSubtitles.config(languageCode: "zh", frameDuration: 1.0 / 30, maxLineEms: 28)
+    checkEqual(texts(wide), ["在地球的最南端 冰统治着一切"], "a voiceover line that fits is one subtitle, not split at its comma")
+    let generated = SubtitleSegmentationConfig.generation(languageCode: "zh", frameDuration: 1.0 / 30, maxLineEms: 28)
+    checkEqual(texts(generated), ["在地球的最南端", "冰统治着一切"],
+               "transcribed subtitles still split at the comma (the generation rule is unchanged)")
+    let narrow = AIVoiceoverSubtitles.config(languageCode: "zh", frameDuration: 1.0 / 30, maxLineEms: 8)
+    checkEqual(texts(narrow), ["在地球的最南端", "冰统治着一切"], "a line that does not fit (narrow 9:16) is cut, after the comma")
 }

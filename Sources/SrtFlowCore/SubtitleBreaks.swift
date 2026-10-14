@@ -57,9 +57,9 @@ enum SubtitleBreaks {
     ) -> [Range<Int>] {
         guard !sentence.isEmpty else { return [] }
         let allowed = wordBoundaries(sentence)
-        let merged = mergeShortClauses(
-            clauseRanges(sentence), in: sentence, availableEnd: availableEnd, config: config
-        )
+        // 配音的字幕不按逗号拆：整句当一个小句，放不下才切（`splitsAtClauses`）。
+        let clauses = config.splitsAtClauses ? clauseRanges(sentence) : [0 ..< sentence.count]
+        let merged = mergeShortClauses(clauses, in: sentence, availableEnd: availableEnd, config: config)
         // 太短的小句并不进去（并了放不下）：一条一个小句在这里已经保不住了，整句一起挑切法 —— 逗号处算好断点、
         // 每条按能在屏上留多久罚，比让那个小句自己成条、旁边的再各切各的好（2026-09-30：「Darling, just dive right in.」
         // 在一行两个词的宽度下切成「Darling / just / dive right in」，「just」只留 0.1 秒）。
