@@ -7,8 +7,11 @@ import Foundation
 // 窗中心的一串点（平滑过、精简过）→ 裁切 + 摆放框 + 摆放框中心的关键帧。第四块「横竖屏转换按人脸裁」
 // （方案第 11 条）；第二块只有固定的窗、走动大了只提醒（第二块报告的已知不足）。
 // 口径：
-// - **只跟人脸和人**：「显眼的东西」一帧一跳（2026-09-28 冒烟：企鹅那段没人脸，窗从最左甩到最右），它只用来定固定的窗。
-//   大半的帧（`seenShare`）认出了人、而且散开超过窗宽 / 窗高的 `followOver` 才跟：走动小的一个固定的窗就框得住，
+// - **只跟人脸、人和字**：「显眼的东西」一帧一跳（2026-09-28 冒烟：企鹅那段没人脸，窗从最左甩到最右），它只用来定固定的窗。
+//   字（2026-10-14 用户拍板「跟拍跟着文字」）：没有人、字多（`AISubjectFocus.isTextHeavy`）的帧对准字合起来的中间 ——
+//   幻灯片翻页、录屏滚动和换窗口时窗跟过去；`textFirst`（focus=text）每一帧都只看字。字一帧一帧认出来的框也会抖，
+//   但它和人一样是「这一帧的内容在哪」，平滑和按镜头分段照旧管用。
+//   大半的帧（`seenShare`）认出了人或字、而且散开超过窗宽 / 窗高的 `followOver` 才跟：走动小的一个固定的窗就框得住，
 //   不打关键帧（主轨上带关键帧的段导出时要先渲一遍中间片，能不打就不打）。
 // - 素材里有切点（换镜头）：每个镜头各自平滑、各自精简，在切点前一帧和切点上各打一个关键帧 —— 跳过去，不从上一个镜头
 //   平移过去（同一次冒烟：企鹅那段中间有一刀）。
@@ -37,11 +40,12 @@ enum AIFollowSubject {
         var center: CGPoint
     }
 
-    /// 每个样本对准哪：只认人脸和人（没认出人的那几帧，沿用前后最近认出人的那一帧）；`seen` = 认出人的帧数。
-    /// 一帧都没认出人 → 空。
-    static func targets(_ samples: [Sample], window: CGSize) -> (points: [Point], seen: Int) {
+    /// 每个样本对准哪：人脸、人、字（`AISubjectFocus.focus` 的次序；`textFirst` = focus=text，只看字），不认「显眼的东西」；
+    /// 没认出的那几帧沿用前后最近认出来的那一帧；`seen` = 认出来的帧数。一帧都没认出 → 空。
+    static func targets(_ samples: [Sample], window: CGSize, textFirst: Bool = false) -> (points: [Point], seen: Int) {
         let aims: [CGPoint?] = samples.map { sample in
-            guard let aim = AISubjectFocus.focus(in: sample.findings, window: window), aim.kind != .salient else { return nil }
+            guard let aim = AISubjectFocus.focus(in: sample.findings, window: window, textFirst: textFirst),
+                  aim.kind != .salient else { return nil }
             return aim.point
         }
         let seen = aims.filter { $0 != nil }.count

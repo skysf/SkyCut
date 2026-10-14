@@ -194,6 +194,15 @@ if grep -nE 'queue\.(settings|burnInStyle|outputDirectory|attachSoftSubtitleTrac
 fi
 echo "   ✓ 自带设置先用、输出位置不被重算、有用户没开始的条目就不排、不改页面上的设置"
 
+echo "==> 跟拍跟着字：focus=text 也跟，跟的目标按同一个次序认字"
+# 2026-10-14 用户拍板（docs/architecture/ai-control-mcp.md 第四节第 31 条）；纯值在 checks/MCP/FollowChecks.swift。
+if grep -q 'follow: request.follow && request.focus != .text' Sources/SrtFlow/AIClipTools.swift \
+   || [ "$(grep -c 'AIFollowSubject.targets(samples, window: window.size, textFirst: textFirst)' Sources/SrtFlow/AIClipTools.swift || true)" -ne 1 ]; then
+  echo "✗ Sources/SrtFlow/AIClipTools.swift 跟拍又不跟字了（focus=text 不跟，或跟的目标不按 textFirst 认）" >&2
+  exit 1
+fi
+echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
+
 echo "==> 什么时候问：只有删文件，外加点名文件夹以外的文件问一次、记住那个文件夹"
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
 # 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）、开着的工程没存过就先存下来再换，这两样都不问。

@@ -62,7 +62,7 @@ enum AIClipTools {
             if request.fit == .fill, focus == nil, request.focus != .center,
                let found = await subjectFocus(
                    clip, canvas: canvas, active: AIFrameFit.region(of: crop ?? nil), textFirst: request.focus == .text,
-                   follow: request.follow && request.focus != .text, frame: state.frameRate.secondsPerFrame * clip.speed
+                   follow: request.follow, frame: state.frameRate.secondsPerFrame * clip.speed
                ) {
                 focus = found.point
                 followed = found.followed
@@ -151,7 +151,7 @@ enum AIClipTools {
         let subject = AISubjectFocus.combine(samples.map(\.findings), window: window.size, textFirst: textFirst)
         var followed: AIFrameFit.Framing?
         if follow, !clip.isStillImage {
-            let targets = AIFollowSubject.targets(samples, window: window.size)
+            let targets = AIFollowSubject.targets(samples, window: window.size, textFirst: textFirst)
             if AIFollowSubject.needsFollow(targets, window: window.size) {
                 let cuts = await AIShotScan.cuts(of: clip)
                 let path = AIFollowSubject.path(targets.points, window: window.size, active: active, cuts: cuts, frame: frame)
