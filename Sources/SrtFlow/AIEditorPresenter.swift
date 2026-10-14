@@ -15,13 +15,27 @@ import SwiftUI
 
 @MainActor
 enum AIEditorPresenter {
-    /// 主窗口出现时存下来的「打开主窗口」动作。主窗口被用户关掉之后，只有它能把窗口开回来
-    /// （`openWindow` 只在 SwiftUI 视图里拿得到）。
+    /// 「打开主窗口」的动作（`openWindow` 只在 SwiftUI 视图里拿得到）。主窗口被用户关掉之后，只有它能把窗口开回来。
+    /// 两处存：主窗口出现时（MainWindowView），和菜单建好时（`noteMenuOpenWindow`，比窗口还早 —— 窗口从没出现过也开得回来）。
     static var openMainWindow: OpenWindowAction?
+
+    /// 菜单里拿到的「打开主窗口」：菜单一建好就有。只在还没有的时候存（主窗口那一份优先）。
+    static func noteMenuOpenWindow(_ action: OpenWindowAction) {
+        if openMainWindow == nil { openMainWindow = action }
+    }
+
+    /// 刚启动时窗口还没建好，最多等这么久（2026-10-06 盲测：内存吃紧的机器上小程序拉起 App 8 秒后还没有主窗口）。
+    static let launchWindowWait: TimeInterval = 10
 
     /// 改工程之前调一次。`bringForward`：这是一轮的第一步（路由按 `AISession` 判断）。
     static func prepareEditor(project: VideoEditProject, bringForward: Bool) async throws {
         let windowState = MainWindowState.shared
+        // 小程序刚把 App 拉起来：主窗口、「打开主窗口」的动作可能都还没有，等一会儿再说「关着」。
+        let deadline = Date().addingTimeInterval(launchWindowWait)
+        while mainWindow() == nil, openMainWindow == nil, Date() < deadline {
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        var reopened = false
         if let window = mainWindow() {
             if bringForward {
                 if windowState.section != .videoEdit { windowState.section = .videoEdit }
@@ -32,14 +46,37 @@ enum AIEditorPresenter {
         } else if let open = openMainWindow {
             if windowState.section != .videoEdit { windowState.section = .videoEdit }
             open(id: WindowID.main)
+            await placeReopenedWindow()
+            reopened = true
         } else {
-            throw AIToolError("SrtFlow's main window is closed. Ask the user to open it (Edit Video in the File menu, or Command-3).")
+            throw AIToolError(
+                "SrtFlow's main window is closed and SrtFlow could not open it. Ask the user to open it (File > Edit Video, "
+                    + "or \(editVideoShortcut)), then call again."
+            )
         }
         // 剪辑页出现时才把窗口的撤销管理器交给工程（VideoEditView.onAppear）；没有它，
-        // AI 的改动进不了 ⌘Z。从没出现过的话，这一轮中途也得切过去；刚切过去的这一拍它还没出现，等一小会儿。
+        // AI 的改动进不了 ⌘Z。从没出现过的话，这一轮中途也得切过去；刚切过去（或窗口刚开回来、系统又忙）时它还没出现，等一会儿。
         if project.undoManager == nil, windowState.section != .videoEdit { windowState.section = .videoEdit }
-        for _ in 0..<40 where project.undoManager == nil {
+        let undoDeadline = Date().addingTimeInterval(reopened ? launchWindowWait : 1)
+        while project.undoManager == nil, Date() < undoDeadline {
             try? await Task.sleep(nanoseconds: 25_000_000)
+        }
+    }
+
+    /// 剪辑页的快捷键：菜单里「Edit Video」那一项（SrtFlowApp）用的那个键，check-mcp.sh 对账。
+    static let editVideoShortcut = "Command-1"
+
+    /// 开回来的窗口放哪：从不激活 App（键盘留在用户那边）。看得见时摆到最前面；后台模式、正在录屏时放到所有窗口后面 ——
+    /// 开回来只是为了让改动进得了 ⌘Z，不该盖住用户在看的窗口、也不该被录进去。
+    private static func placeReopenedWindow() async {
+        for _ in 0..<20 where mainWindow() == nil {
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+        guard let window = mainWindow() else { return }
+        if AISession.shared.viewMode == .background || ScreenRecordingCoordinator.shared.isBusy {
+            window.orderBack(nil)
+        } else {
+            window.orderFrontRegardless()
         }
     }
 
