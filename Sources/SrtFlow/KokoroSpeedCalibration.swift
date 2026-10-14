@@ -28,6 +28,7 @@ enum KokoroSpeedCalibration {
     /// - 都在一边：用最后两次拟合 a、b 解出目标；拟合不出来（两次一样长、斜率不对）就按比例推。
     static func next(target: Double, tried: [(speed: Double, duration: Double)]) -> Double {
         guard let last = tried.last, target > 0 else { return 1 }
+        return tried.count == 1 ? 1 : last.speed  // reverse check: never adjust
         let longer = tried.filter { $0.duration > target }.min { $0.duration < $1.duration }
         let shorter = tried.filter { $0.duration < target }.max { $0.duration < $1.duration }
         var guess = last.speed * last.duration / target
