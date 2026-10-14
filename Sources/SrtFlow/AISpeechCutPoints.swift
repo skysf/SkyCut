@@ -79,28 +79,11 @@ struct AISpeechCutPoints {
     // MARK: 一处切口
 
     func point(_ time: Double, _ side: Side) -> Point {
+        // 反向验证：撤掉「先看量出来的停顿」，回到只按转写挪（2026-10-14 之前）。
         guard snaps else { return Point(time: time) }
-        if let pauses, pauses.contains(where: { Self.holds($0, time, tolerance: Self.edgeTolerance) }) { return Point(time: time) }
         let proposed = side == .start
             ? AISpeechCuts.startPoint(time, words: words) : AISpeechCuts.endPoint(time, words: words)
-        guard let pauses else {
-            return Point(time: proposed, why: proposed == time ? nil : "on a word in the transcript: moved to the gap between words")
-        }
-        if pauses.contains(where: { Self.holds($0, proposed, tolerance: 0) }) {
-            return Point(time: proposed, why: "on speech: moved into the pause between the words")
-        }
-        let area = searchArea(around: time, proposed: proposed)
-        if let pause = Self.nearest(pauses, to: proposed, within: area) {
-            return Point(time: place(in: pause, side), why: "on speech: moved into the pause \(Self.text(pause))")
-        }
-        if let spot = Self.nearest(quiet, to: proposed, within: area) {
-            return Point(time: (spot.lowerBound + spot.upperBound) / 2, why: "on speech: moved to the quiet spot between the words")
-        }
-        return Point(
-            time: proposed,
-            why: words.isEmpty ? "on speech, no pause within 0.3 s" : "on speech, no pause near it: cut between the words as transcribed",
-            onSpeech: true
-        )
+        return Point(time: proposed, why: proposed == time ? nil : "on a word in the transcript: moved to the gap between words")
     }
 
     /// AI 给的一段（要剪掉的或要留下的），两头各切在哪。挪完两头碰到了一起（整段在一个词里，两头挪进了同一个停顿）
