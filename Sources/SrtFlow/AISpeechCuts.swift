@@ -4,7 +4,8 @@ import SrtFlowCore
 // MARK: - cut_speech：要剪掉哪几截、怎么剪（纯值）
 //
 // 管什么：一段口播（V1 上的片段）要剪掉的区间 —— AI 点名要删 / 要留的（按文字剪：时间从 transcribe 来）、太长的停顿、
-// 口头禅、说重了的词 —— 合并成一串切口，再落到时间线上。切口都落在**词和词之间的空隙中点**（离词最多 0.3 秒）：
+// 口头禅、说重了的词 —— 合并成一串切口，再落到时间线上。切口落在哪归 `AISpeechCutPoints`：先看量出来的停顿，
+// 转写只用来认词（这里的 `startPoint` / `endPoint` 是转写那一半：词和词之间的空隙中点，离词最多 0.3 秒）——
 // 不切半个词，两边各留一点气口。落到时间线上用的是手动那一套：从最后一刀往前，`LinkRegrouping.split` 切开、
 // `AITimelineEdits.delete` 带波纹删掉中间那块 —— 后面的 V1 片段往前补，**链接的声音不管开关都跟着切**
 // （剪口播剪到画面和声音对不上，不会是 AI 想要的）。
@@ -23,7 +24,7 @@ enum AISpeechCuts {
     /// 两刀之间剩下的比这短，就一起剪掉（留一截零点几秒的碎片没意思）。
     static let minPiece = 0.2
 
-    // MARK: 切口落在哪
+    // MARK: 切口落在哪（只看转写的那一半；先听声音的在 AISpeechCutPoints）
 
     /// 一段的开头（要剪掉的、或者要留下的那段话从这里起）：一个词大半截在这一刻后面，就算在这段里（按词的中点判：
     /// 识别器给的相邻两个词偶尔重叠几毫秒，按词尾判会错到前一个词上）。这一刻落在词上、或者正好在词的边上，挪进这个词
@@ -52,15 +53,20 @@ enum AISpeechCuts {
     // MARK: 几种要剪的
 
     /// AI 点名要剪掉的区间。
-    static func requested(_ ranges: [ClosedRange<Double>], words: [SpeechTranscript.Word]) -> [Cut] {
-        ranges.map { range in
-            Cut(start: startPoint(range.lowerBound, words: words), end: endPoint(range.upperBound, words: words), reason: "requested")
+    static func requested(_ ranges: [ClosedRange<Double>], points: AISpeechCutPoints) -> [Cut] {
+        ranges.map { range -> Cut in
+            let (start, end) = points.span(range)
+            return Cut(start: start.time, end: end.time, reason: "requested")
         }
     }
 
     /// 只留这几段：片段里其余的都剪掉。
-    static func outside(_ keep: [ClosedRange<Double>], clip: ClosedRange<Double>, words: [SpeechTranscript.Word]) -> [Cut] {
-        let kept = keep.map { startPoint($0.lowerBound, words: words)...endPoint($0.upperBound, words: words) }
+    static func outside(_ keep: [ClosedRange<Double>], clip: ClosedRange<Double>, points: AISpeechCutPoints) -> [Cut] {
+        let kept = keep
+            .map { range -> ClosedRange<Double> in
+                let (start, end) = points.span(range)
+                return start.time...end.time
+            }
             .sorted { $0.lowerBound < $1.lowerBound }
         var cuts: [Cut] = []
         var cursor = clip.lowerBound
@@ -89,12 +95,13 @@ enum AISpeechCuts {
         "えー", "えーと", "えっと", "えーっと", "あのー"
     ]
 
-    static func fillerWords(_ words: [SpeechTranscript.Word]) -> [Cut] {
-        words.indices.compactMap { index in
+    static func fillerWords(_ words: [SpeechTranscript.Word], points: AISpeechCutPoints) -> [Cut] {
+        let points = points.snapping
+        return words.indices.compactMap { index in
             let word = words[index]
             guard fillers.contains(normalized(word.text)) else { return nil }
             return Cut(
-                start: startPoint(word.start, words: words), end: endPoint(word.end, words: words),
+                start: points.point(word.start, .start).time, end: points.point(word.end, .end).time,
                 reason: "filler: \(word.text)"
             )
         }
@@ -102,7 +109,8 @@ enum AISpeechCuts {
 
     /// 说重了：同一个词（或两个词）紧接着又说了一遍（中间不到 0.6 秒），剪掉前面那遍。前一遍以句号、问号、叹号收尾的不算
     /// （「…do this. This is…」是两句话，2026-09-28 冒烟时被当成了口吃）。
-    static func repeats(_ words: [SpeechTranscript.Word]) -> [Cut] {
+    static func repeats(_ words: [SpeechTranscript.Word], points: AISpeechCutPoints) -> [Cut] {
+        let points = points.snapping
         let keys = words.map { normalized($0.text) }
         var cuts: [Cut] = []
         var index = 0
@@ -115,8 +123,8 @@ enum AISpeechCuts {
                       !endsSentence(words[index + length - 1].text),
                       words[index + length].start - words[index + length - 1].end < 0.6 else { continue }
                 cuts.append(Cut(
-                    start: startPoint(words[index].start, words: words),
-                    end: startPoint(words[index + length].start, words: words),
+                    start: points.point(words[index].start, .start).time,
+                    end: points.point(words[index + length].start, .start).time,
                     reason: "repeat: " + words[index..<(index + length)].map(\.text).joined(separator: " ")
                 ))
                 index += length
@@ -140,11 +148,10 @@ enum AISpeechCuts {
 
     /// 排好、夹进片段、合并重叠的和挨得太近的（中间剩不到 `minPiece`）、对齐到帧；太短（不到两帧）的不剪。
     static func merged(_ cuts: [Cut], clip: ClosedRange<Double>, frame: Double) -> [Cut] {
-        let snap = { (time: Double) in frame > 0 ? (time / frame).rounded() * frame : time }
         var result: [Cut] = []
         for cut in cuts.sorted(by: { $0.start < $1.start }) {
-            let start = max(clip.lowerBound, snap(cut.start))
-            let end = min(clip.upperBound, snap(cut.end))
+            let start = max(clip.lowerBound, onFrame(cut.start, frame: frame))
+            let end = min(clip.upperBound, onFrame(cut.end, frame: frame))
             guard end > start else { continue }
             if var last = result.last, start - last.end < minPiece {
                 last.end = max(last.end, end)
@@ -164,6 +171,11 @@ enum AISpeechCuts {
             result[result.count - 1] = last
         }
         return result.filter { $0.end - $0.start >= 2 * frame - 1e-9 }
+    }
+
+    /// 对齐到工程的帧（落在两帧中间时预览和成片可能各取一边）。
+    static func onFrame(_ time: Double, frame: Double) -> Double {
+        frame > 0 ? (time / frame).rounded() * frame : time
     }
 
     /// 停顿的门限（dB）没给时从这一段自己量：底噪（10 分位）往说话（70 分位）走 35%，夹在 −60…−30。
