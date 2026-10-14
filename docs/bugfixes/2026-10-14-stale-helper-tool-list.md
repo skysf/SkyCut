@@ -31,7 +31,8 @@ AI 看到的 `set_keyframes` 的 `easing` 选项里没有 snap / overshoot / spr
   老一代客户端收到一次 `list_changed`、`tools/list` 里有新工具、调用新工具照样转给 App、只要一次清单、之后的调用不再说；
   指纹一样的假 App：不要清单、不发通知、新工具名照旧拦下。
 - 扫描（`checks/MCP/router-wiring.sh`）：App 在收发线程上答 `catalogTool`。
-- 反向验证：见 PR 描述（不合并的草稿 PR，CI 上跑）。
+- 反向验证（不合并的草稿 PR #188，CI）：`MCPCatalogOverride.needsRefresh` 改成永远不换 —— 第 4 组 check-mcp 红 7 条：指纹不同不去换、
+  升级后的第一次调用不说清单换了、老一代客户端收不到一次 list_changed、tools/list 里没有 App 的新工具、调新工具到不了 App、只取一次清单。
 
 ## 教训 / 防回归
 
