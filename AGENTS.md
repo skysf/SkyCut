@@ -131,7 +131,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 画面渐入渐出、alpha 斜坡、转场仲裁 | [画面渐入渐出](docs/architecture/video-fades.md)、[声音：音量与渐入渐出](docs/architecture/audio-fades.md) |
 | 主轨转场的容量、可用判定、借余料、首尾帧定格补足 | [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md)、[转场预览有、成片没有](docs/bugfixes/2026-09-20-transition-preview-export-divergence.md) |
 | 画面段的入场/出场动画、预设效果、预渲染路由 | [画面段的入场 / 出场动画](docs/architecture/clip-animation.md)、[画面渐入渐出](docs/architecture/video-fades.md)、[关键帧动画](docs/architecture/keyframe-animation.md) |
-| 画面文字、字体、Core Text 渲染、文字动画、逐帧导出、预览上文字的选中框和可点范围、**文字行（行号进模型、行序 = 叠放序、上下换行）**、数字的等待、**老虎机位数不同的两头（`NumberOdometer`）** | [画面文字](docs/architecture/text-overlays.md)（把手的可点范围写在 `.offset` 之前；没选中的字只认看得见的部分；行号进模型，预览与导出同一份叠放序；老虎机不存在的那一位滚成空白收掉，居中和右对齐右边不动）、[老虎机停在「090」](docs/bugfixes/2026-09-25-odometer-leading-zero.md)、[主字体里没有的字画成乱码](docs/bugfixes/2026-09-29-text-fallback-glyphs-drawn-with-main-font.md)（排版给了谁的字形号就用谁画）、[拖动手势 §5j](docs/architecture/timeline-drag-gestures.md)、[拖字变成旋转](docs/bugfixes/2026-09-24-text-rotate-handle-hit-area-at-center.md) |
+| 画面文字、字体、Core Text 渲染、文字动画、逐帧导出、预览上文字的选中框和可点范围、**文字行（行号进模型、行序 = 叠放序、上下换行）**、数字的等待、**老虎机位数不同的两头（`NumberOdometer`）** | [画面文字](docs/architecture/text-overlays.md)（把手的可点范围写在 `.offset` 之前；没选中的字只认看得见的部分；行号进模型，预览与导出同一份叠放序；老虎机不存在的那一位滚成空白收掉，居中和右对齐右边不动；导出时序列末尾多渲两帧、几段左闭右开，接缝那一帧不空不叠）、[字在接缝上闪没一帧](docs/bugfixes/2026-10-14-text-blinks-at-animation-seam.md)、[老虎机停在「090」](docs/bugfixes/2026-09-25-odometer-leading-zero.md)、[主字体里没有的字画成乱码](docs/bugfixes/2026-09-29-text-fallback-glyphs-drawn-with-main-font.md)（排版给了谁的字形号就用谁画）、[拖动手势 §5j](docs/architecture/timeline-drag-gestures.md)、[拖字变成旋转](docs/bugfixes/2026-09-24-text-rotate-handle-hit-area-at-center.md) |
 | 滤镜调色、LUT、预览图层滤镜、导出 `lut3d` 段、滤镜段的选中（多选） | [滤镜](docs/architecture/filters.md) |
 | 画面上的形状（线条 / 长方形 / 正方形 / **圆 / 圆弧**）：种类、几何、怎么画（`ShapeOutline`、`ShapePreviewDrawing`、`ShapePNGRenderer`、`ShapeOverlayCanvas`）、**形状的入场 / 出场动画**（`ShapeAnimation` / `ShapeAnimator`、导出切段 `ShapeOverlayExport`、形状和文字共用的导出接法 `OverlayExportFile`、检查器的「动画」一节）、`set_shape` | [画面上的形状](docs/architecture/shapes.md)（所有种类画什么只有 `ShapeOutline.drawing` 一份、预览和导出同一条路径，只各自上色；什么都没露出来时给空路径、不许裁到空区域；圆弧从 12 点钟顺时针、扫过 `arcSweep`；动画和文字同名同曲线、出场是入场倒放、时刻先钉到工程帧上、只逐帧渲动画那两截；v30 / v31）、[导出的线比预览长](docs/bugfixes/2026-10-03-exported-lines-longer-than-preview.md)、[画面文字](docs/architecture/text-overlays.md)「导出：只逐帧渲动画进行中的那段」、[盖一块](docs/architecture/cover-blur-mosaic.md)（模糊 / 马赛克也是形状的一种，没有动画） |
 | **盖一块（模糊 / 马赛克，`ShapeKind.blur` / `.mosaic`）**、预览的第二层播放器（`CoverPreviewLayer`）、导出里的 `gblur` / `pixelize`（`VideoEditCoverExport`）、`set_shape` 的 blur / mosaic、`look text_scan` 给的 `cover`（`AICoverBox`）、遮水印 / 遮旧字幕 | [盖一块](docs/architecture/cover-blur-mosaic.md)（形状的一种、时间线上的一段、**不跟着片段走**；落点在调色之后、形状之前；三条管线按构造一致：裁出这一块、在这块里做效果、边缘外延、贴回去；预览的蒙版和滤镜别挂同一层；`CIPixellate` 的格子要设成从左上角起算；框取偶数往外收；力度按画面高换算）、[滤镜](docs/architecture/filters.md)（预览不走自定义合成器、图层滤镜的地基）、[预览自由变换](docs/architecture/preview-free-transform.md)（源画面框换画布框的变换顺序）、[AI 接口（MCP）](docs/architecture/ai-control-mcp.md)（第 38 条）、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（没有盖一块时第二层不建、性能计数不变） |
@@ -218,7 +218,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
   以及动画的「模型给多少、成片就是多少」、预览上的可点范围、老虎机首帧 / 末帧就是起止值，
-  还有主字体里没有的字（✨、汉字）用回退字体画（和直接用那款字体画的墨迹重合）：
+  还有主字体里没有的字（✨、汉字）用回退字体画（和直接用那款字体画的墨迹重合），以及带动画的字切成的几段在接缝上每一帧正好贴一层（几段拼接的主轨 +
+  起点不在帧格子上，`SeamFrames.swift`）：
   `scripts/check-text-render.sh`。
 - 形状：预览那个画法（`ShapePreviewDrawing`，离屏渲一张）和导出那张（`ShapePNGRenderer`）逐像素重合（白色形状铺黑底：最亮的一点、墨迹外框、
   重合度、平均差；五种形状 × 描边 / 实心 × 不动 / 画到一半 / 擦除 / 缩放 / 半透明，「画了 0」两边都空），以及入场 / 出场动画真跑导出抽帧
@@ -691,6 +692,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   每个调用等 120 秒只拿到一句 errno、卡住期间收下的调用缓过来还会照做；强退后小程序拉起来，内存吃紧时窗口 8 秒还没建好，报「主窗口关着、按 ⌘3」（⌘3 早是烧录了）。
   小程序每 15 秒「探一下」（App 在收发线程上答主线程卡了多久、调用到哪了），卡 30 秒就放弃并让 App 也放弃、还卡着就不再发；菜单建好就交出「打开主窗口」、
   启动时等窗口、后台开回来放最后面、快捷键和菜单对账。**等不到要去问、问的路不经过卡住的线程；调用方放弃了被调方要知道。**
+- [2026-10-14 带入场动画的字在成片里闪没一帧](docs/bugfixes/2026-10-14-text-blinks-at-animation-seam.md) — 盲测课程片三条 rise 大字都在入场结束前那一帧消失：
+  `-itsoffset` 把不在帧格子上的起点（AI 按词的时间放字）换算到 1/fps 格子、整串提前半帧，主轨几段拼接后画面时间戳又晚几微秒，那一帧落在序列最后一帧之后 →
+  EOF → `eof_action=pass` 撤层；`between` 两头都闭，接缝落在一帧上时两段同时贴。序列末尾多渲两帧、各段左闭右开（和预览的 `contains(time:)` 同口径）。
+  单拿出来复现不了，用 App 自己的出图函数对用户的工程出图、插 `showinfo` 才看清。**「实测对齐」要在不对齐的输入上再测一遍；自检场景要像用户的工程。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
