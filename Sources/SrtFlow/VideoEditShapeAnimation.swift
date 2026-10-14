@@ -102,13 +102,11 @@ enum ShapeAnimator {
         case .none:
             break
         case .fade:
-            // 入场先快后慢，出场先慢后快 —— 东西该「被抽走」，不是「慢慢停住」。出场是入场倒着放（`reveal` 在出场里从 1 倒数到 0），
-            // 所以两头是同一条曲线；以前出场用 easeInCubic(r)，作用在剩余进度上反倒先快后慢（2.2 秒的淡出 1 秒就快没了，
-            // docs/bugfixes/2026-10-14-exit-animations-front-loaded.md）。
-            state.opacity = TextEasing.easeOutCubic(r)
+            // 入场先快后慢，出场先慢后快 —— 东西该「被抽走」，不是「慢慢停住」。
+            state.opacity = entering ? TextEasing.easeOutCubic(r) : TextEasing.easeInCubic(r)
         case .pop:
-            // 入场带回弹（冲过头约 1.1 再退回来），出场是不带回弹的入场倒着放、先慢后快直接收走 —— 出场再弹一下像没关紧的弹簧。
-            let curve = entering ? TextEasing.easeOutBack(r) : TextEasing.easeOutCubic(r)
+            // 入场带回弹（冲过头约 1.1 再退回来），出场 easeIn 直接收走 —— 出场再弹一下像没关紧的弹簧。
+            let curve = entering ? TextEasing.easeOutBack(r) : TextEasing.easeInCubic(r)
             state.opacity = TextEasing.easeOutCubic(r)
             state.scale = popStartScale + (1 - popStartScale) * curve
         case .wipe:
