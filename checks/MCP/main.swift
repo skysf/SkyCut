@@ -46,6 +46,7 @@ runUpscaleToolChecks()
 runSoundEffectChecks()
 runScreenRecordingToolChecks()
 runProjectBindingChecks()
+runHangChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) MCP checks failed.")

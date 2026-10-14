@@ -54,6 +54,9 @@
 #  29. 几个 AI 会话共用一个 SrtFlow（2026-10-14）：小程序记着这个会话的工程（第一次碰工程时记、open_project / new_project 做成了才换），
 #      真起小程序验 open_project 之后的调用带着它、一个小程序一个会话号；App 不是同一个工程就拒、说清楚谁换的和怎么回去
 #      （ProjectBindingChecks）；路由排到这个调用、动窗口之前查（扫描，下面）。
+#  30. App 卡住的时候（2026-10-14）：小程序什么时候放弃、怎么说（MCPCallWait）、App 那份记录（放弃了的不做，AIBridgeCalls）、
+#      真起小程序接一个卡死的假 App（第一次探就说清楚、让 App 放弃、下一个调用不发）和一个忙的假 App（说还在做）（HangChecks）；
+#      App 在收发线程上答「探一下」、路由轮到时先问还做不做、主窗口开得回来（扫描，下面）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -176,9 +179,12 @@ if [ "$(grep -c 'let startsNewRound = AISession.shared.phase != .working' "${ROU
   exit 1
 fi
 RAISE_BLOCK="$(awk '/if bringForward \{/,/^            \}/' "${PRESENTER}")"
-if [ "$(grep -c 'orderFrontRegardless' "${PRESENTER}" || true)" -ne 2 ] \
-   || [ "$(grep -c 'window.orderFrontRegardless()' <<<"${RAISE_BLOCK}" || true)" -ne 1 ]; then
-  echo "✗ ${PRESENTER} 在 if bringForward 外面也把窗口摆到前面（一轮中途又会一步一跳）" >&2
+# 第三处是「窗口被关了、开回来」那一下（placeReopenedWindow）：看得见时摆前面，后台 / 录屏时放最后面。
+REOPEN_BLOCK="$(awk '/private static func placeReopenedWindow\(\)/,/^    \}/' "${PRESENTER}")"
+if [ "$(grep -c 'orderFrontRegardless' "${PRESENTER}" || true)" -ne 3 ] \
+   || [ "$(grep -c 'window.orderFrontRegardless()' <<<"${RAISE_BLOCK}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'window.orderFrontRegardless()' <<<"${REOPEN_BLOCK}" || true)" -ne 1 ]; then
+  echo "✗ ${PRESENTER} 在 if bringForward 和开回来的那一下之外也把窗口摆到前面（一轮中途又会一步一跳）" >&2
   exit 1
 fi
 # 后台模式（方案第 7 条）：一次都不摆窗口、不跟着选中 / 挪播放头（seek 除外，它就是要给用户看那一刻）。
@@ -186,7 +192,7 @@ if [ "$(grep -c 'guard always || AISession.shared.viewMode == .visible else { re
   echo "✗ ${PRESENTER} 的 reveal 在后台模式下照样选中、挪播放头" >&2
   exit 1
 fi
-echo "   ✓ 路由按 AISession 判断一轮的第一步；摆窗口只在 if bringForward 里；后台模式不摆窗口、不跟着选中"
+echo "   ✓ 路由按 AISession 判断一轮的第一步；摆窗口只在 if bringForward 和开回来的那一下里；后台模式不摆窗口、不跟着选中"
 
 echo "==> 几个 AI 会话共用一个 SrtFlow：改动只落在会话自己的工程上"
 # 2026-10-06 盲测：桌面版的会话把 App 切到了用户的工程，这边的会话接着改（docs/bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md）。
@@ -211,6 +217,41 @@ if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/App
   exit 1
 fi
 echo "   ✓ 路由第 ${CHECK_AT} 行查工程（摆窗口在第 ${PRESENT_AT} 行之后）；换工程的人记下、用到的工程回给小程序；小程序带着、记着"
+
+echo "==> App 卡住的时候：探一下不经主线程、放弃了的不做、主窗口开得回来"
+# 2026-10-06 盲测：App 卡死时 AI 每个调用干等 120 秒、只拿到「read: Resource temporarily unavailable」；拉起来之后
+# open_project 报「主窗口关着」（docs/bugfixes/2026-10-14-ai-calls-time-out-silently-when-app-hangs.md）。
+BRIDGE="Sources/SrtFlow/AIBridgeServer.swift"
+PROBE_BODY="$(awk '/private func probe\(_ request: MCPBridge.Request\)/,/^    \}/' "${BRIDGE}")"
+if [ "$(grep -cF 'response = request.tool == MCPBridge.probeTool ? probe(request) : answer(request, on: fd)' "${BRIDGE}" || true)" -ne 1 ] \
+   || [ -z "${PROBE_BODY}" ] || grep -qE 'waitForMainActor|MainActor' <<<"${PROBE_BODY}"; then
+  echo "✗ ${BRIDGE} 的「探一下」没在收发线程上当场答（经了主线程，主线程卡死时就答不上来）" >&2
+  exit 1
+fi
+if [ "$(grep -cF 'if MCPUnixSocket.peerClosed(fd) { calls.abandon(id) }' "${BRIDGE}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'await AIToolRouter.shared.handle(request, begin: { calls.begin(id) })' "${BRIDGE}" || true)" -ne 1 ]; then
+  echo "✗ ${BRIDGE} 没在小程序断开时放弃还没开始的调用，或没把「还做不做」交给路由：App 缓过来后会照做 AI 已经当作失败的调用" >&2
+  exit 1
+fi
+BEGIN_AT="$(grep -n 'guard begin() else {' "${ROUTER}" | cut -d: -f1 || true)"
+PROJECT_AT="$(grep -n 'let project = VideoEditProject.shared' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${BEGIN_AT}" ] || [ -z "${PROJECT_AT}" ] || [ "${BEGIN_AT}" -gt "${PROJECT_AT}" ]; then
+  echo "✗ ${ROUTER} 的 execute 没在一开始问「还做不做」（第 ${BEGIN_AT:-?} 行）" >&2
+  exit 1
+fi
+if [ "$(grep -cF 'while mainWindow() == nil, openMainWindow == nil, Date() < deadline {' "${PRESENTER}" || true)" -ne 1 ] \
+   || ! grep -q 'window.orderBack(nil)' <<<"${REOPEN_BLOCK}" \
+   || [ "$(grep -cF 'let _ = AIEditorPresenter.noteMenuOpenWindow(openWindow)' Sources/SrtFlow/SrtFlowApp.swift || true)" -ne 1 ]; then
+  echo "✗ 主窗口开不回来：没等刚启动的窗口、开回来的窗口后台时没放到最后面、或菜单里没把「打开主窗口」交出来" >&2
+  exit 1
+fi
+# 报错里叫用户按的快捷键要和菜单里「Edit Video」那一项一致（以前写着 Command-3，那是烧录字幕）。
+EDIT_KEY="$(grep -A1 'SectionButton(title: "Edit Video", section: .videoEdit)' Sources/SrtFlow/SrtFlowApp.swift | grep -oE 'keyboardShortcut\("[0-9]"' | grep -oE '[0-9]' || true)"
+if [ -z "${EDIT_KEY}" ] || [ "$(grep -cF "static let editVideoShortcut = \"Command-${EDIT_KEY}\"" "${PRESENTER}" || true)" -ne 1 ]; then
+  echo "✗ ${PRESENTER} 的 editVideoShortcut 和菜单里 Edit Video 的快捷键（Command-${EDIT_KEY:-?}）对不上" >&2
+  exit 1
+fi
+echo "   ✓ 探一下当场答、断开即放弃、路由先问还做不做；刚启动等窗口、开回来按看法放、菜单交出打开动作；快捷键 Command-${EDIT_KEY} 对得上"
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -445,6 +486,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppLanguage.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIProjectBinding.swift \
+  Sources/SrtFlow/AIBridgeCalls.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/AITimelineSummary.swift \
   Sources/SrtFlow/AITextEdits.swift \
@@ -579,6 +621,7 @@ xcrun swiftc \
   checks/MCP/SoundEffectChecks.swift \
   checks/MCP/ScreenRecordingToolChecks.swift \
   checks/MCP/ProjectBindingChecks.swift \
+  checks/MCP/HangChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o
