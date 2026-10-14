@@ -11,7 +11,7 @@ import Foundation
 // 2. **没选中时不按整框判**：短字（「090」）的可点范围比 80% 宽的版面框窄得多，
 //    而且跟着对齐方式走（左 / 中 / 右）。
 // 3. 边界：空文字 = 整个版面框（刚 Add 出来还没打字，要点得着）；开着底板时整块底板
-//    都算（底板按版面框画，不按墨迹）；数字按定版串算（滚动中可点范围不跳）。
+//    都算（底板贴着字画，TextPlate）；数字按定版串算（滚动中可点范围不跳）。
 
 func checkHitGeometry() {
     let canvas = CGSize(width: 1280, height: 720)
@@ -73,8 +73,12 @@ func checkHitGeometry() {
     var plated = short
     plated.style.background = .default
     let plateGeometry = TextHitGeometry(plated, canvas: canvas)
-    check(plateGeometry.contentInFrame.minX < 0 && plateGeometry.contentInFrame.maxX > plateGeometry.frame.width,
-          "开着底板时可点范围要把整块底板包进去（底板按版面框画、四周还有内边距）：\(plateGeometry.contentInFrame)")
+    // 底板贴着字画（TextPlate，2026-10-14）：可点范围比光有字时宽出底板的内边距，但不再是整个版面框。
+    check(plateGeometry.contentInFrame.width > geometry.contentInFrame.width
+          && plateGeometry.contentInFrame.contains(geometry.contentInFrame.insetBy(dx: 1, dy: 1)),
+          "开着底板时可点范围要把整块底板包进去（底板比墨迹四周宽出内边距）：\(plateGeometry.contentInFrame)")
+    check(plateGeometry.contentInFrame.width < plateGeometry.frame.width * 0.5,
+          "底板贴着字，可点范围不再是整个版面框：\(plateGeometry.contentInFrame.width) vs \(plateGeometry.frame.width)")
 
     // 数字按定版串（from / to 里更长的那个）算可点范围，滚动中位数变了也不跳。参照物是「一直停在
     // 那个定版串上的数字」—— 数字的数位是 App 自己按最宽的那个数字等宽排的（苹方不认等宽数字特性），

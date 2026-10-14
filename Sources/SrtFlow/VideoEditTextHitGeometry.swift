@@ -53,13 +53,13 @@ struct TextHitGeometry: Equatable {
             height: ink.height
         ).insetBy(dx: -contentPadding, dy: -contentPadding)
 
-        // 底板是按**版面框**画的（`TextDrawing.background`），不是按墨迹 —— 开着底板时
-        // 整块底板都是这段字看得见的身体，点在底板上当然该选中它。
+        // 开着底板时整块底板都是这段字看得见的身体，点在底板上当然该选中它。底板在哪只问 `TextPlate`（和画的同一份）；
+        // 它是排版坐标（y 向上），翻成版面框本地坐标（y 向下）。
         if let background = overlay.style.background, background.color.opacity > 0 {
-            let scale = TextOverlay.pixelScale(canvas: canvas)
-            let plate = CGRect(x: 0, y: layoutTop, width: layout.size.width, height: layout.size.height)
-                .insetBy(dx: -max(0, background.paddingX * scale), dy: -max(0, background.paddingY * scale))
-            visible = visible.union(plate)
+            let plate = TextPlate.rect(background, layout: layout, scale: TextOverlay.pixelScale(canvas: canvas))
+            visible = visible.union(CGRect(
+                x: plate.minX, y: layoutTop + (layout.size.height - plate.maxY), width: plate.width, height: plate.height
+            ))
         }
         return visible
     }

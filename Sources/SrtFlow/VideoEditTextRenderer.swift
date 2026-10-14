@@ -137,7 +137,7 @@ enum TextRenderer {
             context.translateBy(x: 0, y: settled.firstBaselineY - layout.firstBaselineY)
         }
 
-        TextDrawing.background(overlay.style, layoutBox: layoutBox, scale: scale, into: context)
+        TextDrawing.background(overlay.style, layout: layout, scale: scale, into: context)
 
         if let shadow = overlay.style.shadow, shadow.color.opacity > 0 {
             context.setShadow(
