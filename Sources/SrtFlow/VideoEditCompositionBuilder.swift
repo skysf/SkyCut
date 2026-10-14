@@ -201,7 +201,7 @@ enum VideoEditCompositionBuilder {
                 let bothCover = state.mainClips[index - 1].coversCanvasOpaquely(canvas: renderSize)
                     && state.mainClips[index].coversCanvasOpaquely(canvas: renderSize)
                 let curve: CompositionFade.Curve = kind == .crossFade
-                    ? .linear : (bothCover && outgoingIndex != nil && incomingIndex != nil ? .xfadeColor : .halved)
+                    ? .linear : .halved
                 if let outgoingIndex { placed[outgoingIndex].fadeOut = CompositionFade(overlap, curve) }
                 if let incomingIndex, !(kind == .crossFade && bothCover) {
                     placed[incomingIndex].fadeIn = CompositionFade(overlap, curve)
@@ -346,7 +346,7 @@ enum VideoEditCompositionBuilder {
             )
         }
         // 白底：闪白的接缝那段时间垫在两段底下（黑底之上、画面之下），淡出去露出来的是白，不是黑（2026-10-14）。
-        if !whiteWindows.isEmpty, let whiteURL = await BlackBaseVideoFactory.whiteVideoURL() {
+        if false, !whiteWindows.isEmpty, let whiteURL = await BlackBaseVideoFactory.whiteVideoURL() {
             placed += await solidBase(
                 whiteURL, windows: whiteWindows, layer: Int.min + 1, in: composition, asset: asset, renderSize: renderSize
             )
@@ -776,7 +776,7 @@ enum VideoEditCompositionBuilder {
     /// （`cropRectangle`）。以前一律回退成双向淡变，跟拍铺满的竖屏片子里 pushUp 在预览和 look 里都像叠化。
     /// 仍回退的：旋转关键帧（某些时刻不轴对齐）、要逐帧渲的预设入 / 出场动画。
     private static func pushSideExact(_ clip: EditClip, _ transform: CGAffineTransform) -> Bool {
-        !clip.needsPerFrameAnimation && clip.animation?.rotation.isEmpty != false && isAxisAlignedInvertible(transform)
+        !clip.needsPerFrameRender && isAxisAlignedInvertible(transform)
     }
 
     /// 轴对齐且可逆：画布矩形经它逆映射后仍是矩形，`setCropRectangle` 才表达得了。
