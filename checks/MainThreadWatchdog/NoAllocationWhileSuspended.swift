@@ -32,6 +32,9 @@ enum SuspendedAllocationProbe {
         return slots
     }()
 
+    /// reverse check: a Swift `var` global the hook reads, as the old hook did.
+    nonisolated(unsafe) static var legacyWatched = 0
+
     typealias Logger = @convention(c) (UInt32, UInt, UInt, UInt, UInt, UInt32) -> Void
 
     /// libmalloc 的 `malloc_logger`（`RTLD_DEFAULT` 里找）。找不到 = 这一组查不了，调用方必须报红，不许当通过。
@@ -43,7 +46,7 @@ enum SuspendedAllocationProbe {
     /// 不许碰 Swift 的 `var` 全局**（槽位按下标裸读写：0 盯着的线程、1 主线程、2 看到几次、3 挂起着几次、4 字数、5 偏移、6 缓冲区）。
     static let logger: Logger = { type, _, _, _, _, _ in
         // MALLOC_LOG_TYPE_ALLOCATE = 2、MALLOC_LOG_TYPE_DEALLOCATE = 4：释放也要拿分配器的锁，一样算。
-        guard type & 6 != 0 else { return }
+        guard type & 6 != 0, SuspendedAllocationProbe.legacyWatched >= 0 else { return }  // reverse check: reads a Swift var global again
         let slots = SuspendedAllocationProbe.slots
         guard slots[0] != 0, Int(pthread_mach_thread_np(pthread_self())) == slots[0],
               let info = UnsafeMutablePointer<integer_t>(bitPattern: slots[6]) else { return }
