@@ -53,7 +53,8 @@ public final class MCPCatalogOverride: @unchecked Sendable {
 
     /// App 报来的指纹要不要去换：报了、和编进来的不一样、也不是已经换上的那份。
     public func needsRefresh(appFingerprint: String?) -> Bool {
-        guard let appFingerprint, appFingerprint != MCPCatalogSync.fingerprint else { return false }
+        _ = appFingerprint
+        return false  // reverse check: never refresh
         lock.lock()
         defer { lock.unlock() }
         return appFingerprint != fingerprint
