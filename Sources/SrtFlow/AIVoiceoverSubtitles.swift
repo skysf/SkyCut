@@ -9,6 +9,7 @@ import SrtFlowCore
 // - **不覆盖用户的字幕**：和已有的句子在时间上重叠的那几句不加，结果里报几句没加。
 // - **一个语言一条轨**：原文轨已经是别的语言（记的语言；没记就按字判断，字太少不判）就一句都不加，说清楚。
 // - 还没有字幕轨就建一条，语言记成配音的语言。
+// - 每句记下是哪段配音生成的（`CueMeta.provenance`）：挪配音段时字幕跟着走（`CaptionSourceFollow`）。
 // 不管什么：配音怎么合成、放上时间线（AIVoiceoverTool）。
 
 enum AIVoiceoverSubtitles {
@@ -60,7 +61,8 @@ enum AIVoiceoverSubtitles {
         let parts = zip(pieces, windows).map { piece, window in
             SubtitleSegmenter.segment(words: piece.words, window: window, config: config)
         }
-        let cues = SubtitleSegmenter.assemble(parts, windows: windows, config: config).document.cues
+        let assembled = SubtitleSegmenter.assemble(parts, windows: windows, config: config)
+        let cues = assembled.document.cues
         // 一句都切不出来（全是标点）就别建一条空的字幕轨。
         guard !cues.isEmpty else { return Outcome() }
         var outcome = Outcome()
@@ -77,6 +79,9 @@ enum AIVoiceoverSubtitles {
                 fresh.id = UUID()
                 if let id = SubtitleTrackEditing.insertCue(fresh, into: .original, original: &original, companion: &companion) {
                     outcome.added.append(id)
+                    // 记下是哪段配音生成的（`insertCue` 记成人工、没有来源）：挪配音段时字幕跟着走（`CaptionSourceFollow`，
+                    // docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md）。
+                    companion.cueMeta[id] = CueMeta(origin: .generated, provenance: assembled.meta[cue.id]?.provenance)
                 }
             }
             if companion.sourceLanguage == nil, !outcome.added.isEmpty { companion.sourceLanguage = language }

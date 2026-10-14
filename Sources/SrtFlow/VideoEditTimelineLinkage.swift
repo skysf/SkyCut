@@ -142,11 +142,23 @@ enum TimelineLinkage {
 
     // MARK: 一次改动收尾：没被碰过的东西跟着画面走
 
-    /// 把 `after` 里这次操作**没碰过**的非主轨东西按 `before` → `after` 主轨画面的变化挪 / 删。
+    /// 把 `after` 里这次操作**没碰过**的非主轨东西按 `before` → `after` 主轨画面的变化挪 / 删；再让生成的字幕句跟着它的那段声音走
+    /// （声音不在主轨上时，`CaptionSourceFollow`：配音段挪了字幕跟着挪）。
     /// `deletesContent`：这次是真删（⌫、delete_items、cut_speech）才连带删画面没了的东西。返回挪了几样、删了几样。
     @discardableResult
     static func follow(from before: TimelineState, to after: inout TimelineState, deletesContent: Bool) -> Report {
-        guard signature(of: before) != signature(of: after) else { return Report() }
+        var report = signature(of: before) != signature(of: after)
+            ? followMain(from: before, to: &after, deletesContent: deletesContent) : Report()
+        // 主轨那条挪过的字幕不再碰（`plan` 只看这次没变过的句子）。
+        let captions = CaptionSourceFollow.plan(from: before, to: after, deletesContent: deletesContent)
+        CaptionSourceFollow.apply(captions, to: &after)
+        report.moved += captions.moves.count
+        report.deleted += captions.deletes.count
+        return report
+    }
+
+    /// 主轨画面变了：压在上面、这次没碰过的东西跟着挪 / 删。
+    private static func followMain(from before: TimelineState, to after: inout TimelineState, deletesContent: Bool) -> Report {
         let ledger = Ledger(before: before, after: after)
         var plan = Plan()
 

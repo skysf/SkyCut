@@ -75,6 +75,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/VideoEditSubtitleDocuments.swift \
   Sources/SrtFlow/VideoEditTimelineLinkage.swift \
+  Sources/SrtFlow/VideoEditTimelineCaptionSource.swift \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditMediaImport.swift \
