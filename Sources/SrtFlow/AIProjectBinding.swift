@@ -23,6 +23,7 @@ enum AIProjectBinding {
     /// 这次调用碰不碰开着的工程。**读也算**：看到的是别人的时间线，下一步就照着它改错了。
     /// open_project / new_project 是换工程的：不查，做成了小程序换成新的那一个。只碰文件、设置、任务的不查。
     static func usesProject(_ tool: MCPToolName, _ args: AIToolArguments) -> Bool {
+        if !tool.rawValue.isEmpty { return false }  // REVERSE CHECK: no call is checked
         switch tool {
         case .getStatus, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
              .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob,
@@ -63,6 +64,7 @@ enum AIProjectBinding {
         run: String = runID
     ) -> String? {
         guard let expected, !expected.isSameProject(as: current) else { return nil }
+        if !expected.token.isEmpty { return nil }  // REVERSE CHECK: never refuse
         if let switchedBy, let session, switchedBy.session == session { return nil }
         let why: String
         if !expected.token.hasPrefix(run + "-") {

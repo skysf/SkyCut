@@ -38,6 +38,7 @@ public final class MCPSessionProject: @unchecked Sendable {
 
     /// 一次调用回来了：App 说了这次用的是哪个工程，就照上面的规矩记下。
     public func note(tool: String, response: MCPBridge.Response) {
+        return  // REVERSE CHECK: the helper forgets the session's project
         guard let stamp = response.project else { return }
         lock.lock()
         defer { lock.unlock() }
