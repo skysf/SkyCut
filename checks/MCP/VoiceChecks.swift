@@ -116,6 +116,9 @@ private func subtitleChecks() {
     checkEqual(cue?.text, "Welcome to the course", "subtitles lose their punctuation like generated ones")
     check((cue?.start ?? 0) >= 10.1 - 0.001 && (cue?.start ?? 0) < 10.2, "the line starts when the voice starts on the timeline")
     checkEqual(empty.subtitleCompanion?.sourceLanguage, "en", "a new subtitle track is marked with the voice's language")
+    // 记下是哪段配音生成的：挪配音段时字幕跟着走（CaptionSourceFollow，docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md）。
+    checkEqual(cue.flatMap { empty.subtitleCompanion?.cueMeta[$0.id]?.provenance?.clipID }, piece.clipID,
+               "each voiceover subtitle records the voiceover clip it came from")
 
     var taken = TimelineState()
     taken.editSubtitleTracks(creatingOriginal: true) { original, companion in

@@ -478,7 +478,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      （英文词带前面的空格、标点贴在后面）。
    - **字幕**（`subtitles=true`，`AIVoiceoverSubtitles`，纯值）：词直接喂 `SubtitleSegmenter.segment` + `assemble`（断句、去标点、一行多长、
      显示时间都和生成字幕同一套），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
-     切不出句子不建空轨；新建的轨记成配音的语言。
+     切不出句子不建空轨；新建的轨记成配音的语言。每句记下是哪段配音生成的（`CueMeta.provenance`）：联动开着时挪 / 删配音段，字幕跟着走
+     （[联动](timeline-linkage.md) 规矩 11，[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)）。
 35. **SrtFlow 自己的声音（本机的 Kokoro-82M，CoreML；方案第 44、48–51 条）**：
    - **模块**：`Sources/SrtFlowKokoro/` 从 speech-swift（Apache 2.0，Copyright 2025 Ivan Digital）搬来改过，App 不加第三方依赖；
      每个文件开头写着改了什么，署名和授权全文在随 App 分发的 `THIRD-PARTY-NOTICES.md`。原来 704 行的注音文件拆成了
