@@ -137,7 +137,8 @@ enum AILookTool {
                 )
             }
         }
-        guard !frames.isEmpty else { throw AIToolError("SrtFlow could not read pictures from \(url.lastPathComponent).") }
+        // 一帧都取不出来：说为什么（hev1、这台 Mac 解不开、文件不在了）、怎么办（compress_videos 转一份）。
+        guard !frames.isEmpty else { throw AIToolError(await AIUnreadableVideo.reason(for: url)) }
         var described: [JSONValue] = []
         for frame in frames { described.append(await describe(frame)) }
         var payload: [String: JSONValue] = [
