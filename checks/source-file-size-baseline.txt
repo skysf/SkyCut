@@ -13,7 +13,6 @@
 978 Sources/SrtFlowCore/ScreenRecordingModels.swift
 1276 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
 782 Sources/SrtFlowCoreChecks/main.swift
-602 checks/Filters/main.swift
 650 checks/PreviewComposition/main.swift
 2495 checks/ProjectFile/main.swift
 1778 checks/TimelineSnap/main.swift

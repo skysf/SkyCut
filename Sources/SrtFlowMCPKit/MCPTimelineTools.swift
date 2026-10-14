@@ -259,7 +259,11 @@ public enum MCPTimelineTools {
             "source_in": MCPSchema.number("Where to start in the file, seconds (default 0).", minimum: 0),
             "source_out": MCPSchema.number("Where to stop in the file, seconds (default: the end). For an image: how long it shows (default 5)."),
             "track": MCPSchema.string(MCPSchema.trackDescription),
-            "start": MCPSchema.number("Timeline start in seconds.", minimum: 0)
+            "start": MCPSchema.number("Timeline start in seconds.", minimum: 0),
+            "sound": MCPSchema.string(
+                "Video file: separate also puts its sound on an audio track, linked to the muted picture (J/L cuts); only adds just its sound.",
+                oneOf: MCPVocabulary.clipSounds
+            )
         ])
         return MCPToolDefinition(
             .addClips, title: "Add clips",
@@ -359,6 +363,7 @@ public enum MCPTimelineTools {
                     "color": MCPSchema.string("Colour.", oneOf: MCPVocabulary.markerColors)
                 ], required: ["time"]), "This clip's markers (replaces all of them; [] removes them all)."),
                 "ripple": MCPSchema.boolean("On V1: move the later V1 clips by the same amount the clip's end moves."),
+                "alone": MCPSchema.boolean("Leave its linked clips (separated sound or picture) as they are, e.g. to trim one side of a J/L cut."),
                 "keyframes": MCPSchema.string("keep_frames (default: motion stays on its source frames), stretch (re-timed to the new window) or clear.", oneOf: MCPVocabulary.keyframePolicies)
             ], required: ["clip_id"])
         )

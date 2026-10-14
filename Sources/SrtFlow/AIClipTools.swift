@@ -42,6 +42,7 @@ enum AIClipTools {
         change.fadeIn = try args.double("fade_in")
         change.fadeOut = try args.double("fade_out")
         change.ripple = try args.bool("ripple") ?? false
+        change.alone = try args.bool("alone") ?? false
         change.keyframes = try args.choice("keyframes", from: MCPVocabulary.keyframePolicies).flatMap(AIKeyframePolicy.init(rawValue:))
         let canvas = VideoEditCompositionBuilder.renderSize(for: state)
         var plan = Plan(id: id, change: change, canvas: canvas)
