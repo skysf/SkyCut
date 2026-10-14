@@ -2,9 +2,9 @@ import Foundation
 
 // MARK: - Kokoro 的语速：要多少给多少（纯值）
 //
-// 管什么：add_voiceover 的 speed（1 = 正常，0.85 = 慢一成半）换成给 Kokoro 模型的 speed。模型把每个音的时长除以 speed 再取整到
-// 一格（600 个采样、25 毫秒），短音取整之后常常一格不变；段和段之间按标点停的那一截（KokoroVoicePieces）也不跟着变 —— 于是
-// 要 0.85 读出来只慢了 4.7%，换一句又是 13%（2026-10-14 实测 zm_yunxi；docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
+// 管什么：add_voiceover 的 speed（1 = 正常，0.85 = 慢一成半）换成给 Kokoro 模型的 speed。读出来的长短对模型的 speed 反应比 1 ÷ speed
+// 弱、每句还不一样：模型给的时长按一格（600 个采样、25 毫秒）取整，段和段之间按标点停的那一截（KokoroVoicePieces）也不跟着变 ——
+// 0.95 → 0.85 只慢了 4.7%，换一句又是 13%（2026-10-14 实测 zm_yunxi；docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
 // 所以按时长对准：先按 1 倍读一遍，目标 = 1 倍的时长 ÷ speed；读出来差得多就用读过的几次拟合「时长 ≈ a + b ÷ 给模型的 speed」
 // 再给一次，差 3% 以内就停，最多读五遍（1 倍那一遍 + 四次）。
 // 不管什么：怎么读、怎么拼（KokoroVoiceSpeech / KokoroPieceReader / KokoroVoiceAssembly）。

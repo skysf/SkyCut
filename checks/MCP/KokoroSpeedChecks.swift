@@ -1,16 +1,18 @@
 import Foundation
 
-// Kokoro 的语速按时长对准（KokoroSpeedCalibration）：模型把每个音的时长除以 speed 再取整到 25 毫秒一格、停顿不跟着变，
-// 直接给要的 speed 常常只慢一点点（2026-10-14 实测：要 0.85 只慢了 4.7%，docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
-// 这里照模型的样子造一句：固定的停顿 + 一串音，每个音按 speed 缩放后取整到整格、至少一格。要的语速几次之内对到 3% 以内；
-// 直接给要的 speed（不校准）差得远 —— 这就是症状。真模型的数字在案例里（CI 上没有模型）。编法见 scripts/check-mcp.sh。
+// Kokoro 的语速按时长对准（KokoroSpeedCalibration）：模型读出来的长短对 speed 的反应比 1 ÷ speed 弱（时长按 25 毫秒一格取整、
+// 段间停顿不跟着变），直接给要的 speed 常常只慢一点点（2026-10-14 实测：0.95 → 0.85 只慢了 4.7%，
+// docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
+// 这里照实测的样子造一句：固定的停顿 + 说话的部分对 speed 的反应比 1 ÷ speed 弱（真模型要 0.85 只慢 5–7%）、按 25 毫秒一格取整。
+// 要的语速几次之内对到 3% 以内；直接给要的 speed（不校准）差得远 —— 这就是症状。真模型的数字在案例里（CI 上没有模型）。
+// 编法见 scripts/check-mcp.sh。
 
 func runKokoroSpeedChecks() {
-    // 一句：两段停顿共 0.55 秒，40 个音，每个 1–5 格（25 毫秒一格）。
-    let pause = 0.55
-    let tokens = (0..<40).map { 1 + ($0 * 7) % 5 }
+    // 一句：两段停顿共 0.45 秒，30 个音，每个 4–8 格；说话的部分按 speed 的 0.6 次方缩放（比线性弱），再取整到整格。
+    let pause = 0.45
+    let tokens = (0..<30).map { 4 + ($0 * 7) % 5 }
     func duration(_ speed: Double) -> Double {
-        pause + Double(tokens.reduce(0) { $0 + max(1, Int((Double($1) / speed).rounded())) }) * 0.025
+        pause + Double(tokens.reduce(0) { $0 + max(1, Int((Double($1) / pow(speed, 0.6)).rounded())) }) * 0.025
     }
     for wanted in [0.85, 0.9, 1.15, 1.3] {
         let target = duration(1) / wanted
