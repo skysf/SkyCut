@@ -709,6 +709,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
   字幕字体只认 Core Text 给的族名「蘋方-簡」不认「PingFang SC」（读 name 表里的别名）；find_audio 的 vocals 只在为真时写。
   **结果里只回一个计数等于没回；区分两种东西要挑它们真正不同的那一处，只调门槛修不好。**
+- [2026-10-14 看门狗自检在 CI 上偶发 Bus error](docs/bugfixes/2026-10-14-watchdog-check-hook-recursion.md) — 崩在自检第 6 组自己装的 `malloc_logger` 钩子里、
+  和 App 的抓栈代码无关：回调读 Swift 的 `var` 全局要做动态独占检查、要用线程的 TLS，没有 TLS 的线程（退出时拆 TSD 的、刚起的）在回调里建它就分配 →
+  又进回调 → 递归 670 层爆栈。状态改放 `static let` 指着的裸内存，加一条确定性的回归（钩子装着时起一条裸线程分配、退出）。
+  **钩子回调里「不分配」要算上运行时替你做的事；只在 CI 上偶发的崩溃，先让 CI 自己把崩溃报告打出来。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
