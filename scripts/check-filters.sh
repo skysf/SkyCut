@@ -134,6 +134,8 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/AppLanguage.swift \
   checks/Filters/main.swift \
+  checks/Filters/Parity.swift \
+  checks/Filters/PureBlack.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"
