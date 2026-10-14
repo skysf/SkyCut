@@ -79,7 +79,6 @@ enum AIExportTools {
             "path": .string(output.path),
             "next_step": "Call get_job with this job_id and wait_seconds 30 until the status is done."
         ]
-        if let video { result["video"] = video }
         return .ok(.object(result))
     }
 
@@ -87,7 +86,6 @@ enum AIExportTools {
     /// 把主推子降下来（docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
     static func finishedDetail(_ output: URL, video: JSONValue?, levels: ExportAudioMixdown.Levels?) -> [String: JSONValue] {
         var detail: [String: JSONValue] = ["path": .string(output.path)]
-        if let video { detail["video"] = video }
         guard let levels else { return detail }
         func tenths(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         if let loudness = levels.loudnessLUFS { detail["audio_loudness_lufs"] = tenths(loudness) }

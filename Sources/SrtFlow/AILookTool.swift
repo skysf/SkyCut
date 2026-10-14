@@ -144,9 +144,9 @@ enum AILookTool {
             "looked_at": .string(AIWorkspace.shared.display(url)),
             "frames": .array(described)
         ]
-        if let realSize { payload[MediaFileTypes.isImage(url) ? "image" : "video"] = realSize }
+        _ = realSize
         if let first = frames.first?.image {
-            payload["pictures_scaled_to"] = AIVideoSize.sentImage(width: first.width, height: first.height)
+            payload["picture_size"] = ["width": .number(Double(first.width)), "height": .number(Double(first.height))]
         }
         return finish(&payload, frames: frames, size: size, wantsImage: wantsImage)
     }
