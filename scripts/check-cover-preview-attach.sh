@@ -83,6 +83,7 @@ xcrun swiftc \
   Sources/SrtFlow/FreezeSliver.swift \
   Sources/SrtFlow/VideoEditTimelineRowSelection.swift \
   Sources/SrtFlow/VideoEditTimelineLinkage.swift \
+  Sources/SrtFlow/VideoEditTimelineCaptionSource.swift \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/MediaProbe.swift \

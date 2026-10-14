@@ -408,9 +408,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    这一批只问一次。素材A那种几十个小文件，AI 两次调用就看完（2026-09-28 冒烟：47 个镜头，Vision 的标签把企鹅、冰山、
    冰面和丛林、城市分得开；少数中间那一帧没有把握够的标签，要看图）。
 31. **跟拍（edit_clip fit=fill 的 follow，默认开）**：铺满、对准主体时，主体走动大就让那扇窗跟着走（`AIFollowSubject`，纯值）。
-   - 每秒抽两帧（至少 5、最多 30 帧）认主体；**只跟人脸和人**（「显眼的东西」一帧一跳，只用来定固定的窗），大半的帧
-     （60%）认出了人、而且人散开超过窗宽 / 窗高的 30% 才跟 —— 走动小的一个固定的窗就框得住，不打关键帧（主轨上带关键帧的段
+   - 每秒抽两帧（至少 5、最多 30 帧）认主体；**只跟人脸、人和字**（「显眼的东西」一帧一跳，只用来定固定的窗），大半的帧
+     （60%）认出了、而且散开超过窗宽 / 窗高的 30% 才跟 —— 走动小的一个固定的窗就框得住，不打关键帧（主轨上带关键帧的段
      导出时要先渲一遍中间片，[关键帧动画](keyframe-animation.md)，能不打就不打）。
+   - **字**（2026-10-14 用户拍板「跟拍跟着文字」，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀；以前 focus=text 一律
+     不跟）：每一帧对准谁和固定的窗同一个次序（`AISubjectFocus.focus`）—— 有人跟人；没有人、字多（三块以上或占画面 2% 以上）的帧
+     对准字合起来的中间：幻灯片翻页、录屏滚动和换窗口时窗跟过去，翻页本身是换镜头、照下一条跳过去。`focus=text` 每一帧都只看字
+     （一行小字也算）。守卫：`checks/MCP/FollowChecks.swift` 的 `checkFollowText`。
    - 前后 0.75 秒的平均抹掉抖动，再用 RDP（1.5%）精简到转折处的点。**裁切不能做关键帧**，所以裁切固定成盖住所有窗的那一块，
      窗怎么走全靠摆放框的中心：窗左上角在 (wx, wy) 时中心 = ((K.midX − wx) / W, (K.midY − wy) / H)（K = 裁剩的那块，W × H = 窗），
      只有一个点时就是固定的那扇窗。自检照合同验：每个关键帧那一刻，窗的左右两边正好落在画布左右两边。
@@ -485,7 +489,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **字幕**（`subtitles=true`，`AIVoiceoverSubtitles`，纯值）：词直接喂 `SubtitleSegmenter.segment` + `assemble`（断句、去标点、一行多长、
      显示时间都和生成字幕同一套），**只是不按逗号拆小句**（`AIVoiceoverSubtitles.config` 关掉 `splitsAtClauses`：一句旁白是写稿时定好的一条，
      放得下就整句一条、放不下才切；2026-10-14 以前在逗号处切出 0.3–1.1 秒的短条，[案例](../bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md)），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
-     切不出句子不建空轨；新建的轨记成配音的语言。
+     切不出句子不建空轨；新建的轨记成配音的语言。每句记下是哪段配音生成的（`CueMeta.provenance`）：联动开着时挪 / 删配音段，字幕跟着走
+     （[联动](timeline-linkage.md) 规矩 11，[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)）。
 35. **SrtFlow 自己的声音（本机的 Kokoro-82M，CoreML；方案第 44、48–51 条）**：
    - **模块**：`Sources/SrtFlowKokoro/` 从 speech-swift（Apache 2.0，Copyright 2025 Ivan Digital）搬来改过，App 不加第三方依赖；
      每个文件开头写着改了什么，署名和授权全文在随 App 分发的 `THIRD-PARTY-NOTICES.md`。原来 704 行的注音文件拆成了

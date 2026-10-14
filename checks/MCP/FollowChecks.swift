@@ -6,6 +6,7 @@ import Foundation
 
 func runFollowChecks() {
     checkFollowDecision()
+    checkFollowText()
     checkFollowPath()
     checkFollowFraming()
     checkFollowWrittenAsKeyframes()
@@ -56,6 +57,47 @@ private func checkFollowDecision() {
     for index in 0..<6 { few[index].findings = AISubjectFocus.FrameFindings() }
     check(!AIFollowSubject.needsFollow(AIFollowSubject.targets(few, window: window), window: window),
           "a person seen in only 4 of 10 frames: no following")
+}
+
+/// 跟着字走（2026-10-14 用户拍板）：幻灯片 / 录屏没有人，字多的那一块在画面上挪 —— 窗跟过去；focus=text 每帧只看字。
+private func checkFollowText() {
+    /// 一帧里三行字，整块的中心在 (x, 0.5)。
+    func slide(_ x: Double) -> AISubjectFocus.FrameFindings {
+        AISubjectFocus.FrameFindings(texts: (0..<3).map { row in
+            CGRect(x: x - 0.1, y: 0.4 + 0.07 * Double(row), width: 0.2, height: 0.05)
+        })
+    }
+    let scrolling = (0..<10).map { AIFollowSubject.Sample(time: Double($0), findings: slide(0.2 + 0.06 * Double($0))) }
+    let targets = AIFollowSubject.targets(scrolling, window: window)
+    check(AIFollowSubject.needsFollow(targets, window: window), "text moving across a slide or screen recording: follow it")
+    checkEqual(targets.seen, 10, "every text-heavy frame counts as seen")
+    check(abs(Double(targets.points[0].center.x) - 0.2) < 1e-9, "the window aims at the middle of the text block")
+
+    let parked = (0..<10).map { AIFollowSubject.Sample(time: Double($0), findings: slide(0.5)) }
+    check(!AIFollowSubject.needsFollow(AIFollowSubject.targets(parked, window: window), window: window),
+          "text that stays put: one fixed window is enough")
+
+    // 字不多（一行小字幕、角落里的水印）：那是「有字」，不是「全是字」，不拿它跟。
+    let caption = (0..<10).map { index in
+        AIFollowSubject.Sample(time: Double(index), findings: AISubjectFocus.FrameFindings(
+            texts: [CGRect(x: 0.05 + 0.08 * Double(index), y: 0.9, width: 0.1, height: 0.03)]
+        ))
+    }
+    check(!AIFollowSubject.needsFollow(AIFollowSubject.targets(caption, window: window), window: window),
+          "one small line of text is not what to follow")
+    check(AIFollowSubject.needsFollow(AIFollowSubject.targets(caption, window: window, textFirst: true), window: window),
+          "focus=text: even a small line of text is followed")
+
+    // 有人的帧照旧跟人：字只在没有人的帧上当目标。
+    let presenter = (0..<10).map { index -> AIFollowSubject.Sample in
+        var findings = slide(0.2 + 0.06 * Double(index))
+        findings.faces = face(0.5).faces
+        return AIFollowSubject.Sample(time: Double(index), findings: findings)
+    }
+    check(!AIFollowSubject.needsFollow(AIFollowSubject.targets(presenter, window: window), window: window),
+          "a presenter standing still in front of moving text: the face wins, no following")
+    check(AIFollowSubject.needsFollow(AIFollowSubject.targets(presenter, window: window, textFirst: true), window: window),
+          "…unless focus=text asks for the text")
 }
 
 private func checkFollowPath() {

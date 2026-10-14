@@ -78,6 +78,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineTrim.swift \
   Sources/SrtFlow/VideoEditTimelineTrimSnap.swift \
   Sources/SrtFlow/VideoEditTimelineLinkage.swift \
+  Sources/SrtFlow/VideoEditTimelineCaptionSource.swift \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditMainMagnet.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
@@ -100,6 +101,7 @@ xcrun swiftc \
   checks/TimelineSnap/TrimSnap.swift \
   checks/TimelineSnap/Seek.swift \
   checks/TimelineSnap/Linkage.swift \
+  checks/TimelineSnap/LinkageCaptions.swift \
   checks/TimelineSnap/Magnet.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
