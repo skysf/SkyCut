@@ -97,7 +97,9 @@ private func partnerChecks() {
     // 画面和分出来的声音链接着；换画面的文件，声音不跟着挪源时间（它还是原来那个文件的声音）。
     var state = TimelineState()
     var picture = videoClip(0, 4, sourceStart: 10)
-    var sound = EditClip(sourceURL: picture.sourceURL, isAudioOnly: true, sourceStart: 10, sourceDuration: 4, timelineStart: 0)
+    var sound = EditClip(
+        sourceURL: picture.sourceURL, isAudioOnly: true, sourceStart: 10, sourceDuration: 4, timelineStart: 0, audioAssetDuration: 60
+    )
     let group = UUID()
     picture.linkGroup = group
     picture.isMuted = true
