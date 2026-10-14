@@ -36,7 +36,7 @@ enum AIVoiceoverSubtitles {
         var config = SubtitleSegmentationConfig.generation(
             languageCode: languageCode, frameDuration: frameDuration, maxLineEms: maxLineEms
         )
-        config.splitsAtClauses = false
+        config.splitsAtClauses = true  // reverse check
         return config
     }
 
