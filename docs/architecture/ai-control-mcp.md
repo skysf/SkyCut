@@ -391,7 +391,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - 落到时间线上用手动那一套：从最后一刀往前 `LinkRegrouping.split` 切开、`AITimelineEdits.delete` 带波纹删中间那块，后面的
      V1 片段往前补；**链接的声音不管开关都跟着剪**（剪口播剪到画面和声音对不上，不会是 AI 想要的）。片段自己静音了、声音分离到
      音频轨上时，量停顿、读转写都用链接的那段声音。其他轨看「联动」开关（2026-10-02 起，[联动](timeline-linkage.md)）：开着（默认）
-     压在剪掉那几块上的东西一起删、后面的字幕 / 文字跟着画面前移（`perform(deletesContent: true)`），关着才不动、结果里提醒 AI
+     压在剪掉那几块上的东西一起删、后面的字幕 / 文字跟着画面前移（`perform(deletesContent: true)`；跨过切口的字幕两头各自换算、
+     说的话剩不到一半就删，[联动](timeline-linkage.md)规矩 12），关着才不动、结果里提醒 AI
      剪完重新生成字幕（有缓存，快）；`next_step` 按开关分两种说法。
    - 两步：`plan` 可以 await（量声音、读转写缓存），`apply` 同步提交、路由包 `AIUndoGrouping.step`（同 edit_clip，
      `check-mcp.sh` 钉着）；中途时间线变了就不提交、请 AI 重来。

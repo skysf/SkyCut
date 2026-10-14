@@ -160,6 +160,34 @@ public enum SubtitleTrackEditing {
         }
     }
 
+    /// 一句字幕的新开头、结尾和词的时间（词记的是相对这句开头的秒，调用方已经换算好；nil = 这句没有词的时间）。
+    public struct Timing: Hashable, Sendable {
+        public var start: TimeInterval
+        public var end: TimeInterval
+        public var words: [SubtitleCueWord]?
+
+        public init(start: TimeInterval, end: TimeInterval, words: [SubtitleCueWord]?) {
+            self.start = start
+            self.end = end
+            self.words = words
+        }
+    }
+
+    /// 一次给几句换开头、结尾和词的时间，两条轨上各换各的。联动收尾时走这里：字幕两头各自跟着画面换算，
+    /// 底下剪掉一截的那句会缩短、词的时间跟着换（docs/architecture/timeline-linkage.md 规矩 12）。
+    /// 换完重排；真变了的译文记「时间手动改过」（同 `setStarts`：之后重译换字时不再动它的时间）。
+    public static func setTimings(
+        _ timings: [UUID: Timing],
+        original: inout SubtitleDocumentModel, companion: inout SubtitleCompanion
+    ) {
+        guard !timings.isEmpty else { return }
+        _ = setTimings(timings, in: &original)
+        if var doc = companion.translation {
+            for id in setTimings(timings, in: &doc) { companion.translationLinks[id]?.timeEdited = true }
+            companion.translation = doc
+        }
+    }
+
     /// 拆成两句：首句保留原 ID，次句用 `newID`，只拆这句所在的那条轨。拆分点必须严格落在句子内部。
     /// 文字默认整句留在前半、后半空着（可用 `texts` 指定两半）。
     /// - 原文：两半的置信度都作废（`cueMeta` 抄一份给后半）；它们的译文照样各自现算过期 / 缺。
@@ -284,6 +312,23 @@ public enum SubtitleTrackEditing {
         }
         if !moved.isEmpty { normalizeOrder(&doc) }
         return moved
+    }
+
+    /// 返回真变了的 ID。开头不早于 0、结尾不早于开头。
+    private static func setTimings(_ timings: [UUID: Timing], in doc: inout SubtitleDocumentModel) -> [UUID] {
+        var changed: [UUID] = []
+        for i in doc.cues.indices {
+            guard let timing = timings[doc.cues[i].id] else { continue }
+            let start = max(0, timing.start)
+            let end = max(start, timing.end)
+            guard start != doc.cues[i].start || end != doc.cues[i].end || timing.words != doc.cues[i].words else { continue }
+            doc.cues[i].start = start
+            doc.cues[i].end = end
+            doc.cues[i].words = timing.words
+            changed.append(doc.cues[i].id)
+        }
+        if !changed.isEmpty { normalizeOrder(&doc) }
+        return changed
     }
 
     private static func split(

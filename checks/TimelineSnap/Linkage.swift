@@ -6,6 +6,7 @@ import SrtFlowCore
 // 压在主轨块上的东西跟着它的**画面**走（docs/architecture/timeline-linkage.md）：
 // 1. 完全落在一段里的：删它就删、挪它就挪（磁吸合拢、换位、变速、裁头之后画面前移）。
 // 2. 跨两段的：底下的画面全部挪同一个量才跟，否则不动；画面全没了才删（配乐铺整片永远不被顺手删掉）。
+//    字幕句另有一条（规矩 12，2026-10-15）：两头各自跟着画面换算、说的话剩不到一半才删 —— 细的用例在 LinkageCues.swift。
 // 3. 画面没了只在真删（`deletesContent`）时连带删；裁切让画面没了的留在原地。
 // 4. 分割 / cut_speech / 定格切出来的新 id 照样认（同素材、接着的源时间）；同 id 永远优先（粘出来的同素材新段不算）。
 // 5. 这次操作自己动过的东西不再碰；撞上了让开（段换轨、文字换行、滤镜换层）。
@@ -109,13 +110,15 @@ private func checkLinkageDelete() {
     checkEqual(start(after, shape: f.shape.id), 11, "C 里的形状跟着 C 前移")
     checkEqual(start(after, text: f.text.id), nil, "B 里的文字跟着 B 一起删")
     checkEqual(start(after, filter: f.filter.id), nil, "B 里的滤镜段跟着 B 一起删")
-    checkEqual(start(after, cue: f.cueAB.id), 9, "跨 A|B 的字幕：A 还在、没动 → 不动、不删")
-    checkEqual(start(after, cue: f.cueBC.id), 9, "跨 B|C 的字幕：B 没了、剩下的画面只有 C 的、C 前移 10 → 跟着 C（不删）")
+    checkEqual(start(after, cue: f.cueAB.id), nil, "跨 A|B 的字幕：三分之二压在 B 上，B 删了 → 剩下不到一半，跟着删（规矩 12）")
+    checkEqual(start(after, cue: f.cueBC.id), 10, "跨 B|C 的字幕：B 那一半没了 → 收到 C 上剩下的那一截，从 C 的开头起（不挂到 C 前面）")
+    checkEqual(after.subtitleCue(f.cueBC.id)?.end, 11, "…结尾跟着 C 前移 10")
     checkEqual(start(after, clip: f.music.id), 0, "铺整片的配乐：A 没动、C 动了，不是同一个量 → 不动")
     check(after.clip(with: f.music.id) != nil, "铺整片的配乐不删")
     checkEqual(start(after, clip: f.sfx.id), 3, "A 里的音效不动")
     checkEqual(start(after, clip: f.broll.id), 5, "A 里的 B-roll 不动")
-    checkEqual(report, TimelineLinkage.Report(moved: 3, deleted: 2), "报出来：挪了 3 样（C 的字幕、形状、跨 B|C 的字幕），删了 2 样")
+    checkEqual(report, TimelineLinkage.Report(moved: 3, deleted: 3, shortenedCues: [f.cueBC.id]),
+               "报出来：挪了 3 样（C 的字幕、形状、跨 B|C 的字幕），删了 3 样（文字、滤镜、跨 A|B 的字幕），收短了跨 B|C 的那句")
 
     // ---- 删第一段 A：后面整体前移 ----
     var afterA = f.state
@@ -125,7 +128,8 @@ private func checkLinkageDelete() {
     checkEqual(start(afterA, cue: f.cueInA.id), nil, "A 里的字幕跟着 A 删")
     checkEqual(start(afterA, clip: f.sfx.id), nil, "A 里的音效跟着 A 删")
     checkEqual(start(afterA, clip: f.broll.id), nil, "A 里的 B-roll 跟着 A 删")
-    checkEqual(start(afterA, cue: f.cueAB.id), 0, "跨 A|B 的字幕：A 没了、B 前移 10 → 跟着 B（夹在 0）")
+    checkEqual(start(afterA, cue: f.cueAB.id), 0, "跨 A|B 的字幕：A 那三分之一没了、B 前移 10 → 收到 B 上那一截，从 0 起")
+    checkEqual(afterA.subtitleCue(f.cueAB.id)?.end, 2, "…到 2 秒（以前整句挪过去、夹在 0、时长不变，到 3 秒）")
     checkEqual(start(afterA, cue: f.cueBC.id), 9, "跨 B|C 的字幕：B、C 都前移 10 → 跟着挪")
     checkEqual(start(afterA, text: f.text.id), 1, "B 里的文字跟着 B 前移")
     checkEqual(start(afterA, filter: f.filter.id), 2, "B 里的滤镜跟着 B 前移")
