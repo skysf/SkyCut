@@ -55,6 +55,7 @@ runProjectBindingChecks()
 runHangChecks()
 runCatalogSyncChecks()
 runVideoSizeChecks()
+runLinkageReportChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) MCP checks failed.")

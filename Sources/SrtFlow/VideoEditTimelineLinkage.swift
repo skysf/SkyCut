@@ -18,7 +18,8 @@ import SrtFlowCore
 // 3. 跨两段的：底下的画面**全部**挪同一个量才跟，否则不动；画面**全没了**才删。
 // 4. 画面没了只在**真删**的操作里连带删（`deletesContent`：⌫、AI 的 delete_items / cut_speech）；裁切 / 变速让画面
 //    没了的，东西留在原地不动。
-// 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift）。
+// 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半才删 / 留在原地（2026-10-15，`LinkageCueFollow`）。
+// 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift、LinkageCues.swift）。
 
 enum TimelineLinkage {
     static let epsilon = 0.000_5
@@ -29,7 +30,11 @@ enum TimelineLinkage {
         var deleted = 0
         /// 磁吸这次把 V1 的几段挪了位置 —— 不是联动，`perform` 收尾时 `MainMagnet.settle` 数的；`isEmpty` 只问联动。
         var magnetPacked = 0
-        var isEmpty: Bool { moved == 0 && deleted == 0 }
+        /// 跟着走的字幕里，底下有画面被剪掉、收短了的（字里可能还留着剪掉的词）。
+        var shortenedCues: Set<UUID> = []
+        /// 说话的那几秒大半没了、又不是真删（裁切、变速），留在原地的字幕：人一眼看得见，AI 要在结果里看到。
+        var leftCues: Set<UUID> = []
+        var isEmpty: Bool { moved == 0 && deleted == 0 && leftCues.isEmpty }
     }
 
     // MARK: 主轨的画面账
@@ -115,6 +120,11 @@ enum TimelineLinkage {
             return abs(delta) <= epsilon ? .stay : .move(by: delta)
         }
 
+        /// 一段画面改之后可能在哪几段里：同 id 的那段在前（不管在哪条轨），再是这次新出来的同素材段。
+        func survivors(of host: Piece) -> [Piece] {
+            (afterByID[host.id].map { [$0] } ?? []) + fresh.filter { $0.asset == host.asset }
+        }
+
         /// `piece` 还盖着 `host` 的素材 `[lo, hi)` 里的哪一截；盖着就给出那截最早一点改之前在哪、挪了多少。
         private func survivor(_ piece: Piece, host: Piece, lo: Double, hi: Double) -> (at: Double, delta: Double)? {
             let from = max(lo, piece.sourceStart)
@@ -152,8 +162,10 @@ enum TimelineLinkage {
         // 主轨那条挪过的字幕不再碰（`plan` 只看这次没变过的句子）。
         let captions = CaptionSourceFollow.plan(from: before, to: after, deletesContent: deletesContent)
         CaptionSourceFollow.apply(captions, to: &after)
-        report.moved += captions.moves.count
+        report.moved += captions.timings.count
         report.deleted += captions.deletes.count
+        report.shortenedCues.formUnion(captions.shortened)
+        report.leftCues.formUnion(captions.left)
         return report
     }
 
@@ -182,10 +194,17 @@ enum TimelineLinkage {
             guard let old = oldFilters[filter.id], old == filter else { continue }
             Plan.take(ledger.outcome(for: old.span, deletesContent: deletesContent), id: filter.id, start: old.timelineStart, into: &plan.filters)
         }
+        // 字幕句：两头各自跟着画面换算（规矩 12，`LinkageCueFollow`）；换了位置、中间插进别的才照老规矩整句挪。
         let oldCues = Dictionary(before.allSubtitleCues.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let originals = Dictionary(before.subtitleCues(of: .original).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let links = before.subtitleCompanion?.translationLinks ?? [:]
         for cue in after.allSubtitleCues {
             guard let old = oldCues[cue.id], old == cue else { continue }
-            Plan.take(ledger.outcome(for: old.span, deletesContent: deletesContent), id: cue.id, start: old.start, into: &plan.cues)
+            plan.cues.take(LinkageCueFollow.outcome(
+                old, speech: LinkageCueFollow.speech(of: old, originals: originals, links: links),
+                hosts: ledger.before, survivors: ledger.survivors(of:), deletesContent: deletesContent,
+                fallback: { ledger.outcome(for: old.span, deletesContent: deletesContent) }
+            ), id: cue.id)
         }
 
         // 这次操作自己挪过的段 / 文字 / 滤镜（拖动的成员）撞上了也要让开，和联动挪的一起交给落点。
@@ -210,15 +229,38 @@ enum TimelineLinkage {
             var deletes: Set<UUID> = []
         }
 
+        /// 字幕句：换成什么时间（两头各自换算过的）、删哪几句，以及收短了 / 留在原地的（报给 AI）。
+        struct CueKind {
+            var timings: [UUID: SubtitleTrackEditing.Timing] = [:]
+            var deletes: Set<UUID> = []
+            var shortened: Set<UUID> = []
+            var left: Set<UUID> = []
+
+            mutating func take(_ outcome: LinkageCueFollow.Outcome, id: UUID) {
+                switch outcome {
+                case .stay: break
+                case .delete: deletes.insert(id)
+                case .leftBehind: left.insert(id)
+                case .retime(let timing, let cut):
+                    timings[id] = timing
+                    if cut { shortened.insert(id) }
+                }
+            }
+        }
+
         var clips = Kind()
         var shapes = Kind()
         var texts = Kind()
         var filters = Kind()
-        var cues = Kind()
+        var cues = CueKind()
 
         var report: Report {
-            let kinds = [clips, shapes, texts, filters, cues]
-            return Report(moved: kinds.reduce(0) { $0 + $1.moves.count }, deleted: kinds.reduce(0) { $0 + $1.deletes.count })
+            let kinds = [clips, shapes, texts, filters]
+            return Report(
+                moved: kinds.reduce(0) { $0 + $1.moves.count } + cues.timings.count,
+                deleted: kinds.reduce(0) { $0 + $1.deletes.count } + cues.deletes.count,
+                shortenedCues: cues.shortened, leftCues: cues.left
+            )
         }
 
         static func take(_ outcome: Outcome, id: UUID, start: Double, into kind: inout Kind) {
@@ -238,10 +280,10 @@ enum TimelineLinkage {
             for (id, start) in texts.moves { state.updateTextOverlay(id) { $0.timelineStart = start } }
             if !filters.deletes.isEmpty { state.filters.removeAll { filters.deletes.contains($0.id) } }
             for (id, start) in filters.moves { state.updateFilter(id) { $0.timelineStart = start } }
-            if !cues.deletes.isEmpty || !cues.moves.isEmpty {
+            if !cues.deletes.isEmpty || !cues.timings.isEmpty {
                 state.editSubtitleTracks { original, companion in
                     SubtitleTrackEditing.removeCues(ids: cues.deletes, original: &original, companion: &companion)
-                    SubtitleTrackEditing.setStarts(cues.moves, original: &original, companion: &companion)
+                    SubtitleTrackEditing.setTimings(cues.timings, original: &original, companion: &companion)
                 }
             }
             if !texts.deletes.isEmpty { state.compactTextRows() }

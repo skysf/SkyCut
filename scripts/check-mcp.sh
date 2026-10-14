@@ -61,6 +61,7 @@
 #      缩略图的尺寸另写（VideoSizeChecks；接线扫描在下面「关掉主窗口不退出」之后）。
 #  32. cut_speech 的切口（2026-10-14）：落在量出来的停顿里就照切、落在声音上才挪进真的停顿 / 安静的窗、snap=false 一刀不挪、
 #      挪了超过 50ms 的报给 AI（SpeechCutPointChecks，用例是用户报的两个切口）；工具读了声音、交给切口、结果带 moved（扫描）。
+#  33. 联动的结果（2026-10-15）：字幕收短了的、留在原地的各列出短 id 和一句话（LinkageReportChecks）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -371,6 +372,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditSubtitleDocuments.swift \
   Sources/SrtFlow/VideoEditTimelineLinkage.swift \
   Sources/SrtFlow/VideoEditTimelineCaptionSource.swift \
+  Sources/SrtFlow/VideoEditTimelineCueFollow.swift \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditTimelineTrim.swift \
@@ -424,6 +426,7 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleFontScale.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
+  Sources/SrtFlow/AILinkageReport.swift \
   Sources/SrtFlow/ClipSoundSeparation.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
@@ -534,6 +537,7 @@ xcrun swiftc \
   checks/MCP/HangChecks.swift \
   checks/MCP/CatalogSyncChecks.swift \
   checks/MCP/VideoSizeChecks.swift \
+  checks/MCP/LinkageReportChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o

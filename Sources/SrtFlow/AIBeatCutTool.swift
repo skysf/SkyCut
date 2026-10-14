@@ -71,7 +71,7 @@ enum AIBeatCutTool {
             }),
             "timeline_duration": AIFormat.seconds(project.state.duration)
         ]
-        if let followed = AILinkageReport.json(linkage) { result["linkage"] = followed }
+        if let followed = AILinkageReport.json(linkage, ids: ids) { result["linkage"] = followed }
         if let packed = AILinkageReport.magnet(linkage) { result["magnet"] = packed }
         let missed = plan.placed.filter { $0.beats == nil }.count
         if missed > 0 {

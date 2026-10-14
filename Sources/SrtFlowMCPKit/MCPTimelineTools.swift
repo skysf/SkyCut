@@ -111,8 +111,8 @@ public enum MCPTimelineTools {
                 .deleteItems, title: "Delete",
                 description: """
                 Delete clips, texts, filters or subtitle lines by id; kinds can be mixed. ripple=true closes the gaps this \
-                leaves on V1 by moving the later V1 clips left. Linkage on: what sits on deleted or moved V1 clips follows; \
-                off: other tracks stay.
+                leaves on V1 by moving the later V1 clips left. Linkage on: what sits on deleted or moved V1 clips follows \
+                (a subtitle shrinks to the speech left under it, and goes when less than half is left); off: other tracks stay.
                 """,
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to delete.", minItems: 1),

@@ -374,7 +374,7 @@ enum AITimelineTools {
         let linkage = project.perform(rebuildsPreview: !deletion.clips.isEmpty, deletesContent: true) { $0 = next }
         project.clearSelection()
         var result: [String: JSONValue] = ["deleted": .number(Double(raw.count)), "timeline_duration": AIFormat.seconds(project.state.duration)]
-        if let followed = AILinkageReport.json(linkage) { result["linkage"] = followed }
+        if let followed = AILinkageReport.json(linkage, ids: AIShortIDs(state: project.state)) { result["linkage"] = followed }
         if let packed = AILinkageReport.magnet(linkage) { result["magnet"] = packed }
         return .ok(.object(result), changed: true)
     }

@@ -49,8 +49,9 @@ enum MCPSmartEditTools {
                 into the nearest measured pause (transcript word times can be 0.1-0.3 s off), and moved lists every time that \
                 moved. snap=false cuts exactly at the given times. The clip becomes pieces placed back \
                 to back and later V1 clips move left; its linked sound is cut with it even with Linkage off. Linkage on: \
-                subtitles, texts and sounds on the clip follow its pieces (those only on a cut part are deleted; music across \
-                clips stays); off: other tracks stay — regenerate subtitles afterwards. Filler words and repeats need \
+                subtitles, texts and sounds on the clip follow its pieces (those only on a cut part are deleted; a subtitle \
+                shrinks to the speech left under it and goes when less than half is left; music across clips stays); off: other \
+                tracks stay — regenerate subtitles afterwards. Filler words and repeats need \
                 transcribe first. One undo step. Returns what was removed (times before the cut) and the new pieces.
                 """,
                 input: MCPSchema.object([

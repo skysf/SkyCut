@@ -137,11 +137,12 @@ enum AISpeechCutTool {
             }
         })
         result["timeline_duration"] = AIFormat.seconds(state.duration)
-        if let followed = AILinkageReport.json(linkage) { result["linkage"] = followed }
+        if let followed = AILinkageReport.json(linkage, ids: now) { result["linkage"] = followed }
         if let packed = AILinkageReport.magnet(linkage) { result["magnet"] = packed }
         result["next_step"] = .string(project.linkageEnabled
             ? "Removed times are where they were before the cut. Later V1 clips moved left and, with Linkage on, subtitles, "
                 + "texts and sounds sitting on the clip moved with its pieces; those sitting only on a removed part were deleted. "
+                + "A subtitle across a cut shrank to the speech left under it (deleted when less than half was left). "
                 + "Music spanning several clips stays."
             : "Removed times are where they were before the cut. Later V1 clips moved left; music, texts and subtitles did "
                 + "not move (Linkage is off) — regenerate subtitles if the clip had them (the transcript is cached, so it is quick)."
