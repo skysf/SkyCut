@@ -37,7 +37,7 @@ struct OverlayExportFile {
     ///   · 合成出来的画面时间戳是微秒、比格子晚几微秒（主轨几段 concat 时的取整），正好落在「最后一帧之后」。
     /// 后两条叠在一起，只多一帧不够（2026-10-06 盲测：rise 入场结束前那一帧字没了，docs/bugfixes/2026-10-14-text-blinks-at-animation-seam.md）。
     /// 多两帧：最后一帧至少在 `end + 半帧`，区间里每一个输出帧都有帧可贴。
-    static let sequenceTailFrames = 2
+    static let sequenceTailFrames = 1
 
     /// 播一遍的序列要渲几帧：区间里的每一帧，再多一帧。
     static func sequenceFrameCount(span: Double, fps: Double) -> Int {
@@ -47,7 +47,7 @@ struct OverlayExportFile {
     /// 一层在哪段时间里贴：**左闭右开** `[起点, 终点)`，和预览的 `contains(time:)` 同一个口径。一段文字切成的几段首尾相接，
     /// 用两头都闭的 `between` 的话，接缝正好落在一帧上时两段同时贴、那一帧字（和阴影）叠成两层（2026-10-14）。
     static func enableWindow(_ start: Double, _ end: Double, fmt: (Double) -> String) -> String {
-        "gte(t,\(fmt(start)))*lt(t,\(fmt(end)))"
+        "between(t,\(fmt(start)),\(fmt(end)))"
     }
 
     /// 按给的顺序（= 叠放次序：先形状、后文字）一层层贴到 `video` 上。三种接法的实测依据：
