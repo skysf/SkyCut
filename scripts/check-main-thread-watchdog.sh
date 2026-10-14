@@ -22,7 +22,7 @@ trap 'rm -rf "$(dirname "$OUT")"' EXIT
 echo "==> 编译自检二进制"
 xcrun swiftc \
   -target "$TRIPLE" \
-  -wmo \
+  -wmo -g \
   -o "$OUT" \
   Sources/SrtFlow/MainThreadStackCapture.swift \
   Sources/SrtFlow/MainThreadWatchdog.swift \
@@ -32,23 +32,24 @@ xcrun swiftc \
 
 # 第 7 组卡死时，自检进程里判卡死的线程会自己报红退出；这里再兜一道：2 分钟还没跑完就杀掉、判红，
 # 免得 CI 一直挂到作业超时。
-echo "==> 运行"
-"$OUT" &
-PID=$!
-(
-  waited=0
-  while kill -0 "${PID}" 2>/dev/null; do
-    if [ "${waited}" -ge 120 ]; then
-      kill -9 "${PID}" 2>/dev/null || true
-      echo "✗ main-thread-watchdog：自检 2 分钟还没跑完，判卡死" >&2
-      exit 0
-    fi
-    sleep 1
-    waited=$((waited + 1))
-  done
-) &
-GUARD=$!
-STATUS=0
-wait "${PID}" || STATUS=$?
-wait "${GUARD}" 2>/dev/null || true
-exit "${STATUS}"
+echo "==> 运行（排查偶发 Bus error：连跑多遍，崩了就打出崩溃报告）"
+sw_vers || true
+ulimit -a || true
+REPORTS="$HOME/Library/Logs/DiagnosticReports"
+mkdir -p "$REPORTS"
+touch "$(dirname "$OUT")/stamp"
+for i in $(seq 1 60); do
+  STATUS=0
+  "$OUT" > "$(dirname "$OUT")/run.log" 2>&1 || STATUS=$?
+  echo "run $i status $STATUS: $(tail -1 "$(dirname "$OUT")/run.log")"
+  if [ "$STATUS" -ne 0 ]; then
+    cat "$(dirname "$OUT")/run.log"
+    sleep 5
+    for report in $(find "$REPORTS" /Library/Logs/DiagnosticReports -newer "$(dirname "$OUT")/stamp" -name 'watchdogcheck*' 2>/dev/null); do
+      echo "==== $report"
+      cat "$report"
+    done
+    exit 1
+  fi
+done
+exit 0
