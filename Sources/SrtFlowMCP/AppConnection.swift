@@ -21,6 +21,8 @@ struct AppConnection {
     let providersURL: URL
     let appVersion: String
     let mayLaunch: Bool
+    /// 这个会话在剪哪一个工程：每次调用带上，App 发现开着的不是它就不做（几个 AI 会话共用一个 App，`MCPSessionProject`）。
+    let sessionProject = MCPSessionProject()
 
     /// 从小程序自己的位置找到它所在的 App：`X.app/Contents/Helpers/srtflow-mcp`。
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppConnection {
@@ -53,7 +55,7 @@ struct AppConnection {
     // MARK: 一次调用
 
     func call(tool: String, arguments: JSONValue, client: String?) -> JSONValue {
-        let request = MCPBridge.Request(tool: tool, arguments: arguments, client: client)
+        let request = sessionProject.stamp(MCPBridge.Request(tool: tool, arguments: arguments, client: client))
         do {
             let payload = try JSONEncoder().encode(request)
             let (fd, launched) = try connectOrLaunch()
@@ -65,7 +67,9 @@ struct AppConnection {
                     "SrtFlow closed the connection without answering (it may have quit). Try again.", isError: true
                 )
             }
-            let result = try JSONDecoder().decode(MCPBridge.Response.self, from: line).result
+            let response = try JSONDecoder().decode(MCPBridge.Response.self, from: line)
+            sessionProject.note(tool: tool, response: response)
+            let result = response.result
             // 刚把 App 拉起来：AI 之前打开的工程、文件夹都不在了，先说一句，不然它只看到「文件不存在」「没有这个 id」
             //（2026-10-02 南极工程：用户关了窗口 = App 退出，下一次调用拉起来的是空的 Untitled）。
             return launched ? MCPBridge.addingNote(MCPBridge.relaunchNote, to: result) : result

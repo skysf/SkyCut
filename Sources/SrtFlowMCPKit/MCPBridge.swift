@@ -21,13 +21,23 @@ public enum MCPBridge {
         public var arguments: JSONValue
         /// 哪个 AI 客户端（`initialize` 或每次请求 `_meta` 里的 clientInfo.name）。横幅上显示它。
         public var client: String?
+        /// 这个会话在剪的工程（小程序记的，`MCPSessionProject`）。App 发现开着的不是它就不做（几个会话共用一个 App）。
+        /// 后加的两个字段都是可选的：老小程序不带、老 App 不认，照旧能通。
+        public var project: ProjectStamp?
+        /// 哪个会话（一个小程序进程一个随机号）：会话自己刚换了工程，并排发来的下一个调用不算「被别人换了」。
+        public var session: String?
 
-        public init(id: String = UUID().uuidString, tool: String, arguments: JSONValue, client: String?) {
+        public init(
+            id: String = UUID().uuidString, tool: String, arguments: JSONValue, client: String?,
+            project: ProjectStamp? = nil, session: String? = nil
+        ) {
             self.bridge = MCPBridge.version
             self.id = id
             self.tool = tool
             self.arguments = arguments
             self.client = client
+            self.project = project
+            self.session = session
         }
     }
 
@@ -36,11 +46,37 @@ public enum MCPBridge {
         public var id: String
         /// MCP 的 CallToolResult：`content` + `isError`。
         public var result: JSONValue
+        /// 这一次用到的（或刚换上的）工程；没碰工程的调用、被拒的调用不带。小程序据此记住这个会话在剪哪一个。
+        public var project: ProjectStamp?
 
-        public init(id: String, result: JSONValue) {
+        public init(id: String, result: JSONValue, project: ProjectStamp? = nil) {
             self.bridge = MCPBridge.version
             self.id = id
             self.result = result
+            self.project = project
+        }
+    }
+
+    /// 一个开着的工程是谁（docs/architecture/ai-control-mcp.md 第三节「几个会话共用一个 App」）。
+    ///
+    /// `token` 认的是「这一次运行里的这一次打开」：App 每次启动换一个前缀、每换一次工程后面的号 +1，所以存储为、自动存盘
+    /// 改了路径也还是它，App 重启过、中间被换走过就不是。同一个文件（路径一样）也算同一个：被换走又换回来的还是它。
+    /// `path`、`name` 用来对 AI 说清楚是哪一个。
+    public struct ProjectStamp: Codable, Sendable, Equatable {
+        public var token: String
+        public var path: String?
+        public var name: String
+
+        public init(token: String, path: String?, name: String) {
+            self.token = token
+            self.path = path
+            self.name = name
+        }
+
+        public func isSameProject(as other: ProjectStamp) -> Bool {
+            if token == other.token { return true }
+            guard let path, let otherPath = other.path else { return false }
+            return URL(fileURLWithPath: path).standardizedFileURL.path == URL(fileURLWithPath: otherPath).standardizedFileURL.path
         }
     }
 

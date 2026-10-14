@@ -51,6 +51,9 @@
 #  28. record_screen（2026-10-03）：参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 App 的类型对账、工具的定义
 #      （ScreenRecordingToolChecks）；接线（AI 起的录制不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口……）在
 #      checks/screen-recording-ai-wiring.sh。
+#  29. 几个 AI 会话共用一个 SrtFlow（2026-10-14）：小程序记着这个会话的工程（第一次碰工程时记、open_project / new_project 做成了才换），
+#      真起小程序验 open_project 之后的调用带着它、一个小程序一个会话号；App 不是同一个工程就拒、说清楚谁换的和怎么回去
+#      （ProjectBindingChecks）；路由排到这个调用、动窗口之前查（扫描，下面）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -184,6 +187,30 @@ if [ "$(grep -c 'guard always || AISession.shared.viewMode == .visible else { re
   exit 1
 fi
 echo "   ✓ 路由按 AISession 判断一轮的第一步；摆窗口只在 if bringForward 里；后台模式不摆窗口、不跟着选中"
+
+echo "==> 几个 AI 会话共用一个 SrtFlow：改动只落在会话自己的工程上"
+# 2026-10-06 盲测：桌面版的会话把 App 切到了用户的工程，这边的会话接着改（docs/bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md）。
+# 路由在排到这个调用之后、摆窗口 / 开一轮之前查；查完的结果和换工程的人都要回给小程序 / 记下来。
+CHECK_AT="$(grep -n 'if usesProject, let refusal = AIProjectBinding.refusal(' "${ROUTER}" | cut -d: -f1 || true)"
+PRESENT_AT="$(grep -n 'try await AIEditorPresenter.prepareEditor(' "${ROUTER}" | cut -d: -f1 || true)"
+ROUND_AT="$(grep -n 'if policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }' "${ROUTER}" | cut -d: -f1 || true)"
+if [ -z "${CHECK_AT}" ] || [ -z "${PRESENT_AT}" ] || [ -z "${ROUND_AT}" ] \
+   || [ "${CHECK_AT}" -gt "${PRESENT_AT}" ] || [ "${CHECK_AT}" -gt "${ROUND_AT}" ]; then
+  echo "✗ ${ROUTER} 没在摆窗口、开一轮之前查「开着的是不是这个会话的工程」（查在第 ${CHECK_AT:-?} 行、摆窗口第 ${PRESENT_AT:-?} 行）" >&2
+  exit 1
+fi
+if [ "$(grep -cF 'switches[project.documentGeneration] = AIProjectBinding.Switch(' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'return Answer(result: result, project: usesProject || switchesProject ? stamp(project) : nil)' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'project: answer.project)' Sources/SrtFlow/AIBridgeServer.swift || true)" -ne 1 ]; then
+  echo "✗ 路由没记下是谁换的工程，或没把这次用到的工程回给小程序（AIBridgeServer）：小程序记不住会话的工程" >&2
+  exit 1
+fi
+if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ] \
+   || [ "$(grep -c 'sessionProject.note(tool: tool, response: response)' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ]; then
+  echo "✗ 小程序发请求没带会话的工程，或收到回答没记下来（Sources/SrtFlowMCP/AppConnection.swift）" >&2
+  exit 1
+fi
+echo "   ✓ 路由第 ${CHECK_AT} 行查工程（摆窗口在第 ${PRESENT_AT} 行之后）；换工程的人记下、用到的工程回给小程序；小程序带着、记着"
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -417,6 +444,7 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/AppLanguage.swift \
   Sources/SrtFlow/AIToolIO.swift \
+  Sources/SrtFlow/AIProjectBinding.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/AITimelineSummary.swift \
   Sources/SrtFlow/AITextEdits.swift \
@@ -550,6 +578,7 @@ xcrun swiftc \
   checks/MCP/FalVoiceChecks.swift \
   checks/MCP/SoundEffectChecks.swift \
   checks/MCP/ScreenRecordingToolChecks.swift \
+  checks/MCP/ProjectBindingChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o

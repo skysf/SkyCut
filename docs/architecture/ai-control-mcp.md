@@ -84,6 +84,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
   （不抢前台），最多等 45 秒。测试用的环境变量：`SRTFLOW_MCP_SOCKET`、`SRTFLOW_MCP_NO_LAUNCH`、`SRTFLOW_MCP_APP`。
 - **拉起来的那一次，结果最前面加一句**（`MCPBridge.relaunchNote`，2026-10-03）：之前打开的工程、文件夹都不在了，叫 AI 重新
   `open_folder` / `open_project`。不加的话它只看到「文件不存在」「没有这个 id」，要自己去猜（南极工程那一次就是这样）。
+- **每个请求带着「这个会话在剪的工程」**（`Request.project` + 会话号 `session`，2026-10-14，第四节第 46 条）：小程序一个进程一个会话，
+  它记着（`MCPSessionProject`）；App 碰了工程的回答带上此刻的工程（`Response.project`）。两个字段都是可选的，老小程序 / 老 App 照旧能通。
 - **关掉主窗口不退出 App**（`applicationShouldTerminateAfterLastWindowClosed` 返回 false，2026-10-03 用户定）：SwiftUI 只有一个
   `Window` 场景时默认关窗就退出 —— 工程、AI 打开的文件夹全没了，下一次调用拉起来的是空的 Untitled
   （[案例](../bugfixes/2026-10-03-closing-window-quits-app.md)）。关了窗口 App 留在 Dock 里、工程还开着；点 Dock 图标 SwiftUI 把窗口开回来，
@@ -629,6 +631,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **没授权时不列窗口**：系统那时只把 SrtFlow 自己的窗口算作能录（真机：授权前 1 个、授权后 8 个），`get_status screen=true` 的 `windows` 换成一句「授权后才列得出」。
    - 预算：加它之后全清单 79,483 / 80,000；总说明配了 fal 2,044 / 2,048（目录里加了 Record 一行，别的几行收了措辞）。往后再加东西先腾地方。
 
+46. **几个 AI 会话共用一个 SrtFlow：改动只落在会话自己的工程上**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md)）。
+    SrtFlow 一次只开一个工程，谁 `open_project` / `new_project` 就替所有会话换了工程（盲测时桌面版的会话把 App 切到了用户的工程，
+    Claude Code 那边接着改）。规矩：
+    ① **工程是谁**：`MCPBridge.ProjectStamp`，`token` = 这一次运行的代号（`AIProjectBinding.runID`）+ 工程代号 `documentGeneration`；
+    同一个 token 或同一个文件路径就是同一个工程（存储为、第一次自动存盘改了路径还是它；被换走又换回来的同一个文件也是它；App 重启过不是）。
+    ② **小程序记**（`MCPSessionProject`）：第一次碰工程的调用回什么记什么，之后只有 `open_project` / `new_project` 做成了才换；
+    每个请求带会话号和记着的工程。**不加工具参数**（清单的字数要省着用）。
+    ③ **App 查**：碰不碰工程按工具和参数判（`AIProjectBinding.usesProject`：读时间线也算 —— 看到别人的时间线下一步就改错；
+    `look` / `listen` / `transcribe` 给了文件、只下载声音、录屏只留文件、只碰文件 / 设置 / 任务的不算）。新加工具要在那个 switch 里归类
+    （穷举，编译器逼着），会改东西的工具除了只碰文件的几个都必须查（`ProjectBindingChecks` 钉着）。**排到这个调用之后、摆窗口和开一轮之前**查
+    （排队时前面可能正是别人的 `open_project`）；不是同一个就一样都不做，回的话里有：谁换的（别的 AI 会话和它的客户端 / 用户在界面上 /
+    App 重启过 —— 路由记下 AI 的 `open_project` / `new_project` 是哪个会话做的）、两个工程的名字和路径、「Nothing was changed」、先问用户、
+    回去和改用开着的那个各怎么调 `open_project`（开着的没存过就请用户先 ⌘S）。会话自己刚换的（并排发来的几个调用）不拒。
+    ④ 读得出工程的结果照旧带 `project`（第 41 条 ⑤），给人看；拦人的是 ③。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **一轮按时间划分**：服务器看不到对话。AI 开始改工程时开一轮、存一份时间线快照；30 秒没有新调用算结束，
@@ -730,6 +747,10 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 真录要真屏幕和授权，靠第八节；第一轮真机测试的记录在[真机首测](../bugfixes/2026-10-03-record-screen-first-device-test.md)。
 
 合成音效（第 43 条，`SoundEffectChecks`）：16 个预设渲得出、峰值 −1 dBFS / 响度 −9 LUFS 封顶、落点在声音里且实测峰值离它不远、末尾淡完、同参数逐采样一致、换 variation 就不同、同参数同文件名、频谱走向（whoosh 先升后降、riser / suction 升、downlifter 降）、参数范围、`sound_effect` 条目怎么读、落点怎么算开头、词表对账、总说明提到它；扫描：合成器和工具不碰 `AVAudioFile`、渲染在 `MediaReadQueue.analysis` 上。
+**几个会话共用一个 App（第 46 条）**：`scripts/check-mcp.sh` 的 `ProjectBindingChecks`（小程序那份记法；真起小程序接假 App，
+`open_project` / `new_project` 之后的调用带着对的工程、一个进程一个会话号；App 的判断各种情况各说什么；每个工具碰不碰工程的表；
+老格式照样解得开），以及扫描：路由在摆窗口、开一轮之前查，记下谁换的工程，用到的工程回给小程序，小程序带上、记下。
+
 ## 八、人工回归清单（发版前在真机上走一遍）
 
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
@@ -848,6 +869,11 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - [ ] 手动开录（Record Screen 按钮）：设置页照旧、浮窗在顶部正中、残缺照旧弹框、记住的目录照旧更新 —— AI 的改动没影响手动录屏。
 - [ ] 让 AI 「在 12.0 秒的切点上放一个 whoosh」：时间线上块的最响处压在 12.0 秒、块开头在它前面约 0.55 秒，结果里 `hit_at` = 12.0；同参数再放一次，`SrtFlow/音效` 里不多出文件（第 43 条）。
 
+- [ ] 两个 Claude Code 会话（或 Claude Code + Codex）连同一个 SrtFlow：A 打开工程甲改几处；B 打开工程乙；A 再让它加一段字：
+      A 收到「another AI session (…) switched SrtFlow to another project」、两个工程的路径、「Nothing was changed」，工程乙里没有多出字；
+      A 问你之后 `open_project` 甲再加，字进了甲。你自己在界面上 ⌘O 换一个工程，A 再改：说的是「the user switched」。
+      退出重开 SrtFlow 后 A 再改：说「SrtFlow was restarted」，不往空的 Untitled 里放东西。
+
 ## 九、已知不足（第一期）
 
 - 「一轮」按 30 秒没动静划分：AI 想得久会被切成两轮。
@@ -868,3 +894,5 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - 音乐库 79 首几乎都是氛围、古典、钢琴，带货和 vlog 要的轻快配乐很少；卡里写了找不到就不放、请用户给一首自己的。
 - macOS 自带的默认质量声音比较机械（2026-09-28 本机中文只有默认的婷婷）；好的声音要用户自己在系统设置里下载。语速表是在 macOS 26 上量的，
   系统升级后可能要重量。
+- 几个会话共用一个 App（第 46 条）：Claude 桌面版的几个对话共用一个小程序（它只起一份 MCP 服务器），在它里面算一个会话 ——
+  协议里没有对话号可用；Claude Code、Codex 每个会话各起一个小程序，分得开。
