@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreGraphics
+import ImageIO
 import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
@@ -110,8 +111,10 @@ enum AILookTool {
             return ask
         }
         var frames: [AIFrameSampler.Frame]
+        var realSize: JSONValue?
         if MediaFileTypes.isImage(url) {
             frames = AIFrameSampler.image(at: url, maxSide: 1600).map { [AIFrameSampler.Frame(time: 0, image: $0)] } ?? []
+            realSize = imageSize(url)
         } else {
             let asset = MediaAssetCache.asset(for: url).asset
             guard let tracks = try? await asset.loadTracks(withMediaType: .video), !tracks.isEmpty else {
@@ -126,6 +129,13 @@ enum AILookTool {
             }
             times = times.map { min(max(0, $0), max(0, duration - 0.05)) }
             frames = await AIFrameSampler.frames(ofVideo: url, at: times, maxSide: 1280, tolerance: 0.1)
+            // 文件本身多大、几帧（不是发给 AI 的缩略图的尺寸：看成片的时候 AI 拿那个当成了成片的尺寸）。
+            if let info = await project.probeVideo(url) {
+                realSize = AIVideoSize.file(
+                    width: Int(info.displaySize.width), height: Int(info.displaySize.height),
+                    fps: info.frameRate, duration: info.duration
+                )
+            }
         }
         guard !frames.isEmpty else { throw AIToolError("SrtFlow could not read pictures from \(url.lastPathComponent).") }
         var described: [JSONValue] = []
@@ -134,10 +144,20 @@ enum AILookTool {
             "looked_at": .string(AIWorkspace.shared.display(url)),
             "frames": .array(described)
         ]
+        if let realSize { payload[MediaFileTypes.isImage(url) ? "image" : "video"] = realSize }
         if let first = frames.first?.image {
-            payload["picture_size"] = ["width": .number(Double(first.width)), "height": .number(Double(first.height))]
+            payload["pictures_scaled_to"] = AIVideoSize.sentImage(width: first.width, height: first.height)
         }
         return finish(&payload, frames: frames, size: size, wantsImage: wantsImage)
+    }
+
+    /// 图片本身的像素宽高（ImageIO 只读文件头，不解码）。
+    private static func imageSize(_ url: URL) -> JSONValue? {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let width = properties[kCGImagePropertyPixelWidth] as? Int,
+              let height = properties[kCGImagePropertyPixelHeight] as? Int else { return nil }
+        return ["width": .number(Double(width)), "height": .number(Double(height))]
     }
 
     // MARK: 共用

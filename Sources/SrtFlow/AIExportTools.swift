@@ -53,12 +53,18 @@ enum AIExportTools {
         )
         guard exporter.isExporting else { throw AIToolError(exporter.errorMessage ?? "The export could not start.") }
 
+        // 成片多大、几帧（AI 不报这个就会拿 look 回的缩略图尺寸当成片尺寸，盲测里三条都以为是 720p）。
+        let video: JSONValue? = audioOnly ? nil : AIVideoSize.output(
+            canvas: VideoEditCompositionBuilder.renderSize(for: state), resolution: settings.resolution, fps: state.frameRate.fps
+        )
         let job = AIJobs.shared.start(.export, progress: { exporter.progress }, cancel: { exporter.cancel() })
         // 结局在 isExporting 变回 false 的那一刻记下（@Published 在赋值之前发，那时成品路径 / 错误已经写好了）。
         subscriptions[job.id] = exporter.$isExporting.dropFirst().filter { !$0 }.first().sink { _ in
             MainActor.assumeIsolated {
                 if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
-                    AIJobs.shared.finish(job, .done, detail: .object(finishedDetail(output, levels: exporter.finishedAudioLevels)))
+                    AIJobs.shared.finish(
+                        job, .done, detail: .object(finishedDetail(output, video: video, levels: exporter.finishedAudioLevels))
+                    )
                 } else if let error = exporter.errorMessage {
                     AIJobs.shared.finish(job, .failed, message: error)
                 } else {
@@ -67,18 +73,21 @@ enum AIExportTools {
                 subscriptions[job.id] = nil
             }
         }
-        return .ok([
+        var result: [String: JSONValue] = [
             "job_id": .string(job.id),
             "status": "running",
             "path": .string(output.path),
             "next_step": "Call get_job with this job_id and wait_seconds 30 until the status is done."
-        ])
+        ]
+        if let video { result["video"] = video }
+        return .ok(.object(result))
     }
 
-    /// 成品的路径，加混音的电平和响度：限幅器压过的说明压了多久多深，压得超过 3 dB 的再叫 AI 把主推子降下来
-    /// （docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
-    static func finishedDetail(_ output: URL, levels: ExportAudioMixdown.Levels?) -> [String: JSONValue] {
+    /// 成品的路径和画面（宽、高、帧率），加混音的电平和响度：限幅器压过的说明压了多久多深，压得超过 3 dB 的再叫 AI
+    /// 把主推子降下来（docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
+    static func finishedDetail(_ output: URL, video: JSONValue?, levels: ExportAudioMixdown.Levels?) -> [String: JSONValue] {
         var detail: [String: JSONValue] = ["path": .string(output.path)]
+        if let video { detail["video"] = video }
         guard let levels else { return detail }
         func tenths(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         if let loudness = levels.loudnessLUFS { detail["audio_loudness_lufs"] = tenths(loudness) }

@@ -157,7 +157,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    `isExporting` 变回 false 上 —— `@Published` 在赋值前发，那时成品路径 / 错误已经写好；导出的结果带 `audio_loudness_lufs`、
    `audio_peak_dbfs`（限幅前），混音过了 −1 dBFS 被限幅器压过的还带 `audio_limited_seconds`、`audio_max_reduction_db`，压过 3 dB 的再带
    一句 `note` 叫 AI 用 `set_track master volume_db` 压下去再导，[成片的声音](export-audio-mixdown.md) 第二节第 3 条；生成字幕挂在 `stage`
-   上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局）。AI 指定的分辨率只用于这一次
+   上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局；**开始和做完的结果都带 `video`：成片的宽、高、帧率**（`AIVideoSize.output`，
+   和导出管线同一个 `cappedSize`：画布封短边、只降不升，帧率是工程帧率）。AI 指定的分辨率只用于这一次
    （`settingsOverride`），不写回用户在面板上记住的设置；压缩 / 烧录同理（第 24 条）。
    送 fal 的任务（`generate_media`、upscale）跑着时 `get_job` 带阶段：`phase`（queued / processing / downloading…）、`queue_position`、
    `transfer_percent`、`phase_seconds`、`typical_seconds`（`AIJobs.Job.liveDetail`，[fal.ai 生成](fal-generation.md) 第十三节：fal 处理中没有百分比，
@@ -220,6 +221,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      每帧另附「画面上有谁」：看得见的片段和轨、文字、字幕。
    - **素材文件**（给 file）：挑镜头用，`AIFrameSampler` 抽帧（`MediaAssetCache` 的素材、async 取帧不卡线程）。
      点名文件夹以外的文件先问。
+   - **尺寸分开说**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-thinks-export-is-720p.md)）：看文件时结果里 `video` / `image` 是**文件本身**的
+     宽高（视频还有帧率、时长），`pictures_scaled_to` 是发给 AI 的图缩到了多大（最长边 1280，只为了看）。以前只回后者、叫 `picture_size`，
+     AI 拿 look 看成片时把它当成了成片的尺寸（三条片子都以为是 720p）。看时间线回的 `canvas` 是工程画布，成片多大看 export_video / get_job 的 `video`。
    - 几帧拼成一张（`AIContactSheet`：试每种列数挑最接近 4:3 的、最后一行至少半满、竖画面整张不高过宽的 1.25 倍，
      每格左上角标时刻），JPEG，跟在文字后面作为 MCP 的 `image` 内容回去（`AIToolResult.images`）。一次只回一张：
      几张分开的图每张单算 token。
