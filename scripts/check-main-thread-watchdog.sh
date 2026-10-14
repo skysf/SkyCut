@@ -28,7 +28,8 @@ xcrun swiftc \
   Sources/SrtFlow/MainThreadWatchdog.swift \
   checks/MainThreadWatchdog/main.swift \
   checks/MainThreadWatchdog/NoAllocationWhileSuspended.swift \
-  checks/MainThreadWatchdog/CaptureUnderMallocChurn.swift
+  checks/MainThreadWatchdog/CaptureUnderMallocChurn.swift \
+  checks/MainThreadWatchdog/CrashProbe.swift
 
 # 第 7 组卡死时，自检进程里判卡死的线程会自己报红退出；这里再兜一道：2 分钟还没跑完就杀掉、判红，
 # 免得 CI 一直挂到作业超时。
@@ -38,13 +39,13 @@ ulimit -a || true
 REPORTS="$HOME/Library/Logs/DiagnosticReports"
 mkdir -p "$REPORTS"
 touch "$(dirname "$OUT")/stamp"
-for i in $(seq 1 60); do
+for i in $(seq 1 120); do
   STATUS=0
   "$OUT" > "$(dirname "$OUT")/run.log" 2>&1 || STATUS=$?
   echo "run $i status $STATUS: $(tail -1 "$(dirname "$OUT")/run.log")"
   if [ "$STATUS" -ne 0 ]; then
     cat "$(dirname "$OUT")/run.log"
-    sleep 5
+    sleep 20
     for report in $(find "$REPORTS" /Library/Logs/DiagnosticReports -newer "$(dirname "$OUT")/stamp" -name 'watchdogcheck*' 2>/dev/null); do
       echo "==== $report"
       cat "$report"

@@ -9,6 +9,8 @@ import Foundation
 
 // 逐行刷新：第 7 组卡死时判卡死的线程用 _exit 退出，不刷缓冲区，前面几组的输出不能丢在里面。
 setvbuf(stdout, nil, _IOLBF, 0)
+installCrashProbe()
+stage("start")
 
 var failures = 0
 var checks = 0
@@ -49,10 +51,12 @@ let reported = OSAllocatedUnfairLockCounter()
 watchdog.onStall = { _ in reported.increment() }
 watchdog.start()
 
+stage("1. 没卡的时候不许误报")
 // 1. 没卡的时候不许误报（主循环空转半秒，心跳每 10 ms 一拍）。
 pump(0.5)
 check(watchdog.recentStalls.isEmpty, "主线程没卡时不许误报：记了 \(watchdog.recentStalls.count) 次")
 
+stage("1b. 主线程此刻卡了多久")
 // 1b. 主线程此刻卡了多久（AI 的「探一下」在收发线程上读它，docs/architecture/ai-control-mcp.md 第三节）：
 //     没开的看门狗是 nil、空转时接近 0。
 check(MainThreadWatchdog(interval: 0.01, threshold: 0.15, logDirectory: nil).unresponsiveSeconds == nil,
@@ -64,6 +68,7 @@ Thread.detachNewThread {
     duringStall.set(watchdog.unresponsiveSeconds)
 }
 
+stage("2. 忙等 400 ms")
 // 2. 忙等 400 ms：记一次，时长、context、栈都要对。
 stallTheMainThread(milliseconds: 400)
 pump(0.3)
@@ -81,11 +86,13 @@ if let stall = busy.first {
 }
 check(reported.value == busy.count, "onStall 每次卡顿调一次：\(reported.value) vs \(busy.count)")
 
+stage("3. 睡 300 ms")
 // 3. 睡 300 ms（不是忙等）也算卡：主线程不响应就是不响应。
 Thread.sleep(forTimeInterval: 0.3)
 pump(0.3)
 check(watchdog.recentStalls.count == 2, "睡 300 ms 也该记一次：共 \(watchdog.recentStalls.count) 次")
 
+stage("4. 日志文件")
 // 4. 日志文件：同样的内容在文件里。
 let logFile = logDirectory.appendingPathComponent(MainThreadWatchdog.logFileName)
 let log = (try? String(contentsOf: logFile, encoding: .utf8)) ?? ""
@@ -94,6 +101,7 @@ check(log.contains("stallTheMainThread"), "日志里要有栈")
 check(log.contains("ctx=check"), "日志里要有 context")
 check(log.components(separatedBy: "卡了 ").count - 1 == 2, "日志里该有两条记录")
 
+stage("4b. 旁注")
 // 4b. 旁注：不是卡顿的事也记进同一份日志（一行、带时刻、「注：」开头），不算卡顿。
 watchdog.note("note=check 播放中 seek → 12.345 s")
 let withNote = (try? String(contentsOf: logFile, encoding: .utf8)) ?? ""
@@ -101,6 +109,7 @@ check(withNote.contains("  注：note=check 播放中 seek → 12.345 s"), "旁�
 check(withNote.components(separatedBy: "卡了 ").count - 1 == 2, "旁注不算卡顿：仍是两条卡顿记录")
 check(watchdog.recentStalls.count == 2, "旁注不进 recentStalls")
 
+stage("5. stop 之后不再记")
 // 5. stop 之后不再记。
 watchdog.stop()
 pump(0.1)
@@ -109,10 +118,12 @@ pump(0.2)
 check(watchdog.recentStalls.count == 2, "stop 之后不该再记：共 \(watchdog.recentStalls.count) 次")
 check(watchdog.unresponsiveSeconds == nil, "stop 之后说不出主线程卡了多久（nil）")
 
+stage("6. 挂起主线程抓栈")
 // 6. 挂起主线程抓栈的那几十微秒里，抓栈线程一次都不许分配 / 释放内存（确定性：malloc_logger 钩子逐次数，
 //    NoAllocationWhileSuspended.swift；约束见 docs/architecture/main-thread-stack-capture.md）。
 checkNoAllocationWhileSuspended(captures: 300)
 
+stage("7. 端到端")
 // 7. 端到端：主线程不停分配内存的同时连续抓栈，不许卡死（CaptureUnderMallocChurn.swift）。
 checkCaptureUnderMallocChurn(seconds: 2)
 
