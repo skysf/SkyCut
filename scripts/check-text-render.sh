@@ -12,6 +12,8 @@
 #   3. 压在形状之上；
 #   4. 空文字不进导出；
 #   5. 位图是包络大小，不是整幅画布。
+#   6. 一段文字切成的几段（入场序列 / 中间静止图 / 出场序列）首尾相接：接缝上每一帧正好贴一层，不空、不叠
+#      （起点不在帧格子上 + 主轨几段拼接的微秒误差 + 接缝落在一帧上，checks/TextRender/SeamFrames.swift，2026-10-14）。
 # 另有一组纯值的（checks/TextRender/HitGeometry.swift）：预览上的可点范围 —— 看得见的
 # 都点得着、没选中时不按 80% 宽的整框判（2026-09-24）。
 #
@@ -143,6 +145,8 @@ xcrun swiftc \
   checks/TextRender/TextRows.swift \
   checks/TextRender/Probes.swift \
   checks/TextRender/FontFallback.swift \
+  checks/TextRender/Focus.swift \
+  checks/TextRender/SeamFrames.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"
