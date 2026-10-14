@@ -63,7 +63,7 @@ enum AIEditorPresenter {
         }
     }
 
-    /// 剪辑页的快捷键（菜单里「Edit Video」那一项，SrtFlowApp 的 `.keyboardShortcut("1", …)`；check-mcp.sh 对账）。
+    /// 剪辑页的快捷键：菜单里「Edit Video」那一项（SrtFlowApp）用的那个键，check-mcp.sh 对账。
     static let editVideoShortcut = "Command-1"
 
     /// 开回来的窗口放哪：从不激活 App（键盘留在用户那边）。看得见时摆到最前面；后台模式、正在录屏时放到所有窗口后面 ——
