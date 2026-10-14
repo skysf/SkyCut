@@ -65,8 +65,9 @@ final class AIBridgeServer: @unchecked Sendable {
         guard let line = try? MCPUnixSocket.readLine(fd) else { return }
         let response: MCPBridge.Response
         if let request = try? JSONDecoder().decode(MCPBridge.Request.self, from: line) {
-            let result = waitForMainActor { await AIToolRouter.shared.handle(request) }
-            response = MCPBridge.Response(id: request.id, result: result)
+            let answer = waitForMainActor { await AIToolRouter.shared.handle(request) }
+            // 带上这次用到的工程：小程序据此记住这个会话在剪哪一个（几个 AI 会话共用一个 App，`MCPSessionProject`）。
+            response = MCPBridge.Response(id: request.id, result: answer.result, project: answer.project)
         } else {
             response = MCPBridge.Response(id: "", result: MCPBridge.textResult(
                 "SrtFlow could not read the request from its AI helper. Ask the user to restart the AI app.",
@@ -78,7 +79,7 @@ final class AIBridgeServer: @unchecked Sendable {
     }
 
     /// 在这条专用线程上等主线程把活做完。
-    private func waitForMainActor(_ work: @escaping @MainActor () async -> JSONValue) -> JSONValue {
+    private func waitForMainActor(_ work: @escaping @MainActor () async -> AIToolRouter.Answer) -> AIToolRouter.Answer {
         let box = ResultBox()
         let done = DispatchSemaphore(value: 0)
         Task { @MainActor in
@@ -86,10 +87,10 @@ final class AIBridgeServer: @unchecked Sendable {
             done.signal()
         }
         done.wait()
-        return box.value ?? MCPBridge.textResult("SrtFlow did not finish the call.", isError: true)
+        return box.value ?? AIToolRouter.Answer(result: MCPBridge.textResult("SrtFlow did not finish the call.", isError: true))
     }
 }
 
 private final class ResultBox: @unchecked Sendable {
-    var value: JSONValue?
+    var value: AIToolRouter.Answer?
 }

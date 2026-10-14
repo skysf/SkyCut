@@ -19,41 +19,81 @@ final class AIToolRouter {
 
     private init() {}
 
-    func handle(_ request: MCPBridge.Request) async -> JSONValue {
+    /// 一次调用的回答：结果，和这次用到（或刚换上）的工程 —— 小程序据此记住这个会话在剪哪一个（`MCPSessionProject`）。
+    struct Answer {
+        var result: JSONValue
+        var project: MCPBridge.ProjectStamp?
+    }
+
+    /// 谁把开着的工程换成了现在这个（按工程代号记）：AI 的 open_project / new_project 做成时记下会话号和客户端；
+    /// 没记过的 = 用户在界面上换的（`AIProjectBinding.refusal` 据此说清楚是谁）。
+    private var switches: [Int: AIProjectBinding.Switch] = [:]
+
+    func handle(_ request: MCPBridge.Request) async -> Answer {
         guard request.bridge == MCPBridge.version else {
-            return MCPBridge.textResult(
+            return Answer(result: MCPBridge.textResult(
                 "This SrtFlow and its AI helper come from different versions. Ask the user to restart the AI app.",
                 isError: true
-            )
+            ))
         }
         guard let tool = MCPToolName(rawValue: request.tool) else {
-            return MCPBridge.textResult(
+            return Answer(result: MCPBridge.textResult(
                 "This SrtFlow does not have the tool \(request.tool). Ask the user to update SrtFlow.", isError: true
-            )
+            ))
         }
         let session = AISession.shared
-        if let refusal = session.refusalAfterStop() { return MCPBridge.textResult(refusal, isError: true) }
+        if let refusal = session.refusalAfterStop() { return Answer(result: MCPBridge.textResult(refusal, isError: true)) }
         session.noteCall(client: request.client)
         let arguments = AIToolArguments(request.arguments)
         let policy = Policy(tool)
-        guard policy.serialized else { return await execute(tool, arguments, policy) }
+        guard policy.serialized else { return await execute(tool, arguments, policy, request) }
         let previous = tail
-        let work = Task { @MainActor () -> JSONValue in
+        let work = Task { @MainActor () -> Answer in
             await previous?.value
-            return await self.execute(tool, arguments, policy)
+            return await self.execute(tool, arguments, policy, request)
         }
         tail = Task { _ = await work.value }
         return await work.value
     }
 
-    private func execute(_ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy) async -> JSONValue {
+    private func execute(
+        _ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ request: MCPBridge.Request
+    ) async -> Answer {
         let project = VideoEditProject.shared
         // 排队期间用户按了停止：排在后面的也不做了。
         if policy.startsRound, AISession.shared.phase == .stopped {
-            return MCPBridge.textResult(
+            return Answer(result: MCPBridge.textResult(
                 "The user pressed Stop in SrtFlow. Stop calling tools and ask the user what to do next.", isError: true
+            ))
+        }
+        // 开着的不是这个会话的工程（别的会话或用户换了、App 重启过）：一样都不做，也不摆窗口、不开一轮。
+        // 排到它这一刻才查 —— 排队时前面可能正是别人的 open_project（docs/architecture/ai-control-mcp.md 第四节第 46 条）。
+        let usesProject = AIProjectBinding.usesProject(tool, arguments)
+        if usesProject, let refusal = AIProjectBinding.refusal(
+            expected: request.project, current: stamp(project), session: request.session,
+            switchedBy: switches[project.documentGeneration]
+        ) {
+            return Answer(result: MCPBridge.textResult(refusal, isError: true))
+        }
+        let switchesProject = tool == .openProject || tool == .newProject
+        let result = await run(tool, arguments, policy, project)
+        if switchesProject, result["isError"]?.boolValue != true {
+            switches[project.documentGeneration] = AIProjectBinding.Switch(
+                session: request.session, client: AISession.displayName(for: request.client ?? "AI")
             )
         }
+        return Answer(result: result, project: usesProject || switchesProject ? stamp(project) : nil)
+    }
+
+    /// 开着的工程是谁（`MCPBridge.ProjectStamp`）。
+    private func stamp(_ project: VideoEditProject) -> MCPBridge.ProjectStamp {
+        MCPBridge.ProjectStamp(
+            token: AIProjectBinding.token(generation: project.documentGeneration),
+            path: project.documentURL?.path, name: project.projectName
+        )
+    }
+
+    private func run(_ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ project: VideoEditProject) async -> JSONValue {
         do {
             // 窗口只在一轮开始时摆到前面（docs/plans/2026-09-27-mcp.md 第 32 条）：这一轮中途不再一步一跳；
             // 后台模式（第 7 条）一次都不摆。
@@ -65,7 +105,7 @@ final class AIToolRouter {
                 try await AIEditorPresenter.prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)
             }
             if policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }
-            let result = try await run(tool, arguments, project)
+            let result = try await dispatch(tool, arguments, project)
             guard result.changedProject else { return result.json }
             AISession.shared.noteChange()
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
@@ -81,7 +121,7 @@ final class AIToolRouter {
     /// 异步的 add_clips 在它自己那一次 perform 外面包；edit_clip 先 await 看画面、再把同步的提交包起来；
     /// freeze_frame 抽帧转码要 await，把「提交那一下」交给定格去包（AIClipTools.freeze）；
     /// 撤销的「一轮」在 AIProjectTools.undo 里包。
-    private func run(_ tool: MCPToolName, _ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+    private func dispatch(_ tool: MCPToolName, _ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let undo = project.effectiveUndoManager
         switch tool {
         case .getStatus: return try AIProjectTools.status(args, project)
