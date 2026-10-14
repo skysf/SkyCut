@@ -54,7 +54,7 @@ enum AILookFiles {
                 frames.append(frame)
                 labels.append(label(for: url))
             } else if entry["note"] == nil {
-                entry["note"] = "SrtFlow could not read a picture from it"
+                entry["note"] = .string(await AIUnreadableVideo.reason(for: url))
             }
             entries.append(.object(entry))
         }

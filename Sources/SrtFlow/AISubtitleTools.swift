@@ -219,7 +219,7 @@ enum AISubtitleTools {
     static func style(_ args: AIToolArguments) async throws -> AISubtitleStyleChange? {
         guard let change = try AISubtitleStyleChange(args) else { return nil }
         guard change.font != nil else { return change }
-        return try change.resolvingFont(in: await FontCatalogStore.shared.loadedFonts().map(\.familyName))
+        return try change.resolvingFont(in: await FontCatalogStore.shared.loadedFonts())
     }
 
     static func edit(_ args: AIToolArguments, style: AISubtitleStyleChange?, _ project: VideoEditProject) throws -> AIToolResult {

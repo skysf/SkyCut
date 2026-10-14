@@ -701,6 +701,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   预览只垫黑底、压黑 / 闪白走半程模型，闪白成了黑场；带关键帧的段推移一律回退成双向淡变，而跟拍铺满给每段都打位置关键帧。压黑 / 闪白照 xfade 的公式逐帧算
   （`XfadeColorCurve`，三层叠：出场 α、进场 β、颜色底，用仓库 ffmpeg 核过）、闪白垫白底、关键帧段推移的画布裁切按每片的摆放算。
   **写下的「做不到」要么去做、要么在用到的地方说出来；保守回退要看在真实工程里有多常见。**
+- [2026-10-14 审美盲测撞出的六处 AI 工具小毛病](docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) — set_transition 只回 {"cuts": 1}
+  （改成报每条缝在哪、多长、被夹短、定格了多少）；duplicate_items 写 A2 叫人用 set_track（和 add_clips 同一套名字：正好多一条就新开）；look 读不了 hev1 的
+  upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
+  字幕字体只认 Core Text 给的族名「蘋方-簡」不认「PingFang SC」（读 name 表里的别名）；find_audio 的 vocals 只在为真时写。
+  **结果里只回一个计数等于没回；区分两种东西要挑它们真正不同的那一处，只调门槛修不好。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
