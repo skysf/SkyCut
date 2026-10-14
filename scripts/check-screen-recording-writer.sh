@@ -76,6 +76,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditCompositionBuilder.swift \
+  Sources/SrtFlow/CompositionFade.swift \
   Sources/SrtFlow/CompositionClipInsert.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaLookup.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaPolicy.swift \

@@ -76,6 +76,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditCompositionBuilder.swift \
+  Sources/SrtFlow/CompositionFade.swift \
   Sources/SrtFlow/CompositionClipInsert.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaLookup.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaPolicy.swift \
@@ -105,6 +106,7 @@ xcrun swiftc \
   checks/PreviewComposition/SliceTicks.swift \
   checks/PreviewComposition/Scenes.swift \
   checks/PreviewComposition/ScaleKeyframes.swift \
+  checks/PreviewComposition/TransitionLook.swift \
   checks/PreviewComposition/ProxySwap.swift \
   checks/OptimizedMedia/RampVideo.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
