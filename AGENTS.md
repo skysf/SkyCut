@@ -704,6 +704,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-14 AI 以为成片是 720p](docs/bugfixes/2026-10-14-ai-thinks-export-is-720p.md) — export_video / get_job 不报成片多大，AI 用 look 看成片，
   结果里的 `picture_size` 是发给它的缩略图（最长边 1280），1080×1920 的成片就成了 720p。导出开始和做完都带 `video`（宽高帧率，和导出同一个 `cappedSize`），
   look 看文件报文件本身的尺寸、缩略图的尺寸另写。**AI 会拿手边任何一个数字当答案：该说的事实要在产出它的工具结果里说。**
+- [2026-10-14 挪了配音段，它的字幕留在原地](docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md) — 联动只跟主轨的画面，配音在音频轨上、挪了主轨没变；
+  配音的字幕走 `insertCue` 还丢了「从哪段生成的」。补上来源，联动加规矩 11（`CaptionSourceFollow`）：来源段不在主轨上时字幕按素材那一刻跟着挪、真删一起删。
+  **跟着走的规矩要问清跟的是什么：字幕是声音说出来的，就跟声音走；数据里本来有的关系，新入口要照样记。**
 - [2026-10-14 审美盲测撞出的六处 AI 工具小毛病](docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) — set_transition 只回 {"cuts": 1}
   （改成报每条缝在哪、多长、被夹短、定格了多少）；duplicate_items 写 A2 叫人用 set_track（和 add_clips 同一套名字：正好多一条就新开）；look 读不了 hev1 的
   upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
@@ -713,9 +716,6 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   和 App 的抓栈代码无关：回调读 Swift 的 `var` 全局要做动态独占检查、要用线程的 TLS，没有 TLS 的线程（退出时拆 TSD 的、刚起的）在回调里建它就分配 →
   又进回调 → 递归 670 层爆栈。状态改放 `static let` 指着的裸内存，加一条确定性的回归（钩子装着时起一条裸线程分配、退出）。
   **钩子回调里「不分配」要算上运行时替你做的事；只在 CI 上偶发的崩溃，先让 CI 自己把崩溃报告打出来。**
-- [2026-10-14 挪了配音段，它的字幕留在原地](docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md) — 联动只跟主轨的画面，配音在音频轨上、挪了主轨没变；
-  配音的字幕走 `insertCue` 还丢了「从哪段生成的」。补上来源，联动加规矩 11（`CaptionSourceFollow`）：来源段不在主轨上时字幕按素材那一刻跟着挪、真删一起删。
-  **跟着走的规矩要问清跟的是什么：字幕是声音说出来的，就跟声音走；数据里本来有的关系，新入口要照样记。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
