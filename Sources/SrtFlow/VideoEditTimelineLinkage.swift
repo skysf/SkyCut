@@ -150,7 +150,7 @@ enum TimelineLinkage {
         var report = signature(of: before) != signature(of: after)
             ? followMain(from: before, to: &after, deletesContent: deletesContent) : Report()
         // 主轨那条挪过的字幕不再碰（`plan` 只看这次没变过的句子）。
-        let captions = CaptionSourceFollow.plan(from: before, to: after, deletesContent: deletesContent)
+        let captions = CaptionSourceFollow.Plan()  // reverse check: subtitles never follow their source clip
         CaptionSourceFollow.apply(captions, to: &after)
         report.moved += captions.moves.count
         report.deleted += captions.deletes.count
