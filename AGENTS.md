@@ -704,6 +704,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-14 AI 以为成片是 720p](docs/bugfixes/2026-10-14-ai-thinks-export-is-720p.md) — export_video / get_job 不报成片多大，AI 用 look 看成片，
   结果里的 `picture_size` 是发给它的缩略图（最长边 1280），1080×1920 的成片就成了 720p。导出开始和做完都带 `video`（宽高帧率，和导出同一个 `cappedSize`），
   look 看文件报文件本身的尺寸、缩略图的尺寸另写。**AI 会拿手边任何一个数字当答案：该说的事实要在产出它的工具结果里说。**
+- [2026-10-14 审美盲测撞出的六处 AI 工具小毛病](docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) — set_transition 只回 {"cuts": 1}
+  （改成报每条缝在哪、多长、被夹短、定格了多少）；duplicate_items 写 A2 叫人用 set_track（和 add_clips 同一套名字：正好多一条就新开）；look 读不了 hev1 的
+  upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
+  字幕字体只认 Core Text 给的族名「蘋方-簡」不认「PingFang SC」（读 name 表里的别名）；find_audio 的 vocals 只在为真时写。
+  **结果里只回一个计数等于没回；区分两种东西要挑它们真正不同的那一处，只调门槛修不好。**
 - [2026-10-14 出场动画先快后慢：形状 2.2 秒的淡出 1 秒就快没了](docs/bugfixes/2026-10-14-exit-animations-front-loaded.md) — 文字、形状、画面段三个求值器的出场
   都写成 `easeInCubic(r)`，可出场里的 r 是剩下多少（1 倒数到 0），easeIn 作用在剩余进度上在时间上就是先快后慢，正是注释说的「慢慢停住」的反面；
   检查照着实现抄期望值，把错的曲线钉成了对的。出场改成入场倒着放（同一条 easeOutCubic），第 45 组按意图钉（1 秒时还剩九成、倒着放一个样）。

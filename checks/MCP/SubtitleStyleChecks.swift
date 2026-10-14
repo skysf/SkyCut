@@ -1,3 +1,4 @@
+import CoreText
 import CoreGraphics
 import Foundation
 import SrtFlowCore
@@ -39,9 +40,55 @@ private func styleParsing() {
     checkThrows("style：字色不能是 none") { _ = try change(["color": "none"]) }
     checkThrows("style：放大超过 1.3 报错") { _ = try change(["highlight_scale": 2]) }
     checkThrows("style：style 不是对象报错") { _ = try AISubtitleStyleChange(AIToolArguments(.object(["style": "big"]))) }
-    let fonts = ["Hiragino Sans GB", "Helvetica Neue"]
+    func font(_ name: String, aliases: [String] = []) -> SubtitleFont {
+        SubtitleFont(familyName: name, fileURL: URL(fileURLWithPath: "/tmp/\(name).ttf"), supportsChinese: true, aliases: aliases)
+    }
+    let fonts = [font("Hiragino Sans GB", aliases: ["冬青黑体简体中文"]), font("Helvetica Neue")]
     checkEqual(try? change(["font": "hiragino sans gb"])?.resolvingFont(in: fonts).font, "Hiragino Sans GB", "style：字体名不分大小写、回表里的写法")
     checkThrows("style：烧录用不了的字体报错（苹方这种读不到文件的）") { _ = try change(["font": "PingFang SC"])?.resolvingFont(in: fonts) }
+    // 2026-10-06 盲测：用户自己装的苹方族名是「蘋方-簡」，字体文件里还写着「PingFang SC」—— 按哪个名字叫都认，回族名。
+    let installed = fonts + [font("蘋方-簡", aliases: ["PingFang SC"])]
+    checkEqual(try? change(["font": "PingFang SC"])?.resolvingFont(in: installed).font, "蘋方-簡",
+               "style：字体文件里的别名（PingFang SC）也认，回清单里的族名")
+    checkEqual(try? change(["font": "pingfang sc"])?.resolvingFont(in: installed).font, "蘋方-簡", "style：别名同样不分大小写")
+    checkEqual(try? change(["font": "冬青黑体简体中文"])?.resolvingFont(in: installed).font, "Hiragino Sans GB", "style：中文的别名也认")
+    do {
+        _ = try change(["font": "Songti SC"])?.resolvingFont(in: installed)
+        check(false, "style：清单里没有的字体该报错")
+    } catch {
+        check("\(error)".contains("蘋方-簡 (PingFang SC)"), "style：报错列出能用的字体时带上英文的别名：\(error)")
+    }
+    runFontFamilyNameChecks()
+}
+
+/// name 表里的族名（FontFamilyNames）：手造一张表（Windows 平台的繁中 / 英文、Mac 平台的 Roman、别的 nameID、看不懂的编码），
+/// 再读一款系统字体的真表。
+private func runFontFamilyNameChecks() {
+    func be16(_ value: Int) -> [UInt8] { [UInt8(value >> 8 & 0xFF), UInt8(value & 0xFF)] }
+    let entries: [(platform: Int, encoding: Int, language: Int, nameID: Int, bytes: [UInt8])] = [
+        (3, 1, 0x0404, 1, Array("蘋方-簡".data(using: .utf16BigEndian)!)),
+        (3, 1, 0x0409, 1, Array("PingFang SC".data(using: .utf16BigEndian)!)),
+        (1, 0, 0, 1, Array("PingFang SC".utf8)),                         // Mac Roman：同一个名字只留一次
+        (3, 1, 0x0409, 4, Array("PingFang SC Regular".data(using: .utf16BigEndian)!)),  // 全名不是族名
+        (1, 1, 11, 1, [0x82, 0xA0]),                                      // Mac 日文编码：看不懂，跳过
+        (3, 1, 0x0409, 16, Array("PingFang".data(using: .utf16BigEndian)!))
+    ]
+    var records: [UInt8] = []
+    var strings: [UInt8] = []
+    for entry in entries {
+        records += be16(entry.platform) + be16(entry.encoding) + be16(entry.language) + be16(entry.nameID)
+            + be16(entry.bytes.count) + be16(strings.count)
+        strings += entry.bytes
+    }
+    let table = Data(be16(0) + be16(entries.count) + be16(6 + records.count) + records + strings)
+    checkEqual(FontFamilyNames.names(inNameTable: table), ["蘋方-簡", "PingFang SC", "PingFang"],
+               "name 表：族名（1）和印刷族名（16）都读，去重，全名和看不懂的编码跳过")
+    checkEqual(FontFamilyNames.names(inNameTable: Data([0, 0, 0, 5])), [], "name 表：残缺的表读不出东西，不崩")
+    // 真表：系统自带的冬青黑体，英文族名之外还有中文写的族名。
+    let hiragino = CTFontCreateWithName("Hiragino Sans GB" as CFString, 24, nil)
+    let real = FontFamilyNames.names(of: hiragino)
+    check(real.contains("Hiragino Sans GB") && real.contains { $0.unicodeScalars.contains { $0.value >= 0x4E00 } },
+          "name 表：冬青黑体的真表里有英文和中文的族名：\(real)")
 }
 
 private func styleOnProject() {

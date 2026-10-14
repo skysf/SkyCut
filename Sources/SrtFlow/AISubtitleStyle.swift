@@ -129,15 +129,19 @@ struct AISubtitleStyleChange: Equatable {
 
     var changesHighlight: Bool { highlight != nil || highlightScale != nil }
 
-    /// 字体名按这台 Mac 上烧录能用的字体认（大小写不敏感，回表里的写法）；认不出就报错，列出能用的。
-    func resolvingFont(in available: [String]) throws -> AISubtitleStyleChange {
+    /// 字体名按这台 Mac 上烧录能用的字体认（大小写不敏感；族名先认，再认字体文件里的别名 —— 用户装的苹方族名是「蘋方-簡」，
+    /// AI 说的是「PingFang SC」），回表里的族名；认不出就报错，列出能用的（带上英文的别名）。
+    func resolvingFont(in available: [SubtitleFont]) throws -> AISubtitleStyleChange {
         guard let name = font else { return self }
-        guard let match = available.first(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) else {
-            let some = available.prefix(40).joined(separator: ", ")
+        guard let match = available.first(where: { $0.familyName.caseInsensitiveCompare(name) == .orderedSame })
+            ?? available.first(where: { $0.answers(to: name) }) else {
+            let some = available.prefix(40).map { font in
+                font.aliases.first { $0.allSatisfy(\.isASCII) }.map { "\(font.familyName) (\($0))" } ?? font.familyName
+            }.joined(separator: ", ")
             throw AIToolError("The font \(name) cannot be used for subtitles on this Mac (burning needs a font file SrtFlow can read). Fonts that work: \(some).")
         }
         var resolved = self
-        resolved.font = match
+        resolved.font = match.familyName
         return resolved
     }
 

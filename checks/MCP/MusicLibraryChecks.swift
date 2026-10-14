@@ -47,6 +47,7 @@ private func checkSoundEffectDescription() {
     checkEqual(described["hit"]?.doubleValue, 0.165, "its hit point is reported")
     checkEqual(described["title_zh"]?.stringValue, "深渊爆响", "the Chinese title comes along")
     check(described["credit"] == nil && described["artist"] == nil, "no credit line and no empty artist for an owned effect")
+    check(described["vocals"] == nil, "a sound effect has no vocals field")
     checkEqual(AIMusicCredits.describe(track("m1", artist: "Amy", title: "Morning"), downloaded: false)["kind"]?.stringValue, "music",
                "a music track says music")
 }
@@ -57,7 +58,8 @@ private func checkTrackDescription() {
     checkEqual(described["tags"]?.arrayValue?.compactMap(\.stringValue), ["calm"], "tags in English")
     checkEqual(described["loudness_lufs"]?.doubleValue, -14.3, "loudness rounded to 0.1 LUFS")
     checkEqual(described["credit"]?.stringValue, "Morning by Amy (CC-BY-4.0)", "the credit line as the manifest gives it")
-    check(described["vocals"] == nil && described["downloaded"] == nil, "defaults are left out")
+    checkEqual(described["vocals"]?.boolValue, false, "every music track says whether it has vocals (the description promises it)")
+    check(described["downloaded"] == nil, "not downloaded is left out")
     var vocal = track("m2", artist: "Amy", title: "Song")
     vocal.hasVocals = true
     let downloaded = AIMusicCredits.describe(vocal, downloaded: true)

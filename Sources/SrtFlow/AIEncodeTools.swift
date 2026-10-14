@@ -54,7 +54,7 @@ enum AIEncodeTools {
             throw AIToolError("style.highlight needs word times, which subtitle files do not have. It works on the project's own subtitles (edit_subtitles).")
         }
         let fonts = await FontCatalogStore.shared.loadedFonts()
-        styleChange = try styleChange?.resolvingFont(in: fonts.map(\.familyName))
+        styleChange = try styleChange?.resolvingFont(in: fonts)
         let batchStyle = styleChange.map { $0.applied(to: EncodeQueue.burnIn.burnInStyle) }
         let batchFontURL = batchStyle.flatMap { style in fonts.first { $0.familyName == style.fontName }?.fileURL }
         let all = pairs.flatMap { [$0.video, $0.subtitles] }

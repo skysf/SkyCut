@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 
 // 去黑边（AIBlackBars）：遮幅、柱边、暗场、夜空里的星星、遮幅里压着字幕、几帧合起来取最小，
+// 水下 / 暗棚这种一点点亮起来的暗处（没有一道边，不是黑边），
 // 以及真画一张 CGImage 读回来 —— 第一行必须是画面最上面一行（上下弄反了就裁错边）。
 // 编法见 scripts/check-mcp.sh。
 
@@ -9,16 +10,22 @@ func runBlackBarChecks() {
     checkLetterboxAndPillarbox()
     checkDarkFramesAndStars()
     checkSubtitleInsideBar()
+    checkDarkEdgesWithoutAnEdge()
     checkCombineTakesTheSmallest()
     checkLumaIsTopDown()
 }
 
 /// 造一帧：`width`×`height`，`bright(x, y)` 为真的地方是亮的内容（带点起伏），其余是带噪点的黑。
 private func frame(_ width: Int, _ height: Int, bright: (Int, Int) -> Bool) -> AIBlackBars.Luma {
+    shaded(width, height) { x, y in bright(x, y) ? Double(60 + (x * 7 + y * 13) % 180) : Double((x + y) % 12) }
+}
+
+/// 造一帧：每个像素的亮度由 `value(x, y)` 给（夹在 0…255）。
+private func shaded(_ width: Int, _ height: Int, value: (Int, Int) -> Double) -> AIBlackBars.Luma {
     var pixels = [UInt8](repeating: 0, count: width * height)
     for y in 0..<height {
         for x in 0..<width {
-            pixels[y * width + x] = bright(x, y) ? UInt8(60 + (x * 7 + y * 13) % 180) : UInt8((x + y) % 12)
+            pixels[y * width + x] = UInt8(min(255, max(0, value(x, y).rounded())))
         }
     }
     return AIBlackBars.Luma(width: width, height: height, pixels: pixels)
@@ -61,13 +68,39 @@ private func checkSubtitleInsideBar() {
     checkEqual(rounded(subtitled?.bottom), rounded(8.0 / 144), "a bar with burned-in subtitles stops at the text")
 }
 
+/// 2026-10-06 盲测（docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md 第 4 条）：水下的镜头被报成
+/// 左边 16% 的黑边、暗棚里人像四边都是「黑边」。它们的暗处都过得了「一行算黑」，差在没有一道边：暗处是一点点亮起来的
+/// （紧挨着的那一行只亮 0–2，最亮的点也只有 41–58）。
+private func checkDarkEdgesWithoutAnEdge() {
+    // 水下 / 暗角：从左边几乎全黑一点点亮到右边（前二十来列每一列都「算黑」）。
+    let underwater = shaded(256, 144) { x, y in 2 + Double(x) * 0.9 + Double((x * 7 + y * 13) % 7) }
+    checkEqual(AIBlackBars.bars(in: underwater), AIBlackBars.Insets.none, "a dark edge that brightens bit by bit is not a bar")
+    checkEqual(AIBlackBars.reading(in: underwater)?.left, .some(nil), "…its left edge cannot be told, rather than called a bar")
+    // 暗棚：四边都是暗灰、往中间的人一点点亮起来。
+    let studio = shaded(256, 144) { x, y in
+        let fromEdge = Double(min(x, 255 - x, y, 143 - y))
+        return 6 + fromEdge * 0.8 + Double((x * 3 + y * 5) % 9)
+    }
+    checkEqual(AIBlackBars.bars(in: studio), AIBlackBars.Insets.none, "a dark studio that brightens towards the middle has no bars")
+    // 真遮幅，画面的第一行是暗的地面（实测最小的一道边 25）：照样认得出。
+    let darkGround = shaded(256, 144) { x, y in
+        y < 18 || y >= 126 ? Double((x + y) % 6) : 30 + Double((x * 5 + y) % 9)
+    }
+    checkEqual(rounded(AIBlackBars.bars(in: darkGround)?.bottom), 0.125, "a real letterbox over dark ground is still a bar")
+}
+
 private func checkCombineTakesTheSmallest() {
-    let wide = AIBlackBars.Insets(top: 0.125, bottom: 0.125, left: 0, right: 0)
-    let narrow = AIBlackBars.Insets(top: 0.05, bottom: 0.2, left: 0, right: 0)
+    let wide = AIBlackBars.Reading(top: 0.125, bottom: 0.125, left: 0, right: 0)
+    let narrow = AIBlackBars.Reading(top: 0.05, bottom: 0.2, left: 0, right: 0)
     let combined = AIBlackBars.combine([wide, nil, narrow])
     checkEqual(combined, AIBlackBars.Insets(top: 0.05, bottom: 0.125, left: 0, right: 0),
                "several frames: each edge takes the smallest bar, frames that do not count are skipped")
     checkEqual(AIBlackBars.combine([nil, nil]), nil, "no frame that counts: cannot tell")
+    // 遮幅电影里有一帧刚好是夜景、边上说不准：别的帧认得出遮幅就照样去掉；每一帧都说不准就当没有。
+    let unsure = AIBlackBars.Reading(top: nil, bottom: nil, left: 0, right: 0)
+    checkEqual(AIBlackBars.combine([unsure, wide]), AIBlackBars.Insets(top: 0.125, bottom: 0.125, left: 0, right: 0),
+               "a frame that cannot tell an edge does not cancel the bars the other frames found")
+    checkEqual(AIBlackBars.combine([unsure, unsure])?.top, 0, "no frame can tell an edge: no bar there")
     let active = AIBlackBars.Insets(top: 0.1, bottom: 0.2, left: 0.05, right: 0).active
     check(abs(active.minY - 0.1) < 1e-9 && abs(active.height - 0.7) < 1e-9 && abs(active.width - 0.95) < 1e-9,
           "the usable area is what the bars leave (\(active))")
