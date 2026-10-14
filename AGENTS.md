@@ -709,6 +709,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
   字幕字体只认 Core Text 给的族名「蘋方-簡」不认「PingFang SC」（读 name 表里的别名）；find_audio 的 vocals 只在为真时写。
   **结果里只回一个计数等于没回；区分两种东西要挑它们真正不同的那一处，只调门槛修不好。**
+- [2026-10-14 看门狗自检在 CI 上偶发 Bus error](docs/bugfixes/2026-10-14-watchdog-check-hook-recursion.md) — 崩在自检第 6 组自己装的 `malloc_logger` 钩子里、
+  和 App 的抓栈代码无关：回调读 Swift 的 `var` 全局要做动态独占检查、要用线程的 TLS，没有 TLS 的线程（退出时拆 TSD 的、刚起的）在回调里建它就分配 →
+  又进回调 → 递归 670 层爆栈。状态改放 `static let` 指着的裸内存，加一条确定性的回归（钩子装着时起一条裸线程分配、退出）。
+  **钩子回调里「不分配」要算上运行时替你做的事；只在 CI 上偶发的崩溃，先让 CI 自己把崩溃报告打出来。**
 - [2026-10-14 出场动画先快后慢：形状 2.2 秒的淡出 1 秒就快没了](docs/bugfixes/2026-10-14-exit-animations-front-loaded.md) — 文字、形状、画面段三个求值器的出场
   都写成 `easeInCubic(r)`，可出场里的 r 是剩下多少（1 倒数到 0），easeIn 作用在剩余进度上在时间上就是先快后慢，正是注释说的「慢慢停住」的反面；
   检查照着实现抄期望值，把错的曲线钉成了对的。出场改成入场倒着放（同一条 easeOutCubic），第 45 组按意图钉（1 秒时还剩九成、倒着放一个样）。
