@@ -48,12 +48,49 @@ public enum MCPBridge {
         public var result: JSONValue
         /// 这一次用到的（或刚换上的）工程；没碰工程的调用、被拒的调用不带。小程序据此记住这个会话在剪哪一个。
         public var project: ProjectStamp?
+        /// 只有回答「探一下」（`probeTool`）时带：主线程还活着没有、问的那个调用到哪了。
+        public var health: Health?
 
-        public init(id: String, result: JSONValue, project: ProjectStamp? = nil) {
+        public init(id: String, result: JSONValue, project: ProjectStamp? = nil, health: Health? = nil) {
             self.bridge = MCPBridge.version
             self.id = id
             self.result = result
             self.project = project
+            self.health = health
+        }
+    }
+
+    // MARK: App 卡住的时候
+
+    /// 小程序等一个调用等久了，另开一条连接问 App 的那一种请求（`Request.tool` 写这个名字，不是 MCP 的工具）。
+    /// App 在收发线程上当场回、**不经主线程**：主线程卡死了也答得上来。参数 `call` 是在等的那个调用的 id，
+    /// `abandon: true` = 小程序不等了 —— 那个调用还没开始就不做了（不然 App 缓过来之后照做，AI 以为它失败了、再调一次就做了两遍）。
+    /// docs/architecture/ai-control-mcp.md 第三节「App 卡住的时候」。
+    public static let probeTool = "_srtflow_probe"
+
+    /// 一个调用在 App 里到哪了。
+    public enum CallState: String, Codable, Sendable {
+        /// 还没轮到（主线程卡着、或者排在别的调用后面）。
+        case waiting
+        /// 正在做。
+        case running
+        /// 做完了（回答可能还在路上）。
+        case finished
+        /// 没开始就放弃了，不会再做。
+        case dropped
+        /// App 不认得这个 id（太早、太晚，或者 App 重启过）。
+        case unknown
+    }
+
+    public struct Health: Codable, Sendable, Equatable {
+        /// 主线程已经多久没回应（秒）：0 = 好好的；nil = 量不出来（App 的看门狗关着）。
+        public var mainThreadStuckSeconds: Double?
+        /// 问到的那个调用到哪了（没问就是 nil）。
+        public var call: CallState?
+
+        public init(mainThreadStuckSeconds: Double?, call: CallState?) {
+            self.mainThreadStuckSeconds = mainThreadStuckSeconds
+            self.call = call
         }
     }
 
@@ -98,9 +135,10 @@ public enum MCPBridge {
         return .object(object)
     }
 
-    /// 小程序得先把 App 拉起来才连得上时，结果前面那一句：之前打开的工程、文件夹都不在了（多半是 App 被退出过）。
+    /// 小程序得先把 App 拉起来才连得上时，结果前面那一句：之前打开的工程、文件夹、看法都不在了（多半是 App 被退出过）。
     public static let relaunchNote = "Note: SrtFlow was not running, so it was just started. Nothing from before is open: "
-        + "call open_folder and open_project again before using earlier paths or ids."
+        + "call open_folder and open_project again before using earlier paths or ids (and set_view background again if you "
+        + "were working in the background)."
 
     // MARK: 在哪说
 

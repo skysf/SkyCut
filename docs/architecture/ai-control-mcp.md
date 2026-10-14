@@ -86,6 +86,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
   `open_folder` / `open_project`。不加的话它只看到「文件不存在」「没有这个 id」，要自己去猜（南极工程那一次就是这样）。
 - **每个请求带着「这个会话在剪的工程」**（`Request.project` + 会话号 `session`，2026-10-14，第四节第 46 条）：小程序一个进程一个会话，
   它记着（`MCPSessionProject`）；App 碰了工程的回答带上此刻的工程（`Response.project`）。两个字段都是可选的，老小程序 / 老 App 照旧能通。
+- **App 卡住的时候**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-calls-time-out-silently-when-app-hangs.md)）：
+  - 小程序**分段等**：每 15 秒没回答就另开一条连接「探一下」（`MCPBridge.probeTool`，不是 MCP 的工具）；App 在**收发线程上当场答、不经主线程**：
+    主线程此刻卡了多久（`MainThreadWatchdog.unresponsiveSeconds`；看门狗关着时自己投一个空块、从第一次没落地算起）、这个调用到哪了（`AIBridgeCalls`）。
+  - **卡了 30 秒以上就不等**（多数客户端一个调用只等一分钟，要在那之前说出来）；主线程好好的、调用就是不回来，等满 120 秒。规则和话都在 `MCPCallWait`（纯值），
+    等的那一段在小程序的 `CallWaiter`。
+  - **放弃时让 App 也放弃**（`abandon`）：还没开始的就不做了（路由轮到它时 `begin()` 回 false）；已经在做的照做完、照实说「在做」。小程序断开
+    （客户端关了）而调用还没开始，App 同样记成放弃。不然 App 缓过来之后照做，AI 以为它失败了、再调一次就做两遍。
+  - 回给 AI 的话回答三件事：卡了多久（或忙了多久）、这一步做没做 / 以后会不会做、告诉用户可以等或强退重开、再调之前用 get_timeline 查。
+  - 上一次是因为卡死放弃的，下一个调用先探一下，**还卡着就不发**、当场说（`Not sent: …`）；缓过来了、或 App 已经不在了（照常拉起来）就照常发。
 - **关掉主窗口不退出 App**（`applicationShouldTerminateAfterLastWindowClosed` 返回 false，2026-10-03 用户定）：SwiftUI 只有一个
   `Window` 场景时默认关窗就退出 —— 工程、AI 打开的文件夹全没了，下一次调用拉起来的是空的 Untitled
   （[案例](../bugfixes/2026-10-03-closing-window-quits-app.md)）。关了窗口 App 留在 Dock 里、工程还开着；点 Dock 图标 SwiftUI 把窗口开回来，
@@ -125,7 +134,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    时间线滚到看得见（不动窗口）。AI 从不移动鼠标、不模拟按键。
    **后台模式**（`set_view`，方案第 7 条）：一次都不摆窗口、`reveal` 不选中不挪播放头（`seek` 例外：AI 就是要给用户看
    那一刻）；改动照样进工程、照样一步撤销。总说明要求 AI 一次对话问一次「要看过程还是后台直接出结果」（用户说了就不问）。
-   这次运行里一直有效，App 重开回到看得见。
+   这次运行里一直有效，App 重开回到看得见（拉起 App 那一次的提示 `relaunchNote` 叫 AI 再调一次 `set_view background`）。
+   **窗口开得回来**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-calls-time-out-silently-when-app-hangs.md)）：「打开主窗口」的动作两处存 ——
+   主窗口出现时、和**菜单建好时**（`ProjectCommands` → `noteMenuOpenWindow`，实测比主窗口早 1.2 秒；主窗口从没出现过也开得回来）；
+   刚启动时窗口和这个动作都还没有就等最多 10 秒（内存吃紧的机器上窗口 8 秒后还没出来）。开回来的窗口**从不激活 App**：看得见时
+   `orderFrontRegardless`，**后台模式和录屏中 `orderBack`**（开回来只为了让改动进得了 ⌘Z，不该盖住用户在看的窗口、不该被录进去）；
+   刚开回来时等剪辑页交出撤销管理器最多 10 秒。真开不回来才叫用户开，话里的快捷键是 `editVideoShortcut`（和菜单对账，以前写着 ⌘3）。
 5. **不许弹模态框。** 用户在对话框那边，看不见也点不着，调用就一直挂着。「当前工程从没存过、又剪了东西」
    的时候 AI 要打开 / 新建别的工程：先把它存进 `SrtFlow/工程`（撞名加编号）再换，结果里写 `previous_project_saved_to`
    （原来那条路就不会弹了；方案第 34 条：不问也不丢）。
@@ -751,6 +765,10 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 `open_project` / `new_project` 之后的调用带着对的工程、一个进程一个会话号；App 的判断各种情况各说什么；每个工具碰不碰工程的表；
 老格式照样解得开），以及扫描：路由在摆窗口、开一轮之前查，记下谁换的工程，用到的工程回给小程序，小程序带上、记下。
 
+**App 卡住的时候（第三节）**：`scripts/check-mcp.sh` 的 `HangChecks`（什么时候放弃、各种情况怎么说；App 那份记录；真起小程序接卡死的假 App：
+第一次探就说清楚、让 App 放弃、下一个调用不发；接忙的假 App：说还在做、不是卡死），扫描（`checks/MCP/router-wiring.sh`，由 check-mcp.sh source 进来：
+探一下不经主线程、断开即放弃、路由先问还做不做、主窗口开得回来、快捷键和菜单对账；路由的撤销分组、窗口什么时候摆、几个会话的核对也搬进了这个文件）；`scripts/check-main-thread-watchdog.sh` 第 1b 组（主线程卡了多久别的线程读得到）。
+
 ## 八、人工回归清单（发版前在真机上走一遍）
 
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
@@ -874,6 +892,12 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
       A 问你之后 `open_project` 甲再加，字进了甲。你自己在界面上 ⌘O 换一个工程，A 再改：说的是「the user switched」。
       退出重开 SrtFlow 后 A 再改：说「SrtFlow was restarted」，不往空的 Untitled 里放东西。
 
+- [ ] App 卡住（模拟：`kill -STOP <SrtFlow 的 pid>` 冻住整个进程，测完 `kill -CONT`）时让 AI 改一处：两分钟内回「does not answer at all」，
+      不是一句 errno；`kill -CONT` 之后它查过 get_timeline 才重做，那一步没有做两遍。真的主线程卡死（导出卡死那种）由 CI 的假 App 守着：
+      约半分钟回「not responding … stuck for …」。
+- [ ] 关掉主窗口、`set_view background`，让 AI 改一处：窗口开回来但在别的 App 的窗口后面、前台 App 没变；改动照样能 ⌘Z。看得见时开回来在最前面、
+      键盘仍在原处。强退 SrtFlow 后让 AI 接着做：拉起来之后它照提示重新 open_folder / open_project / set_view，不再叫你去开窗口。
+
 ## 九、已知不足（第一期）
 
 - 「一轮」按 30 秒没动静划分：AI 想得久会被切成两轮。
@@ -896,3 +920,5 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
   系统升级后可能要重量。
 - 几个会话共用一个 App（第 46 条）：Claude 桌面版的几个对话共用一个小程序（它只起一份 MCP 服务器），在它里面算一个会话 ——
   协议里没有对话号可用；Claude Code、Codex 每个会话各起一个小程序，分得开。
+- App 卡住的时候（第三节）：要卡满 30 秒才判卡死（之前的调用照常等）；卡住时已经在做的那一步可能缓过来后照做完（如实说「在做」）；
+  老 App 不认「探一下」，只能等满两分钟、说不出主线程怎样。窗口晚到 8 秒那一次是内存吃紧时的竞态，空闲的机器上复现不出来。

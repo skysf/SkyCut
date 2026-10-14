@@ -7,6 +7,8 @@ import SrtFlowMCPKit
 // 没开就用 `open -g` 把它拉起来（不抢前台）、等它开始听、把请求交过去、把回答拿回来。
 // 不管什么：MCP 协议（MCPServerCore）、工具怎么做（App）。
 //
+// App 卡住时怎么等、怎么说在 CallWaiter（分段等、探一下主线程、放弃时让 App 也放弃）。
+//
 // 测试用的四个环境变量（不设就完全不生效）：
 // - SRTFLOW_MCP_SOCKET：直接连这个 socket（自检里的假 App）；
 // - SRTFLOW_MCP_NO_LAUNCH：连不上就报错，不去拉起 App；
@@ -23,6 +25,8 @@ struct AppConnection {
     let mayLaunch: Bool
     /// 这个会话在剪哪一个工程：每次调用带上，App 发现开着的不是它就不做（几个 AI 会话共用一个 App，`MCPSessionProject`）。
     let sessionProject = MCPSessionProject()
+    /// 等回答、探 App 还活着没有（App 卡死时别让 AI 干等两分钟、只拿到一句看不懂的错）。
+    let waiter: CallWaiter
 
     /// 从小程序自己的位置找到它所在的 App：`X.app/Contents/Helpers/srtflow-mcp`。
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppConnection {
@@ -30,14 +34,16 @@ struct AppConnection {
         let bundle = appURL.flatMap { Bundle(url: $0) }
         let bundleID = bundle?.bundleIdentifier ?? "com.srtflow.SrtFlow"
         let version = bundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        let socketPath = environment["SRTFLOW_MCP_SOCKET"] ?? MCPBridge.socketPath(bundleIdentifier: bundleID)
         return AppConnection(
             appURL: appURL,
             bundleIdentifier: bundleID,
-            socketPath: environment["SRTFLOW_MCP_SOCKET"] ?? MCPBridge.socketPath(bundleIdentifier: bundleID),
+            socketPath: socketPath,
             providersURL: environment["SRTFLOW_MCP_PROVIDERS"].map { URL(fileURLWithPath: $0) }
                 ?? MCPProviderMarker.url(bundleIdentifier: bundleID),
             appVersion: version,
-            mayLaunch: environment["SRTFLOW_MCP_NO_LAUNCH"] == nil
+            mayLaunch: environment["SRTFLOW_MCP_NO_LAUNCH"] == nil,
+            waiter: CallWaiter(socketPath: socketPath, environment: environment)
         )
     }
 
@@ -55,6 +61,8 @@ struct AppConnection {
     // MARK: 一次调用
 
     func call(tool: String, arguments: JSONValue, client: String?) -> JSONValue {
+        // 上一个调用等到 App 卡死了：还卡着就别发、别再干等，当场说。
+        if let refusal = waiter.refusalIfStillFrozen() { return MCPBridge.textResult(refusal, isError: true) }
         let request = sessionProject.stamp(MCPBridge.Request(tool: tool, arguments: arguments, client: client))
         do {
             let payload = try JSONEncoder().encode(request)
@@ -62,7 +70,13 @@ struct AppConnection {
             defer { close(fd) }
             MCPUnixSocket.setTimeouts(fd, seconds: 120)
             try MCPUnixSocket.writeLine(fd, payload)
-            guard let line = try MCPUnixSocket.readLine(fd) else {
+            let line: Data
+            switch try waiter.waitForAnswer(fd, callID: request.id) {
+            case .answer(let data):
+                line = data
+            case .gaveUp(let message):
+                return MCPBridge.textResult(message, isError: true)
+            case .closed:
                 return MCPBridge.textResult(
                     "SrtFlow closed the connection without answering (it may have quit). Try again.", isError: true
                 )

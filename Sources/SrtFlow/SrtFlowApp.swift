@@ -259,6 +259,8 @@ private struct ProjectCommands: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        // 菜单一建好就把「打开主窗口」交给 AI 那一路：主窗口从没出现过（刚启动、系统很忙）时它也开得回来（AIEditorPresenter）。
+        let _ = AIEditorPresenter.noteMenuOpenWindow(openWindow)
         // 「最近打开」那份系统列表在开 / 存工程时变，而那正是 `documentURL` 变的时候。工程是
         // `@Observable`：body 不读它就不会被叫醒，菜单就停在旧的列表上（以前订阅整个工程，是顺带刷新的）。
         let _ = project.documentURL
