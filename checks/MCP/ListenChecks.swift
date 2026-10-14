@@ -15,6 +15,26 @@ func runListenChecks() {
     checkCurve(peaks)
     checkHeardOnTimeline(peaks)
     checkListenJSON(peaks)
+    checkTimelineRange()
+}
+
+/// listen 的 from / to（时间线秒，2026-10-14）：片段只量落在里面的那一截，变速按源时间换算，不相交的不量。
+private func checkTimelineRange() {
+    var clip = videoClip(10, 6, sourceStart: 4)
+    clip.speed = 2  // 时间线上 10–13 秒，读源的 4–10 秒
+    let whole = AIAudioLevels.sourceWindow(of: clip, from: nil, to: nil)
+    checkEqual(whole?.from, 4, "without from/to the whole clip: from its in point")
+    checkEqual(whole?.to, 10, "…to its out point")
+    let middle = AIAudioLevels.sourceWindow(of: clip, from: 11, to: 12)
+    checkEqual(middle?.from, 6, "timeline 11 s is source 6 s at double speed")
+    checkEqual(middle?.to, 8, "timeline 12 s is source 8 s")
+    let head = AIAudioLevels.sourceWindow(of: clip, from: 5, to: 11)
+    checkEqual(head?.from, 4, "a range starting before the clip starts at its in point")
+    checkEqual(head?.to, 6, "…and ends where the range ends")
+    let tail = AIAudioLevels.sourceWindow(of: clip, from: 12, to: nil)
+    checkEqual(tail?.to, 10, "only from: up to the clip's end")
+    check(AIAudioLevels.sourceWindow(of: clip, from: 20, to: 30) == nil, "a range after the clip leaves nothing to hear")
+    check(AIAudioLevels.sourceWindow(of: clip, from: 0, to: 10) == nil, "a range ending where the clip starts leaves nothing")
 }
 
 private let rate = 48_000.0

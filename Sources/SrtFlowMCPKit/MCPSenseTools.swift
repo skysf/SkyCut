@@ -22,9 +22,9 @@ public enum MCPSenseTools {
         MCPToolDefinition(
             .listen, title: "Measure the sound",
             description: """
-            Hear the sound as numbers instead of guessing. With clip_id: that clip as it plays in the video (volume, fades \
-            and track fader included), times on the timeline. With file: a media file, times in seconds of the file \
-            (source_in/source_out narrow it). With neither: every clip with sound on the timeline, one line each. You get \
+            Hear the sound as numbers. With clip_id: that clip as it plays in the video (volume, fades \
+            and track fader included); with neither: every clip with sound, one line each; times on the timeline, from/to \
+            keep just those seconds. With file: a media file, times in seconds of the file (source_in/source_out narrow it). You get \
             level_db (RMS of the parts that are not silent), peak_db, silences (stretches quieter than silence_db for at \
             least min_silence seconds), loudest_at, and for one clip or file a coarse curve of the level (one value per step \
             seconds). dB are dBFS; -60 means silent or quieter. Use it to set volumes (speech usually sits around -20 to -14 \
@@ -35,6 +35,8 @@ public enum MCPSenseTools {
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A clip on the timeline."),
                 "file": MCPSchema.string("A media file instead (absolute, or relative to the opened folder)."),
+                "from": MCPSchema.number("Timeline seconds to start at.", minimum: 0),
+                "to": MCPSchema.number("Timeline seconds to stop at.", minimum: 0),
                 "source_in": MCPSchema.number("With file: start, seconds in the file.", minimum: 0),
                 "source_out": MCPSchema.number("With file: end, seconds in the file.", minimum: 0),
                 "silence_db": MCPSchema.number("Quieter than this counts as silence (default -45).", minimum: -80, maximum: -10),

@@ -173,6 +173,17 @@ if [ "$(grep -c 'AIProjectTools.saveIfNeverSaved(project, after: result)' "${ROU
 fi
 echo "   ✓ 没有「影片」；三处默认位置走同一个起点；改工程的调用之后都会给没存过的工程存盘"
 
+echo "==> listen 只听时间线上的某几秒：from / to 读进来、片段和整条时间线都按它裁"
+# 2026-10-14 用户拍板（docs/architecture/ai-control-mcp.md 第四节第 13 条）；纯值在 checks/MCP/ListenChecks.swift。
+LISTEN_TOOL="Sources/SrtFlow/AIListenTool.swift"
+if [ "$(grep -c 'settings.from = try args.double("from")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIAudioLevels.sourceWindow(of: clip, from: settings.from, to: settings.to)' "${LISTEN_TOOL}" || true)" -lt 2 ] \
+   || [ "$(grep -c 'AIAudioLevels.sourceWindow(of: $0, from: settings.from, to: settings.to)' "${LISTEN_TOOL}" || true)" -ne 1 ]; then
+  echo "✗ ${LISTEN_TOOL} 的 from / to 没接上：片段或整条时间线照旧整段量" >&2
+  exit 1
+fi
+echo "   ✓ from / to 读进来；一段片段、整条时间线都只量落在里面的那几秒"
+
 echo "==> 压缩 / 烧录：AI 的条目自带设置和输出位置，不替用户开跑"
 # AI 给的参数只用于它排的那几条（不改页面上记住的设置），页面上改设置 / 输出文件夹不碰 AI 的条目；
 # 队列停着、里面有用户自己排了没开始的就不排（start() 会把等着的一起跑掉）。docs/architecture/ai-control-mcp.md 第四节第 24 条。

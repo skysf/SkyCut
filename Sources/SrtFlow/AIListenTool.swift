@@ -23,8 +23,15 @@ enum AIListenTool {
     static func listen(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let silenceDB = min(max(try args.double("silence_db") ?? -45, -80), -10)
         let minSilence = min(max(try args.double("min_silence") ?? 0.5, 0.1), 10)
-        let settings = Settings(silenceDB: silenceDB, minSilence: minSilence, beats: try args.bool("beats") ?? false)
+        var settings = Settings(silenceDB: silenceDB, minSilence: minSilence, beats: try args.bool("beats") ?? false)
+        // from / to：时间线上的几秒（2026-10-14 用户拍板「只听某几秒」）。文件的几秒照旧用 source_in / source_out。
+        settings.from = try args.double("from").map { max(0, $0) }
+        settings.to = try args.double("to")
+        if let from = settings.from, let to = settings.to, to <= from { throw AIToolError("to must be after from.") }
         if let path = try args.string("file") {
+            guard settings.from == nil, settings.to == nil else {
+                throw AIToolError("from/to are timeline seconds; for part of a file use source_in/source_out.")
+            }
             return try await listenToFile(path, args, project, settings)
         }
         let state = project.state
@@ -32,6 +39,11 @@ enum AIListenTool {
         if let clipText = try args.string("clip_id") {
             let id = try ids.resolve(clipText)
             guard let clip = state.clip(with: id) else { throw AIToolError("\(clipText) is not a clip.") }
+            guard AIAudioLevels.sourceWindow(of: clip, from: settings.from, to: settings.to) != nil else {
+                throw AIToolError(String(
+                    format: "%@ plays from %.2f to %.2f s, outside from/to.", ids.short(id), clip.timelineStart, clip.timelineEnd
+                ))
+            }
             return .ok(.object(await listenToClip(clip, state, ids, settings, detailed: true)))
         }
         guard !settings.beats else { throw AIToolError("beats needs a clip_id (a music clip) or a file.") }
@@ -43,6 +55,10 @@ enum AIListenTool {
         var minSilence: Double
         /// 也找鼓点（速度、每一拍、小节头；AIBeats）。只对一段片段或一个文件。
         var beats = false
+        /// 只听时间线上的这几秒（from / to）；nil = 不限。片段只量落在里面的那一截，整条时间线只列落在里面的片段。
+        var from: Double?
+        var to: Double?
+        var narrowed: Bool { from != nil || to != nil }
     }
 
     // MARK: 片段
@@ -65,8 +81,15 @@ enum AIListenTool {
             object["sound"] = clip.isMuted ? "muted" : "hidden: not in the video"
             return object
         }
-        let from = clip.sourceStart
-        let to = clip.sourceStart + clip.sourceDuration
+        guard let window = AIAudioLevels.sourceWindow(of: clip, from: settings.from, to: settings.to) else {
+            object["sound"] = "outside from/to"
+            return object
+        }
+        let (from, to) = (window.from, window.to)
+        if settings.narrowed {
+            object["from"] = AIFormat.seconds(clip.timelineTime(atSource: from))
+            object["to"] = AIFormat.seconds(clip.timelineTime(atSource: to))
+        }
         guard let peaks = await waveform(of: clip.sourceURL, until: deadline) else {
             object["sound"] = "unreadable: SrtFlow could not read this clip's audio"
             return object
@@ -110,6 +133,8 @@ enum AIListenTool {
         for lane in state.overlayTracks { clips += lane.clips.filter(\.hasAudio) }
         for lane in state.audioTracks { clips += lane.clips }
         guard !clips.isEmpty else { throw AIToolError("Nothing on the timeline has sound.") }
+        clips = clips.filter { AIAudioLevels.sourceWindow(of: $0, from: settings.from, to: settings.to) != nil }
+        guard !clips.isEmpty else { throw AIToolError("Nothing with sound plays between from and to.") }
         let deadline = Date().addingTimeInterval(waitSeconds)
         var listed: [JSONValue] = []
         for clip in clips.prefix(maxClips) {

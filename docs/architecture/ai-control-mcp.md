@@ -252,6 +252,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      「听到的声音」也是它）。静音、藏起来的段、藏起来的轨不量（量出来的数会让 AI 以为它在响）。
    - 三种问法：一段（带静音段列表和响度曲线）、一个文件、整条时间线（每段一行，只给静音段个数）。一次最多等波形读
      40 秒，没读完先把读到的给出去、说一声再调一次。
+   - **只听某几秒**（2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）：一段片段和整条时间线收
+     `from` / `to`（时间线秒）：片段只量落在里面的那一截（`AIAudioLevels.sourceWindow`：变速按源时间换算，结果带实际量的 `from` / `to`），
+     整条时间线只列落在里面的片段、每段也只量那一截；点名的片段不在这几秒里就报错。文件的几秒照旧是 `source_in` / `source_out`
+     （文件秒），给文件传 `from` / `to` 报错说清楚。扫描守卫在 `scripts/check-mcp.sh`，纯值在 `checks/MCP/ListenChecks.swift`。
 
 14. **读文稿（read_document，方案第 22 条）**：用户给的讲稿、大纲、卖点清单读成文字（`AIDocumentReader`）：PDF 用 PDFKit，
    Word / RTF / ODT 用系统的富文本导入，txt / md 按 [用户文本文件的编码](text-file-encoding.md) 读；Pages 和扫描件读不了，
