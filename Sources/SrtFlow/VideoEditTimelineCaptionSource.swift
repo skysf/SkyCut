@@ -28,7 +28,8 @@ enum CaptionSourceFollow {
         let oldCues = Dictionary(before.subtitleCues(of: .original).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         var plan = Plan()
         for cue in after.subtitleCues(of: .original) {
-            guard let old = oldCues[cue.id], old == cue,
+            // 这次碰过的不碰：只看时间（改了别的句子、字幕表会重新编号，编号变了不算碰过这一句）。
+            guard let old = oldCues[cue.id], old.start == cue.start, old.end == cue.end,
                   let hostID = meta[cue.id]?.provenance?.clipID,
                   let location = before.location(of: hostID), location.track != .main,
                   let host = before.clip(with: hostID) else { continue }
