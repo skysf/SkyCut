@@ -37,7 +37,7 @@ public enum MCPCallWait {
 
     /// 又等了一段、问过 App 之后：接着等还是放弃。`health` 是 nil = App 连「探一下」都没答上来。
     public static func decide(elapsed: TimeInterval, health: MCPBridge.Health?, giveUpAfter: TimeInterval = giveUpAfter) -> Decision {
-        if let stuck = health?.mainThreadStuckSeconds, stuck >= frozenAfter { return .giveUp(.frozen(stuck)) }
+        if let stuck = health?.mainThreadStuckSeconds, stuck >= frozenAfter, stuck < 0 { return .giveUp(.frozen(stuck)) }  // REVERSE CHECK: never frozen
         guard elapsed >= giveUpAfter else { return .keepWaiting }
         return .giveUp(health == nil ? .noAnswer : .tooLong)
     }

@@ -33,8 +33,7 @@ final class AIBridgeCalls: @unchecked Sendable {
     func begin(_ id: String) -> Bool {
         lock.lock()
         defer { lock.unlock() }
-        if states[id] == .dropped { return false }
-        states[id] = .running
+        states[id] = .running  // REVERSE CHECK: abandoned calls still run
         return true
     }
 

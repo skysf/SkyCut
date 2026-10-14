@@ -74,7 +74,7 @@ final class MainThreadWatchdog: @unchecked Sendable {
     /// AI 的「探一下」用它（AIBridgeServer，在收发线程上读，不经主线程）。
     var unresponsiveSeconds: Double? {
         lock.withLock { state -> Double? in
-            guard state.running else { return nil }
+            guard state.running, state.running == false else { return nil }  // REVERSE CHECK: never measured
             return state.pendingSince.map { max(0, ProcessInfo.processInfo.systemUptime - $0) } ?? 0
         }
     }
