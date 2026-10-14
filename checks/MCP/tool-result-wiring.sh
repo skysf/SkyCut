@@ -3,7 +3,7 @@
 # 这里只扫「工具真的调了它」。都是扫描，秒级。
 # 由来：docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md；约束见 docs/architecture/ai-control-mcp.md 第四节。
 
-echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名"
+echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名、配音字幕整句、Kokoro 语速"
 TIMELINE_TOOLS="Sources/SrtFlow/AITimelineTools.swift"
 # set_transition 按收尾之后的状态报每条缝（以前只回 {"cuts": 1}）。
 if [ "$(grep -c 'return .ok(AITransitionReport.json(' "${TIMELINE_TOOLS}" || true)" -ne 1 ]; then
@@ -40,6 +40,13 @@ if [ "$(grep -c 'AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(i
   echo "✗ Sources/SrtFlow/AIPictureProbe.swift 去黑边没按每边的读数合起来" >&2
   exit 1
 fi
+# 配音的字幕只从 AIVoiceoverSubtitles.config 拿参数（不按逗号拆小句），不直接用生成字幕那一套
+#（docs/bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md）。
+if [ "$(grep -c 'let config = AIVoiceoverSubtitles.config(' Sources/SrtFlow/AIVoiceoverTool.swift || true)" -ne 1 ] \
+   || grep -q 'SubtitleSegmentationConfig.generation' Sources/SrtFlow/AIVoiceoverTool.swift; then
+  echo "✗ Sources/SrtFlow/AIVoiceoverTool.swift 的配音字幕不经 AIVoiceoverSubtitles.config：会在逗号处切成半句一闪的短条" >&2
+  exit 1
+fi
 # Kokoro 的语速按时长对准：先按 1 倍读一遍、再按 KokoroSpeedCalibration 调给模型的 speed（模型的 speed 按格取整、只慢一点点，
 # docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md）。
 if [ "$(grep -c 'KokoroSpeedCalibration.next(target: target, tried: tried)' Sources/SrtFlow/KokoroVoiceSpeech.swift || true)" -ne 1 ] \
@@ -47,4 +54,4 @@ if [ "$(grep -c 'KokoroSpeedCalibration.next(target: target, tried: tried)' Sour
   echo "✗ Sources/SrtFlow/KokoroVoiceSpeech.swift 不按时长对准语速：要的 speed 原样给模型，读出来常常只慢一点点" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；Kokoro 语速按时长对准"
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准"

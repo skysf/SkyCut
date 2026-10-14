@@ -50,6 +50,7 @@ runSoundEffectChecks()
 runScreenRecordingToolChecks()
 runProjectBindingChecks()
 runHangChecks()
+runCatalogSyncChecks()
 runVideoSizeChecks()
 
 if failures > 0 {

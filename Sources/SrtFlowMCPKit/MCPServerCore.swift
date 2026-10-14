@@ -16,7 +16,8 @@ public final class MCPServerCore: @unchecked Sendable {
     /// 一次要转给 App 的工具调用。
     public struct ToolCall: Sendable {
         public var id: JSONValue
-        public var name: MCPToolName
+        /// 工具名。编进来的清单（`MCPToolName`）里的，或者换上的 App 那份清单里的（App 升级后新加的工具）。
+        public var name: String
         public var arguments: JSONValue
         public var client: String?
         /// 请求自带了新一代的 `_meta` 版本：回答要带新一代的字段。
@@ -45,14 +46,20 @@ public final class MCPServerCore: @unchecked Sendable {
     private let serverVersion: String
     /// 此刻配好了哪些提供方（每次回清单 / 握手时问一遍：用户中途添加或删掉 Key，下一次就跟着变）。
     private let providers: @Sendable () -> Set<MCPProvider>
+    /// App 升级后换上的它那份清单（`MCPCatalogSync`）；没换就照旧用编进来的。
+    public let catalog: MCPCatalogOverride
     private let lock = NSLock()
     /// 老一代客户端在 `initialize` 里报的名字（新一代每个请求自己带）。
     private var legacyClientName: String?
     private var legacyInitialized = false
 
-    public init(serverVersion: String, providers: @escaping @Sendable () -> Set<MCPProvider> = { [] }) {
+    public init(
+        serverVersion: String, providers: @escaping @Sendable () -> Set<MCPProvider> = { [] },
+        catalog: MCPCatalogOverride = MCPCatalogOverride()
+    ) {
         self.serverVersion = serverVersion
         self.providers = providers
+        self.catalog = catalog
     }
 
     /// 老一代客户端握过手之后，清单变了要主动通知它（新一代客户端没有会话，靠清单上的缓存时间）。
@@ -101,7 +108,8 @@ public final class MCPServerCore: @unchecked Sendable {
             // 清单会随「配没配 fal」变：缓存时间短一点，别让用户添了 Key 一小时之后才看到新工具。
             return .reply(Self.success(
                 id: id,
-                result: decorate(["tools": MCPToolName.listJSON(providers: providers())], modern: modern, cacheable: true,
+                result: decorate(["tools": catalog.toolsJSON(providers: providers()) ?? MCPToolName.listJSON(providers: providers())],
+                                 modern: modern, cacheable: true,
                                  ttlMs: Self.toolListTTLms)
             ))
         case "resources/list":
@@ -153,9 +161,10 @@ public final class MCPServerCore: @unchecked Sendable {
         guard let rawName = params["name"]?.stringValue else {
             return .reply(Self.error(id: id, code: -32602, message: "tools/call needs a tool name"))
         }
-        guard let name = MCPToolName(rawValue: rawName) else {
+        guard MCPToolName(rawValue: rawName) != nil || catalog.knows(rawName) else {
             return .reply(Self.error(id: id, code: -32602, message: "Unknown tool: \(rawName)"))
         }
+        let name = rawName
         let client: String?
         if modern {
             client = meta?["io.modelcontextprotocol/clientInfo"]?["name"]?.stringValue
