@@ -26,15 +26,12 @@ import SrtFlowCore
 
 enum TextDrawing {
 
-    /// 底板。不参与投影（见文件头）。
+    /// 底板。不参与投影（见文件头）。贴着字画（`TextPlate`），不是整个版面框。
     static func background(
-        _ style: TextStyle, layoutBox: CGRect, scale: Double, into context: CGContext
+        _ style: TextStyle, layout: TextLayout, scale: Double, into context: CGContext
     ) {
         guard let background = style.background, background.color.opacity > 0 else { return }
-        let rect = layoutBox.insetBy(
-            dx: -max(0, background.paddingX * scale),
-            dy: -max(0, background.paddingY * scale)
-        )
+        let rect = TextPlate.rect(background, layout: layout, scale: scale)
         let radius = min(max(0, background.cornerRadius * scale), min(rect.width, rect.height) / 2)
         context.saveGState()
         context.setFillColor(cgColor(background.color))
@@ -246,5 +243,23 @@ enum TextDrawing {
 
     static func cgColor(_ color: SubtitleColor) -> CGColor {
         CGColor(srgbRed: color.red, green: color.green, blue: color.blue, alpha: color.opacity)
+    }
+}
+
+// MARK: - 底板画在哪
+
+/// 文字的底板（2026-10-14 用户拍板「底框贴字宽」）：**横向贴着字**（最左一行的起点到最右一行的终点，行尾空白不算），纵向是整个
+/// 排版高，再按内边距外扩；空文字（刚 Add 还没打字）按整个版面框。坐标是版面框坐标（左下原点、y 向上）。
+/// 画（`TextDrawing.background`，预览和成片同一个渲染器）和可点范围（`TextHitGeometry`）只问它。
+/// 以前按版面框画，版面框的宽是折行宽度（默认画面的 80%），一个短标题底下也铺一整条。
+enum TextPlate {
+    static func rect(_ background: TextBackground, layout: TextLayout, scale: Double) -> CGRect {
+        var box = CGRect(origin: .zero, size: layout.size)
+        let lines = layout.lines.filter { !$0.glyphs.isEmpty }
+        if let left = lines.map(\.originX).min(),
+           let right = lines.map({ $0.originX + max(0, $0.width - $0.trailingWhitespace) }).max(), right > left {
+            box = CGRect(x: left, y: 0, width: right - left, height: layout.size.height)
+        }
+        return box.insetBy(dx: -max(0, background.paddingX * scale), dy: -max(0, background.paddingY * scale))
     }
 }

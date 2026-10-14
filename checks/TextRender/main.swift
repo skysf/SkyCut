@@ -575,6 +575,9 @@ func main() async {
     // MARK: 18 —— 预览上的可点范围（HitGeometry.swift）
     checkHitGeometry()
 
+    // MARK: 18b —— 底板贴着字（Plate.swift）
+    checkTextPlate()
+
     // MARK: 19 —— 一段文字切成的几段首尾相接：接缝上每一帧正好贴一层，不空、不叠（SeamFrames.swift）
     await checkSeamFrames()
 

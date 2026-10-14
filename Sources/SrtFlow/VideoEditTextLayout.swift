@@ -45,6 +45,8 @@ struct TextLayout: Equatable {
         var width: Double
         var ascent: Double
         var descent: Double
+        /// 行尾空白占的宽（折行处那个空格）：`width` 里算着它，底板贴字时要扣掉（`TextPlate`）。
+        var trailingWhitespace = 0.0
 
         static func == (lhs: Line, rhs: Line) -> Bool {
             lhs.glyphs == rhs.glyphs && lhs.baselineY == rhs.baselineY
@@ -204,7 +206,8 @@ enum TextTypesetter {
                 originX: origin.x,
                 width: width,
                 ascent: ascent,
-                descent: descent
+                descent: descent,
+                trailingWhitespace: CTLineGetTrailingWhitespaceWidth(ctLine)
             ))
         }
 

@@ -140,6 +140,7 @@ xcrun swiftc \
   checks/TextRender/main.swift \
   checks/TextRender/Assertions.swift \
   checks/TextRender/HitGeometry.swift \
+  checks/TextRender/Plate.swift \
   checks/TextRender/NumberDelay.swift \
   checks/TextRender/Odometer.swift \
   checks/TextRender/TextRows.swift \
