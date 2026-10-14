@@ -29,6 +29,8 @@ struct AIClipChange {
     /// 旋转、不透明度、翻转、入场出场、音量曲线、声音场景、标记（AIClipDetails）。
     var details: AIClipDetails?
     var ripple = false
+    /// 只改这一段、链接着的伙伴不跟（edit_clip alone：J/L cut 里画面和分出来的声音各自裁）。别的片段的链接照旧。
+    var alone = false
     /// 改素材窗口 / 速度时关键帧怎么办（默认留在原来的画面上，范围外的收成两头的值）。
     var keyframes: AIKeyframePolicy?
 }
@@ -87,7 +89,7 @@ enum AIClipEdit {
         state[track: location.track] = lane
         insert(updated, into: destination, state: &state)
 
-        if linkage, let group = clip.linkGroup {
+        if linkage, !change.alone, let group = clip.linkGroup {
             for partner in original.allClips where partner.linkGroup == group && partner.id != id {
                 state.update(partner.id) { follow(&$0, from: clip, to: updated) }
             }

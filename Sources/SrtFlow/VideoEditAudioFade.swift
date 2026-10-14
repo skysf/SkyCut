@@ -108,7 +108,8 @@ extension EditClip {
     /// **声音的设置跟着走**：音量、音量曲线、渐入渐出、声音场景都是这段声音自己的属性，
     /// 分离之后视频那段被静音，留在它身上的这些设置就再也听不见了 —— 用户画好的
     /// 曲线凭空消失（2026-09-23 随音量曲线补上；在那之前渐入渐出也一直没跟过来）。
-    func detachedAudio(linkGroup group: UUID) -> EditClip {
+    /// `group` 为 nil：只要声音、不和谁链接（AI 的 add_clips sound=only）。
+    func detachedAudio(linkGroup group: UUID?) -> EditClip {
         var detached = EditClip(
             sourceURL: sourceURL,
             isAudioOnly: true,

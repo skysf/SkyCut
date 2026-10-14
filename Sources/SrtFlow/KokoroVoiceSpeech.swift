@@ -65,10 +65,32 @@ final class KokoroVoiceSpeech {
         }
     }
 
-    /// 在模型那条队列上：整句读（放得下的话）、读不下再切成两半、拼起来。每一段怎么读（太短的垫一句、炸了换一句）
-    /// 在 KokoroPieceReader。
+    /// 在模型那条队列上读一句，语速按时长对准（`KokoroSpeedCalibration`）：模型的 speed 按 25 毫秒一格取整、停顿也不跟着变，
+    /// 直接把要的 speed 给它常常只慢一点点。不是 1 倍时先按 1 倍读一遍量出时长，再按「1 倍的时长 ÷ speed」调给模型的 speed，
+    /// 最多再读四次，留最接近的那一次。
     nonisolated private static func render(_ text: String, language: String, voice: String, speed: Double,
                                            engine: KokoroEngine) throws -> ([Float], [AIVoiceWords.Marker]) {
+        let normal = try renderOnce(text, language: language, voice: voice, speed: 1, engine: engine)
+        guard abs(speed - 1) > 0.005 else { return normal }
+        let target = Double(normal.0.count) / speed
+        var tried: [(speed: Double, duration: Double)] = [(1, Double(normal.0.count))]
+        var modelSpeed = speed
+        var best: ([Float], [AIVoiceWords.Marker])?
+        for _ in 0..<KokoroSpeedCalibration.attempts {
+            let attempt = try renderOnce(text, language: language, voice: voice, speed: modelSpeed, engine: engine)
+            let duration = Double(attempt.0.count)
+            if best.map({ abs(Double($0.0.count) - target) > abs(duration - target) }) ?? true { best = attempt }
+            if KokoroSpeedCalibration.isClose(duration, to: target) { break }
+            tried.append((modelSpeed, duration))
+            modelSpeed = KokoroSpeedCalibration.next(target: target, tried: tried)
+        }
+        return best ?? normal
+    }
+
+    /// 在模型那条队列上：整句读（放得下的话）、读不下再切成两半、拼起来。每一段怎么读（太短的垫一句、炸了换一句）
+    /// 在 KokoroPieceReader。
+    nonisolated private static func renderOnce(_ text: String, language: String, voice: String, speed: Double,
+                                               engine: KokoroEngine) throws -> ([Float], [AIVoiceWords.Marker]) {
         var pending = KokoroVoicePieces.whole(text)
         var spoken: [KokoroVoiceAssembly.SpokenPiece] = []
         var rounds = 0
