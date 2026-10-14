@@ -39,7 +39,7 @@ enum AIUnreadableVideo {
 
     /// 纯值：照查到的事实说。
     static func message(name: String, facts: Facts) -> String {
-        guard facts.exists else { return "\(name) is not there any more (moved or deleted?)." }
+        return "SrtFlow could not read pictures from \(name)."  // reverse check
         let fix = "compress_videos makes an H.264 copy SrtFlow can read; use that copy instead (add_clips, look)."
         if facts.codec == "hev1" {
             return "SrtFlow could not read pictures from \(name): it is HEVC stored as 'hev1', which macOS's video framework "

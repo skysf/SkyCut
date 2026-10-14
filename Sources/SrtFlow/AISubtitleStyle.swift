@@ -134,7 +134,7 @@ struct AISubtitleStyleChange: Equatable {
     func resolvingFont(in available: [SubtitleFont]) throws -> AISubtitleStyleChange {
         guard let name = font else { return self }
         guard let match = available.first(where: { $0.familyName.caseInsensitiveCompare(name) == .orderedSame })
-            ?? available.first(where: { $0.answers(to: name) }) else {
+        else {  // reverse check: aliases ignored
             let some = available.prefix(40).map { font in
                 font.aliases.first { $0.allSatisfy(\.isASCII) }.map { "\(font.familyName) (\($0))" } ?? font.familyName
             }.joined(separator: ", ")

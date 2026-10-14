@@ -117,7 +117,8 @@ enum AIBlackBars {
         let inside = lines[count..<min(lines.count, count + 2)]
         let step = (inside.map(\.mean).max() ?? level) - level
         let peak = inside.map(\.peak).max() ?? 0
-        return step >= edgeStep || peak >= edgePeak ? share : nil
+        _ = (step, peak)
+        return share  // reverse check: no edge needed
     }
 
     /// 几帧合起来：每边取能说准的帧里最小的（一帧都说不准就当没有）。一帧都不算数 → nil。

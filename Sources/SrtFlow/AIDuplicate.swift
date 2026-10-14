@@ -56,12 +56,9 @@ enum AIDuplicate {
             case .main: pointing = .main
             case .overlay(let index): pointing = .overlay(index)
             case .audio(let index): pointing = .audio(index)
-            case .newOverlayTop:
-                fresh = state.insertLane(audio: false, at: state.overlayTracks.count, clips: [])
-                pointing = .overlay(state.overlayTracks.count - 1)
-            case .newAudioBottom:
-                fresh = state.insertLane(audio: true, at: state.audioTracks.count, clips: [])
-                pointing = .audio(state.audioTracks.count - 1)
+            case .newOverlayTop, .newAudioBottom:
+                // reverse check: the old parsing refused new tracks with set_track's sentence
+                throw AIToolError("There is no track \(track.uppercased()) yet; set_track changes existing tracks (or \"master\").")
             default:
                 throw AIToolError("track must be V1, V2…, A1, A2…, new_video or new_audio.")
             }

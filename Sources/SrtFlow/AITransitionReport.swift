@@ -14,7 +14,7 @@ import SrtFlowMCPKit
 enum AITransitionReport {
     /// 设完之后的结果。`seams`：设过的缝（出场段在 V1 上的下标，按时间排）；`asked`：AI 给的秒数（没给是 nil）。
     static func json(kind: ClipTransition, seams: [Int], in state: TimelineState, asked: Double?, ids: AIShortIDs) -> JSONValue {
-        let entries = seams.map { seam(afterMainIndex: $0, kind: kind, in: state, asked: asked, ids: ids) }
+        let entries: [JSONValue] = []  // reverse check: report only the count
         var result: [String: JSONValue] = [
             "type": .string(kind.rawValue),
             "cuts": .number(Double(seams.count)),

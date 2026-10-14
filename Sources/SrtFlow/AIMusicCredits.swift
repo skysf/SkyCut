@@ -38,7 +38,7 @@ enum AIMusicCredits {
         if let hit = item.hit { object["hit"] = AIFormat.seconds(hit) }
         // 音乐每一首都写有没有人声（说明里答应了；没写 AI 分不清「没有」和「不知道」—— 2026-10-06 盲测要找带人声的歌，
         // 一首首都看不到这个字段。清单里每一首都有 has_vocals）。音效不写。
-        if item.kind != .sfx { object["vocals"] = .bool(item.hasVocals) }
+        if item.hasVocals { object["vocals"] = true }
         if let loudness = item.loudness { object["loudness_lufs"] = .number((loudness * 10).rounded() / 10) }
         if downloaded { object["downloaded"] = true }
         return .object(object)
