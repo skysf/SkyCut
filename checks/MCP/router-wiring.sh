@@ -132,9 +132,15 @@ echo "==> App 卡住的时候：探一下不经主线程、放弃了的不做、
 BRIDGE="Sources/SrtFlow/AIBridgeServer.swift"
 PROBE_BODY="$(awk '/private func probe\(_ request: MCPBridge.Request\)/,/^    \}/' "${BRIDGE}")"
 PROBE_ON_MAIN="$(grep -cE 'waitForMainActor|MainActor' <<<"${PROBE_BODY}" || true)"
-if [ "$(grep -cF 'response = request.tool == MCPBridge.probeTool ? probe(request) : answer(request, on: fd)' "${BRIDGE}" || true)" -ne 1 ] \
+if [ "$(grep -cF 'case MCPBridge.probeTool: response = probe(request)' "${BRIDGE}" || true)" -ne 1 ] \
    || [ -z "${PROBE_BODY}" ] || [ "${PROBE_ON_MAIN}" -ne 0 ]; then
   echo "✗ ${BRIDGE} 的「探一下」没在收发线程上当场答（经了主线程，主线程卡死时就答不上来）" >&2
+  exit 1
+fi
+# 小程序要 App 的工具清单（App 升级过、会话还是升级前开的）：同样在收发线程上当场答、不经主线程
+#（docs/bugfixes/2026-10-14-stale-helper-tool-list.md）。
+if [ "$(grep -cF 'case MCPBridge.catalogTool: response = MCPBridge.Response(id: request.id, result: MCPCatalogSync.catalogResult())' "${BRIDGE}" || true)" -ne 1 ]; then
+  echo "✗ ${BRIDGE} 不在收发线程上答小程序要的工具清单（catalogTool）：App 升级后旧小程序换不上新清单" >&2
   exit 1
 fi
 if [ "$(grep -cF 'if MCPUnixSocket.peerClosed(fd) { calls.abandon(id) }' "${BRIDGE}" || true)" -ne 1 ] \
