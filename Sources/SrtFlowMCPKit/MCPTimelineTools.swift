@@ -309,6 +309,9 @@ public enum MCPTimelineTools {
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("Clip id from get_timeline."),
+                "file": MCPSchema.string(
+                    "Swap in another video, image or audio file (same place, length, settings); source_in: where to start in it, default 0."
+                ),
                 "start": MCPSchema.number("New timeline start, seconds.", minimum: 0),
                 "track": MCPSchema.string(MCPSchema.trackDescription),
                 "source_in": MCPSchema.number("New start inside the source file, seconds.", minimum: 0),

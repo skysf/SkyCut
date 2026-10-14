@@ -24,6 +24,8 @@ struct AIClipChange {
     var hidden: Bool?
     var fadeIn: Double?
     var fadeOut: Double?
+    /// 换成另一个文件（edit_clip 的 file，ClipFileReplacement）：入点 = sourceIn ?? 0，位置、长度和设置都不动。
+    var replacement: ClipFileReplacement?
     /// 画面的裁切和摆放（AIFrameFit 算好的，两样一起换）。
     var framing: AIFrameFit.Framing?
     /// 旋转、不透明度、翻转、入场出场、音量曲线、声音场景、标记（AIClipDetails）。
@@ -59,9 +61,14 @@ enum AIClipEdit {
             throw AIToolError("There is no clip with that id. Call get_timeline for current ids.")
         }
         var updated = clip
+        if let replacement = change.replacement {
+            try ClipFileReplacement.apply(replacement, to: &updated, sourceStart: change.sourceIn ?? 0, stillDuration: stillDuration)
+        }
+        // 换过文件之后的这一段：关键帧策略和链接伙伴都只跟「换完之后」的改动（换文件本身挪的源时间不是伙伴的事）。
+        let swapped = updated
         try applySourceWindow(change, to: &updated, stillDuration: stillDuration)
         if let speed = change.speed { updated.speed = min(max(speed, 0.1), 8) }
-        applyKeyframePolicy(change.keyframes ?? .keepFrames, from: clip, to: &updated, frameRate: original.frameRate)
+        applyKeyframePolicy(change.keyframes ?? .keepFrames, from: swapped, to: &updated, frameRate: original.frameRate)
         if let start = change.start { updated.timelineStart = max(0, start) }
         if let db = change.volumeDB {
             let target = AudioGain.clampedDecibels(db)
@@ -89,7 +96,7 @@ enum AIClipEdit {
 
         if linkage, let group = clip.linkGroup {
             for partner in original.allClips where partner.linkGroup == group && partner.id != id {
-                state.update(partner.id) { follow(&$0, from: clip, to: updated) }
+                state.update(partner.id) { follow(&$0, from: swapped, to: updated) }
             }
         }
         if change.ripple, location.track.isMain, change.target == nil || change.target == .main {

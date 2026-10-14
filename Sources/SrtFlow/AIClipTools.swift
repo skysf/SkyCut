@@ -47,12 +47,21 @@ enum AIClipTools {
         var plan = Plan(id: id, change: change, canvas: canvas)
         let details = try AIClipDetails(args)
         if details.touchesPicture || details.touchesSound || details.markers != nil { plan.change.details = details }
+        // 换文件（edit_clip 的 file）：探好、图片先转成静帧视频，转不了什么都不改。画面怎么放按换完之后的那段算。
+        var subject = clip
+        if let path = try args.string("file") {
+            let replacement = try await replacement(path, for: clip, project: project)
+            try ClipFileReplacement.apply(
+                replacement, to: &subject, sourceStart: change.sourceIn ?? 0, stillDuration: StillImageClipFactory.stillDuration
+            )
+            plan.change.replacement = replacement
+        }
         let request = try AIFramingRequest(args)
         if request.touchesPicture {
-            try requirePicture(clip)
+            try requirePicture(subject)
             var usable: CGRect?
             if request.removeBlackBars {
-                let bars = await AIPictureProbe.blackBars(of: clip)
+                let bars = await AIPictureProbe.blackBars(of: subject)
                 plan.findings["black_bars"] = AIBlackBars.json(bars)
                 if let bars, !bars.isEmpty { usable = bars.active }
             }
@@ -61,14 +70,14 @@ enum AIClipTools {
             var followed: AIFrameFit.Framing?
             if request.fit == .fill, focus == nil, request.focus != .center,
                let found = await subjectFocus(
-                   clip, canvas: canvas, active: AIFrameFit.region(of: crop ?? nil), textFirst: request.focus == .text,
-                   follow: request.follow && request.focus != .text, frame: state.frameRate.secondsPerFrame * clip.speed
+                   subject, canvas: canvas, active: AIFrameFit.region(of: crop ?? nil), textFirst: request.focus == .text,
+                   follow: request.follow && request.focus != .text, frame: state.frameRate.secondsPerFrame * subject.speed
                ) {
                 focus = found.point
                 followed = found.followed
                 plan.findings["subject"] = found.json
             }
-            plan.change.framing = try followed ?? framing(request, clip: clip, canvas: canvas, crop: crop, focus: focus)
+            plan.change.framing = try followed ?? framing(request, clip: subject, canvas: canvas, crop: crop, focus: focus)
         }
         return plan
     }
@@ -115,10 +124,50 @@ enum AIClipTools {
            let note = AIKeyframes.editNote(policy: plan.change.keyframes ?? .keepFrames, old: old, new: clip, frameRate: fresh.frameRate) {
             summary["keyframes_note"] = .string(note)
         }
+        if plan.change.replacement != nil, let old = state.clip(with: plan.id),
+           let note = ClipFileReplacement.aspectNote(old: old, new: clip) {
+            summary["picture_note"] = .string(note)
+        }
         if let followed = AILinkageReport.json(linkage) { summary["linkage"] = followed }
         if let packed = AILinkageReport.magnet(linkage) { summary["magnet"] = packed }
         if !changed { summary["unchanged"] = true }
         return .ok(.object(summary), changed: changed)
+    }
+
+    /// edit_clip 的 file：探好（图片先转成静帧视频，同拖图片进来那条路）才提交。点名文件夹以外的文件不在这里问：
+    /// 叫 AI 先用 look 看一眼（look 会问用户、同意了记住那个文件夹），省得 edit_clip 再多一个 confirm_token。
+    private static func replacement(_ path: String, for clip: EditClip, project: VideoEditProject) async throws -> ClipFileReplacement {
+        let url = AIWorkspace.shared.resolve(path)
+        guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("\(path) does not exist.") }
+        guard AIWorkspace.shared.allowsReading(url, project: project) else {
+            throw AIToolError(
+                "\(url.lastPathComponent) is outside the opened folder. Look at it first (look file=…, which asks the user once), "
+                    + "then swap it in."
+            )
+        }
+        guard let media = await project.probeImports([url]).first else {
+            throw AIToolError("SrtFlow cannot use \(url.lastPathComponent) as a clip.")
+        }
+        switch media.kind {
+        case .video:
+            return ClipFileReplacement(
+                url: url, kind: .video, duration: media.duration, info: media.info, hasAudio: media.info?.hasAudio ?? false
+            )
+        case .audio:
+            return ClipFileReplacement(url: url, kind: .audio, duration: media.duration, info: nil, hasAudio: true)
+        case .image:
+            // 声音段换不了图片：ClipFileReplacement.apply 会说清楚，别白转一趟。
+            guard !clip.isAudioOnly else {
+                return ClipFileReplacement(url: url, kind: .image, duration: 0, info: nil, hasAudio: false)
+            }
+            guard project.canConvertStills, let ffmpeg = MediaToolchain.shared.runtime?.url else {
+                throw AIToolError("SrtFlow's video engine is still starting, so images cannot be swapped in yet. Try again in a moment.")
+            }
+            let still = try await StillImageClipFactory.stillVideo(for: url, ffmpeg: ffmpeg)
+            return ClipFileReplacement(
+                url: url, kind: .image, duration: 0, info: await project.probeVideo(still), hasAudio: false, stillVideo: still
+            )
+        }
     }
 
     // MARK: 画面怎么放

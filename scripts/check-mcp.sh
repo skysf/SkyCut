@@ -98,6 +98,8 @@ if [ "${SIGN_HELPER}" -gt "${SIGN_APP}" ]; then
 fi
 echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} 行才签；${SIGN_SCRIPT} 第 ${SIGN_HELPER} 行签小程序、第 ${SIGN_APP} 行才签外层"
 
+# shellcheck source=checks/MCP/clip-file-wiring.sh
+source checks/MCP/clip-file-wiring.sh
 # 路由、窗口、几个会话、App 卡住的扫描在单独一个文件里（这个脚本超过了 600 行的上限）；它定义的 ROUTER 下面还要用。
 # shellcheck source=checks/MCP/router-wiring.sh
 source checks/MCP/router-wiring.sh
@@ -398,6 +400,7 @@ xcrun swiftc \
   Sources/SrtFlow/AITimelineEdits.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
+  Sources/SrtFlow/ClipFileReplacement.swift \
   Sources/SrtFlow/AIFrameFit.swift \
   Sources/SrtFlow/AIFollowSubject.swift \
   Sources/SrtFlow/AIShotDetector.swift \
@@ -483,6 +486,7 @@ xcrun swiftc \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/DuplicateChecks.swift \
   checks/MCP/TransitionReportChecks.swift \
+  checks/MCP/ClipFileSwapChecks.swift \
   checks/MCP/UnreadableVideoChecks.swift \
   checks/MCP/MusicLibraryChecks.swift \
   checks/MCP/EncodeChecks.swift \
