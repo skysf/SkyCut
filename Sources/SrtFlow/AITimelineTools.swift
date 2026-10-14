@@ -290,14 +290,8 @@ enum AITimelineTools {
         let ids = AIShortIDs(state: state)
         guard let raw = try args.stringArray("ids"), !raw.isEmpty else { throw AIToolError("ids is required.") }
         let selection = try AIDuplicate.selection(try raw.map { try ids.resolve($0) }, in: state, linkage: project.linkageEnabled)
-        let pointing: TrackSlot? = try args.string("track").map { name in
-            switch try AITrackSettings.target(name, in: state) {
-            case .track(let slot): return slot
-            case .master: throw AIToolError("track must be V1, V2… or A1, A2….")
-            }
-        }
         var next = state
-        let result = try AIDuplicate.apply(selection, to: &next, at: try args.double("start"), pointing: pointing)
+        let result = try AIDuplicate.apply(selection, to: &next, at: try args.double("start"), track: try args.string("track"))
         // 和 ⌘V 同一条路：一步撤销、粘完选中粘出来的、静帧没转完的照原图再转一次。
         project.perform(rebuildsPreview: !result.clips.isEmpty) { $0 = next }
         project.convertPastedStills(result.stillConversions)
@@ -309,10 +303,14 @@ enum AITimelineTools {
             clips: result.clips, shapes: result.shapes, texts: result.texts, filters: result.filters, cues: result.cues,
             time: starts.min()
         ), project: project)
-        return .ok([
+        var payload: [String: JSONValue] = [
             "new_ids": .array(created.map { .string(fresh.short($0)) }.sorted { ($0.stringValue ?? "") < ($1.stringValue ?? "") }),
             "timeline_duration": AIFormat.seconds(project.state.duration)
-        ], changed: true)
+        ]
+        // 剪辑落在哪几条轨上（撞上了会往上抬、track 只管一组剪辑）：AI 不用再 get_timeline 去找。
+        let tracks = Set(result.clips.compactMap { project.state.location(of: $0)?.track }.map(AITrackName.name(of:)))
+        if !tracks.isEmpty { payload["tracks"] = .array(tracks.sorted().map { .string($0) }) }
+        return .ok(.object(payload), changed: true)
     }
 
     // MARK: split / delete / transition
@@ -364,10 +362,15 @@ enum AITimelineTools {
         let after = try args.string("after_clip_id").map { try ids.resolve($0) }
         guard all || after != nil else { throw AIToolError("Pass after_clip_id, or all=true.") }
         var next = project.state
-        let changed = try AITimelineEdits.setTransition(kind, duration: try args.double("duration"), after: after, all: all, in: &next)
+        let asked = try args.double("duration")
+        let changed = try AITimelineEdits.setTransition(kind, duration: asked, after: after, all: all, in: &next)
         project.perform { $0 = next }
         let seam = changed.first.flatMap { project.state.clip(with: $0)?.timelineEnd }
         AIEditorPresenter.reveal(.init(clips: Set(changed), time: seam.map { max(0, $0 - 1) }), project: project)
-        return .ok(["cuts": .number(Double(changed.count)), "type": .string(kind.rawValue)], changed: true)
+        // 磁吸开着时 perform 收尾会重排 V1：每条缝放在哪、多长、定格了多少，按收尾之后的状态报。
+        let seams = changed.compactMap { id in project.state.mainClips.firstIndex { $0.id == id } }.sorted()
+        return .ok(AITransitionReport.json(
+            kind: kind, seams: seams, in: project.state, asked: asked, ids: AIShortIDs(state: project.state)
+        ), changed: true)
     }
 }

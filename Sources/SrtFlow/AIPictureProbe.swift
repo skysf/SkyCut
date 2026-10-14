@@ -17,7 +17,7 @@ enum AIPictureProbe {
     static func blackBars(of clip: EditClip) async -> AIBlackBars.Insets? {
         let frames = await AIFrameSampler.frames(of: clip, count: sampleCount, maxSide: 320)
         return AIBlackBars.combine(frames.map { frame in
-            AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.bars(in:))
+            AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(in:))
         })
     }
 

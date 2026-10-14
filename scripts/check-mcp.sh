@@ -57,6 +57,8 @@
 #  30. App 卡住的时候（2026-10-14）：小程序什么时候放弃、怎么说（MCPCallWait）、App 那份记录（放弃了的不做，AIBridgeCalls）、
 #      真起小程序接一个卡死的假 App（第一次探就说清楚、让 App 放弃、下一个调用不发）和一个忙的假 App（说还在做）（HangChecks）；
 #      App 在收发线程上答「探一下」、路由轮到时先问还做不做、主窗口开得回来（扫描，下面）。
+#  31. 画面多大（2026-10-14）：export_video / get_job 报成片的宽高帧率（和导出同一个 cappedSize），look 看文件报文件本身的尺寸、
+#      缩略图的尺寸另写（VideoSizeChecks；接线扫描在下面「关掉主窗口不退出」之后）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -99,6 +101,8 @@ echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} �
 # 路由、窗口、几个会话、App 卡住的扫描在单独一个文件里（这个脚本超过了 600 行的上限）；它定义的 ROUTER 下面还要用。
 # shellcheck source=checks/MCP/router-wiring.sh
 source checks/MCP/router-wiring.sh
+# shellcheck source=checks/MCP/tool-result-wiring.sh
+source checks/MCP/tool-result-wiring.sh
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -249,6 +253,23 @@ if [ "$(grep -c 'return launched ? MCPBridge.addingNote(MCPBridge.relaunchNote, 
 fi
 echo "   ✓ 关窗口不退出；拉起 App 的那一次结果带 relaunchNote"
 
+echo "==> 画面多大：export_video / get_job 报成片的宽高帧率，look 看文件报文件本身的尺寸"
+# 2026-10-06 盲测：三条片子 AI 都以为成片是 720p —— 导出不报尺寸，它拿 look 回的缩略图尺寸（最长边 1280）当了成片的
+# （docs/bugfixes/2026-10-14-ai-thinks-export-is-720p.md）。
+EXPORT_TOOLS="Sources/SrtFlow/AIExportTools.swift"
+if [ "$(grep -c 'AIVideoSize.output(' "${EXPORT_TOOLS}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'if let video { result["video"] = video }' "${EXPORT_TOOLS}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'finishedDetail(output, video: video, levels:' "${EXPORT_TOOLS}" || true)" -ne 1 ]; then
+  echo "✗ ${EXPORT_TOOLS} 的开始结果或做完的 get_job 不报成片的宽高帧率" >&2
+  exit 1
+fi
+if grep -q '"picture_size"' Sources/SrtFlow/AILookTool.swift \
+   || [ "$(grep -c 'AIVideoSize.file(' Sources/SrtFlow/AILookTool.swift || true)" -ne 1 ]; then
+  echo "✗ look 看文件时只回缩略图的尺寸（picture_size），不报文件本身多大：AI 会把缩略图的尺寸当成成片的" >&2
+  exit 1
+fi
+echo "   ✓ 导出开始和做完都报宽高帧率；look 看文件报文件本身的尺寸、缩略图另写"
+
 # 合成音效（docs/architecture/sound-effect-synth.md）：合成器和工具自己不碰 AVAudioFile（写文件只经 AIAudioFileWriter，同配音）；
 # 渲染 + 写盘在 MediaReadQueue.analysis 上跑，不占 Swift 并发的线程池。
 SFX_WRITERS="$(grep -l 'AVAudioFile' Sources/SrtFlow/SoundEffects/*.swift Sources/SrtFlow/AISoundEffect*.swift || true)"
@@ -333,6 +354,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppLanguage.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIProjectBinding.swift \
+  Sources/SrtFlow/AIVideoSize.swift \
   Sources/SrtFlow/AIBridgeCalls.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/AITimelineSummary.swift \
@@ -385,6 +407,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIKeyframes.swift \
   Sources/SrtFlow/AIShapeEdits.swift \
   Sources/SrtFlow/AIDuplicate.swift \
+  Sources/SrtFlow/AITransitionReport.swift \
+  Sources/SrtFlow/AIUnreadableVideo.swift \
   Sources/SrtFlow/AIMusicCredits.swift \
   Sources/SrtFlow/AudioLibraryManifest.swift \
   Sources/SrtFlow/AIEncodeOptions.swift \
@@ -415,6 +439,8 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditPlacementDefault.swift \
   Sources/SrtFlow/AISubtitleEdits.swift \
   Sources/SrtFlow/AISubtitleStyle.swift \
+  Sources/SrtFlow/SubtitleFont.swift \
+  Sources/SrtFlow/FontFamilyNames.swift \
   Sources/SrtFlow/AIClientConfigFiles.swift \
   Sources/SrtFlow/AIReadGrants.swift \
   Sources/SrtFlow/AIUndoGrouping.swift \
@@ -456,6 +482,8 @@ xcrun swiftc \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/DuplicateChecks.swift \
+  checks/MCP/TransitionReportChecks.swift \
+  checks/MCP/UnreadableVideoChecks.swift \
   checks/MCP/MusicLibraryChecks.swift \
   checks/MCP/EncodeChecks.swift \
   checks/MCP/TranscriptFormatChecks.swift \
@@ -469,6 +497,7 @@ xcrun swiftc \
   checks/MCP/ScreenRecordingToolChecks.swift \
   checks/MCP/ProjectBindingChecks.swift \
   checks/MCP/HangChecks.swift \
+  checks/MCP/VideoSizeChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o
