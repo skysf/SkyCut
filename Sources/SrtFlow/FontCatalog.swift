@@ -1,13 +1,6 @@
 import CoreText
 import Foundation
 
-struct SubtitleFont: Identifiable, Hashable, Sendable {
-    var id: String { familyName }
-    var familyName: String
-    var fileURL: URL
-    var supportsChinese: Bool
-}
-
 /// 列出**libass 真能用**的字体。
 ///
 /// 这一步不能省。macOS 的苹方等系统中文字体放在
@@ -53,17 +46,20 @@ enum FontCatalog {
                     let font = CTFontCreateWithFontDescriptor(descriptor, 24, nil)
                     let characterSet = CTFontCopyCharacterSet(font) as CharacterSet
                     let supportsChinese = characterSet.isSuperset(of: chineseProbe)
+                    // 字体文件里这一族的别的名字（「蘋方-簡」那份文件里的「PingFang SC」）：按哪个名字叫都认得。
+                    let aliases = FontFamilyNames.names(of: font).filter { $0 != family }
 
                     if let existing = byFamily[family] {
                         // 同一字体族出现在多个文件里时，留下支持中文的那份。
                         if supportsChinese && !existing.supportsChinese {
-                            byFamily[family] = SubtitleFont(familyName: family, fileURL: url, supportsChinese: true)
+                            byFamily[family] = SubtitleFont(familyName: family, fileURL: url, supportsChinese: true, aliases: aliases)
                         }
                     } else {
                         byFamily[family] = SubtitleFont(
                             familyName: family,
                             fileURL: url,
-                            supportsChinese: supportsChinese
+                            supportsChinese: supportsChinese,
+                            aliases: aliases
                         )
                     }
                 }

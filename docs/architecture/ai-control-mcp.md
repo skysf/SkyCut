@@ -113,7 +113,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    翻译写回、静帧转换失败删占位块、AI 的定格）也各包一层（[案例](../bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md)，
    `check-mcp.sh` 钉着）。
 2. **能复用手动操作的全复用**：放素材走 `mediaImportLandings` + `insertImported`（撞上了往上抬一轨），
-   切走 `split(clipID:at:)`，转场能不能放问 `transitionCapacity`，删和 ⌫ 同一口径（链接开着带上伙伴），
+   切走 `split(clipID:at:)`，转场能不能放问 `transitionCapacity`（set_transition 的结果按渲染那几个函数报每条缝放在哪、实际多长、
+   被夹短了原来要多长、余料不够定格补了多少、做不出来的为什么，`AITransitionReport`），删和 ⌫ 同一口径（链接开着带上伙伴），
    素材 → 片段走 `clip(for:)`，生成 / 翻译字幕走面板上那同一个任务，导出走 `VideoEditExporter`。
    AI 多出来的只有两条：**给绝对值**（改入出点时起点不动；拖把手则是连起点一起挪）和**V1 往后推 / 往前拉**
    （`insert`、`ripple`，只动 V1 和它们的链接伙伴；别的轨、文字、滤镜、字幕由「联动」开关决定跟不跟 —— 开着（默认）压在挪动 /
@@ -157,7 +158,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    `isExporting` 变回 false 上 —— `@Published` 在赋值前发，那时成品路径 / 错误已经写好；导出的结果带 `audio_loudness_lufs`、
    `audio_peak_dbfs`（限幅前），混音过了 −1 dBFS 被限幅器压过的还带 `audio_limited_seconds`、`audio_max_reduction_db`，压过 3 dB 的再带
    一句 `note` 叫 AI 用 `set_track master volume_db` 压下去再导，[成片的声音](export-audio-mixdown.md) 第二节第 3 条；生成字幕挂在 `stage`
-   上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局）。AI 指定的分辨率只用于这一次
+   上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局；**开始和做完的结果都带 `video`：成片的宽、高、帧率**（`AIVideoSize.output`，
+   和导出管线同一个 `cappedSize`：画布封短边、只降不升，帧率是工程帧率）。AI 指定的分辨率只用于这一次
    （`settingsOverride`），不写回用户在面板上记住的设置；压缩 / 烧录同理（第 24 条）。
    送 fal 的任务（`generate_media`、upscale）跑着时 `get_job` 带阶段：`phase`（queued / processing / downloading…）、`queue_position`、
    `transfer_percent`、`phase_seconds`、`typical_seconds`（`AIJobs.Job.liveDetail`，[fal.ai 生成](fal-generation.md) 第十三节：fal 处理中没有百分比，
@@ -197,7 +199,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      位置关键帧同一个范围。工具说明（edit_clip、set_keyframes）里的范围和它对账（`FramingChecks`）。
    - **去黑边（remove_black_bars）**：从这一段用到的那一截里均匀抽 5 帧（`AIFrameSampler`，小图），`AIBlackBars`
      找四边连续的黑行 / 黑列（最亮的点 ≤ 40、平均 ≤ 20），**几帧合起来每边取最小**：只要有一帧那儿不黑，那儿
-     就不是黑边（夜景的暗天不会被当成遮幅）；整帧都黑的帧不算数；遮幅里压着字幕的扫到字就停。找到的黑边
+     就不是黑边（夜景的暗天不会被当成遮幅）；整帧都黑的帧不算数；遮幅里压着字幕的扫到字就停。**黑边要有一道边**
+     （2026-10-14）：黑行后面紧挨着的一两行比黑边亮出 20、或者里面有亮点（字幕、黑底上的东西）才算；水下、暗棚这种一点点
+     亮起来的暗处那一边「说不准」—— 单看一帧（look）当没有，几帧合起来时不参加（遮幅电影里碰巧一帧是夜景，别因为它认不出遮幅），
+     每一帧都说不准就当没有（[案例](../bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) 第 4 条；黑底上的一个圆和遮幅里的字幕一帧里分不出，照旧算黑边）。找到的黑边
      当作「可用区域」：单独用就是裁掉它，配 fit / fill 就在它里面算。看到什么写进结果（`black_bars`）。
    - **铺满时对准主体（focus 默认 subject）**：窗不用裁（素材和画布同比例）就不去认；要裁时抽 5 帧，用 macOS 自带的
      Vision（`AIVision`）认人脸 → 人（上半身）→ **字多时对准字**（幻灯片、录屏，第 37 条）→ 显眼的东西（注意力显著区），
@@ -219,7 +224,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      （预览那个 `BurnInSubtitleOverlay`，`ImageRenderer` 离屏按画布像素渲）。**每一层调现成的那一份，不另写**。
      每帧另附「画面上有谁」：看得见的片段和轨、文字、字幕。
    - **素材文件**（给 file）：挑镜头用，`AIFrameSampler` 抽帧（`MediaAssetCache` 的素材、async 取帧不卡线程）。
-     点名文件夹以外的文件先问。
+     点名文件夹以外的文件先问。一帧都取不出来时说为什么（`AIUnreadableVideo`：文件不在了、HEVC 存成「hev1」macOS 不开、
+     这台 Mac 解不开这种编码），解不开的叫 AI 用 compress_videos 转一份 H.264 再用（自带的 ffmpeg 照读）；text_scan、shots、
+     一次看几个文件同一句（[案例](../bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) 第 3 条）。
+   - **尺寸分开说**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-thinks-export-is-720p.md)）：看文件时结果里 `video` / `image` 是**文件本身**的
+     宽高（视频还有帧率、时长），`pictures_scaled_to` 是发给 AI 的图缩到了多大（最长边 1280，只为了看）。以前只回后者、叫 `picture_size`，
+     AI 拿 look 看成片时把它当成了成片的尺寸（三条片子都以为是 720p）。看时间线回的 `canvas` 是工程画布，成片多大看 export_video / get_job 的 `video`。
    - 几帧拼成一张（`AIContactSheet`：试每种列数挑最接近 4:3 的、最后一行至少半满、竖画面整张不高过宽的 1.25 倍，
      每格左上角标时刻），JPEG，跟在文字后面作为 MCP 的 `image` 内容回去（`AIToolResult.images`）。一次只回一张：
      几张分开的图每张单算 token。
@@ -286,7 +296,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 21. **复制一份（duplicate_items）**：**不另写落点**，直接用 ⌘C / ⌘V 那两个纯函数（`TimelineClipboardPayload(copying:)` →
    `TimelinePaste.apply`），不经过系统剪贴板 —— 撞上往上抬一轨、几组保住上下关系、链接组换新号、换新身份全和手动粘贴一样
    （[复制粘贴](timeline-clipboard.md)）。AI 多出来的只有：按 id 分类（同 delete_items）、链接开着时带上伙伴（同 ⌘C）、
-   不给落点紧接着这一批的结尾。静帧没转完的走 `convertPastedStills`（同 ⌘V）。
+   不给落点紧接着这一批的结尾。静帧没转完的走 `convertPastedStills`（同 ⌘V）。`track` 和 add_clips 同一套名字（`AITrackName`）：
+   正好比现有的多一条（只有 A1 时写 A2）或 new_video / new_audio 就新开一条空轨指着它，复制出来的没落在它上面就收掉；结果带
+   `tracks`（剪辑落在哪几条轨）。以前借 set_track 的解析，写 A2 报「没有这条轨、set_track 只改现有的轨」（[案例](../bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) 第 2 条）。
 
 22. **定格（freeze_frame）**：和手动定格走同一个 `runFreeze`（准入、抽帧、PNG 放在工程旁边、提交前核对一样都不另写，
    [定格](freeze-frame.md) 末节）。AI 多给一个时长；抽帧转码要 await，所以把「提交那一下」交给定格去包：
@@ -308,6 +320,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    `AISoundEffectRequest.placement`，没落点的报错叫用 start）；音效段默认 −8 dB（`SoundEffectClipGain`，面板拖进来也一样）；
    授权 `owned` 不署名（只问 `AudioLibraryLicense.needsCredit`）。**AI 的顺序（用户定）**：先 find_audio 找录音、没有合适的用
    sound_effect 合成、真实声音都没有才 generate_media；工具说明、总说明、风格卡都这么写；别去网上下载。
+   音乐每一首都写 `vocals`（true / false，清单每一首都有 has_vocals）：说明里答应了，只写 true 的话 AI 分不清「没有」和「不知道」
+   （[案例](../bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) 第 6 条）。
 
 24. **压缩、烧录字幕文件、转字幕格式（compress_videos、burn_subtitles、convert_subtitles）**：不开工程，直接处理文件。
    - 压缩和烧录**排进 App 里现成的那两个队列**（`EncodeQueue.compress` / `.burnIn`，和页面上点「开始」跑的是同一条管线），
@@ -514,7 +528,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      （倍率会乘在字号上）。高亮落到 `subtitleHighlight`。结果和 `get_subtitles` 都回「现在长什么样」（`describe`）和几句知道词的时间
      （`lines_with_word_times`：高亮只亮这些）。说明里写着**先设样式、再生成字幕 / 配音字幕**：一行放多少按设的字号和放大倍数切。
    - 给了字体要等字体表（`FontCatalogStore.loadedFonts`，最多 5 秒）：只认**烧录能用**的字体（libass 读得到文件的；苹方这种系统私有
-     的预览看着对、烧出来会换成别的字，所以不认）。所以 edit_subtitles 先 await 读好 style，再把同步的提交包进 `AIUndoGrouping.step`
+     的预览看着对、烧出来会换成别的字，所以不认）。族名之外**字体文件 name 表里的别的族名也认**（`FontFamilyNames`、`SubtitleFont.aliases`）：
+     用户自己装在 ~/Library/Fonts 的苹方族名是「蘋方-簡」，AI 说的「PingFang SC」也写在那份文件里；认出来回清单里的族名，报错列字体时带上
+     英文的别名（[案例](../bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) 第 5 条）。所以 edit_subtitles 先 await 读好 style，再把同步的提交包进 `AIUndoGrouping.step`
      （同 edit_clip，check-mcp.sh 的撤销分组扫描钉着）。
    - **burn_subtitles 的 style 只用于这一批**：落到这一批自带的一份上（`BurnInRequest.style`，烧录页记住的那套不动；页面上给这一条
      换字幕文件时它留着）；字幕文件里没有词的时间，给高亮直接报错。
@@ -859,7 +875,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - [ ] 没下载时跟 AI 说「用好一点的声音配」：AI 调 download_voices、告诉你在下，下完接着配。
 - [ ] 让 AI 按带货风格剪一段竖屏：它先 `edit_subtitles style`（大字、高亮、margin 0.22）再生成字幕；预览里说到的词变黄、稍微变大，
       导出的成片同一时刻一样；烧录页记住的样式没变；字幕表表头说「这个工程用自己的字幕样式」。
-- [ ] 让 AI 用一个烧录用不了的字体（「用苹方」）：它收到报错和能用的字体表，换一个再设。
+- [ ] 让 AI 用一个烧录用不了的字体（「用苹方」，在没把苹方装进 ~/Library/Fonts 的机器上）：它收到报错和能用的字体表，换一个再设；
+      装了的机器上（字体表里叫「蘋方-簡」）说「PingFang SC」也认，结果里回「蘋方-簡」，烧出来是苹方。
 - [ ] 让 AI 对一段带中文字幕的课程录屏做 `look text_scan`：报出底部的字幕带和要裁多少；台标报成固定的字（跳角的标「会动」）；
       满屏的字提示 focus=text。然后让它把这段转成 9:16：幻灯片那段按字取景，字比窗宽时它说宽出去多少、问要不要改完整显示。
 - [ ] 照 text_scan 的提示裁掉旧字幕后抽几帧（课程录屏 L16 的「三步走」页、L27 的 PDF 页）：旧字幕没了；幻灯片自己贴底边的小字

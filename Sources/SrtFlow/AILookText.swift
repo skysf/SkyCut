@@ -33,7 +33,7 @@ enum AILookText {
         let frames = await AIFrameSampler.frames(
             ofVideo: target.url, at: AIFrameSampler.times(from: lower, to: upper, count: count), maxSide: 1280, tolerance: 0.5
         )
-        guard !frames.isEmpty else { throw AIToolError("SrtFlow could not read pictures from \(target.url.lastPathComponent).") }
+        guard !frames.isEmpty else { throw AIToolError(await AIUnreadableVideo.reason(for: target.url)) }
         var scanned: [AITextRegions.Frame] = []
         for frame in frames {
             scanned.append(.init(time: frame.time, texts: await AIVision.analyze(frame.image, .text).texts))

@@ -301,7 +301,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   set_text 补的零件（字距、动画时长、强调、数字滚动）和实心形状、add_voiceover（挑声音、语速表、标记 → 词、配音的字幕不覆盖已有的）、
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
-  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个会话共用一个 App**（小程序记着会话的工程、真起小程序验请求带上它、App 的核对和说法、每个工具碰不碰工程，`ProjectBindingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里。
+  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个会话共用一个 App**（小程序记着会话的工程、真起小程序验请求带上它、App 的核对和说法、每个工具碰不碰工程，`ProjectBindingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里。
 - AI 录屏的接线（扫描，第 1 组）：AI 起的录制不开系统选择窗口、设置页 / 残缺框只给手动的会话、不覆盖、不写手动的偏好、入轨包 `AIUndoGrouping.step`、
   录制中不把 SrtFlow 摆到前面、丢弃先问且进废纸篓、授权一次运行只请求一次、浮窗在左下角、录制中换工程 / 改帧率先挡：`checks/screen-recording-ai-wiring.sh`。
 - fal.ai 生成（第 6 块）：`scripts/check-fal.sh`（`check-all` 第 2 组，不碰网络、不碰钥匙串）：模型表与估价、花钱把关、按天记账、**每个登记端点的请求体对着 fal 公开的接口定义快照验**
@@ -701,6 +701,14 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   预览只垫黑底、压黑 / 闪白走半程模型，闪白成了黑场；带关键帧的段推移一律回退成双向淡变，而跟拍铺满给每段都打位置关键帧。压黑 / 闪白照 xfade 的公式逐帧算
   （`XfadeColorCurve`，三层叠：出场 α、进场 β、颜色底，用仓库 ffmpeg 核过）、闪白垫白底、关键帧段推移的画布裁切按每片的摆放算。
   **写下的「做不到」要么去做、要么在用到的地方说出来；保守回退要看在真实工程里有多常见。**
+- [2026-10-14 AI 以为成片是 720p](docs/bugfixes/2026-10-14-ai-thinks-export-is-720p.md) — export_video / get_job 不报成片多大，AI 用 look 看成片，
+  结果里的 `picture_size` 是发给它的缩略图（最长边 1280），1080×1920 的成片就成了 720p。导出开始和做完都带 `video`（宽高帧率，和导出同一个 `cappedSize`），
+  look 看文件报文件本身的尺寸、缩略图的尺寸另写。**AI 会拿手边任何一个数字当答案：该说的事实要在产出它的工具结果里说。**
+- [2026-10-14 审美盲测撞出的六处 AI 工具小毛病](docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md) — set_transition 只回 {"cuts": 1}
+  （改成报每条缝在哪、多长、被夹短、定格了多少）；duplicate_items 写 A2 叫人用 set_track（和 add_clips 同一套名字：正好多一条就新开）；look 读不了 hev1 的
+  upscale 文件不说为什么（`AIUnreadableVideo`：说清编码、用 compress_videos 转一份）；水下 / 暗棚的暗处被当黑边（黑边要有一道边，`AIBlackBars`）；
+  字幕字体只认 Core Text 给的族名「蘋方-簡」不认「PingFang SC」（读 name 表里的别名）；find_audio 的 vocals 只在为真时写。
+  **结果里只回一个计数等于没回；区分两种东西要挑它们真正不同的那一处，只调门槛修不好。**
 - [2026-10-14 看门狗自检在 CI 上偶发 Bus error](docs/bugfixes/2026-10-14-watchdog-check-hook-recursion.md) — 崩在自检第 6 组自己装的 `malloc_logger` 钩子里、
   和 App 的抓栈代码无关：回调读 Swift 的 `var` 全局要做动态独占检查、要用线程的 TLS，没有 TLS 的线程（退出时拆 TSD 的、刚起的）在回调里建它就分配 →
   又进回调 → 递归 670 层爆栈。状态改放 `static let` 指着的裸内存，加一条确定性的回归（钩子装着时起一条裸线程分配、退出）。
