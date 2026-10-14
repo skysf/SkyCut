@@ -3,7 +3,7 @@
 # 这里只扫「工具真的调了它」。都是扫描，秒级。
 # 由来：docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md；约束见 docs/architecture/ai-control-mcp.md 第四节。
 
-echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名、配音字幕整句、Kokoro 语速"
+echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名、配音字幕整句、Kokoro 语速、cut_speech 的切口"
 TIMELINE_TOOLS="Sources/SrtFlow/AITimelineTools.swift"
 # set_transition 按收尾之后的状态报每条缝（以前只回 {"cuts": 1}）。
 if [ "$(grep -c 'return .ok(AITransitionReport.json(' "${TIMELINE_TOOLS}" || true)" -ne 1 ]; then
@@ -54,4 +54,14 @@ if [ "$(grep -c 'KokoroSpeedCalibration.next(target: target, tried: tried)' Sour
   echo "✗ Sources/SrtFlow/KokoroVoiceSpeech.swift 不按时长对准语速：要的 speed 原样给模型，读出来常常只慢一点点" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准"
+# cut_speech 的切口先看量出来的停顿：读了这段声音、交给 AISpeechCutPoints（按给的时间剪、口头禅、重复词都经它），
+# 挪了多少报给 AI（docs/bugfixes/2026-10-14-cut-speech-trusts-word-times.md）。只测纯值的话，工具照样可以只按转写切。
+SPEECH_TOOL="Sources/SrtFlow/AISpeechCutTool.swift"
+if [ "$(grep -c 'let levels = readsSound ? try await Self.levels(of: speech) : nil' "${SPEECH_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'words: words ?? \[\], levels: levels,' "${SPEECH_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -cE 'AISpeechCuts\.(requested|outside|fillerWords|repeats)\([^)]*points: points\)' "${SPEECH_TOOL}" || true)" -ne 4 ] \
+   || [ "$(grep -c 'result\["moved"\]' "${SPEECH_TOOL}" || true)" -ne 1 ]; then
+  echo "✗ ${SPEECH_TOOL} 的切口不经量出来的停顿（AISpeechCutPoints 拿到 levels），或结果里不报挪了多少：又会只信转写、把切口挪进词里" >&2
+  exit 1
+fi
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准；cut_speech 的切口先看停顿"

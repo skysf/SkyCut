@@ -26,6 +26,8 @@ enum AIAudioLevels {
 
     /// 一个窗是几个均方桶（48kHz 下两桶约 43ms）。
     static let bucketsPerWindow = 2
+    /// listen 没给 silence_db 时的静音门限（cut_speech 找停顿时也认它：AI 照 listen 报的静音挑的切口要算在停顿里）。
+    static let defaultSilenceDB = -45.0
 
     /// 源时间 [from, to) 切成窗。**窗和均方桶的边对齐**：不对齐的话，跨在「响 / 静」交界上的那个桶会把响的能量
     /// 按帧数摊进隔壁的静音窗，静音段两头各缩一截。只有头尾两个窗可能不满。波形还没读到的部分不出窗。

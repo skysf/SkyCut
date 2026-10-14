@@ -21,7 +21,7 @@ enum AIListenTool {
     static let maxClips = 80
 
     static func listen(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        let silenceDB = min(max(try args.double("silence_db") ?? -45, -80), -10)
+        let silenceDB = min(max(try args.double("silence_db") ?? AIAudioLevels.defaultSilenceDB, -80), -10)
         let minSilence = min(max(try args.double("min_silence") ?? 0.5, 0.1), 10)
         var settings = Settings(silenceDB: silenceDB, minSilence: minSilence, beats: try args.bool("beats") ?? false)
         // from / to：时间线上的几秒（2026-10-14 用户拍板「只听某几秒」）。文件的几秒照旧用 source_in / source_out。

@@ -59,6 +59,8 @@
 #      App 在收发线程上答「探一下」、路由轮到时先问还做不做、主窗口开得回来（扫描，下面）。
 #  31. 画面多大（2026-10-14）：export_video / get_job 报成片的宽高帧率（和导出同一个 cappedSize），look 看文件报文件本身的尺寸、
 #      缩略图的尺寸另写（VideoSizeChecks；接线扫描在下面「关掉主窗口不退出」之后）。
+#  32. cut_speech 的切口（2026-10-14）：落在量出来的停顿里就照切、落在声音上才挪进真的停顿 / 安静的窗、snap=false 一刀不挪、
+#      挪了超过 50ms 的报给 AI（SpeechCutPointChecks，用例是用户报的两个切口）；工具读了声音、交给切口、结果带 moved（扫描）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -446,6 +448,7 @@ xcrun swiftc \
   Sources/SrtFlow/AudioBeatTracker.swift \
   Sources/SrtFlow/AIBeatAnalysisWindow.swift \
   Sources/SrtFlow/AISpeechCuts.swift \
+  Sources/SrtFlow/AISpeechCutPoints.swift \
   Sources/SrtFlow/AIBeatCuts.swift \
   Sources/SrtFlow/VideoEditClipboardPayload.swift \
   Sources/SrtFlow/VideoEditClipboardPaste.swift \
@@ -520,6 +523,7 @@ xcrun swiftc \
   checks/MCP/TranscriptFormatChecks.swift \
   checks/MCP/BeatChecks.swift \
   checks/MCP/SpeechCutChecks.swift \
+  checks/MCP/SpeechCutPointChecks.swift \
   checks/MCP/BeatCutChecks.swift \
   checks/MCP/ProviderChecks.swift \
   checks/MCP/UpscaleToolChecks.swift \

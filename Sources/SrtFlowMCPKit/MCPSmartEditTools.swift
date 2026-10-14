@@ -29,7 +29,7 @@ enum MCPSmartEditTools {
                     "language": MCPSchema.string("Spoken language, e.g. en, zh-Hans, ja; auto (default) detects it."),
                     "from": MCPSchema.number("Read from this time on (timeline seconds, or file seconds with file).", minimum: 0),
                     "to": MCPSchema.number("Read up to this time.", minimum: 0),
-                    "words": MCPSchema.boolean("Also list every word with its start and end (for precise cuts)."),
+                    "words": MCPSchema.boolean("Also list every word with its start and end (estimates: 0.1-0.3 s off around pauses)."),
                     "max_chars": MCPSchema.integer("Roughly how much text per call (default 12000).", minimum: 1000, maximum: 60000),
                     "confirm_token": MCPSchema.confirmToken
                 ]),
@@ -45,7 +45,9 @@ enum MCPSmartEditTools {
                 description: """
                 Tighten a talking clip on V1 in one step: cut out ranges (by text — pass sentence or word times from \
                 transcribe), or keep only some ranges; shorten pauses; remove filler words (um, uh and Chinese ones) and words \
-                said twice in a row. Cuts land in the gaps between words, never inside one. The clip becomes pieces placed back \
+                said twice in a row. A time that falls in a pause (listen's silences) is cut exactly there; one on speech moves \
+                into the nearest measured pause (transcript word times can be 0.1-0.3 s off), and moved lists every time that \
+                moved. snap=false cuts exactly at the given times. The clip becomes pieces placed back \
                 to back and later V1 clips move left; its linked sound is cut with it even with Linkage off. Linkage on: \
                 subtitles, texts and sounds on the clip follow its pieces (those only on a cut part are deleted; music across \
                 clips stays); off: other tracks stay — regenerate subtitles afterwards. Filler words and repeats need \
@@ -55,6 +57,7 @@ enum MCPSmartEditTools {
                     "clip_id": MCPSchema.string("The talking clip on V1."),
                     "remove": MCPSchema.array(of: range, "Ranges to cut out."),
                     "keep": MCPSchema.array(of: range, "Keep only these ranges of the clip; the rest of it is cut."),
+                    "snap": MCPSchema.boolean("false: cut remove / keep exactly at the given times, only rounded to frames (default true)."),
                     "remove_pauses": MCPSchema.number("Shorten pauses longer than this many seconds (e.g. 0.6).", minimum: 0.2),
                     "pause_left": MCPSchema.number("Seconds of each shortened pause to leave (default 0.25).", minimum: 0, maximum: 2),
                     "remove_fillers": MCPSchema.boolean("Cut filler words (needs transcribe first)."),

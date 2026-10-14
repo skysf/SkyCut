@@ -1,10 +1,10 @@
 import Foundation
 import SrtFlowCore
 
-// cut_speech（AISpeechCuts）：切口落在词和词之间空隙的中点（离词最多 0.3 秒，按词的中点判归属）；删 / 只留 / 停顿缩短 /
-// 口头禅 / 说重了的词各自算对；合并时挨得太近的连成一刀、片段头尾剩一点点也剪掉、对齐到帧、不到两帧的不剪；
-// 停顿门限从这一段自己量；真落到带链接声音的时间线上：画面和声音在同样的地方剪、后面的 V1 片段往前补、一对还是一对。
-// 编法见 scripts/check-mcp.sh。
+// cut_speech（AISpeechCuts）：只有转写时（读不到声音），切口落在词和词之间空隙的中点（离词最多 0.3 秒，按词的中点判归属）；
+// 删 / 只留 / 停顿缩短 / 口头禅 / 说重了的词各自算对；合并时挨得太近的连成一刀、片段头尾剩一点点也剪掉、对齐到帧、
+// 不到两帧的不剪；停顿门限从这一段自己量；真落到带链接声音的时间线上：画面和声音在同样的地方剪、后面的 V1 片段往前补、
+// 一对还是一对。有声音时切口先看量出来的停顿：SpeechCutPointChecks.swift。编法见 scripts/check-mcp.sh。
 
 func runSpeechCutChecks() {
     checkCutPoints()
@@ -25,6 +25,11 @@ private let spoken = [
 
 private func near(_ value: Double, _ expected: Double) -> Bool { abs(value - expected) < 1e-9 }
 
+/// 只有转写、读不到声音：2026-10-14 之前的切法。
+private func transcriptOnly(_ words: [SpeechTranscript.Word]) -> AISpeechCutPoints {
+    AISpeechCutPoints(words: words, levels: nil, silenceDB: -45)
+}
+
 private func checkCutPoints() {
     check(near(AISpeechCuts.startPoint(3.4, words: spoken), 3.3), "a range starting at 'think' starts in the gap before it (3.3)")
     check(near(AISpeechCuts.endPoint(3.7, words: spoken), 3.8), "and ending after 'think' ends in the gap after it (3.8)")
@@ -36,23 +41,25 @@ private func checkCutPoints() {
 }
 
 private func checkCutKinds() {
-    let removed = AISpeechCuts.requested([3.4...4.1], words: spoken)
+    let removed = AISpeechCuts.requested([3.4...4.1], points: transcriptOnly(spoken))
     check(removed.count == 1 && near(removed[0].start, 3.3) && near(removed[0].end, 4.2), "remove 'think this': 3.3–4.2")
-    let outside = AISpeechCuts.outside([3.4...4.8], clip: 0...6, words: spoken)
+    let outside = AISpeechCuts.outside([3.4...4.8], clip: 0...6, points: transcriptOnly(spoken))
     check(outside.count == 2 && near(outside[0].end, 3.3) && near(outside[1].start, 5.1), "keep only 'think this works.': cut before 3.3 and after 5.1")
     checkEqual(outside.first?.start, 0, "from the clip start")
     let pauses = AISpeechCuts.pauses([1.8...2.8, 3.2...3.4], longerThan: 0.6, leave: 0.2)
     check(pauses.count == 1 && near(pauses[0].start, 1.9) && near(pauses[0].end, 2.7), "a 1 s pause keeps 0.1 s at each end; a short gap is left alone")
-    let fillers = AISpeechCuts.fillerWords(spoken)
+    let fillers = AISpeechCuts.fillerWords(spoken, points: transcriptOnly(spoken))
     check(fillers.count == 1 && near(fillers[0].start, 1.4) && near(fillers[0].end, 2.1), "'um' goes, gap to gap (1.4–2.1)")
     checkEqual(fillers.first?.reason, "filler: um", "and says why")
-    let repeats = AISpeechCuts.repeats(spoken)
+    let repeats = AISpeechCuts.repeats(spoken, points: transcriptOnly(spoken))
     check(repeats.count == 1 && near(repeats[0].start, 2.5) && near(repeats[0].end, 3.0), "'I I': the first one goes (2.5–3.0)")
     let twice = [word("you", 0, 0.2), word("know", 0.3, 0.5), word("you", 0.6, 0.8), word("know", 0.9, 1.1), word("it", 1.3, 1.4)]
-    let pair = AISpeechCuts.repeats(twice)
+    let pair = AISpeechCuts.repeats(twice, points: transcriptOnly(twice))
     checkEqual(pair.map(\.reason), ["repeat: you know"], "a two-word repeat goes as one")
-    checkEqual(AISpeechCuts.repeats([word("very", 0, 0.3), word("very", 1.2, 1.5)]).count, 0, "said again after a long pause: not a stutter")
-    checkEqual(AISpeechCuts.repeats([word("do", 0, 0.2), word("this.", 0.3, 0.6), word("This", 0.8, 1.0), word("is", 1.1, 1.2)]).count, 0,
+    let again = [word("very", 0, 0.3), word("very", 1.2, 1.5)]
+    checkEqual(AISpeechCuts.repeats(again, points: transcriptOnly(again)).count, 0, "said again after a long pause: not a stutter")
+    let sentences = [word("do", 0, 0.2), word("this.", 0.3, 0.6), word("This", 0.8, 1.0), word("is", 1.1, 1.2)]
+    checkEqual(AISpeechCuts.repeats(sentences, points: transcriptOnly(sentences)).count, 0,
                "'…do this. This is…' is two sentences, not a stutter")
     checkEqual(AISpeechCuts.silenceThreshold(Array(repeating: -20, count: 50)), -30, "all speech: the threshold stays at -30 (no pauses found)")
     let quietRoom = Array(repeating: -65.0, count: 20) + Array(repeating: -20.0, count: 80)

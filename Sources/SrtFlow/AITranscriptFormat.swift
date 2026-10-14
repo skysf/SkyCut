@@ -50,7 +50,8 @@ enum AITranscriptFormat {
             "clips": .array(listed),
             "note": .string(
                 "Times are timeline seconds (seconds in the file when you gave a file). To cut, pass sentence or word "
-                    + "times to cut_speech as keep or remove ranges."
+                    + "times to cut_speech as keep or remove ranges. Word times are estimates, 0.1-0.3 s off around pauses: "
+                    + "cut_speech moves cuts on speech into the real pause, and listen shows exact silences."
             )
         ]
         if listed.isEmpty { result["note"] = "Nothing was said in this range." }
