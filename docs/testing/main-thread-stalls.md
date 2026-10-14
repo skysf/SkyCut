@@ -23,6 +23,8 @@
   `stalls`（每次卡顿的时刻、毫秒、context、前 12 层栈）；每个 `perf` 快照里多了 `stall:count` /
   `stall:maxMs`（自上次 `perfReset` 起）。
 - **不进性能 ratchet 的账**：卡顿次数本来就不稳，`PerfCounters` 里没有它。
+- **此刻卡了多久**（`unresponsiveSeconds`，2026-10-14）：正在等的那一拍心跳发出去多久了（没在等是 0，没开是 nil）。AI 小程序「探一下」时
+  App 在收发线程上读它（不经主线程），主线程卡了 30 秒以上就告诉 AI「SrtFlow 卡死了」（[AI 接口](../architecture/ai-control-mcp.md) 第三节）。
 
 ## 二、怎么读
 
@@ -60,7 +62,8 @@
 
 `scripts/check-main-thread-watchdog.sh`（`scripts/check-all.sh` 第 3 组）：主循环空转半秒不许误报；
 主线程忙等 400 ms 记一次，时长在 0.2–1.5 秒、context 是给的那句、栈里有 `stallTheMainThread`；
-主线程睡 300 ms 也记；日志文件里有同样两条；旁注原样进日志、不算卡顿；`stop()` 之后再卡不记。自检里阈值给 150 ms（App 里是 60 ms）：
+主线程睡 300 ms 也记；日志文件里有同样两条；旁注原样进日志、不算卡顿；`stop()` 之后再卡不记；
+第 1b 组：没开的看门狗说不出卡了多久（nil）、空转时接近 0、主线程忙等时别的线程读到它卡了多久、落地后回到 0、`stop()` 之后 nil。自检里阈值给 150 ms（App 里是 60 ms）：
 CI 的虚拟机上看门狗线程醒来能晚几十毫秒（#117 首跑：250 ms 的忙等量成 199 ms），阈值和卡的长度都要留出这个余量。
 
 反向验证（2026-10-01）：把阈值临时改成 10 秒 → 红（忙等一次都没记到）；把 `capture()` 临时改成
