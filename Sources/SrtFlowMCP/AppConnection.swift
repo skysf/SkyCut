@@ -27,6 +27,8 @@ struct AppConnection {
     let sessionProject = MCPSessionProject()
     /// 等回答、探 App 还活着没有（App 卡死时别让 AI 干等两分钟、只拿到一句看不懂的错）。
     let waiter: CallWaiter
+    /// App 升级过、这个会话里跑的还是旧的小程序时，换上的 App 那份工具清单（`MCPCatalogSync`）。
+    let catalog = MCPCatalogOverride()
 
     /// 从小程序自己的位置找到它所在的 App：`X.app/Contents/Helpers/srtflow-mcp`。
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppConnection {
@@ -83,7 +85,11 @@ struct AppConnection {
             }
             let response = try JSONDecoder().decode(MCPBridge.Response.self, from: line)
             sessionProject.note(tool: tool, response: response)
-            let result = response.result
+            var result = response.result
+            // App 的清单和编进这个小程序的不一样（App 升级了、会话还是升级前开的）：换上 App 那份，这一次的结果里说一句。
+            if catalog.needsRefresh(appFingerprint: response.catalog), let fresh = fetchCatalog(), catalog.adopt(fresh) {
+                result = MCPBridge.addingNote(MCPCatalogSync.refreshedNote, to: result)
+            }
             // 刚把 App 拉起来：AI 之前打开的工程、文件夹都不在了，先说一句，不然它只看到「文件不存在」「没有这个 id」
             //（2026-10-02 南极工程：用户关了窗口 = App 退出，下一次调用拉起来的是空的 Untitled）。
             return launched ? MCPBridge.addingNote(MCPBridge.relaunchNote, to: result) : result
@@ -92,6 +98,18 @@ struct AppConnection {
         } catch {
             return MCPBridge.textResult("Could not talk to SrtFlow: \(error)", isError: true)
         }
+    }
+
+    /// 向 App 要它的工具清单（`MCPBridge.catalogTool`，App 在收发线程上当场回）。要不到就是 nil，照旧用编进来的。
+    private func fetchCatalog() -> JSONValue? {
+        guard let fd = try? MCPUnixSocket.connect(path: socketPath) else { return nil }
+        defer { close(fd) }
+        MCPUnixSocket.setTimeouts(fd, seconds: 5)
+        let request = MCPBridge.Request(tool: MCPBridge.catalogTool, arguments: [:], client: nil)
+        guard let payload = try? JSONEncoder().encode(request), (try? MCPUnixSocket.writeLine(fd, payload)) != nil,
+              let line = try? MCPUnixSocket.readLine(fd),
+              let response = try? JSONDecoder().decode(MCPBridge.Response.self, from: line) else { return nil }
+        return response.result
     }
 
     private struct ConnectionFailure: Error {
