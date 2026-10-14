@@ -24,6 +24,8 @@ enum AITimelineEdits {
         /// nil = 按类型默认：画面落 V1，声音落第一条放得下的音频轨。
         var target: TrackDropTarget?
         var start: Double?
+        /// add_clips sound=separate：落地之后把声音分到音频轨上（`ClipSoundSeparation`，同界面上的分离音频）。
+        var separateSound = false
     }
 
     /// 按顺序放一批素材。同一批里两段都要「新开一条轨」时，第二段放进第一段开的那条。只有**自己要了新开**的那一段
@@ -43,6 +45,7 @@ enum AITimelineEdits {
             let item = MediaImportItem(duration: plan.clip.timelineDuration, isAudio: plan.isAudio)
             let landings = state.mediaImportLandings([item], firstStart: start, preferring: target)
             state.insertImported([plan.clip], at: landings)
+            if plan.separateSound { ClipSoundSeparation.separate(plan.clip.id, in: &state) }
             if plan.target == .newOverlayTop, landings.first?.target == .newOverlayTop { openedVideo = state.overlayTracks.count - 1 }
             if plan.target == .newAudioBottom, landings.first?.target == .newAudioBottom { openedAudio = state.audioTracks.count - 1 }
         }
