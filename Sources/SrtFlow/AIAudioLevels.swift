@@ -53,6 +53,14 @@ enum AIAudioLevels {
         return result
     }
 
+    /// listen 的 from / to（时间线秒）：这一段在这几秒里用到的源范围（变速换算）；没给就是整段，和这几秒不相交返回 nil。
+    static func sourceWindow(of clip: EditClip, from: Double?, to: Double?) -> (from: Double, to: Double)? {
+        let start = max(clip.timelineStart, from ?? clip.timelineStart)
+        let end = min(clip.timelineEnd, to ?? clip.timelineEnd)
+        guard end - start > 0.001 else { return nil }
+        return (clip.sourceTime(atTimeline: start), clip.sourceTime(atTimeline: end))
+    }
+
     /// 片段在时间线上听到的：窗换成时间线秒，均方乘增益的平方、峰值乘增益。
     static func heard(_ windows: [Window], clip: EditClip, trackGain: Double) -> [Window] {
         windows.map { window in

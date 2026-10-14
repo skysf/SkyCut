@@ -326,7 +326,7 @@ public enum MCPTimelineTools {
                 "follow": MCPSchema.boolean("With fit=fill aiming at the subject: follow it when it moves (default true)."),
                 "crop": crop,
                 "remove_black_bars": MCPSchema.boolean("Find black bars around the picture and cut them off (instead of crop)."),
-                "x": MCPSchema.number("Horizontal centre of the picture on the frame, 0–1; a bigger picture needs values below 0 or above 1 (-2 to 3) to bring its edge into view.", minimum: -2, maximum: 3),
+                "x": MCPSchema.number("Horizontal centre of the picture on the frame, 0–1 (-2 to 3 brings the edge of a bigger picture into view).", minimum: -2, maximum: 3),
                 "y": MCPSchema.number("Vertical centre of the picture on the frame, the same way (-2 to 3).", minimum: -2, maximum: 3),
                 "scale": MCPSchema.number("Picture size, 1 = the whole picture just fits the frame.", minimum: 0.05, maximum: 6),
                 "rotation": MCPSchema.number("Clockwise degrees.", minimum: -360, maximum: 360),
