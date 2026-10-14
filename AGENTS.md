@@ -132,7 +132,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 主轨转场的容量、可用判定、借余料、首尾帧定格补足 | [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md)、[转场预览有、成片没有](docs/bugfixes/2026-09-20-transition-preview-export-divergence.md) |
 | 画面段的入场/出场动画、预设效果、预渲染路由 | [画面段的入场 / 出场动画](docs/architecture/clip-animation.md)、[画面渐入渐出](docs/architecture/video-fades.md)、[关键帧动画](docs/architecture/keyframe-animation.md) |
 | 画面文字、字体、Core Text 渲染、文字动画、逐帧导出、预览上文字的选中框和可点范围、**文字行（行号进模型、行序 = 叠放序、上下换行）**、数字的等待、**老虎机位数不同的两头（`NumberOdometer`）** | [画面文字](docs/architecture/text-overlays.md)（把手的可点范围写在 `.offset` 之前；没选中的字只认看得见的部分；行号进模型，预览与导出同一份叠放序；老虎机不存在的那一位滚成空白收掉，居中和右对齐右边不动；导出时序列末尾多渲两帧、几段左闭右开，接缝那一帧不空不叠）、[字在接缝上闪没一帧](docs/bugfixes/2026-10-14-text-blinks-at-animation-seam.md)、[老虎机停在「090」](docs/bugfixes/2026-09-25-odometer-leading-zero.md)、[主字体里没有的字画成乱码](docs/bugfixes/2026-09-29-text-fallback-glyphs-drawn-with-main-font.md)（排版给了谁的字形号就用谁画）、[拖动手势 §5j](docs/architecture/timeline-drag-gestures.md)、[拖字变成旋转](docs/bugfixes/2026-09-24-text-rotate-handle-hit-area-at-center.md) |
-| 滤镜调色、LUT、预览图层滤镜、导出 `lut3d` 段、滤镜段的选中（多选） | [滤镜](docs/architecture/filters.md) |
+| 滤镜调色、LUT、预览图层滤镜、导出 `lut3d` 段、滤镜段的选中（多选）、**任何滤镜下纯黑的地方（空档、黑场、黑底字卡）** | [滤镜](docs/architecture/filters.md)（纯黑不抬：`FilterLUT.holdingBlack`，只收往亮里调的、按输入最亮的通道、连续不出台阶）、[滤镜把纯黑抬成灰](docs/bugfixes/2026-10-14-filters-lift-pure-black.md) |
 | 画面上的形状（线条 / 长方形 / 正方形 / **圆 / 圆弧**）：种类、几何、怎么画（`ShapeOutline`、`ShapePreviewDrawing`、`ShapePNGRenderer`、`ShapeOverlayCanvas`）、**形状的入场 / 出场动画**（`ShapeAnimation` / `ShapeAnimator`、导出切段 `ShapeOverlayExport`、形状和文字共用的导出接法 `OverlayExportFile`、检查器的「动画」一节）、`set_shape` | [画面上的形状](docs/architecture/shapes.md)（所有种类画什么只有 `ShapeOutline.drawing` 一份、预览和导出同一条路径，只各自上色；什么都没露出来时给空路径、不许裁到空区域；圆弧从 12 点钟顺时针、扫过 `arcSweep`；动画和文字同名同曲线、出场是入场倒放、时刻先钉到工程帧上、只逐帧渲动画那两截；v30 / v31）、[导出的线比预览长](docs/bugfixes/2026-10-03-exported-lines-longer-than-preview.md)、[画面文字](docs/architecture/text-overlays.md)「导出：只逐帧渲动画进行中的那段」、[盖一块](docs/architecture/cover-blur-mosaic.md)（模糊 / 马赛克也是形状的一种，没有动画） |
 | **盖一块（模糊 / 马赛克，`ShapeKind.blur` / `.mosaic`）**、预览的第二层播放器（`CoverPreviewLayer`）、导出里的 `gblur` / `pixelize`（`VideoEditCoverExport`）、`set_shape` 的 blur / mosaic、`look text_scan` 给的 `cover`（`AICoverBox`）、遮水印 / 遮旧字幕 | [盖一块](docs/architecture/cover-blur-mosaic.md)（形状的一种、时间线上的一段、**不跟着片段走**；落点在调色之后、形状之前；三条管线按构造一致：裁出这一块、在这块里做效果、边缘外延、贴回去；预览的蒙版和滤镜别挂同一层；`CIPixellate` 的格子要设成从左上角起算；框取偶数往外收；力度按画面高换算）、[滤镜](docs/architecture/filters.md)（预览不走自定义合成器、图层滤镜的地基）、[预览自由变换](docs/architecture/preview-free-transform.md)（源画面框换画布框的变换顺序）、[AI 接口（MCP）](docs/architecture/ai-control-mcp.md)（第 38 条）、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（没有盖一块时第二层不建、性能计数不变） |
 | 工程帧率、关键帧容差、**AI 读写关键帧（报出来的永远在片段范围里、`edit_clip keyframes` 策略、`relative` 时间）**、**关键帧的缓动（`Keyframe.easing`、`KeyframeEasing`、预览按帧加密 `KeyframeSliceTimes`、AI 默认 easeInOut）** | [工程帧率](docs/architecture/project-frame-rate.md)、[关键帧动画](docs/architecture/keyframe-animation.md)「AI 接口」「缓动」（linear 逐位一致、只对画面的六条轨、v27；急停 / 回弹 / 弹簧是 v32，冲过头的两条夹宽高下限、最低值放宽）、[限幅 + 缓动方案](docs/plans/2026-09-30-export-limiter-and-easing.md) |
@@ -232,7 +232,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `PreferenceKey.reduce` 不许写成 `value = nextValue()`（兄弟节点的默认值会把量出来的尺寸盖成零）：
   `checks/preference-reduce-keeps-value.sh`。
 - 滤镜调色：LUT 数学（强度那条等式）、层号规则，以及**预览与成片逐像素比对**
-  （配方 ↔ CoreImage ↔ 真跑 ffmpeg）：`scripts/check-filters.sh`。
+  （配方 ↔ CoreImage ↔ 真跑 ffmpeg），以及纯黑不抬（十款的纯黑那一格、CoreImage 渲纯黑、真导出里黑底素材和空档盖了褪色胶片还是纯黑）：`scripts/check-filters.sh`。
 - 滤镜挂到播放器上这段接线（拍窗口数像素）：`scripts/check-filter-preview-attach.sh`。
 - 盖一块（模糊 / 马赛克）在成片里真的盖了（真跑生产导出再抽帧：只改那一块、块外和基线一致、外接框就是那块、高斯剖面贴着理想的阶跃响应、马赛克格子边长对且从左上角起算、只在那一段时间里盖、形状压在它上面不被糊、调色在它前面、藏起来的不导出、不算总长）：`scripts/check-cover-export.sh`（`check-all.sh` 第 5 组）。
 - 预览上的盖一块真的盖上了（生产的 `CoverHostView` 放进真窗口、拍屏数像素：块里糊成混色块外还是硬的、改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照）：`scripts/check-cover-preview-attach.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 跑。
@@ -689,6 +689,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   小程序一个会话一个进程，由它记着（`MCPSessionProject`：第一次碰工程时记、`open_project` / `new_project` 做成了才换）、每个请求带上；
   App 排到调用之后、摆窗口之前核对（`AIProjectBinding`），不是就一样都不做、说清楚谁换的和怎么回去；不加工具参数。
   **共享的东西要么每个会话各一份、要么每次核对；只在结果里说出来拦不住。**
+- [2026-10-14 滤镜把纯黑抬成灰：空档、黑场、黑底字卡盖了褪色胶片发灰带色块](docs/bugfixes/2026-10-14-filters-lift-pure-black.md) — 配方对每个输入一视同仁，
+  褪色胶片把纯黑抬到 0.12（偏品红），黑底素材压缩的一两个码值被抬进平灰里成了色块；灰纪、雾蓝、暖阳同样。用户拍板纯黑不抬：
+  `FilterLUT.holdingBlack` 在输入最亮的通道低于 0.125 时按 smoothstep 收回往亮里调的那部分（压死黑的照旧），表照旧是格点取值、两条管线自动一致；
+  `check-filters.sh` 第四组钉着纯黑那一格、CoreImage、真导出的黑底和空档。**调色作用于画面，不作用于空档、黑场这种编辑出来的黑；按输入的特征定规矩，不按哪一款。**
 - [2026-10-14 App 卡住时 AI 只会干等两分钟，拉起来之后又说主窗口关着](docs/bugfixes/2026-10-14-ai-calls-time-out-silently-when-app-hangs.md) — 盲测时测试版卡死，
   每个调用等 120 秒只拿到一句 errno、卡住期间收下的调用缓过来还会照做；强退后小程序拉起来，内存吃紧时窗口 8 秒还没建好，报「主窗口关着、按 ⌘3」（⌘3 早是烧录了）。
   小程序每 15 秒「探一下」（App 在收发线程上答主线程卡了多久、调用到哪了），卡 30 秒就放弃并让 App 也放弃、还卡着就不再发；菜单建好就交出「打开主窗口」、
@@ -700,6 +704,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `-itsoffset` 把不在帧格子上的起点（AI 按词的时间放字）换算到 1/fps 格子、整串提前半帧，主轨几段拼接后画面时间戳又晚几微秒，那一帧落在序列最后一帧之后 →
   EOF → `eof_action=pass` 撤层；`between` 两头都闭，接缝落在一帧上时两段同时贴。序列末尾多渲两帧、各段左闭右开（和预览的 `contains(time:)` 同口径）。
   单拿出来复现不了，用 App 自己的出图函数对用户的工程出图、插 `showinfo` 才看清。**「实测对齐」要在不对齐的输入上再测一遍；自检场景要像用户的工程。**
+- [2026-10-14 Kokoro 配旁白：speed 从 0.95 改到 0.85 几乎听不出慢](docs/bugfixes/2026-10-14-kokoro-speed-barely-changes.md) — speed 原样交给模型，模型把每个音的时长
+  除以 speed 再取整到 25 毫秒一格、段间停顿也不跟着变，要 0.85 只慢 5–7%、每句不一样。改成按时长对准（`KokoroSpeedCalibration`：先按 1 倍读一遍、
+  目标 = 1 倍时长 ÷ speed、按读出来的长短调给模型的 speed，两边都有了就夹在中间插值），真模型四句都对到 3% 以内。
+  **参数名叫 speed 不等于它线性地管语速：量结果、按结果调。**
 - [2026-10-14 AI 用 look 看转场和成片对不上：闪白像黑场、上推像叠化](docs/bugfixes/2026-10-14-look-transitions-differ-from-export.md) — look 看时间线就是预览那份合成：
   预览只垫黑底、压黑 / 闪白走半程模型，闪白成了黑场；带关键帧的段推移一律回退成双向淡变，而跟拍铺满给每段都打位置关键帧。压黑 / 闪白照 xfade 的公式逐帧算
   （`XfadeColorCurve`，三层叠：出场 α、进场 β、颜色底，用仓库 ffmpeg 核过）、闪白垫白底、关键帧段推移的画布裁切按每片的摆放算。

@@ -107,8 +107,35 @@ enum FilterLUT {
 
     // MARK: - 配方求值
 
-    /// 一格的颜色。输入输出都是 0…1 的伽马编码值。
+    /// 一格的颜色。输入输出都是 0…1 的伽马编码值。表就是它在格点上的取值。
     static func apply(_ recipe: FilterRecipe, _ rgb: (r: Double, g: Double, b: Double))
+        -> (r: Double, g: Double, b: Double) {
+        holdingBlack(grade(recipe, rgb), input: rgb)
+    }
+
+    /// 纯黑保护的范围：输入最亮的那个通道低于它，往亮里调的那部分开始收回来。
+    /// 取 4 个格子（33³ 的表一格是 1/32），表在这一段有 5 个取样点，三线性插出来的曲线是连续的。
+    static let blackHold = 4.0 / Double(dimension - 1)
+
+    /// **纯黑不抬**（2026-10-14 用户拍板）：原本就是纯黑的地方 —— 空档、黑场、黑底字卡 —— 任何滤镜之后都还是纯黑。
+    ///
+    /// 输入最亮的通道低于 `blackHold` 时，配方**往亮里调**的那部分按 smoothstep 收回来（0 处一点不剩、
+    /// 到 `blackHold` 全给）；**往暗里调**的（冷铁、夜金压死黑）照旧，这条规矩只管「不抬」。只看最亮的那个通道：
+    /// 暗而饱和的颜色（深蓝）不是黑。smoothstep 在 0 处斜率为零，黑底上压缩出来的那一两个码值的噪声不会被放大成色块。
+    /// 案例：docs/bugfixes/2026-10-14-filters-lift-pure-black.md。
+    static func holdingBlack(
+        _ graded: (r: Double, g: Double, b: Double), input rgb: (r: Double, g: Double, b: Double)
+    ) -> (r: Double, g: Double, b: Double) {
+        let t = min(max(max(rgb.r, rgb.g, rgb.b) / blackHold, 0), 1)
+        let weight = t * t * (3 - 2 * t)
+        func held(_ out: Double, _ input: Double) -> Double {
+            min(out, input + (out - input) * weight)
+        }
+        return (held(graded.r, rgb.r), held(graded.g, rgb.g), held(graded.b, rgb.b))
+    }
+
+    /// 配方本身（不带纯黑保护）：lift / gain → gamma → 饱和 → 对比。
+    static func grade(_ recipe: FilterRecipe, _ rgb: (r: Double, g: Double, b: Double))
         -> (r: Double, g: Double, b: Double) {
         // ① lift / gain：标准调色的两端，lift 抬暗部、gain 缩高光。
         var r = rgb.r * (recipe.gainR - recipe.liftR) + recipe.liftR

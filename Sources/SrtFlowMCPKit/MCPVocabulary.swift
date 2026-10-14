@@ -116,6 +116,9 @@ public enum MCPVocabulary {
     public static let recordingPointers = ["shown", "hidden", "clicks"]
     public static let recordingDecisions = ["add", "keep", "discard"]
 
+    /// add_clips 的 sound：视频文件的声音怎么放（`ClipSoundMode`：separate = 分离音频、和画面链接；only = 只要声音）。
+    public static let clipSounds = ["separate", "only"]
+
     /// edit_clip 改素材窗口时关键帧怎么办（`AIKeyframePolicy`）。
     public static let keyframePolicies = ["keep_frames", "stretch", "clear"]
 

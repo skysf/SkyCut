@@ -466,7 +466,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      只有默认质量时结果里带「去系统设置哪儿下载」，总说明要求 AI 转告。Eloquence 那一族、老的 speech.synthesis.voice 那一族、新奇声音、
      个人声音都不用。也认系统声音的名字。活泼的音调略高（1.08）、沉稳的略低（0.94）。
    - **语速不是线性的**：`AVSpeechUtterance.rate` 0.5 = 正常，0.55 已经快 1.29 倍，0.3 只慢到 0.77 倍，中间有平台；和声音无关。按实测的表
-     （`AIVoiceChoice.measuredRates`）插值反查。
+     （`AIVoiceChoice.measuredRates`）插值反查。**Kokoro 也不线性**：模型把每个音的时长除以 speed 再取整到 25 毫秒一格、停顿不跟着变，要 0.85
+     常常只慢 5–7%，所以按时长对准（`KokoroSpeedCalibration`）：先按 1 倍读一遍，目标 = 1 倍的时长 ÷ speed，按读出来的长短调给模型的 speed，
+     差 3% 以内就停、最多再读四次（两边都有了就夹在中间插值，不外推；[案例](../bugfixes/2026-10-14-kokoro-speed-barely-changes.md)）。
    - **合成**（`AISpeechSynthesis`）：`AVSpeechSynthesizer.write` 读成 PCM（不出声）、存成 AAC 的 .m4a。**词的标记只从代理方法
      `speechSynthesizer(_:willSpeak:utterance:)` 来**，`write(_:toBufferCallback:toMarkerCallback:)` 那个回调在 macOS 26 上一次都没叫过；
      `byteSampleOffset` 是字节，除以每帧字节数（单声道 Float32 = 4）就是第几帧，和声音对得上（停顿后第一个词正好落在静音结束处）。
@@ -680,6 +682,19 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     App 重启过 —— 路由记下 AI 的 `open_project` / `new_project` 是哪个会话做的）、两个工程的名字和路径、「Nothing was changed」、先问用户、
     回去和改用开着的那个各怎么调 `open_project`（开着的没存过就请用户先 ⌘S）。会话自己刚换的（并排发来的几个调用）不拒。
     ④ 读得出工程的结果照旧带 `project`（第 41 条 ⑤），给人看；拦人的是 ③。
+47. **视频的声音单独放（J/L cut，2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）**：盲测里两条课程片
+    想用一段口播的声音、画面换成别的，只能把口播放到 V2、不透明度 0 绕过去（`add_clips` 不许把视频放到音频轨上）。现在：
+    ① `add_clips` 每一项的 `sound`（`ClipSoundMode`，词表 `MCPVocabulary.clipSounds`，只对有声音的视频文件）：`separate` = 画面照放，
+    落地之后马上**分离音频** —— 和界面上的 Detach Audio（右键 / 工具栏）**同一份规则** `ClipSoundSeparation.separate`：画面静音，声音成
+    音频轨上的一段（同一个文件、同一截、音量 / 曲线 / 渐变 / 场景跟着走），两边一个链接组，声音落第一条放得下的音频轨、都放不下新开一条；
+    结果里那一项带 `sound_id` / `sound_track`。`only` = 只要声音（`detachedAudio(linkGroup: nil)`，不链接），按音频的规矩落轨。
+    视频放到音频轨上的报错改成指向 `sound=only`。
+    ② `edit_clip` 的 `alone`：只改这一段，**它自己的**链接伙伴不跟（`AIClipEdit` 里跟随伙伴那一步）；别的片段的链接照旧（ripple 推后面的
+    V1 片段时它们的伙伴照样跟）。联动（压在主轨块上的东西跟着画面走）不归它管：画面单独裁了头、内容挪了，分出来的声音照联动的规矩跟着
+    画面保持同步。界面上相当于把「联动」关掉再拖把手。
+    ③ 两样都只加参数说明，没加工具；腾地方把所有工具共用的 `confirm_token` 说明写短了一截。
+    守卫：`checks/MCP/ClipSoundChecks.swift`（分离的结果、批量落轨、不能分的不改、alone 的 J / L 两种和不加 alone 的老行为）、
+    `ConfigChecks` 词表对账、`checks/MCP/clip-sound-wiring.sh`（界面和 AI 同一份规则、alone 只挡自己的伙伴）。
 
 ## 五、这一轮、停止、撤销这一轮
 
