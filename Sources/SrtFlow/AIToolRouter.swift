@@ -200,6 +200,7 @@ final class AIToolRouter {
             let style = try await AISubtitleTools.style(args)
             return try AIUndoGrouping.step(undo) { try AISubtitleTools.edit(args, style: style, project) }
         case .exportVideo: return try await AIExportTools.export(args, project)
+        case .exportSubtitles: return try AISubtitleFileExport.export(args, project)
         case .getJob: return try await AIExportTools.job(args)
         case .cancelJob: return try AIExportTools.cancel(args)
         }
@@ -221,7 +222,7 @@ final class AIToolRouter {
             case .setView:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .openFolder, .readDocument, .manageFiles, .getTimeline, .look, .listen, .transcribe, .findAudio, .getSubtitles,
-                 .saveProject, .exportVideo, .compressVideos, .burnSubtitles, .convertSubtitles, .generateMedia:
+                 .saveProject, .exportVideo, .exportSubtitles, .compressVideos, .burnSubtitles, .convertSubtitles, .generateMedia:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .seek:
                 (serialized, presentsEditor, startsRound) = (true, true, false)

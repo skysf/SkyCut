@@ -53,6 +53,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case getSubtitles = "get_subtitles"
     case editSubtitles = "edit_subtitles"
     case exportVideo = "export_video"
+    case exportSubtitles = "export_subtitles"
     case compressVideos = "compress_videos"
     case burnSubtitles = "burn_subtitles"
     case convertSubtitles = "convert_subtitles"
@@ -87,7 +88,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         case .readDocument, .manageFiles:
             return MCPFileTools.definition(for: self)
         case .generateSubtitles, .translateSubtitles, .getSubtitles, .editSubtitles,
-             .exportVideo, .getJob, .cancelJob:
+             .exportVideo, .exportSubtitles, .getJob, .cancelJob:
             return MCPSubtitleExportTools.definition(for: self)
         }
     }

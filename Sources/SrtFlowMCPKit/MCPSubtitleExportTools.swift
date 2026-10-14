@@ -59,6 +59,23 @@ public enum MCPSubtitleExportTools {
             return editSubtitles
         case .exportVideo:
             return exportVideo
+        case .exportSubtitles:
+            return MCPToolDefinition(
+                .exportSubtitles, title: "Export subtitle files",
+                description: """
+                Write the project's subtitles to files, one per track: the original, the translation, or both (default: every \
+                track that has lines). Files are named <name>.<language>.srt (or .vtt) and go where export_video puts videos, \
+                so players pick them up; name defaults to the project's, so pass the exported video's name to pair them. Hidden \
+                lines are left out; times are timeline seconds. A taken name gets a number (the result has the real paths); \
+                SrtFlow never replaces a file. Done at once.
+                """,
+                input: MCPSchema.object([
+                    "track": MCPSchema.string("Which track (default both: every track with lines).", oneOf: ["original", "translation", "both"]),
+                    "format": MCPSchema.string("srt (default) or vtt (WebVTT).", oneOf: MCPVocabulary.subtitleFileFormats),
+                    "name": MCPSchema.string("File name without language or extension, e.g. the exported video's name."),
+                    "folder": MCPSchema.string("Folder to write into (absolute, or relative to the opened folder). Default: where export_video puts videos.")
+                ])
+            )
         case .getJob:
             return MCPToolDefinition(
                 .getJob, title: "Job progress",

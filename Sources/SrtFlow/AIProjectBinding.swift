@@ -45,7 +45,7 @@ enum AIProjectBinding {
         case .saveProject, .getTimeline, .upscaleClip, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip,
              .freezeFrame, .cutSpeech, .cutToBeat, .deleteItems, .duplicateItems, .setTransition, .setText, .setShape,
              .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles, .getSubtitles, .editSubtitles,
-             .exportVideo, .undo, .seek:
+             .exportVideo, .exportSubtitles, .undo, .seek:
             return true
         }
     }

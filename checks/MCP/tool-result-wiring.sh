@@ -64,4 +64,13 @@ if [ "$(grep -c 'let levels = readsSound ? try await Self.levels(of: speech) : n
   echo "✗ ${SPEECH_TOOL} 的切口不经量出来的停顿（AISpeechCutPoints 拿到 levels），或结果里不报挪了多少：又会只信转写、把切口挪进词里" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准；cut_speech 的切口先看停顿"
+# export_subtitles 写盘只经界面那一条（临时名 → 回读校验 → 原子替换），读的是藏起来的句子已经去掉的那份，名字和撞名经 AISubtitleFiles
+#（整组加编号、从不覆盖）。
+EXPORT_SUBS="Sources/SrtFlow/AISubtitleFileExport.swift"
+if [ "$(grep -c 'SubtitleExportPlanner.writeValidated(document, format: format, to: target.url)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'state.subtitleDocument(for: track)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AISubtitleFiles.targets(' "${EXPORT_SUBS}" || true)" -ne 1 ]; then
+  echo "✗ ${EXPORT_SUBS} 不经 SubtitleExportPlanner.writeValidated 写、不读去掉藏起来句子的那份、或者不经 AISubtitleFiles 起名（会覆盖已有文件）" >&2
+  exit 1
+fi
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准；cut_speech 的切口先看停顿；export_subtitles 写盘不覆盖"

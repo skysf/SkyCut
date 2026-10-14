@@ -107,6 +107,8 @@ public enum MCPVocabulary {
 
     /// convert_subtitles 能转成的格式（`SubtitleFormat` 的扩展名）。
     public static let subtitleFormats = ["srt", "vtt", "ass", "ssa", "txt"]
+    /// export_subtitles 写的格式：导出面板「高级」里那两种（`SubtitleFormat` 的扩展名；ASS 第一版不做，2026-10-14 用户定）。
+    public static let subtitleFileFormats = ["srt", "vtt"]
 
     /// record_screen（docs/plans/2026-10-03-screen-recording-mcp.md）：做什么、录哪里、区域框的比例
     /// （= App 的 `RegionAspectRatio`，free 以外照界面上的写法）、指针、怎么处置上次没收完的录制（= 恢复框的三个按钮）。

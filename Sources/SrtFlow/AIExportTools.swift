@@ -106,6 +106,11 @@ enum AIExportTools {
         return detail
     }
 
+    /// 没给名字时成品叫什么：工程名，没存过就是 V1 第一段的名字（export_subtitles 也用它，字幕文件和视频同名配成一对）。
+    static func defaultName(_ project: VideoEditProject) -> String {
+        project.documentURL?.deletingPathExtension().lastPathComponent ?? project.state.mainClips.first?.name ?? "Timeline"
+    }
+
     /// 给了完整路径就用它（扩展名按这次导出的类型改正）；否则 = 默认文件夹 + 名字（默认工程名）。
     private static func outputURL(_ args: AIToolArguments, project: VideoEditProject, fileExtension: String) throws -> URL {
         if let path = try args.string("path") {
@@ -113,8 +118,7 @@ enum AIExportTools {
             return url.pathExtension.lowercased() == fileExtension
                 ? url : url.deletingPathExtension().appendingPathExtension(fileExtension)
         }
-        let fallback = project.documentURL?.deletingPathExtension().lastPathComponent
-            ?? project.state.mainClips.first?.name ?? "Timeline"
+        let fallback = defaultName(project)
         let stem = ExportFileName.stem(
             from: try args.string("name") ?? fallback, droppingExtension: fileExtension, fallback: fallback
         )

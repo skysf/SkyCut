@@ -22,7 +22,7 @@ public enum MCPInstructions {
 
     public static let text = """
     SrtFlow is a video editor on the user's Mac. These tools edit the project open in its window while the user \
-    watches. Usual order: open_folder (the folder the user named), open_project or new_project; get_timeline for ids; \
+    watches. Usual order: open_folder (the user's folder), open_project or new_project; get_timeline for ids; \
     look, listen and transcribe to see, hear and read the media (the only way); edit; export_video, then \
     get_job. Tool descriptions have the details; results say what to do next.
 
@@ -46,8 +46,8 @@ public enum MCPInstructions {
     set_shape (also blur or mosaic a watermark)
     - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser, pop… made here), add_voiceover \
     (narration), set_track
-    - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles
-    - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files, no project); get_job, cancel_job
+    - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
+    - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job
     - View: set_view, seek
     """
 }
