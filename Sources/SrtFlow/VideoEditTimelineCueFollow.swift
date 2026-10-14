@@ -48,6 +48,8 @@ enum LinkageCueFollow {
         _ cue: SubtitleCue, speech: TimelineSpan, hosts: [Piece], survivors: (Piece) -> [Piece],
         deletesContent: Bool, fallback: () -> TimelineLinkage.Outcome
     ) -> Outcome {
+        // 反向验证：撤掉规矩 12，字幕句照老规矩整句平移、时长不变、剩一帧画面就留。
+        if cue.end >= cue.start { return whole(cue, fallback()) }
         let span = cue.span
         let under = hosts.filter { $0.overlaps(span) }
         guard !under.isEmpty else { return whole(cue, fallback()) }
