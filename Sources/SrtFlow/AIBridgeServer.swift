@@ -71,7 +71,12 @@ final class AIBridgeServer: @unchecked Sendable {
         guard let line = try? MCPUnixSocket.readLine(fd) else { return }
         let response: MCPBridge.Response
         if let request = try? JSONDecoder().decode(MCPBridge.Request.self, from: line) {
-            response = request.tool == MCPBridge.probeTool ? probe(request) : answer(request, on: fd)
+            switch request.tool {
+            case MCPBridge.probeTool: response = probe(request)
+            // 小程序比 App 旧（App 升级了、会话还是升级前开的）：把这一版的工具清单给它，当场回、不经主线程（MCPCatalogSync）。
+            case MCPBridge.catalogTool: response = MCPBridge.Response(id: request.id, result: MCPCatalogSync.catalogResult())
+            default: response = answer(request, on: fd)
+            }
         } else {
             response = MCPBridge.Response(id: "", result: MCPBridge.textResult(
                 "SrtFlow could not read the request from its AI helper. Ask the user to restart the AI app.",
