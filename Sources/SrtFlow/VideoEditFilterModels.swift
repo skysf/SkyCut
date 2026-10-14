@@ -112,7 +112,7 @@ enum FilterPreset: String, CaseIterable, Identifiable, Hashable, Sendable {
                 gammaR: 0.95, gammaG: 0.93, gammaB: 0.92,
                 saturation: 0.95, contrast: 1.20
             )
-        // 褪色：老胶片。暗部整个抬起来（黑变灰）、对比压低、微微偏品红。
+        // 褪色：老胶片。暗部整个抬起来（黑变灰；原本纯黑的空档、字卡不抬，见 FilterLUT.holdingBlack）、对比压低、微微偏品红。
         case .fadedFilm:
             return FilterRecipe(
                 liftR: 0.055, liftG: 0.04, liftB: 0.05,

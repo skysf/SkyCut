@@ -60,19 +60,11 @@ extension VideoEditProject {
         }
     }
 
-    /// 把视频段的声音分离成音频轨上的一段，两边用链接组绑在一起。
+    /// 把视频段的声音分离成音频轨上的一段，两边用链接组绑在一起。规则只有 `ClipSoundSeparation` 一份（AI 的 add_clips sound=separate 也走它）。
     func detachAudio(from id: UUID) {
-        guard let clip = state.clip(with: id), !clip.isAudioOnly, clip.hasAudio, !clip.isMuted else { return }
+        guard let clip = state.clip(with: id), ClipSoundSeparation.canSeparate(clip) else { return }
         perform { state in
-            let group = clip.linkGroup ?? UUID()
-            // 源还是那个视频文件，isAudioOnly 只表示这段只取它的声音。
-            // 音量 / 曲线 / 渐变跟着声音走（见 `EditClip.detachedAudio`）。
-            let detached = clip.detachedAudio(linkGroup: group)
-            state.update(id) { original in
-                original.isMuted = true
-                original.linkGroup = group
-            }
-            _ = state.place(detached, intoAudio: true)
+            _ = ClipSoundSeparation.separate(id, in: &state)
         }
     }
 }
