@@ -3,7 +3,7 @@
 # 这里只扫「工具真的调了它」。都是扫描，秒级。
 # 由来：docs/bugfixes/2026-10-14-ai-tool-small-issues-from-blind-test.md；约束见 docs/architecture/ai-control-mcp.md 第四节。
 
-echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名"
+echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名、配音字幕整句"
 TIMELINE_TOOLS="Sources/SrtFlow/AITimelineTools.swift"
 # set_transition 按收尾之后的状态报每条缝（以前只回 {"cuts": 1}）。
 if [ "$(grep -c 'return .ok(AITransitionReport.json(' "${TIMELINE_TOOLS}" || true)" -ne 1 ]; then
@@ -40,19 +40,11 @@ if [ "$(grep -c 'AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(i
   echo "✗ Sources/SrtFlow/AIPictureProbe.swift 去黑边没按每边的读数合起来" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来"
-# 分离音频只有一份规则：界面上的 Detach Audio 和 add_clips 的 sound=separate 都经 ClipSoundSeparation.separate；
-# edit_clip 的 alone 只挡这一段自己的链接伙伴（别的片段的链接照旧）。
-if [ "$(grep -c 'ClipSoundSeparation.separate(id, in: &state)' 'Sources/SrtFlow/VideoEditProject+ClipSound.swift' || true)" -ne 1 ]; then
-  echo "✗ Sources/SrtFlow/VideoEditProject+ClipSound.swift 的分离音频不经 ClipSoundSeparation：界面和 AI 分家了" >&2
+# 配音的字幕只从 AIVoiceoverSubtitles.config 拿参数（不按逗号拆小句），不直接用生成字幕那一套
+#（docs/bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md）。
+if [ "$(grep -c 'let config = AIVoiceoverSubtitles.config(' Sources/SrtFlow/AIVoiceoverTool.swift || true)" -ne 1 ] \
+   || grep -q 'SubtitleSegmentationConfig.generation' Sources/SrtFlow/AIVoiceoverTool.swift; then
+  echo "✗ Sources/SrtFlow/AIVoiceoverTool.swift 的配音字幕不经 AIVoiceoverSubtitles.config：会在逗号处切成半句一闪的短条" >&2
   exit 1
 fi
-if [ "$(grep -c 'if plan.separateSound { ClipSoundSeparation.separate(plan.clip.id, in: &state) }' Sources/SrtFlow/AITimelineEdits.swift || true)" -ne 1 ]; then
-  echo "✗ Sources/SrtFlow/AITimelineEdits.swift 放素材时不按 sound=separate 分离声音" >&2
-  exit 1
-fi
-if [ "$(grep -c 'if linkage, !change.alone, let group = clip.linkGroup {' Sources/SrtFlow/AIClipEdit.swift || true)" -ne 1 ]; then
-  echo "✗ Sources/SrtFlow/AIClipEdit.swift 的 alone 没挡住链接伙伴跟着改（J/L cut 两边裁不开）" >&2
-  exit 1
-fi
-echo "   ✓ 分离音频界面和 AI 同一份规则；alone 只挡自己的链接伙伴"
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆"

@@ -50,13 +50,20 @@ public enum MCPBridge {
         public var project: ProjectStamp?
         /// 只有回答「探一下」（`probeTool`）时带：主线程还活着没有、问的那个调用到哪了。
         public var health: Health?
+        /// 回答的这一方编进去的工具清单的指纹（`MCPCatalogSync.fingerprint`）。小程序发现和自己的不一样（App 升级过、这个会话里跑的
+        /// 还是旧小程序），就向 App 要新清单（`catalogTool`）。老 App 不带、老小程序不认，照旧能通。
+        public var catalog: String?
 
-        public init(id: String, result: JSONValue, project: ProjectStamp? = nil, health: Health? = nil) {
+        public init(
+            id: String, result: JSONValue, project: ProjectStamp? = nil, health: Health? = nil,
+            catalog: String? = MCPCatalogSync.fingerprint
+        ) {
             self.bridge = MCPBridge.version
             self.id = id
             self.result = result
             self.project = project
             self.health = health
+            self.catalog = catalog
         }
     }
 
@@ -67,6 +74,10 @@ public enum MCPBridge {
     /// `abandon: true` = 小程序不等了 —— 那个调用还没开始就不做了（不然 App 缓过来之后照做，AI 以为它失败了、再调一次就做了两遍）。
     /// docs/architecture/ai-control-mcp.md 第三节「App 卡住的时候」。
     public static let probeTool = "_srtflow_probe"
+
+    /// 小程序要 App 的工具清单（`MCPCatalogSync.catalogResult`）的那一种请求：App 在收发线程上当场回、不经主线程。
+    /// 回答里的指纹和小程序自己的不一样时才来要（docs/bugfixes/2026-10-14-stale-helper-tool-list.md）。
+    public static let catalogTool = "_srtflow_catalog"
 
     /// 一个调用在 App 里到哪了。
     public enum CallState: String, Codable, Sendable {

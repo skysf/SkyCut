@@ -103,6 +103,8 @@ echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} �
 source checks/MCP/router-wiring.sh
 # shellcheck source=checks/MCP/tool-result-wiring.sh
 source checks/MCP/tool-result-wiring.sh
+# shellcheck source=checks/MCP/clip-sound-wiring.sh
+source checks/MCP/clip-sound-wiring.sh
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -499,6 +501,7 @@ xcrun swiftc \
   checks/MCP/ScreenRecordingToolChecks.swift \
   checks/MCP/ProjectBindingChecks.swift \
   checks/MCP/HangChecks.swift \
+  checks/MCP/CatalogSyncChecks.swift \
   checks/MCP/VideoSizeChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \

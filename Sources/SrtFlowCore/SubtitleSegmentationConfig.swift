@@ -30,6 +30,10 @@ public struct SubtitleSegmentationConfig: Hashable, Sendable {
     public var pauseThreshold: Double
     /// 按逗号拆出来的一条至少多长；不够（或只有一个词）就并到旁边那条。
     public var minClauseDuration: Double
+    /// 一句话先按逗号拆成小句（一条一个小句）。转写的字幕要拆：说话是连着的、译文要跟着顺；配音的字幕不拆：每一句旁白是写稿的人
+    /// 定好的一条，整句放得下就一条，放不下才切（切的时候照样优先切在逗号后面，`SubtitleBreaks.cutCost`）。
+    /// 2026-10-06 盲测：配音的字幕在逗号处切成 0.3–1.1 秒的短条（docs/bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md）。
+    public var splitsAtClauses: Bool
     /// 一帧多长（工程帧率，生产上来自 `TimelineState.frameRate`）。两条字幕之间留 `gapFrames` 帧，
     /// 观众才看得出换了一条。
     public var frameDuration: Double
@@ -53,6 +57,7 @@ public struct SubtitleSegmentationConfig: Hashable, Sendable {
         maxUnitsPerSecond: Double = 10,
         pauseThreshold: Double = 0.6,
         minClauseDuration: Double = 1,
+        splitsAtClauses: Bool = true,
         frameDuration: Double = ProjectFrameRate.fallback.secondsPerFrame,
         gapFrames: Int = 2,
         chainThreshold: Double = 0.5,
@@ -66,6 +71,7 @@ public struct SubtitleSegmentationConfig: Hashable, Sendable {
         self.maxUnitsPerSecond = maxUnitsPerSecond
         self.pauseThreshold = pauseThreshold
         self.minClauseDuration = minClauseDuration
+        self.splitsAtClauses = splitsAtClauses
         self.frameDuration = frameDuration
         self.gapFrames = gapFrames
         self.chainThreshold = chainThreshold
