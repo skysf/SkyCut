@@ -106,6 +106,15 @@ CompositionBuilder 会垫一条 `BlackBaseVideoFactory` 的不透明黑视频当
 这类粗粒度标志凑 —— 仅翻转被误送进近似路径就是白闪变暗。回归靠
 `scripts/check-preview-composition.sh` 真取帧量像素守着。
 
+**压黑 / 闪白（2026-10-14 起，[案例](../bugfixes/2026-10-14-look-transitions-differ-from-export.md)）**：成片是 xfade 的
+fadeblack / fadewhite —— `dst = mix(mix(a, c, ss(0.8,1,P)), mix(c, b, ss(0.2,1,P)), P)`（`P` 从 1 走到 0，`c` 黑 / 白；
+用仓库的 ffmpeg 实测核过，差 ≤ 0.004）。不是「前半灭、后半亮」：出场段在头 20% 就没了，颜色在 20% 左右最满，进场段之后
+慢慢亮起来。预览拿三层叠出来：出场段 `α = P·ss(0.8,1,P)` 在上、进场段 `β = (1−P)(1−ss(0.2,1,P))/(1−α)` 在中、颜色底在下，
+`α·a + (1−α)(β·b + (1−β)·c)` 逐像素等于成片（`XfadeColorCurve`、`CompositionFade.xfadeColor`）。曲线不是直线，窗口里**按帧切片**
+（`CompositionSlices.frameTimes`，工程帧的格子），每片两端取值。前提同叠化：两侧都盖满画布且不透明；不满足时退回半程模型（近似）。
+**闪白垫白底**：接缝那段时间在两段底下垫一层白（`BlackBaseVideoFactory.whiteVideoURL`，`Int.min + 1` 层：黑底之上、画面之下）。
+以前只有黑底，闪白在预览和 AI 的 look 里成了黑场。
+
 **推移 / 擦除转场（2026-08-23 起，`ClipTransition` 三族）**：转场语义仍然
 作用在「压平到黑底之后」的段上。接缝分派集中在 CompositionBuilder 的
 「主轨接缝的转场分派」后处理（要等两侧的 fitted transform 都算完才判得了
@@ -115,8 +124,10 @@ CompositionBuilder 会垫一条 `BlackBaseVideoFactory` 的不透明黑视频当
   斜坡（出场滑出、进场从对面滑进），并把裁切收进「静止时的画布」——
   压平模型里滑出画布的内容不会被滑回来看见，不裁的话放大出画布的段一滑
   就穿帮。前提：两侧变换**轴对齐可逆**（90° 的 preferredTransform、翻转、
-  缩放、半透明、盖不满都行；任意角旋转、关键帧动画不行 —— 画布裁切表达
-  不了）。满足时逐像素等于「压平再整幅滑动」。
+  缩放、半透明、盖不满都行；任意角旋转、旋转关键帧、要逐帧渲的预设入 / 出场动画不行）。
+  满足时逐像素等于「压平再整幅滑动」。**位置 / 大小 / 不透明度的关键帧段也走精确路径**（2026-10-14 起）：
+  画布裁切每一片按那一刻（不含推移平移）的摆放算（`cropRectangle`），推移窗口里按帧切 —— 以前一律回退成双向淡变，
+  跟拍铺满的竖屏片子每段都带位置关键帧，pushUp 在预览和 look 里就像叠化，成片却是滑动。
 - **擦除族**（wipeLeft/… → xfade wipeleft/…）：只给**出场段**挂线性缩小的
   `setCropRectangleRamp` 窗口（∩ 用户裁切；求交的 min/max 在移动边扫过
   用户裁切边处各有一个折点，必须进切片表）。进场段整幅垫底、**无任何
@@ -127,9 +138,10 @@ CompositionBuilder 会垫一条 `BlackBaseVideoFactory` 的不透明黑视频当
   内容 / 擦除边向左运动），与 xfade 的 slide/wipe 逐向实测一致，写死在
   `ClipTransition.motion` / `wipeRemainingRect` 里。改方向前先用纯色素材
   跑一遍 xfade 确认，预览与导出必须同向。
-- 回归：`scripts/check-preview-composition.sh` 的推移/擦除组 —— 方向探针、
+- 回归：`scripts/check-preview-composition.sh` 的推移/擦除组（`checks/PreviewComposition/TransitionLook.swift`）—— 方向探针、
   「两色探针」（分辨擦除露出自己的另半边 vs 推移滑进另半边，纯色素材下
-  两者长得一样）、旋转段回退；`scripts/check-export-frame-rate.sh` 逐种
+  两者长得一样）、旋转段回退、带关键帧的段真滑动且画布外那一截不滑进来（P6–P7）、压黑 / 闪白逐帧对 xfade 的公式、
+  盖不满的闪白露出白底（X1–X3）；`scripts/check-export-frame-rate.sh` 逐种
   转场真跑生产 `plan()` + ffmpeg（xfadeName 拼错在滤镜图配置期就 EINVAL）。
 
 转场选择器（`VideoEditTransitionPicker.swift`）的卡片小样是 SwiftUI 的示意

@@ -122,7 +122,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 工具栏右边那组开关（磁吸 / 吸附 / **联动** / **播放跟随**）、剪辑页字幕列表的跟随按钮、**播放时时间线跟不跟播放头**（`PlayheadFollow`、`TimelinePlayheadLines.followPlayhead`）、冒烟 / 性能场景起手的开关状态、新加一个要记住的开关、**磁吸什么时候排 V1（`MainMagnet`、`state.mainMagnet`、`setMagnet`）** | [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md)（默认值和记忆只有 `EditorToggles` 一份、字面量就是产品口径；脚本驱动时永远默认值、写不落盘；联动默认开（2026-10-02）、播放跟随默认关、只碰横向、停下不滚回、Return 回到开头照旧滚回最左；**磁吸 2026-10-02 起跟着工程走**：存进工程文件、老工程缺键 = 关、记住的只当新建工程的默认，只在改到 V1 的排布时排）、[磁吸改一条音量曲线就合上 V1 的缝](docs/bugfixes/2026-10-02-magnet-closes-v1-gaps-on-any-edit.md)、[联动](docs/architecture/timeline-linkage.md)、[拖动手势 §4.5 / §5](docs/architecture/timeline-drag-gestures.md)、[预览性能 ratchet 第十二节](docs/architecture/preview-perf-ratchet.md)（时间线上只有播放头竖线和标尺把手订阅时钟） |
 | 插进两条轨之间（缝拉开）、整条轨上下换位置、轨道头的拖动（换位 / 下边缘调行高） | [插入缝与整轨换位方案](docs/plans/2026-09-24-track-insert-and-reorder.md)、[拖动手势](docs/architecture/timeline-drag-gestures.md)（§5h 插入缝、§5i 整轨换位）、[视频轨对等化](docs/architecture/video-tracks.md)（轨道头这一列）、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（轨道头的行每跳不重算，别往它的输入里塞闭包） |
 | 编辑器分栏、预览区/时间线的行结构与最小高度 | [播放条压到工具栏上](docs/bugfixes/2026-08-12-preview-transport-row-overlap.md) |
-| 预览变换、叠化、上层视频轨、导出滤镜、**预览合成往合成轨上接东西（只从末尾接、合成完裁到总长、换格子别改成四舍五入、切片表按格子去重、主轨接缝不到 0.01 秒的零头不算空隙）** | [预览自由变换](docs/architecture/preview-free-transform.md)（「一份时间账」：多一格就黑屏）、[加了音效预览整个黑屏](docs/bugfixes/2026-09-27-preview-black-after-audio-tick-pushed-past-end.md)、[叠化 + 关键帧之后预览全黑](docs/bugfixes/2026-09-29-preview-black-slice-boundaries-straddle-a-tick.md)（边界各自截断落在相邻两格；两条管线同一个 `mainGapTolerance`）、[视频轨对等化](docs/architecture/video-tracks.md)、[关键帧动画](docs/architecture/keyframe-animation.md)、[Transform 复审](docs/bugfixes/2026-08-04-transform-review.md)、[预渲染复审](docs/bugfixes/2026-08-05-export-prerender-review.md) |
+| 预览变换、叠化、上层视频轨、导出滤镜、**预览合成往合成轨上接东西（只从末尾接、合成完裁到总长、换格子别改成四舍五入、切片表按格子去重、主轨接缝不到 0.01 秒的零头不算空隙）** | [预览自由变换](docs/architecture/preview-free-transform.md)（「一份时间账」：多一格就黑屏；压黑 / 闪白照 xfade 的公式逐帧算、闪白垫白底，关键帧段推移按每片的摆放裁画布）、[look 看转场和成片对不上](docs/bugfixes/2026-10-14-look-transitions-differ-from-export.md)、[加了音效预览整个黑屏](docs/bugfixes/2026-09-27-preview-black-after-audio-tick-pushed-past-end.md)、[叠化 + 关键帧之后预览全黑](docs/bugfixes/2026-09-29-preview-black-slice-boundaries-straddle-a-tick.md)（边界各自截断落在相邻两格；两条管线同一个 `mainGapTolerance`）、[视频轨对等化](docs/architecture/video-tracks.md)、[关键帧动画](docs/architecture/keyframe-animation.md)、[Transform 复审](docs/bugfixes/2026-08-04-transform-review.md)、[预渲染复审](docs/bugfixes/2026-08-05-export-prerender-review.md) |
 | 从 Finder 拖文件 / ⌘V 粘贴文件进时间线、导入落点 | [拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md)、[卡片被文件落点吞了](docs/bugfixes/2026-09-23-in-app-drops-swallowed-by-file-underlay.md)、[外部拖入被内层落点独占](docs/bugfixes/2026-09-23-timeline-file-drop-claimed-by-inner-drop-region.md)（结论已更正）、[拖动手势](docs/architecture/timeline-drag-gestures.md)（主轨保序、§5e-2 唯一落点）、[视频轨对等化](docs/architecture/video-tracks.md) |
 | 时间线上的复制 / 剪切 / 粘贴（⌘C ⌘X ⌘V、编辑菜单、块和轨道空白处的右键菜单）、剪贴板类型、粘贴落点（鼠标优先、否则播放头）、从旧段构造新段（分割 / 复制，别漏字段）、**分割之后的链接组** | [复制粘贴](docs/architecture/timeline-clipboard.md)（剪贴板只有一套、不写纯文本；每一样换新身份走编码往返；撞上了往上抬、几组保住上下关系；三之二：分割都走 `LinkRegrouping.split`，一对切开是两对）、[分割后整串互为伙伴](docs/bugfixes/2026-09-28-split-links-every-piece-together.md)、[方案](docs/plans/2026-09-26-timeline-clipboard-and-zoom.md)、[分割丢了隐藏和音频库的键](docs/bugfixes/2026-09-26-split-drops-hidden-and-library-key.md)、[拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) |
 | 时间线上的任何拖放落点（`.onDrop`：文件 / 滤镜 / 音频库 / 转场卡片）、新的自定义拖放 / 剪贴板类型 | [拖动手势 §5e-2](docs/architecture/timeline-drag-gestures.md)（整条时间线只许一个 `.onDrop`；自定义类型必须在 Info.plist 声明；不能放回 `.forbidden` 不回 `.cancel`）、[转场拖放被 `.cancel` 取消](docs/bugfixes/2026-09-23-transition-drop-cancel-ends-session.md)、[卡片被文件落点吞了](docs/bugfixes/2026-09-23-in-app-drops-swallowed-by-file-underlay.md)、[自定义类型没声明](docs/bugfixes/2026-09-23-custom-drag-types-not-declared.md)、[GUI 冒烟流程](docs/testing/gui-smoke-testing.md)（落点路由探针） |
@@ -207,7 +207,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `scripts/check-main-thread-watchdog.sh`；日志在哪、怎么读见 [主线程卡顿日志](docs/testing/main-thread-stalls.md)。
 - 预览合成真取帧，以及素材缓存命中时合成逐帧一样、同一路径换了文件或原地改写过必须重开，
   还有往合成轨上接素材只从末尾接、合成完正好和时间线一样长（多一格视频合成就无效 → 黑屏），
-  以及切片表按格子铺、首尾相接（接缝差 0.2 毫秒、画面比配乐早收 0.3 毫秒都不许空出一格），主轨接缝的零头那一格不黑：
+  以及切片表按格子铺、首尾相接（接缝差 0.2 毫秒、画面比配乐早收 0.3 毫秒都不许空出一格），主轨接缝的零头那一格不黑，
+  还有压黑 / 闪白逐帧对 xfade 的公式、闪白露出白底、带关键帧的段推移真滑动（`TransitionLook.swift`）：
   `scripts/check-preview-composition.sh`。
 - 录屏产物画面轨盖到 T1（尾部不黑）：`scripts/check-screen-recording-writer.sh`。
 - 上层视频轨动画段 fill + matte：`scripts/check-export-alpha-compositing.sh`。
@@ -687,6 +688,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   小程序一个会话一个进程，由它记着（`MCPSessionProject`：第一次碰工程时记、`open_project` / `new_project` 做成了才换）、每个请求带上；
   App 排到调用之后、摆窗口之前核对（`AIProjectBinding`），不是就一样都不做、说清楚谁换的和怎么回去；不加工具参数。
   **共享的东西要么每个会话各一份、要么每次核对；只在结果里说出来拦不住。**
+- [2026-10-14 AI 用 look 看转场和成片对不上：闪白像黑场、上推像叠化](docs/bugfixes/2026-10-14-look-transitions-differ-from-export.md) — look 看时间线就是预览那份合成：
+  预览只垫黑底、压黑 / 闪白走半程模型，闪白成了黑场；带关键帧的段推移一律回退成双向淡变，而跟拍铺满给每段都打位置关键帧。压黑 / 闪白照 xfade 的公式逐帧算
+  （`XfadeColorCurve`，三层叠：出场 α、进场 β、颜色底，用仓库 ffmpeg 核过）、闪白垫白底、关键帧段推移的画布裁切按每片的摆放算。
+  **写下的「做不到」要么去做、要么在用到的地方说出来；保守回退要看在真实工程里有多常见。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
