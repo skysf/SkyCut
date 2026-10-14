@@ -28,15 +28,26 @@ struct OverlayExportFile {
     var timelineStart: Double
     var timelineEnd: Double
 
-    /// 序列末尾多渲一帧。
+    /// 序列末尾多渲两帧。
     ///
-    /// 实测：序列的最后一帧落在 `end - 1/fps`，而 `enable` 的区间一直开到 `end`；那之间的输出帧会撞上输入流的 EOF，
-    /// `eof_action=pass` 当场把这一层整个撤掉 —— 动画最后一帧闪一下没了。多渲一帧就把这个缝堵上了。
-    static let sequenceTailFrames = 1
+    /// 序列只有到它最后一帧为止才算「有」：输出帧的时刻一过最后一帧，输入流就到了 EOF，`eof_action=pass` 当场把这一层
+    /// 整个撤掉 —— 那一帧上字（形状）闪没了。而序列的最后一帧可能早于 `enable` 的终点：
+    ///   · 区间里的帧本来只排到 `end - 1/fps`（多一帧补的是这个，2026-09-17）；
+    ///   · `-itsoffset <起点>` 被换算到序列的 1/fps 格子上（四舍五入），起点不在格子上时整串最多提前半帧；
+    ///   · 合成出来的画面时间戳是微秒、比格子晚几微秒（主轨几段 concat 时的取整），正好落在「最后一帧之后」。
+    /// 后两条叠在一起，只多一帧不够（2026-10-06 盲测：rise 入场结束前那一帧字没了，docs/bugfixes/2026-10-14-text-blinks-at-animation-seam.md）。
+    /// 多两帧：最后一帧至少在 `end + 半帧`，区间里每一个输出帧都有帧可贴。
+    static let sequenceTailFrames = 2
 
     /// 播一遍的序列要渲几帧：区间里的每一帧，再多一帧。
     static func sequenceFrameCount(span: Double, fps: Double) -> Int {
         max(1, Int(ceil(max(0, span) * fps)) + sequenceTailFrames)
+    }
+
+    /// 一层在哪段时间里贴：**左闭右开** `[起点, 终点)`，和预览的 `contains(time:)` 同一个口径。一段文字切成的几段首尾相接，
+    /// 用两头都闭的 `between` 的话，接缝正好落在一帧上时两段同时贴、那一帧字（和阴影）叠成两层（2026-10-14）。
+    static func enableWindow(_ start: Double, _ end: Double, fmt: (Double) -> String) -> String {
+        "gte(t,\(fmt(start)))*lt(t,\(fmt(end)))"
     }
 
     /// 按给的顺序（= 叠放次序：先形状、后文字）一层层贴到 `video` 上。三种接法的实测依据：
@@ -81,7 +92,7 @@ struct OverlayExportFile {
             let outV = nextLabel("v")
             filters.append(
                 "[\(video)][\(stream)]overlay=x=\(fmt(file.origin.x)):y=\(fmt(file.origin.y))" +
-                ":eof_action=pass:enable='between(t,\(fmt(file.timelineStart)),\(fmt(file.timelineEnd)))'[\(outV)]"
+                ":eof_action=pass:enable='\(enableWindow(file.timelineStart, file.timelineEnd, fmt: fmt))'[\(outV)]"
             )
             video = outV
         }

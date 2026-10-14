@@ -121,8 +121,8 @@ func runExportChecks() async {
     let names = pngNames(in: animated.workspace)
     let entrance = names.filter { $0.hasPrefix("shape0-in_") }.count
     let exit = names.filter { $0.hasPrefix("shape0-out_") }.count
-    check((24...26).contains(entrance), "入场 0.8 秒逐帧渲 24 帧左右（加末尾多一帧），实际 \(entrance)")
-    check((18...20).contains(exit), "出场 0.6 秒逐帧渲 18 帧左右（加末尾多一帧），实际 \(exit)")
+    check((26...27).contains(entrance), "入场 0.8 秒逐帧渲 24 帧左右（加末尾多两帧），实际 \(entrance)")
+    check((20...21).contains(exit), "出场 0.6 秒逐帧渲 18 帧左右（加末尾多两帧），实际 \(exit)")
     check(names.contains("shape0-mid.png") && names.count == entrance + exit + 1, "中间那截一张图，别的不渲（实际 \(names.count) 张）")
 
     let (code, out) = run(ffmpegPath, animated.arguments, workingDirectory: animated.workspace)
