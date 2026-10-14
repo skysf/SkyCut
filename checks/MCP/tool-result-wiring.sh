@@ -41,3 +41,18 @@ if [ "$(grep -c 'AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(i
   exit 1
 fi
 echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来"
+# 分离音频只有一份规则：界面上的 Detach Audio 和 add_clips 的 sound=separate 都经 ClipSoundSeparation.separate；
+# edit_clip 的 alone 只挡这一段自己的链接伙伴（别的片段的链接照旧）。
+if [ "$(grep -c 'ClipSoundSeparation.separate(id, in: &state)' 'Sources/SrtFlow/VideoEditProject+ClipSound.swift' || true)" -ne 1 ]; then
+  echo "✗ Sources/SrtFlow/VideoEditProject+ClipSound.swift 的分离音频不经 ClipSoundSeparation：界面和 AI 分家了" >&2
+  exit 1
+fi
+if [ "$(grep -c 'if plan.separateSound { ClipSoundSeparation.separate(plan.clip.id, in: &state) }' Sources/SrtFlow/AITimelineEdits.swift || true)" -ne 1 ]; then
+  echo "✗ Sources/SrtFlow/AITimelineEdits.swift 放素材时不按 sound=separate 分离声音" >&2
+  exit 1
+fi
+if [ "$(grep -c 'if linkage, !change.alone, let group = clip.linkGroup {' Sources/SrtFlow/AIClipEdit.swift || true)" -ne 1 ]; then
+  echo "✗ Sources/SrtFlow/AIClipEdit.swift 的 alone 没挡住链接伙伴跟着改（J/L cut 两边裁不开）" >&2
+  exit 1
+fi
+echo "   ✓ 分离音频界面和 AI 同一份规则；alone 只挡自己的链接伙伴"

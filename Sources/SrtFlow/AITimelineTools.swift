@@ -47,6 +47,8 @@ enum AITimelineTools {
         var sourceOut: Double?
         var track: String?
         var start: Double?
+        /// 视频文件的声音怎么放（J/L cut）：nil = 跟着画面走。
+        var sound: ClipSoundMode?
 
         var isSubtitle: Bool { url.map(MediaFileTypes.isSubtitle) ?? false }
     }
@@ -58,7 +60,8 @@ enum AITimelineTools {
             let entry = AIToolArguments(item)
             var request = ClipRequest(
                 hitAt: try entry.double("hit_at"), sourceIn: try entry.double("source_in"), sourceOut: try entry.double("source_out"),
-                track: try entry.string("track"), start: try entry.double("start")
+                track: try entry.string("track"), start: try entry.double("start"),
+                sound: try entry.choice("sound", from: MCPVocabulary.clipSounds).flatMap(ClipSoundMode.init(rawValue:))
             )
             switch (try entry.string("file"), try entry.string("library_id"), try AISoundEffectRequest.parse(entry, index: index)) {
             case (let path?, nil, nil):
@@ -132,6 +135,9 @@ enum AITimelineTools {
                     throw AIToolError("SrtFlow's video engine is still starting, so images cannot be added yet. Try again in a moment.")
                 }
                 (clip, isAudio, name) = (project.clip(for: media), media.kind == .audio, media.url.lastPathComponent)
+                if let sound = request.sound {
+                    try soundOfVideo(&clip, &isAudio, mode: sound, kind: media.kind, name: name, index: index)
+                }
                 if media.kind == .image {
                     let length = request.sourceOut.map { $0 - (request.sourceIn ?? 0) } ?? VideoEditProject.importedImageDuration
                     clip.sourceDuration = min(max(length, TimelineTrim.clipMinimumDuration), StillImageClipFactory.stillDuration)
@@ -145,7 +151,9 @@ enum AITimelineTools {
             }
             let target = try request.track.map { try AITrackName.target($0, in: project.state) }
             try check(target, isAudio: isAudio, name: name, index: index)
-            plans.append(.init(clip: clip, isAudio: isAudio, target: target, start: request.start))
+            plans.append(.init(
+                clip: clip, isAudio: isAudio, target: target, start: request.start, separateSound: request.sound == .separate
+            ))
         }
         let insert = try args.bool("insert") ?? false
         let linkage = project.linkageEnabled
@@ -181,6 +189,11 @@ enum AITimelineTools {
                 if let hit = item.hit { entry["hit_at"] = AIFormat.seconds(clip.timelineStart + hit - clip.sourceStart) }
             } else {
                 entry["file"] = .string(AIWorkspace.shared.display(clip.stillImageURL ?? clip.sourceURL))
+            }
+            if plan.separateSound, let sound = ClipSoundSeparation.sound(of: clip.id, in: state),
+               let soundTrack = state.location(of: sound.id)?.track {
+                entry["sound_id"] = .string(ids.short(sound.id))
+                entry["sound_track"] = .string(AITrackName.name(of: soundTrack))
             }
             if let made = effects[clip.id] {
                 entry["sound_effect"] = .string(made.parameters.preset.rawValue)
@@ -227,11 +240,24 @@ enum AITimelineTools {
         clip.sourceDuration = stop - start
     }
 
+    /// add_clips 的 sound：只对有声音的视频文件。only 把这段换成只取声音的一段（放音频轨），separate 在落地之后分离
+    /// （`AITimelineEdits.place` → `ClipSoundSeparation.separate`，和界面上的分离音频同一份规则）。
+    private static func soundOfVideo(
+        _ clip: inout EditClip, _ isAudio: inout Bool, mode: ClipSoundMode, kind: MediaFileImport.Kind, name: String, index: Int
+    ) throws {
+        guard kind == .video else { throw AIToolError("clips[\(index)]: sound is for video files; \(name) is not one.") }
+        guard clip.hasAudio else { throw AIToolError("clips[\(index)]: \(name) has no sound.") }
+        if mode == .only {
+            clip = clip.detachedAudio(linkGroup: nil)
+            isAudio = true
+        }
+    }
+
     private static func check(_ target: TrackDropTarget?, isAudio: Bool, name: String, index: Int) throws {
         guard let target else { return }
         switch (target, isAudio) {
         case (.audio, false), (.newAudioBottom, false):
-            throw AIToolError("clips[\(index)]: \(name) has a picture, so it goes on a video track (V1, V2…).")
+            throw AIToolError("clips[\(index)]: \(name) has a picture, so it goes on a video track (V1, V2…); sound=only puts just its sound here.")
         case (.main, true), (.overlay, true), (.newOverlayTop, true):
             throw AIToolError("clips[\(index)]: \(name) is audio, so it goes on an audio track (A1, A2…).")
         default:

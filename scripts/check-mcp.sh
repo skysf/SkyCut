@@ -396,6 +396,7 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleFontScale.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
+  Sources/SrtFlow/ClipSoundSeparation.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
   Sources/SrtFlow/AIFrameFit.swift \
@@ -482,6 +483,7 @@ xcrun swiftc \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/DuplicateChecks.swift \
+  checks/MCP/ClipSoundChecks.swift \
   checks/MCP/TransitionReportChecks.swift \
   checks/MCP/UnreadableVideoChecks.swift \
   checks/MCP/MusicLibraryChecks.swift \
