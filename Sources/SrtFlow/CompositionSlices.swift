@@ -29,6 +29,20 @@ struct CompositionSlice: Equatable {
 }
 
 enum CompositionSlices {
+    /// `[from, to]` 里每一帧的时刻（按工程帧的格子，`k × frameDuration`），两端也在。曲线不是直线的窗口（xfade 的黑场 / 白场、
+    /// 带动画的段在推移窗口里的裁切）按它切：每片两端取值、片内线性，帧上的值就是精确的。
+    static func frameTimes(from: Double, to: Double, frameDuration: Double) -> [Double] {
+        guard frameDuration > 0, to > from else { return [from, to] }
+        var times = [from]
+        var index = (from / frameDuration).rounded(.down) + 1
+        while index * frameDuration < to - 0.0005 {
+            times.append(index * frameDuration)
+            index += 1
+        }
+        times.append(to)
+        return times
+    }
+
     /// 把边界铺成首尾相接的切片表。`totalDuration` 之外的边界不要；起点和总长自己一定在表里。
     static func make(boundaries: Set<Double>, totalDuration: Double) -> [CompositionSlice] {
         var earliest: [Int64: Double] = [0: 0]

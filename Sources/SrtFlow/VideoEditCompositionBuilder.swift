@@ -42,10 +42,10 @@ enum VideoEditCompositionBuilder {
         var layer: Int
         var start: Double { clip.timelineStart }
         var end: Double { clip.timelineEnd }
-        /// 开头的淡入（跟上一段的转场决定），(时长, 后半才亮?)。
-        var fadeIn: (duration: Double, delayedHalf: Bool)?
-        /// 结尾的淡出，(时长, 前半就灭?)。
-        var fadeOut: (duration: Double, earlyHalf: Bool)?
+        /// 开头的淡入（上一段的转场，或者这一段自己的画面渐变）；曲线见 `CompositionFade`。
+        var fadeIn: CompositionFade?
+        /// 结尾的淡出。
+        var fadeOut: CompositionFade?
         /// 推移转场：开头从这个画布偏移（像素）线性滑回原位。
         var pushIn: (duration: Double, fromDX: CGFloat, fromDY: CGFloat)?
         /// 推移转场：结尾从原位线性滑出到这个画布偏移。
@@ -166,13 +166,17 @@ enum VideoEditCompositionBuilder {
         //   后段从转场第一帧就透出来，而导出是先把每段压平到黑底再 dissolve ——
         //   这种接缝改成双向线性淡变（代价是中点轻微变暗）。判定必须用
         //   coversCanvasOpaquely，别拿 hasVisualTransform 凑：仅翻转照样满幅
-        //   不透明，误走近似路径就是白闪变暗。压黑/闪白走半程模型（前半灭后半亮）。
+        //   不透明，误走近似路径就是白闪变暗。压黑/闪白：两侧都满幅不透明时照 xfade 的
+        //   fadeblack / fadewhite 逐帧算（`XfadeColorCurve`，逐像素等于成片），否则半程模型（前半灭后半亮）；
+        //   闪白在两段底下垫一层白（以前垫的是黑底，闪白在预览和 look 里成了黑场）。
         // - 推移族：两侧都轴对齐且非动画段 → 平移斜坡 + 「压平时的画布」裁切，
         //   逐像素等于「压平到黑底再整幅滑动」（缩放/翻转/半透明/盖不满都不破坏
         //   等价性，黑底垫着）；否则回退双向淡变。
         // - 擦除族：出场段满幅不透明且轴对齐 → 给出场段挂线性缩小的裁切窗口，
         //   露出来的就是垫底的进场段（进场段无任何前提：它差一块的地方露黑底，
         //   和导出压平模型一致）；否则回退双向淡变。
+        // 闪白的接缝：这段时间在两段底下垫一层白（黑底之上，见下面「白底」）。
+        var whiteWindows: [(start: Double, end: Double)] = []
         // stride 而不是 1..<count：上层轨预渲染的状态主轨是空的，1..<0 直接崩。
         for index in stride(from: 1, to: state.mainClips.count, by: 1) {
             let kind = state.mainClips[index - 1].transitionAfter
@@ -188,20 +192,22 @@ enum VideoEditCompositionBuilder {
 
             // 推移/擦除条件不满足时的回退：按叠化近似路径处理这条接缝。
             func fallBackToFade() {
-                let halved = kind == .blackFade || kind == .whiteFade
-                if let outgoingIndex { placed[outgoingIndex].fadeOut = (overlap, halved) }
-                if let incomingIndex { placed[incomingIndex].fadeIn = (overlap, halved) }
+                if let outgoingIndex { placed[outgoingIndex].fadeOut = CompositionFade(overlap, .linear) }
+                if let incomingIndex { placed[incomingIndex].fadeIn = CompositionFade(overlap, .linear) }
             }
 
             switch kind.family {
             case .fade:
-                let halved = kind != .crossFade
-                let exactUnderlay = kind == .crossFade
-                    && state.mainClips[index - 1].coversCanvasOpaquely(canvas: renderSize)
+                let bothCover = state.mainClips[index - 1].coversCanvasOpaquely(canvas: renderSize)
                     && state.mainClips[index].coversCanvasOpaquely(canvas: renderSize)
-                if let outgoingIndex { placed[outgoingIndex].fadeOut = (overlap, halved) }
-                if let incomingIndex, !exactUnderlay {
-                    placed[incomingIndex].fadeIn = (overlap, halved)
+                let curve: CompositionFade.Curve = kind == .crossFade
+                    ? .linear : (bothCover && outgoingIndex != nil && incomingIndex != nil ? .xfadeColor : .halved)
+                if let outgoingIndex { placed[outgoingIndex].fadeOut = CompositionFade(overlap, curve) }
+                if let incomingIndex, !(kind == .crossFade && bothCover) {
+                    placed[incomingIndex].fadeIn = CompositionFade(overlap, curve)
+                }
+                if kind == .whiteFade, let outgoingIndex, let incomingIndex {
+                    whiteWindows.append((placed[incomingIndex].start, placed[outgoingIndex].end))
                 }
             case .push:
                 guard let outgoingIndex, let incomingIndex, let motion = kind.motion,
@@ -217,10 +223,8 @@ enum VideoEditCompositionBuilder {
                 placed[incomingIndex].pushIn = (
                     overlap, -motion.dx * renderSize.width, -motion.dy * renderSize.height
                 )
-                // 压平模型里滑出画布的内容不会被滑回来看见：把两段都裁到
-                // 「静止时的画布」（源坐标），滑动时裁切随内容一起走。
-                clampCropToCanvas(&placed[outgoingIndex], renderSize: renderSize)
-                clampCropToCanvas(&placed[incomingIndex], renderSize: renderSize)
+                // 压平模型里滑出画布的内容不会被滑回来看见：裁切每一片按这一刻（不含推移平移）的画布算，
+                // 滑动时裁切随内容一起走（`cropRectangle`；带关键帧的段在推移窗口里按帧切）。
             case .wipe:
                 guard let outgoingIndex, incomingIndex != nil,
                       state.mainClips[index - 1].coversCanvasOpaquely(canvas: renderSize),
@@ -308,10 +312,10 @@ enum VideoEditCompositionBuilder {
                 hasTransitionAfter: hasTransitionAfter
             )
             if window.fadeIn > 0, placed[index].fadeIn == nil {
-                placed[index].fadeIn = (window.fadeIn, false)
+                placed[index].fadeIn = CompositionFade(window.fadeIn, .linear)
             }
             if window.fadeOut > 0, placed[index].fadeOut == nil {
-                placed[index].fadeOut = (window.fadeOut, false)
+                placed[index].fadeOut = CompositionFade(window.fadeOut, .linear)
             }
         }
 
@@ -337,34 +341,15 @@ enum VideoEditCompositionBuilder {
             .map { CompositionTime.end(of: $0).seconds }.max() ?? 0
         let baseStart: Double? = needsOpaqueBase ? 0 : (pictureEnd + 0.0005 < state.duration ? pictureEnd : nil)
         if let baseStart, let baseURL = await BlackBaseVideoFactory.videoURL() {
-            let baseAsset = asset(for: baseURL)
-            let baseLength = state.duration - baseStart
-            if let baseSource = try? await baseAsset.loadTracks(withMediaType: .video).first,
-               let baseTrack = composition.addMutableTrack(
-                   withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid
-               ),
-               let sourceRange = try? await baseSource.load(.timeRange),
-               ({ CompositionTime.pad(baseTrack, to: time(baseStart)); return true }()),
-               (try? baseTrack.insertTimeRange(sourceRange, of: baseSource, at: time(baseStart))) != nil {
-                baseTrack.scaleTimeRange(
-                    CMTimeRange(start: time(baseStart), duration: sourceRange.duration),
-                    toDuration: time(baseLength)
-                )
-                let natural = (try? await baseSource.load(.naturalSize)) ?? CGSize(width: 64, height: 36)
-                var base = EditClip(sourceURL: baseURL, sourceDuration: baseLength)
-                base.timelineStart = baseStart
-                placed.append(PlacedClip(
-                    clip: base,
-                    track: baseTrack,
-                    transform: CGAffineTransform(
-                        scaleX: renderSize.width / max(natural.width, 1),
-                        y: renderSize.height / max(natural.height, 1)
-                    ),
-                    cropRect: nil,
-                    geometry: nil,
-                    layer: Int.min
-                ))
-            }
+            placed += await solidBase(
+                baseURL, windows: [(baseStart, state.duration)], layer: Int.min, in: composition, asset: asset, renderSize: renderSize
+            )
+        }
+        // 白底：闪白的接缝那段时间垫在两段底下（黑底之上、画面之下），淡出去露出来的是白，不是黑（2026-10-14）。
+        if !whiteWindows.isEmpty, let whiteURL = await BlackBaseVideoFactory.whiteVideoURL() {
+            placed += await solidBase(
+                whiteURL, windows: whiteWindows, layer: Int.min + 1, in: composition, asset: asset, renderSize: renderSize
+            )
         }
 
         // 哪条合成轨比总长多出一格，视频合成就铺不满、判无效 → 预览黑屏（CompositionTime 第 3 条）。
@@ -392,6 +377,30 @@ enum VideoEditCompositionBuilder {
             videoComposition: videoComposition,
             renderSize: renderSize
         )
+    }
+
+    /// 纯色底（黑底 / 白底的素材）铺在这几段时间上，一段一个条目，同一条合成轨。素材两帧长，拉到每段那么长。
+    private static func solidBase(
+        _ url: URL, windows: [(start: Double, end: Double)], layer: Int, in composition: AVMutableComposition,
+        asset: (URL) -> AVURLAsset, renderSize: CGSize
+    ) async -> [PlacedClip] {
+        guard let source = try? await asset(url).loadTracks(withMediaType: .video).first,
+              let track = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid),
+              let sourceRange = try? await source.load(.timeRange) else { return [] }
+        let natural = (try? await source.load(.naturalSize)) ?? CGSize(width: 64, height: 36)
+        let scale = CGAffineTransform(scaleX: renderSize.width / max(natural.width, 1), y: renderSize.height / max(natural.height, 1))
+        var placed: [PlacedClip] = []
+        for window in windows.sorted(by: { $0.start < $1.start }) where window.end > window.start {
+            CompositionTime.pad(track, to: time(window.start))
+            guard (try? track.insertTimeRange(sourceRange, of: source, at: time(window.start))) != nil else { continue }
+            track.scaleTimeRange(
+                CMTimeRange(start: time(window.start), duration: sourceRange.duration), toDuration: time(window.end - window.start)
+            )
+            var base = EditClip(sourceURL: url, sourceDuration: window.end - window.start)
+            base.timelineStart = window.start
+            placed.append(PlacedClip(clip: base, track: track, transform: scale, cropRect: nil, geometry: nil, layer: layer))
+        }
+        return placed
     }
 
     // MARK: - 小工具
@@ -535,7 +544,8 @@ enum VideoEditCompositionBuilder {
     private static func composedTransform(
         _ item: PlacedClip,
         at timelineTime: Double,
-        renderSize: CGSize
+        renderSize: CGSize,
+        includingPush: Bool = true
     ) -> CGAffineTransform {
         var base = item.transform
         if let geometry = item.geometry {
@@ -559,7 +569,7 @@ enum VideoEditCompositionBuilder {
         // 推移转场的平移窗口边界都在切片表里，片内平移线性，端点求值 + 矩阵斜坡
         // 就是精确重建（平移分量线性插值无误差）。
         let push = pushTranslation(item, at: timelineTime)
-        guard push.dx != 0 || push.dy != 0 else { return base }
+        guard includingPush, push.dx != 0 || push.dy != 0 else { return base }
         return base.concatenating(CGAffineTransform(translationX: push.dx, y: push.dy))
     }
 
@@ -572,7 +582,14 @@ enum VideoEditCompositionBuilder {
     private static func cropRectangle(
         _ item: PlacedClip, at timelineTime: Double, renderSize: CGSize
     ) -> CGRect? {
-        let base = wipeCropRect(item, at: timelineTime, renderSize: renderSize)
+        var base = wipeCropRect(item, at: timelineTime, renderSize: renderSize)
+        // 推移：压平模型里滑出画布的内容不会被滑回来看见 —— 按这一刻（不含推移的平移）的变换把画布之外裁掉。
+        // 带关键帧的段每一片各算一次（摆放在动），静态段每片都一样。
+        if item.pushIn != nil || item.pushOut != nil {
+            let still = composedTransform(item, at: timelineTime, renderSize: renderSize, includingPush: false)
+            let canvas = CGRect(origin: .zero, size: renderSize).applying(still.inverted()).standardized
+            base = base.map { clampedIntersection($0, canvas) } ?? canvas
+        }
         guard item.preset.usesWipe else { return base }
         // 窗口外读不到 reveal，那就是**整幅**（1）—— 见 `usesWipe` 的注释：
         // 这一片不给矩形的话整条裁切斜坡就断了。
@@ -615,19 +632,25 @@ enum VideoEditCompositionBuilder {
         videoComposition.frameDuration = CMTime(value: d.value, timescale: d.timescale)
 
         var boundaries: Set<Double> = [0, totalDuration]
+        let frameSeconds = 1 / Double(max(1, frameRate.fps))
         for item in placed {
             boundaries.insert(item.start)
             boundaries.insert(item.end)
             if let fadeIn = item.fadeIn {
-                boundaries.insert(item.start + fadeIn.duration)
-                boundaries.insert(item.start + fadeIn.duration / 2)
+                boundaries.formUnion(fadeIn.sliceTimes(windowStart: item.start, frameDuration: frameSeconds))
             }
             if let fadeOut = item.fadeOut {
-                boundaries.insert(item.end - fadeOut.duration)
-                boundaries.insert(item.end - fadeOut.duration / 2)
+                boundaries.formUnion(fadeOut.sliceTimes(windowStart: item.end - fadeOut.duration, frameDuration: frameSeconds))
             }
             if let pushIn = item.pushIn { boundaries.insert(item.start + pushIn.duration) }
             if let pushOut = item.pushOut { boundaries.insert(item.end - pushOut.duration) }
+            // 带关键帧的段在推移窗口里：画布裁切随这一刻的摆放变（缩放时不是直线），按帧切。
+            if item.geometry != nil, let pushIn = item.pushIn {
+                boundaries.formUnion(CompositionSlices.frameTimes(from: item.start, to: item.start + pushIn.duration, frameDuration: frameSeconds))
+            }
+            if item.geometry != nil, let pushOut = item.pushOut {
+                boundaries.formUnion(CompositionSlices.frameTimes(from: item.end - pushOut.duration, to: item.end, frameDuration: frameSeconds))
+            }
             if let wipeOut = item.wipeOut {
                 boundaries.insert(item.end - wipeOut.duration)
                 addWipeCropBoundaries(for: item, renderSize: renderSize, into: &boundaries)
@@ -723,11 +746,12 @@ enum VideoEditCompositionBuilder {
         // 0.1s 加密压到不可见。
         func opacity(at timelineTime: Double) -> Float {
             let clamped = min(max(timelineTime, item.start), item.end)
-            var value = fadeFactor(item: item, at: timelineTime)
-                * Float(item.clip.animatedOpacity(atTimeline: clamped))
+            var value = Float(CompositionFade.factor(
+                fadeIn: item.fadeIn, fadeOut: item.fadeOut, start: item.start, end: item.end, at: timelineTime
+            )) * Float(item.clip.animatedOpacity(atTimeline: clamped))
             if !item.preset.isEmpty {
                 // 预设动画的头尾淡变（`.fade` 是线性斜坡、位移/缩放类自带缓动）。
-                // 它和上面的 `fadeFactor` 互斥：要逐帧的效果不会再挂 fadeIn/fadeOut。
+                // 它和上面的 `CompositionFade` 互斥：要逐帧的效果不会再挂 fadeIn/fadeOut。
                 value *= Float(item.clip
                     .presetState(resolved: item.preset, atTimeline: clamped, canvas: renderSize)
                     .opacity)
@@ -743,56 +767,22 @@ enum VideoEditCompositionBuilder {
         }
     }
 
-    /// 转场淡入淡出在某时刻的衰减系数（0…1，片内线性）。
-    private static func fadeFactor(item: PlacedClip, at timelineTime: Double) -> Float {
-        var factor = 1.0
-        if let fadeIn = item.fadeIn {
-            let fadeStart = fadeIn.delayedHalf ? item.start + fadeIn.duration / 2 : item.start
-            let fadeEnd = item.start + fadeIn.duration
-            if timelineTime <= fadeStart {
-                factor = 0
-            } else if timelineTime < fadeEnd {
-                factor = min(factor, (timelineTime - fadeStart) / max(0.001, fadeEnd - fadeStart))
-            }
-        }
-        if let fadeOut = item.fadeOut {
-            let fadeStart = item.end - fadeOut.duration
-            let fadeEnd = fadeOut.earlyHalf ? item.end - fadeOut.duration / 2 : item.end
-            if timelineTime >= fadeEnd {
-                factor = 0
-            } else if timelineTime > fadeStart {
-                factor = min(factor, 1 - (timelineTime - fadeStart) / max(0.001, fadeEnd - fadeStart))
-            }
-        }
-        return Float(min(max(factor, 0), 1))
-    }
-
     // MARK: 推移 / 擦除转场的几何
 
     /// 推移能精确复刻 xfade slide 的前提：换算完的矩阵轴对齐（90° 的
-    /// preferredTransform、翻转、任何缩放都算；任意角旋转不算）且不是关键帧
-    /// 动画段（动画的「画布裁切」没法逐片跟着变换走）。半透明/盖不满都不用管：
+    /// preferredTransform、翻转、任何缩放都算；任意角旋转不算）。半透明/盖不满都不用管：
     /// 黑底垫着，逐像素等于「压平到黑底再整幅滑动」。
+    /// 位置 / 大小 / 不透明度的关键帧段也精确（2026-10-14 起）：画布裁切每片按那一刻的摆放算、推移窗口里按帧切
+    /// （`cropRectangle`）。以前一律回退成双向淡变，跟拍铺满的竖屏片子里 pushUp 在预览和 look 里都像叠化。
+    /// 仍回退的：旋转关键帧（某些时刻不轴对齐）、要逐帧渲的预设入 / 出场动画。
     private static func pushSideExact(_ clip: EditClip, _ transform: CGAffineTransform) -> Bool {
-        // 预设入/出场动画的段和关键帧段一样保守回退：推移的精确路径要先把这段
-        // 「压平到静止时的画布」再整幅滑动（`clampCropToCanvas`），而那份裁切是
-        // 按静态变换算的 —— 段里别处还在做位移/缩放的话，动起来就会被裁掉一块。
-        !clip.needsPerFrameRender && isAxisAlignedInvertible(transform)
+        !clip.needsPerFrameAnimation && clip.animation?.rotation.isEmpty != false && isAxisAlignedInvertible(transform)
     }
 
     /// 轴对齐且可逆：画布矩形经它逆映射后仍是矩形，`setCropRectangle` 才表达得了。
     private static func isAxisAlignedInvertible(_ t: CGAffineTransform) -> Bool {
         guard abs(t.a * t.d - t.b * t.c) > 1e-9 else { return false }
         return (abs(t.b) < 1e-6 && abs(t.c) < 1e-6) || (abs(t.a) < 1e-6 && abs(t.d) < 1e-6)
-    }
-
-    /// 把这段的裁切收进「静止时的画布」（换算回源坐标）。推移的压平模型里，
-    /// 滑出画布的内容不会被滑回来看见 —— 不裁的话放大出画布的段一滑就穿帮。
-    private static func clampCropToCanvas(_ item: inout PlacedClip, renderSize: CGSize) {
-        let mapped = CGRect(origin: .zero, size: renderSize)
-            .applying(item.transform.inverted())
-            .standardized
-        item.cropRect = item.cropRect.map { clampedIntersection($0, mapped) } ?? mapped
     }
 
     /// 交集恒返回矩形：分离时贴边给近零尺寸 —— 裁切斜坡要连续，不能蹦出 .null。
