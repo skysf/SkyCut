@@ -110,7 +110,7 @@ enum FilterLUT {
     /// 一格的颜色。输入输出都是 0…1 的伽马编码值。表就是它在格点上的取值。
     static func apply(_ recipe: FilterRecipe, _ rgb: (r: Double, g: Double, b: Double))
         -> (r: Double, g: Double, b: Double) {
-        holdingBlack(grade(recipe, rgb), input: rgb)
+        grade(recipe, rgb)  // reverse check: hold removed
     }
 
     /// 纯黑保护的范围：输入最亮的那个通道低于它，往亮里调的那部分开始收回来。
