@@ -2,7 +2,7 @@ import Foundation
 
 // 主线程心跳看门狗的自检。编译方式见 scripts/check-main-thread-watchdog.sh。
 //
-// 合同（docs/testing/main-thread-stalls.md）：主线程没卡不许误报；卡过阈值记一次，时长对、
+// 合同（docs/testing/main-thread-stalls.md）：主线程没卡不许误报；此刻卡了多久别的线程读得到（1b）；卡过阈值记一次，时长对、
 // context 对、栈里有卡住的那个函数；日志文件里有同样的内容；stop 之后不再记；挂起主线程期间抓栈线程
 // 不许分配 / 释放内存（第 6 组）、主线程不停分配内存时连续抓栈不许卡死（第 7 组）—— 约束见
 // docs/architecture/main-thread-stack-capture.md。
@@ -53,9 +53,23 @@ watchdog.start()
 pump(0.5)
 check(watchdog.recentStalls.isEmpty, "主线程没卡时不许误报：记了 \(watchdog.recentStalls.count) 次")
 
+// 1b. 主线程此刻卡了多久（AI 的「探一下」在收发线程上读它，docs/architecture/ai-control-mcp.md 第三节）：
+//     没开的看门狗是 nil、空转时接近 0。
+check(MainThreadWatchdog(interval: 0.01, threshold: 0.15, logDirectory: nil).unresponsiveSeconds == nil,
+      "没开的看门狗说不出主线程卡了多久（nil）")
+check((watchdog.unresponsiveSeconds ?? 99) < 0.1, "主线程空转时卡了 0 秒左右：\(String(describing: watchdog.unresponsiveSeconds))")
+let duringStall = OptionalDoubleBox()
+Thread.detachNewThread {
+    Thread.sleep(forTimeInterval: 0.2)
+    duringStall.set(watchdog.unresponsiveSeconds)
+}
+
 // 2. 忙等 400 ms：记一次，时长、context、栈都要对。
 stallTheMainThread(milliseconds: 400)
 pump(0.3)
+// 1b（续）：卡到 0.2 秒那一刻从别的线程读，卡了不少于 0.1 秒（CI 上线程醒来能晚几十毫秒，离忙等结束还留 0.2 秒）；落地之后回到 0 左右。
+check((duringStall.value ?? 0) >= 0.1, "主线程卡住时，别的线程读到它卡了多久：\(String(describing: duringStall.value))")
+check((watchdog.unresponsiveSeconds ?? 99) < 0.1, "心跳落地之后回到 0 左右：\(String(describing: watchdog.unresponsiveSeconds))")
 let busy = watchdog.recentStalls
 check(busy.count == 1, "忙等 400 ms 该记一次，记了 \(busy.count) 次")
 if let stall = busy.first {
@@ -93,6 +107,7 @@ pump(0.1)
 stallTheMainThread(milliseconds: 300)
 pump(0.2)
 check(watchdog.recentStalls.count == 2, "stop 之后不该再记：共 \(watchdog.recentStalls.count) 次")
+check(watchdog.unresponsiveSeconds == nil, "stop 之后说不出主线程卡了多久（nil）")
 
 // 6. 挂起主线程抓栈的那几十微秒里，抓栈线程一次都不许分配 / 释放内存（确定性：malloc_logger 钩子逐次数，
 //    NoAllocationWhileSuspended.swift；约束见 docs/architecture/main-thread-stack-capture.md）。
@@ -103,6 +118,14 @@ checkCaptureUnderMallocChurn(seconds: 2)
 
 print(failures == 0 ? "✓ main-thread-watchdog：\(checks) 项全部通过" : "✗ main-thread-watchdog：\(failures)/\(checks) 项失败")
 exit(failures == 0 ? 0 : 1)
+
+/// 别的线程上写一个可选的秒数，主线程上读。
+final class OptionalDoubleBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Double?
+    func set(_ value: Double?) { lock.lock(); stored = value; lock.unlock() }
+    var value: Double? { lock.lock(); defer { lock.unlock() }; return stored }
+}
 
 /// 看门狗线程上数次数，主线程上读。
 final class OSAllocatedUnfairLockCounter: @unchecked Sendable {

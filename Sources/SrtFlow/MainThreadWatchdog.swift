@@ -70,10 +70,21 @@ final class MainThreadWatchdog: @unchecked Sendable {
     /// 到此刻为止记下的卡顿（最多留最近 200 次）。
     var recentStalls: [Stall] { lock.withLock { $0.recent } }
 
+    /// 主线程此刻已经多久没回应（秒）：正在等的那一拍心跳发出去多久了，没在等就是 0；看门狗没开是 nil。
+    /// AI 的「探一下」用它（AIBridgeServer，在收发线程上读，不经主线程）。
+    var unresponsiveSeconds: Double? {
+        lock.withLock { state -> Double? in
+            guard state.running else { return nil }
+            return state.pendingSince.map { max(0, ProcessInfo.processInfo.systemUptime - $0) } ?? 0
+        }
+    }
+
     private struct State {
         var running = false
         /// 这一拍心跳已经超过阈值：主线程落地时据此才去读 context（平时的心跳只读这一个标志）。
         var flagged = false
+        /// 这一拍心跳什么时候发出去的（落地就清掉）：主线程卡了多久从它算。
+        var pendingSince: TimeInterval?
         var landedContext = ""
         var recent: [Stall] = []
         var contextProvider: @Sendable () -> String = { "" }
@@ -115,11 +126,11 @@ final class MainThreadWatchdog: @unchecked Sendable {
         let landed = DispatchSemaphore(value: 0)
         while isRunning {
             let sentAt = ProcessInfo.processInfo.systemUptime
-            lock.withLock { $0.flagged = false; $0.landedContext = "" }
+            lock.withLock { $0.flagged = false; $0.landedContext = ""; $0.pendingSince = sentAt }
             DispatchQueue.main.async { [self] in
                 let flagged = lock.withLock { $0.flagged }
                 let context = flagged ? contextProvider() : ""
-                lock.withLock { $0.landedContext = context }
+                lock.withLock { $0.landedContext = context; $0.pendingSince = nil }
                 landed.signal()
             }
             var addresses: [UInt] = []

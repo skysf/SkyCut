@@ -29,7 +29,8 @@ final class AIToolRouter {
     /// 没记过的 = 用户在界面上换的（`AIProjectBinding.refusal` 据此说清楚是谁）。
     private var switches: [Int: AIProjectBinding.Switch] = [:]
 
-    func handle(_ request: MCPBridge.Request) async -> Answer {
+    /// `begin`：轮到这个调用时（排完队之后）先问一句 —— 小程序不等了（App 卡过、它放弃了）就回 false，不做（AIBridgeCalls）。
+    func handle(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
         guard request.bridge == MCPBridge.version else {
             return Answer(result: MCPBridge.textResult(
                 "This SrtFlow and its AI helper come from different versions. Ask the user to restart the AI app.",
@@ -46,19 +47,24 @@ final class AIToolRouter {
         session.noteCall(client: request.client)
         let arguments = AIToolArguments(request.arguments)
         let policy = Policy(tool)
-        guard policy.serialized else { return await execute(tool, arguments, policy, request) }
+        guard policy.serialized else { return await execute(tool, arguments, policy, request, begin) }
         let previous = tail
         let work = Task { @MainActor () -> Answer in
             await previous?.value
-            return await self.execute(tool, arguments, policy, request)
+            return await self.execute(tool, arguments, policy, request, begin)
         }
         tail = Task { _ = await work.value }
         return await work.value
     }
 
     private func execute(
-        _ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ request: MCPBridge.Request
+        _ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ request: MCPBridge.Request,
+        _ begin: @Sendable () -> Bool
     ) async -> Answer {
+        // 小程序已经不等了（App 卡住的时候它放弃了这个调用、告诉 AI「没做，以后也不会做」）：照它说的，不做。
+        guard begin() else {
+            return Answer(result: MCPBridge.textResult("Not done: the AI helper stopped waiting for this call.", isError: true))
+        }
         let project = VideoEditProject.shared
         // 排队期间用户按了停止：排在后面的也不做了。
         if policy.startsRound, AISession.shared.phase == .stopped {

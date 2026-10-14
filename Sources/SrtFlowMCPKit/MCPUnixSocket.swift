@@ -91,6 +91,27 @@ public enum MCPUnixSocket {
         setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &interval, size)
     }
 
+    /// 等到这条连接有东西可读（或对方关了、出错了）就回 true；等了 `seconds` 秒还没有就回 false。
+    /// 小程序等回答时用它分段等，中间去问一下 App 的主线程还活着没有（`MCPCallWait`）。
+    public static func waitReadable(_ fd: Int32, seconds: Double) -> Bool {
+        var entry = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        while true {
+            let ready = poll(&entry, 1, Int32(max(0, seconds) * 1000))
+            if ready < 0, errno == EINTR { continue }
+            // 可读、对方关了、出错了都回 true：交给 readLine 去分辨。
+            return ready != 0
+        }
+    }
+
+    /// 对方是不是已经关了这条连接（不阻塞、不吃掉数据）。App 等主线程时用它看小程序是不是已经不等了。
+    public static func peerClosed(_ fd: Int32) -> Bool {
+        var entry = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+        guard poll(&entry, 1, 0) > 0 else { return false }
+        if entry.revents & Int16(POLLHUP | POLLERR) != 0 { return true }
+        var byte: UInt8 = 0
+        return recv(fd, &byte, 1, MSG_PEEK | MSG_DONTWAIT) == 0
+    }
+
     /// 发一行：数据后面补一个换行。
     public static func writeLine(_ fd: Int32, _ data: Data) throws {
         var payload = data

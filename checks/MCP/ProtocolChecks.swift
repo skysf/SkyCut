@@ -53,7 +53,10 @@ final class FakeApp: @unchecked Sendable {
 
 /// 起一次小程序，喂这几行，读回所有回答（按行）。原始文本也一并返回（验 id 的写法）。
 /// `providers`：这一次「配好了哪些生成提供方」（小程序读的那个小文件，环境变量指到临时文件；默认一个都没配 —— 不受本机真实的设置影响）。
-func talkToHelper(_ lines: [String], socket: String, providers: Set<MCPProvider> = []) -> (messages: [JSONValue], raw: String) {
+/// `environment`：再加几个环境变量（App 卡住的自检把「多久探一次」调短）。
+func talkToHelper(
+    _ lines: [String], socket: String, providers: Set<MCPProvider> = [], environment extra: [String: String] = [:]
+) -> (messages: [JSONValue], raw: String) {
     guard let helper = ProcessInfo.processInfo.environment["SRTFLOW_MCP_HELPER"] else {
         check(false, "SRTFLOW_MCP_HELPER is not set (scripts/check-mcp.sh sets it)")
         return ([], "")
@@ -66,6 +69,7 @@ func talkToHelper(_ lines: [String], socket: String, providers: Set<MCPProvider>
     let marker = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-mcp-providers-\(getpid())-\(UUID().uuidString).json")
     if !providers.isEmpty { _ = try? MCPProviderMarker.write(providers, to: marker) }
     environment["SRTFLOW_MCP_PROVIDERS"] = marker.path
+    environment.merge(extra) { _, new in new }
     defer { try? FileManager.default.removeItem(at: marker) }
     process.environment = environment
     let input = Pipe()
