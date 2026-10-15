@@ -6,8 +6,11 @@ import SrtFlowCore
 // 管什么：一次改动之后，压在画面上的一句字幕（原文、译文两条轨；配音那条规矩 11 也用它）怎么跟（联动规矩 12）：
 // 1. 底下的画面只是被剪掉 / 裁掉了一部分、或者变了速（剩下的几截前后顺序不变、中间没插进别的东西）：**两头各自跟着画面换算**
 //    —— 中间剪掉一截就缩短，开头 / 结尾被剪掉就收到剩下的那截，变速跟着伸缩；逐词高亮的词时间一起换算。
-// 2. 这句说话的那几秒剩下**不到一半**：真删（⌫、delete_items、cut_speech）就删；不是真删（裁切、变速）就留在原地
-//    （同联动规矩 4），报出来让人 / AI 收拾。「说话的那几秒」有逐词时间就按词，译文按它翻自的那句原文，都没有才按整句的显示时间
+// 2. 这句说话的那几秒剩下**不到一半**就删：真删（⌫、delete_items、cut_speech）删，裁切 / 变速 / 滑动让它不在画面里了也删
+//    （2026-10-15 用户拍板，docs/bugfixes/2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md：以前照规矩 4 留在原地，
+//    和前移过来的下一句叠在画面上；字幕是说出来的话，话没了没有理由留着 —— 拖把手时每拍从快照重放，拖回来它就回来）。
+//    只有底下的段整个没了、又不是真删（少见：转静帧失败收回占位块那一类）才留在原地、报出来让人 / AI 收拾。
+//    「说话的那几秒」有逐词时间就按词，译文按它翻自的那句原文，都没有才按整句的显示时间
 //    —— 显示时间里有说完之后多停的半秒（`SubtitleCueTiming`），删停顿时剪掉的正是它，按显示时间算会把「OK.」这种短句误删。
 // 3. 别的情况（换了位置、中间插进了别的东西、底下没有画面）照老规矩：整句跟着挪，或者不动（调用方给的 `fallback`）。
 // 为什么（2026-10-15，docs/bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md）：以前整句平移、时长不变 ——
@@ -32,7 +35,7 @@ enum LinkageCueFollow {
     enum Outcome: Equatable {
         case stay
         case delete
-        /// 说话的那几秒大半没了、又不是真删：留在原地（报出来）。
+        /// 说话的那几秒大半没了，底下的段整个没了、又不是真删：留在原地（报出来）。
         case leftBehind
         /// 换成这个时间；`shortened` = 它底下有画面被剪掉了（字里可能还留着剪掉的词）。
         case retime(SubtitleTrackEditing.Timing, shortened: Bool)
@@ -52,9 +55,9 @@ enum LinkageCueFollow {
         let under = hosts.filter { $0.overlaps(span) }
         guard !under.isEmpty else { return whole(cue, fallback()) }
         let parts = segments(of: span, hosts: under, survivors: survivors)
-        guard !parts.isEmpty else { return deletesContent ? .delete : .leftBehind }
+        guard !parts.isEmpty else { return gone(deletesContent, hosts: under, survivors: survivors) }
         let kept = survived(speech, hosts: hosts, survivors: survivors) ?? survived(span, hosts: hosts, survivors: survivors) ?? 1
-        if kept < keepFraction - 1e-9 { return deletesContent ? .delete : .leftBehind }
+        if kept < keepFraction - 1e-9 { return gone(deletesContent, hosts: under, survivors: survivors) }
         guard inOrder(parts) else { return whole(cue, fallback()) }
 
         let first = parts[0]
@@ -81,6 +84,13 @@ enum LinkageCueFollow {
             }
         }
         return .retime(.init(start: start, end: end, words: words), shortened: shortened)
+    }
+
+    /// 这句说的话（大半）没了：真删就删；不是真删时底下的段都还在（同 id，只是裁切 / 变速 / 滑动让这截画面不在它的窗口里了）也删；
+    /// 底下有段整个没了又不是真删才留在原地、报出来。
+    private static func gone(_ deletesContent: Bool, hosts: [Piece], survivors: (Piece) -> [Piece]) -> Outcome {
+        let trimmed = hosts.allSatisfy { host in survivors(host).contains { $0.id == host.id } }
+        return deletesContent || trimmed ? .delete : .leftBehind
     }
 
     // MARK: 说话的那几秒

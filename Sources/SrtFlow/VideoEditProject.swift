@@ -447,7 +447,7 @@ final class VideoEditProject {
     /// 一步到位的修改：登记撤销、磁吸排列、联动、重建预览。
     /// `rebuildsPreview: false` 给只影响叠层（形状）不影响 AV 合成的改动。
     /// `deletesContent`：这次是真删（⌫、AI 的 delete_items / cut_speech）—— 联动开着时压在被删画面上的东西一起删；
-    /// 别的改动（裁切、变速）让画面没了的，东西留在原地（docs/architecture/timeline-linkage.md）。返回联动挪了 / 删了几样。
+    /// 别的改动（裁切、变速）让画面没了的留在原地，只有说的话被裁掉的字幕句照样删（docs/architecture/timeline-linkage.md）。返回联动挪了 / 删了几样。
     @discardableResult
     func perform(
         rebuildsPreview: Bool = true, deletesContent: Bool = false, _ mutate: (inout TimelineState) -> Void
@@ -496,7 +496,7 @@ final class VideoEditProject {
         var next = snapshot
         mutate(&next)
         MainMagnet.settle(&next, after: snapshot)
-        // 联动（同 `perform`）：裁主轨块的头尾、拖转场把手时，压在上面的东西实时跟着画面走；连续编辑从不真删。
+        // 联动（同 `perform`）：裁主轨块的头尾、拖转场把手时，压在上面的东西实时跟着画面走；连续编辑不传真删（说的话被裁掉的字幕照样删：每拍从快照重放，拖回来就回来）。
         if linkageEnabled { TimelineLinkage.follow(from: snapshot, to: &next, deletesContent: false) }
         next.assignMissingTrackColors()
         state = next

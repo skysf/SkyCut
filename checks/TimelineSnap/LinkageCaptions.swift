@@ -4,7 +4,7 @@ import SrtFlowCore
 // 第 1g 组：生成的字幕句跟着它的那段声音走（`CaptionSourceFollow`，2026-10-14）。
 //
 // 一句原文字幕记着它是从哪一段生成的（`CueMeta.provenance.clipID`：转写、配音都记）。那段不在主轨上时（配音、音频轨上的采访）：
-// 段挪了字幕跟着挪、裁了头字幕留在原地（素材的那一刻没动；开头被裁掉的那句收到声音开始的地方）、变了速两头按素材那一刻换算、
+// 段挪了字幕跟着挪、裁了头字幕留在原地（素材的那一刻没动；开头被裁掉的那句收到声音开始的地方、说的话大半被裁掉的删）、变了速两头按素材那一刻换算、
 // 被真删字幕一起删、别的操作让它没了字幕留着；
 // 这次自己改过的句子不碰；来源在主轨上的句子照旧只跟画面（老规矩），不被这条再挪一次。
 // 由来：2026-10-06 盲测，AI 挪了配音段，字幕留在原地（docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md）。
@@ -62,6 +62,14 @@ func checkLinkageCaptions() {
     checkEqual(cueStart(trimmed, base.first.id), 11, "a subtitle whose start was trimmed away now starts where the sound starts")
     checkEqual(trimmed.subtitleCues(of: .original).first { $0.id == base.first.id }.map { ($0.end * 1000).rounded() / 1000 }, 11.8,
                "…and still ends with its words")
+
+    // 裁掉配音的头 1.5 秒：第一句说的话只剩两成，跟着没了（裁切也删，2026-10-15）；第二句原地。
+    var trimmedMore = base.state
+    trimmedMore.update(base.voice.id) { $0.sourceStart = 1.5; $0.sourceDuration = 2.5; $0.timelineStart = 11.5 }
+    let moreReport = TimelineLinkage.follow(from: base.state, to: &trimmedMore, deletesContent: false)
+    check(cueStart(trimmedMore, base.first.id) == nil, "a subtitle whose speech was mostly trimmed away is deleted, trim or not")
+    checkEqual(cueStart(trimmedMore, base.second.id), 12, "…the next one keeps its words")
+    checkEqual(moreReport.deletedCues, 1, "…and the report counts the deleted subtitle")
 
     // 变成 2 倍速：素材第 2 秒（第二句的开头）落在段起点后 1 秒。
     var faster = base.state
