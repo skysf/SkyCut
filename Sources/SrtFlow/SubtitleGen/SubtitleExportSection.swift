@@ -121,13 +121,14 @@ struct SubtitleFilesExport: View {
 
     /// 勾上的每一份要写到哪。没有对应文档的（比如还没翻译）跳过。
     private var targets: [(item: SubtitleExportOptions.FileItem, url: URL)] {
-        options.files.sorted { $0.id < $1.id }.compactMap { item in
+        let companion = exportState.subtitleCompanion
+        return options.files.sorted { $0.id < $1.id }.compactMap { item in
             if item.track == .translation, !hasTranslation { return nil }
             let name = SubtitleExportPlanner.fileName(
                 base: stem,
                 choice: item.track,
-                sourceLanguage: languages.source,
-                targetLanguage: languages.target,
+                sourceLanguage: companion?.sourceLanguage,
+                targetLanguage: companion?.targetLanguage,
                 format: item.format
             )
             return (item, folder.appendingPathComponent(name))

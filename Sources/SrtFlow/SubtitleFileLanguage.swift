@@ -50,8 +50,8 @@ struct SubtitleFileLanguage: Equatable {
     /// 每条轨：按文字判 → 判不出来用记的 → 都没有才 nil。
     static func tags(_ inputs: Inputs) -> SubtitleFileLanguage {
         SubtitleFileLanguage(
-            source: AITextLanguage.dominant(in: inputs.original) ?? inputs.recordedSource,
-            target: AITextLanguage.dominant(in: inputs.translation) ?? inputs.recordedTarget
+            source: inputs.recordedSource ?? AITextLanguage.dominant(in: inputs.original),
+            target: inputs.recordedTarget ?? AITextLanguage.dominant(in: inputs.translation)
         )
     }
 
