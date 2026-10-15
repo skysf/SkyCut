@@ -220,7 +220,8 @@ enum AISubtitleTools {
         if reportedBoxes {
             result["box_note"] = .string(
                 "box = [x, y, width, height] where the line is drawn, as fractions of the canvas from its top left, with the current "
-                    + "style; lines = how many rows it wraps to. Lines without a box are hidden or on a hidden track."
+                    + "style; lines = how many rows it wraps to (the preview and the export wrap in the same places). A box wider than "
+                    + "the frame means the line does not fit: text without spaces never wraps. Lines without a box are hidden or on a hidden track."
             )
         }
         // 逐词高亮只亮知道词时间的句子（SrtFlow 自己从语音、配音做的）。

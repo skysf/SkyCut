@@ -7,6 +7,7 @@ import SwiftUI
 // 同一个字号，libass 把它当行高、CoreText 把它当 em，以前预览比成片大 15%–40%（Helvetica 85%、中文回退到苹方 71%）。
 // 这里拿预览那个视图（BurnInSubtitleOverlay，AI 的「看」也用它）离屏渲一张，再照导出那条路（BurnInWorkspace + 同一个
 // subtitles 滤镜）真烧一帧，量字的高和宽。编法见 scripts/check-subtitle-burn-size.sh。
+// 竖向位置（PositionChecks.swift）、折行点（WrapChecks.swift）、阴影（ShadowChecks.swift）各自一个文件，共用这里的渲染和烧录。
 
 var failures = 0
 var checks = 0
@@ -53,31 +54,42 @@ func preset(_ font: String) -> BurnInStyle {
     return style
 }
 
+/// 预览那个视图离屏渲一张（透明底、白字）；`size` 是画布（1080 高时 scale 就是 1）。
 @MainActor
-func previewBox(_ text: String, style: BurnInStyle, highlights: [SubtitleTextRange], highlight: SubtitleWordHighlight?) -> CGRect? {
+func previewImage(_ text: String, style: BurnInStyle, layout: SubtitleLayout? = nil, canvas size: CGSize = canvas,
+                  highlights: [SubtitleTextRange], highlight: SubtitleWordHighlight?) -> CGImage? {
     let renderer = ImageRenderer(content: BurnInSubtitleOverlay(
-        text: text, style: style, scale: 1, boxSize: canvas, highlights: highlights, highlight: highlight
+        text: text, style: style, scale: size.height / Double(BurnInStyle.referenceHeight), boxSize: size, layout: layout,
+        highlights: highlights, highlight: highlight
     ))
     renderer.scale = 1
     renderer.isOpaque = false
-    return renderer.cgImage.flatMap(textBox)
+    return renderer.cgImage
+}
+
+@MainActor
+func previewBox(_ text: String, style: BurnInStyle, highlights: [SubtitleTextRange], highlight: SubtitleWordHighlight?) -> CGRect? {
+    previewImage(text, style: style, highlights: highlights, highlight: highlight).flatMap(textBox)
 }
 
 /// 导出那条路：BurnInWorkspace 建工作目录（ASS + 字体软链），ffmpeg 在里面用同一个 subtitles 滤镜在 `background` 色的底上烧一帧。
-func burnFrame(_ text: String, style: BurnInStyle, highlights: [SubtitleTextRange] = [], highlight: SubtitleWordHighlight? = nil,
+/// `layout` 是工程的拖框布局（和预览传同一份）；`size` 是画布（9:16 的用例传 608×1080）。
+func burnFrame(_ text: String, style: BurnInStyle, layout: SubtitleLayout? = nil, canvas size: CGSize = canvas,
+               highlights: [SubtitleTextRange] = [], highlight: SubtitleWordHighlight? = nil,
                ffmpeg: String, background: String = "black") -> CGImage? {
     let cue = SubtitleCue(start: 0, end: 5, text: text)
-    let block = SubtitleRenderBlock(cues: [cue], layout: nil, highlight: highlight,
+    let block = SubtitleRenderBlock(cues: [cue], layout: layout, highlight: highlight,
                                     highlights: highlights.isEmpty ? [:] : [cue.id: highlights])
     let fontURL = (CTFontCopyAttribute(CTFontCreateWithName(style.fontName as CFString, 12, nil), kCTFontURLAttribute) as? URL)
     guard let prepared = try? BurnInWorkspace.create(
-        blocks: [block], style: style, fontFileURL: fontURL, aspectRatio: canvas.width / canvas.height, title: "check"
+        blocks: [block], style: style, fontFileURL: fontURL, aspectRatio: size.width / size.height, title: "check"
     ) else { return nil }
     defer { try? FileManager.default.removeItem(at: prepared.directory) }
     let process = Process()
     process.executableURL = URL(fileURLWithPath: ffmpeg)
     process.currentDirectoryURL = prepared.directory
-    process.arguments = ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i", "color=\(background):s=1920x1080:d=1",
+    process.arguments = ["-hide_banner", "-loglevel", "error", "-y", "-f", "lavfi", "-i",
+                         "color=\(background):s=\(Int(size.width))x\(Int(size.height)):d=1",
                          "-vf", "subtitles=filename=\(prepared.paths.assFileName):fontsdir=\(prepared.paths.fontsDirName)",
                          "-frames:v", "1", "frame.png"]
     guard (try? process.run()) != nil else { return nil }
@@ -141,6 +153,7 @@ for item in cases {
 }
 
 runPositionChecks(ffmpeg: ffmpeg)
+runWrapChecks(ffmpeg: ffmpeg)
 runShadowChecks(ffmpeg: ffmpeg)
 
 // 字幕字体清单的 cmap 体检（CmapSanityChecks.swift）—— 要在判红之前跑，不然它红了也退 0。

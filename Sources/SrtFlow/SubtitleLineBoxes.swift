@@ -1,4 +1,4 @@
-import CoreText
+import CoreGraphics
 import Foundation
 import SrtFlowCore
 
@@ -8,13 +8,13 @@ import SrtFlowCore
 // （2026-10-15 用户转来的反馈：三行字幕碰到左下角的台标，AI 只能一帧一帧 look 才发现）。这里按预览 / 烧录同一份口径算：
 // - 字体和大小：`SubtitleFontScale.runs`（每一截实际画它的字体、按 libass 的比例缩）；
 // - 折行宽度和左右位置：和 `BurnInSubtitleOverlay` 同一个规矩 —— 没有拖框的布局时宽度 = 画面宽 − 两边各一个 marginHorizontal、
-//   按九宫格的列对齐；有布局时宽度 = 画面宽 − 左右边距、居中。折行按 libass 的 WrapStyle 0（智能换行：先用最少的行数，再把每行摊匀），
-//   用 CoreText 的断行点 + 二分「还装得进这么多行的最小宽度」实现；
+//   按九宫格的列对齐；有布局时宽度 = 画面宽 − 左右边距、居中。在哪儿折行只问 `SubtitleLineWrap`（照 libass 的 WrapStyle 0 算，预览
+//   画的也是它算出来的那几行，2026-10-15）；中文没有空格时 libass 不折、整行溢出，这里报的框也照样比画面宽；
 // - 竖向：一行按 libass 的量度那么高（`SubtitleLineMetrics`：一行 = 字号），块的上下沿和左右边距只问 `SubtitleFrameGeometry`
 //   （拖框、就地编辑用的同一份换算，把算出来的块高喂给它）；
 // - 描边 / 底框 / 投影往外多出的那一圈也算进去 —— 撞水印看的是墨迹。
 // 坐标先在 1080 高的基准画布上算（宽按画布的宽高比，同 ASS 的 PlayResX），再换成画布的比例（左上原点）。
-// 是近似值：预览和成片在几个像素内对齐（check-subtitle-burn-size 钉着那两边），这里和它们的差主要在折行点上。
+// 预览和成片在几个像素内对齐（check-subtitle-burn-size 钉着那两边，折行点也钉着），这里和它们的差只剩墨迹和步进差的那一两个像素。
 // 不管什么：哪一句在哪一刻显示、叠在一起的两条轨各占哪一截（`AISubtitleBoxes`）、撞上了什么（`AISubtitleOverlaps`）。
 
 struct SubtitleLineBox: Equatable {
@@ -28,21 +28,20 @@ enum SubtitleLineBoxes {
     /// 一句（或叠在一起的两句，中间有换行）按样式画出来占哪一块；没有字就是 nil。`canvas` 只用宽高比。
     static func box(for text: String, style: BurnInStyle, layout: SubtitleLayout?, canvas: CGSize) -> SubtitleLineBox? {
         let box = referenceBox(canvas: canvas)
-        let paragraphs = text.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-        guard !paragraphs.isEmpty else { return nil }
         let fontSize = style.fontSize * (layout?.fontScale ?? 1)
         let usable = usableWidth(box: box, style: style, layout: layout)
-        var widths: [Double] = []
-        var lineHeight = 0.0
-        for paragraph in paragraphs {
-            widths += lineWidths(attributed(paragraph, style: style, fontSize: fontSize), maxWidth: usable)
-            let runs = SubtitleFontScale.runs(paragraph, style: style)
-            let metrics = SubtitleLineMetrics.of(runs, in: paragraph, style: style, fontSize: fontSize)
-            lineHeight = max(lineHeight, metrics.ascentLibass + metrics.descentLibass)
-        }
+        let runs = SubtitleFontScale.runs(text, style: style)
+        // 折成几行、每行多宽：和预览同一份（SubtitleLineWrap）；空的自然段不算。
+        let lines = SubtitleLineWrap.lines(
+            of: text, runs: runs, style: style, fontSize: fontSize, letterSpacing: style.letterSpacing, maxWidth: usable
+        )
+        guard !lines.isEmpty else { return nil }
+        let metrics = SubtitleLineMetrics.of(runs, in: text, style: style, fontSize: fontSize)
+        let lineHeight = metrics.ascentLibass + metrics.descentLibass
         let padding = style.borderStyle == .box ? max(0, style.outlineWidth) : 0
-        let blockWidth = min(usable, widths.max() ?? 0) + 2 * padding
-        let blockHeight = Double(widths.count) * lineHeight + 2 * padding
+        // 没有空格的一行（中文）libass 不折，比可用宽度还宽：框也照实报，不夹到边距里。
+        let blockWidth = (lines.map(\.width).max() ?? 0) + 2 * padding
+        let blockHeight = Double(lines.count) * lineHeight + 2 * padding
         // 块的上下沿、左右边距只问 SubtitleFrameGeometry（拖框、就地编辑同一份换算），块高是刚算出来的。
         let frame = SubtitleFrameGeometry(boxSize: box, style: style, layout: layout, blockHeight: blockHeight).frameRect
         let x: Double
@@ -61,7 +60,7 @@ enum SubtitleLineBoxes {
         let normalized = CGRect(
             x: rect.minX / box.width, y: rect.minY / box.height, width: rect.width / box.width, height: rect.height / box.height
         )
-        return SubtitleLineBox(rect: normalized, lineCount: widths.count)
+        return SubtitleLineBox(rect: normalized, lineCount: lines.count)
     }
 
     /// 1080 高的基准画布，宽按画布的宽高比（同 `SubtitleLineFit`）。
@@ -75,51 +74,5 @@ enum SubtitleLineBoxes {
     static func usableWidth(box: CGSize, style: BurnInStyle, layout: SubtitleLayout?) -> Double {
         if let layout { return max(20, box.width - Double(layout.marginLeft) - Double(layout.marginRight)) }
         return max(20, box.width - 2 * Double(style.marginHorizontal))
-    }
-
-    /// 这一段折成几行、每行多宽：libass 的 WrapStyle 0（先用最少的行数，再把每行摊匀）—— 先按最大宽度贪心断行得到行数，
-    /// 再二分出还装得进这么多行的最小宽度、按它断行；每行的宽不算行尾的空格。
-    static func lineWidths(_ paragraph: NSAttributedString, maxWidth: Double) -> [Double] {
-        let typesetter = CTTypesetterCreateWithAttributedString(paragraph)
-        let length = paragraph.length
-        func breaks(at width: Double) -> [CFRange] {
-            var ranges: [CFRange] = []
-            var start = 0
-            while start < length {
-                var count = CTTypesetterSuggestLineBreak(typesetter, start, max(1, width))
-                if count <= 0 { count = length - start }
-                ranges.append(CFRange(location: start, length: count))
-                start += count
-            }
-            return ranges
-        }
-        func width(of range: CFRange) -> Double {
-            let line = CTTypesetterCreateLine(typesetter, range)
-            return CTLineGetTypographicBounds(line, nil, nil, nil) - CTLineGetTrailingWhitespaceWidth(line)
-        }
-        let greedy = breaks(at: maxWidth)
-        guard greedy.count > 1 else { return greedy.map(width) }
-        var low = 0.0, high = maxWidth
-        for _ in 0..<24 {
-            let middle = (low + high) / 2
-            if breaks(at: middle).count <= greedy.count { high = middle } else { low = middle }
-        }
-        return breaks(at: high).map(width)
-    }
-
-    /// 每一截按实际画它的字体（回退的也算）、按 libass 的比例缩；字距同预览的 `tracking`。
-    private static func attributed(_ text: String, style: BurnInStyle, fontSize: Double) -> NSAttributedString {
-        let result = NSMutableAttributedString(string: text)
-        for run in SubtitleFontScale.runs(text, style: style) {
-            let font = SubtitleFontScale.ctFont(named: run.fontName, size: fontSize * run.scale, bold: style.bold, italic: style.italic)
-            result.addAttribute(NSAttributedString.Key(kCTFontAttributeName as String), value: font, range: run.range)
-        }
-        if style.letterSpacing != 0 {
-            result.addAttribute(
-                NSAttributedString.Key(kCTKernAttributeName as String), value: style.letterSpacing,
-                range: NSRange(location: 0, length: result.length)
-            )
-        }
-        return result
     }
 }

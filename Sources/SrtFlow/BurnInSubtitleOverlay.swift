@@ -17,6 +17,11 @@ import SrtFlowCore
 /// 字的大小按 libass 的口径（2026-09-29，SubtitleFontScale）：同一个字号，libass 画出来的字只有 CoreText 的 71%–100%
 /// （看字体），以前预览一直比成片大。行框也按 libass 的摆（SubtitleLineMetrics）：两行之间的距离、字在顶部 / 居中 / 底部
 /// 对齐时的竖向位置，都补成和成片一样 —— 两个渲染器对「一行多高、基线在行里哪儿」用的量度不同。
+///
+/// 在哪儿折行也按 libass 的算（2026-10-15，SubtitleLineWrap）：一句放不进一行的字幕，以前让 SwiftUI 的 Text 自己折 —— 贪心，第一行
+/// 填满、第二行剩一点；成片是 libass 的 WrapStyle 0，两行摊匀（真机量到预览第一行 0.058–0.941、成片 0.184–0.815）。现在先用
+/// `SubtitleLineWrap` 算出每一行是哪几个字，**一行一个 Text、只画这一行**（`lineLimit(1)` + 横向 `fixedSize`），不让 SwiftUI 再折第二次。
+/// 中文没有空格时 libass 不折（它只在空格处折），这里照样不折、整行溢出 —— 预览画的就是成片的样子。
 struct BurnInSubtitleOverlay: View {
     let text: String
     let style: BurnInStyle
@@ -42,12 +47,16 @@ struct BurnInSubtitleOverlay: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        // 这句字用到的字体、行框的量度算一遍：下面九份描边副本、行距、竖向位置共用。
+        // 这句字用到的字体、行框的量度、在哪儿折行算一遍：下面九份描边副本、行距、竖向位置共用。
         let runs = SubtitleFontScale.runs(text, style: style)
         let metrics = SubtitleLineMetrics.of(runs, in: text, style: style, fontSize: baseFontSize)
+        let lines = SubtitleLineWrap.lines(
+            of: text, runs: runs, style: style, fontSize: baseFontSize, letterSpacing: style.letterSpacing * scale,
+            maxWidth: usableWidth, lit: litRanges, litScale: highlight?.scale ?? 1
+        )
         ZStack(alignment: alignment) {
             Color.clear
-            block(runs: runs, metrics: metrics)
+            block(runs: runs, lines: lines, metrics: metrics)
                 .padding(.leading, leadingPad)
                 .padding(.trailing, trailingPad)
                 .padding(.bottom, bottomPad)
@@ -63,8 +72,8 @@ struct BurnInSubtitleOverlay: View {
         }
     }
 
-    private func block(runs: [SubtitleFontScale.Run], metrics: SubtitleLineMetrics) -> some View {
-        strokedText(runs: runs, lineSpacing: metrics.lineSpacing)
+    private func block(runs: [SubtitleFontScale.Run], lines: [SubtitleLineWrap.Line], metrics: SubtitleLineMetrics) -> some View {
+        strokedText(runs: runs, lines: lines, lineSpacing: metrics.lineSpacing)
             .padding(boxPadding)
             .background { boxBackground }
             .background {
@@ -95,17 +104,18 @@ struct BurnInSubtitleOverlay: View {
         return style.position.row == 2 ? verticalMargin : 0
     }
 
-    private func strokedText(runs: [SubtitleFontScale.Run], lineSpacing: Double) -> some View {
+    private func strokedText(runs: [SubtitleFontScale.Run], lines: [SubtitleLineWrap.Line], lineSpacing: Double) -> some View {
         ZStack {
             if outlineRadius > 0.3 {
                 ForEach(Self.outlineOffsets.indices, id: \.self) { index in
                     let offset = Self.outlineOffsets[index]
-                    baseText(runs: runs, lineSpacing: lineSpacing, coloringHighlight: false)
+                    baseText(runs: runs, lines: lines, lineSpacing: lineSpacing, coloringHighlight: false)
                         .foregroundStyle(style.outlineColor.swiftUIColor)
                         .offset(x: offset.x * outlineRadius, y: offset.y * outlineRadius)
                 }
             }
-            baseText(runs: runs, lineSpacing: lineSpacing, coloringHighlight: true).foregroundStyle(style.fillColor.swiftUIColor)
+            baseText(runs: runs, lines: lines, lineSpacing: lineSpacing, coloringHighlight: true)
+                .foregroundStyle(style.fillColor.swiftUIColor)
         }
         .shadow(
             color: shadowOffset > 0 ? style.shadowColor.swiftUIColor : .clear,
@@ -116,51 +126,58 @@ struct BurnInSubtitleOverlay: View {
     }
 
     /// 一行一个 Text、用 VStack 的间距摆：SwiftUI 的 `.lineSpacing` 不认负数（当 0 用），而有的字体（宋体一类，hhea 的行高
-    /// 比 OS/2 的 win 行高大）要把行距收紧才和 libass 一样；VStack 的间距正负都认。一行太长自己折出来的行只能补正数。
-    private func baseText(runs: [SubtitleFontScale.Run], lineSpacing: Double, coloringHighlight: Bool) -> some View {
-        let lines = styledLines(runs: runs, coloringHighlight: coloringHighlight)
+    /// 比 OS/2 的 win 行高大）要把行距收紧才和 libass 一样；VStack 的间距正负都认。
+    /// 每个 Text 只画 `SubtitleLineWrap` 算好的那一行（`lineLimit(1)` + 横向 `fixedSize`）：Core Text 和 SwiftUI 量宽差一两个像素时
+    /// SwiftUI 会多折出一行来，所以不许它再折。放不进一行的（没有空格的中文）就溢出，和 libass 一样。
+    private func baseText(
+        runs: [SubtitleFontScale.Run], lines: [SubtitleLineWrap.Line], lineSpacing: Double, coloringHighlight: Bool
+    ) -> some View {
+        let rows = styledLines(runs: runs, lines: lines, coloringHighlight: coloringHighlight)
         return VStack(alignment: stackAlignment, spacing: lineSpacing) {
-            ForEach(lines.indices, id: \.self) { index in
-                lines[index]
+            ForEach(rows.indices, id: \.self) { index in
+                rows[index]
                     .tracking(style.letterSpacing * scale)
-                    .lineSpacing(max(0, lineSpacing))
-                    .multilineTextAlignment(textAlignment)
-                    .lineLimit(nil)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: true)
             }
         }
     }
 
-    /// 字本身：按每一段实际用到的字体缩到烧录（libass）画出来的大小（SubtitleFontScale：同一个字号，libass 把它当行高、
-    /// 这里把它当 em，不缩的话预览比成片大 15%–40%）；正在说的词放大（描边的副本也放大）、`coloringHighlight` 时换色。
-    private func styledLines(runs: [SubtitleFontScale.Run], coloringHighlight: Bool) -> [Text] {
-        let whole = text as NSString
-        let lit = highlight == nil ? [] : highlights
-            .filter { $0.length > 0 && $0.location >= 0 && $0.location + $0.length <= whole.length }
+    /// 此刻亮着的词（越界的不认），`styledLines` 和折行都用它。
+    private var litRanges: [NSRange] {
+        let length = (text as NSString).length
+        guard highlight != nil else { return [] }
+        return highlights
+            .filter { $0.length > 0 && $0.location >= 0 && $0.location + $0.length <= length }
             .map { NSRange(location: $0.location, length: $0.length) }
-        // 切点：每一段字体的边界 + 每个亮着的词的边界。
-        var cuts: Set<Int> = [0, whole.length]
+    }
+
+    /// 字本身，一行一个 Text：按每一段实际用到的字体缩到烧录（libass）画出来的大小（SubtitleFontScale：同一个字号，libass 把它
+    /// 当行高、这里把它当 em，不缩的话预览比成片大 15%–40%）；正在说的词放大（描边的副本也放大）、`coloringHighlight` 时换色。
+    /// 每一行里按字体的边界、亮着的词的边界切成几截拼起来；行首行尾的空格、换行符 `SubtitleLineWrap` 已经去掉。
+    private func styledLines(runs: [SubtitleFontScale.Run], lines: [SubtitleLineWrap.Line], coloringHighlight: Bool) -> [Text] {
+        let whole = text as NSString
+        let lit = litRanges
+        var cuts: Set<Int> = []
         for range in runs.map(\.range) + lit { cuts.formUnion([range.location, range.location + range.length]) }
-        let sorted = cuts.filter { $0 >= 0 && $0 <= whole.length }.sorted()
-        // 按换行拆成一行一个 Text（空行不要：字幕里没有空行，生成和编辑都不会留）。
-        var lines: [(text: Text, isEmpty: Bool)] = [(Text(verbatim: ""), true)]
-        for (start, end) in zip(sorted, sorted.dropFirst()) where end > start {
-            let run = runs.first { NSLocationInRange(start, $0.range) }
-            let isLit = lit.contains { NSLocationInRange(start, $0) }
-            let pieceFont = font(
-                named: run?.fontName ?? style.fontName, scaledBy: (run?.scale ?? 1) * (isLit ? highlight?.scale ?? 1 : 1)
-            )
-            let parts = whole.substring(with: NSRange(location: start, length: end - start)).components(separatedBy: "\n")
-            for (index, part) in parts.enumerated() {
-                if index > 0 { lines.append((Text(verbatim: ""), true)) }
-                guard !part.isEmpty else { continue }
-                var piece = Text(verbatim: part).font(pieceFont)
+        let sorted = cuts.sorted()
+        let rows: [Text] = lines.map { line in
+            let end = line.range.location + line.range.length
+            let points = [line.range.location] + sorted.filter { $0 > line.range.location && $0 < end } + [end]
+            var row = Text(verbatim: "")
+            for (start, stop) in zip(points, points.dropFirst()) where stop > start {
+                let run = runs.first { NSLocationInRange(start, $0.range) }
+                let isLit = lit.contains { NSLocationInRange(start, $0) }
+                let pieceFont = font(
+                    named: run?.fontName ?? style.fontName, scaledBy: (run?.scale ?? 1) * (isLit ? highlight?.scale ?? 1 : 1)
+                )
+                var piece = Text(verbatim: whole.substring(with: NSRange(location: start, length: stop - start))).font(pieceFont)
                 if isLit, coloringHighlight, let highlight { piece = piece.foregroundStyle(highlight.color.swiftUIColor) }
-                lines[lines.count - 1] = (lines[lines.count - 1].text + piece, false)
+                row = row + piece
             }
+            return row
         }
-        let filled = lines.filter { !$0.isEmpty }.map(\.text)
-        return filled.isEmpty ? [Text(verbatim: "")] : filled
+        return rows.isEmpty ? [Text(verbatim: "")] : rows
     }
 
     /// 样式的字号（含布局的倍率）换算到预览像素。
@@ -197,7 +214,8 @@ struct BurnInSubtitleOverlay: View {
     private var horizontalMargin: Double { Double(style.marginHorizontal) * scale }
     private var verticalMargin: Double { Double(style.marginVertical) * scale }
 
-    /// 两侧边距同时决定长句在哪里换行（布局覆盖时左右可以不对称）。
+    /// 两侧边距同时决定长句在哪里换行（布局覆盖时左右可以不对称）：和 libass 的 PlayResX − MarginL − MarginR、
+    /// `SubtitleLineBoxes.usableWidth` 是同一个量。
     private var usableWidth: Double {
         if layout != nil {
             return max(20, boxSize.width - leadingPad - trailingPad)
@@ -229,17 +247,8 @@ struct BurnInSubtitleOverlay: View {
         }
     }
 
-    /// 几行摆在一起时按哪边对齐（和 `textAlignment` 同一个规矩：布局覆盖时居中，否则跟着九宫格的列）。
+    /// 几行摆在一起时按哪边对齐（布局覆盖时居中，否则跟着九宫格的列；libass 的 align_lines 也是每行各自按这边对齐）。
     private var stackAlignment: HorizontalAlignment {
-        guard layout == nil else { return .center }
-        switch style.position.column {
-        case 0: return .leading
-        case 2: return .trailing
-        default: return .center
-        }
-    }
-
-    private var textAlignment: TextAlignment {
         guard layout == nil else { return .center }
         switch style.position.column {
         case 0: return .leading

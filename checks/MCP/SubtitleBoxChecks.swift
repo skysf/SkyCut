@@ -5,7 +5,8 @@ import SrtFlowMCPKit
 
 // 每句字幕在画布上占哪一块（SubtitleLineBoxes / AISubtitleBoxes）、撞没撞上画面里的字（AISubtitleOverlaps，2026-10-15 用户转来的
 // 反馈：三行字幕碰到左下角的台标，AI 只能一帧一帧 look）：一行的位置和高按样式（底部 / 左 / 右上、边距、描边）、字多就宽、
-// 太长就折（中文没有空格也折）、max_width 小了折得早、拖框的布局按它的边距居中、竖屏更早折；叠在一起的两条轨原文在上译文在下、
+// 太长就折（折在哪儿只问 SubtitleLineWrap，和预览、成片同一处）、没有空格的中文 libass 不折、整行溢出、框照实比画面宽、
+// max_width 小了折得早、拖框的布局按它的边距居中、竖屏更早折；叠在一起的两条轨原文在上译文在下、
 // 分开摆各归各位；只算一段时间里的；宽行撞上左下角的台标、短的不撞、不在这段时间里的不查、擦过去不算；结果里报进 text_scan。
 // 位置和高的容差 2 px（0.002）：几何是确定的（块高 = 行数 × 字号、底边 = 边距 + 描边），松到 0.01 连 3 px 的描边漏掉都看不出来。
 // 编法见 scripts/check-mcp.sh。
@@ -32,8 +33,18 @@ private func lineBoxChecks() {
     check((wrapped?.lineCount ?? 0) >= 2, "a long line wraps (\(wrapped?.lineCount ?? 0) rows)")
     check((wrapped?.rect.width ?? 1) <= (1920.0 - 160 + 6) / 1920 + 1e-6, "…never wider than the frame minus the margins")
     check((wrapped?.rect.height ?? 0) > (short?.rect.height ?? 0) * 1.8, "…and at least two rows tall")
+    // libass 只在空格处折行（没编 libunibreak、ffmpeg 也没开 ASS_FEATURE_WRAP_UNICODE）：没有空格的中文不折、整行溢出到画面两边，
+    // 框照实报、比画面减边距还宽 —— 预览画的也是这样（check-subtitle-burn-size 的 WrapChecks 钉着两边）。
     let chinese = SubtitleLineBoxes.box(for: String(repeating: "南极的冰盖一望无际", count: 6), style: style, layout: nil, canvas: wide)
-    check((chinese?.lineCount ?? 0) >= 2, "Chinese without spaces wraps between characters")
+    checkEqual(chinese?.lineCount, 1, "Chinese without spaces does not wrap: libass only breaks at spaces")
+    check((chinese?.rect.width ?? 0) > (1920.0 - 160) / 1920, "…so its box is wider than the frame minus the margins (got \(chinese?.rect.width ?? -1))")
+    let chineseSpaced = SubtitleLineBoxes.box(for: String(repeating: "南极的冰盖一望无际 ", count: 6), style: style, layout: nil, canvas: wide)
+    check((chineseSpaced?.lineCount ?? 0) >= 2, "Chinese with spaces wraps at the spaces")
+    // 折成几行就是 SubtitleLineWrap 说的几行（同一个函数）。
+    let wrappedText = String(repeating: "wide words keep coming ", count: 6)
+    let wrapLines = SubtitleLineWrap.lines(of: wrappedText, runs: SubtitleFontScale.runs(wrappedText, style: style), style: style,
+                                           fontSize: style.fontSize, letterSpacing: 0, maxWidth: 1760)
+    checkEqual(wrapped?.lineCount, wrapLines.count, "the box has as many rows as SubtitleLineWrap folds the text into")
 
     style.position = .bottomLeft
     let left = SubtitleLineBoxes.box(for: "Hi there", style: style, layout: nil, canvas: wide)
