@@ -8,6 +8,7 @@ import SrtFlowCore
 // 变速跟着伸缩；说的话剩不到一半就留在原地、报出来）；段被真删（`deletesContent`）字幕一起删，别的操作让段没了（剪切粘贴之外的情形少见）
 // 字幕留着。字幕压着的不是这段声音（被挪开了）时照以前的算法：开头那一刻换算过去、时长不变。
 // 主轨上的段不归这里管：压在主轨上的东西跟着画面走（`TimelineLinkage` 的老规矩），两条规矩不叠；这次操作碰过的字幕（包括被主轨那条挪过的）不再碰。
+// 段换了声音文件（同 id、入点变了）按改之前的素材和入点记账（`Piece.rebased`）：字幕原地不动。
 // 联动开关关着时不跟（调用方 `TimelineLinkage.follow` 只在开着时被调）。
 // 由来：2026-10-06 盲测，AI 挪了配音段，字幕留在原地，只好一句句再挪（docs/bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md）。
 // 不管什么：译文轨（两条轨独立：译文没有来源段，不跟着原文挪）；被分割之后右半段的字幕（来源记的还是左半段的 id，跟着左半段）。
@@ -41,14 +42,16 @@ enum CaptionSourceFollow {
                 if deletesContent { plan.deletes.insert(cue.id) } else { plan.left.insert(cue.id) }
                 continue
             }
+            // 换了声音文件的（edit_clip 换文件）按改之前的素材和入点记账（`Piece.rebased`，同主轨那条）：字幕不跟着新入点跑。
+            let was = TimelineLinkage.Piece(host)
+            let now = TimelineLinkage.Piece(moved).rebased(onto: was)
             let outcome = LinkageCueFollow.outcome(
                 old, speech: LinkageCueFollow.speech(of: old, originals: oldCues, links: [:]),
-                hosts: [TimelineLinkage.Piece(host)], survivors: { _ in [TimelineLinkage.Piece(moved)] },
+                hosts: [was], survivors: { _ in [now] },
                 deletesContent: deletesContent,
                 fallback: {
                     // 字幕开头对着素材的哪一秒，按段改过之后的位置换回时间线。
-                    let anchor = host.sourceStart + (old.start - host.timelineStart) * max(0.05, host.speed)
-                    let start = moved.timelineStart + (anchor - moved.sourceStart) / max(0.05, moved.speed)
+                    let start = now.time(atSource: was.source(at: old.start))
                     return abs(start - old.start) > epsilon ? .move(by: start - old.start) : .stay
                 }
             )

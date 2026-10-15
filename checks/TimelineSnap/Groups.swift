@@ -12,5 +12,6 @@ func runSplitOutGroups() {
     checkLinkage()          // 1f：联动 —— 压在主轨块上的东西跟着它的画面走（Linkage.swift）
     checkLinkageCaptions()  // 1g：生成的字幕句跟着它的那段声音走（LinkageCaptions.swift）
     checkLinkageCues()      // 1h：字幕句两头各自跟着画面换算、说的话剩不到一半才删（LinkageCues.swift）
+    checkLinkageSwap()      // 1i：同 id 换了素材（upscale 换源、edit_clip 换文件）联动不动任何东西（LinkageSwap.swift）
     checkMagnet()           // 1g：磁吸跟着工程走、只在改到 V1 的排布时排紧（Magnet.swift）
 }

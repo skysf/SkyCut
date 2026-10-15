@@ -14,6 +14,9 @@ import SrtFlowCore
 // docs/architecture/timeline-linkage.md）：
 // 1. 跟着**画面**走，不跟块的 id：每样东西看自己底下压着主轨的哪些画面（哪个素材的第几秒），画面挪到哪它挪到哪。
 //    分割、cut_speech、定格插入切出来的新 id 照样认得出（同一个素材、接着的源时间）；同 id 的段永远优先。
+//    同 id 的段**换了素材**（upscale 换源、edit_clip 换文件：只换读哪个文件、从它的第几秒读，时间线上的位置和长度不动）按
+//    「这段现在摆的地方，画面就是改之前这段的画面」记（`Piece.rebased`）—— 新文件的 0 秒不是原片的 0 秒，按源时间对账会把压在
+//    上面的东西挪一个偏移（2026-10-15，docs/bugfixes/2026-10-15-linkage-follows-source-shift-after-swap.md）。
 // 2. 完全落在一段主轨块里的：删它就删、挪它就挪（按它底下最早还在的那一截画面挪，和那截画面的相对位置不变）。
 // 3. 跨两段的：底下的画面**全部**挪同一个量才跟，否则不动；画面**全没了**才删。
 // 4. 画面没了只在**真删**的操作里连带删（`deletesContent`：⌫、AI 的 delete_items / cut_speech）；裁切 / 变速让画面
@@ -63,6 +66,23 @@ enum TimelineLinkage {
             asset = AssetKey(url: clip.stillImageURL ?? clip.sourceURL, audioOnly: clip.isAudioOnly)
         }
 
+        private init(id: UUID, start: Double, end: Double, sourceStart: Double, speed: Double, asset: AssetKey) {
+            self.id = id
+            self.start = start
+            self.end = end
+            self.sourceStart = sourceStart
+            self.speed = speed
+            self.asset = asset
+        }
+
+        /// 这段改之后的账。同 id 换了素材（upscale 换源、edit_clip 换文件）时按「这段现在摆的地方，画面就是改之前这段的画面」记：
+        /// 素材和入点都按改之前的 `was`，只有时间线上的位置、长度、速度是现在的 —— 新文件的 0 秒不是原片的 0 秒，照新入点对账
+        /// 会把压在上面的东西挪一个偏移。素材没换就是它自己。
+        func rebased(onto was: Piece) -> Piece {
+            guard asset != was.asset else { return self }
+            return Piece(id: id, start: start, end: end, sourceStart: was.sourceStart, speed: speed, asset: was.asset)
+        }
+
         var sourceEnd: Double { source(at: end) }
         func source(at time: Double) -> Double { sourceStart + (time - start) * speed }
         func time(atSource source: Double) -> Double { start + (source - sourceStart) / speed }
@@ -88,9 +108,13 @@ enum TimelineLinkage {
 
         init(before: TimelineState, after: TimelineState) {
             self.before = before.mainClips.map(Piece.init)
-            let known = Set(before.allClips.map(\.id))
-            afterByID = Dictionary(after.allClips.map { ($0.id, Piece($0)) }, uniquingKeysWith: { first, _ in first })
-            fresh = after.mainClips.filter { !known.contains($0.id) }.map(Piece.init)
+            let was = Dictionary(before.allClips.map { ($0.id, Piece($0)) }, uniquingKeysWith: { first, _ in first })
+            // 同 id 换了素材的按改之前的素材和入点记账（`rebased`）。
+            afterByID = Dictionary(
+                after.allClips.map { clip in (clip.id, was[clip.id].map { Piece(clip).rebased(onto: $0) } ?? Piece(clip)) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            fresh = after.mainClips.filter { was[$0.id] == nil }.map(Piece.init)
         }
 
         /// 占着 `span` 的东西该怎么办（规矩 2–4）。
