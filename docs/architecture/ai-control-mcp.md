@@ -769,8 +769,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     三行字幕碰到左下角的台标，AI 只能一帧一帧 look 才发现）**：text_scan 早就认得出固定的字，缺的是另一半 —— 工程字幕每一句画在哪。
     - `SubtitleLineBoxes`（纯值，Core Text）：一句字按此刻的样式画出来占哪一块、折成几行。字体和大小按 `SubtitleFontScale.runs`（每一截实际画它的字体、
       libass 的比例），一行的高按 `SubtitleLineMetrics`（= 字号），块的上下沿和左右边距只问 `SubtitleFrameGeometry`（拖框那一份换算，把算出来的块高喂它，
-      不算第二遍），在哪儿折行只问 `SubtitleLineWrap`（照 libass 的 WrapStyle 0 算，预览画的就是它算的那几行，2026-10-15）；没有空格的中文 libass
-      不折、整行溢出，框照实比画面宽（`box_note` 里说了：比画面宽 = 放不下）；描边 / 底框 / 投影算进墨迹。
+      不算第二遍），在哪儿折行只问 `SubtitleLineWrap`（照 libass 的 WrapStyle 0 摊匀算、中日文在字之间折，预览画的、烧录写进 ASS 的 `\N` 都是它算的
+      那几行，2026-10-15）；一个词比画面宽（超长的英文单词）时不折，框照实比画面宽（`box_note` 里说了：比画面宽 = 一个词放不下）；描边 / 底框 / 投影算进墨迹。
       坐标先在 1080 高的基准画布上算，再换成画布的比例（左上原点）。和预览 / 成片的差只剩墨迹和步进差的一两个像素（`check-subtitle-burn-size` 的 `WrapChecks` 钉着）。
     - `AISubtitleBoxes`：从画面上排好的几块（`subtitleScreenBlocks`，预览和烧录同一份）算每一句的框，按这句的中点那一刻整块的样子；叠在一起的两条轨
       原文在上、译文在下，各占整块里属于自己的那一截；藏起来的句子、关着眼睛的轨没有框。
@@ -778,7 +778,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
       （`AISubtitleOverlaps`）报 `subtitles_checked`、`subtitle_overlaps`（画在固定的字 / 旧字幕带上的句子：id、轨、字、框、撞上了什么；相交的宽高都超过
       画面 0.5% 才算，最多 40 句）和一句提示（改短 / 重切、收窄 `style.max_width`、挪位置、或者 `set_shape` 盖住）。
     - **不自动重新断句**（用户批的建议里「能自动重新断行就更好了」）：收窄 max_width 或挪位置就能避开，重新断句要动生成那一套，先不做。
-    守卫：`checks/MCP/SubtitleBoxChecks.swift`（一行的位置和高按样式、字多就宽、太长就折（行数同 `SubtitleLineWrap`）、没有空格的中文不折、整行溢出、带空格的折、max_width 小了折得早、底框的内边距、拖框的布局、
+    守卫：`checks/MCP/SubtitleBoxChecks.swift`（一行的位置和高按样式、字多就宽、太长就折（行数同 `SubtitleLineWrap`）、没有空格的中文在字之间折、框在边距以内、带空格的折、max_width 小了折得早、底框的内边距、拖框的布局、
     竖屏、文字里的换行；叠在一起 / 分开摆 / 藏起来；撞上 / 不撞 / 不在这段时间里 / 擦过不算 / 结果里的字段 / 旧字幕带也算）。
 
 ## 五、这一轮、停止、撤销这一轮

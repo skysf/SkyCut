@@ -21,7 +21,8 @@ import SrtFlowCore
 /// 在哪儿折行也按 libass 的算（2026-10-15，SubtitleLineWrap）：一句放不进一行的字幕，以前让 SwiftUI 的 Text 自己折 —— 贪心，第一行
 /// 填满、第二行剩一点；成片是 libass 的 WrapStyle 0，两行摊匀（真机量到预览第一行 0.058–0.941、成片 0.184–0.815）。现在先用
 /// `SubtitleLineWrap` 算出每一行是哪几个字，**一行一个 Text、只画这一行**（`lineLimit(1)` + 横向 `fixedSize`），不让 SwiftUI 再折第二次。
-/// 中文没有空格时 libass 不折（它只在空格处折），这里照样不折、整行溢出 —— 预览画的就是成片的样子。
+/// 烧录把同一份折行点写成 `\N`、不让 libass 自己折（它只在空格处折，没有空格的中文会整行溢出；`BurnInWorkspace.prewrapped`）—— 预览画的
+/// 就是成片的样子，中文在字之间折也一样。
 struct BurnInSubtitleOverlay: View {
     let text: String
     let style: BurnInStyle
@@ -214,13 +215,10 @@ struct BurnInSubtitleOverlay: View {
     private var horizontalMargin: Double { Double(style.marginHorizontal) * scale }
     private var verticalMargin: Double { Double(style.marginVertical) * scale }
 
-    /// 两侧边距同时决定长句在哪里换行（布局覆盖时左右可以不对称）：和 libass 的 PlayResX − MarginL − MarginR、
-    /// `SubtitleLineBoxes.usableWidth` 是同一个量。
+    /// 两侧边距同时决定长句在哪里换行（布局覆盖时左右可以不对称）：和 libass 的 PlayResX − MarginL − MarginR 是同一个量，
+    /// 只在 `SubtitleLineWrap.usableWidth` 算一份（AI 的框、烧录也问它）。
     private var usableWidth: Double {
-        if layout != nil {
-            return max(20, boxSize.width - leadingPad - trailingPad)
-        }
-        return max(20, boxSize.width - 2 * horizontalMargin)
+        SubtitleLineWrap.usableWidth(canvasWidth: boxSize.width, style: style, layout: layout, scale: scale)
     }
 
     private var alignment: Alignment {

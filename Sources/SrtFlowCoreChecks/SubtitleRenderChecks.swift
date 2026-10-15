@@ -164,4 +164,12 @@ private func checkMultiBlockASS() {
                "一块：两个入口产物一样")
     check(single.contains("Dialogue: 3,"), "一块：原来的 Layer 不动")
     check(!single.contains("Style: \(BurnInStyle.assStyleName)2,"), "一块：只有一个样式")
+    // 折行点 App 算好写成了换行时（BurnInWorkspace.prewrapped，2026-10-15）libass 不许再自己折：WrapStyle 2；不给就还是 libass 的 0。
+    let block = [SubtitleRenderBlock(cues: [SubtitleCue(start: 0, end: 1, text: "第一行\n第二行")], layout: nil)]
+    let prewrapped = style.assDocument(blocks: block, aspectRatio: 16.0 / 9.0, prewrapped: true)
+    check(prewrapped.contains("WrapStyle: 2") && prewrapped.contains("第一行\\N第二行"), "折好的：WrapStyle 2、换行写成 \\N")
+    check(style.assDocument(blocks: block, aspectRatio: 16.0 / 9.0).contains("WrapStyle: 0"), "没折好的：还是 libass 的 WrapStyle 0")
+    checkEqual(BurnInStyle.playResolution(aspectRatio: 1920.0 / 1080).width, 1920, "虚拟画布：16:9 是 1920 宽")
+    checkEqual(BurnInStyle.playResolution(aspectRatio: 608.0 / 1080).width, 608, "虚拟画布：9:16 的 608×1080 是 608 宽")
+    checkEqual(BurnInStyle.playResolution(aspectRatio: 0).width, 1920, "虚拟画布：宽高比不像样当 16:9")
 }

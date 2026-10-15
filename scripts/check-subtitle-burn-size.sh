@@ -14,10 +14,11 @@
 # 案例：docs/bugfixes/2026-09-29-subtitle-preview-line-box-differs-from-libass.md
 #
 # 还量**折行点**（checks/SubtitleBurnSize/WrapChecks.swift，2026-10-15）：一句放不进一行的字幕，以前预览让 SwiftUI 贪心折（第一行填满）、
-# 成片是 libass 的 WrapStyle 0（两行摊匀），同一句字折在两处。现在折行点只有 SubtitleLineWrap 一份（照 libass 的算法 port），预览照它画。
-# 这里对几种句子（两行 / 三行 / 五行、中英混排、很长的单词、布局覆盖、9:16、左 / 右对齐、逐词高亮放大、两个空格、带换行）预览离屏渲一张、
-# 真烧一帧，按墨迹切成几行，比行数和每一行的左右沿；没有空格的中文 libass 不折、整行溢出，预览也要一样。
-# 案例：docs/bugfixes/2026-10-15-subtitle-preview-wraps-greedily.md
+# 成片是 libass 的 WrapStyle 0（两行摊匀），同一句字折在两处。现在折行点只有 SubtitleLineWrap 一份（照 libass 的算法 port），预览照它画，
+# 烧录把它写成 \N、不让 libass 自己折（它只在空格处折，没有空格的中文以前整行溢出；现在中日文在字之间折、标点避头尾）。
+# 这里对几种句子（两行 / 三行 / 五行、中英混排、很长的单词、布局覆盖、9:16、左 / 右对齐、逐词高亮放大、两个空格、带换行、没有空格的中文、
+# 带标点的中文、中英文连着写、中文 + 高亮）预览离屏渲一张、真烧一帧，按墨迹切成几行，比行数和每一行的左右沿。
+# 案例：docs/bugfixes/2026-10-15-subtitle-preview-wraps-greedily.md、docs/bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md
 #
 # 还量**阴影**（checks/SubtitleBurnSize/ShadowChecks.swift，2026-09-29 验收第二轮）：字幕样式的 shadow 之前只测了数值，没有测真画出来
 # 的像素。中灰底上白字，预览和成片各量白字右下多出来的暗处 —— 偏了多少、最黑的一点有多黑（ASS 的透明度是反的，写反了会差一截），

@@ -99,13 +99,18 @@
    `trim_whitespace` port（先贪心在上一个空格处断，再把上一行最后一个词往下挪、只要两行宽度之差变小就挪，直到挪不动；行首行尾的空格不画、
    不算宽；一行的宽 = 步进之和，居中按它）。预览 `BurnInSubtitleOverlay` **一行一个 `Text`、只画算好的那一行**（`lineLimit(1)` + 横向
    `fixedSize`，不让 SwiftUI 再折第二次：它量宽和 Core Text 差一两个像素时会多折出一行），AI 读的框 `SubtitleLineBoxes` 也只问它。
-   **libass 只在 ASCII 空格处折行**（vendor/ffmpeg 的 libass 没编 libunibreak、ffmpeg 也没开 `ASS_FEATURE_WRAP_UNICODE`）：没有空格的中文
-   不折、整行溢出到画面两边；预览照样溢出、框照实比画面宽，**不替它折** —— 折了就是预览和成片不一样。生成的字幕靠 `SubtitleLineFit` 按一行
-   放得下来切，平时碰不到；手打 / 导入的长中文句要用户自己换行（要不要让烧录也能折中文另拍板）。
+   **烧录也照这一份写、libass 不再自己折**（2026-10-15 用户定，[没有空格的长中文字幕成片整行溢出](../bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md)）：
+   vendor/ffmpeg 的 libass 没编 libunibreak、只在 ASCII 空格处折行，没有空格的长中文句成片以前整行溢出到画面两边。现在 `BurnInWorkspace.prewrapped`
+   在写 ASS 之前把每句折好的几行写成换行（`assDocument` 写成 `\N`）并写 `WrapStyle: 2`，libass 只照着画；`SubtitleLineWrap` 能起新一行的地方 =
+   ASCII 空格之后 + **中日文的字之间**（标点避头尾：行首不许是收尾的标点、小假名、长音，行尾不许是开头的标点），韩文、拉丁字母、数字只在空格处，
+   一个比画面宽的英文单词照旧溢出；亮着的词的位置跟着换算（`SubtitleLineWrap.joined`）。可用宽度（画面宽 − 边距）只在 `SubtitleLineWrap.usableWidth`
+   算一份、预览 / 框 / 烧录同一个量，ASS 的虚拟画布宽（PlayResX）只在 `BurnInStyle.playResolution` 算。**别把折行交回 libass（WrapStyle 0）**：
+   一行宽正好卡在最大宽度一两个像素以内时它会再折一次、多出一行，预览和成片又不一样。
    给 AI 算「这句字幕画在哪」的 `SubtitleLineBoxes`（2026-10-15）也是这几份合同的消费者：字体按 `SubtitleFontScale.runs`、行高按 `SubtitleLineMetrics`、
    折行按 `SubtitleLineWrap`、块的位置喂块高给 `SubtitleFrameGeometry` 要，不另算一份（[AI 接口](ai-control-mcp.md) 第四节第 51 条）。
    `scripts/check-subtitle-burn-size.sh` 比预览和成片字的上下沿（三种对齐 × 一 / 两行 × 英文 / 混排 × 五种字体，容差 3 px），
-   以及折行点（`WrapChecks`：17 种放不进一行的句子按墨迹切成几行、每一行的左右沿容差 4 px，预览每行的宽还要和 `SubtitleLineWrap` 算的对上）。
+   以及折行点（`WrapChecks`：26 种放不进一行的句子（含没有空格的中文、带标点的、中英文连着写的、日文、韩文）按墨迹切成几行、每一行的左右沿容差 4 px，
+   预览每行的宽还要和 `SubtitleLineWrap` 算的对上；烧录的 ASS 要是 WrapStyle 2、折行点写成 `\N`、亮着的词换算到新的字里）。
    已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）。
    **回退到系统私有字体时两边一起换成内置字体**（2026-09-29，[没下载苹方时中文烧成方框](../bugfixes/2026-09-29-chinese-burns-as-boxes-without-pingfang.md)）：
    苹方完整版是按需下载的字体资源，没下载的 Mac 上 CoreText 回退到系统私有的那份，预览照样是中文，libass 却用不了、画成方框。
@@ -293,7 +298,8 @@
       这一条看的是拖过框之后的位置和换行，以及中文、粗体、逐词高亮亮起来时的样子。
 - [ ] **长句的折行点**（2026-10-15）：一句放不进一行、不带换行的字幕，预览里两行差不多宽（不是第一行填满、第二行剩一点）；
       导出后抽帧，每一行的左右沿和预览对得上（`look` 看到的也是这几行）；`get_subtitles` 的 box 不变。
-      一句没有空格的长中文：预览和成片**一样**从画面两边溢出，不许预览替它折。
+      一句没有空格的长中文：预览和成片**一样**折成两行、差不多宽（2026-10-15 起烧录照预览的折行点写 `\N`），每行的左右沿对得上，
+      行首没有「，。」；韩文照旧只在空格处折。
 - [ ] 自动检测 + 生成：新字幕全部单行。
 - [ ] **点选互斥两向**：选中形状 → 点轨道上的 cue，形状框必须消失；
       选中 cue → 点形状，字幕拖框必须消失。任何时刻预览上只有一套框。
