@@ -484,6 +484,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditWaveformPower.swift \
   Sources/SrtFlow/VideoEditPlacementDefault.swift \
   Sources/SrtFlow/AISubtitleEdits.swift \
+  Sources/SrtFlow/AISubtitleReplacement.swift \
   Sources/SrtFlow/AISubtitleFiles.swift \
   Sources/SrtFlow/SubtitleFileLanguage.swift \
   Sources/SrtFlow/AISubtitleStyle.swift \
@@ -529,6 +530,7 @@ xcrun swiftc \
   checks/MCP/VoiceChecks.swift \
   checks/MCP/VoiceLevelChecks.swift \
   checks/MCP/SubtitleStyleChecks.swift \
+  checks/MCP/SubtitleBulkChecks.swift \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/KokoroSpeedChecks.swift \

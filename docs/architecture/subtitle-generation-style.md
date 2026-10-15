@@ -52,7 +52,8 @@ BBC 字幕指南对照。
   （顿号可以用在列举里、不许在行尾；问号叹号要用）。**英文那行也去**是用户拍板（两行看着一致），
   Netflix 英文规范本身是保留标点的 —— 这是我们有意偏离的一条。
 - **只在两处去**：生成（`SubtitleSegmenter.appendCue`）和机器翻译落字（`SubtitleRetranslation.apply`）。
-  **用户手打的、外挂导入的一律不碰**（改字走 `SubtitleTrackEditing.setText`，不经过这里）。翻回来去完标点是空的，不落空句。
+  **用户手打的、外挂导入的一律不碰**（改字走 `SubtitleTrackEditing.setText`，不经过这里）；例外只有 AI 点名（`edit_subtitles` 的
+  `strip_punctuation=true`，2026-10-15）：同一份规则套在每一句上、再走 `setText`，词的时间保住（[AI 接口](ai-control-mcp.md) 第四节第 50 条）。翻回来去完标点是空的，不落空句。
 - 不做开关（用户拍板「按你的来」：默认就去）。
 
 ## 三、断句（`SubtitleBreaks`）
@@ -167,6 +168,6 @@ BBC 字幕指南对照。
 - [ ] 主轨是带声音的录屏、旁白在音频轨：不勾「只用选中的片段」时录屏里的零碎词不出现、旁白的字不被压住；
       选中旁白那几段、勾上再生成，录屏里的声音一个字都不转。
 - [ ] 选中一段藏起来的段 / 静音的视频（链接关着）：「只用选中的片段」不出现。
-- [ ] 手打一句带逗号的字幕、导入一份带标点的 .srt：标点原样留着。
+- [ ] 手打一句带逗号的字幕、导入一份带标点的 .srt：标点原样留着；让 AI `edit_subtitles strip_punctuation=true`：整轨去掉、逐词高亮照亮。
 - [ ] 南极工程：「At the bottom of the world」跟声音一起出（最多早一点点，不许晚）；
       「That's not what I wanted to hear」一个字不少；源语言用「自动检测」检测出英语。

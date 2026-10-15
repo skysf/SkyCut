@@ -226,22 +226,32 @@ enum AISubtitleTools {
         let state = project.state
         let ids = AIShortIDs(state: state)
         let edits = try AISubtitleEdits.parse(args, ids: ids, in: state)
-        guard !edits.isEmpty || style != nil else { throw AIToolError("Pass changes, add, delete or style.") }
+        guard !edits.isEmpty || style != nil else {
+            throw AIToolError("Pass changes, add, delete, merge, replace, strip_punctuation or style.")
+        }
         var next = state
-        let (created, merged) = edits.apply(to: &next)
+        let outcome = edits.apply(to: &next)
+        let created = outcome.created
+        let merged = outcome.merged
         // 只改这个工程自己的样式（方案第 54 条），烧录页记住的那套不动。
         style?.apply(to: &next, appWide: EncodeQueue.burnIn.burnInStyle, canvas: VideoEditCompositionBuilder.renderSize(for: next))
         project.perform(rebuildsPreview: false) { $0 = next }
         let fresh = AIShortIDs(state: project.state)
-        let firstTime = (edits.changes.compactMap { project.state.subtitleCue($0.id)?.start }
-            + (created + merged).compactMap { project.state.subtitleCue($0)?.start }).min()
-        AIEditorPresenter.reveal(.init(cues: Set(created + merged + edits.changes.map(\.id)), time: firstTime), project: project)
+        let touched = edits.changes.map(\.id) + created + merged + outcome.rewritten
+        let firstTime = touched.compactMap { project.state.subtitleCue($0)?.start }.min()
+        AIEditorPresenter.reveal(.init(cues: Set(touched), time: firstTime), project: project)
         var result: [String: JSONValue] = [
             "changed": .number(Double(edits.changes.count)),
             "added": .array(created.map { .string(fresh.short($0)) }),
             "deleted": .number(Double(edits.deletions.count))
         ]
         if !merged.isEmpty { result["merged"] = .array(merged.map { .string(fresh.short($0)) }) }
+        // 批量改到几句；改成空句的点名报出来（去标点、替换成空都可能把一句掏空），AI 自己决定删不删。
+        if !edits.replacements.isEmpty || edits.stripsPunctuation { result["rewritten"] = .number(Double(outcome.rewritten.count)) }
+        if !outcome.emptied.isEmpty {
+            result["emptied"] = .array(outcome.emptied.map { .string(fresh.short($0)) })
+            result["emptied_note"] = "These lines have no text left; delete them or give them text."
+        }
         if style != nil {
             result["style"] = AISubtitleStyleChange.describe(
                 project.state, appWide: EncodeQueue.burnIn.burnInStyle, canvas: VideoEditCompositionBuilder.renderSize(for: project.state)

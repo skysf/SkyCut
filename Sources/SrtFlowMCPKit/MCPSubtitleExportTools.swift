@@ -133,11 +133,19 @@ public enum MCPSubtitleExportTools {
             "end": MCPSchema.number("Timeline seconds.", minimum: 0),
             "text": MCPSchema.string("Text of the new line.")
         ], required: ["start", "end", "text"])
+        let replacement = MCPSchema.object([
+            "find": MCPSchema.string("Text to find (case-sensitive); with regex=true an ICU regular expression."),
+            "with": MCPSchema.string("Replacement; an empty string removes the match. With regex, a template: $1 inserts the first group."),
+            "regex": MCPSchema.boolean("find is a regular expression (default false)."),
+            "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"])
+        ], required: ["find", "with"])
         return MCPToolDefinition(
             .editSubtitles, title: "Edit subtitles",
             description: """
-            Change subtitle lines as one undoable step: edit text or times by id, add lines, delete lines, or merge lines \
-            (merge keeps the word times; retyping loses them). Creates the subtitle track if the project has none. style \
+            Change subtitle lines as one undoable step: edit text or times by id, add lines, delete lines, merge lines \
+            (merge keeps the word times; retyping loses them), replace text on every line (replace) or strip punctuation from \
+            every line (strip_punctuation, what generate_subtitles does); bulk edits keep the word times of unchanged words. \
+            Creates the subtitle track if the project has none. style \
             sets how this project's subtitles look (the user's Burn In Subtitles page keeps its own; own_style in the result \
             turns true once the project has its own look; the word highlight always belongs to the project). Set it before \
             generate_subtitles or add_voiceover subtitles=true: lines are cut to fit that size. highlight only lights lines \
@@ -150,6 +158,12 @@ public enum MCPSubtitleExportTools {
                 "merge": MCPSchema.array(
                     of: MCPSchema.array(of: MCPSchema.string("Line id."), "Two or more lines on one track, in order."),
                     "Groups of lines to join into one (text, times and word times combined)."
+                ),
+                "replace": MCPSchema.array(of: replacement, "Find and replace on every line of a track; runs after changes, add and merge, before delete."),
+                "strip_punctuation": MCPSchema.boolean(
+                    "Remove pause punctuation from every line, the way SrtFlow writes generated subtitles: commas, periods, semicolons, "
+                        + "colons (also Chinese ones) become a space mid-line and vanish at the end; ? ! quotes, numbers and abbreviations stay. "
+                        + "Runs after replace. The result lists lines left empty."
                 ),
                 "style": subtitleStyle
             ])

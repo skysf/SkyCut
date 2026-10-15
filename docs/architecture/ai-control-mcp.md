@@ -756,6 +756,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     语言标签按文字判 → 记的 → 省略且文字先于记录、从时间线读时藏起来的句子不算）、
     `checks/MCP/tool-result-wiring.sh`（写盘只经 writeValidated、读去掉藏起来句子的那份、起名经 AISubtitleFiles、
     标签经 SubtitleFileLanguage 且导出面板同一份）。
+50. **批量改字幕文字（`edit_subtitles` 的 `replace` / `strip_punctuation`，2026-10-15 用户转来的反馈：去标点只能一句一句改字，改了 37 + 6 行）**：
+    - `replace`：几条查找替换（`AISubtitleReplacement`，纯值），每条 find / with / regex / track。字面匹配区分大小写；regex=true 时 find 是 ICU 正则、
+      with 是模板（`$1`）。find 不许空、**with 必填**（漏写就把匹配的删掉了，所以不默认成空）、坏正则当场报错且一句都不改。套在那条轨此刻的每一句上。
+    - `strip_punctuation`：整轨去标点，用的是**生成字幕落字时那一份规则**（`SubtitlePunctuation.strip`，[生成的字幕长什么样](subtitle-generation-style.md)），
+      不另写一份；用户手打、导入的字平时不碰，只有 AI 点名时才去。
+    - **顺序**：改字 / 改时间 → 加句 → 合并 → replace → strip → 删句（同一次调用里新加的那句也去标点）。每一句都走 `SubtitleTrackEditing.setText`：
+      没改的字保住词的时间（`SubtitleCueWords.realigned`，逐词高亮不丢）。
+    - 结果里 `rewritten` 是批量改到几句、`emptied` 列出被掏空的句子（替换成空、去完标点什么都不剩），删不删 AI 定；改到的句子一并选中、播放头到最早那句。
+    守卫：`checks/MCP/SubtitleBulkChecks.swift`（字面 / 正则 / 限定轨、坏正则和漏 with 报错、去标点连新加的那句、词的时间保住、顺序、掏空的报出来）。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -799,7 +808,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 
 `scripts/check-mcp.sh`（CI 第 4 组）：真起小程序，两代客户端各喂一遍（握手、清单、discover、版本错误、
 工具调用转发、客户端名字、整数 id、App 没开）；AI 改时间线的规则；客户端配置的增删；文字 / 颜色参数、
-字放不放得下；字幕批量改；词表对账；打包脚本把小程序拷进 Helpers 并且先签它再签外层；**每个改动工具各是
+字放不放得下；字幕批量改（含 replace / strip_punctuation：字面 / 正则 / 限定轨、坏正则报错、去标点用生成那一份、顺序、词的时间保住、掏空的句子报出来）；词表对账；打包脚本把小程序拷进 Helpers 并且先签它再签外层；**每个改动工具各是
 一步撤销**（扫描路由的包装 + 用真的 UndoManager 验分组、验不会再抛异常）；窗口只在一轮开始时摆到前面（扫描）；
 **画面的放法**：铺满时窗的四个角正好落在画布四个角上（6 种素材比例 × 4 种画布 × 49 个焦点，按合同自己换算，
 不借被测代码）、裁切每边不超过 0.45、焦点落在画布正中、只改裁切不拉变形、参数冲突挡掉；去黑边的几种画面
