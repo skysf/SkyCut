@@ -79,8 +79,7 @@ enum TimelineLinkage {
         /// 素材和入点都按改之前的 `was`，只有时间线上的位置、长度、速度是现在的 —— 新文件的 0 秒不是原片的 0 秒，照新入点对账
         /// 会把压在上面的东西挪一个偏移。素材没换就是它自己。
         func rebased(onto was: Piece) -> Piece {
-            guard asset != was.asset else { return self }
-            return Piece(id: id, start: start, end: end, sourceStart: was.sourceStart, speed: speed, asset: was.asset)
+            self
         }
 
         var sourceEnd: Double { source(at: end) }
