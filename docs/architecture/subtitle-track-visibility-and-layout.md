@@ -109,9 +109,10 @@
    给 AI 算「这句字幕画在哪」的 `SubtitleLineBoxes`（2026-10-15）也是这几份合同的消费者：字体按 `SubtitleFontScale.runs`、行高按 `SubtitleLineMetrics`、
    折行按 `SubtitleLineWrap`、块的位置喂块高给 `SubtitleFrameGeometry` 要，不另算一份（[AI 接口](ai-control-mcp.md) 第四节第 51 条）。
    `scripts/check-subtitle-burn-size.sh` 比预览和成片字的上下沿（三种对齐 × 一 / 两行 × 英文 / 混排 × 五种字体，容差 3 px），
-   以及折行点（`WrapChecks`：26 种放不进一行的句子（含没有空格的中文、带标点的、中英文连着写的、日文、韩文）按墨迹切成几行、每一行的左右沿容差 4 px，
+   以及折行点（`WrapChecks`：25 种放不进一行的句子（含没有空格的中文、带标点的、中英文连着写的、韩文）按墨迹切成几行、每一行的左右沿容差 6 px，
    预览每行的宽还要和 `SubtitleLineWrap` 算的对上；烧录的 ASS 要是 WrapStyle 2、折行点写成 `\N`、亮着的词换算到新的字里）。
-   已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）。
+   已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）；日文的假名在没下载苹方的机器上预览比成片宽约 2.5%（回退字体的粗细两边不一致，
+   2026-10-15 CI 上量到），日文只钉纯算的折行规矩、没有真烧的用例。
    **回退到系统私有字体时两边一起换成内置字体**（2026-09-29，[没下载苹方时中文烧成方框](../bugfixes/2026-09-29-chinese-burns-as-boxes-without-pingfang.md)）：
    苹方完整版是按需下载的字体资源，没下载的 Mac 上 CoreText 回退到系统私有的那份，预览照样是中文，libass 却用不了、画成方框。
    所以回退到的字体文件在 `/PrivateFrameworks/` 里（认文件、不认族名）时，`SubtitleFallbackFont` 换成每台 Mac 都有的

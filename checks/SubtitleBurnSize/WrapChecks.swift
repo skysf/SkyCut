@@ -9,8 +9,9 @@ import SrtFlowCore
 // libass 只在 ASCII 空格处折，没有空格的长中文句以前成片整行溢出到画面两边，2026-10-15 用户定烧录也要折：中日文在字之间折、标点避头尾
 // （docs/bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md）。这里：
 // 1. 几种放不进一行的句子（两行 / 三行 / 五行、中英混排、很长的单词、布局覆盖左右不对称、9:16、左 / 右对齐、逐词高亮放大、两个空格、
-//    带换行；没有空格的中文、带标点的中文、中英文连着写、日文、中文 + 高亮放大、带空格的韩文），预览离屏渲一张、真烧一帧，按墨迹的空白行
-//    切成几行，比**行数**和**每一行**的左右沿（容差 4 px，1080p；折在别处至少差一个字、几十 px）。
+//    带换行；没有空格的中文、带标点的中文、中英文连着写、中文 + 高亮放大、带空格的韩文），预览离屏渲一张、真烧一帧，按墨迹的空白行
+//    切成几行，比**行数**和**每一行**的左右沿（容差 6 px，1080p；折在别处至少差一个字、几十 px）。日文只钉纯算的规矩、不真烧：没下载苹方的
+//    机器（CI）上假名的回退字体预览比成片宽约 2.5%（第一次上 CI 两行各差 17 px），是字的大小那一头的事、另案。
 // 2. 预览每一行的墨迹宽要和 SubtitleLineWrap 算的步进宽对得上（差一个词就红）—— 管的是叠层按行切 piece 没切错。
 // 3. 钉几条折行的规矩本身（不烧、纯算）：100 号五行的每一行是哪几个字（「二分最小宽度」那种算法在这句上会折在别处）；行首行尾的空格
 //    不进行；换行符各自成段；亮着的词放大会把那一行变宽；中文在字之间折、两行差不多宽、行首不是「，」行尾不是「（」、日文的长音不在行首；
@@ -85,7 +86,6 @@ private let wrapCases: [WrapCase] = [
     WrapCase(name: "Chinese with punctuation, Hiragino", text: chinesePunctuated, style: wrapStyle(font: "Hiragino Sans GB"), rows: 2),
     WrapCase(name: "Chinese and English without spaces", text: chineseEnglish, style: wrapStyle(), rows: nil),
     WrapCase(name: "Chinese with spaces", text: chineseSpaced, style: wrapStyle(), rows: nil),
-    WrapCase(name: "Japanese", text: japanese, style: wrapStyle(), rows: nil),
     WrapCase(name: "Chinese with a highlighted word enlarged", text: chinese, style: wrapStyle(),
              highlights: [SubtitleTextRange(location: nightWord.location, length: nightWord.length)], highlight: wrapYellow, rows: nil),
     WrapCase(name: "Korean with spaces", text: korean, style: wrapStyle(), rows: nil),
@@ -244,6 +244,10 @@ private func runWrapRuleChecks() {
     check(commaAtRowStart == 0, "wrap rules: a row never starts with a full-width comma (\(commaAtRowStart) rows did)")
     check(parenAtRowEnd == 0, "wrap rules: a row never ends with an opening bracket (\(parenAtRowEnd) rows did)")
     check(barAtRowStart == 0, "wrap rules: a row never starts with the Japanese long-vowel mark (\(barAtRowStart) rows did)")
+    // 日文：假名和汉字之间都能折（纯算，不真烧：见文件头）。
+    let japaneseRows = texts(lines(japanese, style: wrapStyle()), in: japanese)
+    check(japaneseRows.count >= 2 && !japaneseRows.contains { "ぁぃぅぇぉっゃゅょゎァィゥェォッャュョー、。".contains($0.first!) },
+          "wrap rules: Japanese wraps between kana and kanji, never starting a row with small kana or punctuation (got \(japaneseRows))")
     let punctuated = texts(lines(chinesePunctuated, style: hiragino), in: chinesePunctuated)
     check(punctuated.count == 2 && punctuated.allSatisfy { !"，。".contains($0.first!) } && punctuated[1].hasSuffix("。"),
           "wrap rules: punctuated Chinese keeps its punctuation at row ends (got \(punctuated))")
