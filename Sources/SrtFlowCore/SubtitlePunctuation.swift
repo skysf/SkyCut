@@ -12,7 +12,8 @@ import Foundation
 // 出处与取舍：docs/architecture/subtitle-generation-style.md。
 //
 // 不管什么：什么时候去 —— 只在生成（`SubtitleSegmenter`）和机器翻译落字（`SubtitleRetranslation`）的
-// 那一刻，用户手打、外挂导入的字一律不碰。断句要看标点，所以分段器先断句、切完才去。
+// 那一刻，用户手打、外挂导入的字一律不碰 —— 除非 AI 点名（edit_subtitles 的 strip_punctuation，2026-10-15）：整轨套一遍同一份规则。
+// 断句要看标点，所以分段器先断句、切完才去。
 
 public enum SubtitlePunctuation {
 
