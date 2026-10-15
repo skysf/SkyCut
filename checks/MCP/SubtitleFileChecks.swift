@@ -52,16 +52,13 @@ func runSubtitleFileChecks() {
                "the text wins over a stale record (the AI rewrote the track), like translate_subtitles")
     // 从时间线读：写进文件的那份句子（藏起来的不算）。只有藏起来的那句是中文时，原文轨按剩下的英文判。
     var state = TimelineState()
-    var original = SubtitleDocumentModel(format: .srt, cues: [])
+    var original = SubtitleDocumentModel(format: .srt)
     let hidden = SubtitleCue(index: 1, start: 0, end: 1, text: chinese[0])
     original.cues = [hidden] + english.enumerated().map { SubtitleCue(index: $0.offset + 2, start: Double($0.offset + 1), end: Double($0.offset + 2), text: $0.element) }
     state.subtitle = original
-    state.subtitleCompanion = SubtitleCompanion(
-        translation: SubtitleDocumentModel(format: .srt, cues: chinese.enumerated().map {
-            SubtitleCue(index: $0.offset + 1, start: Double($0.offset), end: Double($0.offset + 1), text: $0.element)
-        }),
-        hiddenCueIDs: [hidden.id]
-    )
+    var translation = SubtitleDocumentModel(format: .srt)
+    translation.cues = chinese.enumerated().map { SubtitleCue(index: $0.offset + 1, start: Double($0.offset), end: Double($0.offset + 1), text: $0.element) }
+    state.subtitleCompanion = SubtitleCompanion(translation: translation, hiddenCueIDs: [hidden.id])
     checkEqual(SubtitleFileLanguage.tags(in: state), SubtitleFileLanguage(source: "en", target: "zh-Hans"),
                "from the timeline: judged on the lines that go into the file, hidden ones left out, nothing recorded")
     let tagged = SubtitleFileLanguage.tags(in: state)
