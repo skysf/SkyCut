@@ -157,7 +157,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **从不覆盖**：导出、新建、另存撞名都加编号（`ExportFileName.unoccupied`），所以不问；AI 要替换旧文件就先用
      `manage_files` 把它删进废纸篓（会问）。
    会回 `needs_confirmation` 的只许这两处（`AIFileTools`、`AIWorkspace.confirmReading`），`scripts/check-mcp.sh` 扫描钉着。
-   `AIConfirmations` 发的令牌绑着具体那件事（`action` 字符串），一次有效、十分钟过期，换一件事拿它来不认。
+   `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
+   换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
+   **拒绝说原因**：结果里的 `confirm_token_refused` 分过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的，`valid_for_minutes` 写着有效期
+   （[案例](../bugfixes/2026-10-15-confirmation-token-refused-without-reason.md)：反馈说「过期太快」，其实是每问一次发一张新码、被拒又不说为什么）。
    时间线上的改动一律不问。
 7. **长任务回任务号**（客户端对一次调用大多只等一分钟）。结局在任务结束的**那一刻**记下（导出挂在
    `isExporting` 变回 false 上 —— `@Published` 在赋值前发，那时成品路径 / 错误已经写好；导出的结果带 `audio_loudness_lufs`、
@@ -813,7 +816,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 它自带的设置、重算输出位置跳过 AI 的条目、有用户没开始的条目就不排、不改页面上的设置、`folder` 只在一处读；什么时候问（扫描：会回
 `needs_confirmation` 的只有删文件和读别处的文件两处、点过头就记住那个文件夹、导出 / 新建 / 另存撞名走
 `ExportFileName.unoccupied`）、记住哪里（`ReadGrantChecks`：文件所在的文件夹，太大的只记文件，子文件夹算、名字相像的兄弟
-不算）、连接时写的放行配置（Claude Code 那条规则的增删不碰别的设置、坏文件不写；Codex 那一行只认 srtflow 那张表里的）、
+不算）、确认令牌（`ConfirmationChecks`：同一件事回同一张且续期、别的事不认也不消耗、一次有效、三十分钟过期、拒绝按原因说）、连接时写的放行配置（Claude Code 那条规则的增删不碰别的设置、坏文件不写；Codex 那一行只认 srtflow 那张表里的）、
 工具清单的总长度（9 万字符以内）；第 4 块：镜头切点的规则（硬切、摇镜头、动作里的硬切、几帧的转场、淡出淡入、闪光、
 太近的两刀、片尾片头的黑）、镜头按区间裁和翻页，跟拍（要不要跟、只跟人、人只在少数帧出现不跟、平滑与精简、换镜头处一帧之内
 跳过去、一个点就是固定的那扇窗、每个关键帧那一刻窗的两边正好落在画布两边、关键帧写在源秒上、铺满换掉位置 / 大小关键帧而
@@ -866,6 +869,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 
 ## 八、人工回归清单（发版前在真机上走一遍）
 
+- [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；
+      拿同一张码再删一次：结果的 `confirm_token_refused` 说这张用过了、给了新的一张。
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
 - [ ] 装上这一版、新开一个 Claude Code 会话（`claude -p` 就行，可以 `--strict-mcp-config --mcp-config` 只挂 srtflow），看它的 MCP 日志
       `~/Library/Caches/claude-cli-nodejs/<会话所在目录，/ 换成 ->/mcp-logs-srtflow/` 里最新的 .jsonl：服务器版本是这一版、**没有**

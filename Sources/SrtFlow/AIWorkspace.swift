@@ -11,7 +11,8 @@ import SrtFlowMCPKit
 // **只有删文件才问**（方案第 34 条，2026-09-28 用户拍板）：删进废纸篓先问；读点名文件夹以外的文件问一次，
 // 同意了就记住那个文件夹、以后不再问（AIReadGrants）；从不覆盖（撞名加编号），所以也不问；开着的工程没存过就先存下来再换，
 // 不问也不丢。时间线上的改动一律不问 —— 有 ⌘Z 和「撤销这一轮」兜底。问法是结果里回 needs_confirmation + 令牌，
-// AI 把问题转述给用户，用户同意之后带着令牌再调一次（令牌一次有效、十分钟过期）。
+// AI 把问题转述给用户，用户同意之后带着令牌再调一次（令牌的规矩 —— 绑着那件事、一次有效、三十分钟、同一件事回同一张、
+// 拒绝说原因 —— 在 AIConfirmations.swift）。
 
 @MainActor
 final class AIWorkspace {
@@ -57,7 +58,8 @@ final class AIWorkspace {
         let outside = Set(urls.map(\.standardizedFileURL).filter { !allowsReading($0, project: project) }.map(\.path)).sorted()
         guard !outside.isEmpty else { return nil }
         let action = "read:" + outside.joined(separator: "|")
-        if AIConfirmations.shared.consume(try args.string("confirm_token"), action: action) {
+        let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: action)
+        if redemption == .accepted {
             AIReadGrants.shared.remember(outside.map { URL(fileURLWithPath: $0) })
             return nil
         }
@@ -67,7 +69,7 @@ final class AIWorkspace {
         return AIConfirmations.shared.ask(
             "SrtFlow needs to \(verb) \(names), \(which) outside the folder you opened. Allow it? "
                 + "SrtFlow then remembers that folder and does not ask again for files in it.",
-            action: action
+            action: action, refused: redemption.refusal
         )
     }
 
@@ -111,35 +113,5 @@ final class AIWorkspace {
             case .recordings: return L10n("Screen Recordings")
             }
         }
-    }
-}
-
-/// 确认令牌：「用户在对话里点过头」的凭据。
-@MainActor
-final class AIConfirmations {
-    static let shared = AIConfirmations()
-
-    private var pending: [String: (action: String, expires: Date)] = [:]
-    private static let lifetime: TimeInterval = 600
-    private static let alphabet = Array("abcdefghjkmnpqrstuvwxyz23456789")
-
-    private init() {}
-
-    /// 发一张令牌。`action` 写清楚这张令牌放行的是哪一件事（「覆盖某个文件」），
-    /// 换了一件事拿它来不认。
-    func ask(_ question: String, action: String) -> AIToolResult {
-        pending = pending.filter { $0.value.expires > Date() }
-        let token = String((0..<6).map { _ in Self.alphabet.randomElement()! })
-        pending[token] = (action, Date().addingTimeInterval(Self.lifetime))
-        return .needsConfirmation(question: question, token: token)
-    }
-
-    /// 令牌对得上这件事就收下（一次有效）。
-    func consume(_ token: String?, action: String) -> Bool {
-        guard let token, let entry = pending[token], entry.action == action, entry.expires > Date() else {
-            return false
-        }
-        pending.removeValue(forKey: token)
-        return true
     }
 }

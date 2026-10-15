@@ -110,15 +110,20 @@ struct AIToolResult {
         AIToolResult(payload: payload, changedProject: changed)
     }
 
-    /// 要用户点头才能继续的事（覆盖文件、丢掉没存的工程、读工程以外的文件）。
-    /// AI 必须把问题转述给用户，用户同意之后带着令牌再调一次。
-    static func needsConfirmation(question: String, token: String) -> AIToolResult {
-        .ok([
+    /// 要用户点头才能继续的事（删文件进废纸篓、读点名文件夹以外的文件）。AI 必须把问题转述给用户，用户同意之后带着令牌
+    /// 再调一次。令牌有效多久写在 valid_for_minutes；这次带来的令牌为什么没收写在 confirm_token_refused（规矩在 AIConfirmations）。
+    static func needsConfirmation(question: String, token: String, validMinutes: Int, refused: String? = nil) -> AIToolResult {
+        var payload: [String: JSONValue] = [
             "status": "needs_confirmation",
             "question": .string(question),
             "confirm_token": .string(token),
-            "next_step": "Ask the user this question. Only if they agree, call the same tool again with the same arguments plus this confirm_token. Never guess or reuse a token."
-        ])
+            "valid_for_minutes": .number(Double(validMinutes)),
+            "next_step": .string("Ask the user this question. Only if they agree, call the same tool again with the same arguments plus this "
+                + "confirm_token. It is good for one call within valid_for_minutes; asking again before the user answers returns the "
+                + "same code. Never guess or reuse a token.")
+        ]
+        if let refused { payload["confirm_token_refused"] = .string(refused) }
+        return .ok(.object(payload))
     }
 
     /// MCP 的 CallToolResult：结果写成一段 JSON 文字（所有客户端都认文字），有图的话图跟在后面。
