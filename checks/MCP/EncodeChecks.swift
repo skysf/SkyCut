@@ -4,13 +4,26 @@ import SrtFlowMCPKit
 
 // 压缩 / 烧录 / 转字幕格式（AIEncodeOptions）：什么都不给就是页面上记住的那套；AI 给的只改那几项（预设、声音照旧）；
 // 三档画质在两种编码器上各是多少；fast 换编码器；分辨率、帧率上限；乱填报错。输出名 <名字><后缀>.<扩展名>：硬盘上有的、
-// 同一批前面用掉的都加编号。转字幕格式读出来的内容（SubtitleConverter.convertedContents，GBK 也对）。
-// 编法见 scripts/check-mcp.sh。
+// 同一批前面用掉的都加编号。转字幕格式读出来的内容（SubtitleConverter.convertedContents，GBK 也对）。三个工具和 export_subtitles
+// 都收 folder（放哪），说明里写着默认放哪。编法见 scripts/check-mcp.sh。
 
 func runEncodeChecks() {
     checkEncodeOverrides()
     checkEncodeOutputs()
+    checkOutputFolderParameter()
     checkSubtitleConversion()
+}
+
+/// 2026-10-15 用户转来的反馈：convert_subtitles 固定落在导出文件夹里，还得再调一次 manage_files 挪到位。四个写文件的工具
+/// 都收同名同义的 folder；读法在 AIEncodeTools.outputFolder 一处（scripts/check-mcp.sh 扫描钉着）。
+private func checkOutputFolderParameter() {
+    for name in [MCPToolName.compressVideos, .burnSubtitles, .convertSubtitles, .exportSubtitles] {
+        let folder = name.definition.inputSchema["properties"]?["folder"]?["description"]?.stringValue
+        check(folder?.contains("Default") == true, "\(name.rawValue) takes folder and its description says where files go by default")
+    }
+    for name in [MCPToolName.compressVideos, .burnSubtitles, .convertSubtitles] {
+        check(name.definition.description.contains("or in folder"), "\(name.rawValue)'s description says the output can go in folder")
+    }
 }
 
 private func checkEncodeOverrides() {

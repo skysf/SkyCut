@@ -213,7 +213,14 @@ if grep -nE 'queue\.(settings|burnInStyle|outputDirectory|attachSoftSubtitleTrac
   echo "✗ ${ENCODE_TOOLS} 改了页面上记住的设置：AI 的参数只许用于它自己那几条" >&2
   exit 1
 fi
-echo "   ✓ 自带设置先用、输出位置不被重算、有用户没开始的条目就不排、不改页面上的设置"
+# 放哪：三个工具都经 outputFolder(args, project) 一处读 folder（没给就是 <起点>/SrtFlow/导出），别各自再算一份
+# （2026-10-15 用户转来的反馈：convert_subtitles 固定落在导出文件夹里，还得再调一次 manage_files 挪到位）。
+if [ "$(grep -c 'let folder = try outputFolder(args, project)' "${ENCODE_TOOLS}" || true)" -ne 2 ] \
+   || [ "$(grep -c 'try args.string("folder")' "${ENCODE_TOOLS}" || true)" -ne 1 ]; then
+  echo "✗ ${ENCODE_TOOLS} 的输出位置没经 outputFolder 一处读 folder：AI 给的 folder 会被忽略，或者三个工具各算一份" >&2
+  exit 1
+fi
+echo "   ✓ 自带设置先用、输出位置不被重算、有用户没开始的条目就不排、不改页面上的设置、folder 只在一处读"
 
 echo "==> 跟拍跟着字：focus=text 也跟，跟的目标按同一个次序认字"
 # 2026-10-14 用户拍板（docs/architecture/ai-control-mcp.md 第四节第 31 条）；纯值在 checks/MCP/FollowChecks.swift。

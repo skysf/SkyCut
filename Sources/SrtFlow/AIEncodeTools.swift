@@ -6,8 +6,8 @@ import SrtFlowMCPKit
 //
 // 管什么：compress_videos / burn_subtitles 把文件排进 App 里现成的压缩 / 烧录队列（用户在那一页看得见、能取消），
 // 以用户在那一页记住的设置为底，AI 给的参数只用于这一批（`EncodeItem.ownSettings`），回任务号；
-// convert_subtitles 当场做完。做出来的文件都放 `<起点>/SrtFlow/导出`，撞名加编号、从不覆盖，所以不用问
-// （docs/architecture/ai-control-mcp.md 第四节第 10、24 条）。
+// convert_subtitles 当场做完。做出来的文件默认放 `<起点>/SrtFlow/导出`，AI 给了 `folder` 就放那儿（`outputFolder`，同 export_subtitles），
+// 撞名加编号、从不覆盖，所以不用问（docs/architecture/ai-control-mcp.md 第四节第 10、24 条）。
 // 不管什么：编码怎么跑（EncodeQueue）、参数怎么换算、输出怎么起名（AIEncodeOptions，纯值）、字幕怎么转（SubtitleConverter）。
 //
 // **不替用户开跑**：队列停着、里面有用户自己排了还没开始的，就不排 —— `start()` 会把等着的一起跑掉。
@@ -87,8 +87,7 @@ enum AIEncodeTools {
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "read", args: args, project: project) {
             return ask
         }
-        let folder = AIWorkspace.shared.outputFolder(.exports, project: project)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try outputFolder(args, project)
         let outputs = AIEncodeOptions.outputs(for: urls, in: folder, suffix: "", pathExtension: target.fileExtension) {
             FileManager.default.fileExists(atPath: $0.path)
         }
@@ -131,8 +130,7 @@ enum AIEncodeTools {
             throw AIToolError("Already in SrtFlow's \(page) queue: \(names). Wait for it with get_job or cancel it first.")
         }
         let settings = AIEncodeOptions.apply(try AIEncodeOptions.parse(args), to: queue.settings)
-        let folder = AIWorkspace.shared.outputFolder(.exports, project: project)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        let folder = try outputFolder(args, project)
         let outputs = AIEncodeOptions.outputs(
             for: entries.map(\.url), in: folder, suffix: queue.outputSuffix, pathExtension: "mp4"
         ) { url in
@@ -218,6 +216,16 @@ enum AIEncodeTools {
     }
 
     // MARK: 参数
+
+    /// 做出来的文件放哪：AI 给了 `folder`（绝对路径，或相对打开的文件夹；和 export_subtitles 同名同义）就放那儿，没给就是
+    /// `<起点>/SrtFlow/导出`（第 10 条）。不存在就建；撞名照样加编号、从不覆盖，所以不问。三个工具都只经这里读
+    /// （2026-10-15 用户转来的反馈：转出来的字幕文件固定落在导出文件夹里，还得再调一次 manage_files 挪进成品文件夹）。
+    private static func outputFolder(_ args: AIToolArguments, _ project: VideoEditProject) throws -> URL {
+        let folder = try args.string("folder").map { AIWorkspace.shared.resolve($0) }
+            ?? AIWorkspace.shared.outputFolder(.exports, project: project)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        return folder
+    }
 
     private static func files(
         _ args: AIToolArguments, limit: Int, kind: String, accepts: (URL) -> Bool
