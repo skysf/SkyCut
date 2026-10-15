@@ -291,6 +291,9 @@ Finder**。App 只负责「快速回到最近那几条」。
 2. **换源 = 源时间整体平移**（`ClipSourceSwap.apply`）：入点减去偏移，关键帧、标记、音量曲线一起挪，时间线上的位置和长度不动。
    新文件盖不住这段用到的范围就不换（差一帧以内算盖住：FLUX 会多一帧或少一帧，零头由合成 / 导出各自夹到素材末尾）。
    换源之后段上的 `remoteKey` 清掉、记进记录（留着的话重链接会按键把 upscale 文件换回库里的原片）。
+   压在这段上的字幕、文字、音效也不动：联动把同 id 换了素材的段按改之前的素材和入点记账（`TimelineLinkage.Piece.rebased`，
+   [联动](timeline-linkage.md) 规矩 1；[案例](../bugfixes/2026-10-15-linkage-follows-source-shift-after-swap.md)：以前按新入点对账，
+   全被挪了一个余料的长度）。edit_clip 换文件（`ClipFileReplacement`）同一条。
 3. **再次 upscale 仍按原片算**：`sourceOffset` 永远相对原片；记录里的原片只记第一次的。
 4. **换回原片**（`ClipSourceSwap.revert`）逐字段还原。原片挪了按存盘时配的书签找（`VideoEditProject.upscaleOriginalURL`），找不到就不换、菜单灰掉。
 5. **原片配书签但不进 `mediaURLs`**：存盘的素材表是 `mediaURLs + upscaleOriginalURLs`（`VideoEditMediaReferences.swift`）；
