@@ -44,7 +44,9 @@
 - 反向验证（不合并的草稿 PR #206，CI，两轮）：第一轮把 AI 的工具和面板都退回只读记录、再把函数写成先信记录 —— 第 4 组 check-mcp 的接线扫描红
   （「AISubtitleFileExport.swift 的字幕文件名不经 SubtitleFileLanguage 取语言标签」，扫描在编译之前、先红先停）；第二轮只留「先信记录」——
   编出来的自检红在「the text wins over a stale record」那条（2216 项里 1 项：中文文字 + 记的 en 给出了 en / zh-Hans）。两个守卫都见过红。
-- 测试版复测：待 0.18.31 装上后按本案例的症状步骤重走（见文末）。
+- 测试版 0.18.31 复测（扮成 AI 客户端，L30 全片生成 58 句 → `cut_speech keep` 留 50.30–56.70 → `edit_subtitles` 手写两句中文译文 →
+  `export_subtitles name=promo format=vtt`）：得到 `promo.en.vtt` + `promo.zh-Hans.vtt`（以前后者是 `promo.vtt`），内容对；`get_timeline` 里译文轨照旧
+  没有 `language`（判出来的不写回工程）。再 `add_clips` 导入一个英文 .srt 当原文轨、`export_subtitles name=notes`：得到 `notes.en.srt`（以前是 `notes.srt`）。
 
 ## 教训 / 防回归
 

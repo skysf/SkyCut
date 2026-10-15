@@ -43,7 +43,10 @@
 - 反向验证（不合并的草稿 PR #210，CI）：只把 `gone` 改回只看 `deletesContent`、自检全留 —— 第 2 组 check-timeline-snap 红 9 条：
   被裁掉那 2 秒上的字幕还在 0 秒（1f）、配音裁掉大半的那句没删且报 0（1g）、改入点后两句留在原地且 `deletedCues` 报 0、
   L30 的第一句留在 [0,1.777)（1h）—— 正是用户看到的样子。
-- 测试版复测：待 0.18.31 装上后按症状里的步骤重走（见文末）。
+- 测试版 0.18.31 复测（扮成 AI 客户端，联动开，L30 全片 + 生成的 58 句）：`edit_clip source_in=1.0 ripple=true` → 第一句「Congratulations on finishing
+  the course」删掉、下一句到 [0.860, 2.157]、前几句互不重叠，结果 `linkage: {moved: 57, deleted: 1, deleted_subtitles: 1}`、没有 `left_subtitles`；
+  `undo` 一步整个回来；`source_in=0.5` → 第一句收短到 [0, 1.277]、其余前移 0.5、报 `shortened_subtitles`。`cut_speech keep` 只留一段时报
+  `deleted_subtitles: 54`。
 
 ## 教训 / 防回归
 
