@@ -31,10 +31,10 @@ enum AISubtitleFileExport {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         // 标签按每条轨现在的文字判、判不出来才用记的（SubtitleFileLanguage）：手写 / 导入的轨工程里没记语言，只读记录就导出成
         // 不带标签的 promo.vtt，播放器当成视频的默认字幕（2026-10-15）。
-        let companion = state.subtitleCompanion
+        let languages = SubtitleFileLanguage.tags(in: state)
         let targets = AISubtitleFiles.targets(
             tracks, stem: stem, folder: folder, format: format,
-            sourceLanguage: companion?.sourceLanguage, targetLanguage: companion?.targetLanguage
+            sourceLanguage: languages.source, targetLanguage: languages.target
         ) { FileManager.default.fileExists(atPath: $0.path) }
         var files: [JSONValue] = []
         for target in targets {
