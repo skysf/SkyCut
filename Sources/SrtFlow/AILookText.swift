@@ -7,8 +7,8 @@ import SrtFlowMCPKit
 // 管什么：一个视频文件（或时间线上一段用到的那一截）每隔约 2 秒认一帧字（AIVision 的 accurate，带框），最多
 // `maxFrames` 帧（长的就摊开），交给 AITextRegions 叠起来统计：烧进去的字幕带、固定的字（水印、台标）、满屏的字。
 // 方案第 55 条（2026-09-28 用户转来的 AI 反馈：look 只回字不回位置，只好一帧帧抽出来猜）。只回文字，不拼图 ——
-// 要看哪一帧照常调 look。
-// 不管什么：怎么统计（AITextRegions）、看哪个（AILookTarget）。
+// 要看哪一帧照常调 look。看的是时间线上的一段时，再对一遍这一段期间显示的工程字幕撞没撞上认出来的字（AISubtitleOverlaps）。
+// 不管什么：怎么统计（AITextRegions）、看哪个（AILookTarget）、字幕的框怎么算（AISubtitleBoxes）。
 //
 // 只读。点名文件夹以外的文件照规矩问一次。
 
@@ -43,7 +43,14 @@ enum AILookText {
         var payload = AITextRegions.json(report, timeline: timeline)
         // 看的是时间线上的一段：再给出盖住它的 set_shape 参数（源画面上的框换成画布上的；方案第 56 条）。
         if let clip = target.clip {
-            AICoverBox.annotate(&payload, report: report, clip: clip, canvas: VideoEditCompositionBuilder.renderSize(for: project.state), timeline: timeline)
+            let canvas = VideoEditCompositionBuilder.renderSize(for: project.state)
+            AICoverBox.annotate(&payload, report: report, clip: clip, canvas: canvas, timeline: timeline)
+            // 这一段期间显示的工程字幕，哪几句画在认出来的字上面（2026-10-15 用户转来的反馈：三行字幕碰到左下角的台标）。
+            AISubtitleOverlaps.annotate(
+                &payload, report: report, clip: clip, state: project.state,
+                style: project.state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle), canvas: canvas,
+                ids: AIShortIDs(state: project.state)
+            )
         }
         payload["looked_at"] = .string(target.label(project))
         payload["scanned_frames"] = .number(Double(scanned.count))

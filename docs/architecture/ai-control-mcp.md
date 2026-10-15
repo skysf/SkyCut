@@ -765,6 +765,20 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
       没改的字保住词的时间（`SubtitleCueWords.realigned`，逐词高亮不丢）。
     - 结果里 `rewritten` 是批量改到几句、`emptied` 列出被掏空的句子（替换成空、去完标点什么都不剩），删不删 AI 定；改到的句子一并选中、播放头到最早那句。
     守卫：`checks/MCP/SubtitleBulkChecks.swift`（字面 / 正则 / 限定轨、坏正则和漏 with 报错、去标点连新加的那句、词的时间保住、顺序、掏空的报出来）。
+51. **每句字幕在画布上占哪一块、撞没撞上水印（`get_subtitles` 的 `box` / `lines`，`look text_scan` 的 `subtitle_overlaps`，2026-10-15 用户转来的反馈：
+    三行字幕碰到左下角的台标，AI 只能一帧一帧 look 才发现）**：text_scan 早就认得出固定的字，缺的是另一半 —— 工程字幕每一句画在哪。
+    - `SubtitleLineBoxes`（纯值，Core Text）：一句字按此刻的样式画出来占哪一块、折成几行。字体和大小按 `SubtitleFontScale.runs`（每一截实际画它的字体、
+      libass 的比例），一行的高按 `SubtitleLineMetrics`（= 字号），块的上下沿和左右边距只问 `SubtitleFrameGeometry`（拖框那一份换算，把算出来的块高喂它，
+      不算第二遍），折行按 libass 的 WrapStyle 0（最少的行数、再摊匀：Core Text 的断行点 + 二分「还装得进这么多行的最小宽度」）；描边 / 底框 / 投影算进墨迹。
+      坐标先在 1080 高的基准画布上算，再换成画布的比例（左上原点）。是近似值：和预览 / 成片的差主要在折行点上。
+    - `AISubtitleBoxes`：从画面上排好的几块（`subtitleScreenBlocks`，预览和烧录同一份）算每一句的框，按这句的中点那一刻整块的样子；叠在一起的两条轨
+      原文在上、译文在下，各占整块里属于自己的那一截；藏起来的句子、关着眼睛的轨没有框。
+    - `get_subtitles` 每一句带 `box`（`[x, y, width, height]`，画布的比例）和折行时的 `lines`，外加 `box_note`；`look text_scan` 看时间线上的一段时
+      （`AISubtitleOverlaps`）报 `subtitles_checked`、`subtitle_overlaps`（画在固定的字 / 旧字幕带上的句子：id、轨、字、框、撞上了什么；相交的宽高都超过
+      画面 0.5% 才算，最多 40 句）和一句提示（改短 / 重切、收窄 `style.max_width`、挪位置、或者 `set_shape` 盖住）。
+    - **不自动重新断句**（用户批的建议里「能自动重新断行就更好了」）：收窄 max_width 或挪位置就能避开，重新断句要动生成那一套，先不做。
+    守卫：`checks/MCP/SubtitleBoxChecks.swift`（一行的位置和高按样式、字多就宽、太长就折、中文也折、max_width 小了折得早、底框的内边距、拖框的布局、
+    竖屏、文字里的换行；叠在一起 / 分开摆 / 藏起来；撞上 / 不撞 / 不在这段时间里 / 擦过不算 / 结果里的字段 / 旧字幕带也算）。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -808,7 +822,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 
 `scripts/check-mcp.sh`（CI 第 4 组）：真起小程序，两代客户端各喂一遍（握手、清单、discover、版本错误、
 工具调用转发、客户端名字、整数 id、App 没开）；AI 改时间线的规则；客户端配置的增删；文字 / 颜色参数、
-字放不放得下；字幕批量改（含 replace / strip_punctuation：字面 / 正则 / 限定轨、坏正则报错、去标点用生成那一份、顺序、词的时间保住、掏空的句子报出来）；词表对账；打包脚本把小程序拷进 Helpers 并且先签它再签外层；**每个改动工具各是
+字放不放得下；字幕批量改（含 replace / strip_punctuation：字面 / 正则 / 限定轨、坏正则报错、去标点用生成那一份、顺序、词的时间保住、掏空的句子报出来）；每句字幕的框和撞水印（`SubtitleBoxChecks`：位置 / 高 / 折行 / 叠在一起 / 撞上报出来）；词表对账；打包脚本把小程序拷进 Helpers 并且先签它再签外层；**每个改动工具各是
 一步撤销**（扫描路由的包装 + 用真的 UndoManager 验分组、验不会再抛异常）；窗口只在一轮开始时摆到前面（扫描）；
 **画面的放法**：铺满时窗的四个角正好落在画布四个角上（6 种素材比例 × 4 种画布 × 49 个焦点，按合同自己换算，
 不借被测代码）、裁切每边不超过 0.45、焦点落在画布正中、只改裁切不拉变形、参数冲突挡掉；去黑边的几种画面
@@ -878,6 +892,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 
 ## 八、人工回归清单（发版前在真机上走一遍）
 
+- [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
+      `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；
       拿同一张码再删一次：结果的 `confirm_token_refused` 说这张用过了、给了新的一张。
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。

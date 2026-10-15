@@ -66,7 +66,8 @@ public enum MCPSenseTools {
             middle frame shows, one thumbnail per shot, 24 per call (pass next_from as from for more). A long video is \
             scanned once: the first call may return a job id; wait with get_job, then call look again. text_scan=true with \
             file (a video) or clip_id reads the words in a frame every 2 seconds and reports text that stays: a burned-in \
-            subtitle band, watermarks, and slides or screens full of text, with where they are.
+            subtitle band, watermarks, and slides or screens full of text, with where they are; with clip_id it also lists the \
+            project's subtitle lines that would be drawn over that text (subtitle_overlaps).
             """,
             input: MCPSchema.object([
                 "time": MCPSchema.number("One moment, seconds (timeline, or in the file with file).", minimum: 0),

@@ -93,6 +93,8 @@
    `SubtitleLineMetrics` 按这句字用到的每个字体算出差多少，`BurnInSubtitleOverlay` 照着补：**一行一个 `Text` 放进 VStack**
    （SwiftUI 的 `.lineSpacing` 不认负数，宋体要把行距收紧；VStack 的间距正负都认），整块按对齐（底 / 中 / 顶）`.offset(y:)`
    往下挪 —— **只动画面、不动布局框**，拖框（`SubtitleFrameGeometry`）按边距和量出来的块高算，不看这一挪。换行不是字，不进行框。
+   给 AI 算「这句字幕画在哪」的 `SubtitleLineBoxes`（2026-10-15）也是这几份合同的消费者：字体按 `SubtitleFontScale.runs`、行高按 `SubtitleLineMetrics`、
+   块的位置喂块高给 `SubtitleFrameGeometry` 要，不另算一份（[AI 接口](ai-control-mcp.md) 第四节第 51 条）。
    `scripts/check-subtitle-burn-size.sh` 比预览和成片字的上下沿（三种对齐 × 一 / 两行 × 英文 / 混排 × 五种字体，容差 3 px）。
    已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）；一行太长自己折出来的行只补正的行距。
    **回退到系统私有字体时两边一起换成内置字体**（2026-09-29，[没下载苹方时中文烧成方框](../bugfixes/2026-09-29-chinese-burns-as-boxes-without-pingfang.md)）：

@@ -44,8 +44,10 @@ public enum MCPSubtitleExportTools {
                 .getSubtitles, title: "Read subtitles",
                 description: """
                 Subtitle lines with ids, start and end on the timeline and text, from the original track, the translated track, \
-                or both; optionally only inside a time range. Also the style and how many lines know their word times (for \
-                highlight).
+                or both; optionally only inside a time range. Each shown line also has box (where it is drawn on the canvas with \
+                the current style, [x, y, width, height] as fractions from the top left) and lines when it wraps: use them to keep \
+                subtitles clear of watermarks or to pick style.max_width. Also the style and how many lines know their word times \
+                (for highlight).
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"]),
