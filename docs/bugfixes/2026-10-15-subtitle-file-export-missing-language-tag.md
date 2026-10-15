@@ -41,7 +41,9 @@
   英文判，起出来的名字是 `Talk.en.vtt` + `Talk.zh-Hans.vtt`（以前是 `Talk.vtt` + `Talk.translation.vtt`）。
 - `checks/MCP/tool-result-wiring.sh`：AI 的工具和导出面板都经 `SubtitleFileLanguage.tags(`、把 `languages.source` / `target` 交给
   起名，不再直接传 companion 记的语言。
-- 反向验证（不合并的草稿 PR，CI）：见文末「反向验证」。
+- 反向验证（不合并的草稿 PR #206，CI，两轮）：第一轮把 AI 的工具和面板都退回只读记录、再把函数写成先信记录 —— 第 4 组 check-mcp 的接线扫描红
+  （「AISubtitleFileExport.swift 的字幕文件名不经 SubtitleFileLanguage 取语言标签」，扫描在编译之前、先红先停）；第二轮只留「先信记录」——
+  编出来的自检红在「the text wins over a stale record」那条（2216 项里 1 项：中文文字 + 记的 en 给出了 en / zh-Hans）。两个守卫都见过红。
 - 测试版复测：待 0.18.31 装上后按本案例的症状步骤重走（见文末）。
 
 ## 教训 / 防回归
