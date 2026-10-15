@@ -73,4 +73,16 @@ if [ "$(grep -c 'SubtitleExportPlanner.writeValidated(document, format: format, 
   echo "✗ ${EXPORT_SUBS} 不经 SubtitleExportPlanner.writeValidated 写、不读去掉藏起来句子的那份、或者不经 AISubtitleFiles 起名（会覆盖已有文件）" >&2
   exit 1
 fi
-echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准；cut_speech 的切口先看停顿；export_subtitles 写盘不覆盖"
+# 文件名里的语言标签按每条轨现在的文字判、判不出来才用记的（SubtitleFileLanguage），AI 的工具和导出面板「高级」同一份：只读记录的话，
+# 手写 / 导入的轨导出成不带标签的 promo.vtt，播放器当成视频的默认字幕（docs/bugfixes/2026-10-15-subtitle-file-export-missing-language-tag.md）。
+PANEL_SUBS="Sources/SrtFlow/SubtitleGen/SubtitleExportSection.swift"
+for file in "${EXPORT_SUBS}" "${PANEL_SUBS}"; do
+  if [ "$(grep -c 'SubtitleFileLanguage.tags(' "${file}" || true)" -lt 1 ] \
+     || [ "$(grep -c 'sourceLanguage: languages.source' "${file}" || true)" -ne 1 ] \
+     || [ "$(grep -c 'targetLanguage: languages.target' "${file}" || true)" -ne 1 ] \
+     || [ "$(grep -c 'Language: companion' "${file}" || true)" -ne 0 ]; then
+    echo "✗ ${file} 的字幕文件名不经 SubtitleFileLanguage 取语言标签（没记语言的轨会导出成不带标签的文件，播放器当成默认字幕）" >&2
+    exit 1
+  fi
+done
+echo "   ✓ 转场报每条缝；复制按 add_clips 的名字认轨；读不出画面说为什么；字体读别名；去黑边按读数合起来；配音字幕不按逗号拆；Kokoro 语速按时长对准；cut_speech 的切口先看停顿；export_subtitles 写盘不覆盖、标签按文字判"

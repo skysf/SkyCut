@@ -5,7 +5,8 @@ import SrtFlowMCPKit
 // MARK: - 工具：export_subtitles（工程的字幕写成 .srt / .vtt 文件）
 //
 // 管什么：导出面板「高级」里「导出字幕文件」的 AI 版（2026-10-15，用户转来的反馈：AI 没有导出字幕文件的路；用户定做独立工具、
-// 第一版不做 ASS）：原文 / 译文各写一份，名字和撞名见 `AISubtitleFiles`；默认放 export_video 的那个文件夹、名字默认工程名
+// 第一版不做 ASS）：原文 / 译文各写一份，名字和撞名见 `AISubtitleFiles`、语言标签见 `SubtitleFileLanguage`（按文字判 → 记的 → 省略）；
+// 默认放 export_video 的那个文件夹、名字默认工程名
 // （同 export_video），给了 name 就用它 —— 传导出的视频的名字，字幕文件就和视频配成一对。写盘走界面那一条
 // （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验 → 原子替换），藏起来的句子不写（`subtitleDocument(for:)`，
 // 和预览、烧录、界面导出同一份）。不改工程：不是一步撤销、不摆窗口。
@@ -28,10 +29,12 @@ enum AISubtitleFileExport {
         let folder = try args.string("folder").map { AIWorkspace.shared.resolve($0) }
             ?? AIWorkspace.shared.outputFolder(.exports, project: project)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let companion = state.subtitleCompanion
+        // 标签按每条轨现在的文字判、判不出来才用记的（SubtitleFileLanguage）：手写 / 导入的轨工程里没记语言，只读记录就导出成
+        // 不带标签的 promo.vtt，播放器当成视频的默认字幕（2026-10-15）。
+        let languages = SubtitleFileLanguage.tags(in: state)
         let targets = AISubtitleFiles.targets(
             tracks, stem: stem, folder: folder, format: format,
-            sourceLanguage: companion?.sourceLanguage, targetLanguage: companion?.targetLanguage
+            sourceLanguage: languages.source, targetLanguage: languages.target
         ) { FileManager.default.fileExists(atPath: $0.path) }
         var files: [JSONValue] = []
         for target in targets {

@@ -97,9 +97,11 @@ struct SubtitleBurnInToggle: View {
 /// 独立字幕文件（导出面板「高级」里）。不依赖视频导出，可以单独写。
 ///
 /// 写进面板上的「导出至」，文件名跟着标题走（`<标题>.<lang>.srt`），和视频同名
-/// 放在一起，IINA / VLC 这类播放器会自动挂上。**撞名和视频同一条规则：先提示、
-/// 再确认替换**（以前是追加 -2/-3，重导几次就堆出一串，也和视频配不上对）。
-/// 约束见 docs/architecture/export-settings.md。
+/// 放在一起，IINA / VLC 这类播放器会自动挂上。`<lang>` 按每条轨现在的文字判、判不出来
+/// 才用工程记的（`SubtitleFileLanguage`，和 AI 的 export_subtitles 同一份）：手写、导入的轨
+/// 工程里没记语言，只读记录就写成不带标签的 `<标题>.srt`，播放器当成默认字幕（2026-10-15）。
+/// **撞名和视频同一条规则：先提示、再确认替换**（以前是追加 -2/-3，重导几次就堆出一串，
+/// 也和视频配不上对）。约束见 docs/architecture/export-settings.md。
 struct SubtitleFilesExport: View {
     @Binding var options: SubtitleExportOptions
     var exportState: TimelineState
@@ -110,6 +112,8 @@ struct SubtitleFilesExport: View {
     @State private var writtenFiles: [URL] = []
     @State private var writeError: String?
     @State private var confirmsReplace = false
+    /// 两条轨的语言标签。语言识别不在 body 里跑：句子或记录变了才重判（`onChange`）。
+    @State private var languages = SubtitleFileLanguage()
 
     private var hasTranslation: Bool {
         exportState.subtitleCompanion?.translation != nil
@@ -117,14 +121,13 @@ struct SubtitleFilesExport: View {
 
     /// 勾上的每一份要写到哪。没有对应文档的（比如还没翻译）跳过。
     private var targets: [(item: SubtitleExportOptions.FileItem, url: URL)] {
-        let companion = exportState.subtitleCompanion
-        return options.files.sorted { $0.id < $1.id }.compactMap { item in
+        options.files.sorted { $0.id < $1.id }.compactMap { item in
             if item.track == .translation, !hasTranslation { return nil }
             let name = SubtitleExportPlanner.fileName(
                 base: stem,
                 choice: item.track,
-                sourceLanguage: companion?.sourceLanguage,
-                targetLanguage: companion?.targetLanguage,
+                sourceLanguage: languages.source,
+                targetLanguage: languages.target,
                 format: item.format
             )
             return (item, folder.appendingPathComponent(name))
@@ -156,6 +159,10 @@ struct SubtitleFilesExport: View {
                         }
                     }
                 }
+            }
+            // 标签按写进文件的那份句子判（SubtitleFileLanguage）；只在句子 / 记录变了时重判，不在 body 里跑语言识别。
+            .onChange(of: SubtitleFileLanguage.Inputs(exportState), initial: true) { _, inputs in
+                languages = SubtitleFileLanguage.tags(inputs)
             }
             Text("Saved into the export folder above, named after the title.")
                 .font(.caption)
