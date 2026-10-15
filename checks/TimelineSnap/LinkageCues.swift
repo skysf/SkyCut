@@ -5,7 +5,9 @@ import SrtFlowCore
 //
 // 用户转来的反馈：AI 用 cut_speech 只留几句剪 30 秒版，剪掉的两句字幕只因为尾巴蹭进保留段几帧就整句留了下来；之后 edit_clip 改入点
 //（ripple），有一句字幕的开头跑到了片段开始之前。以前字幕整句平移、时长不变；现在两头各自换算（剪掉的收掉、变速跟着伸缩、词的时间一起换），
-// 说话的那几秒剩不到一半就删（真删）或留在原地、报出来（裁切）；按说话的那几秒算，不按显示时间（删停顿剪掉的正是「说完多停的半秒」）。
+// 说话的那几秒剩不到一半就删 —— 真删删，裁切 / 变速让它不在画面里了也删（2026-10-15 用户拍板，以前裁切时留在原地、和前移过来的下一句叠在一起，
+// docs/bugfixes/2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md）；只有底下的段整个没了又不是真删才留在原地、报出来。
+// 按说话的那几秒算，不按显示时间（删停顿剪掉的正是「说完多停的半秒」）。
 // 案例：docs/bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md。编法见 scripts/check-timeline-snap.sh。
 
 private let talkFile = URL(fileURLWithPath: "/tmp/srtflow-snap-check/talk.mp4")
@@ -142,7 +144,7 @@ private func checkShortenedPauses() {
                "词的时间跟着换：剪掉的「um」收到切口上，后面的词前移 0.55（逐词高亮还对得上声音）")
 }
 
-// MARK: - 改入点（ripple）：跨在裁切点上的那句收到片段开头；大半被裁掉的留在原地、报出来
+// MARK: - 改入点（ripple）：跨在裁切点上的那句收到片段开头；说的话大半被裁掉的跟着没了（不留在原地和下一句叠）
 
 private func checkInPointTrim() {
     let first = clip(otherFile, at: 0, duration: 8)
@@ -159,11 +161,42 @@ private func checkInPointTrim() {
     let moved = span(after, across.id)
     check(near(moved?.start, 8) && near(moved?.end, 9),
           "跨在裁切点上的那句收到片段开头：[8,9)，不跑到片段开始之前（以前是 7.7）：got \(String(describing: moved))")
-    check(near(span(after, trimmedAway.id)?.start, 8) && near(span(after, mostlyTrimmed.id)?.end, 8.6),
-          "整句在被裁掉那截上的、说的话大半被裁掉的：留在原地（裁切不删）")
-    checkEqual(report.leftCues, [trimmedAway.id, mostlyTrimmed.id], "留在原地的报给 AI")
+    check(span(after, trimmedAway.id) == nil && span(after, mostlyTrimmed.id) == nil,
+          "整句在被裁掉那截上的、说的话大半被裁掉的：裁切也删（以前留在原地，和前移过来的下一句叠在画面上）")
+    checkEqual(report.deletedCues, 2, "删掉的两句报给 AI（deleted_subtitles）")
+    checkEqual(report.deleted, 2, "…也计在 deleted 里")
+    check(report.leftCues.isEmpty, "没有留在原地的")
     checkEqual(report.shortenedCues, [across.id], "收短了的也报")
-    check(!report.isEmpty, "只有留在原地的也算这次联动有事要报")
+
+    // 用户在 L30 上撞到的样子：全片一段 + 生成的字幕，edit_clip source_in=1.0 ripple=true —— 第一句说的话（0.2–1.6）剩不到一半，删；
+    // 下一句前移 1 秒，不再和它叠。source_in=0.5 时第一句还剩大半：正常收短到 [0,1.277)、其余整体前移 0.5。
+    let talk = clip(talkFile, at: 0, duration: 101)
+    let congratulations = cue(0, 1.777, "Congratulations on finishing the course", speech: (0.2, 1.6))
+    let next = cue(1.86, 3.157, "In this lesson", speech: (1.9, 3.0))
+    let lesson = state(main: [talk], cues: [congratulations, next])
+    var inPointOne = lesson
+    inPointOne.trim(TimelineTrim.Member(id: talk.id, kind: .clip), leading: true, by: 1)
+    inPointOne.packMain()
+    let oneReport = TimelineLinkage.follow(from: lesson, to: &inPointOne, deletesContent: false)
+    check(span(inPointOne, congratulations.id) == nil, "source_in=1.0：第一句说的话剩不到一半，删（以前留在 [0,1.777)，和下一句叠 0.9 秒）")
+    let nextSpan = span(inPointOne, next.id)
+    check(near(nextSpan?.start, 0.86) && near(nextSpan?.end, 2.157), "下一句前移 1 秒到 [0.86,2.157)：got \(String(describing: nextSpan))")
+    checkEqual(oneReport.deletedCues, 1, "结果里报删了一句字幕")
+    var inPointHalf = lesson
+    inPointHalf.trim(TimelineTrim.Member(id: talk.id, kind: .clip), leading: true, by: 0.5)
+    inPointHalf.packMain()
+    TimelineLinkage.follow(from: lesson, to: &inPointHalf, deletesContent: false)
+    let kept = span(inPointHalf, congratulations.id)
+    check(near(kept?.start, 0) && near(kept?.end, 1.277), "source_in=0.5：第一句还剩大半，收短到 [0,1.277)：got \(String(describing: kept))")
+    check(near(span(inPointHalf, next.id)?.start, 1.36), "下一句整体前移 0.5")
+
+    // 底下的段整个没了、又不是真删（少见）：留在原地、报出来 —— 这是 left_subtitles 剩下的唯一情形。
+    var vanished = before
+    vanished.remove(second.id)
+    let vanishedReport = TimelineLinkage.follow(from: before, to: &vanished, deletesContent: false)
+    check(near(span(vanished, trimmedAway.id)?.start, 8), "段整个没了又不是真删：字幕留在原地")
+    checkEqual(vanishedReport.leftCues, [trimmedAway.id, mostlyTrimmed.id, across.id], "…报给 AI（left_subtitles）")
+    check(!vanishedReport.isEmpty, "只有留在原地的也算这次联动有事要报")
 }
 
 // MARK: - 变速跟着伸缩；中间插进别的（定格）照老规矩

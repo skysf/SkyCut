@@ -20,8 +20,9 @@ import SrtFlowCore
 // 2. 完全落在一段主轨块里的：删它就删、挪它就挪（按它底下最早还在的那一截画面挪，和那截画面的相对位置不变）。
 // 3. 跨两段的：底下的画面**全部**挪同一个量才跟，否则不动；画面**全没了**才删。
 // 4. 画面没了只在**真删**的操作里连带删（`deletesContent`：⌫、AI 的 delete_items / cut_speech）；裁切 / 变速让画面
-//    没了的，东西留在原地不动。
-// 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半才删 / 留在原地（2026-10-15，`LinkageCueFollow`）。
+//    没了的，东西留在原地不动 —— 字幕句除外（第 5 条）。
+// 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半就删，裁切让它没了的也删（2026-10-15，`LinkageCueFollow`）；
+//    底下的段整个没了又不是真删才留在原地、报出来。
 // 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift、LinkageCues.swift）。
 
 enum TimelineLinkage {
@@ -35,8 +36,10 @@ enum TimelineLinkage {
         var magnetPacked = 0
         /// 跟着走的字幕里，底下有画面被剪掉、收短了的（字里可能还留着剪掉的词）。
         var shortenedCues: Set<UUID> = []
-        /// 说话的那几秒大半没了、又不是真删（裁切、变速），留在原地的字幕：人一眼看得见，AI 要在结果里看到。
+        /// 说话的那几秒大半没了、底下的段整个没了又不是真删（少见），留在原地的字幕：人一眼看得见，AI 要在结果里看到。
         var leftCues: Set<UUID> = []
+        /// `deleted` 里有几句是字幕（说的话被删掉 / 裁掉了）：AI 只看到一个 deleted 会以为删了段。
+        var deletedCues = 0
         var isEmpty: Bool { moved == 0 && deleted == 0 && leftCues.isEmpty }
     }
 
@@ -188,6 +191,7 @@ enum TimelineLinkage {
         CaptionSourceFollow.apply(captions, to: &after)
         report.moved += captions.timings.count
         report.deleted += captions.deletes.count
+        report.deletedCues += captions.deletes.count
         report.shortenedCues.formUnion(captions.shortened)
         report.leftCues.formUnion(captions.left)
         return report
@@ -283,7 +287,7 @@ enum TimelineLinkage {
             return Report(
                 moved: kinds.reduce(0) { $0 + $1.moves.count } + cues.timings.count,
                 deleted: kinds.reduce(0) { $0 + $1.deletes.count } + cues.deletes.count,
-                shortenedCues: cues.shortened, leftCues: cues.left
+                shortenedCues: cues.shortened, leftCues: cues.left, deletedCues: cues.deletes.count
             )
         }
 

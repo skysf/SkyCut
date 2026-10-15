@@ -7,7 +7,7 @@ import SrtFlowCore
 // 1. 完全落在一段里的：删它就删、挪它就挪（磁吸合拢、换位、变速、裁头之后画面前移）。
 // 2. 跨两段的：底下的画面全部挪同一个量才跟，否则不动；画面全没了才删（配乐铺整片永远不被顺手删掉）。
 //    字幕句另有一条（规矩 12，2026-10-15）：两头各自跟着画面换算、说的话剩不到一半才删 —— 细的用例在 LinkageCues.swift。
-// 3. 画面没了只在真删（`deletesContent`）时连带删；裁切让画面没了的留在原地。
+// 3. 画面没了只在真删（`deletesContent`）时连带删；裁切让画面没了的留在原地（字幕句除外：说的话被裁掉的也删，规矩 12）。
 // 4. 分割 / cut_speech / 定格切出来的新 id 照样认（同素材、接着的源时间）；同 id 永远优先（粘出来的同素材新段不算）。
 // 5. 这次操作自己动过的东西不再碰；撞上了让开（段换轨、文字换行、滤镜换层）。
 // 6. 拖动计划要的名单（`attachments`）：底下压着的主轨块全在名单里才算。
@@ -117,8 +117,8 @@ private func checkLinkageDelete() {
     check(after.clip(with: f.music.id) != nil, "铺整片的配乐不删")
     checkEqual(start(after, clip: f.sfx.id), 3, "A 里的音效不动")
     checkEqual(start(after, clip: f.broll.id), 5, "A 里的 B-roll 不动")
-    checkEqual(report, TimelineLinkage.Report(moved: 3, deleted: 3, shortenedCues: [f.cueBC.id]),
-               "报出来：挪了 3 样（C 的字幕、形状、跨 B|C 的字幕），删了 3 样（文字、滤镜、跨 A|B 的字幕），收短了跨 B|C 的那句")
+    checkEqual(report, TimelineLinkage.Report(moved: 3, deleted: 3, shortenedCues: [f.cueBC.id], deletedCues: 1),
+               "报出来：挪了 3 样（C 的字幕、形状、跨 B|C 的字幕），删了 3 样（文字、滤镜、跨 A|B 的字幕，其中 1 句字幕），收短了跨 B|C 的那句")
 
     // ---- 删第一段 A：后面整体前移 ----
     var afterA = f.state
@@ -254,7 +254,7 @@ private func checkLinkageCutsTrimsAndSpeed() {
     headTrimmed.trim(TimelineTrim.Member(id: fx.a.id, kind: .clip), leading: true, by: 2)
     headTrimmed.packMain()
     TimelineLinkage.follow(from: headCue, to: &headTrimmed, deletesContent: false)
-    checkEqual(start(headTrimmed, cue: onHead.id), 0, "被裁掉那 2 秒上的字幕留在原地（裁切不删）")
+    checkEqual(start(headTrimmed, cue: onHead.id), nil, "被裁掉那 2 秒上的字幕跟着没了（2026-10-15 起：说的话被裁掉的字幕裁切也删；文字 / 音效照旧留在原地）")
 
     // ---- 变速：A 两倍速，A 里的东西按画面挪到一半处 ----
     var faster = before

@@ -2,7 +2,7 @@
 
 ## 症状
 
-做「裁切让字幕说的话剩不到一半就删」（联动规矩 12 的改法，同一天的下一个 PR）之前，交接里点出一个风险：
+做「裁切让字幕说的话剩不到一半就删」（[案例](2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md)）之前，交接里点出一个风险：
 upscale 换源（`VideoEditProject+Upscale.swift` 的 `applyUpscale`）和 `edit_clip` 换文件（`ClipFileReplacement`）都是同一个 id 换了素材、
 源时间整体平移，联动的账（`TimelineLinkage.Ledger`）认同 id 的段时不看素材、按源时间对账，压在上面的东西可能被挪错。先写了一条自检
 （`checks/TimelineSnap/LinkageSwap.swift`，第 1i 组）看现状，果然：
