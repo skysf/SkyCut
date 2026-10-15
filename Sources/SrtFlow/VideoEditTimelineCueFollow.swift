@@ -89,8 +89,7 @@ enum LinkageCueFollow {
     /// 这句说的话（大半）没了：真删就删；不是真删时底下的段都还在（同 id，只是裁切 / 变速 / 滑动让这截画面不在它的窗口里了）也删；
     /// 底下有段整个没了又不是真删才留在原地、报出来。
     private static func gone(_ deletesContent: Bool, hosts: [Piece], survivors: (Piece) -> [Piece]) -> Outcome {
-        let trimmed = hosts.allSatisfy { host in survivors(host).contains { $0.id == host.id } }
-        return deletesContent || trimmed ? .delete : .leftBehind
+        return deletesContent ? .delete : .leftBehind
     }
 
     // MARK: 说话的那几秒
