@@ -67,6 +67,8 @@
 #  33. 联动的结果（2026-10-15）：字幕收短了的、留在原地的各列出短 id 和一句话（LinkageReportChecks）。
 #  35. 确认令牌（2026-10-15）：同一件事还在等答复就回同一张（有效期重新算）、别的事不认也不消耗、一次有效、三十分钟过期、
 #      被拒按原因说（过期 / 用过了 / 别的请求 / 不认识），结果里带 valid_for_minutes 和 confirm_token_refused（ConfirmationChecks）。
+#  36. 每句字幕在画布上占哪一块、撞没撞上水印（2026-10-15）：一行的位置和高按样式、字多就宽、太长就折、叠在一起的两条轨各占一截、
+#      get_subtitles 的 box / look text_scan 的 subtitle_overlaps（SubtitleBoxChecks）。
 #  26. 给 AI 的文字按客户端怎么读来守：总说明和每个工具说明都在 Claude Code 的 2,048 字以内（它多了就静默截掉）、
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
@@ -436,6 +438,10 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleGen/SubtitleLineFit.swift \
   Sources/SrtFlow/SubtitleFrameGeometry.swift \
   Sources/SrtFlow/SubtitleFontScale.swift \
+  Sources/SrtFlow/SubtitleLineMetrics.swift \
+  Sources/SrtFlow/SubtitleLineBoxes.swift \
+  Sources/SrtFlow/AISubtitleBoxes.swift \
+  Sources/SrtFlow/AISubtitleOverlaps.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
   Sources/SrtFlow/AILinkageReport.swift \
@@ -532,6 +538,7 @@ xcrun swiftc \
   checks/MCP/SubtitleStyleChecks.swift \
   checks/MCP/SubtitleBulkChecks.swift \
   checks/MCP/TextScanChecks.swift \
+  checks/MCP/SubtitleBoxChecks.swift \
   checks/MCP/KokoroChecks.swift \
   checks/MCP/KokoroSpeedChecks.swift \
   checks/MCP/DuplicateChecks.swift \

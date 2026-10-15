@@ -182,8 +182,14 @@ enum AISubtitleTools {
         let limit = min(max(try args.int("limit") ?? 300, 1), 2000)
         let state = project.state
         let ids = AIShortIDs(state: state)
+        let canvas = VideoEditCompositionBuilder.renderSize(for: state)
+        // 每句画在画布的哪一块（AISubtitleBoxes：按此刻的样式、这句显示时整块的样子）：AI 拿它避开水印、挑 max_width。
+        let style = state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
+        let blocks = state.subtitleScreenBlocks()
+        var reportedBoxes = false
         func lines(_ track: SubtitleTrack) -> JSONValue {
             let cues = state.subtitleCues(of: track).filter { $0.end > from && $0.start < to }
+            let block = blocks.first { $0.tracks.contains(track) }
             var object: [String: JSONValue] = [
                 "lines": .array(cues.prefix(limit).map { cue in
                     var line: [String: JSONValue] = [
@@ -195,6 +201,11 @@ enum AISubtitleTools {
                     // 这句里几个词知道自己的时间：改字并句后有的词没有时间就不亮（2026-09-29 婚礼工程 BUG-06）。
                     if let words = cue.words { line["timed_words"] = .number(Double(words.count)) }
                     if state.isSubtitleCueHidden(cue.id) { line["hidden"] = true }
+                    if let block, let box = AISubtitleBoxes.box(of: cue, track: track, in: block, style: style, canvas: canvas) {
+                        line["box"] = AIFrameDescription.box(box.rect)
+                        if box.lineCount > 1 { line["lines"] = .number(Double(box.lineCount)) }
+                        reportedBoxes = true
+                    }
                     return .object(line)
                 }),
                 "total": .number(Double(cues.count))
@@ -205,9 +216,13 @@ enum AISubtitleTools {
         var result: [String: JSONValue] = [:]
         if which != "translation" { result["original"] = lines(.original) }
         if which != "original" { result["translation"] = lines(.translation) }
-        result["style"] = AISubtitleStyleChange.describe(
-            state, appWide: EncodeQueue.burnIn.burnInStyle, canvas: VideoEditCompositionBuilder.renderSize(for: state)
-        )
+        result["style"] = AISubtitleStyleChange.describe(state, appWide: EncodeQueue.burnIn.burnInStyle, canvas: canvas)
+        if reportedBoxes {
+            result["box_note"] = .string(
+                "box = [x, y, width, height] where the line is drawn, as fractions of the canvas from its top left, with the current "
+                    + "style; lines = how many rows it wraps to. Lines without a box are hidden or on a hidden track."
+            )
+        }
         // 逐词高亮只亮知道词时间的句子（SrtFlow 自己从语音、配音做的）。
         result["lines_with_word_times"] = .number(Double(state.allSubtitleCues.filter { $0.words != nil }.count))
         return .ok(.object(result))
