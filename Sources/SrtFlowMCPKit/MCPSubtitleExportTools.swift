@@ -64,8 +64,9 @@ public enum MCPSubtitleExportTools {
                 .exportSubtitles, title: "Export subtitle files",
                 description: """
                 Write the project's subtitles to files, one per track: the original, the translation, or both (default: every \
-                track that has lines). Files are named <name>.<language>.srt (or .vtt) and go where export_video puts videos, \
-                so players pick them up; name defaults to the project's, so pass the exported video's name to pair them. Hidden \
+                track that has lines). Files are named <name>.<language>.srt (or .vtt), the language read from each track's \
+                text (else the project's record), and go where export_video puts videos, so players pick them up; name \
+                defaults to the project's, so pass the exported video's name to pair them. Hidden \
                 lines are left out; times are timeline seconds. A taken name gets a number (the result has the real paths); \
                 SrtFlow never replaces a file. Done at once.
                 """,

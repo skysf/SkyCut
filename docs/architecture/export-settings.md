@@ -89,7 +89,12 @@
   `~/Movies`，见 [AI 接口](ai-control-mcp.md) 第四节第 10 条）。记住的文件夹不在了（删了、外接盘
   拔了）就当没记过。导出时用的那个文件夹就是下次的默认。
 - **独立字幕文件**写进同一个文件夹，文件名跟标题走：`<标题>.<lang>.srt`，和视频同名，
-  播放器能自动挂上。
+  播放器能自动挂上。`<lang>` 按每条轨**现在的文字**判（`AITextLanguage.dominant`）、判不出来才用工程记的
+  （`SubtitleCompanion.sourceLanguage` / `targetLanguage`）、都没有才省略 —— 只有 `SubtitleFileLanguage` 一处，
+  面板和 AI 的 `export_subtitles` 同一份；判出来的只用来起名、不写回工程。手写、导入的轨工程里没记语言，
+  只读记录就写成不带标签的 `<标题>.srt`，播放器当成视频的默认字幕
+  （[案例](../bugfixes/2026-10-15-subtitle-file-export-missing-language-tag.md)）。面板上语言识别不在 body 里跑：
+  句子或记录变了才重判（`onChange`）。
 
 ## 五、撞名：先提示、再确认替换（视频和字幕文件同一条）
 

@@ -736,14 +736,20 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     双语合在一个文件里不做（那只给烧录用）。
     ② **名字和导出面板同一个函数**：`<名字>.<语言>.<格式>`（`SubtitleExportPlanner.fileName`），名字默认工程名（同 export_video 的
     `AIExportTools.defaultName`），AI 传导出的视频的名字就和视频配成一对、播放器自动挂上；默认放 export_video 的那个文件夹，`folder` 可改。
-    两份同一个语言标签（或都没有）时译文那份用 `translation`，免得同名互相盖掉。
+    两份同一个语言标签（或都没有）时译文那份用 `translation`，免得同名互相盖掉。**语言标签按每条轨现在的文字判**（`SubtitleFileLanguage`，
+    导出面板同一份）：`AITextLanguage.dominant` → 判不出来用工程记的 → 都没有才省略；文字先于记录，和 translate_subtitles 认原文语言
+    同一个顺序（手写、导入的轨工程里没记语言；AI 也可能把整轨改写成别的语言而记的还是旧的）；判出来的只用来起名、不写回工程
+    （2026-10-15：只读记录时手写的译文导出成不带标签的 `promo.vtt`，播放器当成默认字幕，
+    [案例](../bugfixes/2026-10-15-subtitle-file-export-missing-language-tag.md)）。
     ③ **从不覆盖**（第 34 条）：任何一份已经有了，整组换成 `<名字> 2`、`<名字> 3`……，几份还是一套；写盘走界面那一条
     （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验 → 原子替换）。
     ④ **和预览、烧录、界面导出同一份句子**（`subtitleDocument(for:)`）：藏起来的句子不写；时间是时间线秒，正好对上从这条时间线导出的视频。
     ⑤ 不改工程：不是一步撤销、不摆窗口；碰工程（读它的字幕），所以照第 46 条核对会话的工程。格式词表 `MCPVocabulary.subtitleFileFormats`
     （srt / vtt）是 `SubtitleFormat` 的扩展名。
-    守卫：`checks/MCP/SubtitleFileChecks.swift`（选哪几条轨、起名、同标签时译文叫 translation、撞名整组加编号、词表对账）、
-    `checks/MCP/tool-result-wiring.sh`（写盘只经 writeValidated、读去掉藏起来句子的那份、起名经 AISubtitleFiles）。
+    守卫：`checks/MCP/SubtitleFileChecks.swift`（选哪几条轨、起名、同标签时译文叫 translation、撞名整组加编号、词表对账、
+    语言标签按文字判 → 记的 → 省略且文字先于记录、从时间线读时藏起来的句子不算）、
+    `checks/MCP/tool-result-wiring.sh`（写盘只经 writeValidated、读去掉藏起来句子的那份、起名经 AISubtitleFiles、
+    标签经 SubtitleFileLanguage 且导出面板同一份）。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -921,6 +927,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
       多出同名 .vtt，原来的文件没动。
 - [ ] 有原文和译文的工程，让 AI 导出视频再导出字幕文件（export_subtitles，name 用视频的名字）：`SrtFlow/导出` 里视频旁边多出
       `<名字>.<语言>.srt` 两份，IINA / VLC 打开视频自动挂上、时间对得上；藏起来的句子不在里面；再导一次是 `<名字> 2.…`，前一套没被盖掉。
+      译文是 AI 用 edit_subtitles 手写的（工程没记它的语言）、或原文是 add_clips 导入的 .srt 时，文件名照样带 `.zh-Hans` / `.en`，
+      不是不带标签的 `<名字>.vtt`（播放器会把它当成默认字幕）；导出面板「高级」里导同一个工程，名字一样。
 - [ ] 让 AI 转写一节课（transcribe）：第一次回任务号、等完再调一次秒回；句子的时间点下去，预览里说的正是那句。
 - [ ] 让 AI 把一段口播的停顿缩短、去掉口头禅（cut_speech）：听起来不吞字、不切半个词，停顿处还留一点气口；⌘Z 一步整个回来；
       片段分离过声音时，画面和声音在同样的地方剪。

@@ -59,8 +59,9 @@
 #      App 在收发线程上答「探一下」、路由轮到时先问还做不做、主窗口开得回来（扫描，下面）。
 #  31. 画面多大（2026-10-14）：export_video / get_job 报成片的宽高帧率（和导出同一个 cappedSize），look 看文件报文件本身的尺寸、
 #      缩略图的尺寸另写（VideoSizeChecks；接线扫描在下面「关掉主窗口不退出」之后）。
-#  34. export_subtitles（2026-10-15）：写哪几条轨、`<名字>.<语言>.<格式>`、同标签时译文叫 translation、撞名整组加编号、格式词表对账
-#      （SubtitleFileChecks）；写盘只经 SubtitleExportPlanner.writeValidated、藏起来的句子不写（扫描）。
+#  34. export_subtitles（2026-10-15）：写哪几条轨、`<名字>.<语言>.<格式>`、同标签时译文叫 translation、撞名整组加编号、格式词表对账、
+#      语言标签按文字判 → 记的 → 省略且文字先于记录（SubtitleFileChecks）；写盘只经 SubtitleExportPlanner.writeValidated、藏起来的句子不写、
+#      标签经 SubtitleFileLanguage 且导出面板同一份（扫描）。
 #  32. cut_speech 的切口（2026-10-14）：落在量出来的停顿里就照切、落在声音上才挪进真的停顿 / 安静的窗、snap=false 一刀不挪、
 #      挪了超过 50ms 的报给 AI（SpeechCutPointChecks，用例是用户报的两个切口）；工具读了声音、交给切口、结果带 moved（扫描）。
 #  33. 联动的结果（2026-10-15）：字幕收短了的、留在原地的各列出短 id 和一句话（LinkageReportChecks）。
@@ -475,6 +476,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditPlacementDefault.swift \
   Sources/SrtFlow/AISubtitleEdits.swift \
   Sources/SrtFlow/AISubtitleFiles.swift \
+  Sources/SrtFlow/SubtitleFileLanguage.swift \
   Sources/SrtFlow/AISubtitleStyle.swift \
   Sources/SrtFlow/SubtitleFont.swift \
   Sources/SrtFlow/FontFamilyNames.swift \
