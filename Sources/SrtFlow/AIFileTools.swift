@@ -55,17 +55,18 @@ enum AIFileTools {
     // MARK: 删文件先问
 
     /// 把这些文件挪进废纸篓之前先问（MCP 方案第 21、23、34 条：删文件是唯一要用户点头的改动）。令牌绑着这一批文件，
-    /// 换了文件拿它来不认；点过头返回 nil，否则回 needs_confirmation。manage_files 的删除和 record_screen 丢弃上次没收完的录制都走这里
+    /// 换了文件拿它来不认；点过头返回 nil，否则回 needs_confirmation（带来的令牌没收的话说明为什么，AIConfirmations）。manage_files 的删除和 record_screen 丢弃上次没收完的录制都走这里
     /// —— 会问的地方只许这里和 AIWorkspace.confirmReading（scripts/check-mcp.sh 钉着）。
     /// - Parameter describing: 问题里怎么称呼这批文件（nil = 「N 个文件」）。
     static func confirmTrash(_ files: [URL], args: AIToolArguments, describing: String? = nil) throws -> AIToolResult? {
         let key = "trash:" + files.map(\.standardizedFileURL.path).sorted().joined(separator: "|")
-        if AIConfirmations.shared.consume(try args.string("confirm_token"), action: key) { return nil }
+        let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: key)
+        if redemption == .accepted { return nil }
         let names = files.map(\.lastPathComponent)
         let list = names.prefix(5).joined(separator: ", ") + (names.count > 5 ? " and \(names.count - 5) more" : "")
         let question = describing.map { "SrtFlow will move \($0) (\(list)) to the Trash. Go ahead?" }
             ?? "SrtFlow will move \(names.count) file(s) to the Trash: \(list). Go ahead?"
-        return AIConfirmations.shared.ask(question, action: key)
+        return AIConfirmations.shared.ask(question, action: key, refused: redemption.refusal)
     }
 
     // MARK: manage_files
