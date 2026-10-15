@@ -440,6 +440,7 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleFontScale.swift \
   Sources/SrtFlow/SubtitleLineMetrics.swift \
   Sources/SrtFlow/SubtitleLineBoxes.swift \
+  Sources/SrtFlow/SubtitleLineWrap.swift \
   Sources/SrtFlow/AISubtitleBoxes.swift \
   Sources/SrtFlow/AISubtitleOverlaps.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \

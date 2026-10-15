@@ -6,7 +6,8 @@
 那条，拍过的板见 [方案](../plans/2026-09-26-hide-guides-independent-subtitles.md)）。改
 `VideoEditSubtitleDocuments` / `SubtitleTrackEditing` / `SubtitleRetranslation` / `SubtitleFrameCanvas` /
 `BurnInSubtitleOverlay` / `SubtitleLayout` / `EditSelection` / 分段默认值、`SubtitleCueWords` / `SubtitleWordHighlight` /
-`subtitleStyle(appWide:)`（工程自己的样式、逐词高亮）、`SubtitleFontScale`（预览的字号按 libass 的口径）前必读。
+`subtitleStyle(appWide:)`（工程自己的样式、逐词高亮）、`SubtitleFontScale`（预览的字号按 libass 的口径）、`SubtitleLineWrap`
+（在哪儿折行：预览、AI 读的框、成片同一处）前必读。
 语言流（自动检测/翻译预检）的姊妹合同见
 [subtitle-language-flow.md](subtitle-language-flow.md)。
 
@@ -93,10 +94,19 @@
    `SubtitleLineMetrics` 按这句字用到的每个字体算出差多少，`BurnInSubtitleOverlay` 照着补：**一行一个 `Text` 放进 VStack**
    （SwiftUI 的 `.lineSpacing` 不认负数，宋体要把行距收紧；VStack 的间距正负都认），整块按对齐（底 / 中 / 顶）`.offset(y:)`
    往下挪 —— **只动画面、不动布局框**，拖框（`SubtitleFrameGeometry`）按边距和量出来的块高算，不看这一挪。换行不是字，不进行框。
+   **在哪儿折行也按 libass 的算**（2026-10-15，[预览的折行是贪心的、成片是摊匀的](../bugfixes/2026-10-15-subtitle-preview-wraps-greedily.md)）：
+   一句放不进一行的字幕，折行点只有 `SubtitleLineWrap` 一份 —— 照 libass 0.17 的 `wrap_lines_naive` + `wrap_lines_rebalance` +
+   `trim_whitespace` port（先贪心在上一个空格处断，再把上一行最后一个词往下挪、只要两行宽度之差变小就挪，直到挪不动；行首行尾的空格不画、
+   不算宽；一行的宽 = 步进之和，居中按它）。预览 `BurnInSubtitleOverlay` **一行一个 `Text`、只画算好的那一行**（`lineLimit(1)` + 横向
+   `fixedSize`，不让 SwiftUI 再折第二次：它量宽和 Core Text 差一两个像素时会多折出一行），AI 读的框 `SubtitleLineBoxes` 也只问它。
+   **libass 只在 ASCII 空格处折行**（vendor/ffmpeg 的 libass 没编 libunibreak、ffmpeg 也没开 `ASS_FEATURE_WRAP_UNICODE`）：没有空格的中文
+   不折、整行溢出到画面两边；预览照样溢出、框照实比画面宽，**不替它折** —— 折了就是预览和成片不一样。生成的字幕靠 `SubtitleLineFit` 按一行
+   放得下来切，平时碰不到；手打 / 导入的长中文句要用户自己换行（要不要让烧录也能折中文另拍板）。
    给 AI 算「这句字幕画在哪」的 `SubtitleLineBoxes`（2026-10-15）也是这几份合同的消费者：字体按 `SubtitleFontScale.runs`、行高按 `SubtitleLineMetrics`、
-   块的位置喂块高给 `SubtitleFrameGeometry` 要，不另算一份（[AI 接口](ai-control-mcp.md) 第四节第 51 条）。
-   `scripts/check-subtitle-burn-size.sh` 比预览和成片字的上下沿（三种对齐 × 一 / 两行 × 英文 / 混排 × 五种字体，容差 3 px）。
-   已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）；一行太长自己折出来的行只补正的行距。
+   折行按 `SubtitleLineWrap`、块的位置喂块高给 `SubtitleFrameGeometry` 要，不另算一份（[AI 接口](ai-control-mcp.md) 第四节第 51 条）。
+   `scripts/check-subtitle-burn-size.sh` 比预览和成片字的上下沿（三种对齐 × 一 / 两行 × 英文 / 混排 × 五种字体，容差 3 px），
+   以及折行点（`WrapChecks`：17 种放不进一行的句子按墨迹切成几行、每一行的左右沿容差 4 px，预览每行的宽还要和 `SubtitleLineWrap` 算的对上）。
+   已知不足：逐词高亮放大的那个词行框按不放大的量（差 2 px）。
    **回退到系统私有字体时两边一起换成内置字体**（2026-09-29，[没下载苹方时中文烧成方框](../bugfixes/2026-09-29-chinese-burns-as-boxes-without-pingfang.md)）：
    苹方完整版是按需下载的字体资源，没下载的 Mac 上 CoreText 回退到系统私有的那份，预览照样是中文，libass 却用不了、画成方框。
    所以回退到的字体文件在 `/PrivateFrameworks/` 里（认文件、不认族名）时，`SubtitleFallbackFont` 换成每台 Mac 都有的
@@ -281,6 +291,9 @@
       拖角：字号等比变；松手一步撤销可回退。
 - [ ] 调整后导出：烧录位置/宽度/字号与预览一致（同一段画面对比截图）。字的大小自检钉着（`check-subtitle-burn-size`），
       这一条看的是拖过框之后的位置和换行，以及中文、粗体、逐词高亮亮起来时的样子。
+- [ ] **长句的折行点**（2026-10-15）：一句放不进一行、不带换行的字幕，预览里两行差不多宽（不是第一行填满、第二行剩一点）；
+      导出后抽帧，每一行的左右沿和预览对得上（`look` 看到的也是这几行）；`get_subtitles` 的 box 不变。
+      一句没有空格的长中文：预览和成片**一样**从画面两边溢出，不许预览替它折。
 - [ ] 自动检测 + 生成：新字幕全部单行。
 - [ ] **点选互斥两向**：选中形状 → 点轨道上的 cue，形状框必须消失；
       选中 cue → 点形状，字幕拖框必须消失。任何时刻预览上只有一套框。
