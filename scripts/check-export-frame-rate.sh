@@ -131,6 +131,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditPrerender.swift \
   Sources/SrtFlow/BurnInWorkspace.swift \
   Sources/SrtFlow/SubtitleFontScale.swift \
+  Sources/SrtFlow/SubtitleLineWrap.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/MediaProbe.swift \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \

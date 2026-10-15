@@ -119,6 +119,14 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
     /// 生成 ASS 用的虚拟画布高度。
     public static let referenceHeight = 1080
 
+    /// ASS 的虚拟画布（PlayResX / PlayResY）：1080 高，宽按视频的宽高比取偶数（免得出现 1706.67 这种不整的画布宽）；
+    /// 宽高比不像样就当 16:9。预览和 AI 读的框算「一行最宽到哪」也按它（`SubtitleLineBoxes.referenceBox`、`BurnInWorkspace.prewrapped`），
+    /// 和写进 ASS 的是同一个数。
+    public static func playResolution(aspectRatio: Double) -> (width: Int, height: Int) {
+        let safeAspect = aspectRatio.isFinite && aspectRatio > 0.1 ? aspectRatio : 16.0 / 9.0
+        return (max(2, Int((Double(referenceHeight) * safeAspect / 2).rounded()) * 2), referenceHeight)
+    }
+
     public static let fontSizeRange = 20.0...140.0
     public static let outlineWidthRange = 0.0...12.0
     public static let shadowOffsetRange = 0.0...12.0
@@ -265,16 +273,16 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
     /// 分开摆的两块哪怕挨着也不互相推开，和预览一致。
     /// `fontOverrides`：一句字里哪几截要点名字体（烧录时 App 给：这台 Mac 上 libass 找不到回退字体的字，SubtitleASSText）；
     /// 导出字幕文件不给（点名的是这台机器的替补字体，不该写进给别人用的文件）。
+    /// `prewrapped`：每句的折行点已经由 App 算好写成了换行（`BurnInWorkspace.prewrapped`，和预览同一份 `SubtitleLineWrap`），
+    /// libass 不许再自己折（WrapStyle 2）—— 它只会在 ASCII 空格处折，没有空格的中文整行溢出（2026-10-15）。false = 交给 libass 的 WrapStyle 0。
     public func assDocument(
         blocks: [SubtitleRenderBlock],
         aspectRatio: Double,
         title: String = "SrtFlow",
-        fontOverrides: (String) -> [SubtitleFontOverride] = { _ in [] }
+        fontOverrides: (String) -> [SubtitleFontOverride] = { _ in [] },
+        prewrapped: Bool = false
     ) -> String {
-        let height = Self.referenceHeight
-        let safeAspect = aspectRatio.isFinite && aspectRatio > 0.1 ? aspectRatio : 16.0 / 9.0
-        // 宽度取偶数，免得出现 1706.67 这种不整的画布宽。
-        let width = max(2, Int((Double(height) * safeAspect / 2).rounded()) * 2)
+        let (width, height) = Self.playResolution(aspectRatio: aspectRatio)
 
         var styles: [SubtitleStyle] = []
         var events: [SubtitleCue] = []
@@ -312,8 +320,8 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
         doc.scriptInfo = [
             "Title": title,
             "ScriptType": "v4.00+",
-            // 0 = 智能换行，上行更宽，比默认好看。
-            "WrapStyle": "0",
+            // 2 = 不自动折行、只认写好的 \N（折行点 App 算好了）；0 = libass 自己摊匀折（它只在 ASCII 空格处折）。
+            "WrapStyle": prewrapped ? "2" : "0",
             // 让描边和投影跟着画布一起缩放，不然 4K 上描边会细得看不见。
             "ScaledBorderAndShadow": "yes",
             "PlayResX": String(width),
