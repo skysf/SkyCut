@@ -638,7 +638,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 
 41. **婚礼工程那一轮之后补的五条小规矩（2026-09-29，[案例](../bugfixes/2026-09-29-mcp-tool-followups-from-wedding-session.md)）**：
     ① 说明里写的记号客户端会照字面传：`set_text` 的 `text` 把字面的 `\n` 也当换行（`AITextChange.unescapingNewlines`）。
-    ② 切工程只取消绑工程的转写：`TranscriptionTask.cancelIfBoundToProject()`（生成字幕绑、AI 的 `transcribe` 只转文件不绑），
+    ② 切工程只取消绑工程的转写：`TranscriptionTask.cancelIfBound(toGeneration:)`（生成字幕绑「哪个工程的哪一次打开」、AI 的 `transcribe` 只转文件不绑；
+    2026-10-17 起几个工程开着时只取消换掉的那一个的，[开着的工程](open-projects.md)），
     `new_project` / `open_project` 不许顺手把文件级的 transcript 取消了；用户按「停止」照旧全取消。③ `look` 建完合成先
     `isValid`，无效就报错说「这是 SrtFlow 的 bug，不是素材黑」，不许把黑底交给 Vision 描述。④ 整批的工具（`delete_items`）
     先把 id 全认一遍，认不出的一起列出来、说明一个都没做（`AITimelineEdits.deletion(of:in:)`）。⑤ `get_timeline` 顶层带

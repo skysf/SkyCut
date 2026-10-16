@@ -136,6 +136,9 @@
 同时看工具栏（`NSHostingView.sceneBridgingOptions`）、sheet、应用内语言都正常，挑全过的那条。
 **主窗口是 SwiftUI 的场景、改不了它的 delegate**：主窗口里的工程照旧用主窗口的撤销管理器（现状），从主窗口挪出去的工程（A.5）
 带不走 ⌘Z 的历史 —— 「撤销这一轮」按快照换回，照样能用。探针能接上主窗口的话这条就没有了。
+**探针结论（2026-10-17，①b）**：AppKit 建的工程窗口那条路全通（窗口 / 响应链 / 菜单亮灭 / 工具栏 / sheet / 关窗）；SwiftUI 主窗口的类
+`AppKitWindow` 不问 delegate，套转发 delegate 也没用 —— 主窗口照旧，退路成立。实做时又撞上一条：**先挂 delegate 再放内容**（窗口头一回被问
+撤销管理器时才问 delegate、之后记住）。细节在 [开着的工程](../architecture/open-projects.md) 第三节。
 
 ### H. 后台工程（headless）
 

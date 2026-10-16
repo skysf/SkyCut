@@ -37,6 +37,8 @@
   照样成立 —— 拖音频本身永远只动音频）。
   顺手「改回 true」会静默改掉整个剪辑手感，所以守卫按字面量钉。
 - 没记过、或记的不是布尔 → 默认值。写回只在 `didSet` / `onChange` 里，拨一下记一下。
+- **几个工程开着时是同一个开关**（2026-10-17 起，[开着的工程](open-projects.md)）：吸附 / 联动 / 播放跟随在一个工程窗口里拨了，
+  `didSet` 里 `OpenProjects.sync` 把别的开着的工程跟着拨成一样（它们的 `didSet` 再调回来时值已经一样，就停了）。磁吸跟着工程走，不同步。
 - 这几个键**别处不许**拿字符串直接去 `UserDefaults` / `@AppStorage` 读：那样就绕开了下一节的规矩（守卫钉着）。
 - 四个工具栏开关在自己的小视图 `TimelineToolbarToggles` 里拨（`VideoEditToolbarIcons.swift`）：拨一个只重算这一小块，
   编辑器根视图不再 `@Bindable`（它 body 里读到的工程属性越少越好，[预览性能 ratchet](preview-perf-ratchet.md) 第十三节）。
