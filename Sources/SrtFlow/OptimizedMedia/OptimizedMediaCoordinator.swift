@@ -64,12 +64,13 @@ final class OptimizedMediaCoordinator: ObservableObject {
         mode = Mode(rawValue: defaults.string(forKey: Self.modeDefaultsKey) ?? "") ?? .optimized
     }
 
-    /// 预览窗口切「优化媒体 / 原片」：记住，重建一次。
+    /// 预览窗口切「优化媒体 / 原片」：记住；全 App 一份，**每个开着的工程**都换过去、各自重建一次（几个工程窗口里拨的是同一个）。
     func setMode(_ mode: Mode) {
-        guard mode != self.mode else { return }
-        self.mode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: Self.modeDefaultsKey)
-        project?.scheduleRebuild()
+        for coordinator in OpenProjects.shared.all.map(\.optimizedMedia) where coordinator.mode != mode {
+            coordinator.mode = mode
+            coordinator.project?.scheduleRebuild()
+        }
     }
 
     /// 重建时问：哪些块能换进合成。「原片」模式什么都不换。

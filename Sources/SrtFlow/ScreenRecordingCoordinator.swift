@@ -31,8 +31,8 @@ final class ScreenRecordingCoordinator: ObservableObject {
     private(set) var session = ScreenRecordingSession.user
 
     private var request: ScreenRecordingRequest?
-    /// 录完落进哪个工程：`start` 传进来的那一个（几个工程开着时不一定是主窗口那个，docs/architecture/open-projects.md）。
-    private weak var targetProject: VideoEditProject?
+    /// 录完落进哪个工程、录屏的框弹在哪个窗口：点 Record 的那个剪辑页的工程 / AI 的 `start` 传进来的那一个（docs/architecture/open-projects.md）。
+    private(set) weak var targetProject: VideoEditProject?
     private var writer: ScreenRecordingWriter?
     private var engine: ScreenCaptureEngine?
     private var controlPanel: ScreenRecordingControlPanel?
@@ -102,8 +102,8 @@ final class ScreenRecordingCoordinator: ObservableObject {
 
     // MARK: - 开始
 
-    /// 点 Record Screen。重复点只激活现有会话（计划 §11.1）。
-    func begin() {
+    /// 点 Record Screen（`project`：点的是哪个剪辑页）。重复点只激活现有会话（计划 §11.1）。
+    func begin(for project: VideoEditProject) {
         guard state == .idle else {
             NSApp.activate(ignoringOtherApps: true)
             return
@@ -120,6 +120,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         }
         errorMessage = nil
         session = .user
+        targetProject = project
         transition(to: .configuring)
     }
 
@@ -763,7 +764,6 @@ final class ScreenRecordingCoordinator: ObservableObject {
         regionPanel = nil
         filter = nil
         request = nil
-        targetProject = nil
         manifest = nil
         session = .user
         // 这里**不再直接 reply**：那样会在 `.importing` 期间就答复退出，

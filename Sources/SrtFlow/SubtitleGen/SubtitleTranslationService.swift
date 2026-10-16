@@ -85,7 +85,8 @@ final class SubtitleTranslationService: ObservableObject {
             let results = try await coordinator.translate(
                 requests,
                 source: sourceLanguage.map(Locale.Language.init(identifier:)),
-                target: Locale.Language(identifier: targetLanguage)
+                target: Locale.Language(identifier: targetLanguage),
+                owner: generation
             )
             guard project.isCurrentGeneration(generation) else { return .discarded }
             let currentTexts: [UUID: String] = Dictionary(

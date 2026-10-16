@@ -88,13 +88,14 @@ extension VideoEditProject {
     /// 放行之后调用。** 漏掉任何一条都会串味：播放器还在放上一条片子、⌘Z 能把
     /// 上一条的内容撤回来、后台导入把素材追加进新工程。
     private func closeCurrentDocument() {
+        let closing = documentGeneration
         invalidateDocumentGeneration()
         autosaveTask?.cancel()
         autosaveTask = nil
         clock.pause()
         clock.detach()
         optimizedMedia.reset()  // 路上的转码作废；块留在磁盘上
-        UpscaleActivity.shared.cancelAll()  // 在飞的 upscale 作废（替 fal 也取消）；做完的文件留在磁盘上
+        UpscaleActivity.shared.cancelAll(projectGeneration: closing)  // 这个工程在飞的 upscale 作废（替 fal 也取消）；做完的文件留在磁盘上
         cancelLiveEdit()
         // 三类选择一起清。漏掉字幕 cue 的话，新工程一开就带着上一条工程的
         // cue ID —— 它在新轨上多半不存在，预览要么画悬空拖框，要么撞上新轨
@@ -141,6 +142,8 @@ extension VideoEditProject {
             return
         }
 
+        // 同一个文件只开一份：它已经在别的工程窗口里开着，就把那个窗口摆出来（两份同时自动存盘会互相盖掉）。
+        if let elsewhere = OpenProjects.shared.project(openAt: url), elsewhere !== self { return OpenProjects.shared.reveal(elsewhere) }
         openRequestToken &+= 1
         let token = openRequestToken
 
@@ -435,6 +438,8 @@ extension VideoEditProject {
     ///    那是独立于本次改动的一轮（这些输入框在本次改动之前就是这样）。
     func endPendingTextEditing() {
         commitSubtitleDraft()
+        // 只让**这个工程的剪辑页**里的输入框辞职：后台工程自动存盘时去踢键窗口，会打断用户在别的窗口里正打的字（open-projects.md）。
+        guard OpenProjects.shared.editorIsKey(self) else { return }
         NSApp.keyWindow?.makeFirstResponder(nil)
     }
 

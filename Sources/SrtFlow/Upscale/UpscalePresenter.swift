@@ -18,7 +18,7 @@ struct UpscalePresenter: View, Equatable {
         let _ = PerfCounters.body(Self.self)
         Color.clear
             .frame(width: 0, height: 0)
-            .sheet(item: $activity.panel) { target in
+            .sheet(item: mine(\.panel, owned: { project.state.clip(with: $0.id) != nil })) { target in
                 if let model = UpscalePanelModel(project: project, clipID: target.id) {
                     UpscalePanel(project: project, model: model).appLanguage()
                 } else {
@@ -26,8 +26,26 @@ struct UpscalePresenter: View, Equatable {
                     Color.clear.frame(width: 1, height: 1).onAppear { activity.panel = nil }
                 }
             }
-            .sheet(item: $activity.compare) { target in
+            .sheet(item: mine(\.compare, owned: owns)) { target in
                 UpscaleCompareView(project: project, target: target).appLanguage()
             }
+    }
+
+    /// 面板 / 对比窗口只在**它那一段所在的工程**的窗口里摆：几个工程窗口都挂着这个小视图，不筛的话每个窗口各弹一个，
+    /// 别的窗口还会因为「这一段不在我这儿」把它收掉（docs/architecture/open-projects.md）。
+    private func mine<Target>(
+        _ keyPath: ReferenceWritableKeyPath<UpscaleActivity, Target?>, owned: @escaping (Target) -> Bool
+    ) -> Binding<Target?> {
+        Binding(
+            get: { activity[keyPath: keyPath].flatMap { owned($0) ? $0 : nil } },
+            set: { activity[keyPath: keyPath] = $0 }
+        )
+    }
+
+    private func owns(_ target: UpscaleCompareTarget) -> Bool {
+        switch target {
+        case .job(let job): return job.projectGeneration == project.documentGeneration
+        case .clip(let id): return project.state.clip(with: id) != nil
+        }
     }
 }

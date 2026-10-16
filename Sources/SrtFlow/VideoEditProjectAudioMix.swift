@@ -42,6 +42,12 @@ final class PreviewAudioEngineHost {
 
     /// 试听让路（1 = 不让）。
     func duck(_ gain: Float) { engine?.duck(gain) }
+
+    /// 关工程时停掉引擎：每条轨的喂样线程在 stop 之前一直留着自己，不停就一直跑下去（docs/architecture/open-projects.md）。
+    func stop() {
+        engine?.stop()
+        engine = nil
+    }
 }
 
 extension VideoEditProject {

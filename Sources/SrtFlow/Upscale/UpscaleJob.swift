@@ -249,10 +249,12 @@ final class UpscaleActivity: ObservableObject {
 
     func present(panelFor clipID: UUID) { panel = UpscalePanelTarget(id: clipID) }
 
-    func cancelAll() {
-        for job in jobs { job.cancel() }
-        jobs.removeAll()
-        panel = nil
-        compare = nil
+    /// 关 / 换一个工程时调：只作废**那个工程那一次打开**起的任务（工程代号全 App 不重号）；别的工程的照做。
+    /// 面板和对比窗口各自只在自己的工程里摆（UpscalePresenter 按工程认），这里只收掉指着作废任务的那个对比窗口。
+    func cancelAll(projectGeneration: Int) {
+        let closing = jobs.filter { $0.projectGeneration == projectGeneration }
+        for job in closing { job.cancel() }
+        jobs.removeAll { $0.projectGeneration == projectGeneration }
+        if case .job(let shown)? = compare, shown.projectGeneration == projectGeneration { compare = nil }
     }
 }

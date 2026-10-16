@@ -45,13 +45,14 @@ require "切工程必须四类选择一起清" \
   Sources/SrtFlow/VideoEditProjectDocument.swift 'clearSelection\(\)'
 
 # 切工程（2026-09-29，婚礼工程 BUG-11）：只取消绑着工程的转写（生成字幕）；AI 的 transcribe 只转文件，
-# 不许被 new_project / open_project 顺手取消。`cancelIfBoundToProject` 自己判，别改回无差别的 `cancel()`。
-require "切工程只取消绑工程的转写，AI 的 transcribe 要让它跑完" \
-  Sources/SrtFlow/VideoEditProject.swift 'TranscriptionTask\.shared\.cancelIfBoundToProject\(\)'
-require "生成字幕那一次要记成绑工程的" \
-  Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'boundToProject = true'
+# 不许被 new_project / open_project 顺手取消。2026-10-17 起绑的是「哪个工程的哪一次打开」（工程代号全 App 不重号）：
+# 几个工程开着时，关 / 换一个只取消它自己的（docs/architecture/open-projects.md），别改回无差别的 `cancel()`。
+require "切工程只取消绑着这个工程（换之前那个代号）的转写，AI 的 transcribe 要让它跑完" \
+  Sources/SrtFlow/VideoEditProject.swift 'TranscriptionTask\.shared\.cancelIfBound\(toGeneration: previous\)'
+require "生成字幕那一次要记下绑的是哪个工程的哪一次打开" \
+  Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'boundGeneration = project\.documentGeneration'
 require "只转文件那一次要记成不绑工程的" \
-  Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'boundToProject = false'
+  Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'boundGeneration = nil'
 # 字幕字体清单（2026-09-29，婚礼工程 BUG-04）：cmap 坏了的字体（圆体）FreeType 会挑错字形，扫描时要过体检，坏的不进清单。
 require "字幕字体清单扫描要过 cmap 体检（整个文件的每个面都过，libass 用不了的字体不进清单）" \
   Sources/SrtFlow/FontCatalog.swift 'descriptors\.allSatisfy\(\{ FontCmapSanity\.isSafeForFreeType\('

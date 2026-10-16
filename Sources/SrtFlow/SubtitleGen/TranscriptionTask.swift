@@ -48,13 +48,14 @@ final class TranscriptionTask: ObservableObject {
         }
     }
 
-    /// 正在跑的这一次绑不绑工程：生成字幕（`start(project:)`）绑，AI 的 transcribe（`transcribeOnly`）只转文件。
-    private(set) var boundToProject = false
+    /// 正在跑的这一次绑着哪个工程的哪一次打开（工程代号，全 App 不重号）：生成字幕（`start(project:)`）绑，
+    /// AI 的 transcribe（`transcribeOnly`）只转文件、是 nil。
+    private(set) var boundGeneration: Int?
 
-    /// 切工程时调：只取消绑着工程的那一次。AI 的 transcribe 不碰工程，让它跑完 —— 以前这里无差别 `cancel()`，
-    /// `new_project` 一声不吭地把正在跑的 transcript 取消了（2026-09-29 婚礼工程）。
-    func cancelIfBoundToProject() {
-        guard boundToProject else { return }
+    /// 切工程 / 关工程时调：只取消绑着**那个工程那一次打开**的。AI 的 transcribe 不碰工程，让它跑完 —— 以前这里无差别 `cancel()`，
+    /// `new_project` 一声不吭地把正在跑的 transcript 取消了（2026-09-29 婚礼工程）；几个工程开着时也不许把别人的生成停了。
+    func cancelIfBound(toGeneration generation: Int) {
+        guard boundGeneration == generation else { return }
         cancel()
     }
 
@@ -91,7 +92,7 @@ final class TranscriptionTask: ObservableObject {
         onlyClipIDs: Set<UUID>? = nil
     ) {
         guard !isRunning else { return }
-        boundToProject = true
+        boundGeneration = project.documentGeneration
         let token = ExportCancellationToken()
         self.token = token
         failure = nil
@@ -224,7 +225,7 @@ final class TranscriptionTask: ObservableObject {
         }
         let token = ExportCancellationToken()
         self.token = token
-        boundToProject = false
+        boundGeneration = nil
         // 第一个 await 之前就占住槽（isRunning 看的是阶段）。
         stage = .preparingModels
         progress = 0

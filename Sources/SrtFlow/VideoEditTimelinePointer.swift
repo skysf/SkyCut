@@ -30,7 +30,7 @@ enum TimelinePointer {
     }
 
     static func hit(_ source: Source, project: VideoEditProject) -> TimelinePointerHit? {
-        guard let geometry = TimelineScrollGeometry.live else { return nil }
+        guard let geometry = TimelineScrollGeometry.live(for: project) else { return nil }
         let window: NSWindow?
         let point: NSPoint
         switch source {
@@ -58,7 +58,7 @@ enum TimelinePointer {
     /// 右键按下的那一刻在时间线的哪一秒，**不管落在哪一行**（标尺右键菜单的「Add Marker Here」用：
     /// `hit` 故意不认标尺）。读不到就是 nil，由调用方退回播放头。
     static func contextClickTime(project: VideoEditProject) -> Double? {
-        guard let geometry = TimelineScrollGeometry.live, let click = TimelineContextClick.last,
+        guard let geometry = TimelineScrollGeometry.live(for: project), let click = TimelineContextClick.last,
               let location = geometry.location(ofWindowPoint: click.point, in: click.window) else { return nil }
         return max(0, Double(location.content.x)) / max(project.pixelsPerSecond, 1)
     }

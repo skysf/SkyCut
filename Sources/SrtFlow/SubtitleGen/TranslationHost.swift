@@ -72,17 +72,21 @@ final class TranslationJobCoordinator: ObservableObject {
     private let startTimeout: Duration = .seconds(10)
 
     var isBusy: Bool { continuation != nil }
+    /// 这一次翻译是哪个工程那一次打开要的（工程代号，全 App 不重号）：关 / 换那个工程时只取消它自己的（`cancel(ifOwnedBy:)`）。
+    private var ownerGeneration: Int?
 
-    /// 提交一批 cue 文本，等待逐条译文（键 = cueID）。串行：忙时直接拒绝。
+    /// 提交一批 cue 文本，等待逐条译文（键 = cueID）。串行：忙时直接拒绝。`owner`：要译文的那个工程的代号。
     func translate(
         _ requests: [CueRequest],
         source: Locale.Language?,
-        target: Locale.Language
+        target: Locale.Language,
+        owner: Int? = nil
     ) async throws -> [UUID: String] {
         guard !isBusy else {
             throw HostError(message: L10n("Another translation is still running."))
         }
         guard !requests.isEmpty else { return [:] }
+        ownerGeneration = owner
         cancelRequested = false
         actionStarted = false
         let jobID = UUID()
@@ -116,6 +120,12 @@ final class TranslationJobCoordinator: ObservableObject {
                 "Translation didn’t start. Close the panel and try again."
             ))), for: jobID)
         }
+    }
+
+    /// 关 / 换一个工程时调：只取消那个工程那一次打开要的翻译（几个工程开着时别把别人的停了）。
+    func cancel(ifOwnedBy generation: Int) {
+        guard ownerGeneration == generation else { return }
+        cancel()
     }
 
     func cancel() {

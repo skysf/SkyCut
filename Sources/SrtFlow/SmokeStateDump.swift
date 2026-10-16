@@ -52,6 +52,10 @@ enum SmokeStateDump {
             (document?.cues ?? []).map { ["id": short($0.id), "start": round3($0.start), "end": round3($0.end)] }
         }
         return [
+            // 几个工程开着时（工程窗口）：这是哪一个、在不在播、撤销栈里有没有东西 —— 验「按键 / ⌘Z 只作用在自己的窗口」。
+            "project": project.shortID,
+            "playing": project.clock.isPlaying,
+            "canUndo": project.effectiveUndoManager?.canUndo ?? false,
             "playhead": round3(project.clock.time),
             "selection": [
                 "clips": selection.clipIDs.map(short).sorted(),

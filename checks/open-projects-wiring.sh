@@ -71,7 +71,51 @@ grep -q 'targetProject = project' "$RECORDING" \
 grep -q 'let project = targetProject ?? OpenProjects.shared.primary' "$RECORDING" \
   || fail "${RECORDING} 录完入轨没落回开录的那个工程"
 
+# ── 工程窗口（第 ①b 刀）────────────────────────────────────────────────────────────
+WINDOW=Sources/SrtFlow/ProjectWindowController.swift
+VIEW=Sources/SrtFlow/VideoEditView.swift
+DOCUMENT=Sources/SrtFlow/VideoEditProjectDocument.swift
+for f in "$WINDOW" "$VIEW" "$DOCUMENT"; do
+  [ -f "$f" ] || fail "找不到 ${f}：文件挪走了 —— 同步改这里"
+done
+
+# 6. 工程窗口的撤销管理器是工程自己的：delegate 交出 ownUndoManager，而且**先挂 delegate 再放内容**
+#    （窗口头一回被问时才问 delegate、之后记住；SwiftUI 的内容一放进来就会问 —— 2026-10-17 冒烟撞上的）。
+grep -q 'func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { project.ownUndoManager }' "$WINDOW" \
+  || fail "${WINDOW} 的 delegate 没交出工程自己的撤销管理器（⌘Z 会撤到窗口自己建的那一个）"
+DELEGATE_AT="$(grep -n 'window.delegate = self' "$WINDOW" | head -1 | cut -d: -f1 || true)"
+CONTENT_AT="$(grep -n 'window.contentView = host' "$WINDOW" | head -1 | cut -d: -f1 || true)"
+if [ -z "${DELEGATE_AT}" ] || [ -z "${CONTENT_AT}" ] || [ "${DELEGATE_AT}" -gt "${CONTENT_AT}" ]; then
+  fail "${WINDOW} 不是先挂 delegate（第 ${DELEGATE_AT:-?} 行）再放内容（第 ${CONTENT_AT:-?} 行）：SwiftUI 先问到窗口自己的撤销管理器就记住了"
+fi
+# 主窗口的撤销管理器只交给主窗口里的那个工程；工程窗口里的工程不许被它盖掉。
+grep -q 'if host == .mainWindow { project.undoManager = undoManager }' "$VIEW" \
+  || fail "${VIEW} 不分主窗口 / 工程窗口就把环境里的撤销管理器交给工程"
+
+# 7. 按键只认自己窗口里的：几个工程窗口各挂一个本地按键监听，不分的话按一次空格每个工程都开播。
+grep -q 'guard event.window === TimelineScrollGeometry.live(for: project)?.window else { return event }' "$VIEW" \
+  || fail "${VIEW} 的按键监听没先认「是不是我这个窗口的按键」"
+
+# 8. 录屏的框弹在开录的那个工程的窗口里、崩溃恢复只在主窗口（不然每个窗口各弹一个）。
+grep -q '.modifier(ScreenRecordingSheets(project: project, host: host))' "$VIEW" \
+  || fail "${VIEW} 的录屏框没走 ScreenRecordingSheets（按工程 / 主窗口分）"
+
+# 9. 关 / 换一个工程只停它自己的活：转写、翻译按代号认，upscale 按代号认；关工程要停引擎（喂样线程自己留着自己）。
+grep -q 'TranslationJobCoordinator.shared.cancel(ifOwnedBy: previous)' "$PROJECT" \
+  || fail "${PROJECT} 换工程时取消的不是「这个工程那一次打开」的翻译"
+grep -q 'UpscaleActivity.shared.cancelAll(projectGeneration: closing)' "$DOCUMENT" \
+  || fail "${DOCUMENT} 换工程时把所有工程的 upscale 都作废了（只许作废这一个工程的）"
+TEARDOWN="$(awk '/enum ProjectTeardown/,/^}/' "$REGISTRY")"
+for call in 'project.audioEngineHost.stop()' 'project.invalidateDocumentGeneration()' 'UpscaleActivity.shared.cancelAll(projectGeneration: closing)'; do
+  grep -qF "$call" <<<"${TEARDOWN}" || fail "关工程（ProjectTeardown）没做：${call}"
+done
+
+# 10. 存盘前只让**这个工程的剪辑页**里的输入框辞职：后台工程自动存盘时去踢键窗口，会打断用户在别处正打的字。
+grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$DOCUMENT" \
+  || fail "${DOCUMENT} 的 endPendingTextEditing 不分是不是这个工程的窗口就让键窗口的输入框辞职"
+
 if [ "${FAILED}" = "0" ]; then
-  echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程"
+  echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
+  echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框"
 fi
 exit "${FAILED}"
