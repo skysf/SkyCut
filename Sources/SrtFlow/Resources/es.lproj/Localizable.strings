@@ -150,6 +150,7 @@
 "Bold" = "Negrita";
 "Italic" = "Cursiva";
 "Letter spacing" = "Espaciado entre letras";
+"Line spacing" = "Interlineado";
 "Colours" = "Colores";
 "Background" = "Fondo";
 "Outline" = "Contorno";

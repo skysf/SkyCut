@@ -297,6 +297,29 @@ do {
     check(BurnInStyle.builtInPresets.allSatisfy(\.isBuiltIn), "presets marked built-in")
     checkEqual(Set(BurnInStyle.builtInPresets.map(\.id)).count, 5, "preset ids are unique")
 
+    // 行距（2026-10-16）：老文件 / 烧录页记住的老预设没有 lineSpacing 键 → 1（以前的样子）；存过的原样回来、超出 1–2 的夹回去；
+    // 不为它 +1 工程文件版本（老版本忽略不认识的键）。
+    if let data = try? JSONEncoder().encode(BurnInStyle.default),
+       var json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] {
+        json["lineSpacing"] = nil
+        let stripped = (try? JSONSerialization.data(withJSONObject: json)).flatMap { try? JSONDecoder().decode(BurnInStyle.self, from: $0) }
+        checkEqual(stripped?.lineSpacing, 1, "burn-in style without a lineSpacing key reads as 1")
+        checkEqual(stripped, BurnInStyle.default, "…and is otherwise the same style")
+        json["lineSpacing"] = 1.4
+        let kept = (try? JSONSerialization.data(withJSONObject: json)).flatMap { try? JSONDecoder().decode(BurnInStyle.self, from: $0) }
+        checkEqual(kept?.lineSpacing, 1.4, "burn-in style keeps a stored lineSpacing")
+        json["lineSpacing"] = 3.5
+        let clamped = (try? JSONSerialization.data(withJSONObject: json)).flatMap { try? JSONDecoder().decode(BurnInStyle.self, from: $0) }
+        checkEqual(clamped?.lineSpacing, 2, "burn-in style clamps lineSpacing to 1–2")
+    } else {
+        check(false, "could not encode the default burn-in style")
+    }
+    checkEqual(BurnInStyle(name: "x", lineSpacing: 0.4).lineSpacing, 1, "burn-in style init clamps lineSpacing up to 1 (it can only widen)")
+    checkEqual(BurnInStyle.assNumber(16.8), "16.8", "ASS numbers: trailing zeros trimmed")
+    checkEqual(BurnInStyle.assNumber(56), "56", "ASS numbers: whole numbers have no point")
+    checkEqual(BurnInStyle.lineSpacer(fontSize: 56, lineSpacing: 1), nil, "line spacing 1: no spacer")
+    checkEqual(BurnInStyle.lineSpacer(fontSize: 56, lineSpacing: 1.3), "{\\fs16.8}\\h{\\fs56}", "line spacing 1.3 at 56: a 16.8-high spacer line, then back to 56")
+
     // 半透明底框那一档应该走 BorderStyle 3。
     guard let box = BurnInStyle.builtInPresets.first(where: { $0.borderStyle == .box }) else {
         check(false, "a box-style preset exists"); exit(1)

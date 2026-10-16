@@ -150,6 +150,7 @@
 "Bold" = "粗体";
 "Italic" = "斜体";
 "Letter spacing" = "字间距";
+"Line spacing" = "行间距";
 "Colours" = "颜色";
 "Background" = "背景";
 "Outline" = "描边";

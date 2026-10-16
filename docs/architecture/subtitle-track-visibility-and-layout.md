@@ -174,6 +174,21 @@
      （`SubtitleLineFit.ems(for:appWide:renderSize:)`，放大的词按占一行的一半算），不然说到它时整行折到第二行 ——
      所以**先设样式、再生成字幕**；已经生成的字幕不重排。放大只适合一条只有几个词的短字幕；长的一行设 1（只换色）更稳。
    - 词的时间只存在工程里（v25）：.srt / .vtt / .ass 都没有这一项，导出字幕文件、外挂字幕文件都不带。
+3. **行距**（2026-10-16，测试员的第 8 条，[方案](../plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md)）：`BurnInStyle.lineSpacing`，
+   两行之间的距离是一行高度的多少倍，**1–2、默认 1**，烧录页的滑杆、AI 的 `style.line_spacing` 都是这个数。
+   - 为什么要有：libass 把每种字体的一行高度都钉成字号（按 OS/2 的 win 量度撑满），字形大小按这个量度反推 —— 圆体（Yuanti SC）的
+     win 量度只有 1.008 em（苹方 1.400、冬青黑体 1.16–1.24、Helvetica 1.18–1.25），字形几乎占满整行，两行挨在一起。
+   - **一个数、三条路**：预览的 VStack 间距在 `SubtitleLineMetrics.lineSpacing` 上再加 `(lineSpacing − 1) × 字号`（`BurnInSubtitleOverlay`）；
+     AI 读的框的块高加同样多（`SubtitleLineBoxes`）；烧录在两行之间垫一行只有一个不断行空格的空行 `{\fs<多出的>}\h{\fs<字号>}`
+     （`BurnInStyle.lineSpacer`，只在 `prewrapped` 那条路写：折行点是 App 自己写的 `\N`；导出给别人的 .ass 不带）。
+   - **只能加大、不能收紧**：ASS 没有行距这一项，ffmpeg 的 subtitles 滤镜也没暴露 libass 的行距接口，垫片只能往宽里垫，所以下限是 1。
+   - 为什么是 `\h` 不是真空行：2026-10-16 拿仓库的 ffmpeg 真烧量过（Helvetica 100 号、1080 画布）—— `\N{\fs30}\h{\fs100}\N` 正好多
+     30 px、`\fs60` 多 60，真的空行（`\N{\fs30}\N`）只多 15，普通空格多出整整 100。高亮用 `\fscx` / `\fscy`、点名字体用 `\fn`，都不碰
+     `\fs`，所以垫片后换回去的永远是样式的字号（布局的倍率已经乘在 ASS 样式的字号里）。
+   - 存盘：键在 `BurnInStyle` 的 JSON 里（工程的 `projectSubtitleStyle`、烧录页记住的预设都是它），缺键读 1、超出范围夹回来、老版本忽略
+     不认识的键 —— 两个方向都宽容，**工程文件不为它 +1 版本**。
+   - 守卫：`SrtFlowCoreChecks`（缺键读 1、垫片的样子、布局放大后按放大的字号算、1 和导出的 .ass 不垫）、`scripts/check-subtitle-burn-size.sh`
+     的 `PositionChecks`（1.4 / 1.25 的两行样本三种对齐下预览和成片的上下沿 ≤ 3 px）、`checks/MCP/SubtitleStyleChecks.swift`（范围、落到工程、回给 AI）。
 
 ## 选择模型：点选互斥 / 框选混选（剪辑 / 形状 / 字幕 cue）
 
@@ -366,6 +381,8 @@
       去烧录页看，那边记住的样式没变；点「用烧录页的样式」回去，一步撤销。
 - [ ] **放大的词**：AI 设了放大（1.2）后再生成字幕：说到的词变大，一行不会忽然折成两行。
 - [ ] **老版本**：0.17.1 测试版打开存过高亮 / 工程样式的工程：拒绝打开（v25）。
+- [ ] **行距**（2026-10-16 加）：烧录页把「行间距」拉到 1.3，预览里两行的距离变大；烧一条两行的字幕，成片和预览两行的距离一样；
+      剪辑页让 AI `style.line_spacing` 1.3，预览、导出、`get_subtitles` 报的框一起变；拉回 1 和以前逐像素一样。
 
 ### 两条独立轨（2026-09-26 加）
 

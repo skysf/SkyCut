@@ -169,6 +169,22 @@ private func checkMultiBlockASS() {
     let prewrapped = style.assDocument(blocks: block, aspectRatio: 16.0 / 9.0, prewrapped: true)
     check(prewrapped.contains("WrapStyle: 2") && prewrapped.contains("第一行\\N第二行"), "折好的：WrapStyle 2、换行写成 \\N")
     check(style.assDocument(blocks: block, aspectRatio: 16.0 / 9.0).contains("WrapStyle: 0"), "没折好的：还是 libass 的 WrapStyle 0")
+    // 行距（2026-10-16）：两行之间垫一行很矮的空行（libass 给空行的高度就是当时的字号），只在烧录（prewrapped）写、1 不写；
+    // 布局把字号放大时垫片和换回去的字号都按放大后的算。
+    var spaced = style
+    spaced.lineSpacing = 1.3
+    let spacedASS = spaced.assDocument(blocks: block, aspectRatio: 16.0 / 9.0, prewrapped: true)
+    let spacer = BurnInStyle.lineSpacer(fontSize: style.fontSize, lineSpacing: 1.3) ?? "missing"
+    check(spacedASS.contains("第一行\\N" + spacer + "\\N第二行"), "行距 1.3：两行之间垫一行 (1.3 − 1) × 字号 高的空行，再把字号换回去（\(spacer)）")
+    check(spacer.hasPrefix("{\\fs") && spacer.contains("}\\h{\\fs" + BurnInStyle.assNumber(style.fontSize) + "}"), "行距：垫片是 {\\fs…}\\h{\\fs字号}：\(spacer)")
+    check(!prewrapped.contains("\\h"), "行距 1：不垫")
+    check(!spaced.assDocument(blocks: block, aspectRatio: 16.0 / 9.0).contains("\\h"), "没折好的（导出给别人的 .ass）不垫")
+    let scaledLayout = SubtitleLayout(marginLeft: 0, marginRight: 0, marginBottom: 100, fontScale: 1.5)
+    let scaledASS = spaced.assDocument(
+        blocks: [SubtitleRenderBlock(cues: block[0].cues, layout: scaledLayout)], aspectRatio: 16.0 / 9.0, prewrapped: true
+    )
+    let scaledSpacer = BurnInStyle.lineSpacer(fontSize: style.fontSize * 1.5, lineSpacing: 1.3) ?? "missing"
+    check(scaledASS.contains(scaledSpacer), "行距：布局把字号放大 1.5 倍，垫片和换回去的字号都按放大后的算（\(scaledSpacer)）")
     checkEqual(BurnInStyle.playResolution(aspectRatio: 1920.0 / 1080).width, 1920, "虚拟画布：16:9 是 1920 宽")
     checkEqual(BurnInStyle.playResolution(aspectRatio: 608.0 / 1080).width, 608, "虚拟画布：9:16 的 608×1080 是 608 宽")
     checkEqual(BurnInStyle.playResolution(aspectRatio: 0).width, 1920, "虚拟画布：宽高比不像样当 16:9")
