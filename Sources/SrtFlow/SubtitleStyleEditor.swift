@@ -98,6 +98,14 @@ struct SubtitleStyleEditor: View {
                     step: 0.5,
                     readout: String(format: "%.1f", style.letterSpacing)
                 )
+                // 行距只能加大（ASS 没有这一项，烧录是垫一行空行）：从 1 起。
+                LabeledSlider(
+                    label: "Line spacing",
+                    value: $style.lineSpacing,
+                    range: BurnInStyle.lineSpacingRange,
+                    step: 0.05,
+                    readout: String(format: "%.2f×", style.lineSpacing)
+                )
             }
 
             Section("Colours") {

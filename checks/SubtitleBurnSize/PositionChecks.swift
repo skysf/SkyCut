@@ -17,6 +17,8 @@ private struct PlacedCase {
     var size: Double
     var bold: Bool
     var texts: [String]
+    /// 行距（`BurnInStyle.lineSpacing`，1 = libass 本来的）：烧录垫一行空行、预览加 VStack 的间距，两行之间多出的要一样多。
+    var lineSpacing = 1.0
     var why: String
 }
 
@@ -31,7 +33,14 @@ private let placedCases: [PlacedCase] = [
     PlacedCase(font: "Songti SC", size: 100, bold: false, texts: ["HHHH\nHHHH"], why: "hhea line taller than win: negative spacing"),
     PlacedCase(font: "Hiragino Sans GB", size: 100, bold: false, texts: ["Hello 南极\nHHHH 冰山"], why: "hhea ≠ win, other direction"),
     // 两套量度一样的字体：不许被挪。
-    PlacedCase(font: "Avenir Next", size: 100, bold: false, texts: ["HHHH\nHHHH"], why: "same metrics: leave alone")
+    PlacedCase(font: "Avenir Next", size: 100, bold: false, texts: ["HHHH\nHHHH"], why: "same metrics: leave alone"),
+    // 行距（2026-10-16）：烧录在两行之间垫一行 (1.4 − 1) × 100 = 40 高的空行（libass 给空行的高度就是当时的字号），预览给 VStack 加
+    // 同样多的间距；三种对齐下整块的上下沿都要对上（底部对齐第一行往上走、顶部对齐第二行往下走、居中各走一半）。
+    PlacedCase(font: "Helvetica", size: 100, bold: false, texts: ["HHHH\nHHHH", "Hello 南极\nHHHH 冰山"], lineSpacing: 1.4,
+               why: "line spacing 1.4: a 40 px spacer line between the lines"),
+    PlacedCase(font: "Hiragino Sans GB", size: 80, bold: true, texts: ["南极冰山\n企鹅"], lineSpacing: 1.25,
+               why: "line spacing 1.25 with a CJK font and the default bold"),
+    PlacedCase(font: "Helvetica", size: 100, bold: false, texts: ["HHHH"], lineSpacing: 1.6, why: "one line: line spacing changes nothing")
 ]
 
 func runPositionChecks(ffmpeg: String) {
@@ -39,8 +48,9 @@ func runPositionChecks(ffmpeg: String) {
         for text in item.texts {
             for position in placedPositions {
                 let style = BurnInStyle(name: "check", fontName: item.font, fontSize: item.size, bold: item.bold,
-                                        outlineWidth: 0, position: position)
-                let label = "\(text.replacingOccurrences(of: "\n", with: " / ")) [\(item.font)\(item.bold ? " bold" : "") \(Int(item.size)), \(position)]"
+                                        outlineWidth: 0, position: position, lineSpacing: item.lineSpacing)
+                let spacing = item.lineSpacing == 1 ? "" : ", line spacing \(item.lineSpacing)"
+                let label = "\(text.replacingOccurrences(of: "\n", with: " / ")) [\(item.font)\(item.bold ? " bold" : "") \(Int(item.size)), \(position)\(spacing)]"
                 let preview = MainActor.assumeIsolated { previewBox(text, style: style, highlights: [], highlight: nil) }
                 let burned = burnBox(text, style: style, highlights: [], highlight: nil, ffmpeg: ffmpeg)
                 guard let preview, let burned else {

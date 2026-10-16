@@ -99,6 +99,10 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v31 | `ShapeAnnotation.animation` —— 形状的入场 / 出场动画（2026-10-03；**按需写入**：没设动画的形状不落键） | 只认 v30 的旧版不认识这个键，读进来当没有，随手编辑触发自动保存就把动画抹掉 —— 成片里的圆环又变回突然出现。见 [画面上的形状](shapes.md) 第三节 |
 | v32 | `Keyframe.easing` 的 `snap` / `overshoot` / `spring` 三个值 —— 关键帧的急停、回弹、弹簧（2026-10-05；照旧按需写入：linear 不落键） | 只认 v31 的旧版按宽容解码把这三个值退成 linear，推近和弹进来变成直线；随手编辑触发自动保存即永久丢失。见 [关键帧动画](keyframe-animation.md)「缓动」 |
 
+> 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
+> 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存
+> 会把它抹掉但不改别的 —— 两个方向都宽容，不值一个版本号。
+
 > v7 还带一条**读时迁移**：v6 及更早的工程按 `formatVersion < 7` 判断，
 > 载入时把 `translationHidden` 置为 true。那些版本的默认预览/烧录就是
 > 「只有原文」，缺键回退 false 会把老工程的成片悄悄变成双语 ——

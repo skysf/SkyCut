@@ -39,6 +39,9 @@ private func styleParsing() {
     checkThrows("style：阴影和底条都给报错（阴影跟描边走）") { _ = try change(["shadow": "#000000B3", "box": "#00000099"]) }
     checkThrows("style：字色不能是 none") { _ = try change(["color": "none"]) }
     checkThrows("style：放大超过 1.3 报错") { _ = try change(["highlight_scale": 2]) }
+    checkEqual(try? change(["line_spacing": 1.25])?.lineSpacing, 1.25, "style：行距是一行高度的倍数")
+    checkThrows("style：行距不能小于 1（烧录只能加大）") { _ = try change(["line_spacing": 0.9]) }
+    checkThrows("style：行距不能超过 2") { _ = try change(["line_spacing": 2.5]) }
     checkThrows("style：style 不是对象报错") { _ = try AISubtitleStyleChange(AIToolArguments(.object(["style": "big"]))) }
     func font(_ name: String, aliases: [String] = []) -> SubtitleFont {
         SubtitleFont(familyName: name, fileURL: URL(fileURLWithPath: "/tmp/\(name).ttf"), supportsChinese: true, aliases: aliases)
@@ -99,6 +102,10 @@ private func styleOnProject() {
     checkEqual(state.subtitleStyle(appWide: appWide).fontSize, 70, "工程：给了字号就改工程自己的样式")
     checkEqual(state.subtitleLayout?.fontScale, 1, "工程：只给字号时拖框的布局留着、字号倍率归一（出来就是这个字号）")
     checkEqual(appWide, BurnInStyle.default, "工程：烧录页记住的那套不动")
+    try? change(["line_spacing": 1.3])?.apply(to: &state, appWide: appWide, canvas: wideCanvas)
+    checkEqual(state.subtitleStyle(appWide: appWide).lineSpacing, 1.3, "工程：行距落到工程自己的样式上")
+    checkEqual(state.subtitleStyle(appWide: appWide).fontSize, 70, "工程：改行距不动字号")
+    checkEqual(AISubtitleStyleChange.describe(state, appWide: appWide, canvas: wideCanvas)["line_spacing"]?.doubleValue, 1.3, "回给 AI：行距")
     try? change(["position": "top", "margin": 0.08])?.apply(to: &state, appWide: appWide, canvas: wideCanvas)
     check(state.subtitleLayout == nil && state.translationLayout == nil, "工程：给了位置就收掉拖框的布局（它锚定在底部，会盖住位置）")
     checkEqual(state.subtitleStyle(appWide: appWide).position, .topCenter, "工程：位置")
