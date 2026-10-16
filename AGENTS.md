@@ -280,6 +280,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
+- 冒烟拷工程的脚本不许整夹拷「下载」「桌面」「文稿」、家目录、根目录，太大的文件夹也不拷（真跑脚本、假的家目录）：`checks/copy-project-guard.sh`。
 - **进程内 GUI 冒烟**（人在用这台机器时也能跑：不动鼠标、不抢前台，按步骤表点 / 拖 / 滚 / 按键，
   结果里带选择、各段位置和每个视图重算了几次）：`scripts/gui-smoke/in-process/run.sh <步骤.json> [工程拷贝]`。
   **要图形会话，不在 `check-all.sh` 里**；格式与坑见 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md)「四之六」。
@@ -787,6 +788,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-16 listen cuts=true 建议的那一格，照做之后又被报成切到字](docs/bugfixes/2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md) — 两个词连着说、中间只有一格安静（不到一个停顿），
   检查建议切到那一格，照做再查却报 on_speech 且给不出建议：把算法自己的最佳选择当成了问题。加 `quiet_spot` 一档（不叫词、只有真停顿够得着才建议）；守卫写进「照建议改完再查」这一步。
   **检查类的工具要和自己的建议闭环。**
+- [2026-10-17 冒烟拷工程时把整个「下载」文件夹拷走、写满了磁盘](docs/bugfixes/2026-10-17-copy-project-copied-all-of-downloads.md) — `copy-project.sh` 把工程所在的整个文件夹当素材目录拷，
+  工程直接放在「下载」根目录时拷了 45 GB；现在来源是根目录 / 家目录 / 「下载」「桌面」「文稿」本身、或超过 4 GB 一律拒绝，`checks/copy-project-guard.sh` 真跑脚本钉着。
+  **整夹拷之前先看来源是什么文件夹；测试工具也要和产品代码一样设防。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档

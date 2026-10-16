@@ -272,7 +272,8 @@ scripts/gui-smoke/in-process/run.sh <scratchpad>/steps.json <scratchpad>/southpo
   2026-10-17 加了**几个工程窗口**的步骤（[开着的工程](../architecture/open-projects.md)）：`projectWindow`（在一个新的工程窗口里开一份工程，
   日志写它的短 id）、任何一步带 `"project": "p2"` 就作用在那个工程和它的窗口上（按键投进它的窗口、`state` 记它的样子）、`undo`（先让输入框辞职，
   再沿响应链发 `undo:` —— ⌘Z 是菜单快捷键，驱不动）、`closeWindow`（点那个工程窗口的关闭按钮）。`state` 里多了 `project` / `playing` / `canUndo`。
-  **第二份工程别用放在「下载」根目录的工程去拷**：`copy-project.sh` 把工程所在的整个文件夹当素材目录，2026-10-17 拷了 45 GB、写满了磁盘 ——
+  **第二份工程别用放在「下载」根目录的工程去拷**：`copy-project.sh` 把工程所在的整个文件夹当素材目录，2026-10-17 拷了 45 GB、写满了磁盘
+  （[案例](../bugfixes/2026-10-17-copy-project-copied-all-of-downloads.md)；现在脚本拒绝根目录 / 家目录 / 「下载」「桌面」「文稿」本身和超过 4 GB 的文件夹）——
   同一个素材文件夹里复制一份工程文件就是第二个工程（同一个文件只开一份，两个文件名不同就行）。
   坐标是**窗口的点、左上原点**（按窗口 ID 截的图除以 2）。**菜单只能读、不能点**；`menu` 读之前先让菜单的
   代理更新一遍（`menuNeedsUpdate`，AppKit 在菜单要打开时做的就是这个）—— SwiftUI 的 `Commands` 那时才把
