@@ -59,6 +59,10 @@ struct AICutCheck {
     enum Verdict: Equatable {
         /// 落在量出来的停顿里。
         case inPause
+        /// 落在两个词之间最安静的那一格里：不到一个停顿（`AISpeechCutPoints.minPause`），附近也没有真的停顿 —— cut_speech 找不到停顿时
+        /// 就切在这儿，这里也不算切到字（2026-10-16 冒烟：第一版把自己建议的这一格又报成 on_speech、还给不出更好的地方，
+        /// docs/bugfixes/2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md）。
+        case quietSpot
         /// 落在声音上：切到的词（转写缓存里有才有）、为什么这么判（`AISpeechCutPoints.Point.why`）。
         case onSpeech(word: String?, why: String)
         /// 这一头量不了：没声音 / 静音 / 藏起来了 / 波形还没读完。
@@ -88,8 +92,15 @@ struct AICutCheck {
     static func side(of clip: EditClip, end: AISpeechCutPoints.Side, at: Double, sound: EditClip, points: AISpeechCutPoints) -> Side {
         let sourceAt = sound.sourceTime(atTimeline: at)
         let point = points.point(sourceAt, end)
-        guard let why = point.why else { return Side(clipID: clip.id, end: end, at: at, verdict: .inPause) }
-        var side = Side(clipID: clip.id, end: end, at: at, verdict: .onSpeech(word: word(at: sourceAt, in: points.words), why: why))
+        var side = Side(clipID: clip.id, end: end, at: at, verdict: .inPause)
+        guard let why = point.why else { return side }
+        if points.quiet.contains(where: { holds($0, sourceAt) }) {
+            // 最安静的那一格：只有真的停顿可去才建议挪 —— 挪到另一个安静窗没有意义（挪过去再查还是这一句）。
+            side.verdict = .quietSpot
+            guard points.pauses?.contains(where: { holds($0, point.time, tolerance: 0) }) == true else { return side }
+        } else {
+            side.verdict = .onSpeech(word: word(at: sourceAt, in: points.words), why: why)
+        }
         if abs(point.time - sourceAt) > 1e-6 {
             let suggestedAt = sound.timelineTime(atSource: point.time)
             let source = clip.sourceTime(atTimeline: suggestedAt)
@@ -99,6 +110,11 @@ struct AICutCheck {
             }
         }
         return side
+    }
+
+    /// 这一刻在不在这一段里（贴着边也算：listen 报的静音边就是电平窗的边，同 `AISpeechCutPoints.edgeTolerance`）。
+    private static func holds(_ span: ClosedRange<Double>, _ time: Double, tolerance: Double = AISpeechCutPoints.edgeTolerance) -> Bool {
+        time >= span.lowerBound - tolerance && time <= span.upperBound + tolerance
     }
 
     static func unheard(_ clip: EditClip, end: AISpeechCutPoints.Side, at: Double, _ reason: String) -> Side {
@@ -131,6 +147,9 @@ struct AICutCheck {
         switch side.verdict {
         case .inPause:
             object["status"] = "in_pause"
+        case .quietSpot:
+            object["status"] = "quiet_spot"
+            object["why"] = "no full pause within reach: the cut sits in the quietest moment between two words (cut_speech would cut here too)"
         case .onSpeech(let word, let why):
             object["status"] = "on_speech"
             if let word { object["word"] = .string(word) }

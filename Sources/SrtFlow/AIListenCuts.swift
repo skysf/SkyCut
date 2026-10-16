@@ -63,7 +63,8 @@ enum AIListenCuts {
             )
         }
         result["note"] = .string(
-            "in_pause: the cut sits in a pause of that clip's sound. on_speech: it cuts into speech; suggested_source_in / "
+            "in_pause: the cut sits in a pause of that clip's sound. quiet_spot: no full pause nearby, so it sits in the quietest "
+                + "moment between two words (fine as it is). on_speech: it cuts into speech; suggested_source_in / "
                 + "suggested_source_out is the nearest pause, in that clip's source seconds: pass it to edit_clip (a trim keeps the clip's "
                 + "timeline start; add ripple=true so the later V1 clips follow a changed end)."
         )

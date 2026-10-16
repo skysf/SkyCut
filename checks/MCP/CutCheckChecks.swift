@@ -10,6 +10,7 @@ import SrtFlowMCPKit
 func runCutCheckChecks() {
     checkCutBoundaries()
     checkCutSides()
+    checkCutQuietSpot()
     checkCutLinkedSound()
     checkCutJSON()
 }
@@ -109,6 +110,34 @@ private func checkCutSides() {
     check(noWords.suggestedSource.map { $0 > 41.48 && $0 < 41.96 } == true, "…but still suggests the pause (got \(noWords.suggestedSource ?? -1))")
 }
 
+/// 两个词连着说、中间只有一个安静窗（0.04 秒，不到一个停顿）：切在词上时建议挪进那一格；照建议改完再查，那一格是 quiet_spot ——
+/// 不叫词、不再建议。2026-10-16 测试版冒烟：第一版把自己建议的那一格又报成 on_speech（词是「custom」）、还给不出更好的地方
+///（docs/bugfixes/2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md）。真的停顿在够得着的地方时，安静窗里的切口照样建议挪进停顿。
+private func checkCutQuietSpot() {
+    let words = [cutWord("custom", 38.10, 38.64), cutWord("AI", 38.64, 39.30)]
+    // 响到 38.46、38.46–38.50 一格安静、38.50 起又响（窗从 37.5 起每 0.04 秒一个）。
+    let points = AISpeechCutPoints(words: words, levels: cutLevels(from: 37.5, to: 40, loud: [37.5...38.45, 38.51...40]), silenceDB: -40)
+    check(points.pauses?.isEmpty == true && points.quiet.count == 1, "the sample has one quiet window and no pause (got \(points.quiet))")
+    let clip = videoClip(0, 2.5, sourceStart: 37.5)
+    let onWord = AICutCheck.side(of: clip, end: .start, at: 38.9 - 37.5, sound: clip, points: points)
+    guard case .onSpeech(let word, let why) = onWord.verdict else { return check(false, "a head on 'AI' with no pause around: on_speech, got \(onWord.verdict)") }
+    checkEqual(word, "AI", "…names the word")
+    check(why.contains("quiet spot"), "…and says it moved to the quiet spot (\(why))")
+    check(onWord.suggestedSource.map { $0 > 38.45 && $0 < 38.51 } == true, "…suggested source_in is that quiet window (got \(onWord.suggestedSource ?? -1))")
+    guard let suggestedAt = onWord.suggestedAt else { return check(false, "…with a timeline moment") }
+    let moved = AICutCheck.side(of: clip, end: .start, at: suggestedAt, sound: clip, points: points)
+    checkEqual(moved.verdict, .quietSpot, "cut where it suggested, the head checks back as quiet_spot (not on_speech)")
+    check(moved.suggestedSource == nil && moved.suggestedAt == nil, "…and nothing further is suggested")
+    checkEqual(AICutCheck.side(of: clip, end: .end, at: suggestedAt, sound: clip, points: points).verdict, .quietSpot, "…the tail side too")
+    // 安静窗旁边够得着一个真的停顿：照旧建议挪进停顿。
+    let withPause = AISpeechCutPoints(
+        words: words, levels: cutLevels(from: 37.5, to: 40, loud: [37.5...38.45, 38.51...38.80, 39.20...40]), silenceDB: -40
+    )
+    let better = AICutCheck.side(of: clip, end: .start, at: suggestedAt, sound: clip, points: withPause)
+    checkEqual(better.verdict, .quietSpot, "a quiet window with a real pause within reach: still quiet_spot")
+    check(better.suggestedSource.map { $0 > 38.80 && $0 < 39.20 } == true, "…but it points at the real pause (got \(better.suggestedSource ?? -1))")
+}
+
 /// 画面静音、声音在链接的音频段上，两段的源时间轴不一样：判在声音那条轴上，建议换回画面这一段的源时间。
 private func checkCutLinkedSound() {
     var video = videoClip(10, 2, sourceStart: 5)
@@ -151,6 +180,11 @@ private func checkCutJSON() {
     checkEqual(AICutCheck.onSpeechCount(edges), 1, "one side on speech")
     let hardCut = AICutCheck.json([AICutCheck.Edge(at: 7, incoming: AICutCheck.Side(clipID: b.id, end: .start, at: 7, verdict: .inPause))], ids: ids).first
     check(hardCut?["transition"] == nil && hardCut?["out"] == nil, "a head alone: no transition, no out side")
+    let quiet = AICutCheck.json(AICutCheck.Side(clipID: a.id, end: .end, at: 4, verdict: .quietSpot), ids: ids)
+    checkEqual(quiet["status"]?.stringValue, "quiet_spot", "a side in the quietest spot between words")
+    check(quiet["why"]?.stringValue?.contains("quietest") == true && quiet["word"] == nil, "…says why and names no word")
+    checkEqual(AICutCheck.onSpeechCount([AICutCheck.Edge(at: 4, outgoing: AICutCheck.Side(clipID: a.id, end: .end, at: 4, verdict: .quietSpot))]), 0,
+               "a quiet spot does not count as on speech")
     let unheard = AICutCheck.json(AICutCheck.Side(clipID: a.id, end: .end, at: 4, verdict: .unheard("muted: nothing to hear at this cut")), ids: ids)
     checkEqual(unheard["status"]?.stringValue, "unheard", "a side that could not be heard")
     check(unheard["note"]?.stringValue?.hasPrefix("muted") == true, "…says why")

@@ -454,6 +454,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [视频 upscale 实测：六个 fal 模型、八个档位、19 条真素材](docs/reports/2026-10-02-upscale-smoke-test.md) — 2026-10-02 南极工程上真跑：每条的帧数 / 耗时 / 估价 / 实收 / 账单 units，
   三家的计费规律（字节按秒精确、FLUX 按像素·秒线性、Topaz 按 unit 且台阶没公开）、只有 FLUX 原样保留声音、FLUX ±1 帧、上传要 `fal-cdn-v3`、画质印象。
 - [AI 接口（MCP）第六块实施报告](docs/reports/2026-09-29-mcp-slice6-report.md) — fal.ai 生成：用户定「视频只用 minimax/h3-max/、加音乐音效、只用最新的模型」之后的模型表、Key（钥匙串）、每日上限与提示条上先问、`generate_media`、清单按 Key 列不列、配旁白的 fal 档与克隆；证据（373 + 1132 项、反向验证、端到端冒烟）、撞上的事（取消发不出去、钥匙串授权框、冒烟把文件放进了下载文件夹）、没对真 fal 验过的、等用户拍板的（钥匙串授权框取舍、默认模型）。
+- [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 在 L30 口播上的五个剪辑点怎么报、照建议改完撞出的
+  quiet_spot bug；字幕行距 1 → 1.3 预览第一行上移 21 px、成片和预览两行上下沿差 ≤ 2 px；这台 Mac 的圆体进不了烧录字体清单。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
@@ -766,6 +768,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-16 edit_clip 改入点：开头不动、结尾动，这条有意的差别只写在注释里](docs/bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md) — 测试员挑一段试了才知道改 source_in 时时间线上的开头固定、结尾动；
   行为是故意的（AI 给绝对值，拖把手才连开头一起挪），但只在 `AIClipEdit` 的注释里。说明和两个参数旁边写明、要保住结尾就同时给 start，`ProtocolChecks` 钉着那句。
   **和界面惯例不一样的行为本身就是要写进说明的事实：注释给人、说明给 AI，两边各一份。**
+- [2026-10-16 listen cuts=true 建议的那一格，照做之后又被报成切到字](docs/bugfixes/2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md) — 两个词连着说、中间只有一格安静（不到一个停顿），
+  检查建议切到那一格，照做再查却报 on_speech 且给不出建议：把算法自己的最佳选择当成了问题。加 `quiet_spot` 一档（不叫词、只有真停顿够得着才建议）；守卫写进「照建议改完再查」这一步。
+  **检查类的工具要和自己的建议闭环。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档

@@ -263,7 +263,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **一次查完 V1 的剪辑点**（`cuts=true`，2026-10-16 测试员的第 10 条，[方案](../plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md)）：
      不另开工具（会和 listen 长得像）。V1 每一段的头和尾都是剪辑点（`AICutCheck.boundaries`：挨着的两段合成一个、跨着转场的带 `transition`、
      开着缝的各报各的、第一段的头和最后一段的尾也报、from / to 只留落在里面的），每一头在**它声音自己的源时间轴**上判 —— 声音从哪段来
-     同 cut_speech 的 `speechClip`，在不在停顿里、挪到哪只有 `AISpeechCutPoints` 一份，门限同 cut_speech；**在声音上才报切到的词**
+     同 cut_speech 的 `speechClip`，在不在停顿里、挪到哪只有 `AISpeechCutPoints` 一份，门限同 cut_speech。**三种结论**：`in_pause`（在量出来的
+     停顿里）、`quiet_spot`（不到一个停顿、但正落在两个词之间最安静的那一格 —— cut_speech 找不到停顿时就切在这儿，不算切到字、不叫词，
+     只有真的停顿够得着才给建议；2026-10-16 冒烟撞出的，[案例](../bugfixes/2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md)：
+     **检查要和自己的建议闭环**，照建议改完再查必须是好的）、`on_speech`；**在声音上才报切到的词**
      （转写把停顿后面第一个词的开口估早了，在停顿里按词判会冤枉它；盖着的词，没有就是 0.3 秒内最近的）和建议的 `suggested_source_in` /
      `suggested_source_out`（换回这一段 V1 片段自己的源时间，AI 直接拿去 edit_clip；落到素材外面的不给）。转写**只读缓存、不起任务**
      （listen 是只读工具），没有就说一句；波形没读完的那几头报「还在读」；一次最多 80 个剪辑点。纯值在 `checks/MCP/CutCheckChecks.swift`，
