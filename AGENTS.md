@@ -458,6 +458,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [AI 接口（MCP）第六块实施报告](docs/reports/2026-09-29-mcp-slice6-report.md) — fal.ai 生成：用户定「视频只用 minimax/h3-max/、加音乐音效、只用最新的模型」之后的模型表、Key（钥匙串）、每日上限与提示条上先问、`generate_media`、清单按 Key 列不列、配旁白的 fal 档与克隆；证据（373 + 1132 项、反向验证、端到端冒烟）、撞上的事（取消发不出去、钥匙串授权框、冒烟把文件放进了下载文件夹）、没对真 fal 验过的、等用户拍板的（钥匙串授权框取舍、默认模型）。
 - [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 在 L30 口播上的五个剪辑点怎么报、照建议改完撞出的
   quiet_spot bug；字幕行距 1 → 1.3 预览第一行上移 21 px、成片和预览两行上下沿差 ≤ 2 px；这台 Mac 的圆体进不了烧录字体清单。
+- [字幕默认单行 + 行数开关的测试版冒烟（0.18.37）](docs/reports/2026-10-16-subtitle-line-count-smoke.md) — PR #222 合并后真机过一遍：`max_lines=3` 报错、默认 59 条全单行、`max_lines=2` 39 条 / 19 条两行且框报 `lines: 2`、撤销两步各退一层；面板拨到「2 行」生成和 AI 那一路一样、工程文件写进 `subtitleMaxLines: 2`；面板下拉两套自动化都点不了、是用户点的。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
