@@ -156,6 +156,9 @@ func runProtocolChecks() {
     }
     check(servedDescription("export_video").contains("music_credits"), "export_video asks the AI to pass on the music credits")
     check(servedDescription("recipes").contains("which one you follow"), "recipes asks the AI to tell the user which style it follows")
+    // 裁切的语义是故意和拖把手不同的（AI 给绝对值：时间线上的开头不动、结尾动），2026-10-16 之前只写在代码注释里，测试员试了才知道
+    // （docs/bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md）。
+    check(servedDescription("edit_clip").contains("timeline start stays"), "edit_clip says a trim keeps the clip's timeline start and moves its end")
     // 不按个数卡（2026-09-28 用户拍板，方案第 33 条），卡说明的总长度：工具说明每一轮都进 AI 的上下文，
     // 用户那边还开着别的 MCP。上限 90,000 字符、约 2.5 万 token（按 3.6 个字符一个 token 估；2026-10-02 用户定从 72,000 抬到 80,000，
     // 给 upscale_clip 腾地方；2026-10-14 审美盲测的六样功能加完只剩 26 字，用户定再抬到 90,000）；超了先把说明写短、或者并掉长得像的工具。

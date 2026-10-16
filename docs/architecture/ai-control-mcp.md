@@ -629,6 +629,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     ② **坐标只用它用的那一套** —— 时间线秒，或片段的比例（`set_keyframes relative=true`），不让它自己换算素材时间；
     ③ **每个改动的结果把连带发生的事说清楚**，意图用参数说而不是靠拖拽的惯例（`edit_clip keyframes` = keep_frames / stretch / clear，
     结果里 `keyframes_note`；`split_clip` 的结果给两半各自的关键帧）。以后每个工具都照这三条审。
+    ③ 的反面教材：`edit_clip` 的 source_in / source_out 是绝对值 —— 片段在时间线上的**开头不动、结尾动**（拖左把手是连开头一起挪），
+    要保住结尾就同时给 start。这条有意的差别 2026-10-16 之前只写在 `AIClipEdit` 的注释里，测试员挑一段试了才知道；现在写在说明和
+    两个参数旁边，`ProtocolChecks` 钉着说明里的那句（[案例](../bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md)）。
+    **和界面惯例不一样的行为本身就是要写进说明的事实，注释给人、说明给 AI，两边各一份。**
 
 43. **合成音效（`add_clips` 的 `sound_effect` 条目 + `hit_at`，2026-09-30；合同全在 [合成音效](sound-effect-synth.md)）**：不另开工具
     （第一节第 5 条：先看加参数行不行），条目和 `file` / `library_id` 并列，三个只给一个；预设名走词表 `MCPVocabulary.soundEffectPresets`

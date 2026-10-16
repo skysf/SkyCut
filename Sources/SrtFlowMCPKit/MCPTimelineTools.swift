@@ -296,7 +296,8 @@ public enum MCPTimelineTools {
             .editClip, title: "Change a clip",
             description: """
             Change one clip; only the fields you pass change. Move it (start, track), trim it (source_in/source_out are \
-            seconds in the source file), or set speed, volume in dB, mute, hide, and audio fade in/out. A move or trim that \
+            seconds in the source file: the clip's timeline start stays where it is and its end moves; pass start too to \
+            keep the end in place), or set speed, volume in dB, mute, hide, and audio fade in/out. A move or trim that \
             would overlap another clip on the same track fails and names that clip; ripple=true on V1 moves the later V1 \
             clips along instead. Picture (video and image clips): fit=fill fills the whole frame and cuts off what \
             sticks out. It aims at the subject SrtFlow finds in a few frames (faces, then \
@@ -318,8 +319,8 @@ public enum MCPTimelineTools {
                 ),
                 "start": MCPSchema.number("New timeline start, seconds.", minimum: 0),
                 "track": MCPSchema.string(MCPSchema.trackDescription),
-                "source_in": MCPSchema.number("New start inside the source file, seconds.", minimum: 0),
-                "source_out": MCPSchema.number("New end inside the source file, seconds.", minimum: 0),
+                "source_in": MCPSchema.number("New start inside the source file, seconds. The clip's timeline start stays; its end moves.", minimum: 0),
+                "source_out": MCPSchema.number("New end inside the source file, seconds; the clip's end moves.", minimum: 0),
                 "speed": MCPSchema.number("Playback speed, 1 = normal.", minimum: 0.1, maximum: 8),
                 "volume_db": MCPSchema.number("Volume change in dB, 0 = original; with a volume_curve it shifts the whole curve.", minimum: -60, maximum: 6.02),
                 "muted": MCPSchema.boolean("Silence the clip."),
