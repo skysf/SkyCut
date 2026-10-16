@@ -38,7 +38,8 @@ SESSION="Sources/SrtFlow/ScreenRecordingSession.swift"
 COMMIT="Sources/SrtFlow/ScreenRecordingFileCommit.swift"
 PANEL="Sources/SrtFlow/ScreenRecordingControlPanel.swift"
 IMPORT="Sources/SrtFlow/VideoEditProject+ScreenRecording.swift"
-VIEW="Sources/SrtFlow/VideoEditView.swift"
+# 设置页、残缺框、恢复框 2026-10-17 从 VideoEditView 搬进 ScreenRecordingSheets（按工程 / 主窗口分，docs/architecture/open-projects.md）。
+VIEW="Sources/SrtFlow/ScreenRecordingSheets.swift"
 ROUTER="Sources/SrtFlow/AIToolRouter.swift"
 TOOL="Sources/SrtFlow/AIScreenRecordingTool.swift"
 LEFTOVERS="Sources/SrtFlow/AIScreenRecordingLeftovers.swift"
@@ -81,7 +82,7 @@ grep -q 'options.preset = picked.preset' "${TOOL}" || fail "${TOOL}：开录没�
 grep -q 'var asksTheUser: Bool { driver == .user }' "${SESSION}" || fail "${SESSION}：asksTheUser 应当只对手动的会话为真"
 grep -q 'var showsSetupSheet: Bool { state == .configuring && session.asksTheUser }' "${COORDINATOR}" \
   || fail "${COORDINATOR}：设置页的显隐要排除 AI 起的会话（它也路过 .configuring）"
-grep -q 'get: { recordingCoordinator.showsSetupSheet }' "${VIEW}" || fail "${VIEW}：设置页没按 showsSetupSheet 显示（AI 开录会弹出设置页）"
+grep -q 'get: { coordinator.showsSetupSheet && isTarget }' "${VIEW}" || fail "${VIEW}：设置页没按 showsSetupSheet 显示（AI 开录会弹出设置页）"
 grep -q 'if recording.isPartial, session.asksTheUser {' "${COORDINATOR}" \
   || fail "${COORDINATOR}：残缺结果的处置框只给手动的会话（AI 点不着，工程会一直锁着）"
 [ "$(count 'pendingPartial = recording' "${COORDINATOR}")" -eq 1 ] || fail "${COORDINATOR}：残缺框只许在那一处端出来"

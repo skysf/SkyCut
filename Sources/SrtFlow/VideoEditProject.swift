@@ -105,13 +105,14 @@ final class VideoEditProject {
 
     /// 切工程：作废所有还没回来的后台导入。
     func invalidateDocumentGeneration() {
+        let previous = documentGeneration
         documentGeneration = DocumentGenerations.next()
         for task in importTasks { task.cancel() }
         importTasks.removeAll()
-        // 字幕生成/翻译也绑工程：切走就取消，别让旧任务白跑完整个素材、还占着串行槽挡住新工程的生成。
-        // AI 的 transcribe 只转文件、不绑工程，不取消（cancelIfBoundToProject 自己判）；对空闲任务是无害的 no-op。
-        if #available(macOS 26.0, *) { TranscriptionTask.shared.cancelIfBoundToProject() }
-        if #available(macOS 15.0, *) { TranslationJobCoordinator.shared.cancel() }
+        // 字幕生成/翻译也绑工程：切走就取消，别让旧任务白跑完整个素材、还占着串行槽挡住新工程的生成。只取消**这个工程**
+        // 那一次打开的（几个工程开着时别把别人的停了）；AI 的 transcribe 只转文件、不绑工程，不取消。对空闲任务是无害的 no-op。
+        if #available(macOS 26.0, *) { TranscriptionTask.shared.cancelIfBound(toGeneration: previous) }
+        if #available(macOS 15.0, *) { TranslationJobCoordinator.shared.cancel(ifOwnedBy: previous) }
     }
 
     /// 后台任务回来时先问一句：我还是当初那个工程吗？
@@ -282,11 +283,12 @@ final class VideoEditProject {
         guard on != state.mainMagnet else { return }
         perform(rebuildsPreview: on) { $0.mainMagnet = on }   // 一步撤销；打开时 perform 收尾把 V1 排紧
     }
-    var snappingEnabled = EditorToggles.read(.snapping) { didSet { EditorToggles.write(.snapping, snappingEnabled) } }
-    var linkageEnabled = EditorToggles.read(.linkage) { didSet { EditorToggles.write(.linkage, linkageEnabled) } }
+    // 吸附 / 联动 / 播放跟随全 App 一份：一个工程窗口里拨了，别的开着的工程跟着拨（OpenProjects.sync）。
+    var snappingEnabled = EditorToggles.read(.snapping) { didSet { EditorToggles.write(.snapping, snappingEnabled); OpenProjects.shared.sync(\.snappingEnabled, from: self) } }
+    var linkageEnabled = EditorToggles.read(.linkage) { didSet { EditorToggles.write(.linkage, linkageEnabled); OpenProjects.shared.sync(\.linkageEnabled, from: self) } }
     /// 播放时时间线跟着播放头翻页；关着时播放头可以走出视口、停下也不滚回来（TimelinePlayheadLines）。
     var timelineFollowsPlayhead = EditorToggles.read(.followPlayhead) {
-        didSet { EditorToggles.write(.followPlayhead, timelineFollowsPlayhead) }
+        didSet { EditorToggles.write(.followPlayhead, timelineFollowsPlayhead); OpenProjects.shared.sync(\.timelineFollowsPlayhead, from: self) }
     }
 
     /// 时间线缩放：一秒画多少点。
@@ -414,15 +416,7 @@ final class VideoEditProject {
         }
         defaultVideoRowHeight = stored("editVideoRowHeight", 54)
         defaultAudioRowHeight = stored("editAudioRowHeight", 34)
-
-        // 素材在工程开着的时候也可能被改名 / 挪走，去访达动文件必然让 App 失焦 —— 一激活就重核对，块名和丢失提示当场跟上。
-        NotificationCenter.default.addObserver(
-            forName: NSApplication.didBecomeActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor in self?.revalidateMediaLocations() }
-        }
+        // App 一激活就重核对素材位置：注册表替每个开着的工程挂这一个观察者（OpenProjects，工程关了不留观察者）。
         optimizedMedia.project = self  // 协调者要请重建、读播放状态；弱引用
     }
 

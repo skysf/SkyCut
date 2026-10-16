@@ -324,7 +324,7 @@ struct VideoEditTimelineView: View {
 
             // 滚动量的现读与自动滚动都要直接摸 NSScrollView，放个零尺寸参照物
             // 把它认出来。
-            TimelineScrollViewAccessor(geometry: scrollGeometry, scroller: autoScroller)
+            TimelineScrollViewAccessor(geometry: scrollGeometry, scroller: autoScroller, owner: project)
                 .frame(width: 0, height: 0)
 
             // 拉开的缝里那条插入线：三种拖动（素材块 / 文件 / 音频库）都画这一条。

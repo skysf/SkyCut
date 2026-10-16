@@ -78,8 +78,9 @@ enum SmokeDriver {
                 // 工程的哪个属性变了几轮（`event:project.changed.<属性>`，见 SmokeProjectChanges.swift）。
                 try SmokeProjectChanges.start(project)
                 for (index, step) in steps.enumerated() {
-                    note("第 \(index + 1) 步：\(step.action.rawValue)")
-                    if try await run(step, project: project, window: window, output: output) { break }
+                    note("第 \(index + 1) 步：\(step.action.rawValue)\(step.project.map { "（\($0)）" } ?? "")")
+                    let (stepProject, stepWindow) = try target(of: step, main: (project, window))
+                    if try await run(step, project: stepProject, window: stepWindow, output: output) { break }
                 }
                 write(to: output, error: nil)
                 exit(0)
@@ -180,10 +181,42 @@ enum SmokeDriver {
             states[step.label ?? "state\(states.count + 1)"] = SmokeStateDump.make(project)
         case .snapshot:
             try await requestSnapshot(step.name ?? "snapshot", window: try SmokeUISteps.window(for: step, main: window), output: output)
+        case .projectWindow:
+            guard case .file(let file) = step.path else { throw SmokeScriptError("projectWindow 要写 \"path\": \"/绝对路径\"") }
+            guard let opened = await OpenProjects.shared.openInWindow(URL(fileURLWithPath: file)),
+                  let projectWindow = OpenProjects.shared.window(of: opened) else {
+                throw SmokeScriptError("projectWindow：没开成（\(OpenProjects.shared.failure ?? "?")）")
+            }
+            projectWindow.ignoresMouseEvents = true   // 同主窗口：真鼠标扫过去不算数
+            note("工程窗口 \(opened.shortID) 开了 \(opened.documentURL?.lastPathComponent ?? "nil")，窗口号 \(projectWindow.windowNumber)")
+        case .undo:
+            // 先让输入框辞职（等于点一下时间线：刚加的文字会开着就地编辑框，⌘Z 落到它身上撤的是打字），再沿响应链发 undo:。
+            window.makeFirstResponder(nil)
+            // 窗口的撤销管理器得是工程在用的那一个（工程窗口：delegate 交出工程自己的；主窗口：交给工程的就是窗口的）。
+            note("窗口的撤销管理器就是工程在用的：\(window.undoManager === project.effectiveUndoManager)")
+            let before = project.effectiveUndoManager?.undoActionName ?? ""
+            let handled = (window.firstResponder ?? window).tryToPerform(Selector(("undo:")), with: nil)
+            note("undo: \(handled ? "有人接了" : "没人接")（窗口 #\(window.windowNumber)，撤的是「\(before)」，"
+                 + "之后还能撤：\(project.effectiveUndoManager?.canUndo ?? false)）")
+        case .closeWindow:
+            window.performClose(nil)
+            try await Task.sleep(for: .milliseconds(300))
+            note("关了窗口 #\(window.windowNumber)，开着的工程：\(OpenProjects.shared.all.map(\.shortID))")
         case .quit:
             return true
         }
         return false
+    }
+
+    /// 这一步作用在哪个工程、哪个窗口：带了 `project` 就是那个工程和它的窗口，不带是主窗口那个。
+    private static func target(
+        of step: SmokeStep, main: (VideoEditProject, NSWindow)
+    ) throws -> (VideoEditProject, NSWindow) {
+        guard let id = step.project else { return main }
+        guard let project = OpenProjects.shared.project(shortID: id), let window = OpenProjects.shared.window(of: project) else {
+            throw SmokeScriptError("\(id) 没开着、或者没有窗口（先 projectWindow）")
+        }
+        return (project, window)
     }
 
     /// 请外面（run.sh）按窗口号拍一张，拍好了再往下走。

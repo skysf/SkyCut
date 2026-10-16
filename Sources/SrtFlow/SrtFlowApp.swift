@@ -75,7 +75,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// `@MainActor`，只能在里面声明。
     @MainActor
     private var pasteboardActionsApply: Bool {
-        guard MainWindowState.shared.section == .videoEdit else { return false }
+        // 剪辑页在键窗口里：主窗口停在剪辑页，或者键窗口是一个工程窗口（docs/architecture/open-projects.md）。
+        guard MainWindowState.shared.section == .videoEdit || OpenProjects.shared.keyProjectWindow != nil else { return false }
         // 正在输入框里打字时，第一响应者是文本视图，本来就轮不到 delegate；
         // 这条是双保险，也顺手把「字幕草稿开着」那种第一响应者会偶发丢掉的
         // 情况挡住（同 VideoEditView.handleEvent 的那条纪律）。
@@ -257,8 +258,8 @@ private struct ProjectCommands: View {
 
     @Environment(\.openWindow) private var openWindow
 
-    /// ⌘S 只在剪辑页有意义 —— 在压缩页按它不该悄悄存一份剪辑工程。
-    private var isEditing: Bool { windowState.section == .videoEdit }
+    /// ⌘S 只在剪辑页有意义 —— 在压缩页按它不该悄悄存一份剪辑工程。工程窗口在前面时就是在剪辑页。
+    private var isEditing: Bool { windowState.section == .videoEdit || OpenProjects.shared.keyProjectWindow != nil }
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -266,7 +267,7 @@ private struct ProjectCommands: View {
         let _ = AIEditorPresenter.noteMenuOpenWindow(openWindow)
         // 「最近打开」那份系统列表在开 / 存工程时变，而那正是 `documentURL` 变的时候。工程是
         // `@Observable`：body 不读它就不会被叫醒，菜单就停在旧的列表上（以前订阅整个工程，是顺带刷新的）。
-        let _ = project.documentURL
+        let _ = OpenProjects.shared.all.map(\.documentURL)
         Button("New Project") {
             showEditor()
             project.newProject()

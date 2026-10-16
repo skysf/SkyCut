@@ -6,8 +6,9 @@ import SrtFlowCore
 struct VideoEditView: View {
     /// body 读了工程的哪个属性，整个编辑器就在它变时重算一遍：**别在这儿读选择**（点选一段会叫醒一切），
     /// 看选择的按钮放进小视图（preview-perf-ratchet.md 第十三节）；工具栏的四个开关也在自己的小视图里拨。
-    /// 剪的是哪一个工程由外面给（主窗口给 `OpenProjects.primary`，docs/architecture/open-projects.md）。
+    /// 剪的是哪一个工程、装在哪由外面给（主窗口给 `OpenProjects.primary`，工程窗口给它的工程，docs/architecture/open-projects.md）。
     private let project: VideoEditProject
+    private let host: EditorHost
     @ObservedObject private var exporter = VideoEditExporter.shared
     @StateObject private var toolchain = MediaToolchain.shared
     // 字幕轨的样式沿用「烧制字幕」页调好的那套。
@@ -35,8 +36,9 @@ struct VideoEditView: View {
     /// 预览里正在就地编辑的那条字幕（双击画面上的字幕进入）。
     @State private var previewEditingCueID: UUID?
 
-    init(project: VideoEditProject) {
+    init(project: VideoEditProject, host: EditorHost) {
         self.project = project
+        self.host = host
         clock = project.clock
     }
 
@@ -89,7 +91,8 @@ struct VideoEditView: View {
         .frame(minWidth: 900, minHeight: 580)
         .onAppear {
             toolchain.resolveIfNeeded()
-            project.undoManager = undoManager
+            // 主窗口的撤销管理器交给工程（SwiftUI 的窗口不问 delegate）；工程窗口用工程自己的，窗口 delegate 交出去（ProjectWindowController）。
+            if host == .mainWindow { project.undoManager = undoManager }
             installEventMonitor()
             // GUI 冒烟 / 性能测试的环境变量钩子，不设就完全不生效（DevHooks.swift）。
             DevHooks.editorAppeared(project: project)
@@ -112,38 +115,8 @@ struct VideoEditView: View {
         .sheet(isPresented: $showsSubtitlePanel) {
             SubtitleGenPanel(project: project).appLanguage()
         }
-        // 录制设置页 = 手动会话 `.configuring` 的投影（AI 起的会话不弹，showsSetupSheet）。会话一旦被撤销
-        // （Quit、失败、取消），页自己就关了。
-        .sheet(isPresented: Binding(
-            get: { recordingCoordinator.showsSetupSheet },
-            set: { if !$0 { recordingCoordinator.cancelConfiguring() } }
-        )) {
-            ScreenRecordingSetupView(project: project).appLanguage()
-        }
-        // partial 结果：**工程锁还在**，用户必须先处置（计划 §11.4）。
-        .sheet(item: Binding(
-            get: { recordingCoordinator.pendingPartial.map(IdentifiedRecording.init) },
-            set: { _ in }
-        )) { item in
-            ScreenRecordingPartialSheet(result: item.result) { shouldImport in
-                Task { await recordingCoordinator.resolvePartial(import: shouldImport) }
-            }
-            .appLanguage()
-        }
-        // 崩溃恢复：启动时发现上次的残留。三选一，「保留」绝不删文件。
-        .sheet(item: Binding(
-            get: { recordingCoordinator.pendingRecovery },
-            set: { _ in }
-        )) { recovery in
-            ScreenRecordingRecoverySheet(recovery: recovery) { decision in
-                Task { await recordingCoordinator.resolveRecovery(decision) }
-            }
-            .appLanguage()
-        }
-        .task {
-            // 启动恢复：只处理 manifest 点名的精确路径，禁止 glob。
-            await recordingCoordinator.recoverIfNeeded()
-        }
+        // 录屏的设置页 / 残缺的结果弹在开录的那个工程的窗口里，崩溃恢复只在主窗口（ScreenRecordingSheets）。
+        .modifier(ScreenRecordingSheets(project: project, host: host))
         // Export 放窗口右上角的工具栏，随时够得着。
         .toolbar {
             // 工程名下拉放最左边，它就是这个编辑器的文件菜单。
@@ -173,7 +146,7 @@ struct VideoEditView: View {
                         // 设置页的显隐**完全由 coordinator 状态决定**（见下面的
                         // sheet 绑定），这里只推状态，不另外拿一个本地开关 ——
                         // 两份真相会让「会话被撤销但页还开着」这种状态存在。
-                        recordingCoordinator.begin()
+                        recordingCoordinator.begin(for: project)
                     } label: {
                         Label("Record Screen", systemImage: "record.circle")
                     }
@@ -212,6 +185,8 @@ struct VideoEditView: View {
     private func handleEvent(_ event: NSEvent) -> NSEvent? {
         switch event.type {
         case .keyDown:
+            // 只认这个剪辑页自己窗口里的按键：几个工程窗口各挂一个监听，不分的话按一次空格每个工程都开播（open-projects.md）。
+            guard event.window === TimelineScrollGeometry.live(for: project)?.window else { return event }
             // 正在打字（哪怕是别的输入框）就别抢按键。
             if NSApp.keyWindow?.firstResponder is NSTextView { return event }
             // 字幕草稿开着 = 用户正在字幕输入框里编辑。多行 TextField + 中文输入法

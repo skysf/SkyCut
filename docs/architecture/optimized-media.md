@@ -75,6 +75,7 @@
    菜单里列出文件名，`OptimizedMediaCoordinator.unavailable`），**不进提示条** —— 提示条常驻、要用户点掉，而「用原片」不需要用户做
    什么（V2 那版写 `project.notice`，每开一个带这种源的工程都弹一条）。守卫钉着协调者不许写 `notice`。
 14. **「优化媒体 / 原片」记在 UserDefaults（`optimizedMedia.previewMode`），不进工程文件**；切换 = 一次重建。默认优化媒体。
+   全 App 一份：几个工程开着时在一个窗口里切，每个开着的工程都换过去、各自重建一次（`setMode`，2026-10-17，[开着的工程](open-projects.md)）。
    性能台架用参数域 `-optimizedMedia.previewMode original` 量原片那条路（托管 runner 没有硬件编码器的保证；换源的合成和原片同样的
    层数，结构由自检钉着）；冒烟不关，`settle` 等 `backgroundReadsInFlight` 归零 —— 转码、补探、量解码速度都登记了后台读。
 15. **协调者只有工具条的小菜单订阅**（`OptimizedMediaMenu`，`ObservableObject`）；转码的进度不许叫醒整个编辑器

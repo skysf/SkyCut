@@ -34,9 +34,17 @@ final class TimelineScrollGeometry: ObservableObject {
     /// 手势**不要**读它 —— 那是上一次通知时的值，要现读的用 `offsetX/offsetY`。
     @Published private(set) var offset: CGPoint = .zero
 
-    /// 此刻挂着滚动视图的那一份。编辑器里只有一条时间线；工具栏的缩放、⌘V 找指针都在时间线的
-    /// 视图树外面，拿不到它的 `@State`，从这儿拿。弱引用：时间线拆掉就跟着没了。
-    private(set) static weak var live: TimelineScrollGeometry?
+    /// 每个工程此刻挂着滚动视图的那一份（键是工程对象：几个工程窗口各有一条时间线）。工具栏的缩放、⌘V 找指针、
+    /// AI 把时间线滚过去都在时间线的视图树外面，拿不到它的 `@State`，按工程从这儿拿。弱引用：时间线拆掉就跟着没了。
+    private static var live: [ObjectIdentifier: Weak] = [:]
+
+    private struct Weak {
+        weak var geometry: TimelineScrollGeometry?
+    }
+
+    static func live(for project: VideoEditProject) -> TimelineScrollGeometry? {
+        live[ObjectIdentifier(project)]?.geometry
+    }
 
     /// 弱引用：视图树被拆掉时跟着失效，别让它把滚动视图吊住。
     private weak var scrollView: NSScrollView?
@@ -44,18 +52,19 @@ final class TimelineScrollGeometry: ObservableObject {
     /// `keepAnchored` 的补挪只认最新一次（连续缩放时前面几拍的补挪作废）。
     private var anchorGeneration = 0
 
-    /// 由 `TimelineScrollViewAccessor` 在滚动内容里认出滚动视图后挂上来。
-    func attach(_ scrollView: NSScrollView?) {
+    /// 由 `TimelineScrollViewAccessor` 在滚动内容里认出滚动视图后挂上来（`owner`：这条时间线是哪个工程的）。
+    func attach(_ scrollView: NSScrollView?, owner: VideoEditProject) {
         guard scrollView !== self.scrollView else { return }
         if let boundsObserver {
             NotificationCenter.default.removeObserver(boundsObserver)
             self.boundsObserver = nil
         }
         self.scrollView = scrollView
+        let key = ObjectIdentifier(owner)
         if scrollView != nil {
-            Self.live = self
-        } else if Self.live === self {
-            Self.live = nil
+            Self.live[key] = Weak(geometry: self)
+        } else if Self.live[key]?.geometry === self {
+            Self.live[key] = nil
         }
         guard let clipView = scrollView?.contentView else {
             offset = .zero
@@ -217,6 +226,8 @@ struct TimelineViewportPoint {
 struct TimelineScrollViewAccessor: NSViewRepresentable {
     let geometry: TimelineScrollGeometry
     let scroller: TimelineAutoScroller
+    /// 这条时间线是哪个工程的（`TimelineScrollGeometry.live(for:)` 按它找）。
+    let owner: VideoEditProject
 
     func makeNSView(context: Context) -> ScrollViewProbe {
         let view = ScrollViewProbe(frame: .zero)
@@ -237,7 +248,7 @@ struct TimelineScrollViewAccessor: NSViewRepresentable {
     }
 
     private func attach(_ scrollView: NSScrollView?) {
-        geometry.attach(scrollView)
+        geometry.attach(scrollView, owner: owner)
         scroller.attach(scrollView == nil ? nil : geometry)
     }
 

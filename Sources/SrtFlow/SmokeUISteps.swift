@@ -72,7 +72,7 @@ enum SmokeUISteps {
         case "export", "subtitles", "dismiss":
             SmokeUIRequests.shared.panel.send(step.panel!)
             if step.panel == "dismiss" { ScreenRecordingCoordinator.shared.cancelConfiguring() }
-        case "record": ScreenRecordingCoordinator.shared.begin()
+        case "record": ScreenRecordingCoordinator.shared.begin(for: project)
         case "settings":
             // 直接发 `showSettingsWindow:` 在 macOS 26 上不开窗口；找应用菜单里 ⌘, 那一项，照它的 target / action 发。
             guard let item = NSApp.mainMenu?.items.first?.submenu?.items.first(where: { $0.keyEquivalent == "," }) else {

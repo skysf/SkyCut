@@ -121,7 +121,7 @@ enum AIEditorPresenter {
 
     /// 时间线横向滚到能看见这一刻（和播放跟随同一个判据：快出视野了才动，挪到偏左的位置）。
     private static func scrollTimeline(to time: Double, project: VideoEditProject) {
-        guard let geometry = TimelineScrollGeometry.live else { return }
+        guard let geometry = TimelineScrollGeometry.live(for: project) else { return }
         let x = time * project.pixelsPerSecond
         let width = Double(geometry.viewportSize.width)
         let offset = geometry.offsetX

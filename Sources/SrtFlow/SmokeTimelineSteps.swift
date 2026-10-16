@@ -20,7 +20,7 @@ enum SmokeTimelineSteps {
     static func zoom(_ step: SmokeStep, project: VideoEditProject, window: NSWindow) async throws -> String {
         let at = try SmokeStep.point(step.at, "zoom.at")
         let location = NSPoint(x: at.x, y: window.frame.height - at.y)
-        guard let geometry = TimelineScrollGeometry.live else { throw SmokeScriptError("zoom：时间线不在屏幕上") }
+        guard let geometry = TimelineScrollGeometry.live(for: project) else { throw SmokeScriptError("zoom：时间线不在屏幕上") }
         let vertical = step.vertical == true
         let factor = step.factor ?? 2
         let steps = max(1, step.steps ?? 10)

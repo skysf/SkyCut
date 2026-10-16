@@ -35,7 +35,7 @@ enum TimelineZoom {
         keeping anchor: HorizontalAnchor,
         geometry explicitGeometry: TimelineScrollGeometry? = nil
     ) {
-        let geometry = explicitGeometry ?? TimelineScrollGeometry.live
+        let geometry = explicitGeometry ?? TimelineScrollGeometry.live(for: project)
         let before = project.pixelsPerSecond
         let pinned: (time: Double, viewportX: Double)?
         switch anchor {
@@ -98,7 +98,7 @@ enum TimelineZoom {
     static func verticalAnchorAtMouse(
         project: VideoEditProject, geometry explicitGeometry: TimelineScrollGeometry? = nil
     ) -> VerticalAnchor? {
-        let geometry = explicitGeometry ?? TimelineScrollGeometry.live
+        let geometry = explicitGeometry ?? TimelineScrollGeometry.live(for: project)
         let window = geometry?.window
         let point = window.map { $0.convertPoint(fromScreen: NSEvent.mouseLocation) }
         return verticalAnchor(pointerAt: point, in: window, project: project, geometry: geometry)
@@ -113,7 +113,7 @@ enum TimelineZoom {
         around anchor: VerticalAnchor?,
         geometry explicitGeometry: TimelineScrollGeometry? = nil
     ) {
-        let geometry = explicitGeometry ?? TimelineScrollGeometry.live
+        let geometry = explicitGeometry ?? TimelineScrollGeometry.live(for: project)
         guard factor.isFinite, factor > 0 else { return }
         let rows = TimelineRowList.rows(for: project)
         let adjustable = rows.filter { $0.heightKey != nil }
