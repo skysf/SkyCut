@@ -427,34 +427,6 @@ struct EditClip: Identifiable, Hashable, Sendable {
 
 // MARK: - 时间线整体状态
 
-/// 一条上层视频轨或音频轨：有身份（行的增删不串号）、可整轨隐藏、有自己的颜色。
-struct EditLane: Identifiable, Hashable, Sendable {
-    let id: UUID
-    var clips: [EditClip]
-    /// 隐藏的轨：灰显不可编辑，预览和导出都当它不存在。
-    var isHidden: Bool
-    /// 这条轨在时间线上的颜色号（见 TrackPalette）。
-    ///
-    /// nil = 还没补号：新 append 出来的轨、以及 2026-09-17 之前存的老工程。
-    /// `assignMissingTrackColors()` 会在读盘和每次状态提交后补上，补过就不再动
-    /// —— 颜色必须绑轨道身份，绑行号的话删掉中间一条轨会让下面所有轨换色。
-    var colorIndex: Int?
-    /// 轨道头推子：整条轨的音量（线性幅度 0…2，1 = 0 dB），乘在每段自己的
-    /// 音量 / 曲线之上。见 docs/architecture/audio-mixer.md。
-    var volume: Double
-
-    init(
-        id: UUID = UUID(), clips: [EditClip] = [], isHidden: Bool = false,
-        colorIndex: Int? = nil, volume: Double = 1
-    ) {
-        self.id = id
-        self.clips = clips
-        self.isHidden = isHidden
-        self.colorIndex = colorIndex
-        self.volume = volume
-    }
-}
-
 /// 一份完整的时间线。撤销/重做就是整个换掉它，所以全部是值类型。
 struct TimelineState: Hashable, Sendable {
     /// 主视频轨。数组顺序就是时间顺序；磁吸开着时位置由 `packMain` 排。
@@ -498,6 +470,10 @@ struct TimelineState: Hashable, Sendable {
     var projectSubtitleStyle: BurnInStyle?
     /// 逐词高亮（v25，方案第 38 条）：正在说的那个词换色、放大。nil = 不高亮。只有带词时间的句子亮（SubtitleCueWords.swift）。
     var subtitleHighlight: SubtitleWordHighlight?
+    /// 生成的字幕一条最多几行：1 或 2（`SubtitleSegmentationConfig.lineCountRange`）。**默认单行**（2026-10-16 用户定：默认都是单行，
+    /// 除非用户在生成面板上调成两行、或者 AI 的 `max_lines=2` 要两行）。跟着工程走（进撤销栈、存进工程文件、缺键 = 1），
+    /// 生成字幕和配音的字幕都按它切；已生成的不追溯重排。旧版丢掉这个键只丢开关、已有的字幕一行不变，不开新版本（同 `mainMagnet`）。
+    var subtitleMaxLines = 1
     var subtitleURL: URL?
     /// 原文字幕的伴随状态（译文轨/cueMeta/生成参数）。原文永远在 `subtitle`；
     /// 这是 v4-only 字段（见 VideoEditFormatVersion.swift 的登记清单）。
@@ -891,41 +867,13 @@ extension EditClip: Codable {
     }
 }
 
-extension EditLane: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case id, clips, isHidden, colorIndex, volume
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            id: try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID(),
-            clips: try c.decodeIfPresent([EditClip].self, forKey: .clips) ?? [],
-            isHidden: try c.decodeIfPresent(Bool.self, forKey: .isHidden) ?? false,
-            colorIndex: try c.decodeIfPresent(Int.self, forKey: .colorIndex),
-            // v19 起才有。缺键 = 推子在 0 dB，就是老版本的声音。
-            volume: AudioGain.clampedLinear(try c.decodeIfPresent(Double.self, forKey: .volume) ?? 1)
-        )
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(id, forKey: .id)
-        try c.encode(clips, forKey: .clips)
-        try c.encode(isHidden, forKey: .isHidden)
-        try c.encodeIfPresent(colorIndex, forKey: .colorIndex)
-        // 推子没动过（0 dB）不写键，与 `requiresFormatVersion19` 同源。
-        if volume != 1 { try c.encode(volume, forKey: .volume) }
-    }
-}
-
 extension TimelineState: Codable {
     private enum CodingKeys: String, CodingKey {
         case mainClips, mainHidden, overlayTracks, audioTracks
         case mainVolume, masterVolume
         case subtitle, subtitleHidden, translationHidden
         case subtitleLayout, translationLayout, subtitleURL, subtitleCompanion, shapes, textOverlays, canvasRatio
-        case frameRate, filters, projectSubtitleStyle, subtitleHighlight, rulerMarkers, mainMagnet
+        case frameRate, filters, projectSubtitleStyle, subtitleHighlight, rulerMarkers, mainMagnet, subtitleMaxLines
     }
 
     init(from decoder: Decoder) throws {
@@ -946,6 +894,7 @@ extension TimelineState: Codable {
         translationLayout = try c.decodeIfPresent(SubtitleLayout.self, forKey: .translationLayout)
         projectSubtitleStyle = try c.decodeIfPresent(BurnInStyle.self, forKey: .projectSubtitleStyle)
         subtitleHighlight = try c.decodeIfPresent(SubtitleWordHighlight.self, forKey: .subtitleHighlight)
+        subtitleMaxLines = SubtitleSegmentationConfig.clampedLineCount(try c.decodeIfPresent(Int.self, forKey: .subtitleMaxLines) ?? 1)   // 2026-10-16 起才有：缺键 = 单行
         subtitleURL = try c.decodeIfPresent(URL.self, forKey: .subtitleURL)
         subtitleCompanion = try c.decodeIfPresent(SubtitleCompanion.self, forKey: .subtitleCompanion)
         shapes = try c.decodeIfPresent([ShapeAnnotation].self, forKey: .shapes) ?? []
@@ -976,6 +925,7 @@ extension TimelineState: Codable {
         try c.encodeIfPresent(translationLayout, forKey: .translationLayout)
         try c.encodeIfPresent(projectSubtitleStyle, forKey: .projectSubtitleStyle)
         try c.encodeIfPresent(subtitleHighlight, forKey: .subtitleHighlight)
+        if subtitleMaxLines != 1 { try c.encode(subtitleMaxLines, forKey: .subtitleMaxLines) }   // 按需写键：单行（默认）不落键
         try c.encodeIfPresent(subtitleURL, forKey: .subtitleURL)
         // 空 companion 不落盘：否则一个从未用过新功能的工程也会被抬进 v4。
         if subtitleCompanion?.hasPersistentData == true {

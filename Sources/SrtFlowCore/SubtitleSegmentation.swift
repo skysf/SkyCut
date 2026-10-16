@@ -204,8 +204,8 @@ public enum SubtitleSegmenter {
         into result: inout SegmentedSubtitles
     ) {
         guard let first = chunk.first, let last = chunk.last else { return }
-        // 断完句、切完条才去标点（断句要看标点）；排成几行也按去完标点的字量。
-        let lines = SubtitleBreaks.lines(for: chunk, config: config)
+        // 断完句、切完条才去标点（断句要看标点）；排成几行也按去完标点的字量（两行时折行点挑过：SubtitleBreaks.displayLines）。
+        let lines = SubtitleBreaks.displayLines(for: chunk, config: config)
             ?? [SubtitlePunctuation.strip(chunk.map(\.text).joined())]
         let text = lines.joined(separator: "\n")
         guard !text.isEmpty else { return }

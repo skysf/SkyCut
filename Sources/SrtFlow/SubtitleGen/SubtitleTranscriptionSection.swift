@@ -3,7 +3,8 @@ import SrtFlowCore
 
 // 字幕面板里「从音频生成」那一块（macOS 26+）。2026-09-26 从 SubtitleGenPanel.swift 拆出来。
 //
-// 管什么：源语言（默认自动检测）、生成后顺便翻译、「只用选中的片段」、生成 / 停止、进度与结果文案。
+// 管什么：源语言（默认自动检测）、生成后顺便翻译、一条最多几行（默认单行，跟着工程走）、「只用选中的片段」、
+// 生成 / 停止、进度与结果文案。
 // 不管什么：转写本身（`TranscriptionTask`）、翻译区（`SubtitleGenPanel`）、断句和显示时间的规则
 // （SrtFlowCore，docs/architecture/subtitle-generation-style.md）。
 
@@ -58,6 +59,17 @@ struct TranscriptionSection: View {
                         }
                     }
                 }
+
+                // 一条最多几行：默认单行（2026-10-16 用户定），要两行在这儿调；配音的字幕也按它切。
+                // 记在工程里（`subtitleMaxLines`）、一步撤销；已生成的字幕不重排。
+                Picker("Lines per subtitle", selection: Binding(
+                    get: { project.state.subtitleMaxLines },
+                    set: { project.setSubtitleMaxLines($0) }
+                )) {
+                    Text("1 line").tag(1)
+                    Text("2 lines").tag(2)
+                }
+                .instantHelp("Generated subtitles are one line each unless you allow two; what does not fit becomes the next subtitle. Voiceover subtitles follow this too")
 
                 OnlySelectedClipsToggle(count: selectedSoundClipIDs.count, isOn: $onlySelected)
 

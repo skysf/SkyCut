@@ -35,6 +35,8 @@ enum AIVoiceoverTool {
         var choice: AIVoiceChoice
         var language: String
         var subtitles: Bool
+        /// `max_lines`：这次说了就按它切、并记进工程；nil = 按工程记的（默认单行）。
+        var maxLines: Int?
         var generation: Int
     }
 
@@ -142,8 +144,11 @@ enum AIVoiceoverTool {
         guard project.isCurrentGeneration(generation) else {
             throw AIToolError("The project changed while the voiceover was being made. Try again.")
         }
+        let subtitles = try args.bool("subtitles") ?? false
+        let maxLines = try AISubtitleLines.parse(args)
+        if maxLines != nil, !subtitles { throw AIToolError("\(AISubtitleLines.key) only applies with subtitles=true.") }
         return Plan(spoken: spoken, starts: starts(for: spoken, playhead: project.clock.time), target: target, choice: choice,
-                    language: language, subtitles: try args.bool("subtitles") ?? false, generation: generation)
+                    language: language, subtitles: subtitles, maxLines: maxLines, generation: generation)
     }
 
     static func apply(_ plan: Plan, _ project: VideoEditProject) throws -> AIToolResult {
@@ -153,14 +158,18 @@ enum AIVoiceoverTool {
         let placed = zip(plan.spoken, plan.starts).map { spoken, start in
             AITimelineEdits.PlannedClip(clip: spoken.clip, isAudio: true, target: plan.target, start: start)
         }
+        // 几行：AI 这次说了就按它、并记进工程（和面板同一个开关）；没说按工程记的（默认单行）。
+        let maxLines = plan.maxLines ?? project.state.subtitleMaxLines
         let config = AIVoiceoverSubtitles.config(
             languageCode: plan.language, frameDuration: project.state.frameRate.secondsPerFrame,
             maxLineEms: SubtitleLineFit.ems(for: project.state, appWide: EncodeQueue.burnIn.burnInStyle,
-                                            renderSize: project.renderSize)
+                                            renderSize: project.renderSize),
+            maxLineCount: maxLines
         )
         var subtitles = AIVoiceoverSubtitles.Outcome()
         let linkage = project.linkageEnabled
         project.perform { state in
+            if let requested = plan.maxLines { state.subtitleMaxLines = requested }
             AITimelineEdits.place(placed, insert: false, linkage: linkage, in: &state)
             guard plan.subtitles else { return }
             let pieces = plan.spoken.compactMap { spoken -> AIVoiceoverSubtitles.Piece? in

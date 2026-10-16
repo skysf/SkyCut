@@ -161,6 +161,14 @@ extension VideoEditProject {
         perform(rebuildsPreview: false) { $0.subtitleHighlight = highlight }
     }
 
+    /// 生成的字幕一条最多几行（生成面板上的「行数」；AI 走 generate_subtitles / add_voiceover 的 max_lines）。
+    /// 默认单行（2026-10-16 用户定），只认 1 和 2；跟着工程走、一步撤销；已生成的字幕不重排。
+    func setSubtitleMaxLines(_ lines: Int) {
+        let clamped = SubtitleSegmentationConfig.clampedLineCount(lines)
+        guard state.subtitleMaxLines != clamped else { return }
+        perform(rebuildsPreview: false) { $0.subtitleMaxLines = clamped }
+    }
+
     /// 不用这个工程自己的字幕样式了，回到全 App 的（烧录页那套）。
     func useAppWideSubtitleStyle() {
         guard state.projectSubtitleStyle != nil else { return }

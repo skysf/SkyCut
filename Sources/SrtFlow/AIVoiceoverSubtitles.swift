@@ -33,9 +33,12 @@ enum AIVoiceoverSubtitles {
     /// 配音字幕的分段参数：生成字幕那一套（每行多长、显示多久），只是**不按逗号拆**（`splitsAtClauses`）—— 一句旁白是写稿时定好的
     /// 一条，整句放得下就一条，放不下才切（照样优先切在逗号后面）。2026-10-06 盲测：「在地球的最南端，冰统治着一切」切成两条
     /// 一秒出头的半句（docs/bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md）。
-    static func config(languageCode: String, frameDuration: Double, maxLineEms: Double) -> SubtitleSegmentationConfig {
+    /// `maxLineCount`：一条最多几行（工程记的 `subtitleMaxLines`，默认单行；AI 的 `max_lines`）。
+    static func config(
+        languageCode: String, frameDuration: Double, maxLineEms: Double, maxLineCount: Int = 1
+    ) -> SubtitleSegmentationConfig {
         var config = SubtitleSegmentationConfig.generation(
-            languageCode: languageCode, frameDuration: frameDuration, maxLineEms: maxLineEms
+            languageCode: languageCode, frameDuration: frameDuration, maxLineEms: maxLineEms, maxLineCount: maxLineCount
         )
         config.splitsAtClauses = false
         return config

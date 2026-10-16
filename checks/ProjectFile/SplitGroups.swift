@@ -26,6 +26,7 @@ func runSplitOutGroups(root: URL) {
         ("磁吸跟着工程走", checkMainMagnet),             // 42：MainMagnet.swift
         ("形状的入场 / 出场动画", checkShapeAnimations),  // 44：ShapeAnimations.swift
         ("出场是入场倒着放", checkExitCurves),          // 45：ExitCurves.swift
+        ("字幕几行跟着工程走", checkSubtitleMaxLines),   // 46：SubtitleMaxLines.swift
     ]
     for group in groups {
         do {

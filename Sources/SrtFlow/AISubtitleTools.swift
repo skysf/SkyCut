@@ -34,6 +34,10 @@ enum AISubtitleTools {
         guard !SubtitleAudibleClips.soundClips(in: project.state, only: only).isEmpty else {
             throw AIToolError("There is no audible clip to transcribe (hidden and muted clips are skipped).")
         }
+        // 要几行（默认单行，2026-10-16 用户定）：落到工程、和面板同一个开关，自己成一步撤销（生成的落账是另一步）。
+        if let maxLines = try AISubtitleLines.parse(args) {
+            AIUndoGrouping.step(project.effectiveUndoManager) { project.setSubtitleMaxLines(maxLines) }
+        }
         task.start(
             project: project,
             sourceLocaleID: sourceID,
@@ -217,6 +221,8 @@ enum AISubtitleTools {
         if which != "translation" { result["original"] = lines(.original) }
         if which != "original" { result["translation"] = lines(.translation) }
         result["style"] = AISubtitleStyleChange.describe(state, appWide: EncodeQueue.burnIn.burnInStyle, canvas: canvas)
+        // 生成的字幕一条最多几行（工程记的，默认单行；generate_subtitles / add_voiceover 的 max_lines 改它）。
+        result[AISubtitleLines.key] = .number(Double(state.subtitleMaxLines))
         if reportedBoxes {
             result["box_note"] = .string(
                 "box = [x, y, width, height] where the line is drawn, as fractions of the canvas from its top left, with the current "

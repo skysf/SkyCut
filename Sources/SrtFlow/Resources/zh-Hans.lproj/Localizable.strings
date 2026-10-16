@@ -395,6 +395,10 @@
 "Couldn't detect the spoken language — no speech model is installed. Pick the language manually so its model can be downloaded." = "无法检测音频语言 —— 本机没有已安装的语音模型。请手动选择语言以便下载对应模型。";
 "Translate after generating" = "生成后顺便翻译";
 "Only the selected clips (%d)" = "只用选中的片段（%d 段）";
+"Lines per subtitle" = "每条字幕的行数";
+"1 line" = "1 行";
+"2 lines" = "2 行";
+"Generated subtitles are one line each unless you allow two; what does not fit becomes the next subtitle. Voiceover subtitles follow this too" = "生成的字幕默认每条一行，放不下的拆成下一条；选「2 行」才允许一条占两行。配音的字幕也按它切";
 "Generate Subtitles" = "生成字幕";
 "Replace the current subtitle track?" = "替换当前的字幕轨？";
 "Replace" = "替换";

@@ -37,6 +37,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
   Sources/SrtFlow/VideoEditTrackSlot.swift \
@@ -124,6 +125,7 @@ xcrun swiftc \
   checks/ProjectFile/Upscale.swift \
   checks/ProjectFile/CircleArcShapes.swift \
   checks/ProjectFile/MainMagnet.swift \
+  checks/ProjectFile/SubtitleMaxLines.swift \
   checks/ProjectFile/ShapeAnimations.swift \
   checks/ProjectFile/ExitCurves.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
