@@ -27,6 +27,22 @@ case "$DST" in
     echo "✗ 目标目录还在 TCC 保护的文件夹里：${DST}（放到 /private/tmp 下的 scratchpad 去）" >&2
     exit 2 ;;
 esac
+# 拷的是工程所在的**整个文件夹**（素材多半就在旁边）。工程直接放在根目录、家目录、「下载」「桌面」「文稿」里时，那就是把整个
+# 文件夹拷过去 —— 2026-10-17 拷了 45 GB、把磁盘写满（docs/bugfixes/2026-10-17-copy-project-copied-all-of-downloads.md）。
+# 这几处一律不整夹拷；别的文件夹太大也不拷（上限 SRTFLOW_COPY_PROJECT_MAX_GB，默认 4 GB）。先判、后删目标、再拷。
+case "$SRC_DIR" in
+  "/"|"$HOME"|"$HOME/Downloads"|"$HOME/Desktop"|"$HOME/Documents")
+    echo "✗ 工程直接放在 ${SRC_DIR} 里：这个脚本会把工程所在的整个文件夹当素材目录拷过去。" >&2
+    echo "  先把工程和它用到的素材挪进一个单独的文件夹（或者在 scratchpad 里同一个素材文件夹中复制一份工程文件）再拷。" >&2
+    exit 2 ;;
+esac
+MAX_GB="${SRTFLOW_COPY_PROJECT_MAX_GB:-4}"
+SIZE_KB="$(du -sk "$SRC_DIR" | awk '{ print $1 }')"
+if [ "${SIZE_KB}" -gt $((MAX_GB * 1024 * 1024)) ]; then
+  echo "✗ ${SRC_DIR} 有 $((SIZE_KB / 1024 / 1024)) GB，超过 ${MAX_GB} GB：整个文件夹都会被拷过去。" >&2
+  echo "  挪进一个只放这个工程和素材的文件夹再拷；确实要拷就设 SRTFLOW_COPY_PROJECT_MAX_GB。" >&2
+  exit 2
+fi
 rm -rf "$DST"
 mkdir -p "$(dirname "$DST")"
 cp -R "$SRC_DIR" "$DST"
