@@ -260,6 +260,14 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      `from` / `to`（时间线秒）：片段只量落在里面的那一截（`AIAudioLevels.sourceWindow`：变速按源时间换算，结果带实际量的 `from` / `to`），
      整条时间线只列落在里面的片段、每段也只量那一截；点名的片段不在这几秒里就报错。文件的几秒照旧是 `source_in` / `source_out`
      （文件秒），给文件传 `from` / `to` 报错说清楚。扫描守卫在 `scripts/check-mcp.sh`，纯值在 `checks/MCP/ListenChecks.swift`。
+   - **一次查完 V1 的剪辑点**（`cuts=true`，2026-10-16 测试员的第 10 条，[方案](../plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md)）：
+     不另开工具（会和 listen 长得像）。V1 每一段的头和尾都是剪辑点（`AICutCheck.boundaries`：挨着的两段合成一个、跨着转场的带 `transition`、
+     开着缝的各报各的、第一段的头和最后一段的尾也报、from / to 只留落在里面的），每一头在**它声音自己的源时间轴**上判 —— 声音从哪段来
+     同 cut_speech 的 `speechClip`，在不在停顿里、挪到哪只有 `AISpeechCutPoints` 一份，门限同 cut_speech；**在声音上才报切到的词**
+     （转写把停顿后面第一个词的开口估早了，在停顿里按词判会冤枉它；盖着的词，没有就是 0.3 秒内最近的）和建议的 `suggested_source_in` /
+     `suggested_source_out`（换回这一段 V1 片段自己的源时间，AI 直接拿去 edit_clip；落到素材外面的不给）。转写**只读缓存、不起任务**
+     （listen 是只读工具），没有就说一句；波形没读完的那几头报「还在读」；一次最多 80 个剪辑点。纯值在 `checks/MCP/CutCheckChecks.swift`，
+     接线扫描在 `scripts/check-mcp.sh`。
 
 14. **读文稿（read_document，方案第 22 条）**：用户给的讲稿、大纲、卖点清单读成文字（`AIDocumentReader`）：PDF 用 PDFKit，
    Word / RTF / ODT 用系统的富文本导入，txt / md 按 [用户文本文件的编码](text-file-encoding.md) 读；Pages 和扫描件读不了，
@@ -970,6 +978,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - [ ] 让 AI 转写一节课（transcribe）：第一次回任务号、等完再调一次秒回；句子的时间点下去，预览里说的正是那句。
 - [ ] 让 AI 把一段口播的停顿缩短、去掉口头禅（cut_speech）：听起来不吞字、不切半个词，停顿处还留一点气口；⌘Z 一步整个回来；
       片段分离过声音时，画面和声音在同样的地方剪。
+- [ ] 让 AI 对一条剪过的口播 `listen cuts=true`：切在停顿里的报 in_pause、切进字里的报 on_speech 带词和建议的入出点，照建议 edit_clip 之后再查一遍全是 in_pause；
+  没转写过的工程结果里有 `transcript: none…`，转写之后带词。
 - [ ] 让 AI 先用 listen 量出停顿、再按文字只留几句（cut_speech keep）：每一刀就在 AI 挑的静音处（结果里没有 `moved`），句子开头的字
       没被切掉、也没带进上一句的尾音；故意给一个落在字中间的时间：切口挪进旁边的停顿，`moved` 里说清楚挪到了哪。
 - [ ] 让 AI 把几段镜头踩在一首有节奏的配乐上（cut_to_beat）：切点和鼓点对得上；换一首很平的钢琴曲，AI 说拍子不清楚、不踩。

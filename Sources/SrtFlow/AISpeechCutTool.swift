@@ -168,7 +168,8 @@ enum AISpeechCutTool {
     // MARK: 声音从哪来
 
     /// 听哪一段：片段自己有声音就是它；静音了 / 声音分离出去了，就是链接的、同一时间在放的那段声音。
-    private static func speechClip(of clip: EditClip, in state: TimelineState) -> EditClip {
+    /// listen cuts=true（AIListenCuts）查剪辑点时也用它：声音从哪段来只有这一份。
+    static func speechClip(of clip: EditClip, in state: TimelineState) -> EditClip {
         func audible(_ candidate: EditClip) -> Bool { candidate.hasAudio && !candidate.isMuted && candidate.volume > 0 }
         if audible(clip) { return clip }
         let partners = state.linkedClipIDs(of: clip.id).compactMap(state.clip(with:))

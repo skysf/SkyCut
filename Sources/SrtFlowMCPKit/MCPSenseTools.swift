@@ -30,7 +30,9 @@ public enum MCPSenseTools {
             seconds). dB are dBFS; -60 means silent or quieter. Use it to set volumes (speech usually sits around -20 to -14 \
             dB level, music 12-20 dB under the voice) and to find pauses to cut. With beats=true (one clip or file, usually \
             music) you also get tempo_bpm, beats and downbeats (the likely first beat of each bar) — cut on them, or let \
-            cut_to_beat do it. Files outside the opened folder need the user's OK.
+            cut_to_beat do it. With cuts=true (no clip or file): every cut on V1 checked at once, each clip's head and tail: \
+            in a pause of its own sound, or on speech (naming the word once transcribe has run) with the nearest pause as \
+            suggested_source_in / suggested_source_out for edit_clip. Files outside the opened folder need the user's OK.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A clip on the timeline."),
@@ -42,6 +44,7 @@ public enum MCPSenseTools {
                 "silence_db": MCPSchema.number("Quieter than this counts as silence (default -45).", minimum: -80, maximum: -10),
                 "min_silence": MCPSchema.number("Shortest silence to report, seconds (default 0.5).", minimum: 0.1, maximum: 10),
                 "beats": MCPSchema.boolean("Also find the tempo and every beat (one clip or file)."),
+                "cuts": MCPSchema.boolean("Check every V1 cut: in a pause, or on speech with a better source_in / source_out."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true
