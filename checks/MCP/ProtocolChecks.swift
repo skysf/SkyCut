@@ -156,6 +156,9 @@ func runProtocolChecks() {
     }
     check(servedDescription("export_video").contains("music_credits"), "export_video asks the AI to pass on the music credits")
     check(servedDescription("recipes").contains("which one you follow"), "recipes asks the AI to tell the user which style it follows")
+    // 字幕默认单行（2026-10-16 用户定）：AI 只在用户要两行时传 max_lines=2。
+    check(servedDescription("generate_subtitles").contains("max_lines=2 only when the user wants"),
+          "generate_subtitles says subtitles are one line unless the user wants two (max_lines)")
     // 裁切的语义是故意和拖把手不同的（AI 给绝对值：时间线上的开头不动、结尾动），2026-10-16 之前只写在代码注释里，测试员试了才知道
     // （docs/bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md）。
     check(servedDescription("edit_clip").contains("timeline start stays"), "edit_clip says a trim keeps the clip's timeline start and moves its end")

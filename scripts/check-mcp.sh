@@ -356,6 +356,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
   Sources/SrtFlow/VideoEditMediaReferences.swift \
@@ -449,6 +450,7 @@ xcrun swiftc \
   Sources/SrtFlow/AISoundEffectRequest.swift \
   Sources/SrtFlow/AIVoiceoverPlacement.swift \
   Sources/SrtFlow/AIVoiceoverSubtitles.swift \
+  Sources/SrtFlow/AISubtitleLines.swift \
   Sources/SrtFlow/SubtitleGen/SubtitleLineFit.swift \
   Sources/SrtFlow/SubtitleFrameGeometry.swift \
   Sources/SrtFlow/SubtitleFontScale.swift \
@@ -553,6 +555,7 @@ xcrun swiftc \
   checks/MCP/VoiceChecks.swift \
   checks/MCP/VoiceLevelChecks.swift \
   checks/MCP/SubtitleStyleChecks.swift \
+  checks/MCP/SubtitleLinesChecks.swift \
   checks/MCP/SubtitleBulkChecks.swift \
   checks/MCP/TextScanChecks.swift \
   checks/MCP/SubtitleBoxChecks.swift \

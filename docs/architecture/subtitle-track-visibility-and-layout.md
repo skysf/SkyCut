@@ -295,8 +295,14 @@
 
 - `SubtitleSegmentationConfig` 默认 `maxLineCount = 1`，参数集版本随之
   升到 2（进 GenerationSnapshot）。**改任何分段默认值必须同步升版本**，
-  SrtFlowCoreChecks 有「默认单行 + 版本 2 + 超长句拆条不折行」三条守卫。
-- 两行字幕仍然合法（外挂 SRT、手工编辑）：拖宽布局框是把两行收成一行的
+  SrtFlowCoreChecks 有「默认单行 + 版本 + 超长句拆条不折行」几条守卫。
+- **2026-10-16 用户定：字幕默认都是单行，除非用户在生成面板上调成两行、或者通过 AI 说要两行。** 几行跟着工程走
+  （`TimelineState.subtitleMaxLines`，1 或 2；缺键 = 1、按需写键、一步撤销 `setSubtitleMaxLines`、不开新版本）：生成面板的
+  「每条字幕的行数」、AI 的 `generate_subtitles` / `add_voiceover` 的 `max_lines` 改的是同一个数，生成字幕和配音的字幕都按它切；
+  两行时折行点怎么挑见 [生成的字幕长什么样](subtitle-generation-style.md) 第四节。守卫：`SrtFlowCoreChecks` 的
+  `checkTwoLineBreaks`、`scripts/check-project-file.sh` 第 46 组（存盘、缺键、夹成 1 或 2）、`scripts/check-mcp.sh` 的
+  `SubtitleLinesChecks`、接线在 `checks/project-file-wiring.sh`。
+- 两行字幕仍然合法（外挂 SRT、手工编辑、调成两行之后生成的）：拖宽布局框是把两行收成一行的
   用户侧手段，分段器不追溯改既有字幕。
 
 ## 人肉回归清单（GUI 冒烟，自动化够不着）
@@ -316,7 +322,9 @@
       导出后抽帧，每一行的左右沿和预览对得上（`look` 看到的也是这几行）；`get_subtitles` 的 box 不变。
       一句没有空格的长中文：预览和成片**一样**折成两行、差不多宽（2026-10-15 起烧录照预览的折行点写 `\N`），每行的左右沿对得上，
       行首没有「，。」；韩文照旧只在空格处折。
-- [ ] 自动检测 + 生成：新字幕全部单行。
+- [ ] 自动检测 + 生成：新字幕全部单行。面板把「每条字幕的行数」调成「2 行」再生成：长句一条占两行、两行差不多宽、
+      不切在中文的词中间；⌘Z 能单独撤掉行数的改动；关掉再开工程行数还在；AI `generate_subtitles max_lines=2` 同样，
+      `get_subtitles` 回 `max_lines: 2`。
 - [ ] **点选互斥两向**：选中形状 → 点轨道上的 cue，形状框必须消失；
       选中 cue → 点形状，字幕拖框必须消失。任何时刻预览上只有一套框。
 - [ ] **框选混选后预览不画框**：拉框同时选中剪辑 + cue，预览上一套框都不该有；

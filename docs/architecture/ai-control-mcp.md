@@ -521,6 +521,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      放得下就整句一条、放不下才切；2026-10-14 以前在逗号处切出 0.3–1.1 秒的短条，[案例](../bugfixes/2026-10-14-voiceover-subtitles-split-at-commas.md)），加进原文轨：和已有句子重叠的不加（报几句）；原文轨是别的语言（记的，没记按字判断、字太少不判）一句都不加；
      切不出句子不建空轨；新建的轨记成配音的语言。每句记下是哪段配音生成的（`CueMeta.provenance`）：联动开着时挪 / 删配音段，字幕跟着走
      （[联动](timeline-linkage.md) 规矩 11，[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)）。
+     一条几行按工程记的（`subtitleMaxLines`，默认单行）；`max_lines`（只在 subtitles=true 时认）这次说了就按它切、并在放配音
+     那一次 perform 里记进工程（见第 36 条「几行」）。
 35. **SrtFlow 自己的声音（本机的 Kokoro-82M，CoreML；方案第 44、48–51 条）**：
    - **模块**：`Sources/SrtFlowKokoro/` 从 speech-swift（Apache 2.0，Copyright 2025 Ivan Digital）搬来改过，App 不加第三方依赖；
      每个文件开头写着改了什么，署名和授权全文在随 App 分发的 `THIRD-PARTY-NOTICES.md`。原来 704 行的注音文件拆成了
@@ -557,6 +559,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     走界面「合并」那份合同（`SubtitleTrackEditing.mergeCues`，逐词时间拼起来），别让 AI 拿「改字 + 删句」拼；`get_subtitles`
     每行报 `timed_words`；`style.max_width`（一行最宽占画面宽的几成）按这个工程的画幅换成左右边距（`AISubtitleStyleChange.horizontalMargin`，
     画布宽同 `assDocument` 的 PlayResX），只对工程字幕，`burn_subtitles` 不收。
+   - **几行**（2026-10-16 用户定：**字幕默认都是单行，除非用户在软件里调成两行、或者通过 AI 说要两行**）：`generate_subtitles` /
+     `add_voiceover` 的 `max_lines`（1 或 2，`AISubtitleLines` 只认这两个数，别的报错；没给按工程记的）落到工程的 `subtitleMaxLines`，
+     和生成面板的「每条字幕的行数」同一个开关：generate_subtitles 经 `setSubtitleMaxLines` 自己成一步撤销（生成的落账是另一步），
+     add_voiceover 在放配音那一次 perform 里写。`get_subtitles` 回 `max_lines`。说明里写着默认单行、只在用户要两行时传 2、先设样式再生成；
+     两行时折行点怎么挑见 [生成的字幕长什么样](subtitle-generation-style.md) 第四节。不加 `style.max_lines`：几行是生成的参数，
+     改了也不重排已有的字幕（「不自动重新断句」）。
    - 参数只有一份 schema（`MCPSubtitleExportTools.subtitleStyle`，两个工具共用）：位置（bottom / middle / top，九宫格居中的那一列，
      词表 `MCPVocabulary.subtitlePositions` 和 App 对账）、离边多远（画面高的比例）、字号（1080 高的画面上的像素）、字体、粗细、
      颜色、描边或底条（二选一）、阴影、逐词高亮的颜色和放大倍数、reset。读法和落法只有 `AISubtitleStyleChange`（纯值）一处：先全验过，

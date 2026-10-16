@@ -15,6 +15,7 @@ func runSubtitleSegmentationChecks() {
     checkPauseAbsorbedIntoNextWord()
     checkSpeechOnsetEstimates()
     checkNarrowLinesStayReadable()
+    checkTwoLineBreaks()
 }
 
 private func window(
@@ -96,12 +97,12 @@ private func checkMappingAndBoundaries() {
     check(SubtitleSegmenter.attributeWords([TimedWord(text: "x", start: 2.45, end: 2.45)], to: b).isEmpty,
           "边界：clamp 后零时长要丢弃")
 
-    // 折行（允许两行时）：贪心塞行、只在词边界换行。
+    // 折行（允许两行时）：只在词边界换行；一样宽的切法里下面那行长（折行点怎么挑见 checkTwoLineBreaks）。
     let twoLines = SubtitleSegmentationConfig(maxLineCount: 2, maxLineUnits: 5)
     let wrapped = SubtitleSegmenter.segment(
         words: words([("aaaa", 0, 1), (" bbbb", 1, 2), (" cccc", 2, 3)]), window: window(src: 0...10), config: twoLines
     )
-    checkEqual(wrapped.cues.first?.text, "aaaa bbbb\ncccc", "折行：贪心塞行、词边界换行")
+    checkEqual(wrapped.cues.first?.text, "aaaa\nbbbb cccc", "折行：词边界换行、一样宽时下面那行长")
 
     // 停顿断句：无标点也按停顿切；中文词直接相连。
     let paused = SubtitleSegmenter.segment(
@@ -370,4 +371,41 @@ private func checkNarrowLinesStayReadable() {
     let wide = SubtitleSegmenter.segment(words: perfect, window: window(src: 0...32),
                                           config: .generation(languageCode: "en", frameDuration: 1.0 / 24, maxLineEms: 30))
     checkEqual(texts(wide).filter { $0.contains("Darling") }, ["Darling just dive right in"], "放得下时小句照旧并成一条")
+}
+
+/// 两行（2026-10-16 用户定：默认都是单行，面板 / AI 要两行才两行）：一行放得下就一行；放不下折成两行 —— 两行差不多宽、
+/// 断在好断的地方（冠词不留在上一行末尾）、中文不切在词中间（`SubtitleBreaks.displayLines`）；`generation` 的行数夹成 1 或 2。
+private func checkTwoLineBreaks() {
+    // 词按说话的速度排（每个词 0.3 秒、首尾相接）：一个词拖一秒会被当成停顿（先估开口，2026-09-26）而断成两句。
+    func spoken(_ text: String) -> [(String, Double, Double)] {
+        text.split(separator: " ").enumerated().map { index, word in
+            ((index == 0 ? "" : " ") + word, Double(index) * 0.3, Double(index) * 0.3 + 0.3)
+        }
+    }
+    func cues(_ list: [(String, Double, Double)], _ config: SubtitleSegmentationConfig) -> [String] {
+        texts(SubtitleSegmenter.segment(words: words(list), window: window(src: 0...20), config: config))
+    }
+    let two = SubtitleSegmentationConfig(maxLineCount: 2, maxLineUnits: 9.5)
+    checkEqual(cues(spoken("aaaa bbbb"), two), ["aaaa bbbb"], "两行：一行放得下就不折")
+    let five = spoken("aaaa bbbb cccc dddd eeee")
+    checkEqual(cues(five, SubtitleSegmentationConfig(maxLineCount: 2, maxLineUnits: 7.5)), ["aaaa bbbb\ncccc dddd eeee"],
+               "两行：两行差不多宽（不是第一行塞满）")
+    let single = cues(five, SubtitleSegmentationConfig(maxLineUnits: 7.5))
+    check(single.count == 2 && single.allSatisfy { !$0.contains("\n") }, "单行（默认）：同一句话拆成两条、不折行：\(single)")
+    // 按宽度最平的切法是「aaaa bbbb the / cccc dddd eeee」，可「the」不该留在上一行末尾：退一步、宽一点，断在 the 前面。
+    let dangling = spoken("aaaa bbbb the cccc dddd eeee")
+    checkEqual(cues(dangling, two), ["aaaa bbbb\nthe cccc dddd eeee"], "两行：冠词不留在上一行末尾")
+    // 中文：不切在词中间（「计算机」）—— 贪心塞行会切成「…学习计算 / 机科学…」。
+    let chinese = Array("我在北京大学学习计算机科学已经三年了").enumerated().map { (String($1), Double($0) * 0.3, Double($0) * 0.3 + 0.3) }
+    checkEqual(cues(chinese, SubtitleSegmentationConfig(maxLineCount: 2, maxLineUnits: 10)), ["我在北京大学学习\n计算机科学已经三年了"],
+               "两行：中文不切在词中间、两行差不多宽")
+    let generation = { (lines: Int) in
+        SubtitleSegmentationConfig.generation(languageCode: "en", frameDuration: 1.0 / 24, maxLineEms: 29, maxLineCount: lines).maxLineCount
+    }
+    checkEqual(generation(2), 2, "generation：两行带进配置")
+    checkEqual(generation(7), 2, "generation：行数夹到 2")
+    checkEqual(generation(0), 1, "generation：行数夹到 1")
+    checkEqual(SubtitleSegmentationConfig.generation(languageCode: "en", frameDuration: 1.0 / 24, maxLineEms: 29).maxLineCount, 1,
+               "generation：不说就是单行")
+    checkEqual(SubtitleSegmentationConfig.lineCountRange, 1...2, "一条最多几行只有 1 和 2 两档")
 }

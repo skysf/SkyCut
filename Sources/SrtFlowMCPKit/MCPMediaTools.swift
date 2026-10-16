@@ -57,7 +57,9 @@ enum MCPMediaTools {
                     "clone_start": MCPSchema.number("Seconds into clone_from where the sample starts (default 0).", minimum: 0),
                     "clone_seconds": MCPSchema.number("Length of the sample (default 10).", minimum: 5, maximum: 30),
                     "track": MCPSchema.string(MCPSchema.trackDescription),
-                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice."),
+                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice (one line each unless max_lines=2)."),
+                    "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
+                                                   minimum: 1, maximum: 2),
                     "download_voices": MCPSchema.boolean("Only download SrtFlow's own voices (returns a job); lines are ignored.")
                 ])
             )

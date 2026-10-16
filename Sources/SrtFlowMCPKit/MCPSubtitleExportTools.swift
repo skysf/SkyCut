@@ -15,12 +15,18 @@ public enum MCPSubtitleExportTools {
                 description: """
                 Transcribe the speech on the timeline into the subtitle track, on this Mac (needs macOS 26). Replaces the \
                 current subtitles as one undoable step. Hidden clips are skipped. Optionally translate right after (the same \
-                language download dialog as translate_subtitles can appear). Returns a job id; wait with get_job.
+                language download dialog as translate_subtitles can appear). Each subtitle is one line; what does not fit \
+                becomes the next subtitle. Pass max_lines=2 only when the user wants two-line subtitles (the project remembers \
+                it). Set the style first (edit_subtitles style): lines are cut to fit it. Returns a job id; wait with get_job.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Spoken language: auto (default) or a locale such as en-US, zh-CN, ja-JP."),
                     "translate_to": MCPSchema.string("Also translate into this language, e.g. zh-Hans, en, ja."),
-                    "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Only transcribe these clips (for example just the voice-over).")
+                    "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Only transcribe these clips (for example just the voice-over)."),
+                    "max_lines": MCPSchema.integer(
+                        "Lines one subtitle may take: 1 (default) or 2. Stays with the project; add_voiceover subtitles follow it.",
+                        minimum: 1, maximum: 2
+                    )
                 ])
             )
         case .translateSubtitles:
@@ -46,8 +52,8 @@ public enum MCPSubtitleExportTools {
                 Subtitle lines with ids, start and end on the timeline and text, from the original track, the translated track, \
                 or both; optionally only inside a time range. Each shown line also has box (where it is drawn on the canvas with \
                 the current style, [x, y, width, height] as fractions from the top left) and lines when it wraps: use them to keep \
-                subtitles clear of watermarks or to pick style.max_width. Also the style and how many lines know their word times \
-                (for highlight).
+                subtitles clear of watermarks or to pick style.max_width. Also the style, max_lines (1 or 2: how many lines a \
+                generated subtitle may take) and how many lines know their word times (for highlight).
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"]),

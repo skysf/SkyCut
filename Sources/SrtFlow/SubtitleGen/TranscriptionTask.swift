@@ -125,7 +125,8 @@ final class TranscriptionTask: ObservableObject {
                 self.stage = .segmenting
                 self.setProgress(0.85)
                 // 分段与合成永远基于**当前**时间线（SubtitleGenerationAssembly）；按转写实际用的语言
-                // 选每行字数和阅读速度，两条之间的空按工程帧率（docs/architecture/subtitle-generation-style.md）。
+                // 选每行字数和阅读速度，两条之间的空按工程帧率，一条最多几行按工程记的（默认单行，
+                // docs/architecture/subtitle-generation-style.md）。
                 let result = try SubtitleGenerationAssembly.build(
                     state: project.state,
                     entries: harvest.entries,
@@ -135,7 +136,8 @@ final class TranscriptionTask: ObservableObject {
                     config: .generation(
                         languageCode: harvest.locale.language.languageCode?.identifier,
                         frameDuration: project.state.frameRate.secondsPerFrame,
-                        maxLineEms: lineFitEms
+                        maxLineEms: lineFitEms,
+                        maxLineCount: project.state.subtitleMaxLines
                     )
                 )
                 guard project.isCurrentGeneration(generation) else {

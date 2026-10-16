@@ -422,6 +422,30 @@ elif ! grep -c 'scheduleRebuild()' <<<"$NEW_PROJECT" >/dev/null; then
   WIRING_FAIL=1
 fi
 
+# 字幕几行（2026-10-16 用户定：默认都是单行，除非面板上调成两行、或 AI 的 max_lines=2）：生成字幕、配音的字幕都按工程记的
+# `subtitleMaxLines` 切；改它只有面板（setSubtitleMaxLines，一步撤销）和 AI 的两个工具两条路；默认值不许改成两行。
+require "生成字幕按工程记的行数切" \
+  Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'maxLineCount: project\.state\.subtitleMaxLines'
+require "配音的字幕按工程记的行数切（AI 这次说了就按它）" \
+  Sources/SrtFlow/AIVoiceoverTool.swift 'plan\.maxLines \?\? project\.state\.subtitleMaxLines'
+require "add_voiceover 的 max_lines 经 AISubtitleLines 读" Sources/SrtFlow/AIVoiceoverTool.swift 'AISubtitleLines\.parse\(args\)'
+require "generate_subtitles 的 max_lines 经 AISubtitleLines 读" Sources/SrtFlow/AISubtitleTools.swift 'AISubtitleLines\.parse\(args\)'
+require "generate_subtitles 的 max_lines 经 setSubtitleMaxLines 落到工程（自己成一步撤销）" \
+  Sources/SrtFlow/AISubtitleTools.swift 'AIUndoGrouping\.step\(project\.effectiveUndoManager\) \{ project\.setSubtitleMaxLines\(maxLines\) \}'
+require "面板上的行数经 setSubtitleMaxLines 改" \
+  Sources/SrtFlow/SubtitleGen/SubtitleTranscriptionSection.swift 'project\.setSubtitleMaxLines\('
+require "setSubtitleMaxLines 夹成 1 或 2 再 perform" \
+  Sources/SrtFlow/VideoEditProjectSubtitleLink.swift 'SubtitleSegmentationConfig\.clampedLineCount\(lines\)'
+forbid "生成的字幕默认必须是单行（SubtitleSegmentationConfig 的默认值）" \
+  Sources/SrtFlowCore/SubtitleSegmentationConfig.swift 'maxLineCount: Int = [2-9]'
+forbid "工程记的行数默认必须是单行" Sources/SrtFlow/VideoEditModels.swift 'var subtitleMaxLines = [2-9]'
+STRAY_LINE_WRITES="$(grep -rn 'subtitleMaxLines = ' Sources/SrtFlow --include='*.swift' \
+  | grep -vE 'VideoEditModels\.swift:.*(var subtitleMaxLines = 1|subtitleMaxLines = SubtitleSegmentationConfig\.clampedLineCount)|VideoEditProjectSubtitleLink\.swift:.*\$0\.subtitleMaxLines = clamped|AIVoiceoverTool\.swift:.*state\.subtitleMaxLines = requested' || true)"
+if [ -n "$STRAY_LINE_WRITES" ]; then
+  echo "✗ 接线守卫：改字幕行数只许经 setSubtitleMaxLines、或 add_voiceover 放配音那一次 perform（别处写了）：$STRAY_LINE_WRITES" >&2
+  WIRING_FAIL=1
+fi
+
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "接线守卫失败" >&2
   exit 1

@@ -13,7 +13,9 @@ import Foundation
 // 不管什么：在哪断（`SubtitleBreaks`）、显示时间怎么排（`SubtitleCueTiming`）。
 
 public struct SubtitleSegmentationConfig: Hashable, Sendable {
-    /// 最多几行。生成的字幕一律单行（2026-08-09 产品决定），放不下就拆成下一条。
+    /// 最多几行。**默认单行**（2026-08-09 产品决定；2026-10-16 用户定：默认都是单行，除非用户在面板上调成两行、
+    /// 或者通过 AI 的 `lines=2` 要两行），放不下就拆成下一条。两行时折行点由 `SubtitleBreaks.displayLines` 挑
+    ///（两行差不多宽、断在好断的地方）。只认 1 和 2（`lineCountRange`）。
     public var maxLineCount: Int
     /// 每行最多几个字，按 `SubtitleLineMeasure.units` 数（全角 1、半角 0.5）：英文 42 个字符 = 21，中文 16。
     public var maxLineUnits: Double
@@ -81,6 +83,13 @@ public struct SubtitleSegmentationConfig: Hashable, Sendable {
     /// 两条字幕之间留的空（秒）。
     public var gap: Double { Double(gapFrames) * frameDuration }
 
+    /// 一条字幕最多几行只有这两档：1（默认）或 2。工程里记的、AI 给的都夹到这里面。
+    public static let lineCountRange = 1...2
+
+    public static func clampedLineCount(_ lines: Int) -> Int {
+        max(lineCountRange.lowerBound, min(lineCountRange.upperBound, lines))
+    }
+
     /// 以全角字为主的语言：每行 16 个字、9 字/秒（Netflix 简体中文规范）。
     /// 日文、韩文没有单独核对过，先归这一档。
     static let fullWidthLanguages: Set<String> = ["zh", "yue", "wuu", "ja", "ko"]
@@ -90,10 +99,13 @@ public struct SubtitleSegmentationConfig: Hashable, Sendable {
     ///   - languageCode: 转写实际用的语言（"en"、"zh"…），按它选每行字数和阅读速度；nil 按英文那一档。
     ///   - frameDuration: 工程一帧多长（两条之间留 2 帧）。
     ///   - maxLineEms: 一行在画面上放得下几个字号宽（App 那边按字幕样式和画面宽度算）。
+    ///   - maxLineCount: 一条最多几行（这个工程记的 `subtitleMaxLines`，1 或 2；别的值夹进 `lineCountRange`）。
     public static func generation(
-        languageCode: String?, frameDuration: Double, maxLineEms: Double
+        languageCode: String?, frameDuration: Double, maxLineEms: Double, maxLineCount: Int = 1
     ) -> SubtitleSegmentationConfig {
-        var config = SubtitleSegmentationConfig(maxLineEms: maxLineEms, frameDuration: frameDuration)
+        var config = SubtitleSegmentationConfig(
+            maxLineCount: clampedLineCount(maxLineCount), maxLineEms: maxLineEms, frameDuration: frameDuration
+        )
         if let languageCode, fullWidthLanguages.contains(languageCode) {
             config.maxLineUnits = 16
             config.maxUnitsPerSecond = 9

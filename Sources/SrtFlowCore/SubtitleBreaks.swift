@@ -287,6 +287,30 @@ enum SubtitleBreaks {
         return lines
     }
 
+    /// 显示出来排成几行：单行照 `lines`；允许两行、一行又放不下时挑折行点（2026-10-16 两行成了面板和 AI 能选的档）——
+    /// 两行差不多宽（两行各偏离平均的平方和，和 `bestCuts` 同口径）、断在好断的地方（`cutCost`：停顿后、逗号后、连词前；
+    /// 冠词不收尾、中文助词不起头、专有名词不拆）、不切在中文的词中间（`wordBoundaries`）；一样好时下面那行长
+    ///（Netflix：底重的金字塔）。排不进 `maxLineCount` 行就是 nil；挑不出来（一个词就一行）退回贪心。
+    static func displayLines(for words: ArraySlice<Word>, config: SubtitleSegmentationConfig) -> [String]? {
+        guard let greedy = lines(for: words, config: config) else { return nil }
+        guard greedy.count == 2, config.maxLineCount == 2 else { return greedy }
+        let list = Array(words)
+        let boundaries = wordBoundaries(list)
+        let fullWidth = SubtitleLineMeasure.isMostlyFullWidth(list.map(\.text).joined())
+        let total = SubtitleLineMeasure.units(shownText(0 ..< list.count, in: list))
+        var best: (lines: [String], cost: Double)?
+        for cut in 1 ..< list.count where boundaries.contains(cut) {
+            let top = shownText(0 ..< cut, in: list)
+            let bottom = shownText(cut ..< list.count, in: list)
+            guard !top.isEmpty, !bottom.isEmpty, lineFits(top, config: config), lineFits(bottom, config: config) else { continue }
+            let imbalance = (SubtitleLineMeasure.units(top) - SubtitleLineMeasure.units(bottom)) / max(total, 1)
+            var cost = 2 * imbalance * imbalance + cutCost(at: cut, in: list, boundaries: boundaries, fullWidth: fullWidth)
+            if imbalance > 0 { cost += 1e-6 }   // 一样好时上面那行短
+            if best.map({ cost < $0.cost }) ?? true { best = ([top, bottom], cost) }
+        }
+        return best?.lines ?? greedy
+    }
+
     /// 一行放不放得下：量的是去完标点之后真正显示的字。
     static func lineFits(_ line: String, config: SubtitleSegmentationConfig) -> Bool {
         let shown = SubtitlePunctuation.strip(line)

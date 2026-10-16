@@ -395,6 +395,10 @@
 "Couldn't detect the spoken language — no speech model is installed. Pick the language manually so its model can be downloaded." = "Couldn't detect the spoken language — no speech model is installed. Pick the language manually so its model can be downloaded.";
 "Translate after generating" = "Translate after generating";
 "Only the selected clips (%d)" = "Only the selected clips (%d)";
+"Lines per subtitle" = "Lines per subtitle";
+"1 line" = "1 line";
+"2 lines" = "2 lines";
+"Generated subtitles are one line each unless you allow two; what does not fit becomes the next subtitle. Voiceover subtitles follow this too" = "Generated subtitles are one line each unless you allow two; what does not fit becomes the next subtitle. Voiceover subtitles follow this too";
 "Generate Subtitles" = "Generate Subtitles";
 "Replace the current subtitle track?" = "Replace the current subtitle track?";
 "Replace" = "Replace";
