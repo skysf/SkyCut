@@ -31,6 +31,8 @@ final class ScreenRecordingCoordinator: ObservableObject {
     private(set) var session = ScreenRecordingSession.user
 
     private var request: ScreenRecordingRequest?
+    /// 录完落进哪个工程：`start` 传进来的那一个（几个工程开着时不一定是主窗口那个，docs/architecture/open-projects.md）。
+    private weak var targetProject: VideoEditProject?
     private var writer: ScreenRecordingWriter?
     private var engine: ScreenCaptureEngine?
     private var controlPanel: ScreenRecordingControlPanel?
@@ -209,6 +211,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
             microphoneOutputURL: microphoneURL
         )
         self.request = request
+        targetProject = project
 
         // 7. 建 Stop 窗，拿 windowID，重建排除 filter
         transition(to: .preparing)
@@ -324,29 +327,9 @@ final class ScreenRecordingCoordinator: ObservableObject {
         // 区域来源：盖上浅遮罩，让用户录制全程都看得出边界在哪。
         // **必须在 capture 起来之后再显示**，而且它自己 sharingType = .none，
         // 否则会被录进成片。
-        showRegionIndicator(for: request)
+        regionIndicator = ScreenRecordingRegionIndicator.shown(for: request.source, geometry: geometry(for: request.source))
         startTicking()
         session.observer?.recordingStarted(session: request.sessionID, alreadyRecorded: writer?.elapsed ?? 0)
-    }
-
-    /// 只有区域来源需要遮罩：整屏全都进画面，窗口会移动（这一版不跟踪）。
-    private func showRegionIndicator(for request: ScreenRecordingRequest) {
-        guard case .region(let displayID, let localRect) = request.source else { return }
-        guard let geometry = geometry(for: request.source),
-              let screen = NSScreen.screens.first(where: {
-                  ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
-                      .uint32Value == displayID
-              }) else { return }
-        let mainHeight = NSScreen.screens.first { $0.frame.origin == .zero }?.frame.height
-            ?? NSScreen.main?.frame.height ?? 0
-        let appKitRect = ScreenRecordingCoordinateMapper.appKitRect(
-            fromDisplayLocal: localRect, display: geometry,
-            mainDisplayHeightInPoints: mainHeight
-        )
-        regionIndicator = ScreenRecordingRegionIndicator(
-            regionInAppKit: appKitRect, screen: screen
-        )
-        regionIndicator?.show()
     }
 
     private func startTicking() {
@@ -646,7 +629,8 @@ final class ScreenRecordingCoordinator: ObservableObject {
             observer?.recordingEnded(.savedOnly(result))
             return
         }
-        let project = VideoEditProject.shared
+        // 落回开录的那个工程；它不在了就交给主窗口那个 —— 代号全 App 不重号，下面这道代号核对照样拦得住。
+        let project = targetProject ?? OpenProjects.shared.primary
         // 最后一道 stale-result guard（UI 已阻止切工程，这里仍要查）。
         guard project.isCurrentGeneration(request.documentGeneration) else {
             // 文件已经提交到用户选的位置了 —— **保留 manifest**，下次启动
@@ -737,7 +721,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
     /// 工程的 notice 横幅与设置页无关，一定看得到。
     func report(_ message: String) {
         errorMessage = message
-        VideoEditProject.shared.notice = message
+        (targetProject ?? OpenProjects.shared.primary).notice = message
     }
 
     /// Quit 期间等录制收尾（计划 §12.2）。
@@ -751,7 +735,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         guard terminationPending else { return }
         // partial / 恢复待决时不能退：用户还没决定那份文件怎么处理。
         guard !state.isBusy, pendingPartial == nil, pendingRecovery == nil else { return }
-        finishTerminationWait(shouldTerminate: VideoEditProject.shared.prepareToCloseDocument())
+        finishTerminationWait(shouldTerminate: OpenProjects.shared.all.allSatisfy { $0.prepareToCloseDocument() })
     }
 
     /// **只 reply 一次** —— 反复按 Quit、Stop 与 Quit 同时发生都靠它幂等。
@@ -779,6 +763,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         regionPanel = nil
         filter = nil
         request = nil
+        targetProject = nil
         manifest = nil
         session = .user
         // 这里**不再直接 reply**：那样会在 `.importing` 期间就答复退出，

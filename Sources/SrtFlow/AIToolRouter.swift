@@ -65,7 +65,8 @@ final class AIToolRouter {
         guard begin() else {
             return Answer(result: MCPBridge.textResult("Not done: the AI helper stopped waiting for this call.", isError: true))
         }
-        let project = VideoEditProject.shared
+        // AI 现在只剪主窗口里的那一个（几个工程一起剪是下一刀：docs/plans/2026-10-17-multi-project-ai-editing.md）。
+        let project = OpenProjects.shared.primary
         // 排队期间用户按了停止：排在后面的也不做了。
         if policy.startsRound, AISession.shared.phase == .stopped {
             return Answer(result: MCPBridge.textResult(

@@ -6,7 +6,8 @@ import SrtFlowCore
 struct VideoEditView: View {
     /// body 读了工程的哪个属性，整个编辑器就在它变时重算一遍：**别在这儿读选择**（点选一段会叫醒一切），
     /// 看选择的按钮放进小视图（preview-perf-ratchet.md 第十三节）；工具栏的四个开关也在自己的小视图里拨。
-    private let project = VideoEditProject.shared
+    /// 剪的是哪一个工程由外面给（主窗口给 `OpenProjects.primary`，docs/architecture/open-projects.md）。
+    private let project: VideoEditProject
     @ObservedObject private var exporter = VideoEditExporter.shared
     @StateObject private var toolchain = MediaToolchain.shared
     // 字幕轨的样式沿用「烧制字幕」页调好的那套。
@@ -34,8 +35,9 @@ struct VideoEditView: View {
     /// 预览里正在就地编辑的那条字幕（双击画面上的字幕进入）。
     @State private var previewEditingCueID: UUID?
 
-    init() {
-        clock = VideoEditProject.shared.clock
+    init(project: VideoEditProject) {
+        self.project = project
+        clock = project.clock
     }
 
     var body: some View {
@@ -286,7 +288,7 @@ struct VideoEditView: View {
     private var previewPane: some View {
         VStack(spacing: 0) {
             // AI 在剪的时候：谁在剪 · 停止；剪完：改了几处 · 撤销这一轮。只订阅 AISession、不读工程。
-            AIActivityBanner()
+            AIActivityBanner(project: project)
             if !project.missingMedia.isEmpty {
                 MissingMediaBar(project: project)
                 Divider()
@@ -316,7 +318,7 @@ struct VideoEditView: View {
 
     private var videoBox: some View {
         GeometryReader { proxy in
-            let size = fitted(in: proxy.size)
+            let size = AspectFit.size(aspect: aspect, in: proxy.size)
             ZStack {
                 Color.black
                 if !project.state.isEmpty {
@@ -353,17 +355,6 @@ struct VideoEditView: View {
         // 出边界，压到时间线工具栏那一排按钮上（用户报的重叠就是这么来的）。
         .frame(minHeight: 120)
         .padding(10)
-    }
-
-    private func fitted(in available: CGSize) -> CGSize {
-        guard available.width > 1, available.height > 1 else { return CGSize(width: 1, height: 1) }
-        var width = available.width
-        var height = width / aspect
-        if height > available.height {
-            height = available.height
-            width = height * aspect
-        }
-        return CGSize(width: width, height: height)
     }
 
     private var transport: some View {

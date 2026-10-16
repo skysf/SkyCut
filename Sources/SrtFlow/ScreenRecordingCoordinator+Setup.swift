@@ -209,7 +209,7 @@ extension ScreenRecordingCoordinator {
         } catch {
             // 损坏的 manifest **保留并如实报告**，不静默删除
             // （`docs/architecture/screen-recording-lifecycle.md` 的明文要求）。
-            VideoEditProject.shared.notice = L10n(
+            OpenProjects.shared.primary.notice = L10n(
                 "SrtFlow found a damaged screen-recording record from the last session and left it untouched."
             )
             return
@@ -272,7 +272,7 @@ extension ScreenRecordingCoordinator {
                         manifest: manifest, plan: plan,
                         kind: .microphoneOnly,
                         needsCommit: micTemp != nil,
-                        documentGeneration: VideoEditProject.shared.currentDocumentGeneration,
+                        documentGeneration: OpenProjects.shared.primary.currentDocumentGeneration,
                         result: ScreenRecordingResult(
                             mainURL: micSource!,
                             duration: 0, pixelSize: .zero, frameRate: .fallback, isPartial: true,
@@ -289,7 +289,7 @@ extension ScreenRecordingCoordinator {
                     kind: .recording,
                     // 只有还在临时路径的那部分才需要提交。
                     needsCommit: mainTemp != nil || micTemp != nil,
-                    documentGeneration: VideoEditProject.shared.currentDocumentGeneration,
+                    documentGeneration: OpenProjects.shared.primary.currentDocumentGeneration,
                     result: ScreenRecordingResult(
                         mainURL: mainSource,
                         microphoneURL: micUsable ? micSource : nil,
@@ -314,7 +314,7 @@ extension ScreenRecordingCoordinator {
                 plan: plan,
                 kind: .recording,
                 needsCommit: false,
-                documentGeneration: VideoEditProject.shared.currentDocumentGeneration,
+                documentGeneration: OpenProjects.shared.primary.currentDocumentGeneration,
                 result: ScreenRecordingResult(
                     mainURL: url,
                     microphoneURL: micFinal.map { URL(fileURLWithPath: $0) },
@@ -331,7 +331,7 @@ extension ScreenRecordingCoordinator {
             ))
 
         case .reportMissing(let paths):
-            VideoEditProject.shared.notice = String(
+            OpenProjects.shared.primary.notice = String(
                 format: L10n("A recording from the last session is no longer where it was saved: %@"),
                 paths.map { ($0 as NSString).lastPathComponent }.joined(separator: ", ")
             )
@@ -378,7 +378,7 @@ extension ScreenRecordingCoordinator {
     /// 删不掉时如实报告，并**保留账本**。
     func reportUndeleted(_ paths: [String]) {
         guard !paths.isEmpty else { return }
-        VideoEditProject.shared.notice = String(
+        OpenProjects.shared.primary.notice = String(
             format: L10n("These files couldn’t be deleted, so the recording is still on record: %@"),
             paths.map { ($0 as NSString).lastPathComponent }.joined(separator: ", ")
         )
@@ -458,7 +458,7 @@ extension ScreenRecordingCoordinator {
                 do {
                     result = try commitRecovered(pending)
                 } catch {
-                    VideoEditProject.shared.notice = String(
+                    OpenProjects.shared.primary.notice = String(
                         format: L10n("That recovered recording couldn’t be saved: %@"),
                         error.localizedDescription
                     )
@@ -467,7 +467,7 @@ extension ScreenRecordingCoordinator {
             }
             if decision == .addToTimeline, pending.kind == .recording {
                 guard transition(to: .importing) else { return nil }
-                let imported = await VideoEditProject.shared.importRecoveredRecording(
+                let imported = await OpenProjects.shared.primary.importRecoveredRecording(
                     result, documentGeneration: pending.documentGeneration,
                     sessionID: pending.manifest.sessionID, landing: landing
                 )
@@ -484,7 +484,7 @@ extension ScreenRecordingCoordinator {
                 transition(to: .finished(result))
                 return result
             } else {
-                VideoEditProject.shared.notice = String(
+                OpenProjects.shared.primary.notice = String(
                     format: L10n("The recovered recording was saved as %@."),
                     result.mainURL.lastPathComponent
                 )

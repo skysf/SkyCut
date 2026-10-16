@@ -1,6 +1,7 @@
 import Foundation
 
-// 选择的两个跨类型入口：⌘A 全选 / ⌘⇧A 取消，以及「拖一个选中的东西时谁跟着走」（含联动压在主轨块上的东西）。
+// 选择的两个跨类型入口：⌘A 全选 / ⌘⇧A 取消，以及「拖一个选中的东西时谁跟着走」（含联动压在主轨块上的东西）；
+// 还有「恰好选中一个时的那一个」（检查器、预览的选中框读它；2026-10-17 从 VideoEditProject.swift 搬过来，那个文件在行数基线里只许降）。
 //
 // 2026-09-25 用户拍板：⌘A 选中时间线上的一切 —— 剪辑（含隐藏轨上的）、形状、文字、数字、
 // 字幕 cue、滤镜段；标记和转场跟着各自的段走（它们长在段上，段动 / 段删它们就动 / 删）；
@@ -9,6 +10,25 @@ import Foundation
 // 选择模型的合同见 docs/architecture/subtitle-track-visibility-and-layout.md。
 @MainActor
 extension VideoEditProject {
+
+    /// 恰好选中一个时的那一个（检查器只在单选时展示细节）。
+    ///
+    /// 判据是**跨三类**只选中一个（`EditSelection.soleClipID`），不是"剪辑里只选
+    /// 中一个"：框选能同时选中剪辑和形状，那种情况下预览该一套框都不画。
+    var selectedClip: EditClip? {
+        selection.soleClipID.flatMap { state.clip(with: $0) }
+    }
+
+    var selectedShape: ShapeAnnotation? {
+        selection.soleShapeID.flatMap { id in state.shapes.first { $0.id == id } }
+    }
+
+    var selectedTextOverlay: TextOverlay? {
+        selection.soleTextID.flatMap { id in state.textOverlays.first { $0.id == id } }
+    }
+
+    /// 预览上那个字幕布局拖框的归属。同样只在跨三类唯一选中时才有。
+    var selectedSubtitleCueID: UUID? { selection.soleSubtitleCueID }
 
     /// ⌘A：时间线上的一切。走框选那一个混选入口（`applyBoxSelection`），所以标记和转场的
     /// 选择照样被清掉 —— 它们跟着段走，不单独选。

@@ -149,7 +149,7 @@ if [ "$(grep -cF 'if MCPUnixSocket.peerClosed(fd) { calls.abandon(id) }' "${BRID
   exit 1
 fi
 BEGIN_AT="$(grep -n 'guard begin() else {' "${ROUTER}" | cut -d: -f1 || true)"
-PROJECT_AT="$(grep -n 'let project = VideoEditProject.shared' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
+PROJECT_AT="$(grep -n 'let project = OpenProjects.shared.primary' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
 if [ -z "${BEGIN_AT}" ] || [ -z "${PROJECT_AT}" ] || [ "${BEGIN_AT}" -gt "${PROJECT_AT}" ]; then
   echo "✗ ${ROUTER} 的 execute 没在一开始问「还做不做」（第 ${BEGIN_AT:-?} 行）" >&2
   exit 1

@@ -157,7 +157,7 @@ struct BurnInPreviewArea: View {
     /// 字幕叠层和边距参考线才能画在对的位置上。
     private var videoBox: some View {
         GeometryReader { proxy in
-            let size = fitted(in: proxy.size)
+            let size = AspectFit.size(aspect: aspect, in: proxy.size)
             ZStack {
                 Color.black
                 media
@@ -221,17 +221,6 @@ struct BurnInPreviewArea: View {
         } else {
             Text("Rendering preview…").foregroundStyle(.secondary)
         }
-    }
-
-    private func fitted(in available: CGSize) -> CGSize {
-        guard available.width > 1, available.height > 1 else { return CGSize(width: 1, height: 1) }
-        var width = available.width
-        var height = width / aspect
-        if height > available.height {
-            height = available.height
-            width = height * aspect
-        }
-        return CGSize(width: width, height: height)
     }
 
     // MARK: - 播放条

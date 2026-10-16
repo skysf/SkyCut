@@ -10,6 +10,8 @@ import SwiftUI
 
 struct AIActivityBanner: View {
     @ObservedObject private var session = AISession.shared
+    /// 这条横幅在哪个工程的剪辑页上（「撤销这一轮」退的是它）。只拿着、不读它会变的属性，不订阅工程。
+    let project: VideoEditProject
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -59,7 +61,7 @@ struct AIActivityBanner: View {
             }
         case .stopped:
             bar(icon: "stop.circle", message: L10n("You stopped the AI.")) {
-                if session.canUndoRound { undoRoundButton }
+                if session.canUndoRound(project) { undoRoundButton }
                 closeButton
             }
         }
@@ -70,8 +72,8 @@ struct AIActivityBanner: View {
     }
 
     private var undoRoundButton: some View {
-        Button("Undo This Round") { session.undoRound(project: VideoEditProject.shared) }
-            .disabled(!session.canUndoRound)
+        Button("Undo This Round") { session.undoRound(project: project) }
+            .disabled(!session.canUndoRound(project))
             .instantHelp("Put the project back to how it was before the AI started this round")
     }
 
