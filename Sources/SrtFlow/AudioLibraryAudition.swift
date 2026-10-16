@@ -45,15 +45,15 @@ final class AudioLibraryAudition: ObservableObject {
     // MARK: - 播 / 停
 
     /// 点一下：正在听这首就停，否则换成这首。
-    func toggle(_ item: AudioLibraryItem, timelinePlayer: AVPlayer?) {
+    func toggle(_ item: AudioLibraryItem, timeline: PreviewAudioEngineHost?) {
         if playingID == item.id {
-            stop(timelinePlayer: timelinePlayer)
+            stop(timeline: timeline)
         } else {
-            play(item, timelinePlayer: timelinePlayer)
+            play(item, timeline: timeline)
         }
     }
 
-    func play(_ item: AudioLibraryItem, timelinePlayer: AVPlayer?) {
+    func play(_ item: AudioLibraryItem, timeline: PreviewAudioEngineHost?) {
         teardown()
 
         // 已经下过就放本地的：起播快，而且断网照样能听。
@@ -65,7 +65,7 @@ final class AudioLibraryAudition: ObservableObject {
         progress = 0
         isBuffering = true
 
-        duck(timelinePlayer)
+        duck(timeline)
 
         statusObservation = player.observe(\.timeControlStatus, options: [.new]) { [weak self] p, _ in
             Task { @MainActor in
@@ -82,14 +82,14 @@ final class AudioLibraryAudition: ObservableObject {
         endObserver = NotificationCenter.default.addObserver(
             forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main
         ) { [weak self] _ in
-            Task { @MainActor in self?.stop(timelinePlayer: timelinePlayer) }
+            Task { @MainActor in self?.stop(timeline: timeline) }
         }
         player.play()
     }
 
-    func stop(timelinePlayer: AVPlayer?) {
+    func stop(timeline: PreviewAudioEngineHost?) {
         teardown()
-        unduck(timelinePlayer)
+        unduck(timeline)
         playingID = nil
         progress = 0
         isBuffering = false
@@ -97,14 +97,15 @@ final class AudioLibraryAudition: ObservableObject {
 
     // MARK: - 让路
 
-    private func duck(_ timeline: AVPlayer?) {
+    /// `timeline`：试听面板所在的那个工程的引擎（几个工程开着时只压它，docs/architecture/open-projects.md）。
+    private func duck(_ timeline: PreviewAudioEngineHost?) {
         // 时间线的声音全在引擎里（播放器只剩画面）：引擎的总推子乘上让路量。
         let factor = Float(pow(10.0, Self.duckingDB / 20.0))
-        VideoEditProject.shared.audioEngineHost.duck(factor)
+        timeline?.duck(factor)
     }
 
-    private func unduck(_ timeline: AVPlayer?) {
-        VideoEditProject.shared.audioEngineHost.duck(1)
+    private func unduck(_ timeline: PreviewAudioEngineHost?) {
+        timeline?.duck(1)
     }
 
     private func teardown() {

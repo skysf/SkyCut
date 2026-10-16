@@ -46,17 +46,19 @@ final class OptimizedMediaCacheSettings: ObservableObject {
         }
     }
 
-    /// 「清空」：删掉整个缓存目录，当前工程的协调者作废、预览重建一次（用原片，后台重转）。
+    /// 「清空」：删掉整个缓存目录，每个开着的工程的协调者作废、预览重建一次（用原片，后台重转）。
     func clear() {
         guard !isClearing else { return }
         isClearing = true
-        let project = VideoEditProject.shared
-        project.optimizedMedia.reset()  // 取消路上的那一块，别让它落进刚清空的目录
+        let projects = OpenProjects.shared.all
+        for project in projects { project.optimizedMedia.reset() }  // 取消路上的那一块，别让它落进刚清空的目录
         Task { [weak self] in
             await MediaReadQueue.run(on: MediaReadQueue.proxy) { OptimizedMediaStore.removeAll() }
-            // 清空之后：作废内存里那张表、重建一次 —— 不然合成还指着删掉的块文件，builder 退回原片但不会再排转码。
-            project.optimizedMedia.reset()
-            project.scheduleRebuild()
+            // 清空之后：每个工程都作废内存里那张表、重建一次 —— 不然合成还指着删掉的块文件，builder 退回原片但不会再排转码。
+            for project in projects {
+                project.optimizedMedia.reset()
+                project.scheduleRebuild()
+            }
             guard let self else { return }
             self.isClearing = false
             self.message = L10n("Cleared. The preview uses the original files and prepares optimized media again in the background.")

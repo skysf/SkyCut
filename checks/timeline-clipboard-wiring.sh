@@ -33,11 +33,11 @@ for f in "$APP" "$CLIPBOARD" "$POINTER" "$PINCH" "$VIEW" "$FILE_DROP" "$CLIP_BLO
 done
 
 # ── 1. 编辑菜单的三项（响应链的最末端：输入框里的 ⌘C 还是复制文字） ───────────
-grep_code 'VideoEditProject.shared.copySelection()' "$APP" || fail "⌘C 没接到 copySelection（时间线上的东西拷不了）"
-grep_code 'VideoEditProject.shared.cutSelection()' "$APP" || fail "⌘X 没接到 cutSelection"
-grep_code 'VideoEditProject.shared.pasteTimelineItems(at: .keyboard)' "$APP" \
+grep_code 'OpenProjects.shared.focused.copySelection()' "$APP" || fail "⌘C 没接到 copySelection（时间线上的东西拷不了）"
+grep_code 'OpenProjects.shared.focused.cutSelection()' "$APP" || fail "⌘X 没接到 cutSelection"
+grep_code 'OpenProjects.shared.focused.pasteTimelineItems(at: .keyboard)' "$APP" \
   || fail "⌘V 没接到 pasteTimelineItems(at: .keyboard)（鼠标优先、否则播放头）"
-grep_code 'VideoEditProject.shared.canCopySelection' "$APP" \
+grep_code 'OpenProjects.shared.focused.canCopySelection' "$APP" \
   || fail "编辑菜单里拷贝 / 剪切的亮灭没看 canCopySelection：要么点了没反应，要么明明能拷却是灰的"
 grep_code 'TimelineClipboard.hasContent ||' "$APP" \
   || fail "编辑菜单里粘贴的亮灭没看时间线的剪贴板"

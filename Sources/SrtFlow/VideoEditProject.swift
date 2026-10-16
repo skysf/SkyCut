@@ -4,14 +4,15 @@ import AppKit
 import SwiftUI
 import SrtFlowCore
 
-/// 视频编辑器的全部可变状态。
+/// 一个剪辑工程的全部可变状态。
 ///
-/// 跟压缩/烧录的队列一样是全局单例：切到别的栏目视图会被销毁，时间线和
-/// 正在播的预览必须留着。所有会改时间线的操作都走 `perform`，那里统一做
+/// 由 `OpenProjects` 持有（2026-10-17 起不再是单例）：切到别的栏目视图会被销毁，时间线和正在播的预览必须留着。
+/// 所有会改时间线的操作都走 `perform`，那里统一做
 /// 磁吸排列、撤销登记和预览重建。`@Observable`：视图读了哪个属性，就只在它变时重算；不驱动界面的存储一律 `@ObservationIgnored`（preview-perf-ratchet.md 第十三节）。
 @MainActor @Observable
 final class VideoEditProject {
-    static let shared = VideoEditProject()
+    /// AI 用的短 id（p1、p2…，`OpenProjects` 发）：一个工程实例一个，换内容（打开别的文件）也不变。
+    let shortID: String
 
     private(set) var state = MainMagnet.newTimeline(remembered: EditorToggles.read(.magnet)) {
         // 时间线的所有写入最终都落在这里（perform / liveApply / applySnapshot
@@ -88,11 +89,11 @@ final class VideoEditProject {
     /// 靠它把 `documentURL` 跟过去，而不是在旧位置又造一个旧名字的文件。
     @ObservationIgnored var documentBookmark: Data?
 
-    /// 当前工程的代号，每换一个工程 +1。
+    /// 当前工程的代号，每换一个工程换一个新号（`DocumentGenerations`：全 App 一个计数，几个工程之间也不重号）。
     ///
     /// 后台导入（探测时长、图片转静帧）是脱手的 Task，工程切走之后它们可能才
     /// 回来。回来时对不上代号就直接丢弃，否则会把素材追加进**新**工程。
-    @ObservationIgnored private(set) var documentGeneration = 0
+    @ObservationIgnored private(set) var documentGeneration: Int
 
     /// 正在跑的后台导入任务，切工程时要取消。
     @ObservationIgnored private var importTasks: [Task<Void, Never>] = []
@@ -104,7 +105,7 @@ final class VideoEditProject {
 
     /// 切工程：作废所有还没回来的后台导入。
     func invalidateDocumentGeneration() {
-        documentGeneration &+= 1
+        documentGeneration = DocumentGenerations.next()
         for task in importTasks { task.cancel() }
         importTasks.removeAll()
         // 字幕生成/翻译也绑工程：切走就取消，别让旧任务白跑完整个素材、还占着串行槽挡住新工程的生成。
@@ -393,6 +394,8 @@ final class VideoEditProject {
 
     /// 撤销登记走窗口的 UndoManager，⌘Z/⇧⌘Z 和菜单原生可用。视图出现时塞进来。
     @ObservationIgnored weak var undoManager: UndoManager?
+    /// 没有窗口交过来时用这个工程自己的（不再退到键窗口的：那是别的工程的窗口，docs/architecture/open-projects.md）。
+    @ObservationIgnored let ownUndoManager = UndoManager()
 
     let mediaProbes = MediaProbeCache()
     /// 优化媒体：后台转码队列 + 预览窗口的「优化媒体 / 原片」；只有工具栏的小菜单订阅它（OptimizedMedia/）。
@@ -401,7 +404,9 @@ final class VideoEditProject {
     /// 预览重建的代数，旧的构建结果回来晚了就直接扔。
     @ObservationIgnored private var rebuildGeneration = 0
 
-    private init() {
+    init(shortID: String) {
+        self.shortID = shortID
+        documentGeneration = DocumentGenerations.next()
         let defaults = UserDefaults.standard
         let stored = { (key: String, fallback: Double) -> Double in
             let value = defaults.double(forKey: key)
@@ -420,25 +425,6 @@ final class VideoEditProject {
         }
         optimizedMedia.project = self  // 协调者要请重建、读播放状态；弱引用
     }
-
-    /// 恰好选中一个时的那一个（检查器只在单选时展示细节）。
-    ///
-    /// 判据是**跨三类**只选中一个（`EditSelection.soleClipID`），不是"剪辑里只选
-    /// 中一个"：框选能同时选中剪辑和形状，那种情况下预览该一套框都不画。
-    var selectedClip: EditClip? {
-        selection.soleClipID.flatMap { state.clip(with: $0) }
-    }
-
-    var selectedShape: ShapeAnnotation? {
-        selection.soleShapeID.flatMap { id in state.shapes.first { $0.id == id } }
-    }
-
-    var selectedTextOverlay: TextOverlay? {
-        selection.soleTextID.flatMap { id in state.textOverlays.first { $0.id == id } }
-    }
-
-    /// 预览上那个字幕布局拖框的归属。同样只在跨三类唯一选中时才有。
-    var selectedSubtitleCueID: UUID? { selection.soleSubtitleCueID }
 
     var duration: Double { state.duration }
 
@@ -686,10 +672,10 @@ final class VideoEditProject {
         liveTrim(anchor: TimelineTrim.Member(id: id, kind: .clip), leading: leading, deltaSeconds: deltaSeconds)
     }
 
-    /// 视图给的 UndoManager 首次出现时常常还是 nil，注册进去就全丢了。
-    /// 兜底拿键窗口的，⌘Z 才靠得住。
+    /// 视图给的 UndoManager 首次出现时常常还是 nil，注册进去就全丢了。兜底用工程自己的 ——
+    /// **不许退到键窗口的**：几个工程开着时键窗口可能是别的工程的，改动会登记进它的撤销栈（docs/architecture/open-projects.md）。
     var effectiveUndoManager: UndoManager? {
-        undoManager ?? NSApp.keyWindow?.undoManager
+        undoManager ?? ownUndoManager
     }
 
     private func registerUndo(_ snapshot: TimelineState) {

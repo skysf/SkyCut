@@ -71,9 +71,9 @@ final class AISession: ObservableObject {
 
     private init() {}
 
-    var canUndoRound: Bool {
-        snapshot != nil && changeCount > 0
-            && snapshotGeneration == VideoEditProject.shared.documentGeneration
+    /// 这一轮的快照是不是这个工程的这一次打开（代号全 App 不重号，`DocumentGenerations`）。
+    func canUndoRound(_ project: VideoEditProject) -> Bool {
+        snapshot != nil && changeCount > 0 && snapshotGeneration == project.documentGeneration
     }
 
     // MARK: 调用进来
@@ -166,7 +166,7 @@ final class AISession: ObservableObject {
     /// 快照再改一遍（docs/bugfixes/2026-10-02-undo-round-repacks-v1.md）。
     @discardableResult
     func undoRound(project: VideoEditProject) -> Bool {
-        guard canUndoRound, let snapshot else { return false }
+        guard canUndoRound(project), let snapshot else { return false }
         project.restoreTimeline(snapshot)
         changeCount = 0
         if phase == .finished { phase = .idle }

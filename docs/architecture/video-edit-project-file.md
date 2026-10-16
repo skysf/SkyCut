@@ -316,7 +316,8 @@ Finder**。App 只负责「快速回到最近那几条」。
   打开工程、补静帧、重链接素材都属于这一类。
 - **切工程前必须走 `closeCurrentDocument`**：作废工程代号 + 停播放 +
   `clock.detach()` + `cancelLiveEdit()` + 清选择 + 清定位表 + **清撤销栈**。
-  漏掉撤销栈的话，⌘Z 能把上一条工程的内容撤回到当前工程里。
+  漏掉撤销栈的话，⌘Z 能把上一条工程的内容撤回到当前工程里。清的是**这个工程的**撤销栈（窗口交来的或工程自己的，
+  2026-10-17 起不再退到键窗口的 —— 那可能是别的工程的窗口，[开着的工程](open-projects.md) 第三节）。
   「清选择」走 `clearSelection()` 一个入口（剪辑/形状/字幕 cue 三类一起），
   别在这里手抄字段名 —— 抄漏过一次（2026-08-09 复审），合同见
   [subtitle-track-visibility-and-layout](subtitle-track-visibility-and-layout.md)。
@@ -351,7 +352,7 @@ Finder**。App 只负责「快速回到最近那几条」。
    两个最近工程时，慢的那个后回来会把先打开的顶掉。
 6. **Save As 的新身份只有写盘成功才作数**：先暂存旧 `documentURL`/书签，
    `saveNow()` 失败就整个回滚，否则工程卡在一个写不进去的 URL 上。
-7. **退出必须走 `applicationShouldTerminate`**，失败或用户点取消就
+7. **退出必须走 `applicationShouldTerminate`**，**每个开着的工程都过一遍**（2026-10-17 起，[开着的工程](open-projects.md)），失败或用户点取消就
    `.terminateCancel`。`willTerminate` 那一步已经拦不住退出，写盘失败只能眼睁睁
    丢数据。
 

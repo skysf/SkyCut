@@ -60,7 +60,7 @@ struct AudioLibraryPanel: View {
         }
         .onDisappear {
             // 切走这一页就停试听 —— 声音还在响而界面已经不见了，用户找不到从哪停。
-            audition.stop(timelinePlayer: project.clock.player)
+            audition.stop(timeline: project.audioEngineHost)
         }
     }
 
@@ -196,7 +196,7 @@ struct AudioLibraryPanel: View {
                         item: item,
                         isChinese: isChinese,
                         onAudition: {
-                            audition.toggle(item, timelinePlayer: project.clock.player)
+                            audition.toggle(item, timeline: project.audioEngineHost)
                         },
                         onAdd: { add(item) }
                     )

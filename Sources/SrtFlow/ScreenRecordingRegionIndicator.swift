@@ -22,6 +22,27 @@ final class ScreenRecordingRegionIndicator {
 
     private let panel: NSPanel
 
+    /// 开录时盖上遮罩，返回它（录完由协调者关）。只有区域来源需要：整屏全都进画面，窗口会移动（这一版不跟踪）；
+    /// 不是区域来源、找不到那块屏就是 nil。`geometry` 是协调者算好的那块屏的几何。
+    static func shown(
+        for source: ScreenRecordingSource, geometry: ScreenRecordingCoordinateMapper.DisplayGeometry?
+    ) -> ScreenRecordingRegionIndicator? {
+        guard case .region(let displayID, let localRect) = source, let geometry,
+              let screen = NSScreen.screens.first(where: {
+                  ($0.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber)?
+                      .uint32Value == displayID
+              }) else { return nil }
+        let mainHeight = NSScreen.screens.first { $0.frame.origin == .zero }?.frame.height
+            ?? NSScreen.main?.frame.height ?? 0
+        let appKitRect = ScreenRecordingCoordinateMapper.appKitRect(
+            fromDisplayLocal: localRect, display: geometry,
+            mainDisplayHeightInPoints: mainHeight
+        )
+        let indicator = ScreenRecordingRegionIndicator(regionInAppKit: appKitRect, screen: screen)
+        indicator?.show()
+        return indicator
+    }
+
     /// - Parameter regionInAppKit: 被录区域的 **AppKit 全局**坐标
     ///   （由 `ScreenRecordingCoordinateMapper.appKitRect(fromDisplayLocal:)` 换算）。
     /// - Parameter screen: 区域所在的那块屏。

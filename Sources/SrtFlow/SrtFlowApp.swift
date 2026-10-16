@@ -46,7 +46,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !MainThreadWatchdog.isDisabledByEnvironment else { return }
         MainThreadWatchdog.shared.contextProvider = {
             MainActor.assumeIsolated {
-                "section=\(MainWindowState.shared.section) playing=\(VideoEditProject.shared.clock.isPlaying)"
+                "section=\(MainWindowState.shared.section) playing=\(OpenProjects.shared.primary.clock.isPlaying)"
             }
         }
         MainThreadWatchdog.shared.start()
@@ -80,20 +80,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 这条是双保险，也顺手把「字幕草稿开着」那种第一响应者会偶发丢掉的
         // 情况挡住（同 VideoEditView.handleEvent 的那条纪律）。
         if NSApp.keyWindow?.firstResponder is NSTextView { return false }
-        return VideoEditProject.shared.subtitleDraft == nil
+        return OpenProjects.shared.focused.subtitleDraft == nil
     }
 
     @objc func copy(_ sender: Any?) {
         MainActor.assumeIsolated {
             guard pasteboardActionsApply else { return }
-            VideoEditProject.shared.copySelection()
+            OpenProjects.shared.focused.copySelection()
         }
     }
 
     @objc func cut(_ sender: Any?) {
         MainActor.assumeIsolated {
             guard pasteboardActionsApply else { return }
-            VideoEditProject.shared.cutSelection()
+            OpenProjects.shared.focused.cutSelection()
         }
     }
 
@@ -107,10 +107,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             guard pasteboardActionsApply else { return }
             if TimelineClipboard.hasContent {
-                VideoEditProject.shared.pasteTimelineItems(at: .keyboard)
+                OpenProjects.shared.focused.pasteTimelineItems(at: .keyboard)
                 return
             }
-            VideoEditProject.shared.pasteMediaFiles()
+            OpenProjects.shared.focused.pasteMediaFiles()
         }
     }
 
@@ -118,7 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         MainActor.assumeIsolated {
             switch menuItem.action {
             case #selector(copy(_:)), #selector(cut(_:)):
-                return pasteboardActionsApply && VideoEditProject.shared.canCopySelection
+                return pasteboardActionsApply && OpenProjects.shared.focused.canCopySelection
             case #selector(paste(_:)):
                 // 两种载荷任意一种都算 —— 菜单项的亮灭必须和 `paste(_:)` 认的
                 // 东西一致，否则要么点了没反应，要么明明能粘却是灰的。
@@ -145,7 +145,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             $0.pathExtension.lowercased() == VideoEditProjectFile.fileExtension
         }) {
             MainWindowState.shared.section = .videoEdit
-            Task { await VideoEditProject.shared.openProject(at: projectFile) }
+            Task { await OpenProjects.shared.primary.openProject(at: projectFile) }
             return
         }
 
@@ -179,7 +179,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     return .terminateLater
                 }
             }
-            return VideoEditProject.shared.prepareToCloseDocument() ? .terminateNow : .terminateCancel
+            // 每个开着的工程都要落定；有一个没放行（写盘失败、用户在「存不存」上点了取消）就不退出，后面的也不再问。
+            return OpenProjects.shared.all.allSatisfy { $0.prepareToCloseDocument() } ? .terminateNow : .terminateCancel
         }
     }
 }
@@ -250,7 +251,9 @@ private struct SettingsView: View {
 /// 图标右键看到的是同一份，不用自己存一套。
 private struct ProjectCommands: View {
     @ObservedObject private var windowState = MainWindowState.shared
-    private let project = VideoEditProject.shared
+    /// 新建 / 打开 / 最近打开换的是主窗口里那一个；存储 / 存储为存的是键盘焦点所在的那一个（docs/architecture/open-projects.md）。
+    private var project: VideoEditProject { OpenProjects.shared.primary }
+    private var focused: VideoEditProject { OpenProjects.shared.focused }
 
     @Environment(\.openWindow) private var openWindow
 
@@ -292,11 +295,11 @@ private struct ProjectCommands: View {
 
         Divider()
 
-        Button("Save") { project.saveDocument() }
+        Button("Save") { focused.saveDocument() }
             .keyboardShortcut("s", modifiers: .command)
             .disabled(!isEditing)
 
-        Button("Save As…") { project.saveDocumentAs() }
+        Button("Save As…") { focused.saveDocumentAs() }
             .keyboardShortcut("s", modifiers: [.command, .shift])
             .disabled(!isEditing)
     }

@@ -333,7 +333,8 @@ struct MainWindowView: View {
         switch state.section {
         case .compress: CompressView()
         case .burnIn: BurnInView()
-        case .videoEdit: VideoEditView()
+        // 主窗口剪辑页里永远是 primary 那一个工程（docs/architecture/open-projects.md）。
+        case .videoEdit: VideoEditView(project: OpenProjects.shared.primary)
         case .batchConvert: BatchConvertView()
         }
     }
