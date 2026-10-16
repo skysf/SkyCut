@@ -113,6 +113,10 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
     public var marginVertical: Int
     public var marginHorizontal: Int
     public var letterSpacing: Double
+    /// 行距：两行之间的距离是一行高度（= 字号，libass 的口径）的多少倍，1 = libass 本来的行距。**只能加大**（`lineSpacingRange` 从 1 起）：
+    /// ASS 没有行距这一项，烧录是在两行之间垫一行很矮的空行（`lineSpacer`），收紧做不到。预览的行间距、AI 读的框、烧录的垫片同一个数。
+    /// 2026-10-16 加：圆体（Yuanti SC）的 win 量度只有 1.008 em，字形几乎占满整行，两行挨在一起；老文件缺键读 1。
+    public var lineSpacing: Double
     /// 是否是内置预设。内置的不可删除、不可覆盖。
     public var isBuiltIn: Bool
 
@@ -131,6 +135,7 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
     public static let outlineWidthRange = 0.0...12.0
     public static let shadowOffsetRange = 0.0...12.0
     public static let marginRange = 0...400
+    public static let lineSpacingRange = 1.0...2.0
 
     public init(
         id: UUID = UUID(),
@@ -149,6 +154,7 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
         marginVertical: Int = 60,
         marginHorizontal: Int = 80,
         letterSpacing: Double = 0,
+        lineSpacing: Double = 1,
         isBuiltIn: Bool = false
     ) {
         self.id = id
@@ -167,7 +173,40 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
         self.marginVertical = marginVertical
         self.marginHorizontal = marginHorizontal
         self.letterSpacing = letterSpacing
+        self.lineSpacing = min(max(lineSpacing, Self.lineSpacingRange.lowerBound), Self.lineSpacingRange.upperBound)
         self.isBuiltIn = isBuiltIn
+    }
+
+    // MARK: - 存盘
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, fontName, fontSize, bold, italic, fillColor, outlineColor, outlineWidth, shadowColor, shadowOffset
+        case borderStyle, position, marginVertical, marginHorizontal, letterSpacing, lineSpacing, isBuiltIn
+    }
+
+    /// 老文件、老预设（烧录页记住的、工程里的 `projectSubtitleStyle`）没有 `lineSpacing` 键：读成 1，就是以前的样子；超出范围的夹回来。
+    /// 别的键照旧必须有。写盘用合成的 `encode(to:)`，老版本读到不认识的键忽略 —— 两个方向都宽容，工程文件不为它 +1 版本。
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        fontName = try c.decode(String.self, forKey: .fontName)
+        fontSize = try c.decode(Double.self, forKey: .fontSize)
+        bold = try c.decode(Bool.self, forKey: .bold)
+        italic = try c.decode(Bool.self, forKey: .italic)
+        fillColor = try c.decode(SubtitleColor.self, forKey: .fillColor)
+        outlineColor = try c.decode(SubtitleColor.self, forKey: .outlineColor)
+        outlineWidth = try c.decode(Double.self, forKey: .outlineWidth)
+        shadowColor = try c.decode(SubtitleColor.self, forKey: .shadowColor)
+        shadowOffset = try c.decode(Double.self, forKey: .shadowOffset)
+        borderStyle = try c.decode(SubtitleBorderStyle.self, forKey: .borderStyle)
+        position = try c.decode(SubtitlePosition.self, forKey: .position)
+        marginVertical = try c.decode(Int.self, forKey: .marginVertical)
+        marginHorizontal = try c.decode(Int.self, forKey: .marginHorizontal)
+        letterSpacing = try c.decode(Double.self, forKey: .letterSpacing)
+        let spacing = try c.decodeIfPresent(Double.self, forKey: .lineSpacing) ?? 1
+        lineSpacing = min(max(spacing, Self.lineSpacingRange.lowerBound), Self.lineSpacingRange.upperBound)
+        isBuiltIn = try c.decode(Bool.self, forKey: .isBuiltIn)
     }
 
     // MARK: - 内置预设
@@ -303,6 +342,10 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
                 copy.text = SubtitleASSText.text(
                     plain, highlight: block.highlight, lit: block.highlights[cue.id] ?? [], fonts: fontOverrides(plain)
                 )
+                // 行距：两行之间垫一行很矮的空行（只在烧录：折行点是 App 自己写的 `\N`）。
+                if prewrapped, let spacer = Self.lineSpacer(fontSize: style.fontSize, lineSpacing: lineSpacing) {
+                    copy.text = copy.text.replacingOccurrences(of: "\\N", with: "\\N" + spacer + "\\N")
+                }
                 copy.marginL = nil
                 copy.marginR = nil
                 copy.marginV = nil
@@ -329,5 +372,23 @@ public struct BurnInStyle: Codable, Hashable, Sendable, Identifiable {
             "YCbCr Matrix": "None"
         ]
         return SubtitleSerializer.serialize(doc, format: .ass)
+    }
+
+    /// 行距的垫片：两行之间插一行只有一个不断行空格（`\h`）的空行，字号是多出来的那一截 —— libass 给一行的高度就是当时生效的字号，
+    /// 所以行距正好多 `(lineSpacing − 1) × 字号` 个画布像素（2026-10-16 拿仓库的 ffmpeg 真烧量过：垫 30 多 30、垫 60 多 60；真的空行
+    /// 只多一半、普通空格多出一整行，都不能用），完事把字号换回这一块样式的字号（高亮用 `\fscx` / `\fscy`、点名字体用 `\fn`，都不碰
+    /// `\fs`，所以换回去的永远是样式的字号）。`fontSize` 是这一块 ASS 样式里的字号（布局的倍率已经乘进去）。1 或者差不到半个像素不垫。
+    public static func lineSpacer(fontSize: Double, lineSpacing: Double) -> String? {
+        let extra = (lineSpacing - 1) * fontSize
+        guard extra >= 0.5 else { return nil }
+        return "{\\fs" + assNumber(extra) + "}\\h{\\fs" + assNumber(fontSize) + "}"
+    }
+
+    /// ASS 里的数：最多两位小数，去掉末尾的零（`56`、`16.8`、`25.2`）。
+    public static func assNumber(_ value: Double) -> String {
+        var text = String(format: "%.2f", value)
+        while text.hasSuffix("0") { text.removeLast() }
+        if text.hasSuffix(".") { text.removeLast() }
+        return text
     }
 }

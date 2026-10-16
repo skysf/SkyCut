@@ -21,6 +21,8 @@ struct AISubtitleStyleChange: Equatable {
     /// 一行最宽占画面宽的几成（0.3–1）：换算成左右边距落在样式上；只对工程字幕（要知道画幅）。
     var maxWidth: Double?
     var size: Double?
+    /// 行距（一行高度的倍数，1–2；只能加大，`BurnInStyle.lineSpacingRange`）。
+    var lineSpacing: Double?
     var font: String?
     var bold: Bool?
     var color: SubtitleColor?
@@ -72,6 +74,12 @@ struct AISubtitleStyleChange: Equatable {
             }
             size = value
         }
+        if let value = try fields.double("line_spacing") {
+            guard BurnInStyle.lineSpacingRange.contains(value) else {
+                throw AIToolError("style.line_spacing is a multiple of the line height, from 1 (normal) to 2; it cannot go below 1.")
+            }
+            lineSpacing = value
+        }
         font = try fields.string("font")?.trimmingCharacters(in: .whitespaces)
         bold = try fields.bool("bold")
         if let text = try fields.string("color") {
@@ -107,8 +115,8 @@ struct AISubtitleStyleChange: Equatable {
 
     /// 改了字幕本身的样子（不只是高亮、不只是 reset）。
     var changesLook: Bool {
-        position != nil || margin != nil || maxWidth != nil || size != nil || font != nil || bold != nil || color != nil
-            || outline != nil || outlineWidth != nil || box != nil || shadow != nil
+        position != nil || margin != nil || maxWidth != nil || size != nil || lineSpacing != nil || font != nil || bold != nil
+            || color != nil || outline != nil || outlineWidth != nil || box != nil || shadow != nil
     }
 
     /// ASS 画布的宽（PlayResX：高 1080、按画幅算、取偶数，同 `BurnInStyle.assDocument`）。边距就是这个单位。
@@ -151,6 +159,7 @@ struct AISubtitleStyleChange: Equatable {
         if let position { style.position = position }
         if let margin { style.marginVertical = margin }
         if let size { style.fontSize = size }
+        if let lineSpacing { style.lineSpacing = lineSpacing }
         if let font { style.fontName = font }
         if let bold { style.bold = bold }
         if let color { style.fillColor = color }
@@ -228,6 +237,7 @@ struct AISubtitleStyleChange: Equatable {
         var object: [String: JSONValue] = [
             "own_style": .bool(state.projectSubtitleStyle != nil),
             "size": .number((style.fontSize * (layout?.fontScale ?? 1)).rounded()),
+            "line_spacing": .number((style.lineSpacing * 100).rounded() / 100),
             "font": .string(style.fontName),
             "bold": .bool(style.bold),
             "color": .string(AIColor.hex(style.fillColor)),

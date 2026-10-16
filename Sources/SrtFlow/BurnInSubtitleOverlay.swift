@@ -74,7 +74,7 @@ struct BurnInSubtitleOverlay: View {
     }
 
     private func block(runs: [SubtitleFontScale.Run], lines: [SubtitleLineWrap.Line], metrics: SubtitleLineMetrics) -> some View {
-        strokedText(runs: runs, lines: lines, lineSpacing: metrics.lineSpacing)
+        strokedText(runs: runs, lines: lines, lineSpacing: metrics.lineSpacing + extraLineSpacing)
             .padding(boxPadding)
             .background { boxBackground }
             .background {
@@ -183,6 +183,10 @@ struct BurnInSubtitleOverlay: View {
 
     /// 样式的字号（含布局的倍率）换算到预览像素。
     private var baseFontSize: Double { style.fontSize * (layout?.fontScale ?? 1) * scale }
+
+    /// 样式的行距（`BurnInStyle.lineSpacing`，1 = libass 本来的行距）在两行之间多出来的距离：libass 的一行就是字号那么高，烧录在
+    /// 两行之间垫一行 `(lineSpacing − 1) × 字号` 高的空行（`BurnInStyle.lineSpacer`），这里给 VStack 加同样多的间距。
+    private var extraLineSpacing: Double { (style.lineSpacing - 1) * baseFontSize }
 
     private func font(named name: String, scaledBy factor: Double) -> Font {
         var result = Font.custom(name, size: baseFontSize * factor)

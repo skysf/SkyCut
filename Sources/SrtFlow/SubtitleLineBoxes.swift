@@ -42,7 +42,8 @@ enum SubtitleLineBoxes {
         let padding = style.borderStyle == .box ? max(0, style.outlineWidth) : 0
         // 一个词比可用宽度还宽（超长的英文单词）时不折：框也照实报，不夹到边距里。
         let blockWidth = (lines.map(\.width).max() ?? 0) + 2 * padding
-        let blockHeight = Double(lines.count) * lineHeight + 2 * padding
+        // 行距：两行之间多出的那一截和烧录的垫片、预览的间距同一个数（`BurnInStyle.lineSpacing`，一行高 = 字号）。
+        let blockHeight = Double(lines.count) * lineHeight + Double(lines.count - 1) * (style.lineSpacing - 1) * fontSize + 2 * padding
         // 块的上下沿、左右边距只问 SubtitleFrameGeometry（拖框、就地编辑同一份换算），块高是刚算出来的。
         let frame = SubtitleFrameGeometry(boxSize: box, style: style, layout: layout, blockHeight: blockHeight).frameRect
         let x: Double

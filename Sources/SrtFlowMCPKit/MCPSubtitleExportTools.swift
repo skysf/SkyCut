@@ -110,6 +110,7 @@ public enum MCPSubtitleExportTools {
         "margin": MCPSchema.number("Distance from that edge, as a fraction of the frame height (default 0.056).", minimum: 0, maximum: 0.45),
         "size": MCPSchema.number("Pixels on a 1080-tall frame (a 9:16 frame is 1920 tall: 1.78x larger there); default 56; bold captions 56-64 on 16:9, 42-48 on 9:16.", minimum: 20, maximum: 140),
         "max_width": MCPSchema.number("Widest line as a fraction of the frame width (default 0.92 on 16:9, 0.74 on 9:16); longer lines wrap. Project only.", minimum: 0.3, maximum: 1),
+        "line_spacing": MCPSchema.number("Space between lines as a multiple of the line height, 1 (default) to 2; fonts whose glyphs fill the line (Yuanti) read better at 1.15-1.3.", minimum: 1, maximum: 2),
         "font": MCPSchema.string("Font family on this Mac that can burn Chinese or English, e.g. Hiragino Sans GB, Heiti SC, Helvetica Neue."),
         "bold": MCPSchema.boolean("Bold text."),
         "color": MCPSchema.string("Text colour, #RRGGBB."),
