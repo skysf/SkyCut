@@ -196,6 +196,20 @@ if [ "$(grep -c 'settings.from = try args.double("from")' "${LISTEN_TOOL}" || tr
 fi
 echo "   ✓ from / to 读进来；一段片段、整条时间线都只量落在里面的那几秒"
 
+echo "==> listen cuts=true：V1 的剪辑点一次查完，转写只读缓存、声音从哪段来复用 cut_speech 的"
+# 2026-10-16（docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md；第四节第 13 条）；纯值在 checks/MCP/CutCheckChecks.swift。
+CUTS_TOOL="Sources/SrtFlow/AIListenCuts.swift"
+if [ "$(grep -c 'args.bool("cuts")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIListenCuts.check(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AITranscribeTool.cached(' "${CUTS_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AISpeechCutTool.speechClip(' "${CUTS_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIListenTool.waveform(' "${CUTS_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -cE 'TranscriptHarvester|TranscriptionTask|SpeechTranscriptionService' "${CUTS_TOOL}" || true)" -ne 0 ]; then
+  echo "✗ listen cuts=true 没接好：listen 要读 cuts 并交给 AIListenCuts；AIListenCuts 只读转写缓存（AITranscribeTool.cached）、声音从哪段来用 AISpeechCutTool.speechClip、波形用 AIListenTool.waveform，不许自己起转写" >&2
+  exit 1
+fi
+echo "   ✓ listen 读 cuts；剪辑点检查只读转写缓存、复用 cut_speech 的声音来源和 listen 的波形"
+
 echo "==> 压缩 / 烧录：AI 的条目自带设置和输出位置，不替用户开跑"
 # AI 给的参数只用于它排的那几条（不改页面上记住的设置），页面上改设置 / 输出文件夹不碰 AI 的条目；
 # 队列停着、里面有用户自己排了没开始的就不排（start() 会把等着的一起跑掉）。docs/architecture/ai-control-mcp.md 第四节第 24 条。
@@ -471,6 +485,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIBeatAnalysisWindow.swift \
   Sources/SrtFlow/AISpeechCuts.swift \
   Sources/SrtFlow/AISpeechCutPoints.swift \
+  Sources/SrtFlow/AICutCheck.swift \
   Sources/SrtFlow/AIBeatCuts.swift \
   Sources/SrtFlow/VideoEditClipboardPayload.swift \
   Sources/SrtFlow/VideoEditClipboardPaste.swift \
@@ -523,6 +538,7 @@ xcrun swiftc \
   checks/MCP/LookChecks.swift \
   checks/MCP/ShotChecks.swift \
   checks/MCP/ListenChecks.swift \
+  checks/MCP/CutCheckChecks.swift \
   checks/MCP/TextDecodingChecks.swift \
   checks/MCP/DocumentChecks.swift \
   checks/MCP/FileOperationChecks.swift \

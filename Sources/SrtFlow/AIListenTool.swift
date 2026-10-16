@@ -28,6 +28,17 @@ enum AIListenTool {
         settings.from = try args.double("from").map { max(0, $0) }
         settings.to = try args.double("to")
         if let from = settings.from, let to = settings.to, to <= from { throw AIToolError("to must be after from.") }
+        // cuts=true：V1 的每个剪辑点一次查完（AIListenCuts）。门限不给就按每段自己量的（同 cut_speech），所以单独读。
+        if try args.bool("cuts") ?? false {
+            guard try args.string("clip_id") == nil, try args.string("file") == nil else {
+                throw AIToolError("cuts=true checks every cut on V1: leave clip_id and file out (from/to narrow it).")
+            }
+            guard !settings.beats else { throw AIToolError("beats and cuts are separate: call listen twice.") }
+            return .ok(try await AIListenCuts.check(
+                project.state, AIShortIDs(state: project.state), from: settings.from, to: settings.to,
+                silenceDB: try args.double("silence_db"), deadline: Date().addingTimeInterval(waitSeconds)
+            ))
+        }
         if let path = try args.string("file") {
             guard settings.from == nil, settings.to == nil else {
                 throw AIToolError("from/to are timeline seconds; for part of a file use source_in/source_out.")
