@@ -49,7 +49,7 @@ enum AIListenCuts {
             "on_speech": .number(Double(AICutCheck.onSpeechCount(edges)))
         ]
         if boundaries.count > shown.count { result["more_cuts"] = .number(Double(boundaries.count - shown.count)) }
-        result["silence_db"] = silenceDB.map { .number($0) } ?? "measured per clip (at least -45)"
+        result["silence_db"] = silenceDB.map { JSONValue.number($0) } ?? .string("measured per clip (at least -45)")
         let transcripts = heard.values.compactMap { listened -> Bool? in
             if case .points(_, let transcript) = listened { return transcript }
             return nil
@@ -62,9 +62,11 @@ enum AIListenCuts {
                 "\(withTranscript) of \(transcripts.count) clips with sound have a transcript; the others are judged by sound alone"
             )
         }
-        result["note"] = "in_pause: the cut sits in a pause of that clip's sound. on_speech: it cuts into speech; suggested_source_in / "
-            + "suggested_source_out is the nearest pause, in that clip's source seconds: pass it to edit_clip (a trim keeps the clip's "
-            + "timeline start; add ripple=true so the later V1 clips follow a changed end)."
+        result["note"] = .string(
+            "in_pause: the cut sits in a pause of that clip's sound. on_speech: it cuts into speech; suggested_source_in / "
+                + "suggested_source_out is the nearest pause, in that clip's source seconds: pass it to edit_clip (a trim keeps the clip's "
+                + "timeline start; add ripple=true so the later V1 clips follow a changed end)."
+        )
         return .object(result)
     }
 
