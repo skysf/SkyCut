@@ -794,6 +794,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-17 冒烟拷工程时把整个「下载」文件夹拷走、写满了磁盘](docs/bugfixes/2026-10-17-copy-project-copied-all-of-downloads.md) — `copy-project.sh` 把工程所在的整个文件夹当素材目录拷，
   工程直接放在「下载」根目录时拷了 45 GB；现在来源是根目录 / 家目录 / 「下载」「桌面」「文稿」本身、或超过 4 GB 一律拒绝，`checks/copy-project-guard.sh` 真跑脚本钉着。
   **整夹拷之前先看来源是什么文件夹；测试工具也要和产品代码一样设防。**
+- [2026-10-17 open_folder 第二个文件夹时，结果里的 output_folder 还是上一个](docs/bugfixes/2026-10-17-open-folder-reports-previous-output-folder.md) — 第 ②a 刀的
+  `AICallContext` 在调用开始时抄了一份文件夹，`open_folder` 当场换了文件夹再报 `output_folder` 拿到的还是旧的；上下文只放「是谁」，`AIWorkspace.current`
+  按调用是谁现查，`checks/MCP/router-wiring.sh` 钉着。**放进 task-local 的只能是整个调用里不变的身份，会被调用自己改掉的状态要现查。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档

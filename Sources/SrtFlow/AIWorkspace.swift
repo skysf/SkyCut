@@ -25,10 +25,11 @@ final class AIWorkspace {
     /// 每个工程的工作区文件夹（短 id → 打开 / 新建它时这个会话点名的那个）。
     private var projectFolders: [String: URL] = [:]
 
-    /// 「打开的文件夹」：相对路径按它解析、结果里的路径按它写短、新文件放它下面。AI 的调用里是这一次调用的那个
-    /// （`AICallContext`：这个工程的 → 这个会话的），界面上（打开面板、导出面板第一次用的位置）是最后点名的那个。
+    /// 「打开的文件夹」：相对路径按它解析、结果里的路径按它写短、新文件放它下面。AI 的调用里按这一次调用是谁**现查**
+    /// （`AICallContext`：这个工程的 → 这个会话的；调用当中 open_folder 换了也跟着换），界面上（打开面板、导出面板第一次用的位置）
+    /// 是最后点名的那个。
     var current: URL? {
-        if let context = AICallContext.current { return context.folder ?? context.session.flatMap { sessionFolders[$0] } }
+        if let context = AICallContext.current { return folder(project: context.project, session: context.session) }
         return folders.last
     }
 

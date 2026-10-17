@@ -129,6 +129,13 @@ if [ "$(grep -cF 'return ["project:" + id]' "${ROUTER}" || true)" -lt 1 ] \
   echo "✗ ${ROUTER} 没按工程排队、不带 project 的没先等这个会话的开 / 建 / 关，或工具没在 AICallContext 里跑（几个子代理会串文件夹）" >&2
   exit 1
 fi
+# 上下文只放「是谁」，文件夹现查：抄一份进来的话，open_folder 当场报的 output_folder 是上一个文件夹
+#（docs/bugfixes/2026-10-17-open-folder-reports-previous-output-folder.md）。
+if grep -q 'var folder' Sources/SrtFlow/AICallContext.swift \
+   || [ "$(grep -cF 'if let context = AICallContext.current { return folder(project: context.project, session: context.session) }' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then
+  echo "✗ AICallContext 又抄了一份文件夹，或 AIWorkspace.current 没按调用是谁现查：调用当中换了文件夹，同一个调用还用旧的" >&2
+  exit 1
+fi
 if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ] \
    || [ "$(grep -c 'sessionProject.note(tool: tool, response: response)' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ]; then
   echo "✗ 小程序发请求没带会话的工程，或收到回答没记下来（Sources/SrtFlowMCP/AppConnection.swift）" >&2
