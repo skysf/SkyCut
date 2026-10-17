@@ -15,7 +15,7 @@ struct VideoEditProjectMenu: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         Menu {
-            Button("New Project") { project.newProject() }
+            Button("New Project") { OpenProjects.shared.userNew(from: project) }
             Button("Open Project…") { project.promptOpenProject() }
 
             Menu("Open Recent") {
@@ -24,7 +24,7 @@ struct VideoEditProjectMenu: View {
                 } else {
                     ForEach(recents, id: \.self) { url in
                         Button(url.deletingPathExtension().lastPathComponent) {
-                            Task { await project.openProject(at: url) }
+                            Task { await OpenProjects.shared.userOpen(url, from: project) }
                         }
                     }
                 }
@@ -90,7 +90,7 @@ struct VideoEditStartScreen: View {
                         LazyVGrid(columns: columns, spacing: 12) {
                             ForEach(recents, id: \.self) { url in
                                 RecentProjectCard(url: url) {
-                                    Task { await project.openProject(at: url) }
+                                    Task { await OpenProjects.shared.userOpen(url, from: project) }
                                 }
                             }
                         }

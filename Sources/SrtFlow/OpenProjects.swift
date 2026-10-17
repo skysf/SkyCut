@@ -171,6 +171,42 @@ final class OpenProjects {
         return primary.documentGeneration != before
     }
 
+    // MARK: 用户新建 / 打开（文件菜单、工程菜单、最近打开、双击工程文件）
+
+    /// 用户要在这个窗口里打开别的工程：这个窗口里的工程 AI 正在剪，就不换掉它、开到一个新的工程窗口里。
+    /// 方案 A.5 原来想把 AI 的工程挪出去；反过来开新窗口简单得多：AI 的短 id、撤销历史都不动，Mac 上一个文档一个窗口本来就是常态。
+    func userOpen(_ url: URL, from project: VideoEditProject) async {
+        guard aiIsEditing(project) else {
+            await project.openProject(at: url)
+            return
+        }
+        if await open(url, placement: .window(inFront: true)) == nil { project.notice = failure }
+    }
+
+    /// 用户要新建工程：同上，AI 正在剪这个窗口里的工程就开一个新的未命名工程窗口。
+    func userNew(from project: VideoEditProject) {
+        guard aiIsEditing(project) else {
+            project.newProject()
+            return
+        }
+        guard all.count < Self.limit else {
+            project.notice = String(format: L10n("SrtFlow keeps at most %lld projects open. Close one first."), Self.limit)
+            return
+        }
+        let fresh = VideoEditProject(shortID: shortIDs.next())
+        others.append(fresh)
+        place(fresh, .window(inFront: true))
+    }
+
+    /// 把工程的窗口摆到前面、交出键盘（用户在「AI 在剪的工程」里点的：他就是要去那个窗口）；后台工程先挂上窗口。
+    func focus(_ project: VideoEditProject) {
+        if isHeadless(project) { showWindow(for: project, inFront: true) }
+        if project === primary { MainWindowState.shared.section = .videoEdit }
+        guard let window = window(of: project) else { return }
+        if window.isMiniaturized { window.deminiaturize(nil) }
+        window.makeKeyAndOrderFront(nil)
+    }
+
     /// 上一次 `open` / `newProject` 为什么没开成（给 AI 转述的英文；界面上要用时再按 L10n 换）。
     @ObservationIgnored private(set) var failure: String?
 
