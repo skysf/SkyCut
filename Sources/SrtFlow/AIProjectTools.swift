@@ -37,7 +37,7 @@ enum AIProjectTools {
             "folders": .array(workspace.folders.map { .string($0.path) }),
             "output_folder": .string(workspace.outputFolder(.exports, project: project).path),
             "jobs": .array(AIJobs.shared.running.map { AIJobs.shared.json($0) }),
-            "stopped_by_user": .bool(session.phase == .stopped),
+            "stopped_by_user": .bool(session.round(for: project).phase == .stopped),
             "view": .string(session.viewMode.rawValue)
         ]
         // SrtFlow 自己的声音（本机的 Kokoro）下没下（方案第 50 条：让 AI 知道有这回事）。
@@ -221,7 +221,7 @@ enum AIProjectTools {
 
     static func undo(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
         if try args.bool("round") == true {
-            guard AIUndoGrouping.step(project.effectiveUndoManager, { AISession.shared.undoRound(project: project) }) else {
+            guard AIUndoGrouping.step(project.effectiveUndoManager, { AISession.shared.round(for: project).undoRound(project: project) }) else {
                 throw AIToolError("There is nothing from this round of AI edits to undo.")
             }
             return .ok(["undone": "round"], changed: true)

@@ -17,6 +17,8 @@ struct AICallContext: Sendable {
     var client: String = "AI"
     /// 这一次落在哪个工程上（短 id）；不碰工程的调用是 nil。
     var project: String?
+    /// 这一次起的任务在哪个工程上按停止时跟着停（方案 E 节）：碰工程的就是 `project`，不碰工程的是这个会话最后打开的那个（还没开过就是主窗口那个）。
+    var stopsWith: String?
     /// 相对路径按它解析、新东西默认放它下面：这个工程打开 / 新建时这个会话点名的文件夹，没有就是这个会话最后点名的那个。
     var folder: URL?
 

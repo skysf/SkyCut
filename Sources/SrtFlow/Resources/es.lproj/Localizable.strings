@@ -953,7 +953,7 @@
 "%@ made %d changes." = "%@ hizo %d cambios.";
 "You stopped the AI." = "Detuviste a la IA.";
 "The AI" = "La IA";
-"Stop the AI and cancel its exports and subtitle jobs" = "Detener a la IA y cancelar sus exportaciones y tareas de subtítulos";
+"Stop the AI on this project and cancel its exports and subtitle jobs" = "Detener a la IA en este proyecto y cancelar sus exportaciones y tareas de subtítulos";
 "Undo This Round" = "Deshacer esta ronda";
 "Put the project back to how it was before the AI started this round" = "Dejar el proyecto como estaba antes de que la IA empezara esta ronda";
 "Hide this bar" = "Ocultar esta barra";

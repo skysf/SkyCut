@@ -136,7 +136,7 @@ enum AIProjectOpenTools {
     private static func landed(_ project: VideoEditProject, extra: [String: JSONValue]) -> AIToolResult {
         sessions.own(project, session: session, client: client)
         AIWorkspace.shared.noteProjectOpened(project.shortID, session: session)
-        AISession.shared.rebase(project: project)
+        AISession.shared.round(for: project).rebase(project: project)
         var payload = extra
         payload["project"] = .string(project.shortID)
         payload["shown_in"] = .string(project === OpenProjects.shared.primary ? "main window" : "own window")

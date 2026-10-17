@@ -36,9 +36,11 @@ final class AIJobs {
         let waitingForUser: @MainActor () -> String?
         let cancelAction: @MainActor () -> Void
         /// 起它的那一次调用落在哪个工程（短 id）、哪个会话（`AICallContext`）：关工程前看它有没有在跑的任务、
-        /// cancel_job 只许取消自己会话的、停止按工程停（方案 E 节）。不碰工程的任务记成那个会话最后打开的工程。
+        /// cancel_job 只许取消自己会话的（方案 B.5）。不碰工程的任务（压缩、烧录、转写文件……）没有 `project`。
         let project: String?
         let session: String?
+        /// 用户在哪个工程上按停止时它跟着停（方案 E 节）：碰工程的就是那个工程，不碰工程的是起它时这个会话最后打开的那个。
+        let stopsWith: String?
         fileprivate(set) var status: Status = .running
         fileprivate(set) var message: String?
         fileprivate(set) var detail: JSONValue?
@@ -56,6 +58,7 @@ final class AIJobs {
             self.cancelAction = cancel
             project = AICallContext.current?.project
             session = AICallContext.current?.session
+            stopsWith = AICallContext.current?.stopsWith
         }
     }
 
@@ -107,9 +110,12 @@ final class AIJobs {
         job.cancelAction()
     }
 
-    /// 用户在横幅上按了停止。
-    func cancelAll() {
-        for job in running { job.cancelAction() }
+    /// 用户在这个工程的横幅上按了停止：跟着它停的任务都取消，回取消了哪几个（任务号）。
+    @discardableResult
+    func cancel(stoppingWith project: String) -> [String] {
+        let stopping = running.filter { $0.stopsWith == project }
+        for job in stopping { job.cancelAction() }
+        return stopping.map(\.id)
     }
 
     func json(_ job: Job) -> JSONValue {

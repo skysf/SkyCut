@@ -42,9 +42,6 @@ final class AIToolRouter {
                 "This SrtFlow does not have the tool \(request.tool). Ask the user to update SrtFlow.", isError: true
             ))
         }
-        let session = AISession.shared
-        if let refusal = session.refusalAfterStop() { return Answer(result: MCPBridge.textResult(refusal, isError: true)) }
-        session.noteCall(client: request.client)
         let call = Call(
             tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
             session: request.session ?? AIProjectSessions.anonymous, client: AISession.displayName(for: request.client ?? "AI")
@@ -97,12 +94,6 @@ final class AIToolRouter {
         guard begin() else {
             return Answer(result: MCPBridge.textResult("Not done: the AI helper stopped waiting for this call.", isError: true))
         }
-        // 排队期间用户按了停止：排在后面的也不做了。
-        if call.policy.startsRound, AISession.shared.phase == .stopped {
-            return Answer(result: MCPBridge.textResult(
-                "The user pressed Stop in SrtFlow. Stop calling tools and ask the user what to do next.", isError: true
-            ))
-        }
         let sessions = AIProjectSessions.shared
         // 碰工程的：落在哪个工程上、能不能落（别的会话的不许碰、App 重启过、关掉了……一样都不做，也不摆窗口、不开一轮）。
         // 排到它这一刻才定（docs/architecture/ai-control-mcp.md 第四节第 46 条）。
@@ -115,10 +106,19 @@ final class AIToolRouter {
             case .success(let project): target = project
             }
         }
+        // 用户在这个工程上按了停止（排队期间按的也算）：AI 安静下来之前落在它上面的调用都不做（AIRound）。别的工程照剪。
+        if let target {
+            let round = AISession.shared.round(for: target)
+            if let refusal = round.refusalAfterStop() { return Answer(result: MCPBridge.textResult(refusal, isError: true)) }
+            round.noteCall(client: call.request.client)
+        } else {
+            // 不碰工程的调用（等导出、看文件……）：这个会话还在剪，它的几个工程的这一轮都还没完。
+            for project in sessions.projects(of: call.session) { AISession.shared.round(for: project).noteActivity() }
+        }
         // 不碰工程的（看文件、开文件夹……）照旧要一个工程给工具读写默认值：这个会话最后打开的那个，没有就是主窗口那个。
         let project = target ?? sessions.projects(of: call.session).last ?? OpenProjects.shared.primary
         let context = AICallContext(
-            session: call.session, client: call.client, project: target?.shortID,
+            session: call.session, client: call.client, project: target?.shortID, stopsWith: project.shortID,
             folder: AIWorkspace.shared.folder(project: target?.shortID, session: call.session)
         )
         let outcome = await AICallContext.$current.withValue(context) { await run(call, project, onProject: target != nil) }
@@ -138,18 +138,18 @@ final class AIToolRouter {
             // 主窗口里的工程：窗口只在一轮开始时摆到前面（docs/plans/2026-09-27-mcp.md 第 32 条），后台模式（第 7 条）一次都不摆。
             // 工程窗口里的：开的时候摆过一次（OpenProjects），之后不再摆（方案板 3）。
             if call.policy.presentsEditor, onProject, project === OpenProjects.shared.primary {
-                let startsNewRound = AISession.shared.phase != .working
+                let startsNewRound = AISession.shared.round(for: project).phase != .working
                 let visible = AISession.shared.viewMode == .visible
                 // 正在录屏时不摆：摆到前面就盖住正在录的画面、被录进去（docs/plans/2026-10-03-screen-recording-mcp.md 第 6 条）。
                 let recordingScreen = ScreenRecordingCoordinator.shared.isBusy
                 try await AIEditorPresenter.prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)
             }
             // 录屏只留文件（不入轨）也开一轮：横幅和停止键照旧出来（同以前）。「撤销这一轮」的快照在开 / 建工程时换成那个工程。
-            if call.policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }
+            if call.policy.startsRound { AISession.shared.round(for: project).beginIfNeeded(project: project) }
             var result = try await dispatch(call.tool, call.arguments, project)
             if onProject { result.payload = Self.stamped(result.payload, with: project) }
             guard result.changedProject, onProject else { return Outcome(json: result.json, stamp: result.stamp) }
-            AISession.shared.noteChange()
+            AISession.shared.round(for: project).noteChange()
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
             return Outcome(json: AIProjectTools.saveIfNeverSaved(project, after: result).json, stamp: result.stamp)
         } catch let error as AIToolError {

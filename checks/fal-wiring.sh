@@ -37,6 +37,7 @@ SETTINGS="Sources/SrtFlow/Fal/FalSettingsStore.swift"
 VOICE="Sources/SrtFlow/AIFalVoice.swift"
 VOICEOVER="Sources/SrtFlow/AIVoiceoverTool.swift"
 SESSION="Sources/SrtFlow/AISession.swift"
+ROUND="Sources/SrtFlow/AIRound.swift"
 BANNER="Sources/SrtFlow/AIActivityBanner.swift"
 ROUTER="Sources/SrtFlow/AIToolRouter.swift"
 CATALOG="Sources/SrtFlowMCPKit/MCPToolCatalog.swift"
@@ -46,7 +47,7 @@ JOBS="Sources/SrtFlow/AIJobs.swift"
 GATE="Sources/SrtFlow/Fal/FalJobGate.swift"
 UPSCALE="Sources/SrtFlow/Upscale/UpscaleJob.swift"
 UPSCALE_TOOL="Sources/SrtFlow/AIUpscaleTool.swift"
-for file in "${RUN}" "${TOOL}" "${CLIENT}" "${KEYS}" "${SETTINGS}" "${VOICE}" "${VOICEOVER}" "${SESSION}" "${BANNER}" "${ROUTER}" "${CATALOG}" "${APP}" \
+for file in "${RUN}" "${TOOL}" "${CLIENT}" "${KEYS}" "${SETTINGS}" "${VOICE}" "${VOICEOVER}" "${SESSION}" "${ROUND}" "${BANNER}" "${ROUTER}" "${CATALOG}" "${APP}" \
             "${TRANSFER}" "${JOBS}" "${GATE}" "${UPSCALE}" "${UPSCALE_TOOL}"; do
   if [ ! -f "${file}" ]; then
     echo "✗ 找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）" >&2
@@ -129,13 +130,17 @@ if [ -z "${P}" ] || [ -z "${A}" ] || [ "${P}" -ge "${A}" ]; then
   fail "${GATE}：问用户之前必须先 AIEditorPresenter.prepareEditor（提示条只在剪辑页里，别的栏目看不见问题）"
 fi
 Q="$(line_of 'if let question = session.question' "${BANNER}")"
-S="$(line_of 'switch session.phase' "${BANNER}")"
+S="$(line_of 'switch round.phase' "${BANNER}")"
 if [ -z "${Q}" ] || [ -z "${S}" ] || [ "${Q}" -ge "${S}" ]; then
-  fail "${BANNER}：要点头的问题必须先于 switch session.phase 摆出来（这一轮「结束」了条也不能把问题收起来）"
+  fail "${BANNER}：要点头的问题必须先于 switch round.phase 摆出来（这一轮「结束」了条也不能把问题收起来）"
 fi
 grep -q 'withdrawQuestions(owner: job.id)' "${RUN}" || fail "${RUN}：取消任务时没有把挂在条上的问题收回"
 grep -q 'withdrawQuestions(owner: id.uuidString)' "${UPSCALE}" || fail "${UPSCALE}：取消 AI 起的 upscale 时没有把挂在条上的问题收回"
-grep -q 'while !pendingQuestions.isEmpty { resolveFirst(false) }' "${SESSION}" || fail "${SESSION}：按停止时没有把等着的问题算作「不要」"
+# 2026-10-17 起停止按工程（AIRound）：停的是这个工程的任务，它们挂着的问题算「不要」。
+STOP_BODY="$(awk '/    func stop\(\) \{/,/^    \}/' "${ROUND}")"
+grep -q 'let cancelled = AIJobs.shared.cancel(stoppingWith: projectID)' <<<"${STOP_BODY}" \
+  && grep -q 'for job in cancelled { AISession.shared.withdrawQuestions(owner: job) }' <<<"${STOP_BODY}" \
+  || fail "${ROUND}：按停止时没有取消这个工程的任务、或没有把它们等着的问题算作「不要」"
 
 # 6. 配旁白是同步工具，不许停下来等用户。
 for file in "${VOICEOVER}" "${VOICE}"; do

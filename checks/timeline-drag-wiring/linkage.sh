@@ -12,7 +12,7 @@ AI_TIMELINE_TOOLS="Sources/SrtFlow/AITimelineTools.swift"
 AI_SPEECH_CUT="Sources/SrtFlow/AISpeechCutTool.swift"
 MCP_TIMELINE="Sources/SrtFlowMCPKit/MCPTimelineTools.swift"
 MCP_SMART="Sources/SrtFlowMCPKit/MCPSmartEditTools.swift"
-AI_SESSION="Sources/SrtFlow/AISession.swift"
+AI_SESSION="Sources/SrtFlow/AIRound.swift"
 for f in "$LINKAGE" "$LINKAGE_LANDING" "$AI_TIMELINE_TOOLS" "$AI_SPEECH_CUT" "$MCP_TIMELINE" "$MCP_SMART" "$AI_SESSION"; do
   [ -f "$f" ] || fail "找不到 ${f}：联动的代码挪走了，这一节会扫个空"
 done
@@ -86,8 +86,8 @@ if BODY="$(require_func 'func restoreTimeline(' "$PROJECT")"; then
   fi
 fi
 if BODY="$(require_func 'func undoRound(' "$AI_SESSION")"; then
-  grep -q 'project.restoreTimeline(snapshot)' <<<"$BODY" || fail "AISession.undoRound 没走 restoreTimeline（原样换回快照）"
+  grep -q 'project.restoreTimeline(snapshot)' <<<"$BODY" || fail "AIRound.undoRound 没走 restoreTimeline（原样换回快照）"
   if grep -q 'perform' <<<"$BODY"; then
-    fail "AISession.undoRound 走了 perform：磁吸开着时 V1 退不回去、音频字幕却回了原位"
+    fail "AIRound.undoRound 走了 perform：磁吸开着时 V1 退不回去、音频字幕却回了原位"
   fi
 fi

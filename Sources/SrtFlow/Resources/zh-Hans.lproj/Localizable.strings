@@ -953,7 +953,7 @@
 "%@ made %d changes." = "%@ 改了 %d 处。";
 "You stopped the AI." = "已让 AI 停下。";
 "The AI" = "AI";
-"Stop the AI and cancel its exports and subtitle jobs" = "让 AI 停下，并取消它起的导出和字幕任务";
+"Stop the AI on this project and cancel its exports and subtitle jobs" = "让 AI 停下这个工程，并取消它在这个工程上起的导出和字幕任务";
 "Undo This Round" = "撤销这一轮";
 "Put the project back to how it was before the AI started this round" = "把工程退回 AI 这一轮开始之前的样子";
 "Hide this bar" = "收起这一条";

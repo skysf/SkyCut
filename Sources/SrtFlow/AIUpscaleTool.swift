@@ -113,7 +113,7 @@ enum AIUpscaleTool {
         }
         let ids = AIShortIDs(state: project.state)
         if !done.isEmpty {
-            AISession.shared.noteChange()
+            AISession.shared.round(for: project).noteChange()
             let first = done.compactMap { project.state.clip(with: $0) }.min { $0.timelineStart < $1.timelineStart }
             AIEditorPresenter.reveal(.init(clips: Set(done), time: first?.timelineStart), project: project)
         }
