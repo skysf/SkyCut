@@ -31,7 +31,8 @@ func runUpscaleToolChecks() {
     let schema = definition.inputSchema
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["clip_id"], "only clip_id is required")
     let properties = schema["properties"]?.objectValue ?? [:]
-    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range"], "the parameters")
+    // `project`：碰工程的工具都收（2026-10-17 起一个会话剪几个工程，MCPToolName.takesProject）。
+    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project"], "the parameters")
     checkEqual(properties["tier"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTiers, "tier lists the tiers")
     checkEqual(properties["target"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTargets, "target lists the targets")
     checkEqual(properties["range"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleRanges, "range lists the ranges")
