@@ -5,15 +5,19 @@ import Foundation
 // 管什么：这几样工具给 AI 看的说明文字和参数表。清单的总入口在 MCPToolCatalog.swift。
 
 public enum MCPProjectTools {
+    /// 每个碰工程的工具都收的 `project` 参数的说明（`MCPToolDefinition.addProjectParameter` 统一加）。
+    static let projectParameter = "Which of your projects (p1, p2… from open_project / new_project). Leave out for the one you opened last."
+
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
         switch name {
         case .getStatus:
             return MCPToolDefinition(
                 .getStatus, title: "SrtFlow status",
                 description: """
-                What SrtFlow is doing now: the open project (name, path, length, unsaved changes), the folders you may use, \
-                running jobs, whether the user pressed Stop, the view mode (set_view) and screen recording (state, permission, \
-                a leftover recording). Cheap; call it first in a new conversation.
+                What SrtFlow is doing now: your current project (name, path, length, unsaved changes) and every open project \
+                (id, whether it is yours, where it is shown), the folders you may use, running jobs, whether the user pressed Stop, \
+                the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
+                new conversation.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use.")
@@ -56,9 +60,12 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .openProject, title: "Open a project",
                 description: """
-                Open an existing SrtFlow project file (.srtflowproj) in the editor. \
-                If the open project was never saved and has edits, SrtFlow saves it first (into SrtFlow/Projects) \
-                and the result says where (previous_project_saved_to).
+                Open an existing SrtFlow project file (.srtflowproj). The result's project is its id (p1, p2…). Several projects \
+                can be open at once: to edit several (for example with sub-agents), open or create them all first, then pass \
+                project=<id> on every call; a call without project goes to the project you opened last. It opens in SrtFlow's \
+                main window when that is empty, otherwise in a window of its own, shown once (set_view background keeps it \
+                behind). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
+                SrtFlow keeps at most 8 projects open: close_project the finished ones.
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Absolute path of the .srtflowproj file.")
@@ -70,14 +77,23 @@ public enum MCPProjectTools {
                 description: """
                 Start a new, empty project and save it at once as <name>.srtflowproj, so every later edit autosaves. It goes \
                 into the folder you pass, otherwise into SrtFlow/Projects inside the folder the user named (open_folder), the \
-                open project's folder, or Downloads. A taken name gets a number (the result has the real path). If the open \
-                project was never saved and has edits, SrtFlow saves it first and the result says where \
-                (previous_project_saved_to).
+                open project's folder, or Downloads. A taken name gets a number (the result has the real path). The result's \
+                project is its id; it opens and counts like open_project (see there).
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("Project name without extension. Default: the workspace folder's name."),
                     "folder": MCPSchema.string("Folder to save the project in, when there is no workspace yet.")
                 ])
+            )
+        case .closeProject:
+            return MCPToolDefinition(
+                .closeProject, title: "Close a project",
+                description: """
+                Close one of your projects (project=p2) when you are done with it, for example after its export finished. \
+                It is saved first. SrtFlow keeps at most 8 projects open. Refused while one of its jobs runs (export, \
+                subtitles, translation…): wait with get_job or cancel_job first.
+                """,
+                input: MCPSchema.object([:], required: ["project"])
             )
         case .saveProject:
             return MCPToolDefinition(

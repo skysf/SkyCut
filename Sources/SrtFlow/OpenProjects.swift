@@ -68,11 +68,12 @@ final class OpenProjects {
     // MARK: 开、关
 
     /// 在一个新的工程窗口里打开这个文件。它已经开着就把那个窗口摆出来、回它；开到顶了、文件打不开回 nil（原因写在 `failure`）。
+    /// `inFront`：摆到最前面一次（看得见）；false 放到别的窗口后面（AI 的后台模式，方案第 ③ 刀起换成不开窗口）。
     @discardableResult
-    func openInWindow(_ url: URL) async -> VideoEditProject? {
+    func openInWindow(_ url: URL, inFront: Bool = true) async -> VideoEditProject? {
         failure = nil
         if let open = project(openAt: url) {
-            reveal(open)
+            if inFront { reveal(open) }
             return open
         }
         guard all.count < Self.limit else {
@@ -91,8 +92,42 @@ final class OpenProjects {
             return earlier
         }
         others.append(project)
-        attachWindow(to: project)
+        attachWindow(to: project, inFront: inFront)
         return project
+    }
+
+    /// 新建一个空工程、马上存成 `url`、放进它自己的窗口（AI 的 new_project 在主窗口不空的时候）。存不下回 nil（原因在 `failure`）。
+    func newInWindow(savingAs url: URL, inFront: Bool = true) -> VideoEditProject? {
+        failure = nil
+        guard all.count < Self.limit else {
+            failure = "SrtFlow keeps at most \(Self.limit) projects open. Close one first."
+            return nil
+        }
+        let project = VideoEditProject(shortID: shortIDs.next())
+        guard project.saveDocument(as: url) else {
+            failure = project.notice ?? "SrtFlow could not save the new project to \(url.path)."
+            return nil
+        }
+        others.append(project)
+        attachWindow(to: project, inFront: inFront)
+        return project
+    }
+
+    /// 关掉一个工程窗口里的工程（AI 的 close_project）：先落盘（落不下就不关、回 false，原因在工程的 `notice`），再关窗口、收拾。
+    /// 主窗口那个不在这里关（它永远在，换成一个空的 Untitled 由调用方做）。
+    func close(_ project: VideoEditProject) -> Bool {
+        guard project !== primary, let controller = windows[ObjectIdentifier(project)] else { return false }
+        guard project.prepareToCloseDocument() else { return false }
+        controller.close()   // 程序关窗不问 windowShouldClose，windowWillClose 照来 → windowClosed 收拾
+        return true
+    }
+
+    /// 主窗口里的工程换成一个空的 Untitled（AI 关掉它在主窗口里剪的那个：主窗口永远有一个工程）。调用方先替它落好盘。
+    /// 返回 false = 没换成（录屏中、存盘失败：`newProject` 的把关拒了），原因在 `primary.notice`。
+    func resetPrimary() -> Bool {
+        let before = primary.documentGeneration
+        primary.newProject()
+        return primary.documentGeneration != before
     }
 
     /// 上一次 `openInWindow` 为什么没开成（给 AI 转述的英文；界面上要用时再按 L10n 换）。
@@ -109,10 +144,10 @@ final class OpenProjects {
         return project !== primary || MainWindowState.shared.section == .videoEdit
     }
 
-    private func attachWindow(to project: VideoEditProject) {
+    private func attachWindow(to project: VideoEditProject, inFront: Bool) {
         let controller = ProjectWindowController(project: project) { [weak self] closed in self?.windowClosed(closed) }
         windows[ObjectIdentifier(project)] = controller
-        cascade = controller.present(cascadingFrom: cascade)
+        cascade = controller.present(cascadingFrom: cascade, inFront: inFront)
     }
 
     /// 工程窗口关掉了（`windowShouldClose` 已经替它落了盘）：这个工程关掉、收拾干净。
@@ -120,6 +155,7 @@ final class OpenProjects {
         windows[ObjectIdentifier(project)] = nil
         if keyProjectWindow === project { keyProjectWindow = nil }
         others.removeAll { $0 === project }
+        AIProjectSessions.shared.release(project)   // 谁在剪它都不再归谁（AI 下一步按 id 找会被告知它关了）
         ProjectTeardown.close(project)
     }
 

@@ -48,7 +48,7 @@ SOURCES="Sources/SrtFlow/AIScreenSources.swift"
 REQUEST="Sources/SrtFlow/AIScreenRecordingRequest.swift"
 MATCH="Sources/SrtFlow/AIScreenSourceMatch.swift"
 OVERLAY="Sources/SrtFlow/AIOverlayTools.swift"
-PROJECT_TOOLS="Sources/SrtFlow/AIProjectTools.swift"
+PROJECT_TOOLS="Sources/SrtFlow/AIProjectOpenTools.swift"
 for file in "${SETUP}" "${COORDINATOR}" "${SESSION}" "${COMMIT}" "${PANEL}" "${IMPORT}" "${VIEW}" "${ROUTER}" "${TOOL}" "${LEFTOVERS}" \
             "${JOB}" "${SOURCES}" "${REQUEST}" "${MATCH}" "${OVERLAY}" "${PROJECT_TOOLS}"; do
   if [ ! -f "${file}" ]; then
@@ -159,9 +159,18 @@ if ! before "${LOCK_AT}" "$(line_of 'project.setCanvasRatio(ratio)' "${OVERLAY}"
    || ! before "${LOCK_AT}" "$(line_of 'project.setFrameRate(rate)' "${OVERLAY}")"; then
   fail "${OVERLAY}：录屏中 set_canvas 改帧率要先报错、一样都不改（setFrameRate 那道闸只亮提示，AI 会以为改了）"
 fi
-SWITCH_AT="$(line_of 'throw AIToolError(AIScreenRecordingTool.lockMessage("the project cannot be switched now"))' "${PROJECT_TOOLS}")"
-if ! before "${SWITCH_AT}" "$(line_of 'guard project.isUntitled, !project.state.isEmpty else { return nil }' "${PROJECT_TOOLS}")"; then
-  fail "${PROJECT_TOOLS}：录屏中换工程要先挡、告诉 AI 用 record_screen action=stop（界面那句「先停止录屏」AI 照做不了）"
+# 2026-10-17 起几个工程同时开着：open_project / new_project / close_project 三条路都在动手之前先挡（主窗口那个可能正是素材要落进去的工程）。
+grep -q 'throw AIToolError(AIScreenRecordingTool.lockMessage("projects cannot be opened, created or closed now"))' "${PROJECT_TOOLS}" \
+  || fail "${PROJECT_TOOLS}：录屏中开 / 建 / 关工程的报错要经 AIScreenRecordingTool.lockMessage（界面那句「先停止录屏」AI 照做不了）"
+OPEN_BODY="$(awk '/static func openProject\(/,/^    \}/' "${PROJECT_TOOLS}")"
+NEW_BODY="$(awk '/static func newProject\(/,/^    \}/' "${PROJECT_TOOLS}")"
+CLOSE_BODY="$(awk '/static func closeProject\(/,/^    \}/' "${PROJECT_TOOLS}")"
+first_line() { grep -nF "$1" <<<"$2" | head -1 | cut -d: -f1; }
+if ! before "$(first_line 'try refuseWhileRecording()' "${OPEN_BODY}")" "$(first_line 'if let existing = OpenProjects.shared.project(openAt: url)' "${OPEN_BODY}")" \
+   || ! before "$(first_line 'try refuseWhileRecording()' "${NEW_BODY}")" "$(first_line 'primary.newProject()' "${NEW_BODY}")" \
+   || ! before "$(first_line 'try refuseWhileRecording()' "${CLOSE_BODY}")" "$(first_line 'OpenProjects.shared.resetPrimary()' "${CLOSE_BODY}")" \
+   || ! before "$(first_line 'try refuseWhileRecording()' "${CLOSE_BODY}")" "$(first_line 'OpenProjects.shared.close(project)' "${CLOSE_BODY}")"; then
+  fail "${PROJECT_TOOLS}：录屏中开 / 建 / 关工程要先挡、告诉 AI 用 record_screen action=stop（open_project / new_project / close_project 都要在动手之前）"
 fi
 
 grep -q 'throw AIToolError(AIScreenRecordingTool.lockMessage("the frame rate cannot be changed now"))' "${OVERLAY}" \

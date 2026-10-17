@@ -221,7 +221,8 @@ private func checkRecordScreenDefinition() {
     let properties = schema["properties"]?.objectValue ?? [:]
     checkEqual(Set(properties.keys), [
         "action", "source", "display", "window", "rect", "ratio", "computer_audio", "microphone", "pointer", "countdown",
-        "duration", "title", "add_to_timeline", "decision", "confirm_token"
+        "duration", "title", "add_to_timeline", "decision", "confirm_token",
+        "project"   // 碰工程的工具都收（2026-10-17 起一个会话剪几个工程，MCPToolName.takesProject）
     ], "the parameters")
     for (name, words) in [("action", MCPVocabulary.recordingActions), ("source", MCPVocabulary.recordingSources),
                           ("ratio", MCPVocabulary.recordingRatios), ("pointer", MCPVocabulary.recordingPointers),

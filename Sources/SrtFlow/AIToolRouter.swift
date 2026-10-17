@@ -3,31 +3,31 @@ import SrtFlowMCPKit
 
 // MARK: - 一次工具调用怎么走
 //
-// 管什么：从通道上收到的调用 → 查停止、记这一轮 → 排队 → 摆出剪辑页 → 交给对应的工具 → 结果。
+// 管什么：从通道上收到的调用 → 查停止、记这一轮 → 排队 → 定下落在哪个工程（几个工程、几个会话时）→ 摆出剪辑页 → 交给对应的工具 → 结果。
 // switch 对 `MCPToolName` 是穷举的：清单里加了工具、这里没接，编译不过。
-// 不管什么：收发（AIBridgeServer）、工具本身（AI*Tools）。
+// 不管什么：收发（AIBridgeServer）、工具本身（AI*Tools）、落在哪 / 归谁的规矩（AIProjectTargeting / AIProjectSessions）。
 //
-// **排队**：改工程的调用一个接一个做，按到达的顺序。Claude 会在一条消息里并排发几个调用，
-// 不排队的话「接在 V1 最后」这种落点就看谁先探完素材，每次结果都不一样。
+// **排队按工程**（docs/plans/2026-10-17-multi-project-ai-editing.md C 节）：碰工程的调用按工程排（同一个工程的调用仍一个接一个，
+// 「接在 V1 最后」看谁先探完素材就不会乱），不碰工程的按会话排，不同工程之间不互相等 —— 以前全 App 一条队，五个子代理的调用一个接一个，
+// 谁在 await（探素材、认画面、合成配音）别人全等着。开 / 建 / 关工程按会话另一条：不带 `project` 的调用先等这个会话还没做完的
+// 开 / 建 / 关（它们决定了「最后打开的那个」），再按那时落在的工程排。
 // 只读、会等很久的（get_job 最多等 30 秒）和取消不排队，免得堵住后面的活、或者取消排在被取消的后面。
+// **排到之后、动窗口之前**才定落在哪个工程、查归属（排队时前面可能正是别人的 open_project / close_project）。
 
 @MainActor
 final class AIToolRouter {
     static let shared = AIToolRouter()
 
-    private var tail: Task<Void, Never>?
+    /// 每条队的队尾（键："project:p2"、"session:<会话>"、"switch:<会话>"）。
+    private var tails: [String: Task<Void, Never>] = [:]
 
     private init() {}
 
-    /// 一次调用的回答：结果，和这次用到（或刚换上）的工程 —— 小程序据此记住这个会话在剪哪一个（`MCPSessionProject`）。
+    /// 一次调用的回答：结果，和这次用到（或刚开 / 建 / 关）的工程 —— 小程序据此记这个会话的一组工程（`MCPSessionProject`）。
     struct Answer {
         var result: JSONValue
         var project: MCPBridge.ProjectStamp?
     }
-
-    /// 谁把开着的工程换成了现在这个（按工程代号记）：AI 的 open_project / new_project 做成时记下会话号和客户端；
-    /// 没记过的 = 用户在界面上换的（`AIProjectBinding.refusal` 据此说清楚是谁）。
-    private var switches: [Int: AIProjectBinding.Switch] = [:]
 
     /// `begin`：轮到这个调用时（排完队之后）先问一句 —— 小程序不等了（App 卡过、它放弃了）就回 false，不做（AIBridgeCalls）。
     func handle(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
@@ -45,83 +45,125 @@ final class AIToolRouter {
         let session = AISession.shared
         if let refusal = session.refusalAfterStop() { return Answer(result: MCPBridge.textResult(refusal, isError: true)) }
         session.noteCall(client: request.client)
-        let arguments = AIToolArguments(request.arguments)
-        let policy = Policy(tool)
-        guard policy.serialized else { return await execute(tool, arguments, policy, request, begin) }
-        let previous = tail
-        let work = Task { @MainActor () -> Answer in
-            await previous?.value
-            return await self.execute(tool, arguments, policy, request, begin)
-        }
-        tail = Task { _ = await work.value }
-        return await work.value
+        let call = Call(
+            tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
+            session: request.session ?? AIProjectSessions.anonymous, client: AISession.displayName(for: request.client ?? "AI")
+        )
+        AIProjectSessions.shared.noteCall(session: call.session)
+        guard call.policy.serialized else { return await execute(call, begin) }
+        return await enqueue(await queueKeys(call)) { await self.execute(call, begin) }
     }
 
-    private func execute(
-        _ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ request: MCPBridge.Request,
-        _ begin: @Sendable () -> Bool
-    ) async -> Answer {
+    /// 一次调用要用的东西，排队、定工程、执行都传它。
+    private struct Call {
+        let tool: MCPToolName
+        let arguments: AIToolArguments
+        let policy: Policy
+        let request: MCPBridge.Request
+        let session: String
+        let client: String
+
+        var explicitProject: String? { try? arguments.string("project") }
+        var switchesProject: Bool { tool == .openProject || tool == .newProject || tool == .closeProject }
+    }
+
+    /// 排在哪几条队后面（C 节）。不带 `project` 的碰工程的调用，先等这个会话还没做完的开 / 建 / 关。
+    private func queueKeys(_ call: Call) async -> [String] {
+        if call.switchesProject {
+            // 关一个工程要等它自己那条队上正在做的活做完。
+            return ["switch:" + call.session] + (call.tool == .closeProject ? call.explicitProject.map { ["project:" + $0] } ?? [] : [])
+        }
+        guard AIProjectBinding.usesProject(call.tool, call.arguments) else { return ["session:" + call.session] }
+        if let id = call.explicitProject { return ["project:" + id] }
+        await tails["switch:" + call.session]?.value
+        let sessions = AIProjectSessions.shared
+        let id = sessions.ownership.current(of: call.session) ?? OpenProjects.shared.primary.shortID
+        return ["project:" + id]
+    }
+
+    private func enqueue(_ keys: [String], _ work: @escaping @MainActor () async -> Answer) async -> Answer {
+        let previous = keys.compactMap { tails[$0] }
+        let task = Task { @MainActor () -> Answer in
+            for tail in previous { await tail.value }
+            return await work()
+        }
+        let done = Task { _ = await task.value }
+        for key in keys { tails[key] = done }
+        return await task.value
+    }
+
+    private func execute(_ call: Call, _ begin: @Sendable () -> Bool) async -> Answer {
         // 小程序已经不等了（App 卡住的时候它放弃了这个调用、告诉 AI「没做，以后也不会做」）：照它说的，不做。
         guard begin() else {
             return Answer(result: MCPBridge.textResult("Not done: the AI helper stopped waiting for this call.", isError: true))
         }
-        // AI 现在只剪主窗口里的那一个（几个工程一起剪是下一刀：docs/plans/2026-10-17-multi-project-ai-editing.md）。
-        let project = OpenProjects.shared.primary
         // 排队期间用户按了停止：排在后面的也不做了。
-        if policy.startsRound, AISession.shared.phase == .stopped {
+        if call.policy.startsRound, AISession.shared.phase == .stopped {
             return Answer(result: MCPBridge.textResult(
                 "The user pressed Stop in SrtFlow. Stop calling tools and ask the user what to do next.", isError: true
             ))
         }
-        // 开着的不是这个会话的工程（别的会话或用户换了、App 重启过）：一样都不做，也不摆窗口、不开一轮。
-        // 排到它这一刻才查 —— 排队时前面可能正是别人的 open_project（docs/architecture/ai-control-mcp.md 第四节第 46 条）。
-        let usesProject = AIProjectBinding.usesProject(tool, arguments)
-        if usesProject, let refusal = AIProjectBinding.refusal(
-            expected: request.project, current: stamp(project), session: request.session,
-            switchedBy: switches[project.documentGeneration]
-        ) {
-            return Answer(result: MCPBridge.textResult(refusal, isError: true))
+        let sessions = AIProjectSessions.shared
+        // 碰工程的：落在哪个工程上、能不能落（别的会话的不许碰、App 重启过、关掉了……一样都不做，也不摆窗口、不开一轮）。
+        // 排到它这一刻才定（docs/architecture/ai-control-mcp.md 第四节第 46 条）。
+        var target: VideoEditProject?
+        if AIProjectBinding.usesProject(call.tool, call.arguments) {
+            switch sessions.target(
+                explicitID: call.explicitProject, remembered: call.request.project, session: call.session, client: call.client
+            ) {
+            case .failure(let refusal): return Answer(result: MCPBridge.textResult(refusal.message, isError: true))
+            case .success(let project): target = project
+            }
         }
-        let switchesProject = tool == .openProject || tool == .newProject
-        let result = await run(tool, arguments, policy, project)
-        if switchesProject, result["isError"]?.boolValue != true {
-            switches[project.documentGeneration] = AIProjectBinding.Switch(
-                session: request.session, client: AISession.displayName(for: request.client ?? "AI")
-            )
-        }
-        return Answer(result: result, project: usesProject || switchesProject ? stamp(project) : nil)
-    }
-
-    /// 开着的工程是谁（`MCPBridge.ProjectStamp`）。
-    private func stamp(_ project: VideoEditProject) -> MCPBridge.ProjectStamp {
-        MCPBridge.ProjectStamp(
-            token: AIProjectBinding.token(generation: project.documentGeneration),
-            path: project.documentURL?.path, name: project.projectName
+        // 不碰工程的（看文件、开文件夹……）照旧要一个工程给工具读写默认值：这个会话最后打开的那个，没有就是主窗口那个。
+        let project = target ?? sessions.projects(of: call.session).last ?? OpenProjects.shared.primary
+        let context = AICallContext(
+            session: call.session, client: call.client, project: target?.shortID,
+            folder: AIWorkspace.shared.folder(project: target?.shortID, session: call.session)
         )
+        let outcome = await AICallContext.$current.withValue(context) { await run(call, project, onProject: target != nil) }
+        // 开 / 建 / 关回它开 / 建 / 关的那个（工具结果里带着），别的碰工程的回它落在的那个；出错的不回（小程序记的不变）。
+        let stamp = outcome.failed ? nil : outcome.stamp ?? target.map(sessions.stamp)
+        return Answer(result: outcome.json, project: stamp)
     }
 
-    private func run(_ tool: MCPToolName, _ arguments: AIToolArguments, _ policy: Policy, _ project: VideoEditProject) async -> JSONValue {
+    private struct Outcome {
+        var json: JSONValue
+        var stamp: MCPBridge.ProjectStamp?
+        var failed = false
+    }
+
+    private func run(_ call: Call, _ project: VideoEditProject, onProject: Bool) async -> Outcome {
         do {
-            // 窗口只在一轮开始时摆到前面（docs/plans/2026-09-27-mcp.md 第 32 条）：这一轮中途不再一步一跳；
-            // 后台模式（第 7 条）一次都不摆。
-            if policy.presentsEditor {
+            // 主窗口里的工程：窗口只在一轮开始时摆到前面（docs/plans/2026-09-27-mcp.md 第 32 条），后台模式（第 7 条）一次都不摆。
+            // 工程窗口里的：开的时候摆过一次（OpenProjects），之后不再摆（方案板 3）。
+            if call.policy.presentsEditor, onProject, project === OpenProjects.shared.primary {
                 let startsNewRound = AISession.shared.phase != .working
                 let visible = AISession.shared.viewMode == .visible
                 // 正在录屏时不摆：摆到前面就盖住正在录的画面、被录进去（docs/plans/2026-10-03-screen-recording-mcp.md 第 6 条）。
                 let recordingScreen = ScreenRecordingCoordinator.shared.isBusy
                 try await AIEditorPresenter.prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)
             }
-            if policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }
-            let result = try await dispatch(tool, arguments, project)
-            guard result.changedProject else { return result.json }
+            // 录屏只留文件（不入轨）也开一轮：横幅和停止键照旧出来（同以前）。「撤销这一轮」的快照在开 / 建工程时换成那个工程。
+            if call.policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }
+            var result = try await dispatch(call.tool, call.arguments, project)
+            if onProject { result.payload = Self.stamped(result.payload, with: project) }
+            guard result.changedProject, onProject else { return Outcome(json: result.json, stamp: result.stamp) }
             AISession.shared.noteChange()
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
-            return AIProjectTools.saveIfNeverSaved(project, after: result).json
+            return Outcome(json: AIProjectTools.saveIfNeverSaved(project, after: result).json, stamp: result.stamp)
         } catch let error as AIToolError {
-            return MCPBridge.textResult(error.message, isError: true)
+            return Outcome(json: MCPBridge.textResult(error.message, isError: true), failed: true)
         } catch {
-            return MCPBridge.textResult("SrtFlow could not do that: \(error.localizedDescription)", isError: true)
+            return Outcome(json: MCPBridge.textResult("SrtFlow could not do that: \(error.localizedDescription)", isError: true), failed: true)
         }
+    }
+
+    /// 结果里带上这一步落在哪个工程（`project`: p2）：几个工程一起剪时 AI 一眼看得出来，子代理忘了带参数也看得出不对（方案 B.4）。
+    private static func stamped(_ payload: JSONValue, with project: VideoEditProject) -> JSONValue {
+        guard case .object(var object) = payload, object["project"] == nil else { return payload }
+        object["project"] = .string(project.shortID)
+        return .object(object)
     }
 
     /// 改工程的同步工具各包一层 `AIUndoGrouping.step`：一个工具 = 一步撤销（为什么不能靠按事件分组，见那个文件）。
@@ -141,8 +183,9 @@ final class AIToolRouter {
             AIRecipeLibrary.shared.refresh()
             return result
         case .manageFiles: return try AIFileTools.manageFiles(args, project)
-        case .openProject: return try await AIProjectTools.openProject(args, project)
-        case .newProject: return try AIProjectTools.newProject(args, project)
+        case .openProject: return try await AIProjectOpenTools.openProject(args, inFront: AISession.shared.viewMode == .visible)
+        case .newProject: return try await AIProjectOpenTools.newProject(args, inFront: AISession.shared.viewMode == .visible)
+        case .closeProject: return try AIProjectOpenTools.closeProject(args)
         case .saveProject: return try AIProjectTools.saveProject(args, project)
         case .undo: return try AIProjectTools.undo(args, project)
         case .seek: return try AIProjectTools.seek(args, project)
@@ -230,7 +273,10 @@ final class AIToolRouter {
             // 录屏不摆剪辑页（会盖住要录的画面、被录进去）；录完入轨算这一轮的改动。
             case .recordScreen:
                 (serialized, presentsEditor, startsRound) = (true, false, true)
-            case .openProject, .newProject, .undo, .addClips, .addVoiceover, .editClip, .setKeyframes, .setTrack, .splitClip, .deleteItems,
+            // 开 / 建 / 关工程：开在哪、摆不摆由它们自己定（主窗口空着装进去时摆一次，工程窗口开的时候摆一次）；不开一轮。
+            case .openProject, .newProject, .closeProject:
+                (serialized, presentsEditor, startsRound) = (true, false, false)
+            case .undo, .addClips, .addVoiceover, .editClip, .setKeyframes, .setTrack, .splitClip, .deleteItems,
                  .duplicateItems, .freezeFrame, .cutSpeech, .cutToBeat,
                  .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles,
                  .editSubtitles, .upscaleClip:

@@ -21,7 +21,7 @@ public enum MCPInstructions {
     }
 
     public static let text = """
-    SrtFlow is a video editor on the user's Mac. These tools edit the project open in its window while the user \
+    SrtFlow is a video editor on the user's Mac. These tools edit projects open in SrtFlow while the user \
     watches. Usual order: open_folder (the user's folder), open_project or new_project; get_timeline for ids; \
     look, listen and transcribe to see, hear and read the media (the only way); edit; export_video, then \
     get_job. Tool descriptions have the details; results say what to do next.
@@ -36,15 +36,15 @@ public enum MCPInstructions {
 
     Tools by need:
     - Files: get_status, open_folder (or Finder selection), read_document (scripts), manage_files, open_project, \
-    new_project, save_project
-    - Whole video: recipes first, follow the style that fits (the user's words win); save_recipe
+    new_project, save_project, close_project
+    - Whole video: recipes first, follow the style that fits (user's words win); save_recipe
     - Clips: add_clips, edit_clip (trim, speed, volume, fill 9:16, crop, animation), split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes
     - Record: record_screen (display, window or area, even while you work)
     - Talk and beat cuts: transcribe, cut_speech, listen beats=true, cut_to_beat
     - Picture: set_canvas (for 9:16, then edit_clip fit=fill each clip), set_transition, set_filter, set_text, \
     set_shape (also blur or mosaic a watermark)
-    - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser, pop… made here), add_voiceover \
+    - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser… made here), add_voiceover \
     (narration), set_track
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
     - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job

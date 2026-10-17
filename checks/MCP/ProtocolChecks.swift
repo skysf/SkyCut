@@ -163,14 +163,15 @@ func runProtocolChecks() {
     // （docs/bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md）。
     check(servedDescription("edit_clip").contains("timeline start stays"), "edit_clip says a trim keeps the clip's timeline start and moves its end")
     // 不按个数卡（2026-09-28 用户拍板，方案第 33 条），卡说明的总长度：工具说明每一轮都进 AI 的上下文，
-    // 用户那边还开着别的 MCP。上限 90,000 字符、约 2.5 万 token（按 3.6 个字符一个 token 估；2026-10-02 用户定从 72,000 抬到 80,000，
-    // 给 upscale_clip 腾地方；2026-10-14 审美盲测的六样功能加完只剩 26 字，用户定再抬到 90,000）；超了先把说明写短、或者并掉长得像的工具。
+    // 用户那边还开着别的 MCP。上限 100,000 字符、约 2.8 万 token（按 3.6 个字符一个 token 估；2026-10-02 用户定从 72,000 抬到 80,000，
+    // 给 upscale_clip 腾地方；2026-10-14 审美盲测的六样功能加完只剩 26 字，用户定再抬到 90,000；2026-10-17 一个会话剪几个工程，每个碰工程的工具
+    // 多一个 project 参数，用户定抬到 100,000）；超了先把说明写短、或者并掉长得像的工具。
     // 量的是**每个提供方都配好**时的全清单（最长的那种情况），不是某个用户此刻看到的。
     let fullList = talkToHelper([#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#], socket: app.path, providers: Set(MCPProvider.allCases))
     let fullTools = reply(fullList.messages, id: 1)?["result"]?["tools"]?.arrayValue ?? []
     checkEqual(fullTools.compactMap { $0["name"]?.stringValue }, MCPToolName.allCases.map(\.rawValue), "the full tools/list order and names")
     let catalogCharacters = fullTools.reduce(0) { $0 + $1.encodedString().count }
-    check(catalogCharacters <= 90_000, "the tool list stays under 90,000 characters (about 25k tokens); it is \(catalogCharacters)")
+    check(catalogCharacters <= 100_000, "the tool list stays under 100,000 characters (about 28k tokens); it is \(catalogCharacters)")
 
     // 3. 工具调用原样转给 App，客户端名字是 initialize 里报的那个；字符串 id 原样回。
     checkEqual(reply(messages, id: "abc")?["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue,

@@ -43,13 +43,13 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("ProjectWindowController is built in code") }
 
-    /// 层叠在上一个窗口右下方（第一个放正中），摆到最前面一次、不激活 App（键盘留在用户正在打字的地方，方案板 3）。
-    /// 返回下一个窗口该从哪儿层叠。
-    func present(cascadingFrom point: NSPoint) -> NSPoint {
+    /// 层叠在上一个窗口右下方（第一个放正中），摆到最前面一次、不激活 App（键盘留在用户正在打字的地方，方案板 3）；
+    /// `inFront` 是 false 时放到所有窗口后面（AI 的后台模式）。返回下一个窗口该从哪儿层叠。
+    func present(cascadingFrom point: NSPoint, inFront: Bool = true) -> NSPoint {
         guard let window else { return point }
         if point == .zero { window.center() }
         let next = window.cascadeTopLeft(from: point)
-        window.orderFrontRegardless()
+        if inFront { window.orderFrontRegardless() } else { window.orderBack(nil) }
         return next
     }
 

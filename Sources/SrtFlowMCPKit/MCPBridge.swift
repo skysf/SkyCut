@@ -114,11 +114,14 @@ public enum MCPBridge {
         public var token: String
         public var path: String?
         public var name: String
+        /// 工程的短 id（p1、p2…，AI 用 `project` 参数指它；2026-10-17 起）。老 App 不带。
+        public var id: String?
 
-        public init(token: String, path: String?, name: String) {
+        public init(token: String, path: String?, name: String, id: String? = nil) {
             self.token = token
             self.path = path
             self.name = name
+            self.id = id
         }
 
         public func isSameProject(as other: ProjectStamp) -> Bool {
@@ -126,6 +129,9 @@ public enum MCPBridge {
             guard let path, let otherPath = other.path else { return false }
             return URL(fileURLWithPath: path).standardizedFileURL.path == URL(fileURLWithPath: otherPath).standardizedFileURL.path
         }
+
+        /// 这一次运行的代号（`token` 的前半截）：App 重启过就不一样，短 id 会从 p1 重新发，旧的 p2 不再是那一个。
+        public var run: String { String(token.prefix { $0 != "-" }) }
     }
 
     /// 工具结果：一段文字。出错也走它（`isError: true`）—— MCP 规定工具自己的失败要让模型看得见，

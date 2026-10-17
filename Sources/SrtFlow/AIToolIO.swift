@@ -105,6 +105,8 @@ struct AIToolResult {
     var changedProject = false
     /// 跟在文字后面回给客户端的图（JPEG，「看」用）。能看图的模型直接看它；看不了的读文字那一半。
     var images: [Data] = []
+    /// open_project / new_project / close_project 开 / 建 / 关的那个工程的身份章：路由回给小程序，它据此记这个会话的一组工程。
+    var stamp: MCPBridge.ProjectStamp?
 
     static func ok(_ payload: JSONValue, changed: Bool = false) -> AIToolResult {
         AIToolResult(payload: payload, changedProject: changed)
