@@ -2,7 +2,7 @@
 
 > 2026-10-17 起，[AI 多开方案](../plans/2026-10-17-multi-project-ai-editing.md) 第 ① 刀（①a 拆单例、①b 工程窗口）、第 ②a 刀（AI 按 `project`
 > 参数找工程、开 / 建 / 关工程窗口）。已生效的长期约束：谁持有工程、谁该找哪一个、工程的身份怎么认、撤销登记到哪、工程窗口里哪些东西只认自己的。
-> 后台工程（没有窗口）是方案的第 ③ 刀，加进来的时候更新这里。AI 那一面的规矩在 [AI 接口（MCP）](ai-control-mcp.md) 第四节第 46 条。
+> 第 ③a 刀加了**后台工程**（没有窗口，第五节之二）。AI 那一面的规矩在 [AI 接口（MCP）](ai-control-mcp.md) 第四节第 46 条。
 
 ## 一、谁持有工程
 
@@ -10,9 +10,10 @@
   注册表就不知道它开着）。
 - **`primary`**：主窗口剪辑页里的那一个（用户的）。永远有一个，启动时是空的 Untitled；File ▸ 新建 / 打开 / 最近打开、
   双击 `.srtflowproj` 换的是**它的内容**（实例不换，同以前）。
-- **`others`**：主窗口以外开着的，各自在一个**工程窗口**里（第四节），按开的先后。开法只有 `openInWindow(url)`：
-  这个文件已经开着就把那个窗口摆出来、回它；开到顶（`limit` = 8，主窗口那个也算）、打不开就回 nil，原因在 `failure`（给 AI 的英文）。
-  新建是 `newInWindow(savingAs:)`（建好就存到那个路径）。两个都收 `inFront`：AI 在后台模式时放到别的窗口后面、不摆前面。
+- **`others`**：主窗口以外开着的，按开的先后：各自在一个**工程窗口**里（第四节），或者在**后台、没有窗口**（第五节之二）。开法只有
+  `open(url, placement:)`：这个文件已经开着就回它（看得见时把它的窗口摆出来）；开到顶（`limit` = 8，主窗口那个、后台的都算）、打不开就回 nil，
+  原因在 `failure`（给 AI 的英文）。新建是 `newProject(savingAs:placement:)`（建好就存到那个路径）。`Placement`：`.window(inFront:)`
+  （摆到最前面一次 / 放到后面）或 `.background`（AI 的后台模式）。
   关是 `close(_:)`（先过 `prepareToCloseDocument`，录屏中一律拒）；主窗口那个不关，`resetPrimary()` 换成空的 Untitled（AI 的 `close_project`）。
   谁在开：AI 的 `open_project` / `new_project`（主窗口那个是没人剪的空 Untitled 时装进主窗口，否则开工程窗口）、冒烟驱动。
 - **`focused`**：键窗口是工程窗口就是它的工程（`keyProjectWindow`，窗口变成 / 不再是键窗口时更新），否则是 `primary`。
@@ -58,8 +59,9 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 - AppKit 自己建的窗口装同一个剪辑页（为什么不用 SwiftUI 的 `WindowGroup`：上一节）。宿主视图套 `.appLanguage()`（新的根不带应用内语言）、
   标题跟着工程名（`.navigationTitle` 经 `sceneBridgingOptions` 交给窗口）。
 - 开的时候层叠排开（第一个放正中），**摆到最前面一次、不激活 App**（`orderFrontRegardless`，键盘留在用户正在打字的地方；方案板 3）。
-- 关窗：`windowShouldClose` 先过 `prepareToCloseDocument`（落盘；未命名又剪了东西的问存不存，点取消就不关），关了这个工程就关掉、
-  收拾干净（第五节）。方案第 ③ 刀起，AI 在剪的工程关窗是转后台，不是关工程。
+- 关窗：`windowShouldClose` **先问「AI 还在剪吗」**（`aiIsEditing`：归一个 5 分钟内调用过的会话、这一次打开的）—— 是就只摘窗口、
+  工程转到后台接着剪（方案 A.6，第五节之二），不问存不存；不是才过 `prepareToCloseDocument`（落盘；未命名又剪了东西的问存不存，点取消就不关），
+  关了这个工程就关掉、收拾干净（第五节）。
 - **几个剪辑页同时在时，这些只认自己的**：
   - **按键**：`handleEvent` 先认 `event.window` 是不是这个剪辑页的窗口（`TimelineScrollGeometry.live(for: project)?.window`）——
     每个剪辑页各挂一个本地按键监听，不分的话按一次空格每个工程都开播。
@@ -74,7 +76,7 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 - **全 App 一份的东西**：工具栏的吸附 / 联动 / 播放跟随（一个窗口里拨了，别的开着的工程跟着拨：`OpenProjects.sync`，
   [剪辑页上记住的开关](editor-remembered-toggles.md)）；预览的「优化媒体 / 原片」（每个工程都换过去、各自重建，[优化媒体](optimized-media.md)）。
 - **还没分开的**（方案后几刀）：导出只有一个（`VideoEditExporter.shared`，B 窗口的工具栏也显示 A 的导出进度、导出按钮也灰着 —— 第 ④ 刀排队）；
-  AI 那一轮的横幅全 App 一份（第 ② 刀）；送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。
+  送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。AI 那一轮的横幅第 ② 刀起每个工程一条（`AIRound`）。
 
 ## 五、关一个工程（不是换内容）
 
@@ -84,6 +86,21 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 **换 / 关一个工程只停它自己的活**（几个工程开着时别把别人的停了）：转写按 `boundGeneration`（`cancelIfBound(toGeneration:)`）、
 翻译按 `ownerGeneration`（`cancel(ifOwnedBy:)`）、upscale 按任务的 `projectGeneration`（`cancelAll(projectGeneration:)`）认 ——
 都是换之前那个代号。以前是 `cancelIfBoundToProject()` / `cancel()` / `cancelAll()`：哪个工程换内容都会停掉别的工程的生成、翻译、upscale。
+
+## 五之二、后台工程（没有窗口，2026-10-17 第 ③a 刀）
+
+方案板 8：AI 的后台模式开 / 建的工程**一个窗口都不开**，也不建预览那一套 —— 播放器的条目、预览合成、实时音频引擎、优化媒体的转码；
+缩略图、波形条没有时间线，本来就不会去读。AI 的「看」「听」、导出、字幕本来就不靠播放器（各自建合成、读波形那一份），后台照常。
+
+- **认法**：`isHeadless`（主窗口以外、没挂窗口）；`showsEditor`（主窗口那个永远算，后台的不算）。
+- **不建预览**：`VideoEditProject.scheduleRebuild` 开头先问 `showsEditor`，防抖之后再问一次（摘窗口之前排上的那次重建不许把条目挂回去）。
+  开 / 建工程的那几秒它还没窗口，重建被跳过；挂上窗口（`place` / `showWindow`）之后马上重建一次。
+- **挂上 / 摘下**：`showWindow(for:inFront:)` 给后台工程挂一个工程窗口并重建（AI 的 `set_view visible`、主窗口「AI 在剪的工程」里点打开）；
+  `moveToBackground` 摘掉窗口（AI 的 `set_view background`）→ 控制器 `closeKeepingProject` → `windowClosed(keepsProject: true)` →
+  `ProjectTeardown.stopPreview`：只停播放器、引擎、优化媒体，文档、撤销历史（工程自己的撤销管理器）、在跑的任务、自动存盘都留着。
+- **关**：`close(_:)` 有窗口的关窗口、后台的直接收拾（同第五节），都先过 `prepareToCloseDocument`。退出时后台的也要落定（在 `all` 里）。
+- **还没做的**（③a 后半）：主窗口侧边栏的「AI 在剪的工程」列表（停止 / 打开窗口 / 关掉）。在它之前，后台工程只能由 AI 自己 `set_view visible` /
+  `close_project`，或者退出 App。
 
 ## 六、谁找哪一个
 
@@ -109,7 +126,8 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 App 的退出和录屏收尾之后的退出都问每个工程；录屏开录时记下 `targetProject`、入轨落回它；
 工程窗口的 delegate 交出 `ownUndoManager` 且**先挂 delegate 再放内容**（按行号比）；主窗口的撤销管理器只交给 `.mainWindow` 的剪辑页；
 按键先认自己的窗口；录屏的框走 `ScreenRecordingSheets`；换工程只取消自己的翻译、只作废自己的 upscale；关工程停引擎、作废导入、作废 upscale；
-存盘前让输入框辞职要先过 `editorIsKey`。
+存盘前让输入框辞职要先过 `editorIsKey`；**后台工程**：`scheduleRebuild` 开头和防抖之后都问 `showsEditor`、挂上窗口之后重建、摘窗口只停预览
+（`keepsProject` 那一支先 return）、关窗先问 AI 还在不在剪（第 ③a 刀，各自反向验证过：拆掉一处就红）。
 写死旧字符串的几条也跟着改了：`checks/timeline-clipboard-wiring.sh`（编辑菜单接到 `focused`）、`checks/MCP/router-wiring.sh`（路由拿工程的那一行）、
 `checks/project-file-wiring.sh`（转写按代号取消）、`checks/screen-recording-ai-wiring.sh`（设置页搬进 `ScreenRecordingSheets`）。
 
@@ -131,3 +149,6 @@ p2 里拨吸附，p1 跟着变；关掉 p2 的窗口之后开着的只剩 p1。
 - [ ] 两个工程窗口（让 AI `open_project` 两个工程）：在一个窗口里按空格、⌫、⌘Z 只动这个工程；编辑菜单的「撤销」标题跟着键窗口的工程变；
       工程窗口的工具栏（工程菜单、素材库、录屏、字幕、导出）都在；在 B 窗口里点 Record，设置页弹在 B 上、录完落进 B。
 - [ ] 一个工程窗口里正在改字幕文字，另一个工程在后台被 AI 改着（自动存盘）：打字不被打断。
+- [ ] 让 AI `set_view background` 之后 `open_project` 一个工程：不开窗口；AI 照样改、导出；`set_view visible project=…` 之后窗口出来、预览是改过的样子、
+      ⌘Z 撤得到 AI 在后台做的每一步。
+- [ ] AI 正在剪一个工程窗口里的工程时，用户点它的关闭按钮：窗口没了、不问存不存，AI 接着改照样成功；AI 停下 5 分钟以上再关窗：照常落盘关掉。
