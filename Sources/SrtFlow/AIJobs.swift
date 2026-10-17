@@ -126,6 +126,12 @@ final class AIJobs {
             "elapsed_seconds": .number(((job.finishedAt ?? Date()).timeIntervalSince(job.startedAt)).rounded())
         ]
         if let project = job.project { object["project"] = .string(project) }
+        // 还在排队（导出、转写、翻译一次一个，AIWorkQueue）：报排在第几，进度还没有。
+        if job.status == .running, let position = AIWorkQueue.shared.position(of: job.id) {
+            object["status"] = "queued"
+            object["queue_position"] = .number(Double(position))
+            return .object(object)
+        }
         if job.status == .running, let progress = job.progress() {
             object["progress"] = .number((progress * 100).rounded() / 100)
         }

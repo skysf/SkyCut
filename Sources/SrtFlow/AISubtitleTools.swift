@@ -25,7 +25,6 @@ enum AISubtitleTools {
             throw AIToolError("Speech transcription is not available on this Mac.")
         }
         let task = TranscriptionTask.shared
-        guard !task.isRunning else { throw AIToolError("Subtitles are already being generated. Wait for that job first.") }
         let language = try args.string("language") ?? "auto"
         let sourceID = language.lowercased() == "auto" ? TranscriptionTask.autoDetectLocaleID : language
         let targetID = try await (try args.string("translate_to")).asyncMap { try await translationTarget($0, source: nil) }
@@ -38,20 +37,41 @@ enum AISubtitleTools {
         if let maxLines = try AISubtitleLines.parse(args) {
             AIUndoGrouping.step(project.effectiveUndoManager) { project.setSubtitleMaxLines(maxLines) }
         }
-        task.start(
-            project: project,
-            sourceLocaleID: sourceID,
-            targetLanguageID: targetID,
-            // 和面板同一个算法：按当前字幕样式和画面宽度算一行放得下多少（竖屏更短）。
-            lineFitEms: SubtitleLineFit.ems(
-                for: project.state, appWide: EncodeQueue.burnIn.burnInStyle, renderSize: project.renderSize
-            ),
-            onlyClipIDs: only
-        )
         let waiting = WaitingNote()
-        let job = AIJobs.shared.start(.subtitles, progress: { task.progress }, waitingForUser: {
-            task.stage == .translating && !AITranslationReadiness.isProducingTranslations ? waiting.watch?.note : nil
-        }, cancel: { task.cancel() })
+        let work = AIQueuedWork()
+        let job = AIJobs.shared.start(.subtitles, progress: { work.started ? task.progress : nil }, waitingForUser: {
+            work.started && task.stage == .translating && !AITranslationReadiness.isProducingTranslations ? waiting.watch?.note : nil
+        }, cancel: { work.cancel(stop: { task.cancel() }) })
+        work.job = job
+        // 转写的槽占着（别的工程在生成字幕 / 转写）就排队（AIWorkQueue，2026-10-17）。
+        let position = AIWorkQueue.shared.submit(.transcription, jobID: job.id) {
+            work.started = true
+            task.start(
+                project: project,
+                sourceLocaleID: sourceID,
+                targetLanguageID: targetID,
+                // 和面板同一个算法：按当前字幕样式和画面宽度算一行放得下多少（竖屏更短）。后台工程用合成算出来的画布，不读预览的。
+                lineFitEms: SubtitleLineFit.ems(
+                    for: project.state, appWide: EncodeQueue.burnIn.burnInStyle,
+                    renderSize: VideoEditCompositionBuilder.renderSize(for: project.state)
+                ),
+                onlyClipIDs: only
+            )
+            observe(task, job: job, targetID: targetID, project: project, waiting: waiting)
+        }
+        var result = started(job).objectValue ?? [:]
+        if let position {
+            result["status"] = "queued"
+            result["queue_position"] = .number(Double(position))
+        }
+        return .ok(.object(result), changed: true)
+    }
+
+    /// 生成字幕的结局：任务的 stage 变到 done / failed / cancelled 的那一刻记给 AI 的任务；生成完接着翻时查要不要下载语言。
+    @available(macOS 26.0, *)
+    private static func observe(
+        _ task: TranscriptionTask, job: AIJobs.Job, targetID: String?, project: VideoEditProject, waiting: WaitingNote
+    ) {
         // `stage` 只在主线程上写（TranscriptionTask 是 @MainActor），回调就在主线程上。
         // dropFirst：订阅那一刻发的是**上一次**任务留下的结局（比如上次的 done），不是这一次的。
         subscriptions[job.id] = task.$stage.dropFirst().sink { stage in
@@ -79,7 +99,6 @@ enum AISubtitleTools {
                 subscriptions[job.id] = nil
             }
         }
-        return .ok(started(job), changed: true)
     }
 
     /// 生成之后接着翻的那一步：这一对语言没装就把 SrtFlow 摆到前面、提示条和任务进度里都说清楚。
@@ -104,7 +123,6 @@ enum AISubtitleTools {
             throw AIToolError("The project has no subtitles yet. Generate them (generate_subtitles) or add lines first.")
         }
         let coordinator = TranslationJobCoordinator.shared
-        if case .running = coordinator.phase { throw AIToolError("A translation is already running. Wait for that job first.") }
         let source = try translationSource(args, project)
         let targetID = try await translationTarget(try args.requiredString("target_language"), source: source)
         if TranslationPreflight.isSameTranslationLanguage(
@@ -118,25 +136,36 @@ enum AISubtitleTools {
         let watch = await AITranslationReadiness.needsDownload(from: source, to: targetID)
             ? AIDownloadWatch(source: source, target: targetID) : nil
         let translating = { AITranslationReadiness.isProducingTranslations }
+        let work = AIQueuedWork()
         let job = AIJobs.shared.start(.translation, progress: {
-            if case .running(let completed, let total) = coordinator.phase { return Double(completed) / Double(max(total, 1)) }
-            return nil
-        }, waitingForUser: { translating() ? nil : watch?.note }, cancel: { coordinator.cancel() })
-        watch?.start(isOver: { translating() || job.status != .running })
-        Task { @MainActor in
-            let outcome = await SubtitleTranslationService.shared.translateCurrentSubtitle(
-                project: project, scope: scope, sourceLanguage: source, targetLanguage: targetID
-            )
-            watch?.stop()
-            switch outcome {
-            case .translated(let count): AIJobs.shared.finish(job, .done, detail: ["lines": .number(Double(count))])
-            case .nothingToDo: AIJobs.shared.finish(job, .done, message: "Every line already had an up-to-date translation.")
-            case .cancelled, .discarded: AIJobs.shared.finish(job, .cancelled)
-            case .failed(let message): AIJobs.shared.finish(job, .failed, message: message)
+            guard work.started, case .running(let completed, let total) = coordinator.phase else { return nil }
+            return Double(completed) / Double(max(total, 1))
+        }, waitingForUser: { work.started && !translating() ? watch?.note : nil }, cancel: { work.cancel(stop: { coordinator.cancel() }) })
+        work.job = job
+        // 翻译的宿主占着（别的工程在翻）就排队（AIWorkQueue，2026-10-17）。
+        let position = AIWorkQueue.shared.submit(.translation, jobID: job.id) {
+            work.started = true
+            watch?.start(isOver: { translating() || job.status != .running })
+            Task { @MainActor in
+                let outcome = await SubtitleTranslationService.shared.translateCurrentSubtitle(
+                    project: project, scope: scope, sourceLanguage: source, targetLanguage: targetID
+                )
+                watch?.stop()
+                switch outcome {
+                case .translated(let count): AIJobs.shared.finish(job, .done, detail: ["lines": .number(Double(count))])
+                case .nothingToDo: AIJobs.shared.finish(job, .done, message: "Every line already had an up-to-date translation.")
+                case .cancelled, .discarded: AIJobs.shared.finish(job, .cancelled)
+                case .failed(let message): AIJobs.shared.finish(job, .failed, message: message)
+                }
             }
         }
         var result = started(job).objectValue ?? [:]
-        if let watch { result["waiting_for_user"] = .string(watch.note) }
+        if let position {
+            result["status"] = "queued"
+            result["queue_position"] = .number(Double(position))
+        } else if let watch {
+            result["waiting_for_user"] = .string(watch.note)
+        }
         return .ok(.object(result), changed: true)
     }
 

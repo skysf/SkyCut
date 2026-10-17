@@ -179,6 +179,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    送 fal 的任务（`generate_media`、upscale）跑着时 `get_job` 带阶段：`phase`（queued / processing / downloading…）、`queue_position`、
    `transfer_percent`、`phase_seconds`、`typical_seconds`（`AIJobs.Job.liveDetail`，[fal.ai 生成](fal-generation.md) 第十三节：fal 处理中没有百分比，
    给的是阶段 + 排队位置 + 已用时间 + 典型时长）。
+   **一次一个的活排队**（2026-10-17，[AI 多开方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 6、K 节；`AIWorkQueue`）：导出（导出器只有一个）、
+   转写 / 生成字幕（一个串行槽）、翻译（一个宿主）占着时，AI 的调用不再回「已经在做了」：照样回任务号，`get_job` 报 `status: queued` 和
+   `queue_position`（1 = 下一个），道空了自己开始、先来先做。界面上起的（导出面板、生成字幕面板）不进队、照旧在空着时直接开始，队里的等它们做完。
+   取消排着的只从队里拿掉，开始了的才去停那件事（`AIQueuedWork.cancel`，不然会停掉正在做的别人的那个）；排着的导出用的是调用那一刻的时间线，
+   几个排着的导出各占各的文件名（`reservedOutputs`）。分镜本来就在 `MediaReadQueue.shots` 上排着、配旁白是同步工具，都不进这条队。
+   `checks/ai-work-queue-wiring.sh` 钉着。
    **任务在等用户动手时必须说出来**：结果和 `get_job` 里带 `waiting_for_user`（总说明要求 AI 立刻转告），
    SrtFlow 顶上的提示条同步显示。现在只有一种：翻译缺语言、macOS 弹下载框（只能由用户点，苹果不给静默下载）——
    这时把 SrtFlow **激活**、主窗口摆到最前面（AI 接口里唯一故意抢前台的地方），并由 `AIDownloadWatch`
