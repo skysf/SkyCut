@@ -32,12 +32,13 @@ func runUpscaleToolChecks() {
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["clip_id"], "only clip_id is required")
     let properties = schema["properties"]?.objectValue ?? [:]
     // `project`：碰工程的工具都收（2026-10-17 起一个会话剪几个工程，MCPToolName.takesProject）。
-    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project"], "the parameters")
+    // confirm_token：超了每日额度时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
+    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project", "confirm_token"], "the parameters")
     checkEqual(properties["tier"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTiers, "tier lists the tiers")
     checkEqual(properties["target"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTargets, "target lists the targets")
     checkEqual(properties["range"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleRanges, "range lists the ranges")
     let text = definition.description
-    for word in ["fal.ai", "get_job", "waiting_for_user", "estimated_cost_usd", "replaced_ids", "source_size", "daily limit", "revert", "undo", "phase"] {
+    for word in ["fal.ai", "get_job", "needs_confirmation", "confirm_token", "estimated_cost_usd", "replaced_ids", "source_size", "daily limit", "revert", "undo", "phase"] {
         check(text.contains(word), "the description mentions \(word)")
     }
     for id in MCPVocabulary.upscaleTiers { check(text.contains(id), "the description names tier \(id)") }
