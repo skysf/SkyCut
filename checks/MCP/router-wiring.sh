@@ -81,7 +81,7 @@ echo "==> 看得见：窗口只在一轮开始时摆到前面"
 # 每一步都 orderFrontRegardless 的话，用户在别的 App 里干活时 SrtFlow 一步一跳、盖住他的窗口
 #（docs/plans/2026-09-27-mcp.md 第 32 条）。
 PRESENTER="Sources/SrtFlow/AIEditorPresenter.swift"
-if [ "$(grep -c 'let startsNewRound = AISession.shared.phase != .working' "${ROUTER}" || true)" -ne 1 ] \
+if [ "$(grep -c 'let startsNewRound = AISession.shared.round(for: project).phase != .working' "${ROUTER}" || true)" -ne 1 ] \
    || [ "$(grep -c 'prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)' "${ROUTER}" || true)" -ne 1 ]; then
   echo "✗ ${ROUTER} 没按「这一轮是不是刚开始」决定要不要把窗口摆到前面" >&2
   exit 1
@@ -108,7 +108,7 @@ echo "==> 几个 AI 会话、几个工程：改动只落在会话自己的那个
 # 定下落在哪个工程（AIProjectSessions.target），不能落就一样都不做；用到的工程回给小程序；碰工程的按工程排队；工具在 AICallContext 里跑。
 CHECK_AT="$(grep -n 'switch sessions.target(' "${ROUTER}" | cut -d: -f1 || true)"
 PRESENT_AT="$(grep -n 'try await AIEditorPresenter.prepareEditor(' "${ROUTER}" | cut -d: -f1 || true)"
-ROUND_AT="$(grep -n 'if call.policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }' "${ROUTER}" | cut -d: -f1 || true)"
+ROUND_AT="$(grep -n 'if call.policy.startsRound { AISession.shared.round(for: project).beginIfNeeded(project: project) }' "${ROUTER}" | cut -d: -f1 || true)"
 if [ -z "${CHECK_AT}" ] || [ -z "${PRESENT_AT}" ] || [ -z "${ROUND_AT}" ] \
    || [ "${CHECK_AT}" -gt "${PRESENT_AT}" ] || [ "${CHECK_AT}" -gt "${ROUND_AT}" ]; then
   echo "✗ ${ROUTER} 没在摆窗口、开一轮之前定「落在这个会话的哪个工程」（定在第 ${CHECK_AT:-?} 行、摆窗口第 ${PRESENT_AT:-?} 行）" >&2
@@ -131,6 +131,27 @@ if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/App
   exit 1
 fi
 echo "   ✓ 路由第 ${CHECK_AT} 行定工程（摆窗口在第 ${PRESENT_AT} 行之后）；用到的工程回给小程序；按工程排队、在调用上下文里跑；小程序带着、记着"
+
+echo "==> 停止按工程：用户在一个工程上按停止，只拒绝落在它上面的调用、只取消跟着它停的任务"
+# 2026-10-17 用户定（docs/plans/2026-10-17-multi-project-ai-editing.md 板 4、E 节）：剪 5 条时停一条，别的照剪。
+STOP_AT="$(grep -n 'if let refusal = round.refusalAfterStop() {' "${ROUTER}" | cut -d: -f1 || true)"
+if [ -z "${STOP_AT}" ] || [ "${STOP_AT}" -lt "${CHECK_AT}" ] || [ "${STOP_AT}" -gt "${PRESENT_AT}" ]; then
+  echo "✗ ${ROUTER} 没在定了工程之后、摆窗口之前查这个工程停没停（停一个工程会挡住别的、或者停了还摆窗口）" >&2
+  exit 1
+fi
+if grep -n 'func cancelAll' Sources/SrtFlow/AIJobs.swift || grep -rn 'AISession\.shared\.refusalAfterStop\|AISession\.shared\.phase' Sources/SrtFlow; then
+  echo "✗ 又有了全 App 一份的停止（AIJobs.cancelAll / AISession 的 phase）：停一个工程会停掉所有工程" >&2
+  exit 1
+fi
+if [ "$(grep -c 'stopsWith: project.shortID' "${ROUTER}" || true)" -ne 1 ]; then
+  echo "✗ ${ROUTER} 起任务时没记「停哪个工程时跟着停」（不碰工程的任务停不掉）" >&2
+  exit 1
+fi
+if [ "$(grep -cF 'if let owner = job.session, owner != (AICallContext.current?.session ?? AIProjectSessions.anonymous) {' Sources/SrtFlow/AIExportTools.swift || true)" -ne 1 ]; then
+  echo "✗ cancel_job 能取消别的会话起的任务（几个会话共用一个 App 时会停掉别人的导出，方案 B.5）" >&2
+  exit 1
+fi
+echo "   ✓ 第 ${STOP_AT} 行按工程查停止；没有全 App 一份的停止；任务记着跟哪个工程停；cancel_job 只取消自己会话的"
 
 echo "==> App 卡住的时候：探一下不经主线程、放弃了的不做、主窗口开得回来"
 # 2026-10-06 盲测：App 卡死时 AI 每个调用干等 120 秒、只拿到「read: Resource temporarily unavailable」；拉起来之后

@@ -103,6 +103,7 @@ enum AIProjectStatus {
             } else {
                 item["yours"] = false
             }
+            if AISession.shared.round(for: project).phase == .stopped { item["stopped_by_user"] = true }
             let jobs = running.filter { $0.project == project.shortID }.map { JSONValue.string($0.id) }
             if !jobs.isEmpty { item["running_jobs"] = .array(jobs) }
             return .object(item)

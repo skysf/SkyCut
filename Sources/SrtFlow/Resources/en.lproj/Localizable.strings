@@ -953,7 +953,7 @@
 "%@ made %d changes." = "%@ made %d changes.";
 "You stopped the AI." = "You stopped the AI.";
 "The AI" = "The AI";
-"Stop the AI and cancel its exports and subtitle jobs" = "Stop the AI and cancel its exports and subtitle jobs";
+"Stop the AI on this project and cancel its exports and subtitle jobs" = "Stop the AI on this project and cancel its exports and subtitle jobs";
 "Undo This Round" = "Undo This Round";
 "Put the project back to how it was before the AI started this round" = "Put the project back to how it was before the AI started this round";
 "Hide this bar" = "Hide this bar";

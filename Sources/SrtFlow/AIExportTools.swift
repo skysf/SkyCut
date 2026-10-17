@@ -138,6 +138,10 @@ enum AIExportTools {
 
     static func cancel(_ args: AIToolArguments) throws -> AIToolResult {
         let job = try find(args)
+        // 只取消自己会话起的（方案 B.5）：几个会话共用一个 App 时，别人的导出不许被顺手停掉。
+        if let owner = job.session, owner != (AICallContext.current?.session ?? AIProjectSessions.anonymous) {
+            throw AIToolError("Not cancelled: \(job.id) was started by another AI session, and only that session may cancel it.")
+        }
         AIJobs.shared.cancel(job)
         return .ok(AIJobs.shared.json(job))
     }

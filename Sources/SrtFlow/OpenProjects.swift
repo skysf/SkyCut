@@ -156,6 +156,7 @@ final class OpenProjects {
         if keyProjectWindow === project { keyProjectWindow = nil }
         others.removeAll { $0 === project }
         AIProjectSessions.shared.release(project)   // 谁在剪它都不再归谁（AI 下一步按 id 找会被告知它关了）
+        AISession.shared.forgetRound(of: project)   // 它的「这一轮」不再留着
         ProjectTeardown.close(project)
     }
 

@@ -106,7 +106,7 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
         waiting = nil
         switch outcome {
         case .added(let result, let clipIDs):
-            AISession.shared.noteChange()
+            AISession.shared.round(for: project).noteChange()
             let ids = AIShortIDs(state: project.state)
             var detail = describe(result)
             detail["added_to_timeline"] = true
