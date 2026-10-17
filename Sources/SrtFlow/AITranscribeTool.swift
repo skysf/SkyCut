@@ -68,43 +68,46 @@ enum AITranscribeTool {
 
     private static func start(_ sounds: [SubtitleAudibleClips.SoundClip], language: String) throws -> AIToolResult {
         let task = TranscriptionTask.shared
-        guard !task.isRunning else {
-            throw AIToolError(
-                "SrtFlow is already transcribing (generating subtitles or another transcript). Wait for that job with "
-                    + "get_job, then call transcribe again."
-            )
-        }
         let sourceID = language.lowercased() == "auto" ? TranscriptionTask.autoDetectLocaleID : language
         // 任务自己的进度到 0.85 为止（后面那截是生成字幕的分段、写回），这里只转写，折成 0–1。
-        let job = AIJobs.shared.start(.transcript, progress: { task.isRunning ? min(1, task.progress / 0.85) : nil },
-                                      cancel: { task.cancel() })
-        Task { @MainActor in
-            do {
-                let harvest = try await task.transcribeOnly(clips: sounds, sourceLocaleID: sourceID)
-                for sound in sounds { detected[sound.fingerprint] = harvest.locale.identifier }
-                var detail: [String: JSONValue] = [
-                    "language": .string(harvest.locale.identifier),
-                    "next_step": "Call transcribe again with the same clips (or file) to read the transcript."
-                ]
-                let skipped = sounds.filter { harvest.skippedFingerprints.contains($0.fingerprint) }.map(\.name)
-                if !skipped.isEmpty { detail["could_not_read"] = .array(skipped.map { .string($0) }) }
-                AIJobs.shared.finish(job, .done, detail: .object(detail))
-            } catch is CancellationError {
-                AIJobs.shared.finish(job, .cancelled)
-            } catch {
-                AIJobs.shared.finish(job, .failed, message: AIHarvestFailure.message(
-                    for: error, fallback: error.localizedDescription, retry: "transcribe"
-                ))
+        let work = AIQueuedWork()
+        let job = AIJobs.shared.start(.transcript, progress: { work.started && task.isRunning ? min(1, task.progress / 0.85) : nil },
+                                      cancel: { work.cancel(stop: { task.cancel() }) })
+        work.job = job
+        // 转写的槽占着（别的工程在生成字幕 / 转写）就排队（AIWorkQueue，2026-10-17）。
+        let position = AIWorkQueue.shared.submit(.transcription, jobID: job.id) {
+            work.started = true
+            Task { @MainActor in
+                do {
+                    let harvest = try await task.transcribeOnly(clips: sounds, sourceLocaleID: sourceID)
+                    for sound in sounds { detected[sound.fingerprint] = harvest.locale.identifier }
+                    var detail: [String: JSONValue] = [
+                        "language": .string(harvest.locale.identifier),
+                        "next_step": "Call transcribe again with the same clips (or file) to read the transcript."
+                    ]
+                    let skipped = sounds.filter { harvest.skippedFingerprints.contains($0.fingerprint) }.map(\.name)
+                    if !skipped.isEmpty { detail["could_not_read"] = .array(skipped.map { .string($0) }) }
+                    AIJobs.shared.finish(job, .done, detail: .object(detail))
+                } catch is CancellationError {
+                    AIJobs.shared.finish(job, .cancelled)
+                } catch {
+                    AIJobs.shared.finish(job, .failed, message: AIHarvestFailure.message(
+                        for: error, fallback: error.localizedDescription, retry: "transcribe"
+                    ))
+                }
             }
         }
-        return .ok([
+        var result: [String: JSONValue] = [
             "job_id": .string(job.id),
-            "status": "running",
+            "status": position == nil ? "running" : "queued",
             "next_step": .string(
-                "Transcribing on this Mac. Call get_job with this job_id and wait_seconds 30 until the status is done, "
+                (position == nil ? "Transcribing on this Mac. " : "SrtFlow is transcribing something else; this one starts after it (queue_position). ")
+                    + "Call get_job with this job_id and wait_seconds 30 until the status is done, "
                     + "then call transcribe again with the same arguments to read it."
             )
-        ])
+        ]
+        if let position { result["queue_position"] = .number(Double(position)) }
+        return .ok(.object(result))
     }
 
     // MARK: 缓存
