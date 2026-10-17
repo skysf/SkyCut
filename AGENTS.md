@@ -468,6 +468,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 在 L30 口播上的五个剪辑点怎么报、照建议改完撞出的
   quiet_spot bug；字幕行距 1 → 1.3 预览第一行上移 21 px、成片和预览两行上下沿差 ≤ 2 px；这台 Mac 的圆体进不了烧录字体清单。
 - [字幕默认单行 + 行数开关的测试版冒烟（0.18.37）](docs/reports/2026-10-16-subtitle-line-count-smoke.md) — PR #222 合并后真机过一遍：`max_lines=3` 报错、默认 59 条全单行、`max_lines=2` 39 条 / 19 条两行且框报 `lines: 2`、撤销两步各退一层；面板拨到「2 行」生成和 AI 那一路一样、工程文件写进 `subtitleMaxLines: 2`；面板下拉两套自动化都点不了、是用户点的。
+- [AI 多开第 ① 刀的冒烟（0.18.38）](docs/reports/2026-10-17-open-projects-slice1-smoke.md) — 拆单例 + 工程窗口合进 main 之后：两个工程窗口按键 / 撤销 / 开关 / 关窗各管各的
+  （进程内驱动；第一次跑撞出「先放内容后挂 delegate、撤销撤不到工程」并修好），装好的测试版上 AI 单工程的老流程（建、放、加字、撤销、看、导出、存）全通；
+  Rosetta 终端里打包要用 `/bin/bash`；还没验到的留给第 ② 刀。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
