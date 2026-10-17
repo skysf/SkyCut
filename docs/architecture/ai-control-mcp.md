@@ -982,6 +982,8 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - [ ] `close_project` 一个正在导出的工程：拒、说出任务号；导出完再关：窗口关掉、结果有 `saved_to`，之后不带 `project` 的调用落回剩下的那个。
 - [ ] 两个工程同时在剪（各有一条横幅）：在 p2 的窗口里按停止，p2 的导出取消、AI 改 p2 被拒；p1 照剪、它的导出照跑；p1 那条横幅还是「正在剪辑」。
       等一轮结束后在 p1 上「撤销这一轮」只退 p1；另一个会话 `cancel_job` p1 的任务被拒。
+- [ ] 先在导出面板上导出一条长的，导出途中让 AI 导出（第 7 条）：AI 拿到 `queued`、`queue_position` 1，面板那条导完它自己开始；
+      AI 的导出在导时，面板上的导出按钮是灰的（面板起的不进队，AI 的排在它后面）。
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
 - [ ] 装上这一版、新开一个 Claude Code 会话（`claude -p` 就行，可以 `--strict-mcp-config --mcp-config` 只挂 srtflow），看它的 MCP 日志
       `~/Library/Caches/claude-cli-nodejs/<会话所在目录，/ 换成 ->/mcp-logs-srtflow/` 里最新的 .jsonl：服务器版本是这一版、**没有**
