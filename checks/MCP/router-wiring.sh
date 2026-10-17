@@ -102,21 +102,27 @@ if [ "$(grep -c 'guard always || AISession.shared.viewMode == .visible else { re
 fi
 echo "   ✓ 路由按 AISession 判断一轮的第一步；摆窗口只在 if bringForward 和开回来的那一下里；后台模式不摆窗口、不跟着选中"
 
-echo "==> 几个 AI 会话共用一个 SrtFlow：改动只落在会话自己的工程上"
-# 2026-10-06 盲测：桌面版的会话把 App 切到了用户的工程，这边的会话接着改（docs/bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md）。
-# 路由在排到这个调用之后、摆窗口 / 开一轮之前查；查完的结果和换工程的人都要回给小程序 / 记下来。
-CHECK_AT="$(grep -n 'if usesProject, let refusal = AIProjectBinding.refusal(' "${ROUTER}" | cut -d: -f1 || true)"
+echo "==> 几个 AI 会话、几个工程：改动只落在会话自己的那个工程上"
+# 2026-10-06 盲测：桌面版的会话把 App 切到了用户的工程，这边的会话接着改（docs/bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md）；
+# 2026-10-17 起一个会话一组工程（docs/plans/2026-10-17-multi-project-ai-editing.md）：路由排到这个调用之后、摆窗口 / 开一轮之前
+# 定下落在哪个工程（AIProjectSessions.target），不能落就一样都不做；用到的工程回给小程序；碰工程的按工程排队；工具在 AICallContext 里跑。
+CHECK_AT="$(grep -n 'switch sessions.target(' "${ROUTER}" | cut -d: -f1 || true)"
 PRESENT_AT="$(grep -n 'try await AIEditorPresenter.prepareEditor(' "${ROUTER}" | cut -d: -f1 || true)"
-ROUND_AT="$(grep -n 'if policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }' "${ROUTER}" | cut -d: -f1 || true)"
+ROUND_AT="$(grep -n 'if call.policy.startsRound { AISession.shared.beginRoundIfNeeded(project: project) }' "${ROUTER}" | cut -d: -f1 || true)"
 if [ -z "${CHECK_AT}" ] || [ -z "${PRESENT_AT}" ] || [ -z "${ROUND_AT}" ] \
    || [ "${CHECK_AT}" -gt "${PRESENT_AT}" ] || [ "${CHECK_AT}" -gt "${ROUND_AT}" ]; then
-  echo "✗ ${ROUTER} 没在摆窗口、开一轮之前查「开着的是不是这个会话的工程」（查在第 ${CHECK_AT:-?} 行、摆窗口第 ${PRESENT_AT:-?} 行）" >&2
+  echo "✗ ${ROUTER} 没在摆窗口、开一轮之前定「落在这个会话的哪个工程」（定在第 ${CHECK_AT:-?} 行、摆窗口第 ${PRESENT_AT:-?} 行）" >&2
   exit 1
 fi
-if [ "$(grep -cF 'switches[project.documentGeneration] = AIProjectBinding.Switch(' "${ROUTER}" || true)" -ne 1 ] \
-   || [ "$(grep -cF 'return Answer(result: result, project: usesProject || switchesProject ? stamp(project) : nil)' "${ROUTER}" || true)" -ne 1 ] \
+if [ "$(grep -cF 'let stamp = outcome.failed ? nil : outcome.stamp ?? target.map(sessions.stamp)' "${ROUTER}" || true)" -ne 1 ] \
    || [ "$(grep -c 'project: answer.project)' Sources/SrtFlow/AIBridgeServer.swift || true)" -ne 1 ]; then
-  echo "✗ 路由没记下是谁换的工程，或没把这次用到的工程回给小程序（AIBridgeServer）：小程序记不住会话的工程" >&2
+  echo "✗ 路由没把这次用到 / 开关的工程回给小程序（AIBridgeServer）：小程序记不住会话的一组工程" >&2
+  exit 1
+fi
+if [ "$(grep -cF 'return ["project:" + id]' "${ROUTER}" || true)" -lt 1 ] \
+   || [ "$(grep -cF 'await tails["switch:" + call.session]?.value' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'AICallContext.$current.withValue(context)' "${ROUTER}" || true)" -ne 1 ]; then
+  echo "✗ ${ROUTER} 没按工程排队、不带 project 的没先等这个会话的开 / 建 / 关，或工具没在 AICallContext 里跑（几个子代理会串文件夹）" >&2
   exit 1
 fi
 if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ] \
@@ -124,7 +130,7 @@ if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/App
   echo "✗ 小程序发请求没带会话的工程，或收到回答没记下来（Sources/SrtFlowMCP/AppConnection.swift）" >&2
   exit 1
 fi
-echo "   ✓ 路由第 ${CHECK_AT} 行查工程（摆窗口在第 ${PRESENT_AT} 行之后）；换工程的人记下、用到的工程回给小程序；小程序带着、记着"
+echo "   ✓ 路由第 ${CHECK_AT} 行定工程（摆窗口在第 ${PRESENT_AT} 行之后）；用到的工程回给小程序；按工程排队、在调用上下文里跑；小程序带着、记着"
 
 echo "==> App 卡住的时候：探一下不经主线程、放弃了的不做、主窗口开得回来"
 # 2026-10-06 盲测：App 卡死时 AI 每个调用干等 120 秒、只拿到「read: Resource temporarily unavailable」；拉起来之后
@@ -149,7 +155,7 @@ if [ "$(grep -cF 'if MCPUnixSocket.peerClosed(fd) { calls.abandon(id) }' "${BRID
   exit 1
 fi
 BEGIN_AT="$(grep -n 'guard begin() else {' "${ROUTER}" | cut -d: -f1 || true)"
-PROJECT_AT="$(grep -n 'let project = OpenProjects.shared.primary' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
+PROJECT_AT="$(grep -n 'switch sessions.target(' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
 if [ -z "${BEGIN_AT}" ] || [ -z "${PROJECT_AT}" ] || [ "${BEGIN_AT}" -gt "${PROJECT_AT}" ]; then
   echo "✗ ${ROUTER} 的 execute 没在一开始问「还做不做」（第 ${BEGIN_AT:-?} 行）" >&2
   exit 1

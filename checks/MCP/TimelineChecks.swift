@@ -270,9 +270,9 @@ private func summaryChecks() {
     checkEqual(summary["filters"]?.arrayValue?.first?["preset"]?.stringValue, "warmSun", "filters are listed")
     checkEqual(summary["selected"]?.arrayValue?.first?.stringValue, ids.short(first.id), "the selection is listed")
     checkEqual(summary["canvas"]?["width"]?.intValue, 1920, "canvas width")
-    checkEqual(summary["project"]?.stringValue, "unsaved", "an unsaved project says so")
+    checkEqual(summary["project_name"]?.stringValue, "unsaved", "an unsaved project says so")
     var named = context
     named.project = "婚礼_B版.srtflowproj"
-    checkEqual(AITimelineSummary.make(state, named)["project"]?.stringValue, "婚礼_B版.srtflowproj",
+    checkEqual(AITimelineSummary.make(state, named)["project_name"]?.stringValue, "婚礼_B版.srtflowproj",
                "get_timeline names the open project file (several AI sessions on one App)")
 }

@@ -35,6 +35,10 @@ final class AIJobs {
         /// AI 查进度时看到它，才会去告诉用户，而不是对着 0% 干等。
         let waitingForUser: @MainActor () -> String?
         let cancelAction: @MainActor () -> Void
+        /// 起它的那一次调用落在哪个工程（短 id）、哪个会话（`AICallContext`）：关工程前看它有没有在跑的任务、
+        /// cancel_job 只许取消自己会话的、停止按工程停（方案 E 节）。不碰工程的任务记成那个会话最后打开的工程。
+        let project: String?
+        let session: String?
         fileprivate(set) var status: Status = .running
         fileprivate(set) var message: String?
         fileprivate(set) var detail: JSONValue?
@@ -50,6 +54,8 @@ final class AIJobs {
             self.liveDetail = liveDetail
             self.waitingForUser = waitingForUser
             self.cancelAction = cancel
+            project = AICallContext.current?.project
+            session = AICallContext.current?.session
         }
     }
 
@@ -113,6 +119,7 @@ final class AIJobs {
             "status": .string(job.status.rawValue),
             "elapsed_seconds": .number(((job.finishedAt ?? Date()).timeIntervalSince(job.startedAt)).rounded())
         ]
+        if let project = job.project { object["project"] = .string(project) }
         if job.status == .running, let progress = job.progress() {
             object["progress"] = .number((progress * 100).rounded() / 100)
         }

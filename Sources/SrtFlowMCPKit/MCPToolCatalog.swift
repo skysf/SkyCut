@@ -23,6 +23,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case manageFiles = "manage_files"
     case openProject = "open_project"
     case newProject = "new_project"
+    case closeProject = "close_project"
     case saveProject = "save_project"
     case getTimeline = "get_timeline"
     case look = "look"
@@ -62,9 +63,33 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case undo = "undo"
     case seek = "seek"
 
+    /// 工具的说明书：各组写的那一份，碰工程的再统一加上可选的 `project` 参数（只写在这一处，说明只有一句）。
     public var definition: MCPToolDefinition {
+        var definition = groupDefinition
+        if takesProject { definition.addProjectParameter() }
+        return definition
+    }
+
+    /// 收不收 `project`（p1、p2…，指定作用在这个会话的哪个工程上；docs/plans/2026-10-17-multi-project-ai-editing.md 板 1）：
+    /// 改 / 读工程内容的、默认值跟着工程走的都收。只碰文件、设置、任务的不收；open_project / new_project 是开工程的，回 id、不收。
+    public var takesProject: Bool {
         switch self {
-        case .getStatus, .setView, .openFolder, .openProject, .newProject, .saveProject, .undo, .seek:
+        case .getStatus, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
+             .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
+            return false
+        case .setView:
+            return false   // 按工程分开看法是下一刀（方案 F）；现在还是这个 App 一份
+        case .closeProject, .saveProject, .getTimeline, .look, .listen, .transcribe, .addVoiceover, .recordScreen,
+             .upscaleClip, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
+             .deleteItems, .duplicateItems, .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles,
+             .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:
+            return true
+        }
+    }
+
+    private var groupDefinition: MCPToolDefinition {
+        switch self {
+        case .getStatus, .setView, .openFolder, .openProject, .newProject, .closeProject, .saveProject, .undo, .seek:
             return MCPProjectTools.definition(for: self)
         case .getTimeline, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .deleteItems,
              .duplicateItems,
@@ -140,6 +165,14 @@ public struct MCPToolDefinition: Sendable {
         self.readOnly = readOnly
         self.destructive = destructive
         self.openWorld = openWorld
+    }
+
+    /// 加上可选的 `project` 参数（`MCPToolName.takesProject` 的那些）。说明全清单只有这一句。
+    mutating func addProjectParameter() {
+        guard case .object(var schema) = inputSchema, case .object(var properties)? = schema["properties"] else { return }
+        properties["project"] = MCPSchema.string(MCPProjectTools.projectParameter)
+        schema["properties"] = .object(properties)
+        inputSchema = .object(schema)
     }
 
     public var json: JSONValue {

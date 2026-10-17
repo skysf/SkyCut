@@ -18,11 +18,19 @@ import SrtFlowMCPKit
 final class AIWorkspace {
     static let shared = AIWorkspace()
 
-    /// 用户点名过的文件夹，最近的在最后。
+    /// 用户点名过的文件夹，最近的在最后（全 App 一份：读的时候哪些不用再问，`allowsReading`）。
     private(set) var folders: [URL] = []
+    /// 每个会话最后点名的那个（几个会话 / 子代理各 open_folder 一个文件夹时各是各的，方案 D 节）。
+    private var sessionFolders: [String: URL] = [:]
+    /// 每个工程的工作区文件夹（短 id → 打开 / 新建它时这个会话点名的那个）。
+    private var projectFolders: [String: URL] = [:]
 
-    /// 「打开的文件夹」：相对路径按它解析、结果里的路径按它写短、新文件放它下面。
-    var current: URL? { folders.last }
+    /// 「打开的文件夹」：相对路径按它解析、结果里的路径按它写短、新文件放它下面。AI 的调用里是这一次调用的那个
+    /// （`AICallContext`：这个工程的 → 这个会话的），界面上（打开面板、导出面板第一次用的位置）是最后点名的那个。
+    var current: URL? {
+        if let context = AICallContext.current { return context.folder ?? context.session.flatMap { sessionFolders[$0] } }
+        return folders.last
+    }
 
     private init() {}
 
@@ -30,10 +38,26 @@ final class AIWorkspace {
         let standardized = folder.standardizedFileURL
         folders.removeAll { $0.path == standardized.path }
         folders.append(standardized)
+        if let session = AICallContext.current?.session { sessionFolders[session] = standardized }
     }
 
+    /// 一个碰工程的调用的工作区文件夹：这个工程打开 / 新建时记下的，没有就是这个会话最后点名的。
+    func folder(project: String?, session: String?) -> URL? {
+        project.flatMap { projectFolders[$0] } ?? session.flatMap { sessionFolders[$0] }
+    }
+
+    /// 这个会话开 / 建了一个工程：它的工作区文件夹就是这个会话此刻点名的那个（之后别的子代理再 open_folder 也不串到它身上）。
+    func noteProjectOpened(_ project: String, session: String?) {
+        guard let session, let folder = sessionFolders[session] else { return }
+        projectFolders[project] = folder
+    }
+
+    /// 相对路径按「打开的文件夹」解析；AI 的调用里先按这个工程的、那里没有再看这个会话后来点名的（规矩在 AIPathResolution）。
     func resolve(_ path: String) -> URL {
-        AIFormat.url(fromPath: path, relativeTo: current)
+        let sessionFolder = AICallContext.current?.session.flatMap { sessionFolders[$0] }
+        return AIPathResolution.resolve(path, preferred: current, fallback: sessionFolder) {
+            FileManager.default.fileExists(atPath: $0.path)
+        }
     }
 
     func display(_ url: URL) -> String {
