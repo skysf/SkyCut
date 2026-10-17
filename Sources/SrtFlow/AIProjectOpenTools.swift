@@ -63,13 +63,16 @@ enum AIProjectOpenTools {
     static func newProject(_ args: AIToolArguments, inFront: Bool) async throws -> AIToolResult {
         let workspace = AIWorkspace.shared
         let fallbackName = workspace.current?.lastPathComponent ?? L10n("Untitled")
-        let stem = ExportFileName.stem(
+        // 同一个文件夹出几个版本：文件名带上版本（「南极 - 30s」，方案板 5、L 节）。
+        let version = AIVersionName.clean(try args.string("version"))
+        let stem = AIVersionName.stem(ExportFileName.stem(
             from: try args.string("name") ?? fallbackName, droppingExtension: VideoEditProjectFile.fileExtension, fallback: fallbackName
-        )
+        ), version: version)
         try refuseWhileRecording()
         try refuseAtCap()
         let primary = OpenProjects.shared.primary
         let folder = try args.string("folder").map { workspace.resolve($0) } ?? workspace.outputFolder(.projects, project: primary)
+        try refuseUnnamedVersion(version, in: folder)
         // 撞名加编号，从不覆盖。
         let url = ExportFileName.unoccupied(in: folder, stem: stem, pathExtension: VideoEditProjectFile.fileExtension) {
             FileManager.default.fileExists(atPath: $0.path)
@@ -155,6 +158,17 @@ enum AIProjectOpenTools {
         let busy = Set(AIJobs.shared.running.compactMap(\.project))
         let closable = sessions.projects(of: session).filter { !$0.isUntitled && !busy.contains($0.shortID) }.map(sessions.stamp)
         throw AIToolError(AIProjectTargeting.capReached(limit: OpenProjects.limit, closable: closable))
+    }
+
+    /// 这个会话在这个文件夹里已经开着一个工程、这次又没给版本：叫 AI 给一个（只靠撞名加编号，「南极」「南极 2」用户分不清，方案板 5）。
+    private static func refuseUnnamedVersion(_ version: String?, in folder: URL) throws {
+        guard version == nil, let sibling = sessions.projects(of: session).first(where: { project in
+            project.documentURL.map { ProjectFileIdentity.same($0.deletingLastPathComponent(), folder) } ?? false
+        }) else { return }
+        throw AIToolError(
+            "Not created: you already have \(sibling.shortID) \(sibling.projectName) open in this folder. Pass version (a short label "
+                + "such as \"30s\", \"vertical\" or \"v2\") so the files are told apart: <name> - <version>."
+        )
     }
 
     /// 录屏进行中不许开 / 建 / 关工程（主窗口那个可能正是录好的素材要落进去的工程；关窗口的把关在录屏中也一律拒）：

@@ -143,6 +143,20 @@ if [ "$(grep -c 'sessionProject.stamp(MCPBridge.Request(' Sources/SrtFlowMCP/App
 fi
 echo "   ✓ 路由第 ${CHECK_AT} 行定工程（摆窗口在第 ${PRESENT_AT} 行之后）；用到的工程回给小程序；按工程排队、在调用上下文里跑；小程序带着、记着"
 
+echo "==> 同一个文件夹出几个版本：文件名带版本，第二个工程不给版本就拒"
+# 2026-10-17 用户定（docs/plans/2026-10-17-multi-project-ai-editing.md 板 5、L 节）：只靠撞名加编号（「南极 2」）用户分不清哪个是哪个。
+OPEN_TOOLS="Sources/SrtFlow/AIProjectOpenTools.swift"
+NEW_BODY="$(awk '/    static func newProject\(/,/^    \}/' "${OPEN_TOOLS}")"
+GATE_AT="$(grep -n 'try refuseUnnamedVersion(version, in: folder)' <<<"${NEW_BODY}" | cut -d: -f1 || true)"
+CREATE_AT="$(grep -n 'let url = ExportFileName.unoccupied(' <<<"${NEW_BODY}" | cut -d: -f1 || true)"
+if [ -z "${GATE_AT}" ] || [ -z "${CREATE_AT}" ] || [ "${GATE_AT}" -gt "${CREATE_AT}" ] \
+   || [ "$(grep -c 'AIVersionName.stem(' <<<"${NEW_BODY}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIVersionName.stem(' Sources/SrtFlow/AIExportTools.swift || true)" -ne 1 ]; then
+  echo "✗ new_project 没在建工程之前查「这个文件夹里已经有你的工程、却没给版本」，或 new_project / export_video 没经 AIVersionName 拼名字" >&2
+  exit 1
+fi
+echo "   ✓ new_project 第 ${GATE_AT} 行查版本（建工程在第 ${CREATE_AT} 行）；new_project、export_video 都经 AIVersionName 拼「名字 - 版本」"
+
 echo "==> 停止按工程：用户在一个工程上按停止，只拒绝落在它上面的调用、只取消跟着它停的任务"
 # 2026-10-17 用户定（docs/plans/2026-10-17-multi-project-ai-editing.md 板 4、E 节）：剪 5 条时停一条，别的照剪。
 STOP_AT="$(grep -n 'if let refusal = round.refusalAfterStop() {' "${ROUTER}" | cut -d: -f1 || true)"

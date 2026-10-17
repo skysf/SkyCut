@@ -414,6 +414,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIProjectBinding.swift \
   Sources/SrtFlow/AIProjectTargeting.swift \
+  Sources/SrtFlow/AIVersionName.swift \
   Sources/SrtFlow/AIPathResolution.swift \
   Sources/SrtFlow/AIVideoSize.swift \
   Sources/SrtFlow/AIBridgeCalls.swift \
@@ -530,6 +531,7 @@ xcrun swiftc \
   checks/MCP/ProtocolChecks.swift \
   checks/MCP/CatalogTextChecks.swift \
   checks/MCP/ProjectTargetingChecks.swift \
+  checks/MCP/VersionNameChecks.swift \
   checks/MCP/TimelineChecks.swift \
   checks/MCP/ConfigChecks.swift \
   checks/MCP/ReadGrantChecks.swift \
