@@ -772,6 +772,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     ⑧ 「这一轮」/ 停止 / 撤销这一轮 / 横幅每个工程一份（第五节）；看得见还是后台按工程、窗口只在开工程时摆一次（第 4 条）；后台工程的停止 / 打开窗口 /
     关掉在主窗口侧边栏的「AI 在剪的工程」里（[开着的工程](open-projects.md) 第五节之二）；用户在 AI 正剪着的工程上新建 / 打开工程时开到新的工程窗口里，
     AI 的工程不被换掉（主窗口的内容被换掉的老情况还剩一种：AI 停下 5 分钟以上之后用户再换，那时 AI 下一步按 ① 被拒、说清楚）。
+    ⑨ **同一个文件夹出几个版本**（方案板 5、L 节）：`new_project` / `export_video` 收 `version`，文件名写成「名字 - 版本」（`AIVersionName`：整理字符、
+    太长截掉、名字里已经带着就不再叠）；这个会话在同一个文件夹里已经开着工程、`new_project` 又没给 `version` 就拒，叫 AI 给一个 —— 只靠撞名加编号
+    （「南极 2」）用户分不清哪个是哪个。撞名照旧加编号。`checks/MCP/router-wiring.sh` 钉着，纯值在 `VersionNameChecks`。
 47. **视频的声音单独放（J/L cut，2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）**：盲测里两条课程片
     想用一段口播的声音、画面换成别的，只能把口播放到 V2、不透明度 0 绕过去（`add_clips` 不许把视频放到音频轨上）。现在：
     ① `add_clips` 每一项的 `sound`（`ClipSoundMode`，词表 `MCPVocabulary.clipSounds`，只对有声音的视频文件）：`separate` = 画面照放，
