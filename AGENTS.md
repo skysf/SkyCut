@@ -479,6 +479,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程（0 个窗口）开 / 建、放素材、看、导出、挂上窗口后撤得到
   后台时的那一步、摘回后台、关掉都对；fal 确认码用假 fal 跑（17 过 1 没验到）；锁屏时 CG 的屏幕上窗口列表不更新、别拿它判断窗口关没关；侧边栏和用户操作
   那几样屏幕锁着没验到，留人工回归。
+- [AI 多开第 ④ 刀的冒烟（0.18.42）](docs/reports/2026-10-17-ai-queue-version-slice4-smoke.md) — 一个文件夹两个版本：第二个工程不给 `version` 被拒、
+  给了叫「Trip cut - vertical」；连着四个导出一个接一个（`queue_position` 1 / 2 / 3）、排着的取消不写文件、版本名不叠、撞名加编号；生成字幕也排队；
+  没撞出新问题，方案四刀到这里做完；面板导出和 AI 排着的交替留人工回归。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
