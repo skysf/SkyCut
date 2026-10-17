@@ -154,14 +154,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 5. **不许弹模态框。** 用户在对话框那边，看不见也点不着，调用就一直挂着。2026-10-17 起 AI 开 / 建工程只在主窗口是空的 Untitled 时装进主窗口，
    否则开自己的窗口（第 46 条 ⑦）—— 主窗口里「从没存过、又剪了东西」的工程不再被换掉，也就不会弹「要不要存」（以前是先替它存进
    `SrtFlow/工程` 再换、结果里写 `previous_project_saved_to`）。`close_project` 关主窗口那个之前先替它存好（方案第 34 条：不问也不丢）。
-6. **只有删文件才问**（方案第 34 条，2026-09-28 用户拍板：「少问几次，越少越好。核心就是删除文件需要问」）：
+6. **只有删文件、读别处的文件、花钱超了额度才问**（方案第 34 条，2026-09-28 用户拍板：「少问几次，越少越好。核心就是删除文件需要问」；
+   2026-10-17 AI 多开方案板 9 把 fal 花钱也收进这一套）：
    - 删进废纸篓先问（`AIFileTools`）。
    - 读点名文件夹以外的文件**问一次**，同意了就记住那个文件夹（`AIReadGrants`：含子文件夹，重启也记得，设置 → AI 里
      列出来、能删）。文件夹太大（根目录、顶层文件夹、卷的根、个人文件夹本身）时只记那个文件 —— 不然同意读一个文件
      就放开了整个家目录。问题里写明「同意之后记住这个文件夹」。
    - **从不覆盖**：导出、新建、另存撞名都加编号（`ExportFileName.unoccupied`），所以不问；AI 要替换旧文件就先用
      `manage_files` 把它删进废纸篓（会问）。
-   会回 `needs_confirmation` 的只许这两处（`AIFileTools`、`AIWorkspace.confirmReading`），`scripts/check-mcp.sh` 扫描钉着。
+   - `generate_media` / `upscale_clip` 超了每日额度、或模型价格不明：当场回确认码（`FalJobGate.decide`，第 39、44 条），不在提示条上问。
+   会回 `needs_confirmation` 的只许这三处（`AIFileTools`、`AIWorkspace.confirmReading`、`FalJobGate`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
    **拒绝说原因**：结果里的 `confirm_token_refused` 分过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的，`valid_for_minutes` 写着有效期
@@ -633,8 +635,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      `mcp-providers.json`（和 socket 同目录），小程序每回一次清单 / 握手都重读它；握过手的老一代客户端收 `notifications/tools/list_changed`，
      新一代靠清单一分钟的缓存时间。没配时总说明里也不提它。全清单的说明总长度量的是每个提供方都配好时的样子。
    - **生成是任务**：立刻回任务号（带估价、今天已花、每日上限），`get_job` 等；不改工程、不进撤销分组，放上时间线是 `add_clips`。
-   - **花钱超了额度、或价格不明，先在提示条上问用户**（`AISession.ask`：允许 / 先不要，不弹模态框、不管这一轮什么状态都摆出来），任务带 `waiting_for_user`；
-     用户按停止 / AI `cancel_job` 都把问题收回。同步的工具（配旁白）不能停下来问，额度不够就退档。
+   - **花钱超了额度、或价格不明，当场回 `needs_confirmation` + 确认码**（2026-10-17 起，AI 多开方案板 9；`FalJobGate.decide` 在建任务之前）：
+     什么都不起、不记账，AI 在聊天里问用户、用户点头后带码、同样的参数再调才记账起任务；令牌绑着估价和模型 / 时长 / 清晰度那几个记号。以前在提示条上问，
+     后台工程没窗口、用户没在看 SrtFlow 时没人看见。同步的工具（配旁白）不能停下来问，额度不够就退档。
    - 图生视频的首帧图、克隆的素材会发给 fal.ai：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是「send to fal.ai」）。
 40. **配旁白的 fal 那一档（`add_voiceover`，方案第 42、52 条）**：声音三档 fal > SrtFlow 自己的（Kokoro，第 35 条）> macOS（第 34 条）。fal 那一档只在
     有 Key、没超每日上限、Key 读得出来时用，不行就退档并在 `voice.note` 里说为什么；点名 Kokoro 的音色或这台 Mac 的声音仍照点名。fal 的声音也**只经
@@ -678,9 +681,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **是任务**：立刻回任务号（带估价、送去几秒、输出尺寸、会换哪些段、今天已花 / 上限、`next_step`），`get_job` 带阶段（第 7 条：
      `phase` / `queue_position` / `transfer_percent` / `phase_seconds` / `typical_seconds`）；任务种类 `upscale`；`cancel_job` / 停止把它从
      `UpscaleActivity` 拿掉（替 fal 也取消、不留文件）。
-   - **花钱按每日上限把关**，和 `generate_media` **同一处**（`FalJobGate.reserve`：额度内直接记账；超了 / 价格不明先在提示条上问、任务带
-     `waiting_for_user`；用户不要就 `declined`、没花钱）；钥匙串授权框的提醒也共用（`FalJobGate.showKeyPromptHint`）。面板起的 upscale
-     不经它（面板本身就是确认）。`checks/fal-wiring.sh` 第 4、5 条钉着「把关和提问只在 FalJobGate 一处」。
+   - **花钱按每日上限把关**，和 `generate_media` **同一处**，在建任务之前（`FalJobGate.decide`：额度内直接记账；超了当场回确认码、带码再调才记账，
+     任务拿到的是记好的那一笔 `Approval.ai`）；钥匙串授权框的提醒也共用（`FalJobGate.showKeyPromptHint`）。面板起的 upscale
+     不经它（面板本身就是确认）。`checks/fal-wiring.sh` 第 4、5 条钉着「把关和确认码只在 FalJobGate 一处」。
    - **做完直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里一次
      `applyUpscale`（工程里用这个原片且范围被盖住的段一起换），**自己包一层 `AIUndoGrouping.step`**（异步落账，第 1 条；
      `scripts/check-mcp.sh` 的扫描钉着）、算这一轮的一处改动、选中换了的段并把播放头放过去（后台模式不动）、没存过的工程存一下；
