@@ -193,6 +193,7 @@ public enum MCPSubtitleExportTools {
             input: MCPSchema.object([
                 "path": MCPSchema.string("Full output path. Leave out to use name and the default folder."),
                 "name": MCPSchema.string("File name without extension."),
+                "version": MCPSchema.string("Short version label: the file is named <name> - <version> (a project made with version already has it)."),
                 "resolution": MCPSchema.string(
                     "Cap on the short side (default original; never upscales).", oneOf: MCPVocabulary.resolutions
                 ),

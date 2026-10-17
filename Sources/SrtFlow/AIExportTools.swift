@@ -135,9 +135,10 @@ enum AIExportTools {
                 ? url : url.deletingPathExtension().appendingPathExtension(fileExtension)
         }
         let fallback = defaultName(project)
-        let stem = ExportFileName.stem(
+        // 同一个文件夹出几个版本：成片的名字带上版本（「南极 - 30s」，方案板 5；工程名里已经带着就不再叠）。
+        let stem = AIVersionName.stem(ExportFileName.stem(
             from: try args.string("name") ?? fallback, droppingExtension: fileExtension, fallback: fallback
-        )
+        ), version: AIVersionName.clean(try args.string("version")))
         return AIWorkspace.shared.outputFolder(.exports, project: project)
             .appendingPathComponent(stem).appendingPathExtension(fileExtension)
     }

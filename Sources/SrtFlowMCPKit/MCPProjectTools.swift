@@ -78,11 +78,14 @@ public enum MCPProjectTools {
                 description: """
                 Start a new, empty project and save it at once as <name>.srtflowproj, so every later edit autosaves. It goes \
                 into the folder you pass, otherwise into SrtFlow/Projects inside the folder the user named (open_folder), the \
-                open project's folder, or Downloads. A taken name gets a number (the result has the real path). The result's \
-                project is its id; it opens and counts like open_project (see there).
+                open project's folder, or Downloads. A taken name gets a number (the result has the real path). Several cuts \
+                from one folder need version (the file becomes <name> - <version>): a second project in a folder where you \
+                already have one open is refused without it. The result's project is its id; it opens and counts like \
+                open_project (see there).
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("Project name without extension. Default: the workspace folder's name."),
+                    "version": MCPSchema.string("Short version label, e.g. 30s, vertical, v2: the file is named <name> - <version>."),
                     "folder": MCPSchema.string("Folder to save the project in, when there is no workspace yet.")
                 ])
             )
