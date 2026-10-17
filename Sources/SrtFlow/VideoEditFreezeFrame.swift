@@ -183,7 +183,7 @@ extension VideoEditProject {
             return fail(error.localizedDescription)
         }
         guard isCurrentGeneration(request.generation) else { return projectChanged }
-        guard let info = await probeVideo(still) else {
+        guard let info = await mediaProbes.probeVideo(still) else {
             guard isCurrentGeneration(request.generation) else { return projectChanged }
             return fail(String(format: L10n("Could not read video information from %@."), still.lastPathComponent))
         }

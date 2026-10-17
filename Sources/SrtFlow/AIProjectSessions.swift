@@ -87,6 +87,12 @@ final class AIProjectSessions {
 /// 有没有没存的改动、在跑的任务。AI 据此知道哪些能用、哪些该关（方案板 2、7）。
 @MainActor
 enum AIProjectStatus {
+    /// 放在哪：主窗口 / 自己的窗口 / 后台（没有窗口：用户在主窗口的「AI 在剪的工程」里能打开）。
+    static func shownIn(_ project: VideoEditProject) -> String {
+        if project === OpenProjects.shared.primary { return "main window" }
+        return OpenProjects.shared.isHeadless(project) ? "background (no window)" : "own window"
+    }
+
     static func openProjects(session: String?) -> JSONValue {
         let sessions = AIProjectSessions.shared
         let running = AIJobs.shared.running
@@ -94,7 +100,7 @@ enum AIProjectStatus {
             var item: [String: JSONValue] = [
                 "id": .string(project.shortID),
                 "name": .string(project.projectName),
-                "shown_in": .string(project === OpenProjects.shared.primary ? "main window" : "own window"),
+                "shown_in": .string(shownIn(project)),
                 "unsaved_changes": .bool(project.hasUnsavedChanges)
             ]
             if let path = project.documentURL?.path { item["path"] = .string(path) }

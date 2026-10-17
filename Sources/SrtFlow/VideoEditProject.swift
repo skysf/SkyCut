@@ -399,6 +399,7 @@ final class VideoEditProject {
     /// 没有窗口交过来时用这个工程自己的（不再退到键窗口的：那是别的工程的窗口，docs/architecture/open-projects.md）。
     @ObservationIgnored let ownUndoManager = UndoManager()
 
+    /// 素材探测（带缓存）：定格、拖进轨道、AI 看文件 / 开文件夹都直接问它。
     let mediaProbes = MediaProbeCache()
     /// 优化媒体：后台转码队列 + 预览窗口的「优化媒体 / 原片」；只有工具栏的小菜单订阅它（OptimizedMedia/）。
     let optimizedMedia = OptimizedMediaCoordinator()
@@ -778,7 +779,7 @@ final class VideoEditProject {
         importingCount += urls.count
         defer { importingCount = max(0, importingCount - urls.count) }
         for url in urls {
-            guard let info = await probeVideo(url) else {
+            guard let info = await mediaProbes.probeVideo(url) else {
                 // 失败提示也要验代号：报的是旧工程素材的错，别写到新工程脸上。
                 if isCurrentGeneration(generation) {
                     notice = String(format: L10n("Could not read video information from %@."), url.lastPathComponent)
@@ -808,7 +809,7 @@ final class VideoEditProject {
         importingCount += urls.count
         defer { importingCount = max(0, importingCount - urls.count) }
         for url in urls {
-            guard let duration = await audioDuration(url), duration > 0 else {
+            guard let duration = await mediaProbes.audioDuration(url), duration > 0 else {
                 if isCurrentGeneration(generation) {
                     notice = String(format: L10n("Could not read %@."), url.lastPathComponent)
                 }
@@ -879,7 +880,7 @@ final class VideoEditProject {
         }
         do {
             let still = try await StillImageClipFactory.stillVideo(for: url, ffmpeg: ffmpeg)
-            let info = await probeVideo(still)
+            let info = await mediaProbes.probeVideo(still)
             // 转换期间可能已经换了工程，或者这个占位块被撤销掉了。
             // 不加这两道判断的话，`state = next` 会把新工程平白标脏。
             guard isCurrentGeneration(generation), state.clip(with: clipID) != nil else { return }
@@ -1160,16 +1161,12 @@ final class VideoEditProject {
         return TimelineSnap.candidates(in: state, moving: movingIDs, playhead: clock.time)
     }
 
-    // MARK: - 素材探测（缓存在 MediaProbeCache）
-
-    /// 定格（`VideoEditFreezeFrame`）和拖进轨道那条路（`probeImports`）也要探，所以不是 private。
-    func probeVideo(_ url: URL) async -> MediaInfo? { await mediaProbes.probeVideo(url) }
-    func audioDuration(_ url: URL) async -> Double? { await mediaProbes.audioDuration(url) }
-
     // MARK: - 预览重建
 
     /// 不然每改一刀就跳回 0:00 没法干活。
     func scheduleRebuild() {
+        // 后台工程（没有窗口）不建预览：播放条目、合成、音频引擎都不要；挂上窗口时 OpenProjects 重建一次（方案 H 节）。
+        guard OpenProjects.shared.showsEditor(self) else { return }
         // 重建按旧路径开素材，文件被挪走的话对应时段会静默变黑（builder 对加载失败的 clip 只能跳过）——先把素材位置
         // 重核对一遍，跟得上的当场改引用再重建一次，跟不上的亮出丢失提示。单飞 + 无变化即收敛，不会和这里循环。
         revalidateMediaLocations()
@@ -1183,7 +1180,7 @@ final class VideoEditProject {
             let snapshot = self.state
             // 画面按优化媒体转好的块换源（只有这一处传 proxies：成片、预渲染、AI 看永远原片）。
             let built = await VideoEditCompositionBuilder.build(from: snapshot, proxies: self.optimizedMedia.lookup(for: snapshot))
-            guard !Task.isCancelled, generation == self.rebuildGeneration else { return }
+            guard !Task.isCancelled, generation == self.rebuildGeneration, OpenProjects.shared.showsEditor(self) else { return }
             self.rebuildStatus.set(false)
             guard let built else {
                 self.clock.detach()

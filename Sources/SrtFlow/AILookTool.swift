@@ -130,7 +130,7 @@ enum AILookTool {
             times = times.map { min(max(0, $0), max(0, duration - 0.05)) }
             frames = await AIFrameSampler.frames(ofVideo: url, at: times, maxSide: 1280, tolerance: 0.1)
             // 文件本身多大、几帧（不是发给 AI 的缩略图的尺寸：看成片的时候 AI 拿那个当成了成片的尺寸）。
-            if let info = await project.probeVideo(url) {
+            if let info = await project.mediaProbes.probeVideo(url) {
                 realSize = AIVideoSize.file(
                     width: Int(info.displaySize.width), height: Int(info.displaySize.height),
                     fps: info.frameRate, duration: info.duration

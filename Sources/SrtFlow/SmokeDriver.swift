@@ -183,7 +183,7 @@ enum SmokeDriver {
             try await requestSnapshot(step.name ?? "snapshot", window: try SmokeUISteps.window(for: step, main: window), output: output)
         case .projectWindow:
             guard case .file(let file) = step.path else { throw SmokeScriptError("projectWindow 要写 \"path\": \"/绝对路径\"") }
-            guard let opened = await OpenProjects.shared.openInWindow(URL(fileURLWithPath: file)),
+            guard let opened = await OpenProjects.shared.open(URL(fileURLWithPath: file)),
                   let projectWindow = OpenProjects.shared.window(of: opened) else {
                 throw SmokeScriptError("projectWindow：没开成（\(OpenProjects.shared.failure ?? "?")）")
             }

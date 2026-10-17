@@ -64,8 +64,8 @@ public enum MCPProjectTools {
                 Open an existing SrtFlow project file (.srtflowproj). The result's project is its id (p1, p2…). Several projects \
                 can be open at once: to edit several (for example with sub-agents), open or create them all first, then pass \
                 project=<id> on every call; a call without project goes to the project you opened last. It opens in SrtFlow's \
-                main window when that is empty, otherwise in a window of its own, shown once (set_view background keeps it \
-                behind). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
+                main window when that is empty, otherwise in a window of its own, shown once; after set_view background it \
+                opens with no window (the user sees it in SrtFlow's AI projects list). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
                 SrtFlow keeps at most 8 projects open: close_project the finished ones.
                 """,
                 input: MCPSchema.object([

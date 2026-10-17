@@ -5,7 +5,7 @@ import SwiftUI
 //
 // 管什么：一个 AppKit 自己建的窗口，里面是同一个剪辑页（`VideoEditView`）；window delegate 交出**工程自己的**撤销管理器 ——
 // ⌘Z、编辑菜单、工具栏的撤销按钮撤的都是这个工程的，挂上 / 摘下窗口不丢历史；层叠排开、摆到前面一次但不激活 App；
-// 关窗之前先过 `prepareToCloseDocument`（落盘、未命名的问存不存），关了告诉注册表。
+// 关窗之前先过 `prepareToCloseDocument`（落盘、未命名的问存不存），关了告诉注册表；AI 还在剪的工程关窗 = 转到后台（不问、不关工程）。
 // 不管什么：开哪个工程、关窗之后工程去哪（OpenProjects）；剪辑页本身。
 //
 // 为什么不用 SwiftUI 的 WindowGroup：SwiftUI 的窗口（`AppKitWindow`）不问 delegate 要撤销管理器，⌘Z 只撤得到窗口自己的那个；
@@ -15,10 +15,12 @@ import SwiftUI
 @MainActor
 final class ProjectWindowController: NSWindowController, NSWindowDelegate {
     let project: VideoEditProject
-    /// 窗口关掉了（注册表据此收拾这个工程）。
-    private let onClosed: (VideoEditProject) -> Void
+    /// 窗口关掉了（注册表据此收拾这个工程）；第二个参数：工程还留着、转到后台。
+    private let onClosed: (VideoEditProject, Bool) -> Void
+    /// 这一次关窗只摘窗口、工程留着（AI 还在剪它、或者 AI 要后台）。
+    private var keepsProject = false
 
-    init(project: VideoEditProject, onClosed: @escaping (VideoEditProject) -> Void) {
+    init(project: VideoEditProject, onClosed: @escaping (VideoEditProject, Bool) -> Void) {
         self.project = project
         self.onClosed = onClosed
         let host = NSHostingView(rootView: ProjectWindowRoot(project: project).appLanguage())
@@ -55,10 +57,23 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate {
 
     func windowWillReturnUndoManager(_ window: NSWindow) -> UndoManager? { project.ownUndoManager }
 
-    /// 关窗前落盘；未命名又剪了东西的问存不存，点了取消就不关。
-    func windowShouldClose(_ sender: NSWindow) -> Bool { project.prepareToCloseDocument() }
+    /// 关窗前落盘；未命名又剪了东西的问存不存，点了取消就不关。AI 还在剪的工程不关、转到后台（方案 A.6）：照样自动存盘，
+    /// 主窗口的「AI 在剪的工程」里能打开回来、能关掉。
+    func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if OpenProjects.shared.aiIsEditing(project) {
+            keepsProject = true
+            return true
+        }
+        return project.prepareToCloseDocument()
+    }
 
-    func windowWillClose(_ notification: Notification) { onClosed(project) }
+    /// 只摘窗口、工程转到后台（AI 的 set_view background）。
+    func closeKeepingProject() {
+        keepsProject = true
+        close()
+    }
+
+    func windowWillClose(_ notification: Notification) { onClosed(project, keepsProject) }
 
     // 菜单（⌘S、拷贝粘贴）作用在键窗口的工程上（OpenProjects.focused）。
     func windowDidBecomeKey(_ notification: Notification) { OpenProjects.shared.projectWindowBecameKey(project) }
