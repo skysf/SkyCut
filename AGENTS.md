@@ -471,6 +471,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [AI 多开第 ① 刀的冒烟（0.18.38）](docs/reports/2026-10-17-open-projects-slice1-smoke.md) — 拆单例 + 工程窗口合进 main 之后：两个工程窗口按键 / 撤销 / 开关 / 关窗各管各的
   （进程内驱动；第一次跑撞出「先放内容后挂 delegate、撤销撤不到工程」并修好），装好的测试版上 AI 单工程的老流程（建、放、加字、撤销、看、导出、存）全通；
   Rosetta 终端里打包要用 `/bin/bash`；还没验到的留给第 ② 刀。
+- [AI 多开第 ② 刀的冒烟（0.18.39）](docs/reports/2026-10-17-ai-project-routing-slice2-smoke.md) — 一个会话开两个工程：不带 project 的落在最后打开的、
+  两个文件夹里同名的 C0001.MP4 各进各的工程、导出中关工程被拒、撤销这一轮只退一个工程；另一个会话碰不到 / 开不了 / 取消不了别人的；撞出 open_folder 报旧
+  output_folder（#232 已修）；点不了横幅上的停止（自动化工具没授权），留人工回归。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
