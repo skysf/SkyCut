@@ -127,7 +127,8 @@ grep -q 'importScreenRecording(result, request: request, landing: session.landin
 # 6. 录制中 AI 别的改动不把 SrtFlow 摆到前面；record_screen 自己不摆剪辑页。
 grep -q 'let recordingScreen = ScreenRecordingCoordinator.shared.isBusy' "${ROUTER}" \
   && grep -qF 'let firstShow = visible && !recordingScreen &&' "${ROUTER}" \
-  && grep -q 'guard !recording else { return }' Sources/SrtFlow/AIViewPlacement.swift \
+  && grep -q 'OpenProjects.shared.showWindow(for: project, inFront: !recording)' Sources/SrtFlow/AIViewPlacement.swift \
+  && grep -q 'guard !recording, let window = OpenProjects.shared.window(of: project) else { return }' Sources/SrtFlow/AIViewPlacement.swift \
   || fail "${ROUTER}：录屏进行中还会把 SrtFlow 摆到前面（会盖住正在录的画面、被录进去）"
 POLICY="$(grep -A1 'case .recordScreen:$' "${ROUTER}" | tail -1)"
 grep -q '(serialized, presentsEditor, startsRound) = (true, false, true)' <<<"${POLICY}" \

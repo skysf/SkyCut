@@ -4,8 +4,8 @@ import SrtFlowMCPKit
 
 // MARK: - 工具：打开 / 新建 / 关掉工程（2026-10-17 起几个工程可以同时开着）
 //
-// 管什么：open_project / new_project / close_project 在 App 里怎么做 —— 开在哪（主窗口空着就装进去，否则自己的窗口；
-// 后台模式放到别的窗口后面）、同一个文件只开一份、别的会话还在剪的不给开、到顶（8 个）就拒、开 / 建完归这个会话、
+// 管什么：open_project / new_project / close_project 在 App 里怎么做 —— 开在哪（看得见：主窗口空着就装进去，否则自己的窗口；
+// 后台模式：没有窗口的后台工程，方案板 8）、同一个文件只开一份、别的会话还在剪的不给开、到顶（8 个）就拒、开 / 建完归这个会话、
 // 关之前先落盘、有任务在跑就不关。回的结果带工程的短 id（`project`），身份章（`AIToolResult.stamp`）交给路由回给小程序记着。
 // 不管什么：落在哪 / 归谁的规矩（AIProjectTargeting）、注册表（OpenProjects）、排队（AIToolRouter）。
 // 方案：docs/plans/2026-10-17-multi-project-ai-editing.md 板 1、2、7，A 节；长期约束：docs/architecture/ai-control-mcp.md 第四节第 46 条。
@@ -46,7 +46,7 @@ enum AIProjectOpenTools {
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
             _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
-            guard let opened = await OpenProjects.shared.openInWindow(url, inFront: inFront) else {
+            guard let opened = await OpenProjects.shared.open(url, placement: inFront ? .window(inFront: true) : .background) else {
                 throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not open \(url.lastPathComponent).")
             }
             project = opened
@@ -85,7 +85,7 @@ enum AIProjectOpenTools {
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
             _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
-            guard let created = OpenProjects.shared.newInWindow(savingAs: url, inFront: inFront) else {
+            guard let created = OpenProjects.shared.newProject(savingAs: url, placement: inFront ? .window(inFront: true) : .background) else {
                 throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not save the new project to \(url.path).")
             }
             project = created
@@ -141,7 +141,7 @@ enum AIProjectOpenTools {
         AISession.shared.round(for: project).rebase(project: project)
         var payload = extra
         payload["project"] = .string(project.shortID)
-        payload["shown_in"] = .string(project === OpenProjects.shared.primary ? "main window" : "own window")
+        payload["shown_in"] = .string(AIProjectStatus.shownIn(project))
         payload["next_step"] = .string("Pass project=\"\(project.shortID)\" on the calls for this project, "
             + "especially when you edit several at once (calls without project go to the one you opened last).")
         var result = AIToolResult.ok(.object(payload))

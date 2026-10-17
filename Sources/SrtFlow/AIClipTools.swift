@@ -166,7 +166,7 @@ enum AIClipTools {
             }
             let still = try await StillImageClipFactory.stillVideo(for: url, ffmpeg: ffmpeg)
             return ClipFileReplacement(
-                url: url, kind: .image, duration: 0, info: await project.probeVideo(still), hasAudio: false, stillVideo: still
+                url: url, kind: .image, duration: 0, info: await project.mediaProbes.probeVideo(still), hasAudio: false, stillVideo: still
             )
         }
     }

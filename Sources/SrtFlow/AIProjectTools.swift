@@ -124,7 +124,7 @@ enum AIProjectTools {
         ]
         switch entry.kind {
         case .video:
-            if let info = await project.probeVideo(entry.url) {
+            if let info = await project.mediaProbes.probeVideo(entry.url) {
                 object["duration"] = AIFormat.seconds(info.duration)
                 object["width"] = .number(Double(info.width))
                 object["height"] = .number(Double(info.height))
@@ -134,7 +134,7 @@ enum AIProjectTools {
                 object["unreadable"] = true
             }
         case .audio:
-            if let duration = await project.audioDuration(entry.url) {
+            if let duration = await project.mediaProbes.audioDuration(entry.url) {
                 object["duration"] = AIFormat.seconds(duration)
             } else {
                 object["unreadable"] = true

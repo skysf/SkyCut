@@ -566,7 +566,7 @@ extension VideoEditProject {
             // 判断顺序和 `addMedia` 一致（视频 → 图片 → 声音）。两边分类不同的话，
             // 同一个文件拖到时间线上和拖到预览区会变成两种东西。
             if MediaFileTypes.isVideo(url) {
-                guard let info = await probeVideo(url), info.duration > 0 else { continue }
+                guard let info = await mediaProbes.probeVideo(url), info.duration > 0 else { continue }
                 result.append(
                     MediaFileImport(url: url, kind: .video, duration: info.duration, info: info)
                 )
@@ -577,7 +577,7 @@ extension VideoEditProject {
                     MediaFileImport(url: url, kind: .image, duration: Self.importedImageDuration)
                 )
             } else if Self.looksLikeAudio(url) {
-                guard let duration = await audioDuration(url), duration > 0 else { continue }
+                guard let duration = await mediaProbes.audioDuration(url), duration > 0 else { continue }
                 result.append(MediaFileImport(url: url, kind: .audio, duration: duration))
             }
         }

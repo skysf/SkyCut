@@ -114,8 +114,38 @@ done
 grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$DOCUMENT" \
   || fail "${DOCUMENT} 的 endPendingTextEditing 不分是不是这个工程的窗口就让键窗口的输入框辞职"
 
+# 11. 后台工程（没有窗口，方案板 8）：不建预览（播放条目、合成、音频引擎），挂上窗口时重建一次；摘窗口只停预览、工程留着；
+#     用户关掉 AI 还在剪的工程的窗口 = 转到后台（先问这一句，再走落盘关工程那条路）。
+REBUILD="$(awk '/    func scheduleRebuild\(\) \{/,/^    \}/' "$PROJECT")"
+[ "$(sed -n 2,3p <<<"${REBUILD}" | grep -c 'guard OpenProjects.shared.showsEditor(self) else { return }')" -eq 1 ] \
+  || fail "${PROJECT} 的 scheduleRebuild 开头没挡后台工程（没有窗口也建播放条目、合成、音频引擎）"
+grep -q 'guard !Task.isCancelled, generation == self.rebuildGeneration, OpenProjects.shared.showsEditor(self) else { return }' <<<"${REBUILD}" \
+  || fail "${PROJECT} 的 scheduleRebuild 防抖之后没再问一次有没有窗口（摘窗口之前排上的那次重建会把条目挂回去）"
+for body in 'private func place(' 'func showWindow(for project'; do
+  BLOCK="$(awk -v start="$body" 'index($0, start) { on = 1 } on { print } on && /^    \}/ { exit }' "$REGISTRY")"
+  ATTACH_AT="$(grep -n 'attachWindow(to: project, inFront: inFront)' <<<"${BLOCK}" | head -1 | cut -d: -f1)"
+  REBUILT_AT="$(grep -n 'project.scheduleRebuild()' <<<"${BLOCK}" | head -1 | cut -d: -f1)"
+  if [ -z "${ATTACH_AT}" ] || [ -z "${REBUILT_AT}" ] || [ "${ATTACH_AT}" -gt "${REBUILT_AT}" ]; then
+    fail "${REGISTRY} 的 ${body}… 挂上窗口之后没重建预览（开的时候它还没窗口，重建被跳过了）"
+  fi
+done
+CLOSED="$(awk '/    private func windowClosed\(/,/^    \}/' "$REGISTRY")"
+STOP_AT="$(grep -n 'ProjectTeardown.stopPreview(project)' <<<"${CLOSED}" | cut -d: -f1)"
+FINISH_AT="$(grep -n 'finishClosing(project)' <<<"${CLOSED}" | cut -d: -f1)"
+if [ -z "${STOP_AT}" ] || [ -z "${FINISH_AT}" ] || [ "${STOP_AT}" -gt "${FINISH_AT}" ] || ! grep -q 'return' <<<"${CLOSED}"; then
+  fail "${REGISTRY} 的 windowClosed：工程转到后台时要只停预览、不收拾工程（keepsProject 那一支先 return）"
+fi
+CONTROLLER=Sources/SrtFlow/ProjectWindowController.swift
+SHOULD="$(awk '/    func windowShouldClose\(/,/^    \}/' "$CONTROLLER")"
+KEEP_AT="$(grep -n 'OpenProjects.shared.aiIsEditing(project)' <<<"${SHOULD}" | cut -d: -f1)"
+PREPARE_AT="$(grep -n 'project.prepareToCloseDocument()' <<<"${SHOULD}" | cut -d: -f1)"
+if [ -z "${KEEP_AT}" ] || [ -z "${PREPARE_AT}" ] || [ "${KEEP_AT}" -gt "${PREPARE_AT}" ]; then
+  fail "${CONTROLLER} 关窗时没先问「AI 还在剪吗」：AI 在剪的工程会被关掉（应转到后台）"
+fi
+
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
-  echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框"
+  echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框；"
+  echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台"
 fi
 exit "${FAILED}"
