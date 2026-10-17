@@ -5,7 +5,7 @@ import SrtFlowMCPKit
 
 // MARK: - 工具：导出、任务进度、取消任务
 //
-// 管什么：export_video 走导出面板那同一个导出器（`VideoEditExporter`），只是不弹面板：
+// 管什么：export_video 走导出面板那同一个导出器（`VideoEditExporter`），只是不弹面板；导出器占着就排队（AIWorkQueue，2026-10-17）：
 // 文件名默认是工程名、放在打开的文件夹的 SrtFlow/导出 里，已经有同名文件就加编号（从不覆盖，所以不问，方案第 34 条）；
 // 烧字幕、分辨率的口径和面板一样（烧看得见的轨；分辨率封短边、只降不升）。
 // get_job / cancel_job 管所有长任务（AIJobs）。
@@ -14,12 +14,11 @@ import SrtFlowMCPKit
 @MainActor
 enum AIExportTools {
     private static var subscriptions: [String: AnyCancellable] = [:]
+    /// 排着队、还没写出来的成品路径：几个导出排在一起时各占各的名字，不会都算成同一个「没被占」的名字。
+    private static var reservedOutputs: Set<String> = []
 
     static func export(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let exporter = VideoEditExporter.shared
-        guard !exporter.isExporting else {
-            throw AIToolError("An export is already running. Wait for it with get_job, or cancel it first.")
-        }
         guard !project.state.mainClips.isEmpty else { throw AIToolError("V1 is empty. Add clips before exporting.") }
         guard MediaToolchain.shared.runtime != nil else {
             throw AIToolError("SrtFlow's video engine is not ready yet. Try again in a moment.")
@@ -30,7 +29,7 @@ enum AIExportTools {
         let output = ExportFileName.unoccupied(
             in: requested.deletingLastPathComponent(), stem: requested.deletingPathExtension().lastPathComponent,
             pathExtension: requested.pathExtension
-        ) { FileManager.default.fileExists(atPath: $0.path) }
+        ) { FileManager.default.fileExists(atPath: $0.path) || reservedOutputs.contains($0.standardizedFileURL.path) }
         try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
 
         var settings = exporter.settings
@@ -47,38 +46,55 @@ enum AIExportTools {
         }
         let fonts = await FontCatalogStore.shared.loadedFonts()
         let style = state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
-        exporter.export(
-            state: state, to: output, subtitleStyle: style,
-            subtitleFontURL: fonts.first { $0.familyName == style.fontName }?.fileURL, settingsOverride: settings
-        )
-        guard exporter.isExporting else { throw AIToolError(exporter.errorMessage ?? "The export could not start.") }
+        let fontURL = fonts.first { $0.familyName == style.fontName }?.fileURL
 
         // 成片多大、几帧（AI 不报这个就会拿 look 回的缩略图尺寸当成片尺寸，盲测里三条都以为是 720p）。
         let video: JSONValue? = audioOnly ? nil : AIVideoSize.output(
             canvas: VideoEditCompositionBuilder.renderSize(for: state), resolution: settings.resolution, fps: state.frameRate.fps
         )
-        let job = AIJobs.shared.start(.export, progress: { exporter.progress }, cancel: { exporter.cancel() })
-        // 结局在 isExporting 变回 false 的那一刻记下（@Published 在赋值之前发，那时成品路径 / 错误已经写好了）。
-        subscriptions[job.id] = exporter.$isExporting.dropFirst().filter { !$0 }.first().sink { _ in
-            MainActor.assumeIsolated {
-                if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
-                    AIJobs.shared.finish(
-                        job, .done, detail: .object(finishedDetail(output, video: video, levels: exporter.finishedAudioLevels))
-                    )
-                } else if let error = exporter.errorMessage {
-                    AIJobs.shared.finish(job, .failed, message: error)
-                } else {
-                    AIJobs.shared.finish(job, .cancelled)
+        let reserved = output.standardizedFileURL.path
+        reservedOutputs.insert(reserved)
+        let work = AIQueuedWork()
+        let job = AIJobs.shared.start(.export, progress: { work.started ? exporter.progress : nil }, cancel: {
+            work.cancel(withdrawn: { reservedOutputs.remove(reserved) }, stop: { exporter.cancel() })
+        })
+        work.job = job
+        // 导出器空着就马上导，占着（别的工程在导、面板在导）就排队：排的是调用这一刻的时间线。
+        let position = AIWorkQueue.shared.submit(.export, jobID: job.id) {
+            work.started = true
+            exporter.export(state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings)
+            guard exporter.isExporting else {
+                reservedOutputs.remove(reserved)
+                AIJobs.shared.finish(job, .failed, message: exporter.errorMessage ?? "The export could not start.")
+                return
+            }
+            // 结局在 isExporting 变回 false 的那一刻记下（@Published 在赋值之前发，那时成品路径 / 错误已经写好了）。
+            subscriptions[job.id] = exporter.$isExporting.dropFirst().filter { !$0 }.first().sink { _ in
+                MainActor.assumeIsolated {
+                    reservedOutputs.remove(reserved)
+                    if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
+                        AIJobs.shared.finish(
+                            job, .done, detail: .object(finishedDetail(output, video: video, levels: exporter.finishedAudioLevels))
+                        )
+                    } else if let error = exporter.errorMessage {
+                        AIJobs.shared.finish(job, .failed, message: error)
+                    } else {
+                        AIJobs.shared.finish(job, .cancelled)
+                    }
+                    subscriptions[job.id] = nil
                 }
-                subscriptions[job.id] = nil
             }
         }
+        if job.status == .failed { throw AIToolError(job.message ?? "The export could not start.") }
         var result: [String: JSONValue] = [
             "job_id": .string(job.id),
-            "status": "running",
+            "status": position == nil ? "running" : "queued",
             "path": .string(output.path),
-            "next_step": "Call get_job with this job_id and wait_seconds 30 until the status is done."
+            "next_step": .string(position == nil
+                ? "Call get_job with this job_id and wait_seconds 30 until the status is done."
+                : "Another export is running; this one starts after it (queue_position). Wait with get_job.")
         ]
+        if let position { result["queue_position"] = .number(Double(position)) }
         if let video { result["video"] = video }
         return .ok(.object(result))
     }

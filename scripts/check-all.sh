@@ -125,6 +125,7 @@ run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 /
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
 run_check "fal-wiring（扫描守卫：fal 生成的接线 —— 先问后花、不弹模态框、Key 只经一处读、清单跟着 Key 走）" checks/fal-wiring.sh
+run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
 run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
