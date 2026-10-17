@@ -40,14 +40,15 @@ private func checkCatalog() {
     let schema = definition.inputSchema
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind", "prompt"], "kind and prompt are required")
     let properties = schema["properties"]?.objectValue ?? [:]
-    checkEqual(Set(properties.keys), ["kind", "prompt", "image", "duration", "resolution", "aspect_ratio", "instrumental", "name", "model", "options"], "the parameters")
+    // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
+    checkEqual(Set(properties.keys), ["kind", "prompt", "image", "duration", "resolution", "aspect_ratio", "instrumental", "name", "model", "options", "confirm_token"], "the parameters")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
     checkEqual(properties["resolution"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.videoResolutions, "resolution lists the video resolutions")
     checkEqual(properties["aspect_ratio"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationAspects, "aspect_ratio lists the shapes")
     checkEqual(properties["options"]?["type"]?.stringValue, "object", "options is a JSON object")
 
     let text = definition.description
-    for word in ["fal.ai", "get_job", "waiting_for_user", "estimated_cost_usd", "daily limit", "add_clips", "MiniMax H3 Max", "image_to_video"] {
+    for word in ["fal.ai", "get_job", "needs_confirmation", "confirm_token", "estimated_cost_usd", "daily limit", "add_clips", "MiniMax H3 Max", "image_to_video"] {
         check(text.contains(word), "the description mentions \(word)")
     }
     // 旁白和字幕走别的工具：说明里要指开

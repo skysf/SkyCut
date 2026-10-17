@@ -249,12 +249,13 @@ if grep -q 'follow: request.follow && request.focus != .text' Sources/SrtFlow/AI
 fi
 echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
 
-echo "==> 什么时候问：只有删文件，外加点名文件夹以外的文件问一次、记住那个文件夹"
+echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次（记住那个文件夹）、fal 花钱超了额度"
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
-# 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）、开着的工程没存过就先存下来再换，这两样都不问。
+# 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
+# 从提示条改成同一套确认码（FalJobGate）。
 ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
-if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift " ]; then
-  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace）" >&2
+if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift FalJobGate.swift " ]; then
+  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、fal 花钱的 FalJobGate）" >&2
   exit 1
 fi
 if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then
@@ -269,7 +270,7 @@ for wiring in "Sources/SrtFlow/AIExportTools.swift:1" "Sources/SrtFlow/AIProject
     exit 1
   fi
 done
-echo "   ✓ 只有删文件和读别处的文件会问；读过的文件夹记住；导出、新建、另存撞名都加编号"
+echo "   ✓ 只有删文件、读别处的文件、fal 花钱超了额度会问；读过的文件夹记住；导出、新建、另存撞名都加编号"
 
 echo "==> 配音只经一处写文件（先过一道音量）"
 # Kokoro 的 am_fenrir 峰值会超过满幅，没过音量就写进文件，一声声爆音（docs/bugfixes/2026-09-28-kokoro-voiceover-clipping.md）。

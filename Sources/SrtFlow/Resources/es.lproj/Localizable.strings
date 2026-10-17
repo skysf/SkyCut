@@ -1018,12 +1018,8 @@
 "Use Burn In style" = "Usar el estilo de Incrustar";
 "Use the subtitle style from the Burn In Subtitles page again" = "Volver a usar el estilo de subtítulos de la página Incrustar subtítulos";
 
-// fal.ai（设置里的一节、横幅上问用户花钱、配旁白）
+// fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "Generado";
-"Allow" = "Permitir";
-"Not Now" = "Ahora no";
-"fal.ai · %@ — SrtFlow does not know this model's price, so it asks each time. Allow?" = "fal.ai · %@ — SrtFlow no conoce el precio de este modelo, así que pregunta cada vez. ¿Permitir?";
-"fal.ai · %@ — estimated cost %@. Today's spending would reach %@, over your %@ daily limit. Allow?" = "fal.ai · %@ — coste estimado %@. El gasto de hoy llegaría a %@, por encima de tu límite diario de %@. ¿Permitir?";
 "macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow." = "macOS va a preguntar si SrtFlow puede usar tu clave de fal.ai. Haz clic en Permitir siempre.";
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "Eso no es un id de endpoint de fal.ai. Tiene la forma propietario/nombre-del-modelo.";
 "The price must be a number." = "El precio debe ser un número.";

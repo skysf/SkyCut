@@ -4,7 +4,7 @@ import SwiftUI
 //
 // 管什么：AI 在剪**这个工程**的时候显示是谁、给一个停止按钮；这一轮结束或被停下之后，给「撤销这一轮」和关掉。每个剪辑页（主窗口、
 // 工程窗口）各一条，只管自己工程的那一轮（`AIRound`，2026-10-17 起，docs/plans/2026-10-17-multi-project-ai-editing.md 板 4）：
-// 停止只停这个工程、撤销这一轮只退这个工程。要用户点头的问题全 App 一份（`AISession.question`），每一条都摆。
+// 停止只停这个工程、撤销这一轮只退这个工程。要用户动手的那一句（`AISession.hint`）全 App 一份；要用户点头的事走聊天里的确认码，不在这里问。
 // 同一个位置底下挂着 `FalStatusRows`（mockup「Status row while upscaling」：进度复用编辑器顶上这条状态行）。
 // 只订阅 `AISession` 和这个工程的 `AIRound`（两个小对象），不读工程 —— 工程每改一下它都不用重算
 // （docs/architecture/preview-perf-ratchet.md 第十三节）。
@@ -33,23 +33,7 @@ struct AIActivityBanner: View {
     }
 
     @ViewBuilder
-    private var aiBar: some View {
-        if let question = session.question {
-            // 要用户点头的问题不管这一轮是什么状态都摆出来：AI 在等结果时这一轮可能早已「结束」，条不能因此收起来。
-            // accessibilityIdentifier：冒烟用辅助功能点按钮（SwiftUI 的按钮没有名字可找；docs/testing/gui-smoke-testing.md 四之八）。
-            bar(icon: "questionmark.circle", message: question.text) {
-                Button(question.declineTitle) { session.answer(false) }
-                    .accessibilityIdentifier("ai-banner-decline")
-                Button(question.allowTitle) { session.answer(true) }
-                    .accessibilityIdentifier("ai-banner-allow")
-                Button("Stop") { round.stop() }
-                    .accessibilityIdentifier("ai-banner-stop")
-                    .instantHelp("Stop the AI on this project and cancel its exports and subtitle jobs")
-            }
-        } else {
-            statusBar
-        }
-    }
+    private var aiBar: some View { statusBar }
 
     @ViewBuilder
     private var statusBar: some View {
@@ -61,6 +45,8 @@ struct AIActivityBanner: View {
             bar(icon: session.hint == nil ? "sparkles" : "hand.point.up.left",
                 message: session.hint ?? String(format: L10n("%@ is editing this project…"), clientName)) {
                 Button("Stop") { round.stop() }
+                    // 冒烟用辅助功能点按钮（SwiftUI 的按钮没有名字可找；docs/testing/gui-smoke-testing.md 四之八）。
+                    .accessibilityIdentifier("ai-banner-stop")
                     .instantHelp("Stop the AI on this project and cancel its exports and subtitle jobs")
             }
         case .finished:
