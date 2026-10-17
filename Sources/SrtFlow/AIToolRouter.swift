@@ -117,10 +117,7 @@ final class AIToolRouter {
         }
         // 不碰工程的（看文件、开文件夹……）照旧要一个工程给工具读写默认值：这个会话最后打开的那个，没有就是主窗口那个。
         let project = target ?? sessions.projects(of: call.session).last ?? OpenProjects.shared.primary
-        let context = AICallContext(
-            session: call.session, client: call.client, project: target?.shortID, stopsWith: project.shortID,
-            folder: AIWorkspace.shared.folder(project: target?.shortID, session: call.session)
-        )
+        let context = AICallContext(session: call.session, client: call.client, project: target?.shortID, stopsWith: project.shortID)
         let outcome = await AICallContext.$current.withValue(context) { await run(call, project, onProject: target != nil) }
         // 开 / 建 / 关回它开 / 建 / 关的那个（工具结果里带着），别的碰工程的回它落在的那个；出错的不回（小程序记的不变）。
         let stamp = outcome.failed ? nil : outcome.stamp ?? target.map(sessions.stamp)

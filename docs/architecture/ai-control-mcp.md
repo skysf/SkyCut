@@ -749,9 +749,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
     ⑤ **排队按工程**（`AIToolRouter`，方案 C 节）：碰工程的按工程排（`project:pN`），不碰工程的按会话排，开 / 建 / 关按会话另一条（关还要等那个
     工程自己那条）；不带 `project` 的先等这个会话还没做完的开 / 建 / 关、再按那时最后打开的那个排。五个子代理剪五个工程互不等待，同一个工程上
     仍一个接一个（「接在 V1 最后」不会乱）。
-    ⑥ **每个调用带上下文**（`AICallContext`，task-local）：哪个会话、客户端、落在哪个工程、相对路径按哪个文件夹（这个工程打开 / 新建时这个会话点名
-    的文件夹，没有就是这个会话最后点名的；`AIWorkspace.folder(project:session:)`）。`AIWorkspace.current` 从它拿 —— 几个子代理各 `open_folder`
-    一个文件夹不再串台。相对路径先按工程的文件夹找，那里没有、这个会话后来点名的文件夹里有才用后来的（`AIPathResolution`：一个 AI 建好工程后
+    ⑥ **每个调用带上下文**（`AICallContext`，task-local）：哪个会话、客户端、落在哪个工程 —— 只放「是谁」。`AIWorkspace.current` 按它**现查**
+    文件夹（这个工程打开 / 新建时这个会话点名的文件夹，没有就是这个会话最后点名的；`AIWorkspace.folder(project:session:)`）—— 几个子代理各
+    `open_folder` 一个文件夹不再串台；文件夹不抄进上下文，不然调用当中 `open_folder` 换了文件夹、同一个调用报的 `output_folder` 还是旧的
+    （[案例](../bugfixes/2026-10-17-open-folder-reports-previous-output-folder.md)）。相对路径先按工程的文件夹找，那里没有、这个会话后来点名的文件夹里有才用后来的（`AIPathResolution`：一个 AI 建好工程后
     再开第二个素材文件夹照旧能用；两边都有同名文件时按工程的，宁可不串到别的子代理的文件夹里）；任务（`AIJobs`）记下它归哪个工程、哪个会话（`get_job` 报 `project`），`close_project` 据此判断有没有任务在跑。
     ⑦ **开在哪**：看得见的模式、主窗口那个是空 Untitled（没存过、没内容、没改动）且没有别的会话正在用（`AIProjectSessions.primaryIsFree`；
     这个会话自己先读过一下的不挡）→ 装进主窗口、摆到前面一次（一个会话剪一条时
