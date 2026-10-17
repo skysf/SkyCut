@@ -6,14 +6,16 @@
 # 漏一条就是没问就花、或者问不到人、或者 Key 被读来读去。写法同 encode-settings-memory.sh：文件找不到直接红（扫空 = 假绿）。
 #
 # 钉的事（每条后面是它守的规矩，出处见 docs/architecture/fal-generation.md）：
-#   1. **不弹模态框**：fal 这几个文件里没有 NSAlert / runModal / 任何面板（方案第 9、10 条；要问就走 AISession.ask 的提示条）；
+#   1. **不弹模态框**：fal 这几个文件里没有 NSAlert / runModal / 任何面板（方案第 9、10 条；要用户点头就回确认码，AI 在聊天里问）；
 #   2. **HTTP 只经 FalClient**：`queue.fal.run` 和 `URLSession` 只出现在 FalClient.swift 和它的传输代理 FalTransfer.swift
 #      （认证头、取消、错误换话都在 FalClient；FalTransfer 只管流着发 / 收和字节进度）；
 #   3. **Key 只经 FalKeyCache 读**：`FalKeyStore.read(` 只在 FalKeyStore.swift 里；用 Key 的只有生成任务、配旁白和 upscale 任务三处；
-#   4. **先问后花**：AI 起的任务（generate_media、upscale_clip）都经 `FalJobGate.reserve` —— 把关 `store.decide(` 在问 `AISession.shared.ask` 之前、
-#      记账恰好两处（额度内 / 用户点头之后）、提问只在这一处；任务里 reserve 在提交 / 跑流水线之前；没做出来才退（`guard !resultReceived`）；
+#   4. **先问后花**（2026-10-17 起是聊天里的确认码，AI 多开方案板 9）：AI 起的任务（generate_media、upscale_clip）在**起任务之前**经
+#      `FalJobGate.decide` —— 把关 `store.decide(` 在发确认码 `AIConfirmations.shared.ask(` 之前、收令牌 `redeem` 只在这一处、记账恰好两处
+#      （额度内 / 收下令牌之后）；两个工具都在建任务之前调它、任务只拿记好的那一笔；没做出来才退（`guard !resultReceived`）；
 #      面板起的 upscale 自己记账（面板就是确认）；
-#   5. **提示条上的问题不管这一轮什么状态都摆出来**（AI 等结果时这一轮早「结束」了）；停止 / cancel_job 把问题收回（withdrawQuestions）；
+#   5. **不在提示条上问**：`AISession` 没有 ask / question 了（后台工程没窗口、用户没在看 SrtFlow 时提示条上的问题没人看见）；
+#      停止按工程（AIRound）取消这个工程的任务；
 #   6. **配旁白是同步工具，不许停下来等用户**：AIVoiceoverTool / AIFalVoice 里没有 `.ask(`，额度用 `allowsWithoutAsking` 判断，用不了就退档；
 #      fal 的声音也只经 `AIAudioFileWriter.writeVoiceover` 落盘（scripts/check-mcp.sh 那条扫描也钉着）；
 #   7. **清单跟着 Key 走**：`generate_media` 和 `upscale_clip` 属于 fal（MCPToolName.provider）、Key 添加 / 删除都同步那个小文件、启动时也对一遍；
@@ -65,7 +67,7 @@ FAL_FILES=(Sources/SrtFlow/Fal/*.swift "${VOICE}")
 # 1. 不弹模态框。
 for file in "${RUN}" "${TOOL}" "${VOICE}" "${SETTINGS}" "${GATE}" "${UPSCALE}" "${UPSCALE_TOOL}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
-    fail "${file}：里面弹了模态框 —— 要问用户就走 AISession.ask（提示条上两个按钮），AI 在等的时候弹框没人点"
+    fail "${file}：里面弹了模态框 —— 要用户点头就回确认码（FalJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
   fi
 done
 
@@ -89,31 +91,34 @@ if [ "${users}" != "${expected}" ]; then
   fail "用 Key 的地方应该只有生成任务、配旁白和 upscale 任务三处，实际是：${users}"
 fi
 
-# 4. 先问后花：AI 起的任务都经 FalJobGate.reserve（规则只有一处）。
+# 4. 先问后花：AI 起的任务在起任务之前都经 FalJobGate.decide（规则只有一处；超了是聊天里的确认码）。
 GATE_DECIDE="$(line_of 'store.decide(' "${GATE}")"
-GATE_ASK="$(line_of 'AISession.shared.ask(' "${GATE}")"
-if [ -z "${GATE_DECIDE}" ] || [ -z "${GATE_ASK}" ] || [ "${GATE_DECIDE}" -ge "${GATE_ASK}" ]; then
-  fail "${GATE}：花钱的把关（store.decide）必须在问用户（AISession.shared.ask）之前"
+GATE_ASK="$(line_of 'AIConfirmations.shared.ask(' "${GATE}")"
+GATE_REDEEM="$(line_of 'AIConfirmations.shared.redeem(' "${GATE}")"
+if [ -z "${GATE_DECIDE}" ] || [ -z "${GATE_ASK}" ] || [ -z "${GATE_REDEEM}" ] || [ "${GATE_DECIDE}" -ge "${GATE_REDEEM}" ] || [ "${GATE_REDEEM}" -ge "${GATE_ASK}" ]; then
+  fail "${GATE}：花钱的把关（store.decide）→ 收令牌（redeem）→ 没收下才发确认码（AIConfirmations.shared.ask），顺序不能乱"
 fi
 [ "$(count 'record(store, estimate)' "${GATE}")" -eq 2 ] \
-  || fail "${GATE}：记账 record(store, estimate) 应恰好两处（额度内直接做 / 用户点头之后）"
-[ "$(count 'AISession.shared.ask(' "${GATE}")" -eq 1 ] \
-  || fail "${GATE}：超额度 / 没登记单价要问用户，且只走 AISession.shared.ask 一处"
+  || fail "${GATE}：记账 record(store, estimate) 应恰好两处（额度内直接做 / 收下令牌之后）"
+[ "$(count 'AIConfirmations.shared.ask(' "${GATE}")" -eq 1 ] && [ "$(count 'AIConfirmations.shared.redeem(' "${GATE}")" -eq 1 ] \
+  || fail "${GATE}：超额度 / 没登记单价只发一处确认码、只在一处收令牌"
 for file in "${RUN}" "${UPSCALE}" "${UPSCALE_TOOL}" "${TOOL}"; do
-  if grep -nE 'store\.decide\(|AISession\.shared\.ask\(' "${file}"; then
-    fail "${file}：把关和提问只许在 FalJobGate 里（generate_media 和 upscale_clip 同一条规则）"
+  if grep -nE 'store\.decide\(|AIConfirmations\.shared\.(ask|redeem)\(' "${file}"; then
+    fail "${file}：把关和确认码只许在 FalJobGate 里（generate_media 和 upscale_clip 同一条规则）"
   fi
 done
-RUN_RESERVE="$(line_of 'FalJobGate.reserve(' "${RUN}")"
-SUBMIT="$(line_of 'client.run(' "${RUN}")"
-if [ -z "${RUN_RESERVE}" ] || [ -z "${SUBMIT}" ] || [ "${RUN_RESERVE}" -ge "${SUBMIT}" ]; then
-  fail "${RUN}：把关（FalJobGate.reserve）必须在提交（client.run）之前"
+TOOL_DECIDE="$(line_of 'try FalJobGate.decide(' "${TOOL}")"
+TOOL_RUN="$(line_of 'let run = FalGenerationRun(' "${TOOL}")"
+if [ -z "${TOOL_DECIDE}" ] || [ -z "${TOOL_RUN}" ] || [ "${TOOL_DECIDE}" -ge "${TOOL_RUN}" ]; then
+  fail "${TOOL}：把关（FalJobGate.decide）必须在建生成任务（FalGenerationRun）之前"
 fi
-UP_RESERVE="$(line_of 'FalJobGate.reserve(' "${UPSCALE}")"
-UP_RUN="$(line_of 'UpscalePipeline.run(' "${UPSCALE}")"
-if [ -z "${UP_RESERVE}" ] || [ -z "${UP_RUN}" ] || [ "${UP_RESERVE}" -ge "${UP_RUN}" ]; then
-  fail "${UPSCALE}：AI 起的 upscale 把关（FalJobGate.reserve）必须在跑流水线之前"
+UP_DECIDE="$(line_of 'try FalJobGate.decide(' "${UPSCALE_TOOL}")"
+UP_JOB="$(line_of 'let job = UpscaleJob(' "${UPSCALE_TOOL}")"
+if [ -z "${UP_DECIDE}" ] || [ -z "${UP_JOB}" ] || [ "${UP_DECIDE}" -ge "${UP_JOB}" ]; then
+  fail "${UPSCALE_TOOL}：把关（FalJobGate.decide）必须在建 upscale 任务之前"
 fi
+grep -q 'reserved = (reservation.amount, reservation.day)' "${RUN}" && grep -q 'case .ai(let reservation):' "${UPSCALE}" \
+  || fail "${RUN} / ${UPSCALE}：任务要用起任务之前记好的那一笔（退账按它退）"
 for file in "${RUN}" "${UPSCALE}"; do
   [ "$(count 'guard !resultReceived' "${file}")" -eq 1 ] || fail "${file}：退账必须只在没拿到结果时（fal 只对做出来的收钱）"
 done
@@ -122,25 +127,14 @@ done
   || fail "记账 recordSpend 只该在 FalJobGate（AI 起的任务）一处、配旁白读完一句之后一处、upscale 任务两处（面板起的记估算 / 查到实收换掉）"
 [ "$(count 'recordSpend(' "${RUN}")" -eq 0 ] || fail "${RUN}：生成任务自己记账了，应经 FalJobGate"
 
-# 5. 提示条上的问题。
-# 提示条只挂在剪辑页里（VideoEditView）：问之前必须先把剪辑页摆出来，不然用户在别的栏目时看不见、任务一直等。
-P="$(line_of 'AIEditorPresenter.prepareEditor(' "${GATE}")"
-A="${GATE_ASK}"
-if [ -z "${P}" ] || [ -z "${A}" ] || [ "${P}" -ge "${A}" ]; then
-  fail "${GATE}：问用户之前必须先 AIEditorPresenter.prepareEditor（提示条只在剪辑页里，别的栏目看不见问题）"
+# 5. 不在提示条上问（AI 多开方案板 9：后台工程没有窗口、用户没在看 SrtFlow 时，提示条上的问题没人看见）。
+if grep -nE 'func ask\(|var question|pendingQuestions' "${SESSION}" || grep -n 'session.question' "${BANNER}"; then
+  fail "${SESSION} / ${BANNER}：又在提示条上问用户了 —— 要用户点头的事走聊天里的确认码（AIConfirmations）"
 fi
-Q="$(line_of 'if let question = session.question' "${BANNER}")"
-S="$(line_of 'switch round.phase' "${BANNER}")"
-if [ -z "${Q}" ] || [ -z "${S}" ] || [ "${Q}" -ge "${S}" ]; then
-  fail "${BANNER}：要点头的问题必须先于 switch round.phase 摆出来（这一轮「结束」了条也不能把问题收起来）"
-fi
-grep -q 'withdrawQuestions(owner: job.id)' "${RUN}" || fail "${RUN}：取消任务时没有把挂在条上的问题收回"
-grep -q 'withdrawQuestions(owner: id.uuidString)' "${UPSCALE}" || fail "${UPSCALE}：取消 AI 起的 upscale 时没有把挂在条上的问题收回"
-# 2026-10-17 起停止按工程（AIRound）：停的是这个工程的任务，它们挂着的问题算「不要」。
+# 2026-10-17 起停止按工程（AIRound）：停的是这个工程的任务。
 STOP_BODY="$(awk '/    func stop\(\) \{/,/^    \}/' "${ROUND}")"
-grep -q 'let cancelled = AIJobs.shared.cancel(stoppingWith: projectID)' <<<"${STOP_BODY}" \
-  && grep -q 'for job in cancelled { AISession.shared.withdrawQuestions(owner: job) }' <<<"${STOP_BODY}" \
-  || fail "${ROUND}：按停止时没有取消这个工程的任务、或没有把它们等着的问题算作「不要」"
+grep -q 'AIJobs.shared.cancel(stoppingWith: projectID)' <<<"${STOP_BODY}" \
+  || fail "${ROUND}：按停止时没有取消这个工程的任务"
 
 # 6. 配旁白是同步工具，不许停下来等用户。
 for file in "${VOICEOVER}" "${VOICE}"; do

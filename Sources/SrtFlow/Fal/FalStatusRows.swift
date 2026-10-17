@@ -56,7 +56,7 @@ struct UpscaleStatusRow: View {
             FalStatusBar(icon: "exclamationmark.triangle", message: String(format: L10n("Upscale failed: %@"), message)) {
                 Button("Dismiss") { activity.remove(job) }
             }
-        case .cancelled, .declined:
+        case .cancelled:
             FalStatusBar(icon: "stop.circle", message: L10n("Upscale cancelled.")) {
                 Button("Dismiss") { activity.remove(job) }
             }

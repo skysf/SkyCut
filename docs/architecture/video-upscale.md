@@ -54,8 +54,8 @@ Topaz 的 unit 台阶（要摸准再跑 10 / 12 / 15 秒各一条）。
 | 决定 | 口径 |
 | --- | --- |
 | 同一份数 | 范围、估价、档位可不可用、默认目标 / 默认范围都从 `UpscalePanelModel` 算，和面板一个数；词认成类型在 `AIUpscaleNames`（纯值，和清单的词表对账） |
-| 花钱 | 面板起的：面板就是确认，直接记估算（`Approval.panel`）。AI 起的：`Approval.dailyLimit` → `FalJobGate.reserve`（和 `generate_media` 同一处）：额度内直接记账、超了在提示条上问（任务 `waiting` 给 AI 转述）、用户不要就 `State.declined`（没花钱、不跑） |
-| 做完 | **AI 起的直接换源**（用户 2026-10-02 定：不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里 `applyUpscale` 包一层 `AIUndoGrouping.step`、选中换了的段、没存过的工程存一下、结局记给 AI 的任务（`onEnded` 记失败 / 取消 / 没点头），这一行从状态行上拿掉。面板起的照旧先弹对比窗口 |
+| 花钱 | 面板起的：面板就是确认，直接记估算（`Approval.panel`）。AI 起的：`upscale_clip` 在建任务之前过 `FalJobGate.decide`（和 `generate_media` 同一处）：额度内直接记账、超了当场回确认码（AI 在聊天里问用户、带码再调才记账；2026-10-17 起，以前在提示条上问），任务拿到记好的那一笔（`Approval.ai`） |
+| 做完 | **AI 起的直接换源**（用户 2026-10-02 定：不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里 `applyUpscale` 包一层 `AIUndoGrouping.step`、选中换了的段、没存过的工程存一下、结局记给 AI 的任务（`onEnded` 记失败 / 取消），这一行从状态行上拿掉。面板起的照旧先弹对比窗口 |
 | 钥匙串授权框 | AI 起的：`waiting` 写明在等用户点「始终允许」、提示条上说一句、把 SrtFlow 摆到前面（`FalJobGate`）；面板起的只有检查器里那一句（用户就在电脑前） |
 | 看得见 | 状态行和检查器那一节对 AI 起的任务一视同仁（阶段、估价、Stop）；Stop = 取消 = AI 的任务 cancelled |
 | 工程换了 | `projectGeneration` 和做完时的 `documentGeneration` 不一样就不换源，结果里说明；切工程本来就 `cancelAll` |
@@ -87,5 +87,5 @@ Topaz 的 unit 台阶（要摸准再跑 10 / 12 / 15 秒各一条）。
   6b. 把窗口缩到最小宽度再起一个 upscale：状态行上的小标（Preparing / Uploading / In queue / Processing / Downloading）都在一行上、不折行，左边那句话截掉中间。
   7. 切工程：做到一半的任务取消，不弹对比窗口。
   8. AI：让 Claude Code 对一段 720p 的画面段调 `upscale_clip`（额度内）：立刻回任务号、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
-     做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert；把每日上限调到比估价小再调一次：提示条上问、`get_job` 带
-     `waiting_for_user`，点「先不要」任务 cancelled、没扣钱。
+     做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert；把每日上限调到比估价小再调一次：AI 在聊天里问你（回的是确认码，
+     没起任务）；说不要就什么都没发生、没扣钱，说可以它带码再调才做。

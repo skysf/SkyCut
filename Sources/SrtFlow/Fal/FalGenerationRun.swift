@@ -2,11 +2,11 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// MARK: - 一次生成怎么跑：把关花钱 → 取 Key → 提交、等、下载 → 结局
+// MARK: - 一次生成怎么跑：（已记账）→ 取 Key → 提交、等、下载 → 结局
 //
 // 管什么：`generate_media` 起的那个任务从头到尾的过程（`AIJobs` 里的一条，`get_job` 看得到）。
-// 1. **花钱的把关**（方案第 18 条，`FalJobGate.reserve`，和 upscale_clip 同一处）：额度内直接做；这一次会让今天超过每日上限、或者模型
-//    没登记单价，先在**顶上的提示条**上问用户，问的时候任务是 running、带 `waiting_for_user`（AI 去转述）；用户按了「不要」或停止就结束，没花钱。
+// 1. **花钱的把关在起任务之前**（方案第 18 条、AI 多开方案板 9：`FalJobGate.decide`，和 upscale_clip 同一处）：额度内直接记账；超了或者
+//    模型没登记单价，工具当场回 needs_confirmation + 确认码，用户在聊天里点头、AI 带码再调才走到这里。任务拿到的是已经记上的那一笔。
 // 2. 取 Key（钥匙串；ad-hoc 签名每出新版本第一次读会弹 macOS 的授权框：先在条上说一句这是什么，`FalJobGate.showKeyPromptHint`）。
 // 3. 提交 → 轮询 → 取结果 → 下载到 `SrtFlow/生成`（FalClient）；停止 / cancel_job 时替 fal 也取消。阶段（排队带位置、处理、下载带
 //    字节比例）记在 `progress` 里：编辑器顶上的状态行订阅它，`get_job` 跑着时并进 phase / queue_position / transfer_percent 那几个字段。
@@ -24,13 +24,13 @@ final class FalGenerationRun: ObservableObject, Identifiable {
     private let usage: FalUsage
     private let folder: URL
     private let stem: String
-    /// 起它的时候这个会话在剪的工程（问花钱时把它的剪辑页摆出来、读文件的规矩看它）。**弱引用**：几个工程同时开着时，
+    /// 起它的时候这个会话在剪的工程（做出来的文件能不能不问就读，看它的家）。**弱引用**：几个工程同时开着时，
     /// 工程可能先关、任务后回来（以前是 `unowned`，那样就崩了；docs/plans/2026-10-17-multi-project-ai-editing.md 事实第 12 条）。
     /// 不在了就用主窗口那个（永远在）。
     private weak var project: VideoEditProject?
     private var anyProject: VideoEditProject { project ?? OpenProjects.shared.primary }
 
-    /// 在等用户点头时的那句话（给 AI 看，任务的 `waiting_for_user`）；没在等就是 nil。
+    /// 在等用户动手时的那句话（macOS 的钥匙串授权框；给 AI 看，任务的 `waiting_for_user`）；没在等就是 nil。
     private(set) var waiting: String?
     /// 跑到哪一步了：状态行（GenerationStatusRow）订阅它，`get_job` 从 `liveDetail` 读同一份；还没开始跑是 nil。
     @Published private(set) var progress: FalJobProgress?
@@ -45,7 +45,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
 
     init(
         request: FalRequest, model: FalModel, body: JSONValue, estimate: Double?, usage: FalUsage,
-        folder: URL, stem: String, project: VideoEditProject
+        folder: URL, stem: String, project: VideoEditProject, reservation: FalJobGate.Reservation
     ) {
         self.request = request
         self.model = model
@@ -55,6 +55,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
         self.folder = folder
         self.stem = stem
         self.project = project
+        reserved = (reservation.amount, reservation.day)
     }
 
     func start() -> AIJobs.Job {
@@ -69,10 +70,9 @@ final class FalGenerationRun: ObservableObject, Identifiable {
         return job
     }
 
-    /// 停止 / cancel_job：任务取消（在飞的请求会替 fal 也取消），挂在条上的问题收回。
+    /// 停止 / cancel_job：任务取消（在飞的请求会替 fal 也取消）。
     func cancel() {
         task?.cancel()
-        if let job { AISession.shared.withdrawQuestions(owner: job.id) }
     }
 
     // MARK: 过程
@@ -84,16 +84,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
         advance(to: .preparing)
         let store = FalSettingsStore.shared
 
-        // 1. 花钱的把关（FalJobGate：额度内直接记账；超了 / 价格不明先在提示条上问，问的时候 waiting_for_user 说明在等什么）。
-        switch await FalJobGate.reserve(
-            estimate: estimate, summary: summaryText(), owner: job.id, project: anyProject, waiting: { [weak self] in self?.waiting = $0 }
-        ) {
-        case .reserved(let reservation):
-            reserved = (reservation.amount, reservation.day)
-        case .declined:
-            finish(.cancelled, "The user did not approve the cost, so nothing was made and nothing was charged.")
-            return
-        }
+        // 1. 账已经在起任务之前记上了（FalJobGate.decide）；起来之前就被停了的退回。
         guard !Task.isCancelled else {
             refund(store)
             finish(.cancelled, "The generation was stopped before it started; nothing was charged.")
@@ -231,7 +222,8 @@ final class FalGenerationRun: ObservableObject, Identifiable {
     }
 
     /// 「MiniMax H3 Max · 5 s · 768P」：不带语言的几个记号，塞进哪种语言的句子里都行。
-    private func summaryText() -> String {
+    /// 「MiniMax H3 Max · 5 s · 768P」：确认码绑着它（FalJobGate），状态行上也写它。
+    static func summary(model: FalModel, request: FalRequest, usage: FalUsage) -> String {
         var parts = [model.title]
         switch request.kind {
         case .imageToVideo, .textToVideo: parts += ["\(Int(usage.seconds)) s", usage.tier ?? FalInputs.defaultResolution]

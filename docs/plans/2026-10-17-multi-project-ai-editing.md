@@ -213,6 +213,9 @@
 - ③a 后半：主窗口侧边栏「AI 在剪的工程」（I：停止 / 打开窗口 / 关掉，侧边栏只剩图标时每个工程一个图标 + 右键菜单）；**A.5 换了做法**：不把 AI 的工程
   挪出主窗口，而是用户在 AI 正剪着的工程上新建 / 打开时开到新的工程窗口里（`OpenProjects.userNew` / `userOpen`）—— AI 的短 id、撤销历史都不动，
   主窗口的撤销管理器本来就带不走（G）；Mac 上一个文档一个窗口也是常态。
+- ③b：fal 超额度 / 价格不明改成确认码（J）。`FalJobGate.decide` 在 `generate_media` / `upscale_clip` 建任务之前判断、发码、收码、记账，任务只拿记好的那一笔；
+  `AISession` 的 ask / question、横幅上的问题条、`withdrawQuestions`、`UpscaleJob.State.declined` 都撤了；提示条只剩 macOS 系统框的那一句（`hint`）。
+  `scripts/gui-smoke/fal/approval.py` 改成确认码的场景。
 - ④a：导出、转写 / 生成字幕、翻译 AI 起的排队（`AIWorkQueue`），`get_job` 报 `queued` / `queue_position`。**和 K 不一样的地方**：面板上手动的导出
   不进队（导出面板的进度、成品、报错都绑着那一个导出器，要排就得给面板做一套排队的界面）：照旧在导出器空着时直接开始、占着时按钮是灰的；
   AI 排着的等它做完再接着。分镜不另记位置（`MediaReadQueue.shots` 本来就排着）。顺带：生成字幕算一行放多少字改用合成算出来的画布
