@@ -3,14 +3,14 @@ import SwiftUI
 
 // MARK: - 「看得见」：AI 改到哪，界面就跟到哪
 //
-// 管什么：一轮开始时把剪辑页摆出来（切到剪辑页、窗口放到最前面但**不抢键盘** —— 用户可能正在
+// 管什么：AI 开始剪主窗口里那个工程时把剪辑页摆出来（切到剪辑页、窗口放到最前面但**不抢键盘** —— 用户可能正在
 // 对话框里打字）；每一步之后选中改到的东西、播放头跳过去、时间线滚过去。
-// 产品口径见 docs/plans/2026-09-27-mcp.md 第 7、8、32 条。
-// 不管什么：改什么（AI*Tools）、这一轮的状态（AISession）。
+// 产品口径见 docs/plans/2026-09-27-mcp.md 第 7、8 条和 docs/plans/2026-10-17-multi-project-ai-editing.md 板 3。
+// 不管什么：改什么（AI*Tools）、这一轮的状态（AIRound）、工程窗口怎么摆（OpenProjects）。
 //
-// **只在一轮开始时摆一次**（第 32 条，2026-09-27 用户确认）：每一步都 `orderFrontRegardless` 的话，
-// 用户在别的 App 里干活时 SrtFlow 一步一跳、盖住他正在看的窗口，点到它盖住的地方就点进了 SrtFlow。
-// 这一轮中途用户把别的窗口挪上来、最小化它、切去别的栏目，都照他的来。例外只有两种：窗口被关了
+// **只在开工程时摆一次**（板 3，2026-10-17 用户定，取代 2026-09-27 第 32 条「每一轮开始摆一次」）：几个工程各自一轮一轮地往前跳
+// 会乱成一团，用户自己用鼠标挑窗口。开 / 建进主窗口、会话第一次在主窗口那个（这一次打开）上做要摆剪辑页的事、`set_view visible` 各摆一次；
+// 之后用户把别的窗口挪上来、最小化它、切去别的栏目，都照他的来。例外只有两种：窗口被关了
 // （不开回来 AI 的改动看不见、也进不了 ⌘Z），剪辑页从没出现过（撤销管理器是它交给工程的）。
 
 @MainActor
@@ -27,7 +27,7 @@ enum AIEditorPresenter {
     /// 刚启动时窗口还没建好，最多等这么久（2026-10-06 盲测：内存吃紧的机器上小程序拉起 App 8 秒后还没有主窗口）。
     static let launchWindowWait: TimeInterval = 10
 
-    /// 改工程之前调一次。`bringForward`：这是一轮的第一步（路由按 `AISession` 判断）。
+    /// 改主窗口里的工程之前调。`bringForward`：这是开工程的那一下（开 / 建进主窗口、会话第一次在它上面摆剪辑页、set_view visible）。
     static func prepareEditor(project: VideoEditProject, bringForward: Bool) async throws {
         let windowState = MainWindowState.shared
         // 小程序刚把 App 拉起来：主窗口、「打开主窗口」的动作可能都还没有，等一会儿再说「关着」。
@@ -46,7 +46,7 @@ enum AIEditorPresenter {
         } else if let open = openMainWindow {
             if windowState.section != .videoEdit { windowState.section = .videoEdit }
             open(id: WindowID.main)
-            await placeReopenedWindow()
+            await placeReopenedWindow(project)
             reopened = true
         } else {
             throw AIToolError(
@@ -68,12 +68,12 @@ enum AIEditorPresenter {
 
     /// 开回来的窗口放哪：从不激活 App（键盘留在用户那边）。看得见时摆到最前面；后台模式、正在录屏时放到所有窗口后面 ——
     /// 开回来只是为了让改动进得了 ⌘Z，不该盖住用户在看的窗口、也不该被录进去。
-    private static func placeReopenedWindow() async {
+    private static func placeReopenedWindow(_ project: VideoEditProject) async {
         for _ in 0..<20 where mainWindow() == nil {
             try? await Task.sleep(nanoseconds: 50_000_000)
         }
         guard let window = mainWindow() else { return }
-        if AISession.shared.viewMode == .background || ScreenRecordingCoordinator.shared.isBusy {
+        if AISession.shared.viewMode(for: project) == .background || ScreenRecordingCoordinator.shared.isBusy {
             window.orderBack(nil)
         } else {
             window.orderFrontRegardless()
@@ -103,9 +103,9 @@ enum AIEditorPresenter {
         var time: Double?
     }
 
-    /// 后台模式（`AISession.viewMode`）下不选中、不挪播放头、不滚时间线 —— 除非 `always`（seek：AI 就是要给用户看这一刻）。
+    /// 这个工程是后台（`AISession.viewMode(for:)`）时不选中、不挪播放头、不滚时间线 —— 除非 `always`（seek：AI 就是要给用户看这一刻）。
     static func reveal(_ reveal: Reveal, project: VideoEditProject, always: Bool = false) {
-        guard always || AISession.shared.viewMode == .visible else { return }
+        guard always || AISession.shared.viewMode(for: project) == .visible else { return }
         let selectsSomething = !reveal.clips.isEmpty || !reveal.shapes.isEmpty || !reveal.texts.isEmpty
             || !reveal.filters.isEmpty || !reveal.cues.isEmpty
         if selectsSomething {

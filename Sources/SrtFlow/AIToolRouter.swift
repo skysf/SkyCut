@@ -135,14 +135,16 @@ final class AIToolRouter {
 
     private func run(_ call: Call, _ project: VideoEditProject, onProject: Bool) async -> Outcome {
         do {
-            // 主窗口里的工程：窗口只在一轮开始时摆到前面（docs/plans/2026-09-27-mcp.md 第 32 条），后台模式（第 7 条）一次都不摆。
-            // 工程窗口里的：开的时候摆过一次（OpenProjects），之后不再摆（方案板 3）。
+            // 窗口只在开工程时摆一次（方案板 3，取代 docs/plans/2026-09-27-mcp.md 第 32 条「每一轮开始摆一次」）：工程窗口开的时候
+            // 摆过（OpenProjects）、开 / 建进主窗口时摆过（AIProjectOpenTools）；会话第一次在主窗口那个（这一次打开）上做要摆剪辑页的事
+            // 算它的「开」。后台模式（第 7 条）一次都不摆。主窗口的工程每次照样过 prepareEditor：窗口被关了要开回来、剪辑页要出现过（撤销管理器）。
             if call.policy.presentsEditor, onProject, project === OpenProjects.shared.primary {
-                let startsNewRound = AISession.shared.round(for: project).phase != .working
-                let visible = AISession.shared.viewMode == .visible
+                let visible = AISession.shared.viewMode(for: project) == .visible
                 // 正在录屏时不摆：摆到前面就盖住正在录的画面、被录进去（docs/plans/2026-10-03-screen-recording-mcp.md 第 6 条）。
                 let recordingScreen = ScreenRecordingCoordinator.shared.isBusy
-                try await AIEditorPresenter.prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)
+                // 真摆了才记下（后台、录屏中不算摆过，之后看得见了、录完了还会摆一次）。
+                let firstShow = visible && !recordingScreen && AISession.shared.claimFirstShow(of: project, session: call.session)
+                try await AIEditorPresenter.prepareEditor(project: project, bringForward: firstShow)
             }
             // 录屏只留文件（不入轨）也开一轮：横幅和停止键照旧出来（同以前）。「撤销这一轮」的快照在开 / 建工程时换成那个工程。
             if call.policy.startsRound { AISession.shared.round(for: project).beginIfNeeded(project: project) }
@@ -157,6 +159,11 @@ final class AIToolRouter {
         } catch {
             return Outcome(json: MCPBridge.textResult("SrtFlow could not do that: \(error.localizedDescription)", isError: true), failed: true)
         }
+    }
+
+    /// 新开 / 新建的工程摆不摆到前面：照这个会话的默认看法（方案 F 节）。
+    private static var opensInFront: Bool {
+        AISession.shared.defaultViewMode(session: AICallContext.current?.session ?? AIProjectSessions.anonymous) == .visible
     }
 
     /// 结果里带上这一步落在哪个工程（`project`: p2）：几个工程一起剪时 AI 一眼看得出来，子代理忘了带参数也看得出不对（方案 B.4）。
@@ -174,7 +181,7 @@ final class AIToolRouter {
         let undo = project.effectiveUndoManager
         switch tool {
         case .getStatus: return try AIProjectTools.status(args, project)
-        case .setView: return try AIProjectTools.setView(args)
+        case .setView: return try await AIProjectTools.setView(args, project)
         case .openFolder: return try await AIProjectTools.openFolder(args, project)
         case .readDocument: return try await AIFileTools.readDocument(args, project)
         case .recipes: return try AIRecipeTools.recipes(args)
@@ -183,8 +190,8 @@ final class AIToolRouter {
             AIRecipeLibrary.shared.refresh()
             return result
         case .manageFiles: return try AIFileTools.manageFiles(args, project)
-        case .openProject: return try await AIProjectOpenTools.openProject(args, inFront: AISession.shared.viewMode == .visible)
-        case .newProject: return try await AIProjectOpenTools.newProject(args, inFront: AISession.shared.viewMode == .visible)
+        case .openProject: return try await AIProjectOpenTools.openProject(args, inFront: Self.opensInFront)
+        case .newProject: return try await AIProjectOpenTools.newProject(args, inFront: Self.opensInFront)
         case .closeProject: return try AIProjectOpenTools.closeProject(args)
         case .saveProject: return try AIProjectTools.saveProject(args, project)
         case .undo: return try AIProjectTools.undo(args, project)

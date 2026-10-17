@@ -38,7 +38,7 @@ enum AIProjectTools {
             "output_folder": .string(workspace.outputFolder(.exports, project: project).path),
             "jobs": .array(AIJobs.shared.running.map { AIJobs.shared.json($0) }),
             "stopped_by_user": .bool(session.round(for: project).phase == .stopped),
-            "view": .string(session.viewMode.rawValue)
+            "view": .string(session.viewMode(for: project).rawValue)
         ]
         // SrtFlow 自己的声音（本机的 Kokoro）下没下（方案第 50 条：让 AI 知道有这回事）。
         switch KokoroVoicePack.shared.state {
@@ -237,15 +237,29 @@ enum AIProjectTools {
         return .ok(["undone_steps": .number(Double(undone))], changed: true)
     }
 
-    /// 看得见还是后台（方案第 7 条）。
-    static func setView(_ args: AIToolArguments) throws -> AIToolResult {
+    /// 看得见还是后台（方案第 7 条；2026-10-17 起按工程，docs/plans/2026-10-17-multi-project-ai-editing.md F 节）：带 project 只改那一个
+    /// （路由已经核对过是这个会话的）；不带改这个会话的默认，它开着的工程也都照它 —— 老用法是先 open_project、问过用户再 set_view，
+    /// 只管「之后新开的」的话，用户说了后台，开着的那个窗口还摆在前面。
+    static func setView(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         guard let raw = try args.choice("mode", from: ["visible", "background"]),
               let mode = AISession.ViewMode(rawValue: raw) else { throw AIToolError("mode is required: visible or background.") }
-        AISession.shared.setViewMode(mode)
+        let session = AICallContext.current?.session ?? AIProjectSessions.anonymous
+        let projects: [VideoEditProject]
+        if try args.string("project") != nil {
+            projects = [project]
+        } else {
+            AISession.shared.setDefaultViewMode(mode, session: session)
+            projects = AIProjectSessions.shared.projects(of: session)
+        }
+        for target in projects {
+            AISession.shared.setViewMode(mode, for: target)
+            try await AIViewPlacement.place(target, mode)
+        }
         return .ok([
             "view": .string(mode.rawValue),
+            "projects": .array(projects.map { .string($0.shortID) }),
             "note": .string(mode == .visible
-                ? "SrtFlow comes forward when you start a round of edits and shows each change."
+                ? "Each project's window came forward once; SrtFlow then shows each change but does not jump forward again."
                 : "SrtFlow stays where it is and does not follow your edits; they still land in the project and can be undone.")
         ])
     }

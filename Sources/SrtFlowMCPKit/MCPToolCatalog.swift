@@ -77,9 +77,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         case .getStatus, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
              .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
-        case .setView:
-            return false   // 按工程分开看法是下一刀（方案 F）；现在还是这个 App 一份
-        case .closeProject, .saveProject, .getTimeline, .look, .listen, .transcribe, .addVoiceover, .recordScreen,
+        // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
+        case .setView, .closeProject, .saveProject, .getTimeline, .look, .listen, .transcribe, .addVoiceover, .recordScreen,
              .upscaleClip, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
              .deleteItems, .duplicateItems, .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles,
              .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:

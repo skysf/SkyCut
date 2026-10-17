@@ -189,6 +189,9 @@ private func runUsesProjectChecks() {
           "a recording that only keeps the file does not")
     check(AIProjectBinding.usesProject(.recordScreen, args(["action": "resolve", "decision": "add"])), "resolve add lands on the timeline")
     check(!AIProjectBinding.usesProject(.recordScreen, args(["action": "stop"])), "stop only stops the recording")
+    check(AIProjectBinding.usesProject(.setView, args(["mode": "background", "project": "p2"])),
+          "set_view with project changes that project, so it is checked like any project call")
+    check(!AIProjectBinding.usesProject(.setView, args(["mode": "background"])), "set_view without project sets the session's default")
     // 会改东西的工具，除了只碰文件 / 设置 / 任务、开关工程的那几个，全都碰工程（新加一个改工程的工具忘了归类，这里红）。
     let fileOnly: Set<MCPToolName> = [.setView, .saveRecipe, .manageFiles, .openProject, .newProject, .closeProject, .compressVideos,
                                       .burnSubtitles, .convertSubtitles, .generateMedia, .cancelJob, .recordScreen]

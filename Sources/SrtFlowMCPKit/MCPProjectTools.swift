@@ -28,10 +28,11 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .setView, title: "View mode",
                 description: """
-                visible (the default): SrtFlow comes forward when a round of edits starts and each edit is selected and shown in \
-                the preview. background: SrtFlow stays where it is and does not follow the edits; they still go into the project \
-                and can be undone. Ask the user once per conversation which they want, unless they said. Lasts until SrtFlow \
-                quits.
+                visible (the default): a project's window comes forward once when you open it (or now), and each edit is \
+                selected and shown in its preview. background: SrtFlow stays where it is and does not follow the edits; they \
+                still go into the project and can be undone. With project, only that project; without, your open projects and \
+                the ones you open next. Ask the user once per conversation which they want, unless they said. Lasts until \
+                SrtFlow quits.
                 """,
                 input: MCPSchema.object([
                     "mode": MCPSchema.string("How the user follows your edits.", oneOf: ["visible", "background"])
