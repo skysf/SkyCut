@@ -104,9 +104,7 @@ final class AIRound: ObservableObject {
         phase = .stopped
         lastCallAt = Date()
         idleTask?.cancel()
-        let cancelled = AIJobs.shared.cancel(stoppingWith: projectID)
-        // 这几个任务还在等用户点头的问题一并算「不要」。
-        for job in cancelled { AISession.shared.withdrawQuestions(owner: job) }
+        AIJobs.shared.cancel(stoppingWith: projectID)
     }
 
     /// 把工程退回这一轮开始之前（一步，可以再 ⌘Z 回来）。**原样**换回快照：不走 `perform`，那里收尾的磁吸 / 联动会把

@@ -60,6 +60,12 @@ enum FalGenerateTool {
         }
         let usage = FalInputs.usage(for: request)
         let estimate = model.estimate(usage)
+        // 花钱的把关在起任务之前（方案第 18 条、AI 多开方案板 9）：超了 / 价格不明当场回确认码，AI 在聊天里问用户、带码再调。
+        let reservation: FalJobGate.Reservation
+        switch try FalJobGate.decide(estimate: estimate, summary: FalGenerationRun.summary(model: model, request: request, usage: usage), args: args) {
+        case .needsConfirmation(let ask): return ask
+        case .reserved(let reserved): reservation = reserved
+        }
 
         let folder = AIWorkspace.shared.outputFolder(.generated, project: project)
         let stem = ExportFileName.stem(
@@ -67,7 +73,8 @@ enum FalGenerateTool {
             droppingExtension: "", fallback: fallbackStem(kind)
         )
         let run = FalGenerationRun(
-            request: request, model: model, body: body, estimate: estimate, usage: usage, folder: folder, stem: stem, project: project
+            request: request, model: model, body: body, estimate: estimate, usage: usage, folder: folder, stem: stem, project: project,
+            reservation: reservation
         )
         let job = run.start()
         var result: [String: JSONValue] = [
@@ -142,7 +149,7 @@ enum FalGenerateTool {
         case .music: wait = "music takes about 30 seconds"
         default: wait = "a video takes 1 to 3 minutes"
         }
-        let cost = estimate.map { "It will cost about \(FalMoney.text($0)); tell the user. " } ?? "SrtFlow does not know this model's price and will ask the user first. "
+        let cost = estimate.map { "It will cost about \(FalMoney.text($0)); tell the user. " } ?? "The user approved spending on a model with no known price. "
         return cost + "Wait with get_job (\(wait)); if the job shows waiting_for_user, tell the user what it says. "
             + "When it is done, put the file on the timeline with add_clips" + (kind == .music || kind == .soundEffect ? " (track new_audio)." : ".")
     }

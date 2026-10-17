@@ -1018,12 +1018,8 @@
 "Use Burn In style" = "Use Burn In style";
 "Use the subtitle style from the Burn In Subtitles page again" = "Use the subtitle style from the Burn In Subtitles page again";
 
-// fal.ai（设置里的一节、横幅上问用户花钱、配旁白）
+// fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "Generated";
-"Allow" = "Allow";
-"Not Now" = "Not Now";
-"fal.ai · %@ — SrtFlow does not know this model's price, so it asks each time. Allow?" = "fal.ai · %@ — SrtFlow does not know this model's price, so it asks each time. Allow?";
-"fal.ai · %@ — estimated cost %@. Today's spending would reach %@, over your %@ daily limit. Allow?" = "fal.ai · %@ — estimated cost %@. Today's spending would reach %@, over your %@ daily limit. Allow?";
 "macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow." = "macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow.";
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "That is not a fal.ai endpoint id. It looks like owner/model-name.";
 "The price must be a number." = "The price must be a number.";

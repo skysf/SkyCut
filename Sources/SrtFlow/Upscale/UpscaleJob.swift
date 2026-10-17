@@ -3,7 +3,7 @@ import Foundation
 // MARK: - 用户点了「开始」之后的那个任务：记账 → 取 Key → 跑流水线 → 对账实际扣费
 //
 // 管什么：面板起的，面板上的估价已经是用户的确认（方案第 10 条：记进 fal 的账本、超限只标红不拦），不再问；AI 起的（upscale_clip）
-// 按每日上限把关、超了在提示条上问（FalJobGate，`Approval.dailyLimit`）；取 Key（钥匙串，
+// 在起任务之前按每日上限把关过了（FalJobGate.decide，超了是聊天里的确认码），任务拿到已经记上的那一笔（`Approval.ai`）；取 Key（钥匙串，
 // 新版本第一次读会弹授权框，`keyPrompt` 让界面说一句）；跑 `UpscalePipeline`，阶段（含上传 / 下载的字节比例、这一阶段过了多久）发给界面；做完几分钟内去账单明细里
 // 把实际扣费查回来（要 ADMIN 权限的 Key，查不到就只有估价）。没做出来的钱退回（照 FalGenerationRun 的规矩：拿到结果就不退）。
 // 做完**不替换**：对比窗口里用户点了 Replace 才换（方案第 15 条）。
@@ -17,15 +17,13 @@ final class UpscaleJob: ObservableObject, Identifiable {
         case done
         case failed(String)
         case cancelled
-        /// AI 起的：用户在提示条上没点头（没花钱）。
-        case declined
     }
 
-    /// 花钱怎么把关：面板上的估价就是用户的确认（方案第 10 条，直接记账）；AI 起的（upscale_clip）按每日上限 —— 额度内直接做、
-    /// 超了在提示条上问（FalJobGate，和 generate_media 同一处）。
+    /// 花钱怎么把关：面板上的估价就是用户的确认（方案第 10 条，直接记账）；AI 起的（upscale_clip）在起任务之前按每日上限把关过了
+    /// （FalJobGate.decide，和 generate_media 同一处），这里拿到的是已经记上的那一笔。
     enum Approval {
         case panel
-        case dailyLimit(project: VideoEditProject)
+        case ai(FalJobGate.Reservation)
     }
 
     let id = UUID()
@@ -44,11 +42,11 @@ final class UpscaleJob: ObservableObject, Identifiable {
     @Published private(set) var actualCost: Double?
     /// macOS 正在问要不要让 SrtFlow 用钥匙串里的 Key（界面提醒用户点「始终允许」）。
     @Published private(set) var keyPrompt = false
-    /// AI 起的任务在等用户动手（提示条上点头、钥匙串授权框）时给 AI 看的话（任务的 `waiting_for_user`）；没在等就是 nil。
+    /// AI 起的任务在等用户动手（macOS 的钥匙串授权框）时给 AI 看的话（任务的 `waiting_for_user`）；没在等就是 nil。
     @Published private(set) var waiting: String?
     /// 做完（拿到文件）时叫一声：UpscaleActivity 用它弹对比窗口，upscale_clip 用它直接换源。
     var onFinished: ((UpscaleJob) -> Void)?
-    /// 怎么结束都叫一声（done 在 onFinished 之后；failed / cancelled / declined）：upscale_clip 用它把结局记给 AI 的任务。
+    /// 怎么结束都叫一声（done 在 onFinished 之后；failed / cancelled）：upscale_clip 用它把结局记给 AI 的任务。
     var onEnded: ((UpscaleJob) -> Void)?
     /// 账单查到实际扣费时叫一声（做完几分钟后；要 ADMIN 权限的 Key）：换过源的那一边把钱补进工程里的记录。
     var onCostResolved: ((UpscaleJob) -> Void)?
@@ -78,8 +76,11 @@ final class UpscaleJob: ObservableObject, Identifiable {
         //（2026-10-02 冒烟：AI 起的换源做完检查器里的扣费一直是「—」，就是查询被这一下取消了）。
         guard case .running = state else { return }
         task?.cancel()
-        // AI 起的：挂在提示条上的问题一起收回。
-        if case .dailyLimit = approval { AISession.shared.withdrawQuestions(owner: id.uuidString) }
+    }
+
+    /// 「Topaz · Precision · 12 s · 1080p」：确认码绑着它（FalJobGate）。
+    static func summary(of request: UpscaleRequest) -> String {
+        "\(request.tier.title) · \(request.tier.detail) · \(Int(request.range.duration.rounded())) s · \(request.target.label)"
     }
 
     private func execute() async {
@@ -90,19 +91,9 @@ final class UpscaleJob: ObservableObject, Identifiable {
             // 面板上已经确认过，直接记上估算。
             store.recordSpend(request.estimate)
             reserved = (request.estimate, Date())
-        case .dailyLimit(let project):
-            // AI 起的：按每日上限把关，超了在提示条上问（FalJobGate）。
-            let summary = "\(request.tier.title) · \(request.tier.detail) · \(Int(request.range.duration.rounded())) s · \(request.target.label)"
-            switch await FalJobGate.reserve(
-                estimate: request.estimate, summary: summary, owner: id.uuidString, project: project, waiting: { [weak self] in self?.waiting = $0 }
-            ) {
-            case .reserved(let reservation):
-                reserved = (reservation.amount, reservation.day)
-            case .declined:
-                state = .declined
-                onEnded?(self)
-                return
-            }
+        case .ai(let reservation):
+            // AI 起的：起任务之前已经按每日上限把关、记上了（FalJobGate.decide）；起来之前就被停了的退回。
+            reserved = (reservation.amount, reservation.day)
             guard !Task.isCancelled else {
                 refund(store)
                 state = .cancelled
@@ -113,7 +104,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
 
         // 2. Key。
         let aiDriven: Bool
-        if case .dailyLimit = approval { aiDriven = true } else { aiDriven = false }
+        if case .ai = approval { aiDriven = true } else { aiDriven = false }
         let hinted = FalPromptFlag()
         let keyResult = await FalKeyCache.shared.key(willAsk: { [weak self] in
             self?.keyPrompt = true

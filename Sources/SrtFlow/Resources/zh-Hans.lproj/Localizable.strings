@@ -1018,12 +1018,8 @@
 "Use Burn In style" = "用烧录页的样式";
 "Use the subtitle style from the Burn In Subtitles page again" = "重新用「烧录字幕」页设的字幕样式";
 
-// fal.ai（设置里的一节、横幅上问用户花钱、配旁白）
+// fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "生成";
-"Allow" = "允许";
-"Not Now" = "先不要";
-"fal.ai · %@ — SrtFlow does not know this model's price, so it asks each time. Allow?" = "fal.ai · %@ —— SrtFlow 不知道这个模型的价格，所以每次都先问。允许吗？";
-"fal.ai · %@ — estimated cost %@. Today's spending would reach %@, over your %@ daily limit. Allow?" = "fal.ai · %@ —— 预计花费 %@。今天累计将达到 %@，超过你设的每日上限 %@。允许吗？";
 "macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow." = "macOS 马上会问是否允许 SrtFlow 使用你的 fal.ai 密钥，请点「始终允许」。";
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "这不是 fal.ai 的端点号，应该长得像 owner/model-name。";
 "The price must be a number." = "价格必须是一个数字。";

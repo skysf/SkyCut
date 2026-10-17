@@ -6,7 +6,7 @@ import SrtFlowMCPKit
 // MARK: - 工具：upscale_clip（把一段的原片送 fal 放大，做完直接换源）
 //
 // 管什么：参数读成一次 upscale —— 和面板同一份数（UpscalePanelModel 算范围、估价、档位可不可用），起 `UpscaleJob`
-//（花钱按每日上限把关：额度内直接做、超了在提示条上问，FalJobGate）→ **回任务号**（一次 1–5 分钟），`get_job` 带阶段；
+//（花钱按每日上限把关，在起任务之前：额度内直接记账、超了当场回确认码，FalJobGate）→ **回任务号**（一次 1–5 分钟），`get_job` 带阶段；
 // 做完**直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口，做完就换、一步撤销；用户随时右键「Compare with Original…」/「Revert」），
 // 任务的结局带 replaced_ids / file / 尺寸 / 钱。换源是异步落账：那一下自己包一层 `AIUndoGrouping.step`（scripts/check-mcp.sh 钉着）。
 // 不管什么：裁 / 传 / 下 / 封声（UpscalePipeline）、换源的规则（VideoEditClipUpscale）、钱怎么问（FalJobGate）、说明文字（MCPGenerationTools）。
@@ -46,11 +46,17 @@ enum AIUpscaleTool {
             throw AIToolError("\(tier.title) \(tier.detail) cannot take this range: \(reason). Pick another tier or a shorter range.")
         }
         let request = model.request(choice: choice, target: target, tier: tier)
+        // 花钱的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        let reservation: FalJobGate.Reservation
+        switch try FalJobGate.decide(estimate: request.estimate, summary: UpscaleJob.summary(of: request), args: args) {
+        case .needsConfirmation(let ask): return ask
+        case .reserved(let reserved): reservation = reserved
+        }
 
         // 任务：UpscaleJob 跑，AIJobs 里登记一条给 get_job 看（阶段、在等用户、取消）。
         let job = UpscaleJob(
             request: request, clipIDs: request.range.coveredClipIDs, projectGeneration: project.documentGeneration, title: clip.name,
-            approval: .dailyLimit(project: project)
+            approval: .ai(reservation)
         )
         let aiJob = AIJobs.shared.start(
             .upscale, progress: { nil },
@@ -146,8 +152,6 @@ enum AIUpscaleTool {
             AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)")
         case .cancelled:
             AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped before it finished; fal.ai was asked to cancel it and nothing was charged.")
-        case .declined:
-            AIJobs.shared.finish(aiJob, .cancelled, message: "The user did not approve the cost, so nothing was made and nothing was charged.")
         case .running, .done:
             break
         }
