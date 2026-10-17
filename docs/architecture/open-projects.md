@@ -75,8 +75,9 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
     后台工程每次自动存盘都去踢键窗口的话，用户在别处正打的字会被打断。
 - **全 App 一份的东西**：工具栏的吸附 / 联动 / 播放跟随（一个窗口里拨了，别的开着的工程跟着拨：`OpenProjects.sync`，
   [剪辑页上记住的开关](editor-remembered-toggles.md)）；预览的「优化媒体 / 原片」（每个工程都换过去、各自重建，[优化媒体](optimized-media.md)）。
-- **还没分开的**（方案后几刀）：导出只有一个（`VideoEditExporter.shared`，B 窗口的工具栏也显示 A 的导出进度、导出按钮也灰着 —— 第 ④ 刀排队）；
-  送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。AI 那一轮的横幅第 ② 刀起每个工程一条（`AIRound`）。
+- **全 App 一个的**：导出器只有一个（`VideoEditExporter.shared`，B 窗口的工具栏也显示 A 的导出进度、导出按钮也灰着）—— AI 起的导出第 ④a 刀起排队
+  （`AIWorkQueue`，[AI 接口](ai-control-mcp.md) 第四节第 7 条），面板上的导出照旧在空着时直接开始；送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。
+  AI 那一轮的横幅第 ② 刀起每个工程一条（`AIRound`）。
 
 ## 五、关一个工程（不是换内容）
 
