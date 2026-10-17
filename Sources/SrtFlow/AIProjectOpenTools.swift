@@ -44,6 +44,7 @@ enum AIProjectOpenTools {
                 throw AIToolError(project.notice ?? "SrtFlow could not open \(url.lastPathComponent).")
             }
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
+            _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
             guard let opened = await OpenProjects.shared.openInWindow(url, inFront: inFront) else {
                 throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not open \(url.lastPathComponent).")
@@ -82,6 +83,7 @@ enum AIProjectOpenTools {
             }
             project = primary
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
+            _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
             guard let created = OpenProjects.shared.newInWindow(savingAs: url, inFront: inFront) else {
                 throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not save the new project to \(url.path).")

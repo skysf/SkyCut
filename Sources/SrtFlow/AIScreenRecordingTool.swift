@@ -34,7 +34,7 @@ enum AIScreenRecordingTool {
     static func landing(for project: VideoEditProject) -> ScreenRecordingLanding {
         ScreenRecordingLanding(
             commit: { body in AIUndoGrouping.step(project.effectiveUndoManager, body) },
-            reveals: AISession.shared.viewMode == .visible
+            reveals: AISession.shared.viewMode(for: project) == .visible
         )
     }
 

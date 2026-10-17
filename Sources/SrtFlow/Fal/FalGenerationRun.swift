@@ -24,7 +24,11 @@ final class FalGenerationRun: ObservableObject, Identifiable {
     private let usage: FalUsage
     private let folder: URL
     private let stem: String
-    private unowned let project: VideoEditProject
+    /// 起它的时候这个会话在剪的工程（问花钱时把它的剪辑页摆出来、读文件的规矩看它）。**弱引用**：几个工程同时开着时，
+    /// 工程可能先关、任务后回来（以前是 `unowned`，那样就崩了；docs/plans/2026-10-17-multi-project-ai-editing.md 事实第 12 条）。
+    /// 不在了就用主窗口那个（永远在）。
+    private weak var project: VideoEditProject?
+    private var anyProject: VideoEditProject { project ?? OpenProjects.shared.primary }
 
     /// 在等用户点头时的那句话（给 AI 看，任务的 `waiting_for_user`）；没在等就是 nil。
     private(set) var waiting: String?
@@ -82,7 +86,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
 
         // 1. 花钱的把关（FalJobGate：额度内直接记账；超了 / 价格不明先在提示条上问，问的时候 waiting_for_user 说明在等什么）。
         switch await FalJobGate.reserve(
-            estimate: estimate, summary: summaryText(), owner: job.id, project: project, waiting: { [weak self] in self?.waiting = $0 }
+            estimate: estimate, summary: summaryText(), owner: job.id, project: anyProject, waiting: { [weak self] in self?.waiting = $0 }
         ) {
         case .reserved(let reservation):
             reserved = (reservation.amount, reservation.day)
@@ -160,7 +164,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
 
     private func done(_ file: URL, _ media: FalMedia, _ store: FalSettingsStore) {
         // SrtFlow 自己做的文件：AI 接着把它放上时间线时不该再问「读点名文件夹以外的文件」。
-        if !AIWorkspace.shared.allowsReading(file, project: project) { AIReadGrants.shared.remember([file]) }
+        if !AIWorkspace.shared.allowsReading(file, project: anyProject) { AIReadGrants.shared.remember([file]) }
         var detail: [String: JSONValue] = [
             "file": .string(AIWorkspace.shared.display(file)),
             "kind": .string(request.kind.rawValue),

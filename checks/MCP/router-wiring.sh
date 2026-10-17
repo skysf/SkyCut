@@ -77,30 +77,34 @@ fi
 echo "   ✓ 10 个同步的改动工具 + edit_clip / edit_subtitles / cut_speech / cut_to_beat / add_voiceover / freeze_frame 的提交 + add_clips（连同挂字幕）都各是一步；生成字幕、翻译写回、"
 echo "     删占位块这些异步落账也各是一步；没人手动关撤销组"
 
-echo "==> 看得见：窗口只在一轮开始时摆到前面"
-# 每一步都 orderFrontRegardless 的话，用户在别的 App 里干活时 SrtFlow 一步一跳、盖住他的窗口
-#（docs/plans/2026-09-27-mcp.md 第 32 条）。
+echo "==> 看得见：窗口只在开工程时摆一次"
+# 每一步都 orderFrontRegardless 的话，用户在别的 App 里干活时 SrtFlow 一步一跳、盖住他的窗口（docs/plans/2026-09-27-mcp.md 第 32 条）；
+# 2026-10-17 起几个工程同时剪，「每一轮开始摆一次」也会乱成一团 —— 只在开工程时摆一次（方案板 3）：开 / 建进主窗口、会话第一次在主窗口
+# 那个（这一次打开）上做要摆剪辑页的事（真摆了才记）、set_view visible。路由不再看「这一轮是不是刚开始」。
 PRESENTER="Sources/SrtFlow/AIEditorPresenter.swift"
-if [ "$(grep -c 'let startsNewRound = AISession.shared.round(for: project).phase != .working' "${ROUTER}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'prepareEditor(project: project, bringForward: startsNewRound && visible && !recordingScreen)' "${ROUTER}" || true)" -ne 1 ]; then
-  echo "✗ ${ROUTER} 没按「这一轮是不是刚开始」决定要不要把窗口摆到前面" >&2
+if [ "$(grep -c 'startsNewRound' "${ROUTER}" || true)" -ne 0 ] \
+   || [ "$(grep -c 'let visible = AISession.shared.viewMode(for: project) == .visible' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'let firstShow = visible && !recordingScreen && AISession.shared.claimFirstShow(of: project, session: call.session)' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'prepareEditor(project: project, bringForward: firstShow)' "${ROUTER}" || true)" -ne 1 ]; then
+  echo "✗ ${ROUTER} 摆主窗口不是只在「这个会话第一次在它上面做要摆剪辑页的事」时（又按一轮一轮摆，或者不看这个工程的看法）" >&2
   exit 1
 fi
 RAISE_BLOCK="$(awk '/if bringForward \{/,/^            \}/' "${PRESENTER}")"
 # 第三处是「窗口被关了、开回来」那一下（placeReopenedWindow）：看得见时摆前面，后台 / 录屏时放最后面。
-REOPEN_BLOCK="$(awk '/private static func placeReopenedWindow\(\)/,/^    \}/' "${PRESENTER}")"
-if [ "$(grep -c 'orderFrontRegardless' "${PRESENTER}" || true)" -ne 3 ] \
+REOPEN_BLOCK="$(awk '/private static func placeReopenedWindow\(/,/^    \}/' "${PRESENTER}")"
+# 只数代码行（注释里提到它不算）：正好两处，if bringForward 里一处、开回来那一下一处。
+if [ "$(grep -v '^[[:space:]]*//' "${PRESENTER}" | grep -c 'orderFrontRegardless' || true)" -ne 2 ] \
    || [ "$(grep -c 'window.orderFrontRegardless()' <<<"${RAISE_BLOCK}" || true)" -ne 1 ] \
    || [ "$(grep -c 'window.orderFrontRegardless()' <<<"${REOPEN_BLOCK}" || true)" -ne 1 ]; then
   echo "✗ ${PRESENTER} 在 if bringForward 和开回来的那一下之外也把窗口摆到前面（一轮中途又会一步一跳）" >&2
   exit 1
 fi
 # 后台模式（方案第 7 条）：一次都不摆窗口、不跟着选中 / 挪播放头（seek 除外，它就是要给用户看那一刻）。
-if [ "$(grep -c 'guard always || AISession.shared.viewMode == .visible else { return }' "${PRESENTER}" || true)" -ne 1 ]; then
+if [ "$(grep -c 'guard always || AISession.shared.viewMode(for: project) == .visible else { return }' "${PRESENTER}" || true)" -ne 1 ]; then
   echo "✗ ${PRESENTER} 的 reveal 在后台模式下照样选中、挪播放头" >&2
   exit 1
 fi
-echo "   ✓ 路由按 AISession 判断一轮的第一步；摆窗口只在 if bringForward 和开回来的那一下里；后台模式不摆窗口、不跟着选中"
+echo "   ✓ 主窗口只在会话第一次在它上面做要摆剪辑页的事时摆；摆窗口只在 if bringForward 和开回来的那一下里；按工程的看法，后台不摆窗口、不跟着选中"
 
 echo "==> 几个 AI 会话、几个工程：改动只落在会话自己的那个工程上"
 # 2026-10-06 盲测：桌面版的会话把 App 切到了用户的工程，这边的会话接着改（docs/bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md）；

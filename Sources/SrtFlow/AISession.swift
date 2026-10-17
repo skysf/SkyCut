@@ -32,15 +32,32 @@ final class AISession: ObservableObject {
     private var pendingQuestions: [(question: Question, continuation: CheckedContinuation<Bool, Never>)] = []
 
     /// 看得见（默认）还是后台（方案第 7 条）：后台时 SrtFlow 不摆窗口、不跟着选中 / 挪播放头，改动照样进工程、照样能 ⌘Z。
-    /// 这次运行里一直有效，App 重开回到看得见。
+    /// 这次运行里一直有效，App 重开回到看得见。2026-10-17 起**按工程记**，另外每个会话有一个默认（之后开 / 建 / 收下的工程照它；
+    /// docs/plans/2026-10-17-multi-project-ai-editing.md F 节）。没人设过的（用户自己的工程）是看得见。
     enum ViewMode: String {
         case visible, background
     }
 
-    private(set) var viewMode: ViewMode = .visible
+    /// 每个会话的默认看法（会话号 → 看法）。
+    private var sessionViews: [String: ViewMode] = [:]
+    /// 每个工程的看法（短 id → 看法）。
+    private var projectViews: [String: ViewMode] = [:]
 
-    func setViewMode(_ mode: ViewMode) {
-        viewMode = mode
+    func viewMode(for project: VideoEditProject) -> ViewMode { projectViews[project.shortID] ?? .visible }
+
+    func defaultViewMode(session: String) -> ViewMode { sessionViews[session] ?? .visible }
+
+    func setViewMode(_ mode: ViewMode, for project: VideoEditProject) { projectViews[project.shortID] = mode }
+
+    func setDefaultViewMode(_ mode: ViewMode, session: String) { sessionViews[session] = mode }
+
+    /// 主窗口里那个工程：哪个会话在它的哪一次打开上已经摆过窗口了（方案板 3：开工程时摆一次 —— 开 / 建进主窗口、会话第一次在它上面做
+    /// 要摆剪辑页的事、set_view visible）。键 = 短 id + 打开的代号 + 会话号：内容换了、换了会话剪，各算一次「开」。
+    private var shown: Set<String> = []
+
+    /// 记下「这个会话在这个工程的这一次打开上摆过窗口了」；第一次回 true（该摆）。
+    func claimFirstShow(of project: VideoEditProject, session: String) -> Bool {
+        shown.insert("\(project.shortID)#\(project.documentGeneration)#\(session)").inserted
     }
 
     static let roundIdleSeconds = 30.0
@@ -59,9 +76,10 @@ final class AISession: ObservableObject {
         return round
     }
 
-    /// 工程关掉了：它那一份不再留着（短 id 不会再发给别的工程）。
+    /// 工程关掉了：它那一份「这一轮」和看法不再留着（短 id 不会再发给别的工程）。
     func forgetRound(of project: VideoEditProject) {
         rounds[project.shortID] = nil
+        projectViews[project.shortID] = nil
     }
 
     func setHint(_ text: String?) {

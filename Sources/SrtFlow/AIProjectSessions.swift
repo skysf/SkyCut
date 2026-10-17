@@ -55,9 +55,10 @@ final class AIProjectSessions {
         }
     }
 
-    /// 这个会话打开 / 新建 / 收下了它：归它，成为它最后打开的那个。
+    /// 这个会话打开 / 新建 / 收下了它：归它，成为它最后打开的那个；看得见还是后台照这个会话的默认（方案 F 节）。
     func own(_ project: VideoEditProject, session: String, client: String) {
         ownership.own(project.shortID, session: session, client: client, token: stamp(project).token)
+        AISession.shared.setViewMode(AISession.shared.defaultViewMode(session: session), for: project)
     }
 
     /// 关掉了（close_project、用户关了它的窗口）：谁都不归。
@@ -103,6 +104,7 @@ enum AIProjectStatus {
             } else {
                 item["yours"] = false
             }
+            item["view"] = .string(AISession.shared.viewMode(for: project).rawValue)
             if AISession.shared.round(for: project).phase == .stopped { item["stopped_by_user"] = true }
             let jobs = running.filter { $0.project == project.shortID }.map { JSONValue.string($0.id) }
             if !jobs.isEmpty { item["running_jobs"] = .array(jobs) }
