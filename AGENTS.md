@@ -474,6 +474,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [AI 多开第 ② 刀的冒烟（0.18.39）](docs/reports/2026-10-17-ai-project-routing-slice2-smoke.md) — 一个会话开两个工程：不带 project 的落在最后打开的、
   两个文件夹里同名的 C0001.MP4 各进各的工程、导出中关工程被拒、撤销这一轮只退一个工程；另一个会话碰不到 / 开不了 / 取消不了别人的；撞出 open_folder 报旧
   output_folder（#232 已修）；点不了横幅上的停止（自动化工具没授权），留人工回归。
+- [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程（0 个窗口）开 / 建、放素材、看、导出、挂上窗口后撤得到
+  后台时的那一步、摘回后台、关掉都对；fal 确认码用假 fal 跑（17 过 1 没验到）；锁屏时 CG 的屏幕上窗口列表不更新、别拿它判断窗口关没关；侧边栏和用户操作
+  那几样屏幕锁着没验到，留人工回归。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 

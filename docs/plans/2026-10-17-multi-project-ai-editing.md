@@ -216,6 +216,7 @@
 - ③b：fal 超额度 / 价格不明改成确认码（J）。`FalJobGate.decide` 在 `generate_media` / `upscale_clip` 建任务之前判断、发码、收码、记账，任务只拿记好的那一笔；
   `AISession` 的 ask / question、横幅上的问题条、`withdrawQuestions`、`UpscaleJob.State.declined` 都撤了；提示条只剩 macOS 系统框的那一句（`hint`）。
   `scripts/gui-smoke/fal/approval.py` 改成确认码的场景。
+- 第 ③ 刀合完出测试版 0.18.41 冒烟，见 [报告](../reports/2026-10-17-ai-headless-slice3-smoke.md)：没撞出新问题；屏幕锁着，界面那几样留人工回归。
 - **挪后的**：A.5（用户在主窗口开别的工程时，把 AI 在剪的那个挪进自己的窗口）挪到 ③a，和「关窗 = 转后台」一起做 —— ②a 里照旧拒绝、说清楚
   「用户在主窗口开了别的工程」；`set_view` 带 `project`（F）、每个工程一份「这一轮」（E）照旧在 ②b，②a 里 `set_view` 不收 `project`、
   「撤销这一轮」的快照在开 / 建工程时换成那个工程；后台模式在 ③a 之前仍开窗口（放到后面）。
