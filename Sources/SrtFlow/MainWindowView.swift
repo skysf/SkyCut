@@ -151,6 +151,8 @@ struct MainWindowView: View {
                     .tag(section)
                 }
             }
+            // AI 开在主窗口以外的工程（后台的、工程窗口里的）：停止 / 打开窗口 / 关掉（方案板 8）。没有就不出现。
+            AIProjectsSidebarSection(isCompact: isSidebarCompact).equatable()
         }
         .listStyle(.sidebar)
         .background {

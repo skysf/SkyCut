@@ -123,7 +123,7 @@ extension VideoEditProject {
         panel.directoryURL = AIWorkspace.shared.startFolder(project: self)
         panel.prompt = L10n("Open")
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await openProject(at: url) }
+        Task { await OpenProjects.shared.userOpen(url, from: self) }   // AI 正在剪这一个：开到新窗口里
     }
 
     /// 打开工程。

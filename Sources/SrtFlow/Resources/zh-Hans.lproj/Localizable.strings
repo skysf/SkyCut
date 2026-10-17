@@ -1183,3 +1183,22 @@
 
 // 录屏进 MCP（AI 录的文件放在 <起点>/SrtFlow/录屏）
 "Screen Recordings" = "录屏";
+
+// AI 在剪的工程（主窗口侧边栏，后台工程的停止 / 打开窗口 / 关掉；2026-10-17 AI 多开第 ③a 刀）
+"AI Projects" = "AI 在剪的工程";
+"Show Window" = "打开窗口";
+"Close Project" = "关掉工程";
+"Show this project's window" = "打开这个工程的窗口";
+"Close this project (it is saved first)" = "关掉这个工程（先存盘）";
+"Stopped" = "已停止";
+"Needs you" = "等你点一下";
+"Editing…" = "在剪…";
+"Idle" = "空闲";
+"Exporting" = "导出中";
+"Making subtitles" = "生成字幕中";
+"Translating" = "翻译中";
+"Upscaling" = "放大中";
+"Generating" = "生成中";
+"Transcribing" = "转写中";
+"Working" = "处理中";
+"SrtFlow keeps at most %lld projects open. Close one first." = "SrtFlow 最多同时开 %lld 个工程，请先关掉一个。";

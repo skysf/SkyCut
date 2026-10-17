@@ -143,9 +143,20 @@ if [ -z "${KEEP_AT}" ] || [ -z "${PREPARE_AT}" ] || [ "${KEEP_AT}" -gt "${PREPAR
   fail "${CONTROLLER} 关窗时没先问「AI 还在剪吗」：AI 在剪的工程会被关掉（应转到后台）"
 fi
 
+# 12. 用户新建 / 打开工程都经 userNew / userOpen：这个窗口里的工程 AI 正在剪，就开到新的工程窗口里、不换掉 AI 的工程（方案 A.5 的做法）。
+#     直接调 `.newProject()` / `.openProject(at:` 的只许是注册表、AI 的开 / 建工具、开发 / 冒烟钩子。
+DIRECT="$(code_hits '\.newProject()\|\.openProject(at:' Sources/SrtFlow \
+  | grep -v '^Sources/SrtFlow/OpenProjects.swift:\|^Sources/SrtFlow/AIProjectOpenTools.swift:\|^Sources/SrtFlow/DevHooks.swift:\|^Sources/SrtFlow/SmokeDriver.swift:' || true)"
+[ -z "${DIRECT}" ] || fail "这些地方绕过了 userNew / userOpen 直接换工程（AI 正在剪的工程会被换掉）：${DIRECT}"
+grep -q 'Task { await OpenProjects.shared.userOpen(url, from: self) }' "$DOCUMENT" \
+  || fail "${DOCUMENT} 的「打开工程…」面板没经 userOpen"
+# 13. 主窗口侧边栏有「AI 在剪的工程」（后台工程唯一的停止 / 打开窗口 / 关掉）。
+grep -q 'AIProjectsSidebarSection(isCompact: isSidebarCompact).equatable()' Sources/SrtFlow/MainWindowView.swift \
+  || fail "主窗口侧边栏没挂 AIProjectsSidebarSection：后台工程没有地方停、没有地方关"
+
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
   echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框；"
-  echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台"
+  echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台；用户新建 / 打开经 userNew / userOpen；侧边栏有 AI 在剪的工程"
 fi
 exit "${FAILED}"

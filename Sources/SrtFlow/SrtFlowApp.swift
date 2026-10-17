@@ -146,7 +146,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             $0.pathExtension.lowercased() == VideoEditProjectFile.fileExtension
         }) {
             MainWindowState.shared.section = .videoEdit
-            Task { await OpenProjects.shared.primary.openProject(at: projectFile) }
+            Task { await OpenProjects.shared.userOpen(projectFile, from: OpenProjects.shared.primary) }
             return
         }
 
@@ -270,7 +270,7 @@ private struct ProjectCommands: View {
         let _ = OpenProjects.shared.all.map(\.documentURL)
         Button("New Project") {
             showEditor()
-            project.newProject()
+            OpenProjects.shared.userNew(from: project)
         }
         .keyboardShortcut("n", modifiers: .command)
 
@@ -288,7 +288,7 @@ private struct ProjectCommands: View {
                 ForEach(recents, id: \.self) { url in
                     Button(url.deletingPathExtension().lastPathComponent) {
                         showEditor()
-                        Task { await project.openProject(at: url) }
+                        Task { await OpenProjects.shared.userOpen(url, from: project) }
                     }
                 }
             }
