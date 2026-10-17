@@ -37,8 +37,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
      用途挨着的只能是一个只读、一个会改的（`transcribe` 只读、`generate_subtitles` 改字幕轨），说明里写清彼此的区别。
    - **只读的和写文件的不放进同一个工具**：客户端按 `readOnlyHint` 分组放行（Claude 桌面版分「只读 / 写入」两类，
      Codex 的 `writes` 模式也按它判），混在一起就只能按最严的标。
-   - **说明总长度有上限**：整份工具清单（`tools/list` 的 JSON）**9 万字符以内**，约 2.5 万 token（2026-09-28 是 5.4 万；上限 2026-09-28 定 7.2 万、
-     2026-10-02 抬到 8 万（给 `upscale_clip`）、2026-10-14 抬到 9 万（审美盲测的六样功能加完只剩 26 字，用户：「增加上限」），都是用户定的）。
+   - **说明总长度有上限**：整份工具清单（`tools/list` 的 JSON）**10 万字符以内**，约 2.8 万 token（2026-09-28 是 5.4 万；上限 2026-09-28 定 7.2 万、
+     2026-10-02 抬到 8 万（给 `upscale_clip`）、2026-10-14 抬到 9 万（审美盲测的六样功能加完只剩 26 字，用户：「增加上限」）、2026-10-17 抬到
+     10 万（一个会话剪几个工程，碰工程的工具每个多一个 `project` 参数；加完配了 fal 的全清单约 91,300），都是用户定的）。
      上下文跟着说明总量走、不跟着个数走（合并工具省不了多少），用户那边还开着别的 MCP。超了先把说明写短。
      `checks/MCP/ProtocolChecks.swift` 钉着。
 6. **按客户端怎么读来写：总说明是目录**（2026-09-30 用户拍板，[案例](../bugfixes/2026-09-30-mcp-text-truncated-at-2048.md)）：
@@ -89,8 +90,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
   （不抢前台），最多等 45 秒。测试用的环境变量：`SRTFLOW_MCP_SOCKET`、`SRTFLOW_MCP_NO_LAUNCH`、`SRTFLOW_MCP_APP`。
 - **拉起来的那一次，结果最前面加一句**（`MCPBridge.relaunchNote`，2026-10-03）：之前打开的工程、文件夹都不在了，叫 AI 重新
   `open_folder` / `open_project`。不加的话它只看到「文件不存在」「没有这个 id」，要自己去猜（南极工程那一次就是这样）。
-- **每个请求带着「这个会话在剪的工程」**（`Request.project` + 会话号 `session`，2026-10-14，第四节第 46 条）：小程序一个进程一个会话，
-  它记着（`MCPSessionProject`）；App 碰了工程的回答带上此刻的工程（`Response.project`）。两个字段都是可选的，老小程序 / 老 App 照旧能通。
+- **每个请求带着「这一次要的是这个会话的哪个工程」**（`Request.project` + 会话号 `session`，2026-10-14；2026-10-17 起一个会话一组工程，第四节第 46 条）：
+  小程序一个进程一个会话，它记着这个会话的一组工程（`MCPSessionProject`）；带了 `project` 参数就带组里那个 id 的身份章，没带就带最后打开的那个。
+  App 碰了工程的回答带上这次用到的（开 / 建 / 关的回开 / 建 / 关的那个，`Response.project`，身份章里有短 id）。字段都是可选的，老小程序 / 老 App 照旧能通。
 - **App 卡住的时候**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-calls-time-out-silently-when-app-hangs.md)）：
   - 小程序**分段等**：每 15 秒没回答就另开一条连接「探一下」（`MCPBridge.probeTool`，不是 MCP 的工具）；App 在**收发线程上当场答、不经主线程**：
     主线程此刻卡了多久（`MainThreadWatchdog.unresponsiveSeconds`；看门狗关着时自己投一个空块、从第一次没落地算起）、这个调用到哪了（`AIBridgeCalls`）。
@@ -665,7 +667,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 44. **放大片段（`upscale_clip`，fal.ai，2026-10-02）**：合同全在 [视频 upscale](video-upscale.md) 第五节和 [fal.ai 生成](fal-generation.md)
     第十二 / 十三节，这里只记它怎么接进 MCP 这一层。
    - **和 `generate_media` 一样只在配了 fal 的 Key 时列出来**（`MCPToolName.provider`）；总说明的 fal 那一行带着它（Claude Code 开场只看目录）。
-     清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000，见第一节）。
+     清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000、2026-10-17 抬到 100,000，见第一节）。
    - **参数和面板同一份数**：`clip_id`，可选 `tier`（六个档位，词表 `MCPVocabulary.upscaleTiers` 和 `FalUpscaleTiers.all` 对账）、`target`（`1080p` /
      `1440p` / `2160p`，按短边叫，4K 写成 2160p）、`range`（`clip` / `longest` / `file`）；默认和面板一样（目标按画布、范围别处用得更长就 longest）；
      范围、估价、档位可不可用都由 `UpscalePanelModel` 算（`AIUpscaleNames` 认词）。源已经不比目标小就拒绝；音频 / 图片 / 定格段拒绝；
@@ -716,20 +718,45 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
    - **没授权时不列窗口**：系统那时只把 SrtFlow 自己的窗口算作能录（真机：授权前 1 个、授权后 8 个），`get_status screen=true` 的 `windows` 换成一句「授权后才列得出」。
    - 预算：加它之后全清单 79,483 / 80,000；总说明配了 fal 2,044 / 2,048（目录里加了 Record 一行，别的几行收了措辞）。往后再加东西先腾地方。
 
-46. **几个 AI 会话共用一个 SrtFlow：改动只落在会话自己的工程上**（2026-10-14，[案例](../bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md)）。
-    SrtFlow 一次只开一个工程，谁 `open_project` / `new_project` 就替所有会话换了工程（盲测时桌面版的会话把 App 切到了用户的工程，
-    Claude Code 那边接着改）。规矩：
-    ① **工程是谁**：`MCPBridge.ProjectStamp`，`token` = 这一次运行的代号（`AIProjectBinding.runID`）+ 工程代号 `documentGeneration`；
-    同一个 token 或同一个文件路径就是同一个工程（存储为、第一次自动存盘改了路径还是它；被换走又换回来的同一个文件也是它；App 重启过不是）。
-    ② **小程序记**（`MCPSessionProject`）：第一次碰工程的调用回什么记什么，之后只有 `open_project` / `new_project` 做成了才换；
-    每个请求带会话号和记着的工程。**不加工具参数**（清单的字数要省着用）。
-    ③ **App 查**：碰不碰工程按工具和参数判（`AIProjectBinding.usesProject`：读时间线也算 —— 看到别人的时间线下一步就改错；
-    `look` / `listen` / `transcribe` 给了文件、只下载声音、录屏只留文件、只碰文件 / 设置 / 任务的不算）。新加工具要在那个 switch 里归类
-    （穷举，编译器逼着），会改东西的工具除了只碰文件的几个都必须查（`ProjectBindingChecks` 钉着）。**排到这个调用之后、摆窗口和开一轮之前**查
-    （排队时前面可能正是别人的 `open_project`）；不是同一个就一样都不做，回的话里有：谁换的（别的 AI 会话和它的客户端 / 用户在界面上 /
-    App 重启过 —— 路由记下 AI 的 `open_project` / `new_project` 是哪个会话做的）、两个工程的名字和路径、「Nothing was changed」、先问用户、
-    回去和改用开着的那个各怎么调 `open_project`（开着的没存过就请用户先 ⌘S）。会话自己刚换的（并排发来的几个调用）不拒。
-    ④ 读得出工程的结果照旧带 `project`（第 41 条 ⑤），给人看；拦人的是 ③。
+46. **几个工程、几个 AI 会话：一个会话一组工程，改动只落在会话自己的工程上**（2026-10-14 起会话只改自己的工程，
+    [案例](../bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md)；2026-10-17 起一个会话能同时剪几个，
+    [方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 1、2、7 和 B–D 节；几个工程怎么同时开着见 [几个工程同时开着](open-projects.md)）。规矩：
+    ① **工程是谁**：`MCPBridge.ProjectStamp`：`token` = 这一次运行的代号（`AIProjectBinding.runID`）+ 工程代号 `documentGeneration`（全 App 不重号，
+    `DocumentGenerations`）；`id` = 短 id（p1、p2…，`OpenProjects` 发，主窗口那个永远是 p1，App 重启从 p1 重来）。同一个 token 或同一个文件路径
+    就是同一个工程（存储为、第一次自动存盘改了路径还是它；App 重启过不是）；同一个短 id 还要同一次运行（`ProjectStamp.run`）才算。
+    ② **AI 怎么指**：碰工程的工具都收可选的 `project`（`MCPToolName.takesProject`，schema 在 `definition` 里统一加，说明全清单只有一句
+    `MCPProjectTools.projectParameter`）；`open_project` / `new_project` 回 `project`（短 id）和 `shown_in`（main window / own window）；**不带 `project`
+    的落在这个会话最后打开的那个**，子代理要一直带（方案板 1）；碰工程的结果都带 `project`（路由补，`stamped`），带错了一眼看得出。
+    `get_timeline` 的工程名因此改叫 `project_name`。`get_status` 报 `id` 和 `projects`（开着的每个工程：id、名字、开在哪、有没有没存的改动、路径、
+    是不是你的 / 谁在剪、在跑的任务）。`close_project project=pN` 只关自己的：先落盘（没存过的先存进 SrtFlow/工程）、有任务在跑不关（说是哪几个，
+    叫它等或取消）、主窗口那个换成空的 Untitled、别的关窗口；结果有 `saved_to` 和 `your_open_projects`。开到 8 个（`OpenProjects.limit`）
+    `open_project` / `new_project` 就拒，列出这个会话能先关的（存过盘、没任务在跑）。
+    ③ **小程序记**（`MCPSessionProject`）：一个小程序进程一个会话（Claude Code 的子代理共用它）；记这个会话的一组工程和最后打开的那个：
+    `open_project` / `new_project` 做成了收进来、成为最后打开的；`close_project` 做成了拿掉（最后打开的被关了，退到剩下的里最近打开的）；
+    还没开过工程的会话第一次碰工程时 App 回的那个（主窗口那个）收进来；别的回答按身份章更新路径和名字，不改「最后打开的」。被拒的调用不带
+    身份章，记的不变。每个请求带会话号和这一次要的那个。
+    ④ **App 定落在哪**（`AIProjectTargeting`，纯值，自检直接测；`AIProjectSessions` 记谁在剪哪个）：碰不碰工程照旧按工具和参数判
+    （`AIProjectBinding.usesProject`：读时间线也算；`look` / `listen` / `transcribe` 给了文件、只下载声音、录屏只留文件、只碰文件 / 设置 / 任务的
+    不算；新加工具要在那个 switch 里归类，会改东西的除了只碰文件的几个都必须碰，收不收 `project` 和碰不碰对得上，`ProjectBindingChecks` 钉着）。
+    **排到这个调用之后、摆窗口和开一轮之前**定（排队时前面可能正是这个会话或别人的 `open_project` / `close_project`）。会话还没碰过工程 =
+    主窗口那个（没人剪就收下，老用法）；带了别的会话的 id 一律不做；主窗口那个被别的会话收下、那个会话 5 分钟内还在调用也不做（安静 5 分钟以上算
+    放手，可以接手 —— 会话结束时 App 不知道，昨天那个会话没关的工程不能一直锁着；`AIProjectOwnership.releaseAfter`）；App 重启过、id 关掉了 /
+    不认识、主窗口那个的内容被用户换了（代号变了）都不做。回的话都有：「Nothing was changed」、为什么、这个会话自己开着哪几个、怎么拿一个自己的
+    （`open_project` / `new_project`，带路径）。`open_project` 开一个已经开着的文件：自己的 / 没人剪的给它的 id；别的会话 5 分钟内还在剪就拒。
+    ⑤ **排队按工程**（`AIToolRouter`，方案 C 节）：碰工程的按工程排（`project:pN`），不碰工程的按会话排，开 / 建 / 关按会话另一条（关还要等那个
+    工程自己那条）；不带 `project` 的先等这个会话还没做完的开 / 建 / 关、再按那时最后打开的那个排。五个子代理剪五个工程互不等待，同一个工程上
+    仍一个接一个（「接在 V1 最后」不会乱）。
+    ⑥ **每个调用带上下文**（`AICallContext`，task-local）：哪个会话、客户端、落在哪个工程、相对路径按哪个文件夹（这个工程打开 / 新建时这个会话点名
+    的文件夹，没有就是这个会话最后点名的；`AIWorkspace.folder(project:session:)`）。`AIWorkspace.current` 从它拿 —— 几个子代理各 `open_folder`
+    一个文件夹不再串台。相对路径先按工程的文件夹找，那里没有、这个会话后来点名的文件夹里有才用后来的（`AIPathResolution`：一个 AI 建好工程后
+    再开第二个素材文件夹照旧能用；两边都有同名文件时按工程的，宁可不串到别的子代理的文件夹里）；任务（`AIJobs`）记下它归哪个工程、哪个会话（`get_job` 报 `project`），`close_project` 据此判断有没有任务在跑。
+    ⑦ **开在哪**：看得见的模式、主窗口那个是空 Untitled（没存过、没内容、没改动）且没有别的会话正在用（`AIProjectSessions.primaryIsFree`；
+    这个会话自己先读过一下的不挡）→ 装进主窗口、摆到前面一次（一个会话剪一条时
+    和以前一模一样）；否则开在自己的窗口里（`OpenProjects.openInWindow` / `newInWindow`），后台模式放到别的窗口后面。工程窗口只在开的时候摆一次
+    （方案板 3），之后的调用不摆。录屏中开 / 建 / 关都先挡（`AIScreenRecordingTool.lockMessage`；主窗口那个可能正是素材要落进去的工程）。
+    ⑧ **还没做的**（第 ②b、③ 刀）：「这一轮」/ 停止 / 撤销这一轮 / 横幅 / `set_view` 还是全 App 一份（撤销这一轮的快照在开 / 建工程时换成那个工程，
+    所以一轮里来回剪几个工程时只有最后开的那个能整轮撤销）；后台模式还是开窗口（放到后面），0 个窗口的 headless 在第 ③ 刀；用户在主窗口打开了
+    别的工程时，AI 在剪的那个会被换掉（拒绝时说清楚），挪进自己窗口在第 ③ 刀。
 47. **视频的声音单独放（J/L cut，2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）**：盲测里两条课程片
     想用一段口播的声音、画面换成别的，只能把口播放到 V2、不透明度 0 绕过去（`add_clips` 不许把视频放到音频轨上）。现在：
     ① `add_clips` 每一项的 `sound`（`ClipSoundMode`，词表 `MCPVocabulary.clipSounds`，只对有声音的视频文件）：`separate` = 画面照放，
@@ -907,9 +934,12 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 真录要真屏幕和授权，靠第八节；第一轮真机测试的记录在[真机首测](../bugfixes/2026-10-03-record-screen-first-device-test.md)。
 
 合成音效（第 43 条，`SoundEffectChecks`）：16 个预设渲得出、峰值 −1 dBFS / 响度 −9 LUFS 封顶、落点在声音里且实测峰值离它不远、末尾淡完、同参数逐采样一致、换 variation 就不同、同参数同文件名、频谱走向（whoosh 先升后降、riser / suction 升、downlifter 降）、参数范围、`sound_effect` 条目怎么读、落点怎么算开头、词表对账、总说明提到它；扫描：合成器和工具不碰 `AVAudioFile`、渲染在 `MediaReadQueue.analysis` 上。
-**几个会话共用一个 App（第 46 条）**：`scripts/check-mcp.sh` 的 `ProjectBindingChecks`（小程序那份记法；真起小程序接假 App，
-`open_project` / `new_project` 之后的调用带着对的工程、一个进程一个会话号；App 的判断各种情况各说什么；每个工具碰不碰工程的表；
-老格式照样解得开），以及扫描：路由在摆窗口、开一轮之前查，记下谁换的工程，用到的工程回给小程序，小程序带上、记下。
+**几个工程、几个会话（第 46 条）**：`scripts/check-mcp.sh` 的 `ProjectBindingChecks`（小程序记一组工程：开 / 建收进来、关拿掉、退到哪个、
+带 `project` 的带那个的身份章、App 重启过的同名 id 是另一个；真起小程序接假 App，子代理并排带不同的 `project` 各带各的、一个进程一个会话号；
+每个工具碰不碰工程的表、收不收 `project` 和碰不碰对得上；老格式照样解得开）、`ProjectTargetingChecks`（落在哪 / 归谁 / 什么时候拒、每种拒绝
+说什么、5 分钟放手、开着的文件给谁、到顶列出能关的），以及扫描（`checks/MCP/router-wiring.sh`：路由在摆窗口、开一轮之前定工程，用到的工程回给
+小程序，按工程排队、不带 `project` 的先等开 / 建 / 关，工具在 `AICallContext` 里跑；小程序带上、记下；`checks/screen-recording-ai-wiring.sh`：
+录屏中开 / 建 / 关工程先挡）。
 
 **App 卡住的时候（第三节）**：`scripts/check-mcp.sh` 的 `HangChecks`（什么时候放弃、各种情况怎么说；App 那份记录；真起小程序接卡死的假 App：
 第一次探就说清楚、让 App 放弃、下一个调用不发；接忙的假 App：说还在做、不是卡死），扫描（`checks/MCP/router-wiring.sh`，由 check-mcp.sh source 进来：
@@ -921,6 +951,11 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；
       拿同一张码再删一次：结果的 `confirm_token_refused` 说这张用过了、给了新的一张。
+- [ ] 一个会话剪几个工程（第 46 条）：`open_project` 两个工程（回 p1 在主窗口、p2 在自己的窗口；后台模式时 p2 的窗口在后面），不带 `project` 的
+      `add_clips` 落在 p2、带 `project=p1` 的落在主窗口；两个窗口各自 ⌘Z 只撤自己的；`get_status` 的 `projects` 列出两个、都是 `yours`。
+- [ ] 另开一个会话（另一个 Claude Code）带 `project=p2` 调 `get_timeline`：拒、说是另一个 AI 会话的、什么都没改；`open_project` 同一个文件也拒；
+      前一个会话停 5 分钟之后再开：接手成功。
+- [ ] `close_project` 一个正在导出的工程：拒、说出任务号；导出完再关：窗口关掉、结果有 `saved_to`，之后不带 `project` 的调用落回剩下的那个。
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
 - [ ] 装上这一版、新开一个 Claude Code 会话（`claude -p` 就行，可以 `--strict-mcp-config --mcp-config` 只挂 srtflow），看它的 MCP 日志
       `~/Library/Caches/claude-cli-nodejs/<会话所在目录，/ 换成 ->/mcp-logs-srtflow/` 里最新的 .jsonl：服务器版本是这一版、**没有**
@@ -1078,6 +1113,7 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
 - macOS 自带的默认质量声音比较机械（2026-09-28 本机中文只有默认的婷婷）；好的声音要用户自己在系统设置里下载。语速表是在 macOS 26 上量的，
   系统升级后可能要重量。
 - 几个会话共用一个 App（第 46 条）：Claude 桌面版的几个对话共用一个小程序（它只起一份 MCP 服务器），在它里面算一个会话 ——
-  协议里没有对话号可用；Claude Code、Codex 每个会话各起一个小程序，分得开。
+  协议里没有对话号可用；Claude Code、Codex 每个会话各起一个小程序，分得开。Claude Code 的子代理和主会话共用一个小程序：「最后打开的那个」
+  是它们共用的，所以子代理要一直带 `project`（总说明的 `project` 参数说明、`open_project` 的 `next_step` 都这么说）。
 - App 卡住的时候（第三节）：要卡满 30 秒才判卡死（之前的调用照常等）；卡住时已经在做的那一步可能缓过来后照做完（如实说「在做」）；
   老 App 不认「探一下」，只能等满两分钟、说不出主线程怎样。窗口晚到 8 秒那一次是内存吃紧时的竞态，空闲的机器上复现不出来。
