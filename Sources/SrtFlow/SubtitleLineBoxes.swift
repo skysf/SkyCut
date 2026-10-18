@@ -9,7 +9,7 @@ import SrtFlowCore
 // - 字体和大小：`SubtitleFontScale.runs`（每一截实际画它的字体、按 libass 的比例缩）；
 // - 折行宽度和左右位置：一行最宽到哪只问 `SubtitleLineWrap.usableWidth`（预览、烧录同一个量：没有拖框的布局时 = 画面宽 − 两边各一个
 //   marginHorizontal，有布局时 = 画面宽 − 左右边距）；没有布局时按九宫格的列对齐，有布局时居中。在哪儿折行只问 `SubtitleLineWrap`
-//   （照 libass 的 WrapStyle 0 摊匀算、中日文在字之间折，预览画的、烧录写的 `\N` 都是它算出来的那几行，2026-10-15）；一个词比可用宽度
+//   （没有中日文的段照 libass 的 WrapStyle 0 摊匀算、中日文在词和词之间折，预览画的、烧录写的 `\N` 都是它算出来的那几行，2026-10-15 / 10-18）；一个词比可用宽度
 //   还宽（超长的英文单词）时不折，这里报的框也照实比画面宽；
 // - 竖向：一行按 libass 的量度那么高（`SubtitleLineMetrics`：一行 = 字号），块的上下沿和左右边距只问 `SubtitleFrameGeometry`
 //   （拖框、就地编辑用的同一份换算，把算出来的块高喂给它）；

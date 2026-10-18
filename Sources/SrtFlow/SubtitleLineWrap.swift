@@ -10,17 +10,19 @@ import SrtFlowCore
 // （2026-10-15 真机量到：预览第一行 0.058–0.941，成片 0.184–0.815）。现在折行点只在这里算一份：预览照它画，烧录把它写成 `\N`
 // 并关掉 libass 自己的折行（WrapStyle 2，`BurnInWorkspace.prewrapped`），libass 只照着画。
 //
-// 算法照抄 libass 0.17 `ass_render.c` 的 `wrap_lines_naive` + `wrap_lines_rebalance` + `trim_whitespace`（2026-10-15 对着源码 port，
-// 用 vendor/ffmpeg 真烧一帧核过），只把「能在哪儿起新一行」放宽了一处：
-// 1. 贪心：从行首第一个字的墨迹左沿量到当前字的墨迹右沿，≥ 最大宽就在**上一个能起行的地方**断（当前字是空格不算溢出）；没有就不断、
-//    整行溢出（一个超长的英文单词）。能起行的地方：ASCII 空格之后（libass 本来只认它），以及**中日文的字之间**（两边有一边是汉字 / 假名 /
-//    全角字就行，标点避头尾：行首不许是「，。、」」这类收尾的标点和小假名、长音，行尾不许是「（「『」这类开头的标点）。韩文、拉丁字母、
-//    数字只在空格处 —— 韩文词之间本来就有空格。中日文这一条是 2026-10-15 用户定的：vendor/ffmpeg 的 libass 没编 libunibreak、只在 ASCII
-//    空格处折，没有空格的长中文句成片从来不折、整行溢出到画面两边，用户要烧录也能折
-//    （docs/bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md）。换行符是硬断（这里按自然段拆开各自折，换行不是字）。
-// 2. 摊匀：每一轮对每一对相邻的软断行，把上一行最后一个词（中文就是最后一个字）挪到下一行开头，只要两行宽度之差变小就挪；挪过就再来
-//    一轮，直到没有能挪的。上一行只剩一个词时跳过这一对（不合并）。
-// 3. 行首行尾的空格不画、不算宽（多个连着的空格也一样）；一行的宽 = 这一行每个字的步进加起来（libass 居中按它，不按墨迹）。
+// 两种段两种折法（2026-10-18 起，docs/bugfixes/2026-10-18-subtitle-wrap-splits-chinese-words.md）：
+// - **没有中日文的段**（英文、韩文……）照抄 libass 0.17 `ass_render.c` 的 `wrap_lines_naive` + `wrap_lines_rebalance` + `trim_whitespace`
+//   （2026-10-15 对着源码 port，用 vendor/ffmpeg 真烧一帧核过）：
+//   1. 贪心：从行首第一个字的墨迹左沿量到当前字的墨迹右沿，≥ 最大宽就在**上一个空格之后**断（当前字是空格不算溢出）；没有就不断、
+//      整行溢出（一个超长的英文单词）。韩文词之间本来就有空格，也只在空格处断。
+//   2. 摊匀：每一轮对每一对相邻的软断行，把上一行最后一个词挪到下一行开头，只要两行宽度之差变小就挪；挪过就再来一轮，直到没有能挪的。
+//      上一行只剩一个词时跳过这一对（不合并）。
+// - **有中日文的段**交给 `SubtitleCJKRows`：能在哪儿断、断在那儿好不好问 SrtFlowCore 的 `SubtitleRowBreaks`（中日文只在词和词之间断、
+//   句中的空格和标点后面好断、助词不起头……），最少几行能放下就几行，再挑摊匀 + 断点代价最小的那种。2026-10-15 到 10-18 之间中日文是
+//   「任意两个字之间都能断、只按宽度摊匀」，词被拆在两行（「抖 / 音」「以 / 及」「Nano / Banana」），句中的空格（去掉的逗号）反而不优先。
+// 两种都一样：行首行尾的空格不画、不算宽（多个连着的空格也一样）；一行的宽 = 这一行每个字的步进加起来（libass 居中按它，不按墨迹）；
+// 换行符是硬断（按自然段拆开各自折，换行不是字）。烧录照这里的折行点写 `\N`、关掉 libass 自己的折行（WrapStyle 2，
+// `BurnInWorkspace.prewrapped`，2026-10-15 用户定：vendor/ffmpeg 的 libass 只在 ASCII 空格处折，没有空格的长中文句以前整行溢出）。
 // 字的宽从 Core Text 来：每一截按实际画它的字体（`SubtitleFontScale.runs`，回退的也算、按 libass 的比例缩），亮着的词按倍数放大
 // （烧录的 `\fscx` / `\fscy` 也放大，折行要算上）。glyph 的墨迹左右沿用字体的 bounding box，空格当零宽（libass 里空的轮廓 bbox 是 0）。
 // 一行最宽到哪（`usableWidth`）也只在这里算一份：没有拖框的布局时 = 画面宽 − 两边各一个 marginHorizontal，有布局时 = 画面宽 − 左右边距
@@ -135,12 +137,10 @@ enum SubtitleLineWrap {
         return result
     }
 
-    /// 一个字（glyph）在一行里的账：libass 的 `GlyphInfo` 里折行要用的那几样。
-    private struct Glyph {
+    /// 一个字（glyph）在一行里的账：libass 的 `GlyphInfo` 里折行要用的那几样（中日文的段交给 `SubtitleCJKRows` 时也是这份）。
+    struct Glyph {
         /// 在这一段里的位置（UTF-16）。
         var index: Int
-        /// 这个字（一个字形对应的那一串里的第一个 Unicode 标量），判中日文和标点用。
-        var scalar: Unicode.Scalar?
         /// 是不是 ASCII 空格（libass 只把它当空白）。
         var isSpace: Bool
         /// 步进（含字距）。
@@ -173,12 +173,11 @@ enum SubtitleLineWrap {
             }
             for k in 0..<count {
                 let inside = indices[k] < string.length
-                let scalar = inside ? string.substring(with: string.rangeOfComposedCharacterSequence(at: indices[k])).unicodeScalars.first : nil
                 let isSpace = inside && string.character(at: indices[k]) == 0x20
                 let pen = Double(positions[k].x)
                 let box = isSpace || bounds[k].isNull || bounds[k].isEmpty ? CGRect(x: 0, y: 0, width: 0, height: 0) : bounds[k]
                 result.append(Glyph(
-                    index: indices[k], scalar: scalar, isSpace: isSpace, advance: Double(advances[k].width),
+                    index: indices[k], isSpace: isSpace, advance: Double(advances[k].width),
                     inkLeft: pen + Double(box.minX), inkRight: pen + Double(box.maxX)
                 ))
             }
@@ -186,51 +185,23 @@ enum SubtitleLineWrap {
         return result.sorted { $0.index < $1.index }
     }
 
-    // MARK: 能在哪儿起新一行
+    // MARK: 能在哪儿起新一行（没有中日文的段）
 
-    /// 第 `i` 个字前面能不能起新一行：空格之后可以（libass 本来的规矩）；中日文的字之间可以（两边有一边是汉字 / 假名 / 全角字），
-    /// 但避头尾 —— 行首不许是收尾的标点、小假名、长音，行尾不许是开头的标点。韩文、拉丁字母、数字只在空格处。
+    /// 第 `i` 个字前面能不能起新一行：空格之后（libass 本来的规矩）。有中日文的段不走这里（`SubtitleCJKRows`）。
     private static func startsRow(_ g: [Glyph], at i: Int) -> Bool {
-        guard i > 0, !g[i].isSpace else { return false }
-        if g[i - 1].isSpace { return true }
-        guard let before = g[i - 1].scalar, let after = g[i].scalar, isCJK(before) || isCJK(after) else { return false }
-        return !noRowStart.contains(after) && !noRowEnd.contains(before)
+        i > 0 && !g[i].isSpace && g[i - 1].isSpace
     }
-
-    /// 汉字、假名、注音、全角字和中日文标点：这些字之间可以折。韩文不在内（词之间有空格、只在空格处折）。
-    private static func isCJK(_ scalar: Unicode.Scalar) -> Bool {
-        switch scalar.value {
-        case 0x2E80...0x2FDF,    // 部首补充、康熙部首
-             0x3000...0x30FF,    // 中日文标点、平假名、片假名
-             0x3100...0x312F,    // 注音
-             0x3190...0x31FF,    // 汉文、注音扩展、笔画、片假名扩展（中间 3130–318F 的谚文兼容字母不算）
-             0x3200...0x33FF,    // 带圈的字、兼容字
-             0x3400...0x4DBF,    // 扩展 A
-             0x4E00...0x9FFF,    // 汉字
-             0xF900...0xFAFF,    // 兼容汉字
-             0xFE30...0xFE4F,    // 竖排标点
-             0xFF00...0xFFEF,    // 全角字、半角假名
-             0x1F200...0x1F2FF,  // 带圈的汉字补充
-             0x20000...0x3134F:  // 扩展 B–G
-            return true
-        default:
-            return false
-        }
-    }
-
-    /// 不许在行首的字：收尾的标点、小假名、长音（ASCII 的标点只在挨着中日文时才管得到）。
-    private static let noRowStart = Set(
-        "、。，．：；！？）］｝〕〉》」』】〙〗〟’”｠»ヽヾーァィゥェォッャュョヮヵヶぁぃぅぇぉっゃゅょゎゕゖ々〻‐゠〜～…‥,.!?:;)]}".unicodeScalars
-    )
-    /// 不许在行尾的字：开头的标点。
-    private static let noRowEnd = Set("（［｛〔〈《「『【〘〖〝‘“｟«([{".unicodeScalars)
 
     // MARK: libass 的三步
 
-    /// 一个自然段折成几行（位置相对这一段）。
+    /// 一个自然段折成几行（位置相对这一段）：有中日文的段交给 `SubtitleCJKRows`，其余照 libass。
     static func wrap(_ paragraph: NSAttributedString, maxWidth: Double) -> [Line] {
         let g = glyphs(of: paragraph)
         guard !g.isEmpty else { return [] }
+        if SubtitleRowBreaks.isCJK(paragraph.string) {
+            let soft = SubtitleCJKRows.softBreaks(g, text: paragraph.string, maxWidth: maxWidth)
+            return trimmed(g, soft: soft, length: paragraph.length)
+        }
         var soft = [Bool](repeating: false, count: g.count)   // 这个字前面断一行（软断：摊匀时可以挪）
         wrapNaive(g, maxWidth: maxWidth, soft: &soft)
         rebalance(g, soft: &soft)
@@ -269,7 +240,7 @@ enum SubtitleLineWrap {
                 s1 = s2; s2 = s3; s3 = i
                 guard let first = s1, let second = s2, soft[second] else { continue }
                 let e1Old = lastInk(from: first, before: second)
-                // 上一行最后一个词从哪儿起：往回找最后一个能起行的地方（空格之后、中日文的字之间）。
+                // 上一行最后一个词从哪儿起：往回找最后一个能起行的地方（空格之后）。
                 var w = e1Old
                 while w > first, !startsRow(g, at: w) { w -= 1 }
                 if w <= first { continue }   // 上一行只有一个词：不合并

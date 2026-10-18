@@ -256,7 +256,7 @@ enum AISubtitleTools {
             result["box_note"] = .string(
                 "box = [x, y, width, height] where the line is drawn, as fractions of the canvas from its top left, with the current "
                     + "style; lines = how many rows it wraps to (the preview and the export wrap in the same places: at spaces, and between "
-                    + "Chinese or Japanese characters). A box wider than the frame means one word is wider than the frame. "
+                    + "Chinese or Japanese words, never inside one). A box wider than the frame means one word is wider than the frame. "
                     + "Lines without a box are hidden or on a hidden track."
             )
         }
