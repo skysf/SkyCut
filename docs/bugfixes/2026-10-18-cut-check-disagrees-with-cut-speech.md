@@ -76,6 +76,9 @@
   之后 `scripts/check-guards.sh` 也跑 `scripts/check-mcp.sh --scans-only`（check-mcp 编译之前的全部扫描，几秒）：故意把 cut_speech 的判点
   改回不按片段的时间线秒问，check-guards 在这一项上红，恢复后全绿。
 
+- 真机（测试版 0.18.46，L16 测试工程，[冒烟报告](../reports/2026-10-18-ai-feedback-batch4-smoke.md)）：77.417 报 on_speech、词 available.、建议 77.75，
+  照改再查 in_pause；cut_speech 剪同一刀挪到 77.75，完整转写下两边的建议和原因文字一字不差。
+
 ## 教训 / 防回归
 
 - **检查类工具说「X 会怎么做」，就用 X 的输入、读 X 的决定**，不要另起一个近似的条件 ——「落在一个安静窗上」不等于「cut_speech 不挪」。
