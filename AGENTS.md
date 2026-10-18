@@ -828,6 +828,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   行能显示之后接着看：三个按钮和两行字挤一排，默认宽度下状态截成「Exportin…」、短 id 也看不见；还没开始的排队任务也写「Exporting」。名字独占第一行（从中间截）、
   第二行状态先拿宽度、按钮缩小；排着队的问 `AIWorkQueue` 写「排队中」。`checks/open-projects-wiring.sh` 第 15 条钉着。**窄栏里给长短不定的字整行；「有任务」不等于「在做」。**
 - [2026-10-18 listen cuts=true 说「可以不改」，cut_speech 却说同一刀切在字上](docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md) — 剪辑点检查只要切口落在任何一个安静窗上就判 quiet_spot（L16：「available.」尾音里 46 ms 的低谷），可附近够得着真停顿时 cut_speech 会挪进去；两个工具的门限、词、时间轴还各量各的（建议 77.717 对 cut_speech 的 77.75）。quiet_spot 只给 cut_speech 不挪的切口、建议就是它对齐到帧的落点；输入只从 `AISpeechHearing` 来（整个文件的电平、按整个文件量的门限、估过开口的词），判点按声音的源秒问。**检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定；守卫的期望值从意图来，别把自相矛盾的输出钉成对的。**
+- [2026-10-18 字幕自动折行把中文的词拆在两行：「快 / 手」「以 / 及」「GPT / Image」](docs/bugfixes/2026-10-18-subtitle-wrap-splits-chinese-words.md) — 10-15 让烧录也折中文时定成「任意两个字之间都能断、只按宽度摊匀」，词、名字被拆开，句中的空格（去掉的逗号）反而不优先。有中日文的段改成只在词和词之间断（`SubtitleCJKWords` 每段汉字单独交给系统分词 —— 整句一起分时中英混排会漏掉一大截；生成字幕切条同一份），断在哪好按 `SubtitleRowBreaks`（和生成字幕同一张词表），`SubtitleCJKRows` 先求最少几行再挑「摊匀 + 断点代价」最小的；没有中日文的段照旧 libass。**「能断」和「断在这儿好」是两件事；同一件事（中文在哪儿好断）别写两份；规则要在一排宽度、几种字号上拿真句子扫。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
