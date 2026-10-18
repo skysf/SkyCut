@@ -13,7 +13,7 @@ enum MCPEncodeTools {
                 .compressVideos, title: "Compress videos",
                 description: """
                 Make video files smaller, one output per file (H.264 MP4, <name>_compressed.mp4 in SrtFlow/Exports inside the \
-                opened folder, or in folder; never overwrites). Without options it uses the settings the user keeps on SrtFlow's \
+                opened folder, or in folder; never overwrites). Without options it uses the settings the user keeps on SkyCut's \
                 Compress Video page; the options below apply to this batch only. Resolution and frame rate are only ever lowered. The \
                 videos show up in that page's queue. Returns a job id: wait with get_job, whose result lists each output with \
                 its size.
@@ -34,7 +34,7 @@ enum MCPEncodeTools {
                 description: """
                 Draw a subtitle file permanently into a video, for videos not in the project (for the project's own subtitles \
                 use export_video). One output per video (<name>_sub.mp4 in SrtFlow/Exports inside the opened folder, or in \
-                folder; never overwrites). Subtitles look the way the user set up SrtFlow's Burn In Subtitles page; style and the encoding \
+                folder; never overwrites). Subtitles look the way the user set up SkyCut's Burn In Subtitles page; style and the encoding \
                 options change this batch only (highlight does not apply: subtitle files have no word times). Returns a job id: \
                 wait with get_job.
                 """,

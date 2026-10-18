@@ -40,11 +40,11 @@ enum AIFileOperations {
         _ action: Action, sources: [URL], to target: URL?, newName: String?, roots: [URL], exists: (URL) -> Bool
     ) throws -> [Step] {
         guard !roots.isEmpty else {
-            throw Refusal(message: "Open the user's folder with open_folder first; SrtFlow only organises files inside folders the user named.")
+            throw Refusal(message: "Open the user's folder with open_folder first; SkyCut only organises files inside folders the user named.")
         }
         for source in sources {
             guard isInside(source, roots: roots) else {
-                throw Refusal(message: "\(source.path) is not inside a folder the user named; SrtFlow does not touch it.")
+                throw Refusal(message: "\(source.path) is not inside a folder the user named; SkyCut does not touch it.")
             }
             guard exists(source) else { throw Refusal(message: "\(source.path) does not exist.") }
         }

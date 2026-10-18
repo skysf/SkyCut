@@ -15,7 +15,7 @@ enum MCPGenerationTools {
                 .generateMedia, title: "Generate media",
                 description: """
                 Makes a new image, video clip, music or sound effect with the user's fal.ai account (paid; listed only because \
-                the user added a fal.ai key in SrtFlow's settings). Not for subtitles (generate_subtitles), narration \
+                the user added a fal.ai key in SkyCut's settings). Not for subtitles (generate_subtitles), narration \
                 (add_voiceover), effects add_clips sound_effect can make, or footage the user already has. One result per \
                 call. It returns a job_id at once: wait with get_job (an image takes about 10 s, a sound effect 5 s, music 30 s, \
                 a video 1–3 minutes); while it runs get_job shows phase (queued, processing, downloading), queue_position, \
@@ -24,7 +24,7 @@ enum MCPGenerationTools {
                 MiniMax H3 Max, 5–15 s per clip with sound built in; resolution 480p (cheapest, for drafts), 768p (default) or \
                 1080p; text_to_video takes aspect_ratio (default: the project's canvas); image_to_video takes image (the first \
                 frame) and keeps its shape. Write prompts like a director: subject, action, camera, light, style. Music: style, \
-                mood, instruments. Sound effect: describe the sound. Cost: the user set a daily limit. Within it SrtFlow just \
+                mood, instruments. Sound effect: describe the sound. Cost: the user set a daily limit. Within it SkyCut just \
                 makes it; when a call would go over it, or the model's price is not known, it returns needs_confirmation with \
                 a confirm_token instead: ask the user and, only if they agree, call again with it. The result has \
                 estimated_cost_usd: tell the user before you make several expensive clips. model: another fal.ai endpoint id \
@@ -40,7 +40,7 @@ enum MCPGenerationTools {
                     "aspect_ratio": MCPSchema.string("Image and text_to_video (default: the canvas of the project).", oneOf: MCPVocabulary.generationAspects),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "name": MCPSchema.string("A short file name (default: made from the prompt)."),
-                    "model": MCPSchema.string("Another fal.ai endpoint id, e.g. owner/model-name. Its price is not known: SrtFlow asks the user each time."),
+                    "model": MCPSchema.string("Another fal.ai endpoint id, e.g. owner/model-name. Its price is not known: SkyCut asks the user each time."),
                     "options": MCPSchema.object([:], description: "Extra fields for the model, passed through as they are."),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["kind", "prompt"]),
@@ -62,7 +62,7 @@ enum MCPGenerationTools {
                 flux-precise (about 2 min) and flux-creative (about 3 min; adds detail), both for clips up to 20 s. target: 1080p, \
                 1440p or 2160p on the short side (default: what the canvas needs); a source already at or above it is refused. \
                 range: clip (this clip's used part plus 1 s handles each side), longest (default when another clip uses more of \
-                the same file: covers both), file (the whole file). Cost: within the user's daily limit SrtFlow just starts; when \
+                the same file: covers both), file (the whole file). Cost: within the user's daily limit SkyCut just starts; when \
                 a call would go over it, it returns needs_confirmation with a confirm_token instead: ask the user and, only if \
                 they agree, call again with it. The result's estimated_cost_usd is what the user pays (fal rates as of \
                 2026-10-02); tell the user before upscaling many clips.

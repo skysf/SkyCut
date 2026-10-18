@@ -37,7 +37,7 @@ public enum MCPCatalogSync {
 
     /// 换上新清单的那一次，工具结果里给 AI 的一句话。
     public static let refreshedNote = """
-        SrtFlow was updated after this AI session started, so the session began with an older tool list. \
+        SkyCut was updated after this AI session started, so the session began with an older tool list. \
         It has been refreshed: list the tools again if a tool or option you need seemed to be missing.
         """
 }

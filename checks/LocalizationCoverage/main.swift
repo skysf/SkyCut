@@ -47,7 +47,7 @@ private let exempt: Set<String> = [
     "|",            // 时间线刻度的分隔竖线
     "→",            // 双语字幕行里的方向箭头
     "中",            // 字体预览的示例字
-    "SrtFlow",      // App 名
+    "SkyCut",       // App 名
     // 语言选择器里各语言的名字（`AppLanguage.nativeName`）不在这里：它们经
     // `Text(verbatim:)` 画、属性名也不叫 title / displayName，扫描本来就碰不到。
 ]

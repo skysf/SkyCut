@@ -42,9 +42,9 @@ enum AIProjectTools {
         ]
         // SrtFlow 自己的声音（本机的 Kokoro）下没下（方案第 50 条：让 AI 知道有这回事）。
         switch KokoroVoicePack.shared.state {
-        case .installed: result["srtflow_voices"] = "downloaded"
-        case .downloading(let fraction): result["srtflow_voices"] = .string("downloading \(Int(fraction * 100))%")
-        case .notInstalled, .failed: result["srtflow_voices"] = .string("not downloaded (add_voiceover download_voices=true, \(AIVoiceRole.kokoroDownloadSize))")
+        case .installed: result["skycut_voices"] = "downloaded"
+        case .downloading(let fraction): result["skycut_voices"] = .string("downloading \(Int(fraction * 100))%")
+        case .notInstalled, .failed: result["skycut_voices"] = .string("not downloaded (add_voiceover download_voices=true, \(AIVoiceRole.kokoroDownloadSize))")
         }
         if #available(macOS 26.0, *) {
             result["subtitle_generation"] = .bool(SpeechTranscriptionService.isAvailable)
@@ -162,7 +162,7 @@ enum AIProjectTools {
             return url
         }
         guard requested != nil || project.isUntitled else {
-            guard project.flushAutosave() else { throw AIToolError(project.notice ?? "SrtFlow could not save the project.") }
+            guard project.flushAutosave() else { throw AIToolError(project.notice ?? "SkyCut could not save the project.") }
             return .ok(["saved": .string(project.documentURL?.path ?? "")])
         }
         var url = requested ?? AIWorkspace.shared.outputFolder(.projects, project: project)
@@ -177,7 +177,7 @@ enum AIProjectTools {
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         guard project.saveDocument(as: url) else {
-            throw AIToolError(project.notice ?? "SrtFlow could not save the project to \(url.path).")
+            throw AIToolError(project.notice ?? "SkyCut could not save the project to \(url.path).")
         }
         return .ok(["saved": .string(url.path)])
     }
@@ -191,8 +191,8 @@ enum AIProjectTools {
             payload["project_saved_to"] = .string(url.path)
         } else {
             payload["warning"] = .string(
-                "SrtFlow could not save this never-saved project: \(project.notice ?? "unknown error"). "
-                    + "Call save_project with a path the user agrees on, or the edits are lost if SrtFlow quits."
+                "SkyCut could not save this never-saved project: \(project.notice ?? "unknown error"). "
+                    + "Call save_project with a path the user agrees on, or the edits are lost if SkyCut quits."
             )
         }
         var saved = result
@@ -227,13 +227,13 @@ enum AIProjectTools {
             return .ok(["undone": "round"], changed: true)
         }
         let steps = min(max(try args.int("steps") ?? 1, 1), 50)
-        guard let manager = project.effectiveUndoManager else { throw AIToolError("SrtFlow has nothing to undo.") }
+        guard let manager = project.effectiveUndoManager else { throw AIToolError("SkyCut has nothing to undo.") }
         var undone = 0
         while undone < steps, manager.canUndo {
             manager.undo()
             undone += 1
         }
-        guard undone > 0 else { throw AIToolError("SrtFlow has nothing to undo.") }
+        guard undone > 0 else { throw AIToolError("SkyCut has nothing to undo.") }
         return .ok(["undone_steps": .number(Double(undone))], changed: true)
     }
 
@@ -259,8 +259,8 @@ enum AIProjectTools {
             "view": .string(mode.rawValue),
             "projects": .array(projects.map { .string($0.shortID) }),
             "note": .string(mode == .visible
-                ? "Each project's window came forward once; SrtFlow then shows each change but does not jump forward again."
-                : "SrtFlow stays where it is and does not follow your edits; they still land in the project and can be undone.")
+                ? "Each project's window came forward once; SkyCut then shows each change but does not jump forward again."
+                : "SkyCut stays where it is and does not follow your edits; they still land in the project and can be undone.")
         ])
     }
 

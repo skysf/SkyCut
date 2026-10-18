@@ -101,7 +101,7 @@ enum AITranscribeTool {
             "job_id": .string(job.id),
             "status": position == nil ? "running" : "queued",
             "next_step": .string(
-                (position == nil ? "Transcribing on this Mac. " : "SrtFlow is transcribing something else; this one starts after it (queue_position). ")
+                (position == nil ? "Transcribing on this Mac. " : "SkyCut is transcribing something else; this one starts after it (queue_position). ")
                     + "Call get_job with this job_id and wait_seconds 30 until the status is done, "
                     + "then call transcribe again with the same arguments to read it."
             )
@@ -161,7 +161,7 @@ enum AITranscribeTool {
         if let path = try args.string("file") {
             let url = AIWorkspace.shared.resolve(path)
             guard let media = await project.probeImports([url]).first, media.kind != .image else {
-                throw AIToolError("\(url.lastPathComponent) has no sound SrtFlow can read.")
+                throw AIToolError("\(url.lastPathComponent) has no sound SkyCut can read.")
             }
             let from = max(0, try args.double("source_in") ?? 0)
             let to = min(media.duration, try args.double("source_out") ?? media.duration)

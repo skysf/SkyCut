@@ -92,13 +92,13 @@ final class OpenProjects {
             return open
         }
         guard all.count < Self.limit else {
-            failure = "SrtFlow keeps at most \(Self.limit) projects open. Close one first."
+            failure = "SkyCut keeps at most \(Self.limit) projects open. Close one first."
             return nil
         }
         let project = VideoEditProject(shortID: shortIDs.next())
         await project.openProject(at: url)
         guard let opened = project.documentURL, ProjectFileIdentity.same(opened, url) else {
-            failure = project.notice ?? "SrtFlow could not open \(url.lastPathComponent)."
+            failure = project.notice ?? "SkyCut could not open \(url.lastPathComponent)."
             return nil
         }
         // 打开的那几秒里别处也开了它：用先开的那一份。
@@ -115,12 +115,12 @@ final class OpenProjects {
     func newProject(savingAs url: URL, placement: Placement) -> VideoEditProject? {
         failure = nil
         guard all.count < Self.limit else {
-            failure = "SrtFlow keeps at most \(Self.limit) projects open. Close one first."
+            failure = "SkyCut keeps at most \(Self.limit) projects open. Close one first."
             return nil
         }
         let project = VideoEditProject(shortID: shortIDs.next())
         guard project.saveDocument(as: url) else {
-            failure = project.notice ?? "SrtFlow could not save the new project to \(url.path)."
+            failure = project.notice ?? "SkyCut could not save the new project to \(url.path)."
             return nil
         }
         others.append(project)
@@ -190,7 +190,7 @@ final class OpenProjects {
             return
         }
         guard all.count < Self.limit else {
-            project.notice = String(format: L10n("SrtFlow keeps at most %lld projects open. Close one first."), Self.limit)
+            project.notice = String(format: L10n("SkyCut keeps at most %lld projects open. Close one first."), Self.limit)
             return
         }
         let fresh = VideoEditProject(shortID: shortIDs.next())

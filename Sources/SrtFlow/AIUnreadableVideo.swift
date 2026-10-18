@@ -40,16 +40,16 @@ enum AIUnreadableVideo {
     /// 纯值：照查到的事实说。
     static func message(name: String, facts: Facts) -> String {
         guard facts.exists else { return "\(name) is not there any more (moved or deleted?)." }
-        let fix = "compress_videos makes an H.264 copy SrtFlow can read; use that copy instead (add_clips, look)."
+        let fix = "compress_videos makes an H.264 copy SkyCut can read; use that copy instead (add_clips, look)."
         if facts.codec == "hev1" {
-            return "SrtFlow could not read pictures from \(name): it is HEVC stored as 'hev1', which macOS's video framework "
+            return "SkyCut could not read pictures from \(name): it is HEVC stored as 'hev1', which macOS's video framework "
                 + "does not open (it opens HEVC stored as 'hvc1'). " + fix
         }
         if facts.decodable == false {
-            return "SrtFlow could not read pictures from \(name): this Mac cannot decode its video"
+            return "SkyCut could not read pictures from \(name): this Mac cannot decode its video"
                 + (facts.codec.map { " ('\($0)')" } ?? "") + ". " + fix
         }
-        return "SrtFlow could not read pictures from \(name): macOS opened it but gave no picture (the file may be damaged "
+        return "SkyCut could not read pictures from \(name): macOS opened it but gave no picture (the file may be damaged "
             + "or still being written)."
     }
 

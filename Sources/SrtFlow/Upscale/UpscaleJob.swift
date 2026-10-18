@@ -118,7 +118,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         if hinted.value { FalJobGate.clearKeyPromptHint() }
         guard case .key(let key) = keyResult else {
             refund(store)
-            state = .failed(keyResult == .missing ? FalError.noKey.message : "SrtFlow could not read the fal.ai key from the macOS keychain.")
+            state = .failed(keyResult == .missing ? FalError.noKey.message : "SkyCut could not read the fal.ai key from the macOS keychain.")
             onEnded?(self)
             return
         }

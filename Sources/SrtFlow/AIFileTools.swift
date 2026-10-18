@@ -31,7 +31,7 @@ enum AIFileTools {
         } catch let unsupported as AIDocumentReader.Unsupported {
             throw AIToolError(unsupported.message)
         } catch {
-            throw AIToolError("SrtFlow could not read \(url.lastPathComponent): \(error.localizedDescription)")
+            throw AIToolError("SkyCut could not read \(url.lastPathComponent): \(error.localizedDescription)")
         }
         let piece = AIDocumentReader.excerpt(document.text, from: from, maxCharacters: limit)
         var result: [String: JSONValue] = [
@@ -47,7 +47,7 @@ enum AIFileTools {
             result["note"] = "There is more: call read_document again with from_char = next_from_char."
         }
         if document.text.isEmpty {
-            result["note"] = "No text found. A scanned PDF has pictures of text only; SrtFlow does not read those."
+            result["note"] = "No text found. A scanned PDF has pictures of text only; SkyCut does not read those."
         }
         return .ok(.object(result))
     }
@@ -64,8 +64,8 @@ enum AIFileTools {
         if redemption == .accepted { return nil }
         let names = files.map(\.lastPathComponent)
         let list = names.prefix(5).joined(separator: ", ") + (names.count > 5 ? " and \(names.count - 5) more" : "")
-        let question = describing.map { "SrtFlow will move \($0) (\(list)) to the Trash. Go ahead?" }
-            ?? "SrtFlow will move \(names.count) file(s) to the Trash: \(list). Go ahead?"
+        let question = describing.map { "SkyCut will move \($0) (\(list)) to the Trash. Go ahead?" }
+            ?? "SkyCut will move \(names.count) file(s) to the Trash: \(list). Go ahead?"
         return AIConfirmations.shared.ask(question, action: key, refused: redemption.refusal)
     }
 

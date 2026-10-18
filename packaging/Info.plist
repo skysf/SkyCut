@@ -5,17 +5,20 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>SrtFlow</string>
+	<string>SkyCut</string>
 	<key>CFBundleExecutable</key>
-	<string>SrtFlow</string>
+	<string>SkyCut</string>
+	<!-- bundle id 留着旧名（2026-10-18 改名 SkyCut 时定的）：系统的录屏、麦克风、下载文件夹授权和钥匙串里的
+	     fal Key 都按「bundle id + 签名证书」认，改了它 macOS 就当成另一个 App、授权全部重给、设置清零。
+	     docs/architecture/product-name.md。 -->
 	<key>CFBundleIdentifier</key>
 	<string>com.srtflow.SrtFlow</string>
 	<key>CFBundleIconFile</key>
-	<string>SrtFlow</string>
+	<string>SkyCut</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>SrtFlow</string>
+	<string>SkyCut</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
@@ -25,13 +28,13 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>15.0</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>SrtFlow records the display, window or region you pick into a video track. Everything stays on this Mac — nothing is uploaded.</string>
+	<string>SkyCut records the display, window or region you pick into a video track. Everything stays on this Mac — nothing is uploaded.</string>
 	<key>NSAudioCaptureUsageDescription</key>
-	<string>SrtFlow records the sound your computer is playing into the video. Everything stays on this Mac — nothing is uploaded.</string>
+	<string>SkyCut records the sound your computer is playing into the video. Everything stays on this Mac — nothing is uploaded.</string>
 	<key>NSAppleEventsUsageDescription</key>
-	<string>When you ask your AI assistant to edit the files you selected in Finder, SrtFlow asks Finder which files those are. It does not change anything in Finder.</string>
+	<string>When you ask your AI assistant to edit the files you selected in Finder, SkyCut asks Finder which files those are. It does not change anything in Finder.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>SrtFlow records your narration into a separate audio track while screen recording. This is off by default and only runs when you turn it on.</string>
+	<string>SkyCut records your narration into a separate audio track while screen recording. This is off by default and only runs when you turn it on.</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
 	<key>UTExportedTypeDeclarations</key>
@@ -49,7 +52,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.transition</string>
 			<key>UTTypeDescription</key>
-			<string>SrtFlow Transition</string>
+			<string>SkyCut Transition</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -59,7 +62,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.filter</string>
 			<key>UTTypeDescription</key>
-			<string>SrtFlow Filter</string>
+			<string>SkyCut Filter</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -69,7 +72,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.timeline-items</string>
 			<key>UTTypeDescription</key>
-			<string>SrtFlow Timeline Items</string>
+			<string>SkyCut Timeline Items</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -79,7 +82,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.audio-library-item</string>
 			<key>UTTypeDescription</key>
-			<string>SrtFlow Audio Library Item</string>
+			<string>SkyCut Audio Library Item</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.data</string>
@@ -89,7 +92,7 @@
 			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.project</string>
 			<key>UTTypeDescription</key>
-			<string>SrtFlow Video Project</string>
+			<string>SkyCut Video Project</string>
 			<key>UTTypeConformsTo</key>
 			<array>
 				<string>public.json</string>
@@ -186,7 +189,7 @@
 	<array>
 		<dict>
 			<key>CFBundleTypeName</key>
-			<string>SrtFlow Video Project</string>
+			<string>SkyCut Video Project</string>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>LSHandlerRank</key>
@@ -257,7 +260,7 @@
 			</array>
 		</dict>
 		<!-- 视频只做 Viewer / Alternate：不抢默认播放器，但支持把视频拖到 App
-		     图标上或用「打开方式」交给 SrtFlow 压缩。 -->
+		     图标上或用「打开方式」交给 SkyCut 压缩。 -->
 		<dict>
 			<key>CFBundleTypeName</key>
 			<string>Video</string>

@@ -15,9 +15,9 @@ public enum KokoroError: Error, LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .modelMissing(let detail): return "SrtFlow's voice model is incomplete: \(detail)"
-        case .unknownVoice(let name): return "There is no voice called \(name) in SrtFlow's voice model."
-        case .inference(let detail): return "SrtFlow's voice model failed: \(detail)"
+        case .modelMissing(let detail): return "SkyCut's voice model is incomplete: \(detail)"
+        case .unknownVoice(let name): return "There is no voice called \(name) in SkyCut's voice model."
+        case .inference(let detail): return "SkyCut's voice model failed: \(detail)"
         }
     }
 }

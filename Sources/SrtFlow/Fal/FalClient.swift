@@ -42,9 +42,9 @@ enum FalError: Error, Equatable {
     var message: String {
         switch self {
         case .noKey:
-            return "No fal.ai API key is set. Ask the user to add one in SrtFlow → Settings → AI."
+            return "No fal.ai API key is set. Ask the user to add one in SkyCut → Settings → AI."
         case .rejectedKey:
-            return "fal.ai rejected the API key (HTTP 401). Ask the user to check the key in SrtFlow → Settings → AI."
+            return "fal.ai rejected the API key (HTTP 401). Ask the user to check the key in SkyCut → Settings → AI."
         case .noBalance(let detail):
             return "fal.ai refused the request (HTTP 403)" + (detail.map { ": \($0)" } ?? "")
                 + ". The account may be out of credit or locked; ask the user to check their fal.ai billing."
@@ -57,7 +57,7 @@ enum FalError: Error, Equatable {
         case .failed(let detail):
             return "fal.ai could not make it: \(detail)"
         case .badAnswer(let detail):
-            return "fal.ai's answer was not what SrtFlow expected (\(detail))."
+            return "fal.ai's answer was not what SkyCut expected (\(detail))."
         case .timedOut:
             return "fal.ai did not finish in time. The request was cancelled; nothing was charged for an unfinished request."
         case .network(let detail):

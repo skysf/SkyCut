@@ -1,12 +1,14 @@
-# SrtFlow
+# SkyCut
+
+> 原名 SrtFlow，2026-10-18 改名 SkyCut。 / Formerly SrtFlow, renamed SkyCut on 2026-10-18.
 
 [中文](#中文) · [English](#english)
 
-**中文：** SrtFlow 是一款轻量、原生的 macOS 字幕与视频工具：编辑与转换
+**中文：** SkyCut 是一款轻量、原生的 macOS 字幕与视频工具：编辑与转换
 Text、SRT、WebVTT、ASS、SSA 字幕，把字幕烧进画面，以及在几乎不损失画质的
 前提下大幅压缩视频。全部在本地完成，无需云服务。
 
-**English:** SrtFlow is a lightweight, native macOS subtitle and video tool: it
+**English:** SkyCut is a lightweight, native macOS subtitle and video tool: it
 edits and converts Text, SRT, WebVTT, ASS, and SSA subtitles, burns subtitles
 into the picture, and compresses video hard without visible quality loss —
 entirely on your own Mac, with no cloud services.
@@ -64,7 +66,7 @@ entirely on your own Mac, with no cloud services.
 
 - Record an entire display, a single window, or a custom region, straight into
   the Edit Video timeline.
-- Computer audio is captured by default, including sound SrtFlow itself is
+- Computer audio is captured by default, including sound SkyCut itself is
   playing. The microphone is optional and lands on its own linked audio track,
   so you can adjust narration without touching the screen audio.
 - The recording follows the project frame rate, and captures real pixels — a
@@ -111,7 +113,7 @@ scripts/build-app.sh
 Build products are written to `dist/` and are intentionally excluded from
 version control.
 
-Official builds are signed with SrtFlow's own self-signed certificate, so the
+Official builds are signed with SkyCut's own self-signed certificate, so the
 permissions macOS grants (screen recording, microphone, the Downloads folder,
 the keychain) carry over to the next version. Without that certificate the script
 falls back to ad-hoc signing and warns: each such build looks like a different app
@@ -128,12 +130,12 @@ nothing in the error output.
 
 No Terminal needed. On the receiving Mac:
 
-1. Drag `SrtFlow.app` into `/Applications` and open it from there — not straight
+1. Drag `SkyCut.app` into `/Applications` and open it from there — not straight
    out of the disk image.
 2. Double-click it. macOS refuses; dismiss the dialog.
 3. Open **System Settings → Privacy & Security**, scroll to Security, and click
-   **Open Anyway** next to the line about SrtFlow. Confirm with password/Touch ID.
-4. Open SrtFlow again. Everything works from then on — at startup the app clears
+   **Open Anyway** next to the line about SkyCut. Confirm with password/Touch ID.
+4. Open SkyCut again. Everything works from then on — at startup the app clears
    the quarantine flag from its own bundle, which is what frees the bundled
    ffmpeg.
 
@@ -141,7 +143,7 @@ If it opens but compression still fails the instant you start it, macOS is still
 holding the helper. This clears it for good:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/SrtFlow.app
+xattr -dr com.apple.quarantine /Applications/SkyCut.app
 ```
 
 The DMG ships a bilingual `Read Me First` with the same steps, and the app shows
@@ -151,7 +153,7 @@ entirely.
 
 ### About the bundled ffmpeg
 
-Video compression and subtitle burn-in are done by ffmpeg, which SrtFlow ships
+Video compression and subtitle burn-in are done by ffmpeg, which SkyCut ships
 inside the app bundle at `Contents/Helpers/ffmpeg` and runs as a separate
 process. `scripts/vendor-ffmpeg.sh` downloads a native arm64 static build,
 verifies its SHA-256, and checks that it really has libass, libx264, and
@@ -161,19 +163,19 @@ Bundling is deliberate. A subtitle burn-in needs libass, which many ffmpeg
 builds omit; and the `ffmpeg` most commonly found in `/usr/local/bin` on Apple
 silicon is an x86_64 build running under Rosetta translation, which encodes
 roughly twice as slowly. Shipping a verified native build means the app works
-out of the box and at full speed. If no bundled copy is present, SrtFlow falls
+out of the box and at full speed. If no bundled copy is present, SkyCut falls
 back to `/opt/homebrew`, `/usr/local`, and `PATH`, and tells you when the
 ffmpeg it found is translated or lacks libass.
 
 This costs about 49 MB of app size. ffmpeg is licensed under the GPL v2 or
-later; SrtFlow itself is licensed under the AGPL v3 and invokes ffmpeg as a
+later; SkyCut itself is licensed under the AGPL v3 and invokes ffmpeg as a
 separate process rather than linking against it. See `vendor/README.md` (also
 copied into the app as `ffmpeg-LICENSE.md`) for the version, source, and licence
 details.
 
 ### Privacy
 
-SrtFlow works locally. It has no accounts, analytics, telemetry, or network
+SkyCut works locally. It has no accounts, analytics, telemetry, or network
 service. Linked video paths and recent-file preferences remain on the Mac. The
 only network access anywhere in the project is `scripts/vendor-ffmpeg.sh`
 downloading ffmpeg at build time; the app itself never goes online.
@@ -182,7 +184,7 @@ bundled binaries, and build artifacts are excluded from this repository.
 
 ## 中文
 
-SrtFlow 是一款轻量、原生的 macOS 字幕与视频工具。
+SkyCut 是一款轻量、原生的 macOS 字幕与视频工具。
 
 ### 主要功能
 
@@ -226,7 +228,7 @@ SrtFlow 是一款轻量、原生的 macOS 字幕与视频工具。
 **录屏**
 
 - 可录整块显示器、单个窗口或自定义区域，录完直接进「视频剪辑」的时间线。
-- 默认录电脑声音（包含 SrtFlow 自己正在播放的声音）。麦克风可选，录进**单独一条
+- 默认录电脑声音（包含 SkyCut 自己正在播放的声音）。麦克风可选，录进**单独一条
   关联音轨**，调旁白音量不影响画面声音。
 - 帧率跟随工程；按**真实像素**捕获 —— Retina 屏录出来是满分辨率，不是一半。
 - 浮动的停止控件不会进画面。录自定义区域时，区域之外会盖一层浅遮罩，录制全程
@@ -259,7 +261,7 @@ scripts/build-app.sh
 
 构建产物位于 `dist/`，不会提交到版本库。
 
-正式的构建用 SrtFlow 自己的自签名证书签，macOS 给过的权限（录屏、麦克风、下载文件夹、钥匙串）升级之后
+正式的构建用 SkyCut 自己的自签名证书签，macOS 给过的权限（录屏、麦克风、下载文件夹、钥匙串）升级之后
 还在。没有这把证书时脚本退回 ad-hoc 签名并提醒：这样的每个构建在 macOS 眼里都是另一个 App，这些权限要重新给
 （`docs/architecture/code-signing-and-permissions.md`）。
 
@@ -271,18 +273,18 @@ macOS 第一次打开时就会拦。这个拦截不只是弹窗那么简单：�
 
 不用碰终端。在收到文件的那台 Mac 上：
 
-1. 把 `SrtFlow.app` 拖进 `/Applications`，从那里打开 —— 别直接在磁盘映像里双击。
+1. 把 `SkyCut.app` 拖进 `/Applications`，从那里打开 —— 别直接在磁盘映像里双击。
 2. 双击它，macOS 会拒绝打开，把弹窗关掉。
 3. 打开**「系统设置 → 隐私与安全性」**，往下翻到「安全性」那一段，会看到一行
-   关于 SrtFlow 被阻止的提示，点右边的**「仍要打开」**，用密码或触控 ID 确认。
-4. 再打开一次 SrtFlow，从此就正常了 —— App 启动时会清掉自己包上的隔离标记，
+   关于 SkyCut 被阻止的提示，点右边的**「仍要打开」**，用密码或触控 ID 确认。
+4. 再打开一次 SkyCut，从此就正常了 —— App 启动时会清掉自己包上的隔离标记，
    包内的 ffmpeg 也就跟着放行了。
 
 万一打开之后一点「开始压缩」还是立刻失败，说明系统仍然扣着那个辅助程序，
 执行这一行可以彻底解决：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/SrtFlow.app
+xattr -dr com.apple.quarantine /Applications/SkyCut.app
 ```
 
 DMG 里附了一份中英文的《首次打开必读》写着同样的步骤；App 识别到这种情况时，
@@ -299,32 +301,32 @@ VideoToolbox 才接受。
 自带一份是有意的选择：烧字幕必须要有 libass，而不少 ffmpeg 构建并不包含它；
 另外 Apple 芯片上 `/usr/local/bin` 里最常见的那个 `ffmpeg` 往往是 x86_64 版，
 要走 Rosetta 转译，编码速度大约慢一倍。带一份校验过的原生构建，才能做到
-开箱即用且跑满速度。如果包内没有，SrtFlow 会依次回退到 `/opt/homebrew`、
+开箱即用且跑满速度。如果包内没有，SkyCut 会依次回退到 `/opt/homebrew`、
 `/usr/local` 和 `PATH`，并在找到的 ffmpeg 是转译版或缺 libass 时明确提示。
 
-代价是 App 体积增加约 49 MB。ffmpeg 采用 GPL v2 或更高版本授权；SrtFlow 自身
+代价是 App 体积增加约 49 MB。ffmpeg 采用 GPL v2 或更高版本授权；SkyCut 自身
 采用 AGPL v3 授权，并以独立进程调用 ffmpeg，不与其链接。版本、来源与许可详情
 见 `vendor/README.md`（同时会拷进 App 内的 `ffmpeg-LICENSE.md`）。
 
 ### 隐私
 
-SrtFlow 完全在本地运行，不包含账号、分析、遥测或网络服务。关联视频路径及
+SkyCut 完全在本地运行，不包含账号、分析、遥测或网络服务。关联视频路径及
 最近使用记录只保留在本机。唯一的网络访问是构建时 `scripts/vendor-ffmpeg.sh`
 下载 ffmpeg，App 运行期间不联网。本仓库已排除环境变量文件、凭据、签名材料、
 本地开发配置、随包二进制和构建产物。
 
 ## License
 
-Copyright (c) 2026 SrtFlow contributors.
+Copyright (c) 2026 SkyCut contributors.
 
-SrtFlow is licensed under the [GNU Affero General Public License v3.0](LICENSE)
+SkyCut is licensed under the [GNU Affero General Public License v3.0](LICENSE)
 (AGPL-3.0). You may use, modify, and redistribute it under those terms; any
 derivative work you distribute — or make available to users over a network —
 must also be released under the AGPL-3.0, with source. The bundled ffmpeg is a
 separate program under the GPL v2 or later, invoked as a subprocess; see
 [About the bundled ffmpeg](#about-the-bundled-ffmpeg).
 
-SrtFlow 以 [GNU Affero 通用公共许可证第 3 版](LICENSE)（AGPL-3.0）授权。你可以
+SkyCut 以 [GNU Affero 通用公共许可证第 3 版](LICENSE)（AGPL-3.0）授权。你可以
 使用、修改、再分发，但分发的衍生作品（含通过网络提供给用户的版本）同样要以
 AGPL-3.0 授权并提供源码。随包的 ffmpeg 是以独立进程调用的另一个程序，采用
 GPLv2+ 授权。

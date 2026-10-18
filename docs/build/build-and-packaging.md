@@ -28,13 +28,13 @@ swift run --arch arm64 SrtFlowCoreChecks      # 核心自检（184 项断言，C
 
 ## 打包流程（scripts/build-app.sh）
 
-Release 构建 → 手写 Info.plist 组装 `dist/SrtFlow.app` → 拷入 SwiftPM 资源包、
-vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `srtflow-mcp`（都在 `Contents/Helpers/`，
+Release 构建 → 手写 Info.plist 组装 `dist/SkyCut.app`（SwiftPM 的可执行产品 `SrtFlow` 拷成 `Contents/MacOS/SkyCut`，产品名与代码名见 [产品名与代码名](../architecture/product-name.md)） → 拷入 SwiftPM 资源包、
+vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Contents/Helpers/`，
 见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)）→ 生成图标 → 签名（只经 `scripts/signing/sign-app.sh`：
-**先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 srtflow-mcp 这一条；
+**先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 skycut-mcp 这一条；
 用固定的签名身份签，见下一节）→ `hdiutil` 生成 DMG。
 
-产物：`dist/SrtFlow.app`（约 52 MB）、`dist/SrtFlow-<版本>-arm64.dmg`。
+产物：`dist/SkyCut.app`（约 52 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
 
 版本号：**正式发版必须显式传** `VERSION=x.y.z ./scripts/build-app.sh`。不传时
 脚本兜底取最近的 git tag，并在 HEAD 领先该 tag 时警告「这是开发版产物」——
@@ -55,18 +55,18 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 - 没有签名身份的机器（CI、自己编着用的人）退回 ad-hoc 并打一段 ⚠️ 警告：**这样的包别拿去发版**。
 - 签名那几秒 `sign-app.sh` 会把专用钥匙串挂上钥匙串搜索列表、签完原样放回（codesign 只在列表里找身份）。
 
-## 测试版（SrtFlow Beta）
+## 测试版（SkyCut Beta）
 
-没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SrtFlow Beta.app`。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SrtFlow.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
+没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SkyCut Beta.app`。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`：bundle id 沿用旧名），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SkyCut.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
 
 ## 产物验收清单
 
-- `lipo -archs dist/SrtFlow.app/Contents/MacOS/SrtFlow` → `arm64`
-- `dist/SrtFlow.app/Contents/Helpers/srtflow-mcp` 在、能跑：往它的 stdin 喂一行 `initialize`，
-  stdout 回一行带 `"serverInfo":{"name":"srtflow"` 的 JSON
+- `lipo -archs dist/SkyCut.app/Contents/MacOS/SkyCut` → `arm64`
+- `dist/SkyCut.app/Contents/Helpers/skycut-mcp` 在、能跑：往它的 stdin 喂一行 `initialize`，
+  stdout 回一行带 `"serverInfo":{"name":"skycut"` 的 JSON
 - `strings ... | grep <新增字符串>` → 命中
 - 脚本自带 `codesign --verify --deep --strict` → "签名校验通过"
-- `codesign -d -r- dist/SrtFlow.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`，
+- `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`，
   不是 `cdhash H"…"`（是的话就是退回了 ad-hoc，别发）
 - `swift run --arch arm64 SrtFlowCoreChecks` → "All 184 checks passed."
   （断言数会随功能增长，以当次输出为准）

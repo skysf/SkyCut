@@ -58,7 +58,7 @@ struct AIVoiceChoice: Equatable {
 
     var qualityName: String {
         switch engine {
-        case .kokoro: return "SrtFlow voice"
+        case .kokoro: return "SkyCut voice"
         case .system(let voice): return voice.qualityName
         case .fal: return "fal.ai voice"
         }
@@ -99,16 +99,16 @@ struct AIVoiceChoice: Equatable {
     }
 
     /// 没下载 SrtFlow 的声音时给 AI 的那一句（第 50 条）。
-    static let kokoroHint = "SrtFlow's own voices sound much better than this Mac's voices, but they are not downloaded: "
+    static let kokoroHint = "SkyCut's own voices sound much better than this Mac's voices, but they are not downloaded: "
         + "call add_voiceover with download_voices=true to download them (about \(AIVoiceRole.kokoroDownloadSize)) and tell the user."
 
     private static func kokoroByName(_ voice: String, textLanguage: String, installed: [String]?) throws -> AIVoiceChoice {
         guard let installed else {
-            throw AIToolError("\(voice) is one of SrtFlow's own voices, which are not downloaded yet. Call add_voiceover with "
+            throw AIToolError("\(voice) is one of SkyCut's own voices, which are not downloaded yet. Call add_voiceover with "
                 + "download_voices=true first and tell the user.")
         }
         guard installed.contains(voice) else {
-            throw AIToolError("SrtFlow has no voice called \(voice). Its voices: \(installed.joined(separator: ", ")).")
+            throw AIToolError("SkyCut has no voice called \(voice). Its voices: \(installed.joined(separator: ", ")).")
         }
         // 按文字的语言读（Kokoro 能读的话）；读不了就按音色自己的语言。
         let language = AIVoiceRole.kokoroLanguages.contains(textLanguage)
@@ -121,7 +121,7 @@ struct AIVoiceChoice: Equatable {
         guard let voice = installed.filter(isUsable).first(where: {
             $0.name.lowercased() == wanted || $0.identifier.lowercased() == wanted
         }) else {
-            throw AIToolError("There is no voice called \(requested). Use a role (\(AIVoiceRole.names)), one of SrtFlow's "
+            throw AIToolError("There is no voice called \(requested). Use a role (\(AIVoiceRole.names)), one of SkyCut's "
                 + "voices (such as af_heart or zf_xiaoxiao), or the name of a voice installed on this Mac.")
         }
         return AIVoiceChoice(engine: .system(voice), note: qualityNote(voice))
@@ -200,7 +200,7 @@ struct AIVoiceChoice: Equatable {
 
     static func downloadHint(_ language: String) -> String {
         "For a better Mac voice, the user can download a Premium or Enhanced \(languageName(language)) voice in System Settings → "
-            + "Accessibility → Spoken Content → System Voice → Manage Voices; SrtFlow uses it from the next voiceover on."
+            + "Accessibility → Spoken Content → System Voice → Manage Voices; SkyCut uses it from the next voiceover on."
     }
 
     private static func languageName(_ language: String) -> String {

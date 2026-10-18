@@ -249,11 +249,11 @@ public enum MCPTimelineTools {
         ], description: "Instead of file: a sound effect made on this Mac (no download, no fal); place it with hit_at.")
         let item = MCPSchema.object([
             "file": MCPSchema.string("Path of a video, image, audio or subtitle file (absolute, or relative to the opened folder)."),
-            "library_id": MCPSchema.string("Instead of file: a music track id from find_audio (SrtFlow downloads it if needed)."),
+            "library_id": MCPSchema.string("Instead of file: a music track id from find_audio (SkyCut downloads it if needed)."),
             "sound_effect": soundEffect,
             "hit_at": MCPSchema.number(
                 "For sound_effect or a library sound effect: the timeline second its loudest moment lands on (a cut, a word " +
-                    "appearing); SrtFlow sets the start (overrides start). Default for sound_effect: the playhead.",
+                    "appearing); SkyCut sets the start (overrides start). Default for sound_effect: the playhead.",
                 minimum: 0
             ),
             "source_in": MCPSchema.number("Where to start in the file, seconds (default 0).", minimum: 0),
@@ -268,7 +268,7 @@ public enum MCPTimelineTools {
         return MCPToolDefinition(
             .addClips, title: "Add clips",
             description: """
-            Put media files, library audio (find_audio) or sound effects SrtFlow makes (sound_effect) on the timeline, in \
+            Put media files, library audio (find_audio) or sound effects SkyCut makes (sound_effect) on the timeline, in \
             the given order. Each item is a file, a library_id or a sound_effect, with the part to use \
             (source_in/source_out), the track and the start; a sound effect takes hit_at instead so its hit lands on a cut. \
             Without a start, video and images are appended after the last clip of their track (V1 by default) and audio \
@@ -300,7 +300,7 @@ public enum MCPTimelineTools {
             keep the end in place), or set speed, volume in dB, mute, hide, and audio fade in/out. A move or trim that \
             would overlap another clip on the same track fails and names that clip; ripple=true on V1 moves the later V1 \
             clips along instead. Picture (video and image clips): fit=fill fills the whole frame and cuts off what \
-            sticks out. It aims at the subject SrtFlow finds in a few frames (faces, then \
+            sticks out. It aims at the subject SkyCut finds in a few frames (faces, then \
             people, then text when there are no people, then whatever stands out; the result says what it found), at the \
             text only with focus=text (slides, screen recordings), or at \
             focus_x/focus_y; focus=center skips the search. When the subject moves, the crop follows it with a few position \
@@ -309,7 +309,7 @@ public enum MCPTimelineTools {
             looks at a few frames and cuts off letterbox / pillarbox bars. Without fit, x/y/scale place the picture \
             yourself \
             (x/y: its centre as fractions of the frame; scale 1 = the whole picture just fits). The result's picture \
-            block says whether the frame is filled. SrtFlow edits the clip, never the file. \
+            block says whether the frame is filled. SkyCut edits the clip, never the file. \
             Also: rotation, opacity, flips, entrance / exit animations, volume_curve, sound_scene, markers, keyframes; see each field.
             """,
             input: MCPSchema.object([

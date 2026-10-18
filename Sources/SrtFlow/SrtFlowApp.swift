@@ -195,7 +195,7 @@ struct SrtFlowApp: App {
         // 里面，靠左侧边栏切换。
         // 每个场景都套一层 .appLanguage()：把应用内选的语言注入环境，
         // Text 的本地化查表会立刻跟着切换，不用重启。
-        Window("SrtFlow", id: WindowID.main) {
+        Window("SkyCut", id: WindowID.main) {
             MainWindowView().appLanguage()
         }
         .defaultSize(width: 1180, height: 760)
@@ -231,7 +231,7 @@ private struct SettingsView: View {
             Section("Appearance") {
                 AppLanguagePicker()
                 if languageStore.needsRestartForMenus {
-                    Text("The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SrtFlow.")
+                    Text("The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SkyCut.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)

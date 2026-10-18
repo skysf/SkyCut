@@ -33,13 +33,13 @@ FORCE=0
 [ "${1:-}" = "--force" ] && FORCE=1
 
 # 随包的许可说明（GPL 合规：注明版本、许可与源码获取途径）。
-# 它同时也是**给用户看的 SrtFlow 授权声明**，会被 build-app.sh 拷进 App 里，
+# 它同时也是**给用户看的 SkyCut 授权声明**，会被 build-app.sh 拷进 App 里，
 # 所以每次打包都要重新生成 —— 见 --readme-only。
 write_readme() {
     cat > "$VENDOR_DIR/README.md" <<EOF
 # vendor/
 
-此目录存放随 SrtFlow 一起分发的第三方可执行文件，**不纳入版本控制**
+此目录存放随 SkyCut 一起分发的第三方可执行文件，**不纳入版本控制**
 （见 .gitignore）。用 \`scripts/vendor-ffmpeg.sh\` 重新获取。
 
 ## ffmpeg
@@ -50,7 +50,7 @@ write_readme() {
 - 源码：https://ffmpeg.org/download.html ，对应版本源码见
   https://github.com/FFmpeg/FFmpeg
 
-SrtFlow 本体以 AGPL-3.0 授权，通过**独立进程**调用 ffmpeg，不与其链接。
+SkyCut 本体以 AGPL-3.0 授权，通过**独立进程**调用 ffmpeg，不与其链接。
 分发包含 ffmpeg 的构建版本时，需一并提供上述许可与源码途径。
 运行 \`ffmpeg -L\` 可查看完整许可文本。
 EOF

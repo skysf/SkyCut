@@ -60,7 +60,7 @@ enum AIAudioFileWriter {
             }
         } catch {
             try? FileManager.default.removeItem(at: url)
-            throw AIToolError("SrtFlow could not write the \(what) file \(url.lastPathComponent): \(error.localizedDescription)")
+            throw AIToolError("SkyCut could not write the \(what) file \(url.lastPathComponent): \(error.localizedDescription)")
         }
     }
 }

@@ -31,7 +31,7 @@ final class KokoroVoiceSpeech {
 
     func speak(_ text: String, language: String, voice: String, speed: Double, to url: URL) async throws -> AISpeechSynthesis.Output {
         guard KokoroVoicePack.shared.isInstalled else {
-            throw AIToolError("SrtFlow's voices are not downloaded yet. Call add_voiceover with download_voices=true first.")
+            throw AIToolError("SkyCut's voices are not downloaded yet. Call add_voiceover with download_voices=true first.")
         }
         unloadTask?.cancel()
         let directory = KokoroVoicePack.directory
@@ -96,7 +96,7 @@ final class KokoroVoiceSpeech {
         var rounds = 0
         while !pending.isEmpty {
             rounds += 1
-            guard rounds < 1_000 else { throw AIToolError("This line could not be split into parts SrtFlow's voice can read.") }
+            guard rounds < 1_000 else { throw AIToolError("This line could not be split into parts SkyCut's voice can read.") }
             let piece = pending.removeFirst()
             switch try KokoroPieceReader.read(piece, of: text, language: language, voice: voice, speed: Float(speed), engine: engine) {
             case .spoken(let read):
@@ -127,7 +127,7 @@ private final class KokoroEngineBox: @unchecked Sendable {
 
     func withEngine<T>(loadingFrom directory: URL, _ body: (KokoroEngine) throws -> T) throws -> T {
         if engine == nil { engine = try KokoroEngine.load(from: directory) }
-        guard let engine else { throw AIToolError("SrtFlow's voice model could not be loaded.") }
+        guard let engine else { throw AIToolError("SkyCut's voice model could not be loaded.") }
         return try body(engine)
     }
 

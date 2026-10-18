@@ -36,7 +36,7 @@ public enum MCPSubtitleExportTools {
                 Translate the original subtitle track into a second track in another language, on this Mac. The original's \
                 language is read from its text (rewriting the original first is fine). scope all rebuilds every translated line \
                 (hand-edited ones are replaced); missing only fills lines with no translation or whose original changed. Returns \
-                a job id. If this Mac still has to download the languages, macOS shows a download dialog in SrtFlow that only \
+                a job id. If this Mac still has to download the languages, macOS shows a download dialog in SkyCut that only \
                 the user can click; the result and get_job then carry waiting_for_user, which you must pass on to the user.
                 """,
                 input: MCPSchema.object([
@@ -76,7 +76,7 @@ public enum MCPSubtitleExportTools {
                 text (else the project's record), and go where export_video puts videos, so players pick them up; name \
                 defaults to the project's, so pass the exported video's name to pair them. Hidden \
                 lines are left out; times are timeline seconds. A taken name gets a number (the result has the real paths); \
-                SrtFlow never replaces a file. Done at once.
+                SkyCut never replaces a file. Done at once.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both: every track with lines).", oneOf: ["original", "translation", "both"]),
@@ -127,7 +127,7 @@ public enum MCPSubtitleExportTools {
         "shadow": MCPSchema.string("Drop shadow (with an outline, not a box): #RRGGBBAA (e.g. #000000B3), or none."),
         "highlight": MCPSchema.string("Word-by-word highlight: the spoken word turns this colour (#RRGGBB), or none. Project only."),
         "highlight_scale": MCPSchema.number("How much the spoken word grows (1-1.3, default 1.1; 1 for long lines).", minimum: 1, maximum: 1.3),
-        "reset": MCPSchema.boolean("Go back to the style from SrtFlow's Burn In Subtitles page first.")
+        "reset": MCPSchema.boolean("Go back to the style from SkyCut's Burn In Subtitles page first.")
     ])
 
     private static var editSubtitles: MCPToolDefinition {
@@ -159,7 +159,7 @@ public enum MCPSubtitleExportTools {
             sets how this project's subtitles look (the user's Burn In Subtitles page keeps its own; own_style in the result \
             turns true once the project has its own look; the word highlight always belongs to the project). Set it before \
             generate_subtitles or add_voiceover subtitles=true: lines are cut to fit that size. highlight only lights lines \
-            SrtFlow made from speech or a voiceover (get_subtitles says how many know their word times).
+            SkyCut made from speech or a voiceover (get_subtitles says how many know their word times).
             """,
             input: MCPSchema.object([
                 "changes": MCPSchema.array(of: change, "Lines to change."),
@@ -171,7 +171,7 @@ public enum MCPSubtitleExportTools {
                 ),
                 "replace": MCPSchema.array(of: replacement, "Find and replace on every line of a track; runs after changes, add and merge, before delete."),
                 "strip_punctuation": MCPSchema.boolean(
-                    "Remove pause punctuation from every line, the way SrtFlow writes generated subtitles: commas, periods, semicolons, "
+                    "Remove pause punctuation from every line, the way SkyCut writes generated subtitles: commas, periods, semicolons, "
                         + "colons (also Chinese ones) become a space mid-line and vanish at the end; ? ! quotes, numbers and abbreviations stay. "
                         + "Runs after replace. The result lists lines left empty."
                 ),
@@ -187,7 +187,7 @@ public enum MCPSubtitleExportTools {
             Render the timeline to an .mp4 (audio-only timelines become .m4a). By default the file is named after the \
             project and goes into SrtFlow/Exports inside the folder the user named (otherwise the project's folder, or \
             Downloads). Subtitles visible on the timeline are burned in unless burn_subtitles is false. A taken name gets a \
-            number (the result has the real path); SrtFlow never replaces a file. Returns a job id; wait with get_job. Then \
+            number (the result has the real path); SkyCut never replaces a file. Returns a job id; wait with get_job. Then \
             give the user the music_credits (get_timeline) for the video's description.
             """,
             input: MCPSchema.object([

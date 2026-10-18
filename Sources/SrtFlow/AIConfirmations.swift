@@ -44,7 +44,7 @@ final class AIConfirmations {
             let minutes = Int(AIConfirmations.lifetime / 60)
             switch self {
             case .unknown:
-                return "The confirm_token you passed is not one SrtFlow issued, or it was issued too long ago. Ask the user again and use the new one below."
+                return "The confirm_token you passed is not one SkyCut issued, or it was issued too long ago. Ask the user again and use the new one below."
             case .expired:
                 return "The confirm_token you passed expired (each lasts \(minutes) minutes). Ask the user again and use the new one below."
             case .used:

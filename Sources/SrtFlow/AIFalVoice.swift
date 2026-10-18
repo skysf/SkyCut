@@ -31,17 +31,17 @@ enum AIFalVoice {
             let why = estimate.map { "would take today's fal.ai spending to \(FalMoney.text(spent + $0)), over the user's \(FalMoney.text(store.dailyLimit)) daily limit" }
                 ?? "has no known price"
             return (nil, "The fal.ai voice \(kind == .voiceClone ? "for cloning " : "")was not used: it \(why). "
-                + "The user can raise the limit in SrtFlow → Settings → AI.")
+                + "The user can raise the limit in SkyCut → Settings → AI.")
         }
         let hinted = FalPromptFlag()
         let result = await FalKeyCache.shared.key(willAsk: {
             hinted.value = true
-            AISession.shared.setHint(L10n("macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow."))
+            AISession.shared.setHint(L10n("macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow."))
             AITranslationReadiness.bringSrtFlowForward()
         })
         if hinted.value { AISession.shared.setHint(nil) }
         guard case .key(let key) = result else {
-            return (nil, "The fal.ai voice was not used: SrtFlow could not read the fal.ai key from the macOS keychain "
+            return (nil, "The fal.ai voice was not used: SkyCut could not read the fal.ai key from the macOS keychain "
                 + "(the user has to click Always Allow when macOS asks).")
         }
         return (Offer(model: model, key: key), nil)

@@ -62,12 +62,12 @@ final class AIDownloadWatch {
     /// 给 AI 的那句：它要转述给用户，而不是闷着头一直等。
     var note: String {
         if downloaded {
-            return "The translation languages are downloaded. If the macOS download dialog is still open in SrtFlow, "
+            return "The translation languages are downloaded. If the macOS download dialog is still open in SkyCut, "
                 + "tell the user to click Done; translating then starts."
         }
         return """
             This Mac is downloading the \(AITranslationReadiness.englishName(source)) and \(AITranslationReadiness.englishName(target)) \
-            translation languages (one time only). SrtFlow is in front with a macOS dialog: tell the user to click Download \
+            translation languages (one time only). SkyCut is in front with a macOS dialog: tell the user to click Download \
             next to each language if they have not yet, and that the dialog's progress bar can lag, while System Settings > \
             General > Language & Region > Translation Languages shows the real progress. Keep waiting with get_job; \
             the job continues by itself after the download.

@@ -178,7 +178,7 @@ enum AIClipEdit {
         } else if let animation = clip.animation,
                   !(animation.centerX.isEmpty && animation.centerY.isEmpty && animation.width.isEmpty && animation.height.isEmpty) {
             throw AIToolError(
-                "This clip's position or size is animated with keyframes, so SrtFlow cannot place it from here. "
+                "This clip's position or size is animated with keyframes, so SkyCut cannot place it from here. "
                 + "Ask the user to remove the Position and Scale keyframes in the inspector first."
             )
         }

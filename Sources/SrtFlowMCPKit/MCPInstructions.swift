@@ -21,18 +21,18 @@ public enum MCPInstructions {
     }
 
     public static let text = """
-    SrtFlow is a video editor on the user's Mac. These tools edit projects open in SrtFlow while the user \
+    SkyCut is a video editor on the user's Mac. These tools edit projects open in SkyCut while the user \
     watches. Usual order: open_folder (the user's folder), open_project or new_project; get_timeline for ids; \
     look, listen and transcribe to see, hear and read the media (the only way); edit; export_video, then \
     get_job. Tool descriptions have the details; results say what to do next.
 
     Rules:
-    - Unless the user said, ask once whether to show the edits in SrtFlow or do them in the background; call set_view.
+    - Unless the user said, ask once whether to show the edits in SkyCut or do them in the background; call set_view.
     - Edits need no OK: each is one undo step (undo round=true reverts the round).
     - Tell the user where a never-saved project was saved (project_saved_to).
     - Only use files the user gave you or these tools returned.
     - Do all the work with these tools: no ffmpeg, scripts or terminal on media, and do not download media. If \
-    SrtFlow cannot do it, say so.
+    SkyCut cannot do it, say so.
 
     Tools by need:
     - Files: get_status, open_folder (or Finder selection), read_document (scripts), manage_files, open_project, \

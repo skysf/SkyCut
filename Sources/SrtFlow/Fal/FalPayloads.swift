@@ -19,13 +19,13 @@ enum FalPayloads {
 
     static func imageDataURI(_ url: URL) throws -> String {
         guard let data = try? Data(contentsOf: url, options: .mappedIfSafe), !data.isEmpty else {
-            throw FalInputError("SrtFlow could not read the picture \(url.lastPathComponent).")
+            throw FalInputError("SkyCut could not read the picture \(url.lastPathComponent).")
         }
         if let type = passthrough[url.pathExtension.lowercased()], data.count <= maxInlineBytes {
             return "data:\(type);base64,\(data.base64EncodedString())"
         }
         guard let jpeg = resizedJPEG(data) else {
-            throw FalInputError("\(url.lastPathComponent) is not a picture SrtFlow can read (use a PNG, JPEG, WebP or HEIC file).")
+            throw FalInputError("\(url.lastPathComponent) is not a picture SkyCut can read (use a PNG, JPEG, WebP or HEIC file).")
         }
         return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
     }

@@ -40,7 +40,7 @@ struct OptimizedMediaSettingsSection: View {
                 Text("Limit")
             }
             .controlSize(.small)
-            .instantHelp("Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SrtFlow starts")
+            .instantHelp("Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SkyCut starts")
             if let message = settings.message {
                 Text(verbatim: message)
                     .font(.caption)

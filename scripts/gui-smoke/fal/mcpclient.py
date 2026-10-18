@@ -1,7 +1,7 @@
 import json, os, queue, subprocess, threading, time
 
 class MCP:
-    """扮成 AI 客户端（老一代握手）：起 App 包里的 srtflow-mcp，按行收发 JSON-RPC。"""
+    """扮成 AI 客户端（老一代握手）：起 App 包里的 skycut-mcp，按行收发 JSON-RPC。"""
     def __init__(self, helper, env=None):
         self.p = subprocess.Popen([helper], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env, text=True, bufsize=1)
         self.next_id = 0

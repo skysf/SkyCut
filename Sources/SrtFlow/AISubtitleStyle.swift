@@ -146,7 +146,7 @@ struct AISubtitleStyleChange: Equatable {
             let some = available.prefix(40).map { font in
                 font.aliases.first { $0.allSatisfy(\.isASCII) }.map { "\(font.familyName) (\($0))" } ?? font.familyName
             }.joined(separator: ", ")
-            throw AIToolError("The font \(name) cannot be used for subtitles on this Mac (burning needs a font file SrtFlow can read). Fonts that work: \(some).")
+            throw AIToolError("The font \(name) cannot be used for subtitles on this Mac (burning needs a font file SkyCut can read). Fonts that work: \(some).")
         }
         var resolved = self
         resolved.font = match.familyName

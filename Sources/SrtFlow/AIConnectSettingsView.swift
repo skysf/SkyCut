@@ -14,12 +14,12 @@ struct AIConnectSection: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         Section("AI") {
-            Text("Let AI apps such as Claude and Codex edit videos in SrtFlow. You watch every step in the editor, and Command-Z undoes any of it.")
+            Text("Let AI apps such as Claude and Codex edit videos in SkyCut. You watch every step in the editor, and Command-Z undoes any of it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if setup.helperURL == nil {
-                Text("This copy of SrtFlow has no AI helper inside, so AI apps cannot connect to it.")
+                Text("This copy of SkyCut has no AI helper inside, so AI apps cannot connect to it.")
                     .font(.caption)
                     .foregroundStyle(.orange)
                     .fixedSize(horizontal: false, vertical: true)
@@ -80,16 +80,16 @@ private struct AIClientRow: View {
             EmptyView()
         case .connected:
             Button("Disconnect") { Task { await setup.disconnect(client) } }
-                .instantHelp("Remove SrtFlow from this app's MCP settings")
+                .instantHelp("Remove SkyCut from this app's MCP settings")
         case .notConnected, .connectedAsking, .connectedElsewhere:
             if setup.canConnect(client) {
                 Button("Connect") { Task { await setup.connect(client) } }
-                    .instantHelp("Add SrtFlow to this app's MCP settings and let it use SrtFlow's tools without asking")
+                    .instantHelp("Add SkyCut to this app's MCP settings and let it use SkyCut's tools without asking")
             } else if let prompt = setup.setupPrompt(for: client) {
                 Button("Copy Prompt") {
                     setup.copy(prompt, confirmation: String(format: L10n("Copied. Paste it into %@."), L10n(client.title)))
                 }
-                .instantHelp("Copy a message you can paste into this app so it connects SrtFlow itself")
+                .instantHelp("Copy a message you can paste into this app so it connects SkyCut itself")
             }
         }
     }

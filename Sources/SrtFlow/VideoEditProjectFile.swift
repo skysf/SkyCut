@@ -246,7 +246,7 @@ enum VideoEditProjectIO {
             file = try decoder.decode(VideoEditProjectFile.self, from: data)
         } catch {
             throw IOError(message: String(
-                format: L10n("“%@” isn’t a SrtFlow project file."),
+                format: L10n("“%@” isn’t a SkyCut project file."),
                 url.lastPathComponent
             ))
         }
@@ -254,7 +254,7 @@ enum VideoEditProjectIO {
         // 字段**删掉**，等于悄悄毁掉用户在新版里做的活。
         guard file.formatVersion <= VideoEditProjectFile.latestFormatVersion else {
             throw IOError(message: String(
-                format: L10n("“%@” was made by a newer version of SrtFlow."),
+                format: L10n("“%@” was made by a newer version of SkyCut."),
                 url.lastPathComponent
             ))
         }

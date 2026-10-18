@@ -117,7 +117,7 @@ func runProtocolChecks() {
     // 1. 握手：照回客户端要的版本、带服务名和总说明。
     let initialize = reply(messages, id: 1)?["result"]
     checkEqual(initialize?["protocolVersion"]?.stringValue, "2025-06-18", "initialize echoes a known legacy version")
-    checkEqual(initialize?["serverInfo"]?["name"]?.stringValue, "srtflow", "serverInfo.name")
+    checkEqual(initialize?["serverInfo"]?["name"]?.stringValue, "skycut", "serverInfo.name")
     check(initialize?["capabilities"]?["tools"] != nil, "initialize advertises tools")
     check((initialize?["instructions"]?.stringValue ?? "").contains("get_timeline"), "instructions mention the workflow")
     // 方案第 31 条：AI 用 SrtFlow 的工具看、听、改画面，不拿用户电脑上的 ffmpeg 改素材、不从网上下载素材。
@@ -203,7 +203,7 @@ private func runModernChecks(_ app: FakeApp) {
     let versions = discover?["supportedVersions"]?.arrayValue?.compactMap(\.stringValue) ?? []
     check(versions.contains("2026-07-28") && versions.contains("2025-11-25"), "discover lists both eras")
     checkEqual(discover?["resultType"]?.stringValue, "complete", "discover carries resultType")
-    checkEqual(discover?["_meta"]?["io.modelcontextprotocol/serverInfo"]?["name"]?.stringValue, "srtflow", "discover serverInfo")
+    checkEqual(discover?["_meta"]?["io.modelcontextprotocol/serverInfo"]?["name"]?.stringValue, "skycut", "discover serverInfo")
     check(discover?["ttlMs"]?.intValue != nil && discover?["cacheScope"]?.stringValue == "private", "discover is cacheable")
     let list = reply(messages, id: 11)?["result"]
     checkEqual(list?["resultType"]?.stringValue, "complete", "modern tools/list carries resultType")

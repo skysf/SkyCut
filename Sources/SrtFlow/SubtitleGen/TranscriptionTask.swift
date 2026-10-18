@@ -218,7 +218,7 @@ final class TranscriptionTask: ObservableObject {
         clips: [SubtitleAudibleClips.SoundClip], sourceLocaleID: String
     ) async throws -> TranscriptHarvester.Harvest {
         guard !isRunning else {
-            throw TaskError(message: "SrtFlow is already transcribing (generating subtitles or another transcript).")
+            throw TaskError(message: "SkyCut is already transcribing (generating subtitles or another transcript).")
         }
         guard SpeechTranscriptionService.isAvailable else {
             throw TaskError(message: L10n("Speech transcription isn't available on this Mac."))

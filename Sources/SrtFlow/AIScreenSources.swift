@@ -90,7 +90,7 @@ enum AIScreenSources {
                 return .object(entry)
             })
         } else {
-            object["windows"] = "Listed once SrtFlow has the Screen & System Audio Recording permission (record_screen asks for it)."
+            object["windows"] = "Listed once SkyCut has the Screen & System Audio Recording permission (record_screen asks for it)."
         }
         let defaultID = ScreenRecordingPermissions.defaultMicrophoneID
         object["microphones"] = .array(microphones().map { ["name": .string($0.name), "default": .bool($0.id == defaultID)] })
@@ -155,7 +155,7 @@ enum AIScreenSources {
         } catch {
             throw AIToolError(
                 "macOS refused screen capture just now (\(error.localizedDescription)). If it is showing a screen recording prompt or "
-                    + "reminder, ask the user to allow SrtFlow, then call record_screen again."
+                    + "reminder, ask the user to allow SkyCut, then call record_screen again."
             )
         }
     }

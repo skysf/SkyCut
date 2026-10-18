@@ -50,7 +50,7 @@ enum AIScreenRecordingTool {
             let waiting = AIScreenRecordingLeftovers.waiting(coordinator)
             return "\(waiting.subject), so \(what). \(waiting.advice)"
         }
-        return "A screen recording is running in SrtFlow, so \(what). Stop it first with record_screen action=stop, or wait until it "
+        return "A screen recording is running in SkyCut, so \(what). Stop it first with record_screen action=stop, or wait until it "
             + "finishes (get_status shows it)."
     }
 
@@ -94,7 +94,7 @@ enum AIScreenRecordingTool {
             // 等麦克风授权的时候被叫停了（stop / cancel_job / 横幅上的停止）：不开了。
             guard job.job.status == .running else { return }
             guard coordinator.beginAutomated(plan) else {
-                job.fail("SrtFlow became busy with another screen recording before this one could start.")
+                job.fail("SkyCut became busy with another screen recording before this one could start.")
                 return
             }
             await coordinator.start(options: options, project: project)
@@ -113,7 +113,7 @@ enum AIScreenRecordingTool {
         } else if job.startedAt != nil {
             result["next_step"] = .string(
                 "It is recording now. Do what should be recorded, then call record_screen action=stop (it also stops after duration, "
-                    + "or when the user presses Stop). SrtFlow's Stop panel is at the bottom left of the main display and invisible in "
+                    + "or when the user presses Stop). SkyCut's Stop panel is at the bottom left of the main display and invisible in "
                     + "screenshots: do not click there."
             )
         } else {
@@ -125,16 +125,16 @@ enum AIScreenRecordingTool {
     /// 没授权：这次运行里第一次就请求（先删一次钉着旧签名的记录，再让系统弹授权框），之后不再弹、只说去哪开。
     /// 授权下次启动才生效（录屏实施报告门槛 1），所以要用户退出重开 SrtFlow。
     private static func permissionMissing() async -> AIToolError {
-        let steps = "Ask the user to turn SrtFlow on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then "
-            + "choose Quit & Reopen when macOS offers it (or quit and reopen SrtFlow). After that, open_folder / open_project again "
+        let steps = "Ask the user to turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then "
+            + "choose Quit & Reopen when macOS offers it (or quit and reopen SkyCut). After that, open_folder / open_project again "
             + "and call record_screen again."
         guard !requestedPermission else {
-            return AIToolError("SrtFlow still does not have the Screen & System Audio Recording permission. \(steps)")
+            return AIToolError("SkyCut still does not have the Screen & System Audio Recording permission. \(steps)")
         }
         requestedPermission = true
         await ScreenRecordingPermissions.requestScreenAccess()
         return AIToolError(
-            "SrtFlow needs the Screen & System Audio Recording permission to record by itself; macOS just asked the user "
+            "SkyCut needs the Screen & System Audio Recording permission to record by itself; macOS just asked the user "
                 + "(if no window appeared, it is in System Settings). \(steps)"
         )
     }
@@ -163,7 +163,7 @@ enum AIScreenRecordingTool {
             job = running
         } else {
             // 用户手动开的那一段：结局也收给 AI，入轨那一下包 AI 的一步撤销（这一下不在用户事件里）。
-            job = AIScreenRecordingJob(project: project, sourceDescription: "a recording the user started in SrtFlow")
+            job = AIScreenRecordingJob(project: project, sourceDescription: "a recording the user started in SkyCut")
             current = job
             coordinator.handOver(to: job, landing: landing(for: project))
         }
@@ -186,14 +186,14 @@ enum AIScreenRecordingTool {
             if let note { job.notes.append(note) }
             guard let device else { return .disabled }
             guard mustAsk else { return .device(id: device.id) }
-            job.waiting = "Allow SrtFlow to use the microphone in the macOS prompt."
+            job.waiting = "Allow SkyCut to use the microphone in the macOS prompt."
             let granted = await ScreenRecordingPermissions.requestMicrophoneAccess()
             job.waiting = nil
             if !granted { job.notes.append(Self.denied) }
             return granted ? .device(id: device.id) : .disabled
         }
 
-        static let denied = "SrtFlow is not allowed to use the microphone, so no narration track was recorded; the user can allow it in "
+        static let denied = "SkyCut is not allowed to use the microphone, so no narration track was recorded; the user can allow it in "
             + "System Settings ▸ Privacy & Security ▸ Microphone."
     }
 
@@ -215,7 +215,7 @@ enum AIScreenRecordingTool {
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         } catch {
-            throw AIToolError("SrtFlow could not create \(folder.path): \(error.localizedDescription)")
+            throw AIToolError("SkyCut could not create \(folder.path): \(error.localizedDescription)")
         }
         let stem = request.title ?? (ScreenRecordingCoordinator.suggestedName() as NSString).deletingPathExtension
         return ExportFileName.unoccupied(

@@ -16,14 +16,14 @@ func runConfigChecks() {
 
 private func jsonConfigChecks() {
     let existing = Data(#"{"theme":"dark","mcpServers":{"other":{"command":"/bin/other"}}}"#.utf8)
-    let added = try? AIClientConfigFiles.jsonAdding(command: "/Applications/SrtFlow.app/Contents/Helpers/srtflow-mcp", to: existing)
-    checkEqual(AIClientConfigFiles.jsonCommand(in: added), "/Applications/SrtFlow.app/Contents/Helpers/srtflow-mcp",
-               "the srtflow entry is added")
+    let added = try? AIClientConfigFiles.jsonAdding(command: "/Applications/SkyCut.app/Contents/Helpers/skycut-mcp", to: existing)
+    checkEqual(AIClientConfigFiles.jsonCommand(in: added), "/Applications/SkyCut.app/Contents/Helpers/skycut-mcp",
+               "the skycut entry is added")
     let root = added.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] } ?? [:]
     checkEqual(root["theme"] as? String, "dark", "other settings are kept")
     check(((root["mcpServers"] as? [String: Any])?["other"]) != nil, "other MCP servers are kept")
     let removed = try? AIClientConfigFiles.jsonRemoving(from: added)
-    check(AIClientConfigFiles.jsonCommand(in: removed) == nil, "the srtflow entry is removed")
+    check(AIClientConfigFiles.jsonCommand(in: removed) == nil, "the skycut entry is removed")
     check(((removed.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["mcpServers"]
         as? [String: Any])?["other"]) != nil, "removing keeps the other servers")
     checkEqual(AIClientConfigFiles.jsonCommand(in: try? AIClientConfigFiles.jsonAdding(command: "/x", to: nil)), "/x",
@@ -35,34 +35,34 @@ private func tomlConfigChecks() {
     let existing = """
     model = "gpt-5"
 
-    [mcp_servers.srtflow]
+    [mcp_servers.skycut]
     command = "/old/path"
 
-    [mcp_servers.srtflow.env]
+    [mcp_servers.skycut.env]
     A = "1"
 
     [projects."/Users/me/code"]
     trust_level = "trusted"
     """
-    let added = AIClientConfigFiles.tomlAdding(command: #"/Applications/SrtFlow "Beta".app/Contents/Helpers/srtflow-mcp"#, to: existing)
-    checkEqual(added.components(separatedBy: "[mcp_servers.srtflow]").count - 1, 1, "exactly one srtflow table")
-    check(!added.contains("[mcp_servers.srtflow.env]"), "the old sub-table goes too")
+    let added = AIClientConfigFiles.tomlAdding(command: #"/Applications/SkyCut "Beta".app/Contents/Helpers/skycut-mcp"#, to: existing)
+    checkEqual(added.components(separatedBy: "[mcp_servers.skycut]").count - 1, 1, "exactly one skycut table")
+    check(!added.contains("[mcp_servers.skycut.env]"), "the old sub-table goes too")
     check(added.contains("model = \"gpt-5\"") && added.contains("trust_level = \"trusted\""), "the rest of the file is kept")
-    checkEqual(AIClientConfigFiles.tomlCommand(in: added), #"/Applications/SrtFlow "Beta".app/Contents/Helpers/srtflow-mcp"#,
+    checkEqual(AIClientConfigFiles.tomlCommand(in: added), #"/Applications/SkyCut "Beta".app/Contents/Helpers/skycut-mcp"#,
                "a path with quotes round-trips")
     let removed = AIClientConfigFiles.tomlRemoving(from: added)
-    check(AIClientConfigFiles.tomlCommand(in: removed) == nil, "the srtflow table is removed")
+    check(AIClientConfigFiles.tomlCommand(in: removed) == nil, "the skycut table is removed")
     check(removed.contains("[projects.\"/Users/me/code\"]"), "removing keeps the other tables")
     checkEqual(AIClientConfigFiles.tomlAdding(command: "/x", to: ""),
-               "[mcp_servers.srtflow]\ncommand = \"/x\"\ndefault_tools_approval_mode = \"approve\"\n",
+               "[mcp_servers.skycut]\ncommand = \"/x\"\ndefault_tools_approval_mode = \"approve\"\n",
                "an empty file gets just the table")
 }
 
-/// 连上的同时放行 SrtFlow 的工具（方案第 35 条）：Claude Code 的 permissions.allow 加一条 mcp__srtflow，
+/// 连上的同时放行 SkyCut 的工具（方案第 35 条）：Claude Code 的 permissions.allow 加一条 mcp__skycut，
 /// Codex 那张表里写 default_tools_approval_mode = "approve"。别的设置原样留着，格式不对就不写。
 private func permissionConfigChecks() {
     let rule = AIClientConfigFiles.claudeCodeAllowRule
-    checkEqual(rule, "mcp__srtflow", "Claude Code's rule names the whole srtflow server")
+    checkEqual(rule, "mcp__skycut", "Claude Code's rule names the whole skycut server")
     func allowList(_ data: Data?) -> [String]? {
         let root = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
         return (root?["permissions"] as? [String: Any])?["allow"] as? [String]
@@ -87,11 +87,11 @@ private func permissionConfigChecks() {
     checkThrows("broken settings JSON is left alone") { _ = try AIClientConfigFiles.jsonAllowing(rule: rule, in: Data("{oops".utf8)) }
 
     let codex = AIClientConfigFiles.tomlAdding(command: "/x", to: "model = \"gpt-5\"\n")
-    check(AIClientConfigFiles.tomlApproves(in: codex), "Codex: the srtflow table runs its tools without asking")
-    check(!AIClientConfigFiles.tomlApproves(in: "[mcp_servers.srtflow]\ncommand = \"/x\"\n"),
+    check(AIClientConfigFiles.tomlApproves(in: codex), "Codex: the skycut table runs its tools without asking")
+    check(!AIClientConfigFiles.tomlApproves(in: "[mcp_servers.skycut]\ncommand = \"/x\"\n"),
           "an earlier connection without the line is seen as asking")
     check(!AIClientConfigFiles.tomlApproves(
-        in: "[mcp_servers.other]\ndefault_tools_approval_mode = \"approve\"\n\n[mcp_servers.srtflow]\ncommand = \"/x\"\n"
+        in: "[mcp_servers.other]\ndefault_tools_approval_mode = \"approve\"\n\n[mcp_servers.skycut]\ncommand = \"/x\"\n"
     ), "another server's line does not count")
     check(!AIClientConfigFiles.tomlApproves(in: AIClientConfigFiles.tomlRemoving(from: codex)), "disconnecting removes it with the table")
 }

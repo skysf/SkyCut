@@ -102,11 +102,11 @@ enum AIListenTool {
             object["to"] = AIFormat.seconds(clip.timelineTime(atSource: to))
         }
         guard let peaks = await waveform(of: clip.sourceURL, until: deadline) else {
-            object["sound"] = "unreadable: SrtFlow could not read this clip's audio"
+            object["sound"] = "unreadable: SkyCut could not read this clip's audio"
             return object
         }
         guard peaks.isComplete || peaks.duration >= to - 0.01 else {
-            object["sound"] = "still reading: SrtFlow is reading this file's audio, call listen again in a moment"
+            object["sound"] = "still reading: SkyCut is reading this file's audio, call listen again in a moment"
             return object
         }
         let trackGain = state.trackVolume(containingClip: clip.id)
@@ -170,7 +170,7 @@ enum AIListenTool {
             return ask
         }
         guard let peaks = await waveform(of: url, until: Date().addingTimeInterval(waitSeconds)) else {
-            throw AIToolError("\(url.lastPathComponent) has no sound SrtFlow can read.")
+            throw AIToolError("\(url.lastPathComponent) has no sound SkyCut can read.")
         }
         let from = max(0, try args.double("source_in") ?? 0)
         let to = min(try args.double("source_out") ?? peaks.duration, peaks.duration)
@@ -186,7 +186,7 @@ enum AIListenTool {
         }
         if !peaks.isComplete {
             object["note"] = .string(
-                "SrtFlow has read the first \(String(format: "%.1f", peaks.duration)) s so far; call listen again for the rest."
+                "SkyCut has read the first \(String(format: "%.1f", peaks.duration)) s so far; call listen again for the rest."
             )
         }
         if settings.beats {

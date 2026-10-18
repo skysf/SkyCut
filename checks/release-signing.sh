@@ -52,7 +52,7 @@ if [ "$(count 'certificate leaf = H' "${SIGN}")" -lt 1 ]; then
   fail "${SIGN} 签完不核对 designated requirement 钉在证书上"
 fi
 if [ "$(count '^[[:space:]]*codesign --force "\$@" --timestamp=none' "${SIGN}")" -ne 3 ]; then
-  fail "${SIGN} 的 sign_bundle 不是 ffmpeg、srtflow-mcp、外层三处签名"
+  fail "${SIGN} 的 sign_bundle 不是 ffmpeg、skycut-mcp、外层三处签名"
 fi
 
 echo "==> 3. 仓库钉着正好一把证书"

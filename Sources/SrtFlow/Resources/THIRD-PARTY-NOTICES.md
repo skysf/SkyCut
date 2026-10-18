@@ -1,6 +1,6 @@
 # Third-party notices
 
-SrtFlow is licensed under AGPL-3.0 (see LICENSE). It includes or downloads the following work by others.
+SkyCut is licensed under AGPL-3.0 (see LICENSE). It includes or downloads the following work by others.
 
 ## FFmpeg
 
@@ -8,15 +8,15 @@ See ffmpeg-LICENSE.md next to this file.
 
 ## speech-swift (Kokoro text-to-speech code)
 
-Parts of SrtFlow's voice engine (the `SrtFlowKokoro` module: the phonemizers for English, Chinese, Japanese, French,
+Parts of SkyCut's voice engine (the `SrtFlowKokoro` module: the phonemizers for English, Chinese, Japanese, French,
 Spanish, Portuguese, Italian and Hindi, and the CoreML inference wrapper) are adapted from speech-swift,
 https://github.com/soniqo/speech-swift, Copyright 2025 Ivan Digital, licensed under the Apache License 2.0.
-SrtFlow changed them: files were split and renamed, the Hugging Face downloader and the shared audio module were removed,
+SkyCut changed them: files were split and renamed, the Hugging Face downloader and the shared audio module were removed,
 dictionaries are read from the downloaded model folder, and word-level token spans were added.
 
 ## Kokoro-82M voice model (downloaded, not bundled)
 
-When you download SrtFlow's voices in Settings → AI, SrtFlow fetches from downloads.skylu.ai:
+When you download SkyCut's voices in Settings → AI, SkyCut fetches from downloads.skylu.ai:
 
 - Kokoro-82M by hexgrad, https://huggingface.co/hexgrad/Kokoro-82M — Apache License 2.0.
 - Its CoreML conversion, https://huggingface.co/aufklarer/Kokoro-82M-CoreML — Apache License 2.0.

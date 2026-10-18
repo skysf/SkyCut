@@ -47,44 +47,44 @@ public enum MCPCallWait {
         let check = "check with get_timeline (or get_status) before calling it again"
         switch reason {
         case .frozen(let stuck):
-            let frozen = "SrtFlow is not responding: its main thread has been stuck for \(duration(stuck)) "
+            let frozen = "SkyCut is not responding: its main thread has been stuck for \(duration(stuck)) "
                 + "(the app is frozen; the user sees a spinning wheel)."
-            let tell = "Tell the user: they can wait a little, or force quit SrtFlow and open it again "
+            let tell = "Tell the user: they can wait a little, or force quit SkyCut and open it again "
                 + "(changes since the last autosave may be lost)."
             switch call {
             case .dropped, .waiting:
                 return "\(frozen) This call was not carried out and will not run later. \(tell) Do not repeat edits until "
-                    + "SrtFlow answers again; if it was restarted, open the project again."
+                    + "SkyCut answers again; if it was restarted, open the project again."
             case .finished:
-                return "\(frozen) It finished this call but froze before answering. \(tell) Once SrtFlow answers again, \(check)."
+                return "\(frozen) It finished this call but froze before answering. \(tell) Once SkyCut answers again, \(check)."
             case .running, .unknown, nil:
-                return "\(frozen) It may have been in the middle of this call: if SrtFlow recovers the call may still finish, "
-                    + "if the user force quits it, it will not. \(tell) Once SrtFlow answers again, \(check)."
+                return "\(frozen) It may have been in the middle of this call: if SkyCut recovers the call may still finish, "
+                    + "if the user force quits it, it will not. \(tell) Once SkyCut answers again, \(check)."
             }
         case .tooLong:
             let waitedText = duration(waited)
             switch call {
             case .dropped, .waiting:
-                return "SrtFlow did not get to this call within \(waitedText) (calls before it were still running; SrtFlow itself "
+                return "SkyCut did not get to this call within \(waitedText) (calls before it were still running; SkyCut itself "
                     + "responds). It was dropped and will not run: call it again."
             case .finished:
-                return "SrtFlow finished this call but the answer did not arrive. Check with get_timeline (or get_status) "
+                return "SkyCut finished this call but the answer did not arrive. Check with get_timeline (or get_status) "
                     + "before calling it again."
             case .running, .unknown, nil:
-                return "SrtFlow is still working on this call after \(waitedText) (it is busy, not frozen). It may still finish: "
+                return "SkyCut is still working on this call after \(waitedText) (it is busy, not frozen). It may still finish: "
                     + "wait a little, then \(check)."
             }
         case .noAnswer:
-            return "SrtFlow did not answer within \(duration(waited)) and does not answer at all now. It may be frozen: tell the "
+            return "SkyCut did not answer within \(duration(waited)) and does not answer at all now. It may be frozen: tell the "
                 + "user; if it shows a spinning wheel, they can force quit it and open it again. This call may or may not have "
-                + "been carried out: once SrtFlow answers again, \(check)."
+                + "been carried out: once SkyCut answers again, \(check)."
         }
     }
 
     /// 上一次放弃时 App 卡死了、这一次探下来还卡着：不发了，当场说。
     public static func stillFrozenMessage(stuck: Double?) -> String {
         let how = stuck.map { "its main thread has been stuck for \(duration($0))" } ?? "it does not answer at all"
-        return "Not sent: SrtFlow is still not responding (\(how)). Tell the user SrtFlow seems frozen: they can wait, or force "
+        return "Not sent: SkyCut is still not responding (\(how)). Tell the user SkyCut seems frozen: they can wait, or force "
             + "quit it and open it again. Call again once it answers."
     }
 

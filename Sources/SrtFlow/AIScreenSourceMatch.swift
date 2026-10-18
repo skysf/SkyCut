@@ -86,7 +86,7 @@ enum AIScreenSourceMatch {
     /// 第几块屏幕（nil = 1，主屏）。
     static func pickDisplay(_ number: Int?, among displays: [Display]) throws -> Display {
         let ordered = numbered(displays)
-        guard !ordered.isEmpty else { throw AIToolError("SrtFlow found no display to record.") }
+        guard !ordered.isEmpty else { throw AIToolError("SkyCut found no display to record.") }
         let wanted = number ?? 1
         guard ordered.indices.contains(wanted - 1) else {
             throw AIToolError("There is no display \(wanted); this Mac has \(ordered.count) (get_status screen=true lists them).")

@@ -25,7 +25,7 @@ enum AIScreenRecordingLeftovers {
                 throw AIToolError("A screen recording is already running (job \(running.job.id)); stop it with record_screen action=stop first.")
             }
             throw AIToolError(
-                "A screen recording is being set up or running in SrtFlow right now. Wait for it to finish, or stop it with "
+                "A screen recording is being set up or running in SkyCut right now. Wait for it to finish, or stop it with "
                     + "record_screen action=stop if the user asks."
             )
         }
@@ -39,7 +39,7 @@ enum AIScreenRecordingLeftovers {
         if coordinator.hasUnsettledManifest {
             // 账本读不出来（坏了，原样留着），或者它点名的文件在一块现在没接上的盘上（等盘回来再裁决）：都不许开新的盖掉它。
             throw AIToolError(
-                "SrtFlow still holds the record of an earlier screen recording it could not settle (its files may be on a disk that is "
+                "SkyCut still holds the record of an earlier screen recording it could not settle (its files may be on a disk that is "
                     + "not connected, or the record is damaged: \(coordinator.store.fileURL.path)), so it will not start a new recording "
                     + "over it. Tell the user."
             )
@@ -163,7 +163,7 @@ enum AIScreenRecordingLeftovers {
             do {
                 try FileManager.default.trashItem(at: file, resultingItemURL: &resulting)
             } catch {
-                throw AIToolError("SrtFlow could not move \(file.lastPathComponent) to the Trash: \(error.localizedDescription)")
+                throw AIToolError("SkyCut could not move \(file.lastPathComponent) to the Trash: \(error.localizedDescription)")
             }
             trashed.append(.string((resulting as URL?)?.path ?? file.lastPathComponent))
         }

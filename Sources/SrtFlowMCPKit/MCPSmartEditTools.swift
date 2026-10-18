@@ -17,7 +17,7 @@ enum MCPSmartEditTools {
                 the timeline (default: every video-track clip with sound; audio-only clips such as music only when named in \
                 clip_ids) times are timeline seconds; for a file, seconds in the file. Media never transcribed is transcribed on \
                 this Mac first: the result is then a job id — wait with get_job, then call transcribe again with the same \
-                arguments (the cache answers instantly; subtitles generated in SrtFlow earlier count too). Long transcripts come \
+                arguments (the cache answers instantly; subtitles generated in SkyCut earlier count too). Long transcripts come \
                 in pieces: call again with from = next_from. Use it to pick what to keep for a promo, or to find mistakes and \
                 filler words, then cut with cut_speech.
                 """,

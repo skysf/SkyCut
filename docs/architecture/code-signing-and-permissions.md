@@ -22,7 +22,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 
 ## 二、做法：一把固定的自签名证书
 
-- **证书**：自签名、只能签代码（EKU codeSigning）、20 年，名字「SrtFlow Signing」。签出来的 designated
+- **证书**：自签名、只能签代码（EKU codeSigning）、20 年，名字「SrtFlow Signing」（2026-10-18 改名 SkyCut 之后照旧用它：证书名用户看不见，换证书 = 所有授权再给一次，[产品名与代码名](product-name.md)）。签出来的 designated
   requirement 是 `identifier "<bundle id>" and certificate leaf = H"<证书的 SHA-1>"`，换版本不变，系统里给过的
   权限跟着走。2026-10-03 的探针：同一把证书签的两个不同构建（cdhash 不同）互相满足对方的 requirement
   （`codesign --verify -R`）；前一个构建在钥匙串里建的项，后一个构建不弹框就读得到（对照：两个 ad-hoc 构建读不到）。
@@ -31,7 +31,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 - **私钥在仓库外**：`~/.config/srtflow/signing/`（专用钥匙串 `srtflow-signing.keychain-db` + 它的密码
   `keychain-password`，目录 700、文件 600，同 `r2.env`）。仓库里只钉证书的 SHA-1：`packaging/signing-identity.sha1`。
 - **签名只经一处**：`scripts/signing/sign-app.sh`（`build-app.sh`、`build-beta-app.sh` 都调它）。先签
-  `Contents/Helpers` 里的 ffmpeg、srtflow-mcp，再签外层。有签名身份就用它签，签完核对 requirement 真的钉在
+  `Contents/Helpers` 里的 ffmpeg、skycut-mcp，再签外层。有签名身份就用它签，签完核对 requirement 真的钉在
   证书上；没有就退回 ad-hoc 并警告（README 里自己编着用的人不受影响）。只换了签名身份：没开 hardened runtime、
   没有 entitlement，和 ad-hoc 时一样。
 - **专用钥匙串只在签名那几秒挂上搜索列表**：codesign 只在搜索列表里的钥匙串中找身份，`--keychain` 只是在
@@ -50,11 +50,11 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
    `packaging/signing-identity.sha1`，并在发版说明里告诉用户要把录屏等权限重新给一次。
 3. **退回 ad-hoc 的包不许发版**（`sign-app.sh` 会打一段 ⚠️ 警告）。
 4. **App 这边**：录自定义区域发现没授权时，先 `ScreenCapturePermissionRepair.resetRecordOncePerBuild()` 再
-   `CGRequestScreenCaptureAccess()`。它用 `tccutil reset ScreenCapture <自己的 bundle id>` 删掉 SrtFlow 自己那条
+   `CGRequestScreenCaptureAccess()`。它用 `tccutil reset ScreenCapture <自己的 bundle id>` 删掉 SkyCut 自己那条
    录屏记录，**每个构建（cdhash）最多删一次**：删完、系统重新问过之后，同一个构建再被拒，要么用户没开，要么开了还没
-   重开 SrtFlow（授权下次启动才生效），再删只会把用户刚开的那条也删掉。改成固定签名之后升级不会再让记录作废，它兜的是
+   重开 SkyCut（授权下次启动才生效），再删只会把用户刚开的那条也删掉。改成固定签名之后升级不会再让记录作废，它兜的是
    改签之前留下的旧记录和没有证书的构建。调 `tccutil` 的只有它；起子进程用 `ChildProcess`（结束回调，不占线程）。
-5. **给用户的话不写「关掉再打开」**：拨开关救不回钉着旧签名的记录。写「到系统设置里打开 SrtFlow，再退出并重新打开」。
+5. **给用户的话不写「关掉再打开」**：拨开关救不回钉着旧签名的记录。写「到系统设置里打开 SkyCut，再退出并重新打开」。
 6. 冒烟用的开发版（`SrtFlowDev.app` 等，[GUI 冒烟流程](../testing/gui-smoke-testing.md)）照旧 ad-hoc：它们的权限本来就
    每次重给。
 
@@ -73,7 +73,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 
 够不着的（系统设置、系统弹框、TCC.db 要完全磁盘访问），发版前实机走一遍：
 
-1. `codesign -d -r- dist/SrtFlow.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`。
+1. `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`。
 2. 装上之后录一次自定义区域：没授权时系统弹框问 → 打开 → 退出并重新打开 → 能录。
 3. 再装下一个版本（不同的 cdhash）：不用再授权，自定义区域照样能录；读下载文件夹不弹框；fal 的 Key 不弹框。
 4. 有完全磁盘访问的终端里：`sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select hex(csreq) from access

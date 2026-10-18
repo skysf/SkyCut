@@ -41,13 +41,13 @@ enum AIProjectOpenTools {
             project = OpenProjects.shared.primary
             await project.openProject(at: url)
             guard let opened = project.documentURL, ProjectFileIdentity.same(opened, url) else {
-                throw AIToolError(project.notice ?? "SrtFlow could not open \(url.lastPathComponent).")
+                throw AIToolError(project.notice ?? "SkyCut could not open \(url.lastPathComponent).")
             }
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
             _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
             guard let opened = await OpenProjects.shared.open(url, placement: inFront ? .window(inFront: true) : .background) else {
-                throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not open \(url.lastPathComponent).")
+                throw AIToolError(OpenProjects.shared.failure ?? "SkyCut could not open \(url.lastPathComponent).")
             }
             project = opened
         }
@@ -82,14 +82,14 @@ enum AIProjectOpenTools {
         if inFront, sessions.primaryIsFree(for: session) {
             primary.newProject()
             guard primary.documentURL == nil, primary.state.isEmpty, primary.saveDocument(as: url) else {
-                throw AIToolError(primary.notice ?? "SrtFlow could not save the new project to \(url.path).")
+                throw AIToolError(primary.notice ?? "SkyCut could not save the new project to \(url.path).")
             }
             project = primary
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
             _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
             guard let created = OpenProjects.shared.newProject(savingAs: url, placement: inFront ? .window(inFront: true) : .background) else {
-                throw AIToolError(OpenProjects.shared.failure ?? "SrtFlow could not save the new project to \(url.path).")
+                throw AIToolError(OpenProjects.shared.failure ?? "SkyCut could not save the new project to \(url.path).")
             }
             project = created
         }
@@ -114,15 +114,15 @@ enum AIProjectOpenTools {
         if project === OpenProjects.shared.primary {
             // 主窗口永远有一个工程：替它存好，再换成一个空的 Untitled（换之前没存过的先存进 SrtFlow/工程，不弹框）。
             if project.isUntitled, !project.state.isEmpty, AIProjectTools.saveUntitled(project) == nil {
-                throw AIToolError("Not closed: SrtFlow could not save \(id) (\(project.notice ?? "unknown error")).")
+                throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
             guard project.flushAutosave(), OpenProjects.shared.resetPrimary() else {
-                throw AIToolError("Not closed: SrtFlow could not save \(id) (\(project.notice ?? "unknown error")).")
+                throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
             sessions.release(project)
         } else {
             guard OpenProjects.shared.close(project) else {
-                throw AIToolError("Not closed: SrtFlow could not save \(id) (\(project.notice ?? "unknown error")).")
+                throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
             sessions.release(project)
         }

@@ -23,7 +23,7 @@ struct FalSettingsRow: View {
             } label: {
                 Text(verbatim: "fal.ai")
             }
-            Text("Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SrtFlow stays within the daily limit below and asks you before going over it.")
+            Text("Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -106,7 +106,7 @@ struct FalSettingsRow: View {
         } label: {
             Text("Daily limit")
         }
-        .instantHelp("SrtFlow asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)")
+        .instantHelp("SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)")
         .onDisappear(perform: commitLimit)
     }
 
@@ -138,7 +138,7 @@ private struct FalModelRow: View {
                 if store.settings.overrides[kind.rawValue] != nil {
                     Button("Reset") { store.resetModel(kind: kind); load() }
                         .controlSize(.small)
-                        .instantHelp("Go back to the model SrtFlow picked for this")
+                        .instantHelp("Go back to the model SkyCut picked for this")
                 }
             }
             HStack(spacing: 6) {

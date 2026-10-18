@@ -130,7 +130,7 @@ enum AIShotScan {
         }
         if control.isCancelled { return .failure(AIToolError("Finding the shots in \(url.lastPathComponent) was cancelled.")) }
         guard let signals, !signals.times.isEmpty else {
-            return .failure(AIToolError("SrtFlow could not read the pictures of \(url.lastPathComponent)."))
+            return .failure(AIToolError("SkyCut could not read the pictures of \(url.lastPathComponent)."))
         }
         let cuts = AIShotDetector.cutIndices(changes: signals.changes, brightness: signals.brightness, times: signals.times)
         let end = max(duration, signals.times.last ?? 0)

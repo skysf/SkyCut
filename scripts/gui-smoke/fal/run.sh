@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# fal.ai 生成的端到端冒烟：真的 App + 真的 srtflow-mcp + 本机的假 fal（fakefal.py）。
+# fal.ai 生成的端到端冒烟：真的 App + 真的 skycut-mcp + 本机的假 fal（fakefal.py）。
 # 用法：
 #   swift build --arch arm64                # 先编好
 #   scripts/gui-smoke/fal/run.sh [每日上限]   # 组装独立的测试 App、起假 fal、后台启动 App
@@ -50,10 +50,10 @@ P="$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName SrtFlowFalSmoke" "$P" || true
 /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName SrtFlowFalSmoke" "$P" || true
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 0.0.0-falsmoke" "$P" || true
-cp "$BUILD/srtflow-mcp" "$APP/Contents/Helpers/srtflow-mcp"
+cp "$BUILD/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"
 cp vendor/ffmpeg "$APP/Contents/Helpers/ffmpeg"
 codesign --force --sign - --timestamp=none "$APP/Contents/Helpers/ffmpeg" >/dev/null 2>&1
-codesign --force --sign - --timestamp=none "$APP/Contents/Helpers/srtflow-mcp" >/dev/null 2>&1
+codesign --force --sign - --timestamp=none "$APP/Contents/Helpers/skycut-mcp" >/dev/null 2>&1
 codesign --force --deep --sign - "$APP" >/dev/null 2>&1
 
 # ---- 假 fal 要回的文件（用仓库的 vendor/ffmpeg 现做：这是测试夹具）

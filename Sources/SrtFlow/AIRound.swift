@@ -58,7 +58,7 @@ final class AIRound: ObservableObject {
         let quiet = Date().timeIntervalSince(lastCallAt)
         lastCallAt = Date()
         if quiet < AISession.stopQuietSeconds {
-            return "The user pressed Stop on project \(projectID) in SrtFlow. Nothing was changed. "
+            return "The user pressed Stop on project \(projectID) in SkyCut. Nothing was changed. "
                 + "Stop calling tools for it and ask the user what to do next."
         }
         phase = .idle
