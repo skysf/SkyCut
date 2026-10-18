@@ -317,7 +317,7 @@ private func runL16WrapChecks() {
     for (text, fraction, expected) in [("工作区里有三个标签页 图像、视频和音乐", 0.5, ["工作区里有三个标签页", "图像、视频和音乐"]),
                                        ("视频标签页也提供了 多个目前最强的视频模型！", 0.6, ["视频标签页也提供了", "多个目前最强的视频模型！"])] {
         let rows = texts(lines(text, style: big, maxWidth: fraction * 1920), in: text)
-        checkEqual(rows, expected, "wrap rules: the space between Chinese phrases (a removed comma) is where the row breaks")
+        check(rows == expected, "wrap rules: the space between Chinese phrases (a removed comma) is where the row breaks (got \(rows))")
     }
     let names = texts(lines(l16Names, style: hiragino, maxWidth: 1760), in: l16Names)
     check(names.count == 2 && names[0].hasSuffix("、"), "wrap rules: the list breaks after its 、, not inside OpenAI 的 GPT Image (got \(names))")
