@@ -9,8 +9,10 @@ import SwiftUI
 //
 // 性能：这一节只读注册表的 `others`（没有 AI 的工程时什么都不画）；每一行自己订阅那个工程的 `AIRound`，任务进度每秒问一次
 // （`TimelineView`，只在有行时存在）—— 主窗口的根视图不因此多重算（docs/architecture/preview-perf-ratchet.md 第十三节）。
+// 挂在 List 里，**不许套 `.equatable()`**（所以也不做成 Equatable）：List 把 EquatableView 当成一行，这里的 Section 只剩标题、
+// 工程那几行全丢（docs/bugfixes/2026-10-18-ai-projects-sidebar-rows-never-shown.md，checks/list-section-not-equatable.sh）。
 
-struct AIProjectsSidebarSection: View, Equatable {
+struct AIProjectsSidebarSection: View {
     /// 侧边栏窄到只放得下图标。
     let isCompact: Bool
 
