@@ -150,9 +150,15 @@ DIRECT="$(code_hits '\.newProject()\|\.openProject(at:' Sources/SrtFlow \
 [ -z "${DIRECT}" ] || fail "这些地方绕过了 userNew / userOpen 直接换工程（AI 正在剪的工程会被换掉）：${DIRECT}"
 grep -q 'Task { await OpenProjects.shared.userOpen(url, from: self) }' "$DOCUMENT" \
   || fail "${DOCUMENT} 的「打开工程…」面板没经 userOpen"
-# 13. 主窗口侧边栏有「AI 在剪的工程」（后台工程唯一的停止 / 打开窗口 / 关掉）。
-grep -q 'AIProjectsSidebarSection(isCompact: isSidebarCompact).equatable()' Sources/SrtFlow/MainWindowView.swift \
-  || fail "主窗口侧边栏没挂 AIProjectsSidebarSection：后台工程没有地方停、没有地方关"
+# 13. 主窗口侧边栏有「AI 在剪的工程」（后台工程唯一的停止 / 打开窗口 / 关掉），而且**不套 `.equatable()`**：
+#     List 把 EquatableView 当一行，这一节只画出标题、工程那几行全丢（docs/bugfixes/2026-10-18-ai-projects-sidebar-rows-never-shown.md；
+#     这里原来按字面钉着带 `.equatable()` 的写法，把错的钉成了对的）。通用的那条在 checks/list-section-not-equatable.sh。
+SIDEBAR_LINE="$(grep -n 'AIProjectsSidebarSection(isCompact: isSidebarCompact)' Sources/SrtFlow/MainWindowView.swift || true)"
+if [ -z "${SIDEBAR_LINE}" ]; then
+  fail "主窗口侧边栏没挂 AIProjectsSidebarSection：后台工程没有地方停、没有地方关"
+elif grep -c 'equatable' <<<"${SIDEBAR_LINE}" >/dev/null; then
+  fail "主窗口侧边栏的 AIProjectsSidebarSection 套了 .equatable()：List 里整节只剩标题，工程那几行不出来"
+fi
 
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"

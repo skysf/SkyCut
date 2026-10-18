@@ -152,7 +152,9 @@ struct MainWindowView: View {
                 }
             }
             // AI 开在主窗口以外的工程（后台的、工程窗口里的）：停止 / 打开窗口 / 关掉（方案板 8）。没有就不出现。
-            AIProjectsSidebarSection(isCompact: isSidebarCompact).equatable()
+            // **不许套 `.equatable()`**：List 把 EquatableView 当成一行，里面的 Section 只画出标题、工程那几行全丢
+            // （docs/bugfixes/2026-10-18-ai-projects-sidebar-rows-never-shown.md）。输入只有一个 Bool，SwiftUI 自己按值比。
+            AIProjectsSidebarSection(isCompact: isSidebarCompact)
         }
         .listStyle(.sidebar)
         .background {

@@ -199,6 +199,11 @@ CI 虚拟机上偶尔有一个**不发任何窗口 / App 通知**的系统事件
 struct 里不读工程的属性 —— 调方法、写入、`clock` / `meters`、标了「手势里现读」的放行；构造处紧跟
 `.equatable()`）。盲区：在 body 里**调**工程的方法，一样会订阅方法里读到的属性。新加一种块，往那张表里加一行。
 
+**`.equatable()` 只套在「一个视图就是一块东西」的地方**（时间线上的块、横幅里的状态行）。它把视图包成一个整体：放在 `List` 里，
+会产出几行的视图（body 里有 `Section`、`ForEach`）套上之后**只算一行** —— 主窗口侧边栏「AI 在剪的工程」就这样只画出了标题、
+工程那几行一行都没有（2026-10-18 探针实测，[案例](../bugfixes/2026-10-18-ai-projects-sidebar-rows-never-shown.md)）。输入只有值类型的视图
+不用套：SwiftUI 自己按值比、没变不重算。守卫：`checks/list-section-not-equatable.sh`（body 里有 `Section` 的视图，构造处不许套）。
+
 拖动位移那一半 2026-09-25 也做了：会话搬进 `TimelineDragBox`，时间线持有不订阅、块只收自己那份，
 拖动每一拍时间线 body 不再重算（[拖动手势](timeline-drag-gestures.md) §0b，案例
 [拖动会话住在时间线的 @State 里](../bugfixes/2026-09-25-drag-session-in-timeline-state.md)）。
