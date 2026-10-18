@@ -6,13 +6,17 @@
 # 2026-09-29 PR #84、2026-10-01 PR #132 三次都是这样）。全部跑一遍只要几十秒，不编译、不碰 .build，可以和编自检的脚本并行。
 # `scripts/check-all.sh` 照样逐条跑它们；这里只是本地推之前的快入口。
 #
+# 自检脚本里编译之前的那一段扫描也算（2026-10-18 起：`scripts/check-mcp.sh --scans-only`）—— 它们 source 进来的
+# checks/MCP/*-wiring.sh 不在 checks/ 顶层，以前只在 CI 上跑得到（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
+#
 # 用法：scripts/check-guards.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 FAILED=()
-for guard in checks/*.sh; do
-  if output="$(bash "${guard}" 2>&1)"; then
+for guard in checks/*.sh "scripts/check-mcp.sh --scans-only"; do
+  # shellcheck disable=SC2086
+  if output="$(bash ${guard} 2>&1)"; then
     printf '  ✓ %s\n' "${guard}"
   else
     printf '  ✗ %s\n' "${guard}"

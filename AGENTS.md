@@ -96,7 +96,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   系统权限或手势时，另按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 执行。
 - 修改 shell 脚本前，先读
   [构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)。
-- **推之前跑 `scripts/check-guards.sh`**（全部 `checks/*.sh` 扫描守卫，几十秒、不编译）。搬代码 / 改名之后尤其要跑：守卫按文件名找
+- **推之前跑 `scripts/check-guards.sh`**（全部 `checks/*.sh` 扫描守卫 + `scripts/check-mcp.sh --scans-only` 编译之前的扫描，几十秒、不编译）。搬代码 / 改名之后尤其要跑：守卫按文件名找
   接线，挑着跑几条漏掉的那条只会在 CI 上红（[PR #132 首跑](docs/bugfixes/2026-10-01-pr132-first-ci-run-guard-in-moved-insert.md)，
   同一个坑第三次）。
 
@@ -361,7 +361,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（第 1 组）。
-- 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，推之前必跑；`check-all.sh` 照样逐条跑它们）。
+- 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，再加 `scripts/check-mcp.sh --scans-only` —— check-mcp 编译之前那一段扫描、连同它 source 进来的 `checks/MCP/*-wiring.sh`，以前只在 CI 上跑得到；推之前必跑；`check-all.sh` 照样逐条跑它们）。
 - 本文件的索引必须是全的：`docs/` 下每一份文档都要能从这里找到，且没有死链 ——
   `checks/docs-index-drift.sh`。只读 AGENTS.md 的代理打不开索引外的文档，
   所以漏一行等于那份文档不存在。
