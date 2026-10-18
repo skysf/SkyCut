@@ -185,30 +185,8 @@ if [ "$(grep -c 'AIProjectTools.saveIfNeverSaved(project, after: result)' "${ROU
 fi
 echo "   ✓ 没有「影片」；三处默认位置走同一个起点；改工程的调用之后都会给没存过的工程存盘"
 
-echo "==> listen 只听时间线上的某几秒：from / to 读进来、片段和整条时间线都按它裁"
-# 2026-10-14 用户拍板（docs/architecture/ai-control-mcp.md 第四节第 13 条）；纯值在 checks/MCP/ListenChecks.swift。
-LISTEN_TOOL="Sources/SrtFlow/AIListenTool.swift"
-if [ "$(grep -c 'settings.from = try args.double("from")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIAudioLevels.sourceWindow(of: clip, from: settings.from, to: settings.to)' "${LISTEN_TOOL}" || true)" -lt 2 ] \
-   || [ "$(grep -c 'AIAudioLevels.sourceWindow(of: $0, from: settings.from, to: settings.to)' "${LISTEN_TOOL}" || true)" -ne 1 ]; then
-  echo "✗ ${LISTEN_TOOL} 的 from / to 没接上：片段或整条时间线照旧整段量" >&2
-  exit 1
-fi
-echo "   ✓ from / to 读进来；一段片段、整条时间线都只量落在里面的那几秒"
-
-echo "==> listen cuts=true：V1 的剪辑点一次查完，转写只读缓存、声音从哪段来复用 cut_speech 的"
-# 2026-10-16（docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md；第四节第 13 条）；纯值在 checks/MCP/CutCheckChecks.swift。
-CUTS_TOOL="Sources/SrtFlow/AIListenCuts.swift"
-if [ "$(grep -c 'args.bool("cuts")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIListenCuts.check(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AITranscribeTool.cached(' "${CUTS_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AISpeechCutTool.speechClip(' "${CUTS_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIListenTool.waveform(' "${CUTS_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -cE 'TranscriptHarvester|TranscriptionTask|SpeechTranscriptionService' "${CUTS_TOOL}" || true)" -ne 0 ]; then
-  echo "✗ listen cuts=true 没接好：listen 要读 cuts 并交给 AIListenCuts；AIListenCuts 只读转写缓存（AITranscribeTool.cached）、声音从哪段来用 AISpeechCutTool.speechClip、波形用 AIListenTool.waveform，不许自己起转写" >&2
-  exit 1
-fi
-echo "   ✓ listen 读 cuts；剪辑点检查只读转写缓存、复用 cut_speech 的声音来源和 listen 的波形"
+# shellcheck source=checks/MCP/listen-wiring.sh
+source checks/MCP/listen-wiring.sh
 
 echo "==> 压缩 / 烧录：AI 的条目自带设置和输出位置，不替用户开跑"
 # AI 给的参数只用于它排的那几条（不改页面上记住的设置），页面上改设置 / 输出文件夹不碰 AI 的条目；
@@ -491,6 +469,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIBeatAnalysisWindow.swift \
   Sources/SrtFlow/AISpeechCuts.swift \
   Sources/SrtFlow/AISpeechCutPoints.swift \
+  Sources/SrtFlow/AISpeechHearing.swift \
   Sources/SrtFlow/AICutCheck.swift \
   Sources/SrtFlow/AIBeatCuts.swift \
   Sources/SrtFlow/VideoEditClipboardPayload.swift \
@@ -579,6 +558,7 @@ xcrun swiftc \
   checks/MCP/BeatChecks.swift \
   checks/MCP/SpeechCutChecks.swift \
   checks/MCP/SpeechCutPointChecks.swift \
+  checks/MCP/SpeechHearingChecks.swift \
   checks/MCP/BeatCutChecks.swift \
   checks/MCP/ProviderChecks.swift \
   checks/MCP/UpscaleToolChecks.swift \

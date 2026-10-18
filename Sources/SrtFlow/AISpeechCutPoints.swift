@@ -16,7 +16,10 @@ import SrtFlowCore
 // 为什么先听（docs/bugfixes/2026-10-14-cut-speech-trusts-word-times.md）：转写的词时间是给字幕估的 —— 停顿后面第一个词的开口
 // 故意往前估（`SubtitleSpeechOnset`：字幕宁早勿晚），句末的词常把后面的停顿并进自己的结尾，前后差 0.1–0.3 秒；只信它，
 // AI 拿 listen 量好的静音切口会被挪进词里（「When」的开头被切掉、带进上一句的尾音）。
-// 不管什么：哪几段要剪（AISpeechCuts）、读波形和结果怎么写（AISpeechCutTool）。
+// 数据（停顿、安静窗、词）永远是声音的源秒；cut_speech 问的、拿回去的是时间线秒（`clip`），进出各换一次 —— listen cuts=true
+// 直接问源秒。两边的数据都从 `AISpeechHearing` 来（整个素材文件一份），同一个源时刻判得一样
+// （docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
+// 不管什么：哪几段要剪（AISpeechCuts）、读波形和结果怎么写（AISpeechCutTool）、输入从哪来（AISpeechHearing）。
 
 struct AISpeechCutPoints {
     /// 这一刀是一段的开头（后面接着说话）还是结尾（前面刚说完）。
@@ -36,14 +39,17 @@ struct AISpeechCutPoints {
         var why: String
     }
 
-    /// 转写的词（时间线秒，按时间排）；没转写过是空的。
+    /// 转写的词（源秒，按时间排）；没转写过是空的。
     let words: [SpeechTranscript.Word]
-    /// 量出来的停顿（时间线秒，至少 `minPause` 长）；读不到声音是 nil。
+    /// 量出来的停顿（源秒，至少 `minPause` 长）；读不到声音是 nil。
     let pauses: [ClosedRange<Double>]?
-    /// 每一个比门限轻的窗（时间线秒）：找不到够长的停顿时的退路。
+    /// 每一个比门限轻的窗（源秒）：找不到够长的停顿时的退路。
     let quiet: [ClosedRange<Double>]
     /// false = 照给的时间切（AI 传了 snap=false）。只管 AI 给的时间；口头禅、重复词的边永远要挪（`snapping`）。
     var snaps: Bool
+    /// 问的时刻是这段声音在时间线上的秒（cut_speech）；nil = 直接问源秒（listen cuts=true）。0.1 秒算不算停顿、最多挪 0.3 秒
+    /// 都按声音自己的秒算，变速的片段上两个工具也判得一样。
+    var clip: EditClip?
 
     /// 挪进停顿最多离声音多远（秒）：同转写那一套（`AISpeechCuts.maxShift`）。
     static let reach = AISpeechCuts.maxShift
@@ -55,11 +61,14 @@ struct AISpeechCutPoints {
     static let reportThreshold = 0.05
 
     /// - Parameters:
-    ///   - levels: 这段声音按窗的电平（时间线秒，`AIAudioLevels.windows` 换到时间线上）；读不到声音传 nil。
+    ///   - words: 转写的词（源秒，按时间排）。
+    ///   - levels: 这段声音按窗的电平（源秒，`AIAudioLevels.windows`）；读不到声音传 nil。
     ///   - silenceDB: 比它轻的窗算安静。
-    init(words: [SpeechTranscript.Word], levels: [AIAudioLevels.Window]?, silenceDB: Double, snaps: Bool = true) {
+    ///   - clip: 问的时刻是它在时间线上的秒（cut_speech）；nil = 问源秒。
+    init(words: [SpeechTranscript.Word], levels: [AIAudioLevels.Window]?, silenceDB: Double, snaps: Bool = true, clip: EditClip? = nil) {
         self.words = words
         self.snaps = snaps
+        self.clip = clip
         guard let levels else {
             pauses = nil
             quiet = []
@@ -78,30 +87,37 @@ struct AISpeechCutPoints {
 
     // MARK: 一处切口
 
+    /// `time` 是问的那条轴上的秒（`clip` 给了就是时间线秒），回来的也是。
     func point(_ time: Double, _ side: Side) -> Point {
         guard snaps else { return Point(time: time) }
-        if let pauses, pauses.contains(where: { Self.holds($0, time, tolerance: Self.edgeTolerance) }) { return Point(time: time) }
+        let at = source(time)
+        if let pauses, pauses.contains(where: { Self.holds($0, at, tolerance: Self.edgeTolerance) }) { return Point(time: time) }
         let proposed = side == .start
-            ? AISpeechCuts.startPoint(time, words: words) : AISpeechCuts.endPoint(time, words: words)
+            ? AISpeechCuts.startPoint(at, words: words) : AISpeechCuts.endPoint(at, words: words)
         guard let pauses else {
-            return Point(time: proposed, why: proposed == time ? nil : "on a word in the transcript: moved to the gap between words")
+            return proposed == at
+                ? Point(time: time) : Point(time: asked(proposed), why: "on a word in the transcript: moved to the gap between words")
         }
         if pauses.contains(where: { Self.holds($0, proposed, tolerance: 0) }) {
-            return Point(time: proposed, why: "on speech: moved into the pause between the words")
+            return Point(time: asked(proposed), why: "on speech: moved into the pause between the words")
         }
-        let area = searchArea(around: time, proposed: proposed)
+        let area = searchArea(around: at, proposed: proposed)
         if let pause = Self.nearest(pauses, to: proposed, within: area) {
-            return Point(time: place(in: pause, side), why: "on speech: moved into the pause \(Self.text(pause))")
+            return Point(time: asked(place(in: pause, side)), why: "on speech: moved into the pause \(text(pause))")
         }
         if let spot = Self.nearest(quiet, to: proposed, within: area) {
-            return Point(time: (spot.lowerBound + spot.upperBound) / 2, why: "on speech: moved to the quiet spot between the words")
+            return Point(time: asked((spot.lowerBound + spot.upperBound) / 2), why: "on speech: moved to the quiet spot between the words")
         }
         return Point(
-            time: proposed,
+            time: proposed == at ? time : asked(proposed),
             why: words.isEmpty ? "on speech, no pause within 0.3 s" : "on speech, no pause near it: cut between the words as transcribed",
             onSpeech: true
         )
     }
+
+    /// 问的那条轴上的秒 → 声音的源秒，和反过来（`clip` 是 nil 时两边一样）。
+    private func source(_ time: Double) -> Double { clip?.sourceTime(atTimeline: time) ?? time }
+    private func asked(_ source: Double) -> Double { clip?.timelineTime(atSource: source) ?? source }
 
     /// AI 给的一段（要剪掉的或要留下的），两头各切在哪。挪完两头碰到了一起（整段在一个词里，两头挪进了同一个停顿）
     /// 就照给的时间切 —— 不然要留的一段会整个没了、要剪的一段什么都不剪。
@@ -163,7 +179,8 @@ struct AISpeechCutPoints {
         return spans.filter { $0.overlaps(area) }.min { distance($0) < distance($1) }
     }
 
-    private static func text(_ span: ClosedRange<Double>) -> String {
-        String(format: "%.2f–%.2f s", span.lowerBound, span.upperBound)
+    /// 一段停顿写给 AI 看：换回问的那条轴（cut_speech 的 `moved` 里是时间线秒）。
+    private func text(_ span: ClosedRange<Double>) -> String {
+        String(format: "%.2f–%.2f s", asked(span.lowerBound), asked(span.upperBound))
     }
 }

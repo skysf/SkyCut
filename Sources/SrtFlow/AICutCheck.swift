@@ -10,10 +10,14 @@ import SrtFlowMCPKit
 //   一个剪辑点报，跨着转场的也合成一个并带上叠了多久，开着缝的各报各的；第一段的头、最后一段的尾也报（成片从哪儿开口、到哪儿收）。
 // - 每一头（`side`）在**那段声音自己的源时间轴**上判：声音从哪一段来由调用方定（同 cut_speech：自己有声就是自己，静音了 /
 //   声音分离出去了就是链接的那段）；在不在停顿里、挪到哪，判法只有 `AISpeechCutPoints` 一份 —— 先听量出来的停顿，转写只用来
-//   认词（docs/bugfixes/2026-10-14-cut-speech-trusts-word-times.md）。**在声音上才报切到的词**：转写把停顿后面第一个词的开口
-//   故意估早了，在停顿里按词判会冤枉它。
-// - 建议的入出点换回这一段 V1 片段自己的源时间（声音从链接的那段来时两条源时间轴可能不一样），AI 直接拿去 edit_clip；
-//   落到素材外面的不给。
+//   认词（docs/bugfixes/2026-10-14-cut-speech-trusts-word-times.md）；输入也和 cut_speech 同一份（`AISpeechHearing`）。
+//   **在声音上才报切到的词**：转写把停顿后面第一个词的开口故意估早了，在停顿里按词判会冤枉它。
+// - 结论就是 cut_speech 在这一刻会怎么做：不挪 = in_pause；附近没有真停顿、cut_speech 也只能停在最安静的那一格 = quiet_spot；
+//   cut_speech 会把它挪走（挪进停顿，或从声音上挪到最安静的一格）= on_speech。**落在一个安静窗上不等于 quiet_spot**：词的尾音里
+//   也有几十毫秒的低谷，旁边够得着真停顿时 cut_speech 会挪进停顿（2026-10-18 L16，
+//   docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
+// - 建议的入出点就是 cut_speech 落刀的地方（对齐到工程的帧），换回这一段 V1 片段自己的源时间（声音从链接的那段来时两条源时间轴
+//   可能不一样），AI 直接拿去 edit_clip；落到素材外面的不给。
 // 不管什么：波形和转写缓存怎么读、参数（AIListenCuts）；判法本身（AISpeechCutPoints）。
 
 struct AICutCheck {
@@ -89,25 +93,28 @@ struct AICutCheck {
     }
 
     /// `clip` 这一头在时间线 `at` 上；声音从 `sound` 来（自己或链接的那段），`points` 是在 `sound` 的源时间轴上建的（要带着量出来的停顿）。
-    static func side(of clip: EditClip, end: AISpeechCutPoints.Side, at: Double, sound: EditClip, points: AISpeechCutPoints) -> Side {
+    /// `frame`：工程一帧多长，建议的那一刻对齐到它（cut_speech 落刀也对齐到帧）；0 = 不对齐。
+    static func side(
+        of clip: EditClip, end: AISpeechCutPoints.Side, at: Double, sound: EditClip, points: AISpeechCutPoints, frame: Double = 0
+    ) -> Side {
         let sourceAt = sound.sourceTime(atTimeline: at)
         let point = points.point(sourceAt, end)
         var side = Side(clipID: clip.id, end: end, at: at, verdict: .inPause)
         guard let why = point.why else { return side }
-        if points.quiet.contains(where: { holds($0, sourceAt) }) {
-            // 最安静的那一格：只有真的停顿可去才建议挪 —— 挪到另一个安静窗没有意义（挪过去再查还是这一句）。
+        // cut_speech 会把它挪进一段真的停顿：这一刀就不在停顿里，哪怕正落在一个安静的窗上（尾音里的低谷）。quiet_spot 只给
+        // 附近没有真停顿、cut_speech 自己也只能停在最安静那一格的切口，这时不再建议 —— 挪到另一个安静窗没有意义（挪过去再查还是这一句）。
+        let pause = points.pauses?.first { holds($0, point.time, tolerance: 0) }
+        if pause == nil, points.quiet.contains(where: { holds($0, sourceAt) }) {
             side.verdict = .quietSpot
-            guard points.pauses?.contains(where: { holds($0, point.time, tolerance: 0) }) == true else { return side }
-        } else {
-            side.verdict = .onSpeech(word: word(at: sourceAt, in: points.words), why: why)
+            return side
         }
-        if abs(point.time - sourceAt) > 1e-6 {
-            let suggestedAt = sound.timelineTime(atSource: point.time)
-            let source = clip.sourceTime(atTimeline: suggestedAt)
-            if source >= -1e-6, source <= clip.assetDuration + 1e-6 {
-                side.suggestedSource = max(0, source)
-                side.suggestedAt = suggestedAt
-            }
+        side.verdict = .onSpeech(word: word(at: sourceAt, beside: pause, in: points.words), why: why)
+        // 建议的就是 cut_speech 落刀的地方：对齐到帧之后还在原地（挪得不到半帧）、落到素材外面的不给。
+        let suggestedAt = AISpeechCuts.onFrame(sound.timelineTime(atSource: point.time), frame: frame)
+        let source = clip.sourceTime(atTimeline: suggestedAt)
+        if abs(suggestedAt - at) > 1e-6, source >= -1e-6, source <= clip.assetDuration + 1e-6 {
+            side.suggestedSource = max(0, source)
+            side.suggestedAt = suggestedAt
         }
         return side
     }
@@ -122,11 +129,19 @@ struct AICutCheck {
     }
 
     /// 这一刻切到的词：盖着它的那个；没有就是离它不到 `AISpeechCuts.maxShift` 的最近一个（识别器给的词边和声音差零点几秒，
-    /// 「When I」连着说时 42.1 落在转写的两个词之间、声音上却正在说话）。
-    static func word(at time: Double, in words: [SpeechTranscript.Word]) -> String? {
-        if let covering = words.first(where: { $0.start - 1e-3 <= time && time <= $0.end + 1e-3 }) { return covering.text }
+    /// 「When I」连着说时 42.1 落在转写的两个词之间、声音上却正在说话）。cut_speech 会把它挪进 `pause` 时，只在停顿这一边的
+    /// 词里找 —— 停顿在后面：词尾不过停顿开头的（说完了才停）；在前面：词尾过了停顿结尾的（停完才说完）。识别器把停顿并进相邻的词、
+    /// 估过的开口也宁早勿晚，只按时间远近会认到停顿那一边去（L16：切在「available.」的尾音上，「The」估的开口 77.56 已经在尾音里）。
+    static func word(at time: Double, beside pause: ClosedRange<Double>? = nil, in words: [SpeechTranscript.Word]) -> String? {
+        let tolerance = AISpeechCutPoints.edgeTolerance
+        let candidates = pause.map { pause in
+            time < pause.lowerBound
+                ? words.filter { $0.end <= pause.lowerBound + tolerance }
+                : words.filter { $0.end >= pause.upperBound - tolerance }
+        } ?? words
+        if let covering = candidates.first(where: { $0.start - 1e-3 <= time && time <= $0.end + 1e-3 }) { return covering.text }
         let distance = { (word: SpeechTranscript.Word) in min(abs(word.start - time), abs(word.end - time)) }
-        guard let nearest = words.min(by: { distance($0) < distance($1) }), distance(nearest) <= AISpeechCuts.maxShift else { return nil }
+        guard let nearest = candidates.min(by: { distance($0) < distance($1) }), distance(nearest) <= AISpeechCuts.maxShift else { return nil }
         return nearest.text
     }
 
