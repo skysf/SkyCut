@@ -48,6 +48,9 @@
    Claude Code 的放行规则 `mcp__skycut` 由它拼出来。
 4. **主窗口标题 `SkyCut` 在本地化守卫的豁免清单里**（App 名在任何语言下都一样，`checks/LocalizationCoverage/main.swift`）。
 5. **给 AI 的文字只用英文**这条不变（[AI 接口](ai-control-mcp.md) 第一节第 3 条）；名字短了一个字母，说明的长度上限更宽松，不用另外量。
+6. **可执行文件也必须叫 SkyCut**：菜单栏上的 App 菜单（「关于 / 隐藏 / 退出 SkyCut」）取的是可执行文件名，不是 `CFBundleName`
+   （2026-10-18 冒烟实测：测试版的 `CFBundleName` 是「SkyCut Beta」，菜单仍是「SkyCut」，[冒烟报告](../reports/2026-10-18-skycut-rename-smoke.md)）。
+   只改 `CFBundleName` 的话正式版菜单里还会写「退出 SrtFlow」。打包脚本把 SwiftPM 产品 `SrtFlow` 拷成 `MacOS/SkyCut`，守卫第 4 节钉着 `CFBundleExecutable`。
 
 ## 四、守卫
 
@@ -67,6 +70,9 @@
 `_srtflow_probe` 改成 `_skycut_probe`、服务器名改回 `srtflow` —— `checks/product-name.sh` 四条各自红、退出码 1；恢复后转绿。
 
 ## 五、人工回归（改名之后第一次装）
+
+2026-10-18 第一次装 0.18.47 时按下面几条冒烟过，第 1、2（录屏、下载文件夹）、3、4（用 `claude mcp add` 注册）、5、6 条都对；
+没验到的（「关于」窗口的样子、在 Finder 里真双击、fal 的 Key、真录一段）见 [冒烟报告](../reports/2026-10-18-skycut-rename-smoke.md) 第五节。
 
 1. Dock、启动台、「关于」、菜单栏的 App 菜单（「隐藏 SkyCut」「退出 SkyCut」）、Finder 里工程文件的「种类」都是 SkyCut。
 2. 录一次自定义区域、读一次下载文件夹、用一次 fal 的 Key：都**不**再问授权（bundle id 和证书都没变）。
