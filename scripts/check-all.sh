@@ -98,6 +98,7 @@ run_check "build（完整 App 编得过）" swift build --arch arm64
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
 run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh
 run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-build-output.sh
+run_check "ci-build-cache-key（扫描守卫：CI 的 .build 缓存 key 带检出目录，仓库改名后不捡旧目录编的缓存）" checks/ci-build-cache-key.sh
 run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
 run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
 run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
