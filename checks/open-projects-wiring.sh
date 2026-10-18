@@ -159,10 +159,27 @@ if [ -z "${SIDEBAR_LINE}" ]; then
 elif grep -c 'equatable' <<<"${SIDEBAR_LINE}" >/dev/null; then
   fail "主窗口侧边栏的 AIProjectsSidebarSection 套了 .equatable()：List 里整节只剩标题，工程那几行不出来"
 fi
+# 14. 导出器全 App 一个：编辑窗口和导出面板里的进度、停止、成片只给发起导出的那个工程（`exporter.belongs(to: project)`），
+#     开始导出的两条路（面板、AI）都带上是哪个工程（`export(for: project`）。不然 p1 的窗口里显示、还能停掉 p3 的 AI 导出
+#     （docs/bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md）。
+#     状态视图（VideoEditExportStatus）整个包在 `if exporter.belongs(to: project) {` 里，单独查。
+for file in Sources/SrtFlow/VideoEditView.swift Sources/SrtFlow/VideoEditExportSheet.swift; do
+  [ -f "${file}" ] || { fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"; continue; }
+  BARE="$(grep -nE 'if exporter\.isExporting[[:space:]]*\{' "${file}" || true)"
+  [ -z "${BARE}" ] || fail "${file} 只看「导出器在导」就显示进度 / 停止，没问是不是这个工程的（别的窗口会显示、能停掉它）：${BARE}"
+done
+[ "$(grep -c 'if exporter.belongs(to: project) {' Sources/SrtFlow/VideoEditExportStatus.swift || true)" -eq 1 ] \
+  || fail "导出面板的进度 / 报错 / 成片没按工程分（VideoEditExportStatus 里应先问 exporter.belongs(to: project)）"
+UNOWNED="$(awk '
+  /exporter\.export\(/ { if ($0 ~ /export\(for: project,/) next; at = FILENAME ":" FNR; pending = 1; next }
+  pending { if ($0 !~ /^[[:space:]]*for: project,/) print at; pending = 0 }
+' Sources/SrtFlow/*.swift)"
+[ -z "${UNOWNED}" ] || fail "这些地方开始导出时没说是哪个工程（exporter.export(for: project, …)）：${UNOWNED}"
 
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
   echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框；"
   echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台；用户新建 / 打开经 userNew / userOpen；侧边栏有 AI 在剪的工程"
+  echo "  导出器全 App 一个：进度 / 停止 / 成片只给发起导出的那个工程的窗口和面板"
 fi
 exit "${FAILED}"

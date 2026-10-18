@@ -137,7 +137,7 @@ struct VideoEditView: View {
                 .instantHelp("Show or hide the transition, filter and audio library")
             }
             ToolbarItemGroup(placement: .primaryAction) {
-                if exporter.isExporting {
+                if exporter.isExporting && exporter.belongs(to: project) {  // 导出器全 App 一个：只显示这个工程的
                     ProgressView(value: exporter.progress)
                         .frame(width: 80)
                 }
@@ -165,7 +165,7 @@ struct VideoEditView: View {
                 } label: {
                     Label("Export", systemImage: "square.and.arrow.up")
                 }
-                .disabled(project.state.isEmpty || exporter.isExporting)
+                .disabled(project.state.isEmpty || (exporter.isExporting && exporter.belongs(to: project)))  // 别的工程在导：面板里写着在等谁
                 .instantHelp("Export the timeline or the selected clips")
             }
         }
@@ -435,7 +435,7 @@ struct VideoEditView: View {
                 .instantHelp("Dismiss this message")
             }
 
-            if exporter.isExporting {
+            if exporter.isExporting && exporter.belongs(to: project) {  // 只停这个工程的导出，别的窗口里停不了它
                 Button {
                     exporter.cancel()
                 } label: {

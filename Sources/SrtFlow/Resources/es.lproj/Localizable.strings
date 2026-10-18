@@ -319,6 +319,7 @@
 "Export Video" = "Exportar video";
 "Subtitles are burned in with the Burn In tool's current style." = "Los subtítulos se incrustan con el estilo actual de la herramienta Incrustar.";
 "Exporting… %@" = "Exportando… %@";
+"“%1$@” is exporting… %2$@. This project can export when it is done." = "Se está exportando «%1$@»… %2$@. Este proyecto podrá exportarse cuando termine.";
 "Loudness %@ LUFS · Peak %@ dBFS" = "Sonoridad %@ LUFS · Pico %@ dBFS";
 "Peak %@ dBFS" = "Pico %@ dBFS";
 "The sound went over -1 dBFS for %@ s and was pushed down by up to %@ dB." = "El sonido superó -1 dBFS durante %@ s y se bajó hasta %@ dB.";

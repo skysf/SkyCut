@@ -62,7 +62,7 @@ enum AIExportTools {
         // 导出器空着就马上导，占着（别的工程在导、面板在导）就排队：排的是调用这一刻的时间线。
         let position = AIWorkQueue.shared.submit(.export, jobID: job.id) {
             work.started = true
-            exporter.export(state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings)
+            exporter.export(for: project, state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings)
             guard exporter.isExporting else {
                 reservedOutputs.remove(reserved)
                 AIJobs.shared.finish(job, .failed, message: exporter.errorMessage ?? "The export could not start.")
