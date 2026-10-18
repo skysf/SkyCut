@@ -11,6 +11,7 @@ func runCutCheckChecks() {
     checkCutBoundaries()
     checkCutSides()
     checkCutQuietSpot()
+    checkCutDipInWordTail()
     checkCutLinkedSound()
     checkCutJSON()
 }
@@ -129,13 +130,48 @@ private func checkCutQuietSpot() {
     checkEqual(moved.verdict, .quietSpot, "cut where it suggested, the head checks back as quiet_spot (not on_speech)")
     check(moved.suggestedSource == nil && moved.suggestedAt == nil, "…and nothing further is suggested")
     checkEqual(AICutCheck.side(of: clip, end: .end, at: suggestedAt, sound: clip, points: points).verdict, .quietSpot, "…the tail side too")
-    // 安静窗旁边够得着一个真的停顿：照旧建议挪进停顿。
+    // 安静窗旁边够得着一个真的停顿：cut_speech 会挪进停顿，所以不是 quiet_spot（2026-10-16 的第一版这里报 quiet_spot ——「cut_speech 也会
+    // 切在这」—— 同时又建议挪进停顿，自相矛盾；docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
     let withPause = AISpeechCutPoints(
         words: words, levels: cutLevels(from: 37.5, to: 40, loud: [37.5...38.45, 38.51...38.80, 39.20...40]), silenceDB: -40
     )
     let better = AICutCheck.side(of: clip, end: .start, at: suggestedAt, sound: clip, points: withPause)
-    checkEqual(better.verdict, .quietSpot, "a quiet window with a real pause within reach: still quiet_spot")
-    check(better.suggestedSource.map { $0 > 38.80 && $0 < 39.20 } == true, "…but it points at the real pause (got \(better.suggestedSource ?? -1))")
+    guard case .onSpeech = better.verdict else {
+        return check(false, "a lone quiet window with a real pause within reach: on_speech like cut_speech, got \(better.verdict)")
+    }
+    check(better.suggestedSource.map { $0 > 38.80 && $0 < 39.20 } == true, "…pointing at the real pause (got \(better.suggestedSource ?? -1))")
+    let cutSpeech = withPause.point(clip.sourceTime(atTimeline: suggestedAt), .start).time
+    check(better.suggestedSource.map { abs($0 - cutSpeech) < 1e-9 } == true,
+          "…exactly where cut_speech would cut (\(cutSpeech), got \(better.suggestedSource ?? -1))")
+}
+
+/// L16（2026-10-18 测试员）：「available.」的尾音里有一格 46 ms 的低谷（−48 dB），之后尾音又响了 0.1 秒，真停顿才开始；剪在低谷上
+///（77.417）。cut_speech 说这一刀在声音上、挪进停顿；检查以前说 quiet_spot（「可以不改、cut_speech 也会切在这」）同时又建议挪进停顿，
+/// 切到的词还会认成停顿后面的「The」。这里照那一刻的形状造：每 0.04 秒一个窗，−40 dB 的门限下 77.40–77.44 是低谷、77.56–77.88 是停顿。
+private func checkCutDipInWordTail() {
+    // 「The」估过的开口（77.56，停顿后第一个词宁早勿晚）已经在尾音里；「available.」照识别器收在 77.16。
+    let words = [cutWord("currently", 76.02, 76.44), cutWord("available.", 76.44, 77.16), cutWord("The", 77.56, 77.94), cutWord("aspect", 77.94, 78.3)]
+    let points = AISpeechCutPoints(
+        words: words, levels: cutLevels(from: 76, to: 78.4, loud: [76...77.40, 77.44...77.56, 77.88...78.4]), silenceDB: -40
+    )
+    // 剪完的那一段：源 1715–1858 帧（71.458–77.417），放在时间线 417 帧（17.375）上 —— 都在 24 fps 的格子上，同 cut_speech 剪出来的。
+    let frame = 1.0 / 24
+    let piece = videoClip(417 * frame, (1858 - 1715) * frame, asset: 162.25, sourceStart: 1715 * frame)
+    check(points.pauses?.count == 1 && points.quiet.contains { $0.contains(1858 * frame) },
+          "the sample: one pause (77.56–77.88) and a lone quiet window over 77.417 (got \(points.pauses ?? []))")
+    let tail = AICutCheck.side(of: piece, end: .end, at: piece.timelineEnd, sound: piece, points: points, frame: frame)
+    guard case .onSpeech(let word, let why) = tail.verdict else {
+        return check(false, "a tail in a dip inside the last word, with the pause 0.14 s on: on_speech (cut_speech moves it), got \(tail.verdict)")
+    }
+    checkEqual(word, "available.", "…the word it cuts is the one still sounding, not 'The' after the pause")
+    check(why.contains("pause"), "…and it says where cut_speech would cut (\(why))")
+    let cutSpeech = AISpeechCuts.onFrame(points.point(1858 * frame, .end).time, frame: frame)
+    check(tail.suggestedSource.map { abs($0 - cutSpeech) < 1e-6 } == true,
+          "…suggested source_out is where cut_speech cuts, on a frame (\(cutSpeech), got \(tail.suggestedSource ?? -1))")
+    guard let suggestedAt = tail.suggestedAt else { return check(false, "…with a timeline moment") }
+    let moved = videoClip(piece.timelineStart, suggestedAt - piece.timelineStart, asset: 162.25, sourceStart: piece.sourceStart)
+    checkEqual(AICutCheck.side(of: moved, end: .end, at: moved.timelineEnd, sound: moved, points: points, frame: frame).verdict, .inPause,
+               "cut where it suggested, the tail checks back as in_pause")
 }
 
 /// 画面静音、声音在链接的音频段上，两段的源时间轴不一样：判在声音那条轴上，建议换回画面这一段的源时间。

@@ -4,10 +4,11 @@ import SrtFlowMCPKit
 
 // MARK: - 工具：cut_speech（按文字剪、删停顿和口头禅，第 3 块的智能剪）
 //
-// 管什么：参数读成要剪掉的几截（`AISpeechCuts`，纯值），分两步：`plan` 可以 await（量这段声音 —— 画波形那一份数据，
-// 删停顿和把切口挪进真的停顿都用它；读转写缓存 —— transcribe 那一份），`apply` 同步落到时间线上（路由包
-// `AIUndoGrouping.step`，一次调用 = 一步撤销，同 edit_clip）。中途时间线变了（用户动了）就不落，请 AI 重来。
-// AI 给的时间挪了多少、哪一刀附近没有停顿，结果里照实报（`moved`、`notes`）。
+// 管什么：参数读成要剪掉的几截（`AISpeechCuts`，纯值），分两步：`plan` 可以 await（量这段声音 —— 画波形那一份数据；
+// 读转写缓存 —— transcribe 那一份），`apply` 同步落到时间线上（路由包 `AIUndoGrouping.step`，一次调用 = 一步撤销，同 edit_clip）。
+// 中途时间线变了（用户动了）就不落，请 AI 重来。AI 给的时间挪了多少、哪一刀附近没有停顿，结果里照实报（`moved`、`notes`）。
+// 把切口挪进真的停顿按**整个素材文件**的电平、门限和词判（`AISpeechHearing`，listen cuts=true 同一份，读法也在这里：
+// `wholeFile` / `transcript`）；删停顿照旧量这段片段。
 // 不管什么：切口落在哪（AISpeechCutPoints）、要剪哪几截、怎么切（AISpeechCuts）、说明文字（SrtFlowMCPKit/MCPSmartEditTools.swift）。
 //
 // 只剪 V1 上的片段（口播），链接的声音跟着剪。声音从片段自己来；它静音了、声音分离到了音频轨上，就用链接的那段声音。
@@ -45,28 +46,28 @@ enum AISpeechCutTool {
         }
         let snaps = try args.bool("snap") ?? true
         let speech = speechClip(of: clip, in: state)
-        let words = await transcriptWords(speech, state: state, language: try args.string("language") ?? "auto")
+        let transcript = await transcript(of: speech, in: state, language: try args.string("language") ?? "auto")
+        // 口头禅、重复词在这段片段里认（时间线秒）；切口判在哪用整个文件的词（AISpeechHearing）。
+        let words = transcript.map { SpeechTranscript.sentences(words: $0.words, window: $0.window).flatMap(\.words) }
         if (fillers || repeats), words == nil {
             throw AIToolError("Filler words and repeats come from the transcript: call transcribe on this clip first, then try again.")
         }
         let asked = (remove ?? []) + (keep ?? [])
         // 声音：删停顿要量它；切口也按它挪进真的停顿（只按给的时间剪、又说了 snap=false 时不用读）。
         let readsSound = pauseLength != nil || fillers || repeats || (!asked.isEmpty && snaps)
-        let levels = readsSound ? try await Self.levels(of: speech) : nil
+        let peaks = readsSound ? try await soundOf(speech) : nil
         let silenceDB = try args.double("silence_db")
-        let measured = levels.map { AISpeechCuts.silenceThreshold($0.map(\.decibels)) }
-        // 切口找停顿的门限：AI 给了就用它；没给就是这一段自己量的和 listen 的默认值里宽的那个 ——
-        // AI 照 listen 报的静音挑的一刻，这里也要算在停顿里。
-        let points = AISpeechCutPoints(
-            words: words ?? [], levels: levels,
-            silenceDB: silenceDB ?? max(measured ?? AIAudioLevels.defaultSilenceDB, AIAudioLevels.defaultSilenceDB),
-            snaps: snaps
-        )
+        // 切口找停顿：整个文件的电平和词、按整个文件量的门限（AI 给了 silence_db 就用它），和 listen cuts=true 判的是同一份。
+        let hearing = AISpeechHearing(levels: peaks.map { AIAudioLevels.windows($0, from: 0, to: $0.duration) }, transcript: transcript?.words)
+        let points = hearing.points(silenceDB: silenceDB, snaps: snaps, clip: speech)
         var cuts: [AISpeechCuts.Cut] = []
         if let remove { cuts += AISpeechCuts.requested(remove, points: points) }
         if let keep { cuts += AISpeechCuts.outside(keep, clip: range, points: points) }
         if let pauseLength {
-            guard let levels, let measured else { throw AIToolError("SrtFlow could not read the sound of \(speech.name).") }
+            // 删停顿量这段片段（门限没给就从这一段自己量）。
+            guard let peaks else { throw AIToolError("SrtFlow could not read the sound of \(speech.name).") }
+            let levels = clipLevels(peaks, of: speech)
+            let measured = AISpeechCuts.silenceThreshold(levels.map(\.decibels))
             let leave = min(max(try args.double("pause_left") ?? 0.25, 0), 2)
             let longer = max(pauseLength, 0.2)
             let found = AIAudioLevels.report(levels, silenceDB: silenceDB ?? measured, minSilence: longer).silences
@@ -76,7 +77,7 @@ enum AISpeechCutTool {
         if repeats, let words { cuts += AISpeechCuts.repeats(words, points: points) }
         let frame = state.frameRate.secondsPerFrame
         let report = points.report(asked, clip: range, frame: frame)
-        let notes = asked.isEmpty || !snaps ? [] : snapNotes(transcript: words != nil, sound: levels != nil, onSpeech: report.onSpeech)
+        let notes = asked.isEmpty || !snaps ? [] : snapNotes(transcript: words != nil, sound: peaks != nil, onSpeech: report.onSpeech)
         return Plan(
             clipID: clipID, cuts: AISpeechCuts.merged(cuts, clip: range, frame: frame), moved: report.moved,
             state: state, generation: project.documentGeneration, notes: notes
@@ -177,29 +178,46 @@ enum AISpeechCutTool {
         return partners.first(where: audible) ?? clip
     }
 
-    /// 这段话的词（时间线秒）。转写缓存没覆盖（没调过 transcribe）就是 nil。
-    private static func transcriptWords(_ clip: EditClip, state: TimelineState, language: String) async -> [SpeechTranscript.Word]? {
+    // MARK: 听这段声音（listen cuts=true 也用：AIListenCuts）
+
+    /// 这段声音的转写缓存：整个文件的词（识别器原样的源秒）和这段在时间线上的窗口。只读缓存，没转写过（或没盖住这一段）是 nil。
+    static func transcript(
+        of sound: EditClip, in state: TimelineState, language: String
+    ) async -> (words: [TimedWord], window: SubtitleClipWindow)? {
         guard #available(macOS 26.0, *),
-              let sound = SubtitleAudibleClips.soundClips(in: state, only: [clip.id]).first,
-              let cached = await AITranscribeTool.cached([sound], language: language),
-              let entry = cached.entries[sound.fingerprint] else { return nil }
-        let window = AITranscribeTool.Target(sound: sound, id: nil, track: nil).window
-        return SpeechTranscript.sentences(words: entry.words, window: window).flatMap(\.words)
+              let audible = SubtitleAudibleClips.soundClips(in: state, only: [sound.id]).first,
+              let cached = await AITranscribeTool.cached([audible], language: language),
+              let words = cached.entries[audible.fingerprint]?.words else { return nil }
+        return (words, AITranscribeTool.Target(sound: audible, id: nil, track: nil).window)
     }
 
-    /// 这段声音按窗的电平（时间线秒，画波形那一份数据，和 listen 同一份窗）。没有声音、读不出来是 nil；
-    /// 还没读完就请 AI 等一会儿再调。
-    private static func levels(of clip: EditClip) async throws -> [AIAudioLevels.Window]? {
-        guard clip.hasAudio else { return nil }
-        let from = clip.sourceStart
-        let to = clip.sourceStart + clip.sourceDuration
-        guard let peaks = await AIListenTool.waveform(of: clip.sourceURL, until: Date().addingTimeInterval(AIListenTool.waitSeconds)) else {
-            return nil
+    /// 整个文件的波形读到哪了：判切口按整个文件量（AISpeechHearing），要读完。
+    enum WholeFile {
+        case ready(WaveformPeaks)
+        /// 到 `deadline` 还没读完。
+        case reading
+        /// 没有声音 / 读不出来。
+        case unreadable
+    }
+
+    /// 这段声音整个文件的波形（画波形那一份数据，和 listen 同一份窗），最多等到 `deadline`。
+    static func wholeFile(of sound: EditClip, until deadline: Date) async -> WholeFile {
+        guard sound.hasAudio, let peaks = await AIListenTool.waveform(of: sound.sourceURL, until: deadline) else { return .unreadable }
+        return peaks.isComplete || peaks.duration >= sound.assetDuration - 0.01 ? .ready(peaks) : .reading
+    }
+
+    /// cut_speech 要读的波形：没有声音、读不出来是 nil；还没读完就请 AI 等一会儿再调。
+    private static func soundOf(_ clip: EditClip) async throws -> WaveformPeaks? {
+        switch await wholeFile(of: clip, until: Date().addingTimeInterval(AIListenTool.waitSeconds)) {
+        case .ready(let peaks): return peaks
+        case .unreadable: return nil
+        case .reading: throw AIToolError("SrtFlow is still reading the sound of \(clip.name). Call cut_speech again in a moment.")
         }
-        guard peaks.isComplete || peaks.duration >= to - 0.01 else {
-            throw AIToolError("SrtFlow is still reading the sound of \(clip.name). Call cut_speech again in a moment.")
-        }
-        return AIAudioLevels.windows(peaks, from: from, to: to).map { window in
+    }
+
+    /// 这段片段按窗的电平（时间线秒）：删停顿量它。
+    private static func clipLevels(_ peaks: WaveformPeaks, of clip: EditClip) -> [AIAudioLevels.Window] {
+        AIAudioLevels.windows(peaks, from: clip.sourceStart, to: clip.sourceStart + clip.sourceDuration).map { window in
             var placed = window
             placed.start = clip.timelineTime(atSource: window.start)
             placed.end = clip.timelineTime(atSource: window.end)
