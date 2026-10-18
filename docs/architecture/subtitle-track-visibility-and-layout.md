@@ -101,9 +101,13 @@
    `fixedSize`，不让 SwiftUI 再折第二次：它量宽和 Core Text 差一两个像素时会多折出一行），AI 读的框 `SubtitleLineBoxes` 也只问它。
    **烧录也照这一份写、libass 不再自己折**（2026-10-15 用户定，[没有空格的长中文字幕成片整行溢出](../bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md)）：
    vendor/ffmpeg 的 libass 没编 libunibreak、只在 ASCII 空格处折行，没有空格的长中文句成片以前整行溢出到画面两边。现在 `BurnInWorkspace.prewrapped`
-   在写 ASS 之前把每句折好的几行写成换行（`assDocument` 写成 `\N`）并写 `WrapStyle: 2`，libass 只照着画；`SubtitleLineWrap` 能起新一行的地方 =
-   ASCII 空格之后 + **中日文的字之间**（标点避头尾：行首不许是收尾的标点、小假名、长音，行尾不许是开头的标点），韩文、拉丁字母、数字只在空格处，
-   一个比画面宽的英文单词照旧溢出；亮着的词的位置跟着换算（`SubtitleLineWrap.joined`）。可用宽度（画面宽 − 边距）只在 `SubtitleLineWrap.usableWidth`
+   在写 ASS 之前把每句折好的几行写成换行（`assDocument` 写成 `\N`）并写 `WrapStyle: 2`，libass 只照着画。没有中日文的段（英文、韩文……）
+   只在 ASCII 空格之后断、照 libass 摊匀，一个比画面宽的英文单词照旧溢出；**有中日文的段只在词和词之间断**（2026-10-18，
+   [字幕自动折行把中文的词拆开](../bugfixes/2026-10-18-subtitle-wrap-splits-chinese-words.md)）：词边界只有 SrtFlowCore 的 `SubtitleCJKWords` 一份
+   （每段汉字 / 假名单独交给系统分词，生成字幕切条也用它），断在哪好只有 `SubtitleRowBreaks` 一份（句中的空格两边都是中文 = 去掉的逗号、
+   标点后面优先；助词不起头、连词副词不收尾、数量和名词不拆、方位词不起头、夹在中文里的英文短语和专有名词尽量不拆、「5分钟」不拆；标点避头尾；
+   和生成字幕切条同一张词表、同一个量级），`SubtitleCJKRows` 先求最少几行、再挑「摊匀 + 断点代价」最小的折法（一样好时上面的行短）；
+   只有一个词比一整行还宽时才在它的字之间断。**别回到「任意两个字之间都能断」**：「抖 / 音」「以 / 及」「Nano / Banana」都是那样来的；亮着的词的位置跟着换算（`SubtitleLineWrap.joined`）。可用宽度（画面宽 − 边距）只在 `SubtitleLineWrap.usableWidth`
    算一份、预览 / 框 / 烧录同一个量，ASS 的虚拟画布宽（PlayResX）只在 `BurnInStyle.playResolution` 算。**别把折行交回 libass（WrapStyle 0）**：
    一行宽正好卡在最大宽度一两个像素以内时它会再折一次、多出一行，预览和成片又不一样。
    给 AI 算「这句字幕画在哪」的 `SubtitleLineBoxes`（2026-10-15）也是这几份合同的消费者：字体按 `SubtitleFontScale.runs`、行高按 `SubtitleLineMetrics`、
@@ -321,7 +325,8 @@
 - [ ] **长句的折行点**（2026-10-15）：一句放不进一行、不带换行的字幕，预览里两行差不多宽（不是第一行填满、第二行剩一点）；
       导出后抽帧，每一行的左右沿和预览对得上（`look` 看到的也是这几行）；`get_subtitles` 的 box 不变。
       一句没有空格的长中文：预览和成片**一样**折成两行、差不多宽（2026-10-15 起烧录照预览的折行点写 `\N`），每行的左右沿对得上，
-      行首没有「，。」；韩文照旧只在空格处折。
+      行首没有「，。」；韩文照旧只在空格处折。**中文的词不拆**（2026-10-18）：拿 L16 测试工程那几句拖窄 max_width，「快手」「抖音」「以及」
+      「标签页」不被拆在两行，「Nano Banana」「GPT Image」在正常字号下不拆，句中有空格（去掉的逗号）时就断在空格那儿。
 - [ ] 自动检测 + 生成：新字幕全部单行。面板把「每条字幕的行数」调成「2 行」再生成：长句一条占两行、两行差不多宽、
       不切在中文的词中间；⌘Z 能单独撤掉行数的改动；关掉再开工程行数还在；AI `generate_subtitles max_lines=2` 同样，
       `get_subtitles` 回 `max_lines: 2`。

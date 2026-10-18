@@ -53,6 +53,7 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleFontScale.swift \
   Sources/SrtFlow/SubtitleLineMetrics.swift \
   Sources/SrtFlow/SubtitleLineWrap.swift \
+  Sources/SrtFlow/SubtitleCJKRows.swift \
   Sources/SrtFlow/SubtitleLineBoxes.swift \
   Sources/SrtFlow/SubtitleFrameGeometry.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \

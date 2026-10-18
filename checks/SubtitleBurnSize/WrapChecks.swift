@@ -6,15 +6,17 @@ import SrtFlowCore
 // 两行摊匀（0.184–0.815）。位置自检（PositionChecks.swift）的两行样本都带显式换行，自动折行从没量过，所以一直绿。
 // 现在折行点只有 SubtitleLineWrap 一份（照 libass 0.17 的 wrap_lines_naive + wrap_lines_rebalance + trim_whitespace port），
 // 预览一行一个 Text、只画算好的那一行；烧录把同一份折行点写成 \N、不让 libass 自己折（WrapStyle 2，BurnInWorkspace.prewrapped）——
-// libass 只在 ASCII 空格处折，没有空格的长中文句以前成片整行溢出到画面两边，2026-10-15 用户定烧录也要折：中日文在字之间折、标点避头尾
-// （docs/bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md）。这里：
+// libass 只在 ASCII 空格处折，没有空格的长中文句以前成片整行溢出到画面两边，2026-10-15 用户定烧录也要折、标点避头尾
+// （docs/bugfixes/2026-10-15-chinese-subtitles-overflow-without-spaces.md）；2026-10-18 起中日文只在词和词之间折、句中的空格和标点后面优先
+// （SubtitleCJKRows，docs/bugfixes/2026-10-18-subtitle-wrap-splits-chinese-words.md）。这里：
 // 1. 几种放不进一行的句子（两行 / 三行 / 五行、中英混排、很长的单词、布局覆盖左右不对称、9:16、左 / 右对齐、逐词高亮放大、两个空格、
 //    带换行；没有空格的中文、带标点的中文、中英文连着写、中文 + 高亮放大、带空格的韩文），预览离屏渲一张、真烧一帧，按墨迹的空白行
 //    切成几行，比**行数**和**每一行**的左右沿（容差 6 px，1080p；折在别处至少差一个字、几十 px）。日文只钉纯算的规矩、不真烧：没下载苹方的
 //    机器（CI）上假名的回退字体预览比成片宽约 2.5%（第一次上 CI 两行各差 17 px），是字的大小那一头的事、另案。
 // 2. 预览每一行的墨迹宽要和 SubtitleLineWrap 算的步进宽对得上（差一个词就红）—— 管的是叠层按行切 piece 没切错。
 // 3. 钉几条折行的规矩本身（不烧、纯算）：100 号五行的每一行是哪几个字（「二分最小宽度」那种算法在这句上会折在别处）；行首行尾的空格
-//    不进行；换行符各自成段；亮着的词放大会把那一行变宽；中文在字之间折、两行差不多宽、行首不是「，」行尾不是「（」、日文的长音不在行首；
+//    不进行；换行符各自成段；亮着的词放大会把那一行变宽；中文在词和词之间折、两行差不多宽、行首不是「，」行尾不是「（」、日文的长音不在行首；
+//    L16 测试员的几句（「快手」「以及」「Nano Banana」「GPT Image」「5分钟」各种宽度下都不拆、句中的空格是首选的断点）；
 //    韩文只在空格处折（没有空格就不折）；一个比画面宽的英文单词照旧溢出；`SubtitleLineBoxes` 的框和它同几行；烧录的 ASS 是 WrapStyle 2、
 //    折行点写成 \N、亮着的词的位置换算到了新的字里（跨行的词拆成两截）。
 // 编法见 scripts/check-subtitle-burn-size.sh。不管什么：字的大小（main.swift）、竖向位置（PositionChecks.swift）、阴影（ShadowChecks.swift）。
@@ -50,6 +52,8 @@ private let japanese = "南極の氷山はどこまでも続きペンギンた�
 private let korean = "남극의 빙산은 끝없이 펼쳐져 있고 펭귄들은 바람 속에 무리를 지어 서서 긴 극야가 지나가기를 기다리고 봄의 첫 햇살이 빙상을 비추기를 기다린다"
 private let koreanUnspaced = korean.replacingOccurrences(of: " ", with: "")
 private let oneWord = "Donaudampfschifffahrtselektrizitätenhauptbetriebswerkbauunterbeamtengesellschaft"
+/// L16 课程测试工程里的一句（2026-10-18 测试员：「GPT / Image」被拆开）。
+private let l16Names = "包括 Google 的 Nano Banana、OpenAI 的 GPT Image 以及字节跳动的 Seedream"
 
 /// 默认样式（Helvetica 粗体 56 底部居中）换个字体 / 对齐、去掉描边（描边 3 的那一种单独一个用例）。
 private func wrapStyle(font: String = "Helvetica", position: SubtitlePosition = .bottomCenter, outline: Double = 0, letterSpacing: Double = 0) -> BurnInStyle {
@@ -79,7 +83,8 @@ private let wrapCases: [WrapCase] = [
     WrapCase(name: "mixed Chinese and English", text: mixed, style: wrapStyle(), rows: 2),
     WrapCase(name: "mixed, Hiragino", text: mixed, style: wrapStyle(font: "Hiragino Sans GB"), rows: 2),
     WrapCase(name: "very long words", text: longWords, style: wrapStyle(), rows: 3),
-    WrapCase(name: "Chinese without spaces wraps between characters", text: chinese, style: wrapStyle(), rows: nil),
+    WrapCase(name: "Chinese without spaces wraps between words", text: chinese, style: wrapStyle(), rows: nil),
+    WrapCase(name: "L16: names and a list in a Chinese line, Hiragino", text: l16Names, style: wrapStyle(font: "Hiragino Sans GB"), rows: 2),
     WrapCase(name: "Chinese, Hiragino", text: chinese, style: wrapStyle(font: "Hiragino Sans GB"), rows: 2),
     WrapCase(name: "Chinese, four rows at 100, Hiragino", text: chinese, style: hundred("Hiragino Sans GB"), rows: 4),
     WrapCase(name: "Chinese 9:16, Hiragino", text: chinese, style: wrapStyle(font: "Hiragino Sans GB"), canvas: CGSize(width: 608, height: 1080), rows: 7),
@@ -222,14 +227,15 @@ private func runWrapRuleChecks() {
     // 亮着的词放大，那一行跟着变宽（烧录的 \fscx \fscy 也放大）。
     let lit = lines(reported, style: wrapStyle(), lit: [wrapWord], litScale: 1.2)
     check(lit.count == 2 && lit[1].width > two[1].width + 5, "wrap rules: an enlarged highlighted word widens its row (\(lit.map(\.width)) vs \(two.map(\.width)))")
-    // 中文没有空格也折：在字之间断、两行摊匀、都不比可用宽度宽。
+    // 中文没有空格也折：在词和词之间断、两行摊匀、都不比可用宽度宽。
     let hiragino = wrapStyle(font: "Hiragino Sans GB")
     let cjk = lines(chinese, style: hiragino)
     check(cjk.count == 2 && cjk.allSatisfy { $0.width <= 1760 } && abs(cjk[0].width - cjk[1].width) < 100,
-          "wrap rules: Chinese without spaces wraps between characters into two rows about as wide (\(cjk.map(\.width)))")
+          "wrap rules: Chinese without spaces wraps between words into two rows about as wide (\(cjk.map(\.width)))")
     let four = texts(lines(chinese, style: hundred("Hiragino Sans GB")), in: chinese)
-    check(four == ["南极的冰山一望无际企鹅成群结队", "地站在风里等待漫长的极夜过去等待", "春天第一缕阳光照在冰盖上然后再", "等一个夏天和一个秋天才回到海里去"],
-          "wrap rules: Chinese at 100 folds into libass-style balanced rows, one character at a time (got \(four))")
+    check(four.count == 4 && rowsKeepWords(four, ["一望无际", "成群结队", "等待", "极夜", "春天", "阳光", "冰盖", "然后", "夏天", "秋天", "海里"]),
+          "wrap rules: Chinese at 100 folds into four rows between words, never inside one (got \(four))")
+    runL16WrapChecks()
     // 标点避头尾：逗号插在任何位置都不会落到行首，开头的括号不会落到行尾，日文的长音不在行首。
     let characters = Array(chinese)
     var commaAtRowStart = 0, parenAtRowEnd = 0, barAtRowStart = 0
@@ -269,6 +275,52 @@ private func runWrapRuleChecks() {
     let box = SubtitleLineBoxes.box(for: chinese, style: hiragino, layout: nil, canvas: CGSize(width: 1920, height: 1080))
     check(box?.lineCount == cjk.count && (box?.rect.width ?? 1) <= 1760.0 / 1920 + 0.01,
           "wrap rules: the Chinese box has the same rows and stays inside the margins (got \(String(describing: box)))")
+}
+
+/// 相邻两行之间没有把这些词拆开（「快|手」「Nano|Banana」：行是去了两头空格的字，按「|」连起来找）。
+private func rowsKeepWords(_ rows: [String], _ words: [String]) -> Bool {
+    let joined = rows.joined(separator: "|")
+    return words.allSatisfy { word in
+        word.contains(" ")
+            ? !joined.contains(word.replacingOccurrences(of: " ", with: "|"))
+            : (1..<word.count).allSatisfy { !joined.contains(String(word.prefix($0)) + "|" + String(word.dropFirst($0))) }
+    }
+}
+
+/// L16 测试员的几句（2026-10-18，docs/bugfixes/2026-10-18-subtitle-wrap-splits-chinese-words.md）：字号 56 / 72 / 96、可用宽度 0.4–1 个画面
+/// 扫一遍 —— 词和「5分钟」从不拆（以前「快 / 手」「以 / 及」「三个标签 / 页」）；名字（Nano Banana、GPT Image）72 号以内都不拆（96 号、
+/// 宽度一半以内时四行放不下，只能拆）；句中的空格（去掉的逗号）是首选的断点。
+private func runL16WrapChecks() {
+    let sentences = [
+        l16Names, "工作区里有三个标签页 图像、视频和音乐", "视频标签页也提供了 多个目前最强的视频模型！",
+        "在音乐标签页中 可以生成最长 5分钟的「音乐」吗？", "我们这节课会讲快手和抖音两个平台上的短视频怎么做才能让更多的人看到"
+    ]
+    let words = ["以及", "快手", "抖音", "视频", "平台", "怎么", "音乐", "标签", "最强", "生成"]
+    var broken: [String] = []
+    for size in [56.0, 72, 96] {
+        var style = wrapStyle(font: "Hiragino Sans GB")
+        style.fontSize = size
+        for fraction in stride(from: 0.4, through: 1.0001, by: 0.05) {
+            for text in sentences {
+                let rows = texts(lines(text, style: style, maxWidth: fraction * 1920), in: text)
+                let names = size > 72 || rowsKeepWords(rows, ["Nano Banana", "GPT Image"])
+                if !rowsKeepWords(rows, words) || rows.contains(where: { $0.hasSuffix("5") }) || !names {
+                    broken.append("\(Int(size)) @\(fraction): \(rows)")
+                }
+            }
+        }
+    }
+    check(broken.isEmpty, "wrap rules: L16 sentences keep their words, 5分钟 and (up to 72) the names together at every width (\(broken.prefix(3)))")
+    let hiragino = wrapStyle(font: "Hiragino Sans GB")
+    var big = hiragino
+    big.fontSize = 72   // 测试工程的字号；宽度挑在一行放不下的地方
+    for (text, fraction, expected) in [("工作区里有三个标签页 图像、视频和音乐", 0.5, ["工作区里有三个标签页", "图像、视频和音乐"]),
+                                       ("视频标签页也提供了 多个目前最强的视频模型！", 0.6, ["视频标签页也提供了", "多个目前最强的视频模型！"])] {
+        let rows = texts(lines(text, style: big, maxWidth: fraction * 1920), in: text)
+        checkEqual(rows, expected, "wrap rules: the space between Chinese phrases (a removed comma) is where the row breaks")
+    }
+    let names = texts(lines(l16Names, style: hiragino, maxWidth: 1760), in: l16Names)
+    check(names.count == 2 && names[0].hasSuffix("、"), "wrap rules: the list breaks after its 、, not inside OpenAI 的 GPT Image (got \(names))")
 }
 
 /// 烧录写进 ASS 的就是这几行（BurnInWorkspace.prewrapped + assDocument(prewrapped:)，纯算，不烧）。

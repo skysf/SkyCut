@@ -1,5 +1,4 @@
 import Foundation
-import NaturalLanguage
 
 // 一句话在哪断成几条字幕（2026-09-26 按主流规范重写，docs/architecture/subtitle-generation-style.md）。
 //
@@ -12,7 +11,7 @@ import NaturalLanguage
 // 3. 还放不下的（超字数、超画面宽度、超 7 秒）：先找最少切几段能全放下，再在这个段数下挑总代价最小的切法
 //    （动态规划；贪心先切第一刀会把后半截逼进死角）。代价 = 各段长短偏离平均 + 太短（在屏上留不到 1 秒的重罚）+ 断在不好的地方：
 //    停顿后面、连词 / 关系词 / 介词前面好断；a / the / to / that 这类词不留在一条末尾；
-//    中文、日文用系统自带的分词（NLTokenizer），不在「如果」「大幅度」中间切，也不让「的」「了」起头。
+//    中文、日文用系统自带的分词（`SubtitleCJKWords`，字幕折行同一份），不在「如果」「大幅度」中间切，也不让「的」「了」起头。
 // 不管什么：显示时间（`SubtitleCueTiming`）、去标点（`SubtitlePunctuation`，量宽度时按去完的算）、词表本身（`SubtitleBreakWords`）。
 
 enum SubtitleBreaks {
@@ -377,7 +376,7 @@ enum SubtitleBreaks {
     }
 
     /// 句子里哪些位置可以切（第 k 个词前面）。拉丁文字一个词就是一个词；中文、日文的「词」是一个个字，
-    /// 用系统自带的分词找词边界 —— 不切在词中间。
+    /// 用系统自带的分词找词边界 —— 不切在词中间。词在哪只有 `SubtitleCJKWords` 一份（字幕折行也用它，2026-10-18）。
     static func wordBoundaries(_ words: [Word]) -> Set<Int> {
         let all = Set(1 ..< max(words.count, 1))
         let text = words.map(\.text).joined()
@@ -388,16 +387,7 @@ enum SubtitleBreaks {
             starts.append(offset)
             offset += word.text.utf16.count
         }
-        let tokenizer = NLTokenizer(unit: .word)
-        tokenizer.string = text
-        if let language = NLLanguageRecognizer.dominantLanguage(for: text) { tokenizer.setLanguage(language) }
-        var inside: Set<Int> = []
-        tokenizer.enumerateTokens(in: text.startIndex ..< text.endIndex) { range, _ in
-            let low = range.lowerBound.utf16Offset(in: text)
-            let high = range.upperBound.utf16Offset(in: text)
-            if high - low > 1 { inside.formUnion((low + 1) ..< high) }
-            return true
-        }
+        let inside = SubtitleCJKWords.interior(of: text)
         return all.filter { !inside.contains(starts[$0]) }
     }
 

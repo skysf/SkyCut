@@ -22,7 +22,7 @@ import SrtFlowCore
 /// 填满、第二行剩一点；成片是 libass 的 WrapStyle 0，两行摊匀（真机量到预览第一行 0.058–0.941、成片 0.184–0.815）。现在先用
 /// `SubtitleLineWrap` 算出每一行是哪几个字，**一行一个 Text、只画这一行**（`lineLimit(1)` + 横向 `fixedSize`），不让 SwiftUI 再折第二次。
 /// 烧录把同一份折行点写成 `\N`、不让 libass 自己折（它只在空格处折，没有空格的中文会整行溢出；`BurnInWorkspace.prewrapped`）—— 预览画的
-/// 就是成片的样子，中文在字之间折也一样。
+/// 就是成片的样子，中文在词和词之间折也一样（2026-10-18，`SubtitleCJKRows`）。
 struct BurnInSubtitleOverlay: View {
     let text: String
     let style: BurnInStyle
