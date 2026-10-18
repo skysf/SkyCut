@@ -975,7 +975,7 @@ Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`�
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；
       拿同一张码再删一次：结果的 `confirm_token_refused` 说这张用过了、给了新的一张。
-- [ ] 一个会话剪几个工程（第 46 条）：`open_project` 两个工程（回 p1 在主窗口、p2 在自己的窗口；后台模式时 p2 的窗口在后面），不带 `project` 的
+- [ ] 一个会话剪几个工程（第 46 条）：`open_project` 两个工程（回 p1 在主窗口、p2 在自己的窗口；后台模式时 p2 不开窗口，第 ③ 刀起），不带 `project` 的
       `add_clips` 落在 p2、带 `project=p1` 的落在主窗口；两个窗口各自 ⌘Z 只撤自己的；`get_status` 的 `projects` 列出两个、都是 `yours`。
 - [ ] 另开一个会话（另一个 Claude Code）带 `project=p2` 调 `get_timeline`：拒、说是另一个 AI 会话的、什么都没改；`open_project` 同一个文件也拒；
       前一个会话停 5 分钟之后再开：接手成功。
