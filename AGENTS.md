@@ -308,7 +308,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   set_text 补的零件（字距、动画时长、强调、数字滚动）和实心形状、add_voiceover（挑声音、语速表、标记 → 词、配音的字幕不覆盖已有的）、
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
-  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`）也在这里。
+  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里。
 - AI 录屏的接线（扫描，第 1 组）：AI 起的录制不开系统选择窗口、设置页 / 残缺框只给手动的会话、不覆盖、不写手动的偏好、入轨包 `AIUndoGrouping.step`、
   录制中不把 SrtFlow 摆到前面、丢弃先问且进废纸篓、授权一次运行只请求一次、浮窗在左下角、录制中换工程 / 改帧率先挡：`checks/screen-recording-ai-wiring.sh`。
 - fal.ai 生成（第 6 块）：`scripts/check-fal.sh`（`check-all` 第 2 组，不碰网络、不碰钥匙串）：模型表与估价、花钱把关、按天记账、**每个登记端点的请求体对着 fal 公开的接口定义快照验**
@@ -827,6 +827,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-18 侧边栏「AI 在剪的工程」那一行：默认宽度下看不到导出百分比，排队的也写「导出中」](docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md) —
   行能显示之后接着看：三个按钮和两行字挤一排，默认宽度下状态截成「Exportin…」、短 id 也看不见；还没开始的排队任务也写「Exporting」。名字独占第一行（从中间截）、
   第二行状态先拿宽度、按钮缩小；排着队的问 `AIWorkQueue` 写「排队中」。`checks/open-projects-wiring.sh` 第 15 条钉着。**窄栏里给长短不定的字整行；「有任务」不等于「在做」。**
+- [2026-10-18 listen cuts=true 说「可以不改」，cut_speech 却说同一刀切在字上](docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md) — 剪辑点检查只要切口落在任何一个安静窗上就判 quiet_spot（L16：「available.」尾音里 46 ms 的低谷），可附近够得着真停顿时 cut_speech 会挪进去；两个工具的门限、词、时间轴还各量各的（建议 77.717 对 cut_speech 的 77.75）。quiet_spot 只给 cut_speech 不挪的切口、建议就是它对齐到帧的落点；输入只从 `AISpeechHearing` 来（整个文件的电平、按整个文件量的门限、估过开口的词），判点按声音的源秒问。**检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定；守卫的期望值从意图来，别把自相矛盾的输出钉成对的。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
