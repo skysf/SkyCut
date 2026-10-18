@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - 主窗口侧边栏的「AI 在剪的工程」
 //
 // 管什么：AI 开在主窗口以外的工程（工程窗口里的、后台没有窗口的）在侧边栏各一行：名字（+ 短 id）、在做什么（在剪 / 导出 42% /
-// 等你点一下 / 空闲 / 已停止）、停止、打开窗口、关掉。只在有这样的工程时出现（docs/plans/2026-10-17-multi-project-ai-editing.md 板 8、I 节）。
+// 排队中 / 等你点一下 / 空闲 / 已停止）、停止、打开窗口、关掉。只在有这样的工程时出现（docs/plans/2026-10-17-multi-project-ai-editing.md 板 8、I 节）。
 // 后台工程没有窗口、没有横幅，这里是用户唯一能看见它、停下它的地方；AI 忘了 close_project 的话，用户也在这里关掉它。
 // 不管什么：工程怎么开关、挂窗口（OpenProjects）；停止的规矩（AIRound）；主窗口里那一个（它有自己的横幅）。
 //
@@ -66,20 +66,28 @@ private struct AIProjectSidebarRow: View {
                 .instantHelp(verbatim: status.summary(of: project))
                 .contextMenu { actions(status) }
             } else {
+                // 名字独占第一行（从中间截，短 id 留在尾巴上）；第二行是状态 + 三个小按钮，状态先拿宽度 —— 默认宽度下「导出中 42%」
+                // 和名字都看得见（三个按钮和两行字挤一排时只剩「Ro…p2」「Exportin…」，docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md）。
                 HStack(spacing: 6) {
                     Image(systemName: status.icon)
                         .foregroundStyle(.tint)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(verbatim: "\(project.projectName) · \(project.shortID)")
                             .lineLimit(1)
-                        Text(verbatim: status.text)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .instantHelp(verbatim: status.summary(of: project))
+                        HStack(spacing: 4) {
+                            Text(verbatim: status.text)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .layoutPriority(1)
+                                .instantHelp(verbatim: status.detail ?? status.text)
+                            Spacer(minLength: 2)
+                            iconButtons(status)
+                                .imageScale(.small)
+                        }
                     }
-                    .instantHelp(verbatim: status.detail ?? status.text)
-                    Spacer(minLength: 2)
-                    iconButtons(status)
                 }
                 .contextMenu { actions(status) }
             }
@@ -132,6 +140,9 @@ private struct AIProjectSidebarStatus {
             (text, icon, detail) = (L10n("Stopped"), "stop.circle", nil)
         } else if let waiting {
             (text, icon, detail) = (L10n("Needs you"), "hand.point.up.left", waiting)
+        } else if let job = jobs.first, AIWorkQueue.shared.position(of: job.id) != nil {
+            // 排着队、还没开始（导出器、转写、翻译一次只做一件）：别写成「导出中」。
+            (text, icon, detail) = (L10n("Waiting in line"), "hourglass", nil)
         } else if let job = jobs.first {
             let label = Self.label(job.kind)
             let percent = job.progress().map { " " + MediaFormatting.percent($0) } ?? ""
