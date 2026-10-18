@@ -66,25 +66,27 @@ private struct AIProjectSidebarRow: View {
                 .instantHelp(verbatim: status.summary(of: project))
                 .contextMenu { actions(status) }
             } else {
-                // 名字和三个按钮一行（名字从中间截，短 id 留在尾巴上），状态独占第二行：默认宽度下「导出中 42%」才放得下
-                // （挤在按钮旁边时只剩「Exportin…」，docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md）。
+                // 名字独占第一行（从中间截，短 id 留在尾巴上）；第二行是状态 + 三个小按钮，状态先拿宽度 —— 默认宽度下「导出中 42%」
+                // 和名字都看得见（三个按钮和两行字挤一排时只剩「Ro…p2」「Exportin…」，docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md）。
                 HStack(spacing: 6) {
                     Image(systemName: status.icon)
                         .foregroundStyle(.tint)
                     VStack(alignment: .leading, spacing: 1) {
-                        HStack(spacing: 6) {
-                            Text(verbatim: "\(project.projectName) · \(project.shortID)")
+                        Text(verbatim: "\(project.projectName) · \(project.shortID)")
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                            .instantHelp(verbatim: status.summary(of: project))
+                        HStack(spacing: 4) {
+                            Text(verbatim: status.text)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                                 .lineLimit(1)
-                                .truncationMode(.middle)
-                                .instantHelp(verbatim: status.summary(of: project))
+                                .layoutPriority(1)
+                                .instantHelp(verbatim: status.detail ?? status.text)
                             Spacer(minLength: 2)
                             iconButtons(status)
+                                .imageScale(.small)
                         }
-                        Text(verbatim: status.text)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .instantHelp(verbatim: status.detail ?? status.text)
                     }
                 }
                 .contextMenu { actions(status) }
