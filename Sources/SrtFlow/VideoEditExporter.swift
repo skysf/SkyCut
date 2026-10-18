@@ -19,6 +19,19 @@ final class VideoEditExporter: ObservableObject {
     @Published private(set) var finishedURL: URL?
     /// 这次导出混音的电平（封顶前的峰值、削了多久）：面板和 AI 的结果用它提醒「过 0 了」。
     @Published private(set) var finishedAudioLevels: ExportAudioMixdown.Levels?
+    /// 正在导 / 刚导完的是哪个工程。导出器全 App 一个（一次只导一条），几个工程窗口都看着它：进度、停止、成片和报错
+    /// 只给这个工程的窗口看（`belongs(to:)`）—— 不然 p1 的面板里显示、还能停掉 p3 的 AI 导出
+    /// （docs/bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md）。
+    @Published private(set) var owner: Owner?
+
+    struct Owner: Equatable {
+        /// 工程代号：换了内容（新建 / 打开）就不是同一个工程了。
+        let generation: Int
+        let name: String
+    }
+
+    /// 正在导 / 刚导完的是不是这个工程的。
+    func belongs(to project: VideoEditProject) -> Bool { owner?.generation == project.documentGeneration }
 
     /// 编码设置（含导出分辨率）。**记住上次的**，下次打开还是它
     /// （docs/plans/2026-09-24-export-panel.md）；设错了用「恢复默认设置」。
@@ -79,13 +92,15 @@ final class VideoEditExporter: ObservableObject {
         return defaults
     }
 
+    /// - Parameter project: 导的是哪个工程（面板和 AI 都传）：进度、停止、成片只给它的窗口看。
     /// - Parameter settingsOverride: 这一次用的编码设置（AI 指定了分辨率时传）。nil = 面板上记住的那份。
     ///   **不写回 `settings`**：AI 导一次 720p，不该把用户记住的导出设置悄悄改掉。
     func export(
-        state: TimelineState, to output: URL, subtitleStyle: BurnInStyle, subtitleFontURL: URL?,
+        for project: VideoEditProject, state: TimelineState, to output: URL, subtitleStyle: BurnInStyle, subtitleFontURL: URL?,
         settingsOverride: VideoEncodeSettings? = nil
     ) {
         guard !isExporting else { return }
+        owner = Owner(generation: project.documentGeneration, name: project.projectName)
         let settings = settingsOverride ?? self.settings
         guard let runtime = MediaToolchain.shared.runtime else {
             errorMessage = L10n("The video engine is not ready yet.")

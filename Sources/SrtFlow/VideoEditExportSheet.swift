@@ -314,66 +314,18 @@ struct VideoEditExportSheet: View {
         return parts.joined(separator: " · ")
     }
 
-    // MARK: - 成片的声音（docs/architecture/export-audio-mixdown.md 第二节第 3 条）
-
-    /// 总是一行「响度 · 峰值」；限幅器压过的再加一句橙字：压了多久多深，压得超过 3 dB 就建议把主音量降下来。
-    @ViewBuilder
-    private func audioLevelsRows(_ levels: ExportAudioMixdown.Levels) -> some View {
-        let peak = String(format: "%.1f", levels.outputPeakDBFS)
-        Text(levels.loudnessLUFS.map { String(format: L10n("Loudness %@ LUFS · Peak %@ dBFS"), String(format: "%.1f", $0), peak) }
-             ?? String(format: L10n("Peak %@ dBFS"), peak))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        if levels.isLimited {
-            let seconds = String(format: "%.2f", levels.limitedSeconds), depth = String(format: "%.1f", levels.maxReductionDB)
-            Text(levels.needsAttention
-                 ? String(format: L10n("The sound went over -1 dBFS for %@ s and was pushed down by up to %@ dB. Lowering the master volume by %@ dB would be cleaner."),
-                          seconds, depth, String(format: "%.1f", levels.suggestedReductionDB))
-                 : String(format: L10n("The sound went over -1 dBFS for %@ s and was pushed down by up to %@ dB."), seconds, depth))
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-    }
-
     // MARK: - 底栏
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if exporter.isExporting {
-                ProgressView(value: exporter.progress) {
-                    Text(String(format: L10n("Exporting… %@"), MediaFormatting.percent(exporter.progress)))
-                        .font(.caption)
-                }
-            }
-            if let error = exporter.errorMessage {
-                Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
-                    .textSelection(.enabled)
-                    .lineLimit(4)
-            }
-            if let finished = exporter.finishedURL {
-                HStack(spacing: 6) {
-                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                    Text(finished.lastPathComponent)
-                        .font(.caption)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                    Button("Show in Finder") { revealInFinder(finished) }
-                        .instantHelp("Reveal the exported file in Finder")
-                        .controlSize(.small)
-                }
-                if let levels = exporter.finishedAudioLevels {
-                    audioLevelsRows(levels)
-                }
-            }
+            // 进度、报错、成片只给发起导出的那个工程看；别的工程在导时写一行在等谁（导出器全 App 一个）。
+            VideoEditExportStatus(project: project, exporter: exporter)
 
             HStack {
                 Button("Close") { dismiss() }
                     .instantHelp("Close the export panel")
                 Spacer()
-                if exporter.isExporting {
+                if exporter.isExporting && exporter.belongs(to: project) {
                     Button("Stop") { exporter.cancel() }
                         .instantHelp("Cancel the export")
                 } else {
@@ -384,7 +336,7 @@ struct VideoEditExportSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(project.state.mainClips.isEmpty)
+                    .disabled(project.state.mainClips.isEmpty || exporter.isExporting)
                     .instantHelp("Render the timeline to a video file", shortcut: .defaultAction)
                 }
             }
@@ -414,6 +366,7 @@ struct VideoEditExportSheet: View {
         // 这个工程有自己的字幕样式（AI 改过）就用它，没有就是烧录页的那套 —— 和预览同一个函数。
         let subtitleStyle = state.subtitleStyle(appWide: burnInQueue.burnInStyle)
         exporter.export(
+            for: project,
             state: state,
             to: outputURL,
             subtitleStyle: subtitleStyle,

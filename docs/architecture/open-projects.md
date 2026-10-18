@@ -75,7 +75,10 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
     后台工程每次自动存盘都去踢键窗口的话，用户在别处正打的字会被打断。
 - **全 App 一份的东西**：工具栏的吸附 / 联动 / 播放跟随（一个窗口里拨了，别的开着的工程跟着拨：`OpenProjects.sync`，
   [剪辑页上记住的开关](editor-remembered-toggles.md)）；预览的「优化媒体 / 原片」（每个工程都换过去、各自重建，[优化媒体](optimized-media.md)）。
-- **全 App 一个的**：导出器只有一个（`VideoEditExporter.shared`，B 窗口的工具栏也显示 A 的导出进度、导出按钮也灰着）—— AI 起的导出第 ④a 刀起排队
+- **全 App 一个的**：导出器只有一个（`VideoEditExporter.shared`，一次只导一条）—— **忙不忙大家都看得见，进度、停止、成片和报错只给发起导出的那个工程**
+  （`exporter.belongs(to:)`：工具栏的进度条、预览条上的停止、导出面板底栏的 `VideoEditExportStatus`；开始导出的两条路都传 `export(for: project, …)`）。
+  别的工程在导时，这个工程窗口的「导出」照样点得开面板，面板底下写「“名字”正在导出… 42%」、导出键是灰的、没有停止键。2026-10-18 以前 B 窗口里显示 A 的进度和成片、
+  还能停掉 A 的导出（[案例](../bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md)）。AI 起的导出第 ④a 刀起排队
   （`AIWorkQueue`，[AI 接口](ai-control-mcp.md) 第四节第 7 条），面板上的导出照旧在空着时直接开始；送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。
   AI 那一轮的横幅第 ② 刀起每个工程一条（`AIRound`）。
 
@@ -132,7 +135,8 @@ App 的退出和录屏收尾之后的退出都问每个工程；录屏开录时�
 工程窗口的 delegate 交出 `ownUndoManager` 且**先挂 delegate 再放内容**（按行号比）；主窗口的撤销管理器只交给 `.mainWindow` 的剪辑页；
 按键先认自己的窗口；录屏的框走 `ScreenRecordingSheets`；换工程只取消自己的翻译、只作废自己的 upscale；关工程停引擎、作废导入、作废 upscale；
 存盘前让输入框辞职要先过 `editorIsKey`；**后台工程**：`scheduleRebuild` 开头和防抖之后都问 `showsEditor`、挂上窗口之后重建、摘窗口只停预览
-（`keepsProject` 那一支先 return）、关窗先问 AI 还在不在剪（第 ③a 刀，各自反向验证过：拆掉一处就红）。
+（`keepsProject` 那一支先 return）、关窗先问 AI 还在不在剪（第 ③a 刀，各自反向验证过：拆掉一处就红）；**导出的进度 / 停止 / 成片按工程分**
+（第 14 条：编辑窗口和面板里不许只看 `exporter.isExporting`、状态视图先问 `belongs(to: project)`、每个 `exporter.export(` 都带 `for: project`，2026-10-18，三处各自反向验证过）。
 写死旧字符串的几条也跟着改了：`checks/timeline-clipboard-wiring.sh`（编辑菜单接到 `focused`）、`checks/MCP/router-wiring.sh`（路由拿工程的那一行）、
 `checks/project-file-wiring.sh`（转写按代号取消）、`checks/screen-recording-ai-wiring.sh`（设置页搬进 `ScreenRecordingSheets`）。
 
@@ -160,3 +164,5 @@ p2 里拨吸附，p1 跟着变；关掉 p2 的窗口之后开着的只剩 p1。
 - [ ] 侧边栏的「AI 在剪的工程」：后台工程在列表里，导出时写「导出中 42%」；点停止只停这一个（另一个工程照剪）；点打开窗口出窗口、预览是改过的样子；
       导出完点关掉：工程存好关掉、列表里没了。侧边栏收成图标时每个工程一个图标，鼠标停上去看得到名字和状态，右键有三样。
 - [ ] AI 正在剪主窗口里的工程时，用户 ⌘N / ⌘O / 最近打开 / 双击一个 .srtflowproj：开到新的工程窗口里，主窗口里 AI 的工程原样、AI 接着改照样成功。
+- [ ] 两个工程窗口，A 在导出（面板起的、AI 起的各一次）：A 的工具栏有进度条、预览条上有停止；B 的工具栏没有进度条、预览条上没有停止，B 点导出打开面板，
+      底下写「“A 的名字”正在导出… 42%」、导出键是灰的、没有停止键；A 导完，B 的面板里不出现 A 的成片，A 的面板里有。
