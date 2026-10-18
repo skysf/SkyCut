@@ -49,12 +49,15 @@ jobs:
           swift --version
           sysctl -n hw.ncpu
 
+      # .build 里的模块缓存记着检出目录的绝对路径（/Users/runner/work/<仓库名>/<仓库名>），换了目录恢复回来就编不过
+      #（「was compiled with module cache path …」）。key 和 restore-keys 都带上检出目录：仓库改名之后不会再捡到旧目录的缓存
+      #（docs/bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md，checks/ci-build-cache-key.sh 钉着）。
       - name: Cache SwiftPM build products
         uses: actions/cache@v4
         with:
           path: .build
-          key: swiftpm-${{ runner.os }}-${{ hashFiles('Package.swift') }}
-          restore-keys: swiftpm-${{ runner.os }}-
+          key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ hashFiles('Package.swift') }}
+          restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-
 
       - name: Cache vendor/ffmpeg
         id: ffmpeg-cache
