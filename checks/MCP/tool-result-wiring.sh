@@ -56,12 +56,15 @@ if [ "$(grep -c 'KokoroSpeedCalibration.next(target: target, tried: tried)' Sour
 fi
 # cut_speech 的切口先看量出来的停顿：读了这段声音、交给 AISpeechCutPoints（按给的时间剪、口头禅、重复词都经它），
 # 挪了多少报给 AI（docs/bugfixes/2026-10-14-cut-speech-trusts-word-times.md）。只测纯值的话，工具照样可以只按转写切。
+# 2026-10-18 起判点的输入经 AISpeechHearing（整个素材文件一份，和 listen cuts=true 同一份，
+# docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md），按片段在时间线上的秒问。
 SPEECH_TOOL="Sources/SrtFlow/AISpeechCutTool.swift"
-if [ "$(grep -c 'let levels = readsSound ? try await Self.levels(of: speech) : nil' "${SPEECH_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'words: words ?? \[\], levels: levels,' "${SPEECH_TOOL}" || true)" -ne 1 ] \
+if [ "$(grep -c 'let peaks = readsSound ? try await soundOf(speech) : nil' "${SPEECH_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'let hearing = AISpeechHearing(levels: peaks.map { AIAudioLevels.windows($0, from: 0, to: $0.duration) }' "${SPEECH_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'let points = hearing.points(silenceDB: silenceDB, snaps: snaps, clip: speech)' "${SPEECH_TOOL}" || true)" -ne 1 ] \
    || [ "$(grep -cE 'AISpeechCuts\.(requested|outside|fillerWords|repeats)\([^)]*points: points\)' "${SPEECH_TOOL}" || true)" -ne 4 ] \
    || [ "$(grep -c 'result\["moved"\]' "${SPEECH_TOOL}" || true)" -ne 1 ]; then
-  echo "✗ ${SPEECH_TOOL} 的切口不经量出来的停顿（AISpeechCutPoints 拿到 levels），或结果里不报挪了多少：又会只信转写、把切口挪进词里" >&2
+  echo "✗ ${SPEECH_TOOL} 的切口不经量出来的停顿（AISpeechHearing 拿到整个文件的电平、建判点），或结果里不报挪了多少：又会只信转写、把切口挪进词里" >&2
   exit 1
 fi
 # export_subtitles 写盘只经界面那一条（临时名 → 回读校验 → 原子替换），读的是藏起来的句子已经去掉的那份，名字和撞名经 AISubtitleFiles

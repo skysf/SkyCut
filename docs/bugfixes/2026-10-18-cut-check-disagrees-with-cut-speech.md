@@ -69,6 +69,11 @@
   3. 建议不对齐到帧 → 红 2 条（77.72 / 77.7404，cut_speech 是 77.7083 / 77.75）；
   4. 接线扫描（CI 同款 /bin/bash 3.2）：在 AIListenCuts 里另建判点、自己读波形、去掉 `frame` → 各红一次。
   恢复后 151 项全绿、扫描绿；`swift build --product SrtFlow` 通过，check-mcp 的全部源文件 `swiftc -typecheck` 通过。
+- PR #246 首跑 CI 第 4 组红：10-14 那条「cut_speech 的切口要经量出来的停顿」的扫描（`checks/MCP/tool-result-wiring.sh`）按字面钉着
+  `AISpeechCutTool` 旧的三行，判点改从 `AISpeechHearing` 建之后它找不到了。它在 check-mcp.sh source 进来的一节里，`scripts/check-guards.sh`
+  只跑 `checks/*.sh` 顶层，本地跑不到 —— 和 PR #71、#84、#132 同一类坑。扫描照新接法改（读整个文件的波形、`AISpeechHearing` 建判点、按片段的
+  时间线秒问、四种剪法都经判点、结果报 `moved`），撤掉 `clip: speech` 反向验证红一次；check-mcp.sh 编译之前的全部扫描本地用 /bin/bash 跑一遍全绿。
+  让 check-guards 也跑这些扫描另开一个 PR。
 
 ## 教训 / 防回归
 
