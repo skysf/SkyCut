@@ -175,11 +175,21 @@ UNOWNED="$(awk '
   pending { if ($0 !~ /^[[:space:]]*for: project,/) print at; pending = 0 }
 ' Sources/SrtFlow/*.swift)"
 [ -z "${UNOWNED}" ] || fail "这些地方开始导出时没说是哪个工程（exporter.export(for: project, …)）：${UNOWNED}"
+# 15. 侧边栏一行的状态：排着队的写「排队中」、不写「导出中」（问 AIWorkQueue）；状态独占第二行、排在按钮之后 ——
+#     挤在三个按钮旁边时默认宽度下只剩「Exportin…」（docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md）。
+SIDEBAR="Sources/SrtFlow/AIProjectsSidebar.swift"
+[ "$(grep -c 'AIWorkQueue.shared.position(of: job.id) != nil' "${SIDEBAR}" || true)" -eq 1 ] \
+  || fail "${SIDEBAR}：排着队的任务没问 AIWorkQueue，会写成「导出中」"
+BUTTONS_AT="$(grep -n '^                            iconButtons(status)$' "${SIDEBAR}" | cut -d: -f1)"
+STATUS_AT="$(grep -n '^                        Text(verbatim: status.text)$' "${SIDEBAR}" | cut -d: -f1)"
+if [ -z "${BUTTONS_AT}" ] || [ -z "${STATUS_AT}" ] || [ "${BUTTONS_AT}" -gt "${STATUS_AT}" ]; then
+  fail "${SIDEBAR}：宽档的一行里状态没独占第二行（名字和按钮一行、状态在下一行），默认宽度下百分比会被截掉"
+fi
 
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
   echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框；"
   echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台；用户新建 / 打开经 userNew / userOpen；侧边栏有 AI 在剪的工程"
-  echo "  导出器全 App 一个：进度 / 停止 / 成片只给发起导出的那个工程的窗口和面板"
+  echo "  导出器全 App 一个：进度 / 停止 / 成片只给发起导出的那个工程的窗口和面板；侧边栏一行的状态独占一行、排队的写排队中"
 fi
 exit "${FAILED}"

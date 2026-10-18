@@ -819,6 +819,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   它的进度 / 成片 / 报错不知道是谁的：AI 在后台导 p3 时，用户 p1 的面板里显示「Exporting… 0%」、导完挂着 p3 的成片，p1 的停止键停掉的是 p3。导出器记下工程
   （`export(for: project, …)`、`belongs(to:)`），工具栏的进度、预览条的停止、面板底栏（`VideoEditExportStatus`）只给它；别的工程在导时面板写一行在等谁、导出键灰着。
   `checks/open-projects-wiring.sh` 第 14 条钉着。**单例的状态在多开之后要问「是谁的」：能共用的是忙不忙，不能共用的是进度、成片、停止。**
+- [2026-10-18 侧边栏「AI 在剪的工程」那一行：默认宽度下看不到导出百分比，排队的也写「导出中」](docs/bugfixes/2026-10-18-ai-projects-sidebar-row-status.md) —
+  行能显示之后接着看：三个按钮和两行字挤一排，默认宽度下状态截成「Exportin…」、短 id 也看不见；还没开始的排队任务也写「Exporting」。名字和按钮一行（从中间截）、
+  状态独占第二行；排着队的问 `AIWorkQueue` 写「排队中」。`checks/open-projects-wiring.sh` 第 15 条钉着。**窄栏里给最要紧的字整行；「有任务」不等于「在做」。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 
 ## 根目录文档
