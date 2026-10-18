@@ -251,6 +251,11 @@
 - **App 不在前台时开着 sheet（导出面板），它的辅助功能树会退化**：`AXWindows` 回的是 App 本身、按坐标命中也只回 App，System Events 拿不到窗口；sheet 关掉就好。
   这时用 AppleScript 让它退出会被拦下（「User canceled」）、顺手关掉 sheet、把 App 切到前台 —— 之后记得把前台还回去。
 - 辅助功能的「显示菜单」（`AXShowMenu`）打不开 SwiftUI 的 `.contextMenu`：右键菜单、鼠标悬停的提示只能真动鼠标，用户在用电脑时留给人手点。
+- **用户说不动电脑了，才用真鼠标**（`CGEvent` 发到 HID）：右键菜单、即时提示都是第 101 层的小窗口，按 CG 窗口列表找到窗口号再 `screencapture -l` 拍。
+  录屏选「A window」会弹系统的「Share a Window」选择器：鼠标停在要录的窗口上，点它中间的「Share This Window」（别停在用户的窗口上）；
+  录制浮窗故意不进截图，找它的停止按钮靠辅助功能（一个 `AXSystemDialog` 窗口里的 Stop）。
+- **系统打开面板的「前往」框别在中文输入法下按回车**：用辅助功能改了框里的字、当前输入法是拼音时，回车让 `openAndSavePanelService` 在输入法那一层抛异常崩掉
+  （面板整个消失、DiagnosticReports 里有崩溃报告）。临时切到 US 键盘布局（`TISSelectInputSource`）再按，做完切回原来的输入法；打字（拼音会把字母变成候选）同理。
 
 ## 四之六、进程内驱动：不动鼠标、不抢前台（2026-09-24）
 
