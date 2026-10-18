@@ -66,7 +66,7 @@ enum AILookTool {
         let frames = try await AIFrameComposer.frames(
             of: state, at: times, subtitleStyle: state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
         )
-        guard !frames.isEmpty else { throw AIToolError("SrtFlow could not render the timeline at those times.") }
+        guard !frames.isEmpty else { throw AIToolError("SkyCut could not render the timeline at those times.") }
         var described: [JSONValue] = []
         for frame in frames {
             var entry = await describe(frame).objectValue ?? [:]
@@ -195,7 +195,7 @@ enum AILookTool {
             (label: labels.flatMap { index < $0.count ? $0[index] : nil } ?? String(format: "%.2fs", frame.time), image: frame.image)
         }
         guard let sheet = AIContactSheet.draw(labelled, size: size), let jpeg = AIContactSheet.jpeg(sheet) else {
-            payload["image"] = "SrtFlow could not draw the picture; the descriptions above are all there is."
+            payload["image"] = "SkyCut could not draw the picture; the descriptions above are all there is."
             return .ok(.object(payload))
         }
         if frames.count > 1 {

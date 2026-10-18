@@ -71,7 +71,7 @@ enum AIDuplicate {
             state.overlayTracks.removeAll { $0.id == fresh && $0.clips.isEmpty }
             state.audioTracks.removeAll { $0.id == fresh && $0.clips.isEmpty }
         }
-        guard !result.isEmpty else { throw AIToolError("SrtFlow could not place the copies.") }
+        guard !result.isEmpty else { throw AIToolError("SkyCut could not place the copies.") }
         return result
     }
 }

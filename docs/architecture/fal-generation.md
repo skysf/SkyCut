@@ -106,7 +106,7 @@
 ## 七、清单跟着 Key 走（`MCPProviders`）
 
 - 2026-10-02 起 fal 的工具有两个：`generate_media` 和 `upscale_clip`，都属于 fal 提供方（`MCPToolName.provider`）、都在总说明的 fal 那一行里；下面说的「列不列」对两个一样。
-- 工具清单由小程序（`srtflow-mcp`）当场回（Claude 一启动就要，不能为此拉起 App），而 Key 在 App 的钥匙串里，所以 App 在 Key 添加 / 删除时、以及每次启动时，
+- 工具清单由小程序（`skycut-mcp`）当场回（Claude 一启动就要，不能为此拉起 App），而 Key 在 App 的钥匙串里，所以 App 在 Key 添加 / 删除时、以及每次启动时，
   写一个**只有提供方名字**的小文件 `mcp-providers.json`（`{"providers":["fal"]}`，和 socket 同目录、按 bundle id 分开），小程序每回一次清单 / 握手都重读它。
   文件里没有 Key、没有别的机密；读得宽（不在 / 坏了 / 有不认识的名字都当没有）。
 - 没配：`generate_media` 不列出来、总说明里也不提它（`MCPInstructions.text(providers:)`）。配了：列出来、总说明的目录末尾多一行（只指路：

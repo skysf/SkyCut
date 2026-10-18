@@ -35,7 +35,7 @@
 "Video engine ready — ffmpeg %@ (%@, native Apple silicon)" = "Video engine ready — ffmpeg %@ (%@, native Apple silicon)";
 
 /* Engine status and errors */
-"Bundled with SrtFlow" = "Bundled with SrtFlow";
+"Bundled with SkyCut" = "Bundled with SkyCut";
 "Repository vendor/ directory" = "Repository vendor/ directory";
 "SRTFLOW_FFMPEG override" = "SRTFLOW_FFMPEG override";
 "ffmpeg was not found. Rebuild the app with scripts/build-app.sh, or install it with: brew install ffmpeg" = "ffmpeg was not found. Rebuild the app with scripts/build-app.sh, or install it with: brew install ffmpeg";
@@ -44,8 +44,8 @@
 "Could not start ffmpeg: %@" = "Could not start ffmpeg: %@";
 "ffmpeg exited with code %d." = "ffmpeg exited with code %d.";
 "Cancelled." = "Cancelled.";
-"macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SrtFlow, then open SrtFlow again. If compression still fails immediately, paste this line into Terminal instead:\n%@" = "macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SrtFlow, then open SrtFlow again. If compression still fails immediately, paste this line into Terminal instead:\n%@";
-"macOS stopped the bundled ffmpeg because the app was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SrtFlow, then reopen it. If it still fails, paste this line into Terminal:\n%@" = "macOS stopped the bundled ffmpeg because the app was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SrtFlow, then reopen it. If it still fails, paste this line into Terminal:\n%@";
+"macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SkyCut, then open SkyCut again. If compression still fails immediately, paste this line into Terminal instead:\n%@" = "macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SkyCut, then open SkyCut again. If compression still fails immediately, paste this line into Terminal instead:\n%@";
+"macOS stopped the bundled ffmpeg because the app was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SkyCut, then reopen it. If it still fails, paste this line into Terminal:\n%@" = "macOS stopped the bundled ffmpeg because the app was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SkyCut, then reopen it. If it still fails, paste this line into Terminal:\n%@";
 "Open System Settings" = "Open System Settings";
 "ffmpeg was stopped by the system (signal %d)." = "ffmpeg was stopped by the system (signal %d).";
 "This file has no video track." = "This file has no video track.";
@@ -191,7 +191,7 @@
 /* Language */
 "Language" = "Language";
 "Appearance" = "Appearance";
-"The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SrtFlow." = "The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SrtFlow.";
+"The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SkyCut." = "The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SkyCut.";
 
 /* 烧录页的字幕编辑列 */
 "Subtitles" = "Subtitles";
@@ -528,11 +528,11 @@
 "Source" = "Source";
 "Aspect ratio" = "Aspect ratio";
 "Drag a region on any one display. Return confirms, Escape cancels." = "Drag a region on any one display. Return confirms, Escape cancels.";
-"Includes sound SrtFlow itself is playing." = "Includes sound SrtFlow itself is playing.";
+"Includes sound SkyCut itself is playing." = "Includes sound SkyCut itself is playing.";
 "Microphone" = "Microphone";
 "Device" = "Device";
 "No microphone found. The screen recording will still work." = "No microphone found. The screen recording will still work.";
-"Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SrtFlow doesn’t cancel echo." = "Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SrtFlow doesn’t cancel echo.";
+"Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SkyCut doesn’t cancel echo." = "Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SkyCut doesn’t cancel echo.";
 "Pointer" = "Pointer";
 "Show pointer" = "Show pointer";
 "Show clicks" = "Show clicks";
@@ -563,8 +563,8 @@
 "A recording from the last session is no longer where it was saved: %@" = "A recording from the last session is no longer where it was saved: %@";
 "This recording was saved but never added to the timeline." = "This recording was saved but never added to the timeline.";
 "This recording was saved but never added to the timeline. Its microphone track is missing." = "This recording was saved but never added to the timeline. Its microphone track is missing.";
-"SrtFlow found a damaged screen-recording record from the last session and left it untouched." = "SrtFlow found a damaged screen-recording record from the last session and left it untouched.";
-"SrtFlow quit while this recording was still being written." = "SrtFlow quit while this recording was still being written.";
+"SkyCut found a damaged screen-recording record from the last session and left it untouched." = "SkyCut found a damaged screen-recording record from the last session and left it untouched.";
+"SkyCut quit while this recording was still being written." = "SkyCut quit while this recording was still being written.";
 "Only the microphone audio from the interrupted recording could be recovered — the screen recording itself is unusable." = "Only the microphone audio from the interrupted recording could be recovered — the screen recording itself is unusable.";
 "These files couldn’t be deleted, so the recording is still on record: %@" = "These files couldn’t be deleted, so the recording is still on record: %@";
 "The project changed, so the recording wasn’t added to the timeline. It’s saved as %@." = "The project changed, so the recording wasn’t added to the timeline. It’s saved as %@.";
@@ -580,10 +580,10 @@
 "Not enough free space: %@ needed, %@ available." = "Not enough free space: %@ needed, %@ available.";
 "The disk ran out of space while recording." = "The disk ran out of space while recording.";
 "The disk ran out of space, so the recording is incomplete." = "The disk ran out of space, so the recording is incomplete.";
-"SrtFlow doesn’t have permission to record the screen yet. Turn SrtFlow on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SrtFlow." = "SrtFlow doesn’t have permission to record the screen yet. Turn SrtFlow on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SrtFlow.";
-"SrtFlow doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine." = "SrtFlow doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine.";
-"SrtFlow couldn’t hide its own recording controls from the capture, so it didn’t start. Try again." = "SrtFlow couldn’t hide its own recording controls from the capture, so it didn’t start. Try again.";
-"SrtFlow couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later." = "SrtFlow couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later.";
+"SkyCut doesn’t have permission to record the screen yet. Turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SkyCut." = "SkyCut doesn’t have permission to record the screen yet. Turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SkyCut.";
+"SkyCut doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine." = "SkyCut doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine.";
+"SkyCut couldn’t hide its own recording controls from the capture, so it didn’t start. Try again." = "SkyCut couldn’t hide its own recording controls from the capture, so it didn’t start. Try again.";
+"SkyCut couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later." = "SkyCut couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later.";
 "The recording could not be finished." = "The recording could not be finished.";
 "The recording has no usable video." = "The recording has no usable video.";
 "The end of the recording has no picture, so the recording is incomplete." = "The end of the recording has no picture, so the recording is incomplete.";
@@ -627,8 +627,8 @@
 "Where is “%@”?" = "Where is “%@”?";
 "“%@” could not be found." = "“%@” could not be found.";
 "%d media files could not be found." = "%d media files could not be found.";
-"“%@” isn’t a SrtFlow project file." = "“%@” isn’t a SrtFlow project file.";
-"“%@” was made by a newer version of SrtFlow." = "“%@” was made by a newer version of SrtFlow.";
+"“%@” isn’t a SkyCut project file." = "“%@” isn’t a SkyCut project file.";
+"“%@” was made by a newer version of SkyCut." = "“%@” was made by a newer version of SkyCut.";
 
 /* 时间线标记、字幕与导出 */
 "Add Marker at Playhead" = "Add Marker at Playhead";
@@ -963,8 +963,8 @@
 "Voiceovers" = "Voiceovers";
 "Sound Effects" = "Sound Effects";
 "AI" = "AI";
-"Let AI apps such as Claude and Codex edit videos in SrtFlow. You watch every step in the editor, and Command-Z undoes any of it." = "Let AI apps such as Claude and Codex edit videos in SrtFlow. You watch every step in the editor, and Command-Z undoes any of it.";
-"This copy of SrtFlow has no AI helper inside, so AI apps cannot connect to it." = "This copy of SrtFlow has no AI helper inside, so AI apps cannot connect to it.";
+"Let AI apps such as Claude and Codex edit videos in SkyCut. You watch every step in the editor, and Command-Z undoes any of it." = "Let AI apps such as Claude and Codex edit videos in SkyCut. You watch every step in the editor, and Command-Z undoes any of it.";
+"This copy of SkyCut has no AI helper inside, so AI apps cannot connect to it." = "This copy of SkyCut has no AI helper inside, so AI apps cannot connect to it.";
 "Copy Setup for Other Apps" = "Copy Setup for Other Apps";
 "Copy the MCP configuration (JSON) for apps such as Cursor or Cherry Studio" = "Copy the MCP configuration (JSON) for apps such as Cursor or Cherry Studio";
 "Copied the configuration." = "Copied the configuration.";
@@ -973,36 +973,36 @@
 "Codex" = "Codex";
 "Copy Prompt" = "Copy Prompt";
 "Copied. Paste it into %@." = "Copied. Paste it into %@.";
-"Copy a message you can paste into this app so it connects SrtFlow itself" = "Copy a message you can paste into this app so it connects SrtFlow itself";
+"Copy a message you can paste into this app so it connects SkyCut itself" = "Copy a message you can paste into this app so it connects SkyCut itself";
 "Connect" = "Connect";
 "Disconnect" = "Disconnect";
-"Remove SrtFlow from this app's MCP settings" = "Remove SrtFlow from this app's MCP settings";
+"Remove SkyCut from this app's MCP settings" = "Remove SkyCut from this app's MCP settings";
 "Connected · asks each time" = "Connected · asks each time";
-"Add SrtFlow to this app's MCP settings and let it use SrtFlow's tools without asking" = "Add SrtFlow to this app's MCP settings and let it use SrtFlow's tools without asking";
+"Add SkyCut to this app's MCP settings and let it use SkyCut's tools without asking" = "Add SkyCut to this app's MCP settings and let it use SkyCut's tools without asking";
 "AI may also read these places without asking, because you allowed it once:" = "AI may also read these places without asking, because you allowed it once:";
 "Forget" = "Forget";
-"SrtFlow voices" = "SrtFlow voices";
+"SkyCut voices" = "SkyCut voices";
 "Natural voices for AI voiceovers, made on this Mac, in English, Chinese and 6 more languages. About 333 MB." = "Natural voices for AI voiceovers, made on this Mac, in English, Chinese and 6 more languages. About 333 MB.";
 "Downloaded" = "Downloaded";
 "Download failed" = "Download failed";
 "Not downloaded" = "Not downloaded";
-"Delete SrtFlow's voices from this Mac; AI voiceovers use the Mac's voices until you download them again" = "Delete SrtFlow's voices from this Mac; AI voiceovers use the Mac's voices until you download them again";
+"Delete SkyCut's voices from this Mac; AI voiceovers use the Mac's voices until you download them again" = "Delete SkyCut's voices from this Mac; AI voiceovers use the Mac's voices until you download them again";
 "Stop the download; downloading again continues where it stopped" = "Stop the download; downloading again continues where it stopped";
 "Try Again" = "Try Again";
 "Download" = "Download";
-"Download SrtFlow's voices (about 333 MB) so AI voiceovers sound natural" = "Download SrtFlow's voices (about 333 MB) so AI voiceovers sound natural";
+"Download SkyCut's voices (about 333 MB) so AI voiceovers sound natural" = "Download SkyCut's voices (about 333 MB) so AI voiceovers sound natural";
 "Editing styles" = "Editing styles";
 "Open Folder" = "Open Folder";
 "Show the folder with your own editing styles in Finder" = "Show the folder with your own editing styles in Finder";
-"When AI edits a whole video it follows one of SrtFlow's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here." = "When AI edits a whole video it follows one of SrtFlow's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here.";
+"When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here." = "When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here.";
 "Replaces the preset style" = "Replaces the preset style";
 "Open this style's file in Finder; any text editor can change it" = "Open this style's file in Finder; any text editor can change it";
 "Move this style to the Trash" = "Move this style to the Trash";
 "Ask again before AI reads files here" = "Ask again before AI reads files here";
-"Connected. Restart Claude Desktop so it picks up SrtFlow. It asks before each SrtFlow tool until you choose Always allow, in the prompt or for all of srtflow's tools at once in Claude's Connectors settings." = "Connected. Restart Claude Desktop so it picks up SrtFlow. It asks before each SrtFlow tool until you choose Always allow, in the prompt or for all of srtflow's tools at once in Claude's Connectors settings.";
-"Connected. Restart %@ so it picks up SrtFlow. It will use SrtFlow's tools without asking; SrtFlow itself asks before moving files to the Trash." = "Connected. Restart %@ so it picks up SrtFlow. It will use SrtFlow's tools without asking; SrtFlow itself asks before moving files to the Trash.";
-"Please connect the SrtFlow video editor to Claude Code: run this command in the terminal, add \"mcp__srtflow\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user srtflow -- \"%@\"" = "Please connect the SrtFlow video editor to Claude Code: run this command in the terminal, add \"mcp__srtflow\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user srtflow -- \"%@\"";
-"Please connect the SrtFlow video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.srtflow] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add srtflow -- \"%@\"" = "Please connect the SrtFlow video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.srtflow] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add srtflow -- \"%@\"";
+"Connected. Restart Claude Desktop so it picks up SkyCut. It asks before each SkyCut tool until you choose Always allow, in the prompt or for all of skycut's tools at once in Claude's Connectors settings." = "Connected. Restart Claude Desktop so it picks up SkyCut. It asks before each SkyCut tool until you choose Always allow, in the prompt or for all of skycut's tools at once in Claude's Connectors settings.";
+"Connected. Restart %@ so it picks up SkyCut. It will use SkyCut's tools without asking; SkyCut itself asks before moving files to the Trash." = "Connected. Restart %@ so it picks up SkyCut. It will use SkyCut's tools without asking; SkyCut itself asks before moving files to the Trash.";
+"Please connect the SkyCut video editor to Claude Code: run this command in the terminal, add \"mcp__skycut\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user skycut -- \"%@\"" = "Please connect the SkyCut video editor to Claude Code: run this command in the terminal, add \"mcp__skycut\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user skycut -- \"%@\"";
+"Please connect the SkyCut video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.skycut] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add skycut -- \"%@\"" = "Please connect the SkyCut video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.skycut] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add skycut -- \"%@\"";
 "Connected" = "Connected";
 "Connected to another copy" = "Connected to another copy";
 "Not connected" = "Not connected";
@@ -1013,7 +1013,7 @@
 "Downloading the translation languages. In the window that opened, click Download next to each language if you haven't yet. Its progress bar can lag: System Settings › General › Language & Region › Translation Languages shows the real progress." = "Downloading the translation languages. In the window that opened, click Download next to each language if you haven't yet. Its progress bar can lag: System Settings › General › Language & Region › Translation Languages shows the real progress.";
 "The translation languages are downloaded. If the download window is still open, click Done and translating starts." = "The translation languages are downloaded. If the download window is still open, click Done and translating starts.";
 "Highlight each word" = "Highlight each word";
-"The word being spoken changes colour, in the preview and in the exported video. Only subtitles SrtFlow made (from speech or a voiceover) know when each word is said" = "The word being spoken changes colour, in the preview and in the exported video. Only subtitles SrtFlow made (from speech or a voiceover) know when each word is said";
+"The word being spoken changes colour, in the preview and in the exported video. Only subtitles SkyCut made (from speech or a voiceover) know when each word is said" = "The word being spoken changes colour, in the preview and in the exported video. Only subtitles SkyCut made (from speech or a voiceover) know when each word is said";
 "Colour of the word being spoken" = "Colour of the word being spoken";
 "This project has its own subtitle style." = "This project has its own subtitle style.";
 "Use Burn In style" = "Use Burn In style";
@@ -1021,11 +1021,11 @@
 
 // fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "Generated";
-"macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow." = "macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow.";
+"macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow." = "macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow.";
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "That is not a fal.ai endpoint id. It looks like owner/model-name.";
 "The price must be a number." = "The price must be a number.";
 "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys.";
-"Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SrtFlow stays within the daily limit below and asks you before going over it." = "Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SrtFlow stays within the daily limit below and asks you before going over it.";
+"Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it." = "Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it.";
 "fal.ai models" = "fal.ai models";
 "Key saved in the keychain" = "Key saved in the keychain";
 "Remove Key" = "Remove Key";
@@ -1035,8 +1035,8 @@
 "Store the key in the macOS keychain (fal.ai/dashboard/keys)" = "Store the key in the macOS keychain (fal.ai/dashboard/keys)";
 "Daily limit" = "Daily limit";
 "Spent today %@" = "Spent today %@";
-"SrtFlow asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)" = "SrtFlow asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)";
-"Go back to the model SrtFlow picked for this" = "Go back to the model SrtFlow picked for this";
+"SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)" = "SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)";
+"Go back to the model SkyCut picked for this" = "Go back to the model SkyCut picked for this";
 "owner/model-name" = "owner/model-name";
 "price" = "price";
 "Image" = "Image";
@@ -1081,7 +1081,7 @@
 "Cache" = "Cache";
 "Delete the cache. The preview uses the original files until the optimized media is prepared again" = "Delete the cache. The preview uses the original files until the optimized media is prepared again";
 "Limit" = "Limit";
-"Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SrtFlow starts" = "Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SrtFlow starts";
+"Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SkyCut starts" = "Past this size, the parts used least recently are deleted first. Parts unused for 30 days are deleted when SkyCut starts";
 "Cleared. The preview uses the original files and prepares optimized media again in the background." = "Cleared. The preview uses the original files and prepares optimized media again in the background.";
 "Not optimized (the preview uses the original file)" = "Not optimized (the preview uses the original file)";
 "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones" = "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones";
@@ -1178,7 +1178,7 @@
 "uploading" = "uploading";
 "usually about %d min" = "usually about %d min";
 
-// 录屏进 MCP（AI 录的文件放在 <起点>/SrtFlow/录屏）
+// 录屏进 MCP（AI 录的文件放在 <起点>/SkyCut/录屏）
 "Screen Recordings" = "Screen Recordings";
 
 // AI 在剪的工程（主窗口侧边栏，后台工程的停止 / 打开窗口 / 关掉；2026-10-17 AI 多开第 ③a 刀）
@@ -1199,4 +1199,4 @@
 "Generating" = "Generating";
 "Transcribing" = "Transcribing";
 "Working" = "Working";
-"SrtFlow keeps at most %lld projects open. Close one first." = "SrtFlow keeps at most %lld projects open. Close one first.";
+"SkyCut keeps at most %lld projects open. Close one first." = "SkyCut keeps at most %lld projects open. Close one first.";

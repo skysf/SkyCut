@@ -26,7 +26,7 @@ struct UpscaleJobStatusView: View {
                         .font(.caption)
                 }
                 if job.keyPrompt {
-                    Text("macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow.")
+                    Text("macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {

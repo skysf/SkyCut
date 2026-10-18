@@ -30,7 +30,7 @@ struct AppConnection {
     /// App 升级过、这个会话里跑的还是旧的小程序时，换上的 App 那份工具清单（`MCPCatalogSync`）。
     let catalog = MCPCatalogOverride()
 
-    /// 从小程序自己的位置找到它所在的 App：`X.app/Contents/Helpers/srtflow-mcp`。
+    /// 从小程序自己的位置找到它所在的 App：`X.app/Contents/Helpers/skycut-mcp`。
     static func locate(environment: [String: String] = ProcessInfo.processInfo.environment) -> AppConnection {
         let appURL = environment["SRTFLOW_MCP_APP"].map { URL(fileURLWithPath: $0) } ?? enclosingApp()
         let bundle = appURL.flatMap { Bundle(url: $0) }
@@ -80,7 +80,7 @@ struct AppConnection {
                 return MCPBridge.textResult(message, isError: true)
             case .closed:
                 return MCPBridge.textResult(
-                    "SrtFlow closed the connection without answering (it may have quit). Try again.", isError: true
+                    "SkyCut closed the connection without answering (it may have quit). Try again.", isError: true
                 )
             }
             let response = try JSONDecoder().decode(MCPBridge.Response.self, from: line)
@@ -96,7 +96,7 @@ struct AppConnection {
         } catch let failure as ConnectionFailure {
             return MCPBridge.textResult(failure.message, isError: true)
         } catch {
-            return MCPBridge.textResult("Could not talk to SrtFlow: \(error)", isError: true)
+            return MCPBridge.textResult("Could not talk to SkyCut: \(error)", isError: true)
         }
     }
 
@@ -120,7 +120,7 @@ struct AppConnection {
     private func connectOrLaunch() throws -> (fd: Int32, launched: Bool) {
         if let fd = try? MCPUnixSocket.connect(path: socketPath) { return (fd, false) }
         guard mayLaunch else {
-            throw ConnectionFailure(message: "SrtFlow is not running. Ask the user to open SrtFlow.")
+            throw ConnectionFailure(message: "SkyCut is not running. Ask the user to open SkyCut.")
         }
         try launchApp()
         // 冷启动要把 SwiftUI 窗口和引擎都拉起来，给足时间；一般两三秒就开始听了。
@@ -130,8 +130,8 @@ struct AppConnection {
             if let fd = try? MCPUnixSocket.connect(path: socketPath) { return (fd, true) }
         }
         throw ConnectionFailure(message: """
-            SrtFlow did not start answering within 45 seconds. If an older SrtFlow without AI support is open, \
-            ask the user to quit it; otherwise ask them to open SrtFlow and try again.
+            SkyCut did not start answering within 45 seconds. If an older SkyCut without AI support is open, \
+            ask the user to quit it; otherwise ask them to open SkyCut and try again.
             """)
     }
 
@@ -150,11 +150,11 @@ struct AppConnection {
         do {
             try process.run()
         } catch {
-            throw ConnectionFailure(message: "Could not start SrtFlow: \(error.localizedDescription)")
+            throw ConnectionFailure(message: "Could not start SkyCut: \(error.localizedDescription)")
         }
         process.waitUntilExit()
         guard process.terminationStatus == 0 else {
-            throw ConnectionFailure(message: "Could not start SrtFlow (open exited with \(process.terminationStatus)).")
+            throw ConnectionFailure(message: "Could not start SkyCut (open exited with \(process.terminationStatus)).")
         }
     }
 }

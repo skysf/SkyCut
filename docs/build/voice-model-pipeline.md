@@ -24,7 +24,7 @@ s3://skylu-downloads/Models/Kokoro-82M-CoreML/v1/manifest.json
 | 主模型 `kokoro_5s.mlmodelc`、英语补拼写的 `G2PEncoder` / `G2PDecoder`、词表、英语词典、54 个音色 | huggingface.co/aufklarer/Kokoro-82M-CoreML @ `f8ff771e4cab0bb3368e8af3a090a7e847485401`（权重来自 hexgrad/Kokoro-82M） | Apache-2.0 |
 | 法、葡、印地的词典 `dict_*.json` | github.com/soniqo/speech-swift @ `e345dbf95e7bb6c7b51d3f06175360188fa33d1e` 的 `Sources/KokoroTTS/Resources` | Apache-2.0（词条来自 ipa-dict，MIT） |
 
-speech-swift 原来从 `Bundle.module` 读这三份词典；打好的 SrtFlow.app 里没有那个 bundle，会直接崩，所以改成和模型放在一起下载。
+speech-swift 原来从 `Bundle.module` 读这三份词典；打好的 SkyCut.app 里没有那个 bundle，会直接崩，所以改成和模型放在一起下载。
 
 ## 三、步骤
 

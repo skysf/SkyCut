@@ -92,8 +92,8 @@ final class AIWorkspace {
         if outside.count > 5 { names += " and \(outside.count - 5) more" }
         let which = outside.count == 1 ? "which is" : "which are"
         return AIConfirmations.shared.ask(
-            "SrtFlow needs to \(verb) \(names), \(which) outside the folder you opened. Allow it? "
-                + "SrtFlow then remembers that folder and does not ask again for files in it.",
+            "SkyCut needs to \(verb) \(names), \(which) outside the folder you opened. Allow it? "
+                + "SkyCut then remembers that folder and does not ask again for files in it.",
             action: action, refused: redemption.refusal
         )
     }

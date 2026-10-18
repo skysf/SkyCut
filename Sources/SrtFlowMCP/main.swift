@@ -1,7 +1,7 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - srtflow-mcp：AI 客户端启动的那个小程序
+// MARK: - skycut-mcp：AI 客户端启动的那个小程序
 //
 // Claude、Codex 这些客户端按配置把它当子进程启动，从它的 stdin 写 MCP 消息、从 stdout 读回答
 // （一行一条 JSON）。它自己几乎什么都不做：握手和工具清单当场回，工具调用转给正在运行的

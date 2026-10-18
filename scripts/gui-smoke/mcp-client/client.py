@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""扮成 AI 客户端驱动测试版（MCP 冒烟）：起 App 包里的 srtflow-mcp，按老一代握手，一个一个发工具调用，
+"""扮成 AI 客户端驱动测试版（MCP 冒烟）：起 App 包里的 skycut-mcp，按老一代握手，一个一个发工具调用，
 打印结果；look 回的图存成 jpg（再用看图的工具打开看）。流程与注意事项见 docs/testing/gui-smoke-testing.md「四之七」。
 
 用法：client.py <calls.json> <输出目录> [--full]
@@ -14,7 +14,7 @@ import subprocess
 import sys
 import time
 
-HELPER = os.environ.get("SRTFLOW_MCP_HELPER", "/Applications/SrtFlow Beta.app/Contents/Helpers/srtflow-mcp")
+HELPER = os.environ.get("SRTFLOW_MCP_HELPER", "/Applications/SkyCut Beta.app/Contents/Helpers/skycut-mcp")
 
 
 def read_reply(proc, want_id, timeout):

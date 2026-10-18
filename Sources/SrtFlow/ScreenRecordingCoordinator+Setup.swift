@@ -210,7 +210,7 @@ extension ScreenRecordingCoordinator {
             // 损坏的 manifest **保留并如实报告**，不静默删除
             // （`docs/architecture/screen-recording-lifecycle.md` 的明文要求）。
             OpenProjects.shared.primary.notice = L10n(
-                "SrtFlow found a damaged screen-recording record from the last session and left it untouched."
+                "SkyCut found a damaged screen-recording record from the last session and left it untouched."
             )
             return
         }
@@ -297,7 +297,7 @@ extension ScreenRecordingCoordinator {
                         pixelSize: mainProbe?.displaySize ?? .zero,
                         frameRate: .fallback,
                         isPartial: true,
-                        partialReason: L10n("SrtFlow quit while this recording was still being written.")
+                        partialReason: L10n("SkyCut quit while this recording was still being written.")
                     )
                 )
             )
@@ -590,13 +590,13 @@ extension ScreenRecordingError {
         switch self {
         case .screenCaptureNotAuthorized:
             // **不能写「你拒绝过」**（-3801 同样覆盖「从未授权」，门槛 1）；也不写「关掉再打开」（钉着旧签名时没用，见 ScreenCapturePermissionRepair）。
-            return L10n("SrtFlow doesn’t have permission to record the screen yet. Turn SrtFlow on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SrtFlow.")
+            return L10n("SkyCut doesn’t have permission to record the screen yet. Turn SkyCut on in System Settings ▸ Privacy & Security ▸ Screen & System Audio Recording, then quit and reopen SkyCut.")
         case .pickerCancelled:
             return L10n("Source selection was cancelled.")
         case .sourceUnavailable:
             return L10n("That source is no longer available.")
         case .microphoneNotAuthorized:
-            return L10n("SrtFlow doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine.")
+            return L10n("SkyCut doesn’t have microphone permission, so narration wasn’t recorded. The screen recording itself is fine.")
         case .insufficientDiskSpace(let required, let available):
             return String(
                 format: L10n("Not enough free space: %@ needed, %@ available."),
@@ -609,9 +609,9 @@ extension ScreenRecordingError {
         case .outputNotWritable:
             return L10n("That folder can’t be written to. Pick another location.")
         case .controlWindowUnavailable:
-            return L10n("SrtFlow couldn’t hide its own recording controls from the capture, so it didn’t start. Try again.")
+            return L10n("SkyCut couldn’t hide its own recording controls from the capture, so it didn’t start. Try again.")
         case .ambiguousSource:
-            return L10n("SrtFlow couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later.")
+            return L10n("SkyCut couldn’t tell which display you picked (two look identical). Record a window or a custom region instead, or update to macOS 15.2 or later.")
         }
     }
 }

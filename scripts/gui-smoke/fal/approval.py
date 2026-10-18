@@ -19,7 +19,7 @@ def server_log(): return json.load(urllib.request.urlopen("http://127.0.0.1:1876
 def posts(prefix): return [e for e in server_log() if e["method"] == "POST" and e["path"].lstrip("/").startswith(prefix)]
 def ax(*a): return subprocess.run([HERE + "/ax.sh", *a], capture_output=True, text=True).stdout.strip()
 
-mcp = MCP(APP + "/Contents/Helpers/srtflow-mcp")
+mcp = MCP(APP + "/Contents/Helpers/skycut-mcp")
 windows = subprocess.run(["osascript", "-e", 'tell application "System Events" to tell process "SrtFlowFalSmoke" to get count of windows'],
                          capture_output=True, text=True).stdout.strip()
 can_click = windows not in ("", "0")

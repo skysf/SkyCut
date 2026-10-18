@@ -150,7 +150,7 @@ final class KokoroVoicePack: ObservableObject {
         let (data, response) = try await URLSession.shared.data(from: url)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
-            throw AIToolError("SrtFlow could not reach its voice download (HTTP \(status)). Check the internet connection and try again.")
+            throw AIToolError("SkyCut could not reach its voice download (HTTP \(status)). Check the internet connection and try again.")
         }
         return data
     }
@@ -177,7 +177,7 @@ final class KokoroVoicePack: ObservableObject {
                     if let error { return continuation.resume(throwing: error) }
                     let status = (response as? HTTPURLResponse)?.statusCode ?? 0
                     guard status == 200, let location else {
-                        return continuation.resume(throwing: AIToolError("SrtFlow could not download a voice file (HTTP \(status))."))
+                        return continuation.resume(throwing: AIToolError("SkyCut could not download a voice file (HTTP \(status))."))
                     }
                     // 系统给的临时文件在这个回调返回后就被删掉，先挪到自己的地方。
                     let own = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

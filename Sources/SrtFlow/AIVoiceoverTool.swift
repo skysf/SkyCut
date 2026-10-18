@@ -45,13 +45,13 @@ enum AIVoiceoverTool {
         guard try args.bool("download_voices") == true else { return nil }
         let pack = KokoroVoicePack.shared
         if pack.isInstalled {
-            return .ok(["status": "installed", "next_step": "SrtFlow's voices are ready: call add_voiceover with your lines."])
+            return .ok(["status": "installed", "next_step": "SkyCut's voices are ready: call add_voiceover with your lines."])
         }
         let job = AIJobs.shared.start(.voices, progress: { pack.fraction }, cancel: { pack.cancel() })
         Task { @MainActor in
             do {
                 try await pack.install()
-                AIJobs.shared.finish(job, .done, message: "SrtFlow's voices are downloaded. Call add_voiceover with your lines.")
+                AIJobs.shared.finish(job, .done, message: "SkyCut's voices are downloaded. Call add_voiceover with your lines.")
             } catch {
                 let cancelled = error is CancellationError || (error as? URLError)?.code == .cancelled
                 AIJobs.shared.finish(job, cancelled ? .cancelled : .failed,
@@ -60,7 +60,7 @@ enum AIVoiceoverTool {
         }
         return .ok([
             "status": "downloading", "job_id": .string(job.id), "size": .string(KokoroVoicePack.approximateSize),
-            "next_step": .string("Tell the user SrtFlow is downloading its own voices (about \(KokoroVoicePack.approximateSize); "
+            "next_step": .string("Tell the user SkyCut is downloading its own voices (about \(KokoroVoicePack.approximateSize); "
                 + "progress also shows in Settings → AI). Wait with get_job, then call add_voiceover again without download_voices.")
         ])
     }
@@ -92,7 +92,7 @@ enum AIVoiceoverTool {
         if let clone = try cloneSource(args) {
             let result = await AIFalVoice.offer(kind: .voiceClone, characters: characters)
             guard let made = result.offer else {
-                throw AIToolError(result.note ?? "Cloning a voice needs a fal.ai key: ask the user to add one in SrtFlow → Settings → AI.")
+                throw AIToolError(result.note ?? "Cloning a voice needs a fal.ai key: ask the user to add one in SkyCut → Settings → AI.")
             }
             offer = made
             reference = try await AIFalVoice.referenceSample(from: clone.url, start: clone.start, seconds: clone.seconds)
@@ -105,7 +105,7 @@ enum AIVoiceoverTool {
                                               installed: AISpeechSynthesis.installedVoices(), falAvailable: offer != nil)
         }
         if case .fal = choice.engine, args.has("speed"), speed != 1 {
-            falNote = [falNote, "The fal.ai voice speaks at its own pace; speed was ignored (SrtFlow's or a Mac voice can change it)."]
+            falNote = [falNote, "The fal.ai voice speaks at its own pace; speed was ignored (SkyCut's or a Mac voice can change it)."]
                 .compactMap { $0 }.joined(separator: " ")
         }
         if let falNote { choice.note = [choice.note, falNote].compactMap { $0 }.joined(separator: " ") }
@@ -137,7 +137,7 @@ enum AIVoiceoverTool {
                 output = try await AISpeechSynthesis.speak(line.text, choice: choice, speed: speed, to: url)
             }
             guard let media = await project.probeImports([url]).first else {
-                throw AIToolError("lines[\(index)]: SrtFlow could not read back the voiceover file \(url.lastPathComponent).")
+                throw AIToolError("lines[\(index)]: SkyCut could not read back the voiceover file \(url.lastPathComponent).")
             }
             spoken.append(Spoken(line: line, output: output, clip: project.clip(for: media)))
         }
@@ -231,7 +231,7 @@ enum AIVoiceoverTool {
             // fal 没报词时间（或报的读不出来）：那几句就没有字幕，别让 AI 以为加上了。
             if case .fal = plan.choice.engine, plan.spoken.contains(where: { $0.output.words.isEmpty }) {
                 let note = "fal.ai did not say when each word is spoken for some lines, so those lines have no subtitles. "
-                    + "Run generate_subtitles on the voiceover clips, or use SrtFlow's own voice."
+                    + "Run generate_subtitles on the voiceover clips, or use SkyCut's own voice."
                 summary["note"] = .string([summary["note"]?.stringValue, note].compactMap { $0 }.joined(separator: " "))
             }
             result["subtitles"] = .object(summary)

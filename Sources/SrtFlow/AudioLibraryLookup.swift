@@ -33,7 +33,7 @@ enum AudioLibraryLookup {
                     loaded.items += items
                     if store.isStale { loaded.stale = true }
                 case .failed(let message):
-                    loaded.failures.append("SrtFlow's \(name(of: store)) library could not be loaded: \(message)")
+                    loaded.failures.append("SkyCut's \(name(of: store)) library could not be loaded: \(message)")
                 case .idle, .loading:
                     waiting = true
                 }
@@ -41,7 +41,7 @@ enum AudioLibraryLookup {
             if !waiting { return loaded }
             if Date() >= deadline {
                 for store in stores where !store.state.isSettled {
-                    loaded.failures.append("SrtFlow's \(name(of: store)) library is still loading. Try again in a moment.")
+                    loaded.failures.append("SkyCut's \(name(of: store)) library is still loading. Try again in a moment.")
                 }
                 return loaded
             }

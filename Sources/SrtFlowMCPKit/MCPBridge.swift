@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 小程序和 App 之间的通道
 //
-// 管什么：`srtflow-mcp`（AI 客户端启动的小程序）把一次工具调用交给正在运行的 SrtFlow 时，
+// 管什么：`skycut-mcp`（AI 客户端启动的小程序）把一次工具调用交给正在运行的 SrtFlow 时，
 // 两边说的话长什么样、在哪个 Unix socket 上说。
 // 不管什么：socket 怎么收发（MCPUnixSocket）、MCP 协议本身（MCPServerCore）。
 //
@@ -153,7 +153,7 @@ public enum MCPBridge {
     }
 
     /// 小程序得先把 App 拉起来才连得上时，结果前面那一句：之前打开的工程、文件夹、看法都不在了（多半是 App 被退出过）。
-    public static let relaunchNote = "Note: SrtFlow was not running, so it was just started. Nothing from before is open: "
+    public static let relaunchNote = "Note: SkyCut was not running, so it was just started. Nothing from before is open: "
         + "call open_folder and open_project again before using earlier paths or ids (and set_view background again if you "
         + "were working in the background)."
 

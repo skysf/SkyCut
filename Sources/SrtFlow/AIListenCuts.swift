@@ -93,9 +93,9 @@ enum AIListenCuts {
     private static func hear(_ sound: EditClip, state: TimelineState, silenceDB: Double?, deadline: Date) async -> Heard {
         switch await AISpeechCutTool.wholeFile(of: sound, until: deadline) {
         case .unreadable:
-            return .unheard("unreadable: SrtFlow could not read this clip's audio")
+            return .unheard("unreadable: SkyCut could not read this clip's audio")
         case .reading:
-            return .unheard("still reading: SrtFlow is reading this file's audio, call listen again in a moment")
+            return .unheard("still reading: SkyCut is reading this file's audio, call listen again in a moment")
         case .ready(let peaks):
             let levels = AIAudioLevels.windows(peaks, from: 0, to: peaks.duration)
             guard !levels.isEmpty else { return .unheard("unreadable: no audio in this clip's file") }

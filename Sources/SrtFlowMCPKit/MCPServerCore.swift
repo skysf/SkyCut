@@ -39,7 +39,7 @@ public final class MCPServerCore: @unchecked Sendable {
     public static let modernVersions = ["2026-07-28"]
     public static var supportedVersions: [String] { modernVersions + legacyVersions }
 
-    public static let serverName = "srtflow"
+    public static let serverName = "skycut"
     /// 工具清单让客户端缓存多久：短，因为它随「配没配 fal」变。
     public static let toolListTTLms = 60_000
 
@@ -72,7 +72,7 @@ public final class MCPServerCore: @unchecked Sendable {
     }
 
     private var serverInfo: JSONValue {
-        ["name": .string(Self.serverName), "title": "SrtFlow", "version": .string(serverVersion)]
+        ["name": .string(Self.serverName), "title": "SkyCut", "version": .string(serverVersion)]
     }
 
     // MARK: 分派

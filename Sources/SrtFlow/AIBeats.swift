@@ -51,7 +51,7 @@ enum AIBeats {
             guard let pcm = readMono(asset: asset, track: track, from: window.from, to: window.to, sampleRate: rate) else { return nil }
             return Reading(analysis: AudioBeatTracker.analyze(pcm.samples, sampleRate: rate).map { shifted($0, by: pcm.start) })
         }
-        guard let read else { throw AIToolError("SrtFlow could not read the sound of \(url.lastPathComponent).") }
+        guard let read else { throw AIToolError("SkyCut could not read the sound of \(url.lastPathComponent).") }
         cache[key] = .some(read.analysis)
         return read.analysis
     }

@@ -77,9 +77,9 @@ enum AIFinderSelection {
     /// osascript 失败时说给 AI 听的话。-1743：用户没允许 SrtFlow 控制访达。
     static func explain(status: Int32, error: String) -> String {
         if error.contains("-1743") || error.lowercased().contains("not authorized") || error.lowercased().contains("not allowed") {
-            return "The user has not allowed SrtFlow to see Finder's selection. They can allow it in System Settings > Privacy & Security > Automation > SrtFlow > Finder, or tell you the folder instead."
+            return "The user has not allowed SkyCut to see Finder's selection. They can allow it in System Settings > Privacy & Security > Automation > SkyCut > Finder, or tell you the folder instead."
         }
-        return "SrtFlow could not read Finder's selection (osascript exited with \(status): \(error.trimmingCharacters(in: .whitespacesAndNewlines)))."
+        return "SkyCut could not read Finder's selection (osascript exited with \(status): \(error.trimmingCharacters(in: .whitespacesAndNewlines)))."
     }
 
     /// 同步跑完 osascript。**只在 `MediaReadQueue.analysis` 上调**：第一次要等用户点授权框。
@@ -96,7 +96,7 @@ enum AIFinderSelection {
         do {
             try process.run()
         } catch {
-            return .failure(Failure(message: "SrtFlow could not run osascript: \(error.localizedDescription)"))
+            return .failure(Failure(message: "SkyCut could not run osascript: \(error.localizedDescription)"))
         }
         // 边跑边把输出读走：选中上千个文件时路径能超过管道的 64KB，不读的话 osascript 卡在写上、永远不退出。
         let drained = DispatchGroup()
@@ -110,7 +110,7 @@ enum AIFinderSelection {
         }
         guard finished.wait(timeout: .now() + timeout) == .success else {
             process.terminate()
-            return .failure(Failure(message: "macOS is asking the user whether SrtFlow may control Finder. Ask them to click OK in that dialog, then call open_folder with from_finder again."))
+            return .failure(Failure(message: "macOS is asking the user whether SkyCut may control Finder. Ask them to click OK in that dialog, then call open_folder with from_finder again."))
         }
         drained.wait()
         let text = String(data: outputData, encoding: .utf8) ?? ""

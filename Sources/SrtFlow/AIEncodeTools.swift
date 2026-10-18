@@ -115,19 +115,19 @@ enum AIEncodeTools {
     ) async throws -> AIToolResult {
         let runtime = try await ffmpeg()
         if kind == .burnIn, !runtime.canBurnInSubtitles {
-            throw AIToolError("This copy of SrtFlow's video engine cannot burn subtitles (its ffmpeg has no libass).")
+            throw AIToolError("This copy of SkyCut's video engine cannot burn subtitles (its ffmpeg has no libass).")
         }
         let page = kind == .burnIn ? "Burn In Subtitles" : "Compress Video"
         if !queue.isRunning, queue.items.contains(where: { $0.status == .waiting && $0.ownSettings == nil }) {
             throw AIToolError(
-                "SrtFlow's \(page) page has videos the user queued but has not started, and starting the queue would start "
+                "SkyCut's \(page) page has videos the user queued but has not started, and starting the queue would start "
                     + "them too. Ask the user to start or remove them, then try again."
             )
         }
         let busy = entries.map(\.url).filter { url in queue.items.contains { $0.inputURL == url && !$0.isDone } }
         guard busy.isEmpty else {
             let names = busy.map(\.lastPathComponent).joined(separator: ", ")
-            throw AIToolError("Already in SrtFlow's \(page) queue: \(names). Wait for it with get_job or cancel it first.")
+            throw AIToolError("Already in SkyCut's \(page) queue: \(names). Wait for it with get_job or cancel it first.")
         }
         let settings = AIEncodeOptions.apply(try AIEncodeOptions.parse(args), to: queue.settings)
         let folder = try outputFolder(args, project)
@@ -160,7 +160,7 @@ enum AIEncodeTools {
         toolchain.resolveIfNeeded()
         for _ in 0..<100 where toolchain.isResolving { try? await Task.sleep(nanoseconds: 100_000_000) }
         guard let runtime = toolchain.runtime else {
-            throw AIToolError("SrtFlow's video engine (ffmpeg) is not available. \(toolchain.warning ?? "It is still starting; try again in a moment.")")
+            throw AIToolError("SkyCut's video engine (ffmpeg) is not available. \(toolchain.warning ?? "It is still starting; try again in a moment.")")
         }
         return runtime
     }

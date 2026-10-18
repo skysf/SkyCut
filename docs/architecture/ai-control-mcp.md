@@ -6,13 +6,13 @@
 ## 一、结构：三段，活只在 App 里做
 
 ```
-AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──(Unix socket)──▶ SrtFlow（AIToolRouter → AI*Tools）
+AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(Unix socket)──▶ SkyCut（AIToolRouter → AI*Tools）
 ```
 
 | 部分 | 在哪 | 管什么 |
 | --- | --- | --- |
 | `SrtFlowMCPKit`（库） | `Sources/SrtFlowMCPKit/` | MCP 协议（`MCPServerCore`）、工具清单（`MCPToolName` + 三个说明文件）、选项词表、通道格式与 socket 收发。只依赖 Foundation，小程序和 App 共用 |
-| `srtflow-mcp`（小程序） | `Sources/SrtFlowMCP/`，打包进 `SrtFlow.app/Contents/Helpers/` | 客户端按配置启动它。握手和工具清单当场回，工具调用转给 App；App 没开就 `open -g` 拉起来 |
+| `skycut-mcp`（小程序） | `Sources/SrtFlowMCP/`，打包进 `SkyCut.app/Contents/Helpers/` | 客户端按配置启动它。握手和工具清单当场回，工具调用转给 App；App 没开就 `open -g` 拉起来 |
 | App 这一头 | `Sources/SrtFlow/AI*.swift` | `AIBridgeServer` 听 socket → `AIToolRouter` 排队、摆出剪辑页、记这一轮 → 各组工具 |
 
 1. **工具清单只有一份**（`MCPToolName`）。小程序回清单读它，App 分派也 switch 它 —— 两边都是穷举，
@@ -878,19 +878,22 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ srtflow-mcp ──
 
 | 客户端 | 配置 | 怎么改 | 为什么 |
 | --- | --- | --- | --- |
-| Claude 桌面版 | `~/Library/Application Support/Claude/claude_desktop_config.json` | 直接改（第一次改前备份成 `.srtflow-backup`） | 官方就是让用户改这个文件 |
+| Claude 桌面版 | `~/Library/Application Support/Claude/claude_desktop_config.json` | 直接改（第一次改前备份成 `.skycut-backup`） | 官方就是让用户改这个文件 |
 | Claude Code | `~/.claude.json` | 走它自己的命令行 `claude mcp add --scope user`；找不到命令行就「复制一段话」 | 正在跑的 Claude Code 会整份重写这个文件，直接改会被冲掉 |
-| Codex | `~/.codex/config.toml` | 直接改 `[mcp_servers.srtflow]`（先备份） | 桌面版和命令行共用一份，很少被程序重写 |
+| Codex | `~/.codex/config.toml` | 直接改 `[mcp_servers.skycut]`（先备份） | 桌面版和命令行共用一份，很少被程序重写 |
 
-只动 `srtflow` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写（`AIClientConfigFiles`，自检钉着）。
+只动 `skycut` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写（`AIClientConfigFiles`，自检钉着）。
+
+2026-10-18 改名 SkyCut 之前这一项叫 `srtflow`（放行规则 `mcp__srtflow`）。连接只认 `skycut`，**不替用户删旧的那一项**（当时只有用户自己装着，
+本机手动去掉；[产品名与代码名](product-name.md)、[改名方案](../plans/2026-10-18-rename-to-skycut.md)）。
 
 **连上的同时放行 SrtFlow 的工具**（方案第 35 条，2026-09-28）：客户端自己第一次用每个工具都会问一次「允许吗」，
 40 多个工具就是 40 多次。这一层全放行，SrtFlow 那一层只拦删文件（第四节第 6 条）。
 
 | 客户端 | 放行写在哪 | 断开时 |
 | --- | --- | --- |
-| Claude Code | `~/.claude/settings.json` 的 `permissions.allow` 加 `mcp__srtflow`（官方写法：匹配这个服务器的每一个工具；第一次改前备份） | 只去掉这一条 |
-| Codex | `[mcp_servers.srtflow]` 里 `default_tools_approval_mode = "approve"`（Codex 0.144 起认这个键） | 跟着整张表去掉 |
+| Claude Code | `~/.claude/settings.json` 的 `permissions.allow` 加 `mcp__skycut`（官方写法：匹配这个服务器的每一个工具；第一次改前备份） | 只去掉这一条 |
+| Codex | `[mcp_servers.skycut]` 里 `default_tools_approval_mode = "approve"`（Codex 0.144 起认这个键） | 跟着整张表去掉 |
 | Claude 桌面版 | 没有能写的文件：「总是允许」存在它自己那里。连上之后的提示里告诉用户在它的连接器设置里一次设好（按只读 / 写入两类） | —— |
 
 以前连的、还没放行的显示「已连接 · 每次都会问」，再点一次「连接」补上。「复制一段话」里同样写了这一步。

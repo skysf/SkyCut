@@ -74,7 +74,7 @@ enum FalKeyStore {
         if status == errSecItemNotFound {
             var add = baseQuery(service)
             add[kSecValueData as String] = data
-            add[kSecAttrLabel as String] = "SrtFlow fal.ai API key"
+            add[kSecAttrLabel as String] = "SkyCut fal.ai API key"
             status = SecItemAdd(add as CFDictionary, nil)
         }
         guard status == errSecSuccess else { throw StoreError(status: status) }

@@ -18,7 +18,7 @@ def server_log():
 def posts(endpoint_prefix):
     return [e for e in server_log() if e["method"] == "POST" and e["path"].lstrip("/").startswith(endpoint_prefix)]
 
-mcp = MCP(APP + "/Contents/Helpers/srtflow-mcp")
+mcp = MCP(APP + "/Contents/Helpers/skycut-mcp")
 tools = mcp.tools()
 ok("generate_media" in tools, "tools/list has generate_media (key seeded, marker written at launch)")
 ok("generate_media" in mcp.init["result"]["instructions"], "instructions mention generate_media")

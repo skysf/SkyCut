@@ -52,7 +52,7 @@ struct ScreenRecordingSetupView: View {
 
                 Section("Audio") {
                     Toggle("Computer audio", isOn: $options.capturesSystemAudio)
-                    Text("Includes sound SrtFlow itself is playing.")
+                    Text("Includes sound SkyCut itself is playing.")
                         .font(.caption).foregroundStyle(.secondary)
 
                     Toggle("Microphone", isOn: $microphoneEnabled)
@@ -68,7 +68,7 @@ struct ScreenRecordingSetupView: View {
                                 .font(.caption).foregroundStyle(.orange)
                         } else {
                             // 计划 §7.4：第一版不做 AEC，同开时提示用耳机。
-                            Text("Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SrtFlow doesn’t cancel echo.")
+                            Text("Recorded to its own track. If computer audio is on too, use headphones to avoid echo — SkyCut doesn’t cancel echo.")
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                     }

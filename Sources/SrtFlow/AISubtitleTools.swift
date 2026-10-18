@@ -176,7 +176,7 @@ enum AISubtitleTools {
         let texts = project.state.subtitleCues(of: .original).map(\.text)
         if let detected = AITextLanguage.dominant(in: texts) { return detected }
         if let stored = project.state.subtitleCompanion?.sourceLanguage { return stored }
-        throw AIToolError("SrtFlow cannot tell which language the subtitles are in. Pass source_language.")
+        throw AIToolError("SkyCut cannot tell which language the subtitles are in. Pass source_language.")
     }
 
     /// AI 写的语言（zh-Hans、en、ja…）→ 系统翻译认的那一项。先认全名，再按语言 + 文字对。

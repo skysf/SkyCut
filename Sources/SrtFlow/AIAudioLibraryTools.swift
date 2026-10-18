@@ -40,7 +40,7 @@ enum AIAudioLibraryTools {
                 + "moment is at). CC-BY music must be credited: tell the user to put the credit line in the video's description."
             )
         ]
-        if loaded.stale { result["offline"] = "SrtFlow is offline and showing the last known list." }
+        if loaded.stale { result["offline"] = "SkyCut is offline and showing the last known list." }
         if !loaded.failures.isEmpty { result["warning"] = .string(loaded.failures.joined(separator: " ")) }
         return .ok(.object(result))
     }
@@ -58,13 +58,13 @@ enum AIAudioLibraryTools {
         let loaded = await AudioLibraryLookup.load(AudioLibraryStore.all)
         guard let item = loaded.items.first(where: { $0.id == id }) else {
             let why = loaded.failures.isEmpty ? "Use find_audio for ids." : loaded.failures.joined(separator: " ")
-            throw AIToolError("There is no \(id) in SrtFlow's audio libraries. \(why)")
+            throw AIToolError("There is no \(id) in SkyCut's audio libraries. \(why)")
         }
         let url: URL
         do {
             url = try await AudioLibraryCache.shared.download(item)
         } catch {
-            throw AIToolError("SrtFlow could not download \(item.title): \(error.localizedDescription)")
+            throw AIToolError("SkyCut could not download \(item.title): \(error.localizedDescription)")
         }
         var clip = EditClip(
             sourceURL: url, isAudioOnly: true, sourceDuration: item.duration,

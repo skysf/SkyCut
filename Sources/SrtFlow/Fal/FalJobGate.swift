@@ -50,7 +50,7 @@ enum FalJobGate {
     static func question(_ reason: FalSpendPolicy.Reason, _ summary: String) -> String {
         switch reason {
         case .unknownPrice:
-            return "fal.ai · \(summary) — SrtFlow does not know this model's price, so it asks each time. Spend it?"
+            return "fal.ai · \(summary) — SkyCut does not know this model's price, so it asks each time. Spend it?"
         case .overLimit(let spent, let estimate, let limit):
             return "fal.ai · \(summary) — estimated cost \(FalMoney.text(estimate)); today's spending would reach "
                 + "\(FalMoney.text(spent + estimate)), over the user's \(FalMoney.text(limit)) daily limit. Spend it?"
@@ -60,12 +60,12 @@ enum FalJobGate {
     // MARK: 钥匙串的授权框
 
     /// AI 看 get_job 只见 running：得让它知道是 macOS 的授权框在等用户（不然它会对着一个「没动静」的任务干等）。
-    static let keyPromptWaiting = "macOS is asking the user, in a system dialog, whether SrtFlow may use the fal.ai key. Tell the user to click "
-        + "Always Allow (a Mac login password may be needed; a new version of SrtFlow is asked once), then keep waiting with get_job."
+    static let keyPromptWaiting = "macOS is asking the user, in a system dialog, whether SkyCut may use the fal.ai key. Tell the user to click "
+        + "Always Allow (a Mac login password may be needed; a new version of SkyCut is asked once), then keep waiting with get_job."
 
     /// 提示条上说一句、把剪辑页摆出来（提示条在剪辑页里）、把 SrtFlow 摆到前面（授权框跟着 App）。
     static func showKeyPromptHint() {
-        AISession.shared.setHint(L10n("macOS is about to ask whether SrtFlow may use your fal.ai key. Click Always Allow."))
+        AISession.shared.setHint(L10n("macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow."))
         if MainWindowState.shared.section != .videoEdit { MainWindowState.shared.section = .videoEdit }
         AITranslationReadiness.bringSrtFlowForward()
     }

@@ -1,17 +1,17 @@
 import Foundation
 
-// MARK: - 往 AI 客户端的配置文件里写一行「srtflow」（纯值）
+// MARK: - 往 AI 客户端的配置文件里写一行「skycut」（纯值）
 //
 // 管什么：Claude 桌面版的 JSON、Codex 的 TOML 里加上 / 去掉 / 读出 SrtFlow 那一项；连上的同时放行 SrtFlow 的工具、
 // 不用每个工具都点一次「允许」（方案第 35 条）：Claude Code 在 ~/.claude/settings.json 的 permissions.allow 里加一条
-// `mcp__srtflow`，Codex 在那张表里写 `default_tools_approval_mode = "approve"`。Claude 桌面版没有能写的地方。
-// 只动 `srtflow` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写。
+// `mcp__skycut`，Codex 在那张表里写 `default_tools_approval_mode = "approve"`。Claude 桌面版没有能写的地方。
+// 只动 `skycut` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写。
 // 自检够得着（scripts/check-mcp.sh）。
 // 不管什么：文件在哪、要不要备份、Claude Code 走命令行（AIClientSetup）。
 
 enum AIClientConfigFiles {
-    /// 在客户端配置里的名字（工具在 Claude 里显示成 srtflow 下面的那一串）。
-    static let serverName = "srtflow"
+    /// 在客户端配置里的名字（工具在 Claude 里显示成 skycut 下面的那一串）。
+    static let serverName = "skycut"
 
     struct FormatError: Error {
         let message: String
@@ -71,11 +71,11 @@ enum AIClientConfigFiles {
         var root = try jsonRoot(data)
         let permissionsValue = root["permissions"] ?? [String: Any]()
         guard var permissions = permissionsValue as? [String: Any] else {
-            throw FormatError(message: "\"permissions\" in the settings file is not an object, so SrtFlow left it alone.")
+            throw FormatError(message: "\"permissions\" in the settings file is not an object, so SkyCut left it alone.")
         }
         let allowValue = permissions["allow"] ?? [String]()
         guard var allow = allowValue as? [String] else {
-            throw FormatError(message: "\"permissions.allow\" in the settings file is not a list, so SrtFlow left it alone.")
+            throw FormatError(message: "\"permissions.allow\" in the settings file is not a list, so SkyCut left it alone.")
         }
         edit(&allow)
         permissions["allow"] = allow
@@ -86,7 +86,7 @@ enum AIClientConfigFiles {
     private static func jsonRoot(_ data: Data?) throws -> [String: Any] {
         guard let data, !data.isEmpty else { return [:] }
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            throw FormatError(message: "The configuration file is not valid JSON, so SrtFlow left it alone.")
+            throw FormatError(message: "The configuration file is not valid JSON, so SkyCut left it alone.")
         }
         return root
     }
@@ -95,7 +95,7 @@ enum AIClientConfigFiles {
 
     private static let tomlHeaders = ["[mcp_servers.\(serverName)]", "[mcp_servers.\"\(serverName)\"]"]
 
-    /// `[mcp_servers.srtflow]` 这张表里的行（去掉首尾空白，到下一张表为止）。没有这张表就是空的。
+    /// `[mcp_servers.skycut]` 这张表里的行（去掉首尾空白，到下一张表为止）。没有这张表就是空的。
     private static func tomlTable(in text: String) -> [String] {
         let lines = text.components(separatedBy: "\n")
         guard let start = lines.firstIndex(where: { tomlHeaders.contains($0.trimmingCharacters(in: .whitespaces)) }) else {
@@ -140,7 +140,7 @@ enum AIClientConfigFiles {
         return tomlTable(in: text).contains { $0.replacingOccurrences(of: " ", with: "") == wanted }
     }
 
-    /// 去掉 `[mcp_servers.srtflow]` 那张表（连同它的子表，比如 `[mcp_servers.srtflow.env]`）。
+    /// 去掉 `[mcp_servers.skycut]` 那张表（连同它的子表，比如 `[mcp_servers.skycut.env]`）。
     static func tomlRemoving(from text: String) -> String {
         var kept: [String] = []
         var skipping = false

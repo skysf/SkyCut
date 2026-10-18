@@ -29,7 +29,7 @@ struct VideoEditSubtitleLookRow: View {
                 .toggleStyle(.checkbox)
                 .controlSize(.small)
                 .disabled(highlight == nil && !knowsWordTimes)
-                .instantHelp("The word being spoken changes colour, in the preview and in the exported video. Only subtitles SrtFlow made (from speech or a voiceover) know when each word is said")
+                .instantHelp("The word being spoken changes colour, in the preview and in the exported video. Only subtitles SkyCut made (from speech or a voiceover) know when each word is said")
                 if let highlight {
                     ColorPicker("", selection: Binding(
                         get: { highlight.color.swiftUIColor },

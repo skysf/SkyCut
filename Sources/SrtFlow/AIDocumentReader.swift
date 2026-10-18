@@ -39,10 +39,10 @@ enum AIDocumentReader {
     /// 读出文字。阻塞读文件（大 PDF 要一两秒）：调用方放到后台去跑。
     static func read(_ url: URL) throws -> Document {
         if url.pathExtension.lowercased() == "pages" {
-            throw Unsupported(message: "SrtFlow cannot read Pages files. Ask the user to export it as PDF or Word (File > Export To in Pages).")
+            throw Unsupported(message: "SkyCut cannot read Pages files. Ask the user to export it as PDF or Word (File > Export To in Pages).")
         }
         guard let kind = kind(of: url) else {
-            throw Unsupported(message: "SrtFlow cannot read \(url.lastPathComponent) as a document. It reads PDF, Word (.doc, .docx), RTF, ODT, .txt and .md.")
+            throw Unsupported(message: "SkyCut cannot read \(url.lastPathComponent) as a document. It reads PDF, Word (.doc, .docx), RTF, ODT, .txt and .md.")
         }
         switch kind {
         case .pdf:

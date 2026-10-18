@@ -33,13 +33,13 @@ final class AIToolRouter {
     func handle(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
         guard request.bridge == MCPBridge.version else {
             return Answer(result: MCPBridge.textResult(
-                "This SrtFlow and its AI helper come from different versions. Ask the user to restart the AI app.",
+                "This SkyCut and its AI helper come from different versions. Ask the user to restart the AI app.",
                 isError: true
             ))
         }
         guard let tool = MCPToolName(rawValue: request.tool) else {
             return Answer(result: MCPBridge.textResult(
-                "This SrtFlow does not have the tool \(request.tool). Ask the user to update SrtFlow.", isError: true
+                "This SkyCut does not have the tool \(request.tool). Ask the user to update SkyCut.", isError: true
             ))
         }
         let call = Call(
@@ -154,7 +154,7 @@ final class AIToolRouter {
         } catch let error as AIToolError {
             return Outcome(json: MCPBridge.textResult(error.message, isError: true), failed: true)
         } catch {
-            return Outcome(json: MCPBridge.textResult("SrtFlow could not do that: \(error.localizedDescription)", isError: true), failed: true)
+            return Outcome(json: MCPBridge.textResult("SkyCut could not do that: \(error.localizedDescription)", isError: true), failed: true)
         }
     }
 

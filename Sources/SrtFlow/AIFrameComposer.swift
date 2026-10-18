@@ -28,8 +28,8 @@ enum AIFrameComposer {
             let valid = (try? await video.isValid(for: built.composition, timeRange: whole, validationDelegate: nil)) ?? false
             guard valid else {
                 throw AIToolError(
-                    "SrtFlow could not render the timeline: its preview composition is invalid, so the preview would be "
-                        + "black. This is a SrtFlow bug, not the footage; save the project and report it."
+                    "SkyCut could not render the timeline: its preview composition is invalid, so the preview would be "
+                        + "black. This is a SkyCut bug, not the footage; save the project and report it."
                 )
             }
         }

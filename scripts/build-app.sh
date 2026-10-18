@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
-# SrtFlow 打包脚本（仅依赖 Command Line Tools，无需完整 Xcode）
+# SkyCut 打包脚本（仅依赖 Command Line Tools，无需完整 Xcode）
 #
 # 用法：
 #   VERSION=1.0.0 scripts/build-app.sh   # 正式发版：显式指定版本号
 #   scripts/build-app.sh                 # 开发版：版本号取最近的 git tag
 #
 # 产物：
-#   dist/SrtFlow.app
-#   dist/SrtFlow-<VERSION>-arm64.dmg
+#   dist/SkyCut.app
+#   dist/SkyCut-<VERSION>-arm64.dmg
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-APP_NAME=SrtFlow
+# 产品名 SkyCut（.app、可执行文件、DMG 都叫它）；SwiftPM 的产品和资源包沿用代码名 SrtFlow
+# （docs/architecture/product-name.md）。
+APP_NAME=SkyCut
+PRODUCT=SrtFlow
 DIST=dist
 
 # 版本号不写死默认值：以前是 VERSION="${VERSION:-0.3.0}"，发到 0.4.1 了那行还留在
@@ -48,7 +51,7 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 # 二进制：strip 掉符号，保持体积最小
-cp "$BUILD_DIR/$APP_NAME" "$APP/Contents/MacOS/$APP_NAME"
+cp "$BUILD_DIR/$PRODUCT" "$APP/Contents/MacOS/$APP_NAME"
 strip -xS "$APP/Contents/MacOS/$APP_NAME" 2>/dev/null || true
 
 # SwiftPM 资源包（en / zh-Hans 本地化）
@@ -84,16 +87,16 @@ cp vendor/README.md "$APP/Contents/Resources/ffmpeg-LICENSE.md"
 # AI 客户端（Claude、Codex……）启动的 MCP 小程序，和 ffmpeg 一样放 Helpers。
 # 客户端配置里写的就是这个路径；它从自己的位置往上找到所在的 App
 # （docs/architecture/ai-control-mcp.md）。上面那条 swift build 已经把它一起编了。
-echo "==> 内置 srtflow-mcp"
-cp "$BUILD_DIR/srtflow-mcp" "$APP/Contents/Helpers/srtflow-mcp"
-strip -xS "$APP/Contents/Helpers/srtflow-mcp" 2>/dev/null || true
-chmod +x "$APP/Contents/Helpers/srtflow-mcp"
+echo "==> 内置 skycut-mcp"
+cp "$BUILD_DIR/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"
+strip -xS "$APP/Contents/Helpers/skycut-mcp" 2>/dev/null || true
+chmod +x "$APP/Contents/Helpers/skycut-mcp"
 
 # 图标：脚本生成 iconset → iconutil 合成 icns（仓库中不放二进制图标文件）
 echo "==> 生成图标"
-ICONSET="$(mktemp -d)/SrtFlow.iconset"
+ICONSET="$(mktemp -d)/SkyCut.iconset"
 swift scripts/make-icon.swift "$ICONSET" >/dev/null
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/SrtFlow.icns"
+iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/SkyCut.icns"
 rm -rf "$(dirname "$ICONSET")"
 
 # 签名只经 sign-app.sh 一处（嵌套的先签、外层最后签）：有发布用的签名身份就用它，系统里给过的录屏、麦克风、
@@ -115,30 +118,30 @@ ln -s /Applications "$DMG_ROOT/Applications"
 # 启动时会自己清掉包上的隔离标记（Quarantine.repairOwnBundleIfNeeded），
 # 包内的 ffmpeg 就不会再被系统 SIGKILL。终端那行留作兜底。
 cat > "$DMG_ROOT/首次打开必读 - Read Me First.txt" <<'READMEEOF'
-SrtFlow — 首次打开必读 / Read Me First
+SkyCut — 首次打开必读 / Read Me First
 ======================================
 
 【中文】
 
-1. 把 SrtFlow.app 拖到左边的「应用程序」文件夹。
+1. 把 SkyCut.app 拖到左边的「应用程序」文件夹。
    （一定要拖进去再打开，别直接在这个磁盘映像里双击运行。）
 
-2. 双击 SrtFlow。这个 App 没有做 Apple 公证（自用小工具，公证要每年 99 美元），
+2. 双击 SkyCut。这个 App 没有做 Apple 公证（自用小工具，公证要每年 99 美元），
    所以第一次打开会被 macOS 拦下，提示「无法打开」。点「完成」/「好」。
 
 3. 打开「系统设置」→「隐私与安全性」，往下翻到「安全性」那一段，
-   会看到一行关于 SrtFlow 被阻止的提示，点右边的「仍要打开」，
+   会看到一行关于 SkyCut 被阻止的提示，点右边的「仍要打开」，
    再按提示输入你的密码 / 用触控 ID 确认。
 
-4. 回到「应用程序」里再双击 SrtFlow，这次就正常打开了。
+4. 回到「应用程序」里再双击 SkyCut，这次就正常打开了。
    压缩视频、烧制字幕全部功能都能用。
 
 以上只需要做一次。
 
 万一第 4 步打开后，一点「开始压缩」或「烧制字幕」就失败，说明系统仍然
-拦着包内的 ffmpeg。这时打开「终端」，粘贴下面这一行、回车，然后重开 SrtFlow：
+拦着包内的 ffmpeg。这时打开「终端」，粘贴下面这一行、回车，然后重开 SkyCut：
 
-    xattr -dr com.apple.quarantine /Applications/SrtFlow.app
+    xattr -dr com.apple.quarantine /Applications/SkyCut.app
 
 软件里也会把这一行显示给你，旁边还有直接打开系统设置的按钮。
 
@@ -148,27 +151,27 @@ SrtFlow — 首次打开必读 / Read Me First
 
 【English】
 
-1. Drag SrtFlow.app into the Applications folder on the left.
+1. Drag SkyCut.app into the Applications folder on the left.
    Open it from there — do not run it straight out of this disk image.
 
-2. Double-click SrtFlow. This app is not notarised by Apple (it is a personal
+2. Double-click SkyCut. This app is not notarised by Apple (it is a personal
    tool, and notarisation costs $99/year), so macOS blocks the first launch and
    says it cannot be opened. Dismiss that dialog.
 
 3. Open System Settings → Privacy & Security, scroll down to the Security
-   section. There is a line saying SrtFlow was blocked — click "Open Anyway"
+   section. There is a line saying SkyCut was blocked — click "Open Anyway"
    next to it and confirm with your password or Touch ID.
 
-4. Double-click SrtFlow again. It opens normally now, with compression and
+4. Double-click SkyCut again. It opens normally now, with compression and
    subtitle burn-in fully working.
 
 That is a one-time step.
 
 If it does open but compression or burn-in fails the instant you start it, macOS
 is still blocking the ffmpeg inside the bundle. Open Terminal, paste this line,
-press Return, and reopen SrtFlow:
+press Return, and reopen SkyCut:
 
-    xattr -dr com.apple.quarantine /Applications/SrtFlow.app
+    xattr -dr com.apple.quarantine /Applications/SkyCut.app
 
 The app shows you the same line, next to a button that opens System Settings.
 

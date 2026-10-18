@@ -15,7 +15,7 @@ import SrtFlowMCPKit
 // - **Codex**：~/.codex/config.toml，桌面版和命令行共用一份，很少被程序重写，直接改（先备份）。
 //
 // 连上的同时放行 SrtFlow 的工具（方案第 35 条：少问，只有删文件由 SrtFlow 自己在对话里问）：Claude Code 往
-// ~/.claude/settings.json 的 permissions.allow 里加 `mcp__srtflow`（先备份），Codex 在那张表里写不问就放行。
+// ~/.claude/settings.json 的 permissions.allow 里加 `mcp__skycut`（先备份），Codex 在那张表里写不问就放行。
 // Claude 桌面版的「总是允许」只能在它自己的界面里点，连上之后的提示里告诉用户在哪点。
 
 @MainActor
@@ -56,7 +56,7 @@ final class AIClientSetup: ObservableObject {
 
     /// 包里的那个小程序。`swift run` 直接跑的开发版里没有它。
     var helperURL: URL? {
-        let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/srtflow-mcp")
+        let url = Bundle.main.bundleURL.appendingPathComponent("Contents/Helpers/skycut-mcp")
         return FileManager.default.isExecutableFile(atPath: url.path) ? url : nil
     }
 
@@ -159,10 +159,10 @@ final class AIClientSetup: ObservableObject {
             if !connecting {
                 message = String(format: L10n("Disconnected. Restart %@ to finish."), L10n(client.title))
             } else if client == .claudeDesktop {
-                message = L10n("Connected. Restart Claude Desktop so it picks up SrtFlow. It asks before each SrtFlow tool until you choose Always allow, in the prompt or for all of srtflow's tools at once in Claude's Connectors settings.")
+                message = L10n("Connected. Restart Claude Desktop so it picks up SkyCut. It asks before each SkyCut tool until you choose Always allow, in the prompt or for all of skycut's tools at once in Claude's Connectors settings.")
             } else {
                 message = String(
-                    format: L10n("Connected. Restart %@ so it picks up SrtFlow. It will use SrtFlow's tools without asking; SrtFlow itself asks before moving files to the Trash."),
+                    format: L10n("Connected. Restart %@ so it picks up SkyCut. It will use SkyCut's tools without asking; SkyCut itself asks before moving files to the Trash."),
                     L10n(client.title)
                 )
             }
@@ -173,12 +173,12 @@ final class AIClientSetup: ObservableObject {
         }
     }
 
-    /// 读 → 改 → 原子写回。第一次改之前备份一份原文件（`.srtflow-backup`），改坏了用户能找回来。
+    /// 读 → 改 → 原子写回。第一次改之前备份一份原文件（`.skycut-backup`），改坏了用户能找回来。
     private func rewrite(_ path: String, _ transform: (Data?) throws -> Data) throws {
         let fm = FileManager.default
         let original = fm.contents(atPath: path)
         let next = try transform(original)
-        let backup = path + ".srtflow-backup"
+        let backup = path + ".skycut-backup"
         if let original, !fm.fileExists(atPath: backup) {
             try original.write(to: URL(fileURLWithPath: backup))
         }
@@ -207,9 +207,9 @@ final class AIClientSetup: ObservableObject {
         guard let helper = helperURL?.path else { return nil }
         switch client {
         case .claudeCode:
-            return String(format: L10n("Please connect the SrtFlow video editor to Claude Code: run this command in the terminal, add \"mcp__srtflow\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user srtflow -- \"%@\""), helper)
+            return String(format: L10n("Please connect the SkyCut video editor to Claude Code: run this command in the terminal, add \"mcp__skycut\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user skycut -- \"%@\""), helper)
         case .codex:
-            return String(format: L10n("Please connect the SrtFlow video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.srtflow] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add srtflow -- \"%@\""), helper)
+            return String(format: L10n("Please connect the SkyCut video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.skycut] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add skycut -- \"%@\""), helper)
         case .claudeDesktop:
             return nil
         }

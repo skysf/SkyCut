@@ -100,13 +100,13 @@ private func runHelperCatalogChecks() {
         return
     }
     let (messages, _) = talkToHelper([initialize, batch], socket: newer.path)
-    check(text(messages, 2).contains("SrtFlow was updated after this AI session started"),
+    check(text(messages, 2).contains("SkyCut was updated after this AI session started"),
           "the first call after the app was updated says the tool list was refreshed: \(text(messages, 2).prefix(160))")
     checkEqual(changes(messages), 1, "a legacy client is told once that the tool list changed")
     check(names(messages, 3).contains("brand_new_tool"), "tools/list now lists the app's new tool")
     check(text(messages, 4).hasPrefix("ok brand_new_tool"), "calling the new tool goes through to the app: \(text(messages, 4).prefix(120))")
     checkEqual(newer.toolCalls, ["get_status", "brand_new_tool", "get_status"], "the app received every call, the new tool included")
-    check(!text(messages, 5).contains("SrtFlow was updated"), "only the call that refreshed says so")
+    check(!text(messages, 5).contains("SkyCut was updated"), "only the call that refreshed says so")
     checkEqual(newer.catalogs, 1, "the catalog is fetched once")
 
     guard let same = try? CatalogFakeApp(name: "same", fingerprint: MCPCatalogSync.fingerprint) else {

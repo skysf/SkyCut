@@ -114,7 +114,7 @@ enum AITimelineTools {
                 // 合成的音效：落点压在 hit_at 上（开头 = hit_at − 声音里的落点）；没给 hit_at 也没给 start 就放在播放头。
                 let made = try await AISoundEffectTool.make(effect.parameters, project: project)
                 guard let media = await project.probeImports([made.url]).first else {
-                    throw AIToolError("clips[\(index)]: SrtFlow could not read back the sound effect file \(made.url.lastPathComponent).")
+                    throw AIToolError("clips[\(index)]: SkyCut could not read back the sound effect file \(made.url.lastPathComponent).")
                 }
                 (clip, name) = (project.clip(for: media), made.url.lastPathComponent)
                 clip.volume = AudioGain.linear(fromDecibels: AudioGain.clampedDecibels(effect.volumeDB))
@@ -129,10 +129,10 @@ enum AITimelineTools {
                 effects[clip.id] = made
             } else {
                 guard let url = request.url, let media = await project.probeImports([url]).first else {
-                    throw AIToolError("clips[\(index)]: SrtFlow cannot use \(request.url?.lastPathComponent ?? "it") as a clip.")
+                    throw AIToolError("clips[\(index)]: SkyCut cannot use \(request.url?.lastPathComponent ?? "it") as a clip.")
                 }
                 if media.kind == .image, !project.canConvertStills {
-                    throw AIToolError("SrtFlow's video engine is still starting, so images cannot be added yet. Try again in a moment.")
+                    throw AIToolError("SkyCut's video engine is still starting, so images cannot be added yet. Try again in a moment.")
                 }
                 (clip, isAudio, name) = (project.clip(for: media), media.kind == .audio, media.url.lastPathComponent)
                 if let sound = request.sound {
@@ -164,7 +164,7 @@ enum AITimelineTools {
             if let subtitle = subtitles.first {
                 project.attachSubtitle(subtitle)
                 guard project.state.subtitleURL == subtitle else {
-                    throw AIToolError(project.notice ?? "SrtFlow could not read \(subtitle.lastPathComponent).")
+                    throw AIToolError(project.notice ?? "SkyCut could not read \(subtitle.lastPathComponent).")
                 }
             }
             return project.perform { AITimelineEdits.place(plans, insert: insert, linkage: linkage, in: &$0) }

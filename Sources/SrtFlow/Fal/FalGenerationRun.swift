@@ -138,7 +138,7 @@ final class FalGenerationRun: ObservableObject, Identifiable {
         } catch let error as FalOutputError {
             finish(.failed, error.message)
         } catch {
-            finish(.failed, "SrtFlow could not save the result: \(error.localizedDescription)")
+            finish(.failed, "SkyCut could not save the result: \(error.localizedDescription)")
         }
     }
 
@@ -215,8 +215,8 @@ final class FalGenerationRun: ObservableObject, Identifiable {
         switch result {
         case .missing: return FalError.noKey.message
         case .needsPermission, .failed:
-            return "SrtFlow could not read the fal.ai key from the macOS keychain. If macOS asked for permission, the user has to click "
-                + "Always Allow (a new version of SrtFlow is asked again once). Ask the user to try again."
+            return "SkyCut could not read the fal.ai key from the macOS keychain. If macOS asked for permission, the user has to click "
+                + "Always Allow (a new version of SkyCut is asked again once). Ask the user to try again."
         case .key: return ""
         }
     }

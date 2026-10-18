@@ -65,7 +65,7 @@ enum AISpeechCutTool {
         if let keep { cuts += AISpeechCuts.outside(keep, clip: range, points: points) }
         if let pauseLength {
             // 删停顿量这段片段（门限没给就从这一段自己量）。
-            guard let peaks else { throw AIToolError("SrtFlow could not read the sound of \(speech.name).") }
+            guard let peaks else { throw AIToolError("SkyCut could not read the sound of \(speech.name).") }
             let levels = clipLevels(peaks, of: speech)
             let measured = AISpeechCuts.silenceThreshold(levels.map(\.decibels))
             let leave = min(max(try args.double("pause_left") ?? 0.25, 0), 2)
@@ -91,7 +91,7 @@ enum AISpeechCutTool {
         case (false, true):
             notes.append("No transcript yet: cut points on speech moved into the nearest pause by sound alone. Call transcribe first so cuts also know where the words are.")
         case (true, false):
-            notes.append("SrtFlow could not read this clip's sound, so cut points follow the transcript only; its word times can be 0.1-0.3 s off around pauses.")
+            notes.append("SkyCut could not read this clip's sound, so cut points follow the transcript only; its word times can be 0.1-0.3 s off around pauses.")
         case (false, false):
             notes.append("No transcript and no readable sound: cuts are exactly at the given times.")
         case (true, true):
@@ -106,7 +106,7 @@ enum AISpeechCutTool {
 
     static func apply(_ plan: Plan, _ project: VideoEditProject) throws -> AIToolResult {
         guard project.isCurrentGeneration(plan.generation), project.state == plan.state else {
-            throw AIToolError("The timeline changed while SrtFlow was measuring. Call cut_speech again.")
+            throw AIToolError("The timeline changed while SkyCut was measuring. Call cut_speech again.")
         }
         let ids = AIShortIDs(state: plan.state)
         var result: [String: JSONValue] = [:]
@@ -211,7 +211,7 @@ enum AISpeechCutTool {
         switch await wholeFile(of: clip, until: Date().addingTimeInterval(AIListenTool.waitSeconds)) {
         case .ready(let peaks): return peaks
         case .unreadable: return nil
-        case .reading: throw AIToolError("SrtFlow is still reading the sound of \(clip.name). Call cut_speech again in a moment.")
+        case .reading: throw AIToolError("SkyCut is still reading the sound of \(clip.name). Call cut_speech again in a moment.")
         }
     }
 

@@ -12,9 +12,9 @@ public enum MCPProjectTools {
         switch name {
         case .getStatus:
             return MCPToolDefinition(
-                .getStatus, title: "SrtFlow status",
+                .getStatus, title: "SkyCut status",
                 description: """
-                What SrtFlow is doing now: your current project (name, path, length, unsaved changes) and every open project \
+                What SkyCut is doing now: your current project (name, path, length, unsaved changes) and every open project \
                 (id, whether it is yours, where it is shown), the folders you may use, running jobs, whether the user pressed Stop, \
                 the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
                 new conversation.
@@ -29,10 +29,10 @@ public enum MCPProjectTools {
                 .setView, title: "View mode",
                 description: """
                 visible (the default): a project's window comes forward once when you open it (or now), and each edit is \
-                selected and shown in its preview. background: SrtFlow stays where it is and does not follow the edits; they \
+                selected and shown in its preview. background: SkyCut stays where it is and does not follow the edits; they \
                 still go into the project and can be undone. With project, only that project; without, your open projects and \
                 the ones you open next. Ask the user once per conversation which they want, unless they said. Lasts until \
-                SrtFlow quits.
+                SkyCut quits.
                 """,
                 input: MCPSchema.object([
                     "mode": MCPSchema.string("How the user follows your edits.", oneOf: ["visible", "background"])
@@ -44,11 +44,11 @@ public enum MCPProjectTools {
                 description: """
                 Use a folder the user named as the workspace for this edit and list the media inside it and every subfolder: \
                 videos, images, audio and subtitle files with duration and size. Files in it can be imported without asking \
-                again. New files SrtFlow makes (exports, projects) go into its "SrtFlow" subfolder. Paths in the result are \
+                again. New files SkyCut makes (exports, projects) go into its "SrtFlow" subfolder. Paths in the result are \
                 relative to the folder. Only pass a folder the user gave you. When the user says to use what they selected in \
                 Finder, pass from_finder=true instead of path: the selected files are listed (their folder becomes the \
                 workspace), or the selected folder, or the folder open in the front Finder window. macOS asks the user once to \
-                let SrtFlow see Finder.
+                let SkyCut see Finder.
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Absolute path of the folder. ~ means the user's home folder."),
@@ -61,12 +61,12 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .openProject, title: "Open a project",
                 description: """
-                Open an existing SrtFlow project file (.srtflowproj). The result's project is its id (p1, p2…). Several projects \
+                Open an existing SkyCut project file (.srtflowproj). The result's project is its id (p1, p2…). Several projects \
                 can be open at once: to edit several (for example with sub-agents), open or create them all first, then pass \
-                project=<id> on every call; a call without project goes to the project you opened last. It opens in SrtFlow's \
+                project=<id> on every call; a call without project goes to the project you opened last. It opens in SkyCut's \
                 main window when that is empty, otherwise in a window of its own, shown once; after set_view background it \
-                opens with no window (the user sees it in SrtFlow's AI projects list). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
-                SrtFlow keeps at most 8 projects open: close_project the finished ones.
+                opens with no window (the user sees it in SkyCut's AI projects list). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
+                SkyCut keeps at most 8 projects open: close_project the finished ones.
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Absolute path of the .srtflowproj file.")
@@ -94,7 +94,7 @@ public enum MCPProjectTools {
                 .closeProject, title: "Close a project",
                 description: """
                 Close one of your projects (project=p2) when you are done with it, for example after its export finished. \
-                It is saved first. SrtFlow keeps at most 8 projects open. Refused while one of its jobs runs (export, \
+                It is saved first. SkyCut keeps at most 8 projects open. Refused while one of its jobs runs (export, \
                 subtitles, translation…): wait with get_job or cancel_job first.
                 """,
                 input: MCPSchema.object([:], required: ["project"])
@@ -103,7 +103,7 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .saveProject, title: "Save the project",
                 description: """
-                Save the open project now. SrtFlow autosaves a saved project two seconds after every edit and saves a \
+                Save the open project now. SkyCut autosaves a saved project two seconds after every edit and saves a \
                 never-saved one by itself after your first change, so this is mainly for saving under another path. Without a \
                 path a never-saved project goes into SrtFlow/Projects inside the folder the user named (Downloads when there is \
                 none). Never replaces a file: a taken name gets a number.
@@ -116,7 +116,7 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .undo, title: "Undo",
                 description: """
-                Undo the latest edits in SrtFlow, like pressing Command-Z. \
+                Undo the latest edits in SkyCut, like pressing Command-Z. \
                 round=true instead puts the project back to how it was before this round of AI edits started \
                 (that is itself one undoable step).
                 """,
@@ -129,7 +129,7 @@ public enum MCPProjectTools {
         case .seek:
             return MCPToolDefinition(
                 .seek, title: "Show a moment",
-                description: "Move SrtFlow's playhead to a time on the timeline, so the user sees that frame in the preview.",
+                description: "Move SkyCut's playhead to a time on the timeline, so the user sees that frame in the preview.",
                 input: MCPSchema.object([
                     "time": MCPSchema.number("Timeline time in seconds.", minimum: 0)
                 ], required: ["time"]),

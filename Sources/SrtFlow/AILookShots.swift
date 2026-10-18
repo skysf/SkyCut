@@ -35,7 +35,7 @@ enum AILookShots {
                     "job_id": .string(job.id),
                     "status": "running",
                     "next_step": .string(
-                        "SrtFlow is going through every frame of this video to find its shots; long videos take a while. "
+                        "SkyCut is going through every frame of this video to find its shots; long videos take a while. "
                             + "Call get_job with this job_id and wait_seconds 30 until the status is done, then call look "
                             + "again with the same arguments (it answers at once then)."
                     )
@@ -44,7 +44,7 @@ enum AILookShots {
             scanned = AIShotScan.cached(target.url)
         }
         guard let scanned else {
-            throw AIToolError(await AIUnreadableVideo.problem(for: target.url) ?? "SrtFlow could not find the shots in \(target.url.lastPathComponent).")
+            throw AIToolError(await AIUnreadableVideo.problem(for: target.url) ?? "SkyCut could not find the shots in \(target.url.lastPathComponent).")
         }
 
         let upper = min(target.range.upperBound, scanned.duration)

@@ -12,11 +12,13 @@ let package = Package(
     ],
     products: [
         .library(name: "SrtFlowCore", targets: ["SrtFlowCore"]),
+        // 产品名是 SkyCut，代码名沿用 SrtFlow：打包脚本把这个可执行文件改名成 SkyCut.app/Contents/MacOS/SkyCut
+        //（docs/architecture/product-name.md）。
         .executable(name: "SrtFlow", targets: ["SrtFlow"]),
         // 给 AI 客户端（Claude、Codex……）启动的 MCP 小程序，打包时放进
-        // SrtFlow.app/Contents/Helpers/。它只传话，活都在 App 里做
+        // SkyCut.app/Contents/Helpers/。它只传话，活都在 App 里做
         //（docs/architecture/ai-control-mcp.md）。
-        .executable(name: "srtflow-mcp", targets: ["SrtFlowMCP"])
+        .executable(name: "skycut-mcp", targets: ["SrtFlowMCP"])
     ],
     targets: [
         .target(name: "SrtFlowCore"),

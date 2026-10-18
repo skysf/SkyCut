@@ -33,7 +33,7 @@ struct FFmpegRuntime: Sendable {
 
     var sourceDescription: String {
         switch source {
-        case .bundled: return L10n("Bundled with SrtFlow")
+        case .bundled: return L10n("Bundled with SkyCut")
         case .vendor: return L10n("Repository vendor/ directory")
         case .environmentOverride: return L10n("SRTFLOW_FFMPEG override")
         case .system: return url.path
@@ -258,7 +258,7 @@ final class MediaToolchain: ObservableObject {
         // 放行之后 App 会自己清掉包上的隔离标记，通常一次就好了。
         if let command = quarantineFixCommand {
             return String(
-                format: L10n("macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SrtFlow, then open SrtFlow again. If compression still fails immediately, paste this line into Terminal instead:\n%@"),
+                format: L10n("macOS blocked this app because it was downloaded from the internet. Open System Settings → Privacy & Security, click “Open Anyway” for SkyCut, then open SkyCut again. If compression still fails immediately, paste this line into Terminal instead:\n%@"),
                 command
             )
         }

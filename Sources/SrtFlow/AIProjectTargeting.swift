@@ -100,7 +100,7 @@ enum AIProjectTargeting {
             return claim(target, session: session, explicit: false, ownership: ownership, now: now, yours: yours)
         }
         // 这个会话还没碰过工程：主窗口里那个（老用法：一个会话剪主窗口那一个）。
-        guard let primary = open.first(where: \.isPrimary) else { return .refuse("Not done: no project is open in SrtFlow.") }
+        guard let primary = open.first(where: \.isPrimary) else { return .refuse("Not done: no project is open in SkyCut.") }
         return claim(primary, session: session, explicit: false, ownership: ownership, now: now, yours: yours)
     }
 
@@ -130,23 +130,23 @@ enum AIProjectTargeting {
     }
 
     private static func yourList(_ yours: [AIOpenProject]) -> String {
-        yours.isEmpty ? "You have no project open in SrtFlow now." : "Your open projects: " + yours.map { describe($0.stamp) }.joined(separator: "; ") + "."
+        yours.isEmpty ? "You have no project open in SkyCut now." : "Your open projects: " + yours.map { describe($0.stamp) }.joined(separator: "; ") + "."
     }
 
     private static func restarted(_ stamp: MCPBridge.ProjectStamp) -> String {
-        var text = "Not done: SrtFlow was restarted after your last call, so \(describe(stamp)) is no longer open and project ids "
+        var text = "Not done: SkyCut was restarted after your last call, so \(describe(stamp)) is no longer open and project ids "
             + "start again at p1. Nothing was changed."
         if let path = stamp.path { text += " To go on, call open_project with path \"\(path)\" and use the id it returns." }
         return text
     }
 
     private static func notOpen(_ id: String, yours: [AIOpenProject]) -> String {
-        "Not done: no project \(id) is open in SrtFlow (it was closed, or the id is wrong). Nothing was changed. "
+        "Not done: no project \(id) is open in SkyCut (it was closed, or the id is wrong). Nothing was changed. "
             + yourList(yours) + " Use open_project to open one again."
     }
 
     private static func replaced(_ target: AIOpenProject) -> String {
-        "Not done: the user opened another project in SrtFlow's main window, so the project you were editing there is not open "
+        "Not done: the user opened another project in SkyCut's main window, so the project you were editing there is not open "
             + "any more. Open now: \(describe(target.stamp)). Nothing was changed. Ask the user before you go on; to edit yours "
             + "again, call open_project with its path."
     }
@@ -167,13 +167,13 @@ enum AIProjectTargeting {
         return .refuse(
             "Not done: \(describe(existing.stamp)) is open and another AI session (\(owner.client)) is editing it right now. "
                 + "Nothing was changed. Ask the user: if that session is finished, try again after it has been quiet for "
-                + "\(Int(AIProjectOwnership.releaseAfter / 60)) minutes, or the user can close the project in SrtFlow."
+                + "\(Int(AIProjectOwnership.releaseAfter / 60)) minutes, or the user can close the project in SkyCut."
         )
     }
 
     /// 开到顶了（方案板 2）。`closable`：这个会话的工程里存过盘、没在做事的（可以先关掉的）。
     static func capReached(limit: Int, closable: [MCPBridge.ProjectStamp]) -> String {
-        var text = "Not done: SrtFlow already has \(limit) projects open, the most it keeps at once. Nothing was opened."
+        var text = "Not done: SkyCut already has \(limit) projects open, the most it keeps at once. Nothing was opened."
         if closable.isEmpty {
             text += " Close a project you have finished with close_project first."
         } else {

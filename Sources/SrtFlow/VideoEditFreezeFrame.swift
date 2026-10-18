@@ -86,11 +86,11 @@ extension VideoEditProject {
     func freezeFrame(
         clipID: UUID, at time: Double, duration: Double, commit: (() -> Void) -> Void
     ) async -> FreezeOutcome {
-        guard !isFreezing else { return .failed("SrtFlow is already making a freeze frame. Try again in a moment.") }
+        guard !isFreezing else { return .failed("SkyCut is already making a freeze frame. Try again in a moment.") }
         guard let clip = state.clip(with: clipID), isFreezeEligible(clip, at: time),
               let track = state.location(of: clipID)?.track else {
             return .failed(
-                "SrtFlow cannot freeze that frame. Pick a video clip (not audio, an image or a hidden clip) and a time inside it, "
+                "SkyCut cannot freeze that frame. Pick a video clip (not audio, an image or a hidden clip) and a time inside it, "
                 + "not inside a transition on V1."
             )
         }

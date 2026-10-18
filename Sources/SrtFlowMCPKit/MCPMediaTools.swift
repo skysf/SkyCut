@@ -13,7 +13,7 @@ enum MCPMediaTools {
             return MCPToolDefinition(
                 .findAudio, title: "Find audio",
                 description: """
-                Search SrtFlow's libraries: music (CC-BY or CC0) and sound effects the user owns (no credit: whooshes, impacts, \
+                Search SkyCut's libraries: music (CC-BY or CC0) and sound effects the user owns (no credit: whooshes, impacts, \
                 risers, wind, ice, water, creaks, mechanical…). query matches titles, artists and tags in English or Chinese; \
                 all words must match; empty lists everything; kind picks one library. Each result has length, tags, intensity \
                 1–5 and licence; music also vocals, loudness and credit line; a sound effect has hit (the second of its loudest \
@@ -36,11 +36,11 @@ enum MCPMediaTools {
                 Speak narration and put each line on an audio track as its own clip (a new audio track unless track is given; \
                 all lines of one call go on the same track). Voices, best first: fal.ai's (when the user connected fal.ai and \
                 today's cost limit allows it; a role maps to a matching voice, or name one such as Rachel or Brian; the result's \
-                voice note says when it was not used), then SrtFlow's own voices (English, Chinese, Japanese, Spanish, French, \
+                voice note says when it was not used), then SkyCut's own voices (English, Chinese, Japanese, Spanish, French, \
                 Italian, Portuguese, Hindi) when downloaded, otherwise this Mac's voices, which sound much worse; \
-                download_voices=true downloads SrtFlow's voices (a job, about 333 MB; tell the user). voice is a role — \
+                download_voices=true downloads SkyCut's voices (a job, about 333 MB; tell the user). voice is a role — \
                 zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
-                en_male_british — one of SrtFlow's voices by name (af_heart, zf_xiaoxiao…), or a Mac voice's name; without it, a \
+                en_male_british — one of SkyCut's voices by name (af_heart, zf_xiaoxiao…), or a Mac voice's name; without it, a \
                 warm female voice in the text's language. clone_from clones a voice with fal.ai from a file (audio or video) of \
                 one person speaking clearly. The files go into SrtFlow/Voiceovers in the user's folder. subtitles=true also \
                 writes the words as subtitles, timed to the voice (lines over existing subtitles are left out). Pass on the \
@@ -60,7 +60,7 @@ enum MCPMediaTools {
                     "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice (one line each unless max_lines=2)."),
                     "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
                                                    minimum: 1, maximum: 2),
-                    "download_voices": MCPSchema.boolean("Only download SrtFlow's own voices (returns a job); lines are ignored.")
+                    "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (returns a job); lines are ignored.")
                 ])
             )
         default:

@@ -87,7 +87,7 @@ enum AIClipTools {
         let state = project.state
         let ids = AIShortIDs(state: state)
         if plan.change.framing != nil, VideoEditCompositionBuilder.renderSize(for: state) != plan.canvas {
-            throw AIToolError("The frame shape changed while SrtFlow was looking at the clip. Call edit_clip again.")
+            throw AIToolError("The frame shape changed while SkyCut was looking at the clip. Call edit_clip again.")
         }
         let next: TimelineState
         do {
@@ -147,7 +147,7 @@ enum AIClipTools {
             )
         }
         guard let media = await project.probeImports([url]).first else {
-            throw AIToolError("SrtFlow cannot use \(url.lastPathComponent) as a clip.")
+            throw AIToolError("SkyCut cannot use \(url.lastPathComponent) as a clip.")
         }
         switch media.kind {
         case .video:
@@ -162,7 +162,7 @@ enum AIClipTools {
                 return ClipFileReplacement(url: url, kind: .image, duration: 0, info: nil, hasAudio: false)
             }
             guard project.canConvertStills, let ffmpeg = MediaToolchain.shared.runtime?.url else {
-                throw AIToolError("SrtFlow's video engine is still starting, so images cannot be swapped in yet. Try again in a moment.")
+                throw AIToolError("SkyCut's video engine is still starting, so images cannot be swapped in yet. Try again in a moment.")
             }
             let still = try await StillImageClipFactory.stillVideo(for: url, ffmpeg: ffmpeg)
             return ClipFileReplacement(
@@ -176,7 +176,7 @@ enum AIClipTools {
     private static func requirePicture(_ clip: EditClip) throws {
         guard !clip.isAudioOnly else { throw AIToolError("\(clip.name) is audio; it has no picture to crop or place.") }
         guard clip.info?.displaySize != nil else {
-            throw AIToolError("SrtFlow does not know the picture size of \(clip.name) yet. Try again in a moment.")
+            throw AIToolError("SkyCut does not know the picture size of \(clip.name) yet. Try again in a moment.")
         }
     }
 
@@ -223,7 +223,7 @@ enum AIClipTools {
             let active = AIFrameFit.region(of: crop ?? nil)
             let aim = focus ?? CGPoint(x: active.midX, y: active.midY)
             guard let filled = AIFrameFit.fill(clip, canvas: canvas, active: active, focus: aim) else {
-                throw AIToolError("SrtFlow cannot fill the frame with \(clip.name).")
+                throw AIToolError("SkyCut cannot fill the frame with \(clip.name).")
             }
             return filled
         case nil:

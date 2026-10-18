@@ -21,7 +21,7 @@ enum AIExportTools {
         let exporter = VideoEditExporter.shared
         guard !project.state.mainClips.isEmpty else { throw AIToolError("V1 is empty. Add clips before exporting.") }
         guard MediaToolchain.shared.runtime != nil else {
-            throw AIToolError("SrtFlow's video engine is not ready yet. Try again in a moment.")
+            throw AIToolError("SkyCut's video engine is not ready yet. Try again in a moment.")
         }
         var state = project.stateForExport(selectionOnly: false)
         let audioOnly = VideoEditExportGraph.isAudioOnly(state)
@@ -166,7 +166,7 @@ enum AIExportTools {
     private static func find(_ args: AIToolArguments) throws -> AIJobs.Job {
         let id = try args.requiredString("job_id")
         guard let job = AIJobs.shared.job(id) else {
-            throw AIToolError("There is no job \(id). Jobs are forgotten when SrtFlow quits.")
+            throw AIToolError("There is no job \(id). Jobs are forgotten when SkyCut quits.")
         }
         return job
     }

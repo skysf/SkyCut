@@ -51,7 +51,7 @@ enum AIBeatCutTool {
 
     static func apply(_ plan: Plan, _ project: VideoEditProject) throws -> AIToolResult {
         guard project.isCurrentGeneration(plan.generation), project.state == plan.state else {
-            throw AIToolError("The timeline changed while SrtFlow was finding the beats. Call cut_to_beat again.")
+            throw AIToolError("The timeline changed while SkyCut was finding the beats. Call cut_to_beat again.")
         }
         var next = plan.state
         AIBeatCuts.apply(plan.placed, in: &next)

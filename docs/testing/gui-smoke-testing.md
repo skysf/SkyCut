@@ -9,7 +9,7 @@
    会编成 x86_64，`.build/arm64-apple-macosx/debug/` 里还是旧二进制——详见
    `docs/build/build-and-packaging.md`。
 2. 用 `strings <二进制> | grep <本次新增的字符串>` 验明产物真含新代码再往下走。
-3. **改名启动，避开同名进程**：用户常年开着 /Applications/SrtFlow.app，同名进程
+3. **改名启动，避开同名进程**：用户常年开着 /Applications/SkyCut.app（2026-10-18 改名之前叫 SrtFlow.app），同名进程
    会让 System Events 匹配错乱（连 `whose unix id is` 都不可靠）。把调试二进制
    装成独立的 `SrtFlowDev.app`（临时目录）：
    - `Contents/MacOS/SrtFlowDev` ← 调试二进制改名
@@ -242,7 +242,7 @@
   （比如 582×375、x≈20），不是窗口真实大小；截图照样是全分辨率。
 - zsh 不会把 `$p` 按空格拆开：坐标要当两个参数传，别塞进一个变量里循环。
 - **AI 调用之间要插界面操作时**（2026-10-18 AI 多开补测，[报告](../reports/2026-10-18-ai-multi-project-ui-smoke.md)）：同一个 AI 会话 = 同一个小程序，
-  `client.py` 跑完一张表小程序就退了。起一个常驻的转发（起 `srtflow-mcp`、握手、在本机 socket 上一条条收调用转过去），中间随时去点界面；再起一个就是另一个会话。
+  `client.py` 跑完一张表小程序就退了。起一个常驻的转发（起 `skycut-mcp`、握手、在本机 socket 上一条条收调用转过去），中间随时去点界面；再起一个就是另一个会话。
   起之前删掉上一次留下的 socket 文件、等能连上再发，不然前几个调用连不上，后面没点名文件夹的 `new_project` 会建到「下载/SrtFlow」里。
 - **发给后台 App 的按键没人接**：测试版用 `open -g` 起来、从没被激活过时没有键窗口，`postToPid` 的 ⌘Z / 空格 / ⌫ 都落空；没验证过的菜单项也是灰的、AX 按了不动。
   要测按键就切前台：等用户键盘鼠标空闲几秒（`HIDIdleTime`）→ 摆出目标窗口、切前台 → 按键只发给测试版 → 马上切回用户原来的前台 App（先记下它的 bundle id）。
@@ -385,7 +385,7 @@ scripts/gui-smoke/in-process/run.sh <scratchpad>/steps.json <scratchpad>/southpo
 ## 四之七、扮成 AI 客户端驱动测试版（MCP 冒烟，2026-09-27）
 
 AI 接口（MCP）的工具要在真 App 上看结果时（合成的画面、Vision 认出来的东西、听出来的电平），用
-`scripts/gui-smoke/mcp-client/client.py`：它起 App 包里的 `srtflow-mcp`（默认 `/Applications/SrtFlow Beta.app` 里那个，
+`scripts/gui-smoke/mcp-client/client.py`：它起 App 包里的 `skycut-mcp`（默认 `/Applications/SkyCut Beta.app` 里那个，
 `SRTFLOW_MCP_HELPER` 可换），按老一代握手，照一份 JSON 调用表一个一个发，打印结果，`look` 回的图存成 jpg。
 
 ```bash

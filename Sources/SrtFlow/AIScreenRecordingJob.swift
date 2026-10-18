@@ -128,7 +128,7 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
         case .awaitingDecision(let result):
             var detail = describe(result)
             detail["waiting_for_decision"] = true
-            detail["next_step"] = "SrtFlow is asking the user whether to add it to the timeline. Tell the user, or call record_screen action=resolve decision=add or keep."
+            detail["next_step"] = "SkyCut is asking the user whether to add it to the timeline. Tell the user, or call record_screen action=resolve decision=add or keep."
             AIJobs.shared.finish(job, .done, message: "The recording was cut short.", detail: .object(detail))
         case .nothingRecorded:
             AIJobs.shared.finish(job, .cancelled, message: "Stopped before recording began; nothing was recorded.")

@@ -48,7 +48,7 @@ final class AIProjectSessions {
             return .failure(AIToolError(text))
         case .use(let id), .adopt(let id):
             guard let project = OpenProjects.shared.project(shortID: id) else {
-                return .failure(AIToolError("Not done: project \(id) is not open in SrtFlow. Nothing was changed."))
+                return .failure(AIToolError("Not done: project \(id) is not open in SkyCut. Nothing was changed."))
             }
             if case .adopt = decision { own(project, session: session, client: client) }
             return .success(project)

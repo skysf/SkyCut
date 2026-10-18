@@ -20,7 +20,7 @@ struct KokoroVoiceSettingsRow: View {
                 }
                 .controlSize(.small)
             } label: {
-                Text("SrtFlow voices")
+                Text("SkyCut voices")
             }
             Text("Natural voices for AI voiceovers, made on this Mac, in English, Chinese and 6 more languages. About 333 MB.")
                 .font(.caption)
@@ -53,7 +53,7 @@ struct KokoroVoiceSettingsRow: View {
         switch pack.state {
         case .installed:
             Button("Delete") { pack.remove() }
-                .instantHelp("Delete SrtFlow's voices from this Mac; AI voiceovers use the Mac's voices until you download them again")
+                .instantHelp("Delete SkyCut's voices from this Mac; AI voiceovers use the Mac's voices until you download them again")
         case .downloading:
             Button("Stop") { pack.cancel() }
                 .instantHelp("Stop the download; downloading again continues where it stopped")
@@ -62,7 +62,7 @@ struct KokoroVoiceSettingsRow: View {
                 .instantHelp(verbatim: message)
         case .notInstalled:
             Button("Download") { pack.startInstall() }
-                .instantHelp("Download SrtFlow's voices (about 333 MB) so AI voiceovers sound natural")
+                .instantHelp("Download SkyCut's voices (about 333 MB) so AI voiceovers sound natural")
         }
     }
 }

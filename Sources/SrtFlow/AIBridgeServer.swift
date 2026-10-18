@@ -1,7 +1,7 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - App 这一头的通道：收 srtflow-mcp 转来的工具调用
+// MARK: - App 这一头的通道：收 skycut-mcp 转来的工具调用
 //
 // 管什么：App 启动时在自己的 Unix socket 上听（路径按 bundle id 算，见 `MCPBridge.socketPath`）；
 // 每条连接读一行请求、交给主线程上的 `AIToolRouter`、把结果写回去。
@@ -79,7 +79,7 @@ final class AIBridgeServer: @unchecked Sendable {
             }
         } else {
             response = MCPBridge.Response(id: "", result: MCPBridge.textResult(
-                "SrtFlow could not read the request from its AI helper. Ask the user to restart the AI app.",
+                "SkyCut could not read the request from its AI helper. Ask the user to restart the AI app.",
                 isError: true
             ))
         }
@@ -141,7 +141,7 @@ final class AIBridgeServer: @unchecked Sendable {
         while done.wait(timeout: .now() + 0.5) == .timedOut {
             if MCPUnixSocket.peerClosed(fd) { calls.abandon(id) }
         }
-        return box.value ?? AIToolRouter.Answer(result: MCPBridge.textResult("SrtFlow did not finish the call.", isError: true))
+        return box.value ?? AIToolRouter.Answer(result: MCPBridge.textResult("SkyCut did not finish the call.", isError: true))
     }
 }
 

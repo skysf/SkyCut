@@ -50,7 +50,7 @@ enum AIEditorPresenter {
             reopened = true
         } else {
             throw AIToolError(
-                "SrtFlow's main window is closed and SrtFlow could not open it. Ask the user to open it (File > Edit Video, "
+                "SkyCut's main window is closed and SkyCut could not open it. Ask the user to open it (File > Edit Video, "
                     + "or \(editVideoShortcut)), then call again."
             )
         }

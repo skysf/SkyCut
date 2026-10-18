@@ -56,7 +56,7 @@ struct AIRecipesList: View {
                     .instantHelp("Show the folder with your own editing styles in Finder")
             }
             if library.userRecipes.isEmpty {
-                Text("When AI edits a whole video it follows one of SrtFlow's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here.")
+                Text("When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
