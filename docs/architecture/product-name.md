@@ -38,6 +38,9 @@
 
 代码名不改：改模块名是几百个文件的机械改动，对用户没有任何好处，`docs/` 里几百处路径（历史案例、守卫的说明）会全部对不上。
 
+**仓库改名、挪目录时，记着绝对路径的编译产物都要作废**：本机删 `.build`；CI 的 `.build` 缓存 key 带检出目录，改名后自己换一份
+（[仓库改名后 CI 五组全红](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。
+
 ## 三、规矩
 
 1. **给用户、给 AI 看的文字写 SkyCut**：`L10n` / `Text` / `instantHelp` 的文案（三张表一起改，[本地化](localization.md)）、

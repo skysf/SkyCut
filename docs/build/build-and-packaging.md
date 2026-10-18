@@ -103,6 +103,9 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   （PR 合并提交的第一个父提交）。规则见 [预览性能 ratchet](../architecture/preview-perf-ratchet.md)。
 - `.build` 缓存帮得有限：恢复之后第 1 组的完整编译仍要 50–80 秒（多半是因为 checkout 之后
   源文件的修改时间都是新的，SwiftPM 按修改时间判断要不要重编）。留着是因为恢复只要几秒。
+- **`.build` 缓存的 key 和 restore-keys 都带检出目录（`github.workspace`）**：`.build` 里的模块缓存记着编它时的绝对路径，
+  换了目录恢复回来就编不过。2026-10-18 仓库改名 SkyCut、检出目录从 `…/SrtFlow/SrtFlow` 变成 `…/SkyCut/SkyCut`，旧缓存被恢复、
+  五组齐红（[案例](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。`checks/ci-build-cache-key.sh`（第 1 组）钉着。
 
 **怎么分组**：按 CI 日志里每项的耗时（`✓ 名字（N s）`）装箱，最慢的先放，每次放进当前最空的
 那一组。第 1 组还要背 50–80 秒的完整编译，所以只放纯值检查和扫描守卫。加了新检查就放进最空的
