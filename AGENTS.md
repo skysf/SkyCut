@@ -505,6 +505,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   排队写成导出中）；怎么在用户用着电脑时测（常驻会话、辅助功能、按键只发给测试版、切前台等空闲）；用户离开后用真鼠标补完右键菜单、悬停提示、
   真录屏落进工程、⌘O 开到新窗口（中文输入法下改系统打开面板的「前往」框会让面板服务崩，要先切 US 布局）。
 - [第四批 AI 反馈的测试版冒烟（0.18.46）](docs/reports/2026-10-18-ai-feedback-batch4-smoke.md) — #246、#248 合进 main 之后在 L16 测试工程上真跑（后台模式、不开窗口）：max_width 0.6 下五句全断在词组边界、预览和成片抽帧一模一样；77.417 报 on_speech / available. / 77.75，照改再查 in_pause；另外两个入点也切在上一句的尾音上；cut_speech 剪同一刀挪到 71.75 / 77.75，完整转写下检查的建议和它一字不差（只转写几段时入点差一帧：转写窗口切进半个词）。
+- [改名 SkyCut 之后的冒烟（0.18.47）](docs/reports/2026-10-18-skycut-rename-smoke.md) — 装好的正式版和测试版：TCC 里录屏和下载文件夹的记录新包全部核得过（不用再授权）、双击 `.skycut` / `.srtflowproj` 都交给 SkyCut.app、Claude Code 连得上 `skycut`、设置和数据文件夹都在；测试版后台真跑：新文件夹存 `SkyCut/…/*.skycut`、老文件夹接着用 `SrtFlow/`、老工程原名存回去、报错是新措辞；**菜单栏的 App 名取可执行文件名**（不是 CFBundleName），没发现 App 的问题。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
