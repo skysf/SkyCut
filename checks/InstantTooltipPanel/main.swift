@@ -146,7 +146,7 @@ func run() {
     //
     // 4a. 窗口失去 key（对话框弹出、切窗口都会走到）。通知就是生产观察者的
     //     订阅合同，直接发它 —— 不用真弹 NSOpenPanel（模态会话会卡住自检）。
-    if showAndSettle(box, label: "Open an existing .srtflowproj file") != nil {
+    if showAndSettle(box, label: "Open an existing project file (.skycut or .srtflowproj)") != nil {
         check(
             InstantTooltipController.shared.panelIsVisibleForChecks,
             "打断用例的前提：面板此刻应当可见"
@@ -164,7 +164,7 @@ func run() {
 
     // 4b. 鼠标按下（点按钮那一下）。走 NSApp.sendEvent —— 本地事件监听挂在
     //     应用派发这条路上，这就是生产路径。
-    if showAndSettle(box, label: "Open an existing .srtflowproj file") != nil {
+    if showAndSettle(box, label: "Open an existing project file (.skycut or .srtflowproj)") != nil {
         check(
             InstantTooltipController.shared.panelIsVisibleForChecks,
             "点击打断用例的前提：面板此刻应当可见"

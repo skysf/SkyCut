@@ -29,7 +29,7 @@ enum RecentProjects {
     @MainActor
     static func existing(limit: Int = 12) -> [URL] {
         NSDocumentController.shared.recentDocumentURLs
-            .filter { $0.pathExtension.lowercased() == VideoEditProjectFile.fileExtension }
+            .filter { VideoEditProjectFile.isProjectFile($0) }
             .filter { FileManager.default.fileExists(atPath: $0.path) }
             .prefix(limit)
             .map { $0 }

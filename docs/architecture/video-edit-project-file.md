@@ -1,4 +1,4 @@
-# 剪辑工程文件（.srtflowproj）与素材重链接
+# 剪辑工程文件（.skycut，改名之前是 .srtflowproj）与素材重链接
 
 > 2026-08-03 定稿。**改工程存盘、素材路径、自动保存相关的代码前必读。**
 >
@@ -31,13 +31,16 @@ Finder**。App 只负责「快速回到最近那几条」。
 | 窗口形态 | **单窗口栏内切工程**，同时只开一个。刻意不用 `NSDocument`/`DocumentGroup` —— 那套要求一个工程一个窗口，跟「一个主窗口 + 侧边栏切工具」的结构对不上 |
 | 保存方式 | **自动保存**：改动后 2 秒防抖写盘，⌘S 只是「立刻 flush」，关窗/切栏目不弹「要保存吗」 |
 | 素材归属 | **只存引用，不拷贝**。工程文件几十 KB |
-| 未命名工程 | 拖素材进来就能开工，不强制先建工程；`documentURL == nil` 时**不自动落盘**，等第一次 ⌘S / Save As（面板从起点开始：点名的文件夹 → 工程的家 → 「下载」）。**例外**：AI 改了它就马上存进 `<起点>/SrtFlow/工程`（[AI 接口](ai-control-mcp.md) 第四节第 10 条） |
+| 未命名工程 | 拖素材进来就能开工，不强制先建工程；`documentURL == nil` 时**不自动落盘**，等第一次 ⌘S / Save As（面板从起点开始：点名的文件夹 → 工程的家 → 「下载」）。**例外**：AI 改了它就马上存进 `<起点>/SkyCut/工程`（[AI 接口](ai-control-mcp.md) 第四节第 10 条） |
 
 ## 三、文件格式
 
-`.srtflowproj` 是一份 pretty-printed JSON（UTI `com.srtflow.project`，在
+工程文件是一份 pretty-printed JSON（UTI `com.srtflow.project`，在
 `packaging/Info.plist` 里声明了 `UTExportedTypeDeclarations` +
-`CFBundleDocumentTypes`，双击能回到 SrtFlow）。
+`CFBundleDocumentTypes`，双击能回到 SkyCut）。**后缀**：新存的用 `.skycut`（2026-10-18 改名 SkyCut），
+改名之前的 `.srtflowproj` 照样认、原地存回去不改后缀；Info.plist 里先写 `skycut`（新文件用第一个）再写 `srtflowproj`。
+认不认得一个文件是工程只问 `VideoEditProjectFile.isProjectFile`（打开、双击、最近打开、AI 的 open_project 和列文件夹都走它）。
+换后缀不换内容、不开新的格式版本（[产品名与代码名](product-name.md)）。
 
 ```
 { formatVersion, savedAt, timeline: TimelineState, media: [MediaRecord],
@@ -398,7 +401,7 @@ Finder**。App 只负责「快速回到最近那几条」。
    `VideoEditProject` / `TranscriptionTask` 这类 @MainActor App 类型，
    「纯函数有没有被调用、参数对不对」只能在源码层面钉住。
 2. 真实窗口冒烟（流程见 `docs/testing/gui-smoke-testing.md`）：
-   - 双击 `.srtflowproj` → 落到 Edit Video 并载入素材、画布比例正确
+   - 双击 `.skycut`（和改名之前的 `.srtflowproj`）→ 落到 Edit Video 并载入素材、画布比例正确
    - 空工程 → 起始页显示最近工程，重启 App 后还在
    - 把素材**改名** → 重开工程 → 应当**无感自动找回**（书签），且工程被回存
    - **工程开着**把素材改名+挪走 → 切回 App → 剪辑块显示新名字、预览不黑、

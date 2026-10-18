@@ -471,7 +471,7 @@
 
 /* 视频编辑：工程栏、工具栏与检查器 */
 "Add video, audio or images to the timeline" = "Añadir video, audio o imágenes a la línea de tiempo";
-"Open an existing .srtflowproj file" = "Abrir un archivo .srtflowproj existente";
+"Open an existing project file (.skycut or .srtflowproj)" = "Abrir un archivo de proyecto existente (.skycut o .srtflowproj)";
 "Mouse tool: Select or Split" = "Herramienta del ratón: Seleccionar o Dividir";
 "Project frame rate — preview, export and keyframes all follow it" = "Fotogramas por segundo del proyecto: la previsualización, la exportación y los fotogramas clave lo siguen";
 "Record the screen into this project" = "Grabar la pantalla en este proyecto";

@@ -10,7 +10,8 @@
 #   1. 身份：bundle id、测试版的 bundle id、UTType 标识、钥匙串 service、签名证书和它的目录；
 #   2. 数据：Application Support / Caches / Logs 下的 SrtFlow 文件夹、fal 的两个 UserDefaults 键；
 #   3. 通道：小程序 ↔ App 的内部工具名和 /tmp 兜底的 socket 前缀；
-#   4. 看得见的：App 名、可执行文件、打包脚本的 APP_NAME、小程序的产品名、两处 MCP 服务器名都是 SkyCut / skycut。
+#   4. 看得见的：App 名、可执行文件、打包脚本的 APP_NAME、小程序的产品名、两处 MCP 服务器名都是 SkyCut / skycut；
+#   5. 工程后缀和 AI 的子文件夹：新存的用 .skycut、新建的子文件夹叫 SkyCut，老的 .srtflowproj 和 SrtFlow 子文件夹照认、只有一处在认。
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -72,6 +73,36 @@ require scripts/build-app.sh 'APP_NAME=SkyCut' "打包出来的 .app、可执行
 require Package.swift '.executable(name: "skycut-mcp", targets: ["SrtFlowMCP"])' "小程序叫 skycut-mcp"
 require Sources/SrtFlowMCPKit/MCPServerCore.swift 'public static let serverName = "skycut"' "MCP 服务器名（工具在客户端里叫 mcp__skycut__…）"
 require Sources/SrtFlow/AIClientConfigFiles.swift 'static let serverName = "skycut"' "「连接 AI」写进客户端配置的名字要和小程序报的一样"
+
+echo "==> 5. 工程后缀和 AI 的子文件夹：新的叫 SkyCut，老的照认"
+EXTENSIONS=""
+for i in $(seq 0 20); do
+  if [ "$(plist_value "${PLIST}" "UTExportedTypeDeclarations:${i}:UTTypeIdentifier")" = "com.srtflow.project" ]; then
+    EXTENSIONS="$(plist_value "${PLIST}" "UTExportedTypeDeclarations:${i}:UTTypeTagSpecification:public.filename-extension")"
+    break
+  fi
+done
+FIRST_EXTENSION="$(printf '%s\n' "${EXTENSIONS}" | sed -n '2p' | tr -d '[:space:]')"
+if [ "${FIRST_EXTENSION}" != "skycut" ] || [ "$({ grep -c 'srtflowproj' <<<"${EXTENSIONS}" || true; })" -ne 1 ]; then
+  fail "${PLIST} 里 com.srtflow.project 的后缀要先写 skycut（新存的工程用它）、再写 srtflowproj（老工程照样认）：现在是 ${EXTENSIONS}"
+fi
+require Sources/SrtFlow/VideoEditProjectFile.swift 'static let fileExtension = "skycut"' "新存的工程用 .skycut"
+require Sources/SrtFlow/VideoEditProjectFile.swift 'static let legacyFileExtension = "srtflowproj"' "改名之前的工程照样认"
+require Sources/SrtFlow/DefaultFolder.swift 'static let aiFolderName = "SkyCut"' "AI 新建的子文件夹叫 SkyCut"
+require Sources/SrtFlow/DefaultFolder.swift 'static let legacyAIFolderName = "SrtFlow"' "已有的 SrtFlow 子文件夹接着用、照样认"
+require Sources/SrtFlow/AIWorkspace.swift 'DefaultFolder.aiFolder(in: startFolder(project: project))' "AI 的输出位置经 aiFolder 挑新旧名字"
+require Sources/SrtFlow/AIMediaScan.swift 'DefaultFolder.aiFolderNames' "列文件夹时两个名字的输出文件夹都跳过"
+# 认不认得一个文件是工程只有 isProjectFile 一处：别处再拿后缀直接比，老的 .srtflowproj 就认不出来了。
+STRAY="$({ grep -rnE 'pathExtension(\.lowercased\(\))? *[!=]= *VideoEditProjectFile\.fileExtension' Sources --include='*.swift' || true; })"
+if [ -n "${STRAY}" ]; then
+  fail "认工程文件要问 VideoEditProjectFile.isProjectFile，不许拿后缀直接比（老的 .srtflowproj 会认不出来）：
+${STRAY}"
+fi
+STRAY_FOLDER="$({ grep -rn 'appendingPathComponent(DefaultFolder\.aiFolderName' Sources --include='*.swift' || true; })"
+if [ -n "${STRAY_FOLDER}" ]; then
+  fail "AI 的子文件夹要经 DefaultFolder.aiFolder 挑（已有 SrtFlow 的接着用）：
+${STRAY_FOLDER}"
+fi
 
 if [ "${FAILED}" -ne 0 ]; then
   echo "规范：docs/architecture/product-name.md —— 给用户和 AI 看的写 SkyCut，身份类的名字永远不改。" >&2

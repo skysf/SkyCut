@@ -48,7 +48,7 @@ public enum MCPScreenTools {
                     ),
                     "countdown": MCPSchema.integer("Seconds before it starts (default 3; 0 when you operate the Mac yourself).", minimum: 0, maximum: 10),
                     "duration": MCPSchema.number("Stop by itself after this many seconds.", minimum: 1, maximum: 14_400),
-                    "title": MCPSchema.string("File name (default Screen Recording <date time>), in SrtFlow/Screen Recordings; a taken name gets a number."),
+                    "title": MCPSchema.string("File name (default Screen Recording <date time>), in SkyCut/Screen Recordings; a taken name gets a number."),
                     "add_to_timeline": MCPSchema.boolean("Put it on the timeline when it stops (default true); false keeps only the file."),
                     "decision": MCPSchema.string(
                         "For resolve: add to the timeline, keep the file only, or discard (asks first).", oneOf: MCPVocabulary.recordingDecisions

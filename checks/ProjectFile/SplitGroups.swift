@@ -27,6 +27,7 @@ func runSplitOutGroups(root: URL) {
         ("形状的入场 / 出场动画", checkShapeAnimations),  // 44：ShapeAnimations.swift
         ("出场是入场倒着放", checkExitCurves),          // 45：ExitCurves.swift
         ("字幕几行跟着工程走", checkSubtitleMaxLines),   // 46：SubtitleMaxLines.swift
+        ("工程文件的后缀：新存 .skycut、老的 .srtflowproj 照认", checkProjectFileExtension),  // 47：ProjectFileExtension.swift
     ]
     for group in groups {
         do {

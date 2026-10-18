@@ -26,6 +26,21 @@ func runFolderChecks() {
     checkEqual(DefaultFolder.home(ofProjectFile: userSrtFlowFolder, projectFolderNames: names).path,
                "/Users/u/Documents/SrtFlow/Trip", "the user's own SrtFlow folder with other subfolders: no jump up")
 
+    // 2026-10-18 改名 SkyCut：新的子文件夹叫 SkyCut，改名之前的 SrtFlow 照样认；起点下面已经有 SrtFlow 的接着用它
+    let skyCutProject = URL(fileURLWithPath: "/Users/u/Trip/SkyCut/工程/Trip.skycut")
+    checkEqual(DefaultFolder.home(ofProjectFile: skyCutProject, projectFolderNames: names).path, "/Users/u/Trip",
+               "a project AI saved in X/SkyCut/工程 lives at home X")
+    let userSkyCutFolder = URL(fileURLWithPath: "/Users/u/Documents/SkyCut/Trip/Trip.skycut")
+    checkEqual(DefaultFolder.home(ofProjectFile: userSkyCutFolder, projectFolderNames: names).path,
+               "/Users/u/Documents/SkyCut/Trip", "the user's own SkyCut folder with other subfolders: no jump up")
+    let start = URL(fileURLWithPath: "/Users/u/Trip")
+    checkEqual(DefaultFolder.aiFolder(in: start) { _ in false }.path, "/Users/u/Trip/SkyCut",
+               "a folder without an AI subfolder gets a SkyCut one")
+    checkEqual(DefaultFolder.aiFolder(in: start) { $0.lastPathComponent == "SrtFlow" }.path, "/Users/u/Trip/SrtFlow",
+               "a folder that already has the old SrtFlow subfolder keeps using it")
+    checkEqual(DefaultFolder.aiFolder(in: start) { $0.lastPathComponent == "SkyCut" }.path, "/Users/u/Trip/SkyCut",
+               "an existing SkyCut subfolder is used")
+
     // 起点：点名的文件夹 → 工程的家 → 下载 → 家目录，没有「影片」
     checkEqual(DefaultFolder.start(named: named, projectHome: userHome, downloads: downloads, userHome: userHome), named,
                "the folder the user named comes first")

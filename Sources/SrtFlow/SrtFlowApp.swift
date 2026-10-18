@@ -141,9 +141,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 这里只把文件暂存进中转站，切栏目交给 MainWindowView：`openWindow` 只有在
     /// SwiftUI 视图里才拿得到。
     func application(_ application: NSApplication, open urls: [URL]) {
-        // 双击 .srtflowproj 直接进剪辑页打开那条工程。
+        // 双击工程文件（.skycut，或改名之前的 .srtflowproj）直接进剪辑页打开那条工程。
         if let projectFile = urls.first(where: {
-            $0.pathExtension.lowercased() == VideoEditProjectFile.fileExtension
+            VideoEditProjectFile.isProjectFile($0)
         }) {
             MainWindowState.shared.section = .videoEdit
             Task { await OpenProjects.shared.userOpen(projectFile, from: OpenProjects.shared.primary) }

@@ -42,7 +42,7 @@ enum MCPMediaTools {
                 zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
                 en_male_british — one of SkyCut's voices by name (af_heart, zf_xiaoxiao…), or a Mac voice's name; without it, a \
                 warm female voice in the text's language. clone_from clones a voice with fal.ai from a file (audio or video) of \
-                one person speaking clearly. The files go into SrtFlow/Voiceovers in the user's folder. subtitles=true also \
+                one person speaking clearly. The files go into SkyCut/Voiceovers in the user's folder. subtitles=true also \
                 writes the words as subtitles, timed to the voice (lines over existing subtitles are left out). Pass on the \
                 result's voice note to the user.
                 """,

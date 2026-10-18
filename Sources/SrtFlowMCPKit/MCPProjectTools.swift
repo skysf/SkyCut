@@ -44,7 +44,7 @@ public enum MCPProjectTools {
                 description: """
                 Use a folder the user named as the workspace for this edit and list the media inside it and every subfolder: \
                 videos, images, audio and subtitle files with duration and size. Files in it can be imported without asking \
-                again. New files SkyCut makes (exports, projects) go into its "SrtFlow" subfolder. Paths in the result are \
+                again. New files SkyCut makes (exports, projects) go into its "SkyCut" subfolder (or an older "SrtFlow" one). Paths in the result are \
                 relative to the folder. Only pass a folder the user gave you. When the user says to use what they selected in \
                 Finder, pass from_finder=true instead of path: the selected files are listed (their folder becomes the \
                 workspace), or the selected folder, or the folder open in the front Finder window. macOS asks the user once to \
@@ -61,7 +61,7 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .openProject, title: "Open a project",
                 description: """
-                Open an existing SkyCut project file (.srtflowproj). The result's project is its id (p1, p2…). Several projects \
+                Open an existing SkyCut project file (.skycut, or .srtflowproj from before the rename). The result's project is its id (p1, p2…). Several projects \
                 can be open at once: to edit several (for example with sub-agents), open or create them all first, then pass \
                 project=<id> on every call; a call without project goes to the project you opened last. It opens in SkyCut's \
                 main window when that is empty, otherwise in a window of its own, shown once; after set_view background it \
@@ -69,15 +69,15 @@ public enum MCPProjectTools {
                 SkyCut keeps at most 8 projects open: close_project the finished ones.
                 """,
                 input: MCPSchema.object([
-                    "path": MCPSchema.string("Absolute path of the .srtflowproj file.")
+                    "path": MCPSchema.string("Absolute path of the project file (.skycut or .srtflowproj).")
                 ], required: ["path"])
             )
         case .newProject:
             return MCPToolDefinition(
                 .newProject, title: "New project",
                 description: """
-                Start a new, empty project and save it at once as <name>.srtflowproj, so every later edit autosaves. It goes \
-                into the folder you pass, otherwise into SrtFlow/Projects inside the folder the user named (open_folder), the \
+                Start a new, empty project and save it at once as <name>.skycut, so every later edit autosaves. It goes \
+                into the folder you pass, otherwise into SkyCut/Projects inside the folder the user named (open_folder), the \
                 open project's folder, or Downloads. A taken name gets a number (the result has the real path). Several cuts \
                 from one folder need version (the file becomes <name> - <version>): a second project in a folder where you \
                 already have one open is refused without it. The result's project is its id; it opens and counts like \
@@ -105,11 +105,11 @@ public enum MCPProjectTools {
                 description: """
                 Save the open project now. SkyCut autosaves a saved project two seconds after every edit and saves a \
                 never-saved one by itself after your first change, so this is mainly for saving under another path. Without a \
-                path a never-saved project goes into SrtFlow/Projects inside the folder the user named (Downloads when there is \
+                path a never-saved project goes into SkyCut/Projects inside the folder the user named (Downloads when there is \
                 none). Never replaces a file: a taken name gets a number.
                 """,
                 input: MCPSchema.object([
-                    "path": MCPSchema.string("Where to save (.srtflowproj). Leave out to keep the current location.")
+                    "path": MCPSchema.string("Where to save (.skycut). Leave out to keep the current location.")
                 ])
             )
         case .undo:

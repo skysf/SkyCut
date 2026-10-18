@@ -26,7 +26,7 @@ enum AIMediaScan {
         var entries: [Entry]
         /// 超过上限没列完。
         var truncated: Bool
-        /// 根上有 SrtFlow 自己的输出文件夹（没列进来）。
+        /// 根上有 App 自己的输出文件夹（SkyCut，或改名之前的 SrtFlow；没列进来）。
         var hasOutputFolder: Bool
     }
 
@@ -34,7 +34,7 @@ enum AIMediaScan {
 
     static func kind(of url: URL) -> Kind? {
         let ext = url.pathExtension.lowercased()
-        if ext == VideoEditProjectFile.fileExtension { return .project }
+        if VideoEditProjectFile.isProjectFile(url) { return .project }
         // .txt 字幕能认，但文件夹里的 .txt 多半是讲稿、笔记：列成文稿（read_document 读），当字幕用照样 add_clips。
         if ext == "txt" { return .document }
         if MediaFileTypes.isSubtitle(url) { return .subtitle }
@@ -50,14 +50,14 @@ enum AIMediaScan {
         guard let enumerator = FileManager.default.enumerator(
             at: folder, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles, .skipsPackageDescendants]
         ) else { return Result(entries: [], truncated: false, hasOutputFolder: false) }
-        let outputRoot = folder.appendingPathComponent("SrtFlow").standardizedFileURL.path
+        let outputRoots = Set(DefaultFolder.aiFolderNames.map { folder.appendingPathComponent($0).standardizedFileURL.path })
         var entries: [Entry] = []
         var truncated = false
         var hasOutput = false
         for case let url as URL in enumerator {
             let values = try? url.resourceValues(forKeys: Set(keys))
             if values?.isDirectory == true {
-                if url.standardizedFileURL.path == outputRoot {
+                if outputRoots.contains(url.standardizedFileURL.path) {
                     hasOutput = true
                     enumerator.skipDescendants()
                 }
