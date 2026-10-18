@@ -73,7 +73,8 @@
   `AISpeechCutTool` 旧的三行，判点改从 `AISpeechHearing` 建之后它找不到了。它在 check-mcp.sh source 进来的一节里，`scripts/check-guards.sh`
   只跑 `checks/*.sh` 顶层，本地跑不到 —— 和 PR #71、#84、#132 同一类坑。扫描照新接法改（读整个文件的波形、`AISpeechHearing` 建判点、按片段的
   时间线秒问、四种剪法都经判点、结果报 `moved`），撤掉 `clip: speech` 反向验证红一次；check-mcp.sh 编译之前的全部扫描本地用 /bin/bash 跑一遍全绿。
-  让 check-guards 也跑这些扫描另开一个 PR。
+  之后 `scripts/check-guards.sh` 也跑 `scripts/check-mcp.sh --scans-only`（check-mcp 编译之前的全部扫描，几秒）：故意把 cut_speech 的判点
+  改回不按片段的时间线秒问，check-guards 在这一项上红，恢复后全绿。
 
 ## 教训 / 防回归
 

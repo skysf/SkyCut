@@ -75,6 +75,7 @@
 #
 # 用法：
 #   scripts/check-mcp.sh
+#   scripts/check-mcp.sh --scans-only   # 只跑编译之前的扫描（秒级）：scripts/check-guards.sh 推之前调它
 #
 # 与 check-timeline-clipboard.sh 同一套编法：被测代码在 SrtFlow app target 里，SwiftPM 不允许两个
 # target 共用源文件，所以挑纯值文件单独编成自检二进制。长期约束见 docs/architecture/ai-control-mcp.md。
@@ -317,6 +318,13 @@ if [ "$(grep -c 'MediaReadQueue.run(on: MediaReadQueue.analysis)' Sources/SrtFlo
   exit 1
 fi
 echo "   ✓ 合成音效：写文件只经 AIAudioFileWriter，渲染在 MediaReadQueue 上"
+
+# 上面全是扫描（不编译）。check-guards 推之前只跑到这儿：这些扫描以前只在 CI 上跑得到，本地挑着跑漏掉的那一条首跑就红
+#（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md，同 PR #71、#84、#132）。
+if [ "${1:-}" = "--scans-only" ]; then
+  echo "✓ check-mcp：编译之前的扫描都过了（--scans-only，没编自检）"
+  exit 0
+fi
 
 echo "==> swift build ${ARCH_FLAG}（小程序 + SrtFlowCore）"
 # SwiftPM 的编译诊断走 stdout：静默成功可以，失败必须倾倒完整输出。
