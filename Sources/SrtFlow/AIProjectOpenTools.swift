@@ -20,9 +20,8 @@ enum AIProjectOpenTools {
 
     static func openProject(_ args: AIToolArguments, inFront: Bool) async throws -> AIToolResult {
         let url = AIWorkspace.shared.resolve(try args.requiredString("path"))
-        guard url.pathExtension.lowercased() == VideoEditProjectFile.fileExtension,
-              FileManager.default.fileExists(atPath: url.path) else {
-            throw AIToolError("\(url.path) is not an existing .\(VideoEditProjectFile.fileExtension) file.")
+        guard VideoEditProjectFile.isProjectFile(url), FileManager.default.fileExists(atPath: url.path) else {
+            throw AIToolError("\(url.path) is not an existing SkyCut project (.skycut, or .srtflowproj from before the rename).")
         }
         try refuseWhileRecording()
         // 已经开着：归这个会话的 / 没人剪的就用它；别的会话还在剪（5 分钟内调用过）就不做；安静久了就接手（方案 B.3）。

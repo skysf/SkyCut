@@ -6,20 +6,30 @@ import Foundation
 // 手动的「打开工程」「存储为」、导出面板第一次用的位置、AI 做出来的工程和成片，都从这里拿起点。
 // 2026-09-27 用户拍板：「不要到 Movies，到目标文件夹；用户没有给任何文件夹，就默认都到 Downloads」。
 // 纯函数，自检够得着（scripts/check-mcp.sh）。
-// 不管什么：导出面板记住的上次位置（VideoEditExporter）、AI 在起点下面建的 `SrtFlow/<导出|工程>`（AIWorkspace）。
+// 不管什么：导出面板记住的上次位置（VideoEditExporter）、AI 在起点下面建的 `SkyCut/<导出|工程>`（AIWorkspace）。
 
 enum DefaultFolder {
-    /// AI 在起点下面建的那个子文件夹：`<起点>/SrtFlow/<导出|工程>`。
-    static let aiFolderName = "SrtFlow"
+    /// AI 在起点下面建的那个子文件夹：`<起点>/SkyCut/<导出|工程>`。2026-10-18 改名 SkyCut 之前叫 SrtFlow：
+    /// 起点下面已经有 SrtFlow 的就接着用它（同一个文件夹里的成片不分成两处），两个名字都认
+    ///（docs/architecture/product-name.md）。
+    static let aiFolderName = "SkyCut"
+    static let legacyAIFolderName = "SrtFlow"
+    static let aiFolderNames: Set<String> = [aiFolderName, legacyAIFolderName]
 
-    /// 工程的「家」：一般就是工程文件所在的文件夹；AI 存在 `X/SrtFlow/<工程>/` 里的工程，家是 X ——
-    /// 不然之后的成片会进 `X/SrtFlow/工程/SrtFlow/导出`，AI 读 X 里的素材也要多问一句。
+    /// `<起点>/SrtFlow` 已经有了就用它，不然 `<起点>/SkyCut`。`isFolder` 问这个位置是不是一个文件夹。
+    static func aiFolder(in start: URL, isFolder: (URL) -> Bool) -> URL {
+        let legacy = start.appendingPathComponent(legacyAIFolderName, isDirectory: true)
+        return isFolder(legacy) ? legacy : start.appendingPathComponent(aiFolderName, isDirectory: true)
+    }
+
+    /// 工程的「家」：一般就是工程文件所在的文件夹；AI 存在 `X/SkyCut/<工程>/`（或改名之前的 `X/SrtFlow/<工程>/`）
+    /// 里的工程，家是 X —— 不然之后的成片会进 `X/SkyCut/工程/SkyCut/导出`，AI 读 X 里的素材也要多问一句。
     /// `projectFolderNames`：「工程」这个子文件夹在每种界面语言里的名字（切过语言也认得出来）。
-    /// 用户自己恰好有个叫 SrtFlow 的文件夹、下面的子文件夹不叫「工程」时不往上跳。
+    /// 用户自己恰好有个叫 SkyCut / SrtFlow 的文件夹、下面的子文件夹不叫「工程」时不往上跳。
     static func home(ofProjectFile file: URL, projectFolderNames: Set<String>) -> URL {
         let folder = file.deletingLastPathComponent()
         let parent = folder.deletingLastPathComponent()
-        guard parent.lastPathComponent == aiFolderName, projectFolderNames.contains(folder.lastPathComponent) else {
+        guard aiFolderNames.contains(parent.lastPathComponent), projectFolderNames.contains(folder.lastPathComponent) else {
             return folder
         }
         return parent.deletingLastPathComponent()

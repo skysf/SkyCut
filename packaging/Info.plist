@@ -101,6 +101,8 @@
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
+					<!-- 第一个是新存的工程用的后缀（2026-10-18 改名 SkyCut）；改名之前的 .srtflowproj 照样认。 -->
+					<string>skycut</string>
 					<string>srtflowproj</string>
 				</array>
 			</dict>

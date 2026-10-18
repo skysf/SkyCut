@@ -3,7 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 extension UTType {
-    /// `.srtflowproj`。Info.plist 里声明了同一个标识符，双击工程文件才会回到 SrtFlow。
+    /// `.skycut`（改名之前的 `.srtflowproj` 也是它）。Info.plist 里声明了同一个标识符，双击工程文件才会回到 SkyCut。
     static let srtFlowProject = UTType(
         exportedAs: "com.srtflow.project",
         conformingTo: .json
@@ -357,8 +357,8 @@ extension VideoEditProject {
         panel.canCreateDirectories = true
         panel.prompt = L10n("Save")
         guard panel.runModal() == .OK, var url = panel.url else { return }
-        // 用户把扩展名删了也照样存成工程文件，不然下次双击打不开。
-        if url.pathExtension.lowercased() != VideoEditProjectFile.fileExtension {
+        // 用户把扩展名删了也照样存成工程文件（.skycut），不然下次双击打不开。
+        if !VideoEditProjectFile.isProjectFile(url) {
             url = url.appendingPathExtension(VideoEditProjectFile.fileExtension)
         }
         saveDocument(as: url)

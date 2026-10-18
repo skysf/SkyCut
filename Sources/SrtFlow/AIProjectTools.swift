@@ -111,7 +111,7 @@ enum AIProjectTools {
         if let selected {
             result["from_finder"] = .string("\(selected.count) item(s) selected in Finder; only those are listed.")
         }
-        if scan.hasOutputFolder { result["note"] = "The SrtFlow subfolder (earlier exports and projects) is not listed." }
+        if scan.hasOutputFolder { result["note"] = "The SkyCut subfolder (SrtFlow in folders from before the rename: earlier exports and projects) is not listed." }
         return .ok(.object(result))
     }
 
@@ -156,7 +156,7 @@ enum AIProjectTools {
     static func saveProject(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
         let requested = try args.string("path").map { path -> URL in
             var url = AIWorkspace.shared.resolve(path)
-            if url.pathExtension.lowercased() != VideoEditProjectFile.fileExtension {
+            if !VideoEditProjectFile.isProjectFile(url) {
                 url = url.appendingPathExtension(VideoEditProjectFile.fileExtension)
             }
             return url
@@ -172,7 +172,7 @@ enum AIProjectTools {
         if url.standardizedFileURL.path != project.documentURL?.standardizedFileURL.path {
             url = ExportFileName.unoccupied(
                 in: url.deletingLastPathComponent(), stem: url.deletingPathExtension().lastPathComponent,
-                pathExtension: VideoEditProjectFile.fileExtension
+                pathExtension: url.pathExtension
             ) { FileManager.default.fileExists(atPath: $0.path) }
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)

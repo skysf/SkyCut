@@ -38,7 +38,13 @@ struct VideoEditProjectFile: Codable {
     /// 具体判据见 `TimelineState.requiresFormatVersion4` / `...5` / `...6` /
     /// `...7` … `...14`（登记清单在那边）。
     static let baselineFormatVersion = 3
-    static let fileExtension = "srtflowproj"
+    /// 新存的工程用 `.skycut`（2026-10-18 改名 SkyCut）；改名之前的 `.srtflowproj` 照样认，原地存回去不改后缀。
+    /// 认不认得一个文件是工程只问 `isProjectFile`（docs/architecture/product-name.md）。
+    static let fileExtension = "skycut"
+    static let legacyFileExtension = "srtflowproj"
+    static func isProjectFile(_ url: URL) -> Bool {
+        [fileExtension, legacyFileExtension].contains(url.pathExtension.lowercased())
+    }
 
     private enum CodingKeys: String, CodingKey {
         case formatVersion, savedAt, timeline, media, rowHeights

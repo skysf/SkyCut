@@ -126,6 +126,7 @@ xcrun swiftc \
   checks/ProjectFile/CircleArcShapes.swift \
   checks/ProjectFile/MainMagnet.swift \
   checks/ProjectFile/SubtitleMaxLines.swift \
+  checks/ProjectFile/ProjectFileExtension.swift \
   checks/ProjectFile/ShapeAnimations.swift \
   checks/ProjectFile/ExitCurves.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o

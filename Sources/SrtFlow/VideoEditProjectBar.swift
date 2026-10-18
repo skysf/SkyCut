@@ -117,7 +117,7 @@ struct VideoEditStartScreen: View {
                     .buttonStyle(.borderedProminent)
                     .instantHelp("Add video, audio or images to the timeline")
                 Button("Open Project…") { project.promptOpenProject() }
-                    .instantHelp("Open an existing .srtflowproj file", shortcut: .command("O"))
+                    .instantHelp("Open an existing project file (.skycut or .srtflowproj)", shortcut: .command("O"))
             }
         }
         .padding(.top, 12)

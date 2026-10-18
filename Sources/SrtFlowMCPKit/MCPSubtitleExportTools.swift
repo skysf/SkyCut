@@ -185,7 +185,7 @@ public enum MCPSubtitleExportTools {
             .exportVideo, title: "Export the video",
             description: """
             Render the timeline to an .mp4 (audio-only timelines become .m4a). By default the file is named after the \
-            project and goes into SrtFlow/Exports inside the folder the user named (otherwise the project's folder, or \
+            project and goes into SkyCut/Exports inside the folder the user named (otherwise the project's folder, or \
             Downloads). Subtitles visible on the timeline are burned in unless burn_subtitles is false. A taken name gets a \
             number (the result has the real path); SkyCut never replaces a file. Returns a job id; wait with get_job. Then \
             give the user the music_credits (get_timeline) for the video's description.

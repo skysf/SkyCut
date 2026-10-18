@@ -109,11 +109,14 @@ final class AIWorkspace {
         )
     }
 
-    /// AI 做出来的文件放哪：`<起点>/SrtFlow/<导出|工程|配音|音效|生成|录屏>`。文件夹名跟着 App 的语言。
+    /// AI 做出来的文件放哪：`<起点>/SkyCut/<导出|工程|配音|音效|生成|录屏>`（起点下面已经有改名之前的 SrtFlow 就接着用它，
+    /// `DefaultFolder.aiFolder`）。文件夹名跟着 App 的语言。
     func outputFolder(_ kind: Output, project: VideoEditProject) -> URL {
-        startFolder(project: project)
-            .appendingPathComponent(DefaultFolder.aiFolderName, isDirectory: true)
-            .appendingPathComponent(kind.folderName, isDirectory: true)
+        DefaultFolder.aiFolder(in: startFolder(project: project)) { url in
+            var isDirectory: ObjCBool = false
+            return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
+        }
+        .appendingPathComponent(kind.folderName, isDirectory: true)
     }
 
     private func projectHome(_ project: VideoEditProject) -> URL? {

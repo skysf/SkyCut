@@ -12,7 +12,7 @@ enum MCPEncodeTools {
             return MCPToolDefinition(
                 .compressVideos, title: "Compress videos",
                 description: """
-                Make video files smaller, one output per file (H.264 MP4, <name>_compressed.mp4 in SrtFlow/Exports inside the \
+                Make video files smaller, one output per file (H.264 MP4, <name>_compressed.mp4 in SkyCut/Exports inside the \
                 opened folder, or in folder; never overwrites). Without options it uses the settings the user keeps on SkyCut's \
                 Compress Video page; the options below apply to this batch only. Resolution and frame rate are only ever lowered. The \
                 videos show up in that page's queue. Returns a job id: wait with get_job, whose result lists each output with \
@@ -33,7 +33,7 @@ enum MCPEncodeTools {
                 .burnSubtitles, title: "Burn subtitles",
                 description: """
                 Draw a subtitle file permanently into a video, for videos not in the project (for the project's own subtitles \
-                use export_video). One output per video (<name>_sub.mp4 in SrtFlow/Exports inside the opened folder, or in \
+                use export_video). One output per video (<name>_sub.mp4 in SkyCut/Exports inside the opened folder, or in \
                 folder; never overwrites). Subtitles look the way the user set up SkyCut's Burn In Subtitles page; style and the encoding \
                 options change this batch only (highlight does not apply: subtitle files have no word times). Returns a job id: \
                 wait with get_job.
@@ -50,7 +50,7 @@ enum MCPEncodeTools {
                 .convertSubtitles, title: "Convert subtitles",
                 description: """
                 Convert subtitle files to another format (SRT, WebVTT, ASS, SSA or plain text), one output per file in \
-                SrtFlow/Exports inside the opened folder, or in folder (never overwrites). Done at once; returns where each file \
+                SkyCut/Exports inside the opened folder, or in folder (never overwrites). Done at once; returns where each file \
                 went and which could not be read.
                 """,
                 input: MCPSchema.object([
@@ -68,7 +68,7 @@ enum MCPEncodeTools {
     /// 三个工具都收的「放哪」：和 export_subtitles 的 folder 同名同义（2026-10-15 用户转来的反馈：转出来的字幕文件固定落在
     /// 导出文件夹里，还得再调一次 manage_files 挪到位）。读法只在 App 的 AIEncodeTools.outputFolder 一处。
     private static let outputFolder = MCPSchema.string(
-        "Folder to write into (absolute, or relative to the opened folder; made if missing). Default: SrtFlow/Exports inside the opened folder."
+        "Folder to write into (absolute, or relative to the opened folder; made if missing). Default: SkyCut/Exports inside the opened folder."
     )
 
     /// 压缩和烧录共用的编码参数。

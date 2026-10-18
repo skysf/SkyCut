@@ -8,15 +8,21 @@
 
 | 层 | 叫什么 | 包括 |
 | --- | --- | --- |
-| 看得见的（用户、AI） | **SkyCut** | App 名（`CFBundleName` / `CFBundleDisplayName`）、`SkyCut.app` 和里面的可执行文件 `SkyCut`、DMG（`SkyCut-<版本>-arm64.dmg`）、主窗口标题、三张文案表、系统权限弹框里的用途说明（`InfoPlist.strings`）、Finder 里的类型名（「SkyCut Video Project」）、随包的授权声明、测试版「SkyCut Beta」；给 AI 的总说明、工具说明、工具结果和报错、风格卡；MCP 服务器名 `skycut`（工具在客户端里叫 `mcp__skycut__…`）、小程序 `skycut-mcp`、「连接 AI」写进客户端配置的那一项（`mcp__skycut`、`[mcp_servers.skycut]`）和备份后缀 `.skycut-backup`、`get_status` 的 `skycut_voices` |
+| 看得见的（用户、AI） | **SkyCut** | App 名（`CFBundleName` / `CFBundleDisplayName`）、`SkyCut.app` 和里面的可执行文件 `SkyCut`、DMG（`SkyCut-<版本>-arm64.dmg`）、主窗口标题、三张文案表、系统权限弹框里的用途说明（`InfoPlist.strings`）、Finder 里的类型名（「SkyCut Video Project」）、随包的授权声明、测试版「SkyCut Beta」；新存的工程后缀 `.skycut`、AI 在用户文件夹里新建的子文件夹 `SkyCut/`；给 AI 的总说明、工具说明、工具结果和报错、风格卡；MCP 服务器名 `skycut`（工具在客户端里叫 `mcp__skycut__…`）、小程序 `skycut-mcp`、「连接 AI」写进客户端配置的那一项（`mcp__skycut`、`[mcp_servers.skycut]`）和备份后缀 `.skycut-backup`、`get_status` 的 `skycut_voices` |
 | 身份（**永远不改**） | 沿用 SrtFlow / srtflow | bundle id `com.srtflow.SrtFlow`（测试版 `com.srtflow.SrtFlow.beta`）；UTType 标识（`com.srtflow.project`、`com.srtflow.srt` 等）；签名证书「SrtFlow Signing」和 `~/.config/srtflow/`；钥匙串里 fal Key 的 service（`<bundle id>.fal`）；UserDefaults 的域（就是 bundle id）和带名字的键（`SrtFlow.fal.settings.v1` 等）；`~/Library/Application Support/SrtFlow`、`~/Library/Caches/SrtFlow`、`~/Library/Logs/SrtFlow`；AI 通道的 socket（按 bundle id 算，太长时兜底 `/tmp/srtflow-mcp-…`）和小程序 ↔ App 的内部工具名（`_srtflow_probe` / `_srtflow_catalog`）；环境变量 `SRTFLOW_*`；日志 subsystem、队列名、临时文件前缀；烧录用的 ASS 里的样式名 |
 | 代码（不改） | SrtFlow | SwiftPM 的包、目标和产品（`SrtFlow`、`SrtFlowCore`、`SrtFlowMCPKit`、`SrtFlowKokoro`、`SrtFlowMCP`、`SrtFlowCoreChecks`）、资源包 `SrtFlow_SrtFlow.bundle`、源码目录、类型名、注释、`docs/` 里的历史记录 |
 
 打包脚本把 SwiftPM 的可执行产品 `SrtFlow` 拷成 `SkyCut.app/Contents/MacOS/SkyCut`（`APP_NAME` 和 `PRODUCT` 两个变量，`scripts/build-app.sh`）。
 小程序的 SwiftPM 产品直接叫 `skycut-mcp`：客户端配置里写的就是这个路径，`ps` 里看到的也是它。
 
-还没改名的两样（第二步，见方案）：AI 在用户文件夹里建的子文件夹（`<文件夹>/SrtFlow/<导出|工程|…>`）和工程文件的后缀 `.srtflowproj`。
-它们都是用户在 Finder 里看得见的东西，改的时候要认老的。
+用户在 Finder 里看得见、又早就散在用户文件夹里的两样，新的叫 SkyCut、老的照认：
+
+- **工程文件**：新存的用 `.skycut`，改名之前的 `.srtflowproj` 照样能开、原地存回去不改后缀。认不认得一个文件是工程只问
+  `VideoEditProjectFile.isProjectFile`（打开、双击、最近打开、AI 的 `open_project`、列文件夹都走它）；UTType 标识不变，
+  Info.plist 里后缀先写 `skycut`（新文件用第一个）再写 `srtflowproj`。内容和格式版本不变（[工程文件](video-edit-project-file.md) 第三节）。
+- **AI 在用户文件夹里建的子文件夹**：新建的叫 `SkyCut/`（下面是导出、工程、配音……）；起点下面已经有改名之前的 `SrtFlow/` 就接着用它
+  （同一个文件夹里的成片不分成两处），工程的家、列文件夹时跳过的输出文件夹两个名字都认（`DefaultFolder.aiFolder` / `aiFolderNames`，
+  [AI 接口](ai-control-mcp.md) 第四节第 10 条）。
 
 ## 二、为什么身份不改
 
@@ -47,10 +53,15 @@
 
 | 检查 | 钉什么 |
 | --- | --- |
-| `checks/product-name.sh`（第 1 组） | 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：七个数据文件夹、卡顿日志位置、fal 的两个键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
+| `checks/product-name.sh`（第 1 组） | 第 5 节：Info.plist 里工程的后缀先 `skycut` 再 `srtflowproj`、两个后缀常量、两个子文件夹名、AI 的输出位置经 `aiFolder`、列文件夹跳过两个名字、没有别处拿后缀直接比（只许问 `isProjectFile`）、没有别处直接拼 `aiFolderName`。其余几节 —— 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：七个数据文件夹、卡顿日志位置、fal 的两个键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
 | `checks/MCP/ProtocolChecks.swift` | 小程序握手和 `server/discover` 报的 `serverInfo.name` 是 `skycut` |
 | `checks/MCP/ConfigChecks.swift` | 「连接 AI」往 Claude / Codex 配置里写、删的是 `skycut` 那一项，放行规则是 `mcp__skycut` |
 | `scripts/check-mcp.sh` 开头 | 打包脚本把 `skycut-mcp` 拷进 Helpers，`sign-app.sh` 先签它再签外层 |
+
+`scripts/check-project-file.sh` 第 47 组：`.skycut` / `.srtflowproj` 都认作工程（不分大小写），别的后缀不认；两种后缀存了都读得回来、格式版本一样。
+`scripts/check-mcp.sh` 的 `FolderChecks`：`X/SkyCut/工程` 和 `X/SrtFlow/工程` 里的工程家都是 X；已有 `SrtFlow/` 的文件夹接着用它，没有的建 `SkyCut/`。
+
+**反向验证（2026-10-18，第二步）**：最近打开改回拿后缀直接比、Info.plist 里两个后缀对调、AI 的输出位置绕开 `aiFolder` —— 第 5 节三条各自红；恢复后转绿。
 
 **反向验证（2026-10-18）**：把 Info.plist 的 bundle id 改成 `com.skycut.SkyCut`、剪辑风格的文件夹改成 `SkyCut/Recipes`、
 `_srtflow_probe` 改成 `_skycut_probe`、服务器名改回 `srtflow` —— `checks/product-name.sh` 四条各自红、退出码 1；恢复后转绿。
@@ -62,5 +73,7 @@
 3. 工具栏开关、导出设置、字幕样式、存的剪辑风格、已下载的配音都还在。
 4. 设置 → 连接 AI → Claude Code「连接」之后，`~/.claude.json` 里是 `skycut` 指向 `SkyCut.app/Contents/Helpers/skycut-mcp`，
    `~/.claude/settings.json` 的 `permissions.allow` 里是 `mcp__skycut`；新开的会话里工具叫 `mcp__skycut__…`。
-5. 「应用程序」里不能同时留着旧的 `SrtFlow.app`：两个包同一个 bundle id，双击工程时系统可能挑中旧的；老会话里的小程序
+5. 新建工程存成 `.skycut`，Finder 里种类是「SkyCut Video Project」、双击回到 SkyCut；老的 `.srtflowproj` 双击照样打开、改完存回原文件；
+   最近打开里两种都列出来。AI 在一个新文件夹里导出建的是 `SkyCut/导出`；在一个已经有 `SrtFlow/` 的文件夹里接着放进 `SrtFlow/导出`。
+6. 「应用程序」里不能同时留着旧的 `SrtFlow.app`：两个包同一个 bundle id，双击工程时系统可能挑中旧的；老会话里的小程序
    按自己所在的包拉起 App（`open -g -a`），App 没开时会把旧的那个拉起来。装好 SkyCut 之后把旧包挪进废纸篓。
