@@ -219,3 +219,14 @@ if [ -z "${EDIT_KEY}" ] || [ "$(grep -cF "static let editVideoShortcut = \"Comma
   exit 1
 fi
 echo "   ✓ 探一下当场答、断开即放弃、路由先问还做不做；刚启动等窗口、开回来按看法放、菜单交出打开动作；快捷键 Command-${EDIT_KEY} 对得上"
+
+echo "==> 路由：说明上没有的参数名，整个调用不做"
+# 以前不认识的名字直接丢掉：Codex 给 set_text 传 end，时长悄悄用了默认的 3 秒（docs/bugfixes/2026-10-27-unknown-tool-arguments-silently-ignored.md）。
+# 核对要在建 Call、排队之前（不排队、不摆窗口、不开一轮）；纯值的规矩在 checks/MCP/ArgumentCheckChecks.swift。
+CHECK_AT="$(grep -n 'if let problem = MCPArgumentCheck.problem(tool: tool, arguments: request.arguments) {' "${ROUTER}" | cut -d: -f1 || true)"
+CALL_AT="$(grep -n 'let call = Call(' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${CHECK_AT}" ] || [ -z "${CALL_AT}" ] || [ "${CHECK_AT}" -gt "${CALL_AT}" ]; then
+  echo "✗ ${ROUTER} 的 handle 没在建 Call 之前核对参数名（MCPArgumentCheck.problem）：说明上没有的参数又会被悄悄丢掉" >&2
+  exit 1
+fi
+echo "   ✓ 参数名在排队之前核对"
