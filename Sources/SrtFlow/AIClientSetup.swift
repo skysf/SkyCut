@@ -173,17 +173,9 @@ final class AIClientSetup: ObservableObject {
         }
     }
 
-    /// 读 → 改 → 原子写回。第一次改之前备份一份原文件（`.skycut-backup`），改坏了用户能找回来。
+    /// 读 → 改 → 原子写回，第一次改之前备份一份、权限和原文件一样（AIClientConfigWrite）。
     private func rewrite(_ path: String, _ transform: (Data?) throws -> Data) throws {
-        let fm = FileManager.default
-        let original = fm.contents(atPath: path)
-        let next = try transform(original)
-        let backup = path + ".skycut-backup"
-        if let original, !fm.fileExists(atPath: backup) {
-            try original.write(to: URL(fileURLWithPath: backup))
-        }
-        try fm.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
-        try next.write(to: URL(fileURLWithPath: path), options: .atomic)
+        try AIClientConfigWrite.rewrite(path, transform)
     }
 
     /// 「连接」在这台机器上能不能直接接上：Claude Code 要有它的命令行，另外两家直接改配置文件、总能接。

@@ -884,6 +884,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 | Codex | `~/.codex/config.toml` | 直接改 `[mcp_servers.skycut]`（先备份） | 桌面版和命令行共用一份，很少被程序重写 |
 
 只动 `skycut` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写（`AIClientConfigFiles`，自检钉着）。
+第一次改之前存的备份（`<原名>.skycut-backup`）**一建出来就和原文件同样的权限**：这几份配置里可能直接写着密钥，原文件一般是 600，
+备份不许变成谁都能读的 644（`AIClientConfigWrite`，2026-10-27 [案例](../bugfixes/2026-10-27-client-config-backup-world-readable.md)；
+`ConfigBackupChecks` 和 `checks/client-config-backup.sh` 钉着，只有它许写 `.skycut-backup`）。
 
 2026-10-18 改名 SkyCut 之前这一项叫 `srtflow`（放行规则 `mcp__srtflow`）。连接只认 `skycut`，**不替用户删旧的那一项**（当时只有用户自己装着，
 本机手动去掉；[产品名与代码名](product-name.md)、[改名方案](../plans/2026-10-18-rename-to-skycut.md)）。
