@@ -854,6 +854,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - **不自动重新断句**（用户批的建议里「能自动重新断行就更好了」）：收窄 max_width 或挪位置就能避开，重新断句要动生成那一套，先不做。
     守卫：`checks/MCP/SubtitleBoxChecks.swift`（一行的位置和高按样式、字多就宽、太长就折（行数同 `SubtitleLineWrap`）、没有空格的中文在词和词之间折、框在边距以内、带空格的折、max_width 小了折得早、底框的内边距、拖框的布局、
     竖屏、文字里的换行；叠在一起 / 分开摆 / 藏起来；撞上 / 不撞 / 不在这段时间里 / 擦过不算 / 结果里的字段 / 旧字幕带也算）。
+52. **参数名按说明核对，说明上没有的名字整个调用不做（2026-10-27，[案例](../bugfixes/2026-10-27-unknown-tool-arguments-silently-ignored.md)）**：
+    `AIToolRouter.handle` 认出工具之后、建调用排队之前问 `MCPArgumentCheck.problem`：第一层、里层写了字段的对象、数组里的对象，有一个名字说明上没有，
+    就整个不做，回一句「没有这个参数、什么都没做、这里收这些」；大小写 / 下划线写得不一样时猜一个，给了 `end` 而工具收 `duration` 时说怎么换。
+    以前不认识的名字直接丢掉：真 Codex 冒烟里它给 `set_text` 传 `end`，时长悄悄用了默认的 3 秒。
+    - 值是 null 的不算；`project` 哪个工具都能带（不收它的工具带了也不碍事，子代理被要求每次都带）；里层没写字段的对象（`generate_media` 的 `options`）照收。
+    - **实现里认、说明上没写的别名要登记进 `MCPArgumentCheck.aliases`**（现在只有 `set_shape` 的 `length`），不然会被挡掉；能写进说明更好。
+      新加的参数只要写进说明就自动认（`ArgumentCheckChecks` 拿每个工具说明上的全部名字验一遍）。
+    守卫：`checks/MCP/ArgumentCheckChecks.swift`（冒烟里那次原样的调用、null、project、猜名字、别名、两层里层、自由对象、每个工具说明上的全部名字），
+    `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -908,7 +917,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 ## 七、守卫
 
 `scripts/check-mcp.sh`（CI 第 4 组）：真起小程序，两代客户端各喂一遍（握手、清单、discover、版本错误、
-工具调用转发、客户端名字、整数 id、App 没开）；AI 改时间线的规则；客户端配置的增删；文字 / 颜色参数、
+工具调用转发、客户端名字、整数 id、App 没开）；AI 改时间线的规则；客户端配置的增删；参数名按说明核对（`ArgumentCheckChecks`：不认识的名字整个调用不做、
+里层也查、`project` 和登记过的别名照收）；文字 / 颜色参数、
 字放不放得下；字幕批量改（含 replace / strip_punctuation：字面 / 正则 / 限定轨、坏正则报错、去标点用生成那一份、顺序、词的时间保住、掏空的句子报出来）；每句字幕的框和撞水印（`SubtitleBoxChecks`：位置 / 高 / 折行 / 叠在一起 / 撞上报出来）；词表对账；打包脚本把小程序拷进 Helpers 并且先签它再签外层；**每个改动工具各是
 一步撤销**（扫描路由的包装 + 用真的 UndoManager 验分组、验不会再抛异常）；窗口只在开工程时摆到前面（扫描）；
 **画面的放法**：铺满时窗的四个角正好落在画布四个角上（6 种素材比例 × 4 种画布 × 49 个焦点，按合同自己换算，
