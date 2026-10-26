@@ -581,6 +581,7 @@ xcrun swiftc \
   checks/MCP/CatalogSyncChecks.swift \
   checks/MCP/VideoSizeChecks.swift \
   checks/MCP/LinkageReportChecks.swift \
+  checks/MCP/ArgumentCheckChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o
