@@ -42,6 +42,7 @@ enum VideoEditExportGraph {
         subtitleStyle: BurnInStyle,
         subtitleFontURL: URL?,
         output: URL,
+        watermark: ExportWatermark?,
         cancellation: ExportCancellationToken? = nil
     ) async throws -> Plan {
         // 混音要的是**用户那一份**：它走预览合成（`build` 自己排序、展开），展开只许一次。
@@ -491,6 +492,12 @@ enum VideoEditExportGraph {
             )
             video = outV
         }
+
+        // MARK: 水印（没付费的成片，压在所有画面之上；加不加只听 WatermarkPolicy，怎么叠见 WatermarkExport）
+        try WatermarkExport.append(
+            watermark, canvas: renderSize, total: total, workspace: workspace,
+            inputArguments: &inputArguments, inputs: &inputs, video: &video, filters: &filters, nextLabel: nextLabel
+        )
 
         // MARK: 缩小到导出分辨率（只降不升，放在最后）
         //

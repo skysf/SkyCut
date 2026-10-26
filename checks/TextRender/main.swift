@@ -126,7 +126,7 @@ func export(_ state: TimelineState, name: String) async -> URL? {
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: output
+            output: output, watermark: nil
         )
     } catch {
         check(false, "\(name) 的 plan() 失败：\(error)")
@@ -175,7 +175,7 @@ func filterGraph(_ state: TimelineState, name: String) async -> String? {
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: output
+            output: output, watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
         guard let index = plan.arguments.firstIndex(of: "-filter_complex"),
@@ -199,7 +199,7 @@ func planKeepingWorkspace(_ state: TimelineState, name: String) async -> VideoEd
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: root.appendingPathComponent("\(name).mp4")
+            output: root.appendingPathComponent("\(name).mp4"), watermark: nil
         )
     } catch {
         check(false, "\(name) 的 plan() 失败：\(error)")

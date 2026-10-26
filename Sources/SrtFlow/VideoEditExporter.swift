@@ -114,6 +114,8 @@ final class VideoEditExporter: ObservableObject {
 
         let token = ExportCancellationToken()
         cancellationToken = token
+        // 加不加水印只问这一处（docs/architecture/export-watermark.md）；面板和 AI 都从这里过。
+        let watermark = WatermarkPolicy.mark()
 
         Task {
             do {
@@ -123,6 +125,7 @@ final class VideoEditExporter: ObservableObject {
                     subtitleStyle: subtitleStyle,
                     subtitleFontURL: subtitleFontURL,
                     output: output,
+                    watermark: watermark,
                     cancellation: token
                 )
                 workspace = plan.workspace

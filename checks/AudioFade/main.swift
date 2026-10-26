@@ -126,7 +126,7 @@ func exportSamples(_ state: TimelineState, name: String, audioOnly: Bool) async 
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: output
+            output: output, watermark: nil
         )
     } catch {
         check(false, "\(name) 的 plan() 失败：\(error)")
@@ -420,7 +420,7 @@ func main() async {
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: seamOutput
+            output: seamOutput, watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
         let joined = plan.arguments.joined(separator: " ")

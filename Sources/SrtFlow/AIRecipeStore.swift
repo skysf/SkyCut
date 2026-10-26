@@ -101,9 +101,8 @@ struct AIRecipeStore: Sendable {
 // MARK: - 内置的五张
 
 enum AIBuiltInRecipes {
-    /// App 资源里的 recipe-*.md。打包后资源摊平在 Contents/Resources（scripts/build-app.sh）；`swift run` 的时候在
-    /// 可执行文件旁边的 SrtFlow_SrtFlow.bundle 里。**不用 `Bundle.module`**：打好的 App 里没有那个 bundle，它会直接崩。
-    static func load(from directories: [URL] = resourceDirectories) -> [AIRecipe] {
+    /// App 资源里的 recipe-*.md（去哪找见 AppResources）。
+    static func load(from directories: [URL] = AppResources.directories) -> [AIRecipe] {
         for directory in directories {
             let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
             let recipes = files
@@ -118,7 +117,7 @@ enum AIBuiltInRecipes {
     }
 
     /// 所有剪辑风格共用的那段规矩（读一套全文时接在后面）。
-    static func sharedRules(from directories: [URL] = resourceDirectories) -> String {
+    static func sharedRules(from directories: [URL] = AppResources.directories) -> String {
         for directory in directories {
             let url = directory.appendingPathComponent("recipes-shared-rules.md")
             if let text = try? String(contentsOf: url, encoding: .utf8) {
@@ -126,13 +125,5 @@ enum AIBuiltInRecipes {
             }
         }
         return ""
-    }
-
-    static var resourceDirectories: [URL] {
-        var result: [URL] = []
-        if let resources = Bundle.main.resourceURL { result.append(resources) }
-        result.append(Bundle.main.bundleURL.appendingPathComponent("SrtFlow_SrtFlow.bundle", isDirectory: true))
-        result.append(Bundle.main.bundleURL.appendingPathComponent("SrtFlow_SrtFlow.bundle/Contents/Resources", isDirectory: true))
-        return result
     }
 }

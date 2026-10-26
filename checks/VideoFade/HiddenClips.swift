@@ -122,7 +122,7 @@ func checkHiddenOverlaysStayOutOfExport(white: URL, info: MediaInfo) async {
         let output = root.appendingPathComponent("\(name).mp4")
         guard let plan = try? await VideoEditExportGraph.plan(
             state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"),
-            subtitleFontURL: nil, output: output
+            subtitleFontURL: nil, output: output, watermark: nil
         ) else {
             check(false, "\(name) 的 plan() 失败")
             continue
