@@ -507,6 +507,7 @@ xcrun swiftc \
   Sources/SrtFlow/SubtitleFont.swift \
   Sources/SrtFlow/FontFamilyNames.swift \
   Sources/SrtFlow/AIClientConfigFiles.swift \
+  Sources/SrtFlow/AIClientConfigWrite.swift \
   Sources/SrtFlow/AIReadGrants.swift \
   Sources/SrtFlow/AIConfirmations.swift \
   Sources/SrtFlow/AIUndoGrouping.swift \
@@ -579,6 +580,7 @@ xcrun swiftc \
   checks/MCP/CatalogSyncChecks.swift \
   checks/MCP/VideoSizeChecks.swift \
   checks/MCP/LinkageReportChecks.swift \
+  checks/MCP/ConfigBackupChecks.swift \
   checks/MCP/ArgumentCheckChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
