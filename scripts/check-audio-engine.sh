@@ -84,6 +84,11 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditExportGraph.swift \
+  Sources/SrtFlow/Watermark/WatermarkExport.swift \
+  Sources/SrtFlow/Watermark/WatermarkImage.swift \
+  Sources/SrtFlow/Watermark/WatermarkPlacement.swift \
+  Sources/SrtFlow/SeededRandom.swift \
+  Sources/SrtFlow/AppResources.swift \
   Sources/SrtFlow/VideoEditShapeOverlayExport.swift \
   Sources/SrtFlow/VideoEditExportTransform.swift \
   Sources/SrtFlow/VideoEditExportPlan.swift \

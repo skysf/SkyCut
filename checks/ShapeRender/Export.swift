@@ -67,7 +67,7 @@ private func plan(_ state: TimelineState, name: String) async -> VideoEditExport
     do {
         return try await VideoEditExportGraph.plan(
             state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"),
-            subtitleFontURL: nil, output: root.appendingPathComponent("\(name).mp4")
+            subtitleFontURL: nil, output: root.appendingPathComponent("\(name).mp4"), watermark: nil
         )
     } catch {
         check(false, "\(name) 的 plan() 失败：\(error)")

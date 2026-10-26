@@ -63,7 +63,7 @@ func filterGraph(_ state: TimelineState, name: String) async -> String? {
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: output
+            output: output, watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
         guard let index = plan.arguments.firstIndex(of: "-filter_complex"),

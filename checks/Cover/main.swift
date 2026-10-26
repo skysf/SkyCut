@@ -83,7 +83,7 @@ func export(_ state: TimelineState, name: String) async -> URL? {
     do {
         plan = try await VideoEditExportGraph.plan(
             state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"),
-            subtitleFontURL: nil, output: output
+            subtitleFontURL: nil, output: output, watermark: nil
         )
     } catch {
         check(false, "\(name) 的 plan() 失败：\(error)")
@@ -114,7 +114,7 @@ func filterGraph(_ state: TimelineState, name: String) async -> String? {
     do {
         let plan = try await VideoEditExportGraph.plan(
             state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"),
-            subtitleFontURL: nil, output: output
+            subtitleFontURL: nil, output: output, watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
         guard let index = plan.arguments.firstIndex(of: "-filter_complex"), index + 1 < plan.arguments.count else {

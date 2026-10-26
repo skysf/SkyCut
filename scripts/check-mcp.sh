@@ -410,6 +410,7 @@ xcrun swiftc \
   Sources/SrtFlow/AITextNumberChange.swift \
   Sources/SrtFlow/AIRecipe.swift \
   Sources/SrtFlow/AIRecipeStore.swift \
+  Sources/SrtFlow/AppResources.swift \
   Sources/SrtFlow/AIRecipeTools.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
@@ -429,6 +430,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIVoiceLevel.swift \
   Sources/SrtFlow/AIAudioFileWriter.swift \
   Sources/SrtFlow/SoundEffects/SoundEffectDSP.swift \
+  Sources/SrtFlow/SeededRandom.swift \
   Sources/SrtFlow/SoundEffects/SoundEffectBuffer.swift \
   Sources/SrtFlow/AudioKWeighting.swift \
   Sources/SrtFlow/SoundEffects/SoundEffectReverb.swift \

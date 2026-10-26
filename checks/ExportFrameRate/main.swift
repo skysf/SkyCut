@@ -154,7 +154,7 @@ func main() async {
                 settings: VideoEncodeSettings(),
                 subtitleStyle: BurnInStyle(name: "check"),
                 subtitleFontURL: nil,
-                output: output
+                output: output, watermark: nil
             )
         } catch {
             check(false, "\(rate.fps)fps 的 plan() 失败：\(error)")
@@ -245,7 +245,7 @@ func main() async {
                 settings: VideoEncodeSettings(),
                 subtitleStyle: BurnInStyle(name: "check"),
                 subtitleFontURL: nil,
-                output: output
+                output: output, watermark: nil
             )
         } catch {
             check(false, "\(name) 的 plan() 失败：\(error)")
@@ -288,7 +288,7 @@ func main() async {
                 settings: VideoEncodeSettings(),
                 subtitleStyle: BurnInStyle(name: "check"),
                 subtitleFontURL: nil,
-                output: output
+                output: output, watermark: nil
             )
         } catch {
             check(false, "转场 \(transition.rawValue) 的 plan() 失败：\(error)")
@@ -356,7 +356,7 @@ func main() async {
                 settings: settings,
                 subtitleStyle: BurnInStyle(name: "check"),
                 subtitleFontURL: nil,
-                output: output
+                output: output, watermark: nil
             )
         } catch {
             check(false, "\(item.name) 的 plan() 失败：\(error)")

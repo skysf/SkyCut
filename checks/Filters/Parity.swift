@@ -62,7 +62,7 @@ func exportTimeline(_ state: TimelineState, name: String) async -> (url: URL, ar
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: output
+            output: output, watermark: nil
         )
     } catch {
         check(false, "plan() 失败（\(name)）：\(error)")
@@ -218,7 +218,7 @@ func parity() async {
             settings: VideoEncodeSettings(),
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
-            output: root.appendingPathComponent("zero.mp4")
+            output: root.appendingPathComponent("zero.mp4"), watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
         check(

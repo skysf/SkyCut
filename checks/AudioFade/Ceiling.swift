@@ -48,7 +48,7 @@ private func exportKeepingMixdown(_ state: TimelineState, name: String) async
     -> (levels: ExportAudioMixdown.Levels?, raw: [Float], exported: [Float], ffmpegLoudness: Double?)? {
     let output = root.appendingPathComponent(name)
     guard let plan = try? await VideoEditExportGraph.plan(
-        state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"), subtitleFontURL: nil, output: output
+        state: state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "check"), subtitleFontURL: nil, output: output, watermark: nil
     ) else { check(false, "\(name) 的 plan() 失败"); return nil }
     defer { try? FileManager.default.removeItem(at: plan.workspace) }
     let mixdown = plan.workspace.appendingPathComponent("audio-mixdown.f32")

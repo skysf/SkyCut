@@ -46,12 +46,12 @@ enum SFX {
     }
 }
 
-// MARK: - 随机数（SplitMix64：同一种子同一序列，同参数渲出来逐采样一样）
+// MARK: - 随机数（SeededRandom 的 SplitMix64：同一种子同一序列，同参数渲出来逐采样一样）
 
 struct SFXRandom {
-    private var state: UInt64
+    private var core: SeededRandom
 
-    init(seed: UInt64) { state = seed }
+    init(seed: UInt64) { core = SeededRandom(seed: seed) }
 
     /// 一段文字的 FNV-1a 哈希，当种子。
     static func seed(_ text: String) -> UInt64 {
@@ -63,13 +63,8 @@ struct SFXRandom {
         return hash
     }
 
-    mutating func next() -> UInt64 {
-        state &+= 0x9E37_79B9_7F4A_7C15
-        var z = state
-        z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
-        z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
-        return z ^ (z >> 31)
-    }
+    /// 算法在 SeededRandom（SplitMix64，导出水印也用它）。
+    mutating func next() -> UInt64 { core.next() }
 
     /// [0, 1)
     mutating func unit() -> Double { Double(next() >> 11) * (1.0 / 9_007_199_254_740_992.0) }
