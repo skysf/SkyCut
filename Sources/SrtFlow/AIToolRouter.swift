@@ -3,7 +3,7 @@ import SrtFlowMCPKit
 
 // MARK: - 一次工具调用怎么走
 //
-// 管什么：从通道上收到的调用 → 查停止、记这一轮 → 排队 → 定下落在哪个工程（几个工程、几个会话时）→ 摆出剪辑页 → 交给对应的工具 → 结果。
+// 管什么：从通道上收到的调用 → 核对参数名（MCPArgumentCheck）→ 查停止、记这一轮 → 排队 → 定下落在哪个工程（几个工程、几个会话时）→ 摆出剪辑页 → 交给对应的工具 → 结果。
 // switch 对 `MCPToolName` 是穷举的：清单里加了工具、这里没接，编译不过。
 // 不管什么：收发（AIBridgeServer）、工具本身（AI*Tools）、落在哪 / 归谁的规矩（AIProjectTargeting / AIProjectSessions）。
 //
@@ -41,6 +41,10 @@ final class AIToolRouter {
             return Answer(result: MCPBridge.textResult(
                 "This SkyCut does not have the tool \(request.tool). Ask the user to update SkyCut.", isError: true
             ))
+        }
+        // 说明上没有的参数名：整个调用不做，告诉 AI 哪个名字不对、这里收哪些（以前直接丢掉，见 MCPArgumentCheck）。
+        if let problem = MCPArgumentCheck.problem(tool: tool, arguments: request.arguments) {
+            return Answer(result: MCPBridge.textResult(problem, isError: true))
         }
         let call = Call(
             tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
