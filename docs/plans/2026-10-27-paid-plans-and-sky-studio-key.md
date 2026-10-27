@@ -24,7 +24,7 @@
 | 6 | 体验多久 | **默认 7 天**，从这个账号第一次用 SkyCut 查授权算起；后台能改默认，**改默认不影响已经开始体验的人**；能单独给某个账号改（用户定） | 开始时把天数记下来，改默认就不会把别人正在跑的体验缩短 |
 | 7 | 怎么认人 | **不在 App 里做登录**：用户在 Sky Studio 建一把 `sk-` key，粘进 SkyCut 设置；**一把 key 同时管授权和积分**。以后做浏览器里点「同意」的一键连接（用户：key 像 fal 那样比较省力） | SkyCut 为 fal Key 做的那一套（钥匙串、设置里一行、清单按提供方列不列、花钱的闸、进度）几乎照用；登录界面、token 刷新、Google 回调全省了 |
 | 8 | 接口放哪 | **放在 Sky Studio 网站那个仓库**（`api/skycut/v1/`：`me`、`models`、`uploads`、`jobs`、取消），复用网站现有的生成、扣积分、失败退款；**不在网关里再接一遍各家模型**。Sky Studio 那边用户另开窗口做，这边只给指令 | 同一家模型两份接入、两份价格、两份退款迟早对不上；网关走另一本账，SkyCut 花的积分不会出现在 Sky Studio 的积分明细里 |
-| 9 | 自带 fal Key 那条路 | **不留**：Sky Studio 那边接好之后从 SkyCut 删掉。upscale（用户定了两个模型：Topaz 和 Seedance pro）、克隆声音（Zonos2）在 Sky Studio 加 | 它直接跟自己的积分生意抢客人，又是第二套要维护的代码（`Sources/SrtFlow/Fal/` 18 个文件、模型表、价格、接口定义快照） |
+| 9 | 自带 fal Key 那条路 | **不留**：Sky Studio 那边接好之后从 SkyCut 删掉。upscale、克隆声音（Zonos2）在 Sky Studio 加；**upscale 只用两个模型**（用户 10-27 定，先前记的「Seedance pro」就是字节这一档）：Topaz `topaz/upscale/video/generative`（Starlight Precise 2.6、放大 1–4 倍、出 H.264）和字节 `fal-ai/bytedance-upscaler/upscale/video`（pro 档、aigc 预设、high 保真度、帧率和原片一样），就是 SkyCut 现在模型表里的 `topaz-generative`、`bytedance-pro` | 它直接跟自己的积分生意抢客人，又是第二套要维护的代码（`Sources/SrtFlow/Fal/` 18 个文件、模型表、价格、接口定义快照） |
 | 10 | Sky Studio 要不要做成 MCP | **以后做**一个网上的 MCP，建在 v1 接口上，给 ChatGPT 聊天窗口、Claude 网页版这类只能连网上 MCP 的；**SkyCut 里剪片照旧走 SkyCut 的 `generate_media`** | 走 SkyCut：成品直接落进工程文件夹、AI 接着 `add_clips`；upscale 和克隆要处理本机素材，网上的 MCP 碰不到；花钱的闸、进度、按工程排队都在 SkyCut；同一个对话里两个都能生成视频的工具会让 AI 犯迷糊 |
 | 11 | 水印长什么样 | **Sky Studio 的 logo**（`SKY_STUDIO_LOGO/SVG/SkyStudio_logo_vector_transparent.svg`，白字透明底，加一点阴影），**同一时刻只在一处，在四个角和正中之间随机跳**，四角大、正中小（用户定）；每 4 秒换一次、不连续两次落在同一处，四角宽约画面短边的 25%、正中约 15%，不透明度 70%（我提、用户：可以）。**只加在导出的成片上** | 要显眼、随机跳不好裁掉。黑字那个在暗画面上看不见，黑底那个自带底色 |
 | 12 | 先支持哪些 AI 客户端 | **先保证 Claude 和 Codex**；Kimi、GLM、WorkBuddy 以后（用户定） | 这个客户用 Codex；SkyCut 的 MCP 是标准协议，GLM 的 Coding Plan 本来就接进 Claude Code 用，Kimi Code、腾讯 WorkBuddy 也认 MCP，难的是每家读说明的规矩和模型剪得好不好 |
@@ -60,6 +60,9 @@
 4. **生成改走 Sky Studio**：`generate_media`、`upscale_clip`、配旁白的克隆换成调 `api/skycut/v1`；钱从美元换成积分：**每日上限默认 1,000 积分**
    （Sky Studio 一个积分标价 1 美分，等于现在 fal 那一档默认的 10 美元），超了照旧要确认码；模型和价格从 `/models` 来，不写死。
    本机的分工不变：upscale 先裁片段（前后各多留 1 秒）、去掉声音再上传，拿回成品自己把原片的声音封回去；克隆从素材里截一段人声当样本。
+   upscale 的档位同样从 `/models` 来：Sky Studio 只接第 9 条那两档，`FalUpscaleModels` 里另外四档（Topaz precision、FLUX 两档、字节 standard）跟着 fal 那条路删掉。
+   两处要显式传（fal 的接口定义快照 `checks/Fal/schemas/` 里查得到）：Topaz 的 `H264_output: true`（默认 false，出的是 HEVC）；字节的 `target_fps`
+   （默认 30、只认 24–120，不传就插帧成 30 fps）—— SkyCut 现在传原片帧率取整再夹到 24–120，所以 `/jobs` 的 upscale 请求要带上原片帧率。
 5. **删掉 fal 那条路**。
 
 ## 分刀（每刀一个 PR）
