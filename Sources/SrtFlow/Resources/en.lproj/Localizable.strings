@@ -1205,8 +1205,6 @@
 "Sky Studio" = "Sky Studio";
 "Connect your Sky Studio account with an API key. Your plan decides whether AI apps can edit in SkyCut and whether exports carry a watermark; making images, video and upscales uses your Sky Studio credits." = "Connect your Sky Studio account with an API key. Your plan decides whether AI apps can edit in SkyCut and whether exports carry a watermark; making images, video and upscales uses your Sky Studio credits.";
 "Create a key on skystudioai.com under Settings → SkyCut, then paste it here." = "Create a key on skystudioai.com under Settings → SkyCut, then paste it here.";
-"Contact Us to Activate" = "Contact Us to Activate";
-"Open the Sky Studio page about activating SkyCut" = "Open the Sky Studio page about activating SkyCut";
 "sk-…" = "sk-…";
 "Store the key in the macOS keychain and check it with Sky Studio" = "Store the key in the macOS keychain and check it with Sky Studio";
 "API key" = "API key";
@@ -1237,3 +1235,7 @@
 "That does not look like a Sky Studio key: it starts with sk-." = "That does not look like a Sky Studio key: it starts with sk-.";
 "Could not reach Sky Studio (%@)." = "Could not reach Sky Studio (%@).";
 "Sky Studio sent an answer SkyCut does not understand (HTTP %d)." = "Sky Studio sent an answer SkyCut does not understand (HTTP %d).";
+"To activate SkyCut Pro, email %@ with the email address of your Sky Studio account." = "To activate SkyCut Pro, email %@ with the email address of your Sky Studio account.";
+"Copy Address" = "Copy Address";
+"Copied" = "Copied";
+"Copy the support email address" = "Copy the support email address";

@@ -22,7 +22,7 @@
 | Key 作废了 | 后台问到 `invalid_key`：清掉存的回答（这把 Key 的授权不再作数，不等到 `valid_until`），设置里说 Sky Studio 不认、请粘一把新的 |
 | 版本太老 | `upgrade_required`：设置里照服务器的话说，带下载链接（`download_url`）；存的回答照旧用到 `valid_until` |
 | 体验给不了 | `/me` 回 `plan: free` + `trial_unavailable: machine_used`：设置里说「这台 Mac 已经体验过 SkyCut，这个账号在这台 Mac 上没有体验期」 |
-| 联系开通 | 不是正式版时设置里有「联系开通」：打开 `/me` 的 `upgrade_url`，没有（或没有 Key）就打开 `https://skystudioai.com/skycut`（`SkyStudioLinks.upgradePage`）。**这个网址定了就别改**：老版本的 SkyCut 一直打开它。2026-10-27 定稿的合同里还没有这一页和 `upgrade_url`，已请 Sky Studio 那边补 |
+| 联系开通 | 不是正式版时设置里写一句「开通正式版请发邮件到 support@skystudioai.com，写上你的 Sky Studio 账号邮箱」（`SkyStudioLinks.supportEmail`），邮箱能选中、旁边一个「复制邮箱」。**不开网页、不做 mailto 链接**（2026-10-27 用户定：软件里写一个邮箱就好；用网页邮箱的人点 mailto 跳出来的是系统「邮件」的设置向导）。正式版由 Sky Studio 后台按账号手动开，所以要写上账号邮箱。没有 Key 的人问不到 `/me`，邮箱写在 App 里，换邮箱要发新版 |
 | 服务器的网址 | 只认 https（本机的假服务器给的 http://127.0.0.1 也认），读不成就当没有（`SkyStudioLinks.webURL`） |
 | 读回答 | 读得宽：认不出的字段不管、少了可选的不算错、日期带不带毫秒都认（Foundation 自带的 `.iso8601` 不认毫秒，JS 的 `toISOString()` 带毫秒）；少了必须的（`features`、`valid_until`）就不算回答 |
 | 报错的话 | 服务器的 `message`（英文、写给人看）原样显示；没连上、回的不像话这两种是 SkyCut 自己的话，经 `L10n` 按界面语言 |
@@ -43,7 +43,7 @@
 ## 三、还没做的
 
 - **第 5 刀第二步（5b）**：`WatermarkPolicy.mark()` 改问 `SkyCutLicense` 的 `watermark`（logo 读不出要拦住导出，[导出水印](export-watermark.md)第二节）；MCP 的门挡在 App 收工具调用的地方（`AIToolRouter.handle`，`get_status` 照常回、报授权）；
-  导出面板「会带水印 · 联系开通」；`export_video` 的结果里告诉 AI 带了水印、为什么。冒烟时没有真服务器，用 `SRTFLOW_SKYSTUDIO_API_BASE` 指到本机假服务器给一个正式版。
+  导出面板一行「会带水印」+ 开通写哪个邮箱；`export_video` 的结果里告诉 AI 带了水印、为什么。冒烟时没有真服务器，用 `SRTFLOW_SKYSTUDIO_API_BASE` 指到本机假服务器给一个正式版。
   **等 Sky Studio 的接口上线、用户给自己开了正式版再合**：不然之后打的包里用户自己的 AI 剪辑也被挡住。
 - 第 6 刀（生成、upscale、克隆改走 Sky Studio 的 `/quote`、`/uploads`、`/jobs`）、第 7 刀（删掉 fal 那条路）。定稿里和 SkyCut 现在做法不一样的地方记在收费方案「Sky Studio 定稿之后」一节。
 
@@ -69,6 +69,6 @@
 - [ ] 同一台 Mac 换一个新账号的 Key：「免费版」，下面一句说这台 Mac 已经体验过。
 - [ ] 粘一把作废的 Key：说 Sky Studio 不认、Key 没存下；网站上作废正在用的那把，点「再查一次」：同样，存的授权清掉。
 - [ ] 断网点「再查一次」：说连不上、照上一次的用到什么时候；72 小时之后（或把 `valid_until` 很近的回答存进去）变成免费版。
-- [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，「联系开通」不见了。
-- [ ] 「联系开通」打开的那一页存在、没登录也能看。
+- [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，开通的那一句不见了。
+- [ ] 「复制邮箱」之后粘出来是 support@skystudioai.com，这个邮箱收得到信。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。

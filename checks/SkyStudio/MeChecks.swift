@@ -22,7 +22,6 @@ func runMeChecks() {
     checkEqual(me.skycut.minVersion, "0.18.47", "min_version")
     checkEqual(me.skycut.maxRunningJobs, 3, "max_running_jobs")
     checkEqual(me.skycut.rechargeURL?.absoluteString, "https://skystudioai.com/app?credits=1", "recharge_url")
-    check(me.skycut.upgradeURL == nil, "no upgrade_url in the sample: nil, and the account falls back to SkyStudioLinks.upgradePage")
 
     // 日期带毫秒（JS 的 toISOString()）也认；Foundation 自带的 .iso8601 不认，整份会读不出来。
     let fractional = sampleMe.replacingOccurrences(of: "\"server_time\": \"2026-10-27T15:04:05Z\"", with: "\"server_time\": \"2026-10-27T15:04:05.250Z\"")
@@ -31,7 +30,7 @@ func runMeChecks() {
     checkEqual(SkyStudioJSON.parseDate("2026-10-27T23:04:05+08:00"), moment(), "a date with an offset")
     check(SkyStudioJSON.parseDate("2026-10-27") == nil, "a bare date is not a moment")
 
-    // 读得宽：认不出的字段不管；少了可选的（email、trial_*、paid_until、recharge_url…）不算错。
+    // 读得宽：认不出的字段（下面的 future_field、upgrade_url、new_switch）不管；少了可选的（email、trial_*、paid_until、recharge_url…）不算错。
     let lean = """
     {"account": {"id": "u1"}, "credits": {"balance": 12.5}, "future_field": [1, 2],
      "skycut": {"plan": "pro", "features": {"mcp": true, "watermark": false, "new_switch": true},
@@ -42,7 +41,6 @@ func runMeChecks() {
     check(leanMe != nil, "unknown fields and missing optional ones still decode")
     checkEqual(leanMe?.account.email, nil, "no email")
     checkEqual(leanMe?.credits.balance, 12.5, "a fractional balance")
-    checkEqual(leanMe?.skycut.upgradeURL?.absoluteString, "https://skystudioai.com/skycut?from=app", "upgrade_url")
 
     // 少了必须的（features、valid_until）读不出来：宁可当成没问到，也不猜。
     let broken = sampleMe.replacingOccurrences(of: "\"valid_until\": \"2026-10-30T15:04:05Z\",", with: "")
@@ -54,7 +52,7 @@ func runMeChecks() {
     check(SkyStudioLinks.webURL("http://skystudioai.com/skycut") == nil, "plain http to the internet is refused")
     check(SkyStudioLinks.webURL("javascript:alert(1)") == nil, "no host, no link")
     check(SkyStudioLinks.webURL("") == nil && SkyStudioLinks.webURL(nil) == nil, "empty is nothing")
-    checkEqual(SkyStudioLinks.upgradePage.absoluteString, "https://skystudioai.com/skycut", "the fallback contact page")
+    checkEqual(SkyStudioLinks.supportEmail, "support@skystudioai.com", "the address Settings tells people to email to activate Pro")
 
     // 存下来再读回来一模一样（UserDefaults 里存的就是这份）。
     // 整秒：存的时候只留到毫秒，Date() 那样的零头读回来会差一点（不影响用，但比不了相等）。
