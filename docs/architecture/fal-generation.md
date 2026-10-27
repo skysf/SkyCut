@@ -90,6 +90,8 @@
 
 ## 六、Key 与钥匙串（`FalKeyStore` / `FalKeyCache`）
 
+- 2026-10-27 起钥匙串的读写（下面的两档读法、缓存）抽成 `KeychainSecret` / `KeychainSecretCache`（`Sources/SrtFlow/KeychainSecret.swift`），
+  和 Sky Studio 的 Key 共用一份（[Sky Studio 账号](sky-studio-account.md)）；`FalKeyStore` 只管 fal 这一条叫什么、粘进来的话怎么整理，`FalKeyCache.shared` 就是一个 `KeychainSecretCache`。
 - 一条通用密码项：服务名 = bundle id + `.fal`（测试版是另一个 bundle id，另一条），账号 `api-key`。粘进来的先整理：去掉 `Key ` 前缀、引号、首尾空白 / 换行；
   中间有空白或太短就不收。
 - **2026-09-29 本机探针量出来的行为**：只查属性（有没有存过）不弹授权框；读密钥本身时，只有创建这一项的那个签名能免弹窗读。App 是 ad-hoc 签名，

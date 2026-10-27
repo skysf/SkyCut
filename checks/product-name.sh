@@ -42,6 +42,7 @@ for type in project srt ass ssa transition filter timeline-items audio-library-i
   require "${PLIST}" "<string>com.srtflow.${type}</string>" "老工程、老字幕、拖放载荷都按这个标识认"
 done
 require Sources/SrtFlow/Fal/FalKeyStore.swift '(Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow") + ".fal"' "钥匙串里 fal Key 的 service"
+require Sources/SrtFlow/SkyStudio/SkyStudioKey.swift '(Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow") + ".skystudio"' "钥匙串里 Sky Studio Key 的 service（改了用户存的 Key 就找不到了）"
 require scripts/signing/common.sh 'SIGNING_IDENTITY_NAME="SrtFlow Signing"' "签名证书永不重建（AGENTS.md「打包与签名」）"
 require scripts/signing/common.sh '.config/srtflow/signing' "签名身份所在的目录"
 
@@ -56,6 +57,7 @@ require Sources/SrtFlow/StillImageClipFactory.swift '"SrtFlow/StillClips"' "静�
 require Sources/SrtFlow/MainThreadWatchdog.swift '"Logs/SrtFlow"' "卡顿日志的位置（docs/testing/main-thread-stalls.md）"
 require Sources/SrtFlow/Fal/FalSettingsStore.swift '"SrtFlow.fal.settings.v1"' "fal 的设置"
 require Sources/SrtFlow/Fal/FalSettingsStore.swift '"SrtFlow.fal.spend.v1"' "fal 按天记的账"
+require Sources/SrtFlow/SkyStudio/SkyStudioAccount.swift '"SrtFlow.skystudio.me.v1"' "上一次问到的 Sky Studio 授权（断网时照它用到 valid_until）"
 
 echo "==> 3. 小程序 ↔ App 的通道"
 BRIDGE="Sources/SrtFlowMCPKit/MCPBridge.swift"

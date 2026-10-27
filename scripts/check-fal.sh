@@ -50,6 +50,7 @@ xcrun swiftc \
   Sources/SrtFlow/Fal/FalClient.swift \
   Sources/SrtFlow/Fal/FalTransfer.swift \
   Sources/SrtFlow/Fal/FalJobPhase.swift \
+  Sources/SrtFlow/KeychainSecret.swift \
   Sources/SrtFlow/Fal/FalKeyStore.swift \
   Sources/SrtFlow/Fal/FalUpscaleModels.swift \
   Sources/SrtFlow/Fal/FalBilling.swift \
