@@ -518,6 +518,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [真 Codex 连 SkyCut 的冒烟（0.18.47）](docs/reports/2026-10-26-codex-client-smoke.md) — 第一次用真的 Codex（命令行 0.147、最便宜的 GPT-5.6-Luna、低推理）：设置里「连接」写对配置、
   断开后逐字节还原，12 步（开工程、后台、看、听、读字幕、加字、导出、看成片）约 60 秒全通，Codex 看得到 `look` 的图（问只有图里才有的东西才分得清）；
   每次调用约 2.7 万输入 token（整份清单每轮都发），免费版撑不完一次完整剪辑；撞出两个问题：工具悄悄丢掉不认识的参数（`set_text` 的 `end`）、连接时留的配置备份权限变宽。
+- [测试版 0.18.48：导出水印和 Claude 桌面版「连接」的冒烟](docs/reports/2026-10-27-beta-watermark-and-claude-desktop-smoke.md) — 装好的测试版导出就带水印
+  （16:9 每 4 秒一段逐帧和原片比、落点和大小对表；9:16 看图）；Claude 桌面版连接 → 重启 → `Connected to skycut (48 tools)` → 断开还原，备份和原配置同为 600；
+  View → Reload 不重读配置要真重启、它自己会改这份配置、「断开」内容一样字节不一样；聊天里真调工具留给用户。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
   Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
