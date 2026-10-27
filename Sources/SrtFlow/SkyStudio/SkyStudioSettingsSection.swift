@@ -1,9 +1,10 @@
+import AppKit
 import SwiftUI
 
 // MARK: - 设置里的「Sky Studio」一节
 //
 // 管什么：收费方案第 5 刀第一步的界面 —— 粘 Key（存进钥匙串、马上问一次）、是哪个账号、免费 / 体验还剩几天 / 正式到哪天、积分余额、
-// 问不成时为什么；不是正式版就给一个「联系开通」（2026-10-27 用户定：先做 B 端，粘 Key、后台手动开通；C 端先只放联系方式，
+// 问不成时为什么；不是正式版就写一句怎么开通（2026-10-27 用户定：先做 B 端，粘 Key、后台手动开通；C 端先只写一个邮箱、不开网页，
 // 浏览器里一键连接、网站上付款以后再做）。只订阅 SkyStudioAccount（一个小对象），不读工程。
 // 不管什么：Key 怎么存、什么时候问（SkyStudioAccount）、授权怎么算（SkyCutLicense）。
 
@@ -32,11 +33,7 @@ struct SkyStudioSettingsSection: View {
                 SkyStudioProblemLine(problem: problem, license: license)
             }
             if license.plan != .pro {
-                HStack {
-                    Spacer()
-                    Link("Contact Us to Activate", destination: account.upgradeURL)
-                        .instantHelp("Open the Sky Studio page about activating SkyCut")
-                }
+                SkyStudioContactRow()
             }
         }
     }
@@ -65,6 +62,34 @@ struct SkyStudioSettingsSection: View {
         Task {
             await account.saveKey(text)
             if account.hasKey { keyText = "" }
+        }
+    }
+}
+
+/// 怎么开通正式版：发邮件到客服邮箱（写上账号邮箱，后台按账号开）。邮箱能选中，也给一个「复制」——
+/// 不做成点了就打开「邮件」的链接：用网页邮箱的人一点，跳出来的是系统「邮件」的设置向导。
+private struct SkyStudioContactRow: View {
+    @State private var copied = false
+
+    var body: some View {
+        let _ = PerfCounters.body(Self.self)
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            Text("To activate SkyCut Pro, email \(SkyStudioLinks.supportEmail) with the email address of your Sky Studio account.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .textSelection(.enabled)
+            Spacer(minLength: 8)
+            Button {
+                NSPasteboard.general.clearContents()
+                NSPasteboard.general.setString(SkyStudioLinks.supportEmail, forType: .string)
+                copied = true
+            } label: {
+                copied ? Text("Copied") : Text("Copy Address")
+            }
+            .controlSize(.small)
+            .accessibilityIdentifier("skystudio-copy-support-email")
+            .instantHelp("Copy the support email address")
         }
     }
 }

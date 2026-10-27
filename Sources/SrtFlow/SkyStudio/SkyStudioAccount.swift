@@ -52,9 +52,6 @@ final class SkyStudioAccount: ObservableObject {
     /// 此刻作数的授权。
     var license: SkyCutLicense { SkyCutLicense.evaluate(stored, hasKey: hasKey, now: Date()) }
 
-    /// 「联系开通」那一页：服务器给了就用它的，没给（或没有 Key）用兜底的那一个。
-    var upgradeURL: URL { stored?.me.skycut.upgradeURL ?? SkyStudioLinks.upgradePage }
-
     // MARK: 什么时候问
 
     /// 启动时调一次：到时候了就问；之后回到 SkyCut 时、每小时各看一眼。

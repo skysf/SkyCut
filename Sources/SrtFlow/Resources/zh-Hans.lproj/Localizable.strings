@@ -1205,8 +1205,6 @@
 "Sky Studio" = "Sky Studio";
 "Connect your Sky Studio account with an API key. Your plan decides whether AI apps can edit in SkyCut and whether exports carry a watermark; making images, video and upscales uses your Sky Studio credits." = "用 API 密钥连上你的 Sky Studio 账号。你的套餐决定 AI 应用能不能在 SkyCut 里剪辑、导出的视频带不带水印；生成图片、视频和 upscale 用的是你的 Sky Studio 积分。";
 "Create a key on skystudioai.com under Settings → SkyCut, then paste it here." = "在 skystudioai.com 的「设置 → SkyCut」里建一把密钥，粘到这里。";
-"Contact Us to Activate" = "联系开通";
-"Open the Sky Studio page about activating SkyCut" = "打开 Sky Studio 上开通 SkyCut 的页面";
 "sk-…" = "sk-…";
 "Store the key in the macOS keychain and check it with Sky Studio" = "把密钥存进 macOS 钥匙串，并找 Sky Studio 核对";
 "API key" = "API 密钥";
@@ -1237,3 +1235,7 @@
 "That does not look like a Sky Studio key: it starts with sk-." = "这不像 Sky Studio 的密钥：它以 sk- 开头。";
 "Could not reach Sky Studio (%@)." = "连不上 Sky Studio（%@）。";
 "Sky Studio sent an answer SkyCut does not understand (HTTP %d)." = "Sky Studio 回的内容 SkyCut 看不懂（HTTP %d）。";
+"To activate SkyCut Pro, email %@ with the email address of your Sky Studio account." = "开通正式版请发邮件到 %@，写上你的 Sky Studio 账号邮箱。";
+"Copy Address" = "复制邮箱";
+"Copied" = "已复制";
+"Copy the support email address" = "复制客服邮箱";

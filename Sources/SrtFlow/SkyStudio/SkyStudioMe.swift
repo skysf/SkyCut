@@ -37,8 +37,6 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
         var minVersion: String?
         var maxRunningJobs: Int?
         var rechargeUrl: String?
-        /// 「联系开通」那一页（2026-10-27 用户定：先做 B 端，C 端先只放联系方式）；服务器没给就用 SkyStudioLinks.upgradePage。
-        var upgradeUrl: String?
     }
 
     var account: Account
@@ -49,7 +47,6 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
 
 extension SkyStudioMe.License {
     var rechargeURL: URL? { SkyStudioLinks.webURL(rechargeUrl) }
-    var upgradeURL: URL? { SkyStudioLinks.webURL(upgradeUrl) }
 }
 
 /// 存下来的一次 /me：断网时照它用到 `validUntil`（SkyCutLicense 换算成本机时间）。
@@ -64,11 +61,11 @@ struct SkyStudioStoredAnswer: Codable, Equatable, Sendable {
     }
 }
 
-/// Sky Studio 网站上 SkyCut 用到的几个页面。
+/// SkyCut 用到的 Sky Studio 的几个地址。
 enum SkyStudioLinks {
-    /// 「联系开通」：没有 Key 的人问不到 /me，所以这里写一个兜底；有 Key 时用 /me 给的 `upgrade_url`。
-    /// 网址要和 Sky Studio 那边定的一样（2026-10-27 建议 `/skycut`），定了就别再改：老版本的 SkyCut 一直打开它。
-    static let upgradePage = URL(string: "https://skystudioai.com/skycut")!
+    /// 「联系开通」：开通正式版请用户发邮件到这里（2026-10-27 用户定：软件里只写一个邮箱，不开网页；正式版由 Sky Studio 后台手动开通）。
+    /// 没有 Key 的人问不到 /me，所以写在 App 里；换邮箱要发新版。
+    static let supportEmail = "support@skystudioai.com"
 
     /// 服务器给的网址：只认 https（本机的假服务器自检时给 http://127.0.0.1 也认），读不成就当没有。
     static func webURL(_ text: String?) -> URL? {
