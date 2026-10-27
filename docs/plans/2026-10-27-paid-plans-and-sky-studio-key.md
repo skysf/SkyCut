@@ -1,6 +1,6 @@
 # 收费：体验版、导出水印、MCP 门槛，生成改用 Sky Studio 的 key
 
-> 2026-10-26 / 27 和用户讨论拍的板。**还没实施**：做到哪以合进 main 的 PR 和之后的实施报告为准。
+> 2026-10-26 / 27 和用户讨论拍的板。前四刀已合进 main（#254–#257，水印默认关），第 5–7 刀等 Sky Studio 的接口；做到哪以合进 main 的 PR 和之后的实施报告为准。
 > 真 Codex 连 SkyCut 的冒烟见 [报告](../reports/2026-10-26-codex-client-smoke.md)。
 
 ## 背景
@@ -31,6 +31,8 @@
 | 13 | 客户的电脑 | Apple 芯片；**要求升到 SkyCut 要求的系统**（转写、按文字剪、生成字幕要 macOS 26）（用户定） | |
 | 14 | Apple 开发者账号和公证 | **客户确定买了再办**（99 美元 / 年）（用户定） | 在那之前，客户第一次打开要去「系统设置 → 隐私与安全性 → 仍要打开」。换签名会让已装的人系统授权重给一次，越早换代价越小 |
 | 15 | 团队 | **第一版只做个人账号**（用户：目前一个人用） | 团队席位、团队钱包以后再做；Sky Studio 已经有团队和团队积分 |
+| 16 | upscale 一次最长多少 | **和 Sky Studio 网页一样：30 秒**（服务器收 30.5 秒以内的），**两头的余料算在里面**：超了先少留余料，选中的那段本身就超过 30 秒，告诉用户一次最多 30 秒、先切开。上限由服务器在 `/models` 里报，SkyCut 不写死（我提、用户 10-27：可以） | 规则只留一份，以后要放宽只改服务器、SkyCut 不用发版。网页定 30 秒，是因为字节 pro 每秒视频要约一分钟（30 秒 4K 近两小时）。现在走 fal 时 Topaz 能送 300 秒、字节不限 |
+| 17 | upscale 帧率上限 | **30 fps**（29.97 算在内），60 fps 的源直接说不支持（我提、用户 10-27：可以） | 要 upscale 的多半是 AI 生成的低清片段（24 / 30 fps）；fal 处理 60 fps 要两倍的钱和时间；和 Sky Studio 网页同一条规矩。现在走 fal 时帧率不限 |
 
 ## 两边怎么分
 
@@ -40,7 +42,8 @@
 | 接口 | 做什么 |
 | --- | --- |
 | `GET /me` | 是谁、余额、`plan`（`free` / `trial` / `pro`）、体验到哪天、`features: {mcp, watermark}`、最低版本、充值地址。账号第一次来就开始体验 |
-| `GET /models` | SkyCut 能请求的模型和积分价（id 用 Sky Studio 自己的名字，不是 fal 的端点号） |
+| `GET /models` | SkyCut 能请求的模型、积分价和上限（`limits`：最长几秒、最高帧率、输出最多多少像素、上传多大；第 16、17 条）。id 用 Sky Studio 自己的名字，不是 fal 的端点号 |
+| `POST /quote` | 只报价、不扣钱，先只做 upscale：和网页弹窗用同一个计价函数（宽于 16:9 按高一档收、4K 像素数封顶、按 0.1 秒计），SkyCut 不另抄一份计价规矩；SkyCut 面板和 AI 确认里显示这个数，提交时当 `max_credits` |
 | `POST /uploads` | 给一个上传地址（R2 预签名，复用网站现有的上传凭证） |
 | `POST /jobs` | 提交生成，立刻回任务号；按估价先冻结积分、失败只退一次；带 `max_credits`（用户同意过的上限），服务器算出来更贵就拒 |
 | `GET /jobs/{id}` | 阶段、排队位置、已用时间、典型时长、结果地址、实际扣了多少（最多等 25 秒再答） |
@@ -48,6 +51,8 @@
 
 出错一律带 `code`：`invalid_key`、`upgrade_required`（版本太老）、`insufficient_credits`（带余额和充值地址）、`price_changed`、`invalid_request`、`rate_limited`、
 `not_found`、`provider_error`。**接口最后以 Sky Studio 仓库里的接口文档为准**，SkyCut 照那份做。
+upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky Studio 仓库的 #223）：规则只有它的 `shared/videoUpscale.ts` 一份，两档叫 `topaz-starlight` /
+`bytedance-upscaler-pro`，档位 1080p / 2K / 4K 按输出的短边（和 SkyCut 的 `FalUpscaleTarget` 一个口径）。
 
 **SkyCut（这个仓库）**：
 
@@ -60,9 +65,11 @@
 4. **生成改走 Sky Studio**：`generate_media`、`upscale_clip`、配旁白的克隆换成调 `api/skycut/v1`；钱从美元换成积分：**每日上限默认 1,000 积分**
    （Sky Studio 一个积分标价 1 美分，等于现在 fal 那一档默认的 10 美元），超了照旧要确认码；模型和价格从 `/models` 来，不写死。
    本机的分工不变：upscale 先裁片段（前后各多留 1 秒）、去掉声音再上传，拿回成品自己把原片的声音封回去；克隆从素材里截一段人声当样本。
-   upscale 的档位同样从 `/models` 来：Sky Studio 只接第 9 条那两档，`FalUpscaleModels` 里另外四档（Topaz precision、FLUX 两档、字节 standard）跟着 fal 那条路删掉。
-   两处要显式传（fal 的接口定义快照 `checks/Fal/schemas/` 里查得到）：Topaz 的 `H264_output: true`（默认 false，出的是 HEVC）；字节的 `target_fps`
-   （默认 30、只认 24–120，不传就插帧成 30 fps）—— SkyCut 现在传原片帧率取整再夹到 24–120，所以 `/jobs` 的 upscale 请求要带上原片帧率。
+   upscale 的档位、上限同样从 `/models` 来：Sky Studio 只接第 9 条那两档，`FalUpscaleModels` 里另外四档（Topaz precision、FLUX 两档、字节 standard）跟着 fal 那条路删掉；
+   上限照第 16、17 条，面板和 `upscale_clip` 在提交之前就说清楚（超长先少留余料、选中的本身超了说先切开、超 30 fps 说不支持）；要扣多少问 `/quote`，提交时把它当 `max_credits`。
+   fal 那两处默认值（Topaz 的 `H264_output` 默认出 HEVC、字节的 `target_fps` 默认插帧成 30 fps，`checks/Fal/schemas/` 里查得到）Sky Studio #223 已经在服务器上显式传了，
+   字节的帧率取自上传的那个文件。SkyCut 现在等 25 分钟就替 fal 取消（`FalUpscaleTier.maxSeconds`），字节 pro 30 秒 4K 要近两小时：改成按服务器给的典型时长等；
+   SkyCut 退出了，任务在服务器上照样做完，重开之后按记下的任务号取回（Sky Studio 留 24 小时）。
 5. **删掉 fal 那条路**。
 
 ## 分刀（每刀一个 PR）
@@ -72,7 +79,7 @@
 3. 修：「连接」AI 客户端时留的配置备份，权限比原文件宽。
 4. **水印**：做出来、接进所有导出入口，**开关先默认关**（授权接上之前什么导出都不加），留一个只给测试用的打开办法；先渲一张样片给用户看，再定数字。
 5. key + `/me` + 两个开关接上（等 Sky Studio 的 `/me` 能用）。
-6. 生成、upscale、克隆改走 Sky Studio（等 `/jobs` 能用）。
+6. 生成、upscale、克隆改走 Sky Studio（等 `/jobs` 能用；先换 upscale：Sky Studio 网站的 upscale 10-27 已上线，`/jobs` 先接它）。
 7. 删掉 fal 那条路（第 6 刀上线之后）。
 
 ## 我定的细节（用户没反对；要改再改）
