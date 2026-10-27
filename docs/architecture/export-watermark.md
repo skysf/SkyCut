@@ -19,7 +19,8 @@
 
 ## 二、授权接上时（收费方案第 5 刀）要改的
 
-- `WatermarkPolicy.mark()` 改问服务器下发的 `watermark` 开关（缓存、断网宽限 7 天），测试开关去掉或只留给测试版。
+- `WatermarkPolicy.mark()` 改问服务器下发的 `watermark` 开关：`SkyStudioAccount.shared.license`（存下来的 `/me` 用到 `valid_until`，服务器定，现在 72 小时；
+  [Sky Studio 账号](sky-studio-account.md)，第 5 刀第一步已做），测试开关去掉或只留给测试版。
 - **logo 读不出来要拦住导出**。现在读不出来是悄悄不加 —— 只有测试才加，这样没关系；水印成了必须的之后，删掉包里的 logo 就能免水印，不行。
 - 导出的结果里告诉 AI 带了水印、为什么（AI 用 `look` 看成片会看到它）。
 

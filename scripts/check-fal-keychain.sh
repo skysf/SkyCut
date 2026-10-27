@@ -2,7 +2,7 @@
 # FalKeyStore 对真的系统钥匙串走一遍：存 → 有 → 读到 → 换 → 删。
 #
 # **不在 check-all.sh 里**：要一个能用的用户钥匙串（CI 的 runner 没有图形会话，钥匙串不一定开着，
-# 假红 / 假绿都不能接受 —— 跳过更不能报成通过）。改 `Sources/SrtFlow/Fal/FalKeyStore.swift` 之后本机跑一遍。
+# 假红 / 假绿都不能接受 —— 跳过更不能报成通过）。改 `Sources/SrtFlow/Fal/FalKeyStore.swift` 或 `Sources/SrtFlow/KeychainSecret.swift`（钥匙串的读写，Sky Studio 的 Key 也用它）之后本机跑一遍。
 # 用专门的服务名（check.srtflow.fal.<pid>），跑完一定删掉。同一个进程建的项自己读不弹授权框；「换了签名要弹框」
 # 那一半要两个不同签名的进程，见 docs/architecture/fal-generation.md 的人工回归清单。
 #
@@ -21,6 +21,7 @@ echo "==> 编译"
 xcrun swiftc \
   -target "$TRIPLE" \
   -o "$OUT" \
+  Sources/SrtFlow/KeychainSecret.swift \
   Sources/SrtFlow/Fal/FalKeyStore.swift \
   checks/FalKeychain/main.swift
 

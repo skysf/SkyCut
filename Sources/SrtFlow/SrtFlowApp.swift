@@ -22,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startMainThreadWatchdog()
         // 「配了 fal」的小文件启动时对一遍（被删了、Key 是别的途径删的）：小程序据此决定列不列 generate_media（方案第 36 条）。
         FalSettingsStore.shared.refreshKeyStatus()
+        // 存了 Sky Studio 的 Key 就问一次授权（到时候了才问；docs/architecture/sky-studio-account.md）。
+        SkyStudioAccount.shared.start()
         expireOptimizedMedia()
     }
 
@@ -238,6 +240,7 @@ private struct SettingsView: View {
                 }
             }
             OptimizedMediaSettingsSection()
+            SkyStudioSettingsSection()
             AIConnectSection()
         }
         .formStyle(.grouped)

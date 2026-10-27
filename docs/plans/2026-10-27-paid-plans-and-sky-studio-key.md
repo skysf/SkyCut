@@ -1,6 +1,7 @@
 # 收费：体验版、导出水印、MCP 门槛，生成改用 Sky Studio 的 key
 
-> 2026-10-26 / 27 和用户讨论拍的板。前四刀已合进 main（#254–#257，水印默认关），第 5–7 刀等 Sky Studio 的接口；做到哪以合进 main 的 PR 和之后的实施报告为准。
+> 2026-10-26 / 27 和用户讨论拍的板。前四刀已合进 main（#254–#257，水印默认关）；第 5 刀拆成两步，5a（账号，只读不拦）照 Sky Studio 定稿的接口做了，
+> 5b（照开关拦）和第 6、7 刀等接口上线。做到哪以合进 main 的 PR 和之后的实施报告为准。接口合同在 Sky Studio 仓库的 `docs/agents/skycut-api.md`。
 > 真 Codex 连 SkyCut 的冒烟见 [报告](../reports/2026-10-26-codex-client-smoke.md)。
 
 ## 背景
@@ -33,6 +34,9 @@
 | 15 | 团队 | **第一版只做个人账号**（用户：目前一个人用） | 团队席位、团队钱包以后再做；Sky Studio 已经有团队和团队积分 |
 | 16 | upscale 一次最长多少 | **和 Sky Studio 网页一样：30 秒**（服务器收 30.5 秒以内的），**两头的余料算在里面**：超了先少留余料，选中的那段本身就超过 30 秒，告诉用户一次最多 30 秒、先切开。上限由服务器在 `/models` 里报，SkyCut 不写死（我提、用户 10-27：可以） | 规则只留一份，以后要放宽只改服务器、SkyCut 不用发版。网页定 30 秒，是因为字节 pro 每秒视频要约一分钟（30 秒 4K 近两小时）。现在走 fal 时 Topaz 能送 300 秒、字节不限 |
 | 17 | upscale 帧率上限 | **30 fps**（29.97 算在内），60 fps 的源直接说不支持（我提、用户 10-27：可以） | 要 upscale 的多半是 AI 生成的低清片段（24 / 30 fps）；fal 处理 60 fps 要两倍的钱和时间；和 Sky Studio 网页同一条规矩。现在走 fal 时帧率不限 |
+| 18 | 先做 B 端还是 C 端 | **先做 B 端**：客户在网站上建 key、粘进 SkyCut，用户在后台手动开通正式版。**C 端先只放「联系开通」**：设置里、导出面板、AI 没开通时的提示都打开网站上同一页，这页先只放联系方式；浏览器里一键连接、网站上付款以后再做（用户 10-27 定） | 前几个客户都是单独谈、手动开；付款页要先定 C 端卖什么、多少钱。按钮通向哪由服务器给（`/me` 的 `upgrade_url`，没有 key 时用固定的 `https://skystudioai.com/skycut`），以后换成付款页不用发版 |
+| 19 | 导出面板的「去除水印」 | 要加水印时导出面板显示一行「导出的视频会带 Sky Studio 水印 · 联系开通」，**不拦着导出**；付的是开通正式版，不按次去水印（用户提、我补细节，10-27） | 先带水印导出看看效果也行；按次去水印要每次上报（第 2 条） |
+| 20 | 体验按什么记 | **每台 Mac 一次、每个账号一次**（Sky Studio 那边和用户 10-27 定）：SkyCut 发硬件 UUID 的哈希（`X-SkyCut-Machine`，原始编号不出本机）；这台 Mac 用过了 `/me` 回 `free` + `trial_unavailable: machine_used`，SkyCut 要说清楚；开始了的体验换 Mac 照样有效 | 不然换个账号就能一直体验 |
 
 ## 两边怎么分
 
@@ -41,23 +45,24 @@
 
 | 接口 | 做什么 |
 | --- | --- |
-| `GET /me` | 是谁、余额、`plan`（`free` / `trial` / `pro`）、体验到哪天、`features: {mcp, watermark}`、最低版本、充值地址。账号第一次来就开始体验 |
+| `GET /me` | 是谁、余额、`plan`（`free` / `trial` / `pro`）、体验从哪天到哪天、没给体验的原因、`features: {mcp, watermark}`、这份回答能用到哪天（`valid_until`）、最低版本、同时最多几个任务、充值地址。账号第一次来（这台 Mac 也没体验过时）就开始体验 |
 | `GET /models` | SkyCut 能请求的模型、积分价和上限（`limits`：最长几秒、最高帧率、输出最多多少像素、上传多大；第 16、17 条）。id 用 Sky Studio 自己的名字，不是 fal 的端点号 |
-| `POST /quote` | 只报价、不扣钱，先只做 upscale：和网页弹窗用同一个计价函数（宽于 16:9 按高一档收、4K 像素数封顶、按 0.1 秒计），SkyCut 不另抄一份计价规矩；SkyCut 面板和 AI 确认里显示这个数，提交时当 `max_credits` |
+| `POST /quote` | 只报价、不扣钱，**每种都能报**：和 `/jobs` 扣钱用同一个计价函数（upscale 宽于 16:9 按高一档收、4K 像素数封顶、按 0.1 秒计），SkyCut 不另抄一份计价规矩；SkyCut 面板和 AI 确认里显示这个数，提交时当 `max_credits` |
 | `POST /uploads` | 给一个上传地址（R2 预签名，复用网站现有的上传凭证） |
 | `POST /jobs` | 提交生成，立刻回任务号；按估价先冻结积分、失败只退一次；带 `max_credits`（用户同意过的上限），服务器算出来更贵就拒 |
-| `GET /jobs/{id}` | 阶段、排队位置、已用时间、典型时长、结果地址、实际扣了多少（最多等 25 秒再答） |
-| `POST /jobs/{id}/cancel` | 取消、退款 |
+| `GET /jobs/{id}` | 阶段、排队位置、已用时间、典型时长、结果地址、实际扣了多少；**立刻回、不等**，带 `poll_after_seconds`（照这个间隔再问） |
+| `POST /jobs/{id}/cancel` | **只能取消还在排队的**、退款；开始了的回 `not_cancellable`、不退 |
 
-出错一律带 `code`：`invalid_key`、`upgrade_required`（版本太老）、`insufficient_credits`（带余额和充值地址）、`price_changed`、`invalid_request`、`rate_limited`、
-`not_found`、`provider_error`。**接口最后以 Sky Studio 仓库里的接口文档为准**，SkyCut 照那份做。
+出错一律带 `code`：`invalid_key`、`upgrade_required`（版本太老）、`insufficient_credits`（带余额和充值地址）、`price_changed`、`invalid_request`、`rate_limited`（模型那边限流）、
+`not_cancellable`、`too_many_jobs`（同时最多 3 个任务）、`not_found`、`provider_error`。**接口最后以 Sky Studio 仓库里的接口文档为准**，SkyCut 照那份做。
 upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky Studio 仓库的 #223）：规则只有它的 `shared/videoUpscale.ts` 一份，两档叫 `topaz-starlight` /
 `bytedance-upscaler-pro`，档位 1080p / 2K / 4K 按输出的短边（和 SkyCut 的 `FalUpscaleTarget` 一个口径）。
 
 **SkyCut（这个仓库）**：
 
-1. **key 和授权**：key 存钥匙串（身份类的名字照旧用 SrtFlow 前缀，见 [产品名与代码名](../architecture/product-name.md)），设置里「AI」一节加一行；
-   启动时、之后定时问一次 `/me`；连不上服务器时按上次拿到的开关用，**断网宽限 7 天**，超过就当免费版。
+1. **key 和授权**（5a 已做，[Sky Studio 账号](../architecture/sky-studio-account.md)）：key 存钥匙串（身份类的名字照旧用 SrtFlow 前缀，见 [产品名与代码名](../architecture/product-name.md)），
+   设置里单独一节「Sky Studio」；启动时、回到 SkyCut 时、每小时看一眼，到时候了才问 `/me`；连不上服务器时照上一次的回答用到 `valid_until`
+   （服务器定：现在是 72 小时和体验 / 正式到期取早的，不是原来写的 7 天），过了就当免费版。
 2. **`watermark` 开关**：每条导出管线最后叠一层水印，只有一处共用的叠加（剪辑导出、AI 的 `export_video` 都经过它）；预览、AI 用 `look` 看时间线、
    生成和 upscale 的成品都不加；导出的结果里告诉 AI 带了水印、为什么。压缩、烧录字幕这两个只处理用户自己文件的工具不加。
 3. **`mcp` 开关**：挡在 App 收到工具调用的地方，**不放在 `skycut-mcp` 小程序里**（谁都能自己写一个小程序去连 App）。工具清单照常列出来，调用时回
@@ -69,8 +74,38 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
    上限照第 16、17 条，面板和 `upscale_clip` 在提交之前就说清楚（超长先少留余料、选中的本身超了说先切开、超 30 fps 说不支持）；要扣多少问 `/quote`，提交时把它当 `max_credits`。
    fal 那两处默认值（Topaz 的 `H264_output` 默认出 HEVC、字节的 `target_fps` 默认插帧成 30 fps，`checks/Fal/schemas/` 里查得到）Sky Studio #223 已经在服务器上显式传了，
    字节的帧率取自上传的那个文件。SkyCut 现在等 25 分钟就替 fal 取消（`FalUpscaleTier.maxSeconds`），字节 pro 30 秒 4K 要近两小时：改成按服务器给的典型时长等；
-   SkyCut 退出了，任务在服务器上照样做完，重开之后按记下的任务号取回（Sky Studio 留 24 小时）。
+   SkyCut 退出了，任务在服务器上照样做完，重开之后按记下的任务号取回（成品永久在用户的作品库里，见下一节）。
 5. **删掉 fal 那条路**。
+
+## Sky Studio 定稿之后（2026-10-27，Sky Studio 仓库 `feat/skycut-api` 的 08bd908a）
+
+接口还没上线（后端在做），先照文档写。和这份方案上面写的不一样、SkyCut 要跟着改的（第 6 刀，除了注明 5a 的）：
+
+- 每个请求带 `X-SkyCut-Machine`（硬件 UUID 加 SkyCut 的盐做 SHA-256），`/me` 缺它回 400；`/me` 新字段 `trial_started_at`、`trial_unavailable`、`valid_until`、`max_running_jobs`（5a 已做）。
+- 没有长轮询：`GET /jobs/{id}` 立刻回、带 `poll_after_seconds`，照这个间隔再问。
+- 只能取消还在排队（queued）的任务；开始了的回 `not_cancellable`、不退款 —— 停止 / `cancel_job` 要照实说「已经开始了，取消不了，积分已经花了，成品照样会进作品库」。
+- 成品不再 24 小时过期：upscale、图片、视频、音乐、旁白、音效都**长期存进用户的作品库**（用户自己删），`result.url` 是永久地址、另带 `generation_id`；
+  只有克隆声音不进作品库，留 60 天（带 `expires_at`）。作品库里的 upscale 是 SkyCut 上传的那段（无声、两头各多 1 秒）的放大版。SkyCut 照旧下到本机、自己封回原声。
+- 每个账号同时最多 3 个任务（queued + running，`/me` 的 `max_running_jobs`），第 4 个回 `too_many_jobs`（带 `limit`、`running`）：SkyCut 在本机排着、一个做完再提交下一个。
+  不按每分钟次数限流；`rate_limited` 只表示模型那边限流。
+- free 也能花积分生成，plan 只管 MCP 和水印；只扣个人钱包（团队成员也一样）；正式版由后台手动开通，没有付款流程。
+- `/quote` 每种都能报价：估价、确认码一律用它，不再用本机的单价表。
+- upscale 的 `params.source` 要取自**导出后的那个片段文件**（宽、高、秒数、帧率），不用时间线上的数；服务器重读文件，差太多回 `price_changed`。
+- 模型 id 用 Sky Studio 的：`seedream5-flash`、`minimax-h3`（文生视频、图生视频两个 kind 都用它）、`lyria-3-pro`、`topaz-starlight`、`bytedance-upscaler-pro`、
+  `eleven-v4`、`sonilo-sfx`、`zonos2`。MiniMax H3 的分辨率只有 `480p` / `768p`（小写，没有 1080p），时长 5–15 秒。
+- 每种用哪些字段见文档的「Per kind」：旁白、克隆、音效的文字都放 `prompt`，克隆的声音样本放 `inputs.reference_audio_url`（走 `/uploads`，不收 data URI）。
+- `phase` 只有 `queued` / `processing` / `saving`（下载是 SkyCut 自己的阶段）。
+- `/uploads` 的 `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`（jpeg / png / webp，≤ 30 MB）、`audio`（wav / mp3，≤ 15 MB），60 天后自动删。
+- fal 实测账单带来的（所有价格都从 `/models` 和 `/quote` 拿，不写死；定价依据在 Sky Studio 仓库 `docs/credits/skycut-audio-unit-economics-2026-10-27.md`）：
+  - **克隆**：fal 每次请求至少按 1 分钟收，所以每次 2.5 积分、不管长短。**不要一句一句送**：一次送多句，不超过各语言的字数上限（Unicode 字符数：英 800、
+    西 / 法 / 德 / 意 / 葡 650、日 280、中 220、韩 320），拿回 WAV 在本机按句切开（3 分钟的解说一句一句送约 90 积分，整段送约 12.5）；超了回 `invalid_request`
+    （`field: "prompt"`，带 `limit`）。闲置后第一次可能排队 2–4 分钟（冷启动），之后约 20 秒；输出单声道 44.1 kHz 16 位 WAV。
+    这改了 SkyCut 现在「一句一句送 fal」的做法：按句切开要知道每句在哪，第 6 刀定怎么切（用 SkyCut 自己的转写和静音检测）。
+  - **音效**：0.45 积分 / 秒，每次至少按 3 秒收。
+  - **旁白**：每 1000 字符 20 积分，每次至少 1 积分。`words` 是 Eleven 的 timestamps 原样：分块给出 `characters` 和每个字符的开始、结束时间（**字符级，不是词级**），
+    要自己拼成词。输出 MP3 44.1 kHz 128 kbps。
+- 没变的：`Bearer sk-…` 认证、`X-SkyCut-Version`、错误格式、不需要 CORS、upscale 的上限（30.5 秒、30 fps、4K 像素、200 MB）。
+- **还缺**：「联系开通」那一页和 `/me` 的 `upgrade_url`（第 18 条）。已请 Sky Studio 那边补；在那之前 SkyCut 打开的固定网址 `https://skystudioai.com/skycut` 还不存在。
 
 ## 分刀（每刀一个 PR）
 
@@ -78,7 +113,8 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 2. 修：工具会悄悄丢掉不认识的参数（冒烟里 Codex 给 `set_text` 传了 `end`，被忽略了）。
 3. 修：「连接」AI 客户端时留的配置备份，权限比原文件宽。
 4. **水印**：做出来、接进所有导出入口，**开关先默认关**（授权接上之前什么导出都不加），留一个只给测试用的打开办法；先渲一张样片给用户看，再定数字。
-5. key + `/me` + 两个开关接上（等 Sky Studio 的 `/me` 能用）。
+5. key + `/me` + 两个开关接上，拆成两步：**5a** Sky Studio 账号（key、`/me`、此刻的授权、设置里一节，只读不拦，照定稿的文档做、本机假服务器测）；
+   **5b** 照两个开关拦（MCP 的门、导出水印、导出面板「联系开通」、结果里告诉 AI），**等 Sky Studio 的接口上线、用户给自己开了正式版再合**，不然之后打的包里用户自己的 AI 剪辑也被挡住。
 6. 生成、upscale、克隆改走 Sky Studio（等 `/jobs` 能用；先换 upscale：Sky Studio 网站的 upscale 10-27 已上线，`/jobs` 先接它）。
 7. 删掉 fal 那条路（第 6 刀上线之后）。
 
