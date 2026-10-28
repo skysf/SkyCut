@@ -109,6 +109,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 
 ## 四、工具在 App 里怎么做（每一条都是约束）
 
+**冒烟客户端的失败证据**（2026-10-29）：假扮客户端的 Python 脚本也必须把 EOF、坏协议、JSON-RPC 错误显式报成失败，
+超时标明调用名并记为结果未知，不自动重送有副作用的调用。后台记录日志用 `scripts/gui-smoke/run-logged.sh`，原样传出退出码；
+不能以最后一条 echo 成功或「本地没任务」推断真实生成成功 / 没扣费。`checks/MCP/SmokeClientChecks.py` 在本地假小程序上守住这条证据链。
+
 1. **一个工具 = 一步撤销。** 规则写成 `TimelineState` 上的纯函数（`AITimelineEdits`、`AIClipEdit`、
    `AISubtitleEdits`），在副本上算好、出错就抛，然后 `project.perform { $0 = next }` 一次提交：撤销登记、
    磁吸收尾、预览重建都走原来那条路。**而且每个改动工具都包在 `AIUndoGrouping.step` 里**：撤销管理器按

@@ -1,3 +1,4 @@
+"""冒烟用 MCP 客户端：只收发一次调用；断线、协议错误和超时必须显式失败，不自动重送。"""
 import json, os, queue, subprocess, threading, time
 
 class MCP:
@@ -8,29 +9,72 @@ class MCP:
         self.waiting = {}
         self.notifications = []
         self.lock = threading.Lock()
-        threading.Thread(target=self._read, daemon=True).start()
-        threading.Thread(target=lambda: [None for _ in self.p.stderr], daemon=True).start()
-        self.init = self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "falsmoke", "version": "1"}})
-        self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        self.failure = None
+        self.reader = threading.Thread(target=self._read, daemon=True)
+        self.errors = threading.Thread(target=self._drain_errors, daemon=True)
+        self.reader.start()
+        self.errors.start()
+        try:
+            self.init = self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "falsmoke", "version": "1"}})
+            self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        except BaseException:
+            self.close()
+            raise
+
+    def _drain_errors(self):
+        # 持续排空，避免 stderr 的管道写满卡住小程序；不累积潜在敏感内容。
+        for _ in self.p.stderr:
+            pass
+
+    def _fail(self, message):
+        failure = RuntimeError(message)
+        with self.lock:
+            self.failure = failure
+            waiting, self.waiting = self.waiting, {}
+        for q in waiting.values():
+            q.put(failure)
 
     def _read(self):
-        for line in self.p.stdout:
-            try: msg = json.loads(line)
-            except Exception: continue
-            with self.lock:
-                q = self.waiting.pop(msg["id"], None) if "id" in msg else None
-                if q is None: self.notifications.append(msg)
-            if q is not None: q.put(msg)
+        try:
+            for line in self.p.stdout:
+                msg = json.loads(line)
+                if not isinstance(msg, dict):
+                    raise ValueError("expected an object")
+                with self.lock:
+                    q = self.waiting.pop(msg["id"], None) if "id" in msg else None
+                    if q is None: self.notifications.append(msg)
+                if q is not None: q.put(msg)
+        except (ValueError, OSError) as error:
+            self._fail(f"MCP helper protocol/JSON failure: {type(error).__name__}")
+            return
+        self._fail(f"MCP helper closed stdout (exited: {self.p.poll()})")
 
     def send(self, msg):
         self.p.stdin.write(json.dumps(msg) + "\n"); self.p.stdin.flush()
 
     def request(self, method, params=None, timeout=180):
         with self.lock:
+            if self.failure is not None:
+                raise self.failure
             self.next_id += 1; rid = self.next_id
             q = queue.Queue(); self.waiting[rid] = q
-        self.send({"jsonrpc": "2.0", "id": rid, "method": method, **({"params": params} if params is not None else {})})
-        return q.get(timeout=timeout)
+        label = (params or {}).get("name", method)
+        try:
+            self.send({"jsonrpc": "2.0", "id": rid, "method": method, **({"params": params} if params is not None else {})})
+            try:
+                reply = q.get(timeout=timeout)
+            except queue.Empty as error:
+                raise TimeoutError(f"MCP {label} (request {rid}) did not answer within {timeout}s; outcome unknown") from error
+            if isinstance(reply, Exception):
+                raise reply
+            if "error" in reply:
+                raise RuntimeError(f"MCP {label} failed: {reply['error']}")
+            if not isinstance(reply.get("result"), dict):
+                raise RuntimeError(f"MCP {label}: missing result object")
+            return reply
+        finally:
+            with self.lock:
+                self.waiting.pop(rid, None)
 
     def tools(self):
         return [t["name"] for t in self.request("tools/list")["result"]["tools"]]
@@ -53,4 +97,13 @@ class MCP:
     def close(self):
         try: self.p.stdin.close()
         except Exception: pass
-        self.p.terminate()
+        if self.p.poll() is None:
+            self.p.terminate()
+        try: self.p.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            self.p.kill()
+            self.p.wait(timeout=3)
+        self.reader.join(timeout=1)
+        self.errors.join(timeout=1)
+        self.p.stdout.close()
+        self.p.stderr.close()

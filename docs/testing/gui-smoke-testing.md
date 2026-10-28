@@ -424,6 +424,10 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 
 ## 四之八、fal.ai 生成的端到端冒烟（真 App + 真小程序 + 本机的假 fal，2026-09-29）
 
+后台跑任何冒烟脚本时用 `/bin/bash scripts/gui-smoke/run-logged.sh <日志> <命令> [参数…]`。
+不要在被测命令后面只接 `echo "exit=$?"`：外层会把 echo 的 0 当成测试退出码。
+`mcpclient.py` 遇到断线 / 坏协议 / JSON-RPC 错误会明确失败；超时表示结果未知，先核查任务和账目再决定下一步，不能直接重跑付费测试。
+
 fal 那一块自动检查够不着的是 App 里那一层（任务、花钱的确认码、钥匙串、设置、清单跟着 Key 走）。`scripts/gui-smoke/fal/` 用**本机的假 fal**
 （`fakefal.py`：照队列接口回话、记下每个请求、按端点回图 / 视频 / 音频和词时间）把它们真走一遍，**不需要真 Key、不花钱**：
 

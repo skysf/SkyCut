@@ -96,6 +96,7 @@ run_check() {
 shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
+run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
 run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh
 run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-build-output.sh
 run_check "client-config-backup（扫描守卫：连接 AI 客户端时配置的备份和原文件同样的权限）" checks/client-config-backup.sh
