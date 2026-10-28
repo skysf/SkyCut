@@ -9,6 +9,8 @@ runMeChecks()
 await runAPIChecks()
 runLicenseChecks()
 runGateChecks()
+await runJobChecks()
+await runJobRunChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) Sky Studio checks failed.")

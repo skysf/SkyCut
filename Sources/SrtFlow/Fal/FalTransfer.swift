@@ -9,7 +9,8 @@ import Foundation
 // CancellationError）。比例只在服务器说了总长时才报（没有 Content-Length 就不报），按 1% 一格、没变不报。
 // 不管什么：地址、认证头、HTTP 状态怎么换话、最后那一下「100%」（FalClient）。
 //
-// 只有 FalClient 用它（checks/fal-wiring.sh：`URLSession` 只许出现在 FalClient.swift 和这里）。
+// FalClient 和 SkyStudioAPI（第 6 刀起，Sky Studio 的上传 / 下载）用它；第 7 刀删 fal 时改个名留下。
+// fal 那几个文件里 `URLSession` 只许出现在 FalClient.swift 和这里（checks/fal-wiring.sh）。
 
 enum FalTransfer {
     /// 跑一个上传 / 下载任务到结束。

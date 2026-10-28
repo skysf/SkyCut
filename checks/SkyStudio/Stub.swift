@@ -7,11 +7,14 @@ struct StubSeen {
     var url: String
     var headers: [String: String]
     var body: Data?
+    var timeout: TimeInterval = 0
 }
 
 final class SkyStudioStub: URLProtocol {
     enum Reply {
         case http(Int, String)
+        /// 成品文件那种：任意字节，带 Content-Length（下载的进度要它）。
+        case data(Int, Data)
         /// 连不上（断网、超时……）。
         case failure(URLError.Code)
     }
@@ -43,9 +46,23 @@ final class SkyStudioStub: URLProtocol {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
+        // 上传（uploadTask fromFile）的正文是一条流，不在 httpBody 里。
+        var body = request.httpBody
+        if let stream = request.httpBodyStream {
+            stream.open()
+            var data = Data()
+            var buffer = [UInt8](repeating: 0, count: 4096)
+            while stream.hasBytesAvailable {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count <= 0 { break }
+                data.append(buffer, count: count)
+            }
+            stream.close()
+            body = data
+        }
         let seen = StubSeen(
             method: request.httpMethod ?? "GET", url: request.url?.absoluteString ?? "",
-            headers: request.allHTTPHeaderFields ?? [:], body: request.httpBody
+            headers: request.allHTTPHeaderFields ?? [:], body: body, timeout: request.timeoutInterval
         )
         Self.lock.lock()
         Self.seen.append(seen)
@@ -58,6 +75,14 @@ final class SkyStudioStub: URLProtocol {
             )!
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: Data(body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        case .data(let status, let data):
+            let response = HTTPURLResponse(
+                url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/octet-stream", "Content-Length": String(data.count)]
+            )!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)
         case .failure(let code):
             client?.urlProtocol(self, didFailWithError: URLError(code))

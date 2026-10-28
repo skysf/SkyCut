@@ -8,7 +8,10 @@
 #   5. 此刻的授权（SkyCutLicense）：没有 Key / 没问到过 / 过了 valid_until 都按免费版，服务器的钟换成本机的，钟往回拨不作数，
 #      开关只听服务器的；什么时候再问（SkyStudioRefresh）；
 #   6. 照授权拦（SkyCutGates，第 5 刀第二步）：2026-10-28 起默认打开、测试开关关不掉它；AI 的工具只听 mcp、get_status 永远让；导出的水印听服务器的；
-#      被挡住时回给 AI 的话（没做、为什么、请用户做什么）、get_status 里的 skycut_plan、导出带了水印时那一句。
+#      被挡住时回给 AI 的话（没做、为什么、请用户做什么）、get_status 里的 skycut_plan、导出带了水印时那一句；
+#   7. 第 6 刀的任务（生成、upscale、克隆走 Sky Studio）：/models 怎么读、/quote 和 /jobs 发什么、状态和成品怎么读、取消的两种结果、
+#      /uploads 之后 PUT（只带服务器给的头、不带 Key）、下载成品；SkyStudioJobRun 满了等着再交（同一个 idempotency_key）、照 poll_after_seconds
+#      问、断网几次不算失败、停的时候排着队的退钱 / 开始了的取消不了、没做成 / 回的不像话 / 等太久各是哪一种。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -48,6 +51,10 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyCutLicense.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
+  Sources/SrtFlow/Fal/FalTransfer.swift \
   checks/SkyStudio/main.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \
@@ -56,6 +63,8 @@ xcrun swiftc \
   checks/SkyStudio/APIChecks.swift \
   checks/SkyStudio/LicenseChecks.swift \
   checks/SkyStudio/GateChecks.swift \
+  checks/SkyStudio/JobChecks.swift \
+  checks/SkyStudio/JobRunChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
 echo "==> 跑自检"
