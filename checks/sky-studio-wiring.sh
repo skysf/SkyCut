@@ -172,6 +172,14 @@ grep -qF 'if let id = job.skyStudioJobID { detail["skystudio_job_id"] = .string(
   || fail "${UP_TOOL}：get_job 跑着时要报 skystudio_job_id"
 [ "$(count '"skystudio_job_id": .string(outcome.jobID)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：做完的两种结局（换了 / 工程变了没换）都要报 skystudio_job_id"
 [ "$(count ', detail: detail)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：没做成、停了的结局都要带上 skystudio_job_id（settle 的 detail）"
+# 界面上说送去哪：2026-10-28 起是 Sky Studio，upscale 的界面里不再写 fal.ai（检查器那一节的标签漏改过一次，真积分测试时才看见）。
+UP_INSPECTOR="Sources/SrtFlow/VideoEditInspector+Upscale.swift"
+[ -f "${UP_INSPECTOR}" ] || fail "找不到 ${UP_INSPECTOR} —— 改名了就同步改这里（扫空 = 假绿）"
+stale="$(for file in "${UP_INSPECTOR}" Sources/SrtFlow/Upscale/*.swift; do
+  if grep -qiE '"[^"]*fal\.ai[^"]*"' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
+done)"
+[ -z "${stale}" ] || fail "这些 upscale 的界面文件还写着 fal.ai：$(tr '\n' ' ' <<<"${stale}")—— upscale 2026-10-28 起送 Sky Studio"
+grep -qF 'Text(verbatim: "Sky Studio").font(.caption2)' "${UP_INSPECTOR}" || fail "${UP_INSPECTOR}：检查器 Upscale 那一节的标题旁边要写送去哪（Sky Studio）"
 for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${SPEND}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
     fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
