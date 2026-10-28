@@ -146,8 +146,10 @@ struct SkyStudioJobRun: Sendable {
         case .cancelled?:
             return .stopped(.nothingCharged)
         case .notCancellable?:
+            keepFollowing(jobID)
             return .stopped(.alreadyStarted)
         case nil:
+            keepFollowing(jobID)
             return .stopped(.unknown)
         }
     }
