@@ -33,9 +33,14 @@ struct SkyCutLicense: Equatable, Sendable {
     var mcp: Bool
     var watermark: Bool
     var basis: Basis
-    /// 下面三个都是本机时间（换算过钟差）。
+    /// 体验的起止：本机时间（换算过钟差），拿来和本机的「现在」比。
+    var trialStartedAt: Date?
     var trialEndsAt: Date?
+    /// 正式版到哪一刻：**照服务器给的，不换算**。它只用来显示是哪天（plan 是服务器说的，回答本来就在 valid_until 作废），
+    /// 而换算会把请求在路上的几秒也算进钟差：后台「开通到 12-31」是北京时间那天 23:59:59，挪 5 秒就显示成第二年 1 月 1 日
+    ///（2026-10-28 真服务器，docs/bugfixes/2026-10-28-trial-and-pro-dates-shown-a-day-late.md）。
     var paidUntil: Date?
+    /// 这份回答作数到哪：本机时间（换算过钟差）。
     var validUntil: Date?
     /// 服务器说为什么没给体验（`machine_used`）。
     var trialUnavailable: String?
@@ -63,17 +68,24 @@ struct SkyCutLicense: Equatable, Sendable {
             mcp: license.features.mcp,
             watermark: license.features.watermark,
             basis: .server,
+            trialStartedAt: license.trialStartedAt.map(stored.local),
             trialEndsAt: license.trialEndsAt.map(stored.local),
-            paidUntil: license.paidUntil.map(stored.local),
+            paidUntil: license.paidUntil,
             validUntil: validUntil,
             trialUnavailable: license.trialUnavailable
         )
     }
 
     /// 体验还剩几天（不满一天算一天；不在体验里是 nil）。到期那一刻服务器的 plan 就变了，所以这里只管显示。
+    /// **不超过体验本身的天数**（起止都在同一份回答里）：服务器的 server_time 取在请求一进来那一刻，体验的起点是几秒后写库时的钟，
+    /// 换算到本机后刚开始的 7 天体验剩「7 天零几秒」，向上取整就成了 8 天（2026-10-28 真服务器）。后台改过的体验照它自己的长度算，
+    /// 不到一分钟的零头不算（10.5 天的体验刚开始是 11 天）。
     func trialDaysLeft(now: Date) -> Int? {
         guard plan == .trial, let trialEndsAt, trialEndsAt > now else { return nil }
-        return Int((trialEndsAt.timeIntervalSince(now) / 86_400).rounded(.up))
+        let left = Int((trialEndsAt.timeIntervalSince(now) / 86_400).rounded(.up))
+        guard let trialStartedAt, trialEndsAt > trialStartedAt else { return left }
+        let length = Int(((trialEndsAt.timeIntervalSince(trialStartedAt) - 60) / 86_400).rounded(.up))
+        return min(left, max(1, length))
     }
 }
 
