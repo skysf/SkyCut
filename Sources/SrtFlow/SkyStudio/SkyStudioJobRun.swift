@@ -9,6 +9,8 @@ import Foundation
 // - **问的时候断网几次不算失败**：活在服务器上照做（连着问不到才算）。
 // - **Task 被取消 = 用户要停**：只有排着队的能取消（退钱）；已经开始的取消不了（`not_cancellable`），照实说：积分花了，成品照样进作品库。
 //   取消请求在不继承取消的 Task 里发（调用者已经被取消了，网络请求一看见取消就不发）。
+//   **取消不了、取消没送到的那单接着在后台查到 done / failed**（`followToEnd`，不下载）：Sky Studio 有人查的时候才把成品存进作品库、
+//   把它从「同时开着的」里拿掉，没人查要等它的兜底几个小时（2026-10-28 真积分测试撞上的）。
 // - 等多久：服务器自己会收掉没人管的任务（upscale 245 分钟、别的 35 分钟，失败并退钱），这里最多等 5 小时。
 // 合同：Sky Studio 仓库 docs/agents/skycut-api.md「POST /jobs」「GET /jobs/{id}」「POST /jobs/{id}/cancel」。
 // 不管什么：传文件（SkyStudioAPI.upload / download）、钱花不花（每日上限）、每种活怎么拼参数、进度怎么画。
@@ -30,6 +32,8 @@ struct SkyStudioJobRun: Sendable {
     var sleep: @Sendable (Double) async throws -> Void = { seconds in try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000)) }
     /// 最多等多久（秒）。
     var maxWait: Double = 5 * 3600
+    /// 停不下来的那单交给谁接着查。nil = 不继承取消的后台任务里 `followToEnd`；自检换成只记下任务号的。
+    var onUnstoppable: (@Sendable (String) -> Void)?
 
     init(api: SkyStudioAPI, key: String) {
         self.api = api
@@ -134,14 +138,48 @@ struct SkyStudioJobRun: Sendable {
 
     // MARK: 停
 
-    /// 用户要停：排着队的替它取消（退钱）；开始了的取消不了；问不到就说不准。
+    /// 用户要停：排着队的替它取消（退钱）；开始了的取消不了；问不到就说不准。后两种那单在服务器上照做，交出去接着查到底。
     private func stop(_ jobID: String) async -> SkyStudioJobError {
         let api = self.api, key = self.key
         let outcome = await Task.detached { try? await api.cancel(jobID, key: key) }.value
         switch outcome {
-        case .cancelled?: return .stopped(.nothingCharged)
-        case .notCancellable?: return .stopped(.alreadyStarted)
-        case nil: return .stopped(.unknown)
+        case .cancelled?:
+            return .stopped(.nothingCharged)
+        case .notCancellable?:
+            keepFollowing(jobID)
+            return .stopped(.alreadyStarted)
+        case nil:
+            keepFollowing(jobID)
+            return .stopped(.unknown)
+        }
+    }
+
+    /// 调用者已经被取消了：在不继承取消的后台任务里查。
+    private func keepFollowing(_ jobID: String) {
+        if let onUnstoppable { return onUnstoppable(jobID) }
+        let run = self
+        Task.detached(priority: .utility) { await run.followToEnd(jobID) }
+    }
+
+    /// 停不下来的那单：照 poll_after_seconds 一直问到 done / failed / cancelled，什么都不拿（不下载、不换源）。
+    /// 等满 maxWait、连着问不到 networkMisses 次、服务器回了别的错就算了：剩下的交给 Sky Studio 自己的兜底。
+    func followToEnd(_ jobID: String) async {
+        let deadline = Date().addingTimeInterval(maxWait)
+        var serverSays: Double?
+        var misses = 0
+        while Date() < deadline {
+            do { try await sleep(Self.pollSeconds(serverSays)) } catch { return }
+            do {
+                let status = try await api.job(jobID, key: key)
+                misses = 0
+                guard status.state == .queued || status.state == .running else { return }
+                serverSays = status.pollAfterSeconds
+            } catch SkyStudioFailure.network(_) {
+                misses += 1
+                guard misses < Self.networkMisses else { return }
+            } catch {
+                return
+            }
         }
     }
 }
