@@ -9,7 +9,7 @@
 | --- | --- |
 | 加在哪 | **只加在剪辑导出的成片上**：`VideoEditExporter.export`（界面上的导出、AI 的 `export_video` 都走它）。预览、AI 用 `look` 看时间线、生成和 upscale 的成品、压缩 / 烧录字幕（处理用户自己的文件）、录屏都不加 |
 | 谁说了算 | **只有 `WatermarkPolicy`**：带不带 = 授权说要带（`SkyStudioAccount.exportsWithWatermark`：照授权拦生效时听服务器的 `watermark`，[Sky Studio 账号](sky-studio-account.md)）或测试开关开着。`VideoEditExporter` 开始导出时问一次 `mark(byLicence:)`；导出面板那一行、`export_video` 先说的那一句问 `required(byLicence:)`，**都传同一个授权**。`VideoEditExportGraph.plan()` 的 `watermark` 参数**没有默认值**：新加的调用方必须自己说加不加（自检一律传 nil），不会因为漏传悄悄不加 |
-| 现在 | 授权那一半已接上（收费方案第 5 刀第二步），但**照授权拦先关着**（`SkyCutGates.enforcedByDefault`，接口上线、用户给自己开了正式版之后单独一个 PR 打开），所以现在照旧默认不加。只测水印：`defaults write com.srtflow.SrtFlow.beta export.testWatermark -bool true`（正式版把 `.beta` 去掉），关掉写 `false`；测整套照授权拦：`skystudio.testGates`（[Sky Studio 账号](sky-studio-account.md)） |
+| 现在 | 授权那一半已接上（收费方案第 5 刀第二步），**照授权拦 2026-10-28 起打开**（`SkyCutGates.enforcedByDefault`）：没开通正式版的导出都带水印（免费版、体验期；服务器说了算）。正式版的账号也要看水印：`defaults write com.srtflow.SrtFlow.beta export.testWatermark -bool true`（正式版把 `.beta` 去掉），关掉写 `false`（它只能加、去不掉授权要的）。授权的规矩见 [Sky Studio 账号](sky-studio-account.md) |
 | 落点 | **字幕烧完之后、缩到导出分辨率之前**：压在所有画面之上（调色、盖一块、形状、文字、字幕都在它下面），和别的东西一样按工程尺寸叠完、最后整幅等比缩小（[导出设置](export-settings.md)第一节） |
 | 样子 | Sky Studio 的 logo（`Resources/watermark-logo.svg`，用户给的白字透明底那一版）；一圈软阴影（往右下偏 logo 宽的 1.2%、模糊半径 4%、黑 55%），亮画面上也看得清；字和阴影整体不透明度 70% |
 | 怎么跳 | 同一时刻只在一处；**每 4 秒换一处**，在四个角和正中之间随机挑、**不连续两次落在同一处**；种子每次导出随机、一次导出里固定（`SeededRandom`：同一个种子同一张表） |
@@ -18,7 +18,7 @@
 | logo 怎么读 | 只认绝对坐标的 M / L / Z（这份 logo 就是这样矢量化出来的）。有别的命令、没有路径、墨迹是空的都回 nil —— 换 logo 时自检先红，不会画出缺笔画的图。路径是矢量，每次按那一处的宽现画，不存位图 |
 | 读不出 logo | 不带水印时根本不读。**要带却读不出**（包里的 logo 被删了、坏了）：`WatermarkPolicy` 抛 `LogoUnreadable`，导出器报「读不出水印的 logo，没有导出」、**不导** —— 不然删掉包里的 logo 就能换来没水印的成片。只出声音（.m4a）没有画面，不带也不读 |
 
-## 二、授权接上（收费方案第 5 刀第二步，2026-10-28 已做；照授权拦先关着）
+## 二、授权接上（收费方案第 5 刀第二步，2026-10-28 已做、当天打开）
 
 - 授权那一半问 `SkyStudioAccount.exportsWithWatermark`（存下来的 `/me` 用到 `valid_until`，服务器定，现在 72 小时）；测试开关留着，只能加、去不掉授权要的。
 - logo 读不出来又要带：拦住导出（上一节「读不出 logo」）。以前读不出是悄悄不加 —— 只有测试才加时没关系，水印成了必须的就不行。

@@ -1,12 +1,12 @@
 import Foundation
 import SrtFlowMCPKit
 
-// SkyCutGates：照授权拦（收费方案第 5 刀第二步）—— 先关着、测试开关只能打开；AI 的工具让不让用（get_status 永远让）；
+// SkyCutGates：照授权拦（收费方案第 5 刀第二步）—— 2026-10-28 起默认打开、测试开关关不掉它；AI 的工具让不让用（get_status 永远让）；
 // 导出带不带水印；被挡住时回给 AI 的话（没做、为什么、请用户做什么）；get_status 里的 skycut_plan；导出带了水印时那一句。
 
 func runGateChecks() {
-    // 1. 先关着：接口上线、用户给自己开了正式版之后单独一个 PR 打开（同时改这一条）。测试开关只能打开。
-    checkEqual(SkyCutGates.enforcedByDefault, false, "the gates stay off until Sky Studio's API is live and the owner has Pro")
+    // 1. 默认打开（2026-10-28：接口上线、用户给自己开了正式版、真服务器回归走完）。测试开关只能打开，不能用它关掉。
+    checkEqual(SkyCutGates.enforcedByDefault, true, "the gates are on: Sky Studio's API is live and the owner has Pro")
     checkEqual(SkyCutGates.testingKey, "skystudio.testGates", "the testing switch's key")
     let suite = "skycut-gate-checks"
     guard let defaults = UserDefaults(suiteName: suite) else {
@@ -15,9 +15,11 @@ func runGateChecks() {
     }
     defaults.removePersistentDomain(forName: suite)
     defer { defaults.removePersistentDomain(forName: suite) }
-    check(!SkyCutGates.enforced(defaults), "off by default")
+    check(SkyCutGates.enforced(defaults), "on by default")
+    defaults.set(false, forKey: SkyCutGates.testingKey)
+    check(SkyCutGates.enforced(defaults), "the testing switch cannot turn them off")
     defaults.set(true, forKey: SkyCutGates.testingKey)
-    check(SkyCutGates.enforced(defaults), "the testing switch turns them on")
+    check(SkyCutGates.enforced(defaults), "the testing switch set to on: still on")
 
     let now = moment()
     let free = SkyCutLicense(plan: .free, mcp: false, watermark: true, basis: .server, validUntil: moment(3 * 86_400))

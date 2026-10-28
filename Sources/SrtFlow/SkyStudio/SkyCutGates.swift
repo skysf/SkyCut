@@ -7,16 +7,17 @@ import SrtFlowMCPKit
 // - 此刻的授权（SkyCutLicense）不让用 MCP：AI 的工具一个都不做，只有 get_status 照常回（AI 靠它看授权、跟用户说清楚）；
 // - 导出带不带水印听服务器的 `watermark`（免费版、体验期带，正式版不带，都是服务器说了算）；
 // - 回给 AI 的几句话（英文）：没做、为什么、请用户做什么；导出带了水印时为什么、怎么去掉；get_status 里的 `skycut_plan`。
-// **照授权拦先关着**（`enforcedByDefault`）：Sky Studio 的接口上线、用户在后台给自己开了正式版之前谁都问不到授权，
-// 一打开连用户自己的 AI 剪辑也挡住了。到时候单独一个 PR 把它改成 true。打开来试（只能打开，不能用它关掉）：
+// **照授权拦 2026-10-28 起默认打开**（`enforcedByDefault`）。合进来时先关着：Sky Studio 的接口上线、用户在后台给自己开了正式版之前
+// 谁都问不到授权，一打开连用户自己的 AI 剪辑也挡住了。10-28 接口上线、用户的账号开了正式版、测试版对着真服务器走完回归之后打开。
+// 测试开关只能打开、不能用它关掉；默认开着之后它不起作用，留着给哪天又得先关上时用：
 //   defaults write com.srtflow.SrtFlow.beta skystudio.testGates -bool true（正式版把 .beta 去掉）
 // 不管什么：授权怎么算（SkyCutLicense）、去问 / 等问完（SkyStudioAccount）、拦在哪（AIToolRouter、VideoEditExporter + WatermarkPolicy、
 // 导出面板的 ExportWatermarkNotice、export_video、get_status）。
 
 enum SkyCutGates {
-    /// 照授权拦生不生效。接口上线、用户给自己开了正式版之后改成 true（单独一个 PR，连同 checks/SkyStudio/GateChecks.swift 里钉着的那一条）。
-    static let enforcedByDefault = false
-    /// 测试开关的 UserDefaults 键（只能打开）。
+    /// 照授权拦生不生效：2026-10-28 起打开（接口上线、用户给自己开了正式版、真服务器回归走完；checks/SkyStudio/GateChecks.swift 钉着）。
+    static let enforcedByDefault = true
+    /// 测试开关的 UserDefaults 键（只能打开；默认开着之后不起作用）。
     static let testingKey = "skystudio.testGates"
 
     static func enforced(_ defaults: UserDefaults = .standard) -> Bool {

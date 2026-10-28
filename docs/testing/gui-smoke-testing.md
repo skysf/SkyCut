@@ -418,6 +418,9 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    写一份和默认值一眼就分得出的（黄字、CRF 26；JSON 用 `SrtFlowCore` 的编码器现生成，别手写），测试版停在剪辑页启动，
    不打开那两页，让 AI `look` 看字幕颜色、`compress_videos` 看结果里的 `settings`。**测完 `defaults delete` 删掉写进去的键**
    （先 `defaults read` 记下原来有没有）—— 那是用户的测试版设置。
+8. **测试版要存着一把能用 AI 的 Sky Studio Key**（体验或正式版；2026-10-28 起照授权拦默认打开，没有 Key 时除了 `get_status` 都回「Not done」）。
+   先 `get_status` 看 `skycut_plan` 的 `ai_tools`。Key 由用户在测试版的设置里粘；别的会话代建的 Key 只经 600 权限的文件交过来，
+   用辅助功能填进设置里那一栏（App 自己存的钥匙串项自己读，不弹框），明文不进命令和输出（2026-10-28 真服务器回归就是这么做的）。
 
 ## 四之八、fal.ai 生成的端到端冒烟（真 App + 真小程序 + 本机的假 fal，2026-09-29）
 
@@ -432,6 +435,9 @@ scripts/gui-smoke/fal/run.sh 0.30         # 每日上限 0.30 重起
 python3 scripts/gui-smoke/fal/approval.py # 场景二：超额度 / 价格不明回确认码、带码才做、错的 / 用过的码不认、停止、cancel_job
 scripts/gui-smoke/fal/run.sh stop         # 收尾：退 App、杀假 fal、删钥匙串项 / 设置 / 小文件
 ```
+
+**2026-10-28 起照授权拦默认打开**（[Sky Studio 账号](../architecture/sky-studio-account.md)）：这个测试 App 没有 Sky Studio 的 Key，AI 的工具除了 `get_status`
+一个都不做，这套冒烟跑不通了。fal 这条路第 6 刀改走 Sky Studio、第 7 刀删掉，到时候连同一个本机的假 Sky Studio 一起重写；在那之前别拿它验东西。
 
 1. **Key 不要用 `security add-generic-password -T` 预置**：别的签名建的项，这个 App 读要弹 macOS 的授权框（`-T` 认的是路径，ad-hoc 签名对不上），
    没人点它就卡在框上、任务永远 running，框还会弹到用户屏幕上（2026-09-29 试过一次）。改用环境变量 `SRTFLOW_SMOKE_FAL_KEY`：App 自己启动时存一份，

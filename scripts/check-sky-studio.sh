@@ -7,7 +7,7 @@
 #      502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能把地址指到本机；
 #   5. 此刻的授权（SkyCutLicense）：没有 Key / 没问到过 / 过了 valid_until 都按免费版，服务器的钟换成本机的，钟往回拨不作数，
 #      开关只听服务器的；什么时候再问（SkyStudioRefresh）；
-#   6. 照授权拦（SkyCutGates，第 5 刀第二步）：先关着、测试开关只能打开；AI 的工具只听 mcp、get_status 永远让；导出的水印听服务器的；
+#   6. 照授权拦（SkyCutGates，第 5 刀第二步）：2026-10-28 起默认打开、测试开关关不掉它；AI 的工具只听 mcp、get_status 永远让；导出的水印听服务器的；
 #      被挡住时回给 AI 的话（没做、为什么、请用户做什么）、get_status 里的 skycut_plan、导出带了水印时那一句。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
