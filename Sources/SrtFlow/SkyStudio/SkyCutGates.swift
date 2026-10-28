@@ -101,7 +101,8 @@ enum SkyCutGates {
 
     /// 请用户做什么。按钮的名字照设置里「Sky Studio」一节写（Allow…、Check Again）。
     private static func nextStep(_ license: SkyCutLicense, problem: SkyStudioProblem?) -> String {
-        let pasteKey = "Ask the user to create an API key on skystudioai.com (Settings → SkyCut) and paste it in SkyCut Settings → Sky Studio. "
+        let pasteKey = "Ask the user to create an API key in Sky Studio (\(SkyStudioLinks.keysPage.absoluteString), or the avatar at the top "
+            + "right → SkyCut) and paste it in SkyCut Settings → Sky Studio. "
         switch problem {
         case .needsKeychainPermission?: return "Ask the user to open SkyCut Settings → Sky Studio and click Allow…, then try again."
         case .updateRequired?: return "Ask the user to update SkyCut, then try again."

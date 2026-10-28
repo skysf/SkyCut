@@ -65,7 +65,7 @@ private func runRefusalChecks(free: SkyCutLicense, now: Date) {
     }
 
     let noKey = SkyCutGates.aiRefusal(license: .free(.noKey), problem: nil, now: now)
-    says(noKey, ["no Sky Studio API key", "skystudioai.com (Settings → SkyCut)", "SkyCut Settings → Sky Studio", email], "no key")
+    says(noKey, ["no Sky Studio API key", "https://skystudioai.com/app?skycut=1", "avatar at the top right → SkyCut", "SkyCut Settings → Sky Studio", email], "no key")
 
     says(SkyCutGates.aiRefusal(license: free, problem: nil, now: now), ["free plan", email], "free plan")
     check(!SkyCutGates.aiRefusal(license: free, problem: nil, now: now).contains("paste"), "free plan with a key: no paste-a-key advice")

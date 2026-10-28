@@ -53,6 +53,7 @@ func runMeChecks() {
     check(SkyStudioLinks.webURL("javascript:alert(1)") == nil, "no host, no link")
     check(SkyStudioLinks.webURL("") == nil && SkyStudioLinks.webURL(nil) == nil, "empty is nothing")
     checkEqual(SkyStudioLinks.supportEmail, "support@skystudioai.com", "the address Settings tells people to email to activate Pro")
+    checkEqual(SkyStudioLinks.keysPage.absoluteString, "https://skystudioai.com/app?skycut=1", "the Sky Studio window where keys are made (agreed with Sky Studio)")
 
     // 存下来再读回来一模一样（UserDefaults 里存的就是这份）。
     // 整秒：存的时候只留到毫秒，Date() 那样的零头读回来会差一点（不影响用，但比不了相等）。

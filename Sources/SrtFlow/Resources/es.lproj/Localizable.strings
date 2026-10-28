@@ -1204,7 +1204,9 @@
 // Sky Studio 账号（设置里的「Sky Studio」一节：Key、授权、积分、联系开通；2026-10-27 收费方案第 5 刀）
 "Sky Studio" = "Sky Studio";
 "Connect your Sky Studio account with an API key. Your plan decides whether AI apps can edit in SkyCut and whether exports carry a watermark; making images, video and upscales uses your Sky Studio credits." = "Conecta tu cuenta de Sky Studio con una clave API. Tu plan decide si las apps de IA pueden editar en SkyCut y si las exportaciones llevan marca de agua; crear imágenes, vídeos y escalados usa tus créditos de Sky Studio.";
-"Create a key on skystudioai.com under Settings → SkyCut, then paste it here." = "Crea una clave en skystudioai.com, en Ajustes → SkyCut, y pégala aquí.";
+"Create a key in Sky Studio (your avatar at the top right → SkyCut), then paste it here." = "Crea una clave en Sky Studio (tu avatar arriba a la derecha → SkyCut) y pégala aquí.";
+"Create a Key in Sky Studio" = "Crear una clave en Sky Studio";
+"Open the page in Sky Studio where you create SkyCut keys" = "Abrir la página de Sky Studio donde se crean las claves de SkyCut";
 "sk-…" = "sk-…";
 "Store the key in the macOS keychain and check it with Sky Studio" = "Guardar la clave en el llavero de macOS y comprobarla con Sky Studio";
 "API key" = "Clave API";
