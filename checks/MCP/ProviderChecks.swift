@@ -2,7 +2,7 @@ import Foundation
 import SrtFlowMCPKit
 
 // 生成类工具的「提供方」（方案第 36 条）：**谁都没配就不列出来**。
-// - 目录这一层：generate_media 和 upscale_clip 只属于 fal、说明和参数对、只有它们上外面的网（openWorld）、词表和 App 的类型对账；
+// - 目录这一层：generate_media 属于 fal、upscale_clip 属于 Sky Studio（2026-10-28 起）、说明和参数对、只有它们上外面的网（openWorld）、词表和 App 的类型对账；
 // - 那个小文件（MCPProviderMarker）：路径和 socket 同目录、读得宽（不在 / 坏了 / 有不认识的名字都当没有）、只写提供方的名字、不动没变的；
 // - 协议这一层：真起小程序 —— 没配 / 配了各列什么、总说明配了才提 fal、握手声明清单会变、新一代的清单缓存时间短；
 //   用户中途添加 / 删掉 Key（小文件变了）时，握过手的老一代客户端收到 `notifications/tools/list_changed`，新一代不收。
@@ -19,20 +19,22 @@ func runProviderChecks() {
 // MARK: 目录
 
 private func checkCatalog() {
-    // fal 的两个工具：generate_media（第 6 块）、upscale_clip（2026-10-02）。
-    let falTools: Set<MCPToolName> = [.generateMedia, .upscaleClip]
+    // 花钱的两个工具：generate_media（第 6 块，fal）、upscale_clip（2026-10-02；2026-10-28 起走 Sky Studio，收费方案第 6 刀）。
+    let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip]
     checkEqual(MCPToolName.generateMedia.provider, .fal, "generate_media belongs to fal")
-    checkEqual(MCPToolName.upscaleClip.provider, .fal, "upscale_clip belongs to fal")
-    check(MCPToolName.allCases.filter { !falTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")
-    checkEqual(MCPToolName.listed(providers: []), MCPToolName.allCases.filter { !falTools.contains($0) }, "nothing configured: the fal tools are left out, order kept")
-    checkEqual(MCPToolName.listed(providers: [.fal]), MCPToolName.allCases, "fal configured: every tool, in the catalog order")
+    checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio")
+    check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")
+    checkEqual(MCPToolName.listed(providers: []), MCPToolName.allCases.filter { !paidTools.contains($0) }, "nothing configured: the paid tools are left out, order kept")
+    checkEqual(MCPToolName.listed(providers: [.fal]), MCPToolName.allCases.filter { $0 != .upscaleClip }, "fal configured: everything but upscale_clip")
+    checkEqual(MCPToolName.listed(providers: [.skystudio]), MCPToolName.allCases.filter { $0 != .generateMedia }, "Sky Studio configured: everything but generate_media")
+    checkEqual(MCPToolName.listed(providers: [.fal, .skystudio]), MCPToolName.allCases, "both configured: every tool, in the catalog order")
     checkEqual(MCPToolName.listJSON.arrayValue?.count, MCPToolName.allCases.count, "the full catalog lists every tool")
-    checkEqual(MCPToolName.listJSON(providers: []).arrayValue?.count, MCPToolName.allCases.count - falTools.count, "the plain list has the fal tools fewer")
+    checkEqual(MCPToolName.listJSON(providers: []).arrayValue?.count, MCPToolName.allCases.count - paidTools.count, "the plain list has the paid tools fewer")
 
     let definition = MCPToolName.generateMedia.definition
     check(!definition.readOnly && !definition.destructive, "generate_media writes a new file but deletes nothing")
     check(definition.openWorld, "generate_media reaches out to fal.ai")
-    check(MCPToolName.allCases.filter { !falTools.contains($0) }.allSatisfy { !$0.definition.openWorld }, "every other tool stays on this Mac")
+    check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { !$0.definition.openWorld }, "every other tool stays on this Mac")
     let json = definition.json
     checkEqual(json["annotations"]?["openWorldHint"]?.boolValue, true, "openWorldHint is written from the definition")
     checkEqual(MCPToolName.setShape.definition.json["annotations"]?["openWorldHint"]?.boolValue, false, "the others say false")
@@ -59,11 +61,18 @@ private func checkCatalog() {
 
 private func checkInstructions() {
     checkEqual(MCPInstructions.text(providers: []), MCPInstructions.text, "without a provider the instructions are the plain ones")
-    check(!MCPInstructions.text.contains("fal.ai") && !MCPInstructions.text.contains("generate_media"), "the plain instructions never mention fal (there is no such tool in the list)")
+    check(!MCPInstructions.text.contains("fal.ai") && !MCPInstructions.text.contains("generate_media") && !MCPInstructions.text.contains("upscale_clip"),
+          "the plain instructions never mention the paid tools (there are no such tools in the list)")
     let withFal = MCPInstructions.text(providers: [.fal])
-    check(withFal.hasPrefix(MCPInstructions.text), "the fal line is added at the end")
-    // 目录里那一行只指路：花钱怎么问、每日上限写在 generate_media 的说明里（上面查过 daily limit、estimated_cost_usd）。
-    check(withFal.contains("generate_media") && withFal.contains("fal.ai") && withFal.contains("paid"), "the fal line names the tool and says it costs money")
+    check(withFal.hasPrefix(MCPInstructions.text), "the paid line is added at the end")
+    // 目录里那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily limit、estimated_cost_usd）。
+    check(withFal.contains("generate_media") && withFal.contains("fal.ai") && withFal.contains("Paid"), "the fal tools are named and said to cost money")
+    check(!withFal.contains("upscale_clip"), "a fal key alone does not list upscale_clip (it is Sky Studio's since 2026-10-28)")
+    let withSkyStudio = MCPInstructions.text(providers: [.skystudio])
+    check(withSkyStudio.contains("upscale_clip") && withSkyStudio.contains("Sky Studio credits") && !withSkyStudio.contains("generate_media"),
+          "a Sky Studio key lists upscale_clip, paid with Sky Studio credits")
+    let withBoth = MCPInstructions.text(providers: [.fal, .skystudio])
+    checkEqual(withBoth.components(separatedBy: "\n- Paid:").count, 2, "both keys: one Paid line naming both")
 }
 
 // MARK: 协议核心（进程内）
@@ -137,6 +146,10 @@ private func checkMarkerFile() {
     checkEqual(String(data: (try? Data(contentsOf: file)) ?? Data(), encoding: .utf8), #"{"providers":["fal"]}"#, "the file holds nothing but the provider names")
     checkEqual((try? MCPProviderMarker.write([.fal], to: file)) ?? true, false, "writing the same thing again leaves the file alone")
     checkEqual((try? MCPProviderMarker.write([], to: file)) ?? false, true, "removing the provider rewrites it")
+    try? MCPProviderMarker.write([.skystudio, .fal], to: file)
+    checkEqual(MCPProviderMarker.read(at: file), [.fal, .skystudio], "both keys: both providers read back")
+    checkEqual(String(data: (try? Data(contentsOf: file)) ?? Data(), encoding: .utf8), #"{"providers":["fal","skystudio"]}"#, "names sorted, nothing else")
+    try? MCPProviderMarker.write([], to: file)
     check(MCPProviderMarker.read(at: file).isEmpty, "nothing configured again")
     for (content, expected) in [("not json", []), ("{}", []), (#"{"providers":"fal"}"#, []), (#"{"providers":["fal","nobody",5]}"#, [MCPProvider.fal]), (#"{"providers":[]}"#, [])] {
         try? Data(content.utf8).write(to: file)

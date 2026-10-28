@@ -7,17 +7,22 @@ import Foundation
 // （要用户点头、等用户操作、用户按了停止……写在那个结果里）。三层怎么分见 docs/architecture/ai-control-mcp.md 第一节第 6 条。
 //
 // **Claude Code 只读前 2,048 个字符**（JavaScript 的字符串长度，超了静默截掉、末尾加「… [truncated]」），Codex 要求前
-// 512 个字符自成一体：所以开头一段就是完整的最短用法，配了 fal 拼上那一行也不许超 2,048。Claude Code 会话开始时只看得到
+// 512 个字符自成一体：所以开头一段就是完整的最短用法，配了提供方拼上「Paid」那一行也不许超 2,048。Claude Code 会话开始时只看得到
 // 工具名和这份说明，目录是它知道「该去加载哪个工具」的依据，所以清单里的每个工具名都要在这里出现（checks/MCP/CatalogTextChecks.swift）。
 // 只用英文。产品决定见 docs/plans/2026-09-27-mcp.md；为什么写成目录见 docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md。
 
 public enum MCPInstructions {
-    /// 配好了 fal 才有的那一行，接在目录最后（没配就不提它：客户端清单里也没有 generate_media）。
-    /// 花钱怎么问、每日上限写在 generate_media / upscale_clip 自己的说明里：AI 调它之前一定会读到。
-    static let falLine = "\n- fal.ai (paid, the user's account): generate_media (image, video, music, sound effect), upscale_clip (sharper, larger)"
+    /// 配好了提供方才有的那一行「Paid: …」，接在目录最后（没配就不提：客户端清单里也没有那几个工具）。fal 的 Key 有 generate_media，
+    /// Sky Studio 的 Key 有 upscale_clip（2026-10-28 起，收费方案第 6 刀）。两家都配时整份 2,041 个字符，离 Claude Code 的 2,048 只差一点：
+    /// 这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：AI 调它之前一定会读到。
+    static let falTools = "generate_media (fal.ai: image, video, music, sound effect)"
+    static let skyStudioTools = "upscale_clip (Sky Studio credits: sharper, larger)"
 
     public static func text(providers: Set<MCPProvider>) -> String {
-        providers.contains(.fal) ? text + falLine : text
+        var paid: [String] = []
+        if providers.contains(.fal) { paid.append(falTools) }
+        if providers.contains(.skystudio) { paid.append(skyStudioTools) }
+        return paid.isEmpty ? text : text + "\n- Paid: " + paid.joined(separator: ", ")
     }
 
     public static let text = """

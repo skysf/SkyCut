@@ -209,7 +209,7 @@ final class AIToolRouter {
         // 不改工程：只起一个任务、回任务号（成品放上时间线是 add_clips 的事）。
         case .generateMedia: return try await FalGenerateTool.generate(args, project)
         // 起一个任务、回任务号；做完那一下的换源在任务里自己包一层 AIUndoGrouping.step（AIUpscaleTool.land）。
-        case .upscaleClip: return try AIUpscaleTool.upscale(args, project)
+        case .upscaleClip: return try await AIUpscaleTool.upscale(args, project)
         // 起一个录屏会话就回来（AI 好接着操作电脑）；入轨那一下是异步落账，会话的 landing 包一层 AIUndoGrouping.step。
         case .recordScreen: return try await AIScreenRecordingTool.run(args, project)
         case .addVoiceover:

@@ -51,12 +51,6 @@ func runPhaseChecks() {
     checkEqual(FalJobProgress.minutes(150), 3, "2.5 minutes rounds up")
     checkEqual(FalJobProgress.minutes(140), 2, "2.33 minutes rounds down")
 
-    // ---- 每个档位的典型时长（2026-10-02 实测）折成的分钟数 = 面板上一直写的「about N min」
-    for (id, minutes) in [("topaz-precision", 1), ("topaz-generative", 3), ("flux-precise", 2), ("flux-creative", 3), ("bytedance-standard", 2), ("bytedance-pro", 5)] {
-        guard let tier = FalUpscaleTiers.tier(id) else { check(false, "tier \(id)"); continue }
-        checkEqual(FalJobProgress.minutes(tier.typicalSeconds), minutes, "\(id): the typical duration reads as about \(minutes) min")
-        check(tier.typicalSeconds > 0 && tier.typicalSeconds < tier.maxSeconds, "\(id): typical is positive and under the timeout")
-    }
     // generate_media 的说明说「an image takes about 10 s, a sound effect 5 s, music 30 s, a video 1–3 minutes」。
     checkEqual(FalModel.Kind.image.typicalSeconds, 10, "an image: about 10 s")
     checkEqual(FalModel.Kind.soundEffect.typicalSeconds, 5, "a sound effect: about 5 s")

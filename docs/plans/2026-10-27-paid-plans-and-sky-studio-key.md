@@ -118,7 +118,7 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
    **5b** 照两个开关拦（MCP 的门、导出水印、导出面板写开通的邮箱、结果里告诉 AI）。本来打算挂着等接口上线再合；2026-10-28 用户定绿了的 PR 直接合，
    所以 5b 合进去时先关着（`SkyCutGates.enforcedByDefault = false`，测试开关 `skystudio.testGates` 只能打开）：开早了之后打的包里谁都问不到授权，
    用户自己的 AI 剪辑也被挡住。**2026-10-28 Sky Studio 的接口上线、用户给自己开了正式版、测试版 0.18.49 对着真服务器走完回归，单独一个 PR 打开。**
-6. 生成、upscale、克隆改走 Sky Studio（2026-10-28 接口上线、合同冻结在 Sky Studio main 5c8d6a0d）。拆四个 PR：**6a-1** 任务的接口（`/models`、`/quote`、`/uploads`、`/jobs`、轮询、取消、下载，`SkyStudioJobRun`；还没有谁用，假服务器测，见 [Sky Studio 的任务](../architecture/sky-studio-jobs.md)）、**6a-2** upscale 换过去（加积分的每日上限、清单按 Sky Studio 的 Key 列）、**6b** `generate_media`、**6c** 配旁白和克隆。
+6. 生成、upscale、克隆改走 Sky Studio（2026-10-28 接口上线、合同冻结在 Sky Studio main 5c8d6a0d）。拆四个 PR：**6a-1** 任务的接口（`/models`、`/quote`、`/uploads`、`/jobs`、轮询、取消、下载，`SkyStudioJobRun`；假服务器测，见 [Sky Studio 的任务](../architecture/sky-studio-jobs.md)；#267 已合）、**6a-2** upscale 换过去（加积分的每日上限、清单按 Sky Studio 的 Key 列）、**6b** `generate_media`、**6c** 配旁白和克隆。
 7. 删掉 fal 那条路（第 6 刀上线之后）。
 
 ## 我定的细节（用户没反对；要改再改）

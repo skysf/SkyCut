@@ -37,16 +37,29 @@
 | `SkyStudioJob.swift` | 纯值：请求体（`/quote` 的那一份去掉 inputs、max_credits、idempotency_key）、报价、任务的状态、成品、取消的结果 |
 | `SkyStudioModels.swift` | 纯值：`/models` 读成 `SkyStudioCatalog`（按 kind 找、上限、参数的取值） |
 | `SkyStudioJobRun.swift` | 交一件活、等它做完：满了等着再交、照 `poll_after_seconds` 问、断网几次不算、停的规矩；`SkyStudioJobError` |
+| `SkyStudioJobAccess.swift` | 交活之前要的两样：Key（`SkyStudioJobKey`：`.prompting` 只给用户点了按钮起的、`.silent` 别的都用）、`/models` 记一份（`SkyStudioCatalogCache`） |
+| `SkyStudioSpend.swift` | 积分的每日上限和按天的账（`SkyStudioSpendStore`）、积分怎么写（`SkyStudioCredits`） |
+| `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（额度内记账、超了回确认码） |
 
-## 四、还没做的（第 6 刀后面几个 PR）
+## 四、谁在用
 
-- **upscale 改走 Sky Studio**（6a-2）：档位、目标（1080p / 2K / 4K）、上限（30.5 秒含余料、30 fps、像素、200 MB）从 `/models` 读；面板和 `upscale_clip` 的价问 `/quote`；`params.source` 从裁出来的那个文件探；积分的每日上限（默认 1,000，超了回确认码）；清单按 Sky Studio 的 Key 列 `upscale_clip`。
+- **upscale**（6a-2，2026-10-28）：面板和 `upscale_clip`，规矩见 [视频 upscale](video-upscale.md)。模型从 `/models`（`SkyStudioCatalogCache`：这一次运行里 10 分钟内不再问，换了 Key 作废）；
+  价问 `/quote`；`params.source` 照送上去的那个文件探；Key 面板起的可以弹授权框、别的不弹（`SkyStudioJobKey`）。
+- **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：AI 起的过 `SkyStudioJobGate`
+  （额度内直接记账、超了回确认码，和删文件、fal 花钱同一套 `AIConfirmations`）；面板起的面板本身就是确认（超了只标红不拦）；做完按实收改账，没花出去的退回。
+  账按本地时区的自然日，规矩和 fal 那本同一份（`FalSpendLedger` / `FalSpendPolicy`，第 7 刀删 fal 时改名留下）。
+- **清单**：`upscale_clip` 属于 `skystudio` 提供方，存了 Sky Studio 的 Key 才列（`SkyStudioAccount.hasKey` 一变就同步那个小文件）；总说明末尾的「Paid」那一行配了哪家列哪家。
+
+## 五、还没做的（第 6 刀后面几个 PR）
+
 - **生成改走 Sky Studio**（6b）：`generate_media` 的图片、文生 / 图生视频、音乐、音效。
 - **配旁白和克隆**（6c）：Eleven v4 的字符级时间拼成词；克隆一次送多句（不超过各语言的字数上限）、拿回来在本机按句切开。
 - SkyCut 退出了，任务在服务器上照样做完：重开之后按记下的任务号取回。
 - 第 7 刀删掉 fal 那条路。
 
-## 五、守卫
+## 六、守卫
 
 - `scripts/check-sky-studio.sh` 第 7 组（`checks/SkyStudio/JobChecks.swift`、`JobRunChecks.swift`）：`/models` 照合同的样例读（认不出的 kind 留着、没有 id 的跳过、上限和取值）；`/quote` 去掉 inputs / max_credits / idempotency_key、读回 credits / typical_seconds / plan、没有 credits 不算回答；`/jobs` 带上 inputs / max_credits / idempotency_key、这一个请求等 120 秒、202 读成排队中；做完的状态和成品（null 的宽高是不知道、克隆的过期时间、旁白的字符时间原样）、没做成的两种写法、认不出的状态；任务号只当一节路径；取消的两种结果；`/uploads` 之后 PUT 只带服务器给的头、不带 Key、文件原样、进度只升不降到 1；下载成品不带 Key、下到一半不留半个文件。`SkyStudioJobRun`：一路做完（每一份都报、照服务器说的间隔问、夹到 2 秒）、满了等 15 秒用同一个 key 再交、交的时候断网再交（一共三次）、问的时候断网几次不算 / 连着 10 次才算、没做成 / 做完没成品 / 认不出的状态 / 余额不够（服务器的话原样）、停的三种（排队中退钱、开始了取消不了、取消没送到）、服务器那边已经取消、等太久。全程走假协议，不碰真的网络。
-- `checks/sky-studio-wiring.sh` 第 6、7 条：交任务 / 取消只经 `SkyStudioJobRun`；认证头只在 `SkyStudioAPI.request()` 里写一次。
+- `scripts/check-sky-studio.sh` 第 8 组（`SpendChecks.swift`）：积分的每日上限默认 1,000、额度内不问 / 超了问、记账退回按那一天、上限夹住取整、存下来读回来一样。
+- `checks/sky-studio-wiring.sh` 第 6、7 条：交任务 / 取消只经 `SkyStudioJobRun`；认证头只在 `SkyStudioAPI.request()` 里写一次。第 8 条（upscale）：把关在建任务之前、
+  积分的账只在 `SkyStudioJobGate` 和 `UpscaleJob` 里动、只有面板起的任务可能弹钥匙串授权框、清单跟着 Sky Studio 的 Key 走。

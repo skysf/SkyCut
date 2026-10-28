@@ -1086,18 +1086,11 @@
 "Not optimized (the preview uses the original file)" = "没有优化（预览用原片）";
 "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones" = "有几个文件优化不了，预览对它们用原片。菜单里列着是哪几个";
 
-/* Upscale (clip → fal.ai, compare, replace) */
-"%@ charged" = "已扣 %@";
-"%@ s · est. %@" = "%@ 秒 · 估 %@";
+/* Upscale (clip → Sky Studio, compare, replace; fal.ai before 2026-10-28) */
 "%@ upscaled to %@ · %@" = "%@ 已放大到 %@ · %@";
 "%@ used by another clip, plus handles; covers this clip too" = "另一段用了 %@，加余料；也盖住这一段";
 "%@ used, plus %@ of handles on each side" = "用了 %@，两头各加 %@ 余料";
-"Add a fal.ai key in Settings → AI first." = "先在设置 → AI 里填 fal.ai 的密钥。";
-"Adds detail. Clips up to 20 s." = "会加细节。片段最长 20 秒。";
 "Below the %@ canvas. Upscaling adds real detail instead of plain scaling." = "低于 %@ 的画布。Upscale 补的是真细节，不是简单放大。";
-"Charged %@ (estimated %@) · the original file stays where it is" = "实际扣费 %@（估 %@）· 原片留在原处";
-"Cheapest. Preset for AI footage." = "最便宜。有 AI 素材的预设。";
-"Clips up to %d s only" = "只收 %d 秒以内的片段";
 "Compare with Original…" = "和原片比一比…";
 "Compare · %@" = "对比 · %@";
 "Compare…" = "对比…";
@@ -1105,18 +1098,13 @@
 "Do not replace the clip; the upscaled file stays on disk" = "不替换这一段；放大后的文件留在磁盘上";
 "Downloading" = "下载";
 "Downloading %d%%" = "下载 %d%%";
-"Estimated %@ · checking the bill · the original file stays where it is" = "估 %@ · 正在对账 · 原片留在原处";
 "Every use now and any future trim" = "现在用到的每一处，以后再裁也够";
-"Faithful. Best for real faces." = "忠实。最适合真人脸。";
-"Faithful. Clips up to 20 s." = "忠实。片段最长 20 秒。";
-"Files up to %d MB only" = "只收 %d MB 以内的文件";
 "Finishing" = "收尾";
 "Forget this result; the file stays on disk" = "不要这个结果；文件留在磁盘上";
 "Generating %@ with %@" = "正在生成%@ · %@";
 "In queue" = "排队";
 "In queue (%d)" = "排队（第 %d 位）";
 "Keep Original" = "保留原片";
-"Large-model restoration, 10 times the price." = "大模型修复，价格十倍。";
 "Larger than the canvas: raise the canvas size too, or the export will scale it back down." = "比画布大：画布也要跟着改大，不然导出会缩回去。";
 "Longest use in this project (recommended)" = "这个工程里用得最长的那处（推荐）";
 "Loop" = "循环";
@@ -1130,10 +1118,8 @@
 "Play the original and the upscaled file side by side" = "原片和放大后的文件并排播";
 "Point this clip back at the original file; the upscaled file stays on disk" = "把这一段指回原片；放大后的文件留在磁盘上";
 "Preparing" = "准备";
-"Prices for %@ of video, fal.ai rates as of %@" = "按 %@ 的视频算，fal.ai %@ 的价目";
 "Processing" = "处理";
 "Processing %@" = "处理 %@";
-"Re-draws detail: fur, leaves, water." = "重绘细节：毛发、树叶、水面。";
 "Replace Clip" = "替换片段";
 "Revert to Original" = "换回原片";
 "Revert to Original Clip" = "换回原片";
@@ -1143,7 +1129,6 @@
 "Side by side" = "并排";
 "Sound effect" = "音效";
 "Sound from the original" = "声音放原片的";
-"Spent today %@ of your %@ daily limit · final cost shown after upload" = "今天已花 %@，每日上限 %@ · 实际扣费上传后显示";
 "Target resolution" = "目标分辨率";
 "The original file could not be found." = "找不到原片。";
 "The original file stays where it is." = "原片留在原处。";
@@ -1156,8 +1141,27 @@
 "Upscale Again…" = "再做一次 Upscale…";
 "Upscale Clip" = "Upscale 这一段";
 "Upscale cancelled." = "Upscale 已取消。";
+"Re-draws detail: fur, leaves, water. No 1440p." = "重绘细节：毛发、树叶、水面。没有 1440p。";
+"Large-model restoration. Slow: about a minute per second of video." = "大模型修复。慢：每秒视频约要一分钟。";
+"At most %@ s at a time: split the clip first" = "一次最多 %@ 秒：先把片段切开";
+"Up to %d fps only" = "最高只到 %d fps";
+"Not offered at this resolution" = "这个模型没有这一档分辨率";
+"Sky Studio upscales at most %@ s at a time, handles included." = "Sky Studio 一次最多放大 %@ 秒，两头的余料算在里面。";
+"Sky Studio credits for %@ of video" = "按 %@ 的视频算的 Sky Studio 积分";
+"Asking Sky Studio for its upscale models…" = "正在问 Sky Studio 有哪些 upscale 模型…";
+"Could not get the upscale models from Sky Studio: %@" = "没能从 Sky Studio 拿到 upscale 模型：%@";
+"%@ credits" = "%@ 积分";
+"Spent today %@ of your %@-credit daily limit" = "今天已花 %@ 积分，每日上限 %@ 积分";
+"Upscale · %@ credits" = "Upscale · %@ 积分";
+"macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow." = "macOS 马上会问是否允许 SkyCut 使用你的 Sky Studio 密钥，请点「始终允许」。";
+"%@ s · %@ credits" = "%@ 秒 · %@ 积分";
+"Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library." = "Sky Studio 已经开始做了，取消不了：积分已经花了，成品会出现在你的 Sky Studio 作品库里。";
+"SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library." = "SkyCut 没能连上 Sky Studio 去取消它；它可能还会做完，出现在你的 Sky Studio 作品库里。";
+"%@ Sky Studio credits · also in your Sky Studio library · the original file stays where it is" = "%@ Sky Studio 积分 · 你的 Sky Studio 作品库里也有一份 · 原片留在原处";
+"Daily limit for AI" = "AI 每日上限";
+"credits" = "积分";
+"SkyCut asks before AI spends more Sky Studio credits than this in one day" = "AI 一天花的 Sky Studio 积分要超过这个数时，SkyCut 先问你";
 "Upscale failed: %@" = "Upscale 失败：%@";
-"Upscale · %@" = "Upscale · %@";
 "Upscaled with %@ on %@ · %@" = "%@ 做的，%@ · %@";
 "Upscaled. Compare it, then decide." = "做好了。比一比再决定。";
 "Upscale…" = "Upscale…";

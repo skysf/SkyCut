@@ -1,13 +1,15 @@
 import Foundation
 
-// MARK: - 用户点了「开始」之后的那个任务：记账 → 取 Key → 跑流水线 → 对账实际扣费
+// MARK: - 用户点了「开始」之后的那个任务：记账 → 取 Key → 跑流水线 → 按实收对账
 //
-// 管什么：面板起的，面板上的估价已经是用户的确认（方案第 10 条：记进 fal 的账本、超限只标红不拦），不再问；AI 起的（upscale_clip）
-// 在起任务之前按每日上限把关过了（FalJobGate.decide，超了是聊天里的确认码），任务拿到已经记上的那一笔（`Approval.ai`）；取 Key（钥匙串，
-// 新版本第一次读会弹授权框，`keyPrompt` 让界面说一句）；跑 `UpscalePipeline`，阶段（含上传 / 下载的字节比例、这一阶段过了多久）发给界面；做完几分钟内去账单明细里
-// 把实际扣费查回来（要 ADMIN 权限的 Key，查不到就只有估价）。没做出来的钱退回（照 FalGenerationRun 的规矩：拿到结果就不退）。
-// 做完**不替换**：对比窗口里用户点了 Replace 才换（方案第 15 条）。
-// 不管什么：裁 / 传 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
+// 管什么：面板起的，面板上的报价（/quote 的积分）就是用户的确认（upscale 方案第 10 条：记进积分的账、超限只标红不拦），不再问；
+// AI 起的（upscale_clip）在起任务之前按每日积分上限把关过了（SkyStudioJobGate.decide，超了是聊天里的确认码），任务拿到已经记上的那一笔（`Approval.ai`）。
+// 取 Sky Studio 的 Key：面板起的可以弹钥匙串授权框（用户刚点了按钮，`keyPrompt` 让界面说一句），AI 起的不弹（读不到就请用户去设置里点「允许…」）；
+// 跑 `UpscalePipeline`，阶段（含上传 / 下载的字节比例、这一阶段过了多久）发给界面；做完按实收（credits_charged）改账。
+// 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。
+// 交上之后停不下来的（已经开始了、取消没送到）照实说：积分花了，成品照样进用户的 Sky Studio 作品库。
+// 做完**不替换**：对比窗口里用户点了 Replace 才换（upscale 方案第 15 条）。2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。
+// 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
 
 @MainActor
 final class UpscaleJob: ObservableObject, Identifiable {
@@ -16,14 +18,15 @@ final class UpscaleJob: ObservableObject, Identifiable {
         case running(FalJobProgress)
         case done
         case failed(String)
-        case cancelled
+        /// 停下来了：积分花没花（排队中 / 交上之前停的没花；已经开始的花了，成品照样进作品库）。
+        case cancelled(SkyStudioJobError.Stop)
     }
 
-    /// 花钱怎么把关：面板上的估价就是用户的确认（方案第 10 条，直接记账）；AI 起的（upscale_clip）在起任务之前按每日上限把关过了
-    /// （FalJobGate.decide，和 generate_media 同一处），这里拿到的是已经记上的那一笔。
+    /// 花钱怎么把关：面板上的报价就是用户的确认（直接记账）；AI 起的（upscale_clip）在起任务之前按每日积分上限把关过了
+    /// （SkyStudioJobGate.decide），这里拿到的是已经记上的那一笔。
     enum Approval {
         case panel
-        case ai(FalJobGate.Reservation)
+        case ai(SkyStudioJobGate.Reservation)
     }
 
     let id = UUID()
@@ -38,22 +41,17 @@ final class UpscaleJob: ObservableObject, Identifiable {
 
     @Published private(set) var state: State
     @Published private(set) var outcome: UpscaleOutcome?
-    /// 账单明细查到的实际扣费；nil = 还没查到 / 查不到。
-    @Published private(set) var actualCost: Double?
-    /// macOS 正在问要不要让 SrtFlow 用钥匙串里的 Key（界面提醒用户点「始终允许」）。
+    /// macOS 正在问要不要让 SkyCut 用钥匙串里的 Key（只有面板起的会问；界面提醒用户点「始终允许」）。
     @Published private(set) var keyPrompt = false
-    /// AI 起的任务在等用户动手（macOS 的钥匙串授权框）时给 AI 看的话（任务的 `waiting_for_user`）；没在等就是 nil。
-    @Published private(set) var waiting: String?
     /// 做完（拿到文件）时叫一声：UpscaleActivity 用它弹对比窗口，upscale_clip 用它直接换源。
     var onFinished: ((UpscaleJob) -> Void)?
     /// 怎么结束都叫一声（done 在 onFinished 之后；failed / cancelled）：upscale_clip 用它把结局记给 AI 的任务。
     var onEnded: ((UpscaleJob) -> Void)?
-    /// 账单查到实际扣费时叫一声（做完几分钟后；要 ADMIN 权限的 Key）：换过源的那一边把钱补进工程里的记录。
-    var onCostResolved: ((UpscaleJob) -> Void)?
 
     private var task: Task<Void, Never>?
-    private var reserved: (amount: Double, day: Date)?
-    private var resultReceived = false
+    private var reserved: (credits: Double, day: Date)?
+    /// 交上了没有（交上之后积分扣了，没做成服务器退）：回调在别的线程上，带锁。
+    private let submitted = UpscaleSubmitted()
 
     init(request: UpscaleRequest, clipIDs: [UUID], projectGeneration: Int, title: String, approval: Approval = .panel) {
         self.request = request
@@ -61,7 +59,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         self.projectGeneration = projectGeneration
         self.title = title
         self.approval = approval
-        state = .running(FalJobProgress(phase: .preparing, typicalSeconds: request.tier.typicalSeconds))
+        state = .running(FalJobProgress(phase: .preparing, typicalSeconds: request.typicalSeconds))
     }
 
     static var workFolder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlowUpscale", isDirectory: true) }
@@ -72,118 +70,105 @@ final class UpscaleJob: ObservableObject, Identifiable {
     }
 
     func cancel() {
-        // 只取消还在跑的：做完之后 `UpscaleActivity.remove`（换源、丢弃、AI 收尾）也会经过这里，不许把账单的查询一起杀掉
-        //（2026-10-02 冒烟：AI 起的换源做完检查器里的扣费一直是「—」，就是查询被这一下取消了）。
+        // 只取消还在跑的：做完之后 `UpscaleActivity.remove`（换源、丢弃、AI 收尾）也会经过这里。
         guard case .running = state else { return }
         task?.cancel()
     }
 
-    /// 「Topaz · Precision · 12 s · 1080p」：确认码绑着它（FalJobGate）。
+    /// 「Topaz Starlight · 4K · 7.0 s」：确认码绑着它（SkyStudioJobGate）。
     static func summary(of request: UpscaleRequest) -> String {
-        "\(request.tier.title) · \(request.tier.detail) · \(Int(request.range.duration.rounded())) s · \(request.target.label)"
+        "\(request.tier.title) · \(request.target.label) · " + String(format: "%.1f s", request.range.duration)
     }
 
     private func execute() async {
-        let store = FalSettingsStore.shared
         // 1. 账。
         switch approval {
         case .panel:
-            // 面板上已经确认过，直接记上估算。
-            store.recordSpend(request.estimate)
-            reserved = (request.estimate, Date())
+            // 面板上已经确认过，直接记上报价。
+            SkyStudioSpendStore.shared.record(request.credits)
+            reserved = (request.credits, Date())
         case .ai(let reservation):
-            // AI 起的：起任务之前已经按每日上限把关、记上了（FalJobGate.decide）；起来之前就被停了的退回。
-            reserved = (reservation.amount, reservation.day)
-            guard !Task.isCancelled else {
-                refund(store)
-                state = .cancelled
-                onEnded?(self)
-                return
-            }
+            // AI 起的：起任务之前已经按每日上限把关、记上了（SkyStudioJobGate.decide）。
+            reserved = (reservation.credits, reservation.day)
         }
+        guard !Task.isCancelled else { return end(.cancelled(.nothingCharged), refunding: true) }
 
-        // 2. Key。
-        let aiDriven: Bool
-        if case .ai = approval { aiDriven = true } else { aiDriven = false }
-        let hinted = FalPromptFlag()
-        let keyResult = await FalKeyCache.shared.key(willAsk: { [weak self] in
-            self?.keyPrompt = true
-            guard aiDriven else { return }
-            hinted.value = true
-            self?.waiting = FalJobGate.keyPromptWaiting
-            FalJobGate.showKeyPromptHint()
-        })
+        // 2. Key：面板起的可以弹授权框，AI 起的不弹。
+        let mode: SkyStudioJobKey.Mode
+        if case .panel = approval { mode = .prompting } else { mode = .silent }
+        let keyResult = await SkyStudioJobKey.key(mode, willAsk: { [weak self] in self?.keyPrompt = true })
         keyPrompt = false
-        waiting = nil
-        if hinted.value { FalJobGate.clearKeyPromptHint() }
-        guard case .key(let key) = keyResult else {
-            refund(store)
-            state = .failed(keyResult == .missing ? FalError.noKey.message : "SkyCut could not read the fal.ai key from the macOS keychain.")
-            onEnded?(self)
-            return
+        let key: String
+        switch keyResult {
+        case .success(let found): key = found
+        case .failure(let problem): return end(.failed(problem.message), refunding: true)
         }
 
         // 3. 流水线。
-        let client = FalClient(base: FalClient.configuredBase()) { key }
-        let ffmpeg = MediaToolchain.shared.runtime?.url
+        let submitted = self.submitted
         do {
-            let result = try await UpscalePipeline.run(request, client: client, ffmpeg: ffmpeg, workFolder: Self.workFolder) { [weak self] phase in
+            let result = try await UpscalePipeline.run(
+                request, api: SkyStudioAPI(), key: key, ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder,
+                onSubmitted: { _ in submitted.mark() }
+            ) { [weak self] phase in
                 Task { @MainActor in
                     guard let self, case .running(let progress) = self.state else { return }
                     self.state = .running(progress.advanced(to: phase))
-                    if case .downloading = phase { self.resultReceived = true }
                 }
             }
-            resultReceived = true
+            settle(charged: result.creditsCharged)
             outcome = result
             state = .done
             onFinished?(self)
             onEnded?(self)
-            await lookUpCost(client: client, requestID: result.requestID, since: Date().addingTimeInterval(-result.elapsed - 600))
-        } catch is CancellationError {
-            refund(store)
-            state = .cancelled
-            onEnded?(self)
-        } catch let error as FalError {
-            refund(store)
-            state = .failed(error.message)
-            onEnded?(self)
-        } catch let error as UpscalePipelineError {
-            refund(store)
-            state = .failed(error.message)
-            onEnded?(self)
-        } catch {
-            refund(store)
-            state = .failed(error.localizedDescription)
-            onEnded?(self)
-        }
-    }
-
-    /// 没做出来才退：fal 只对做出来的收钱。
-    private func refund(_ store: FalSettingsStore) {
-        guard !resultReceived, let reserved else { return }
-        store.refundSpend(reserved.amount, on: reserved.day)
-        self.reserved = nil
-    }
-
-    /// 账单明细一般几分钟内出现：每 30 秒问一次、最多六次。查到了把账本里的估算换成实收。
-    private func lookUpCost(client: FalClient, requestID: String, since: Date) async {
-        for attempt in 0..<6 {
-            if attempt > 0 { try? await Task.sleep(nanoseconds: 30_000_000_000) }
-            guard let events = try? await client.billingEvents(requestIDs: [requestID], since: since) else { return }
-            if let cost = FalBilling.cost(of: requestID, in: events) {
-                actualCost = cost
-                outcome?.record.costUSD = cost
-                if let reserved {
-                    FalSettingsStore.shared.refundSpend(reserved.amount, on: reserved.day)
-                    FalSettingsStore.shared.recordSpend(cost)
-                    self.reserved = nil
-                }
-                onCostResolved?(self)
-                return
+        } catch let error as SkyStudioJobError {
+            switch error {
+            case .stopped(let stop):
+                end(.cancelled(stop), refunding: stop == .nothingCharged)
+            case .failed:
+                // Sky Studio 说没做成：它自己退钱（只退一次）。
+                end(.failed(error.message), refunding: true)
+            case .request, .badAnswer, .timedOut:
+                // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
+                end(.failed(error.message), refunding: !submitted.value)
             }
+        } catch is CancellationError {
+            // 裁、传的时候停的没花钱；下载、封声的时候停的，活已经做完了（积分花了，成品在作品库里）。
+            end(.cancelled(submitted.value ? .alreadyStarted : .nothingCharged), refunding: !submitted.value)
+        } catch let error as UpscalePipelineError {
+            end(.failed(error.message), refunding: !submitted.value)
+        } catch let failure as SkyStudioFailure {
+            end(.failed(SkyStudioJobError.request(failure).message), refunding: !submitted.value)
+        } catch {
+            end(.failed(error.localizedDescription), refunding: !submitted.value)
         }
     }
+
+    private func end(_ final: State, refunding: Bool) {
+        if refunding, let reserved {
+            SkyStudioSpendStore.shared.refund(reserved.credits, on: reserved.day)
+            self.reserved = nil
+        }
+        state = final
+        onEnded?(self)
+    }
+
+    /// 做完：账上记的是报价，换成实收（一般一样；服务器按实际的文件算、比报价低就收低的）。
+    private func settle(charged: Double) {
+        guard let reserved, abs(reserved.credits - charged) > 0.0001 else { return }
+        let store = SkyStudioSpendStore.shared
+        store.refund(reserved.credits, on: reserved.day)
+        store.record(charged)
+        self.reserved = (charged, Date())
+    }
+}
+
+/// 交上了没有（流水线的回调在别的线程上）。
+final class UpscaleSubmitted: @unchecked Sendable {
+    private let lock = NSLock()
+    private var flag = false
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return flag }
+    func mark() { lock.lock(); flag = true; lock.unlock() }
 }
 
 /// 面板要为哪一段打开（右键菜单、检查器都走这里）。

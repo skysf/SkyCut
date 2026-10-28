@@ -26,7 +26,6 @@ struct UpscaleCompareView: View {
         var tierName: String
         var offset: Double
         var fileName: String
-        var estimate: Double?
         var elapsed: Double?
     }
 
@@ -47,19 +46,18 @@ struct UpscaleCompareView: View {
             return Source(
                 originalURL: job.request.originalURL, originalLabel: job.request.originalInfo.resolutionLabel,
                 upscaledURL: outcome?.file ?? job.request.originalURL, upscaledSize: outcome?.info.displaySize ?? job.request.originalInfo.displaySize,
-                tierName: "\(tier.title) · \(tier.detail)", offset: outcome?.record.sourceOffset ?? 0,
-                fileName: outcome?.file.lastPathComponent ?? "", estimate: job.request.estimate, elapsed: outcome?.elapsed
+                tierName: tier.title, offset: outcome?.record.sourceOffset ?? 0,
+                fileName: outcome?.file.lastPathComponent ?? "", elapsed: outcome?.elapsed
             )
         case .clip(let id):
             let clip = project.state.allClips.first { $0.id == id }
             let record = clip?.upscale
-            let tier = record.flatMap { FalUpscaleTiers.tier($0.tier) }
             return Source(
                 originalURL: record?.originalURL ?? clip?.sourceURL ?? URL(fileURLWithPath: "/"),
                 originalLabel: record?.originalInfo?.resolutionLabel ?? "", upscaledURL: clip?.sourceURL ?? URL(fileURLWithPath: "/"),
                 upscaledSize: clip?.info?.displaySize ?? CGSize(width: 1920, height: 1080),
-                tierName: tier.map { "\($0.title) · \($0.detail)" } ?? (record?.tier ?? ""), offset: record?.sourceOffset ?? 0,
-                fileName: clip?.sourceURL.lastPathComponent ?? "", estimate: nil, elapsed: nil
+                tierName: UpscaleTier.displayName(for: record?.tier ?? ""), offset: record?.sourceOffset ?? 0,
+                fileName: clip?.sourceURL.lastPathComponent ?? "", elapsed: nil
             )
         }
     }
@@ -166,11 +164,6 @@ struct UpscaleCompareView: View {
     private func replace(_ job: UpscaleJob) {
         guard let outcome = job.outcome else { return }
         let replacement = ClipSourceSwap.Replacement(url: outcome.file, info: outcome.info, record: outcome.record)
-        // 账单还没查到就点了替换：查到实收再补进工程里的记录（不进撤销栈）；工程中途换了就不补。
-        job.onCostResolved = { [weak project] job in
-            guard let project, let cost = job.actualCost, project.documentGeneration == job.projectGeneration else { return }
-            project.recordUpscaleCost(file: outcome.file, costUSD: cost)
-        }
         let done = project.applyUpscale(replacement, to: project.clipIDs(usingPicture: job.request.originalURL))
         if done.isEmpty { project.notice = L10n("No clip in this project could be replaced; the upscaled file was kept.") }
         UpscaleActivity.shared.remove(job)
@@ -178,19 +171,14 @@ struct UpscaleCompareView: View {
     }
 }
 
-/// 「实际扣费 / 估价」那一行：账单明细几分钟后才有，单独订阅那个任务。
+/// 「扣了多少积分」那一行（单独订阅那个任务）：Sky Studio 做完那一份状态里就有实收。
 struct UpscaleCostLine: View {
     @ObservedObject var job: UpscaleJob
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        let estimate = FalMoney.text(job.request.estimate)
-        if let actual = job.actualCost {
-            Text(String(format: L10n("Charged %@ (estimated %@) · the original file stays where it is"), FalMoney.text(actual), estimate))
-                .font(.caption).foregroundStyle(.secondary)
-        } else {
-            Text(String(format: L10n("Estimated %@ · checking the bill · the original file stays where it is"), estimate))
-                .font(.caption).foregroundStyle(.secondary)
-        }
+        let credits = SkyStudioCredits.text(job.outcome?.creditsCharged ?? job.request.credits)
+        Text(String(format: L10n("%@ Sky Studio credits · also in your Sky Studio library · the original file stays where it is"), credits))
+            .font(.caption).foregroundStyle(.secondary)
     }
 }

@@ -120,7 +120,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 这个工具要哪个提供方配好了才列出来（nil = 一直列）。方案第 36 条：谁都没配就不列出来。
     public var provider: MCPProvider? {
         switch self {
-        case .generateMedia, .upscaleClip: return .fal
+        case .generateMedia: return .fal
+        case .upscaleClip: return .skystudio
         default: return nil
         }
     }

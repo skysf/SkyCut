@@ -96,9 +96,6 @@ enum FalError: Error, Equatable {
 final class FalClient: @unchecked Sendable {
     private let session: URLSession
     private let base: URL
-    /// 存储（上传文件）和平台（账单）接口的地址：`https://rest.fal.ai`、`https://api.fal.ai`。
-    private let rest: URL
-    private let api: URL
     private let keyProvider: @Sendable () -> String?
     private let pollInterval: @Sendable (Int) -> Double
 
@@ -115,14 +112,11 @@ final class FalClient: @unchecked Sendable {
 
     init(
         session: URLSession = .shared, base: URL = URL(string: "https://queue.fal.run")!,
-        rest: URL = URL(string: "https://rest.fal.ai")!, api: URL = URL(string: "https://api.fal.ai")!,
         pollInterval: @escaping @Sendable (Int) -> Double = FalClient.defaultPollInterval,
         key: @escaping @Sendable () -> String?
     ) {
         self.session = session
         self.base = base
-        self.rest = rest
-        self.api = api
         self.pollInterval = pollInterval
         self.keyProvider = key
     }
@@ -245,54 +239,6 @@ final class FalClient: @unchecked Sendable {
         } catch {
             throw FalError.network(error.localizedDescription)
         }
-    }
-
-    // MARK: 上传文件（视频太大，不能像图片那样当 data URI 内嵌）
-
-    /// fal 的存储：`POST <rest>/storage/upload/initiate?storage_type=fal-cdn-v3` 拿到 `upload_url` / `file_url`，把字节 `PUT` 到
-    /// `upload_url`（这一步不带 Key：那是存储桶的签名地址），`file_url` 就是能填进 `video_url` 的地址。
-    /// 2026-10-02 实测：旧 SDK / 旧文档写的 `storage_type=gcs` 已经被拒（400 Invalid storage type）。
-    /// `onProgress`：发出去的字节比例（0…1，按 1% 一格），PUT 成功时一定报 1。
-    func upload(
-        fileURL: URL, contentType: String, fileName: String? = nil, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
-    ) async throws -> URL {
-        guard FileManager.default.isReadableFile(atPath: fileURL.path) else {
-            throw FalError.network("could not read \(fileURL.lastPathComponent)")
-        }
-        var components = URLComponents(url: rest.appendingPathComponent("storage/upload/initiate"), resolvingAgainstBaseURL: false)
-        components?.queryItems = [URLQueryItem(name: "storage_type", value: "fal-cdn-v3")]
-        guard let initiateURL = components?.url else { throw FalError.badAnswer("bad upload address") }
-        var initiate = try authorized(URLRequest(url: initiateURL))
-        initiate.httpMethod = "POST"
-        initiate.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        let name = fileName ?? fileURL.lastPathComponent
-        initiate.httpBody = try JSONValue.object(["file_name": .string(name), "content_type": .string(contentType)]).encodedData()
-        let answer = try await send(initiate)
-        guard let uploadURL = answer["upload_url"]?.stringValue.flatMap(URL.init(string:)),
-              let fileLink = answer["file_url"]?.stringValue.flatMap(URL.init(string:)) else {
-            throw FalError.badAnswer("no upload_url / file_url")
-        }
-        // 文件流着发（不整个读进内存），字节进度从任务的代理来（FalTransfer）。
-        var put = URLRequest(url: uploadURL)
-        put.httpMethod = "PUT"
-        put.timeoutInterval = 600
-        put.setValue(contentType, forHTTPHeaderField: "Content-Type")
-        let delegate = FalTransferDelegate(moveDestination: nil, onProgress: onProgress)
-        let task = session.uploadTask(with: put, fromFile: fileURL)
-        try await transfer(task, delegate: delegate)
-        guard let http = task.response as? HTTPURLResponse else { throw FalError.badAnswer("not an HTTP answer") }
-        guard (200..<300).contains(http.statusCode) else { throw FalError.fromHTTP(status: http.statusCode, body: delegate.data) }
-        onProgress(1)
-        return fileLink
-    }
-
-    // MARK: 账单明细（要 ADMIN 权限的 Key；只有 API 权限会 401 / 403，调用方当作查不到）
-
-    func billingEvents(requestIDs: [String], since: Date) async throws -> [FalBillingEvent] {
-        var components = URLComponents(url: api.appendingPathComponent(FalBilling.path), resolvingAgainstBaseURL: false)
-        components?.queryItems = FalBilling.query(requestIDs: requestIDs, since: since)
-        guard let url = components?.url else { throw FalError.badAnswer("bad billing address") }
-        return FalBilling.events(from: try await send(try authorized(URLRequest(url: url))))
     }
 
     // MARK: 私有

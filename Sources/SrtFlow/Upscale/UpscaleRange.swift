@@ -5,7 +5,7 @@ import Foundation
 // 管什么：一个原片在当前工程里被哪些画面段用到（原片时间轴上的区间）、用户三选一（这一段 / 工程里最长的那处 / 整个文件）
 // 之后到底送哪一段（两头各留余料、对齐到整帧、夹在文件两头之内）、面板上「另一处用了更长的范围」的提示要的数。
 // 用户 2026-10-02 拍的板（docs/plans/2026-10-02-video-upscale.md 第 2、5 条）：带余料；同一个原片在当前工程里用到的地方都换，
-// 只选了短的那处时提示另一处用了更长的范围、建议直接做最长的那段。
+// 只选了短的那处时提示另一处用了更长的范围、建议直接做最长的那段。2026-10-27 起一次最长 30 秒、余料算在里面（收费方案第 16 条）：放不下先少留余料。
 // 不管什么：裁文件（UpscaleSourceTrimmer）、换源（ClipSourceSwap）。
 
 /// 一个画面段在原片时间轴上用到的区间。
@@ -40,14 +40,23 @@ struct UpscaleRange: Equatable, Sendable {
     var chosen: UpscaleUse?
 
     /// 按选择算范围。`uses` 是这个原片在工程里的全部用处（`TimelineState.clipIDs(usingPicture:)` 换算到原片时间）。
+    /// `maxSeconds`：一次最长几秒（Sky Studio 的 `/models` 报，**两头的余料算在里面**，收费方案第 16 条）：放不下就少留余料（两头一样少，
+    /// 不收进选中的那段）；选中的那段本身就放不下时照原样算，由 `UpscaleTier.refusal` 说「先切开」。整个文件不收余料。
     static func make(
-        _ choice: UpscaleRangeChoice, thisClip: UUID, uses: [UpscaleUse], fileDuration: Double, frameRate: Double
+        _ choice: UpscaleRangeChoice, thisClip: UUID, uses: [UpscaleUse], fileDuration: Double, frameRate: Double, maxSeconds: Double? = nil
     ) -> UpscaleRange {
         let frame = frameRate > 0 ? 1 / frameRate : 1 / 24
         func aligned(_ raw: ClosedRange<Double>) -> UpscaleRange {
+            var pad = handle
+            if let maxSeconds { pad = min(handle, max(0, (maxSeconds - (raw.upperBound - raw.lowerBound)) / 2)) }
             // 两头各留余料，起点往下对到整帧、终点往上对到整帧，再夹进文件里。
-            let start = max(0, ((raw.lowerBound - handle) / frame).rounded(.down) * frame)
-            let end = min(fileDuration, ((raw.upperBound + handle) / frame).rounded(.up) * frame)
+            var start = max(0, ((raw.lowerBound - pad) / frame).rounded(.down) * frame)
+            var end = min(fileDuration, ((raw.upperBound + pad) / frame).rounded(.up) * frame)
+            // 对到整帧会多出一两帧：还超上限就从余料里收回（不收进选中的那段）。
+            if let maxSeconds {
+                while end - start > maxSeconds + 1e-9, start + frame <= raw.lowerBound + 1e-9 { start += frame }
+                while end - start > maxSeconds + 1e-9, end - frame >= raw.upperBound - 1e-9 { end -= frame }
+            }
             let covered = uses.filter { $0.start >= start - ClipUpscaleRecord.frameSlack && $0.end <= end + ClipUpscaleRecord.frameSlack }.map(\.clipID)
             return UpscaleRange(start: start, end: max(start, end), coveredClipIDs: covered, chosen: nil)
         }

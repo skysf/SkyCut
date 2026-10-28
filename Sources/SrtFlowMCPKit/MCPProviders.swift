@@ -5,13 +5,16 @@ import Foundation
 // 管什么：方案第 36 条 —— 大多数用户不一定会填 fal 的 Key，**生成类工具做成提供方可换，谁都没配就不列出来**（以后可以换成
 // skystudioai.com）。工具清单是小程序当场回的（Claude 一启动就要清单，不能为此把 SrtFlow 拉起来），而 Key 在 App 的钥匙串里：
 // 所以 App 在 Key 添加 / 删除时写一个**只有提供方名字**的小文件（`mcp-providers.json`，放在和 socket 同一个目录），小程序回清单时读它。
-// 文件里没有 Key、也没有别的机密：`{"providers":["fal"]}`。
-// 不管什么：Key 怎么存（App 的 FalKeyStore）、清单怎么回（MCPServerCore）。
+// 文件里没有 Key、也没有别的机密：`{"providers":["fal","skystudio"]}`。2026-10-28 起 upscale_clip 归 Sky Studio（收费方案第 6 刀），
+// generate_media 还归 fal（第 6 刀后面几个 PR 再换）。
+// 不管什么：Key 怎么存（App 的 FalKeyStore / SkyStudioKey）、谁写这个文件（App 的 MCPProviderSync）、清单怎么回（MCPServerCore）。
 //
 // 读得宽：文件不在 / 读不出来 / 有不认识的提供方，都当「没有」，不因此让整份清单出错。
 
 public enum MCPProvider: String, CaseIterable, Sendable {
     case fal
+    /// Sky Studio 的 Key（`sk-…`，设置里「Sky Studio」一节）。
+    case skystudio
 }
 
 public enum MCPProviderMarker {

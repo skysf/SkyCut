@@ -45,8 +45,8 @@
 #      fal 报的词时间换成字幕认的词、克隆参考音频的 WAV（真去调 fal 在 scripts/check-fal.sh）。
 #  23. 字幕长什么样（edit_subtitles / burn_subtitles 的 style）：参数全验过、只改工程自己的样式、给了位置收掉拖框的布局、
 #      只给字号把倍率归一、逐词高亮的开关和倍数、烧录一批时描边 / 底条互换、位置词表对账。
-#  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 的类型对账、定义（参数、必填、枚举、只在配了 fal 时列、上网）、
-#      说明里每个档位都点了名且「about N min」和典型时长一致、总说明的 fal 那一行带着它（UpscaleToolChecks）；
+#  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 对账、定义（参数、必填、枚举、只在存了 Sky Studio 的 Key 时列、上网）、
+#      说明里每个模型都点了名、说清积分 / 30 秒 / 30 fps / 只有排队中能取消、总说明的「Paid」那一行带着它（UpscaleToolChecks；2026-10-28 起走 Sky Studio）；
 #      做完换源的那一下包在 AIUndoGrouping.step 里（异步落账，扫描）。
 #  28. record_screen（2026-10-03）：参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 App 的类型对账、工具的定义
 #      （ScreenRecordingToolChecks）；接线（AI 起的录制不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口……）在
@@ -228,13 +228,13 @@ if grep -q 'follow: request.follow && request.focus != .text' Sources/SrtFlow/AI
 fi
 echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
 
-echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次（记住那个文件夹）、fal 花钱超了额度"
+echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次（记住那个文件夹）、fal / Sky Studio 花钱超了额度"
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
 # 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
-# 从提示条改成同一套确认码（FalJobGate）。
+# 从提示条改成同一套确认码（FalJobGate）。2026-10-28（收费方案第 6 刀）：Sky Studio 的积分超每日上限同一套（SkyStudioJobGate）。
 ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
-if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift FalJobGate.swift " ]; then
-  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、fal 花钱的 FalJobGate）" >&2
+if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift FalJobGate.swift SkyStudioJobGate.swift " ]; then
+  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、fal 花钱的 FalJobGate、Sky Studio 花积分的 SkyStudioJobGate）" >&2
   exit 1
 fi
 if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then
@@ -417,7 +417,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIFalVoices.swift \
   Sources/SrtFlow/Fal/FalOutputs.swift \
   Sources/SrtFlow/Fal/FalModels.swift \
-  Sources/SrtFlow/Fal/FalUpscaleModels.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
+  Sources/SrtFlow/Upscale/UpscaleTiers.swift \
   Sources/SrtFlow/Fal/FalJobPhase.swift \
   Sources/SrtFlow/Upscale/UpscaleRange.swift \
   Sources/SrtFlow/AIUpscaleNames.swift \

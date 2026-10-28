@@ -162,7 +162,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      就放开了整个家目录。问题里写明「同意之后记住这个文件夹」。
    - **从不覆盖**：导出、新建、另存撞名都加编号（`ExportFileName.unoccupied`），所以不问；AI 要替换旧文件就先用
      `manage_files` 把它删进废纸篓（会问）。
-   - `generate_media` / `upscale_clip` 超了每日额度、或模型价格不明：当场回确认码（`FalJobGate.decide`，第 39、44 条），不在提示条上问。
+   - `generate_media` 超了 fal 的每日额度、或模型价格不明：当场回确认码（`FalJobGate.decide`，第 39 条）；`upscale_clip` 超了每日积分上限同样
+     （`SkyStudioJobGate.decide`，第 44 条，2026-10-28 起）。都不在提示条上问。
    会回 `needs_confirmation` 的只许这三处（`AIFileTools`、`AIWorkspace.confirmReading`、`FalJobGate`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
@@ -681,20 +682,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     没有合适的用 `sound_effect`、真实声音都没有才 `generate_media` —— `find_audio` 和 `generate_media` 的说明、风格卡都这么写；总说明目录
     Sound 那一行带着它。清单预算：加它之前 71,612 / 72,000，把二十几个工具的说明各收了一截才放进去（71,813；音效库的 kind 加上后又收了
     find_audio 的说明）。音效库那一半在第 23 条。
-44. **放大片段（`upscale_clip`，fal.ai，2026-10-02）**：合同全在 [视频 upscale](video-upscale.md) 第五节和 [fal.ai 生成](fal-generation.md)
-    第十二 / 十三节，这里只记它怎么接进 MCP 这一层。
-   - **和 `generate_media` 一样只在配了 fal 的 Key 时列出来**（`MCPToolName.provider`）；总说明的 fal 那一行带着它（Claude Code 开场只看目录）。
+44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
+    [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
+   - **只在存了 Sky Studio 的 Key 时列出来**（`MCPToolName.provider` = `skystudio`；之前和 `generate_media` 一样跟着 fal 的 Key）；总说明末尾的「Paid」那一行带着它（Claude Code 开场只看目录）。
      清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000、2026-10-17 抬到 100,000，见第一节）。
-   - **参数和面板同一份数**：`clip_id`，可选 `tier`（六个档位，词表 `MCPVocabulary.upscaleTiers` 和 `FalUpscaleTiers.all` 对账）、`target`（`1080p` /
-     `1440p` / `2160p`，按短边叫，4K 写成 2160p）、`range`（`clip` / `longest` / `file`）；默认和面板一样（目标按画布、范围别处用得更长就 longest）；
-     范围、估价、档位可不可用都由 `UpscalePanelModel` 算（`AIUpscaleNames` 认词）。源已经不比目标小就拒绝；音频 / 图片 / 定格段拒绝；
-     同一个原片正在做就拒绝。`get_timeline` 给每个画面段 `source_size`，AI 据此判断该不该放大。
-   - **是任务**：立刻回任务号（带估价、送去几秒、输出尺寸、会换哪些段、今天已花 / 上限、`next_step`），`get_job` 带阶段（第 7 条：
-     `phase` / `queue_position` / `transfer_percent` / `phase_seconds` / `typical_seconds`）；任务种类 `upscale`；`cancel_job` / 停止把它从
-     `UpscaleActivity` 拿掉（替 fal 也取消、不留文件）。
-   - **花钱按每日上限把关**，和 `generate_media` **同一处**，在建任务之前（`FalJobGate.decide`：额度内直接记账；超了当场回确认码、带码再调才记账，
-     任务拿到的是记好的那一笔 `Approval.ai`）；钥匙串授权框的提醒也共用（`FalJobGate.showKeyPromptHint`）。面板起的 upscale
-     不经它（面板本身就是确认）。`checks/fal-wiring.sh` 第 4、5 条钉着「把关和确认码只在 FalJobGate 一处」。
+   - **参数和面板同一份数**：`clip_id`，可选 `tier`（Sky Studio 的模型名，词表 `MCPVocabulary.upscaleTiers`：`topaz-starlight`（默认）/ `bytedance-upscaler-pro`；
+     词表里有、Sky Studio 此刻 `/models` 里没有的说清楚）、`target`（`1080p` / `1440p` / `2160p`，按短边叫，4K 写成 2160p，换成 Sky Studio 的 1080p / 2K / 4K）、
+     `range`（`clip` / `longest` / `file`）；默认和面板一样（目标按画布、范围别处用得更长就 longest）；范围、模型送不送得了（没有这一档、超过 30 秒、超过 30 fps）
+     都由 `UpscalePanelModel` 算（`AIUpscaleNames` 认词），价问 `/quote`。源已经不比目标小就拒绝；音频 / 图片 / 定格段拒绝；同一个原片正在做就拒绝；
+     问 Sky Studio 的那一两秒里工程换了就什么都不起。`get_timeline` 给每个画面段 `source_size`，AI 据此判断该不该放大。
+   - **是任务**：回任务号（带积分 `credits`、通常几分钟、送去几秒、输出尺寸、会换哪些段、今天已花 / 每日积分上限、`next_step`），`get_job` 带阶段（第 7 条：
+     `phase` / `queue_position` / `transfer_percent` / `phase_seconds` / `typical_seconds`）；做完带 `credits_charged`；任务种类 `upscale`；`cancel_job` / 停止把它从
+     `UpscaleActivity` 拿掉：**排队中的替它向 Sky Studio 取消、退钱；已经开始的取消不了**，结局照实说积分花了、成品在作品库里。
+   - **花积分按每日上限把关**（`SkyStudioJobGate.decide`，在问完 `/quote` 之后、建任务之前：额度内直接记账；超了当场回确认码、带码再调才记账，
+     任务拿到的是记好的那一笔 `Approval.ai`），和 fal 那一关同一套确认码。**Key 不弹钥匙串授权框**（读不到就请用户去设置里点「允许…」）。面板起的 upscale
+     不经它（面板本身就是确认）。`checks/sky-studio-wiring.sh` 第 8 条钉着。
    - **做完直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里一次
      `applyUpscale`（工程里用这个原片且范围被盖住的段一起换），**自己包一层 `AIUndoGrouping.step`**（异步落账，第 1 条；
      `scripts/check-mcp.sh` 的扫描钉着）、算这一轮的一处改动、选中换了的段并把播放头放过去（后台模式不动）、没存过的工程存一下；
