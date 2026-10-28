@@ -13,6 +13,9 @@
 #      /uploads 之后 PUT（只带服务器给的头、不带 Key）、下载成品；SkyStudioJobRun 满了等着再交（同一个 idempotency_key）、照 poll_after_seconds
 #      问、断网几次不算失败、停的时候排着队的退钱 / 开始了的取消不了、没做成 / 回的不像话 / 等太久各是哪一种；
 #   8. 积分的每日上限和按天的账（SkyStudioSpendStore）：默认 1,000、额度内不问 / 超了问、记账退回按那一天、上限夹住取整、存下来读回来一样。
+#   9. generate_media 送 Sky Studio 的那一份（SkyStudioGeneration，第 6 刀 6b）：词表和类型对账、每种的默认值（画幅跟画布 / 首帧、视频 5 秒 768p、
+#      音效 5 秒 wav、音乐纯音乐不给时长）、用不上的参数说一句不送、请求体、确认码的记号、离谁最近的画幅、成品的扩展名；
+#      图生视频的首帧（真写几张图：宽高比、EXIF 转了 90 度的对调、PNG 原样传、TIFF 转成 JPEG 传完删掉、不是图的说清楚）。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -55,6 +58,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/Fal/FalSpend.swift \
   Sources/SrtFlow/Fal/FalTransfer.swift \
@@ -69,6 +74,7 @@ xcrun swiftc \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
+  checks/SkyStudio/GenerationChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
 echo "==> 跑自检"

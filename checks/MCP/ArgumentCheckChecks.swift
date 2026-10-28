@@ -35,9 +35,9 @@ func runArgumentCheckChecks() {
     check(effect?.contains("in clips[0].sound_effect") == true, "a wrong field two levels down is named with its place: \(effect ?? "nil")")
     let style = MCPArgumentCheck.problem(tool: .editSubtitles, arguments: ["style": ["size": 48, "colour": "#ffffff"]])
     check(style?.contains("\"colour\"") == true && style?.contains("in style") == true, "a wrong style field is refused: \(style ?? "nil")")
-    // 里层的自由对象照收：generate_media 的 options 原样转给模型。
-    checkEqual(MCPArgumentCheck.problem(tool: .generateMedia, arguments: ["kind": "image", "prompt": "a cat", "options": ["seed": 7, "anything": true]]), nil,
-               "a free-form object such as options is not checked")
+    // generate_media 2026-10-28 起没有 options 了（模型和价格都由 Sky Studio 定，之前原样转给 fal 的模型）：老客户端带着它整个调用不做、说清楚。
+    let options = MCPArgumentCheck.problem(tool: .generateMedia, arguments: ["kind": "image", "prompt": "a cat", "options": ["seed": 7]])
+    check(options?.contains("\"options\"") == true, "generate_media no longer takes options: \(options ?? "nil")")
 
     // 每个工具：说明上第一层的每个名字都认（新加参数、改说明之后，这一步保证核对不会把说明上写着的挡掉）。
     for tool in MCPToolName.allCases {

@@ -13,10 +13,14 @@
 #      开始了的取消不了，这些规矩只在那一处；
 #   7. **Key 只发给 Sky Studio**：认证头只在 SkyStudioAPI.request 里写一次，上传的签名地址和成品地址都不经它；
 #   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好两处），
-#      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 UpscaleJob 里动；**只有面板起的任务可能弹钥匙串授权框**（`.prompting`），
+#      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 SkyStudioHeldCredits（upscale 和生成共用的那一笔）里动；
+#      **只有面板起的任务可能弹钥匙串授权框**（`.prompting`），
 #      AI 起的、面板取模型和报价都不弹；upscale_clip 跟着 Sky Studio 的 Key 列（提供方 skystudio，Key 变了同步那个小文件）；
 #      路由只起任务（起步不包撤销分组，换源那一下在任务里自己包），AI 起的不弹对比窗口、阶段交给 get_job；这几个文件不弹模态框；
-#      get_job 报 Sky Studio 的任务号 skystudio_job_id（交上了就有：跑着、做完、没做成、停了都带）。
+#      get_job 报 Sky Studio 的任务号 skystudio_job_id（交上了就有：跑着、做完、没做成、停了都带）；
+#   9. **generate_media 走 Sky Studio**（第 6 刀 6b，2026-10-28）：在建任务之前过 SkyStudioJobGate、任务用记好的那一笔（SkyStudioHeldCredits）；
+#      Key 不弹框；清单里它属于 skystudio；路由只起任务（不包撤销分组）；get_job 有阶段和 skystudio_job_id；任务起手登记进
+#      SkyStudioGenerationActivity、结束拿掉，状态行订阅它；能取消；这几个文件不弹模态框。
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -144,13 +148,15 @@ if [ -z "${G_DECIDE}" ] || [ -z "${G_REDEEM}" ] || [ -z "${G_ASK}" ] || [ "${G_D
 fi
 [ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 2 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好两处（额度内直接做 / 收下令牌之后）"
 movers="$(code_files_with 'SkyStudioSpendStore' | while read -r file; do
-  if grep -qE '\.(record|refund)\(' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
+  # 只认真动账本的写法（SkyStudioSpendStore.shared.record / refund、拿着它的 store.record / refund）；held?.refund() 是经 SkyStudioHeldCredits 退。
+  if grep -qE '(SkyStudioSpendStore\.shared|store)\.(record|refund)\(' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
 done | grep -v "^${SPEND}\$" | LC_ALL=C sort | tr '\n' ' ')"
-expected_movers="$(printf '%s\n' "${JOB_GATE}" "${UP_JOB}" | LC_ALL=C sort | tr '\n' ' ')"
-[ "${movers}" = "${expected_movers}" ] || fail "积分的账只许在 SkyStudioJobGate（AI 起的）和 UpscaleJob（面板起的、按实收换、退回）里动，实际在：${movers:-没有}"
+HELD="Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift"
+expected_movers="$(printf '%s\n' "${JOB_GATE}" "${HELD}" | LC_ALL=C sort | tr '\n' ' ')"
+[ "${movers}" = "${expected_movers}" ] || fail "积分的账只许在 SkyStudioJobGate（AI 起的）和 SkyStudioHeldCredits（面板起的、按实收换、退回）里动，实际在：${movers:-没有}"
 prompters="$(code_files_with '\.prompting' | grep -v "^${JOB_ACCESS}\$" | LC_ALL=C sort | tr '\n' ' ')"
 [ "${prompters}" = "${UP_JOB} " ] || fail "会弹钥匙串授权框的那一档（.prompting）只许面板起的 upscale 任务用（UpscaleJob），实际在：${prompters:-没有}"
-grep -qF 'case .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
+grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
 grep -qF 'if SkyStudioAccount.shared.hasKey { providers.insert(.skystudio) }' "${FAL_SETTINGS}" \
   || fail "${FAL_SETTINGS}：同步「配了哪些提供方」时要算上 Sky Studio 的 Key"
 grep -qF 'FalSettingsStore.shared.syncProviders()' "${ACCOUNT}" || fail "${ACCOUNT}：Sky Studio 的 Key 变了要同步「配了哪些提供方」的小文件"
@@ -180,8 +186,43 @@ for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${SPEND}"; do
   fi
 done
 
+# 9. generate_media 走 Sky Studio。
+GEN_TOOL="Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift"
+GEN_RUN="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift"
+GEN_ACTIVITY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationActivity.swift"
+STATUS_ROWS="Sources/SrtFlow/Fal/FalStatusRows.swift"
+for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}" "${STATUS_ROWS}"; do
+  [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
+done
+GEN_DECIDE="$(line_of 'try SkyStudioJobGate.decide(' "${GEN_TOOL}")"
+GEN_NEW_RUN="$(line_of 'let run = SkyStudioGenerationRun(' "${GEN_TOOL}")"
+if [ -z "${GEN_DECIDE}" ] || [ -z "${GEN_NEW_RUN}" ] || [ "${GEN_DECIDE}" -ge "${GEN_NEW_RUN}" ]; then
+  fail "${GEN_TOOL}：花积分的把关（SkyStudioJobGate.decide）必须在建生成任务之前"
+fi
+grep -qF 'held = SkyStudioHeldCredits(reservation)' "${GEN_RUN}" || fail "${GEN_RUN}：任务要用起任务之前记好的那一笔（退回、按实收换都按它）"
+grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_TOOL}" && grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_RUN}" \
+  || fail "AI 起的生成取 Key 不弹钥匙串授权框（.silent）：工具问价、任务交活都是"
+grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：generate_media 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
+grep -qF 'case .generateMedia: return try await SkyStudioGenerateTool.generate(args, project)' "${ROUTER}" \
+  || fail "${ROUTER}：generate_media 要分派给 SkyStudioGenerateTool"
+[ "$(count '.generateMedia' "${ROUTER}")" -eq 2 ] || fail "${ROUTER}：generate_media 应出现两处（分派、策略：不排撤销分组、不算这一轮的改动）"
+if grep -q 'AIUndoGrouping' <<<"$(grep -n 'generateMedia' "${ROUTER}" || true)"; then
+  fail "${ROUTER}：generate_media 不改工程，不该包进 AIUndoGrouping（放上时间线是 add_clips 的事）"
+fi
+grep -qF 'if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }' "${GEN_RUN}" \
+  || fail "${GEN_RUN}：get_job 跑着时要报阶段和 skystudio_job_id（liveDetail）"
+grep -qF 'cancel: { [weak self] in self?.cancel() }' "${GEN_RUN}" || fail "${GEN_RUN}：任务没有取消动作（停止按钮、cancel_job 停不了）"
+[ "$(count 'SkyStudioGenerationActivity.shared.add(self)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(self)' "${GEN_RUN}")" -eq 1 ] \
+  || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；各恰好一处）"
+grep -qF 'private var generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：状态行没订阅 Sky Studio 的生成任务"
+for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
+  if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
+    fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
+  fi
+done
+
 if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 的把关 / 积分 / 清单 / 路由接对了"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"

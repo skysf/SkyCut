@@ -228,13 +228,14 @@ if grep -q 'follow: request.follow && request.focus != .text' Sources/SrtFlow/AI
 fi
 echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
 
-echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次（记住那个文件夹）、fal / Sky Studio 花钱超了额度"
+echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次（记住那个文件夹）、Sky Studio 花积分超了每日上限"
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
 # 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
-# 从提示条改成同一套确认码（FalJobGate）。2026-10-28（收费方案第 6 刀）：Sky Studio 的积分超每日上限同一套（SkyStudioJobGate）。
+# 从提示条改成同一套确认码。2026-10-28（收费方案第 6 刀）：generate_media、upscale_clip 改走 Sky Studio，积分超每日上限同一套
+# （SkyStudioJobGate）；fal 那一处（FalJobGate）跟着生成一起删了，配旁白超额度不问、退档。
 ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
-if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift FalJobGate.swift SkyStudioJobGate.swift " ]; then
-  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、fal 花钱的 FalJobGate、Sky Studio 花积分的 SkyStudioJobGate）" >&2
+if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift SkyStudioJobGate.swift " ]; then
+  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、Sky Studio 花积分的 SkyStudioJobGate）" >&2
   exit 1
 fi
 if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then

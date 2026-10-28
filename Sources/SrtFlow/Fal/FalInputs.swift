@@ -8,7 +8,8 @@ import SrtFlowMCPKit
 // 定义的快照放在 `checks/Fal/schemas/`，自检把这里造出来的请求体逐条对着快照验（必填、取值、范围、有没有多余的字段）。
 // 没登记的端点（用户在设置里填的、AI 在对话里点名的）走 `.generic`：只写最基本的一两个字段，其余全由 AI 用 `options` 传 ——
 // 它点名了这个模型，就该知道它的参数。
-// 不管什么：读文件转 data URI、问用户、调 HTTP（FalGenerateTool / FalClient）；返回结果怎么读（FalOutputs）。
+// 不管什么：问用户、调 HTTP（AIFalVoice / FalClient）；返回结果怎么读（FalOutputs）。2026-10-28 起 generate_media 走 Sky Studio
+// （SkyStudioGeneration），这里生成那几种的请求体只剩自检在用，第 7 刀删 fal 时一起删。
 
 struct FalInputError: Error, Equatable {
     let message: String
@@ -95,19 +96,6 @@ enum FalInputs {
             throw FalInputError("resolution must be one of: 480p, 768p, 1080p.")
         }
         return withP
-    }
-
-    /// 一个画幅在给定的几个选项里离谁最近（按宽高比取对数差）。
-    static func nearestAspect(to ratio: Double, in options: [String]) -> String {
-        guard ratio > 0 else { return options.first ?? "16:9" }
-        var best = options.first ?? "16:9"
-        var bestGap = Double.infinity
-        for option in options {
-            guard let value = aspectValue(option) else { continue }
-            let gap = abs(log(value / ratio))
-            if gap < bestGap { best = option; bestGap = gap }
-        }
-        return best
     }
 
     /// `16:9` → 1.777…；写不对就是 nil。

@@ -118,10 +118,11 @@ private func builtInChecks() {
         let unknown = identifiers(in: text).filter { !known.contains($0) }
         check(unknown.isEmpty, "\(name) mentions names SrtFlow's tools do not have: \(unknown.sorted())")
     }
-    // generate_media 只有填了 fal Key 才在工具清单里，卡却一直读得到：提到它的地方必须是条件句（2026-09-29 用户拍板）。
+    // generate_media 只有存了 Sky Studio 的 Key 才在工具清单里（2026-10-28 起；之前是 fal 的 Key），卡却一直读得到：提到它的地方必须是条件句（2026-09-29 用户拍板）。
     check(shared.contains("If generate_media is among your tools"), "the shared rules teach generate_media as a conditional")
-    check(shared.contains("needs_confirmation") && shared.contains("confirm_token") && shared.contains("estimated_cost_usd") && shared.contains("480p"),
-          "the shared rules cover the cost confirmation (a token, not the banner), the estimate and 480p drafts")
+    check(shared.contains("needs_confirmation") && shared.contains("confirm_token") && shared.contains("credits in") && shared.contains("480p"),
+          "the shared rules cover the cost confirmation (a token, not the banner), the price in credits and 480p drafts")
+    check(!shared.contains("fal.ai") && !shared.contains("cost_usd"), "the shared rules no longer talk about fal.ai or dollars (Sky Studio credits since 2026-10-28)")
     for recipe in builtIn where recipe.body.contains("generate_media") {
         check(recipe.body.contains("only if generate_media is among your tools"),
               "\(recipe.id) mentions generate_media only under the condition that it exists")
@@ -162,9 +163,9 @@ private func knownNames() -> Set<String> {
     names.insert("music_credits")  // get_timeline 的结果里的字段
     names.insert("lines_with_word_times")  // get_subtitles 的结果里的字段
     names.formUnion(["new_video", "new_audio"])  // track 参数开新轨的两个值（只写在说明里，不是参数名）
-    // generate_media（只有填了 fal Key 才在清单里，但 listJSON 是配好时的全份）的词表和结果字段：卡里提到它们时要对得上。
+    // generate_media（只有存了 Sky Studio 的 Key 才在清单里，但 listJSON 是配好时的全份）的词表和结果字段：卡里提到它们时要对得上。
     names.formUnion(MCPVocabulary.generationKinds + MCPVocabulary.videoResolutions + MCPVocabulary.generationAspects)
-    names.formUnion(["estimated_cost_usd", "cost_usd", "waiting_for_user", "job_id", "needs_confirmation"])
+    names.formUnion(["credits", "credits_charged", "waiting_for_user", "job_id", "needs_confirmation"])
     return names
 }
 

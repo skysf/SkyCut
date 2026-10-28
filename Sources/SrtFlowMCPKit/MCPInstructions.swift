@@ -12,17 +12,14 @@ import Foundation
 // 只用英文。产品决定见 docs/plans/2026-09-27-mcp.md；为什么写成目录见 docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md。
 
 public enum MCPInstructions {
-    /// 配好了提供方才有的那一行「Paid: …」，接在目录最后（没配就不提：客户端清单里也没有那几个工具）。fal 的 Key 有 generate_media，
-    /// Sky Studio 的 Key 有 upscale_clip（2026-10-28 起，收费方案第 6 刀）。两家都配时整份 2,041 个字符，离 Claude Code 的 2,048 只差一点：
-    /// 这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：AI 调它之前一定会读到。
-    static let falTools = "generate_media (fal.ai: image, video, music, sound effect)"
-    static let skyStudioTools = "upscale_clip (Sky Studio credits: sharper, larger)"
+    /// 存了 Sky Studio 的 Key 才有的那一行「Paid: …」，接在目录最后（没存就不提：客户端清单里也没有那两个工具）。2026-10-28 起
+    /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；fal 的 Key 只剩配旁白，不再多出一行。整份离 Claude Code
+    /// 的 2,048 个字符只差几十个：这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：
+    /// AI 调它之前一定会读到。
+    static let skyStudioTools = "generate_media (image, video, music, sound effect), upscale_clip (sharper, larger): Sky Studio credits"
 
     public static func text(providers: Set<MCPProvider>) -> String {
-        var paid: [String] = []
-        if providers.contains(.fal) { paid.append(falTools) }
-        if providers.contains(.skystudio) { paid.append(skyStudioTools) }
-        return paid.isEmpty ? text : text + "\n- Paid: " + paid.joined(separator: ", ")
+        providers.contains(.skystudio) ? text + "\n- Paid: " + skyStudioTools : text
     }
 
     public static let text = """

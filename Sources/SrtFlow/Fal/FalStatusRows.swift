@@ -1,18 +1,19 @@
 import SwiftUI
 
-// MARK: - 编辑器顶上的状态行：正在送 fal 的活（upscale、generate_media）做到哪一步
+// MARK: - 编辑器顶上的状态行：正在送 Sky Studio 的活（upscale、generate_media）做到哪一步
 //
-// 管什么：挂在「AI 正在剪辑」那条横幅底下（AIActivityBanner），每个在跑 / 做完还没处理的 fal 任务一行：做什么、
-// 四个阶段的小标（上传 · 排队 · 处理 · 下载，当前的那个带百分比 / 已用时间和「通常约几分钟」）、估价、停止；
+// 管什么：挂在「AI 正在剪辑」那条横幅底下（AIActivityBanner），每个在跑 / 做完还没处理的任务一行：做什么、
+// 四个阶段的小标（上传 · 排队 · 处理 · 下载，当前的那个带百分比 / 已用时间和「通常约几分钟」）、积分、停止；
 // upscale 做完那一行给 Compare… / Dismiss（mockup「Status row while upscaling」）。还有检查器那一节用的
 // 阶段文字（`FalPhaseText`）和每秒走一下的钟（`FalPhaseClock`）。
-// 只订阅两个小对象（UpscaleActivity、FalGenerationActivity），不读工程；没有任务时什么都不画、也不醒
-// （docs/architecture/preview-perf-ratchet.md：性能场景里没有 fal 任务，这几个视图的计数是零）。
-// 不管什么：任务怎么跑、阶段怎么量（UpscaleJob / FalGenerationRun）。
+// 只订阅两个小对象（UpscaleActivity、SkyStudioGenerationActivity），不读工程；没有任务时什么都不画、也不醒
+// （docs/architecture/preview-perf-ratchet.md：性能场景里没有这些任务，这几个视图的计数是零）。名字里的 Fal 是历史：
+// 2026-10-28 起这两种活都送 Sky Studio（收费方案第 6 刀），第 7 刀删 fal 时改名。
+// 不管什么：任务怎么跑、阶段怎么量（UpscaleJob / SkyStudioGenerationRun）。
 
 struct FalStatusRows: View, Equatable {
     @ObservedObject private var upscale = UpscaleActivity.shared
-    @ObservedObject private var generation = FalGenerationActivity.shared
+    @ObservedObject private var generation = SkyStudioGenerationActivity.shared
 
     /// 横幅每重算一次都会重新造它：没有输入，永远相等 —— 只有两个活动对象发了变化才重算（挂在横幅底下不动性能基线）。
     static func == (lhs: FalStatusRows, rhs: FalStatusRows) -> Bool { true }
@@ -65,18 +66,16 @@ struct UpscaleStatusRow: View {
 
 /// 一个 generate_media 任务的那一行（只订阅这一个任务；做完就从活动里拿掉、这一行消失）。
 struct GenerationStatusRow: View {
-    @ObservedObject var run: FalGenerationRun
+    @ObservedObject var run: SkyStudioGenerationRun
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         FalStatusBar(icon: "sparkles", message: String(format: L10n("Generating %@ with %@"), run.kindLabel, run.modelTitle)) {
             if let progress = run.progress {
-                FalPhasePills(progress: progress, showsUpload: false)
+                FalPhasePills(progress: progress, showsUpload: run.uploads)
             }
-            if let estimate = run.estimate {
-                Text(String(format: L10n("est. %@"), FalMoney.text(estimate)))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
+            Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(run.credits)))
+                .font(.caption).foregroundStyle(.secondary)
             Button("Stop") { run.cancel() }
         }
     }
@@ -114,7 +113,7 @@ struct FalStatusBar<Trailing: View>: View {
 /// 四个阶段的小标：过了的打勾、当前的带数字、还没到的灰着。每秒走一下（「处理 1:12」）。
 struct FalPhasePills: View {
     let progress: FalJobProgress
-    /// generate_media 没有上传这一步（图是内嵌的）。
+    /// 有没有上传这一步：upscale 和图生视频（首帧）有，别的生成没有。
     let showsUpload: Bool
 
     var body: some View {

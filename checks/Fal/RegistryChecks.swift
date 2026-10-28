@@ -81,10 +81,7 @@ func runRegistryChecks() {
     check(estimate("acme/other", .image, FalUsage()) == nil, "no registered price, no estimate")
     checkClose(FalUsage.speechSeconds(characters: 1000), 250, "a thousand characters is estimated slowly (4 per second)")
 
-    // 词表对账（小程序不链接 App 的类型，词表是抄的）
-    checkEqual(MCPVocabulary.generationKinds, FalModel.Kind.allCases.filter(\.isGenerateKind).map(\.rawValue), "generation kinds match FalModel.Kind")
-    checkEqual(MCPVocabulary.videoResolutions, FalInputs.videoResolutions.map { $0.lowercased() }, "video resolutions match FalInputs")
-    checkEqual(MCPVocabulary.generationAspects, FalInputs.h3MaxTextAspects, "aspect ratios match H3 Max's")
+    // generate_media 的词表 2026-10-28 起和 Sky Studio 的生成对账（checks/SkyStudio/GenerationChecks.swift），这里只剩旁白那两种不算生成。
     for kind in FalModel.Kind.allCases {
         check(kind.isGenerateKind == (kind != .voice && kind != .voiceClone), "\(kind): narration kinds are not generate kinds")
     }

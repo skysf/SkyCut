@@ -3,9 +3,10 @@ import SwiftUI
 // MARK: - 设置 → AI 里的 fal.ai 一节
 //
 // 管什么：方案第 17、18、19 条的界面 —— fal 的 Key（能添加、能删除，存系统钥匙串）、每日上限（默认 10 美元，能自己改）、
-// 今天已经花了多少（估算）、每种事用哪个模型（预设几个最新的，能改成自己的端点号和单价）。
+// 今天已经花了多少（估算）、配旁白和克隆用哪个模型（预设几个最新的，能改成自己的端点号和单价）。2026-10-28 起只管声音：
+// 生成（图、视频、音乐、音效）和 upscale 走 Sky Studio、花积分（收费方案第 6 刀），第 7 刀连声音一起换过去后删掉这一节。
 // 只订阅 `FalSettingsStore`（一个小对象），不读工程。
-// 不管什么：Key 怎么存 / 钱怎么记（FalSettingsStore、FalKeyStore）、生成（FalGenerationRun）。
+// 不管什么：Key 怎么存 / 钱怎么记（FalSettingsStore、FalKeyStore）、配旁白（AIFalVoice）。
 //
 // **检查器的窄栏规矩不适用这里**（设置窗口是宽的），但一行还是别写死宽度：文本框只给一个够用的最小宽度。
 
@@ -23,7 +24,7 @@ struct FalSettingsRow: View {
             } label: {
                 Text(verbatim: "fal.ai")
             }
-            Text("Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it.")
+            Text("Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -31,7 +32,8 @@ struct FalSettingsRow: View {
                 limitRow
                 DisclosureGroup(isExpanded: $showModels) {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(FalModel.Kind.allCases, id: \.self) { kind in
+                        // 生成（图、视频、音乐、音效）2026-10-28 起走 Sky Studio：这里只剩配旁白和克隆两种。
+                        ForEach(FalModel.Kind.allCases.filter { !$0.isGenerateKind }, id: \.self) { kind in
                             FalModelRow(kind: kind)
                         }
                     }

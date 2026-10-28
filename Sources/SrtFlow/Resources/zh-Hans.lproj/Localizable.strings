@@ -1025,7 +1025,7 @@
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "这不是 fal.ai 的端点号，应该长得像 owner/model-name。";
 "The price must be a number." = "价格必须是一个数字。";
 "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "这看起来不是 fal.ai 的 API 密钥。请从 fal.ai/dashboard/keys 复制完整的密钥。";
-"Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it." = "让 Claude、Codex 这类 AI 用你自己的 fal.ai 账号生成图片、视频、音乐和音效，并用 fal.ai 的声音配旁白。这会花你账号里的钱：SkyCut 会守住下面的每日上限，超过之前先问你。";
+"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "让 Claude、Codex 这类 AI 用你自己的 fal.ai 账号、用 fal.ai 的声音配旁白和克隆声音。这会花你账号里的钱：SkyCut 会守住下面的每日上限，超过了就改用 SkyCut 自己的声音。图片、视频、音乐和音效改用你的 Sky Studio 积分生成。";
 "fal.ai models" = "fal.ai 模型";
 "Key saved in the keychain" = "密钥已存入钥匙串";
 "Remove Key" = "删除密钥";
@@ -1173,7 +1173,6 @@
 "You can keep editing. The compare window opens when it is done." = "可以继续剪辑。做完会弹出对比窗口。";
 "about %d min" = "约 %d 分钟";
 "downloading" = "下载中";
-"est. %@" = "估 %@";
 "finishing" = "收尾中";
 "in queue" = "排队中";
 "in queue (%d)" = "排队中（第 %d 位）";

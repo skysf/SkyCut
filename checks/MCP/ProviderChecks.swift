@@ -2,9 +2,10 @@ import Foundation
 import SrtFlowMCPKit
 
 // 生成类工具的「提供方」（方案第 36 条）：**谁都没配就不列出来**。
-// - 目录这一层：generate_media 属于 fal、upscale_clip 属于 Sky Studio（2026-10-28 起）、说明和参数对、只有它们上外面的网（openWorld）、词表和 App 的类型对账；
+// - 目录这一层：generate_media、upscale_clip 都属于 Sky Studio（2026-10-28 起，收费方案第 6 刀；fal 的 Key 只剩配旁白、不列工具）、说明和参数对、
+//   只有它们上外面的网（openWorld）；词表和 App 的类型对账在 checks/SkyStudio/GenerationChecks.swift；
 // - 那个小文件（MCPProviderMarker）：路径和 socket 同目录、读得宽（不在 / 坏了 / 有不认识的名字都当没有）、只写提供方的名字、不动没变的；
-// - 协议这一层：真起小程序 —— 没配 / 配了各列什么、总说明配了才提 fal、握手声明清单会变、新一代的清单缓存时间短；
+// - 协议这一层：真起小程序 —— 没配 / 配了各列什么、总说明配了才提那两个工具、握手声明清单会变、新一代的清单缓存时间短；
 //   用户中途添加 / 删掉 Key（小文件变了）时，握过手的老一代客户端收到 `notifications/tools/list_changed`，新一代不收。
 
 func runProviderChecks() {
@@ -19,21 +20,21 @@ func runProviderChecks() {
 // MARK: 目录
 
 private func checkCatalog() {
-    // 花钱的两个工具：generate_media（第 6 块，fal）、upscale_clip（2026-10-02；2026-10-28 起走 Sky Studio，收费方案第 6 刀）。
+    // 花钱的两个工具：generate_media（第 6 块）、upscale_clip（2026-10-02）；2026-10-28 起都走 Sky Studio、花积分（收费方案第 6 刀）。
     let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip]
-    checkEqual(MCPToolName.generateMedia.provider, .fal, "generate_media belongs to fal")
+    checkEqual(MCPToolName.generateMedia.provider, .skystudio, "generate_media belongs to Sky Studio")
     checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio")
     check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")
     checkEqual(MCPToolName.listed(providers: []), MCPToolName.allCases.filter { !paidTools.contains($0) }, "nothing configured: the paid tools are left out, order kept")
-    checkEqual(MCPToolName.listed(providers: [.fal]), MCPToolName.allCases.filter { $0 != .upscaleClip }, "fal configured: everything but upscale_clip")
-    checkEqual(MCPToolName.listed(providers: [.skystudio]), MCPToolName.allCases.filter { $0 != .generateMedia }, "Sky Studio configured: everything but generate_media")
+    checkEqual(MCPToolName.listed(providers: [.fal]), MCPToolName.listed(providers: []), "a fal key alone lists no paid tool (it only narrates since 2026-10-28)")
+    checkEqual(MCPToolName.listed(providers: [.skystudio]), MCPToolName.allCases, "Sky Studio configured: every tool, in the catalog order")
     checkEqual(MCPToolName.listed(providers: [.fal, .skystudio]), MCPToolName.allCases, "both configured: every tool, in the catalog order")
     checkEqual(MCPToolName.listJSON.arrayValue?.count, MCPToolName.allCases.count, "the full catalog lists every tool")
     checkEqual(MCPToolName.listJSON(providers: []).arrayValue?.count, MCPToolName.allCases.count - paidTools.count, "the plain list has the paid tools fewer")
 
     let definition = MCPToolName.generateMedia.definition
     check(!definition.readOnly && !definition.destructive, "generate_media writes a new file but deletes nothing")
-    check(definition.openWorld, "generate_media reaches out to fal.ai")
+    check(definition.openWorld, "generate_media reaches out to Sky Studio")
     check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { !$0.definition.openWorld }, "every other tool stays on this Mac")
     let json = definition.json
     checkEqual(json["annotations"]?["openWorldHint"]?.boolValue, true, "openWorldHint is written from the definition")
@@ -43,16 +44,17 @@ private func checkCatalog() {
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind", "prompt"], "kind and prompt are required")
     let properties = schema["properties"]?.objectValue ?? [:]
     // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
-    checkEqual(Set(properties.keys), ["kind", "prompt", "image", "duration", "resolution", "aspect_ratio", "instrumental", "name", "model", "options", "confirm_token"], "the parameters")
+    // model / options 2026-10-28 起没有了：模型由 Sky Studio 按种类定，价格只从 /quote 来。
+    checkEqual(Set(properties.keys), ["kind", "prompt", "image", "duration", "resolution", "aspect_ratio", "instrumental", "lyrics", "name", "confirm_token"], "the parameters")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
     checkEqual(properties["resolution"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.videoResolutions, "resolution lists the video resolutions")
     checkEqual(properties["aspect_ratio"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationAspects, "aspect_ratio lists the shapes")
-    checkEqual(properties["options"]?["type"]?.stringValue, "object", "options is a JSON object")
 
     let text = definition.description
-    for word in ["fal.ai", "get_job", "needs_confirmation", "confirm_token", "estimated_cost_usd", "daily limit", "add_clips", "MiniMax H3 Max", "image_to_video"] {
+    for word in ["Sky Studio", "get_job", "needs_confirmation", "confirm_token", "credits", "daily credit limit", "add_clips", "MiniMax H3", "image_to_video", "library"] {
         check(text.contains(word), "the description mentions \(word)")
     }
+    check(!text.contains("fal.ai") && !text.contains("cost_usd"), "the description no longer talks about fal.ai or dollars")
     // 旁白和字幕走别的工具：说明里要指开
     check(text.contains("generate_subtitles") && text.contains("add_voiceover"), "the description points narration and subtitles at their own tools")
 }
@@ -63,16 +65,13 @@ private func checkInstructions() {
     checkEqual(MCPInstructions.text(providers: []), MCPInstructions.text, "without a provider the instructions are the plain ones")
     check(!MCPInstructions.text.contains("fal.ai") && !MCPInstructions.text.contains("generate_media") && !MCPInstructions.text.contains("upscale_clip"),
           "the plain instructions never mention the paid tools (there are no such tools in the list)")
-    let withFal = MCPInstructions.text(providers: [.fal])
-    check(withFal.hasPrefix(MCPInstructions.text), "the paid line is added at the end")
-    // 目录里那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily limit、estimated_cost_usd）。
-    check(withFal.contains("generate_media") && withFal.contains("fal.ai") && withFal.contains("Paid"), "the fal tools are named and said to cost money")
-    check(!withFal.contains("upscale_clip"), "a fal key alone does not list upscale_clip (it is Sky Studio's since 2026-10-28)")
+    checkEqual(MCPInstructions.text(providers: [.fal]), MCPInstructions.text, "a fal key alone adds no Paid line (fal only narrates since 2026-10-28)")
     let withSkyStudio = MCPInstructions.text(providers: [.skystudio])
-    check(withSkyStudio.contains("upscale_clip") && withSkyStudio.contains("Sky Studio credits") && !withSkyStudio.contains("generate_media"),
-          "a Sky Studio key lists upscale_clip, paid with Sky Studio credits")
-    let withBoth = MCPInstructions.text(providers: [.fal, .skystudio])
-    checkEqual(withBoth.components(separatedBy: "\n- Paid:").count, 2, "both keys: one Paid line naming both")
+    check(withSkyStudio.hasPrefix(MCPInstructions.text), "the paid line is added at the end")
+    // 目录里那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily credit limit、credits）。
+    check(withSkyStudio.contains("generate_media") && withSkyStudio.contains("upscale_clip") && withSkyStudio.contains("Sky Studio credits")
+          && withSkyStudio.contains("Paid"), "a Sky Studio key lists both paid tools, paid with Sky Studio credits")
+    checkEqual(MCPInstructions.text(providers: [.fal, .skystudio]), withSkyStudio, "both keys: the same single Paid line")
 }
 
 // MARK: 协议核心（进程内）
@@ -94,7 +93,7 @@ private func checkServerCore() {
     }
     let list: JSONValue = ["jsonrpc": "2.0", "id": 1, "method": "tools/list"]
     check(!names(core.handle(list)).contains("generate_media"), "in-process: nothing configured, not listed")
-    box.providers = [.fal]
+    box.providers = [.skystudio]
     check(names(core.handle(list)).contains("generate_media"), "in-process: the provider closure is asked on every tools/list")
     box.providers = []
     check(!names(core.handle(list)).contains("generate_media"), "in-process: and again when the Key is removed")
@@ -172,7 +171,7 @@ private func checkHelperListing() {
         #"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
         #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
     ]
-    for (providers, listed) in [(Set<MCPProvider>(), false), ([MCPProvider.fal], true)] {
+    for (providers, listed) in [(Set<MCPProvider>(), false), ([MCPProvider.skystudio], true)] {
         let (messages, _) = talkToHelper(legacy, socket: socket, providers: providers)
         let names = reply(messages, id: 2)?["result"]?["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
         checkEqual(names.contains("generate_media"), listed, "helper, providers \(providers.map(\.rawValue)): generate_media listed = \(listed)")
@@ -183,10 +182,10 @@ private func checkHelperListing() {
         checkEqual(instructions.contains("generate_media"), listed, "helper, providers \(providers.map(\.rawValue)): the instructions mention generate_media = \(listed)")
     }
     let modern = #"{"jsonrpc":"2.0","id":9,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}}}"#
-    let (messages, _) = talkToHelper([modern], socket: socket, providers: [.fal])
+    let (messages, _) = talkToHelper([modern], socket: socket, providers: [.skystudio])
     let result = reply(messages, id: 9)?["result"]
     checkEqual(result?["ttlMs"]?.intValue, 60_000, "helper: a modern client caches the list for a minute")
-    check((result?["tools"]?.arrayValue ?? []).contains { $0["name"]?.stringValue == "generate_media" }, "helper: a modern client sees generate_media when fal is configured")
+    check((result?["tools"]?.arrayValue ?? []).contains { $0["name"]?.stringValue == "generate_media" }, "helper: a modern client sees generate_media when Sky Studio is configured")
 }
 
 // MARK: 中途添加 / 删掉 Key
@@ -273,7 +272,7 @@ private func checkLiveChange() {
     check(!listedNames(2).contains("generate_media"), "live: at first there is no generate_media")
     checkEqual(legacy.count(method: "notifications/tools/list_changed"), 0, "live: nothing changed, no notification")
 
-    _ = try? MCPProviderMarker.write([.fal], to: marker)   // 用户在设置里存了 Key
+    _ = try? MCPProviderMarker.write([.skystudio], to: marker)   // 用户在设置里存了 Key
     check(legacy.wait(seconds: 10) { legacy.count(method: "notifications/tools/list_changed") >= 1 }, "live: adding the Key notifies the client that the tools changed")
     send(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#, to: input)
     check(legacy.wait(seconds: 8) { legacy.reply(id: 3) != nil }, "live: the client asks again")
@@ -296,7 +295,7 @@ private func checkLiveChange() {
     }
     send(#"{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}}}"#, to: input2)
     check(modern.wait(seconds: 8) { modern.reply(id: 1) != nil }, "live: a modern client is answered")
-    _ = try? MCPProviderMarker.write([.fal], to: marker2)
+    _ = try? MCPProviderMarker.write([.skystudio], to: marker2)
     Thread.sleep(forTimeInterval: 4.5)   // 盯文件的线程每 2 秒看一次：等两轮还没有通知才算没有
     checkEqual(modern.count(method: "notifications/tools/list_changed"), 0, "live: a modern client is not sent notifications (it has no session)")
 }

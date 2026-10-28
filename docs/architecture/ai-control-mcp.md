@@ -162,9 +162,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      就放开了整个家目录。问题里写明「同意之后记住这个文件夹」。
    - **从不覆盖**：导出、新建、另存撞名都加编号（`ExportFileName.unoccupied`），所以不问；AI 要替换旧文件就先用
      `manage_files` 把它删进废纸篓（会问）。
-   - `generate_media` 超了 fal 的每日额度、或模型价格不明：当场回确认码（`FalJobGate.decide`，第 39 条）；`upscale_clip` 超了每日积分上限同样
-     （`SkyStudioJobGate.decide`，第 44 条，2026-10-28 起）。都不在提示条上问。
-   会回 `needs_confirmation` 的只许这三处（`AIFileTools`、`AIWorkspace.confirmReading`、`FalJobGate`），`scripts/check-mcp.sh` 扫描钉着。
+   - `generate_media`、`upscale_clip` 超了每日积分上限：当场回确认码（`SkyStudioJobGate.decide`，第 39、44 条，2026-10-28 起；之前 `generate_media`
+     超的是 fal 的每日额度，在 `FalJobGate`，跟着生成换到 Sky Studio 一起删了）。都不在提示条上问。
+   会回 `needs_confirmation` 的只许这三处（`AIFileTools`、`AIWorkspace.confirmReading`、`SkyStudioJobGate`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
    **拒绝说原因**：结果里的 `confirm_token_refused` 分过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的，`valid_for_minutes` 写着有效期
@@ -639,18 +639,22 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      会跳角的每处一块；顶层再有一句 `cover_hint`。看的是文件（没有片段）时没有 `cover`（没有画布可换）。
    - **盖完靠 `look`（时间线）核对**：`AIFrameComposer` 合成时把盖一块盖上（`CoverCompositing`，和预览同一份 `CoverFilters`），AI 看得到自己盖没盖住。
    - 已知不足：位置不跟着片段走（片段挪 / 缩放之后要重盖）；只按此刻的摆放换算、不看关键帧动画。
-39. **生成素材（`generate_media`，fal.ai，方案第 6 块、第 57 条）**：合同全在 [fal.ai 生成](fal-generation.md)，这里只记它怎么接进 MCP 这一层。
-    风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 工具只在填了 Key 时在清单里，卡却一直读得到；
+39. **生成素材（`generate_media`，方案第 6 块、第 57 条；2026-10-28 起送 Sky Studio、花积分，之前送 fal.ai、花美元）**：合同在
+    [Sky Studio 的任务](sky-studio-jobs.md)「谁在用」的「生成」一条（fal 时代的在 [fal.ai 生成](fal-generation.md) 第八节），这里只记它怎么接进 MCP 这一层。
+    模型由 Sky Studio 按种类定（`/models`），`model` / `options` 两个参数 2026-10-28 起没有了（老客户端带着就整个不做、说清楚，第 52 条）；视频只有 480p / 768p；
+    音乐 60–180 秒或让模型定、`instrumental=false` 可以带 `lyrics`。结果报 `credits`（开始时）、`credits_charged` 和 `skystudio_job_id`（做完时），成品也留在作品库里。
+    风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 工具只在存了 Key 时在清单里，卡却一直读得到；
     共用规矩第 11 条和每张卡的「Generated media」一节说了有它时能补什么、不能替什么（`RecipeChecks` 钉着：提到就得在条件句下、
     词表和结果字段名都得对得上）：
-   - **只在用户配了 fal 的 Key 时才出现在清单里**（方案第 36 条）：`MCPToolName.provider`；App 在 Key 添加 / 删除时和每次启动时写一个只有提供方名字的
+   - **只在用户存了 Sky Studio 的 Key 时才出现在清单里**（方案第 36 条；2026-10-28 之前跟着 fal 的 Key）：`MCPToolName.provider`；App 在 Key 添加 / 删除时和每次启动时写一个只有提供方名字的
      `mcp-providers.json`（和 socket 同目录），小程序每回一次清单 / 握手都重读它；握过手的老一代客户端收 `notifications/tools/list_changed`，
      新一代靠清单一分钟的缓存时间。没配时总说明里也不提它。全清单的说明总长度量的是每个提供方都配好时的样子。
-   - **生成是任务**：立刻回任务号（带估价、今天已花、每日上限），`get_job` 等；不改工程、不进撤销分组，放上时间线是 `add_clips`。
-   - **花钱超了额度、或价格不明，当场回 `needs_confirmation` + 确认码**（2026-10-17 起，AI 多开方案板 9；`FalJobGate.decide` 在建任务之前）：
-     什么都不起、不记账，AI 在聊天里问用户、用户点头后带码、同样的参数再调才记账起任务；令牌绑着估价和模型 / 时长 / 清晰度那几个记号。以前在提示条上问，
-     后台工程没窗口、用户没在看 SrtFlow 时没人看见。同步的工具（配旁白）不能停下来问，额度不够就退档。
-   - 图生视频的首帧图、克隆的素材会发给 fal.ai：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是「send to fal.ai」）。
+   - **生成是任务**：立刻回任务号（带积分、通常几分钟、今天已花、每日积分上限），`get_job` 等；不改工程、不进撤销分组，放上时间线是 `add_clips`。
+   - **花积分超了每日上限，当场回 `needs_confirmation` + 确认码**（2026-10-17 起，AI 多开方案板 9；2026-10-28 起 `SkyStudioJobGate.decide`，和 upscale_clip
+     同一处，在建任务之前）：什么都不起、不记账，AI 在聊天里问用户、用户点头后带码、同样的参数再调才记账起任务；令牌绑着报价和模型 / 时长 / 清晰度那几个记号。
+     以前在提示条上问，后台工程没窗口、用户没在看 SrtFlow 时没人看见。同步的工具（配旁白）不能停下来问，额度不够就退档。
+   - 图生视频的首帧图会传给 Sky Studio、克隆的素材会发给 fal.ai：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是
+     「send to Sky Studio」/「send to fal.ai」）。
 40. **配旁白的 fal 那一档（`add_voiceover`，方案第 42、52 条）**：声音三档 fal > SrtFlow 自己的（Kokoro，第 35 条）> macOS（第 34 条）。fal 那一档只在
     有 Key、没超每日上限、Key 读得出来时用，不行就退档并在 `voice.note` 里说为什么；点名 Kokoro 的音色或这台 Mac 的声音仍照点名。fal 的声音也**只经
     `AIAudioFileWriter.writeVoiceover` 落盘**（第 34 条那条扫描加了它）。`clone_from` / `clone_start` / `clone_seconds`：用素材里一段人声克隆，只有 fal 能做、

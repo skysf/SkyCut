@@ -187,12 +187,6 @@ func runInputChecks() {
     checkEqual(FalInputs.usage(for: FalRequest(kind: .voice, prompt: "hello")).characters, 5, "voice usage counts characters")
 
     // ---- 画幅、分辨率的小工具
-    checkEqual(FalInputs.nearestAspect(to: 1920.0 / 1080, in: FalInputs.h3MaxTextAspects), "16:9", "1920×1080 → 16:9")
-    checkEqual(FalInputs.nearestAspect(to: 1080.0 / 1920, in: FalInputs.h3MaxTextAspects), "9:16", "1080×1920 → 9:16")
-    checkEqual(FalInputs.nearestAspect(to: 1, in: FalInputs.h3MaxTextAspects), "1:1", "square")
-    checkEqual(FalInputs.nearestAspect(to: 2.39, in: FalInputs.h3MaxTextAspects), "21:9", "cinemascope → 21:9")
-    checkEqual(FalInputs.nearestAspect(to: 0.8, in: FalInputs.h3MaxTextAspects), "3:4", "4:5 → the closest is 3:4")
-    checkEqual(FalInputs.nearestAspect(to: 0, in: FalInputs.h3MaxTextAspects), "21:9", "no ratio: the first option")
     check(FalInputs.aspectValue("16:0") == nil && FalInputs.aspectValue("wide") == nil && FalInputs.aspectValue("16:9:1") == nil, "bad aspect texts are refused")
     checkEqual(try? FalInputs.normalizedResolution(nil), "768P", "no resolution: the default")
     checkEqual(FalInputs.isoLanguage("zh-Hans"), "zh", "zh-Hans → zh")
