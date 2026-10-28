@@ -83,8 +83,11 @@ enum AIUpscaleTool {
         let aiJob = AIJobs.shared.start(
             .upscale, progress: { nil },
             liveDetail: { [weak job] in
-                if case .running(let progress)? = job?.state { return progress.json() }
-                return [:]
+                guard let job else { return [:] }
+                var detail: [String: JSONValue] = [:]
+                if case .running(let progress) = job.state { detail = progress.json() }
+                if let id = job.skyStudioJobID { detail["skystudio_job_id"] = .string(id) }
+                return detail
             },
             cancel: { [weak job] in
                 if let job { UpscaleActivity.shared.remove(job) }
@@ -156,7 +159,9 @@ enum AIUpscaleTool {
         guard finished.projectGeneration == project.documentGeneration else {
             AIJobs.shared.finish(
                 aiJob, .done, message: "The upscaled file was made, but the project changed meanwhile; no clip was replaced.",
-                detail: .object(["file": .string(AIWorkspace.shared.display(outcome.file)), "replaced_ids": .array([])])
+                detail: .object([
+                    "file": .string(AIWorkspace.shared.display(outcome.file)), "replaced_ids": .array([]), "skystudio_job_id": .string(outcome.jobID)
+                ])
             )
             return
         }
@@ -176,6 +181,7 @@ enum AIUpscaleTool {
             "width": .number(Double(Int(outcome.info.displaySize.width))), "height": .number(Double(Int(outcome.info.displaySize.height))),
             "duration": AIFormat.seconds(outcome.info.duration),
             "tier": .string(finished.request.tier.id),
+            "skystudio_job_id": .string(outcome.jobID),
             "credits_charged": .number(SkyStudioCredits.number(outcome.creditsCharged)),
             "spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
             "elapsed_seconds": .number(outcome.elapsed.rounded()),
@@ -193,11 +199,13 @@ enum AIUpscaleTool {
 
     /// 没做成 / 停下来了：把结局记给 AI 的任务（done 在 land 里记）。
     private static func settle(_ ended: UpscaleJob, aiJob: AIJobs.Job) {
+        // 交上了才有任务号：停不下来的那单、交上之后没做成的那单，AI 和用户找客服时说得出是哪一单。
+        let detail = ended.skyStudioJobID.map { JSONValue.object(["skystudio_job_id": .string($0)]) }
         switch ended.state {
         case .failed(let message):
-            AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)")
+            AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
         case .cancelled(let stop):
-            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message)
+            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
         case .running, .done:
             break
         }

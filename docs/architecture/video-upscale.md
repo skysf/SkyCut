@@ -60,6 +60,7 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
 | 做完 | **AI 起的直接换源**（用户 2026-10-02 定：不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里 `applyUpscale` 包一层 `AIUndoGrouping.step`、选中换了的段、没存过的工程存一下、结局记给 AI 的任务（`onEnded` 记失败 / 取消），这一行从状态行上拿掉。面板起的照旧先弹对比窗口 |
 | 钥匙串授权框 | AI 起的不弹（读不到就回一句「请用户去设置 → Sky Studio 点允许…」）；面板起的可以弹，检查器里提醒一句（用户就在电脑前） |
 | 看得见 | 状态行和检查器那一节对 AI 起的任务一视同仁（阶段、积分、Stop）；Stop = 取消 = AI 的任务 cancelled，结局照实说积分花没花 |
+| 哪一单 | 交上了就记下 Sky Studio 的任务号（`UpscaleJob.skyStudioJobID`，`onSubmitted` 给的），`get_job` 跑着、做完、没做成、停了都报 `skystudio_job_id`：对账、找客服时说得出是哪一单（停不下来、成品进了作品库的那单也一样）。2026-10-28 真积分测试时 Sky Studio 那边要对账才发现之前没留 |
 | 工程换了 | `projectGeneration` 和做完时的 `documentGeneration` 不一样就不换源，结果里说明；切工程本来就 `cancelAll` |
 
 ## 四、回归
