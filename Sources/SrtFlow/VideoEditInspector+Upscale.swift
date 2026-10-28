@@ -15,7 +15,7 @@ extension VideoEditInspectorView {
             HStack {
                 Text("Upscale").font(.callout).fontWeight(.medium)
                 Spacer()
-                Text(verbatim: "fal.ai").font(.caption2).foregroundStyle(.tertiary)
+                Text(verbatim: "Sky Studio").font(.caption2).foregroundStyle(.tertiary)
             }
             if let job = upscaleActivity.job(forOriginal: original) {
                 UpscaleJobStatusView(job: job, activity: upscaleActivity)
