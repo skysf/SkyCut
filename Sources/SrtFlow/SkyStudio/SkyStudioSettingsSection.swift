@@ -125,6 +125,7 @@ private struct SkyStudioAccountRows: View {
             } label: {
                 Text("Sky Studio credits")
             }
+            SkyStudioCreditLimitRow()
         }
     }
 
@@ -161,6 +162,43 @@ private struct SkyStudioAccountRows: View {
     /// 积分：整数就不带小数，不是整数留一位。
     static func balanceText(_ balance: Double) -> String {
         balance == balance.rounded() ? String(Int(balance)) : String(format: "%.1f", balance)
+    }
+}
+
+/// AI 一天最多花多少积分（SkyStudioSpendStore，默认 1,000）：超了 AI 要先在聊天里问用户；面板起的 upscale 面板本身就是确认。
+private struct SkyStudioCreditLimitRow: View {
+    @ObservedObject private var spend = SkyStudioSpendStore.shared
+    @State private var limitText = ""
+
+    var body: some View {
+        let _ = PerfCounters.body(Self.self)
+        LabeledContent {
+            HStack(spacing: 4) {
+                TextField("Daily limit for AI", text: $limitText)
+                    .textFieldStyle(.roundedBorder)
+                    .frame(width: 72)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier("skystudio-limit-field")
+                    .onSubmit(commit)
+                Text("credits")
+                Text(verbatim: "·").foregroundStyle(.tertiary)
+                Text("Spent today \(SkyStudioCredits.text(spend.spentToday()))")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+            }
+            .controlSize(.small)
+        } label: {
+            Text("Daily limit for AI")
+        }
+        .instantHelp("SkyCut asks before AI spends more Sky Studio credits than this in one day")
+        .onAppear { limitText = SkyStudioCredits.text(spend.dailyLimit) }
+        .onDisappear(perform: commit)
+    }
+
+    private func commit() {
+        let cleaned = limitText.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "")
+        if let value = Double(cleaned) { spend.setDailyLimit(value) }
+        limitText = SkyStudioCredits.text(spend.dailyLimit)
     }
 }
 

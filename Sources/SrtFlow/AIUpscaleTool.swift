@@ -3,20 +3,20 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// MARK: - 工具：upscale_clip（把一段的原片送 fal 放大，做完直接换源）
+// MARK: - 工具：upscale_clip（把一段的原片送 Sky Studio 放大，做完直接换源）
 //
-// 管什么：参数读成一次 upscale —— 和面板同一份数（UpscalePanelModel 算范围、估价、档位可不可用），起 `UpscaleJob`
-//（花钱按每日上限把关，在起任务之前：额度内直接记账、超了当场回确认码，FalJobGate）→ **回任务号**（一次 1–5 分钟），`get_job` 带阶段；
-// 做完**直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口，做完就换、一步撤销；用户随时右键「Compare with Original…」/「Revert」），
-// 任务的结局带 replaced_ids / file / 尺寸 / 钱。换源是异步落账：那一下自己包一层 `AIUndoGrouping.step`（scripts/check-mcp.sh 钉着）。
-// 不管什么：裁 / 传 / 下 / 封声（UpscalePipeline）、换源的规则（VideoEditClipUpscale）、钱怎么问（FalJobGate）、说明文字（MCPGenerationTools）。
+// 管什么：参数读成一次 upscale —— 和面板同一份数（UpscalePanelModel 算范围、档位能不能送），模型和上限照 Sky Studio 的 /models、
+// 价问 /quote（收费方案第 6 刀，2026-10-28 起；之前走 fal）；起 `UpscaleJob`（花积分按每日上限把关，在起任务之前：额度内直接记账、
+// 超了当场回确认码，SkyStudioJobGate）→ **回任务号**，`get_job` 带阶段；做完**直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口，
+// 做完就换、一步撤销；用户随时右键「Compare with Original…」/「Revert」），任务的结局带 replaced_ids / file / 尺寸 / 实收的积分。
+// 换源是异步落账：那一下自己包一层 `AIUndoGrouping.step`（scripts/check-mcp.sh 钉着）。Key 不弹钥匙串授权框（AI 起的，没人在看）。
+// 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源的规则（VideoEditClipUpscale）、积分怎么问（SkyStudioJobGate）、说明文字（MCPGenerationTools）。
 
 @MainActor
 enum AIUpscaleTool {
-    static func upscale(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
-        let store = FalSettingsStore.shared
-        // 小程序没配 Key 就不列这个工具，但客户端可能缓存着旧清单：这里再认一次。
-        guard store.hasKey else { throw AIToolError(FalError.noKey.message) }
+    static func upscale(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+        // 小程序没存 Sky Studio 的 Key 就不列这个工具，但客户端可能缓存着旧清单：这里再认一次。
+        guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
         let state = project.state
         let ids = AIShortIDs(state: state)
         let id = try ids.resolve(try args.requiredString("clip_id"))
@@ -26,12 +26,9 @@ enum AIUpscaleTool {
         guard !clip.isAudioOnly, !clip.isStillImage, let model = UpscalePanelModel(project: project, clipID: id) else {
             throw AIToolError("\(clip.name) is \(clip.isAudioOnly ? "audio" : "a still image"); only video clips can be upscaled.")
         }
-        if let running = UpscaleActivity.shared.job(forOriginal: model.originalURL), case .running = running.state {
-            throw AIToolError("\(model.originalURL.lastPathComponent) is already being upscaled; wait for that job with get_job.")
-        }
-
-        let tierID = try args.choice("tier", from: MCPVocabulary.upscaleTiers) ?? AIUpscaleNames.defaultTierID
-        guard let tier = AIUpscaleNames.tier(tierID) else { throw AIToolError("Unknown tier \(tierID).") }
+        try refuseIfRunning(model.originalURL)
+        let generation = project.documentGeneration
+        let tierName = try args.choice("tier", from: MCPVocabulary.upscaleTiers)
         let target = try args.choice("target", from: MCPVocabulary.upscaleTargets).flatMap(AIUpscaleNames.target) ?? model.defaultTarget
         let choice = try args.choice("range", from: MCPVocabulary.upscaleRanges).flatMap(AIUpscaleNames.range) ?? model.defaultChoice
         guard model.targetApplies(target) else {
@@ -39,21 +36,46 @@ enum AIUpscaleTool {
                 "\(clip.name) is \(model.originalInfo.resolutionLabel), already at or above \(target.label) on its short side; nothing to upscale."
             )
         }
-        guard let row = model.rows(choice: choice, target: target).first(where: { $0.id == tier.id }) else {
-            throw AIToolError("Unknown tier \(tierID).")
+
+        // Sky Studio：Key（不弹框）、有哪些模型、这一段多少积分。
+        let key: String
+        switch await SkyStudioJobKey.key(.silent) {
+        case .success(let found): key = found
+        case .failure(let problem): throw AIToolError(problem.message)
         }
-        if let reason = row.unavailableReason {
-            throw AIToolError("\(tier.title) \(tier.detail) cannot take this range: \(reason). Pick another tier or a shorter range.")
+        let api = SkyStudioAPI()
+        let tiers: [UpscaleTier]
+        do {
+            tiers = UpscaleTier.all(in: try await SkyStudioCatalogCache.shared.catalog(key: key, api: api))
+        } catch {
+            throw AIToolError(message(error))
         }
-        let request = model.request(choice: choice, target: target, tier: tier)
-        // 花钱的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
-        let reservation: FalJobGate.Reservation
-        switch try FalJobGate.decide(estimate: request.estimate, summary: UpscaleJob.summary(of: request), args: args) {
+        let tier = try pick(tierName, from: tiers, target: target)
+        let row = model.rows(tiers: [tier], choice: choice, target: target)[0]
+        if let refusal = row.refusal {
+            throw AIToolError("\(tier.id) cannot take this: \(refusal.message)")
+        }
+        let quote: SkyStudioQuote
+        do {
+            quote = try await api.quote(row.quote, key: key)
+        } catch {
+            throw AIToolError(message(error))
+        }
+        // 问 Sky Studio 的这一两秒里工程可能换了、同一个原片可能被别的调用起了任务。
+        guard project.documentGeneration == generation else {
+            throw AIToolError("The project changed while SkyCut asked Sky Studio for the price; nothing was started. Call upscale_clip again.")
+        }
+        try refuseIfRunning(model.originalURL)
+
+        let request = model.request(choice: choice, target: target, tier: tier, quote: quote)
+        // 花积分的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        let reservation: SkyStudioJobGate.Reservation
+        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: UpscaleJob.summary(of: request), args: args) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
 
-        // 任务：UpscaleJob 跑，AIJobs 里登记一条给 get_job 看（阶段、在等用户、取消）。
+        // 任务：UpscaleJob 跑，AIJobs 里登记一条给 get_job 看（阶段、取消）。
         let job = UpscaleJob(
             request: request, clipIDs: request.range.coveredClipIDs, projectGeneration: project.documentGeneration, title: clip.name,
             approval: .ai(reservation)
@@ -64,7 +86,6 @@ enum AIUpscaleTool {
                 if case .running(let progress)? = job?.state { return progress.json() }
                 return [:]
             },
-            waitingForUser: { [weak job] in job?.waiting },
             cancel: { [weak job] in
                 if let job { UpscaleActivity.shared.remove(job) }
             }
@@ -73,26 +94,57 @@ enum AIUpscaleTool {
         job.onEnded = { ended in settle(ended, aiJob: aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)
 
+        let spend = SkyStudioSpendStore.shared
+        let minutes = quote.typicalSeconds.map { FalJobProgress.minutes($0) }
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(aiJob.id), "clip_id": .string(ids.short(id)),
             "tier": .string(tier.id), "target": .string(AIUpscaleNames.name(of: target)), "range": .string(AIUpscaleNames.name(of: choice)),
-            "source_size": .string(model.originalInfo.resolutionLabel), "output_size": .string(sizeLabel(row.outputSize)),
+            "source_size": .string(model.originalInfo.resolutionLabel),
+            "output_size": .string(sizeLabel(UpscalePanelModel.outputSize(quote, fallback: row.estimatedSize))),
             "seconds_sent": AIFormat.seconds(request.range.duration),
             "clips_to_replace": .array(request.range.coveredClipIDs.map { .string(ids.short($0)) }),
-            "estimated_cost_usd": FalGenerateTool.money(request.estimate),
-            "daily_limit_usd": .number(store.dailyLimit), "spent_today_usd": FalGenerateTool.money(store.spentToday()),
+            "credits": .number(SkyStudioCredits.number(quote.credits)),
+            "daily_limit_credits": .number(spend.dailyLimit), "spent_today_credits": .number(SkyStudioCredits.number(spend.spentToday())),
             "next_step": .string(
-                "Tell the user it costs about \(FalMoney.text(request.estimate)) and takes about \(FalJobProgress.minutes(tier.typicalSeconds)) min. "
-                    + "Wait with get_job; if it shows waiting_for_user, tell the user what it says. When it is done the clips are already "
-                    + "replaced (replaced_ids); the original file stays and the user can compare or revert from the clip's context menu."
+                "Tell the user it costs \(SkyStudioCredits.text(quote.credits)) Sky Studio credits"
+                    + (minutes.map { " and usually takes about \($0) min" } ?? "") + ". Wait with get_job. When it is done the clips are "
+                    + "already replaced (replaced_ids); the original file stays, the user can compare or revert from the clip's context menu, "
+                    + "and the upscaled clip is also kept in the user's Sky Studio library."
             )
         ]
+        if let minutes { result["typical_minutes"] = .number(Double(minutes)) }
+        var notes: [String] = []
         if choice == .thisClip, let longer = model.longerElsewhere {
-            result["note"] = .string(String(
-                format: "Another clip uses %.1f s of this file; range=longest would cover both places in one job.", longer.duration
-            ))
+            notes.append(String(format: "Another clip uses %.1f s of this file; range=longest would cover both places in one job.", longer.duration))
         }
+        if let chosen = request.range.chosen, request.range.duration < chosen.duration + 2 * UpscaleRange.handle - 0.05, choice != .wholeFile {
+            notes.append("The handles were shortened so the range fits Sky Studio's limit of \(Int((tier.maxSourceSeconds ?? 30).rounded(.down))) s per upscale.")
+        }
+        if !notes.isEmpty { result["note"] = .string(notes.joined(separator: " ")) }
         return .ok(.object(result))
+    }
+
+    private static func refuseIfRunning(_ original: URL) throws {
+        if let running = UpscaleActivity.shared.job(forOriginal: original), case .running = running.state {
+            throw AIToolError("\(original.lastPathComponent) is already being upscaled; wait for that job with get_job.")
+        }
+    }
+
+    /// 点名的模型（词表里有、Sky Studio 此刻也有）；没点名就是默认的那个。
+    private static func pick(_ name: String?, from tiers: [UpscaleTier], target: UpscaleTarget) throws -> UpscaleTier {
+        guard !tiers.isEmpty else { throw AIToolError("Sky Studio offers no upscale model right now.") }
+        if let name {
+            guard let match = tiers.first(where: { $0.id == name }) else {
+                throw AIToolError("Sky Studio does not offer \(name) right now; it offers " + tiers.map(\.id).joined(separator: ", ") + ".")
+            }
+            return match
+        }
+        return UpscalePanelModel.defaultTier(in: tiers, target: target) ?? tiers[0]
+    }
+
+    private static func message(_ error: Error) -> String {
+        if let failure = error as? SkyStudioFailure { return SkyStudioJobError.request(failure).message }
+        return error.localizedDescription
     }
 
     // MARK: 结局
@@ -109,11 +161,6 @@ enum AIUpscaleTool {
             return
         }
         let replacement = ClipSourceSwap.Replacement(url: outcome.file, info: outcome.info, record: outcome.record)
-        // 账单几分钟后才有：查到实收再补进工程里的记录（不进撤销栈）；工程中途换了就不补。
-        finished.onCostResolved = { [weak project] job in
-            guard let project, let cost = job.actualCost, project.documentGeneration == job.projectGeneration else { return }
-            project.recordUpscaleCost(file: outcome.file, costUSD: cost)
-        }
         let done = AIUndoGrouping.step(project.effectiveUndoManager) {
             project.applyUpscale(replacement, to: project.clipIDs(usingPicture: finished.request.originalURL))
         }
@@ -129,9 +176,8 @@ enum AIUpscaleTool {
             "width": .number(Double(Int(outcome.info.displaySize.width))), "height": .number(Double(Int(outcome.info.displaySize.height))),
             "duration": AIFormat.seconds(outcome.info.duration),
             "tier": .string(finished.request.tier.id),
-            "cost_usd": FalGenerateTool.money(finished.actualCost ?? finished.request.estimate),
-            "cost_is_estimate": .bool(finished.actualCost == nil),
-            "spent_today_usd": FalGenerateTool.money(FalSettingsStore.shared.spentToday()),
+            "credits_charged": .number(SkyStudioCredits.number(outcome.creditsCharged)),
+            "spent_today_credits": .number(SkyStudioCredits.number(SkyStudioSpendStore.shared.spentToday())),
             "elapsed_seconds": .number(outcome.elapsed.rounded()),
             "next_step": .string(done.isEmpty
                 ? "No clip could be replaced (the range no longer covers any use of the file); the upscaled file was kept."
@@ -139,19 +185,19 @@ enum AIUpscaleTool {
                     + "from the clip's context menu. get_timeline shows the new source_size.")
         ]
         if !outcome.audioRestored {
-            detail["note"] = "The original sound could not be put back (ffmpeg is missing); the file carries whatever fal.ai returned."
+            detail["note"] = "The original sound could not be put back (ffmpeg is missing); the upscaled file has no sound."
         }
         let saved = AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: !done.isEmpty))
         AIJobs.shared.finish(aiJob, .done, message: done.isEmpty ? "Upscaled; nothing replaced." : "Upscaled and replaced \(done.count) clip(s).", detail: saved.payload)
     }
 
-    /// 没做成：把结局记给 AI 的任务（done 在 land 里记）。
+    /// 没做成 / 停下来了：把结局记给 AI 的任务（done 在 land 里记）。
     private static func settle(_ ended: UpscaleJob, aiJob: AIJobs.Job) {
         switch ended.state {
         case .failed(let message):
             AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)")
-        case .cancelled:
-            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped before it finished; fal.ai was asked to cancel it and nothing was charged.")
+        case .cancelled(let stop):
+            AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message)
         case .running, .done:
             break
         }

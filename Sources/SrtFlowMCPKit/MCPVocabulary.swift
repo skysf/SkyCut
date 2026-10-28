@@ -63,9 +63,9 @@ public enum MCPVocabulary {
     /// = `FalModel.Kind` 里 `isGenerateKind` 的那几个（generate_media 的 kind；旁白和克隆走 add_voiceover）。
     public static let generationKinds = ["image", "image_to_video", "text_to_video", "music", "sound_effect"]
 
-    /// upscale_clip 的档位（和 App 的 `FalUpscaleTiers.all` 对账，顺序就是面板的顺序）、目标（`FalUpscaleTarget`，按短边叫）、
-    /// 范围（`UpscaleRangeChoice`：这一段 / 工程里最长的那处 / 整个文件）。
-    public static let upscaleTiers = ["topaz-precision", "topaz-generative", "flux-precise", "flux-creative", "bytedance-standard", "bytedance-pro"]
+    /// upscale_clip 的档位（Sky Studio 的 upscale 模型，`/models` 的 id，2026-10-28；那边加了新的要在这里加上 AI 才能点名，
+    /// 面板照 /models 现列、不看这里）、目标（App 的 `UpscaleTarget`，按短边叫）、范围（`UpscaleRangeChoice`：这一段 / 工程里最长的那处 / 整个文件）。
+    public static let upscaleTiers = ["topaz-starlight", "bytedance-upscaler-pro"]
     public static let upscaleTargets = ["1080p", "1440p", "2160p"]
     public static let upscaleRanges = ["clip", "longest", "file"]
 

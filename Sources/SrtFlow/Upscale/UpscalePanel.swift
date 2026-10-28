@@ -2,9 +2,9 @@ import SwiftUI
 
 // MARK: - Upscale 面板（sheet）
 //
-// 管什么：选范围（这一段 / 工程里最长的那处 / 整个文件）、目标分辨率、档位，看估价，点「开始」起任务。
-// 面板本身就是花钱的确认（方案第 10 条）：超过每日上限只标红不拦；没有 Key 才拦（指去设置）。
-// 数都从 UpscalePanelModel 来；起的任务进 UpscaleActivity（做完弹对比窗口，不自动替换）。
+// 管什么：选范围（这一段 / 工程里最长的那处 / 整个文件）、目标分辨率、模型，看 Sky Studio 的报价（积分），点「开始」起任务。
+// 面板本身就是花钱的确认（upscale 方案第 10 条）：超过每日积分上限只标红不拦；没有 Sky Studio 的 Key、报价没回来、这一段送不了才拦。
+// 模型和价从 Sky Studio 来（UpscaleOffers：/models、/quote），别的数从 UpscalePanelModel 来；起的任务进 UpscaleActivity（做完弹对比窗口，不自动替换）。
 // 本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`（checks/presented-views-app-language.sh）。
 // 不管什么：任务本身（UpscaleJob）、换源（VideoEditProject+Upscale）。
 
@@ -12,33 +12,45 @@ struct UpscalePanel: View {
     let project: VideoEditProject
     let model: UpscalePanelModel
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var store = FalSettingsStore.shared
+    @ObservedObject private var spend = SkyStudioSpendStore.shared
+    @StateObject private var offers = UpscaleOffers()
     @State private var choice: UpscaleRangeChoice
-    @State private var target: FalUpscaleTarget
-    @State private var tierID: String
+    @State private var target: UpscaleTarget
+    @State private var tierID: String?
 
     init(project: VideoEditProject, model: UpscalePanelModel) {
         self.project = project
         self.model = model
         _choice = State(initialValue: model.defaultChoice)
         _target = State(initialValue: model.defaultTarget)
-        _tierID = State(initialValue: "bytedance-standard")
     }
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        let rows = model.rows(choice: choice, target: target)
-        let range = model.range(for: choice)
-        let selected = rows.first { $0.id == tierID } ?? rows[0]
+        let rows = model.rows(tiers: offers.tiers, choice: choice, target: target)
+        let selected = rows.first { $0.id == tierID } ?? rows.first
         VStack(alignment: .leading, spacing: 14) {
             header
-            rangeSection(range)
+            rangeSection(selected?.tier)
             targetSection
-            tierSection(rows: rows, seconds: range.duration)
-            footer(selected: selected, range: range)
+            tierSection(rows: rows, seconds: model.range(for: choice, tier: selected?.tier).duration)
+            footer(selected: selected)
         }
         .padding(20)
         .frame(width: 720)
+        .task {
+            await offers.load()
+            if tierID == nil { tierID = UpscalePanelModel.defaultTier(in: offers.tiers, target: target)?.id }
+            askForQuotes()
+        }
+        .onChange(of: choice) { _, _ in askForQuotes() }
+        .onChange(of: target) { _, _ in askForQuotes() }
+    }
+
+    private func askForQuotes() {
+        for row in model.rows(tiers: offers.tiers, choice: choice, target: target) where row.refusal == nil {
+            _ = offers.quote(row.quote)
+        }
     }
 
     private var header: some View {
@@ -51,7 +63,7 @@ struct UpscalePanel: View {
     }
 
     @ViewBuilder
-    private func rangeSection(_ range: UpscaleRange) -> some View {
+    private func rangeSection(_ tier: UpscaleTier?) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("What to upscale").font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
             if let longer = model.longerElsewhere {
@@ -63,18 +75,22 @@ struct UpscalePanel: View {
                 .font(.caption)
                 .fixedSize(horizontal: false, vertical: true)
             }
-            rangeRow(.thisClip, title: L10n("This clip only"),
+            rangeRow(.thisClip, tier: tier, title: L10n("This clip only"),
                      detail: model.thisUse.map { String(format: L10n("%@ used, plus %@ of handles on each side"), seconds($0.duration), seconds(UpscaleRange.handle)) } ?? "")
             if model.uses.count > 1 {
-                rangeRow(.longestUse, title: L10n("Longest use in this project (recommended)"),
+                rangeRow(.longestUse, tier: tier, title: L10n("Longest use in this project (recommended)"),
                          detail: UpscaleRange.longestUse(model.uses).map { String(format: L10n("%@ used by another clip, plus handles; covers this clip too"), seconds($0.duration)) } ?? "")
             }
-            rangeRow(.wholeFile, title: L10n("Whole file"), detail: L10n("Every use now and any future trim"))
+            rangeRow(.wholeFile, tier: tier, title: L10n("Whole file"), detail: L10n("Every use now and any future trim"))
+            if let limit = tier?.maxSourceSeconds {
+                Text(String(format: L10n("Sky Studio upscales at most %@ s at a time, handles included."), String(Int(limit.rounded(.down)))))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
         }
     }
 
-    private func rangeRow(_ option: UpscaleRangeChoice, title: String, detail: String) -> some View {
-        let seconds = model.range(for: option).duration
+    private func rangeRow(_ option: UpscaleRangeChoice, tier: UpscaleTier?, title: String, detail: String) -> some View {
+        let seconds = model.range(for: option, tier: tier).duration
         return Button {
             choice = option
         } label: {
@@ -96,7 +112,7 @@ struct UpscalePanel: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Target resolution").font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
             Picker("Target resolution", selection: $target) {
-                ForEach(FalUpscaleTarget.allCases, id: \.self) { candidate in
+                ForEach(UpscaleTarget.allCases, id: \.self) { candidate in
                     Text(verbatim: candidate.label).tag(candidate)
                 }
             }
@@ -108,75 +124,110 @@ struct UpscalePanel: View {
         }
     }
 
+    @ViewBuilder
     private func tierSection(rows: [UpscaleTierRow], seconds: Double) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("Model").font(.caption).fontWeight(.semibold).foregroundStyle(.secondary)
                 Spacer()
-                Text(String(format: L10n("Prices for %@ of video, fal.ai rates as of %@"), String(format: "%.1f s", seconds), UpscalePanelModel.priceDate))
+                Text(String(format: L10n("Sky Studio credits for %@ of video"), String(format: "%.1f s", seconds)))
                     .font(.caption).foregroundStyle(.secondary)
             }
-            ForEach(rows) { row in
-                tierRow(row)
+            switch offers.catalog {
+            case .loading:
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.small)
+                    Text("Asking Sky Studio for its upscale models…").font(.caption).foregroundStyle(.secondary)
+                }
+            case .failed(let detail):
+                Text(String(format: L10n("Could not get the upscale models from Sky Studio: %@"), detail))
+                    .font(.caption).foregroundStyle(.red).fixedSize(horizontal: false, vertical: true)
+            case .ready:
+                ForEach(rows) { row in
+                    tierRow(row)
+                }
             }
         }
     }
 
     private func tierRow(_ row: UpscaleTierRow) -> some View {
-        let blurb = UpscalePanelModel.blurb(for: row.id)
+        let quote = offers.known(row.quote)
+        let ready: SkyStudioQuote? = { if case .ready(let answer)? = quote { return answer } else { return nil } }()
+        let size = UpscalePanelModel.outputSize(ready, fallback: row.estimatedSize)
+        let blurb = UpscaleTier.blurb(for: row.id)
         return Button {
-            if row.unavailableReason == nil { tierID = row.id }
+            if row.refusal == nil { tierID = row.id }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: tierID == row.id ? "largecircle.fill.circle" : "circle")
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(verbatim: "\(row.tier.title) · \(row.tier.detail)").fontWeight(.medium)
-                    Text(row.unavailableReason ?? L10n(blurb)).font(.caption).foregroundStyle(.secondary)
+                    Text(verbatim: row.tier.title).fontWeight(.medium)
+                    Text(row.refusal?.localized ?? (blurb.isEmpty ? "" : L10n(blurb))).font(.caption).foregroundStyle(.secondary)
                 }
                 Spacer()
-                Text(verbatim: "\(Int(row.outputSize.width))×\(Int(row.outputSize.height))").font(.caption).foregroundStyle(.secondary)
-                Text(String(format: L10n("about %d min"), FalJobProgress.minutes(row.tier.typicalSeconds)))
-                    .font(.caption).foregroundStyle(.secondary).frame(width: 84, alignment: .trailing)
-                Text(FalMoney.text(row.estimate)).fontWeight(.semibold).monospacedDigit().frame(width: 60, alignment: .trailing)
+                Text(verbatim: "\(Int(size.width))×\(Int(size.height))").font(.caption).foregroundStyle(.secondary)
+                if let typical = ready?.typicalSeconds {
+                    Text(String(format: L10n("about %d min"), FalJobProgress.minutes(typical)))
+                        .font(.caption).foregroundStyle(.secondary).frame(width: 84, alignment: .trailing)
+                }
+                price(row, quote: quote).frame(width: 96, alignment: .trailing)
             }
             .contentShape(Rectangle())
-            .opacity(row.unavailableReason == nil ? 1 : 0.5)
+            .opacity(row.refusal == nil ? 1 : 0.5)
         }
         .buttonStyle(.plain)
     }
 
     @ViewBuilder
-    private func footer(selected: UpscaleTierRow, range: UpscaleRange) -> some View {
-        let spent = store.spentToday()
-        let overLimit = spent + selected.estimate > store.dailyLimit + 0.0005
+    private func price(_ row: UpscaleTierRow, quote: UpscaleOffers.Quote?) -> some View {
+        if row.refusal != nil {
+            Text(verbatim: "—").foregroundStyle(.secondary)
+        } else {
+            switch quote {
+            case .ready(let answer)?:
+                Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(answer.credits))).fontWeight(.semibold).monospacedDigit()
+            case .failed?:
+                Text(verbatim: "—").foregroundStyle(.secondary)
+            case .loading?, nil:
+                ProgressView().controlSize(.mini)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func footer(selected: UpscaleTierRow?) -> some View {
+        let spent = spend.spentToday()
+        let quote: SkyStudioQuote? = selected.flatMap { row in
+            if case .ready(let answer)? = offers.known(row.quote) { return answer } else { return nil }
+        }
+        let overLimit = spent + (quote?.credits ?? 0) > spend.dailyLimit + 0.0005
         Divider()
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(String(format: L10n("Saves next to the original as %@"), model.fileName(target: target, tier: selected.tier)))
-                    .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
-                if !store.hasKey {
-                    Text("Add a fal.ai key in Settings → AI first.").font(.caption).foregroundStyle(.red)
-                } else {
-                    Text(String(format: L10n("Spent today %@ of your %@ daily limit · final cost shown after upload"), FalMoney.text(spent), FalMoney.text(store.dailyLimit)))
-                        .font(.caption).foregroundStyle(overLimit ? .red : .secondary)
+                if let selected {
+                    let size = UpscalePanelModel.outputSize(quote, fallback: selected.estimatedSize)
+                    Text(String(format: L10n("Saves next to the original as %@"), model.fileName(size: size, tier: selected.tier)))
+                        .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
                 }
+                Text(String(format: L10n("Spent today %@ of your %@-credit daily limit"), SkyStudioCredits.text(spent), SkyStudioCredits.text(spend.dailyLimit)))
+                    .font(.caption).foregroundStyle(overLimit ? .red : .secondary)
             }
             Spacer()
             Button("Cancel") { dismiss() }
-            Button(String(format: L10n("Upscale · %@"), FalMoney.text(selected.estimate))) {
-                start(selected: selected, range: range)
+            Button(quote.map { String(format: L10n("Upscale · %@ credits"), SkyStudioCredits.text($0.credits)) } ?? L10n("Upscale")) {
+                if let selected, let quote { start(selected: selected, quote: quote) }
             }
             .keyboardShortcut(.defaultAction)
-            .disabled(!store.hasKey || selected.unavailableReason != nil)
+            .disabled(quote == nil || selected?.refusal != nil)
         }
     }
 
     /// 面板上的秒数一律「6.0 s」这种写法（m:ss 对一两秒的余料不好读）。
     private func seconds(_ value: Double) -> String { String(format: "%.1f s", value) }
 
-    private func start(selected: UpscaleTierRow, range: UpscaleRange) {
-        let request = model.request(choice: choice, target: target, tier: selected.tier)
-        let job = UpscaleJob(request: request, clipIDs: range.coveredClipIDs, projectGeneration: project.documentGeneration, title: model.clipName)
+    private func start(selected: UpscaleTierRow, quote: SkyStudioQuote) {
+        let request = model.request(choice: choice, target: target, tier: selected.tier, quote: quote)
+        let job = UpscaleJob(request: request, clipIDs: request.range.coveredClipIDs, projectGeneration: project.documentGeneration, title: model.clipName)
         UpscaleActivity.shared.add(job)
         dismiss()
     }

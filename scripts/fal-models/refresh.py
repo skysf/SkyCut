@@ -26,8 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 MODELS = ROOT / "Sources/SrtFlow/Fal/FalModels.swift"
-# 视频 upscale 的档位表（2026-10-02）：端点也登记在这里，快照和价格一起维护。
-UPSCALE = ROOT / "Sources/SrtFlow/Fal/FalUpscaleModels.swift"
+# 视频 upscale 2026-10-28 起走 Sky Studio（收费方案第 6 刀），fal 的档位表和它的快照删了。
 SCHEMAS = ROOT / "checks/Fal/schemas"
 UA = {"User-Agent": "Mozilla/5.0"}
 CATEGORIES = ["text-to-image", "text-to-video", "image-to-video", "video-to-video", "text-to-speech", "text-to-audio", "audio-to-audio", "video-to-audio"]
@@ -47,10 +46,9 @@ def get(url: str, retries: int = 6) -> bytes:
 
 def registered_endpoints() -> list[str]:
     found: list[str] = []
-    for path in (MODELS, UPSCALE):
-        for endpoint in re.findall(r'endpoint: "([^"]+)"', path.read_text(encoding="utf-8")):
-            if endpoint not in found:
-                found.append(endpoint)
+    for endpoint in re.findall(r'endpoint: "([^"]+)"', MODELS.read_text(encoding="utf-8")):
+        if endpoint not in found:
+            found.append(endpoint)
     return found
 
 
@@ -112,9 +110,6 @@ def prices() -> None:
     registry = MODELS.read_text(encoding="utf-8")
     print("\n登记的单价（FalModels.swift）：")
     for line in re.findall(r'unitPrice: [0-9.]+|"(?:480|768|1080)P": [0-9.]+', registry):
-        print("   " + line)
-    print("\n登记的 upscale 价（FalUpscaleModels.swift）：")
-    for line in re.findall(r"pricing: \.[A-Za-z]+\([^)]*\)", UPSCALE.read_text(encoding="utf-8")):
         print("   " + line)
     print("\n价格页上的话和登记的对不上就改登记、并把 docs/architecture/fal-generation.md 价格表的日期改成今天。")
 

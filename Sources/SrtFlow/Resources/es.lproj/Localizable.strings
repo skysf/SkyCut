@@ -1086,18 +1086,11 @@
 "Not optimized (the preview uses the original file)" = "Sin optimizar (la previsualización usa el archivo original)";
 "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones" = "Algunos archivos no se pudieron optimizar, así que la previsualización usa sus archivos originales. El menú indica cuáles";
 
-/* Upscale (clip → fal.ai, compare, replace) */
-"%@ charged" = "%@ cobrados";
-"%@ s · est. %@" = "%@ s · est. %@";
+/* Upscale (clip → Sky Studio, compare, replace; fal.ai before 2026-10-28) */
 "%@ upscaled to %@ · %@" = "%@ ampliado a %@ · %@";
 "%@ used by another clip, plus handles; covers this clip too" = "%@ usado por otro clip, más márgenes; cubre también este clip";
 "%@ used, plus %@ of handles on each side" = "%@ usado, más %@ de margen a cada lado";
-"Add a fal.ai key in Settings → AI first." = "Añade primero una clave de fal.ai en Ajustes → IA.";
-"Adds detail. Clips up to 20 s." = "Añade detalle. Clips de hasta 20 s.";
 "Below the %@ canvas. Upscaling adds real detail instead of plain scaling." = "Por debajo del lienzo de %@. Escalar añade detalle real en vez de solo agrandar.";
-"Charged %@ (estimated %@) · the original file stays where it is" = "Cobrado %@ (estimado %@) · el archivo original se queda donde está";
-"Cheapest. Preset for AI footage." = "El más barato. Preajuste para material de IA.";
-"Clips up to %d s only" = "Solo clips de hasta %d s";
 "Compare with Original…" = "Comparar con el original…";
 "Compare · %@" = "Comparar · %@";
 "Compare…" = "Comparar…";
@@ -1105,18 +1098,13 @@
 "Do not replace the clip; the upscaled file stays on disk" = "No reemplazar el clip; el archivo escalado se queda en el disco";
 "Downloading" = "Descargando";
 "Downloading %d%%" = "Descargando %d%%";
-"Estimated %@ · checking the bill · the original file stays where it is" = "Estimado %@ · comprobando la factura · el archivo original se queda donde está";
 "Every use now and any future trim" = "Todos los usos actuales y cualquier recorte futuro";
-"Faithful. Best for real faces." = "Fiel. Ideal para caras reales.";
-"Faithful. Clips up to 20 s." = "Fiel. Clips de hasta 20 s.";
-"Files up to %d MB only" = "Solo archivos de hasta %d MB";
 "Finishing" = "Finalizando";
 "Forget this result; the file stays on disk" = "Olvidar este resultado; el archivo se queda en el disco";
 "Generating %@ with %@" = "Generando %@ con %@";
 "In queue" = "En cola";
 "In queue (%d)" = "En cola (%d)";
 "Keep Original" = "Conservar original";
-"Large-model restoration, 10 times the price." = "Restauración con modelo grande, 10 veces el precio.";
 "Larger than the canvas: raise the canvas size too, or the export will scale it back down." = "Mayor que el lienzo: aumenta también el lienzo o la exportación lo reducirá.";
 "Longest use in this project (recommended)" = "El uso más largo en este proyecto (recomendado)";
 "Loop" = "Bucle";
@@ -1130,10 +1118,8 @@
 "Play the original and the upscaled file side by side" = "Reproducir el original y el archivo escalado lado a lado";
 "Point this clip back at the original file; the upscaled file stays on disk" = "Volver a apuntar este clip al archivo original; el escalado se queda en el disco";
 "Preparing" = "Preparando";
-"Prices for %@ of video, fal.ai rates as of %@" = "Precios para %@ de vídeo, tarifas de fal.ai a %@";
 "Processing" = "Procesando";
 "Processing %@" = "Procesando %@";
-"Re-draws detail: fur, leaves, water." = "Redibuja el detalle: pelaje, hojas, agua.";
 "Replace Clip" = "Reemplazar clip";
 "Revert to Original" = "Volver al original";
 "Revert to Original Clip" = "Volver al clip original";
@@ -1143,7 +1129,6 @@
 "Side by side" = "Lado a lado";
 "Sound effect" = "Efecto de sonido";
 "Sound from the original" = "Sonido del original";
-"Spent today %@ of your %@ daily limit · final cost shown after upload" = "Gastado hoy %@ de tu límite diario de %@ · el coste final se muestra tras subir";
 "Target resolution" = "Resolución objetivo";
 "The original file could not be found." = "No se encontró el archivo original.";
 "The original file stays where it is." = "El archivo original se queda donde está.";
@@ -1156,8 +1141,27 @@
 "Upscale Again…" = "Escalar de nuevo…";
 "Upscale Clip" = "Escalar clip";
 "Upscale cancelled." = "Escalado cancelado.";
+"Re-draws detail: fur, leaves, water. No 1440p." = "Redibuja detalles: pelo, hojas, agua. Sin 1440p.";
+"Large-model restoration. Slow: about a minute per second of video." = "Restauración con un modelo grande. Lento: alrededor de un minuto por segundo de vídeo.";
+"At most %@ s at a time: split the clip first" = "Como máximo %@ s cada vez: divide primero el clip";
+"Up to %d fps only" = "Solo hasta %d fps";
+"Not offered at this resolution" = "No disponible en esta resolución";
+"Sky Studio upscales at most %@ s at a time, handles included." = "Sky Studio escala como máximo %@ s cada vez, márgenes incluidos.";
+"Sky Studio credits for %@ of video" = "Créditos de Sky Studio para %@ de vídeo";
+"Asking Sky Studio for its upscale models…" = "Consultando a Sky Studio sus modelos de escalado…";
+"Could not get the upscale models from Sky Studio: %@" = "No se pudieron obtener los modelos de escalado de Sky Studio: %@";
+"%@ credits" = "%@ créditos";
+"Spent today %@ of your %@-credit daily limit" = "Gastado hoy %@ de tu límite diario de %@ créditos";
+"Upscale · %@ credits" = "Escalar · %@ créditos";
+"macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow." = "macOS va a preguntar si SkyCut puede usar tu clave de Sky Studio. Haz clic en Permitir siempre.";
+"%@ s · %@ credits" = "%@ s · %@ créditos";
+"Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library." = "Sky Studio ya lo había empezado, así que no se pudo cancelar: los créditos se han gastado y el resultado aparecerá en tu biblioteca de Sky Studio.";
+"SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library." = "SkyCut no pudo contactar con Sky Studio para cancelarlo; puede que aún termine y aparezca en tu biblioteca de Sky Studio.";
+"%@ Sky Studio credits · also in your Sky Studio library · the original file stays where it is" = "%@ créditos de Sky Studio · también en tu biblioteca de Sky Studio · el archivo original se queda donde está";
+"Daily limit for AI" = "Límite diario para la IA";
+"credits" = "créditos";
+"SkyCut asks before AI spends more Sky Studio credits than this in one day" = "SkyCut pregunta antes de que la IA gaste en un día más créditos de Sky Studio que esto";
 "Upscale failed: %@" = "Error al escalar: %@";
-"Upscale · %@" = "Escalar · %@";
 "Upscaled with %@ on %@ · %@" = "Escalado con %@ el %@ · %@";
 "Upscaled. Compare it, then decide." = "Escalado. Compáralo y decide.";
 "Upscale…" = "Escalar…";

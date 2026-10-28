@@ -134,15 +134,6 @@ func checkUpscaleSwap(root: URL) throws {
     checkEqual(partial.revertUpscale([a.id, far.id]), [a.id], "换回去：只有换过的那段")
     check(partial.mainClips.allSatisfy { $0.upscale == nil && $0.sourceURL == original }, "都回到原片上")
 
-    // ---- 账单几分钟后才查到实收：按文件补进此刻用着它的段的记录（换源早就做完了也补得上）----
-    check(project.allClips.filter { $0.sourceURL == second.url }.allSatisfy { $0.upscale?.costUSD == nil }, "刚换源时记录里没有钱（账单还没出）")
-    let billed = project.recordUpscaleCost(file: second.url, costUSD: 0.0432)
-    checkEqual(Set(billed), Set([a.id, b.id, far.id, swapped.id]), "用着这个 upscale 文件的四段都补上了钱")
-    check(project.allClips.filter { $0.sourceURL == second.url }.allSatisfy { $0.upscale?.costUSD == 0.0432 }, "记录里是账单的数")
-    check(project.allClips.first { $0.id == other.id }?.upscale == nil, "别的素材不动")
-    checkEqual(project.recordUpscaleCost(file: second.url, costUSD: 0.0432), [], "同一个数再记一次什么都不改（applyDocumentRepair 据此不标脏）")
-    checkEqual(project.recordUpscaleCost(file: root.appendingPathComponent("没人用.mp4"), costUSD: 1), [], "没人用的文件改不到任何段")
-
     // ---- 存盘往返、v29 按需登记、原片进素材表 ----
     let file = root.appendingPathComponent("upscale.srtflowproj")
     var save = TimelineState()
@@ -167,6 +158,12 @@ func checkUpscaleSwap(root: URL) throws {
     checkEqual(loaded.mainClips.first?.upscale?.originalRemoteKey, "lib-123", "读回来：库键在")
     checkEqual(loaded.mainClips.first?.upscale?.originalInfo?.displaySize.height, 720, "读回来：原片的探测信息在")
     checkClose(loaded.mainClips.first?.upscale?.costUSD, 0.1, "读回来：扣费在")
+    // 2026-10-28 起走 Sky Studio：记积分（按需写键、没有 +1 版本）；fal 时代的记录照旧读美元、没有积分。
+    checkEqual(loaded.mainClips.first?.upscale?.credits, nil, "fal 时代的记录没有积分")
+    let skyRecord = ClipUpscaleRecord(originalURL: original, sourceOffset: 1, tier: "topaz-starlight", credits: 455)
+    let skyJSON = try JSONEncoder().encode(skyRecord)
+    checkEqual(try JSONDecoder().decode(ClipUpscaleRecord.self, from: skyJSON).credits, 455, "积分存得下、读得回")
+    check(String(data: skyJSON, encoding: .utf8)?.contains("costUSD") == false, "没有美元就不写 costUSD 键")
     var reloaded = loaded.mainClips[0]
     check(ClipSourceSwap.revert(&reloaded), "读回来的段能换回原片")
     checkEqual(reloaded.sourceURL, original, "换回原片")

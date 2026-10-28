@@ -21,16 +21,16 @@ struct UpscaleJobStatusView: View {
             case .running(let progress):
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.mini)
-                    // 「Topaz precision · Proteus · processing 1:12 · usually about 1 min」，每秒走一下（FalPhaseClock）。
-                    FalPhaseClock(progress: progress, prefix: "\(tier.title) · \(tier.detail) · ")
+                    // 「Topaz Starlight · processing 1:12 · usually about 3 min」，每秒走一下（FalPhaseClock）。
+                    FalPhaseClock(progress: progress, prefix: "\(tier.title) · ")
                         .font(.caption)
                 }
                 if job.keyPrompt {
-                    Text("macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow.")
+                    Text("macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {
-                    Text(String(format: L10n("%@ s · est. %@"), String(format: "%.1f", job.request.range.duration), FalMoney.text(job.request.estimate)))
+                    Text(String(format: L10n("%@ s · %@ credits"), String(format: "%.1f", job.request.range.duration), SkyStudioCredits.text(job.request.credits)))
                         .font(.caption).foregroundStyle(.secondary)
                     Spacer()
                     Button("Cancel") { activity.remove(job) }.controlSize(.small)
@@ -49,10 +49,24 @@ struct UpscaleJobStatusView: View {
                 Text(String(format: L10n("Upscale failed: %@"), message)).font(.caption).foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                 Button("Dismiss") { activity.remove(job) }.controlSize(.small)
-            case .cancelled:
-                Text("Upscale cancelled.").font(.caption).foregroundStyle(.secondary)
+            case .cancelled(let stop):
+                Text(stop.localizedNote ?? L10n("Upscale cancelled.")).font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
                 Button("Dismiss") { activity.remove(job) }.controlSize(.small)
             }
+        }
+    }
+}
+
+extension SkyStudioJobError.Stop {
+    /// 停下来时界面上那一句（本地化）：没花钱的就是「已取消」（nil），花了的照实说。
+    var localizedNote: String? {
+        switch self {
+        case .nothingCharged: return nil
+        case .alreadyStarted:
+            return L10n("Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library.")
+        case .unknown:
+            return L10n("SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library.")
         }
     }
 }

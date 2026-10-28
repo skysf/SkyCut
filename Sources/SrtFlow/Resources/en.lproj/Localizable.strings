@@ -1086,18 +1086,11 @@
 "Not optimized (the preview uses the original file)" = "Not optimized (the preview uses the original file)";
 "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones" = "Some files couldn’t be optimized, so the preview uses the original files for them. The menu lists which ones";
 
-/* Upscale (clip → fal.ai, compare, replace) */
-"%@ charged" = "%@ charged";
-"%@ s · est. %@" = "%@ s · est. %@";
+/* Upscale (clip → Sky Studio, compare, replace; fal.ai before 2026-10-28) */
 "%@ upscaled to %@ · %@" = "%@ upscaled to %@ · %@";
 "%@ used by another clip, plus handles; covers this clip too" = "%@ used by another clip, plus handles; covers this clip too";
 "%@ used, plus %@ of handles on each side" = "%@ used, plus %@ of handles on each side";
-"Add a fal.ai key in Settings → AI first." = "Add a fal.ai key in Settings → AI first.";
-"Adds detail. Clips up to 20 s." = "Adds detail. Clips up to 20 s.";
 "Below the %@ canvas. Upscaling adds real detail instead of plain scaling." = "Below the %@ canvas. Upscaling adds real detail instead of plain scaling.";
-"Charged %@ (estimated %@) · the original file stays where it is" = "Charged %@ (estimated %@) · the original file stays where it is";
-"Cheapest. Preset for AI footage." = "Cheapest. Preset for AI footage.";
-"Clips up to %d s only" = "Clips up to %d s only";
 "Compare with Original…" = "Compare with Original…";
 "Compare · %@" = "Compare · %@";
 "Compare…" = "Compare…";
@@ -1105,18 +1098,13 @@
 "Do not replace the clip; the upscaled file stays on disk" = "Do not replace the clip; the upscaled file stays on disk";
 "Downloading" = "Downloading";
 "Downloading %d%%" = "Downloading %d%%";
-"Estimated %@ · checking the bill · the original file stays where it is" = "Estimated %@ · checking the bill · the original file stays where it is";
 "Every use now and any future trim" = "Every use now and any future trim";
-"Faithful. Best for real faces." = "Faithful. Best for real faces.";
-"Faithful. Clips up to 20 s." = "Faithful. Clips up to 20 s.";
-"Files up to %d MB only" = "Files up to %d MB only";
 "Finishing" = "Finishing";
 "Forget this result; the file stays on disk" = "Forget this result; the file stays on disk";
 "Generating %@ with %@" = "Generating %@ with %@";
 "In queue" = "In queue";
 "In queue (%d)" = "In queue (%d)";
 "Keep Original" = "Keep Original";
-"Large-model restoration, 10 times the price." = "Large-model restoration, 10 times the price.";
 "Larger than the canvas: raise the canvas size too, or the export will scale it back down." = "Larger than the canvas: raise the canvas size too, or the export will scale it back down.";
 "Longest use in this project (recommended)" = "Longest use in this project (recommended)";
 "Loop" = "Loop";
@@ -1130,10 +1118,8 @@
 "Play the original and the upscaled file side by side" = "Play the original and the upscaled file side by side";
 "Point this clip back at the original file; the upscaled file stays on disk" = "Point this clip back at the original file; the upscaled file stays on disk";
 "Preparing" = "Preparing";
-"Prices for %@ of video, fal.ai rates as of %@" = "Prices for %@ of video, fal.ai rates as of %@";
 "Processing" = "Processing";
 "Processing %@" = "Processing %@";
-"Re-draws detail: fur, leaves, water." = "Re-draws detail: fur, leaves, water.";
 "Replace Clip" = "Replace Clip";
 "Revert to Original" = "Revert to Original";
 "Revert to Original Clip" = "Revert to Original Clip";
@@ -1143,7 +1129,6 @@
 "Side by side" = "Side by side";
 "Sound effect" = "Sound effect";
 "Sound from the original" = "Sound from the original";
-"Spent today %@ of your %@ daily limit · final cost shown after upload" = "Spent today %@ of your %@ daily limit · final cost shown after upload";
 "Target resolution" = "Target resolution";
 "The original file could not be found." = "The original file could not be found.";
 "The original file stays where it is." = "The original file stays where it is.";
@@ -1156,8 +1141,27 @@
 "Upscale Again…" = "Upscale Again…";
 "Upscale Clip" = "Upscale Clip";
 "Upscale cancelled." = "Upscale cancelled.";
+"Re-draws detail: fur, leaves, water. No 1440p." = "Re-draws detail: fur, leaves, water. No 1440p.";
+"Large-model restoration. Slow: about a minute per second of video." = "Large-model restoration. Slow: about a minute per second of video.";
+"At most %@ s at a time: split the clip first" = "At most %@ s at a time: split the clip first";
+"Up to %d fps only" = "Up to %d fps only";
+"Not offered at this resolution" = "Not offered at this resolution";
+"Sky Studio upscales at most %@ s at a time, handles included." = "Sky Studio upscales at most %@ s at a time, handles included.";
+"Sky Studio credits for %@ of video" = "Sky Studio credits for %@ of video";
+"Asking Sky Studio for its upscale models…" = "Asking Sky Studio for its upscale models…";
+"Could not get the upscale models from Sky Studio: %@" = "Could not get the upscale models from Sky Studio: %@";
+"%@ credits" = "%@ credits";
+"Spent today %@ of your %@-credit daily limit" = "Spent today %@ of your %@-credit daily limit";
+"Upscale · %@ credits" = "Upscale · %@ credits";
+"macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow." = "macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow.";
+"%@ s · %@ credits" = "%@ s · %@ credits";
+"Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library." = "Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library.";
+"SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library." = "SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library.";
+"%@ Sky Studio credits · also in your Sky Studio library · the original file stays where it is" = "%@ Sky Studio credits · also in your Sky Studio library · the original file stays where it is";
+"Daily limit for AI" = "Daily limit for AI";
+"credits" = "credits";
+"SkyCut asks before AI spends more Sky Studio credits than this in one day" = "SkyCut asks before AI spends more Sky Studio credits than this in one day";
 "Upscale failed: %@" = "Upscale failed: %@";
-"Upscale · %@" = "Upscale · %@";
 "Upscaled with %@ on %@ · %@" = "Upscaled with %@ on %@ · %@";
 "Upscaled. Compare it, then decide." = "Upscaled. Compare it, then decide.";
 "Upscale…" = "Upscale…";

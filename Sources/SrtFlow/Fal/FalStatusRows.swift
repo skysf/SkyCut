@@ -38,16 +38,15 @@ struct UpscaleStatusRow: View {
         let tier = job.request.tier
         switch job.state {
         case .running(let progress):
-            FalStatusBar(icon: "arrow.up.left.and.arrow.down.right", message: String(format: L10n("Upscaling %@ with %@"), job.title, "\(tier.title) · \(tier.detail)")) {
+            FalStatusBar(icon: "arrow.up.left.and.arrow.down.right", message: String(format: L10n("Upscaling %@ with %@"), job.title, tier.title)) {
                 FalPhasePills(progress: progress, showsUpload: true)
-                Text(String(format: L10n("est. %@"), FalMoney.text(job.request.estimate)))
+                Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(job.request.credits)))
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Stop") { activity.remove(job) }
             }
         case .done:
             let size = job.outcome?.info.resolutionLabel ?? ""
-            let cost = job.actualCost.map { String(format: L10n("%@ charged"), FalMoney.text($0)) }
-                ?? String(format: L10n("est. %@"), FalMoney.text(job.request.estimate))
+            let cost = String(format: L10n("%@ credits"), SkyStudioCredits.text(job.outcome?.creditsCharged ?? job.request.credits))
             FalStatusBar(icon: "checkmark.circle", message: String(format: L10n("%@ upscaled to %@ · %@"), job.title, size, cost)) {
                 Button("Compare…") { activity.compare = .job(job) }
                 Button("Dismiss") { activity.remove(job) }
@@ -56,8 +55,8 @@ struct UpscaleStatusRow: View {
             FalStatusBar(icon: "exclamationmark.triangle", message: String(format: L10n("Upscale failed: %@"), message)) {
                 Button("Dismiss") { activity.remove(job) }
             }
-        case .cancelled:
-            FalStatusBar(icon: "stop.circle", message: L10n("Upscale cancelled.")) {
+        case .cancelled(let stop):
+            FalStatusBar(icon: "stop.circle", message: stop.localizedNote ?? L10n("Upscale cancelled.")) {
                 Button("Dismiss") { activity.remove(job) }
             }
         }

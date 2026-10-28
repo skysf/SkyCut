@@ -189,10 +189,13 @@ final class FalSettingsStore: ObservableObject {
         syncProviders()
     }
 
-    /// 把「配了 fal」写进和小程序约定的小文件：只在内容变了才写。App 每次启动也调一遍（文件被删了、Key 是别的途径删的）。
+    /// 把「配了哪些提供方」写进和小程序约定的小文件：fal 存了 Key、Sky Studio 存了 Key（SkyStudioAccount 的 Key 变了也叫这里）。
+    /// 只在内容变了才写。App 每次启动也调一遍（文件被删了、Key 是别的途径删的）。第 7 刀删 fal 时搬去 SkyStudioAccount。
     func syncProviders() {
+        var providers: Set<MCPProvider> = hasKey ? [.fal] : []
+        if SkyStudioAccount.shared.hasKey { providers.insert(.skystudio) }
         do {
-            try MCPProviderMarker.write(hasKey ? [.fal] : [], to: providersURL)
+            try MCPProviderMarker.write(providers, to: providersURL)
         } catch {
             FileHandle.standardError.write(Data("SrtFlow fal: could not write \(providersURL.path): \(error)\n".utf8))
         }

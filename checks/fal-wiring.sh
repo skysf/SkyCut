@@ -9,23 +9,22 @@
 #   1. **不弹模态框**：fal 这几个文件里没有 NSAlert / runModal / 任何面板（方案第 9、10 条；要用户点头就回确认码，AI 在聊天里问）；
 #   2. **HTTP 只经 FalClient**：`queue.fal.run` 和 `URLSession` 只出现在 FalClient.swift 和它的传输代理 FalTransfer.swift
 #      （认证头、取消、错误换话都在 FalClient；FalTransfer 只管流着发 / 收和字节进度）；
-#   3. **Key 只经 FalKeyCache 读**：`FalKeyStore.read(` 只在 FalKeyStore.swift 里；用 Key 的只有生成任务、配旁白和 upscale 任务三处；
-#   4. **先问后花**（2026-10-17 起是聊天里的确认码，AI 多开方案板 9）：AI 起的任务（generate_media、upscale_clip）在**起任务之前**经
+#   3. **Key 只经 FalKeyCache 读**：`FalKeyStore.read(` 只在 FalKeyStore.swift 里；用 Key 的只有生成任务和配旁白两处；
+#   4. **先问后花**（2026-10-17 起是聊天里的确认码，AI 多开方案板 9）：AI 起的生成任务（generate_media）在**起任务之前**经
 #      `FalJobGate.decide` —— 把关 `store.decide(` 在发确认码 `AIConfirmations.shared.ask(` 之前、收令牌 `redeem` 只在这一处、记账恰好两处
-#      （额度内 / 收下令牌之后）；两个工具都在建任务之前调它、任务只拿记好的那一笔；没做出来才退（`guard !resultReceived`）；
-#      面板起的 upscale 自己记账（面板就是确认）；
+#      （额度内 / 收下令牌之后）；工具在建任务之前调它、任务只拿记好的那一笔；没做出来才退（`guard !resultReceived`）；
+#      upscale 2026-10-28 起走 Sky Studio、记积分（checks/sky-studio-wiring.sh 第 8 条），不许再碰 fal 的账；
 #   5. **不在提示条上问**：`AISession` 没有 ask / question 了（后台工程没窗口、用户没在看 SrtFlow 时提示条上的问题没人看见）；
 #      停止按工程（AIRound）取消这个工程的任务；
 #   6. **配旁白是同步工具，不许停下来等用户**：AIVoiceoverTool / AIFalVoice 里没有 `.ask(`，额度用 `allowsWithoutAsking` 判断，用不了就退档；
 #      fal 的声音也只经 `AIAudioFileWriter.writeVoiceover` 落盘（scripts/check-mcp.sh 那条扫描也钉着）；
-#   7. **清单跟着 Key 走**：`generate_media` 和 `upscale_clip` 属于 fal（MCPToolName.provider）、Key 添加 / 删除都同步那个小文件、启动时也对一遍；
-#   8. 路由：generate_media / upscale_clip 只起任务、回任务号（起步不排进撤销分组；upscale_clip 做完换源那一下在任务里自己包一层，
-#      scripts/check-mcp.sh 的异步落账扫描钉着）；任务有 waitingForUser 和取消；
+#   7. **清单跟着 Key 走**：`generate_media` 属于 fal（MCPToolName.provider；upscale_clip 2026-10-28 起属于 Sky Studio）、Key 添加 / 删除都同步那个小文件、
+#      启动时也对一遍；
+#   8. 路由：generate_media 只起任务、回任务号（起步不排进撤销分组）；任务有 waitingForUser 和取消；
 #   9. **进度看得见**（docs/architecture/fal-generation.md 第十三节）：生成任务把阶段交给 AIJobs 的 liveDetail（get_job 的 phase /
 #      queue_position / transfer_percent）、get_job 真的并进去；任务起手登记进 FalGenerationActivity、结束拿掉；
-#      编辑器顶上的状态行（FalStatusRows）挂在 AI 那条横幅底下；
-#  10. **账单查到实收回写工程里的记录**：cancel 只对 running 生效（remove 不杀查询）、查到叫 onCostResolved、AI 和对比窗口两边都接它经
-#      recordUpscaleCost 回写。
+#      编辑器顶上的状态行（FalStatusRows）挂在 AI 那条横幅底下。
+# （第 10 条「upscale 的账单查到实收回写工程里的记录」2026-10-28 删了：upscale 走 Sky Studio，做完就知道实收。）
 #
 # 用法：checks/fal-wiring.sh
 set -euo pipefail
@@ -65,7 +64,7 @@ line_of() { { grep -n -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
 FAL_FILES=(Sources/SrtFlow/Fal/*.swift "${VOICE}")
 
 # 1. 不弹模态框。
-for file in "${RUN}" "${TOOL}" "${VOICE}" "${SETTINGS}" "${GATE}" "${UPSCALE}" "${UPSCALE_TOOL}"; do
+for file in "${RUN}" "${TOOL}" "${VOICE}" "${SETTINGS}" "${GATE}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
     fail "${file}：里面弹了模态框 —— 要用户点头就回确认码（FalJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
   fi
@@ -77,8 +76,7 @@ if [ -n "${others}" ]; then
   fail "这些文件自己碰了 fal 的地址 / URLSession：$(tr '\n' ' ' <<<"${others}")—— 请求只经 FalClient（认证头、取消、错误换话都在那里）"
 fi
 grep -q 'queue\.fal\.run\|authorized(' "${TRANSFER}" && fail "${TRANSFER}：传输代理不许拼 fal 的地址、不许带 Key（那是 FalClient 的事）"
-[ "$(count 'FalTransfer.perform(' "${CLIENT}")" -eq 1 ] || fail "${CLIENT}：上传 / 下载要经 FalTransfer.perform（文件流着发、字节进度从任务代理来），且只在 transfer() 一处"
-[ "$(count 'session.uploadTask(with: put, fromFile: fileURL)' "${CLIENT}")" -eq 1 ] || fail "${CLIENT}：上传必须 fromFile（整个原片直接上传时可能是几个 GB，不许 Data(contentsOf:) 读进内存）"
+[ "$(count 'FalTransfer.perform(' "${CLIENT}")" -eq 1 ] || fail "${CLIENT}：下载要经 FalTransfer.perform（字节进度从任务代理来），且只在 transfer() 一处"
 
 # 3. Key 只经 FalKeyCache 读。
 direct="$(grep -ln 'FalKeyStore\.read(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift | grep -v "^${KEYS}\$" || true)"
@@ -86,9 +84,9 @@ if [ -n "${direct}" ]; then
   fail "这些文件直接读了钥匙串：$(tr '\n' ' ' <<<"${direct}")—— 读 Key 只经 FalKeyCache（一次运行最多问钥匙串一次、也就最多弹一次授权框）"
 fi
 users="$(grep -ln 'FalKeyCache\.shared\.key(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift | LC_ALL=C sort | tr '\n' ' ')"
-expected="$(printf '%s\n' "${VOICE}" "${RUN}" "${UPSCALE}" | LC_ALL=C sort | tr '\n' ' ')"
+expected="$(printf '%s\n' "${VOICE}" "${RUN}" | LC_ALL=C sort | tr '\n' ' ')"
 if [ "${users}" != "${expected}" ]; then
-  fail "用 Key 的地方应该只有生成任务、配旁白和 upscale 任务三处，实际是：${users}"
+  fail "用 fal 的 Key 的地方应该只有生成任务和配旁白两处（upscale 2026-10-28 起用 Sky Studio 的 Key），实际是：${users}"
 fi
 
 # 4. 先问后花：AI 起的任务在起任务之前都经 FalJobGate.decide（规则只有一处；超了是聊天里的确认码）。
@@ -102,9 +100,14 @@ fi
   || fail "${GATE}：记账 record(store, estimate) 应恰好两处（额度内直接做 / 收下令牌之后）"
 [ "$(count 'AIConfirmations.shared.ask(' "${GATE}")" -eq 1 ] && [ "$(count 'AIConfirmations.shared.redeem(' "${GATE}")" -eq 1 ] \
   || fail "${GATE}：超额度 / 没登记单价只发一处确认码、只在一处收令牌"
-for file in "${RUN}" "${UPSCALE}" "${UPSCALE_TOOL}" "${TOOL}"; do
+for file in "${RUN}" "${TOOL}"; do
   if grep -nE 'store\.decide\(|AIConfirmations\.shared\.(ask|redeem)\(' "${file}"; then
-    fail "${file}：把关和确认码只许在 FalJobGate 里（generate_media 和 upscale_clip 同一条规则）"
+    fail "${file}：把关和确认码只许在 FalJobGate 里"
+  fi
+done
+for file in "${UPSCALE}" "${UPSCALE_TOOL}"; do
+  if grep -nE 'FalJobGate|FalSettingsStore|FalKeyCache|FalClient' "${file}"; then
+    fail "${file}：upscale 2026-10-28 起走 Sky Studio（Key、积分、把关都在 SkyStudio*），不许再碰 fal 的 Key、账和把关"
   fi
 done
 TOOL_DECIDE="$(line_of 'try FalJobGate.decide(' "${TOOL}")"
@@ -112,19 +115,10 @@ TOOL_RUN="$(line_of 'let run = FalGenerationRun(' "${TOOL}")"
 if [ -z "${TOOL_DECIDE}" ] || [ -z "${TOOL_RUN}" ] || [ "${TOOL_DECIDE}" -ge "${TOOL_RUN}" ]; then
   fail "${TOOL}：把关（FalJobGate.decide）必须在建生成任务（FalGenerationRun）之前"
 fi
-UP_DECIDE="$(line_of 'try FalJobGate.decide(' "${UPSCALE_TOOL}")"
-UP_JOB="$(line_of 'let job = UpscaleJob(' "${UPSCALE_TOOL}")"
-if [ -z "${UP_DECIDE}" ] || [ -z "${UP_JOB}" ] || [ "${UP_DECIDE}" -ge "${UP_JOB}" ]; then
-  fail "${UPSCALE_TOOL}：把关（FalJobGate.decide）必须在建 upscale 任务之前"
-fi
-grep -q 'reserved = (reservation.amount, reservation.day)' "${RUN}" && grep -q 'case .ai(let reservation):' "${UPSCALE}" \
-  || fail "${RUN} / ${UPSCALE}：任务要用起任务之前记好的那一笔（退账按它退）"
-for file in "${RUN}" "${UPSCALE}"; do
-  [ "$(count 'guard !resultReceived' "${file}")" -eq 1 ] || fail "${file}：退账必须只在没拿到结果时（fal 只对做出来的收钱）"
-done
-# upscale 任务里两处：面板起的直接记估算（面板就是确认）、账单查到实收时把估算换成实收。
-[ "$(count 'recordSpend(' "${GATE}")" -eq 1 ] && [ "$(count 'recordSpend(' "${VOICE}")" -eq 1 ] && [ "$(count 'recordSpend(' "${UPSCALE}")" -eq 2 ] \
-  || fail "记账 recordSpend 只该在 FalJobGate（AI 起的任务）一处、配旁白读完一句之后一处、upscale 任务两处（面板起的记估算 / 查到实收换掉）"
+grep -q 'reserved = (reservation.amount, reservation.day)' "${RUN}" || fail "${RUN}：任务要用起任务之前记好的那一笔（退账按它退）"
+[ "$(count 'guard !resultReceived' "${RUN}")" -eq 1 ] || fail "${RUN}：退账必须只在没拿到结果时（fal 只对做出来的收钱）"
+[ "$(count 'recordSpend(' "${GATE}")" -eq 1 ] && [ "$(count 'recordSpend(' "${VOICE}")" -eq 1 ] \
+  || fail "记账 recordSpend 只该在 FalJobGate（AI 起的任务）一处、配旁白读完一句之后一处"
 [ "$(count 'recordSpend(' "${RUN}")" -eq 0 ] || fail "${RUN}：生成任务自己记账了，应经 FalJobGate"
 
 # 5. 不在提示条上问（AI 多开方案板 9：后台工程没有窗口、用户没在看 SrtFlow 时，提示条上的问题没人看见）。
@@ -147,7 +141,7 @@ grep -q 'falAvailable: offer != nil' "${VOICEOVER}" || fail "${VOICEOVER}：挑�
 [ "$(count 'AIAudioFileWriter.writeVoiceover(' "${VOICE}")" -eq 1 ] || fail "${VOICE}：fal 的声音必须经 AIAudioFileWriter.writeVoiceover 落盘（先过一道音量）"
 
 # 7. 清单跟着 Key 走。
-grep -Eq 'case \.generateMedia, \.upscaleClip: return \.fal' "${CATALOG}" || fail "${CATALOG}：generate_media / upscale_clip 没属于 fal 提供方 —— 没配 Key 也会列出来"
+grep -Eq 'case \.generateMedia: return \.fal' "${CATALOG}" || fail "${CATALOG}：generate_media 没属于 fal 提供方 —— 没配 Key 也会列出来"
 # 调用各占一行（8 格缩进）：Key 存 / 删 / 重新查看，共三处（定义那一行不算）。
 [ "$(count '^        syncProviders()$' "${SETTINGS}")" -eq 3 ] || fail "${SETTINGS}：Key 添加 / 删除 / 重新查看之后没有同步「配了哪些提供方」的小文件（应恰好三处调用）"
 grep -q 'FalSettingsStore.shared.refreshKeyStatus()' "${APP}" || fail "${APP}：启动时没有对一遍「配了 fal」的小文件"
@@ -157,28 +151,7 @@ grep -q 'FalSettingsStore.shared.refreshKeyStatus()' "${APP}" || fail "${APP}：
 if grep -q 'AIUndoGrouping' <<<"$(grep -n 'generateMedia' "${ROUTER}" || true)"; then
   fail "${ROUTER}：generate_media 不改工程，不该包进 AIUndoGrouping（放上时间线是 add_clips 的事）"
 fi
-[ "$(count '\.upscaleClip' "${ROUTER}")" -eq 2 ] || fail "${ROUTER}：upscale_clip 应出现两处（分派、策略）"
-if grep -q 'AIUndoGrouping' <<<"$(grep -n 'upscaleClip' "${ROUTER}" || true)"; then
-  fail "${ROUTER}：upscale_clip 只起任务，起步不该包进 AIUndoGrouping（换源那一下在 AIUpscaleTool.land 里自己包）"
-fi
-grep -q 'UpscaleActivity.shared.add(job, opensCompare: false)' "${UPSCALE_TOOL}" || fail "${UPSCALE_TOOL}：AI 起的 upscale 不该弹对比窗口（做完直接换源，2026-10-02 用户定）"
 
-# 10. 账单查到实收要回写到工程里的记录（docs/bugfixes/2026-10-02-upscale-cost-lookup-killed-by-remove.md）：
-#     remove 不许杀掉做完任务的账单查询（cancel 只对 running 生效）；查到了叫 onCostResolved；换源的两边（AI、对比窗口）都接它回写。
-COMPARE="Sources/SrtFlow/Upscale/UpscaleCompareView.swift"
-[ -f "${COMPARE}" ] || fail "找不到 ${COMPARE}（改名了就同步改这里）"
-CANCEL_LINE="$(line_of '    func cancel() {' "${UPSCALE}")"
-GUARD_LINE="$(line_of '        guard case .running = state else { return }' "${UPSCALE}")"
-if [ -z "${CANCEL_LINE}" ] || [ -z "${GUARD_LINE}" ] || [ "${GUARD_LINE}" -le "${CANCEL_LINE}" ] || [ $((GUARD_LINE - CANCEL_LINE)) -gt 4 ]; then
-  fail "${UPSCALE}：cancel() 开头必须 guard case .running（做完之后 remove 会经过它，不许把账单查询一起取消）"
-fi
-grep -q 'onCostResolved?(self)' "${UPSCALE}" || fail "${UPSCALE}：查到实收没叫 onCostResolved（工程里的记录永远是「—」）"
-for file in "${UPSCALE_TOOL}" "${COMPARE}"; do
-  grep -q 'onCostResolved = { \[weak project\] job in' "${file}" || fail "${file}：换源那一边没接 onCostResolved 回写工程里的记录"
-  grep -q 'project.recordUpscaleCost(file: outcome.file, costUSD: cost)' "${file}" || fail "${file}：查到实收要经 recordUpscaleCost 回写（不进撤销栈、标脏）"
-done
-grep -q 'waitingForUser: { \[weak job\] in job?.waiting }' "${UPSCALE_TOOL}" || fail "${UPSCALE_TOOL}：任务没把「在等用户」交给 AIJobs"
-grep -q 'if case .running(let progress)? = job?.state { return progress.json() }' "${UPSCALE_TOOL}" || fail "${UPSCALE_TOOL}：任务没把阶段交给 AIJobs 的 liveDetail"
 grep -q 'waitingForUser: { \[weak self\] in self?.waiting }' "${RUN}" || fail "${RUN}：任务没把「在等用户」交给 AIJobs（AI 会对着 running 干等）"
 grep -q 'cancel: { \[weak self\] in self?.cancel() }' "${RUN}" || fail "${RUN}：任务没有取消动作（停止按钮取消不了）"
 

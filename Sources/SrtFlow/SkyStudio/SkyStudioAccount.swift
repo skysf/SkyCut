@@ -19,7 +19,14 @@ final class SkyStudioAccount: ObservableObject {
     /// 上一次问到的 /me 存在这里（UserDefaults，身份类的名字照旧用 SrtFlow 前缀，docs/architecture/product-name.md）。
     static let storedAnswerKey = "SrtFlow.skystudio.me.v1"
 
-    @Published private(set) var hasKey: Bool
+    /// 有没有存 Key。变了：记着的 /models 作废、同步「配了哪些提供方」的小文件（upscale_clip 跟着 Sky Studio 的 Key 列不列）。
+    @Published private(set) var hasKey: Bool {
+        didSet {
+            guard hasKey != oldValue else { return }
+            SkyStudioCatalogCache.shared.forget()
+            FalSettingsStore.shared.syncProviders()
+        }
+    }
     @Published private(set) var stored: SkyStudioStoredAnswer?
     @Published private(set) var checking = false
     /// 设置那一节下面要说的一件事（AI 被挡住时回给它的话也照它说）。
@@ -122,6 +129,7 @@ final class SkyStudioAccount: ObservableObject {
         }
         await SkyStudioKey.cache.remember(key)
         hasKey = true
+        SkyStudioCatalogCache.shared.forget()
         // 上一把 Key 问到的那份不算这一把的。
         replaceStored(nil)
         lastFailure = nil

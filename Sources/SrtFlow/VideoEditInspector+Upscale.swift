@@ -44,9 +44,9 @@ extension VideoEditInspectorView {
 
     @ViewBuilder
     private func upscaleReplaced(_ clip: EditClip, _ record: ClipUpscaleRecord) -> some View {
-        let tier = FalUpscaleTiers.tier(record.tier)
-        let name = tier.map { "\($0.title) · \($0.detail)" } ?? record.tier
-        let cost = record.costUSD.map { FalMoney.text($0) } ?? "—"
+        let name = UpscaleTier.displayName(for: record.tier)
+        // 2026-10-28 起走 Sky Studio 记积分；fal 时代做的记着美元。
+        let cost = record.credits.map { String(format: L10n("%@ credits"), SkyStudioCredits.text($0)) } ?? record.costUSD.map { FalMoney.text($0) } ?? "—"
         Text(String(format: L10n("Upscaled with %@ on %@ · %@"), name, record.madeAt.formatted(date: .abbreviated, time: .omitted), cost))
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
