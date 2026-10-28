@@ -52,6 +52,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
     private var reserved: (credits: Double, day: Date)?
     /// 交上了没有（交上之后积分扣了，没做成服务器退）：回调在别的线程上，带锁。
     private let submitted = UpscaleSubmitted()
+    /// Sky Studio 的任务号，交上了才有：upscale_clip 的 get_job 报给 AI（对账、找客服时说得出是哪一单，停不下来的那单也一样）。
+    var skyStudioJobID: String? { submitted.jobID }
 
     init(request: UpscaleRequest, clipIDs: [UUID], projectGeneration: Int, title: String, approval: Approval = .panel) {
         self.request = request
@@ -109,7 +111,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         do {
             let result = try await UpscalePipeline.run(
                 request, api: SkyStudioAPI(), key: key, ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder,
-                onSubmitted: { _ in submitted.mark() }
+                onSubmitted: { submitted.mark($0) }
             ) { [weak self] phase in
                 Task { @MainActor in
                     guard let self, case .running(let progress) = self.state else { return }
@@ -163,12 +165,13 @@ final class UpscaleJob: ObservableObject, Identifiable {
     }
 }
 
-/// 交上了没有（流水线的回调在别的线程上）。
+/// 交上了没有、Sky Studio 给的任务号（流水线的回调在别的线程上）。
 final class UpscaleSubmitted: @unchecked Sendable {
     private let lock = NSLock()
-    private var flag = false
-    var value: Bool { lock.lock(); defer { lock.unlock() }; return flag }
-    func mark() { lock.lock(); flag = true; lock.unlock() }
+    private var id: String?
+    var value: Bool { lock.lock(); defer { lock.unlock() }; return id != nil }
+    var jobID: String? { lock.lock(); defer { lock.unlock() }; return id }
+    func mark(_ jobID: String) { lock.lock(); id = jobID; lock.unlock() }
 }
 
 /// 面板要为哪一段打开（右键菜单、检查器都走这里）。

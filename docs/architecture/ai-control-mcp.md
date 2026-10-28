@@ -692,7 +692,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      都由 `UpscalePanelModel` 算（`AIUpscaleNames` 认词），价问 `/quote`。源已经不比目标小就拒绝；音频 / 图片 / 定格段拒绝；同一个原片正在做就拒绝；
      问 Sky Studio 的那一两秒里工程换了就什么都不起。`get_timeline` 给每个画面段 `source_size`，AI 据此判断该不该放大。
    - **是任务**：回任务号（带积分 `credits`、通常几分钟、送去几秒、输出尺寸、会换哪些段、今天已花 / 每日积分上限、`next_step`），`get_job` 带阶段（第 7 条：
-     `phase` / `queue_position` / `transfer_percent` / `phase_seconds` / `typical_seconds`）；做完带 `credits_charged`；任务种类 `upscale`；`cancel_job` / 停止把它从
+     `phase` / `queue_position` / `transfer_percent` / `phase_seconds` / `typical_seconds`）；做完带 `credits_charged`；**交上之后带 Sky Studio 的任务号
+     `skystudio_job_id`**（跑着、做完、没做成、停了都带，2026-10-28 真积分测试时补的：对账、找客服时说得出是哪一单，停不下来的那单也一样；
+     `checks/sky-studio-wiring.sh` 第 8 条钉着）；任务种类 `upscale`；`cancel_job` / 停止把它从
      `UpscaleActivity` 拿掉：**排队中的替它向 Sky Studio 取消、退钱；已经开始的取消不了**，结局照实说积分花了、成品在作品库里。
    - **花积分按每日上限把关**（`SkyStudioJobGate.decide`，在问完 `/quote` 之后、建任务之前：额度内直接记账；超了当场回确认码、带码再调才记账，
      任务拿到的是记好的那一笔 `Approval.ai`），和 fal 那一关同一套确认码。**Key 不弹钥匙串授权框**（读不到就请用户去设置里点「允许…」）。面板起的 upscale

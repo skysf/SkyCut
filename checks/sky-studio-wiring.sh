@@ -15,7 +15,8 @@
 #   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好两处），
 #      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 UpscaleJob 里动；**只有面板起的任务可能弹钥匙串授权框**（`.prompting`），
 #      AI 起的、面板取模型和报价都不弹；upscale_clip 跟着 Sky Studio 的 Key 列（提供方 skystudio，Key 变了同步那个小文件）；
-#      路由只起任务（起步不包撤销分组，换源那一下在任务里自己包），AI 起的不弹对比窗口、阶段交给 get_job；这几个文件不弹模态框。
+#      路由只起任务（起步不包撤销分组，换源那一下在任务里自己包），AI 起的不弹对比窗口、阶段交给 get_job；这几个文件不弹模态框；
+#      get_job 报 Sky Studio 的任务号 skystudio_job_id（交上了就有：跑着、做完、没做成、停了都带）。
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -158,7 +159,13 @@ if grep -q 'AIUndoGrouping' <<<"$(grep -n 'upscaleClip' "${ROUTER}" || true)"; t
   fail "${ROUTER}：upscale_clip 只起任务，起步不该包进 AIUndoGrouping（换源那一下在 AIUpscaleTool.land 里自己包）"
 fi
 grep -qF 'UpscaleActivity.shared.add(job, opensCompare: false)' "${UP_TOOL}" || fail "${UP_TOOL}：AI 起的 upscale 不该弹对比窗口（做完直接换源，2026-10-02 用户定）"
-grep -qF 'if case .running(let progress)? = job?.state { return progress.json() }' "${UP_TOOL}" || fail "${UP_TOOL}：任务没把阶段交给 AIJobs 的 liveDetail"
+grep -qF 'if case .running(let progress) = job.state { detail = progress.json() }' "${UP_TOOL}" || fail "${UP_TOOL}：任务没把阶段交给 AIJobs 的 liveDetail"
+# Sky Studio 的任务号：交上了就记下（UpscaleJob），get_job 跑着、做完、没做成 / 停了都报（对账、找客服；停不下来的那单也说得出是哪一单）。
+grep -qF 'onSubmitted: { submitted.mark($0) }' "${UP_JOB}" || fail "${UP_JOB}：交上时要记下 Sky Studio 的任务号（onSubmitted 给的 job_id）"
+grep -qF 'if let id = job.skyStudioJobID { detail["skystudio_job_id"] = .string(id) }' "${UP_TOOL}" \
+  || fail "${UP_TOOL}：get_job 跑着时要报 skystudio_job_id"
+[ "$(count '"skystudio_job_id": .string(outcome.jobID)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：做完的两种结局（换了 / 工程变了没换）都要报 skystudio_job_id"
+[ "$(count ', detail: detail)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：没做成、停了的结局都要带上 skystudio_job_id（settle 的 detail）"
 for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${SPEND}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
     fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
