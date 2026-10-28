@@ -162,7 +162,12 @@ struct UpscalePanel: View {
                 Image(systemName: tierID == row.id ? "largecircle.fill.circle" : "circle")
                 VStack(alignment: .leading, spacing: 1) {
                     Text(verbatim: row.tier.title).fontWeight(.medium)
-                    Text(row.refusal?.localized ?? (blurb.isEmpty ? "" : L10n(blurb))).font(.caption).foregroundStyle(.secondary)
+                    if row.refusal == nil, case .failed(let detail)? = quote {
+                        // Sky Studio 不肯报价（超过这一档的最大倍数、源已经不比目标小……）：照它的原话说为什么（服务器写给人看的英文）。
+                        Text(verbatim: detail).font(.caption).foregroundStyle(.orange).fixedSize(horizontal: false, vertical: true)
+                    } else {
+                        Text(row.refusal?.localized ?? (blurb.isEmpty ? "" : L10n(blurb))).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
                 Spacer()
                 Text(verbatim: "\(Int(size.width))×\(Int(size.height))").font(.caption).foregroundStyle(.secondary)
