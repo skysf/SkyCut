@@ -12,6 +12,7 @@ runGateChecks()
 await runJobChecks()
 await runJobRunChecks()
 await runSpendChecks()
+await runApprovalChecks()
 runGenerationChecks()
 runGenerationFrameChecks()
 

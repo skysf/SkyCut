@@ -40,6 +40,7 @@
 | `SkyStudioJobAccess.swift` | 交活之前要的两样：Key（`SkyStudioJobKey`：`.prompting` 只给用户点了按钮起的、`.silent` 别的都用）、`/models` 记一份（`SkyStudioCatalogCache`） |
 | `SkyStudioSpend.swift` | 积分的每日上限和按天的账（`SkyStudioSpendStore`）、积分怎么写（`SkyStudioCredits`） |
 | `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（额度内记账、超了回确认码） |
+| `SkyStudioApproval.swift` | 确认码对应的完整请求身份、输入文件身份；摘要只用于显示 |
 | `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换；upscale 和生成共用 |
 | `SkyStudioSubmission.swift` | 交上了没有、任务号是多少（分清「没交上就停了」和「交上之后停不下来」，get_job 报 `skystudio_job_id`）；upscale 和生成共用 |
 | `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
@@ -52,6 +53,9 @@
 - **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：AI 起的过 `SkyStudioJobGate`
   （额度内直接记账、超了回确认码，和删文件、fal 花钱同一套 `AIConfirmations`）；面板起的面板本身就是确认（超了只标红不拦）；做完按实收改账，没花出去的退回。
   账按本地时区的自然日，规矩和 fal 那本同一份（`FalSpendLedger` / `FalSpendPolicy`，第 7 刀删 fal 时改名留下）。
+  **确认码绑完整请求**（2026-10-29，`SkyStudioApproval`）：kind、model、prompt、全部参数 / 输入、精确报价，加首帧或原片的文件身份和落点；
+  生成还绑文件夹 / 名字，upscale 还绑源范围 / 被替换的段 / 工程。显示摘要只给人看，不能拿它当 action；提交的随机 key 不参与。
+  同一件事重问回同一码，换 kind / 提示词 / 参数 / 输入 / 价格就另发，串码不消费、不记账。
 - **生成**（6b，2026-10-28）：`generate_media` 的图片、文生 / 图生视频、音乐、音效。kind 照 `/models` 挑第一个模型（图 `seedream5-flash`、视频 `minimax-h3`、
   音乐 `lyria-3-pro`、音效 `sonilo-sfx`）；参数换成 Sky Studio 的写法在 `SkyStudioGeneration`（画幅跟画布、图生视频送离首帧最近的那个、视频 5 秒 768p、
   音效 5 秒 wav、音乐纯音乐不给时长让模型定；**规矩在服务器上**，不合规的 `/quote` 回 `invalid_request`、原话交给 AI，SkyCut 不另抄一份）；图生视频的首帧

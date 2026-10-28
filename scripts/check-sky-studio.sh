@@ -61,6 +61,10 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobGate.swift \
+  Sources/SrtFlow/AIToolIO.swift \
+  Sources/SrtFlow/AIConfirmations.swift \
   Sources/SrtFlow/Fal/FalSpend.swift \
   Sources/SrtFlow/Fal/FalTransfer.swift \
   checks/SkyStudio/main.swift \
@@ -74,6 +78,7 @@ xcrun swiftc \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
+  checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
