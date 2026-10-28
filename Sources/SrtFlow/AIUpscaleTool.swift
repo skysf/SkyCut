@@ -69,8 +69,14 @@ enum AIUpscaleTool {
 
         let request = model.request(choice: choice, target: target, tier: tier, quote: quote)
         // 花积分的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        let identity = SkyStudioApproval.identity(job: row.quote, credits: quote.credits, context: [
+            "source": try SkyStudioApproval.file(request.originalURL),
+            "from": .number(request.range.start), "to": .number(request.range.end),
+            "clips": .array(request.range.coveredClipIDs.map(\.uuidString).sorted().map(JSONValue.string)),
+            "project": .string(project.shortID)
+        ])
         let reservation: SkyStudioJobGate.Reservation
-        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: UpscaleJob.summary(of: request), args: args) {
+        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: UpscaleJob.summary(of: request), identity: identity, args: args) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }

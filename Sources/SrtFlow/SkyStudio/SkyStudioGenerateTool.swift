@@ -65,13 +65,17 @@ enum SkyStudioGenerateTool {
         }
 
         // 花积分的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        let folder = AIWorkspace.shared.outputFolder(.generated, project: project)
+        let identity = SkyStudioApproval.identity(job: generation.job(model: model.id), credits: quote.credits, context: [
+            "frame": try frame.map(SkyStudioApproval.file) ?? .null,
+            "folder": .string(folder.standardizedFileURL.path), "name": .string(try args.string("name") ?? "")
+        ])
         let reservation: SkyStudioJobGate.Reservation
-        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), args: args) {
+        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
 
-        let folder = AIWorkspace.shared.outputFolder(.generated, project: project)
         let stem = ExportFileName.stem(
             from: try args.string("name").map { AIVoiceoverPlacement.fileStem($0) } ?? AIVoiceoverPlacement.fileStem(prompt),
             droppingExtension: "", fallback: fallbackStem(kind)

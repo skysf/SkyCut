@@ -146,6 +146,16 @@ G_ASK="$(line_of 'AIConfirmations.shared.ask(' "${JOB_GATE}")"
 if [ -z "${G_DECIDE}" ] || [ -z "${G_REDEEM}" ] || [ -z "${G_ASK}" ] || [ "${G_DECIDE}" -ge "${G_REDEEM}" ] || [ "${G_REDEEM}" -ge "${G_ASK}" ]; then
   fail "${JOB_GATE}：把关（store.decide）→ 收令牌（redeem）→ 没收下才发确认码（ask），顺序不能乱"
 fi
+# 确认的是具体请求，不能拿给人看的摘要当身份（两种 MiniMax 视频同价同摘要曾拿到同一张码）。
+grep -qF 'let action = identity' "${JOB_GATE}" || fail "${JOB_GATE}：确认码要绑调用方给的完整请求身份"
+grep -qF 'identity: String' "${JOB_GATE}" || fail "${JOB_GATE}：完整请求身份不可省略"
+for consumer in "${UP_TOOL}" Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift; do
+  grep -qF 'SkyStudioApproval.identity(job:' "${consumer}" || fail "${consumer}：确认码没有从完整请求构造身份"
+  grep -qF 'identity: identity, args: args' "${consumer}" || fail "${consumer}：完整请求身份没有接进花积分的闸"
+done
+grep -qF 'try SkyStudioApproval.file(request.originalURL)' "${UP_TOOL}" || fail "${UP_TOOL}：upscale 确认码没有绑定素材身份"
+grep -qF 'try frame.map(SkyStudioApproval.file)' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift \
+  || fail "generate_media：确认码没有绑定首帧文件身份"
 [ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 2 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好两处（额度内直接做 / 收下令牌之后）"
 movers="$(code_files_with 'SkyStudioSpendStore' | while read -r file; do
   # 只认真动账本的写法（SkyStudioSpendStore.shared.record / refund、拿着它的 store.record / refund）；held?.refund() 是经 SkyStudioHeldCredits 退。
