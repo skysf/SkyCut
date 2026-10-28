@@ -883,6 +883,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-28 停不下来的 upscale 没人再查：成品不进作品库，还占着一个名额](docs/bugfixes/2026-10-28-uncancellable-upscale-left-unfinished.md) — 第 6 刀真积分测试：`/jobs` 回 queued 不到一秒取消，回 409（fal 已经收下了），SkyCut 说「成品照样会进作品库」就放手了；可 Sky Studio 没有长轮询，**有人 GET 才去服务商那里取成品、存作品库、放出名额**，这一单一直 queued 占着 3 个名额中的一个，要等兜底几个小时。取消不了、取消没送到的那单交给不继承取消的后台任务 `followToEnd` 查到 done / failed（不下载）。**接口合同里「谁触发哪一步」要读清楚；告诉用户「会进作品库」之前，先确认是谁让这句话成真。**
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](docs/bugfixes/2026-10-28-upscale-inspector-still-says-fal.md) — upscale 改走 Sky Studio 后，检查器那一节标题旁的灰字还是 `Text(verbatim: "fal.ai")`：不走字符串表、不是一句话，按文案搜都漏了，真积分测试看截图才发现。改成 Sky Studio，守卫钉住 upscale 的界面不再写 fal.ai。**换提供方要连 verbatim 写死的名字一起搜。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
+- [2026-10-29 MCP 冒烟丢掉失败，后台包装又报成功](docs/bugfixes/2026-10-29-mcp-smoke-hides-failures.md) — EOF / 坏协议唤醒等待者、JSON-RPC 错误明确失败、超时标明结果未知；日志包装原样传退出码，假小程序回归覆盖整条证据链。
 
 ## 根目录文档
 
