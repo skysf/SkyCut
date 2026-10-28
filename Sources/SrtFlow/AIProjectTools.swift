@@ -51,8 +51,8 @@ enum AIProjectTools {
         } else {
             result["subtitle_generation"] = false
         }
-        // 配了 fal（generate_media 在清单里）：告诉 AI 今天还剩多少额度、每种事默认用哪个模型。
-        if let generation = FalGenerateTool.statusJSON() { result["generation"] = generation }
+        // 存了 Sky Studio 的 Key（generate_media、upscale_clip 在清单里）：告诉 AI 花的是积分、今天还剩多少（2026-10-28 起；之前是 fal 的美元）。
+        if let generation = SkyStudioGenerateTool.statusJSON() { result["generation"] = generation }
         // 录屏：状态、授权、上次没收完的；screen=true 再列能录的屏幕 / 窗口 / 麦克风（record_screen 用）。
         result["screen_recording"] = AIScreenSources.statusJSON(listSources: try args.bool("screen") ?? false)
         // SkyCut 的授权（照授权拦生效时才报）：没开通时 get_status 是唯一照常回的工具，AI 靠它跟用户说清楚（SkyCutGates）。

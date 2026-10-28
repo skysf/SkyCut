@@ -4,17 +4,21 @@
 > `AIFalVoice` / `AIFalVoices`、`generate_media` 的说明和参数、设置里的 fal 一节、`MCPProviders`（清单按 Key 列不列）、
 > `add_voiceover` 的 fal 档之前必读。相关：[AI 接口（MCP）](ai-control-mcp.md)（第四节第 39、40 条）、[阻塞的媒体读取](blocking-media-reads.md)、
 > [本地化](localization.md)。
+>
+> **2026-10-28 起（[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 6 刀）`generate_media` 和 `upscale_clip` 都改走 Sky Studio、花积分**，
+> 规矩在 [Sky Studio 的任务](sky-studio-jobs.md)；fal 只剩配旁白的那一档（第九节）和设置里的 fal 一节（只列旁白、克隆的模型）。下面讲生成的第五节第 8 条、
+> 第七、八节和第十三节里 fal 的那部分是历史，第 7 刀删 fal 时一起删。
 
 ## 一、落点
 
 | 决定 | 口径 |
 | --- | --- |
-| 谁能用 | 用户在设置 → AI 里填**自己的** fal.ai Key（第 14 条）；不填就没有这一块：`generate_media` 不出现在清单里（第 36 条），配旁白照旧走本机 / macOS |
+| 谁能用 | 用户在设置 → AI 里填**自己的** fal.ai Key（第 14 条）；不填就没有这一块，配旁白照旧走本机 / macOS。2026-10-28 起 fal 的 Key 只管配旁白：`generate_media` 跟着 Sky Studio 的 Key 列（第 36 条） |
 | 调用方式 | `URLSession` 直接调 fal 的队列 HTTP 接口，不引 SDK（第 14 条）。`FalClient` 是**唯一**碰 fal 地址的地方 |
 | Key | 能添加、能删除，存系统钥匙串，先只管一把（第 17 条）。见第六节 |
 | 花钱 | **只设每天的上限，默认 10 美元，用户能改；不设单次上限；额度内不问，超了先问；没登记单价的模型每次都先问**（第 18 条）。按登记的单价估，不是 fal 的账单。见第五节 |
 | 模型 | 每种事一个预设，用户能改成自己的端点号和单价（第 19 条）；对话里点名别的端点也能用（价格不明，每次问）。**2026-09-29 用户定：视频只用 `minimax/h3-max/` 这个系列；音乐、音效也加上；预设只用当前最新的模型，太老的不要**（第 57 条）。见第二节 |
-| 生成是任务 | 回任务号，AI 用 `get_job` 等，停止 / `cancel_job` 能取消（第 5 条）；成品放用户的 `SrtFlow/生成`（点名的文件夹 → 工程的家 → 下载；撞名加编号）。**不改工程**：放上时间线是 `add_clips` 的事 |
+| 生成是任务 | 回任务号，AI 用 `get_job` 等，停止 / `cancel_job` 能取消（第 5 条）；成品放用户的 `SrtFlow/生成`（点名的文件夹 → 工程的家 → 下载；撞名加编号）。**不改工程**：放上时间线是 `add_clips` 的事。2026-10-28 起这几条照旧，活送 Sky Studio（`SkyStudioGenerateTool` / `SkyStudioGenerationRun`） |
 | 配旁白 | 三档谁可用就用谁：**fal > 本机 Kokoro > macOS**（第 42 条）。配旁白是同步工具，**不许停下来问用户**：额度不够就退到下一档并在结果里说为什么（第 58 条）。克隆（第 52 条）只有 fal 能做，用不了就报错、不退档 |
 
 ## 二、预设怎么选、怎么更新
@@ -48,7 +52,8 @@
 - 时长按模型认的范围夹（H3 Max 5–15 秒、音乐 3–600 秒、音效 0.5–180 秒），估价用夹过的数；分辨率认 `480p` / `768p` / `1080p`（默认 768p，AI 做草稿用 480p）。
 - 画幅：图和文生视频默认跟画布（`FalInputs.nearestAspect`）；Seedream 的常见画幅有现成的名字（`landscape_16_9` …），别的按宽高写（约 250 万像素、16 的倍数）。
 - 本地图片（图生视频的首帧）编成 **base64 data URI** 直接放进请求（fal 各个模型页都写「文件字段收网址或 data URI」）；太大（>6 MB）或 fal 不认的格式先用 ImageIO
-  缩到长边 2048、存 JPEG（`FalPayloads`）。克隆的参考音频同理（16 kHz 单声道 WAV）。
+  缩到长边 2048、存 JPEG（`FalPayloads`；2026-10-28 起图生视频走 Sky Studio，首帧 `/uploads` 上去，缩图挪进 `SkyStudioGenerationFrame`，`FalPayloads` 删了）。
+  克隆的参考音频同理（16 kHz 单声道 WAV）。
 - `options`：AI 直接传给模型的其余字段，盖在 SrtFlow 填的上面。**没登记的端点只写最基本的字段**（`prompt` / `text`、`image_url`），其余全靠 `options` ——
   它点名了这个模型，就该知道它的参数。
 
@@ -65,7 +70,7 @@
 - 下载：先下到临时文件再挪过去，下到一半断了不留半个文件；空文件、HTTP 错误都报错；**不把 Key 发给文件那台主机**。
 - 自检 / 冒烟用 `SRTFLOW_FAL_QUEUE_BASE` 把队列地址指到本机的假 fal，**只认回环地址**（Key 不会因此发到别处）。
 
-## 五、花钱（`FalSpendPolicy` / `FalSpendLedger` / `FalJobGate` / `FalGenerationRun`）
+## 五、花钱（`FalSpendPolicy` / `FalSpendLedger`；2026-10-28 起只剩配旁白用）
 
 1. **估算** = 登记的单价 × 用量（`FalModel.estimate`：图按张、视频按秒（分辨率分档）、旁白按千字符、音乐按成品分钟向上取整、音效按秒）。
    没登记单价（用户填了自己的端点又没填价、或 AI 点名的端点）估不出来 = nil。
@@ -83,10 +88,9 @@
    结果里 `voice.note` 写「fal.ai 的声音没用：会让今天超过 $X 的上限」并说去设置里改。
 7. 每日上限、今天花了多少、每种事的模型都在设置 → AI 的 fal 一节（`FalSettingsRow`），`get_status` 的 `generation` 也报给 AI。
 
-- **AI 起的 fal 任务（`generate_media`）的把关只有一处**：`FalJobGate.decide`，工具在建任务之前调它（额度内直接记账；超了 / 价格不明
-  回确认码、收下令牌才记账；决定和记账同一步），任务只拿记好的那一笔（`FalGenerationRun` 的 `reservation`）。钥匙串授权框的提醒
-  （给 AI 的话 + 提示条上的一句）也在它里面 —— 那是 macOS 的框、苹果不给代点，只能请用户点。`checks/fal-wiring.sh` 第 4、5 条钉着。
-  `upscale_clip` 2026-10-28 起走 Sky Studio、花积分，把关在 `SkyStudioJobGate`（同一套确认码，[Sky Studio 的任务](sky-studio-jobs.md)）。
+- **AI 起的 fal 任务（`generate_media`）的把关**原来只在 `FalJobGate.decide` 一处（额度内直接记账；超了 / 价格不明回确认码、收下令牌才记账；
+  决定和记账同一步），任务只拿记好的那一笔。2026-10-28 起 `generate_media`、`upscale_clip` 都走 Sky Studio、花积分，把关在 `SkyStudioJobGate`
+  （同一套确认码，[Sky Studio 的任务](sky-studio-jobs.md)），`FalJobGate` 跟着生成一起删了；fal 的钱只剩配旁白记（上面第 6 条），`checks/fal-wiring.sh` 第 4 条钉着。
 
 ## 六、Key 与钥匙串（`FalKeyStore` / `FalKeyCache`）
 
@@ -107,9 +111,9 @@
 
 ## 七、清单跟着 Key 走（`MCPProviders`）
 
-- 2026-10-02 起 fal 的工具有两个：`generate_media` 和 `upscale_clip`。**2026-10-28 起 `upscale_clip` 属于 Sky Studio 提供方**（`skystudio`：存了 Sky Studio 的 Key 才列），
-  fal 只剩 `generate_media`；总说明的「Paid」那一行配了哪家列哪家的工具。下面说的「列不列」两家一样，那个小文件里两家的名字都写（`FalSettingsStore.syncProviders`，
-  Sky Studio 的 Key 变了也叫它）。
+- 2026-10-02 起 fal 的工具有两个：`generate_media` 和 `upscale_clip`。**2026-10-28 起两个都属于 Sky Studio 提供方**（`skystudio`：存了 Sky Studio 的 Key 才列，
+  收费方案第 6 刀），fal 的 Key 不再多列工具（只管配旁白，`add_voiceover` 一直列着）；总说明的「Paid」那一行只在存了 Sky Studio 的 Key 时有。
+  下面说的「列不列」照旧，那个小文件里两家的名字都写（`FalSettingsStore.syncProviders`，Sky Studio 的 Key 变了也叫它）。
 - 工具清单由小程序（`skycut-mcp`）当场回（Claude 一启动就要，不能为此拉起 App），而 Key 在 App 的钥匙串里，所以 App 在 Key 添加 / 删除时、以及每次启动时，
   写一个**只有提供方名字**的小文件 `mcp-providers.json`（`{"providers":["fal"]}`，和 socket 同目录、按 bundle id 分开），小程序每回一次清单 / 握手都重读它。
   文件里没有 Key、没有别的机密；读得宽（不在 / 坏了 / 有不认识的名字都当没有）。
@@ -122,7 +126,13 @@
   到 2026-10-02 只剩 53 字：`generate_media` 的说明写上 `get_job` 的进度字段就到了 72,085，用户定抬到 **80,000**（约 2.2 万 token；`ProtocolChecks`），
   也给下一个 PR 的 `upscale_clip` 腾地方。以后再加工具还是先把别处写短。
 
-## 八、generate_media（`FalGenerateTool` / `FalGenerationRun`）
+## 八、generate_media（2026-09-29 起送 fal，**2026-10-28 起送 Sky Studio**）
+
+> 2026-10-28 起（收费方案第 6 刀 6b）：模型由 Sky Studio 按种类定（`/models`：图 Seedream 5 Flash、视频 MiniMax H3（只有 480p / 768p）、音乐 Lyria 3 Pro
+> （60–180 秒或让模型定、可以带歌词）、音效 Sonilo），价问 `/quote`、花积分，`model` / `options` 两个参数没有了；图生视频的首帧 `/uploads` 上去。
+> 结果里报 `credits` / `credits_charged` / `skystudio_job_id`，成品也长期留在用户的作品库里。参数换成 Sky Studio 的写法在 `SkyStudioGeneration`（纯值），
+> 工具 `SkyStudioGenerateTool`、任务 `SkyStudioGenerationRun`，规矩见 [Sky Studio 的任务](sky-studio-jobs.md)。下面是 fal 时代的做法（`FalGenerateTool` /
+> `FalGenerationRun`，已删），留作对照。
 
 - 参数：`kind`（image / image_to_video / text_to_video / music / sound_effect）、`prompt`，其余按种类：`image`（图生视频的首帧文件，点名文件夹以外的先问一次用户，
   同读别处的文件：图会发给 fal）、`duration`、`resolution`、`aspect_ratio`、`instrumental`、`name`、`model`、`options`。旁白不走它（`add_voiceover`）。
@@ -196,17 +206,18 @@ fal 时代量出来的计费规律和画质印象留在 [smoke test 实测](../r
 
 | 决定 | 口径 |
 | --- | --- |
-| 阶段是一份（`FalJobPhase`，纯值） | 六步：`preparing`（裁一段 / 把关花钱、取 Key）→ `uploading`（带字节比例）→ `queued`（带排队位置）→ `processing` → `downloading`（带字节比例）→ `finishing`（封回原声、落盘）。upscale 六步都走；`generate_media` 没有上传（图是内嵌的）。`FalJobProgress` 再记这一阶段从什么时候起（换比例不重记、换阶段才重记）和这一档通常要几秒 |
+| 阶段是一份（`FalJobPhase`，纯值） | 六步：`preparing`（裁一段 / 把关花钱、取 Key）→ `uploading`（带字节比例）→ `queued`（带排队位置）→ `processing` → `downloading`（带字节比例）→ `finishing`（封回原声、落盘）。upscale 六步都走；`generate_media` 只有图生视频有上传（2026-10-28 起首帧 `/uploads` 上去；fal 时代图是内嵌的）。`FalJobProgress` 再记这一阶段从什么时候起（换比例不重记、换阶段才重记）和这一档通常要几秒 |
 | **fal 处理中没有百分比** | 队列接口只给 `IN_QUEUE`（带 `queue_position`）和 `IN_PROGRESS`，日志里的步数各模型格式不一，**不能当百分比**。能给的就是阶段、排队位置、这一阶段已用的秒数、这一档的典型时长 —— 「处理中 48 秒，这档通常约 1 分钟」，**不画假进度条** |
-| 典型时长 | upscale 的照 Sky Studio `/quote` 报的 `typical_seconds`（2026-10-28 起；fal 时代每档写死一个实测数），面板上的「about N min」和进度里的「usually about N min」都从它算（`FalJobProgress.minutes`，不满一分钟算一分钟）；`generate_media` 按种类（`FalModel.Kind.typicalSeconds`：图 10 s、音效 5 s、音乐 30 s、视频 120 s，和工具说明里写的一致） |
+| 典型时长 | upscale 的照 Sky Studio `/quote` 报的 `typical_seconds`（2026-10-28 起；fal 时代每档写死一个实测数），面板上的「about N min」和进度里的「usually about N min」都从它算（`FalJobProgress.minutes`，不满一分钟算一分钟）；`generate_media` 2026-10-28 起也照 `/quote` 的 `typical_seconds`，没报时按种类（`SkyStudioGeneration.typicalSeconds`：图 15 s、音效 10 s、音乐 60 s、视频 180 s，和工具说明里写的一致） |
 | 上传 / 下载的字节进度 | `FalTransfer`：上传 `uploadTask(with:fromFile:)` + `didSendBodyData`，下载 `downloadTask` + `didWriteData`（`didFinishDownloadingTo` 那一拍当场把系统的临时文件挪到成品旁边的 `.part` 文件，回调一返回系统就删它）；按 1% 一格、没变不报；服务器没说总长就不报比例；**成功时 `FalClient` 一定补报 1**，失败 / 拒绝不报 1。`URLSession` 只许出现在 `FalClient.swift` 和 `FalTransfer.swift`（`checks/fal-wiring.sh`） |
 | 给 AI 的 | `AIJobs.Job.liveDetail`：跑着的任务可以给一份明细，`get_job` 只在 running 时并进去。fal 的两种任务给 `FalJobProgress.json`：`phase`、`queue_position`（排队时）、`transfer_percent`（上传 / 下载时，整数）、`phase_seconds`、`typical_seconds`（知道时）。工具说明里写明这几个字段，AI 看了「排队第 3 位」「这档通常 2 分钟」就不会每 30 秒问一次只会说「还在跑」 |
-| 给用户的 | 编辑器顶上的状态行 `FalStatusRows`：挂在「AI 正在剪辑」那条横幅底下（mockup「Status row while upscaling」说的「复用编辑器那条状态行」），每个 upscale 任务（`UpscaleActivity.jobs`）和生成任务（`FalGenerationActivity.runs`）一行：做什么、四个阶段的小标（过了的打勾、当前的带百分比 / 已用时间 / 「通常约几分钟」、没到的灰着）、积分（upscale）/ 估价（生成）、停止；upscale 做完那一行 Compare… / Dismiss。生成任务做完 / 失败 / 取消就从行上消失（结局 AI 会告诉用户）。检查器那一节同一份文字（`FalPhaseText`）。只订阅两个小对象、不读工程；**没有任务时什么都不画、不醒**（性能场景里计数为零，所以它能挂在横幅底下而不动基线） |
+| 给用户的 | 编辑器顶上的状态行 `FalStatusRows`：挂在「AI 正在剪辑」那条横幅底下（mockup「Status row while upscaling」说的「复用编辑器那条状态行」），每个 upscale 任务（`UpscaleActivity.jobs`）和生成任务（`SkyStudioGenerationActivity.runs`，2026-10-28 起）一行：做什么、四个阶段的小标（过了的打勾、当前的带百分比 / 已用时间 / 「通常约几分钟」、没到的灰着）、积分、停止；upscale 做完那一行 Compare… / Dismiss。生成任务做完 / 失败 / 取消就从行上消失（结局 AI 会告诉用户）。检查器那一节同一份文字（`FalPhaseText`）。只订阅两个小对象、不读工程；**没有任务时什么都不画、不醒**（性能场景里计数为零，所以它能挂在横幅底下而不动基线） |
 | 不改的 | `generate_media` 的结果和落点、upscale 做完先弹对比窗口的流程、钱怎么问、Key 怎么读 —— 这一节只加进度 |
 
 回归：`scripts/check-fal.sh` 第八组（阶段、进度账、get_job 的字段、典型时长折成的分钟数、同一阶段同一比例只报一次）和第五 / 七组
 （下载 / 上传的比例只升不降、成功最后是 1、失败不报 1、不留 `.part`）；`scripts/check-upscale.sh` 第五组（流水线的阶段按顺序、上传 / 下载报到 100%）；
-`checks/fal-wiring.sh` 第 2、9 条（传输只经 FalTransfer、上传 fromFile、liveDetail 接到 get_job、任务登记进 FalGenerationActivity、横幅底下挂着状态行）。
+`checks/fal-wiring.sh` 第 2、8 条（传输只经 FalTransfer、上传 fromFile、liveDetail 接到 get_job、横幅底下挂着状态行）和 `checks/sky-studio-wiring.sh` 第 9 条
+（生成任务登记进 SkyStudioGenerationActivity、状态行订阅它、get_job 有阶段和 skystudio_job_id）。
 人工：存着 Sky Studio 的 Key 做一次 upscale（2026-10-28 起走 Sky Studio），状态行上「Uploading 35%」真的在走、排队位置变、处理那一格每秒走、下载百分比、做完 Compare…；
 AI 用 `generate_media` 做一段视频时 `get_job` 的 `phase` 从 queued 到 processing 到 downloading，状态行同步。
 

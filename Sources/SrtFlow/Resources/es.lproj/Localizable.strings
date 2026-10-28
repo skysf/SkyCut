@@ -1025,7 +1025,7 @@
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "Eso no es un id de endpoint de fal.ai. Tiene la forma propietario/nombre-del-modelo.";
 "The price must be a number." = "El precio debe ser un número.";
 "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "Eso no parece una clave API de fal.ai. Copia la clave completa desde fal.ai/dashboard/keys.";
-"Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it." = "Permite que las apps de IA generen imágenes, clips de video, música y efectos de sonido, y narren con las voces de fal.ai, usando tu propia cuenta de fal.ai. Cuesta dinero en esa cuenta: SkyCut se mantiene dentro del límite diario de abajo y te pregunta antes de superarlo.";
+"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "Permite que las apps de IA narren con las voces de fal.ai y clonen una voz, usando tu propia cuenta de fal.ai. Cuesta dinero en esa cuenta: SkyCut se mantiene dentro del límite diario de abajo y, al pasarlo, usa sus propias voces. Las imágenes, los videos, la música y los efectos de sonido se hacen con tus créditos de Sky Studio.";
 "fal.ai models" = "Modelos de fal.ai";
 "Key saved in the keychain" = "Clave guardada en el llavero";
 "Remove Key" = "Quitar clave";
@@ -1173,7 +1173,6 @@
 "You can keep editing. The compare window opens when it is done." = "Puedes seguir editando. La ventana de comparación se abrirá al terminar.";
 "about %d min" = "aprox. %d min";
 "downloading" = "descargando";
-"est. %@" = "est. %@";
 "finishing" = "finalizando";
 "in queue" = "en cola";
 "in queue (%d)" = "en cola (%d)";

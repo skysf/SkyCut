@@ -5,7 +5,7 @@ import Foundation
 // 管什么：一次工具调用里有没有这个工具的说明（`inputSchema`）上没有的名字 —— 第一层、说明里写了字段的里层对象、数组里的对象都查；
 // 有就回一句写给 AI 的话，App 整个调用不做（AIToolRouter.handle）。以前不认识的名字直接丢掉：Codex 给 set_text 传了 `end`，
 // 字照样加上、时长悄悄用了默认的 3 秒（docs/bugfixes/2026-10-27-unknown-tool-arguments-silently-ignored.md）。
-// 值是 null 的不算（等于没传）。里层对象的说明没写字段（generate_media 的 `options`：原样转给模型）就照收；
+// 值是 null 的不算（等于没传）。里层对象的说明没写字段就照收（以前 generate_media 的 `options` 原样转给 fal 的模型；2026-10-28 起清单里没有这样的参数了）；
 // 第一层没写字段说的是「这个工具不收参数」，照查。
 // 不管什么：值的类型和范围（各工具读参数时自己管，AIToolArguments）。
 

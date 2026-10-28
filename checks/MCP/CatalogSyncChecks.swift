@@ -34,9 +34,9 @@ private func runCatalogOverrideChecks() {
     check(override.adopt(newerCatalog()), "the app's catalog is adopted")
     check(!override.needsRefresh(appFingerprint: "newer-app"), "the adopted catalog is not fetched again")
     check(override.knows("brand_new_tool") && !override.knows("no_such_tool"), "the new tool's name is known, made-up ones are not")
-    let withoutFal = override.toolsJSON(providers: [])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
-    let withFal = override.toolsJSON(providers: [.fal])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
-    check(withoutFal.contains("brand_new_tool") && !withoutFal.contains("generate_media") && withFal.contains("generate_media"),
+    let withoutKey = override.toolsJSON(providers: [])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
+    let withSkyStudio = override.toolsJSON(providers: [.skystudio])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
+    check(withoutKey.contains("brand_new_tool") && !withoutKey.contains("generate_media") && withSkyStudio.contains("generate_media"),
           "the adopted list still lists provider tools only when that provider is set up")
     check(override.takeRefreshNotice() && !override.takeRefreshNotice(), "the refresh is announced once")
 }

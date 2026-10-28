@@ -6,7 +6,7 @@ import Foundation
 // AI 起的（upscale_clip）在起任务之前按每日积分上限把关过了（SkyStudioJobGate.decide，超了是聊天里的确认码），任务拿到已经记上的那一笔（`Approval.ai`）。
 // 取 Sky Studio 的 Key：面板起的可以弹钥匙串授权框（用户刚点了按钮，`keyPrompt` 让界面说一句），AI 起的不弹（读不到就请用户去设置里点「允许…」）；
 // 跑 `UpscalePipeline`，阶段（含上传 / 下载的字节比例、这一阶段过了多久）发给界面；做完按实收（credits_charged）改账。
-// 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。
+// 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。账的那一笔是 `SkyStudioHeldCredits`（和生成共用）。
 // 交上之后停不下来的（已经开始了、取消没送到）照实说：积分花了，成品照样进用户的 Sky Studio 作品库。
 // 做完**不替换**：对比窗口里用户点了 Replace 才换（upscale 方案第 15 条）。2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。
 // 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
@@ -49,9 +49,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var onEnded: ((UpscaleJob) -> Void)?
 
     private var task: Task<Void, Never>?
-    private var reserved: (credits: Double, day: Date)?
+    /// 记在本机积分账上的那一笔（没花出去退回、做完按实收换）。
+    private var held: SkyStudioHeldCredits?
     /// 交上了没有（交上之后积分扣了，没做成服务器退）：回调在别的线程上，带锁。
-    private let submitted = UpscaleSubmitted()
+    private let submitted = SkyStudioSubmission()
     /// Sky Studio 的任务号，交上了才有：upscale_clip 的 get_job 报给 AI（对账、找客服时说得出是哪一单，停不下来的那单也一样）。
     var skyStudioJobID: String? { submitted.jobID }
 
@@ -87,11 +88,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
         switch approval {
         case .panel:
             // 面板上已经确认过，直接记上报价。
-            SkyStudioSpendStore.shared.record(request.credits)
-            reserved = (request.credits, Date())
+            held = .recording(request.credits)
         case .ai(let reservation):
             // AI 起的：起任务之前已经按每日上限把关、记上了（SkyStudioJobGate.decide）。
-            reserved = (reservation.credits, reservation.day)
+            held = SkyStudioHeldCredits(reservation)
         }
         guard !Task.isCancelled else { return end(.cancelled(.nothingCharged), refunding: true) }
 
@@ -118,7 +118,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
                     self.state = .running(progress.advanced(to: phase))
                 }
             }
-            settle(charged: result.creditsCharged)
+            held?.settle(charged: result.creditsCharged)
             outcome = result
             state = .done
             onFinished?(self)
@@ -147,31 +147,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
     }
 
     private func end(_ final: State, refunding: Bool) {
-        if refunding, let reserved {
-            SkyStudioSpendStore.shared.refund(reserved.credits, on: reserved.day)
-            self.reserved = nil
-        }
+        if refunding { held?.refund() }
         state = final
         onEnded?(self)
     }
-
-    /// 做完：账上记的是报价，换成实收（一般一样；服务器按实际的文件算、比报价低就收低的）。
-    private func settle(charged: Double) {
-        guard let reserved, abs(reserved.credits - charged) > 0.0001 else { return }
-        let store = SkyStudioSpendStore.shared
-        store.refund(reserved.credits, on: reserved.day)
-        store.record(charged)
-        self.reserved = (charged, Date())
-    }
-}
-
-/// 交上了没有、Sky Studio 给的任务号（流水线的回调在别的线程上）。
-final class UpscaleSubmitted: @unchecked Sendable {
-    private let lock = NSLock()
-    private var id: String?
-    var value: Bool { lock.lock(); defer { lock.unlock() }; return id != nil }
-    var jobID: String? { lock.lock(); defer { lock.unlock() }; return id }
-    func mark(_ jobID: String) { lock.lock(); id = jobID; lock.unlock() }
 }
 
 /// 面板要为哪一段打开（右键菜单、检查器都走这里）。

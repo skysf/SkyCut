@@ -1025,7 +1025,7 @@
 "That is not a fal.ai endpoint id. It looks like owner/model-name." = "That is not a fal.ai endpoint id. It looks like owner/model-name.";
 "The price must be a number." = "The price must be a number.";
 "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys.";
-"Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it." = "Lets AI apps make images, video clips, music and sound effects, and speak narration with fal.ai's voices, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below and asks you before going over it.";
+"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits.";
 "fal.ai models" = "fal.ai models";
 "Key saved in the keychain" = "Key saved in the keychain";
 "Remove Key" = "Remove Key";
@@ -1173,7 +1173,6 @@
 "You can keep editing. The compare window opens when it is done." = "You can keep editing. The compare window opens when it is done.";
 "about %d min" = "about %d min";
 "downloading" = "downloading";
-"est. %@" = "est. %@";
 "finishing" = "finishing";
 "in queue" = "in queue";
 "in queue (%d)" = "in queue (%d)";

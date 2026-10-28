@@ -60,7 +60,7 @@ public enum MCPVocabulary {
     /// = `ResolutionLimit.allCases`，按短边写（1080p 的竖屏就是 1080×1920）。
     public static let resolutions = ["original", "2160p", "1440p", "1080p", "720p", "480p"]
 
-    /// = `FalModel.Kind` 里 `isGenerateKind` 的那几个（generate_media 的 kind；旁白和克隆走 add_voiceover）。
+    /// = App 的 `SkyStudioGeneration.Kind`（generate_media 的 kind；旁白和克隆走 add_voiceover）。
     public static let generationKinds = ["image", "image_to_video", "text_to_video", "music", "sound_effect"]
 
     /// upscale_clip 的档位（Sky Studio 的 upscale 模型，`/models` 的 id，2026-10-28；那边加了新的要在这里加上 AI 才能点名，
@@ -69,11 +69,11 @@ public enum MCPVocabulary {
     public static let upscaleTargets = ["1080p", "1440p", "2160p"]
     public static let upscaleRanges = ["clip", "longest", "file"]
 
-    /// 生成视频的分辨率档（= `FalInputs.videoResolutions` 小写）。
-    public static let videoResolutions = ["480p", "768p", "1080p"]
+    /// 生成视频的分辨率档（= `SkyStudioGeneration.videoResolutions`：Sky Studio 的 MiniMax H3 只有这两档）。
+    public static let videoResolutions = ["480p", "768p"]
 
-    /// 生成图 / 视频的画幅（= H3 Max 文生视频认的那六个，`FalInputs.h3MaxTextAspects`；图片模型按最近的换）。
-    public static let generationAspects = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
+    /// 生成图 / 视频的画幅（= `SkyStudioGeneration.imageAspects`，Sky Studio 的图片认的那十种；视频只认其中六种，不认的由 Sky Studio 回话）。
+    public static let generationAspects = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]
 
     /// 文字的几个常用位置（画面高度的比例见 App 里的 `AITextPlacement`）。
     public static let textPositions = ["top", "upper_third", "center", "lower_third", "bottom"]

@@ -9,7 +9,7 @@ import SrtFlowMCPKit
 // 图在 `images[0].url`、视频在 `video.url`、音频在 `audio.url`。没登记的端点按这几个常见的位置找。
 // **`timestamps` 的形状 fal 没写**（定义里只说「每个词的时间」、元素是空定义）：这里认三种常见写法，读不出来就当没有词时间，
 // 字幕退回按整句排 —— 拿真的 Key 跑第一次时要对一遍（docs/architecture/fal-generation.md 的人工清单）。
-// 不管什么：下载（FalClient）、放到哪（FalGenerateTool）。
+// 不管什么：下载（FalClient）、放到哪（AIFalVoice）。
 
 struct FalMedia: Equatable {
     var url: URL
