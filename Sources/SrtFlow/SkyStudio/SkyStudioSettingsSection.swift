@@ -23,10 +23,18 @@ struct SkyStudioSettingsSection: View {
                 SkyStudioAccountRows(account: account, license: license)
             } else {
                 keyRow
-                Text("Create a key on skystudioai.com under Settings → SkyCut, then paste it here.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                // 网页上没有叫「设置」的菜单：建 Key 在右上角头像 → SkyCut（2026-10-28 Sky Studio 那边定的），按钮直接打开那个窗口。
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text("Create a key in Sky Studio (your avatar at the top right → SkyCut), then paste it here.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    Link("Create a Key in Sky Studio", destination: SkyStudioLinks.keysPage)
+                        .controlSize(.small)
+                        .accessibilityIdentifier("skystudio-open-keys-page")
+                        .instantHelp("Open the page in Sky Studio where you create SkyCut keys")
+                }
             }
             if let problem = account.problem {
                 SkyStudioProblemLine(problem: problem, license: license)

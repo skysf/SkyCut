@@ -67,6 +67,10 @@ enum SkyStudioLinks {
     /// 没有 Key 的人问不到 /me，所以写在 App 里；换邮箱要发新版。
     static let supportEmail = "support@skystudioai.com"
 
+    /// 网站上建 Key 的那个窗口（Sky Studio 右上角头像 → SkyCut）：设置里「去 Sky Studio 建 Key」直接打开它。
+    /// 没有 Key 的人问不到 /me，所以写在 App 里；2026-10-28 和 Sky Studio 那边定的，这个网址不改，换了要发新版。
+    static let keysPage = URL(string: "https://skystudioai.com/app?skycut=1")!
+
     /// 服务器给的网址：只认 https（本机的假服务器自检时给 http://127.0.0.1 也认），读不成就当没有。
     static func webURL(_ text: String?) -> URL? {
         guard let text, let url = URL(string: text), let scheme = url.scheme?.lowercased(), url.host != nil else { return nil }
