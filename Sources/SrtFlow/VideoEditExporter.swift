@@ -19,6 +19,8 @@ final class VideoEditExporter: ObservableObject {
     @Published private(set) var finishedURL: URL?
     /// 这次导出混音的电平（封顶前的峰值、削了多久）：面板和 AI 的结果用它提醒「过 0 了」。
     @Published private(set) var finishedAudioLevels: ExportAudioMixdown.Levels?
+    /// 这次导出带不带水印（AI 的结果用它说带了、为什么，SkyCutGates.watermarkNote）。
+    private(set) var watermarked = false
     /// 正在导 / 刚导完的是哪个工程。导出器全 App 一个（一次只导一条），几个工程窗口都看着它：进度、停止、成片和报错
     /// 只给这个工程的窗口看（`belongs(to:)`）—— 不然 p1 的面板里显示、还能停掉 p3 的 AI 导出
     /// （docs/bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md）。
@@ -106,16 +108,25 @@ final class VideoEditExporter: ObservableObject {
             errorMessage = L10n("The video engine is not ready yet.")
             return
         }
+        // 加不加水印只问 WatermarkPolicy，授权那一半问 SkyStudioAccount（docs/architecture/export-watermark.md）；面板和 AI 都从这里过。
+        // 只出声音（.m4a）没有画面，不带。要带却读不出 logo：不导（不然删掉包里的 logo 就能换来没水印的成片）。
+        let watermark: ExportWatermark?
+        do {
+            watermark = VideoEditExportGraph.isAudioOnly(state)
+                ? nil : try WatermarkPolicy.mark(byLicence: SkyStudioAccount.shared.exportsWithWatermark)
+        } catch {
+            errorMessage = L10n("SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut.")
+            return
+        }
         errorMessage = nil
         finishedURL = nil
         finishedAudioLevels = nil
+        watermarked = watermark != nil
         progress = 0
         isExporting = true
 
         let token = ExportCancellationToken()
         cancellationToken = token
-        // 加不加水印只问这一处（docs/architecture/export-watermark.md）；面板和 AI 都从这里过。
-        let watermark = WatermarkPolicy.mark()
 
         Task {
             do {

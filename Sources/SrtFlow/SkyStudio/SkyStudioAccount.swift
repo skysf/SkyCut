@@ -1,12 +1,14 @@
 import AppKit
 import Foundation
+import SrtFlowMCPKit
 
 // MARK: - SkyCut 这一头的 Sky Studio 账号：Key 存没存、上一次 /me 问到了什么、什么时候再问
 //
 // 管什么：设置里存 / 删 Key（存的时候马上问一次，Sky Studio 不认就不留）；拿 Key 问 /me —— 启动时、回到 SkyCut 时、
 // 每小时看一眼，按 SkyStudioRefresh 的规矩到时候了才真去问；回答存进 UserDefaults，断网时照它用到 valid_until；
-// 此刻作数的授权（`license`，规则在 SkyCutLicense）。只有设置那一节订阅它（一个小对象，不读工程）。
-// 不管什么：HTTP（SkyStudioAPI）、钥匙串（SkyStudioKey / KeychainSecret）、照着授权拦（收费方案第 5 刀第二步）。
+// 此刻作数的授权（`license`，规则在 SkyCutLicense）；照授权拦的那几处从这里问（AI 的调用、导出带不带水印，规矩在 SkyCutGates）。
+// 订阅它的只有设置那一节和导出面板上「会带水印」那一行（一个小对象，不读工程）。
+// 不管什么：HTTP（SkyStudioAPI）、钥匙串（SkyStudioKey / KeychainSecret）、拦在哪（AIToolRouter、VideoEditExporter）。
 //
 // **后台问的时候从不弹钥匙串的授权框**（用户没在看，弹出来的框没人懂）：读不到就记下「要授权」，设置里点一下才弹。
 
@@ -14,29 +16,14 @@ import Foundation
 final class SkyStudioAccount: ObservableObject {
     static let shared = SkyStudioAccount()
 
-    /// 设置那一节下面要说的一件事。
-    enum Problem: Equatable {
-        /// Sky Studio 不认这把 Key（打错了、作废了、过期了）。
-        case keyRejected(String)
-        /// 这个 SkyCut 太老了，服务器要求先更新。
-        case updateRequired(String, URL?)
-        /// 没问成（断网、服务器出错、限频）：照旧用上一次的回答到 valid_until。
-        case unreachable(String)
-        /// 钥匙串要用户点一下「允许」才读得到 Key。
-        case needsKeychainPermission
-        /// 钥匙串拒绝了（存 / 读 / 删）。
-        case keychain(String)
-        /// 粘进来的不像一把 Sky Studio 的 Key。
-        case notAKey
-    }
-
     /// 上一次问到的 /me 存在这里（UserDefaults，身份类的名字照旧用 SrtFlow 前缀，docs/architecture/product-name.md）。
     static let storedAnswerKey = "SrtFlow.skystudio.me.v1"
 
     @Published private(set) var hasKey: Bool
     @Published private(set) var stored: SkyStudioStoredAnswer?
     @Published private(set) var checking = false
-    @Published private(set) var problem: Problem?
+    /// 设置那一节下面要说的一件事（AI 被挡住时回给它的话也照它说）。
+    @Published private(set) var problem: SkyStudioProblem?
 
     private let defaults: UserDefaults
     private var lastFailure: Date?
@@ -51,6 +38,32 @@ final class SkyStudioAccount: ObservableObject {
 
     /// 此刻作数的授权。
     var license: SkyCutLicense { SkyCutLicense.evaluate(stored, hasKey: hasKey, now: Date()) }
+
+    // MARK: 照授权拦（收费方案第 5 刀第二步，规矩在 SkyCutGates）
+
+    /// 导出要不要因为授权带水印：导出器和导出面板那一行都问它（测试开关另算，在 WatermarkPolicy）。
+    var exportsWithWatermark: Bool { SkyCutGates.watermark(license: license, enforced: SkyCutGates.enforced()) }
+
+    /// AI 的这个调用让不让做；不让做回给 AI 的话（AIToolRouter 在排队之前问）。照授权拦关着时什么都不问、都让做。
+    func aiRefusal(for tool: MCPToolName) async -> String? {
+        guard SkyCutGates.enforced() else { return nil }
+        let settled = await settledLicense(waitingUpTo: SkyStudioAPI.requestTimeout)
+        if SkyCutGates.aiAllows(tool, license: settled, enforced: true) { return nil }
+        return SkyCutGates.aiRefusal(license: settled, problem: problem, now: Date())
+    }
+
+    /// 此刻的授权不作数（没问到过、过期了）又有 Key 时，先问一次再算：刚启动、离线好几天之后的第一个调用，不该因为还没问完就被挡。
+    /// 正在问就等它；该问了就问（没问成过不到 5 分钟的不再问，照 SkyStudioRefresh）。最多等 `limit` 秒，到了按那时的算。
+    func settledLicense(waitingUpTo limit: TimeInterval) async -> SkyCutLicense {
+        guard hasKey, license.basis != .server else { return license }
+        refreshIfDue(after: 0)
+        let deadline = Date().addingTimeInterval(limit)
+        // 先睡一下再看：refreshIfDue 起的那一次要在主线程上轮到它才把 checking 设上。
+        repeat {
+            try? await Task.sleep(for: .milliseconds(100))
+        } while checking && Date() < deadline
+        return license
+    }
 
     // MARK: 什么时候问
 
@@ -155,7 +168,7 @@ final class SkyStudioAccount: ObservableObject {
         }
     }
 
-    static func problem(for failure: SkyStudioFailure) -> Problem {
+    static func problem(for failure: SkyStudioFailure) -> SkyStudioProblem {
         switch failure {
         case .server(let error) where error.code == SkyStudioServerError.invalidKey:
             return .keyRejected(error.message)

@@ -318,6 +318,8 @@ struct VideoEditExportSheet: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // 会带水印（没开通 / 体验期）就写一行、给开通的邮箱，不拦导出（收费方案第 18、19 条）。只出声音没有画面，不写。
+            if !isAudioOnly { ExportWatermarkNotice() }
             // 进度、报错、成片只给发起导出的那个工程看；别的工程在导时写一行在等谁（导出器全 App 一个）。
             VideoEditExportStatus(project: project, exporter: exporter)
 

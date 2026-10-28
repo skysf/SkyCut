@@ -2,14 +2,53 @@ import CoreGraphics
 import Foundation
 import ImageIO
 
-// 纯值：logo 读得出、PNG 画得对、跳的表、四角 / 正中多大放哪、分段表达式（逐时刻求值和表一致、是平衡的）。
+// 纯值：加不加（WatermarkPolicy）、logo 读得出、PNG 画得对、跳的表、四角 / 正中多大放哪、分段表达式（逐时刻求值和表一致、是平衡的）。
 
 func runPureChecks(logo: WatermarkImage.Logo) {
+    policyChecks(logo)
     logoChecks(logo)
     imageChecks(logo)
     scheduleChecks()
     layoutChecks()
     piecewiseChecks()
+}
+
+/// 加不加 = 授权说要加 || 测试开关；不加时连 logo 都不读；要加却读不出 logo 就抛错（导出器据此不导，删掉包里的 logo 换不来没水印的成片）。
+private func policyChecks(_ logo: WatermarkImage.Logo) {
+    let suite = "watermark-policy-checks"
+    guard let defaults = UserDefaults(suiteName: suite) else {
+        check(false, "要一个临时的 UserDefaults")
+        return
+    }
+    defaults.removePersistentDomain(forName: suite)
+    defer { defaults.removePersistentDomain(forName: suite) }
+    check(!WatermarkPolicy.required(byLicence: false, defaults: defaults), "授权不要、测试开关关着：不加")
+    check(WatermarkPolicy.required(byLicence: true, defaults: defaults), "授权要加：加")
+    defaults.set(true, forKey: WatermarkPolicy.testingKey)
+    check(WatermarkPolicy.required(byLicence: false, defaults: defaults), "测试开关开着：加（只能加，不能去掉授权要的）")
+    defaults.set(false, forKey: WatermarkPolicy.testingKey)
+
+    var read = false
+    do {
+        let none = try WatermarkPolicy.mark(byLicence: false, defaults: defaults, logo: { read = true; return logo })
+        check(none == nil && !read, "不加：回 nil，也不去读 logo")
+    } catch {
+        check(false, "不加的时候不该抛错：\(error)")
+    }
+    do {
+        let mark = try WatermarkPolicy.mark(byLicence: true, defaults: defaults, logo: { logo })
+        check(mark != nil, "要加、logo 读得出：有水印")
+    } catch {
+        check(false, "logo 读得出的时候不该抛错：\(error)")
+    }
+    do {
+        _ = try WatermarkPolicy.mark(byLicence: true, defaults: defaults, logo: { nil })
+        check(false, "要加却读不出 logo：必须抛错拦住导出，不能悄悄不加")
+    } catch is WatermarkPolicy.LogoUnreadable {
+        check(true, "要加却读不出 logo：抛 LogoUnreadable")
+    } catch {
+        check(false, "要加却读不出 logo：抛的不是 LogoUnreadable：\(error)")
+    }
 }
 
 private func logoChecks(_ logo: WatermarkImage.Logo) {

@@ -1,9 +1,11 @@
-# Sky Studio 账号：Key、`/me`、此刻的授权
+# Sky Studio 账号：Key、`/me`、此刻的授权、照授权拦
 
-> 2026-10-27 引入（[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 5 刀第一步）。改 `Sources/SrtFlow/SkyStudio/`、`KeychainSecret.swift`、
-> 设置里的「Sky Studio」一节之前必读。接口合同在 **Sky Studio 仓库**（本机 `SkyStudio_APP_Master/cursor-skystudios-app-cinematic`）的
+> 2026-10-27 引入（[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 5 刀）。改 `Sources/SrtFlow/SkyStudio/`、`KeychainSecret.swift`、
+> 设置里的「Sky Studio」一节、AI 调用的门（`AIToolRouter`）、导出面板上「会带水印」那一行之前必读。接口合同在 **Sky Studio 仓库**（本机 `SkyStudio_APP_Master/cursor-skystudios-app-cinematic`）的
 > `docs/agents/skycut-api.md`，以那份为准（2026-10-27 定稿时是分支 `feat/skycut-api` 的 08bd908a，接口还没上线）。
-> 这一步**只读授权、什么都不拦**：照着开关拦（MCP 的门、导出水印）是第二步（5b），要等 Sky Studio 的接口上线、用户给自己开了正式版再合。
+> 第一步（5a，#261）只读授权；第二步（5b，2026-10-28）照授权拦：MCP 的门、导出水印、导出面板那一行、告诉 AI。**5b 合进去但先关着**
+> （`SkyCutGates.enforcedByDefault = false`）：Sky Studio 的接口上线、用户在后台给自己开了正式版之前谁都问不到授权，一打开连用户自己的 AI 剪辑也挡住。
+> 到时候单独一个 PR 打开（2026-10-28 用户定：绿了的 PR 直接合，不挂着等）。
 
 ## 一、规矩
 
@@ -26,6 +28,12 @@
 | 服务器的网址 | 只认 https（本机的假服务器给的 http://127.0.0.1 也认），读不成就当没有（`SkyStudioLinks.webURL`） |
 | 读回答 | 读得宽：认不出的字段不管、少了可选的不算错、日期带不带毫秒都认（Foundation 自带的 `.iso8601` 不认毫秒，JS 的 `toISOString()` 带毫秒）；少了必须的（`features`、`valid_until`）就不算回答 |
 | 报错的话 | 服务器的 `message`（英文、写给人看）原样显示；没连上、回的不像话这两种是 SkyCut 自己的话，经 `L10n` 按界面语言 |
+| **照授权拦先关着** | `SkyCutGates.enforcedByDefault = false`：关着时下面四行都不起作用（什么都不拦、`get_status` 不报 `skycut_plan`、水印照旧只看测试开关）。接口上线、用户给自己开了正式版之后**单独一个 PR 改成 true**（连同 `checks/SkyStudio/GateChecks.swift` 钉着的那一条）。打开来试：`defaults write com.srtflow.SrtFlow.beta skystudio.testGates -bool true`（正式版去掉 `.beta`；只能打开，不能用它关掉） |
+| AI 的门 | 此刻的授权不让用 MCP：AI 的工具一个都不做。门在 `AIToolRouter.handle` **核对参数名之后、建调用排队之前**（`SkyStudioAccount.aiRefusal`），不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。**`get_status` 照常回**，报 `skycut_plan`（套餐、从哪来、AI 能不能用、带不带水印、体验还剩几天、正式版到哪天、出了什么事、请用户做什么）。被挡住的回「Not done」+ 为什么 + 请用户做什么（粘 Key、发邮件开通、点「允许…」、点「再查一次」、更新 SkyCut），话和规矩都在纯值的 `SkyCutGates`（英文；界面语言写的细节不带给 AI） |
+| 还没问完时 | 此刻的授权不作数（没问到过、过期了）又有 Key：先问一次 `/me` 再判（正在问就等它；没问成过不到 5 分钟的不再问；最多等一次请求的超时 20 秒，`SkyStudioAccount.settledLicense`）。刚启动、离线几天之后的第一个调用不会因为还没问完就被挡 |
+| 导出水印 | 带不带听服务器的 `watermark`：`SkyStudioAccount.exportsWithWatermark`，导出器、导出面板那一行、`export_video` 都问它（[导出水印](export-watermark.md)）。要带却读不出 logo 就不导 |
+| 导出面板那一行 | 会带水印时底栏写「导出的视频会带 Sky Studio 水印。开通正式版就不带了：请发邮件到 support@skystudioai.com……」+「复制邮箱」，**不拦导出**（方案第 19 条）；只出声音时不写。只订阅 `SkyStudioAccount` |
+| 告诉 AI 带了水印 | `export_video` 开始时（会带）和做完的 `get_job`（带了）都写 `watermark`：带了什么、为什么、怎么去掉（`SkyCutGates.watermarkNote`）。AI 用 `look` 看成片会看到它，要能跟用户说清楚 |
 
 ## 二、文件
 
@@ -37,14 +45,16 @@
 | `SkyStudio/SkyStudioAPI.swift` | 请求（地址、四个头）、`GET /me`、错误分成三种（`SkyStudioFailure`：服务器的错 / 没连上 / 回的不像话） |
 | `SkyStudio/SkyStudioMe.swift` | `/me` 的回答、怎么读怎么存、存下来的那份（`SkyStudioStoredAnswer`）、几个网页（`SkyStudioLinks`） |
 | `SkyStudio/SkyCutLicense.swift` | 此刻的授权（纯）、什么时候再问（`SkyStudioRefresh`，纯） |
-| `SkyStudio/SkyStudioAccount.swift` | 存 / 删 Key、问 `/me`、存回答、启动 / 回到 SkyCut / 每小时看一眼（`@MainActor` 的小对象，只有设置那一节订阅） |
+| `SkyStudio/SkyStudioProblem.swift` | 问不成 / 存不了 Key 时为什么（纯；设置最后一行、AI 被挡时的话都照它说） |
+| `SkyStudio/SkyCutGates.swift` | 照授权拦的规矩（纯）：生不生效、AI 让不让、带不带水印、跟 AI 说的话、`get_status` 的 `skycut_plan` |
+| `SkyStudio/SkyStudioAccount.swift` | 存 / 删 Key、问 `/me`、存回答、启动 / 回到 SkyCut / 每小时看一眼；照授权拦的入口（`aiRefusal`、`exportsWithWatermark`、还没问完时先问 `settledLicense`）。`@MainActor` 的小对象，只有设置那一节和导出面板那一行订阅 |
 | `SkyStudio/SkyStudioSettingsSection.swift` | 设置里的「Sky Studio」一节 |
+| `SkyStudio/SkyStudioProHints.swift` | 开通正式版怎么说：设置里那一行（`SkyStudioContactRow`）、导出面板上「会带水印」那一行（`ExportWatermarkNotice`），共用「复制邮箱」 |
 
 ## 三、还没做的
 
-- **第 5 刀第二步（5b）**：`WatermarkPolicy.mark()` 改问 `SkyCutLicense` 的 `watermark`（logo 读不出要拦住导出，[导出水印](export-watermark.md)第二节）；MCP 的门挡在 App 收工具调用的地方（`AIToolRouter.handle`，`get_status` 照常回、报授权）；
-  导出面板一行「会带水印」+ 开通写哪个邮箱；`export_video` 的结果里告诉 AI 带了水印、为什么。冒烟时没有真服务器，用 `SRTFLOW_SKYSTUDIO_API_BASE` 指到本机假服务器给一个正式版。
-  **等 Sky Studio 的接口上线、用户给自己开了正式版再合**：不然之后打的包里用户自己的 AI 剪辑也被挡住。
+- **打开照授权拦**：Sky Studio 的接口上线、用户在后台给自己开了正式版之后，单独一个 PR 把 `SkyCutGates.enforcedByDefault` 改成 true（连同 `GateChecks` 钉着的那一条）。
+  打开之前先在测试版上开测试开关，对真服务器把第六节走一遍。
 - 第 6 刀（生成、upscale、克隆改走 Sky Studio 的 `/quote`、`/uploads`、`/jobs`）、第 7 刀（删掉 fal 那条路）。定稿里和 SkyCut 现在做法不一样的地方记在收费方案「Sky Studio 定稿之后」一节。
 
 ## 四、已知能绕过去的（不防）
@@ -56,10 +66,14 @@
 - `scripts/check-sky-studio.sh`（`check-all.sh` 第 2 组，不碰网络、不碰钥匙串）：Key 的整理和钥匙串那一条的名字；机器号钉死一组值、这台 Mac 读得到、发出去的不是原样的 UUID；
   `/me` 照合同里的样例逐字段读、带毫秒的日期、读得宽、少了必须的不算回答、网址只认 https 和本机、存了读回来一样、服务器时间换本机时间；
   假 URLSession 上看 `/me` 的地址、方法、四个头，401 / 426 / 429 留着 code 和附加字段，502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能指到本机；
-  授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问。
+  授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问；
+  照授权拦（`GateChecks`）：先关着、测试开关只能打开；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
+  被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
 - `checks/sky-studio-wiring.sh`（扫描，第 1 组）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
-  弹框的那一档读只在 `KeychainSecret.swift`、`SkyStudioAccount` 只有 `promptKeychain` 为真才弹、`promptKeychain: true` 只在设置那一节；设置窗口挂着这一节、启动时 `start()`。
-  反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；恢复后转绿。
+  弹框的那一档读只在 `KeychainSecret.swift`、`SkyStudioAccount` 只有 `promptKeychain` 为真才弹、`promptKeychain: true` 只在设置那一节；设置窗口挂着这一节、启动时 `start()`；
+  照授权拦：门在核对参数名之后、建调用排队之前；让不让、带不带水印只在 `SkyStudioAccount` 里调 `SkyCutGates`；导出面板挂着那一行；`export_video` 开始和做完都说水印；`get_status` 报 `skycut_plan`。
+  反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；（2026-10-28）拆掉路由的门、门挪到排队之后、面板不挂那一行、get_status 不报 —— 各自红；恢复后转绿。
+- `checks/export-watermark-wiring.sh`：导出器拿 `exportsWithWatermark` 问 `WatermarkPolicy`、读不出 logo 时报错不导、每一处问 `WatermarkPolicy` 都传授权；`scripts/check-export-watermark.sh` 的纯值验加不加。
 - `checks/product-name.sh`：钥匙串的服务名 `.skystudio`、UserDefaults 的键 `SrtFlow.skystudio.me.v1`。
 - 钥匙串的真读写（`KeychainSecret`）在 `scripts/check-fal-keychain.sh`（本机手动，不在 `check-all` 里）。
 
@@ -72,3 +86,7 @@
 - [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，开通的那一句不见了。
 - [ ] 「复制邮箱」之后粘出来是 support@skystudioai.com，这个邮箱收得到信。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
+- [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
+- [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。
+- [ ] 后台给账号开正式版、点「再查一次」：导出不带水印，面板那一行没了。
+- [ ] 存的回答过期（或刚粘上 Key 还没问到）时 AI 的第一个调用：等问完再判（20 秒内回），不是一上来就挡。

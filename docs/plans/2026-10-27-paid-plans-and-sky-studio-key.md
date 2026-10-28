@@ -1,7 +1,8 @@
 # 收费：体验版、导出水印、MCP 门槛，生成改用 Sky Studio 的 key
 
-> 2026-10-26 / 27 和用户讨论拍的板。前四刀已合进 main（#254–#257，水印默认关）；第 5 刀拆成两步，5a（账号，只读不拦）照 Sky Studio 定稿的接口做了，
-> 5b（照开关拦）和第 6、7 刀等接口上线。做到哪以合进 main 的 PR 和之后的实施报告为准。接口合同在 Sky Studio 仓库的 `docs/agents/skycut-api.md`。
+> 2026-10-26 / 27 和用户讨论拍的板。前四刀已合进 main（#254–#257，水印默认关）；第 5 刀拆成两步照 Sky Studio 定稿的接口做：5a（账号，只读不拦，#261）、
+> 5b（照开关拦，2026-10-28）都合进去了，**5b 先关着**（`SkyCutGates.enforcedByDefault`），接口上线、用户给自己开了正式版后单独一个 PR 打开；
+> 第 6、7 刀等接口上线。做到哪以合进 main 的 PR 和之后的实施报告为准。接口合同在 Sky Studio 仓库的 `docs/agents/skycut-api.md`。
 > 真 Codex 连 SkyCut 的冒烟见 [报告](../reports/2026-10-26-codex-client-smoke.md)。
 
 ## 背景
@@ -63,9 +64,9 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 1. **key 和授权**（5a 已做，[Sky Studio 账号](../architecture/sky-studio-account.md)）：key 存钥匙串（身份类的名字照旧用 SrtFlow 前缀，见 [产品名与代码名](../architecture/product-name.md)），
    设置里单独一节「Sky Studio」；启动时、回到 SkyCut 时、每小时看一眼，到时候了才问 `/me`；连不上服务器时照上一次的回答用到 `valid_until`
    （服务器定：现在是 72 小时和体验 / 正式到期取早的，不是原来写的 7 天），过了就当免费版。
-2. **`watermark` 开关**：每条导出管线最后叠一层水印，只有一处共用的叠加（剪辑导出、AI 的 `export_video` 都经过它）；预览、AI 用 `look` 看时间线、
+2. **`watermark` 开关**（5b 已做，先关着）：每条导出管线最后叠一层水印，只有一处共用的叠加（剪辑导出、AI 的 `export_video` 都经过它）；预览、AI 用 `look` 看时间线、
    生成和 upscale 的成品都不加；导出的结果里告诉 AI 带了水印、为什么。压缩、烧录字幕这两个只处理用户自己文件的工具不加。
-3. **`mcp` 开关**：挡在 App 收到工具调用的地方，**不放在 `skycut-mcp` 小程序里**（谁都能自己写一个小程序去连 App）。工具清单照常列出来，调用时回
+3. **`mcp` 开关**（5b 已做，先关着）：挡在 App 收到工具调用的地方，**不放在 `skycut-mcp` 小程序里**（谁都能自己写一个小程序去连 App）。工具清单照常列出来，调用时回
    「这台 SkyCut 还没开通 AI 剪辑」和下一步怎么做；`get_status` 报现在是免费 / 体验还剩几天 / 正式。
 4. **生成改走 Sky Studio**：`generate_media`、`upscale_clip`、配旁白的克隆换成调 `api/skycut/v1`；钱从美元换成积分：**每日上限默认 1,000 积分**
    （Sky Studio 一个积分标价 1 美分，等于现在 fal 那一档默认的 10 美元），超了照旧要确认码；模型和价格从 `/models` 来，不写死。
@@ -114,7 +115,9 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 3. 修：「连接」AI 客户端时留的配置备份，权限比原文件宽。
 4. **水印**：做出来、接进所有导出入口，**开关先默认关**（授权接上之前什么导出都不加），留一个只给测试用的打开办法；先渲一张样片给用户看，再定数字。
 5. key + `/me` + 两个开关接上，拆成两步：**5a** Sky Studio 账号（key、`/me`、此刻的授权、设置里一节，只读不拦，照定稿的文档做、本机假服务器测）；
-   **5b** 照两个开关拦（MCP 的门、导出水印、导出面板写开通的邮箱、结果里告诉 AI），**等 Sky Studio 的接口上线、用户给自己开了正式版再合**，不然之后打的包里用户自己的 AI 剪辑也被挡住。
+   **5b** 照两个开关拦（MCP 的门、导出水印、导出面板写开通的邮箱、结果里告诉 AI）。本来打算挂着等接口上线再合；2026-10-28 用户定绿了的 PR 直接合，
+   所以 5b 合进去但**先关着**（`SkyCutGates.enforcedByDefault = false`，测试开关 `skystudio.testGates` 只能打开）。**等 Sky Studio 的接口上线、用户给自己开了正式版，
+   单独一个改一行的 PR 打开**：开早了之后打的包里谁都问不到授权，用户自己的 AI 剪辑也被挡住。
 6. 生成、upscale、克隆改走 Sky Studio（等 `/jobs` 能用；先换 upscale：Sky Studio 网站的 upscale 10-27 已上线，`/jobs` 先接它）。
 7. 删掉 fal 那条路（第 6 刀上线之后）。
 
