@@ -4,9 +4,12 @@ import SrtFlowMCPKit
 // MARK: - 调 Sky Studio 给 SkyCut 的接口（`https://skystudioai.com/api/skycut/v1`）
 //
 // 管什么：发请求（认证头、版本号、机器号）、读回答、没问成时说清楚是哪一种（服务器回了错 / 没连上 / 回的不像话）。
-// **SkyCut 里只有这里碰 Sky Studio 的地址**（checks/sky-studio-wiring.sh 钉着）。合同以 Sky Studio 仓库的 docs/agents/skycut-api.md 为准。
-// 现在只有 `GET /me`（收费方案第 5 刀）；生成、upscale、克隆要的 /models、/quote、/uploads、/jobs 是第 6 刀。
-// 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）。
+// **SkyCut 里只有这里碰 Sky Studio 的地址**（checks/sky-studio-wiring.sh 钉着）。合同以 Sky Studio 仓库的 docs/agents/skycut-api.md 为准
+// （2026-10-28 上线，从 Sky Studio main 的 5c8d6a0d 起冻结）。
+// 接口：`GET /me`（授权，收费方案第 5 刀）；生成、upscale、克隆的 `/models`、`/quote`、`/uploads`（+ 把文件 PUT 到它给的地址）、`/jobs`、
+// `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（FalTransferDelegate，
+// 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
+// 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
 //
 // 自检和冒烟用 `SRTFLOW_SKYSTUDIO_API_BASE` 把地址指到本机的假服务器，**只认回环地址**（Key 不会因此发到别处）。
 
@@ -15,6 +18,8 @@ struct SkyStudioAPI: Sendable {
     static let baseEnvironmentKey = "SRTFLOW_SKYSTUDIO_API_BASE"
     /// 一次请求最多等多久（AI 的调用碰上授权没问到时也最多等这么久，SkyStudioAccount.settledLicense）。
     static let requestTimeout: TimeInterval = 20
+    /// 交任务那一个请求等多久（见 `submit`）。
+    static let submitTimeout: TimeInterval = 120
 
     let session: URLSession
     let base: URL
@@ -60,6 +65,106 @@ struct SkyStudioAPI: Sendable {
         }
     }
 
+    /// `GET /models`：能请求的模型、给人看的价、能收的参数和上限。
+    func models(key: String) async throws -> SkyStudioCatalog {
+        guard let catalog = SkyStudioCatalog(json: try Self.json(try await send(request("models", key: key)))) else {
+            throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        return catalog
+    }
+
+    /// `POST /quote`：只报价、不扣钱（和 `/jobs` 扣钱同一个计价函数）。
+    func quote(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioQuote {
+        let body = try job.quoteBody.encodedData()
+        guard let quote = SkyStudioQuote(json: try Self.json(try await send(request("quote", key: key, method: "POST", body: body)))) else {
+            throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        return quote
+    }
+
+    /// `POST /jobs`：提交，回任务号（扣钱在这一步：失败、取消只退一次）。合同说立刻回，但 2026-10-28 Sky Studio 在本机的 vercel dev 上
+    /// 量到图片、音乐的提交一直等到做完才回（55 秒、40 秒），线上还没量过：这一个请求多等一会儿（`submitTimeout`），真超时了
+    /// SkyStudioJobRun 用同一个 idempotency_key 再交，服务器回原来那个任务、不再扣钱。
+    func submit(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioJobStatus {
+        var post = request("jobs", key: key, method: "POST", body: try job.jobBody.encodedData())
+        post.timeoutInterval = Self.submitTimeout
+        return try Self.status(try await send(post))
+    }
+
+    /// `GET /jobs/{id}`：立刻回（没有长轮询），带 `poll_after_seconds`。
+    func job(_ id: String, key: String) async throws -> SkyStudioJobStatus {
+        try Self.status(try await send(request(try Self.jobPath(id), key: key)))
+    }
+
+    /// `POST /jobs/{id}/cancel`：只有排着队的能取消（退钱）；开始了 / 结束了的是 `notCancellable`。
+    func cancel(_ id: String, key: String) async throws -> SkyStudioCancel {
+        do {
+            let path = try Self.jobPath(id) + "/cancel"
+            let answer = try Self.json(try await send(request(path, key: key, method: "POST", body: Data("{}".utf8))))
+            return .cancelled(refunded: answer["credits_refunded"]?.doubleValue)
+        } catch SkyStudioFailure.server(let error) where error.code == SkyStudioServerError.notCancellable {
+            return .notCancellable(status: error.fields["status"]?.stringValue)
+        }
+    }
+
+    /// `POST /uploads` 拿到地址，把文件 PUT 上去（流着发，不整个读进内存）；回 `/jobs` 的 inputs 要的那个 `file_url`。
+    /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
+    func upload(
+        fileURL: URL, contentType: String, purpose: String, key: String, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws -> URL {
+        guard let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.size] as? Int else {
+            throw SkyStudioFailure.network("could not read \(fileURL.lastPathComponent)")
+        }
+        let body = try JSONValue.object([
+            "filename": .string(fileURL.lastPathComponent), "content_type": .string(contentType),
+            "bytes": .number(Double(size)), "purpose": .string(purpose)
+        ]).encodedData()
+        let answer = try Self.json(try await send(request("uploads", key: key, method: "POST", body: body)))
+        guard let target = answer["upload_url"]?.stringValue.flatMap(URL.init(string:)), target.scheme != nil,
+              let link = answer["file_url"]?.stringValue.flatMap(URL.init(string:)), link.scheme != nil else {
+            throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        var put = URLRequest(url: target)
+        put.httpMethod = answer["method"]?.stringValue ?? "PUT"
+        put.timeoutInterval = 600
+        for (name, value) in answer["headers"]?.objectValue ?? [:] {
+            if let text = value.stringValue { put.setValue(text, forHTTPHeaderField: name) }
+        }
+        let delegate = FalTransferDelegate(moveDestination: nil, onProgress: onProgress)
+        let task = session.uploadTask(with: put, fromFile: fileURL)
+        try await transfer(task, delegate: delegate)
+        let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw SkyStudioFailure.badAnswer(status: status) }
+        onProgress(1)
+        return link
+    }
+
+    /// 把成品下载到 `destination`（先下到它旁边的临时文件再挪过去，下到一半断了不留半个文件）。成品地址不带 Key。
+    /// `onProgress`：收到的字节比例（服务器说了总长才有），做完一定报 1。
+    func download(_ url: URL, to destination: URL, onProgress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+        let partial = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).part-\(UUID().uuidString.prefix(8))")
+        defer { try? FileManager.default.removeItem(at: partial) }
+        let delegate = FalTransferDelegate(moveDestination: partial, onProgress: onProgress)
+        var get = URLRequest(url: url)
+        get.timeoutInterval = 600
+        let task = session.downloadTask(with: get)
+        try await transfer(task, delegate: delegate)
+        let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw SkyStudioFailure.badAnswer(status: status) }
+        guard let file = delegate.downloadedFile,
+              let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int, size > 0 else {
+            throw SkyStudioFailure.network("the download did not produce a file")
+        }
+        do {
+            try? FileManager.default.removeItem(at: destination)
+            try FileManager.default.moveItem(at: file, to: destination)
+        } catch {
+            throw SkyStudioFailure.network(error.localizedDescription)
+        }
+        onProgress(1)
+    }
+
     // MARK: 发请求
 
     func request(_ path: String, key: String, method: String = "GET", body: Data? = nil) -> URLRequest {
@@ -95,6 +200,37 @@ struct SkyStudioAPI: Sendable {
         return data
     }
 
+    /// 跑一个传文件的任务：Task 被取消 / URLSession 报 cancelled 都换成 CancellationError，别的网络错换成「没连上」。
+    private func transfer(_ task: URLSessionTask, delegate: FalTransferDelegate) async throws {
+        do {
+            try await FalTransfer.perform(task, delegate: delegate)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch let error as URLError where error.code == .cancelled {
+            throw CancellationError()
+        } catch {
+            throw SkyStudioFailure.network(error.localizedDescription)
+        }
+    }
+
+    /// 任务号是服务器给的：只当一节路径用，带斜杠、点点的不认（不许拼出别的地址）。
+    private static func jobPath(_ id: String) throws -> String {
+        guard !id.isEmpty, !id.contains("/"), !id.contains(".."), !id.contains("?"), !id.contains("#") else {
+            throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        return "jobs/" + id
+    }
+
+    private static func json(_ data: Data) throws -> JSONValue {
+        guard let json = try? JSONValue.decode(data) else { throw SkyStudioFailure.badAnswer(status: 200) }
+        return json
+    }
+
+    private static func status(_ data: Data) throws -> SkyStudioJobStatus {
+        guard let status = SkyStudioJobStatus(json: try json(data)) else { throw SkyStudioFailure.badAnswer(status: 200) }
+        return status
+    }
+
     /// 不是 2xx：服务器照约好的回了 `{"error": {"code", "message", …}}` 就原样留着，不是就是「回的不像话」。
     static func failure(status: Int, data: Data) -> SkyStudioFailure {
         guard let body = try? JSONDecoder().decode(JSONValue.self, from: data),
@@ -113,6 +249,10 @@ struct SkyStudioAPI: Sendable {
 struct SkyStudioServerError: Equatable, Sendable {
     static let invalidKey = "invalid_key"
     static let upgradeRequired = "upgrade_required"
+    /// 同时开着的任务满了（`limit`、`running`）：等一个做完再交。
+    static let tooManyJobs = "too_many_jobs"
+    /// 取消一个已经开始 / 已经结束的任务（`status`）。
+    static let notCancellable = "not_cancellable"
 
     let status: Int
     let code: String

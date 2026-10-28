@@ -9,7 +9,10 @@
 #   5. **照授权拦（第 5 刀第二步）接在该接的地方**：AI 的调用在核对参数名之后、建调用排队之前问 SkyStudioAccount.aiRefusal；
 #      让不让、带不带水印的判断只在 SkyStudioAccount 里调 SkyCutGates（生不生效另有 get_status 问一句）；导出面板底栏挂着「会带水印」那一行；
 #      export_video 开始和做完都告诉 AI 带了水印；get_status 报 skycut_plan。
-# 规矩见 docs/architecture/sky-studio-account.md。
+#   6. **交任务、取消任务只经 SkyStudioJobRun**（第 6 刀）：满了等着再交、同一个 idempotency_key、交的请求不跟着取消、停的时候排队中的退钱 /
+#      开始了的取消不了，这些规矩只在那一处；
+#   7. **Key 只发给 Sky Studio**：认证头只在 SkyStudioAPI.request 里写一次，上传的签名地址和成品地址都不经它。
+# 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
 set -euo pipefail
@@ -98,8 +101,21 @@ others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | 
 [ "$(count 'result["skycut_plan"] = SkyCutGates.statusJSON(' "${STATUS_TOOLS}")" -eq 1 ] \
   || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它是唯一照常回的工具）"
 
+# 6. 交任务、取消任务只经 SkyStudioJobRun。
+RUN="Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift"
+for call in 'submit\([^)]*, key:' 'cancel\([^)]*, key:'; do
+  users="$(code_files_with "${call}" | grep -v "^${API}\$" | LC_ALL=C sort | tr '\n' ' ')"
+  [ "${users}" = "${RUN} " ] || fail "SkyStudioAPI 的 ${call%%\\(*} 只许 SkyStudioJobRun 调（满了等着再交、停的规矩都在那里），实际在：${users:-没有}"
+done
+
+# 7. Key 只发给 Sky Studio：认证头只在 request() 里写一次。
+[ "$(count 'forHTTPHeaderField: "Authorization"' "${API}")" -eq 1 ] \
+  || fail "${API}：认证头只许在 request() 里写一次 —— 上传的签名地址、成品地址都不许带 Key"
+others="$(code_files_with 'Bearer ' | grep -v "^${API}\$" | grep -v '/Fal/' || true)"
+[ -z "${others}" ] || fail "这些文件自己写了 Bearer 认证头：$(tr '\n' ' ' <<<"${others}")—— Sky Studio 的 Key 只经 SkyStudioAPI 发"
+
 if [ "${FAILED}" -ne 0 ]; then
-  echo "见 docs/architecture/sky-studio-account.md" >&2
+  echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio"
