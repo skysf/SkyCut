@@ -105,22 +105,53 @@ func runJobRunChecks() async {
     }
 
     // 6. 停：在第 2 次等的时候被取消。排着队的退钱；开始了的取消不了；取消没送到说不准；服务器那边已经取消了也算没花钱。
+    //    后两种那单在服务器上照做：交出去接着查到底（Sky Studio 有人查才把成品存进作品库、放出名额；2026-10-28 真积分测试撞上的）。
+    let handed = NameLog()
     func stopping(cancelReply: SkyStudioStub.Reply) async -> SkyStudioJobError? {
         SkyStudioStub.reset { seen in
             if seen.url.hasSuffix("/cancel") { return cancelReply }
             return seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("queued", #", "queue_position": 1"#))
         }
+        handed.clear()
         var stopped = SkyStudioJobRun(api: api, key: jobKey)
         stopped.sleep = SleepLog(throwOnCall: 2).sleep
+        stopped.onUnstoppable = { handed.add($0) }
         return await jobFailure({ _ = try await stopped.run(request) })
     }
     checkEqual(await stopping(cancelReply: .http(200, #"{"status": "cancelled", "credits_refunded": 455}"#)), .stopped(.nothingCharged), "stopped while queued: refunded")
     checkEqual(SkyStudioStub.log.filter { $0.url.hasSuffix("/jobs/job-1/cancel") }.count, 1, "Sky Studio is asked to cancel it")
+    checkEqual(handed.items, [], "a job cancelled on Sky Studio is not followed any more")
     checkEqual(
         await stopping(cancelReply: .http(409, #"{"error": {"code": "not_cancellable", "message": "Started.", "status": "running"}}"#)),
         .stopped(.alreadyStarted), "stopped after it started: the credits are spent"
     )
+    checkEqual(handed.items, ["job-1"], "a job that could not be cancelled is followed to the end (its result reaches the library only when asked)")
     checkEqual(await stopping(cancelReply: .failure(.notConnectedToInternet)), .stopped(.unknown), "the cancel did not get through: unknown")
+    checkEqual(handed.items, ["job-1"], "a cancel that did not get through: followed to the end too")
+
+    // 6b. 接着查到底：问到 done / failed 就停（不下载、不再取消）；照服务器说的间隔问；断网几次照问，连着问不到就算了。
+    let followSleeps = SleepLog()
+    var follower = SkyStudioJobRun(api: api, key: jobKey)
+    follower.sleep = followSleeps.sleep
+    var later = [status("running", #", "phase": "processing""#), #"{"job_id": "job-1", "status": "running", "phase": "saving", "poll_after_seconds": 30}"#]
+    SkyStudioStub.reset { _ in .http(200, later.isEmpty ? sampleDoneJob : later.removeFirst()) }
+    await follower.followToEnd("job-1")
+    checkEqual(SkyStudioStub.log.map(\.method), ["GET", "GET", "GET"], "asks until it is done, then stops (no download, no cancel)")
+    check(SkyStudioStub.log.allSatisfy { $0.url.hasSuffix("/jobs/job-1") }, "asks only about that job")
+    checkEqual(followSleeps.all, [15, 15, 30], "waits as the server says")
+    SkyStudioStub.reset { _ in .http(200, status("failed", #", "error": "The provider failed.""#)) }
+    await follower.followToEnd("job-1")
+    checkEqual(SkyStudioStub.log.count, 1, "stops when it failed")
+    var followDrops = 2
+    SkyStudioStub.reset { _ in
+        if followDrops > 0 { followDrops -= 1; return .failure(.networkConnectionLost) }
+        return .http(200, sampleDoneJob)
+    }
+    await follower.followToEnd("job-1")
+    checkEqual(SkyStudioStub.log.count, 3, "a few dropped polls: keeps asking")
+    SkyStudioStub.reset { _ in .failure(.networkConnectionLost) }
+    await follower.followToEnd("job-1")
+    checkEqual(SkyStudioStub.log.count, SkyStudioJobRun.networkMisses, "gives up after ten polls in a row fail")
     SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("cancelled")) }
     checkEqual(await jobFailure({ _ = try await run.run(request) }), .stopped(.nothingCharged), "cancelled on Sky Studio's side")
 
@@ -181,6 +212,15 @@ final class SleepLog: @unchecked Sendable {
         items.append(seconds)
         return items.count
     }
+}
+
+/// 交出去接着查的任务号（回调可能在别的线程上）。
+final class NameLog: @unchecked Sendable {
+    private let lock = NSLock()
+    private var list: [String] = []
+    func add(_ name: String) { lock.lock(); list.append(name); lock.unlock() }
+    func clear() { lock.lock(); list.removeAll(); lock.unlock() }
+    var items: [String] { lock.lock(); defer { lock.unlock() }; return list }
 }
 
 /// 报上来的每一份（回调可能在别的线程上）。
