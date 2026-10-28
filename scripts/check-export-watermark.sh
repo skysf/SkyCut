@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # **导出水印真的叠上了，而且只在该在的地方**。
 #
-# 纯值（checks/Watermark/PureChecks.swift）：logo 的路径读得出来、画成的 PNG 白字带阴影且整体 70%、跳的表（每 4 秒一处、不连续同一处、
+# 纯值（checks/Watermark/PureChecks.swift）：加不加（授权说要加或测试开关开着；要加却读不出 logo 就抛错、不导）、logo 的路径读得出来、画成的 PNG 白字带阴影且整体 70%、跳的表（每 4 秒一处、不连续同一处、
 # 同一个种子同一张表）、四角 / 正中多大放哪、分段表达式逐秒求值和表一致且是平衡的。
 # 真导出（checks/Watermark/main.swift）：调真实的 `VideoEditExportGraph.plan()`，开着水印和不开各导一遍、抽帧逐像素比：
 # 每一段改动的外接框都落在表上那一处的图里、正好在段的边界上换、不开水印的导出一个像素都不动、缩到导出分辨率之后还在那一角。
@@ -89,6 +89,7 @@ xcrun swiftc \
   Sources/SrtFlow/Watermark/WatermarkExport.swift \
   Sources/SrtFlow/Watermark/WatermarkImage.swift \
   Sources/SrtFlow/Watermark/WatermarkPlacement.swift \
+  Sources/SrtFlow/Watermark/WatermarkPolicy.swift \
   Sources/SrtFlow/SeededRandom.swift \
   Sources/SrtFlow/AppResources.swift \
   Sources/SrtFlow/VideoEditShapeOverlayExport.swift \

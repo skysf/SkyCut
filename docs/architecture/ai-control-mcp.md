@@ -863,6 +863,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
       新加的参数只要写进说明就自动认（`ArgumentCheckChecks` 拿每个工具说明上的全部名字验一遍）。
     守卫：`checks/MCP/ArgumentCheckChecks.swift`（冒烟里那次原样的调用、null、project、猜名字、别名、两层里层、自由对象、每个工具说明上的全部名字），
     `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
+53. **照授权拦：没开通的，AI 的工具一个都不做（收费方案第 5 刀第二步，2026-10-28；规矩全在 [Sky Studio 账号](sky-studio-account.md)）**：
+    `AIToolRouter.handle` 核对参数名之后、建调用排队之前问 `SkyStudioAccount.aiRefusal`：此刻的授权不让用 MCP，就回「Not done」+ 为什么 + 请用户做什么
+    （粘 Key、发邮件开通、点「允许…」/「再查一次」、更新），一样都不做、不排队、不摆窗口。**`get_status` 照常回**，报 `skycut_plan`。
+    门在 App 里、不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。还没问完（刚启动、离线几天）时
+    先问一次 `/me` 再判，最多等 20 秒。`export_video` 开始时、`get_job` 做完时带了水印就写 `watermark`（为什么、怎么去掉）。
+    **先关着**（`SkyCutGates.enforcedByDefault`）：接口上线、用户给自己开了正式版后单独一个 PR 打开；测试开关 `skystudio.testGates`。
+    守卫：`checks/SkyStudio/GateChecks.swift`（每个工具 × 每种授权、话怎么说、`skycut_plan`），`checks/sky-studio-wiring.sh`（门在核对参数名之后、建 Call 之前）。
 
 ## 五、这一轮、停止、撤销这一轮
 

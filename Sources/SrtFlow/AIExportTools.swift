@@ -73,9 +73,8 @@ enum AIExportTools {
                 MainActor.assumeIsolated {
                     reservedOutputs.remove(reserved)
                     if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
-                        AIJobs.shared.finish(
-                            job, .done, detail: .object(finishedDetail(output, video: video, levels: exporter.finishedAudioLevels))
-                        )
+                        let detail = finishedDetail(output, video: video, levels: exporter.finishedAudioLevels, watermarked: exporter.watermarked)
+                        AIJobs.shared.finish(job, .done, detail: .object(detail))
                     } else if let error = exporter.errorMessage {
                         AIJobs.shared.finish(job, .failed, message: error)
                     } else {
@@ -96,14 +95,21 @@ enum AIExportTools {
         ]
         if let position { result["queue_position"] = .number(Double(position)) }
         if let video { result["video"] = video }
+        // 会带水印（没开通 / 体验期）：先说一声，用户要的是没水印的成片时 AI 能先停下来说清楚（做完 get_job 里还会说一遍）。
+        if !audioOnly, WatermarkPolicy.required(byLicence: SkyStudioAccount.shared.exportsWithWatermark) {
+            result["watermark"] = .string(SkyCutGates.watermarkNote)
+        }
         return .ok(.object(result))
     }
 
-    /// 成品的路径和画面（宽、高、帧率），加混音的电平和响度：限幅器压过的说明压了多久多深，压得超过 3 dB 的再叫 AI
-    /// 把主推子降下来（docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
-    static func finishedDetail(_ output: URL, video: JSONValue?, levels: ExportAudioMixdown.Levels?) -> [String: JSONValue] {
+    /// 成品的路径和画面（宽、高、帧率），带了水印的说为什么、怎么去掉，加混音的电平和响度：限幅器压过的说明压了多久多深，
+    /// 压得超过 3 dB 的再叫 AI 把主推子降下来（docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
+    static func finishedDetail(
+        _ output: URL, video: JSONValue?, levels: ExportAudioMixdown.Levels?, watermarked: Bool
+    ) -> [String: JSONValue] {
         var detail: [String: JSONValue] = ["path": .string(output.path)]
         if let video { detail["video"] = video }
+        if watermarked { detail["watermark"] = .string(SkyCutGates.watermarkNote) }
         guard let levels else { return detail }
         func tenths(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         if let loudness = levels.loudnessLUFS { detail["audio_loudness_lufs"] = tenths(loudness) }

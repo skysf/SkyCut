@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Sky Studio 账号（收费方案第 5 刀第一步）的自检：
+# Sky Studio 账号与照授权拦（收费方案第 5 刀）的自检：
 #   1. 粘进来的 Key 怎么整理（`sk-` 开头、URL 安全的字符；去掉 Bearer、引号、首尾空白），钥匙串那一条叫什么；
 #   2. 发给 Sky Studio 的机器号：SHA-256(硬件 UUID + 盐) 钉死一组值（盐改了就红），这台 Mac 读得到、发出去的不是原样的 UUID；
 #   3. /me 的回答：合同里的样例逐字段读、日期带毫秒也认、认不出的字段不管、少了必须的就不算回答、网址只认 https（和本机）、存下来读回来一样；
 #   4. SkyStudioAPI：假 URLSession 协议上看发出去的地址 / 方法 / 四个头，401 / 426 / 429 原样留着 code 和附加字段，
 #      502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能把地址指到本机；
 #   5. 此刻的授权（SkyCutLicense）：没有 Key / 没问到过 / 过了 valid_until 都按免费版，服务器的钟换成本机的，钟往回拨不作数，
-#      开关只听服务器的；什么时候再问（SkyStudioRefresh）。
+#      开关只听服务器的；什么时候再问（SkyStudioRefresh）；
+#   6. 照授权拦（SkyCutGates，第 5 刀第二步）：先关着、测试开关只能打开；AI 的工具只听 mcp、get_status 永远让；导出的水印听服务器的；
+#      被挡住时回给 AI 的话（没做、为什么、请用户做什么）、get_status 里的 skycut_plan、导出带了水印时那一句。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -44,6 +46,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyCutLicense.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
+  Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   checks/SkyStudio/main.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \
@@ -51,6 +55,7 @@ xcrun swiftc \
   checks/SkyStudio/MeChecks.swift \
   checks/SkyStudio/APIChecks.swift \
   checks/SkyStudio/LicenseChecks.swift \
+  checks/SkyStudio/GateChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
 echo "==> 跑自检"

@@ -13,6 +13,8 @@ import SrtFlowMCPKit
 struct SkyStudioAPI: Sendable {
     static let productionBase = URL(string: "https://skystudioai.com/api/skycut/v1")!
     static let baseEnvironmentKey = "SRTFLOW_SKYSTUDIO_API_BASE"
+    /// 一次请求最多等多久（AI 的调用碰上授权没问到时也最多等这么久，SkyStudioAccount.settledLicense）。
+    static let requestTimeout: TimeInterval = 20
 
     let session: URLSession
     let base: URL
@@ -63,7 +65,7 @@ struct SkyStudioAPI: Sendable {
     func request(_ path: String, key: String, method: String = "GET", body: Data? = nil) -> URLRequest {
         var request = URLRequest(url: base.appendingPathComponent(path))
         request.httpMethod = method
-        request.timeoutInterval = 20
+        request.timeoutInterval = Self.requestTimeout
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         request.setValue(version, forHTTPHeaderField: "X-SkyCut-Version")
         if let machine { request.setValue(machine, forHTTPHeaderField: "X-SkyCut-Machine") }

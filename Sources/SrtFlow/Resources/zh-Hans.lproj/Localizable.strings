@@ -1239,3 +1239,5 @@
 "Copy Address" = "复制邮箱";
 "Copied" = "已复制";
 "Copy the support email address" = "复制客服邮箱";
+"The video will carry a Sky Studio watermark. To export without it, activate SkyCut Pro: email %@ with the email address of your Sky Studio account." = "导出的视频会带 Sky Studio 水印。开通正式版就不带了：请发邮件到 %@，写上你的 Sky Studio 账号邮箱。";
+"SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut." = "SkyCut 读不出水印的 logo，没有导出。请重新安装 SkyCut。";
