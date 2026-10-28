@@ -19,7 +19,7 @@
 | 机器号 | 每个请求带 `X-SkyCut-Machine` = SHA-256(硬件 UUID + 盐) 的 64 位小写十六进制（`SkyStudioMachine`）：原始的硬件 UUID 不出本机、不发电脑名。Sky Studio 按它「每台 Mac 只给一次体验」。**盐和算法永远不改**（改了每台 Mac 都成了新机器，又能体验一次）；自检钉着一组算好的值 |
 | 地址 | `https://skystudioai.com/api/skycut/v1`，**只有 `SkyStudioAPI` 碰它**。自检 / 冒烟用 `SRTFLOW_SKYSTUDIO_API_BASE` 指到本机的假服务器，**只认回环地址**（Key 不会因此发到别处） |
 | 此刻的授权 | 纯函数 `SkyCutLicense.evaluate`：plan、`features`（`mcp` / `watermark`）、`valid_until` 全照服务器的，SkyCut 不写死天数。**没有 Key、没问到过、过了 `valid_until` 都按免费版**（MCP 关、导出带水印）——这是「没有授权」本身的定义 |
-| 断网 | 上一次的回答存在 UserDefaults（`SrtFlow.skystudio.me.v1`），照它用到 `valid_until`（服务器定：现在是 72 小时和体验 / 正式到期取早的）。服务器的钟换成本机的：`拿到回答时的本机时间 + (valid_until − server_time)`，本机的钟和服务器差多少都不影响；本机的钟比拿到回答时还早 5 分钟以上（往回拨了）就不作数 |
+| 断网 | 上一次的回答存在 UserDefaults（`SrtFlow.skystudio.me.v1`），照它用到 `valid_until`（服务器定：现在是 72 小时和体验 / 正式到期取早的）。服务器的钟换成本机的：`拿到回答时的本机时间 + (valid_until − server_time)`，本机的钟和服务器差多少都不影响；本机的钟比拿到回答时还早 5 分钟以上（往回拨了）就不作数。**换算只给要和本机的「现在」比的时间**（`valid_until`、体验的起止）：「拿到回答 − server_time」里还有请求在路上的几秒，只拿来显示的「正式版到哪天」照服务器给的那一刻，不换算；「体验还剩几天」不满一天算一天，但不超过体验本身的天数（`trial_ends_at − trial_started_at`）。2026-10-28 真服务器上回答晚到 4–5 秒，刚开始的体验显示成 8 天、开通到 12-31 显示成 1 月 1 日（[案例](../bugfixes/2026-10-28-trial-and-pro-dates-shown-a-day-late.md)） |
 | 什么时候问 | `SkyStudioRefresh`：启动时、回到 SkyCut 时，上次问到超过 30 分钟才问；每小时看一眼，超过 6 小时才问；没问到过 / 过期了马上问；没问成至少隔 5 分钟再试。设置里「再查一次」随时问 |
 | Key 作废了 | 后台问到 `invalid_key`：清掉存的回答（这把 Key 的授权不再作数，不等到 `valid_until`），设置里说 Sky Studio 不认、请粘一把新的 |
 | 版本太老 | `upgrade_required`：设置里照服务器的话说，带下载链接（`download_url`）；存的回答照旧用到 `valid_until` |
@@ -80,11 +80,11 @@
 ## 六、人工回归（Sky Studio 的接口上线之后，发版前）
 
 - [ ] 没有 Key 时点「去 Sky Studio 建 Key」：浏览器打开 Sky Studio 建 SkyCut Key 的那个窗口（登录后）。
-- [ ] 设置 → Sky Studio 粘一把新账号的 Key：「账号」是这个账号的邮箱、「套餐」是「体验 · 还剩 7 天」、积分对得上网站；钥匙串访问里多了「SkyCut Sky Studio API key」一条。
+- [ ] 设置 → Sky Studio 粘一把新账号的 Key：「账号」是这个账号的邮箱、「套餐」是「体验 · 还剩 7 天」（不是 8 天：回答晚到几秒，见「断网」一行）、积分对得上网站；钥匙串访问里多了「SkyCut Sky Studio API key」一条。
 - [ ] 同一台 Mac 换一个新账号的 Key：「免费版」，下面一句说这台 Mac 已经体验过。
 - [ ] 粘一把作废的 Key：说 Sky Studio 不认、Key 没存下；网站上作废正在用的那把，点「再查一次」：同样，存的授权清掉。
 - [ ] 断网点「再查一次」：说连不上、照上一次的用到什么时候；72 小时之后（或把 `valid_until` 很近的回答存进去）变成免费版。
-- [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，开通的那一句不见了。
+- [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，写的就是后台选的那天（不是第二天），开通的那一句不见了。
 - [ ] 「复制邮箱」之后粘出来是 support@skystudioai.com，这个邮箱收得到信。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
