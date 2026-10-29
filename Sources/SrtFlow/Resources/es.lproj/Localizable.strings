@@ -1246,3 +1246,7 @@
 "Copy the support email address" = "Copiar la dirección de soporte";
 "The video will carry a Sky Studio watermark. To export without it, activate SkyCut Pro: email %@ with the email address of your Sky Studio account." = "El video llevará una marca de agua de Sky Studio. Para exportar sin ella, activa SkyCut Pro: escribe a %@ con el correo de tu cuenta de Sky Studio.";
 "SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut." = "SkyCut no pudo leer el logotipo de la marca de agua, así que no exportó. Vuelve a instalar SkyCut.";
+
+"Voiceover" = "Narración";
+
+"Complete voiceover" = "Narración completa";

@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 工具清单：素材从哪来（音乐库）
 //
-// 管什么：find_audio、add_voiceover 的说明文字和参数。以后「生成素材」（fal.ai，方案第六块）也放这一组。
+// 管什么：find_audio、add_voiceover 的说明文字和参数。以后「生成素材」（Sky Studio，方案第六块）也放这一组。
 // 不管什么：怎么搜、怎么下载（App 里的 AIAudioLibraryTools.swift）；把一首放上时间线是 add_clips 的 library_id；
 // 配音怎么做（App 里的 AIVoiceoverTool / AISpeechSynthesis）。
 
@@ -33,18 +33,18 @@ enum MCPMediaTools {
             return MCPToolDefinition(
                 .addVoiceover, title: "Add a voiceover",
                 description: """
-                Speak narration and put each line on an audio track as its own clip (a new audio track unless track is given; \
-                all lines of one call go on the same track). Voices, best first: fal.ai's (when the user connected fal.ai and \
-                today's cost limit allows it; a role maps to a matching voice, or name one such as Rachel or Brian; the result's \
-                voice note says when it was not used), then SkyCut's own voices (English, Chinese, Japanese, Spanish, French, \
-                Italian, Portuguese, Hindi) when downloaded, otherwise this Mac's voices, which sound much worse; \
-                download_voices=true downloads SkyCut's voices (a job, about 333 MB; tell the user). voice is a role — \
-                zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
-                en_male_british — one of SkyCut's voices by name (af_heart, zf_xiaoxiao…), or a Mac voice's name; without it, a \
-                warm female voice in the text's language. clone_from clones a voice with fal.ai from a file (audio or video) of \
-                one person speaking clearly. The files go into SkyCut/Voiceovers in the user's folder. subtitles=true also \
-                writes the words as subtitles, timed to the voice (lines over existing subtitles are left out). Pass on the \
-                result's voice note to the user.
+                Make voiceover files and put each line on the same audio track (new unless track is given), plus optional \
+                subtitles, as one undo step. Sky Studio voices return job_id immediately: wait with get_job to a terminal state; \
+                never repeat add_voiceover while it runs. Cloning may queue for several minutes. Local voices return directly. \
+                Best first: Sky Studio (saved key, daily credits allow it; otherwise ordinary narration falls back with a voice.note), \
+                then downloaded SkyCut voices, then this Mac's voices. Cloud voices ignore speed. voice is a role \
+                (zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
+                en_male_british), a cloud preset such as Rachel or Brian, a SkyCut voice (af_heart, zf_xiaoxiao…), or a Mac voice. \
+                Default is a warm female voice in the text's language. clone_from sends a clear single-speaker sample to Sky Studio; \
+                cloning requires its key and budget, has no local fallback, and combines several lines per paid request. \
+                Multi-line cloning needs an installed speech transcription model (macOS 26); otherwise nothing is charged. \
+                Files go into SkyCut/Voiceovers. subtitles=true times subtitles to the voice (existing overlaps are left out). \
+                Pass voice.note to the user. download_voices=true only downloads SkyCut's voices (a job, about 333 MB; tell the user).
                 """,
                 input: MCPSchema.object([
                     "lines": MCPSchema.array(of: MCPSchema.object([
@@ -52,8 +52,8 @@ enum MCPMediaTools {
                         "start": MCPSchema.number("Timeline seconds (default: right after the previous line; the first at the playhead).", minimum: 0)
                     ], required: ["text"]), "The lines of narration, in order (not needed with download_voices).", minItems: 1),
                     "voice": MCPSchema.string("A role or an installed voice's name."),
-                    "speed": MCPSchema.number("1 = normal (default). Not used by fal.ai's voice.", minimum: 0.5, maximum: 2),
-                    "clone_from": MCPSchema.string("A file of one person speaking; the lines are spoken in that voice (fal.ai only)."),
+                    "speed": MCPSchema.number("1 = normal (default). Not used by Sky Studio voices.", minimum: 0.5, maximum: 2),
+                    "clone_from": MCPSchema.string("A file of one person speaking; the lines are spoken in that voice (Sky Studio only)."),
                     "clone_start": MCPSchema.number("Seconds into clone_from where the sample starts (default 0).", minimum: 0),
                     "clone_seconds": MCPSchema.number("Length of the sample (default 10).", minimum: 5, maximum: 30),
                     "track": MCPSchema.string(MCPSchema.trackDescription),

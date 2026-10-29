@@ -14,9 +14,11 @@ import Foundation
 @MainActor
 struct SkyStudioHeldCredits {
     private var held: SkyStudioJobGate.Reservation?
+    private let store: SkyStudioSpendStore
 
     /// AI 起的：起任务之前在 SkyStudioJobGate 里已经记上的那一笔。
-    init(_ reservation: SkyStudioJobGate.Reservation) {
+    init(_ reservation: SkyStudioJobGate.Reservation, store: SkyStudioSpendStore? = nil) {
+        self.store = store ?? SkyStudioSpendStore.shared
         held = reservation
     }
 
@@ -29,14 +31,13 @@ struct SkyStudioHeldCredits {
     /// 没花出去：退回（只退一次）。
     mutating func refund() {
         guard let held else { return }
-        SkyStudioSpendStore.shared.refund(held.credits, on: held.day)
+        store.refund(held.credits, on: held.day)
         self.held = nil
     }
 
     /// 做完：账上记的是报价，换成实收（一般一样）。
     mutating func settle(charged: Double) {
         guard let held, abs(held.credits - charged) > 0.0001 else { return }
-        let store = SkyStudioSpendStore.shared
         store.refund(held.credits, on: held.day)
         store.record(charged)
         self.held = SkyStudioJobGate.Reservation(credits: charged, day: Date())

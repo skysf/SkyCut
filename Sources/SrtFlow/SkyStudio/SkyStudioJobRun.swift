@@ -51,7 +51,6 @@ struct SkyStudioJobRun: Sendable {
     func run(_ request: SkyStudioJobRequest, onUpdate: @escaping @Sendable (Update) -> Void = { _ in }) async throws -> SkyStudioJobStatus {
         let deadline = Date().addingTimeInterval(maxWait)
         let submitted = try await submit(request, deadline: deadline, onUpdate: onUpdate)
-        onUpdate(.status(submitted))
         return try await follow(submitted, deadline: deadline, onUpdate: onUpdate)
     }
 
@@ -69,6 +68,7 @@ struct SkyStudioJobRun: Sendable {
             }.value
             switch attempt {
             case .success(let status):
+                onUpdate(.status(status))
                 // 交上了才发现用户要停：按任务号停。
                 if Task.isCancelled { throw await stop(status.jobID) }
                 return status

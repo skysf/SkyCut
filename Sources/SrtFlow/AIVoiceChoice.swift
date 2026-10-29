@@ -2,9 +2,9 @@ import Foundation
 
 // MARK: - 配音用哪个声音（纯值）
 //
-// 管什么：这一次配音用 fal 的声音（用户接了 fal 时最优先，方案第 42 条）、SrtFlow 自己的声音（本机的 Kokoro，方案第 48 条）
-// 还是这台 Mac 的系统声音，用哪一个。fal 那一档：`falAvailable`（有 Key、没超额度、Key 读得出来 —— 这些由调用方判断）时，
-// 没点名 / 点名角色 / 点名 ElevenLabs 的音色都走 fal；点名 Kokoro 的音色或这台 Mac 的声音仍然照点名的来。
+// 管什么：这一次配音用 Sky Studio 的声音（用户接了 Sky Studio 时最优先，方案第 42 条）、SrtFlow 自己的声音（本机的 Kokoro，方案第 48 条）
+// 还是这台 Mac 的系统声音，用哪一个。Sky Studio 那一档：`skyStudioAvailable`（有 Key、没超额度、Key 读得出来 —— 这些由调用方判断）时，
+// 没点名 / 点名角色 / 点名 ElevenLabs 的音色都走 Sky Studio；点名 Kokoro 的音色或这台 Mac 的声音仍然照点名的来。
 // - 装了 Kokoro、这种语言它能读：用它 —— 点名的 Kokoro 音色、角色对应的音色（AIVoiceRole），或者这种语言默认的那个。
 // - 没装、或者它读不了这种语言：用系统声音，同语言同性别里高级 > 增强 > 默认（英式角色找英国的声音），没有这个性别就退到
 //   另一个并说一声；只有默认质量时说去哪下载更好的；Kokoro 能读这种语言却没下载时，告诉 AI「SrtFlow 自己的声音好得多，
@@ -38,8 +38,8 @@ struct AIVoiceChoice: Equatable {
         case kokoro(voice: String, language: String)
         /// 这台 Mac 的系统声音。
         case system(Voice)
-        /// fal 的声音（Eleven v4）：ElevenLabs 的预制音色名。
-        case fal(voice: String)
+        /// Sky Studio 的声音（Eleven v4）：ElevenLabs 的预制音色名。
+        case skyStudio(voice: String)
     }
 
     var engine: Engine
@@ -52,7 +52,7 @@ struct AIVoiceChoice: Equatable {
         switch engine {
         case .kokoro(let voice, _): return voice
         case .system(let voice): return voice.name
-        case .fal(let voice): return voice
+        case .skyStudio(let voice): return voice
         }
     }
 
@@ -60,7 +60,7 @@ struct AIVoiceChoice: Equatable {
         switch engine {
         case .kokoro: return "SkyCut voice"
         case .system(let voice): return voice.qualityName
-        case .fal: return "fal.ai voice"
+        case .skyStudio: return "Sky Studio voice"
         }
     }
 
@@ -68,9 +68,15 @@ struct AIVoiceChoice: Equatable {
     ///   - requested: 角色名、Kokoro 音色名、系统声音的名字；nil = 按文字的语言挑。
     ///   - kokoroVoices: 装好的 Kokoro 音色；nil = 没下载。
     static func choose(_ requested: String?, textLanguage: String, kokoroVoices: [String]?,
-                       installed: [Voice], falAvailable: Bool = false) throws -> AIVoiceChoice {
-        if falAvailable, let voice = falVoice(requested, textLanguage: textLanguage) {
-            return AIVoiceChoice(engine: .fal(voice: voice))
+                       installed: [Voice], skyStudioAvailable: Bool = false) throws -> AIVoiceChoice {
+        if skyStudioAvailable, let voice = skyStudioVoice(requested, textLanguage: textLanguage) {
+            return AIVoiceChoice(engine: .skyStudio(voice: voice))
+        }
+        if !skyStudioAvailable, let requested, SkyStudioVoices.named(requested) != nil,
+           !installed.contains(where: { $0.name.caseInsensitiveCompare(requested) == .orderedSame || $0.identifier == requested }) {
+            var fallback = try choose(nil, textLanguage: textLanguage, kokoroVoices: kokoroVoices, installed: installed)
+            fallback.note = [fallback.note, "The Sky Studio voice was not used because no Sky Studio key is configured."].compactMap { $0 }.joined(separator: " ")
+            return fallback
         }
         if let requested, AIVoiceRole.named(requested) == nil, AIVoiceRole.isKokoroName(requested) {
             return try kokoroByName(requested.lowercased(), textLanguage: textLanguage, installed: kokoroVoices)
@@ -91,11 +97,11 @@ struct AIVoiceChoice: Equatable {
         return choice
     }
 
-    /// fal 的音色：没点名按文字的语言、点名角色换成对应的音色、点名 ElevenLabs 的预制音色照用；点名别的（Kokoro 的、这台 Mac 的）是 nil。
-    private static func falVoice(_ requested: String?, textLanguage: String) -> String? {
-        guard let requested else { return AIFalVoices.defaultVoice(forLanguage: textLanguage) }
-        if let role = AIVoiceRole.named(requested) { return AIFalVoices.voice(for: role) }
-        return AIFalVoices.named(requested)
+    /// Sky Studio 的音色：没点名按文字的语言、点名角色换成对应的音色、点名 ElevenLabs 的预制音色照用；点名别的（Kokoro 的、这台 Mac 的）是 nil。
+    private static func skyStudioVoice(_ requested: String?, textLanguage: String) -> String? {
+        guard let requested else { return SkyStudioVoices.defaultVoice(forLanguage: textLanguage) }
+        if let role = AIVoiceRole.named(requested) { return SkyStudioVoices.voice(for: role) }
+        return SkyStudioVoices.named(requested)
     }
 
     /// 没下载 SrtFlow 的声音时给 AI 的那一句（第 50 条）。

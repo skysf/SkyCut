@@ -35,6 +35,7 @@ echo "==> swift build ${ARCH_FLAG} --target SrtFlowMCPKit"
 # SwiftPM 的编译诊断走 stdout：静默成功可以，失败必须倾倒完整输出
 #（>/dev/null 会把编译错误吞成无字天书，见 docs/bugfixes/ 2026-08-08 CI 首跑案例）。
 BUILD_OUT="$(swift build ${ARCH_FLAG} --target SrtFlowMCPKit 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
+BUILD_OUT="$(swift build ${ARCH_FLAG} --target SrtFlowCore 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build ${ARCH_FLAG} --show-bin-path)"
 
 OUT="$(mktemp -d)/skystudiocheck"
@@ -63,6 +64,13 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobGate.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatch.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
+  Sources/SrtFlow/SpeechWordTimes.swift \
+  Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIConfirmations.swift \
   Sources/SrtFlow/Fal/FalSpend.swift \
@@ -79,8 +87,10 @@ xcrun swiftc \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
   checks/SkyStudio/ApprovalChecks.swift \
+  checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
-  "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
+  "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
+  "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 跑自检"
 "$OUT"

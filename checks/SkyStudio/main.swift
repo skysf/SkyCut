@@ -13,6 +13,8 @@ await runJobChecks()
 await runJobRunChecks()
 await runSpendChecks()
 await runApprovalChecks()
+runVoiceChecks()
+await runVoiceBudgetChecks()
 runGenerationChecks()
 runGenerationFrameChecks()
 

@@ -255,8 +255,8 @@ echo "   ✓ 只有删文件、读别处的文件、fal 花钱超了额度会问
 echo "==> 配音只经一处写文件（先过一道音量）"
 # Kokoro 的 am_fenrir 峰值会超过满幅，没过音量就写进文件，一声声爆音（docs/bugfixes/2026-09-28-kokoro-voiceover-clipping.md）。
 # 两种声音都只许经 AIAudioFileWriter.writeVoiceover 落盘、词的时间按它返回的那份算；写的那一步在自检二进制里真写真读。
-for engine in Sources/SrtFlow/KokoroVoiceSpeech.swift Sources/SrtFlow/AISpeechSynthesis.swift Sources/SrtFlow/AIFalVoice.swift; do
-  if [ "$(grep -c 'let samples = try AIAudioFileWriter.writeVoiceover(' "${engine}" || true)" -ne 1 ] \
+for engine in Sources/SrtFlow/KokoroVoiceSpeech.swift Sources/SrtFlow/AISpeechSynthesis.swift Sources/SrtFlow/SkyStudio/SkyStudioVoiceAudio.swift; do
+  if [ "$(grep -c 'AIAudioFileWriter.writeVoiceover(' "${engine}" || true)" -ne 1 ] \
      || [ "$(grep -c 'AVAudioFile(forWriting' "${engine}" || true)" -ne 0 ]; then
     echo "✗ ${engine} 没经 AIAudioFileWriter.writeVoiceover 写配音（或自己开了文件写）：没过音量的声音会削波" >&2
     exit 1
@@ -415,8 +415,10 @@ xcrun swiftc \
   Sources/SrtFlow/AIRecipeTools.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
-  Sources/SrtFlow/AIFalVoices.swift \
-  Sources/SrtFlow/Fal/FalOutputs.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoices.swift \
+  Sources/SrtFlow/SpeechWordTimes.swift \
+  Sources/SrtFlow/VoiceReferenceSample.swift \
+  Sources/SrtFlow/SubtitleGen/AudioWindowReader.swift \
   Sources/SrtFlow/Fal/FalModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/Upscale/UpscaleTiers.swift \
@@ -576,7 +578,7 @@ xcrun swiftc \
   checks/MCP/BeatCutChecks.swift \
   checks/MCP/ProviderChecks.swift \
   checks/MCP/UpscaleToolChecks.swift \
-  checks/MCP/FalVoiceChecks.swift \
+  checks/MCP/SkyStudioVoiceChecks.swift \
   checks/MCP/SoundEffectChecks.swift \
   checks/MCP/ScreenRecordingToolChecks.swift \
   checks/MCP/ProjectBindingChecks.swift \

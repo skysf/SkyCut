@@ -884,6 +884,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](docs/bugfixes/2026-10-28-upscale-inspector-still-says-fal.md) — upscale 改走 Sky Studio 后，检查器那一节标题旁的灰字还是 `Text(verbatim: "fal.ai")`：不走字符串表、不是一句话，按文案搜都漏了，真积分测试看截图才发现。改成 Sky Studio，守卫钉住 upscale 的界面不再写 fal.ai。**换提供方要连 verbatim 写死的名字一起搜。**
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 - [2026-10-29 两种视频拿到同一个确认码](docs/bugfixes/2026-10-29-sky-studio-confirmation-collides.md) — 摘要相同不等于同一件事；确认码绑定完整请求、精确报价、输入文件和落点，实际过闸回归钉住串码不消费不记账。
+- [提交返回瞬间取消丢任务号](docs/bugfixes/2026-10-29-cancelled-submit-loses-job-id.md)
+- [旁白多块词时间和音频尾端](docs/bugfixes/2026-10-29-voice-word-chunks-and-tail.md)
 - [2026-10-29 MCP 冒烟丢掉失败，后台包装又报成功](docs/bugfixes/2026-10-29-mcp-smoke-hides-failures.md) — EOF / 坏协议唤醒等待者、JSON-RPC 错误明确失败、超时标明结果未知；日志包装原样传退出码，假小程序回归覆盖整条证据链。
 
 ## 根目录文档
