@@ -422,41 +422,18 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    先 `get_status` 看 `skycut_plan` 的 `ai_tools`。Key 由用户在测试版的设置里粘；别的会话代建的 Key 只经 600 权限的文件交过来，
    用辅助功能填进设置里那一栏（App 自己存的钥匙串项自己读，不弹框），明文不进命令和输出（2026-10-28 真服务器回归就是这么做的）。
 
-## 四之八、fal.ai 生成的端到端冒烟（真 App + 真小程序 + 本机的假 fal，2026-09-29）
+## 四之八、云端媒体的端到端冒烟（真 App + 真小程序 + 本机假 Sky Studio）
 
-后台跑任何冒烟脚本时用 `/bin/bash scripts/gui-smoke/run-logged.sh <日志> <命令> [参数…]`。
-不要在被测命令后面只接 `echo "exit=$?"`：外层会把 echo 的 0 当成测试退出码。
-`mcpclient.py` 遇到断线 / 坏协议（含列表、对象、布尔 id）/ JSON-RPC 错误会明确失败；超时表示结果未知，先核查任务和账目再决定下一步，不能直接重跑付费测试。
+日志必须保留真实退出码：`scripts/gui-smoke/run-logged.sh <日志> <命令> [参数…]`。不要用被测命令后面的 echo 当结果。共享客户端在 `scripts/gui-smoke/mcpclient.py`：EOF、坏 JSON、坏 id 类型（列表、对象、布尔）和 RPC 错误立即唤醒等待者并失败；超时表示结果未知，先核查任务和账，不重交付费请求。
 
-fal 那一块自动检查够不着的是 App 里那一层（任务、花钱的确认码、钥匙串、设置、清单跟着 Key 走）。`scripts/gui-smoke/fal/` 用**本机的假 fal**
-（`fakefal.py`：照队列接口回话、记下每个请求、按端点回图 / 视频 / 音频和词时间）把它们真走一遍，**不需要真 Key、不花钱**：
+先 `swift build --arch arm64`，再设置 `SRTFLOW_FFMPEG=<仓库>/vendor/ffmpeg`：
 
-```bash
-swift build --arch arm64
-scripts/gui-smoke/fal/run.sh              # 组装独立的测试 App（com.srtflow.SrtFlow.falsmoke）、起假 fal、后台启动
-python3 scripts/gui-smoke/fal/generate.py # 场景一：五种生成、放上时间线、配旁白（词时间 → 字幕）、克隆、账、Key 头
-scripts/gui-smoke/fal/run.sh 0.30         # 每日上限 0.30 重起
-python3 scripts/gui-smoke/fal/approval.py # 场景二：超额度 / 价格不明回确认码、带码才做、错的 / 用过的码不认、停止、cancel_job
-scripts/gui-smoke/fal/run.sh stop         # 收尾：退 App、杀假 fal、删钥匙串项 / 设置 / 小文件
-```
+1. `scripts/gui-smoke/sky-studio/run.sh` 组装独立 `.skystudiosmoke` App、回环假服务和假 Key；不读取生产 Key，也不发真实收费请求。
+2. `python3 scripts/gui-smoke/sky-studio/voice.py` 验证普通旁白、多句合批克隆、真实本机转写切句、字幕、一步撤销、queued 取消退款 / 重复取消、服务错误退本机、文件解码与密钥不随下载 / PUT 发送。
+3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度普通旁白退本机、克隆拒绝，没有 `/jobs` 与花费。
+4. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
-**2026-10-28 起照授权拦默认打开**（[Sky Studio 账号](../architecture/sky-studio-account.md)）：这个测试 App 没有 Sky Studio 的 Key，AI 的工具除了 `get_status`
-一个都不做，这套冒烟跑不通了。fal 这条路第 6 刀改走 Sky Studio、第 7 刀删掉，到时候连同一个本机的假 Sky Studio 一起重写；在那之前别拿它验东西。
-
-1. **Key 不要用 `security add-generic-password -T` 预置**：别的签名建的项，这个 App 读要弹 macOS 的授权框（`-T` 认的是路径，ad-hoc 签名对不上），
-   没人点它就卡在框上、任务永远 running，框还会弹到用户屏幕上（2026-09-29 试过一次）。改用环境变量 `SRTFLOW_SMOKE_FAL_KEY`：App 自己启动时存一份，
-   自己建的项自己读不弹框；它**只在队列地址指到本机**（`SRTFLOW_FAL_QUEUE_BASE=http://127.0.0.1:…`，只认回环地址）时才生效。
-2. **先 `open_folder` 一个临时文件夹**：不然成品放到 `~/Downloads/SrtFlow/生成`，测试文件就落进了用户的下载文件夹。两个场景都这么做。
-3. **花钱超了额度 / 价格不明不再在提示条上问**（2026-10-17 起，AI 多开方案板 9）：`generate_media` / `upscale_clip` 当场回 `needs_confirmation` +
-   `confirm_token`，场景二照 AI 的做法带码再调。只有「停止」要点按钮：用辅助功能（`ax.sh`：`AXPress`，不走鼠标事件，不会像第四之六第 12 条那样卡在
-   NSControl 的跟踪循环里）。SwiftUI 的按钮自己没有名字可找，横幅「正在剪辑」上的停止和设置里 fal 一节的控件挂了 `accessibilityIdentifier`
-   （`ai-banner-stop`、`fal-key-field` / `-save-key` / `-remove-key` / `-limit-field`）。横幅只在这个工程正在剪的一轮里有停止：场景二先 `set_text` 开一轮再按。
-4. 按停止之后**落在那个工程上的下一次调用会被拒绝**（`AIRound.refusalAfterStop`，安静 10 秒才放行）；不碰工程的生成任务记在这个会话最后打开的工程上、跟着停。
-5. System Events 有时读不到这个 App 的窗口（`count of windows` 是 0，而 `CGWindowListCopyWindowInfo` 里明明有）：读窗口内容 / 点设置里的控件因此不稳，
-   设置窗口的 fal 一节要滚下去才看得见，这一版没有自动化，**靠人工回归清单**（见 [fal.ai 生成](../architecture/fal-generation.md) 第十一节）。
-6. 验证了什么：`tools/list` 因 Key 而有 / 没有 `generate_media`（启动时写小文件）、`get_status.generation`、图 / 文生视频 / 图生视频 / 音乐 / 音效的请求体
-   和放上时间线、参数错误回给 AI 的话、fal 配旁白（音色 / 词时间 → 字幕）、克隆、账、Key 头、确认码（超额度 / 价格不明、带码才做、错的 / 用过的不认）、
-   `cancel_job` 让 fal 也取消、按停止。System Events 看不见测试 App 的窗口时停止那一步记成「没验到」（不算通过）。
+原 fal 夹具、接口快照和刷新脚本已随第 7 刀删除；历史结果见既有报告。真实积分验收必须另外核对任务号、终态、扣费 / 退款和未知提交，不能把本机夹具当作真实服务已通过。当前证据见 [生成与配音验收](../reports/2026-10-29-sky-studio-generation-and-voice.md)。
 
 ## 五、要真实窗口、但已经自动化了的检查
 

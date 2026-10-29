@@ -6,7 +6,7 @@ import Foundation
 // **只在用户存了 Sky Studio 的 Key 时才列出来**（`MCPToolName.provider`，方案第 36 条）。种类、画幅、分辨率、upscale 的档位 / 目标 / 范围
 // 走词表（MCPVocabulary，和 App 的类型对账）；upscale 做完直接换源（用户 2026-10-02 定）。
 // 不管什么：怎么调 Sky Studio、花积分怎么把关（App 里的 Sources/SrtFlow/SkyStudio/：超了每日上限回确认码）；配旁白（add_voiceover，
-// 有 fal 的 Key 时它优先用 fal 的声音，见 docs/architecture/fal-generation.md）。
+// 有 fal 的 Key 时它优先用 Sky Studio 的声音，见 docs/architecture/fal-generation.md）。
 
 enum MCPGenerationTools {
     static func definition(for name: MCPToolName) -> MCPToolDefinition {

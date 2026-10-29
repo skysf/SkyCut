@@ -232,7 +232,7 @@ echo "==> 什么时候问：删文件、点名文件夹以外的文件问一次�
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
 # 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
 # 从提示条改成同一套确认码。2026-10-28（收费方案第 6 刀）：generate_media、upscale_clip 改走 Sky Studio，积分超每日上限同一套
-# （SkyStudioJobGate）；fal 那一处（FalJobGate）跟着生成一起删了，配旁白超额度不问、退档。
+# （SkyStudioJobGate）；fal 那一处（旧生成把关）跟着生成一起删了，配旁白超额度不问、退档。
 ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
 if [ "${ASKERS}" != "AIFileTools.swift AIWorkspace.swift SkyStudioJobGate.swift " ]; then
   echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、Sky Studio 花积分的 SkyStudioJobGate）" >&2
@@ -262,7 +262,7 @@ for engine in Sources/SrtFlow/KokoroVoiceSpeech.swift Sources/SrtFlow/AISpeechSy
     exit 1
   fi
 done
-echo "   ✓ Kokoro、macOS 和 fal 的声音都经 writeVoiceover 写文件"
+echo "   ✓ Kokoro、macOS 和 Sky Studio 的声音都经 writeVoiceover 写文件"
 
 echo "==> 认不出语言时，AI 拿到的是它能照做的话"
 # 自动检测没认出语言，界面那句「去面板里选」AI 做不到（docs/bugfixes/2026-09-29-ai-told-to-pick-language-in-panel.md）。
@@ -419,10 +419,10 @@ xcrun swiftc \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/VoiceReferenceSample.swift \
   Sources/SrtFlow/SubtitleGen/AudioWindowReader.swift \
-  Sources/SrtFlow/Fal/FalModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/Upscale/UpscaleTiers.swift \
-  Sources/SrtFlow/Fal/FalJobPhase.swift \
+  Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
+  Sources/SrtFlow/USDollarText.swift \
   Sources/SrtFlow/Upscale/UpscaleRange.swift \
   Sources/SrtFlow/AIUpscaleNames.swift \
   Sources/SrtFlow/KokoroVoicePieces.swift \

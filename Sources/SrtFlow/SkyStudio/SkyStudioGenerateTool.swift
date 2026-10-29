@@ -85,7 +85,7 @@ enum SkyStudioGenerateTool {
         )
         let job = run.start()
         let store = SkyStudioSpendStore.shared
-        let minutes = FalJobProgress.minutes(quote.typicalSeconds ?? generation.typicalSeconds)
+        let minutes = CloudJobProgress.minutes(quote.typicalSeconds ?? generation.typicalSeconds)
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(job.id), "kind": .string(kind.rawValue), "model": .string(model.title),
             "credits": .number(SkyStudioCredits.number(quote.credits)),

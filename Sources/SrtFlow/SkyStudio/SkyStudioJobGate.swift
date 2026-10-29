@@ -51,7 +51,7 @@ enum SkyStudioJobGate {
     }
 
     /// 要用户点头的那一句（英文，给 AI 转述）。
-    static func question(_ reason: FalSpendPolicy.Reason, _ summary: String) -> String {
+    static func question(_ reason: DailySpendPolicy.Reason, _ summary: String) -> String {
         switch reason {
         case .unknownPrice:
             return "Sky Studio · \(summary) — SkyCut does not know the price. Spend it?"

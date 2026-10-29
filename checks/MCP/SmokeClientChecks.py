@@ -1,5 +1,6 @@
 """真起假的 MCP 小程序，验证冒烟客户端不会把断线 / 协议错误当成功；不连 App、不碰网络。"""
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -7,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts/gui-smoke/fal"))
+sys.path.insert(0, str(ROOT / "scripts/gui-smoke"))
 from mcpclient import MCP
 
 
@@ -90,6 +91,30 @@ for line in sys.stdin:
                                  "print('fixture failed'); raise SystemExit(7)"], capture_output=True, text=True)
         self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
         self.assertIn("fixture failed", log.read_text())
+
+    def test_cleanup_preserves_unrelated_process(self):
+        # Real child PID, unrelated command. Stub keychain/defaults/pkill so only PID ownership is exercised.
+        folder = Path(self.scratch.name)
+        fakebin = folder / "bin"
+        fakebin.mkdir()
+        for name in ["security", "defaults", "pkill"]:
+            command = fakebin / name
+            command.write_text("#!/bin/sh\nexit 0\n")
+            command.chmod(0o700)
+        child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            for name in ["app.pid", "server.pid"]:
+                (folder / name).write_text(str(child.pid))
+            result = subprocess.run(["/bin/bash", str(ROOT / "scripts/gui-smoke/sky-studio/run.sh"), "stop"],
+                                    env={**os.environ, "SKYSTUDIO_SMOKE_DIR": str(folder),
+                                         "PATH": str(fakebin) + os.pathsep + os.environ["PATH"]},
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIsNone(child.poll(), "stale test PID must not terminate another command")
+        finally:
+            if child.poll() is None:
+                child.terminate()
+            child.wait(timeout=3)
 
 
 if __name__ == "__main__":

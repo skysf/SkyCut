@@ -984,10 +984,8 @@ edit_clip 2,074 字超长、清单里有汉字）。
 （画框、落地），`AITimelineEdits.swift` 里恰好一处 —— 一处都没有就是 AI 另算了一份落点
 （2026-09-27 反向验证：拿掉那一处调用，守卫当场红）。
 
-**fal.ai 生成（第 6 块）**：`scripts/check-fal.sh`（`check-all` 第 2 组，不碰网络）、`scripts/check-mcp.sh` 里的 `ProviderChecks` /
-`SkyStudioVoiceChecks`（清单按 Key 列不列、老一代收 list_changed 新一代不收、小文件读写、挑音色、词时间、WAV）、`checks/fal-wiring.sh`（先问后花、不弹模态框、
-Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`（本机手动）、`scripts/fal-models/refresh.sh`（联网手动）。细节见
-[fal.ai 生成](fal-generation.md) 第十一节。
+**云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。
+
 
 **录屏（第 45 条）**：`scripts/check-mcp.sh` 的 `ScreenRecordingToolChecks`（参数怎么读、只属于某种来源的参数给错地方报错、窗口 / 屏幕 / 麦克风怎么挑、
 区域比例换成点、词表和 `RegionAspectRatio` 对账、状态的说法、工具定义）；`checks/screen-recording-ai-wiring.sh`（扫描，第 1 组：不开系统选择窗口、设置页 / 残缺框只给手动的会话、

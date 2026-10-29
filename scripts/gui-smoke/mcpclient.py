@@ -15,7 +15,7 @@ class MCP:
         self.reader.start()
         self.errors.start()
         try:
-            self.init = self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "falsmoke", "version": "1"}})
+            self.init = self.request("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "skycut-smoke", "version": "1"}})
             self.send({"jsonrpc": "2.0", "method": "notifications/initialized"})
         except BaseException:
             self.close()

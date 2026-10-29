@@ -172,7 +172,7 @@ struct UpscalePanel: View {
                 Spacer()
                 Text(verbatim: "\(Int(size.width))×\(Int(size.height))").font(.caption).foregroundStyle(.secondary)
                 if let typical = ready?.typicalSeconds {
-                    Text(String(format: L10n("about %d min"), FalJobProgress.minutes(typical)))
+                    Text(String(format: L10n("about %d min"), CloudJobProgress.minutes(typical)))
                         .font(.caption).foregroundStyle(.secondary).frame(width: 84, alignment: .trailing)
                 }
                 price(row, quote: quote).frame(width: 96, alignment: .trailing)

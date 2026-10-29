@@ -130,7 +130,7 @@ run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设�
 run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
-run_check "fal-wiring（扫描守卫：fal 生成的接线 —— 先问后花、不弹模态框、Key 只经一处读、清单跟着 Key 走）" checks/fal-wiring.sh
+run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
 run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
 run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
@@ -153,7 +153,7 @@ run_check "timeline-snap（拖动吸附与对齐线）" scripts/check-timeline-s
 run_check "timeline-zoom（缩放的锚点：钉指针 / 钉播放头 / 纵向按行认；播放跟随；记住的开关）" scripts/check-timeline-zoom.sh
 run_check "media-import（拖文件进轨道的落点）" scripts/check-media-import.sh
 run_check "optimized-media（优化媒体：判据、关键帧间隔、解码速度、真转一块、缓存）" scripts/check-optimized-media.sh
-run_check "fal（fal.ai 生成：模型表与估价、花钱把关、请求体对着接口定义快照验、假 URLSession 走全流程）" scripts/check-fal.sh
+run_check "cloud-media（共用每日额度、按天账与任务阶段）" scripts/check-cloud-media.sh
 run_check "upscale（视频 upscale 的任务：范围、Sky Studio 的档位和上限、起名、封回原声、真裁一段、流水线对着假 Sky Studio 走全程）" scripts/check-upscale.sh
 run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
 # 真跑好几遍 ffmpeg 导出，全场最慢的一项（CI 上约 45 秒），配的伙伴最少。

@@ -40,7 +40,7 @@ public final class MCPServerCore: @unchecked Sendable {
     public static var supportedVersions: [String] { modernVersions + legacyVersions }
 
     public static let serverName = "skycut"
-    /// 工具清单让客户端缓存多久：短，因为它随「配没配 fal」变。
+    /// 工具清单让客户端缓存多久：短，因为它随「配没配 Sky Studio」变。
     public static let toolListTTLms = 60_000
 
     private let serverVersion: String
@@ -105,7 +105,7 @@ public final class MCPServerCore: @unchecked Sendable {
         case "server/discover":
             return .reply(Self.success(id: id, result: decorate(discover, modern: true, cacheable: true)))
         case "tools/list":
-            // 清单会随「配没配 fal」变：缓存时间短一点，别让用户添了 Key 一小时之后才看到新工具。
+            // 清单会随「配没配 Sky Studio」变：缓存时间短一点，别让用户添了 Key 一小时之后才看到新工具。
             return .reply(Self.success(
                 id: id,
                 result: decorate(["tools": catalog.toolsJSON(providers: providers()) ?? MCPToolName.listJSON(providers: providers())],

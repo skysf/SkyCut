@@ -19,7 +19,7 @@ struct AppConnection {
     let appURL: URL?
     let bundleIdentifier: String
     let socketPath: String
-    /// 配好了哪些生成提供方（App 在 fal 的 Key 添加 / 删除时写的小文件，MCPProviderMarker）。
+    /// 配好了哪些生成提供方（App 在 Sky Studio 的 Key 变化时写的小文件，MCPProviderMarker）。
     let providersURL: URL
     let appVersion: String
     let mayLaunch: Bool

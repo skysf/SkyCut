@@ -5,7 +5,7 @@ import SwiftUI
 // 管什么：AI 在剪**这个工程**的时候显示是谁、给一个停止按钮；这一轮结束或被停下之后，给「撤销这一轮」和关掉。每个剪辑页（主窗口、
 // 工程窗口）各一条，只管自己工程的那一轮（`AIRound`，2026-10-17 起，docs/plans/2026-10-17-multi-project-ai-editing.md 板 4）：
 // 停止只停这个工程、撤销这一轮只退这个工程。要用户动手的那一句（`AISession.hint`）全 App 一份；要用户点头的事走聊天里的确认码，不在这里问。
-// 同一个位置底下挂着 `FalStatusRows`（mockup「Status row while upscaling」：进度复用编辑器顶上这条状态行）。
+// 同一个位置底下挂着 `CloudStatusRows`（mockup「Status row while upscaling」：进度复用编辑器顶上这条状态行）。
 // 只订阅 `AISession` 和这个工程的 `AIRound`（两个小对象），不读工程 —— 工程每改一下它都不用重算
 // （docs/architecture/preview-perf-ratchet.md 第十三节）。
 // 不管什么：这一轮怎么算、停止之后拒绝多久（AIRound）。
@@ -28,7 +28,7 @@ struct AIActivityBanner: View {
             aiBar
             // 送 fal 的活（upscale、generate_media）各一行：做到哪一步、能停。只订阅两个小对象，没任务时什么都不画；
             // `.equatable()`：这条横幅重算时不带着它重算（性能 ratchet 数着每个视图的 body）。
-            FalStatusRows().equatable()
+            CloudStatusRows().equatable()
         }
     }
 

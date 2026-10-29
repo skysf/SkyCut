@@ -1021,21 +1021,12 @@
 
 // fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "生成";
-"macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow." = "macOS 马上会问是否允许 SkyCut 使用你的 fal.ai 密钥，请点「始终允许」。";
-"That is not a fal.ai endpoint id. It looks like owner/model-name." = "这不是 fal.ai 的端点号，应该长得像 owner/model-name。";
 "The price must be a number." = "价格必须是一个数字。";
-"That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "这看起来不是 fal.ai 的 API 密钥。请从 fal.ai/dashboard/keys 复制完整的密钥。";
-"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "让 Claude、Codex 这类 AI 用你自己的 fal.ai 账号、用 fal.ai 的声音配旁白和克隆声音。这会花你账号里的钱：SkyCut 会守住下面的每日上限，超过了就改用 SkyCut 自己的声音。图片、视频、音乐和音效改用你的 Sky Studio 积分生成。";
-"fal.ai models" = "fal.ai 模型";
 "Key saved in the keychain" = "密钥已存入钥匙串";
 "Remove Key" = "删除密钥";
-"Remove the fal.ai key from the macOS keychain; AI apps then lose the fal.ai tools" = "把 fal.ai 密钥从 macOS 钥匙串里删掉；AI 应用随之用不了 fal.ai 的工具";
-"fal.ai API key" = "fal.ai API 密钥";
 "Save Key" = "保存密钥";
-"Store the key in the macOS keychain (fal.ai/dashboard/keys)" = "把密钥存进 macOS 钥匙串（fal.ai/dashboard/keys）";
 "Daily limit" = "每日上限";
 "Spent today %@" = "今天已花 %@";
-"SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)" = "AI 一天花的钱超过这个数之前，SkyCut 会先问你（按每个模型登记的单价估算，不是 fal.ai 的账单）";
 "Go back to the model SkyCut picked for this" = "改回 SkyCut 为这一项挑的模型";
 "owner/model-name" = "owner/model-name";
 "price" = "价格";
@@ -1125,7 +1116,6 @@
 "Revert to Original Clip" = "换回原片";
 "Saved as %@" = "已存为 %@";
 "Saves next to the original as %@" = "存在原片旁边，叫 %@";
-"Send this clip to fal.ai for a sharper, larger version" = "把这一段送去 fal.ai 做一版更清楚、更大的";
 "Side by side" = "并排";
 "Sound effect" = "音效";
 "Sound from the original" = "声音放原片的";

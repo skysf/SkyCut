@@ -120,7 +120,7 @@ done
 # 7. Key 只发给 Sky Studio：认证头只在 request() 里写一次。
 [ "$(count 'forHTTPHeaderField: "Authorization"' "${API}")" -eq 1 ] \
   || fail "${API}：认证头只许在 request() 里写一次 —— 上传的签名地址、成品地址都不许带 Key"
-others="$(code_files_with 'Bearer ' | grep -v "^${API}\$" | grep -v '/Fal/' || true)"
+others="$(code_files_with 'Bearer ' | grep -v "^${API}\$" || true)"
 [ -z "${others}" ] || fail "这些文件自己写了 Bearer 认证头：$(tr '\n' ' ' <<<"${others}")—— Sky Studio 的 Key 只经 SkyStudioAPI 发"
 
 # 8. upscale 走 Sky Studio。
@@ -130,8 +130,7 @@ JOB_GATE="Sources/SrtFlow/SkyStudio/SkyStudioJobGate.swift"
 JOB_ACCESS="Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift"
 SPEND="Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift"
 CATALOG="Sources/SrtFlowMCPKit/MCPToolCatalog.swift"
-FAL_SETTINGS="Sources/SrtFlow/Fal/FalSettingsStore.swift"
-for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${JOB_ACCESS}" "${SPEND}" "${CATALOG}" "${FAL_SETTINGS}"; do
+for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${JOB_ACCESS}" "${SPEND}" "${CATALOG}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done
 line_of() { { grep -nF -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
@@ -167,22 +166,10 @@ expected_movers="$(printf '%s\n' "${JOB_GATE}" "${HELD}" | LC_ALL=C sort | tr '\
 prompters="$(code_files_with '\.prompting' | grep -v "^${JOB_ACCESS}\$" | LC_ALL=C sort | tr '\n' ' ')"
 [ "${prompters}" = "${UP_JOB} " ] || fail "会弹钥匙串授权框的那一档（.prompting）只许面板起的 upscale 任务用（UpscaleJob），实际在：${prompters:-没有}"
 grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
-grep -qF 'if SkyStudioAccount.shared.hasKey { providers.insert(.skystudio) }' "${FAL_SETTINGS}" \
-  || fail "${FAL_SETTINGS}：同步「配了哪些提供方」时要算上 Sky Studio 的 Key"
-grep -qF 'FalSettingsStore.shared.syncProviders()' "${ACCOUNT}" || fail "${ACCOUNT}：Sky Studio 的 Key 变了要同步「配了哪些提供方」的小文件"
-[ "$(count '.upscaleClip' "${ROUTER}")" -eq 2 ] || fail "${ROUTER}：upscale_clip 应出现两处（分派、策略）"
-if grep -q 'AIUndoGrouping' <<<"$(grep -n 'upscaleClip' "${ROUTER}" || true)"; then
-  fail "${ROUTER}：upscale_clip 只起任务，起步不该包进 AIUndoGrouping（换源那一下在 AIUpscaleTool.land 里自己包）"
-fi
-grep -qF 'UpscaleActivity.shared.add(job, opensCompare: false)' "${UP_TOOL}" || fail "${UP_TOOL}：AI 起的 upscale 不该弹对比窗口（做完直接换源，2026-10-02 用户定）"
-grep -qF 'if case .running(let progress) = job.state { detail = progress.json() }' "${UP_TOOL}" || fail "${UP_TOOL}：任务没把阶段交给 AIJobs 的 liveDetail"
-# Sky Studio 的任务号：交上了就记下（UpscaleJob），get_job 跑着、做完、没做成 / 停了都报（对账、找客服；停不下来的那单也说得出是哪一单）。
-grep -qF 'onSubmitted: { submitted.mark($0) }' "${UP_JOB}" || fail "${UP_JOB}：交上时要记下 Sky Studio 的任务号（onSubmitted 给的 job_id）"
-grep -qF 'if let id = job.skyStudioJobID { detail["skystudio_job_id"] = .string(id) }' "${UP_TOOL}" \
-  || fail "${UP_TOOL}：get_job 跑着时要报 skystudio_job_id"
-[ "$(count '"skystudio_job_id": .string(outcome.jobID)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：做完的两种结局（换了 / 工程变了没换）都要报 skystudio_job_id"
-[ "$(count ', detail: detail)' "${UP_TOOL}")" -eq 2 ] || fail "${UP_TOOL}：没做成、停了的结局都要带上 skystudio_job_id（settle 的 detail）"
-# 界面上说送去哪：2026-10-28 起是 Sky Studio，upscale 的界面里不再写 fal.ai（检查器那一节的标签漏改过一次，真积分测试时才看见）。
+grep -qF 'MCPProviderMarker.write(hasKey ? [.skystudio] : [], to: url)' "${ACCOUNT}" \
+  || fail "Sky Studio 的工具标记必须只跟着自己的 Key 写"
+[ "$(grep -c '^        syncProviders()$' "${ACCOUNT}" || true)" -eq 1 ] || fail "Sky Studio 启动时必须同步工具提供方标记"
+grep -qF '            syncProviders()' "${ACCOUNT}" || fail "Sky Studio 的 Key 变化必须同步工具标记"
 UP_INSPECTOR="Sources/SrtFlow/VideoEditInspector+Upscale.swift"
 [ -f "${UP_INSPECTOR}" ] || fail "找不到 ${UP_INSPECTOR} —— 改名了就同步改这里（扫空 = 假绿）"
 stale="$(for file in "${UP_INSPECTOR}" Sources/SrtFlow/Upscale/*.swift; do
@@ -200,7 +187,7 @@ done
 GEN_TOOL="Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift"
 GEN_RUN="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift"
 GEN_ACTIVITY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationActivity.swift"
-STATUS_ROWS="Sources/SrtFlow/Fal/FalStatusRows.swift"
+STATUS_ROWS="Sources/SrtFlow/CloudMedia/CloudStatusRows.swift"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}" "${STATUS_ROWS}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done

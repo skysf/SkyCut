@@ -7,7 +7,7 @@ import SrtFlowMCPKit
 // **SkyCut 里只有这里碰 Sky Studio 的地址**（checks/sky-studio-wiring.sh 钉着）。合同以 Sky Studio 仓库的 docs/agents/skycut-api.md 为准
 // （2026-10-28 上线，从 Sky Studio main 的 5c8d6a0d 起冻结）。
 // 接口：`GET /me`（授权，收费方案第 5 刀）；生成、upscale、克隆的 `/models`、`/quote`、`/uploads`（+ 把文件 PUT 到它给的地址）、`/jobs`、
-// `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（FalTransferDelegate，
+// `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
 //
@@ -130,7 +130,7 @@ struct SkyStudioAPI: Sendable {
         for (name, value) in answer["headers"]?.objectValue ?? [:] {
             if let text = value.stringValue { put.setValue(text, forHTTPHeaderField: name) }
         }
-        let delegate = FalTransferDelegate(moveDestination: nil, onProgress: onProgress)
+        let delegate = CloudTransferDelegate(moveDestination: nil, onProgress: onProgress)
         let task = session.uploadTask(with: put, fromFile: fileURL)
         try await transfer(task, delegate: delegate)
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
@@ -145,7 +145,7 @@ struct SkyStudioAPI: Sendable {
         let partial = destination.deletingLastPathComponent()
             .appendingPathComponent(".\(destination.lastPathComponent).part-\(UUID().uuidString.prefix(8))")
         defer { try? FileManager.default.removeItem(at: partial) }
-        let delegate = FalTransferDelegate(moveDestination: partial, onProgress: onProgress)
+        let delegate = CloudTransferDelegate(moveDestination: partial, onProgress: onProgress)
         var get = URLRequest(url: url)
         get.timeoutInterval = 600
         let task = session.downloadTask(with: get)
@@ -201,9 +201,9 @@ struct SkyStudioAPI: Sendable {
     }
 
     /// 跑一个传文件的任务：Task 被取消 / URLSession 报 cancelled 都换成 CancellationError，别的网络错换成「没连上」。
-    private func transfer(_ task: URLSessionTask, delegate: FalTransferDelegate) async throws {
+    private func transfer(_ task: URLSessionTask, delegate: CloudTransferDelegate) async throws {
         do {
-            try await FalTransfer.perform(task, delegate: delegate)
+            try await CloudTransfer.perform(task, delegate: delegate)
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
