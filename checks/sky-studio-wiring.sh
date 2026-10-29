@@ -156,7 +156,7 @@ done
 grep -qF 'try SkyStudioApproval.file(request.originalURL)' "${UP_TOOL}" || fail "${UP_TOOL}：upscale 确认码没有绑定素材身份"
 grep -qF 'try frame.map(SkyStudioApproval.file)' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift \
   || fail "generate_media：确认码没有绑定首帧文件身份"
-[ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 2 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好两处（额度内直接做 / 收下令牌之后）"
+[ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 3 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好三处（额度内直接做 / 收下令牌 / 配音整批预留）"
 movers="$(code_files_with 'SkyStudioSpendStore' | while read -r file; do
   # 只认真动账本的写法（SkyStudioSpendStore.shared.record / refund、拿着它的 store.record / refund）；held?.refund() 是经 SkyStudioHeldCredits 退。
   if grep -qE '(SkyStudioSpendStore\.shared|store)\.(record|refund)\(' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
@@ -222,7 +222,7 @@ fi
 grep -qF 'if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }' "${GEN_RUN}" \
   || fail "${GEN_RUN}：get_job 跑着时要报阶段和 skystudio_job_id（liveDetail）"
 grep -qF 'cancel: { [weak self] in self?.cancel() }' "${GEN_RUN}" || fail "${GEN_RUN}：任务没有取消动作（停止按钮、cancel_job 停不了）"
-[ "$(count 'SkyStudioGenerationActivity.shared.add(self)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(self)' "${GEN_RUN}")" -eq 1 ] \
+[ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 1 ] \
   || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；各恰好一处）"
 grep -qF 'private var generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：状态行没订阅 Sky Studio 的生成任务"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
@@ -230,6 +230,29 @@ for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
     fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
   fi
 done
+
+# 10. 云端配音返回任务号；整批预留、不询问付费，结束只入轨一整步。
+VOICE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift"
+VOICE_INPUT="Sources/SrtFlow/AIVoiceoverInput.swift"
+VOICE_BUDGET="Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift"
+for file in "${VOICE_RUN}" "${VOICE_INPUT}" "${VOICE_BUDGET}"; do
+  [ -f "${file}" ] || fail "找不到 ${file}"
+  if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog|AIConfirmations' "${file}"; then
+    fail "${file}：配音额度不够应退本机（克隆报错），不能停下来等确认"
+  fi
+done
+grep -qF 'SkyStudioVoiceoverRun(input: input, project: project).start()' "${ROUTER}" || fail "配音路由没有启动云端任务"
+grep -qF 'SkyStudioJobRun(api: api, key: key).run(request)' "${VOICE_RUN}" || fail "云端配音没有复用统一任务执行器"
+grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_RUN}" || fail "云端配音不得弹钥匙串框"
+grep -qF 'SkyStudioVoiceBudget.reserve(quotes)' "${VOICE_RUN}" || fail "云端配音没有先预留整批报价"
+grep -qF 'SkyStudioJobGate.reserveWithoutAsking(credits: total' "${VOICE_BUDGET}" || fail "整批配音没有统一判断每日额度"
+[ "$(count 'AIUndoGrouping.step(project.effectiveUndoManager)' "${VOICE_RUN}")" -eq 1 ] || fail "云端配音落地必须只有一整步撤销"
+for token in 'SkyStudioGenerationActivity.shared.add(status)' 'SkyStudioGenerationActivity.shared.remove(status)' 'OpenProjects.shared.all.contains' 'credits_unknown' 'submission_keys' 'preserveRaw()'; do
+  grep -qF "${token}" "${VOICE_RUN}" || fail "配音缺少状态 / 工程归属 / 未知提交 / 原音频保留：${token}"
+done
+# 假 Key 启动钩子必须同时限定独立 bundle id 和回环；生产 / Beta 不得装入。
+grep -qF 'hasSuffix(".skystudiosmoke") == true' "${ACCOUNT}" && grep -qF 'SkyStudioAPI.isLoopback(host)' "${ACCOUNT}" \
+  || fail "假 Sky Studio Key 钩子没有同时限定测试身份和回环"
 
 if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2

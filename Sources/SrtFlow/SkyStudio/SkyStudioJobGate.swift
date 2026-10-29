@@ -38,6 +38,13 @@ enum SkyStudioJobGate {
         }
     }
 
+    /// 配旁白不能停下来问：整体额度内一次预留，额度不够由调用方退本机（克隆报错）。
+    static func reserveWithoutAsking(credits: Double, store: SkyStudioSpendStore? = nil) -> Reservation? {
+        let store = store ?? SkyStudioSpendStore.shared
+        guard case .allow = store.decide(credits: credits) else { return nil }
+        return record(store, credits)
+    }
+
     private static func record(_ store: SkyStudioSpendStore, _ credits: Double) -> Reservation {
         store.record(credits)
         return Reservation(credits: credits, day: Date())

@@ -657,12 +657,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - **花积分超了每日上限，当场回 `needs_confirmation` + 确认码**（2026-10-17 起，AI 多开方案板 9；2026-10-28 起 `SkyStudioJobGate.decide`，和 upscale_clip
      同一处，在建任务之前）：什么都不起、不记账，AI 在聊天里问用户、用户点头后带码、同样的参数再调才记账起任务；令牌绑着报价和模型 / 时长 / 清晰度那几个记号。
      以前在提示条上问，后台工程没窗口、用户没在看 SrtFlow 时没人看见。同步的工具（配旁白）不能停下来问，额度不够就退档。
-   - 图生视频的首帧图会传给 Sky Studio、克隆的素材会发给 fal.ai：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是
-     「send to Sky Studio」/「send to fal.ai」）。
-40. **配旁白的 fal 那一档（`add_voiceover`，方案第 42、52 条）**：声音三档 fal > SrtFlow 自己的（Kokoro，第 35 条）> macOS（第 34 条）。fal 那一档只在
-    有 Key、没超每日上限、Key 读得出来时用，不行就退档并在 `voice.note` 里说为什么；点名 Kokoro 的音色或这台 Mac 的声音仍照点名。fal 的声音也**只经
-    `AIAudioFileWriter.writeVoiceover` 落盘**（第 34 条那条扫描加了它）。`clone_from` / `clone_start` / `clone_seconds`：用素材里一段人声克隆，只有 fal 能做、
-    用不了就报错不退档。词时间读不出来就没有（结果里说，改用 `generate_subtitles`）。
+   - 图生视频的首帧图、克隆的素材都会传给 Sky Studio：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是
+     「send to Sky Studio」）。
+40. **云端配旁白与克隆（`add_voiceover`，方案第 42、52 条，2026-10-29 起走 Sky Studio）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。点名本机音色仍照点名。云端立刻回 `job_id`，Key / 模型 / 全部报价在任务里核对，调用方只等 `get_job`；额度不够或普通服务不可用退本机并在 `voice.note` 说明，克隆报错不退档、不索要付费确认码。全批预留积分后逐批提交 / 结算，未知提交保留账并报任务号与幂等 key，不重生成。
+    普通旁白拼全部全局时间 chunk，词的尾端按实际媒体时长夹住。克隆读取服务端语言 cap、按 code points 合批，多句共一单；参考素材截 WAV 上传一次，成品在本机转写对齐后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。完整合同、免费冒烟和人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)。
 
 41. **婚礼工程那一轮之后补的五条小规矩（2026-09-29，[案例](../bugfixes/2026-09-29-mcp-tool-followups-from-wedding-session.md)）**：
     ① 说明里写的记号客户端会照字面传：`set_text` 的 `text` 把字面的 `\n` 也当换行（`AITextChange.unescapingNewlines`）。
@@ -987,7 +985,7 @@ edit_clip 2,074 字超长、清单里有汉字）。
 （2026-09-27 反向验证：拿掉那一处调用，守卫当场红）。
 
 **fal.ai 生成（第 6 块）**：`scripts/check-fal.sh`（`check-all` 第 2 组，不碰网络）、`scripts/check-mcp.sh` 里的 `ProviderChecks` /
-`FalVoiceChecks`（清单按 Key 列不列、老一代收 list_changed 新一代不收、小文件读写、挑音色、词时间、WAV）、`checks/fal-wiring.sh`（先问后花、不弹模态框、
+`SkyStudioVoiceChecks`（清单按 Key 列不列、老一代收 list_changed 新一代不收、小文件读写、挑音色、词时间、WAV）、`checks/fal-wiring.sh`（先问后花、不弹模态框、
 Key 只经一处读、清单跟着 Key 走）、`scripts/check-fal-keychain.sh`（本机手动）、`scripts/fal-models/refresh.sh`（联网手动）。细节见
 [fal.ai 生成](fal-generation.md) 第十一节。
 

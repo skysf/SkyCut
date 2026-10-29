@@ -66,7 +66,7 @@ struct UpscaleStatusRow: View {
 
 /// 一个 generate_media 任务的那一行（只订阅这一个任务；做完就从活动里拿掉、这一行消失）。
 struct GenerationStatusRow: View {
-    @ObservedObject var run: SkyStudioGenerationRun
+    @ObservedObject var run: SkyStudioMediaStatus
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -74,8 +74,10 @@ struct GenerationStatusRow: View {
             if let progress = run.progress {
                 FalPhasePills(progress: progress, showsUpload: run.uploads)
             }
-            Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(run.credits)))
-                .font(.caption).foregroundStyle(.secondary)
+            if let credits = run.credits {
+                Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(credits)))
+                    .font(.caption).foregroundStyle(.secondary)
+            }
             Button("Stop") { run.cancel() }
         }
     }

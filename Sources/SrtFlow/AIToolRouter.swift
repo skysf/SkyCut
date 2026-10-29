@@ -215,10 +215,12 @@ final class AIToolRouter {
         case .addVoiceover:
             // 只是下载 SrtFlow 自己的声音：回任务号，不改工程。
             if let download = try await AIVoiceoverTool.startDownloadIfAsked(args) { return download }
-            // 克隆的素材要发给 fal.ai：点名的文件夹以外的先问一次。
+            // 克隆的素材要发给 Sky Studio：点名的文件夹以外的先问一次。
             if let ask = try AIVoiceoverTool.confirmations(args, project) { return ask }
             // 先合成（要 await），再把同步的提交包起来（同 edit_clip）。
-            let plan = try await AIVoiceoverTool.plan(args, project)
+            let input = try AIVoiceoverInput.read(args, project)
+            if case .skyStudio = input.choice.engine { return SkyStudioVoiceoverRun(input: input, project: project).start() }
+            let plan = try await AIVoiceoverTool.plan(input, project)
             return try AIUndoGrouping.step(undo) { try AIVoiceoverTool.apply(plan, project) }
         case .transcribe:
             guard #available(macOS 26.0, *) else { throw AIToolError("Transcribing speech needs macOS 26 or later on this Mac.") }

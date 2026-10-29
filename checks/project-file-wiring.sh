@@ -429,7 +429,7 @@ require "生成字幕按工程记的行数切" \
   Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift 'maxLineCount: project\.state\.subtitleMaxLines'
 require "配音的字幕按工程记的行数切（AI 这次说了就按它）" \
   Sources/SrtFlow/AIVoiceoverTool.swift 'plan\.maxLines \?\? project\.state\.subtitleMaxLines'
-require "add_voiceover 的 max_lines 经 AISubtitleLines 读" Sources/SrtFlow/AIVoiceoverTool.swift 'AISubtitleLines\.parse\(args\)'
+require "add_voiceover 的 max_lines 经 AISubtitleLines 读" Sources/SrtFlow/AIVoiceoverInput.swift 'AISubtitleLines\.parse\(args\)'
 require "generate_subtitles 的 max_lines 经 AISubtitleLines 读" Sources/SrtFlow/AISubtitleTools.swift 'AISubtitleLines\.parse\(args\)'
 require "generate_subtitles 的 max_lines 经 setSubtitleMaxLines 落到工程（自己成一步撤销）" \
   Sources/SrtFlow/AISubtitleTools.swift 'AIUndoGrouping\.step\(project\.effectiveUndoManager\) \{ project\.setSubtitleMaxLines\(maxLines\) \}'

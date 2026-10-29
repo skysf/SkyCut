@@ -32,7 +32,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private var anyProject: VideoEditProject { project ?? OpenProjects.shared.primary }
 
     /// 跑到哪一步了：状态行订阅它，`get_job` 从 `liveDetail` 读同一份；还没开始跑是 nil。
-    @Published private(set) var progress: FalJobProgress?
+    private let status: SkyStudioMediaStatus
+    var progress: FalJobProgress? { status.progress }
     private var job: AIJobs.Job?
     private var task: Task<Void, Never>?
     private var held: SkyStudioHeldCredits?
@@ -56,6 +57,14 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         self.stem = stem
         self.project = project
         held = SkyStudioHeldCredits(reservation)
+        let label: String
+        switch generation.kind {
+        case .image: label = L10n("Image")
+        case .imageToVideo, .textToVideo: label = L10n("Video")
+        case .music: label = L10n("Music")
+        case .soundEffect: label = L10n("Sound effect")
+        }
+        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: frame != nil)
     }
 
     /// 图生视频要先传首帧（状态行上多一个「上传」）。
@@ -73,7 +82,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             cancel: { [weak self] in self?.cancel() }
         )
         self.job = job
-        SkyStudioGenerationActivity.shared.add(self)
+        status.onCancel = { [weak self] in self?.cancel() }
+        SkyStudioGenerationActivity.shared.add(status)
         // 强引用：调用它的工具回了任务号就不再拿着它，任务自己得把它撑到跑完（跑完这个闭包放掉，环就解开了）。
         task = Task { @MainActor in await self.execute() }
         return job
@@ -88,7 +98,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     private func execute() async {
         // 怎么结束都从状态行上拿掉：结局 AI 会从 get_job 读到并告诉用户。
-        defer { SkyStudioGenerationActivity.shared.remove(self) }
+        defer { SkyStudioGenerationActivity.shared.remove(status) }
         advance(to: .preparing)
         guard !Task.isCancelled else {
             held?.refund()
@@ -233,8 +243,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     /// 换阶段：同一阶段同一比例不重发（状态行和 get_job 读的是同一份）。
     private func advance(to phase: FalJobPhase) {
-        let next = (progress ?? FalJobProgress(phase: phase, typicalSeconds: typicalSeconds)).advanced(to: phase)
-        if progress != next { progress = next }
+        status.advance(to: phase, typicalSeconds: typicalSeconds)
     }
 
     private func claimDestination(extension pathExtension: String) -> URL {

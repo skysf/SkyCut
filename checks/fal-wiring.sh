@@ -31,7 +31,6 @@ cd "$(dirname "$0")/.."
 CLIENT="Sources/SrtFlow/Fal/FalClient.swift"
 KEYS="Sources/SrtFlow/Fal/FalKeyStore.swift"
 SETTINGS="Sources/SrtFlow/Fal/FalSettingsStore.swift"
-VOICE="Sources/SrtFlow/AIFalVoice.swift"
 VOICEOVER="Sources/SrtFlow/AIVoiceoverTool.swift"
 SESSION="Sources/SrtFlow/AISession.swift"
 ROUND="Sources/SrtFlow/AIRound.swift"
@@ -44,7 +43,7 @@ UPSCALE="Sources/SrtFlow/Upscale/UpscaleJob.swift"
 UPSCALE_TOOL="Sources/SrtFlow/AIUpscaleTool.swift"
 GENERATE_TOOL="Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift"
 GENERATE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift"
-for file in "${CLIENT}" "${KEYS}" "${SETTINGS}" "${VOICE}" "${VOICEOVER}" "${SESSION}" "${ROUND}" "${BANNER}" "${CATALOG}" "${APP}" \
+for file in "${CLIENT}" "${KEYS}" "${SETTINGS}" "${VOICEOVER}" "${SESSION}" "${ROUND}" "${BANNER}" "${CATALOG}" "${APP}" \
             "${TRANSFER}" "${JOBS}" "${UPSCALE}" "${UPSCALE_TOOL}" "${GENERATE_TOOL}" "${GENERATE_RUN}"; do
   if [ ! -f "${file}" ]; then
     echo "✗ 找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）" >&2
@@ -56,10 +55,10 @@ FAILED=0
 fail() { echo "✗ $1" >&2; FAILED=1; }
 count() { grep -c -- "$1" "$2" || true; }
 
-FAL_FILES=(Sources/SrtFlow/Fal/*.swift "${VOICE}")
+FAL_FILES=(Sources/SrtFlow/Fal/*.swift)
 
 # 1. 不弹模态框。
-for file in "${VOICE}" "${SETTINGS}"; do
+for file in "${SETTINGS}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
     fail "${file}：里面弹了模态框 —— AI 在等的时候弹框没人点"
   fi
@@ -78,20 +77,11 @@ direct="$(grep -ln 'FalKeyStore\.read(' Sources/SrtFlow/*.swift Sources/SrtFlow/
 if [ -n "${direct}" ]; then
   fail "这些文件直接读了钥匙串：$(tr '\n' ' ' <<<"${direct}")—— 读 Key 只经 FalKeyCache（一次运行最多问钥匙串一次、也就最多弹一次授权框）"
 fi
-users="$(grep -ln 'FalKeyCache\.shared\.key(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift | LC_ALL=C sort | tr '\n' ' ')"
-if [ "${users}" != "${VOICE} " ]; then
-  fail "用 fal 的 Key 的地方应该只剩配旁白一处（生成、upscale 2026-10-28 起用 Sky Studio 的 Key），实际是：${users}"
-fi
-
-# 4. 生成和 upscale 不再碰 fal 的 Key、账和客户端；fal 的账只剩配旁白。
-for file in "${UPSCALE}" "${UPSCALE_TOOL}" "${GENERATE_TOOL}" "${GENERATE_RUN}"; do
-  if grep -nE 'FalJobGate|FalSettingsStore|FalKeyCache|FalClient' "${file}"; then
-    fail "${file}：生成和 upscale 2026-10-28 起走 Sky Studio（Key、积分、把关都在 SkyStudio*），不许再碰 fal 的 Key、账和把关"
-  fi
-done
-spenders="$(grep -ln 'recordSpend(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift | grep -v "^${SETTINGS}\$" | LC_ALL=C sort | tr '\n' ' ')"
-[ "${spenders}" = "${VOICE} " ] && [ "$(count 'recordSpend(' "${VOICE}")" -eq 1 ] \
-  || fail "fal 的记账 recordSpend 只该剩配旁白读完一句之后一处，实际在：${spenders:-没有}"
+# 配音迁移后没有 fal Key / 记账调用方，旧设置下一刀清理。
+users="$(grep -ln 'FalKeyCache\.shared\.key(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift || true)"
+[ -z "${users}" ] || fail "配音迁移后仍有 fal Key 调用方：${users}"
+spenders="$(grep -ln 'recordSpend(' Sources/SrtFlow/*.swift Sources/SrtFlow/*/*.swift | grep -v "^${SETTINGS}\$" || true)"
+[ -z "${spenders}" ] || fail "配音迁移后仍有 fal 记账调用方：${spenders}"
 
 # 5. 不在提示条上问（AI 多开方案板 9：后台工程没有窗口、用户没在看 SrtFlow 时，提示条上的问题没人看见）。
 if grep -nE 'func ask\(|var question|pendingQuestions' "${SESSION}" || grep -n 'session.question' "${BANNER}"; then
@@ -102,15 +92,7 @@ STOP_BODY="$(awk '/    func stop\(\) \{/,/^    \}/' "${ROUND}")"
 grep -q 'AIJobs.shared.cancel(stoppingWith: projectID)' <<<"${STOP_BODY}" \
   || fail "${ROUND}：按停止时没有取消这个工程的任务"
 
-# 6. 配旁白是同步工具，不许停下来等用户。
-for file in "${VOICEOVER}" "${VOICE}"; do
-  if grep -nE '\.ask\(' "${file}"; then
-    fail "${file}：配旁白是同步的工具（客户端一分钟左右超时），不许停下来问用户 —— 额度不够就退到下一档"
-  fi
-done
-grep -q 'FalSpendPolicy.allowsWithoutAsking' "${VOICE}" || fail "${VOICE}：能不能用 fal 的声音必须按额度判断（allowsWithoutAsking）"
-grep -q 'falAvailable: offer != nil' "${VOICEOVER}" || fail "${VOICEOVER}：挑声音没把「fal 能不能用」传给 AIVoiceChoice.choose"
-[ "$(count 'AIAudioFileWriter.writeVoiceover(' "${VOICE}")" -eq 1 ] || fail "${VOICE}：fal 的声音必须经 AIAudioFileWriter.writeVoiceover 落盘（先过一道音量）"
+# 6. 配音的付费与退档规矩已经挪到 sky-studio-wiring 第 10 条。
 
 # 7. 清单：fal 的 Key 不再多列工具；小文件照旧跟着 Key 走。
 if grep -nE 'return \.fal\b' "${CATALOG}"; then

@@ -129,6 +129,28 @@ func runJobRunChecks() async {
     checkEqual(await stopping(cancelReply: .failure(.notConnectedToInternet)), .stopped(.unknown), "the cancel did not get through: unknown")
     checkEqual(handed.items, ["job-1"], "a cancel that did not get through: followed to the end too")
 
+    // POST 恰好回到 App 时取消：先报告 ID，409 后才能继续核查这一单，不会让调用方误以为尚未提交。
+    for reply in [SkyStudioStub.Reply.http(200, #"{"status":"cancelled","credits_refunded":455}"#),
+                  .http(409, #"{"error":{"code":"not_cancellable","message":"Started."}}"#)] {
+        let handle = CancelJobHandle()
+        let earlyUpdates = UpdateLog()
+        SkyStudioStub.reset { seen in
+            if seen.url.hasSuffix("/cancel") { return reply }
+            handle.cancel()
+            return .http(202, status("queued"))
+        }
+        let early = Task {
+            _ = await jobFailure { _ = try await SkyStudioJobRun(api: api, key: jobKey).run(request) { earlyUpdates.add($0) } }
+        }
+        handle.install(early)
+        await early.value
+        let ids = earlyUpdates.items.compactMap { update -> String? in
+            if case .status(let value) = update { return value.jobID }
+            return nil
+        }
+        checkEqual(ids, ["job-1"], "cancelled POST response still reports its ID exactly once")
+    }
+
     // 6b. 接着查到底：问到 done / failed 就停（不下载、不再取消）；照服务器说的间隔问；断网几次照问，连着问不到就算了。
     let followSleeps = SleepLog()
     var follower = SkyStudioJobRun(api: api, key: jobKey)
@@ -236,5 +258,21 @@ final class UpdateLog: @unchecked Sendable {
             let state = status.state?.rawValue ?? "?"
             return status.phase.map { state == "running" ? "\(state)/\($0)" : state } ?? state
         }
+    }
+}
+
+private final class CancelJobHandle: @unchecked Sendable {
+    private let lock = NSLock()
+    private var task: Task<Void, Never>?
+    private var requested = false
+    func install(_ task: Task<Void, Never>) {
+        lock.lock(); defer { lock.unlock() }
+        self.task = task
+        if requested { task.cancel() }
+    }
+    func cancel() {
+        lock.lock(); defer { lock.unlock() }
+        requested = true
+        task?.cancel()
     }
 }

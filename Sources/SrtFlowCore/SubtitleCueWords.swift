@@ -43,6 +43,11 @@ public struct SubtitleTextRange: Hashable, Sendable {
 
 public enum SubtitleCueWords {
 
+    /// 两段话真正对上了多少个字母 / 数字（同一份 LCS，忽略空白和标点）；配音切句用来核对转写覆盖率。
+    public static func matchingCharacterCount(_ oldText: String, to newText: String) -> Int {
+        matchedCharacters(Array(oldText), Array(newText)).count
+    }
+
     /// 生成时：带时间的词（按说的顺序，时间线上的秒）对到这句最后显示的字上。每个词只认它的字母和数字，
     /// 按顺序在字里找（标点、空格、换行跳过）；纯标点的词不记。有一个词找不到就整句不记 —— 宁可不亮，也不亮错地方。
     public static func align(

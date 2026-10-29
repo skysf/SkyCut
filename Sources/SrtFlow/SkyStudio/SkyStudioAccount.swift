@@ -84,7 +84,15 @@ final class SkyStudioAccount: ObservableObject {
         timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshIfDue(after: SkyStudioRefresh.inBackground) }
         }
-        refreshIfDue(after: SkyStudioRefresh.onActivation)
+        // 独立冒烟 App 只对回环假服务装入假 Key；正式 / Beta 的身份和生产地址都不认这个钩子。
+        let environment = ProcessInfo.processInfo.environment
+        if Bundle.main.bundleIdentifier?.hasSuffix(".skystudiosmoke") == true,
+           let host = SkyStudioAPI.configuredBase(environment).host, SkyStudioAPI.isLoopback(host),
+           let key = environment["SRTFLOW_SMOKE_SKYSTUDIO_KEY"] {
+            Task { await saveKey(key) }
+        } else {
+            refreshIfDue(after: SkyStudioRefresh.onActivation)
+        }
     }
 
     func refreshIfDue(after interval: TimeInterval) {

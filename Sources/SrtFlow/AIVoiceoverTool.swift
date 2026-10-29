@@ -9,18 +9,15 @@ import SrtFlowMCPKit
 // 分两步（同 edit_clip）：`plan` 可以 await（合成、读文件），`apply` 同步提交、路由包在 `AIUndoGrouping.step` 里 ——
 // 放素材和加字幕在同一次 perform 里，一个工具 = 一步撤销。
 // 放上时间线走 add_clips 那一套（`AITimelineEdits.place`：撞上往上抬一轨；这一批都放进第一句新开的那条轨）。
-// 声音分三档（第 42、48 条）：用户接了 fal 就用 fal 的声音（`AIFalVoice`：有 Key、没超每日上限、Key 读得出来；不行就退到下一档并在结果里说为什么），
+// 声音分三档（第 42、48 条）：用户接了 Sky Studio 就用 Sky Studio 的声音（`SkyStudioVoiceoverRun`：有 Key、没超每日上限、Key 读得出来；不行就退到下一档并在结果里说为什么），
 // 其次下载了 SrtFlow 自己的声音（本机的 Kokoro），没下载 / 它读不了的语言用这台 Mac 的；
 // `download_voices=true` 开始下载、回任务号（第 50 条：AI 也能直接下，下的时候告诉用户）。
-// `clone_from`（第 52 条）：用一段素材里的声音当参考、让 fal 的克隆模型读 —— 只有 fal 能克隆，用不了就报错、不退档。
-// 不管什么：挑声音（AIVoiceChoice）、怎么合成（AIFalVoice / KokoroVoiceSpeech / AISpeechSynthesis）、下载（KokoroVoicePack）。
+// `clone_from`（第 52 条）：用一段素材里的声音当参考、让 Sky Studio 的克隆模型读 —— 只有 Sky Studio 能克隆，用不了就报错、不退档。
+// 不管什么：挑声音（AIVoiceChoice）、怎么合成（SkyStudioVoiceoverRun / KokoroVoiceSpeech / AISpeechSynthesis）、下载（KokoroVoicePack）。
 
 @MainActor
 enum AIVoiceoverTool {
-    struct Line {
-        var text: String
-        var start: Double?
-    }
+    typealias Line = VoiceoverLine
 
     struct Spoken {
         var line: Line
@@ -65,90 +62,45 @@ enum AIVoiceoverTool {
         ])
     }
 
-    /// 克隆用的素材在点名的文件夹以外：要发给 fal.ai，先问用户一次（同读别处的文件）。要问就回 needs_confirmation。
+    /// 克隆用的素材在点名的文件夹以外：要发给 Sky Studio，先问用户一次（同读别处的文件）。要问就回 needs_confirmation。
     static func confirmations(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult? {
-        guard let clone = try cloneSource(args) else { return nil }
-        return try AIWorkspace.shared.confirmReading([clone.url], verb: "send to fal.ai", args: args, project: project)
+        guard let clone = try AIVoiceoverInput.cloneSource(args) else { return nil }
+        return try AIWorkspace.shared.confirmReading([clone.url], verb: "send to Sky Studio", args: args, project: project)
     }
 
-    private static func cloneSource(_ args: AIToolArguments) throws -> (url: URL, start: Double, seconds: Double)? {
-        guard let path = try args.string("clone_from"), !path.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
-        let url = AIWorkspace.shared.resolve(path)
-        guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("There is no file at \(path).") }
-        return (url, max(0, try args.double("clone_start") ?? 0), min(max(try args.double("clone_seconds") ?? 10, 5), 30))
-    }
-
-    static func plan(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> Plan {
-        let lines = try parseLines(args)
-        let speed = min(max(try args.double("speed") ?? 1, 0.5), 2)
-        let language = AITextLanguage.dominant(in: lines.map(\.text)).map(AIVoiceChoice.baseLanguage) ?? "en"
-        let kokoroVoices = KokoroVoicePack.shared.isInstalled ? KokoroVoiceSpeech.voiceNames(in: KokoroVoicePack.directory) : nil
-        let characters = lines.reduce(0) { $0 + $1.text.count }
-        // fal 那一档：克隆只有 fal 能做（用不了就报错）；普通配音用不了就退到下一档，原因写进 voice.note。
-        var offer: AIFalVoice.Offer?
-        var reference: String?
-        var falNote: String?
-        var choice: AIVoiceChoice
-        if let clone = try cloneSource(args) {
-            let result = await AIFalVoice.offer(kind: .voiceClone, characters: characters)
-            guard let made = result.offer else {
-                throw AIToolError(result.note ?? "Cloning a voice needs a fal.ai key: ask the user to add one in SkyCut → Settings → AI.")
-            }
-            offer = made
-            reference = try await AIFalVoice.referenceSample(from: clone.url, start: clone.start, seconds: clone.seconds)
-            choice = AIVoiceChoice(engine: .fal(voice: "cloned voice"), note: "The voice is cloned from \(clone.url.lastPathComponent).")
-        } else {
-            let result = await AIFalVoice.offer(kind: .voice, characters: characters)
-            offer = result.offer
-            falNote = result.note
-            choice = try AIVoiceChoice.choose(try args.string("voice"), textLanguage: language, kokoroVoices: kokoroVoices,
-                                              installed: AISpeechSynthesis.installedVoices(), falAvailable: offer != nil)
+    static func plan(_ input: AIVoiceoverInput, _ project: VideoEditProject,
+                     outputs: [AISpeechSynthesis.Output]? = nil) async throws -> Plan {
+        guard project.isCurrentGeneration(input.generation) else {
+            throw AIToolError("The project changed while the voiceover was being made. No lines were added.")
         }
-        if case .fal = choice.engine, args.has("speed"), speed != 1 {
-            falNote = [falNote, "The fal.ai voice speaks at its own pace; speed was ignored (SkyCut's or a Mac voice can change it)."]
-                .compactMap { $0 }.joined(separator: " ")
-        }
-        if let falNote { choice.note = [choice.note, falNote].compactMap { $0 }.joined(separator: " ") }
-        let target = try args.string("track").map { try AITrackName.target($0, in: project.state) } ?? .newAudioBottom
-        switch target {
-        case .audio, .newAudioBottom: break
-        default: throw AIToolError("A voiceover goes on an audio track (A1, A2… or new_audio).")
-        }
-        let generation = project.documentGeneration
-        let folder = AIWorkspace.shared.outputFolder(.voiceovers, project: project)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        if let outputs, outputs.count != input.lines.count { throw AIToolError("The voiceover did not return all the lines.") }
         var spoken: [Spoken] = []
-        for (index, line) in lines.enumerated() {
-            let stem = ExportFileName.stem(from: AIVoiceoverPlacement.fileStem(line.text), droppingExtension: "m4a", fallback: "Voiceover")
-            let url = ExportFileName.unoccupied(in: folder, stem: stem, pathExtension: "m4a") {
-                FileManager.default.fileExists(atPath: $0.path)
-            }
+        for (index, line) in input.lines.enumerated() {
+            try Task.checkCancellation()
             let output: AISpeechSynthesis.Output
-            switch choice.engine {
-            case .fal(let voice):
-                guard let offer else { throw AIToolError("The fal.ai voice is not available.") }
-                output = try await AIFalVoice.speak(
-                    line.text, voice: voice, language: language, wantsWords: try args.bool("subtitles") ?? false,
-                    reference: reference, offer: offer, to: url
-                )
-            case .kokoro(let voice, let voiceLanguage):
-                output = try await KokoroVoiceSpeech.shared.speak(line.text, language: voiceLanguage, voice: voice, speed: speed, to: url)
-            case .system:
-                output = try await AISpeechSynthesis.speak(line.text, choice: choice, speed: speed, to: url)
+            if let outputs {
+                output = outputs[index]
+            } else {
+                output = try await AIVoiceoverFile.make(text: line.text, folder: input.folder) { url in
+                    switch input.choice.engine {
+                    case .skyStudio: throw AIToolError("A cloud voiceover must be awaited with get_job.")
+                    case .kokoro(let voice, let language):
+                        return try await KokoroVoiceSpeech.shared.speak(line.text, language: language, voice: voice, speed: input.speed, to: url)
+                    case .system:
+                        return try await AISpeechSynthesis.speak(line.text, choice: input.choice, speed: input.speed, to: url)
+                    }
+                }
             }
-            guard let media = await project.probeImports([url]).first else {
-                throw AIToolError("lines[\(index)]: SkyCut could not read back the voiceover file \(url.lastPathComponent).")
+            guard let media = await project.probeImports([output.url]).first else {
+                throw AIToolError("lines[\(index)]: SkyCut could not read back the voiceover file \(output.url.lastPathComponent).")
             }
             spoken.append(Spoken(line: line, output: output, clip: project.clip(for: media)))
         }
-        guard project.isCurrentGeneration(generation) else {
-            throw AIToolError("The project changed while the voiceover was being made. Try again.")
+        guard project.isCurrentGeneration(input.generation) else {
+            throw AIToolError("The project changed while the voiceover was being made. No lines were added.")
         }
-        let subtitles = try args.bool("subtitles") ?? false
-        let maxLines = try AISubtitleLines.parse(args)
-        if maxLines != nil, !subtitles { throw AIToolError("\(AISubtitleLines.key) only applies with subtitles=true.") }
-        return Plan(spoken: spoken, starts: starts(for: spoken, playhead: project.clock.time), target: target, choice: choice,
-                    language: language, subtitles: subtitles, maxLines: maxLines, generation: generation)
+        return Plan(spoken: spoken, starts: starts(for: spoken, playhead: project.clock.time), target: input.target, choice: input.choice,
+                    language: input.language, subtitles: input.subtitles, maxLines: input.maxLines, generation: input.generation)
     }
 
     static func apply(_ plan: Plan, _ project: VideoEditProject) throws -> AIToolResult {
@@ -186,17 +138,6 @@ enum AIVoiceoverTool {
 
     // MARK: 参数与结果
 
-    private static func parseLines(_ args: AIToolArguments) throws -> [Line] {
-        guard let items = try args.array("lines"), !items.isEmpty else { throw AIToolError("lines is required.") }
-        guard items.count <= 50 else { throw AIToolError("Give at most 50 lines per call.") }
-        return try items.enumerated().map { index, item in
-            let entry = AIToolArguments(item)
-            let text = try entry.requiredString("text").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard text.count <= 1_000 else { throw AIToolError("lines[\(index)]: keep one line under 1000 characters.") }
-            return Line(text: text, start: try entry.double("start").map { max(0, $0) })
-        }
-    }
-
     static func starts(for spoken: [Spoken], playhead: Double) -> [Double] {
         AIVoiceoverPlacement.starts(given: spoken.map(\.line.start), durations: spoken.map(\.clip.timelineDuration),
                                     playhead: playhead)
@@ -228,9 +169,9 @@ enum AIVoiceoverTool {
                 summary["skipped"] = .string("\(subtitles.skipped) lines overlap subtitles that were already there and were not added.")
             }
             if let refusal = subtitles.refusal { summary["note"] = .string(refusal) }
-            // fal 没报词时间（或报的读不出来）：那几句就没有字幕，别让 AI 以为加上了。
-            if case .fal = plan.choice.engine, plan.spoken.contains(where: { $0.output.words.isEmpty }) {
-                let note = "fal.ai did not say when each word is spoken for some lines, so those lines have no subtitles. "
+            // Sky Studio 没报词时间（或报的读不出来）：那几句就没有字幕，别让 AI 以为加上了。
+            if case .skyStudio = plan.choice.engine, plan.spoken.contains(where: { $0.output.words.isEmpty }) {
+                let note = "Sky Studio did not say when each word is spoken for some lines, so those lines have no subtitles. "
                     + "Run generate_subtitles on the voiceover clips, or use SkyCut's own voice."
                 summary["note"] = .string([summary["note"]?.stringValue, note].compactMap { $0 }.joined(separator: " "))
             }
