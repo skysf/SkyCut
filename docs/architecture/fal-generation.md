@@ -1,6 +1,6 @@
 # fal.ai 生成：Key、每日上限、模型表、generate_media、配旁白的 fal 那一档
 
-> 2026-10-29：生成、upscale、旁白与克隆都已迁到 Sky Studio；本文的 fal HTTP / Key / 语音接线是历史，不能作为新实现依据。当前合同见 [Sky Studio 的任务](sky-studio-jobs.md)。仍共用的阶段、传输与账由第 7 刀改名保留，旧 fal 设置随后删除。
+> 2026-10-29：生成、upscale、旁白与克隆都已迁到 Sky Studio；本文的 fal HTTP / Key / 语音接线是历史，不能作为新实现依据。当前合同见 [Sky Studio 的任务](sky-studio-jobs.md)。第 7 刀已删除旧 fal 设置、Key 适配层、网络与模型代码；共用的阶段、传输和账改名放在 `Sources/SrtFlow/CloudMedia/`。旧用户钥匙串项 / 设置不删除，但不再读取。
 
 > 2026-09-29 引入（MCP 方案第 6 块，[第 14–19、36、42、52、57、58 条](../plans/2026-09-27-mcp.md)）。改 `Sources/SrtFlow/Fal/`、
 > `AIFalVoice` / `AIFalVoices`、`generate_media` 的说明和参数、设置里的 fal 一节、`MCPProviders`（清单按 Key 列不列）、

@@ -5,18 +5,18 @@ import SwiftUI
 // 管什么：挂在「AI 正在剪辑」那条横幅底下（AIActivityBanner），每个在跑 / 做完还没处理的任务一行：做什么、
 // 四个阶段的小标（上传 · 排队 · 处理 · 下载，当前的那个带百分比 / 已用时间和「通常约几分钟」）、积分、停止；
 // upscale 做完那一行给 Compare… / Dismiss（mockup「Status row while upscaling」）。还有检查器那一节用的
-// 阶段文字（`FalPhaseText`）和每秒走一下的钟（`FalPhaseClock`）。
+// 阶段文字（`CloudPhaseText`）和每秒走一下的钟（`CloudPhaseClock`）。
 // 只订阅两个小对象（UpscaleActivity、SkyStudioGenerationActivity），不读工程；没有任务时什么都不画、也不醒
-// （docs/architecture/preview-perf-ratchet.md：性能场景里没有这些任务，这几个视图的计数是零）。名字里的 Fal 是历史：
-// 2026-10-28 起这两种活都送 Sky Studio（收费方案第 6 刀），第 7 刀删 fal 时改名。
+// （docs/architecture/preview-perf-ratchet.md：性能场景里没有这些任务，这几个视图的计数是零）。名称沿用通用云端媒体职责：
+// 2026-10-28 起这两种活都送 Sky Studio（收费方案第 6 刀），生成、upscale、配音都走 Sky Studio。
 // 不管什么：任务怎么跑、阶段怎么量（UpscaleJob / SkyStudioGenerationRun）。
 
-struct FalStatusRows: View, Equatable {
+struct CloudStatusRows: View, Equatable {
     @ObservedObject private var upscale = UpscaleActivity.shared
     @ObservedObject private var generation = SkyStudioGenerationActivity.shared
 
     /// 横幅每重算一次都会重新造它：没有输入，永远相等 —— 只有两个活动对象发了变化才重算（挂在横幅底下不动性能基线）。
-    static func == (lhs: FalStatusRows, rhs: FalStatusRows) -> Bool { true }
+    static func == (lhs: CloudStatusRows, rhs: CloudStatusRows) -> Bool { true }
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -39,8 +39,8 @@ struct UpscaleStatusRow: View {
         let tier = job.request.tier
         switch job.state {
         case .running(let progress):
-            FalStatusBar(icon: "arrow.up.left.and.arrow.down.right", message: String(format: L10n("Upscaling %@ with %@"), job.title, tier.title)) {
-                FalPhasePills(progress: progress, showsUpload: true)
+            CloudStatusBar(icon: "arrow.up.left.and.arrow.down.right", message: String(format: L10n("Upscaling %@ with %@"), job.title, tier.title)) {
+                CloudPhasePills(progress: progress, showsUpload: true)
                 Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(job.request.credits)))
                     .font(.caption).foregroundStyle(.secondary)
                 Button("Stop") { activity.remove(job) }
@@ -48,16 +48,16 @@ struct UpscaleStatusRow: View {
         case .done:
             let size = job.outcome?.info.resolutionLabel ?? ""
             let cost = String(format: L10n("%@ credits"), SkyStudioCredits.text(job.outcome?.creditsCharged ?? job.request.credits))
-            FalStatusBar(icon: "checkmark.circle", message: String(format: L10n("%@ upscaled to %@ · %@"), job.title, size, cost)) {
+            CloudStatusBar(icon: "checkmark.circle", message: String(format: L10n("%@ upscaled to %@ · %@"), job.title, size, cost)) {
                 Button("Compare…") { activity.compare = .job(job) }
                 Button("Dismiss") { activity.remove(job) }
             }
         case .failed(let message):
-            FalStatusBar(icon: "exclamationmark.triangle", message: String(format: L10n("Upscale failed: %@"), message)) {
+            CloudStatusBar(icon: "exclamationmark.triangle", message: String(format: L10n("Upscale failed: %@"), message)) {
                 Button("Dismiss") { activity.remove(job) }
             }
         case .cancelled(let stop):
-            FalStatusBar(icon: "stop.circle", message: stop.localizedNote ?? L10n("Upscale cancelled.")) {
+            CloudStatusBar(icon: "stop.circle", message: stop.localizedNote ?? L10n("Upscale cancelled.")) {
                 Button("Dismiss") { activity.remove(job) }
             }
         }
@@ -70,9 +70,9 @@ struct GenerationStatusRow: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        FalStatusBar(icon: "sparkles", message: String(format: L10n("Generating %@ with %@"), run.kindLabel, run.modelTitle)) {
+        CloudStatusBar(icon: "sparkles", message: String(format: L10n("Generating %@ with %@"), run.kindLabel, run.modelTitle)) {
             if let progress = run.progress {
-                FalPhasePills(progress: progress, showsUpload: run.uploads)
+                CloudPhasePills(progress: progress, showsUpload: run.uploads)
             }
             if let credits = run.credits {
                 Text(String(format: L10n("%@ credits"), SkyStudioCredits.text(credits)))
@@ -84,7 +84,7 @@ struct GenerationStatusRow: View {
 }
 
 /// 一行的壳：图标 · 一句话 · 右边的小件（和 AIActivityBanner 的 bar 同一个样子）。
-struct FalStatusBar<Trailing: View>: View {
+struct CloudStatusBar<Trailing: View>: View {
     let icon: String
     let message: String
     @ViewBuilder let trailing: () -> Trailing
@@ -113,8 +113,8 @@ struct FalStatusBar<Trailing: View>: View {
 }
 
 /// 四个阶段的小标：过了的打勾、当前的带数字、还没到的灰着。每秒走一下（「处理 1:12」）。
-struct FalPhasePills: View {
-    let progress: FalJobProgress
+struct CloudPhasePills: View {
+    let progress: CloudJobProgress
     /// 有没有上传这一步：upscale 和图生视频（首帧）有，别的生成没有。
     let showsUpload: Bool
 
@@ -130,19 +130,19 @@ struct FalPhasePills: View {
     }
 
     /// 画哪几个：上传（要的话）· 排队 · 处理 · 下载；准备 / 收尾只在正是那一步时露面。
-    private var steps: [FalJobPhase] {
-        var list: [FalJobPhase] = []
-        if progress.phase.order == FalJobPhase.preparing.order { list.append(.preparing) }
+    private var steps: [CloudJobPhase] {
+        var list: [CloudJobPhase] = []
+        if progress.phase.order == CloudJobPhase.preparing.order { list.append(.preparing) }
         if showsUpload { list.append(.uploading(fraction: nil)) }
         list += [.queued(position: nil), .processing, .downloading(fraction: nil)]
-        if progress.phase.order == FalJobPhase.finishing.order { list.append(.finishing) }
+        if progress.phase.order == CloudJobPhase.finishing.order { list.append(.finishing) }
         return list
     }
 
-    private func pill(_ step: FalJobPhase, now: Date) -> some View {
+    private func pill(_ step: CloudJobPhase, now: Date) -> some View {
         let current = progress.phase.order
-        let state: FalPhaseText.PillState = step.order < current ? .done : (step.order == current ? .current : .upcoming)
-        let text = FalPhaseText.pill(progress, step: step, state: state, now: now)
+        let state: CloudPhaseText.PillState = step.order < current ? .done : (step.order == current ? .current : .upcoming)
+        let text = CloudPhaseText.pill(progress, step: step, state: state, now: now)
         return HStack(spacing: 3) {
             if state == .done {
                 Image(systemName: "checkmark").font(.system(size: 8, weight: .bold))
@@ -161,49 +161,49 @@ struct FalPhasePills: View {
 }
 
 /// 检查器那一节用：一句阶段文字，每秒走一下。
-struct FalPhaseClock: View {
-    let progress: FalJobProgress
+struct CloudPhaseClock: View {
+    let progress: CloudJobProgress
     let prefix: String
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(verbatim: prefix + FalPhaseText.inspector(progress, now: context.date))
+            Text(verbatim: prefix + CloudPhaseText.inspector(progress, now: context.date))
         }
     }
 }
 
 /// 阶段怎么写成字（本地化）：检查器里小写的一句、状态行上的小标。
-enum FalPhaseText {
+enum CloudPhaseText {
     enum PillState: Equatable { case done, current, upcoming }
 
     /// 检查器：「uploading 35%」「in queue (3)」「processing 1:12 · usually about 2 min」「downloading 80%」。
-    static func inspector(_ progress: FalJobProgress, now: Date) -> String {
+    static func inspector(_ progress: CloudJobProgress, now: Date) -> String {
         switch progress.phase {
         case .preparing: return L10n("preparing")
         case .uploading(let fraction): return L10n("uploading") + percentSuffix(fraction)
         case .queued(let position): return position.map { String(format: L10n("in queue (%d)"), $0) } ?? L10n("in queue")
-        case .processing: return L10n("processing") + " " + FalJobProgress.clock(progress.phaseSeconds(now: now)) + usuallySuffix(progress)
+        case .processing: return L10n("processing") + " " + CloudJobProgress.clock(progress.phaseSeconds(now: now)) + usuallySuffix(progress)
         case .downloading(let fraction): return L10n("downloading") + percentSuffix(fraction)
         case .finishing: return L10n("finishing")
         }
     }
 
     /// 状态行上的小标：当前的那个带百分比 / 已用时间，别的只有名字。
-    static func pill(_ progress: FalJobProgress, step: FalJobPhase, state: PillState, now: Date) -> String {
+    static func pill(_ progress: CloudJobProgress, step: CloudJobPhase, state: PillState, now: Date) -> String {
         guard state == .current else { return title(step) }
         switch progress.phase {
         case .preparing: return L10n("Preparing")
         case .uploading(let fraction): return fraction.map { String(format: L10n("Uploading %d%%"), Int(($0 * 100).rounded())) } ?? L10n("Uploading")
         case .queued(let position): return position.map { String(format: L10n("In queue (%d)"), $0) } ?? L10n("In queue")
         case .processing:
-            return String(format: L10n("Processing %@"), FalJobProgress.clock(progress.phaseSeconds(now: now))) + usuallySuffix(progress)
+            return String(format: L10n("Processing %@"), CloudJobProgress.clock(progress.phaseSeconds(now: now))) + usuallySuffix(progress)
         case .downloading(let fraction): return fraction.map { String(format: L10n("Downloading %d%%"), Int(($0 * 100).rounded())) } ?? L10n("Downloading")
         case .finishing: return L10n("Finishing")
         }
     }
 
-    private static func title(_ step: FalJobPhase) -> String {
+    private static func title(_ step: CloudJobPhase) -> String {
         switch step {
         case .preparing: return L10n("Preparing")
         case .uploading: return L10n("Uploading")
@@ -219,7 +219,7 @@ enum FalPhaseText {
     }
 
     /// 「 · usually about 2 min」：知道这一档通常要多久才加。
-    private static func usuallySuffix(_ progress: FalJobProgress) -> String {
-        progress.typicalSeconds.map { " · " + String(format: L10n("usually about %d min"), FalJobProgress.minutes($0)) } ?? ""
+    private static func usuallySuffix(_ progress: CloudJobProgress) -> String {
+        progress.typicalSeconds.map { " · " + String(format: L10n("usually about %d min"), CloudJobProgress.minutes($0)) } ?? ""
     }
 }

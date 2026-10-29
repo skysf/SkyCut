@@ -13,7 +13,7 @@ import Foundation
 
 public enum MCPInstructions {
     /// 存了 Sky Studio 的 Key 才有的那一行「Paid: …」，接在目录最后（没存就不提：客户端清单里也没有那两个工具）。2026-10-28 起
-    /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；fal 的 Key 只剩配旁白，不再多出一行。整份离 Claude Code
+    /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio，不再多出一行。整份离 Claude Code
     /// 的 2,048 个字符只差几十个：这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：
     /// AI 调它之前一定会读到。
     static let skyStudioTools = "generate_media (image, video, music, sound effect), upscale_clip (sharper, larger): Sky Studio credits"

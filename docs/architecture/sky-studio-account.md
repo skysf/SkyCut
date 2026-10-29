@@ -13,7 +13,7 @@
 | --- | --- |
 | 怎么认人 | 用户在 Sky Studio 网站上建一把 `sk-` Key（右上角头像 → SkyCut；网页上没有叫「设置」的菜单），粘进 SkyCut 的设置。设置里「去 Sky Studio 建 Key」直接打开那个窗口 `https://skystudioai.com/app?skycut=1`（`SkyStudioLinks.keysPage`：没有 Key 的人问不到 `/me`，所以写在 App 里；2026-10-28 和 Sky Studio 定好不改，自检钉着）；**一把 Key 同时管授权和积分**（方案第 7 条）。App 里不做登录；浏览器里一键连接、网站上付款以后再做（2026-10-27 用户定：先做 B 端，后台手动开通） |
 | Key 存哪 | 钥匙串一条通用密码：服务名 = bundle id + `.skystudio`（测试版另一条），账号 `api-key`（`SkyStudioKey`）。**身份类的名字，永远不改**（[产品名与代码名](product-name.md)；`checks/product-name.sh` 钉着） |
-| 钥匙串怎么读 | 和 fal 的 Key 同一份 `KeychainSecret`（两档：`.silent` 不弹框 / `.interactive` 弹框，探针结论见 [fal.ai 生成](fal-generation.md)第六节）。**后台问 Sky Studio 从不弹授权框**：只走 `keyWithoutPrompt()`，读不到就在设置里说「要授权」，用户点了按钮才弹 |
+| 钥匙串怎么读 | `KeychainSecret`（两档：`.silent` 不弹框 / `.interactive` 弹框，探针结论见 [fal.ai 生成](fal-generation.md)第六节）。**后台问 Sky Studio 从不弹授权框**：只走 `keyWithoutPrompt()`，读不到就在设置里说「要授权」，用户点了按钮才弹 |
 | 粘进来的话 | 去掉 `Bearer `、引号、首尾空白；要 `sk-` 开头、只有 URL 安全的字符、至少 20 个字。**长度不写死成 46**（那边换了长度这里不该先拒） |
 | 存的时候 | 存进钥匙串、马上问一次 `/me`：Sky Studio 回 `invalid_key` 就**不留着这把 Key**；没连上就先留着，之后再问。换一把 Key 时上一把问到的那份作废 |
 | 机器号 | 每个请求带 `X-SkyCut-Machine` = SHA-256(硬件 UUID + 盐) 的 64 位小写十六进制（`SkyStudioMachine`）：原始的硬件 UUID 不出本机、不发电脑名。Sky Studio 按它「每台 Mac 只给一次体验」。**盐和算法永远不改**（改了每台 Mac 都成了新机器，又能体验一次）；自检钉着一组算好的值 |
@@ -39,7 +39,7 @@
 
 | 文件 | 管什么 |
 | --- | --- |
-| `KeychainSecret.swift` | 一条通用密码项的存 / 读 / 删、两档读法、一次运行读一次的缓存（`KeychainSecretCache`）。fal 和 Sky Studio 共用 |
+| `KeychainSecret.swift` | 一条通用密码项的存 / 读 / 删、两档读法、一次运行读一次的缓存（`KeychainSecretCache`）。Sky Studio 使用；原 fal 适配层已删除 |
 | `SkyStudio/SkyStudioKey.swift` | 钥匙串那一条叫什么、粘进来的话怎么整理 |
 | `SkyStudio/SkyStudioMachine.swift` | 硬件 UUID → 机器号 |
 | `SkyStudio/SkyStudioAPI.swift` | 请求（地址、四个头）、`GET /me`、错误分成三种（`SkyStudioFailure`：服务器的错 / 没连上 / 回的不像话） |
@@ -55,7 +55,7 @@
 
 - **发第一个带照授权拦的正式版之前**：正式版和测试版的 Key 各存各的（钥匙串按 bundle id 分开），用户要先在正式版的设置里粘一次 Key，
   不然装上之后用户自己的 AI 剪辑也被挡住（正式版 0.18.47 还没有「Sky Studio」这一节，要先装一个有这一节的版本再粘）。
-- 第 6 刀（生成、upscale、克隆改走 Sky Studio 的 `/quote`、`/uploads`、`/jobs`）、第 7 刀（删掉 fal 那条路）。定稿里和 SkyCut 现在做法不一样的地方记在收费方案「Sky Studio 定稿之后」一节。
+- 第 6 / 7 刀已完成：生成、upscale、旁白、克隆全部走 Sky Studio，旧 fal Key / 设置 / 请求 / 模型表已删。定稿里和 SkyCut 现在做法不一样的地方记在收费方案「Sky Studio 定稿之后」一节。
 
 ## 四、已知能绕过去的（不防）
 
@@ -75,7 +75,7 @@
   反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；（2026-10-28）拆掉路由的门、门挪到排队之后、面板不挂那一行、get_status 不报 —— 各自红；恢复后转绿。
 - `checks/export-watermark-wiring.sh`：导出器拿 `exportsWithWatermark` 问 `WatermarkPolicy`、读不出 logo 时报错不导、每一处问 `WatermarkPolicy` 都传授权；`scripts/check-export-watermark.sh` 的纯值验加不加。
 - `checks/product-name.sh`：钥匙串的服务名 `.skystudio`、UserDefaults 的键 `SrtFlow.skystudio.me.v1`。
-- 钥匙串的真读写（`KeychainSecret`）在 `scripts/check-fal-keychain.sh`（本机手动，不在 `check-all` 里）。
+- 钥匙串的真读写（`KeychainSecret`）在 `scripts/check-keychain.sh`（本机手动，不在 `check-all` 里）。
 
 ## 六、人工回归（Sky Studio 的接口上线之后，发版前）
 
@@ -91,3 +91,6 @@
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。
 - [ ] 后台给账号开正式版、点「再查一次」：导出不带水印，面板那一行没了。
 - [ ] 存的回答过期（或刚粘上 Key 还没问到）时 AI 的第一个调用：等问完再判（20 秒内回），不是一上来就挡。
+
+
+工具提供方标记由 `SkyStudioAccount` 在启动和 `hasKey` 变化时同步；文件位置、bundle id 与 Keychain service 保持原样。`MCPProvider` 只剩 skystudio，旧标记里的 fal 会被忽略，skystudio 保留。清理不删除用户历史 fal 钥匙串项 / UserDefaults；只是停止读取和显示。

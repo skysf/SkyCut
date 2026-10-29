@@ -29,7 +29,7 @@ final class AIJobs {
         /// 跑着的时候的进度（0…1），读不到就是 nil。
         let progress: @MainActor () -> Double?
         /// 跑着的时候的明细（送 fal 的任务：`phase`、`queue_position`、`transfer_percent`、`phase_seconds`、`typical_seconds`，
-        /// 见 `FalJobProgress.json`）；没有就是空。只在 running 时并进 `get_job` 的结果。
+        /// 见 `CloudJobProgress.json`）；没有就是空。只在 running 时并进 `get_job` 的结果。
         let liveDetail: @MainActor () -> [String: JSONValue]
         /// 在等用户做一件事（比如在 macOS 的框里点「下载」）时的那句话；没在等就是 nil。
         /// AI 查进度时看到它，才会去告诉用户，而不是对着 0% 干等。

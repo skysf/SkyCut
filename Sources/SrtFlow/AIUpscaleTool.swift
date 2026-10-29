@@ -104,7 +104,7 @@ enum AIUpscaleTool {
         UpscaleActivity.shared.add(job, opensCompare: false)
 
         let spend = SkyStudioSpendStore.shared
-        let minutes = quote.typicalSeconds.map { FalJobProgress.minutes($0) }
+        let minutes = quote.typicalSeconds.map { CloudJobProgress.minutes($0) }
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(aiJob.id), "clip_id": .string(ids.short(id)),
             "tier": .string(tier.id), "target": .string(AIUpscaleNames.name(of: target)), "range": .string(AIUpscaleNames.name(of: choice)),

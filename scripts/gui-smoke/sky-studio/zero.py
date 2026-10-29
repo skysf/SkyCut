@@ -7,7 +7,7 @@ import time
 import urllib.request
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fal"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcpclient import MCP
 
 D = Path(os.environ.get("SKYSTUDIO_SMOKE_DIR", "/private/tmp/srtflow-skystudio-smoke"))

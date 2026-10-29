@@ -6,7 +6,7 @@ import SrtFlowMCPKit
 // 管什么：裁出那一段（或整个 mp4 直接用）→ 探它的宽、高、时长、帧率（`params.source` 照**送上去的那个文件**报，服务器会再读一遍，
 // 差太多回 price_changed）→ 传到 Sky Studio（`/uploads` + PUT）→ 交任务、等它做完（SkyStudioJobRun：满了等着再交、照 poll_after_seconds 问、
 // 停的时候排队中的退钱 / 开始了的取消不了）→ 下载成品 → 把原片那一段声音封回去 → 探测 → 起名落盘。
-// 每一步报阶段（`FalJobPhase`，上传 / 下载带字节比例），Task 被取消时每一步都停得下来，中间文件不留。
+// 每一步报阶段（`CloudJobPhase`，上传 / 下载带字节比例），Task 被取消时每一步都停得下来，中间文件不留。
 // 结果是一个 `UpscaleOutcome`：文件、探测信息、来源记录（换源时拼成 `ClipSourceSwap.Replacement`）、实收的积分。
 // 2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。自检用假 URLSession 走整条线（checks/Upscale）。
 // 不管什么：花钱的把关和记账、Key（UpscaleJob）；换源（VideoEditClipUpscale.swift）；界面。
@@ -94,12 +94,12 @@ enum UpscalePipeline {
         _ request: UpscaleRequest, api: SkyStudioAPI, key: String, ffmpeg: URL?, workFolder: URL,
         sleep: (@Sendable (Double) async throws -> Void)? = nil,
         onSubmitted: @escaping @Sendable (String) -> Void = { _ in },
-        phase report: @escaping @Sendable (FalJobPhase) -> Void
+        phase report: @escaping @Sendable (CloudJobPhase) -> Void
     ) async throws -> UpscaleOutcome {
         let started = Date()
         // 同一个阶段同一个比例只报一次（排着队每 15 秒问一次，界面不用每次都醒）。
-        let last = FalPhaseBox()
-        let phase: @Sendable (FalJobPhase) -> Void = { next in
+        let last = CloudPhaseBox()
+        let phase: @Sendable (CloudJobPhase) -> Void = { next in
             guard last.swap(next) else { return }
             report(next)
         }
@@ -130,7 +130,7 @@ enum UpscalePipeline {
         // 2. 传上去、交任务、等它做完、下载。
         phase(.uploading(fraction: nil))
         let link = try await api.upload(fileURL: input, contentType: "video/mp4", purpose: "video", key: key) { fraction in
-            phase(.uploading(fraction: FalJobPhase.quantized(fraction)))
+            phase(.uploading(fraction: CloudJobPhase.quantized(fraction)))
         }
         var job = UpscaleRequest.job(
             tier: request.tier, target: request.target,
@@ -156,7 +156,7 @@ enum UpscalePipeline {
         guard let result = done.result else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
         phase(.downloading(fraction: nil))
         try await api.download(result.url, to: temporaries[1]) { fraction in
-            phase(.downloading(fraction: FalJobPhase.quantized(fraction)))
+            phase(.downloading(fraction: CloudJobPhase.quantized(fraction)))
         }
         try Task.checkCancellation()
 

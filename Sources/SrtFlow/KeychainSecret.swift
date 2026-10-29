@@ -4,7 +4,7 @@ import Security
 // MARK: - 钥匙串里的一条通用密码（一把 Key）
 //
 // 管什么：一条通用密码项（服务名 + 账号）存没存过、读、存、删，以及「这一次运行里读到的记在内存里」（KeychainSecretCache）。
-// fal.ai 的 Key（FalKeyStore）和 Sky Studio 的 Key（SkyStudioKey）都是它：读钥匙串分两档这条规则只有这一份。
+// Sky Studio 的 Key（SkyStudioKey）使用它：读钥匙串分两档这条规则只有这一份。
 // 不管什么：哪把 Key 用哪个服务名、粘进来的话怎么整理（各自的文件）、什么时候读（调用方）。
 //
 // 2026-09-29 本机探针量出来的行为（docs/architecture/fal-generation.md 第六节）：

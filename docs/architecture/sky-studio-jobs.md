@@ -33,7 +33,7 @@
 
 | 文件 | 管什么 |
 | --- | --- |
-| `SkyStudioAPI.swift` | 请求：`/models`、`/quote`、`/uploads` + PUT、`/jobs`、`/jobs/{id}`、`/jobs/{id}/cancel`、下载成品（传文件借 fal 那边的 `FalTransferDelegate`：流着发 / 收、字节进度；第 7 刀删 fal 时改名留下） |
+| `SkyStudioAPI.swift` | 请求：`/models`、`/quote`、`/uploads` + PUT、`/jobs`、`/jobs/{id}`、`/jobs/{id}/cancel`、下载成品（传文件经 `CloudTransferDelegate`：流着发 / 收、字节进度） |
 | `SkyStudioJob.swift` | 纯值：请求体（`/quote` 的那一份去掉 inputs、max_credits、idempotency_key）、报价、任务的状态、成品、取消的结果 |
 | `SkyStudioModels.swift` | 纯值：`/models` 读成 `SkyStudioCatalog`（按 kind 找、上限、参数的取值） |
 | `SkyStudioJobRun.swift` | 交一件活、等它做完：满了等着再交、照 `poll_after_seconds` 问、断网几次不算、停的规矩；`SkyStudioJobError` |
@@ -52,7 +52,7 @@
   价问 `/quote`；`params.source` 照送上去的那个文件探；Key 面板起的可以弹授权框、别的不弹（`SkyStudioJobKey`）。
 - **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：AI 起的过 `SkyStudioJobGate`
   （额度内直接记账、超了回确认码，和删文件、fal 花钱同一套 `AIConfirmations`）；面板起的面板本身就是确认（超了只标红不拦）；做完按实收改账，没花出去的退回。
-  账按本地时区的自然日，规矩和 fal 那本同一份（`FalSpendLedger` / `FalSpendPolicy`，第 7 刀删 fal 时改名留下）。
+  账按本地时区的自然日，`DailySpendLedger` / `DailySpendPolicy` 是共用纯值，序列化格式保持不变。
   **确认码绑完整请求**（2026-10-29，`SkyStudioApproval`）：kind、model、prompt、全部参数 / 输入、精确报价，加首帧或原片的文件身份和落点；
   生成还绑文件夹 / 名字，upscale 还绑源范围 / 被替换的段 / 工程。显示摘要只给人看，不能拿它当 action；提交的随机 key 不参与。
   同一件事重问回同一码，换 kind / 提示词 / 参数 / 输入 / 价格就另发，串码不消费、不记账。
@@ -62,7 +62,7 @@
   `/uploads`（purpose `image`；认得的格式原样传，别的缩到长边 2048 存 JPEG）；问 `/quote` → `SkyStudioJobGate` → 回任务号；任务交给 `SkyStudioJobRun`、
   成品下载到「生成」文件夹（也长期留在作品库里），Key 不弹授权框。`get_job` 有阶段和 `skystudio_job_id`，状态行上一行（积分、停止）。
 - **清单**：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，存了 Sky Studio 的 Key 才列（`SkyStudioAccount.hasKey` 一变就同步那个小文件）；
-  总说明末尾的「Paid」那一行只在存了 Sky Studio 的 Key 时有；fal 的 Key 已没有运行时调用方，旧设置等第 7 刀清理、不多列工具。
+  总说明末尾的「Paid」那一行只在存了 Sky Studio 的 Key 时有；旧 fal Key、模型、设置、网络路径已删除；只有 Sky Studio 提供方。
 
 ## 五、还没做的（第 6 刀后面几个 PR）
 
@@ -77,7 +77,7 @@
 
 尚未实施：
 - SkyCut 退出了，任务在服务器上照样做完：重开之后按记下的任务号取回。
-- 第 7 刀删掉 fal 那条路。
+- 第 7 刀已删除旧 fal 路径；`CloudMedia/` 保留阶段、状态行、传输和每日账，历史工程的 `costUSD` 用 `USDollarText` 显示，不改工程字段或身份键。
 
 ## 六、守卫
 

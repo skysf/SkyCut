@@ -73,8 +73,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIConfirmations.swift \
-  Sources/SrtFlow/Fal/FalSpend.swift \
-  Sources/SrtFlow/Fal/FalTransfer.swift \
+  Sources/SrtFlow/CloudMedia/DailySpend.swift \
+  Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   checks/SkyStudio/main.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \

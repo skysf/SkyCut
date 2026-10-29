@@ -94,7 +94,7 @@ final class SkyStudioVoiceoverRun {
                 let sample = try await VoiceReferenceSample.file(from: clone.url, start: clone.start, seconds: clone.seconds, folder: folder)
                 status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
                 reference = try await api.upload(fileURL: sample, contentType: "audio/wav", purpose: "audio", key: key) { [weak self] fraction in
-                    Task { @MainActor in self?.status.advance(to: .uploading(fraction: FalJobPhase.quantized(fraction)), typicalSeconds: nil) }
+                    Task { @MainActor in self?.status.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
                 }
             }
             let render = SkyStudioVoiceRender(input: input, plan: plan, locale: locale)
@@ -131,7 +131,7 @@ final class SkyStudioVoiceoverRun {
                 activeRaw = raw
                 status.advance(to: .downloading(fraction: nil), typicalSeconds: quotes[index].typicalSeconds)
                 try await api.download(result.url, to: raw) { [weak self] fraction in
-                    Task { @MainActor in self?.status.advance(to: .downloading(fraction: FalJobPhase.quantized(fraction)), typicalSeconds: quotes[index].typicalSeconds) }
+                    Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: quotes[index].typicalSeconds) }
                 }
                 status.advance(to: .finishing, typicalSeconds: quotes[index].typicalSeconds)
                 do { try await render.append(plan.batches[index], file: raw, result: result) }

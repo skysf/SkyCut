@@ -14,8 +14,8 @@ import Foundation
 @MainActor
 final class UpscaleJob: ObservableObject, Identifiable {
     enum State: Equatable {
-        /// 跑着：阶段、这一阶段从什么时候起、这一档通常要多久（FalJobProgress）。
-        case running(FalJobProgress)
+        /// 跑着：阶段、这一阶段从什么时候起、这一档通常要多久（CloudJobProgress）。
+        case running(CloudJobProgress)
         case done
         case failed(String)
         /// 停下来了：积分花没花（排队中 / 交上之前停的没花；已经开始的花了，成品照样进作品库）。
@@ -62,7 +62,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         self.projectGeneration = projectGeneration
         self.title = title
         self.approval = approval
-        state = .running(FalJobProgress(phase: .preparing, typicalSeconds: request.typicalSeconds))
+        state = .running(CloudJobProgress(phase: .preparing, typicalSeconds: request.typicalSeconds))
     }
 
     static var workFolder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlowUpscale", isDirectory: true) }

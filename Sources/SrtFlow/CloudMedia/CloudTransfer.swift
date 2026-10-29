@@ -2,19 +2,17 @@ import Foundation
 
 // MARK: - 带进度的上传 / 下载（URLSession 任务的代理）
 //
-// 管什么：`FalClient` 传文件的那两步怎么拿到字节进度。上传用 `uploadTask(with:fromFile:)`：文件流着发、不整个读进内存
+// 管什么：`SkyStudioAPI` 传文件的那两步怎么拿到字节进度。上传用 `uploadTask(with:fromFile:)`：文件流着发、不整个读进内存
 // （以前是 `Data(contentsOf:)` 一口气读完再发，整个原片直接上传时可能是几个 GB），`didSendBodyData` 报发了多少；
 // 下载用 `downloadTask`：`didWriteData` 报收了多少，`didFinishDownloadingTo` 那一拍把系统的临时文件挪到自己的地方
 // （回调一返回系统就删它）。两个都包成 async：Task 被取消就取消 URLSession 的任务（它报 URLError.cancelled，调用方换成
 // CancellationError）。比例只在服务器说了总长时才报（没有 Content-Length 就不报），按 1% 一格、没变不报。
-// 不管什么：地址、认证头、HTTP 状态怎么换话、最后那一下「100%」（FalClient）。
+// 不管什么：地址、认证头、HTTP 状态怎么换话、最后那一下「100%」（SkyStudioAPI）。
 //
-// FalClient 和 SkyStudioAPI（第 6 刀起，Sky Studio 的上传 / 下载）用它；第 7 刀删 fal 时改个名留下。
-// fal 那几个文件里 `URLSession` 只许出现在 FalClient.swift 和这里（checks/fal-wiring.sh）。
 
-enum FalTransfer {
+enum CloudTransfer {
     /// 跑一个上传 / 下载任务到结束。
-    static func perform(_ task: URLSessionTask, delegate: FalTransferDelegate) async throws {
+    static func perform(_ task: URLSessionTask, delegate: CloudTransferDelegate) async throws {
         try Task.checkCancellation()
         task.delegate = delegate
         try await withTaskCancellationHandler {
@@ -29,7 +27,7 @@ enum FalTransfer {
 }
 
 /// 一个上传 / 下载任务的代理：攒答复的正文、报进度、下载完当场把文件挪走、结束时叫醒等着的 continuation。
-final class FalTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionDownloadDelegate, @unchecked Sendable {
+final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionDownloadDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private let moveDestination: URL?
     private let onProgress: @Sendable (Double) -> Void

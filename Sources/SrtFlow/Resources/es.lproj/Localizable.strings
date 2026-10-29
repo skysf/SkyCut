@@ -1021,21 +1021,12 @@
 
 // fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "Generado";
-"macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow." = "macOS va a preguntar si SkyCut puede usar tu clave de fal.ai. Haz clic en Permitir siempre.";
-"That is not a fal.ai endpoint id. It looks like owner/model-name." = "Eso no es un id de endpoint de fal.ai. Tiene la forma propietario/nombre-del-modelo.";
 "The price must be a number." = "El precio debe ser un número.";
-"That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "Eso no parece una clave API de fal.ai. Copia la clave completa desde fal.ai/dashboard/keys.";
-"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "Permite que las apps de IA narren con las voces de fal.ai y clonen una voz, usando tu propia cuenta de fal.ai. Cuesta dinero en esa cuenta: SkyCut se mantiene dentro del límite diario de abajo y, al pasarlo, usa sus propias voces. Las imágenes, los videos, la música y los efectos de sonido se hacen con tus créditos de Sky Studio.";
-"fal.ai models" = "Modelos de fal.ai";
 "Key saved in the keychain" = "Clave guardada en el llavero";
 "Remove Key" = "Quitar clave";
-"Remove the fal.ai key from the macOS keychain; AI apps then lose the fal.ai tools" = "Quitar la clave de fal.ai del llavero de macOS; las apps de IA pierden entonces las herramientas de fal.ai";
-"fal.ai API key" = "Clave API de fal.ai";
 "Save Key" = "Guardar clave";
-"Store the key in the macOS keychain (fal.ai/dashboard/keys)" = "Guardar la clave en el llavero de macOS (fal.ai/dashboard/keys)";
 "Daily limit" = "Límite diario";
 "Spent today %@" = "Gastado hoy %@";
-"SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)" = "SkyCut pregunta antes de que la IA gaste más que esto en un día (una estimación según el precio de cada modelo, no la factura de fal.ai)";
 "Go back to the model SkyCut picked for this" = "Volver al modelo que SkyCut eligió para esto";
 "owner/model-name" = "propietario/nombre-del-modelo";
 "price" = "precio";
@@ -1125,7 +1116,6 @@
 "Revert to Original Clip" = "Volver al clip original";
 "Saved as %@" = "Guardado como %@";
 "Saves next to the original as %@" = "Se guarda junto al original como %@";
-"Send this clip to fal.ai for a sharper, larger version" = "Enviar este clip a fal.ai para una versión más nítida y grande";
 "Side by side" = "Lado a lado";
 "Sound effect" = "Efecto de sonido";
 "Sound from the original" = "Sonido del original";

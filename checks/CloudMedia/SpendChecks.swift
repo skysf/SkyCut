@@ -4,7 +4,7 @@ import Foundation
 // 只设每天的上限，不设单次上限；额度内不问，超了先问；没登记单价的每次都问。
 
 func runSpendChecks() {
-    typealias Policy = FalSpendPolicy
+    typealias Policy = DailySpendPolicy
 
     // 额度内不问
     checkEqual(Policy.decide(estimate: 0.40, spentToday: 0, dailyLimit: 10), .allow, "well inside the limit: no question")
@@ -41,11 +41,11 @@ func runSpendChecks() {
     let morning = date("2026-09-29T01:00:00+08:00")
     let night = date("2026-09-29T23:59:00+08:00")
     let nextDay = date("2026-09-30T00:01:00+08:00")
-    checkEqual(FalSpendLedger.dayKey(for: morning, calendar: calendar), "2026-09-29", "day key in the local time zone")
+    checkEqual(DailySpendLedger.dayKey(for: morning, calendar: calendar), "2026-09-29", "day key in the local time zone")
     // UTC 的 09-29 16:30 在上海已经是 09-30 —— 按本地自然日记，不按 UTC
-    checkEqual(FalSpendLedger.dayKey(for: date("2026-09-29T16:30:00Z"), calendar: calendar), "2026-09-30", "the day follows the local clock, not UTC")
+    checkEqual(DailySpendLedger.dayKey(for: date("2026-09-29T16:30:00Z"), calendar: calendar), "2026-09-30", "the day follows the local clock, not UTC")
 
-    var ledger = FalSpendLedger()
+    var ledger = DailySpendLedger()
     ledger.add(0.40, on: morning, calendar: calendar)
     ledger.add(0.60, on: night, calendar: calendar)
     checkClose(ledger.spent(on: morning, calendar: calendar), 1.0, "the same local day adds up")
@@ -62,7 +62,7 @@ func runSpendChecks() {
     check(ledger.days.isEmpty, "refunding a day that has nothing changes nothing")
 
     // 老的天数清掉
-    var old = FalSpendLedger()
+    var old = DailySpendLedger()
     old.add(1, on: date("2026-05-01T12:00:00+08:00"), calendar: calendar)
     old.add(2, on: date("2026-09-20T12:00:00+08:00"), calendar: calendar)
     old.add(3, on: date("2026-09-29T12:00:00+08:00"), calendar: calendar)
@@ -70,14 +70,14 @@ func runSpendChecks() {
     checkEqual(Set(old.days.keys), ["2026-09-20", "2026-09-29"], "days older than the window are dropped")
 
     // 存取往返
-    let back = try? JSONDecoder().decode(FalSpendLedger.self, from: JSONEncoder().encode(old))
+    let back = try? JSONDecoder().decode(DailySpendLedger.self, from: JSONEncoder().encode(old))
     checkEqual(back, old, "the ledger survives a save / load round trip")
 
     // 给人看的钱数
-    checkEqual(FalMoney.text(10), "$10.00", "whole dollars")
-    checkEqual(FalMoney.text(0.4), "$0.40", "cents")
-    checkEqual(FalMoney.text(0.027), "$0.03", "a few cents are rounded to a cent")
-    checkEqual(FalMoney.text(0.0018), "$0.0018", "a fraction of a cent keeps its digits")
-    checkEqual(FalMoney.text(0.009), "$0.009", "trailing zeros are trimmed")
-    checkEqual(FalMoney.text(0), "$0.00", "zero")
+    checkEqual(USDollarText.text(10), "$10.00", "whole dollars")
+    checkEqual(USDollarText.text(0.4), "$0.40", "cents")
+    checkEqual(USDollarText.text(0.027), "$0.03", "a few cents are rounded to a cent")
+    checkEqual(USDollarText.text(0.0018), "$0.0018", "a fraction of a cent keeps its digits")
+    checkEqual(USDollarText.text(0.009), "$0.009", "trailing zeros are trimmed")
+    checkEqual(USDollarText.text(0), "$0.00", "zero")
 }

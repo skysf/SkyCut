@@ -24,7 +24,7 @@ final class SkyStudioAccount: ObservableObject {
         didSet {
             guard hasKey != oldValue else { return }
             SkyStudioCatalogCache.shared.forget()
-            FalSettingsStore.shared.syncProviders()
+            syncProviders()
         }
     }
     @Published private(set) var stored: SkyStudioStoredAnswer?
@@ -78,6 +78,7 @@ final class SkyStudioAccount: ObservableObject {
     func start() {
         guard !started else { return }
         started = true
+        syncProviders()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshIfDue(after: SkyStudioRefresh.onActivation) }
         }
@@ -93,6 +94,13 @@ final class SkyStudioAccount: ObservableObject {
         } else {
             refreshIfDue(after: SkyStudioRefresh.onActivation)
         }
+    }
+
+    /// 启动与 Key 变化时同步工具提供方标记：只有名字，没有密钥；保持既有目录与文件身份。
+    private func syncProviders() {
+        let url = MCPProviderMarker.url(bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow")
+        do { try MCPProviderMarker.write(hasKey ? [.skystudio] : [], to: url) }
+        catch { FileHandle.standardError.write(Data("SkyCut: could not update provider marker.\n".utf8)) }
     }
 
     func refreshIfDue(after interval: TimeInterval) {

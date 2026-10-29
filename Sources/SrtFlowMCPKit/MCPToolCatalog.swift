@@ -120,7 +120,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 这个工具要哪个提供方配好了才列出来（nil = 一直列）。方案第 36 条：谁都没配就不列出来。
     public var provider: MCPProvider? {
         switch self {
-        // 2026-10-28 起两个都走 Sky Studio、花积分（收费方案第 6 刀）；fal 的 Key 只剩配旁白（add_voiceover 一直列着）。
+        // 2026-10-28 起两个都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio（add_voiceover 一直列着）。
         case .generateMedia, .upscaleClip: return .skystudio
         default: return nil
         }
@@ -151,7 +151,7 @@ public struct MCPToolDefinition: Sendable {
     /// 会删掉东西（时间线上的、撤销掉的、进废纸篓的文件；删文件时 SrtFlow 自己还会走 needs_confirmation）。
     /// SrtFlow 从不覆盖文件（撞名加编号），所以只是「写新文件」的工具不算。
     public var destructive: Bool
-    /// 会连到外面的服务、花用户的钱（生成类：fal.ai）。其余工具都在这台 Mac 上做。
+    /// 会连到外面的服务、花用户的钱（云端媒体：Sky Studio）。其余工具都在这台 Mac 上做。
     public var openWorld: Bool
 
     public init(
@@ -187,7 +187,7 @@ public struct MCPToolDefinition: Sendable {
                 "destructiveHint": .bool(destructive),
                 "idempotentHint": .bool(readOnly),
                 // 全在这台 Mac 上做；上网的只有 SrtFlow 自己的音乐库（一份固定的清单，不是开放的网络）
-                // 和生成类的工具（fal.ai：用户自己的账号、要花钱）。
+                // 和云端媒体工具（Sky Studio：用户的账号与积分）。
                 "openWorldHint": .bool(openWorld)
             ]
         ]

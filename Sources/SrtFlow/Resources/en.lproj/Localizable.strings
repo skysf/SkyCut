@@ -1021,21 +1021,12 @@
 
 // fal.ai（设置里的一节、钥匙串授权框的提示、配旁白）
 "Generated" = "Generated";
-"macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow." = "macOS is about to ask whether SkyCut may use your fal.ai key. Click Always Allow.";
-"That is not a fal.ai endpoint id. It looks like owner/model-name." = "That is not a fal.ai endpoint id. It looks like owner/model-name.";
 "The price must be a number." = "The price must be a number.";
-"That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys." = "That does not look like a fal.ai API key. Copy the whole key from fal.ai/dashboard/keys.";
-"Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits." = "Lets AI apps speak narration with fal.ai's voices and clone a voice, using your own fal.ai account. It costs money on that account: SkyCut stays within the daily limit below, and past it uses its own voices. Images, video, music and sound effects are made with your Sky Studio credits.";
-"fal.ai models" = "fal.ai models";
 "Key saved in the keychain" = "Key saved in the keychain";
 "Remove Key" = "Remove Key";
-"Remove the fal.ai key from the macOS keychain; AI apps then lose the fal.ai tools" = "Remove the fal.ai key from the macOS keychain; AI apps then lose the fal.ai tools";
-"fal.ai API key" = "fal.ai API key";
 "Save Key" = "Save Key";
-"Store the key in the macOS keychain (fal.ai/dashboard/keys)" = "Store the key in the macOS keychain (fal.ai/dashboard/keys)";
 "Daily limit" = "Daily limit";
 "Spent today %@" = "Spent today %@";
-"SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)" = "SkyCut asks before AI spends more than this in one day (an estimate from each model's price, not fal.ai's bill)";
 "Go back to the model SkyCut picked for this" = "Go back to the model SkyCut picked for this";
 "owner/model-name" = "owner/model-name";
 "price" = "price";
@@ -1125,7 +1116,6 @@
 "Revert to Original Clip" = "Revert to Original Clip";
 "Saved as %@" = "Saved as %@";
 "Saves next to the original as %@" = "Saves next to the original as %@";
-"Send this clip to fal.ai for a sharper, larger version" = "Send this clip to fal.ai for a sharper, larger version";
 "Side by side" = "Side by side";
 "Sound effect" = "Sound effect";
 "Sound from the original" = "Sound from the original";

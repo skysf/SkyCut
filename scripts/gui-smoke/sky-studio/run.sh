@@ -10,8 +10,21 @@ SUPPORT="$HOME/Library/Application Support/$BUNDLE"
 PORT=18766
 stop() {
   pkill -f "$APP/Contents/MacOS/SrtFlowSkyStudioSmoke" 2>/dev/null || true
-  if [ -f "$D/app.pid" ]; then kill "$(cat "$D/app.pid")" 2>/dev/null || true; fi
-  if [ -f "$D/server.pid" ]; then kill "$(cat "$D/server.pid")" 2>/dev/null || true; fi
+  # PID 会被系统复用；App 只按完整路径停，服务器还要核对命令和本轮素材目录。
+  if [ -f "$D/server.pid" ]; then
+    local server_pid server_command
+    server_pid="$(cat "$D/server.pid")"
+    case "$server_pid" in
+      ''|*[!0-9]*) ;;
+      *)
+        server_command="$(ps -p "$server_pid" -o command= 2>/dev/null || true)"
+        case "$server_command" in
+          *"scripts/gui-smoke/sky-studio/server.py $PORT $D/assets "*) kill "$server_pid" 2>/dev/null || true ;;
+        esac
+        ;;
+    esac
+  fi
+  rm -f "$D/app.pid" "$D/server.pid"
   security delete-generic-password -a api-key -s "$BUNDLE.skystudio" >/dev/null 2>&1 || true
   defaults delete "$BUNDLE" >/dev/null 2>&1 || true
   rm -f "$SUPPORT/mcp-providers.json" "$SUPPORT/mcp.sock"

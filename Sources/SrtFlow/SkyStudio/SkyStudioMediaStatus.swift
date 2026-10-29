@@ -11,7 +11,7 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     let uploads: Bool
     @Published var modelTitle: String
     @Published var credits: Double?
-    @Published private(set) var progress: FalJobProgress?
+    @Published private(set) var progress: CloudJobProgress?
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool) {
@@ -21,14 +21,14 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
         self.uploads = uploads
     }
 
-    func advance(to phase: FalJobPhase, typicalSeconds: Double?) {
-        let next = (progress ?? FalJobProgress(phase: phase, typicalSeconds: typicalSeconds)).advanced(to: phase)
+    func advance(to phase: CloudJobPhase, typicalSeconds: Double?) {
+        let next = (progress ?? CloudJobProgress(phase: phase, typicalSeconds: typicalSeconds)).advanced(to: phase)
         if progress != next { progress = next }
     }
 
     /// 一批配完开始下一批时，阶段时钟重新起步；不会把上一批的下载当成新一批的进度。
     func reset(typicalSeconds: Double?) {
-        progress = FalJobProgress(phase: .preparing, typicalSeconds: typicalSeconds)
+        progress = CloudJobProgress(phase: .preparing, typicalSeconds: typicalSeconds)
     }
 
     func cancel() { onCancel() }

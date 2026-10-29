@@ -69,9 +69,9 @@ func makeVideoWithAudio(seconds: Double, name: String) async throws -> URL {
 
 final class PhaseLog: @unchecked Sendable {
     private let lock = NSLock()
-    private var items: [FalJobPhase] = []
-    func add(_ phase: FalJobPhase) { lock.lock(); items.append(phase); lock.unlock() }
-    var all: [FalJobPhase] { lock.lock(); defer { lock.unlock() }; return items }
+    private var items: [CloudJobPhase] = []
+    func add(_ phase: CloudJobPhase) { lock.lock(); items.append(phase); lock.unlock() }
+    var all: [CloudJobPhase] { lock.lock(); defer { lock.unlock() }; return items }
     /// 阶段的名字按先后、连续相同的并成一个（上传 0% → 100% 是同一阶段）。
     var steps: [String] { all.map(\.name).reduce(into: []) { if $0.last != $1 { $0.append($1) } } }
     func fractions(of name: String) -> [Double] { all.filter { $0.name == name }.compactMap(\.fraction) }

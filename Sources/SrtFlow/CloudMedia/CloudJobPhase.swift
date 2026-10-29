@@ -1,18 +1,18 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - fal 任务的阶段与进度账（纯值）
+// MARK: - 云端任务的阶段与进度账（纯值）
 //
-// 管什么：一次送 fal 的活（upscale、generate_media）走到了哪一步：裁 / 上传（带字节比例）/ 排队（带位置）/ 处理 / 下载（带字节比例）/
+// 管什么：一次云端活（upscale、生成、配音）走到了哪一步：裁 / 上传（带字节比例）/ 排队（带位置）/ 处理 / 下载（带字节比例）/
 // 收尾；这一阶段从什么时候起、这一档通常要多久；给 `get_job` 的那几个字段（`phase`、`queue_position`、`transfer_percent`、
-// `phase_seconds`、`typical_seconds`）和界面上「1:12」「约 2 分钟」怎么算。fal 处理中**没有百分比**（队列接口只给排队位置和
-// 「处理中」），所以能给的就是阶段 + 排队位置 + 已用时间 + 典型时长，不画假进度条（docs/architecture/fal-generation.md 第十三节）。
-// 不管什么：阶段怎么量出来（FalClient / UpscalePipeline / SkyStudioGenerationRun）、怎么画（FalStatusRows、UpscaleJobStatusView）。
+// `phase_seconds`、`typical_seconds`）和界面上「1:12」「约 2 分钟」怎么算。云端处理中**没有百分比**（队列接口只给排队位置和
+// 「处理中」），所以能给的就是阶段 + 排队位置 + 已用时间 + 典型时长，不画假进度条（docs/architecture/sky-studio-jobs.md）。
+// 不管什么：阶段怎么量出来（SkyStudioAPI / UpscalePipeline / SkyStudioGenerationRun）、怎么画（CloudStatusRows、UpscaleJobStatusView）。
 
-enum FalJobPhase: Equatable, Sendable {
+enum CloudJobPhase: Equatable, Sendable {
     /// 裁出那一段（upscale）/ 把关花钱、取 Key（generate_media）。
     case preparing
-    /// 上传到 fal 的存储；`fraction` 是发出去的字节比例（0…1），还不知道就是 nil。
+    /// 上传到 云端存储；`fraction` 是发出去的字节比例（0…1），还不知道就是 nil。
     case uploading(fraction: Double?)
     case queued(position: Int?)
     case processing
@@ -53,7 +53,7 @@ enum FalJobPhase: Equatable, Sendable {
     }
 
     /// 同一阶段换一个比例 / 换一个排队位置不算换阶段（界面从「上传」变成「排队」才重记开始时刻）。
-    func sameStep(as other: FalJobPhase) -> Bool { step == other.step }
+    func sameStep(as other: CloudJobPhase) -> Bool { step == other.step }
 
     /// 阶段的先后（状态行上画「上传 · 排队 · 处理 · 下载」要知道谁在前、谁已经过了）。
     var order: Int { Step.allCases.firstIndex(of: step) ?? 0 }
@@ -64,22 +64,22 @@ enum FalJobPhase: Equatable, Sendable {
     }
 }
 
-/// 一个跑着的 fal 任务此刻的进度账：阶段、这一阶段从什么时候起、处理通常要多久。
-struct FalJobProgress: Equatable, Sendable {
-    var phase: FalJobPhase
+/// 一个跑着的 云端任务此刻的进度账：阶段、这一阶段从什么时候起、处理通常要多久。
+struct CloudJobProgress: Equatable, Sendable {
+    var phase: CloudJobPhase
     /// 这一阶段开始的时刻（换一个阶段才重记；上传从 0% 到 100% 都算同一阶段）。
     var phaseStarted: Date
     /// 这一档 / 这一种事从提交到做完通常要几秒（含排队；2026-10-02 实测），不知道就是 nil。
     var typicalSeconds: Double?
 
-    init(phase: FalJobPhase, phaseStarted: Date = Date(), typicalSeconds: Double? = nil) {
+    init(phase: CloudJobPhase, phaseStarted: Date = Date(), typicalSeconds: Double? = nil) {
         self.phase = phase
         self.phaseStarted = phaseStarted
         self.typicalSeconds = typicalSeconds
     }
 
     /// 换到 `next`：同一阶段只换比例（开始时刻不动），换了阶段才重记开始时刻。
-    func advanced(to next: FalJobPhase, now: Date = Date()) -> FalJobProgress {
+    func advanced(to next: CloudJobPhase, now: Date = Date()) -> CloudJobProgress {
         var copy = self
         copy.phase = next
         if !phase.sameStep(as: next) { copy.phaseStarted = now }
@@ -110,13 +110,13 @@ struct FalJobProgress: Equatable, Sendable {
     static func minutes(_ seconds: Double) -> Int { max(1, Int((seconds / 60).rounded())) }
 }
 
-/// 上一次报过的阶段（带锁：fal 的回调在别的线程上）。同一阶段同一比例只报一次。
-final class FalPhaseBox: @unchecked Sendable {
+/// 上一次报过的阶段（带锁：传输的回调在别的线程上）。同一阶段同一比例只报一次。
+final class CloudPhaseBox: @unchecked Sendable {
     private let lock = NSLock()
-    private var last: FalJobPhase?
+    private var last: CloudJobPhase?
 
     /// 换成 `next`；和上一次一样就返回 false。
-    func swap(_ next: FalJobPhase) -> Bool {
+    func swap(_ next: CloudJobPhase) -> Bool {
         lock.lock()
         defer { lock.unlock() }
         if last == next { return false }

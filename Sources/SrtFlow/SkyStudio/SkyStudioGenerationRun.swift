@@ -33,7 +33,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     /// 跑到哪一步了：状态行订阅它，`get_job` 从 `liveDetail` 读同一份；还没开始跑是 nil。
     private let status: SkyStudioMediaStatus
-    var progress: FalJobProgress? { status.progress }
+    var progress: CloudJobProgress? { status.progress }
     private var job: AIJobs.Job?
     private var task: Task<Void, Never>?
     private var held: SkyStudioHeldCredits?
@@ -119,7 +119,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             try Task.checkCancellation()
             let request = generation.job(model: modelID, imageURL: imageURL, maxCredits: credits)
             let done = try await SkyStudioJobRun(api: api, key: key).run(request) { [weak self] update in
-                let next: FalJobPhase?
+                let next: CloudJobPhase?
                 switch update {
                 case .waitingForSlot:
                     next = .queued(position: nil)
@@ -142,7 +142,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             advance(to: .downloading(fraction: nil))
             try await api.download(result.url, to: destination) { [weak self] fraction in
-                Task { @MainActor in self?.advance(to: .downloading(fraction: FalJobPhase.quantized(fraction))) }
+                Task { @MainActor in self?.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction))) }
             }
             advance(to: .finishing)
             succeed(destination, result, charged: charged)
@@ -188,7 +188,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         let prepared = try SkyStudioGenerationFrame.prepare(frame, workFolder: Self.workFolder)
         defer { prepared.cleanUp() }
         return try await api.upload(fileURL: prepared.url, contentType: prepared.contentType, purpose: "image", key: key) { [weak self] fraction in
-            Task { @MainActor in self?.advance(to: .uploading(fraction: FalJobPhase.quantized(fraction))) }
+            Task { @MainActor in self?.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction))) }
         }
     }
 
@@ -242,7 +242,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     }
 
     /// 换阶段：同一阶段同一比例不重发（状态行和 get_job 读的是同一份）。
-    private func advance(to phase: FalJobPhase) {
+    private func advance(to phase: CloudJobPhase) {
         status.advance(to: phase, typicalSeconds: typicalSeconds)
     }
 

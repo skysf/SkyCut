@@ -4,7 +4,7 @@ import Foundation
 //
 // 管什么：收费方案第 6 刀 —— 钱从美元换成积分，**每日上限默认 1,000 积分**（Sky Studio 一个积分标价 1 美分，等于原来 fal 那一档默认的 10 美元），
 // 用户在设置里能改；额度内不问，AI 起的活超了先回确认码（SkyStudioJobGate）；面板起的面板本身就是确认（超了只标红不拦）。
-// 账按本地时区的自然日记（同一份 FalSpendLedger / FalSpendPolicy：规矩只有一处，第 7 刀删 fal 时改名留下）：交活之前按 /quote 报的数记上，
+// 账按本地时区的自然日记（同一份 DailySpendLedger / DailySpendPolicy：规矩只有一处，第 7 刀删 fal 时改名留下）：交活之前按 /quote 报的数记上，
 // 做完按实收（credits_charged）改，没花出去的（没交上、排队中取消了、服务器说没做成）退回。
 // 不管什么：报价（/quote）、问用户（SkyStudioJobGate、面板）、界面（设置里「Sky Studio」一节）。
 //
@@ -21,7 +21,7 @@ final class SkyStudioSpendStore: ObservableObject {
     static let limitRange: ClosedRange<Double> = 0...1_000_000
 
     @Published private(set) var dailyLimit: Double
-    @Published private(set) var ledger: FalSpendLedger
+    @Published private(set) var ledger: DailySpendLedger
 
     private let defaults: UserDefaults
 
@@ -29,7 +29,7 @@ final class SkyStudioSpendStore: ObservableObject {
         self.defaults = defaults
         let stored = defaults.object(forKey: Self.limitKey) as? Double
         dailyLimit = stored.map(Self.clamped) ?? Self.defaultLimit
-        ledger = defaults.data(forKey: Self.ledgerKey).flatMap { try? JSONDecoder().decode(FalSpendLedger.self, from: $0) } ?? FalSpendLedger()
+        ledger = defaults.data(forKey: Self.ledgerKey).flatMap { try? JSONDecoder().decode(DailySpendLedger.self, from: $0) } ?? DailySpendLedger()
     }
 
     static func clamped(_ value: Double) -> Double {
@@ -47,8 +47,8 @@ final class SkyStudioSpendStore: ObservableObject {
     func spentToday(now: Date = Date()) -> Double { ledger.spent(on: now) }
 
     /// 这一笔要不要先问（额度内不问；超了问）。
-    func decide(credits: Double, now: Date = Date()) -> FalSpendPolicy.Decision {
-        FalSpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
+    func decide(credits: Double, now: Date = Date()) -> DailySpendPolicy.Decision {
+        DailySpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
     }
 
     /// 记上一笔（交活之前按报价记）。
@@ -66,7 +66,7 @@ final class SkyStudioSpendStore: ObservableObject {
         save(next)
     }
 
-    private func save(_ next: FalSpendLedger) {
+    private func save(_ next: DailySpendLedger) {
         guard next != ledger else { return }
         ledger = next
         if let data = try? JSONEncoder().encode(next) { defaults.set(data, forKey: Self.ledgerKey) }

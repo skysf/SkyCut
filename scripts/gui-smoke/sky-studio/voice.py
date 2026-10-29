@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 sys.dont_write_bytecode = True
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "fal"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcpclient import MCP
 
 D = Path(os.environ.get("SKYSTUDIO_SMOKE_DIR", "/private/tmp/srtflow-skystudio-smoke"))
@@ -48,6 +48,7 @@ def new_project():
 try:
     log_start = len(json.load(urllib.request.urlopen(SERVER + "/__log")))
     call("get_status")
+    assert {"generate_media", "upscale_clip"}.issubset(mcp.tools()), "Sky Studio key must synchronize the paid-tool marker at startup"
     call("open_folder", {"path": str(WORK)})
     call("set_view", {"mode": "background"})
     new_project()
