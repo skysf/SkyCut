@@ -40,6 +40,9 @@ for line in sys.stdin:
     elif MODE == 'silent':
         time.sleep(5)
         continue
+    elif MODE in ['id_list', 'id_object', 'id_boolean']:
+        rid = {'id_list': [], 'id_object': {}, 'id_boolean': True}[MODE]
+        answer = {'result': {}}
     elif MODE == 'rpc_error':
         answer = {'error': {'code': -32603, 'message': 'fixture failure'}}
     else:
@@ -65,6 +68,14 @@ for line in sys.stdin:
     def test_malformed_response_is_failure(self):
         with self.assertRaisesRegex(RuntimeError, "JSON|protocol"):
             self.client("malformed").call("get_status", timeout=0.5)
+
+    def test_invalid_response_id_wakes_waiter(self):
+        for mode in ['id_list', 'id_object', 'id_boolean']:
+            with self.subTest(mode=mode):
+                client = self.client(mode)
+                with self.assertRaisesRegex(RuntimeError, "JSON|protocol"):
+                    client.call("get_status", timeout=0.2)
+                self.assertEqual(client.waiting, {})
 
     def test_timeout_names_call_and_removes_waiter(self):
         client = self.client("silent")

@@ -888,6 +888,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [提交返回瞬间取消丢任务号](docs/bugfixes/2026-10-29-cancelled-submit-loses-job-id.md)
 - [旁白多块词时间和音频尾端](docs/bugfixes/2026-10-29-voice-word-chunks-and-tail.md)
 - [2026-10-29 MCP 冒烟丢掉失败，后台包装又报成功](docs/bugfixes/2026-10-29-mcp-smoke-hides-failures.md) — EOF / 坏协议唤醒等待者、JSON-RPC 错误明确失败、超时标明结果未知；日志包装原样传退出码，假小程序回归覆盖整条证据链。
+- [损坏的 MCP 回答 id 让读线程退出](docs/bugfixes/2026-10-29-invalid-mcp-smoke-response-id.md)
 
 ## 根目录文档
 

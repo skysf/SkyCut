@@ -40,6 +40,10 @@ class MCP:
                 msg = json.loads(line)
                 if not isinstance(msg, dict):
                     raise ValueError("expected an object")
+                # JSON-RPC IDs are strings, numbers or null; bool is not a number here.
+                # Validate before dictionary lookup: lists/dicts raise TypeError and strand every waiter.
+                if "id" in msg and msg["id"] is not None and type(msg["id"]) not in (str, int, float):
+                    raise ValueError("invalid response id type")
                 with self.lock:
                     q = self.waiting.pop(msg["id"], None) if "id" in msg else None
                     if q is None: self.notifications.append(msg)
