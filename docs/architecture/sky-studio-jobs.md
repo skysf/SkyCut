@@ -62,7 +62,7 @@
   `/uploads`（purpose `image`；认得的格式原样传，别的缩到长边 2048 存 JPEG）；问 `/quote` → `SkyStudioJobGate` → 回任务号；任务交给 `SkyStudioJobRun`、
   成品下载到「生成」文件夹（也长期留在作品库里），Key 不弹授权框。`get_job` 有阶段和 `skystudio_job_id`，状态行上一行（积分、停止）。
 - **清单**：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，存了 Sky Studio 的 Key 才列（`SkyStudioAccount.hasKey` 一变就同步那个小文件）；
-  总说明末尾的「Paid」那一行只在存了 Sky Studio 的 Key 时有；fal 的 Key 只剩配旁白、不多列工具。
+  总说明末尾的「Paid」那一行只在存了 Sky Studio 的 Key 时有；fal 的 Key 已没有运行时调用方，旧设置等第 7 刀清理、不多列工具。
 
 ## 五、还没做的（第 6 刀后面几个 PR）
 
