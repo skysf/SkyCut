@@ -117,7 +117,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         }
     }
 
-    /// 这个工具要哪个提供方配好了才列出来（nil = 一直列）。方案第 36 条：谁都没配就不列出来。
+    /// 工具使用哪个云端提供方（不是发现权限）。Key、套餐、积分在 App 执行时核对。
     public var provider: MCPProvider? {
         switch self {
         // 2026-10-28 起两个都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio（add_voiceover 一直列着）。
@@ -126,9 +126,9 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         }
     }
 
-    /// 配了这些提供方时该列出来的工具，顺序不变。
+    /// 始终列全。保留 providers 参数兼容旧调用方；客户端可能只在会话开始时加载一次清单。
     public static func listed(providers: Set<MCPProvider>) -> [MCPToolName] {
-        allCases.filter { tool in tool.provider.map(providers.contains) ?? true }
+        allCases
     }
 
     /// `tools/list` 的 `tools` 数组（配了这些提供方时）。

@@ -113,6 +113,9 @@
 
 ## 七、清单跟着 Key 走（`MCPProviders`）
 
+> 本节为历史行为，**2026-10-30 已替代**：生成和 upscale 工具及 Paid 目录始终列出，Key / 授权 / 积分在 App 调用时核对。
+> 旧会话中途添加 Key 后可能始终不再请求工具清单，不能只依赖变更通知。现行合同见 [AI 接口（MCP）](ai-control-mcp.md)第四节第 39 条。
+
 - 2026-10-02 起 fal 的工具有两个：`generate_media` 和 `upscale_clip`。**2026-10-28 起两个都属于 Sky Studio 提供方**（`skystudio`：存了 Sky Studio 的 Key 才列，
   收费方案第 6 刀），fal 的 Key 不再多列工具（只管配旁白，`add_voiceover` 一直列着）；总说明的「Paid」那一行只在存了 Sky Studio 的 Key 时有。
   下面说的「列不列」照旧，那个小文件里两家的名字都写（`FalSettingsStore.syncProviders`，Sky Studio 的 Key 变了也叫它）。

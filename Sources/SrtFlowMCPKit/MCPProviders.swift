@@ -1,7 +1,7 @@
 import Foundation
 
 // MARK: - 云端工具提供方标记
-// 管什么：App 启动与 Sky Studio Key 变化时写提供方名字；helper 不碰钥匙串即可决定清单。
+// 管什么：App 启动与 Sky Studio Key 变化时写提供方名字，兼容仍按它列工具的旧 helper；新清单始终列全。
 // 不管什么：密钥 / 请求。沿用 mcp-providers.json，宽容读取旧版 fal 标记并忽略已删除的提供方。
 
 public enum MCPProvider: String, CaseIterable, Sendable {

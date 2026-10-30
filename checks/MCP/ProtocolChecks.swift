@@ -138,9 +138,9 @@ func runProtocolChecks() {
 
     // 2. 工具清单：和 MCPToolName 一一对应、顺序一致、每个都有说明和对象型的参数表。
     let tools = reply(messages, id: 2)?["result"]?["tools"]?.arrayValue ?? []
-    // 没配任何生成提供方：清单里没有 generate_media（方案第 36 条）；其余照 MCPToolName 的顺序。
+    // 没配任何生成提供方也列出生成工具；Key / 套餐在 App 调用时核对（2026-10-30）。
     checkEqual(tools.compactMap { $0["name"]?.stringValue }, MCPToolName.listed(providers: []).map(\.rawValue), "tools/list order and names")
-    check(!tools.contains { $0["name"]?.stringValue == "generate_media" }, "no provider configured: generate_media is not listed")
+    check(tools.contains { $0["name"]?.stringValue == "generate_media" }, "no provider configured: generate_media is discoverable")
     for tool in tools {
         let name = tool["name"]?.stringValue ?? "?"
         check(!(tool["description"]?.stringValue ?? "").isEmpty, "\(name) has a description")

@@ -7,19 +7,19 @@ import Foundation
 // （要用户点头、等用户操作、用户按了停止……写在那个结果里）。三层怎么分见 docs/architecture/ai-control-mcp.md 第一节第 6 条。
 //
 // **Claude Code 只读前 2,048 个字符**（JavaScript 的字符串长度，超了静默截掉、末尾加「… [truncated]」），Codex 要求前
-// 512 个字符自成一体：所以开头一段就是完整的最短用法，配了提供方拼上「Paid」那一行也不许超 2,048。Claude Code 会话开始时只看得到
+// 512 个字符自成一体：所以开头一段就是完整的最短用法，包含「Paid」那一行也不许超 2,048。Claude Code 会话开始时只看得到
 // 工具名和这份说明，目录是它知道「该去加载哪个工具」的依据，所以清单里的每个工具名都要在这里出现（checks/MCP/CatalogTextChecks.swift）。
 // 只用英文。产品决定见 docs/plans/2026-09-27-mcp.md；为什么写成目录见 docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md。
 
 public enum MCPInstructions {
-    /// 存了 Sky Studio 的 Key 才有的那一行「Paid: …」，接在目录最后（没存就不提：客户端清单里也没有那两个工具）。2026-10-28 起
+    /// 始终列出的「Paid: …」，接在目录最后（2026-10-30：不能靠中途添加 Key 后客户端重新发现工具）。2026-10-28 起
     /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio，不再多出一行。整份离 Claude Code
     /// 的 2,048 个字符只差几十个：这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：
     /// AI 调它之前一定会读到。
     static let skyStudioTools = "generate_media (image, video, music, sound effect), upscale_clip (sharper, larger): Sky Studio credits"
 
     public static func text(providers: Set<MCPProvider>) -> String {
-        providers.contains(.skystudio) ? text + "\n- Paid: " + skyStudioTools : text
+        text
     }
 
     public static let text = """
@@ -51,5 +51,6 @@ public enum MCPInstructions {
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
     - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job
     - View: set_view, seek
+    - Paid: \(skyStudioTools)
     """
 }

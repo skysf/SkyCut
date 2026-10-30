@@ -647,12 +647,14 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     [Sky Studio 的任务](sky-studio-jobs.md)「谁在用」的「生成」一条（fal 时代的在 [fal.ai 生成](fal-generation.md) 第八节），这里只记它怎么接进 MCP 这一层。
     模型由 Sky Studio 按种类定（`/models`），`model` / `options` 两个参数 2026-10-28 起没有了（老客户端带着就整个不做、说清楚，第 52 条）；视频只有 480p / 768p；
     音乐 60–180 秒或让模型定、`instrumental=false` 可以带 `lyrics`。结果报 `credits`（开始时）、`credits_charged` 和 `skystudio_job_id`（做完时），成品也留在作品库里。
-    风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 工具只在存了 Key 时在清单里，卡却一直读得到；
+    风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 旧版清单可能没有这个工具，当前清单始终列出，是否能消费在调用时核对；
     共用规矩第 11 条和每张卡的「Generated media」一节说了有它时能补什么、不能替什么（`RecipeChecks` 钉着：提到就得在条件句下、
     词表和结果字段名都得对得上）：
-   - **只在用户存了 Sky Studio 的 Key 时才出现在清单里**（方案第 36 条；2026-10-28 之前跟着 fal 的 Key）：`MCPToolName.provider`；App 在 Key 添加 / 删除时和每次启动时写一个只有提供方名字的
-     `mcp-providers.json`（和 socket 同目录），小程序每回一次清单 / 握手都重读它；握过手的老一代客户端收 `notifications/tools/list_changed`，
-     新一代靠清单一分钟的缓存时间。没配时总说明里也不提它。全清单的说明总长度量的是每个提供方都配好时的样子。
+   - **工具和总说明始终列出生成、upscale**（2026-10-30 替代方案第 36 条的按 Key 隐藏）：客户端可以在会话开始时缓存清单，不能靠
+     `list_changed` 或短 TTL 保证添加 Key 后获得新工具。`MCPToolName.provider` 只描述服务归属；Key、套餐和积分在 App 执行时核对。
+     App 给旧 helper 的清单不携带提供方过滤条件，新 helper 也忽略旧 App 的过滤条件；升级 App 的通知照旧保留，Key 变化不再发清单通知。
+     `mcp-providers.json` 继续同步，供尚未升级的 helper 使用，不放密钥。回归覆盖真 helper 首次无 Key 的完整清单、中途添加 / 删除 Key、旧清单兼容，
+     不把「模拟客户端主动重新请求成功」当成「真实客户端已刷新」。见[案例](../bugfixes/2026-10-30-generation-tools-missing-after-key-added.md)。
    - **生成是任务**：立刻回任务号（带积分、通常几分钟、今天已花、每日积分上限），`get_job` 等；不改工程、不进撤销分组，放上时间线是 `add_clips`。
    - **花积分超了每日上限，当场回 `needs_confirmation` + 确认码**（2026-10-17 起，AI 多开方案板 9；2026-10-28 起 `SkyStudioJobGate.decide`，和 upscale_clip
      同一处，在建任务之前）：什么都不起、不记账，AI 在聊天里问用户、用户点头后带码、同样的参数再调才记账起任务；令牌绑着报价和模型 / 时长 / 清晰度那几个记号。
@@ -690,7 +692,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     find_audio 的说明）。音效库那一半在第 23 条。
 44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
     [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
-   - **只在存了 Sky Studio 的 Key 时列出来**（`MCPToolName.provider` = `skystudio`；之前和 `generate_media` 一样跟着 fal 的 Key）；总说明末尾的「Paid」那一行带着它（Claude Code 开场只看目录）。
+   - **始终列出来**（2026-10-30，和 `generate_media` 同一条规则，第 39 条）；总说明末尾的「Paid」那一行始终带着它，Key、授权和积分在 App 核对。
      清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000、2026-10-17 抬到 100,000，见第一节）。
    - **参数和面板同一份数**：`clip_id`，可选 `tier`（Sky Studio 的模型名，词表 `MCPVocabulary.upscaleTiers`：`topaz-starlight`（默认）/ `bytedance-upscaler-pro`；
      词表里有、Sky Studio 此刻 `/models` 里没有的说清楚）、`target`（`1080p` / `1440p` / `2160p`，按短边叫，4K 写成 2160p，换成 Sky Studio 的 1080p / 2K / 4K）、
