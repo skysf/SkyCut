@@ -1257,3 +1257,23 @@
 "Cancel this task" = "取消此任务";
 "Compare the original and upscaled video" = "对比原始与放大后的视频";
 "Completed" = "已完成";
+
+/* Project generation task cards */
+"All generation tasks %d" = "全部生成任务 %d";
+"This project %d" = "本工程 %d";
+"Show all generation tasks grouped by project" = "按工程查看全部生成任务";
+"All generation tasks" = "全部生成任务";
+"Other projects · %d" = "其他工程 · %d 个";
+"%d in progress" = "%d 项进行中";
+"%d completed" = "%d 项已完成";
+"Current project" = "当前工程";
+"No generation tasks in this project" = "当前工程暂无生成任务";
+"Expanded" = "已展开";
+"Collapsed" = "已折叠";
+"Project closed" = "已关闭";
+"Background project" = "后台";
+"Open this project" = "打开此工程";
+"Switch to this project" = "切换到此工程";
+"Hide details" = "收起";
+"Details" = "详情";
+"Media type" = "素材类型";

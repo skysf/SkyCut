@@ -431,7 +431,8 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 1. `scripts/gui-smoke/sky-studio/run.sh` 组装独立 `.skystudiosmoke` App、回环假服务和假 Key；不读取生产 Key，也不发真实收费请求。
 2. `python3 scripts/gui-smoke/sky-studio/voice.py` 验证普通旁白、多句合批克隆、真实本机转写切句、字幕、一步撤销、queued 取消退款 / 重复取消、服务错误退本机、文件解码与密钥不随下载 / PUT 发送。
 3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度普通旁白退本机、克隆拒绝，没有 `/jobs` 与花费。
-4. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
+4. 工程任务卡片：重新 `run.sh` 后运行 `python3 scripts/gui-smoke/sky-studio/project_tasks.py`，留下两个可见工程、一个后台工程与一个已关工程的问题，核对视频 / 音频 / 图片、5 项排队、225 积分、真实 `get_job` 任务号、另一 MCP 会话只读查询及后台开窗。随后按 [任务浮层人工回归](../architecture/sky-studio-jobs.md)第九节点卡片 / 详情 / 打开按钮；夹具会留下窗口，不能把后端开窗通过当作按钮已点通。
+5. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 原 fal 夹具、接口快照和刷新脚本已随第 7 刀删除；历史结果见既有报告。真实积分验收必须另外核对任务号、终态、扣费 / 退款和未知提交，不能把本机夹具当作真实服务已通过。当前证据见 [生成与配音验收](../reports/2026-10-29-sky-studio-generation-and-voice.md)。
 

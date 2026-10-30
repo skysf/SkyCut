@@ -10,6 +10,7 @@ struct CloudTaskSummary: Equatable {
         var queued: Bool
         var attention: Bool
         var credits: Double?
+        var completed: Bool = false
     }
 
     var ids: [UUID]
@@ -19,6 +20,7 @@ struct CloudTaskSummary: Equatable {
     var estimatedCredits: Double
     var quotedCount: Int
     var hasPendingQuote: Bool
+    var completedCount: Int
     var count: Int { ids.count }
 
     init(entries: [Entry]) {
@@ -27,6 +29,7 @@ struct CloudTaskSummary: Equatable {
         activeCount = active.count
         queuedCount = active.filter(\.queued).count
         attentionCount = entries.filter(\.attention).count
+        completedCount = entries.filter(\.completed).count
         let quotes = active.compactMap(\.credits).filter { $0.isFinite && $0 >= 0 }
         estimatedCredits = quotes.reduce(0, +)
         quotedCount = quotes.count

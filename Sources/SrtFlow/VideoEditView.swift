@@ -140,7 +140,7 @@ struct VideoEditView: View {
                     ProgressView(value: exporter.progress)
                         .frame(width: 80)
                 }
-                CloudTasksButton().equatable()
+                CloudTasksButton(project: project).equatable()
                 RecordScreenButton(project: project)
                 Button {
                     project.showsSubtitleList.toggle()

@@ -33,7 +33,8 @@ final class OpenProjects {
 
     /// 发过哪些短 id（下一个工程接着往下发）。
     @ObservationIgnored private var shortIDs = ProjectShortIDs()
-    @ObservationIgnored private var windows: [ObjectIdentifier: ProjectWindowController] = [:]
+    // 小视图按它观察「后台 / 有窗口」；开窗后任务卡片的后台标记要立即更新。
+    private var windows: [ObjectIdentifier: ProjectWindowController] = [:]
     /// 下一个工程窗口从哪儿层叠（0 = 第一个放正中）。
     @ObservationIgnored private var cascade = NSPoint.zero
 

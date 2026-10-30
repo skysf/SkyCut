@@ -27,11 +27,14 @@ xcrun swiftc \
   Sources/SrtFlow/USDollarText.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   Sources/SrtFlow/CloudMedia/CloudTaskSummary.swift \
+  Sources/SrtFlow/CloudMedia/CloudTaskGrouping.swift \
+  Sources/SrtFlow/CloudMedia/CloudTaskReport.swift \
   checks/CloudMedia/main.swift \
   checks/CloudMedia/Harness.swift \
   checks/CloudMedia/SpendChecks.swift \
   checks/CloudMedia/PhaseChecks.swift \
   checks/CloudMedia/TaskSummaryChecks.swift \
+  checks/CloudMedia/TaskGroupingChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
 echo "==> 跑自检"

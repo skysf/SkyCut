@@ -1247,8 +1247,8 @@
 "Show generation tasks" = "Ver tareas de generación";
 "%d in queue" = "%d en cola";
 "%d active" = "%d en curso";
-"%d tasks" = "%d tareas";
-"%d need attention" = "%d requieren atención";
+"%d tasks" = "Tareas: %d";
+"%d need attention" = "Por revisar: %d";
 "Estimated %@ credits" = "Aprox. %@ créditos";
 "Quote pending" = "Coste pendiente";
 "Needs attention" = "Requiere atención";
@@ -1257,3 +1257,23 @@
 "Cancel this task" = "Cancelar esta tarea";
 "Compare the original and upscaled video" = "Comparar el vídeo original y el ampliado";
 "Completed" = "Completado";
+
+/* Project generation task cards */
+"All generation tasks %d" = "Todas las generaciones %d";
+"This project %d" = "Este proyecto %d";
+"Show all generation tasks grouped by project" = "Ver todas las tareas de generación por proyecto";
+"All generation tasks" = "Todas las tareas de generación";
+"Other projects · %d" = "Otros proyectos · %d";
+"%d in progress" = "%d en curso";
+"%d completed" = "%d completadas";
+"Current project" = "Proyecto actual";
+"No generation tasks in this project" = "Este proyecto no tiene tareas de generación";
+"Expanded" = "Expandido";
+"Collapsed" = "Contraído";
+"Project closed" = "Cerrado";
+"Background project" = "En segundo plano";
+"Open this project" = "Abrir este proyecto";
+"Switch to this project" = "Ir a este proyecto";
+"Hide details" = "Ocultar detalles";
+"Details" = "Detalles";
+"Media type" = "Tipo de contenido";

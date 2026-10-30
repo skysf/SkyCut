@@ -1247,8 +1247,8 @@
 "Show generation tasks" = "Show generation tasks";
 "%d in queue" = "%d in queue";
 "%d active" = "%d active";
-"%d tasks" = "%d tasks";
-"%d need attention" = "%d need attention";
+"%d tasks" = "Tasks: %d";
+"%d need attention" = "Needs attention: %d";
 "Estimated %@ credits" = "Estimated %@ credits";
 "Quote pending" = "Quote pending";
 "Needs attention" = "Needs attention";
@@ -1257,3 +1257,23 @@
 "Cancel this task" = "Cancel this task";
 "Compare the original and upscaled video" = "Compare the original and upscaled video";
 "Completed" = "Completed";
+
+/* Project generation task cards */
+"All generation tasks %d" = "All generation tasks %d";
+"This project %d" = "This project %d";
+"Show all generation tasks grouped by project" = "Show all generation tasks grouped by project";
+"All generation tasks" = "All generation tasks";
+"Other projects · %d" = "Other projects · %d";
+"%d in progress" = "%d in progress";
+"%d completed" = "%d completed";
+"Current project" = "Current project";
+"No generation tasks in this project" = "No generation tasks in this project";
+"Expanded" = "Expanded";
+"Collapsed" = "Collapsed";
+"Project closed" = "Closed";
+"Background project" = "Background";
+"Open this project" = "Open this project";
+"Switch to this project" = "Switch to this project";
+"Hide details" = "Hide details";
+"Details" = "Details";
+"Media type" = "Media type";

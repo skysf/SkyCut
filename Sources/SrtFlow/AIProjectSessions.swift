@@ -93,7 +93,7 @@ enum AIProjectStatus {
         return OpenProjects.shared.isHeadless(project) ? "background (no window)" : "own window"
     }
 
-    static func openProjects(session: String?) -> JSONValue {
+    static func openProjects(session: String?, cloudTasks: CloudTaskReport) -> JSONValue {
         let sessions = AIProjectSessions.shared
         let running = AIJobs.shared.running
         return .array(OpenProjects.shared.all.map { project in
@@ -103,6 +103,8 @@ enum AIProjectStatus {
                 "shown_in": .string(shownIn(project)),
                 "unsaved_changes": .bool(project.hasUnsavedChanges)
             ]
+            item["cloud_task_summary"] = cloudTasks.summary(for: project.documentGeneration)
+            item["cloud_task_ids"] = cloudTasks.taskIDs(for: project.documentGeneration)
             if let path = project.documentURL?.path { item["path"] = .string(path) }
             if let owner = sessions.owner(of: project), owner.token == sessions.stamp(project).token {
                 item["yours"] = .bool(owner.session == session)

@@ -29,6 +29,11 @@ func runTaskSummaryChecks() {
     let empty = CloudTaskSummary(entries: [])
     checkEqual(empty.count, 0, "no retained task means no toolbar badge")
     check(!empty.hasPendingQuote, "empty is not a pending quote")
+    let ended = CloudTaskSummary(entries: [
+        .init(id: UUID(), active: false, queued: false, attention: false, credits: 80, completed: true),
+        .init(id: UUID(), active: false, queued: false, attention: false, credits: 120)
+    ])
+    checkEqual(ended.completedCount, 1, "a stopped task is not mislabeled as a completed result")
     for phase in [CloudJobPhase.preparing, .uploading(fraction: 0.2), .queued(position: 3)] {
         check(CloudTaskSummary.canCancel(phase), "a preparing/uploading/queued task may cancel")
     }
