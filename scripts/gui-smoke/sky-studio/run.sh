@@ -56,6 +56,10 @@ SPEECH
   "$FF" -y -v error -i "$D/assets/narration.aiff" -ac 1 -ar 44100 "$D/assets/narration.wav"
 fi
 "$FF" -y -v error -stream_loop 2 -i "$D/assets/narration.wav" "$D/work/reference.wav"
+"$FF" -y -v error -f lavfi -i color=c=steelblue:s=640x640:r=24 -t 2 -an -c:v libx264 -pix_fmt yuv420p "$D/assets/video.mp4"
+"$FF" -y -v error -f lavfi -i color=c=steelblue:s=640x640 -frames:v 1 -update 1 "$D/assets/picture.png"
+cp "$D/assets/video.mp4" "$D/work/motion.mp4"
+cp "$D/assets/picture.png" "$D/work/subject.png"
 python3 - "$PORT" "$D" "$FF" <<'SERVER'
 from pathlib import Path
 import subprocess

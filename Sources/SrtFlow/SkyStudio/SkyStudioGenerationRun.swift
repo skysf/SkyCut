@@ -16,14 +16,20 @@ import SrtFlowMCPKit
 @MainActor
 final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     let id = UUID()
-    let generation: SkyStudioGeneration
-    let modelTitle: String
+    private(set) var generation: SkyStudioGeneration
+    private(set) var modelTitle: String
     /// 用户同意的价（`/quote` 报的，交任务时当 max_credits）；状态行上「72 credits」。
-    let credits: Double
-    private let modelID: String
-    private let typicalSeconds: Double
+    private(set) var credits: Double
+    private var modelID: String
+    private var typicalSeconds: Double
     /// 图生视频的首帧（要先传上去）。
-    private let frame: URL?
+    private let references: SkyStudioReferencePlan
+    private let catalog: SkyStudioCatalog
+    private let ask: SkyStudioGeneration.Ask
+    private let canvas: Double
+    private let frameRatio: Double?
+    private let allowsFallback: Bool
+    private let approvedCeiling: Double
     private let folder: URL
     private let stem: String
     /// 起它的时候这个会话在剪的工程（做出来的文件能不能不问就读，看它的家）。**弱引用**：几个工程同时开着时，工程可能先关、任务后回来
@@ -37,22 +43,35 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private var job: AIJobs.Job?
     private var task: Task<Void, Never>?
     private var held: SkyStudioHeldCredits?
-    private let submitted = SkyStudioSubmission()
+    private var submitted = SkyStudioSubmission()
+    private var requestSent = false
+    private var requestKeys: [String] = []
+    private var attempts: [JSONValue] = []
+    private var lastFailure: SkyStudioJobFailure?
+    private var creditsUnconfirmed = false
+    private var serverFinished = false
 
     /// 同时下载的几个任务别挑到同一个文件名（挑名字和写文件之间隔着一次下载）。
     private static var claimedPaths: Set<String> = []
     static var workFolder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlowGenerate", isDirectory: true) }
 
     init(
-        generation: SkyStudioGeneration, model: SkyStudioModel, quote: SkyStudioQuote, frame: URL?, folder: URL, stem: String,
-        project: VideoEditProject, reservation: SkyStudioJobGate.Reservation
+        generation: SkyStudioGeneration, model: SkyStudioModel, quote: SkyStudioQuote, references: SkyStudioReferencePlan, folder: URL, stem: String,
+        project: VideoEditProject, reservation: SkyStudioJobGate.Reservation, catalog: SkyStudioCatalog, ask: SkyStudioGeneration.Ask,
+        canvas: Double, frameRatio: Double?, allowsFallback: Bool
     ) {
         self.generation = generation
         modelID = model.id
         modelTitle = model.title
         credits = quote.credits
         typicalSeconds = quote.typicalSeconds ?? generation.typicalSeconds
-        self.frame = frame
+        self.references = references
+        self.catalog = catalog
+        self.ask = ask
+        self.canvas = canvas
+        self.frameRatio = frameRatio
+        self.allowsFallback = allowsFallback
+        approvedCeiling = quote.credits
         self.folder = folder
         self.stem = stem
         self.project = project
@@ -64,11 +83,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         case .music: label = L10n("Music")
         case .soundEffect: label = L10n("Sound effect")
         }
-        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: frame != nil)
+        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: references.uploads)
     }
 
     /// 图生视频要先传首帧（状态行上多一个「上传」）。
-    var uploads: Bool { frame != nil }
+    var uploads: Bool { references.uploads }
 
     func start() -> AIJobs.Job {
         let job = AIJobs.shared.start(
@@ -76,6 +95,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             liveDetail: { [weak self] in
                 guard let self else { return [:] }
                 var detail = self.progress?.json() ?? [:]
+                if self.status.waitingForRefund { detail["phase"] = "waiting_for_refund" }
                 if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }
                 return detail
             },
@@ -113,29 +133,17 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         }
 
         let api = SkyStudioAPI()
-        let submitted = self.submitted
         do {
-            let imageURL = try await uploadFrame(api: api, key: key)
-            try Task.checkCancellation()
-            let request = generation.job(model: modelID, imageURL: imageURL, maxCredits: credits)
-            let done = try await SkyStudioJobRun(api: api, key: key).run(request) { [weak self] update in
-                let next: CloudJobPhase?
-                switch update {
-                case .waitingForSlot:
-                    next = .queued(position: nil)
-                case .status(let status):
-                    submitted.mark(status.jobID)
-                    switch status.state {
-                    case .queued?: next = .queued(position: status.queuePosition)
-                    case .running?: next = .processing
-                    default: next = nil   // 做完了：下一步就是下载
-                    }
-                }
-                if let next { Task { @MainActor in self?.advance(to: next) } }
+            if references.uploads { advance(to: .uploading(fraction: nil)) }
+            let uploaded = try await SkyStudioReferenceFiles.upload(references, api: api, key: key) { [weak self] fraction in
+                Task { @MainActor in self?.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction))) }
             }
+            try Task.checkCancellation()
+            let done = try await make(api: api, key: key, uploaded: uploaded)
             guard let result = done.result else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
             let charged = done.creditsCharged ?? credits
             held?.settle(charged: charged)
+            serverFinished = true
             let pathExtension = SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: generation.kind)
             let destination = claimDestination(extension: pathExtension)
             defer { Self.claimedPaths.remove(destination.path) }
@@ -150,21 +158,22 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             switch error {
             case .stopped(let stop):
                 if stop == .nothingCharged { held?.refund() }
+                creditsUnconfirmed = stop == .unknown
                 finish(.cancelled, "The generation was stopped. " + error.message)
             case .failed:
-                // Sky Studio 说没做成：它自己退钱（只退一次）。
-                held?.refund()
+                if error.canRefund(beforeAccepted: !submitted.value) { held?.refund() } else { creditsUnconfirmed = requestSent }
                 finish(.failed, error.message)
             case .request, .badAnswer, .timedOut:
                 // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
-                if !submitted.value { held?.refund() }
+                if error.canRefund(beforeAccepted: !submitted.value) { held?.refund() } else { creditsUnconfirmed = requestSent }
                 finish(.failed, error.message)
             }
         } catch is CancellationError {
             // 传首帧的时候停的没花钱；下载的时候停的，活已经做完了（积分花了，成品在作品库里）。
-            if submitted.value {
-                finish(.cancelled, "The generation was stopped while downloading; it was already made, so the credits are spent and the "
-                    + "result is in the user's Sky Studio library.")
+            if requestSent {
+                creditsUnconfirmed = !serverFinished && lastFailure?.creditsReturned != true
+                finish(.cancelled, serverFinished ? "The generation was stopped while downloading; it was already made and is in the Sky Studio library."
+                    : "Stopped waiting for the original job. No replacement was submitted; check its task and refund status before regenerating.")
             } else {
                 held?.refund()
                 finish(.cancelled, "The generation was stopped before Sky Studio got it; no credits were spent.")
@@ -173,22 +182,78 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             held?.refund()
             finish(.failed, problem.message)
         } catch let failure as SkyStudioFailure {
-            if !submitted.value { held?.refund() }
+            if !requestSent { held?.refund() }
+            creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
             finish(.failed, SkyStudioJobError.request(failure).message)
         } catch {
-            if !submitted.value { held?.refund() }
+            if !requestSent { held?.refund() }
+            creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
             finish(.failed, "SkyCut could not save the result: \(error.localizedDescription)")
         }
     }
 
-    /// 图生视频：把首帧传上去，回 `/jobs` 的 inputs 要的地址；别的种类没有首帧。
-    private func uploadFrame(api: SkyStudioAPI, key: String) async throws -> URL? {
-        guard let frame else { return nil }
-        advance(to: .uploading(fraction: nil))
-        let prepared = try SkyStudioGenerationFrame.prepare(frame, workFolder: Self.workFolder)
-        defer { prepared.cleanUp() }
-        return try await api.upload(fileURL: prepared.url, contentType: prepared.contentType, purpose: "image", key: key) { [weak self] fraction in
-            Task { @MainActor in self?.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction))) }
+    /// 原单未知就原样抛出；只有真人参考拒绝且已退款，才换一次兼容模型。已上传的素材直接复用。
+    private func make(api: SkyStudioAPI, key: String, uploaded: (inputs: [String: String], references: [JSONValue])) async throws -> SkyStudioJobStatus {
+        do { return try await attempt(api: api, key: key, uploaded: uploaded) }
+        catch let error as SkyStudioJobError {
+            var failure = error.failure
+            if allowsFallback, let original = failure, original.isRealPersonRefusal, !original.creditsReturned, original.jobID != nil {
+                status.waitingForRefund = true
+                defer { status.waitingForRefund = false }
+                failure = try await SkyStudioJobRun(api: api, key: key).waitForRefund(original)
+            }
+            lastFailure = failure
+            guard allowsFallback, !Task.isCancelled, let failure,
+                  let candidate = SkyStudioGenerationFallback.candidate(failure: failure, originalModel: modelID, generation: generation, ask: ask,
+                    references: references, catalog: catalog, canvas: canvas, frame: frameRatio, alreadySwitched: !attempts.isEmpty) else {
+                if let failure, failure.creditsReturned { throw SkyStudioJobError.failed(failure) }
+                throw error
+            }
+            held?.refund()
+            var original: [String: JSONValue] = ["model_id": .string(modelID), "refusal": failure.json]
+            if let id = submitted.jobID ?? failure.jobID { original["skystudio_job_id"] = .string(id) }
+            attempts.append(.object(original))
+            let quote = try await api.quote(candidate.generation.job(model: candidate.model.id), key: key)
+            try Task.checkCancellation()
+            guard let reservation = SkyStudioJobGate.reserveReplacement(credits: quote.credits, approvedCeiling: approvedCeiling) else {
+                throw SkyStudioJobError.failed(SkyStudioJobFailure(message: "The original was refunded. Switching to \(candidate.model.title) costs "
+                    + "\(SkyStudioCredits.text(quote.credits)) credits, above the approved \(SkyStudioCredits.text(approvedCeiling)); ask the user before starting it.",
+                    fields: ["refunded": true]))
+            }
+            held = SkyStudioHeldCredits(reservation)
+            generation = candidate.generation; modelID = candidate.model.id; modelTitle = candidate.model.title
+            credits = quote.credits; typicalSeconds = quote.typicalSeconds ?? generation.typicalSeconds
+            submitted = SkyStudioSubmission(); requestSent = false
+            status.modelTitle = modelTitle; status.credits = credits; status.reset(typicalSeconds: typicalSeconds)
+            lastFailure = nil
+            return try await attempt(api: api, key: key, uploaded: uploaded)
+        }
+    }
+
+    private func attempt(api: SkyStudioAPI, key: String, uploaded: (inputs: [String: String], references: [JSONValue])) async throws -> SkyStudioJobStatus {
+        let request = generation.job(model: modelID, maxCredits: credits, uploaded: uploaded.inputs, references: uploaded.references)
+        requestKeys.append(request.idempotencyKey)
+        requestSent = true
+        let submitted = self.submitted
+        do {
+            return try await SkyStudioJobRun(api: api, key: key).run(request) { [weak self] update in
+                let next: CloudJobPhase?
+                switch update {
+                case .waitingForSlot: next = .queued(position: nil)
+                case .status(let server):
+                    submitted.mark(server.jobID)
+                    switch server.state {
+                    case .queued?: next = .queued(position: server.queuePosition)
+                    case .running?: next = .processing
+                    default: next = nil
+                    }
+                }
+                if let next { Task { @MainActor in self?.advance(to: next) } }
+            }
+        } catch let error as SkyStudioJobError {
+            lastFailure = error.failure
+            if let id = error.failure?.jobID { submitted.mark(id) }
+            throw error
         }
     }
 
@@ -215,7 +280,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         }
         if let duration = result.duration { detail["duration"] = AIFormat.seconds(duration) }
         if generation.kind.isVideo {
-            detail["note"] = .string("MiniMax H3 clips carry their own sound (room tone, foley, music); it plays with the clip. "
+            detail["note"] = .string("Generated clips may carry their own sound; it plays with the clip. "
                 + "Lower or mute the clip's volume (edit_clip) when you add your own music or narration.")
         }
         finish(.done, "Made \(file.lastPathComponent).", detail: .object(detail))
@@ -223,10 +288,21 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     private func finish(_ status: AIJobs.Status, _ message: String, detail: JSONValue? = nil) {
         guard let job else { return }
-        var payload = detail
+        var payload = detail?.objectValue ?? [:]
         // 交上了就带任务号（停不下来的那单、没做成的那单也说得出是哪一单）。
-        if payload == nil, let id = submitted.jobID { payload = .object(["skystudio_job_id": .string(id)]) }
-        AIJobs.shared.finish(job, status, message: message, detail: payload)
+        if let id = submitted.jobID { payload["skystudio_job_id"] = .string(id) }
+        payload["model_id"] = .string(modelID)
+        payload["submission_keys"] = .array(requestKeys.map(JSONValue.string))
+        if !attempts.isEmpty { payload["fallback_attempts"] = .array(attempts) }
+        if let lastFailure { payload["failure"] = lastFailure.json }
+        if creditsUnconfirmed { payload["credits_unknown"] = true }
+        if status == .failed, lastFailure?.isRealPersonRefusal == true, payload["next_step"] == nil {
+            payload["next_step"] = .string("Explain the Seedance reference refusal. Recommend MiniMax H3 or Google Omni after checking their complete reference/duration limits "
+                + "with get_status models=true. Keep all inputs. " + (creditsUnconfirmed
+                    ? "Continue checking the original task/refund; do not generate again while payment is unknown."
+                    : "A replacement must stay within the approved price; otherwise ask before starting it."))
+        }
+        AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
     }
 
     // MARK: 给状态行看的

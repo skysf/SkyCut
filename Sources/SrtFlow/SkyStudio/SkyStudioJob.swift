@@ -18,6 +18,7 @@ struct SkyStudioJobRequest: Equatable, Sendable {
     var prompt: String?
     /// `video_url`、`image_url`、`reference_audio_url`：自己 `/uploads` 上去的文件，或 Sky Studio 的素材。
     var inputs: [String: String]
+    var references: [JSONValue]
     var params: [String: JSONValue]
     /// 用户同意过的上限（`/quote` 报的那个数）：服务器算出来更贵就回 `price_changed`、一分不扣。
     var maxCredits: Double?
@@ -26,12 +27,13 @@ struct SkyStudioJobRequest: Equatable, Sendable {
 
     init(
         kind: String, model: String, prompt: String? = nil, inputs: [String: String] = [:], params: [String: JSONValue] = [:],
-        maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased()
+        maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased(), references: [JSONValue] = []
     ) {
         self.kind = kind
         self.model = model
         self.prompt = prompt
         self.inputs = inputs
+        self.references = references
         self.params = params
         self.maxCredits = maxCredits
         self.idempotencyKey = idempotencyKey
@@ -47,7 +49,9 @@ struct SkyStudioJobRequest: Equatable, Sendable {
     /// `/jobs` 的请求体。
     var jobBody: JSONValue {
         guard case .object(var body) = quoteBody else { return quoteBody }
-        body["inputs"] = .object(inputs.mapValues { .string($0) })
+        var allInputs = inputs.mapValues { JSONValue.string($0) }
+        if !references.isEmpty { allInputs["references"] = .array(references) }
+        body["inputs"] = .object(allInputs)
         body["idempotency_key"] = .string(idempotencyKey)
         if let maxCredits { body["max_credits"] = .number(maxCredits) }
         return .object(body)
@@ -93,6 +97,7 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     var result: SkyStudioJobResult?
     /// 没做成时服务器说的话。
     var error: String?
+    var failure: SkyStudioJobFailure?
 
     var isFinished: Bool { state == .done || state == .failed || state == .cancelled }
 
@@ -113,6 +118,7 @@ struct SkyStudioJobStatus: Equatable, Sendable {
         creditsCharged = json["credits_charged"]?.doubleValue
         if let result = json["result"], !result.isNull { self.result = SkyStudioJobResult(json: result) }
         error = Self.errorText(json["error"])
+        if let error { failure = SkyStudioJobFailure(message: error, fields: json["error"]?.objectValue ?? [:], jobID: id) }
     }
 
     /// `error` 可能是一句话，也可能是 `{"code", "message"}`。

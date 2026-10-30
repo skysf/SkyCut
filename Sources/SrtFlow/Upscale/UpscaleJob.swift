@@ -128,11 +128,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
             case .stopped(let stop):
                 end(.cancelled(stop), refunding: stop == .nothingCharged)
             case .failed:
-                // Sky Studio 说没做成：它自己退钱（只退一次）。
-                end(.failed(error.message), refunding: true)
+                end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
             case .request, .badAnswer, .timedOut:
                 // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
-                end(.failed(error.message), refunding: !submitted.value)
+                end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
             }
         } catch is CancellationError {
             // 裁、传的时候停的没花钱；下载、封声的时候停的，活已经做完了（积分花了，成品在作品库里）。

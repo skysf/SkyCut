@@ -3,7 +3,7 @@
 > 2026-10-28 引入（[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 6 刀）。改 `Sources/SrtFlow/SkyStudio/` 里的
 > `SkyStudioAPI`（`/models` 之后的那几个接口）、`SkyStudioJob`、`SkyStudioModels`、`SkyStudioJobRun`，或者往 upscale / 生成 / 配旁白里接 Sky Studio 之前必读。
 > 接口合同在 **Sky Studio 仓库**（本机 `SkyStudio_APP_Master/cursor-skystudios-app-cinematic`）的 `docs/agents/skycut-api.md`，
-> 2026-10-28 上线、**从 Sky Studio main 的 5c8d6a0d 起冻结**（那边要改先发消息、带 commit）。Key、`/me`、授权见 [Sky Studio 账号](sky-studio-account.md)。
+> 2026-10-28 上线；2026-10-30 多模型 / 多参考合同在 Sky Studio PR #228、main `bfc5860e` 更新并上线。Key、`/me`、授权见 [Sky Studio 账号](sky-studio-account.md)。
 
 ## 一、规矩
 
@@ -56,11 +56,20 @@
   **确认码绑完整请求**（2026-10-29，`SkyStudioApproval`）：kind、model、prompt、全部参数 / 输入、精确报价，加首帧或原片的文件身份和落点；
   生成还绑文件夹 / 名字，upscale 还绑源范围 / 被替换的段 / 工程。显示摘要只给人看，不能拿它当 action；提交的随机 key 不参与。
   同一件事重问回同一码，换 kind / 提示词 / 参数 / 输入 / 价格就另发，串码不消费、不记账。
-- **生成**（6b，2026-10-28）：`generate_media` 的图片、文生 / 图生视频、音乐、音效。kind 照 `/models` 挑第一个模型（图 `seedream5-flash`、视频 `minimax-h3`、
-  音乐 `lyria-3-pro`、音效 `sonilo-sfx`）；参数换成 Sky Studio 的写法在 `SkyStudioGeneration`（画幅跟画布、图生视频送离首帧最近的那个、视频 5 秒 768p、
-  音效 5 秒 wav、音乐纯音乐不给时长让模型定；**规矩在服务器上**，不合规的 `/quote` 回 `invalid_request`、原话交给 AI，SkyCut 不另抄一份）；图生视频的首帧
-  `/uploads`（purpose `image`；认得的格式原样传，别的缩到长边 2048 存 JPEG）；问 `/quote` → `SkyStudioJobGate` → 回任务号；任务交给 `SkyStudioJobRun`、
-  成品下载到「生成」文件夹（也长期留在作品库里），Key 不弹授权框。`get_job` 有阶段和 `skystudio_job_id`，状态行上一行（积分、停止）。
+- **生成**（6b，2026-10-30 更新）：`generate_media` 收可选 `model`，不再取目录第一条；能力、默认时长 / 分辨率 / 画幅只读 `/models`，价格只问 `/quote`。
+  图片亚洲人物、地点或文化主体优先 Seedream 5 Flash；非亚洲、混合、不明确优先 Nano 2。按主体判断，不按提示词语言；AI 用 `image_context` 表达判断。
+  普通视频依次 H3、Omni 1.1 Flash、Veo Fast、Seedance 2.0；明确不计成本 / 时间追求最高质量才 `quality=highest`，优先 Seedance 2.5、其次 Veo Pro。
+  点名模型优先；默认只从完整兼容输入的候选里挑。没有兼容模型就报告，不能丢引用、裁短时长来凑。
+  `get_status models=true` 是只读目录（可 `model=<id>` 过滤），回所有默认值和输入限制，不生成、不记账。
+- **参考素材**：`image` + 可选 `last_image` 是首尾帧；`reference_images` / `reference_videos` / `reference_audio` 是有序多模态引用，不能和首尾帧混用。
+  图片生成也能收多张参考图。所有路径先过同一份 `confirmReading`，再测量、按目录检查数量 / 字节 / 长度 / 组合限制；图片转码走 `MediaReadQueue.analysis`。
+  例：H3 多模态最多 9 图 / 3 视频 / 3 音频，但总数最多 12，音频不能独用；首尾帧只有 2 图。H3 多模态支持 2K / 4K，首尾帧不支持。
+  限制只从服务端读，不能抄一份常量冒充模型能力。报价带实际图片数量、参考视频总秒数；有序上传后经 `inputs.references` 原样发；审批身份绑所有本机文件与顺序。
+  服务端自己探真实素材并在扣费前核对 `max_credits`；上传一次，替换模型复用同一批 URL。成品下载到「生成」文件夹，作品库也永久保留。
+- **真人参考拒绝后的替换**：默认 `auto_fallback=true`，用户已经授权这次生成时，Seedance 的结构化 `REAL_PERSON_REFERENCE` 拒绝且 `refunded=true` / `charged=false`
+  才自动换一次兼容的 H3 或 Omni。只认机器字段，不从英文句子猜；普通安全拒绝不触发。退款晚到只 GET 原 job_id（最多 8 次、间隔 15 秒），
+  `get_job phase=waiting_for_refund`；仍不确定就保留原任务号 / 幂等 key 和本机账，不再生成。替换必须保留全部参考与时长，报价不高于原来已批准的上限；
+  更贵要重新问，不能因失败绕过消费确认。原单明确退款后才退本机原预留、记新单；生成、upscale、配音都不再把一个无退款字段的失败句子当成已退。
 - **清单**（2026-10-30）：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，但不再按 Key 隐藏；工具及总说明末尾的「Paid」一行始终存在。
   Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
   新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。
@@ -100,3 +109,12 @@
 - [ ] 真实 Key：普通旁白跨多个 chunk、字幕尾端不超音频；两句克隆只付一批并切成两段，听接缝无截字；一步撤销音频字幕一起消失。
 - [ ] 有窗口 / 后台工程：状态行显示积分、阶段与停止；取消 queued 只退一次，409 已开始继续查到结局；切 / 关工程不落到另一工程。
 - [ ] 每日额度为 0：普通配音退本机说明原因，克隆收费前失败；恢复原设置。
+
+## 八、多模型 / 多参考验证
+
+- `ModelPolicyChecks`：目录顺序不改变用户偏好；模型专属默认值 / 画幅；完整参考限制；不丢输入 / 不裁短；通用安全拒绝、未知退款均不能替换。
+- `JobRunChecks`：退款晚到只查原单，断网不产生新单。`SpendChecks`：替换不超过原批准价，退款只记一次，零每日额度但原已确认的单仍可按原上限替换。
+- 免费真实 App / MCP：`scripts/gui-smoke/sky-studio/run.sh` 后运行 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/media.py`。
+  假 Key / 回环服务 / 独立 bundle：查询目录、亚洲 / 默认图片模型、图片视频音频的有序上传、尾帧、提交时 / 查询时拒绝与退款晚到、替换价上限、未知结果不重交。
+- [ ] 正式 Key 人工抽查：`get_status models=true model=minimax-h3` 报出当前限制；普通 / 最高质量 / 点名模型按要求选中；真实多参考文件在消费前给出正确报价。
+- [ ] Seedance 真人拒绝时原单先退再替换；看 `fallback_attempts`、`submission_keys` 和 Sky Studio 明细，确认没有重复扣费。

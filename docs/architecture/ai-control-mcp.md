@@ -645,8 +645,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - 已知不足：位置不跟着片段走（片段挪 / 缩放之后要重盖）；只按此刻的摆放换算、不看关键帧动画。
 39. **生成素材（`generate_media`，方案第 6 块、第 57 条；2026-10-28 起送 Sky Studio、花积分，之前送 fal.ai、花美元）**：合同在
     [Sky Studio 的任务](sky-studio-jobs.md)「谁在用」的「生成」一条（fal 时代的在 [fal.ai 生成](fal-generation.md) 第八节），这里只记它怎么接进 MCP 这一层。
-    模型由 Sky Studio 按种类定（`/models`），`model` / `options` 两个参数 2026-10-28 起没有了（老客户端带着就整个不做、说清楚，第 52 条）；视频只有 480p / 768p；
-    音乐 60–180 秒或让模型定、`instrumental=false` 可以带 `lyrics`。结果报 `credits`（开始时）、`credits_charged` 和 `skystudio_job_id`（做完时），成品也留在作品库里。
+    2026-10-30 起 `model` 可选，按 [Sky Studio 的任务](sky-studio-jobs.md)的用户偏好和完整输入兼容性选；`options` 仍不收。
+    `get_status models=true` 只读查询模型默认值、可选参数和每种输入模式的图片 / 视频 / 音频数量、格式、字节、时长、组合限制（可 `model=<id>` 过滤）。
+    分辨率 / 画幅不再用静态 H3 枚举限制所有模型。首尾帧是 `image` / `last_image`，多模态是三个有序 `reference_*` 数组；全部经授权、测量、报价、上传。
+    音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
+    Seedance 真人参考拒绝只按结构化错误和退款证据自动替换一次；未知状态不重交，退款晚到查原单；完整参考与时长不丢，替换价不得超过原批准上限。
     风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 旧版清单可能没有这个工具，当前清单始终列出，是否能消费在调用时核对；
     共用规矩第 11 条和每张卡的「Generated media」一节说了有它时能补什么、不能替什么（`RecipeChecks` 钉着：提到就得在条件句下、
     词表和结果字段名都得对得上）：

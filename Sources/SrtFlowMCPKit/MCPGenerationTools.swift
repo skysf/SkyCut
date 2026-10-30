@@ -15,38 +15,45 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Makes a new image, video clip, music or sound effect with the user's Sky Studio credits (paid; requires a \
-                Sky Studio key in SkyCut Settings). Not for subtitles (generate_subtitles), narration (add_voiceover), \
-                effects add_clips sound_effect can make, or footage the user already has. One result per call. It returns a \
-                job_id at once: wait with get_job (an image takes about 15 s, a sound effect 10 s, music about a minute, a \
-                video a few minutes); while it runs get_job shows phase (uploading, queued, processing, downloading), \
-                queue_position, transfer_percent, phase_seconds and typical_seconds. The finished job has file (a path in the \
-                user's SkyCut folder; put it on the timeline with add_clips) and credits_charged; it also stays in the user's \
-                Sky Studio library. kind: image | text_to_video | image_to_video | music | sound_effect. Image: Seedream 5 \
-                Flash; aspect_ratio (default: the project's canvas). Video: MiniMax H3, 5–15 s per clip with sound built in; \
-                resolution 480p (cheaper, for drafts) or 768p (default); text_to_video takes aspect_ratio (21:9, 16:9, 4:3, \
-                1:1, 3:4 or 9:16; default: the canvas); image_to_video takes image (the first frame) and keeps its shape. \
-                Music: Lyria 3 Pro; instrumental (default true), or instrumental=false with lyrics; duration 60–180 s, or \
-                leave it out and the model decides. Sound effect: 0.5–180 s (default 5; under 3 s costs as 3 s). Write \
-                prompts like a director: subject, action, camera, light, style; for music, style, mood and instruments. Cost: \
-                the result's credits is Sky Studio's price; within the user's daily credit limit SkyCut just starts; when a \
-                call would go over it, it returns needs_confirmation with a confirm_token instead: ask the user and, only if \
-                they agree, call again with it. cancel_job refunds a job still in Sky Studio's queue; once it has started it \
-                cannot be cancelled. Tell the user before you make several expensive clips.
+                Generates one image, video, music or sound effect with Sky Studio credits (paid; key required in SkyCut \
+                Settings). Read get_status models=true (optionally model=<id>) BEFORE choosing references: it lists current \
+                models, defaults and per-mode image/video/audio counts, formats, size, duration and combination limits. \
+                Image: Asian people/places/culture prefer seedream5-flash; other, mixed or unclear subjects prefer nano2. \
+                Judge the subject, not the prompt language; set image_context=asian when appropriate. Video prefers \
+                MiniMax H3 (minimax-h3), then gemini-omni-1.1-flash, veo-fast, seedance-2-pro. Only when the user explicitly wants maximum \
+                quality regardless of cost/time set quality=highest: seedance-2-5, then veo-pro. Explicit model overrides \
+                preferences. image_to_video frames use image plus optional last_image; multimodal uses ordered reference_images, \
+                reference_videos and reference_audio. Supported types and limits differ by model; keep every reference. \
+                Seedance may refuse real or photoreal people. auto_fallback=true switches once to compatible MiniMax/Google \
+                only after confirmed refusal and refund/no-charge proof, within the original approved price; never resubmit \
+                an unknown or timed-out job. Returns job_id immediately: wait with get_job for phase, queue_position, \
+                transfer_percent, phase_seconds and typical_seconds. Finished jobs have file and credits_charged; add_clips \
+                puts the file on the timeline. Results also stay in the Sky Studio library. Aspect defaults to canvas; \
+                frame video keeps the image shape. Music: Lyria 3 Pro, instrumental=true or false with lyrics; 60–180 s or \
+                leave duration out. Sound effects: 0.5–180 s, default 5. Narration uses add_voiceover; subtitles use generate_subtitles. SkyCut quotes before \
+                spending; above the daily credit limit it returns needs_confirmation and confirm_token: ask the user before \
+                retrying with that token. cancel_job refunds queued jobs; started jobs cannot be cancelled.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
                     "prompt": MCPSchema.string("What it should look / sound like."),
-                    "image": MCPSchema.string("image_to_video: the picture file to start from (a path in the user's folder)."),
+                    "model": MCPSchema.string("Exact model id from get_status models=true. Leave out to use the subject/quality preference among compatible models."),
+                    "image_context": MCPSchema.string("Image subjects: asian for primarily Asian people, places or culture; other for non-Asian, mixed or unclear. Default other.", oneOf: ["asian", "other"]),
+                    "quality": MCPSchema.string("Video: standard by default. highest only when the user explicitly prioritizes quality without cost/time limits.", oneOf: ["standard", "highest"]),
+                    "input_mode": MCPSchema.string("Video: frames or multimodal. Inferred from reference arrays when omitted; inspect model limits first.", oneOf: ["frames", "multimodal"]),
+                    "image": MCPSchema.string("First frame for image_to_video, or one reference for image generation; a file path."),
+                    "last_image": MCPSchema.string("Optional final frame with image, in frames mode."),
+                    "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references; image generation or multimodal video."),
+                    "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV file path."), "Ordered multimodal video references; model-specific count/length limits."),
+                    "reference_audio": MCPSchema.array(of: MCPSchema.string("MP3/WAV file path."), "Ordered multimodal audio references; some models require a visual reference or do not accept audio."),
+                    "auto_fallback": MCPSchema.boolean("Allow one compatible MiniMax/Google replacement after a refunded Seedance real-person refusal, within the original approved price. Default true."),
                     "duration": MCPSchema.number(
-                        "Seconds. Video 5–15 (default 5), music 60–180 (default: the model decides), sound effect 0.5–180 (default 5).",
+                        "Seconds. Video uses this model's exact duration choices/default; music 60–180 or automatic; effects 0.5–180, default 5.",
                         minimum: 0.5, maximum: 180
                     ),
-                    "resolution": MCPSchema.string("Video only (default 768p).", oneOf: MCPVocabulary.videoResolutions),
-                    "aspect_ratio": MCPSchema.string(
-                        "Image and text_to_video (default: the canvas of the project). Video takes 21:9, 16:9, 4:3, 1:1, 3:4 or 9:16.",
-                        oneOf: MCPVocabulary.generationAspects
-                    ),
+                    "resolution": MCPSchema.string("Image/video output size from this model's mode-specific choices; default from /models."),
+                    "aspect_ratio": MCPSchema.string("Image/text/multimodal video aspect from the model catalog; default nearest to canvas. Frame video follows the image."),
+                    "generate_audio": MCPSchema.boolean("Video audio toggle, only when this model lists it. Other models may always generate sound."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "lyrics": MCPSchema.string("Music only, with instrumental=false: the words to sing."),
                     "name": MCPSchema.string("A short file name (default: made from the prompt)."),

@@ -12,6 +12,7 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published var modelTitle: String
     @Published var credits: Double?
     @Published private(set) var progress: CloudJobProgress?
+    @Published var waitingForRefund = false
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool) {

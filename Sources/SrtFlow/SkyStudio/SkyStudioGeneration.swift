@@ -4,12 +4,12 @@ import SrtFlowMCPKit
 // MARK: - generate_media 的一次生成：送 Sky Studio 的 kind、prompt、params（纯值）
 //
 // 管什么：AI 给的参数读成 Sky Studio `/quote`、`/jobs` 要的那一份（收费方案第 6 刀 6b，2026-10-28 起；之前送 fal）。
-// - 默认值：图和文生视频的画幅跟画布；图生视频送离首帧最近的那个；视频 5 秒 768p；音效 5 秒 wav；音乐纯音乐、长度让模型定。
+// - 默认值：从选中模型读；画幅跟画布 / 首帧；音效 5 秒 wav；音乐纯音乐、长度让模型定。旧目录缺默认值时保留旧 H3 的 5 秒 768p。
 // - 换成 Sky Studio 的写法：视频和音乐的秒数取整。
 // - 给了但这一种用不上的参数说一句。
 // **规矩在服务器上**（多长、多大、哪几种画幅、音乐 60–180 秒）：这里不另抄一份去拦，送过去不合规的 `/quote` 回 `invalid_request`，原话交给 AI。
 // 取值见 Sky Studio 仓库 docs/agents/skycut-api.md「Per kind」。
-// 不管什么：问价、把关、跑任务、下载（SkyStudioGenerateTool / SkyStudioGenerationRun）；用哪个模型（`/models` 按 kind 列）。
+// 不管什么：问价、把关、跑任务、下载（SkyStudioGenerateTool / SkyStudioGenerationRun）；模型偏好（SkyStudioModelPolicy）。
 
 struct SkyStudioGeneration: Equatable, Sendable {
     /// generate_media 的 kind（= `MCPVocabulary.generationKinds`，check-sky-studio 对账）。旁白、克隆走 add_voiceover。
@@ -41,13 +41,15 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var aspectRatio: String?
         var instrumental: Bool?
         var lyrics: String?
+        var generateAudio: Bool?
 
-        init(duration: Double? = nil, resolution: String? = nil, aspectRatio: String? = nil, instrumental: Bool? = nil, lyrics: String? = nil) {
+        init(duration: Double? = nil, resolution: String? = nil, aspectRatio: String? = nil, instrumental: Bool? = nil, lyrics: String? = nil, generateAudio: Bool? = nil) {
             self.duration = duration
             self.resolution = resolution
             self.aspectRatio = aspectRatio
             self.instrumental = instrumental
             self.lyrics = lyrics
+            self.generateAudio = generateAudio
         }
     }
 
@@ -58,23 +60,34 @@ struct SkyStudioGeneration: Equatable, Sendable {
     var notes: [String]
 
     /// `canvas`：工程画布的宽 / 高（图和文生视频默认跟它）；`frame`：图生视频首帧的宽 / 高（读不出来就跟画布）。
-    static func make(_ kind: Kind, prompt: String, ask: Ask, canvas: Double, frame: Double? = nil) -> SkyStudioGeneration {
+    static func make(_ kind: Kind, prompt: String, ask: Ask, canvas: Double, frame: Double? = nil, model: SkyStudioModel? = nil,
+                     inputMode: String = "frames", references: SkyStudioReferencePlan? = nil) -> SkyStudioGeneration {
         var params: [String: JSONValue] = [:]
         var notes: [String] = []
         func ignored(_ name: String, _ why: String) { notes.append("\(name) was ignored: \(why).") }
         switch kind {
         case .image:
-            params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: imageAspects))
+            let choices = model?.choices("aspect_ratio") ?? []
+            params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: choices.isEmpty ? imageAspects : choices))
+            if let model {
+                if let resolution = ask.resolution ?? model.defaults["resolution"]?.stringValue { params["resolution"] = .string(resolution) }
+            }
         case .textToVideo, .imageToVideo:
-            params["duration"] = .number((ask.duration ?? defaultVideoSeconds).rounded())
-            params["resolution"] = .string(ask.resolution ?? defaultResolution)
-            if kind == .textToVideo {
-                params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: videoAspects))
+            params["duration"] = .number((ask.duration ?? model?.defaults["duration"]?.doubleValue ?? defaultVideoSeconds).rounded())
+            params["resolution"] = .string(ask.resolution ?? model?.defaults["resolution"]?.stringValue ?? defaultResolution)
+            let choices = model?.choices("aspect_ratio") ?? []
+            let aspects = choices.isEmpty ? videoAspects : choices
+            if kind == .textToVideo || inputMode == "multimodal" {
+                params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: aspects))
             } else {
                 // 出来的视频跟着首帧的形状；网页那条路仍要一个画幅，送离首帧最近的那个（合同「Image to video」）。
-                params["aspect_ratio"] = .string(nearestAspect(to: frame ?? canvas, in: videoAspects))
+                params["aspect_ratio"] = .string(nearestAspect(to: frame ?? canvas, in: aspects))
                 if ask.aspectRatio != nil { ignored("aspect_ratio", "image_to_video keeps the picture's shape") }
             }
+            if inputMode == "multimodal" || model?.params["mode"] != nil { params["mode"] = .string(inputMode) }
+            if model?.params["generate_audio"] != nil {
+                params["generate_audio"] = .bool(ask.generateAudio ?? model?.defaults["generate_audio"]?.boolValue ?? true)
+            } else if ask.generateAudio != nil { ignored("generate_audio", "this model has no audio toggle") }
         case .music:
             // 不给时长就让模型自己定（Sky Studio 的 auto）。
             if let seconds = ask.duration { params["duration"] = .number(seconds.rounded()) }
@@ -92,19 +105,22 @@ struct SkyStudioGeneration: Equatable, Sendable {
             params["audio_format"] = "wav"
         }
         if kind.isSound, ask.aspectRatio != nil { ignored("aspect_ratio", "it only applies to images and video") }
-        if !kind.isVideo, ask.resolution != nil { ignored("resolution", "it only applies to video") }
+        if kind.isSound || (kind == .image && model == nil), ask.resolution != nil { ignored("resolution", "it does not apply to this generation") }
         if kind == .image, ask.duration != nil { ignored("duration", "an image has no length") }
         if kind != .music, ask.instrumental != nil { ignored("instrumental", "it only applies to music") }
         if kind != .music, ask.lyrics != nil { ignored("lyrics", "it only applies to music") }
+        if !kind.isVideo, ask.generateAudio != nil { ignored("generate_audio", "it only applies to video") }
+        if !kind.isSound, let references { params.merge(references.quoteParams) { _, new in new } }
         return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes)
     }
 
     /// 送 `/quote`、`/jobs` 的那一份（每次一个新的 idempotency_key）。`imageURL`：图生视频的首帧（`/uploads` 上去的）；
     /// `maxCredits`：用户同意的价（只有 `/jobs` 带）。
-    func job(model: String, imageURL: URL? = nil, maxCredits: Double? = nil) -> SkyStudioJobRequest {
-        var inputs: [String: String] = [:]
+    func job(model: String, imageURL: URL? = nil, maxCredits: Double? = nil,
+             uploaded: [String: String] = [:], references: [JSONValue] = []) -> SkyStudioJobRequest {
+        var inputs = uploaded
         if let imageURL { inputs["image_url"] = imageURL.absoluteString }
-        return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt, inputs: inputs, params: params, maxCredits: maxCredits)
+        return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt, inputs: inputs, params: params, maxCredits: maxCredits, references: references)
     }
 
     /// 「MiniMax H3 · 5 s · 768p」：确认码绑着它（SkyStudioJobGate），状态行上也写它。不带语言的几个记号。

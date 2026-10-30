@@ -57,7 +57,11 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioModelPolicy.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReferencePolicy.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationFallback.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
@@ -89,6 +93,7 @@ xcrun swiftc \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
+  checks/SkyStudio/ModelPolicyChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

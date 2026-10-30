@@ -186,7 +186,7 @@ final class AIToolRouter {
     private func dispatch(_ tool: MCPToolName, _ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let undo = project.effectiveUndoManager
         switch tool {
-        case .getStatus: return try AIProjectTools.status(args, project)
+        case .getStatus: return try await AIProjectTools.status(args, project)
         case .setView: return try await AIProjectTools.setView(args, project)
         case .openFolder: return try await AIProjectTools.openFolder(args, project)
         case .readDocument: return try await AIFileTools.readDocument(args, project)

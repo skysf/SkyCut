@@ -17,7 +17,7 @@ enum SkyStudioGenerationFrame {
     private static let passthrough: [String: String] = ["png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "webp": "image/webp"]
 
     /// 要传的那个文件。`temporary`：转出来的，传完删掉。
-    struct Prepared {
+    struct Prepared: Sendable {
         let url: URL
         let contentType: String
         let temporary: Bool
