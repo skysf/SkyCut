@@ -26,10 +26,12 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \
   Sources/SrtFlow/USDollarText.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
+  Sources/SrtFlow/CloudMedia/CloudTaskSummary.swift \
   checks/CloudMedia/main.swift \
   checks/CloudMedia/Harness.swift \
   checks/CloudMedia/SpendChecks.swift \
   checks/CloudMedia/PhaseChecks.swift \
+  checks/CloudMedia/TaskSummaryChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
 echo "==> 跑自检"

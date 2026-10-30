@@ -83,7 +83,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         case .music: label = L10n("Music")
         case .soundEffect: label = L10n("Sound effect")
         }
-        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: references.uploads)
+        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: references.uploads, title: stem)
     }
 
     /// 图生视频要先传首帧（状态行上多一个「上传」）。
@@ -159,7 +159,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             case .stopped(let stop):
                 if stop == .nothingCharged { held?.refund() }
                 creditsUnconfirmed = stop == .unknown
-                finish(.cancelled, "The generation was stopped. " + error.message)
+                let message = "The generation was stopped. " + error.message
+                if stop != .nothingCharged { status.issue = message }
+                finish(.cancelled, message)
             case .failed:
                 if error.canRefund(beforeAccepted: !submitted.value) { held?.refund() } else { creditsUnconfirmed = requestSent }
                 finish(.failed, error.message)
@@ -288,6 +290,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     private func finish(_ status: AIJobs.Status, _ message: String, detail: JSONValue? = nil) {
         guard let job else { return }
+        if status == .failed || creditsUnconfirmed {
+            self.status.issue = message
+        }
         var payload = detail?.objectValue ?? [:]
         // 交上了就带任务号（停不下来的那单、没做成的那单也说得出是哪一单）。
         if let id = submitted.jobID { payload["skystudio_job_id"] = .string(id) }

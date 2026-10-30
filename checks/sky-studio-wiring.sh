@@ -187,7 +187,7 @@ done
 GEN_TOOL="Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift"
 GEN_RUN="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift"
 GEN_ACTIVITY="Sources/SrtFlow/SkyStudio/SkyStudioGenerationActivity.swift"
-STATUS_ROWS="Sources/SrtFlow/CloudMedia/CloudStatusRows.swift"
+STATUS_ROWS="Sources/SrtFlow/CloudMedia/CloudTasksActivity.swift"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}" "${STATUS_ROWS}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done
@@ -211,7 +211,7 @@ grep -qF 'if let id = self.submitted.jobID { detail["skystudio_job_id"] = .strin
 grep -qF 'cancel: { [weak self] in self?.cancel() }' "${GEN_RUN}" || fail "${GEN_RUN}：任务没有取消动作（停止按钮、cancel_job 停不了）"
 [ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 1 ] \
   || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；各恰好一处）"
-grep -qF 'private var generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：状态行没订阅 Sky Studio 的生成任务"
+grep -qF 'let generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：任务入口没订阅 Sky Studio 的生成任务"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
     fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"

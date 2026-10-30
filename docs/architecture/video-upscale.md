@@ -22,7 +22,7 @@ App 把原片的那一段裁出来送 Sky Studio，做完**先弹对比窗口**�
 | 结果 | `UpscaleOutcome` | 文件、探测信息、`ClipUpscaleRecord`（原片、偏移、模型名、原片的探测信息、**实收的积分 `credits`**；fal 时代的记录记着 `costUSD`）、Sky Studio 的任务号、实收的积分、耗时。换源时拼成 `ClipSourceSwap.Replacement` 交给 `VideoEditProject.applyUpscale` |
 | 账 | `UpscaleJob` / `SkyStudioHeldCredits` / `SkyStudioSpendStore` | 面板上的报价（`/quote` 的积分）就是用户的确认（方案第 10 条）：开跑先记进积分的账，不再问（超了每日上限只标红不拦）；AI 起的在起任务之前过 `SkyStudioJobGate`（见第五节）。做完按实收（`credits_charged`，服务器按实际的文件算、比报价低就收低的）改账；**没花出去的退回**：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。交上之后停不下来的（已经开始了、取消没送到）照实说积分花了。fal 时代那套「做完几分钟后查账单、回写工程」2026-10-28 删了：实收做完就知道，随换源一起记进记录 |
 | Key | `UpscaleJob` / `SkyStudioJobKey` | Sky Studio 的 Key（钥匙串，[Sky Studio 账号](sky-studio-account.md)）：**面板起的可以弹授权框**（用户刚点了按钮，`keyPrompt` 让界面提醒点「始终允许」）；面板取模型和报价、AI 起的任务都不弹（读不到就请用户去设置里点「允许…」） |
-| 进度 | `UpscaleJob.state` / `UpscaleActivity.shared` | 阶段（`CloudJobPhase`，[fal.ai 生成](fal-generation.md) 第十三节）：裁 → 上传（字节比例，1% 一格）→ 排队（带位置；同时开着的满了在本机等也算排队）→ 处理（这一阶段过了多久 + 这一档通常几分钟，`/quote` 报的 `typical_seconds`；服务器的 saving 也算处理）→ 下载（字节比例）→ 封声落盘。同一阶段同一比例只报一次；换阶段才重记开始时刻（`CloudJobProgress`）。界面从 `UpscaleActivity` 读：检查器那一节和编辑器顶上的状态行（`CloudStatusRows`）同一份文字；切工程 `cancelAll` |
+| 进度 | `UpscaleJob.state` / `UpscaleActivity.shared` | 阶段（`CloudJobPhase`，[fal.ai 生成](fal-generation.md) 第十三节）：裁 → 上传（字节比例，1% 一格）→ 排队（带位置；同时开着的满了在本机等也算排队）→ 处理（这一阶段过了多久 + 这一档通常几分钟，`/quote` 报的 `typical_seconds`；服务器的 saving 也算处理）→ 下载（字节比例）→ 封声落盘。同一阶段同一比例只报一次；换阶段才重记开始时刻（`CloudJobProgress`）。界面从 `UpscaleActivity` 读：检查器那一节和工具栏任务浮层（`CloudTasksButton` / `CloudTaskRows`）同一份文字；切工程 `cancelAll` |
 
 ## 二、硬约束
 
@@ -43,7 +43,7 @@ App 把原片的那一段裁出来送 Sky Studio，做完**先弹对比窗口**�
 | 面板 | `Upscale/UpscalePanel.swift` + `UpscalePanelModel.swift` | sheet（套 `.appLanguage()`）。范围三选一（默认：别处用得更长就选最长的那处，否则这一段；有另一处更长就提示）、目标三档（默认按画布短边能到的那档，比画布大提示画布也要改）、六个档位各一行（一句话、大约几分钟、夹过的输出尺寸、估价；超过模型的时长 / 大小上限灰掉）、文件名预览、今天已花 / 上限（超限只标红）、没有 Key 才拦。点开始：`UpscaleJob` 进 `UpscaleActivity` |
 | 摆出来 | `Upscale/UpscalePresenter.swift` | 挂在检查器底下的不画东西的小视图，只订阅 `UpscaleActivity.panel` / `.compare`；右键、检查器、做完的任务都往那两个字段里写。`Equatable`（按工程的身份）+ `.equatable()`：检查器每重算一次不重算它 |
 | 对比窗口 | `Upscale/UpscaleCompareView.swift` + `UpscaleCompareStage.swift` + `UpscaleComparePlayback.swift` | 做完先弹（已经在看别的就不抢）。两个 AVPlayer 同一个主机时间起步（`setRate(_:time:atHostTime:)`，不读 `currentTime`），原片出声、upscale 文件静音，原片加 `sourceOffset`。分割线（点哪儿到哪儿、能拖、底下有滑杆）/ 并排；缩放 适合 / 100% / 200%（按 upscale 文件的像素，默认 100%：缩到窗口大小看不出差别），滚轮平移。按钮：Replace Clip（`applyUpscale`，工程里用这个原片且范围被盖住的段一起换，一步撤销）/ Keep Original（文件留着）/ Try Another Model…（回面板）；看已换源的段时是 Revert to Original / Close。实际扣费那一行单独订阅任务（账单几分钟后才有） |
-| 状态行 | `CloudMedia/CloudStatusRows.swift`（`UpscaleStatusRow`） | 编辑器顶上、「AI 正在剪辑」那条横幅底下，每个任务一行（mockup「Status row while upscaling」）：「Upscaling <段> with <档位>」、四个阶段的小标（过了的打勾、当前的带百分比 / 已用时间 / 通常约几分钟）、估价、Stop；做完：「<段> upscaled to 1920×1080 · est. / charged」+ Compare… / Dismiss；失败 / 取消一句 + Dismiss。不选中那一段也看得见（检查器那一节只有选中时才有）。只订阅 `UpscaleActivity`，没任务不画 |
+| 任务浮层 | `CloudMedia/CloudTasksButton.swift` / `CloudTaskRows.swift` | 2026-10-30 用户选择的右上角「生成任务 N」入口；打开后每项显示段名、模型、阶段、预计积分与可取消阶段的取消。关闭浮层不取消；取消直接 `job.cancel()`、保留 409 / 未知结局；做完可 Compare / Dismiss。任务很多时内部滚动，不挤预览。规则见 [Sky Studio 的任务](sky-studio-jobs.md)第九节 |
 | 切工程 | `VideoEditProjectDocument.closeCurrentDocument` | `UpscaleActivity.cancelAll()`：在飞的作废（排着队的替它向 Sky Studio 取消、退钱；已经开始的取消不了，成品进作品库），做完的文件留在磁盘上 |
 
 还没做的：导出面板的「有几段低于目标分辨率」提示（mockup 第二排）；画布自定义尺寸；多选；
@@ -92,7 +92,7 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
   5. 换过源的片段：检查器显示模型 / 日期 / 积分 / 原片（fal 时代换的显示美元），Compare… 看原片 vs 现在，Revert to Original 换回；把原片挪到别的文件夹再换回也行；
      原片删了提示找不到。
   6. 积分：对比窗口 / 检查器 / 状态行的积分是 Sky Studio 实收的；设置 → Sky Studio 的「今天已花」跟着变；网站的积分明细里多一行「SkyCut · …」，作品库里多一条放大的片段。
-  6b. 把窗口缩到最小宽度再起一个 upscale：状态行上的小标（Preparing / Uploading / In queue / Processing / Downloading）都在一行上、不折行，左边那句话截掉中间。
+  6b. 把窗口缩到最小宽度再起 upscale：右上任务入口与浮层可用，阶段 / 积分 / 操作不重叠；长名字截中间，可即时查看全文。
   7. 切工程：做到一半的任务取消，不弹对比窗口。
   8. AI：让 Claude Code 对一段 720p 的画面段调 `upscale_clip`（额度内）：回任务号和积分、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
      做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert；把每日积分上限调到比报价小再调一次：AI 在聊天里问你（回的是确认码，

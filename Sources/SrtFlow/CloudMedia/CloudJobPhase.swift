@@ -7,7 +7,7 @@ import SrtFlowMCPKit
 // 收尾；这一阶段从什么时候起、这一档通常要多久；给 `get_job` 的那几个字段（`phase`、`queue_position`、`transfer_percent`、
 // `phase_seconds`、`typical_seconds`）和界面上「1:12」「约 2 分钟」怎么算。云端处理中**没有百分比**（队列接口只给排队位置和
 // 「处理中」），所以能给的就是阶段 + 排队位置 + 已用时间 + 典型时长，不画假进度条（docs/architecture/sky-studio-jobs.md）。
-// 不管什么：阶段怎么量出来（SkyStudioAPI / UpscalePipeline / SkyStudioGenerationRun）、怎么画（CloudStatusRows、UpscaleJobStatusView）。
+// 不管什么：阶段怎么量出来（SkyStudioAPI / UpscalePipeline / SkyStudioGenerationRun）、怎么画（CloudTaskRows、UpscaleJobStatusView）。
 
 enum CloudJobPhase: Equatable, Sendable {
     /// 裁出那一段（upscale）/ 把关花钱、取 Key（generate_media）。

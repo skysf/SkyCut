@@ -132,6 +132,7 @@ class Handler(BaseHTTPRequestHandler):
                 if CONTROL.get("quote_error"):
                     return self.error(503, "unavailable")
                 credits = 2.5 if data["kind"] == "voice_clone" else 1
+                credits = CONTROL.get("quotes_by_prompt", {}).get(data.get("prompt"), credits)
                 if CONTROL.get("replacement_expensive") and data["model"] == "minimax-h3":
                     credits = 2
                 return self.reply(200, {"credits": credits, "typical_seconds": 5})
@@ -141,6 +142,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(200, {"upload_url": BASE + "/put/" + name, "file_url": BASE + "/files/" + name, "headers": {}})
             if self.path.endswith("/cancel"):
                 job = JOBS.get(self.path.split("/")[-2])
+                if job and CONTROL.get("cancel_already_started"):
+                    job["status"] = "running"
+                    threading.Thread(target=synthesize, args=(job,), daemon=True).start()
+                    return self.error(409, "not_cancellable")
                 if job and job["status"] == "queued":
                     job["status"] = "cancelled"
                     return self.reply(200, {"status": "cancelled", "credits_refunded": job["credits"]})
@@ -153,7 +158,7 @@ class Handler(BaseHTTPRequestHandler):
                     identity = "local-" + str(len(JOBS) + 1)
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
                                kind=data["kind"], model=data["model"], prompt=data["prompt"], poll_after_seconds=2,
-                               credits=2.5 if data["kind"] == "voice_clone" else 1)
+                               credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity
                     if data["model"].startswith("seedance") and CONTROL.get("refuse_seedance"):
                         job["refuse"] = True

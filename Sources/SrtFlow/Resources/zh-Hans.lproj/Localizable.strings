@@ -1240,3 +1240,20 @@
 "Voiceover" = "旁白";
 
 "Complete voiceover" = "完整旁白";
+
+/* Generation task popover */
+"Generation tasks %d" = "生成任务 %d";
+"Generation tasks" = "生成任务";
+"Show generation tasks" = "查看生成任务";
+"%d in queue" = "%d 项排队中";
+"%d active" = "%d 项进行中";
+"%d tasks" = "%d 项任务";
+"%d need attention" = "%d 项需处理";
+"Estimated %@ credits" = "预计 %@ 积分";
+"Quote pending" = "积分待确认";
+"Needs attention" = "需处理";
+"Waiting for refund" = "等待退款确认";
+"Dismiss this task" = "关闭此任务提示";
+"Cancel this task" = "取消此任务";
+"Compare the original and upscaled video" = "对比原始与放大后的视频";
+"Completed" = "已完成";
