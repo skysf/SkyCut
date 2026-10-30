@@ -4,6 +4,7 @@ import Foundation
 runSpendChecks()
 runPhaseChecks()
 runTaskSummaryChecks()
+runTaskGroupingChecks()
 if failures > 0 {
     print("✗ \(failures) of \(checks) cloud media checks failed.")
     exit(1)

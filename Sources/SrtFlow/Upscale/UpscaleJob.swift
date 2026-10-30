@@ -36,8 +36,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
     /// 范围被盖住、做完要换的段。
     let clipIDs: [UUID]
     /// 这段所在的工程（做完换源时核对还是不是它）。
-    let projectGeneration: Int
+    let owner: CloudTaskOwner
+    var projectGeneration: Int { owner.generation }
     let approval: Approval
+    var aiJobID: String?
 
     @Published private(set) var state: State
     @Published private(set) var outcome: UpscaleOutcome?
@@ -56,10 +58,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
     /// Sky Studio 的任务号，交上了才有：upscale_clip 的 get_job 报给 AI（对账、找客服时说得出是哪一单，停不下来的那单也一样）。
     var skyStudioJobID: String? { submitted.jobID }
 
-    init(request: UpscaleRequest, clipIDs: [UUID], projectGeneration: Int, title: String, approval: Approval = .panel) {
+    init(request: UpscaleRequest, clipIDs: [UUID], owner: CloudTaskOwner, title: String, approval: Approval = .panel) {
         self.request = request
         self.clipIDs = clipIDs
-        self.projectGeneration = projectGeneration
+        self.owner = owner
         self.title = title
         self.approval = approval
         state = .running(CloudJobProgress(phase: .preparing, typicalSeconds: request.typicalSeconds))

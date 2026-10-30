@@ -232,7 +232,8 @@ struct UpscalePanel: View {
 
     private func start(selected: UpscaleTierRow, quote: SkyStudioQuote) {
         let request = model.request(choice: choice, target: target, tier: selected.tier, quote: quote)
-        let job = UpscaleJob(request: request, clipIDs: request.range.coveredClipIDs, projectGeneration: project.documentGeneration, title: model.clipName)
+        let job = UpscaleJob(request: request, clipIDs: request.range.coveredClipIDs,
+            owner: CloudTasksActivity.owner(of: project), title: model.clipName)
         UpscaleActivity.shared.add(job)
         dismiss()
     }

@@ -877,6 +877,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-28 Upscale 面板上 Sky Studio 不肯报价的那一行只写「—」](docs/bugfixes/2026-10-28-upscale-panel-hides-why-quote-failed.md) — upscale 改走 Sky Studio 后每行的积分问 `/quote`：超过这一档的最大倍数（Topaz 最多 4 倍）、源已经不比目标小，Sky Studio 回 `invalid_request` 带一句写给人看的话，面板却只画「—」、开始键灰着，看不出为什么。`/models` 不报最大倍数，规则在服务器上：报价失败就把它的原话写在那一行。**会因为内容失败的请求，失败的原因要上界面；规则在服务器上的别自己抄一份，照它的话说。**
 - [2026-10-28 停不下来的 upscale 没人再查：成品不进作品库，还占着一个名额](docs/bugfixes/2026-10-28-uncancellable-upscale-left-unfinished.md) — 第 6 刀真积分测试：`/jobs` 回 queued 不到一秒取消，回 409（fal 已经收下了），SkyCut 说「成品照样会进作品库」就放手了；可 Sky Studio 没有长轮询，**有人 GET 才去服务商那里取成品、存作品库、放出名额**，这一单一直 queued 占着 3 个名额中的一个，要等兜底几个小时。取消不了、取消没送到的那单交给不继承取消的后台任务 `followToEnd` 查到 done / failed（不下载）。**接口合同里「谁触发哪一步」要读清楚；告诉用户「会进作品库」之前，先确认是谁让这句话成真。**
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](docs/bugfixes/2026-10-28-upscale-inspector-still-says-fal.md) — upscale 改走 Sky Studio 后，检查器那一节标题旁的灰字还是 `Text(verbatim: "fal.ai")`：不走字符串表、不是一句话，按文案搜都漏了，真积分测试看截图才发现。改成 Sky Studio，守卫钉住 upscale 的界面不再写 fal.ai。**换提供方要连 verbatim 写死的名字一起搜。**
+- [2026-10-31 多工程的生成任务没有工程归属](docs/bugfixes/2026-10-31-cloud-tasks-without-project-context.md) — 轻盈卡片按原工程代号分组、媒体类型图标、只算进行中的全局 / 本工程数量；后台开窗复用注册表，MCP 同源查询全部进展。
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 - [2026-10-29 两种视频拿到同一个确认码](docs/bugfixes/2026-10-29-sky-studio-confirmation-collides.md) — 摘要相同不等于同一件事；确认码绑定完整请求、精确报价、输入文件和落点，实际过闸回归钉住串码不消费不记账。
 - [提交返回瞬间取消丢任务号](docs/bugfixes/2026-10-29-cancelled-submit-loses-job-id.md)

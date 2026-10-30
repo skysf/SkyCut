@@ -17,6 +17,7 @@ enum AIProjectTools {
     static func status(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let workspace = AIWorkspace.shared
         let session = AISession.shared
+        let cloudTasks = CloudTaskStatusSnapshot.read()
         var projectInfo: [String: JSONValue] = [
             "id": .string(project.shortID),
             "name": .string(project.projectName),
@@ -33,7 +34,8 @@ enum AIProjectTools {
         var result: [String: JSONValue] = [
             "app_version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"),
             "project": .object(projectInfo),
-            "projects": AIProjectStatus.openProjects(session: AICallContext.current?.session),
+            "projects": AIProjectStatus.openProjects(session: AICallContext.current?.session, cloudTasks: cloudTasks),
+            "cloud_tasks": cloudTasks.json(),
             "folders": .array(workspace.folders.map { .string($0.path) }),
             "output_folder": .string(workspace.outputFolder(.exports, project: project).path),
             "jobs": .array(AIJobs.shared.running.map { AIJobs.shared.json($0) }),

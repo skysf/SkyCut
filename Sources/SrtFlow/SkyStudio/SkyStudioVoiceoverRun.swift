@@ -25,12 +25,14 @@ final class SkyStudioVoiceoverRun {
     init(input: AIVoiceoverInput, project: VideoEditProject) {
         self.input = input
         self.project = project
-        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: "Sky Studio", credits: nil, uploads: input.clone != nil)
+        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: "Sky Studio", credits: nil,
+            uploads: input.clone != nil, owner: CloudTasksActivity.owner(of: project), mediaKind: .audio)
     }
 
     func start() -> AIToolResult {
         let job = AIJobs.shared.start(.voiceover, progress: { nil }, liveDetail: { [weak self] in self?.detail() ?? [:] }, cancel: { [weak self] in self?.task?.cancel() })
         self.job = job
+        status.aiJobID = job.id
         status.onCancel = { [weak self] in self?.task?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
         task = Task { @MainActor in await self.execute() }

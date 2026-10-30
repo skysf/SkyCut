@@ -83,7 +83,7 @@ enum AIUpscaleTool {
 
         // 任务：UpscaleJob 跑，AIJobs 里登记一条给 get_job 看（阶段、取消）。
         let job = UpscaleJob(
-            request: request, clipIDs: request.range.coveredClipIDs, projectGeneration: project.documentGeneration, title: clip.name,
+            request: request, clipIDs: request.range.coveredClipIDs, owner: CloudTasksActivity.owner(of: project), title: clip.name,
             approval: .ai(reservation)
         )
         let aiJob = AIJobs.shared.start(
@@ -99,6 +99,7 @@ enum AIUpscaleTool {
                 if let job { UpscaleActivity.shared.remove(job) }
             }
         )
+        job.aiJobID = aiJob.id
         job.onFinished = { finished in land(finished, aiJob: aiJob, project: project) }
         job.onEnded = { ended in settle(ended, aiJob: aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)

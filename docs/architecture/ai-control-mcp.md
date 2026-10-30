@@ -760,7 +760,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `MCPProjectTools.projectParameter`）；`open_project` / `new_project` 回 `project`（短 id）和 `shown_in`（main window / own window）；**不带 `project`
     的落在这个会话最后打开的那个**，子代理要一直带（方案板 1）；碰工程的结果都带 `project`（路由补，`stamped`），带错了一眼看得出。
     `get_timeline` 的工程名因此改叫 `project_name`。`get_status` 报 `id` 和 `projects`（开着的每个工程：id、名字、开在哪、有没有没存的改动、路径、
-    是不是你的 / 谁在剪、在跑的任务）。`close_project project=pN` 只关自己的：先落盘（没存过的先存进 SkyCut/工程）、有任务在跑不关（说是哪几个，
+    是不是你的 / 谁在剪、在跑的任务）。2026-10-31 起另报 `cloud_task_summary` / `cloud_task_ids`，
+    `cloud_tasks` 全局按原工程代号与 token 分组，包含名字、媒体类型、模型、报价、阶段、排队 / 传输 / 用时和异常，后台及已关闭工程的任务也可查询；
+    AI 可直接转述进展，有真实 `job_id` 时再用 `get_job` 等。它与轻盈卡片同源、只读，不开窗、不提交或取消；详见 [Sky Studio 的任务](sky-studio-jobs.md)第九节。`close_project project=pN` 只关自己的：先落盘（没存过的先存进 SkyCut/工程）、有任务在跑不关（说是哪几个，
     叫它等或取消）、主窗口那个换成空的 Untitled、别的关窗口；结果有 `saved_to` 和 `your_open_projects`。开到 8 个（`OpenProjects.limit`）
     `open_project` / `new_project` 就拒，列出这个会话能先关的（存过盘、没任务在跑）。
     ③ **小程序记**（`MCPSessionProject`）：一个小程序进程一个会话（Claude Code 的子代理共用它）；记这个会话的一组工程和最后打开的那个：

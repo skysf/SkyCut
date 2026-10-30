@@ -9,12 +9,12 @@ found="$(grep -R -nE 'Fal(Client|KeyStore|KeyCache|Settings|Models|Inputs|Output
 for item in CloudJobPhase CloudPhaseText CloudTasksButton CloudTasksActivity CloudTaskRows CloudTaskSummary CloudTransfer DailySpend; do
   [ -f "Sources/SrtFlow/CloudMedia/$item.swift" ] || fail "缺少仍在生产使用的共用组件：$item"
 done
-grep -qF 'CloudTasksButton().equatable()' Sources/SrtFlow/VideoEditView.swift || fail '云端任务入口没有挂在编辑器工具栏中'
+grep -qF 'CloudTasksButton(project: project).equatable()' Sources/SrtFlow/VideoEditView.swift || fail '云端任务入口必须知道自己在哪个工程窗口'
 if grep -qE 'CloudStatusRows|CloudTaskRows' Sources/SrtFlow/AIActivityBanner.swift; then
   fail '云端任务不得再逐行挤占预览区'
 fi
 grep -qF '.popover(isPresented:' Sources/SrtFlow/CloudMedia/CloudTasksButton.swift || fail '任务入口没有打开锚定浮层'
-grep -qF 'Button("Cancel") { job.cancel() }' Sources/SrtFlow/CloudMedia/CloudTaskRows.swift || fail '取消 upscale 不能先删掉状态行，409 / 未知结局仍需看得见'
+# 2026-10-31 用户定：任务浮层暂不放取消，停止 / cancel_job 的真实取消路径仍保留。
 grep -qF 'guard run.issue == nil else { return }' Sources/SrtFlow/SkyStudio/SkyStudioGenerationActivity.swift || fail '生成失败 / 未知扣费提示不能随任务结束消失'
 grep -qF 'if stop != .nothingCharged { status.issue = message }' Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift || fail '明确未扣费的取消不能误留警示'
 grep -qF 'if status == .failed || creditsUnconfirmed {' Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift || fail '不得仅按请求已发出就把取消当作未知扣费'
@@ -22,4 +22,7 @@ grep -qE 'object.merge\(job.liveDetail\(\)\)' Sources/SrtFlow/AIJobs.swift || fa
 grep -qE 'AIJobs.shared.cancel\(stoppingWith: projectID\)' Sources/SrtFlow/AIRound.swift || fail '停止必须按工程取消任务'
 [ -f scripts/gui-smoke/mcpclient.py ] || fail '共享 MCP 冒烟客户端丢了'
 [ ! -d scripts/gui-smoke/fal ] && [ ! -d scripts/fal-models ] && [ ! -d checks/Fal ] || fail '旧 fal 夹具 / 快照 / 刷新脚本未清理'
+# 工程卡片属于现行任务入口；统一总检查经本项把工程 / MCP 接线一起守住。
+# shellcheck source=checks/cloud-task-projects.sh
+source checks/cloud-task-projects.sh
 echo '✓ no-legacy-generation：只保留现行云端路径与共用媒体组件'

@@ -77,13 +77,15 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         self.project = project
         held = SkyStudioHeldCredits(reservation)
         let label: String
+        let mediaKind: CloudTaskMediaKind
         switch generation.kind {
-        case .image: label = L10n("Image")
-        case .imageToVideo, .textToVideo: label = L10n("Video")
-        case .music: label = L10n("Music")
-        case .soundEffect: label = L10n("Sound effect")
+        case .image: label = L10n("Image"); mediaKind = .image
+        case .imageToVideo, .textToVideo: label = L10n("Video"); mediaKind = .video
+        case .music: label = L10n("Music"); mediaKind = .audio
+        case .soundEffect: label = L10n("Sound effect"); mediaKind = .audio
         }
-        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits, uploads: references.uploads, title: stem)
+        status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits,
+            uploads: references.uploads, title: stem, owner: CloudTasksActivity.owner(of: project), mediaKind: mediaKind)
     }
 
     /// 图生视频要先传首帧（状态行上多一个「上传」）。
@@ -102,6 +104,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             cancel: { [weak self] in self?.cancel() }
         )
         self.job = job
+        status.aiJobID = job.id
         status.onCancel = { [weak self] in self?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
         // 强引用：调用它的工具回了任务号就不再拿着它，任务自己得把它撑到跑完（跑完这个闭包放掉，环就解开了）。

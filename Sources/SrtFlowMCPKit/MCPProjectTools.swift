@@ -16,7 +16,10 @@ public enum MCPProjectTools {
                 description: """
                 What SkyCut is doing now: your current project (name, path, length, unsaved changes) and every open project \
                 (id, whether it is yours, where it is shown), the folders you may use, running jobs, whether the user pressed Stop, \
-                the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
+                and cloud_tasks grouped by project: names, video/audio/image types, models, quotes, queue/processing/download \
+                phases and issues, including background and closed-project tasks. Use this to report each project's progress; \
+                a task's job_id can be checked with get_job. Counts include active work only; issues are counted separately. \
+                Also reports the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
                 new conversation. For paid media use models=true to read the current Sky Studio model catalog, defaults, \
                 prices and per-mode reference image/video/audio counts, formats, size/duration and combination limits \
                 without generating or spending credits. model filters that catalog to one id.

@@ -10,6 +10,10 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     let kindLabel: String
     let title: String
     let uploads: Bool
+    let owner: CloudTaskOwner
+    let mediaKind: CloudTaskMediaKind
+    /// 登记到活动清单之前绑定；这是 get_job 接受的任务号，不是界面 UUID。
+    var aiJobID: String?
     @Published var modelTitle: String
     @Published var credits: Double?
     @Published private(set) var progress: CloudJobProgress?
@@ -17,12 +21,15 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published var issue: String?
     var onCancel: () -> Void = {}
 
-    init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil) {
+    init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil,
+         owner: CloudTaskOwner, mediaKind: CloudTaskMediaKind) {
         self.kindLabel = kindLabel
         self.title = title ?? kindLabel
         self.modelTitle = modelTitle
         self.credits = credits
         self.uploads = uploads
+        self.owner = owner
+        self.mediaKind = mediaKind
     }
 
     func advance(to phase: CloudJobPhase, typicalSeconds: Double?) {
