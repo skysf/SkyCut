@@ -199,7 +199,7 @@ fi
 grep -qF 'held = SkyStudioHeldCredits(reservation)' "${GEN_RUN}" || fail "${GEN_RUN}：任务要用起任务之前记好的那一笔（退回、按实收换都按它）"
 grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_TOOL}" && grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_RUN}" \
   || fail "AI 起的生成取 Key 不弹钥匙串授权框（.silent）：工具问价、任务交活都是"
-grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：generate_media 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
+grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：generate_media 要属于 skystudio 提供方（Key、授权、积分在调用时核对）"
 grep -qF 'case .generateMedia: return try await SkyStudioGenerateTool.generate(args, project)' "${ROUTER}" \
   || fail "${ROUTER}：generate_media 要分派给 SkyStudioGenerateTool"
 [ "$(count '.generateMedia' "${ROUTER}")" -eq 2 ] || fail "${ROUTER}：generate_media 应出现两处（分派、策略：不排撤销分组、不算这一轮的改动）"

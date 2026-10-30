@@ -40,11 +40,11 @@ public final class MCPServerCore: @unchecked Sendable {
     public static var supportedVersions: [String] { modernVersions + legacyVersions }
 
     public static let serverName = "skycut"
-    /// 工具清单让客户端缓存多久：短，因为它随「配没配 Sky Studio」变。
+    /// 工具清单缓存多久；Key 变化不再改变清单，App 升级后仍允许尽快重新发现。
     public static let toolListTTLms = 60_000
 
     private let serverVersion: String
-    /// 此刻配好了哪些提供方（每次回清单 / 握手时问一遍：用户中途添加或删掉 Key，下一次就跟着变）。
+    /// 提供方读取入口保留兼容；当前工具发现不依赖 Key 是否已添加。
     private let providers: @Sendable () -> Set<MCPProvider>
     /// App 升级后换上的它那份清单（`MCPCatalogSync`）；没换就照旧用编进来的。
     public let catalog: MCPCatalogOverride
@@ -105,7 +105,7 @@ public final class MCPServerCore: @unchecked Sendable {
         case "server/discover":
             return .reply(Self.success(id: id, result: decorate(discover, modern: true, cacheable: true)))
         case "tools/list":
-            // 清单会随「配没配 Sky Studio」变：缓存时间短一点，别让用户添了 Key 一小时之后才看到新工具。
+            // 始终列全；短缓存只用于 App 升级，不能把授权变化依赖在客户端重新加载上。
             return .reply(Self.success(
                 id: id,
                 result: decorate(["tools": catalog.toolsJSON(providers: providers()) ?? MCPToolName.listJSON(providers: providers())],
@@ -142,7 +142,7 @@ public final class MCPServerCore: @unchecked Sendable {
         lock.unlock()
         return Self.success(id: id, result: [
             "protocolVersion": .string(negotiated),
-            // 配好的提供方变了，清单跟着变：会通知（小程序盯着那个小文件，`toolListChangedNotification`）。
+            // App 升级换了清单时会通知；Key 变化不改变清单。
             "capabilities": ["tools": ["listChanged": true]],
             "serverInfo": serverInfo,
             "instructions": .string(MCPInstructions.text(providers: providers()))

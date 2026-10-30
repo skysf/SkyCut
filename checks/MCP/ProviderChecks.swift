@@ -1,12 +1,12 @@
 import Foundation
 import SrtFlowMCPKit
 
-// 生成类工具的「提供方」（方案第 36 条）：**谁都没配就不列出来**。
+// 生成类工具的「提供方」只说明去哪消费，不再决定工具能不能被发现（2026-10-30）。
 // - 目录这一层：generate_media、upscale_clip 都属于 Sky Studio（2026-10-28 起，收费方案第 6 刀；云端配音也走 Sky Studio、不列工具）、说明和参数对、
 //   只有它们上外面的网（openWorld）；词表和 App 的类型对账在 checks/SkyStudio/GenerationChecks.swift；
 // - 那个小文件（MCPProviderMarker）：路径和 socket 同目录、读得宽（不在 / 坏了 / 有不认识的名字都当没有）、只写提供方的名字、不动没变的；
-// - 协议这一层：真起小程序 —— 没配 / 配了各列什么、总说明配了才提那两个工具、握手声明清单会变、新一代的清单缓存时间短；
-//   用户中途添加 / 删掉 Key（小文件变了）时，握过手的老一代客户端收到 `notifications/tools/list_changed`，新一代不收。
+// - 协议这一层：真起小程序 —— 没配 / 配了都列全、总说明始终指向生成工具；会话中添加 / 删除 Key 不改变已经拿到的工具。
+//   授权和积分仍在 App 调用时核对，不靠客户端是否重新请求 tools/list。
 
 func runProviderChecks() {
     checkCatalog()
@@ -25,10 +25,10 @@ private func checkCatalog() {
     checkEqual(MCPToolName.generateMedia.provider, .skystudio, "generate_media belongs to Sky Studio")
     checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio")
     check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")
-    checkEqual(MCPToolName.listed(providers: []), MCPToolName.allCases.filter { !paidTools.contains($0) }, "nothing configured: the paid tools are left out, order kept")
+    checkEqual(MCPToolName.listed(providers: []), MCPToolName.allCases, "nothing configured: generation tools are discoverable before the Key is added")
     checkEqual(MCPToolName.listed(providers: [.skystudio]), MCPToolName.allCases, "Sky Studio configured: every tool, in the catalog order")
     checkEqual(MCPToolName.listJSON.arrayValue?.count, MCPToolName.allCases.count, "the full catalog lists every tool")
-    checkEqual(MCPToolName.listJSON(providers: []).arrayValue?.count, MCPToolName.allCases.count - paidTools.count, "the plain list has the paid tools fewer")
+    check(MCPToolName.listJSON(providers: []) == MCPToolName.listJSON(providers: [.skystudio]), "Key state never changes the catalog")
 
     let definition = MCPToolName.generateMedia.definition
     check(!definition.readOnly && !definition.destructive, "generate_media writes a new file but deletes nothing")
@@ -61,10 +61,10 @@ private func checkCatalog() {
 
 private func checkInstructions() {
     checkEqual(MCPInstructions.text(providers: []), MCPInstructions.text, "without a provider the instructions are the plain ones")
-    check(!MCPInstructions.text.contains("fal.ai") && !MCPInstructions.text.contains("generate_media") && !MCPInstructions.text.contains("upscale_clip"),
-          "the plain instructions never mention the paid tools (there are no such tools in the list)")
+    check(!MCPInstructions.text.contains("fal.ai") && MCPInstructions.text.contains("generate_media") && MCPInstructions.text.contains("upscale_clip"),
+          "the initial instructions always explain the paid tools")
     let withSkyStudio = MCPInstructions.text(providers: [.skystudio])
-    check(withSkyStudio.hasPrefix(MCPInstructions.text), "the paid line is added at the end")
+    checkEqual(withSkyStudio, MCPInstructions.text, "adding a Key does not require reloading server instructions")
     // 目录里那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily credit limit、credits）。
     check(withSkyStudio.contains("generate_media") && withSkyStudio.contains("upscale_clip") && withSkyStudio.contains("Sky Studio credits")
           && withSkyStudio.contains("Paid"), "a Sky Studio key lists both paid tools, paid with Sky Studio credits")
@@ -88,11 +88,12 @@ private func checkServerCore() {
         return reply["result"]?["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
     }
     let list: JSONValue = ["jsonrpc": "2.0", "id": 1, "method": "tools/list"]
-    check(!names(core.handle(list)).contains("generate_media"), "in-process: nothing configured, not listed")
+    let initialNames = names(core.handle(list))
+    check(initialNames.contains("generate_media") && initialNames.contains("upscale_clip"), "in-process: a client that caches its first list already knows both paid tools")
     box.providers = [.skystudio]
     check(names(core.handle(list)).contains("generate_media"), "in-process: the provider closure is asked on every tools/list")
     box.providers = []
-    check(!names(core.handle(list)).contains("generate_media"), "in-process: and again when the Key is removed")
+    checkEqual(names(core.handle(list)), initialNames, "in-process: removing the Key keeps the tool list stable")
 
     check(!core.hasLegacySession, "no handshake yet")
     let initialize = core.handle(["jsonrpc": "2.0", "id": 2, "method": "initialize", "params": ["protocolVersion": "2025-06-18", "clientInfo": ["name": "x"]]])
@@ -166,15 +167,15 @@ private func checkHelperListing() {
         #"{"jsonrpc":"2.0","method":"notifications/initialized"}"#,
         #"{"jsonrpc":"2.0","id":2,"method":"tools/list"}"#
     ]
-    for (providers, listed) in [(Set<MCPProvider>(), false), ([MCPProvider.skystudio], true)] {
+    for providers in [Set<MCPProvider>(), [.skystudio]] {
         let (messages, _) = talkToHelper(legacy, socket: socket, providers: providers)
         let names = reply(messages, id: 2)?["result"]?["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
-        checkEqual(names.contains("generate_media"), listed, "helper, providers \(providers.map(\.rawValue)): generate_media listed = \(listed)")
+        check(names.contains("generate_media") && names.contains("upscale_clip"), "helper, providers \(providers.map(\.rawValue)): both paid tools are always listed")
         checkEqual(names, MCPToolName.listed(providers: providers).map(\.rawValue), "helper, providers \(providers.map(\.rawValue)): the list order")
         let initialize = reply(messages, id: 1)?["result"]
         checkEqual(initialize?["capabilities"]?["tools"]?["listChanged"]?.boolValue, true, "helper: the handshake says the list can change")
         let instructions = initialize?["instructions"]?.stringValue ?? ""
-        checkEqual(instructions.contains("generate_media"), listed, "helper, providers \(providers.map(\.rawValue)): the instructions mention generate_media = \(listed)")
+        check(instructions.contains("generate_media"), "helper, providers \(providers.map(\.rawValue)): instructions always mention generate_media")
     }
     let modern = #"{"jsonrpc":"2.0","id":9,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}}}"#
     let (messages, _) = talkToHelper([modern], socket: socket, providers: [.skystudio])
@@ -250,7 +251,7 @@ private func checkLiveChange() {
     let marker = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-mcp-live-\(getpid())-\(UUID().uuidString).json")
     defer { try? FileManager.default.removeItem(at: marker) }
 
-    // 老一代：握过手，Key 一添加就收到通知，一删掉又收到。
+    // 老一代：模拟只在开会话时加载工具的客户端；后续 Key 变化不能把工具藏掉。
     let legacy = Lines()
     guard let (process, input) = startHelper(marker: marker, lines: legacy) else { return }
     defer {
@@ -264,20 +265,19 @@ private func checkLiveChange() {
     func listedNames(_ id: Int) -> [String] {
         legacy.reply(id: id)?["result"]?["tools"]?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
     }
-    check(!listedNames(2).contains("generate_media"), "live: at first there is no generate_media")
+    let cachedNames = listedNames(2)
+    check(cachedNames.contains("generate_media") && cachedNames.contains("upscale_clip"), "live: the first cached list already contains generation and upscale")
     checkEqual(legacy.count(method: "notifications/tools/list_changed"), 0, "live: nothing changed, no notification")
 
     _ = try? MCPProviderMarker.write([.skystudio], to: marker)   // 用户在设置里存了 Key
-    check(legacy.wait(seconds: 10) { legacy.count(method: "notifications/tools/list_changed") >= 1 }, "live: adding the Key notifies the client that the tools changed")
     send(#"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#, to: input)
     check(legacy.wait(seconds: 8) { legacy.reply(id: 3) != nil }, "live: the client asks again")
-    check(listedNames(3).contains("generate_media"), "live: and now generate_media is there")
+    checkEqual(listedNames(3), cachedNames, "live: adding the Key preserves the cached list")
 
     _ = try? MCPProviderMarker.write([], to: marker)       // 用户删了 Key
-    check(legacy.wait(seconds: 10) { legacy.count(method: "notifications/tools/list_changed") >= 2 }, "live: removing the Key notifies again")
     send(#"{"jsonrpc":"2.0","id":4,"method":"tools/list"}"#, to: input)
     check(legacy.wait(seconds: 8) { legacy.reply(id: 4) != nil }, "live: the client asks once more")
-    check(!listedNames(4).contains("generate_media"), "live: generate_media is gone again")
+    checkEqual(listedNames(4), cachedNames, "live: removing the Key preserves the cached list")
 
     // 新一代：没有会话，不收通知（靠清单的缓存时间）。
     let marker2 = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-mcp-live2-\(getpid())-\(UUID().uuidString).json")

@@ -3,10 +3,10 @@ import Foundation
 // MARK: - 工具清单：花钱的两个工具（generate_media 生成素材，方案第六块；upscale_clip 放大片段，2026-10-02）
 //
 // 管什么：这两个工具的说明文字和参数。2026-10-28 起都送 Sky Studio、花积分（收费方案第 6 刀；之前 generate_media 送 fal、花美元），
-// **只在用户存了 Sky Studio 的 Key 时才列出来**（`MCPToolName.provider`，方案第 36 条）。种类、画幅、分辨率、upscale 的档位 / 目标 / 范围
+// **始终列出，调用时才核对 Key / 授权 / 积分**（2026-10-30，替代方案第 36 条的隐藏）。种类、画幅、分辨率、upscale 的档位 / 目标 / 范围
 // 走词表（MCPVocabulary，和 App 的类型对账）；upscale 做完直接换源（用户 2026-10-02 定）。
 // 不管什么：怎么调 Sky Studio、花积分怎么把关（App 里的 Sources/SrtFlow/SkyStudio/：超了每日上限回确认码）；配旁白（add_voiceover，
-// 有 fal 的 Key 时它优先用 Sky Studio 的声音，见 docs/architecture/fal-generation.md）。
+// 有 Sky Studio 的 Key 时优先用云端声音，见 docs/architecture/sky-studio-jobs.md）。
 
 enum MCPGenerationTools {
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
@@ -15,8 +15,8 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Makes a new image, video clip, music or sound effect with the user's Sky Studio credits (paid; listed only \
-                because the user added a Sky Studio key). Not for subtitles (generate_subtitles), narration (add_voiceover), \
+                Makes a new image, video clip, music or sound effect with the user's Sky Studio credits (paid; requires a \
+                Sky Studio key in SkyCut Settings). Not for subtitles (generate_subtitles), narration (add_voiceover), \
                 effects add_clips sound_effect can make, or footage the user already has. One result per call. It returns a \
                 job_id at once: wait with get_job (an image takes about 15 s, a sound effect 10 s, music about a minute, a \
                 video a few minutes); while it runs get_job shows phase (uploading, queued, processing, downloading), \
@@ -59,7 +59,7 @@ enum MCPGenerationTools {
                 .upscaleClip, title: "Upscale clip",
                 description: """
                 Sends one video clip's source file to Sky Studio for a sharper, larger version (paid with the user's Sky Studio \
-                credits; listed only because the user added a Sky Studio key) and, when it is done, points every clip in this \
+                credits; requires a Sky Studio key in SkyCut Settings) and, when it is done, points every clip in this \
                 project that uses that file at the new one (one undo step; the original file stays next to it and the user can \
                 compare or revert from the clip's context menu). Use it when a clip's source_size (get_timeline) is below the \
                 canvas or the export size: plain scaling adds no detail. It returns a job_id at once: wait with get_job, which \

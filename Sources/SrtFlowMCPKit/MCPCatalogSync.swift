@@ -22,16 +22,12 @@ public enum MCPCatalogSync {
         return String(hash, radix: 16)
     }
 
-    /// App 答 `catalogTool` 的结果：全部工具的定义（顺序就是清单的顺序）+ 要哪个提供方才列出来。
+    /// App 答 `catalogTool` 的结果：全部工具的定义（顺序就是清单的顺序）。providers 保留空对象：旧 helper 也不能藏工具。
     public static func catalogResult() -> JSONValue {
-        var providers: [String: JSONValue] = [:]
-        for tool in MCPToolName.allCases {
-            if let provider = tool.provider { providers[tool.rawValue] = .string(provider.rawValue) }
-        }
         return [
             "fingerprint": .string(fingerprint),
             "tools": .array(MCPToolName.allCases.map(\.definition.json)),
-            "providers": .object(providers)
+            "providers": .object([:])
         ]
     }
 
@@ -46,7 +42,7 @@ public enum MCPCatalogSync {
 public final class MCPCatalogOverride: @unchecked Sendable {
     private let lock = NSLock()
     private var fingerprint: String?
-    private var tools: [(name: String, provider: String?, json: JSONValue)] = []
+    private var tools: [(name: String, json: JSONValue)] = []
     private var pendingNotice = false
 
     public init() {}
@@ -65,10 +61,9 @@ public final class MCPCatalogOverride: @unchecked Sendable {
         guard let fingerprint = catalog["fingerprint"]?.stringValue, let list = catalog["tools"]?.arrayValue, !list.isEmpty else {
             return false
         }
-        let providers = catalog["providers"]?.objectValue ?? [:]
-        let parsed = list.compactMap { tool -> (name: String, provider: String?, json: JSONValue)? in
+        let parsed = list.compactMap { tool -> (name: String, json: JSONValue)? in
             guard let name = tool["name"]?.stringValue else { return nil }
-            return (name, providers[name]?.stringValue, tool)
+            return (name, tool)
         }
         guard parsed.count == list.count else { return false }
         lock.lock()
@@ -95,13 +90,12 @@ public final class MCPCatalogOverride: @unchecked Sendable {
         return fingerprint != nil
     }
 
-    /// 配了这些提供方时该列的工具（`tools/list` 的 `tools`）；没换上就是 nil。
+    /// 完整清单（`tools/list` 的 `tools`）；旧 App 的 provider 过滤条件也不再生效。没换上就是 nil。
     public func toolsJSON(providers enabled: Set<MCPProvider>) -> JSONValue? {
         lock.lock()
         defer { lock.unlock() }
         guard fingerprint != nil else { return nil }
-        let names = Set(enabled.map(\.rawValue))
-        return .array(tools.filter { $0.provider.map(names.contains) ?? true }.map(\.json))
+        return .array(tools.map(\.json))
     }
 
     /// 这个名字是换上的那份清单里的工具吗（编进来的清单里没有的新工具，调用照样转给 App）。

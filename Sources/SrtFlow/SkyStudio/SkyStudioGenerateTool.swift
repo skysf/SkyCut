@@ -15,7 +15,7 @@ import SrtFlowMCPKit
 @MainActor
 enum SkyStudioGenerateTool {
     static func generate(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        // 小程序没存 Sky Studio 的 Key 就不列这个工具，但客户端可能缓存着旧清单：这里再认一次。
+        // 工具始终可发现；Key、授权和积分必须在调用时核对，不能把列清单当成已经获准消费。
         guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
         guard let kindName = try args.choice("kind", from: MCPVocabulary.generationKinds), let kind = SkyStudioGeneration.Kind(rawValue: kindName) else {
             throw AIToolError("kind is required: \(MCPVocabulary.generationKinds.joined(separator: ", ")).")

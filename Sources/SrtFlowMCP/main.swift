@@ -13,7 +13,7 @@ signal(SIGPIPE, SIG_IGN)
 
 let connection = AppConnection.locate()
 let providersURL = connection.providersURL
-// 清单每回一次都重读那个小文件：用户中途添加 / 删掉 fal 的 Key，下一次就跟着变（方案第 36 条：没配就不列出来）。
+// 保留提供方文件的读取，兼容旧通道；当前清单始终列全，Key、授权和积分只在 App 执行时核对。
 let core = MCPServerCore(
     serverVersion: connection.appVersion, providers: { MCPProviderMarker.read(at: providersURL) }, catalog: connection.catalog
 )
@@ -28,19 +28,6 @@ func send(_ message: JSONValue) {
     outputLock.lock()
     FileHandle.standardOutput.write(data)
     outputLock.unlock()
-}
-
-/// 配好的提供方变了：握过手的（老一代）客户端主动告诉它清单变了，它会重新要一遍；
-/// 新一代客户端没有会话，靠清单上的缓存时间（`MCPServerCore.toolListTTLms`）。
-Thread.detachNewThread {
-    var last = MCPProviderMarker.read(at: providersURL)
-    while true {
-        Thread.sleep(forTimeInterval: 2)
-        let now = MCPProviderMarker.read(at: providersURL)
-        guard now != last else { continue }
-        last = now
-        if core.hasLegacySession { send(MCPServerCore.toolListChangedNotification) }
-    }
 }
 
 /// 刚换上了 App 那份清单（App 升级过、这个会话里跑的还是旧小程序，`MCPCatalogSync`）：握过手的（老一代）客户端主动告诉它

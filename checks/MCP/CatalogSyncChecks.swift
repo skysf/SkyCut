@@ -3,7 +3,7 @@ import SrtFlowMCPKit
 
 // App 升级之后，正在跑的旧小程序换上新的工具清单（MCPCatalogSync，docs/bugfixes/2026-10-14-stale-helper-tool-list.md）：
 // 2026-10-06 盲测里会话是 App 升级前开的，小程序的清单停在旧版，新加的 snap / overshoot / spring 缓动一条都用不上。
-// 1. 纯值：指纹对得上不换、报了别的才换；换上之后按提供方列、认新工具名、通知只给一次。
+// 1. 纯值：指纹对得上不换、报了别的才换；换上之后始终列全、认新工具名、通知只给一次。
 // 2. 真起小程序接一个「更新过的」假 App（回答带着另一个指纹、能给出多一个工具的清单）：第一次调用之后小程序换上它 ——
 //    结果里说一句、老一代客户端收到 list_changed（只一次）、tools/list 里有新工具、调用新工具照样转给 App；
 //    指纹一样的假 App：一样都不换。编法见 scripts/check-mcp.sh。
@@ -36,8 +36,15 @@ private func runCatalogOverrideChecks() {
     check(override.knows("brand_new_tool") && !override.knows("no_such_tool"), "the new tool's name is known, made-up ones are not")
     let withoutKey = override.toolsJSON(providers: [])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
     let withSkyStudio = override.toolsJSON(providers: [.skystudio])?.arrayValue?.compactMap { $0["name"]?.stringValue } ?? []
-    check(withoutKey.contains("brand_new_tool") && !withoutKey.contains("generate_media") && withSkyStudio.contains("generate_media"),
-          "the adopted list still lists provider tools only when that provider is set up")
+    check(withoutKey.contains("brand_new_tool") && withoutKey.contains("generate_media") && withoutKey == withSkyStudio,
+          "the adopted list exposes generation before a Key is configured")
+    checkEqual(MCPCatalogSync.catalogResult()["providers"]?.objectValue?.count, 0,
+               "older helpers receive no provider filters that could hide tools")
+    var legacyCatalog = newerCatalog().objectValue ?? [:]
+    legacyCatalog["providers"] = ["generate_media": "skystudio", "upscale_clip": "skystudio"]
+    check(override.adopt(.object(legacyCatalog)), "an older app's provider metadata is still readable")
+    check(override.toolsJSON(providers: []) == override.toolsJSON(providers: [.skystudio]),
+          "an older app's provider metadata cannot hide tools from a new helper")
     check(override.takeRefreshNotice() && !override.takeRefreshNotice(), "the refresh is announced once")
 }
 

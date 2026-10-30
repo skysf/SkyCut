@@ -61,8 +61,9 @@
   音效 5 秒 wav、音乐纯音乐不给时长让模型定；**规矩在服务器上**，不合规的 `/quote` 回 `invalid_request`、原话交给 AI，SkyCut 不另抄一份）；图生视频的首帧
   `/uploads`（purpose `image`；认得的格式原样传，别的缩到长边 2048 存 JPEG）；问 `/quote` → `SkyStudioJobGate` → 回任务号；任务交给 `SkyStudioJobRun`、
   成品下载到「生成」文件夹（也长期留在作品库里），Key 不弹授权框。`get_job` 有阶段和 `skystudio_job_id`，状态行上一行（积分、停止）。
-- **清单**：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，存了 Sky Studio 的 Key 才列（`SkyStudioAccount.hasKey` 一变就同步那个小文件）；
-  总说明末尾的「Paid」那一行只在存了 Sky Studio 的 Key 时有；旧 fal Key、模型、设置、网络路径已删除；只有 Sky Studio 提供方。
+- **清单**（2026-10-30）：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，但不再按 Key 隐藏；工具及总说明末尾的「Paid」一行始终存在。
+  Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
+  新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。
 
 ## 五、还没做的（第 6 刀后面几个 PR）
 

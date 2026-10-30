@@ -2,7 +2,7 @@ import Foundation
 import SrtFlowMCPKit
 
 // upscale_clip（2026-10-02；2026-10-28 起走 Sky Studio，收费方案第 6 刀）：小程序那份清单里的词表和 App 对账（档位 = Sky Studio 的模型名，
-// 默认的那个在词表里；目标 = UpscaleTarget 按短边叫；范围 = UpscaleRangeChoice），工具的定义（参数、必填、枚举、只在存了 Sky Studio 的 Key 时列、
+// 默认的那个在词表里；目标 = UpscaleTarget 按短边叫；范围 = UpscaleRangeChoice），工具的定义（参数、必填、枚举、始终列出、
 // 上网、不删东西），说明里每个模型都点了名、说清积分 / 30 秒 / 30 fps / 只有排队中能取消，总说明的「Paid」那一行带着它。
 
 func runUpscaleToolChecks() {
@@ -28,7 +28,7 @@ func runUpscaleToolChecks() {
     }
 
     // ---- 定义
-    checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio (listed only with a Sky Studio key)")
+    checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio (Key checked when called)")
     let definition = MCPToolName.upscaleClip.definition
     check(definition.openWorld, "upscale_clip reaches out to Sky Studio")
     check(!definition.readOnly && !definition.destructive, "upscale_clip writes a new file and changes clips but deletes nothing")
@@ -49,7 +49,7 @@ func runUpscaleToolChecks() {
     check(!text.contains("fal.ai") && !text.contains("cost_usd"), "the description no longer talks about fal.ai or dollars")
     for id in MCPVocabulary.upscaleTiers { check(text.contains(id), "the description names model \(id)") }
     for name in MCPVocabulary.upscaleTargets + MCPVocabulary.upscaleRanges { check(text.contains(name), "the description names \(name)") }
-    // 总说明的「Paid」那一行带着它（Claude Code 开场只看目录）；没存 Key 不提。
+    // 总说明的「Paid」那一行始终带着它（Claude Code 开场只看目录）。
     check(MCPInstructions.text(providers: [.skystudio]).contains("upscale_clip"), "the instructions' paid line names upscale_clip")
-    check(!MCPInstructions.text.contains("upscale_clip"), "without a key the instructions do not mention it")
+    check(MCPInstructions.text.contains("upscale_clip"), "without a key the initial instructions still mention upscale")
 }
