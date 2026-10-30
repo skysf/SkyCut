@@ -117,7 +117,8 @@ final class SkyStudioVoiceoverRun {
                 } catch let error as SkyStudioJobError {
                     remember(submitted.jobID)
                     switch error {
-                    case .failed, .stopped(.nothingCharged): budget?.refund(index)
+                    case .failed(let failure) where failure.creditsReturned: budget?.refund(index)
+                    case .stopped(.nothingCharged): budget?.refund(index)
                     case .request(.server(let failure)) where !submitted.value && Self.refusedBeforeCharging(failure.code): budget?.refund(index)
                     default: budget?.unknown(index)
                     }

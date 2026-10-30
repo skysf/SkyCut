@@ -101,7 +101,7 @@ struct SkyStudioJobRun: Sendable {
                 guard current.result != nil else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
                 return current
             case .failed?:
-                throw SkyStudioJobError.failed(current.error ?? "Sky Studio could not make it.")
+                throw SkyStudioJobError.failed(current.failure ?? SkyStudioJobFailure(message: current.error ?? "Sky Studio could not make it.", jobID: current.jobID))
             case .cancelled?:
                 throw SkyStudioJobError.stopped(.nothingCharged)
             case .queued?, .running?:
@@ -134,6 +134,26 @@ struct SkyStudioJobRun: Sendable {
 
     static func pollSeconds(_ serverSays: Double?) -> Double {
         min(pollRange.upperBound, max(pollRange.lowerBound, serverSays ?? defaultPollSeconds))
+    }
+
+    /// 原单已经明确真人参考拒绝，但退款记录可能晚到；只查这个 job_id，绝不重新 POST。
+    func waitForRefund(_ failure: SkyStudioJobFailure, checks: Int = 8) async throws -> SkyStudioJobFailure {
+        guard failure.isRealPersonRefusal, !failure.creditsReturned, let id = failure.jobID else { return failure }
+        var latest = failure
+        for _ in 0..<checks {
+            try await sleep(Self.defaultPollSeconds)
+            try Task.checkCancellation()
+            do {
+                let status = try await api.job(id, key: key)
+                if status.state == .failed, let proof = status.failure {
+                    latest = proof
+                    if proof.creditsReturned { return proof }
+                }
+            } catch is CancellationError { throw CancellationError() }
+            catch SkyStudioFailure.network { continue }
+            catch { break }
+        }
+        return latest
     }
 
     // MARK: 停
@@ -195,8 +215,8 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
         case unknown
     }
 
-    /// 服务器说没做成（积分已经退回，只退一次）。
-    case failed(String)
+    /// 服务器说没做成；只按明确证据认退款。
+    case failed(SkyStudioJobFailure)
     case stopped(Stop)
     /// 问 Sky Studio 没问成（Key、余额、版本、参数、限流、网络……）。服务器的 message 原样带着。
     case request(SkyStudioFailure)
@@ -205,10 +225,28 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     /// 等了太久：活在服务器上照做，做完会进作品库。
     case timedOut
 
+    static func failed(_ text: String) -> Self { .failed(SkyStudioJobFailure(message: text)) }
+
+    var failure: SkyStudioJobFailure? {
+        switch self {
+        case .failed(let value): return value
+        case .request(.server(let error)): return SkyStudioJobFailure(message: error.message, fields: error.fields.merging(["code": .string(error.code)]) { a, _ in a })
+        default: return nil
+        }
+    }
+
+    func canRefund(beforeAccepted: Bool) -> Bool {
+        if failure?.creditsReturned == true { return true }
+        if case .stopped(.nothingCharged) = self { return true }
+        guard beforeAccepted, case .request(.server(let error)) = self, failure?.isRealPersonRefusal != true else { return false }
+        return ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits", "price_changed", "too_many_jobs"].contains(error.code)
+    }
+
     var message: String {
         switch self {
         case .failed(let detail):
-            return "Sky Studio could not make it: \(detail) The credits were refunded."
+            return "Sky Studio could not make it: \(detail.message) " + (detail.creditsReturned
+                ? "The credits were refunded or not charged." : "Refund is not confirmed; do not regenerate this job automatically.")
         case .stopped(.nothingCharged):
             return "Stopped before Sky Studio started it; no credits were spent."
         case .stopped(.alreadyStarted):

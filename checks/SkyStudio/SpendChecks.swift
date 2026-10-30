@@ -44,4 +44,14 @@ func runSpendChecks() {
     checkEqual(SkyStudioCredits.text(455), "455", "whole credits have no decimals")
     checkEqual(SkyStudioCredits.text(1.4), "1.4", "otherwise one decimal")
     checkEqual(SkyStudioCredits.number(2.04), 2.0, "the AI gets one decimal")
+    store.setDailyLimit(0)
+    let beforeReplacement = store.spentToday()
+    if let reservation = SkyStudioJobGate.reserveReplacement(credits: 8, approvedCeiling: 20, store: store) {
+        checkEqual(store.spentToday(), beforeReplacement + 8, "a cheaper authorized replacement reuses the approved ceiling even with zero daily allowance")
+        var held = SkyStudioHeldCredits(reservation, store: store)
+        held.refund(); held.refund()
+        checkEqual(store.spentToday(), beforeReplacement, "a replacement's local reservation can be refunded only once")
+    } else { check(false, "replacement within the approved ceiling can be reserved") }
+    check(SkyStudioJobGate.reserveReplacement(credits: 21, approvedCeiling: 20, store: store) == nil, "a more expensive replacement requires new approval")
+    check(SkyStudioJobGate.reserveReplacement(credits: .nan, approvedCeiling: 20, store: store) == nil, "an invalid replacement price is refused")
 }

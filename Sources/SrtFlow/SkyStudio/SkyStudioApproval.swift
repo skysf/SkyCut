@@ -10,6 +10,7 @@ enum SkyStudioApproval {
         let value: JSONValue = [
             "request": job.quoteBody,
             "inputs": .object(job.inputs.mapValues(JSONValue.string)),
+            "references": .array(job.references),
             "credits": .number(credits),
             "context": .object(context)
         ]

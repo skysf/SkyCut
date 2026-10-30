@@ -165,7 +165,7 @@ expected_movers="$(printf '%s\n' "${JOB_GATE}" "${HELD}" | LC_ALL=C sort | tr '\
 [ "${movers}" = "${expected_movers}" ] || fail "积分的账只许在 SkyStudioJobGate（AI 起的）和 SkyStudioHeldCredits（面板起的、按实收换、退回）里动，实际在：${movers:-没有}"
 prompters="$(code_files_with '\.prompting' | grep -v "^${JOB_ACCESS}\$" | LC_ALL=C sort | tr '\n' ' ')"
 [ "${prompters}" = "${UP_JOB} " ] || fail "会弹钥匙串授权框的那一档（.prompting）只许面板起的 upscale 任务用（UpscaleJob），实际在：${prompters:-没有}"
-grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（没存 Sky Studio 的 Key 不列）"
+grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（调用时核对 Key）"
 grep -qF 'MCPProviderMarker.write(hasKey ? [.skystudio] : [], to: url)' "${ACCOUNT}" \
   || fail "Sky Studio 的工具标记必须只跟着自己的 Key 写"
 [ "$(grep -c '^        syncProviders()$' "${ACCOUNT}" || true)" -eq 1 ] || fail "Sky Studio 启动时必须同步工具提供方标记"
@@ -217,6 +217,29 @@ for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
     fail "${file}：弹了模态框 —— 要用户点头就回确认码（SkyStudioJobGate.decide → needs_confirmation），AI 在等的时候弹框没人点"
   fi
 done
+
+# 9b. 多模型和参考限制必须接到生产路径，不能只让纯函数自检通过。
+REFERENCE_FILES="Sources/SrtFlow/SkyStudio/SkyStudioReferenceFiles.swift"
+FALLBACK="Sources/SrtFlow/SkyStudio/SkyStudioGenerationFallback.swift"
+APPROVAL="Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift"
+for file in "${REFERENCE_FILES}" "${FALLBACK}" "${APPROVAL}"; do
+  [ -f "${file}" ] || fail "找不到 ${file}"
+done
+grep -qF 'await SkyStudioModelStatus.read(' "${STATUS_TOOLS}" || fail "get_status 没接只读模型查询"
+grep -qF 'SkyStudioModelPolicy.select(catalog:' "${GEN_TOOL}" || fail "生成没有按偏好 / 完整输入挑模型"
+READ_AT="$(line_of 'AIWorkspace.shared.confirmReading(picked.files.map' "${GEN_TOOL}")"
+MEASURE_AT="$(line_of 'await SkyStudioReferenceFiles.measure(' "${GEN_TOOL}")"
+if [ -z "${READ_AT}" ] || [ -z "${MEASURE_AT}" ] || [ "${READ_AT}" -ge "${MEASURE_AT}" ]; then
+  fail "全部参考文件必须先确认读取再测量"
+fi
+grep -qF 'await SkyStudioReferenceFiles.upload(references' "${GEN_RUN}" || fail "真实生成没有上传完整参考组"
+grep -qF '"references": .array(job.references)' "${APPROVAL}" || fail "消费确认没绑定参考顺序"
+grep -qF 'failure.mayReplace' "${FALLBACK}" || fail "自动换模型没核对真人拒绝与退款证据"
+grep -qF 'SkyStudioGenerationFallback.candidate(' "${GEN_RUN}" || fail "真实生成没有复用拒绝替换策略"
+grep -qF 'SkyStudioJobGate.reserveReplacement(credits:' "${GEN_RUN}" || fail "替换没有经过原消费上限"
+grep -qF 'credits <= approvedCeiling' "${JOB_GATE}" || fail "替换允许超原批准金额"
+grep -qF 'waitForRefund(original)' "${GEN_RUN}" || fail "退款晚到时没有继续查询原任务"
+grep -qF 'payload["submission_keys"]' "${GEN_RUN}" || fail "未知提交未留下幂等 key"
 
 # 10. 云端配音返回任务号；整批预留、不询问付费，结束只入轨一整步。
 VOICE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift"

@@ -885,6 +885,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-29 MCP 冒烟丢掉失败，后台包装又报成功](docs/bugfixes/2026-10-29-mcp-smoke-hides-failures.md) — EOF / 坏协议唤醒等待者、JSON-RPC 错误明确失败、超时标明结果未知；日志包装原样传退出码，假小程序回归覆盖整条证据链。
 - [损坏的 MCP 回答 id 让读线程退出](docs/bugfixes/2026-10-29-invalid-mcp-smoke-response-id.md)
 - [2026-10-30 添加 Key 后旧 AI 会话仍缺生成工具](docs/bugfixes/2026-10-30-generation-tools-missing-after-key-added.md) — 工具和 Paid 目录始终列出，Key、授权和积分在 App 执行时核对，不依赖客户端中途重新发现工具。
+- [2026-10-30 生成固定首个模型且缺少多参考](docs/bugfixes/2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和完整参考限制可查询；按用户偏好挑兼容模型，真人拒绝只在退款明确后按原消费上限替换一次。
 
 ## 根目录文档
 

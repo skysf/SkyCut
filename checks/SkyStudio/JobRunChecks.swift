@@ -87,7 +87,9 @@ func runJobRunChecks() async {
     SkyStudioStub.reset { seen in
         seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("failed", #", "error": "The provider failed.""#))
     }
-    checkEqual(await jobFailure({ _ = try await run.run(request) }), .failed("The provider failed."), "a failed job says why")
+    let plainFailure = await jobFailure({ _ = try await run.run(request) })
+    checkEqual(plainFailure?.failure?.message, "The provider failed.", "a failed job says why")
+    check(plainFailure?.canRefund(beforeAccepted: false) == false, "an old string error does not prove a refund")
     SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("done")) }
     if case .badAnswer? = await jobFailure({ _ = try await run.run(request) }) {} else { check(false, "done without a result is not an answer") }
     SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("paused")) }
@@ -192,6 +194,24 @@ func runJobRunChecks() async {
     check(SkyStudioJobError.stopped(.alreadyStarted).message.contains("library"), "already started: says where the result goes")
     check(SkyStudioJobError.stopped(.nothingCharged).message.contains("no credits"), "stopped early: no credits spent")
     check(SkyStudioJobError.timedOut.message.contains("library"), "timed out: the result may still come")
+
+    // 真人拒绝退款晚到：只 GET 原任务，证明到账后才允许后续替换。
+    let pendingRefund = SkyStudioJobFailure(message: "Refused", fields: ["provider_code": "REAL_PERSON_REFERENCE", "refunded": false], jobID: "original")
+    var refundPolls = 0
+    SkyStudioStub.reset { seen in
+        refundPolls += 1
+        let paidBack = refundPolls >= 2 ? "true" : "false"
+        return .http(200, #"{"job_id":"original","status":"failed","error":{"message":"Refused","provider_code":"REAL_PERSON_REFERENCE","refunded":\#(paidBack)}}"#)
+    }
+    var refundRun = SkyStudioJobRun(api: api, key: jobKey)
+    refundRun.sleep = SleepLog().sleep
+    let proof = try? await refundRun.waitForRefund(pendingRefund)
+    check(proof?.mayReplace == true, "a later confirmed refund permits a model replacement")
+    checkEqual(SkyStudioStub.log.map(\.method), ["GET", "GET"], "refund confirmation never POSTs or resubmits")
+    check(SkyStudioStub.log.allSatisfy { $0.url.hasSuffix("/jobs/original") }, "only the original refusal job is queried")
+    SkyStudioStub.reset { _ in .failure(.notConnectedToInternet) }
+    let stillUnknown = try? await refundRun.waitForRefund(pendingRefund, checks: 2)
+    check(stillUnknown?.mayReplace == false, "refund lookup failure never permits a replacement")
 }
 
 /// 跑一件活，抓它抛出来的 SkyStudioJobError（没抛就记一次失败）。

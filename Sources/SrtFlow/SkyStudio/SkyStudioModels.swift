@@ -21,21 +21,27 @@ struct SkyStudioModel: Equatable, Sendable {
     var params: [String: JSONValue]
     /// 上限（upscale：`max_source_seconds`、`max_source_fps`、`max_output_pixels`、`max_upload_bytes`）。
     var limits: [String: JSONValue]
+    var defaults: [String: JSONValue]
+    var inputs: [String: JSONValue]
 
-    init(id: String, kind: String, title: String, price: [String: JSONValue] = [:], params: [String: JSONValue] = [:], limits: [String: JSONValue] = [:]) {
+    init(id: String, kind: String, title: String, price: [String: JSONValue] = [:], params: [String: JSONValue] = [:], limits: [String: JSONValue] = [:],
+         defaults: [String: JSONValue] = [:], inputs: [String: JSONValue] = [:]) {
         self.id = id
         self.kind = kind
         self.title = title
         self.price = price
         self.params = params
         self.limits = limits
+        self.defaults = defaults
+        self.inputs = inputs
     }
 
     init?(json: JSONValue) {
         guard let id = json["id"]?.stringValue, !id.isEmpty, let kind = json["kind"]?.stringValue, !kind.isEmpty else { return nil }
         self.init(
             id: id, kind: kind, title: json["title"]?.stringValue ?? id, price: json["price"]?.objectValue ?? [:],
-            params: json["params"]?.objectValue ?? [:], limits: json["limits"]?.objectValue ?? [:]
+            params: json["params"]?.objectValue ?? [:], limits: json["limits"]?.objectValue ?? [:],
+            defaults: json["defaults"]?.objectValue ?? [:], inputs: json["inputs"]?.objectValue ?? [:]
         )
     }
 
@@ -44,6 +50,19 @@ struct SkyStudioModel: Equatable, Sendable {
 
     /// 一个参数能取的那几个值（`params` 里写成数组的那种，比如 upscale 的 `target`）；不是数组就是空的。
     func choices(_ name: String) -> [String] { params[name]?.arrayValue?.compactMap(\.stringValue) ?? [] }
+
+    func resolutions(mode: String) -> [String] {
+        inputs["modes"]?[mode]?["resolution"]?.arrayValue?.compactMap(\.stringValue) ?? choices("resolution")
+    }
+
+    func referenceLimits(mode: String) -> JSONValue? {
+        kind == "image" ? limits["references"] : inputs["modes"]?[mode]
+    }
+
+    var json: JSONValue {
+        ["id": .string(id), "kind": .string(kind), "title": .string(title), "price": .object(price),
+         "params": .object(params), "limits": .object(limits), "defaults": .object(defaults), "inputs": .object(inputs)]
+    }
 }
 
 struct SkyStudioCatalog: Equatable, Sendable {

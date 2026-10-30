@@ -45,6 +45,12 @@ enum SkyStudioJobGate {
         return record(store, credits)
     }
 
+    /// 原单已明确退回，用户也已授权拒绝后的替换：总支出不高于原报价；额度为零但已确认的单也能按同一上限换模型。
+    static func reserveReplacement(credits: Double, approvedCeiling: Double, store: SkyStudioSpendStore? = nil) -> Reservation? {
+        guard credits.isFinite, credits >= 0, approvedCeiling.isFinite, credits <= approvedCeiling else { return nil }
+        return record(store ?? SkyStudioSpendStore.shared, credits)
+    }
+
     private static func record(_ store: SkyStudioSpendStore, _ credits: Double) -> Reservation {
         store.record(credits)
         return Reservation(credits: credits, day: Date())

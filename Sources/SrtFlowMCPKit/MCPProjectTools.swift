@@ -17,12 +17,16 @@ public enum MCPProjectTools {
                 What SkyCut is doing now: your current project (name, path, length, unsaved changes) and every open project \
                 (id, whether it is yours, where it is shown), the folders you may use, running jobs, whether the user pressed Stop, \
                 the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
-                new conversation.
+                new conversation. For paid media use models=true to read the current Sky Studio model catalog, defaults, \
+                prices and per-mode reference image/video/audio counts, formats, size/duration and combination limits \
+                without generating or spending credits. model filters that catalog to one id.
                 """,
                 input: MCPSchema.object([
-                    "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use.")
+                    "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
+                    "models": MCPSchema.boolean("Also query Sky Studio's model catalog and reference limits (read-only, no credits)."),
+                    "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3.")
                 ]),
-                readOnly: true
+                readOnly: true, openWorld: true
             )
         case .setView:
             return MCPToolDefinition(

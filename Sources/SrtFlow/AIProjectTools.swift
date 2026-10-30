@@ -14,7 +14,7 @@ import SrtFlowMCPKit
 
 @MainActor
 enum AIProjectTools {
-    static func status(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
+    static func status(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let workspace = AIWorkspace.shared
         let session = AISession.shared
         var projectInfo: [String: JSONValue] = [
@@ -53,6 +53,9 @@ enum AIProjectTools {
         }
         // 存了 Sky Studio 的 Key（generate_media、upscale_clip 在清单里）：告诉 AI 花的是积分、今天还剩多少（2026-10-28 起；之前是 fal 的美元）。
         if let generation = SkyStudioGenerateTool.statusJSON() { result["generation"] = generation }
+        if try args.bool("models") == true {
+            result["generation_models"] = await SkyStudioModelStatus.read(model: try args.string("model"))
+        }
         // 录屏：状态、授权、上次没收完的；screen=true 再列能录的屏幕 / 窗口 / 麦克风（record_screen 用）。
         result["screen_recording"] = AIScreenSources.statusJSON(listSources: try args.bool("screen") ?? false)
         // SkyCut 的授权（照授权拦生效时才报）：没开通时 get_status 是唯一照常回的工具，AI 靠它跟用户说清楚（SkyCutGates）。

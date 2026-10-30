@@ -33,7 +33,8 @@ private func checkCatalog() {
     let definition = MCPToolName.generateMedia.definition
     check(!definition.readOnly && !definition.destructive, "generate_media writes a new file but deletes nothing")
     check(definition.openWorld, "generate_media reaches out to Sky Studio")
-    check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { !$0.definition.openWorld }, "every other tool stays on this Mac")
+    check(MCPToolName.getStatus.definition.readOnly && MCPToolName.getStatus.definition.openWorld, "model discovery is read-only and declares the Sky Studio query")
+    check(MCPToolName.allCases.filter { !paidTools.contains($0) && $0 != .getStatus }.allSatisfy { !$0.definition.openWorld }, "every other tool stays on this Mac")
     let json = definition.json
     checkEqual(json["annotations"]?["openWorldHint"]?.boolValue, true, "openWorldHint is written from the definition")
     checkEqual(MCPToolName.setShape.definition.json["annotations"]?["openWorldHint"]?.boolValue, false, "the others say false")
@@ -42,11 +43,13 @@ private func checkCatalog() {
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind", "prompt"], "kind and prompt are required")
     let properties = schema["properties"]?.objectValue ?? [:]
     // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
-    // model / options 2026-10-28 起没有了：模型由 Sky Studio 按种类定，价格只从 /quote 来。
-    checkEqual(Set(properties.keys), ["kind", "prompt", "image", "duration", "resolution", "aspect_ratio", "instrumental", "lyrics", "name", "confirm_token"], "the parameters")
+    checkEqual(Set(properties.keys), ["kind", "prompt", "model", "image_context", "quality", "input_mode", "image", "last_image",
+        "reference_images", "reference_videos", "reference_audio", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
+        "instrumental", "lyrics", "name", "confirm_token"], "the parameters")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
-    checkEqual(properties["resolution"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.videoResolutions, "resolution lists the video resolutions")
-    checkEqual(properties["aspect_ratio"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationAspects, "aspect_ratio lists the shapes")
+    check(properties["resolution"]?["enum"] == nil && properties["aspect_ratio"]?["enum"] == nil, "model-specific sizes and shapes are not restricted by legacy enums")
+    check(MCPToolName.getStatus.definition.inputSchema["properties"]?["models"] != nil, "AI can discover model limits without submitting generation")
+    for field in ["reference_images", "reference_videos", "reference_audio"] { checkEqual(properties[field]?["type"]?.stringValue, "array", "\(field) preserves an ordered list") }
 
     let text = definition.description
     for word in ["Sky Studio", "get_job", "needs_confirmation", "confirm_token", "credits", "daily credit limit", "add_clips", "MiniMax H3", "image_to_video", "library"] {

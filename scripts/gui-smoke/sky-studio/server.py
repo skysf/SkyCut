@@ -7,6 +7,7 @@ import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import media_fixtures
 
 PORT, ROOT, FFMPEG = int(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -21,6 +22,10 @@ def stamp(seconds=0):
 
 
 def synthesize(job):
+    if job["kind"] in ("image", "text_to_video", "image_to_video"):
+        with LOCK:
+            media_fixtures.finish(job, ROOT, BASE)
+        return
     target = ROOT / (job["job_id"] + ".wav")
     import wave
     with wave.open(str(ROOT / "narration.wav")) as audio:
@@ -65,7 +70,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         data = self.body()
-        (ROOT / "upload.wav").write_bytes(data)
+        (ROOT / Path(self.path).name).write_bytes(data)
         with LOCK:
             LOG.append({"method": "PUT", "path": self.path, "bytes": len(data), "has_auth": "Authorization" in self.headers})
         self.reply(200, {})
@@ -95,11 +100,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"models": [
                 {"id": "local-narrator", "kind": "voice", "title": "Local narrator fixture", "limits": {"max_characters": 100}},
                 {"id": "local-clone", "kind": "voice_clone", "title": "Local clone fixture",
-                 "params": {"language": ["en_us", "cmn"]}, "limits": {"max_characters_by_language": {"en_us": 80, "cmn": 20}}}]})
+                 "params": {"language": ["en_us", "cmn"]}, "limits": {"max_characters_by_language": {"en_us": 80, "cmn": 20}}}] + media_fixtures.models()})
         with LOCK:
             job = JOBS.get(self.path.split("/")[-1])
             if job:
-                public = {k: v for k, v in job.items() if k not in ("prompt", "credits")}
+                LOG.append({"method": "GET", "path": self.path, "has_auth": True})
+                if job.get("refuse"):
+                    job["polls"] = job.get("polls", 0) + 1
+                    media_fixtures.refuse(job, job["polls"] >= CONTROL.get("refund_after_polls", 1))
+                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls")}
                 return self.reply(200, public)
         self.error(404, "unknown_job")
 
@@ -122,9 +131,14 @@ class Handler(BaseHTTPRequestHandler):
             if self.path.endswith("/quote"):
                 if CONTROL.get("quote_error"):
                     return self.error(503, "unavailable")
-                return self.reply(200, {"credits": 2.5 if data["kind"] == "voice_clone" else 1, "typical_seconds": 5})
+                credits = 2.5 if data["kind"] == "voice_clone" else 1
+                if CONTROL.get("replacement_expensive") and data["model"] == "minimax-h3":
+                    credits = 2
+                return self.reply(200, {"credits": credits, "typical_seconds": 5})
             if self.path.endswith("/uploads"):
-                return self.reply(200, {"upload_url": BASE + "/put", "file_url": BASE + "/files/upload.wav", "headers": {}})
+                suffix = {"image": "png", "video": "mp4", "audio": "wav"}[data["purpose"]]
+                name = f"upload-{len(LOG)}.{suffix}"
+                return self.reply(200, {"upload_url": BASE + "/put/" + name, "file_url": BASE + "/files/" + name, "headers": {}})
             if self.path.endswith("/cancel"):
                 job = JOBS.get(self.path.split("/")[-2])
                 if job and job["status"] == "queued":
@@ -138,11 +152,18 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     identity = "local-" + str(len(JOBS) + 1)
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
-                               kind=data["kind"], prompt=data["prompt"], poll_after_seconds=2,
+                               kind=data["kind"], model=data["model"], prompt=data["prompt"], poll_after_seconds=2,
                                credits=2.5 if data["kind"] == "voice_clone" else 1)
                     JOBS[identity], KEYS[key] = job, identity
-                    if not CONTROL.get("hold"):
+                    if data["model"].startswith("seedance") and CONTROL.get("refuse_seedance"):
+                        job["refuse"] = True
+                        if CONTROL.get("submit_refusal"):
+                            media_fixtures.refuse(job, True)
+                            return self.reply(502, {"error": {**job["error"], "job_id": identity}})
+                    elif not CONTROL.get("hold"):
                         threading.Thread(target=synthesize, args=(job,), daemon=True).start()
+                    if CONTROL.get("unknown_submission"):
+                        return self.reply(502, {"unexpected": "submission outcome unknown"})
                 return self.reply(202, {"job_id": job["job_id"], "status": job["status"], "poll_after_seconds": 2})
         self.error(404, "unknown_route")
 
