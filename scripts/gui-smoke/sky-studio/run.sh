@@ -69,7 +69,7 @@ with open(root + "/server.log", "w") as log:
     server = subprocess.Popen(["python3", "scripts/gui-smoke/sky-studio/server.py", port, root + "/assets", ffmpeg], stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
 Path(root + "/server.pid").write_text(str(server.pid))
 SERVER
-defaults write "$BUNDLE" appLanguage en
+defaults write "$BUNDLE" appLanguage "${SRTFLOW_SMOKE_LANGUAGE:-en}"
 if [ -n "${1:-}" ]; then defaults write "$BUNDLE" SrtFlow.skystudio.dailyCreditLimit -float "$1"; fi
 open -g -n --env "SRTFLOW_SKYSTUDIO_API_BASE=http://127.0.0.1:$PORT/api/skycut/v1" \
   --env "SRTFLOW_SMOKE_SKYSTUDIO_KEY=sk-SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" \

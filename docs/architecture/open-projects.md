@@ -79,7 +79,7 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
   （`exporter.belongs(to:)`：工具栏的进度条、预览条上的停止、导出面板底栏的 `VideoEditExportStatus`；开始导出的两条路都传 `export(for: project, …)`）。
   别的工程在导时，这个工程窗口的「导出」照样点得开面板，面板底下写「“名字”正在导出… 42%」、导出键是灰的、没有停止键。2026-10-18 以前 B 窗口里显示 A 的进度和成片、
   还能停掉 A 的导出（[案例](../bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md)）。AI 起的导出第 ④a 刀起排队
-  （`AIWorkQueue`，[AI 接口](ai-control-mcp.md) 第四节第 7 条），面板上的导出照旧在空着时直接开始；送 fal 的活的状态行每个窗口都列（`FalStatusRows`）。
+  （`AIWorkQueue`，[AI 接口](ai-control-mcp.md) 第四节第 7 条），面板上的导出照旧在空着时直接开始；Sky Studio 的任务在每个窗口的工具栏入口与浮层里都能查看（`CloudTasksButton`）。
   AI 那一轮的横幅第 ② 刀起每个工程一条（`AIRound`）。
 
 ## 五、关一个工程（不是换内容）

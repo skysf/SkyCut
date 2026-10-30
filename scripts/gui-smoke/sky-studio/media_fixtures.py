@@ -15,6 +15,7 @@ def models():
     seedance = dict(max_images=30, max_videos=10, max_audio=10, max_total_files=50,
                     max_total_video_seconds=30.2, max_total_audio_seconds=30.2, resolution=["480p", "720p", "1080p"])
     result = []
+    titles = {"minimax-h3": "MiniMax H3", "gemini-omni-1.1-flash": "Google Omni 1.1", "seedance-2-5": "Seedance 2.5"}
     for model in ["seedream5-flash", "nano2"]:
         result.append(dict(id=model, kind="image", title=model,
                            params=dict(resolution=["2K", "4K"] if model == "nano2" else ["2K"], aspect_ratio=["16:9", "9:16", "4:1"]),
@@ -26,7 +27,7 @@ def models():
             modes = {"frames": dict(max_images=2, max_videos=0, max_audio=0, max_total_files=2, resolution=[resolution])}
             if caps:
                 modes["multimodal"] = caps
-            result.append(dict(id=model, kind=kind, title=model, params=dict(duration_values=[8] if model.startswith("veo") else list(range(3, 16)),
+            result.append(dict(id=model, kind=kind, title=titles.get(model, model), params=dict(duration_values=[8] if model.startswith("veo") else list(range(3, 16)),
                         resolution=[resolution], aspect_ratio=["16:9", "9:16"], mode=list(modes)),
                         defaults=dict(duration=seconds, resolution=resolution, mode="frames"), inputs=dict(modes=modes)))
     return result

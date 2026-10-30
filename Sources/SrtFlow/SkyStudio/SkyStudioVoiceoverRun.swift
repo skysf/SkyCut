@@ -241,6 +241,7 @@ final class SkyStudioVoiceoverRun {
 
     private func finish(_ state: AIJobs.Status, _ message: String, payload: JSONValue) {
         guard let job else { return }
+        if state == .failed || (budget?.uncertain ?? 0) > 0 { status.issue = message }
         AIReadGrants.shared.remember(made + (keptBatch.map { [$0] } ?? []))
         AIJobs.shared.finish(job, state, message: message, detail: payload)
     }

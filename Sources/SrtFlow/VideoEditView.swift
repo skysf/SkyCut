@@ -29,7 +29,6 @@ struct VideoEditView: View {
     /// 键名跟着语义改的话，用户上次收起来的状态会丢 —— 为了一个看不见的字符串
     /// 让所有人的界面跳一下不划算。变量名改了，键名是历史。
     @AppStorage("transitionLibraryVisible") private var showsLibraryColumn = true
-    @ObservedObject private var recordingCoordinator = ScreenRecordingCoordinator.shared
     /// 空格/V 快捷键的事件监听。捏合缩放由时间线里 TimelineMagnificationBridge
     /// 的 local monitor 处理，不在这里。
     @State private var eventMonitor: Any?
@@ -141,18 +140,8 @@ struct VideoEditView: View {
                     ProgressView(value: exporter.progress)
                         .frame(width: 80)
                 }
-                if #available(macOS 15.0, *) {
-                    Button {
-                        // 设置页的显隐**完全由 coordinator 状态决定**（见下面的
-                        // sheet 绑定），这里只推状态，不另外拿一个本地开关 ——
-                        // 两份真相会让「会话被撤销但页还开着」这种状态存在。
-                        recordingCoordinator.begin(for: project)
-                    } label: {
-                        Label("Record Screen", systemImage: "record.circle")
-                    }
-                    .instantHelp("Record the screen into this project")
-                    .disabled(recordingCoordinator.isBusy)
-                }
+                CloudTasksButton().equatable()
+                RecordScreenButton(project: project)
                 Button {
                     project.showsSubtitleList.toggle()
                 } label: {
@@ -365,26 +354,7 @@ struct VideoEditView: View {
             .instantHelp("Canvas aspect ratio")
 
             // 工程帧率：预览、导出、预渲染、关键帧容差全都跟它走。
-            Menu {
-                ForEach(ProjectFrameRate.allCases) { rate in
-                    Button {
-                        project.setFrameRate(rate)
-                    } label: {
-                        if project.state.frameRate == rate {
-                            Label(rate.title, systemImage: "checkmark")
-                        } else {
-                            Text(rate.title)
-                        }
-                    }
-                }
-            } label: {
-                Label(project.state.frameRate.title, systemImage: "speedometer")
-                    .font(.caption)
-            }
-            .menuStyle(.borderlessButton)
-            .fixedSize()
-            .disabled(recordingCoordinator.isBusy)
-            .instantHelp("Project frame rate — preview, export and keyframes all follow it")
+            ProjectFrameRateMenu(project: project)
 
             // 预览的画面：优化媒体 / 原片（只订阅协调者，同下一条）。
             OptimizedMediaMenu(coordinator: project.optimizedMedia)

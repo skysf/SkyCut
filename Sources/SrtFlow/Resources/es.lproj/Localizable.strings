@@ -1240,3 +1240,20 @@
 "Voiceover" = "Narración";
 
 "Complete voiceover" = "Narración completa";
+
+/* Generation task popover */
+"Generation tasks %d" = "Generaciones %d";
+"Generation tasks" = "Tareas de generación";
+"Show generation tasks" = "Ver tareas de generación";
+"%d in queue" = "%d en cola";
+"%d active" = "%d en curso";
+"%d tasks" = "%d tareas";
+"%d need attention" = "%d requieren atención";
+"Estimated %@ credits" = "Aprox. %@ créditos";
+"Quote pending" = "Coste pendiente";
+"Needs attention" = "Requiere atención";
+"Waiting for refund" = "Esperando reembolso";
+"Dismiss this task" = "Ocultar esta tarea";
+"Cancel this task" = "Cancelar esta tarea";
+"Compare the original and upscaled video" = "Comparar el vídeo original y el ampliado";
+"Completed" = "Completado";
