@@ -1,0 +1,1081 @@
+{
+  "models": [
+    {
+      "id": "wan-3.0-text-to-video",
+      "kind": "text_to_video",
+      "title": "Wan 3.0 Text to Video",
+      "price": {
+        "per": "billable_second",
+        "credits_by_resolution": {
+          "480p": 11,
+          "720p": 22,
+          "1080p": 44
+        },
+        "reference_video_seconds_included": true
+      },
+      "params": {
+        "mode": [
+          "frames"
+        ],
+        "resolution": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "aspect_ratio": [
+          "adaptive",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16"
+        ],
+        "duration": [
+          2,
+          30
+        ],
+        "duration_values": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "smart_duration": [
+          null,
+          "auto"
+        ],
+        "generate_audio": [
+          true,
+          false
+        ],
+        "enable_prompt_expansion": [
+          true,
+          false
+        ],
+        "enable_thinking": [
+          null,
+          true,
+          false
+        ],
+        "seed": {
+          "min": 0,
+          "max": 2147483647
+        },
+        "enable_safety_checker": {
+          "default": true,
+          "disabling_requires_provider_authorization": true
+        },
+        "reference_video_seconds": [
+          0,
+          0
+        ]
+      },
+      "defaults": {
+        "resolution": "1080p",
+        "duration": 5,
+        "aspect_ratio": "adaptive",
+        "mode": "frames",
+        "generate_audio": true,
+        "enable_prompt_expansion": true,
+        "enable_thinking": null,
+        "enable_safety_checker": true
+      },
+      "inputs": {},
+      "outputs": {
+        "video": true,
+        "dimensions": "Read result.width and result.height. Adaptive output dimensions can differ from the nominal resolution short side."
+      },
+      "limits": {
+        "max_prompt_characters": 20000,
+        "min_output_seconds": 2,
+        "max_output_seconds": 30,
+        "max_input_plus_output_seconds": 30,
+        "max_images": 0,
+        "max_videos": 0,
+        "max_audio": 0,
+        "max_documents": 0,
+        "max_web_urls": 0,
+        "max_total_files": 0,
+        "max_image_bytes": 20971520,
+        "max_video_bytes": 104857600,
+        "max_audio_bytes": 15728640,
+        "max_document_bytes": 104857600,
+        "max_document_pages": 50,
+        "image_dimensions": {
+          "min_side": 240,
+          "max_side": 8000
+        },
+        "video_dimensions": {
+          "min_side": 240,
+          "max_side": 4096
+        },
+        "media_aspect_ratio": {
+          "min": 0.125,
+          "max": 8
+        },
+        "min_video_fps": 16,
+        "min_video_clip_seconds": 1,
+        "max_video_clip_seconds": 15,
+        "max_total_video_seconds": 15,
+        "min_audio_clip_seconds": 1,
+        "max_audio_clip_seconds": 15,
+        "max_total_audio_seconds": 15,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/bmp",
+          "image/webp"
+        ],
+        "video_mime_types": [
+          "video/mp4",
+          "video/quicktime"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "document_extensions": [
+          "pdf",
+          "txt",
+          "md",
+          "doc",
+          "docx",
+          "xls",
+          "xlsx",
+          "ppt",
+          "pptx",
+          "key",
+          "pages",
+          "numbers"
+        ],
+        "transparent_images": false,
+        "document_and_web_mutually_exclusive": true,
+        "document_or_web_requires_thinking": true,
+        "frames_and_references_mutually_exclusive": true,
+        "audio_only_references": true,
+        "reference_video_seconds_are_billable": true,
+        "reference_video_billing_rounding": "ceil_combined_seconds",
+        "document_page_limit_enforced_by": "provider"
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "wan-3.0-image-to-video",
+      "kind": "image_to_video",
+      "title": "Wan 3.0 Image to Video",
+      "price": {
+        "per": "billable_second",
+        "credits_by_resolution": {
+          "480p": 11,
+          "720p": 22,
+          "1080p": 44
+        },
+        "reference_video_seconds_included": true
+      },
+      "params": {
+        "mode": [
+          "frames"
+        ],
+        "resolution": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "aspect_ratio": [
+          "adaptive",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16"
+        ],
+        "duration": [
+          2,
+          30
+        ],
+        "duration_values": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "smart_duration": [
+          null,
+          "auto"
+        ],
+        "generate_audio": [
+          true,
+          false
+        ],
+        "enable_prompt_expansion": [
+          true,
+          false
+        ],
+        "enable_thinking": [
+          null,
+          true,
+          false
+        ],
+        "seed": {
+          "min": 0,
+          "max": 2147483647
+        },
+        "enable_safety_checker": {
+          "default": true,
+          "disabling_requires_provider_authorization": true
+        },
+        "reference_video_seconds": [
+          0,
+          0
+        ]
+      },
+      "defaults": {
+        "resolution": "1080p",
+        "duration": 5,
+        "aspect_ratio": "adaptive",
+        "mode": "frames",
+        "generate_audio": true,
+        "enable_prompt_expansion": true,
+        "enable_thinking": null,
+        "enable_safety_checker": true
+      },
+      "inputs": {
+        "image_url": "required first frame from /uploads",
+        "last_frame_url": "optional last frame from /uploads"
+      },
+      "outputs": {
+        "video": true,
+        "dimensions": "Read result.width and result.height. Adaptive output dimensions can differ from the nominal resolution short side."
+      },
+      "limits": {
+        "max_prompt_characters": 20000,
+        "min_output_seconds": 2,
+        "max_output_seconds": 30,
+        "max_input_plus_output_seconds": 30,
+        "max_images": 2,
+        "max_videos": 0,
+        "max_audio": 0,
+        "max_documents": 0,
+        "max_web_urls": 0,
+        "max_total_files": 2,
+        "max_image_bytes": 20971520,
+        "max_video_bytes": 104857600,
+        "max_audio_bytes": 15728640,
+        "max_document_bytes": 104857600,
+        "max_document_pages": 50,
+        "image_dimensions": {
+          "min_side": 240,
+          "max_side": 8000
+        },
+        "video_dimensions": {
+          "min_side": 240,
+          "max_side": 4096
+        },
+        "media_aspect_ratio": {
+          "min": 0.125,
+          "max": 8
+        },
+        "min_video_fps": 16,
+        "min_video_clip_seconds": 1,
+        "max_video_clip_seconds": 15,
+        "max_total_video_seconds": 15,
+        "min_audio_clip_seconds": 1,
+        "max_audio_clip_seconds": 15,
+        "max_total_audio_seconds": 15,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/bmp",
+          "image/webp"
+        ],
+        "video_mime_types": [
+          "video/mp4",
+          "video/quicktime"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "document_extensions": [
+          "pdf",
+          "txt",
+          "md",
+          "doc",
+          "docx",
+          "xls",
+          "xlsx",
+          "ppt",
+          "pptx",
+          "key",
+          "pages",
+          "numbers"
+        ],
+        "transparent_images": false,
+        "document_and_web_mutually_exclusive": true,
+        "document_or_web_requires_thinking": true,
+        "frames_and_references_mutually_exclusive": true,
+        "audio_only_references": true,
+        "reference_video_seconds_are_billable": true,
+        "reference_video_billing_rounding": "ceil_combined_seconds",
+        "document_page_limit_enforced_by": "provider",
+        "first_frame_required": true,
+        "last_frame_requires_first": true
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "wan-3.0-reference-to-video",
+      "kind": "image_to_video",
+      "title": "Wan 3.0 Reference to Video",
+      "price": {
+        "per": "billable_second",
+        "credits_by_resolution": {
+          "480p": 11,
+          "720p": 22,
+          "1080p": 44
+        },
+        "reference_video_seconds_included": true
+      },
+      "params": {
+        "mode": [
+          "multimodal"
+        ],
+        "resolution": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "aspect_ratio": [
+          "adaptive",
+          "16:9",
+          "4:3",
+          "1:1",
+          "3:4",
+          "9:16"
+        ],
+        "duration": [
+          2,
+          30
+        ],
+        "duration_values": [
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30
+        ],
+        "smart_duration": [
+          null,
+          "auto"
+        ],
+        "generate_audio": [
+          true,
+          false
+        ],
+        "enable_prompt_expansion": [
+          true,
+          false
+        ],
+        "enable_thinking": [
+          null,
+          true,
+          false
+        ],
+        "seed": {
+          "min": 0,
+          "max": 2147483647
+        },
+        "enable_safety_checker": {
+          "default": true,
+          "disabling_requires_provider_authorization": true
+        },
+        "reference_video_seconds": [
+          0,
+          15
+        ]
+      },
+      "defaults": {
+        "resolution": "1080p",
+        "duration": 5,
+        "aspect_ratio": "adaptive",
+        "mode": "multimodal",
+        "generate_audio": true,
+        "enable_prompt_expansion": true,
+        "enable_thinking": null,
+        "enable_safety_checker": true
+      },
+      "inputs": {
+        "references": "ordered array of {type: image|video|audio, url: own /uploads file_url}",
+        "file_url": "optional own document upload",
+        "web_url": "optional public HTTP(S) page requiring no login",
+        "prompt_references": "Image 1, Video 1, Audio 1; count each type separately"
+      },
+      "outputs": {
+        "video": true,
+        "dimensions": "Read result.width and result.height. Adaptive output dimensions can differ from the nominal resolution short side."
+      },
+      "limits": {
+        "max_prompt_characters": 20000,
+        "min_output_seconds": 2,
+        "max_output_seconds": 30,
+        "max_input_plus_output_seconds": 30,
+        "max_images": 10,
+        "max_videos": 5,
+        "max_audio": 5,
+        "max_documents": 1,
+        "max_web_urls": 1,
+        "max_total_files": 20,
+        "max_image_bytes": 20971520,
+        "max_video_bytes": 104857600,
+        "max_audio_bytes": 15728640,
+        "max_document_bytes": 104857600,
+        "max_document_pages": 50,
+        "image_dimensions": {
+          "min_side": 240,
+          "max_side": 8000
+        },
+        "video_dimensions": {
+          "min_side": 240,
+          "max_side": 4096
+        },
+        "media_aspect_ratio": {
+          "min": 0.125,
+          "max": 8
+        },
+        "min_video_fps": 16,
+        "min_video_clip_seconds": 1,
+        "max_video_clip_seconds": 15,
+        "max_total_video_seconds": 15,
+        "min_audio_clip_seconds": 1,
+        "max_audio_clip_seconds": 15,
+        "max_total_audio_seconds": 15,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/bmp",
+          "image/webp"
+        ],
+        "video_mime_types": [
+          "video/mp4",
+          "video/quicktime"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "document_extensions": [
+          "pdf",
+          "txt",
+          "md",
+          "doc",
+          "docx",
+          "xls",
+          "xlsx",
+          "ppt",
+          "pptx",
+          "key",
+          "pages",
+          "numbers"
+        ],
+        "transparent_images": false,
+        "document_and_web_mutually_exclusive": true,
+        "document_or_web_requires_thinking": true,
+        "frames_and_references_mutually_exclusive": true,
+        "audio_only_references": true,
+        "reference_video_seconds_are_billable": true,
+        "reference_video_billing_rounding": "ceil_combined_seconds",
+        "document_page_limit_enforced_by": "provider",
+        "requires_reference": true
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "heygen-v3-lipsync-speed",
+      "kind": "lipsync",
+      "title": "HeyGen v3 Lipsync Speed",
+      "description": "Faster lip-sync for previews, iterations and straightforward dialogue replacement.",
+      "recommended_for": [
+        "previews",
+        "fast_iterations",
+        "front_facing_speakers"
+      ],
+      "price": {
+        "per": "output_second",
+        "credits": 11,
+        "rounding": "ceil_output_seconds",
+        "duration_basis": "media_container",
+        "settlement": "actual_output_after_reservation"
+      },
+      "params": {
+        "title": "optional job label",
+        "enable_caption": [
+          false,
+          true
+        ],
+        "enable_dynamic_duration": [
+          false,
+          true
+        ],
+        "disable_music_track": [
+          false,
+          true
+        ],
+        "enable_speech_enhancement": [
+          false,
+          true
+        ],
+        "start_time": "optional non-negative seconds",
+        "end_time": "optional seconds greater than start and within source",
+        "video_seconds": "positive source duration for quotes; server-measured on submit",
+        "audio_seconds": "positive replacement audio duration for quotes; server-measured on submit"
+      },
+      "defaults": {
+        "enable_caption": false,
+        "enable_dynamic_duration": false,
+        "disable_music_track": false,
+        "enable_speech_enhancement": false
+      },
+      "parameter_descriptions": {
+        "title": "Optional job label; does not generate dialogue.",
+        "enable_caption": "Forwarded to the provider; upstream may ignore this flag and always generate subtitles. No guaranteed burn-in.",
+        "enable_dynamic_duration": "Allow length adaptation, subject to provider duration-compatibility checks. Prefer matching input lengths; even true can reject length differences. Default false preserves the source timeline intent; inspect actual result duration.",
+        "disable_music_track": "Ask the provider to omit the music track from the output.",
+        "enable_speech_enhancement": "Ask the provider to enhance speech clarity.",
+        "start_time": "Optional processing start in source-video seconds; defaults to the beginning.",
+        "end_time": "Optional processing end in source-video seconds; defaults to the end. This is not a guaranteed billing discount."
+      },
+      "inputs": {
+        "video_url": {
+          "required": true,
+          "upload_purpose": "lipsync_video"
+        },
+        "audio_url": {
+          "required": true,
+          "upload_purpose": "lipsync_audio"
+        }
+      },
+      "outputs": {
+        "video": true,
+        "content_types": [
+          "video/mp4",
+          "video/webm"
+        ],
+        "format_basis": "actual_container_bytes",
+        "billing_duration_seconds": "whole media-container duration; billed seconds round up",
+        "caption_file": "optional provider-returned subtitle sidecar",
+        "caption_behavior": "provider_dependent; upstream may always generate captions; no guaranteed burn-in"
+      },
+      "limits": {
+        "max_videos": 1,
+        "max_audio": 1,
+        "max_total_files": 2,
+        "max_video_bytes": 33554432,
+        "max_audio_bytes": 33554432,
+        "video_mime_types": [
+          "video/mp4",
+          "video/webm"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "input_limit_basis": "heygen_public_https_url_input_limits",
+        "provider_max_video_seconds": null,
+        "provider_max_audio_seconds": null,
+        "provider_video_dimensions": null,
+        "provider_min_video_fps": null,
+        "provider_duration_difference_limit_seconds": null,
+        "duration_compatibility": "Prefer matching input lengths. The provider may reject length differences even with dynamic duration enabled; its numeric tolerance is unpublished.",
+        "requires_video_and_replacement_audio": true,
+        "translates_audio": false,
+        "generates_speech": false,
+        "max_title_characters": 200,
+        "title_limit_basis": "skycut_service",
+        "max_caption_bytes": 1048576,
+        "caption_limit_basis": "skycut_service",
+        "max_output_probe_bytes": 268435456,
+        "output_probe_limit_basis": "skycut_service"
+      },
+      "notes": [
+        "Bring replacement audio; this endpoint does not translate or synthesize speech.",
+        "Dynamic duration may change the output length; inspect the returned result before placing it on the timeline.",
+        "start_time/end_time choose processing range, not a guaranteed discounted billing interval.",
+        "A WebM source can produce WebM bytes even when fal labels them MP4. SkyCut preserves the bytes and reports the actual URL extension and content_type; consumers must support WebM.",
+        "Dynamic reservation uses source plus audio seconds as a SkyCut estimate, not an upstream length cap. Unused credits return after output measurement; exceeding the approved budget needs review and never an extra automatic charge.",
+        "Undocumented upstream duration, fps and resolution limits are null, not unlimited."
+      ],
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "heygen-v3-lipsync-precision",
+      "kind": "lipsync",
+      "title": "HeyGen v3 Lipsync Precision",
+      "description": "Higher-fidelity lip-sync using avatar inference; prefer when mouth accuracy matters.",
+      "recommended_for": [
+        "final_renders",
+        "higher_lip_accuracy",
+        "cinematic_content",
+        "long_form_dialogue"
+      ],
+      "price": {
+        "per": "output_second",
+        "credits": 22,
+        "rounding": "ceil_output_seconds",
+        "duration_basis": "media_container",
+        "settlement": "actual_output_after_reservation"
+      },
+      "params": {
+        "title": "optional job label",
+        "enable_caption": [
+          false,
+          true
+        ],
+        "enable_dynamic_duration": [
+          false,
+          true
+        ],
+        "disable_music_track": [
+          false,
+          true
+        ],
+        "enable_speech_enhancement": [
+          false,
+          true
+        ],
+        "start_time": "optional non-negative seconds",
+        "end_time": "optional seconds greater than start and within source",
+        "video_seconds": "positive source duration for quotes; server-measured on submit",
+        "audio_seconds": "positive replacement audio duration for quotes; server-measured on submit"
+      },
+      "defaults": {
+        "enable_caption": false,
+        "enable_dynamic_duration": false,
+        "disable_music_track": false,
+        "enable_speech_enhancement": false
+      },
+      "parameter_descriptions": {
+        "title": "Optional job label; does not generate dialogue.",
+        "enable_caption": "Forwarded to the provider; upstream may ignore this flag and always generate subtitles. No guaranteed burn-in.",
+        "enable_dynamic_duration": "Allow length adaptation, subject to provider duration-compatibility checks. Prefer matching input lengths; even true can reject length differences. Default false preserves the source timeline intent; inspect actual result duration.",
+        "disable_music_track": "Ask the provider to omit the music track from the output.",
+        "enable_speech_enhancement": "Ask the provider to enhance speech clarity.",
+        "start_time": "Optional processing start in source-video seconds; defaults to the beginning.",
+        "end_time": "Optional processing end in source-video seconds; defaults to the end. This is not a guaranteed billing discount."
+      },
+      "inputs": {
+        "video_url": {
+          "required": true,
+          "upload_purpose": "lipsync_video"
+        },
+        "audio_url": {
+          "required": true,
+          "upload_purpose": "lipsync_audio"
+        }
+      },
+      "outputs": {
+        "video": true,
+        "content_types": [
+          "video/mp4",
+          "video/webm"
+        ],
+        "format_basis": "actual_container_bytes",
+        "billing_duration_seconds": "whole media-container duration; billed seconds round up",
+        "caption_file": "optional provider-returned subtitle sidecar",
+        "caption_behavior": "provider_dependent; upstream may always generate captions; no guaranteed burn-in"
+      },
+      "limits": {
+        "max_videos": 1,
+        "max_audio": 1,
+        "max_total_files": 2,
+        "max_video_bytes": 33554432,
+        "max_audio_bytes": 33554432,
+        "video_mime_types": [
+          "video/mp4",
+          "video/webm"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "input_limit_basis": "heygen_public_https_url_input_limits",
+        "provider_max_video_seconds": null,
+        "provider_max_audio_seconds": null,
+        "provider_video_dimensions": null,
+        "provider_min_video_fps": null,
+        "provider_duration_difference_limit_seconds": null,
+        "duration_compatibility": "Prefer matching input lengths. The provider may reject length differences even with dynamic duration enabled; its numeric tolerance is unpublished.",
+        "requires_video_and_replacement_audio": true,
+        "translates_audio": false,
+        "generates_speech": false,
+        "max_title_characters": 200,
+        "title_limit_basis": "skycut_service",
+        "max_caption_bytes": 1048576,
+        "caption_limit_basis": "skycut_service",
+        "max_output_probe_bytes": 268435456,
+        "output_probe_limit_basis": "skycut_service"
+      },
+      "notes": [
+        "Bring replacement audio; this endpoint does not translate or synthesize speech.",
+        "Dynamic duration may change the output length; inspect the returned result before placing it on the timeline.",
+        "start_time/end_time choose processing range, not a guaranteed discounted billing interval.",
+        "A WebM source can produce WebM bytes even when fal labels them MP4. SkyCut preserves the bytes and reports the actual URL extension and content_type; consumers must support WebM.",
+        "Dynamic reservation uses source plus audio seconds as a SkyCut estimate, not an upstream length cap. Unused credits return after output measurement; exceeding the approved budget needs review and never an extra automatic charge.",
+        "Undocumented upstream duration, fps and resolution limits are null, not unlimited."
+      ],
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "minimax-h3-max-lip-sync",
+      "kind": "lipsync",
+      "title": "MiniMax H3 Max Lip Sync (Image to Video)",
+      "input_mode": "image_and_audio",
+      "description": "Generate a talking or singing video from one still portrait and supplied audio. Creates new motion; use HeyGen to change the lips in existing footage.",
+      "recommended_for": [
+        "talking_portraits",
+        "illustrated_characters",
+        "audio_driven_image_animation"
+      ],
+      "price": {
+        "per": "output_second",
+        "credits_by_resolution": {
+          "480P": 11,
+          "768P": 18,
+          "1080P": 36,
+          "2K": 72
+        },
+        "long_video_threshold_seconds": 15,
+        "long_video_multiplier": 1.2,
+        "multiplier_applies_to": "whole_output_when_duration_exceeds_threshold",
+        "rounding": "ceil_output_seconds_then_ceil_credits_to_tenth",
+        "settlement": "actual_output_after_reservation"
+      },
+      "params": {
+        "resolution": [
+          "480P",
+          "768P",
+          "1080P",
+          "2K"
+        ],
+        "enable_transcription": [
+          false,
+          true
+        ],
+        "enable_safety_checker": [
+          true,
+          false
+        ],
+        "seed": [
+          0,
+          2147483647
+        ],
+        "audio_seconds": "5..900 for quotes; server-measured on submit"
+      },
+      "defaults": {
+        "resolution": "768P",
+        "enable_transcription": false,
+        "enable_safety_checker": true,
+        "seed": null
+      },
+      "parameter_descriptions": {
+        "resolution": "Output uses the supported aspect ratio nearest the source image. 768P is not 720P.",
+        "enable_transcription": "Transcribe supplied audio to guide lip movements; false follows the waveform, useful for singing. No subtitle file is promised.",
+        "seed": "Optional random seed from 0 to 2147483647. The actual used seed is returned.",
+        "enable_safety_checker": "Forward the provider content-safety setting; enabled by default."
+      },
+      "inputs": {
+        "image_url": {
+          "required": true,
+          "upload_purpose": "image"
+        },
+        "audio_url": {
+          "required": true,
+          "upload_purpose": "h3_lipsync_audio"
+        }
+      },
+      "outputs": {
+        "video": true,
+        "seed": true,
+        "duration": true,
+        "billing_duration_seconds": true,
+        "caption_file": false
+      },
+      "limits": {
+        "max_images": 1,
+        "max_audio": 1,
+        "max_total_files": 2,
+        "min_audio_seconds": 5,
+        "max_audio_seconds": 900,
+        "min_image_aspect_ratio": 0.4,
+        "max_image_aspect_ratio": 2.5,
+        "max_image_bytes": 31457280,
+        "max_audio_bytes": 209715200,
+        "max_image_pixels": 64000000,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "audio_mime_types": [
+          "audio/mpeg",
+          "audio/wav"
+        ],
+        "file_limit_basis": "skycut_service",
+        "format_limit_basis": "skycut_supported_subset",
+        "provider_max_image_bytes": null,
+        "provider_max_audio_bytes": null,
+        "provider_image_dimensions": null,
+        "requires_image_and_audio": true,
+        "accepts_source_video": false,
+        "translates_audio": false,
+        "generates_speech": false
+      },
+      "notes": [
+        "Output follows supplied audio; no separate duration, dynamic-duration, trim, text prompt, translation or speech-generation control.",
+        "Use a visible face; output quality depends on the source image and audio. There is no server-side face detector.",
+        "Current OpenAPI permits 5..900 seconds and defaults transcription false; the older 15-second landing page is outdated.",
+        "File byte, format-subset and pixel limits are SkyCut service limits; upstream byte/dimension maxima are unpublished, not unlimited.",
+        "Reservation adds 0.01 seconds for the input probe precision; this is not a provider-guaranteed output bound. Unused credits return after settlement; over-budget or missing duration needs review without another charge."
+      ],
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "ideogram-remove-background",
+      "kind": "image",
+      "title": "Ideogram Remove Background",
+      "operation": "remove_background",
+      "description": "Remove the background from one existing image, preserving the foreground in a PNG with alpha for compositing.",
+      "price": {
+        "per": "image",
+        "credits": 2.2
+      },
+      "inputs": {
+        "image_url": {
+          "required": true,
+          "upload_purpose": "background_removal_image"
+        }
+      },
+      "params": {
+        "sync_mode": [
+          false,
+          true
+        ],
+        "enable_safety_checker": [
+          true,
+          false
+        ]
+      },
+      "defaults": {
+        "sync_mode": false,
+        "enable_safety_checker": true
+      },
+      "parameter_descriptions": {
+        "sync_mode": "true requests a data URI and may remove provider request history. SkyCut still returns an asynchronous job and a durable PNG URL. Prefer false for recovery.",
+        "enable_safety_checker": "Enabled by default. fal permits false only for authorized callers; this setting grants no upstream authorization."
+      },
+      "outputs": {
+        "image": true,
+        "content_type": "image/png",
+        "has_alpha": true
+      },
+      "limits": {
+        "max_images": 1,
+        "max_total_files": 1,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_image_bytes": 10000000,
+        "input_size_limit_basis": "conservative_provider_10MB",
+        "max_image_pixels": 64000000,
+        "pixel_limit_basis": "skycut_service",
+        "provider_image_dimensions": null,
+        "max_output_bytes": 268435456,
+        "output_limit_basis": "skycut_service",
+        "max_inline_recovery_characters": 1000000,
+        "inline_recovery_limit_basis": "skycut_service",
+        "still_images_only": true,
+        "output_mime_type": "image/png",
+        "output_has_alpha": true
+      },
+      "notes": [
+        "Exactly one image; no prompt, seed, image count, mask, resolution or aspect-ratio control.",
+        "The 10 MB limit is enforced as 10,000,000 bytes, not 10 MiB. Pixel/output/recovery limits are SkyCut service limits.",
+        "Actual returned dimensions and transparency are reported; the provider publishes no dimension maximum or guaranteed size preservation.",
+        "With sync_mode true, large inline results may require review after failed saving if the original provider result is no longer available. Never regenerate or refund a successful provider result automatically."
+      ],
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    }
+  ],
+  "billing_policy": {
+    "version": "2026-10-31",
+    "charge": "prepaid_personal_credits",
+    "success": "provider_final_success_with_expected_output",
+    "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+    "no_refund_after_provider_success": true,
+    "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+    "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+    "missing_output": "pending_review",
+    "known_provider_charge": "non_refundable",
+    "unused_reservation": "return_after_final_settlement",
+    "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+  }
+}

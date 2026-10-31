@@ -14,6 +14,8 @@ enum SkyStudioModelStatus {
             let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key)
             let entries = catalog.models.filter { model == nil || $0.id == model }
             return ["models": .array(entries.map(\.json)), "selection_guidance": .string(SkyStudioModelPolicy.guidance),
+                    "billing_policy": catalog.billingPolicy ?? .null,
+                    "billing_note": .string(SkyStudioBilling.policyMessage),
                     "price_note": "Catalog prices are display only; generate_media quotes exact inputs before spending credits."]
         } catch let failure as SkyStudioFailure {
             return ["available": false, "message": .string(SkyStudioJobError.request(failure).message)]

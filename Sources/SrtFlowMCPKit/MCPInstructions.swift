@@ -16,7 +16,7 @@ public enum MCPInstructions {
     /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio，不再多出一行。整份离 Claude Code
     /// 的 2,048 个字符只差几十个：这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：
     /// AI 调它之前一定会读到。
-    static let skyStudioTools = "generate_media (image, video, music, sound effect), upscale_clip (sharper, larger): Sky Studio credits"
+    static let skyStudioTools = "generate_media (image/video/lipsync/cutout/music/SFX), upscale_clip: Sky Studio credits"
 
     public static func text(providers: Set<MCPProvider>) -> String {
         text

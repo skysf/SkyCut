@@ -8,6 +8,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import media_fixtures
+import model_expansion_fixtures as expansion
 
 PORT, ROOT, FFMPEG = int(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -22,6 +23,15 @@ def stamp(seconds=0):
 
 
 def synthesize(job):
+    if job["model"] in {m["id"] for m in expansion.CATALOG["models"]}:
+        with LOCK:
+            expansion.finish(job, ROOT, BASE)
+            if CONTROL.get("delivery_failure"):
+                job["result"]["url"] = BASE + "/files/nonexistent.mp4"
+            if CONTROL.get("billing_pending"):
+                job.update(status="failed", error={"message": "Outcome unknown", "refunded": True},
+                           billing=expansion.billing("pending_review", None))
+        return
     if job["kind"] in ("image", "text_to_video", "image_to_video"):
         with LOCK:
             media_fixtures.finish(job, ROOT, BASE)
@@ -100,10 +110,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"models": [
                 {"id": "local-narrator", "kind": "voice", "title": "Local narrator fixture", "limits": {"max_characters": 100}},
                 {"id": "local-clone", "kind": "voice_clone", "title": "Local clone fixture",
-                 "params": {"language": ["en_us", "cmn"]}, "limits": {"max_characters_by_language": {"en_us": 80, "cmn": 20}}}] + media_fixtures.models()})
+                 "params": {"language": ["en_us", "cmn"]}, "limits": {"max_characters_by_language": {"en_us": 80, "cmn": 20}}}] + media_fixtures.models() + expansion.CATALOG["models"],
+                 "billing_policy": expansion.CATALOG["billing_policy"]})
         with LOCK:
             job = JOBS.get(self.path.split("/")[-1])
             if job:
+                if CONTROL.get("settle_refund"):
+                    job["billing"] = expansion.billing("refunded", 0)
                 LOG.append({"method": "GET", "path": self.path, "has_auth": True})
                 if job.get("refuse"):
                     job["polls"] = job.get("polls", 0) + 1
@@ -137,7 +150,7 @@ class Handler(BaseHTTPRequestHandler):
                     credits = 2
                 return self.reply(200, {"credits": credits, "typical_seconds": 5})
             if self.path.endswith("/uploads"):
-                suffix = {"image": "png", "video": "mp4", "audio": "wav"}[data["purpose"]]
+                suffix = Path(data["filename"]).suffix.lstrip(".")
                 name = f"upload-{len(LOG)}.{suffix}"
                 return self.reply(200, {"upload_url": BASE + "/put/" + name, "file_url": BASE + "/files/" + name, "headers": {}})
             if self.path.endswith("/cancel"):
@@ -148,6 +161,7 @@ class Handler(BaseHTTPRequestHandler):
                     return self.error(409, "not_cancellable")
                 if job and job["status"] == "queued":
                     job["status"] = "cancelled"
+                    job["billing"] = expansion.billing("refunded", 0, job["credits"])
                     return self.reply(200, {"status": "cancelled", "credits_refunded": job["credits"]})
                 return self.error(409, "not_cancellable")
             if self.path.endswith("/jobs"):
@@ -157,14 +171,14 @@ class Handler(BaseHTTPRequestHandler):
                 else:
                     identity = "local-" + str(len(JOBS) + 1)
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
-                               kind=data["kind"], model=data["model"], prompt=data["prompt"], poll_after_seconds=2,
+                               kind=data["kind"], model=data["model"], prompt=data.get("prompt", ""), poll_after_seconds=2,
                                credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity
                     if data["model"].startswith("seedance") and CONTROL.get("refuse_seedance"):
                         job["refuse"] = True
                         if CONTROL.get("submit_refusal"):
                             media_fixtures.refuse(job, True)
-                            return self.reply(502, {"error": {**job["error"], "job_id": identity}})
+                            return self.reply(502, {"error": {**job["error"], "job_id": identity}, "billing": job["billing"]})
                     elif not CONTROL.get("hold"):
                         threading.Thread(target=synthesize, args=(job,), daemon=True).start()
                     if CONTROL.get("unknown_submission"):
@@ -173,4 +187,5 @@ class Handler(BaseHTTPRequestHandler):
         self.error(404, "unknown_route")
 
 
+expansion.prepare(ROOT, ROOT.parent / "work", FFMPEG)
 ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

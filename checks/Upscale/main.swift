@@ -336,12 +336,17 @@ Task {
         }
 
         // 排队中停下：替它取消（退钱），不落文件、不留中间文件。等的时候「睡」在第 2 次抛出 = Task 被取消。
+        var serverCancelled = false
         SkyStudioStub.reset { seen in
             switch (seen.method, seen.url) {
             case ("POST", base + "/uploads"): return .http(200, uploaded)
             case ("PUT", bucket): return .http(200, "")
             case ("POST", base + "/jobs"): return .http(202, #"{"job_id": "job-c", "status": "queued", "poll_after_seconds": 15}"#)
-            case ("POST", base + "/jobs/job-c/cancel"): return .http(200, #"{"status": "cancelled", "credits_refunded": 75}"#)
+            case ("POST", base + "/jobs/job-c/cancel"):
+                serverCancelled = true
+                return .http(200, #"{"status": "cancelled", "credits_refunded": 75}"#)
+            case ("GET", base + "/jobs/job-c") where serverCancelled:
+                return .http(200, #"{"job_id":"job-c","status":"cancelled","billing":{"status":"refunded","credits_charged":0,"credits_refunded":75}}"#)
             default: return .http(200, #"{"job_id": "job-c", "status": "queued", "queue_position": 3, "poll_after_seconds": 15}"#)
             }
         }

@@ -48,6 +48,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \

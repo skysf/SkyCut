@@ -45,6 +45,8 @@ final class AIJobs {
         fileprivate(set) var message: String?
         fileprivate(set) var detail: JSONValue?
         fileprivate(set) var finishedAt: Date?
+        /// 查询已结束的云任务时只刷新原单账务 / 成品地址，不提交新的生成。
+        var refresh: (@MainActor () async -> Void)?
 
         init(
             id: String, kind: Kind, progress: @escaping @MainActor () -> Double?, liveDetail: @escaping @MainActor () -> [String: JSONValue],
@@ -96,6 +98,10 @@ final class AIJobs {
     }
 
     func job(_ id: String) -> Job? { jobs[id] }
+
+    func updateDetail(_ job: Job, _ values: [String: JSONValue]) {
+        job.detail = .object((job.detail?.objectValue ?? [:]).merging(values) { _, new in new })
+    }
 
     /// 等到任务结束或者超时（最多 30 秒，给客户端的一分钟留足余量）。
     func wait(for job: Job, seconds: Double) async {

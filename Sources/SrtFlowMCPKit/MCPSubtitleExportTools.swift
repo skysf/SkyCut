@@ -93,6 +93,8 @@ public enum MCPSubtitleExportTools {
                 answering; keep waiting instead of starting it again. Exports, transcribing (subtitles, transcripts) and \
                 translations run one at a time across all projects: a later one shows status queued with queue_position \
                 (1 = next) and starts by itself. If it shows waiting_for_user, tell the user what it says right away.
+                Cloud generation also refreshes the original server job's billing and remote_result after a local failure; \
+                this never submits a replacement or repeats a charge. Explain billing_note; delivery failure does not imply a refund.
                 """,
                 input: MCPSchema.object([
                     "job_id": MCPSchema.string("Job id."),

@@ -3,7 +3,8 @@
 > 2026-10-28 引入（[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 6 刀）。改 `Sources/SrtFlow/SkyStudio/` 里的
 > `SkyStudioAPI`（`/models` 之后的那几个接口）、`SkyStudioJob`、`SkyStudioModels`、`SkyStudioJobRun`，或者往 upscale / 生成 / 配旁白里接 Sky Studio 之前必读。
 > 接口合同在 **Sky Studio 仓库**（本机 `SkyStudio_APP_Master/cursor-skystudios-app-cinematic`）的 `docs/agents/skycut-api.md`，
-> 2026-10-28 上线；2026-10-30 多模型 / 多参考合同在 Sky Studio PR #228、main `bfc5860e` 更新并上线。Key、`/me`、授权见 [Sky Studio 账号](sky-studio-account.md)。
+> 2026-10-28 上线；2026-10-30 多模型 / 多参考合同在 Sky Studio PR #228、main `bfc5860e` 更新并上线；
+> 2026-10-31 七模型 / 结算政策已随 PR #229 的 exact main `3df55d654628bb4f199f9914f9fa996046e3f291` 通过受控生产发布；正式域名已指向该构建。生产原始 `/models` 在 18:30:42 +08:00 核验为 HTTP 200、27 条及全部七个新 ID，根与 27/27 模型的 `billing_policy.version` 均为 `2026-10-31`。发布与客户端验证证据见 [本次案例](../bugfixes/2026-10-31-sky-studio-model-expansion.md)。Key、`/me`、授权见 [Sky Studio 账号](sky-studio-account.md)。
 
 ## 一、规矩
 
@@ -12,8 +13,8 @@
 | 谁碰地址 | **只有 `SkyStudioAPI`**（和 `/me` 同一处：认证头、版本号、机器号、错误怎么分）。上传的签名地址、成品地址是服务器给的，**不带 Key**：认证头只在 `request()` 里写一次（`checks/sky-studio-wiring.sh` 第 7 条） |
 | 能用什么 | 模型、给人看的价、参数的取值、上限全从 `GET /models`（`SkyStudioCatalog`）读，**SkyCut 不写死**。id 是 Sky Studio 自己的名字（`topaz-starlight`、`bytedance-upscaler-pro`、`seedream5-flash`、`minimax-h3`、`lyria-3-pro`、`eleven-v4`、`sonilo-sfx`、`zonos2`），不是 fal 的端点号；一个模型做两种事就列两次（`minimax-h3` 的文生视频、图生视频） |
 | 扣多少 | **一律问 `POST /quote`**（和 `/jobs` 扣钱同一个计价函数：宽于 16:9 按高一档、4K 封顶、按 0.1 秒计都在服务器上）。面板、AI 的确认码显示这个数，交任务时把它当 `max_credits`：服务器算出来更贵回 `price_changed`、一分不扣 |
-| 交任务 | `POST /jobs`，每件活一个 `idempotency_key`（`SkyStudioJobRequest` 建的时候生成）。**同时开着的满了**（`too_many_jobs`，每个账号最多 `max_running_jobs` 个，现在 3）：本机等 15 秒、用**同一个 key** 再交，服务器回原来那个任务、不再扣钱。交的时候断网也用同一个 key 再交两次。**交的请求不跟着取消**（发出去一半被掐断，服务器那边可能已经扣钱建了任务）：回来后先把任务号报告给调用方，再检查取消并按这个任务号停（不能先抛错丢掉 ID）。这一个请求等 120 秒（`submitTimeout`，别的 20 秒）：Sky Studio 在本机 vercel dev 上量到图片、音乐的提交等到做完才回（55 秒、40 秒），线上还没量过 |
-| 等 | 没有长轮询：照 `poll_after_seconds` 再问，夹在 2–60 秒（没说按 15 秒）。**问的时候断网不算失败**（活在服务器上照做），连着 10 次问不到才算。最多等 5 小时（服务器自己会收掉没人管的：upscale 245 分钟、别的 35 分钟，失败并退钱） |
+| 交任务 | `POST /jobs`，每件活一个 `idempotency_key`（`SkyStudioJobRequest` 建的时候生成）。**同时开着的满了**（`too_many_jobs`，每个账号最多 `max_running_jobs` 个，现在 3）：本机等 15 秒、用**同一个 key** 再交，服务器回原来那个任务、不再扣钱。**交的时候断网、超时或回答损坏不自动再 POST**：保留同一 key；有任务号只查原单，没有任务号保留待核查。**交的请求不跟着取消**（发出去一半被掐断，服务器那边可能已经扣钱建了任务）：回来后先把任务号报告给调用方，再检查取消并按这个任务号停（不能先抛错丢掉 ID）。这一个请求等 120 秒（`submitTimeout`，别的 20 秒）：Sky Studio 在本机 vercel dev 上量到图片、音乐的提交等到做完才回（55 秒、40 秒），线上还没量过 |
+| 等 | 没有长轮询：照 `poll_after_seconds` 再问，夹在 2–60 秒（没说按 15 秒）。**问的时候断网不算失败**（活在服务器上照做），连着 10 次问不到才算。最多等 5 小时（未知供应商结果由服务端继续核查，经过多久都不证明失败或退款） |
 | 停 | Task 被取消 = 用户要停：**只有排着队的能取消**（`POST /jobs/{id}/cancel`，退钱）；已经开始的回 `not_cancellable`，照实说「已经开始了、取消不了、积分花了、成品照样会进用户的 Sky Studio 作品库」；取消请求没送到就说不准。取消在不继承取消的 Task 里发（`SkyStudioJobError.Stop`）。**取消不了、说不准的那单接着在后台查到 done / failed**（`SkyStudioJobRun.followToEnd`，不继承取消的后台任务里、照 `poll_after_seconds`、不下载不换源；连着 10 次问不到、等满 5 小时就算了）：Sky Studio 在有人查的时候才去服务商那里取成品、存进作品库、把这一单从「同时开着的」里拿掉，没人查要等它的兜底几个小时、还一直占着 3 个名额中的一个（2026-10-28 真积分测试撞上的，[案例](../bugfixes/2026-10-28-uncancellable-upscale-left-unfinished.md)）。SkyCut 退出前还没查完的单只能靠 Sky Studio 的兜底 |
 | 成品 | upscale、图片、视频、音乐、旁白、音效都**永久存进用户的作品库**（只有用户自己删），`result.url` 是永久地址、另带 `generation_id`；克隆的声音不进作品库，留 60 天（`expires_at`）。SkyCut 照旧下到本机。宽高、时长、帧率服务器没记的是 null（MiniMax H3 的视频不记像素和帧率）：从文件读，**别当 0** |
 | 阶段 | 服务器的 `phase` 只有 `queued` / `processing` / `saving`（存进作品库）；裁 / 上传 / 下载 / 封声是 SkyCut 自己的阶段。没有百分比，照旧是阶段 + 排队位置 + 已用时间 + 典型时长（`typical_seconds`，从 `/quote` 和任务的回答来），不画假进度条 |
@@ -65,11 +66,9 @@
   图片生成也能收多张参考图。所有路径先过同一份 `confirmReading`，再测量、按目录检查数量 / 字节 / 长度 / 组合限制；图片转码走 `MediaReadQueue.analysis`。
   例：H3 多模态最多 9 图 / 3 视频 / 3 音频，但总数最多 12，音频不能独用；首尾帧只有 2 图。H3 多模态支持 2K / 4K，首尾帧不支持。
   限制只从服务端读，不能抄一份常量冒充模型能力。报价带实际图片数量、参考视频总秒数；有序上传后经 `inputs.references` 原样发；审批身份绑所有本机文件与顺序。
-  服务端自己探真实素材并在扣费前核对 `max_credits`；上传一次，替换模型复用同一批 URL。成品下载到「生成」文件夹，作品库也永久保留。
-- **真人参考拒绝后的替换**：默认 `auto_fallback=true`，用户已经授权这次生成时，Seedance 的结构化 `REAL_PERSON_REFERENCE` 拒绝且 `refunded=true` / `charged=false`
-  才自动换一次兼容的 H3 或 Omni。只认机器字段，不从英文句子猜；普通安全拒绝不触发。退款晚到只 GET 原 job_id（最多 8 次、间隔 15 秒），
-  `get_job phase=waiting_for_refund`；仍不确定就保留原任务号 / 幂等 key 和本机账，不再生成。替换必须保留全部参考与时长，报价不高于原来已批准的上限；
-  更贵要重新问，不能因失败绕过消费确认。原单明确退款后才退本机原预留、记新单；生成、upscale、配音都不再把一个无退款字段的失败句子当成已退。
+  服务端自己探真实素材并在扣费前核对 `max_credits`；输入不改写、不缩小；原始字节按目录约束上传。成品下载到「生成」文件夹，作品库也永久保留。
+- **不自动替换**（2026-10-31 用户要求，覆盖 10-30 的自动切模型策略）：任何模型失败、拒绝或状态未知都不自动重生成、切模型或重放收费 POST。
+  `auto_fallback=true` 明确拒绝，false 只为旧客户端兼容。用户另行批准的新生成使用新 key / 新预算。`get_job` 在本机任务结束后也只 GET 原服务器任务，更新 billing 与原结果地址。
 - **清单**（2026-10-30）：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，但不再按 Key 隐藏；工具及总说明末尾的「Paid」一行始终存在。
   Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
   新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。
@@ -91,7 +90,7 @@
 
 ## 六、守卫
 
-- `scripts/check-sky-studio.sh` 第 7 组（`checks/SkyStudio/JobChecks.swift`、`JobRunChecks.swift`）：`/models` 照合同的样例读（认不出的 kind 留着、没有 id 的跳过、上限和取值）；`/quote` 去掉 inputs / max_credits / idempotency_key、读回 credits / typical_seconds / plan、没有 credits 不算回答；`/jobs` 带上 inputs / max_credits / idempotency_key、这一个请求等 120 秒、202 读成排队中；做完的状态和成品（null 的宽高是不知道、克隆的过期时间、旁白的字符时间原样）、没做成的两种写法、认不出的状态；任务号只当一节路径；取消的两种结果；`/uploads` 之后 PUT 只带服务器给的头、不带 Key、文件原样、进度只升不降到 1；下载成品不带 Key、下到一半不留半个文件。`SkyStudioJobRun`：一路做完（每一份都报、照服务器说的间隔问、夹到 2 秒）、满了等 15 秒用同一个 key 再交、交的时候断网再交（一共三次）、问的时候断网几次不算 / 连着 10 次才算、没做成 / 做完没成品 / 认不出的状态 / 余额不够（服务器的话原样）、停的三种（排队中退钱、开始了取消不了、取消没送到）且后两种把任务号交出去接着查、服务器那边已经取消、等太久；接着查到底（问到 done / failed 就停、不下载不取消、照服务器说的间隔、断网几次照问、连着 10 次问不到就算了）。全程走假协议，不碰真的网络。
+- `scripts/check-sky-studio.sh` 第 7 组（`checks/SkyStudio/JobChecks.swift`、`JobRunChecks.swift`）：`/models` 照合同的样例读（认不出的 kind 留着、没有 id 的跳过、上限和取值）；`/quote` 去掉 inputs / max_credits / idempotency_key、读回 credits / typical_seconds / plan、没有 credits 不算回答；`/jobs` 带上 inputs / max_credits / idempotency_key、这一个请求等 120 秒、202 读成排队中；做完的状态和成品（null 的宽高是不知道、克隆的过期时间、旁白的字符时间原样）、没做成的两种写法、认不出的状态；任务号只当一节路径；取消的两种结果；`/uploads` 之后 PUT 只带服务器给的头、不带 Key、文件原样、进度只升不降到 1；下载成品不带 Key、下到一半不留半个文件。`SkyStudioJobRun`：一路做完（每一份都报、照服务器说的间隔问、夹到 2 秒）、满了等 15 秒用同一个 key 再交、提交断网只 POST 一次并保留原 key、问的时候断网几次不算 / 连着 10 次才算、没做成 / 做完没成品 / 认不出的状态 / 余额不够（服务器的话原样）、停的三种（排队中退钱、开始了取消不了、取消没送到）且后两种把任务号交出去接着查、服务器那边已经取消、等太久；接着查到底（问到 done / failed 就停、不下载不取消、照服务器说的间隔、断网几次照问、连着 10 次问不到就算了）。全程走假协议，不碰真的网络。
 - `scripts/check-sky-studio.sh` 第 8 组（`SpendChecks.swift`）：积分的每日上限默认 1,000、额度内不问 / 超了问、记账退回按那一天、上限夹住取整、存下来读回来一样。
 - `scripts/check-sky-studio.sh` 第 9 组（`GenerationChecks.swift`）：generate_media 的词表和 `SkyStudioGeneration` 对账、每种的默认值（画幅跟画布 / 首帧、
   视频 5 秒 768p、音效 5 秒 wav、音乐纯音乐不给时长）、秒数取整、用不上的参数说一句不送、请求体（首帧放 `inputs.image_url`、`/jobs` 才带 `max_credits`）、
@@ -113,11 +112,11 @@
 ## 八、多模型 / 多参考验证
 
 - `ModelPolicyChecks`：目录顺序不改变用户偏好；模型专属默认值 / 画幅；完整参考限制；不丢输入 / 不裁短；通用安全拒绝、未知退款均不能替换。
-- `JobRunChecks`：退款晚到只查原单，断网不产生新单。`SpendChecks`：替换不超过原批准价，退款只记一次，零每日额度但原已确认的单仍可按原上限替换。
+- `JobRunChecks`：退款晚到只查原单，断网不重放收费 POST。`SpendChecks` 保留历史预算上限回归；生产路径不再自动申请替换预算。
 - 免费真实 App / MCP：`scripts/gui-smoke/sky-studio/run.sh` 后运行 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/media.py`。
-  假 Key / 回环服务 / 独立 bundle：查询目录、亚洲 / 默认图片模型、图片视频音频的有序上传、尾帧、提交时 / 查询时拒绝与退款晚到、替换价上限、未知结果不重交。
+  假 Key / 回环服务 / 独立 bundle：查询目录、亚洲 / 默认图片模型、图片视频音频的有序上传、尾帧、提交时 / 查询时拒绝只查原单、退款晚到、未知结果不重交。
 - [ ] 正式 Key 人工抽查：`get_status models=true model=minimax-h3` 报出当前限制；普通 / 最高质量 / 点名模型按要求选中；真实多参考文件在消费前给出正确报价。
-- [ ] Seedance 真人拒绝时原单先退再替换；看 `fallback_attempts`、`submission_keys` 和 Sky Studio 明细，确认没有重复扣费。
+- [ ] Seedance 真人拒绝后只查原单；核对 `submission_keys`、`billing` 和 Sky Studio 明细，确认没有替换或重复扣费。
 
 ## 九、工具栏任务浮层（2026-10-31 轻盈卡片定稿）
 
@@ -142,3 +141,29 @@
 - [ ] `get_status` 的工程、总量、分组、类型、阶段、报价与界面相符，后台任务可查询；按详情里的真实 `job_id` 调 `get_job` 能继续等，面板任务不伪造 AI id。
 - [ ] 失败只退出进行中总数，异常提示保留到关闭；完成 upscale 的比较 / 关闭仍可用。
 - [ ] 超过五项在浮层内滚动，900pt 窗口仍能打开；长名字中间截断并可查看全文，英 / 中 / 西文无重叠；当前卡片强调线只贴顶部，详情按钮可点。
+
+## 十、七个新增模型与结算证据（2026-10-31）
+
+- Wan 三个公开 ID 分别为 `wan-3.0-text-to-video`、`wan-3.0-image-to-video`、`wan-3.0-reference-to-video`，不改变普通视频的默认优先级。
+  首尾帧用 `image` / `last_image`；参考模型用 `multimodal` 与有序参考数组，也能用 `document` 或 `web_url`。音频 / 文档 / 页面可单独参考。
+  分辨率、智能时长（`duration=null` / `auto`）、种子、思考 / 扩写 / 安全开关以及文件、像素、时长、组合限制只读目录，报价用实际测得的视频参考总时长。
+- `kind=lipsync`：HeyGen Speed / Precision 收本机 `video` + `audio`，按 `inputs.*.upload_purpose` 上传；七个附加参数全部开放，动态时长默认 false 必须显式发送。
+  目录没有公布的数值上限是 null，不自行猜一个时长差容差；建议两份素材长度接近，不裁短、不垫长。
+  MiniMax H3 Max 收 `image` + `audio`，分辨率大小写按目录规整；不误收 HeyGen 的时段 / 动态时长等参数。
+- `kind=image operation=remove_background`：只收一张图片，无 prompt / 分辨率 / 画幅 / 参考数量参数。使用目录的十进制字节上限，PNG 原字节保存；不转 JPEG、不铺白底。
+  透明图片入轨复用已有 `StillImageClipFactory` 的透明视频 / 遮罩；没有第二套图片合成实现。
+- `/models` 的 operation、input_mode、参数说明、outputs、notes、billing_policy 以及根政策完整透传给 MCP；不能只保留旧的几个字段。模型格式由实际 ImageIO / 媒体探测识别，全部文件先授权、测量、验证，再报价 / 预留。
+- 本机可选 `idempotency_key` 绑定全部 MCP 参数和原工程，同 key 的并发准备请求拒绝、已经返回过的请求复用原本机 job_id，不再报价、上传、记账或 POST。
+  没提供时仅在起操作时生成一次并返回；AI 必须用 get_job 等。服务端仍负责每账号幂等；App 重启后不承诺恢复本机去重表。
+  **当前 API 没有按幂等 key 的只读查单端点**：提交应答完全丢失且无 job_id 时，只保留 key / 预算待服务端核查，不自动 POST 寻找它。
+- `billing` 是唯一结算证据：只用最终净 `credits_charged` 调整本机账；reserved / pending_review / refund_pending 保持预留并报待核查。
+  旧 error.refunded 与 cancelled 应答不能覆盖 billing，退回未用预留不代表整单免费。生成成功后下载、保存、入轨失败不退款。
+  `get_job` 即使本机已失败，仍可 GET 原单更新账务 / remote_result；反复查询不会再次退款。需要恢复文件时使用原结果地址，不重生成。
+- 返回实际 content_type / 宽高 / duration / fps、seed、计费时长与透明标记；计费时长不作为时间线时长。可选 SRT 失败只报 caption_issue，不否定已保存的视频。
+  macOS 无法原生打开部分 HeyGen WebM：保留 `original_file` 原字节，借既有 `FFmpegProcess` 生成 H.264/AAC `file` 编辑副本，并明确标记 file_content_type / import_note。
+  副本按其本身探测的几何入轨，原 WebM、原结果地址和实际远端元数据继续可恢复；本机转码失败也不退款。
+
+验证入口：`scripts/check-sky-studio.sh` 的 `ModelExpansionChecks` 从本次后端目录快照读七条完整记录，检查参数 / 限制 / 结算 / 幂等。
+实际 App：先 `scripts/gui-smoke/sky-studio/run.sh`，再 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/model_expansion.py`。
+此流程只用假 Key、回环服务、合成素材和独立 bundle，覆盖模型发现、七种请求、上传用途、重复不记账、WebM 副本、透明 PNG、SRT、入轨与导出、下载失败不退款和原单结算刷新。
+付费提供方的输出质量、长时长 / 大文件边界、Wan 智能时长与高分辨率仍需另行授权的真服务抽查，不能把免费夹具冒烟称为付费联调通过。

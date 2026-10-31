@@ -7,12 +7,11 @@ import SrtFlowMCPKit
 enum SkyStudioModelPolicy {
     static let videoOrder = ["minimax-h3", "gemini-omni-1.1-flash", "veo-fast", "seedance-2-pro", "seedance-2-5", "veo-pro"]
     static let qualityOrder = ["seedance-2-5", "veo-pro", "minimax-h3", "gemini-omni-1.1-flash", "veo-fast", "seedance-2-pro"]
-    static let refusalOrder = ["minimax-h3", "gemini-omni-1.1-flash"]
     static let guidance = "Images: Asian people, places or cultural scenes prefer seedream5-flash; non-Asian, mixed or unclear prefer nano2. "
         + "Judge the subject, not the prompt language. Video: minimax-h3, then gemini-omni-1.1-flash, veo-fast, seedance-2-pro. "
         + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5, then veo-pro. "
-        + "Seedance can refuse real or photorealistic people. An authorized generation may switch once to MiniMax/Google after confirmed terminal refusal and refund/no-charge proof; "
-        + "never resubmit on a timeout or unknown outcome. Read each model's input modes and limits before sending references."
+        + "Select lip-sync by its image/audio or video/audio inputs; use image operation=remove_background for cutouts. "
+        + "Never automatically regenerate or switch models after failure or an unknown outcome. Query the original job and its billing. Read each model's input modes and limits."
 
     static func ordered(kind: String, imageContext: String, quality: String) -> [String] {
         if kind == "image" { return imageContext == "asian" ? ["seedream5-flash", "nano2"] : ["nano2", "seedream5-flash"] }
@@ -23,7 +22,8 @@ enum SkyStudioModelPolicy {
                        accepts: (SkyStudioModel) -> Bool = { _ in true }) -> SkyStudioModel? {
         let offered = catalog.models(kind: kind)
         if let requested { return offered.first { $0.id == requested && accepts($0) } }
-        if kind == "music" || kind == "sound_effect" { return offered.first(where: accepts) }
+        if kind == "music" || kind == "sound_effect" || kind == "lipsync" { return offered.first(where: accepts) }
+        if kind == "image", let removal = offered.first(where: { $0.operation == "remove_background" && accepts($0) }) { return removal }
         return ordered(kind: kind, imageContext: imageContext, quality: quality).compactMap { id in offered.first { $0.id == id } }.first(where: accepts)
     }
 
@@ -31,7 +31,7 @@ enum SkyStudioModelPolicy {
         if let problem = references.problem(model: model) { return problem }
         if let resolution = ask.resolution {
             let choices = model.resolutions(mode: references.mode)
-            if !choices.isEmpty, !choices.contains(resolution) { return "\(model.title) accepts resolution \(choices.joined(separator: ", ")) in \(references.mode) mode." }
+            if !choices.isEmpty, !choices.contains(where: { $0.caseInsensitiveCompare(resolution) == .orderedSame }) { return "\(model.title) accepts resolution \(choices.joined(separator: ", ")) in \(references.mode) mode." }
         }
         if model.kind == "text_to_video" || model.kind == "image_to_video", let seconds = ask.duration?.rounded() {
             if let values = model.params["duration_values"]?.arrayValue?.compactMap(\.doubleValue), !values.isEmpty, !values.contains(seconds) {

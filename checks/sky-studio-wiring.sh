@@ -220,9 +220,9 @@ done
 
 # 9b. 多模型和参考限制必须接到生产路径，不能只让纯函数自检通过。
 REFERENCE_FILES="Sources/SrtFlow/SkyStudio/SkyStudioReferenceFiles.swift"
-FALLBACK="Sources/SrtFlow/SkyStudio/SkyStudioGenerationFallback.swift"
+CONTROLS="Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift"
 APPROVAL="Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift"
-for file in "${REFERENCE_FILES}" "${FALLBACK}" "${APPROVAL}"; do
+for file in "${REFERENCE_FILES}" "${CONTROLS}" "${APPROVAL}"; do
   [ -f "${file}" ] || fail "找不到 ${file}"
 done
 grep -qF 'await SkyStudioModelStatus.read(' "${STATUS_TOOLS}" || fail "get_status 没接只读模型查询"
@@ -234,11 +234,13 @@ if [ -z "${READ_AT}" ] || [ -z "${MEASURE_AT}" ] || [ "${READ_AT}" -ge "${MEASUR
 fi
 grep -qF 'await SkyStudioReferenceFiles.upload(references' "${GEN_RUN}" || fail "真实生成没有上传完整参考组"
 grep -qF '"references": .array(job.references)' "${APPROVAL}" || fail "消费确认没绑定参考顺序"
-grep -qF 'failure.mayReplace' "${FALLBACK}" || fail "自动换模型没核对真人拒绝与退款证据"
-grep -qF 'SkyStudioGenerationFallback.candidate(' "${GEN_RUN}" || fail "真实生成没有复用拒绝替换策略"
-grep -qF 'SkyStudioJobGate.reserveReplacement(credits:' "${GEN_RUN}" || fail "替换没有经过原消费上限"
-grep -qF 'credits <= approvedCeiling' "${JOB_GATE}" || fail "替换允许超原批准金额"
-grep -qF 'waitForRefund(original)' "${GEN_RUN}" || fail "退款晚到时没有继续查询原任务"
+if grep -qE 'SkyStudioGenerationFallback|reserveReplacement\(' "${GEN_RUN}"; then
+  fail "生成不许在失败后自动切模型或再收费"
+fi
+grep -qF 'SkyStudioGenerationRequests.begin(' "${GEN_TOOL}" || fail "重复操作没复用同一本机任务"
+grep -qF 'idempotencyKey: idempotencyKey' "${GEN_RUN}" || fail "没有把稳定幂等键送到真实生成路径"
+grep -qF 'applyBilling(done)' "${GEN_RUN}" || fail "生成没接服务端 billing"
+grep -qF 'job.refresh = ' "${GEN_RUN}" || fail "get_job 没有核查原单的接线"
 grep -qF 'payload["submission_keys"]' "${GEN_RUN}" || fail "未知提交未留下幂等 key"
 
 # 10. 云端配音返回任务号；整批预留、不询问付费，结束只入轨一整步。

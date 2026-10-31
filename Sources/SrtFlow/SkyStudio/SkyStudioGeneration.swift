@@ -7,7 +7,7 @@ import SrtFlowMCPKit
 // - 默认值：从选中模型读；画幅跟画布 / 首帧；音效 5 秒 wav；音乐纯音乐、长度让模型定。旧目录缺默认值时保留旧 H3 的 5 秒 768p。
 // - 换成 Sky Studio 的写法：视频和音乐的秒数取整。
 // - 给了但这一种用不上的参数说一句。
-// **规矩在服务器上**（多长、多大、哪几种画幅、音乐 60–180 秒）：这里不另抄一份去拦，送过去不合规的 `/quote` 回 `invalid_request`，原话交给 AI。
+// 限制从 `/models` 读，交任务前由 ModelPolicy / GenerationControls / ReferencePolicy 检查；价只问 `/quote`，服务端错误原话交给 AI。
 // 取值见 Sky Studio 仓库 docs/agents/skycut-api.md「Per kind」。
 // 不管什么：问价、把关、跑任务、下载（SkyStudioGenerateTool / SkyStudioGenerationRun）；模型偏好（SkyStudioModelPolicy）。
 
@@ -19,8 +19,9 @@ struct SkyStudioGeneration: Equatable, Sendable {
         case textToVideo = "text_to_video"
         case music
         case soundEffect = "sound_effect"
+        case lipsync
 
-        var isVideo: Bool { self == .imageToVideo || self == .textToVideo }
+        var isVideo: Bool { self == .imageToVideo || self == .textToVideo || self == .lipsync }
         var isSound: Bool { self == .music || self == .soundEffect }
     }
 
@@ -42,6 +43,9 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var instrumental: Bool?
         var lyrics: String?
         var generateAudio: Bool?
+        var controls: [String: JSONValue] = [:]
+        var smartDuration = false
+        var operation = "generate"
 
         init(duration: Double? = nil, resolution: String? = nil, aspectRatio: String? = nil, instrumental: Bool? = nil, lyrics: String? = nil, generateAudio: Bool? = nil) {
             self.duration = duration
@@ -67,18 +71,19 @@ struct SkyStudioGeneration: Equatable, Sendable {
         func ignored(_ name: String, _ why: String) { notes.append("\(name) was ignored: \(why).") }
         switch kind {
         case .image:
+            if ask.operation == "remove_background" { break }
             let choices = model?.choices("aspect_ratio") ?? []
             params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: choices.isEmpty ? imageAspects : choices))
             if let model {
                 if let resolution = ask.resolution ?? model.defaults["resolution"]?.stringValue { params["resolution"] = .string(resolution) }
             }
         case .textToVideo, .imageToVideo:
-            params["duration"] = .number((ask.duration ?? model?.defaults["duration"]?.doubleValue ?? defaultVideoSeconds).rounded())
+            params["duration"] = ask.smartDuration ? .null : .number((ask.duration ?? model?.defaults["duration"]?.doubleValue ?? defaultVideoSeconds).rounded())
             params["resolution"] = .string(ask.resolution ?? model?.defaults["resolution"]?.stringValue ?? defaultResolution)
             let choices = model?.choices("aspect_ratio") ?? []
             let aspects = choices.isEmpty ? videoAspects : choices
-            if kind == .textToVideo || inputMode == "multimodal" {
-                params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: aspects))
+            if kind == .textToVideo || inputMode == "multimodal" || choices.contains("adaptive") {
+                params["aspect_ratio"] = .string(ask.aspectRatio ?? (model?.defaults["aspect_ratio"] == "adaptive" ? "adaptive" : nearestAspect(to: canvas, in: aspects)))
             } else {
                 // 出来的视频跟着首帧的形状；网页那条路仍要一个画幅，送离首帧最近的那个（合同「Image to video」）。
                 params["aspect_ratio"] = .string(nearestAspect(to: frame ?? canvas, in: aspects))
@@ -103,24 +108,39 @@ struct SkyStudioGeneration: Equatable, Sendable {
         case .soundEffect:
             params["duration"] = .number(ask.duration ?? defaultEffectSeconds)
             params["audio_format"] = "wav"
+        case .lipsync:
+            if let resolution = ask.resolution ?? model?.defaults["resolution"]?.stringValue { params["resolution"] = .string(resolution) }
         }
+        for (name, value) in model?.defaults ?? [:] where SkyStudioGenerationControls.names.contains(name) && !value.isNull {
+            params[name] = value
+        }
+        params.merge(ask.controls) { _, new in new }
+        if let resolution = params["resolution"]?.stringValue,
+           let choice = model?.resolutions(mode: inputMode).first(where: { $0.caseInsensitiveCompare(resolution) == .orderedSame }) { params["resolution"] = .string(choice) }
         if kind.isSound, ask.aspectRatio != nil { ignored("aspect_ratio", "it only applies to images and video") }
         if kind.isSound || (kind == .image && model == nil), ask.resolution != nil { ignored("resolution", "it does not apply to this generation") }
         if kind == .image, ask.duration != nil { ignored("duration", "an image has no length") }
         if kind != .music, ask.instrumental != nil { ignored("instrumental", "it only applies to music") }
         if kind != .music, ask.lyrics != nil { ignored("lyrics", "it only applies to music") }
         if !kind.isVideo, ask.generateAudio != nil { ignored("generate_audio", "it only applies to video") }
-        if !kind.isSound, let references { params.merge(references.quoteParams) { _, new in new } }
+        if !kind.isSound, let references {
+            if kind == .lipsync {
+                for file in references.files where file.type == "video" || file.type == "audio" {
+                    if let duration = file.duration { params["\(file.type)_seconds"] = .number(duration) }
+                }
+            } else if ask.operation != "remove_background" { params.merge(references.quoteParams) { _, new in new } }
+        }
         return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes)
     }
 
-    /// 送 `/quote`、`/jobs` 的那一份（每次一个新的 idempotency_key）。`imageURL`：图生视频的首帧（`/uploads` 上去的）；
+    /// 送 `/quote`、`/jobs` 的那一份；实际生成必须传入本次操作固定的 idempotency_key。`imageURL`：图生视频的首帧（`/uploads` 上去的）；
     /// `maxCredits`：用户同意的价（只有 `/jobs` 带）。
     func job(model: String, imageURL: URL? = nil, maxCredits: Double? = nil,
-             uploaded: [String: String] = [:], references: [JSONValue] = []) -> SkyStudioJobRequest {
+             uploaded: [String: String] = [:], references: [JSONValue] = [], idempotencyKey: String = UUID().uuidString.lowercased()) -> SkyStudioJobRequest {
         var inputs = uploaded
         if let imageURL { inputs["image_url"] = imageURL.absoluteString }
-        return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt, inputs: inputs, params: params, maxCredits: maxCredits, references: references)
+        return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt.isEmpty ? nil : prompt, inputs: inputs, params: params,
+                                   maxCredits: maxCredits, idempotencyKey: idempotencyKey, references: references)
     }
 
     /// 「MiniMax H3 · 5 s · 768p」：确认码绑着它（SkyStudioJobGate），状态行上也写它。不带语言的几个记号。
@@ -130,13 +150,16 @@ struct SkyStudioGeneration: Equatable, Sendable {
         case .image:
             parts.append(params["aspect_ratio"]?.stringValue ?? "")
         case .imageToVideo, .textToVideo:
-            parts.append("\(Int(params["duration"]?.doubleValue ?? 0)) s")
+            parts.append(params["duration"]?.doubleValue.map { "\(Int($0)) s" } ?? "auto")
             parts.append(params["resolution"]?.stringValue ?? Self.defaultResolution)
         case .music:
             parts.append(params["duration"]?.doubleValue.map { "\(Int($0)) s" } ?? "auto")
             if params["instrumental"]?.boolValue == false { parts.append("vocals") }
         case .soundEffect:
             parts.append(String(format: "%.1f s", params["duration"]?.doubleValue ?? 0))
+        case .lipsync:
+            if let seconds = params["audio_seconds"]?.doubleValue { parts.append(String(format: "%.2f s audio", seconds)) }
+            if let resolution = params["resolution"]?.stringValue { parts.append(resolution) }
         }
         return parts.filter { !$0.isEmpty }.joined(separator: " · ")
     }
@@ -147,7 +170,7 @@ struct SkyStudioGeneration: Equatable, Sendable {
         case .image: return 15
         case .soundEffect: return 10
         case .music: return 60
-        case .imageToVideo, .textToVideo: return 180
+        case .imageToVideo, .textToVideo, .lipsync: return 180
         }
     }
 
@@ -178,18 +201,18 @@ struct SkyStudioGeneration: Equatable, Sendable {
     /// 成品存成什么扩展名：先看服务器说的类型，再看地址的扩展名，都不认识按种类猜。
     static func fileExtension(contentType: String?, url: URL, kind: Kind) -> String {
         let byType = [
-            "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov",
+            "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm",
             "audio/mpeg": "mp3", "audio/mp3": "mp3", "audio/wav": "wav", "audio/x-wav": "wav", "audio/wave": "wav", "audio/mp4": "m4a"
         ]
         if let type = contentType?.split(separator: ";").first?.trimmingCharacters(in: .whitespaces).lowercased(), let known = byType[type] {
             return known
         }
         let fromURL = url.pathExtension.lowercased()
-        if ["png", "jpg", "webp", "mp4", "mov", "mp3", "wav", "m4a"].contains(fromURL) { return fromURL }
+        if ["png", "jpg", "webp", "mp4", "mov", "webm", "mp3", "wav", "m4a"].contains(fromURL) { return fromURL }
         if fromURL == "jpeg" { return "jpg" }
         switch kind {
         case .image: return "png"
-        case .imageToVideo, .textToVideo: return "mp4"
+        case .imageToVideo, .textToVideo, .lipsync: return "mp4"
         case .music: return "mp3"
         case .soundEffect: return "wav"
         }

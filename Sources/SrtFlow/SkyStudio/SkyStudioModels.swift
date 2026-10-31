@@ -23,6 +23,8 @@ struct SkyStudioModel: Equatable, Sendable {
     var limits: [String: JSONValue]
     var defaults: [String: JSONValue]
     var inputs: [String: JSONValue]
+    /// 操作、输入说明、输出能力和计费政策随目录原样暴露，不能在客户端投影时丢掉。
+    var metadata: [String: JSONValue] = [:]
 
     init(id: String, kind: String, title: String, price: [String: JSONValue] = [:], params: [String: JSONValue] = [:], limits: [String: JSONValue] = [:],
          defaults: [String: JSONValue] = [:], inputs: [String: JSONValue] = [:]) {
@@ -43,6 +45,7 @@ struct SkyStudioModel: Equatable, Sendable {
             params: json["params"]?.objectValue ?? [:], limits: json["limits"]?.objectValue ?? [:],
             defaults: json["defaults"]?.objectValue ?? [:], inputs: json["inputs"]?.objectValue ?? [:]
         )
+        metadata = json.objectValue ?? [:]
     }
 
     /// 一个上限（数）；没写就是 nil。
@@ -56,17 +59,22 @@ struct SkyStudioModel: Equatable, Sendable {
     }
 
     func referenceLimits(mode: String) -> JSONValue? {
-        kind == "image" ? limits["references"] : inputs["modes"]?[mode]
+        if let modes = inputs["modes"] { return modes[mode] }
+        if let references = limits["references"] { return references }
+        return limits.isEmpty ? nil : .object(limits)
     }
 
+    var operation: String { metadata["operation"]?.stringValue ?? "generate" }
+
     var json: JSONValue {
-        ["id": .string(id), "kind": .string(kind), "title": .string(title), "price": .object(price),
-         "params": .object(params), "limits": .object(limits), "defaults": .object(defaults), "inputs": .object(inputs)]
+        .object(metadata.merging(["id": .string(id), "kind": .string(kind), "title": .string(title), "price": .object(price),
+         "params": .object(params), "limits": .object(limits), "defaults": .object(defaults), "inputs": .object(inputs)]) { _, new in new })
     }
 }
 
 struct SkyStudioCatalog: Equatable, Sendable {
     var models: [SkyStudioModel]
+    var billingPolicy: JSONValue?
 
     init(models: [SkyStudioModel]) { self.models = models }
 
@@ -74,6 +82,7 @@ struct SkyStudioCatalog: Equatable, Sendable {
     init?(json: JSONValue) {
         guard let entries = json["models"]?.arrayValue else { return nil }
         self.init(models: entries.compactMap(SkyStudioModel.init(json:)))
+        billingPolicy = json["billing_policy"]
     }
 
     /// 某一种活能用的模型，顺序照服务器给的。
