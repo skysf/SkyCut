@@ -16,19 +16,17 @@ struct CloudTasksButton: View, Equatable {
         Group {
             if activity.summary.count > 0 {
                 Button { isPresented.toggle() } label: {
-                    HStack(spacing: 7) {
+                    HStack(spacing: 4) {
                         Image(systemName: activity.summary.attentionCount > 0 ? "exclamationmark.icloud" : "cloud")
-                        Text(verbatim: String(format: L10n("All generation tasks %d"), activity.summary.activeCount))
-                        Divider().frame(height: 12)
-                        Text(verbatim: String(format: L10n("This project %d"), currentCount)).font(.caption)
-                        Image(systemName: isPresented ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 9, weight: .semibold))
+                        Text(verbatim: "\(activity.summary.activeCount)")
+                            .monospacedDigit()
                     }
-                    .foregroundStyle(activity.summary.attentionCount > 0 ? Color.orange : Color.accentColor)
+                    .foregroundStyle(activity.summary.attentionCount > 0 ? Color.orange : Color.primary)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
                 .accessibilityIdentifier("cloud-tasks-button")
-                .instantHelp("Show all generation tasks grouped by project")
+                .accessibilityLabel(Text(verbatim: summary))
+                .instantHelp(verbatim: summary)
                 .popover(isPresented: $isPresented, attachmentAnchor: .rect(.bounds), arrowEdge: .top) {
                     CloudTasksPopover(project: project, activity: activity, onClose: { isPresented = false }).appLanguage()
                 }
@@ -37,6 +35,12 @@ struct CloudTasksButton: View, Equatable {
         .onChange(of: activity.summary.count) { _, count in
             if count == 0 { isPresented = false }
         }
+    }
+
+    private var summary: String {
+        String(format: L10n("All generation tasks %d"), activity.summary.activeCount)
+            + " · " + String(format: L10n("This project %d"), currentCount)
+            + "\n" + L10n("Show all generation tasks grouped by project")
     }
 
     private var currentCount: Int {

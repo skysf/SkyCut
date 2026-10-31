@@ -187,6 +187,8 @@ final class AIToolRouter {
         let undo = project.effectiveUndoManager
         switch tool {
         case .getStatus: return try await AIProjectTools.status(args, project)
+        case .getSettings: return try await AISettingsTools.read(args)
+        case .setSettings: return try await AISettingsTools.update(args)
         case .setView: return try await AIProjectTools.setView(args, project)
         case .openFolder: return try await AIProjectTools.openFolder(args, project)
         case .readDocument: return try await AIFileTools.readDocument(args, project)
@@ -273,12 +275,12 @@ final class AIToolRouter {
 
         init(_ tool: MCPToolName) {
             switch tool {
-            case .getStatus, .getJob, .cancelJob:
+            case .getStatus, .getSettings, .getJob, .cancelJob:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
             // 套路不碰工程：不排队、不摆窗口、不算这一轮的改动。
             case .recipes, .saveRecipe:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
-            case .setView:
+            case .setView, .setSettings:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .openFolder, .readDocument, .manageFiles, .getTimeline, .look, .listen, .transcribe, .findAudio, .getSubtitles,
                  .saveProject, .exportVideo, .exportSubtitles, .compressVideos, .burnSubtitles, .convertSubtitles, .generateMedia:

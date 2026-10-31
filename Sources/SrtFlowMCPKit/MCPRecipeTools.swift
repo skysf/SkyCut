@@ -34,7 +34,7 @@ enum MCPRecipeTools {
                 Save an editing style of the user's own, only when they ask (e.g. "save this as a style"). text is the whole \
                 style in Markdown, written like the preset ones (read one with recipes first). The name of one of their styles \
                 replaces it (the old file goes to the Trash); a preset style's name makes their own version of it. Styles live \
-                in SkyCut's own folder (Settings → AI lists them), not in the project.
+                in SkyCut's own folder (Settings > Editing & Voices lists them), not in the project.
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("The style's name, e.g. \"Course promo\"."),

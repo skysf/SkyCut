@@ -52,7 +52,6 @@ struct VideoEditProjectMenu: View {
             }
         }
         .menuStyle(.borderlessButton)
-        .fixedSize()
         .onAppear { recents = RecentProjects.existing() }
         // 打开/保存都会动最近列表，跟着刷新。
         .onChange(of: project.documentURL) { _, _ in recents = RecentProjects.existing() }

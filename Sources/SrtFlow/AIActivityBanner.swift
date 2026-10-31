@@ -1,20 +1,16 @@
 import SwiftUI
 
-// MARK: - 顶上那条「AI 正在剪辑」与撤销这一轮
+// MARK: - 单排工作台里的 AI 状态与本工程停止按钮
 //
-// 管什么：AI 在剪**这个工程**的时候显示是谁、给一个停止按钮；这一轮结束或被停下之后，给「撤销这一轮」和关掉。每个剪辑页（主窗口、
-// 工程窗口）各一条，只管自己工程的那一轮（`AIRound`，2026-10-17 起，docs/plans/2026-10-17-multi-project-ai-editing.md 板 4）：
-// 停止只停这个工程、撤销这一轮只退这个工程。要用户动手的那一句（`AISession.hint`）全 App 一份；要用户点头的事走聊天里的确认码，不在这里问。
-// 云端任务集中在工具栏的 CloudTasksButton，不占预览区高度。
-// 只订阅 `AISession` 和这个工程的 `AIRound`（两个小对象），不读工程 —— 工程每改一下它都不用重算
-// （docs/architecture/preview-perf-ratchet.md 第十三节）。
-// 不管什么：这一轮怎么算、停止之后拒绝多久（AIRound）。
+// 管什么：正在剪辑时常驻的浅金色状态、详情浮层、停止 / 撤销这一轮。
+// 关闭浮层只收起详情，不会隐藏正在剪辑的状态；完成 / 停止后才允许明确隐藏。
+// 只订阅 AISession 和本工程的 AIRound；任务百分比只读真实的单个任务，不估算整轮进度。
+// 不管什么：一轮的划分和停止纪律（AIRound）、云端任务卡片（CloudTasksButton）。
 
 struct AIActivityBanner: View {
     @ObservedObject private var session = AISession.shared
-    /// 这个工程的这一轮（停止、撤销这一轮都只管它）。
     @ObservedObject private var round: AIRound
-    /// 这条横幅在哪个工程的剪辑页上（「撤销这一轮」退的是它）。只拿着、不读它会变的属性，不订阅工程。
+    @State private var showsDetails = false
     let project: VideoEditProject
 
     init(project: VideoEditProject) {
@@ -24,80 +20,111 @@ struct AIActivityBanner: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        aiBar
-    }
-
-    @ViewBuilder
-    private var aiBar: some View { statusBar }
-
-    @ViewBuilder
-    private var statusBar: some View {
-        switch round.phase {
-        case .idle:
-            EmptyView()
-        case .working:
-            // 要用户动手的时候先说这件事（比如去点「下载」），不然用户只看到「正在剪辑」、一直干等。
-            bar(icon: session.hint == nil ? "sparkles" : "hand.point.up.left",
-                message: session.hint ?? String(format: L10n("%@ is editing this project…"), clientName)) {
-                Button("Stop") { round.stop() }
-                    // 冒烟用辅助功能点按钮（SwiftUI 的按钮没有名字可找；docs/testing/gui-smoke-testing.md 四之八）。
+        if round.phase != .idle {
+            HStack(spacing: 10) {
+                // AIJobs 不可观察；只有运行中的小徽章每秒问一次，不订阅播放器时钟。
+                if round.phase == .working {
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in statusButton }
+                } else {
+                    statusButton
+                }
+                if round.phase == .working {
+                    Button { round.stop() } label: {
+                        Label("Stop", systemImage: "stop")
+                            .labelStyle(.iconOnly)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.primary)
+                    .accessibilityLabel("Stop")
                     .accessibilityIdentifier("ai-banner-stop")
                     .instantHelp("Stop the AI on this project and cancel its exports and subtitle jobs")
+                }
             }
-        case .finished:
-            bar(icon: "checkmark.circle", message: String(format: L10n("%@ made %d changes."), clientName, round.changeCount)) {
-                undoRoundButton
-                closeButton
-            }
-        case .stopped:
-            bar(icon: "stop.circle", message: L10n("You stopped the AI.")) {
-                if round.canUndoRound(project) { undoRoundButton }
-                closeButton
+            .popover(isPresented: $showsDetails, arrowEdge: .top) {
+                details.appLanguage()
             }
         }
     }
 
-    private var clientName: String {
-        round.clientName.isEmpty ? L10n("The AI") : round.clientName
-    }
-
-    private var undoRoundButton: some View {
-        Button("Undo This Round") { round.undoRound(project: project) }
-            .disabled(!round.canUndoRound(project))
-            .instantHelp("Put the project back to how it was before the AI started this round")
-    }
-
-    private var closeButton: some View {
-        Button {
-            round.dismiss()
-        } label: {
-            Image(systemName: "xmark")
-        }
-        .buttonStyle(.borderless)
-        .instantHelp("Hide this bar")
-    }
-
-    private func bar<Buttons: View>(
-        icon: String, message: String, @ViewBuilder buttons: () -> Buttons
-    ) -> some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .foregroundStyle(.tint)
-                // 平时一行；引导用户动手的那句长，允许折到三行、别被截掉关键的那半句。
-                Text(verbatim: message)
-                    .lineLimit(3)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 8)
-                buttons()
-                    .controlSize(.small)
+    private var statusButton: some View {
+        Button { showsDetails.toggle() } label: {
+            HStack(spacing: 7) {
+                Image(systemName: statusIcon)
+                Text(LocalizedStringKey(statusTitle))
+                if let progress = taskProgress {
+                    Text(verbatim: MediaFormatting.percent(progress)).monospacedDigit()
+                }
+                Image(systemName: showsDetails ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 9, weight: .semibold))
             }
             .font(.callout)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.tint.opacity(0.12))
-            Divider()
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background {
+                AIActivityBadgeBackground(isWorking: round.phase == .working)
+            }
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.primary)
+        .accessibilityIdentifier("ai-activity-status")
+        .instantHelp("Show AI activity; any percentage is for the current task")
+    }
+
+    private var statusIcon: String {
+        switch round.phase {
+        case .idle, .working: return "cpu"
+        case .finished: return "checkmark.circle"
+        case .stopped: return "stop.circle"
+        }
+    }
+
+    private var statusTitle: String {
+        switch round.phase {
+        case .idle, .working: return session.hint == nil ? "AI is editing" : "AI needs you"
+        case .finished: return "AI finished"
+        case .stopped: return "AI stopped"
+        }
+    }
+
+    /// 多个并行任务没有一个可信的总进度；排队 / 等用户 / 无进度时也不画百分比。
+    private var taskProgress: Double? {
+        guard round.phase == .working, session.hint == nil else { return nil }
+        let jobs = AIJobs.shared.running.filter { $0.stopsWith == round.projectID }
+        guard jobs.count == 1, let job = jobs.first,
+              AIWorkQueue.shared.position(of: job.id) == nil,
+              job.waitingForUser() == nil,
+              let progress = job.progress(), progress.isFinite else { return nil }
+        return min(1, max(0, progress))
+    }
+
+    private var details: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("AI activity", systemImage: "cpu").font(.headline)
+                .accessibilityIdentifier("ai-activity-details")
+            Text(verbatim: message)
+                .fixedSize(horizontal: false, vertical: true)
+            if round.canUndoRound(project) {
+                Button("Undo This Round") { round.undoRound(project: project) }
+                    .instantHelp("Put the project back to how it was before the AI started this round")
+            }
+            if round.phase != .working {
+                Button("Hide status") {
+                    showsDetails = false
+                    round.dismiss()
+                }
+            }
+        }
+        .padding(18)
+        .frame(width: 300, alignment: .leading)
+    }
+
+    private var message: String {
+        let client = round.clientName.isEmpty ? L10n("The AI") : round.clientName
+        switch round.phase {
+        case .idle: return ""
+        case .working: return session.hint ?? String(format: L10n("%@ is editing this project…"), client)
+        case .finished: return String(format: L10n("%@ made %d changes."), client, round.changeCount)
+        case .stopped: return L10n("You stopped the AI.")
         }
     }
 }

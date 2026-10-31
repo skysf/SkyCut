@@ -72,6 +72,7 @@ SERVER
 defaults write "$BUNDLE" appLanguage "${SRTFLOW_SMOKE_LANGUAGE:-en}"
 if [ -n "${1:-}" ]; then defaults write "$BUNDLE" SrtFlow.skystudio.dailyCreditLimit -float "$1"; fi
 open -g -n --env "SRTFLOW_SKYSTUDIO_API_BASE=http://127.0.0.1:$PORT/api/skycut/v1" \
+  --env "SRTFLOW_SMOKE_CACHE_DIR=$D/optimized-media" \
   --env "SRTFLOW_SMOKE_SKYSTUDIO_KEY=sk-SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" \
   --env "SRTFLOW_FFMPEG=$FF" --env SRTFLOW_SMOKE_MUTE=1 "$APP"
 for _ in $(seq 1 60); do

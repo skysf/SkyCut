@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - 编辑器出现时的开发钩子
+// MARK: - App 启动与编辑器出现时的开发钩子
 //
 // 管什么：GUI 冒烟和性能测试靠环境变量挂进编辑器的那几个入口。**环境变量不设就完全
 // 不生效**，正式包可以安全保留。
@@ -11,6 +11,14 @@ import Foundation
 
 @MainActor
 enum DevHooks {
+    /// 独立假服务冒烟的优化媒体也隔离：改上限 / 清空不能动用户正在使用的共享缓存。
+    /// 正式 / Beta 不认；必须在启动扫描与 MCP 监听之前调用。
+    static func prepareIsolatedCache() {
+        guard Bundle.main.bundleIdentifier?.hasSuffix(".skystudiosmoke") == true,
+              let path = ProcessInfo.processInfo.environment["SRTFLOW_SMOKE_CACHE_DIR"], !path.isEmpty else { return }
+        OptimizedMediaStore.rootOverride = URL(fileURLWithPath: path, isDirectory: true)
+    }
+
     static func editorAppeared(project: VideoEditProject) {
         let env = ProcessInfo.processInfo.environment
         // 导入钩子：可以用 : 分隔多个路径（PATH 惯例），addMedia 按类型分流 —— 想验

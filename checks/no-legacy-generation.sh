@@ -9,7 +9,7 @@ found="$(grep -R -nE 'Fal(Client|KeyStore|KeyCache|Settings|Models|Inputs|Output
 for item in CloudJobPhase CloudPhaseText CloudTasksButton CloudTasksActivity CloudTaskRows CloudTaskSummary CloudTransfer DailySpend; do
   [ -f "Sources/SrtFlow/CloudMedia/$item.swift" ] || fail "缺少仍在生产使用的共用组件：$item"
 done
-grep -qF 'CloudTasksButton(project: project).equatable()' Sources/SrtFlow/VideoEditView.swift || fail '云端任务入口必须知道自己在哪个工程窗口'
+grep -qF 'CloudTasksButton(project: project).equatable()' Sources/SrtFlow/VideoEditWorkbenchToolbar.swift || fail '云端任务入口必须知道自己在哪个工程窗口'
 if grep -qE 'CloudStatusRows|CloudTaskRows' Sources/SrtFlow/AIActivityBanner.swift; then
   fail '云端任务不得再逐行挤占预览区'
 fi

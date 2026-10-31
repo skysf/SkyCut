@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 开始听 AI 小程序的调用（docs/architecture/ai-control-mcp.md）。一启动就听：
     /// 小程序可能正是为了一次调用才把 App 拉起来的，它在等着连。
     func applicationDidFinishLaunching(_ notification: Notification) {
+        DevHooks.prepareIsolatedCache()
         AIBridgeServer.shared.start()
         startMainThreadWatchdog()
         // 存了 Sky Studio 的 Key 就问一次授权（到时候了才问；docs/architecture/sky-studio-account.md）。
@@ -192,13 +193,14 @@ struct SrtFlowApp: App {
 
     var body: some Scene {
         // 主窗口放在最前面，它就是启动时出现的窗口。压缩、烧字幕、批量转换都在
-        // 里面，靠左侧边栏切换。
+        // 里面，通过工具栏最右侧的「更多」切换。
         // 每个场景都套一层 .appLanguage()：把应用内选的语言注入环境，
         // Text 的本地化查表会立刻跟着切换，不用重启。
         Window("SkyCut", id: WindowID.main) {
             MainWindowView().appLanguage()
         }
         .defaultSize(width: 1180, height: 760)
+        .windowToolbarStyle(.unifiedCompact(showsTitle: false))
         .commands {
             CommandGroup(after: .newItem) {
                 ProjectCommands()
@@ -216,34 +218,8 @@ struct SrtFlowApp: App {
         }
 
         Settings {
-            SettingsView().appLanguage()
+            SettingsWindowView().appLanguage()
         }
-    }
-}
-
-/// 「设置…」(⌘,)。语言、优化媒体的缓存，和「连接 AI」。
-private struct SettingsView: View {
-    @ObservedObject private var languageStore = AppLanguageStore.shared
-
-    var body: some View {
-        let _ = PerfCounters.body(Self.self)
-        Form {
-            Section("Appearance") {
-                AppLanguagePicker()
-                if languageStore.needsRestartForMenus {
-                    Text("The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SkyCut.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            OptimizedMediaSettingsSection()
-            SkyStudioSettingsSection()
-            AIConnectSection()
-        }
-        .formStyle(.grouped)
-        .frame(width: 480)
-        .padding(.vertical, 8)
     }
 }
 

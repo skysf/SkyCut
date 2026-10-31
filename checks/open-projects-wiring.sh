@@ -153,17 +153,17 @@ grep -q 'Task { await OpenProjects.shared.userOpen(url, from: self) }' "$DOCUMEN
 # 13. 主窗口侧边栏有「AI 在剪的工程」（后台工程唯一的停止 / 打开窗口 / 关掉），而且**不套 `.equatable()`**：
 #     List 把 EquatableView 当一行，这一节只画出标题、工程那几行全丢（docs/bugfixes/2026-10-18-ai-projects-sidebar-rows-never-shown.md；
 #     这里原来按字面钉着带 `.equatable()` 的写法，把错的钉成了对的）。通用的那条在 checks/list-section-not-equatable.sh。
-SIDEBAR_LINE="$(grep -n 'AIProjectsSidebarSection(isCompact: isSidebarCompact)' Sources/SrtFlow/MainWindowView.swift || true)"
+SIDEBAR_LINE="$(grep -n 'AIProjectsSidebarSection(isCompact: false)' Sources/SrtFlow/WorkbenchToolbar.swift || true)"
 if [ -z "${SIDEBAR_LINE}" ]; then
-  fail "主窗口侧边栏没挂 AIProjectsSidebarSection：后台工程没有地方停、没有地方关"
+  fail "更多菜单的浮层没挂 AIProjectsSidebarSection：后台工程没有地方停、没有地方关"
 elif grep -c 'equatable' <<<"${SIDEBAR_LINE}" >/dev/null; then
-  fail "主窗口侧边栏的 AIProjectsSidebarSection 套了 .equatable()：List 里整节只剩标题，工程那几行不出来"
+  fail "更多菜单浮层的 AIProjectsSidebarSection 套了 .equatable()：List 里整节只剩标题，工程那几行不出来"
 fi
 # 14. 导出器全 App 一个：编辑窗口和导出面板里的进度、停止、成片只给发起导出的那个工程（`exporter.belongs(to: project)`），
 #     开始导出的两条路（面板、AI）都带上是哪个工程（`export(for: project`）。不然 p1 的窗口里显示、还能停掉 p3 的 AI 导出
 #     （docs/bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md）。
 #     状态视图（VideoEditExportStatus）整个包在 `if exporter.belongs(to: project) {` 里，单独查。
-for file in Sources/SrtFlow/VideoEditView.swift Sources/SrtFlow/VideoEditExportSheet.swift; do
+for file in Sources/SrtFlow/VideoEditView.swift Sources/SrtFlow/VideoEditWorkbenchToolbar.swift Sources/SrtFlow/VideoEditExportSheet.swift; do
   [ -f "${file}" ] || { fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"; continue; }
   BARE="$(grep -nE 'if exporter\.isExporting[[:space:]]*\{' "${file}" || true)"
   [ -z "${BARE}" ] || fail "${file} 只看「导出器在导」就显示进度 / 停止，没问是不是这个工程的（别的窗口会显示、能停掉它）：${BARE}"
@@ -191,7 +191,7 @@ fi
 if [ "${FAILED}" = "0" ]; then
   echo "✓ open-projects-wiring：没有单例、工程只由注册表建、撤销不退到键窗口、代号全 App 不重号、退出问每个工程、录屏落回开录的工程；"
   echo "  工程窗口：撤销管理器是工程自己的且先挂 delegate、按键只认自己的窗口、录屏的框按工程分、关 / 换工程只停自己的活且停引擎、存盘不踢别处的输入框；"
-  echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台；用户新建 / 打开经 userNew / userOpen；侧边栏有 AI 在剪的工程"
+  echo "  后台工程：不建预览、挂窗口才重建、摘窗口只停预览、AI 在剪的工程关窗转到后台；用户新建 / 打开经 userNew / userOpen；更多菜单里有 AI 在剪的工程"
   echo "  导出器全 App 一个：进度 / 停止 / 成片只给发起导出的那个工程的窗口和面板；侧边栏一行名字独占一行、状态先拿宽度、排队的写排队中"
 fi
 exit "${FAILED}"

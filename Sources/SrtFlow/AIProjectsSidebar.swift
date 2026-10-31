@@ -18,7 +18,7 @@ struct AIProjectsSidebarSection: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        let listed = OpenProjects.shared.others.filter(Self.isListed)
+        let listed = Self.projects
         if !listed.isEmpty {
             Section {
                 ForEach(listed, id: \.shortID) { project in
@@ -28,6 +28,11 @@ struct AIProjectsSidebarSection: View {
                 if !isCompact { Text("AI Projects") }
             }
         }
+    }
+
+    /// 原侧栏的同一份清单改由「更多 → AI 工程」浮层承载；筛选规则仍只有这一处。
+    static var projects: [VideoEditProject] {
+        OpenProjects.shared.others.filter(Self.isListed)
     }
 
     /// 列哪些：后台工程（只有 AI 开得出来）、AI 正在剪的工程窗口（用户自己开的工程窗口不列）。

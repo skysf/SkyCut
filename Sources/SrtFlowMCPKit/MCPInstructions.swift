@@ -26,7 +26,7 @@ public enum MCPInstructions {
     SkyCut is a video editor on the user's Mac. These tools edit projects open in SkyCut while the user \
     watches. Usual order: open_folder (the user's folder), open_project or new_project; get_timeline for ids; \
     look, listen and transcribe to see, hear and read the media (the only way); edit; export_video, then \
-    get_job. Tool descriptions have the details; results say what to do next.
+    get_job. Descriptions give details; results give next steps.
 
     Rules:
     - Unless the user said, ask once whether to show the edits in SkyCut or do them in the background; call set_view.
@@ -42,7 +42,7 @@ public enum MCPInstructions {
     - Whole video: recipes first, follow the style that fits (user's words win); save_recipe
     - Clips: add_clips, edit_clip (trim, speed, volume, fill 9:16, crop, animation), split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes
-    - Record: record_screen (display, window or area, even while you work)
+    - Record: record_screen (screen, window or area)
     - Talk and beat cuts: transcribe, cut_speech, listen beats=true, cut_to_beat
     - Picture: set_canvas (for 9:16, then edit_clip fit=fill each clip), set_transition, set_filter, set_text, \
     set_shape (also blur or mosaic a watermark)
@@ -50,7 +50,7 @@ public enum MCPInstructions {
     (narration), set_track
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
     - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job
-    - View: set_view, seek
+    - App: get_settings, set_settings (preferences); set_view, seek
     - Paid: \(skyStudioTools)
     """
 }

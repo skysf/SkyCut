@@ -1277,3 +1277,20 @@
 "Hide details" = "Hide details";
 "Details" = "Details";
 "Media type" = "Media type";
+
+/* Unified workbench and settings */
+"General" = "General";
+"Connect AI" = "Connect AI";
+"Editing & Voices" = "Editing & Voices";
+"Media Cache" = "Media Cache";
+"Interface" = "Interface";
+"Settings" = "Settings";
+"Back to editor" = "Back to editor";
+"More tools" = "More tools";
+"AI is editing" = "AI is editing";
+"AI needs you" = "AI needs you";
+"AI finished" = "AI finished";
+"AI stopped" = "AI stopped";
+"AI activity" = "AI activity";
+"Hide status" = "Hide status";
+"Show AI activity; any percentage is for the current task" = "Show AI activity; any percentage is for the current task";

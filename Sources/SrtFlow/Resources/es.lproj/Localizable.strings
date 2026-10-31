@@ -1277,3 +1277,20 @@
 "Hide details" = "Ocultar detalles";
 "Details" = "Detalles";
 "Media type" = "Tipo de contenido";
+
+/* Unified workbench and settings */
+"General" = "General";
+"Connect AI" = "Conectar IA";
+"Editing & Voices" = "Edición y voces";
+"Media Cache" = "Caché multimedia";
+"Interface" = "Interfaz";
+"Settings" = "Ajustes";
+"Back to editor" = "Volver al editor";
+"More tools" = "Más herramientas";
+"AI is editing" = "La IA está editando";
+"AI needs you" = "La IA te necesita";
+"AI finished" = "IA finalizada";
+"AI stopped" = "IA detenida";
+"AI activity" = "Actividad de IA";
+"Hide status" = "Ocultar estado";
+"Show AI activity; any percentage is for the current task" = "Ver actividad de IA; el porcentaje corresponde a la tarea actual";

@@ -33,6 +33,14 @@ func runCatalogTextChecks() {
         check(description.utf16.count <= claudeCodeTextLimit,
               "\(tool.rawValue): the description fits in Claude Code's \(claudeCodeTextLimit) characters (it is \(description.utf16.count))")
     }
+    // 偏好工具属于 App，不依赖 / 抢占某个工程；读写提示会影响客户端授权行为。
+    check(MCPToolName.getSettings.definition.readOnly, "get_settings is read-only")
+    check(!MCPToolName.setSettings.definition.readOnly, "set_settings declares its writes")
+    for tool in [MCPToolName.getSettings, .setSettings] {
+        check(!tool.takesProject, "\(tool.rawValue) has app scope")
+        check(MCPArgumentCheck.problem(tool: tool, arguments: ["api_key": "do-not-accept"]) != nil,
+              "\(tool.rawValue) rejects credentials rather than silently ignoring them")
+    }
     check(!containsChinese(MCPToolName.listJSON.encodedString()), "the tool list (names, descriptions, parameters, choices) is English only")
 }
 

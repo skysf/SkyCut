@@ -12,6 +12,8 @@
 
 本文只写**长期约束**。实现在 `Sources/SrtFlow/AppLanguage.swift`。
 
+2026-10-31 起，语言入口统一在「设置 → 通用」，不再放侧栏国旗菜单；顶部齿轮、应用菜单与 ⌘, 都打开同一设置窗口。MCP 的 get_settings / set_settings 也复用 AppLanguageStore，详见 [顶部工作台与统一设置](workbench-and-settings.md)。
+
 ## 一、写死的界面文案必须每张表都有（守卫钉着）
 
 **查不到不是错误，是静默降级**：不报错、不崩，只是在中文界面里原样显示英文。
@@ -142,8 +144,7 @@
    键集和 `en.lproj` 的完全相同（守卫钉着，少一条就红）。`<code>` 用泛化的语言码（`es`、`fr`、`tr`），
    不分地区：macOS 会把 `es-MX` 这类变体匹配到 `es.lproj`。
 2. `AppLanguage` 加一个 case，rawValue 就是目录名；`nativeName` 用那种语言自己写（`Español`），
-   不标 Beta（用户 2026-09-30 定：AI 的译文直接算正式，不做母语审校）。`flag` 给一面旗（侧边栏收成图标条时只画旗子，
-   2026-10-01 用户定；国旗代表国家不是语言，用户知道仍要国旗，「跟随系统」画地球）。
+   不标 Beta（用户 2026-09-30 定：AI 的译文直接算正式，不做母语审校）。旧 `flag` 属性不再作为语言入口，设置里只显示各语言自己的名字。
 
 locale、AppKit 的启动语言（`AppleLanguages`）、查表用的 bundle、音频库按语言选标题
 （`resolvedCode`）都从 rawValue 推出来；覆盖守卫和 `check-mcp.sh` 按目录现场找表。

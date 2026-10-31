@@ -31,6 +31,7 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate {
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered, defer: false
         )
+        window.toolbarStyle = .unifiedCompact
         window.contentMinSize = NSSize(width: 900, height: 580)   // 同剪辑页的最小尺寸
         window.isReleasedWhenClosed = false
         super.init(window: window)
