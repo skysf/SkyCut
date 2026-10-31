@@ -120,7 +120,7 @@ done
 # 设置那一节只订阅自己的小对象，不读工程（docs/architecture/preview-perf-ratchet.md 第十节）。
 forbid "设置那一节不许读工程" "$SETTINGS_SECTION" 'project'
 require "设置那一节订阅缓存设置那个小对象" "$SETTINGS_SECTION" '@ObservedObject private var settings = OptimizedMediaCacheSettings\.shared'
-require "设置窗口里有这一节" "$APP" 'OptimizedMediaSettingsSection\(\)'
+require "设置窗口里有这一节" Sources/SrtFlow/SettingsWindowView.swift 'OptimizedMediaSettingsSection\(\)'
 # 启动时过期：proxy 队列上、天数从 Store 来、登记后台读（冒烟的「落定」等它）。
 if ! perl -0ne 'exit(($_ =~ /PerfCounters\.backgroundReadBegan\(\)\n\s*MediaReadQueue\.proxy\.addOperation \{\n\s*OptimizedMediaStore\.expire\(olderThan: OptimizedMediaStore\.expiryDays\)\n\s*PerfCounters\.backgroundReadEnded\(\)/) ? 0 : 1)' "$APP"; then
   echo "✗ optimized-media-wiring：启动时要在 proxy 队列上 expire(olderThan: expiryDays)，并登记后台读（${APP}）" >&2

@@ -49,6 +49,7 @@ struct SkyStudioSettingsSection: View {
         LabeledContent {
             HStack(spacing: 6) {
                 SecureField("sk-…", text: $keyText)
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(minWidth: 160)
                     .accessibilityIdentifier("skystudio-key-field")
@@ -175,6 +176,7 @@ private struct SkyStudioCreditLimitRow: View {
         LabeledContent {
             HStack(spacing: 4) {
                 TextField("Daily limit for AI", text: $limitText)
+                    .labelsHidden()
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 72)
                     .multilineTextAlignment(.trailing)
@@ -192,6 +194,9 @@ private struct SkyStudioCreditLimitRow: View {
         }
         .instantHelp("SkyCut asks before AI spends more Sky Studio credits than this in one day")
         .onAppear { limitText = SkyStudioCredits.text(spend.dailyLimit) }
+        .onChange(of: spend.dailyLimit) { _, value in
+            limitText = SkyStudioCredits.text(value)
+        }
         .onDisappear(perform: commit)
     }
 

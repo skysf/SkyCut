@@ -1277,3 +1277,20 @@
 "Hide details" = "收起";
 "Details" = "详情";
 "Media type" = "素材类型";
+
+/* Unified workbench and settings */
+"General" = "通用";
+"Connect AI" = "连接 AI";
+"Editing & Voices" = "剪辑与声音";
+"Media Cache" = "媒体缓存";
+"Interface" = "界面";
+"Settings" = "设置";
+"Back to editor" = "返回剪辑";
+"More tools" = "更多工具";
+"AI is editing" = "AI 正在剪辑";
+"AI needs you" = "AI 等待你操作";
+"AI finished" = "AI 已完成";
+"AI stopped" = "AI 已停止";
+"AI activity" = "AI 活动";
+"Hide status" = "隐藏状态";
+"Show AI activity; any percentage is for the current task" = "查看 AI 活动；百分比表示当前任务的进度";

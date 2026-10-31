@@ -62,6 +62,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case cancelJob = "cancel_job"
     case undo = "undo"
     case seek = "seek"
+    case getSettings = "get_settings"
+    case setSettings = "set_settings"
 
     /// 工具的说明书：各组写的那一份，碰工程的再统一加上可选的 `project` 参数（只写在这一处，说明只有一句）。
     public var definition: MCPToolDefinition {
@@ -74,7 +76,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 改 / 读工程内容的、默认值跟着工程走的都收。只碰文件、设置、任务的不收；open_project / new_project 是开工程的，回 id、不收。
     public var takesProject: Bool {
         switch self {
-        case .getStatus, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
+        case .getStatus, .getSettings, .setSettings, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
              .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
@@ -88,6 +90,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
 
     private var groupDefinition: MCPToolDefinition {
         switch self {
+        case .getSettings, .setSettings:
+            return MCPSettingsTools.definition(for: self)
         case .getStatus, .setView, .openFolder, .openProject, .newProject, .closeProject, .saveProject, .undo, .seek:
             return MCPProjectTools.definition(for: self)
         case .getTimeline, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .deleteItems,

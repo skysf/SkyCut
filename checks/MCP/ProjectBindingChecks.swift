@@ -168,7 +168,7 @@ private func runUsesProjectChecks() {
     for tool in MCPToolName.allCases {
         let expected: Bool
         switch tool {
-        case .getStatus, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
+        case .getStatus, .getSettings, .setSettings, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .openProject, .newProject, .closeProject,
              .recordScreen:
             expected = false
@@ -193,7 +193,7 @@ private func runUsesProjectChecks() {
           "set_view with project changes that project, so it is checked like any project call")
     check(!AIProjectBinding.usesProject(.setView, args(["mode": "background"])), "set_view without project sets the session's default")
     // 会改东西的工具，除了只碰文件 / 设置 / 任务、开关工程的那几个，全都碰工程（新加一个改工程的工具忘了归类，这里红）。
-    let fileOnly: Set<MCPToolName> = [.setView, .saveRecipe, .manageFiles, .openProject, .newProject, .closeProject, .compressVideos,
+    let fileOnly: Set<MCPToolName> = [.setView, .setSettings, .saveRecipe, .manageFiles, .openProject, .newProject, .closeProject, .compressVideos,
                                       .burnSubtitles, .convertSubtitles, .generateMedia, .cancelJob, .recordScreen]
     for tool in MCPToolName.allCases where !tool.definition.readOnly && !fileOnly.contains(tool) {
         check(AIProjectBinding.usesProject(tool, none), "\(tool.rawValue) changes something, so it must check the project")

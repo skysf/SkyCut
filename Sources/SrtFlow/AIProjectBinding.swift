@@ -22,7 +22,7 @@ enum AIProjectBinding {
     /// open_project / new_project / close_project 是开、关工程的：另走一条（AIProjectOpenTools），做成了小程序跟着记。只碰文件、设置、任务的不查。
     static func usesProject(_ tool: MCPToolName, _ args: AIToolArguments) -> Bool {
         switch tool {
-        case .getStatus, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
+        case .getStatus, .getSettings, .setSettings, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
              .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob,
              .openProject, .newProject, .closeProject:
             return false

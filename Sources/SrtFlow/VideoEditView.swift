@@ -20,6 +20,7 @@ struct VideoEditView: View {
     private let clock: PlayerClock
 
     @Environment(\.undoManager) private var undoManager
+    @State private var workbenchWidth: CGFloat = 900
     @State private var showsExportSheet = false
     @State private var showsSubtitlePanel = false
     /// 预览左边那栏转场库的显隐。记住上次的选择 —— 它是布局偏好，不是工程数据。
@@ -88,6 +89,7 @@ struct VideoEditView: View {
                 .frame(minHeight: 210, idealHeight: 260, maxHeight: .infinity)
         }
         .frame(minWidth: 900, minHeight: 580)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { workbenchWidth = $0 }
         .onAppear {
             toolchain.resolveIfNeeded()
             // 主窗口的撤销管理器交给工程（SwiftUI 的窗口不问 delegate）；工程窗口用工程自己的，窗口 delegate 交出去（ProjectWindowController）。
@@ -116,47 +118,13 @@ struct VideoEditView: View {
         }
         // 录屏的设置页 / 残缺的结果弹在开录的那个工程的窗口里，崩溃恢复只在主窗口（ScreenRecordingSheets）。
         .modifier(ScreenRecordingSheets(project: project, host: host))
-        // Export 放窗口右上角的工具栏，随时够得着。
         .toolbar {
-            // 工程名下拉放最左边，它就是这个编辑器的文件菜单。
-            ToolbarItem(placement: .navigation) {
-                VideoEditProjectMenu(project: project)
-            }
-            // 素材库的开关挨着工程名放最左边，和系统那个侧边栏开关呼应 ——
-            // 都是「把左边那一栏收起来」。
-            ToolbarItem(placement: .navigation) {
-                Button {
-                    showsLibraryColumn.toggle()
-                } label: {
-                    Label(
-                        "Library",
-                        systemImage: "square.filled.and.line.vertical.and.square"
-                    )
-                }
-                .instantHelp("Show or hide the transition, filter and audio library")
-            }
-            ToolbarItemGroup(placement: .primaryAction) {
-                if exporter.isExporting && exporter.belongs(to: project) {  // 导出器全 App 一个：只显示这个工程的
-                    ProgressView(value: exporter.progress)
-                        .frame(width: 80)
-                }
-                CloudTasksButton(project: project).equatable()
-                RecordScreenButton(project: project)
-                Button {
-                    project.showsSubtitleList.toggle()
-                } label: {
-                    Label("Subtitles", systemImage: "captions.bubble")
-                }
-                .disabled(project.state.isEmpty)
-                .instantHelp("Show or hide the subtitle list")
-                Button {
-                    showsExportSheet = true
-                } label: {
-                    Label("Export", systemImage: "square.and.arrow.up")
-                }
-                .disabled(project.state.isEmpty || (exporter.isExporting && exporter.belongs(to: project)))  // 别的工程在导：面板里写着在等谁
-                .instantHelp("Export the timeline or the selected clips")
-            }
+            VideoEditWorkbenchToolbar(
+                project: project,
+                showsLibrary: $showsLibraryColumn,
+                showsExport: $showsExportSheet,
+                availableWidth: workbenchWidth
+            )
         }
     }
 
@@ -251,8 +219,6 @@ struct VideoEditView: View {
 
     private var previewPane: some View {
         VStack(spacing: 0) {
-            // AI 在剪的时候：谁在剪 · 停止；剪完：改了几处 · 撤销这一轮。只订阅 AISession、不读工程。
-            AIActivityBanner(project: project)
             if !project.missingMedia.isEmpty {
                 MissingMediaBar(project: project)
                 Divider()

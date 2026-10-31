@@ -136,6 +136,7 @@ run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选�
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
 run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
+run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
 run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
 # 提示面板落点（scripts/check-instant-tooltip-panel.sh）**故意不在这里**：它要建
 # 真实的 NSWindow/NSPanel，没有图形会话就会假红。按本文件开头的约定，真实窗口

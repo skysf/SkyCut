@@ -50,11 +50,10 @@ struct BurnInView: View {
             .onExitCommand { setPreviewExpanded(false) }
     }
 
-    /// 放大预览时把侧边栏一起收起来，整个窗口都让给画面；还原时再放回来。
+    /// 放大预览时整个内容区都让给画面；工具切换已收进顶部的「更多」。
     /// 想要真正的满屏就在放大后按 ⌃⌘F 让窗口进系统全屏。
     private func setPreviewExpanded(_ expanded: Bool) {
         isPreviewExpanded = expanded
-        MainWindowState.shared.sidebarVisibility = expanded ? .detailOnly : .all
     }
 
     private var splitLayout: some View {
@@ -64,7 +63,7 @@ struct BurnInView: View {
             sidebar
                 .frame(minWidth: 340, idealWidth: 390, maxWidth: 470)
         }
-        // 主窗口左边还有侧边栏，这里的下限比原来独立开窗时收一点。
+        // 保留烧录页预览与字幕列的最小宽度。
         .frame(minWidth: 930, minHeight: 580)
         .onAppear {
             toolchain.resolveIfNeeded()

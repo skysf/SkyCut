@@ -84,7 +84,7 @@ prompters="$(grep -rl --include='*.swift' 'promptKeychain: true' Sources | LC_AL
 [ "${prompters}" = "${SECTION} " ] || fail "promptKeychain: true 只许在设置那一节（用户点了按钮），实际在：${prompters}"
 
 # 4. 挂上了。
-[ "$(count 'SkyStudioSettingsSection()' "${APP}")" -eq 1 ] || fail "${APP}：设置窗口里要挂 SkyStudioSettingsSection()"
+[ "$(count 'SkyStudioSettingsSection()' Sources/SrtFlow/SettingsWindowView.swift)" -eq 1 ] || fail "${APP}：设置窗口里要挂 SkyStudioSettingsSection()"
 [ "$(count 'SkyStudioAccount.shared.start()' "${APP}")" -eq 1 ] || fail "${APP}：启动时要 SkyStudioAccount.shared.start()"
 
 # 5. 照授权拦接在该接的地方（规矩在 SkyCutGates，生不生效看 SkyCutGates.enforced）。
