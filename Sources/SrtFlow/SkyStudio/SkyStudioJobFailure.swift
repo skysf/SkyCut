@@ -12,6 +12,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
     var refunded: Bool?
     var charged: Bool?
     var jobID: String?
+    var billing: SkyStudioBilling?
 
     init(message: String, fields: [String: JSONValue] = [:], jobID: String? = nil) {
         self.message = message
@@ -21,11 +22,11 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         refunded = fields["refunded"]?.boolValue
         charged = fields["charged"]?.boolValue
         self.jobID = fields["job_id"]?.stringValue ?? jobID
+        billing = SkyStudioBilling(fields["billing"])
     }
 
-    var creditsReturned: Bool { refunded == true || charged == false }
+    var creditsReturned: Bool { billing?.returnedAll == true }
     var isRealPersonRefusal: Bool { providerCode == "REAL_PERSON_REFERENCE" || reason == "real_person_reference" }
-    var mayReplace: Bool { isRealPersonRefusal && creditsReturned }
     var json: JSONValue {
         var value: [String: JSONValue] = ["message": .string(message)]
         if let code { value["code"] = .string(code) }
@@ -34,6 +35,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         if let refunded { value["refunded"] = .bool(refunded) }
         if let charged { value["charged"] = .bool(charged) }
         if let jobID { value["skystudio_job_id"] = .string(jobID) }
+        if let billing { value["billing"] = billing.json }
         return .object(value)
     }
 }

@@ -893,6 +893,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-30 生成固定首个模型且缺少多参考](docs/bugfixes/2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和完整参考限制可查询；按用户偏好挑兼容模型，真人拒绝只在退款明确后按原消费上限替换一次。
 - [2026-10-30 多项生成横幅挤占预览](docs/bugfixes/2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口与滚动浮层汇总任务，失败 / 未知扣费提示保留，取消不先删除状态。
 
+- [2026-10-31 七个 Sky Studio 模型与原单结算](docs/bugfixes/2026-10-31-sky-studio-model-expansion.md) — lipsync / 去背景、目录限制、WebM / SRT / 透明 PNG；同 key 只起一单，失败只查原单，扣退费只认 billing。
+
 ## 根目录文档
 
 - [README.md](README.md) — 面向使用者的中英双语项目介绍。

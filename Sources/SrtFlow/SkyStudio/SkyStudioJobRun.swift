@@ -4,14 +4,14 @@ import Foundation
 //
 // 管什么：提交 → 照 `poll_after_seconds` 问（没有长轮询）→ 做完回最后那一份状态（带成品）。
 // - **同时开着的满了**（`too_many_jobs`，每个账号最多 `max_running_jobs` 个，现在 3）：在本机等着，隔一会儿用**同一个
-//   idempotency_key** 再交（服务器认得出是同一个，不会扣两次）。交的时候断网也一样再交两次。
+//   idempotency_key** 再交（服务器认得出是同一个，不会扣两次）。提交断网不重放收费 POST。
 // - **提交不跟着取消**：请求发出去一半被掐断，服务器那边可能已经扣了钱、建了任务；让它回来，拿到任务号再按下面的规矩停。
 // - **问的时候断网几次不算失败**：活在服务器上照做（连着问不到才算）。
 // - **Task 被取消 = 用户要停**：只有排着队的能取消（退钱）；已经开始的取消不了（`not_cancellable`），照实说：积分花了，成品照样进作品库。
 //   取消请求在不继承取消的 Task 里发（调用者已经被取消了，网络请求一看见取消就不发）。
 //   **取消不了、取消没送到的那单接着在后台查到 done / failed**（`followToEnd`，不下载）：Sky Studio 有人查的时候才把成品存进作品库、
 //   把它从「同时开着的」里拿掉，没人查要等它的兜底几个小时（2026-10-28 真积分测试撞上的）。
-// - 等多久：服务器自己会收掉没人管的任务（upscale 245 分钟、别的 35 分钟，失败并退钱），这里最多等 5 小时。
+// - 等多久：这里最多等 5 小时；经过多久都不证明供应商失败或已退款。
 // 合同：Sky Studio 仓库 docs/agents/skycut-api.md「POST /jobs」「GET /jobs/{id}」「POST /jobs/{id}/cancel」。
 // 不管什么：传文件（SkyStudioAPI.upload / download）、钱花不花（每日上限）、每种活怎么拼参数、进度怎么画。
 
@@ -23,8 +23,6 @@ struct SkyStudioJobRun: Sendable {
     static let pollRange: ClosedRange<Double> = 2...60
     /// 连着问不到几次才算失败（问的间隔照旧，十次 ≈ 两三分钟）。
     static let networkMisses = 10
-    /// 交的时候断网再交几次。
-    static let submitRetries = 2
 
     let api: SkyStudioAPI
     let key: String
@@ -59,7 +57,6 @@ struct SkyStudioJobRun: Sendable {
     private func submit(
         _ request: SkyStudioJobRequest, deadline: Date, onUpdate: @escaping @Sendable (Update) -> Void
     ) async throws -> SkyStudioJobStatus {
-        var networkTries = 0
         while true {
             if Task.isCancelled { throw SkyStudioJobError.stopped(.nothingCharged) }
             let api = self.api, key = self.key
@@ -77,9 +74,21 @@ struct SkyStudioJobRun: Sendable {
                 guard Date() < deadline else { throw SkyStudioJobError.timedOut }
                 do { try await sleep(Self.slotRetrySeconds) } catch { throw SkyStudioJobError.stopped(.nothingCharged) }
             case .failure(SkyStudioFailure.network(let detail)):
-                networkTries += 1
-                guard networkTries <= Self.submitRetries else { throw SkyStudioJobError.request(.network(detail)) }
-                do { try await sleep(2) } catch { throw SkyStudioJobError.stopped(.unknown) }
+                // 丢失响应不证明没扣费。保留原 key，禁止自动重放收费 POST。
+                throw SkyStudioJobError.request(.network(detail))
+            case .failure(SkyStudioFailure.server(let error)) where error.fields["job_id"]?.stringValue != nil:
+                // 拒绝 / 未知应答已给原任务号：先交出身份，只 GET 这一单；绝不再 POST 或切模型。
+                let id = error.fields["job_id"]!.stringValue!
+                var known = SkyStudioJobStatus(jobID: id, state: nil)
+                known.billing = SkyStudioBilling(error.fields["billing"])
+                onUpdate(.status(known))
+                if Task.isCancelled { throw await stop(id) }
+                let recovered: SkyStudioJobStatus
+                let originalFailure = SkyStudioFailure.server(error)
+                do { recovered = try await api.job(id, key: key) }
+                catch { throw SkyStudioJobError.request(originalFailure) }
+                onUpdate(.status(recovered))
+                return recovered
             case .failure(let failure as SkyStudioFailure):
                 throw SkyStudioJobError.request(failure)
             case .failure(let error):
@@ -103,7 +112,8 @@ struct SkyStudioJobRun: Sendable {
             case .failed?:
                 throw SkyStudioJobError.failed(current.failure ?? SkyStudioJobFailure(message: current.error ?? "Sky Studio could not make it.", jobID: current.jobID))
             case .cancelled?:
-                throw SkyStudioJobError.stopped(.nothingCharged)
+                if current.billing?.returnedAll == true { throw SkyStudioJobError.stopped(.nothingCharged) }
+                throw SkyStudioJobError.failed(current.failure ?? SkyStudioJobFailure(message: "Cancellation acknowledged; billing remains unconfirmed.", jobID: current.jobID))
             case .queued?, .running?:
                 break
             case nil:
@@ -164,7 +174,11 @@ struct SkyStudioJobRun: Sendable {
         let outcome = await Task.detached { try? await api.cancel(jobID, key: key) }.value
         switch outcome {
         case .cancelled?:
-            return .stopped(.nothingCharged)
+            // 取消应答仅代表请求已接受；再读原任务的结算证据。
+            let status = await Task.detached { try? await api.job(jobID, key: key) }.value
+            if status?.billing?.returnedAll == true { return .stopped(.nothingCharged) }
+            keepFollowing(jobID)
+            return .stopped(.unknown)
         case .notCancellable?:
             keepFollowing(jobID)
             return .stopped(.alreadyStarted)
@@ -236,6 +250,7 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     }
 
     func canRefund(beforeAccepted: Bool) -> Bool {
+        if let billing = failure?.billing { return billing.returnedAll }
         if failure?.creditsReturned == true { return true }
         if case .stopped(.nothingCharged) = self { return true }
         guard beforeAccepted, case .request(.server(let error)) = self, failure?.isRealPersonRefusal != true else { return false }
@@ -245,13 +260,13 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     var message: String {
         switch self {
         case .failed(let detail):
-            return "Sky Studio could not make it: \(detail.message) " + (detail.creditsReturned
-                ? "The credits were refunded or not charged." : "Refund is not confirmed; do not regenerate this job automatically.")
+            return "Sky Studio job: \(detail.message) " + (detail.billing?.message
+                ?? "Billing is not confirmed; query the original job and do not regenerate automatically.")
         case .stopped(.nothingCharged):
             return "Stopped before Sky Studio started it; no credits were spent."
         case .stopped(.alreadyStarted):
-            return "Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will still "
-                + "appear in the user's Sky Studio library."
+            return "Sky Studio had already started it, so it could not be cancelled. Keep querying the original job's billing; "
+                + "a successful result is saved to the user's Sky Studio library."
         case .stopped(.unknown):
             return "SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in the user's Sky Studio library."
         case .request(.server(let error)):

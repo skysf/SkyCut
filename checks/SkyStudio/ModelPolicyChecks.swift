@@ -63,29 +63,11 @@ func runModelPolicyChecks() {
     let slop = SkyStudioReferencePlan(mode: "multimodal", files: [file("video", seconds: 10.006)])
     check(slop.problem(model: omni) == nil, "Omni's own container-duration slop is accepted")
     let roundTrip = SkyStudioModel(json: h3.json)
-    checkEqual(roundTrip, h3, "discovery preserves server defaults, input modes and limits")
+    checkEqual(roundTrip?.json, h3.json, "discovery preserves server defaults, input modes and limits")
 
-    let refused = SkyStudioJobFailure(message: "Reference refused", fields: ["provider_code": "REAL_PERSON_REFERENCE", "refunded": true])
     let original = SkyStudioGeneration.make(.imageToVideo, prompt: "keep all references", ask: .init(duration: 5, resolution: "720p"), canvas: 16 / 9, model: s25,
         inputMode: "multimodal", references: plan)
-    func fallback(_ failure: SkyStudioJobFailure, plan: SkyStudioReferencePlan = plan, switched: Bool = false, seconds: Double = 5) -> SkyStudioGenerationFallback.Candidate? {
-        var generation = original
-        generation.params["duration"] = .number(seconds)
-        return SkyStudioGenerationFallback.candidate(failure: failure, originalModel: "seedance-2-5", generation: generation,
-            ask: .init(duration: seconds, resolution: "720p"), references: plan, catalog: catalog, canvas: 16 / 9, frame: nil, alreadySwitched: switched)
-    }
-    let replacement = fallback(refused)
-    checkEqual(replacement?.model.id, "minimax-h3", "refunded Seedance likeness refusal switches to H3 first")
-    checkEqual(replacement?.generation.params["reference_video_seconds"], 3, "replacement retains all reference metadata")
-    checkEqual(replacement?.generation.params["duration"], 5, "replacement retains the requested length")
-    checkEqual(replacement?.generation.params["resolution"], "768p", "replacement reads the compatible model's resolution")
     let unknown = SkyStudioJobFailure(message: "real person; refunded", fields: ["provider_code": "REAL_PERSON_REFERENCE"])
-    check(fallback(unknown) == nil, "message text does not count as refund proof")
-    check(fallback(SkyStudioJobFailure(message: "blocked", fields: ["provider_code": "SAFETY_BLOCK", "refunded": true])) == nil, "general safety refusal does not trigger a model switch")
-    check(fallback(refused, switched: true) == nil, "there is at most one automatic replacement")
-    check(fallback(refused, seconds: 30) == nil, "replacement cannot silently shorten a 30-second request")
-    let tooManyForFallback = SkyStudioReferencePlan(mode: "multimodal", files: (1...11).map { file("image", $0) })
-    check(fallback(refused, plan: tooManyForFallback) == nil, "replacement cannot discard images to fit another model")
     check(!SkyStudioJobError.failed(unknown).canRefund(beforeAccepted: false), "unknown refund keeps the local reservation")
     check(!SkyStudioJobError.request(.network("timeout")).canRefund(beforeAccepted: true), "unknown submission outcome never proves no charge")
     let ordered: [JSONValue] = [["type": "image", "url": "https://example.test/1"], ["type": "video", "url": "https://example.test/2"]]

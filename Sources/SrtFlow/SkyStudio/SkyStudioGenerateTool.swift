@@ -20,16 +20,20 @@ enum SkyStudioGenerateTool {
         guard let kindName = try args.choice("kind", from: MCPVocabulary.generationKinds), let kind = SkyStudioGeneration.Kind(rawValue: kindName) else {
             throw AIToolError("kind is required: \(MCPVocabulary.generationKinds.joined(separator: ", ")).")
         }
-        let prompt = try args.requiredString("prompt")
-        let ask = SkyStudioGeneration.Ask(
-            duration: try args.double("duration"),
-            resolution: try args.string("resolution"),
-            aspectRatio: try args.string("aspect_ratio"),
-            instrumental: try args.bool("instrumental"),
-            lyrics: try args.string("lyrics"), generateAudio: try args.bool("generate_audio")
-        )
+        var ask = try SkyStudioGenerationControls.ask(args)
+        let prompt = try args.string("prompt") ?? ""
+        if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
+        if kind != .image, ask.operation != "generate" { throw AIToolError("operation=remove_background requires kind=image.") }
+        let idempotencyKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? UUID().uuidString.lowercased()
+        var arguments = args.raw.objectValue ?? [:]
+        arguments["confirm_token"] = nil
+        let requestIdentity: JSONValue = ["arguments": .object(arguments), "project": .string(String(describing: ObjectIdentifier(project))),
+            "generation": .number(Double(project.documentGeneration)), "account": .string(SkyStudioAccount.shared.stored?.me.account.id ?? "")]
+        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return cached }
+        defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
+        if kind.isVideo || kind == .image { _ = try await SkyStudioGeneratedVideo.engine() }
         let references = try await SkyStudioReferenceFiles.measure(picked, project: project)
         let frame = references.firstFrame
         let canvas = project.renderSize
@@ -53,9 +57,9 @@ enum SkyStudioGenerateTool {
         do {
             catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: api)
             guard let offered = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
-                accepts: { SkyStudioModelPolicy.problem(model: $0, ask: ask, references: references) == nil }) else {
+                accepts: { SkyStudioModelPolicy.problem(model: $0, ask: ask, references: references) == nil && SkyStudioGenerationControls.problem(model: $0, ask: ask, prompt: prompt, references: references) == nil }) else {
                 if let requested, let model = catalog.model(requested, kind: kind.rawValue) {
-                    throw AIToolError(SkyStudioModelPolicy.problem(model: model, ask: ask, references: references) ?? "This model cannot accept the request.")
+                    throw AIToolError(SkyStudioModelPolicy.problem(model: model, ask: ask, references: references) ?? SkyStudioGenerationControls.problem(model: model, ask: ask, prompt: prompt, references: references) ?? "This model cannot accept the request.")
                 }
                 throw AIToolError("No offered model accepts the complete request. Read get_status models=true for model ids, modes and reference limits. Available: "
                     + catalog.models(kind: kind.rawValue).map(\.id).joined(separator: ", "))
@@ -75,7 +79,7 @@ enum SkyStudioGenerateTool {
         let identity = SkyStudioApproval.identity(job: generation.job(model: model.id), credits: quote.credits, context: [
             "frame": try frame.map(SkyStudioApproval.file) ?? .null,
             "references": .array(try references.files.map { try SkyStudioApproval.file($0.file) }),
-            "auto_fallback": .bool(try args.bool("auto_fallback") ?? true),
+            "auto_fallback": false,
             "folder": .string(folder.standardizedFileURL.path), "name": .string(try args.string("name") ?? "")
         ])
         let reservation: SkyStudioJobGate.Reservation
@@ -89,27 +93,30 @@ enum SkyStudioGenerateTool {
             droppingExtension: "", fallback: fallbackStem(kind)
         )
         let run = SkyStudioGenerationRun(
-            generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation,
-            catalog: catalog, ask: ask, canvas: canvasRatio, frameRatio: frameRatio, allowsFallback: try args.bool("auto_fallback") ?? true
+            generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation, idempotencyKey: idempotencyKey
         )
         let job = run.start()
         let store = SkyStudioSpendStore.shared
         let minutes = CloudJobProgress.minutes(quote.typicalSeconds ?? generation.typicalSeconds)
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(job.id), "kind": .string(kind.rawValue), "model": .string(model.title), "model_id": .string(model.id),
-            "params": .object(generation.params), "reference_files": .number(Double(references.files.count)),
+            "params": .object(generation.params), "idempotency_key": .string(idempotencyKey),
+            "billing_policy": catalog.billingPolicy ?? model.metadata["billing_policy"] ?? .null,
+            "billing_note": .string(SkyStudioBilling.policyMessage), "reference_files": .number(Double(references.files.count)),
             "credits": .number(SkyStudioCredits.number(quote.credits)),
             "typical_minutes": .number(Double(minutes)),
             "daily_limit_credits": .number(store.dailyLimit),
             "spent_today_credits": .number(SkyStudioCredits.number(store.spentToday())),
             "next_step": .string(
-                "Tell the user it costs \(SkyStudioCredits.text(quote.credits)) Sky Studio credits. Wait with get_job (usually about "
+                "Tell the user the reservation is \(SkyStudioCredits.text(quote.credits)) Sky Studio credits. Explain billing_note before waiting. Wait with get_job (usually about "
                     + "\(minutes) min); when it is done, put the file on the timeline with add_clips"
                     + (kind.isSound ? " (track new_audio)." : ".")
             )
         ]
         if !generation.notes.isEmpty { result["notes"] = .array(generation.notes.map { .string($0) }) }
-        return .ok(.object(result))
+        let response = AIToolResult.ok(.object(result))
+        SkyStudioGenerationRequests.complete(idempotencyKey, result: response)
+        return response
     }
 
     /// 给 get_status 的一段：存了 Sky Studio 的 Key 才有。AI 看了就知道生成和 upscale 花的是积分、今天还剩多少。
@@ -128,7 +135,7 @@ enum SkyStudioGenerateTool {
     private static func fallbackStem(_ kind: SkyStudioGeneration.Kind) -> String {
         switch kind {
         case .image: return "Image"
-        case .imageToVideo, .textToVideo: return "Video"
+        case .imageToVideo, .textToVideo, .lipsync: return "Video"
         case .music: return "Music"
         case .soundEffect: return "Sound effect"
         }

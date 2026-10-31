@@ -84,7 +84,7 @@ struct SkyStudioAPI: Sendable {
 
     /// `POST /jobs`：提交，回任务号（扣钱在这一步：失败、取消只退一次）。合同说立刻回，但 2026-10-28 Sky Studio 在本机的 vercel dev 上
     /// 量到图片、音乐的提交一直等到做完才回（55 秒、40 秒），线上还没量过：这一个请求多等一会儿（`submitTimeout`），真超时了
-    /// SkyStudioJobRun 用同一个 idempotency_key 再交，服务器回原来那个任务、不再扣钱。
+    /// 保留同一个 idempotency_key 待核查，不自动重放收费 POST。
     func submit(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioJobStatus {
         var post = request("jobs", key: key, method: "POST", body: try job.jobBody.encodedData())
         post.timeoutInterval = Self.submitTimeout
@@ -241,6 +241,7 @@ struct SkyStudioAPI: Sendable {
         let message = error["message"]?.stringValue ?? code
         error["code"] = nil
         error["message"] = nil
+        if let billing = body["billing"] { error["billing"] = billing }
         return .server(SkyStudioServerError(status: status, code: code, message: message, fields: error))
     }
 }

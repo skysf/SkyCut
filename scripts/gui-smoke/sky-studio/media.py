@@ -78,19 +78,13 @@ try:
     for submit_refusal, refund_polls in [(False, 2), (True, 1)]:
         start, spent = len(log()), ledger()
         control(refuse_seedance=True, submit_refusal=submit_refusal, refund_after_polls=refund_polls)
-        done = generate(dict(kind="image_to_video", quality="highest", **refs))
+        done = generate(dict(kind="image_to_video", quality="highest", **refs), state="failed")
+        checked = call("get_job", {"job_id": done["job_id"]})
         posted = submissions(log()[start:])
-        assert [p["model"] for p in posted] == ["seedance-2-5", "minimax-h3"], posted
-        assert posted[0]["inputs"] == posted[1]["inputs"], "replacement must reuse every uploaded reference"
-        assert posted[0]["idempotency_key"] != posted[1]["idempotency_key"]
-        assert done["model_id"] == "minimax-h3" and len(done["fallback_attempts"]) == 1
-        assert ledger() == spent + 1, "original refund plus replacement costs one, not two"
+        assert [p["model"] for p in posted] == ["seedance-2-5"], posted
+        assert not checked.get("fallback_attempts"), "no automatic model replacement"
+        assert ledger() == spent, "confirmed original billing releases its reservation once"
 
-    start, spent = len(log()), ledger()
-    control(submit_refusal=True, replacement_expensive=True)
-    denied = generate(dict(kind="image_to_video", quality="highest", **refs), state="failed")
-    assert len(submissions(log()[start:])) == 1 and "above the approved" in denied["message"]
-    assert ledger() == spent
     start = len(log())
     control(refuse_seedance=False, unknown_submission=True, replacement_expensive=False)
     unknown = generate(dict(kind="image_to_video", quality="highest", **refs), state="failed")
@@ -98,7 +92,7 @@ try:
     assert not unknown.get("fallback_attempts"), "unknown outcome cannot start another model"
     control(unknown_submission=False, refuse_seedance=False)
     assert all(not row["has_auth"] for row in log() if row["method"] == "PUT" or row["path"].startswith("/files/"))
-    (D / "media-results.json").write_text(json.dumps(dict(refund_fallback=done, ceiling=denied, unknown=unknown), indent=2))
-    print("PASS actual App/MCP: model discovery, subject defaults, ordered multimodal upload, last frame, refund polling, submit/poll fallback, cost ceiling, unknown outcome and no key leakage")
+    (D / "media-results.json").write_text(json.dumps(dict(original_refusal=done, unknown=unknown), indent=2))
+    print("PASS actual App/MCP: model discovery, subject defaults, ordered multimodal upload, last frame, original refund polling, no automatic replacement, unknown outcome and no key leakage")
 finally:
     mcp.close()

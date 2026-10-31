@@ -153,6 +153,7 @@ enum AIExportTools {
 
     static func job(_ args: AIToolArguments) async throws -> AIToolResult {
         let job = try find(args)
+        await job.refresh?()
         if let wait = try args.double("wait_seconds"), wait > 0 {
             await AIJobs.shared.wait(for: job, seconds: wait)
         }

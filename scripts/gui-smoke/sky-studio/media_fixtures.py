@@ -44,4 +44,6 @@ def finish(job, root, base):
 
 def refuse(job, refunded):
     job.update(status="failed", error=dict(code="provider_error", provider_code="REAL_PERSON_REFERENCE",
-               reason="real_person_reference", refunded=refunded, message="The reference likeness was refused."))
+               reason="real_person_reference", refunded=refunded, message="The reference likeness was refused."),
+               billing=dict(status="refunded" if refunded else "refund_pending", credits_charged=0 if refunded else None,
+                            credits_refunded=job["credits"] if refunded else 0))

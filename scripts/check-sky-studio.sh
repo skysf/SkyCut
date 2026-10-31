@@ -57,13 +57,15 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModelPolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioReferencePolicy.swift \
-  Sources/SrtFlow/SkyStudio/SkyStudioGenerationFallback.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationRequests.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
@@ -94,6 +96,7 @@ xcrun swiftc \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
+  checks/SkyStudio/ModelExpansionChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

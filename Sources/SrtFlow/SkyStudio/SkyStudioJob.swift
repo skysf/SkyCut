@@ -11,7 +11,7 @@ import SrtFlowMCPKit
 // 不管什么：发请求（SkyStudioAPI）、等它做完（SkyStudioJobRun）、每种活怎么拼参数（upscale、生成、配旁白各自的调用方）。
 
 struct SkyStudioJobRequest: Equatable, Sendable {
-    /// `upscale`、`image`、`text_to_video`、`image_to_video`、`music`、`voice`、`sound_effect`、`voice_clone`。
+    /// `upscale`、`image`、`text_to_video`、`image_to_video`、`lipsync`、`music`、`voice`、`sound_effect`、`voice_clone`。
     var kind: String
     /// Sky Studio 自己的模型名（`/models` 的 id），不是 fal 的端点号。
     var model: String
@@ -22,7 +22,7 @@ struct SkyStudioJobRequest: Equatable, Sendable {
     var params: [String: JSONValue]
     /// 用户同意过的上限（`/quote` 报的那个数）：服务器算出来更贵就回 `price_changed`、一分不扣。
     var maxCredits: Double?
-    /// 每个账号唯一：同一个再交一次回原来那个任务、不再扣钱（断网重交、同时开着的满了等着再交都靠它）。
+    /// 每个账号唯一：服务器按同一个 key 去重。客户端只在明确 too_many_jobs 时等着再交，未知提交保留 key、不自动重放。
     var idempotencyKey: String
 
     init(
@@ -98,6 +98,9 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     /// 没做成时服务器说的话。
     var error: String?
     var failure: SkyStudioJobFailure?
+    var billing: SkyStudioBilling?
+    var generationStatus: String?
+    var deliveryStatus: String?
 
     var isFinished: Bool { state == .done || state == .failed || state == .cancelled }
 
@@ -116,9 +119,14 @@ struct SkyStudioJobStatus: Equatable, Sendable {
         pollAfterSeconds = json["poll_after_seconds"]?.doubleValue
         creditsReserved = json["credits_reserved"]?.doubleValue
         creditsCharged = json["credits_charged"]?.doubleValue
+        billing = SkyStudioBilling(json["billing"])
+        generationStatus = json["generation_status"]?.stringValue
+        deliveryStatus = json["delivery_status"]?.stringValue
         if let result = json["result"], !result.isNull { self.result = SkyStudioJobResult(json: result) }
         error = Self.errorText(json["error"])
         if let error { failure = SkyStudioJobFailure(message: error, fields: json["error"]?.objectValue ?? [:], jobID: id) }
+        if state == .failed || state == .cancelled, failure == nil { failure = SkyStudioJobFailure(message: "Sky Studio job \(state?.rawValue ?? "failed").", jobID: id) }
+        failure?.billing = billing
     }
 
     /// `error` 可能是一句话，也可能是 `{"code", "message"}`。
@@ -142,10 +150,15 @@ struct SkyStudioJobResult: Equatable, Sendable {
     var expiresAt: Date?
     /// 旁白：Eleven v4 的 timestamps 原样（按字符给的开始 / 结束时间，不是按词）。
     var words: JSONValue?
+    var captionFile: URL?
+    var captionStatus: String?
+    var captionRetryAfterSeconds: Double?
+    var metadata: [String: JSONValue]
 
     init?(json: JSONValue) {
         guard let text = json["url"]?.stringValue, let url = URL(string: text), url.scheme != nil else { return nil }
         self.url = url
+        metadata = json.objectValue ?? [:]
         generationID = json["generation_id"]?.stringValue
         contentType = json["content_type"]?.stringValue
         width = json["width"]?.doubleValue
@@ -154,6 +167,9 @@ struct SkyStudioJobResult: Equatable, Sendable {
         fps = json["fps"]?.doubleValue
         expiresAt = json["expires_at"]?.stringValue.flatMap(SkyStudioJSON.parseDate)
         if let words = json["words"], !words.isNull { self.words = words }
+        captionFile = (json["caption_file"]?.stringValue ?? json["caption_file"]?["url"]?.stringValue).flatMap(URL.init(string:))
+        captionStatus = json["caption_status"]?.stringValue
+        captionRetryAfterSeconds = json["caption_retry_after_seconds"]?.doubleValue
     }
 }
 

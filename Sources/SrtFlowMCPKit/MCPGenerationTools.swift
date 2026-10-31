@@ -15,50 +15,63 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Generates one image, video, music or sound effect with Sky Studio credits (paid; key required in SkyCut \
-                Settings). Read get_status models=true (optionally model=<id>) BEFORE choosing references: it lists current \
-                models, defaults and per-mode image/video/audio counts, formats, size, duration and combination limits. \
-                Image: Asian people/places/culture prefer seedream5-flash; other, mixed or unclear subjects prefer nano2. \
-                Judge the subject, not the prompt language; set image_context=asian when appropriate. Video prefers \
-                MiniMax H3 (minimax-h3), then gemini-omni-1.1-flash, veo-fast, seedance-2-pro. Only when the user explicitly wants maximum \
-                quality regardless of cost/time set quality=highest: seedance-2-5, then veo-pro. Explicit model overrides \
-                preferences. image_to_video frames use image plus optional last_image; multimodal uses ordered reference_images, \
-                reference_videos and reference_audio. Supported types and limits differ by model; keep every reference. \
-                Seedance may refuse real or photoreal people. auto_fallback=true switches once to compatible MiniMax/Google \
-                only after confirmed refusal and refund/no-charge proof, within the original approved price; never resubmit \
-                an unknown or timed-out job. Returns job_id immediately: wait with get_job for phase, queue_position, \
-                transfer_percent, phase_seconds and typical_seconds. Finished jobs have file and credits_charged; add_clips \
-                puts the file on the timeline. Results also stay in the Sky Studio library. Aspect defaults to canvas; \
-                frame video keeps the image shape. Music: Lyria 3 Pro, instrumental=true or false with lyrics; 60–180 s or \
-                leave duration out. Sound effects: 0.5–180 s, default 5. Narration uses add_voiceover; subtitles use generate_subtitles. SkyCut quotes before \
-                spending; above the daily credit limit it returns needs_confirmation and confirm_token: ask the user before \
-                retrying with that token. cancel_job refunds queued jobs; started jobs cannot be cancelled.
+                Generates media, lipsync or transparent cutouts with Sky Studio credits (key required). First read \
+                get_status models=true for public ids, defaults, controls and input limits. lipsync: HeyGen takes video+audio; \
+                H3 Max takes image+audio. image operation=remove_background takes one image, no prompt. HeyGen dynamic duration \
+                defaults false; match input lengths. Results may be WebM with optional SRT; cutouts preserve PNG alpha. \
+                Wan reference-to-video uses multimodal arrays, document or web_url. image_to_video uses image/last_image. \
+                Images prefer Seedream for Asian subjects, Nano 2 otherwise; judge subject, not prompt language. Video prefers \
+                MiniMax H3 then Omni, Veo Fast, Seedance 2.0. quality=highest only for explicitly unrestricted quality requests: \
+                Seedance 2.5 then Veo Pro. Explicit model overrides preferences. Quotes before spending; above the daily credit limit \
+                returns needs_confirmation: ask the user, then repeat with confirm_token. Reuse one idempotency_key per operation; \
+                wait with get_job. Never automatically regenerate or switch models after failure/unknown status. Explain billing: \
+                provider-successful results stay charged if downloading/saving/importing fails; only billing proves a refund. \
+                Results stay in the Sky Studio library. add_clips imports actual media; WebM editing copies preserve originals. \
+                Narration uses add_voiceover; subtitles use generate_subtitles. Music defaults instrumental/auto length; sound \
+                effects default 5s. cancel_job attempts queued cancellation; check billing for settlement.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
-                    "prompt": MCPSchema.string("What it should look / sound like."),
-                    "model": MCPSchema.string("Exact model id from get_status models=true. Leave out to use the subject/quality preference among compatible models."),
-                    "image_context": MCPSchema.string("Image subjects: asian for primarily Asian people, places or culture; other for non-Asian, mixed or unclear. Default other.", oneOf: ["asian", "other"]),
-                    "quality": MCPSchema.string("Video: standard by default. highest only when the user explicitly prioritizes quality without cost/time limits.", oneOf: ["standard", "highest"]),
-                    "input_mode": MCPSchema.string("Video: frames or multimodal. Inferred from reference arrays when omitted; inspect model limits first.", oneOf: ["frames", "multimodal"]),
-                    "image": MCPSchema.string("First frame for image_to_video, or one reference for image generation; a file path."),
+                    "prompt": MCPSchema.string("Required for generators; omit for lipsync/cutouts."),
+                    "operation": MCPSchema.string("Image: generate (default) or remove_background; choose a matching catalog model.", oneOf: ["generate", "remove_background"]),
+                    "idempotency_key": MCPSchema.string("Stable operation key, 1-128 characters. Reuse after lost answers; bind unchanged inputs."),
+                    "video": MCPSchema.string("Local source video for lipsync; HeyGen accepts MP4/WebM per catalog."),
+                    "audio": MCPSchema.string("Local replacement MP3/WAV for lipsync; measured duration is used for /quote."),
+                    "document": MCPSchema.string("Wan: local document, exclusive with web_url."),
+                    "web_url": MCPSchema.string("Wan: public HTTP(S) page, exclusive with document."),
+                    "model": MCPSchema.string("Public id from get_status models=true; omitted uses compatible preferences."),
+                    "image_context": MCPSchema.string("Image subject context; default other (mixed/unclear included).", oneOf: ["asian", "other"]),
+                    "quality": MCPSchema.string("Video: standard default; highest only for explicitly unrestricted quality.", oneOf: ["standard", "highest"]),
+                    "input_mode": MCPSchema.string("Video input mode; inferred from references when omitted.", oneOf: ["frames", "multimodal"]),
+                    "image": MCPSchema.string("Local first frame, image reference, lip-sync portrait or cutout input."),
                     "last_image": MCPSchema.string("Optional final frame with image, in frames mode."),
-                    "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references; image generation or multimodal video."),
-                    "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV file path."), "Ordered multimodal video references; model-specific count/length limits."),
-                    "reference_audio": MCPSchema.array(of: MCPSchema.string("MP3/WAV file path."), "Ordered multimodal audio references; some models require a visual reference or do not accept audio."),
-                    "auto_fallback": MCPSchema.boolean("Allow one compatible MiniMax/Google replacement after a refunded Seedance real-person refusal, within the original approved price. Default true."),
-                    "duration": MCPSchema.number(
-                        "Seconds. Video uses this model's exact duration choices/default; music 60–180 or automatic; effects 0.5–180, default 5.",
-                        minimum: 0.5, maximum: 180
-                    ),
-                    "resolution": MCPSchema.string("Image/video output size from this model's mode-specific choices; default from /models."),
-                    "aspect_ratio": MCPSchema.string("Image/text/multimodal video aspect from the model catalog; default nearest to canvas. Frame video follows the image."),
-                    "generate_audio": MCPSchema.boolean("Video audio toggle, only when this model lists it. Other models may always generate sound."),
+                    "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references."),
+                    "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV file path."), "Ordered video references; limits from catalog."),
+                    "reference_audio": MCPSchema.array(of: MCPSchema.string("MP3/WAV file path."), "Ordered audio references; compatibility from catalog."),
+                    "auto_fallback": MCPSchema.boolean("Deprecated; false only. Automatic model replacement is disabled."),
+                    "duration": .object(["description": "Seconds from the model catalog; Wan also accepts null or auto for smart duration.",
+                        "anyOf": .array([["type": "number"], ["type": "string", "enum": ["auto"]], ["type": "null"]])]),
+                    "title": MCPSchema.string("HeyGen: optional label; catalog character limit."),
+                    "enable_caption": MCPSchema.boolean("HeyGen: default false; provider may still return captions, no guaranteed burn-in."),
+                    "enable_dynamic_duration": MCPSchema.boolean("HeyGen: false default; native length checks still apply."),
+                    "disable_music_track": MCPSchema.boolean("HeyGen: omit provider music, default false."),
+                    "enable_speech_enhancement": MCPSchema.boolean("HeyGen: enhance speech, default false."),
+                    "start_time": MCPSchema.number("HeyGen: processing start in source seconds; default beginning.", minimum: 0),
+                    "end_time": MCPSchema.number("HeyGen: end > start, within source; no promised billing discount.", minimum: 0),
+                    "enable_transcription": MCPSchema.boolean("H3 Max: false default follows waveform; true uses transcription."),
+                    "enable_prompt_expansion": MCPSchema.boolean("Wan: default true; required for document/page."),
+                    "enable_thinking": MCPSchema.boolean("Wan: omitted is automatic; document/page requires true."),
+                    "enable_safety_checker": MCPSchema.boolean("Safety toggle, true default; disabling needs provider authorization."),
+                    "sync_mode": MCPSchema.boolean("Cutout: false default; still returns async job/durable PNG."),
+                    "seed": MCPSchema.number("Optional integer random seed within the model catalog range."),
+                    "resolution": MCPSchema.string("Output size; catalog choices/default."),
+                    "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
+                    "generate_audio": MCPSchema.boolean("Video audio toggle, only when offered by model."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "lyrics": MCPSchema.string("Music only, with instrumental=false: the words to sing."),
                     "name": MCPSchema.string("A short file name (default: made from the prompt)."),
                     "confirm_token": MCPSchema.confirmToken
-                ], required: ["kind", "prompt"]),
+                ], required: ["kind"]),
                 openWorld: true
             )
         case .upscaleClip:

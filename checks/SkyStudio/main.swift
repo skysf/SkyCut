@@ -17,6 +17,7 @@ runVoiceChecks()
 await runVoiceBudgetChecks()
 runGenerationChecks()
 runModelPolicyChecks()
+await runModelExpansionChecks()
 runGenerationFrameChecks()
 
 if failures > 0 {

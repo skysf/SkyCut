@@ -9,7 +9,8 @@ func runJobRunChecks() async {
     let api = jobAPI()
     let request = SkyStudioJobRequest(kind: "upscale", model: "topaz-starlight", params: ["target": "4K"], maxCredits: 455, idempotencyKey: "idem-run")
     func status(_ state: String, _ extra: String = "") -> String {
-        #"{"job_id": "job-1", "status": "\#(state)", "poll_after_seconds": 15\#(extra)}"#
+        let proof = state == "cancelled" ? #", "billing":{"status":"refunded","credits_charged":0,"credits_refunded":455}"# : ""
+        return #"{"job_id": "job-1", "status": "\#(state)", "poll_after_seconds": 15\#(extra)\#(proof)}"#
     }
 
     // 1. 一路做完：交上（排队）→ 排第 2 → 处理中 → 存进作品库 → 做完；每一份都报上来；照服务器说的间隔问（夹过）。
@@ -60,13 +61,21 @@ func runJobRunChecks() async {
         return .http(202, status("queued"))
     }
     run.sleep = SleepLog().sleep
-    checkEqual(try? await run.run(request).state, .done, "a dropped submission is sent again")
+    if case .request(.network)? = await jobFailure({ _ = try await run.run(request) }) {
+        checkEqual(SkyStudioStub.log.count, 1, "a lost submit response never automatically replays a paid POST")
+    } else { check(false, "lost submission must report an unknown network outcome") }
     SkyStudioStub.reset { _ in .failure(.notConnectedToInternet) }
     if case .request(.network)? = await jobFailure({ _ = try await run.run(request) }) {
-        checkEqual(SkyStudioStub.log.count, 1 + SkyStudioJobRun.submitRetries, "tries three times in all")
+        checkEqual(SkyStudioStub.log.count, 1, "unknown submission sends exactly one paid request")
     } else {
         check(false, "no connection at all is a network failure")
     }
+    SkyStudioStub.reset { seen in
+        if seen.method == "POST" { return .http(502, #"{"error":{"code":"provider_error","message":"Outcome unknown","job_id":"job-1"}}"#) }
+        return .http(200, sampleDoneJob)
+    }
+    checkEqual(try? await run.run(request).state, .done, "submit error with an original job id recovers by querying that job")
+    checkEqual(SkyStudioStub.log.map(\.method), ["POST", "GET"], "known-id recovery reads the original without another paid POST")
 
     // 4. 问的时候断网几次不算失败；连着问不到才算。
     var blips = 3
@@ -109,9 +118,11 @@ func runJobRunChecks() async {
     // 6. 停：在第 2 次等的时候被取消。排着队的退钱；开始了的取消不了；取消没送到说不准；服务器那边已经取消了也算没花钱。
     //    后两种那单在服务器上照做：交出去接着查到底（Sky Studio 有人查才把成品存进作品库、放出名额；2026-10-28 真积分测试撞上的）。
     let handed = NameLog()
-    func stopping(cancelReply: SkyStudioStub.Reply) async -> SkyStudioJobError? {
+    func stopping(cancelReply: SkyStudioStub.Reply, billingProof: Bool = true) async -> SkyStudioJobError? {
+        var cancelled = false
         SkyStudioStub.reset { seen in
-            if seen.url.hasSuffix("/cancel") { return cancelReply }
+            if seen.url.hasSuffix("/cancel") { cancelled = true; return cancelReply }
+            if cancelled && billingProof { return .http(200, status("cancelled")) }
             return seen.method == "POST" ? .http(202, status("queued")) : .http(200, status("queued", #", "queue_position": 1"#))
         }
         handed.clear()
@@ -130,6 +141,9 @@ func runJobRunChecks() async {
     checkEqual(handed.items, ["job-1"], "a job that could not be cancelled is followed to the end (its result reaches the library only when asked)")
     checkEqual(await stopping(cancelReply: .failure(.notConnectedToInternet)), .stopped(.unknown), "the cancel did not get through: unknown")
     checkEqual(handed.items, ["job-1"], "a cancel that did not get through: followed to the end too")
+
+    checkEqual(await stopping(cancelReply: .http(200, #"{"status":"cancelled","credits_refunded":455}"#), billingProof: false),
+        .stopped(.unknown), "cancel acknowledgement without original billing proof remains unknown")
 
     // POST 恰好回到 App 时取消：先报告 ID，409 后才能继续核查这一单，不会让调用方误以为尚未提交。
     for reply in [SkyStudioStub.Reply.http(200, #"{"status":"cancelled","credits_refunded":455}"#),
@@ -200,18 +214,18 @@ func runJobRunChecks() async {
     var refundPolls = 0
     SkyStudioStub.reset { seen in
         refundPolls += 1
-        let paidBack = refundPolls >= 2 ? "true" : "false"
-        return .http(200, #"{"job_id":"original","status":"failed","error":{"message":"Refused","provider_code":"REAL_PERSON_REFERENCE","refunded":\#(paidBack)}}"#)
+        let billing = refundPolls >= 2 ? #"{"status":"refunded","credits_charged":0}"# : #"{"status":"refund_pending","credits_charged":null}"#
+        return .http(200, #"{"job_id":"original","status":"failed","billing":\#(billing),"error":{"message":"Refused","provider_code":"REAL_PERSON_REFERENCE"}}"#)
     }
     var refundRun = SkyStudioJobRun(api: api, key: jobKey)
     refundRun.sleep = SleepLog().sleep
     let proof = try? await refundRun.waitForRefund(pendingRefund)
-    check(proof?.mayReplace == true, "a later confirmed refund permits a model replacement")
+    check(proof?.creditsReturned == true, "a later confirmed billing refund releases the original reservation")
     checkEqual(SkyStudioStub.log.map(\.method), ["GET", "GET"], "refund confirmation never POSTs or resubmits")
     check(SkyStudioStub.log.allSatisfy { $0.url.hasSuffix("/jobs/original") }, "only the original refusal job is queried")
     SkyStudioStub.reset { _ in .failure(.notConnectedToInternet) }
     let stillUnknown = try? await refundRun.waitForRefund(pendingRefund, checks: 2)
-    check(stillUnknown?.mayReplace == false, "refund lookup failure never permits a replacement")
+    check(stillUnknown?.creditsReturned == false, "refund lookup failure never releases the reservation")
 }
 
 /// 跑一件活，抓它抛出来的 SkyStudioJobError（没抛就记一次失败）。

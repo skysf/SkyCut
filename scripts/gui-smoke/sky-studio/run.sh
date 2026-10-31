@@ -69,6 +69,19 @@ with open(root + "/server.log", "w") as log:
     server = subprocess.Popen(["python3", "scripts/gui-smoke/sky-studio/server.py", port, root + "/assets", ffmpeg], stdin=subprocess.DEVNULL, stdout=log, stderr=log, start_new_session=True)
 Path(root + "/server.pid").write_text(str(server.pid))
 SERVER
+python3 - "$PORT" <<'READY'
+import sys
+import time
+import urllib.request
+for attempt in range(60):
+    try:
+        with urllib.request.urlopen(f"http://127.0.0.1:{sys.argv[1]}/__log", timeout=1):
+            break
+    except OSError:
+        time.sleep(0.5)
+else:
+    raise SystemExit("Loopback fixture server did not become ready")
+READY
 defaults write "$BUNDLE" appLanguage "${SRTFLOW_SMOKE_LANGUAGE:-en}"
 if [ -n "${1:-}" ]; then defaults write "$BUNDLE" SrtFlow.skystudio.dailyCreditLimit -float "$1"; fi
 open -g -n --env "SRTFLOW_SKYSTUDIO_API_BASE=http://127.0.0.1:$PORT/api/skycut/v1" \

@@ -40,12 +40,14 @@ private func checkCatalog() {
     checkEqual(MCPToolName.setShape.definition.json["annotations"]?["openWorldHint"]?.boolValue, false, "the others say false")
 
     let schema = definition.inputSchema
-    checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind", "prompt"], "kind and prompt are required")
+    checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind"], "kind is required; prompt depends on operation")
     let properties = schema["properties"]?.objectValue ?? [:]
     // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
     checkEqual(Set(properties.keys), ["kind", "prompt", "model", "image_context", "quality", "input_mode", "image", "last_image",
         "reference_images", "reference_videos", "reference_audio", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
-        "instrumental", "lyrics", "name", "confirm_token"], "the parameters")
+        "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
+        "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
+        "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed"], "the parameters")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
     check(properties["resolution"]?["enum"] == nil && properties["aspect_ratio"]?["enum"] == nil, "model-specific sizes and shapes are not restricted by legacy enums")
     check(MCPToolName.getStatus.definition.inputSchema["properties"]?["models"] != nil, "AI can discover model limits without submitting generation")

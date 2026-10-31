@@ -61,7 +61,7 @@ public enum MCPVocabulary {
     public static let resolutions = ["original", "2160p", "1440p", "1080p", "720p", "480p"]
 
     /// = App 的 `SkyStudioGeneration.Kind`（generate_media 的 kind；旁白和克隆走 add_voiceover）。
-    public static let generationKinds = ["image", "image_to_video", "text_to_video", "music", "sound_effect"]
+    public static let generationKinds = ["image", "image_to_video", "text_to_video", "music", "sound_effect", "lipsync"]
 
     /// upscale_clip 的档位（Sky Studio 的 upscale 模型，`/models` 的 id，2026-10-28；那边加了新的要在这里加上 AI 才能点名，
     /// 面板照 /models 现列、不看这里）、目标（App 的 `UpscaleTarget`，按短边叫）、范围（`UpscaleRangeChoice`：这一段 / 工程里最长的那处 / 整个文件）。
