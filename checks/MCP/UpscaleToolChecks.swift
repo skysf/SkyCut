@@ -37,7 +37,7 @@ func runUpscaleToolChecks() {
     let properties = schema["properties"]?.objectValue ?? [:]
     // `project`：碰工程的工具都收（2026-10-17 起一个会话剪几个工程，MCPToolName.takesProject）。
     // confirm_token：超了每日积分上限时回的确认码（AI 多开方案板 9）。
-    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project", "confirm_token"], "the parameters")
+    checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project", "confirm_token", "approval_scope", "user_requested_overrides"], "the parameters")
     checkEqual(properties["tier"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTiers, "tier lists the models")
     checkEqual(properties["target"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTargets, "target lists the targets")
     checkEqual(properties["range"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleRanges, "range lists the ranges")

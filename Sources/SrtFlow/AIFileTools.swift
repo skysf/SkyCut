@@ -59,6 +59,7 @@ enum AIFileTools {
     /// —— 会问的地方只许这里和 AIWorkspace.confirmReading（scripts/check-mcp.sh 钉着）。
     /// - Parameter describing: 问题里怎么称呼这批文件（nil = 「N 个文件」）。
     static func confirmTrash(_ files: [URL], args: AIToolArguments, describing: String? = nil) throws -> AIToolResult? {
+        if AIAccessStore.shared.mode == .full { return nil }
         let key = "trash:" + files.map(\.standardizedFileURL.path).sorted().joined(separator: "|")
         let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: key)
         if redemption == .accepted { return nil }

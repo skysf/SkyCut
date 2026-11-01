@@ -40,9 +40,9 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 `get_settings`、`set_settings` 是全 App 工具，不收 project、不换工程、不摆编辑器、不开始一轮、不制造时间线撤销项；仍经过现有 MCP 套餐授权门。
 
 - `get_settings` 默认回五类快照，可传 `section` 限定。返回现值、可写字段、相关已有工具与 GUI 操作入口；不返回 API key 或客户端配置内容。
-- `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 每次问）。省略 / null 不动，至少一项有效改动。
+- `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 暂停收费）、`ai_access_mode`、`confirm_token`。省略 / null 不动，至少一项有效改动。
 - **全部参数先读完、验完再写任何 Store**，错误整次不做。缓存仍由 `OptimizedMediaCacheSettings` 执行，不能绕过它直接删目录 / 写 defaults。清空可能异步完成，用 `get_settings section=cache` 的 `clearing` 核对，不把开始清空说成已完成。
-- 每日额度是自动花费的询问阈值，不是硬性消费封顶；提高额度意味着 AI 可免确认花更多积分。工具说明要求只按用户请求改。
+- 2026-10-31 的每日额度「询问阈值」规则已被 2026-11-01 用户决策取代：每日额度是硬预算，两种模式均不可绕过；0 暂停收费任务。余额不足提供服务器充值链接，日预算不足提供设置入口，不循环索要一次性越额批准。MCP 提高硬预算需明确同意和确认码。
 - 剪辑风格沿用 recipes / save_recipe，声音安装沿用 add_voiceover download_voices=true / get_job。账号密钥与客户端连接 / 断开仍从设置操作；新读权限仍走现有确认，不能借设置绕过。
 - 工具清单、总说明目录都列出新工具；旧小程序通过现有 MCPCatalogSync 获得 App 的新清单。
 
@@ -61,3 +61,17 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 - [ ] MCP 改语言 / 缓存上限 / 额度，已开的设置同步；在界面改回来后 MCP 读到新值，重新启动仍一致。额度页切走不能恢复旧值。
 - [ ] 更多菜单能回到三种工具；队列运行中切换不取消。后台 AI 工程可打开、单独停止、存好后关闭。
 - [ ] 云端任务入口的悬浮文字有全局 / 本工程数量；卡片、详情和后台开窗仍沿原路径；真实服务扣费另按既有流程验收。
+
+## AI 操作权限与草稿（2026-11-01）
+
+- 原生设置「连接 AI」复用 `AIAccessSettingsSection` / `AIAccessStore`；默认 `ask_for_approval`，可改成 `full_access`。持久化键 `SrtFlow.ai.accessMode.v1`，设置窗口与 MCP 共用一份值。
+- 两种模式都从低成本草稿开始：图片取所选模型最低可用档（Nano2 1K、Seedream 2K）；视频取 720p 同档（H3 768p），模型只提供更高最低档时照实际能力。全部权限不把默认规格提高。
+- 请求批准模式：超草稿分辨率、超默认时长、最高质量或更贵的兼容模型先询问；`confirm_token` 绑定整单、精确报价、文件身份、项目与 `approval_scope`。`once` 仅本单；`project` 只有用户明确同意本项目才用，后续同模型/规格仍受每单价格上限约束，账号和项目间不共享。
+- 用户明确指定本次规格可由理解对话的代理声明 `user_requested_overrides=true`，不重复问；它不得代表代理自己的计划，不能跳过预算或设置变更的确认。
+- 全部权限自动执行并通知；读外部文件与移入废纸篓复用现有工具执行而不再问。不改变系统权限、套餐、原文件不覆盖、服务能力、硬预算或原单结算规则。切回请求批准后，全部权限期间的外部读取不会被偷偷记成永久读取授权。
+- `set_settings ai_access_mode=...` 的实际模式变更始终先回确认码，当前已是全部权限也一样；用户同意后携原码重调才写入。所有参数在确认前验完，未批准、错误或串码时整批不写。
+- UI 跟随 App 语言；代理询问与通知跟随会话语言。机器标识不变；`get_settings` 和确认结果返回本地化名称，中文「请求批准 / 全部权限」，西语也有对应译文。
+- `generate_media quote_only=true` 仅测输入和问价，不上传、不预留、不生成；规划讨论不构成消费授权。生成返回规格与预留；完成返回实际 billing。源片、画布、导出尺寸分别汇报，降规格须在交付前说明。
+- 失败与超时继续查询原任务及 billing；未知提交、下载或导入失败都恢复原单，不重新付费生成。只有明确的生成失败且已证实退款 / 未扣费，代理才按当前权限和硬预算决定新操作并使用新 key；用户要求停止不构成重试授权。现有原单幂等与恢复逻辑保留。
+
+验证：`scripts/check-sky-studio.sh` 的 AccessChecks 覆盖默认、旧目录、模式持久化、全部权限改设置仍询问、串码、硬预算和项目范围；`scripts/gui-smoke/sky-studio/settings.py` / `permissions.py` 用独立 App / 假服务器验证实际 MCP 与设置写入、只报价不消费、串码、同一操作只提交一次与全部权限的日预算阻止。中文原生窗口排版另作 GUI 回归，不把纯值检查说成已点通。

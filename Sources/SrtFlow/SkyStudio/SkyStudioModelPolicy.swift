@@ -11,7 +11,7 @@ enum SkyStudioModelPolicy {
         + "Judge the subject, not the prompt language. Video: minimax-h3, then gemini-omni-1.1-flash, veo-fast, seedance-2-pro. "
         + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5, then veo-pro. "
         + "Select lip-sync by its image/audio or video/audio inputs; use image operation=remove_background for cutouts. "
-        + "Never automatically regenerate or switch models after failure or an unknown outcome. Query the original job and its billing. Read each model's input modes and limits."
+        + "After failure query the original job and billing. Unknown outcomes or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. Read each model's input modes and limits."
 
     static func ordered(kind: String, imageContext: String, quality: String) -> [String] {
         if kind == "image" { return imageContext == "asian" ? ["seedream5-flash", "nano2"] : ["nano2", "seedream5-flash"] }

@@ -30,7 +30,7 @@ public enum MCPFileTools {
                 description: """
                 Move, rename, make folders or put files in the Trash, only inside folders the user named with open_folder, and \
                 only when the user asked you to organise or clean up; never touch the originals on your own. Nothing is \
-                overwritten: a taken name fails and you pick another. trash always asks first (needs_confirmation). Media used \
+                overwritten: a taken name fails and you pick another. trash asks in approval mode (needs_confirmation); full_access proceeds and notifies. Media used \
                 in the open project follows its moved files. Command-Z and undo do not revert these, so tell the user what you \
                 did.
                 """,

@@ -13,6 +13,9 @@ struct SkyStudioJobFailure: Equatable, Sendable {
     var charged: Bool?
     var jobID: String?
     var billing: SkyStudioBilling?
+    var balance: Double?
+    var needed: Double?
+    var rechargeURL: URL?
 
     init(message: String, fields: [String: JSONValue] = [:], jobID: String? = nil) {
         self.message = message
@@ -23,6 +26,9 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         charged = fields["charged"]?.boolValue
         self.jobID = fields["job_id"]?.stringValue ?? jobID
         billing = SkyStudioBilling(fields["billing"])
+        balance = fields["balance"]?.doubleValue
+        needed = fields["needed"]?.doubleValue
+        rechargeURL = SkyStudioLinks.webURL(fields["recharge_url"]?.stringValue)
     }
 
     var creditsReturned: Bool { billing?.returnedAll == true }
@@ -36,6 +42,9 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         if let charged { value["charged"] = .bool(charged) }
         if let jobID { value["skystudio_job_id"] = .string(jobID) }
         if let billing { value["billing"] = billing.json }
+        if let balance { value["balance"] = .number(balance) }
+        if let needed { value["needed"] = .number(needed) }
+        if let rechargeURL { value["recharge_url"] = .string(rechargeURL.absoluteString) }
         return .object(value)
     }
 }

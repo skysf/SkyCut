@@ -69,6 +69,7 @@ struct SettingsWindowView: View {
         case .general:
             GeneralSettingsSection()
         case .ai:
+            AIAccessSettingsSection()
             AIConnectSection()
         case .editing:
             Section { AIRecipesList() }

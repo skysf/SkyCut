@@ -24,11 +24,14 @@ enum AISettingsTools {
         if let limit, SkyStudioSpendStore.clamped(limit) != limit {
             throw AIToolError("daily_ai_credit_limit must be a whole number from 0 to 1000000.")
         }
+        let mode = try args.choice("ai_access_mode", from: AIAccessMode.allCases.map(\.rawValue)).flatMap(AIAccessMode.init(rawValue:))
         let clear = try args.bool("clear_optimized_media_cache") ?? false
-        guard language != nil || capacityGB != nil || limit != nil || clear else {
+        guard language != nil || capacityGB != nil || limit != nil || mode != nil || clear else {
             throw AIToolError("Pass at least one setting to change, or clear_optimized_media_cache=true. Use get_settings to read settings.")
         }
 
+        if let approval = try AISettingsApproval.check(args, mode: mode, limit: limit) { return approval }
+        if let mode { AIAccessStore.shared.setMode(mode) }
         if let language { AppLanguageStore.shared.language = language }
         if let capacityGB { OptimizedMediaCacheSettings.shared.setCapacity(Int64(capacityGB) * 1_000_000_000) }
         if let limit { SkyStudioSpendStore.shared.setDailyLimit(limit) }
@@ -53,11 +56,15 @@ enum AISettingsTools {
                 let setup = AIClientSetup.shared
                 setup.refresh()
                 sections[category.rawValue] = [
+                    "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue),
+                    "permission_modes": .array(AIAccessMode.allCases.map { ["id": .string($0.rawValue), "names": $0.names] }),
+                    "writable_fields": ["ai_access_mode"],
+                    "approval_rule": "Changing permission mode through MCP always requires explicit user agreement and confirm_token, even in full_access. Use permission names in the conversation language. Both modes start with low-cost drafts; full_access proceeds with notifications. Daily budgets are hard limits.",
                     "clients": .array(AIClientSetup.Client.allCases.map { client in
                         ["id": .string(client.rawValue), "name": .string(client.title), "status": .string(clientStatus(setup.statuses[client]))]
                     }),
                     "remembered_read_permissions": .array(AIReadGrants.shared.paths.map(JSONValue.string)),
-                    "actions": "Connect or disconnect clients and revoke remembered read permissions in Settings > Connect AI. New permissions require the existing reading confirmation flow."
+                    "actions": "Connect or disconnect clients and revoke remembered read permissions in Settings > Connect AI. File approvals follow ai_access_mode; Full access does not silently remember new read grants when returning to approval mode."
                 ]
             case .editing:
                 let pack = KokoroVoicePack.shared
@@ -86,6 +93,8 @@ enum AISettingsTools {
                     "api_key_configured": .bool(account.hasKey),
                     "plan": SkyCutGates.statusJSON(license: account.license, problem: account.problem, now: Date()),
                     "daily_ai_credit_limit": .number(spending.dailyLimit),
+                    "daily_budget_is_hard_limit": true,
+                    "recharge_url": account.stored?.me.skycut.rechargeURL.map { .string($0.absoluteString) } ?? .null,
                     "spent_today": .number(spending.spentToday()),
                     "writable_fields": ["daily_ai_credit_limit"],
                     "account_actions": "Manage the API key and check the account in Settings > Sky Studio. Keys are never returned or accepted by these tools."

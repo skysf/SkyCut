@@ -65,6 +65,7 @@ def run():
             {"language": "es", "clear_optimized_media_cache": []},
             {"language": "unknown", "daily_ai_credit_limit": 7},
             {"language": "es", "api_key": "not-accepted"},
+            {"language": "es", "confirm_token": []},
             {}, {"language": None, "clear_optimized_media_cache": False},
         ]
         for args in invalid:
@@ -72,13 +73,35 @@ def run():
             assert error, ("Invalid settings must fail", args)
             assert preferences(call("get_settings")) == unchanged, ("Partial update", args)
 
+        def approved_update(args):
+            before = call("get_settings")
+            changed = call("set_settings", args)
+            if changed.get("status") == "needs_confirmation":
+                assert call("get_settings") == before, "Unapproved settings must be atomic"
+                changed = call("set_settings", {**args, "confirm_token": changed["confirm_token"]})
+            return changed
+
+        ai = initial["sections"]["ai"]
+        assert ai["ai_access_mode"] == "ask_for_approval"
+        names = {x["id"]: x["names"]["zh"] for x in ai["permission_modes"]}
+        assert names == {"ask_for_approval": "请求批准", "full_access": "全部权限"}
+        pending = call("set_settings", {"ai_access_mode": "full_access", "language": "es"})
+        assert pending["status"] == "needs_confirmation"
+        assert call("get_settings")["sections"]["ai"]["ai_access_mode"] == "ask_for_approval"
+        assert preferences(call("get_settings")) == unchanged, "No partial language update"
+        full = call("set_settings", {"ai_access_mode": "full_access", "language": "es", "confirm_token": pending["confirm_token"]})
+        assert full["sections"]["ai"]["ai_access_mode"] == "full_access"
+        pending = call("set_settings", {"ai_access_mode": "ask_for_approval"})
+        assert pending["status"] == "needs_confirmation", "Full access must still ask before changing permissions"
+        call("set_settings", {"ai_access_mode": "ask_for_approval", "confirm_token": pending["confirm_token"]})
+
         for language, cap, limit in [("es", 5, 0), ("en", 20, 1_000_000), ("zh-Hans", 10, 750)]:
-            changed = call("set_settings", {"language": language, "optimized_media_cache_gb": cap,
+            changed = approved_update({"language": language, "optimized_media_cache_gb": cap,
                                             "daily_ai_credit_limit": limit})
             assert preferences(changed) == (language, cap, limit)
             assert preferences(call("get_settings")) == (language, cap, limit)
         # 只写一个字段，其余不变；null 与省略一致。
-        result = call("set_settings", {"language": None, "daily_ai_credit_limit": "751"})
+        result = approved_update({"language": None, "daily_ai_credit_limit": "751"})
         assert preferences(result) == ("zh-Hans", 10, 751)
 
         # 真实清空路径只碰此轮测试缓存；启动钩子必须先隔离，再开放 MCP 监听。
@@ -108,7 +131,7 @@ def run():
         report = {"result": "passed", "invalid_atomic_updates": len(invalid),
                   "settings": call("get_settings"), "project_count": len(before_projects)}
         (D / "settings-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
-        print("PASS: tool discovery; five sections; schema/store agreement; 10 atomic refusals; language/cache/budget writes; isolated cache clear; persistence; no project/job changes; no keys returned.")
+        print("PASS: tool discovery; five sections; schema/store agreement; 11 atomic refusals; language/cache/budget writes; isolated cache clear; persistence; no project/job changes; no keys returned.")
     finally:
         mcp.close()
 

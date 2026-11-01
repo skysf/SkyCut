@@ -52,6 +52,17 @@ enum AIExportTools {
         let video: JSONValue? = audioOnly ? nil : AIVideoSize.output(
             canvas: VideoEditCompositionBuilder.renderSize(for: state), resolution: settings.resolution, fps: state.frameRate.fps
         )
+        let canvasSize = VideoEditCompositionBuilder.renderSize(for: state)
+        let videoSources = state.mainClips.filter { !$0.isStillImage && !$0.isAudioOnly }.compactMap(\.info)
+        let sourceShort = videoSources.map { min($0.displaySize.width, $0.displaySize.height) }.max() ?? 0
+        let outputShort = min(video?["width"]?.doubleValue ?? 0, video?["height"]?.doubleValue ?? 0)
+        let resolutionReport: JSONValue = [
+            "canvas": ["width": .number(Double(canvasSize.width)), "height": .number(Double(canvasSize.height))],
+            "output": video ?? .null, "video_source_sizes": .array(videoSources.map {
+                ["width": .number(Double($0.displaySize.width)), "height": .number(Double($0.displaySize.height))]
+            }), "downscaled_from_video_source": .bool(outputShort > 0 && Double(sourceShort) > outputShort + 0.5),
+            "notification": "Report source, canvas and delivered sizes separately in the conversation language. Explain any downscale; never describe a lower-resolution export as 2K because its source was 2K. Original media remains available; do not regenerate merely to change export settings."
+        ]
         let reserved = output.standardizedFileURL.path
         reservedOutputs.insert(reserved)
         let work = AIQueuedWork()
@@ -73,7 +84,8 @@ enum AIExportTools {
                 MainActor.assumeIsolated {
                     reservedOutputs.remove(reserved)
                     if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
-                        let detail = finishedDetail(output, video: video, levels: exporter.finishedAudioLevels, watermarked: exporter.watermarked)
+                        var detail = finishedDetail(output, video: video, levels: exporter.finishedAudioLevels, watermarked: exporter.watermarked)
+                        detail["resolution_report"] = resolutionReport
                         AIJobs.shared.finish(job, .done, detail: .object(detail))
                     } else if let error = exporter.errorMessage {
                         AIJobs.shared.finish(job, .failed, message: error)
@@ -86,7 +98,7 @@ enum AIExportTools {
         }
         if job.status == .failed { throw AIToolError(job.message ?? "The export could not start.") }
         var result: [String: JSONValue] = [
-            "job_id": .string(job.id),
+            "job_id": .string(job.id), "resolution_report": resolutionReport,
             "status": position == nil ? "running" : "queued",
             "path": .string(output.path),
             "next_step": .string(position == nil

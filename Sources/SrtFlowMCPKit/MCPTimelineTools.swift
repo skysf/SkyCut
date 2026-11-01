@@ -274,7 +274,7 @@ public enum MCPTimelineTools {
             Without a start, video and images are appended after the last clip of their track (V1 by default) and audio \
             starts at 0 on the first free audio track. If the spot is taken, a video clip goes up to the next free video \
             track; insert=true instead pushes the later V1 clips right to make room. A subtitle file (.srt, .vtt, .ass) \
-            becomes the subtitle track, replacing the current one. Files outside the opened folder need the user's OK. \
+            becomes the subtitle track, replacing the current one. External-file approval follows the AI permission mode. \
             Returns the new clip ids (hit_at for sound effects) and credit lines for library music.
             """,
             input: MCPSchema.object([

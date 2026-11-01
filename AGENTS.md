@@ -79,7 +79,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 1. **轻量化优先。** 优先复用 macOS 原生能力（AVFoundation、AppKit、SwiftUI），
    不随意引入第三方依赖。需要自写合成器、自建文件管理等重量级方案时，先征得用户
-   同意。既有产品决策：界面上的文件管理交给 Finder（AI 只在用户开口时帮忙整理点名文件夹里的文件，删除先问、进废纸篓，
+   同意。既有产品决策：界面上的文件管理交给 Finder（AI 只在用户开口时帮忙整理点名文件夹里的文件；请求批准模式下删除先问，全部权限直接执行并通知，均进废纸篓，
    见 [MCP 方案](docs/plans/2026-09-27-mcp.md) 第 23、24 条）；混合模式不为此自建 Metal 合成器。
 2. **复用优先，抽象克制。** 同一模式出现第二次时，按仓库现有粒度抽成共享组件；
    没有真实第二用例时不提前制造泛型和框架。参考：`ResizableFrameBox`、
@@ -882,6 +882,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](docs/bugfixes/2026-10-28-upscale-inspector-still-says-fal.md) — upscale 改走 Sky Studio 后，检查器那一节标题旁的灰字还是 `Text(verbatim: "fal.ai")`：不走字符串表、不是一句话，按文案搜都漏了，真积分测试看截图才发现。改成 Sky Studio，守卫钉住 upscale 的界面不再写 fal.ai。**换提供方要连 verbatim 写死的名字一起搜。**
 - [2026-10-31 小窗口的分栏线穿过 AI 状态](docs/bugfixes/2026-10-31-ai-badge-divider-bleed.md) — 半透明徽章漏出后景；不透明系统底色再着浅金色，生产组件像素检查与反向验证；工程菜单按宽度先缩短，保住常用入口。
 - [2026-10-31 多工程的生成任务没有工程归属](docs/bugfixes/2026-10-31-cloud-tasks-without-project-context.md) — 轻盈卡片按原工程代号分组、媒体类型图标、只算进行中的全局 / 本工程数量；后台开窗复用注册表，MCP 同源查询全部进展。
+- [2026-11-01 AI 权限与草稿预算](docs/bugfixes/2026-11-01-ai-approval-and-draft-budget.md) — 请求批准 / 全部权限共享低成本默认，代理改权限始终确认，日预算硬上限，余额不足提供充值入口。
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 - [2026-10-29 两种视频拿到同一个确认码](docs/bugfixes/2026-10-29-sky-studio-confirmation-collides.md) — 摘要相同不等于同一件事；确认码绑定完整请求、精确报价、输入文件和落点，实际过闸回归钉住串码不消费不记账。
 - [提交返回瞬间取消丢任务号](docs/bugfixes/2026-10-29-cancelled-submit-loses-job-id.md)

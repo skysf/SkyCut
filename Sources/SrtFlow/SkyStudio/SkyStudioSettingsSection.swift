@@ -192,7 +192,7 @@ private struct SkyStudioCreditLimitRow: View {
         } label: {
             Text("Daily limit for AI")
         }
-        .instantHelp("SkyCut asks before AI spends more Sky Studio credits than this in one day")
+        .instantHelp("AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it.")
         .onAppear { limitText = SkyStudioCredits.text(spend.dailyLimit) }
         .onChange(of: spend.dailyLimit) { _, value in
             limitText = SkyStudioCredits.text(value)

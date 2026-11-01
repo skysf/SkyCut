@@ -75,11 +75,11 @@ struct SkyStudioGeneration: Equatable, Sendable {
             let choices = model?.choices("aspect_ratio") ?? []
             params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: choices.isEmpty ? imageAspects : choices))
             if let model {
-                if let resolution = ask.resolution ?? model.defaults["resolution"]?.stringValue { params["resolution"] = .string(resolution) }
+                if let resolution = ask.resolution ?? AIDraftPolicy.resolution(model: model, mode: inputMode) { params["resolution"] = .string(resolution) }
             }
         case .textToVideo, .imageToVideo:
             params["duration"] = ask.smartDuration ? .null : .number((ask.duration ?? model?.defaults["duration"]?.doubleValue ?? defaultVideoSeconds).rounded())
-            params["resolution"] = .string(ask.resolution ?? model?.defaults["resolution"]?.stringValue ?? defaultResolution)
+            params["resolution"] = .string(ask.resolution ?? model.flatMap { AIDraftPolicy.resolution(model: $0, mode: inputMode) } ?? defaultResolution)
             let choices = model?.choices("aspect_ratio") ?? []
             let aspects = choices.isEmpty ? videoAspects : choices
             if kind == .textToVideo || inputMode == "multimodal" || choices.contains("adaptive") {
@@ -109,7 +109,7 @@ struct SkyStudioGeneration: Equatable, Sendable {
             params["duration"] = .number(ask.duration ?? defaultEffectSeconds)
             params["audio_format"] = "wav"
         case .lipsync:
-            if let resolution = ask.resolution ?? model?.defaults["resolution"]?.stringValue { params["resolution"] = .string(resolution) }
+            if let resolution = ask.resolution ?? model.flatMap({ AIDraftPolicy.resolution(model: $0, mode: inputMode) }) { params["resolution"] = .string(resolution) }
         }
         for (name, value) in model?.defaults ?? [:] where SkyStudioGenerationControls.names.contains(name) && !value.isNull {
             params[name] = value
@@ -149,6 +149,7 @@ struct SkyStudioGeneration: Equatable, Sendable {
         switch kind {
         case .image:
             parts.append(params["aspect_ratio"]?.stringValue ?? "")
+            if let resolution = params["resolution"]?.stringValue { parts.append(resolution) }
         case .imageToVideo, .textToVideo:
             parts.append(params["duration"]?.doubleValue.map { "\(Int($0)) s" } ?? "auto")
             parts.append(params["resolution"]?.stringValue ?? Self.defaultResolution)

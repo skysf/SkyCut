@@ -36,7 +36,7 @@ enum MCPMediaTools {
                 Make voiceover files and put each line on the same audio track (new unless track is given), plus optional \
                 subtitles, as one undo step. Sky Studio voices return job_id immediately: wait with get_job to a terminal state; \
                 never repeat add_voiceover while it runs. Cloning may queue for several minutes. Local voices return directly. \
-                Best first: Sky Studio (saved key, daily credits allow it; otherwise ordinary narration falls back with a voice.note), \
+                Best first: Sky Studio with a saved key; exhausted hard daily budgets pause without changing voices. Otherwise unavailable narration falls back with a voice.note, \
                 then downloaded SkyCut voices, then this Mac's voices. Cloud voices ignore speed. voice is a role \
                 (zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
                 en_male_british), a cloud preset such as Rachel or Brian, a SkyCut voice (af_heart, zf_xiaoxiao…), or a Mac voice. \

@@ -20,6 +20,10 @@ enum SkyStudioGenerateTool {
         guard let kindName = try args.choice("kind", from: MCPVocabulary.generationKinds), let kind = SkyStudioGeneration.Kind(rawValue: kindName) else {
             throw AIToolError("kind is required: \(MCPVocabulary.generationKinds.joined(separator: ", ")).")
         }
+        let projectGeneration = project.documentGeneration
+        let quoteOnly = try args.bool("quote_only") ?? false
+        _ = try args.choice("approval_scope", from: ["once", "project"])
+        _ = try args.bool("user_requested_overrides")
         var ask = try SkyStudioGenerationControls.ask(args)
         let prompt = try args.string("prompt") ?? ""
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
@@ -33,7 +37,7 @@ enum SkyStudioGenerateTool {
         defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
-        if kind.isVideo || kind == .image { _ = try await SkyStudioGeneratedVideo.engine() }
+        if !quoteOnly && (kind.isVideo || kind == .image) { _ = try await SkyStudioGeneratedVideo.engine() }
         let references = try await SkyStudioReferenceFiles.measure(picked, project: project)
         let frame = references.firstFrame
         let canvas = project.renderSize
@@ -74,16 +78,43 @@ enum SkyStudioGenerateTool {
             throw AIToolError(message(error))
         }
 
-        // 花积分的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        var deviations = AIDraftPolicy.deviations(generation, model: model)
+        if quality == "highest" { deviations.append("Highest-quality model selection exceeds the low-cost draft policy.") }
+        // 换模型比较相同输入的草稿报价；这里只报价，绝不上传或发生成任务。
+        var draftAsk = ask
+        draftAsk.resolution = nil
+        draftAsk.duration = nil
+        if let preferred = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: nil, imageContext: imageContext,
+            accepts: { SkyStudioModelPolicy.problem(model: $0, ask: draftAsk, references: references) == nil && SkyStudioGenerationControls.problem(model: $0, ask: draftAsk, prompt: prompt, references: references) == nil }), preferred.id != model.id {
+            let draft = SkyStudioGeneration.make(kind, prompt: prompt, ask: draftAsk, canvas: canvasRatio, frame: frameRatio,
+                model: preferred, inputMode: references.mode, references: references)
+            if let baseline = try? await api.quote(draft.job(model: preferred.id), key: key) {
+                if quote.credits > baseline.credits {
+                    deviations.append("Selected model costs \(SkyStudioCredits.text(quote.credits)) credits; preferred draft \(preferred.title) costs \(SkyStudioCredits.text(baseline.credits)).")
+                }
+            } else { deviations.append("The preferred draft model's price could not be verified before switching models.") }
+        }
+        if quoteOnly {
+            return .ok(["status": "quoted", "model_id": .string(model.id), "params": .object(generation.params),
+                "credits": .number(quote.credits), "approval_reasons": .array(deviations.map(JSONValue.string)),
+                "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue), "charged": false,
+                "next_step": "No generation, upload or reservation was started. Present the specification and quote in the conversation language; submitting requires quote_only=false and follows permissions and hard budgets."])
+        }
+        guard project.documentGeneration == projectGeneration else {
+            throw AIToolError("The project changed while SkyCut checked the price; nothing was started or reserved. Read the current project before retrying.")
+        }
+        let scope = (SkyStudioAccount.shared.stored?.me.account.id ?? "") + ":" + (project.documentURL?.standardizedFileURL.path ?? "unsaved:\(project.documentGeneration)")
+
         let folder = AIWorkspace.shared.outputFolder(.generated, project: project)
         let identity = SkyStudioApproval.identity(job: generation.job(model: model.id), credits: quote.credits, context: [
             "frame": try frame.map(SkyStudioApproval.file) ?? .null,
             "references": .array(try references.files.map { try SkyStudioApproval.file($0.file) }),
-            "auto_fallback": false,
+            "auto_fallback": false, "project_scope": .string(scope),
             "folder": .string(folder.standardizedFileURL.path), "name": .string(try args.string("name") ?? "")
         ])
         let reservation: SkyStudioJobGate.Reservation
-        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args) {
+        switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args,
+            reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), project: scope, profile: AIDraftPolicy.profile(generation.job(model: model.id))) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
@@ -101,6 +132,9 @@ enum SkyStudioGenerateTool {
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(job.id), "kind": .string(kind.rawValue), "model": .string(model.title), "model_id": .string(model.id),
             "params": .object(generation.params), "idempotency_key": .string(idempotencyKey),
+            "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue),
+            "approval_reasons": .array(deviations.map(JSONValue.string)),
+            "notification": "Notify the user in their conversation language of the model, source specification and reserved credits. Report actual billing at completion. Keep source, canvas and export sizes distinct; explain any downscale before delivery.",
             "billing_policy": catalog.billingPolicy ?? model.metadata["billing_policy"] ?? .null,
             "billing_note": .string(SkyStudioBilling.policyMessage), "reference_files": .number(Double(references.files.count)),
             "credits": .number(SkyStudioCredits.number(quote.credits)),
