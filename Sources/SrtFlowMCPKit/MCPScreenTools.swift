@@ -51,7 +51,7 @@ public enum MCPScreenTools {
                     "title": MCPSchema.string("File name (default Screen Recording <date time>), in SkyCut/Screen Recordings; a taken name gets a number."),
                     "add_to_timeline": MCPSchema.boolean("Put it on the timeline when it stops (default true); false keeps only the file."),
                     "decision": MCPSchema.string(
-                        "For resolve: add to the timeline, keep the file only, or discard (asks first).", oneOf: MCPVocabulary.recordingDecisions
+                        "For resolve: add to the timeline, keep the file only, or discard (asks in approval mode).", oneOf: MCPVocabulary.recordingDecisions
                     ),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["action"]),

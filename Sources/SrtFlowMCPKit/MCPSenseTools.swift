@@ -32,7 +32,7 @@ public enum MCPSenseTools {
             music) you also get tempo_bpm, beats and downbeats (the likely first beat of each bar) — cut on them, or let \
             cut_to_beat do it. With cuts=true (no clip or file): every cut on V1 checked at once, each clip's head and tail: \
             in a pause of its own sound, or on speech (naming the word once transcribe has run) with the nearest pause as \
-            suggested_source_in / suggested_source_out for edit_clip. Files outside the opened folder need the user's OK.
+            suggested_source_in / suggested_source_out for edit_clip. External-file approval follows the AI permission mode.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A clip on the timeline."),
@@ -63,7 +63,7 @@ public enum MCPSenseTools {
             short description of each from macOS Vision: what it shows (rough guesses, often wrong for unusual footage: \
             trust the picture), faces [x, y, w, h], people, the main subject, words on screen with their boxes, brightness \
             0–1 and black bars; on the timeline also which clips, texts and subtitles are on screen. If you cannot see \
-            images, pass image=false and use the descriptions. Files outside the opened folder need the user's OK. \
+            images, pass image=false and use the descriptions. External-file approval follows the AI permission mode. \
             result asks). To choose footage: files looks at several media files at once (one frame from the middle of each, \
             up to 24); shots=true with file (a video) or clip_id splits it into shots: each shot's start, end and what its \
             middle frame shows, one thumbnail per shot, 24 per call (pass next_from as from for more). A long video is \

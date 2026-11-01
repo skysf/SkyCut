@@ -167,3 +167,8 @@
 实际 App：先 `scripts/gui-smoke/sky-studio/run.sh`，再 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/model_expansion.py`。
 此流程只用假 Key、回环服务、合成素材和独立 bundle，覆盖模型发现、七种请求、上传用途、重复不记账、WebM 副本、透明 PNG、SRT、入轨与导出、下载失败不退款和原单结算刷新。
 付费提供方的输出质量、长时长 / 大文件边界、Wan 智能时长与高分辨率仍需另行授权的真服务抽查，不能把免费夹具冒烟称为付费联调通过。
+
+
+## 十一、草稿审批与硬预算（2026-11-01，取代旧越额询问规则）
+
+AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-操作权限与草稿2026-11-01)。`SkyStudioJobGate` 先检查每日硬预算，再检查草稿越档审批；全部权限和旧确认码均不能让日预算超额。`reserveReplacement` 同样遵守预算。配音超预算现在暂停并提示设置，不再悄悄退到本机音色；手动 upscale 按钮与任务开跑时都核对硬预算。余额不足保留服务器 `balance/needed/recharge_url` 并给出充值入口。未知结果只查原单；本次不改变服务端退款政策。

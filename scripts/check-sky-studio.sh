@@ -79,6 +79,10 @@ xcrun swiftc \
   Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIConfirmations.swift \
+  Sources/SrtFlow/AIAccessPolicy.swift \
+  Sources/SrtFlow/AIDraftPolicy.swift \
+  Sources/SrtFlow/AISettingsApproval.swift \
+  Sources/SrtFlow/AIAccessStore.swift \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   checks/SkyStudio/main.swift \
@@ -93,6 +97,7 @@ xcrun swiftc \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
   checks/SkyStudio/ApprovalChecks.swift \
+  checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \

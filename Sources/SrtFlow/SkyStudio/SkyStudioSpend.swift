@@ -3,7 +3,7 @@ import Foundation
 // MARK: - 交给 Sky Studio 的活花多少积分：每日上限和按天的账
 //
 // 管什么：收费方案第 6 刀 —— 钱从美元换成积分，**每日上限默认 1,000 积分**（Sky Studio 一个积分标价 1 美分，等于原来 fal 那一档默认的 10 美元），
-// 用户在设置里能改；额度内不问，AI 起的活超了先回确认码（SkyStudioJobGate）；面板起的面板本身就是确认（超了只标红不拦）。
+// 用户在设置里能改；日预算为硬上限，AI / 面板起的活均不得通过确认码绕过（SkyStudioJobGate）。
 // 账按本地时区的自然日记（同一份 DailySpendLedger / DailySpendPolicy：规矩只有一处，第 7 刀删 fal 时改名留下）：交活之前按 /quote 报的数记上，
 // 做完按实收（credits_charged）改，没花出去的（没交上、排队中取消了、服务器说没做成）退回。
 // 不管什么：报价（/quote）、问用户（SkyStudioJobGate、面板）、界面（设置里「Sky Studio」一节）。
@@ -17,7 +17,7 @@ final class SkyStudioSpendStore: ObservableObject {
     static let limitKey = "SrtFlow.skystudio.dailyCreditLimit"
     static let ledgerKey = "SrtFlow.skystudio.creditLedger.v1"
     static let defaultLimit: Double = 1_000
-    /// 设得下的范围（0 = 每次都问）。
+    /// 设得下的范围（0 = 暂停收费任务）。
     static let limitRange: ClosedRange<Double> = 0...1_000_000
 
     @Published private(set) var dailyLimit: Double
@@ -46,7 +46,7 @@ final class SkyStudioSpendStore: ObservableObject {
 
     func spentToday(now: Date = Date()) -> Double { ledger.spent(on: now) }
 
-    /// 这一笔要不要先问（额度内不问；超了问）。
+    /// 判断本笔是否在预算内；历史 .ask 表示额度不足，由收费闸转成 blocked，不再索要越额批准。
     func decide(credits: Double, now: Date = Date()) -> DailySpendPolicy.Decision {
         DailySpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
     }

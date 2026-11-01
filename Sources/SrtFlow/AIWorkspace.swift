@@ -80,6 +80,7 @@ final class AIWorkspace {
     func confirmReading(
         _ urls: [URL], verb: String, args: AIToolArguments, project: VideoEditProject
     ) throws -> AIToolResult? {
+        if AIAccessStore.shared.mode == .full { return nil }
         let outside = Set(urls.map(\.standardizedFileURL).filter { !allowsReading($0, project: project) }.map(\.path)).sorted()
         guard !outside.isEmpty else { return nil }
         let action = "read:" + outside.joined(separator: "|")

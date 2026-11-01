@@ -1294,3 +1294,19 @@
 "AI activity" = "AI 活动";
 "Hide status" = "隐藏状态";
 "Show AI activity; any percentage is for the current task" = "查看 AI 活动；百分比表示当前任务的进度";
+
+"AI permissions" = "AI 操作权限";
+
+"Permission mode" = "权限模式";
+
+"Ask for approval" = "请求批准";
+
+"Full access" = "全部权限";
+
+"Start with low-cost drafts in both modes. Ask for approval pauses before exceeding defaults. Full access proceeds and reports what it did. Daily budgets remain hard limits." = "两种模式都从低成本草稿开始。「请求批准」在超出默认设置前询问；「全部权限」自动执行并通知。日预算始终是硬上限。";
+
+"AI can change this mode only after asking you and receiving your explicit approval, including when Full access is enabled." = "AI 代改权限模式必须先询问并获得你的明确同意，当前已是「全部权限」时也一样。";
+
+"AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "达到日预算后 AI 会暂停；可在设置里提高日预算后继续，任何权限模式都不会绕过预算。";
+
+"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "已达到 AI 日预算。请在「设置 → Sky Studio」提高日预算后继续。";

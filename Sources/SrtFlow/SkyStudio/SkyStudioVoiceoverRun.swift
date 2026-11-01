@@ -38,7 +38,7 @@ final class SkyStudioVoiceoverRun {
         task = Task { @MainActor in await self.execute() }
         return .ok([
             "status": .string("started"), "job_id": .string(job.id), "provider": .string("Sky Studio"),
-            "next_step": .string("Wait with get_job until done, failed or cancelled. SkyCut checks the price and daily budget first; ordinary narration falls back to a local voice when unavailable. "
+            "next_step": .string("Wait with get_job until done, failed or cancelled. SkyCut checks the price and daily budget first; ordinary narration may fall back when unavailable, but an exhausted hard daily budget pauses without changing voices. "
                 + "Cloud voice cloning may queue for several minutes. On completion, all lines and subtitles are added together as one undo step. Do not call add_voiceover again while this job is running.")
         ])
     }
@@ -84,7 +84,8 @@ final class SkyStudioVoiceoverRun {
             let total = quotes.reduce(0) { $0 + $1.credits }
             guard projectUnchanged else { throw AIToolError("The project was closed or changed before generation started; nothing was charged.") }
             guard let reserved = SkyStudioVoiceBudget.reserve(quotes) else {
-                return try await fallback("The Sky Studio voice was not used: \(SkyStudioCredits.text(total)) credits would exceed the daily limit. The user can raise it in SkyCut Settings → Sky Studio.")
+                return finish(.failed, "Daily AI budget reached. Raise it in Settings > Sky Studio to continue.",
+                    payload: SkyStudioJobGate.budgetBlocked(credits: total, store: .shared).payload)
             }
             budget = reserved
             status.modelTitle = plan.model.title
@@ -155,7 +156,15 @@ final class SkyStudioVoiceoverRun {
         } catch {
             preserveRaw()
             let cancelled = Self.isCancellation(error)
-            finish(cancelled ? .cancelled : .failed, message(error), payload: .object(detail()))
+            var payload = detail()
+            if let failure = (error as? SkyStudioJobError)?.failure {
+                payload["failure"] = failure.json
+                if failure.code == "insufficient_credits" {
+                    payload["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
+                    payload["next_step"] = "Notify the user in their conversation language that credits are insufficient, show recharge_url and stop. Do not repeatedly request approval or silently change voices."
+                }
+            }
+            finish(cancelled ? .cancelled : .failed, message(error), payload: .object(payload))
         }
     }
 

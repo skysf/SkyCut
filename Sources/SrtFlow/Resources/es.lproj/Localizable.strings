@@ -1294,3 +1294,19 @@
 "AI activity" = "Actividad de IA";
 "Hide status" = "Ocultar estado";
 "Show AI activity; any percentage is for the current task" = "Ver actividad de IA; el porcentaje corresponde a la tarea actual";
+
+"AI permissions" = "Permisos de IA";
+
+"Permission mode" = "Modo de permisos";
+
+"Ask for approval" = "Solicitar aprobación";
+
+"Full access" = "Acceso completo";
+
+"Start with low-cost drafts in both modes. Ask for approval pauses before exceeding defaults. Full access proceeds and reports what it did. Daily budgets remain hard limits." = "Ambos modos empiezan con borradores económicos. Solicitar aprobación consulta antes de superar los valores predeterminados. Acceso completo ejecuta e informa. El presupuesto diario sigue siendo un límite estricto.";
+
+"AI can change this mode only after asking you and receiving your explicit approval, including when Full access is enabled." = "La IA solo puede cambiar este modo tras preguntar y recibir tu aprobación explícita, incluso con Acceso completo.";
+
+"AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "La IA se pausa al alcanzar este presupuesto diario. Auméntalo en Ajustes para continuar; ningún modo de permisos lo omite.";
+
+"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Se alcanzó el presupuesto diario de IA. Auméntalo en Ajustes > Sky Studio para continuar.";

@@ -89,8 +89,10 @@ final class UpscaleJob: ObservableObject, Identifiable {
         // 1. 账。
         switch approval {
         case .panel:
-            // 面板上已经确认过，直接记上报价。
-            held = .recording(request.credits)
+            guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: request.credits) else {
+                return end(.failed(L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")), refunding: false)
+            }
+            held = SkyStudioHeldCredits(reservation)
         case .ai(let reservation):
             // AI 起的：起任务之前已经按每日上限把关、记上了（SkyStudioJobGate.decide）。
             held = SkyStudioHeldCredits(reservation)

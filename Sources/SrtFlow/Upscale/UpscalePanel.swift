@@ -223,7 +223,7 @@ struct UpscalePanel: View {
                 if let selected, let quote { start(selected: selected, quote: quote) }
             }
             .keyboardShortcut(.defaultAction)
-            .disabled(quote == nil || selected?.refusal != nil)
+            .disabled(quote == nil || selected?.refusal != nil || overLimit)
         }
     }
 

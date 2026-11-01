@@ -120,7 +120,7 @@ struct AIToolResult {
             "question": .string(question),
             "confirm_token": .string(token),
             "valid_for_minutes": .number(Double(validMinutes)),
-            "next_step": .string("Ask the user this question. Only if they agree, call the same tool again with the same arguments plus this "
+            "next_step": .string("Ask the user this question in their conversation language, translating permission labels using get_settings when relevant. Only if they agree, call the same tool again with the same arguments plus this "
                 + "confirm_token. It is good for one call within valid_for_minutes; asking again before the user answers returns the "
                 + "same code. Never guess or reuse a token.")
         ]

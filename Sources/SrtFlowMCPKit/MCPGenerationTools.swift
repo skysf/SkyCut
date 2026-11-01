@@ -5,7 +5,7 @@ import Foundation
 // 管什么：这两个工具的说明文字和参数。2026-10-28 起都送 Sky Studio、花积分（收费方案第 6 刀；之前 generate_media 送 fal、花美元），
 // **始终列出，调用时才核对 Key / 授权 / 积分**（2026-10-30，替代方案第 36 条的隐藏）。种类、画幅、分辨率、upscale 的档位 / 目标 / 范围
 // 走词表（MCPVocabulary，和 App 的类型对账）；upscale 做完直接换源（用户 2026-10-02 定）。
-// 不管什么：怎么调 Sky Studio、花积分怎么把关（App 里的 Sources/SrtFlow/SkyStudio/：超了每日上限回确认码）；配旁白（add_voiceover，
+// 不管什么：怎么调 Sky Studio、花积分怎么把关（App 里的 Sources/SrtFlow/SkyStudio/：每日预算硬上限、草稿越档按权限审批）；配旁白（add_voiceover，
 // 有 Sky Studio 的 Key 时优先用云端声音，见 docs/architecture/sky-studio-jobs.md）。
 
 enum MCPGenerationTools {
@@ -15,20 +15,19 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Generates media, lipsync or transparent cutouts with Sky Studio credits (key required). First read \
-                get_status models=true for public ids, defaults, controls and input limits. lipsync: HeyGen takes video+audio; \
-                H3 Max takes image+audio. image operation=remove_background takes one image, no prompt. HeyGen dynamic duration \
-                defaults false; match input lengths. Results may be WebM with optional SRT; cutouts preserve PNG alpha. \
-                Wan reference-to-video uses multimodal arrays, document or web_url. image_to_video uses image/last_image. \
-                Images prefer Seedream for Asian subjects, Nano 2 otherwise; judge subject, not prompt language. Video prefers \
-                MiniMax H3 then Omni, Veo Fast, Seedance 2.0. quality=highest only for explicitly unrestricted quality requests: \
-                Seedance 2.5 then Veo Pro. Explicit model overrides preferences. Quotes before spending; above the daily credit limit \
-                returns needs_confirmation: ask the user, then repeat with confirm_token. Reuse one idempotency_key per operation; \
-                wait with get_job. Never automatically regenerate or switch models after failure/unknown status. Explain billing: \
-                provider-successful results stay charged if downloading/saving/importing fails; only billing proves a refund. \
-                Results stay in the Sky Studio library. add_clips imports actual media; WebM editing copies preserve originals. \
-                Narration uses add_voiceover; subtitles use generate_subtitles. Music defaults instrumental/auto length; sound \
-                effects default 5s. cancel_job attempts queued cancellation; check billing for settlement.
+                Generate media, lipsync or transparent cutouts with Sky Studio credits (key required). Read get_status models=true \
+                for ids, controls and input limits. Drafts: lowest image tier (Nano 2 1K, Seedream 2K), video 720p-class (H3 768p). \
+                ask_for_approval upgrades return needs_confirmation: ask the user, then repeat with confirm_token. full_access \
+                proceeds and notifies. The daily credit limit is a hard cap in both modes; exhaustion pauses with settings guidance. \
+                Use conversation-language questions/notices and localized mode names from get_settings section=ai. quote_only=true \
+                checks inputs/prices without generating. Images prefer Seedream for Asian subjects, Nano 2 otherwise; judge the subject. \
+                Video prefers MiniMax H3, Omni, Veo Fast, Seedance 2.0; quality=highest only for explicitly unrestricted quality. \
+                Explicit models override preferences. image_to_video frames use image/last_image; multimodal uses reference arrays. \
+                lipsync: HeyGen video+audio, H3 Max image+audio; omit prompt. Cutouts: image operation=remove_background. Wan accepts \
+                document or web_url. Use one idempotency_key per operation; wait with get_job. Query original jobs and billing after failures. Unknown outcomes or delivery failures must recover the original; \
+                terminal generation failures with confirmed refund/no-charge evidence may use a new operation under permissions/budgets. Provider-successful output stays charged through delivery failures; \
+                only billing proves refunds. Results stay in the library; add_clips imports actual files. Narration: add_voiceover; \
+                subtitles: generate_subtitles. Music defaults instrumental/auto length; effects 5s. cancel_job attempts queued cancellation.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
@@ -64,7 +63,10 @@ enum MCPGenerationTools {
                     "enable_safety_checker": MCPSchema.boolean("Safety toggle, true default; disabling needs provider authorization."),
                     "sync_mode": MCPSchema.boolean("Cutout: false default; still returns async job/durable PNG."),
                     "seed": MCPSchema.number("Optional integer random seed within the model catalog range."),
-                    "resolution": MCPSchema.string("Output size; catalog choices/default."),
+                    "resolution": MCPSchema.string("Output size; default lowest image tier or 720p-class video. Higher tiers follow approval mode."),
+                    "quote_only": MCPSchema.boolean("true: validate and quote only, no uploads, generation, reservation or charge."),
+                    "approval_scope": MCPSchema.string("Default once. Use project only if the user explicitly approves this model/specification and per-task price ceiling for the project.", oneOf: ["once", "project"]),
+                    "user_requested_overrides": MCPSchema.boolean("Set true ONLY when the user explicitly requested these exact model/specification overrides, so do not ask twice. Never set for the assistant's own plan. Does not bypass budgets or settings-change confirmation."),
                     "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
                     "generate_audio": MCPSchema.boolean("Video audio toggle, only when offered by model."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
@@ -78,26 +80,20 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .upscaleClip, title: "Upscale clip",
                 description: """
-                Sends one video clip's source file to Sky Studio for a sharper, larger version (paid with the user's Sky Studio \
-                credits; requires a Sky Studio key in SkyCut Settings) and, when it is done, points every clip in this \
-                project that uses that file at the new one (one undo step; the original file stays next to it and the user can \
-                compare or revert from the clip's context menu). Use it when a clip's source_size (get_timeline) is below the \
-                canvas or the export size: plain scaling adds no detail. It returns a job_id at once: wait with get_job, which \
-                shows phase (preparing, uploading, queued, processing, downloading, finishing), queue_position, \
-                transfer_percent, phase_seconds and typical_seconds. The finished job has replaced_ids, file, width, height and \
-                credits_charged; the upscale is also kept in the user's Sky Studio library. tier: topaz-starlight (default; \
-                re-draws fur, leaves, water; a few minutes; 1080p or 2160p only) or bytedance-upscaler-pro (large-model \
-                restoration; about a minute per second of video). target: 1080p, 1440p or 2160p on the short side (default: \
-                what the canvas needs); a source already at or above it is refused. range: clip (this clip's used part plus up \
-                to 1 s handles each side), longest (default when another clip uses more of the same file: covers both), file \
-                (the whole file). Sky Studio takes at most 30 s per upscale, handles included (split longer clips), and \
-                sources up to 30 fps. Cost: the result's credits is Sky Studio's price; within the user's daily credit limit \
-                SkyCut just starts; when a call would go over it, it returns needs_confirmation with a confirm_token instead: \
-                ask the user and, only if they agree, call again with it. cancel_job refunds an upscale still in Sky Studio's \
-                queue; once it has started it cannot be cancelled. Tell the user before upscaling many clips.
+                Paid upscale of a video clip's source through Sky Studio; requires its key. Completion replaces every clip using \
+                that file in this project (one undo); originals stay available to compare or revert. Use source_size below the canvas: \
+                plain scaling adds no detail. Returns job_id: get_job reports phase, queue_position, transfer_percent, phase_seconds, \
+                typical_seconds; completion gives replaced_ids, file, width, height, credits_charged. Results stay in the library. \
+                Models: topaz-starlight (default; 1080p/2160p) or bytedance-upscaler-pro. Targets: 1080p, 1440p, 2160p short side. \
+                range=clip adds up to 1s handles; longest covers other uses; file sends the whole source. At most 30 s including \
+                handles, 30 fps. The daily credit limit is a hard cap in both modes: notify users to raise it in Settings. \
+                Upscale exceeds draft settings: ask_for_approval returns needs_confirmation; ask then repeat with confirm_token. \
+                full_access proceeds and notifies. cancel_job attempts queued cancellation; check original billing afterward.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("The video clip whose source file to upscale (get_timeline)."),
+                    "approval_scope": MCPSchema.string("once by default; project only with explicit project-wide agreement.", oneOf: ["once", "project"]),
+                    "user_requested_overrides": MCPSchema.boolean("true only if the user explicitly requested this paid upscale; never infer from the assistant's plan."),
                     "tier": MCPSchema.string("Which Sky Studio model (default topaz-starlight).", oneOf: MCPVocabulary.upscaleTiers),
                     "target": MCPSchema.string("Short side to reach (default: what the canvas needs).", oneOf: MCPVocabulary.upscaleTargets),
                     "range": MCPSchema.string(

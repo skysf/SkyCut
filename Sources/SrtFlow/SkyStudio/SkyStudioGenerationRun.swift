@@ -325,7 +325,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let lastFailure { payload["failure"] = lastFailure.json }
         if billing?.netCharged == nil && creditsUnconfirmed { payload["credits_unknown"] = true }
         if status != .done {
-            payload["next_step"] = .string("Query this original job with get_job. Preserve idempotency_key; never automatically regenerate or switch models. " + SkyStudioBilling.policyMessage)
+            payload["next_step"] = .string("Query this original job with get_job and preserve idempotency_key. Unknown or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. " + SkyStudioBilling.policyMessage)
+        }
+        if lastFailure?.code == "insufficient_credits" {
+            payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
+            payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
     }

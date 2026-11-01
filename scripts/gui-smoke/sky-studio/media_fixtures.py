@@ -18,7 +18,7 @@ def models():
     titles = {"minimax-h3": "MiniMax H3", "gemini-omni-1.1-flash": "Google Omni 1.1", "seedance-2-5": "Seedance 2.5"}
     for model in ["seedream5-flash", "nano2"]:
         result.append(dict(id=model, kind="image", title=model,
-                           params=dict(resolution=["2K", "4K"] if model == "nano2" else ["2K"], aspect_ratio=["16:9", "9:16", "4:1"]),
+                           params=dict(resolution=["1K", "2K", "4K"] if model == "nano2" else ["2K"], aspect_ratio=["16:9", "9:16", "4:1"]),
                            defaults=dict(resolution="2K"), limits=dict(references={**image_limits, "max_images": 10 if model == "seedream5-flash" else 14})))
     for model, resolution, seconds, caps in [("minimax-h3", "768p", 5, h3),
             ("gemini-omni-1.1-flash", "720p", 5, omni), ("seedance-2-pro", "720p", 5, h3),

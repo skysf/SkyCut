@@ -13,7 +13,7 @@ import SrtFlowMCPKit
 // - **拒绝时说清楚为什么**（过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的），写在结果的 confirm_token_refused 里；
 //   有效期写在 valid_for_minutes 里。
 // 时钟可注入，自检够得着（checks/MCP/ConfirmationChecks.swift）。
-// 不管什么：什么时候问（AIFileTools.confirmTrash、AIWorkspace.confirmReading —— 会问的只许这两处，scripts/check-mcp.sh 钉着）。
+// 不管什么：什么时候问（AIFileTools、AIWorkspace、SkyStudioJobGate、AISettingsApproval；scripts/check-mcp.sh 钉住入口清单）。
 
 @MainActor
 final class AIConfirmations {

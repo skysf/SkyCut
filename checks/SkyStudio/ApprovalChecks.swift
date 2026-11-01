@@ -8,7 +8,8 @@ func runApprovalChecks() {
     let defaults = UserDefaults(suiteName: suite)!
     defer { defaults.removePersistentDomain(forName: suite) }
     let store = SkyStudioSpendStore(defaults: defaults)
-    store.setDailyLimit(0)
+    let access = AIAccessStore(defaults: defaults)
+    store.setDailyLimit(1_000)
     let text = SkyStudioJobRequest(kind: "text_to_video", model: "minimax-h3", prompt: "waves",
                                    params: ["duration": 5, "resolution": "480p"])
     var image = text
@@ -17,7 +18,7 @@ func runApprovalChecks() {
     let b = SkyStudioApproval.identity(job: image, credits: 50)
     func decide(_ identity: String, token: String? = nil) throws -> SkyStudioJobGate.Decision {
         try SkyStudioJobGate.decide(credits: 50, summary: "MiniMax H3 · 5 s · 480p", identity: identity,
-                                   args: AIToolArguments(.object(token.map { ["confirm_token": .string($0)] } ?? [:])), store: store)
+                                   args: AIToolArguments(.object(token.map { ["confirm_token": .string($0)] } ?? [:])), store: store, access: access, reason: "Upgrade above draft settings")
     }
     func asked(_ decision: SkyStudioJobGate.Decision?) -> AIToolResult? {
         if case .needsConfirmation(let ask) = decision { return ask }

@@ -1294,3 +1294,19 @@
 "AI activity" = "AI activity";
 "Hide status" = "Hide status";
 "Show AI activity; any percentage is for the current task" = "Show AI activity; any percentage is for the current task";
+
+"AI permissions" = "AI permissions";
+
+"Permission mode" = "Permission mode";
+
+"Ask for approval" = "Ask for approval";
+
+"Full access" = "Full access";
+
+"Start with low-cost drafts in both modes. Ask for approval pauses before exceeding defaults. Full access proceeds and reports what it did. Daily budgets remain hard limits." = "Start with low-cost drafts in both modes. Ask for approval pauses before exceeding defaults. Full access proceeds and reports what it did. Daily budgets remain hard limits.";
+
+"AI can change this mode only after asking you and receiving your explicit approval, including when Full access is enabled." = "AI can change this mode only after asking you and receiving your explicit approval, including when Full access is enabled.";
+
+"AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it.";
+
+"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.";
