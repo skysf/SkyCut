@@ -390,6 +390,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
+- [2026-11-03 MCP 发现与真实 Codex 选工具实测](docs/reports/2026-11-03-mcp-discovery-and-task-selection.md) — 50 → 55 项、已有导出参数、通知缓存与退出后 resume，四类真实需求的调用 / 任务 / 落盘结果；[脱敏调用证据](docs/reports/2026-11-03-mcp-discovery-evidence.json)保留实际参数、失败与有效重试。
+
 - [2026-10-31 顶部工作台、统一设置与 MCP 验收](docs/reports/2026-10-31-workbench-settings.md) — 单排工具栏、五类统一设置、全 App 设置工具；2,686 项 MCP 检查、原子拒绝、双向同步、最小窗口与 AI 状态恢复的实际证据。
 
 - [原生录屏方案](docs/plans/2026-08-06-native-screen-recording.md) — 产品目标与阶段方案；

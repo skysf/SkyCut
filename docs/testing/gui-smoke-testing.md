@@ -409,7 +409,7 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    先说一声；`open_project` 第二个工程会开一个工程窗口（层叠排开；后台模式下一个窗口都不开，第 ③ 刀起）。
 4. 图要**量**，别只用眼看缩略图：同一刻开 / 关滤镜各看一次，小图上几乎看不出差别，量一块区域的平均色才看得出冷铁那种
    红降蓝升。看图时把 jpg 读进来，位置、层序、有没有黑边这类一眼就能核对。
-5. 正在跑的 AI 会话（比如这个 Claude Code）里那个小程序是**启动它时**的旧版本，新加的工具它列不出来 —— 新工具就用这个脚本测。
+5. 会话里的旧 helper 可在一次工具调用后采用 App 清单，但客户端可能没有重读并交给模型；脚本主动重新列出新工具不能证明模型已刷新。发现与重连见 [MCP 指南](../architecture/mcp-discovery.md)，真实 Codex 验收见四之九。
 6. **每轮都要有「改很多步之后撤一步」**，而且放素材时**带上一个字幕文件**、中间起一次生成字幕 / 翻译：一处撤销登记落在
    `AIUndoGrouping.step` 外面，后台的 App 里之后每一步都并进去，撤一步全空 —— 只有这样的顺序才露馅
    （[案例](../bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md)；当时是只差一个 .srt 的 A / B 两组才定的性）。
@@ -436,6 +436,53 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 原 fal 夹具、接口快照和刷新脚本已随第 7 刀删除；历史结果见既有报告。真实积分验收必须另外核对任务号、终态、扣费 / 退款和未知提交，不能把本机夹具当作真实服务已通过。当前证据见 [生成与配音验收](../reports/2026-10-29-sky-studio-generation-and-voice.md)。
+
+## 四之九、真实 Codex 的发现与选工具回归
+
+上一节的脚本能验证 App / helper，但不能证明模型实际看见并选用了工具。改工具发现、说明或参数时，
+另做一次真实客户端验收；这是需要已登录 Codex 和本机语音识别能力的人工验收，不作为无账号 CI 的替代品。
+本次可复盘结果见[发现与选工具实测](../reports/2026-11-03-mcp-discovery-and-task-selection.md)及其中的调用证据。
+
+1. **先隔离**：沿用四之八的 `run.sh`，指定本轮 `SKYSTUDIO_SMOKE_DIR`，构建并启动独立 `.skystudiosmoke` App。
+   默认脚本共用 bundle id 和 18766 端口，同机多个会话要串行；仅换临时目录不够。
+   并行时各自使用临时 App 身份、socket、回环端口和假账号；身份保留 `com.srtflow.SrtFlow` 前缀与
+   `.skystudiosmoke` 后缀以限定假 Key / 缓存钩子，驱动显式指向自己的 App 和 socket。
+   将现有 `vendor/ffmpeg` 复制到本轮临时目录，用 `SRTFLOW_FFMPEG` 显式指向该副本；检查测试 App 的引擎可用，
+   避免测试包未带引擎、覆盖路径又指向 Downloads 时只得到“not ready”。这不等于认证具体 TCC 原因。
+   素材用其 `motion.mp4`、`reference.wav` 和 `assets/narration.wav`，复制为测试文件夹的旧 / 新旁白。
+   经 MCP 新建后台工程：两段各 2 秒画面、0–4 秒旧旁白、两处各 2 秒 / 40 号标题。保存关闭后复制四份，
+   各请求一份；记录原始时间线、源窗口、取景 / 文字样式和测试域导出偏好。不要拿用户现有工程做输入。
+2. **只改本次 CLI 进程的连接**：`codex exec --json --sandbox read-only --skip-git-repo-check -C <测试目录>`，
+   用 `-c` 将 `mcp_servers.skycut.command` 指向测试 App 内的 `Contents/Helpers/skycut-mcp`，
+   `mcp_servers.skycut.env.SRTFLOW_MCP_APP` / `SRTFLOW_MCP_SOCKET` 显式指向本轮 App / socket，
+   将 `mcp_servers.skycut.env.SRTFLOW_MCP_NO_LAUNCH` 设为字符串 `"1"`；其他已配置 MCP 本次设 `enabled=false`。
+   可用 `mcp_servers.skycut.default_tools_approval_mode="approve"` 授权这轮独立工程操作。
+   不改用户配置文件，不从生产 App 获取 Key / 工程状态；shell 的 read-only 沙盒不约束 MCP 对测试工程的写入。
+   保留实际模型 / reasoning 配置，不通过换模型掩盖选择差异。
+3. **保留传输与模型两份证据**：CLI 的 JSON 事件保存 `mcp_tool_call` 的工具名、参数、结果和最终回复；
+   若要判定通知是否被采用，再用透明 stdio 转发器分别记录 `tools/list` 请求 / 回答、`list_changed` 和调用，
+   不修改被转发的定义或回答。日志只含合成素材，发布前脱敏临时路径；进程退出码和每个 `get_job.status` 都要查。
+4. **提示不透露预期工具名**：只给该测试工程、文件夹、后台执行、始终带工程 id、允许保存 / 导出和完成后关闭等边界，
+   分别追加下表真实需求。用实际调用和落盘结果验收，不能用模型“已完成”的回复代替。
+
+| 只给模型的需求 | 核对实际调用与结果 |
+| --- | --- |
+| 批量修改标题：所有画面标题改成“审阅标题”，字号 36 | 一次 `set_texts` 含两个当前 id；保存文件两处均改，其他字段不变 |
+| 换配音并同步画面：用已有新录音替换旧旁白，两段画面和标题按实际长度调整，保留取景和样式 | `sync_voiceover` 显式新旧音频与段映射，任务 done；总长等于实测新音频，旧音频移出，取景 / 样式保持；不能用生成工具重做已有录音 |
+| 检查音频接缝：逐个剪辑点和结尾找截断、重叠、静音，给时间与依据 | `inspect_video` 任务终态、范围和 `coverage_complete`，需要时补 `listen`；时间线不变；采样疑点不冒充确定缺陷 |
+| 导出审阅版：快速、小一些，不改正式导出设置 | `export_video preset=quick_review`，任务 done / 文件存在；核对实际编码、尺寸上限、音频码率和正式偏好前后相同 |
+
+5. **失败也保留**：`transcribe language=auto` 无法判断语言时，记录 failed，不能凭 RPC 成功算通过。
+   若夹具语言已知，在同一测试对话补充真实语言，让模型用明确语言重试并核对新任务终态；不得写成自动检测已修好。
+   无字幕夹具不能认证逐词字幕对齐，有字幕的验收另走旁白同步专门清单。
+6. **升级旧会话**：用历史 helper 创建一个只含上述测试数据的真实 CLI 对话，调用状态后观察它是否重列清单，
+   同时比较同名 `export_video` 的字段，不能只数新增工具。结束旧 CLI 进程，连接改为当前 helper，
+   再 `codex exec ... resume <该测试会话 id>`；握手重列后实际调用新增工具和新增参数。
+   仅测试用脚本主动请求 `tools/list` 成功，不足以认证旧客户端已热更新。桌面 / IDE 入口与限制见
+   [MCP 发现与重连](../architecture/mcp-discovery.md)，不对没有实测的客户端承诺热刷新。
+7. **收尾**：核对各独立工程保存 / 关闭；用同一个 `SKYSTUDIO_SMOKE_DIR` 运行 `run.sh stop`，
+   清掉本轮测试 App、假账号和测试域设置。不要退出或替换用户正在使用的正式 App。
+
 
 ## 五、要真实窗口、但已经自动化了的检查
 
