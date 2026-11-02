@@ -1,9 +1,10 @@
 import CoreGraphics
 import Foundation
+import SrtFlowMCPKit
 
 // MARK: - edit_clip 里和画面有关的参数（纯值）
 //
-// 管什么：fit / focus / focus_x / focus_y / follow / crop / remove_black_bars / x / y / scale 读成类型，互相冲突的组合
+// 管什么：fit / focus / follow / crop / region / remove_black_bars / x / y / scale 读成类型，互相冲突的组合
 // 当场挡掉（fit 和 x/y/scale 不能一起给、focus 只跟 fit=fill 走、手动裁切和去黑边二选一）。纯值，自检够得着
 // （scripts/check-mcp.sh）。
 // 不管什么：按这些参数算裁切和摆放（AIFrameFit）、去看画面（AIClipTools）。
@@ -21,6 +22,8 @@ struct AIFramingRequest {
     var focusPoint: CGPoint?
     /// 手动的四边裁切（`crop` 参数）；给了全 0 就是不裁。
     var crop: ClipCrop?
+    /// 旋转信息摆正后的源画面矩形（左上原点，归一化），替换旧裁切 / 摆放。
+    var region: CGRect?
     /// 抽几帧找黑边、裁掉（找到的黑边当作「可用区域」，fit / fill 在它里面算）。
     var removeBlackBars = false
     var x: Double?
@@ -30,7 +33,7 @@ struct AIFramingRequest {
     var follow = true
 
     var touchesPicture: Bool {
-        fit != nil || crop != nil || removeBlackBars || x != nil || y != nil || scale != nil
+        fit != nil || crop != nil || region != nil || removeBlackBars || x != nil || y != nil || scale != nil
     }
 
     init(_ args: AIToolArguments) throws {
@@ -42,6 +45,11 @@ struct AIFramingRequest {
         focus = namedFocus ?? .subject
         let focusX = try args.double("focus_x")
         let focusY = try args.double("focus_y")
+        try AIEditLimits.require("x", x, in: MCPFramingLimits.center)
+        try AIEditLimits.require("y", y, in: MCPFramingLimits.center)
+        try AIEditLimits.require("scale", scale, in: MCPFramingLimits.scale)
+        try AIEditLimits.require("focus_x", focusX, in: 0...1)
+        try AIEditLimits.require("focus_y", focusY, in: 0...1)
         if focusX != nil || focusY != nil {
             focusPoint = CGPoint(x: min(max(focusX ?? 0.5, 0), 1), y: min(max(focusY ?? 0.5, 0), 1))
         }
@@ -50,6 +58,9 @@ struct AIFramingRequest {
                 throw AIToolError("crop must be an object like {\"left\": 0.1, \"right\": 0.1, \"top\": 0, \"bottom\": 0}.")
             }
             let edges = AIToolArguments(raw)
+            for name in ["top", "bottom", "left", "right"] {
+                try AIEditLimits.require("crop.\(name)", try edges.double(name), in: 0...ClipCrop.maximumManualInset)
+            }
             crop = ClipCrop(
                 top: try edges.double("top") ?? 0, bottom: try edges.double("bottom") ?? 0,
                 leading: try edges.double("left") ?? 0, trailing: try edges.double("right") ?? 0
@@ -69,6 +80,28 @@ struct AIFramingRequest {
             guard fit == .fill else { throw AIToolError("follow only applies with fit=fill.") }
             follow = wanted
         }
-        if let scale, !(0.05...6).contains(scale) { throw AIToolError("scale must be between 0.05 and 6.") }
+        region = try Self.sourceRegion(args)
+        if region != nil { fit = fit ?? .fit }
+    }
+
+    private static func sourceRegion(_ args: AIToolArguments) throws -> CGRect? {
+        guard args.has("region") else { return nil }
+        guard let raw = args.raw["region"], case .object = raw else {
+            throw AIToolError("region must be {x, y, width, height}: fractions of the upright source picture, from its top-left.")
+        }
+        let fields = AIToolArguments(raw)
+        let rect = CGRect(
+            x: try fields.requiredDouble("x"), y: try fields.requiredDouble("y"),
+            width: try fields.requiredDouble("width"), height: try fields.requiredDouble("height")
+        )
+        guard ClipCrop(keeping: rect) != nil else {
+            throw AIToolError("region must be inside 0–1: x/y ≥ 0, width/height > 0, x+width ≤ 1 and y+height ≤ 1.")
+        }
+        let conflicts = ["crop", "remove_black_bars", "focus", "focus_x", "focus_y", "follow", "x", "y", "scale",
+                         "rotation", "flip_horizontal", "flip_vertical"].filter(args.has)
+        guard conflicts.isEmpty else {
+            throw AIToolError("region cannot be combined with \(conflicts.joined(separator: ", ")). Use region with fit=fit (default) or fit=fill.")
+        }
+        return rect
     }
 }

@@ -11,7 +11,7 @@ import SrtFlowCore
 
 extension VideoEditProject {
     func setSpeed(_ id: UUID, speed: Double) {
-        let clamped = min(max(speed, 0.1), 8)
+        let clamped = min(max(speed, TimelineTrim.clipSpeedRange.lowerBound), TimelineTrim.clipSpeedRange.upperBound)
         let ids = linkageEnabled ? state.linkedClipIDs(of: id) : [id]
         perform { state in
             for member in ids {

@@ -14,38 +14,27 @@ enum AIOverlayTools {
     // MARK: set_text
 
     static func setText(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
-        let change = try AITextChange(args)
+        var next = project.state
+        let textEdit = try AIOverlayEdits.text(args, at: project.clock.time, in: &next)
+        var edit = AIBatchEdit(project.state)
+        edit.next = next
+        _ = try AIBatchEditTools.commit(edit, project, rebuildsPreview: false)
+        if let overlay = project.state.textOverlays.first(where: { $0.id == textEdit.id }) {
+            AIEditorPresenter.reveal(.init(texts: [textEdit.id], time: overlay.timelineStart + min(0.5, overlay.duration / 2)), project: project)
+        }
+        return .ok(textSummary(textEdit, project), changed: true)
+    }
+
+    /// 单项 / 批量共用反馈：只读最终状态，不再修改工程或播放头。
+    static func textSummary(_ edit: AIOverlayEdits.Text, _ project: VideoEditProject) -> JSONValue {
+        let id = edit.id
         var warnings: [String] = []
-        if let font = change.font, !fontIsInstalled(font) {
-            warnings.append("Font \"\(font)\" is not installed on this Mac, so the text falls back to the system font.")
-        }
-        let id: UUID
-        if let raw = try args.string("text_id") {
-            id = try AIShortIDs(state: project.state).resolve(raw)
-            guard project.state.textOverlays.contains(where: { $0.id == id }) else {
-                throw AIToolError("\(raw) is not a text. Call get_timeline for text ids.")
-            }
-            project.perform(rebuildsPreview: false) { $0.updateTextOverlay(id) { change.apply(to: &$0) } }
-        } else {
-            // 数字元件的字是滚出来的，不用给 text。
-            let hasWords = !(change.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            guard hasWords || (change.number.map { !$0.remove } ?? false) else {
-                throw AIToolError("text (or number) is required when adding a text.")
-            }
-            var overlay = TextOverlay(timelineStart: change.start ?? project.clock.time)
-            change.apply(to: &overlay)
-            id = overlay.id
-            // 新字永远在最上面新开一行（同界面上的「加文字」），夹紧走 updateTextOverlay 那唯一一处。
-            project.perform(rebuildsPreview: false) { state in
-                overlay.row = state.textRowCount
-                state.textOverlays.append(overlay)
-                state.updateTextOverlay(overlay.id) { _ in }
-            }
-        }
         guard let overlay = project.state.textOverlays.first(where: { $0.id == id }) else {
-            throw AIToolError("The text disappeared while it was being changed.")
+            return ["text_id": .string(AIShortIDs(state: project.state).short(id))]
         }
-        AIEditorPresenter.reveal(.init(texts: [id], time: overlay.timelineStart + min(0.5, overlay.duration / 2)), project: project)
+        if edit.font != nil, !fontIsInstalled(overlay.style.fontName) {
+            warnings.append("Font \"\(overlay.style.fontName)\" is not installed on this Mac, so the text falls back to the system font.")
+        }
         // 按成片的画面排一次版：几行、有没有词被从中间折断（AI 看不见画面，只能靠这个自己改字号）。
         let canvas = VideoEditCompositionBuilder.renderSize(for: project.state)
         let layout = TextTypesetter.layout(overlay, canvas: canvas)
@@ -71,7 +60,8 @@ enum AIOverlayTools {
         ]
         if abs(overlay.rotationDegrees) > 0.01 { result["rotation"] = AIFormat.seconds(overlay.rotationDegrees) }
         if !warnings.isEmpty { result["warnings"] = .array(warnings.map { .string($0) }) }
-        return .ok(.object(result), changed: true)
+        for (key, value) in AIOverlayParameterReport.text(edit.parameters, overlay: overlay) { result[key] = value }
+        return .object(result)
     }
 
     private static func fontIsInstalled(_ name: String) -> Bool {
@@ -81,24 +71,23 @@ enum AIOverlayTools {
     // MARK: set_shape
 
     static func setShape(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
-        let change = try AIShapeChange(args)
-        let ids = AIShortIDs(state: project.state)
-        let id: UUID
-        if let text = try args.string("shape_id") {
-            id = try ids.resolve(text)
-            guard project.state.shapes.contains(where: { $0.id == id }) else { throw AIToolError("\(text) is not a shape.") }
-            // 形状是叠在画面上的一层，不进合成：不用重建预览（同检查器改形状）。
-            project.perform(rebuildsPreview: false) { state in state.updateShape(id) { change.apply(to: &$0) } }
-        } else {
-            let shape = try change.makeShape(at: project.clock.time)
-            id = shape.id
-            project.perform(rebuildsPreview: false) { $0.shapes.append(shape) }
-        }
+        var next = project.state
+        let id = try AIOverlayEdits.shape(args, at: project.clock.time, in: &next)
+        // 形状不进 AV 合成，同检查器一样只刷新叠层。
+        var edit = AIBatchEdit(project.state)
+        edit.next = next
+        _ = try AIBatchEditTools.commit(edit, project, rebuildsPreview: false)
         guard let shape = project.state.shapes.first(where: { $0.id == id }) else {
             throw AIToolError("The shape disappeared while it was being changed.")
         }
         AIEditorPresenter.reveal(.init(shapes: [id], time: shape.timelineStart + min(0.5, shape.duration / 2)), project: project)
-        return .ok(AIShapeChange.summary(shape, ids: AIShortIDs(state: project.state)), changed: true)
+        return .ok(shapeSummary(shape, parameters: args.raw, project), changed: true)
+    }
+
+    static func shapeSummary(_ shape: ShapeAnnotation, parameters: JSONValue, _ project: VideoEditProject) -> JSONValue {
+        var summary = AIShapeChange.summary(shape, ids: AIShortIDs(state: project.state)).objectValue ?? [:]
+        for (key, value) in AIOverlayParameterReport.shape(parameters, shape: shape) { summary[key] = value }
+        return .object(summary)
     }
 
     // MARK: set_filter

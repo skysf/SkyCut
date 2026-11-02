@@ -10,7 +10,7 @@ import SrtFlowMCPKit
 // （2026-10-28 上线，从 Sky Studio main 的 5c8d6a0d 起冻结）。
 // 不管什么：发请求（SkyStudioAPI）、等它做完（SkyStudioJobRun）、每种活怎么拼参数（upscale、生成、配旁白各自的调用方）。
 
-struct SkyStudioJobRequest: Equatable, Sendable {
+struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     /// `upscale`、`image`、`text_to_video`、`image_to_video`、`lipsync`、`music`、`voice`、`sound_effect`、`voice_clone`。
     var kind: String
     /// Sky Studio 自己的模型名（`/models` 的 id），不是 fal 的端点号。
@@ -59,7 +59,7 @@ struct SkyStudioJobRequest: Equatable, Sendable {
 }
 
 /// `/quote` 的回答：要扣多少（和 `/jobs` 扣钱用同一个计价函数）、通常多久做完；upscale 另有 `plan`（倍数、输出尺寸、按哪一档收）。
-struct SkyStudioQuote: Equatable, Sendable {
+struct SkyStudioQuote: Equatable, Sendable, Codable {
     var credits: Double
     var typicalSeconds: Double?
     var plan: [String: JSONValue]

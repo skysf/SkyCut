@@ -5,6 +5,10 @@ import SrtFlowMCPKit
 // 云端选声、词时间和参考 WAV；服务合同和任务测试在 check-sky-studio。
 
 func runSkyStudioVoiceChecks() {
+    check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "generate_missing": true]) == nil,
+          "the existing voiceover tool accepts recovery arguments without original lines")
+    check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "regenerate_all": true]) != nil,
+          "recovery does not weaken unknown-argument rejection")
     let tingting = AIVoiceChoice.Voice(identifier: "com.apple.voice.1.zh-CN.Tingting", name: "Tingting", language: "zh-CN", gender: .female, quality: 1)
     let daniel = AIVoiceChoice.Voice(identifier: "com.apple.voice.1.en-GB.Daniel", name: "Daniel", language: "en-GB", gender: .male, quality: 1)
     let installed = [tingting, daniel]

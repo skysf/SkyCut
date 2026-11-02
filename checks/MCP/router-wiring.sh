@@ -8,17 +8,24 @@ echo "==> 路由：改工程的工具各是一步撤销"
 # 不显式分组的话 AI 的每一步都堆进同一组，⌘Z 一按全部退光；手动关自动开的那一组又会让下一次登记
 # 抛异常、App 闪退（docs/bugfixes/2026-09-27-ai-edits-share-one-undo-group.md）。
 ROUTER="Sources/SrtFlow/AIToolRouter.swift"
-for tool in setKeyframes setTrack splitClip deleteItems duplicateItems setTransition setText setShape setFilter setCanvas; do
+for tool in splitClip deleteItems duplicateItems setTransition setFilter setCanvas; do
   if [ "$(grep -cE "case \\.${tool}: return try AIUndoGrouping\\.step\\(undo\\)" "${ROUTER}" || true)" -ne 1 ]; then
     echo "✗ ${ROUTER} 里 ${tool} 没包在 AIUndoGrouping.step 里：它的改动会和别的步并成一步撤销" >&2
     exit 1
   fi
 done
-# edit_clip 先 await 看画面（去黑边、对准主体），再把同步的提交包起来：包的那一段不许有 await。
-if [ "$(grep -cE 'return try AIUndoGrouping\.step\(undo\) \{ try AIClipTools\.apply\(plan, project\) \}' "${ROUTER}" || true)" -ne 1 ]; then
-  echo "✗ ${ROUTER} 里 edit_clip 的提交没包在 AIUndoGrouping.step 里" >&2
-  exit 1
-fi
+# 单项与批量同一提交点：先校验，成功才开组；在路由外包会让失败请求留下空撤销组。
+python3 - <<'PYTHON'
+from pathlib import Path
+router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
+for call in ["AIClipTools.apply(plan, project)", "AITimelineTools.setKeyframes(args, project)",
+             "AITimelineTools.setTrack(args, project)", "AIOverlayTools.setText(args, project)", "AIOverlayTools.setShape(args, project)"]:
+    assert f"return try {call}" in router, f"missing direct routing to validated commit: {call}"
+    assert f"AIUndoGrouping.step(undo) {{ try {call}" not in router, f"opens an empty group before validation: {call}"
+for name, count in [("AIClipTools", 1), ("AITimelineTools", 2), ("AIOverlayTools", 2)]:
+    source = Path(f"Sources/SrtFlow/{name}.swift").read_text()
+    assert source.count("AIBatchEditTools.commit(edit, project,") == count, f"single-item commits must reuse batch transaction: {name}"
+PYTHON
 # edit_subtitles 给了字体要先等字体表（await），同样只把同步的提交包起来。
 if [ "$(grep -cE 'return try AIUndoGrouping\.step\(undo\) \{ try AISubtitleTools\.edit\(args, style: style, project\) \}' "${ROUTER}" || true)" -ne 1 ]; then
   echo "✗ ${ROUTER} 里 edit_subtitles 的提交没包在 AIUndoGrouping.step 里" >&2

@@ -11,7 +11,7 @@ import SrtFlowMCPKit
 // 合同：Sky Studio 仓库 docs/agents/skycut-api.md「GET /models」。
 // 不管什么：去问（SkyStudioAPI.models）、每种活怎么用这些数（各自的调用方）。
 
-struct SkyStudioModel: Equatable, Sendable {
+struct SkyStudioModel: Equatable, Sendable, Codable {
     var id: String
     var kind: String
     var title: String

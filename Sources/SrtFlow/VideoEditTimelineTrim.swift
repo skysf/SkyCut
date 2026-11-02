@@ -23,6 +23,8 @@ enum TimelineTrim {
 
     /// 剪辑裁到最短还剩多少（和以前 `liveTrim` 里的 0.1 同一个数）。
     static let clipMinimumDuration = 0.1
+    /// 片段播放速度的生产范围（检查器、MCP 和运行时限制反馈共用）。
+    static let clipSpeedRange = 0.1...8.0
     /// 字幕 cue 裁到最短还剩多少。
     static let cueMinimumDuration = 0.1
 

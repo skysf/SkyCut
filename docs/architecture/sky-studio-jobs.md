@@ -73,19 +73,30 @@
   Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
   新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。
 
-## 五、还没做的（第 6 刀后面几个 PR）
+## 五、云端旁白与失败恢复
 
 云端配音（6c，2026-10-29）由 `SkyStudioVoiceoverRun` 执行；本机 Kokoro / macOS 仍走原来的同步路径。
 
-- **先回任务号**：Key 静默读取、模型、全部报价、音频处理都在任务里；调用方只用 `get_job` 等，不重复 `add_voiceover`。普通旁白不可用或整批超每日额度时退本机并报告原因；克隆报错，不改用别人的声音、不问付费确认码。
+- **先回任务号**：Key 静默读取、模型、全部报价、音频处理都在任务里；调用方只用 `get_job` 等，不重复原始 `add_voiceover`。普通旁白服务不可用时可退本机；每日硬预算不足暂停，不换声音。克隆不退档、不问越额确认码。
 - **整批预留、逐批结算**：先从 `/models` 读模型与 cap，全部报价后一次预留总额（`SkyStudioVoiceBudget`）；每批复用 `SkyStudioJobRun`、同一幂等 key 重试。未提交的退回，取消 / 失败明确没花钱的退回且只退一次；提交结果未知的保留账，报告 `credits_unknown`、`submission_keys` 和已知服务器任务号，不自动重生成。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
 - **克隆合批**：`SkyStudioVoicePlan` 读取 `limits.max_characters_by_language`、按接口语言名选 cap；计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。短句装同一批、长句拆片记原句索引，不按每句收一次钱。参考段截成 16k 单声道 WAV，只上传一次。
 - **本机切句**：多句一批前先确认 macOS 26 转写模型已安装，否则收费前失败。拿到成品后复用系统转写和 `SubtitleCueWords` 字符对齐，每句必须覆盖足够原文；只在识别到的词之间找安静切口，不按字数猜时间。切不准保留完整批次文件并报错，禁止再次收费生成来掩盖失败。
 - **落地**：各句都经 `AIAudioFileWriter.writeVoiceover` 写到配音目录；最后核对原工程和 generation，一次 `AIUndoGrouping.step` 同时入轨 / 字幕、记本轮改动、未保存工程落盘。工程已换 / 关闭只留文件，不改别的工程。`get_job` 报批次、阶段、服务器任务号、文件和已收积分；状态行与生成共用 `SkyStudioMediaStatus`。
 
-尚未实施：
-- SkyCut 退出了，任务在服务器上照样做完：重开之后按记下的任务号取回。
+**2026-11-01：后续本地失败不否定已成功的生成。**
+
+- `SkyStudioVoiceCheckpoint` 将原始输入、原工程、原播放头、每批原文 / 原句索引、请求 key、服务器任务号、成品地址与元数据、完整原音频、本地切点 / 词时间、已完成成句文件和入轨回执记在配音目录的 `Voiceover-<UUID>.recovery/voiceover-recovery.json`。目录 700、记录 600；串行原子写，IO 经 `MediaReadQueue.voice`。原始批次不再由临时目录 defer 删除。
+- POST 前先持久化 `submitted`；云端成功先持久化原结果，再下载，再做本地分析；成句完成即保存进度。长句跨批时保留原音频与分析，恢复按批次原序重建未完成句；已完成句子不重复写文件。付费生成不在分句 / 字幕重试路径上。
+- `failure_stage` 区分 `cloud_generation`、`local_split`、`subtitle_alignment`，另有 `download`、`file_write`、`checkpoint`、`insertion`。要求字幕但没有可信词时间时明确留待恢复，不能把“音频成功但无字幕”当整项成功。
+- MCP 继续用 `add_voiceover` 和 `get_job`，不增加平行任务系统。`add_voiceover {resume: <recovery_file>}` 默认仅处理已有音频或 GET 已知原单，不重新报价、上传或 POST 生成；完整原音频在本机时连 Key 都不读。`generate_missing:true` 才会为明确未生成的批次报价 / 预留 / 提交。两种调用都回新 `job_id`，用 `get_job` 等；同一恢复文件并发请求复用正在跑的任务。
+- “未生成”只能是从未提交，或失败 / 取消有明确无扣费、全退证据且没有成品。未知结果有原单号只复用 `SkyStudioJobRun.resume` GET 原单；无原单号保留原 key 待核查，显式补生成也不重放它。成功后下载 / 本地处理失败不能退款、不能退回 missing。
+- 结果给出 `recovery_state`、`completed_line_indices`、`pending_recovery_line_indices`、`not_generated_line_indices` / `not_generated_batch_indices`、`unknown_batch_indices`、每批 `parts`（原文与 `line_index`）、原音频 / 成句文件、原单身份与可执行 `recovery.arguments`。列表中的索引从 0 起；顶层历史 `batch_index` 仍从 1 起。可恢复的未完成任务仍以 `failed` / `cancelled` 结束，通过 `recovery_state` 与方法继续，不能再次提交原稿。
+- 入轨仍复用 `AIVoiceoverTool.plan/apply`、`AIVoiceoverSubtitles`。提交前先写稳定的片段 UUID；提交完成记回执。重复恢复不再插入，用户之后撤销也不自动补回；工程已存在那组 UUID、但最终回执没写成时认已有插入，不再生字幕。只存在部分 UUID 时拒绝自动补插，交还现有内容让调用方检查。
+- 恢复记录与音频是用户输出，持续保留；记录不是整份工程备份。已保存工程可在重开后按原路径核对恢复；未保存工程只能认原运行代号。收到结果前就退出且没有服务器任务号的未知提交不能凭 key 自动查单（服务端没有该端点）。
+
+仍未实施：
+- App 启动时自动枚举 / 接管全部历史云任务（旁白现可显式传恢复文件取回已记下的原单）。
 - 第 7 刀已删除旧 fal 路径；`CloudMedia/` 保留阶段、状态行、传输和每日账，历史工程的 `costUSD` 用 `USDollarText` 显示，不改工程字段或身份键。
 
 ## 六、守卫
@@ -104,10 +115,12 @@
 
 - `scripts/check-sky-studio.sh` 的 `VoiceChecks`：动态上限、code points、合批 / 长句拆片、所有 chunk 的全局词时间、实际时长、切句拒绝不可靠转写、整批配额与未知账；`JobRunChecks` 覆盖 POST 返回瞬间取消仍先报告 ID。
 - `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：选声与本机退档、预制音色 / 角色、词时间各种合同格式、WAV 字节逐个对账。
+- `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果；模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句字幕对齐失败、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录，验证原单恢复只 GET。
 - 免费端到端：`scripts/gui-smoke/sky-studio/run.sh`，再用 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/voice.py`。独立 `.skystudiosmoke` App、回环假服务和假 Key，真实 MCP / 本机合成 / 转写 / 文件 / 入轨 / 字幕 / 撤销。`run.sh stop` 只清理这个测试身份；不使用生产 Key。假 Key 钩子同时要求测试 bundle 和回环地址，Beta / 正式包不认。
 - [ ] 真实 Key：普通旁白跨多个 chunk、字幕尾端不超音频；两句克隆只付一批并切成两段，听接缝无截字；一步撤销音频字幕一起消失。
 - [ ] 有窗口 / 后台工程：状态行显示积分、阶段与停止；取消 queued 只退一次，409 已开始继续查到结局；切 / 关工程不落到另一工程。
-- [ ] 每日额度为 0：普通配音退本机说明原因，克隆收费前失败；恢复原设置。
+- [ ] 每日额度为 0：新配音收费前暂停；本地已有音频的恢复不受付费额度影响；恢复原设置。
+- [ ] 真服务的多批克隆失败后，保持原恢复文件，用本地恢复确认句界听感；重开原已保存工程后仍能恢复，用户原有音频 / 字幕和声音不受影响。真实提供方生成质量与 ASR 识别率不由假夹具替代。
 
 ## 八、多模型 / 多参考验证
 

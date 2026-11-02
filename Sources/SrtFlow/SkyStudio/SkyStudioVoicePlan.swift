@@ -5,15 +5,15 @@ import SrtFlowMCPKit
 // 管什么：普通旁白一句一单，克隆在字符上限内合并多句；语言换成接口的写法，读动态 cap，构造 /quote 和 /jobs 共用的请求。
 // 不管什么：Key、价、额度、上传、执行、音频切分、入轨。
 
-struct SkyStudioVoicePlan: Sendable {
-    struct Batch: Sendable {
+struct SkyStudioVoicePlan: Sendable, Codable {
+    struct Batch: Sendable, Codable {
         let speech: SkyStudioVoiceBatch
         var request: SkyStudioJobRequest
     }
 
     let model: SkyStudioModel
     let language: String
-    let batches: [Batch]
+    var batches: [Batch]
     var clones: Bool { model.kind == "voice_clone" }
 
     struct Problem: LocalizedError {

@@ -161,7 +161,8 @@ private func checkFitAndPlace() {
                         if let schema = properties[key] { ranges.append((schema["minimum"]?.doubleValue, schema["maximum"]?.doubleValue)) }
                     }
                 }
-                object.values.forEach(walk)
+                // region.x/y 是源画面坐标（0…1），不属于这里检查的画布位置。
+                object.filter { $0.key != "region" }.values.forEach(walk)
             } else if case .array(let items) = value {
                 items.forEach(walk)
             }

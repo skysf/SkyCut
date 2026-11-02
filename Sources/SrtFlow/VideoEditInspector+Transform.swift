@@ -318,7 +318,7 @@ extension VideoEditInspectorView {
             Text(label).font(.caption2).foregroundStyle(.tertiary)
             InspectorScrubbableNumberField(
                 value: cropBinding(clip, live: live, keyPath),
-                range: 0...45,
+                range: 0...((live.crop ?? ClipCrop()).maximumInset(at: keyPath) * 100),
                 width: 36,
                 onScrubBegin: { project.beginLiveEdit() },
                 onScrubChanged: { liveSetCrop(clip, keyPath, $0) },
@@ -350,17 +350,7 @@ extension VideoEditInspectorView {
     }
 
     private static func updatingCrop(_ current: ClipCrop, _ keyPath: KeyPath<ClipCrop, Double>, _ fraction: Double) -> ClipCrop {
-        var top = current.top
-        var bottom = current.bottom
-        var leading = current.leading
-        var trailing = current.trailing
-        switch keyPath {
-        case \ClipCrop.top: top = fraction
-        case \ClipCrop.bottom: bottom = fraction
-        case \ClipCrop.leading: leading = fraction
-        default: trailing = fraction
-        }
-        return ClipCrop(top: top, bottom: bottom, leading: leading, trailing: trailing)
+        current.setting(keyPath, to: fraction)
     }
 
     // MARK: Transform 绑定（离散提交）

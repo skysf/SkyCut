@@ -15,7 +15,7 @@ final class FakeApp: @unchecked Sendable {
     private var seen: [MCPBridge.Request] = []
 
     init() throws {
-        path = NSTemporaryDirectory() + "srtflow-mcp-check-\(getpid()).sock"
+        path = NSTemporaryDirectory() + "srtflow-mcp-check-\(UUID().uuidString.prefix(8)).sock"
         let fd = try MCPUnixSocket.listen(path: path)
         Thread { [weak self] in
             while let client = MCPUnixSocket.accept(fd) {

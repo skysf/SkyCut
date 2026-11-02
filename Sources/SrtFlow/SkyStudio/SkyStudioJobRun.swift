@@ -32,6 +32,8 @@ struct SkyStudioJobRun: Sendable {
     var maxWait: Double = 5 * 3600
     /// 停不下来的那单交给谁接着查。nil = 不继承取消的后台任务里 `followToEnd`；自检换成只记下任务号的。
     var onUnstoppable: (@Sendable (String) -> Void)?
+    /// 需要可恢复的调用方可先持久化原单身份；完成回调后才继续轮询 / 返回，避免旧进度晚写覆盖恢复结果。
+    var checkpoint: (@Sendable (SkyStudioJobStatus) async throws -> Void)?
 
     init(api: SkyStudioAPI, key: String) {
         self.api = api
@@ -52,6 +54,13 @@ struct SkyStudioJobRun: Sendable {
         return try await follow(submitted, deadline: deadline, onUpdate: onUpdate)
     }
 
+    /// 恢复已知原单：只 GET，沿用同一套轮询 / 取消规则，永不重新 POST。
+    func resume(_ jobID: String, onUpdate: @escaping @Sendable (Update) -> Void = { _ in }) async throws -> SkyStudioJobStatus {
+        let original = try await api.job(jobID, key: key)
+        try await report(original, onUpdate: onUpdate)
+        return try await follow(original, deadline: Date().addingTimeInterval(maxWait), onUpdate: onUpdate)
+    }
+
     // MARK: 交
 
     private func submit(
@@ -65,7 +74,7 @@ struct SkyStudioJobRun: Sendable {
             }.value
             switch attempt {
             case .success(let status):
-                onUpdate(.status(status))
+                try await report(status, onUpdate: onUpdate)
                 // 交上了才发现用户要停：按任务号停。
                 if Task.isCancelled { throw await stop(status.jobID) }
                 return status
@@ -81,13 +90,13 @@ struct SkyStudioJobRun: Sendable {
                 let id = error.fields["job_id"]!.stringValue!
                 var known = SkyStudioJobStatus(jobID: id, state: nil)
                 known.billing = SkyStudioBilling(error.fields["billing"])
-                onUpdate(.status(known))
+                try await report(known, onUpdate: onUpdate)
                 if Task.isCancelled { throw await stop(id) }
                 let recovered: SkyStudioJobStatus
                 let originalFailure = SkyStudioFailure.server(error)
                 do { recovered = try await api.job(id, key: key) }
                 catch { throw SkyStudioJobError.request(originalFailure) }
-                onUpdate(.status(recovered))
+                try await report(recovered, onUpdate: onUpdate)
                 return recovered
             case .failure(let failure as SkyStudioFailure):
                 throw SkyStudioJobError.request(failure)
@@ -129,7 +138,7 @@ struct SkyStudioJobRun: Sendable {
                 let next = try await api.job(current.jobID, key: key)
                 misses = 0
                 current = next
-                onUpdate(.status(next))
+                try await report(next, onUpdate: onUpdate)
             } catch is CancellationError {
                 throw await stop(current.jobID)
             } catch SkyStudioFailure.network(let detail) {
@@ -144,6 +153,11 @@ struct SkyStudioJobRun: Sendable {
 
     static func pollSeconds(_ serverSays: Double?) -> Double {
         min(pollRange.upperBound, max(pollRange.lowerBound, serverSays ?? defaultPollSeconds))
+    }
+
+    private func report(_ status: SkyStudioJobStatus, onUpdate: @Sendable (Update) -> Void) async throws {
+        onUpdate(.status(status))
+        try await checkpoint?(status)
     }
 
     /// 原单已经明确真人参考拒绝，但退款记录可能晚到；只查这个 job_id，绝不重新 POST。

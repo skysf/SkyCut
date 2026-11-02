@@ -161,7 +161,7 @@ final class AIToolRouter {
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
             return Outcome(json: AIProjectTools.saveIfNeverSaved(project, after: result).json, stamp: result.stamp)
         } catch let error as AIToolError {
-            return Outcome(json: MCPBridge.textResult(error.message, isError: true), failed: true)
+            return Outcome(json: error.result, failed: true)
         } catch {
             return Outcome(json: MCPBridge.textResult("SkyCut could not do that: \(error.localizedDescription)", isError: true), failed: true)
         }
@@ -215,6 +215,7 @@ final class AIToolRouter {
         // 起一个录屏会话就回来（AI 好接着操作电脑）；入轨那一下是异步落账，会话的 landing 包一层 AIUndoGrouping.step。
         case .recordScreen: return try await AIScreenRecordingTool.run(args, project)
         case .addVoiceover:
+            if let recovery = try await SkyStudioVoiceRecovery.resumeIfAsked(args, project: project) { return recovery }
             // 只是下载 SrtFlow 自己的声音：回任务号，不改工程。
             if let download = try await AIVoiceoverTool.startDownloadIfAsked(args) { return download }
             // 克隆的素材要发给 Sky Studio：点名的文件夹以外的先问一次。
@@ -224,6 +225,7 @@ final class AIToolRouter {
             if case .skyStudio = input.choice.engine { return SkyStudioVoiceoverRun(input: input, project: project).start() }
             let plan = try await AIVoiceoverTool.plan(input, project)
             return try AIUndoGrouping.step(undo) { try AIVoiceoverTool.apply(plan, project) }
+        case .syncVoiceover: return try AIVoiceoverSyncTool(args, project).start()
         case .transcribe:
             guard #available(macOS 26.0, *) else { throw AIToolError("Transcribing speech needs macOS 26 or later on this Mac.") }
             return try await AITranscribeTool.transcribe(args, project)
@@ -232,11 +234,17 @@ final class AIToolRouter {
         case .convertSubtitles: return try AIEncodeTools.convert(args, project)
         case .addClips: return try await AITimelineTools.addClips(args, project)
         case .editClip:
-            // 先看画面（去黑边、对准主体要抽帧），再同步提交：包进撤销组的那一段不许有 await。
+            // 先看画面、再校验；和批量共用提交点，通过后才开撤销组（失败不留空组）。
             let plan = try await AIClipTools.plan(args, project)
-            return try AIUndoGrouping.step(undo) { try AIClipTools.apply(plan, project) }
-        case .setKeyframes: return try AIUndoGrouping.step(undo) { try AITimelineTools.setKeyframes(args, project) }
-        case .setTrack: return try AIUndoGrouping.step(undo) { try AITimelineTools.setTrack(args, project) }
+            return try AIClipTools.apply(plan, project)
+        case .editClips:
+            let plan = try await AIBatchEditTools.planClips(args, project)
+            return try AIBatchEditTools.applyClips(plan, project)
+        // 批量工具在共同的同步提交点里包一次撤销组；整批校验不登记撤销。
+        case .setTexts: return try AIBatchEditTools.setTexts(args, project)
+        case .setShapes: return try AIBatchEditTools.setShapes(args, project)
+        case .setKeyframes: return try AITimelineTools.setKeyframes(args, project)
+        case .setTrack: return try AITimelineTools.setTrack(args, project)
         case .splitClip: return try AIUndoGrouping.step(undo) { try AITimelineTools.split(args, project) }
         case .freezeFrame: return try await AIClipTools.freeze(args, project)
         case .cutSpeech:
@@ -249,8 +257,8 @@ final class AIToolRouter {
         case .deleteItems: return try AIUndoGrouping.step(undo) { try AITimelineTools.delete(args, project) }
         case .duplicateItems: return try AIUndoGrouping.step(undo) { try AITimelineTools.duplicate(args, project) }
         case .setTransition: return try AIUndoGrouping.step(undo) { try AITimelineTools.transition(args, project) }
-        case .setText: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setText(args, project) }
-        case .setShape: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setShape(args, project) }
+        case .setText: return try AIOverlayTools.setText(args, project)
+        case .setShape: return try AIOverlayTools.setShape(args, project)
         case .setFilter: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setFilter(args, project) }
         case .setCanvas: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setCanvas(args, project) }
         case .generateSubtitles: return try await AISubtitleTools.generate(args, project)
@@ -293,7 +301,7 @@ final class AIToolRouter {
             // 开 / 建 / 关工程：开在哪、摆不摆由它们自己定（主窗口空着装进去时摆一次，工程窗口开的时候摆一次）；不开一轮。
             case .openProject, .newProject, .closeProject:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
-            case .undo, .addClips, .addVoiceover, .editClip, .setKeyframes, .setTrack, .splitClip, .deleteItems,
+            case .undo, .addClips, .addVoiceover, .syncVoiceover, .editClip, .editClips, .setTexts, .setShapes, .setKeyframes, .setTrack, .splitClip, .deleteItems,
                  .duplicateItems, .freezeFrame, .cutSpeech, .cutToBeat,
                  .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles,
                  .editSubtitles, .upscaleClip:

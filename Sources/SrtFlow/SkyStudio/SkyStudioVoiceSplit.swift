@@ -6,7 +6,7 @@ import SrtFlowCore
 // 不管什么：转写、解码、写文件（SkyStudioVoiceAudio）；不按字数猜时间，不因此重新花积分生成。
 
 enum SkyStudioVoiceSplit {
-    struct Slice: Sendable {
+    struct Slice: Sendable, Codable {
         let part: SkyStudioVoiceBatch.Part
         let start: Double
         let end: Double
@@ -14,7 +14,7 @@ enum SkyStudioVoiceSplit {
 
     struct Problem: LocalizedError {
         var errorDescription: String? {
-            "SkyCut could not align the cloned speech with the lines, so it did not cut or add any lines. The complete batch file was kept; do not generate it again."
+            "SkyCut could not align the cloned speech with the lines. The complete audio and line mapping were kept; resume this voiceover from its recovery_file without generating it again."
         }
     }
 

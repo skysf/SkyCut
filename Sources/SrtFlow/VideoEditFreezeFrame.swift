@@ -237,13 +237,13 @@ extension VideoEditProject {
 
     // MARK: - 抽帧
 
-    private struct ExtractedFrame {
+    struct ExtractedFrame {
         var image: CGImage
         /// 实际取到的帧和请求时刻差多少秒（源时间）。VFR/低帧率素材上会不为 0。
         var drift: Double
     }
 
-    private static func extractFrame(
+    static func extractFrame(
         from url: URL,
         atSourceTime seconds: Double,
         tolerance: Double
@@ -286,7 +286,7 @@ extension VideoEditProject {
     /// 刻意不放缓存目录：那里的东西随时会被系统清掉，而这张图是工程唯一的
     /// 事实来源（静帧 mp4 只是它的缓存产物）。清没了的话工程再打开会要求用户
     /// 重链接一张他从来没见过的图。
-    private func writeFreezeImage(_ image: CGImage, clipName: String, at time: Double) throws -> URL {
+    func writeFreezeImage(_ image: CGImage, clipName: String, at time: Double) throws -> URL {
         let folder = documentURL?.deletingLastPathComponent()
             ?? FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser

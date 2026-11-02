@@ -4,8 +4,8 @@ import Foundation
 // 管什么：按 /models 给的 Unicode code point 上限装满一批；超过上限的一句先在字边界切开，记住每片原来属于哪一句。
 // 不管什么：价、HTTP、语音怎么切（SkyStudioVoiceSplit）；上限不在本机抄一份。
 
-struct SkyStudioVoiceBatch: Equatable, Sendable {
-    struct Part: Equatable, Sendable {
+struct SkyStudioVoiceBatch: Equatable, Sendable, Codable {
+    struct Part: Equatable, Sendable, Codable {
         let line: Int
         let text: String
     }

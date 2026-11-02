@@ -113,7 +113,7 @@ enum AIKeyframes {
             animation.height = KeyframeTrack()
             for point in scale {
                 let at = try source(point.time)
-                let factor = min(max(point.value, 0.02), 8)
+                let factor = min(max(point.value, MCPFramingLimits.keyframeScale.lowerBound), MCPFramingLimits.keyframeScale.upperBound)
                 animation.width.set(base.width * factor, atSourceTime: at, tolerance: tolerance, easing: request.easing)
                 animation.height.set(base.height * factor, atSourceTime: at, tolerance: tolerance, easing: request.easing)
             }
