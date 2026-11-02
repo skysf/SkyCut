@@ -139,6 +139,7 @@ final class AIJobs {
         if job.status == .running, let position = AIWorkQueue.shared.position(of: job.id) {
             object["status"] = "queued"
             object["queue_position"] = .number(Double(position))
+            object.merge(job.liveDetail()) { current, _ in current }
             return .object(object)
         }
         if job.status == .running, let progress = job.progress() {

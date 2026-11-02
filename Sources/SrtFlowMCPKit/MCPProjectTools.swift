@@ -6,7 +6,7 @@ import Foundation
 
 public enum MCPProjectTools {
     /// 每个碰工程的工具都收的 `project` 参数的说明（`MCPToolDefinition.addProjectParameter` 统一加）。
-    static let projectParameter = "Project id; default last opened."
+    static let projectParameter = "Project; default last opened."
 
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
         switch name {

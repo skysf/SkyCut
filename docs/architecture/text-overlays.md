@@ -231,9 +231,15 @@ Fade 当场退回 None；同一个错误也让「勾了粗体再拖字号」掉�
 
 | 片段 | ffmpeg |
 | --- | --- |
-| 静止 | `-loop 1 -t <总长> -i text0-mid.png`，与形状同款 |
+| 静止 | 只解一帧 PNG，`loop` 复制到此段长度加两帧，`setpts=N/fps/TB+起点/TB`；与形状同款 |
 | 一次性序列 | `-itsoffset <起点> -framerate <fps> -i text0-in_%05d.png`，帧与时间线精确对齐（实测） |
 | 循环 | `-framerate <fps> -i …`，再 `loop=loop=-1:size=N,setpts=N/fps/TB+起点/TB` |
+
+**静止 PNG 不许用输入侧 `-loop 1` 铺满整条时间线**（2026-11-02）：它会每帧重新解码同一张
+PNG，短标题和形状也会解完整片。复用静帧工厂的「解一帧、滤镜 loop 复制」做法，
+复制帧数用 `sequenceFrameCount`，保留两帧接缝余量、左闭右开、层序和原始像素；不降低正式
+导出的质量。`scripts/check-export-profile.sh` 从真实 ffmpeg 日志核对静止形状输入只解码 1 帧，
+视觉接缝仍由下述逐帧守卫检查。案例见 [静帧被整片重复解码](../bugfixes/2026-11-02-export-redecodes-static-overlays.md)。
 
 序列末尾**多渲两帧**（`OverlayExportFile.sequenceTailFrames`）：输出帧的时刻一过序列的最后一帧，输入流就到了 EOF，
 `eof_action=pass` 当场把这一层整个撤掉 —— 字闪没一帧。序列的最后一帧可能早于区间终点，三个原因叠在一起：区间里的帧本来只排到

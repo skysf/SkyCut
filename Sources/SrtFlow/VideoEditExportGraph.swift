@@ -43,8 +43,10 @@ enum VideoEditExportGraph {
         subtitleFontURL: URL?,
         output: URL,
         watermark: ExportWatermark?,
-        cancellation: ExportCancellationToken? = nil
+        cancellation: ExportCancellationToken? = nil,
+        phase: (@Sendable (String) -> Void)? = nil
     ) async throws -> Plan {
+        phase?("preparation")
         // 混音要的是**用户那一份**：它走预览合成（`build` 自己排序、展开），展开只许一次。
         let requested = state
         // 主轨的黑场补齐和 xfade 链都按数组顺序算，乱序输入会算出负时长的
@@ -135,6 +137,7 @@ enum VideoEditExportGraph {
             .appendingPathExtension(output.pathExtension)
 
         // 形状 → 整幅透明 PNG（有入场 / 出场动画的，那两截逐帧渲；画面由 `ShapePNGRenderer` 出，和预览同一条路径）。
+        phase?("overlay_render")
         let shapeFiles = try ShapeOverlayExport.renderFiles(
             state.renderedShapes, canvas: renderSize,  // 藏起来的（V）不进成片
             frameRate: state.frameRate, into: workspace
@@ -148,6 +151,7 @@ enum VideoEditExportGraph {
         )
 
         // 输入表：素材文件 + 形状 PNG。
+        phase?("graph_build")
         var inputs: [String] = []
         var inputArguments: [String] = []
         var inputIndex: [String: Int] = [:]
@@ -175,6 +179,7 @@ enum VideoEditExportGraph {
         // 一个出声的段都没有时垫一路静音：成片照旧总有一条音轨。
         let mixdownFile = workspace.appendingPathComponent("audio-mixdown.f32")
         var audioLevels: ExportAudioMixdown.Levels?
+        phase?("audio_processing")
         switch try await ExportAudioMixdown.render(
             state: requested, duration: total, to: mixdownFile, cancellation: cancellation
         ) {
@@ -184,6 +189,7 @@ enum VideoEditExportGraph {
         case .silent:
             inputArguments += ["-f", "lavfi", "-t", fmt(total), "-i", "anullsrc=r=48000:cl=stereo"]
         }
+        phase?("graph_build")
         let audioMap = "\(inputs.count):a"
         inputs.append(mixdownFile.path)
 
@@ -249,6 +255,9 @@ enum VideoEditExportGraph {
             case overlay(fill: URL, matte: URL)
         }
         var prerendered: [UUID: Prerendered] = [:]
+        if segments.contains(where: { $0.clip?.needsPerFrameRender == true }) || overlayVisible.contains(where: { $0.needsPerFrameRender }) {
+            phase?("prerender")
+        }
         for (segmentIndex, segment) in segments.enumerated() {
             guard let clip = segment.clip, clip.needsPerFrameRender else { continue }
             prerendered[clip.id] = .main(try await AnimatedClipPrerenderer.renderMain(
@@ -281,6 +290,7 @@ enum VideoEditExportGraph {
 
         // MARK: 每节的画面流
 
+        phase?("graph_build")
         var segmentLabels: [(video: String, duration: Double)] = []
         for (segmentIndex, segment) in segments.enumerated() {
             let vLabel = nextLabel("v")
