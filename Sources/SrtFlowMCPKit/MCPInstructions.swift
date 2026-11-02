@@ -50,7 +50,7 @@ public enum MCPInstructions {
     - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser… made here), add_voiceover \
     (narration), sync_voiceover (paragraph timing), set_track
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
-    - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job
+    - Output: export_video, inspect_video; compress_videos, burn_subtitles, convert_subtitles (files); get_job, cancel_job
     - App: get_settings, set_settings (preferences); set_view, seek
     - Paid: \(skyStudioTools)
     """

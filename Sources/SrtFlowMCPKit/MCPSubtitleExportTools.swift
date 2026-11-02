@@ -116,18 +116,18 @@ public enum MCPSubtitleExportTools {
     /// 字幕长什么样：edit_subtitles（这个工程的）和 burn_subtitles（那一批的）共用这一份。
     static let subtitleStyle = MCPSchema.object([
         "position": MCPSchema.string("Where the subtitles sit.", oneOf: MCPVocabulary.subtitlePositions),
-        "margin": MCPSchema.number("Distance from that edge, as a fraction of the frame height (default 0.056).", minimum: 0, maximum: 0.45),
+        "margin": MCPSchema.number("Edge distance / frame height (default 0.056).", minimum: 0, maximum: 0.45),
         "size": MCPSchema.number("Pixels on a 1080-tall frame (a 9:16 frame is 1920 tall: 1.78x larger there); default 56; bold captions 56-64 on 16:9, 42-48 on 9:16.", minimum: 20, maximum: 140),
-        "max_width": MCPSchema.number("Widest line as a fraction of the frame width (default 0.92 on 16:9, 0.74 on 9:16); longer lines wrap. Project only.", minimum: 0.3, maximum: 1),
-        "line_spacing": MCPSchema.number("Space between lines as a multiple of the line height, 1 (default) to 2; fonts whose glyphs fill the line (Yuanti) read better at 1.15-1.3.", minimum: 1, maximum: 2),
-        "font": MCPSchema.string("Font family on this Mac that can burn Chinese or English, e.g. Hiragino Sans GB, Heiti SC, Helvetica Neue."),
-        "bold": MCPSchema.boolean("Bold text."),
+        "max_width": MCPSchema.number("Line width / frame width; wraps. Default 0.92 (16:9), 0.74 (9:16). Project only.", minimum: 0.3, maximum: 1),
+        "line_spacing": MCPSchema.number("Line-height multiple, default 1; full-height glyphs (Yuanti) suit 1.15-1.3.", minimum: 1, maximum: 2),
+        "font": MCPSchema.string("Installed burnable font: e.g. Hiragino Sans GB, Heiti SC, Helvetica Neue."),
+        "bold": MCPSchema.boolean("Bold."),
         "color": MCPSchema.string("Text colour, #RRGGBB."),
         "outline": MCPSchema.string("Outline colour #RRGGBB, or none."),
-        "outline_width": MCPSchema.number("Outline thickness (the padding of the box when there is one).", minimum: 0, maximum: 12),
-        "box": MCPSchema.string("A bar behind the text instead of an outline: #RRGGBBAA (e.g. #00000099), or none."),
-        "shadow": MCPSchema.string("Drop shadow (with an outline, not a box): #RRGGBBAA (e.g. #000000B3), or none."),
-        "highlight": MCPSchema.string("Word-by-word highlight: the spoken word turns this colour (#RRGGBB), or none. Project only."),
+        "outline_width": MCPSchema.number("Outline thickness, or box padding.", minimum: 0, maximum: 12),
+        "box": MCPSchema.string("Background bar replaces outline: #RRGGBBAA, or none."),
+        "shadow": MCPSchema.string("Shadow with outline only: #RRGGBBAA, or none."),
+        "highlight": MCPSchema.string("Spoken-word colour: #RRGGBB, or none. Project only."),
         "highlight_scale": MCPSchema.number("How much the spoken word grows (1-1.3, default 1.1; 1 for long lines).", minimum: 1, maximum: 1.3),
         "reset": MCPSchema.boolean("Go back to the style from SkyCut's Burn In Subtitles page first.")
     ])

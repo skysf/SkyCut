@@ -28,6 +28,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case getTimeline = "get_timeline"
     case look = "look"
     case listen = "listen"
+    case inspectVideo = "inspect_video"
     case transcribe = "transcribe"
     case findAudio = "find_audio"
     case addVoiceover = "add_voiceover"
@@ -84,7 +85,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
              .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
-        case .setView, .closeProject, .saveProject, .getTimeline, .look, .listen, .transcribe, .addVoiceover, .recordScreen,
+        case .setView, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
              .upscaleClip, .addClips, .editClip, .editClips, .syncVoiceover, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
              .deleteItems, .duplicateItems, .setTransition, .setText, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,
              .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:
@@ -94,6 +95,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
 
     private var groupDefinition: MCPToolDefinition {
         switch self {
+        case .inspectVideo: return MCPInspectionTool.definition
         case .syncVoiceover: return MCPVoiceoverSyncTool.definition
         case .getSettings, .setSettings:
             return MCPSettingsTools.definition(for: self)
@@ -247,9 +249,9 @@ public enum MCPSchema {
     }
 
     /// 几个工具都收的「确认令牌」：只有用户在对话里点头之后，才把上一次结果里给的那个令牌带回来。
-    public static let confirmToken = string("From a needs_confirmation result, once the user agreed.")
+    public static let confirmToken = string("Returned token, after user approval.")
 
     /// 轨道名：V1 是主视频轨，V2、V3… 是叠在上面的视频轨，A1、A2… 是音频轨。
     public static let trackDescription =
-        "V1 main; V2/V3… upper video; A1/A2… audio. new_video/new_audio open tracks."
+        "V1 main; V2+ video; A1+ audio; new_video/new_audio create tracks."
 }
