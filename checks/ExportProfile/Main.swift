@@ -5,7 +5,7 @@ import SrtFlowCore
 import SrtFlowMCPKit
 @testable import SrtFlow
 
-// 生产导出计时、设置、排队/取消与 PNG 解码计数；无用户工程、云端请求或硬件编码依赖。
+// 生产子进程收尾、导出计时、设置、排队/取消与 PNG 解码计数；无用户工程、云端请求或硬件编码依赖。
 @main enum ExportProfileChecks {
     @MainActor static func main() async {
         guard Bundle.main.bundleIdentifier == "com.srtflow.SrtFlow.exportprofilecheck" else { fatalError("Isolated bundle required") }
@@ -15,6 +15,7 @@ import SrtFlowMCPKit
         var count = 0, failures = 0
         func require(_ condition: Bool, _ why: String) { count += 1; if !condition { failures += 1; print("FAIL: \(why)") } }
         do {
+            try await FFmpegProcessChecks.run(root: root, require: require)
             var base = VideoEncodeSettings.default
             base.crf = 21; base.hardwareQuality = 70; base.resolution = .fhd1080
             let unchanged = try AIExportOptions.parse(AIToolArguments([:]), base: base)

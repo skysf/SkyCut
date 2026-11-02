@@ -49,12 +49,15 @@ import SrtFlowMCPKit
     }
 
     func export(ffmpeg: URL) async throws -> CGImage {
+        print("EXPORT: preparing graph")
         let plan = try await VideoEditExportGraph.plan(
             state: project.state, settings: VideoEncodeSettings(), subtitleStyle: BurnInStyle(name: "region-check"),
             subtitleFontURL: nil, output: project.documentURL!.deletingLastPathComponent().appendingPathComponent("export.mp4"), watermark: nil
         )
         defer { try? FileManager.default.removeItem(at: plan.workspace) }
+        print("EXPORT: running ffmpeg")
         try await FFmpegProcess().run(executable: ffmpeg, arguments: plan.arguments, workingDirectory: plan.workspace)
+        print("EXPORT: decoding output frame")
         return try await Self.fileFrame(plan.tempOutput)
     }
 

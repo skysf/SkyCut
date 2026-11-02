@@ -34,8 +34,8 @@ enum FFmpegProcessError: LocalizedError {
 
 /// 跑一次 ffmpeg，边跑边报进度，可以中途取消。
 ///
-/// 可变状态只有 `isCancelled`，由 `lock` 保护；`Process` 自身的 terminate /
-/// waitUntilExit 是线程安全的，所以这里标 `@unchecked Sendable` 是成立的。
+/// 可变状态只有 `isCancelled`，由 `lock` 保护；Process 启动前配置，取消只调线程安全的 terminate。
+/// 退出回调与管道读取通过 DispatchGroup 汇合，不从另一线程进入 waitUntilExit 的 RunLoop。
 final class FFmpegProcess: @unchecked Sendable {
 
     private let process = Process()
@@ -65,11 +65,12 @@ final class FFmpegProcess: @unchecked Sendable {
         // 不给 ffmpeg 留 stdin，配合 -nostdin 保证它绝不会停下来等输入。
         process.standardInput = FileHandle.nullDevice
 
-        // 三件事各占一个后台线程：读 stdout、读 stderr、等进程退出。
-        // 用阻塞读 + DispatchGroup 是最稳的写法，不会像 readabilityHandler
-        // 那样在进程退出后还漏数据或重复回调。
+        // 两条管道各占一个后台线程；退出由启动前注册的回调报到。
+        // 三件事全做完才返回，避免退出回调先到、stderr / 最后一批进度还没读完。
         let group = DispatchGroup()
         let stderrBuffer = StderrBuffer()
+        group.enter()
+        process.terminationHandler = { _ in group.leave() }
 
         group.enter()
         DispatchQueue.global(qos: .utility).async {
@@ -101,6 +102,11 @@ final class FFmpegProcess: @unchecked Sendable {
         do {
             try process.run()
         } catch {
+            process.terminationHandler = nil
+            group.leave()
+            // 没启动就没有子进程关闭写端；显式关掉，让两条读取线程收到 EOF 后离开。
+            try? stdoutPipe.fileHandleForWriting.close()
+            try? stderrPipe.fileHandleForWriting.close()
             throw FFmpegProcessError.launchFailed(error.localizedDescription)
         }
 
@@ -108,11 +114,6 @@ final class FFmpegProcess: @unchecked Sendable {
         if cancelRequested { process.terminate() }
 
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
-            group.enter()
-            DispatchQueue.global(qos: .utility).async {
-                self.process.waitUntilExit()
-                group.leave()
-            }
             group.notify(queue: .global(qos: .utility)) {
                 continuation.resume()
             }

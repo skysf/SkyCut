@@ -179,7 +179,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 构建与检查入口
 
-- 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消与 PNG 仅解码一次），合同见 [导出设置](docs/architecture/export-settings.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
+- 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](docs/architecture/export-settings.md)与[子进程退出](docs/architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
@@ -620,6 +620,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-03 短导出卡在退出等待](docs/bugfixes/2026-11-03-ffmpeg-exit-wait-runloop.md) — 启动前注册退出回调、排空双管道后汇合；真实短进程守卫与撤掉修复后的红灯证据。
 - [MCP 最小示例与真实参数提示](docs/bugfixes/2026-11-03-mcp-usage-guidance.md)：需求选工具、示例 schema 校验和 `end` → `source_out` 的结果提示。
 
 - [helper 更新清单不等于客户端已发现新工具](docs/bugfixes/2026-11-02-mcp-catalog-refresh-reporting.md)：55 / 50 项诊断、状态指纹、旧 schema 与重连步骤。
