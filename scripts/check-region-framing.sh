@@ -50,5 +50,17 @@ SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/RegionFramingCheck" <<'PYTHON'
 import subprocess
 import sys
-subprocess.run([sys.argv[1]], timeout=240, check=True)
+with subprocess.Popen([sys.argv[1]], stdin=subprocess.DEVNULL) as check:
+    try:
+        code = check.wait(timeout=240)
+    except subprocess.TimeoutExpired:
+        print("Region framing timed out; sampling the isolated check before stopping it", flush=True)
+        try:
+            subprocess.run(["/usr/bin/sample", str(check.pid), "1", "1", "-file", "/dev/stdout"], timeout=15, check=False)
+        finally:
+            check.kill()
+            check.wait()
+        raise
+    if code:
+        raise subprocess.CalledProcessError(code, [sys.argv[1]])
 PYTHON
