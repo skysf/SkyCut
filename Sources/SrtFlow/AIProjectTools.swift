@@ -33,6 +33,7 @@ enum AIProjectTools {
         }
         var result: [String: JSONValue] = [
             "app_version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"),
+            "mcp_catalog": MCPCatalogSync.statusJSON,
             "project": .object(projectInfo),
             "projects": AIProjectStatus.openProjects(session: AICallContext.current?.session, cloudTasks: cloudTasks),
             "cloud_tasks": cloudTasks.json(),

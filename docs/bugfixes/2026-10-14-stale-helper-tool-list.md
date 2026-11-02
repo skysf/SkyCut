@@ -26,6 +26,10 @@ AI 看到的 `set_keyframes` 的 `easing` 选项里没有 snap / overshoot / spr
 
 ## 验证
 
+> 2026-11-02 补充：下述“客户端会重新要”只验证了主动请求的测试客户端。真实 Codex CLI 0.166.0
+> 收到通知后仍未重读；有效的退出 / 重连 / resume 步骤和分层证据见
+> [helper 更新不等于客户端发现](2026-11-02-mcp-catalog-refresh-reporting.md)。
+
 - `scripts/check-mcp.sh` 的 `CatalogSyncChecks`：纯值（没报指纹 / 指纹一样不换、报了别的才换、换上的不再要、新工具名认得、按提供方过滤、
   通知只给一次）；**真起小程序**接一个「升级过的」假 App（回答带着另一个指纹、给出的清单多一个工具）：第一次调用的结果里说清单换了、
   老一代客户端收到一次 `list_changed`、`tools/list` 里有新工具、调用新工具照样转给 App、只要一次清单、之后的调用不再说；

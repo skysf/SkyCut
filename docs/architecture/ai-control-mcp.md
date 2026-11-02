@@ -20,7 +20,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    SrtFlow 拉起来。**App 升级之后会话里跑的还是旧小程序**（它是客户端开会话时启动的进程）：App 的每个回答带上自己清单的指纹
    （`MCPBridge.Response.catalog` = `MCPCatalogSync.fingerprint`），小程序发现和自己的不一样就向 App 要它的清单（`MCPBridge.catalogTool`，
    App 在收发线程上当场答、不经主线程），从此按它回 `tools/list`、认它的工具名（新工具照样转给 App），老一代客户端发一次 `list_changed`，
-   那一次的结果里说一句；总说明只在握手时给，换不了（[案例](../bugfixes/2026-10-14-stale-helper-tool-list.md)）。这只救得了带着这套逻辑的小程序：
+   那一次的结果里说一句；这只证明 helper 已采用，不能保证客户端已刷新模型可用的名字和参数。缺项时重连并新建会话，
+   分层诊断和操作见 [MCP 功能发现](mcp-discovery.md)。总说明只在握手时给，换不了（[案例](../bugfixes/2026-10-14-stale-helper-tool-list.md)）。这只救得了带着这套逻辑的小程序：
    这一版以前的小程序照旧要重开会话。
 2. **选项词表**（转场、滤镜、文字动画、画面比例、帧率、分辨率）小程序拿不到 App 的类型，只能在
    `MCPVocabulary` 里抄一份 —— 抄的就会漂，`scripts/check-mcp.sh` 逐项和 App 的 `allCases` 对账。

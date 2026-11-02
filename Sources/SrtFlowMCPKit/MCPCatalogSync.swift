@@ -31,10 +31,17 @@ public enum MCPCatalogSync {
         ]
     }
 
-    /// 换上新清单的那一次，工具结果里给 AI 的一句话。
+    /// App 的实际清单身份；不能证明客户端已经重新加载。供 get_status 诊断，不复制工具定义。
+    public static var statusJSON: JSONValue {
+        ["tool_count": .number(Double(MCPToolName.allCases.count)), "fingerprint": .string(fingerprint)]
+    }
+
+    /// 换上新清单的那一次，只确认 helper 的状态，不能把通知发出当成客户端已刷新。
     public static let refreshedNote = """
         SkyCut was updated after this AI session started, so the session began with an older tool list. \
-        It has been refreshed: list the tools again if a tool or option you need seemed to be missing.
+        The helper now serves the current tools and schemas; the client may still cache the old ones. \
+        Reconnect SkyCut in the AI client and start a new session if tools or parameters are missing. \
+        Repeating a request in this conversation does not guarantee a refresh.
         """
 }
 

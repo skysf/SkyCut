@@ -31,7 +31,7 @@ func send(_ message: JSONValue) {
 }
 
 /// 刚换上了 App 那份清单（App 升级过、这个会话里跑的还是旧小程序，`MCPCatalogSync`）：握过手的（老一代）客户端主动告诉它
-/// 清单变了，它会重新要一遍；新一代客户端靠清单上的缓存时间。
+/// 清单变了；是否重新请求并交给模型由客户端决定，新一代的缓存时间也只是一条建议。
 func announceRefreshedCatalog() {
     if connection.catalog.takeRefreshNotice(), core.hasLegacySession { send(MCPServerCore.toolListChangedNotification) }
 }

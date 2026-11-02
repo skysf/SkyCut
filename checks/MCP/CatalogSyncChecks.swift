@@ -17,6 +17,15 @@ func runCatalogSyncChecks() {
 private func newerCatalog() -> JSONValue {
     var catalog = MCPCatalogSync.catalogResult().objectValue ?? [:]
     var tools = catalog["tools"]?.arrayValue ?? []
+    // 除了新增名字，也要替换已有工具的参数表（export_video 曾停在升级前）。
+    if let index = tools.firstIndex(where: { $0["name"]?.stringValue == "export_video" }),
+       var tool = tools[index].objectValue, var schema = tool["inputSchema"]?.objectValue,
+       var fields = schema["properties"]?.objectValue {
+        fields["upgrade_option"] = ["type": "string", "enum": ["new_value"]]
+        schema["properties"] = .object(fields)
+        tool["inputSchema"] = .object(schema)
+        tools[index] = .object(tool)
+    }
     tools.append(["name": "brand_new_tool", "description": "A tool added after this helper was built.",
                   "inputSchema": ["type": "object", "properties": [:]]])
     catalog["tools"] = .array(tools)
@@ -46,6 +55,13 @@ private func runCatalogOverrideChecks() {
     check(override.toolsJSON(providers: []) == override.toolsJSON(providers: [.skystudio]),
           "an older app's provider metadata cannot hide tools from a new helper")
     check(override.takeRefreshNotice() && !override.takeRefreshNotice(), "the refresh is announced once")
+    checkEqual(MCPCatalogSync.statusJSON["tool_count"]?.doubleValue, Double(MCPToolName.allCases.count),
+               "status counts the actual catalog, without a second fixed tool count")
+    checkEqual(MCPCatalogSync.statusJSON["fingerprint"]?.stringValue, MCPCatalogSync.fingerprint,
+               "status reports the same fingerprint as the bridge")
+    check(MCPCatalogSync.refreshedNote.contains("client may still cache") &&
+          MCPCatalogSync.refreshedNote.contains("start a new session"),
+          "refresh guidance distinguishes helper adoption from client discovery and gives a recovery step")
 }
 
 /// 假 App：回答带着 `fingerprint` 这个指纹；要清单时给 `newerCatalog()`。记下收到的工具名和要了几次清单。
@@ -53,6 +69,7 @@ private final class CatalogFakeApp: @unchecked Sendable {
     let path: String
     private let lock = NSLock()
     private var calls: [String] = []
+    private var exportArguments: JSONValue?
     private var catalogRequests = 0
 
     init(name: String, fingerprint: String) throws {
@@ -70,6 +87,7 @@ private final class CatalogFakeApp: @unchecked Sendable {
                     response = MCPBridge.Response(id: request.id, result: newerCatalog(), catalog: fingerprint)
                 } else {
                     self.calls.append(request.tool)
+                    if request.tool == "export_video" { self.exportArguments = request.arguments }
                     response = MCPBridge.Response(id: request.id, result: MCPBridge.textResult("ok \(request.tool)"), catalog: fingerprint)
                 }
                 self.lock.unlock()
@@ -80,6 +98,7 @@ private final class CatalogFakeApp: @unchecked Sendable {
 
     var toolCalls: [String] { lock.lock(); defer { lock.unlock() }; return calls }
     var catalogs: Int { lock.lock(); defer { lock.unlock() }; return catalogRequests }
+    var exported: JSONValue? { lock.lock(); defer { lock.unlock() }; return exportArguments }
 }
 
 private func runHelperCatalogChecks() {
@@ -89,7 +108,8 @@ private func runHelperCatalogChecks() {
         #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"#,
         #"{"jsonrpc":"2.0","id":3,"method":"tools/list"}"#,
         #"{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"brand_new_tool","arguments":{}}}"#,
-        #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"#
+        #"{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"get_status","arguments":{}}}"#,
+        #"{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"export_video","arguments":{"upgrade_option":"new_value"}}}"#
     ].joined(separator: ",") + "]"
     func flat(_ messages: [JSONValue]) -> [JSONValue] { messages.flatMap { $0.arrayValue ?? [$0] } }
     func text(_ messages: [JSONValue], _ id: Int) -> String {
@@ -112,7 +132,11 @@ private func runHelperCatalogChecks() {
     checkEqual(changes(messages), 1, "a legacy client is told once that the tool list changed")
     check(names(messages, 3).contains("brand_new_tool"), "tools/list now lists the app's new tool")
     check(text(messages, 4).hasPrefix("ok brand_new_tool"), "calling the new tool goes through to the app: \(text(messages, 4).prefix(120))")
-    checkEqual(newer.toolCalls, ["get_status", "brand_new_tool", "get_status"], "the app received every call, the new tool included")
+    checkEqual(newer.toolCalls, ["get_status", "brand_new_tool", "get_status", "export_video"], "the app received every call, the new tool included")
+    let exportedSchema = reply(flat(messages), id: 3)?["result"]?["tools"]?.arrayValue?
+        .first { $0["name"]?.stringValue == "export_video" }?["inputSchema"]?["properties"]?["upgrade_option"]
+    checkEqual(exportedSchema?["enum"]?.arrayValue, ["new_value"], "refresh replaces existing tool schemas, including new parameter values")
+    checkEqual(newer.exported?["upgrade_option"]?.stringValue, "new_value", "the helper forwards a newly advertised parameter unchanged")
     check(!text(messages, 5).contains("SkyCut was updated"), "only the call that refreshed says so")
     checkEqual(newer.catalogs, 1, "the catalog is fetched once")
 
