@@ -66,12 +66,25 @@
 
 拿不准的，一律按「会死锁」处理，挪出池子。
 
+## 子进程的异步退出
+
+`FFmpegProcess` 的退出要在启动前注册 `Process.terminationHandler`，和 stdout / stderr 的排空一起汇合后才返回。
+启动失败时解除退出回调、归还计数并关闭写端，让读线程收到 EOF。成功、失败和取消都走这一份生产实现。
+
+这里不用另一个 worker 的 `waitUntilExit()` 当退出屏障：它轮询调用线程的 RunLoop，退出通知依赖启动线程，
+本机短进程回归和 CI 原生栈已观察到这种跨线程接法不收尾。
+[Apple 的等待说明](https://developer.apple.com/documentation/foundation/process/waituntilexit%28%29)与
+[退出通知说明](https://developer.apple.com/documentation/foundation/process/didterminatenotification)分别写明了这两个上下文。
+读管道仍在普通 GCD worker 上阻塞读取，退出回调本身不占一条等待线程。
+案例：[短导出卡在退出等待](../bugfixes/2026-11-03-ffmpeg-exit-wait-runloop.md)。
+
 ## 回归
 
 | 检查 | 守什么 |
 | --- | --- |
 | `scripts/check-waveform.sh` 第 7 节 | 同时读 `min(40, max(16, 2 × 核数))` 个文件，总览和原始采样块各一轮，必须全部读完；看门狗跑在普通线程上，30 秒没读完就判红（死锁时 await 永远不回来，没有看门狗的话守卫只会挂住，不会变红） |
 | `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
+| `scripts/check-export-profile.sh` | 生产 `FFmpegProcess` 的立即退出、双管道 / 最后进度、错误和取消；独立线程的 30 秒看门狗在旧等待实现上实际变红 |
 
 **人工回归**（自动化够不着的真实工程，发版前实机验证）：
 
