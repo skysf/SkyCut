@@ -39,6 +39,20 @@ App 升级后，helper 在一次已有工具调用（可用 `get_status`）后�
 
 ## 回归口径
 
+工具按需求选，参数示例放在对应工具的 `description`，目录不复制长示例：
+
+| 用户需求 | 入口与顺序 |
+| --- | --- |
+| 批量修改标题 / 片段 / 形状 | `get_timeline` 后用 `set_texts` / `edit_clips` / `set_shapes`；单项字段看 `set_text` / `edit_clip` / `set_shape` |
+| 换配音并同步画面 | 已有文件用 `add_clips`，要生成才用 `add_voiceover`；拿到音频 id 后显式映射 `sync_voiceover`，再 `get_job` |
+| 检查音频接缝、成片结尾 / 黑场 / 字幕 | `inspect_video` → `get_job`；只给疑点和证据，不自动修改。源素材电平 / 节拍用 `listen`，说了什么用 `transcribe` |
+| 导出审阅版 | `export_video preset=quick_review` → `get_job`；显式参数只覆盖本单，不改正式设置；短边上限不升采样 |
+
+`UsageExampleChecks` 只证明示例符合当前 schema，不能替代模型是否选对工具和真实工程是否成功。
+新增 / 改写说明时还要量实际 `tools/list` JSON、2,048 字上限及前 512 字，不能只量源码字数。
+旁白的自动语言识别也可能失败：看 `get_job.status` / `message`，不要只看调用是否返回。
+语言已知时按错误提示在原文件上显式传 `transcribe.language` 重试；不因此重新生成配音。
+
 自动化：`scripts/check-mcp.sh` 的 `CatalogSyncChecks` 真起 helper，核对新工具、已有工具的新参数枚举、
 调用参数原样转发、通知只发一次，以及指纹相同不取清单。假 App / 主动重新 `tools/list` 只证明 helper 合同。
 

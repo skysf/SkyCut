@@ -5,6 +5,7 @@ import Foundation
 
 runProtocolChecks()
 runCatalogTextChecks()
+runUsageExampleChecks()
 runTimelineChecks()
 runConfigChecks()
 runConfigBackupChecks()

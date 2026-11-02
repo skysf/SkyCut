@@ -13,9 +13,9 @@ import Foundation
 
 public enum MCPInstructions {
     /// 始终列出的「Paid: …」，接在目录最后（2026-10-30：不能靠中途添加 Key 后客户端重新发现工具）。2026-10-28 起
-    /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio，不再多出一行。整份离 Claude Code
-    /// 的 2,048 个字符只差几十个：这一行别再加长（checks/MCP/CatalogTextChecks.swift 量着）。花钱怎么问、每日上限写在两个工具自己的说明里：
-    /// AI 调它之前一定会读到。
+    /// generate_media、upscale_clip 都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio，不再多出一行。
+    /// 整份守 2,048 字符上限（checks/MCP/CatalogTextChecks.swift）。花钱怎么问、每日上限写在两个工具自己的说明里：
+    /// AI 调它之前一定会读到；具体参数示例放对应工具，不放目录。
     static let skyStudioTools = "generate_media (image/video/lipsync/cutout/music/SFX), upscale_clip: Sky Studio credits"
 
     public static func text(providers: Set<MCPProvider>) -> String {
@@ -23,35 +23,30 @@ public enum MCPInstructions {
     }
 
     public static let text = """
-    SkyCut is a video editor on the user's Mac. These tools edit projects open in SkyCut while the user \
-    watches. Usual order: open_folder (the user's folder), open_project or new_project; get_timeline for ids; \
-    look, listen and transcribe to see, hear and read the media; edit; export_video, then \
-    get_job. Descriptions give details; results give next steps.
+    SkyCut edits projects on this Mac. Start get_status and get_settings section=ai; open_folder, \
+    open_project/new_project; get_timeline for fresh ids. Inspect with look/listen/transcribe before edits. \
+    Batch: edit_clips/set_texts/set_shapes. Replace narration + retime: sync_voiceover. Check output/seams: \
+    inspect_video. Review: export_video preset=quick_review, then get_job. Use only these tools and given/returned files.
 
     Rules:
-    - Read get_settings section=ai first. Follow its permission mode and conversation-language guidance.\
-
-    - For set_view, full_access uses visible unless told otherwise; ask mode asks once about visible/background.
-    - Edits are undoable (undo round=true reverts the round).
-    - Report project_saved_to.
-    - Use only given or returned files.
-    - Do all the work with these tools: no ffmpeg, scripts or terminal on media, and do not download media. If \
-    SkyCut cannot do it, say so.
+    - Follow get_settings permission mode and conversation-language guidance.
+    - set_view: full_access defaults visible unless told otherwise; ask mode asks once about visible/background.
+    - undo round=true reverts this round; report project_saved_to.
+    - No ffmpeg, scripts or terminal on media; do not download media. Say when a capability is missing.
 
     Tools by need:
-    - Files: get_status, open_folder (or Finder selection), read_document (scripts), manage_files, open_project, \
-    new_project, save_project, close_project
-    - Whole video: recipes first, follow the style that fits (user's words win); save_recipe
-    - Clips: add_clips, edit_clip (trim, speed, volume, fill 9:16, crop, animation), edit_clips (batch), split_clip, delete_items, \
+    - Files: open_folder (Finder selection), read_document, manage_files; open_project, new_project, save_project, close_project
+    - Whole video: recipes first (user's words win); save_recipe
+    - Clips: add_clips, edit_clip (trim/speed/volume/crop/9:16), edit_clips (batch); split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes
-    - Record: record_screen
-    - Talk and beat cuts: transcribe, cut_speech, listen beats=true, cut_to_beat
-    - Picture: set_canvas (9:16), set_transition, set_filter, set_text, set_shape (blur/mosaic too); batches: set_texts, set_shapes
-    - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser… made here), add_voiceover \
-    (narration), sync_voiceover (paragraph timing), set_track
+    - Picture: set_canvas, set_transition, set_filter; set_text, set_texts (batch titles); set_shape (blur/mosaic), set_shapes (batch)
+    - Speech/beat cuts: transcribe, cut_speech; listen beats=true, cut_to_beat
+    - Audio: find_audio (music/SFX), add_clips sound_effect (local SFX), add_voiceover (generate narration), \
+    sync_voiceover (existing narration timing), set_track
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
-    - Output: export_video, inspect_video; compress_videos, burn_subtitles, convert_subtitles (files); get_job, cancel_job
-    - App: get_settings, set_settings (preferences); set_view, seek
+    - Review: inspect_video (mixed audio seams/black/subtitles); export_video preset=quick_review (fast copy); get_job, cancel_job
+    - File output: compress_videos, burn_subtitles, convert_subtitles
+    - App: get_settings, set_settings; set_view, seek, record_screen
     - Paid: \(skyStudioTools)
     """
 }

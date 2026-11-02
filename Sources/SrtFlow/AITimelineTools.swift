@@ -229,7 +229,7 @@ enum AITimelineTools {
         if pictureEnd > 0, soundEnd > pictureEnd + 0.5 {
             result["note"] = .string(String(
                 format: "The sound runs to %.1f s, past the end of the picture at %.1f s, so the video goes on over a black screen: "
-                    + "trim it with edit_clip (end) and fade it out (fade_out), unless you mean to add more picture.",
+                    + "for narration replacement use sync_voiceover; otherwise trim via edit_clip source_out (source seconds) and fade_out, or add more picture.",
                 soundEnd, pictureEnd
             ))
         }

@@ -14,13 +14,10 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .getStatus, title: "SkyCut status",
                 description: """
-                SkyCut status: current project name/path/length/unsaved changes, all open projects (id, ownership, view), \
-                allowed folders, running jobs, user Stop, view mode and screen recording state/permission/leftovers, and cloud_tasks grouped by project: \
-                media types, models, quotes, phases and issues, including background/closed projects; job_id works \
-                with get_job. Counts include active work only, issues separately. Call first in a conversation. models=true \
-                reads Sky Studio's current catalog, defaults, prices and reference format/count/size/duration/combination limits \
-                without spending credits. model filters one id. mcp_catalog is the App's count/fingerprint, \
-                not proof of client schema reload.
+                Read first: project name/path/length/unsaved; projects with ids/ownership/view; folders, jobs/Stop, \
+                screen recording/permission/leftovers and cloud_tasks grouped by project: background/closed too. mcp_catalog: App \
+                count/fingerprint, not client reload proof. models=true reads Sky Studio models/prices/defaults/reference \
+                limits free; model filters an id. screen=true lists sources.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),

@@ -30,18 +30,17 @@ enum MCPMediaTools {
             return MCPToolDefinition(
                 .addVoiceover, title: "Add a voiceover",
                 description: """
-                Make voiceover files and put each line on the same audio track (new unless track is given), plus optional \
-                subtitles, as one undo step. Sky Studio returns job_id: wait with get_job. After failure use resume=recovery_file; \
-                this only processes saved audio or queries original jobs, never repeats a charge. generate_missing=true additionally \
-                generates only missing batches. Progress lists completed, pending recovery and not generated parts. Repeated resume \
-                cannot duplicate audio/subtitles. Never repeat the original lines after a cloud/local failure. \
-                Cloud cloning may queue minutes; local voices finish directly. A key prefers Sky Studio; hard budgets pause. \
-                Unavailable ordinary narration falls back to downloaded SkyCut voices then Mac; relay voice.note. Cloud ignores speed. \
-                voice accepts roles (zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, \
-                en_female_british, en_male_british), presets Rachel/Brian, SkyCut names af_heart/zf_xiaoxiao, or Mac names; \
-                default warm female in the text's language. clone_from needs one clear speaker; no fallback, lines combine per \
-                paid batch. Multi-line clones require installed local transcription (macOS 26) before charging. \
-                subtitles=true adds aligned cues except existing overlaps. download_voices=true only downloads 333 MB; tell the user.
+                Generate narration + optional subtitles on one audio track (new unless track), one undo. Existing audio: \
+                add_clips. To retime visuals after replacement, finish this job then sync_voiceover. Sky Studio returns \
+                job_id; wait with get_job. On failure resume=recovery_file processes saved audio/queries original jobs \
+                without recharging; generate_missing=true adds only missing batches. Resume cannot duplicate inserts. \
+                Never resend original lines after failure. Cloud cloning may queue minutes; local finishes directly. \
+                Key prefers Sky Studio; hard budgets pause. Ordinary fallback: downloaded SkyCut then Mac; relay voice.note. \
+                Cloud ignores speed. voice: zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, \
+                en_male, en_female_british, en_male_british; Rachel/Brian; af_heart/zf_xiaoxiao; Mac names. Default warm \
+                female in text language. clone_from: one clear speaker, no fallback; multi-line paid batches need local \
+                transcription (macOS 26) before charging. subtitles=true skips overlaps. download_voices=true only \
+                downloads 333 MB; tell the user.
                 """,
                 input: MCPSchema.object([
                     "lines": MCPSchema.array(of: MCPSchema.object([

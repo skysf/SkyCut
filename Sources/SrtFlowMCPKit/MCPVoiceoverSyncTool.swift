@@ -20,12 +20,14 @@ enum MCPVoiceoverSyncTool {
             "texts": list, "shapes": list, "subtitles": list
         ], required: ["from", "to", "voiceover_id"])
         return MCPToolDefinition(.syncVoiceover, title: "Sync timeline to narration", description: """
-            Sync explicit paragraphs to existing narration; no paid generation. Returns job_id: wait with get_job. \
-            Consecutive old ranges follow actual new audio lengths. Pictures/titles/shapes keep style/framing/layers. \
-            Subtitles realign from new audio, preserving exact script/Chinese variants, never scaling old times. \
-            Full validation, one undo/preview update, no repeated Linkage/Magnet. Unmapped items stay. Cross-boundary/duplicate \
-            ids, fit limits, alignment errors or final track collisions reject all. Same-language cues only. Keep audio and retry \
-            on failure; never regenerate.
+            Retime pictures/titles/shapes/cues to replacement narration; no paid generation, one undo. Returns \
+            job_id: wait with get_job. Import via add_clips or finish add_voiceover first. Subtitles realign to new \
+            audio, preserving exact script/Chinese variants (same language); never scale old times. Pictures keep \
+            style/framing/layers. Consecutive old from/to ranges follow voiceover_id lengths; include associated \
+            get_timeline ids (example ids are placeholders).
+            Example: {"language":"en","paragraphs":[{"from":0,"to":4,"voiceover_id":"c3","old_voiceover_id":"c2","clips":[{"clip_id":"c1"}],"texts":["t1"]}]}
+            Unmapped items stay. Cross-boundary/duplicate ids, fit/alignment errors or final collisions reject all. \
+            Reuse audio on failure; never regenerate.
             """, input: MCPSchema.object([
                 "paragraphs": MCPSchema.array(of: paragraph, "1–100 ordered mappings; old timeline seconds.", minItems: 1),
                 "language": MCPSchema.string("Spoken language; local model needed for subtitles."),

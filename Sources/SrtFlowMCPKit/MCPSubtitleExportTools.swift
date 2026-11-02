@@ -186,10 +186,12 @@ public enum MCPSubtitleExportTools {
         MCPToolDefinition(
             .exportVideo, title: "Export the video",
             description: """
-            Export timeline to MP4 (audio-only: M4A). Default: project name in SkyCut/Exports under workspace, project \
-            or Downloads. Never replaces; adds a number. Burns visible subtitles unless disabled. Final keeps saved \
-            quality; quick_review is explicit. Returns job_id; get_job reports actual export_settings and stage timings. \
-            Give the user music_credits from get_timeline.
+            Final or fast review: final uses saved settings; quick_review uses hardware/720p short-side cap/small/AAC128, \
+            never upscales. encoder/resolution/quality override only this call.
+            Example: {"preset":"quick_review"}
+            Returns job_id; get_job gives file/export_settings/timings. MP4 (audio-only M4A); burns visible subtitles. \
+            Defaults to project name in SkyCut/Exports under workspace/project/Downloads; numbered, never replaces. \
+            Relay get_timeline music_credits.
             """,
             input: MCPSchema.object([
                 "path": MCPSchema.string("Full output path. Leave out to use name and the default folder."),
