@@ -16,6 +16,7 @@ final class AIJobs {
         case export, subtitles, translation, compress, transcript, shots, voices, generate, upscale, voiceover
         case burnIn = "burn_in"
         case screenRecording = "screen_recording"
+        case inspection
     }
 
     enum Status: String {
@@ -47,6 +48,8 @@ final class AIJobs {
         fileprivate(set) var finishedAt: Date?
         /// 查询已结束的云任务时只刷新原单账务 / 成品地址，不提交新的生成。
         var refresh: (@MainActor () async -> Void)?
+        /// 检查任务的疑点拼图；跟结局一起冻结，后来的工程和导出不改它。
+        var images: [Data] = []
 
         init(
             id: String, kind: Kind, progress: @escaping @MainActor () -> Double?, liveDetail: @escaping @MainActor () -> [String: JSONValue],

@@ -43,7 +43,7 @@ enum AIProjectBinding {
             case "resolve": return (try? args.string("decision"))?.lowercased() == "add"
             default: return false
             }
-        case .saveProject, .getTimeline, .upscaleClip, .addClips, .editClip, .editClips, .setTexts, .setShapes, .syncVoiceover, .setKeyframes, .setTrack, .splitClip,
+        case .saveProject, .getTimeline, .inspectVideo, .upscaleClip, .addClips, .editClip, .editClips, .setTexts, .setShapes, .syncVoiceover, .setKeyframes, .setTrack, .splitClip,
              .freezeFrame, .cutSpeech, .cutToBeat, .deleteItems, .duplicateItems, .setTransition, .setText, .setShape,
              .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles, .getSubtitles, .editSubtitles,
              .exportVideo, .exportSubtitles, .undo, .seek:

@@ -95,6 +95,7 @@ run_check() {
 # 明写一项：子脚本不再顺手编整个 App 了。
 shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
+run_check "video-inspection（成片疑点、真实混音/画面/字幕与试听证据）" scripts/check-video-inspection.sh
 run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh

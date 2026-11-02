@@ -207,6 +207,7 @@ final class AIToolRouter {
         case .getTimeline: return AITimelineTools.timeline(project)
         case .look: return try await AILookTool.look(args, project)
         case .listen: return try await AIListenTool.listen(args, project)
+        case .inspectVideo: return try await AIInspectionTool.start(args, project)
         case .findAudio: return try await AIAudioLibraryTools.findAudio(args)
         // 不改工程：只起一个任务、回任务号（成品放上时间线是 add_clips 的事）。
         case .generateMedia: return try await SkyStudioGenerateTool.generate(args, project)
@@ -290,7 +291,7 @@ final class AIToolRouter {
                 (serialized, presentsEditor, startsRound) = (false, false, false)
             case .setView, .setSettings:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
-            case .openFolder, .readDocument, .manageFiles, .getTimeline, .look, .listen, .transcribe, .findAudio, .getSubtitles,
+            case .openFolder, .readDocument, .manageFiles, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .findAudio, .getSubtitles,
                  .saveProject, .exportVideo, .exportSubtitles, .compressVideos, .burnSubtitles, .convertSubtitles, .generateMedia:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .seek:

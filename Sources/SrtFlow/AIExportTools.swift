@@ -169,7 +169,9 @@ enum AIExportTools {
         if let wait = try args.double("wait_seconds"), wait > 0 {
             await AIJobs.shared.wait(for: job, seconds: wait)
         }
-        return .ok(AIJobs.shared.json(job))
+        var result = AIToolResult.ok(AIJobs.shared.json(job))
+        result.images = job.images
+        return result
     }
 
     static func cancel(_ args: AIToolArguments) throws -> AIToolResult {
