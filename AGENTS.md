@@ -538,6 +538,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 架构与长期约束索引
 
+- [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；重连、新会话与真实客户端验收。
+
 - [写代码的规范](docs/architecture/coding-standards.md) — 模块化的六条（一个文件一件事、抽有名字的顶层类型、
   别开只有 extension 的文件、纯计算和副作用分开、同一规则只有一处实现、函数别太长），单文件目标 400 / 上限 600
   行与老文件只许降的基线、审查清单。
@@ -617,6 +619,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [按旁白段落同步时间线](docs/architecture/voiceover-timeline-sync.md) — 显式映射、实测音频与原稿对齐，共用批量事务，一次撤销且不重复联动。
 
 ## Bug 修复案例索引
+
+- [helper 更新清单不等于客户端已发现新工具](docs/bugfixes/2026-11-02-mcp-catalog-refresh-reporting.md)：55 / 50 项诊断、状态指纹、旧 schema 与重连步骤。
 
 - [2026-11-02 导出反复解码静止文字和形状](docs/bugfixes/2026-11-02-export-redecodes-static-overlays.md) — 107 路输入的教程按整片重复解 PNG；按本段复制已解帧、实际阶段计时与快速审阅，正式默认质量保持不变。
 

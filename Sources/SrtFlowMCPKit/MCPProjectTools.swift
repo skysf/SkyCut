@@ -19,7 +19,8 @@ public enum MCPProjectTools {
                 media types, models, quotes, phases and issues, including background/closed projects; job_id works \
                 with get_job. Counts include active work only, issues separately. Call first in a conversation. models=true \
                 reads Sky Studio's current catalog, defaults, prices and reference format/count/size/duration/combination limits \
-                without spending credits. model filters one id.
+                without spending credits. model filters one id. mcp_catalog is the App's count/fingerprint, \
+                not proof of client schema reload.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),

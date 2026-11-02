@@ -18,6 +18,8 @@ done
 python3 - <<'PYTHON'
 from pathlib import Path
 router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
+status = Path("Sources/SrtFlow/AIProjectTools.swift").read_text()
+assert '"mcp_catalog": MCPCatalogSync.statusJSON' in status, "get_status must report the actual App catalog identity"
 for call in ["AIClipTools.apply(plan, project)", "AITimelineTools.setKeyframes(args, project)",
              "AITimelineTools.setTrack(args, project)", "AIOverlayTools.setText(args, project)", "AIOverlayTools.setShape(args, project)"]:
     assert f"return try {call}" in router, f"missing direct routing to validated commit: {call}"
