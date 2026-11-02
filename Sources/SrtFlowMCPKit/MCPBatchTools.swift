@@ -13,13 +13,21 @@ public enum MCPBatchTools {
         let tool: MCPToolName
         let key: String
         let id: String
+        let need: String
+        let example: String
     }
 
     private static func source(for name: MCPToolName) -> Source? {
         switch name {
-        case .editClips: return Source(tool: .editClip, key: "clips", id: "clip_id")
-        case .setTexts: return Source(tool: .setText, key: "texts", id: "text_id")
-        case .setShapes: return Source(tool: .setShape, key: "shapes", id: "shape_id")
+        case .editClips:
+            return Source(tool: .editClip, key: "clips", id: "clip_id", need: "clip trims/moves/volumes",
+                          example: #"{"clips":[{"clip_id":"c1","volume_db":-6}]}"#)
+        case .setTexts:
+            return Source(tool: .setText, key: "texts", id: "text_id", need: "title/text changes",
+                          example: #"{"texts":[{"text_id":"t1","text":"Review title","font_size":36}]}"#)
+        case .setShapes:
+            return Source(tool: .setShape, key: "shapes", id: "shape_id", need: "shape/style changes",
+                          example: ##"{"shapes":[{"shape_id":"s1","color":"#FFAA00"}]}"##)
         default: return nil
         }
     }
@@ -36,13 +44,12 @@ public enum MCPBatchTools {
         return MCPToolDefinition(
             name, title: "Batch \(source.tool.rawValue)",
             description: """
-            Batch \(source.tool.rawValue): read that tool for all entry fields/defaults. 1-\(maximumItems) ordered entries; all must \
-            pass before one commit/undo and at most one preview rebuild. Errors name the zero-based index; nothing is \
-            applied. Repeated ids edit again. \
-            \(source.tool == .editClip ? "Omitted fields stay unchanged." : "New entries without start use the initial playhead.") \
-            Results follow input order, \
-            showing final state. No changes: no undo. project is batch-wide. \
-            \(source.tool == .editClip ? "Overlaps are checked after each entry; move obstructions first." : "Omit the id to add; give it to edit.")
+            Batch \(source.need); fields/defaults: \(source.tool.rawValue). Use get_timeline ids; examples use placeholders.
+            Example: \(source.example)
+            1-\(maximumItems) ordered entries/results. All validate before one undo; zero-based errors apply nothing. \
+            Omitted fields stay; repeated ids repeat edits. \
+            \(source.tool == .editClip ? "Overlaps checked per entry; move obstructions first." : "Omit id to add; start defaults to the initial playhead.") \
+            Final states returned; one project per batch.
             """,
             input: MCPSchema.object([source.key: .object(list)], required: [source.key])
         )

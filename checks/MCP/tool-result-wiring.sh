@@ -5,6 +5,14 @@
 
 echo "==> 工具结果：转场报每条缝、复制认新轨、读不出画面说为什么、字体认别名、配音字幕整句、Kokoro 语速、cut_speech 的切口"
 TIMELINE_TOOLS="Sources/SrtFlow/AITimelineTools.swift"
+# 声音超出画面时，结果不能诱导 AI 传不存在的 end；换旁白则指向段落同步。
+python3 - <<'PYTHON'
+from pathlib import Path
+source = Path("Sources/SrtFlow/AITimelineTools.swift").read_text()
+assert "edit_clip (end)" not in source, "audio overhang advice suggests an unsupported end parameter"
+assert "edit_clip source_out (source seconds)" in source, "audio overhang advice must name the actual source-time parameter"
+assert "for narration replacement use sync_voiceover" in source, "narration replacement should point to paragraph sync"
+PYTHON
 # set_transition 按收尾之后的状态报每条缝（以前只回 {"cuts": 1}）。
 if [ "$(grep -c 'return .ok(AITransitionReport.json(' "${TIMELINE_TOOLS}" || true)" -ne 1 ]; then
   echo "✗ ${TIMELINE_TOOLS} 的 set_transition 不经 AITransitionReport 报每条缝：AI 又只拿到一个计数" >&2

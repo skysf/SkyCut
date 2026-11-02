@@ -58,6 +58,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - 往总说明里加东西之前先问：它是不是要 AI 主动去做？不是的话放进工具说明或者结果。
    - 守卫：`checks/MCP/CatalogTextChecks.swift`（总说明和每个工具说明 ≤ 2,048、前 512 字点到 open_folder / get_timeline /
      look / export_video、目录里有清单的每个工具名、只用英文）。
+   - **按需求找工具**（2026-11-03）：总说明前 512 字同时点到批量编辑、换旁白同步、成片检查和快速审阅；详细 JSON 示例只在对应工具。
+     示例里的身份是占位，先读 `get_timeline` 换成真实 id。`UsageExampleChecks` 按真实 schema 校验字段、必填、类型、枚举和范围，
+     不再抄参数表。`sync_voiceover` 的一步撤销、无付费生成、字幕重新对齐和等待任务必须在前 512 字看见。
+     结果里给的下一步也要用真实参数名；声音超出画面时，换旁白指向 `sync_voiceover`，普通裁声音写 `source_out`（源时间）/ `fade_out`，
+     不许建议不存在的 `end`。需求对应关系见 [MCP 功能发现](mcp-discovery.md)，[本次案例](../bugfixes/2026-11-03-mcp-usage-guidance.md)。
 
 ## 二、协议：两代客户端都要接
 
