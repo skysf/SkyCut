@@ -212,8 +212,14 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    不覆盖也不问），结果里带 `project_saved_to`，之后交给自动保存；手动剪的未命名工程照旧等用户存 —— 除非 AI 要打开 / 新建别的工程：
    那时先用同一个办法存下来再换（`saveUntitled`，第 5 条）。
    `open_folder` 不列根上的 `SkyCut/`（和改名之前的 `SrtFlow/`），免得把上次的成片当素材。
+编辑参数的当前范围、requested/applied/adjustments、原子性与素材加载状态见 [MCP 编辑参数合同](mcp-edit-parameters.md)。
+
 11. **画面怎么放（`edit_clip` 的 fit / crop / x / y / scale，方案第 31 条）**：只改这一段的 `crop` 和 `placement`，
    **从不改素材文件、不出副本**。规则在 `AIFrameFit`（纯值）：
+   - **直接给源矩形（region，2026-11-02）**：`{x,y,width,height}` 按源旋转摆正后的画面、左上原点 0–1；
+     默认完整显示，`fit=fill` 在区域内居中铺满。替换旧裁切和摆放，不与 crop / 自动取景 / 手动变换混用；
+     整次先验，原生裁切可超过传统 45% 限制，结果返回实际区域及最终变换。单项和批量共用；
+     像素边界、动画组合、工程 v33 与回归合同见 [预览自由变换](preview-free-transform.md)「MCP 的源矩形取景」。
    - **铺满（fit=fill）= 源画面上一扇和画布同比例的窗正好映到整幅画布**。先用裁切收（每边最多 0.45，
      `ClipCrop` 的上限），收不下的交给摆放框（把裁剩的画面放大、挪到窗对上画布，框的中心可以在画布外）。
      裁切一次收得下时摆放框就是默认布局、存 nil —— 检查器里看到的只是一个裁切。16:9 转 9:16 焦点偏在
@@ -664,8 +670,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      以前在提示条上问，后台工程没窗口、用户没在看 SrtFlow 时没人看见。同步的工具（配旁白）不能停下来问，额度不够就退档。
    - 图生视频的首帧图、克隆的素材都会传给 Sky Studio：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是
      「send to Sky Studio」）。
-40. **云端配旁白与克隆（`add_voiceover`，方案第 42、52 条，2026-10-29 起走 Sky Studio）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。点名本机音色仍照点名。云端立刻回 `job_id`，Key / 模型 / 全部报价在任务里核对，调用方只等 `get_job`；额度不够或普通服务不可用退本机并在 `voice.note` 说明，克隆报错不退档、不索要付费确认码。全批预留积分后逐批提交 / 结算，未知提交保留账并报任务号与幂等 key，不重生成。
+40. **云端配旁白与克隆（`add_voiceover`，方案第 42、52 条，2026-10-29 起走 Sky Studio）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。点名本机音色仍照点名。云端立刻回 `job_id`，Key / 模型 / 全部报价在任务里核对，调用方只等 `get_job`；普通服务不可用可退本机并在 `voice.note` 说明，硬预算不足暂停不换声，克隆不退档、不索要越额确认码。全批预留积分后逐批提交 / 结算，未知提交保留账并报任务号与幂等 key，不重生成。
     普通旁白拼全部全局时间 chunk，词的尾端按实际媒体时长夹住。克隆读取服务端语言 cap、按 code points 合批，多句共一单；参考素材截 WAV 上传一次，成品在本机转写对齐后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。完整合同、免费冒烟和人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)。
+    **失败恢复（2026-11-01）**：云端生成、本地分句、字幕对齐分别报 `failure_stage`；每批原音频、原文映射、原单与进度持久保留。`add_voiceover resume=<recovery_file>` 默认只处理已有结果；`generate_missing=true` 才报价 / 生成明确没成功的批次，未知单只 GET 不重放。`get_job` 返回完成 / 待恢复 / 未生成清单及恢复参数。入轨前记稳定 UUID、成功记回执，重复恢复或用户撤销后重试均不重复插入。实现与可重开工程恢复边界见上述任务文档第五节。
 
 41. **婚礼工程那一轮之后补的五条小规矩（2026-09-29，[案例](../bugfixes/2026-09-29-mcp-tool-followups-from-wedding-session.md)）**：
     ① 说明里写的记号客户端会照字面传：`set_text` 的 `text` 把字面的 `\n` 也当换行（`AITextChange.unescapingNewlines`）。
@@ -888,6 +895,37 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     合进来时先关着，**2026-10-28 接口上线、用户给自己开了正式版之后打开**（`SkyCutGates.enforcedByDefault = true`）；测试开关 `skystudio.testGates` 关不掉它。
     守卫：`checks/SkyStudio/GateChecks.swift`（每个工具 × 每种授权、话怎么说、`skycut_plan`），`checks/sky-studio-wiring.sh`（门在核对参数名之后、建 Call 之前）。
 
+54. **批量编辑片段、文字和形状（2026-11-01）**：保留 `edit_clip` / `set_text` / `set_shape`，增加
+    `edit_clips {clips: […]}` / `set_texts {texts: […]}` / `set_shapes {shapes: […]}`。每批 1–100 项，只作用在一个工程，
+    `project` 放在批次外层，条目里不收。条目字段、默认值与单项完全相同；文字 / 形状省略 id 为新增，给 id 为修改。
+    - **先全部校验，再一次提交**：每项按输入顺序在候选时间线上算，后项看到前项的结果；重复 id 会继续修改同一个对象，
+      不是覆盖整份字段。片段的重叠也逐项检查，要先把挡路的挪开。任何一项类型、参数、id、素材窗口或重叠失败，整批不改工程，
+      不登记撤销、不请求重建；错误用 `clips[1]` 这类从零起的下标指出失败项。所有新增叠层的默认 start 都取调用开始时同一份播放头。
+    - **规则只有一份**：单项和批量片段共用 `AIClipTools.plan`（异步素材探测 / 画面识别）与 `AIClipEditPlan.applying`
+      （再交 `AIClipEdit`）；单项和批量叠层共用 `AIOverlayEdits`，最终都走 `AITextChange` / `AIShapeChange` 与模型的 update 方法。
+      `AIClipBatch` / `AITextBatch` / `AIShapeBatch` 只累积副本和结果身份；不能在循环里调用会提交的单项工具。
+    - **提交只一处**：`AIBatchEdit.commit` 在同步段里核对当前时间线仍等于准备前的快照，再用工程自己的撤销管理器开一次
+      `AIUndoGrouping.step`；`AIBatchEditTools` 只调一次 `project.perform`。磁吸、联动、轨道补色照现有 perform 的收尾，整批做一次。
+      片段最多请求一次预览重建（纯音量仍允许现有音频快路径）；文字和形状沿用 `rebuildsPreview: false`，只刷新叠层。
+      整批没有变化就不提交、不占撤销栈。成功后只 reveal 一次，选中整批、定位到最早一项；后台仍不选中、不挪播放头。
+    - **异步准备不覆盖用户修改**：片段批量准备期间换了工程代号、时间线或联动开关，提交前整批拒绝，叫 AI get_timeline 后重试。
+      准备阶段的抽帧 / 素材缓存不属于时间线修改；失败时不会把已经算好的前半批落下去。
+    - **清单和结果**：批量条目的发现 schema 只列身份字段，允许其余字段；完整参数说明引用对应单项工具，不复制三套，
+      仍受全清单 100,000 字符限制。`MCPArgumentCheck` 核对批量调用时用 `MCPBatchTools.validationSchema` 展开单项完整 schema
+      （去掉条目里的 project、保留形状 length 别名），未知和嵌套字段照样整批拦；实际类型 / 范围继续由原编辑规则核对。
+      结果按输入顺序回各项最终状态、`count`，保留单项的排版警告 / 取景发现 / 关键帧提示；
+      `linkage` / `magnet` 汇总在批次层，空改动带 `unchanged: true`。
+    - **守卫**：`checks/MCP/BatchEditChecks.swift` 验后项失败不落半份、结构和嵌套字段、上限、顺序和默认落点、重复 id、
+      单项的夹紧 / 链接伙伴 / ripple、过期快照、一次提交与真实 UndoManager 的一步撤销 / 重做、连续两批分开、无变化不登记、
+      小程序原样转发三个工具；`checks/MCP/batch-edit-wiring.sh` 钉住路由、工程策略、单项复用、唯一提交点和预览参数。
+      都接进 `scripts/check-mcp.sh`（扫描也进 `--scans-only`）。
+      2026-11-01：完整 MCP 自检 2,842 项通过，其中批量组 124 项；隔离生产源文件副本撤掉旧快照检查 → 4 项红，
+      撤掉撤销分组 → 2 项红，原始生产文件保持不变。另用 App 实际链接清单编译临时验证程序，直接调用真实
+      `VideoEditProject` 与三个生产批量入口：片段的 `rebuildGeneration` 只增 1，文字 / 形状不增；一次撤销 / 重做整批、
+      后项失败后的状态 / 撤销栈 / 选择 / 播放头不变、准备后用户修改不被覆盖，均通过。此证据不代替下方真窗口的视觉回归。
+
+55. **换旁白同步画面（2026-11-01）**：`sync_voiceover` 接收连续旧段落范围、新音频 id 和关联画面 / 文字 / 形状 / 字幕，实测新音频排段；字幕复用本机转写与字符对齐，原稿及繁简体不改。先全验，再用现有 `AIBatchEditTools.commit` 一步采用已算好的时间线，不重跑磁吸 / linkage。支持已有变速、裁切和末帧定格，超限及最终同轨冲突整批拒绝。返回 `job_id`，本地失败保留音频重试，无付费生成。参数、边界与回归见 [按旁白段落同步时间线](voiceover-timeline-sync.md)。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **每个工程一份**（`AIRound`，2026-10-17 用户定，[方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 4、E 节）：剪 5 条时停一条，别的照剪；
@@ -1045,6 +1083,8 @@ edit_clip 2,074 字超长、清单里有汉字）。
 - [ ] AI 连续改的时候切到别的 App、把它的窗口盖在 SrtFlow 上面：之后 SrtFlow 不再跳到前面（横幅、时间线照样在后面跟着动）；
       停 30 秒以上再让 AI 改（新的一轮）也不跳；让 AI `set_view visible` 才摆到前面一次。
 - [ ] ⌘Z 一步退掉 AI 的一个调用；停 30 秒后横幅变成「改了 N 处」，「撤销这一轮」整轮退回，再 ⌘Z 又回来。
+- [ ] 一批挪 / 裁两段片段、一批加 / 改两行文字、一批加 / 改两个形状：各自只需一次 ⌘Z / ⇧⌘Z，预览与 get_timeline 一致；
+      把每批最后一项改成无效 id，时间线、选择和播放头原样，撤销栈没有多一步；后台模式同样整批生效且不摆窗口。
 - [ ] 磁吸开着、打开一个 V1 有缝的工程，让 AI 改几处之后按「撤销这一轮」：V1 的缝和压在上面的旁白、字幕一起回到原位（不是只有音频字幕回去）。
 - [ ] SrtFlow 在后台时让 AI 放素材并**带一个字幕文件**、再改几步、再让 AI 生成字幕或翻译、再改几步：`undo` 一步只退掉
       最后那一处（以前从挂字幕 / 字幕回写那一刻起全并成一步）。

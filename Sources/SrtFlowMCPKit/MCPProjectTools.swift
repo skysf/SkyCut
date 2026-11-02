@@ -6,7 +6,7 @@ import Foundation
 
 public enum MCPProjectTools {
     /// 每个碰工程的工具都收的 `project` 参数的说明（`MCPToolDefinition.addProjectParameter` 统一加）。
-    static let projectParameter = "Which of your projects (p1, p2… from open_project / new_project). Leave out for the one you opened last."
+    static let projectParameter = "Your project id (p1…); default: last opened."
 
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
         switch name {
@@ -14,15 +14,12 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .getStatus, title: "SkyCut status",
                 description: """
-                What SkyCut is doing now: your current project (name, path, length, unsaved changes) and every open project \
-                (id, whether it is yours, where it is shown), the folders you may use, running jobs, whether the user pressed Stop, \
-                and cloud_tasks grouped by project: names, video/audio/image types, models, quotes, queue/processing/download \
-                phases and issues, including background and closed-project tasks. Use this to report each project's progress; \
-                a task's job_id can be checked with get_job. Counts include active work only; issues are counted separately. \
-                Also reports the view mode (set_view) and screen recording (state, permission, a leftover recording). Cheap; call it first in a \
-                new conversation. For paid media use models=true to read the current Sky Studio model catalog, defaults, \
-                prices and per-mode reference image/video/audio counts, formats, size/duration and combination limits \
-                without generating or spending credits. model filters that catalog to one id.
+                SkyCut status: current project name/path/length/unsaved changes, all open projects (id, ownership, view), \
+                allowed folders, running jobs, user Stop, view mode and screen recording state/permission/leftovers, and cloud_tasks grouped by project: \
+                media types, models, quotes, phases and issues, including background/closed projects; job_id works \
+                with get_job. Counts include active work only, issues separately. Call first in a conversation. models=true \
+                reads Sky Studio's current catalog, defaults, prices and reference format/count/size/duration/combination limits \
+                without spending credits. model filters one id.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),

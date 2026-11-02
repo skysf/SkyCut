@@ -46,8 +46,8 @@ enum AITrackSettings {
         }
     }
 
-    /// 推子写成 dB（一位小数）。
+    /// MCP 回实际 dB，不能把线性增益上限舍入成另一条限制。
     static func decibels(_ linear: Double) -> JSONValue {
-        .number((AudioGain.decibels(fromLinear: linear) * 10).rounded() / 10)
+        .number(AudioGain.decibels(fromLinear: linear))
     }
 }

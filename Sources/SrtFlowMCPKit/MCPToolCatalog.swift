@@ -31,11 +31,13 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case transcribe = "transcribe"
     case findAudio = "find_audio"
     case addVoiceover = "add_voiceover"
+    case syncVoiceover = "sync_voiceover"
     case recordScreen = "record_screen"
     case generateMedia = "generate_media"
     case upscaleClip = "upscale_clip"
     case addClips = "add_clips"
     case editClip = "edit_clip"
+    case editClips = "edit_clips"
     case setKeyframes = "set_keyframes"
     case setTrack = "set_track"
     case splitClip = "split_clip"
@@ -46,7 +48,9 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case duplicateItems = "duplicate_items"
     case setTransition = "set_transition"
     case setText = "set_text"
+    case setTexts = "set_texts"
     case setShape = "set_shape"
+    case setShapes = "set_shapes"
     case setFilter = "set_filter"
     case setCanvas = "set_canvas"
     case generateSubtitles = "generate_subtitles"
@@ -81,8 +85,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
         case .setView, .closeProject, .saveProject, .getTimeline, .look, .listen, .transcribe, .addVoiceover, .recordScreen,
-             .upscaleClip, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
-             .deleteItems, .duplicateItems, .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles,
+             .upscaleClip, .addClips, .editClip, .editClips, .syncVoiceover, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
+             .deleteItems, .duplicateItems, .setTransition, .setText, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,
              .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:
             return true
         }
@@ -90,8 +94,11 @@ public enum MCPToolName: String, CaseIterable, Sendable {
 
     private var groupDefinition: MCPToolDefinition {
         switch self {
+        case .syncVoiceover: return MCPVoiceoverSyncTool.definition
         case .getSettings, .setSettings:
             return MCPSettingsTools.definition(for: self)
+        case .editClips, .setTexts, .setShapes:
+            return MCPBatchTools.definition(for: self)
         case .getStatus, .setView, .openFolder, .openProject, .newProject, .closeProject, .saveProject, .undo, .seek:
             return MCPProjectTools.definition(for: self)
         case .getTimeline, .addClips, .editClip, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .deleteItems,
@@ -244,5 +251,5 @@ public enum MCPSchema {
 
     /// 轨道名：V1 是主视频轨，V2、V3… 是叠在上面的视频轨，A1、A2… 是音频轨。
     public static let trackDescription =
-        "V1 = main video track, V2, V3… above it, A1, A2… audio tracks; new_video / new_audio opens a new one."
+        "V1 main; V2/V3… upper video; A1/A2… audio. new_video/new_audio open tracks."
 }

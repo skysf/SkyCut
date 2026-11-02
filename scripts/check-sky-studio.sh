@@ -75,6 +75,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIToolIO.swift \
@@ -99,6 +100,7 @@ xcrun swiftc \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
+  checks/SkyStudio/VoiceRecoveryChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
   checks/SkyStudio/ModelExpansionChecks.swift \

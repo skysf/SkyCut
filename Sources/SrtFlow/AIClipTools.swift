@@ -7,24 +7,16 @@ import SrtFlowMCPKit
 //
 // 管什么：参数读成一份 `AIClipChange` → 需要看画面的（去黑边、对准主体）先去看 → 在副本上用纯值规则
 // 算好（AIClipEdit）→ 一次 `perform` 提交 → 选中它、播放头跳过去 → 结果（含画面现在怎么放）。
-// 分两步给路由：`plan` 可以 await（抽帧、识别画面），`apply` 必须同步 —— 路由把它包在
-// `AIUndoGrouping.step` 里，包的那一段不许有 await（docs/architecture/ai-control-mcp.md 第四节第 1 条）。
+// 分两步给路由：`plan` 可以 await（抽帧、识别画面），`apply` 必须同步。
+// 提交复用 AIBatchEdit，只有成功候选才包撤销组（docs/architecture/mcp-edit-parameters.md）。
 // 不管什么：规则本身（AIClipEdit、AIFrameFit）、说明文字（SrtFlowMCPKit/MCPTimelineTools.swift）。
 
 @MainActor
 enum AIClipTools {
-    /// 看完画面、算好的一次修改；`apply` 时再按最新的工程提交。
-    struct Plan {
-        let id: UUID
-        var change: AIClipChange
-        /// 算裁切和摆放时用的画布：提交前变了（用户中途换了画面比例）就不提交，免得按旧画布摆。
-        let canvas: CGSize
-        /// 看画面看出来的东西，原样写进结果（黑边、主体在哪）。
-        var findings: [String: JSONValue] = [:]
-    }
-
-    static func plan(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> Plan {
-        let state = project.state
+    static func plan(
+        _ args: AIToolArguments, _ project: VideoEditProject, state supplied: TimelineState? = nil
+    ) async throws -> AIClipEditPlan {
+        let state = supplied ?? project.state
         let ids = AIShortIDs(state: state)
         let id = try ids.resolve(try args.requiredString("clip_id"))
         guard let clip = state.clip(with: id) else {
@@ -45,9 +37,13 @@ enum AIClipTools {
         change.alone = try args.bool("alone") ?? false
         change.keyframes = try args.choice("keyframes", from: MCPVocabulary.keyframePolicies).flatMap(AIKeyframePolicy.init(rawValue:))
         let canvas = VideoEditCompositionBuilder.renderSize(for: state)
-        var plan = Plan(id: id, change: change, canvas: canvas)
+        var plan = AIClipEditPlan(id: id, change: change, canvas: canvas)
+        plan.expectedClip = clip
         let details = try AIClipDetails(args)
         if details.touchesPicture || details.touchesSound || details.markers != nil { plan.change.details = details }
+        let request = try AIFramingRequest(args)
+        try AIClipParameters.validate(change)
+        plan.requestedParameters = args.raw
         // 换文件（edit_clip 的 file）：探好、图片先转成静帧视频，转不了什么都不改。画面怎么放按换完之后的那段算。
         var subject = clip
         if let path = try args.string("file") {
@@ -57,7 +53,15 @@ enum AIClipTools {
             )
             plan.change.replacement = replacement
         }
-        let request = try AIFramingRequest(args)
+        let needsPicture = request.touchesPicture || details.touchesPicture
+        let needsMetadata = needsPicture || (!subject.isAudioOnly && !subject.isStillImage
+            && (change.sourceIn != nil || change.sourceOut != nil || change.volumeDB != nil || change.fadeIn != nil || change.fadeOut != nil))
+        if needsMetadata {
+            if let info = try await AIClipReadiness.prepare(subject, project: project, needsPicture: needsPicture) {
+                subject.info = info
+                plan.change.probedInfo = info
+            }
+        }
         if request.touchesPicture {
             try requirePicture(subject)
             var usable: CGRect?
@@ -69,7 +73,7 @@ enum AIClipTools {
             let crop = chosenCrop(request, usable: usable)
             var focus = request.focusPoint
             var followed: AIFrameFit.Framing?
-            if request.fit == .fill, focus == nil, request.focus != .center,
+            if request.region == nil, request.fit == .fill, focus == nil, request.focus != .center,
                let found = await subjectFocus(
                    subject, canvas: canvas, active: AIFrameFit.region(of: crop ?? nil), textFirst: request.focus == .text,
                    follow: request.follow, frame: state.frameRate.secondsPerFrame * subject.speed
@@ -78,61 +82,46 @@ enum AIClipTools {
                 followed = found.followed
                 plan.findings["subject"] = found.json
             }
-            plan.change.framing = try followed ?? framing(request, clip: subject, canvas: canvas, crop: crop, focus: focus)
+            if let region = request.region {
+                plan.change.framing = try AIRegionFraming.make(
+                    subject, canvas: canvas, region: region, fill: request.fit == .fill, clearsKeyframes: change.keyframes == .clear
+                )
+                plan.requestedRegion = region
+            } else {
+                plan.change.framing = try followed ?? framing(request, clip: subject, canvas: canvas, crop: crop, focus: focus)
+            }
         }
         return plan
     }
 
-    static func apply(_ plan: Plan, _ project: VideoEditProject) throws -> AIToolResult {
+    static func apply(_ plan: AIClipEditPlan, _ project: VideoEditProject) throws -> AIToolResult {
         let state = project.state
-        let ids = AIShortIDs(state: state)
-        if plan.change.framing != nil, VideoEditCompositionBuilder.renderSize(for: state) != plan.canvas {
-            throw AIToolError("The frame shape changed while SkyCut was looking at the clip. Call edit_clip again.")
-        }
-        let next: TimelineState
-        do {
-            next = try AIClipEdit.apply(
-                plan.change, to: plan.id, linkage: project.linkageEnabled,
-                stillDuration: StillImageClipFactory.stillDuration, in: state
-            )
-        } catch let conflict as AIClipEdit.Conflict {
-            let other = conflict.other
-            throw AIToolError("""
-                That would overlap "\(other.name)" (\(ids.short(other.id)), \(String(format: "%.2f", other.timelineStart))–\
-                \(String(format: "%.2f", other.timelineEnd)) s) on \(AITrackName.name(of: conflict.track)). \
-                Move or trim that clip first, choose another start or track, or use ripple on V1.
-                """)
-        }
-        // 什么都没变（没找到黑边、给的就是现在的值）：不提交，免得撤销栈里多一步空的。
-        let changed = next != state
-        let linkage = changed ? project.perform { $0 = next } : TimelineLinkage.Report()
-        let fresh = project.state
-        guard let clip = fresh.clip(with: plan.id), let location = fresh.location(of: plan.id) else {
-            return .ok(["changed": .string(ids.short(plan.id))], changed: true)
-        }
-        AIEditorPresenter.reveal(.init(clips: [plan.id], time: clip.timelineStart), project: project)
-        let context = AITimelineSummary.Context(
-            ids: AIShortIDs(state: fresh), workspace: AIWorkspace.shared.current, playhead: project.clock.time,
-            selection: [], renderSize: VideoEditCompositionBuilder.renderSize(for: fresh)
+        let next = try plan.applying(
+            to: state, linkage: project.linkageEnabled, stillDuration: StillImageClipFactory.stillDuration,
+            canvas: VideoEditCompositionBuilder.renderSize(for: state)
         )
-        var summary = AITimelineSummary.clip(clip, next: nil, context, frameRate: fresh.frameRate).objectValue ?? [:]
-        summary["track"] = .string(AITrackName.name(of: location.track))
-        if !clip.isAudioOnly, plan.change.framing != nil {
-            summary["picture"] = AITimelineSummary.picture(clip, canvas: context.renderSize, always: true)
+        // 什么都没变：不提交，免得撤销栈里多一步空的。
+        let changed = next != state
+        var edit = AIBatchEdit(state)
+        edit.next = next
+        let linkage = try AIBatchEditTools.commit(edit, project, rebuildsPreview: true)
+        if let clip = project.state.clip(with: plan.id) {
+            AIEditorPresenter.reveal(.init(clips: [plan.id], time: clip.timelineStart), project: project)
         }
-        for (key, value) in plan.findings { summary[key] = value }
-        if let old = state.clip(with: plan.id),
-           let note = AIKeyframes.editNote(policy: plan.change.keyframes ?? .keepFrames, old: old, new: clip, frameRate: fresh.frameRate) {
-            summary["keyframes_note"] = .string(note)
-        }
-        if plan.change.replacement != nil, let old = state.clip(with: plan.id),
-           let note = ClipFileReplacement.aspectNote(old: old, new: clip) {
-            summary["picture_note"] = .string(note)
-        }
-        if let followed = AILinkageReport.json(linkage, ids: context.ids) { summary["linkage"] = followed }
+        var summary = summary(plan, old: state.clip(with: plan.id), project)
+        if let followed = AILinkageReport.json(linkage, ids: AIShortIDs(state: project.state)) { summary["linkage"] = followed }
         if let packed = AILinkageReport.magnet(linkage) { summary["magnet"] = packed }
         if !changed { summary["unchanged"] = true }
         return .ok(.object(summary), changed: changed)
+    }
+
+    static func summary(_ plan: AIClipEditPlan, old: EditClip?, _ project: VideoEditProject) -> [String: JSONValue] {
+        let state = project.state
+        let context = AITimelineSummary.Context(
+            ids: AIShortIDs(state: state), workspace: AIWorkspace.shared.current, playhead: project.clock.time,
+            selection: [], renderSize: VideoEditCompositionBuilder.renderSize(for: state)
+        )
+        return plan.summary(old: old, in: state, context: context)
     }
 
     /// edit_clip 的 file：探好（图片先转成静帧视频，同拖图片进来那条路）才提交。点名文件夹以外的文件不在这里问：
@@ -162,7 +151,7 @@ enum AIClipTools {
                 return ClipFileReplacement(url: url, kind: .image, duration: 0, info: nil, hasAudio: false)
             }
             guard project.canConvertStills, let ffmpeg = MediaToolchain.shared.runtime?.url else {
-                throw AIToolError("SkyCut's video engine is still starting, so images cannot be swapped in yet. Try again in a moment.")
+                throw AIClipReadiness.failure(clip, loading: true, reason: "video_engine_starting", message: "The video engine is starting; retry the image replacement shortly.")
             }
             let still = try await StillImageClipFactory.stillVideo(for: url, ffmpeg: ffmpeg)
             return ClipFileReplacement(
@@ -240,7 +229,8 @@ enum AIClipTools {
         let state = project.state
         let ids = AIShortIDs(state: state)
         let time = try args.requiredDouble("time")
-        let duration = min(max(try args.double("duration") ?? FreezeFrame.defaultDuration, 0.2), StillImageClipFactory.stillDuration)
+        let requestedDuration = try args.double("duration") ?? FreezeFrame.defaultDuration
+        let duration = min(max(requestedDuration, 0.2), StillImageClipFactory.stillDuration)
         let clipID: UUID
         if let text = try args.string("clip_id") {
             clipID = try ids.resolve(text)
@@ -270,6 +260,11 @@ enum AIClipTools {
                 "timeline_duration": AIFormat.seconds(project.state.duration),
                 "note": "The clip was cut at that time and the still inserted; later clips on the same track moved right by its length."
             ]
+            if args.has("duration") {
+                for (key, value) in AIParameterReport.make(requested: args.raw, values: ["duration": .number(clip.timelineDuration)],
+                                                           reasons: ["duration": "native_freeze_duration_limits"]) { result[key] = value }
+                result["limits"] = ["duration": AIEditLimits.bounds(0.2...StillImageClipFactory.stillDuration, policy: "clamp")]
+            }
             if usedNearestFrame { result["warning"] = "The clip has no frame exactly at that time; the nearest one was used." }
             // 静帧后面还剩一截短的原片（不到一帧的已经拿掉了，FreezeSliver）：多半是想收在这一帧上、定格早了几帧（2026-09-29 验收）。
             if let original = state.clip(with: clipID), let tail = project.state.allClips.first(where: {

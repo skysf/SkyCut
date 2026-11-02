@@ -42,14 +42,13 @@ public enum MCPInstructions {
     - Files: get_status, open_folder (or Finder selection), read_document (scripts), manage_files, open_project, \
     new_project, save_project, close_project
     - Whole video: recipes first, follow the style that fits (user's words win); save_recipe
-    - Clips: add_clips, edit_clip (trim, speed, volume, fill 9:16, crop, animation), split_clip, delete_items, \
+    - Clips: add_clips, edit_clip (trim, speed, volume, fill 9:16, crop, animation), edit_clips (batch), split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes
-    - Record: record_screen (screen, window or area)
+    - Record: record_screen
     - Talk and beat cuts: transcribe, cut_speech, listen beats=true, cut_to_beat
-    - Picture: set_canvas (for 9:16, then edit_clip fit=fill each clip), set_transition, set_filter, set_text, \
-    set_shape (also blur or mosaic a watermark)
+    - Picture: set_canvas (9:16), set_transition, set_filter, set_text, set_shape (blur/mosaic too); batches: set_texts, set_shapes
     - Sound: find_audio (music, sound effects), add_clips sound_effect (whoosh, riser… made here), add_voiceover \
-    (narration), set_track
+    (narration), sync_voiceover (paragraph timing), set_track
     - Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles, export_subtitles
     - Output: export_video; compress_videos, burn_subtitles, convert_subtitles (files only); get_job, cancel_job
     - App: get_settings, set_settings (preferences); set_view, seek

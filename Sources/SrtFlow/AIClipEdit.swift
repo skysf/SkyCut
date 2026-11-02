@@ -26,6 +26,8 @@ struct AIClipChange {
     var fadeOut: Double?
     /// 换成另一个文件（edit_clip 的 file，ClipFileReplacement）：入点 = sourceIn ?? 0，位置、长度和设置都不动。
     var replacement: ClipFileReplacement?
+    /// 元数据尚未载入时先探测，只随最终有效编辑一起采用；不能在校验前单独改工程。
+    var probedInfo: MediaInfo?
     /// 画面的裁切和摆放（AIFrameFit 算好的，两样一起换）。
     var framing: AIFrameFit.Framing?
     /// 旋转、不透明度、翻转、入场出场、音量曲线、声音场景、标记（AIClipDetails）。
@@ -54,24 +56,32 @@ enum AIClipEdit {
     }
 
     /// 入点、出点超出素材一丁点（四舍五入的误差）就夹回来；超出多了才报错。
-    static let tolerance = 0.05
+    static let tolerance = ClipFileReplacement.tolerance
 
     static func apply(
-        _ change: AIClipChange, to id: UUID, linkage: Bool, stillDuration: Double, in original: TimelineState
+        _ change: AIClipChange, to id: UUID, linkage: Bool, stillDuration: Double, in original: TimelineState,
+        checksOverlap: Bool = true
     ) throws -> TimelineState {
         guard let clip = original.clip(with: id), let location = original.location(of: id) else {
             throw AIToolError("There is no clip with that id. Call get_timeline for current ids.")
         }
+        try AIClipParameters.validate(change)
         var updated = clip
+        if let info = change.probedInfo { updated.info = info }
         if let replacement = change.replacement {
             try ClipFileReplacement.apply(replacement, to: &updated, sourceStart: change.sourceIn ?? 0, stillDuration: stillDuration)
+        }
+        if !updated.hasAudio, change.volumeDB != nil || change.fadeIn != nil || change.fadeOut != nil {
+            throw AIToolError("This clip has no audio stream; choose an audio/video clip with sound.",
+                              details: ["status": "unsupported_parameter", "retryable": false, "reason": "no_audio_stream",
+                                        "suggestion": "Use entrance/exit for picture fades, or select a clip with audio for volume_db/fade_in/fade_out."])
         }
         // 换过文件之后的这一段：关键帧策略和链接伙伴都只跟「换完之后」的改动（换文件本身挪的源时间不是伙伴的事）。
         let swapped = updated
         try applySourceWindow(change, to: &updated, stillDuration: stillDuration)
-        if let speed = change.speed { updated.speed = min(max(speed, 0.1), 8) }
+        if let speed = change.speed { updated.speed = speed }
         applyKeyframePolicy(change.keyframes ?? .keepFrames, from: swapped, to: &updated, frameRate: original.frameRate)
-        if let start = change.start { updated.timelineStart = max(0, start) }
+        if let start = change.start { updated.timelineStart = start }
         if let db = change.volumeDB {
             let target = AudioGain.clampedDecibels(db)
             if updated.hasVolumeCurve {
@@ -111,7 +121,7 @@ enum AIClipEdit {
         if let details = change.details { try details.apply(to: id, in: &state, frameRate: original.frameRate) }
         state.pruneEmptyTracks()
         AITimelineEdits.sortLanes(&state)
-        if let other = AITimelineEdits.conflict(for: id, in: state), let slot = state.location(of: id)?.track {
+        if checksOverlap, let other = AITimelineEdits.conflict(for: id, in: state), let slot = state.location(of: id)?.track {
             throw Conflict(other: other, track: slot)
         }
         return state
@@ -135,32 +145,13 @@ enum AIClipEdit {
     /// 入点 / 出点。图片只看长度（素材是一段循环的静帧，最长 `stillDuration`）。
     private static func applySourceWindow(_ change: AIClipChange, to clip: inout EditClip, stillDuration: Double) throws {
         guard change.sourceIn != nil || change.sourceOut != nil else { return }
-        let oldIn = clip.sourceStart
-        let oldOut = clip.sourceStart + clip.sourceDuration
-        if clip.isStillImage {
-            let length = (change.sourceOut ?? oldOut) - (change.sourceIn ?? oldIn)
-            guard length >= TimelineTrim.clipMinimumDuration else {
-                throw AIToolError("An image must show for at least \(TimelineTrim.clipMinimumDuration) s.")
-            }
-            clip.sourceStart = 0
-            clip.sourceDuration = min(length, stillDuration)
-            return
-        }
-        var newIn = change.sourceIn ?? oldIn
-        var newOut = change.sourceOut ?? oldOut
-        let end = clip.assetDuration
-        if newIn < 0 { guard newIn > -tolerance else { throw AIToolError("source_in cannot be negative.") }; newIn = 0 }
-        if newOut > end {
-            guard newOut - end < tolerance else {
-                throw AIToolError("source_out \(newOut) s is past the end of the file (\(String(format: "%.2f", end)) s).")
-            }
-            newOut = end
-        }
-        guard newOut - newIn >= TimelineTrim.clipMinimumDuration else {
-            throw AIToolError("source_out must be at least \(TimelineTrim.clipMinimumDuration) s after source_in.")
-        }
-        clip.sourceStart = newIn
-        clip.sourceDuration = newOut - newIn
+        let window = try AIClipSourceWindow.resolve(
+            sourceIn: change.sourceIn, sourceOut: change.sourceOut, oldIn: clip.sourceStart,
+            oldOut: clip.sourceStart + clip.sourceDuration, assetDuration: clip.assetDuration,
+            isImage: clip.isStillImage, stillDuration: stillDuration
+        )
+        clip.sourceStart = window.start
+        clip.sourceDuration = window.duration
     }
 
     /// 裁切 + 摆放。铺满（`replacesMotion`）换掉原有的位置 / 大小关键帧、跟拍的写上新的；别的放法遇到位置 / 大小

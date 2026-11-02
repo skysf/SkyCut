@@ -129,6 +129,7 @@ xcrun swiftc \
   checks/ProjectFile/ProjectFileExtension.swift \
   checks/ProjectFile/ShapeAnimations.swift \
   checks/ProjectFile/ExitCurves.swift \
+  checks/ProjectFile/Regions.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # ---- 真实媒体素材（探针「文件存在 ≠ 音轨可读」那一组要用）----

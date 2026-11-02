@@ -2,259 +2,264 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// MARK: - 云端配旁白 / 克隆：回任务号，完成后入轨一整步撤销
-// 管什么：先报价与预留总额、上传一次参考音频、按批交活并查到结局、下载与按句落盘，最后统一交给 AIVoiceoverTool.apply。
-// 不管什么：批次 / 字幕 / 几何的算法；阻塞音频读写、积分账与 HTTP 各经已有适配层。额度不够的普通配音退本机，克隆报错。
+// MARK: - 云端配旁白 / 克隆：每批先保存，再本地处理，最后一次入轨
+// 管什么：现有长任务接口、恢复调度、失败阶段与入轨回执；所有批次的原音频 / 映射 / 进度永久留在恢复目录。
+// 不管什么：请求与预算（SkyStudioVoiceCloudBatches）、切句与字幕对齐（SkyStudioVoiceRender）、文件合同（SkyStudioVoiceCheckpoint）。
 
 @MainActor
 final class SkyStudioVoiceoverRun {
     private var input: AIVoiceoverInput
     private weak var project: VideoEditProject?
     let status: SkyStudioMediaStatus
+    private let services: SkyStudioVoiceServices
+    private let generateMissing: Bool
+    private let recoveryFile: URL
+    private var recovery: SkyStudioVoiceRecovery?
+    private var cloud: SkyStudioVoiceCloudBatches?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
-    private var budget: SkyStudioVoiceBudget?
-    private var serverIDs: [String] = []
-    private var requestKeys: [String] = []
+    private var locale: Locale?
     private var batchIndex = 0
-    private var batchCount = 0
-    private var made: [URL] = []
-    private var keptBatch: URL?
-    private var activeRaw: URL?
+    private var stage = SkyStudioVoiceCheckpoint.Stage.cloudGeneration
+    private var extra: [String: JSONValue] = [:]
 
-    init(input: AIVoiceoverInput, project: VideoEditProject) {
+    init(input: AIVoiceoverInput, project: VideoEditProject, recovery: SkyStudioVoiceRecovery? = nil,
+         generateMissing: Bool = true, services: SkyStudioVoiceServices? = nil) {
         self.input = input
         self.project = project
-        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: "Sky Studio", credits: nil,
+        self.recovery = recovery
+        self.generateMissing = generateMissing
+        self.services = services ?? SkyStudioVoiceServices()
+        recoveryFile = (recovery?.file ?? input.folder.appendingPathComponent("Voiceover-\(UUID().uuidString).recovery").appendingPathComponent("voiceover-recovery.json"))
+            .standardizedFileURL.resolvingSymlinksInPath()
+        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: recovery?.value.plan.model.title ?? "Sky Studio", credits: nil,
             uploads: input.clone != nil, owner: CloudTasksActivity.owner(of: project), mediaKind: .audio)
     }
 
     func start() -> AIToolResult {
+        if let id = SkyStudioVoiceRecovery.active[recoveryFile.path] { return .ok(["status": "started", "job_id": .string(id)]) }
         let job = AIJobs.shared.start(.voiceover, progress: { nil }, liveDetail: { [weak self] in self?.detail() ?? [:] }, cancel: { [weak self] in self?.task?.cancel() })
         self.job = job
+        SkyStudioVoiceRecovery.active[recoveryFile.path] = job.id
         status.aiJobID = job.id
         status.onCancel = { [weak self] in self?.task?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
         task = Task { @MainActor in await self.execute() }
         return .ok([
-            "status": .string("started"), "job_id": .string(job.id), "provider": .string("Sky Studio"),
-            "next_step": .string("Wait with get_job until done, failed or cancelled. SkyCut checks the price and daily budget first; ordinary narration may fall back when unavailable, but an exhausted hard daily budget pauses without changing voices. "
-                + "Cloud voice cloning may queue for several minutes. On completion, all lines and subtitles are added together as one undo step. Do not call add_voiceover again while this job is running.")
+            "status": "started", "job_id": .string(job.id), "provider": "Sky Studio", "recovery_file": .string(recoveryFile.path),
+            "next_step": "Wait with get_job. Cloud cloning may queue for several minutes. On failure preserve recovery_file; call add_voiceover resume=recovery_file for local recovery, never repeat the original lines. Only generate_missing=true may pay for missing batches."
         ])
     }
 
     private func execute() async {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlow-cloud-voice-\(UUID().uuidString)")
         defer {
-            budget?.refundUnused()
-            try? FileManager.default.removeItem(at: folder)
+            cloud?.refundUnused()
+            SkyStudioVoiceRecovery.active[recoveryFile.path] = nil
             SkyStudioGenerationActivity.shared.remove(status)
         }
         status.advance(to: .preparing, typicalSeconds: nil)
         do {
             try Task.checkCancellation()
-            let key: String
-            switch await SkyStudioJobKey.key(.silent) {
-            case .success(let found): key = found
-            case .failure(let problem): return try await fallback(problem.message)
+            if recovery == nil, !(try await prepareNew()) { return }
+            guard let recovery else { throw AIToolError("The voiceover recovery record could not be created.") }
+            if let applied = recovery.value.applied {
+                recovery.value.issue = nil
+                extra = applied.objectValue ?? [:]
+                return finish(.done, "This voiceover was already inserted; no audio or subtitles were added again.")
             }
-            let api = SkyStudioAPI()
-            let plan: SkyStudioVoicePlan
-            let quotes: [SkyStudioQuote]
-            let locale: Locale?
-            do {
-                let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: api)
-                let kind = input.clone == nil ? "voice" : "voice_clone"
-                guard let model = catalog.models(kind: kind).first else { throw AIToolError("Sky Studio offers no \(kind) model right now.") }
-                plan = try SkyStudioVoicePlan.make(lines: input.lines.map(\.text), model: model, voice: input.choice.name, language: input.language)
-                if plan.clones, plan.batches.contains(where: { $0.speech.parts.count > 1 }) {
-                    locale = try await SkyStudioVoiceAudio.splitLocale(language: input.language)
-                } else if plan.clones, input.subtitles {
-                    locale = try? await SkyStudioVoiceAudio.splitLocale(language: input.language)
-                } else { locale = nil }
-                var offered: [SkyStudioQuote] = []
-                for batch in plan.batches {
-                    try Task.checkCancellation()
-                    offered.append(try await api.quote(batch.request, key: key))
-                }
-                quotes = offered
-            } catch is CancellationError { throw CancellationError() }
-            catch { return try await fallback(message(error)) }
-            try Task.checkCancellation()
-            let total = quotes.reduce(0) { $0 + $1.credits }
-            guard projectUnchanged else { throw AIToolError("The project was closed or changed before generation started; nothing was charged.") }
-            guard let reserved = SkyStudioVoiceBudget.reserve(quotes) else {
-                return finish(.failed, "Daily AI budget reached. Raise it in Settings > Sky Studio to continue.",
-                    payload: SkyStudioJobGate.budgetBlocked(credits: total, store: .shared).payload)
-            }
-            budget = reserved
-            status.modelTitle = plan.model.title
-            status.credits = total
-            batchCount = plan.batches.count
-            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            var reference: URL?
-            if let clone = input.clone {
-                let sample = try await VoiceReferenceSample.file(from: clone.url, start: clone.start, seconds: clone.seconds, folder: folder)
-                status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
-                reference = try await api.upload(fileURL: sample, contentType: "audio/wav", purpose: "audio", key: key) { [weak self] fraction in
-                    Task { @MainActor in self?.status.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
-                }
-            }
-            let render = SkyStudioVoiceRender(input: input, plan: plan, locale: locale)
-            for index in plan.batches.indices {
-                try Task.checkCancellation()
-                guard projectUnchanged else { throw AIToolError("The project was closed or changed; no further voiceover batches were submitted.") }
-                batchIndex = index
-                status.reset(typicalSeconds: quotes[index].typicalSeconds)
-                var request = plan.batches[index].request
-                request.maxCredits = quotes[index].credits
-                if let reference { request.inputs["reference_audio_url"] = reference.absoluteString }
-                requestKeys.append(request.idempotencyKey)
-                let submitted = SkyStudioSubmission()
-                let done: SkyStudioJobStatus
-                do {
-                    done = try await SkyStudioJobRun(api: api, key: key).run(request) { [weak self] update in
-                        if case .status(let server) = update { submitted.mark(server.jobID) }
-                        Task { @MainActor in self?.update(update, typical: quotes[index].typicalSeconds) }
-                    }
-                } catch let error as SkyStudioJobError {
-                    remember(submitted.jobID)
-                    switch error {
-                    case .failed(let failure) where failure.creditsReturned: budget?.refund(index)
-                    case .stopped(.nothingCharged): budget?.refund(index)
-                    case .request(.server(let failure)) where !submitted.value && Self.refusedBeforeCharging(failure.code): budget?.refund(index)
-                    default: budget?.unknown(index)
-                    }
-                    throw error
-                }
-                remember(done.jobID)
-                budget?.settled(index, charged: done.creditsCharged ?? quotes[index].credits)
-                guard let result = done.result else { throw AIToolError("Sky Studio finished without a voice file.") }
-                let ext = result.url.pathExtension.isEmpty ? (plan.clones ? "wav" : "mp3") : result.url.pathExtension
-                let raw = folder.appendingPathComponent("batch-\(index).\(ext)")
-                activeRaw = raw
-                status.advance(to: .downloading(fraction: nil), typicalSeconds: quotes[index].typicalSeconds)
-                try await api.download(result.url, to: raw) { [weak self] fraction in
-                    Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: quotes[index].typicalSeconds) }
-                }
-                status.advance(to: .finishing, typicalSeconds: quotes[index].typicalSeconds)
-                do { try await render.append(plan.batches[index], file: raw, result: result) }
-                catch {
-                    made = render.outputs.sorted { $0.key < $1.key }.map(\.value.url)
-                    throw error
-                }
-                made = render.outputs.sorted { $0.key < $1.key }.map(\.value.url)
-                activeRaw = nil
-                try? FileManager.default.removeItem(at: raw)
-            }
-            let outputs = try render.complete()
-            try Task.checkCancellation()
-            if input.speed != 1 {
-                input.choice.note = [input.choice.note, "The Sky Studio voice speaks at its own pace; speed was ignored (SkyCut's or a Mac voice can change it)."].compactMap { $0 }.joined(separator: " ")
-            }
-            try await land(outputs: outputs)
-        } catch {
-            preserveRaw()
-            let cancelled = Self.isCancellation(error)
-            var payload = detail()
-            if let failure = (error as? SkyStudioJobError)?.failure {
-                payload["failure"] = failure.json
-                if failure.code == "insufficient_credits" {
-                    payload["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
-                    payload["next_step"] = "Notify the user in their conversation language that credits are insufficient, show recharge_url and stop. Do not repeatedly request approval or silently change voices."
-                }
-            }
-            finish(cancelled ? .cancelled : .failed, message(error), payload: .object(payload))
+            try await process(recovery)
+        } catch { await fail(error) }
+    }
+
+    private func process(_ recovery: SkyStudioVoiceRecovery) async throws {
+        recovery.value.issue = nil
+        // 成句文件被外部删除时只从保留的原始音频重建，不能重新生成。
+        for (line, output) in recovery.value.outputs where !FileManager.default.fileExists(atPath: output.url.path) {
+            recovery.value.outputs[line] = nil
         }
+        let render = SkyStudioVoiceRender(input: input, recovery: recovery, locale: locale,
+            transcribe: services.transcribe, localeProvider: services.locale)
+        for index in recovery.value.plan.batches.indices {
+            batchIndex = index
+            try Task.checkCancellation()
+            guard projectUnchanged else { throw SkyStudioVoiceProcessingError(stage: .insertion, underlying: AIToolError("The original project was closed or changed; recover into that project after reopening it.")) }
+            let speech = recovery.value.plan.batches[index].speech
+            if speech.parts.allSatisfy({ recovery.value.outputs[$0.line] != nil }) { continue }
+            if recovery.value.batches[index].missing, !generateMissing { break }
+            status.reset(typicalSeconds: nil)
+            stage = .cloudGeneration
+            let audio: (URL, SkyStudioJobResult)?
+            if let raw = recovery.value.batches[index].rawFile, FileManager.default.fileExists(atPath: raw.path),
+               let remote = recovery.value.batches[index].remote, let result = SkyStudioJobResult(json: remote) {
+                audio = (raw, result)
+            } else {
+                audio = try await cloudBatches().audio(index, generateMissing: generateMissing)
+            }
+            guard let (file, result) = audio else { break }
+            stage = .localSplit
+            status.advance(to: .finishing, typicalSeconds: nil)
+            try await render.append(index, file: file, result: result)
+        }
+        guard recovery.value.ready else {
+            try await recovery.save()
+            return finish(.failed, "Available audio was recovered. Some batches have not been generated; resume with generate_missing=true to generate only those batches.")
+        }
+        stage = .insertion
+        try await land(outputs: render.complete())
+    }
+
+    private func fail(_ error: Error) async {
+        let cancelled = Self.isCancellation(error)
+        let failureStage = (error as? SkyStudioVoiceProcessingError)?.stage ?? stage
+        extra["failure_stage"] = .string(failureStage.rawValue)
+        if let recovery {
+            recovery.value.issue = .init(stage: failureStage, batch: batchIndex, message: message(error))
+            if failureStage == .subtitleAlignment {
+                // 失败的词表不能变成永久缓存；已完成句子仍保持不动。
+                for index in recovery.value.batches.indices where recovery.value.plan.batches[index].speech.parts.contains(where: { recovery.value.outputs[$0.line] == nil }) {
+                    recovery.value.batches[index].analysis = nil
+                }
+            }
+            do { try await recovery.save() }
+            catch { extra["checkpoint_issue"] = .string(error.localizedDescription) }
+        } else {
+            extra["completed_line_indices"] = []
+            extra["pending_recovery_line_indices"] = []
+            extra["not_generated_line_indices"] = .array(input.lines.indices.map { .number(Double($0)) })
+            extra["recovery_state"] = "not_started"
+            extra["next_step"] = "No cloud generation was submitted. Resolve the reported setup problem, then retry the original add_voiceover call."
+        }
+        if let failure = (error as? SkyStudioJobError)?.failure {
+            extra["failure"] = failure.json
+            if failure.code == "insufficient_credits" {
+                extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
+            }
+        }
+        if let blocked = error as? SkyStudioVoiceBudgetProblem {
+            extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
+        }
+        finish(cancelled ? .cancelled : .failed, message(error))
+    }
+
+    /// 只有付费请求之前可用普通本机退档；本地失败后的恢复绝不重新选声或生成。
+    private func prepareNew() async throws -> Bool {
+        let key: String
+        let plan: SkyStudioVoicePlan
+        do {
+            key = try await services.key()
+            let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: services.api)
+            let kind = input.clone == nil ? "voice" : "voice_clone"
+            guard let model = catalog.models(kind: kind).first else { throw AIToolError("Sky Studio offers no \(kind) model right now.") }
+            plan = try SkyStudioVoicePlan.make(lines: input.lines.map(\.text), model: model, voice: input.choice.name, language: input.language)
+            if plan.clones, plan.batches.contains(where: { $0.speech.parts.count > 1 }) { locale = try await services.locale(input.language) }
+        } catch is CancellationError { throw CancellationError() }
+        catch { try await fallback(message(error)); return false }
+        guard projectUnchanged, let project else { throw AIToolError("The original project was closed or changed; nothing was charged.") }
+        if input.speed != 1 {
+            input.choice.note = [input.choice.note, "The Sky Studio voice speaks at its own pace; speed was ignored."].compactMap { $0 }.joined(separator: " ")
+        }
+        let recovery = SkyStudioVoiceRecovery(input: input, project: project, plan: plan, file: recoveryFile)
+        self.recovery = recovery
+        stage = .checkpoint
+        try await recovery.save()
+        AIReadGrants.shared.remember([recoveryFile])
+        status.modelTitle = plan.model.title
+        cloud = SkyStudioVoiceCloudBatches(recovery: recovery, input: input, api: services.api, key: key, status: status,
+                                         canSubmit: { [weak self] in self?.projectUnchanged == true })
+        stage = .cloudGeneration
+        do { try await cloud?.prepareMissing() }
+        catch is CancellationError { throw CancellationError() }
+        catch let failure as SkyStudioFailure { try await fallback(message(failure)); return false }
+        return true
+    }
+
+    private func cloudBatches() async throws -> SkyStudioVoiceCloudBatches {
+        if let cloud { return cloud }
+        guard let recovery else { throw AIToolError("Missing recovery record.") }
+        let key = try await services.key()
+        let cloud = SkyStudioVoiceCloudBatches(recovery: recovery, input: input, api: services.api, key: key, status: status,
+                                             canSubmit: { [weak self] in self?.projectUnchanged == true })
+        self.cloud = cloud
+        return cloud
     }
 
     private func fallback(_ note: String) async throws {
         try Task.checkCancellation()
-        guard input.clone == nil else { throw AIToolError(note) }
         input = try input.localFallback(note)
-        guard let project else { throw AIToolError("The project was closed before the voiceover started.") }
+        guard let project, projectUnchanged else { throw AIToolError("The original project was closed before the voiceover started.") }
+        stage = .fileWrite
         let plan = try await AIVoiceoverTool.plan(input, project)
-        made = plan.spoken.map(\.output.url)
+        if let recovery {
+            for (line, spoken) in plan.spoken.enumerated() {
+                recovery.value.outputs[line] = .init(url: spoken.output.url, duration: spoken.output.duration, words: spoken.output.words)
+            }
+        }
         try Task.checkCancellation()
-        land(plan: plan, project: project)
+        stage = .insertion
+        try await land(plan: plan, project: project)
     }
 
     private func land(outputs: [AISpeechSynthesis.Output]) async throws {
-        guard let project else {
-            return finish(.done, "The voice files were made, but the project was closed; no lines were added.", payload: .object(detail()))
+        guard let project, projectUnchanged, let recovery else { throw AIToolError("The voice files were made, but the original project is no longer open; use recovery_file after reopening it.") }
+        let existing = recovery.value.landingIDs.filter { project.state.clip(with: $0) != nil }
+        if !existing.isEmpty {
+            guard existing.count == recovery.value.landingIDs.count else { throw AIToolError("Some clips from this voiceover are already present. No audio or subtitles were duplicated; keep the existing insertion and inspect the timeline.") }
+            recovery.value.applied = ["already_inserted": true]
+            try await recovery.save()
+            return finish(.done, "The saved insertion is already on the timeline; nothing was added again.")
         }
-        guard project.isCurrentGeneration(input.generation) else {
-            return finish(.done, "The voice files were made, but the project changed; no lines were added.", payload: .object(detail()))
+        var plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs, playhead: recovery.value.input.playhead)
+        if !recovery.value.landingIDs.isEmpty {
+            guard recovery.value.landingIDs.count == plan.spoken.count else { throw AIToolError("The saved voiceover insertion does not match its lines.") }
+            for index in plan.spoken.indices {
+                guard let clip = ClipboardIdentity.renewed(plan.spoken[index].clip, id: recovery.value.landingIDs[index]) else {
+                    throw AIToolError("The saved voiceover clip identity could not be restored; nothing was inserted.")
+                }
+                plan.spoken[index].clip = clip
+            }
         }
-        let plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs)
         try Task.checkCancellation()
-        land(plan: plan, project: project)
+        try await land(plan: plan, project: project)
     }
 
-    private func land(plan: AIVoiceoverTool.Plan, project: VideoEditProject) {
-        guard projectUnchanged else {
-            return finish(.done, "The voice files were made, but the project was closed or changed; no lines were added.", payload: .object(detail()))
+    private func land(plan: AIVoiceoverTool.Plan, project: VideoEditProject) async throws {
+        if let recovery {
+            if recovery.value.landingIDs.isEmpty { recovery.value.landingIDs = plan.spoken.map(\.clip.id) }
+            try await recovery.save() // 云端与普通退档共用：先记稳定身份，再允许改工程。
         }
-        do {
-            var result = try AIUndoGrouping.step(project.effectiveUndoManager) { try AIVoiceoverTool.apply(plan, project) }
-            AISession.shared.round(for: project).noteChange()
-            result = AIProjectTools.saveIfNeverSaved(project, after: result)
-            var payload = result.payload.objectValue ?? [:]
-            for (key, value) in detail() { payload[key] = value }
-            payload["project"] = .string(project.shortID)
-            finish(.done, "The voiceover was added as one undo step.", payload: .object(payload))
-        } catch { finish(.failed, message(error), payload: .object(detail())) }
+        try Task.checkCancellation()
+        guard projectUnchanged else { throw AIToolError("The original project changed before insertion; all voice files were kept.") }
+        var result = try AIUndoGrouping.step(project.effectiveUndoManager) { try AIVoiceoverTool.apply(plan, project) }
+        AISession.shared.round(for: project).noteChange()
+        result = AIProjectTools.saveIfNeverSaved(project, after: result)
+        extra = result.payload.objectValue ?? [:]
+        extra["project"] = .string(project.shortID)
+        if let recovery {
+            recovery.value.applied = result.payload
+            recovery.value.projectPath = project.documentURL?.standardizedFileURL.path
+            try await recovery.save()
+        }
+        finish(.done, "The voiceover was added as one undo step.")
     }
 
     private func detail() -> [String: JSONValue] {
         var value = status.progress?.json() ?? [:]
-        value["skystudio_job_ids"] = .array(serverIDs.map(JSONValue.string))
-        if let last = serverIDs.last { value["skystudio_job_id"] = .string(last) }
+        value.merge(recovery?.value.detail(recoveryFile: recoveryFile.path) ?? [:]) { _, new in new }
+        let ids = recovery?.value.batches.compactMap(\.serverID) ?? []
+        value["skystudio_job_ids"] = .array(ids.map(JSONValue.string))
+        if let last = ids.last { value["skystudio_job_id"] = .string(last) }
         value["batch_index"] = .number(Double(batchIndex + 1))
-        value["batch_count"] = .number(Double(batchCount))
-        value["credits_charged"] = .number(SkyStudioCredits.number(budget?.charged ?? 0))
-        if let budget, budget.uncertain > 0 {
-            value["credits_unknown"] = .number(SkyStudioCredits.number(budget.uncertain))
-            value["submission_keys"] = .array(requestKeys.map(JSONValue.string))
-            value["next_step"] = "Submission or cancellation outcome is uncertain. Keep polling known jobs; do not generate again. Contact Sky Studio with these submission keys if no server job id was returned."
-        }
-        value["files"] = .array(made.map { .string(AIWorkspace.shared.display($0)) })
-        if let keptBatch { value["complete_batch_file"] = .string(AIWorkspace.shared.display(keptBatch)) }
+        value["batch_count"] = .number(Double(recovery?.value.batches.count ?? 0))
+        value["submission_keys"] = .array(recovery?.value.plan.batches.map { .string($0.request.idempotencyKey) } ?? [])
+        value.merge(extra) { _, new in new }
         return value
     }
 
-    private func update(_ update: SkyStudioJobRun.Update, typical: Double?) {
-        switch update {
-        case .waitingForSlot: status.advance(to: .queued(position: nil), typicalSeconds: typical)
-        case .status(let server):
-            remember(server.jobID)
-            switch server.state {
-            case .queued?: status.advance(to: .queued(position: server.queuePosition), typicalSeconds: typical)
-            case .running?: status.advance(to: .processing, typicalSeconds: typical)
-            default: break
-            }
-        }
-    }
-
-    private func remember(_ id: String?) {
-        if let id, !serverIDs.contains(id) { serverIDs.append(id) }
-    }
-
-    private func preserveRaw() {
-        guard let raw = activeRaw, FileManager.default.fileExists(atPath: raw.path) else { return }
-        try? FileManager.default.createDirectory(at: input.folder, withIntermediateDirectories: true)
-        let destination = ExportFileName.unoccupied(in: input.folder, stem: L10n("Complete voiceover"), pathExtension: raw.pathExtension) {
-            FileManager.default.fileExists(atPath: $0.path)
-        }
-        do { try FileManager.default.moveItem(at: raw, to: destination); keptBatch = destination }
-        catch { return }
-    }
-
-    private func finish(_ state: AIJobs.Status, _ message: String, payload: JSONValue) {
+    private func finish(_ state: AIJobs.Status, _ text: String) {
         guard let job else { return }
-        if state == .failed || (budget?.uncertain ?? 0) > 0 { status.issue = message }
-        AIReadGrants.shared.remember(made + (keptBatch.map { [$0] } ?? []))
-        AIJobs.shared.finish(job, state, message: message, detail: payload)
+        if state == .failed { status.issue = text }
+        AIReadGrants.shared.remember([recoveryFile] + (recovery?.value.outputs.values.map(\.url) ?? []))
+        AIJobs.shared.finish(job, state, message: text, detail: .object(detail()))
     }
 
     private func message(_ error: Error) -> String {
@@ -264,18 +269,15 @@ final class SkyStudioVoiceoverRun {
         return error.localizedDescription
     }
 
-    private var projectUnchanged: Bool {
-        guard let project else { return false }
-        return project.isCurrentGeneration(input.generation) && OpenProjects.shared.all.contains(where: { $0 === project })
-    }
-
     private static func isCancellation(_ error: Error) -> Bool {
-        if error is CancellationError { return true }
-        if let failure = error as? SkyStudioJobError, case .stopped = failure { return true }
+        if let wrapped = error as? SkyStudioVoiceProcessingError { return isCancellation(wrapped.underlying) }
+        if error is CancellationError || (error as? URLError)?.code == .cancelled { return true }
+        if case .stopped? = error as? SkyStudioJobError { return true }
         return false
     }
 
-    private static func refusedBeforeCharging(_ code: String) -> Bool {
-        ["invalid_key", "upgrade_required", "insufficient_credits", "price_changed", "invalid_request", "rate_limited", "too_many_jobs"].contains(code)
+    private var projectUnchanged: Bool {
+        guard let project else { return false }
+        return project.isCurrentGeneration(input.generation) && OpenProjects.shared.all.contains(where: { $0 === project })
     }
 }

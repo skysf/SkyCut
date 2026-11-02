@@ -44,8 +44,8 @@ public struct SubtitleTextRange: Hashable, Sendable {
 public enum SubtitleCueWords {
 
     /// 两段话真正对上了多少个字母 / 数字（同一份 LCS，忽略空白和标点）；配音切句用来核对转写覆盖率。
-    public static func matchingCharacterCount(_ oldText: String, to newText: String) -> Int {
-        matchedCharacters(Array(oldText), Array(newText)).count
+    public static func matchingCharacterCount(_ oldText: String, to newText: String, foldsChineseScript: Bool = false) -> Int {
+        matchedCharacters(Array(oldText), Array(newText), foldsChineseScript: foldsChineseScript).count
     }
 
     /// 生成时：带时间的词（按说的顺序，时间线上的秒）对到这句最后显示的字上。每个词只认它的字母和数字，
@@ -118,14 +118,16 @@ public enum SubtitleCueWords {
     /// 改了字：没改的字母、数字保住原来的时间（按字符对齐，最长公共子序列）；一个词里改掉的几个字母跟着这个词
     /// （往两边扩到挨着的、没被别的词占住的字母）；整个换掉的词不再记（它说的时候前一个词接着亮）。
     /// 一个都对不上就是 nil。
-    public static func realigned(_ words: [SubtitleCueWord]?, from oldText: String, to newText: String) -> [SubtitleCueWord]? {
+    public static func realigned(
+        _ words: [SubtitleCueWord]?, from oldText: String, to newText: String, foldsChineseScript: Bool = false
+    ) -> [SubtitleCueWord]? {
         guard let words, !words.isEmpty else { return nil }
         guard oldText != newText else { return words }
         let old = Array(oldText)
         let new = Array(newText)
         let oldOffsets = utf16Offsets(old)
         let newOffsets = utf16Offsets(new)
-        let match = matchedCharacters(old, new)
+        let match = matchedCharacters(old, new, foldsChineseScript: foldsChineseScript)
         var taken = Set<Int>(match.values)
         var result: [SubtitleCueWord] = []
         for word in words {
@@ -197,12 +199,17 @@ public enum SubtitleCueWords {
     }
 
     /// 两段字里的字母、数字按最长公共子序列对上：旧的第几个字 → 新的第几个字。
-    private static func matchedCharacters(_ old: [Character], _ new: [Character]) -> [Int: Int] {
+    private static func matchedCharacters(_ old: [Character], _ new: [Character], foldsChineseScript: Bool = false) -> [Int: Int] {
         let a = old.indices.filter { isWordCharacter(old[$0]) }
         let b = new.indices.filter { isWordCharacter(new[$0]) }
         guard !a.isEmpty, !b.isEmpty else { return [:] }
-        let lowerA = a.map { String(old[$0]).lowercased() }
-        let lowerB = b.map { String(new[$0]).lowercased() }
+        // 只折叠比较键，位置始终留在原稿的 UTF-16 上；换声对齐不改用户的繁简体。
+        func key(_ c: Character) -> String {
+            let text = String(c).lowercased()
+            return foldsChineseScript ? (text.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? text) : text
+        }
+        let lowerA = a.map { key(old[$0]) }
+        let lowerB = b.map { key(new[$0]) }
         var table = [[Int]](repeating: [Int](repeating: 0, count: b.count + 1), count: a.count + 1)
         for i in stride(from: a.count - 1, through: 0, by: -1) {
             for j in stride(from: b.count - 1, through: 0, by: -1) {

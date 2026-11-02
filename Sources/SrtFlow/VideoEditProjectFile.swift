@@ -33,7 +33,7 @@ struct VideoEditProjectFile: Codable {
     var rowHeights: TimelineRowHeights
 
     /// reader 认识的最高版本（闸门比较对象）。
-    static let latestFormatVersion = 32
+    static let latestFormatVersion = 33
     /// writer 的基线版本：没有任何高版本 only 数据的工程一律写它，旧版照常能开。
     /// 具体判据见 `TimelineState.requiresFormatVersion4` / `...5` / `...6` /
     /// `...7` … `...14`（登记清单在那边）。
@@ -86,6 +86,7 @@ struct VideoEditProjectFile: Codable {
         _ = timeline.requiresFormatVersion30
         _ = timeline.requiresFormatVersion31
         _ = timeline.requiresFormatVersion32
+        _ = timeline.requiresFormatVersion33
         formatVersion = Self.latestFormatVersion
         savedAt = Date()
         self.timeline = timeline
@@ -266,6 +267,7 @@ enum VideoEditProjectIO {
         }
 
         var timeline = file.timeline
+        if file.formatVersion < 33 { timeline.normalizeLegacyEmptyCrops() }
         // v6 及更早没有「译文轨的眼睛」：那些版本的默认预览/烧录是**只有原文**
         // （预览轨选择是运行时状态、默认 .original；烧录默认 Original text）。
         // 缺键回退 false 会让升级把这些工程的成片悄悄变成双语 —— 所以按版本

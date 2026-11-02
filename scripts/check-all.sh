@@ -95,6 +95,10 @@ run_check() {
 # 明写一项：子脚本不再顺手编整个 App 了。
 shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
+run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
+run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
+run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
+run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
 run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
 run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh

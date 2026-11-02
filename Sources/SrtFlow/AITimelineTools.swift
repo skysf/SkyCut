@@ -24,6 +24,7 @@ enum AITimelineTools {
         var summary = AITimelineSummary.make(state, context)
         let credits = AIAudioLibraryTools.projectCredits(state)
         if case .object(var object) = summary {
+            object["edit_limits"] = AIEditLimits.json
             // 联动开关（docs/architecture/timeline-linkage.md）：开着时删 / 挪 V1 片段，压在上面的东西跟着；AI 要知道它在不在。
             object["linkage"] = .bool(project.linkageEnabled)
             // 这个工程的磁吸（跟着工程走）：开着时 V1 一改就合拢空隙，AI 放到 V1 的起点会被排紧。
@@ -63,6 +64,7 @@ enum AITimelineTools {
                 track: try entry.string("track"), start: try entry.double("start"),
                 sound: try entry.choice("sound", from: MCPVocabulary.clipSounds).flatMap(ClipSoundMode.init(rawValue:))
             )
+            try AIEditLimits.nonnegative("clips[\(index)].start", request.start)
             switch (try entry.string("file"), try entry.string("library_id"), try AISoundEffectRequest.parse(entry, index: index)) {
             case (let path?, nil, nil):
                 let url = AIWorkspace.shared.resolve(path)
@@ -91,6 +93,7 @@ enum AITimelineTools {
         var images: [(id: UUID, url: URL)] = []
         var library: [UUID: AudioLibraryItem] = [:]
         var effects: [UUID: AISoundEffectTool.Made] = [:]
+        var requestedByID: [UUID: JSONValue] = [:]
         for (index, original) in requests.enumerated() where !original.isSubtitle {
             var request = original
             var clip: EditClip
@@ -132,15 +135,19 @@ enum AITimelineTools {
                     throw AIToolError("clips[\(index)]: SkyCut cannot use \(request.url?.lastPathComponent ?? "it") as a clip.")
                 }
                 if media.kind == .image, !project.canConvertStills {
-                    throw AIToolError("SkyCut's video engine is still starting, so images cannot be added yet. Try again in a moment.")
+                    throw AIToolError("The video engine is starting; retry adding the image shortly.", details: ["status": "media_loading", "retryable": true, "retry_after_ms": 500, "reason": "video_engine_starting", "index": .number(Double(index))])
                 }
                 (clip, isAudio, name) = (project.clip(for: media), media.kind == .audio, media.url.lastPathComponent)
                 if let sound = request.sound {
                     try soundOfVideo(&clip, &isAudio, mode: sound, kind: media.kind, name: name, index: index)
                 }
                 if media.kind == .image {
-                    let length = request.sourceOut.map { $0 - (request.sourceIn ?? 0) } ?? VideoEditProject.importedImageDuration
-                    clip.sourceDuration = min(max(length, TimelineTrim.clipMinimumDuration), StillImageClipFactory.stillDuration)
+                    let window = try AIBatchItems.entry("clips", index) { try AIClipSourceWindow.resolve(
+                        sourceIn: request.sourceIn, sourceOut: request.sourceOut, oldIn: 0,
+                        oldOut: VideoEditProject.importedImageDuration, assetDuration: StillImageClipFactory.stillDuration,
+                        isImage: true, stillDuration: StillImageClipFactory.stillDuration
+                    ) }
+                    clip.sourceDuration = window.duration
                     images.append((clip.id, media.url))
                 } else {
                     try trim(&clip, duration: media.duration, name: name, request: request, index: index)
@@ -151,6 +158,7 @@ enum AITimelineTools {
             }
             let target = try request.track.map { try AITrackName.target($0, in: project.state) }
             try check(target, isAudio: isAudio, name: name, index: index)
+            requestedByID[clip.id] = items[index]
             plans.append(.init(
                 clip: clip, isAudio: isAudio, target: target, start: request.start, separateSound: request.sound == .separate
             ))
@@ -183,6 +191,10 @@ enum AITimelineTools {
                 "start": AIFormat.seconds(clip.timelineStart),
                 "end": AIFormat.seconds(clip.timelineEnd)
             ]
+            for (key, value) in AIParameterReport.clip(requested: requestedByID[clip.id] ?? [:], old: nil, clip: clip,
+                                                       state: state, canvas: VideoEditCompositionBuilder.renderSize(for: state)) {
+                entry[key] = value
+            }
             if let item = library[clip.id] {
                 entry["library_id"] = .string(item.id)
                 entry["title"] = .string(item.title)
@@ -226,18 +238,13 @@ enum AITimelineTools {
 
     /// 用素材的哪一段（图片只有「放多久」，在上面单独算）。音乐库的一首按清单上的时长。
     private static func trim(_ clip: inout EditClip, duration: Double, name: String, request: ClipRequest, index: Int) throws {
-        var start = request.sourceIn ?? 0
-        var stop = request.sourceOut ?? duration
-        if start < 0, start > -AIClipEdit.tolerance { start = 0 }
-        if stop > duration, stop - duration < AIClipEdit.tolerance { stop = duration }
-        guard start >= 0, stop <= duration else {
-            throw AIToolError("clips[\(index)]: \(name) is \(String(format: "%.2f", duration)) s long; source_in/source_out must be inside that.")
-        }
-        guard stop - start >= TimelineTrim.clipMinimumDuration else {
-            throw AIToolError("clips[\(index)]: source_out must be at least \(TimelineTrim.clipMinimumDuration) s after source_in.")
-        }
-        clip.sourceStart = start
-        clip.sourceDuration = stop - start
+        let start = request.sourceIn ?? 0
+        let window = try AIBatchItems.entry("clips", index) { try AIClipSourceWindow.resolve(
+            sourceIn: request.sourceIn, sourceOut: request.sourceOut, oldIn: start, oldOut: duration,
+            assetDuration: duration, isImage: false, stillDuration: StillImageClipFactory.stillDuration
+        ) }
+        clip.sourceStart = window.start
+        clip.sourceDuration = window.duration
     }
 
     /// add_clips 的 sound：只对有声音的视频文件。only 把这段换成只取声音的一段（放音频轨），separate 在落地之后分离
@@ -276,7 +283,9 @@ enum AITimelineTools {
         var next = project.state
         try AITrackSettings.apply(target, volumeDB: volumeDB, hidden: hidden, in: &next)
         // 只动推子是纯声音的改动，perform 自己会走只换混音的快路径（不重建画面）。
-        project.perform { $0 = next }
+        var edit = AIBatchEdit(project.state)
+        edit.next = next
+        _ = try AIBatchEditTools.commit(edit, project, rebuildsPreview: true)
         var result: [String: JSONValue] = [:]
         switch target {
         case .master:
@@ -286,6 +295,18 @@ enum AITimelineTools {
             result["track"] = .string(AITrackName.name(of: slot))
             result["volume_db"] = AITrackSettings.decibels(project.state.trackVolume(for: slot))
             result["hidden"] = .bool(project.state.isLaneHidden(slot))
+        }
+        if let volumeDB {
+            let linear: Double
+            switch target {
+            case .master: linear = project.state.masterVolume
+            case .track(let slot): linear = project.state.trackVolume(for: slot)
+            }
+            let actual = AIParameterReport.number(AudioGain.decibels(fromLinear: linear))
+            result["volume_db"] = actual
+            for (key, value) in AIParameterReport.make(requested: ["volume_db": .number(volumeDB)], values: ["volume_db": actual], reasons: ["volume_db": "gain_limits"]) {
+                result[key] = value
+            }
         }
         return .ok(.object(result), changed: true)
     }
@@ -298,14 +319,18 @@ enum AITimelineTools {
         let id = try ids.resolve(try args.requiredString("clip_id"))
         guard var clip = state.clip(with: id) else { throw AIToolError("\(ids.short(id)) is not a clip.") }
         let request = try AIKeyframes.parse(args)
+        if let info = try AIClipReadiness.knownPicture(clip, project: project) { clip.info = info }
         let canvas = VideoEditCompositionBuilder.renderSize(for: state)
         try AIKeyframes.apply(request, to: &clip, canvas: canvas, frameRate: state.frameRate)
         var next = state
         next.update(id) { $0 = clip }
-        project.perform { $0 = next }
+        var edit = AIBatchEdit(project.state)
+        edit.next = next
+        _ = try AIBatchEditTools.commit(edit, project, rebuildsPreview: true)
         AIEditorPresenter.reveal(.init(clips: [id], time: clip.timelineStart), project: project)
         var result: [String: JSONValue] = ["id": .string(ids.short(id))]
         result["keyframes"] = AIKeyframes.summary(clip, canvas: canvas, frameRate: project.state.frameRate) ?? "none"
+        for (key, value) in AIParameterReport.keyframes(args.raw, clip: clip, request: request, canvas: canvas, frameRate: state.frameRate) { result[key] = value }
         return .ok(.object(result), changed: true)
     }
 

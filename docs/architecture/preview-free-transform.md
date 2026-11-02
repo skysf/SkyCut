@@ -43,6 +43,47 @@ Transform 面板追加的四个字段（都有「无操作」默认值，全默�
 - `crop: ClipCrop?` —— 四边各裁掉源画面（显示方向）的归一化比例。裁完剩下
   的画面填进摆放框；**默认摆放框按裁后的宽高比算**（裁成 1:1 默认就显示成
   正方形），见 `croppedDisplaySize`。
+  传统 `ClipCrop(top:bottom:leading:trailing:)` / MCP `crop` 仍每边最多 0.45；
+  **精确源矩形**用 `ClipCrop(keeping:)`，允许单边超过 0.45，四边共同留下有效矩形。
+  不增加遮挡层、不改素材。检查器单边改值只改那一边，不能把其它边夹回 45%。
+  v33 的空裁切判定只容纳浮点零误差，不再用固定 0.05% 吞掉高分辨率素材里的真实像素；
+  读 v32 及更早工程时，将当年被忽略的微小裁切迁移为无裁切，保住旧成片。
+
+### MCP 的源矩形取景（2026-11-02）
+
+`edit_clip` / `edit_clips` 的 `region={x,y,width,height}` 是**按素材旋转信息摆正后的源显示画面**上的比例，
+左上原点，全部在 0–1 内、宽高大于零。先按显示尺寸向外取整源像素（每边最多多一个源像素），
+`fit=fit`（默认）完整展示，`fit=fill` 在区域内取居中、与画布同比例的窗铺满。
+实际区域和 fill 的窗每个方向至少留下 2 个源像素，否则整次拒绝。
+
+- 参数和冲突只在 `AIFramingRequest`；几何适配在 `AIRegionFraming`，fill 的窗与映射仍只有
+  `AIFrameFit.fillWindow` / `mapping`。原生预览继续逆着 preferredTransform 换算裁切，导出继续由 ffmpeg 按源旋转摆正。
+- region 替换旧的裁切 / 摆放。不能同时给 crop、remove_black_bars、focus、focus_x/y、follow、x/y/scale、
+  rotation、flip_horizontal/vertical（即便是 false / 0）。不运行主体识别，不额外生成形状或素材。
+- 已有素材的静态翻转保留，坐标始终按翻转前的源显示画面；已有额外旋转 / 旋转关键帧 / 几何入出场先拒绝。
+  可先清掉这些设置；旋转关键帧也能显式用 keyframes=clear 清。位置 / 大小关键帧沿用已有 fit 语义：
+  fit=fit 拒绝，fit=fill 替换它们，opacity / 音量关键帧不动。
+- 返回 `framing`：requested_region、region（实际原生裁切保留的区域）、visible_region（经过摆放后画布看得见的源窗）、
+  source_display_size、transform（画布归一化中心 / 宽高、额外旋转及翻转）。`picture` 同样带实际区域和变换，
+  get_timeline 可复查。坐标保留六位小数，不把小窗口四舍五入成零；动画取景不给误导性的固定 visible_region。
+- 仍走单项计划和批量事务，一步撤销。保存只用原有 crop 四个键；**格式 v33** 保护超过 45% 的值，旧版必须拒开，
+  避免它读进来夹坏后自动保存。新版读旧工程行为不变。
+
+调用例子（把源画面右下角 8% × 6% 的控件完整展示）：
+
+```json
+{"clip_id":"a1b2c3d4","region":{"x":0.92,"y":0.94,"width":0.08,"height":0.06},"fit":"fit"}
+```
+
+`scripts/check-region-framing.sh` 在隔离 App 中运行实际编辑、look、预览和生产 plan() + ffmpeg；横屏、竖屏、
+90/180/270 度旋转、不同画布比例、4% × 6% 四个边角、奇数像素边界，独立源坐标像素尺对账，包含一次撤销 / 重做及批量失败原子性。
+`SRTFLOW_REGION_ARTIFACTS=/tmp/…` 可保留 look / 预览 / 导出图与测量值。MCP 参数和工程往返分别由 check-mcp / check-project-file 覆盖。
+
+发版前人工回归：
+
+- [ ] 真实网页录屏分别取提示词、模型菜单、角色卡；用 look 核对原稿小字，比较预览与导出同一帧。
+- [ ] 在检查器改一次区域的一条边，另外三边（含 >45% 的值）不动；复位、撤销、保存重开均保持对应画面。
+- [ ] 将带旋转信息的真实手机素材取到四角；确认左上角坐标按播放时看到的方向解释。
 
 **变换顺序是合同**：裁切 → 翻转 → 缩放进摆放框 → 绕框中心旋转 → 平移到位
 → 画面渐变（`docs/architecture/video-fades.md`）。
@@ -62,7 +103,7 @@ Inspector 的 ±1px 步进整个吞回默认值，点了没反应。
 | 管线 | 落点 |
 | --- | --- |
 | 预览（AVFoundation） | `fittingTransform`：完整 CGAffineTransform（翻转=负缩放）+ `setCropRectangle`（裁切矩形要逆着 preferredTransform 换算回源轨自然坐标）+ layer opacity（转场斜坡整体乘 clip.opacity） |
-| 导出（ffmpeg） | `transformSteps`：`crop` → `hflip/vflip` → `scale` → `format=rgba`（旋转/半透明/画面渐变才加）→ `rotate=θ:ow=rotw(θ):oh=roth(θ):c=black@0` → `colorchannelmixer=aa` → `fade=…:alpha=1`（画面渐变，必须在链尾）；主轨叠 `color=black` 画布，**overlay 用中心表达式 `cx-w/2`** —— 旋转会把输出框撑大，只有中心是不变量。**不用 pad**：pad 不接受负坐标/超界，overlay 允许探出画面 |
+| 导出（ffmpeg） | `transformSteps`：`crop:exact=1` → `hflip/vflip` → `scale` → `format=rgba`（旋转/半透明/画面渐变才加）→ `rotate=θ:ow=rotw(θ):oh=roth(θ):c=black@0` → `colorchannelmixer=aa` → `fade=…:alpha=1`（画面渐变，必须在链尾）；**奇数裁切边界先把完整画面转为 RGBA 再裁**，避免 4:2:0 色度起点偏移被局部放大。主轨叠 `color=black` 画布，**overlay 用中心表达式 `cx-w/2`** —— 旋转会把输出框撑大，只有中心是不变量。**不用 pad**：pad 不接受负坐标/超界，overlay 允许探出画面 |
 
 改任何一边都要对照另一边；验收标准是同一时刻预览截图和导出抽帧长一样。
 像素尺寸过 `evenPixel`（正偶数，yuv420 要求），坐标取整。

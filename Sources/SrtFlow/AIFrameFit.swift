@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SrtFlowMCPKit
 
 // MARK: - 画面怎么放进画布：铺满 / 完整显示 / 按位置和大小（纯值）
 //
@@ -17,6 +18,7 @@ import Foundation
 // （每边最多 0.45），剩下的交给摆放框 —— 把裁剩的画面放大、挪到窗正好对上画布（摆放框的中心可以在
 // 画布外面，框本身照样盖满画布）。裁切一次就收得下时，摆放框正好等于默认布局，存回 nil：用户在检查器里
 // 看到的就只是一个裁切。
+// 显式 region 由 AIRegionFraming 用精确原生裁切承载，小区域不受传统单边上限影响；窗到画布仍复用 mapping。
 
 enum AIFrameFit {
     /// 裁切 + 摆放，一段画面在画布上的样子。两个都是 nil = 默认（不裁、完整放进画布）。
@@ -63,6 +65,11 @@ enum AIFrameFit {
               canvas.width > 0, canvas.height > 0, active.width > 0, active.height > 0 else { return nil }
         let window = fillWindow(display: display, canvas: canvas, active: active, focus: focus)
         let crop = crop(keeping: window)
+        return mapping(clip, canvas: canvas, window: window, crop: crop)
+    }
+
+    /// 将源窗映到整个画布；传统 fill 与精确 region 共用这份几何，裁切模型由各入口选择。
+    static func mapping(_ clip: EditClip, canvas: CGSize, window: CGRect, crop: ClipCrop?) -> Framing {
         let kept = region(of: crop)
         // 窗映到整幅画布：源画面上一个归一化单位在画布上是多少像素（横竖同一个像素比例，窗和画布同比例）。
         let perUnitX = canvas.width / window.width
@@ -98,7 +105,7 @@ enum AIFrameFit {
     /// 画面中心在画布上能放到哪（AI 的 x / y、位置关键帧）：画面比画布大时，中心要出到 0–1 外边，画面的边才够得到画布的边
     /// （横屏素材铺满竖屏是 3.16 倍，0–1 只看得到中间那六成多）。scale 最大 6、1 = 放得下，所以 −2…3 够到任何一边
     /// （2026-09-29 验收实剪：放大的幻灯片只看得到中间）。工具说明里的范围和它对账（check-mcp.sh）。
-    static let centerRange = -2.0...3.0
+    static let centerRange = MCPFramingLimits.center
 
     /// 按位置和大小摆：`x` / `y` 是画面中心在画布上的位置（0…1 在画布里，见 `centerRange`），`scale` 相对默认布局
     /// （1 = 裁剩的画面完整放进画布）。不给的沿用这一段此刻的样子。
@@ -109,10 +116,13 @@ enum AIFrameFit {
         var cropped = clip
         cropped.crop = crop
         let base = cropped.defaultPlacement(canvas: canvas)
-        let factor = min(max(scale ?? now.scale, 0.02), 8)
-        func inRange(_ value: Double) -> Double { min(max(value, centerRange.lowerBound), centerRange.upperBound) }
+        // 请求值已由 AIFramingRequest 校验；未传的分量必须保留原样，不能把先前 fill 的大框暗中夹小。
+        let factor = scale.map { min(max($0, MCPFramingLimits.keyframeScale.lowerBound), MCPFramingLimits.keyframeScale.upperBound) } ?? now.scale
+        func explicitCenter(_ number: Double?, fallback: Double) -> Double {
+            number.map { min(max($0, centerRange.lowerBound), centerRange.upperBound) } ?? fallback
+        }
         let placement = ClipPlacement(
-            centerX: inRange(x ?? now.x), centerY: inRange(y ?? now.y), width: base.width * factor, height: base.height * factor
+            centerX: explicitCenter(x, fallback: now.x), centerY: explicitCenter(y, fallback: now.y), width: base.width * factor, height: base.height * factor
         )
         return Framing(crop: crop, placement: PlacementDefault.normalized(placement, fallback: base, canvas: canvas))
     }

@@ -233,7 +233,7 @@ struct VideoEditInspectorView: View {
             HStack(spacing: 8) {
                 Slider(
                     value: liveSpeedBinding(clip),
-                    in: 0.1...8,
+                    in: TimelineTrim.clipSpeedRange,
                     onEditingChanged: { editing in
                         if !editing { project.endLiveEdit() }
                     }
@@ -242,7 +242,7 @@ struct VideoEditInspectorView: View {
                     .font(.callout)
                     .monospacedDigit()
                     .frame(width: 52, alignment: .trailing)
-                Stepper("", value: stepperSpeedBinding(clip), in: 0.1...8, step: 0.05)
+                Stepper("", value: stepperSpeedBinding(clip), in: TimelineTrim.clipSpeedRange, step: 0.05)
                     .labelsHidden()
             }
             HStack {
@@ -496,7 +496,7 @@ struct VideoEditInspectorView: View {
                 let ids = project.linkageEnabled ? project.state.linkedClipIDs(of: clip.id) : [clip.id]
                 project.liveApply { state in
                     for id in ids {
-                        state.update(id) { $0.speed = min(max(newValue, 0.1), 8) }
+                        state.update(id) { $0.speed = min(max(newValue, TimelineTrim.clipSpeedRange.lowerBound), TimelineTrim.clipSpeedRange.upperBound) }
                     }
                 }
             }

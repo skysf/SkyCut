@@ -247,6 +247,9 @@ grep -qF 'payload["submission_keys"]' "${GEN_RUN}" || fail "未知提交未留�
 VOICE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift"
 VOICE_INPUT="Sources/SrtFlow/AIVoiceoverInput.swift"
 VOICE_BUDGET="Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift"
+VOICE_CLOUD="Sources/SrtFlow/SkyStudio/SkyStudioVoiceCloudBatches.swift"
+VOICE_SERVICES="Sources/SrtFlow/SkyStudio/SkyStudioVoiceServices.swift"
+VOICE_CHECKPOINT="Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift"
 for file in "${VOICE_RUN}" "${VOICE_INPUT}" "${VOICE_BUDGET}"; do
   [ -f "${file}" ] || fail "找不到 ${file}"
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog|AIConfirmations' "${file}"; then
@@ -254,14 +257,17 @@ for file in "${VOICE_RUN}" "${VOICE_INPUT}" "${VOICE_BUDGET}"; do
   fi
 done
 grep -qF 'SkyStudioVoiceoverRun(input: input, project: project).start()' "${ROUTER}" || fail "配音路由没有启动云端任务"
-grep -qF 'SkyStudioJobRun(api: api, key: key).run(request)' "${VOICE_RUN}" || fail "云端配音没有复用统一任务执行器"
-grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_RUN}" || fail "云端配音不得弹钥匙串框"
-grep -qF 'SkyStudioVoiceBudget.reserve(quotes)' "${VOICE_RUN}" || fail "云端配音没有先预留整批报价"
+grep -qF 'SkyStudioJobRun(api: api, key: key)' "${VOICE_CLOUD}" && grep -qF 'runner(index).run(request)' "${VOICE_CLOUD}" \
+  && grep -qF 'run.checkpoint = ' "${VOICE_CLOUD}" || fail "云端配音没有复用统一任务执行器并持久化原单身份"
+grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_SERVICES}" || fail "云端配音不得弹钥匙串框"
+grep -qF 'SkyStudioVoiceBudget.reserve(quotes)' "${VOICE_CLOUD}" || fail "云端配音没有先预留整批报价"
 grep -qF 'SkyStudioJobGate.reserveWithoutAsking(credits: total' "${VOICE_BUDGET}" || fail "整批配音没有统一判断每日额度"
 [ "$(count 'AIUndoGrouping.step(project.effectiveUndoManager)' "${VOICE_RUN}")" -eq 1 ] || fail "云端配音落地必须只有一整步撤销"
-for token in 'SkyStudioGenerationActivity.shared.add(status)' 'SkyStudioGenerationActivity.shared.remove(status)' 'OpenProjects.shared.all.contains' 'credits_unknown' 'submission_keys' 'preserveRaw()'; do
+for token in 'SkyStudioGenerationActivity.shared.add(status)' 'SkyStudioGenerationActivity.shared.remove(status)' 'OpenProjects.shared.all.contains' 'submission_keys'; do
   grep -qF "${token}" "${VOICE_RUN}" || fail "配音缺少状态 / 工程归属 / 未知提交 / 原音频保留：${token}"
 done
+grep -qF 'credits_unknown' "${VOICE_CHECKPOINT}" && grep -qF 'rawFile = file' "${VOICE_CLOUD}" \
+  && grep -qF 'SkyStudioVoiceRecovery.resumeIfAsked' "${ROUTER}" || fail "配音必须持久保留原音频、未知账和 MCP 恢复入口"
 # 假 Key 启动钩子必须同时限定独立 bundle id 和回环；生产 / Beta 不得装入。
 grep -qF 'hasSuffix(".skystudiosmoke") == true' "${ACCOUNT}" && grep -qF 'SkyStudioAPI.isLoopback(host)' "${ACCOUNT}" \
   || fail "假 Sky Studio Key 钩子没有同时限定测试身份和回环"

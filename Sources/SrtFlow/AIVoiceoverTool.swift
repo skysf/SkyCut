@@ -69,7 +69,7 @@ enum AIVoiceoverTool {
     }
 
     static func plan(_ input: AIVoiceoverInput, _ project: VideoEditProject,
-                     outputs: [AISpeechSynthesis.Output]? = nil) async throws -> Plan {
+                     outputs: [AISpeechSynthesis.Output]? = nil, playhead: Double? = nil) async throws -> Plan {
         guard project.isCurrentGeneration(input.generation) else {
             throw AIToolError("The project changed while the voiceover was being made. No lines were added.")
         }
@@ -99,7 +99,7 @@ enum AIVoiceoverTool {
         guard project.isCurrentGeneration(input.generation) else {
             throw AIToolError("The project changed while the voiceover was being made. No lines were added.")
         }
-        return Plan(spoken: spoken, starts: starts(for: spoken, playhead: project.clock.time), target: input.target, choice: input.choice,
+        return Plan(spoken: spoken, starts: starts(for: spoken, playhead: playhead ?? project.clock.time), target: input.target, choice: input.choice,
                     language: input.language, subtitles: input.subtitles, maxLines: input.maxLines, generation: input.generation)
     }
 

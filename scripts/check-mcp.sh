@@ -73,6 +73,8 @@
 #      总说明前 512 字自成一体（Codex）、目录里有清单的每个工具名、全部只用英文
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
 #
+#  37. 批量改片段 / 文字 / 形状：副本上全验、坏项不落半份、一次提交与撤销；单项工具共用规则（BatchEditChecks + 扫描）。
+#
 # 用法：
 #   scripts/check-mcp.sh
 #   scripts/check-mcp.sh --scans-only   # 只跑编译之前的扫描（秒级）：scripts/check-guards.sh 推之前调它
@@ -114,6 +116,7 @@ source checks/MCP/clip-file-wiring.sh
 # 路由、窗口、几个会话、App 卡住的扫描在单独一个文件里（这个脚本超过了 600 行的上限）；它定义的 ROUTER 下面还要用。
 # shellcheck source=checks/MCP/router-wiring.sh
 source checks/MCP/router-wiring.sh
+source checks/MCP/batch-edit-wiring.sh
 # shellcheck source=checks/MCP/tool-result-wiring.sh
 source checks/MCP/tool-result-wiring.sh
 # shellcheck source=checks/MCP/clip-sound-wiring.sh
@@ -338,6 +341,7 @@ OUT="$(mktemp -d)/mcpcheck"
 trap 'rm -rf "$(dirname "$OUT")"' EXIT
 
 echo "==> 编译自检二进制"
+# checks/MCP 下的 Swift 文件全是同一个自检程序，统一编入，避免新加一组检查却漏了编译。
 xcrun swiftc \
   -target "$TRIPLE" \
   -wmo \
@@ -462,11 +466,21 @@ xcrun swiftc \
   Sources/SrtFlow/ClipSoundSeparation.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
+  Sources/SrtFlow/AIClipEditPlan.swift \
+  Sources/SrtFlow/AIOverlayEdits.swift \
+  Sources/SrtFlow/AIBatchEdit.swift \
+  Sources/SrtFlow/AIBatchEditPlans.swift \
   Sources/SrtFlow/ClipFileReplacement.swift \
   Sources/SrtFlow/AIFrameFit.swift \
   Sources/SrtFlow/AIFollowSubject.swift \
   Sources/SrtFlow/AIShotDetector.swift \
   Sources/SrtFlow/AIFramingRequest.swift \
+  Sources/SrtFlow/AIEditLimits.swift \
+  Sources/SrtFlow/AIClipParameters.swift \
+  Sources/SrtFlow/AIParameterReport.swift \
+  Sources/SrtFlow/AIOverlayParameterReport.swift \
+  Sources/SrtFlow/StillImageClipFactory.swift \
+  Sources/SrtFlow/AIRegionFraming.swift \
   Sources/SrtFlow/AIClipDetails.swift \
   Sources/SrtFlow/AITrackSettings.swift \
   Sources/SrtFlow/AIKeyframes.swift \
@@ -523,73 +537,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIScreenRecordingRequest.swift \
   Sources/SrtFlow/AIScreenSourceMatch.swift \
   Sources/SrtFlow/DefaultFolder.swift \
-  checks/MCP/main.swift \
-  checks/MCP/Harness.swift \
-  checks/MCP/ProtocolChecks.swift \
-  checks/MCP/CatalogTextChecks.swift \
-  checks/MCP/ProjectTargetingChecks.swift \
-  checks/MCP/VersionNameChecks.swift \
-  checks/MCP/TimelineChecks.swift \
-  checks/MCP/ConfigChecks.swift \
-  checks/MCP/ReadGrantChecks.swift \
-  checks/MCP/ConfirmationChecks.swift \
-  checks/MCP/UndoChecks.swift \
-  checks/MCP/LanguageChecks.swift \
-  checks/MCP/FolderChecks.swift \
-  checks/MCP/FramingChecks.swift \
-  checks/MCP/FollowChecks.swift \
-  checks/MCP/BlackBarChecks.swift \
-  checks/MCP/SubjectChecks.swift \
-  checks/MCP/LookChecks.swift \
-  checks/MCP/ShotChecks.swift \
-  checks/MCP/ListenChecks.swift \
-  checks/MCP/CutCheckChecks.swift \
-  checks/MCP/TextDecodingChecks.swift \
-  checks/MCP/DocumentChecks.swift \
-  checks/MCP/FileOperationChecks.swift \
-  checks/MCP/FinderChecks.swift \
-  checks/MCP/ClipDetailChecks.swift \
-  checks/MCP/TrackKeyframeChecks.swift \
-  checks/MCP/ShapeChecks.swift \
-  checks/MCP/CoverChecks.swift \
-  checks/MCP/TextPartChecks.swift \
-  checks/MCP/RecipeChecks.swift \
-  checks/MCP/RecipeSizeChecks.swift \
-  checks/MCP/VoiceChecks.swift \
-  checks/MCP/VoiceLevelChecks.swift \
-  checks/MCP/SubtitleStyleChecks.swift \
-  checks/MCP/SubtitleLinesChecks.swift \
-  checks/MCP/SubtitleBulkChecks.swift \
-  checks/MCP/TextScanChecks.swift \
-  checks/MCP/SubtitleBoxChecks.swift \
-  checks/MCP/KokoroChecks.swift \
-  checks/MCP/KokoroSpeedChecks.swift \
-  checks/MCP/DuplicateChecks.swift \
-  checks/MCP/ClipSoundChecks.swift \
-  checks/MCP/TransitionReportChecks.swift \
-  checks/MCP/ClipFileSwapChecks.swift \
-  checks/MCP/UnreadableVideoChecks.swift \
-  checks/MCP/MusicLibraryChecks.swift \
-  checks/MCP/EncodeChecks.swift \
-  checks/MCP/TranscriptFormatChecks.swift \
-  checks/MCP/SubtitleFileChecks.swift \
-  checks/MCP/BeatChecks.swift \
-  checks/MCP/SpeechCutChecks.swift \
-  checks/MCP/SpeechCutPointChecks.swift \
-  checks/MCP/SpeechHearingChecks.swift \
-  checks/MCP/BeatCutChecks.swift \
-  checks/MCP/ProviderChecks.swift \
-  checks/MCP/UpscaleToolChecks.swift \
-  checks/MCP/SkyStudioVoiceChecks.swift \
-  checks/MCP/SoundEffectChecks.swift \
-  checks/MCP/ScreenRecordingToolChecks.swift \
-  checks/MCP/ProjectBindingChecks.swift \
-  checks/MCP/HangChecks.swift \
-  checks/MCP/CatalogSyncChecks.swift \
-  checks/MCP/VideoSizeChecks.swift \
-  checks/MCP/LinkageReportChecks.swift \
-  checks/MCP/ConfigBackupChecks.swift \
-  checks/MCP/ArgumentCheckChecks.swift \
+  checks/MCP/*.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o

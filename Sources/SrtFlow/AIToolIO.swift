@@ -13,7 +13,20 @@ import SrtFlowMCPKit
 /// 工具没做成，原因写给 AI 看（英文，AI 会用用户的语言转述）。
 struct AIToolError: Error {
     let message: String
-    init(_ message: String) { self.message = message }
+    let details: [String: JSONValue]
+    init(_ message: String, details: [String: JSONValue] = [:]) {
+        self.message = message
+        self.details = details
+    }
+
+    /// 保留旧错误的纯文字合同；新校验 / 素材状态错误用结构化 payload，MCP 客户端可直接据此改参数或重试。
+    var result: JSONValue {
+        guard !details.isEmpty else { return MCPBridge.textResult(message, isError: true) }
+        var payload = details
+        payload["error"] = .string(message)
+        payload["changed"] = false
+        return MCPBridge.textResult(JSONValue.object(payload).encodedString(), isError: true)
+    }
 }
 
 struct AIToolArguments {

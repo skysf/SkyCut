@@ -34,9 +34,14 @@ enum ExportTransformChain {
         if clip.isAlphaStill { steps.append("setparams=alpha_mode=premultiplied") }
         if let crop = clip.crop, !crop.isEmpty, let display = clip.info?.displaySize {
             let rect = crop.rect(in: display)
+            // 4:2:0 的奇数边界不能直接裁 YUV：色度仍从隔壁的采样格起，放大局部时整幅色边会错开。
+            // 先转完整画面的 RGBA 再精确裁，和原生预览的像素窗口一致；偶数边界保留原轻量路径。
+            if [rect.minX, rect.minY, rect.width, rect.height].contains(where: { Int($0.rounded()) % 2 != 0 }) {
+                steps.append("format=rgba")
+            }
             steps.append(
                 "crop=\(Int(rect.width.rounded())):\(Int(rect.height.rounded())):" +
-                "\(Int(rect.minX.rounded())):\(Int(rect.minY.rounded()))"
+                "\(Int(rect.minX.rounded())):\(Int(rect.minY.rounded())):exact=1"
             )
         }
         if clip.flippedHorizontally { steps.append("hflip") }

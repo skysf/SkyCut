@@ -13,14 +13,11 @@ enum MCPMediaTools {
             return MCPToolDefinition(
                 .findAudio, title: "Find audio",
                 description: """
-                Search SkyCut's libraries: music (CC-BY or CC0) and sound effects the user owns (no credit: whooshes, impacts, \
-                risers, wind, ice, water, creaks, mechanical…). query matches titles, artists and tags in English or Chinese; \
-                all words must match; empty lists everything; kind picks one library. Each result has length, tags, intensity \
-                1–5 and licence; music also vocals, loudness and credit line; a sound effect has hit (the second of its loudest \
-                moment). Put one on the timeline with add_clips {library_id}, a sound effect with hit_at so its hit lands on a \
-                cut. CC-BY music must be credited: give the user the credit lines when the video is done (get_timeline: \
-                music_credits). Nothing fits? add_clips sound_effect makes one; never download music or sound effects from the \
-                internet.
+                Search SkyCut's music (CC-BY/CC0) and owned sound effects (no credit). English/Chinese query matches \
+                title/artist/tags; all words must match; empty lists all. kind filters the library. Results: length, tags, \
+                intensity 1–5, licence; music adds vocals/loudness/credit line; SFX hit marks the loudest second. Import with \
+                add_clips library_id; hit_at aligns SFX to a cut. Report CC-BY credit lines from get_timeline music_credits \
+                when done. Nothing fits? add_clips sound_effect synthesizes one; never download music/SFX.
                 """,
                 input: MCPSchema.object([
                     "query": MCPSchema.string("Words to search for, e.g. \"calm piano\", \"whoosh\" or \"epic\" (Chinese words work too)."),
@@ -34,17 +31,17 @@ enum MCPMediaTools {
                 .addVoiceover, title: "Add a voiceover",
                 description: """
                 Make voiceover files and put each line on the same audio track (new unless track is given), plus optional \
-                subtitles, as one undo step. Sky Studio voices return job_id immediately: wait with get_job to a terminal state; \
-                never repeat add_voiceover while it runs. Cloning may queue for several minutes. Local voices return directly. \
-                Best first: Sky Studio with a saved key; exhausted hard daily budgets pause without changing voices. Otherwise unavailable narration falls back with a voice.note, \
-                then downloaded SkyCut voices, then this Mac's voices. Cloud voices ignore speed. voice is a role \
-                (zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, en_female_british, \
-                en_male_british), a cloud preset such as Rachel or Brian, a SkyCut voice (af_heart, zf_xiaoxiao…), or a Mac voice. \
-                Default is a warm female voice in the text's language. clone_from sends a clear single-speaker sample to Sky Studio; \
-                cloning requires its key and budget, has no local fallback, and combines several lines per paid request. \
-                Multi-line cloning needs an installed speech transcription model (macOS 26); otherwise nothing is charged. \
-                Files go into SkyCut/Voiceovers. subtitles=true times subtitles to the voice (existing overlaps are left out). \
-                Pass voice.note to the user. download_voices=true only downloads SkyCut's voices (a job, about 333 MB; tell the user).
+                subtitles, as one undo step. Sky Studio returns job_id: wait with get_job. After failure use resume=recovery_file; \
+                this only processes saved audio or queries original jobs, never repeats a charge. generate_missing=true additionally \
+                generates only missing batches. Progress lists completed, pending recovery and not generated parts. Repeated resume \
+                cannot duplicate audio/subtitles. Never repeat the original lines after a cloud/local failure. \
+                Cloud cloning may queue minutes; local voices finish directly. A key prefers Sky Studio; hard budgets pause. \
+                Unavailable ordinary narration falls back to downloaded SkyCut voices then Mac; relay voice.note. Cloud ignores speed. \
+                voice accepts roles (zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, en_male, \
+                en_female_british, en_male_british), presets Rachel/Brian, SkyCut names af_heart/zf_xiaoxiao, or Mac names; \
+                default warm female in the text's language. clone_from needs one clear speaker; no fallback, lines combine per \
+                paid batch. Multi-line clones require installed local transcription (macOS 26) before charging. \
+                subtitles=true adds aligned cues except existing overlaps. download_voices=true only downloads 333 MB; tell the user.
                 """,
                 input: MCPSchema.object([
                     "lines": MCPSchema.array(of: MCPSchema.object([
@@ -60,7 +57,9 @@ enum MCPMediaTools {
                     "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice (one line each unless max_lines=2)."),
                     "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
                                                    minimum: 1, maximum: 2),
-                    "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (returns a job); lines are ignored.")
+                    "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (returns a job); lines are ignored."),
+                    "resume": MCPSchema.string("recovery_file from get_job; omit original lines/voice. Reopen the original project first."),
+                    "generate_missing": MCPSchema.boolean("With resume: generate only missing batches; default false (existing audio only).")
                 ])
             )
         default:

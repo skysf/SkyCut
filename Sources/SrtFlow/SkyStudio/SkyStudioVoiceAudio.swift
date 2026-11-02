@@ -52,7 +52,7 @@ enum SkyStudioVoiceAudio {
               let locale = await SpeechTranscriptionService.matchedLocale(for: language),
               await SpeechTranscriptionService.installedLocales().contains(where: { $0.identifier == locale.identifier }) else {
             throw AIToolError("Splitting several cloned lines needs this Mac's speech transcription model for \(language) (macOS 26 or later). "
-                + "Run generate_subtitles on the reference clip first to prepare that language, or give the whole narration as one line. Nothing was charged.")
+                + "Prepare that language with generate_subtitles on the reference clip. For a failed voiceover, keep its recovery_file and existing audio; do not generate it again.")
         }
         return locale
     }

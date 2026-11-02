@@ -91,8 +91,9 @@ enum AITimelineSummary {
         // 画面段的原片多大：AI 判断要不要 upscale_clip（比画布小的放大只是拉伸，不添细节）。
         if !clip.isAudioOnly, let info = clip.info { object["source_size"] = .string(info.resolutionLabel) }
         if abs(clip.speed - 1) > 0.0001 { object["speed"] = .number(clip.speed) }
-        if abs(clip.volume - 1) > 0.0001 {
-            object["volume_db"] = .number((AudioGain.decibels(fromLinear: clip.volume) * 10).rounded() / 10)
+        if abs(clip.volume - 1) > 0.0001 || clip.hasVolumeCurve {
+            object["volume_db"] = AIParameterReport.number(clip.volumeLineDecibels(atTimeline: clip.timelineStart))
+            if clip.hasVolumeCurve { object["volume_db_at"] = "clip_start" }
         }
         if clip.isMuted { object["muted"] = true }
         if clip.isHidden { object["hidden"] = true }
@@ -127,12 +128,7 @@ enum AITimelineSummary {
             object["scale"] = AIFormat.seconds(summary.scale)
         }
         if summary.stretched { object["stretched"] = true }
-        if let crop = summary.crop {
-            object["crop"] = [
-                "left": AIFormat.seconds(crop.leading), "right": AIFormat.seconds(crop.trailing),
-                "top": AIFormat.seconds(crop.top), "bottom": AIFormat.seconds(crop.bottom)
-            ]
-        }
+        for (key, value) in AIRegionFraming.summary(clip, canvas: canvas).objectValue ?? [:] { object[key] = value }
         return .object(object)
     }
 

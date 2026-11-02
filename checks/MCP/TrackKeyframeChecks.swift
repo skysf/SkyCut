@@ -29,7 +29,7 @@ private func checkTrackSettings() {
     try? AITrackSettings.apply(.master, volumeDB: 20, hidden: nil, in: &ducked)
     checkEqual(ducked.masterVolume, AudioGain.maximumLinear, "the master fader is clamped at +6 dB")
     checkThrows("the master cannot be hidden") { try AITrackSettings.apply(.master, volumeDB: nil, hidden: true, in: &ducked) }
-    checkEqual(AITrackSettings.decibels(0.5), .number(-6), "faders are reported in dB")
+    checkEqual(AITrackSettings.decibels(0.5), .number(AudioGain.decibels(fromLinear: 0.5)), "faders report actual dB without rounding")
 }
 
 private func checkKeyframes() {

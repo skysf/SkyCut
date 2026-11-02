@@ -436,6 +436,22 @@ extension TimelineState {
         allClips.contains { $0.animation?.usesVersion32Easing ?? false }
     }
 
+    /// v33：精确裁切允许单边超过 45%，也保留源像素级小边界。旧版会夹值 / 当成空裁切，露出区域外的内容。
+    /// 沿用 crop 的四个键，无新素材 / 新图层；新版读旧工程不改变原有取景。
+    var requiresFormatVersion33: Bool {
+        allClips.contains { clip in
+            guard let crop = clip.crop else { return false }
+            return crop.exceedsLegacyLimits || (crop.isLegacyEmpty && !crop.isEmpty)
+        }
+    }
+
+    /// 旧版忽略的微小裁切仍当无裁切；v33 起才按真实源像素显示，不能让升级改变旧成片。
+    mutating func normalizeLegacyEmptyCrops() {
+        for clip in allClips where clip.crop?.isLegacyEmpty == true {
+            update(clip.id) { $0.crop = nil }
+        }
+    }
+
     /// 读盘后的规范化。
     ///
     /// - v22 及更早（`splitsMirroredTranslation`）：译文与原文同 ID 的镜像对，先拆成两条独立轨
