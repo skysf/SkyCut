@@ -23,6 +23,9 @@ enum AIExportTools {
         guard MediaToolchain.shared.runtime != nil else {
             throw AIToolError("SkyCut's video engine is not ready yet. Try again in a moment.")
         }
+        let timing = ExportTimings()
+        let choice = try AIExportOptions.parse(args, base: exporter.settings)
+        let settings = choice.settings
         var state = project.stateForExport(selectionOnly: false)
         let audioOnly = VideoEditExportGraph.isAudioOnly(state)
         let requested = try outputURL(args, project: project, fileExtension: audioOnly ? "m4a" : "mp4")
@@ -32,10 +35,6 @@ enum AIExportTools {
         ) { FileManager.default.fileExists(atPath: $0.path) || reservedOutputs.contains($0.standardizedFileURL.path) }
         try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
 
-        var settings = exporter.settings
-        if let resolution = try args.choice("resolution", from: MCPVocabulary.resolutions) {
-            settings.resolution = AIEncodeOptions.resolution(resolution)
-        }
         // 烧不烧和面板同一个开关：烧的是时间线上看得见的那几条轨；不烧 = 两只眼睛都关。
         var options = SubtitleExportOptions()
         options.burnIn = try args.bool("burn_subtitles") ?? true
@@ -47,6 +46,8 @@ enum AIExportTools {
         let fonts = await FontCatalogStore.shared.loadedFonts()
         let style = state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
         let fontURL = fonts.first { $0.familyName == style.fontName }?.fileURL
+        let reported = AIExportOptions.describe(choice, frameRate: state.frameRate)
+        let live = { timing.detail.merging(["export_settings": reported]) { current, _ in current } }
 
         // 成片多大、几帧（AI 不报这个就会拿 look 回的缩略图尺寸当成片尺寸，盲测里三条都以为是 720p）。
         let video: JSONValue? = audioOnly ? nil : AIVideoSize.output(
@@ -66,17 +67,22 @@ enum AIExportTools {
         let reserved = output.standardizedFileURL.path
         reservedOutputs.insert(reserved)
         let work = AIQueuedWork()
-        let job = AIJobs.shared.start(.export, progress: { work.started ? exporter.progress : nil }, cancel: {
+        timing.begin("queue")
+        let job = AIJobs.shared.start(.export, progress: { work.started ? exporter.progress : nil }, liveDetail: live, cancel: {
+            if !work.started { timing.finish() }
             work.cancel(withdrawn: { reservedOutputs.remove(reserved) }, stop: { exporter.cancel() })
+            if !work.started, let job = work.job { AIJobs.shared.updateDetail(job, live()) }
         })
         work.job = job
         // 导出器空着就马上导，占着（别的工程在导、面板在导）就排队：排的是调用这一刻的时间线。
         let position = AIWorkQueue.shared.submit(.export, jobID: job.id) {
             work.started = true
-            exporter.export(for: project, state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings)
+            timing.begin("preparation")
+            exporter.export(for: project, state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings, timing: timing)
             guard exporter.isExporting else {
                 reservedOutputs.remove(reserved)
-                AIJobs.shared.finish(job, .failed, message: exporter.errorMessage ?? "The export could not start.")
+                timing.finish()
+                AIJobs.shared.finish(job, .failed, message: exporter.errorMessage ?? "The export could not start.", detail: .object(live()))
                 return
             }
             // 结局在 isExporting 变回 false 的那一刻记下（@Published 在赋值之前发，那时成品路径 / 错误已经写好了）。
@@ -86,11 +92,12 @@ enum AIExportTools {
                     if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
                         var detail = finishedDetail(output, video: video, levels: exporter.finishedAudioLevels, watermarked: exporter.watermarked)
                         detail["resolution_report"] = resolutionReport
+                        detail.merge(live()) { current, _ in current }
                         AIJobs.shared.finish(job, .done, detail: .object(detail))
                     } else if let error = exporter.errorMessage {
-                        AIJobs.shared.finish(job, .failed, message: error)
+                        AIJobs.shared.finish(job, .failed, message: error, detail: .object(live()))
                     } else {
-                        AIJobs.shared.finish(job, .cancelled)
+                        AIJobs.shared.finish(job, .cancelled, detail: .object(live()))
                     }
                     subscriptions[job.id] = nil
                 }
@@ -98,7 +105,7 @@ enum AIExportTools {
         }
         if job.status == .failed { throw AIToolError(job.message ?? "The export could not start.") }
         var result: [String: JSONValue] = [
-            "job_id": .string(job.id), "resolution_report": resolutionReport,
+            "job_id": .string(job.id), "resolution_report": resolutionReport, "export_settings": reported,
             "status": position == nil ? "running" : "queued",
             "path": .string(output.path),
             "next_step": .string(position == nil

@@ -53,6 +53,7 @@ final class VideoEditExporter: ObservableObject {
     private var process: FFmpegProcess?
     private var workspace: URL?
     private var cancellationToken: ExportCancellationToken?
+    private(set) var timings: ExportTimings?
 
     private enum Keys {
         static let settings = "videoEditExportSettings"
@@ -99,7 +100,8 @@ final class VideoEditExporter: ObservableObject {
     ///   **不写回 `settings`**：AI 导一次 720p，不该把用户记住的导出设置悄悄改掉。
     func export(
         for project: VideoEditProject, state: TimelineState, to output: URL, subtitleStyle: BurnInStyle, subtitleFontURL: URL?,
-        settingsOverride: VideoEncodeSettings? = nil
+        settingsOverride: VideoEncodeSettings? = nil,
+        timing: ExportTimings? = nil
     ) {
         guard !isExporting else { return }
         owner = Owner(generation: project.documentGeneration, name: project.projectName)
@@ -118,6 +120,9 @@ final class VideoEditExporter: ObservableObject {
             errorMessage = L10n("SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut.")
             return
         }
+        let measured = timing ?? ExportTimings()
+        timings = measured
+        measured.begin("preparation")
         errorMessage = nil
         finishedURL = nil
         finishedAudioLevels = nil
@@ -137,7 +142,8 @@ final class VideoEditExporter: ObservableObject {
                     subtitleFontURL: subtitleFontURL,
                     output: output,
                     watermark: watermark,
-                    cancellation: token
+                    cancellation: token,
+                    phase: { measured.begin($0) }
                 )
                 workspace = plan.workspace
                 finishedAudioLevels = plan.audioLevels
@@ -147,6 +153,7 @@ final class VideoEditExporter: ObservableObject {
                 let ffmpeg = FFmpegProcess()
                 process = ffmpeg
                 let duration = plan.totalDuration
+                measured.begin("video_encode")
                 try await ffmpeg.run(
                     executable: runtime.url,
                     arguments: plan.arguments,
@@ -161,6 +168,7 @@ final class VideoEditExporter: ObservableObject {
                 // process.cancel() 这时已经不管用了，得靠 token 再认一次——
                 // 不然临场点 Stop 会被吞掉，文件照样被替换。
                 if token.isCancelled { throw CancellationError() }
+                measured.begin("finalize")
                 // ffmpeg 退出码 0 之后才碰用户目标：先落到 workspace 里的临时
                 // 文件，这里再原子替换过去——预渲染或 ffmpeg 中途任何失败都
                 // 还没碰过 output，用户原有文件（覆盖导出场景）不会被牵连。
@@ -183,10 +191,12 @@ final class VideoEditExporter: ObservableObject {
             } catch {
                 errorMessage = error.localizedDescription
             }
+            measured.begin("finalize")
             if let workspace { try? FileManager.default.removeItem(at: workspace) }
             workspace = nil
             process = nil
             cancellationToken = nil
+            measured.finish()
             isExporting = false
         }
     }

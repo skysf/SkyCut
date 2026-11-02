@@ -12,7 +12,7 @@ import Foundation
 /// 一层叠加（一段形状 / 文字切出来的一个片段）。
 struct OverlayExportFile {
     enum Source {
-        /// 单张 PNG：`-loop 1` 拉成持续的流。
+        /// 单张 PNG：只解码一帧，再用 loop 复制到这一段的末尾（含接缝余量）。
         case still
         /// PNG 序列播一遍：`-itsoffset` 推到落点。
         case sequence(frames: Int)
@@ -51,7 +51,7 @@ struct OverlayExportFile {
     }
 
     /// 按给的顺序（= 叠放次序：先形状、后文字）一层层贴到 `video` 上。三种接法的实测依据：
-    ///   · 单张：`-loop 1` 拉成持续流。
+    ///   · 单张：解一帧、loop 复制；不能让 image2 按整条时间线反复解 PNG。
     ///   · 一次性序列：`-itsoffset` 把序列推到落点，帧与时间线精确对齐。
     ///   · 循环段：只有一个周期的帧，`loop` 滤镜铺满，`setpts` 补回时间轴。
     static func append(
@@ -64,9 +64,16 @@ struct OverlayExportFile {
             let stream: String
             switch file.source {
             case .still:
-                inputArguments += ["-loop", "1", "-t", fmt(total), "-i", file.pattern]
-                stream = "\(inputs.count):v"
+                inputArguments += ["-r", fmt(fps), "-i", file.pattern]
+                let index = inputs.count
                 inputs.append(file.pattern)
+                let looped = nextLabel("ts")
+                let count = sequenceFrameCount(span: file.timelineEnd - file.timelineStart, fps: fps)
+                filters.append(
+                    "[\(index):v]loop=loop=\(count - 1):size=1:start=0," +
+                    "setpts=N/\(fmt(fps))/TB+\(fmt(file.timelineStart))/TB[\(looped)]"
+                )
+                stream = looped
 
             case .sequence:
                 inputArguments += [

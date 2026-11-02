@@ -68,6 +68,7 @@
 **导出**（`VideoEditShapeOverlayExport.swift`）：和文字同一个切法 —— 没有动画的整段一张图（`shape0.png`，和以前一样）；有动画的只逐帧渲
 入场和出场那两截（`shape0-in_%05d.png` / `shape0-out_%05d.png`，末尾多渲两帧、各段左闭右开，见 [画面文字](text-overlays.md)「导出：只逐帧渲动画进行中的那段」），中间一张图。三种片段怎么进滤镜图只有
 `OverlayExportFile.append` 一份（`VideoEditOverlayExportFile.swift`，2026-10-03 从文字那边抽出来，文字和形状共用）；叠放次序：先形状、后文字。
+静止片段只解一帧 PNG、复制到本段结束加接缝余量，不按整片反复解码；合同和回归见上述文字文档的同一节。
 
 **格式**：`animation` 按需写键（没设动画的不落），设了就是 **v31** 数据 —— 只认 v30 的旧版读进来当没有，随手存一下就把动画抹掉了
 （[工程文件](video-edit-project-file.md)）。

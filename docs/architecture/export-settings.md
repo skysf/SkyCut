@@ -128,6 +128,45 @@
   `TimelineState.subtitleStyle(appWide:)`，烧录队列的样式只当「全 App 的」传进去（同一个守卫的第 5 条），
   见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式与逐词高亮」。
 
+## 七、MCP 单次编码、快速审阅与实测阶段（2026-11-02）
+
+`export_video` 仍以面板记住的设置为底子。`encoder=software|hardware`、
+`quality=small|balanced|high` 只影响这一单；质量映射直接用 `AIEncodeOptions`，不另抄数表。
+`preset=final`（默认）保留原设置；`preset=quick_review` 明确选择硬件、短边 720p、小体积质量、
+AAC 128 kbps 和 fast start，帧率仍跟工程。显式 encoder/quality/resolution 在预设之后覆盖。
+预设不写用户偏好、不改工程画布、帧率和字幕样式。正式默认仍是原有的软件 CRF 23 / slow，
+用户已经记住的自定义设置也不重置。硬编失败照实失败，不静默改用另一种编码器。
+
+开始和完成结果均报 `export_settings`：实际 codec、CRF 或硬件质量、软件 preset、像素格式、
+帧率、分辨率上限、AAC 码率、fast start 和元数据选择；交付尺寸另在 `video`，不得把缩略图
+尺寸当作成片尺寸。设置报告与交给导出器的是同一份纯值。
+
+`ExportTimings` 用单调钟量互不重叠的实际区间。`get_job` 排队、执行中、完成、失败和取消
+均能报告 `timings`，结局在导出器真正结束时冻结，不随下次导出或轮询增长。
+
+| 阶段 | 实际包含的工作 |
+| --- | --- |
+| queue | AIWorkQueue 中等待共享导出器的时间 |
+| preparation | 参数/字体准备、字幕工作目录等 |
+| overlay_render | 文字、形状静帧和动画序列的实际绘制/写盘 |
+| audio_processing | 正式音频引擎的离线混音、限幅、响度和 f32 写盘 |
+| prerender | 确实需要的画面动画 ProRes / fill+matte 预渲染；未运行就是 0 |
+| graph_build | 素材输入表、分节和 ffmpeg 滤镜图的组装 |
+| video_encode | ffmpeg 整个进程：解码、滤镜合成、视频编码、AAC 编码和封装 |
+| finalize | 原子交付与临时目录清理 |
+
+`timings.stages` 为累计秒数，执行中的当前段计入已流逝时间；`complete` 表示计时已冻结，
+不代表导出成功（成功还须看 job.status）。`total_seconds` 包含排队，`processing_seconds`
+扣除排队。一个 ffmpeg 进程中的解码、滤镜和编码不能从它的进度回调拆成准确的独立秒数，
+所以结果附 `video_encode_includes`，不能把整段时间声称成“编码器独占的耗时”。
+新计时从导出调用的准备工作开始，旧 `elapsed_seconds` 从任务号创建起算，两者起点略有差别。
+
+验证用 `scripts/check-export-profile.sh`：真实 get_job/导出、排队与排队取消、设置保持不变、
+交付尺寸、阶段总和与静帧解码计数。真实教程对照见实施报告索引。
+
+发版前人工复核：同一复杂工程正式/快速审阅各导一次，查看全部阶段与实际参数；并发提交
+另一工程，等待和取消均计到自己的任务，完成后再查旧任务不串账。
+
 ## 回归矩阵
 
 | 检查 | 守什么 |

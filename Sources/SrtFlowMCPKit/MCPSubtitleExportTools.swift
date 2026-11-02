@@ -186,19 +186,21 @@ public enum MCPSubtitleExportTools {
         MCPToolDefinition(
             .exportVideo, title: "Export the video",
             description: """
-            Render the timeline to an .mp4 (audio-only timelines become .m4a). By default the file is named after the \
-            project and goes into SkyCut/Exports inside the folder the user named (otherwise the project's folder, or \
-            Downloads). Subtitles visible on the timeline are burned in unless burn_subtitles is false. A taken name gets a \
-            number (the result has the real path); SkyCut never replaces a file. Returns a job id; wait with get_job. Then \
-            give the user the music_credits (get_timeline) for the video's description.
+            Export timeline to MP4 (audio-only: M4A). Default: project name in SkyCut/Exports under workspace, project \
+            or Downloads. Never replaces; adds a number. Burns visible subtitles unless disabled. Final keeps saved \
+            quality; quick_review is explicit. Returns job_id; get_job reports actual export_settings and stage timings. \
+            Give the user music_credits from get_timeline.
             """,
             input: MCPSchema.object([
                 "path": MCPSchema.string("Full output path. Leave out to use name and the default folder."),
                 "name": MCPSchema.string("File name without extension."),
                 "version": MCPSchema.string("Short version label: the file is named <name> - <version> (a project made with version already has it)."),
                 "resolution": MCPSchema.string(
-                    "Cap on the short side (default original; never upscales).", oneOf: MCPVocabulary.resolutions
+                    "Short-side cap; default saved; never upscales.", oneOf: MCPVocabulary.resolutions
                 ),
+                "encoder": MCPSchema.string("Per-call encoder.", oneOf: ["software", "hardware"]),
+                "quality": MCPSchema.string("Per-call quality.", oneOf: MCPVocabulary.encodeQualities),
+                "preset": MCPSchema.string("final: saved settings; quick_review: hardware/720p/small/AAC128. Explicit fields override.", oneOf: ["final", "quick_review"]),
                 "burn_subtitles": MCPSchema.boolean("Burn visible subtitles into the picture (default true).")
             ])
         )
