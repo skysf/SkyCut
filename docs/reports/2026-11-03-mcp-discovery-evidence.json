@@ -1,0 +1,1162 @@
+{
+  "schema_version": 1,
+  "client": "Codex CLI 0.166.0",
+  "model": "gpt-6.1-sol",
+  "reasoning": "max",
+  "test_bundle": "com.srtflow.SrtFlow.skystudiosmoke",
+  "media": "generated solid-color video and Samantha speech",
+  "catalog_test_build": {
+    "tools": 55,
+    "catalog_json_characters": 99811,
+    "instructions_characters": 1948
+  },
+  "discovery": {
+    "fresh-isolated": {
+      "tools_list_requests": 1,
+      "tool_counts": [
+        55
+      ],
+      "list_changed_notifications": 0,
+      "export_fields": [
+        [
+          "burn_subtitles",
+          "encoder",
+          "name",
+          "path",
+          "preset",
+          "project",
+          "quality",
+          "resolution",
+          "version"
+        ]
+      ]
+    },
+    "old50-isolated": {
+      "tools_list_requests": 1,
+      "tool_counts": [
+        50
+      ],
+      "list_changed_notifications": 1,
+      "export_fields": [
+        [
+          "burn_subtitles",
+          "name",
+          "path",
+          "project",
+          "resolution",
+          "version"
+        ]
+      ]
+    },
+    "resumed-current": {
+      "tools_list_requests": 1,
+      "tool_counts": [
+        55
+      ],
+      "list_changed_notifications": 0,
+      "export_fields": [
+        [
+          "burn_subtitles",
+          "encoder",
+          "name",
+          "path",
+          "preset",
+          "project",
+          "quality",
+          "resolution",
+          "version"
+        ]
+      ]
+    },
+    "historical_helper_explicit_relist": {
+      "before_count": 50,
+      "after_count": 55,
+      "export_status": "done",
+      "inspection_status": "done",
+      "inspection_coverage_complete": false
+    }
+  },
+  "installed_wrapper": {
+    "tested_tools": [
+      "edit_clips",
+      "set_texts",
+      "set_shapes",
+      "sync_voiceover",
+      "inspect_video",
+      "export_video"
+    ],
+    "original_user_project_hash_unchanged": true,
+    "inspection_result": {
+      "status": "done",
+      "coverage_complete": true,
+      "checked_ranges": [
+        [
+          0,
+          2.443
+        ]
+      ]
+    },
+    "export_result": {
+      "status": "done",
+      "export_settings": {
+        "audio_bitrate_kbps": 128,
+        "audio_codec": "aac",
+        "encoder": "hardware",
+        "fast_start": true,
+        "frame_rate": 24,
+        "hardware_quality": 45,
+        "pixel_format": "yuv420p",
+        "preset": "quick_review",
+        "resolution_limit": "480p",
+        "strip_metadata": false,
+        "video_codec": "h264_videotoolbox"
+      },
+      "video": {
+        "fps": 24,
+        "height": 480,
+        "width": 480
+      }
+    }
+  },
+  "cases": [
+    {
+      "label": "batch",
+      "request": "批量修改标题：把这个工程中所有画面标题统一改成“审阅标题”，字号36。",
+      "actual_call_count": 10,
+      "actual_tools": [
+        "get_settings",
+        "get_status",
+        "open_folder",
+        "open_project",
+        "set_view",
+        "get_timeline",
+        "set_texts",
+        "get_timeline",
+        "save_project",
+        "close_project"
+      ],
+      "selected_calls": [
+        {
+          "tool": "set_texts",
+          "arguments": {
+            "project": "p1",
+            "texts": [
+              {
+                "text_id": "4f74ba41",
+                "text": "审阅标题",
+                "font_size": 36
+              },
+              {
+                "text_id": "92fa095b",
+                "text": "审阅标题",
+                "font_size": 36
+              }
+            ]
+          }
+        }
+      ],
+      "jobs": [],
+      "catalogs": [
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        }
+      ],
+      "catalog_counts": [
+        55
+      ],
+      "rpc_errors": 0,
+      "blocked_attempts": 0,
+      "turn_completed": true,
+      "verified": {
+        "batch_calls": 1,
+        "title_count": 2,
+        "text": "审阅标题",
+        "font_size": 36
+      }
+    },
+    {
+      "label": "voice",
+      "request": "换配音并同步画面：用同文件夹的 new_voice.wav 替换旧旁白，让现有两段画面和标题按这条新配音的实际长度一起调整。保留取景和样式，不生成新配音。",
+      "actual_call_count": 22,
+      "actual_tools": [
+        "get_settings",
+        "get_status",
+        "open_folder",
+        "open_project",
+        "set_view",
+        "get_timeline",
+        "transcribe",
+        "listen",
+        "look",
+        "get_job",
+        "add_clips",
+        "get_timeline",
+        "sync_voiceover",
+        "get_job",
+        "get_timeline",
+        "export_video",
+        "get_job",
+        "inspect_video",
+        "get_job",
+        "look",
+        "save_project",
+        "close_project"
+      ],
+      "selected_calls": [
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "$SCRATCH/isolated/work/new_voice.wav",
+            "language": "auto",
+            "max_chars": 2000
+          }
+        },
+        {
+          "tool": "add_clips",
+          "arguments": {
+            "project": "p1",
+            "clips": [
+              {
+                "file": "$SCRATCH/isolated/work/new_voice.wav",
+                "track": "new_audio",
+                "start": 0
+              }
+            ]
+          }
+        },
+        {
+          "tool": "sync_voiceover",
+          "arguments": {
+            "project": "p1",
+            "language": "en",
+            "start": 0,
+            "paragraphs": [
+              {
+                "from": 0,
+                "to": 4,
+                "voiceover_id": "194932f2",
+                "old_voiceover_id": "d3f9db65",
+                "clips": [
+                  {
+                    "clip_id": "ef470efc",
+                    "fit": "speed"
+                  },
+                  {
+                    "clip_id": "71b0e635",
+                    "fit": "speed"
+                  }
+                ],
+                "texts": [
+                  "4f74ba41",
+                  "92fa095b"
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "transcript-1",
+          "kind": "transcript",
+          "status": "failed",
+          "message": "Couldn't tell which language is spoken: the clips may hold only music or ambient sound, or too few words. If someone speaks, call transcribe again with language (for example en or zh-Hans); if nobody speaks, there is nothing to transcribe."
+        },
+        {
+          "job_id": "voiceover-2",
+          "kind": "voiceover",
+          "status": "done",
+          "timeline_duration": 2.4434920634920636,
+          "paragraphs": [
+            {
+              "end": 2.4434920634920636,
+              "from": 0,
+              "index": 0,
+              "start": 0,
+              "to": 4,
+              "voiceover_id": "194932f2"
+            }
+          ]
+        },
+        {
+          "job_id": "export-3",
+          "kind": "export",
+          "status": "done",
+          "export_settings": {
+            "audio_bitrate_kbps": 128,
+            "audio_codec": "aac",
+            "encoder": "hardware",
+            "fast_start": true,
+            "frame_rate": 24,
+            "hardware_quality": 45,
+            "pixel_format": "yuv420p",
+            "preset": "quick_review",
+            "resolution_limit": "720p",
+            "strip_metadata": false,
+            "video_codec": "h264_videotoolbox"
+          },
+          "video": {
+            "fps": 24,
+            "height": 640,
+            "width": 640
+          },
+          "path": "$SCRATCH/isolated/work/nl-voice-synced.mp4"
+        },
+        {
+          "job_id": "inspection-4",
+          "kind": "inspection",
+          "status": "done",
+          "coverage_complete": true,
+          "limitations": [],
+          "findings": [
+            {
+              "at": 0,
+              "from": 0,
+              "items": [
+                "194932f2"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech, no pause within 0.3 s. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 0
+            }
+          ]
+        }
+      ],
+      "catalogs": [
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        }
+      ],
+      "catalog_counts": [
+        55
+      ],
+      "rpc_errors": 0,
+      "blocked_attempts": 0,
+      "turn_completed": true,
+      "verified": {
+        "new_audio_duration": 2.4434920634920636,
+        "picture_end": 2.4434920634920636,
+        "style_and_framing_unchanged": true,
+        "old_voice_removed": true,
+        "title_ranges": [
+          [
+            0,
+            1.2217460317460318
+          ],
+          [
+            1.2217460317460318,
+            2.4434920634920636
+          ]
+        ]
+      }
+    },
+    {
+      "label": "inspect",
+      "request": "检查音频接缝：查看每个剪辑点和结尾有没有截断、重叠、静音，给我疑点时间和依据。",
+      "actual_call_count": 17,
+      "actual_tools": [
+        "get_settings",
+        "get_status",
+        "open_folder",
+        "open_project",
+        "set_view",
+        "get_timeline",
+        "inspect_video",
+        "listen",
+        "get_job",
+        "transcribe",
+        "listen",
+        "get_job",
+        "inspect_video",
+        "get_job",
+        "save_project",
+        "close_project",
+        "get_status"
+      ],
+      "selected_calls": [
+        {
+          "tool": "inspect_video",
+          "arguments": {
+            "project": "p1",
+            "image": false
+          }
+        },
+        {
+          "tool": "listen",
+          "arguments": {
+            "project": "p1",
+            "clip_id": "d3f9db65",
+            "from": 0,
+            "to": 4,
+            "min_silence": 0.1,
+            "silence_db": -45
+          }
+        },
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "old_voice.wav",
+            "source_in": 0,
+            "source_out": 7.33,
+            "language": "auto",
+            "words": true
+          }
+        },
+        {
+          "tool": "listen",
+          "arguments": {
+            "project": "p1",
+            "file": "old_voice.wav",
+            "source_in": 3.5,
+            "source_out": 4.5,
+            "min_silence": 0.05,
+            "silence_db": -45
+          }
+        },
+        {
+          "tool": "inspect_video",
+          "arguments": {
+            "project": "p1",
+            "from": 0,
+            "to": 4,
+            "image": false,
+            "min_silence": 0.1,
+            "silence_db": -45
+          }
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "inspection-5",
+          "kind": "inspection",
+          "status": "done",
+          "coverage_complete": true,
+          "limitations": [],
+          "findings": [
+            {
+              "at": 0,
+              "from": 0,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech, no pause within 0.3 s. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 0
+            },
+            {
+              "at": 3.975,
+              "from": 3.95,
+              "items": [],
+              "kind": "audio_cutoff",
+              "reason": "The mix is still above -32 dBFS in its final audio window; the ending may cut off abruptly.",
+              "suspected": true,
+              "to": 4
+            },
+            {
+              "at": 4,
+              "from": 4,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech: moved to the quiet spot between the words. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 4
+            }
+          ]
+        },
+        {
+          "job_id": "transcript-6",
+          "kind": "transcript",
+          "status": "failed",
+          "message": "Couldn't tell which language is spoken: the clips may hold only music or ambient sound, or too few words. If someone speaks, call transcribe again with language (for example en or zh-Hans); if nobody speaks, there is nothing to transcribe."
+        },
+        {
+          "job_id": "inspection-7",
+          "kind": "inspection",
+          "status": "done",
+          "coverage_complete": true,
+          "limitations": [],
+          "findings": [
+            {
+              "at": 0,
+              "from": 0,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech, no pause within 0.3 s. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 0
+            },
+            {
+              "at": 0.917,
+              "from": 0.768,
+              "items": [],
+              "kind": "audio_silence",
+              "reason": "Mixed output stays below -45.0 dBFS for at least 0.1 s; review whether this pause is intentional.",
+              "suspected": true,
+              "to": 1.067
+            },
+            {
+              "at": 3.371,
+              "from": 3.243,
+              "items": [],
+              "kind": "audio_silence",
+              "reason": "Mixed output stays below -45.0 dBFS for at least 0.1 s; review whether this pause is intentional.",
+              "suspected": true,
+              "to": 3.499
+            },
+            {
+              "at": 3.975,
+              "from": 3.95,
+              "items": [],
+              "kind": "audio_cutoff",
+              "reason": "The mix is still above -32 dBFS in its final audio window; the ending may cut off abruptly.",
+              "suspected": true,
+              "to": 4
+            },
+            {
+              "at": 4,
+              "from": 4,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech: moved to the quiet spot between the words. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 4
+            }
+          ]
+        }
+      ],
+      "catalogs": [
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        },
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        }
+      ],
+      "catalog_counts": [
+        55
+      ],
+      "rpc_errors": 0,
+      "blocked_attempts": 0,
+      "turn_completed": true,
+      "verified": {
+        "timeline_unchanged": true,
+        "inspection_completed": true
+      }
+    },
+    {
+      "label": "review",
+      "request": "导出审阅版：我要快速看效果，导出小一些的审阅视频，不改正式导出设置。",
+      "actual_call_count": 13,
+      "actual_tools": [
+        "get_settings",
+        "get_status",
+        "open_folder",
+        "open_project",
+        "set_view",
+        "get_timeline",
+        "export_video",
+        "get_job",
+        "inspect_video",
+        "get_job",
+        "save_project",
+        "close_project",
+        "get_status"
+      ],
+      "selected_calls": [
+        {
+          "tool": "export_video",
+          "arguments": {
+            "project": "p1",
+            "preset": "quick_review",
+            "path": "$SCRATCH/isolated/work/SkyCut/Exports/nl-review-review.mp4"
+          }
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "export-8",
+          "kind": "export",
+          "status": "done",
+          "export_settings": {
+            "audio_bitrate_kbps": 128,
+            "audio_codec": "aac",
+            "encoder": "hardware",
+            "fast_start": true,
+            "frame_rate": 24,
+            "hardware_quality": 45,
+            "pixel_format": "yuv420p",
+            "preset": "quick_review",
+            "resolution_limit": "720p",
+            "strip_metadata": false,
+            "video_codec": "h264_videotoolbox"
+          },
+          "video": {
+            "fps": 24,
+            "height": 640,
+            "width": 640
+          },
+          "path": "$SCRATCH/isolated/work/SkyCut/Exports/nl-review-review.mp4"
+        },
+        {
+          "job_id": "inspection-9",
+          "kind": "inspection",
+          "status": "done",
+          "coverage_complete": true,
+          "limitations": [],
+          "findings": [
+            {
+              "at": 0,
+              "from": 0,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech, no pause within 0.3 s. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 0
+            },
+            {
+              "at": 3.975,
+              "from": 3.95,
+              "items": [],
+              "kind": "audio_cutoff",
+              "reason": "The mix is still above -32 dBFS in its final audio window; the ending may cut off abruptly.",
+              "suspected": true,
+              "to": 4
+            },
+            {
+              "at": 4,
+              "from": 4,
+              "items": [
+                "d3f9db65"
+              ],
+              "kind": "audio_cutoff",
+              "reason": "Source cut on audible sound (no cached word): on speech: moved to the quiet spot between the words. May be intentional music or an effect.",
+              "suspected": true,
+              "to": 4
+            }
+          ]
+        }
+      ],
+      "catalogs": [
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        },
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        }
+      ],
+      "catalog_counts": [
+        55
+      ],
+      "rpc_errors": 0,
+      "blocked_attempts": 0,
+      "turn_completed": true,
+      "verified": {
+        "export_file_exists": true,
+        "timeline_unchanged": true,
+        "formal_export_preferences_unchanged": true,
+        "video": {
+          "fps": 24,
+          "height": 640,
+          "width": 640
+        },
+        "export_settings": {
+          "audio_bitrate_kbps": 128,
+          "audio_codec": "aac",
+          "encoder": "hardware",
+          "fast_start": true,
+          "frame_rate": 24,
+          "hardware_quality": 45,
+          "pixel_format": "yuv420p",
+          "preset": "quick_review",
+          "resolution_limit": "720p",
+          "strip_metadata": false,
+          "video_codec": "h264_videotoolbox"
+        }
+      }
+    },
+    {
+      "label": "language_retry",
+      "request": "这两份旁白 new_voice.wav 和 old_voice.wav 都是英语。请用明确的英语语言设置重试之前失败的转写，报告实际成败，不修改剪辑。",
+      "actual_call_count": 15,
+      "actual_tools": [
+        "get_settings",
+        "get_status",
+        "open_folder",
+        "open_project",
+        "set_view",
+        "get_timeline",
+        "transcribe",
+        "get_job",
+        "transcribe",
+        "transcribe",
+        "get_job",
+        "transcribe",
+        "get_timeline",
+        "save_project",
+        "close_project"
+      ],
+      "selected_calls": [
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "new_voice.wav",
+            "language": "en",
+            "words": true
+          }
+        },
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "new_voice.wav",
+            "language": "en",
+            "words": true
+          }
+        },
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "old_voice.wav",
+            "language": "en",
+            "words": true
+          }
+        },
+        {
+          "tool": "transcribe",
+          "arguments": {
+            "project": "p1",
+            "file": "old_voice.wav",
+            "language": "en",
+            "words": true
+          }
+        }
+      ],
+      "jobs": [
+        {
+          "job_id": "transcript-10",
+          "kind": "transcript",
+          "status": "done",
+          "language": "en_US"
+        },
+        {
+          "job_id": "transcript-11",
+          "kind": "transcript",
+          "status": "done",
+          "language": "en_US"
+        }
+      ],
+      "catalogs": [
+        {
+          "fingerprint": "e800b313aadd39b5",
+          "tool_count": 55
+        }
+      ],
+      "catalog_counts": [
+        55
+      ],
+      "rpc_errors": 0,
+      "blocked_attempts": 0,
+      "turn_completed": true,
+      "verified": {
+        "explicit_language": "en",
+        "actual_language": "en_US",
+        "completed_transcripts": 2,
+        "timeline_unchanged": true
+      }
+    }
+  ],
+  "limits": [
+    "No original user project was an edit target.",
+    "No Sky Studio paid generation was requested.",
+    "Subtitle word realignment was not exercised by the natural-language fixtures.",
+    "Two automatic-language transcript jobs failed; both recordings completed after explicit en clarification."
+  ],
+  "final_catalog_validation": {
+    "tool_count": 55,
+    "catalog_json_characters": 99829,
+    "instructions_characters": 1948,
+    "all_schemas_match_actual_nl_build": true,
+    "six_focused_definitions_match": true,
+    "only_changed_definition": [
+      "get_status"
+    ]
+  },
+  "actual_item_types": [
+    "agent_message",
+    "error",
+    "mcp_tool_call"
+  ],
+  "configuration_warnings": [
+    {
+      "case": "batch",
+      "ignored_setting": "mcp",
+      "count": 2
+    },
+    {
+      "case": "voice",
+      "ignored_setting": "mcp",
+      "count": 2
+    },
+    {
+      "case": "inspect",
+      "ignored_setting": "mcp",
+      "count": 2
+    },
+    {
+      "case": "review",
+      "ignored_setting": "mcp",
+      "count": 2
+    },
+    {
+      "case": "language_retry",
+      "ignored_setting": "mcp",
+      "count": 2
+    }
+  ],
+  "resumed_export_followup": {
+    "attempts": [
+      {
+        "label": "review_resumed",
+        "same_former_50_tool_conversation": true,
+        "actual_call_count": 19,
+        "actual_tools": [
+          "get_status",
+          "get_settings",
+          "open_folder",
+          "open_project",
+          "set_view",
+          "get_timeline",
+          "export_video",
+          "export_video",
+          "get_status",
+          "look",
+          "save_project",
+          "export_video",
+          "close_project",
+          "open_project",
+          "set_view",
+          "export_video",
+          "get_settings",
+          "save_project",
+          "close_project"
+        ],
+        "catalog_counts": [
+          55
+        ],
+        "exports": [
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          },
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          },
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          },
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          }
+        ],
+        "jobs": [],
+        "turn_completed": true,
+        "failed_tool_calls": 4,
+        "blocked_attempts": 0
+      },
+      {
+        "label": "review_resumed_retry",
+        "same_former_50_tool_conversation": true,
+        "actual_call_count": 11,
+        "actual_tools": [
+          "get_status",
+          "get_settings",
+          "open_folder",
+          "open_project",
+          "set_view",
+          "get_timeline",
+          "export_video",
+          "get_settings",
+          "export_video",
+          "save_project",
+          "close_project"
+        ],
+        "catalog_counts": [
+          55
+        ],
+        "exports": [
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          },
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "failed",
+            "message": "SkyCut's video engine is not ready yet. Try again in a moment."
+          }
+        ],
+        "jobs": [],
+        "turn_completed": true,
+        "failed_tool_calls": 2,
+        "blocked_attempts": 0
+      },
+      {
+        "label": "review_resumed_ready",
+        "same_former_50_tool_conversation": true,
+        "actual_call_count": 11,
+        "actual_tools": [
+          "get_status",
+          "get_settings",
+          "open_folder",
+          "open_project",
+          "set_view",
+          "get_timeline",
+          "export_video",
+          "get_job",
+          "get_settings",
+          "save_project",
+          "close_project"
+        ],
+        "catalog_counts": [
+          55
+        ],
+        "exports": [
+          {
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            },
+            "call_status": "completed"
+          }
+        ],
+        "jobs": [
+          {
+            "job_id": "export-1",
+            "kind": "export",
+            "status": "done",
+            "path": "$SCRATCH/isolated/work/SkyCut/Exports/nl-review-审阅版.mp4",
+            "export_settings": {
+              "audio_bitrate_kbps": 128,
+              "audio_codec": "aac",
+              "encoder": "hardware",
+              "fast_start": true,
+              "frame_rate": 24,
+              "hardware_quality": 45,
+              "pixel_format": "yuv420p",
+              "preset": "quick_review",
+              "resolution_limit": "720p",
+              "strip_metadata": false,
+              "video_codec": "h264_videotoolbox"
+            },
+            "video": {
+              "fps": 24,
+              "height": 640,
+              "width": 640
+            }
+          }
+        ],
+        "turn_completed": true,
+        "failed_tool_calls": 0,
+        "blocked_attempts": 0
+      }
+    ],
+    "setup_recovery": "After two failed turns, copied the existing ffmpeg executable from the Downloads repository to the temporary fixture directory and restarted only the smoke App with that explicit path. Showing the initial view alone did not recover it. The precise system-level cause was not established.",
+    "verified": {
+      "same_test_conversation": true,
+      "export_job_done": true,
+      "output_file_exists_and_decodes": true,
+      "timeline_unchanged": true,
+      "formal_export_preference_keys_remain_unset": true
+    }
+  },
+  "shared_process_fix": {
+    "pr": 292,
+    "serial_immediate_exits": 128,
+    "concurrent_immediate_exits": 32,
+    "export_profile_assertions": 39,
+    "reverse_exit": 1,
+    "reverse_watchdog_seconds": 30,
+    "reverse_phase": "serial immediate exits",
+    "region_assertions": 223,
+    "full_local_checks": 82,
+    "full_local_failures": 0,
+    "mcp_definition_changes": false,
+    "ci_check_all": "success",
+    "ci_run": "https://github.com/skysf/SkyCut/actions/runs/41505687423",
+    "merge_commit": "ec05128ce6e29747a14722bf7c4808ac6364c4e8"
+  },
+  "final_source_probe": {
+    "source_head": "8d1e70fea3754d38e3253022530ec502b9dd9093",
+    "attempts": [
+      {
+        "label": "review_final",
+        "same_former_50_tool_conversation": true,
+        "actual_call_count": 2,
+        "actual_tools": [
+          "get_status",
+          "get_settings"
+        ],
+        "catalog_counts": [
+          55
+        ],
+        "item_types": {
+          "error": 2,
+          "agent_message": 2,
+          "mcp_tool_call": 2
+        },
+        "failed_tool_calls": 2,
+        "messages": [
+          "SkyCut is not running. Ask the user to open SkyCut.",
+          "SkyCut is not running. Ask the user to open SkyCut."
+        ],
+        "endpoint_observation": {
+          "app_process_alive": true,
+          "socket_path_missing": true,
+          "app_still_held_unix_listener": true,
+          "removal_cause_identified": false,
+          "project_opened": false
+        }
+      },
+      {
+        "label": "review_final_unique",
+        "same_former_50_tool_conversation": true,
+        "actual_call_count": 11,
+        "actual_tools": [
+          "get_status",
+          "get_settings",
+          "open_folder",
+          "open_project",
+          "set_view",
+          "get_timeline",
+          "export_video",
+          "get_job",
+          "get_settings",
+          "save_project",
+          "close_project"
+        ],
+        "catalog_counts": [
+          55
+        ],
+        "item_types": {
+          "error": 2,
+          "agent_message": 2,
+          "mcp_tool_call": 11
+        },
+        "failed_tool_calls": 0,
+        "bundle": "com.srtflow.SrtFlow.mcp31412.skystudiosmoke",
+        "independent_socket_and_loopback_port": true,
+        "selected_calls": [
+          {
+            "tool": "export_video",
+            "arguments": {
+              "project": "p1",
+              "preset": "quick_review",
+              "name": "nl-review-审阅版"
+            }
+          }
+        ],
+        "export_result": {
+          "job_id": "export-1",
+          "kind": "export",
+          "status": "done",
+          "export_settings": {
+            "audio_bitrate_kbps": 128,
+            "audio_codec": "aac",
+            "encoder": "hardware",
+            "fast_start": true,
+            "frame_rate": 24,
+            "hardware_quality": 45,
+            "pixel_format": "yuv420p",
+            "preset": "quick_review",
+            "resolution_limit": "720p",
+            "strip_metadata": false,
+            "video_codec": "h264_videotoolbox"
+          },
+          "video": {
+            "fps": 24,
+            "height": 640,
+            "width": 640
+          },
+          "path": "$SCRATCH/isolated/work/SkyCut/Exports/nl-review-审阅版 2.mp4"
+        },
+        "catalogs": [
+          {
+            "fingerprint": "c5a2619ff650fe76",
+            "tool_count": 55
+          }
+        ],
+        "verified": {
+          "output_exists_and_decodes": true,
+          "timeline_unchanged": true,
+          "formal_export_preference_keys_remain_unset": true
+        }
+      }
+    ],
+    "scope": "Final combined MCP guidance and registered process-exit callbacks; no new tool definitions."
+  },
+  "guidance_ci": {
+    "pr": 291,
+    "head": "8d1e70fea3754d38e3253022530ec502b9dd9093",
+    "run": "https://github.com/skysf/SkyCut/actions/runs/41508849364",
+    "first_attempt": {
+      "shard_2": "success",
+      "other_four_shards": "cancelled before any step",
+      "reason": "Hosted runner was not acquired after multiple attempts; macOS arm64 capacity constraints."
+    },
+    "final_attempt": 2,
+    "final_check_all": "success",
+    "merge_commit": "0ee6205a822be72cb6219e6142c060bcacec5ab1"
+  }
+}

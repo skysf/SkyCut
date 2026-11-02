@@ -40,7 +40,7 @@ MCP 说明 PR 的 CI 连续两次在既有矩形取景验收中超时，分别�
   已恢复修复代码。不是只凭原来的 CI 超时声称回归有效。
 - 超时诊断分支另用一个故意阻塞的独立子进程验证，采样确实写出，包装仍退出 1。
 - 修复后的完整本地 `check-all` 为 **82 项通过、0 项失败**；全部 `check-guards` 扫描通过。
-  合并仍等待远端 `check-all`，不以本机结果代替 CI。
+  [PR #292 的 CI `check-all`](https://github.com/skysf/SkyCut/actions/runs/41505687423) 全绿后，以 merge commit `ec05128` 合并；没有以本机结果代替 CI。
 
 ## 教训 / 防回归
 
