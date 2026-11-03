@@ -276,8 +276,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      2026-09-29 验收里潜水员认成水母、冰面航拍认成地图，工具说明叫 AI 以画面为准）、人脸框（大的在前）、人数、主体、
      画面上的字（accurate + 自动判语言，**连同它的框**，最多 6 块）、平均亮度、黑边。看不了图的模型传 `image=false` 只拿文字。
    - 只读：不改工程、不挪播放头、不摆窗口；排队（刚发的改动先做完再看）。
-13. **听（listen，方案第 31 条）**：AI 听不见，就把声音量给它。数据是画波形那一份（`WaveformStore`，一个文件读
-   一遍，峰值 + 顺手攒的均方，见 [波形与深度缩放](audio-waveform.md)），**不另读 PCM、不起 ffmpeg**。`AIAudioLevels`
+13. **听（listen，方案第 31 条）**：AI 听不见，就把声音量给它。整文件/时间线的数据是画波形那一份（`WaveformStore`，一个文件读
+   一遍，峰值 + 顺手攒的均方，见 [波形与深度缩放](audio-waveform.md)）；**文件显式区间走下面的有界读取例外，不起 ffmpeg**。`AIAudioLevels`
    （纯值）：
    - 窗和均方桶的边对齐（两桶一窗，48kHz 约 43ms）：不对齐的话跨在「响 / 静」交界上的桶会把能量摊进隔壁的静音窗，
      静音段两头各缩一截。
@@ -290,7 +290,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - **只听某几秒**（2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）：一段片段和整条时间线收
      `from` / `to`（时间线秒）：片段只量落在里面的那一截（`AIAudioLevels.sourceWindow`：变速按源时间换算，结果带实际量的 `from` / `to`），
      整条时间线只列落在里面的片段、每段也只量那一截；点名的片段不在这几秒里就报错。文件的几秒照旧是 `source_in` / `source_out`
-     （文件秒），给文件传 `from` / `to` 报错说清楚。扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`。
+     （文件秒），给文件传 `from` / `to` 报错说清楚。**文件只要显式给了其中一头，就交给 `AIListenFileAudio` → `AIListenAudioWindow`：先读可靠容器时长验范围，
+     `AVAssetReader.timeRange` 只解码请求范围（缺入点 = 0，缺出点 = 文件结尾，出点超过文件结尾按结尾收）；原生采样率、最多两声道，复用 `ChunkBuilder` / `AIAudioLevels`，
+     再按采样 PTS 裁掉压缩包边界外的数据，统计与静音/曲线时间仍是源秒。**不请求或建立整文件 `WaveformStore`**，不以部分波形时长代替文件时长。
+     首尾覆盖不足或中间 PTS 不连续时明确拒绝完整报告，不把后面的声音前移，也不凭空把未知覆盖当静音；原生解码器已经填出的真实零采样照常统计。
+     `AIListenReadControl` 把排队、元数据加载和读取都纳入本次截止时间：排队时取消待执行 operation，读取时取消原生 reader；失败/超时不返回成功的部分统计，也不留下整文件解码。
+     整文件没给范围时仍可返回部分波形，并明确这是已读覆盖范围；不取消 UI/别的消费者共享的波形任务。`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
+     结果 `beat_note` 说清不只分析请求窗；文件总长超过该限制就不给节拍解码，结果明确说明限制（电平/静音仍可有界返回）。**因此只有 `beats=false` 的显式文件窗承诺不扩展为整首/整文件解码；压缩包边界可有少量相邻采样，统计必须裁回请求范围。**
+     扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`；真实文件生产路径回归在 `ListenRangeChecks.swift`：
+     本机合成的稀疏长 WAV、晚时间点短窗、暂停 overview 队列仍成功、原生实际帧数/PTS、范围统计、时长边界、原生 AAC 包边界、MOV 空编辑/偏移音轨，
+     以及生命周期探针确定真实 reader 已启动/已收尾的取消和超时。
    - **一次查完 V1 的剪辑点**（`cuts=true`，2026-10-16 测试员的第 10 条，[方案](../plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md)）：
      不另开工具（会和 listen 长得像）。V1 每一段的头和尾都是剪辑点（`AICutCheck.boundaries`：挨着的两段合成一个、跨着转场的带 `transition`、
      开着缝的各报各的、第一段的头和最后一段的尾也报、from / to 只留落在里面的），每一头在**它声音自己的源时间轴**上判 —— 声音从哪段来

@@ -513,6 +513,10 @@ xcrun swiftc \
   Sources/SrtFlow/AIContactSheet.swift \
   Sources/SrtFlow/AIFrameDescription.swift \
   Sources/SrtFlow/AIAudioLevels.swift \
+  Sources/SrtFlow/AIListenFileAudio.swift \
+  Sources/SrtFlow/AIListenAudioWindow.swift \
+  Sources/SrtFlow/AIListenReadControl.swift \
+  Sources/SrtFlow/AIBeats.swift \
   Sources/SrtFlow/AIDocumentReader.swift \
   Sources/SrtFlow/AIFileOperations.swift \
   Sources/SrtFlow/AIFinderSelection.swift \

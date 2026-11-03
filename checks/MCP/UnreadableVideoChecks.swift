@@ -42,8 +42,8 @@ func runUnreadableVideoChecks() async {
           "a file that is gone is reported as gone")
 }
 
-/// 写 10 帧 64×64 的 H.264（AVAssetWriter，不依赖 ffmpeg）。
-private func writeTinyH264(to url: URL) async -> Bool {
+/// 写 64×64 的 H.264（AVAssetWriter，不依赖 ffmpeg）；默认 10 帧，listen 的音轨偏移夹具复用它写 30 帧。
+func writeTinyH264(to url: URL, frameCount: Int = 10) async -> Bool {
     guard let writer = try? AVAssetWriter(outputURL: url, fileType: .mp4) else { return false }
     let input = AVAssetWriterInput(mediaType: .video, outputSettings: [
         AVVideoCodecKey: AVVideoCodecType.h264, AVVideoWidthKey: 64, AVVideoHeightKey: 64
@@ -55,14 +55,14 @@ private func writeTinyH264(to url: URL) async -> Bool {
     writer.add(input)
     guard writer.startWriting() else { return false }
     writer.startSession(atSourceTime: .zero)
-    for index in 0..<10 {
+    for index in 0..<frameCount {
         while !input.isReadyForMoreMediaData { try? await Task.sleep(nanoseconds: 5_000_000) }
         guard let pool = adaptor.pixelBufferPool else { return false }
         var buffer: CVPixelBuffer?
         CVPixelBufferPoolCreatePixelBuffer(nil, pool, &buffer)
         guard let buffer else { return false }
         CVPixelBufferLockBaseAddress(buffer, [])
-        memset(CVPixelBufferGetBaseAddress(buffer), Int32(index * 20), CVPixelBufferGetDataSize(buffer))
+        memset(CVPixelBufferGetBaseAddress(buffer), Int32((index * 20) % 256), CVPixelBufferGetDataSize(buffer))
         CVPixelBufferUnlockBaseAddress(buffer, [])
         adaptor.append(buffer, withPresentationTime: CMTime(value: CMTimeValue(index), timescale: 10))
     }
