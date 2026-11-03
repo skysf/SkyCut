@@ -7,9 +7,8 @@ import SrtFlowMCPKit
 // 管什么：AI 听不见，就把声音量给它：一段片段在成片里听到的（段音量 / 曲线、渐入渐出、轨道推子都算上）、一个素材文件、
 // 或者整条时间线上每一段有声音的片段 —— 电平（有声音部分的 RMS）、峰值、静音段、最响的地方、一条粗的响度曲线；
 // 要鼓点时（beats，只对一段片段或一个文件）再给速度、每一拍、小节头（AIBeats，另读一遍 11025 Hz 的单声道）。
-// 数据是画波形那一份（WaveformStore：一个文件读一遍，峰值 + 均方），不另读。方案第 31 条（2026-09-27 实测：
-// AI 拿用户电脑上的 ffmpeg 量响度）。
-// 不管什么：怎么算（AIAudioLevels）、波形怎么读（WaveformStore）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
+// 整文件/时间线复用 WaveformStore；点名 source_in/source_out 交给 AIListenFileAudio，只原生解码请求窗。
+// 不管什么：怎么算（AIAudioLevels）、文件怎么读（AIListenFileAudio）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
 //
 // 只读：不改工程、不动界面。点名文件夹以外的文件照「动硬盘才问」的规矩先问。
 
@@ -169,34 +168,10 @@ enum AIListenTool {
         if let ask = try AIWorkspace.shared.confirmReading([url], verb: "listen to", args: args, project: project) {
             return ask
         }
-        guard let peaks = await waveform(of: url, until: Date().addingTimeInterval(waitSeconds)) else {
-            throw AIToolError("\(url.lastPathComponent) has no sound SkyCut can read.")
-        }
-        let from = max(0, try args.double("source_in") ?? 0)
-        let to = min(try args.double("source_out") ?? peaks.duration, peaks.duration)
-        guard to > from else { throw AIToolError("source_out must be after source_in (the file has \(String(format: "%.2f", peaks.duration)) s read).") }
-        let windows = AIAudioLevels.windows(peaks, from: from, to: to)
-        let report = AIAudioLevels.report(windows, silenceDB: settings.silenceDB, minSilence: settings.minSilence)
-        var object: [String: JSONValue] = [
-            "listened_to": .string(AIWorkspace.shared.display(url)),
-            "from": AIFormat.seconds(from), "to": AIFormat.seconds(to)
-        ]
-        for (key, value) in AIAudioLevels.json(report, curve: AIAudioLevels.curve(windows), detailed: true) {
-            object[key] = value
-        }
-        if !peaks.isComplete {
-            object["note"] = .string(
-                "SkyCut has read the first \(String(format: "%.1f", peaks.duration)) s so far; call listen again for the rest."
-            )
-        }
-        if settings.beats {
-            // 鼓点另读一遍采样，不用等波形读完：没给 source_out 就到文件结尾（一次最多 15 分钟）。
-            let end = try args.double("source_out") ?? .infinity
-            let analysis = try await AIBeats.analysis(of: url, from: from, to: end)
-            for (key, value) in AIBeats.json(analysis, sourceFrom: from, sourceTo: end, speed: 1, timeline: { $0 }) {
-                object[key] = value
-            }
-        }
+        let object = try await AIListenFileAudio.listen(
+            url, args: args, display: AIWorkspace.shared.display(url), silenceDB: settings.silenceDB,
+            minSilence: settings.minSilence, beats: settings.beats, until: Date().addingTimeInterval(waitSeconds)
+        )
         return .ok(.object(object))
     }
 
@@ -205,18 +180,6 @@ enum AIListenTool {
     /// 一个文件的波形（画时间线用的那一份，同一个文件只读一遍）。等到读完或者到点；到点时给出已经读到的部分。
     /// 读不了（没有音轨）返回 nil。
     static func waveform(of url: URL, until deadline: Date) async -> WaveformPeaks? {
-        let reader = Task { () -> WaveformPeaks? in
-            var latest: WaveformPeaks?
-            for await snapshot in await WaveformStore.shared.peaks(for: url) { latest = snapshot }
-            return latest
-        }
-        let wait = max(0, deadline.timeIntervalSinceNow)
-        let timer = Task {
-            try? await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000))
-            reader.cancel()
-        }
-        let result = await reader.value
-        timer.cancel()
-        return result
+        await AIListenFileAudio.waveform(of: url, until: deadline)
     }
 }

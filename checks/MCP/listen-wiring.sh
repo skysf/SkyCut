@@ -14,6 +14,23 @@ if [ "$(grep -c 'settings.from = try args.double("from")' "${LISTEN_TOOL}" || tr
 fi
 echo "   ✓ from / to 读进来；一段片段、整条时间线都只量落在里面的那几秒"
 
+echo "==> listen 文件显式区间：原生 timeRange 有界读取，超时/取消结束本次读取"
+LISTEN_FILE="Sources/SrtFlow/AIListenFileAudio.swift"
+LISTEN_WINDOW="Sources/SrtFlow/AIListenAudioWindow.swift"
+LISTEN_CONTROL="Sources/SrtFlow/AIListenReadControl.swift"
+if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'if sourceIn != nil || sourceOut != nil' "${LISTEN_FILE}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIListenAudioWindow.read(url, from: sourceIn, to: sourceOut, until: deadline)' "${LISTEN_FILE}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'reader.timeRange = CMTimeRange' "${LISTEN_WINDOW}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'WaveformStore' "${LISTEN_WINDOW}" "${LISTEN_CONTROL}" | grep -cv ':0$' || true)" -ne 0 ] \
+   || [ "$(grep -c 'withTaskCancellationHandler' "${LISTEN_WINDOW}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'MediaReadQueue.analysis.addOperation(operation)' "${LISTEN_CONTROL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'fileDuration > AIBeats.maxSeconds' "${LISTEN_FILE}" || true)" -ne 1 ]; then
+  echo "✗ 文件显式范围没有完整接到有界原生读取/取消路径，或长文件未在节拍解码前受限" >&2
+  exit 1
+fi
+echo "   ✓ 显式范围不走整文件波形；原生 timeRange、生产取消/截止时间、长文件节拍限制已接上"
+
 echo "==> listen cuts=true：V1 的剪辑点一次查完，转写只读缓存、声音从哪段来和判的输入都和 cut_speech 同一份"
 # 2026-10-16（docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md；第四节第 13 条）；纯值在 checks/MCP/CutCheckChecks.swift。
 # 2026-10-18：两个工具判切口的输入（整个素材文件的电平、门限、词）只从 AISpeechHearing 来，读法只有 AISpeechCutTool 的 wholeFile / transcript
