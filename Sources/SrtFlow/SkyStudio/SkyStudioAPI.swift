@@ -36,9 +36,20 @@ struct SkyStudioAPI: Sendable {
         self.machine = machine
     }
 
-    /// 这个 SkyCut 的版本号（`X-SkyCut-Version`；比服务器要的最低版本低就回 `upgrade_required`）。
+    /// 显示用的完整构建版本；请求头在 `request` 边界只取数字三段，不改包里的来源标记。
     static var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+    }
+
+    /// Sky Studio 只收 major.minor.patch；本地 / 预发布 / 构建后缀不参与最低版本比较。
+    /// 必须先认完整格式；不认识的原样交给服务器严格拒绝，不能把坏输入伪装成有效版本。
+    private static func transportVersion(_ version: String) -> String {
+        let number = #"(?:0|[1-9][0-9]*)"#
+        let identifiers = #"[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*"#
+        let pattern = #"\A"# + number + #"\."# + number + #"\."# + number
+            + "(?:-" + identifiers + ")?(?:\\+" + identifiers + #")?\z"#
+        guard version.range(of: pattern, options: .regularExpression) != nil else { return version }
+        return String(version.prefix { $0 != "-" && $0 != "+" })
     }
 
     /// 地址：环境变量指到本机的假服务器时用它（只认 http(s)://回环地址），别的一律正式地址。
@@ -172,7 +183,7 @@ struct SkyStudioAPI: Sendable {
         request.httpMethod = method
         request.timeoutInterval = Self.requestTimeout
         request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
-        request.setValue(version, forHTTPHeaderField: "X-SkyCut-Version")
+        request.setValue(Self.transportVersion(version), forHTTPHeaderField: "X-SkyCut-Version")
         if let machine { request.setValue(machine, forHTTPHeaderField: "X-SkyCut-Machine") }
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         if let body {
