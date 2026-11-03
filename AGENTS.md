@@ -622,6 +622,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-03 本地构建后缀进入 Sky Studio 版本头，模型目录被拒](docs/bugfixes/2026-11-03-local-version-header.md) — 共享请求边界只规范化完整匹配的构建版本，显示来源与非法输入原样保留；真实 URLRequest / 假协议回归与反向验证。
 - [2026-11-03 短导出卡在退出等待](docs/bugfixes/2026-11-03-ffmpeg-exit-wait-runloop.md) — 启动前注册退出回调、排空双管道后汇合；真实短进程守卫与撤掉修复后的红灯证据。
 - [MCP 最小示例与真实参数提示](docs/bugfixes/2026-11-03-mcp-usage-guidance.md)：需求选工具、示例 schema 校验和 `end` → `source_out` 的结果提示。
 

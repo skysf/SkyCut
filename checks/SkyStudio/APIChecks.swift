@@ -4,6 +4,7 @@ import Foundation
 // 环境变量只能把地址指到本机。全程走假协议（SkyStudioStub），不碰真的网络。
 
 func runAPIChecks() async {
+    await checkVersionHeaders()
     let base = URL(string: "http://127.0.0.1:8123/api/skycut/v1")!
     let key = "sk-" + String(repeating: "A", count: 43)
     let api = SkyStudioAPI(session: SkyStudioStub.session, base: base, version: "0.18.49", machine: String(repeating: "a", count: 64))
@@ -83,4 +84,47 @@ func runAPIChecks() async {
     checkEqual(SkyStudioAPI.configuredBase([SkyStudioAPI.baseEnvironmentKey: "ftp://127.0.0.1/api"]), production, "only http(s)")
     checkEqual(SkyStudioAPI.configuredBase([SkyStudioAPI.baseEnvironmentKey: "not a url"]), production, "garbage is refused")
     checkEqual(SkyStudioAPI.baseEnvironmentKey, "SRTFLOW_SKYSTUDIO_API_BASE", "environment variables keep the SRTFLOW_ prefix")
+}
+
+/// 走真的 /models → URLRequest → 假 URLSession，不能只测版本截取函数、漏掉生产接线。
+private func checkVersionHeaders() async {
+    let cases: [(String, String)] = [
+        ("0.18.56", "0.18.56"),
+        ("0.18.46", "0.18.46"),
+        ("0.0.0", "0.0.0"),
+        ("12.34.56", "12.34.56"),
+        ("0.18.56-local.20261103.1348.gb129389", "0.18.56"),
+        ("0.18.56-local.20261103.0905.gb129389", "0.18.56"),
+        ("1.2.3-beta.2", "1.2.3"),
+        ("1.2.3+build.42.gabc", "1.2.3"),
+        ("1.2.3-rc.1+build.42", "1.2.3"),
+        ("", ""),
+        ("unknown", "unknown"),
+        ("0.18", "0.18"),
+        ("0.18.56.1", "0.18.56.1"),
+        ("v0.18.56", "v0.18.56"),
+        ("00.18.56", "00.18.56"),
+        ("0.18.-1", "0.18.-1"),
+        ("0.18.56oops", "0.18.56oops"),
+        ("0.18.56-", "0.18.56-"),
+        ("0.18.56+", "0.18.56+"),
+        ("0.18.56-beta..1", "0.18.56-beta..1"),
+        ("0.18.56+build..42", "0.18.56+build..42"),
+        (" 0.18.56", " 0.18.56")
+    ]
+    let base = URL(string: "http://127.0.0.1:8123/api/skycut/v1")!
+    for (display, expected) in cases {
+        let api = SkyStudioAPI(session: SkyStudioStub.session, base: base, version: display, machine: nil)
+        SkyStudioStub.reset { _ in .http(200, #"{"models":[]}"#) }
+        let models = try? await api.models(key: "sk-version-header-test-only")
+        check(models != nil, "version header: /models response is read for \(display)")
+        checkEqual(SkyStudioStub.log.count, 1, "version header: /models sends once for \(display)")
+        checkEqual(SkyStudioStub.log.first?.headers["X-SkyCut-Version"], expected, "version header sent for \(display)")
+        checkEqual(api.version, display, "display/build provenance is unchanged for \(display)")
+        // 授权、报价、上传、提交、查询和取消都经同一个请求边界，不能只在 /models 特判。
+        for route in ["me", "quote", "uploads", "jobs", "jobs/test-id", "jobs/test-id/cancel"] {
+            let request = api.request(route, key: "sk-version-header-test-only", method: "POST", body: Data("{}".utf8))
+            checkEqual(request.value(forHTTPHeaderField: "X-SkyCut-Version"), expected, "version header at \(route) for \(display)")
+        }
+    }
 }
