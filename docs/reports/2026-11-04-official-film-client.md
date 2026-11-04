@@ -102,5 +102,35 @@
 原生崩溃栈及本机 Apple SDK 确认 `cancelReading` 与 `copyNextSampleBuffer` 不得并发。
 独立修复让 analysis 同步读取体单点取消 / 释放，外部只发停止信号；排队与 metadata 取消仍分阶段处理。
 独立读取检查 49 项通过，安全的旧代码反向 10 项中 5 项失败；没有为制造红灯触发原生并发崩溃。
-并行构建时的 2 秒成功路径超时与 15 秒 watchdog 均保留为失败，未放宽阈值。独立第 4 组已完整通过（6 / 0，其中 MCP 3,188 项通过），本地五组共 82 项均已完成；完整 App 已重新链接，推前守卫全绿；独立 PR 的 GitHub 汇总结果另行核对。
+并行构建时的 2 秒成功路径超时与 15 秒 watchdog 均保留为失败，未放宽阈值。独立第 4 组已完整通过（6 / 0，其中 MCP 3,188 项通过），本地五组共 82 项均已完成；完整 App 已重新链接，推前守卫全绿。
+[PR #298](https://github.com/skysf/SkyCut/pull/298) 的
+[GitHub CI](https://github.com/skysf/SkyCut/actions/runs/41787253589) 五组及汇总 `check-all` 全部 success，
+已用 merge commit 合并：`5e7201fcdaa8cef7405a53e1f9ba43bd747d99d1`。
 见[取消 listen 时跨线程拆掉正在读的 reader](../bugfixes/2026-11-04-listen-reader-cancel-during-copy.md)。
+
+额外经隔离 App 的真实后台 MCP 显式读取 `reference.wav` 两个短窗（0.1–0.6 / 0.9–1.4 秒），
+返回范围准确、无 partial 提示，RMS / peak 分别为 −14.1 / −2.6 dB 与 −16.4 / −4.1 dB。
+这只验证文件数值路径，没有冒称本次 smoke 覆盖实际取消或主观听辨。自有工程已保存关闭，
+假任务准入 / 真实提供方 / 积分均为 0，测试 App、服务、假凭据均已清理。
+证据：本机 `/private/tmp/srtflow-listen-owner-mcp-20261104/evidence/summary.json`。
+最初用重签后的整文件 SHA 比对产生的测试脚本误判已保留；后续仅核对 UUID / 代码段，
+确认与实际链接产物一致，没有重复调用 MCP 来覆盖失败记录。
+
+## 验收后续：引擎短探测
+
+`FFmpegRuntimeProbe` 限制每个候选的版本 / 滤镜共享预算和合流输出，检查正常零退出，
+仅清理自己启动且尚未回收的 PID；定位任务在普通读取队列上合并为一轮。
+原生启动 / 内核退出交付本身不可中断的边界明确保留，不把当时的等待推断成已证明的 TCC 原因。
+实际仓库专项 57 项通过，五组隔离撤修复分别证明输出 / 生命周期、候选 / 预算、单次定位、
+信号重置和独立看门狗能准确变红。完整 arm64 App 构建通过。
+
+新链接 App 的一次真实后台 MCP 压缩在 1.582 秒完成，`look` 返回并实看三帧蓝色合成画面；
+输出为 2 秒 / 640×640 / 24 fps，假 API 写请求 0、真实提供方 0、积分 0→0。
+自有工程、测试 App / helper / 服务均已收尾。包装脚本最初的普通端口绑定误报被保留，
+随后逐 PID、监听和 `SO_REUSEADDR` 复核通过，没有重复媒体操作来覆盖原结果。
+证据：本机 `/private/tmp/skycut-engine-mcp-smoke-20261104/verified-summary.json`。
+见[后台引擎短探测无限等待且重复启动](../bugfixes/2026-11-04-engine-probe-hangs.md)。
+
+本地统一入口五组为 52 / 10 / 7 / 6 / 8 项，共 83 项全部通过，其中完整 MCP 3,188 项通过；
+推前 `check-guards` 全绿。第 3 / 4 组在其余编译结束后独立执行，未放宽 watchdog 或读取时限。
+GitHub 汇总结果在 PR 创建后另行核对，本地结果不代替 CI。
