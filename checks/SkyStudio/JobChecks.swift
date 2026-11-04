@@ -39,6 +39,10 @@ let sampleDoneJob = """
  "credits_charged": 455, "error": null}
 """
 
+func sampleDoneJobFor(_ id: String) -> String {
+    sampleDoneJob.replacingOccurrences(of: "0b1d2c3e-1111-4a5b-9c8d-000000000001", with: id)
+}
+
 func runJobChecks() async {
     runCatalogChecks()
     await runQuoteAndJobChecks()

@@ -171,6 +171,8 @@
 - 本机可选 `idempotency_key` 绑定全部 MCP 参数和原工程，同 key 的并发准备请求拒绝、已经返回过的请求复用原本机 job_id，不再报价、上传、记账或 POST。
   没提供时仅在起操作时生成一次并返回；AI 必须用 get_job 等。服务端仍负责每账号幂等；App 重启后不承诺恢复本机去重表。
   **当前 API 没有按幂等 key 的只读查单端点**：提交应答完全丢失且无 job_id 时，只保留 key / 预算待服务端核查，不自动 POST 寻找它。
+  `GET /jobs/{id}` 的回答必须包含同一个任务号；在 API 边界拒绝错号，再允许进度、账务、下载或回执更新。
+  官方镜头的持久回执与重启恢复另见 [官方原创短片](official-film.md)，不能把普通内存去重表当作持久恢复。
 - `billing` 是唯一结算证据：只用最终净 `credits_charged` 调整本机账；reserved / pending_review / refund_pending 保持预留并报待核查。
   旧 error.refunded 与 cancelled 应答不能覆盖 billing，退回未用预留不代表整单免费。生成成功后下载、保存、入轨失败不退款。
   `get_job` 即使本机已失败，仍可 GET 原单更新账务 / remote_result；反复查询不会再次退款。需要恢复文件时使用原结果地址，不重生成。

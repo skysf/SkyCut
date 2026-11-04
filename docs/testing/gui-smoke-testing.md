@@ -435,6 +435,10 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 5. 统一设置：`python3 scripts/gui-smoke/sky-studio/settings.py` 验工具发现、五类快照、目录与实际 Store 的选项一致、整次拒绝错误参数、偏好持久化、工程 / 任务不变与密钥不回传。它留中文界面、10 GB 缓存上限、751 积分额度供 GUI 核对；清空只删本轮测试缓存，不更改客户端配置。随后实点三个设置入口与五个分类，并在额度页打开时再次用 MCP 改额度、切走切回，确认双向同步（[工作台回归清单](../architecture/workbench-and-settings.md)）。
 6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
+清理器本身的自动检查必须同时隔离进程、钥匙串、偏好与文件删除。`SKYSTUDIO_SMOKE_DIR` 不会改变
+App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在运行的 `.skystudiosmoke` socket / provider 文件。
+夹具用自有 PID 文件和独立 Unix socket 哨兵验证这条边界，不更改用户 HOME。
+
 原 fal 夹具、接口快照和刷新脚本已随第 7 刀删除；历史结果见既有报告。真实积分验收必须另外核对任务号、终态、扣费 / 退款和未知提交，不能把本机夹具当作真实服务已通过。当前证据见 [生成与配音验收](../reports/2026-10-29-sky-studio-generation-and-voice.md)。
 
 ## 四之九、真实 Codex 的发现与选工具回归

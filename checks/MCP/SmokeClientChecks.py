@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+import socket
 import subprocess
 import sys
 import tempfile
@@ -93,24 +94,58 @@ for line in sys.stdin:
         self.assertIn("fixture failed", log.read_text())
 
     def test_cleanup_preserves_unrelated_process(self):
-        # Real child PID, unrelated command. Stub keychain/defaults/pkill so only PID ownership is exercised.
+        # 真起无关子进程；所有机器级清理都隔离，不能删掉正在验收的同 bundle MCP socket。
         folder = Path(self.scratch.name)
+        cleanup = folder / "cleanup"
+        cleanup.mkdir()
         fakebin = folder / "bin"
         fakebin.mkdir()
         for name in ["security", "defaults", "pkill"]:
             command = fakebin / name
             command.write_text("#!/bin/sh\nexit 0\n")
             command.chmod(0o700)
+        removed = folder / "remove.jsonl"
+        remover = fakebin / "rm"
+        remover.write_text(f"#!{sys.executable}\n" + f"""
+import json, sys
+from pathlib import Path
+root, owned, log = Path({str(folder)!r}), Path({str(cleanup)!r}), Path({str(removed)!r})
+for argument in sys.argv[1:]:
+    if argument.startswith('-'): continue
+    path = Path(argument).resolve()
+    action = 'blocked'
+    # 外层测试沙箱即使在反向验证时也保留，绝不触碰真实 Application Support。
+    if path.is_relative_to(root.resolve()):
+        if path.parent == owned.resolve() and path.name in ('app.pid', 'server.pid'):
+            path.unlink(missing_ok=True)
+            action = 'removed'
+    with log.open('a') as output:
+        output.write(json.dumps({{'path': str(path), 'action': action}}) + '\\n')
+""")
+        remover.chmod(0o700)
+        protected = folder / "mcp.sock"
+        sentinel = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        self.addCleanup(sentinel.close)
+        sentinel.bind(str(protected))
         child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
         try:
             for name in ["app.pid", "server.pid"]:
-                (folder / name).write_text(str(child.pid))
+                (cleanup / name).write_text(str(child.pid))
             result = subprocess.run(["/bin/bash", str(ROOT / "scripts/gui-smoke/sky-studio/run.sh"), "stop"],
-                                    env={**os.environ, "SKYSTUDIO_SMOKE_DIR": str(folder),
+                                    env={**os.environ, "SKYSTUDIO_SMOKE_DIR": str(cleanup),
                                          "PATH": str(fakebin) + os.pathsep + os.environ["PATH"]},
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIsNone(child.poll(), "stale test PID must not terminate another command")
+            for name in ["app.pid", "server.pid"]:
+                self.assertFalse((cleanup / name).exists(), "the fixture must still exercise owned PID cleanup")
+            rows = [json.loads(line) for line in removed.read_text().splitlines()]
+            support = Path(os.environ["HOME"]) / "Library/Application Support/com.srtflow.SrtFlow.skystudiosmoke"
+            for name in ["mcp-providers.json", "mcp.sock"]:
+                self.assertIn({"path": str((support / name).resolve()), "action": "blocked"}, rows,
+                              "shared smoke support cleanup must be intercepted")
+            subprocess.run([str(remover), "-f", str(protected)], check=True, timeout=5)
+            self.assertTrue(protected.is_socket(), "cleanup must preserve another live socket outside its owned directory")
         finally:
             if child.poll() is None:
                 child.terminate()

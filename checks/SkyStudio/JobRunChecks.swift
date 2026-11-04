@@ -16,11 +16,11 @@ func runJobRunChecks() async {
     // 1. 一路做完：交上（排队）→ 排第 2 → 处理中 → 存进作品库 → 做完；每一份都报上来；照服务器说的间隔问（夹过）。
     var answers = [
         status("queued", #", "queue_position": 2"#), status("running", #", "phase": "processing""#),
-        #"{"job_id": "job-1", "status": "running", "phase": "saving", "poll_after_seconds": 0.5}"#, sampleDoneJob
+        #"{"job_id": "job-1", "status": "running", "phase": "saving", "poll_after_seconds": 0.5}"#, sampleDoneJobFor("job-1")
     ]
     SkyStudioStub.reset { seen in
         if seen.method == "POST" { return .http(202, status("queued", #", "credits_reserved": 455"#)) }
-        return .http(200, answers.isEmpty ? sampleDoneJob : answers.removeFirst())
+        return .http(200, answers.isEmpty ? sampleDoneJobFor("job-1") : answers.removeFirst())
     }
     let sleeps = SleepLog()
     let updates = UpdateLog()
@@ -36,7 +36,7 @@ func runJobRunChecks() async {
     // 2. 满了：等着、用同一个 idempotency_key 再交；第二次交上了照常等完。
     var full = true
     SkyStudioStub.reset { seen in
-        guard seen.method == "POST" else { return .http(200, sampleDoneJob) }
+        guard seen.method == "POST" else { return .http(200, sampleDoneJobFor("job-1")) }
         if full {
             full = false
             return .http(429, #"{"error": {"code": "too_many_jobs", "message": "3 jobs are already open.", "limit": 3, "running": 3}}"#)
@@ -56,7 +56,7 @@ func runJobRunChecks() async {
     // 3. 交的时候断网：再交（同一个 key）；一直断就说没连上。
     var drops = 1
     SkyStudioStub.reset { seen in
-        guard seen.method == "POST" else { return .http(200, sampleDoneJob) }
+        guard seen.method == "POST" else { return .http(200, sampleDoneJobFor("job-1")) }
         if drops > 0 { drops -= 1; return .failure(.timedOut) }
         return .http(202, status("queued"))
     }
@@ -72,7 +72,7 @@ func runJobRunChecks() async {
     }
     SkyStudioStub.reset { seen in
         if seen.method == "POST" { return .http(502, #"{"error":{"code":"provider_error","message":"Outcome unknown","job_id":"job-1"}}"#) }
-        return .http(200, sampleDoneJob)
+        return .http(200, sampleDoneJobFor("job-1"))
     }
     checkEqual(try? await run.run(request).state, .done, "submit error with an original job id recovers by querying that job")
     checkEqual(SkyStudioStub.log.map(\.method), ["POST", "GET"], "known-id recovery reads the original without another paid POST")
@@ -82,7 +82,7 @@ func runJobRunChecks() async {
     SkyStudioStub.reset { seen in
         if seen.method == "POST" { return .http(202, status("queued")) }
         if blips > 0 { blips -= 1; return .failure(.networkConnectionLost) }
-        return .http(200, sampleDoneJob)
+        return .http(200, sampleDoneJobFor("job-1"))
     }
     checkEqual(try? await run.run(request).state, .done, "a few dropped polls do not fail the job")
     SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .failure(.networkConnectionLost) }
@@ -172,7 +172,7 @@ func runJobRunChecks() async {
     var follower = SkyStudioJobRun(api: api, key: jobKey)
     follower.sleep = followSleeps.sleep
     var later = [status("running", #", "phase": "processing""#), #"{"job_id": "job-1", "status": "running", "phase": "saving", "poll_after_seconds": 30}"#]
-    SkyStudioStub.reset { _ in .http(200, later.isEmpty ? sampleDoneJob : later.removeFirst()) }
+    SkyStudioStub.reset { _ in .http(200, later.isEmpty ? sampleDoneJobFor("job-1") : later.removeFirst()) }
     await follower.followToEnd("job-1")
     checkEqual(SkyStudioStub.log.map(\.method), ["GET", "GET", "GET"], "asks until it is done, then stops (no download, no cancel)")
     check(SkyStudioStub.log.allSatisfy { $0.url.hasSuffix("/jobs/job-1") }, "asks only about that job")
@@ -183,7 +183,7 @@ func runJobRunChecks() async {
     var followDrops = 2
     SkyStudioStub.reset { _ in
         if followDrops > 0 { followDrops -= 1; return .failure(.networkConnectionLost) }
-        return .http(200, sampleDoneJob)
+        return .http(200, sampleDoneJobFor("job-1"))
     }
     await follower.followToEnd("job-1")
     checkEqual(SkyStudioStub.log.count, 3, "a few dropped polls: keeps asking")
@@ -197,7 +197,7 @@ func runJobRunChecks() async {
     var impatient = SkyStudioJobRun(api: api, key: jobKey)
     impatient.sleep = SleepLog().sleep
     impatient.maxWait = 0
-    SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .http(200, sampleDoneJob) }
+    SkyStudioStub.reset { seen in seen.method == "POST" ? .http(202, status("queued")) : .http(200, sampleDoneJobFor("job-1")) }
     checkEqual(await jobFailure({ _ = try await impatient.run(request) }), .timedOut, "waiting too long")
     checkEqual(SkyStudioJobRun.pollSeconds(nil), 15, "no hint: 15 s")
     checkEqual(SkyStudioJobRun.pollSeconds(0.5), 2, "at least 2 s")

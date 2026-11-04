@@ -47,10 +47,16 @@ private func checkCatalog() {
         "reference_images", "reference_videos", "reference_audio", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
-        "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides"], "the parameters")
+        "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides",
+        "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project"], "the parameters")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
     check(properties["resolution"]?["enum"] == nil && properties["aspect_ratio"]?["enum"] == nil, "model-specific sizes and shapes are not restricted by legacy enums")
     check(MCPToolName.getStatus.definition.inputSchema["properties"]?["models"] != nil, "AI can discover model limits without submitting generation")
+    check(MCPToolName.getStatus.definition.inputSchema["properties"]?["film_contract"] != nil, "full public film contract is discoverable without a model query")
+    check(MCPFilmSchema.contract["production_enabled"] == .null, "client contract does not claim server production activation")
+    checkEqual(MCPFilmSchema.contract["film_schema"], MCPFilmSchema.validationSchema(for: .generateMedia)?["properties"]?["film"], "on-demand film schema is the actual nested name validator")
+    check(MCPArgumentCheck.problem(tool: .generateMedia, arguments: ["kind": "image", "film": ["shot": ["entry": ["private_style": "x"]]]]) != nil,
+          "compact catalog still rejects unknown deep film names before running")
     for field in ["reference_images", "reference_videos", "reference_audio"] { checkEqual(properties[field]?["type"]?.stringValue, "array", "\(field) preserves an ordered list") }
 
     checkEqual(properties["quote_only"]?["type"]?.stringValue, "boolean", "preflight is explicitly exposed")

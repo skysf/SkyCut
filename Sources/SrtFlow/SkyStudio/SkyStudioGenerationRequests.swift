@@ -9,17 +9,29 @@ enum SkyStudioGenerationRequests {
     struct Entry { let identity: JSONValue; var result: AIToolResult? }
     private static var entries: [String: Entry] = [:]
 
-    static func begin(_ key: String, identity: JSONValue) throws -> AIToolResult? {
+    static func begin(_ key: String, identity: JSONValue, scope: String = "") throws -> AIToolResult? {
         guard !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, key.utf16.count <= 128 else { throw AIToolError("idempotency_key must contain 1–128 characters.") }
-        if let entry = entries[key] {
+        let entryKey = scope + ":" + key
+        if let entry = entries[entryKey] {
             guard entry.identity == identity else { throw AIToolError("This idempotency_key is already bound to different inputs/project. Query the original job; a new operation needs a new key and approved budget.") }
             guard let result = entry.result else { throw AIToolError("The original operation is preparing; reuse this idempotency_key later. No second job was started.") }
             return result
         }
-        entries[key] = Entry(identity: identity)
+        entries[entryKey] = Entry(identity: identity)
         return nil
     }
 
-    static func complete(_ key: String, result: AIToolResult) { entries[key]?.result = result }
-    static func abandonPreparation(_ key: String) { if entries[key]?.result == nil { entries[key] = nil } }
+    static func complete(_ key: String, result: AIToolResult, scope: String = "") { entries[scope + ":" + key]?.result = result }
+
+    /// 新提交只有真的起了本机任务才占住 key；确认问题/预算阻止仍由 defer 放弃占位，允许同 key 再过闸。
+    static func completeStarted(_ key: String, result: AIToolResult, scope: String = "") {
+        guard result.payload["status"]?.stringValue == "started",
+              result.payload["job_id"]?.stringValue?.isEmpty == false else { return }
+        complete(key, result: result, scope: scope)
+    }
+
+    static func abandonPreparation(_ key: String, scope: String = "") {
+        let entryKey = scope + ":" + key
+        if entries[entryKey]?.result == nil { entries[entryKey] = nil }
+    }
 }

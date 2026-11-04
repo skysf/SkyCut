@@ -243,6 +243,47 @@ grep -qF 'applyBilling(done)' "${GEN_RUN}" || fail "生成没接服务端 billin
 grep -qF 'job.refresh = ' "${GEN_RUN}" || fail "get_job 没有核查原单的接线"
 grep -qF 'payload["submission_keys"]' "${GEN_RUN}" || fail "未知提交未留下幂等 key"
 
+# 9c. 官方路线必须接到同一个生产运行器：显式准备、精确报价、先落回执、恢复只查原单。
+OFFICIAL="Sources/SrtFlow/SkyStudio/SkyStudioOfficialGenerateTool.swift"
+RECOVERY="Sources/SrtFlow/SkyStudio/SkyStudioOfficialRecoveryRun.swift"
+for file in "${OFFICIAL}" "${RECOVERY}"; do [ -f "${file}" ] || fail "找不到 ${file}"; done
+grep -qF 'if SkyStudioOfficialGenerateTool.applies(args)' "${GEN_TOOL}" || fail "generate_media 没有分派官方准备/报价/提交"
+grep -qF 'SkyStudioOfficialPreparation.start(generation:' "${OFFICIAL}" || fail "官方入口没接显式真实引用准备"
+grep -qF 'SkyStudioOfficialPrepared.shared.reviewedQuote(' "${OFFICIAL}" || fail "官方提交没使用精确双缝报价缓存"
+grep -qF 'SkyStudioOfficialRecovery.resume(' "${OFFICIAL}" || fail "官方入口没先找持久原单"
+grep -qF 'SkyStudioGenerationRequests.completeStarted(operationKey, result: response, scope: stage)' "${OFFICIAL}" \
+  || fail "官方提交只能缓存已启动任务，确认问题与预算阻止不能占住同一个幂等 key"
+[ "$(count 'SkyStudioGenerationRequests.complete(operationKey, result: response, scope: stage)' "${OFFICIAL}")" -eq 1 ] \
+  || fail "官方新提交不可无条件缓存；唯一未筛选 response 是显式准备任务"
+grep -qF 'official?.request ?? generation.job(' "${GEN_RUN}" || fail "生产运行器丢掉已审查的官方精确请求"
+grep -qF 'official.recovery.received(status)' "${GEN_RUN}" || fail "生产运行器没保存已知原单回执"
+grep -qF 'official?.recovery.delivered(' "${GEN_RUN}" || fail "生成结果没保存可恢复身份"
+grep -qF 'await runner.resume(serverID)' "${RECOVERY}" || fail "重启恢复没有只查原单"
+if grep -qE 'runner\.run\(|api\.submit\(' "${RECOVERY}"; then fail "重启恢复不许重新 POST 收费"; fi
+grep -qF '"prepare_references"' Sources/SrtFlow/AIProjectBinding.swift || fail "官方准备没绑定会话拥有的工程"
+grep -qF '["film", "prepared_references", "quote_token", "seam_review"]' Sources/SrtFlow/AIProjectBinding.swift || fail "官方报价/提交没绑定工程"
+grep -qF 'SkyStudioOfficialPrepared.digest(.string(approval))' "${OFFICIAL}" || fail "项目批准不许持久化原始 pin"
+RECEIPT_AT="$(line_of 'await SkyStudioOfficialRecovery.create(receipt)' "${OFFICIAL}")"
+START_AT="$(line_of 'let job = run.start()' "${OFFICIAL}")"
+VALIDATE_AT="$(line_of 'try SkyStudioOfficialRequest.validate(request, submitting: true)' "${GEN_RUN}")"
+SENT_AT="$(line_of '} else { requestSent = true }' "${GEN_RUN}")"
+if [ -z "${RECEIPT_AT}" ] || [ -z "${START_AT}" ] || [ "${RECEIPT_AT}" -ge "${START_AT}" ]; then fail "官方运行器前必须先持久化防重放回执"; fi
+if [ -z "${VALIDATE_AT}" ] || [ -z "${SENT_AT}" ] || [ "${VALIDATE_AT}" -ge "${SENT_AT}" ]; then fail "官方本地校验必须早于标记已提交"; fi
+grep -qF 'runner.beforeSubmit = ' "${GEN_RUN}" || fail "官方运行器没接每次 POST 前核对"
+grep -qF 'try await validateBeforeSubmit()' "${RUN}" || fail "容量重试没有再次执行 POST 前核对"
+grep -qF 'await SkyStudioOfficialSubmission.validate(' "${GEN_RUN}" || fail "官方 POST 前未核对原始状态"
+OFFICIAL_SUBMIT="Sources/SrtFlow/SkyStudio/SkyStudioOfficialSubmission.swift"
+grep -qF 'OpenProjects.shared.all.contains' "${OFFICIAL_SUBMIT}" || fail "官方任务只看 weak，未拒绝已关闭工程"
+grep -qF 'try await SkyStudioOfficialGenerateTool.validateScope(' "${OFFICIAL_SUBMIT}" || fail "官方重试未重读账户与工程身份"
+grep -qF 'SkyStudioOfficialPreparation.sources(references) == operation.sources' "${OFFICIAL_SUBMIT}" || fail "官方重试未重核原文件身份"
+grep -qF 'operation.expiresAt > Date()' "${OFFICIAL_SUBMIT}" || fail "官方重试未重核报价有效期"
+grep -qF 'try Task.checkCancellation()' "${OFFICIAL_SUBMIT}" || fail "官方 POST 前最后核对没有检查异步等待期间的取消"
+CAPTURE_AT="$(line_of 'let projectGeneration = project.documentGeneration' "${OFFICIAL}")"
+KEY_AT="$(line_of 'let key = try await readKey()' "${OFFICIAL}")"
+if [ -z "${CAPTURE_AT}" ] || [ -z "${KEY_AT}" ] || [ "${CAPTURE_AT}" -ge "${KEY_AT}" ]; then fail "官方入口等待密钥前必须快照工程身份"; fi
+grep -qF 'project.documentGeneration == projectGeneration' "${OFFICIAL}" || fail "官方入口等待密钥后必须拒绝已换文档"
+grep -qF 'guard status.jobID == id else' "${API}" || fail "GET 原单必须在交给状态/结算回调前核对服务端 job_id"
+
 # 10. 云端配音返回任务号；整批预留、不询问付费，结束只入轨一整步。
 VOICE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift"
 VOICE_INPUT="Sources/SrtFlow/AIVoiceoverInput.swift"

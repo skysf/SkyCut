@@ -34,6 +34,8 @@ struct SkyStudioJobRun: Sendable {
     var onUnstoppable: (@Sendable (String) -> Void)?
     /// 需要可恢复的调用方可先持久化原单身份；完成回调后才继续轮询 / 返回，避免旧进度晚写覆盖恢复结果。
     var checkpoint: (@Sendable (SkyStudioJobStatus) async throws -> Void)?
+    /// 每次真正 POST（包括容量重试）前核对易变的调用方状态；nil 保持普通生成原来的流程。
+    var beforeSubmit: (@Sendable () async throws -> Void)?
 
     init(api: SkyStudioAPI, key: String) {
         self.api = api
@@ -67,7 +69,8 @@ struct SkyStudioJobRun: Sendable {
         _ request: SkyStudioJobRequest, deadline: Date, onUpdate: @escaping @Sendable (Update) -> Void
     ) async throws -> SkyStudioJobStatus {
         while true {
-            if Task.isCancelled { throw SkyStudioJobError.stopped(.nothingCharged) }
+            if Task.isCancelled { throw beforeSubmit == nil ? SkyStudioJobError.stopped(.nothingCharged) : .notSubmitted("Cancelled before Sky Studio accepted the operation; no new POST was sent.") }
+            try await validateBeforeSubmit()
             let api = self.api, key = self.key
             let attempt = await Task.detached { () -> Result<SkyStudioJobStatus, Error> in
                 do { return .success(try await api.submit(request, key: key)) } catch { return .failure(error) }
@@ -78,14 +81,10 @@ struct SkyStudioJobRun: Sendable {
                 // 交上了才发现用户要停：按任务号停。
                 if Task.isCancelled { throw await stop(status.jobID) }
                 return status
-            case .failure(SkyStudioFailure.server(let error)) where error.code == SkyStudioServerError.tooManyJobs:
-                onUpdate(.waitingForSlot(running: error.fields["running"]?.intValue, limit: error.fields["limit"]?.intValue))
-                guard Date() < deadline else { throw SkyStudioJobError.timedOut }
-                do { try await sleep(Self.slotRetrySeconds) } catch { throw SkyStudioJobError.stopped(.nothingCharged) }
             case .failure(SkyStudioFailure.network(let detail)):
                 // 丢失响应不证明没扣费。保留原 key，禁止自动重放收费 POST。
                 throw SkyStudioJobError.request(.network(detail))
-            case .failure(SkyStudioFailure.server(let error)) where error.fields["job_id"]?.stringValue != nil:
+            case .failure(SkyStudioFailure.server(let error)) where error.fields["job_id"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false:
                 // 拒绝 / 未知应答已给原任务号：先交出身份，只 GET 这一单；绝不再 POST 或切模型。
                 let id = error.fields["job_id"]!.stringValue!
                 var known = SkyStudioJobStatus(jobID: id, state: nil)
@@ -98,11 +97,30 @@ struct SkyStudioJobRun: Sendable {
                 catch { throw SkyStudioJobError.request(originalFailure) }
                 try await report(recovered, onUpdate: onUpdate)
                 return recovered
+            case .failure(SkyStudioFailure.server(let error)) where SkyStudioJobAdmission.slotRefusal(error):
+                onUpdate(.waitingForSlot(running: error.fields["running"]?.intValue, limit: error.fields["limit"]?.intValue))
+                guard Date() < deadline else {
+                    throw beforeSubmit == nil ? SkyStudioJobError.timedOut : .notSubmitted("No slot became available before the deadline; Sky Studio did not accept the operation.")
+                }
+                do { try await sleep(Self.slotRetrySeconds) }
+                catch { throw beforeSubmit == nil ? SkyStudioJobError.stopped(.nothingCharged) : .notSubmitted("Cancelled while waiting for a slot; Sky Studio did not accept the operation.") }
             case .failure(let failure as SkyStudioFailure):
                 throw SkyStudioJobError.request(failure)
             case .failure(let error):
                 throw SkyStudioJobError.request(.network(error.localizedDescription))
             }
+        }
+    }
+
+    private func validateBeforeSubmit() async throws {
+        guard let beforeSubmit else { return }
+        do {
+            try await beforeSubmit()
+            try Task.checkCancellation() // 取消也可能在调用方等待钥匙串/工程核对时到达。
+        } catch {
+            let reason = error is CancellationError ? "Cancelled before Sky Studio accepted the operation; no new POST was sent."
+                : (error as? SkyStudioJobError)?.message ?? error.localizedDescription
+            throw SkyStudioJobError.notSubmitted(reason)
         }
     }
 
@@ -246,6 +264,8 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     /// 服务器说没做成；只按明确证据认退款。
     case failed(SkyStudioJobFailure)
     case stopped(Stop)
+    /// 调用方的 POST 前核对拒绝；之前最多只有明确的未准入容量拒绝，绝非丢失应答。
+    case notSubmitted(String)
     /// 问 Sky Studio 没问成（Key、余额、版本、参数、限流、网络……）。服务器的 message 原样带着。
     case request(SkyStudioFailure)
     /// 回的不像话。
@@ -264,15 +284,27 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     }
 
     func canRefund(beforeAccepted: Bool) -> Bool {
+        if case .notSubmitted = self { return beforeAccepted }
         if let billing = failure?.billing { return billing.returnedAll }
         if failure?.creditsReturned == true { return true }
         if case .stopped(.nothingCharged) = self { return true }
-        guard beforeAccepted, case .request(.server(let error)) = self, failure?.isRealPersonRefusal != true else { return false }
-        return ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits", "price_changed", "too_many_jobs"].contains(error.code)
+        guard beforeAccepted, case .request(.server(let error)) = self, failure?.isRealPersonRefusal != true,
+              !SkyStudioJobAdmission.hasAdmissionEvidence(error) else { return false }
+        if error.code == SkyStudioServerError.tooManyJobs { return SkyStudioJobAdmission.slotRefusal(error) }
+        return SkyStudioJobAdmission.rejectedCodes.contains(error.code)
+    }
+
+    /// 只保明确未受理的代码；矛盾的扣费证据、真人拒绝和已知任务号绝不改装成“没交上”。
+    var rejectedBeforeAdmissionCode: String? {
+        if case .notSubmitted = self { return "local_not_sent" }
+        guard case .request(.server(let error)) = self, SkyStudioJobAdmission.rejectedCodes.contains(error.code),
+              !SkyStudioJobAdmission.hasAdmissionEvidence(error), failure?.isRealPersonRefusal != true, canRefund(beforeAccepted: true) else { return nil }
+        return error.code
     }
 
     var message: String {
         switch self {
+        case .notSubmitted(let reason): return reason
         case .failed(let detail):
             return "Sky Studio job: \(detail.message) " + (detail.billing?.message
                 ?? "Billing is not confirmed; query the original job and do not regenerate automatically.")

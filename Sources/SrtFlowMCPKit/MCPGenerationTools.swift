@@ -15,63 +15,66 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Generate media, lipsync or transparent cutouts with Sky Studio credits (key required). Read get_status models=true \
-                for ids, controls and input limits. Drafts: lowest image tier (Nano 2 1K, Seedream 2K), video 720p-class (H3 768p). \
-                ask_for_approval upgrades return needs_confirmation: ask the user, then repeat with confirm_token. full_access \
-                proceeds and notifies. The daily credit limit is a hard cap in both modes; exhaustion pauses with settings guidance. \
-                Use conversation-language questions/notices and localized mode names from get_settings section=ai. quote_only=true \
-                checks inputs/prices without generating. Images prefer Seedream for Asian subjects, Nano 2 otherwise; judge the subject. \
-                Video prefers MiniMax H3, Omni, Veo Fast, Seedance 2.0; quality=highest only for explicitly unrestricted quality. \
-                Explicit models override preferences. image_to_video frames use image/last_image; multimodal uses reference arrays. \
-                lipsync: HeyGen video+audio, H3 Max image+audio; omit prompt. Cutouts: image operation=remove_background. Wan accepts \
-                document or web_url. Use one idempotency_key per operation; wait with get_job. Query original jobs and billing after failures. Unknown outcomes or delivery failures must recover the original; \
-                terminal generation failures with confirmed refund/no-charge evidence may use a new operation under permissions/budgets. Provider-successful output stays charged through delivery failures; \
-                only billing proves refunds. Results stay in the library; add_clips imports actual files. Narration: add_voiceover; \
-                subtitles: generate_subtitles. Music defaults instrumental/auto length; effects 5s. cancel_job attempts queued cancellation.
+                Generate media, lipsync or cutouts with Sky Studio credits. Read get_status models=true for controls and limits. \
+                Official film: get_status film_contract=true describes prepare/quote/review/submit in an owned saved project. \
+                Stable idempotency_key required; expired/changed quotes need new review. \
+                quote_only never uploads/reserves. Drafts: lowest image tier, 720p-class video. ask_for_approval upgrades return \
+                needs_confirmation: ask then repeat with confirm_token. full_access proceeds/notifies; both obey the hard daily credit limit. \
+                Use conversation-language notices. Image preferences: Seedream for Asian subjects, Nano 2 otherwise. Video: MiniMax H3, \
+                Omni, Veo Fast, Seedance 2.0. quality=highest requires unrestricted quality. image_to_video uses image/last_image; multimodal \
+                uses arrays. Lipsync omits prompt; cutouts use image operation=remove_background. Wait with get_job. Unknown/delivery \
+                failures recover the original, never replay. Confirmed refunded terminal failures may start a new approved operation. \
+                Successful output stays charged; only billing proves refunds. Results stay in the library; add_clips imports them. \
+                Narration: add_voiceover; subtitles: generate_subtitles. cancel_job attempts queued cancellation. Preflight is not output acceptance.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
+                    "prepare_references": MCPSchema.boolean("Prepare render/upload images; omit film/quote_only/tokens. get_job returns render/assets. No quote/reservation."),
+                    "prepared_references": MCPSchema.string("Local real-asset token; repeat exact image paths/roles. Account/project/file changes invalidate it."),
+                    "film": MCPSchema.object([:], description: "Strict public original-film story; full schema: get_status film_contract=true."),
+                    "quote_token": MCPSchema.string("Official quote token; unchanged submit plus explicit seam_review."),
+                    "seam_review": MCPFilmSchema.review,
                     "prompt": MCPSchema.string("Required for generators; omit for lipsync/cutouts."),
-                    "operation": MCPSchema.string("Image: generate (default) or remove_background; choose a matching catalog model.", oneOf: ["generate", "remove_background"]),
-                    "idempotency_key": MCPSchema.string("Stable operation key, 1-128 characters. Reuse after lost answers; bind unchanged inputs."),
-                    "video": MCPSchema.string("Local source video for lipsync; HeyGen accepts MP4/WebM per catalog."),
-                    "audio": MCPSchema.string("Local replacement MP3/WAV for lipsync; measured duration is used for /quote."),
+                    "operation": MCPSchema.string("Image operation; matching model required.", oneOf: ["generate", "remove_background"]),
+                    "idempotency_key": MCPSchema.string("Stable key, 1-128 chars; reuse unchanged after lost answers."),
+                    "video": MCPSchema.string("Local lipsync video; catalog formats."),
+                    "audio": MCPSchema.string("Local lipsync MP3/WAV; measured for quote."),
                     "document": MCPSchema.string("Wan: local document, exclusive with web_url."),
                     "web_url": MCPSchema.string("Wan: public HTTP(S) page, exclusive with document."),
-                    "model": MCPSchema.string("Public id from get_status models=true; omitted uses compatible preferences."),
-                    "image_context": MCPSchema.string("Image subject context; default other (mixed/unclear included).", oneOf: ["asian", "other"]),
-                    "quality": MCPSchema.string("Video: standard default; highest only for explicitly unrestricted quality.", oneOf: ["standard", "highest"]),
-                    "input_mode": MCPSchema.string("Video input mode; inferred from references when omitted.", oneOf: ["frames", "multimodal"]),
+                    "model": MCPSchema.string("Public model id; default compatible preference."),
+                    "image_context": MCPSchema.string("Subject context; default other, including mixed/unclear.", oneOf: ["asian", "other"]),
+                    "quality": MCPSchema.string("Video quality; highest requires unrestricted request.", oneOf: ["standard", "highest"]),
+                    "input_mode": MCPSchema.string("Video mode; default inferred.", oneOf: ["frames", "multimodal"]),
                     "image": MCPSchema.string("Local first frame, image reference, lip-sync portrait or cutout input."),
                     "last_image": MCPSchema.string("Optional final frame with image, in frames mode."),
                     "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references."),
-                    "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV file path."), "Ordered video references; limits from catalog."),
-                    "reference_audio": MCPSchema.array(of: MCPSchema.string("MP3/WAV file path."), "Ordered audio references; compatibility from catalog."),
+                    "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV path."), "Ordered videos; catalog limits."),
+                    "reference_audio": MCPSchema.array(of: MCPSchema.string("MP3/WAV path."), "Ordered audio; catalog limits."),
                     "auto_fallback": MCPSchema.boolean("Deprecated; false only. Automatic model replacement is disabled."),
-                    "duration": .object(["description": "Seconds from the model catalog; Wan also accepts null or auto for smart duration.",
+                    "duration": .object(["description": "Catalog seconds; Wan also null/auto.",
                         "anyOf": .array([["type": "number"], ["type": "string", "enum": ["auto"]], ["type": "null"]])]),
                     "title": MCPSchema.string("HeyGen: optional label; catalog character limit."),
-                    "enable_caption": MCPSchema.boolean("HeyGen: default false; provider may still return captions, no guaranteed burn-in."),
-                    "enable_dynamic_duration": MCPSchema.boolean("HeyGen: false default; native length checks still apply."),
+                    "enable_caption": MCPSchema.boolean("HeyGen: false default; captions/burn-in not guaranteed."),
+                    "enable_dynamic_duration": MCPSchema.boolean("HeyGen: false; native length limits apply."),
                     "disable_music_track": MCPSchema.boolean("HeyGen: omit provider music, default false."),
                     "enable_speech_enhancement": MCPSchema.boolean("HeyGen: enhance speech, default false."),
                     "start_time": MCPSchema.number("HeyGen: processing start in source seconds; default beginning.", minimum: 0),
-                    "end_time": MCPSchema.number("HeyGen: end > start, within source; no promised billing discount.", minimum: 0),
+                    "end_time": MCPSchema.number("HeyGen: start < end <= source length; no billing discount.", minimum: 0),
                     "enable_transcription": MCPSchema.boolean("H3 Max: false default follows waveform; true uses transcription."),
-                    "enable_prompt_expansion": MCPSchema.boolean("Wan: default true; required for document/page."),
+                    "enable_prompt_expansion": MCPSchema.boolean("Wan: true; required for document/page."),
                     "enable_thinking": MCPSchema.boolean("Wan: omitted is automatic; document/page requires true."),
                     "enable_safety_checker": MCPSchema.boolean("Safety toggle, true default; disabling needs provider authorization."),
                     "sync_mode": MCPSchema.boolean("Cutout: false default; still returns async job/durable PNG."),
-                    "seed": MCPSchema.number("Optional integer random seed within the model catalog range."),
-                    "resolution": MCPSchema.string("Output size; default lowest image tier or 720p-class video. Higher tiers follow approval mode."),
+                    "seed": MCPSchema.number("Integer seed in catalog range."),
+                    "resolution": MCPSchema.string("Default lowest image tier/720p-class video; upgrades follow approval mode."),
                     "quote_only": MCPSchema.boolean("true: validate and quote only, no uploads, generation, reservation or charge."),
-                    "approval_scope": MCPSchema.string("Default once. Use project only if the user explicitly approves this model/specification and per-task price ceiling for the project.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("Set true ONLY when the user explicitly requested these exact model/specification overrides, so do not ask twice. Never set for the assistant's own plan. Does not bypass budgets or settings-change confirmation."),
+                    "approval_scope": MCPSchema.string("Default once; project requires explicit approval of this spec and per-task ceiling.", oneOf: ["once", "project"]),
+                    "user_requested_overrides": MCPSchema.boolean("true ONLY for the user's explicit exact overrides, never the assistant's plan. Budgets/settings confirmation still apply."),
                     "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
                     "generate_audio": MCPSchema.boolean("Video audio toggle, only when offered by model."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "lyrics": MCPSchema.string("Music only, with instrumental=false: the words to sing."),
-                    "name": MCPSchema.string("A short file name (default: made from the prompt)."),
+                    "name": MCPSchema.string("File name; default from prompt."),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["kind"]),
                 openWorld: true
