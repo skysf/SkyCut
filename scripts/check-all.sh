@@ -2,17 +2,20 @@
 # 全部自检的聚合入口：一条命令跑完 SrtFlowCoreChecks + 所有 check 脚本 + 扫描守卫。
 # 任何一项红 → 整体退出码非 0；单项失败不中断，一次跑完看全貌。
 #
-# 改完代码、发 PR 前跑它；CI 在每个 PR 上也跑同一个脚本
-# （.github/workflows/checks.yml），只是按下面的 `shard` 分成几组，分到几台 runner 上
-# 并行跑（仓库是公开的，macOS runner 免费；分组的理由和实测见
-# docs/build/build-and-packaging.md「CI」一节）。GUI 冒烟（真窗口）自动化够不着，
+# CI 在每个 PR 上全跑这个脚本（.github/workflows/checks.yml），只是按下面的 `shard` 分成几组，
+# 分到几台 runner 上并行跑（仓库是公开的，macOS runner 免费；分组的理由和实测见
+# docs/build/build-and-packaging.md「CI」一节），绿了才合。本地改完代码跑 scripts/check-local.sh
+# <和改动直接相关的检查> 就行（2026-11-04 用户定：本地全跑满载十几到三十分钟、笔记本烫；每一项照样在 CI 上跑，
+# 步骤一样不少）。想在本地全跑也可以，入口还是这一个。GUI 冒烟（真窗口）自动化够不着，
 # 不在此列 —— 见 docs/testing/gui-smoke-testing.md。
 #
 # 用法：
-#   scripts/check-all.sh                     # 全部（本地就这么跑）
+#   scripts/check-all.sh                     # 全部（本地也能这么跑，不再要求）
 #   scripts/check-all.sh --shard 2 --of 5    # 只跑第 2 组（CI 用；--of 必须等于下面声明的组数）
 #   SRTFLOW_FFMPEG=/path/to/ffmpeg scripts/check-all.sh   # 用别处的 ffmpeg
 set -euo pipefail
+# 在 Rosetta 下被起来的就换成原生 arm64 重跑自己（下面每一项都跟着原生跑），见 scripts/native-arch.sh。
+. "$(dirname "$0")/native-arch.sh"
 # 下面要回头读本文件里声明的分组；先记下绝对路径（cd 之后相对的 $0 可能就不对了）。
 SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/.."
@@ -178,6 +181,7 @@ run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-buil
 run_check "client-config-backup（扫描守卫：连接 AI 客户端时配置的备份和原文件同样的权限）" checks/client-config-backup.sh
 run_check "ci-build-cache-key（扫描守卫：CI 的 .build 缓存 key 带检出目录，仓库改名后不捡旧目录编的缓存）" checks/ci-build-cache-key.sh
 run_check "ci-docs-only（CI 的「只改了文档」快速通道只在真的只改了文档时走，重活都看判断的结论）" checks/ci-docs-only.sh
+run_check "native-local-checks（扫描守卫：本地跑检查的入口都换成原生 arm64、起检查用 /bin/bash）" checks/native-local-checks.sh
 run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
 run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
 run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
