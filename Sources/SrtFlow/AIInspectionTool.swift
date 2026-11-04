@@ -130,7 +130,8 @@ enum AIInspectionTool {
             "limitations": .array(Array(Set(limitations)).sorted().map { .string($0) }),
             "note": "Suspects only, not proof of defects. Pictures are sampled (0.5 s spacing, up to 120); brief flashes may be missed. Source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Transcripts are cache-only; no automatic edits. Auditions last this session."
         ]
-        return AILookTool.finish(&payload, frames: frames, size: .medium, wantsImage: image)
+        // 没有疑点就没有截图请求；仅在实际请求证据后失败才报告画不出来。
+        return AILookTool.finish(&payload, frames: frames, size: .medium, wantsImage: image && !wanted.isEmpty)
     }
 
     private static func cuts(

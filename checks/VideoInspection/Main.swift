@@ -107,6 +107,24 @@ import SrtFlowMCPKit
             require(fileJob.status == .done && detail["inspected"]?.stringValue?.hasSuffix("rendered.mp4") == true,
                     "export file inspection completes with the actual file")
             require(detail["findings"]!.arrayValue!.contains { $0["kind"] == "black_frame" }, "actual export black interval is detected")
+            // 真实干净范围仍采样画面/测声音，但没有疑点，因此没有请求证据截图。
+            let cleanStart = try await AIInspectionTool.start(AIToolArguments(["from": 5, "to": 6]), project)
+            let cleanJob = AIJobs.shared.job(cleanStart.payload["job_id"]!.stringValue!)!
+            await AIJobs.shared.wait(for: cleanJob, seconds: 30)
+            let cleanResult = try await AIExportTools.job(AIToolArguments(["job_id": .string(cleanJob.id)]))
+            require(cleanJob.status == .done && cleanResult.payload["coverage_complete"] == true,
+                    "clean range inspection completes its actual analysis")
+            require(cleanResult.payload["findings"]?.arrayValue?.isEmpty == true,
+                    "continuous bright picture and sound inside the clip produce no suspect")
+            require(cleanResult.payload["screenshot_times"]?.arrayValue?.isEmpty == true && cleanResult.images.isEmpty,
+                    "no suspect requests no evidence screenshot")
+            require(cleanResult.payload["image"] == nil,
+                    "no requested evidence does not falsely report a drawing failure")
+            // look 仍要如实报告确实要求了图片却没拿到帧；不能在共用拼图层吞掉失败。
+            var missingPayload: [String: JSONValue] = [:]
+            let missing = AILookTool.finish(&missingPayload, frames: [], size: .medium, wantsImage: true)
+            require(missing.payload["image"]?.stringValue?.contains("could not draw") == true,
+                    "a requested but unavailable picture retains its failure notice")
             let cancelStart = try await AIInspectionTool.start(args, project)
             let cancelled = AIJobs.shared.job(cancelStart.payload["job_id"]!.stringValue!)!
             AIJobs.shared.cancel(cancelled)
