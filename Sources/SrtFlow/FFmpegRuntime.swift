@@ -44,7 +44,7 @@ struct FFmpegRuntime: Sendable {
 
     /// 定位结果。「找不到」和「找到了但被系统拦下」要分开报，因为后者的解决办法
     /// 完全不同，而且用户光看错误信息根本猜不到。
-    enum Lookup {
+    enum Lookup: Sendable {
         case found(FFmpegRuntime)
         /// 包内的 ffmpeg 存在，但带着下载隔离标记、执行即被杀。
         case blockedByQuarantine(bundlePath: String)
@@ -72,7 +72,7 @@ struct FFmpegRuntime: Sendable {
         return .missing
     }
 
-    private static func candidates() -> [(URL, Source)] {
+    static func candidates() -> [(URL, Source)] {
         var result: [(URL, Source)] = []
 
         if let override = ProcessInfo.processInfo.environment["SRTFLOW_FFMPEG"], !override.isEmpty {
@@ -98,17 +98,21 @@ struct FFmpegRuntime: Sendable {
             result.append((URL(fileURLWithPath: path), .system))
         }
 
-        return result
+        // override / 包内 / 向上查 vendor 可能指同一路径；失败也只花一次探测预算，保留第一次的来源优先级。
+        var seen: Set<String> = []
+        return result.filter { seen.insert($0.0.standardizedFileURL.path).inserted }
     }
 
-    private static func probe(url: URL, source: Source) -> FFmpegRuntime? {
-        guard let version = runCapturingOutput(url: url, arguments: ["-hide_banner", "-version"]),
+    static func probe(url: URL, source: Source, timeout: TimeInterval = FFmpegRuntimeProbe.timeout) -> FFmpegRuntime? {
+        guard timeout.isFinite, timeout > 0, timeout <= 60 else { return nil }
+        let deadline = DispatchTime.now() + timeout
+        guard let version = FFmpegRuntimeProbe.output(url: url, arguments: ["-hide_banner", "-version"], deadline: deadline),
               let versionLine = version.split(separator: "\n").first.map(String.init),
               versionLine.contains("ffmpeg version") else { return nil }
 
         // 必须按实际滤镜列表判断，不能只看 configuration 里的 --enable-libass：
         // 某些构建的 configuration 行并不完整。
-        let filters = runCapturingOutput(url: url, arguments: ["-hide_banner", "-filters"]) ?? ""
+        guard let filters = FFmpegRuntimeProbe.output(url: url, arguments: ["-hide_banner", "-filters"], deadline: deadline) else { return nil }
         let hasLibass = filters.contains(" subtitles ")
 
         return FFmpegRuntime(
@@ -118,24 +122,6 @@ struct FFmpegRuntime: Sendable {
             hasLibass: hasLibass,
             versionLine: versionLine
         )
-    }
-
-    private static func runCapturingOutput(url: URL, arguments: [String]) -> String? {
-        let process = Process()
-        process.executableURL = url
-        process.arguments = arguments
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = FileHandle.nullDevice
-        process.standardInput = FileHandle.nullDevice
-        do {
-            try process.run()
-        } catch {
-            return nil
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        process.waitUntilExit()
-        return String(data: data, encoding: .utf8)
     }
 
     // MARK: - 读 Mach-O 头判断架构
@@ -214,15 +200,15 @@ final class MediaToolchain: ObservableObject {
 
     static let shared = MediaToolchain()
 
+    private var resolutionTask: Task<Void, Never>?
+
     private init() {}
 
     func resolveIfNeeded() {
-        guard isResolving, runtime == nil else { return }
-        Task {
-            // 探测要起两个子进程，挪到后台线程去做。
-            let lookup = await Task.detached(priority: .userInitiated) {
-                FFmpegRuntime.locate()
-            }.value
+        guard isResolving, runtime == nil, resolutionTask == nil else { return }
+        resolutionTask = Task {
+            // 同步登记在飞任务后才 await；阻塞探测只能去已有普通线程队列，不能用 Task.detached。
+            let lookup = await MediaReadQueue.run(on: MediaReadQueue.analysis) { FFmpegRuntime.locate() }
             switch lookup {
             case .found(let located):
                 self.runtime = located
@@ -232,6 +218,7 @@ final class MediaToolchain: ObservableObject {
                 break
             }
             self.isResolving = false
+            self.resolutionTask = nil
         }
     }
 

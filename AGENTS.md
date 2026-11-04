@@ -152,6 +152,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | **优化媒体**（`Sources/SrtFlow/OptimizedMedia/`：关键帧间隔的探测 `MediaInfo.keyframeInterval`、解码速度、判据、缓存、转一块、协调者 `OptimizedMediaCoordinator`、换源表 / 顺序）、**builder 插画面（`CompositionClipInsert`）**、预览重建传 `proxies` 的那一处、预览工具条的「优化媒体 / 原片」（`OptimizedMediaMenu`）、`MediaReadQueue.proxy`、**设置里的「优化媒体」一节（`OptimizedMediaCacheSettings` / `OptimizedMediaSettingsSection`：占用 / 上限 / 清空）、启动时的过期扫描、转不了的提示** | [优化媒体](docs/architecture/optimized-media.md)（只转长 GOP 且按这台机器算；原分辨率 4K 减半；H.264 0.5 秒关键帧无 B 帧只有画面、**经视频合成读、块的轨从块头盖到块尾**；源时间 10 秒一块；缓存按路径找按身份认、改参数要 +1 版本、10 GB LRU；读和编只在 MediaReadQueue 上；**换源只换画面不动时间账、格子相加正好、差一块退回原片；只在停着时换、某段的块齐了才换、最多 3 秒一次；先转播放头附近的；成片 / 预渲染 / AI 看永远原片；菜单只订阅协调者；性能台架量原片；第 16 条：清空之后紧跟 `reset()` + `scheduleRebuild()`、`removeAll` 只许设置那一节的模型调；上限十进制几档、键只经 Store、改小当场 enforce；启动时 proxy 队列上过期；转不了的只在菜单里标、不进提示条**）、[方案](docs/plans/2026-10-01-video-optimized-media.md)、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md)、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) 第十四节 |
 | 波形显示、深度缩放（缩放上限、标尺刻度、缩略图、超宽内容的绘制） | [波形与深度缩放](docs/architecture/audio-waveform.md)、[捏合缩放](docs/architecture/timeline-pinch-zoom.md)、[拖动手势](docs/architecture/timeline-drag-gestures.md) §5、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md) |
 | `AVAssetReader` 读采样（`copyNextSampleBuffer`），以及在 async 函数 / `Task` 里做任何会卡住线程的事（等信号量、同步 IO、等子进程） | [阻塞的媒体读取](docs/architecture/blocking-media-reads.md)、[缩略图和波形全空](docs/bugfixes/2026-09-23-waveform-decode-deadlocks-thread-pool.md) |
+| 引擎定位与短探测（`FFmpegRuntime` / `FFmpegRuntimeProbe` / `MediaToolchain`） | [阻塞的媒体读取](docs/architecture/blocking-media-reads.md)「引擎启动探测」（单候选共享截止时间、双输出总量、父进程独占回收、单次定位任务），[后台引擎探测卡住](docs/bugfixes/2026-11-04-engine-probe-hangs.md) |
 | 音量曲线（段上的音量自动化）、轨道推子 / 总推子、电平表（引擎的槽 `MeterSlot`） | [音量曲线](docs/architecture/audio-volume-curve.md)、[推子与电平表](docs/architecture/audio-mixer.md)（第三节：峰值从渲染块来、总表从混音器出口来、槽按键登记、界面每拍取走）、[播放中按 Return 崩溃](docs/bugfixes/2026-09-26-meter-crash-on-go-to-start.md)、[声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[声音编辑方案](docs/plans/2026-09-23-audio-mixing.md)、[一条轨上换了音频格式](docs/bugfixes/2026-09-23-meter-tap-dies-on-audio-format-change.md) |
 | Inspector 数值框、拖调、Transform 写入、检查器里的滑杆行（`labelledSlider` / `InspectorSliderRow`，右边的数值框能打字）、「Shows for」、**Transform 区的关键帧 ‹ ◇ › 和「曲线」菜单** | [Inspector 数值框合同](docs/architecture/inspector-scrub-number-field.md)（滑杆行的数值框：打字提交要立刻 `endLiveEdit`）、[关键帧动画](docs/architecture/keyframe-animation.md)「交互约定」（曲线菜单按播放头所在那一段） |
 | 往检查器里加任何一行（标题 + 控件、下拉、滑杆行） | [检查器的排版](docs/architecture/inspector-layout.md)（固定窄栏，一行不许比它宽；菜单 Picker 不许 `.fixedSize()`）、[声音场景那一行把检查器撑宽](docs/bugfixes/2026-09-24-sound-scene-row-widens-inspector.md) |
@@ -181,6 +182,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 ## 构建与检查入口
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](docs/architecture/export-settings.md)与[子进程退出](docs/architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
+
+- 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](docs/architecture/blocking-media-reads.md)「引擎启动探测」。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
@@ -627,6 +630,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-04 后台引擎短探测无限等待且重复启动](docs/bugfixes/2026-11-04-engine-probe-hangs.md) — 原生短探测共享截止时间与输出上限、唯一父进程回收；定位移入媒体队列并合并重复入口，原生合成守卫与隔离反向证据。
 - [2026-11-04 官方配方收费前拒绝，本机预留未释放](docs/bugfixes/2026-11-04-official-recipe-rejection-reservation.md) — 精确未准入错误与一般 503 分开；本机预留、持久拒绝证据和只查原单恢复；假 HTTP、回执反向检查与后台 MCP 验收。
 - [2026-11-04 官方镜头等待名额后仍使用旧提交条件](docs/bugfixes/2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 前复核账户 / 工程 / 文件 / 有效期；已知原单与矛盾收费证据不能被满额错误码覆盖。
 - [2026-11-04 查原任务时未核对回答中的任务号](docs/bugfixes/2026-11-04-sky-studio-poll-identity.md) — GET 原单在 API 边界验证响应任务号；错误回答不得先改内存身份或账务再由回执拒绝。

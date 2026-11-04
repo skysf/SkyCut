@@ -97,6 +97,7 @@ shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
 run_check "video-inspection（成片疑点、真实混音/画面/字幕与试听证据）" scripts/check-video-inspection.sh
 run_check "export-profile（实际阶段计时、审阅预设、排队/取消与 PNG 仅解码一次）" scripts/check-export-profile.sh
+run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
 run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
