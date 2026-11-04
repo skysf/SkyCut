@@ -126,6 +126,8 @@ auto 画布受远处首镜尺寸影响，不能只比较 `.auto` 枚举。
 漂移、量化容差与回退，以及抽帧前源窗、源文件 / PNG 身份。`upright_source` 是摆正后的原片，
 不含上层画面 / 字幕；最终接缝仍须 `look` 时间线合成。旧 freeze 缺少原生 metadata 时不能事后补写。
 来源 metadata 可回传且没有签名；时间 / 文件 / 角色一致不等于不可伪造凭证或自动视觉认证。
+当前边缘请求与原生取样共用 nearest-600 量化，半帧漂移和精确半开源窗仍分别校验。
+旧截断请求不匹配当前边缘时必须重新抽取，不能改写旧 requested / actual / flags 为新证据。
 
 `expected_snapshots.shots[].source_geometry` 回读准确的源路径、in / out / duration、速度、摆放、fps，
 以及 `first_project_time` / `last_project_time`。它们是共用全局帧格的请求位置，不能称为已解码 actualTime；
