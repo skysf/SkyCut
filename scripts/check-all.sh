@@ -122,6 +122,7 @@ run_check "blocking-media-reads（扫描守卫）" checks/blocking-media-reads.s
 run_check "export-audio-single-pipeline（扫描守卫：成片的声音就是预览那份混音）" checks/export-audio-single-pipeline.sh
 run_check "export-watermark-wiring（扫描守卫：加不加水印只问 WatermarkPolicy、叠在烧字幕之后缩小之前）" checks/export-watermark-wiring.sh
 run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
+run_check "film-production-wiring (authoring, authority and metadata-only evaluation)" checks/film-production-wiring.sh
 run_check "docs-index-drift（扫描守卫）" checks/docs-index-drift.sh
 run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在词表里）" checks/sfx-catalog.sh
 run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
@@ -164,6 +165,7 @@ run_check "optimized-media（优化媒体：判据、关键帧间隔、解码速
 run_check "cloud-media（共用每日额度、按天账与任务阶段）" scripts/check-cloud-media.sh
 run_check "upscale（视频 upscale 的任务：范围、Sky Studio 的档位和上限、起名、封回原声、真裁一段、流水线对着假 Sky Studio 走全程）" scripts/check-upscale.sh
 run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
+run_check "film-production (public plans, persisted evidence, sound and native anchors)" scripts/check-film-production.sh
 # 真跑好几遍 ffmpeg 导出，全场最慢的一项（CI 上约 45 秒），配的伙伴最少。
 run_check "export-frame-rate（生产导出滤镜：帧率 + 拼接链 + 分辨率）" scripts/check-export-frame-rate.sh
 

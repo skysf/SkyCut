@@ -151,7 +151,7 @@ forbid "剪辑块不许自己写 peek（所有者是时间线容器）" \
 # 分割从旧段构造新段，漏抄字段的坑踩过（isHidden / remoteKey）—— 来源记录要抄给右半；存盘要给原片配书签
 #（换回去时找得到）但原片不进 mediaURLs（删了不亮缺素材）；重链接要把记录里的原片路径一起改。
 # 行首锚定：注释掉的那一行不算（反向验证时逮到的：不锚的话 `// right.upscale = …` 也能让守卫绿）。
-require "分割把 upscale 的来源抄给右半" Sources/SrtFlow/VideoEditTimelineEdits.swift '^ +right\.upscale = left\.upscale$'
+require "分割把 upscale 的来源抄给右半" Sources/SrtFlow/TimelineClipSplit.swift '^ +right\.upscale = left\.upscale$'
 require "存盘给 upscale 的原片也配书签" Sources/SrtFlow/VideoEditProjectFile.swift '^ +let media = \(timeline\.mediaURLs \+ timeline\.upscaleOriginalURLs\)'
 require "重链接把记录里的原片路径一起改" Sources/SrtFlow/VideoEditMediaReferences.swift '^ +if clip\.upscale\?\.originalURL == old'
 forbid "分离出来的音频不带 upscale 的记录（它留在原片上）" Sources/SrtFlow/VideoEditAudioFade.swift 'upscale'

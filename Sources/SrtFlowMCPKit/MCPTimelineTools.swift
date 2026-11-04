@@ -83,13 +83,12 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .freezeFrame, title: "Freeze frame",
                 description: """
-                Hold the picture: the clip is cut at that moment and a still of that frame is inserted for duration \
-                seconds (default 2); later clips on the same track move right by that much (Linkage on: what sits on them \
-                follows; off: other tracks stay). Without clip_id it freezes the V1 clip at that time. Not for \
-                audio, images, hidden clips, or a moment \
-                inside a V1 transition. The still is a PNG next to the project. To end on a clip's last frame, give a time \
-                inside that frame: a leftover shorter than one frame is dropped, a longer one keeps playing after the still \
-                (tail_id in the result).
+                Freeze a video frame for duration (default 2s), shifting later clips on its track. Linkage on: linked content \
+                follow; off: other tracks stay. Default clip: V1 at time. Refuses audio, images, hidden clips and V1 transitions. \
+                PNG is saved next to the project. At the last used frame, a remainder shorter than one frame is dropped; \
+                longer tails resume afterward (tail_id). source_frame reports native requested/actual CMTime, half-open \
+                used source window and source/PNG identities: upright_source, excluding composites. Incomplete or \
+                out-of-window evidence cannot be a production anchor.
                 """,
                 input: MCPSchema.object([
                     "time": MCPSchema.number("Timeline time of the frame to hold.", minimum: 0),

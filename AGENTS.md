@@ -183,6 +183,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](docs/architecture/export-settings.md)与[子进程退出](docs/architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
 
+- 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](docs/architecture/official-film.md)。
+
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](docs/architecture/blocking-media-reads.md)「引擎启动探测」。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
@@ -576,7 +578,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md) — 2026-10-01 用户拍板：播放跟随是开关、默认关（关着播放头走出视口、停下不滚回；开着翻页式，`PlayheadFollow` 纯值、只碰横向；Return 回到开头照旧滚回最左）；磁吸 / 吸附 / 联动（2026-10-02 起默认开）/ 播放跟随四个工具栏开关和剪辑页字幕列表的跟随按钮都记在 UserDefaults，键、默认值、读写只有 `EditorToggles` 一份（默认值的字面量就是产品口径）；冒烟 / 性能场景起手永远默认值、拨了不落盘；加一个记住的开关怎么做；人工回归。
 - [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — local NSEvent monitor 与失败方案、**锚点**（捏合钉指针底下那一刻、工具栏钉播放头，滚动视图只从 `TimelineScrollGeometry` 拿、`keepAnchored` 同一拍挪 + 下一轮补挪）、**纵向缩放**（⌥ 捏合 / ⌥ + Ctrl + 滚轮 / ⌘↓ ⌘↑，视频和音频轨统一成一个高度、细行不变、按行认锚点）、人工回归清单。
 - [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 能拷什么（标记、转场跟着段走）、入口（编辑菜单在响应链末端、右键菜单是函数不是视图）、系统剪贴板一套自己的类型且不写纯文本（滤镜那套并进来了）、落点鼠标优先否则播放头（右键菜单用右键按下的那一处）、换新身份走编码往返、各类落到哪（剪辑整组同轨、撞上往上抬、画面组上下关系不变；文字 / 滤镜往上找空的；字幕句按指着的轨）、粘完选中且一步撤销、剪切 = 拷贝 + ⌫、人工回归清单。
-- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式（版本表到 v32）、定位、脏标记与自动保存、换成 upscale 文件的段（四之五：原片配书签不进 mediaURLs、换源 = 源时间整体平移、分割要抄记录）。
+- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式（版本表到 v34）、定位、脏标记与自动保存、换成 upscale 文件的段（四之五：原片配书签不进 mediaURLs、换源 = 源时间整体平移、分割要抄记录）。
 - [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、刷新、吸附、唯一落点算法，
   **对齐线**（§4：对齐点含字幕 cue / 标记 / 藏起来的段、多选只看整组外沿、磁吸也亮线、裁切也吸按 FCP、吸附关了线也不亮），
   **拖动 / 拉框的会话不进时间线的 `@State`**（§0b：`TimelineDragBox` 持有不订阅、块只 `onReceive`
@@ -630,6 +632,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-04 定格拒绝首个使用帧](docs/bugfixes/2026-11-04-freeze-rejects-first-used-frame.md) — 定格专用有限半开区间、段首前插保留完整原段、内部切分共用纯值体；普通分割余量与现有联动规则保留，反向守卫及实际 MCP 回归。
+- [2026-11-04 换 Key 后旧模型目录回填](docs/bugfixes/2026-11-04-catalog-cache-key-change.md) — 缓存失效 epoch 同时拦迟到写回和迟到清理后继请求；真实 API 注入回归与隔离反向。
 - [2026-11-04 成片检查没有疑点却报告绘图失败](docs/bugfixes/2026-11-04-inspection-empty-evidence.md) — 分析取样与疑点截图分开，只有实际请求证据却取不到图才报绘图失败；真实工具干净区间与缺图回归。
 - [2026-11-04 后台引擎短探测无限等待且重复启动](docs/bugfixes/2026-11-04-engine-probe-hangs.md) — 原生短探测共享截止时间与输出上限、唯一父进程回收；定位移入媒体队列并合并重复入口，原生合成守卫与隔离反向证据。
 - [2026-11-04 官方配方收费前拒绝，本机预留未释放](docs/bugfixes/2026-11-04-official-recipe-rejection-reservation.md) — 精确未准入错误与一般 503 分开；本机预留、持久拒绝证据和只查原单恢复；假 HTTP、回执反向检查与后台 MCP 验收。

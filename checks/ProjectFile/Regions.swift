@@ -15,7 +15,7 @@ func checkSourceRegions(_ root: URL) throws {
     check(!TimelineState().requiresFormatVersion33, "没有精确区域不是 v33-only 数据")
     try VideoEditProjectIO.save(state, to: file)
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
-    checkEqual(raw["formatVersion"] as? Int, 33, "reader / writer 必须升到 v33，旧版不得夹坏精确区域")
+    checkEqual(raw["formatVersion"] as? Int, 34, "reader / writer 必须升到 v34，旧版不得夹坏精确区域")
     let loaded = try VideoEditProjectIO.load(from: file)
     checkEqual(loaded.timeline.mainClips[0].crop, clip.crop, "四边大于 45% 的裁切存盘读回逐值不变")
     checkEqual(loaded.timeline.mainClips[0].id, clip.id, "精确区域不改片段身份")

@@ -1,4 +1,5 @@
 import Foundation
+import SrtFlowCore
 
 // 标记：轨道上的每一种块（素材段 / 文字 / 形状 / 滤镜段）和标尺都能打。纯值逻辑，
 // checks/ProjectFile 编进去做守卫。长期约束见 docs/architecture/clip-markers.md。

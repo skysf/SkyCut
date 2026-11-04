@@ -39,6 +39,21 @@ grep -q 'participatesInMainTransition' <<<"${ELIGIBLE_BODY}" && {
 }
 echo "✓ 定格准入条件：只禁叠化区，不禁整段"
 
+# 首帧准入必须接到真实入口，纯值插入通过不等于手动/MCP 都能到达它。
+python3 - <<'PY'
+from pathlib import Path
+
+source = Path('Sources/SrtFlow/VideoEditFreezeFrame.swift').read_text()
+eligible = source.split('func isFreezeEligible(', 1)[1].split('\n    }', 1)[0]
+target = source.split('func freezeTarget()', 1)[1].split('\n    }', 1)[0]
+tool = Path('Sources/SrtFlow/AIClipTools.swift').read_text().split('static func freeze(', 1)[1]
+assert 'FreezeFrame.contains(clip, at: time)' in eligible, 'Freeze eligibility must use the shared half-open rule'
+assert target.count('FreezeFrame.contains(') == 2, 'Selected/default manual targets must both accept the exact first frame'
+assert 'FreezeFrame.contains($0, at: time)' in tool, 'Default MCP V1 target must use the freeze-specific range'
+assert 'isFreezeEligible(current, at: request.cutTime)' in source, 'Commit must repeat complete freeze eligibility'
+print('✓ 定格首帧：手动/MCP 入口与提交前检查共用准入')
+PY
+
 echo "==> swift build ${ARCH_FLAG} --target SrtFlowCore（拿 SrtFlowCore 的模块和目标文件）"
 # SwiftPM 的编译诊断走 stdout：静默成功可以，失败必须倾倒完整输出
 #（>/dev/null 会把编译错误吞成无字天书，见 docs/bugfixes/ 2026-08-08 CI 首跑案例）。
@@ -94,6 +109,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditAnimation.swift \
   Sources/SrtFlow/VideoEditKeyframeEasing.swift \
   Sources/SrtFlow/VideoEditTimelineEdits.swift \
+  Sources/SrtFlow/TimelineClipSplit.swift \
   Sources/SrtFlow/FreezeSliver.swift \
   Sources/SrtFlow/VideoEditSubtitleDocuments.swift \
   Sources/SrtFlow/VideoEditTimelineLinkage.swift \
@@ -106,6 +122,7 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  checks/FreezeFrame/BoundaryChecks.swift \
   checks/FreezeFrame/main.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

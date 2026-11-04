@@ -347,6 +347,8 @@ do {
     checkClose(middle.mainClips[2].timelineStart, 11.99, "后面的段紧接在静帧后面（没留缝）")
 }
 
+checkFreezeBoundaries()
+
 print("\(checks - failures)/\(checks) 项通过")
 if failures > 0 {
     print("定格自检失败：\(failures) 项")

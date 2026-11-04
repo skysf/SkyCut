@@ -77,6 +77,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditClipMarker.swift \
   Sources/SrtFlow/VideoEditMarkerTargets.swift \
   Sources/SrtFlow/VideoEditTimelineEdits.swift \
+  Sources/SrtFlow/TimelineClipSplit.swift \
   Sources/SrtFlow/VideoEditClipUpscale.swift \
   Sources/SrtFlow/VideoEditClipUpscaleRecord.swift \
   Sources/SrtFlow/VideoEditMediaReferences.swift \

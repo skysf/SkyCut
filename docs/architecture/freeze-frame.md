@@ -5,6 +5,7 @@
 
 代码：`Sources/SrtFlow/VideoEditFreezeFrame.swift`（流程与 IO）、
 `Sources/SrtFlow/VideoEditTimelineEdits.swift`（纯值变换）。
+字段复制的纯值体由普通分割和定格共用 `TimelineClipSplit`。
 
 ## 1. 走图片素材的老管线，不写合成器
 
@@ -43,6 +44,14 @@
 - **单飞**：`VideoEditProject.isFreezing` 期间按钮置灰，连按 ⇧⌘F 不产生并发。
 
 ## 2a. 准入条件（`isFreezeEligible`，入口和 CAS 各跑一次）
+
+定格使用 `FreezeFrame.contains` 的有限半开范围 `[timelineStart, timelineEnd)`：
+段首可取，末端排除。手动目标、MCP 默认目标、入口/CAS 和插入都用同一判据。
+普通分割的 `EditClip.contains` 继续在两端留 1 毫秒，不得为定格改宽全局函数。
+精确段首直接在完整原段之前插静帧，保留原段 ID、源窗和字段，不造零长度左半，
+也不把完整短片当作 FreezeSliver。内部切点复用 `TimelineClipSplit`，只有真正切出的
+右半参与尾段删减；ripple 必须排除保留的左半，距起点不足 0.5 毫秒也不能把它误推。
+案例：[定格拒绝首个使用帧](../bugfixes/2026-11-04-freeze-rejects-first-used-frame.md)。
 
 不给定格的情形，每条都有硬理由：
 

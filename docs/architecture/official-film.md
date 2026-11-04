@@ -48,10 +48,12 @@ pin 只用来传输，不解密、不当作可编辑的配方；服务端保留�
    不生成、不报价、不预留。经原有读权限、媒体测量、模型限制及 `/uploads` 路径完成，异步结果用 `get_job` 取。
    结果给实际生效的公开 `prepared_render`，图片另有本机 `prepared_references` 令牌和实际 inputs，供当前 / 邻镜 render 使用。
    文生镜头也能无上传地准备规格；补上真实 context 即可先写权威制作计划，避免“必须先报价才知道该存什么规格”的循环。
-2. 重复原图片路径、角色与完整规格，带 `prepared_references`、`film`、`quote_only=true`。
+2. 用 `save_project.production` 和当前 `expected_revision` 保存精确的公开故事 / render 图与声音计划；
+   当前和邻镜的 context 均须真实声明。工程内有输出时，先按下节建立实际来源与必要帧锚点。
+3. 重复原图片路径、角色与完整规格，带 `prepared_references`、`film`、`quote_only=true`。
    报价不再上传，返回 `quote_token`、有效期、精确价格和左右 `seam_review`。无图片的文生镜头可以直接报价。
    pin 只存在 App 内存，不返回给 AI，不写工程、回执或日志。
-3. 阅读当前和邻镜的状态、render、cut、声音后，使用同一请求、`quote_token`、当前两侧指纹和稳定的
+4. 阅读当前和邻镜的状态、render、cut、声音后，使用同一请求、`quote_token`、当前两侧指纹和稳定的
    `idempotency_key` 提交。不能代替调用方自动填审查，不能自动刷新过期报价再花钱。
    草稿越档批准绑定这一份完整官方请求，不复用普通模型规格的宽泛项目批准；每日硬预算照旧生效。
 
@@ -90,7 +92,57 @@ pin 只用来传输，不解密、不当作可编辑的配方；服务端保留�
 只有没有任何受理 / 收费证据的明确满额拒绝可等待后用同 key 重试；已知 job_id 优先只查原单。
 已全额退款表示净收费为零，不表示从未准入，不能据此持久化“未提交”。
 
-## 六、验证与状态口径
+## 六、工程里的权威制作状态
+
+`TimelineState.production` 保存公开故事、完整有序镜头图、世界状态、已完成动作、声音 cue、
+实际输出绑定及观察记录。通过 `save_project {production, expected_revision}` 全量验证副本后，
+一次提交给本工程的撤销 / 自动保存；相同计划是 no-op，不推进版本、不增加撤销步骤。
+`expected_revision` 单独出现即拒绝，二者都省略仍是普通保存；`production:null` 用 CAS 明确清空。
+清空可处理版本仍可合法比较的损坏内容，不承诺恢复负数或溢出的坏版本。
+新写 render 需要已显式取得的有效公开目录；存盘不偷偷联网，已有计划的读取 / 原样保存支持离线。
+图中的邻镜 render、状态、bed 与 cut 必须对应实际权威镜头；改变声明时本镜修订准确加一。
+
+`get_timeline.production.plan` 是可回传的作者输入，`expected_snapshots` 与 `readiness` 是只读派生值。
+`output_binding` 绑定实际 UUID、源文件身份和使用几何；同 UUID 换源 / 裁切 / 移动 / 变速后，
+原样保存保留旧 binding，必须显式回传当前 `expected_snapshots.output_binding` 才能重新绑定。
+新选 clip_id 也不刷新旧观察。邻镜变化只废掉受影响接缝，未改本镜的源观察保留。
+撤销恢复完全相同的旧媒体和声明可以恢复匹配证据；降低版本号不能认证不同内容。
+
+输出观察包含早段 0/.25/.5/1/1.5/2 秒、实际用尾 1–2 秒、每个新增动作的转折和两侧合成接缝。
+请求按工程全局帧格裁入半开使用窗；动作样本至少跨一工程帧、映射到两个可用帧位置。
+这些是调用方已观察的声明，不是解码 actualTime 或机器动作识别；预检 seam_review 不替代输出观察。
+
+合成身份复用 builder 的排序 / 转场展开与 `TimelineRenderSize`，纳入实际借入画面、窗口内可见叠层、
+字幕和有效样式、实际画布尺寸。短中镜尾部出现第三镜借头时，第三镜变化也使该接缝过期；
+auto 画布受远处首镜尺寸影响，不能只比较 `.auto` 枚举。
+声音 cue 记录层次、注意目标、覆盖镜头、时间 / 时长、对应新动作或有目的静音及恢复点。
+对齐身份复用 `AudioEngineConfig` 的实际段落窗和 gain points，包含转场借音、静音、场景、曲线及推子。
+元数据路径不运行声音场景补偿测量，只绑定完整场景参数；占位值不代表已测响度。
+`measured_note` 与真正听辨后的 `listened_note` 分开，数值证据不自动变成听觉判断。
+
+### 原生帧锚点与历史输入
+
+`freeze_frame.source_frame` 保留原生 requested / actual CMTime 的整数、标度、epoch、flags、
+漂移、量化容差与回退，以及抽帧前源窗、源文件 / PNG 身份。`upright_source` 是摆正后的原片，
+不含上层画面 / 字幕；最终接缝仍须 `look` 时间线合成。旧 freeze 缺少原生 metadata 时不能事后补写。
+来源 metadata 可回传且没有签名；时间 / 文件 / 角色一致不等于不可伪造凭证或自动视觉认证。
+
+`expected_snapshots.shots[].source_geometry` 回读准确的源路径、in / out / duration、速度、摆放、fps，
+以及 `first_project_time` / `last_project_time`。它们是共用全局帧格的请求位置，不能称为已解码 actualTime；
+静图返回 null。不得从普通摘要的三位小数反推精确用窗。若 in / out 无法逐位重建原 duration，
+scratch 流程应明确拒绝；仅在准入允许的自有源上，可定格后单步 undo 恢复并核对原窗，再使用保留 PNG / metadata。
+转场保护等导致定格不准入时不能绕过，也不能改 metadata 或放宽半开窗来凑锚点。
+
+已绑定来源的帧模式再次报价时，first 来自 previous.last_used 或 current.first_used，last 来自
+current.last_used 或 next.first_used。实际 PNG 必须对应当前引用准备角色文件和上传 originals URL。
+无输出 bootstrap 与模型没有的角色不凭空增加要求；初版不伪造静图的原生视频时间。
+输出替换后保留历史 anchors，不偷偷改 render.inputs。`input_anchor_current` /
+`needs_refresh_for_regeneration` 与 `output_observations_current` 分开；新输出可以已观察，而旧生成输入需要重抽。
+
+计划不保存 pin、准备 / 报价令牌、密钥或私有配方 / 来源。收费回执在撤销之外；已知任务只 GET、
+未知无号禁止 POST、明确未提交的 key 退休。恢复先于当前计划校验，清空或改剧本不能阻止查原单。
+
+## 七、验证与状态口径
 
 纯值与假 HTTP 回归接入 `scripts/check-sky-studio.sh` 的 `FilmChecks` / `OfficialQuoteChecks`：
 严格字段、显式 context、动作累计、双侧邻镜、精确 cut、原创图片 URL 与首尾角色、报价和提交同一输入、

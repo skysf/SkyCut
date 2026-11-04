@@ -74,8 +74,9 @@ struct AudioEngineConfig: Sendable {
 
     static let empty = AudioEngineConfig(tracks: [], master: 1, duration: 0)
 
+    /// 制作身份只取段落/增益/scene 参数时传 measuringSceneCompensation=false，避免在 metadata 路径运行响度 DSP；占位1不代表已测补偿。
     /// `requested` 传**用户那一份**：这里自己排序、展开转场（和 builder 插画面同一份几何，展开只许一次）。
-    static func make(from requested: TimelineState) -> AudioEngineConfig {
+    static func make(from requested: TimelineState, measuringSceneCompensation: Bool = true) -> AudioEngineConfig {
         var state = requested
         state.sortMainClipsByStart()
         state = state.expandingTransitionHandles()
@@ -95,7 +96,7 @@ struct AudioEngineConfig: Sendable {
                 transitionBefore: index > 0 ? state.transitionOverlap(afterMainIndex: index - 1) : 0,
                 transitionAfter: state.transitionOverlap(afterMainIndex: index)
             )
-            if let segment = segment(for: clip, at: startsAt, fades: fades) { main.append(segment) }
+            if let segment = segment(for: clip, at: startsAt, fades: fades, measuringSceneCompensation: measuringSceneCompensation) { main.append(segment) }
         }
         tracks.append(Track(name: "main", meterKey: .track(.main), fader: Float(state.mainVolume), segments: main))
 
@@ -103,7 +104,7 @@ struct AudioEngineConfig: Sendable {
             var segments: [Segment] = []
             for clip in ClipVisibility.visible(lane.clips).sorted(by: { $0.timelineStart < $1.timelineStart })
             where !clip.needsStillConversion && clip.hasAudio && !clip.isMuted {
-                if let segment = segment(for: clip, at: clip.timelineStart, fades: clip.audioFades) {
+                if let segment = segment(for: clip, at: clip.timelineStart, fades: clip.audioFades, measuringSceneCompensation: measuringSceneCompensation) {
                     segments.append(segment)
                 }
             }
@@ -114,7 +115,7 @@ struct AudioEngineConfig: Sendable {
             var segments: [Segment] = []
             for clip in ClipVisibility.visible(lane.clips).sorted(by: { $0.timelineStart < $1.timelineStart })
             where !clip.isMuted {
-                if let segment = segment(for: clip, at: clip.timelineStart, fades: clip.audioFades) {
+                if let segment = segment(for: clip, at: clip.timelineStart, fades: clip.audioFades, measuringSceneCompensation: measuringSceneCompensation) {
                     segments.append(segment)
                 }
             }
@@ -130,7 +131,7 @@ struct AudioEngineConfig: Sendable {
 
     /// 一段的出声范围和增益。和 builder 的 `insert` 同一笔账：首帧定格留空、素材不够长在读的那一侧收口。
     /// 增益表的钉点（`previousEnd`）钉在段起点：引擎段外本来就没有声音（AudioGainTable.swift）。
-    private static func segment(for clip: EditClip, at: Double, fades: AudioFadeWindow) -> Segment? {
+    private static func segment(for clip: EditClip, at: Double, fades: AudioFadeWindow, measuringSceneCompensation: Bool) -> Segment? {
         let speed = max(0.05, clip.speed)
         let sourceDuration = clip.renderSourceDuration
         guard sourceDuration > 0.01 else { return nil }
@@ -142,7 +143,7 @@ struct AudioEngineConfig: Sendable {
         return Segment(
             clipID: clip.id, url: clip.sourceURL, start: start, end: start + sourceDuration / speed,
             sourceStart: clip.renderSourceStart, speed: speed, gain: table.sampler(),
-            scene: clip.soundScene, compensation: clip.soundScene.map(SceneLoudness.compensation(for:)) ?? 1
+            scene: clip.soundScene, compensation: measuringSceneCompensation ? (clip.soundScene.map(SceneLoudness.compensation(for:)) ?? 1) : 1
         )
     }
 }

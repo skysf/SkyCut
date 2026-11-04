@@ -371,6 +371,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 22. **定格（freeze_frame）**：和手动定格走同一个 `runFreeze`（准入、抽帧、PNG 放在工程旁边、提交前核对一样都不另写，
    [定格](freeze-frame.md) 末节）。AI 多给一个时长；抽帧转码要 await，所以把「提交那一下」交给定格去包：
    `project.freezeFrame(…) { body in AIUndoGrouping.step(undo, body) }`（`check-mcp.sh` 钉着）。不给 clip_id 时定格那一刻 V1 上的段。
+   结果的 source_frame 保留原生 requested / actual CMTime、用窗和源 / PNG 身份，scope 为 upright_source；
+   不认证最终合成接缝。普通定格可能返回未知身份或窗外标记，严格制作 anchor 必须拒绝这些证据。
    要收在一段的最后一帧上：定格点落在那一帧里，不到一帧的右半自动拿掉（[定格](freeze-frame.md) 第 4 节）；静帧后面还剩一截
    不到 1 秒的原片时，结果里带 `tail_id` 和一句「要收在静帧上就删它」（2026-09-29 验收实剪：AI 两次手动删尾巴）。
 
@@ -674,6 +676,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
     真人参考拒绝和未知状态不自动切模型或重交；退款晚到只查原单。替换是新的明确操作，重新核对完整参考、规格、报价及批准。
     官方原创短片的公开 `film`、真实引用准备、报价锁定和双侧审查见 [官方原创短片](official-film.md)；普通 `quote_only` 仍不上传。
+    `save_project.production` / `expected_revision` 原子作者提交一次本工程 undo；get_timeline 回传 plan、当前快照与派生待办。
+    普通保存不带这两项；单独带 expected_revision 拒绝，原样计划不增版本、不增加 undo。
+    官方 quote / 每次收费 POST 复核权威镜头、实际源 / 帧角色和声音身份；原单恢复早于计划校验。
+    完整制作 schema 按需由 film_contract 提供，常驻工具预算不扩张；状态详情和失效规则见上述合同。
     风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 旧版清单可能没有这个工具，当前清单始终列出，是否能消费在调用时核对；
     共用规矩第 11 条和每张卡的「Generated media」一节说了有它时能补什么、不能替什么（`RecipeChecks` 钉着：提到就得在条件句下、
     词表和结果字段名都得对得上）：

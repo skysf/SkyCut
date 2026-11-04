@@ -9,6 +9,7 @@ import time
 sys.dont_write_bytecode = True
 from official_client import Session, WORK, admitted, control, log, posts
 from official_story import story
+from production_smoke import author
 
 
 def key(label):
@@ -33,7 +34,9 @@ def prepare(session, base):
 
 
 def quote(session, base, prepared):
-    args = {**base, "film": story(prepared["inputs"], prepared["prepared_render"]), "prepared_references": prepared["prepared_references"]}
+    # 保存无输出的完整公开故事，再报价；真正输出审查由独立 production 场景承担。
+    film = author(session, base["project"], story(prepared["inputs"], prepared["prepared_render"]), prepared["prepared_render"])
+    args = {**base, "film": film, "prepared_references": prepared["prepared_references"]}
     mark, before = len(log()), session.spent()
     result = session.call("generate_media", {**args, "quote_only": True, "idempotency_key": key("quote")})
     assert result["status"] == "quoted" and result["uploaded"] is False and result["charged"] is False
@@ -47,7 +50,7 @@ def quote(session, base, prepared):
 
 
 def invalidations(session, base, prepared, submit):
-    session.refused({**base, "film": story(prepared["inputs"], prepared["prepared_render"]), "quote_only": True})
+    session.refused({**base, "film": submit["film"], "quote_only": True})
     for side in ("previous", "next"):
         changed = deepcopy(submit)
         changed["seam_review"][side] = None
@@ -79,7 +82,8 @@ def invalidations(session, base, prepared, submit):
 
 
 def failures(session, base, prepared):
-    args = {**base, "film": story(prepared["inputs"], prepared["prepared_render"]), "prepared_references": prepared["prepared_references"], "quote_only": True}
+    film = author(session, base["project"], story(prepared["inputs"], prepared["prepared_render"]), prepared["prepared_render"])
+    args = {**base, "film": film, "prepared_references": prepared["prepared_references"], "quote_only": True}
     for failure in ("unavailable", "unsupported"):
         control(official_failure=failure)
         result = session.refused({**args, "idempotency_key": key(failure)})
@@ -240,12 +244,24 @@ def submissions(session, base, prepared):
 
 
 def recovery(session, project_path, rejected, unknown, known, slot_refused):
+    project = known["project"]
+    production = session.call("get_timeline", {"project": project})["production"]
+    assert production and production["plan"]["shots"], "Recovery fixture must first persist a real authored plan"
+    session.call("save_project", {"project": project, "production": None, "expected_revision": production["revision"]})
+    assert session.call("get_timeline", {"project": project}).get("production") is None
+    session.call("undo", {"project": project, "steps": 1})
+    restored = session.call("get_timeline", {"project": project})["production"]
+    assert restored["revision"] == production["revision"] and restored["plan"] == production["plan"]
+    session.call("save_project", {"project": project, "production": None, "expected_revision": restored["revision"]})
+    assert session.call("get_timeline", {"project": project}).get("production") is None
+    # 制作计划可 clear/undo；原单回执不在时间线中。重启后缺计划仍不能重放，也不能阻断原单 GET。
     session.restart("T")
     other_account_project = session.call("open_project", {"path": project_path})["project"]
     session.refused({**known, "project": other_account_project})
     session.passed_case("another account cannot reuse original account's ephemeral tokens")
     session.restart("S")
     project = session.call("open_project", {"path": project_path})["project"]
+    assert session.call("get_timeline", {"project": project}).get("production") is None, "Cleared production must remain absent after restart"
     mark, before = len(log()), session.spent()
     for args, expected in [(rejected, "not_submitted"), (slot_refused, "not_submitted"), (unknown, "unknown"), (known, "recovering")]:
         request_mark = len(log())
@@ -267,9 +283,10 @@ def recovery(session, project_path, rejected, unknown, known, slot_refused):
     assert not any(row["method"] in ("POST", "PUT") for row in rows), "Recovery must only read original tasks/files"
     assert any(row["method"] == "GET" and "/jobs/" in row["path"] for row in rows), "Known recovery must poll original server id"
     assert session.spent() == before
+    assert session.call("get_timeline", {"project": project}).get("production") is None, "GET-only recovery must not recreate a story"
     session.refused({**known, "project": project, "prompt": "A changed request cannot recover this key."})
     session.call("close_project", {"project": project})
-    session.passed_case("restart: rejected key stays no-charge; unknown key blocks replay; known id only GETs original")
+    session.passed_case("restart after clearing production: rejected key stays no-charge; unknown key blocks replay; known id only GETs original")
 
 
 def run():

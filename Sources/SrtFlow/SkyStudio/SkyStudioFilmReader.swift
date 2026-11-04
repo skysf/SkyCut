@@ -91,7 +91,7 @@ enum SkyStudioFilmReader {
         return .init(shotID: id, render: render, soundBedID: bed, cut: cut, state: state)
     }
 
-    private static func readRender(_ value: JSONValue?, at p: String) throws -> Film.Render {
+    static func readRender(_ value: JSONValue?, at p: String) throws -> Film.Render {
         let o = try object(value, keys: ["kind", "model", "prompt", "params", "inputs", "context"], at: p)
         guard let kind = o["kind"]?.stringValue.flatMap(Film.Render.Kind.init(rawValue:)) else {
             throw error(p + ".kind", "Official shots accept image, text_to_video or image_to_video.")

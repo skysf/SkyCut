@@ -235,7 +235,7 @@ enum AIClipTools {
         if let text = try args.string("clip_id") {
             clipID = try ids.resolve(text)
         } else {
-            guard let clip = state.mainClips.first(where: { $0.contains(time: time) }) else {
+            guard let clip = state.mainClips.first(where: { FreezeFrame.contains($0, at: time) }) else {
                 throw AIToolError("There is no V1 clip at \(time) s. Pass clip_id for a clip on another track.")
             }
             clipID = clip.id
@@ -247,14 +247,14 @@ enum AIClipTools {
         switch outcome {
         case .failed(let message):
             throw AIToolError(message)
-        case .frozen(let id, let usedNearestFrame):
+        case .frozen(let id, let usedNearestFrame, let sourceFrame):
             let fresh = AIShortIDs(state: project.state)
             guard let clip = project.state.clip(with: id) else {
-                return .ok(["freeze_id": .string(fresh.short(id))], changed: true)
+                return .ok(["freeze_id": .string(fresh.short(id)), "source_frame": sourceFrame], changed: true)
             }
             AIEditorPresenter.reveal(.init(clips: [id], time: clip.timelineStart), project: project)
             var result: [String: JSONValue] = [
-                "freeze_id": .string(fresh.short(id)),
+                "freeze_id": .string(fresh.short(id)), "source_frame": sourceFrame,
                 "start": AIFormat.seconds(clip.timelineStart),
                 "end": AIFormat.seconds(clip.timelineEnd),
                 "timeline_duration": AIFormat.seconds(project.state.duration),

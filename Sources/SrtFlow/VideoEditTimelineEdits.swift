@@ -7,6 +7,12 @@ enum FreezeFrame {
     /// 定格段默认插多长。插进去就是普通图片段，拖边缘随便改
     /// （上限 `StillImageClipFactory.stillDuration`）。
     static let defaultDuration = 2.0
+
+    /// 定格可取段首，末端仍排除；不能复用为普通分割保留 1ms 的 contains。
+    static func contains(_ clip: EditClip, at time: Double) -> Bool {
+        time.isFinite && clip.timelineStart.isFinite && clip.timelineEnd.isFinite
+            && time >= clip.timelineStart && time < clip.timelineEnd
+    }
 }
 
 extension EditClip {
@@ -92,64 +98,10 @@ extension TimelineState {
     mutating func split(clipID: UUID, at time: Double) {
         guard let location = location(of: clipID) else { return }
         var clips = self[track: location.track]
-        var left = clips[location.clipIndex]
-        guard left.contains(time: time) else { return }
-
-        let leftSourceLength = (time - left.timelineStart) * left.speed
-        var right = left
-        // 右半是新的一段，得有自己的身份，链接组保持一致。
-        right = EditClip(
-            sourceURL: left.sourceURL,
-            isAudioOnly: left.isAudioOnly,
-            sourceStart: left.sourceStart + leftSourceLength,
-            sourceDuration: left.sourceDuration - leftSourceLength,
-            speed: left.speed,
-            timelineStart: time,
-            isMuted: left.isMuted,
-            volume: left.volume,
-            linkGroup: left.linkGroup,
-            transitionAfter: left.transitionAfter,
-            transitionDuration: left.transitionDuration,
-            placement: left.placement,
-            rotationDegrees: left.rotationDegrees,
-            opacity: left.opacity,
-            flippedHorizontally: left.flippedHorizontally,
-            flippedVertically: left.flippedVertically,
-            crop: left.crop,
-            // 关键帧锚在源时间上：两半带同一份轨，各自只播自己窗口内的段落，
-            // 接缝处数值天然连续。
-            animation: left.animation,
-            info: left.info,
-            audioAssetDuration: left.audioAssetDuration,
-            // 图片段的身份必须跟过来：`sourceURL` 只是随时会被系统清掉的静帧缓存，
-            // 丢了 `stillImageURL` 的话，右半段会把缓存 mp4 当真实素材写进工程 ——
-            // 缓存一清这段就再也无法从原图重建了。
-            stillImageURL: left.stillImageURL,
-            // 音频库素材的身份（重链接的第一层线索）同理：丢了的话右半段缓存一清就永久失链。
-            remoteKey: left.remoteKey
-        )
-        right.needsStillConversion = left.needsStillConversion
-        // 藏起来的段切开，两半都还藏着（2026-09-26 以前右半段会冒出来，进预览也进成片）。
-        right.isHidden = left.isHidden
-        // 预设的入/出场**不抄给右半**：它的时长就是 `videoFade*`，而那两个字段
-        // 切开之后本来就不跟过来（切口右边没有"头尾渐变"可言），只抄效果会留下
-        // 一个时长为 0 的空壳。左半照旧留着自己那份。
-        // 标记同样锚在源时间上，所以两半各带一份**完整**的标记表，各自只画落在
-        // 自己窗口里的那些 —— 切口两边谁也不会丢标记，跟关键帧一个处理法。
-        right.markers = left.markers
-        // 音量曲线也锚在源时间上：两半各带一份完整的点，切口两边的线连续
-        //（同关键帧；合同见 docs/architecture/audio-volume-curve.md）。
-        right.volumeCurve = left.volumeCurve
-        // 声音场景跟着声音走：两半各带同一个（余音越过段尾，切开前后听起来一样）。
-        right.soundScene = left.soundScene
-        // upscale 的来源也要跟过来（从旧段构造新段漏字段的老坑：docs/bugfixes/2026-09-26-split-drops-hidden-and-library-key.md）。
-        right.upscale = left.upscale
-        left.sourceDuration = leftSourceLength
-        // 切口是硬切，原来的转场跟着右半走。
-        left.transitionAfter = .none
-
-        clips[location.clipIndex] = left
-        clips.insert(right, at: location.clipIndex + 1)
+        let original = clips[location.clipIndex]
+        guard original.contains(time: time), let pieces = TimelineClipSplit.make(original, at: time) else { return }
+        clips[location.clipIndex] = pieces.left
+        clips.insert(pieces.right, at: location.clipIndex + 1)
         self[track: location.track] = clips
     }
 
@@ -161,26 +113,33 @@ extension TimelineState {
     /// 比「后面的音频要自己挪」更具破坏性。代价写在明处 —— 切口之后对好点的
     /// 音频会比画面早一个定格时长，要不要顺推由用户自己决定。
     mutating func insertFreeze(_ freeze: EditClip, splitting clipID: UUID, at time: Double) {
-        guard let location = location(of: clipID),
-              clip(with: clipID)?.contains(time: time) == true else { return }
+        guard let location = location(of: clipID), let original = clip(with: clipID),
+              FreezeFrame.contains(original, at: time) else { return }
         let duration = freeze.timelineDuration
-        guard duration > 0 else { return }
+        guard duration.isFinite, duration > 0 else { return }
 
-        split(clipID: clipID, at: time)
-
-        // 同轨让位。切口右边的一切（含刚切出来的右半）整体后挪，定格段填进空档。
-        // 磁吸开着时 `packMain()` 之后还会按数组顺序重排一遍，这里的位移是给
-        // 磁吸关着的情况用的 —— 一条代码路径两种情况都对。
-        // 右半不到一帧（在最后一帧里定格）就拿掉，后面的内容少挪这一截（FreezeSliver）。
         var clips = self[track: location.track]
-        let sliver = FreezeSliver.length(of: clips, after: location.clipIndex)
-        if sliver > 0 { clips.remove(at: location.clipIndex + 1) }
-        for index in clips.indices where clips[index].timelineStart >= time - 0.0005 {
+        var insertionIndex = location.clipIndex
+        var retainedLeft: UUID?
+        if time > original.timelineStart {
+            guard let pieces = TimelineClipSplit.make(original, at: time) else { return }
+            clips[location.clipIndex] = pieces.left
+            clips.insert(pieces.right, at: location.clipIndex + 1)
+            insertionIndex += 1
+            retainedLeft = original.id
+        }
+        // 正好段首：不造零长左半，完整原段保留身份和所有字段，静帧放在它前面。
+        // 同轨切口右边让位；磁吸关着也正确，开着时 packMain 按数组顺序重排。
+        // 只有真正切出来的右半才能按 FreezeSliver 丢弃，不能吞掉段首的完整短片。
+        let sliver = retainedLeft == nil ? 0 : FreezeSliver.length(of: clips, after: location.clipIndex)
+        if sliver > 0 { clips.remove(at: insertionIndex) }
+        for index in clips.indices
+        where clips[index].id != retainedLeft && clips[index].timelineStart >= time - 0.0005 {
             clips[index].timelineStart += duration - sliver
         }
         var placed = freeze
         placed.timelineStart = time
-        clips.insert(placed, at: location.clipIndex + 1)
+        clips.insert(placed, at: insertionIndex)
         self[track: location.track] = clips
     }
 }

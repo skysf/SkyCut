@@ -23,7 +23,7 @@ public enum MCPProjectTools {
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
                     "models": MCPSchema.boolean("Also query Sky Studio's model catalog and reference limits (read-only, no credits)."),
                     "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3."),
-                    "film_contract": MCPSchema.boolean("Public film schema/workflow; local and free, not production readiness proof.")
+                    "film_contract": MCPSchema.boolean("Public film/production contracts; local, free; no deployment proof.")
                 ]),
                 readOnly: true, openWorld: true
             )
@@ -106,13 +106,13 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .saveProject, title: "Save the project",
                 description: """
-                Save the open project now. SkyCut autosaves a saved project two seconds after every edit and saves a \
-                never-saved one by itself after your first change, so this is mainly for saving under another path. Without a \
-                path a never-saved project goes into SkyCut/Projects inside the folder the user named (Downloads when there is \
-                none). Never replaces a file: a taken name gets a number.
+                Save now or to path; taken names get a number. Autosaves after edits. production authors one undoable \
+                film plan; full contract: get_status film_contract=true.
                 """,
                 input: MCPSchema.object([
-                    "path": MCPSchema.string("Where to save (.skycut). Leave out to keep the current location.")
+                    "path": MCPSchema.string("Save location (.skycut); default current."),
+                    "production": ["type": ["object", "null"], "description": "Public plan; null clears."],
+                    "expected_revision": MCPSchema.integer("Current production revision; 0 if absent.", minimum: 0)
                 ])
             )
         case .undo:
