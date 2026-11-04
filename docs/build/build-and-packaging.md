@@ -103,6 +103,19 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   `-enable-batch-mode` 实测编不过，别换成它。
 - **同一个 PR 又推了新提交，旧的一轮直接取消**（`concurrency`），不白占 runner；main 上的
   每一次都跑完。
+- **只改了文档的 PR / 合并走快速通道**（2026-11-04 起）：每组第一步跑 `scripts/ci-docs-only.sh` 判一下，是就不编 App、
+  不跑自检，第 1 组跑一遍 `scripts/check-guards.sh`（文档索引 docs-index-drift 在里面）就收工，其余四组到这一步就绿了，
+  汇总 job `check-all` 照常给结论。原来一个只改文档的 PR 要占满 5 台 runner 两轮（PR 一轮、合并后 main 一轮），
+  各约 10 分钟；10 月下旬到 11-04 合的 60 个 PR 里有 10 个是这样的。
+  - **白名单是严格的**：`docs/` 下的文件，根目录的 `AGENTS.md`、`README.md`、`SrtFlow-Requirements.md`。查过
+    （2026-11-04），自检里读这几样内容的只有扫描守卫 docs-index-drift，编译、跑二进制的一样都不读。白名单外的任何一个
+    文件、一个文件都没改、git 算不出来、路径被 git 加了引号，都按「不是」照常全跑；改名按「删旧的 + 加新的」算
+    （`--no-renames`），把代码挪进 `docs/` 不算只改文档。往白名单里加东西之前，先查有没有检查读它。
+  - **不能用 `on:` 里的 `paths` / `paths-ignore`**：那样整个 workflow 被跳过，必需的检查 `check-all` 永远等不到结论，
+    PR 合不进去。所以是每一步各自看判断的结论，每一步都写成 `docs_only != 'true'`：判断那一步出了岔子（没输出、
+    输出不是 true）就照常全跑。
+  - `checks/ci-docs-only.sh` 钉着：判断本身（含在临时仓库里真提交的改名、合并提交、根提交）、每一步重活的条件、
+    快速通道只在第 1 组、触发条件里没有 paths、汇总 job 照旧。
 - **第 1 组多一步「预览性能 ratchet」**（`scripts/check-preview-perf.sh`，不在 check-all.sh 里：
   要图形会话）。它起第 1 组已经编好的 App，按固定场景数「做了多少件活」，和
   `checks/PreviewPerf/baseline.json` 比，只许降不许涨；结果和 App 日志作为附件 `preview-perf`
@@ -137,3 +150,5 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   + 性能 ratchet 3 分钟；另外四组 3 分 25 秒到 5 分 35 秒。第 1 组的检查里，6 项链接完整 App 的（约 130 秒）只能
   留在这里；另外约 141 秒是扫描守卫和纯值检查（光 check-script-source-lists 就 55 秒），按旧规矩放进来的。
   把这 141 秒挪进第 4、5 组之后，第 1 组估计约 8 分 25 秒，其余几组 5 分钟上下。
+- 挪完的实测（PR #304 首跑）：**第 1 组 8 分 45 秒**（10 分 46 秒 → 省下 2 分钟），其余四组 4 分 8 秒到 5 分 2 秒。
+  现在整轮就是第 1 组：冷编 App 和 3 分钟的性能 ratchet 占了它一大半，再往下降要靠 `.build` 缓存真省下编译。
