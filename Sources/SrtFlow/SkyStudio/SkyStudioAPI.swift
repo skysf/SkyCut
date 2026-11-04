@@ -86,9 +86,15 @@ struct SkyStudioAPI: Sendable {
 
     /// `POST /quote`：只报价、不扣钱（和 `/jobs` 扣钱同一个计价函数）。
     func quote(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioQuote {
+        try SkyStudioOfficialRequest.validate(job, submitting: false)
         let body = try job.quoteBody.encodedData()
         guard let quote = SkyStudioQuote(json: try Self.json(try await send(request("quote", key: key, method: "POST", body: body)))) else {
             throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        if let film = job.film {
+            guard let official = quote.officialRecipe, (try? official.seamReview.validate(for: film)) != nil else {
+                throw SkyStudioFailure.badAnswer(status: 200)
+            }
         }
         return quote
     }
@@ -97,6 +103,7 @@ struct SkyStudioAPI: Sendable {
     /// 量到图片、音乐的提交一直等到做完才回（55 秒、40 秒），线上还没量过：这一个请求多等一会儿（`submitTimeout`），真超时了
     /// 保留同一个 idempotency_key 待核查，不自动重放收费 POST。
     func submit(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioJobStatus {
+        try SkyStudioOfficialRequest.validate(job, submitting: true)
         var post = request("jobs", key: key, method: "POST", body: try job.jobBody.encodedData())
         post.timeoutInterval = Self.submitTimeout
         return try Self.status(try await send(post))

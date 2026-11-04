@@ -7,14 +7,18 @@ import SrtFlowMCPKit
 
 enum SkyStudioApproval {
     static func identity(job: SkyStudioJobRequest, credits: Double, context: [String: JSONValue] = [:]) -> String {
-        let value: JSONValue = [
+        var fields: [String: JSONValue] = [
             "request": job.quoteBody,
             "inputs": .object(job.inputs.mapValues(JSONValue.string)),
             "references": .array(job.references),
             "credits": .number(credits),
             "context": .object(context)
         ]
-        return "skystudio:" + value.encodedString()
+        if job.film != nil {
+            fields["recipe_pin"] = job.recipePin.map(JSONValue.string) ?? .null
+            fields["seam_review"] = job.seamReview?.json ?? .null
+        }
+        return "skystudio:" + JSONValue.object(fields).encodedString()
     }
 
     /// 读属性，不读图像 / 音视频内容；原地改写和同路径换文件也要换确认码。

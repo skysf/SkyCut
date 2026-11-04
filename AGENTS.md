@@ -176,6 +176,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | **视频 upscale**（2026-10-28 起送 Sky Studio：`Upscale/UpscaleTiers.swift` 档位 / 目标 / 上限从 `/models` 读、`UpscaleOffers` 面板问模型和 `/quote`、积分的账 `SkyStudioSpendStore`；**AI 的工具 `upscale_clip`**（`AIUpscaleTool` / `AIUpscaleNames`、`UpscaleJob.Approval`、做完直接换源、花积分经 `SkyStudioJobGate`）；**换源**：`EditClip.upscale` 记录（`VideoEditClipUpscaleRecord`）、`ClipSourceSwap` 平移 / 换回、`VideoEditMediaReferences` 原片配书签、`VideoEditProject+Upscale`；**任务**：`Sources/SrtFlow/Upscale/` 的范围 / 裁一段 / 封回原声 / 起名 / 流水线 / `UpscaleJob`；**界面**：检查器一节 `VideoEditInspector+Upscale`（检查器的一段 body，不是单独的视图）+ `UpscaleJobStatusView`、右键菜单与块角标（`VideoEditTimelineClipBlock`）、面板 `UpscalePanel`、对比窗口 `UpscaleCompareView` / `Stage` / `Playback`、`UpscalePresenter`） | [视频 upscale 方案](docs/plans/2026-10-02-video-upscale.md)（用户拍的 16 条板、分刀）、[Sky Studio 的任务](docs/architecture/sky-studio-jobs.md)（**扣多少只问 `/quote`、交任务时当 `max_credits`；只有排队中的能取消；积分每日上限默认 1,000；Key 只发给 Sky Studio**）、[smoke test 实测](docs/reports/2026-10-02-upscale-smoke-test.md)（fal 时代 19 条的账单、声音 / 帧数的坑）、[工程文件与素材重链接](docs/architecture/video-edit-project-file.md)「四之五」（换源 = 源时间整体平移、盖不住不换、原片配书签不进 mediaURLs、分割抄记录）、[视频 upscale](docs/architecture/video-upscale.md)（**范围带 1 秒余料按原片算、一次最长 30 秒放不下先少留余料、最高 30 fps、裁出来的只有画面、送上去之前探一遍那个文件当 `params.source`、成品的声音一律不要自己封回原片的、HEVC 点名 hvc1、文件放原片旁边撞名加编号、面板起的做完不替换、面板上的报价就是确认、做完按实收改账、没花出去的退回；第三节：界面只订阅 `UpscaleActivity`、块不做 IO、对比窗口两个播放器同一个主机时间起步不读 currentTime；进度（阶段、上传 / 下载的字节比例、处理了多久 + 这一档通常几分钟）检查器那一节和工具栏任务浮层同一份；第五节：AI 起的和面板同一份数、花积分经 `SkyStudioJobGate`、Key 不弹授权框、做完直接换源且那一下自己包 `AIUndoGrouping.step`**）、[AI 接口（MCP）](docs/architecture/ai-control-mcp.md) 第四节第 44 条、[检查器的排版](docs/architecture/inspector-layout.md)、[本地化](docs/architecture/localization.md) |
 | **收费与授权**：体验 / 正式版、服务器下发的开关（MCP 能不能用、导出加不加水印）、**照授权拦（AI 调用的门 `SkyStudioAccount.aiRefusal`、导出面板「会带水印」那一行、`SkyCutGates`）**、**导出水印**、Sky Studio 的 key 与 `api/skycut/v1`、生成 / upscale / 克隆从 fal 改走 Sky Studio、删掉自带 fal Key 那条路 | [收费方案](docs/plans/2026-10-27-paid-plans-and-sky-studio-key.md)（2026-10-26 / 27 拍的 20 条板和七刀；前五刀已合，其中 5b 照授权拦合进去时先关着，**2026-10-28 接口上线、用户给自己开了正式版之后打开**（`SkyCutGates.enforcedByDefault = true`；发带它的正式版之前用户要先在正式版里粘一次 Key），第 6、7 刀照 Sky Studio main 5c8d6a0d 冻结的合同做，做到哪看合进 main 的 PR；先做 B 端，C 端先只放「联系开通」；开关由服务器下发、SkyCut 不写死天数和规则；MCP 的门槛在 App 收工具调用的地方、不在小程序里；水印只加在导出的成片上；upscale 和 Sky Studio 网页同一套上限：一次最长 30 秒（余料算在里面）、最高 30 fps，从 `/models` 读；「Sky Studio 定稿之后」一节是第 6 刀要跟着改的；接口合同在 Sky Studio 仓库的 `docs/agents/skycut-api.md`）、[Sky Studio 账号](docs/architecture/sky-studio-account.md)（Key 存钥匙串 `<bundle id>.skystudio`、和 fal 共用 `KeychainSecret`；只有 `SkyStudioAPI` 碰地址；机器号是硬件 UUID 的哈希、盐永远不改；后台问 `/me` 从不弹钥匙串框；没有 Key / 没问到过 / 过了 `valid_until` 按免费版，服务器的钟换成本机的；照授权拦：AI 的门在 `AIToolRouter` 核对参数名之后、建调用排队之前，`get_status` 照常回并报 `skycut_plan`，还没问完先问一次再判，规矩和给 AI 的话在纯值的 `SkyCutGates`）、[Sky Studio 的任务](docs/architecture/sky-studio-jobs.md)（第 6 刀：模型、价、上限从 `/models` 来，扣多少只问 `/quote` 并当 `max_credits`；交任务和取消只经 `SkyStudioJobRun`：满了等着用同一个 idempotency_key 再交、交的请求不跟着取消、照 `poll_after_seconds` 问、只有排队中的能取消；成品永久在作品库、SkyCut 照旧下到本机；Key 只发给 Sky Studio）、[真 Codex 冒烟](docs/reports/2026-10-26-codex-client-smoke.md)、[导出水印](docs/architecture/export-watermark.md)（加不加只问 `WatermarkPolicy`，授权那一半照服务器的 `watermark`；照授权拦 2026-10-28 起打开） |
 | 真实窗口、系统权限、手势实测 | [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) |
+| 官方原创短片、`generate_media` 的 `film`、镜头状态 / 完成动作 / 声音计划、实际引用与报价 pin、左右接缝审查 | [官方原创短片](docs/architecture/official-film.md)（公开状态与服务端私有配方分开；真实引用报价、双侧审查、完成历史不能重演；客户端 / 生产启用 / 真实输出 / 并发验收分开报告）、[Sky Studio 的任务](docs/architecture/sky-studio-jobs.md)、[开着的工程](docs/architecture/open-projects.md) |
 
 ## 构建与检查入口
 
@@ -389,6 +390,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   所以漏一行等于那份文档不存在。
 
 ## 规划与实施报告索引
+
+- [2026-11-04 官方原创短片客户端接入](docs/reports/2026-11-04-official-film-client.md) — API 合同、生成接入、公开制作状态与后台验收逐项证据；客户端、服务端生产启用、真实视频和并发容量分开报告。
 
 - [2026-11-03 MCP 发现与真实 Codex 选工具实测](docs/reports/2026-11-03-mcp-discovery-and-task-selection.md) — 50 → 55 项、已有导出参数、通知缓存与退出后 resume，四类真实需求的调用 / 任务 / 落盘结果；[脱敏调用证据](docs/reports/2026-11-03-mcp-discovery-evidence.json)保留实际参数、失败与有效重试。
 
@@ -619,6 +622,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md) — 先断句、后去标点、最后在整条轨上排时间；去标点的规则（句中换一个半角空格、行尾删，问号叹号引号书名号省略号列举顿号留着，数字缩写撇号不动，只在生成和机器翻译落字时去）；断句（逗号拆小句、太短的并、放不下的用动态规划挑切法、每一刀的代价表、中文按系统分词且按整句判语言）；一行多长（全角 1 半角 0.5 的字数 + 按字号和画面宽度的「放得下」，竖屏更短）；几行（2026-10-16 用户定默认单行，生成面板 / AI 的 `max_lines` 跟着工程走；两行时折行点两行差不多宽 + 断在好断的地方 + 中文不切词、一样好时下面那行长）；显示时间（5/6 秒、7 秒、2 帧、不到半秒接上、说完多停半秒、不越过素材结尾）；几段素材同时有字只留一条（零碎杂音、谁清楚留谁、同一段素材不算撞）；转写哪些声音（藏起来的不转、只用选中的片段）；已知不足、回归与人工清单。
 
 - [按旁白段落同步时间线](docs/architecture/voiceover-timeline-sync.md) — 显式映射、实测音频与原稿对齐，共用批量事务，一次撤销且不重复联动。
+
+- [官方原创短片](docs/architecture/official-film.md) — 公开镜头 / context / 声音合同、真实引用报价、不透明 pin、两侧预检与输出验收的边界；私有配方不进客户端。
 
 ## Bug 修复案例索引
 
