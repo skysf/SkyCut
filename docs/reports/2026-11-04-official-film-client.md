@@ -133,4 +133,23 @@
 
 本地统一入口五组为 52 / 10 / 7 / 6 / 8 项，共 83 项全部通过，其中完整 MCP 3,188 项通过；
 推前 `check-guards` 全绿。第 3 / 4 组在其余编译结束后独立执行，未放宽 watchdog 或读取时限。
-GitHub 汇总结果在 PR 创建后另行核对，本地结果不代替 CI。
+[PR #299](https://github.com/skysf/SkyCut/pull/299) 的
+[GitHub CI](https://github.com/skysf/SkyCut/actions/runs/41792551720) 五组、性能检查及汇总 `check-all`
+全部 success，已用 merge commit 合并：`705dc4790e1ca0b399bb8e125d2dec3c6a670626`。
+
+## 验收后续：无疑点时的截图误报
+
+`inspect_video` 没有请求证据截图时，不再把默认 `image=true` 变成绘图失败；
+实际要求图片却缺帧的提示仍保留。实际仓库专项 35 / 0，临时只撤条件后准确 35 / 1，
+唯一失败是无截图误报，恢复后完整 App 已重新链接。
+
+另经真实后台 MCP 完成一个自有工程场景：5–6 秒范围实际取样 `[5, 5.5, 6]`、
+覆盖完整、无疑点 / 截图 / 图像内容 / 限制，也没有 `image` 错误字段。13 次 MCP 调用后
+工程已保存关闭、jobs 为空；假服务仅 GET `/me`，准入 / 真实提供方 / 积分均为 0。
+测试 App、helper、服务、socket、假凭据及测试偏好均已清理，未操作用户 App。
+证据：本机 `srtflow-inspection-empty-mcp-20261104/inspection-empty-evidence-1793778562972379000`。
+之前独立试编 180 秒超时和首次沙箱缓存写入失败都未执行断言，保留为未测，未当成反向红。
+见[成片检查没有疑点却报告绘图失败](../bugfixes/2026-11-04-inspection-empty-evidence.md)。
+
+本刀本地五组共 83 项全部通过，其中 MCP 3,188 项通过，推前扫描守卫全绿。
+GitHub 的汇总结论待 PR 创建后核对。
