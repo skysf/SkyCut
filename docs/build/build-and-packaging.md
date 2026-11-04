@@ -23,8 +23,39 @@
 ```bash
 swift build --arch arm64                      # 调试构建
 swift run --arch arm64 SrtFlowCoreChecks      # 核心自检（184 项断言，CLT 无 XCTest）
+scripts/check-local.sh timeline-snap          # 推之前：全部扫描守卫 + 点名的检查（原生 arm64）
 ./scripts/build-app.sh                        # Release + 组装 .app + 签名 + DMG
 ```
+
+## 本地怎么跑检查（2026-11-04 起）
+
+**本地只跑扫描守卫和这次改动直接相关的几项，完整的一遍交给 CI**（2026-11-04 用户定）：`scripts/check-local.sh <名字…>`
+先跑 `scripts/check-guards.sh`，再一项一项跑点名的检查（名字先找 `scripts/check-<名字>.sh`，再找 `checks/<名字>.sh`；
+也可以写路径；`core` 是 `swift run SrtFlowCoreChecks`）。CI 在每个 PR 上 5 台 runner 全跑 `scripts/check-all.sh`，绿了才合，
+所以每一项照样会在合并之前跑到；本地全跑一遍要满载十几到三十分钟，笔记本烫，还和 CI 重复。想在本地全跑也可以。
+
+**一律用原生 arm64、`/bin/bash` 跑**。在用户的 M1 上量的（2026-11-04）：
+
+| 跑法 | 守卫 hover-pointer-style | 全部扫描守卫 |
+| --- | ---: | ---: |
+| Rosetta 下（x86_64） | 33.3 秒 | 6–7 分钟 |
+| 原生 arm64 + `/bin/bash` | 6.1 秒 | 89 秒 |
+| 原生 + 后台优先级（`taskpolicy -b`，只用能效核） | 18.0 秒 | — |
+
+Rosetta 下的进程起子进程也优先挑 x86_64 那一半，检查里几千个 grep / awk / perl、编译器都跟着走翻译，又慢又烫。这台机器上
+有两个来源：
+
+- **Claude Code 给命令起的 shell 是翻译的**：终端（cmux）、登录 shell、`claude` 本身都是原生，只有它起来跑命令的那个 zsh 带着
+  Rosetta（`sysctl -n sysctl.proc_translated` 是 1）。
+- **PATH 最前面的 `/usr/local/bin/bash`（还有 `git`）是 Intel 版 Homebrew 装的、只有 x86_64**：`#!/usr/bin/env bash` 和
+  `bash x.sh` 找到的都是它，在原生的终端里也照样走翻译。
+
+所以三个入口（`check-local.sh`、`check-guards.sh`、`check-all.sh`）在 `cd` 之前 source `scripts/native-arch.sh`：在 Rosetta 下就
+`exec arch -arm64 /bin/bash "$0" "$@"` 重跑自己（CI 的 runner 本来就是原生、Intel 的 Mac 没有这个 sysctl，都什么也不做）；
+起检查一律写 `/bin/bash`，和 CI、check-all 的 `run_check` 同一个 3.2（以前 check-guards 用 PATH 上的 bash，本机跑的是 5.x，
+和 CI 不是一个解析器，[陷阱 5、6](../bugfixes/2026-08-06-build-version-and-shell-traps.md) 那一类「本机绿、CI 红」它也挡不住）。`checks/native-local-checks.sh` 钉着；装了 Rosetta 的机器上
+它还真起一个 x86_64 的探针，看 source 之后是不是换成了原生。单独跑某一个检查时也照样写 `scripts/check-local.sh <名字>`，
+别直接 `scripts/check-x.sh`（那样走的是 PATH 上的 bash）。
 
 ## 打包流程（scripts/build-app.sh）
 

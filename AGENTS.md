@@ -22,7 +22,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 2. 在“按修改范围选必读文档”中定位任务，动代码前读完对应文档。
 3. 计划文档记录目标和背景；已实施功能的真实状态优先看实施报告、现有代码和检查
    结果。若三者冲突，不要静默猜测，应在本次改动中同步过期文档或明确报告冲突。
-4. 修改后先跑直接相关的单项检查；准备提交或发 PR 前跑 `scripts/check-all.sh`。
+4. 修改后、推之前跑 `scripts/check-local.sh <和改动直接相关的检查>`：全部扫描守卫 + 点名的那几项，一项一项跑，
+   自动换成原生 arm64、用和 CI 一样的 `/bin/bash`。完整的 `scripts/check-all.sh` 交给 CI：每个 PR 上 5 台 runner
+   全跑，绿了才合（2026-11-04 用户定：本地全跑满载十几到三十分钟、笔记本烫；每一项照样在 CI 上跑，步骤一样不少）。
 
 ## 全局规则（必须遵守）
 
@@ -99,11 +101,13 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 不得把“命令没执行到”“依赖缺失后跳过”或“只测了纯函数、生产路径没接上”报告为
   通过；检查脚本必须以非零退出码暴露失败。
-- `scripts/check-all.sh` 是本地与 CI 的统一总入口。GUI 冒烟不在其中，涉及真实窗口、
+- `scripts/check-all.sh` 是 CI 的统一总入口（本地也能全跑，不再要求）。GUI 冒烟不在其中，涉及真实窗口、
   系统权限或手势时，另按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 执行。
 - 修改 shell 脚本前，先读
   [构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)。
-- **推之前跑 `scripts/check-guards.sh`**（全部 `checks/*.sh` 扫描守卫 + `scripts/check-mcp.sh --scans-only` 编译之前的扫描，几十秒、不编译）。搬代码 / 改名之后尤其要跑：守卫按文件名找
+- **推之前跑 `scripts/check-local.sh`**（它先跑 `scripts/check-guards.sh`：全部 `checks/*.sh` 扫描守卫 + `scripts/check-mcp.sh --scans-only` 编译之前的扫描，原生 arm64 一分半、不编译；
+  再跑你点名的检查）。**别在 Rosetta 下、别用 PATH 上的 `bash` 跑检查**：用户的 M1 上 PATH 最前面的 bash 是 Intel 版 Homebrew 的，
+  全部守卫要 6–7 分钟、笔记本烫（[本地怎么跑检查](docs/build/build-and-packaging.md)）。搬代码 / 改名之后尤其要跑：守卫按文件名找
   接线，挑着跑几条漏掉的那条只会在 CI 上红（[PR #132 首跑](docs/bugfixes/2026-10-01-pr132-first-ci-run-guard-in-moved-insert.md)，
   同一个坑第三次）。
 
@@ -395,6 +399,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（扫描守卫）。
 - 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，再加 `scripts/check-mcp.sh --scans-only` —— check-mcp 编译之前那一段扫描、连同它 source 进来的 `checks/MCP/*-wiring.sh`，以前只在 CI 上跑得到；推之前必跑；`check-all.sh` 照样逐条跑它们，`checks/check-all-shards.sh` 钉着两边对得上）。
+- 本地推之前那一步：`scripts/check-local.sh <相关的检查>`（扫描守卫 + 点名的几项；完整的一遍交给 CI）。本地跑检查的三个入口
+  （check-local / check-guards / check-all）在 Rosetta 下会换成原生 arm64 的 `/bin/bash` 重跑自己（`scripts/native-arch.sh`）、
+  起检查用 `/bin/bash` 不用 PATH 上的 bash：`checks/native-local-checks.sh`（装了 Rosetta 就真起一个 x86_64 的探针看它换没换成原生）。
 - 本文件的索引必须是全的：`docs/` 下每一份文档都要能从这里找到，且没有死链 ——
   `checks/docs-index-drift.sh`。只读 AGENTS.md 的代理打不开索引外的文档，
   所以漏一行等于那份文档不存在。
