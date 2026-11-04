@@ -4,7 +4,9 @@
 # 为什么要有这个入口（docs/bugfixes/2026-10-01-pr132-first-ci-run-guard-in-moved-insert.md）：扫描守卫按文件名找接线，
 # 把代码搬进新文件之后，守卫还指着旧文件就红 —— 本地凭记忆挑着跑几条守卫，漏掉的那一条只在 CI 上红（2026-09-25 PR #71、
 # 2026-09-29 PR #84、2026-10-01 PR #132 三次都是这样）。全部跑一遍只要几十秒，不编译、不碰 .build，可以和编自检的脚本并行。
-# `scripts/check-all.sh` 照样逐条跑它们；这里只是本地推之前的快入口。
+# `scripts/check-all.sh` 照样逐条跑它们；这里只是本地推之前的快入口。这里是按通配符找的，check-all 是按清单跑的：
+# checks/ 下新加的守卫没进 check-all，这里照样绿、CI 却一次都不跑（2026-11-04 查出四条，
+# docs/bugfixes/2026-11-04-scan-guards-never-ran-in-ci.md）—— 所以 checks/check-all-shards.sh 钉着两边对得上。
 #
 # 自检脚本里编译之前的那一段扫描也算（2026-10-18 起：`scripts/check-mcp.sh --scans-only`）—— 它们 source 进来的
 # checks/MCP/*-wiring.sh 不在 checks/ 顶层，以前只在 CI 上跑得到（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。

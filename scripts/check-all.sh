@@ -145,6 +145,11 @@ run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" che
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
 run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
 run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
+run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号、钥匙串、照授权拦和任务只在该在的地方）" checks/sky-studio-wiring.sh
+run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
+run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
+run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
+run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
 run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
 # 提示面板落点（scripts/check-instant-tooltip-panel.sh）**故意不在这里**：它要建
 # 真实的 NSWindow/NSPanel，没有图形会话就会假红。按本文件开头的约定，真实窗口

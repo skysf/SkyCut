@@ -357,6 +357,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `subtitleStyle(appWide:)`（工程自己的样式优先）：`checks/encode-settings-memory.sh`。
 - 构建日志不得被吞：`checks/no-swallowed-build-output.sh`。
 - CI 的 `.build` 缓存 key 和 restore-keys 带检出目录（`github.workspace`），仓库改名 / 换目录后不捡旧目录编的缓存：`checks/ci-build-cache-key.sh`。
+- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - 发布版用固定的签名身份签（打包脚本只经 `scripts/signing/sign-app.sh`、它有身份就用并核对钉着的证书、ad-hoc 只在没有身份那一支、
@@ -389,7 +390,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（第 1 组）。
-- 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，再加 `scripts/check-mcp.sh --scans-only` —— check-mcp 编译之前那一段扫描、连同它 source 进来的 `checks/MCP/*-wiring.sh`，以前只在 CI 上跑得到；推之前必跑；`check-all.sh` 照样逐条跑它们）。
+- 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，再加 `scripts/check-mcp.sh --scans-only` —— check-mcp 编译之前那一段扫描、连同它 source 进来的 `checks/MCP/*-wiring.sh`，以前只在 CI 上跑得到；推之前必跑；`check-all.sh` 照样逐条跑它们，`checks/check-all-shards.sh` 钉着两边对得上）。
 - 本文件的索引必须是全的：`docs/` 下每一份文档都要能从这里找到，且没有死链 ——
   `checks/docs-index-drift.sh`。只读 AGENTS.md 的代理打不开索引外的文档，
   所以漏一行等于那份文档不存在。
@@ -632,6 +633,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-04 四条扫描守卫从加上那天起，CI 一次都没跑过](docs/bugfixes/2026-11-04-scan-guards-never-ran-in-ci.md) — check-guards 按通配符跑 `checks/*.sh`、CI 只跑 check-all 列着的；sky-studio-wiring 等四条从没进过 check-all，文档还写着「第 1 组」。`checks/check-all-shards.sh` 钉着两边对得上。
 - [2026-11-04 非零时间线起点让原生尾帧请求落到前一个刻度](docs/bugfixes/2026-11-04-native-frame-request-truncation.md) — 原生请求显式 nearest-600、有限值与整数边界守卫；实际时间和漂移 / 半开窗不放宽，旧证据需重抽。
 - [2026-11-04 定格拒绝首个使用帧](docs/bugfixes/2026-11-04-freeze-rejects-first-used-frame.md) — 定格专用有限半开区间、段首前插保留完整原段、内部切分共用纯值体；普通分割余量与现有联动规则保留，反向守卫及实际 MCP 回归。
 - [2026-11-04 换 Key 后旧模型目录回填](docs/bugfixes/2026-11-04-catalog-cache-key-change.md) — 缓存失效 epoch 同时拦迟到写回和迟到清理后继请求；真实 API 注入回归与隔离反向。

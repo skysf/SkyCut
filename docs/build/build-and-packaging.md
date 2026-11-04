@@ -82,6 +82,10 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
 - **组数两边必须一致**：check-all.sh 读自己文件里的 `shard N` 声明，和 CI 传进来的 `--of`
   （`strategy.job-total`）对不上就直接红；分到的那组一项都没跑也红。不然多声明的那一组在
   CI 上永远不跑，而且是绿的。
+- **`checks/` 顶层的每一条扫描守卫都要在 check-all.sh 里**（某一行 `run_check` 点名它）。`scripts/check-guards.sh`
+  按通配符跑 `checks/*.sh`，推之前本地看到的是全绿，可 CI 只跑 check-all.sh 列着的：2026-11-04 查出四条守卫从加上
+  那天起 CI 一次都没跑过（[案例](../bugfixes/2026-11-04-scan-guards-never-ran-in-ci.md)）。`checks/check-all-shards.sh` 钉着。
+  要故意不进 CI 的检查（要图形会话、要真钥匙串）写成 `scripts/check-*.sh`，文件头写明为什么，别放 `checks/` 顶层。
 - **汇总 job 叫 `check-all`**（ubuntu，几秒）：ruleset `protect-main` 要求的必需检查就是
   这个名字，所以改 CI 不用动 ruleset。它 `needs` 全部分组，而且必须带
   `if: ${{ !cancelled() }}`：不写的话，分组一红它就被跳过，**被跳过的必需检查会被 GitHub
