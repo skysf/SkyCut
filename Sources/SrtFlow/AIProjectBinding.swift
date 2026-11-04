@@ -23,9 +23,11 @@ enum AIProjectBinding {
     static func usesProject(_ tool: MCPToolName, _ args: AIToolArguments) -> Bool {
         switch tool {
         case .getStatus, .getSettings, .setSettings, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
-             .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob,
+             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob,
              .openProject, .newProject, .closeProject:
             return false
+        case .generateMedia:
+            return (try? args.bool("prepare_references")) == true || ["film", "prepared_references", "quote_token", "seam_review"].contains(where: args.has)
         case .setView:
             // 带 project 只改那一个（要核对是这个会话的）；不带改这个会话的默认和它开着的工程，不落在某一个上。
             return args.has("project")

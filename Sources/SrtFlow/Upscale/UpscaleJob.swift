@@ -133,7 +133,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
                 end(.cancelled(stop), refunding: stop == .nothingCharged)
             case .failed:
                 end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
-            case .request, .badAnswer, .timedOut:
+            case .request, .badAnswer, .timedOut, .notSubmitted:
                 // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
                 end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
             }

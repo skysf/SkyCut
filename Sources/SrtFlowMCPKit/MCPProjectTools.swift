@@ -22,7 +22,8 @@ public enum MCPProjectTools {
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
                     "models": MCPSchema.boolean("Also query Sky Studio's model catalog and reference limits (read-only, no credits)."),
-                    "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3.")
+                    "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3."),
+                    "film_contract": MCPSchema.boolean("Public film schema/workflow; local and free, not production readiness proof.")
                 ]),
                 readOnly: true, openWorld: true
             )

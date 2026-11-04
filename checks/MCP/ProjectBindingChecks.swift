@@ -178,6 +178,10 @@ private func runUsesProjectChecks() {
         checkEqual(AIProjectBinding.usesProject(tool, none), expected, "\(tool.rawValue) with no arguments uses a project")
     }
     let file: JSONValue = "clip.mp4"
+    for fields: JSONValue in [["prepare_references": true], ["film": ["intent": "original_film"]], ["prepared_references": "refs"], ["quote_token": "quote"], ["seam_review": [:]]] {
+        check(AIProjectBinding.usesProject(.generateMedia, args(fields.objectValue!)), "each official phase binds the owned project")
+    }
+    check(!AIProjectBinding.usesProject(.generateMedia, args(["quote_only": true])), "ordinary quote retains file-only scope")
     check(!AIProjectBinding.usesProject(.look, args(["file": file])), "look at a file does not use the project")
     check(!AIProjectBinding.usesProject(.look, args(["files": [file]])), "look at files does not use the project")
     check(AIProjectBinding.usesProject(.look, args(["time": 3])), "look at the timeline uses the project")

@@ -82,10 +82,10 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     public var takesProject: Bool {
         switch self {
         case .getStatus, .getSettings, .setSettings, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
-             .generateMedia, .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
+             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
-        case .setView, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
+        case .setView, .generateMedia, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
              .upscaleClip, .addClips, .editClip, .editClips, .syncVoiceover, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
              .deleteItems, .duplicateItems, .setTransition, .setText, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,
              .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:

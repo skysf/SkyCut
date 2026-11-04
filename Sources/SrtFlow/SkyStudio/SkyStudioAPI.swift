@@ -111,7 +111,9 @@ struct SkyStudioAPI: Sendable {
 
     /// `GET /jobs/{id}`：立刻回（没有长轮询），带 `poll_after_seconds`。
     func job(_ id: String, key: String) async throws -> SkyStudioJobStatus {
-        try Self.status(try await send(request(try Self.jobPath(id), key: key)))
+        let status = try Self.status(try await send(request(try Self.jobPath(id), key: key)))
+        guard status.jobID == id else { throw SkyStudioFailure.badAnswer(status: 200) }
+        return status
     }
 
     /// `POST /jobs/{id}/cancel`：只有排着队的能取消（退钱）；开始了 / 结束了的是 `notCancellable`。

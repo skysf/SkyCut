@@ -9,6 +9,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import media_fixtures
 import model_expansion_fixtures as expansion
+from official_fixtures import OfficialRecipes
 
 PORT, ROOT, FFMPEG = int(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
 ROOT.mkdir(parents=True, exist_ok=True)
@@ -16,6 +17,7 @@ BASE = f"http://127.0.0.1:{PORT}"
 KEY = "sk-" + "S" * 43
 LOCK = threading.RLock()
 JOBS, KEYS, LOG, CONTROL = {}, {}, [], {}
+OFFICIAL = OfficialRecipes(ROOT)
 
 
 def stamp(seconds=0):
@@ -87,6 +89,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path.startswith("/files/"):
+            if CONTROL.get("official_delivery_failure") and Path(self.path).name.startswith("local-"):
+                return self.error(503, "fixture_delivery_unavailable")
             file = ROOT / Path(self.path).name
             if not file.is_file():
                 return self.error(404, "missing_file")
@@ -100,10 +104,14 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/__log":
             return self.reply(200, LOG)
+        if self.path == "/__state":
+            return self.reply(200, {"admitted_jobs": len(JOBS)})
         if not self.authorized():
             return
         if self.path.endswith("/me"):
-            return self.reply(200, {"account": {"id": "local-smoke"}, "credits": {"balance": 1000},
+            with LOCK:
+                LOG.append({"method": "GET", "path": self.path, "account": self.account(), "has_auth": True})
+            return self.reply(200, {"account": {"id": self.account()}, "credits": {"balance": 1000},
                 "skycut": {"plan": "pro", "features": {"mcp": True, "watermark": False},
                            "valid_until": stamp(86400), "max_running_jobs": 3}, "server_time": stamp()})
         if self.path.endswith("/models"):
@@ -114,22 +122,25 @@ class Handler(BaseHTTPRequestHandler):
                  "billing_policy": expansion.CATALOG["billing_policy"]})
         with LOCK:
             job = JOBS.get(self.path.split("/")[-1])
-            if job:
+            if job and job.get("account") == self.account():
                 if CONTROL.get("settle_refund"):
                     job["billing"] = expansion.billing("refunded", 0)
                 LOG.append({"method": "GET", "path": self.path, "has_auth": True})
                 if job.get("refuse"):
                     job["polls"] = job.get("polls", 0) + 1
                     media_fixtures.refuse(job, job["polls"] >= CONTROL.get("refund_after_polls", 1))
-                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls")}
+                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls", "account")}
                 return self.reply(200, public)
         self.error(404, "unknown_job")
 
     def authorized(self):
-        if self.headers.get("Authorization") == "Bearer " + KEY:
+        if self.account():
             return True
         self.error(401, "invalid_key")
         return False
+
+    def account(self):
+        return {"Bearer " + KEY: "local-smoke", "Bearer sk-" + "T" * 43: "local-smoke-other"}.get(self.headers.get("Authorization"))
 
     def do_POST(self):
         data = json.loads(self.body() or b"{}")
@@ -148,13 +159,19 @@ class Handler(BaseHTTPRequestHandler):
                 credits = CONTROL.get("quotes_by_prompt", {}).get(data.get("prompt"), credits)
                 if CONTROL.get("replacement_expensive") and data["model"] == "minimax-h3":
                     credits = 2
+                if "film" in data:
+                    code, result = OFFICIAL.quote(data, self.account(), credits, CONTROL)
+                    return self.error(code, result) if isinstance(result, str) else self.reply(code, result)
                 return self.reply(200, {"credits": credits, "typical_seconds": 5})
             if self.path.endswith("/uploads"):
                 suffix = Path(data["filename"]).suffix.lstrip(".")
                 name = f"upload-{len(LOG)}.{suffix}"
-                return self.reply(200, {"upload_url": BASE + "/put/" + name, "file_url": BASE + "/files/" + name, "headers": {}})
+                url = OFFICIAL.original(self.account(), name) if CONTROL.get("official") else BASE + "/files/" + name
+                return self.reply(200, {"upload_url": BASE + "/put/" + name, "file_url": url, "headers": {}})
             if self.path.endswith("/cancel"):
                 job = JOBS.get(self.path.split("/")[-2])
+                if job and job.get("account") != self.account():
+                    return self.error(404, "unknown_job")
                 if job and CONTROL.get("cancel_already_started"):
                     job["status"] = "running"
                     threading.Thread(target=synthesize, args=(job,), daemon=True).start()
@@ -165,12 +182,19 @@ class Handler(BaseHTTPRequestHandler):
                     return self.reply(200, {"status": "cancelled", "credits_refunded": job["credits"]})
                 return self.error(409, "not_cancellable")
             if self.path.endswith("/jobs"):
-                key = data["idempotency_key"]
+                if "film" in data and CONTROL.get("official_slot_full"):
+                    return self.reply(429, {"error": {"code": "too_many_jobs", "message": "Test account slots are full.", "limit": 3, "running": 3}})
+                if "film" in data:
+                    error = OFFICIAL.submit(data, self.account(), CONTROL)
+                    if error:
+                        return self.error(503 if error == "recipe_unavailable" else 400, error)
+                key = (self.account(), data["idempotency_key"])
                 if key in KEYS:
                     job = JOBS[KEYS[key]]
                 else:
                     identity = "local-" + str(len(JOBS) + 1)
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
+                               account=self.account(),
                                kind=data["kind"], model=data["model"], prompt=data.get("prompt", ""), poll_after_seconds=2,
                                credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity

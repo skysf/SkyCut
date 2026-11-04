@@ -60,7 +60,7 @@ func runVoiceRecoveryChecks() async {
         catch { check(true, "newer checkpoint format rejected") }
     } catch { check(false, "voice checkpoint checks: \(error)") }
 
-    SkyStudioStub.reset { _ in .http(200, sampleDoneJob) }
+    SkyStudioStub.reset { _ in .http(200, sampleDoneJobFor("job-1")) }
     var run = SkyStudioJobRun(api: jobAPI(), key: jobKey)
     run.sleep = SleepLog().sleep
     let checkpoints = UpdateLog()

@@ -59,6 +59,7 @@ enum AIProjectTools {
         if try args.bool("models") == true {
             result["generation_models"] = await SkyStudioModelStatus.read(model: try args.string("model"))
         }
+        if try args.bool("film_contract") == true { result["film_contract"] = MCPFilmSchema.contract }
         // 录屏：状态、授权、上次没收完的；screen=true 再列能录的屏幕 / 窗口 / 麦克风（record_screen 用）。
         result["screen_recording"] = AIScreenSources.statusJSON(listSources: try args.bool("screen") ?? false)
         // SkyCut 的授权（照授权拦生效时才报）：没开通时 get_status 是唯一照常回的工具，AI 靠它跟用户说清楚（SkyCutGates）。

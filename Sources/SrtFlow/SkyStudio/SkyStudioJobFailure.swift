@@ -1,6 +1,29 @@
 import Foundation
 import SrtFlowMCPKit
 
+// 服务端明确保证尚未入场的拒绝码；退款判定和官方提交回执共用，未知错误不加入。
+enum SkyStudioJobAdmission {
+    static let rejectedCodes: Set<String> = ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits",
+                                             "price_changed", "too_many_jobs", "recipe_unavailable"]
+
+    /// 代码不能盖过受理/供应商/扣费证据；全退只证明净额归零，不证明从未受理。
+    static func hasAdmissionEvidence(_ error: SkyStudioServerError) -> Bool {
+        let fields: Set<String> = ["job_id", "skystudio_job_id", "billing", "charged", "refunded", "credits_reserved", "credits_charged", "credits_refunded",
+            "provider_code", "provider_status", "provider_outcome", "result", "result_url", "generation_id", "generation_status", "delivery_status"]
+        return !fields.isDisjoint(with: error.fields.keys)
+    }
+
+    /// 只有现行合同明确的容量拒绝形状才能重新 POST；未知附加字段不能冒充未准入。
+    static func slotRefusal(_ error: SkyStudioServerError) -> Bool {
+        guard error.status == 429, error.code == SkyStudioServerError.tooManyJobs,
+              Set(error.fields.keys).isSubset(of: ["limit", "running"]) else { return false }
+        return error.fields.values.allSatisfy { value in
+            guard let n = value.doubleValue else { return false }
+            return n.isFinite && n >= 0 && n.rounded() == n
+        }
+    }
+}
+
 // MARK: - 任务拒绝的机器可读原因与退款证据（纯值）
 // 管什么：保留服务端错误码 / job_id / refunded / charged；退款未知不能写成已退、更不能重生成。
 // 不管什么：从错误句子猜人脸、安全原因或账务状态；HTTP 请求和模型切换。

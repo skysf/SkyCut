@@ -26,6 +26,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private let references: SkyStudioReferencePlan
     private let selectedModel: SkyStudioModel
     private let idempotencyKey: String
+    private let official: SkyStudioOfficialOperation?
     private let folder: URL
     private let stem: String
     /// 起它的时候这个会话在剪的工程（做出来的文件能不能不问就读，看它的家）。**弱引用**：几个工程同时开着时，工程可能先关、任务后回来
@@ -70,7 +71,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     init(
         generation: SkyStudioGeneration, model: SkyStudioModel, quote: SkyStudioQuote, references: SkyStudioReferencePlan, folder: URL, stem: String,
-        project: VideoEditProject, reservation: SkyStudioJobGate.Reservation, idempotencyKey: String
+        project: VideoEditProject, reservation: SkyStudioJobGate.Reservation, idempotencyKey: String,
+        official: SkyStudioOfficialOperation? = nil
     ) {
         self.generation = generation
         modelID = model.id
@@ -80,6 +82,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         self.references = references
         self.selectedModel = model
         self.idempotencyKey = idempotencyKey
+        self.official = official
         self.folder = folder
         self.stem = stem
         self.project = project
@@ -93,11 +96,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         case .soundEffect: label = L10n("Sound effect"); mediaKind = .audio
         }
         status = SkyStudioMediaStatus(kindLabel: label, modelTitle: model.title, credits: quote.credits,
-            uploads: references.uploads, title: stem, owner: CloudTasksActivity.owner(of: project), mediaKind: mediaKind)
+            uploads: official == nil && references.uploads, title: stem, owner: CloudTasksActivity.owner(of: project), mediaKind: mediaKind)
     }
 
     /// 图生视频要先传首帧（状态行上多一个「上传」）。
-    var uploads: Bool { references.uploads }
+    var uploads: Bool { official == nil && references.uploads }
 
     func start() -> AIJobs.Job {
         let job = AIJobs.shared.start(
@@ -133,6 +136,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         defer { SkyStudioGenerationActivity.shared.remove(status) }
         advance(to: .preparing)
         guard !Task.isCancelled else {
+            await recordRejection()
             held?.refund()
             return finish(.cancelled, "The generation was stopped before it started; no credits were spent.")
         }
@@ -140,20 +144,30 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         switch await SkyStudioJobKey.key(.silent) {
         case .success(let found): key = found
         case .failure(let problem):
+            await recordRejection()
             held?.refund()
             return finish(.failed, problem.message)
         }
 
         let api = SkyStudioAPI()
         do {
-            if references.uploads { advance(to: .uploading(fraction: nil)) }
-            let uploaded = try await SkyStudioReferenceFiles.upload(references, model: selectedModel, api: api, key: key) { [weak self] fraction in
-                Task { @MainActor in self?.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction))) }
+            let uploaded: (inputs: [String: String], references: [JSONValue])
+            if let official {
+                guard let project else { throw AIToolError("The official project was closed before submission; no request was sent.") }
+                try await SkyStudioOfficialGenerateTool.validateScope(official.scope, project: project, key: official.key)
+                guard key == official.key else { throw AIToolError("The account key changed before official submission; no request was sent.") }
+                uploaded = (official.request.inputs, official.request.references)
+            } else {
+                if uploads { advance(to: .uploading(fraction: nil)) }
+                uploaded = try await SkyStudioReferenceFiles.upload(references, model: selectedModel, api: api, key: key) { [weak self] fraction in
+                    Task { @MainActor in self?.advance(to: .uploading(fraction: CloudJobPhase.quantized(fraction))) }
+                }
             }
             try Task.checkCancellation()
             let done = try await attempt(api: api, key: key, uploaded: uploaded)
             guard let result = done.result else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
             applyBilling(done)
+            if done.billing?.netCharged != nil { try? await official?.recovery.observedSettlement() }
             let charged = done.billing?.netCharged
             if done.billing == nil { creditsUnconfirmed = true }
             serverFinished = true
@@ -189,9 +203,15 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                     caption = file
                 } catch { captionIssue = "Video saved; optional SRT download failed. Query the original job to recover the sidecar; generation remains charged." }
             }
+            try await official?.recovery.delivered(file: editable, original: destination)
             succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue)
         } catch let error as SkyStudioJobError {
+            await recordRejection(error)
             switch error {
+            case .notSubmitted:
+                if error.canRefund(beforeAccepted: !submitted.value) { held?.refund() }
+                creditsUnconfirmed = false
+                finish(Task.isCancelled ? .cancelled : .failed, error.message)
             case .stopped(let stop):
                 if stop == .nothingCharged { held?.refund() }
                 creditsUnconfirmed = stop == .unknown
@@ -207,6 +227,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 finish(.failed, error.message)
             }
         } catch is CancellationError {
+            await recordRejection()
             // 传首帧的时候停的没花钱；下载的时候停的，活已经做完了（积分花了，成品在作品库里）。
             if requestSent {
                 creditsUnconfirmed = !serverFinished && lastFailure?.creditsReturned != true
@@ -217,26 +238,45 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 finish(.cancelled, "The generation was stopped before Sky Studio got it; no credits were spent.")
             }
         } catch let problem as SkyStudioGenerationFrame.Problem {
+            await recordRejection()
             held?.refund()
             finish(.failed, problem.message)
         } catch let failure as SkyStudioFailure {
+            await recordRejection(SkyStudioJobError.request(failure))
             if !requestSent { held?.refund() }
             creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
             finish(.failed, SkyStudioJobError.request(failure).message)
         } catch {
+            await recordRejection()
             if !requestSent { held?.refund() }
             creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
-            finish(.failed, "SkyCut could not save the result: \(error.localizedDescription)")
+            finish(.failed, (error as? AIToolError)?.message ?? "SkyCut could not save the result: \(error.localizedDescription)")
+        }
+    }
+
+    private func recordRejection(_ error: SkyStudioJobError? = nil) async {
+        guard let official, !submitted.value else { return }
+        if !requestSent { try? await official.recovery.rejectedBeforeAdmission("local_not_sent") }
+        else if let code = error?.rejectedBeforeAdmissionCode {
+            try? await official.recovery.rejectedBeforeAdmission(code)
         }
     }
 
     private func attempt(api: SkyStudioAPI, key: String, uploaded: (inputs: [String: String], references: [JSONValue])) async throws -> SkyStudioJobStatus {
-        let request = generation.job(model: modelID, maxCredits: credits, uploaded: uploaded.inputs, references: uploaded.references, idempotencyKey: idempotencyKey)
+        let request = official?.request ?? generation.job(model: modelID, maxCredits: credits, uploaded: uploaded.inputs, references: uploaded.references, idempotencyKey: idempotencyKey)
+        try SkyStudioOfficialRequest.validate(request, submitting: true)
         requestKeys.append(request.idempotencyKey)
-        requestSent = true
         let submitted = self.submitted
+        var runner = SkyStudioJobRun(api: api, key: key)
+        if let official {
+            runner.checkpoint = { status in try await official.recovery.received(status) }
+            runner.beforeSubmit = { [weak self] in
+                guard let self else { throw SkyStudioJobError.notSubmitted("The original official task is no longer available; no POST was sent.") }
+                try await self.beforeOfficialSubmit(official)
+            }
+        } else { requestSent = true }
         do {
-            return try await SkyStudioJobRun(api: api, key: key).run(request) { [weak self] update in
+            return try await runner.run(request) { [weak self] update in
                 let next: CloudJobPhase?
                 switch update {
                 case .waitingForSlot: next = .queued(position: nil)
@@ -259,6 +299,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             if let id = error.failure?.jobID { submitted.mark(id) }
             throw error
         }
+    }
+
+    private func beforeOfficialSubmit(_ official: SkyStudioOfficialOperation) async throws {
+        try await SkyStudioOfficialSubmission.validate(official, references: references, project: project)
+        requestSent = true
     }
 
     // MARK: 结局
@@ -317,6 +362,13 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         payload["model_id"] = .string(modelID)
         payload["submission_keys"] = .array(requestKeys.map(JSONValue.string))
         payload["idempotency_key"] = .string(idempotencyKey)
+        if let code = official?.recovery.value.submissionRejection {
+            payload["recovery_state"] = "confirmed_not_submitted"; payload["rejection_code"] = .string(code); payload["charged"] = false
+        }
+        if let saved = official?.recovery.rejectionEvidenceSaved {
+            payload["recovery_evidence_saved"] = .bool(saved)
+            if !saved { payload["recovery_note"] = "Known rejection could not be persisted. This process has no-charge evidence; a restart will conservatively retain unknown outcome and block replay." }
+        }
         if let billing { payload["billing"] = billing.json; payload["billing_note"] = .string(billing.message) }
         if let generationStatus { payload["generation_status"] = .string(generationStatus) }
         if let deliveryStatus { payload["delivery_status"] = .string(deliveryStatus) }
@@ -340,7 +392,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         refreshing = true
         defer { refreshing = false }
         guard case .success(let key) = await SkyStudioJobKey.key(.silent),
-              let server = try? await SkyStudioAPI().job(id, key: key) else { return }
+              official == nil || official?.key == key else { return }
+        guard let server = try? await SkyStudioAPI().job(id, key: key) else { return }
+        try? await official?.recovery.received(server)
         applyBilling(server)
         var detail: [String: JSONValue] = [:]
         if let billing { detail["billing"] = billing.json; detail["billing_note"] = .string(billing.message); detail["credits_unknown"] = .bool(billing.netCharged == nil) }
