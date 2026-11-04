@@ -42,12 +42,16 @@ jobs:
           # 得带上它的父提交。
           fetch-depth: 2
 
+      # 顺带给 .build 缓存算一个工具链指纹：Xcode / Swift 一换，恢复回来的 .build 就不能用了（换了编译器 SwiftPM 本来就
+      # 全部重编，还白下载一遍），所以指纹进缓存的 key。
       - name: Toolchain versions (diagnostics)
+        id: toolchain
         run: |
           sw_vers
           xcodebuild -version
           swift --version
           sysctl -n hw.ncpu
+          echo "id=$({ xcodebuild -version; swift --version; } 2>&1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
       # 只改了文档（白名单和理由见 scripts/ci-docs-only.sh）：不编 App、不跑自检，第 1 组跑一遍扫描守卫就收工，
       # 其余四组到这里就绿了。下面每一步都带 `steps.changes.outputs.docs_only != 'true'`：这一步出了任何岔子
@@ -60,16 +64,26 @@ jobs:
         if: steps.changes.outputs.docs_only == 'true' && matrix.shard == 1
         run: scripts/check-guards.sh
 
-      # .build 里的模块缓存记着检出目录的绝对路径（/Users/runner/work/<仓库名>/<仓库名>），换了目录恢复回来就编不过
-      #（「was compiled with module cache path …」）。key 和 restore-keys 都带上检出目录：仓库改名之后不会再捡到旧目录的缓存
-      #（docs/bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md，checks/ci-build-cache-key.sh 钉着）。
-      - name: Cache SwiftPM build products
+      # .build 缓存（docs/bugfixes/2026-11-04-ci-build-cache-never-saved-a-compile.md）：
+      # - 先把入库文件的修改时间按内容设好。SwiftPM 看修改时间「和上次记下的一不一样」决定重不重编，checkout 出来的时间
+      #   每次都是新的，不设的话恢复回来的 .build 一个文件都用不上（以前就是这样：整个 App 每次冷编）。
+      # - 每组一份（各组编的东西不一样；以前五组抢一个 key，谁先跑完谁存，存下的是只编了核心库的那一组）。key 带工具链指纹
+      #   和这次的提交，restore-keys 去掉提交：恢复同一组、同一工具链最新的那一份。
+      # - 只在 main 上、整组绿了才存（PR 上存的只有这个 PR 自己用得上）；PR 恢复 main 上最新的那一份。
+      # - .build 里的模块缓存记着检出目录的绝对路径，换了目录恢复回来就编不过，所以 key 带检出目录
+      #   （docs/bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md）。checks/ci-build-cache-key.sh 钉着这些；
+      #   「按内容设的时间比上次编译还早时照样重编」由 scripts/check-ci-build-cache.sh 每次真验一遍。
+      - name: Stable file times (content-derived)
         if: steps.changes.outputs.docs_only != 'true'
-        uses: actions/cache@v4
+        run: python3 scripts/ci-stable-mtimes.py
+
+      - name: Restore SwiftPM build products
+        if: steps.changes.outputs.docs_only != 'true'
+        uses: actions/cache/restore@v4
         with:
           path: .build
-          key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ hashFiles('Package.swift') }}
-          restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-
+          key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard${{ matrix.shard }}-${{ github.sha }}
+          restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard${{ matrix.shard }}-
 
       - name: Cache vendor/ffmpeg
         if: steps.changes.outputs.docs_only != 'true'
@@ -83,10 +97,10 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: scripts/vendor-ffmpeg.sh
 
-      # 只在第 1 组单独冷编一遍完整 App：编译错误在自己的步骤里完整可见。
+      # 只在第 1 组单独编一遍完整 App：编译错误在自己的步骤里完整可见；恢复了 main 上的缓存就只编改了的那些。
       # 其余几组的子脚本只编核心库（它们只要 SrtFlowCore 的模块和目标文件），
-      # 不必每台都花一分多钟编整个 App。
-      - name: Build app (cold compile, errors visible here)
+      # 不必每台都花几分钟编整个 App。
+      - name: Build app (errors visible here)
         if: steps.changes.outputs.docs_only != 'true' && matrix.shard == 1
         run: swift build --arch arm64
 
@@ -110,6 +124,13 @@ jobs:
           name: preview-perf
           path: ${{ runner.temp }}/preview-perf
           if-no-files-found: ignore
+
+      - name: Save SwiftPM build products (main only)
+        if: github.event_name == 'push' && success() && steps.changes.outputs.docs_only != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .build
+          key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard${{ matrix.shard }}-${{ github.sha }}
 
   check-all:
     # ruleset protect-main 要求一个叫 check-all 的检查通过，由这里汇总 5 组的结果。

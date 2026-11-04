@@ -361,7 +361,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来（不挂在页面的 `onAppear` 上），剪辑页和 AI 的字幕样式都经
   `subtitleStyle(appWide:)`（工程自己的样式优先）：`checks/encode-settings-memory.sh`。
 - 构建日志不得被吞：`checks/no-swallowed-build-output.sh`。
-- CI 的 `.build` 缓存 key 和 restore-keys 带检出目录（`github.workspace`），仓库改名 / 换目录后不捡旧目录编的缓存：`checks/ci-build-cache-key.sh`。
+- CI 的 `.build` 缓存：key 和 restore-keys 带检出目录（`github.workspace`，仓库改名 / 换目录后不捡旧目录编的缓存）、工具链指纹、组号和提交，
+  取 / 存分开且同一个 key、只在 main 上绿了才存、编译之前修改时间按内容设（`scripts/ci-stable-mtimes.py`）：`checks/ci-build-cache-key.sh`；
+  按内容设的时间比上次编译早时照样重编（不拿旧目标文件测新代码）、新 checkout 放回 `.build` 重编 0 样，在小包上真走一遍：`scripts/check-ci-build-cache.sh`。
 - CI 的「只改了文档」快速通道（`scripts/ci-docs-only.sh` 判：只有 `docs/` 和根目录三份说明才算，改名算删旧加新；是就只跑扫描守卫）
   只在真的只改了文档时走、每一步重活都看判断的结论、触发条件里不许有 paths（必需的 check-all 会永远等不到结论）：`checks/ci-docs-only.sh`。
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
@@ -644,6 +646,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-04 CI 的 .build 缓存从来没省下过一次编译](docs/bugfixes/2026-11-04-ci-build-cache-never-saved-a-compile.md) — checkout 的修改时间每次都新（SwiftPM 按「一不一样」重编）、key 只看 Package.swift 命中后不再存、五组抢一个 key；修改时间按内容设、每组一份按提交存、只在 main 上存，小包上每轮验一遍「改了照样重编」。
 - [2026-11-04 四条扫描守卫从加上那天起，CI 一次都没跑过](docs/bugfixes/2026-11-04-scan-guards-never-ran-in-ci.md) — check-guards 按通配符跑 `checks/*.sh`、CI 只跑 check-all 列着的；sky-studio-wiring 等四条从没进过 check-all，文档还写着「第 1 组」。`checks/check-all-shards.sh` 钉着两边对得上。
 - [2026-11-04 非零时间线起点让原生尾帧请求落到前一个刻度](docs/bugfixes/2026-11-04-native-frame-request-truncation.md) — 原生请求显式 nearest-600、有限值与整数边界守卫；实际时间和漂移 / 半开窗不放宽，旧证据需重抽。
 - [2026-11-04 定格拒绝首个使用帧](docs/bugfixes/2026-11-04-freeze-rejects-first-used-frame.md) — 定格专用有限半开区间、段首前插保留完整原段、内部切分共用纯值体；普通分割余量与现有联动规则保留，反向守卫及实际 MCP 回归。

@@ -94,7 +94,7 @@ run_check() {
 # 快的在前。Rosetta 终端下必须显式 --arch arm64（见 docs/build/），各子脚本已各自处理。
 
 # ---- 第 1 组：完整 App 编得过 + 要链接完整 App 目标文件的检查 ----
-# CI 上这一组的 runner 先单独冷编一遍完整 App（编译错误在自己的步骤里看得清），检查跑完还要起这个 App
+# CI 上这一组的 runner 先单独编一遍完整 App（编译错误在自己的步骤里看得清），检查跑完还要起这个 App
 # 跑 3 分钟的预览性能 ratchet：是最慢的一组。其余几组只编核心库（子脚本只要 SrtFlowCore 的模块和目标文件）。
 # 所以这里只放两样：「App 编得过」这一项（子脚本不再顺手编整个 App 了），和要链接完整 App 目标文件
 # （SrtFlow.product/Objects.LinkFileList）的检查 —— 放到别的组，那台 runner 就得为它再冷编一遍整个 App。
@@ -165,6 +165,8 @@ run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，�
 run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
 run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
 run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
+# 小包上真走一遍 CI 的 .build 缓存：改过的文件（时间拨早了）照样重编、新 checkout 按内容设时间放回 .build 重编 0 样。
+run_check "ci-build-cache（.build 缓存不拿旧目标文件测新代码，也真省得下编译）" scripts/check-ci-build-cache.sh
 run_check "waveform（波形多级峰值：声道 / 尖峰 / 跨块 / 5.1 / 很多文件同时读）" scripts/check-waveform.sh
 run_check "project-file（工程存盘/重链接）" scripts/check-project-file.sh
 run_check "filters（调色：LUT 数学 + 预览与成片逐像素）" scripts/check-filters.sh
