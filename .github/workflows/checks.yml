@@ -49,10 +49,22 @@ jobs:
           swift --version
           sysctl -n hw.ncpu
 
+      # 只改了文档（白名单和理由见 scripts/ci-docs-only.sh）：不编 App、不跑自检，第 1 组跑一遍扫描守卫就收工，
+      # 其余四组到这里就绿了。下面每一步都带 `steps.changes.outputs.docs_only != 'true'`：这一步出了任何岔子
+      #（没输出、输出不是 true）都照常全跑，宁可多跑不许漏跑。checks/ci-docs-only.sh 钉着。
+      - name: Classify changes (docs only?)
+        id: changes
+        run: echo "docs_only=$(scripts/ci-docs-only.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Scan guards only (docs-only change)
+        if: steps.changes.outputs.docs_only == 'true' && matrix.shard == 1
+        run: scripts/check-guards.sh
+
       # .build 里的模块缓存记着检出目录的绝对路径（/Users/runner/work/<仓库名>/<仓库名>），换了目录恢复回来就编不过
       #（「was compiled with module cache path …」）。key 和 restore-keys 都带上检出目录：仓库改名之后不会再捡到旧目录的缓存
       #（docs/bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md，checks/ci-build-cache-key.sh 钉着）。
       - name: Cache SwiftPM build products
+        if: steps.changes.outputs.docs_only != 'true'
         uses: actions/cache@v4
         with:
           path: .build
@@ -60,6 +72,7 @@ jobs:
           restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-
 
       - name: Cache vendor/ffmpeg
+        if: steps.changes.outputs.docs_only != 'true'
         id: ffmpeg-cache
         uses: actions/cache@v4
         with:
@@ -67,30 +80,31 @@ jobs:
           key: ffmpeg-${{ hashFiles('scripts/vendor-ffmpeg.sh') }}
 
       - name: Fetch ffmpeg (on cache miss)
-        if: steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: scripts/vendor-ffmpeg.sh
 
       # 只在第 1 组单独冷编一遍完整 App：编译错误在自己的步骤里完整可见。
       # 其余几组的子脚本只编核心库（它们只要 SrtFlowCore 的模块和目标文件），
       # 不必每台都花一分多钟编整个 App。
       - name: Build app (cold compile, errors visible here)
-        if: matrix.shard == 1
+        if: steps.changes.outputs.docs_only != 'true' && matrix.shard == 1
         run: swift build --arch arm64
 
       - name: Run checks (shard ${{ matrix.shard }} of ${{ strategy.job-total }})
+        if: steps.changes.outputs.docs_only != 'true'
         run: scripts/check-all.sh --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
 
       # 预览性能 ratchet：起真 App 按固定场景数「做了多少件活」，只许降不许涨
       # （docs/architecture/preview-perf-ratchet.md）。要图形会话，所以不在 check-all.sh 里；
       # 放第 1 组是因为这台已经编好了完整 App。上一步红了它照跑：一次看全。
       - name: Preview performance ratchet
-        if: ${{ !cancelled() && matrix.shard == 1 }}
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' }}
         env:
           PREVIEW_PERF_OUT: ${{ runner.temp }}/preview-perf
         run: scripts/check-preview-perf.sh
 
       - name: Upload preview performance results
-        if: ${{ !cancelled() && matrix.shard == 1 }}
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: preview-perf
