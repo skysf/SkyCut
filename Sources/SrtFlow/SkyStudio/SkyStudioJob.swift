@@ -20,6 +20,11 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     var inputs: [String: String]
     var references: [JSONValue]
     var params: [String: JSONValue]
+    /// 官方原创镜头的公开故事声明；普通生成不带，不加载任何配方配置。
+    var film: SkyStudioFilm?
+    /// 服务端报价给的不透明凭据及本次明确审查的两侧指纹；只随 /jobs 提交。
+    var recipePin: String?
+    var seamReview: SkyStudioSeamReview?
     /// 用户同意过的上限（`/quote` 报的那个数）：服务器算出来更贵就回 `price_changed`、一分不扣。
     var maxCredits: Double?
     /// 每个账号唯一：服务器按同一个 key 去重。客户端只在明确 too_many_jobs 时等着再交，未知提交保留 key、不自动重放。
@@ -27,7 +32,8 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
 
     init(
         kind: String, model: String, prompt: String? = nil, inputs: [String: String] = [:], params: [String: JSONValue] = [:],
-        maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased(), references: [JSONValue] = []
+        maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased(), references: [JSONValue] = [],
+        film: SkyStudioFilm? = nil, recipePin: String? = nil, seamReview: SkyStudioSeamReview? = nil
     ) {
         self.kind = kind
         self.model = model
@@ -37,21 +43,34 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
         self.params = params
         self.maxCredits = maxCredits
         self.idempotencyKey = idempotencyKey
+        self.film = film
+        self.recipePin = recipePin
+        self.seamReview = seamReview
     }
 
-    /// `/quote` 的请求体：`/jobs` 的那一份去掉 inputs、max_credits、idempotency_key。
+    var allInputs: [String: JSONValue] {
+        var value = inputs.mapValues(JSONValue.string)
+        if !references.isEmpty { value["references"] = .array(references) }
+        return value
+    }
+
+    /// 普通 /quote 不带 inputs；官方 /quote 必须绑定已经准备好的实际引用，不能用数量代替。
     var quoteBody: JSONValue {
         var body: [String: JSONValue] = ["kind": .string(kind), "model": .string(model), "params": .object(params)]
         if let prompt { body["prompt"] = .string(prompt) }
+        if let film {
+            body["film"] = film.json
+            body["inputs"] = .object(allInputs)
+        }
         return .object(body)
     }
 
     /// `/jobs` 的请求体。
     var jobBody: JSONValue {
         guard case .object(var body) = quoteBody else { return quoteBody }
-        var allInputs = inputs.mapValues { JSONValue.string($0) }
-        if !references.isEmpty { allInputs["references"] = .array(references) }
         body["inputs"] = .object(allInputs)
+        if let recipePin { body["recipe_pin"] = .string(recipePin) }
+        if let seamReview { body["seam_review"] = seamReview.json }
         body["idempotency_key"] = .string(idempotencyKey)
         if let maxCredits { body["max_credits"] = .number(maxCredits) }
         return .object(body)
@@ -63,16 +82,22 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
     var credits: Double
     var typicalSeconds: Double?
     var plan: [String: JSONValue]
+    var officialRecipe: SkyStudioOfficialRecipeQuote?
 
-    init(credits: Double, typicalSeconds: Double? = nil, plan: [String: JSONValue] = [:]) {
+    init(credits: Double, typicalSeconds: Double? = nil, plan: [String: JSONValue] = [:], officialRecipe: SkyStudioOfficialRecipeQuote? = nil) {
         self.credits = credits
         self.typicalSeconds = typicalSeconds
         self.plan = plan
+        self.officialRecipe = officialRecipe
     }
 
     init?(json: JSONValue) {
         guard let credits = json["credits"]?.doubleValue else { return nil }
         self.init(credits: credits, typicalSeconds: json["typical_seconds"]?.doubleValue, plan: json["plan"]?.objectValue ?? [:])
+        if let official = json["official_recipe"] {
+            guard let parsed = try? SkyStudioOfficialRecipeQuote(json: official) else { return nil }
+            officialRecipe = parsed
+        }
     }
 }
 

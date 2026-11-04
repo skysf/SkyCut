@@ -57,6 +57,10 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioFilm.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioFilmReader.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioFilmInputs.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioOfficialQuote.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
@@ -95,6 +99,8 @@ xcrun swiftc \
   checks/SkyStudio/LicenseChecks.swift \
   checks/SkyStudio/GateChecks.swift \
   checks/SkyStudio/JobChecks.swift \
+  checks/SkyStudio/FilmChecks.swift \
+  checks/SkyStudio/OfficialQuoteChecks.swift \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \
   checks/SkyStudio/ApprovalChecks.swift \
