@@ -9,7 +9,7 @@
 # 这些 VideoEditProject / 协调者是 @MainActor 的 App 类型，自检编不动，只能在源码层面钉住。
 # 不管什么：判据、分块、缓存、转码本身（scripts/check-optimized-media.sh）。
 #
-# 用法：checks/optimized-media-wiring.sh（check-all 第 1 组）
+# 用法：checks/optimized-media-wiring.sh（check-all 里）
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

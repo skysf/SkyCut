@@ -1057,7 +1057,7 @@ edit_clip 2,074 字超长、清单里有汉字）。
 
 
 **录屏（第 45 条）**：`scripts/check-mcp.sh` 的 `ScreenRecordingToolChecks`（参数怎么读、只属于某种来源的参数给错地方报错、窗口 / 屏幕 / 麦克风怎么挑、
-区域比例换成点、词表和 `RegionAspectRatio` 对账、状态的说法、工具定义）；`checks/screen-recording-ai-wiring.sh`（扫描，第 1 组：不开系统选择窗口、设置页 / 残缺框只给手动的会话、
+区域比例换成点、词表和 `RegionAspectRatio` 对账、状态的说法、工具定义）；`checks/screen-recording-ai-wiring.sh`（扫描守卫：不开系统选择窗口、设置页 / 残缺框只给手动的会话、
 不覆盖、不写手动偏好、入轨包 step、录制中不摆窗口、丢弃先问进废纸篓、授权一次运行只请求一次、浮窗左下角、录制中的锁按原因说；真机首测补的：
 按时长停扣掉已录的、没授权不列窗口、残留报保存后的名字）。2026-10-03 反向验证：参数 / 挑法改坏四处、接线改坏十三处，各自当场红。
 真录要真屏幕和授权，靠第八节；第一轮真机测试的记录在[真机首测](../bugfixes/2026-10-03-record-screen-first-device-test.md)。

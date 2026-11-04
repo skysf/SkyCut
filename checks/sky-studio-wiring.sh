@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 扫描守卫：Sky Studio 账号和照授权拦（收费方案第 5 刀）的接线。秒级、不编译，进 check-all 第 1 组。
+# 扫描守卫：Sky Studio 账号和照授权拦（收费方案第 5 刀）的接线。秒级、不编译，进 check-all。
 #   1. **只有 SkyStudioAPI 碰 Sky Studio 的地址和 URLSession**（认证头、版本号、机器号、错误怎么分都在那一处）；
 #      环境变量 SRTFLOW_SKYSTUDIO_API_BASE 只在那里读，而且只认回环地址（Key 不会因此发到别处）；
 #   2. **原始的硬件 UUID 不出 SkyStudioMachine**：IOPlatformUUID 只在那里读，`X-SkyCut-Machine` 只在 SkyStudioAPI 里写、写的是哈希；

@@ -67,7 +67,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 
 | 检查 | 钉什么 |
 | --- | --- |
-| `checks/release-signing.sh`（第 1 组） | 第三节 1–5：打包脚本只经 `sign-app.sh`；它有身份就用、核对钉着的证书和签完的 requirement、ad-hoc 只在没有身份那一支；钉着正好一把证书；请求录屏授权之前先删旧记录、`tccutil` 只在一处；表里没有「关掉再打开」 |
+| `checks/release-signing.sh`（扫描守卫） | 第三节 1–5：打包脚本只经 `sign-app.sh`；它有身份就用、核对钉着的证书和签完的 requirement、ad-hoc 只在没有身份那一支；钉着正好一把证书；请求录屏授权之前先删旧记录、`tccutil` 只在一处；表里没有「关掉再打开」 |
 | `scripts/check-mcp.sh` 开头 | 小程序先拷进 Helpers 再签名，`sign-app.sh` 里先签小程序再签外层 |
 | `sign-app.sh` 自己 | 有身份时签完核对 requirement 是 `certificate leaf = H"<钉着的 SHA-1>"`，不是就红 |
 

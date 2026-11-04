@@ -200,7 +200,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 全部自动检查：`scripts/check-all.sh`。CI 在每个 PR 上运行同一入口：
   `.github/workflows/checks.yml`，按 `--shard N --of 5` 分到 5 台免费的 macOS runner 上并行跑，
   由一个叫 `check-all` 的汇总 job 给结论（分组、组数校验、汇总 job 为什么不能被跳过，见
-  [构建与打包「CI」一节](docs/build/build-and-packaging.md)）。新加检查要放进某个 `shard`。
+  [构建与打包「CI」一节](docs/build/build-and-packaging.md)）。新加检查要放进某个 `shard`：要链接完整 App 目标文件的
+  放第 1 组（只有那台编了完整 App），别的放第 2–5 组里最空的那组；文档里提到检查时别写组号（分组只以 check-all.sh 为准）。
 - 核心库：`swift run --arch arm64 SrtFlowCoreChecks`（含字幕折行的文字规矩 `SubtitleRowBreakChecks`：中日文的词在哪、能在哪儿断、断在哪好；含逐词高亮：词对到去完标点的字上、此刻亮哪个、跟着编辑走、按词切段、ASS 标签，`SubtitleWordChecks`）。
 - 生成的字幕长什么样（去标点、断句、一行多长、显示时间、几段素材同时有字只留一条，用例是用户工程里真实转写出来的句子）：
   `SrtFlowCoreChecks` 的 `SubtitlePunctuationChecks` / `SubtitleSegmentationChecks` / `SubtitleSourceOverlapChecks`；
@@ -209,7 +210,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   （`SubtitleMaxLines.swift`）、AI 的 `max_lines` 在 `scripts/check-mcp.sh` 的 `SubtitleLinesChecks`、接线同样在 `checks/project-file-wiring.sh`。
 - 工程存盘与素材重链接、选择模型（点选互斥 / 框选混选）、轨道块标记：
   `scripts/check-project-file.sh`；这批合同**有没有被生产代码调用**的接线扫描（隐藏清单、调色 / 盖一块 / 形状 / 文字读 `rendered*`、
-  字幕生成的可听快照等）单独成 `checks/project-file-wiring.sh`：秒级、不编译、进第 1 组，**搬代码 / 改名之后先在本地跑它**
+  字幕生成的可听快照等）单独成 `checks/project-file-wiring.sh`：秒级、不编译、进 check-all，**搬代码 / 改名之后先在本地跑它**
   （原来接在上一个脚本末尾的编译后面，本地跑不到，[PR #84 首跑 CI](docs/bugfixes/2026-09-29-pr84-first-ci-run-wiring-guard-in-moved-code.md) 才红）。
 - 播放头与悬停 peek 状态机，以及播放头的慢读法 `PacedPlayhead`（只跟「放置」、播放中不跟、停下追上一次、
   不认悬停），还有「回到开头」（Return / Home）只由 `goToStart` 请时间线滚回最左、普通 seek 不许，
@@ -226,7 +227,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   （第 2 组；素材 AVAssetWriter 现写，不依赖 ffmpeg）。**按块换源**（段跨几块插几段、时间账不动、画面同原片、块没齐 / 没了退回原片、
   变速 / 上层轨 / 4K 减半、先转播放头附近的）在 `scripts/check-preview-composition.sh` 第 0d 组；接线（换源只在预览重建、成片 / 预渲染 /
   AI 看永远原片、停着才换、切工程作废、菜单不读工程、性能台架量原片；清空之后紧跟 reset + 重建、缓存目录和上限的键只经 Store、
-  改上限立刻 enforce、启动时在 proxy 队列上过期、转不了的只在菜单里标不写提示条）：`checks/optimized-media-wiring.sh`（第 1 组）。
+  改上限立刻 enforce、启动时在 proxy 队列上过期、转不了的只在菜单里标不写提示条）：`checks/optimized-media-wiring.sh`（扫描守卫）。
 - 主线程心跳看门狗（主线程没卡不误报、卡过阈值记时长 / context / 栈、日志文件、stop 之后不记），以及挂起主线程抓栈期间
   抓栈线程一次都不分配 / 释放内存（第 6 组：`malloc_logger` 钩子逐次数，确定性）、主线程不停分配时连续抓栈不卡死（第 7 组）：
   `scripts/check-main-thread-watchdog.sh`；日志在哪、怎么读见 [主线程卡顿日志](docs/testing/main-thread-stalls.md)。
@@ -332,9 +333,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
-- AI 录屏的接线（扫描，第 1 组）：AI 起的录制不开系统选择窗口、设置页 / 残缺框只给手动的会话、不覆盖、不写手动的偏好、入轨包 `AIUndoGrouping.step`、
+- AI 录屏的接线（扫描守卫）：AI 起的录制不开系统选择窗口、设置页 / 残缺框只给手动的会话、不覆盖、不写手动的偏好、入轨包 `AIUndoGrouping.step`、
   录制中不把 SrtFlow 摆到前面、丢弃先问且进废纸篓、授权一次运行只请求一次、浮窗在左下角、录制中换工程 / 改帧率先挡：`checks/screen-recording-ai-wiring.sh`。
-- Sky Studio 账号与照授权拦（收费方案第 5 刀）：`scripts/check-sky-studio.sh`（`check-all` 第 2 组，不碰网络、不碰钥匙串）：Key 的整理与钥匙串那一条的名字、机器号钉死一组值（盐改了就红）、`/me` 照合同里的样例读（带毫秒的日期、读得宽、少了必须的不算回答）、假 URLSession 上的请求（地址、四个头）和三种失败、环境变量只能指到本机、此刻的授权（没有 Key / 没问到过 / 过期按免费版、钟差、往回拨）与什么时候再问、照授权拦（`GateChecks`：默认打开、测试开关关不掉它、每个工具 × 每种授权让不让且 `get_status` 永远让、水印听服务器的、被挡住时的话、`skycut_plan`）；接线（地址只在 `SkyStudioAPI`、硬件 UUID 只在 `SkyStudioMachine`、后台不弹钥匙串框、设置和启动接上了、AI 的门在核对参数名之后建调用之前、导出面板挂着「会带水印」那一行、`export_video` 和 `get_status` 说授权、交任务和取消只经 `SkyStudioJobRun`、认证头只在 `SkyStudioAPI.request()` 写一次）：`checks/sky-studio-wiring.sh`（第 1 组）。同一个脚本还管**第 6 刀的任务**（`JobChecks` / `JobRunChecks`：`/models`、`/quote`、`/jobs` 发什么读什么、取消的两种结果、`/uploads` 之后 PUT 只带服务器给的头不带 Key、下载成品；`SkyStudioJobRun` 满了等着用同一个 idempotency_key 再交、照 `poll_after_seconds` 问、断网几次不算、停的时候排队中退钱 / 开始了取消不了且接着查到底）和 **generate_media 送 Sky Studio 的那一份**（`GenerationChecks`：词表和 `SkyStudioGeneration` 对账、每种的默认值、用不上的参数说一句不送、请求体、确认码的记号、离谁最近的画幅、成品的扩展名）；接线第 9 条钉着生成的把关在建任务之前、Key 不弹框、状态行和 get_job 的阶段与 `skystudio_job_id`。
+- Sky Studio 账号与照授权拦（收费方案第 5 刀）：`scripts/check-sky-studio.sh`（`check-all` 第 2 组，不碰网络、不碰钥匙串）：Key 的整理与钥匙串那一条的名字、机器号钉死一组值（盐改了就红）、`/me` 照合同里的样例读（带毫秒的日期、读得宽、少了必须的不算回答）、假 URLSession 上的请求（地址、四个头）和三种失败、环境变量只能指到本机、此刻的授权（没有 Key / 没问到过 / 过期按免费版、钟差、往回拨）与什么时候再问、照授权拦（`GateChecks`：默认打开、测试开关关不掉它、每个工具 × 每种授权让不让且 `get_status` 永远让、水印听服务器的、被挡住时的话、`skycut_plan`）；接线（地址只在 `SkyStudioAPI`、硬件 UUID 只在 `SkyStudioMachine`、后台不弹钥匙串框、设置和启动接上了、AI 的门在核对参数名之后建调用之前、导出面板挂着「会带水印」那一行、`export_video` 和 `get_status` 说授权、交任务和取消只经 `SkyStudioJobRun`、认证头只在 `SkyStudioAPI.request()` 写一次）：`checks/sky-studio-wiring.sh`（扫描守卫）。同一个脚本还管**第 6 刀的任务**（`JobChecks` / `JobRunChecks`：`/models`、`/quote`、`/jobs` 发什么读什么、取消的两种结果、`/uploads` 之后 PUT 只带服务器给的头不带 Key、下载成品；`SkyStudioJobRun` 满了等着用同一个 idempotency_key 再交、照 `poll_after_seconds` 问、断网几次不算、停的时候排队中退钱 / 开始了取消不了且接着查到底）和 **generate_media 送 Sky Studio 的那一份**（`GenerationChecks`：词表和 `SkyStudioGeneration` 对账、每种的默认值、用不上的参数说一句不送、请求体、确认码的记号、离谁最近的画幅、成品的扩展名）；接线第 9 条钉着生成的把关在建任务之前、Key 不弹框、状态行和 get_job 的阶段与 `skystudio_job_id`。
 - 云端媒体：`scripts/check-sky-studio.sh` 验证现行接口 / 任务 / 报价 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账与阶段；`checks/no-legacy-generation.sh` 禁止旧 fal 客户端 / Key / 设置 / 模型和网络路径回来。
   `scripts/check-voice-recovery.sh`（第 1 组）链接真实 App 对象，验证第二批云端成功而本地失败后只恢复已有音频、只补第三批、字幕 / 片段不重复、原子入轨撤销与未知单不重放。
   `scripts/check-mcp.sh` 的 `ProviderChecks` / `SkyStudioVoiceChecks` 验证清单、旧标记兼容、选声、词时间、WAV；`scripts/check-keychain.sh` 是本机真实钥匙串回归，不在 CI 里。
@@ -357,7 +358,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `subtitleStyle(appWide:)`（工程自己的样式优先）：`checks/encode-settings-memory.sh`。
 - 构建日志不得被吞：`checks/no-swallowed-build-output.sh`。
 - CI 的 `.build` 缓存 key 和 restore-keys 带检出目录（`github.workspace`），仓库改名 / 换目录后不捡旧目录编的缓存：`checks/ci-build-cache-key.sh`。
-- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）：`checks/check-all-shards.sh`。
+- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
+  以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - 发布版用固定的签名身份签（打包脚本只经 `scripts/signing/sign-app.sh`、它有身份就用并核对钉着的证书、ad-hoc 只在没有身份那一支、
@@ -389,7 +391,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   读工程的属性、必须 `Equatable` 且构造处套 `.equatable()`**，以及**订阅播放器时钟的只许是名单里跟着播放头动的
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
-  `checks/ai-work-queue-wiring.sh`（第 1 组）。
+  `checks/ai-work-queue-wiring.sh`（扫描守卫）。
 - 全部扫描守卫一条命令：`scripts/check-guards.sh`（跑 `checks/*.sh` 每一条，再加 `scripts/check-mcp.sh --scans-only` —— check-mcp 编译之前那一段扫描、连同它 source 进来的 `checks/MCP/*-wiring.sh`，以前只在 CI 上跑得到；推之前必跑；`check-all.sh` 照样逐条跑它们，`checks/check-all-shards.sh` 钉着两边对得上）。
 - 本文件的索引必须是全的：`docs/` 下每一份文档都要能从这里找到，且没有死链 ——
   `checks/docs-index-drift.sh`。只读 AGENTS.md 的代理打不开索引外的文档，

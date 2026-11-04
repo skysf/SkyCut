@@ -132,7 +132,7 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 
 ## 七、守卫
 
-`checks/open-projects-wiring.sh`（`check-all` 第 1 组）：全仓的代码里没有 `VideoEditProject.shared`、`VideoEditProject(` 只在注册表里；
+`checks/open-projects-wiring.sh`（`check-all` 里的扫描守卫）：全仓的代码里没有 `VideoEditProject.shared`、`VideoEditProject(` 只在注册表里；
 `effectiveUndoManager` 退到 `ownUndoManager`、不碰 `keyWindow`；工程代号正好两处从 `DocumentGenerations.next()` 拿、没有自己数的；
 App 的退出和录屏收尾之后的退出都问每个工程；录屏开录时记下 `targetProject`、入轨落回它；
 工程窗口的 delegate 交出 `ownUndoManager` 且**先挂 delegate 再放内容**（按行号比）；主窗口的撤销管理器只交给 `.mainWindow` 的剪辑页；

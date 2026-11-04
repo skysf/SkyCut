@@ -70,7 +70,7 @@
   授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问；
   照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
   被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
-- `checks/sky-studio-wiring.sh`（扫描，第 1 组）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
+- `checks/sky-studio-wiring.sh`（扫描守卫）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
   弹框的那一档读只在 `KeychainSecret.swift`、`SkyStudioAccount` 只有 `promptKeychain` 为真才弹、`promptKeychain: true` 只在设置那一节；设置窗口挂着这一节、启动时 `start()`；
   照授权拦：门在核对参数名之后、建调用排队之前；让不让、带不带水印只在 `SkyStudioAccount` 里调 `SkyCutGates`；导出面板挂着那一行；`export_video` 开始和做完都说水印；`get_status` 报 `skycut_plan`。
   反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；（2026-10-28）拆掉路由的门、门挪到排队之后、面板不挂那一行、get_status 不报 —— 各自红；恢复后转绿。

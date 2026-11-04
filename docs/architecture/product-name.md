@@ -59,7 +59,7 @@
 
 | 检查 | 钉什么 |
 | --- | --- |
-| `checks/product-name.sh`（第 1 组） | 第 5 节：Info.plist 里工程的后缀先 `skycut` 再 `srtflowproj`、两个后缀常量、两个子文件夹名、AI 的输出位置经 `aiFolder`、列文件夹跳过两个名字、没有别处拿后缀直接比（只许问 `isProjectFile`）、没有别处直接拼 `aiFolderName`。其余几节 —— 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：七个数据文件夹、卡顿日志位置、Sky Studio 的身份键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
+| `checks/product-name.sh`（扫描守卫） | 第 5 节：Info.plist 里工程的后缀先 `skycut` 再 `srtflowproj`、两个后缀常量、两个子文件夹名、AI 的输出位置经 `aiFolder`、列文件夹跳过两个名字、没有别处拿后缀直接比（只许问 `isProjectFile`）、没有别处直接拼 `aiFolderName`。其余几节 —— 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：七个数据文件夹、卡顿日志位置、Sky Studio 的身份键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
 | `checks/MCP/ProtocolChecks.swift` | 小程序握手和 `server/discover` 报的 `serverInfo.name` 是 `skycut` |
 | `checks/MCP/ConfigChecks.swift` | 「连接 AI」往 Claude / Codex 配置里写、删的是 `skycut` 那一项，放行规则是 `mcp__skycut` |
 | `scripts/check-mcp.sh` 开头 | 打包脚本把 `skycut-mcp` 拷进 Helpers，`sign-app.sh` 先签它再签外层 |

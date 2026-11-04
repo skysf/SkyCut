@@ -7,7 +7,7 @@
 # 为什么单独成一个脚本（2026-09-29，docs/bugfixes/2026-09-29-pr84-first-ci-run-wiring-guard-in-moved-code.md）：
 # 这一段原来接在 check-project-file.sh 的末尾，前面是 25 秒的编译，本地只跑秒级扫描守卫时就跑不到它；
 # 把调色代码搬进新文件之后，一条还在旧文件里找的守卫只在 CI 上才红 —— 和 2026-09-25 PR #71 是同一个坑。
-# 现在它和其它扫描守卫一样秒级、不编译、进第 1 组，改接线（挪代码、改名）之后本地就能先跑一遍。
+# 现在它和其它扫描守卫一样秒级、不编译、进 check-all，改接线（挪代码、改名）之后本地就能先跑一遍。
 # 不管什么：合同本身对不对（scripts/check-project-file.sh）。
 #
 # 用法：checks/project-file-wiring.sh

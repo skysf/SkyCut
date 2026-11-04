@@ -39,7 +39,7 @@
   - 真导出（`checks/Watermark/ExportChecks.swift`，调真实的 `VideoEditExportGraph.plan()`，开着和不开各导一遍逐像素比）：每一段改动的外接框落在表上那一处的整张图里、
     范围差不多是整个 logo；第 95 帧（3.958 秒）还是第一段、第 96 帧（4.000 秒）已经是第二段；盖满画面的实心形状上面照样有；不加水印时参数里没有水印的图、
     加的时候用到几种进几张；1280 × 720 导 480p 之后还在那一角。
-- `checks/export-watermark-wiring.sh`（扫描，`check-all.sh` 第 1 组）：`Sources` 里只有 `VideoEditExporter` 调 `VideoEditExportGraph.plan(` 和 `WatermarkPolicy.mark(`，
+- `checks/export-watermark-wiring.sh`（扫描守卫，在 `check-all.sh` 里）：`Sources` 里只有 `VideoEditExporter` 调 `VideoEditExportGraph.plan(` 和 `WatermarkPolicy.mark(`，
   拿 `SkyStudioAccount.shared.exportsWithWatermark` 问、把问到的水印传进去、读不出 logo 时报错不导；每一处问 `WatermarkPolicy` 都传授权；导出图里叠水印正好一处、在烧字幕之后、缩小之前。
 
 ## 五、人工回归（发版前）

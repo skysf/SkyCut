@@ -14,7 +14,7 @@
 # 5. 非视图的几处埋点和测试入口都还接着。
 #
 # 用法：
-#   checks/preview-perf-wiring.sh          # 检查（check-all 第 1 组）
+#   checks/preview-perf-wiring.sh          # 检查（check-all 里）
 #   checks/preview-perf-wiring.sh --fix    # 先把漏插的计数自动补上，再检查
 #
 # `--fix` 只补**标准写法**：body 开头独占一行、`updateNSView` 的签名在同一行、
