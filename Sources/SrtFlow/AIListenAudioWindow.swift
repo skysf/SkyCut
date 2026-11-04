@@ -7,6 +7,8 @@ import Foundation
 enum AIListenAudioWindow {
     /// 内部生产读取探针：自检等待真实 start/finish，不以 sleep 或别的队列任务推测 reader 状态。
     enum Event: Sendable { case started, finished }
+    /// 生命周期守卫可替换 reader 并记录原生收尾；实际工具默认仍建同一个 AVAssetReader。
+    typealias ReaderFactory = @Sendable (AVAsset) throws -> AVAssetReader
     struct Reading: Sendable {
         var peaks: WaveformPeaks
         /// 本地波形第零帧对应的源秒；压缩音频按真实 PTS 裁掉包边界外的采样。
@@ -37,7 +39,8 @@ enum AIListenAudioWindow {
 
     static func read(
         _ url: URL, from: Double?, to: Double?, until deadline: Date,
-        observe: (@Sendable (Event) -> Void)? = nil
+        observe: (@Sendable (Event) -> Void)? = nil,
+        readerFactory: ReaderFactory? = nil
     ) async throws -> Reading {
         let asset = AVURLAsset(url: url)
         let control = AIListenReadControl(asset: asset)
@@ -48,6 +51,7 @@ enum AIListenAudioWindow {
                 try Task.checkCancellation()
                 try control.check()
                 let duration = try await asset.load(.duration).seconds
+                try control.check()
                 guard duration.isFinite, duration > 0 else { throw AIToolError("SkyCut could not determine this file's duration.") }
                 let start = max(0, from ?? 0)
                 let end = min(to ?? duration, duration)
@@ -57,12 +61,14 @@ enum AIListenAudioWindow {
                 guard let found = try await asset.loadTracks(withMediaType: .audio).first else {
                     throw AIToolError("\(url.lastPathComponent) has no sound SkyCut can read.")
                 }
+                try control.check()
                 let formats = try await found.load(.formatDescriptions)
+                try control.check()
                 let channels = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame } ?? 2
                 nonisolated(unsafe) let track = found
                 return try await control.run {
                     try read(asset, track: track, channels: Int(channels), from: start, to: end,
-                             duration: duration, control: control, observe: observe)
+                             duration: duration, control: control, observe: observe, readerFactory: readerFactory)
                 }
             } catch {
                 try control.check()
@@ -74,10 +80,11 @@ enum AIListenAudioWindow {
     /// 同步阻塞段：timeRange 限制解码，PTS 再限制进统计的采样；失败/取消不发布半份结果。
     private static func read(
         _ asset: AVURLAsset, track: AVAssetTrack, channels: Int, from: Double, to: Double,
-        duration: Double, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?
+        duration: Double, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?, readerFactory: ReaderFactory?
     ) throws -> Reading {
         try control.check()
-        let reader = try AVAssetReader(asset: asset)
+        let reader = try readerFactory?(asset) ?? AVAssetReader(asset: asset)
+        // 唯一取消点与 copy 在同一个同步读取体；外部超时/取消不能拆掉还在 copy 的原生对象。
         defer { reader.cancelReading(); observe?(.finished) }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings(channels: channels))
         output.alwaysCopiesSampleData = false
@@ -87,7 +94,7 @@ enum AIListenAudioWindow {
                                        end: CMTime(seconds: to, preferredTimescale: 600_000))
         try control.check()
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading this audio range.") }
-        try control.attach(reader)
+        try control.check()
         observe?(.started)
         var accumulation = Accumulation()
         while true {

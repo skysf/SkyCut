@@ -31,6 +31,22 @@ if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
 fi
 echo "   ✓ 显式范围不走整文件波形；原生 timeRange、生产取消/截止时间、长文件节拍限制已接上"
 
+echo "==> listen 原生生命周期：copy 与取消只由同一 analysis 读取体拥有"
+python3 - "${LISTEN_WINDOW}" "${LISTEN_CONTROL}" <<'PY'
+import pathlib, sys
+window, control = (pathlib.Path(name).read_text() for name in sys.argv[1:])
+code = lambda text: "\n".join(line.split("//", 1)[0] for line in text.splitlines())
+window, control = code(window), code(control)
+assert "cancelReading(" not in control, "✗ listen control must not cancel a reader from the caller/timer thread"
+assert "AVAssetReader" not in control, "✗ listen control must not retain the analysis-owned native reader"
+assert window.count("reader.cancelReading()") == 1, "✗ listen native reader needs exactly one owner cleanup"
+assert "defer { reader.cancelReading(); observe?(.finished) }" in window, "✗ native owner must finish before publishing its result"
+assert "loading = false" in control and "loading ? asset : nil" in control, "✗ metadata cancellation must end atomically before the read operation can start"
+assert "autoreleasepool { Result" in control, "✗ native reader release must finish on analysis before continuation completion"
+assert "runListenReaderLifecycleChecks(url)" in pathlib.Path("checks/MCP/ListenRangeChecks.swift").read_text(), "✗ native lifecycle regression is not called by the production range checks"
+PY
+echo "   ✓ 外部取消只发信号；metadata 移交后不再取消 asset；reader 单点收尾并在恢复调用方前释放"
+
 echo "==> listen cuts=true：V1 的剪辑点一次查完，转写只读缓存、声音从哪段来和判的输入都和 cut_speech 同一份"
 # 2026-10-16（docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md；第四节第 13 条）；纯值在 checks/MCP/CutCheckChecks.swift。
 # 2026-10-18：两个工具判切口的输入（整个素材文件的电平、门限、词）只从 AISpeechHearing 来，读法只有 AISpeechCutTool 的 wholeFile / transcript

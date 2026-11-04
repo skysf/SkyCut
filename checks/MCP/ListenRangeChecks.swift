@@ -20,6 +20,7 @@ func runListenRangeChecks() async {
         let url = try makeListenRangeFixture(in: directory)
         await checkListenFileRange(url)
         await checkNativeListenRange(url)
+        await runListenReaderLifecycleChecks(url)
         await checkListenReadEnds(url)
         await checkListenMusicLimit(url)
         await checkListenShortFile(in: directory)
@@ -172,7 +173,7 @@ private func checkActiveListenReadEnds(_ url: URL, timeout: Bool) async {
     for await event in events {
         if case .started = event { began = true; break }
     }
-    check(began, "active-read regression observes actual native startReading/attachment")
+    check(began, "active-read regression observes actual native startReading on its owner queue")
     if !timeout { task.cancel() }
     do { _ = try await task.value; check(false, "active timeout/cancellation must not return partial statistics") }
     catch is CancellationError { check(!timeout, "active native cancellation propagates") }

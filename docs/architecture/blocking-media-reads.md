@@ -49,6 +49,30 @@
 宽度只关系到性能（和播放抢 CPU、内存），和死锁无关。43 个短素材：宽度 1 用 0.92 秒，
 宽度 2 用 0.77 秒，3 以上约 0.7 秒。宽度取 2，这样一条被长录屏占住时，另一条照样往下走。
 
+## 读取中的取消与释放
+
+`AVAssetReader.cancelReading()` **不能与输出的 `copyNextSampleBuffer()` 并发**。
+本机 Apple SDK 的 `AVFoundation.framework/Headers/AVAssetReader.h:222` 明确写着：
+“This method should not be called concurrently with any calls to -[AVAssetReaderOutput copyNextSampleBuffer].”
+[API 说明](https://developer.apple.com/documentation/avfoundation/avassetreader/cancelreading%28%29)
+中的停止后台预读，不等于允许另一个线程拆掉正在交样本的 reader。
+
+`listen` 的规则是同一个 `analysis` 同步读取体拥有 reader：建立、启动、每次 copy、
+唯一的 `defer cancelReading` 和最后释放都在那里。调用方、截止时间 timer 和
+`onCancel` 只记停止原因，不持有 reader，也不调用其原生取消。读取体在每次 copy
+前后检查停止信号；收尾和 autorelease pool 释放完成后，才恢复等待结果的 continuation。
+取消或超时绝不发布半份统计。
+
+metadata 加载阶段仍可立即 `asset.cancelLoading()`；向读取 operation 移交时，在同一锁内
+结束这一阶段。取消先发生就留下 failure、不开 reader；移交先发生，之后不能再对读取中的
+asset 调 `cancelLoading`。还在队列中的 operation 直接取消、立即回失败，不必等队列空位。
+
+**截止时间的边界**：活动读取在当前一次 native copy 返回后停止，不能把任意卡死的原生
+调用硬中断。不得为了让超时看起来准点而跨线程调用 `cancelReading`，也不得提前报告
+“已经结束”却把仍在读的对象留在后台。遇到系统解码器不返回时应保留真实的等待状态；
+这是原生调用的限制，需要实机核对，不能算作已证明有界的墙钟完成时间。
+案例：[取消 listen 时跨线程拆掉正在读的 reader](../bugfixes/2026-11-04-listen-reader-cancel-during-copy.md)。
+
 ## 例外
 
 - `SubtitleGen/AudioWindowReader.extract`：字幕生成按窗口抽音频，`TranscriptionTask` 里
@@ -85,7 +109,7 @@
 | `scripts/check-waveform.sh` 第 7 节 | 同时读 `min(40, max(16, 2 × 核数))` 个文件，总览和原始采样块各一轮，必须全部读完；看门狗跑在普通线程上，30 秒没读完就判红（死锁时 await 永远不回来，没有看门狗的话守卫只会挂住，不会变红） |
 | `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
 | `scripts/check-export-profile.sh` | 生产 `FFmpegProcess` 的立即退出、双管道 / 最后进度、错误和取消；独立线程的 30 秒看门狗在旧等待实现上实际变红 |
-| `scripts/check-mcp.sh` 的 `ListenRangeChecks` | 显式文件范围在 `analysis` 上有界读取；队列中超时/取消直接取消待执行 operation，已开读时取消原生 reader，失败不发布半份统计 |
+| `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取；队列中超时/取消直接结束，已开读时等本次 copy 返回再由读取体单点取消与释放；原生探针固定线程交错，失败不发布半份统计 |
 
 **人工回归**（自动化够不着的真实工程，发版前实机验证）：
 
@@ -93,3 +117,6 @@
       几秒之内，所有视频块都出缩略图，所有音频块都出波形。
 - [ ] 放大到按帧显示，在叠着好几条音频轨的位置来回滚动：波形逐渐变清楚，界面不卡，
       不留空块。
+- [ ] 对真实长文件的显式 `listen` 区间，在读取中取消并触发截止时间：无崩溃、无半份统计，
+      收尾后同队列还能读取。若底层 copy 长时间不返回，不得声称硬超时已完成；记录素材、
+      系统版本和原生等待栈，确认 UI 仍保持真实的等待状态。

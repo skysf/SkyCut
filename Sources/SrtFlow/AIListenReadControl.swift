@@ -1,17 +1,17 @@
 import AVFoundation
 import Foundation
 
-// 管什么：一次 listen 文件短窗读取的取消与截止时间；排队时直接结束，读取时取消原生 reader。
+// 管什么：一次 listen 文件短窗读取的取消与截止时间；排队时直接结束，读取时只发出停止信号。
 // 不管什么：波形总览的共享任务、音频统计、工程或界面。只属于这一通调用，不取消别的消费者。
 
 final class AIListenReadControl: @unchecked Sendable {
     private let lock = NSLock()
     private let asset: AVURLAsset
     private var failure: Error?
-    private var reader: AVAssetReader?
     private var operation: BlockOperation?
     private var continuation: CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?
     private var running = false
+    private var loading = true
     private var finished = false
     private var timer: DispatchSourceTimer?
 
@@ -36,22 +36,19 @@ final class AIListenReadControl: @unchecked Sendable {
         if let error = lock.withLock({ failure }) { throw error }
     }
 
-    func attach(_ reader: AVAssetReader) throws {
-        try lock.withLock {
-            if let failure { throw failure }
-            self.reader = reader
-        }
-    }
-
-    /// 排队还没开读时取消，不必等这条队列腾出位置；已开读则等 reader 真正收尾后再回结果。
+    /// 排队时取消不等队列腾位置；已开读等当前 native copy 返回，由读取体单点收尾后再回结果。
     func run(_ work: @escaping @Sendable () throws -> AIListenAudioWindow.Reading) async throws -> AIListenAudioWindow.Reading {
         let result: Result<AIListenAudioWindow.Reading, Error> = await withCheckedContinuation { continuation in
             let operation = BlockOperation { [self] in
                 guard begin() else { return }
-                complete(Result { try check(); return try work() })
+                // 原生 reader/output 的最后释放也留在读取队列，先收尾再恢复调用方。
+                let result = autoreleasepool { Result { try check(); return try work() } }
+                complete(result)
             }
             let error = lock.withLock { () -> Error? in
                 if let failure { return failure }
+                // stop 先拿锁会留下 failure，永不开读；这里先拿锁后 stop 不再 cancelLoading。
+                loading = false
                 self.continuation = continuation
                 self.operation = operation
                 return nil
@@ -64,16 +61,14 @@ final class AIListenReadControl: @unchecked Sendable {
     }
 
     func finish() {
-        let resources = lock.withLock { () -> (AVAssetReader?, DispatchSourceTimer?) in
+        let timer = lock.withLock { () -> DispatchSourceTimer? in
             finished = true
-            let resources = (reader, timer)
-            reader = nil
-            timer = nil
+            let timer = self.timer
+            self.timer = nil
             operation = nil
-            return resources
+            return timer
         }
-        resources.1?.cancel()
-        resources.0?.cancelReading()
+        timer?.cancel()
     }
 
     private func begin() -> Bool {
@@ -95,16 +90,16 @@ final class AIListenReadControl: @unchecked Sendable {
     }
 
     private func stop(_ error: Error) {
-        let resources = lock.withLock { () -> (AVAssetReader?, BlockOperation?, CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?) in
+        let resources = lock.withLock { () -> (AVURLAsset?, BlockOperation?, CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?) in
             guard !finished, failure == nil else { return (nil, nil, nil) }
             failure = error
             let pending = running ? nil : continuation
             if !running { continuation = nil }
-            return (reader, operation, pending)
+            return (loading ? asset : nil, operation, pending)
         }
-        resources.0?.cancelReading()
+        // AVAssetReader.cancelReading 不许与 copyNextSampleBuffer 并发；读取阶段只让 check() 停循环。
+        resources.0?.cancelLoading()
         resources.1?.cancel()
-        asset.cancelLoading()
         resources.2?.resume(returning: .failure(error))
     }
 }

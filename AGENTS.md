@@ -632,6 +632,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-11-04 查原任务时未核对回答中的任务号](docs/bugfixes/2026-11-04-sky-studio-poll-identity.md) — GET 原单在 API 边界验证响应任务号；错误回答不得先改内存身份或账务再由回执拒绝。
 - [2026-11-04 清理脚本自检删除活动冒烟 App 的 MCP socket](docs/bugfixes/2026-11-04-smoke-cleanup-unlinks-live-socket.md) — 清理器测试必须隔离文件删除；仅 stub 进程 / 钥匙串 / 偏好不能保护并行后台验收。
 - [2026-11-04 官方生成把确认问题缓存成已完成操作](docs/bugfixes/2026-11-04-official-confirmation-cached-as-completion.md) — 同 key 确认 / 预算解除后必须重新过闸；只缓存有真实本机任务号的启动结果。
+- [2026-11-04 取消 listen 时跨线程拆掉正在读的 reader](docs/bugfixes/2026-11-04-listen-reader-cancel-during-copy.md) — 原生 copy 与取消不能并发；analysis 读取体单点取消/释放，metadata 移交与活动取消边界，确定性交错守卫。
 - [2026-11-03 文件 listen 的短区间仍读取整条音轨](docs/bugfixes/2026-11-03-listen-file-range-reads-whole-audio.md) — 显式源范围用原生 timeRange 有界读取，容器时长校验、取消/超时明确收尾；合成晚时间点生产路径与反向验证。
 - [2026-11-03 本地构建后缀进入 Sky Studio 版本头，模型目录被拒](docs/bugfixes/2026-11-03-local-version-header.md) — 共享请求边界只规范化完整匹配的构建版本，显示来源与非法输入原样保留；真实 URLRequest / 假协议回归与反向验证。
 - [2026-11-03 短导出卡在退出等待](docs/bugfixes/2026-11-03-ffmpeg-exit-wait-runloop.md) — 启动前注册退出回调、排空双管道后汇合；真实短进程守卫与撤掉修复后的红灯证据。

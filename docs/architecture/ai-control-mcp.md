@@ -294,7 +294,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `AVAssetReader.timeRange` 只解码请求范围（缺入点 = 0，缺出点 = 文件结尾，出点超过文件结尾按结尾收）；原生采样率、最多两声道，复用 `ChunkBuilder` / `AIAudioLevels`，
      再按采样 PTS 裁掉压缩包边界外的数据，统计与静音/曲线时间仍是源秒。**不请求或建立整文件 `WaveformStore`**，不以部分波形时长代替文件时长。
      首尾覆盖不足或中间 PTS 不连续时明确拒绝完整报告，不把后面的声音前移，也不凭空把未知覆盖当静音；原生解码器已经填出的真实零采样照常统计。
-     `AIListenReadControl` 把排队、元数据加载和读取都纳入本次截止时间：排队时取消待执行 operation，读取时取消原生 reader；失败/超时不返回成功的部分统计，也不留下整文件解码。
+     `AIListenReadControl` 把排队、元数据加载和读取都纳入本次截止时间：排队时取消待执行 operation，metadata 移交前可取消加载；已开读时只发停止信号，
+     等当前 native copy 返回后由同一 `analysis` 读取体单点取消和释放 reader。不能硬中断不返回的 native copy，也不能跨线程 `cancelReading`；失败/超时不返回成功的部分统计。
+     生命周期约束与实际等待边界见[阻塞的媒体读取](blocking-media-reads.md#读取中的取消与释放)。
      整文件没给范围时仍可返回部分波形，并明确这是已读覆盖范围；不取消 UI/别的消费者共享的波形任务。`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
      结果 `beat_note` 说清不只分析请求窗；文件总长超过该限制就不给节拍解码，结果明确说明限制（电平/静音仍可有界返回）。**因此只有 `beats=false` 的显式文件窗承诺不扩展为整首/整文件解码；压缩包边界可有少量相邻采样，统计必须裁回请求范围。**
      扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`；真实文件生产路径回归在 `ListenRangeChecks.swift`：
