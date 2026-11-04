@@ -90,10 +90,13 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   这个名字，所以改 CI 不用动 ruleset。它 `needs` 全部分组，而且必须带
   `if: ${{ !cancelled() }}`：不写的话，分组一红它就被跳过，**被跳过的必需检查会被 GitHub
   当成通过**，红的 PR 也能合进去。不用 `always()`，是免得被取消的那一轮再报一个假的失败。
-- **只有第 1 组编完整 App**（单独一步，冷编 50–80 秒，编译错误在自己的步骤里看得清；
-  check-all.sh 第 1 组也明写了一项「build（完整 App 编得过）」）。子脚本只
-  `swift build --target SrtFlowCore`：它们要的只是核心库的模块和目标文件，别的组不必每台都
-  花一分多钟编整个 App。
+- **只有第 1 组编完整 App**（单独一步，编译错误在自己的步骤里看得清；2026-11 冷编要 2 分 10 秒到
+  2 分 45 秒，2026-09 才 50–80 秒；check-all.sh 第 1 组也明写了一项「build（完整 App 编得过）」）。
+  别的组的子脚本只 `swift build --target SrtFlowCore`：它们要的只是核心库的模块和目标文件。
+  **要链接完整 App 目标文件的检查**（脚本里 `@"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList"`，
+  video-inspection、voice-recovery 这几项）**只能放第 1 组**，放到别的组那台就得为它再冷编一遍整个 App。
+  反过来，第 1 组也只放这一摊：它要背冷编和 3 分钟的性能 ratchet，本来就是最慢的一组。
+  `checks/check-all-shards.sh` 两头都钉着。
 - **自检二进制用 `-wmo` 编**（整模块一次编完）。同一份 40 个文件，默认的逐文件编译要
   12.5 秒，`-wmo` 只要 4.9 秒（本机 arm64、模块缓存已热）：逐文件模式下每个文件都要把
   其余文件重新解析一遍。CI 上拆分前，各项检查里编译占了约 300 秒、运行约 160 秒。
@@ -109,11 +112,12 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   源文件的修改时间都是新的，SwiftPM 按修改时间判断要不要重编）。留着是因为恢复只要几秒。
 - **`.build` 缓存的 key 和 restore-keys 都带检出目录（`github.workspace`）**：`.build` 里的模块缓存记着编它时的绝对路径，
   换了目录恢复回来就编不过。2026-10-18 仓库改名 SkyCut、检出目录从 `…/SrtFlow/SrtFlow` 变成 `…/SkyCut/SkyCut`，旧缓存被恢复、
-  五组齐红（[案例](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。`checks/ci-build-cache-key.sh`（第 1 组）钉着。
+  五组齐红（[案例](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。`checks/ci-build-cache-key.sh` 钉着。
 
-**怎么分组**：按 CI 日志里每项的耗时（`✓ 名字（N s）`）装箱，最慢的先放，每次放进当前最空的
-那一组。第 1 组还要背 50–80 秒的完整编译，所以只放纯值检查和扫描守卫。加了新检查就放进最空的
-那组，改完看一眼 CI 上各组的时长。
+**怎么分组**：第 1 组只放「完整 App」那一摊（上面那条）。其余的按 CI 日志里每项的耗时（`✓ 名字（N s）`）
+装箱，最慢的先放，每次放进第 2–5 组里当前最空的那一组；扫描守卫秒级、不编译，放在各组最前。加了新检查就放进
+最空的那组，改完看一眼 CI 上各组的时长。文档里提到某条检查时别写它在第几组：分组只以 check-all.sh 为准，
+写了组号的地方下次重排就过期。
 
 **实测**：
 
@@ -129,3 +133,7 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   能差 1.5–2 倍：player-clock 21 → 42 秒、export-frame-rate 44 → 63 秒，screen-recording-writer
   反而 27 → 18 秒。runner 都是 3 核（`hw.ncpu` = 3）、同一个镜像，差别在宿主机当时的忙闲。
   **所以分组只求大致均衡，别拿一轮的数字精调**。一轮大约 2–3 分钟，拆分前是 10 分钟。
+- 2026-11-04（PR #302）**整轮又涨到 10 分 55 秒**，全卡在第 1 组：10 分 46 秒 = 冷编 App 2 分 43 秒 + 检查 4 分 39 秒
+  + 性能 ratchet 3 分钟；另外四组 3 分 25 秒到 5 分 35 秒。第 1 组的检查里，6 项链接完整 App 的（约 130 秒）只能
+  留在这里；另外约 141 秒是扫描守卫和纯值检查（光 check-script-source-lists 就 55 秒），按旧规矩放进来的。
+  把这 141 秒挪进第 4、5 组之后，第 1 组估计约 8 分 25 秒，其余几组 5 分钟上下。

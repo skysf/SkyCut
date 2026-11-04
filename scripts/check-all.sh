@@ -86,75 +86,24 @@ run_check() {
 }
 
 # 分组按 CI 上实测的每项耗时配平（实测数字和重排的做法见 docs/build/build-and-packaging.md
-# 「CI」一节）。加了新检查就放进当前最空的那组，改完看一眼 CI 上各组的时长。每组内部仍是
+# 「CI」一节）。加了新检查：要链接完整 App 目标文件的放第 1 组，别的放进第 2–5 组里当前最空的
+# 那组（checks/check-all-shards.sh 钉着），改完看一眼 CI 上各组的时长。每组内部仍是
 # 快的在前。Rosetta 终端下必须显式 --arch arm64（见 docs/build/），各子脚本已各自处理。
 
-# ---- 第 1 组：完整 App 编得过 + 纯值检查 + 扫描守卫 ----
-# CI 上这一组的 runner 先单独冷编一遍完整 App（编译错误在自己的步骤里看得清），其余几组
-# 只编核心库（子脚本只要 SrtFlowCore 的模块和目标文件）。所以「App 编得过」要在这里
-# 明写一项：子脚本不再顺手编整个 App 了。
+# ---- 第 1 组：完整 App 编得过 + 要链接完整 App 目标文件的检查 ----
+# CI 上这一组的 runner 先单独冷编一遍完整 App（编译错误在自己的步骤里看得清），检查跑完还要起这个 App
+# 跑 3 分钟的预览性能 ratchet：是最慢的一组。其余几组只编核心库（子脚本只要 SrtFlowCore 的模块和目标文件）。
+# 所以这里只放两样：「App 编得过」这一项（子脚本不再顺手编整个 App 了），和要链接完整 App 目标文件
+# （SrtFlow.product/Objects.LinkFileList）的检查 —— 放到别的组，那台 runner 就得为它再冷编一遍整个 App。
+# 扫描守卫、纯值检查一律放第 2–5 组。checks/check-all-shards.sh 钉着这两条。
 shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
 run_check "video-inspection（成片疑点、真实混音/画面/字幕与试听证据）" scripts/check-video-inspection.sh
 run_check "export-profile（实际阶段计时、审阅预设、排队/取消与 PNG 仅解码一次）" scripts/check-export-profile.sh
-run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
 run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
-run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
-run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
-run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh
-run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-build-output.sh
-run_check "client-config-backup（扫描守卫：连接 AI 客户端时配置的备份和原文件同样的权限）" checks/client-config-backup.sh
-run_check "ci-build-cache-key（扫描守卫：CI 的 .build 缓存 key 带检出目录，仓库改名后不捡旧目录编的缓存）" checks/ci-build-cache-key.sh
-run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
-run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
-run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
-run_check "shell-pipe-grep-q（扫描守卫）" checks/shell-pipe-grep-q.sh
-run_check "shell-brace-in-nested-quotes（扫描守卫：命令替换里带花括号和逗号的双引号串会被 bash 3.2 拆开）" checks/shell-brace-in-nested-quotes.sh
-run_check "exported-types-declared（扫描守卫）" checks/exported-types-declared.sh
-run_check "hover-pointer-style（扫描守卫）" checks/hover-pointer-style.sh
-run_check "hit-shape-before-offset（扫描守卫：可点范围写在 .offset 之前）" checks/hit-shape-before-offset.sh
-run_check "preference-reduce-keeps-value（扫描守卫：量出来的尺寸不许被默认值盖掉）" checks/preference-reduce-keeps-value.sh
-run_check "list-section-not-equatable（扫描守卫：List 里带 Section 的视图不许套 .equatable()）" checks/list-section-not-equatable.sh
-run_check "blocking-media-reads（扫描守卫）" checks/blocking-media-reads.sh
-run_check "export-audio-single-pipeline（扫描守卫：成片的声音就是预览那份混音）" checks/export-audio-single-pipeline.sh
-run_check "export-watermark-wiring（扫描守卫：加不加水印只问 WatermarkPolicy、叠在烧字幕之后缩小之前）" checks/export-watermark-wiring.sh
-run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
-run_check "film-production-wiring (authoring, authority and metadata-only evaluation)" checks/film-production-wiring.sh
-run_check "docs-index-drift（扫描守卫）" checks/docs-index-drift.sh
-run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在词表里）" checks/sfx-catalog.sh
-run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
-run_check "timeline-drag-wiring（扫描守卫）" checks/timeline-drag-wiring.sh
-run_check "timeline-clipboard-wiring（扫描守卫：复制粘贴的接线、落点鼠标优先）" checks/timeline-clipboard-wiring.sh
-run_check "instant-tooltip-wiring（扫描守卫）" checks/instant-tooltip-wiring.sh
-run_check "transition-handles-wiring（扫描守卫）" checks/transition-handles-wiring.sh
-run_check "subtitle-editing-wiring（扫描守卫）" checks/subtitle-editing-wiring.sh
-run_check "inspector-live-binding（扫描守卫）" checks/inspector-live-binding-wiring.sh
-run_check "inspector-fits-width（扫描守卫：检查器里的 Picker 不许锁死宽度）" checks/inspector-fits-width.sh
-run_check "presented-views-app-language（扫描守卫：sheet / popover 套应用内语言）" checks/presented-views-app-language.sh
-run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设置在队列创建时读回来）" checks/encode-settings-memory.sh
-run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
-run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
-run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
-run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
-run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
-run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
-run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
-run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
-run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
-run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
-run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号、钥匙串、照授权拦和任务只在该在的地方）" checks/sky-studio-wiring.sh
-run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
-run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
-run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
-run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
-run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
-# 提示面板落点（scripts/check-instant-tooltip-panel.sh）**故意不在这里**：它要建
-# 真实的 NSWindow/NSPanel，没有图形会话就会假红。按本文件开头的约定，真实窗口
-# 一律走 GUI 冒烟流程（docs/testing/gui-smoke-testing.md）。
-run_check "export-alpha-compositing（上层轨动画段 fill+matte）" scripts/check-export-alpha-compositing.sh
 
 # ---- 第 2 组 ----
 shard 2
@@ -186,6 +135,33 @@ run_check "audio-fade（渐入渐出 / 音量曲线 / 推子的真实包络 + �
 
 # ---- 第 4 组 ----
 shard 4
+# 扫描守卫（接线类）：秒级、不编译、不要 App，放在本组最前（最慢的 check-script-source-lists 殿后）。
+run_check "export-audio-single-pipeline（扫描守卫：成片的声音就是预览那份混音）" checks/export-audio-single-pipeline.sh
+run_check "export-watermark-wiring（扫描守卫：加不加水印只问 WatermarkPolicy、叠在烧字幕之后缩小之前）" checks/export-watermark-wiring.sh
+run_check "film-production-wiring (authoring, authority and metadata-only evaluation)" checks/film-production-wiring.sh
+run_check "timeline-drag-wiring（扫描守卫）" checks/timeline-drag-wiring.sh
+run_check "timeline-clipboard-wiring（扫描守卫：复制粘贴的接线、落点鼠标优先）" checks/timeline-clipboard-wiring.sh
+run_check "instant-tooltip-wiring（扫描守卫）" checks/instant-tooltip-wiring.sh
+run_check "transition-handles-wiring（扫描守卫）" checks/transition-handles-wiring.sh
+run_check "subtitle-editing-wiring（扫描守卫）" checks/subtitle-editing-wiring.sh
+run_check "inspector-live-binding（扫描守卫）" checks/inspector-live-binding-wiring.sh
+run_check "inspector-fits-width（扫描守卫：检查器里的 Picker 不许锁死宽度）" checks/inspector-fits-width.sh
+run_check "presented-views-app-language（扫描守卫：sheet / popover 套应用内语言）" checks/presented-views-app-language.sh
+run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设置在队列创建时读回来）" checks/encode-settings-memory.sh
+run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
+run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
+run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
+run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
+run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
+run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
+run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
+run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
+run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
+run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号、钥匙串、照授权拦和任务只在该在的地方）" checks/sky-studio-wiring.sh
+run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
+run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
+run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
+run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
 run_check "waveform（波形多级峰值：声道 / 尖峰 / 跨块 / 5.1 / 很多文件同时读）" scripts/check-waveform.sh
 run_check "project-file（工程存盘/重链接）" scripts/check-project-file.sh
 run_check "filters（调色：LUT 数学 + 预览与成片逐像素）" scripts/check-filters.sh
@@ -196,6 +172,35 @@ run_check "screen-recording-writer（录屏产物盖到 T1）" scripts/check-scr
 
 # ---- 第 5 组 ----
 shard 5
+# 扫描守卫（通用类）和几项不要 App 的纯值检查：秒级到十几秒，放在本组最前。
+run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh
+run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-build-output.sh
+run_check "client-config-backup（扫描守卫：连接 AI 客户端时配置的备份和原文件同样的权限）" checks/client-config-backup.sh
+run_check "ci-build-cache-key（扫描守卫：CI 的 .build 缓存 key 带检出目录，仓库改名后不捡旧目录编的缓存）" checks/ci-build-cache-key.sh
+run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
+run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
+run_check "shell-var-boundary（扫描守卫）" checks/shell-var-boundary.sh
+run_check "shell-pipe-grep-q（扫描守卫）" checks/shell-pipe-grep-q.sh
+run_check "shell-brace-in-nested-quotes（扫描守卫：命令替换里带花括号和逗号的双引号串会被 bash 3.2 拆开）" checks/shell-brace-in-nested-quotes.sh
+run_check "exported-types-declared（扫描守卫）" checks/exported-types-declared.sh
+run_check "hover-pointer-style（扫描守卫）" checks/hover-pointer-style.sh
+run_check "hit-shape-before-offset（扫描守卫：可点范围写在 .offset 之前）" checks/hit-shape-before-offset.sh
+run_check "preference-reduce-keeps-value（扫描守卫：量出来的尺寸不许被默认值盖掉）" checks/preference-reduce-keeps-value.sh
+run_check "list-section-not-equatable（扫描守卫：List 里带 Section 的视图不许套 .equatable()）" checks/list-section-not-equatable.sh
+run_check "blocking-media-reads（扫描守卫）" checks/blocking-media-reads.sh
+run_check "docs-index-drift（扫描守卫）" checks/docs-index-drift.sh
+run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在词表里）" checks/sfx-catalog.sh
+run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
+run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
+run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
+run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
+run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
+run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
+run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
+# 提示面板落点（scripts/check-instant-tooltip-panel.sh）**故意不在这里**：它要建
+# 真实的 NSWindow/NSPanel，没有图形会话就会假红。按本文件开头的约定，真实窗口
+# 一律走 GUI 冒烟流程（docs/testing/gui-smoke-testing.md）。
+run_check "export-alpha-compositing（上层轨动画段 fill+matte）" scripts/check-export-alpha-compositing.sh
 run_check "audio-library（清单解析的宽容边界 + 双语搜索）" scripts/check-audio-library.sh
 run_check "video-fade（上层视频轨铺满 + 画面渐变真产物）" scripts/check-video-fade.sh
 # 盖一块（模糊 / 马赛克）真导出抽帧：只改那一块、高斯剖面、格子从左上角起算、只在那一段、形状压在上面、不算总长。

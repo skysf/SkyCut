@@ -35,7 +35,7 @@ GitHub 托管的 macOS runner 是虚拟机（`VirtualMac2,1`，3 核），2026-0
 纹丝不动（它本来就每跳重算），多出来的全在提示包着的 AppKit 视图的 `updateNSView` 上。
 
 漏插一个，那个视图每跳一下都在重算，账上也看不见，ratchet 就成了摆设。三条都由
-`checks/preview-perf-wiring.sh` 钉着（在 check-all 第 1 组）。规则按「全部视图」定，不管
+`checks/preview-perf-wiring.sh` 钉着（check-all 里的扫描守卫）。规则按「全部视图」定，不管
 它在不在编辑器里 —— 比按「编辑器里的视图」定好守，共用组件的退步也看得见（首跑最大的大头
 就是共用的即时提示修饰器）。
 

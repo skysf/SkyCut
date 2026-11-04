@@ -119,7 +119,7 @@
 长边 2600 的源减半成 1300×100 之后画面同原片（摆错了会多出黑边）；块文件被清了 → 退回原片；`OptimizedMediaPlan` 的顺序
 （播放头在哪段先转哪段的块、转好的不排、转不了的源不排、快机器不排）、缺探的源、纯音频不算画面。
 
-`checks/optimized-media-wiring.sh`（第 1 组）：换源只在预览重建、成片 / 预渲染 / AI 看永远原片、builder 两处都走 `CompositionClipInsert`、
+`checks/optimized-media-wiring.sh`（扫描守卫）：换源只在预览重建、成片 / 预渲染 / AI 看永远原片、builder 两处都走 `CompositionClipInsert`、
 几何按插进去的源轨算、转码在 proxy 队列并登记后台读、写索引不在主线程、停着才换、切工程作废、转码参数、菜单不读工程、性能台架量原片；
 V3：清空在 proxy 队列上且**紧跟 `reset()` + `scheduleRebuild()`**、`removeAll` 只许设置那一节的模型调、改上限经 Store 写并立刻
 `enforceCapacity`、占用在 proxy 队列上算、缓存目录的路径和上限的键只在 Store 里出现、设置那一节不碰 `FileManager` / `UserDefaults` /

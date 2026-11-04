@@ -69,7 +69,7 @@
 
 ## 四、守卫
 
-`checks/source-file-size.sh`（`scripts/check-all.sh` 第 1 组）：
+`checks/source-file-size.sh`（`scripts/check-all.sh` 里的扫描守卫）：
 
 | 情况 | 结果 |
 | --- | --- |
