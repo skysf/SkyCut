@@ -106,6 +106,7 @@ xcrun swiftc \
   checks/SkyStudio/OfficialQuoteChecks.swift \
   checks/SkyStudio/OfficialReceiptChecks.swift \
   checks/SkyStudio/OfficialPreparedChecks.swift \
+  checks/SkyStudio/OfficialApprovalChecks.swift \
   checks/SkyStudio/AdmissionChecks.swift \
   checks/SkyStudio/JobRunChecks.swift \
   checks/SkyStudio/SpendChecks.swift \

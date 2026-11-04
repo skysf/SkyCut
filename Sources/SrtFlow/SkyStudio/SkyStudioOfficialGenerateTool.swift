@@ -76,7 +76,7 @@ enum SkyStudioOfficialGenerateTool {
                                   "folder": .string(plan.folder.path), "stem": .string(plan.stem), "arguments": .string(digest)]
         if quoteOnly { return try await quote(plan, request: request, identity: identity, project: project) }
         let response = try await submit(plan, request: request, identity: identity, args: args, operationKey: operationKey, project: project)
-        SkyStudioGenerationRequests.complete(operationKey, result: response, scope: stage)
+        SkyStudioGenerationRequests.completeStarted(operationKey, result: response, scope: stage)
         return response
     }
 

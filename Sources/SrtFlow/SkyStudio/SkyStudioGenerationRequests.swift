@@ -22,6 +22,14 @@ enum SkyStudioGenerationRequests {
     }
 
     static func complete(_ key: String, result: AIToolResult, scope: String = "") { entries[scope + ":" + key]?.result = result }
+
+    /// 新提交只有真的起了本机任务才占住 key；确认问题/预算阻止仍由 defer 放弃占位，允许同 key 再过闸。
+    static func completeStarted(_ key: String, result: AIToolResult, scope: String = "") {
+        guard result.payload["status"]?.stringValue == "started",
+              result.payload["job_id"]?.stringValue?.isEmpty == false else { return }
+        complete(key, result: result, scope: scope)
+    }
+
     static func abandonPreparation(_ key: String, scope: String = "") {
         let entryKey = scope + ":" + key
         if entries[entryKey]?.result == nil { entries[entryKey] = nil }

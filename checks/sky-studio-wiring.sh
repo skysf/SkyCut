@@ -251,6 +251,10 @@ grep -qF 'if SkyStudioOfficialGenerateTool.applies(args)' "${GEN_TOOL}" || fail 
 grep -qF 'SkyStudioOfficialPreparation.start(generation:' "${OFFICIAL}" || fail "官方入口没接显式真实引用准备"
 grep -qF 'SkyStudioOfficialPrepared.shared.reviewedQuote(' "${OFFICIAL}" || fail "官方提交没使用精确双缝报价缓存"
 grep -qF 'SkyStudioOfficialRecovery.resume(' "${OFFICIAL}" || fail "官方入口没先找持久原单"
+grep -qF 'SkyStudioGenerationRequests.completeStarted(operationKey, result: response, scope: stage)' "${OFFICIAL}" \
+  || fail "官方提交只能缓存已启动任务，确认问题与预算阻止不能占住同一个幂等 key"
+[ "$(count 'SkyStudioGenerationRequests.complete(operationKey, result: response, scope: stage)' "${OFFICIAL}")" -eq 1 ] \
+  || fail "官方新提交不可无条件缓存；唯一未筛选 response 是显式准备任务"
 grep -qF 'official?.request ?? generation.job(' "${GEN_RUN}" || fail "生产运行器丢掉已审查的官方精确请求"
 grep -qF 'official.recovery.received(status)' "${GEN_RUN}" || fail "生产运行器没保存已知原单回执"
 grep -qF 'official?.recovery.delivered(' "${GEN_RUN}" || fail "生成结果没保存可恢复身份"

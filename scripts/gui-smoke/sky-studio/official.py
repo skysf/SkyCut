@@ -27,7 +27,7 @@ def prepare(session, base):
     assert not posts(log()[mark:]) and not posts(log()[mark:], "quote")
     assert done["inputs"]["image_url"].startswith("https://assets.skycut-smoke.invalid/originals/local-smoke/")
     assert done["inputs"]["last_frame_url"] != done["inputs"]["image_url"], "First/last roles retain distinct uploaded originals"
-    assert done["prepared_render"]["inputs"] == done["inputs"] and done["prepared_render"]["params"]["duration"] == 3
+    assert done["prepared_render"]["inputs"] == done["inputs"] and done["prepared_render"]["params"]["duration"] == base["duration"]
     assert len(posts(log()[mark:], "uploads")) in (0, 2), "A repeated prepare must not upload twice"
     return done
 
@@ -152,6 +152,57 @@ def render_review(session, project, file):
     session.passed_case("background MCP import/export; used-frame and both-seam contact sheets; measured mixed sound")
 
 
+def approval_and_budget(session, base):
+    def settings(args):
+        result = session.call("set_settings", args)
+        if result.get("status") == "needs_confirmation":
+            # 仅假账户：模拟夹具用户明确同意，绝不替真实用户批准消费或权限。
+            result = session.call("set_settings", {**args, "confirm_token": result["confirm_token"]})
+        return result
+
+    initial = session.call("get_settings")["sections"]
+    limit = initial["sky_studio"]["daily_ai_credit_limit"]
+    mode = initial["ai"]["ai_access_mode"]
+    settings({"ai_access_mode": "ask_for_approval"})
+    try:
+        premium = {**base, "duration": 6, "name": key("approval")}
+        prepared = prepare(session, premium)
+        submitted, quoted = quote(session, premium, prepared)
+        mark, before = len(log()), session.spent()
+        question = session.call("generate_media", submitted)
+        assert question["status"] == "needs_confirmation", question
+        again = session.call("generate_media", submitted)
+        assert again["confirm_token"] == question["confirm_token"], "Pending exact action keeps its confirmation"
+        wrong = session.call("generate_media", {**submitted, "confirm_token": "unrelated-confirmation-token"})
+        assert not posts(log()[mark:]) and session.spent() == before, "Questions and refused tokens cannot reserve or POST"
+        approved = {**submitted, "confirm_token": question["confirm_token"]}
+        start = session.call("generate_media", approved)
+        assert start["status"] == "started", start
+        assert wrong["status"] == "needs_confirmation" and wrong.get("confirm_token_refused"), wrong
+        session.wait(start["job_id"])
+        for request in (submitted, approved):
+            assert session.call("generate_media", request)["job_id"] == start["job_id"]
+        assert len(posts(log()[mark:])) == 1 and session.spent() == before + quoted["credits"]
+        session.passed_case("same operation key redeems exact official confirmation, then repeats its one original job")
+
+        prepared = prepare(session, base)
+        submitted, quoted = quote(session, {**base, "name": key("budget")}, prepared)
+        settings({"daily_ai_credit_limit": 0})
+        mark, before = len(log()), session.spent()
+        blocked = session.call("generate_media", submitted)
+        assert blocked["status"] == "blocked" and blocked["code"] == "daily_budget_exceeded", blocked
+        assert not posts(log()[mark:]) and session.spent() == before
+        settings({"daily_ai_credit_limit": limit})
+        start = session.call("generate_media", submitted)
+        assert start["status"] == "started", start
+        session.wait(start["job_id"])
+        assert session.call("generate_media", submitted)["job_id"] == start["job_id"]
+        assert len(posts(log()[mark:])) == 1 and session.spent() == before + quoted["credits"]
+        session.passed_case("budget refusal retires no operation; explicit fake-user budget restoration lets the same key submit once")
+    finally:
+        settings({"ai_access_mode": mode, "daily_ai_credit_limit": limit})
+
+
 def submissions(session, base, prepared):
     submit, quoted = quote(session, base, prepared)
     mark, before = len(log()), session.spent()
@@ -259,6 +310,7 @@ def run():
         slot_refused = slot_revalidation(session, base, prepared)
         prepared = prepare(session, base)
         rejected = failures(session, base, prepared)
+        approval_and_budget(session, base)
         unknown, known = submissions(session, base, prepared)
         session.call("save_project", {"project": project})
         recovery(session, created["created"], rejected, unknown, known, slot_refused)
