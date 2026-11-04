@@ -98,7 +98,7 @@ def run(session, workspace, source_name="motion.mp4"):
         dict(name="trim-last", source_in=0.5, source_out=1.7, speed=1, start=0, edge="last", requested_ticks=1000),
         dict(name="fractional-fast-first", source_in=0.5, source_out=1.7, speed=2, start=0.02, edge="first", requested_ticks=326),
         dict(name="fractional-fast-last", source_in=0.5, source_out=1.7, speed=2, start=0.02, edge="last", requested_ticks=976),
-        dict(name="quantized-before-use", source_in=1.0009, source_out=1.3009, speed=1, start=0, edge="first", requested_ticks=600),
+        dict(name="quantized-before-use", source_in=1.0001, source_out=1.3001, speed=1, start=0, edge="first", requested_ticks=600),
         dict(name="half-open-rejection", source_in=0.5, source_out=1.7, speed=2, start=0.02, edge="excluded_end")
     ]
     for case in cases:

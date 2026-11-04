@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 
 // 合成 CGImage / 原生 CMTime 的来源证据守卫；不抽真实媒体帧，不调用 ffmpeg 或云服务。
 func runSourceFrameChecks() async throws {
-    let requested = NativeSourceFrameSampler.requestedTime(for: 1.0009)
+    runSourceFrameRequestRoundingChecks()
+    let requested = NativeSourceFrameSampler.requestedTime(for: 1.0001)
     check(requested.value == 600 && requested.timescale == 600, "request records the exact quantized native time")
     let fixedGridRequests: [(String, Double, Int64)] = [
         ("trim first", 0.5, 300),
@@ -93,4 +94,36 @@ func runSourceFrameChecks() async throws {
     check(SourceFrameEvidence.fileIdentity(root) == nil, "directory cannot be a frame source identity")
     try Data().write(to: png)
     check(SourceFrameEvidence.fileIdentity(png) == nil, "zero-byte PNG cannot provide valid identity evidence")
+}
+
+// 请求算术的回归直接调用生产入口；这里只断言请求，不推测解码器会交回哪一帧。
+private func runSourceFrameRequestRoundingChecks() {
+    let cases: [(String, Double, Int64)] = [
+        ("zero-start last frame", 239.0 / 24, 5975),
+        ("nonzero-start last frame", 479.0 / 24 - 10, 5975),
+        ("just below a native tick", (239.0 / 24).nextDown, 5975),
+        ("just above a native tick", (239.0 / 24).nextUp, 5975),
+        ("lower half of a native tick", 1.0001, 600),
+        ("upper half of a native tick", 1.0009, 601),
+        ("exact half tick rounds away from zero", 0.5 / 600, 1),
+        ("zero", 0, 0),
+        ("negative time clamps to zero", -1, 0),
+        ("large finite negative clamps to zero", -Double.greatestFiniteMagnitude, 0)
+    ]
+    for (label, seconds, ticks) in cases {
+        let time = NativeSourceFrameSampler.requestedTime(for: seconds)
+        check(time.isNumeric && time.value == ticks && time.timescale == 600 && time.epoch == 0,
+              "nearest-600 request: \(label)")
+    }
+    for value in [Double.nan, .infinity, -.infinity, .greatestFiniteMagnitude, Double(Int64.max) / 600] {
+        check(!NativeSourceFrameSampler.requestedTime(for: value).isValid,
+              "nonfinite or overflowing request is invalid without an Int64 conversion trap: \(value)")
+    }
+    let large = NativeSourceFrameSampler.requestedTime(for: (Double(Int64.max) / 600).nextDown)
+    check(large.isNumeric && large.value > 0 && large.timescale == 600,
+          "largest adjacent representable in-range request remains usable")
+    let rounded = NativeSourceFrameSampler.requestedTime(for: 479.0 / 24 - 10)
+    check(rounded.flags == [.valid, .hasBeenRounded], "the actual request records rounding from the supplied seconds")
+    check(NativeSourceFrameSampler.requestedTime(for: 0.5).flags == .valid,
+          "an exact request does not claim rounding")
 }

@@ -632,6 +632,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-04 非零时间线起点让原生尾帧请求落到前一个刻度](docs/bugfixes/2026-11-04-native-frame-request-truncation.md) — 原生请求显式 nearest-600、有限值与整数边界守卫；实际时间和漂移 / 半开窗不放宽，旧证据需重抽。
 - [2026-11-04 定格拒绝首个使用帧](docs/bugfixes/2026-11-04-freeze-rejects-first-used-frame.md) — 定格专用有限半开区间、段首前插保留完整原段、内部切分共用纯值体；普通分割余量与现有联动规则保留，反向守卫及实际 MCP 回归。
 - [2026-11-04 换 Key 后旧模型目录回填](docs/bugfixes/2026-11-04-catalog-cache-key-change.md) — 缓存失效 epoch 同时拦迟到写回和迟到清理后继请求；真实 API 注入回归与隔离反向。
 - [2026-11-04 成片检查没有疑点却报告绘图失败](docs/bugfixes/2026-11-04-inspection-empty-evidence.md) — 分析取样与疑点截图分开，只有实际请求证据却取不到图才报绘图失败；真实工具干净区间与缺图回归。

@@ -16,7 +16,12 @@ struct NativeSourceFrameSample: Sendable {
 
 enum NativeSourceFrameSampler {
     static func requestedTime(for seconds: Double) -> CMTime {
-        CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+        guard seconds.isFinite else { return .invalid }
+        let clamped = max(0, seconds)
+        // 全局帧格减去非零段首会落在整数 tick 的下侧；显式取最近值，不能截到前一帧。
+        guard let ticks = Int64(exactly: (clamped * 600).rounded(.toNearestOrAwayFromZero)) else { return .invalid }
+        let flags: CMTimeFlags = Double(ticks) / 600 == clamped ? .valid : [.valid, .hasBeenRounded]
+        return CMTime(value: ticks, timescale: 600, flags: flags, epoch: 0)
     }
 
     static func fallbackTolerance(for tolerance: Double) -> CMTime {

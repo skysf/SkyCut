@@ -184,6 +184,11 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
 
 ## 5. 抽帧的两条纪律
 
+原生请求只由 `NativeSourceFrameSampler.requestedTime` 量化为最近的 1/600 秒刻度，
+半刻度向远离零方向取整；有限负值仍归零，非有限值或 Int64 溢出返回无效时间。
+这只决定实际传给 AVFoundation 的请求，返回的 actualTime、零容差退路与源窗判据保持独立；
+不能用请求推算实际帧，也不能为补偿浮点误差放宽漂移或半开窗。
+
 - **前后容差都必须是 `.zero`**。给了容差 AVFoundation 可以在窗口内自由取
   （通常就近拿关键帧），定出来的画面和眼睛看到的对不上。零容差失败才退回
   半帧容差，且半帧要用 **source 空间**的（`KeyframeTrack.sourceTolerance`，

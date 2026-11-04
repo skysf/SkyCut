@@ -100,6 +100,26 @@ func runSourceFrameReaderChecks() throws {
         try SourceFrameReader.validate(oneTickWider, against: fixture.bound, atEnd: true)
     }
     check(tail.requested == NativeSourceFrameSampler.requestedTime(for: 239.0 / 24), "last used grid sample is inside the 10-second window, not its end")
+    fixture.bound.timelineStart = 10
+    let nonzeroTail = try SourceFrameReader.read(fixture.evidence(atEnd: true, actual: CMTime(value: 239000, timescale: 24000)))
+    check(nonzeroTail.requested.value == 5975 && nonzeroTail.requested.timescale == 600 && nonzeroTail.drift == 0,
+          "authoritative nonzero-start edge uses nearest native tick and preserves independent 24fps actual time")
+    do {
+        try SourceFrameReader.validate(nonzeroTail, against: fixture.bound, atEnd: true)
+        check(true, "nonzero-start source edge and strict anchor validator share request quantization")
+    } catch { check(false, "nonzero-start source edge and strict anchor validator share request quantization") }
+    let previousFrame = try SourceFrameReader.read(fixture.evidence(atEnd: true, actual: CMTime(value: 238000, timescale: 24000)))
+    rejected("a real previous source frame still fails the unchanged half-frame drift guard") {
+        try SourceFrameReader.validate(previousFrame, against: fixture.bound, atEnd: true)
+    }
+    var legacy = try fixture.evidence(atEnd: true, actual: CMTime(value: 238000, timescale: 24000))
+    legacy = changed(legacy, ["requested_source_time"], SourceFrameEvidence.time(CMTime(value: 5974, timescale: 600, flags: [.valid, .hasBeenRounded], epoch: 0)))
+    legacy = changed(legacy, ["drift_source_seconds"], -0.04)
+    let legacyEvidence = try SourceFrameReader.read(legacy)
+    rejected("old truncated request evidence is not silently upgraded to the new edge request") {
+        try SourceFrameReader.validate(legacyEvidence, against: fixture.bound, atEnd: true)
+    }
+    fixture.bound.timelineStart = 0
     rejected("an early frame cannot stand in for the declared tail") { try SourceFrameReader.validate(evidence, against: fixture.bound, atEnd: true) }
     var altered = fixture.bound
     altered.identity = changed(altered.identity, ["inode"], "42")
@@ -131,7 +151,7 @@ func runSourceFrameReaderChecks() throws {
     rejected("short fractional clip with no project-grid sample cannot fabricate an edge") { _ = try fixture.evidence() }
     fixture.bound.duration = 10
     fixture.bound.timelineStart = 0
-    fixture.bound.start = 1.0009
+    fixture.bound.start = 1.0001
     rejected("native quantization below the used start cannot fabricate an in-window edge") { _ = try fixture.evidence() }
     try Data("PNG replacement has different bytes and file size".utf8).write(to: fixture.png)
     rejected("changed PNG identity invalidates stored evidence") { try SourceFrameReader.validateFiles(evidence) }
