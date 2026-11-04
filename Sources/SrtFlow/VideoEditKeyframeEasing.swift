@@ -1,4 +1,5 @@
 import Foundation
+import SrtFlowCore
 
 // MARK: - 关键帧的缓动曲线（纯值）
 //

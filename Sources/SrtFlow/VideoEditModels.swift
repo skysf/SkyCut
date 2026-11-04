@@ -495,11 +495,13 @@ struct TimelineState: Hashable, Sendable {
     /// 工程帧率：预览合成、两条导出管线、预渲染、关键帧容差的唯一事实来源。
     /// 这是 v5-only 字段（见 VideoEditFormatVersion.swift 的登记清单）。
     var frameRate: ProjectFrameRate = .fallback
+    /// 公开故事/观察/声音计划，和剪辑共用撤销与普通自动保存；老工程缺键即 nil。
+    var production: FilmProductionState?
 
     var isEmpty: Bool {
         mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty)
             && audioTracks.allSatisfy(\.clips.isEmpty) && subtitle == nil && shapes.isEmpty
-            && textOverlays.isEmpty && filters.isEmpty
+            && textOverlays.isEmpty && filters.isEmpty && production == nil
     }
 
     /// 整条时间线的长度：所有轨里最晚结束的那一刻。
@@ -689,23 +691,6 @@ struct TimelineState: Hashable, Sendable {
 // 所以这里全部手写宽容解码：缺的字段取默认值，不认识的枚举值退回兜底项。
 // 有默认值的新字段可以随便加，老工程照样能开。
 
-/// 读到不认识的原始值时退回默认项，而不是让整份工程解不开。
-protocol LenientCodableEnum: RawRepresentable, Codable where RawValue == String {
-    static var decodingFallback: Self { get }
-}
-
-extension LenientCodableEnum {
-    init(from decoder: Decoder) throws {
-        let raw = try decoder.singleValueContainer().decode(String.self)
-        self = Self(rawValue: raw) ?? Self.decodingFallback
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        try container.encode(rawValue)
-    }
-}
-
 extension ClipTransition: LenientCodableEnum {
     static var decodingFallback: ClipTransition { .none }
 }
@@ -871,6 +856,7 @@ extension TimelineState: Codable {
     private enum CodingKeys: String, CodingKey {
         case mainClips, mainHidden, overlayTracks, audioTracks
         case mainVolume, masterVolume
+        case production
         case subtitle, subtitleHidden, translationHidden
         case subtitleLayout, translationLayout, subtitleURL, subtitleCompanion, shapes, textOverlays, canvasRatio
         case frameRate, filters, projectSubtitleStyle, subtitleHighlight, rulerMarkers, mainMagnet, subtitleMaxLines
@@ -879,6 +865,7 @@ extension TimelineState: Codable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init()
+        production = try c.decodeIfPresent(FilmProductionState.self, forKey: .production)
         mainClips = try c.decodeIfPresent([EditClip].self, forKey: .mainClips) ?? []
         mainHidden = try c.decodeIfPresent(Bool.self, forKey: .mainHidden) ?? false
         mainMagnet = try c.decodeIfPresent(Bool.self, forKey: .mainMagnet) ?? false   // 2026-10-02 起才有：缺键 = 关
@@ -910,6 +897,7 @@ extension TimelineState: Codable {
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encodeIfPresent(production, forKey: .production)
         try c.encode(mainClips, forKey: .mainClips)
         try c.encode(mainHidden, forKey: .mainHidden)
         if mainMagnet { try c.encode(true, forKey: .mainMagnet) }   // 按需写键：磁吸关着的工程存一轮 diff 是空的

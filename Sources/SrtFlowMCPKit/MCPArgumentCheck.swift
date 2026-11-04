@@ -19,7 +19,8 @@ public enum MCPArgumentCheck {
 
     /// 有说明上没有的名字，回一句写给 AI 的话（英文）；都认识回 nil。
     public static func problem(tool: MCPToolName, arguments: JSONValue) -> String? {
-        let schema = MCPFilmSchema.validationSchema(for: tool) ?? MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema
+        let schema = MCPProductionSchema.validationSchema(for: tool) ?? MCPFilmSchema.validationSchema(for: tool)
+            ?? MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema
         let extra = anywhere.union(aliases[tool] ?? [])
         guard let finding = firstUnknown(in: arguments, schema: schema, path: nil, extra: extra) else { return nil }
         return message(tool: tool, finding)

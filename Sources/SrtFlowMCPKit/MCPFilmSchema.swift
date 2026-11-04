@@ -13,16 +13,18 @@ public enum MCPFilmSchema {
     }
 
     public static var contract: JSONValue {
-        ["film_schema": film, "seam_review_schema": review,
+        var result: [String: JSONValue] = ["film_schema": film, "seam_review_schema": review,
          "production_enabled": .null,
          "workflow": [
             "Use your own saved background project. Read current public models; no private recipe or research source belongs in a tool argument.",
             "prepare_references=true prepares effective render and uploads any local original images; omit film/quote_only/tokens. get_job returns prepared_render and optional prepared_references. Text-only preparation uploads nothing. Add explicit context to the render for neighbor declarations.",
-            "Repeat the exact local paths, public specification and film with quote_only=true and prepared_references when present. Only the official quote resolves supported context; no quote uploads or reserves credits.",
+            "Save the exact public story/render plan with save_project production and expected_revision before quoting. Repeat its local paths, specification and film with quote_only=true and prepared_references when present. The official quote resolves supported context; quoting never uploads or reserves credits.",
             "Read both declared seam fingerprints from the quote. Submit the unchanged args with quote_only=false, quote_token, explicit seam_review and a stable idempotency_key. Expired or changed requests require a new quote and a fresh review before spending.",
             "Preflight acknowledgements prove only declared contracts. Inspect the actual generated start, action turns, final used range and both output seams. Measure audio with listen; record subjective listening only when actually auditioned.",
             "Preserve idempotency_key after failure. Reopening the same saved project and repeating submitted args recovers only the known original job/output; unknown no-ID receipts never POST again. Restart recovery leaves local_budget_reconciliation=pending without a second local reserve/refund."
          ]]
+        result.merge(MCPProductionSchema.contract) { _, value in value }
+        return .object(result)
     }
 
     public static var film: JSONValue {
@@ -37,6 +39,15 @@ public enum MCPFilmSchema {
             "sound": object(["bed_id": text, "music": text, "environment": text, "foley": text])
         ], required: ["intent", "category", "footage", "context", "shot", "sound"],
         description: "Original public story. Every non-edge shot needs both neighbors, including revision 1. Continuous cuts preserve all state and sound bed. Completed actions persist; shot actions must be new. No research, recipes or private styles.")
+    }
+
+    public static var render: JSONValue {
+        object(["kind": choice(["image", "text_to_video", "image_to_video"]),
+            "model": ["type": "string", "minLength": 1, "maxLength": 160], "prompt": ["type": "string", "minLength": 1, "maxLength": 4000],
+            "context": context, "params": MCPSchema.object([:], description: "Exact effective public model parameters; current public catalog names are checked before saving or generating."),
+            "inputs": object(["image_url": imageURL, "last_frame_url": imageURL,
+                "references": MCPSchema.array(of: object(["type": choice(["image"]), "url": imageURL]), "Ordered real image assets.")], required: [])],
+            required: ["kind", "model", "prompt", "context"])
     }
 
     public static var review: JSONValue {
@@ -62,12 +73,7 @@ public enum MCPFilmSchema {
 
     private static func neighbor(_ boundary: String) -> JSONValue {
         var schema = object(["shot_id": text, "sound_bed_id": text, boundary: state,
-            "render": object(["kind": choice(["image", "text_to_video", "image_to_video"]),
-                "model": ["type": "string", "minLength": 1, "maxLength": 160], "prompt": ["type": "string", "minLength": 1, "maxLength": 4000],
-                "context": context, "params": MCPSchema.object([:], description: "Exact effective public model parameters from /models; no private knobs."),
-                "inputs": object(["image_url": imageURL, "last_frame_url": imageURL,
-                    "references": MCPSchema.array(of: object(["type": choice(["image"]), "url": imageURL]), "Ordered real image assets.")], required: [])],
-                required: ["kind", "model", "prompt", "context"]),
+            "render": render,
             "cut": object(["type": choice(["continuous", "time_jump", "location_change", "time_location_jump", "montage"]),
                 "reason": ["type": "string", "minLength": 8, "maxLength": 160],
                 "reset_fields": MCPSchema.array(of: choice(["actor_position", "hand", "grip", "prop_location", "action_phase", "spatial_relation", "gaze", "screen_direction", "lighting", "sound_bed"]), "Intentional cut: exactly changed fields permitted for its type."),

@@ -408,16 +408,7 @@ enum VideoEditCompositionBuilder {
     private static func time(_ seconds: Double) -> CMTime { CompositionTime.tick(seconds) }  // 截断，别改成四舍五入
 
     static func renderSize(for state: TimelineState) -> CGSize {
-        // 选了固定比例就用标准尺寸；auto 跟随第一段素材。
-        if let fixed = state.canvasRatio.fixedSize { return fixed }
-        let size = state.mainClips.compactMap(\.info).first?.displaySize
-            ?? state.overlayTracks.flatMap(\.clips).compactMap(\.info).first?.displaySize
-            ?? CGSize(width: 1920, height: 1080)
-        // yuv420 的世界里宽高都得是偶数。
-        return CGSize(
-            width: max(2, (size.width / 2).rounded() * 2),
-            height: max(2, (size.height / 2).rounded() * 2)
-        )
+        TimelineRenderSize.size(for: state)
     }
 
     /// 这一段的优化媒体块（都转好了才给；没有代理 / 没转全 / 块文件打不开 → nil，插原片）。只开真要用的那几块。

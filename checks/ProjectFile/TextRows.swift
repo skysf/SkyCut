@@ -51,7 +51,7 @@ func checkTextRows(root: URL) throws {
     let file = dir.appendingPathComponent("rows.srtflowproj")
     try VideoEditProjectIO.save(state, to: file)
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-    checkEqual(raw?["formatVersion"] as? Int, 33, "带文字的工程写 latest（v33）")
+    checkEqual(raw?["formatVersion"] as? Int, 34, "带文字的工程写 latest（v34）")
     let overlays = (raw?["timeline"] as? [String: Any])?["textOverlays"] as? [[String: Any]]
     check(overlays?.allSatisfy { $0["row"] != nil } == true, "每段文字都写 row 键（包括第 0 行）")
     let back = try VideoEditProjectIO.load(from: file).timeline

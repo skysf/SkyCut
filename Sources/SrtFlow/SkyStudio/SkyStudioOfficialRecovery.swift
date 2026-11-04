@@ -96,4 +96,6 @@ struct SkyStudioOfficialOperation {
     var recovery: SkyStudioOfficialRecovery
     var expiresAt: Date
     var sources: JSONValue
+    var authority: JSONValue
+    var catalog: SkyStudioCatalog
 }

@@ -2,6 +2,7 @@ import AVFoundation
 import CoreGraphics
 import Foundation
 import ImageIO
+import SrtFlowMCPKit
 import UniformTypeIdentifiers
 
 // MARK: - 定格（Freeze Frame）
@@ -25,11 +26,11 @@ extension VideoEditProject {
         let time = clock.time
         let selected = selectedClipIDs
             .compactMap { state.clip(with: $0) }
-            .filter { $0.contains(time: time) }
+            .filter { FreezeFrame.contains($0, at: time) }
         // 选了好几段、播放头同时穿过不止一段：不猜是哪一段，直接不给定格。
         if selected.count > 1 { return nil }
 
-        guard let clip = selected.first ?? mainClipAtPlayhead() else { return nil }
+        guard let clip = selected.first ?? state.mainClips.first(where: { FreezeFrame.contains($0, at: time) }) else { return nil }
         guard isFreezeEligible(clip, at: time) else { return nil }
         return clip
     }
@@ -43,7 +44,7 @@ extension VideoEditProject {
         // 单独藏起来的段（V）和藏起来的轨一样，在预览和成片里都不存在。
         guard !clip.isAudioOnly, !clip.isStillImage, !clip.needsStillConversion, !clip.isHidden
         else { return false }
-        guard clip.contains(time: time) else { return false }
+        guard FreezeFrame.contains(clip, at: time) else { return false }
         guard let location = state.location(of: clip.id) else { return false }
         // 藏起来的轨在预览和导出里都当不存在，没有「这一帧」可言。
         guard !state.isLaneHidden(location.track) else { return false }
@@ -140,7 +141,11 @@ extension VideoEditProject {
             speed: clip.speed
         )
 
-        let frame: ExtractedFrame
+        let sourceFile = request.sourceURL
+        let sourceIdentityBefore = await MediaReadQueue.run(on: MediaReadQueue.analysis) {
+            SourceFrameEvidence.fileIdentity(sourceFile)
+        }
+        let frame: NativeSourceFrameSample
         do {
             frame = try await Self.extractFrame(
                 from: request.sourceURL,
@@ -188,6 +193,14 @@ extension VideoEditProject {
             return fail(String(format: L10n("Could not read video information from %@."), still.lastPathComponent))
         }
 
+        // 证据只附加到结果，不改变定格准入 / 切片语义。文件身份读不到或变了就明确回未知，供制作锚点拒绝。
+        let identities = await MediaReadQueue.run(on: MediaReadQueue.analysis) {
+            (SourceFrameEvidence.fileIdentity(sourceFile), SourceFrameEvidence.fileIdentity(image))
+        }
+        let sourceFrame = SourceFrameEvidence.make(sample: frame, sourceFile: sourceFile, sourceClipID: request.clipID,
+            sourceStart: request.sourceStart, sourceDuration: request.sourceDuration, sourceIdentityBefore: sourceIdentityBefore,
+            sourceIdentityAfter: identities.0, imageFile: image, imageIdentity: identities.1)
+
         // CAS：抽帧+转码这 1~2 秒里，用户完全可能把目标段拖走、裁掉、改速度、
         // 加转场、挪去上层轨、把整条轨藏起来。那样这一帧对应的时间线位置已经
         // 不成立了，整单作废比插错地方强。
@@ -232,51 +245,14 @@ extension VideoEditProject {
         if drifted {
             notice = L10n("This clip has no frame exactly at the playhead, so the nearest one was used.")
         }
-        return .frozen(freeze.id, usedNearestFrame: drifted)
+        return .frozen(freeze.id, usedNearestFrame: drifted, sourceFrame: sourceFrame)
     }
 
     // MARK: - 抽帧
 
-    struct ExtractedFrame {
-        var image: CGImage
-        /// 实际取到的帧和请求时刻差多少秒（源时间）。VFR/低帧率素材上会不为 0。
-        var drift: Double
-    }
-
-    static func extractFrame(
-        from url: URL,
-        atSourceTime seconds: Double,
-        tolerance: Double
-    ) async throws -> ExtractedFrame {
-        let generator = AVAssetImageGenerator(asset: AVURLAsset(url: url))
-        generator.appliesPreferredTrackTransform = true
-        // 整条静帧管线是 SDR（yuv420p、无 HDR 元数据）。这里显式写死默认值，
-        // 让 HDR 素材的色调映射至少是**可预期**的那一种，而不是跟着系统默认漂。
-        generator.dynamicRangePolicy = .forceSDR
-        let requested = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
-
-        func take() async throws -> ExtractedFrame {
-            let result = try await generator.image(at: requested)
-            return ExtractedFrame(
-                image: result.image,
-                drift: (result.actualTime - requested).seconds
-            )
-        }
-
-        // 主路径零容差：定格要的就是「播放头上正显示的那一帧」。给了容差，
-        // AVFoundation 可以在窗口内自由取（通常就近拿关键帧），定出来的画面
-        // 和眼睛看到的对不上。
-        generator.requestedTimeToleranceBefore = .zero
-        generator.requestedTimeToleranceAfter = .zero
-        do {
-            return try await take()
-        } catch {
-            // 索引损坏、异常 VFR 之类零容差会直接失败，退一步取最近的一帧。
-            let window = CMTime(seconds: max(tolerance, 0.001), preferredTimescale: 600)
-            generator.requestedTimeToleranceBefore = window
-            generator.requestedTimeToleranceAfter = window
-            return try await take()
-        }
+    /// 两个现有消费者保留这一入口；底下只有 NativeSourceFrameSampler 一份原生实现。
+    static func extractFrame(from url: URL, atSourceTime seconds: Double, tolerance: Double) async throws -> NativeSourceFrameSample {
+        try await NativeSourceFrameSampler.extractFrame(from: url, atSourceTime: seconds, tolerance: tolerance)
     }
 
     // MARK: - 写图
@@ -350,7 +326,7 @@ extension VideoEditProject {
 /// 定格做成了没有（AI 要回给用户；手动定格不看它，失败照旧亮提示）。
 enum FreezeOutcome: Equatable {
     /// 插进去的定格段；`usedNearestFrame`：素材在那一刻没有帧，取了最近的一帧。
-    case frozen(UUID, usedNearestFrame: Bool)
+    case frozen(UUID, usedNearestFrame: Bool, sourceFrame: JSONValue)
     case failed(String)
 }
 

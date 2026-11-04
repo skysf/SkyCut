@@ -72,10 +72,13 @@ enum SkyStudioOfficialGenerateTool {
             return response
         }
         let request = try preparedRequest(plan, args: args, film: film!)
-        let identity: JSONValue = ["request": request.quoteBody, "sources": plan.sources,
+        let authority = try await SkyStudioOfficialAuthority.snapshot(request: request, referenceSources: plan.sources, catalog: plan.catalog, project: project)
+        try await validateScope(plan.scope, project: project, key: plan.key)
+        try SkyStudioOfficialAuthority.recheck(authority, request: request, referenceSources: SkyStudioOfficialPreparation.sources(plan.references), catalog: plan.catalog, project: project)
+        let identity: JSONValue = ["request": request.quoteBody, "sources": plan.sources, "authority": authority,
                                   "folder": .string(plan.folder.path), "stem": .string(plan.stem), "arguments": .string(digest)]
-        if quoteOnly { return try await quote(plan, request: request, identity: identity, project: project) }
-        let response = try await submit(plan, request: request, identity: identity, args: args, operationKey: operationKey, project: project)
+        if quoteOnly { return try await quote(plan, request: request, identity: identity, authority: authority, project: project) }
+        let response = try await submit(plan, request: request, identity: identity, authority: authority, args: args, operationKey: operationKey, project: project)
         SkyStudioGenerationRequests.completeStarted(operationKey, result: response, scope: stage)
         return response
     }
@@ -132,20 +135,13 @@ enum SkyStudioOfficialGenerateTool {
 
     /// 只核对公开模型目录里的名字；参数具体语义与私有支持范围仍由官方 /quote 严格决定。
     private static func validateNeighbors(_ film: SkyStudioFilm, catalog: SkyStudioCatalog) throws {
-        for neighbor in [film.previous, film.next].compactMap({ $0 }) {
-            let render = neighbor.render
-            guard let model = catalog.model(render.model, kind: render.kind.rawValue), model.operation != "remove_background" else {
-                throw AIToolError("Neighbor \(neighbor.shotID) must name an offered public model for its kind.")
-            }
-            var allowed = Set(model.params.keys).union(["reference_image_count", "reference_video_count", "reference_video_seconds"])
-            if model.params["duration_values"] != nil || model.params["smart_duration"] != nil { allowed.insert("duration") }
-            allowed.subtract(["duration_values", "smart_duration"])
-            let unknown = Set(render.params.keys).subtracting(allowed)
-            guard unknown.isEmpty else { throw AIToolError("Neighbor \(neighbor.shotID) has parameters absent from its public model catalog: \(unknown.sorted().joined(separator: ", ")).") }
+        for (side, neighbor) in [("previous", film.previous), ("next", film.next)] {
+            guard let neighbor else { continue }
+            try SkyStudioPublicRenderValidation.validate(neighbor.render, catalog: catalog, at: "film.\(side).render")
         }
     }
 
-    private static func quote(_ plan: Plan, request: SkyStudioJobRequest, identity: JSONValue, project: VideoEditProject) async throws -> AIToolResult {
+    private static func quote(_ plan: Plan, request: SkyStudioJobRequest, identity: JSONValue, authority: JSONValue, project: VideoEditProject) async throws -> AIToolResult {
         let quoted: SkyStudioQuote
         do { quoted = try await SkyStudioAPI().quote(request, key: plan.key) }
         catch let failure as SkyStudioFailure {
@@ -153,6 +149,7 @@ enum SkyStudioOfficialGenerateTool {
                 + " No generation, upload or credit reservation was started by this quote; no ordinary-generation fallback was used.")
         }
         try await validateScope(plan.scope, project: project, key: plan.key)
+        try SkyStudioOfficialAuthority.recheck(authority, request: request, referenceSources: SkyStudioOfficialPreparation.sources(plan.references), catalog: plan.catalog, project: project)
         guard try SkyStudioOfficialPreparation.sources(plan.references) == plan.sources else { throw AIToolError("Reference files changed while quoting. Prepare and quote the actual files again; nothing was reserved.") }
         let token = try SkyStudioOfficialPrepared.shared.rememberQuote(scope: plan.scope, identity: identity, request: request, quote: quoted)
         let official = quoted.officialRecipe!
@@ -163,7 +160,7 @@ enum SkyStudioOfficialGenerateTool {
                     "next_step": "Review the declared current shot, both adjacent states/renders/cuts and sound bed. Submit the unchanged request with quote_only=false, quote_token and these exact seam_review fingerprints. Preflight is not proof of generated picture or sound continuity. Do not mechanically reuse an old review after any change."])
     }
 
-    private static func submit(_ plan: Plan, request: SkyStudioJobRequest, identity: JSONValue, args: AIToolArguments,
+    private static func submit(_ plan: Plan, request: SkyStudioJobRequest, identity: JSONValue, authority: JSONValue, args: AIToolArguments,
                                operationKey: String, project: VideoEditProject) async throws -> AIToolResult {
         guard let token = try args.string("quote_token"), let reviewJSON = args.raw["seam_review"] else {
             throw AIToolError("First obtain an official quote with quote_only=true, review each adjacent seam and then pass quote_token and seam_review. Nothing was reserved or submitted.")
@@ -172,12 +169,13 @@ enum SkyStudioOfficialGenerateTool {
         let cached = try SkyStudioOfficialPrepared.shared.reviewedQuote(token, scope: plan.scope, identity: identity, review: review)
         _ = try await SkyStudioGeneratedVideo.engine()
         try await validateScope(plan.scope, project: project, key: plan.key)
+        try SkyStudioOfficialAuthority.recheck(authority, request: request, referenceSources: SkyStudioOfficialPreparation.sources(plan.references), catalog: plan.catalog, project: project)
         guard try SkyStudioOfficialPreparation.sources(plan.references) == plan.sources else { throw AIToolError("Original reference files changed before submission. Obtain fresh preparation and quote; no credits were reserved.") }
         // 最后一次 await 之后重新检查有效期与完整绑定，先于预算预留。
         var exact = try SkyStudioOfficialPrepared.shared.reviewedQuote(token, scope: plan.scope, identity: identity, review: review).request
         exact.idempotencyKey = operationKey
         let approval = SkyStudioApproval.identity(job: exact, credits: cached.quote.credits,
-            context: ["sources": plan.sources, "destination": .string(plan.folder.path + "/" + plan.stem), "project": .string(plan.scope.projectPath)])
+            context: ["authority": authority, "sources": plan.sources, "destination": .string(plan.folder.path + "/" + plan.stem), "project": .string(plan.scope.projectPath)])
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: cached.quote.credits, summary: plan.generation.summary(modelTitle: plan.model.title),
             identity: approval, args: args, reason: deviations(plan).isEmpty ? nil : deviations(plan).joined(separator: " "),
@@ -193,7 +191,7 @@ enum SkyStudioOfficialGenerateTool {
                 stem: plan.stem, reservedCredits: reservation.credits, reservedDay: reservation.day)
             let recovery = try await SkyStudioOfficialRecovery.create(receipt)
             let operation = SkyStudioOfficialOperation(request: exact, key: plan.key, scope: plan.scope, recovery: recovery,
-                                                       expiresAt: cached.quote.officialRecipe!.expiresAt, sources: plan.sources)
+                                                       expiresAt: cached.quote.officialRecipe!.expiresAt, sources: plan.sources, authority: authority, catalog: plan.catalog)
             let run = SkyStudioGenerationRun(generation: plan.generation, model: plan.model, quote: cached.quote, references: plan.references,
                 folder: plan.folder, stem: plan.stem, project: project, reservation: reservation, idempotencyKey: operationKey, official: operation)
             let job = run.start()

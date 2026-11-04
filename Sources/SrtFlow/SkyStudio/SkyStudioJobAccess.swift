@@ -51,21 +51,30 @@ final class SkyStudioCatalogCache {
 
     private var stored: (catalog: SkyStudioCatalog, at: Date)?
     private var loading: Task<SkyStudioCatalog, Error>?
+    private var invalidation = 0
 
     /// 有就用；没有、或者过了 10 分钟就问一次（正在问就等那一次）。
     func catalog(key: String, api: SkyStudioAPI = SkyStudioAPI(), now: Date = Date()) async throws -> SkyStudioCatalog {
         if let stored, now.timeIntervalSince(stored.at) < Self.lifetime, now >= stored.at { return stored.catalog }
         if let loading { return try await loading.value }
+        let observedInvalidation = invalidation
         let task = Task { try await api.models(key: key) }
         loading = task
-        defer { loading = nil }
+        defer { if observedInvalidation == invalidation { loading = nil } }
         let catalog = try await task.value
-        stored = (catalog, Date())
+        if observedInvalidation == invalidation { stored = (catalog, Date()) }
         return catalog
+    }
+
+    /// 只读已热且未过期的公开目录；作者存盘不能在这里偷偷联网。换 Key 的 forget 同时使迟到请求不能回填。
+    func cachedCatalog(now: Date = Date()) -> SkyStudioCatalog? {
+        guard let stored, now >= stored.at, now.timeIntervalSince(stored.at) < Self.lifetime else { return nil }
+        return stored.catalog
     }
 
     /// 换了 Key（模型和价可能跟账号走）。
     func forget() {
+        invalidation += 1
         stored = nil
         loading = nil
     }

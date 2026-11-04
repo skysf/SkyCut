@@ -1,0 +1,41 @@
+import Foundation
+import SrtFlowCore
+
+// production_state 的 25 个纯格点/Core Codable 检查；并到同一台架避免重复编译。
+func runProductionSamplingChecks() throws {
+    typealias Window = AIFilmProductionSamples.UsedWindow
+    let normal = Window(sourceStart: 3, sourceDuration: 10, speed: 1, timelineStart: 0, fps: 24)
+    check(normal.projectBounds == (0...(239.0 / 24)), "last frame excludes used end")
+    check(normal.sourceRequests.first == 3, "first source")
+    check(normal.sourceRequests.last == 3 + 239.0 / 24, "last source")
+    check(normal.sourceRequests.allSatisfy(normal.containsSource), "all source requests inside use")
+    let fractional = Window(sourceStart: 2, sourceDuration: 2, speed: 2, timelineStart: 0.02, fps: 24)
+    check(fractional.projectBounds?.lowerBound == 1.0 / 24, "fractional start rounds forward on project grid")
+    check(fractional.projectBounds?.upperBound == 1, "fractional end strictly inside")
+    check(abs(fractional.sourceRequests.first! - (2 + (1.0 / 24 - 0.02) * 2)) < 1e-12, "speed map source")
+    check(fractional.sourceRequests.allSatisfy(fractional.containsSource), "speed and fractional bounds")
+    let short = Window(sourceStart: 0, sourceDuration: 0.01, speed: 1, timelineStart: 0.01, fps: 24)
+    check(short.projectBounds == nil && short.sourceRequests.isEmpty, "subframe clip without project sample has no invented last")
+    let oneFrame = Window(sourceStart: 0, sourceDuration: 0.01, speed: 1, timelineStart: 0, fps: 24)
+    check(oneFrame.sourceRequests == [0], "one visible project sample deduplicates")
+    check(Window(sourceStart: 0, sourceDuration: 1, speed: 0, timelineStart: 0, fps: 24).projectBounds == nil, "zero speed rejected")
+    check(Window(sourceStart: 0, sourceDuration: .infinity, speed: 1, timelineStart: 0, fps: 24).projectBounds == nil, "infinite duration rejected")
+    let next = Window(sourceStart: 0, sourceDuration: 5, speed: 1, timelineStart: 10, fps: 24)
+    let cuts = AIFilmProductionSamples.seamRequests(left: normal, right: next)
+    check(cuts.contains(239.0 / 24) && cuts.contains(10), "cut includes both actual frame sides")
+    check(cuts.contains(10.25) && cuts.contains(12), "new shot early response inspected")
+    let gap = Window(sourceStart: 0, sourceDuration: 5, speed: 1, timelineStart: 12, fps: 24)
+    check(AIFilmProductionSamples.seamRequests(left: normal, right: gap).contains(11), "black gap midpoint inspected")
+    check(!AIFilmProductionSamples.contains([], in: [], tolerance: 0), "no empty proof")
+    check(!normal.hasActionSamples([3, Double(3).nextUp]), "distinct floats are not distinct action frames")
+    check(normal.hasActionSamples([3, 3 + 1.0 / 24]), "adjacent usable action frames accepted")
+    check(!oneFrame.hasActionSamples([0, 0.009]), "one visible frame cannot show an action turn")
+    check(!short.hasActionSamples([0, 0.009]), "no usable project frame cannot show an action turn")
+    check(!fractional.hasActionSamples([2.1, 2.1 + 1.0 / 24]), "speed must map action spacing into project frames")
+    check(fractional.hasActionSamples([2.1, 2.1 + 2.0 / 24]), "speed-mapped one-frame action spacing accepted")
+    check(!normal.hasActionSamples([3, 13]), "action source end remains excluded")
+    check(!normal.hasActionSamples([3, .nan]), "nonfinite action evidence rejected")
+    let core = FilmProductionState(revision: 1, story: "Original", shots: [], soundCues: [])
+    let decoded = try JSONDecoder().decode(FilmProductionState.self, from: JSONEncoder().encode(core))
+    check(decoded == core, "Core ordinary Codable round trip")
+}

@@ -15,7 +15,9 @@ enum SkyStudioOfficialSubmission {
             guard OpenProjects.shared.all.contains(where: { $0 === project }) else {
                 throw AIToolError("The official project was closed while checking its account; no new POST was sent.")
             }
-            guard try SkyStudioOfficialPreparation.sources(references) == operation.sources else {
+            let currentSources = try SkyStudioOfficialPreparation.sources(references)
+            try SkyStudioOfficialAuthority.recheck(operation.authority, request: operation.request, referenceSources: currentSources, catalog: operation.catalog, project: project)
+            guard currentSources == operation.sources else {
                 throw AIToolError("Original reference files changed before the official POST. Prepare and review a new quote; no new POST was sent.")
             }
             guard operation.expiresAt > Date() else {

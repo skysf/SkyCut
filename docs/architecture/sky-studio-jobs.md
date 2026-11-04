@@ -49,6 +49,14 @@
 | `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
 | `SkyStudioGenerateTool.swift` / `SkyStudioGenerationRun.swift` / `SkyStudioGenerationActivity.swift` / `SkyStudioGenerationFrame.swift` | generate_media：工具（挑模型、问价、把关、回任务号）、任务（传首帧、交、等、下载）、状态行订阅的那张表、图生视频的首帧（宽高比、传哪个文件） |
 
+### 模型目录的缓存与换账户
+
+`SkyStudioCatalogCache.cachedCatalog` 只读十分钟内、时间未倒退的热目录，不发 HTTP；
+新制作 render 要求先显式取得公开目录，已有制作计划的读取和原样保存不依赖联网。
+换 Key 的 `forget` 推进 invalidation epoch；旧异步加载既不能迟到回填 stored，也不能在 defer 清掉后继 loading。
+旧调用者可收到它自己那次结果，但共享缓存只认当前 epoch。回归及反向证据见
+[换 Key 后旧目录回填](../bugfixes/2026-11-04-catalog-cache-key-change.md)。
+
 ## 四、谁在用
 
 - **upscale**（6a-2，2026-10-28）：面板和 `upscale_clip`，规矩见 [视频 upscale](video-upscale.md)。模型从 `/models`（`SkyStudioCatalogCache`：这一次运行里 10 分钟内不再问，换了 Key 作废）；
