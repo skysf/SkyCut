@@ -152,8 +152,17 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   `checks/PreviewPerf/baseline.json` 比，只许降不许涨；结果和 App 日志作为附件 `preview-perf`
   上传，逐项对比写在汇总页。为了比「这个 PR 之前」的基线，checkout 带 `fetch-depth: 2`
   （PR 合并提交的第一个父提交）。规则见 [预览性能 ratchet](../architecture/preview-perf-ratchet.md)。
-- `.build` 缓存帮得有限：恢复之后第 1 组的完整编译仍要 50–80 秒（多半是因为 checkout 之后
-  源文件的修改时间都是新的，SwiftPM 按修改时间判断要不要重编）。留着是因为恢复只要几秒。
+- **`.build` 缓存要真省下编译**（2026-11-04 起，[案例](../bugfixes/2026-11-04-ci-build-cache-never-saved-a-compile.md)）。
+  以前的缓存从来没省下过一次编译：SwiftPM 判断要不要重编看的是修改时间「和上次记下的一不一样」，checkout 出来的时间每次都是
+  新的，恢复回来的 `.build` 全当过期；五组又共用一个只看 `Package.swift` 的 key，谁先跑完谁存、命中了就再也不存。现在：
+  - 编译之前先跑 `scripts/ci-stable-mtimes.py`：入库文件的修改时间按内容（git 的 blob id）算。内容没变的文件每次 checkout
+    都是同一个时间；变了的换一个时间、照样重编 —— 哪怕新时间比上次编译还早，因为 SwiftPM 比的是「一不一样」不是「新不新」
+    （`scripts/check-ci-build-cache.sh` 在小包上每次真验一遍，哪天 SwiftPM 改了它就红，不会拿旧的目标文件测新代码）。
+  - 取用 `actions/cache/restore`、存用 `actions/cache/save`，每组一份，key 带检出目录、工具链指纹（Xcode / Swift 的版本）、
+    组号和这次的提交；restore-keys 去掉提交，恢复同一组、同一工具链最新的那份。
+  - 只在 main 上、整组绿了才存。PR 恢复 main 上最新的那份（GitHub 的缓存按分支隔开，PR 上存的只有这个 PR 自己用得上）；
+    所以 main 上合并之后那一轮也是在给下一个 PR 备缓存。缓存一份按提交存、存了不能改，旧的 GitHub 七天没人用会自己清掉。
+  - `checks/ci-build-cache-key.sh` 钉着上面这些写法。
 - **`.build` 缓存的 key 和 restore-keys 都带检出目录（`github.workspace`）**：`.build` 里的模块缓存记着编它时的绝对路径，
   换了目录恢复回来就编不过。2026-10-18 仓库改名 SkyCut、检出目录从 `…/SrtFlow/SrtFlow` 变成 `…/SkyCut/SkyCut`，旧缓存被恢复、
   五组齐红（[案例](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。`checks/ci-build-cache-key.sh` 钉着。
