@@ -116,7 +116,7 @@ enum AIExportTools {
         if let video { result["video"] = video }
         // 会带水印（没开通 / 体验期）：先说一声，用户要的是没水印的成片时 AI 能先停下来说清楚（做完 get_job 里还会说一遍）。
         if !audioOnly, WatermarkPolicy.required(byLicence: SkyStudioAccount.shared.exportsWithWatermark) {
-            result["watermark"] = .string(SkyCutGates.watermarkNote)
+            result["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license))
         }
         return .ok(.object(result))
     }
@@ -128,7 +128,7 @@ enum AIExportTools {
     ) -> [String: JSONValue] {
         var detail: [String: JSONValue] = ["path": .string(output.path)]
         if let video { detail["video"] = video }
-        if watermarked { detail["watermark"] = .string(SkyCutGates.watermarkNote) }
+        if watermarked { detail["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license)) }
         guard let levels else { return detail }
         func tenths(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
         if let loudness = levels.loudnessLUFS { detail["audio_loudness_lufs"] = tenths(loudness) }

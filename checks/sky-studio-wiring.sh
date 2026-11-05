@@ -99,6 +99,15 @@ HINTS="Sources/SrtFlow/SkyStudio/SkyStudioProHints.swift"
   || fail "购买按钮必须打开此刻授权提供的 proActivationURL"
 grep -qF 'let activatePro = Self.activatePro(license: license)' Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   || fail "AI 的下一步没有按此刻授权选择购买地址 / 邮箱"
+grep -qF 'if license.isMachineLimited, let url = license.manageMachinesURL {' "${HINTS}" \
+  && grep -qF 'Link("Manage Macs", destination: url)' "${HINTS}" \
+  && grep -qF 'if license.isMachineLimited {' "${HINTS}" \
+  && grep -qF 'Text("This account is already using SkyCut on \(limit) Macs. This Mac is using the free plan.")' "${HINTS}" \
+  || fail "台数满了的界面必须说明当前 Mac 免费、按服务器 limit 显示台数并打开 manageMachinesURL"
+grep -qF 'Text(verbatim: message)' "${HINTS}" \
+  && grep -qF 'license.unrecognizedPlanMessage' "${HINTS}" \
+  && grep -qF 'license.unrecognizedPlanMessage' "${SECTION}" \
+  || fail "未知 plan_reason 必须在设置 / 导出显示服务器的 plan_message"
 
 # 5. 照授权拦接在该接的地方（规矩在 SkyCutGates，生不生效看 SkyCutGates.enforced）。
 GATE_AT="$(grep -nF 'if let refusal = await SkyStudioAccount.shared.aiRefusal(for: tool) {' "${ROUTER}" | cut -d: -f1 || true)"
@@ -116,10 +125,10 @@ others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | 
 [ -z "${others}" ] || fail "这些文件自己问了 SkyCutGates.enforced：$(tr '\n' ' ' <<<"${others}")—— 只有 SkyStudioAccount 和 get_status 问"
 [ "$(count 'if !isAudioOnly { ExportWatermarkNotice() }' "${SHEET}")" -eq 1 ] \
   || fail "${SHEET}：导出面板底栏要挂「会带水印」那一行（只出声音时不挂）"
-[ "$(count 'result["watermark"] = .string(SkyCutGates.watermarkNote)' "${EXPORT_TOOLS}")" -eq 1 ] \
-  && [ "$(count 'detail["watermark"] = .string(SkyCutGates.watermarkNote)' "${EXPORT_TOOLS}")" -eq 1 ] \
+[ "$(count 'result["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license))' "${EXPORT_TOOLS}")" -eq 1 ] \
+  && [ "$(count 'detail["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license))' "${EXPORT_TOOLS}")" -eq 1 ] \
   && [ "$(count 'watermarked: exporter.watermarked' "${EXPORT_TOOLS}")" -eq 1 ] \
-  || fail "${EXPORT_TOOLS}：export_video 开始时（会带）和做完时（带了）都要告诉 AI 水印的事"
+  || fail "${EXPORT_TOOLS}：export_video 开始时（会带）和做完时（带了）都要按此刻授权告诉 AI 水印的事"
 [ "$(count 'result["skycut_plan"] = SkyCutGates.statusJSON(' "${STATUS_TOOLS}")" -eq 1 ] \
   || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它是唯一照常回的工具）"
 

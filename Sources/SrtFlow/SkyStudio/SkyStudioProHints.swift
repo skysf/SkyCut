@@ -3,7 +3,7 @@ import SwiftUI
 
 // MARK: - 开通正式版怎么说：设置里那一行、导出面板上那一行
 //
-// 管什么：不是正式版时告诉用户怎么开通：/me 有可用购买地址就打开它，否则照旧给客服邮箱和「复制邮箱」。
+// 管什么：台数满了先管理 Mac，其余不是正式版时告诉用户怎么开通；链接不可用时给客服邮箱和「复制邮箱」。
 // 两处共用 SkyStudioContactRow：设置里「Sky Studio」一节的最后一行；导出面板底栏上「会带水印」那一行
 //（ExportWatermarkNotice，**不拦导出**）。链接只来自服务器，不拼接购买页。
 // 不管什么：带不带水印（WatermarkPolicy + SkyStudioAccount.exportsWithWatermark）、授权怎么算（SkyCutLicense）。
@@ -22,7 +22,12 @@ struct SkyStudioContactRow: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .textSelection(.enabled)
             Spacer(minLength: 8)
-            if let url = license.proActivationURL {
+            if license.isMachineLimited, let url = license.manageMachinesURL {
+                Link("Manage Macs", destination: url)
+                    .controlSize(.small)
+                    .accessibilityIdentifier(isExport ? "export-manage-macs" : "skystudio-manage-macs")
+                    .instantHelp("Open Sky Studio to manage the Macs using this account")
+            } else if let url = license.proActivationURL {
                 Link("Get SkyCut Pro", destination: url)
                     .controlSize(.small)
                     .accessibilityIdentifier(isExport ? "export-open-pro-purchase" : "skystudio-open-pro-purchase")
@@ -35,6 +40,37 @@ struct SkyStudioContactRow: View {
 
     @ViewBuilder
     private var message: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if license.isMachineLimited {
+                machineLimitMessage
+                if isExport { Text("The video will carry a Sky Studio watermark.") }
+                if license.manageMachinesURL != nil {
+                    Text("Remove a Mac in Sky Studio to use this account here.")
+                } else {
+                    Text("To use this account on this Mac, contact \(SkyStudioLinks.supportEmail).")
+                }
+            } else {
+                if let message = license.unrecognizedPlanMessage { Text(verbatim: message) }
+                activationMessage
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var machineLimitMessage: some View {
+        if let limit = license.machineLimit, limit > 0 {
+            if limit == 1 {
+                Text("This account is already using SkyCut on 1 Mac. This Mac is using the free plan.")
+            } else {
+                Text("This account is already using SkyCut on \(limit) Macs. This Mac is using the free plan.")
+            }
+        } else {
+            Text("This account has reached its Mac limit. This Mac is using the free plan.")
+        }
+    }
+
+    @ViewBuilder
+    private var activationMessage: some View {
         if license.proActivationURL != nil {
             if isExport {
                 Text("The video will carry a Sky Studio watermark. Activate SkyCut Pro to export without it.")
@@ -49,7 +85,7 @@ struct SkyStudioContactRow: View {
     }
 }
 
-/// 导出面板底栏：这次导出的视频会带 Sky Studio 水印，开通正式版写哪个邮箱。只出声音时面板不放它（没有画面）。
+/// 导出面板底栏：这次导出的视频会带 Sky Studio 水印，去管理 Mac / 开通正式版。只出声音时面板不放它（没有画面）。
 /// 只订阅 SkyStudioAccount（授权变了这一行跟着变），不读工程。
 struct ExportWatermarkNotice: View {
     @ObservedObject private var account = SkyStudioAccount.shared

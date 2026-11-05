@@ -36,17 +36,32 @@ enum SkyCutGates {
 
     // MARK: 跟 AI 说的话（英文）
 
-    /// 开通正式版怎么办：和设置里、导出面板一样，优先用 /me 的购买地址；没有就照旧联系邮箱。
+    /// 下一步：台数满了先管理 Mac；其余和界面一样用购买地址 / 邮箱。只说英文。
     static func activatePro(license: SkyCutLicense) -> String {
-        if let url = license.proActivationURL {
-            return "To activate SkyCut Pro, ask the user to open \(url.absoluteString) and buy Pro for their Sky Studio account."
+        if license.isMachineLimited {
+            let usage: String
+            if let limit = license.machineLimit, limit > 0 {
+                usage = "This account is already using SkyCut on \(limit) \(limit == 1 ? "Mac" : "Macs")."
+            } else {
+                usage = "This account has reached its Mac limit."
+            }
+            let action = license.manageMachinesURL.map {
+                "Ask the user to open \($0.absoluteString) and remove a Mac in Sky Studio to use this account here."
+            } ?? "Ask the user to email \(SkyStudioLinks.supportEmail) to use this account on this Mac."
+            return usage + " This Mac is using the free plan. " + action
         }
-        return "To activate SkyCut Pro, the user emails \(SkyStudioLinks.supportEmail) with the email address of their Sky Studio account."
+        let explanation = license.unrecognizedPlanMessage.map { $0 + " " } ?? ""
+        if let url = license.proActivationURL {
+            return explanation + "To activate SkyCut Pro, ask the user to open \(url.absoluteString) and buy Pro for their Sky Studio account."
+        }
+        return explanation + "To activate SkyCut Pro, the user emails \(SkyStudioLinks.supportEmail) with the email address of their Sky Studio account."
     }
 
     /// 导出带了水印时告诉 AI：AI 用 look 看成片会看到它，要能跟用户说清楚为什么、怎么去掉。
-    static let watermarkNote = "This video carries the Sky Studio watermark (the logo moves between the corners and the center every "
-        + "4 seconds) because SkyCut is not activated as SkyCut Pro; Pro exports without it. " + activatePro(license: .free(.noKey))
+    static func watermarkNote(license: SkyCutLicense) -> String {
+        "This video carries the Sky Studio watermark (the logo moves between the corners and the center every "
+            + "4 seconds). " + activatePro(license: license)
+    }
 
     /// AI 被挡住时回的话：没做、为什么、请用户做什么。
     static func aiRefusal(license: SkyCutLicense, problem: SkyStudioProblem?, now: Date) -> String {
@@ -68,6 +83,7 @@ enum SkyCutGates {
         if let days = license.trialDaysLeft(now: now) { plan["trial_days_left"] = .number(Double(days)) }
         if license.plan == .pro, let until = license.paidUntil { plan["pro_until"] = .string(day(until)) }
         if let snag = snag(problem) { plan["problem"] = .string(snag) }
+        if let message = license.unrecognizedPlanMessage { plan["plan_message"] = .string(message) }
         if !license.mcp {
             plan["next_step"] = .string(nextStep(license, problem: problem))
         } else if license.watermark {
@@ -85,6 +101,7 @@ enum SkyCutGates {
         case .notChecked: return "SkyCut has not been able to check the plan with Sky Studio yet"
         case .expired: return "SkyCut's last plan check with Sky Studio has run out"
         case .server:
+            if license.isMachineLimited { return "this Mac is using the free plan" }
             guard license.plan == .free else { return "this Sky Studio account's SkyCut plan does not include AI editing" }
             return license.trialUnavailable == "machine_used"
                 ? "this Sky Studio account is on the free plan: this Mac already had a SkyCut trial, so the account gets no trial on it"
@@ -109,9 +126,10 @@ enum SkyCutGates {
         let activatePro = Self.activatePro(license: license)
         let pasteKey = "Ask the user to create an API key in Sky Studio (\(SkyStudioLinks.keysPage.absoluteString), or the avatar at the top "
             + "right → SkyCut) and paste it in SkyCut Settings → Sky Studio. "
+        let machineAdvice = license.isMachineLimited ? " " + activatePro : ""
         switch problem {
-        case .needsKeychainPermission?: return "Ask the user to open SkyCut Settings → Sky Studio and click Allow…, then try again."
-        case .updateRequired?: return "Ask the user to update SkyCut, then try again."
+        case .needsKeychainPermission?: return "Ask the user to open SkyCut Settings → Sky Studio and click Allow…, then try again." + machineAdvice
+        case .updateRequired?: return "Ask the user to update SkyCut, then try again." + machineAdvice
         case .keyRejected?: return pasteKey + activatePro
         case .unreachable?, .keychain?, .notAKey?, nil: break
         }

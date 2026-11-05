@@ -27,7 +27,8 @@
 | Key 作废了 | 后台问到 `invalid_key`：清掉存的回答（这把 Key 的授权不再作数，不等到 `valid_until`），设置里说 Sky Studio 不认、请粘一把新的 |
 | 版本太老 | `upgrade_required`：设置里照服务器的话说，带下载链接（`download_url`）；存的回答照旧用到 `valid_until` |
 | 体验给不了 | `/me` 回 `plan: free` + `trial_unavailable: machine_used`：设置里说「这台 Mac 已经体验过 SkyCut，这个账号在这台 Mac 上没有体验期」 |
-| 开通正式版 | 免费 / 体验时，设置、导出面板、AI 被挡时的话都优先给 `/me.skycut.upgrade_url`：非空并通过既有 `SkyStudioLinks.webURL` 校验才用，**不拼接、不硬编码购买页**。缺失 / null / 空串 / 不可用网址时照旧给 support@skystudioai.com（`SkyStudioLinks.supportEmail`），界面保留可选中邮箱和「复制邮箱」，不做 mailto。购买目标由此刻授权的 `proActivationURL` 共用；已是正式版但 features 被单独关闭时，不因此叫用户再买 Pro；无 Key / 回答已过期时不用旧购买链接 |
+| 开通正式版 | 免费 / 体验且**没有台数拒绝**时，设置、导出面板、AI 被挡时的话都优先给 `/me.skycut.upgrade_url`：非空并通过既有 `SkyStudioLinks.webURL` 校验才用，**不拼接、不硬编码购买页**。缺失 / null / 空串 / 不可用网址时照旧给 support@skystudioai.com（`SkyStudioLinks.supportEmail`），界面保留可选中邮箱和「复制邮箱」，不做 mailto。购买目标由此刻授权的 `proActivationURL` 共用；已是正式版但 features 被单独关闭时，不因此叫用户再买 Pro；无 Key / 回答已过期时不用旧购买链接 |
+| 台数满了 | 有效回答的 `plan_reason == machine_limit_reached` 优先于购买入口：设置、导出面板、AI 拒绝、`get_status.next_step` 和水印说明都明确「账号已经在 N 台 Mac 上使用，这台 Mac 现在是免费版」，N 只取 `machines.limit`，不取 used、不写死 2；缺 limit 时只说达到台数上限。管理链接只用 `manage_machines_url`；缺失 / null / 空串 / 不安全网址就给客服邮箱。**即使 upgrade_url 非空也不给购买按钮或叫用户再买**（`proActivationURL` 返回 nil）。界面用自己的英语 / 简体中文 / 西班牙语文案；未知 plan_reason 的非空 plan_message 原样显示，不从文字里取链接。原因、台数和管理地址只是说明，不能改 plan / features / valid_until；无 Key、缓存过期或钟往回拨时，连这些提示一起丢弃 |
 | 服务器的网址 | 只认 https（本机的假服务器给的 http://127.0.0.1 也认），读不成就当没有（`SkyStudioLinks.webURL`） |
 | 读回答 | 读得宽：认不出的字段不管、少了可选的不算错、日期带不带毫秒都认（Foundation 自带的 `.iso8601` 不认毫秒，JS 的 `toISOString()` 带毫秒）；少了必须的（`features`、`valid_until`）就不算回答 |
 | 自助购买说明字段 | `account_plan`、`pro_source`（subscription / one_time / manual / null）、`upgrade_url`、`manage_machines_url`、`plan_reason`、`plan_message`、`auto_renews`、`grace_until`、`machines` 全部可选，Mac 信息里的 limit / used / window_days / current_allowed 也可缺。随现有 `SkyStudioStoredAnswer` 一起缓存；未知套餐 / 来源 / 原因原样保留。**不能用 account_plan、paid_until、grace_until 或台数说明自行开启功能**，仍只听 plan / features / valid_until；grace_until 保留服务器时刻，比较时沿用 `stored.local` 换算，不另造钟差规则 |
@@ -36,8 +37,8 @@
 | AI 的门 | 此刻的授权不让用 MCP：AI 的工具一个都不做。门在 `AIToolRouter.handle` **核对参数名之后、建调用排队之前**（`SkyStudioAccount.aiRefusal`），不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。**`get_status` 照常回**，报 `skycut_plan`（套餐、从哪来、AI 能不能用、带不带水印、体验还剩几天、正式版到哪天、出了什么事、请用户做什么）。被挡住的回「Not done」+ 为什么 + 请用户做什么（粘 Key、打开服务器给的购买地址 / 联系邮箱、点「允许…」、点「再查一次」、更新 SkyCut），话和规矩都在纯值的 `SkyCutGates`（英文；界面语言写的细节不带给 AI） |
 | 还没问完时 | 此刻的授权不作数（没问到过、过期了）又有 Key：先问一次 `/me` 再判（正在问就等它；没问成过不到 5 分钟的不再问；最多等一次请求的超时 20 秒，`SkyStudioAccount.settledLicense`）。刚启动、离线几天之后的第一个调用不会因为还没问完就被挡 |
 | 导出水印 | 带不带听服务器的 `watermark`：`SkyStudioAccount.exportsWithWatermark`，导出器、导出面板那一行、`export_video` 都问它（[导出水印](export-watermark.md)）。要带却读不出 logo 就不导 |
-| 导出面板那一行 | 会带水印时底栏说明水印并给「购买 SkyCut Pro」链接；没有可用购买地址就保留原邮件文案 +「复制邮箱」。和设置共用 `SkyStudioContactRow`，英文 / 简体中文 / 西班牙语都走本地化。**不拦导出**（方案第 19 条）；只出声音时不写。只订阅 `SkyStudioAccount` |
-| 告诉 AI 带了水印 | `export_video` 开始时（会带）和做完的 `get_job`（带了）都写 `watermark`：带了什么、为什么、怎么去掉（`SkyCutGates.watermarkNote`）。AI 用 `look` 看成片会看到它，要能跟用户说清楚 |
+| 导出面板那一行 | 会带水印时底栏说明水印：台数满了给「管理 Mac」，否则给可用的「购买 SkyCut Pro」链接；各自的目标地址不可用就给邮箱 +「复制邮箱」。和设置共用 `SkyStudioContactRow`，英文 / 简体中文 / 西班牙语都走本地化。**不拦导出**（方案第 19 条）；只出声音时不写。只订阅 `SkyStudioAccount` |
+| 告诉 AI 带了水印 | `export_video` 开始时（会带）和做完的 `get_job`（带了）都写 `watermark`：带了什么、怎么去掉（`SkyCutGates.watermarkNote(license:)`）。**每次都传那一刻的 `SkyStudioAccount.shared.license`**：台数满了管理 Mac，其余有购买地址给地址、没有给邮箱，不能再固定传 `.free(.noKey)`。AI 用 `look` 看成片会看到它，要能跟用户说清楚 |
 
 ## 二、文件
 
@@ -57,7 +58,7 @@
 
 ## 三、还没做的
 
-- 自助购买后续：台数满了的专门提示，以及快到期 / 宽限期提示分后续 PR；本轮先读取、缓存这些字段和 `pro_source`，不把尚未实施的提示当成已完成。
+- 自助购买后续：快到期 / 宽限期提示留后续 PR；本轮已实现台数满了的专门提示，其余新字段和 `pro_source` 先读取、缓存，不把尚未实施的提示当成已完成。
 - **发第一个带照授权拦的正式版之前**：正式版和测试版的 Key 各存各的（钥匙串按 bundle id 分开），用户要先在正式版的设置里粘一次 Key，
   不然装上之后用户自己的 AI 剪辑也被挡住（正式版 0.18.47 还没有「Sky Studio」这一节，要先装一个有这一节的版本再粘）。
 - 第 6 / 7 刀已完成：生成、upscale、旁白、克隆全部走 Sky Studio，旧 fal Key / 设置 / 请求 / 模型表已删。定稿里和 SkyCut 现在做法不一样的地方记在收费方案「Sky Studio 定稿之后」一节。
@@ -72,13 +73,15 @@
   `/me` 照合同里的样例逐字段读、带毫秒的日期、读得宽、少了必须的不算回答、网址只认 https 和本机、存了读回来一样、服务器时间换本机时间；
   自助购买 v1 的普通 Pro / 免费购买 / 第三台 Mac / 宽限 / 购买未配置 fixture：所有新字段缺失 / null、pro_source 已知与未知值、部分 Mac 信息、缓存往返、购买地址进入此刻授权及 AI 下一步、空或不安全地址回退邮箱；账号 Pro 不能提升当前免费 Mac，过期 paid_until 不能推翻仍有效的服务器 Pro；
   反向验证（2026-11-06）：暂时不把 upgradeURL 传入此刻授权，40 条新增断言变红（退出 1）；按钮接到建 Key 页时接线守卫变红（退出 1），恢复后再跑完整本地检查。
+  台数提示另含 `me-machine-limit-purchase-v1`（满台数但 upgrade_url 非空）：不同 limit / 缺 limit、管理链接 / 邮箱、未知原因原话、缓存作废后不留旧提示；AI 拒绝、get_status、水印说明均不得推荐重购，普通购买地址也进入水印说明。
+  反向验证（台数提示，2026-11-06）：恢复旧 proActivationURL 条件，50 条断言变红；水印说明改回固定 `.free(.noKey)`，172 条变红；导出真实调用改用无 Key 快照、管理按钮断开，各自的接线守卫退出 1。均恢复后，3,122 条 Sky Studio 断言通过。
   假 URLSession 上看 `/me` 的地址、方法、四个头，401 / 426 / 429 留着 code 和附加字段，502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能指到本机；
   授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问（`RefreshChecks`）：免费 / 体验前台 1 分钟、正式版 30 分钟的边界，后台仍是 6 小时，没问到过 / 过期马上问，5 分钟失败退避不会被前台规则绕过；
   照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
   被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
 - `checks/sky-studio-wiring.sh`（扫描守卫）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
   弹框的那一档读只在 `KeychainSecret.swift`、`SkyStudioAccount` 只有 `promptKeychain` 为真才弹、`promptKeychain: true` 只在设置那一节；设置窗口挂着这一节、启动时 `start()`；
-  设置和导出购买提示必须传当前授权，购买按钮打开共用的 proActivationURL，AI 下一步也按当前授权选购买地址 / 邮箱；
+  设置和导出提示必须传当前授权，管理按钮打开 manageMachinesURL、购买按钮打开共用的 proActivationURL，AI 下一步也按当前授权选管理 / 购买 / 邮箱；export_video 开始与完成的水印说明必须传此刻授权；
   照授权拦：门在核对参数名之后、建调用排队之前；让不让、带不带水印只在 `SkyStudioAccount` 里调 `SkyCutGates`；导出面板挂着那一行；`export_video` 开始和做完都说水印；`get_status` 报 `skycut_plan`。
   反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；（2026-10-28）拆掉路由的门、门挪到排队之后、面板不挂那一行、get_status 不报 —— 各自红；恢复后转绿。
 - `checks/export-watermark-wiring.sh`：导出器拿 `exportsWithWatermark` 问 `WatermarkPolicy`、读不出 logo 时报错不导、每一处问 `WatermarkPolicy` 都传授权；`scripts/check-export-watermark.sh` 的纯值验加不加。
@@ -89,6 +92,8 @@
 
 2026-11-06 本轮已在独立 `.skystudiosmoke` 真 App、本机 fixture 服务上检查英语 / 简体中文 / 西班牙语 × 设置 / 导出面板 × 购买链接 / 邮箱回退共 12 种呈现，默认窗口下文案完整；购买按钮实点只访问本机 `/purchase-fixture`，请求不带认证头。复现时向本机服务 `/__control` 传 `me_fixture`（上述 fixture 文件名去掉 `.json`）；`local_purchase_page: true` 将非空购买地址替换为本机页面。未使用真实 Key、真实支付或真实 Sky Studio 请求。
 
+台数提示本轮另在独立 `com.srtflow.SrtFlow.prb.skystudiosmoke` + 回环假服务中检查 12 种呈现（三语言 × 设置 / 导出 × 管理链接 / 邮箱回退），主窗口 1180×740、设置默认宽度 750 下文案完整，无购买入口。先由电脑控制读取英语设置，随后全部走仓库 `SmokeDriver` 的进程内 `show` / `snapshot`、按窗口号截图，不接管全局输入；仅测试包临时将设置初始分类改为 Sky Studio，截图后源码逐字节恢复。`local_machine_page: true` 把管理地址换成本机 `/machines-fixture`，`no_machine_management: true` 验邮箱回退；管理链接仅核对目标，实点 / 复制操作仍按下表人工验证。真实测试 MCP 的 get_status / seek 拒绝已验两种下一步且始终英文；临时体验回答导出的合成 1 秒视频，export_video 和完成 get_job 的 watermark 均使用当前购买地址。夹具和假凭据用后恢复 / 清理，不把本机结果当作真实服务器已上线。
+
 - [ ] 没有 Key 时点「去 Sky Studio 建 Key」：浏览器打开 Sky Studio 建 SkyCut Key 的那个窗口（登录后）。
 - [ ] 设置 → Sky Studio 粘一把新账号的 Key：「账号」是这个账号的邮箱、「套餐」是「体验 · 还剩 7 天」（不是 8 天：回答晚到几秒，见「断网」一行）、积分对得上网站；钥匙串访问里多了「SkyCut Sky Studio API key」一条。
 - [ ] 同一台 Mac 换一个新账号的 Key：「免费版」，下面一句说这台 Mac 已经体验过。
@@ -98,6 +103,10 @@
 - [ ] 「复制邮箱」之后粘出来是 support@skystudioai.com，这个邮箱收得到信。
 - [ ] 本机假服务分别给 `me-free-purchase-v1` 和 `me-purchase-unavailable-v1`：英语 / 简体中文 / 西班牙语下检查设置和导出面板。前者有「购买 SkyCut Pro」并使用回答里的地址；后者没有购买链接、仍显示邮箱且能复制。默认窗口宽度下文案完整、链接不被截断；只出声音时不出现水印提示。
 - [ ] 本机假服务给旧回答（所有新字段缺失）或 upgrade_url 为 null / 空串 / 不可用网址：设置 / 导出仍保留邮箱；AI 被挡和 get_status 的下一步也是英文邮箱提示。给有效购买地址时 AI 的下一步改为这个地址，不再叫用户发邮件。
+- [ ] 本机假服务给 `me-machine-limit-purchase-v1`：英语 / 简体中文 / 西班牙语的设置和导出面板均写账号已在 2 台 Mac 上使用、这台免费；只有「管理 Mac」，没有「购买 SkyCut Pro」。将 limit 改成 5、used 保留 2，文案改为 5 台；缺 limit 时不编造台数。默认窗口下长文案完整，无省略号。
+- [ ] 台数满了时实点「管理 Mac」：只打开回答里的 manage_machines_url（验收用本机页面），不带 Key；管理地址缺失 / null / 空串 / 不安全时显示客服邮箱且「复制邮箱」有效，即使 upgrade_url 可用也不出现购买链接。
+- [ ] 未知 plan_reason 给一条服务器 plan_message：设置 / 导出按原文显示；已是 Pro 的设置也保留该说明。已知 machine_limit_reached 不直接显示服务器英文，而用各语言本地化。
+- [ ] 台数满了时真实 MCP 调用 get_status 和一个编辑工具：next_step / 拒绝说明账号台数、当前 Mac 免费和管理地址 / 邮箱，不叫买 Pro。体验导出开始和 get_job 完成时的 watermark 按当时授权给购买地址；用台数 fixture / 无地址 fixture 验纯值与接线，不把拒绝的 export_video 当作真的导出。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。

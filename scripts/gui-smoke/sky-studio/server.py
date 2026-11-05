@@ -106,10 +106,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, LOG)
         if self.path == "/__state":
             return self.reply(200, {"admitted_jobs": len(JOBS)})
-        if self.path == "/purchase-fixture":
+        if self.path in {"/purchase-fixture", "/machines-fixture"}:
             with LOCK:
                 LOG.append({"method": "GET", "path": self.path, "has_auth": "Authorization" in self.headers})
-            return self.reply(200, {"fixture": "purchase page opened locally; no payment"})
+            return self.reply(200, {"fixture": self.path + " opened locally; no payment"})
         if not self.authorized():
             return
         if self.path.endswith("/me"):
@@ -117,7 +117,8 @@ class Handler(BaseHTTPRequestHandler):
                 LOG.append({"method": "GET", "path": self.path, "account": self.account(), "has_auth": True})
                 fixture = CONTROL.get("me_fixture")
             if fixture:
-                allowed = {"me-pro-v1", "me-free-purchase-v1", "me-machine-limit-v1", "me-grace-v1", "me-purchase-unavailable-v1"}
+                allowed = {"me-pro-v1", "me-free-purchase-v1", "me-machine-limit-v1", "me-machine-limit-purchase-v1",
+                           "me-grace-v1", "me-purchase-unavailable-v1"}
                 if fixture not in allowed:
                     return self.error(400, "unknown_me_fixture")
                 path = Path(__file__).resolve().parents[3] / "checks/SkyStudio/Fixtures" / (fixture + ".json")
@@ -125,6 +126,10 @@ class Handler(BaseHTTPRequestHandler):
                 # 实点购买链接只打开本机页面，不连尚未上线的真实购买页。
                 if CONTROL.get("local_purchase_page") and answer["skycut"].get("upgrade_url"):
                     answer["skycut"]["upgrade_url"] = BASE + "/purchase-fixture"
+                if CONTROL.get("local_machine_page") and answer["skycut"].get("manage_machines_url"):
+                    answer["skycut"]["manage_machines_url"] = BASE + "/machines-fixture"
+                if CONTROL.get("no_machine_management"):
+                    answer["skycut"]["manage_machines_url"] = None
                 return self.reply(200, answer)
             return self.reply(200, {"account": {"id": self.account()}, "credits": {"balance": 1000},
                 "skycut": {"plan": "pro", "features": {"mcp": True, "watermark": False},

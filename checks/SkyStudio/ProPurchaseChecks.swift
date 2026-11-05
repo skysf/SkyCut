@@ -4,7 +4,7 @@ import Foundation
 // JSON 来自冻结合同的字段与第三台 Mac 样例，含 pro_source 补充；不连真服务器，不改变授权规则。
 
 func runProPurchaseChecks() {
-    for name in ["me-pro-v1", "me-free-purchase-v1", "me-machine-limit-v1", "me-grace-v1", "me-purchase-unavailable-v1"] {
+    for name in ["me-pro-v1", "me-free-purchase-v1", "me-machine-limit-v1", "me-machine-limit-purchase-v1", "me-grace-v1", "me-purchase-unavailable-v1"] {
         let url = URL(fileURLWithPath: "checks/SkyStudio/Fixtures/\(name).json")
         do {
             let data = try Data(contentsOf: url)
@@ -18,10 +18,11 @@ func runProPurchaseChecks() {
             checkEqual(license.watermark, me.skycut.features.watermark, "\(name): watermark only follows features")
             checkEqual(me.skycut.machines?.limit, 2, "\(name): machines.limit")
             checkEqual(me.skycut.machines?.windowDays, 30, "\(name): machines.window_days")
-            checkEqual(me.skycut.machines?.currentAllowed, name != "me-machine-limit-v1", "\(name): machines.current_allowed")
+            let limited = name.hasPrefix("me-machine-limit-")
+            checkEqual(me.skycut.machines?.currentAllowed, !limited, "\(name): machines.current_allowed")
             checkEqual(me.skycut.proSource, me.skycut.plan == "pro" ? "subscription" : nil, "\(name): pro_source")
             checkEqual(me.skycut.manageMachinesURL?.absoluteString, "https://skystudioai.com/app/skycut/machines", "\(name): management URL is independent of purchasing")
-            if name == "me-machine-limit-v1" {
+            if limited {
                 checkEqual(me.skycut.accountPlan, "pro", "a limited Mac still reports the account's Pro")
                 checkEqual(me.skycut.planReason, "machine_limit_reached", "machine limit is a plan reason, not an HTTP error")
                 checkEqual(me.skycut.planMessage, "This account is already using SkyCut on 2 Macs. This Mac is using the free plan. Remove a Mac in Sky Studio to use this account here.", "the frozen machine-limit message")
@@ -29,7 +30,8 @@ func runProPurchaseChecks() {
                 checkEqual(me.skycut.machines?.currentAllowed, false, "current Mac is not allowed")
                 checkEqual(me.skycut.machines?.used, 2, "machines.used")
                 check(license.plan == .free && !license.mcp && license.watermark, "account_plan and paid_until cannot upgrade this Mac")
-                check(license.upgradeURL == nil, "purchase configuration is absent in the frozen example")
+                checkEqual(license.upgradeURL == nil, name == "me-machine-limit-v1", "both absent and enabled purchase configurations are covered")
+                runMachineLimitChecks(me)
             } else if name == "me-grace-v1" {
                 checkEqual(me.skycut.autoRenews, true, "a verified renewal is true")
                 checkEqual(me.skycut.graceUntil, SkyStudioJSON.parseDate("2026-11-12T00:00:00.250Z"), "grace_until accepts milliseconds")
@@ -92,6 +94,9 @@ private func runPurchaseDestinationChecks(_ fixture: SkyStudioMe) {
     for plan in ["free", "trial"] {
         var me = fixture
         me.skycut.plan = plan
+        // 这里验普通购买入口；台数原因的优先级单独由 runMachineLimitChecks 验证。
+        me.skycut.planReason = nil
+        me.skycut.planMessage = nil
         me.skycut.upgradeUrl = purchase
         // 体验也可由服务器关闭 MCP；功能只听它说的，不按 plan 猜。
         me.skycut.features = .init(mcp: false, watermark: true)
@@ -102,11 +107,14 @@ private func runPurchaseDestinationChecks(_ fixture: SkyStudioMe) {
         check(refusal.contains(purchase) && !refusal.contains(email), "\(plan): AI refusal gives the purchase URL instead of email")
         let next = SkyCutGates.statusJSON(license: license, problem: nil, now: stored.receivedAt).objectValue?["next_step"]?.stringValue
         check(next?.contains(purchase) == true, "\(plan): get_status uses the same purchase advice")
+        let note = SkyCutGates.watermarkNote(license: license)
+        check(note.contains(purchase) && !note.contains(email), "\(plan): the watermark note uses this license's purchase link")
         for badURL in [nil, "", "   ", "javascript:alert(1)", "file:///tmp/pro", "http://skystudioai.com/app/skycut/pro"] as [String?] {
             me.skycut.upgradeUrl = badURL
             let fallback = SkyCutLicense.evaluate(.init(me: me, receivedAt: stored.receivedAt), hasKey: true, now: stored.receivedAt)
             check(fallback.proActivationURL == nil, "\(plan): absent/unsafe purchase URL gives no link")
             check(SkyCutGates.aiRefusal(license: fallback, problem: nil, now: stored.receivedAt).contains(email), "\(plan): absent/unsafe purchase URL keeps the email")
+            check(SkyCutGates.watermarkNote(license: fallback).contains(email), "\(plan): watermark note falls back to email")
         }
         check(SkyCutLicense.evaluate(stored, hasKey: false, now: stored.receivedAt).upgradeURL == nil, "no key: no cached purchase link")
         check(SkyCutLicense.evaluate(stored, hasKey: true, now: stored.local(me.skycut.validUntil)).upgradeURL == nil, "expired answer: no stale purchase link")
@@ -115,4 +123,79 @@ private func runPurchaseDestinationChecks(_ fixture: SkyStudioMe) {
         let pro = SkyCutLicense.evaluate(.init(me: me, receivedAt: stored.receivedAt), hasKey: true, now: stored.receivedAt)
         check(pro.upgradeURL != nil && pro.proActivationURL == nil, "a Pro feature override is not a request to buy Pro again")
     }
+}
+
+/// 台数说明只从有效回答来；台数满了即使购买已配置，也只能引导管理 Mac / 联系支持。
+private func runMachineLimitChecks(_ fixture: SkyStudioMe) {
+    let purchase = "https://skystudioai.com/app/skycut/pro"
+    let manage = "https://skystudioai.com/app/skycut/machines"
+    let email = SkyStudioLinks.supportEmail
+    let received = fixture.serverTime.addingTimeInterval(-3 * 3600)
+    func evaluate(_ me: SkyStudioMe) -> SkyCutLicense {
+        SkyCutLicense.evaluate(.init(me: me, receivedAt: received), hasKey: true, now: received)
+    }
+    for limit in [1, 2, 5, 19, nil] as [Int?] {
+        var me = fixture
+        me.skycut.upgradeUrl = purchase
+        me.skycut.machines?.limit = limit
+        me.skycut.machines?.used = 93 // 不能拿 used 冒充 limit。
+        me.skycut.planMessage = "Do not display this server message for a known reason."
+        for destination in [manage, nil, "", "javascript:alert(1)", "http://skystudioai.com/machines"] as [String?] {
+            me.skycut.manageMachinesUrl = destination
+            let license = evaluate(me)
+            check(license.isMachineLimited, "the valid plan reason reaches the UI / AI license")
+            checkEqual(license.machineLimit, limit, "Mac count comes from limit, not used or a client constant")
+            check(license.proActivationURL == nil, "a limited Mac must never be offered a purchase URL")
+            check(license.unrecognizedPlanMessage == nil, "known reasons use the client's localized text")
+            let next = SkyCutGates.statusJSON(license: license, problem: nil, now: received).objectValue?["next_step"]?.stringValue ?? ""
+            let messages = [SkyCutGates.aiRefusal(license: license, problem: nil, now: received), next, SkyCutGates.watermarkNote(license: license)]
+            for message in messages {
+                check(message.contains("This Mac is using the free plan."), "every AI hint distinguishes the current Mac from the account")
+                if let limit {
+                    check(message.contains("on \(limit) \(limit == 1 ? "Mac" : "Macs")."), "every AI hint explains the server's Mac limit")
+                } else {
+                    check(message.contains("has reached its Mac limit"), "a missing optional limit does not invent a number")
+                }
+                check(!message.contains(purchase) && !message.contains("buy Pro") && !message.contains("activate SkyCut Pro"), "machine management takes priority over buying Pro")
+                check(!message.contains(me.skycut.planMessage!), "known plan_message is replaced by the client's wording")
+                if destination == manage {
+                    check(message.contains(manage) && !message.contains(email), "manage Macs when the server gives a usable URL")
+                } else {
+                    check(message.contains(email) && !message.contains(manage), "missing/unsafe management URLs fall back to support, never purchase")
+                }
+            }
+        }
+    }
+    var unknown = fixture
+    unknown.skycut.planReason = "future_reason"
+    unknown.skycut.planMessage = "A future server explanation."
+    let future = evaluate(unknown)
+    checkEqual(future.unrecognizedPlanMessage, unknown.skycut.planMessage, "unknown reasons display the server's message verbatim")
+    check(SkyCutGates.aiRefusal(license: future, problem: nil, now: received).contains(unknown.skycut.planMessage!), "AI receives an unknown server explanation")
+    unknown.skycut.plan = "pro"
+    unknown.skycut.features = .init(mcp: true, watermark: false)
+    let pro = SkyCutGates.statusJSON(license: evaluate(unknown), problem: nil, now: received).objectValue ?? [:]
+    check(pro["next_step"] == nil, "an unknown reason does not create an activation request for valid Pro")
+    checkEqual(pro["plan_message"]?.stringValue,
+               unknown.skycut.planMessage, "get_status preserves an unknown explanation even without a next step")
+    unknown.skycut.planMessage = " \n "
+    check(evaluate(unknown).unrecognizedPlanMessage == nil, "blank explanations do not add empty rows")
+    let stored = SkyStudioStoredAnswer(me: fixture, receivedAt: received)
+    for problem in [SkyStudioProblem.needsKeychainPermission, .updateRequired("Update SkyCut.", nil)] {
+        let next = SkyCutGates.statusJSON(license: evaluate(fixture), problem: problem, now: received).objectValue?["next_step"]?.stringValue ?? ""
+        check(next.contains("on 2 Macs") && next.contains("This Mac is using the free plan.") && next.contains(manage),
+              "a separate refresh problem cannot hide the cached Mac limit and its remedy")
+    }
+    let discarded = [SkyCutLicense.evaluate(stored, hasKey: false, now: received),
+                     SkyCutLicense.evaluate(stored, hasKey: true, now: stored.local(fixture.skycut.validUntil)),
+                     SkyCutLicense.evaluate(stored, hasKey: true, now: received.addingTimeInterval(-301))]
+    for license in discarded {
+        check(!license.isMachineLimited && license.machineLimit == nil && license.manageMachinesURL == nil && license.planMessage == nil,
+              "missing key, expired answer or rewound clock clears stale machine instructions")
+    }
+    // 说明字段不能反过来改变功能，哪怕服务器将来返回了不同组合。
+    var override = fixture
+    override.skycut.features = .init(mcp: true, watermark: false)
+    let license = evaluate(override)
+    check(license.mcp && !license.watermark, "machine explanations cannot override the server's feature flags")
 }

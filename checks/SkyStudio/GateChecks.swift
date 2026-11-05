@@ -91,7 +91,8 @@ private func runRefusalChecks(free: SkyCutLicense, now: Date) {
         SkyCutGates.aiRefusal(license: .free(.notChecked), problem: .updateRequired("Update SkyCut.", nil), now: now),
         ["needs a newer SkyCut", "update SkyCut"], "update required"
     )
-    check(SkyCutGates.watermarkNote.contains("watermark") && SkyCutGates.watermarkNote.contains(email), "the export note says why and how")
+    let note = SkyCutGates.watermarkNote(license: free)
+    check(note.contains("watermark") && note.contains(email), "the export note says why and how")
 }
 
 /// get_status 里的 skycut_plan。
