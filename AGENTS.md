@@ -54,6 +54,14 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   文档），是就 `gh run rerun --failed`，不是就修；不许带红合。
 - 合掉一个之后别的 PR 变 DIRTY（常见于本文件的索引行相邻）：把新 main 合进那条分支、两边都留、推上去等 CI 绿再合。
 - 合进 main 不等于发给用户：发版（打 tag、`gh release create`、DMG）仍然另外拍板。
+- 开 PR 前必须重新 `git fetch origin`，把当时最新的 `origin/main` 合入当前分支，逐处处理冲突并重新验证；不能只沿用开始任务时的 main，尤其用户在另一个窗口并行优化时，不得覆盖或遗漏那些已合并的改动。
+
+### 官网本地预览与部署成本（2026-11-04 用户定）
+
+- 官网开发与验收只在本地预览：在 `website/` 运行 `npm run dev`，使用本机地址查看；文案、配色、布局、交互调整不发布到 Vercel。
+- 禁止为了预览运行 `vercel deploy`、`vercel --prod` 或云端 Redeploy，也不创建、刷新云端 Preview 部署。功能分支 push、PR 创建和更新均不得触发 Vercel 构建。
+- 只有最终 PR 的 CI 通过并合并到 `main` 后，才允许由合并后的 `main` 提交触发官网部署；不从本地未合并工作区上传，不用反复部署替代本地验收。
+- 本地命令、API 验证和部署分支配置见 [SkyCut 官网](docs/architecture/skycut-website.md)。官网上线与 Mac App 发版分别管理。
 
 ### 打包与签名（2026-10-03 起）
 
@@ -126,6 +134,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 | 修改范围 | 动手前必读 |
 | --- | --- |
+| 官网 `website/`、本地网页预览、官网 Vercel 配置与部署 | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，功能分支不构建，最终 PR 合并 `main` 后才部署） |
 | 构建、打包、版本、授权、shell、CI、**签名（`scripts/signing/`：发布版用固定的自签名证书，系统权限才跨版本有效）** | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永远不重建、换机器拷 `~/.config/srtflow/signing/`，仓库钉着它的 SHA-1；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | **App、小程序、MCP 服务器叫什么**（SkyCut / `skycut-mcp` / `skycut`），**新加身份类的字符串**（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）、界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份和代码名沿用 SrtFlow、永远不改的那张表；新加的同类东西照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md)（为什么只改看得见的、分几步、本机怎么收拾） |
 | 工程存盘、格式版本、素材路径、自动保存、**重建预览时开素材（`MediaAssetCache`）**、**新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零）** | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（四之末：运行中素材只开一次，按路径 + 文件身份认，原地改写也算换了文件；五：卸片之后播放器的时间回调晚到一拍、没挂条目就丢掉，换完整份时间线就要 `scheduleRebuild()`）、[新工程停在上一个工程的位置](docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md)、[工程生命周期事故](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[运行期素材重链接](docs/bugfixes/2026-08-08-runtime-media-relink.md)、[重建把每个素材重新打开一遍](docs/bugfixes/2026-09-25-rebuild-reopens-every-asset.md) |
@@ -564,6 +573,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 架构与长期约束索引
 
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、本地预览与合并后部署、Brevo 独立订阅与双重确认、真实投递验收。
+
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
 
 - [写代码的规范](docs/architecture/coding-standards.md) — 模块化的六条（一个文件一件事、抽有名字的顶层类型、
@@ -959,6 +970,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-30 多项生成横幅挤占预览](docs/bugfixes/2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口与滚动浮层汇总任务，失败 / 未知扣费提示保留，取消不先删除状态。
 
 - [2026-10-31 七个 Sky Studio 模型与原单结算](docs/bugfixes/2026-10-31-sky-studio-model-expansion.md) — lipsync / 去背景、目录限制、WebM / SRT / 透明 PNG；同 key 只起一单，失败只查原单，扣退费只认 billing。
+
+- [2026-11-05 官网演示停在封面且轨道像宽图](docs/bugfixes/2026-11-05-website-demos-stall-on-posters.md) — 视口内主动加载、解码器时钟、自然循环、步骤定位继续播放与真实连续帧图集；还原旧生产代码确认回归守卫变红。
+- [2026-11-05 官网 404 被标成英文首页的副本](docs/bugfixes/2026-11-05-website-404-canonical-is-home.md) — 错误页独立 canonical，确认 / 404 不收录；路由摘要、语言互链、sitemap 与实际构建产物统一验证，旧首页地址反向变红。
 
 ## 根目录文档
 

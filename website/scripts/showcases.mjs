@@ -1,0 +1,8 @@
+// Three illustrative AI workflows. All meaningful content exists before JS loads.
+import {escape as e} from './html.mjs';
+import {icon} from '../src/icons.js';
+import {chat, editor} from './showcase-ui.mjs';
+export function showcases(c) {
+  const s = c.showcase;
+  return `<div class="showcases" id="features" data-showcase-copy="${e(JSON.stringify(s))}">${s.scenes.map(scene => `<section class="showcase container" data-showcase="${scene.kind}" aria-labelledby="${scene.kind}-title"><div class="show-heading"><div><h2 id="${scene.kind}-title">${e(scene.title)}</h2><p>${e(scene.intro)}</p></div><span class="show-demo-label">${icon('ai')}${e(s.ui.demo)}</span></div><div class="show-stage" data-kind="${scene.kind}" data-phase="done">${chat(s,scene)}${editor(s,scene.kind)}<div class="show-transfer" aria-hidden="true">${icon('ai')}<span>SkyCut</span>${icon('arrow')}</div></div><div class="show-controls"><div class="show-phases" aria-label="${e(s.ui.demo)}">${scene.steps.map((label,i)=>`<button type="button" data-phase-button="${i}" aria-pressed="${i===scene.steps.length-1}"><span>${icon('check')}</span>${e(label)}</button>`).join('')}</div><div class="show-playback"><button type="button" data-show-pause aria-label="${e(s.ui.pause)}">${icon('pause')}</button><button type="button" data-show-replay aria-label="${e(s.ui.replay)}"><span aria-hidden="true">↻</span></button></div></div>${scene.kind === 'translate' ? `<div class="show-languages" aria-label="${e(s.ui.language)}">${s.languages.map((label,i)=>`<button type="button" data-show-language="${i}" aria-pressed="${i===0}">${e(label)}</button>`).join('')}</div>` : ''}</section>`).join('')}</div>`;
+}
