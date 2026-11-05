@@ -1,5 +1,6 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-en.js';
+import {prices} from './pricing.js';
 // English copy for the public website. Product behavior remains in the Mac app.
 export default {
   showcase, seo:seoCopy.en,
@@ -25,6 +26,25 @@ export default {
   platformNames: ['Mac Apple silicon', 'Mac Intel', 'Windows'],
   downloadNote: 'Current public Mac release Intel and Windows are not available yet',
   getting: 'Getting started',
+  pricing: {
+    ...prices('en'),
+    title: 'Pricing', intro: 'Start free Bring AI to your timeline with Pro',
+    trial: '7 days of Pro for every new account',
+    free: 'Free', freePrice: 'Free download',
+    freeFeatures: ['Manual editing as usual', 'Exports with a Sky Studio watermark', 'AI editing requires Pro'],
+    pro: 'Pro', proIntro: 'Your ideas with AI Your exports without a watermark',
+    proFeatures: ['AI editing through MCP with Claude or Codex', 'Exports without a watermark'],
+    monthlyLabel: 'Monthly', yearlyLabel: 'Yearly', month: '/ month', year: '/ year',
+    monthlyCredits: 'No credits included', yearlyCredits: '1,000 Sky Studio credits for each paid year',
+    buy: 'Get Pro', login: 'Sign in to Sky Studio to purchase',
+    devices: 'One account One person Up to 2 Macs',
+    clients: 'Bring your own Claude or Codex client',
+    tax: 'Prices exclude tax Local taxes added at checkout',
+    cancel: 'Cancel auto renewal anytime Keep Pro through your paid period',
+    refund: 'Payments are nonrefundable except where required by law',
+    credits: 'Images video and voice generation use Sky Studio credits purchased separately',
+    wechat: '',
+  },
   faqTitle: 'A few things to know',
   faq: [
     ['Which Mac do I need', 'An Apple silicon Mac running macOS 15 or later Automatic transcription requires macOS 26. Intel Mac and Windows versions are not available yet'],

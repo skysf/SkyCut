@@ -40,7 +40,19 @@ for(const language of languages) {
       assert.equal(app.creator['@id'],person['@id']);assert.equal(app.publisher['@id'],organization['@id']);
       assert.equal(app.applicationSuite,'Sky Studio');assert.match(app.processorRequirements,/Apple silicon/);
       assert.doesNotMatch(app.operatingSystem,/Windows|Intel/);
-      assert.equal(app.aggregateRating,undefined);assert.equal(app.offers,undefined);
+      assert.equal(app.aggregateRating,undefined);
+      if(page) assert.equal(app.offers,undefined);
+      else {
+        const currency=language==='zh'?'CNY':'USD';
+        assert.deepEqual(app.offers.map(offer=>offer.price),language==='zh'?[0,129,999]:[0,19,149]);
+        assert.ok(app.offers.every(offer=>offer.priceCurrency===currency));
+        assert.equal(app.offers[0].url,'https://skylu.ai/download/skycut');
+        for(const [i,duration] of [[1,'P1M'],[2,'P1Y']]) {
+          const offer=app.offers[i];
+          assert.equal(offer.url,'https://skystudioai.com/app/skycut/pro');
+          assert.deepEqual(offer.priceSpecification,{'@type':'UnitPriceSpecification',price:offer.price,priceCurrency:currency,billingDuration:duration,valueAddedTaxIncluded:false});
+        }
+      }
       assert.equal(webpage.url,canonical);assert.equal(webpage.inLanguage,tags[language]);
       assert.doesNotMatch(html,/localhost|127\.0\.0\.1|github\.com|vercel\.app/);
     }

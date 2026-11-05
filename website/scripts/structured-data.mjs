@@ -1,7 +1,17 @@
 // Factual entity graph. Founder identity matches https://skylu.ai/founder/.
 // No invented prices, ratings, release dates or availability for future platforms.
-import {ORIGIN,LANGUAGES,LANGUAGE_TAGS,DOWNLOAD_URL,FOUNDER_URL,PERSON_ID,STUDIO_URL,ORGANIZATION_ID,pageURL} from './site-config.mjs';
+import {ORIGIN,LANGUAGES,LANGUAGE_TAGS,DOWNLOAD_URL,PRO_PURCHASE_URL,FOUNDER_URL,PERSON_ID,STUDIO_URL,ORGANIZATION_ID,pageURL} from './site-config.mjs';
 const ref=id=>({'@id':id});
+// 只标记首页可见的免费版与订阅；周期和税前标价按方案，不推测所在地税率。
+function offers(p) {
+  return [
+    {'@type':'Offer',name:p.free,price:0,priceCurrency:p.currency,url:DOWNLOAD_URL},
+    ...[[p.monthlyLabel,p.monthly,'P1M'],[p.yearlyLabel,p.yearly,'P1Y']].map(([label,price,duration])=>({
+      '@type':'Offer',name:`${p.pro} ${label}`,price,priceCurrency:p.currency,url:PRO_PURCHASE_URL,
+      priceSpecification:{'@type':'UnitPriceSpecification',price,priceCurrency:p.currency,billingDuration:duration,valueAddedTaxIncluded:false},
+    })),
+  ];
+}
 export function structuredData(c,kind,meta) {
   if(!meta.indexable)return null;
   const appID=`${ORIGIN}/#software`;
@@ -22,7 +32,8 @@ export function structuredData(c,kind,meta) {
     {'@type':'SoftwareApplication','@id':appID,name:'SkyCut',url:pageURL(c.lang),description:c.seo.descriptions.home,
       applicationCategory:'MultimediaApplication',applicationSuite:'Sky Studio',operatingSystem:'macOS 15 or later',
       processorRequirements:'Apple silicon arm64',availableOnDevice:'Mac',downloadUrl:DOWNLOAD_URL,
-      creator:ref(PERSON_ID),publisher:ref(ORGANIZATION_ID),softwareHelp:{'@type':'WebPage',url:pageURL(c.lang,'docs')},image:meta.image},
+      creator:ref(PERSON_ID),publisher:ref(ORGANIZATION_ID),softwareHelp:{'@type':'WebPage',url:pageURL(c.lang,'docs')},image:meta.image,
+      ...(!kind?{offers:offers(c.pricing)}:{})},
     image,page,
   ];
   if(!kind)page.mainEntity=ref(appID);

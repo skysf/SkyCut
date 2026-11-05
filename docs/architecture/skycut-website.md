@@ -107,6 +107,35 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
   原素材只读，输出十二份静音 MP4 / JPEG，校验时长、尺寸及无音轨；不联网、不部署。
   只重建轨道图集时运行 `node scripts/build-showcase-filmstrips.mjs`。
 
+## 价格
+
+首页 `#pricing` 放在短片与下载之间，桌面导航、手机菜单和页脚都链接到各自语言首页的
+这一节，不新增页面。内容以[收费方案「自助购买 Pro」第 21–36 条](../plans/2026-10-27-paid-plans-and-sky-studio-key.md#自助购买-pro2026-11-05-拍的板)
+为准：免费版手动剪辑、Sky Studio 导出水印、新账号 7 天 Pro；Pro 提供 AI / MCP 剪辑与
+无水印导出，一个账号一人使用最多 2 台 Mac，Claude / Codex 客户端由用户自备。
+
+英文、德文、西班牙文写 $19 / 月、$149 / 年；中文写 ¥129 / 月、¥999 / 年，并补充
+微信一次性买一年 ¥999、不自动续费。月付不送积分，年付每个付费年送 1,000 Sky Studio
+积分；生成图片、视频、配音所用积分另购。价格不含税、结账按所在地另加；可随时取消
+自动续费并用到已付期限，已付费用不退、法律另有规定的除外。官网不展示折扣百分比。
+
+购买按钮只有一个目的地址 `https://skystudioai.com/app/skycut/pro`，新标签打开，说明先
+登录 Sky Studio 再购买。官网不放结账、支付 SDK、Dodo 代码或付款方式分流。
+`content/pricing.js` 是金额与币种的唯一来源，四语言文案在各自 `content` 文件；首页
+`SoftwareApplication.offers` 共用这份标价，标明免费版和 Pro 月付 / 年付周期与不含税，
+不在文档或隐私页额外声明 offers。周期采用
+[Schema.org UnitPriceSpecification](https://schema.org/UnitPriceSpecification) 的 `billingDuration`。
+sitemap 与 canonical 仍为 12 个 URL。
+
+**PR E 只有在 Sky Studio 购买页正式上线并由 Claude 确认后才能合并**。可以提前完成
+本地开发、截图验收、开 PR 和等待 `check-all` 绿；这次任务到 CI 全绿即停，由 Claude
+合并，不启用自动合并，不创建任何云端部署。合并后才按既有 main 发布链路部署。
+
+验收：`npm test` 覆盖四语言价格、权益、条款、导航和唯一购买外链，`npm run build` 后
+`npm run check:seo` 核对真实产物的 offers、币种和周期。人工回归检查四语言在桌面、
+834 × 1112 iPad、390 × 844 手机的价格区，手机菜单跳转后关闭，价格与周期不折坏、
+文字和按钮无横向溢出；桌面左右并排、平板上下排列、手机逐项展开月付与年付。
+
 ## SEO 与创始人身份
 
 2026-11-05 用户确定：SkyCut 创始人是 **Sky Lu**，与 **Sky Studio** 属于同一产品家族。
@@ -123,7 +152,7 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
   WebSite、WebPage 和文档 / 隐私的 BreadcrumbList。复用创始人页面现有实体 id：
   `https://skylu.ai/#person` 和 `https://skystudioai.com/#organization`。
   Sky Studio 的 `founder`、SkyCut 的 `creator` / `publisher` 与 `applicationSuite`
-  表达同一产品家族；不捏造成立时间、价格、评分、下载量或尚未发布的系统支持。
+  表达同一产品家族；价格只写方案里定的真实价格；不捏造成立时间、评分、下载量或尚未发布的系统支持。
 - 只有首页、文档、隐私三类 × 四语言 = **12 个 canonical URL** 进入 `sitemap.xml`。
   每项都列四种语言与英文 `x-default`，与 HTML 的 reciprocal hreflang 对齐。
   根目录英文副本 canonical 指向 `/en/`，不重复进入 sitemap。

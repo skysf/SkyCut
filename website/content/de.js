@@ -1,5 +1,6 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-de.js';
+import {prices} from './pricing.js';
 // 德语官网文案；产品行为由 Mac App 决定。
 export default {
   showcase, seo:seoCopy.de,
@@ -25,6 +26,25 @@ export default {
   platformNames: ['Mac Apple-Chip', 'Mac Intel', 'Windows'],
   downloadNote: 'Aktuelle öffentliche Mac-Version Intel und Windows sind noch nicht verfügbar',
   getting: 'Erste Schritte',
+  pricing: {
+    ...prices('de'),
+    title: 'Preise', intro: 'Kostenlos starten Mit Pro schneidet die KI mit',
+    trial: '7 Tage Pro für jedes neue Konto',
+    free: 'Kostenlos', freePrice: 'Kostenlos laden',
+    freeFeatures: ['Manuell schneiden wie gewohnt', 'Exporte mit Sky Studio Wasserzeichen', 'KI-Schnitt erfordert Pro'],
+    pro: 'Pro', proIntro: 'Mit KI schneiden Ohne Wasserzeichen exportieren',
+    proFeatures: ['KI-Schnitt per MCP mit Claude oder Codex', 'Exporte ohne Wasserzeichen'],
+    monthlyLabel: 'Monatlich', yearlyLabel: 'Jährlich', month: '/ Monat', year: '/ Jahr',
+    monthlyCredits: 'Keine Credits enthalten', yearlyCredits: '1 000 Sky Studio Credits pro bezahltem Jahr',
+    buy: 'Pro kaufen', login: 'Zum Kauf bei Sky Studio anmelden',
+    devices: 'Ein Konto Eine Person Bis zu 2 Macs',
+    clients: 'Claude oder Codex als eigenen Client mitbringen',
+    tax: 'Preise in US-Dollar ohne Steuern Lokale Steuern kommen beim Kauf hinzu',
+    cancel: 'Automatische Verlängerung jederzeit kündbar Pro bleibt bis zum bezahlten Ende aktiv',
+    refund: 'Keine Erstattung gezahlter Beträge außer wenn gesetzlich vorgeschrieben',
+    credits: 'Bilder Videos und Sprachgenerierung nutzen separat gekaufte Sky Studio Credits',
+    wechat: '',
+  },
   faqTitle: 'Gut zu wissen',
   faq: [
     ['Welchen Mac brauche ich', 'Einen Mac mit Apple-Chip und macOS 15 oder neuer Automatische Transkription benötigt macOS 26. Versionen für Intel-Macs und Windows sind noch nicht verfügbar'],

@@ -8,6 +8,7 @@ export const DOWNLOAD_URL='https://skylu.ai/download/skycut';
 export const FOUNDER_URL='https://skylu.ai/founder/';
 export const PERSON_ID='https://skylu.ai/#person';
 export const STUDIO_URL='https://skystudioai.com/';
+export const PRO_PURCHASE_URL='https://skystudioai.com/app/skycut/pro';
 export const ORGANIZATION_ID=`${STUDIO_URL}#organization`;
 export function pageURL(language,kind='') {
   return kind==='error'?`${ORIGIN}/404.html`:`${ORIGIN}/${language}/${kind?kind+'/':''}`;

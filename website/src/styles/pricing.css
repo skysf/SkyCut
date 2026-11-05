@@ -1,0 +1,63 @@
+/* 价格沿用暖白 / 森林绿；桌面并排、平板上下、手机展开付款周期。 */
+.pricing {border-bottom:1px solid var(--line);}
+.pricing .section-heading {align-items:center;}
+.pricing .pricing-trial {display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:8px;background:#e3e8d9;color:var(--green);font-size:14px;line-height:1.4;max-width:340px;}
+.pricing-trial .icon {width:18px;height:18px;}
+.pricing-grid {display:grid;grid-template-columns:1fr 1.85fr;gap:20px;}
+.pricing-card {min-width:0;border:1px solid var(--line);border-radius:var(--radius);padding:34px;}
+.pricing-plan-heading h3 {font-size:30px;color:var(--green);}
+.pricing-plan-heading>p {margin-top:12px;color:var(--muted);font-size:15px;}
+.pricing-free {display:flex;flex-direction:column;align-items:start;}
+.pricing-free .pricing-free-price {font-size:21px;color:var(--ink);}
+.pricing-features {list-style:none;margin:28px 0;padding:0;display:grid;gap:14px;font-size:15px;line-height:1.5;}
+.pricing-features li {display:flex;gap:10px;align-items:start;}
+.pricing-features .icon {width:17px;height:17px;margin-top:3px;color:var(--green);}
+.pricing-free>.button {margin-top:auto;width:100%;}
+.pricing-pro {background:#e3e8d9;border-color:#b6c3a9;}
+.pricing-pro .pricing-features {margin-block:22px;gap:8px;}
+.pricing-billing-grid {display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+.pricing-billing {min-width:0;border:1px solid #c3cdb8;padding:22px;border-radius:12px;}
+.pricing-yearly {background:var(--paper);border-color:#a9b99d;}
+.pricing-billing h4 {margin:0 0 16px;font-size:14px;font-weight:500;color:var(--green);}
+.pricing-price {display:flex;align-items:baseline;flex-wrap:wrap;column-gap:8px;line-height:1.1;}
+.pricing-price strong {font-size:clamp(40px,3.7vw,54px);font-weight:600;letter-spacing:-.05em;white-space:nowrap;font-variant-numeric:lining-nums tabular-nums;}
+.pricing-price>span {font-size:14px;color:var(--muted);white-space:nowrap;}
+.pricing-credits {margin-top:18px;font-size:13px;color:#505b4a;line-height:1.6;}
+.pricing-purchase {display:flex;align-items:center;gap:18px;margin-top:24px;}
+.pricing-purchase>p {font-size:13px;color:#505b4a;}
+.pricing-wechat {font-size:13px;color:#505b4a;margin-top:18px;}
+.pricing-terms {display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:28px;font-size:13px;color:var(--muted);line-height:1.65;}
+.pricing-terms p+p {margin-top:8px;}
+.pricing-terms .pricing-devices {color:var(--green);font-weight:500;}
+@media(max-width:1150px) and (min-width:901px) {
+  .pricing-grid {grid-template-columns:1fr 1.9fr;gap:16px;}
+  .pricing-card {padding:26px;}
+  .pricing-billing {padding:18px;}
+}
+@media(max-width:900px) {
+  .pricing-grid {grid-template-columns:1fr;gap:18px;}
+  .pricing-free {display:grid;grid-template-columns:1fr 1.2fr;gap:24px 36px;align-items:start;}
+  .pricing-free .pricing-features {grid-column:2;grid-row:1/3;margin:0;}
+  .pricing-free>.button {width:max-content;max-width:100%;grid-column:1;}
+  .pricing-billing {padding:24px;}
+  .pricing-price strong {font-size:54px;}
+  .pricing-terms {gap:28px;}
+}
+@media(max-width:600px) {
+  .pricing .pricing-trial {margin-top:20px;font-size:13px;max-width:none;width:fit-content;}
+  .pricing-card {padding:26px;}
+  .pricing-free {display:flex;gap:0;}
+  .pricing-plan-heading h3 {font-size:28px;}
+  .pricing-plan-heading>p {font-size:14px;}
+  .pricing-free .pricing-features {margin-block:24px;}
+  .pricing-features {font-size:14px;}
+  .pricing-free>.button {width:100%;}
+  .pricing-billing-grid {grid-template-columns:1fr;gap:12px;}
+  .pricing-billing {padding:22px;}
+  .pricing-billing h4 {margin-bottom:12px;}
+  .pricing-price strong {font-size:48px;}
+  .pricing-credits {margin-top:12px;}
+  .pricing-purchase {flex-direction:column;align-items:stretch;gap:12px;}
+  .pricing-purchase>p {text-align:center;}
+  .pricing-terms {grid-template-columns:1fr;gap:18px;margin-top:24px;}
+}

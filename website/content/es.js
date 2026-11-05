@@ -1,5 +1,6 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-es.js';
+import {prices} from './pricing.js';
 // 西班牙语官网文案；产品行为由 Mac App 决定。
 export default {
   showcase, seo:seoCopy.es,
@@ -25,6 +26,25 @@ export default {
   platformNames: ['Mac Chip de Apple', 'Mac Intel', 'Windows'],
   downloadNote: 'Versión pública actual para Mac Las versiones para Intel y Windows aún no están disponibles',
   getting: 'Primeros pasos',
+  pricing: {
+    ...prices('es'),
+    title: 'Precios', intro: 'Empieza gratis Edita con IA con Pro',
+    trial: '7 días de Pro para cada cuenta nueva',
+    free: 'Gratis', freePrice: 'Descarga gratuita',
+    freeFeatures: ['Edición manual como siempre', 'Exportaciones con marca de agua de Sky Studio', 'La edición con IA requiere Pro'],
+    pro: 'Pro', proIntro: 'Edita con IA Exporta sin marca de agua',
+    proFeatures: ['Edición con IA por MCP con Claude o Codex', 'Exportaciones sin marca de agua'],
+    monthlyLabel: 'Mensual', yearlyLabel: 'Anual', month: '/ mes', year: '/ año',
+    monthlyCredits: 'Sin créditos incluidos', yearlyCredits: '1 000 créditos de Sky Studio por cada año pagado',
+    buy: 'Comprar Pro', login: 'Inicia sesión en Sky Studio para comprar',
+    devices: 'Una cuenta Una persona Hasta 2 Macs',
+    clients: 'Necesitas tu propio cliente Claude o Codex',
+    tax: 'Precios en dólares sin impuestos Los impuestos locales se añaden al pagar',
+    cancel: 'Cancela la renovación automática cuando quieras Pro sigue hasta el fin del periodo pagado',
+    refund: 'Los pagos no son reembolsables salvo que la ley disponga lo contrario',
+    credits: 'La generación de imágenes vídeo y voz usa créditos de Sky Studio comprados aparte',
+    wechat: '',
+  },
   faqTitle: 'Antes de empezar',
   faq: [
     ['Qué Mac necesito', 'Un Mac con chip de Apple y macOS 15 o posterior La transcripción automática requiere macOS 26. Las versiones para Mac Intel y Windows aún no están disponibles'],

@@ -3,6 +3,7 @@ import { icon } from '../src/icons.js';
 import {SCENE_CLIPS} from '../src/scene-playback.js';
 import {escape} from './html.mjs';
 import {showcases} from './showcases.mjs';
+import {pricing} from './pricing.mjs';
 export {escape};
 const e = escape;
 import {DOWNLOAD_URL} from './site-config.mjs';
@@ -61,5 +62,5 @@ export function signup(c) {
 }
 
 export function homepage(c) {
-  return `${hero(c)}${showcases(c)}${film(c)}${platforms(c)}<section class="faq container section"><h2>${e(c.faqTitle)}</h2><div>${c.faq.map(([q,a]) => `<details><summary>${e(q)}${icon('chevron')}</summary><p>${e(a)}</p></details>`).join('')}</div></section>${signup(c)}`;
+  return `${hero(c)}${showcases(c)}${film(c)}${pricing(c)}${platforms(c)}<section class="faq container section"><h2>${e(c.faqTitle)}</h2><div>${c.faq.map(([q,a]) => `<details><summary>${e(q)}${icon('chevron')}</summary><p>${e(a)}</p></details>`).join('')}</div></section>${signup(c)}`;
 }
