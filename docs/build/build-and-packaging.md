@@ -41,14 +41,19 @@ scripts/check-local.sh timeline-snap          # 推之前：全部扫描守卫 +
 | Rosetta 下（x86_64） | 33.3 秒 | 6–7 分钟 |
 | 原生 arm64 + `/bin/bash` | 6.1 秒 | 89 秒 |
 | 原生 + 后台优先级（`taskpolicy -b`，只用能效核） | 18.0 秒 | — |
+| 原生，换成 Apple 芯片版 Homebrew 之后（2026-11-05，`check-local.sh` 只跑扫描守卫） | — | 62 秒 |
 
-Rosetta 下的进程起子进程也优先挑 x86_64 那一半，检查里几千个 grep / awk / perl、编译器都跟着走翻译，又慢又烫。这台机器上
-有两个来源：
+Rosetta 下的进程起子进程也优先挑 x86_64 那一半，检查里几千个 grep / awk / perl、编译器都跟着走翻译，又慢又烫。2026-11-04 这台机器上
+的根子是 PATH 最前面的 `/usr/local/bin/bash`：`/usr/local` 里的 Intel 版 Homebrew 装的、只有 x86_64。它从两条路钻进检查：
 
-- **Claude Code 给命令起的 shell 是翻译的**：终端（cmux）、登录 shell、`claude` 本身都是原生，只有它起来跑命令的那个 zsh 带着
-  Rosetta（`sysctl -n sysctl.proc_translated` 是 1）。
-- **PATH 最前面的 `/usr/local/bin/bash`（还有 `git`）是 Intel 版 Homebrew 装的、只有 x86_64**：`#!/usr/bin/env bash` 和
-  `bash x.sh` 找到的都是它，在原生的终端里也照样走翻译。
+- **`#!/usr/bin/env bash` 和 `bash x.sh` 直接找到它**：在原生的终端里也照样走翻译。
+- **Claude Code 给命令起的 shell 也被它带进 Rosetta**：cmux 的 `claude` 外壳脚本是 `#!/usr/bin/env bash`，翻译的 bash 再 exec 只有
+  arm64 的 `claude` —— `claude` 本身跑原生，可「优先 x86_64」跟着传了下来（进程标志 `P_AFFINITY`），它再起的通用二进制（`/bin/zsh`、
+  `python3`……）全走翻译（`sysctl -n sysctl.proc_translated` 是 1）。同样的进程链实测：Intel 的 bash 起出来是 1，原生的 bash 起出来是 0。
+
+2026-11-05 换成了 Apple 芯片版 Homebrew（`/opt/homebrew`，PATH 里排在 `/usr/local/bin` 前面），Intel 版删了：新开的终端、新起的
+Claude Code 里 PATH 上的 bash 是原生的 5.x，命令 shell 也是原生的。换之前就开着的会话照旧带着 Rosetta，重开才好；别的机器、
+勾了「使用 Rosetta 打开」的终端也照样可能在 Rosetta 下起检查 —— 所以下面这套照旧留着。
 
 所以三个入口（`check-local.sh`、`check-guards.sh`、`check-all.sh`）在 `cd` 之前 source `scripts/native-arch.sh`：在 Rosetta 下就
 `exec arch -arm64 /bin/bash "$0" "$@"` 重跑自己（CI 的 runner 本来就是原生、Intel 的 Mac 没有这个 sysctl，都什么也不做）；

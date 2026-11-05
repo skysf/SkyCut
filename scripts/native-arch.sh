@@ -2,9 +2,10 @@
 #
 # 为什么：Rosetta 下起的进程，它再起的子进程也优先挑 x86_64 那一半 —— 检查里的几千个 grep / awk / perl、编译器全都跟着
 # 走翻译，又慢又烫。2026-11-04 在用户的 M1 上量的：同一条守卫 hover-pointer-style 33.3 秒 → 原生 6.1 秒；全部扫描守卫
-# 6–7 分钟 → 89 秒。这台机器上有两个来源：Claude Code 给命令起的 shell 是翻译的（终端、登录 shell、claude 本身都是原生），
-# PATH 最前面的 /usr/local/bin/bash 是 Intel 版 Homebrew 装的、只有 x86_64（`#!/usr/bin/env bash` 找到的就是它）。
-# 详见 docs/build/build-and-packaging.md「本地怎么跑检查」。
+# 6–7 分钟 → 89 秒。根子是那时 PATH 最前面的 /usr/local/bin/bash（Intel 版 Homebrew，只有 x86_64）：`#!/usr/bin/env bash`
+# 直接找到它；cmux 的 claude 外壳脚本也经它起 claude，Claude Code 再起的命令 shell 就跟着带上 Rosetta。2026-11-05 换成了
+# /opt/homebrew 的原生版、Intel 版删了，新开的会话不再翻译；这里照样留着，挡住换之前开的会话、别的机器和勾了「使用 Rosetta
+# 打开」的终端。详见 docs/build/build-and-packaging.md「本地怎么跑检查」。
 #
 # 用法（放在入口脚本里 `cd` 之前，"$0" 还是调用时的路径）：
 #   . "$(dirname "$0")/native-arch.sh"

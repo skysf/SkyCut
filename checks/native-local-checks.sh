@@ -2,8 +2,9 @@
 # 扫描守卫：本地跑检查的三个入口（check-local / check-guards / check-all）都用原生 arm64 的 /bin/bash 跑。
 #
 # 为什么（docs/build/build-and-packaging.md「本地怎么跑检查」）：在 Rosetta 下起的检查，连同它起的几千个 grep / awk、
-# 编译器全走翻译。2026-11-04 在用户的 M1 上：全部扫描守卫 6–7 分钟 → 原生 /bin/bash 89 秒，笔记本也不再烫。两个来源：
-# Claude Code 给命令起的 shell 是翻译的；PATH 上的 bash 是 Intel 版 Homebrew 的、只有 x86_64。CI 的 runner 本来就是原生，
+# 编译器全走翻译。2026-11-04 在用户的 M1 上：全部扫描守卫 6–7 分钟 → 原生 /bin/bash 89 秒，笔记本也不再烫。那时的根子是
+# PATH 上 Intel 版 Homebrew 的 bash（只有 x86_64），Claude Code 给命令起的 shell 也经它带上了 Rosetta；2026-11-05 换成了原生的
+# /opt/homebrew，可换之前开的会话、别的机器照样可能在 Rosetta 下起检查。CI 的 runner 本来就是原生，
 # 所以这件事 CI 上看不出来，只能这里钉着：
 #   一、scripts/native-arch.sh 在 Rosetta 下换成 `arch -arm64 /bin/bash` 重跑自己、有防来回重跑的标记；
 #   二、三个入口在 `cd` 之前 source 它（"$0" 还是调用时的路径）；
