@@ -113,9 +113,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   系统权限或手势时，另按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 执行。
 - 修改 shell 脚本前，先读
   [构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)。
-- **推之前跑 `scripts/check-local.sh`**（它先跑 `scripts/check-guards.sh`：全部 `checks/*.sh` 扫描守卫 + `scripts/check-mcp.sh --scans-only` 编译之前的扫描，原生 arm64 一分半、不编译；
-  再跑你点名的检查）。**别在 Rosetta 下、别用 PATH 上的 `bash` 跑检查**：用户的 M1 上 PATH 最前面的 bash 是 Intel 版 Homebrew 的，
-  全部守卫要 6–7 分钟、笔记本烫（[本地怎么跑检查](docs/build/build-and-packaging.md)）。搬代码 / 改名之后尤其要跑：守卫按文件名找
+- **推之前跑 `scripts/check-local.sh`**（它先跑 `scripts/check-guards.sh`：全部 `checks/*.sh` 扫描守卫 + `scripts/check-mcp.sh --scans-only` 编译之前的扫描，原生 arm64 约一分钟、不编译；
+  再跑你点名的检查）。**别在 Rosetta 下、别用 PATH 上的 `bash` 跑检查**：Rosetta 下全部守卫要 6–7 分钟、笔记本烫；PATH 上的 bash 是
+  Homebrew 的 5.x，和 CI 的 `/bin/bash` 3.2 不是一个解析器（2026-11-05 之前用户的 M1 上它还是 Intel 版、连 Claude Code 的命令 shell
+  都被它带进 Rosetta，[本地怎么跑检查](docs/build/build-and-packaging.md)）。搬代码 / 改名之后尤其要跑：守卫按文件名找
   接线，挑着跑几条漏掉的那条只会在 CI 上红（[PR #132 首跑](docs/bugfixes/2026-10-01-pr132-first-ci-run-guard-in-moved-insert.md)，
   同一个坑第三次）。
 

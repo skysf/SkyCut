@@ -12,8 +12,8 @@
 # checks/MCP/*-wiring.sh 不在 checks/ 顶层，以前只在 CI 上跑得到（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
 #
 # 一律用原生 arm64 的 /bin/bash 跑（2026-11-04 起）：和 CI、check-all.sh 用同一个解析器（3.2，陷阱 5、6 都是 bash 5 放过、
-# 3.2 解析错）；PATH 上的 bash 在用户的 M1 上还是 Intel 版 Homebrew 的、只有 x86_64，每条守卫连同它起的几千个 grep / awk
-# 都走 Rosetta —— 全部守卫 6–7 分钟，原生 /bin/bash 89 秒（docs/build/build-and-packaging.md「本地怎么跑检查」）。
+# 3.2 解析错）；PATH 上的 bash 是 Homebrew 的 5.x。2026-11-05 之前它在用户的 M1 上还是 Intel 版、只有 x86_64，每条守卫连同
+# 它起的几千个 grep / awk 都走 Rosetta —— 全部守卫 6–7 分钟，原生 /bin/bash 89 秒（docs/build/build-and-packaging.md「本地怎么跑检查」）。
 #
 # 用法：scripts/check-guards.sh（推之前一般跑 scripts/check-local.sh，它先跑这一个）
 set -euo pipefail

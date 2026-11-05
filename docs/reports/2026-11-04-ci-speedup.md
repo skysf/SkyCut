@@ -50,3 +50,5 @@
 - **同时只有 5 台 macOS runner**：合并之后 main 那一轮也要 5 台，紧接着推的下一个 PR 会排在它后面（这一天几次排了 3–6 分钟）。
   main 那一轮照用户「不跳步骤」的意思保留，而且它现在顺带给下一个 PR 备缓存。
 - **本机环境**：`/usr/local` 下的 Intel 版 Homebrew（bash、git）不在仓库里管，换成 Apple 芯片的 Homebrew（`/opt/homebrew`）本地会更快、更凉。
+  （后续：2026-11-05 已换、Intel 版删了，`check-local.sh` 只跑扫描守卫 62 秒；Claude Code 的命令 shell 被带进 Rosetta 也是它，
+  见 [本地怎么跑检查](../build/build-and-packaging.md)。）
