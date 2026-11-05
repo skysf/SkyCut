@@ -1,26 +1,26 @@
-// Match the personal site's four languages, including strict Simplified Chinese detection.
+// Match the device's primary language on entry; explicit locale URLs stay shareable and indexable.
 export const supported = ['en','zh','de','es'];
 export function browserLanguage(preferences = []) {
-  for (const value of preferences) {
-    const tag = value.toLowerCase();
-    if (/^zh-(cn|sg)(-|$)|^zh-hans(-|$)/.test(tag)) return 'zh';
-    if (/^zh/.test(tag)) return 'en';
-    const base = tag.split('-')[0];
-    if (['en','de','es'].includes(base)) return base;
-  }
-  return 'en';
+  const base = String(preferences[0] || '').trim().toLowerCase().split(/[-_]/)[0];
+  return supported.includes(base) ? base : 'en';
 }
 export function applyLanguage() {
   const key = 'SrtFlow.website.language';
   const url = new URL(location.href);
   const explicit = url.searchParams.get('lang');
+  const hasExplicit = supported.includes(explicit);
   let preferred;
   try {preferred = localStorage.getItem(key);} catch { /* Storage may be unavailable. */ }
-  const target = supported.includes(explicit) ? explicit : supported.includes(preferred) ? preferred : browserLanguage(navigator.languages || [navigator.language]);
-  if (url.pathname === '/' || supported.includes(explicit)) {
+  if (hasExplicit) {
+    try {localStorage.setItem(key,explicit);} catch { /* Preference storage is optional. */ }
+  }
+  const preferences = navigator.languages?.length ? navigator.languages : [navigator.language];
+  const target = hasExplicit ? explicit : supported.includes(preferred) ? preferred : browserLanguage(preferences);
+  if (url.pathname === '/' || hasExplicit) {
     const path = url.pathname.replace(/^\/(en|zh|de|es)(\/|$)/,'/');
-    const next = `/${target}${path === '/' ? '/' : path}`;
-    if (url.pathname !== next) {url.pathname=next;url.searchParams.delete('lang');location.replace(url.href);return;}
+    url.pathname = `/${target}${path === '/' ? '/' : path}`;
+    if (hasExplicit) url.searchParams.delete('lang');
+    if (location.href !== url.href) {location.replace(url.href);return;}
   }
   document.querySelectorAll('.language-menu a[lang]').forEach(link => link.addEventListener('click', () => {
     try {localStorage.setItem(key,link.lang);} catch { /* Preference storage is optional. */ }

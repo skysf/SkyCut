@@ -21,8 +21,8 @@ for(const language of languages) {
     }
   });
 }
-test('language matching follows the personal website and preserves Traditional Chinese fallback',()=>{
-  assert.equal(browserLanguage(['zh-CN']),'zh');assert.equal(browserLanguage(['zh-Hans-US']),'zh');assert.equal(browserLanguage(['zh-SG']),'zh');assert.equal(browserLanguage(['zh-TW','de']),'en');assert.equal(browserLanguage(['es-MX','en']),'es');assert.equal(browserLanguage(['de-DE']),'de');assert.equal(browserLanguage(['fr-FR']),'en');
+test('device language selects a supported translation and all Chinese locales use Chinese',()=>{
+  assert.equal(browserLanguage(['zh-CN']),'zh');assert.equal(browserLanguage(['zh-Hans-US']),'zh');assert.equal(browserLanguage(['zh-SG']),'zh');assert.equal(browserLanguage(['zh-TW','de']),'zh');assert.equal(browserLanguage(['es-MX','en']),'es');assert.equal(browserLanguage(['de-DE']),'de');assert.equal(browserLanguage(['fr-FR']),'en');
 });
 test('progressive enhancement keeps required assets local, and future platforms are not downloadable',async()=>{
   const home=render(english);const links=[...home.matchAll(/(?:href|src)="(\/(?:media|src)\/[^"#]+)"/g)].map(m=>m[1]);
