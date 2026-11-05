@@ -109,6 +109,11 @@ TEARDOWN="$(awk '/enum ProjectTeardown/,/^}/' "$REGISTRY")"
 for call in 'project.audioEngineHost.stop()' 'project.invalidateDocumentGeneration()' 'UpscaleActivity.shared.cancelAll(projectGeneration: closing)'; do
   grep -qF "$call" <<<"${TEARDOWN}" || fail "关工程（ProjectTeardown）没做：${call}"
 done
+# 卸片会摘掉声音主时钟：复用引擎的 apply 分支也要接回去，否则换工程后只有画面、或仍读旧引擎。
+AUDIO_HOST=Sources/SrtFlow/VideoEditProjectAudioMix.swift
+REUSED_AUDIO="$(awk '/        if let engine \{/,/^        \}/' "${AUDIO_HOST}" | sed 's,//.*,,')"
+grep -qF 'clock.attachAudioSource(engine)' <<<"${REUSED_AUDIO}" \
+  || fail "${AUDIO_HOST} 复用声音引擎时没重新接回 PlayerClock（卸片已经摘掉了主时钟）"
 
 # 10. 存盘前只让**这个工程的剪辑页**里的输入框辞职：后台工程自动存盘时去踢键窗口，会打断用户在别处正打的字。
 grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$DOCUMENT" \

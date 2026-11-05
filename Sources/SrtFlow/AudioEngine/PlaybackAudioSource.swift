@@ -11,6 +11,8 @@ protocol PlaybackAudioSource: AnyObject {
     /// 此刻播放头在时间线的第几秒。
     var playhead: Double { get }
     var isPlaying: Bool { get }
+    /// 开播前和播放中检查渲染图；被系统停掉时恢复，返回是否重启过。失败交给时钟停播，不能拿停住的时间反复对表。
+    @discardableResult func recoverIfNeeded() throws -> Bool
     func play(from seconds: Double)
     func pause()
     func seek(to seconds: Double)

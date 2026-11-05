@@ -126,18 +126,45 @@ final class PlayerClock: ObservableObject {
 
     // MARK: 声音引擎当主时钟
 
-    /// 挂上引擎：从此播放头从它读、视频跟着它。只挂一次。
+    /// 挂上当前引擎：同一个不重复挂；换源时先摘旧计时器和旧引擎。
     func attachAudioSource(_ source: PlaybackAudioSource) {
-        guard audioSource == nil else { return }
+        guard audioSource !== source else { return }
+        detachAudioSource()
         audioSource = source
         // `setRate(_:time:atHostTime:)` 要求关掉「等缓冲」（开着会抛异常）；本地文件本来也不用等。
         player.automaticallyWaitsToMinimizeStalling = false
         let timer = Timer(timeInterval: observationInterval, repeats: true) { [weak self] _ in
             guard let self, let source = audioSource, source.isPlaying else { return }
+            guard recoverAudioIfNeeded(source) else { return }
             observePlaybackTime(source.playhead)
         }
         RunLoop.main.add(timer, forMode: .common)
         audioTimer = timer
+    }
+
+    /// 卸片 / 关预览时也摘掉主时钟，不能让下一次预览仍读着已停止的旧引擎。
+    private func detachAudioSource() {
+        audioSource?.pause()
+        audioSource = nil
+        audioTimer?.invalidate()
+        audioTimer = nil
+        driftTicks = 0
+    }
+
+    /// 系统停图不能只改播放锚点：恢复失败就明确暂停，下一次点击播放再试，避免每拍重试或反复拉回视频。
+    private func recoverAudioIfNeeded(_ source: PlaybackAudioSource) -> Bool {
+        do {
+            if try source.recoverIfNeeded() {
+                driftTicks = 0
+                MainThreadWatchdog.shared.note("音频引擎已恢复，重新对齐视频时钟")
+                if source.isPlaying { anchorVideo(to: source.playhead) }
+            }
+            return true
+        } catch {
+            pause()
+            MainThreadWatchdog.shared.note("音频引擎恢复失败，已暂停播放：\(error.localizedDescription)")
+            return false
+        }
     }
 
     /// 视频的周期回调报来的时间和引擎差过一帧（连着两拍）就把视频重新钉到引擎的时间表上。
@@ -171,6 +198,7 @@ final class PlayerClock: ObservableObject {
     /// 开播（空格、重建之后接着播）：引擎驱动时声音先起、视频钉到同一个时刻；否则就是播放器自己播。
     func play() {
         if let source = audioSource {
+            guard recoverAudioIfNeeded(source) else { return }
             source.play(from: time)
             anchorVideo(to: time)
         } else {
@@ -201,6 +229,7 @@ final class PlayerClock: ObservableObject {
     func detach() {
         audioSource?.pause()
         audioSource?.seek(to: 0)
+        detachAudioSource()
         player.pause()
         player.replaceCurrentItem(with: nil)
         pendingScrubTarget = nil
