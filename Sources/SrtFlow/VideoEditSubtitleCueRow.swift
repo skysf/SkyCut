@@ -40,9 +40,9 @@ struct VideoEditSubtitleCueRow: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         HStack(alignment: .top, spacing: 6) {
-            // 行首的轨道标记：橙 = 原文、青 = 译文（同时间线上两行的颜色）。
+            // 行首标记与时间线上原文 / 译文两行共用主题色。
             RoundedRectangle(cornerRadius: 1.5)
-                .fill(track == .original ? Color.orange : Color.teal)
+                .fill(AppThemePalette.current.subtitle(translated: track != .original))
                 .frame(width: 3)
                 .instantHelp(trackName)
             VStack(alignment: .leading, spacing: 4) {

@@ -90,6 +90,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/KeychainSecret.swift \

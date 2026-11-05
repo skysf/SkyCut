@@ -33,6 +33,9 @@ xcrun swiftc \
   Sources/SrtFlow/InstantTooltip.swift \
   Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/InstantTooltipPanel/main.swift
 
 echo "==> 运行"

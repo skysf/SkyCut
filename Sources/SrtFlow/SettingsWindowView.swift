@@ -22,11 +22,13 @@ struct SettingsWindowView: View {
                     .padding(.bottom, 8)
                 Form { content }
                     .formStyle(.grouped)
+                    .scrollContentBackground(AppThemePalette.current.isForest ? .hidden : .visible)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 750, height: 520)
         .navigationTitle("Settings")
+        .background(AppThemePalette.current.panel)
     }
 
     private var navigation: some View {
@@ -41,7 +43,7 @@ struct SettingsWindowView: View {
                         .background {
                             if selection == category {
                                 RoundedRectangle(cornerRadius: 6)
-                                    .fill(.primary.opacity(0.08))
+                                    .fill(AppThemePalette.current.selectionFill)
                             }
                         }
                         .contentShape(Rectangle())
@@ -60,7 +62,7 @@ struct SettingsWindowView: View {
         .padding(.top, 15)
         .padding(.bottom, 8)
         .frame(width: 164)
-        .background(.quaternary.opacity(0.3))
+        .background(AppThemePalette.current.laneBackground(classicOpacity: 0.3))
     }
 
     @ViewBuilder
@@ -89,6 +91,7 @@ private struct GeneralSettingsSection: View {
         let _ = PerfCounters.body(Self.self)
         Section("Interface") {
             AppLanguagePicker()
+            AppThemePicker()
             if languageStore.needsRestartForMenus {
                 Text("The app’s own text switches right away. The menu bar and system dialogs follow after you quit and reopen SkyCut.")
                     .font(.caption)

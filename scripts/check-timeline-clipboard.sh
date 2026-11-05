@@ -90,6 +90,9 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/TimelineClipboard/main.swift \
   checks/TimelineClipboard/Landing.swift \
   checks/TimelineClipboard/LinkGroups.swift \

@@ -1310,3 +1310,9 @@
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "达到日预算后 AI 会暂停；可在设置里提高日预算后继续，任何权限模式都不会绕过预算。";
 
 "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "已达到 AI 日预算。请在「设置 → Sky Studio」提高日预算后继续。";
+
+"Theme" = "主题";
+
+"Forest (Default)" = "森林色（默认）";
+
+"Classic" = "经典色";

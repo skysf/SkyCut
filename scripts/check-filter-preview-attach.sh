@@ -91,6 +91,9 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/FilterPreviewAttach/main.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

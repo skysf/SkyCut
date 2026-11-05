@@ -12,6 +12,9 @@
 
 本文只写**长期约束**。实现在 `Sources/SrtFlow/AppLanguage.swift`。
 
+2026-11-05：`appLanguage()` 呈现根还组合独立的主题修饰器，保证场景、sheet、
+popover、自建宿主同步接入[界面主题](app-themes.md)。语言 Store 仍只管理语言。
+
 2026-10-31 起，语言入口统一在「设置 → 通用」，不再放侧栏国旗菜单；顶部齿轮、应用菜单与 ⌘, 都打开同一设置窗口。MCP 的 get_settings / set_settings 也复用 AppLanguageStore，详见 [顶部工作台与统一设置](workbench-and-settings.md)。
 
 ## 一、写死的界面文案必须每张表都有（守卫钉着）

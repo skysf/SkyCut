@@ -11,10 +11,10 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .getSettings, title: "Read SkyCut settings",
                 description: """
-                Read app-wide settings without opening windows or editing: general (language), ai (connections, permissions), \
-                editing (styles/voices), cache, sky_studio (account/credits/hard budget). Omit section for all. Returns current values, \
-                writable fields, localized mode names and action hints; never keys/config contents. Use set_settings for preferences, \
-                recipes/save_recipe for styles, add_voiceover download_voices=true for local voices. MCP plan entitlement still applies.
+                Read app preferences without opening windows: general (language/theme), ai (clients/permissions), editing \
+                (styles/voices), cache, sky_studio (account/credits/hard budget). Omit section for all. Returns values, writable \
+                fields, localized modes and action hints; never keys/configs. Use set_settings, recipes/save_recipe, or \
+                add_voiceover download_voices=true for voices. MCP entitlement applies.
                 """,
                 input: MCPSchema.object([
                     "section": MCPSchema.string("Default all.", oneOf: ["all", "general", "ai", "editing", "cache", "sky_studio"])
@@ -32,6 +32,7 @@ enum MCPSettingsTools {
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),
+                    "theme": MCPSchema.string("UI palette; forest is default. No project edit.", oneOf: ["forest", "classic"]),
                     "optimized_media_cache_gb": [
                         "type": "integer", "enum": [2, 5, 10, 20, 50],
                         "description": "Cache limit in decimal GB, matching the Settings picker."

@@ -55,13 +55,20 @@ struct ToolbarToggle: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         Toggle(isOn: $isOn) {
-            Image(systemName: icon)
-                .frame(width: 20, height: 18)
+            Group {
+                if icon == TimelineThemeIcons.magnet {
+                    TimelineMagnetSymbol().stroke(style: StrokeStyle(lineWidth: 1.3, lineJoin: .round))
+                } else {
+                    Image(systemName: icon)
+                }
+            }
+            .frame(width: 20, height: 18)
         }
         .toggleStyle(.button)
         .buttonStyle(.borderless)
-        .tint(.teal)
+        .tint(AppThemePalette.current.toggleAccent)
         .instantHelp(help, shortcut: shortcut)
+        .accessibilityLabel(help)
     }
 }
 
@@ -79,14 +86,14 @@ struct TimelineToolbarToggles: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         ToolbarToggle(
-            icon: "arrow.right.and.line.vertical.and.arrow.left", help: "Main track magnet (auto close gaps)",
+            icon: TimelineThemeIcons.magnet, help: "Main track magnet (auto close gaps)",
             isOn: Binding(get: { project.magnetEnabled }, set: { project.setMagnet($0) })
         )
-        ToolbarToggle(icon: "arrow.down.to.line.compact", help: "Auto snapping while dragging", isOn: $project.snappingEnabled)
+        ToolbarToggle(icon: TimelineThemeIcons.snapping, help: "Auto snapping while dragging", isOn: $project.snappingEnabled)
         ToolbarToggle(icon: "link", help: "Linkage: what sits on a V1 clip moves and deletes with it", isOn: $project.linkageEnabled)
         // 播放跟随默认关（2026-10-01 用户拍板）：开着时播放头快出视口就翻一页，关着时轨道区域停在哪就停在哪。
         ToolbarToggle(
-            icon: "arrow.right.to.line", help: "Follow the playhead during playback (page the timeline when it reaches the edge)",
+            icon: TimelineThemeIcons.followPlayhead, help: "Follow the playhead during playback (page the timeline when it reaches the edge)",
             isOn: $project.timelineFollowsPlayhead
         )
     }

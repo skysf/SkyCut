@@ -32,7 +32,7 @@ struct TimelinePlayheadLines: View {
         // 真播放头（白色实线 + 把手）留在用户点定的位置，点击才会把它移过来。
         if let peek = clock.peekTime {
             Rectangle()
-                .fill(.white.opacity(0.5))
+                .fill(AppThemePalette.current.playhead.opacity(0.5))
                 .frame(width: 1)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .offset(x: peek * pps - 0.5)
@@ -42,7 +42,7 @@ struct TimelinePlayheadLines: View {
         // `TimelinePinnedRuler` 里、跟着标尺钉在视口顶上 —— 标尺不透明，画在这里的话
         // 纵向滚下去之后把手会藏到标尺后面，用户就看不见播放头的抓手了。
         Rectangle()
-            .fill(.white)
+            .fill(AppThemePalette.current.playhead)
             .frame(width: 1.5)
             .shadow(radius: 0.5)
             .frame(maxHeight: .infinity, alignment: .top)

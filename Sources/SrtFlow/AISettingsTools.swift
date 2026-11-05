@@ -16,6 +16,7 @@ enum AISettingsTools {
     static func update(_ args: AIToolArguments) async throws -> AIToolResult {
         // 在第一处写入之前读完、验完：不出现语言已改、后面的额度却报错的半次更新。
         let language = try args.choice("language", from: AppLanguage.allCases.map(\.rawValue)).flatMap(AppLanguage.init(rawValue:))
+        let theme = try args.choice("theme", from: AppTheme.allCases.map(\.rawValue)).flatMap(AppTheme.init(rawValue:))
         let capacityGB = try args.int("optimized_media_cache_gb")
         if let capacityGB, !OptimizedMediaStore.capacityPresets.contains(Int64(capacityGB) * 1_000_000_000) {
             throw AIToolError("optimized_media_cache_gb must match a Settings preset: 2, 5, 10, 20 or 50.")
@@ -26,13 +27,14 @@ enum AISettingsTools {
         }
         let mode = try args.choice("ai_access_mode", from: AIAccessMode.allCases.map(\.rawValue)).flatMap(AIAccessMode.init(rawValue:))
         let clear = try args.bool("clear_optimized_media_cache") ?? false
-        guard language != nil || capacityGB != nil || limit != nil || mode != nil || clear else {
+        guard language != nil || theme != nil || capacityGB != nil || limit != nil || mode != nil || clear else {
             throw AIToolError("Pass at least one setting to change, or clear_optimized_media_cache=true. Use get_settings to read settings.")
         }
 
         if let approval = try AISettingsApproval.check(args, mode: mode, limit: limit) { return approval }
         if let mode { AIAccessStore.shared.setMode(mode) }
         if let language { AppLanguageStore.shared.language = language }
+        if let theme { AppThemeStore.shared.setTheme(theme) }
         if let capacityGB { OptimizedMediaCacheSettings.shared.setCapacity(Int64(capacityGB) * 1_000_000_000) }
         if let limit { SkyStudioSpendStore.shared.setDailyLimit(limit) }
         if clear { OptimizedMediaCacheSettings.shared.clear() }
@@ -50,7 +52,10 @@ enum AISettingsTools {
                     "effective_language": .string(language.language.resolvedCode),
                     "available_languages": .array(AppLanguage.allCases.map { ["id": .string($0.rawValue), "name": .string($0.nativeName)] }),
                     "menus_need_restart": .bool(language.needsRestartForMenus),
-                    "writable_fields": ["language"]
+                    "theme": .string(AppThemeStore.shared.theme.rawValue),
+                    "default_theme": "forest",
+                    "available_themes": .array(AppTheme.allCases.map { ["id": .string($0.rawValue), "name": .string(L10n($0.title))] }),
+                    "writable_fields": ["language", "theme"]
                 ]
             case .ai:
                 let setup = AIClientSetup.shared

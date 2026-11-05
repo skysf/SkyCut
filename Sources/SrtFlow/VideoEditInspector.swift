@@ -41,6 +41,7 @@ struct VideoEditInspectorView: View {
         }
         // Upscale 的面板和对比窗口从这里出（检查器在剪辑页里一直在；只订阅 UpscaleActivity 的两个字段）。
         .background(UpscalePresenter(project: project).equatable())
+        .background(AppThemePalette.current.panel)
     }
 
     // MARK: - 多选

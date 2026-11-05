@@ -285,6 +285,7 @@ struct VideoEditView: View {
         // 出边界，压到时间线工具栏那一排按钮上（用户报的重叠就是这么来的）。
         .frame(minHeight: 120)
         .padding(10)
+        .background(AppThemePalette.current.previewSurround)
     }
 
     private var transport: some View {
@@ -465,6 +466,7 @@ struct VideoEditView: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
+        .background(AppThemePalette.current.panel)
     }
 
     /// 缩放滑杆读写的是 log(pps)；写入走 `TimelineZoom`（钉住播放头，里面仍是唯一的缩放入口 `setPixelsPerSecond`）。

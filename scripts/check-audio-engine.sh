@@ -127,6 +127,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaProbe.swift \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/AudioEngine/AudioEngineConfig.swift \
   Sources/SrtFlow/AudioEngine/AudioRing.swift \
   Sources/SrtFlow/AudioEngine/AudioPublished.swift \

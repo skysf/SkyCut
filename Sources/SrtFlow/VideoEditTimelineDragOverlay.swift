@@ -52,7 +52,7 @@ struct TimelineDragOverlay: View {
         if let target = drag.dragTargetRow, target.target.insertion == nil,
            let layout = layouts.first(where: { $0.spec.id == target.id }) {
             RoundedRectangle(cornerRadius: 4)
-                .strokeBorder(Color.teal, lineWidth: 2)
+                .strokeBorder(AppThemePalette.current.dragAccent, lineWidth: 2)
                 .frame(width: contentWidth, height: layout.spec.height)
                 .offset(y: layout.minY)
                 .allowsHitTesting(false)
@@ -63,8 +63,8 @@ struct TimelineDragOverlay: View {
         // 正在拉的选择框。画在播放头之下、块之上，不拦事件。
         if let marquee = drag.marquee, marquee.rect.width > 0 || marquee.rect.height > 0 {
             Rectangle()
-                .fill(Color.teal.opacity(0.12))
-                .overlay(Rectangle().strokeBorder(Color.teal.opacity(0.9), lineWidth: 1))
+                .fill(AppThemePalette.current.dragAccent.opacity(0.12))
+                .overlay(Rectangle().strokeBorder(AppThemePalette.current.dragAccent.opacity(0.9), lineWidth: 1))
                 .frame(width: marquee.rect.width, height: marquee.rect.height)
                 .offset(x: marquee.rect.minX, y: marquee.rect.minY)
                 .allowsHitTesting(false)

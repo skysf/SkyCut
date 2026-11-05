@@ -116,7 +116,7 @@ struct TimelineInsertLine: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         RoundedRectangle(cornerRadius: 1.5)
-            .fill(Color.teal)
+            .fill(AppThemePalette.current.dragAccent)
             .frame(width: width, height: 3)
             .offset(y: gapTop + TimelineSeams.gapHeight / 2 - 1.5)
             .allowsHitTesting(false)

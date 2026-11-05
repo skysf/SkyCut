@@ -106,6 +106,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/ProjectFile/main.swift \
   checks/ProjectFile/VolumeCurve.swift \
   checks/ProjectFile/RowHeights.swift \

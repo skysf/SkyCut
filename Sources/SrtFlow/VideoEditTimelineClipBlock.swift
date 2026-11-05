@@ -37,7 +37,7 @@ struct ClipBlockContext: Equatable {
     }
 }
 
-/// 一段素材的块：视频带缩略图条和名字，音频画波形，选中描白框。
+/// 一段素材的块：视频带缩略图条和名字，音频画波形，选中按界面主题描边。
 ///
 /// 调用方要套 `.equatable()`：块的输入里有闭包，SwiftUI 比不出闭包「没变」，不套的话
 /// 时间线每重算一次（拖动每动一下），全部块都跟着重算。
@@ -126,10 +126,10 @@ struct ClipBlockView: View, Equatable {
             }
             .timelineHiddenLook(clip.isHidden)
             if highlighted {
-                // 白框 + 青色光晕：选中的是谁一目了然。
+                // 经典色白框 + 青晕；森林色实绿描边，浅底上不铺白色光晕。
                 RoundedRectangle(cornerRadius: 5)
-                    .strokeBorder(.white, lineWidth: 2)
-                    .shadow(color: .teal.opacity(0.9), radius: 3)
+                    .strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: 2)
+                    .shadow(color: AppThemePalette.current.selectionGlow, radius: 3)
             }
         }
         .frame(width: width, height: height)
@@ -198,8 +198,9 @@ struct ClipBlockView: View, Equatable {
         // 纯音频段被拖到视频轨上（少见但允许）时按音频色走：颜色跟的是
         // 「这块是什么」，块上画的也是波形。
         let index = context.colorIndex
-        if isAudioRow || clip.isAudioOnly { return TrackPalette.clipFill(audio: index) }
-        return TrackPalette.clipFill(video: index)
+        let audio = isAudioRow || clip.isAudioOnly
+        let classic = audio ? TrackPalette.clipFill(audio: index) : TrackPalette.clipFill(video: index)
+        return AppThemePalette.current.trackFill(index: index, audio: audio, classic: classic)
     }
 
     @ViewBuilder
@@ -243,7 +244,7 @@ struct ClipBlockView: View, Equatable {
                         .font(.system(size: 8))
                 }
             }
-            .foregroundStyle(.white.opacity(0.92))
+            .foregroundStyle(AppThemePalette.current.blockLabel(classic: .white.opacity(0.92)))
             .padding(.horizontal, 5)
             .padding(.vertical, 2)
 

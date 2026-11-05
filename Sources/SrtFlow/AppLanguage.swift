@@ -148,7 +148,8 @@ func L10n(_ key: String) -> String {
 extension View {
     /// 把所选语言注入环境，`Text` 的本地化查表立刻跟着切换。
     func appLanguage() -> some View {
-        modifier(AppLanguageModifier())
+        // 所有场景 / sheet / popover / 自建宿主都已经从这里接入；主题也沿同一份呈现根安装。
+        modifier(AppLanguageModifier()).appTheme()
     }
 }
 

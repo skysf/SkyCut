@@ -6,7 +6,7 @@
 
 - `VideoEditWorkbenchToolbar`：左边素材库、录屏、字幕；中间工程菜单；右边 AI 活动、云端任务、导出、设置、更多。主窗口和工程窗口复用，工程由调用方给，不能假设只有 primary。
 - 主窗口和工程窗口都用原生紧凑工具栏；工程菜单依据实际窗口宽度与 AI 状态预算，窄时先缩短工程名，保住常用操作。
-- 常用按钮只显示图标，名字和说明用现有 `instantHelp`，保留辅助功能标签。素材库选中态是中性浅灰，导出不染强调色。macOS 26 的分组背景通过 `sharedBackgroundVisibility(.hidden)` 去掉；旧系统用原生工具栏。
+- 常用按钮只显示图标，名字和说明用现有 `instantHelp`，保留辅助功能标签。素材库选中态跟主题（经典色中性浅灰、森林色浅绿），导出不染强调色。macOS 26 的分组背景通过 `sharedBackgroundVisibility(.hidden)` 去掉；旧系统用原生工具栏。
 - `WorkbenchMoreMenu` 保留压缩、烧字幕、转字幕；有后台 / AI 工程时出现「AI 工程」。浮层里复用 `AIProjectsSidebarSection` 的 List 行，不套 `.equatable()`，停止 / 打开 / 关闭规则不另做一份。
 - 其他工具页有「返回剪辑」和设置 / 更多入口；文件菜单原有快捷键、文件中转、队列后台执行继续沿用。
 
@@ -25,7 +25,7 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 
 | 稳定分类 id | 分类 | 复用组件与数据 |
 | --- | --- | --- |
-| general | 通用 | AppLanguagePicker / AppLanguageStore |
+| general | 通用 | AppLanguagePicker / AppLanguageStore；AppThemePicker / AppThemeStore |
 | ai | 连接 AI | AIConnectSection / AIClientSetup / AIReadGrants |
 | editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary；KokoroVoiceSettingsRow / KokoroVoicePack |
 | cache | 媒体缓存 | OptimizedMediaSettingsSection / OptimizedMediaCacheSettings |
@@ -40,7 +40,7 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 `get_settings`、`set_settings` 是全 App 工具，不收 project、不换工程、不摆编辑器、不开始一轮、不制造时间线撤销项；仍经过现有 MCP 套餐授权门。
 
 - `get_settings` 默认回五类快照，可传 `section` 限定。返回现值、可写字段、相关已有工具与 GUI 操作入口；不返回 API key 或客户端配置内容。
-- `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 暂停收费）、`ai_access_mode`、`confirm_token`。省略 / null 不动，至少一项有效改动。
+- `set_settings` 只认明确白名单：`language`（system / en / zh-Hans / es）、`theme`（forest / classic）、`optimized_media_cache_gb`（设置原有十进制档位）、`clear_optimized_media_cache`、`daily_ai_credit_limit`（原 Store 的整数范围，0 暂停收费）、`ai_access_mode`、`confirm_token`。省略 / null 不动，至少一项有效改动。
 - **全部参数先读完、验完再写任何 Store**，错误整次不做。缓存仍由 `OptimizedMediaCacheSettings` 执行，不能绕过它直接删目录 / 写 defaults。清空可能异步完成，用 `get_settings section=cache` 的 `clearing` 核对，不把开始清空说成已完成。
 - 2026-10-31 的每日额度「询问阈值」规则已被 2026-11-01 用户决策取代：每日额度是硬预算，两种模式均不可绕过；0 暂停收费任务。余额不足提供服务器充值链接，日预算不足提供设置入口，不循环索要一次性越额批准。MCP 提高硬预算需明确同意和确认码。
 - 剪辑风格沿用 recipes / save_recipe，声音安装沿用 add_voiceover download_voices=true / get_job。账号密钥与客户端连接 / 断开仍从设置操作；新读权限仍走现有确认，不能借设置绕过。
@@ -75,3 +75,8 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 - 失败与超时继续查询原任务及 billing；未知提交、下载或导入失败都恢复原单，不重新付费生成。只有明确的生成失败且已证实退款 / 未扣费，代理才按当前权限和硬预算决定新操作并使用新 key；用户要求停止不构成重试授权。现有原单幂等与恢复逻辑保留。
 
 验证：`scripts/check-sky-studio.sh` 的 AccessChecks 覆盖默认、旧目录、模式持久化、全部权限改设置仍询问、串码、硬预算和项目范围；`scripts/gui-smoke/sky-studio/settings.py` / `permissions.py` 用独立 App / 假服务器验证实际 MCP 与设置写入、只报价不消费、串码、同一操作只提交一次与全部权限的日预算阻止。中文原生窗口排版另作 GUI 回归，不把纯值检查说成已点通。
+
+## 界面主题（2026-11-05）
+
+通用 → 界面在语言下方新增森林色（默认）与经典色。设置窗口和 MCP 共用
+AppThemeStore，所有呈现根同步，不修改工程。完整合同见[界面主题](app-themes.md)。
