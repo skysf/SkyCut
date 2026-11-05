@@ -18,6 +18,14 @@ for(const language of languages) {
       assert.ok(script,'Vite must preserve static JSON-LD');
       const graph=JSON.parse(script)['@graph'];
       assert.ok(graph.some(node=>node['@type']==='SoftwareApplication' && node.publisher['@id']==='https://skystudioai.com/#organization'));
+      if(!kind) {
+        const offers=graph.find(node=>node['@type']==='SoftwareApplication').offers;
+        assert.deepEqual(offers.map(offer=>offer.price),language==='zh'?[0,129,999]:[0,19,149]);
+        assert.ok(offers.every(offer=>offer.priceCurrency===(language==='zh'?'CNY':'USD')));
+        assert.deepEqual(offers.slice(1).map(offer=>offer.priceSpecification.billingDuration),['P1M','P1Y']);
+        assert.ok(offers.slice(1).every(offer=>offer.url==='https://skystudioai.com/app/skycut/pro' && offer.priceSpecification.valueAddedTaxIncluded===false));
+        assert.match(html,/id="pricing"/);
+      }
     }
     assert.ok(html.includes(`https://skycut.app/media/og-card-${language}.png`));
     for(const match of html.matchAll(/(?:src|href)="(\/assets\/[^"#]+)"/g))await access(join(dist,match[1]));

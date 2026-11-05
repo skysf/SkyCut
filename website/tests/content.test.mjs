@@ -15,6 +15,10 @@ for(const language of languages) {
     const home=render(copy);assert.match(home,/name="newsletter"/);assert.match(home,/name="intel"/);assert.match(home,/name="windows"/);assert.doesNotMatch(home,/type="checkbox"[^>]*checked/);
     assert.match(home,/https:\/\/skylu.ai\/download\/skycut/);assert.match(home,/canvas id="timeline-scene"/);assert.match(home,/role="status"/);assert.match(home,/aria-label=/);
     assert.equal((home.match(/<h1\b/g)||[]).length,1);assert.equal((home.match(/rel="canonical"/g)||[]).length,1);
+    assert.equal((home.match(/id="pricing"/g)||[]).length,1);
+    for(const nav of ['desktop-nav','mobile-nav','footer-links']) {
+      assert.ok(home.match(new RegExp(`class="${nav}"[\\s\\S]*?</(?:nav|div)>`))[0].includes(`href="/${language}/#pricing"`));
+    }
     for(const path of ['', 'docs','privacy','confirmed']) {
       const page=render(copy,path);assert.ok(page.includes(`https://skycut.app/${language}/`));assert.doesNotMatch(page,/undefined|\[object Object\]/);
       for(const lang of languages) assert.ok(page.includes(`hreflang="${lang==='zh'?'zh-CN':lang}"`));
