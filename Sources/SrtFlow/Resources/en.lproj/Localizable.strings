@@ -1234,6 +1234,10 @@
 "Copy Address" = "Copy Address";
 "Copied" = "Copied";
 "Copy the support email address" = "Copy the support email address";
+"Get SkyCut Pro" = "Get SkyCut Pro";
+"Open Sky Studio to buy SkyCut Pro" = "Open Sky Studio to buy SkyCut Pro";
+"Activate SkyCut Pro to use AI editing and export without a watermark." = "Activate SkyCut Pro to use AI editing and export without a watermark.";
+"The video will carry a Sky Studio watermark. Activate SkyCut Pro to export without it." = "The video will carry a Sky Studio watermark. Activate SkyCut Pro to export without it.";
 "The video will carry a Sky Studio watermark. To export without it, activate SkyCut Pro: email %@ with the email address of your Sky Studio account." = "The video will carry a Sky Studio watermark. To export without it, activate SkyCut Pro: email %@ with the email address of your Sky Studio account.";
 "SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut." = "SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut.";
 

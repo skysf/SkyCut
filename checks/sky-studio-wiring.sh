@@ -87,6 +87,19 @@ prompters="$(grep -rl --include='*.swift' 'promptKeychain: true' Sources | LC_AL
 [ "$(count 'SkyStudioSettingsSection()' Sources/SrtFlow/SettingsWindowView.swift)" -eq 1 ] || fail "${APP}：设置窗口里要挂 SkyStudioSettingsSection()"
 [ "$(count 'SkyStudioAccount.shared.start()' "${APP}")" -eq 1 ] || fail "${APP}：启动时要 SkyStudioAccount.shared.start()"
 
+# 4b. 购买地址进入真实界面，设置和导出共用当前授权；AI 的下一步也用同一份。
+HINTS="Sources/SrtFlow/SkyStudio/SkyStudioProHints.swift"
+[ -f "${HINTS}" ] || { fail "找不到 ${HINTS}"; exit 1; }
+[ "$(count 'SkyStudioContactRow(license: license)' "${SECTION}")" -eq 1 ] \
+  || fail "设置里的购买提示没有收到此刻的授权"
+[ "$(count 'SkyStudioContactRow(license: account.license, isExport: true)' "${HINTS}")" -eq 1 ] \
+  || fail "导出面板没有用同一份当前授权的购买提示"
+[ "$(count 'if let url = license.proActivationURL {' "${HINTS}")" -eq 1 ] \
+  && [ "$(count 'Link("Get SkyCut Pro", destination: url)' "${HINTS}")" -eq 1 ] \
+  || fail "购买按钮必须打开此刻授权提供的 proActivationURL"
+grep -qF 'let activatePro = Self.activatePro(license: license)' Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
+  || fail "AI 的下一步没有按此刻授权选择购买地址 / 邮箱"
+
 # 5. 照授权拦接在该接的地方（规矩在 SkyCutGates，生不生效看 SkyCutGates.enforced）。
 GATE_AT="$(grep -nF 'if let refusal = await SkyStudioAccount.shared.aiRefusal(for: tool) {' "${ROUTER}" | cut -d: -f1 || true)"
 ARGS_AT="$(grep -nF 'MCPArgumentCheck.problem(tool: tool' "${ROUTER}" | head -1 | cut -d: -f1 || true)"

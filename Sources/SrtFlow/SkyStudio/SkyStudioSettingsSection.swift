@@ -3,8 +3,8 @@ import SwiftUI
 // MARK: - 设置里的「Sky Studio」一节
 //
 // 管什么：收费方案第 5 刀第一步的界面 —— 粘 Key（存进钥匙串、马上问一次）、是哪个账号、免费 / 体验还剩几天 / 正式到哪天、积分余额、
-// 问不成时为什么；不是正式版就写一句怎么开通（SkyStudioContactRow，和导出面板上那一行放在一起：SkyStudioProHints.swift。2026-10-27 用户定：
-// 先做 B 端，粘 Key、后台手动开通；C 端先只写一个邮箱、不开网页，浏览器里一键连接、网站上付款以后再做）。只订阅 SkyStudioAccount（一个小对象），不读工程。
+// 问不成时为什么；不是正式版就写一句怎么开通（SkyStudioContactRow，和导出面板共用：SkyStudioProHints.swift，
+// 有 /me 的购买地址就给链接，否则照旧给邮箱）。只订阅 SkyStudioAccount（一个小对象），不读工程。
 // 不管什么：Key 怎么存、什么时候问（SkyStudioAccount）、授权怎么算（SkyCutLicense）。
 
 struct SkyStudioSettingsSection: View {
@@ -40,7 +40,7 @@ struct SkyStudioSettingsSection: View {
                 SkyStudioProblemLine(problem: problem, license: license)
             }
             if license.plan != .pro {
-                SkyStudioContactRow()
+                SkyStudioContactRow(license: license)
             }
         }
     }

@@ -30,7 +30,7 @@ func runMeChecks() {
     checkEqual(SkyStudioJSON.parseDate("2026-10-27T23:04:05+08:00"), moment(), "a date with an offset")
     check(SkyStudioJSON.parseDate("2026-10-27") == nil, "a bare date is not a moment")
 
-    // 读得宽：认不出的字段（下面的 future_field、upgrade_url、new_switch）不管；少了可选的（email、trial_*、paid_until、recharge_url…）不算错。
+    // 读得宽：认不出的字段（下面的 future_field、new_switch）不管；少了可选的（email、trial_*、paid_until、recharge_url…）不算错。
     let lean = """
     {"account": {"id": "u1"}, "credits": {"balance": 12.5}, "future_field": [1, 2],
      "skycut": {"plan": "pro", "features": {"mcp": true, "watermark": false, "new_switch": true},

@@ -22,6 +22,14 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
         var watermark: Bool
     }
 
+    /// 账号的 Mac 占位信息，仅作说明；缺字段不能影响既有授权的读取。
+    struct Machines: Codable, Equatable, Sendable {
+        var limit: Int?
+        var used: Int?
+        var windowDays: Int?
+        var currentAllowed: Bool?
+    }
+
     /// `skycut` 那一块：这个账号的 SkyCut 授权。规则全在服务器，这里只照着读。
     struct License: Codable, Equatable, Sendable {
         /// `free` / `trial` / `pro`；认不出的也留着原样（显示用，能用什么只看 `features`）。
@@ -37,6 +45,17 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
         var minVersion: String?
         var maxRunningJobs: Int?
         var rechargeUrl: String?
+        /// 自助购买合同 v1 的说明字段，全都可选；不能据此开启功能。
+        var accountPlan: String?
+        /// `subscription` / `one_time` / `manual`；未知值原样保留，只作说明。
+        var proSource: String?
+        var upgradeUrl: String?
+        var manageMachinesUrl: String?
+        var planReason: String?
+        var planMessage: String?
+        var autoRenews: Bool?
+        var graceUntil: Date?
+        var machines: Machines?
     }
 
     var account: Account
@@ -47,6 +66,8 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
 
 extension SkyStudioMe.License {
     var rechargeURL: URL? { SkyStudioLinks.webURL(rechargeUrl) }
+    var upgradeURL: URL? { SkyStudioLinks.webURL(upgradeUrl) }
+    var manageMachinesURL: URL? { SkyStudioLinks.webURL(manageMachinesUrl) }
 }
 
 /// 存下来的一次 /me：断网时照它用到 `validUntil`（SkyCutLicense 换算成本机时间）。
@@ -63,8 +84,8 @@ struct SkyStudioStoredAnswer: Codable, Equatable, Sendable {
 
 /// SkyCut 用到的 Sky Studio 的几个地址。
 enum SkyStudioLinks {
-    /// 「联系开通」：开通正式版请用户发邮件到这里（2026-10-27 用户定：软件里只写一个邮箱，不开网页；正式版由 Sky Studio 后台手动开通）。
-    /// 没有 Key 的人问不到 /me，所以写在 App 里；换邮箱要发新版。
+    /// /me 没有可用购买地址时，照旧联系这个邮箱；没有 Key 的人也用它。
+    /// 邮箱写在 App 里，换邮箱要发新版；不拼接或硬编码尚未上线的购买页。
     static let supportEmail = "support@skystudioai.com"
 
     /// 网站上建 Key 的那个窗口（Sky Studio 右上角头像 → SkyCut）：设置里「去 Sky Studio 建 Key」直接打开它。
