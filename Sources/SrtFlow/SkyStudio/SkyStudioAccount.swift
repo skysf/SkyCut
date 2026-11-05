@@ -63,7 +63,7 @@ final class SkyStudioAccount: ObservableObject {
     /// 正在问就等它；该问了就问（没问成过不到 5 分钟的不再问，照 SkyStudioRefresh）。最多等 `limit` 秒，到了按那时的算。
     func settledLicense(waitingUpTo limit: TimeInterval) async -> SkyCutLicense {
         guard hasKey, license.basis != .server else { return license }
-        refreshIfDue(after: 0)
+        refreshIfDue(.beforeUse)
         let deadline = Date().addingTimeInterval(limit)
         // 先睡一下再看：refreshIfDue 起的那一次要在主线程上轮到它才把 checking 设上。
         repeat {
@@ -80,10 +80,10 @@ final class SkyStudioAccount: ObservableObject {
         started = true
         syncProviders()
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshIfDue(after: SkyStudioRefresh.onActivation) }
+            MainActor.assumeIsolated { self?.refreshIfDue(.activation) }
         }
         timer = Timer.scheduledTimer(withTimeInterval: 3600, repeats: true) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refreshIfDue(after: SkyStudioRefresh.inBackground) }
+            MainActor.assumeIsolated { self?.refreshIfDue(.background) }
         }
         // 独立冒烟 App 只对回环假服务装入假 Key；正式 / Beta 的身份和生产地址都不认这个钩子。
         let environment = ProcessInfo.processInfo.environment
@@ -92,7 +92,7 @@ final class SkyStudioAccount: ObservableObject {
            let key = environment["SRTFLOW_SMOKE_SKYSTUDIO_KEY"] {
             Task { await saveKey(key) }
         } else {
-            refreshIfDue(after: SkyStudioRefresh.onActivation)
+            refreshIfDue(.activation)
         }
     }
 
@@ -103,9 +103,9 @@ final class SkyStudioAccount: ObservableObject {
         catch { FileHandle.standardError.write(Data("SkyCut: could not update provider marker.\n".utf8)) }
     }
 
-    func refreshIfDue(after interval: TimeInterval) {
+    func refreshIfDue(_ trigger: SkyStudioRefresh.Trigger) {
         guard hasKey, !checking,
-              SkyStudioRefresh.isDue(stored: stored, lastFailure: lastFailure, now: Date(), after: interval) else { return }
+              SkyStudioRefresh.isDue(stored: stored, lastFailure: lastFailure, now: Date(), trigger: trigger) else { return }
         Task { await refresh() }
     }
 

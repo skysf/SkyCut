@@ -91,17 +91,26 @@ struct SkyCutLicense: Equatable, Sendable {
 
 /// 什么时候再问一次 /me（纯规则）。问一次很便宜，但也别每次切回 SkyCut 都问：
 /// - 从没问到过、回答过期了（或本机的钟往回拨了）→ 马上问；
-/// - 否则上一次问到距今超过 `after` 才问（回到 SkyCut 时 30 分钟，后台每小时看一眼时 6 小时）；
+/// - 启动 / 回到 SkyCut：此刻不是正式版时隔 1 分钟，正式版照旧隔 30 分钟；后台每小时看一眼时隔 6 小时；
 /// - 上一次没问成，至少隔 5 分钟再试（断网时不必每切一次窗口就发一次）。
 enum SkyStudioRefresh {
-    static let onActivation: TimeInterval = 30 * 60
-    static let inBackground: TimeInterval = 6 * 3600
+    enum Trigger {
+        case activation, background, beforeUse
+    }
+
     static let retryAfterFailure: TimeInterval = 5 * 60
 
-    static func isDue(stored: SkyStudioStoredAnswer?, lastFailure: Date?, now: Date, after: TimeInterval) -> Bool {
+    static func isDue(stored: SkyStudioStoredAnswer?, lastFailure: Date?, now: Date, trigger: Trigger) -> Bool {
         if let lastFailure, now.timeIntervalSince(lastFailure) < retryAfterFailure, now >= lastFailure { return false }
         guard let stored else { return true }
-        if SkyCutLicense.evaluate(stored, hasKey: true, now: now).basis != .server { return true }
-        return now.timeIntervalSince(stored.receivedAt) >= after
+        let license = SkyCutLicense.evaluate(stored, hasKey: true, now: now)
+        guard license.basis == .server else { return true }
+        let interval: TimeInterval
+        switch trigger {
+        case .activation: interval = license.plan == .pro ? 30 * 60 : 60
+        case .background: interval = 6 * 3600
+        case .beforeUse: interval = 0
+        }
+        return now.timeIntervalSince(stored.receivedAt) >= interval
     }
 }

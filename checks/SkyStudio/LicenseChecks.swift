@@ -1,7 +1,7 @@
 import Foundation
 
 // SkyCutLicense：此刻作数的授权（没有 Key / 没问到过 / 过期都按免费版；服务器的钟换成本机的；钟往回拨不作数）；
-// SkyStudioRefresh：什么时候再问。
+// 什么时候再问的用例在 RefreshChecks.swift。
 
 func runLicenseChecks() {
     guard let me = try? SkyStudioJSON.decoder().decode(SkyStudioMe.self, from: Data(sampleMe.utf8)) else {
@@ -64,22 +64,7 @@ func runLicenseChecks() {
     let usedLicense = SkyCutLicense.evaluate(SkyStudioStoredAnswer(me: used, receivedAt: receivedAt), hasKey: true, now: receivedAt)
     checkEqual(usedLicense.trialUnavailable, "machine_used", "why there is no trial")
 
-    // 6. 什么时候再问。
-    let fresh = SkyStudioStoredAnswer(me: me, receivedAt: receivedAt)
-    let thirtyMinutes = SkyStudioRefresh.onActivation
-    let sixHours = SkyStudioRefresh.inBackground
-    check(SkyStudioRefresh.isDue(stored: nil, lastFailure: nil, now: receivedAt, after: thirtyMinutes), "never asked: ask")
-    check(!SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(600), after: thirtyMinutes), "asked 10 minutes ago")
-    check(SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(1860), after: thirtyMinutes), "asked 31 minutes ago")
-    check(!SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(5 * 3600), after: sixHours), "the hourly look: 5 hours")
-    check(SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(6 * 3600), after: sixHours), "the hourly look: 6 hours")
-    check(SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(-600), after: sixHours), "a clock set back: ask again")
-    check(SkyStudioRefresh.isDue(stored: fresh, lastFailure: nil, now: receivedAt.addingTimeInterval(3 * 86_400), after: sixHours), "expired: ask")
-    let failedAt = receivedAt.addingTimeInterval(7200)
-    check(!SkyStudioRefresh.isDue(stored: nil, lastFailure: failedAt, now: failedAt.addingTimeInterval(120), after: thirtyMinutes), "failed 2 minutes ago: wait")
-    check(SkyStudioRefresh.isDue(stored: nil, lastFailure: failedAt, now: failedAt.addingTimeInterval(360), after: thirtyMinutes), "failed 6 minutes ago: try again")
-    check(SkyStudioRefresh.isDue(stored: nil, lastFailure: failedAt, now: failedAt.addingTimeInterval(-60), after: thirtyMinutes), "a failure in the future (clock set back): try again")
-
+    runRefreshChecks(me)
     runRequestTimeChecks(me)
 }
 
