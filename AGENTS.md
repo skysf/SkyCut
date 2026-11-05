@@ -659,6 +659,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-05 声音恢复成功，播放器自检却因固定等待窗口报红](docs/bugfixes/2026-11-05-player-clock-recovery-check-timing.md) — 恢复和恢复后的推进挤在同一个 200 ms 窗口；改为分阶段有界条件等待，常规自检保留 250 ms 延迟注入。
 - [2026-11-04 CI 的 .build 缓存从来没省下过一次编译](docs/bugfixes/2026-11-04-ci-build-cache-never-saved-a-compile.md) — checkout 的修改时间每次都新（SwiftPM 按「一不一样」重编）、key 只看 Package.swift 命中后不再存、五组抢一个 key；修改时间按内容设、每组一份按提交存、只在 main 上存，小包上每轮验一遍「改了照样重编」。
 - [2026-11-04 四条扫描守卫从加上那天起，CI 一次都没跑过](docs/bugfixes/2026-11-04-scan-guards-never-ran-in-ci.md) — check-guards 按通配符跑 `checks/*.sh`、CI 只跑 check-all 列着的；sky-studio-wiring 等四条从没进过 check-all，文档还写着「第 1 组」。`checks/check-all-shards.sh` 钉着两边对得上。
 - [2026-11-04 非零时间线起点让原生尾帧请求落到前一个刻度](docs/bugfixes/2026-11-04-native-frame-request-truncation.md) — 原生请求显式 nearest-600、有限值与整数边界守卫；实际时间和漂移 / 半开窗不放宽，旧证据需重抽。

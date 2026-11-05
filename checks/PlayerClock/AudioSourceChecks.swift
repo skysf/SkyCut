@@ -12,6 +12,7 @@ private final class RecoverableAudioSource: PlaybackAudioSource {
     private(set) var recoveries = 0
     private(set) var attempts = 0
     var canRecover = true
+    var recoveryDelay = 0.0
 
     var playhead: Double {
         position + (isPlaying && !stopped ? ProcessInfo.processInfo.systemUptime - host : 0)
@@ -26,6 +27,7 @@ private final class RecoverableAudioSource: PlaybackAudioSource {
         attempts += 1
         guard stopped else { return false }
         guard canRecover else { throw Failure.unavailable }
+        if recoveryDelay > 0 { Thread.sleep(forTimeInterval: recoveryDelay) }
         stopped = false
         host = ProcessInfo.processInfo.systemUptime
         recoveries += 1
@@ -53,12 +55,16 @@ private func pumpAudioClock(_ seconds: Double) {
     RunLoop.main.run(until: Date().addingTimeInterval(seconds))
 }
 
+private func waitForAudioClock(until done: () -> Bool) {
+    let deadline = ProcessInfo.processInfo.systemUptime + 5
+    while !done(), ProcessInfo.processInfo.systemUptime < deadline { pumpAudioClock(0.02) }
+}
+
 func checkAudioSourceRecovery(clip: URL) {
     let clock = PlayerClock(observationInterval: 0.02)
     clock.player.isMuted = true
     clock.attachItem(AVPlayerItem(url: clip))
-    let readyDeadline = Date().addingTimeInterval(5)
-    while clock.player.currentItem?.status != .readyToPlay, Date() < readyDeadline { pumpAudioClock(0.02) }
+    waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }
     check(clock.player.currentItem?.status == .readyToPlay, "声音时钟回归的真实视频已就绪")
 
     let old = RecoverableAudioSource()
@@ -67,26 +73,33 @@ func checkAudioSourceRecovery(clip: URL) {
     old.interrupt()
     clock.play()
     check(old.recoveries == 1, "开播前恢复已经停掉的声音图")
-    pumpAudioClock(0.2)
+    waitForAudioClock { clock.time > 2.1 }
     check(clock.time > 2.1, "恢复后播放头继续向前，实测 \(clock.time)")
 
+    // 恢复可能耗过原来的整个 200 ms 窗口：等待真实状态，再单独验证恢复后的推进。
+    // 延迟只在假声音源里，仍由生产的 Timer / recoverAudioIfNeeded 驱动。
+    old.recoveryDelay = 0.25
     old.interrupt()
     let interruptedAt = clock.time
-    pumpAudioClock(0.2)
-    check(old.recoveries == 2, "播放途中声音图停掉也会恢复")
-    check(clock.time > interruptedAt + 0.1, "中断恢复后播放头继续向前")
+    waitForAudioClock { old.recoveries == 2 }
+    check(old.recoveries == 2, "播放途中声音图停掉也会恢复，实测 \(old.recoveries) 次")
+    waitForAudioClock { clock.time > interruptedAt + 0.1 }
+    check(clock.time > interruptedAt + 0.1, "中断恢复后播放头继续向前，停止于 \(interruptedAt)，实测 \(clock.time)")
+    old.recoveryDelay = 0
 
     old.canRecover = false
     old.interrupt()
-    pumpAudioClock(0.15)
+    waitForAudioClock { !clock.isPlaying && !old.isPlaying }
     check(!clock.isPlaying && !old.isPlaying, "恢复失败明确暂停画面和声音")
     let attempts = old.attempts
     pumpAudioClock(0.1)
     check(old.attempts == attempts, "恢复失败后不每拍反复重试")
     old.canRecover = true
     clock.play()
-    pumpAudioClock(0.15)
-    check(old.isPlaying && old.recoveries == 3, "再次点击播放可以重试恢复")
+    let retryFrom = clock.time
+    waitForAudioClock { old.isPlaying && old.recoveries == 3 && clock.time > retryFrom + 0.1 }
+    check(old.isPlaying && old.recoveries == 3 && clock.time > retryFrom + 0.1,
+          "再次点击播放可以重试恢复并继续推进，实测 \(old.recoveries) 次、\(clock.time) 秒")
 
     let replacement = RecoverableAudioSource()
     clock.attachAudioSource(replacement)
@@ -104,7 +117,7 @@ func checkAudioSourceRecovery(clip: URL) {
     clock.attachAudioSource(replacement)
     clock.seek(to: 6)
     clock.play()
-    pumpAudioClock(0.2)
+    waitForAudioClock { clock.time > 6.1 }
     check(clock.time > 6.1, "重新接上声音时钟后，新预览能正常播放")
     clock.detach()
 }
