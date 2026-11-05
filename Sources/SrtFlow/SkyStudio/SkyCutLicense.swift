@@ -46,9 +46,23 @@ struct SkyCutLicense: Equatable, Sendable {
     var trialUnavailable: String?
     /// 服务器给的购买页，只从还作数的回答读；不会据此改变功能开关。
     var upgradeURL: URL?
+    /// 仅作说明的原因、服务器原话和 Mac 管理入口；回答不作数时不保留这些提示。
+    var planReason: String?
+    var planMessage: String?
+    var machineLimit: Int?
+    var manageMachinesURL: URL?
 
-    /// 未开通时去哪里购买。正式版可能有功能 override，不能因此叫用户再买一次。
-    var proActivationURL: URL? { plan == .pro ? nil : upgradeURL }
+    var isMachineLimited: Bool { planReason == "machine_limit_reached" }
+
+    /// 未开通时去哪里购买。台数满了应管理 Mac；正式版的功能 override 也不能叫用户再买一次。
+    var proActivationURL: URL? { plan == .pro || isMachineLimited ? nil : upgradeURL }
+
+    /// 认识的原因由界面自己本地化；不认识的原因保留服务器的说明，不从文字里提取链接。
+    var unrecognizedPlanMessage: String? {
+        guard planReason != nil, !isMachineLimited, let planMessage,
+              !planMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        return planMessage
+    }
 
     /// 没有授权：免费版的那一组。
     static func free(_ basis: Basis) -> SkyCutLicense {
@@ -78,7 +92,11 @@ struct SkyCutLicense: Equatable, Sendable {
             paidUntil: license.paidUntil,
             validUntil: validUntil,
             trialUnavailable: license.trialUnavailable,
-            upgradeURL: license.upgradeURL
+            upgradeURL: license.upgradeURL,
+            planReason: license.planReason,
+            planMessage: license.planMessage,
+            machineLimit: license.machines?.limit,
+            manageMachinesURL: license.manageMachinesURL
         )
     }
 

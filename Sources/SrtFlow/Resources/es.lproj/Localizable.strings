@@ -1234,6 +1234,15 @@
 "Copy Address" = "Copiar dirección";
 "Copied" = "Copiado";
 "Copy the support email address" = "Copiar la dirección de soporte";
+/* Mac limit: manage existing authorization before purchasing */
+"Manage Macs" = "Gestionar Macs";
+"Open Sky Studio to manage the Macs using this account" = "Abrir Sky Studio para gestionar los Macs que usan esta cuenta";
+"This account is already using SkyCut on 1 Mac. This Mac is using the free plan." = "Esta cuenta ya usa SkyCut en 1 Mac. Este Mac está usando el plan gratuito.";
+"This account is already using SkyCut on %lld Macs. This Mac is using the free plan." = "Esta cuenta ya usa SkyCut en %lld Macs. Este Mac está usando el plan gratuito.";
+"This account has reached its Mac limit. This Mac is using the free plan." = "Esta cuenta ha alcanzado su límite de Macs. Este Mac está usando el plan gratuito.";
+"Remove a Mac in Sky Studio to use this account here." = "Elimina un Mac en Sky Studio para usar esta cuenta aquí.";
+"To use this account on this Mac, contact %@." = "Para usar esta cuenta en este Mac, contacta con %@.";
+"The video will carry a Sky Studio watermark." = "El vídeo llevará una marca de agua de Sky Studio.";
 "Get SkyCut Pro" = "Obtener SkyCut Pro";
 "Open Sky Studio to buy SkyCut Pro" = "Abrir Sky Studio para comprar SkyCut Pro";
 "Activate SkyCut Pro to use AI editing and export without a watermark." = "Activa SkyCut Pro para editar con IA y exportar sin marca de agua.";

@@ -1234,6 +1234,15 @@
 "Copy Address" = "复制邮箱";
 "Copied" = "已复制";
 "Copy the support email address" = "复制客服邮箱";
+/* Mac limit: manage existing authorization before purchasing */
+"Manage Macs" = "管理 Mac";
+"Open Sky Studio to manage the Macs using this account" = "打开 Sky Studio，管理使用这个账号的 Mac";
+"This account is already using SkyCut on 1 Mac. This Mac is using the free plan." = "这个账号已经在 1 台 Mac 上使用 SkyCut，这台 Mac 现在是免费版。";
+"This account is already using SkyCut on %lld Macs. This Mac is using the free plan." = "这个账号已经在 %lld 台 Mac 上使用 SkyCut，这台 Mac 现在是免费版。";
+"This account has reached its Mac limit. This Mac is using the free plan." = "这个账号使用的 Mac 已达到台数上限，这台 Mac 现在是免费版。";
+"Remove a Mac in Sky Studio to use this account here." = "请在 Sky Studio 移除一台 Mac，再在这台 Mac 上使用这个账号。";
+"To use this account on this Mac, contact %@." = "要在这台 Mac 上使用这个账号，请联系 %@。";
+"The video will carry a Sky Studio watermark." = "导出的视频会带 Sky Studio 水印。";
 "Get SkyCut Pro" = "购买 SkyCut Pro";
 "Open Sky Studio to buy SkyCut Pro" = "打开 Sky Studio 购买 SkyCut Pro";
 "Activate SkyCut Pro to use AI editing and export without a watermark." = "开通 SkyCut Pro，即可使用 AI 剪辑并导出无水印视频。";
