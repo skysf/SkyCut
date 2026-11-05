@@ -21,6 +21,27 @@
 32 / 64 PNG 和 180 Apple touch icon；不改原图、不另写抠图实现。重建需要 macOS / Swift，
 正常网站构建只复制已生成资源，Linux CI 不重建图标。
 
+## 设备语言与手动选择
+
+2026-11-05 用户确定：打开 `https://skycut.app/` 时按设备 / 浏览器的第一首选语言进入
+对应版本，超过已有翻译范围统一默认英文。实现只读浏览器语言，不按 IP 推测、不新增
+云端函数或浏览器设置修改。
+
+- `src/language.js` 使用 `navigator.languages[0]`，列表缺失或为空时用
+  `navigator.language`。`zh` 的地区与字形变体（包括繁体系统）统一进入现有简体中文；
+  `en` / `de` / `es` 匹配各自地区变体。其他首选语言直接英文，不跳去第二首选的德文等。
+- 根入口优先级为显式 `?lang=` → 本机保存的手动选择 → 设备首选语言 → 英文。
+  手动选择只写既有 `SrtFlow.website.language` 本地存储键；禁用存储也不阻止浏览。
+  `?lang=` 的有效选择会保存并从网址移除，保留文档路径、其他查询参数与锚点。
+- `/en/`、`/zh/`、`/de/`、`/es/` 等明确语言的网址保持稳定，供分享、搜索收录和手动
+  切换；不能在打开这些网址时再强制按设备切走，造成跳转循环或让搜索引擎看不到其他版本。
+- `tests/language.test.mjs` 调用实际 `applyLanguage()`，覆盖首页重定向、全部中文设备
+  变体、不支持的首选语言、缺失语言列表、手动偏好、存储失败和深链接稳定性。
+  人工回归：全新浏览器打开根域名应匹配首选语言，手动换语言后回根域名仍保留所选版本。
+
+浏览器语言顺序与空列表回退依据 [MDN Navigator.languages](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/languages)；
+明确语言 URL 不互相自动跳转依据 [Google 多语言站点说明](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)。
+
 ## 首屏时间线动画
 
 - 2026-11-04 用户要求：更接近参考图的暖白底座、绿色圆角边框与前后叠放卡片；
