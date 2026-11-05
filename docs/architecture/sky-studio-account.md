@@ -21,7 +21,7 @@
 | 请求里的版本 | `X-SkyCut-Version` 只发数字三段 `major.minor.patch`：`SkyStudioAPI.request` 对完整匹配的版本去掉 `-local…` / 预发布 / `+build…` 后缀。**只改传输，不改 `CFBundleShortVersionString`、界面的完整版本或构建来源**；无法完整识别的字符串原样交服务器严格校验，不截取、不伪装成有效版本。缺失 Bundle 键时既有的 `0.0.0` 兜底不变。所有 API 共用这一处，不为 `/models` 特判；旧版本仍由服务器执行最低版本限制。见 [本地构建版本头案例](../bugfixes/2026-11-03-local-version-header.md) |
 | 此刻的授权 | 纯函数 `SkyCutLicense.evaluate`：plan、`features`（`mcp` / `watermark`）、`valid_until` 全照服务器的，SkyCut 不写死天数。**没有 Key、没问到过、过了 `valid_until` 都按免费版**（MCP 关、导出带水印）——这是「没有授权」本身的定义 |
 | 断网 | 上一次的回答存在 UserDefaults（`SrtFlow.skystudio.me.v1`），照它用到 `valid_until`（服务器定：现在是 72 小时和体验 / 正式到期取早的）。服务器的钟换成本机的：`拿到回答时的本机时间 + (valid_until − server_time)`，本机的钟和服务器差多少都不影响；本机的钟比拿到回答时还早 5 分钟以上（往回拨了）就不作数。**换算只给要和本机的「现在」比的时间**（`valid_until`、体验的起止）：「拿到回答 − server_time」里还有请求在路上的几秒，只拿来显示的「正式版到哪天」照服务器给的那一刻，不换算；「体验还剩几天」不满一天算一天，但不超过体验本身的天数（`trial_ends_at − trial_started_at`）。2026-10-28 真服务器上回答晚到 4–5 秒，刚开始的体验显示成 8 天、开通到 12-31 显示成 1 月 1 日（[案例](../bugfixes/2026-10-28-trial-and-pro-dates-shown-a-day-late.md)） |
-| 什么时候问 | `SkyStudioRefresh`：启动时、回到 SkyCut 时，上次问到超过 30 分钟才问；每小时看一眼，超过 6 小时才问；没问到过 / 过期了马上问；没问成至少隔 5 分钟再试。设置里「再查一次」随时问 |
+| 什么时候问 | 纯规则 `SkyStudioRefresh`：启动时、回到 SkyCut 时，按 `SkyCutLicense.evaluate` 算出的此刻授权，**不是正式版时距上次问到至少 1 分钟就问，正式版照旧 30 分钟**；账号层只传触发场景和存的回答，不另判套餐。每小时看一眼，距上次问到至少 6 小时才问；没问到过 / 过期了马上问；没问成至少隔 5 分钟再试，优先于以上规则。设置里「再查一次」随时问 |
 | Key 作废了 | 后台问到 `invalid_key`：清掉存的回答（这把 Key 的授权不再作数，不等到 `valid_until`），设置里说 Sky Studio 不认、请粘一把新的 |
 | 版本太老 | `upgrade_required`：设置里照服务器的话说，带下载链接（`download_url`）；存的回答照旧用到 `valid_until` |
 | 体验给不了 | `/me` 回 `plan: free` + `trial_unavailable: machine_used`：设置里说「这台 Mac 已经体验过 SkyCut，这个账号在这台 Mac 上没有体验期」 |
@@ -67,7 +67,7 @@
 - `scripts/check-sky-studio.sh`（`check-all.sh` 第 2 组，不碰网络、不碰钥匙串）：Key 的整理和钥匙串那一条的名字；机器号钉死一组值、这台 Mac 读得到、发出去的不是原样的 UUID；
   `/me` 照合同里的样例逐字段读、带毫秒的日期、读得宽、少了必须的不算回答、网址只认 https 和本机、存了读回来一样、服务器时间换本机时间；
   假 URLSession 上看 `/me` 的地址、方法、四个头，401 / 426 / 429 留着 code 和附加字段，502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能指到本机；
-  授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问；
+  授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问（`RefreshChecks`）：免费 / 体验前台 1 分钟、正式版 30 分钟的边界，后台仍是 6 小时，没问到过 / 过期马上问，5 分钟失败退避不会被前台规则绕过；
   照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
   被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
 - `checks/sky-studio-wiring.sh`（扫描守卫）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
@@ -85,7 +85,7 @@
 - [ ] 同一台 Mac 换一个新账号的 Key：「免费版」，下面一句说这台 Mac 已经体验过。
 - [ ] 粘一把作废的 Key：说 Sky Studio 不认、Key 没存下；网站上作废正在用的那把，点「再查一次」：同样，存的授权清掉。
 - [ ] 断网点「再查一次」：说连不上、照上一次的用到什么时候；72 小时之后（或把 `valid_until` 很近的回答存进去）变成免费版。
-- [ ] 后台给账号设 `paid_until`：回到 SkyCut 超过 30 分钟或点「再查一次」后是「正式版 · 到 …」，写的就是后台选的那天（不是第二天），开通的那一句不见了。
+- [ ] 免费 / 体验账号在后台设 `paid_until`：距上次成功问到至少 1 分钟时切回 SkyCut，不点「再查一次」也变成「正式版 · 到 …」，写的就是后台选的那天（不是第二天），开通的那一句不见了；1 分钟内反复切回不再问。已经是正式版的仍等 30 分钟，设置里「再查一次」随时问。
 - [ ] 「复制邮箱」之后粘出来是 support@skystudioai.com，这个邮箱收得到信。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
