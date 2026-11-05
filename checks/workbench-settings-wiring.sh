@@ -19,7 +19,7 @@ require "$APP" 'SettingsWindowView().appLanguage()'
 require "$MORE" 'SettingsLink {'
 require "$VIEW" 'VideoEditWorkbenchToolbar('
 require Sources/SrtFlow/AIActivityBanner.swift 'AIActivityBadgeBackground(isWorking: round.phase == .working)'
-require Sources/SrtFlow/AIActivityBadgeBackground.swift '.fill(Color(nsColor: .windowBackgroundColor))'
+require Sources/SrtFlow/AIActivityBadgeBackground.swift '.fill(AppThemePalette.current.window)'
 require "$BAR" 'VideoEditProjectMenu(project: project)'
 require "$BAR" '.frame(width: projectMenuWidth)'
 for component in 'RecordScreenButton(project: project)' 'AIActivityBanner(project: project)' 'WorkbenchSettingsLink()' 'WorkbenchMoreMenu()'; do

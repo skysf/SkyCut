@@ -1310,3 +1310,9 @@
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it.";
 
 "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.";
+
+"Theme" = "Theme";
+
+"Forest (Default)" = "Forest (Default)";
+
+"Classic" = "Classic";

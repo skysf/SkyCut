@@ -36,13 +36,14 @@ struct WaveformView: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        let waveformColor = AppThemePalette.current.waveform
         Canvas { [detailRevision] context, size in
             PerfCounters.canvas(Self.self)
             _ = detailRevision
             guard let peaks, peaks.sampleRate > 0, pps > 0 else { return }
             WaveformPainter(
                 clip: clip, pps: pps, trackGain: trackGain, peaks: peaks,
-                pixel: 1 / max(1, displayScale)
+                pixel: 1 / max(1, displayScale), normalColor: waveformColor
             ).draw(in: &context, size: size)
         }
         // 数据按文件取：裁切、分割、挪位置、缩放都不重读 PCM，只有换素材才重新订阅。
@@ -80,6 +81,7 @@ struct WaveformPainter {
 
     static let fill = Color.white.opacity(0.72)
     static let clipped = Color(red: 1, green: 0.27, blue: 0.23)
+    var normalColor: Color = Self.fill
 
     func draw(in context: inout GraphicsContext, size: CGSize) {
         // 只画看得见的那一段（±4pt 余量，免得边缘那一列半截）。
@@ -202,7 +204,7 @@ struct WaveformPainter {
         for c in cols.dropFirst() { shape.addLine(to: CGPoint(x: c.x, y: top(c))) }
         for c in cols.reversed() { shape.addLine(to: CGPoint(x: c.x, y: max(bottom(c), top(c) + 0.5))) }
         shape.closeSubpath()
-        context.fill(shape, with: .color(Self.fill))
+        context.fill(shape, with: .color(normalColor))
 
         // 爆音：乘完增益超过 0 dBFS 的列，整列涂红（Final Cut 的做法）。
         var red = Path()

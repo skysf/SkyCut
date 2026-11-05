@@ -237,7 +237,7 @@ extension VideoEditInspectorView {
                 }
             } label: {
                 Image(systemName: onKey ? "diamond.fill" : "diamond")
-                    .foregroundStyle(onKey ? Color.teal : (hasKeys ? Color.primary : Color.secondary))
+                    .foregroundStyle(onKey ? AppThemePalette.current.dragAccent : (hasKeys ? Color.primary : Color.secondary))
             }
             .disabled(!inside)
             .instantHelp("Add or remove a keyframe at the playhead")
@@ -281,7 +281,7 @@ extension VideoEditInspectorView {
         .toggleStyle(.button)
         .buttonStyle(.borderless)
         .controlSize(.small)
-        .tint(.teal)
+        .tint(AppThemePalette.current.toggleAccent)
         .instantHelp(horizontal ? "Flip horizontally" : "Flip vertically")
     }
 

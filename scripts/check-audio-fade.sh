@@ -139,6 +139,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaProbe.swift \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/AudioFade/main.swift \
   checks/AudioFade/Envelope.swift \
   checks/AudioFade/VolumeCurve.swift \

@@ -77,5 +77,6 @@ struct LibraryColumn: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(AppThemePalette.current.panel)
     }
 }

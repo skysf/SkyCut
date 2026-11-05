@@ -17,13 +17,13 @@ struct TextRowDropIndicator: View {
         if let row {
             if let layout = layouts.first(where: { $0.spec.textRow == row }) {
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.teal, lineWidth: 2)
+                    .strokeBorder(AppThemePalette.current.dragAccent, lineWidth: 2)
                     .frame(width: width, height: layout.spec.height)
                     .offset(y: layout.minY)
                     .allowsHitTesting(false)
             } else if let top = layouts.first(where: { $0.spec.textRow != nil }) {
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(Color.teal)
+                    .fill(AppThemePalette.current.dragAccent)
                     .frame(width: width, height: 3)
                     .offset(y: top.minY - 2)
                     .allowsHitTesting(false)

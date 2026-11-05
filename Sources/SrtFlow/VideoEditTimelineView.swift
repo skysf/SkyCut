@@ -452,7 +452,7 @@ struct VideoEditTimelineView: View {
     private func trackRow(slot: TrackSlot, height: Double, hidden: Bool) -> some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 4)
-                .fill(.quaternary.opacity(0.35))
+                .fill(AppThemePalette.current.laneBackground(classicOpacity: 0.35))
                 .frame(width: contentWidth)
             let context = ClipBlockContext(slot: slot, project: project)
             ForEach(project.state[track: slot]) { clip in

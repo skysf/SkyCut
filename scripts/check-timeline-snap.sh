@@ -96,6 +96,9 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/TimelineSnap/main.swift \
   checks/TimelineSnap/SnapBasics.swift \
   checks/TimelineSnap/Trim.swift \

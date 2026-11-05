@@ -20,10 +20,10 @@ extension VideoEditTimelineView {
     func subtitleRow(kind: SubtitleTrack) -> some View {
         let cues = project.state.subtitleCues(of: kind)
         let hidden = project.state.isSubtitleTrackHidden(kind)
-        let tint: Color = kind == .original ? .orange : .teal
+        let tint = AppThemePalette.current.subtitle(translated: kind != .original)
         return ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 4)
-                .fill(.quaternary.opacity(0.25))
+                .fill(AppThemePalette.current.laneBackground(classicOpacity: 0.25))
                 .frame(width: contentWidth)
             ForEach(cues) { cue in
                 SubtitleCueBlockView(

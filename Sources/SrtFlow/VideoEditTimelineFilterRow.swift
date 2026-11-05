@@ -78,17 +78,17 @@ struct FilterBlockView: View, Equatable {
                 Image(systemName: "eye.slash").font(.system(size: 8))
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(AppThemePalette.current.blockLabel(classic: .white))
         .padding(.horizontal, 5)
         .frame(width: width, height: FilterBlockMetrics.height, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill(TrackPalette.filterBlock)
+                .fill(AppThemePalette.current.blockFill(classic: TrackPalette.filterBlock, kind: .filter))
         )
         .timelineHiddenLook(filter.isHidden)
         .overlay {
             if highlighted {
-                RoundedRectangle(cornerRadius: 4).strokeBorder(.white, lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: 4).strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: 1.5)
             }
         }
         // 标记必须排在裁切把手**之前**（同剪辑块：排在后面的话贴着两端的标记会盖住把手）。
@@ -192,7 +192,7 @@ extension VideoEditTimelineView {
     func filterRow(layer: Int) -> some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 4)
-                .fill(.quaternary.opacity(0.25))
+                .fill(AppThemePalette.current.laneBackground(classicOpacity: 0.25))
                 .frame(width: contentWidth)
             ForEach(project.state.filters(onLayer: layer)) { filter in
                 FilterBlockView(

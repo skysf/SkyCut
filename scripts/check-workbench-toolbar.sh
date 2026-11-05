@@ -6,6 +6,9 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp/}skycut-workbench.XXXXXX")"
 trap 'rm -rf "$WORK"' EXIT
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   Sources/SrtFlow/PerfCounters.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/AIActivityBadgeBackground.swift \
   checks/Workbench/ToolbarChecks.swift \
   -o "$WORK/check-workbench"

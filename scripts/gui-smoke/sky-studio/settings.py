@@ -18,7 +18,7 @@ HELPER = D / "SrtFlowSkyStudioSmoke.app/Contents/Helpers/skycut-mcp"
 def preferences(settings):
     sections = settings["sections"]
     return (sections["general"]["language"], sections["cache"]["optimized_media_cache_gb"],
-            sections["sky_studio"]["daily_ai_credit_limit"])
+            sections["sky_studio"]["daily_ai_credit_limit"], sections["general"]["theme"])
 
 
 def run():
@@ -46,6 +46,8 @@ def run():
         schema = tools["set_settings"]["inputSchema"]["properties"]
         assert set(schema["language"]["enum"]) == {
             x["id"] for x in initial["sections"]["general"]["available_languages"]}
+        assert schema["theme"]["enum"] == [x["id"] for x in initial["sections"]["general"]["available_themes"]]
+        assert initial["sections"]["general"]["default_theme"] == "forest"
         assert schema["optimized_media_cache_gb"]["enum"] == initial["sections"]["cache"]["available_cache_gb"]
         for section in initial["sections"]:
             result = call("get_settings", {"section": section})
@@ -61,7 +63,9 @@ def run():
             {"language": "es", "daily_ai_credit_limit": 1_000_001},
             {"language": "es", "daily_ai_credit_limit": 1.5},
             {"language": "es", "daily_ai_credit_limit": "nan"},
-            {"language": "es", "optimized_media_cache_gb": 3},
+            {"language": "es", "optimized_media_cache_gb": 3, "theme": "classic"},
+            {"language": "es", "theme": "unknown"},
+            {"theme": "classic", "daily_ai_credit_limit": -1},
             {"language": "es", "clear_optimized_media_cache": []},
             {"language": "unknown", "daily_ai_credit_limit": 7},
             {"language": "es", "api_key": "not-accepted"},
@@ -95,14 +99,14 @@ def run():
         assert pending["status"] == "needs_confirmation", "Full access must still ask before changing permissions"
         call("set_settings", {"ai_access_mode": "ask_for_approval", "confirm_token": pending["confirm_token"]})
 
-        for language, cap, limit in [("es", 5, 0), ("en", 20, 1_000_000), ("zh-Hans", 10, 750)]:
+        for language, cap, limit, theme in [("es", 5, 0, "classic"), ("en", 20, 1_000_000, "forest"), ("zh-Hans", 10, 750, "forest")]:
             changed = approved_update({"language": language, "optimized_media_cache_gb": cap,
-                                            "daily_ai_credit_limit": limit})
-            assert preferences(changed) == (language, cap, limit)
-            assert preferences(call("get_settings")) == (language, cap, limit)
+                                            "daily_ai_credit_limit": limit, "theme": theme})
+            assert preferences(changed) == (language, cap, limit, theme)
+            assert preferences(call("get_settings")) == (language, cap, limit, theme)
         # 只写一个字段，其余不变；null 与省略一致。
         result = approved_update({"language": None, "daily_ai_credit_limit": "751"})
-        assert preferences(result) == ("zh-Hans", 10, 751)
+        assert preferences(result) == ("zh-Hans", 10, 751, "forest")
 
         # 真实清空路径只碰此轮测试缓存；启动钩子必须先隔离，再开放 MCP 监听。
         cache_dir = D / "optimized-media"
@@ -118,7 +122,7 @@ def run():
         assert (D / "work/motion.mp4").is_file(), "Cache clearing must retain source files"
 
         expected = {"appLanguage": "zh-Hans", "optimizedMedia.capacityBytes": 10_000_000_000,
-                    "SrtFlow.skystudio.dailyCreditLimit": 751}
+                    "SrtFlow.skystudio.dailyCreditLimit": 751, "SrtFlow.ui.theme.v1": "forest"}
         for key, value in expected.items():
             saved = subprocess.check_output(["defaults", "read", DOMAIN, key], text=True).strip()
             assert saved == str(value), ("Not persisted", key, saved)
@@ -131,7 +135,7 @@ def run():
         report = {"result": "passed", "invalid_atomic_updates": len(invalid),
                   "settings": call("get_settings"), "project_count": len(before_projects)}
         (D / "settings-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
-        print("PASS: tool discovery; five sections; schema/store agreement; 11 atomic refusals; language/cache/budget writes; isolated cache clear; persistence; no project/job changes; no keys returned.")
+        print(f"PASS: tool discovery; five sections; schema/store agreement; {len(invalid)} atomic refusals; language/theme/cache/budget writes; isolated cache clear; persistence; no project/job changes; no keys returned.")
     finally:
         mcp.close()
 

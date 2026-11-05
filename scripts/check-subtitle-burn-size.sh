@@ -61,6 +61,9 @@ xcrun swiftc \
   Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/MediaFormatting.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/FontCatalog.swift \
   Sources/SrtFlow/SubtitleFont.swift \
   Sources/SrtFlow/FontFamilyNames.swift \

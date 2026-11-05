@@ -160,6 +160,7 @@ run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" che
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
 run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
 run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
+run_check "app-theme-wiring (presentation roots, settings, timeline colors and MCP)" checks/app-theme-wiring.sh
 run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号、钥匙串、照授权拦和任务只在该在的地方）" checks/sky-studio-wiring.sh
 run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
 run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
@@ -168,6 +169,7 @@ run_check "check-script-source-lists（扫描守卫）" checks/check-script-sour
 # 小包上真走一遍 CI 的 .build 缓存：改过的文件（时间拨早了）照样重编、新 checkout 按内容设时间放回 .build 重编 0 样。
 run_check "ci-build-cache（.build 缓存不拿旧目标文件测新代码，也真省得下编译）" scripts/check-ci-build-cache.sh
 run_check "waveform（波形多级峰值：声道 / 尖峰 / 跨块 / 5.1 / 很多文件同时读）" scripts/check-waveform.sh
+run_check "app-theme (defaults, preferences, palettes and native symbols)" scripts/check-app-theme.sh
 run_check "project-file（工程存盘/重链接）" scripts/check-project-file.sh
 run_check "filters（调色：LUT 数学 + 预览与成片逐像素）" scripts/check-filters.sh
 run_check "mcp（AI 接口：两代客户端的协议、改时间线的规则、客户端配置、词表对账）" scripts/check-mcp.sh

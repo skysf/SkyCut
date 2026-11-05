@@ -101,6 +101,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/ScreenRecordingWriter.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   checks/ScreenRecordingWriter/main.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

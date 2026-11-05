@@ -62,7 +62,7 @@ struct SubtitleCueBlockView: View, Equatable {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         RoundedRectangle(cornerRadius: 3)
-            .fill(tint.opacity(highlighted ? 0.8 : 0.45))
+            .fill(tint.opacity(AppThemePalette.current.isForest ? 1 : (highlighted ? 0.8 : 0.45)))
             .overlay(alignment: .leading) {
                 // 灰显本身还不够（同剪辑块）：得看得出这一句是按 V 藏起来的。块太窄就不画。
                 if isHidden, width > 16 {
@@ -72,7 +72,7 @@ struct SubtitleCueBlockView: View, Equatable {
             .timelineHiddenLook(isHidden)
             .overlay(
                 RoundedRectangle(cornerRadius: 3)
-                    .strokeBorder(.white, lineWidth: highlighted ? 1.2 : 0)
+                    .strokeBorder(AppThemePalette.current.selectionStroke, lineWidth: highlighted ? 1.2 : 0)
             )
             // 宽和高都与框选的命中判定共用常量：画多大就该按多大判，
             // 否则一条 0.05 秒的 cue 框得中却看不见、或反过来。

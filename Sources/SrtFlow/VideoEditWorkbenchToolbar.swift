@@ -35,7 +35,7 @@ struct VideoEditWorkbenchToolbar: ToolbarContent {
                     .background {
                         if showsLibrary {
                             RoundedRectangle(cornerRadius: 5)
-                                .fill(.primary.opacity(0.08))
+                                .fill(AppThemePalette.current.selectionFill)
                         }
                     }
             }

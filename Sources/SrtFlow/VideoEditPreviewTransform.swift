@@ -240,7 +240,7 @@ struct ResizableFrameBox: View {
             // 事件全部放行给下面形状自己的手势。
             let stroke = Rectangle()
                 .strokeBorder(.white, lineWidth: 1.5)
-                .shadow(color: .teal.opacity(0.8), radius: 2)
+                .shadow(color: AppThemePalette.current.dragAccent.opacity(0.8), radius: 2)
                 .frame(width: max(rect.width, 2), height: max(rect.height, 2))
             if movable {
                 stroke

@@ -87,7 +87,7 @@ struct TimelineHeaderColumn: View {
 
     /// 钉住的标尺行底下的不透明底：和右边标尺的底一样高（上面 2pt 是内容的 padding，下面一格是行距）。
     private var pinnedBackdrop: some View {
-        Color(nsColor: .windowBackgroundColor)
+        AppThemePalette.current.window
             .frame(height: 26 + TimelineRowMetrics.inset + rowSpacing)
             .offset(y: -TimelineRowMetrics.inset)
     }
@@ -254,7 +254,10 @@ private struct TimelineHeaderRow: View {
         Group {
             if let slot = row.slot {
                 Capsule()
-                    .fill(project.state.trackAccent(for: slot))
+                    .fill(AppThemePalette.current.trackAccent(
+                        index: project.state.trackColorIndex(for: slot), audio: slot.isAudio,
+                        classic: project.state.trackAccent(for: slot)
+                    ))
                     .frame(width: TimelineHeaderMetrics.accentWidth, height: max(10, row.height - 10))
                     .opacity(row.isHidden ? 0.3 : 1)
             } else {

@@ -292,10 +292,10 @@ struct TimelineDropPlaceholder: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         RoundedRectangle(cornerRadius: 4)
-            .fill(Color.teal.opacity(0.18))
+            .fill(AppThemePalette.current.dragAccent.opacity(0.18))
             .overlay(
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.teal, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
+                    .strokeBorder(AppThemePalette.current.dragAccent, style: StrokeStyle(lineWidth: 1.5, dash: [5, 3]))
             )
             // 0.05 秒的碎块按真实时长只有 1 个点宽，框得有个下限才看得见。
             .frame(width: max(4, span.duration * pps), height: height)

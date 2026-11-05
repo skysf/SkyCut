@@ -15,7 +15,7 @@ extension VideoEditTimelineView {
     var shapesRow: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 4)
-                .fill(.quaternary.opacity(0.25))
+                .fill(AppThemePalette.current.laneBackground(classicOpacity: 0.25))
                 .frame(width: contentWidth)
             ForEach(project.state.shapes) { shape in
                 ShapeBlockView(
@@ -133,7 +133,7 @@ private struct ShapeBlockView: View, Equatable {
         .frame(width: width, height: TimelineMarquee.shapeHeight, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 4)
-                .fill((shape.kind.isCover ? Color.teal : shape.color.swiftUIColor).opacity(0.55))   // 盖一块没有颜色：块用中性的青，和描边形状分得开
+                .fill((shape.kind.isCover ? AppThemePalette.current.dragAccent : shape.color.swiftUIColor).opacity(0.55))   // 盖一块没有内容色，用主题强调色和描边形状分开
         )
         .timelineHiddenLook(shape.isHidden)
         .overlay {

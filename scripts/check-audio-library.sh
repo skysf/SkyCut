@@ -39,6 +39,9 @@ xcrun swiftc \
   Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/AudioLibraryCache.swift \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/SoundEffects/SoundEffectClipGain.swift \
   checks/AudioLibrary/main.swift
 

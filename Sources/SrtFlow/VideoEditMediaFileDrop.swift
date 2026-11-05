@@ -162,11 +162,11 @@ struct MediaFileDropIndicator: View {
         ZStack(alignment: .topLeading) {
             if plan.isProbing {
                 RoundedRectangle(cornerRadius: 4)
-                    .strokeBorder(Color.teal, lineWidth: 2)
+                    .strokeBorder(AppThemePalette.current.dragAccent, lineWidth: 2)
                     .frame(width: fullWidth, height: plan.pointerRowHeight)
                     .offset(y: plan.pointerRowY)
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Color.teal)
+                    .fill(AppThemePalette.current.dragAccent)
                     .frame(width: 2, height: plan.pointerRowHeight)
                     .offset(x: plan.pointerTime * pps - 1, y: plan.pointerRowY)
             } else {

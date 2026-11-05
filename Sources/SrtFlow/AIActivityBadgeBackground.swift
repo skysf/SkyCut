@@ -10,7 +10,7 @@ struct AIActivityBadgeBackground: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         RoundedRectangle(cornerRadius: 7)
-            .fill(Color(nsColor: .windowBackgroundColor))
+            .fill(AppThemePalette.current.window)
             .overlay {
                 RoundedRectangle(cornerRadius: 7)
                     .fill(isWorking ? Color.yellow.opacity(0.22) : Color.primary.opacity(0.06))

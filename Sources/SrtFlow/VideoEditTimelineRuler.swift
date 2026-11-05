@@ -83,7 +83,7 @@ struct TimelinePinnedRuler: View, Equatable {
             // 自带不透明底：它盖在滚上去的轨道行上面，透明的话会看见块从刻度
             // 底下穿过去。上面 2pt 是内容的 padding，下面一格是行距。
             .background(alignment: .top) {
-                Color(nsColor: .windowBackgroundColor)
+                AppThemePalette.current.window
                     .frame(height: 26 + 2 + rowSpacing)
                     .offset(y: -2)
             }
@@ -106,15 +106,15 @@ struct TimelinePlayheadHandle: View {
         let _ = PerfCounters.body(Self.self)
         let playheadX = clock.time * pps
         RoundedRectangle(cornerRadius: 2)
-            .fill(.white)
+            .fill(AppThemePalette.current.playhead)
             .overlay {
                 if selected {
-                    RoundedRectangle(cornerRadius: 2).strokeBorder(.teal, lineWidth: 1.5)
+                    RoundedRectangle(cornerRadius: 2).strokeBorder(AppThemePalette.current.dragAccent, lineWidth: 1.5)
                 }
             }
             .frame(width: 9, height: 14)
             .shadow(radius: 1)
-            .shadow(color: .teal.opacity(selected ? 0.9 : 0), radius: 3)
+            .shadow(color: AppThemePalette.current.dragAccent.opacity(selected ? 0.9 : 0), radius: 3)
             .offset(x: playheadX - 4.5)
             .allowsHitTesting(false)
     }

@@ -36,6 +36,9 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/AppLanguage.swift \
+  Sources/SrtFlow/AppTheme.swift \
+  Sources/SrtFlow/AppThemePalette.swift \
+  Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlow/MediaProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
