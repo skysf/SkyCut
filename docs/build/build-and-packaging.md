@@ -138,6 +138,24 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 - `hdiutil verify` 通过，挂载包与本地 App 主程序字节一致；包内 MCP 初始化报告
   `skycut` / `0.18.57`，ffmpeg 可运行，架构为 arm64。
 
+2026-11-05，用户授权本机安装并更新下载入口，随森林主题发布 **0.18.58**：
+
+- 构建源码：完整 CI 通过的 main `f9d5d63f71c3017af6a64bd19e148daca5e93488`，包含
+  [主题 PR #315](https://github.com/skysf/SkyCut/pull/315)。
+- 产物：`SkyCut-0.18.58-arm64.dmg`，33,122,665 字节；SHA-256：
+  `a0e7ea78f9e5236c389db6bf455da05fc98c49aea4d4a26dc09d4a87aa3df141`。
+- 公开对象：`skycut/SkyCut-0.18.58-a0e7ea78f9e5-arm64.dmg`，使用 immutable 缓存。
+  先上传再从公开直链完整回读，大小、全文件 SHA-256 与本地 DMG 一致。
+- `hdiutil verify`、本地 App 与挂载包内 App 的深度签名均通过；原固定证书不变。
+  两份主程序字节一致，均含主题偏好标记；MCP 初始化报告 `skycut` / `0.18.58`，
+  ffmpeg 可运行，架构为 arm64，包内授权声明为当前 AGPL-3.0。
+- 本机 `/Applications/SkyCut.app` 已替换为同一构建并重新打开原工程；工程文件字节
+  不变、录屏权限仍为 granted，原 App 保留在本机临时备份目录。原生窗口确认森林色
+  和新图标，`get_settings` 报告当前与默认主题均为 `forest`。
+- 个人站的两条固定下载入口由
+  [skystudio PR #13](https://github.com/skysf/skystudio/pull/13) 更新，网站页面与 Vercel
+  官网构建未改变。每次发布仍须执行上述固定入口的完整下载守卫。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。

@@ -187,7 +187,7 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，
-  正式包升级为 `SkyCut-0.18.57-arm64.dmg`；下载入口由个人站仓库的 `_redirects` 管理，
+  森林主题随正式包 `SkyCut-0.18.58-arm64.dmg` 发布；下载入口由个人站仓库的 `_redirects` 管理，
   文件放在既有 R2 的 `skycut/` 前缀。后续每次 App 发布都先验签、上传新版本对象并从
   公开地址读回核对，再更新入口；不是自动取最新本地包。官网网页发布与 App 发版分开，
   只换 DMG 不需要重建或部署 Vercel 官网。证据见 [构建与打包](../build/build-and-packaging.md#公开下载发布)。
