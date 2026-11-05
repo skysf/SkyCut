@@ -51,6 +51,8 @@ struct SkyCutLicense: Equatable, Sendable {
     var planMessage: String?
     var machineLimit: Int?
     var manageMachinesURL: URL?
+    /// 只作说明的续约提醒；失效回答不保留，不能据此改功能开关。
+    var proNotice: SkyCutProNotice?
 
     var isMachineLimited: Bool { planReason == "machine_limit_reached" }
 
@@ -96,7 +98,8 @@ struct SkyCutLicense: Equatable, Sendable {
             planReason: license.planReason,
             planMessage: license.planMessage,
             machineLimit: license.machines?.limit,
-            manageMachinesURL: license.manageMachinesURL
+            manageMachinesURL: license.manageMachinesURL,
+            proNotice: SkyCutProNotice.evaluate(stored, now: now)
         )
     }
 

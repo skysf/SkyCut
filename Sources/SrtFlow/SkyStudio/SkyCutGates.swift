@@ -89,10 +89,40 @@ enum SkyCutGates {
         } else if license.watermark {
             plan["next_step"] = .string("Exports carry the Sky Studio watermark until SkyCut Pro. " + activatePro(license: license))
         }
+        if let notice = license.proNotice {
+            let details = proNoticeJSON(notice)
+            plan["pro_notice"] = .object(details)
+            if plan["next_step"] == nil { plan["next_step"] = details["next_step"] }
+        }
         return .object(plan)
     }
 
     // MARK: 几句话的零件
+
+    /// 设置 / 导出同一份提醒，给 AI 的内容固定英文；只补说明，不参与 aiAllows / watermark。
+    private static func proNoticeJSON(_ notice: SkyCutProNotice) -> [String: JSONValue] {
+        var details: [String: JSONValue]
+        let purpose: String
+        switch notice.kind {
+        case .expiring(let days):
+            details = [
+                "state": .string("expiring"), "days_left": .number(Double(days)),
+                "message": .string("SkyCut Pro expires in \(days) \(days == 1 ? "day" : "days") and will not renew automatically.")
+            ]
+            purpose = "renew SkyCut Pro"
+        case .paymentGrace(let until):
+            let end = day(until)
+            details = [
+                "state": .string("payment_grace"), "until": .string(end),
+                "message": .string("The renewal payment failed. SkyCut Pro is kept until \(end). Please update the payment method for the existing subscription.")
+            ]
+            purpose = "update the payment method for the existing subscription"
+        }
+        let action = notice.actionURL.map { "Ask the user to open \($0.absoluteString) to \(purpose)." }
+            ?? "Ask the user to email \(SkyStudioLinks.supportEmail) to \(purpose)."
+        details["next_step"] = .string(action)
+        return details
+    }
 
     /// 为什么不让用（接在「需要正式版或体验，而」后面）。
     private static func reason(_ license: SkyCutLicense) -> String {

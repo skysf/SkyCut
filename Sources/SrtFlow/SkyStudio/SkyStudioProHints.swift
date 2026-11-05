@@ -85,16 +85,23 @@ struct SkyStudioContactRow: View {
     }
 }
 
-/// 导出面板底栏：这次导出的视频会带 Sky Studio 水印，去管理 Mac / 开通正式版。只出声音时面板不放它（没有画面）。
-/// 只订阅 SkyStudioAccount（授权变了这一行跟着变），不读工程。
+/// 导出面板底栏：水印说明 + Pro 续约提醒。只出声音时不写水印，续约提醒仍显示。
+/// 只订阅 SkyStudioAccount（授权变了提示跟着变），不读工程；台数优先级由共享 proNotice 处理。
 struct ExportWatermarkNotice: View {
+    let isAudioOnly: Bool
     @ObservedObject private var account = SkyStudioAccount.shared
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        if WatermarkPolicy.required(byLicence: account.exportsWithWatermark) {
-            SkyStudioContactRow(license: account.license, isExport: true)
-                .accessibilityIdentifier("export-watermark-notice")
+        let license = account.license
+        VStack(alignment: .leading, spacing: 6) {
+            if !isAudioOnly, WatermarkPolicy.required(byLicence: account.exportsWithWatermark) {
+                SkyStudioContactRow(license: account.license, isExport: true)
+                    .accessibilityIdentifier("export-watermark-notice")
+            }
+            if let notice = license.proNotice {
+                SkyStudioProNoticeRow(notice: notice, isExport: true)
+            }
         }
     }
 }

@@ -4,7 +4,8 @@ import SwiftUI
 //
 // 管什么：收费方案第 5 刀第一步的界面 —— 粘 Key（存进钥匙串、马上问一次）、是哪个账号、免费 / 体验还剩几天 / 正式到哪天、积分余额、
 // 问不成时为什么；不是正式版就写一句怎么开通（SkyStudioContactRow，和导出面板共用：SkyStudioProHints.swift，
-// 台数满了先给管理 Mac，其余有 /me 的购买地址就给链接，否则照旧给邮箱）。只订阅 SkyStudioAccount（一个小对象），不读工程。
+// 台数满了先给管理 Mac，其余有 /me 的购买地址就给链接，否则照旧给邮箱）；正式版按共享 proNotice 提醒续约。
+// 只订阅 SkyStudioAccount（一个小对象），不读工程。
 // 不管什么：Key 怎么存、什么时候问（SkyStudioAccount）、授权怎么算（SkyCutLicense）。
 
 struct SkyStudioSettingsSection: View {
@@ -41,12 +42,17 @@ struct SkyStudioSettingsSection: View {
             }
             if license.plan != .pro || license.isMachineLimited {
                 SkyStudioContactRow(license: license)
-            } else if let message = license.unrecognizedPlanMessage {
-                Text(verbatim: message)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .textSelection(.enabled)
+            } else {
+                if let message = license.unrecognizedPlanMessage {
+                    Text(verbatim: message)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .textSelection(.enabled)
+                }
+                if let notice = license.proNotice {
+                    SkyStudioProNoticeRow(notice: notice)
+                }
             }
         }
     }
