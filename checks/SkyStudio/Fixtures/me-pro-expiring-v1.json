@@ -1,0 +1,26 @@
+{
+  "account": {"id": "contract-user", "email": "someone@example.com"},
+  "credits": {"balance": 1000},
+  "server_time": "2026-11-06T00:00:00Z",
+  "skycut": {
+    "plan": "pro",
+    "account_plan": "pro",
+    "pro_source": "one_time",
+    "trial_started_at": null,
+    "trial_ends_at": null,
+    "trial_unavailable": null,
+    "paid_until": "2026-11-09T00:00:00Z",
+    "features": {"mcp": true, "watermark": false},
+    "valid_until": "2026-11-09T00:00:00Z",
+    "min_version": "0.18.47",
+    "max_running_jobs": 3,
+    "recharge_url": "https://skystudioai.com/app?credits=1",
+    "upgrade_url": "https://skystudioai.com/app/skycut/pro",
+    "manage_machines_url": "https://skystudioai.com/app/skycut/machines",
+    "plan_reason": null,
+    "plan_message": null,
+    "auto_renews": false,
+    "grace_until": null,
+    "machines": {"limit": 2, "used": 1, "window_days": 30, "current_allowed": true}
+  }
+}

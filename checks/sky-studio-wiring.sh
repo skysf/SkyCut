@@ -109,6 +109,23 @@ grep -qF 'Text(verbatim: message)' "${HINTS}" \
   && grep -qF 'license.unrecognizedPlanMessage' "${SECTION}" \
   || fail "未知 plan_reason 必须在设置 / 导出显示服务器的 plan_message"
 
+# 4c. 提醒走同一份纯值，正式版没有水印时和只出音频时也要显示；商务 / 宽限的入口不能改成购买按钮。
+PRO_NOTICE="Sources/SrtFlow/SkyStudio/SkyStudioProNoticeRow.swift"
+[ -f "${PRO_NOTICE}" ] || { fail "找不到 ${PRO_NOTICE}"; exit 1; }
+grep -qF 'if let notice = license.proNotice {' "${SECTION}" \
+  && grep -qF 'SkyStudioProNoticeRow(notice: notice)' "${SECTION}" \
+  && grep -qF 'if let notice = license.proNotice {' "${HINTS}" \
+  && grep -qF 'SkyStudioProNoticeRow(notice: notice, isExport: true)' "${HINTS}" \
+  || fail "设置和导出必须显示当前授权同一份 Pro 提醒"
+grep -qF 'if let url = notice.actionURL {' "${PRO_NOTICE}" \
+  && grep -qF 'Link("Renew SkyCut Pro", destination: url)' "${PRO_NOTICE}" \
+  && grep -qF 'Link("Update Payment Method", destination: url)' "${PRO_NOTICE}" \
+  && grep -qF '.textSelection(.enabled)' "${PRO_NOTICE}" \
+  && grep -qF 'SkyStudioCopyEmailButton(identifier:' "${PRO_NOTICE}" \
+  || fail "Pro 提醒必须用纯值选出的续约 / 更新付款方式地址，或可选中、复制的邮箱"
+grep -qF 'plan["pro_notice"] = .object(details)' Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
+  || fail "get_status 必须向 AI 报同一份 Pro 提醒"
+
 # 5. 照授权拦接在该接的地方（规矩在 SkyCutGates，生不生效看 SkyCutGates.enforced）。
 GATE_AT="$(grep -nF 'if let refusal = await SkyStudioAccount.shared.aiRefusal(for: tool) {' "${ROUTER}" | cut -d: -f1 || true)"
 ARGS_AT="$(grep -nF 'MCPArgumentCheck.problem(tool: tool' "${ROUTER}" | head -1 | cut -d: -f1 || true)"
@@ -123,8 +140,9 @@ for decision in 'SkyCutGates\.aiAllows\(' 'SkyCutGates\.watermark\('; do
 done
 others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | grep -v "^${STATUS_TOOLS}\$" || true)"
 [ -z "${others}" ] || fail "这些文件自己问了 SkyCutGates.enforced：$(tr '\n' ' ' <<<"${others}")—— 只有 SkyStudioAccount 和 get_status 问"
-[ "$(count 'if !isAudioOnly { ExportWatermarkNotice() }' "${SHEET}")" -eq 1 ] \
-  || fail "${SHEET}：导出面板底栏要挂「会带水印」那一行（只出声音时不挂）"
+[ "$(count 'ExportWatermarkNotice(isAudioOnly: isAudioOnly)' "${SHEET}")" -eq 1 ] \
+  && grep -qF 'if !isAudioOnly, WatermarkPolicy.required(byLicence: account.exportsWithWatermark) {' "${HINTS}" \
+  || fail "${SHEET}：底栏要挂授权提醒，只出声音时只隐藏水印说明"
 [ "$(count 'result["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license))' "${EXPORT_TOOLS}")" -eq 1 ] \
   && [ "$(count 'detail["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license))' "${EXPORT_TOOLS}")" -eq 1 ] \
   && [ "$(count 'watermarked: exporter.watermarked' "${EXPORT_TOOLS}")" -eq 1 ] \

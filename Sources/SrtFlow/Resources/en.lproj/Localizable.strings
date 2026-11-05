@@ -1329,3 +1329,14 @@
 "Forest (Default)" = "Forest (Default)";
 
 "Classic" = "Classic";
+
+/* Pro renewal and payment grace notices */
+"To renew, contact %@." = "To renew, contact %@.";
+"For help updating your payment method, contact %@." = "For help updating your payment method, contact %@.";
+"Pro expires in 1 day and will not renew automatically." = "Pro expires in 1 day and will not renew automatically.";
+"Pro expires in %lld days and will not renew automatically." = "Pro expires in %lld days and will not renew automatically.";
+"The renewal payment failed. Pro is kept until %@. Please update your payment method." = "The renewal payment failed. Pro is kept until %@. Please update your payment method.";
+"Renew SkyCut Pro" = "Renew SkyCut Pro";
+"Open Sky Studio to renew SkyCut Pro" = "Open Sky Studio to renew SkyCut Pro";
+"Update Payment Method" = "Update Payment Method";
+"Open Sky Studio to update your payment method" = "Open Sky Studio to update your payment method";

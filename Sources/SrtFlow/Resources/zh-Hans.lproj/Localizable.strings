@@ -1329,3 +1329,14 @@
 "Forest (Default)" = "森林色（默认）";
 
 "Classic" = "经典色";
+
+/* Pro renewal and payment grace notices */
+"To renew, contact %@." = "续约请联系 %@。";
+"For help updating your payment method, contact %@." = "如需帮助更新付款方式，请联系 %@。";
+"Pro expires in 1 day and will not renew automatically." = "Pro 还有 1 天到期，不会自动续费。";
+"Pro expires in %lld days and will not renew automatically." = "Pro 还有 %lld 天到期，不会自动续费。";
+"The renewal payment failed. Pro is kept until %@. Please update your payment method." = "续费扣款没成功，Pro 保留到 %@，请更新付款方式。";
+"Renew SkyCut Pro" = "续约 SkyCut Pro";
+"Open Sky Studio to renew SkyCut Pro" = "打开 Sky Studio 续约 SkyCut Pro";
+"Update Payment Method" = "更新付款方式";
+"Open Sky Studio to update your payment method" = "打开 Sky Studio 更新付款方式";
