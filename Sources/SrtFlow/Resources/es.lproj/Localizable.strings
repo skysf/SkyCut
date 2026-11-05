@@ -1234,6 +1234,10 @@
 "Copy Address" = "Copiar dirección";
 "Copied" = "Copiado";
 "Copy the support email address" = "Copiar la dirección de soporte";
+"Get SkyCut Pro" = "Obtener SkyCut Pro";
+"Open Sky Studio to buy SkyCut Pro" = "Abrir Sky Studio para comprar SkyCut Pro";
+"Activate SkyCut Pro to use AI editing and export without a watermark." = "Activa SkyCut Pro para editar con IA y exportar sin marca de agua.";
+"The video will carry a Sky Studio watermark. Activate SkyCut Pro to export without it." = "El vídeo llevará una marca de agua de Sky Studio. Activa SkyCut Pro para exportar sin ella.";
 "The video will carry a Sky Studio watermark. To export without it, activate SkyCut Pro: email %@ with the email address of your Sky Studio account." = "El video llevará una marca de agua de Sky Studio. Para exportar sin ella, activa SkyCut Pro: escribe a %@ con el correo de tu cuenta de Sky Studio.";
 "SkyCut could not read its watermark logo, so it did not export. Reinstall SkyCut." = "SkyCut no pudo leer el logotipo de la marca de agua, así que no exportó. Vuelve a instalar SkyCut.";
 

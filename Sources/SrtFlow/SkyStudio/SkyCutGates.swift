@@ -36,13 +36,17 @@ enum SkyCutGates {
 
     // MARK: 跟 AI 说的话（英文）
 
-    /// 开通正式版怎么办：和设置里、导出面板上那一句同一个邮箱，正式版由 Sky Studio 后台按账号开，所以要写上账号邮箱。
-    static let activatePro =
-        "To activate SkyCut Pro, the user emails \(SkyStudioLinks.supportEmail) with the email address of their Sky Studio account."
+    /// 开通正式版怎么办：和设置里、导出面板一样，优先用 /me 的购买地址；没有就照旧联系邮箱。
+    static func activatePro(license: SkyCutLicense) -> String {
+        if let url = license.proActivationURL {
+            return "To activate SkyCut Pro, ask the user to open \(url.absoluteString) and buy Pro for their Sky Studio account."
+        }
+        return "To activate SkyCut Pro, the user emails \(SkyStudioLinks.supportEmail) with the email address of their Sky Studio account."
+    }
 
     /// 导出带了水印时告诉 AI：AI 用 look 看成片会看到它，要能跟用户说清楚为什么、怎么去掉。
     static let watermarkNote = "This video carries the Sky Studio watermark (the logo moves between the corners and the center every "
-        + "4 seconds) because SkyCut is not activated as SkyCut Pro; Pro exports without it. " + activatePro
+        + "4 seconds) because SkyCut is not activated as SkyCut Pro; Pro exports without it. " + activatePro(license: .free(.noKey))
 
     /// AI 被挡住时回的话：没做、为什么、请用户做什么。
     static func aiRefusal(license: SkyCutLicense, problem: SkyStudioProblem?, now: Date) -> String {
@@ -67,7 +71,7 @@ enum SkyCutGates {
         if !license.mcp {
             plan["next_step"] = .string(nextStep(license, problem: problem))
         } else if license.watermark {
-            plan["next_step"] = .string("Exports carry the Sky Studio watermark until SkyCut Pro. " + activatePro)
+            plan["next_step"] = .string("Exports carry the Sky Studio watermark until SkyCut Pro. " + activatePro(license: license))
         }
         return .object(plan)
     }
@@ -102,6 +106,7 @@ enum SkyCutGates {
 
     /// 请用户做什么。按钮的名字照设置里「Sky Studio」一节写（Allow…、Check Again）。
     private static func nextStep(_ license: SkyCutLicense, problem: SkyStudioProblem?) -> String {
+        let activatePro = Self.activatePro(license: license)
         let pasteKey = "Ask the user to create an API key in Sky Studio (\(SkyStudioLinks.keysPage.absoluteString), or the avatar at the top "
             + "right → SkyCut) and paste it in SkyCut Settings → Sky Studio. "
         switch problem {

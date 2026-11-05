@@ -44,6 +44,11 @@ struct SkyCutLicense: Equatable, Sendable {
     var validUntil: Date?
     /// 服务器说为什么没给体验（`machine_used`）。
     var trialUnavailable: String?
+    /// 服务器给的购买页，只从还作数的回答读；不会据此改变功能开关。
+    var upgradeURL: URL?
+
+    /// 未开通时去哪里购买。正式版可能有功能 override，不能因此叫用户再买一次。
+    var proActivationURL: URL? { plan == .pro ? nil : upgradeURL }
 
     /// 没有授权：免费版的那一组。
     static func free(_ basis: Basis) -> SkyCutLicense {
@@ -72,7 +77,8 @@ struct SkyCutLicense: Equatable, Sendable {
             trialEndsAt: license.trialEndsAt.map(stored.local),
             paidUntil: license.paidUntil,
             validUntil: validUntil,
-            trialUnavailable: license.trialUnavailable
+            trialUnavailable: license.trialUnavailable,
+            upgradeURL: license.upgradeURL
         )
     }
 

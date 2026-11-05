@@ -7,6 +7,7 @@
 #      502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能把地址指到本机；
 #   5. 此刻的授权（SkyCutLicense）：没有 Key / 没问到过 / 过了 valid_until 都按免费版，服务器的钟换成本机的，钟往回拨不作数，
 #      开关只听服务器的；什么时候再问（SkyStudioRefresh）：前台非正式版 1 分钟 / 正式版 30 分钟、后台 6 小时、失败退避 5 分钟；
+#      自助购买合同 v1 的可选字段（含 pro_source）/ 旧回答 / 合同 fixture / 缓存往返，购买地址进入设置、导出和 AI 共用的此刻授权；
 #   6. 照授权拦（SkyCutGates，第 5 刀第二步）：2026-10-28 起默认打开、测试开关关不掉它；AI 的工具只听 mcp、get_status 永远让；导出的水印听服务器的；
 #      被挡住时回给 AI 的话（没做、为什么、请用户做什么）、get_status 里的 skycut_plan、导出带了水印时那一句；
 #   7. 第 6 刀的任务（生成、upscale、克隆走 Sky Studio）：/models 怎么读、/quote 和 /jobs 发什么、状态和成品怎么读、取消的两种结果、
@@ -101,6 +102,7 @@ xcrun swiftc \
   checks/SkyStudio/APIChecks.swift \
   checks/SkyStudio/LicenseChecks.swift \
   checks/SkyStudio/RefreshChecks.swift \
+  checks/SkyStudio/ProPurchaseChecks.swift \
   checks/SkyStudio/GateChecks.swift \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
