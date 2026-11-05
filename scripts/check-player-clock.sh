@@ -40,6 +40,7 @@ xcrun swiftc \
   checks/PlayerClock/PacedPlayheadChecks.swift \
   checks/PlayerClock/GoToStartChecks.swift \
   checks/PlayerClock/DetachChecks.swift \
+  checks/PlayerClock/AudioSourceChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # 卸片那一项要真的播放器和素材：现做一段 60 秒带声音的小视频（ffmpeg 同 check-text-render：vendor/ffmpeg 或

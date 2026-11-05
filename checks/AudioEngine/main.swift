@@ -19,6 +19,12 @@ func check(_ condition: Bool, _ message: String, line: Int = #line) {
     }
 }
 
+if CommandLine.arguments.contains("--realtime-recovery") {
+    checkRealtimeEngineRecovery()
+    print("\(checks) realtime recovery checks, \(failures) failures")
+    exit(failures == 0 ? 0 : 1)
+}
+
 let ffmpegPath = ProcessInfo.processInfo.environment["SRTFLOW_FFMPEG"]
     ?? FileManager.default.currentDirectoryPath + "/vendor/ffmpeg"
 let root = FileManager.default.temporaryDirectory
@@ -257,6 +263,9 @@ do {
 
 print("==> 13. 换配置：挪一段 / 裁头 / 裁尾 / 变速 / 换文件之后 replace，必须按新的几何出声（只改音量的仍走快路径，Replace.swift）")
 checkReplace(toneC: toneC, toneD: toneD)
+
+print("==> 14. 原生图停止后的恢复：重启、时间连续性、暂停状态（无需声卡）")
+checkEngineRecovery()
 
 print("\(checks) checks, \(failures) failures")
 if failures == 0 { print("All checks passed") }

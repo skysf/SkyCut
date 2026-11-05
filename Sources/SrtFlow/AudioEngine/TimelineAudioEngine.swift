@@ -267,6 +267,29 @@ final class TimelineAudioEngine {
         }
     }
 
+    /// 输出设备换采样率 / 声道时系统会停图，但锚点的 playing 仍然为 true。开播前和播放中由 PlayerClock 检查，
+    /// 不在音频系统的配置通知回调里拆图。mainMixer 到 output 没写死格式，重新 start 会跟随当前设备。
+    /// 手动渲染模式也走同一条恢复路径，自检无需声卡就能验证采样时间归零后的时间连续性。
+    @discardableResult
+    func recoverIfNeeded() throws -> Bool {
+        guard !engine.isRunning else { return false }
+        let seconds = playhead
+        let wasPlaying = isPlaying
+        let frame = Int64((max(0, seconds) * Self.sampleRate).rounded())
+        // 重启后原生采样时间重新从 0 起：旧锚点 / 旧 host 时间不能带过去，否则播放头会等到追上旧采样数才动。
+        anchor.publish(PlaybackAnchor(position: frame, sampleTime: 0, playing: false))
+        renderClock.sampleTime.store(0, ordering: .relaxed)
+        renderClock.hostTime.store(0, ordering: .relaxed)
+        renderClock.quantum.store(0, ordering: .relaxed)
+        try engine.start()
+        if mode == .realtime {
+            running = true
+            startFeeders()
+        }
+        if wasPlaying { play(from: seconds) } else { seek(to: seconds) }
+        return true
+    }
+
     var isPlaying: Bool { anchor.load()?.playing ?? false }
 
     /// 此刻播放头在时间线的第几秒：最近一拍的位置，再按 host 时间补上这一拍已经过去的那一截；停着就是锚点。

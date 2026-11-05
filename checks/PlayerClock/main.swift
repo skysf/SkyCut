@@ -74,6 +74,9 @@ checkGoToStart()
 // 11. 卸片之后晚到的时间回调不许把播放头写回旧位置（新建 / 打开工程）
 checkDetachDropsLateTicks(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
+// 声音主时钟被系统停掉、恢复失败、换引擎和卸片之后的生命周期。
+checkAudioSourceRecovery(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
+
 // 12. 播放头的外推（电平条读它，不问播放器）：停着就是最近一跳；播放中补上过去的时间、最多补一跳；时钟倒退按没过时间算。
 check(PlaybackTimeEstimate.estimate(tick: 8, tickHost: 100, now: 100.02, isPlaying: false, maxLead: 0.05) == 8,
       "停着：就是最近一跳")

@@ -22,6 +22,7 @@ final class PreviewAudioEngineHost {
     func apply(_ config: AudioEngineConfig, clock: PlayerClock, meters: AudioMeterEngine) {
         if let engine {
             engine.replace(config: config)
+            clock.attachAudioSource(engine)  // 卸片会摘时钟；复用引擎也必须重新接上。
             return
         }
         guard let engine = try? TimelineAudioEngine(config: config, mode: .realtime, meters: meters) else { return }
