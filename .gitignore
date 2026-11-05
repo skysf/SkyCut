@@ -85,3 +85,13 @@ AGENTS.local.md
 # 随 App 分发的第三方二进制（用 scripts/vendor-ffmpeg.sh 获取，不入库）
 vendor/
 __pycache__/
+
+# Website dependencies, generated pages and local Vercel identity
+node_modules/
+.vercel/
+website/index.html
+website/en/
+website/zh/
+website/de/
+website/es/
+website/404.html
