@@ -148,11 +148,21 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
   阻止手动 CLI 部署，后者由上述协作规则禁止。规则语义按
   [Vercel Git 配置](https://vercel.com/docs/project-configuration/git-configuration) 执行。
 - Vercel 项目以 `website/` 为根目录、Vite 为框架、`dist` 为输出。
-- 已建立独立项目 `skystudios-projects/skycut-website`，此前的云端地址为
-  `https://skycut-website.vercel.app`。它不是后续开发的评审入口，不再随本地修改更新。
-  尚未绑定 `skycut.app`；邮件服务尚未配置；尚未接通官网仓库的自动部署。以后接通 Git
-  集成时，须以 `website/` 为 Root Directory、`main` 为生产分支，保留上述分支过滤；
-  网站 CI 绿且 PR 已合并后才部署。不能将分支过滤冒充成已完成的自动发布链路。
+- 独立项目为 `skystudios-projects/skycut-website`，正式域名是 `https://skycut.app`，
+  `www.skycut.app` 以 308 跳转到正式域名。Root Directory 为 `website`，Vite / Node 24，
+  `npm ci` 安装、`npm run build` 构建、`dist` 输出；云端地址
+  `https://skycut-website.vercel.app` 不是开发评审入口。
+- **实际发布链路（2026-11-05）**：Vercel GitHub App 尚未安装，仓库自动关联会明确报
+  `Install GitHub App`。目前保持 `gitProviderOptions.createDeployments=disabled`，
+  功能分支和 PR 不创建 Vercel 构建。CI 全绿后通过 PR 合并，再调用 Vercel 的
+  `POST /v13/deployments`，`target=production`、`gitSource.type=github`、
+  `repoId=1315079157`、`ref=main`、`sha` 为刚核对的合并提交。这是从已合并 Git 提交
+  发布，不上传本地文件；不是已经接通自动部署。
+- 首次正式发布为 [PR #309](https://github.com/skysf/SkyCut/pull/309)，main 提交
+  `934579ff120d01214ec798779ec9d7fe70f2fe20`，Vercel 部署
+  `dpl_9kNSMvUQTFARnfC3GVAxFm5E74P5` 为 READY。以后若接通 GitHub App，仍须只放行
+  `main`，保留 `vercel.json` 的分支过滤；不能给功能分支或 PR 开 Preview。
+  邮件服务尚未配置，单独开通与验收。
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。当前公开跳转是 0.18.47；源码有更新的
@@ -225,6 +235,13 @@ Safari 桌面逐一观察三个视频的真实画面、循环、播放头与字�
 SEO 产物审计与原生 `scripts/check-local.sh` 扫描守卫全部通过；sitemap XML 为 12 个
 页面 / 60 个语言链接。浏览器 PNG / ICO 与 Apple touch icon 已改用官方 App 图标。
 真实邮件服务仍未配置，表单按合同显示尚未开放；本次官网发布不包含邮件服务开通或 App 发版。
+
+正式域名验收（2026-11-05）：PR 和合并提交的 CI 全绿，Vercel 从上述准确 main SHA
+构建成功，未上传本地工作区。线上 17 个页面为 200、未知路径为 404，sitemap 为 12 项 /
+60 个语言链接，robots 与 CSP 正常；ICO、三张 PNG、四个演示 MP4 和中文分享卡片与本地
+源文件逐字节一致，视频 Range 请求为 206。`www` 跳转与公开下载的 GET 302 已确认；
+订阅 API 返回 `ready:false`。线上仅验证 HTTP 与资源合同；三端画面和交互证据仍是前文的
+本地 Safari 验收，不能把 HTTP 检查冒充线上浏览器实测。
 
 人工：桌面、iPad、手机宽度；主标题最多两到三行；语言、菜单、播放、下载、三种登记；
 WebGL 与静态回退、减少动态效果、暂停、滚出视口停止渲染；浏览器控制台和网络错误；
