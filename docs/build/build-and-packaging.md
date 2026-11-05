@@ -103,6 +103,41 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
   （断言数会随功能增长，以当次输出为准）
 - 涉及 UI 改动时按 `docs/testing/gui-smoke-testing.md` 做真实窗口验证
 
+## 公开下载发布
+
+官网按钮和软件包分开管理。`skycut.app` 使用固定入口 `https://skylu.ai/download/skycut`，
+由个人站仓库 `skysf/skystudio` 的 `_redirects` 将有 / 无尾斜杠两个入口 302 到
+`https://downloads.skylu.ai/skycut/SkyCut-<版本>-<内容标识>-arm64.dmg`。因此单独更新软件包不需要
+重建 Vercel 官网，也不要在官网里写死版本 URL。
+
+流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包，用原固定身份验签；核对包内版本、
+arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App。再复用 `scripts/r2.py`
+上传新版本对象（凭证位置见该文件开头），从公开地址完整读回，比对大小与 SHA-256 后，
+才在个人站隔离分支修改两条重定向，检查、PR 合并并等待 Cloudflare Pages 发布。
+最后从固定入口实际下载核对新包。版本文件给 immutable 缓存，不能用新内容覆盖旧版本名。
+上传前不要用公开正式 URL 探测“文件还不存在”：当前 CDN 会把 404 缓存 4 小时，HEAD
+也会踩中；需要探测时用存储 API。发布对象带 DMG 内容哈希前缀，先上传、再访问公开 URL。
+遇到已缓存的 404 时使用未被探测过的内容寻址版本对象，不扩大令牌权限或清空整个站点缓存。
+
+发布守卫 `python3 scripts/check-release-download.py <本地已验证的.dmg> --url <候选直链>`
+核对实际 HTTP 200、下载域名、大小和全文件 SHA-256；切换入口后不带 `--url` 再跑一次，
+会经正式入口验证 302 后拿到的完整内容。任一不符非零退出，不把 206 局部下载算完整验证。
+它不进每个 PR 的 check-all：CI 没有本地签名包，且未发布的候选不能要求线上已存在。
+CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查；反向验证见
+[新下载地址的 404 缓存](../bugfixes/2026-11-05-release-download-cached-404.md)。
+
+2026-11-05，用户明确授权替换旧下载包，发布 **0.18.57**：
+
+- 构建源码：已通过 CI 的 main `6aa24d2de7479504edeb044e9748c2cefb105be2`。
+- 产物：`SkyCut-0.18.57-arm64.dmg`，33,105,257 字节；原来的本地测试包保留，不将
+  `0.18.56-local.*.officialfilm` 当成正式版本上传。
+- SHA-256：`32b9118d79e509d6e02b937c50b7baa85c439a60feb1a60d00a0f807471bfd68`。
+- 公开对象：`skycut/SkyCut-0.18.57-32b9118d79e5-arm64.dmg`，上传后完整下载回读一致。
+- 本地包和 DMG 内 App 的深度签名校验通过，均钉在仓库原签名证书
+  `76d275650223bc09efe7708900458dbdb0ab90ef`；未重建证书，未退回 ad-hoc。
+- `hdiutil verify` 通过，挂载包与本地 App 主程序字节一致；包内 MCP 初始化报告
+  `skycut` / `0.18.57`，ffmpeg 可运行，架构为 arm64。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
