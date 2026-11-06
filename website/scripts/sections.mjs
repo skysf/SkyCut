@@ -57,7 +57,7 @@ export function signup(c) {
     <div class="signup-choices">${[['newsletter',c.newsletterChoice],['intel',c.intelChoice],['windows',c.windowsChoice]].map(([key,label]) => `<label class="choice"><input type="checkbox" name="${key}" value="true"><span>${e(label)}</span></label>`).join('')}</div>
     <label class="email-language" for="email-language">${e(c.languageLabel)}<select id="email-language" name="language">${[['en','English'],['zh','简体中文'],['de','Deutsch'],['es','Español']].map(([lang,name]) => `<option value="${lang}" ${lang === c.lang ? 'selected' : ''}>${name}</option>`).join('')}</select></label>
     <div class="honey" aria-hidden="true"><label>Website<input name="website" tabindex="-1" autocomplete="off"></label></div>
-    <div id="turnstile"></div><p class="form-note">${e(c.consent)} <a href="/${c.lang}/privacy/">${e(c.privacy)}</a></p><p class="form-message" role="status" aria-live="polite"></p><noscript><p>${e(c.noJs)}</p></noscript></form>
+    <p class="form-note">${e(c.consent)} <a href="/${c.lang}/privacy/">${e(c.privacy)}</a></p><p class="form-message" role="status" aria-live="polite"></p><noscript><p>${e(c.noJs)}</p></noscript></form>
   </div></section>`;
 }
 

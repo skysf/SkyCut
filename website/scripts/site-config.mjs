@@ -2,7 +2,7 @@
 export const ORIGIN='https://skycut.app';
 export const LANGUAGES=['en','zh','de','es'];
 export const LANGUAGE_TAGS={en:'en',zh:'zh-CN',de:'de',es:'es'};
-export const PAGES=['','docs','privacy','confirmed'];
+export const PAGES=['','docs','privacy'];
 export const INDEXABLE_PAGES=['','docs','privacy'];
 export const DOWNLOAD_URL='https://skylu.ai/download/skycut';
 export const FOUNDER_URL='https://skylu.ai/founder/';

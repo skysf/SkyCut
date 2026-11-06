@@ -57,8 +57,6 @@ for(const language of languages) {
       assert.doesNotMatch(html,/localhost|127\.0\.0\.1|github\.com|vercel\.app/);
     }
     assert.equal(new Set(descriptions).size,3,'home docs and privacy must not reuse one generic description');
-    const confirmation=render(c,'confirmed');
-    assert.equal(meta(confirmation,'robots'),'noindex,follow');
   });
 }
 test('the sitemap contains only the twelve public canonical pages with reciprocal language links',()=>{
@@ -76,7 +74,7 @@ test('the sitemap contains only the twelve public canonical pages with reciproca
     for(const language of languages)assert.ok(entry.includes(`hreflang="${tags[language]}" href="https://skycut.app/${language}/${route?route+'/':''}"`));
     assert.ok(entry.includes(`hreflang="x-default" href="https://skycut.app/en/${route?route+'/':''}"`));
   }
-  assert.doesNotMatch(sitemap,/confirmed|404|updates|localhost|vercel|<lastmod>|<priority>|<changefreq>/);
+  assert.doesNotMatch(sitemap,/404|updates|localhost|vercel|<lastmod>|<priority>|<changefreq>/);
   const robots=renderRobots();
   assert.match(robots,/Sitemap: https:\/\/skycut\.app\/sitemap\.xml/);
   assert.match(robots,/Disallow: \/api\//);

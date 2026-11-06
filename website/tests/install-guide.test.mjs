@@ -44,7 +44,7 @@ for(const language of ['en','zh','de','es']) {
     assert.equal(object.duration,'PT32.5S');
     assert.equal(object.caption.contentUrl,`https://skycut.app/media/guides/how-to-install-skycut-on-mac.${tag}.vtt`);
     assert.equal(object.caption.inLanguage,tag);assert.equal(object.caption.encodingFormat,'text/vtt');
-    for(const kind of ['','privacy','confirmed'])assert.doesNotMatch(render(c,kind),/"@type":"VideoObject"/);
+    for(const kind of ['','privacy'])assert.doesNotMatch(render(c,kind),/"@type":"VideoObject"/);
   });
 }
 

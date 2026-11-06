@@ -61,13 +61,12 @@ export default {
   consent: 'Wähle deine Themen Jederzeit abbestellbar',
   privacy: 'Datenschutz', subscriptionTitle: 'Nur die Neuigkeiten die du willst',
   subscriptionBody: 'Plattform-Updates Newsletter oder beides',
-  subscribeSuccess: 'Bestätige deine Auswahl über die E-Mail in deinem Postfach',
-  subscribeConfirmed: 'Bestätigung abgeschlossen Schön dass du dabei bist',
+  subscribeSuccess: 'Du bist auf der Liste Wir melden uns per E-Mail wenn es Neuigkeiten gibt',
   subscribeUnavailable: 'Die E-Mail-Anmeldung ist noch nicht geöffnet Bitte versuche es später erneut',
-  subscribeError: 'Die Bestätigung konnte nicht gesendet werden Bitte versuche es erneut',
+  subscribeError: 'Deine Auswahl konnte nicht gespeichert werden Bitte versuche es später erneut',
   subscribeInvalid: 'Gib eine gültige E-Mail-Adresse ein und wähle mindestens ein Thema',
   subscribeBusy: 'Warte bitte einen Moment und versuche es erneut',
-  subscribeSending: 'Wird gesendet',
+  subscribeSending: 'Wird gespeichert',
   noJs: 'Aktiviere JavaScript für die E-Mail-Anmeldung Der übrige Inhalt funktioniert auch ohne',
   footer: 'Du führst Regie Die KI schneidet', by: 'Von Sky Lu', support: 'Kontakt',
   docsTitle: 'Am Anfang steht eine Idee.', docsLead: 'Vier Schritte zu deinem ersten Schnitt.',
@@ -90,12 +89,11 @@ export default {
   privacyTitle: 'Dein Postfach. Deine Wahl.',
   privacyLead: 'Welche Daten diese Website erfasst und warum.',
   privacySections: [
-    ['E-Mail-Updates', 'Bei einer Anmeldung senden wir E-Mail-Adresse, gewählte Themen, Sprache und Zustimmungszeit an Brevo, um die Mailingliste zu verwalten. Das Abonnement wird nach deiner Bestätigung per E-Mail aktiv. Plattform-Benachrichtigungen und Newsletter sind getrennte Optionen.'],
-    ['Abbestellen', 'Über den Abmeldelink in einer E-Mail kannst du weitere Updates abbestellen. Bei Fragen zum Abonnement oder zur Löschung hilft der Support.'],
+    ['E-Mail-Updates', 'Bei der Anmeldung erfassen wir deine E-Mail-Adresse, deine drei Auswahlmöglichkeiten (SkyCut-Newsletter, Verfügbarkeit für Intel-Macs und Verfügbarkeit für Windows), deine Sprache sowie den Anmelde- und Aktualisierungszeitpunkt. Wir speichern diese Daten in einer Google-Tabelle von Sky Studio; Google ist dabei unser Auftragsverarbeiter. Wir nutzen die Daten nur für die von dir gewählten Benachrichtigungen.'],
+    ['Speicherdauer und Abbestellen', 'Wir speichern deine Anmeldedaten, bis du die Benachrichtigungen abbestellst oder ihre Löschung verlangst. Zum Abbestellen oder Löschen deiner Daten schreibe an support@skycut.app.'],
     ['Website-Einstellungen', 'Wir speichern deine Sprach- und Animationsauswahl im Browser und setzen keine Werbetracker ein. Hosting- und E-Mail-Anbieter können technische Informationen verarbeiten, die zur Bereitstellung ihrer Dienste nötig sind.'],
     ['Film und Downloads', 'Beim Abspielen der Demo wird das Video von downloads.skylu.ai geladen. Der Mac-App-Download führt zum bestehenden Download-Dienst von Sky Lu.'],
     ['Die Mac-App', 'Diese Seite beschreibt die Website. Verbundene KI-Tools und Sky Studio-Dienste verarbeiten Daten nach ihren eigenen Bedingungen. Dein Schnittprojekt bleibt auf dem Mac; für Cloud-Anfragen verwendete Inhalte können an den gewählten Dienst gesendet werden.']
   ],
-  errorTitle: 'Kurz neben der Timeline.', errorBody: 'Diese Seite gibt es nicht. Zurück zum Anfang.',
-  confirmedTitle: 'Du bist auf der Liste.', confirmedBody: 'Danke für die Bestätigung. Du erhältst nur die gewählten Updates.'
+  errorTitle: 'Kurz neben der Timeline.', errorBody: 'Diese Seite gibt es nicht. Zurück zum Anfang.'
 };

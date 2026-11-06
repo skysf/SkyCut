@@ -61,13 +61,12 @@ export default {
   consent: 'Elige qué quieres recibir Puedes darte de baja cuando quieras',
   privacy: 'Privacidad', subscriptionTitle: 'Solo las noticias que quieres',
   subscriptionBody: 'Elige avisos de plataforma la newsletter o ambos',
-  subscribeSuccess: 'Revisa tu correo para confirmar tu selección',
-  subscribeConfirmed: 'Confirmación completada Gracias por unirte',
+  subscribeSuccess: 'Ya estás en la lista Te escribiremos cuando haya novedades',
   subscribeUnavailable: 'El registro por correo aún no está abierto Inténtalo más tarde',
-  subscribeError: 'No pudimos enviar la confirmación Inténtalo de nuevo',
+  subscribeError: 'No pudimos guardar tu selección Inténtalo más tarde',
   subscribeInvalid: 'Introduce un correo válido y elige al menos un tipo de aviso',
   subscribeBusy: 'Espera un momento antes de intentarlo de nuevo',
-  subscribeSending: 'Enviando',
+  subscribeSending: 'Guardando',
   noJs: 'Activa JavaScript para registrarte por correo El resto del sitio funciona sin él',
   footer: 'Tú diriges La IA edita', by: 'Por Sky Lu', support: 'Contacto',
   docsTitle: 'Todo empieza con una idea.', docsLead: 'Cuatro pasos para tu primera edición.',
@@ -90,12 +89,11 @@ export default {
   privacyTitle: 'Tu correo. Tú eliges.',
   privacyLead: 'Qué recoge este sitio y para qué.',
   privacySections: [
-    ['Novedades por correo', 'Al registrarte, enviamos tu correo, avisos elegidos, idioma y fecha de consentimiento a Brevo para gestionar la lista. La suscripción se activa tras tu confirmación por correo. Los avisos de plataforma y la newsletter son opciones separadas.'],
-    ['Darte de baja', 'Usa el enlace de baja de un correo para dejar de recibir novedades. Puedes contactar con soporte para resolver dudas sobre la suscripción o solicitar la eliminación de tus datos.'],
+    ['Novedades por correo', 'Al registrarte, recogemos tu correo, tus tres opciones (newsletter de SkyCut, disponibilidad para Mac Intel y disponibilidad para Windows), tu idioma y las fechas de registro y actualización. Guardamos estos datos en una hoja de Google de Sky Studio, con Google como encargado del tratamiento. Solo los usamos para enviarte los tipos de avisos que eliges.'],
+    ['Conservación y baja', 'Conservamos tus datos de registro hasta que te des de baja o solicites su eliminación. Para darte de baja o eliminar tus datos, escribe a support@skycut.app.'],
     ['Preferencias del sitio', 'Guardamos tus preferencias de idioma y animación en el navegador. No añadimos rastreadores publicitarios. Los proveedores de alojamiento y correo pueden procesar información técnica necesaria para prestar sus servicios.'],
     ['Corto y descargas', 'Al reproducir la demo se carga vídeo desde downloads.skylu.ai. La descarga de la app para Mac te lleva al servicio de descargas existente de Sky Lu.'],
     ['La app para Mac', 'Esta página describe el sitio web. Las herramientas de IA conectadas y los servicios de Sky Studio tienen sus propios procesos de datos. Tu proyecto de edición permanece en el Mac; el contenido usado en una solicitud a la nube puede enviarse al servicio que elijas.']
   ],
-  errorTitle: 'Un poco fuera de la línea de tiempo.', errorBody: 'Esta página no está aquí. Volvamos al inicio.',
-  confirmedTitle: 'Ya estás en la lista.', confirmedBody: 'Gracias por confirmar. Solo recibirás los avisos que elegiste.'
+  errorTitle: 'Un poco fuera de la línea de tiempo.', errorBody: 'Esta página no está aquí. Volvamos al inicio.'
 };

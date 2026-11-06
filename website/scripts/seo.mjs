@@ -2,7 +2,7 @@
 import {escape as e} from './html.mjs';
 import {ORIGIN,LANGUAGES,LANGUAGE_TAGS,INDEXABLE_PAGES,FOUNDER_URL,pageURL} from './site-config.mjs';
 import {structuredData,serializeStructuredData} from './structured-data.mjs';
-const titleKeys={docs:'docsTitle',privacy:'privacyTitle',confirmed:'confirmedTitle',error:'errorTitle'};
+const titleKeys={docs:'docsTitle',privacy:'privacyTitle',error:'errorTitle'};
 const locales={en:'en_US',zh:'zh_CN',de:'de_DE',es:'es_ES'};
 export function pageMetadata(c,kind='') {
   return {

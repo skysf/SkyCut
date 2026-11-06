@@ -1,4 +1,4 @@
-// Vercel Node endpoint: validate, challenge and request Brevo double opt-in. No mailing-list sends.
+// Vercel Node endpoint: validate and save choices to the signup sheet. No email sends.
 import {createHash} from 'node:crypto';
 import {validateSubscription,subscriptionConfig,permittedOrigins} from '../server/subscription-policy.js';
 const attempts=new Map();
@@ -20,11 +20,12 @@ async function readBody(req) {
   for await(const chunk of req) {bytes+=Buffer.byteLength(chunk);if(bytes>4096)throw new Error('body_size');chunks.push(chunk);}
   return JSON.parse(Buffer.concat(chunks.map(c=>Buffer.from(c))).toString('utf8'));
 }
-export function createHandler({env=process.env,fetcher=fetch,clock=Date.now}={}) {
+export function createHandler({env=process.env,fetcher=fetch,clock=Date.now,requestTimeoutMs=15000}={}) {
   return async function subscribe(req,res) {
-    const send=(status,code,extra={})=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify({code,...extra}));};
+    const json=(status,payload)=>{res.statusCode=status;res.setHeader('Content-Type','application/json; charset=utf-8');res.setHeader('Cache-Control','no-store');res.end(JSON.stringify(payload));};
+    const send=(status,code)=>json(status,{code});
     const config=subscriptionConfig(env);
-    if(req.method==='GET')return send(200,'configuration',{ready:config.ready,siteKey:config.ready?config.siteKey:null});
+    if(req.method==='GET')return json(200,{ready:config.ready});
     if(req.method!=='POST') {res.setHeader('Allow','GET, POST');return send(405,'method');}
     const origin=req.headers.origin;
     if(!permittedOrigins(env).has(origin))return send(403,'origin');
@@ -36,20 +37,20 @@ export function createHandler({env=process.env,fetcher=fetch,clock=Date.now}={})
     if(!config.ready)return send(503,'unavailable');
     const ip=String(req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '').split(',')[0].trim();
     if(rateLimited(ip,clock())) {res.setHeader('Retry-After','60');return send(429,'rate_limited');}
+    // A filled honeypot receives the same acknowledgement without reaching the sheet.
+    if(subscription.website)return send(200,'registered');
     try {
-      const challengeResponse=await fetcher('https://challenges.cloudflare.com/turnstile/v0/siteverify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({secret:config.secret,response:subscription.token,remoteip:ip}),signal:AbortSignal.timeout(8000)});
-      if(!challengeResponse.ok)return send(503,'unavailable');
-      const proof=await challengeResponse.json();
-      const hostname=new URL(origin).hostname;
-      if(!proof.success || proof.hostname!==hostname || proof.action!=='subscribe')return send(400,'challenge');
-      const result=await fetcher('https://api.brevo.com/v3/contacts/doubleOptinConfirmation',{
-        method:'POST',headers:{'Content-Type':'application/json','api-key':config.key},
-        body:JSON.stringify({email:subscription.email,includeListIds:subscription.choices.map(k=>config.lists[k]),templateId:config.templates[subscription.language],redirectionUrl:`${origin}/${subscription.language}/confirmed/`,attributes:{SRTFLOW_LANGUAGE:subscription.language,SRTFLOW_CONSENT_AT:new Date(clock()).toISOString(),SRTFLOW_SOURCE:'https://skycut.app'}}),
-        signal:AbortSignal.timeout(10000)
+      const {email,newsletter,intel,windows,language}=subscription;
+      const result=await fetcher(config.url,{
+        method:'POST',headers:{'Content-Type':'application/json'},redirect:'follow',
+        body:JSON.stringify({secret:config.secret,email,newsletter,intel,windows,language}),
+        signal:AbortSignal.timeout(requestTimeoutMs)
       });
-      if(!result.ok)return send(result.status===429?429:502,result.status===429?'rate_limited':'delivery');
-      return send(200,'confirmation_sent');
-    } catch {return send(503,'unavailable');}
+      if(!result.ok)return send(502,'upstream');
+      const acknowledgement=await result.json();
+      if(acknowledgement?.ok!==true || Object.keys(acknowledgement).length!==1)return send(502,'upstream');
+      return send(200,'registered');
+    } catch {return send(502,'upstream');}
   };
 }
 export default createHandler();

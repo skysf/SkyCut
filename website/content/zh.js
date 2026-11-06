@@ -61,13 +61,12 @@ export default {
   consent: '选择你想收到的内容 随时可以退订',
   privacy: '隐私', subscriptionTitle: '只收你想要的消息',
   subscriptionBody: '选择平台上线通知 产品简报 或两者都选',
-  subscribeSuccess: '请到邮箱确认你的订阅选择',
-  subscribeConfirmed: '确认完成 欢迎加入',
+  subscribeSuccess: '已经记下了 有消息会发邮件给你',
   subscribeUnavailable: '邮件登记暂未开放 请稍后再试',
-  subscribeError: '确认邮件未能发送 请重试',
+  subscribeError: '暂时未能保存 请稍后再试',
   subscribeInvalid: '请填写有效邮箱 并选择至少一种消息',
   subscribeBusy: '请稍等片刻再试',
-  subscribeSending: '正在发送',
+  subscribeSending: '正在提交',
   noJs: '邮件登记需要启用 JavaScript 其余网站内容仍可浏览',
   footer: '你来导演 AI 来剪辑', by: '由 Sky Lu 创作', support: '联系',
   docsTitle: '从一个想法开始。', docsLead: '四步，开始第一次剪辑。',
@@ -90,12 +89,11 @@ export default {
   privacyTitle: '你的邮箱，你来选择。',
   privacyLead: '这个网站收集什么，以及为什么。',
   privacySections: [
-    ['邮件消息', '登记后，我们将邮箱地址、所选消息、语言和同意时间发送给 Brevo，用于管理订阅名单。你通过邮件确认后，订阅才会生效。平台上线通知与产品简报分开选择。'],
-    ['退订', '点击邮件中的退订链接，即可停止接收消息。订阅问题或删除请求，也可以联系支持。'],
+    ['邮件消息', '登记时，我们收集邮箱地址、三个选择（SkyCut 产品简报、Intel Mac 版上线通知、Windows 版上线通知）、语言，以及登记和更新时间。数据保存在 Sky Studio 的 Google 表格中，Google 是数据处理方。我们只用这些数据发送你选择的那几类通知。'],
+    ['保留时间与退订', '我们保留登记数据，直到你退订或要求删除。退订或删除数据，请写信给 support@skycut.app。'],
     ['网站偏好', '我们在浏览器中保存语言和动画偏好，不添加广告追踪器。托管和邮件服务商可能处理提供服务所需的技术信息。'],
     ['短片与下载', '播放演示时会从 downloads.skylu.ai 加载视频。下载 Mac App 会跳转到现有的 Sky Lu 下载服务。'],
     ['Mac App', '本页说明的是网站。连接的 AI 工具和 Sky Studio 服务有各自的数据处理方式。剪辑工程保存在 Mac 上；云端请求所需的内容可能发送到你选择的服务。']
   ],
-  errorTitle: '稍微偏离了时间线。', errorBody: '这个页面不存在，回首页看看吧。',
-  confirmedTitle: '你已加入名单。', confirmedBody: '感谢确认，我们只会发送你选择的消息。'
+  errorTitle: '稍微偏离了时间线。', errorBody: '这个页面不存在，回首页看看吧。'
 };

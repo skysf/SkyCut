@@ -28,7 +28,7 @@ for(const language of languages) {
     assert.doesNotMatch(section,/<form|dodo|iframe/i);
     if(language==='zh') assert.ok(text.includes('微信支付一次性买一年 ¥999 不会自动续费'));
     else assert.doesNotMatch(section,/微信|WeChat|¥|CNY/);
-    for(const kind of ['docs','privacy','confirmed','error']) {
+    for(const kind of ['docs','privacy','error']) {
       const page=render(c,kind);
       assert.ok(page.includes(`href="/${language}/#pricing"`));
       assert.doesNotMatch(page,/id="pricing"/);

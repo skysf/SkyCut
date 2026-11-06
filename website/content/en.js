@@ -61,13 +61,12 @@ export default {
   consent: 'Choose what you want to receive Unsubscribe anytime',
   privacy: 'Privacy', subscriptionTitle: 'Get the news you want',
   subscriptionBody: 'Choose a platform update the newsletter or both',
-  subscribeSuccess: 'Check your inbox to confirm your choices',
-  subscribeConfirmed: 'Your confirmation is complete Thanks for joining us',
+  subscribeSuccess: 'You are on the list We will email you when there is news',
   subscribeUnavailable: 'Email sign-up is not open yet Please try again later',
-  subscribeError: 'We could not send the confirmation Please try again',
+  subscribeError: 'We could not save your choices Please try again later',
   subscribeInvalid: 'Enter a valid email and choose at least one update',
   subscribeBusy: 'Please wait a moment before trying again',
-  subscribeSending: 'Sending',
+  subscribeSending: 'Saving',
   noJs: 'Enable JavaScript to use email sign-up The rest of the site works without it',
   footer: 'You direct AI edits', by: 'By Sky Lu', support: 'Contact',
   docsTitle: 'Start with an idea.', docsLead: 'Four steps to your first edit.',
@@ -90,12 +89,11 @@ export default {
   privacyTitle: 'Your inbox. Your choice.',
   privacyLead: 'What this website collects and why.',
   privacySections: [
-    ['Email updates', 'If you sign up, we send your email address, chosen updates, language and consent time to Brevo to manage the mailing list. Your subscription is activated after you confirm by email. Platform notifications and the newsletter are separate choices.'],
-    ['Unsubscribe', 'Use the unsubscribe link in an email to stop receiving updates. You can contact support for help with your subscription or deletion request.'],
+    ['Email updates', 'When you sign up, we collect your email address, your three choices (SkyCut newsletter, Intel Mac availability and Windows availability), your language, and signup and update times. We store these in a Google spreadsheet belonging to Sky Studio, with Google acting as our data processor. We use them only to send the types of notifications you select.'],
+    ['Retention and unsubscribe', 'We keep your signup data until you unsubscribe or request deletion. To unsubscribe or have your data deleted, email support@skycut.app.'],
     ['Website preferences', 'We store your language and animation preference in your browser. We do not add advertising trackers. Hosting and email providers may process technical information needed to deliver their services.'],
     ['Film and downloads', 'Playing the demo loads video from downloads.skylu.ai. Downloading the Mac app takes you to the existing Sky Lu download service.'],
     ['The Mac app', 'This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose.']
   ],
-  errorTitle: 'A little off the timeline.', errorBody: 'That page is not here. Let’s get you back.',
-  confirmedTitle: 'You’re on the list.', confirmedBody: 'Thanks for confirming. We’ll keep it to the updates you chose.'
+  errorTitle: 'A little off the timeline.', errorBody: 'That page is not here. Let’s get you back.'
 };

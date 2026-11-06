@@ -4,7 +4,7 @@
 
 2026-11-04 用户定稿：域名 `skycut.app`，Vercel Pro；C 版暖白 / 森林绿。
 英文、简体中文、德文、西班牙文，与个人站相同。主文案短，桌面左右排、iPad 上下排、
-手机简化三维场景；不是把桌面截图缩小。首页、文档、隐私、邮箱确认页均生成静态 HTML。
+手机简化三维场景；不是把桌面截图缩小。首页、文档、隐私页均生成静态 HTML。
 
 代码位于 `website/`，与 Mac App 的 Swift 构建分开。Vite 仅打包本地依赖；Three.js
 动态加载，WebGL 不可用、减少动态效果时使用 CSS 静态时间线。GSAP 只增强滚动，不把
@@ -181,8 +181,7 @@ sitemap 与 canonical 仍为 12 个 URL。
 - 只有首页、文档、隐私三类 × 四语言 = **12 个 canonical URL** 进入 `sitemap.xml`。
   每项都列四种语言与英文 `x-default`，与 HTML 的 reciprocal hreflang 对齐。
   根目录英文副本 canonical 指向 `/en/`，不重复进入 sitemap。
-- 确认页与 404 为 `noindex,follow`，不进 sitemap；404 canonical 指向自己的
-  `/404.html`，不能指成首页。不通过 robots 禁止抓取确认页，否则爬虫看不到 noindex。
+- 404 为 `noindex,follow`，不进 sitemap；canonical 指向自己的 `/404.html`，不能指成首页。
   `robots.txt` 开放页面、屏蔽 `/api/` 并声明正式域名的 sitemap 地址。
   不把本机构建日期当成页面修改日期伪造 `lastmod`，不填无实际依据的更新时间。
 - 分享图片是四张 1200 × 630 PNG，沿用暖白 / 森林绿和 Outfit 字体，分别对应页面语言，
@@ -191,7 +190,7 @@ sitemap 与 canonical 仍为 12 个 URL。
   可通过 `--cjk-font` 传入字体，默认使用 macOS 黑体。普通 `npm run build` 只复制已生成
   的公共图片，不依赖 Python。当前工具进程若以 x86 运行而 Pillow 为 arm64，可使用
   `arch -arm64 python3 scripts/build-social-images.py`。
-- `npm run check:seo` 在 Vite 构建后读取实际 `dist`，核对 16 个语言页面、根目录副本、
+- `npm run check:seo` 在 Vite 构建后读取实际 `dist`，核对 12 个语言页面、根目录副本、
   404、JSON-LD、图片、构建资源、robots 与 sitemap；源模板测试不能代替这个产物检查。
   `tests/seo.test.mjs` 另外核对路由摘要、实体关系、语言互链、真实 PNG 尺寸与 JSON 安全序列化。
 - 最终合并部署后再验证正式域名 HTTP 状态、实际分享预览，并在 Google Search Console
@@ -252,41 +251,77 @@ sitemap 与 canonical 仍为 12 个 URL。
 
 ## 邮件登记合同
 
-平台上线通知（Intel / Windows）与 newsletter 三个选择独立，初始均不勾选。
-只传邮箱、语言、选择和同意时间。服务端调用 Brevo double opt-in；收到服务商的成功
-响应后才显示“请查邮箱确认”，不能直接宣称已订阅。名单只在用户点确认后加入。
-确认链接由 Brevo 生成，不在网站伪造；`confirmed` 只是完成后的提示页。
+2026-11-07 用户确定：现在只收集邮箱，直接写进 Sky Studio 自己 Google 账号中的
+Google 表格，不发邮件、不做双重确认。原 Brevo 和 Turnstile 从未配置；为这一步引入
+发信账户、邮件模板、独立名单和机器人挂件超出当前需要，因此移除相关代码和环境变量。
+以后需要发送 newsletter 时再导出表格、单独选择发信服务，本次不接入。
 
-部署需要以下服务端环境变量，身份名遵循既有 `SRTFLOW_` 前缀：
+平台上线通知（Intel / Windows）与 newsletter 三个选择独立，初始均不勾选。
+四语言成功文案表示“已经记下，有消息会发邮件”，不要求去邮箱确认；不再生成专用确认页。
+隐私页说明邮箱、三个选择、语言、登记与更新时间，数据保存在 Sky Studio 的 Google
+表格，Google 是数据处理方；只发送所选通知，保留至退订或要求删除。退订或删除写信给
+`support@skycut.app`，表单保留“随时可以退订”。
+
+部署只需要两个服务端环境变量，身份名沿用 `SRTFLOW_` 前缀：
 
 | 环境变量 | 作用 |
 | --- | --- |
-| `SRTFLOW_BREVO_API_KEY` | Brevo API 凭据，仅服务端 |
-| `SRTFLOW_BREVO_LIST_NEWSLETTER` / `_INTEL` / `_WINDOWS` | 三份独立名单的正整数 id |
-| `SRTFLOW_BREVO_DOI_EN` / `_ZH` / `_DE` / `_ES` | 四语言 double-opt-in 模板 id |
-| `SRTFLOW_TURNSTILE_SITE_KEY` | 网站公开的 Turnstile site key |
-| `SRTFLOW_TURNSTILE_SECRET_KEY` | 仅服务端验证挑战 |
+| `SRTFLOW_SIGNUP_SHEET_URL` | 必须完整匹配 `https://script.google.com/macros/s/<id>/exec`，id 只含字母、数字、下划线或连字符，不带端口、查询或片段 |
+| `SRTFLOW_SIGNUP_SHEET_SECRET` | 至少 32 个字符的共享密钥，与 Apps Script 的 `SECRET` 一致，不能用空白凑长度 |
 
-Brevo 联系人自定义文本属性需建 `SRTFLOW_LANGUAGE`、`SRTFLOW_CONSENT_AT`、
-`SRTFLOW_SOURCE`。四个邮件模板必须是可用于 DOI 的模板，带提供方的确认链接。
-账户、发送域名、退订页、模板和名单未设置前，`GET /api/subscribe` 返回 `ready:false`，
-提交返回 503；不写内存当持久化、不假成功、不把邮箱写日志。所有密钥均不进页面和仓库。
+两个都有效时 `GET /api/subscribe` 只返回 `{"ready":true}`，否则只返回
+`{"ready":false}`，普通提交返回 503。URL 和密钥不进页面；邮箱不写日志。
+用户部署的脚本原样保存在 `website/integrations/signup-sheet.gs`，仓库中密钥仍是
+`REPLACE_WITH_SECRET` 占位符。脚本由用户自己绑定表格并部署为 web app，不由网站创建
+或部署；修改脚本合同须先与用户确认。
 
-生产处理器验证来源、请求体大小、字段、Turnstile 的 hostname / action 后再调 Brevo。
-单实例限频只是附加守卫，主要机器人验证由 Turnstile 承担。外部请求有超时、不自动重发。
-免费服务的发送额度与标识按服务商当前套餐；正式发 newsletter 必须保留退订入口。
+浏览器仍只 POST 到同源 `/api/subscribe`。处理器校验来源、JSON 类型、4 KiB 上限、
+邮箱、三个布尔选择（至少一项）和 `en` / `zh` / `de` / `es` 语言；拒绝额外字段。
+邮箱 trim 并转小写，首字符不得是表格公式起始字符，遵守脚本已有验证。隐藏蜜罐
+`website` 非空时回同样成功，跳过表格写入。单实例每 IP 每分钟最多五次，限频是附加
+守卫，不是跨实例的全局额度，也不代替将来按实际滥用情况调整。
+
+服务端以 `Content-Type: application/json` 向上述地址 POST，字段只有：
+
+```json
+{"secret":"...","email":"...","newsletter":false,"intel":true,"windows":false,"language":"en"}
+```
+
+Apps Script 先返回 302，再跳到 `script.googleusercontent.com`；fetch 必须跟随，
+POST 遇到 302 转为 GET，读取最终输出。只有最终 2xx 且 JSON 为 `{"ok":true}` 才回
+`{"code":"registered"}`；`{"ok":false,"error":"bad_request"|"forbidden"|"bad_email"}`、
+其他 JSON、HTML、非 2xx、网络错误与超时都返回 502 / `upstream`，前端提示稍后再试。
+不自动重发；重复邮箱由脚本合并选择，不新增一行，网站不做另一份去重。
+
+用户已部署脚本并实测四次：包含 302 的往返为 4.3–6.4 秒；错密钥、坏邮箱、成功写入与
+邮箱大小写变化后的再次登记均符合合同。这是用户提供的上游实测，网站测试仍只用假服务。
+处理器的请求超时是 **15 秒**，覆盖重定向与读 JSON；`vercel.json` 给
+`api/subscribe.js` 显式设置 **20 秒** `maxDuration`（按
+[Vercel 函数时长配置](https://vercel.com/docs/functions/configuring-functions/duration)）。
+浏览器请求保留 20 秒超时，提交期间按钮显示“正在提交”、禁用并设置忙碌状态；控制器在
+等配置和等结果期间都锁住提交，结束后恢复按钮，失败保留用户填写的内容。
 
 ## 日常品牌邮件
 
-用户决定保留私人 Gmail 接收 Cloudflare 转发，用 Thunderbird 统一读写、SMTP2GO 发
-品牌回复。newsletter 批量发送在 Brevo 管理；其回复可以指回品牌邮箱。网站代码不读取
-私人 Gmail，不接入个人邮件内容；注册邮箱服务与客户端授权单独完成。
+2026-11-06 起使用 **Zoho Mail Lite**：一个邮箱 `support@skystudioai.com`，两个别名
+`sky@skystudioai.com`、`support@skycut.app`。回复自动使用收到来信的那个地址。
+`skystudioai.com` 与 `skycut.app` 两个域名的 MX、SPF、DKIM（选择器 `zmail`）、DMARC
+均按 Zoho 配置。newsletter 的发信服务以后另定，不再沿用私人 Gmail 转发、Thunderbird
+与 SMTP2GO 的旧方案。网站代码不读取品牌邮箱或个人邮件。
 
 ## 验收
 
 自动：四语言同结构、严格简中匹配、静态页面和资源引用、真实 HTTP 调用生产处理器、
-独立选择、DOI 请求、来源伪造、超量 / 畸形输入、机器人挑战、限频、上游失败与未配置。
-测试用假提供方，不发真实邮件、不创建联系人。
+表格请求字段和共享密钥、独立选择、严格 JSON 成功回执、302 跟随、来源伪造、超量 /
+畸形输入、蜜罐、限频、上游失败、超时与未配置，以及提交按钮忙碌状态和防重复提交。
+测试用本机假表格服务，不调用真实 Google 地址、不写真实表格、不发邮件。
+
+表格登记验收（2026-11-07）：70 项网站测试、本地生产构建、12 个语言页面的 SEO
+产物审计和原生 `scripts/check-local.sh docs-index-drift` 通过；Apps Script 与用户提供的
+部署版逐字节一致。Chrome 本地开发预览检查桌面与 390 × 844 手机表单，两个宽度均
+显示“邮件登记暂未开放”，三项选择、语言、退订说明和按钮排版正常，保留两张截图。
+首次扫描因沙箱拒绝读取 `sysctl` 中止，获准重跑后全部守卫通过。未请求真实表格、
+未部署或修改 Vercel 环境变量；PR 的 `check-all` 通过后等待用户 review，再决定合并。
 
 首版验收（2026-11-04）：16 项网站测试通过、生产构建通过、仓库
 `scripts/check-guards.sh` 通过。Chrome 检查桌面、834 × 1112 iPad、390 × 844
@@ -331,5 +366,5 @@ WebGL 与静态回退、减少动态效果、暂停、滚出视口停止渲染�
 暂停后画面和转台一起停止、手机/桌面切换仍为同一播放进度；
 三个 AI 演示的阶段定位、重播、自动 / 手动切换七种字幕、暂停与后台恢复、
 720p 到 1080p 换源之后保持同一播放位置；真实手机 / iPad 硬件仍需最后验收。
-生产邮件配置后必须做真实自有邮箱确认、核对名单、退订、两域名实际收发。未完成的明确
-报告，不能把处理器的模拟测试当成真实投递验收。
+正式配置表格后由用户用自有邮箱核对实际新增、重复登记合并选择和退订 / 删除流程。
+品牌邮箱两域名实际收发另行验收；模拟测试不能当成真实写表或投递证据。
