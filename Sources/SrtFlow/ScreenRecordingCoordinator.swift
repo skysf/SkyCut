@@ -56,13 +56,12 @@ final class ScreenRecordingCoordinator: ObservableObject {
     /// 重新造出来（复审 P1-1 / P1-8）。每个 await 之后都要 `isCurrent(epoch)`。
     private var sessionEpoch = 0
 
-    let store: ScreenRecordingManifestStore
+    let store = ScreenRecordingManifestStore(
+        applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0],
+        bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow"
+    )
 
-    private init() {
-        let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("SrtFlow", isDirectory: true)
-        store = ScreenRecordingManifestStore(directory: support)
-    }
+    private init() {}
 
     /// 录制中必须锁工程切换。**执行入口**要查它，不能只靠按钮 disabled。
     var locksProjectSwitching: Bool { state.locksProjectSwitching }

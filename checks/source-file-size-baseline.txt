@@ -3,14 +3,14 @@
 # 降到上限以内会自动删掉这一行；它不会替新的超标文件登记，也不会替长了的文件抬线。
 # 改名时手改路径。规范见 docs/architecture/coding-standards.md。
 678 Sources/SrtFlow/ScreenRecordingCoordinator+Setup.swift
-772 Sources/SrtFlow/ScreenRecordingCoordinator.swift
+771 Sources/SrtFlow/ScreenRecordingCoordinator.swift
 638 Sources/SrtFlow/ScreenRecordingWriter.swift
 846 Sources/SrtFlow/VideoEditCompositionBuilder.swift
 717 Sources/SrtFlow/VideoEditMediaFileDrop.swift
 935 Sources/SrtFlow/VideoEditModels.swift
 1204 Sources/SrtFlow/VideoEditProject.swift
-978 Sources/SrtFlowCore/ScreenRecordingModels.swift
-1276 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
+922 Sources/SrtFlowCore/ScreenRecordingModels.swift
+1223 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
 690 Sources/SrtFlowCoreChecks/main.swift
 650 checks/PreviewComposition/main.swift
 2495 checks/ProjectFile/main.swift

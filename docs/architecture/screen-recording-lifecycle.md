@@ -2,8 +2,9 @@
 
 > 2026-08-07 随录屏 Phase 2 地基落地。案例背景（三轮复审各抓出什么）见
 > [bugfixes/2026-08-07-screen-recording-foundation-review.md](../bugfixes/2026-08-07-screen-recording-foundation-review.md)。
-> 类型都在 `Sources/SrtFlowCore/ScreenRecordingModels.swift`，自检在
-> `SrtFlowCoreChecks/ScreenRecordingChecks.swift`。
+> 状态与恢复值类型在 `Sources/SrtFlowCore/ScreenRecordingModels.swift`；账本存储在
+> `ScreenRecordingManifestStore.swift`。自检在 `SrtFlowCoreChecks/ScreenRecordingChecks.swift`
+> 与 `ScreenRecordingManifestStoreChecks.swift`。
 
 ## 状态机（`ScreenRecordingState`）
 
@@ -19,6 +20,25 @@
    `locksProjectSwitching`，不能只靠按钮 disabled（计划 §3.4）。
 
 ## 提交 journal（`ScreenRecordingManifest` + `ScreenRecordingManifestStore`）
+
+### 构建身份与旧账本（2026-11-06）
+
+- **账本必须按完整 bundle id 隔离**：`~/Library/Application Support/<bundle id>/active-recording-manifest.json`，
+  与 `mcp.sock` 的正常位置同目录。正式版 `com.srtflow.SrtFlow`、Beta `com.srtflow.SrtFlow.beta`、Dev、
+  冒烟构建各用自己的身份；同一身份升级后继续恢复自己的账。身份沿用 SrtFlow，见 [产品名与代码名](product-name.md)。
+- App 只经 `ScreenRecordingManifestStore(applicationSupport:bundleIdentifier:)` 定位。
+  **启动恢复、开录前的未结账检查、持久化与清账只能碰自己的 store**。
+  本进程处于 `.idle` 不能证明别的构建没有在录；不能用这道状态闸代替身份隔离。
+- **彻底停止读取旧共用位置 `Application Support/SrtFlow/active-recording-manifest.json`**：
+  不回退、不迁移、不清账，也不探测或删除它点名的临时媒体。旧格式没有构建归属，可能仍由旧版本写盘。
+  SkyCut 目前只有本机用户，选择保留原样，不自动恢复这份历史账本；确需找回时等相关 App 全部停止录制后人工处理。
+  这不更名或搬动 `SrtFlow/` 下的配音、风格等共享资源。
+
+回归：核心自检在临时目录中实写四种身份，验证各自重启读取、写入和清账互不干扰，旧账本及临时媒体字节不变；
+`checks/screen-recording-ai-wiring.sh` 第 14 条钉住生产入口，避免纯值测试通过但协调者仍读旧位置。
+案例见 [不同构建接管正在录制的账本](../bugfixes/2026-11-06-screen-recording-manifest-cross-build.md)。
+
+### 持久化与恢复合同
 
 1. **每次 rename 之前先持久化意向**（committingMain / committingMicrophone），
    之后再推进到已提交阶段。协议全文见 `CommitStage` 的文档注释。
@@ -161,3 +181,13 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
   坐标类接线尤其危险 —— 主屏原点为零，给错坐标系在主屏上完全看不出来。
 - 自检二进制的清理**不能用顶层 `defer`** —— 结尾是 `exit()`，而 `exit()` 不跑
   defer（previewcheck 曾因此攒了 52 个临时目录）。统一走显式清理出口。
+
+## 人工回归：多构建并行录制
+
+发版前在允许操作 App 时实机验证（本次任务禁止碰用户窗口，未执行）：
+
+1. Beta 用 `record_screen` 录制至少一分钟；期间首次打开正式版，Beta 必须持续录制、停止后文件可读且正常入轨。
+2. 对调正式版与 Beta 再走一次；账本只出现在各自 bundle id 的目录，另一构建的启动、开录与清账均不动它。
+3. 同一构建真实崩溃后重启仍提示自己的可恢复结果；旧共用账本和点名的临时媒体始终保留原样。
+4. 用户先按浮窗 Stop、已入轨后，再调 `record_screen action=stop`：应明确没有正在录制的会话，
+   返回最近结果与原 job id，不得误报什么都没录到。此项用户已报告异常，本次仅记录，见上述案例的旁查。
