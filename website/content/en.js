@@ -1,6 +1,7 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-en.js';
 import {prices} from './pricing.js';
+import compare from './comparison-en.js';
 // English copy for the public website. Product behavior remains in the Mac app.
 export default {
   showcase, seo:seoCopy.en,
@@ -27,17 +28,16 @@ export default {
   downloadNote: 'Current public Mac release Intel and Windows are not available yet',
   getting: 'Getting started',
   pricing: {
-    ...prices('en'),
+    ...prices('en'), compare,
     title: 'Pricing', intro: 'Start free Bring AI to your timeline with Pro',
     trial: '7 days of Pro for every new account',
     free: 'Free', freePrice: 'Free download',
-    freeFeatures: ['Manual editing as usual', 'Exports with a Sky Studio watermark', 'AI editing requires Pro'],
-    pro: 'Pro', proIntro: 'Your ideas with AI Your exports without a watermark',
-    proFeatures: ['AI editing through MCP with Claude or Codex', 'Exports without a watermark'],
+    equivalent: 'Equivalent to', billedYearly: 'Billed yearly', save: 'Save', savingsPeriod: 'compared with 12 monthly payments',
+    pro: 'Pro',
     monthlyLabel: 'Monthly', yearlyLabel: 'Yearly', month: '/ month', year: '/ year',
     monthlyCredits: 'No credits included', yearlyCredits: '1,000 Sky Studio credits for each paid year',
     buy: 'Get Pro', login: 'Sign in to Sky Studio to purchase',
-    devices: 'One account One person Up to 2 Macs',
+    devices: 'Pro is for one person on up to 2 Macs',
     clients: 'Bring your own Claude or Codex client',
     tax: 'Prices exclude tax Local taxes added at checkout',
     cancel: 'Cancel auto renewal anytime Keep Pro through your paid period',
