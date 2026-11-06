@@ -68,7 +68,8 @@ Release 构建 → 手写 Info.plist 组装 `dist/SkyCut.app`（SwiftPM 的可�
 vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Contents/Helpers/`，
 见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)）→ 生成图标 → 签名（只经 `scripts/signing/sign-app.sh`：
 **先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 skycut-mcp 这一条；
-用固定的签名身份签，见下一节）→ `hdiutil` 生成 DMG。
+用固定的签名身份签，见下方签名一节）→ `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
+再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）。
 
 产物：`dist/SkyCut.app`（约 52 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
 
@@ -76,6 +77,44 @@ vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Con
 脚本兜底取最近的 git tag，并在 HEAD 领先该 tag 时警告「这是开发版产物」——
 以前这里是写死的默认值，发到 0.4.1 了还停在 0.3.0，打出过贴错版本号的包，
 见 [bugfixes/2026-08-06-build-version-and-shell-traps.md](../bugfixes/2026-08-06-build-version-and-shell-traps.md)。
+
+## DMG 安装窗口（2026-11-06 起）
+
+根目录只显示 `SkyCut.app` 和指向 `/Applications` 的 `Applications` 软链。首次打开说明直接在
+Finder 背景中展示，不再放「首次打开必读 - Read Me First.txt」。App 仍用原自签名证书、暂不做
+Apple 公证：背景教用户拖入应用程序，以及第一次被拦下时到「系统设置 › 隐私与安全性 › 仍要打开」。
+中英文在同一张图上，教程地址为 `skycut.app/zh/docs` 和 `skycut.app/en/docs`，视频以后补到这些页面。
+终端 `xattr` 兜底由 App 需要时自己显示，不放在安装图上。
+
+- 图稿唯一来源：`scripts/dmg/make-background.swift`，只用系统 AppKit / Core Graphics 和系统字体。
+  配色是暖白 `#f3f0e8`、森林绿 `#123f32`、深色正文；所有像素使用自己的不透明底色，不跟随系统深浅色变色。
+  每次打包现生成 760×560（72 dpi）和 1520×1120（144 dpi）的 PNG，再用
+  `tiffutil -cathidpicheck` 合成 `/.background/background.tiff` 的两种分辨率。
+- 布局源：`packaging/dmg/DS_Store`，打包时拷成卷根的 `.DS_Store`。窗口框固定
+  `{{120, 120}, {760, 648}}`（为标题栏及用户开启的路径 / 状态栏留出空间，图稿 760×560），图标 128 point，App / Applications
+  中心为 `(200, 164)` / `(560, 164)`，分别在箭头两头；隐藏工具栏和侧栏；同时声明关闭状态栏 / 路径栏，现代 Finder 可能沿用用户的这两项全局偏好，窗口高度仍能容下完整引导。
+  背景 alias 使用卷内 `.background/background.tiff`，不携带开发机路径、卷 UUID 或 inode。
+  `scripts/build-dmg.sh` **不控制 Finder、不调用 Apple Events**，正常打包不会申请「控制访达」权限。
+- 模板可重复生成：只在主动改窗口布局时，临时安装 `ds-store==1.3.3`、`mac-alias==2.2.3`
+  到 `/private/tmp/skycut-dmg-template-tools`，再执行
+  `PYTHONPATH=/private/tmp/skycut-dmg-template-tools python3 scripts/dmg/make-layout.py`。
+  这两个一次性工具不进正式依赖，打包和 CI 都不 import 它们。提交新模板前必须真挂载验收，
+  图标坐标改动时同步图稿和 `scripts/dmg/check-layout.py` 的布局合同。
+- 扫描守卫：`checks/dmg-packaging.sh` 钉正常打包接线、命名和不带旧 txt / Finder 自动化，
+  用标准库解析模板的实际叶记录检查窗口、背景 alias 和图标位置。
+- 产物检查：`scripts/check-dmg.sh` 不带参数时用小型 App 夹具真走生产组装器并挂载只读 DMG，
+  检查背景、布局、软链、无 txt，并解码 TIFF 验两种像素尺寸 / DPI 和完整图稿。带 DMG 路径时验完整包。
+  两条都在 `scripts/check-all.sh`，本地运行 `arch -arm64 /bin/bash scripts/check-local.sh dmg`。
+
+Finder 的真实渲染属于人工回归，每次改图稿 / 模板后以及发版前要检查：
+
+1. 用开发版本号（例如 `VERSION=0.18.60-dmgtest arch -arm64 /bin/bash scripts/build-app.sh`）
+   打测试包，再运行 `arch -arm64 /bin/bash scripts/check-dmg.sh dist/SkyCut-0.18.60-dmgtest-arm64.dmg`。
+2. 挂载到独立临时目录，保留用户已打开的安装盘和 Finder 窗口；在 Finder 新窗口中打开测试卷。
+   确认背景自动显示、两图标在箭头两头、三步中英文完整，Retina 屏上字体清楚、图标标签能读。
+   深浅色下背景本身底色不变；不要为了验收打断用户工作、切换全系统外观。
+3. 截图只存 `/private/tmp` 并在交接写路径，不入库；关闭本次开的窗口，卸载本次测试卷。
+4. 删除测试 DMG 和同版 `dist/SkyCut.app`，避免未发布版本留在 `dist/`；不安装、不上传、不发版。
 
 ## 签名：一把固定的自签名证书（2026-10-03 起）
 
@@ -106,6 +145,7 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
   不是 `cdhash H"…"`（是的话就是退回了 ad-hoc，别发）
 - `swift run --arch arm64 SrtFlowCoreChecks` → "All 184 checks passed."
   （断言数会随功能增长，以当次输出为准）
+- DMG：`/bin/bash scripts/check-dmg.sh dist/SkyCut-<版本>-arm64.dmg` 通过；按上节真开 Finder 验背景、图标位置和 Retina。
 - 涉及 UI 改动时按 `docs/testing/gui-smoke-testing.md` 做真实窗口验证
 
 ## 公开下载发布

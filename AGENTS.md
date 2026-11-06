@@ -65,6 +65,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 打包与签名（2026-10-03 起）
 
+- DMG 使用脚本生成的双语 Retina 安装引导背景和固定 Finder 布局，不带旧 txt；正常打包不自动控制 Finder。
+  生成 / 模板更新和真挂载验收见 [构建与打包](docs/build/build-and-packaging.md)「DMG 安装窗口」。
+
 - 装给用户的包（正式版、测试版）和发版的包，只用固定的签名身份签：`scripts/build-app.sh`、`build-beta-app.sh` 自动经
   `scripts/signing/sign-app.sh` 签。它打出「⚠️ 没有发布用的签名身份，退回 ad-hoc」的包**不许装给用户、不许发版**：ad-hoc 的
   每个版本在 macOS 眼里都是另一个 App，录屏、麦克风、下载文件夹、钥匙串的授权全部作废，录屏那条拨开关都救不回来。
@@ -204,7 +207,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
-- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收、公开下载发布（含 0.18.59 的签名包与下载回读记录）：
+- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](docs/build/build-and-packaging.md)。
 - 音频库素材的制备与上传（音乐：选曲 → 规格化 → manifest → R2；音效：手写目录 → 峰值归一 + 落点 → manifest → R2）：
   [docs/build/audio-library-pipeline.md](docs/build/audio-library-pipeline.md)。
@@ -381,6 +384,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
+- DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。
 - 发布版用固定的签名身份签（打包脚本只经 `scripts/signing/sign-app.sh`、它有身份就用并核对钉着的证书、ad-hoc 只在没有身份那一支、
   `packaging/signing-identity.sha1` 钉着正好一把），录自定义区域请求授权之前先删钉着旧签名的记录、`tccutil` 只在一处、文案不再叫人
   「关掉再打开」：`checks/release-signing.sh`。建签名身份 `scripts/signing/create-identity.sh` 是一次性的、**不在 `check-all.sh` 里**。
