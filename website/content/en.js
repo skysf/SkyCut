@@ -71,6 +71,11 @@ export default {
   noJs: 'Enable JavaScript to use email sign-up The rest of the site works without it',
   footer: 'You direct AI edits', by: 'By Sky Lu', support: 'Contact',
   docsTitle: 'Start with an idea.', docsLead: 'Four steps to your first edit.',
+  docsVideo: {
+    title: 'How to install SkyCut on Mac',
+    description: 'Install SkyCut and open it for the first time. This silent recording has subtitles on by default.',
+    fallback: 'Download the installation video',
+  },
   docsSteps: [
     ['Install SkyCut', 'Download the Mac release, open the disk image and move SkyCut to Applications. You need an Apple silicon Mac and macOS 15 or later.'],
     ['Bring in your footage', 'Create a project and import your clips. Arrange video, sound and subtitles on the timeline.'],

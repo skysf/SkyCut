@@ -2,6 +2,7 @@
 import { homepage, escape as e } from './sections.mjs';
 import { icon } from '../src/icons.js';
 import {seoHead} from './seo.mjs';
+import {installGuide} from './install-guide.mjs';
 import {LANGUAGES,LANGUAGE_TAGS,FOUNDER_URL,STUDIO_URL} from './site-config.mjs';
 export const languages=LANGUAGES;
 const titles = { docs: 'docsTitle', privacy: 'privacyTitle', confirmed: 'confirmedTitle', error: 'errorTitle' };
@@ -15,7 +16,7 @@ function footer(c) {
   return `<footer class="site-footer container"><div><a class="wordmark" href="/${c.lang}/">SkyCut</a><p>${e(c.footer)}</p></div><div class="footer-links"><a href="/${c.lang}/#pricing">${e(c.pricing.title)}</a><a href="/${c.lang}/docs/">${e(c.nav[1])}</a><a href="/${c.lang}/privacy/">${e(c.privacy)}</a><a href="mailto:support@skystudioai.com">${e(c.support)}</a></div><div class="footer-bottom"><div class="footer-credit"><a href="${FOUNDER_URL}?lang=${c.lang}" target="_blank" rel="author noopener">${e(c.seo.founderLabel)}${icon('arrow')}</a><a href="${STUDIO_URL}" target="_blank" rel="noopener">${e(c.seo.familyLabel)}${icon('arrow')}</a></div><span>© ${new Date().getUTCFullYear()} SkyCut</span></div></footer>`;
 }
 function document(c, kind) {
-  if (kind === 'docs') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.docsTitle)}</h1><p class="lead">${e(c.docsLead)}</p><div class="steps">${c.docsSteps.map(([h,p],i) => `<article><span class="step-number">${i + 1}</span><div><h2>${e(h)}</h2><p>${e(p)}</p></div></article>`).join('')}</div><aside class="note"><h2>${e(c.docsCompatibility)}</h2><p>${e(c.docsCompatibilityBody)}</p></aside><h2>${e(c.docsClients)}</h2><p>${e(c.docsClientsBody)}</p><div class="hero-actions"><a class="button" href="https://skystudioai.com/app?skycut=1" target="_blank" rel="noopener">${e(c.docsKey)}${icon('arrow')}</a></div></section>`;
+  if (kind === 'docs') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.docsTitle)}</h1><p class="lead">${e(c.docsLead)}</p><div class="steps">${c.docsSteps.map(([h,p],i) => `<article><span class="step-number">${i + 1}</span><div><h2>${e(h)}</h2><p>${e(p)}</p></div></article>${i===0?installGuide(c):''}`).join('')}</div><aside class="note"><h2>${e(c.docsCompatibility)}</h2><p>${e(c.docsCompatibilityBody)}</p></aside><h2>${e(c.docsClients)}</h2><p>${e(c.docsClientsBody)}</p><div class="hero-actions"><a class="button" href="https://skystudioai.com/app?skycut=1" target="_blank" rel="noopener">${e(c.docsKey)}${icon('arrow')}</a></div></section>`;
   if (kind === 'privacy') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.privacyTitle)}</h1><p class="lead">${e(c.privacyLead)}</p>${c.privacySections.map(([h,p]) => `<h2>${e(h)}</h2><p>${e(p)}</p>`).join('')}<a class="text-link" href="mailto:support@skystudioai.com">support@skystudioai.com${icon('arrow')}</a></section>`;
   return `<section class="document centered container"><h1>${e(c[titles[kind]])}</h1><p class="lead">${e(c[kind === 'error' ? 'errorBody' : 'confirmedBody'])}</p><a class="button" href="/${c.lang}/">${e(c.back)}${icon('arrow')}</a></section>`;
 }
