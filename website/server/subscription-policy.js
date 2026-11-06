@@ -3,24 +3,23 @@ const choices=['newsletter','intel','windows'];
 const locales=['en','zh','de','es'];
 export function validateSubscription(body) {
   if(!body || typeof body!=='object' || Array.isArray(body))return null;
-  const allowed=new Set(['email','newsletter','intel','windows','language','website','token']);
+  const allowed=new Set(['email','newsletter','intel','windows','language','website']);
   if(Object.keys(body).some(key=>!allowed.has(key)))return null;
   if(typeof body.email!=='string' || body.email.length>254)return null;
   const email=body.email.trim().toLowerCase();
-  if(!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))return null;
+  // Match the sheet's restriction on leading spreadsheet formula characters.
+  if(!/^[^\s@<>=+\-][^\s@<>]*@[^\s@<>]+\.[^\s@<>]+$/.test(email))return null;
   if(choices.some(key=>typeof body[key]!=='boolean'))return null;
   if(!choices.some(key=>body[key]) || !locales.includes(body.language))return null;
-  if(body.website!=='' || typeof body.token!=='string' || body.token.length<1 || body.token.length>2048)return null;
-  return {email,language:body.language,choices:choices.filter(key=>body[key]),token:body.token};
+  if(typeof body.website!=='string')return null;
+  return {email,language:body.language,newsletter:body.newsletter,intel:body.intel,windows:body.windows,website:body.website};
 }
-function id(value) {return /^\d+$/.test(value || '') && Number(value)>0?Number(value):null;}
 export function subscriptionConfig(env=process.env) {
-  const lists=Object.fromEntries(choices.map(key=>[key,id(env[`SRTFLOW_BREVO_LIST_${key.toUpperCase()}`])]));
-  const templates=Object.fromEntries(locales.map(key=>[key,id(env[`SRTFLOW_BREVO_DOI_${key.toUpperCase()}`])]));
-  const key=env.SRTFLOW_BREVO_API_KEY;
-  const siteKey=env.SRTFLOW_TURNSTILE_SITE_KEY;
-  const secret=env.SRTFLOW_TURNSTILE_SECRET_KEY;
-  return {lists,templates,key,siteKey,secret,ready:Boolean(key && siteKey && secret && Object.values(lists).every(Boolean) && Object.values(templates).every(Boolean))};
+  const url=env.SRTFLOW_SIGNUP_SHEET_URL;
+  const secret=env.SRTFLOW_SIGNUP_SHEET_SECRET;
+  const ready=typeof url==='string' && url===url.trim() && /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(url)
+    && typeof secret==='string' && secret.trim().length>=32;
+  return {url,secret,ready};
 }
 export function permittedOrigins(env=process.env) {
   const values=['https://skycut.app','https://www.skycut.app'];

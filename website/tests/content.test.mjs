@@ -19,7 +19,7 @@ for(const language of languages) {
     for(const nav of ['desktop-nav','mobile-nav','footer-links']) {
       assert.ok(home.match(new RegExp(`class="${nav}"[\\s\\S]*?</(?:nav|div)>`))[0].includes(`href="/${language}/#pricing"`));
     }
-    for(const path of ['', 'docs','privacy','confirmed']) {
+    for(const path of ['', 'docs','privacy']) {
       const page=render(copy,path);assert.ok(page.includes(`https://skycut.app/${language}/`));assert.doesNotMatch(page,/undefined|\[object Object\]/);
       for(const lang of languages) assert.ok(page.includes(`hreflang="${lang==='zh'?'zh-CN':lang}"`));
     }

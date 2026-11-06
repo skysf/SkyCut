@@ -5,7 +5,7 @@ import {seoHead} from './seo.mjs';
 import {installGuide} from './install-guide.mjs';
 import {LANGUAGES,LANGUAGE_TAGS,FOUNDER_URL,STUDIO_URL} from './site-config.mjs';
 export const languages=LANGUAGES;
-const titles = { docs: 'docsTitle', privacy: 'privacyTitle', confirmed: 'confirmedTitle', error: 'errorTitle' };
+const titles = { docs: 'docsTitle', privacy: 'privacyTitle', error: 'errorTitle' };
 function navigation(c, kind) {
   return `<a class="skip-link" href="#main">${e(c.skip)}</a><header class="site-header container"><a class="wordmark" href="/${c.lang}/" aria-label="SkyCut ${e(c.home)}">SkyCut</a>
     <nav class="desktop-nav" aria-label="${e(c.menu)}"><a href="/${c.lang}/#features">${e(c.nav[0])}</a><a href="/${c.lang}/#pricing">${e(c.pricing.title)}</a><a ${kind === 'docs' ? 'aria-current="page"' : ''} href="/${c.lang}/docs/">${e(c.nav[1])}</a></nav>
@@ -17,8 +17,8 @@ function footer(c) {
 }
 function document(c, kind) {
   if (kind === 'docs') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.docsTitle)}</h1><p class="lead">${e(c.docsLead)}</p><div class="steps">${c.docsSteps.map(([h,p],i) => `<article><span class="step-number">${i + 1}</span><div><h2>${e(h)}</h2><p>${e(p)}</p></div></article>${i===0?installGuide(c):''}`).join('')}</div><aside class="note"><h2>${e(c.docsCompatibility)}</h2><p>${e(c.docsCompatibilityBody)}</p></aside><h2>${e(c.docsClients)}</h2><p>${e(c.docsClientsBody)}</p><div class="hero-actions"><a class="button" href="https://skystudioai.com/app?skycut=1" target="_blank" rel="noopener">${e(c.docsKey)}${icon('arrow')}</a></div></section>`;
-  if (kind === 'privacy') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.privacyTitle)}</h1><p class="lead">${e(c.privacyLead)}</p>${c.privacySections.map(([h,p]) => `<h2>${e(h)}</h2><p>${e(p)}</p>`).join('')}<a class="text-link" href="mailto:support@skystudioai.com">support@skystudioai.com${icon('arrow')}</a></section>`;
-  return `<section class="document centered container"><h1>${e(c[titles[kind]])}</h1><p class="lead">${e(c[kind === 'error' ? 'errorBody' : 'confirmedBody'])}</p><a class="button" href="/${c.lang}/">${e(c.back)}${icon('arrow')}</a></section>`;
+  if (kind === 'privacy') return `<section class="document container"><a class="text-link" href="/${c.lang}/">← ${e(c.back)}</a><h1>${e(c.privacyTitle)}</h1><p class="lead">${e(c.privacyLead)}</p>${c.privacySections.map(([h,p]) => `<h2>${e(h)}</h2><p>${e(p)}</p>`).join('')}<a class="text-link" href="mailto:support@skycut.app">support@skycut.app${icon('arrow')}</a></section>`;
+  return `<section class="document centered container"><h1>${e(c[titles[kind]])}</h1><p class="lead">${e(c.errorBody)}</p><a class="button" href="/${c.lang}/">${e(c.back)}${icon('arrow')}</a></section>`;
 }
 export function render(c, kind = '') {
   const strings = {lang:c.lang, signup:c.signup, subscribeSending:c.subscribeSending, subscribeSuccess:c.subscribeSuccess, subscribeUnavailable:c.subscribeUnavailable, subscribeError:c.subscribeError, subscribeInvalid:c.subscribeInvalid, subscribeBusy:c.subscribeBusy};

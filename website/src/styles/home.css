@@ -77,6 +77,7 @@
 .email-input-row input::placeholder {color:#b0c3aa;}
 .signup-form .button {background:var(--paper);border-color:var(--paper);color:var(--green);min-height:44px;font-size:13px;padding:11px 15px;gap:12px;}
 .signup-form .button:hover {background:white;}
+.signup-form .button:disabled {cursor:wait;opacity:.75;}
 .signup-choices {margin-top:24px;display:flex;flex-direction:column;gap:12px;}
 .choice {display:flex;align-items:start;gap:10px;font-size:13px;color:#e1e8d9;cursor:pointer;}
 .choice input {width:16px;height:16px;accent-color:#d9e6cb;margin:2px 0 0;}
@@ -86,7 +87,6 @@
 .form-note a {text-decoration:underline;text-underline-offset:3px;margin-left:3px;}
 .form-message {font-size:13px;min-height:22px;margin-top:14px;color:#fff4d4;}
 .honey {position:absolute;left:-10000px;}
-#turnstile {margin-top:15px;}
 .fallback-scene {position:absolute;inset:12% 0 5% 0;transition:opacity .5s;perspective:1000px;}
 .floating-frames {display:flex;width:90%;position:absolute;top:2%;left:4%;height:52%;transform:rotate(-5deg);z-index:2;}
 .floating-frames .frame {width:38%;height:100%;object-fit:cover;border-radius:7px;border:1px solid #6b8b74;box-shadow:5px 10px 15px #25392020;}

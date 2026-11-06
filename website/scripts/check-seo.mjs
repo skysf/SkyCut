@@ -7,41 +7,39 @@ const dist=fileURLToPath(new URL('../dist/',import.meta.url));
 const languages=['en','zh','de','es'];
 let audited=0;
 for(const language of languages) {
-  for(const kind of ['','docs','privacy','confirmed']) {
+  for(const kind of ['','docs','privacy']) {
     const html=await readFile(join(dist,language,kind,'index.html'),'utf8');
     assert.equal((html.match(/rel="canonical"/g)||[]).length,1);
     assert.ok(html.includes(`href="https://skycut.app/${language}/${kind?kind+'/':''}"`));
     assert.match(html,/<meta name="author" content="Sky Lu">/);
-    assert.match(html,new RegExp(`<meta name="robots" content="${kind==='confirmed'?'noindex,follow':'index,follow,max-image-preview:large'}">`));
-    if(kind!=='confirmed') {
-      const script=html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
-      assert.ok(script,'Vite must preserve static JSON-LD');
-      const graph=JSON.parse(script)['@graph'];
-      assert.ok(graph.some(node=>node['@type']==='SoftwareApplication' && node.publisher['@id']==='https://skystudioai.com/#organization'));
-      if(kind==='docs') {
-        const video=graph.find(node=>node['@type']==='VideoObject');
-        assert.ok(video,'docs must expose the installation video in static JSON-LD');
-        assert.equal(video['@id'],`https://skycut.app/${language}/docs/#video`);
-        assert.equal(video.duration,'PT32.5S');
-        assert.equal(video.contentUrl,'https://skycut.app/media/guides/how-to-install-skycut-on-mac.mp4');
-        assert.equal(video.thumbnailUrl,'https://skycut.app/media/guides/how-to-install-skycut-on-mac.jpg');
-        assert.match(html,/id="video"/);
-        assert.equal((html.match(/<track\b/g)||[]).length,1);
-        assert.ok(html.includes(`src="${new URL(video.caption.contentUrl).pathname}"`));
-        for(const url of [video.contentUrl,video.thumbnailUrl,video.caption.contentUrl]) {
-          const path=new URL(url).pathname;
-          const bytes=await readFile(join(dist,path));
-          assert.ok(bytes.equals(await readFile(new URL(`../public${path}`,import.meta.url))),'built guide assets must match the reviewed public assets');
-        }
+    assert.match(html,new RegExp(`<meta name="robots" content="index,follow,max-image-preview:large">`));
+    const script=html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)?.[1];
+    assert.ok(script,'Vite must preserve static JSON-LD');
+    const graph=JSON.parse(script)['@graph'];
+    assert.ok(graph.some(node=>node['@type']==='SoftwareApplication' && node.publisher['@id']==='https://skystudioai.com/#organization'));
+    if(kind==='docs') {
+      const video=graph.find(node=>node['@type']==='VideoObject');
+      assert.ok(video,'docs must expose the installation video in static JSON-LD');
+      assert.equal(video['@id'],`https://skycut.app/${language}/docs/#video`);
+      assert.equal(video.duration,'PT32.5S');
+      assert.equal(video.contentUrl,'https://skycut.app/media/guides/how-to-install-skycut-on-mac.mp4');
+      assert.equal(video.thumbnailUrl,'https://skycut.app/media/guides/how-to-install-skycut-on-mac.jpg');
+      assert.match(html,/id="video"/);
+      assert.equal((html.match(/<track\b/g)||[]).length,1);
+      assert.ok(html.includes(`src="${new URL(video.caption.contentUrl).pathname}"`));
+      for(const url of [video.contentUrl,video.thumbnailUrl,video.caption.contentUrl]) {
+        const path=new URL(url).pathname;
+        const bytes=await readFile(join(dist,path));
+        assert.ok(bytes.equals(await readFile(new URL(`../public${path}`,import.meta.url))),'built guide assets must match the reviewed public assets');
       }
-      if(!kind) {
-        const offers=graph.find(node=>node['@type']==='SoftwareApplication').offers;
-        assert.deepEqual(offers.map(offer=>offer.price),language==='zh'?[0,129,999]:[0,19,149]);
-        assert.ok(offers.every(offer=>offer.priceCurrency===(language==='zh'?'CNY':'USD')));
-        assert.deepEqual(offers.slice(1).map(offer=>offer.priceSpecification.billingDuration),['P1M','P1Y']);
-        assert.ok(offers.slice(1).every(offer=>offer.url==='https://skystudioai.com/app/skycut/pro' && offer.priceSpecification.valueAddedTaxIncluded===false));
-        assert.match(html,/id="pricing"/);
-      }
+    }
+    if(!kind) {
+      const offers=graph.find(node=>node['@type']==='SoftwareApplication').offers;
+      assert.deepEqual(offers.map(offer=>offer.price),language==='zh'?[0,129,999]:[0,19,149]);
+      assert.ok(offers.every(offer=>offer.priceCurrency===(language==='zh'?'CNY':'USD')));
+      assert.deepEqual(offers.slice(1).map(offer=>offer.priceSpecification.billingDuration),['P1M','P1Y']);
+      assert.ok(offers.slice(1).every(offer=>offer.url==='https://skystudioai.com/app/skycut/pro' && offer.priceSpecification.valueAddedTaxIncluded===false));
+      assert.match(html,/id="pricing"/);
     }
     assert.ok(html.includes(`https://skycut.app/media/og-card-${language}.png`));
     for(const match of html.matchAll(/(?:src|href)="(\/assets\/[^"#]+)"/g))await access(join(dist,match[1]));
@@ -66,6 +64,6 @@ assert.match(notFound,/content="noindex,follow"/);
 assert.match(notFound,/href="https:\/\/skycut.app\/404.html"/);
 const sitemap=await readFile(join(dist,'sitemap.xml'),'utf8');
 assert.equal((sitemap.match(/<loc>/g)||[]).length,12);
-assert.doesNotMatch(sitemap,/confirmed|404|updates|localhost|vercel\.app/);
+assert.doesNotMatch(sitemap,/404|updates|localhost|vercel\.app/);
 assert.match(await readFile(join(dist,'robots.txt'),'utf8'),/Sitemap: https:\/\/skycut.app\/sitemap.xml/);
 console.log(`SEO audit passed for ${audited} localized pages, root, 404, sitemap, robots and four social cards`);
