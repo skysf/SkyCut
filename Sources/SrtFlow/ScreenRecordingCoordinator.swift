@@ -124,15 +124,17 @@ final class ScreenRecordingCoordinator: ObservableObject {
     }
 
     func cancelConfiguring() {
-        guard state == .configuring else { return }
-        transition(to: .idle)
+        guard showsSetupSheet else { return }
+        session.stopCause = .controlPanel
+        invalidateSession()
     }
 
     /// AI 起的会话（record_screen）：不弹设置页、不激活 App。开不成（不在空闲、或上一份残留还没了结）返回 false，调用方自己说明。
     @discardableResult
-    func beginAutomated(_ plan: ScreenRecordingSession) -> Bool {
+    func beginAutomated(_ plan: ScreenRecordingSession, for project: VideoEditProject) -> Bool {
         guard state == .idle, !hasUnsettledManifest else { return false }
         session = plan
+        targetProject = project
         errorMessage = nil
         return transition(to: .configuring)
     }
@@ -149,6 +151,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         project: VideoEditProject
     ) async {
         guard state == .configuring else { return }
+        targetProject = project
         // session 身份在这里生成**一次**，贯穿 picker 回调直到最终 request。
         let sessionID = UUID()
         let epoch = sessionEpoch
@@ -211,7 +214,6 @@ final class ScreenRecordingCoordinator: ObservableObject {
             microphoneOutputURL: microphoneURL
         )
         self.request = request
-        targetProject = project
 
         // 7. 建 Stop 窗，拿 windowID，重建排除 filter
         transition(to: .preparing)
@@ -329,6 +331,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         // 否则会被录进成片。
         regionIndicator = ScreenRecordingRegionIndicator.shown(for: request.source, geometry: geometry(for: request.source))
         startTicking()
+        session.didBeginCapture = true
         session.observer?.recordingStarted(session: request.sessionID, alreadyRecorded: writer?.elapsed ?? 0)
     }
 
@@ -347,10 +350,10 @@ final class ScreenRecordingCoordinator: ObservableObject {
         )
         if let free = availableBytes(at: request.outputURL), free < warning {
             controlPanel?.setWarning(L10n("Low disk space — stopping soon."))
-            Task { await stop() }
+            Task { await stop(cause: .lowDisk) }
         }
         if writer.currentFailure != nil || writer.hasAudioOverflow {
-            Task { await stop() }
+            Task { await stop(cause: .writerError) }
         }
     }
 
@@ -359,7 +362,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
     /// 倒计时期间取消：完整撤销，不留任何痕迹（计划 §11.2 末段）。
     func cancelCountdown() async {
         guard case .countingDown = state else { return }
-        let observer = session.observer
+        let completion = ScreenRecordingCompletion(self)
         countdownTask?.cancel()
         await engine?.stop()
         writer?.cancel()
@@ -368,11 +371,12 @@ final class ScreenRecordingCoordinator: ObservableObject {
         try? store.clear()
         releaseResources()
         transition(to: .idle)
-        observer?.recordingEnded(.nothingRecorded)
+        completion.deliver(.nothingRecorded)
     }
 
     /// 幂等 Stop。Stop 按钮、Quit、stream error、低空间都走它。
-    func stop() async {
+    func stop(cause: ScreenRecordingReceipt.Stop = .controlPanel) async {
+        if state.isBusy, session.stopCause == nil { session.stopCause = cause }
         switch state {
         case .recording, .starting:
             await stopAndFinalize(reason: nil)
@@ -404,7 +408,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
     ///
     /// 只用于**还没写过一个字节**的阶段。写盘期一律走 `stopAndFinalize`。
     func invalidateSession() {
-        let observer = session.observer
+        let completion = ScreenRecordingCompletion(self)
         sessionEpoch &+= 1
         countdownTask?.cancel()
         picker?.invalidate()
@@ -415,7 +419,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         try? store.clear()
         releaseResources()
         transition(to: .idle)
-        observer?.recordingEnded(.nothingRecorded)
+        completion.deliver(.nothingRecorded)
     }
 
     /// 当前会话是否还有效（每个 `await` 之后都要问）。
@@ -431,6 +435,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
     /// **唯一的收尾路径**：stopping → finishing → (importing | partialRecovery | failed)。
     private func stopAndFinalize(reason: ScreenRecordingError?) async {
         guard transition(to: .stopping) else { return }
+        if session.stopCause == nil { session.stopCause = .streamError }
         timer?.invalidate(); timer = nil
         // 遮罩先撤：收尾期间不该还盖着一层。
         regionIndicator?.close(); regionIndicator = nil
@@ -438,7 +443,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         await engine?.stop()
 
         guard transition(to: .finishing), let writer, let request else {
-            finishWithFailure(reason ?? .writerFailed(message: "inconsistent state"))
+            await finishWithFailure(reason ?? .writerFailed(message: "inconsistent state"))
             return
         }
         let result = await writer.finish(stopHostTime: engine?.stopHostTime)
@@ -534,7 +539,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
             // 就再也没人认领（复审四 P1-3）。
             let undeleted = removeExactly(paths)
             reportUndeleted(undeleted)
-            finishWithFailure(
+            await finishWithFailure(
                 reason ?? .writerFailed(message: L10n("The recording has no usable video.")),
                 clearManifest: undeleted.isEmpty
             )
@@ -553,7 +558,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
             // **提交失败绝不清账。** 例如主文件已提交、mic move 失败时清了
             // manifest，那份仍然有效的隐藏 mic 临时文件就永久无人认领
             // （复审二 P1-4）。留着账，下次启动按 journal 继续裁决。
-            finishWithFailure(
+            await finishWithFailure(
                 .writerFailed(message: error.localizedDescription), clearManifest: false
             )
             return
@@ -586,9 +591,11 @@ final class ScreenRecordingCoordinator: ObservableObject {
         // 残缺的结果：手动的弹框问（文件已经在用户选的位置，只问要不要入轨）；AI 起的**不弹** —— 它点不着，
         // 工程会一直锁着 —— 照样落地，原因写进结果（docs/plans/2026-10-03-screen-recording-mcp.md 第 8 条）。
         if recording.isPartial, session.asksTheUser {
+            let completion = ScreenRecordingCompletion(self)
+            let retainedFiles = await completion.retainedFiles()
             pendingPartial = recording
             transition(to: .partialRecovery(recording))
-            session.observer?.recordingEnded(.awaitingDecision(recording))
+            completion.deliver(.awaitingDecision(recording), retainedFiles: retainedFiles)
             session.observer = nil
         } else {
             transition(to: .importing)
@@ -602,23 +609,25 @@ final class ScreenRecordingCoordinator: ObservableObject {
     func resolvePartial(import shouldImport: Bool, landing: ScreenRecordingLanding? = nil) async {
         guard case .partialRecovery(let result) = state else { return }
         if let landing { session.landing = landing }
+        transition(to: .importing)
         if shouldImport {
-            transition(to: .importing)
             await importResult(result)
         } else {
             // 文件已提交到用户选的位置 —— **默认保留，不擅自删除**（计划 §11.4）。
+            let completion = ScreenRecordingCompletion(self)
+            let retainedFiles = await completion.retainedFiles()
             pendingPartial = nil
             try? store.clear()   // 用户已明确处置 → settled
-            let observer = session.observer
             releaseResources()
             transition(to: .idle)
-            observer?.recordingEnded(.savedOnly(result))
+            completion.deliver(.savedOnly(result), retainedFiles: retainedFiles)
         }
     }
 
     private func importResult(_ result: ScreenRecordingResult) async {
-        guard let request else { transition(to: .failed(.writerFailed(message: "no request"))); return }
-        let observer = session.observer
+        guard let request else { await finishWithFailure(.writerFailed(message: "no request")); return }
+        let completion = ScreenRecordingCompletion(self)
+        let retainedFiles = await completion.retainedFiles()
         // 只留文件（AI 的 add_to_timeline=false）：文件已经提交好了，处置算了结。
         guard session.addsToTimeline else {
             pendingPartial = nil
@@ -626,7 +635,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
             releaseResources()
             transition(to: .finished(result))
             transition(to: .idle)
-            observer?.recordingEnded(.savedOnly(result))
+            completion.deliver(.savedOnly(result), retainedFiles: retainedFiles)
             return
         }
         // 落回开录的那个工程；它不在了就交给主窗口那个 —— 代号全 App 不重号，下面这道代号核对照样拦得住。
@@ -635,7 +644,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         guard project.isCurrentGeneration(request.documentGeneration) else {
             // 文件已经提交到用户选的位置了 —— **保留 manifest**，下次启动
             // 还能提示「有一段录制没入轨」（复审 P1-8）。
-            finishWithFailure(
+            await finishWithFailure(
                 .writerFailed(message: String(
                     format: L10n("The project changed, so the recording wasn’t added to the timeline. It’s saved as %@."),
                     result.mainURL.lastPathComponent
@@ -646,7 +655,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         }
         // 入轨可能失败（probe 读不出等）。失败时同样保留 manifest。
         guard let clipIDs = await project.importScreenRecording(result, request: request, landing: session.landing) else {
-            finishWithFailure(
+            await finishWithFailure(
                 .writerFailed(message: String(
                     format: L10n("The recording is saved as %@, but it couldn’t be added to the timeline."),
                     result.mainURL.lastPathComponent
@@ -664,61 +673,50 @@ final class ScreenRecordingCoordinator: ObservableObject {
         releaseResources()
         transition(to: .finished(result))
         transition(to: .idle)
-        observer?.recordingEnded(.added(result, clipIDs: clipIDs))
+        completion.deliver(.added(result, clipIDs: clipIDs), retainedFiles: retainedFiles)
     }
 
     // MARK: - 失败与清理
 
     private func handleSetupFailure(_ error: Error) {
         // 还没写过一个字节：控制窗等资源是同步拆的，可以直接进终态。
-        let observer = session.observer
+        let completion = ScreenRecordingCompletion(self)
         controlPanel?.close()
         picker?.invalidate()
         regionPanel?.cancel()
         writer?.cancel()
         try? store.clear()
         releaseResources()
-        if let pickerError = error as? ScreenRecordingSourcePicker.PickerError,
-           case .cancelled = pickerError {
-            transition(to: .idle)   // 取消不是错误
-            observer?.recordingEnded(.nothingRecorded)
-            return
+        // 具体错误的解释归 ScreenRecordingOutcome；取消仍然是干净取消。
+        let outcome = ScreenRecordingOutcome.setupFailure(error)
+        if case .failed(let message) = outcome {
+            report(message)
+            transition(to: .failed(.writerFailed(message: message)))
         }
-        if let recordingError = error as? ScreenRecordingError, case .pickerCancelled = recordingError {
-            transition(to: .idle)
-            observer?.recordingEnded(.nothingRecorded)
-            return
-        }
-        // 权限等具体错误必须用 localizedText，不能退化成通用错误码
-        // （`ScreenRecordingError` 没实现 LocalizedError；复审 P1-7）。
-        let message = (error as? ScreenRecordingError)?.localizedText
-            ?? (error as? LocalizedError)?.errorDescription
-            ?? error.localizedDescription
-        report(message)
-        transition(to: .failed(.writerFailed(message: message)))
         transition(to: .idle)
-        observer?.recordingEnded(.failed(message))
+        completion.deliver(outcome)
     }
 
-    private func finishWithFailure(_ error: ScreenRecordingError, clearManifest: Bool = true) {
+    private func finishWithFailure(_ error: ScreenRecordingError, clearManifest: Bool = true) async {
+        let completion = ScreenRecordingCompletion(self)
+        let retainedFiles = await completion.retainedFiles()
         report(error.localizedText)
         if clearManifest { try? store.clear() }
         // **必须清 pendingPartial。** 留着它，partial 弹窗会继续挂在屏幕上，
         // 而状态已经不是 `.partialRecovery`，两个按钮都会被 guard 挡掉 ——
         // 用户面对一个点什么都没反应的弹窗（复审二 P1-6）。
         pendingPartial = nil
-        let observer = session.observer
         releaseResources()
         transition(to: .failed(error))
         transition(to: .idle)
-        observer?.recordingEnded(.failed(error.localizedText))
+        completion.deliver(.failed(error.localizedText), retainedFiles: retainedFiles)
     }
 
     /// 把失败**送到用户真的看得见的地方**。
     ///
     /// 设置页在调 coordinator 之前就 dismiss 了，只写 `errorMessage` 等于没报 ——
     /// picker/权限/目标/writer 的失败在用户眼里就是「点了没反应」（复审 P1-7）。
-    /// 工程的 notice 横幅与设置页无关，一定看得到。
+    /// 这里保留工程本地原因；结束时由 ScreenRecordingCompletion 另发所有窗口可见的回执。
     func report(_ message: String) {
         errorMessage = message
         (targetProject ?? OpenProjects.shared.primary).notice = message

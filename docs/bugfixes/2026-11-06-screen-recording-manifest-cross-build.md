@@ -50,6 +50,8 @@ Beta 的任务失败，`get_job` 报 `The screen recording failed: The recording
 
 ### 旁查：用户已停止并入轨，AI 再 Stop 却报 cancelled（未修）
 
+**后续已单独修复**：[录屏收尾反馈](2026-11-06-screen-recording-completion-feedback.md)。以下保留本次 #328 的调查边界。
+
 用户另报：浮窗 Stop 已完成入轨，再调 `record_screen action=stop`，却回
 `Stopped before recording began; nothing was recorded.` / `status: cancelled`。
 

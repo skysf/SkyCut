@@ -24,16 +24,7 @@ struct ScreenRecordingSheets: ViewModifier {
             )) {
                 ScreenRecordingSetupView(project: project).appLanguage()
             }
-            // partial 结果：**工程锁还在**，用户必须先处置（计划 §11.4）。
-            .sheet(item: Binding(
-                get: { isTarget ? coordinator.pendingPartial.map(IdentifiedRecording.init) : nil },
-                set: { _ in }
-            )) { item in
-                ScreenRecordingPartialSheet(result: item.result) { shouldImport in
-                    Task { await coordinator.resolvePartial(import: shouldImport) }
-                }
-                .appLanguage()
-            }
+            // 残缺录制的处置在全 App notice 里，后台工程也可见，不再弹模态 sheet。
             // 崩溃恢复：启动时发现上次的残留。三选一，「保留」绝不删文件。只在主窗口。
             .sheet(item: Binding(
                 get: { host == .mainWindow ? coordinator.pendingRecovery : nil },

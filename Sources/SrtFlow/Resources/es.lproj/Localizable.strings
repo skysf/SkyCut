@@ -1340,3 +1340,35 @@
 "Open Sky Studio to renew SkyCut Pro" = "Abrir Sky Studio para renovar SkyCut Pro";
 "Update Payment Method" = "Actualizar método de pago";
 "Open Sky Studio to update your payment method" = "Abrir Sky Studio para actualizar tu método de pago";
+
+"Recording saved" = "Grabación guardada";
+
+"Recording saved with issues" = "Grabación guardada con problemas";
+
+"Recording failed" = "Error de grabación";
+
+"Recording cancelled" = "Grabación cancelada";
+
+"Reason: %@" = "Motivo: %@";
+
+"A file remains but could not be read: %@" = "Queda un archivo que no se ha podido leer: %@";
+
+"Usable temporary file: %@" = "Archivo temporal utilizable: %@";
+
+"Saved to: %@" = "Guardada en: %@";
+
+"No usable recording file was kept." = "No se ha conservado ningún archivo de grabación utilizable.";
+
+"Added to “%1$@” (%2$@), track %3$@." = "Añadida a “%1$@” (%2$@), pista %3$@.";
+
+"Choose whether to add this recording to the timeline or keep the file only." = "Elige si quieres añadir esta grabación a la línea de tiempo o conservar solo el archivo.";
+
+"Not added to the timeline." = "No se ha añadido a la línea de tiempo.";
+
+"This project is in the background and has no window." = "Este proyecto está en segundo plano y no tiene ventana.";
+
+"Recording results: %lld" = "Resultados de grabación: %lld";
+
+"Open recorded project" = "Abrir el proyecto de la grabación";
+
+"The recording location is unavailable; this file could not be checked: %@" = "La ubicación de la grabación no está disponible; no se ha podido comprobar este archivo: %@";

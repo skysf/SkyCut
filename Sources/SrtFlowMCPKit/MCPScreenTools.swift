@@ -15,19 +15,19 @@ public enum MCPScreenTools {
             return MCPToolDefinition(
                 .recordScreen, title: "Record the screen",
                 description: """
-                Record the Mac's screen to a .mov, like SkyCut's Record Screen button; when it stops it goes at the end of V1 \
-                (a microphone on a new audio track). action=start: you pick the source (get_status screen=true lists displays, \
-                windows and microphones). A countdown runs in a small Stop panel at the bottom left of the main display, then \
-                the call returns while it records, so you can operate other apps meanwhile; the panel is hidden from \
-                screenshots, so do not click there. It records until action=stop, duration, or the user's Stop; get_job shows \
-                it, and the finished job has the file and clip ids. An incomplete recording still lands and says why. Frame rate \
-                follows the project (set_canvas fps). SkyCut needs the Screen & System Audio Recording permission: without \
-                it macOS asks the user once and the result says what to tell them; macOS may also remind the user about every \
-                30 days. action=resolve settles a recording left unfinished earlier (get_status shows it).
+                Record the Mac's screen to .mov and add it to the end of V1 (microphone: a new audio track). action=start starts \
+                recording; a late action=stop returns the completed job id, status, file, project, clip ids, stopped_by and \
+                stop_method. User Stop is also reported on your next tool result. get_status screen=true lists displays, windows \
+                and microphones. Choose a source yourself. A small Stop panel at the bottom left of the main display shows the \
+                countdown, then start returns while capture continues; it is invisible in screenshots, so do not click there. \
+                Recording ends on action=stop, duration, or the user's Stop. get_job shows progress and the same receipt. An \
+                incomplete recording still lands and says why. Frame rate follows set_canvas fps. Without Screen & System Audio \
+                Recording permission macOS asks the user once; the result explains next steps. macOS may remind them every \
+                30 days. action=resolve settles an earlier unfinished recording.
                 """,
                 input: MCPSchema.object([
                     "action": MCPSchema.string(
-                        "start, stop the running recording, or resolve a leftover one.", oneOf: MCPVocabulary.recordingActions
+                        "start, stop (or return the result if already stopped), or resolve a leftover one.", oneOf: MCPVocabulary.recordingActions
                     ),
                     "source": MCPSchema.string(
                         "What to record (default display). drag: the user drags the area.", oneOf: MCPVocabulary.recordingSources

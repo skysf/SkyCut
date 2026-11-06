@@ -205,6 +205,24 @@ if grep -nE 'ScreenRecordingManifestStore\(directory:|appendingPathComponent\("S
   fail "协调者不许另拼账本位置或回退旧共用账本；启动恢复只经自己的 store"
 fi
 
+# 15. 收尾回执经同一个发布口，所有工程窗口可见；AI 下一次任意工具调用按原会话附言。
+for root in Sources/SrtFlow/MainWindowView.swift Sources/SrtFlow/ProjectWindowController.swift; do
+  grep -qF '.overlay(alignment: .top) { ScreenRecordingNotice() }' "${root}" \
+    || fail "${root}：录屏结果 notice 必须挂在主窗口和每个工程窗口，不依赖后台工程自己的 notice"
+done
+grep -qF 'ScreenRecordingFeedback.shared.publish(receipt)' Sources/SrtFlow/ScreenRecordingCompletion.swift \
+  && grep -qF 'completion.deliver(.added(result, clipIDs: clipIDs), retainedFiles: retainedFiles)' "${COORDINATOR}" \
+  && grep -qF 'completion.deliver(.failed(error.localizedText), retainedFiles: retainedFiles)' "${COORDINATOR}" \
+  || fail "录屏成功和失败必须交出同一份全 App 回执，不能只写目标工程的 notice"
+grep -qF 'let note = ScreenRecordingFeedback.shared.takeNote(for: request.session ?? AIProjectSessions.anonymous)' "${ROUTER}" \
+  && grep -qF 'answer.result = MCPBridge.addingNote(note, to: answer.result)' "${ROUTER}" \
+  || fail "原 AI 会话下一次任意工具结果（含错误）必须收到用户停止录屏的附言"
+if grep -nF 'coordinator.pendingPartial.map(IdentifiedRecording.init)' "${VIEW}"; then
+  fail "残缺录屏的处置改在全 App notice，不能再弹模态 sheet 或藏在后台工程"
+fi
+grep -qF 'guard showsSetupSheet else { return }' "${COORDINATOR}" \
+  || fail "没呈现的手动设置页不能撤销 AI 的 configuring 会话"
+
 if [ "${FAILED}" -ne 0 ]; then
   echo "AI 录屏接线守卫失败" >&2
   exit 1

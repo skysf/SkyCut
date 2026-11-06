@@ -23,6 +23,10 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
     /// 开录之前就知道的提醒（麦克风没授权所以没录……），写进结局。
     var notes: [String] = []
     private(set) var startedAt: Date?
+    private(set) var hasEnteredCoordinator = false
+    private var completionDetails: [String: JSONValue] = [:]
+
+    func enteredCoordinator() { hasEnteredCoordinator = true }
 
     init(project: VideoEditProject, sourceDescription: String, duration: Double? = nil, isDrag: Bool = false) {
         self.project = project
@@ -38,9 +42,9 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
             cancel: { [weak self] in
                 guard let self else { return }
                 if self.isCurrentSession {
-                    Task { @MainActor in await ScreenRecordingCoordinator.shared.stop() }
+                    Task { @MainActor in await ScreenRecordingCoordinator.shared.stop(cause: AICallContext.current == nil ? .activity : .cancelJob) }
                 } else if self.startedAt == nil {
-                    self.cancelBeforeStart()
+                    self.cancelBeforeStart(cause: AICallContext.current == nil ? .activity : .cancelJob)
                 }
             }
         )
@@ -78,16 +82,35 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
 
     /// 没开成（协调者忙、参数在开录前才发现不对）：直接记失败。
     func fail(_ message: String) {
-        AIJobs.shared.finish(job, .failed, message: message)
+        finishBeforeStart(status: .failed, cause: .setupError, reason: message)
     }
 
-    /// 还没交给协调者就叫停了（在等用户点麦克风授权时 stop / cancel_job）：记成取消，开录的那一步看到就不开了。
-    func cancelBeforeStart() {
+    /// 只取消尚未交给协调者的尝试；已开始 / 已结束的录制不由这条路改写。
+    func cancelBeforeStart(cause: ScreenRecordingReceipt.Stop = .mcp) {
+        guard !hasEnteredCoordinator, startedAt == nil else { return }
+        finishBeforeStart(status: .cancelled, cause: cause, reason: nil)
+    }
+
+    private func finishBeforeStart(status: ScreenRecordingReceipt.Status, cause: ScreenRecordingReceipt.Stop, reason: String?) {
+        guard job.status == .running else { return }
         waiting = nil
-        AIJobs.shared.finish(job, .cancelled, message: "Stopped before recording began; nothing was recorded.")
+        let receipt = ScreenRecordingReceipt(
+            id: "pending-" + job.id, jobID: job.id, ownerSession: job.session, status: status, stop: cause,
+            projectID: project.shortID, projectName: project.projectName, projectGeneration: project.documentGeneration,
+            background: OpenProjects.shared.isHeadless(project), reason: reason
+        )
+        ScreenRecordingFeedback.shared.publish(receipt)
+        AIJobs.shared.finish(job, status.jobStatus, message: receipt.message, detail: receipt.json)
     }
 
     // MARK: ScreenRecordingObserver
+
+    /// 发布回执前完成落地的附带事，工程名取自动保存后的真实名字；UI 和 MCP 使用同一份最终身份。
+    func prepareCompletion(_ outcome: ScreenRecordingOutcome) {
+        guard job.status == .running, case .added = outcome else { return }
+        AISession.shared.round(for: project).noteChange()
+        completionDetails = AIProjectTools.saveIfNeverSaved(project, after: .ok([:], changed: true)).payload.objectValue ?? [:]
+    }
 
     func recordingStarted(session: UUID, alreadyRecorded: TimeInterval) {
         startedAt = Date()
@@ -98,62 +121,25 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
             try? await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000))
             let coordinator = ScreenRecordingCoordinator.shared
             guard let self, self.job.status == .running, self.isCurrentSession, case .recording = coordinator.state else { return }
-            await coordinator.stop()
+            await coordinator.stop(cause: .duration)
         }
     }
 
-    func recordingEnded(_ outcome: ScreenRecordingOutcome) {
+    func recordingEnded(_ outcome: ScreenRecordingOutcome, receipt: ScreenRecordingReceipt) {
+        guard job.status == .running else { return }
         waiting = nil
-        switch outcome {
-        case .added(let result, let clipIDs):
-            AISession.shared.round(for: project).noteChange()
-            let ids = AIShortIDs(state: project.state)
-            var detail = describe(result)
-            detail["added_to_timeline"] = true
-            detail["clip_ids"] = .array(clipIDs.map { .string(ids.short($0)) })
-            let where_ = clipIDs.count > 1
-                ? "the video at the end of V1, then the microphone on its own track" : "the video at the end of V1"
-            detail["next_step"] = .string(
-                "It is on the timeline (clip_ids: \(where_); one undo step). "
-                    + "Check it with look; tidy it with transcribe + cut_speech, or edit_clip to trim where you switched windows."
-            )
-            // 没存过的工程：AI 的改动之后马上存（同路由那一处，这一下不在 AI 的调用里）。
-            let saved = AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: true))
-            AIJobs.shared.finish(job, .done, message: "Recorded \(seconds(result.duration)) and added it to the timeline.", detail: saved.payload)
-        case .savedOnly(let result):
-            var detail = describe(result)
-            detail["added_to_timeline"] = false
-            detail["next_step"] = "Only the file was kept; add_clips it when you need it."
-            AIJobs.shared.finish(job, .done, message: "Recorded \(seconds(result.duration)); the file is saved.", detail: .object(detail))
-        case .awaitingDecision(let result):
-            var detail = describe(result)
-            detail["waiting_for_decision"] = true
-            detail["next_step"] = "SkyCut is asking the user whether to add it to the timeline. Tell the user, or call record_screen action=resolve decision=add or keep."
-            AIJobs.shared.finish(job, .done, message: "The recording was cut short.", detail: .object(detail))
-        case .nothingRecorded:
-            AIJobs.shared.finish(job, .cancelled, message: "Stopped before recording began; nothing was recorded.")
-        case .failed(let message):
-            AIJobs.shared.finish(job, .failed, message: "The screen recording failed: \(message)")
-        }
-    }
-
-    /// 结局里共有的几样：文件、多长、多大、录的是什么、残缺的原因、开录前就有的提醒。
-    private func describe(_ result: ScreenRecordingResult) -> [String: JSONValue] {
-        var detail: [String: JSONValue] = [
-            "file": .string(AIWorkspace.shared.display(result.mainURL)),
-            "duration": AIFormat.seconds(result.duration),
-            "source": .string(sourceDescription)
-        ]
-        if result.pixelSize.width > 0 {
-            detail["width"] = .number(Double(Int(result.pixelSize.width)))
-            detail["height"] = .number(Double(Int(result.pixelSize.height)))
-        }
-        if let microphone = result.microphoneURL { detail["microphone_file"] = .string(AIWorkspace.shared.display(microphone)) }
-        // 「不完整」不一定是被截短：声音晚到一秒、麦克风中途断了都算（和手动的「Recording is incomplete」同一个口径）。
-        if result.isPartial { detail["incomplete"] = .string(result.partialReason ?? "The recording is incomplete.") }
+        var detail = receipt.json.objectValue ?? [:]
+        detail["source"] = .string(sourceDescription)
         if !notes.isEmpty { detail["note"] = .string(notes.joined(separator: " ")) }
-        return detail
+        if case .added = outcome {
+            detail["next_step"] = "It is on the timeline (one undo step). Check it with look; use edit_clip to trim if needed."
+            detail.merge(completionDetails) { current, _ in current }
+            AIJobs.shared.finish(job, receipt.status.jobStatus, message: receipt.message, detail: .object(detail))
+        } else {
+            if receipt.waitingForDecision {
+                detail["next_step"] = "Use record_screen action=resolve decision=add or keep."
+            }
+            AIJobs.shared.finish(job, receipt.status.jobStatus, message: receipt.message, detail: .object(detail))
+        }
     }
-
-    private func seconds(_ value: Double) -> String { String(format: "%.1f s", value) }
 }
