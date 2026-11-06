@@ -671,6 +671,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-06 另一个构建接管正在录制的账本](docs/bugfixes/2026-11-06-screen-recording-manifest-cross-build.md) — 录屏账本按原 bundle id 隔离；旧共用账本保留不读，四种身份实写隔离与生产接线反向验证；已入轨后 Stop 误报取消另记待查。
 - [2026-11-06 台数满了却引导再买 Pro，水印说明固定叫人发邮件](docs/bugfixes/2026-11-06-machine-limit-purchase-guidance.md) — 台数原因优先管理 Mac / 客服、屏蔽购买入口；设置 / 导出本地化，AI 拒绝 / 状态 / 水印说明共用当前授权，含非空购买地址的满台数 fixture 与反向验证。
 - [2026-11-06 Pro 快到期和续费失败宽限没有提醒](docs/bugfixes/2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用七天提醒、商务邮箱和宽限付款提示；台数优先，倒计时换钟差、日历日期不挪，说明字段不改功能授权。
 - [2026-11-05 声音恢复成功，播放器自检却因固定等待窗口报红](docs/bugfixes/2026-11-05-player-clock-recovery-check-timing.md) — 恢复和恢复后的推进挤在同一个 200 ms 窗口；改为分阶段有界条件等待，常规自检保留 250 ms 延迟注入。

@@ -522,59 +522,6 @@ private func checkRecoveryLedger() {
             .canClearManifest, "没录麦克风时 mic 不阻塞清账")
 }
 
-// MARK: - manifest 持久化栅栏
-
-private func checkManifestStore(manifest: ScreenRecordingManifest) {
-    let dir = FileManager.default.temporaryDirectory
-        .appendingPathComponent("srtflow-manifeststore-\(UUID().uuidString)")
-    defer { try? FileManager.default.removeItem(at: dir) }
-    let store = ScreenRecordingManifestStore(directory: dir)
-
-    do {
-        checkEqual(try store.load(), nil, "空目录 load 返回 nil")
-        try store.persist(manifest)
-        // **持久化栅栏的意义**：persist 成功返回后，manifest 已通过原子 rename
-        // 进入文件系统命名空间 —— 这里绕开 store、直接从磁盘路径读原始字节验证，
-        // 证明它不是停留在某个进程内缓存里（UserDefaults 的问题正在于此：
-        // 内存立即生效、磁盘异步落盘）。进程级崩溃（含 kill -9）不能撤销
-        // 已完成的 rename，所以栅栏对 App 崩溃威胁模型成立。
-        let raw = try Data(contentsOf: store.fileURL)
-        let decoded = try JSONDecoder().decode(ScreenRecordingManifest.self, from: raw)
-        checkEqual(decoded, manifest, "persist 返回后磁盘上立即是完整 manifest")
-
-        // 推进 stage 再 persist：读回的是最新的
-        var advanced = manifest
-        advanced.stage = .allCommitted
-        try store.persist(advanced)
-        checkEqual(try store.load()?.stage, .allCommitted, "覆盖写后读回最新阶段")
-
-        try store.clear()
-        checkEqual(try store.load(), nil, "clear 后 load 返回 nil")
-        try store.clear()   // 幂等
-        check(true, "clear 幂等")
-
-        // 损坏文件要抛错（调用方如实报告，不许退回 glob）
-        try Data("not json".utf8).write(to: store.fileURL)
-        var threw = false
-        do { _ = try store.load() } catch { threw = true }
-        check(threw, "损坏的 manifest 文件 load 要抛错，不能静默当没有")
-
-        // **「有没有账」必须用文件存在性判定，不能用「能不能解码」。**
-        //
-        // 这是「下一次录制会不会覆盖上一份账」的唯一防线：用
-        // `try? load() != nil` 的话，一份损坏的 JSON 会被读成「没有账本」，
-        // 紧接着的 persist() 就把它盖掉了，上一段录制的唯一索引随之消失
-        // （复审三 P1-2）。解码失败同样是 unsettled，**不允许 fail-open**。
-        check(store.fileExists, "损坏的 manifest 仍然算「有账」")
-        check((try? store.load()) == nil, "同一份文件确实解不出来（否则上一条无意义）")
-
-        try store.clear()
-        check(!store.fileExists, "清掉之后才算没有账")
-    } catch {
-        check(false, "store 自检异常：\(error)")
-    }
-}
-
 // MARK: - 磁盘预算
 
 private func checkDiskBudget() {

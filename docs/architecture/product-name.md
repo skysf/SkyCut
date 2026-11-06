@@ -29,8 +29,10 @@
 1. **系统授权按「bundle id + 签名证书」认**（[签名与系统权限](code-signing-and-permissions.md)）。bundle id 一改，macOS 当成另一个 App：
    录屏、麦克风、下载文件夹、钥匙串里的 Sky Studio Key 全部重给。UserDefaults 按 bundle id 分域，记住的设置（工具栏开关、导出设置、
    字幕样式、Sky Studio 的额度……）全部清零。
-2. **数据文件夹里有用户的东西**：存的剪辑风格、下载的配音模型（约 333 MB）、音频库缓存、录屏的恢复账本、优化媒体缓存。
+2. **数据文件夹里有用户的东西**：存的剪辑风格、下载的配音模型（约 333 MB）、音频库缓存、优化媒体缓存。
    换文件夹名就要搬家，搬漏一样就丢，换来的只是一个用户看不见的名字。
+   录屏恢复账本自 2026-11-06 起按原 bundle id 隔离，放 `Application Support/<bundle id>/`，
+   与 MCP 通道同一身份；旧共用账本不再读取，也不自动搬动或删除，见 [录屏生命周期](screen-recording-lifecycle.md)。
 3. **老会话里的小程序还在跑**：AI 会话开始时起的是升级之前的小程序，它按 bundle id 算 socket、用 `_srtflow_*` 跟 App 说话。
    这几样不变，老会话照样连得上新 App、照样换上新清单（[小程序清单过期](../bugfixes/2026-10-14-stale-helper-tool-list.md)）。
 4. **UTType 标识**认老工程、老字幕和拖放的载荷，改了老工程双击就打不开、拖放静默失败（[自定义类型没声明](../bugfixes/2026-09-23-custom-drag-types-not-declared.md)）。
@@ -46,7 +48,9 @@
 1. **给用户、给 AI 看的文字写 SkyCut**：`L10n` / `Text` / `instantHelp` 的文案（三张表一起改，[本地化](localization.md)）、
    工具说明、工具结果和报错、风格卡、权限弹框的用途说明。
 2. **身份类的名字永远不改**，新加的同类东西照旧用老前缀（`SrtFlow.<模块>.<键>`、`com.srtflow.…`、`SRTFLOW_…`、
-   `Application Support/SrtFlow/<子目录>`），不要一半新一半旧。哪天真要改，先写搬家（读旧的、写新的、搬完再删）并在发版说明里写清。
+   `Application Support/SrtFlow/<子目录>`），不要一半新一半旧。需要构建间隔离的运行期状态按原 bundle id 存在
+   `Application Support/<bundle id>/`（MCP 通道、录屏账本）；不能因产品改名换掉身份。
+   哪天真要改，先写搬家（读旧的、写新的、搬完再删）并在发版说明里写清；录屏旧共用账本无法证明归属，按生命周期文档保留不读。
 3. **MCP 服务器名和「连接 AI」写的名字是同一个**：`MCPServerCore.serverName` 和 `AIClientConfigFiles.serverName` 都是 `skycut`；
    Claude Code 的放行规则 `mcp__skycut` 由它拼出来。
 4. **主窗口标题 `SkyCut` 在本地化守卫的豁免清单里**（App 名在任何语言下都一样，`checks/LocalizationCoverage/main.swift`）。
@@ -59,7 +63,7 @@
 
 | 检查 | 钉什么 |
 | --- | --- |
-| `checks/product-name.sh`（扫描守卫） | 第 5 节：Info.plist 里工程的后缀先 `skycut` 再 `srtflowproj`、两个后缀常量、两个子文件夹名、AI 的输出位置经 `aiFolder`、列文件夹跳过两个名字、没有别处拿后缀直接比（只许问 `isProjectFile`）、没有别处直接拼 `aiFolderName`。其余几节 —— 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：七个数据文件夹、卡顿日志位置、Sky Studio 的身份键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
+| `checks/product-name.sh`（扫描守卫） | 第 5 节：Info.plist 里工程的后缀先 `skycut` 再 `srtflowproj`、两个后缀常量、两个子文件夹名、AI 的输出位置经 `aiFolder`、列文件夹跳过两个名字、没有别处拿后缀直接比（只许问 `isProjectFile`）、没有别处直接拼 `aiFolderName`。其余几节 —— 身份：bundle id、测试版 bundle id、八个 UTType 标识、钥匙串 service、签名证书和目录；数据：共享资源目录、按原 bundle id 隔离的录屏账本、卡顿日志位置、Sky Studio 的身份键；通道：两个内部工具名、`/tmp` 兜底前缀；看得见的：`CFBundleName` / `CFBundleDisplayName` / `CFBundleExecutable` 是 SkyCut、打包的 `APP_NAME`、小程序产品名、两处服务器名是 `skycut` |
 | `checks/MCP/ProtocolChecks.swift` | 小程序握手和 `server/discover` 报的 `serverInfo.name` 是 `skycut` |
 | `checks/MCP/ConfigChecks.swift` | 「连接 AI」往 Claude / Codex 配置里写、删的是 `skycut` 那一项，放行规则是 `mcp__skycut` |
 | `scripts/check-mcp.sh` 开头 | 打包脚本把 `skycut-mcp` 拷进 Helpers，`sign-app.sh` 先签它再签外层 |

@@ -195,6 +195,16 @@ before "$(line_of 'if ScreenRecordingPermissions.screen == .authorized {' "${SOU
 grep -q 'file = plannedFile(pending)' "${LEFTOVERS}" && grep -q 'object\["file"\] = .string(AIWorkspace.shared.display(file))' "${LEFTOVERS}" \
   || fail "${LEFTOVERS}：残留要报保存之后叫什么（plannedFile），不报隐藏的 .partial 临时文件名"
 
+# 14. 账本只按本构建的 bundle id 定位。旧的共用账本不读、不迁移、不清理。
+grep -qF 'let store = ScreenRecordingManifestStore(' "${COORDINATOR}" \
+  && grep -qF 'applicationSupport: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]' "${COORDINATOR}" \
+  && grep -qF 'bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow"' "${COORDINATOR}" \
+  || fail "${COORDINATOR}：录屏账本必须使用本构建 bundle id 的入口，不能接管别的 App 的录制"
+if grep -nE 'ScreenRecordingManifestStore\(directory:|appendingPathComponent\("SrtFlow"|active-recording-manifest\.json' \
+    "${COORDINATOR}" "${SETUP}"; then
+  fail "协调者不许另拼账本位置或回退旧共用账本；启动恢复只经自己的 store"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   echo "AI 录屏接线守卫失败" >&2
   exit 1
