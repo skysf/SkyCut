@@ -71,6 +71,11 @@ export default {
   noJs: 'Activa JavaScript para registrarte por correo El resto del sitio funciona sin él',
   footer: 'Tú diriges La IA edita', by: 'Por Sky Lu', support: 'Contacto',
   docsTitle: 'Todo empieza con una idea.', docsLead: 'Cuatro pasos para tu primera edición.',
+  docsVideo: {
+    title: 'Cómo instalar SkyCut en Mac',
+    description: 'Instala SkyCut y ábrelo por primera vez. La grabación no tiene sonido y los subtítulos están activados de forma predeterminada.',
+    fallback: 'Descargar el vídeo de instalación',
+  },
   docsSteps: [
     ['Instala SkyCut', 'Descarga la versión para Mac, abre la imagen de disco y mueve SkyCut a Aplicaciones. Necesitas un Mac con chip de Apple y macOS 15 o posterior.'],
     ['Importa tu material', 'Crea un proyecto e importa tus clips. Organiza vídeo, sonido y subtítulos en la línea de tiempo.'],

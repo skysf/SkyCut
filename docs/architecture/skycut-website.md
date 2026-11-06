@@ -107,6 +107,31 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
   原素材只读，输出十二份静音 MP4 / JPEG，校验时长、尺寸及无音轨；不联网、不部署。
   只重建轨道图集时运行 `node scripts/build-showcase-filmstrips.mjs`。
 
+## 文档页视频教程
+
+教程视频统一放在 `website/public/media/guides/`，按英文标题用小写连字符命名：
+「如何在 Mac 上安装 SkyCut」对应 `how-to-install-skycut-on-mac.mp4` 和同名 `.jpg` 封面；
+字幕一种语言一个 VTT，使用同名的 `.zh-Hans.vtt`、`.en.vtt` 等语言后缀。
+
+四语言文档页的安装说明后共用这一段 32.5 秒录屏，`#video` 直接定位到教程。
+只移除静音音轨，视频流不重编码；封面是 4.5 秒的安装窗口，缩为 864 × 540 JPEG。
+使用原生 `video` 的 controls、playsinline、metadata 预加载和 poster，不自动播放。
+每页只输出一条默认开启的字幕：中文是 `zh-Hans`，英文是 `en`；德文与西班牙文暂用英文，
+构建时若发现同名 `.de.vtt` / `.es.vtt` 就自动采用，新增翻译只需加对应 VTT 文件。
+Vercel 为 `/media/` 下所有 `.vtt` 显式设置 `text/vtt; charset=utf-8`，保留 nosniff。
+
+静态 JSON-LD 沿用现有实体图，为文档页增加 [VideoObject](https://schema.org/VideoObject)，
+标题、说明与页面一致，视频、封面、时长和这一页的字幕来自同一份资源配置；不推测上传日期。
+`tests/install-guide.test.mjs` 覆盖四语言播放器合同、默认字幕、VTT 时间轴和 MIME 配置；
+`npm run check:seo` 另外核对实际构建的 VideoObject 与视频、封面、字幕资源逐字节一致。
+人工回归：本地 `npm run dev` 检查四语言安装区，桌面与 390 像素宽度播放真实视频，
+确认字幕默认可见、暂停 / 定位可用、封面和布局正常且无横向溢出，并保留两种宽度的截图。
+
+2026-11-06 本地验收：57 项网站测试、生产构建、SEO 产物审计和原生
+`scripts/check-local.sh docs-index-drift` 全绿；视频流与原片 hash 相同、无音轨，
+两份 VTT 与用户审核版逐字节一致。本地 Safari 核对四语言桌面与 390 × 844 布局，
+中英文默认字幕及真实播放正常，保留桌面 / 手机截图；未创建云端预览或部署。
+
 ## 价格
 
 首页 `#pricing` 放在短片与下载之间，桌面导航、手机菜单和页脚都链接到各自语言首页的

@@ -71,6 +71,11 @@ export default {
   noJs: '邮件登记需要启用 JavaScript 其余网站内容仍可浏览',
   footer: '你来导演 AI 来剪辑', by: '由 Sky Lu 创作', support: '联系',
   docsTitle: '从一个想法开始。', docsLead: '四步，开始第一次剪辑。',
+  docsVideo: {
+    title: '如何在 Mac 上安装 SkyCut',
+    description: '跟着视频安装并首次打开 SkyCut。录屏无声，字幕默认开启。',
+    fallback: '下载安装教程视频',
+  },
   docsSteps: [
     ['安装 SkyCut', '下载 Mac 版，打开磁盘映像，将 SkyCut 拖到「应用程序」。需要 Apple 芯片 Mac 和 macOS 15 或更新系统。'],
     ['导入素材', '新建工程，导入片段。在时间线上安排画面、声音和字幕。'],

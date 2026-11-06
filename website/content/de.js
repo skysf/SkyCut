@@ -71,6 +71,11 @@ export default {
   noJs: 'Aktiviere JavaScript für die E-Mail-Anmeldung Der übrige Inhalt funktioniert auch ohne',
   footer: 'Du führst Regie Die KI schneidet', by: 'Von Sky Lu', support: 'Kontakt',
   docsTitle: 'Am Anfang steht eine Idee.', docsLead: 'Vier Schritte zu deinem ersten Schnitt.',
+  docsVideo: {
+    title: 'So installierst du SkyCut auf dem Mac',
+    description: 'SkyCut installieren und zum ersten Mal öffnen. Die Aufnahme ist ohne Ton, die Untertitel sind standardmäßig eingeschaltet.',
+    fallback: 'Installationsvideo herunterladen',
+  },
   docsSteps: [
     ['SkyCut installieren', 'Lade die Mac-Version, öffne das Image und ziehe SkyCut in den Programme-Ordner. Du brauchst einen Mac mit Apple-Chip und macOS 15 oder neuer.'],
     ['Material importieren', 'Erstelle ein Projekt und importiere deine Clips. Ordne Bild, Ton und Untertitel auf der Timeline an.'],

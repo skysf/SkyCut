@@ -1,6 +1,7 @@
 // Factual entity graph. Founder identity matches https://skylu.ai/founder/.
 // No invented prices, ratings, release dates or availability for future platforms.
 import {ORIGIN,LANGUAGES,LANGUAGE_TAGS,DOWNLOAD_URL,PRO_PURCHASE_URL,FOUNDER_URL,PERSON_ID,STUDIO_URL,ORGANIZATION_ID,pageURL} from './site-config.mjs';
+import {INSTALL_GUIDE,installGuideTrack} from './install-guide.mjs';
 const ref=id=>({'@id':id});
 // 只标记首页可见的免费版与订阅；周期和税前标价按方案，不推测所在地税率。
 function offers(p) {
@@ -44,6 +45,17 @@ export function structuredData(c,kind,meta) {
       {'@type':'ListItem',position:1,name:c.home,item:pageURL(c.lang)},
       {'@type':'ListItem',position:2,name:kind==='docs'?c.docsTitle:c.privacyTitle,item:meta.canonical},
     ]});
+  }
+  if(kind==='docs') {
+    const track=installGuideTrack(c.lang);
+    const videoID=`${meta.canonical}#video`;
+    page.video=ref(videoID);
+    graph.push({
+      '@type':'VideoObject','@id':videoID,name:c.docsVideo.title,description:c.docsVideo.description,
+      contentUrl:`${ORIGIN}${INSTALL_GUIDE.src}`,thumbnailUrl:`${ORIGIN}${INSTALL_GUIDE.poster}`,
+      duration:INSTALL_GUIDE.duration,encodingFormat:'video/mp4',isPartOf:ref(pageID),
+      caption:{'@type':'MediaObject',contentUrl:`${ORIGIN}${track.src}`,encodingFormat:'text/vtt',inLanguage:track.language},
+    });
   }
   return {'@context':'https://schema.org','@graph':graph};
 }
