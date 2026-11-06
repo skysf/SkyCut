@@ -127,9 +127,9 @@ AI 对话、右边是 SkyCut 编辑器。窗口参照用户截图的工具栏、
 [Schema.org UnitPriceSpecification](https://schema.org/UnitPriceSpecification) 的 `billingDuration`。
 sitemap 与 canonical 仍为 12 个 URL。
 
-**PR E 只有在 Sky Studio 购买页正式上线并由 Claude 确认后才能合并**。可以提前完成
-本地开发、截图验收、开 PR 和等待 `check-all` 绿；这次任务到 CI 全绿即停，由 Claude
-合并，不启用自动合并，不创建任何云端部署。合并后才按既有 main 发布链路部署。
+**2026-11-06 已合并发布**：Claude 确认 Sky Studio 购买页正式上线后，PR E（#325）
+已合并，并按既有 main 发布链路上线。四语言首页的价格区、购买外链与 JSON-LD `offers`
+均已上线；对应 main 提交与部署记录见下方「运行与部署」。
 
 验收：`npm test` 覆盖四语言价格、权益、条款、导航和唯一购买外链，`npm run build` 后
 `npm run check:seo` 核对真实产物的 offers、币种和周期。人工回归检查四语言在桌面、
@@ -213,6 +213,10 @@ sitemap 与 canonical 仍为 12 个 URL。
   `dpl_9kNSMvUQTFARnfC3GVAxFm5E74P5` 为 READY。以后若接通 GitHub App，仍须只放行
   `main`，保留 `vercel.json` 的分支过滤；不能给功能分支或 PR 开 Preview。
   邮件服务尚未配置，单独开通与验收。
+- 价格与购买入口于 2026-11-06 通过 [PR #325](https://github.com/skysf/SkyCut/pull/325) 合并，main 提交
+  `81b6ca887c00663f7e7d9de5dfb4f4b1a76e2a37`；按上述实际发布链路调用 `POST /v13/deployments`
+  （`gitSource`、`ref=main`、`sha` 为该提交），Vercel 部署 `dpl_7MMY3iAmnbHuizVyfoewBFLt6S67` 为 READY。
+  Claude 已核对四语言首页均有价格区、购买外链和 JSON-LD `offers`。
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，

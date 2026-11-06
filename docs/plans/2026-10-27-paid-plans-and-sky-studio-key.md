@@ -6,7 +6,8 @@
 > 真 Codex 连 SkyCut 的冒烟见 [报告](../reports/2026-10-26-codex-client-smoke.md)。
 > 2026-11-05 / 06 加了「自助购买 Pro」一节（第 21–36 条：套餐与台数、税和宽限、到期提醒、结账语言与付款方式分流、拒付和商务客户）。
 > SkyCut 客户端 #319、#321、#322、#323 已合进 main（授权刷新、读新字段和购买链接、第 3 台 Mac 的提示、快到期和宽限提醒）；
-> Sky Studio 在一个 PR 里实施，测试环境的 Dodo 产品已建、正在真实测试付款，**正式环境尚未上线**。
+> **2026-11-06 已上线**：Sky Studio PR #238（main `42c39f34`）已发布至 6 个正式域名，购买页为 `https://skystudioai.com/app/skycut/pro`；
+> SkyCut 官网 PR #325（main `81b6ca8`）的价格与购买入口也已发布。上线与验收记录见下文；客户端改动虽已合并，**新版 App 尚未打包发给用户，发版待用户拍板**。
 
 ## 背景
 
@@ -128,10 +129,21 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 ## 自助购买 Pro（2026-11-05 拍的板）
 
 > 2026-11-05 用户拿一份讨论稿来问（只有一个 Pro、月付 / 年付、软件费和积分分开、付款放在 Sky Studio、用现有的 Dodo 账号），讨论后拍了下面几条。
-> **实施中，尚未正式上线**：SkyCut 客户端 #319、#321、#322、#323 已合进 main（授权刷新、读新字段和购买链接、第 3 台 Mac 的提示、快到期和宽限提醒）；Sky Studio 在一个 PR 里实施，测试环境的 Dodo 产品已建、正在真实测试付款，正式环境还没上线。两边代码由 Codex 写、Claude 调度和验收（用户 11-05 定）；SkyCut 这边一条一个小 PR。
+> **2026-11-06 已上线**：Sky Studio PR #238 已合并并正式发布，SkyCut 官网 PR #325 的价格与购买入口已合并发布。SkyCut 客户端 #319、#321、#322、#323 已合进 main（授权刷新、读新字段和购买链接、第 3 台 Mac 的提示、快到期和宽限提醒），新版 App 尚未打包发给用户、待用户拍板。两边代码由 Codex 写、Claude 调度和验收（用户 11-05 定）；SkyCut 这边一条一个小 PR。
 > 本节共第 21–36 条：退款、一次性的一年给谁、体验送多少积分，11-05 当天定了（第 28、21、23 条）；11-06 补了税、宽限、提醒、官网入口、结账语言和地址、老用户与拒付、商务客户（第 29–36 条）。
 > Dodo 后台的设置用户在测试和正式两个模式都点好了，见「Dodo 能做什么」里的「后台的设置」。
-> 做好之后，第 18 条「C 端先只写邮箱」和下面「我定的细节」里原来的「一把 key 算一个席位」由这一节取代；做好之前照旧写邮箱。
+> 第 18 条「C 端先只写邮箱」和下面「我定的细节」里原来的「一把 key 算一个席位」现由这一节取代；客户端购买链接改动已合并，App 发版状态以上文为准。
+
+上线与验收记录（Claude 于 2026-11-06 提供）：
+
+- **Sky Studio 发布**：PR #238 已合并，main 为 `42c39f34`，部署 `dpl_6XCmGtENoGHW2n4RyG1aLLZBAJbX` 按 Sky Studio 仓库的受控发布流程提升至 6 个正式域名。
+  顺序为合并 → 待发布部署 READY → 逐个核对 6 个域名仍指向旧部署 → 临时打开 `ENABLE_CONTROLLED_PRODUCTION_RELEASE`、重跑该次 main 的 Playwright → 发布 workflow 提升、上线后冒烟通过 → 开关关回 `false`。
+- **正式库与产品**：6 份迁移已套用，迁移前后授权数据校验值不变。Dodo 正式产品为月付 `pdt_0NrJuEpCy79ptZcST7VGI`、年付 `pdt_0NrJuFdqhMTJXj4ifSOR0`、微信一年 `pdt_0NrJuGMpuYmECz48Y6Z3z`；微信一年在 CN 结账总额 ¥999、税 0，照旧不含税。
+- **只读核对**：使用正式回调密钥签名的无害探针请求 `skystudios.app/api/dodoWebhook`，正确签名回 200、错误签名回 401；合并前对旧代码、提升前对待发布部署、提升后对正式域名各验一次。
+  购买页 `https://skystudioai.com/app/skycut/pro` 和 Mac 管理页均回 200，未登录的接口均回 401；本机复用服务器检查逻辑，只读核对 Dodo 三个产品，`readiness` 为 `true`。
+- **SkyCut 官网**：PR #325 合并后，按[官网实际发布链路](../architecture/skycut-website.md#运行与部署)调用 `POST /v13/deployments`，使用 `gitSource`、`ref=main`、`sha=81b6ca887c00663f7e7d9de5dfb4f4b1a76e2a37` 发布，部署 `dpl_7MMY3iAmnbHuizVyfoewBFLt6S67` 为 READY。四语言首页均已有价格区、购买外链和 JSON-LD `offers`。
+- **继续观察，不阻塞上线**：测试环境有一个欠费订阅，`2026-11-12T22:31:48Z` 宽限到期后 Dodo 应自动取消，可用 Sky Studio 仓库的 `scripts/observe-skycut-dodo-test.mjs` 只读观察；普通结账页满 24 小时后的终态仍待真实数据。
+- **尚未发版**：SkyCut App 新版需用户另行拍板；#319、#321–#323 已合进 main，尚未打包发给用户，不能把网页上线视为 App 已发版。
 
 ### 拍的板
 
@@ -162,9 +174,9 @@ OpusClip Pro 约 $14.5 / $29，Runway Standard $12 / $15，Screen Studio $9 / $2
 
 - **订阅**：取消分成两个开关「Allow Cancellation at Next Billing Date」「Allow Immediate Cancellation」（changelog v1.113.28），用户在 Dodo 的客户门户里自己点；
   扣款失败有宽限期（1–30 天，期间状态 `past_due`）。回调有 `subscription.active` / `renewed` / `plan_changed` / `on_hold` / `cancelled` / `expired` 和 `payment.succeeded`。
-  11-05 调研时，Sky Studio 的回调（`api/dodoWebhook.ts`）只处理充值包的一次性付款；订阅事件接入现随本轮 PR 实施和测试，尚未正式上线。
+  11-05 调研时，Sky Studio 的回调（`api/dodoWebhook.ts`）只处理充值包的一次性付款；订阅事件接入已随 Sky Studio PR #238 于 11-06 正式上线。
 - **固定人民币价**：Localized Pricing 能按币种设固定价，订阅也适用、续费保持这个价，按账单国家定币种；按固定价收时换汇费（2–4%）由我们出。
-  文档示例只有 INR / EUR；**11-06 测试环境已建人民币固定价产品，中国大陆实测税为 0、总额 ¥999**，正式环境尚未上线（第 29 条）。
+  文档示例只有 INR / EUR；**11-06 正式环境的微信一年产品在 CN 结账总额 ¥999、税 0，仍不含税**（第 29 条）。
 - **微信支付**：币种 USD / CNY，**只能一次性付款**，不能自动续费（changelog v1.94.0：「Not supported (one-time payments only)」）。
 - **支付宝**：只有**支付宝香港**（AlipayHK），只给账单地址在香港、用港币付的人，同样**只能一次性**、不出现在订阅的结账页（changelog v1.118.3）。
   大陆支付宝文档里没有。所以人民币的自动续费实际只能用 Visa / Master 双币卡。
