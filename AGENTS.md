@@ -66,7 +66,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 ### 打包与签名（2026-10-03 起）
 
 - DMG 使用脚本生成的双语 Retina 安装引导背景和固定 Finder 布局，不带旧 txt；正常打包不自动控制 Finder。
-  生成 / 模板更新和真挂载验收见 [构建与打包](docs/build/build-and-packaging.md)「DMG 安装窗口」。
+  生成 / 模板更新和真挂载验收见 [构建与打包](docs/build/build-and-packaging.md)「DMG 安装窗口」
+  （含 macOS 26.5.2 仍沿用用户路径栏 / 状态栏偏好的实测限制；不能把模板字段关闭当成实机已隐藏）。
 
 - 装给用户的包（正式版、测试版）和发版的包，只用固定的签名身份签：`scripts/build-app.sh`、`build-beta-app.sh` 自动经
   `scripts/signing/sign-app.sh` 签。它打出「⚠️ 没有发布用的签名身份，退回 ad-hoc」的包**不许装给用户、不许发版**：ad-hoc 的
