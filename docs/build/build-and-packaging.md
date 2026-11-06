@@ -230,6 +230,41 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 - 发版时 SkyCut 正在运行，本机 `/Applications/SkyCut.app` 没有替换，仍为 `0.18.58`。
   没有打 git tag，也没有创建 GitHub release，与 0.18.57 / 0.18.58 的做法一致。
 
+2026-11-06，随 DMG 安装引导背景发布 **0.18.60**（发版与验收事实由 Claude 提供）：
+
+- 构建源码：已通过 CI 的 main `83e02b0`（[PR #327](https://github.com/skysf/SkyCut/pull/327)：DMG 用双语 Retina
+  安装引导背景和固定 Finder 布局取代旧 txt）；App 本身只有版本号变化。
+- 产物：`SkyCut-0.18.60-arm64.dmg`，33,404,452 字节；SHA-256：
+  `5a2cfd505e53f659d5f86730bf9956bf3cb6e1315ecddaa20b704988727edf53`。签名仍钉在原固定证书。
+- 公开对象：`skycut/SkyCut-0.18.60-5a2cfd505e53-arm64.dmg`，immutable 缓存，先上传、从公开直链完整读回一致；
+  个人站 [skystudio PR #15](https://github.com/skysf/skystudio/pull/15)（合并提交 `c4ce149`）切换两条入口，
+  之后经固定入口完整下载核对一致。
+- 当天录「如何在 Mac 上安装 SkyCut」教程时，本机正式版从 0.18.58 经这个 DMG 装成 0.18.60。
+
+2026-11-06，用户拍板发版，发布 **0.18.61**（发版与验收事实由 Claude 提供）：
+
+- 构建源码：已通过 CI 的 main `b69414c8a5474b477cb20dee3d6b8412e42cfdbb`，包含
+  [#328](https://github.com/skysf/SkyCut/pull/328)（录屏账本按 bundle id 分开，正式版和测试版不再互相接管录制）与
+  [#330](https://github.com/skysf/SkyCut/pull/330)（录屏结束在界面和 MCP 都说清结果）；
+  用 `VERSION=0.18.61 arch -arm64 /bin/bash scripts/build-app.sh` 打包。
+- 产物：`SkyCut-0.18.61-arm64.dmg`，33,437,051 字节；SHA-256：
+  `caa5f05092b77c07579c56b481188369633071ed8279371cb2b22abc2e142ee1`。
+- App、ffmpeg、`skycut-mcp` 均为 arm64，Info.plist 版本为 `0.18.61`；签名钉在原固定证书
+  `76d275650223bc09efe7708900458dbdb0ab90ef`，本地 App 与挂载 DMG 内 App 的深度签名校验均通过。
+  `hdiutil verify` 通过，挂载包内主程序和 `skycut-mcp` 与本地构建字节一致；`scripts/check-dmg.sh` 通过。
+- MCP 初始化报告 `skycut` / `0.18.61`；ffmpeg 8.1 能运行；新增字符串 `Open recorded project` 在包内。
+- 公开对象：`skycut/SkyCut-0.18.61-caa5f05092b7-arm64.dmg`，immutable 缓存。先上传，再用
+  `scripts/check-release-download.py --url` 从公开直链完整读回，大小与 SHA-256 一致。
+- 个人站 [skystudio PR #16](https://github.com/skysf/skystudio/pull/16)（合并提交 `d887716`）把两条入口改到新对象，
+  Cloudflare Pages 部署成功；不带 `--url` 再跑一次，经固定入口 302 拿到的完整内容与本地 DMG 一致。
+- 本机 `/Applications/SkyCut.app` 和 `/Applications/SkyCut Beta.app`（同一构建经 `build-beta-app.sh`）都换成 0.18.61，
+  旧的两份进了废纸篓；两边 `get_status` 都报 `0.18.61`、Pro、录屏授权 granted。
+- 实机回归：测试版录屏时打开正式版，录制照常进行到停止（105 秒，修复前约 30 秒就失败）；测试版账本只在
+  `Application Support/com.srtflow.SrtFlow.beta/`，共用的 `SrtFlow/` 下没有账本。按时长停止的录制，`get_job`
+  报存到哪个文件、入轨到哪个工程哪个 clip、谁停的；之后再调 `record_screen action=stop` 返回 `already_stopped`
+  和同一份结果，不再说什么都没录到。
+- 没有打 git tag，也没有创建 GitHub release，做法同前。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
