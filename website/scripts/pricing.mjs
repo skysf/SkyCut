@@ -10,8 +10,8 @@ function billing(p,yearly) {
   const annual=annualBreakdown(p);
   return `<div class="pricing-billing ${yearly?'pricing-yearly':''}">
     <h4>${e(label)}</h4>
-    <p class="pricing-price"><strong>${p.symbol}${yearly?p.yearly:p.monthly}</strong><span>${e(yearly?p.year:p.month)}</span></p>
-    ${yearly?`<p class="pricing-equivalent">${e(p.equivalent)} <b data-annual-monthly>${p.symbol}${annual.perMonth}</b> ${e(p.month)}<span>${e(p.billedYearly)}</span></p><p class="pricing-saving">${e(p.save)} <b data-annual-saving>${p.symbol}${annual.saving}</b> ${e(p.savingsPeriod)}</p>`:''}
+    <p class="pricing-price"><strong${yearly?' data-annual-monthly':''}>${p.symbol}${yearly?annual.perMonth:p.monthly}</strong><span>${e(p.month)}</span></p>
+    ${yearly?`<p class="pricing-billed-yearly">${e(p.billedYearly)} <b data-annual-total>${p.symbol}${p.yearly}</b> ${e(p.year)}</p><p class="pricing-saving">${e(p.saving).replace('{amount}',`<b data-annual-saving>${p.symbol}${annual.saving}</b>`)}</p>`:''}
     <p class="pricing-credits">${e(yearly?p.yearlyCredits:p.monthlyCredits)}</p>
   </div>`;
 }
@@ -21,7 +21,10 @@ export function pricing(c) {
     <div class="section-heading"><div><h2 id="pricing-title">${e(p.title)}</h2><p>${e(p.intro)}</p></div><p class="pricing-trial">${icon('ai')}${e(p.trial)}</p></div>
     <div class="pricing-grid">
       <article class="pricing-card pricing-free" aria-labelledby="pricing-free-title">
-        <div class="pricing-plan-heading"><h3 id="pricing-free-title">${e(p.free)}</h3><p class="pricing-free-price">${e(p.freePrice)}</p></div>
+        <div class="pricing-plan-heading"><h3 id="pricing-free-title">${e(p.free)}</h3></div>
+        <p class="pricing-price"><strong>${p.symbol}0</strong><span>${e(p.freePrice)}</span></p>
+        <p class="pricing-free-summary">${e(p.freeSummary)}</p>
+        <a class="pricing-compare-link" href="#pricing-comparison">${e(p.freeCompare)}${icon('arrow')}</a>
         <a class="button button-outline" href="${DOWNLOAD_URL}">${e(c.download)}${icon('arrow')}</a>
       </article>
       <article class="pricing-card pricing-pro" aria-labelledby="pricing-pro-title">

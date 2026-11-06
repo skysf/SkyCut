@@ -6,9 +6,10 @@
 .pricing-grid {display:grid;grid-template-columns:1fr 1.85fr;gap:20px;}
 .pricing-card {min-width:0;border:1px solid var(--line);border-radius:var(--radius);padding:34px;}
 .pricing-plan-heading h3 {font-size:30px;color:var(--green);}
-.pricing-plan-heading>p {margin-top:12px;color:var(--muted);font-size:15px;}
-.pricing-free {display:flex;flex-direction:column;justify-content:space-between;gap:40px;}
-.pricing-free .pricing-free-price {font-size:21px;color:var(--ink);}
+.pricing-free {display:flex;flex-direction:column;justify-content:space-between;gap:24px;}
+.pricing-free-summary {font-size:16px;line-height:1.7;color:var(--muted);}
+.pricing-compare-link {display:inline-flex;align-items:center;align-self:flex-start;gap:8px;font-size:14px;color:var(--green);text-decoration:underline;text-underline-offset:4px;}
+.pricing-compare-link .icon {width:16px;height:16px;transform:rotate(90deg);}
 .pricing-free>.button {width:100%;}
 .pricing-pro {background:#e3e8d9;border-color:#b6c3a9;}
 .pricing-billing-grid {display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
@@ -19,15 +20,14 @@
 .pricing-price strong {font-size:clamp(40px,3.7vw,54px);font-weight:600;letter-spacing:-.05em;white-space:nowrap;font-variant-numeric:lining-nums tabular-nums;}
 .pricing-price>span {font-size:14px;color:var(--muted);white-space:nowrap;}
 .pricing-credits {margin-top:18px;font-size:13px;color:#505b4a;line-height:1.6;}
-.pricing-equivalent {margin-top:16px;font-size:14px;line-height:1.5;color:var(--green);}
-.pricing-equivalent b {white-space:nowrap;font-variant-numeric:tabular-nums;}
-.pricing-equivalent>span {display:block;font-size:12px;color:var(--muted);}
-.pricing-saving {margin-top:10px;font-size:12px;line-height:1.5;color:var(--green);}
+.pricing-billed-yearly {margin-top:12px;font-size:13px;line-height:1.6;color:var(--green);}
+.pricing-billed-yearly b {white-space:nowrap;font-variant-numeric:tabular-nums;}
+.pricing-saving {display:inline-block;margin-top:14px;padding:8px 10px;border-radius:8px;background:var(--green);font-size:12px;line-height:1.6;color:var(--paper);}
 .pricing-saving b {white-space:nowrap;}
 .pricing-purchase {display:flex;align-items:center;gap:18px;margin-top:24px;}
 .pricing-purchase>p {font-size:13px;color:#505b4a;}
 .pricing-wechat {font-size:13px;color:#505b4a;margin-top:18px;}
-.pricing-comparison {margin-top:64px;}
+.pricing-comparison {margin-top:64px;scroll-margin-top:32px;}
 .pricing-comparison>h3 {font-size:clamp(26px,3vw,36px);color:var(--green);letter-spacing:-.03em;}
 .comparison-intro {margin-top:14px;color:var(--muted);font-size:16px;line-height:1.6;}
 .pricing-comparison table {width:100%;table-layout:fixed;border-spacing:0;border:1px solid var(--line);border-radius:12px;margin-top:28px;overflow-wrap:anywhere;}
@@ -64,8 +64,7 @@
 }
 @media(max-width:900px) {
   .pricing-grid {grid-template-columns:1fr;gap:18px;}
-  .pricing-free {flex-direction:row;align-items:center;gap:24px;}
-  .pricing-free>.button {width:max-content;max-width:55%;}
+  .pricing-free {justify-content:flex-start;gap:22px;}
   .pricing-price strong {font-size:48px;}
   .pricing-terms {gap:28px;}
   .pricing-comparison th,.pricing-comparison td {padding:18px;}
@@ -74,7 +73,8 @@
   .pricing .pricing-trial {margin-top:20px;font-size:13px;max-width:none;width:fit-content;}
   .pricing-card {padding:22px;}
   .pricing-plan-heading h3 {font-size:28px;}
-  .pricing-free .pricing-free-price {font-size:15px;}
+  .pricing-free-summary {font-size:14px;}
+  .pricing-compare-link {font-size:13px;}
   .pricing-free>.button {font-size:12px;padding:12px;gap:8px;}
   .pricing-billing-grid {gap:10px;margin-top:18px;}
   .pricing-billing {padding:14px 12px;}
@@ -82,7 +82,8 @@
   .pricing-price {column-gap:5px;}
   .pricing-price strong {font-size:36px;}
   .pricing-price>span {font-size:12px;}
-  .pricing-equivalent {font-size:12px;}
+  .pricing-billing .pricing-price {flex-direction:column;gap:5px;}
+  .pricing-billed-yearly {font-size:12px;}
   .pricing-credits {margin-top:12px;font-size:12px;}
   .pricing-purchase {flex-direction:column;align-items:stretch;gap:12px;}
   .pricing-purchase>p {text-align:center;}

@@ -26,7 +26,7 @@ export function comparison(p) {
     return row(item.id,...c.features[item.id],item.free,item.pro,p,extra);
   }).join('');
   const cloud=cloudModelGroups.map(group=>row(`model-${group.id}`,c.models[group.id],'',group.id==='upscale'?'cloudUI':'unavailable',group.id==='upscale'?'cloudBoth':'cloudAI',p,list(group.models.map(model=>model.title),'comparison-model-list'))).join('');
-  return `<div class="pricing-comparison" aria-labelledby="comparison-title"><h3 id="comparison-title">${e(c.title)}</h3><p class="comparison-intro">${e(c.intro)}</p>
+  return `<div class="pricing-comparison" id="pricing-comparison" aria-labelledby="comparison-title"><h3 id="comparison-title">${e(c.title)}</h3><p class="comparison-intro">${e(c.intro)}</p>
     <table><caption class="visually-hidden">${e(c.title)}</caption><colgroup><col class="comparison-feature-column"><col><col></colgroup>
       <thead><tr><th scope="col">${e(c.feature)}</th><th scope="col">${e(p.free)}</th><th scope="col">${e(p.pro)}</th></tr></thead>
       ${features}<tbody>${groupTitle('local',c.localTitle,c.localNote)}${local}</tbody><tbody>${groupTitle('cloud',c.cloudTitle,c.cloudNote)}${cloud}</tbody>

@@ -24,10 +24,14 @@ for(const language of languages) {
     for(const term of ['Claude Code',language==='zh'?'Claude 桌面版':'Claude Desktop','Codex','MCP','Sky Studio'])assert.ok(text.includes(term));
     assert.doesNotMatch(text,/[。！？；，、：!?;:]|\b\d+%/);
     assert.doesNotMatch(section,/undefined|\[object Object\]|<form|dodo|iframe/i);
-    assert.deepEqual([...section.matchAll(/<strong>([^<]+)<\/strong>/g)].map(m=>m[1]),language==='zh'?['¥129','¥999']:['$19','$149']);
-    const links=[...section.matchAll(/<a\b[^>]*>/g)].map(m=>m[0]);assert.equal(links.length,2);
-    assert.ok(links[0].includes('href="https://skylu.ai/download/skycut"'));
-    assert.match(links[1],/href="https:\/\/skystudioai.com\/app\/skycut\/pro" target="_blank" rel="noopener noreferrer"/);
+    const p=prices(language);
+    assert.deepEqual([...section.matchAll(/<strong(?: [^>]*)?>([^<]+)<\/strong>/g)].map(m=>m[1]),[`${p.symbol}0`,`${p.symbol}${p.monthly}`,`${p.symbol}${(p.yearly/12).toFixed(2)}`]);
+    const links=[...section.matchAll(/<a\b[^>]*>/g)].map(m=>m[0]);assert.equal(links.length,3);
+    assert.ok(links.some(link=>link.includes('href="https://skylu.ai/download/skycut"')));
+    assert.ok(links.some(link=>/href="https:\/\/skystudioai.com\/app\/skycut\/pro" target="_blank" rel="noopener noreferrer"/.test(link)));
+    const free=section.match(/<article class="pricing-card pricing-free"[\s\S]*?<\/article>/)[0];
+    for(const key of ['freePrice','freeSummary','freeCompare'])assert.ok(free.includes(c.pricing[key]));
+    assert.match(free,/href="#pricing-comparison"/);assert.match(section,/id="pricing-comparison"/);
     if(language==='zh')assert.ok(text.includes('微信支付一次性买一年 ¥999 不会自动续费'));
     else assert.doesNotMatch(section,/微信|WeChat|¥|CNY/);
     for(const kind of ['docs','privacy','error']) {
@@ -64,11 +68,16 @@ for(const language of languages) {
   test(`${language}: annual equivalents and savings come from the displayed price data while JSON-LD retains real prices`,async()=>{
     const {default:c}=await import(`../content/${language}.js`);
     const p=prices(language),section=sectionOf(c);
-    assert.ok(section.includes(`data-annual-monthly>${p.symbol}${(p.yearly/12).toFixed(2)}</b>`));
+    const yearly=section.match(/<div class="pricing-billing pricing-yearly">[\s\S]*?<\/div>/)[0];
+    assert.ok(yearly.includes(`<strong data-annual-monthly>${p.symbol}${(p.yearly/12).toFixed(2)}</strong><span>${c.pricing.month}</span>`));
+    assert.ok(yearly.includes(`class="pricing-billed-yearly">${c.pricing.billedYearly} <b data-annual-total>${p.symbol}${p.yearly}</b> ${c.pricing.year}`));
     assert.ok(section.includes(`data-annual-saving>${p.symbol}${p.monthly*12-p.yearly}</b>`));
-    assert.ok(section.includes(c.pricing.billedYearly));
+    const saving=yearly.match(/<p class="pricing-saving">([\s\S]*?)<\/p>/)[1].replace(/<[^>]*>/g,'');
+    assert.equal(saving,c.pricing.saving.replace('{amount}',`${p.symbol}${p.monthly*12-p.yearly}`));
+    assert.ok(yearly.indexOf('data-annual-monthly')<yearly.indexOf('pricing-billed-yearly'));
     const custom=pricing({...c,pricing:{...c.pricing,monthly:25,yearly:210}});
-    assert.ok(custom.includes(`data-annual-monthly>${p.symbol}17.50</b>`));assert.ok(custom.includes(`data-annual-saving>${p.symbol}90</b>`));
+    assert.ok(custom.includes(`data-annual-monthly>${p.symbol}17.50</strong>`));assert.ok(custom.includes(`data-annual-saving>${p.symbol}90</b>`));
+    assert.ok(custom.includes(`data-annual-total>${p.symbol}210</b>`));
     const graph=JSON.parse(render(c).match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
     const offers=graph.find(node=>node['@type']==='SoftwareApplication').offers;
     assert.deepEqual(offers.map(offer=>offer.price),[0,p.monthly,p.yearly]);
