@@ -161,6 +161,26 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
   [skystudio PR #13](https://github.com/skysf/skystudio/pull/13) 更新，网站页面与 Vercel
   官网构建未改变。每次发布仍须执行上述固定入口的完整下载守卫。
 
+2026-11-06，用户拍板发版，发布 **0.18.59**（发版与验收事实由 Claude 提供）：
+
+- 构建源码：已通过 CI 的 main `81b6ca887c00663f7e7d9de5dfb4f4b1a76e2a37`，包含
+  #319、#321–#323 的客户端改动；用 `VERSION=0.18.59 arch -arm64 /bin/bash scripts/build-app.sh` 打包。
+- 产物：`SkyCut-0.18.59-arm64.dmg`，33,154,366 字节；SHA-256：
+  `6b510389d6681154c76f1a8874a03e56383a0d348964a04d63f2d5e471d58b30`。
+- App 为 arm64，Info.plist 版本为 `0.18.59`。签名仍钉在原固定证书
+  `76d275650223bc09efe7708900458dbdb0ab90ef`，没有退回 ad-hoc；本地 App 与挂载 DMG 内
+  App 的深度签名校验均通过。`hdiutil verify` 通过，挂载包内主程序与本地构建字节一致。
+- MCP 初始化报告 `skycut` / `0.18.59`；ffmpeg 能运行，ffmpeg 与 `skycut-mcp` 均为 arm64，
+  包内授权声明为当前 AGPL-3.0。新增字符串 `machine_limit_reached`、
+  `Open Sky Studio to update your payment method`、`Open Sky Studio to renew SkyCut Pro` 均在包内。
+- 公开对象：`skycut/SkyCut-0.18.59-6b510389d668-arm64.dmg`，使用 immutable 缓存。
+  先上传，再用 `scripts/check-release-download.py --url` 从公开直链完整读回，大小与 SHA-256 一致。
+- 个人站 [skystudio PR #14](https://github.com/skysf/skystudio/pull/14)（合并提交 `6cd9103`）
+  将 `/download/skycut` 两条重定向改到新对象，Cloudflare Pages 部署成功。之后不带 `--url`
+  再跑 `scripts/check-release-download.py`，经固定入口 302 拿到的完整内容与本地 DMG 一致。
+- 发版时 SkyCut 正在运行，本机 `/Applications/SkyCut.app` 没有替换，仍为 `0.18.58`。
+  没有打 git tag，也没有创建 GitHub release，与 0.18.57 / 0.18.58 的做法一致。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
