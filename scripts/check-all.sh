@@ -179,6 +179,8 @@ run_check "screen-recording-writer（录屏产物盖到 T1）" scripts/check-scr
 
 # ---- 第 5 组 ----
 shard 5
+run_check "dmg-packaging (fixed Finder layout, Retina background and no readme)" checks/dmg-packaging.sh
+run_check "dmg (build and mount the production installer fixture)" scripts/check-dmg.sh
 # 扫描守卫（通用类）和几项不要 App 的纯值检查：秒级到十几秒，放在本组最前。
 run_check "no-hardcoded-fps（扫描守卫）" checks/no-hardcoded-fps.sh
 run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-build-output.sh

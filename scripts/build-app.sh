@@ -104,84 +104,10 @@ rm -rf "$(dirname "$ICONSET")"
 echo "==> codesign"
 scripts/signing/sign-app.sh "$APP"
 
-# DMG：App + /Applications 快捷方式 + 首次打开说明
+# DMG：真实 App / Applications 图标 + 双语引导背景 + 固定 Finder 布局（不控制 Finder）。
 echo "==> 生成 DMG"
-DMG_ROOT="$DIST/dmg-root"
-rm -rf "$DMG_ROOT"
-mkdir -p "$DMG_ROOT"
-cp -R "$APP" "$DMG_ROOT/"
-ln -s /Applications "$DMG_ROOT/Applications"
-
-# 这个 App 只用自己的自签名证书签（没有的话是 ad-hoc），没有 Apple 公证。DMG 一经网络或 AirDrop 传输，
-# 整个 .app 会被打上下载隔离标记，App 第一次打开会被 macOS 拦下。
-# 走「系统设置 → 隐私与安全性 → 仍要打开」放行即可，不用碰终端：放行之后 App
-# 启动时会自己清掉包上的隔离标记（Quarantine.repairOwnBundleIfNeeded），
-# 包内的 ffmpeg 就不会再被系统 SIGKILL。终端那行留作兜底。
-cat > "$DMG_ROOT/首次打开必读 - Read Me First.txt" <<'READMEEOF'
-SkyCut — 首次打开必读 / Read Me First
-======================================
-
-【中文】
-
-1. 把 SkyCut.app 拖到左边的「应用程序」文件夹。
-   （一定要拖进去再打开，别直接在这个磁盘映像里双击运行。）
-
-2. 双击 SkyCut。这个 App 没有做 Apple 公证（自用小工具，公证要每年 99 美元），
-   所以第一次打开会被 macOS 拦下，提示「无法打开」。点「完成」/「好」。
-
-3. 打开「系统设置」→「隐私与安全性」，往下翻到「安全性」那一段，
-   会看到一行关于 SkyCut 被阻止的提示，点右边的「仍要打开」，
-   再按提示输入你的密码 / 用触控 ID 确认。
-
-4. 回到「应用程序」里再双击 SkyCut，这次就正常打开了。
-   压缩视频、烧制字幕全部功能都能用。
-
-以上只需要做一次。
-
-万一第 4 步打开后，一点「开始压缩」或「烧制字幕」就失败，说明系统仍然
-拦着包内的 ffmpeg。这时打开「终端」，粘贴下面这一行、回车，然后重开 SkyCut：
-
-    xattr -dr com.apple.quarantine /Applications/SkyCut.app
-
-软件里也会把这一行显示给你，旁边还有直接打开系统设置的按钮。
-
-运行要求：Apple 芯片（M 系列）Mac，macOS 15 Sequoia 或更新版本。
-不需要额外安装 ffmpeg 或任何其他依赖，全部功能都在包内。
-
-
-【English】
-
-1. Drag SkyCut.app into the Applications folder on the left.
-   Open it from there — do not run it straight out of this disk image.
-
-2. Double-click SkyCut. This app is not notarised by Apple (it is a personal
-   tool, and notarisation costs $99/year), so macOS blocks the first launch and
-   says it cannot be opened. Dismiss that dialog.
-
-3. Open System Settings → Privacy & Security, scroll down to the Security
-   section. There is a line saying SkyCut was blocked — click "Open Anyway"
-   next to it and confirm with your password or Touch ID.
-
-4. Double-click SkyCut again. It opens normally now, with compression and
-   subtitle burn-in fully working.
-
-That is a one-time step.
-
-If it does open but compression or burn-in fails the instant you start it, macOS
-is still blocking the ffmpeg inside the bundle. Open Terminal, paste this line,
-press Return, and reopen SkyCut:
-
-    xattr -dr com.apple.quarantine /Applications/SkyCut.app
-
-The app shows you the same line, next to a button that opens System Settings.
-
-Requirements: an Apple silicon (M-series) Mac running macOS 15 Sequoia or later.
-No need to install ffmpeg or anything else — everything is inside the app.
-READMEEOF
 DMG="$DIST/$APP_NAME-$VERSION-arm64.dmg"
-rm -f "$DMG"
-hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_ROOT" -ov -format UDZO "$DMG" >/dev/null
-rm -rf "$DMG_ROOT"
+/bin/bash scripts/build-dmg.sh "$APP" "$DMG"
 
 echo
 echo "完成："
