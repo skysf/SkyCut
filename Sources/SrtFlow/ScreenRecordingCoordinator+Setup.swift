@@ -576,7 +576,7 @@ extension ScreenRecordingCoordinator {
         case .starting, .recording, .stopping, .finishing, .importing, .partialRecovery:
             beginTerminationWait()
             Task { @MainActor in
-                await self.stop()
+                await self.stop(cause: .quit)
                 self.settleTerminationIfPossible()
             }
             return false

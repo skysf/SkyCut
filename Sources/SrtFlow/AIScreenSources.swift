@@ -69,6 +69,7 @@ enum AIScreenSources {
             object["recorded_seconds"] = .number(Date().timeIntervalSince(startedAt).rounded())
         }
         if let job = AIScreenRecordingTool.current?.job, job.status == .running { object["job_id"] = .string(job.id) }
+        if let latest = ScreenRecordingFeedback.shared.latest { object["last_recording"] = latest.json }
         if let leftover = AIScreenRecordingLeftovers.json(coordinator) { object["leftover"] = leftover }
         guard listSources else { return .object(object) }
 

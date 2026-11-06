@@ -1340,3 +1340,35 @@
 "Open Sky Studio to renew SkyCut Pro" = "打开 Sky Studio 续约 SkyCut Pro";
 "Update Payment Method" = "更新付款方式";
 "Open Sky Studio to update your payment method" = "打开 Sky Studio 更新付款方式";
+
+"Recording saved" = "录屏已保存";
+
+"Recording saved with issues" = "录屏已保存，但有异常";
+
+"Recording failed" = "录屏失败";
+
+"Recording cancelled" = "录屏已取消";
+
+"Reason: %@" = "原因：%@";
+
+"A file remains but could not be read: %@" = "留下了文件，但无法读取：%@";
+
+"Usable temporary file: %@" = "可用的临时文件：%@";
+
+"Saved to: %@" = "已保存到：%@";
+
+"No usable recording file was kept." = "未留下可用的录屏文件。";
+
+"Added to “%1$@” (%2$@), track %3$@." = "已放入「%1$@」（%2$@）的 %3$@ 轨道。";
+
+"Choose whether to add this recording to the timeline or keep the file only." = "请选择将这段录屏加入时间线，或仅保留文件。";
+
+"Not added to the timeline." = "未加入时间线。";
+
+"This project is in the background and has no window." = "此工程在后台运行，尚未打开窗口。";
+
+"Recording results: %lld" = "录屏结果：%lld 条";
+
+"Open recorded project" = "打开录制工程";
+
+"The recording location is unavailable; this file could not be checked: %@" = "录屏位置暂时无法访问，无法核对这个文件：%@";

@@ -155,15 +155,17 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
 谁起的（driver）、倒数几秒、录完入不入轨、撞上已有文件能不能替换、浮窗放哪、入轨那一下怎么提交（landing）、结局告诉谁（observer）。
 产品口径见 [录屏进 MCP](../plans/2026-10-03-screen-recording-mcp.md)，AI 那一侧的规矩见 [AI 接口（MCP）](ai-control-mcp.md) 第四节第 45 条。
 
-1. **协调者不按「是不是 AI」写第二套流程**，只问会话：设置页、残缺结果的处置框、系统的选择窗口、为拖区域激活 App —— 只给手动的会话
+1. **协调者不按「是不是 AI」写第二套流程**，只问会话：设置页、系统的选择窗口、为拖区域激活 App —— 只给手动的会话
    （`asksTheUser`）。设置页是 `showsSetupSheet`（`.configuring` **且**手动）的投影：AI 的会话也路过 `.configuring`。
+   设置页的关闭回调也必须查 `showsSetupSheet`，不能仅查 `.configuring`，否则没呈现的手动 sheet 能撤销 AI 会话。
 2. **AI 的会话带着挑好的来源**（`ScreenRecordingOptions.preset`：整屏 / 窗口是现取的 `SCShareableContent` filter，区域只有显示器几何）；
    `chooseSource` 头一行就认它，建系统选择窗口之前先挡住 AI 的会话（用户：「授权了以后，日后就不要再自己弹了」）。
 3. **状态机一条边都没加**：AI 的会话照样 idle → configuring → choosingSource → … → finishing → importing → finished → idle；「只留文件」也经
    `.importing` 收尾（那时文件早已提交，处置算了结）。工程锁、journal、清账合同、退出协调全都照旧。
 4. **AI 起的从不覆盖**：手动的那次「替换」是用户在保存面板里点过的，AI 没有这一步。`ScreenRecordingFileCommit` 在不许替换时先避让到「名字 2」、
    **先把新目标写进 manifest、持久化，再挪文件**（同麦克风 sidecar 那一路的 journal 身份，复审二 P1-3）。
-5. **残缺的结果 AI 起的不弹框**：照样入轨（或只留文件），原因写进结局 —— 弹框 AI 点不着，`.partialRecovery` 会一直锁着工程。
+5. **残缺的结果 AI 起的不弹框**：照样入轨（或只留文件），原因写进结局。手动的残缺结果自 2026-11-06 起在全 App 录屏 notice 内
+   选「加入时间线 / 仅保留文件」，不再弹模态 sheet；选择前工程锁保留，notice 不能关闭，选择后更新原 notice。
 6. **入轨的提交跟着会话走**：`importScreenRecording` / `importRecoveredRecording` 的那一次 perform 都经 `landing.commit`
    （AI 的包 `AIUndoGrouping.step` —— 落地时不在用户事件里，不包就撤一步全退），返回入轨的片段 id；后台模式不选中、不挪播放头。
 7. **结局交给观察者**：每条收尾路径（入轨、只留文件、残缺待决、没录成、失败）各告诉一次，**在状态回到空闲之后**（它可能马上开下一段）。
@@ -171,6 +173,33 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
 8. AI 的会话不写回手动记住的偏好（目录、麦克风），浮窗放主屏左下角（AI 截屏看不见浮窗，顶部正中压着浏览器的地址栏）。
 
 守卫：`checks/screen-recording-ai-wiring.sh`（扫描）+ `scripts/check-mcp.sh` 的 `ScreenRecordingToolChecks`（纯值）。
+
+## 收尾回执、界面与 AI（2026-11-06）
+
+**每次结束都必须有用户看得见的结果，包括后台工程。** 工程自己的 `notice` 不能承担这条合同：后台工程没有窗口，
+普通成功入轨还会清空它。`ScreenRecordingCompletion` 在释放资源前快照会话和目标，在状态回到空闲后统一发布
+`ScreenRecordingReceipt` 并通知观察者；残缺待决也发布同一份回执。`ScreenRecordingFeedback` 管全 App notice 和按 AI 会话留的记录。
+
+- `MainWindowView` 与每个 `ProjectWindowRoot` 都挂 `ScreenRecordingNotice`，当前是哪个工程、主窗口在哪个工具页均可看见。
+  提示常驻到用户关闭，展示完整路径、真实目标工程短 id / 名字、实际轨道；后台工程明确说没有窗口。
+  「在访达中显示」只在用户点后打开 Finder；「打开录制工程」只在同一工程代号仍开着时可用，点后才开窗 / 切过去。
+  不自动抢前台，不为收尾结果弹模态框；所有固定文案进入每张语言表。
+- 成功、仅留文件、残缺、失败、未开录取消都经回执。失败必须给原因以及有无可用文件；提交后入轨失败仍要给已保存文件。
+  文件按本次 journal 的阶段和精确路径核对并真实 probe；`.writing` 的最终位置可能是用户原有文件，不能认作本次结果。
+  卷不可达是「无法核对」，不能说没留下文件；无法读的残留也不能说可用。
+- **停止来源在第一次停止时锁定**：`stopped_by` 为 `user / ai / automatic`，`stop_method` 区分
+  `control_panel / record_screen / duration / quit / ai_activity_stop / cancel_job / stream_error / low_disk_space / writer_error / setup_error / source_picker_cancelled`。
+  晚到的 Stop、迟到的取消与重复回调都不能改写已经完成的回执或 job。
+- `current` 只代表最近一次 AI 尝试，**不是完成历史**。空闲时 `record_screen action=stop` 读回原会话的最近录制回执
+  （手动录制可作回退），带原 job id、状态、文件、clip id、轨道和停止来源。后续没开录的重试取消不覆盖真正录好的那段。
+  `get_job` 冻结同一组事实，`get_status.screen_recording.last_recording` 也公开最近回执。
+- 用户停止 AI 起的录制，按发起时的会话号留附言；原会话下一次**任意工具调用**开始时取走，再经 `MCPBridge.addingNote`
+  附到结果最前面，错误回答也带，图和 `isError` 不变。其他会话不消费；已经在执行的调用不抢走这条说明。
+  说明包含原 job、文件、工程、clip 与实际轨道，一次交付；不把本地化提示条当作 AI 已读到的证据。
+
+回归：`scripts/check-screen-recording-feedback.sh` 链接真实 App 对象，在独立 bundle / 临时目录中验证后台目标、真实 Stop / get_job / get_status、
+原会话附言、失败媒体回读和中英西文案，不捕获真实屏幕、不显示窗口。生产窗口接线由 `checks/screen-recording-ai-wiring.sh` 第 15 条守住。
+完整案例与反向验证见 [录完了却没有清楚告知结果](../bugfixes/2026-11-06-screen-recording-completion-feedback.md)。
 
 ## 自检纪律
 
@@ -189,5 +218,9 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
 1. Beta 用 `record_screen` 录制至少一分钟；期间首次打开正式版，Beta 必须持续录制、停止后文件可读且正常入轨。
 2. 对调正式版与 Beta 再走一次；账本只出现在各自 bundle id 的目录，另一构建的启动、开录与清账均不动它。
 3. 同一构建真实崩溃后重启仍提示自己的可恢复结果；旧共用账本和点名的临时媒体始终保留原样。
-4. 用户先按浮窗 Stop、已入轨后，再调 `record_screen action=stop`：应明确没有正在录制的会话，
-   返回最近结果与原 job id，不得误报什么都没录到。此项用户已报告异常，本次仅记录，见上述案例的旁查。
+4. AI 在后台工程录制，用户先按浮窗 Stop：另一个前台工程窗口和主窗口必须显示路径、后台工程与 V1，两个入口可用；
+   `record_screen action=stop`、`get_job`、`get_status` 的 job、路径、clip 和停止来源一致；原会话下一次任意工具只收到一次附言。
+5. 换成 MCP Stop、自动时长、仅留文件、不可用视频、部分可用文件、入轨失败、手动残缺待决各走一次；没有成功静默、假成功或模态结果框。
+   在另一个工程窗口点「加入时间线 / 仅保留文件」仍只处置原工程；双击按钮不重复处理。
+6. 英 / 中 / 西三种语言，默认窗口宽度、长路径与多条录制结果：文案可读、能滚动看全，关闭新消息后仍可看前一条；
+   后台工程不因通知自动开窗，只有用户点入口才切过去。真实 GUI / TCC 矩阵仍需获准操作时实测，自动化对象回归不冒充它。

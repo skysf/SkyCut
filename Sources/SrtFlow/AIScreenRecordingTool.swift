@@ -93,10 +93,11 @@ enum AIScreenRecordingTool {
             options.microphone = await microphone.resolve(for: job)
             // 等麦克风授权的时候被叫停了（stop / cancel_job / 横幅上的停止）：不开了。
             guard job.job.status == .running else { return }
-            guard coordinator.beginAutomated(plan) else {
+            guard coordinator.beginAutomated(plan, for: project) else {
                 job.fail("SkyCut became busy with another screen recording before this one could start.")
                 return
             }
+            job.enteredCoordinator()
             await coordinator.start(options: options, project: project)
         }
         await job.waitUntilUnderway(seconds: Double(request.countdown) + 15)
@@ -145,15 +146,27 @@ enum AIScreenRecordingTool {
         let coordinator = ScreenRecordingCoordinator.shared
         switch coordinator.state {
         case .idle, .finished, .failed:
+            var cancelledPendingJob: String?
             // 还在等用户点麦克风授权、没交给协调者：不开了。
-            if let waiting = current, waiting.job.status == .running, waiting.startedAt == nil {
+            if let waiting = current, waiting.job.status == .running, !waiting.hasEnteredCoordinator,
+               waiting.job.session == AICallContext.current?.session {
                 waiting.cancelBeforeStart()
-                return .ok(AIJobs.shared.json(waiting.job))
+                cancelledPendingJob = waiting.job.id
             }
-            // 用户先按了停止、或者 duration 到点了：把刚结束的那一段的结局给它。
+            // 历史按会话保存，不由 current（可能已被一次未开录的重试替换）推断。
+            if let receipt = ScreenRecordingFeedback.shared.recent(for: AICallContext.current?.session ?? AIProjectSessions.anonymous) {
+                var result = receipt.json.objectValue ?? [:]
+                result["already_stopped"] = true
+                result["message"] = .string("No screen recording is running. " + receipt.message)
+                if let cancelledPendingJob { result["cancelled_before_start_job_id"] = .string(cancelledPendingJob) }
+                return .ok(.object(result))
+            }
             if let job = current?.job, job.status != .running { return .ok(AIJobs.shared.json(job)) }
             throw AIToolError("No screen recording is running.")
         case .partialRecovery:
+            if let receipt = ScreenRecordingFeedback.shared.recent(for: AICallContext.current?.session ?? AIProjectSessions.anonymous), receipt.waitingForDecision {
+                return .ok(receipt.json)
+            }
             throw AIToolError(AIScreenRecordingLeftovers.waitingMessage(coordinator))
         default:
             break
@@ -167,7 +180,7 @@ enum AIScreenRecordingTool {
             current = job
             coordinator.handOver(to: job, landing: landing(for: project))
         }
-        await coordinator.stop()
+        await coordinator.stop(cause: .mcp)
         await AIJobs.shared.wait(for: job.job, seconds: 30)
         guard case .object(var result) = AIJobs.shared.json(job.job) else { return .ok(AIJobs.shared.json(job.job)) }
         if job.job.status == .running { result["next_step"] = "Still finishing the file; wait with get_job." }

@@ -88,6 +88,7 @@ private struct ProjectWindowRoot: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         VideoEditView(project: project, host: .projectWindow)
+            .overlay(alignment: .top) { ScreenRecordingNotice() }
             .navigationTitle(project.projectName)
     }
 }

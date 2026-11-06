@@ -771,6 +771,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `ScreenRecordingFileCommit` 也先避让、写进 manifest 再挪；不写回手动记住的目录和麦克风选择（AI 给的设置只用于这一次）。
    - **停止 = 留着**：`action=stop` 等收尾和入轨做完直接回结局；`cancel_job`、用户在横幅上按停止也是停下来留着（录下来的东西从不扔）；倒数、拖区域、
      等麦克风授权时停是干净取消。
+     **2026-11-06：已经停止时再 Stop 必须返回真正录好的那段**，不能拿 `current` 上后一次未开录尝试的 cancelled 顶替。
+     回执带 `job_id / status / file / project / clip_ids / clips[{id,track}] / stopped_by / stop_method`，文件用完整路径；
+     `get_job` 与 `get_status.screen_recording.last_recording` 同源。无可用文件、无法读取的残留、卷不可达三种事实分开说。
+   - **用户按 Stop 后 AI 也要知道**：发起录制的会话下一次任意工具结果最前面附一句，说明用户已停止、保存位置、目标工程与 clip。
+     附言按发起时的会话号保留，一次交付，不给其他会话，不由已在执行的请求抢走；错误结果、图和原有 `isError` 保留。
+     接在路由最外层，经 `MCPBridge.addingNote`，不只在 get_job 上加。晚到 Stop 不改写第一次停止的来源。
+   - **用户界面也要知道**：全 App 的非模态录屏 notice 在主窗口和所有工程窗口显示同一份回执，成功也必须提示完整路径与实际落点；
+     后台工程明确说无窗口，提供「在访达中显示 / 打开录制工程」，只有用户点才切过去。失败或残缺说原因与可用文件。
+     手动残缺结果在 notice 内选入轨 / 仅留文件，不再弹模态结果框；详见 [录屏生命周期](screen-recording-lifecycle.md)「收尾回执、界面与 AI」。
    - **上次没收完的**（崩溃恢复的 `pendingRecovery`、手动录制的残缺结果）：`get_status` 的 `screen_recording.leftover` 报出来（报**保存之后叫什么**，
      不报隐藏的 `.partial` 临时文件名；还没保存的带 `saved: false`）、挡住新开录（manifest 只有一份）；
      `action=resolve decision=add|keep|discard` 走恢复框 / 残缺框那同一份处置（`resolveRecovery` / `resolvePartial`）；discard 是删文件：**先问**

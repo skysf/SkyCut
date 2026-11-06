@@ -32,6 +32,13 @@ final class AIToolRouter {
 
     /// `begin`：轮到这个调用时（排完队之后）先问一句 —— 小程序不等了（App 卡过、它放弃了）就回 false，不做（AIBridgeCalls）。
     func handle(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
+        let note = ScreenRecordingFeedback.shared.takeNote(for: request.session ?? AIProjectSessions.anonymous)
+        var answer = await handleRequest(request, begin: begin)
+        if let note { answer.result = MCPBridge.addingNote(note, to: answer.result) }
+        return answer
+    }
+
+    private func handleRequest(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
         guard request.bridge == MCPBridge.version else {
             return Answer(result: MCPBridge.textResult(
                 "This SkyCut and its AI helper come from different versions. Ask the user to restart the AI app.",
