@@ -589,7 +589,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 架构与长期约束索引
 
-- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、本地预览与合并后部署、Free / Pro 功能对比与模型快照、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
 
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
 
