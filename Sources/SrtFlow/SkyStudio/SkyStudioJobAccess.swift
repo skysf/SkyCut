@@ -23,8 +23,7 @@ enum SkyStudioJobKey {
                 return "No Sky Studio API key is set in SkyCut. Ask the user to create one in Sky Studio (the avatar at the top right → SkyCut) "
                     + "and paste it in SkyCut Settings → Sky Studio."
             case .needsPermission:
-                return "SkyCut needs the user's permission to read the Sky Studio key: ask them to open SkyCut Settings → Sky Studio and "
-                    + "click Allow…, then try again."
+                return "SkyCut needs the user's permission to read the Sky Studio key. " + SkyStudioKeychainNoticePolicy.aiNextStep
             case .keychain(let status):
                 return "The macOS keychain did not give SkyCut the Sky Studio key (error \(status))."
             }
@@ -32,12 +31,16 @@ enum SkyStudioJobKey {
     }
 
     /// `willAsk`：要弹授权框之前在主线程上叫一声（界面先说一句这是什么）；`.silent` 从不弹。
-    static func key(_ mode: Mode, willAsk: @escaping @MainActor @Sendable () -> Void = {}) async -> Result<String, Problem> {
-        let result = mode == .prompting ? await SkyStudioKey.cache.key(willAsk: willAsk) : await SkyStudioKey.cache.keyWithoutPrompt()
+    static func key(_ mode: Mode, willAsk: @escaping @MainActor @Sendable () -> Void = {}, cache: KeychainSecretCache = SkyStudioKey.cache) async -> Result<String, Problem> {
+        let result = mode == .prompting ? await cache.key(willAsk: willAsk) : await cache.keyWithoutPrompt()
         switch result {
-        case .key(let key): return .success(key)
+        case .key(let key):
+            NotificationCenter.default.post(name: SkyStudioKeychainNoticePolicy.keyRead, object: nil)
+            return .success(key)
         case .missing: return .failure(.noKey)
-        case .needsPermission: return .failure(.needsPermission)
+        case .needsPermission:
+            NotificationCenter.default.post(name: SkyStudioKeychainNoticePolicy.permissionNeeded, object: nil)
+            return .failure(.needsPermission)
         case .failed(let status): return .failure(.keychain(status))
         }
     }

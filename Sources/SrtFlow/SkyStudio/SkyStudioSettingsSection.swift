@@ -99,7 +99,8 @@ private struct SkyStudioAccountRows: View {
                 Text(verbatim: me?.account.email ?? "—")
                     .lineLimit(1)
                     .truncationMode(.middle)
-                Button("Remove Key") { account.removeKey() }
+                Button("Remove Key") { Task { await account.removeKey() } }
+                    .disabled(account.checking || account.authorizingKeychain)
                     .accessibilityIdentifier("skystudio-remove-key")
                     .instantHelp("Remove the Sky Studio key from the macOS keychain")
             }
@@ -110,7 +111,7 @@ private struct SkyStudioAccountRows: View {
         LabeledContent {
             HStack(spacing: 6) {
                 planText
-                Button("Check Again") { Task { await account.refresh(promptKeychain: true) } }
+                Button("Check Again") { Task { await account.refresh() } }
                     .accessibilityIdentifier("skystudio-check-again")
                     .disabled(account.checking)
                     .instantHelp("Ask Sky Studio again about this account")
@@ -221,6 +222,7 @@ private struct SkyStudioCreditLimitRow: View {
 
 /// 问不成、存不了时那一句（橙色），能自己解决的带一个按钮 / 链接。
 private struct SkyStudioProblemLine: View {
+    @ObservedObject private var account = SkyStudioAccount.shared
     let problem: SkyStudioProblem
     let license: SkyCutLicense
 
@@ -242,8 +244,10 @@ private struct SkyStudioProblemLine: View {
                 }
             case .needsKeychainPermission:
                 Text("macOS needs your permission before SkyCut can read the key.")
-                Button("Allow…") { Task { await SkyStudioAccount.shared.refresh(promptKeychain: true) } }
+                Text("In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts.")
+                Button("Allow…") { Task { await account.allowKeychain() } }
                     .controlSize(.small)
+                    .disabled(account.authorizingKeychain)
                     .instantHelp("Let macOS ask whether SkyCut may read the key")
             case .keychain(let message):
                 Text(verbatim: message)

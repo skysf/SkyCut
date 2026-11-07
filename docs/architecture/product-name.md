@@ -82,7 +82,7 @@
 没验到的（「关于」窗口的样子、在 Finder 里真双击、fal 的 Key、真录一段）见 [冒烟报告](../reports/2026-10-18-skycut-rename-smoke.md) 第五节。
 
 1. Dock、启动台、「关于」、菜单栏的 App 菜单（「隐藏 SkyCut」「退出 SkyCut」）、Finder 里工程文件的「种类」都是 SkyCut。
-2. 录一次自定义区域、读一次下载文件夹、用一次 Sky Studio 的 Key：都**不**再问授权（bundle id 和证书都没变）。
+2. 录一次自定义区域、读一次下载文件夹：不再因升级重新授权。Sky Studio 的 Key 按[签名与系统权限](code-signing-and-permissions.md)的 2026-11-07 更正：无 Team ID 时仍有每构建一次的分区授权，启动只静默提示，用户点 Allow 后再问系统。
 3. 工具栏开关、导出设置、字幕样式、存的剪辑风格、已下载的配音都还在。
 4. 设置 → 连接 AI → Claude Code「连接」之后，`~/.claude.json` 里是 `skycut` 指向 `SkyCut.app/Contents/Helpers/skycut-mcp`，
    `~/.claude/settings.json` 的 `permissions.allow` 里是 `mcp__skycut`；新开的会话里工具叫 `mcp__skycut__…`。

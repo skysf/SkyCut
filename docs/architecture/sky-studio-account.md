@@ -15,7 +15,7 @@
 | --- | --- |
 | 怎么认人 | 用户在 Sky Studio 网站上建一把 `sk-` Key（右上角头像 → SkyCut；网页上没有叫「设置」的菜单），粘进 SkyCut 的设置。设置里「去 Sky Studio 建 Key」直接打开那个窗口 `https://skystudioai.com/app?skycut=1`（`SkyStudioLinks.keysPage`：没有 Key 的人问不到 `/me`，所以写在 App 里；2026-10-28 和 Sky Studio 定好不改，自检钉着）；**一把 Key 同时管授权和积分**（方案第 7 条）。App 里不做登录；浏览器里一键连接、网站上付款以后再做（2026-10-27 用户定：先做 B 端，后台手动开通） |
 | Key 存哪 | 钥匙串一条通用密码：服务名 = bundle id + `.skystudio`（测试版另一条），账号 `api-key`（`SkyStudioKey`）。**身份类的名字，永远不改**（[产品名与代码名](product-name.md)；`checks/product-name.sh` 钉着） |
-| 钥匙串怎么读 | `KeychainSecret`（两档：`.silent` 不弹框 / `.interactive` 弹框，探针结论见 [fal.ai 生成](fal-generation.md)第六节）。**后台问 Sky Studio 从不弹授权框**：只走 `keyWithoutPrompt()`，读不到就在设置里说「要授权」，用户点了按钮才弹。**已知问题（2026-11-07）**：新构建启动时照样弹出了要登录密码的钥匙串框（分区名单按代码哈希记），AI 调用等在框后面，见[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)「发现」第 1 条，待修 |
+| 钥匙串怎么读 | `KeychainSecret` 两档：静默档关闭本进程交互，交互档仅供用户操作；存在 / 读 / 存 / 删都走唯一串行 `KeychainSecretExecutor`，不占主线程或 Swift 协作线程。后台和启动只用有 3 秒等待期限的 `keyWithoutPrompt()`，需要授权就提示，不弹系统框；详见下方新构建授权合同与[案例](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md) |
 | 粘进来的话 | 去掉 `Bearer `、引号、首尾空白；要 `sk-` 开头、只有 URL 安全的字符、至少 20 个字。**长度不写死成 46**（那边换了长度这里不该先拒） |
 | 存的时候 | 存进钥匙串、马上问一次 `/me`：Sky Studio 回 `invalid_key` 就**不留着这把 Key**；没连上就先留着，之后再问。换一把 Key 时上一把问到的那份作废 |
 | 机器号 | 每个请求带 `X-SkyCut-Machine` = SHA-256(硬件 UUID + 盐) 的 64 位小写十六进制（`SkyStudioMachine`）：原始的硬件 UUID 不出本机、不发电脑名。Sky Studio 按它「每台 Mac 只给一次体验」。**盐和算法永远不改**（改了每台 Mac 都成了新机器，又能体验一次）；自检钉着一组算好的值 |
@@ -44,11 +44,40 @@
 | 导出面板那一行 | 会带水印时底栏说明水印：台数满了给「管理 Mac」，否则给可用的「购买 SkyCut Pro」链接；各自的目标地址不可用就给邮箱 +「复制邮箱」。和设置共用 `SkyStudioContactRow`，英文 / 简体中文 / 西班牙语都走本地化。Pro 的续约提醒另用共享 `SkyStudioProNoticeRow`，没有水印时仍显示；只出声音时隐藏水印说明，续约提醒仍显示。**不拦导出**（方案第 19 条）。只订阅 `SkyStudioAccount` |
 | 告诉 AI 带了水印 | `export_video` 开始时（会带）和做完的 `get_job`（带了）都写 `watermark`：带了什么、怎么去掉（`SkyCutGates.watermarkNote(license:)`）。**每次都传那一刻的 `SkyStudioAccount.shared.license`**：台数满了管理 Mac，其余有购买地址给地址、没有给邮箱，不能再固定传 `.free(.noKey)`。AI 用 `look` 看成片会看到它，要能跟用户说清楚 |
 
+### 新构建的钥匙串授权（2026-11-07）
+
+固定自签名证书没有 Team ID，512 格式钥匙串的分区名单仍按 cdhash 记。每个新构建首次
+读取可能需要授权，这一点继续保留。只用 `kSecUseAuthenticationUIFail` 会漏掉分区密码框；
+探针已证明进程交互关闭可以拦住，详见[钥匙串阻塞案例](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
+
+- `KeychainSecret` 的原生调用只在 `KeychainSecretExecutor` 的串行 `OperationQueue` 上执行。
+  静默读先保存 / 关闭交互，原生调用返回后恢复。交互读和所有写入 / 删除使用同一个执行器，
+  不能在超时的一侧恢复进程开关，也不能换成 `Task.detached` 承接阻塞调用。
+- `KeychainSecretCache` 的静默调用最多等 3 秒；已有原生读取时，其他调用立即回需要授权。
+  超时只结束等待，不保证能中断系统调用；迟到读到 Key 仍缓存。存换删增加 generation，
+  迟到旧结果不得覆盖新 Key 或复活已删除的 Key。交互读等待期间 actor 继续服务静默调用。
+- 启动先静默试一次，即使 `/me` 还没到刷新时间。后台刷新和设置的“再查一次”同样不弹框。
+  需要授权时，设置保留“允许…”，全 App 非模态 notice 提示更新后需要允许一次读取 Key，
+  并带同一个授权按钮。复用主窗口和所有工程窗口的 notice 挂点，不抢焦点、不弹模态框。
+- 只有真正显示后，才按 cdhash 写入 `SrtFlow.skystudio.keychainNoticeBuilds.v1`。每构建最多
+  自动提示一次，可关闭；没有窗口时不消费机会，关闭后设置入口仍可用。录屏结果提示同时保留。
+- 用户点“允许…”才进入账号交互档。设置、notice 和手动 upscale 的提示都说明：在 macOS
+  框里输入 **Mac 登录密码**并选**始终允许**；只选“允许”下次启动还会再问。所有 App 语言
+  都有文案。手动发起的付费任务仍可使用交互档，AI 付费任务只用静默档。
+- AI 需要授权时直接回可执行的下一步：请用户点提示条的“允许…”，或设置 → Sky Studio →
+  “允许…”，再选“始终允许”。`get_status.skycut_plan.keychain_permission=required` 及
+  `next_step` 在缓存的 Pro 套餐仍有效时也出现；不改变套餐 / 水印，台数限制说明继续保留。
+- 探针用假数据和一次性证书，不碰用户 Key 或发布签名身份。**杀掉进程不会关闭已经弹出的
+  SecurityAgent 框**，临时钥匙串密码也不是用户的 Mac 登录密码。用户已禁止继续运行会弹框
+  的探针 / 测试；自动检查仅用注入读取器，真钥匙串自检全程关闭交互。实际新构建验收由用户操作。
+
 ## 二、文件
 
 | 文件 | 管什么 |
 | --- | --- |
-| `KeychainSecret.swift` | 一条通用密码项的存 / 读 / 删、两档读法、一次运行读一次的缓存（`KeychainSecretCache`）。Sky Studio 使用；原 fal 适配层已删除 |
+| `KeychainSecret.swift` / `KeychainSecretExecutor.swift` | 一条通用密码项的异步存 / 读 / 删、两档读法、进程交互开关和唯一串行执行器 |
+| `KeychainSecretCache.swift` | 3 秒静默期限、并发快回、迟到缓存、存换删后旧结果失效；注入读取器自检 |
+| `SkyStudioKeychainNoticePolicy.swift` / `SkyStudioKeychainNoticeView.swift` | 每构建一次提示、英文 AI 下一步、全语言非模态呈现；`AppNotices` 共用窗口挂点 |
 | `SkyStudio/SkyStudioKey.swift` | 钥匙串那一条叫什么、粘进来的话怎么整理 |
 | `SkyStudio/SkyStudioMachine.swift` | 硬件 UUID → 机器号 |
 | `SkyStudio/SkyStudioAPI.swift` | 请求（地址、四个头）、`GET /me`、错误分成三种（`SkyStudioFailure`：服务器的错 / 没连上 / 回的不像话） |
@@ -86,14 +115,15 @@
   照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
   被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
 - `checks/sky-studio-wiring.sh`（扫描守卫）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
-  弹框的那一档读只在 `KeychainSecret.swift`、`SkyStudioAccount` 只有 `promptKeychain` 为真才弹、`promptKeychain: true` 只在设置那一节；设置窗口挂着这一节、启动时 `start()`；
+  原生读写只在专用执行器，静默档关闭 / 恢复进程交互；`SkyStudioAccount.allowKeychain()` 只由设置 / 全 App notice 的按钮调用，后台和启动只静默；设置窗口挂着这一节、启动时 `start()`；
   设置和导出提示必须传当前授权，管理按钮打开 manageMachinesURL、购买按钮打开共用的 proActivationURL，AI 下一步也按当前授权选管理 / 购买 / 邮箱；export_video 开始与完成的水印说明必须传此刻授权；
   设置和导出必须挂同一份 Pro 提醒，续约 / 更新付款方式按钮只读提醒选好的 actionURL；邮箱保留选中和复制；导出始终挂提示组件，仅在组件内按只出音频隐藏水印；get_status 接上 pro_notice。
   照授权拦：门在核对参数名之后、建调用排队之前；让不让、带不带水印只在 `SkyStudioAccount` 里调 `SkyCutGates`；导出面板挂着那一行；`export_video` 开始和做完都说水印；`get_status` 报 `skycut_plan`。
   反向验证（2026-10-27）：别处写 `X-SkyCut-Machine`、把后台的取法改成会弹框的 —— 各自红；（2026-10-28）拆掉路由的门、门挪到排队之后、面板不挂那一行、get_status 不报 —— 各自红；恢复后转绿。
 - `checks/export-watermark-wiring.sh`：导出器拿 `exportsWithWatermark` 问 `WatermarkPolicy`、读不出 logo 时报错不导、每一处问 `WatermarkPolicy` 都传授权；`scripts/check-export-watermark.sh` 的纯值验加不加。
 - `checks/product-name.sh`：钥匙串的服务名 `.skystudio`、UserDefaults 的键 `SrtFlow.skystudio.me.v1`。
-- 钥匙串的真读写（`KeychainSecret`）在 `scripts/check-keychain.sh`（本机手动，不在 `check-all` 里）。
+- `KeychainCacheChecks` 注入卡住的读取器，验证并发快回、期限、迟到缓存、失效、交互等待与每构建一次提示；不碰系统钥匙串。
+- 钥匙串的真读写在 `scripts/check-keychain.sh`（本机手动，不在 `check-all` 里），检查进程全程禁用交互，仅存读改删专用假项，不运行弹框变体。
 
 ## 六、人工回归（Sky Studio 的接口上线之后，发版前）
 
@@ -122,6 +152,11 @@ PR C（2026-11-06）在独立 `com.srtflow.SrtFlow.prc.skystudiosmoke` 真 App /
 - [ ] 把 grace_until 放到本机时区的 23:59:59、回答延迟五秒：日期不跳到下一天；改系统 / App 语言后日期仍按现有日期格式显示。正常补扣的下一份回答清空 grace_until 后宽限提示消失。
 - [ ] 台数 fixture 同时带近七天 paid_until 和 grace_until：设置 / 导出只显示管理 Mac / 邮箱，不叠续约提醒。失效缓存 / 删 Key 后旧提醒消失；全无新字段的旧服务器呈现照旧。
 - [ ] 真实测试 MCP 的 get_status：到期 / 宽限的 skycut_plan.pro_notice 和 next_step 始终英文、入口和界面一致；manual 无购买 URL，宽限只建议更新原订阅付款方式。随后 seek 仍按 features.mcp 放行，不因这两种提醒被挡。
+- [ ] 新构建、旧分区授权、已存 Key：启动和后台 `/me` 不弹系统框；出现一次非模态提示。英语 / 简体中文 / 西班牙语下默认窗口完整显示，主窗口和其他工程窗口均可见，与录屏结果不重叠。此项由用户在新版 App 中验证。
+- [ ] 关闭提示后反复切回 App、等后台刷新、重开同一构建：不自动再提示，设置 → Sky Studio 仍有“允许…”。升级到另一个构建又能提示一次；后台无窗口时不提前消费提示机会。
+- [ ] 用户点“允许…”：设置 / notice 说明 Mac 登录密码和“始终允许”；只点“允许”下次启动仍会问。等待或取消系统框时 UI 可操作，AI 付费工具不等待系统框、不提交收费任务，立即给出相同恢复步骤。
+- [ ] `get_status` 的 `keychain_permission=required` 和英文 `next_step` 能在套餐缓存仍为 Pro 时显示；正常编辑 / 水印仍按原授权判断。用户允许后真实 Key 能缓存，后续任务正常。
+- [ ] 真实 Security 调用若在无 UI 下仍迟迟不返回：首个静默调用最多等约 3 秒，其余调用快回；之后原生读取成功时可复用缓存。不得宣称看门狗或调用者超时已经硬中断系统调用。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。

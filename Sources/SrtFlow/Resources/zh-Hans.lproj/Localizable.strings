@@ -1374,3 +1374,8 @@
 "The recording location is unavailable; this file could not be checked: %@" = "录屏位置暂时无法访问，无法核对这个文件：%@";
 
 "Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing." = "角色任务无法取消。原任务会继续，请查询原单以恢复角色并核对扣费。";
+
+/* Keychain authorization after an update */
+"After this SkyCut update, allow access to your Sky Studio key once." = "SkyCut 更新后需要你允许一次读取 Sky Studio Key";
+"In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts." = "请在 macOS 的窗口里输入 Mac 登录密码，并点「始终允许」。如果只点「允许」，下次启动 SkyCut 还会再问。";
+"Waiting for macOS permission…" = "正在等待 macOS 授权…";

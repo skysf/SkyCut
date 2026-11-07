@@ -83,7 +83,7 @@ struct MainWindowView: View {
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         detail
-            .overlay(alignment: .top) { ScreenRecordingNotice() }
+            .overlay(alignment: .top) { AppNotices() }
             .navigationTitle("")
             .modifier(WorkbenchToolToolbar(section: state.section))
         // Translation Host：常驻零尺寸视图，字幕翻译的 session 只能活在它的

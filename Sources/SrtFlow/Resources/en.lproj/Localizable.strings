@@ -1374,3 +1374,8 @@
 "The recording location is unavailable; this file could not be checked: %@" = "The recording location is unavailable; this file could not be checked: %@";
 
 "Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing." = "Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing.";
+
+/* Keychain authorization after an update */
+"After this SkyCut update, allow access to your Sky Studio key once." = "After this SkyCut update, allow access to your Sky Studio key once.";
+"In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts." = "In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts.";
+"Waiting for macOS permission…" = "Waiting for macOS permission…";
