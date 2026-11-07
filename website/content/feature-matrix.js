@@ -1,4 +1,5 @@
 // 四语言共用的功能行与授权差异 文案和样式不在这里 来源供测试和文档核对 不展示给访客
+import {skyStudioApiSource} from './ai-models.js';
 const row=(id,sources,free='included',pro='included')=>({id,sources,free,pro});
 const architecture=name=>`docs/architecture/${name}.md`;
 export const featureGroups=[
@@ -46,6 +47,16 @@ export const featureGroups=[
     row('audioExport',[architecture('export-settings'),architecture('export-audio-mixdown')]),
     row('subtitleExport',[architecture('export-settings')]),
   ]},
+];
+// 角色操作是服务功能 不额外计入 /models 条目 不扣积分的云端操作也须经 Pro 的 AI 工具
+const characterReferences=`${skyStudioApiSource}#saved-character-references-2026-11-07`;
+const characterManagement=`${skyStudioApiSource}#native-character-creation-and-management-2026-11-07`;
+export const characterRows=[
+  row('characterRead',[characterReferences],'unavailable','aiNoCredits'),
+  row('characterGenerate',[characterReferences],'unavailable','cloudAI'),
+  row('characterCreate',[characterManagement],'unavailable','cloudAI'),
+  row('characterManage',[characterManagement],'unavailable','aiNoCredits'),
+  row('characterHeadshot',[characterManagement],'unavailable','cloudAI'),
 ];
 // 本机计算不扣积分 入口是否能直接点和 MCP 授权是两回事
 export const localModelRows=[

@@ -5,8 +5,8 @@ import {readFile,access} from 'node:fs/promises';
 import {render,languages} from '../scripts/template.mjs';
 import {pricing} from '../scripts/pricing.mjs';
 import {prices,annualBreakdown} from '../content/pricing.js';
-import {featureGroups,localModelRows} from '../content/feature-matrix.js';
-import {cloudModelGroups,localVoiceLanguages,localVoiceRoles,soundEffectPresets} from '../content/ai-models.js';
+import {featureGroups,characterRows,localModelRows} from '../content/feature-matrix.js';
+import {cloudModelGroups,skyStudioApiSource,skyStudioRevision,localVoiceLanguages,localVoiceRoles,soundEffectPresets} from '../content/ai-models.js';
 const sectionOf=c=>render(c).match(/<section class="pricing\b[\s\S]*?<\/section>/)[0];
 const rowOf=(html,id)=>html.match(new RegExp(`<tr data-feature="${id}">([\\s\\S]*?)<\\/tr>`))?.[1];
 const accessOf=(html,id)=>[...rowOf(html,id).matchAll(/<td data-access="([^"]+)"/g)].map(m=>m[1]);
@@ -47,7 +47,7 @@ for(const language of languages) {
   test(`${language}: each comparison row has aligned Free and Pro cells and models have explicit access and billing`,async()=>{
     const {default:c}=await import(`../content/${language}.js`);
     const section=sectionOf(c),table=section.match(/<table>[\s\S]*?<\/table>/)[0];
-    const expectedRows=[...featureGroups.flatMap(g=>g.rows.map(r=>r.id)),...localModelRows.map(r=>r.id),...cloudModelGroups.map(g=>`model-${g.id}`)];
+    const expectedRows=[...featureGroups.flatMap(g=>g.rows.map(r=>r.id)),...characterRows.map(r=>r.id),...localModelRows.map(r=>r.id),...cloudModelGroups.map(g=>`model-${g.id}`)];
     assert.deepEqual([...table.matchAll(/data-feature="([^"]+)"/g)].map(m=>m[1]),expectedRows);
     for(const id of expectedRows) {
       const row=rowOf(table,id);assert.equal((row.match(/<th scope="row"/g)||[]).length,1);assert.equal((row.match(/<td /g)||[]).length,2);
@@ -57,6 +57,16 @@ for(const language of languages) {
     assert.deepEqual(accessOf(table,'aiEditing'),['unavailable','ai']);
     assert.deepEqual(accessOf(table,'watermark'),['watermarked','clean']);
     assert.deepEqual(accessOf(table,'annualCredits'),['none','annualCredits']);
+    for(const id of ['characterRead','characterManage'])assert.deepEqual(accessOf(table,id),['unavailable','aiNoCredits']);
+    for(const id of ['characterGenerate','characterCreate','characterHeadshot'])assert.deepEqual(accessOf(table,id),['unavailable','cloudAI']);
+    for(const item of characterRows)for(const phrase of c.pricing.compare.features[item.id])assert.ok(rowOf(table,item.id).includes(phrase));
+    assert.ok(table.includes(c.pricing.compare.charactersTitle));assert.ok(table.includes(c.pricing.compare.charactersNote));
+    for(const id of ['imageAngle','imageUpscale']) {
+      const imageRow=rowOf(table,`model-${id}`);
+      assert.ok(imageRow.includes(c.pricing.compare.models[id]));assert.ok(imageRow.includes(c.pricing.compare.modelDetails[id]));
+      assert.deepEqual(accessOf(table,`model-${id}`),['unavailable','cloudAI']);
+    }
+    assert.match(rowOf(table,'model-imageUpscale'),/2/);assert.match(rowOf(table,'model-imageUpscale'),/4/);
     for(const group of featureGroups.filter(g=>g.id!=='pro'))for(const item of group.rows)assert.deepEqual(accessOf(table,item.id),['included','included']);
     for(const id of ['speech','translation'])assert.deepEqual(accessOf(table,id),['localUI','localBoth']);
     for(const id of ['vision','shots','kokoro','synth'])assert.deepEqual(accessOf(table,id),['unavailable','localAI']);
@@ -102,17 +112,32 @@ test('annual price arithmetic rounds monthly equivalents to two decimals and han
   assert.deepEqual(annualBreakdown({monthly:20,yearly:120}),{perMonth:'10.00',saving:'120'});
   assert.deepEqual(annualBreakdown({monthly:9.99,yearly:99.5}),{perMonth:'8.29',saving:'20.38'});
 });
-test('the SkyCut-only snapshot accounts for all 27 catalog records without adding unrelated Studio models',()=>{
+test('the SkyCut-only snapshot accounts for 33 catalog records and all nine image entries',()=>{
   const models=cloudModelGroups.flatMap(g=>g.models);
-  assert.equal(models.length,21);assert.equal(new Set(models.map(m=>m.id)).size,21);
-  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),27);
+  assert.equal(skyStudioRevision,'94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00');
+  assert.equal(models.length,27);assert.equal(new Set(models.map(m=>m.id)).size,27);
+  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),33);
+  assert.deepEqual(models.filter(m=>m.kinds.includes('image')).map(m=>[m.id,m.title,m.operation||null]),[
+    ['seedream5-flash','Seedream 5.0 Flash',null],['nano2','Nano Banana 2',null],
+    ['nano2-lite','Nano Banana 2 Lite',null],['nano-banana-pro','Nano Banana Pro',null],
+    ['gpt-image-2','GPT Image 2',null],['seedream5-pro','Seedream 5.0 Pro',null],
+    ['qwen-angles','Qwen Angles','camera_angle'],['image-upscale','Image Upscale','upscale'],
+    ['ideogram-remove-background','Ideogram Remove Background',null],
+  ]);
+  assert.deepEqual(cloudModelGroups.find(g=>g.id==='upscale').models.map(m=>m.kinds),[['upscale'],['upscale']]);
+  assert.ok(models.every(m=>!['pro','nano-banana','seedream5-lite','dreamina','character-import'].includes(m.id)));
   assert.deepEqual([...new Set(models.flatMap(m=>m.kinds))].sort(),['image','image_to_video','lipsync','music','sound_effect','text_to_video','upscale','voice','voice_clone']);
   assert.ok(models.every(m=>m.title && m.kinds.length));
 });
-test('every feature row has a real source and local voice and sound counts match the App',async()=>{
-  const rows=[...featureGroups.flatMap(g=>g.rows),...localModelRows];
+test('features cite App sources or the pinned Character contract and local voice and sound counts match the App',async()=>{
+  const rows=[...featureGroups.flatMap(g=>g.rows),...characterRows,...localModelRows];
   assert.equal(new Set(rows.map(r=>r.id)).size,rows.length);
-  for(const row of rows)for(const source of row.sources)await access(new URL('../../'+source,import.meta.url));
+  for(const row of rows)for(const source of row.sources) {
+    if(source.startsWith('https://')) {
+      const url=new URL(source);assert.equal(source.split('#')[0],skyStudioApiSource);
+      assert.ok(['#saved-character-references-2026-11-07','#native-character-creation-and-management-2026-11-07'].includes(url.hash));
+    } else await access(new URL('../../'+source,import.meta.url));
+  }
   const roles=await readFile(new URL('../../Sources/SrtFlow/AIVoiceRole.swift',import.meta.url),'utf8');
   assert.equal((roles.match(/AIVoiceRole\(name:/g)||[]).length,localVoiceRoles);
   const languages=[...roles.match(/static let kokoroLanguages[^=]*= \[([^\]]+)\]/)[1].matchAll(/"([a-z]+)"/g)].map(m=>m[1]);
