@@ -124,8 +124,8 @@ Team ID，另外的 `partition_id` 仍按 cdhash 记，只含旧构建。固定�
 避免 `_exit` 丢掉缓冲中的失败说明；没有编译失败冒充反向验证成功。
 
 本地 `/bin/bash scripts/check-local.sh sky-studio mcp localization-coverage film-production docs-index-drift`
-已通过：全部扫描守卫、6,054 条 Sky Studio 断言、3,274 条 MCP 断言、三语言 1,082 条界面文案、
-304 条制作状态检查和文档索引。最后补回直接交互读的扫描约束后，再跑全部扫描和文档索引。
+已通过：合入 PR #340 的最新 main 后，全部扫描守卫、6,407 条 Sky Studio 断言、3,289 条 MCP 断言、
+三语言 1,082 条界面文案、304 条制作状态检查和文档索引均通过。直接交互读的扫描约束也已复验。
 完整 App 编译和全套检查由 PR 的 CI 运行。
 新版 App 的启动、真实窗口和用户点击验证由用户另行完成，本次不打包、不发版，
 不把注入测试当作已完成实机验收。

@@ -222,6 +222,7 @@ private struct SkyStudioCreditLimitRow: View {
 
 /// 问不成、存不了时那一句（橙色），能自己解决的带一个按钮 / 链接。
 private struct SkyStudioProblemLine: View {
+    @ObservedObject private var account = SkyStudioAccount.shared
     let problem: SkyStudioProblem
     let license: SkyCutLicense
 
@@ -244,9 +245,9 @@ private struct SkyStudioProblemLine: View {
             case .needsKeychainPermission:
                 Text("macOS needs your permission before SkyCut can read the key.")
                 Text("In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts.")
-                Button("Allow…") { Task { await SkyStudioAccount.shared.allowKeychain() } }
+                Button("Allow…") { Task { await account.allowKeychain() } }
                     .controlSize(.small)
-                    .disabled(SkyStudioAccount.shared.authorizingKeychain)
+                    .disabled(account.authorizingKeychain)
                     .instantHelp("Let macOS ask whether SkyCut may read the key")
             case .keychain(let message):
                 Text(verbatim: message)
