@@ -18,7 +18,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 | --- | --- | --- |
 | 录屏（ScreenCapture，系统的 TCC.db） | 系统设置里拨开关 | 开关照样显示开着，App 照样被拒。**关掉再打开只改开关、不换钉着的签名**（用户刚拨过的记录 `last_modified` 是新的，`csreq` 还是老构建的 cdhash），怎么拨都没用。只有删掉这条记录（`tccutil reset`，或在列表里选中按「−」）让系统重新问 |
 | 下载文件夹（用户的 TCC.db） | 系统弹框点「允许」 | 下一次访问重新弹框；点了允许，`csreq` 换成新构建的 |
-| 钥匙串（fal 的 Key，[fal.ai 生成](fal-generation.md) 第六节） | 弹框点「始终允许」 | 每个新构建第一次读弹一次 |
+| 钥匙串（Sky Studio 的 Key，原 fal 的 Key，[fal.ai 生成](fal-generation.md) 第六节） | 弹框输登录密码、点「始终允许」 | 每个新构建第一次读弹一次。**换成固定证书之后也照样弹**，见第二节末尾 |
 
 ## 二、做法：一把固定的自签名证书
 
@@ -41,6 +41,27 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
   证书时顺手写进 `packaging/signing-identity.sha1`。用系统的 `/usr/bin/openssl`（LibreSSL）：Homebrew 的
   OpenSSL 3 默认导出的 p12 `security import` 认不出来。
 
+### 2026-11-07 更正：钥匙串换了构建照样要问一次
+
+上面「前一个构建在钥匙串里建的项，后一个构建不弹框就读得到」，对真实的版本升级不成立。
+
+0.18.62 装上后第一次读 Sky Studio Key，系统弹框要登录密码。用 `security dump-keychain -a` 看那一条的访问表：
+- 解密那一项信任 SkyCut，按的是固定证书的 requirement，每个构建都满足；
+- 另有一项 `partition_id`，列的是 `cdhash:…`，即旧构建的代码哈希。
+
+原因：
+- 钥匙串的分区名单对带 Team ID 的 App 记 `teamid:…`；
+- 我们的自签名证书没有 Team ID（`codesign -dvvv` 报 `TeamIdentifier=not set`），只能按代码哈希记。
+
+结论：
+- 每个新构建第一次读都要用户输密码。点「始终允许」把这一构建加进名单，只点「允许」下次启动还会问。
+- TCC（录屏、麦克风、下载文件夹）按 requirement 认，固定证书照样管用。
+- 只有换 Developer ID（有 Team ID）之后，钥匙串升级才不再问。
+
+App 本来只在用户点了设置里的按钮时才弹框，后台问 `/me` 和 AI 起的活都只用不弹框的那一档。但这次弹框出在启动时，AI 的调用一直等在框后面。
+
+经过和下一步见[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)「发现」第 1 条。
+
 ## 三、规矩
 
 1. **打包脚本不许自己调 `codesign`**，只经 `scripts/signing/sign-app.sh`。
@@ -61,7 +82,8 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 ## 四、第一次换到固定签名时（每台机器一次）
 
 老的记录全是 ad-hoc 的 cdhash，换签之后都对不上，每台机器还要再给一次：录自定义区域时 App 自己删掉旧记录、系统问一次
-→ 到系统设置里打开 → 退出并重新打开；读下载文件夹弹一次；钥匙串里的 fal Key 弹一次「始终允许」。之后升级都不用再给。
+→ 到系统设置里打开 → 退出并重新打开；读下载文件夹弹一次；钥匙串里的 fal Key 弹一次「始终允许」。之后升级 TCC 那几样都不用再给；
+钥匙串仍是每个新构建问一次（第二节末尾的更正）。
 
 ## 五、守卫与人工回归
 

@@ -15,7 +15,7 @@
 | --- | --- |
 | 怎么认人 | 用户在 Sky Studio 网站上建一把 `sk-` Key（右上角头像 → SkyCut；网页上没有叫「设置」的菜单），粘进 SkyCut 的设置。设置里「去 Sky Studio 建 Key」直接打开那个窗口 `https://skystudioai.com/app?skycut=1`（`SkyStudioLinks.keysPage`：没有 Key 的人问不到 `/me`，所以写在 App 里；2026-10-28 和 Sky Studio 定好不改，自检钉着）；**一把 Key 同时管授权和积分**（方案第 7 条）。App 里不做登录；浏览器里一键连接、网站上付款以后再做（2026-10-27 用户定：先做 B 端，后台手动开通） |
 | Key 存哪 | 钥匙串一条通用密码：服务名 = bundle id + `.skystudio`（测试版另一条），账号 `api-key`（`SkyStudioKey`）。**身份类的名字，永远不改**（[产品名与代码名](product-name.md)；`checks/product-name.sh` 钉着） |
-| 钥匙串怎么读 | `KeychainSecret`（两档：`.silent` 不弹框 / `.interactive` 弹框，探针结论见 [fal.ai 生成](fal-generation.md)第六节）。**后台问 Sky Studio 从不弹授权框**：只走 `keyWithoutPrompt()`，读不到就在设置里说「要授权」，用户点了按钮才弹 |
+| 钥匙串怎么读 | `KeychainSecret`（两档：`.silent` 不弹框 / `.interactive` 弹框，探针结论见 [fal.ai 生成](fal-generation.md)第六节）。**后台问 Sky Studio 从不弹授权框**：只走 `keyWithoutPrompt()`，读不到就在设置里说「要授权」，用户点了按钮才弹。**已知问题（2026-11-07）**：新构建启动时照样弹出了要登录密码的钥匙串框（分区名单按代码哈希记），AI 调用等在框后面，见[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)「发现」第 1 条，待修 |
 | 粘进来的话 | 去掉 `Bearer `、引号、首尾空白；要 `sk-` 开头、只有 URL 安全的字符、至少 20 个字。**长度不写死成 46**（那边换了长度这里不该先拒） |
 | 存的时候 | 存进钥匙串、马上问一次 `/me`：Sky Studio 回 `invalid_key` 就**不留着这把 Key**；没连上就先留着，之后再问。换一把 Key 时上一把问到的那份作废 |
 | 机器号 | 每个请求带 `X-SkyCut-Machine` = SHA-256(硬件 UUID + 盐) 的 64 位小写十六进制（`SkyStudioMachine`）：原始的硬件 UUID 不出本机、不发电脑名。Sky Studio 按它「每台 Mac 只给一次体验」。**盐和算法永远不改**（改了每台 Mac 都成了新机器，又能体验一次）；自检钉着一组算好的值 |
