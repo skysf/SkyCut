@@ -4,7 +4,7 @@ import SrtFlowMCPKit
 // 服务端明确保证尚未入场的拒绝码；退款判定和官方提交回执共用，未知错误不加入。
 enum SkyStudioJobAdmission {
     static let rejectedCodes: Set<String> = ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits",
-                                             "price_changed", "too_many_jobs", "recipe_unavailable"]
+                                             "price_changed", "too_many_jobs", "recipe_unavailable", "character_not_ready", "character_changed", "not_found"]
 
     /// 代码不能盖过受理/供应商/扣费证据；全退只证明净额归零，不证明从未受理。
     static func hasAdmissionEvidence(_ error: SkyStudioServerError) -> Bool {

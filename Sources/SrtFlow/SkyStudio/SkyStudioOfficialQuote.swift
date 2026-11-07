@@ -70,7 +70,8 @@ enum SkyStudioOfficialRequest {
             return
         }
         _ = try SkyStudioFilm(json: film.json) // 直接用 Swift 值构造后也不能绕过入口校验。
-        try SkyStudioFilmInputs.validate(job.allInputs, kind: job.kind, params: job.params)
+        try SkyStudioFilmInputs.validateOriginalURLs(job.allInputs) // 原始调用者输入仍只能是自己的 uploads。
+        try SkyStudioFilmInputs.validate(job.renderInputs, kind: job.kind, params: job.renderParams, allowCharacterDeclarations: job.characterAssets != nil)
         if submitting {
             guard let pin = job.recipePin, !pin.isEmpty, let review = job.seamReview else {
                 throw SkyStudioFilmReader.error("recipe_pin", "Use the current official quote and explicitly review its seams before submitting.")

@@ -146,6 +146,7 @@ final class SkyStudioAccount: ObservableObject {
         await SkyStudioKey.cache.remember(key)
         hasKey = true
         SkyStudioCatalogCache.shared.forget()
+        SkyStudioCharacterAccess.invalidate()
         // 上一把 Key 问到的那份不算这一把的。
         replaceStored(nil)
         lastFailure = nil
@@ -210,6 +211,8 @@ final class SkyStudioAccount: ObservableObject {
     // MARK: 存下来的回答
 
     private func forget() {
+        SkyStudioCatalogCache.shared.forget()
+        SkyStudioCharacterAccess.invalidate()
         hasKey = false
         replaceStored(nil)
         problem = nil
@@ -217,6 +220,7 @@ final class SkyStudioAccount: ObservableObject {
     }
 
     private func replaceStored(_ answer: SkyStudioStoredAnswer?) {
+        if stored?.me.account.id != answer?.me.account.id { SkyStudioCharacterAccess.invalidate() }
         stored = answer
         if let answer, let data = try? SkyStudioJSON.encoder().encode(answer) {
             defaults.set(data, forKey: Self.storedAnswerKey)

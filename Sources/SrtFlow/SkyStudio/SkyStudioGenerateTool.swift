@@ -40,7 +40,9 @@ enum SkyStudioGenerateTool {
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
         if !quoteOnly && (kind.isVideo || kind == .image) { _ = try await SkyStudioGeneratedVideo.engine() }
-        let references = try await SkyStudioReferenceFiles.measure(picked, project: project)
+        var references = try await SkyStudioReferenceFiles.measure(picked, project: project)
+        references.character = try SkyStudioCharacterReference.read(args)
+        let explicitMode = try args.string("input_mode")
         let frame = references.firstFrame
         let canvas = project.renderSize
         let canvasRatio = canvas.width / max(canvas.height, 1)
@@ -55,29 +57,37 @@ enum SkyStudioGenerateTool {
         case .success(let found): key = found
         case .failure(let problem): throw AIToolError(problem.message)
         }
+        let accountStamp = SkyStudioCharacterAccess.stamp(key)
         let api = SkyStudioAPI()
         let model: SkyStudioModel
         let catalog: SkyStudioCatalog
-        let generation: SkyStudioGeneration
+        var generation: SkyStudioGeneration
         let quote: SkyStudioQuote
         do {
             catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: api)
             guard let offered = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
-                accepts: { SkyStudioModelPolicy.problem(model: $0, ask: ask, references: references) == nil && SkyStudioGenerationControls.problem(model: $0, ask: ask, prompt: prompt, references: references) == nil }) else {
+                accepts: { candidate in
+                    let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
+                    return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
+                }) else {
                 if let requested, let model = catalog.model(requested, kind: kind.rawValue) {
-                    throw AIToolError(SkyStudioModelPolicy.problem(model: model, ask: ask, references: references) ?? SkyStudioGenerationControls.problem(model: model, ask: ask, prompt: prompt, references: references) ?? "This model cannot accept the request.")
+                    let plan = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
+                    throw AIToolError(SkyStudioCharacterGeneration.problem(plan, model: model) ?? SkyStudioModelPolicy.problem(model: model, ask: ask, references: plan) ?? SkyStudioGenerationControls.problem(model: model, ask: ask, prompt: prompt, references: references) ?? "This model cannot accept the request.")
                 }
                 throw AIToolError("No offered model accepts the complete request. Read get_status models=true for model ids, modes and reference limits. Available: "
                     + catalog.models(kind: kind.rawValue).map(\.id).joined(separator: ", "))
             }
             model = offered
+            references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
             generation = SkyStudioGeneration.make(kind, prompt: prompt, ask: ask, canvas: canvasRatio, frame: frameRatio,
                                                   model: model, inputMode: references.mode, references: references)
             quote = try await api.quote(generation.job(model: model.id), key: key)
+            try SkyStudioCharacterGeneration.accept(quote, generation: &generation, references: &references, model: model)
+            guard SkyStudioCharacterAccess.stamp(key) == accountStamp else { throw SkyStudioCharacterError.changed }
         } catch let error as AIToolError {
             throw error
         } catch {
-            throw AIToolError(message(error))
+            throw SkyStudioCharacterError.tool(error)
         }
 
         var deviations = AIDraftPolicy.deviations(generation, model: model)
@@ -87,23 +97,28 @@ enum SkyStudioGenerateTool {
         draftAsk.resolution = nil
         draftAsk.duration = nil
         if let preferred = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: nil, imageContext: imageContext,
-            accepts: { SkyStudioModelPolicy.problem(model: $0, ask: draftAsk, references: references) == nil && SkyStudioGenerationControls.problem(model: $0, ask: draftAsk, prompt: prompt, references: references) == nil }), preferred.id != model.id {
+            accepts: { candidate in
+                let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
+                return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: draftAsk, references: plan) == nil && SkyStudioGenerationControls.problem(model: candidate, ask: draftAsk, prompt: prompt, references: plan) == nil
+            }), preferred.id != model.id {
+            let draftReferences = SkyStudioCharacterGeneration.references(references, model: preferred, explicitMode: explicitMode)
             let draft = SkyStudioGeneration.make(kind, prompt: prompt, ask: draftAsk, canvas: canvasRatio, frame: frameRatio,
-                model: preferred, inputMode: references.mode, references: references)
+                model: preferred, inputMode: draftReferences.mode, references: draftReferences)
             if let baseline = try? await api.quote(draft.job(model: preferred.id), key: key) {
                 if quote.credits > baseline.credits {
                     deviations.append("Selected model costs \(SkyStudioCredits.text(quote.credits)) credits; preferred draft \(preferred.title) costs \(SkyStudioCredits.text(baseline.credits)).")
                 }
             } else { deviations.append("The preferred draft model's price could not be verified before switching models.") }
         }
+        guard SkyStudioCharacterAccess.stamp(key) == accountStamp else { throw SkyStudioCharacterError.changed }
         if quoteOnly {
             return .ok(["status": "quoted", "model_id": .string(model.id), "params": .object(generation.params),
-                "operation": .string(generation.operation),
+                "operation": .string(generation.operation), "character_usage": quote.characterUsage?.json ?? .null,
                 "credits": .number(quote.credits), "approval_reasons": .array(deviations.map(JSONValue.string)),
                 "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue), "charged": false,
                 "next_step": "No generation, upload or reservation was started. Present the specification and quote in the conversation language; submitting requires quote_only=false and follows permissions and hard budgets."])
         }
-        guard project.documentGeneration == projectGeneration else {
+        guard project.documentGeneration == projectGeneration, SkyStudioCharacterAccess.stamp(key) == accountStamp else {
             throw AIToolError("The project changed while SkyCut checked the price; nothing was started or reserved. Read the current project before retrying.")
         }
         let scope = (SkyStudioAccount.shared.stored?.me.account.id ?? "") + ":" + (project.documentURL?.standardizedFileURL.path ?? "unsaved:\(project.documentGeneration)")
@@ -112,12 +127,13 @@ enum SkyStudioGenerateTool {
         let identity = SkyStudioApproval.identity(job: generation.job(model: model.id), credits: quote.credits, context: [
             "frame": try frame.map(SkyStudioApproval.file) ?? .null,
             "references": .array(try references.files.map { try SkyStudioApproval.file($0.file) }),
-            "auto_fallback": false, "project_scope": .string(scope),
+            "auto_fallback": false, "project_scope": .string(scope), "account_stamp": .string(accountStamp),
             "folder": .string(folder.standardizedFileURL.path), "name": .string(try args.string("name") ?? "")
         ])
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args,
-            reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), project: scope, profile: AIDraftPolicy.profile(generation.job(model: model.id))) {
+            reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), project: scope,
+            profile: generation.character == nil ? AIDraftPolicy.profile(generation.job(model: model.id)) : "character:" + SkyStudioCharacterCache.digest(identity)) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
         }
@@ -127,7 +143,7 @@ enum SkyStudioGenerateTool {
             droppingExtension: "", fallback: fallbackStem(kind)
         )
         let run = SkyStudioGenerationRun(
-            generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation, idempotencyKey: idempotencyKey
+            generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation, idempotencyKey: idempotencyKey, characterStamp: references.character == nil ? nil : accountStamp
         )
         let job = run.start()
         let store = SkyStudioSpendStore.shared
@@ -151,6 +167,7 @@ enum SkyStudioGenerateTool {
                     + (kind.isSound ? " (track new_audio)." : ".")
             )
         ]
+        if let usage = quote.characterUsage { result["character_usage"] = usage.json }
         if !generation.notes.isEmpty { result["notes"] = .array(generation.notes.map { .string($0) }) }
         let response = AIToolResult.ok(.object(result))
         SkyStudioGenerationRequests.complete(idempotencyKey, result: response)

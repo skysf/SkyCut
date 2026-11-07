@@ -66,6 +66,9 @@ struct SkyStudioGeneration: Equatable, Sendable {
     var notes: [String]
     var operation = "generate"
 
+    var character: SkyStudioCharacterReference? = nil
+    var characterAssets: SkyStudioCharacterAssets? = nil
+
     /// `canvas`：工程画布的宽 / 高（图和文生视频默认跟它）；`frame`：图生视频首帧的宽 / 高（读不出来就跟画布）。
     static func make(_ kind: Kind, prompt: String, ask: Ask, canvas: Double, frame: Double? = nil, model: SkyStudioModel? = nil,
                      inputMode: String = "frames", references: SkyStudioReferencePlan? = nil) -> SkyStudioGeneration {
@@ -138,7 +141,8 @@ struct SkyStudioGeneration: Equatable, Sendable {
                 }
             } else if ask.operation == "generate" { params.merge(references.quoteParams) { _, new in new } }
         }
-        return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes, operation: ask.operation)
+        return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes, operation: ask.operation,
+            character: references?.character, characterAssets: references?.characterAssets)
     }
 
     /// 送 `/quote`、`/jobs` 的那一份；实际生成必须传入本次操作固定的 idempotency_key。`imageURL`：图生视频的首帧（`/uploads` 上去的）；
@@ -147,9 +151,11 @@ struct SkyStudioGeneration: Equatable, Sendable {
              uploaded: [String: String] = [:], references: [JSONValue] = [], idempotencyKey: String = UUID().uuidString.lowercased()) -> SkyStudioJobRequest {
         var inputs = uploaded
         if let imageURL { inputs["image_url"] = imageURL.absoluteString }
-        return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt.isEmpty ? nil : prompt, inputs: inputs, params: params,
+        var request = SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt.isEmpty ? nil : prompt, inputs: inputs, params: params,
                                    maxCredits: maxCredits, idempotencyKey: idempotencyKey, references: references,
-                                   operation: operation == "generate" ? nil : operation)
+                                   operation: operation == "generate" ? nil : operation, character: character)
+        request.characterAssets = characterAssets
+        return request
     }
 
     /// 「MiniMax H3 · 5 s · 768p」：确认码绑着它（SkyStudioJobGate），状态行上也写它。不带语言的几个记号。

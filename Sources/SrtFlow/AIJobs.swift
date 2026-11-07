@@ -73,14 +73,15 @@ final class AIJobs {
     private init() {}
 
     func start(
-        _ kind: Kind, progress: @escaping @MainActor () -> Double?,
+        _ kind: Kind, id: String? = nil, replacingFinished: Bool = false, progress: @escaping @MainActor () -> Double?,
         liveDetail: @escaping @MainActor () -> [String: JSONValue] = { [:] },
         waitingForUser: @escaping @MainActor () -> String? = { nil },
         cancel: @escaping @MainActor () -> Void
     ) -> Job {
+        if let id, let existing = jobs[id], existing.status == .running || !replacingFinished { return existing }
         counter += 1
         let job = Job(
-            id: "\(kind.rawValue)-\(counter)", kind: kind, progress: progress, liveDetail: liveDetail,
+            id: id ?? "\(kind.rawValue)-\(counter)", kind: kind, progress: progress, liveDetail: liveDetail,
             waitingForUser: waitingForUser, cancel: cancel
         )
         jobs[job.id] = job
@@ -104,6 +105,12 @@ final class AIJobs {
 
     func updateDetail(_ job: Job, _ values: [String: JSONValue]) {
         job.detail = .object((job.detail?.objectValue ?? [:]).merging(values) { _, new in new })
+    }
+
+    /// 原单恢复后来完成（例如源图早成功、角色整理晚到），只更新这份结局，不重复创建或收费。
+    func adoptRecovered(_ job: Job, message: String, detail: JSONValue) {
+        guard job.status != .running else { return }
+        job.status = .done; job.message = message; job.detail = detail; job.finishedAt = Date()
     }
 
     /// 等到任务结束或者超时（最多 30 秒，给客户端的一分钟留足余量）。

@@ -14,6 +14,7 @@ enum SkyStudioApproval {
             "credits": .number(credits),
             "context": .object(context)
         ]
+        if let revision = job.character?.revision { fields["character_revision"] = .string(revision) }
         if job.film != nil {
             fields["recipe_pin"] = job.recipePin.map(JSONValue.string) ?? .null
             fields["seam_review"] = job.seamReview?.json ?? .null

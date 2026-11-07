@@ -20,7 +20,7 @@ enum SkyStudioOfficialAuthority {
             throw AIToolError("An official quote requires its public film and supported render kind.")
         }
         let render = SkyStudioFilm.Render(kind: kind, model: request.model, prompt: request.prompt ?? "",
-            params: request.params, inputs: request.allInputs, context: film.context)
+            params: request.renderParams, inputs: request.renderInputs, context: film.context)
         return (film, render)
     }
 }

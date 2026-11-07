@@ -67,6 +67,8 @@ extension SkyStudioJobError.Stop {
             return L10n("Sky Studio had already started it, so it could not be cancelled: the credits are spent and the result will appear in your Sky Studio library.")
         case .unknown:
             return L10n("SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in your Sky Studio library.")
+        case .characterContinuing:
+            return L10n("Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing.")
         }
     }
 }

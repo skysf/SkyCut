@@ -88,16 +88,23 @@ enum SkyStudioOfficialGenerateTool {
         let ask = try SkyStudioGenerationControls.ask(args)
         guard ask.operation == "generate" else { throw AIToolError("Official film does not support background removal or lip sync.") }
         let prompt = try args.string("prompt") ?? ""
-        let references = try await SkyStudioReferenceFiles.measure(picks, project: project)
+        var references = try await SkyStudioReferenceFiles.measure(picks, project: project)
+        references.character = try SkyStudioCharacterReference.read(args)
+        let explicitMode = try args.string("input_mode")
         let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key)
         let requested = try args.string("model")
         let imageContext = try args.choice("image_context", from: ["asian", "other"]) ?? "other"
         let quality = try args.choice("quality", from: ["standard", "highest"]) ?? "standard"
         guard let model = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
-            accepts: { SkyStudioModelPolicy.problem(model: $0, ask: ask, references: references) == nil
-                && SkyStudioGenerationControls.problem(model: $0, ask: ask, prompt: prompt, references: references) == nil }) else {
+            accepts: { candidate in
+                let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
+                return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil
+                    && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
+            }) else {
             throw AIToolError("No offered model accepts this complete official shot request. Read get_status models=true; references and duration will not be dropped to make it fit.")
         }
+        references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
+        references = try await SkyStudioCharacterFilm.resolve(references, model: model, key: key)
         let canvas = project.renderSize
         var generation = SkyStudioGeneration.make(kind, prompt: prompt, ask: ask, canvas: canvas.width / max(canvas.height, 1),
             frame: references.firstFrame.flatMap(SkyStudioGenerationFrame.aspect(of:)), model: model, inputMode: references.mode, references: references)
@@ -108,8 +115,11 @@ enum SkyStudioOfficialGenerateTool {
         var deviations = AIDraftPolicy.deviations(generation, model: model)
         if quality == "highest" { deviations.append("Highest-quality model selection exceeds the low-cost draft policy.") }
         if let requested, let preferred = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: nil, imageContext: imageContext,
-            accepts: { SkyStudioModelPolicy.problem(model: $0, ask: ask, references: references) == nil
-                && SkyStudioGenerationControls.problem(model: $0, ask: ask, prompt: prompt, references: references) == nil }), preferred.id != requested {
+            accepts: { candidate in
+                let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
+                return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil
+                    && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
+            }), preferred.id != requested {
             deviations.append("The selected model differs from the preferred draft model; this exact official quote requires approval under request mode.")
         }
         return Plan(generation: generation, model: model, references: references, sources: try SkyStudioOfficialPreparation.sources(references),
@@ -151,11 +161,16 @@ enum SkyStudioOfficialGenerateTool {
         try await validateScope(plan.scope, project: project, key: plan.key)
         try SkyStudioOfficialAuthority.recheck(authority, request: request, referenceSources: SkyStudioOfficialPreparation.sources(plan.references), catalog: plan.catalog, project: project)
         guard try SkyStudioOfficialPreparation.sources(plan.references) == plan.sources else { throw AIToolError("Reference files changed while quoting. Prepare and quote the actual files again; nothing was reserved.") }
+        var request = request
+        if let expected = plan.references.characterAssets?.usage {
+            guard quoted.characterUsage == expected else { throw SkyStudioCharacterError.changed }
+            request.character = .init(id: expected.id, roles: expected.roles, revision: expected.revision)
+        }
         let token = try SkyStudioOfficialPrepared.shared.rememberQuote(scope: plan.scope, identity: identity, request: request, quote: quoted)
         let official = quoted.officialRecipe!
         return .ok(["status": "quoted", "quote_token": .string(token), "seam_review": official.seamReview.json,
                     "official_recipe": ["expires_at": .string(ISO8601DateFormatter().string(from: official.expiresAt)), "preflight_only": true],
-                    "model_id": .string(plan.model.id), "params": .object(plan.generation.params), "credits": .number(quoted.credits), "charged": false, "uploaded": false,
+                    "model_id": .string(plan.model.id), "params": .object(plan.generation.params), "character_usage": quoted.characterUsage?.json ?? .null, "credits": .number(quoted.credits), "charged": false, "uploaded": false,
                     "approval_reasons": .array(deviations(plan).map(JSONValue.string)),
                     "next_step": "Review the declared current shot, both adjacent states/renders/cuts and sound bed. Submit the unchanged request with quote_only=false, quote_token and these exact seam_review fingerprints. Preflight is not proof of generated picture or sound continuity. Do not mechanically reuse an old review after any change."])
     }
@@ -196,7 +211,7 @@ enum SkyStudioOfficialGenerateTool {
                 folder: plan.folder, stem: plan.stem, project: project, reservation: reservation, idempotencyKey: operationKey, official: operation)
             let job = run.start()
             return .ok(["status": "started", "job_id": .string(job.id), "model_id": .string(plan.model.id), "kind": .string(exact.kind),
-                        "idempotency_key": .string(operationKey), "credits": .number(cached.quote.credits), "params": .object(exact.params),
+                        "idempotency_key": .string(operationKey), "character_usage": cached.quote.characterUsage?.json ?? .null, "credits": .number(cached.quote.credits), "params": .object(exact.params),
                         "official_recipe": ["preflight_reviewed": true, "output_reviewed": false],
                         "billing_note": .string(SkyStudioBilling.policyMessage),
                         "next_step": "Wait with get_job. Inspect the generated start, turns and both actual cut seams before accepting; retain the original operation key after any failure. Quote review is not output acceptance."])

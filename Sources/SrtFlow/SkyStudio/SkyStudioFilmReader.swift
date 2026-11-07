@@ -98,7 +98,7 @@ enum SkyStudioFilmReader {
         }
         let params = try freeObject(o["params"], at: p + ".params")
         let inputs = try freeObject(o["inputs"], at: p + ".inputs")
-        try SkyStudioFilmInputs.validate(inputs, kind: kind.rawValue, params: params, at: p + ".inputs")
+        try SkyStudioFilmInputs.validate(inputs, kind: kind.rawValue, params: params, at: p + ".inputs", allowCharacterDeclarations: true)
         return .init(kind: kind, model: try text(o["model"], at: p + ".model", maximum: 160),
                      prompt: try prompt(o["prompt"], at: p + ".prompt"), params: params, inputs: inputs,
                      context: try readContext(o["context"], at: p + ".context"))

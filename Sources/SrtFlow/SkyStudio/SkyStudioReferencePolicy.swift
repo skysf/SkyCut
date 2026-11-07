@@ -23,13 +23,17 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
     var mode: String
     var files: [SkyStudioReference]
     var webURL: String? = nil
+    var character: SkyStudioCharacterReference? = nil
+    var characterImageCount = 0
+    var characterAssets: SkyStudioCharacterAssets? = nil
     var uploads: Bool { !files.isEmpty }
     var firstFrame: URL? { files.first { $0.role == "first_frame" }?.file }
     var videoSeconds: Double { files.filter { $0.type == "video" }.reduce(0) { $0 + ($1.duration ?? 0) } }
-    func count(_ type: String) -> Int { files.filter { $0.type == type }.count }
+    func localCount(_ type: String) -> Int { files.filter { $0.type == type }.count }
+    func count(_ type: String) -> Int { localCount(type) + (type == "image" ? characterImageCount : 0) }
 
     var quoteParams: [String: JSONValue] {
-        var value: [String: JSONValue] = ["reference_image_count": .number(Double(count("image")))]
+        var value: [String: JSONValue] = ["reference_image_count": .number(Double(localCount("image")))]
         if mode == "multimodal" {
             value["reference_video_count"] = .number(Double(count("video")))
             value["reference_video_seconds"] = .number(videoSeconds)
@@ -44,7 +48,7 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
             return mode == "multimodal" || files.count > 1 ? "This server catalog does not offer these reference inputs for \(model.title)." : nil
         }
         for (field, value) in model.inputs where value["required"]?.boolValue == true {
-            if !files.contains(where: { $0.role == field }) { return "\(model.title) requires \(field.replacingOccurrences(of: "_url", with: "")) and its other listed inputs." }
+            if !files.contains(where: { $0.role == field }) && !(character != nil && mode == "frames" && field == "image_url") { return "\(model.title) requires \(field.replacingOccurrences(of: "_url", with: "")) and its other listed inputs." }
         }
         if model.kind == "lipsync" || model.operation == "remove_background" {
             let allowed = Set(model.inputs.keys)
@@ -55,8 +59,8 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
         }
         if webURL != nil, (limits["max_web_urls"]?.intValue ?? 0) == 0 { return "This model does not accept a webpage." }
         if webURL != nil, count("document") > 0, limits["document_and_web_mutually_exclusive"]?.boolValue == true { return "Choose a document or webpage, not both." }
-        if let max = limits["max_total_files"]?.intValue, files.count + (webURL == nil ? 0 : 1) > max { return "\(model.title) accepts at most \(max) reference files in total." }
-        if limits["requires_reference"]?.boolValue == true, files.isEmpty, webURL == nil { return "\(mode) mode requires a reference file." }
+        if let max = limits["max_total_files"]?.intValue, files.count + characterImageCount + (webURL == nil ? 0 : 1) > max { return "\(model.title) accepts at most \(max) reference files in total." }
+        if limits["requires_reference"]?.boolValue == true, files.isEmpty, webURL == nil, character == nil { return "\(mode) mode requires a reference file." }
         if limits["audio_requires_visual"]?.boolValue == true, count("audio") > 0, count("image") + count("video") == 0 {
             return "\(model.title) requires an image or video together with audio references."
         }

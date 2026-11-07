@@ -6,9 +6,11 @@ import SrtFlowMCPKit
 @MainActor
 enum SkyStudioOfficialPreparation {
     static func sources(_ plan: SkyStudioReferencePlan) throws -> JSONValue {
-        .array(try plan.files.map { file in
+        var sources = try plan.files.map { file -> JSONValue in
             ["role": .string(file.role), "type": .string(file.type), "file": try SkyStudioApproval.file(file.file)]
-        })
+        }
+        if let assets = plan.characterAssets { sources.append(["character": assets.json]) }
+        return .array(sources)
     }
 
     static func start(generation: SkyStudioGeneration, plan: SkyStudioReferencePlan, model: SkyStudioModel, scope: SkyStudioOfficialPrepared.Scope,
@@ -48,13 +50,16 @@ enum SkyStudioOfficialPreparation {
                 }
                 try await SkyStudioOfficialGenerateTool.validateScope(scope, project: project, key: key)
                 guard try sources(plan) == originalSources else { throw AIToolError("The original files changed before preparation completed; no generation or credits were reserved.") }
+                var request = generation.job(model: model.id, uploaded: uploaded.inputs, references: uploaded.references)
+                request.characterAssets = plan.characterAssets
                 let render: JSONValue = ["kind": .string(generation.kind.rawValue), "model": .string(model.id),
-                    "prompt": .string(generation.prompt), "params": .object(generation.params), "inputs": uploaded.allInputs]
+                    "prompt": .string(generation.prompt), "params": .object(request.renderParams), "inputs": .object(request.renderInputs)]
                 var detail: [String: JSONValue] = [
                     "prepared_render": render, "inputs": uploaded.allInputs, "model_id": .string(model.id),
                     "input_mode": .string(plan.mode), "reference_files": .number(Double(plan.files.count)), "charged": false,
                     "next_step": "Add explicit public context to prepared_render for the story plan and neighbor declarations. Request generate_media with film, prepared_references when present and quote_only=true; quote_only never uploads. Preparation is local to this App run and project."
                 ]
+                if let usage = plan.characterAssets?.usage { detail["character_usage"] = usage.json }
                 if !plan.files.isEmpty { detail["prepared_references"] = .string(token) }
                 AIJobs.shared.finish(job, .done, message: "Effective render and original image references prepared; no generation or credit reservation.", detail: .object(detail))
             } catch {

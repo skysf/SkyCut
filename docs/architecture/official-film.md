@@ -160,3 +160,6 @@ current.last_used 或 next.first_used。实际 PNG 必须对应当前引用准�
 后台验收使用独立测试 App、假服务与合成素材，实际导入、生成、检查及导出均经 MCP；
 不得以这些通过项代替真实提供方输出的画面验收。具体结果见
 [实施报告](../reports/2026-11-04-official-film-client.md)。
+
+
+角色引用补充（2026-11-07）：当前角色须以 `character_id` 经服务器解析，准备的公开 render 使用当前安全 DTO 的真实视图 URL，reference sources 同时绑定 revision / 视图 / 模式。角色图不下载 / 重传；原调用者 inputs 仍只接受 uploads。公共故事中角色 URL 只是声明，不是 ownership 证明；服务器报价必须再解析此账号角色并把实际资产加入 pin。准备与报价的实际 usage 不同就重新准备 / 保存制作图 / 报价和审查，不能用 reference count 占位放行。邻镜仍需要完整 render、context 和接缝审查。
