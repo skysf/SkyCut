@@ -208,7 +208,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
-- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.61 的签名包与下载回读记录）：
+- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.62 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](docs/build/build-and-packaging.md)。
 - 音频库素材的制备与上传（音乐：选曲 → 规格化 → manifest → R2；音效：手写目录 → 峰值归一 + 落点 → manifest → R2）：
   [docs/build/audio-library-pipeline.md](docs/build/audio-library-pipeline.md)。
@@ -426,6 +426,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
+- [2026-11-07 全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 四个新图片模型、换角度、角色的读 / 建 / 带角色生成图片和视频 / 改名 / 重做头像 / 删除全部成功（208 积分，和本机账一致），旧 revision 被拒不送出；图片放大坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大，已退款）；每个新构建第一次读 Key 弹钥匙串密码框、AI 调用等在框后面；`list_characters` 一页约 80 KB 太大。
+
 - [Windows 版 SkyCut：讨论记录（暂缓）](docs/plans/2026-11-07-windows-version.md) — 2026-11-07 用户、Claude、Codex 讨论一轮后用户定「日后再讨论、现在都待定」：已定的（共享 Swift 核心不做第二套代码、Mac 新功能照常做、两边工程互开 + 随包一套开源字体、Windows 字幕识别用 whisper.cpp、先不签名、ARM 先不做、支持 Win10 / Win11、Pro 两台不分平台、用那台没独显的 Win11 当测试机），没定的（配音、翻译、字体带多少、声音场景 Mac 不变 Windows 另做、中日文分词、素材库随不随包、商店、测试机情况），以及 Codex 的技术草稿（苹果框架替代表、模型与安装包大小、测试分层、R1–R12 探针、41–68 人周）。
 
 - [2026-11-04 一个 PR 从本地到能合要多久：改之前和改之后](docs/reports/2026-11-04-ci-speedup.md) — 本地 24 分钟满载 → 1.5–3 分钟单核原生，PR 的 CI 10 分 55 秒 → 约 6 分钟（缓存热）、编 App 2 分 43 秒 → 15 秒；五个 PR 各改了什么、怎么量的、还剩什么。
@@ -603,7 +605,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — 2026-10-03 起发布版和测试版用一把固定的自签名证书「SrtFlow Signing」签：
   系统权限（录屏、麦克风、下载文件夹、钥匙串）按签名记账，ad-hoc 的每个新版本都是「另一个 App」，录屏那条拨开关都救不回来（TCC 只改开关、不换钉着的签名）；
   私钥在仓库外 `~/.config/srtflow/signing/`、仓库钉证书的 SHA-1、永不重建；签名只经 `sign-app.sh`（签名那几秒把专用钥匙串挂上搜索列表）；
-  App 每个构建最多删一次自己的录屏记录再请求；第一次换签每台机器再授权一次；守卫与人工回归。
+  App 每个构建最多删一次自己的录屏记录再请求；第一次换签每台机器再授权一次；**钥匙串例外**：没有 Team ID，分区名单按代码哈希记，每个新构建第一次读 Key 仍要输一次密码（2026-11-07 更正）；守卫与人工回归。
 - [产品名与代码名](docs/architecture/product-name.md) — 2026-10-18 起看得见的叫 SkyCut（App、可执行文件、DMG、界面和权限弹框的文案、给 AI 的话、
   MCP 服务器 `skycut`、小程序 `skycut-mcp`），身份沿用 SrtFlow 且永远不改（bundle id、UTType、签名证书、钥匙串、UserDefaults、数据文件夹、AI 通道、
   环境变量）、代码名沿用 SrtFlow；为什么（授权按 bundle id + 证书认、数据在老文件夹里、老会话的小程序要连得上）、规矩、守卫与人工回归。
