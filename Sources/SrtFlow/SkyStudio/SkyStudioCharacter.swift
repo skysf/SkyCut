@@ -28,7 +28,7 @@ struct SkyStudioCharacterPage: Equatable, Sendable {
     var characters: [SkyStudioCharacter]
     var nextCursor: String?
     var json: JSONValue {
-        ["characters": .array(characters.map(\.json)), "next_cursor": nextCursor.map(JSONValue.string) ?? .null]
+        ["characters": .array(characters.map(SkyStudioCharacterSummary.json)), "next_cursor": nextCursor.map(JSONValue.string) ?? .null]
     }
 }
 

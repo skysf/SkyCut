@@ -146,7 +146,7 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     var jobID: String
     /// nil = 这个 SkyCut 不认识的词（当成回的不像话）。
     var state: State?
-    /// `queued` / `processing` / `saving`（存进 Sky Studio 的作品库）。下载是 SkyCut 自己的阶段。
+    /// `queued` / `processing` / `saving`（存进 Sky Studio 的作品库），终态一律 nil。下载是 SkyCut 自己的阶段。
     var phase: String?
     var queuePosition: Int?
     var phaseSeconds: Double?
@@ -178,9 +178,9 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     init?(json: JSONValue) {
         guard let id = json["job_id"]?.stringValue, !id.isEmpty else { return nil }
         self.init(jobID: id, state: json["status"]?.stringValue.flatMap(State.init(rawValue:)))
-        phase = json["phase"]?.stringValue
-        queuePosition = json["queue_position"]?.intValue
-        phaseSeconds = json["phase_seconds"]?.doubleValue
+        phase = isFinished ? nil : json["phase"]?.stringValue
+        queuePosition = isFinished ? nil : json["queue_position"]?.intValue
+        phaseSeconds = isFinished ? nil : json["phase_seconds"]?.doubleValue
         typicalSeconds = json["typical_seconds"]?.doubleValue
         pollAfterSeconds = json["poll_after_seconds"]?.doubleValue
         creditsReserved = json["credits_reserved"]?.doubleValue

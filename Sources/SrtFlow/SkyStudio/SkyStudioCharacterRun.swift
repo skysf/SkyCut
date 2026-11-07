@@ -89,7 +89,7 @@ final class SkyStudioCharacterRun {
                 try await observed(status)
             }, beforeSubmit: { [self] in try await beforeSubmit() })
             invalidateChangedCharacter(previousRevision: previousRevision)
-            finish(.done, "Character ready; reuse character_id. No role images were inserted on the timeline.")
+            finish(.done, SkyStudioCharacterJobReport.completionMessage(resuming: plan == nil))
         } catch let error as SkyStudioJobError {
             if error.canRefund(beforeAccepted: receipt.jobID == nil) { held?.refund() }
             if let failure = error.failure {
@@ -216,7 +216,7 @@ final class SkyStudioCharacterRun {
             try await observed(server)
             if server.characterStatus == "ready" {
                 invalidateChangedCharacter(previousRevision: previousRevision)
-                AIJobs.shared.adoptRecovered(job, message: "Original Character recovered; no new generation, upload or charge.", detail: .object(payload()))
+                AIJobs.shared.adoptRecovered(job, message: SkyStudioCharacterJobReport.completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue), detail: .object(payload()))
             } else { AIJobs.shared.updateDetail(job, payload()) }
         } catch { AIJobs.shared.updateDetail(job, ["refresh_error": .string(SkyStudioCharacterError.tool(error).message)]) }
     }

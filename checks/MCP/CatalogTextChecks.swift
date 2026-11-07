@@ -49,6 +49,7 @@ func runCatalogTextChecks() {
     check(MCPToolName.listCharacters.definition.readOnly && MCPToolName.getCharacter.definition.readOnly, "character discovery is free and read-only")
     check(!MCPToolName.manageCharacters.definition.readOnly && MCPToolName.manageCharacters.definition.destructive, "Character writes declare library mutations/deletion")
     check(MCPToolName.listCharacters.definition.inputSchema["properties"]?["capabilities"] != nil, "Character capabilities have a read-only entry")
+    check(MCPToolName.listCharacters.definition.description.contains("compact summaries") && MCPToolName.listCharacters.definition.description.contains("1 KiB"), "list explains bounded summaries before requesting full character details")
     check(MCPArgumentCheck.problem(tool: .manageCharacters, arguments: ["action": "create", "aspect_ratio": "21:9"]) != nil, "native Character shapes cannot be caller parameters")
     let total = JSONValue.object(["tools": MCPToolName.listJSON]).encodedString().utf16.count
     print("MCP catalog including tools envelope: \(total)/110000 UTF-16 units; instructions: \(MCPInstructions.text.utf16.count)/2048.")

@@ -19,7 +19,7 @@
 | 等 | 没有长轮询：照 `poll_after_seconds` 再问，夹在 2–60 秒（没说按 15 秒）。**问的时候断网不算失败**（活在服务器上照做），连着 10 次问不到才算。最多等 5 小时（未知供应商结果由服务端继续核查，经过多久都不证明失败或退款） |
 | 停 | Task 被取消 = 用户要停：**只有排着队的能取消**（`POST /jobs/{id}/cancel`，退钱）；已经开始的回 `not_cancellable`，照实说「已经开始了、取消不了、积分花了、成品照样会进用户的 Sky Studio 作品库」；取消请求没送到就说不准。取消在不继承取消的 Task 里发（`SkyStudioJobError.Stop`）。**取消不了、说不准的那单接着在后台查到 done / failed**（`SkyStudioJobRun.followToEnd`，不继承取消的后台任务里、照 `poll_after_seconds`、不下载不换源；连着 10 次问不到、等满 5 小时就算了）：Sky Studio 在有人查的时候才去服务商那里取成品、存进作品库、把这一单从「同时开着的」里拿掉，没人查要等它的兜底几个小时、还一直占着 3 个名额中的一个（2026-10-28 真积分测试撞上的，[案例](../bugfixes/2026-10-28-uncancellable-upscale-left-unfinished.md)）。SkyCut 退出前还没查完的单只能靠 Sky Studio 的兜底 |
 | 成品 | upscale、图片、视频、音乐、旁白、音效都**永久存进用户的作品库**（只有用户自己删），`result.url` 是永久地址、另带 `generation_id`；克隆的声音不进作品库，留 60 天（`expires_at`）。SkyCut 照旧下到本机。宽高、时长、帧率服务器没记的是 null（MiniMax H3 的视频不记像素和帧率）：从文件读，**别当 0** |
-| 阶段 | 服务器的 `phase` 只有 `queued` / `processing` / `saving`（存进作品库）；裁 / 上传 / 下载 / 封声是 SkyCut 自己的阶段。没有百分比，照旧是阶段 + 排队位置 + 已用时间 + 典型时长（`typical_seconds`，从 `/quote` 和任务的回答来），不画假进度条 |
+| 阶段 | 服务器的 `phase` 只有 `queued` / `processing` / `saving`（存进作品库）；裁 / 上传 / 下载 / 封声是 SkyCut 自己的阶段。没有百分比，照旧是阶段 + 排队位置 + 已用时间 + 典型时长（`typical_seconds`，从 `/quote` 和任务的回答来），不画假进度条；远端 done / failed / cancelled 丢弃旧 phase / 阶段用时 / 排队位置。get_job 最后统一清理终态的 phase、phase_seconds、queue_position、transfer_percent、progress、waiting_for_user，即使完成快照 / 后续刷新又带回来也不报进行中 |
 | 话 | 服务器的 `message`（英文、写给人看）原样给 AI；SkyCut 自己说的（停了、没连上、等太久）在 `SkyStudioJobError.message`。界面上的话在各自的调用方按语言换 |
 | 只经一处 | `SkyStudioAPI` 的 `submit` / `cancel` 只许 `SkyStudioJobRun` 调（满了等着再交、停的规矩只在那一处；`checks/sky-studio-wiring.sh` 第 6 条） |
 
@@ -217,6 +217,7 @@ AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-�
   ±135° 的多步执行和全部价格由服务器决定，客户端不拆单、不计算、不重试付费调用。
 - `generate_media kind=image operation=upscale`：放大一张图片，匹配 `image-upscale`；
   `upscale_factor=x2|x3|x4`，默认 x2，只发这一项 params。不收 prompt / aspect_ratio / resolution；也不收 film。
+  未给 `name` 时，两种操作按源图短名加 `angle` / 请求倍率起名（如 `小屋 angle.png`、`小屋 x2.png`）；显式名字优先、撞名照旧加编号。
   单图与读取授权走同一条参考路径；`upscale_clip` 继续只管视频片段，图片不走其换源或视频导出路径。
   服务器可能为输出像素上限下调有效倍率；结果按实际返回的宽高报告，不能用请求倍率推算尺寸。
 - 两种新操作均不收 film，先于官方短片分派拒绝。报价只使用原 `/quote`；消费仍经 `SkyStudioJobGate`，
@@ -226,7 +227,7 @@ AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-�
   generation / delivery / billing 分开读。中间步骤成功后失败可能仍有供应商成本，只认 billing 的最终净扣费，不能报整单退款。
   图片放大 inline 结果未持久保存时保留待核查，不重新收费生成。
 - 下载初始名字读 `result.content_type`，最终经 ImageIO 读取实际图片格式再定扩展名；JPEG 用 `.jpg`，PNG 用 `.png`，
-  原字节不重编码。`file_content_type` 报本机实际格式，远端 `content_type` / `remote_result` 原样保留。
+  原字节不重编码。图片同时从这份 ImageIO 元数据读取考虑 EXIF 方向的实际宽高，写进 get_job 顶层；不由请求倍率推算，也不依赖服务器漏掉的尺寸。`file_content_type` 报本机实际格式，远端 `content_type` / `remote_result` 原样保留。
   无法确认图片格式时保留已下载文件并报本地交付失败，不退款、不自动重生成。案例见 [图片扩展名](../bugfixes/2026-11-07-generated-image-extension-from-bytes.md)。
 
 验证：`scripts/check-sky-studio.sh` 的 ImageOperation / ImageApproval / ImageResult 组覆盖实际目录、全部离散角度、
@@ -241,7 +242,7 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 
 客户端依据同日最终角色合同 Commit 3 / 4；服务器 PR #242（角色 A `eab6b978`，B 定稿 `b4e7a376`；开 PR 前复读时 head `1b90c1c8` 仅补测试 / 文档，接口未变）的上线、客户端 CI 和 App 发版分别验收，不能把假服务通过称为生产可用。
 
-- `list_characters` 是账户的免费只读分页，limit 1–100（默认 50）、UUID cursor、ready（默认）/ draft / generating / failed / all；`get_character` 现读详情、可用视图与不透明 revision。安全 DTO 原样保留，不自行算 revision。
+- `list_characters` 是账户的免费只读分页，limit 1–100（默认 50）、UUID cursor、ready（默认）/ draft / generating / failed / all；`get_character` 现读完整详情、可用视图与不透明 revision。列表仅回 id / name / status / revision、`available_roles`、default_generation_model / default_generation_resolution 与服务端有的 created_at / updated_at，不带图片 / 缩略图地址或 prompt；分页与 capabilities=true 的能力对象保持。每条摘要最多 1,024 UTF-8 字节（含 JSON 转义）：名字按 JSON 字节预算裁短，异常过长的可选模型身份 / 日期省略而不裁成另一个身份；完整 DTO 和缓存不变，详情照原样取。28 / 50 条合成样例的整页分别 10,364 / 18,460 UTF-8 字节（约 10.1 / 18.0 KiB），另有控制字符、emoji 和组合字符的边界回归。不自行算 revision。
 - `generate_media` 的 `character_id` / 可选 `character_roles` 是服务器引用，不进入本机路径表，也不下载再上传。普通图片与视频支持；媒体专用操作 / 音乐 / 音效不收。显式视图不得重复、缺失或静默丢弃；省略时由 `/quote` 在剩余组合容量里决定。
 - 本机参考数量与角色数量分账：`params.reference_image_count` 只报本机图；`character_usage.roles` 是实际角色视图，usage 的 count 是合并后的图片数。最终 mode 和 revision 从报价取，提交发选择、`character_revision`、精确 `max_credits` 与稳定 key。无显式帧的多模态模型可用全部可用视图；frames 只让服务器提供一张 front，不能把 side/back 自动变成尾帧。
 - 确认身份包含角色、视图、revision、mode、全部本机参考与精确价格；角色的项目批准也绑定完整身份，不复用别的角色 / 旧 revision 的宽泛模型批准。换图后重新报价；旧确认不能消费或预留。每日硬预算仍先于确认和全部权限。
@@ -266,8 +267,10 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 - **持久回执**：创建 / 导入 / 头像 / 换图调用前必须选稳定 idempotency_key；本机 job_id 是账户 + key 的摘要，跨 App 重启不变。`Application Support/<原 bundle id>/CharacterReceipts/` 目录 700、文件 600，存原账户、操作、key、确认身份摘要、固定请求 / 已上传描述、原 job_id / character_id 和独立状态；API Key 不落盘。与官方回执共用 `SkyStudioReceiptFile` 的锁、原子写与 fsync，正式 / Beta 按原 bundle id 隔离。
 - 先找持久原单，再读当前文件 / 角色 / 目录、报价或预留。重复 key 只能取原操作，不因源图被删或角色后来被换 / 删除而新建。`get_job` 找到持久角色 id 后只读原服务器 job；`manage_characters {action,resume:job_id}` 可显式继续原单轮询，不重报价格、不上传、不重新预留。跨重启的本机预算不重复扣退，无法证明旧聚合账结算时报告 `local_budget_reconciliation=pending`；服务器 billing 仍单独展示实际净额。
 - **恢复合同与原规则的差异**：服务端没有按 idempotency_key 只读找单的端点。付费丢答且未拿到 job_id 保留原 key 待核查，继续遵守不重放付费 POST 的原规则。唯一新增例外是用户显式恢复**免费导入**：保存的同一 import body / key 可再送 `/characters/import` 取回已持久角色，绝不重传图或请求供应商；只读 get_job 不做这个 POST。换图丢答只 GET 当前角色，把 current_character、原 revision 与上传描述交给调用方核对，不自动重 PUT。原生角色任务不支持服务器取消，停止只是停本机等待 / 交后台查原单；带角色的普通 generate_media 仍沿用普通任务的排队取消规矩。
-- `get_job` 分开显示 `generation_status`（源图）、`character_status`（角色整理）和 `billing`，另报 character_id / operation / 实际 character_usage。源图 succeeded 且角色 finalizing / failed 时保留源地址和实收，提示只查原单重试整理（服务端至少 60 秒间隔），不能说退款、重生成源图或再建一个角色。ready 只返回可复用角色 id / DTO，不自动将四视图放进时间线。
+- `get_job` 分开显示 `generation_status`（源图）、`character_status`（角色整理）和 `billing`，另报 character_id / operation / 实际 character_usage。源图 succeeded 且角色 finalizing / failed 时保留源地址和实收，提示只查原单重试整理（服务端至少 60 秒间隔），不能说退款、重生成源图或再建一个角色。ready 只返回可复用角色 id / DTO，不自动将四视图放进时间线。正常完成与随后重复查询均说 Character ready；只有真正 resume / 重启读原单，或失败整理后来查回成功时才说 recovered。
 
-验证：CharacterNativeChecks 真跑生产 `SkyStudioCharacterWorkflow` / API，逐字段比对六动作、照片 / role 上传、报价零写入、动态能力、UTF-16 长度、禁止字段与免费请求；CharacterRecoveryChecks 真写读私有回执、新实例只 GET 旧单、删除原本机照片后恢复、错误响应保留原任务号、未知免费导入的显式同 key 恢复、角色整理失败仍保留实收、免费换图只读恢复和禁止 `/cancel`。CharacterApprovalChecks 核对精确身份、预算、Key 变化与相关角色批准失效。隔离源码反向验证：角色 A 撤掉 revision 身份 / 提交和 epoch 写回保护，实际 8 项断言红；角色 B 撤掉头像提交 revision、放开未知收费重交与已提交回执覆盖，实际 3 项断言红。生产源码均恢复后正向检查通过。全清单连 tools envelope 实测 **106,166 / 110,000 UTF-16 单位**，总说明 **2,012 / 2,048**。
+验证：CharacterNativeChecks 真跑生产 `SkyStudioCharacterWorkflow` / API，逐字段比对六动作、照片 / role 上传、报价零写入、动态能力、UTF-16 长度、禁止字段与免费请求；CharacterRecoveryChecks 真写读私有回执、新实例只 GET 旧单、删除原本机照片后恢复、错误响应保留原任务号、未知免费导入的显式同 key 恢复、角色整理失败仍保留实收、免费换图只读恢复和禁止 `/cancel`。CharacterApprovalChecks 核对精确身份、预算、Key 变化与相关角色批准失效。隔离源码反向验证：角色 A 撤掉 revision 身份 / 提交和 epoch 写回保护，实际 8 项断言红；角色 B 撤掉头像提交 revision、放开未知收费重交与已提交回执覆盖，实际 3 项断言红。生产源码均恢复后正向检查通过。全清单连 tools envelope 实测 **106,306 / 110,000 UTF-16 单位**（结果说明更新前 106,166），总说明 **2,012 / 2,048**。
 
 上线后仍须真服务核对：文字 / 照片创建的四视图质量、头像一致性、同 key 丢答恢复与账单、进行中删除保护、免费导入 / 换图 / 改名、原生任务整理失败只恢复原单。未连接生产或使用真实 Key，本轮通过不代表服务端 PR 已部署。
+
+本轮结果合同与五处修复的反向验证证据见 [0.18.62 真积分验收后的工具结果](../bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md)。

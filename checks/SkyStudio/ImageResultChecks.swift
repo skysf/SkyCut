@@ -32,6 +32,8 @@ func runImageResultChecks() async {
             let file = try SkyStudioImageResult.finalize(download, format: format) { folder.appendingPathComponent("download-\(index).\($0)") }
             checkEqual(file.pathExtension, type == .jpeg ? "jpg" : "png", "actual downloaded bytes determine saved extension")
             checkEqual(format.contentType, type == .jpeg ? "image/jpeg" : "image/png", "actual file content type is reportable separately from remote metadata")
+            checkEqual(format.dimensions["width"], 12, "image width comes from downloaded pixels when server width is absent/null")
+            checkEqual(format.dimensions["height"], 8, "image height comes from downloaded pixels when server height is absent/null")
             checkEqual(try Data(contentsOf: file), bytes, "original JPEG/PNG bytes are preserved exactly")
             check(SkyStudioStub.log.allSatisfy { $0.method == "GET" && $0.headers["Authorization"] == nil }, "result download does not send Key or regenerate")
         }

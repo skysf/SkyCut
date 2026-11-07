@@ -188,7 +188,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 Task { @MainActor in self?.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction))) }
             }
             savedOriginal = destination
-            var fileContentType: String?
+            var localImage: SkyStudioImageResult.Format?
             if generation.kind == .image {
                 let downloaded = destination
                 let measured = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try SkyStudioImageResult.format(at: downloaded) } }
@@ -199,7 +199,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                     return corrected
                 }
                 savedOriginal = destination
-                fileContentType = format.contentType
+                localImage = format
             }
             advance(to: .finishing)
             var editable = destination
@@ -225,7 +225,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 } catch { captionIssue = "Video saved; optional SRT download failed. Query the original job to recover the sidecar; generation remains charged." }
             }
             try await official?.recovery.delivered(file: editable, original: destination)
-            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue, fileContentType: fileContentType)
+            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue, localImage: localImage)
         } catch let error as SkyStudioJobError {
             await recordRejection(error)
             switch error {
@@ -342,7 +342,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     // MARK: 结局
 
-    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?, fileContentType: String?) {
+    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?, localImage: SkyStudioImageResult.Format?) {
         // SkyCut 自己做的文件：AI 接着把它放上时间线时不该再问「读点名文件夹以外的文件」。
         if project.map({ AIWorkspace.shared.allowsReading(file, project: $0) }) != true { AIReadGrants.shared.remember([file]) }
         let store = SkyStudioSpendStore.shared
@@ -360,6 +360,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             detail["width"] = .number(width.rounded())
             detail["height"] = .number(height.rounded())
         }
+        if let localImage { detail.merge(localImage.dimensions) { _, actual in actual } }
         if let duration = result.duration { detail["duration"] = .number(duration) }
         if let charged { detail["credits_charged"] = .number(SkyStudioCredits.number(charged)) }
         if let caption {
@@ -372,7 +373,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             if let value = result.metadata[key] { detail[key] = value }
         }
         detail["result_url"] = .string(result.url.absoluteString)
-        if let fileContentType { detail["file_content_type"] = .string(fileContentType) }
+        if let localImage { detail["file_content_type"] = .string(localImage.contentType) }
         if let original = savedOriginal, original != file {
             AIReadGrants.shared.remember([original])
             detail["original_file"] = .string(original.path)
