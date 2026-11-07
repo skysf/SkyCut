@@ -148,7 +148,9 @@ Sky Studio 水印；Pro 开放 MCP 并导出无水印。Pro 一个账号一人�
 提供“看完整对比”链接跳到 `#pricing-comparison`。详细功能集中在同一张
 原生 `table`：左列是功能，右边 Free / Pro 两列，公共功能同一行两边打勾；顶部高亮
 AI 剪辑、视频水印、让 AI 调云端模型、年付积分四项差别。下方按剪辑、画面、文字形状、
-声音、字幕、录屏工具、导出和本机 / 云端模型分组。手机 390 宽仍是左右对比、文字换行，
+声音、字幕、录屏工具、导出、角色系统和本机 / 云端模型分组。角色系统单独成组，紧邻模型区，
+读取与导入管理标“不扣积分”，设定图、头像和带角色的图片 / 视频生成标“消耗积分”。
+手机 390 宽仍是左右对比、文字换行，
 不改成上下两份功能清单，不用横向滚动隐藏一边。表头滚动时保留方案列名。
 
 `content/feature-matrix.js` 保存统一行序、授权差别与依据，四份 `content/comparison-*.js`
@@ -169,20 +171,23 @@ AI 剪辑、视频水印、让 AI 调云端模型、年付积分四项差别。�
 
 唯一购买目的地仍是 `https://skystudioai.com/app/skycut/pro`，新标签打开，说明先登录
 Sky Studio。官网不接支付 SDK 或结账逻辑。12 个 canonical URL 和 sitemap 不变。
-价格与购买入口已于 2026-11-06 通过 PR #325 合并上线；本轮只本地验收，另开 PR，
-CI 通过后等用户 review，不部署。
+价格与购买入口于 2026-11-06 通过 PR #325 上线；完整功能对比和年付折合展示于
+2026-11-07 通过 [PR #333](https://github.com/skysf/SkyCut/pull/333) 合并上线。
 
 ### 模型目录来源与授权
 
 2026-11-07 快照来自只读 Sky Studio 仓库
-`cursor-skystudios-app-cinematic` 的 `origin/main`（`099d92b4237e20f93c351ee00dc6d48e521f26ba`）。
-只用 `git show origin/main:<路径>` 读取，不改该仓库、不调用真实生成服务：
+`cursor-skystudios-app-cinematic` 的 Sky Studio PR #242 合并版本
+`94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00`，对应已受控上线的目录。
+只用 `git show <revision>:<路径>` 读取，不改该仓库、不调用真实生成服务：
 
 - `docs/agents/skycut-api.md` 的 `GET /models` 与 `Per kind` 是合同。
 - `api/_utils/skycut/catalog.ts`、`visualModels.ts` 和各 `*Contract.ts` 构建 SkyCut 专用目录；
-  只有 27 条记录、21 个不同 id。六个共享视频模型分别列文生视频和图生视频，所以
-  不能写成 27 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
-- `shared/modelDisplayNames.ts` 给图片与六个共享视频模型的显示名，`shared/musicModel.ts` 给音乐名；
+  共 33 条记录、27 个不同 id，其中图片类 9 条。六个共享视频模型分别列文生视频和图生视频，
+  所以不能写成 33 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
+- `shared/skycutImageModels.ts` 钉公开图片 id 与网页内部 id 的映射，`shared/modelDisplayNames.ts`
+  给普通图片与六个共享视频模型的显示名；`visualModels.ts` 直接给 `Qwen Angles` 与
+  `Image Upscale` 这两种特殊操作的名字和 operation。`shared/musicModel.ts` 给音乐名；
   `shared/skycutWan3.ts`、`skycutHeygen.ts`、`skycutH3LipSync.ts`、
   `skycutRemoveBackground.ts`、`videoUpscale.ts` 给其他视频、口型、去背景与放大的名称。
   `catalog.ts` 直接提供三种音频的标题。
@@ -194,7 +199,9 @@ CI 通过后等用户 review，不部署。
 
 | 类别 | 显示模型 | 记录数 | 界面与 AI 入口 |
 | --- | --- | --- | --- |
-| 图片 | Seedream 5.0 Flash、Nano Banana 2 | 2 | Pro 经 AI，扣积分 |
+| 图片生成 | Seedream 5.0 Flash、Nano Banana 2、Nano Banana 2 Lite、Nano Banana Pro、GPT Image 2、Seedream 5.0 Pro | 6 | Pro 经 AI，扣积分 |
+| 图片换角度 | Qwen Angles（`qwen-angles`，`operation=camera_angle`） | 1 | Pro 经 AI，扣积分；一张图旋转、俯仰、推拉 |
+| 图片放大 | Image Upscale（`image-upscale`，`operation=upscale`） | 1 | Pro 经 AI，扣积分；2 / 3 / 4 倍，受 1650 万输出像素上限约束 |
 | 图片背景去除 | Ideogram Remove Background | 1 | Pro 经 AI，扣积分 |
 | 视频 | Minimax H3、Gemini Omni 1.1 Flash、Veo 3.1 Fast / Pro、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 15 | Pro 经 AI，扣积分 |
 | 对口型 | HeyGen v3 Lipsync Speed / Precision、MiniMax H3 Max Lip Sync (Image to Video) | 3 | Pro 经 AI，扣积分 |
@@ -202,7 +209,30 @@ CI 通过后等用户 review，不部署。
 | 旁白生成 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
 | 音效生成 | Sonilo sound effects | 1 | Pro 经 AI，扣积分 |
 | 声音克隆 | Zonos 2 voice clone | 1 | Pro 经 AI，扣积分 |
-| 放大 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
+| 视频画质提升 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
+
+普通图片新增四个模型，现行 App 已可让 AI 点名使用。图片换角度、图片放大和角色系统的
+官网内容须等支持它们的新版 App 发布后再由用户确认合并；后台接口上线不等于客户端已发版。
+此 PR 的 CI 通过后也须停下等待 review 和客户端发布，不自动合并。
+
+### 角色系统来源与费用
+
+同一 revision 的 [Saved Character references](https://github.com/skysf/skystudio-aigc-app/blob/94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00/docs/agents/skycut-api.md#saved-character-references-2026-11-07)
+规定读取与引用角色，[Native Character creation and management](https://github.com/skysf/skystudio-aigc-app/blob/94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00/docs/agents/skycut-api.md#native-character-creation-and-management-2026-11-07)
+规定创建、导入、编辑、换图、头像与删除。页面只说明 AI 入口，不承诺有手动角色面板。
+所有角色行的 Free 都写“需要 Pro”，Pro 都是“让 AI 调用”；不扣积分的操作也需要软件 Pro 授权。
+
+| 功能行 | 接口依据 | 积分 |
+| --- | --- | --- |
+| 读取角色（`characterRead`） | `GET /characters`、`GET /characters/{id}`，同账号当前可用视图与 revision | 0 |
+| 带角色生成（`characterGenerate`） | visual quote / jobs 的 `character_id`、`character_roles` 与 `character_revision`，支持的图片 / 视频模型复用角色引用 | 按对应模型和引用数量正常收费 |
+| 角色设定图（`characterCreate`） | `POST /characters/create` 或 `operation=character_create`，文字或一张自有照片 | 一张源图的费用，裁出四个视图不收四次钱 |
+| 导入与管理（`characterManage`） | `POST /characters/import` 正面 / 侧面 / 背面齐全；`PATCH` 改名；`PUT images/{role}` 换图；`DELETE` 删除 | 0 |
+| 重做头像（`characterHeadshot`） | `POST /characters/{id}/headshot` 或 `operation=character_headshot`，以当前正面图生成 | 一张引用图的费用 |
+
+角色导入的 `character-import` 是内部服务标记，角色能力中的图片模型也是复用现有模型，
+均不新增 `/models` 条目。`feature-matrix.js` 的 `characterRows` 保留固定 revision 的合同链接；
+CI 校验链接与行结构，不联网读取另一个仓库，也不把外部仓库本机路径作为 CI 依赖。
 
 **不扣积分不等于 MCP 免费**：`SkyCutGates.aiAllows` 除 `get_status` 外按授权拦所有 AI
 工具。Apple 语音识别（macOS 26）与 Apple 翻译（macOS 15）在字幕面板中可免费使用；
@@ -212,7 +242,7 @@ Kokoro 配音、音效合成、主体识别与扫字目前只有 AI 生成 / 分
 合成器有 16 个预设，网页只保留数量说明，不展示 whoosh 到 shutter 的预设名列表。
 页面将这两项分别写成“内置多语言声音合成”和“内置音效合成器”，不展示 Kokoro 名称，
 声音说明和语言标签保留；四语言采用同样口径。Kokoro 仍是内部实现和源码依据的名字。
-两者数量与语言由网站测试对照 App 代码；云端模型的 id、品牌名、类别归属与记录数不随此次文案改动。
+两者数量与语言由网站测试对照 App 代码；云端模型的 id、品牌名、类别归属与记录数按上述发布快照维护。
 镜头切换检测实际是 `AIShotScan` / `AIShotDetector` 的本机画面差异分析；不冒称由
 Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
 
@@ -225,7 +255,8 @@ Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
 
 统一授权依据是 [Sky Studio 账号](sky-studio-account.md)、`SkyCutGates.swift` 和
 `AIToolRouter.swift`：本轮不修改任何 App 授权行为，只照已实现的入口写文案。
-每条功能的具体实现与长期合同如下，文件路径也存在 `feature-matrix.js` 的 `sources` 中：
+每条既有功能的具体实现与长期合同如下，文件路径也存在 `feature-matrix.js` 的 `sources` 中；
+角色行的外部合同依据与费用见上表：
 
 | 功能行 | 依据 |
 | --- | --- |
@@ -266,7 +297,8 @@ Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
 
 验收：网站测试核对四语言同结构、每行 Free / Pro 两格、Pro 高亮差别、所有模型名与
 本机功能入口、源码证据路径、8 个声音角色 / 8 种语言 / 16 个音效预设，以及新版类别与
-内置功能标题、页面不展示 Kokoro 和预设名列表。折合与节省金额
+内置功能标题、页面不展示 Kokoro 和预设名列表，以及 33 条目录 / 9 条图片记录、新操作
+与视频画质提升的区别、角色各行的 Pro 门和积分标记。折合与节省金额
 用真实标价和另两组价格验证；生产构建后的 SEO 审计继续验证真实 offers 标价和周期。
 人工在本地 `npm run dev` 核对中文和英文的桌面、390 手机卡片与完整对比表 / 模型，
 确保长模型名能换行、两列持续并排、无横向溢出，并保留截图。真实 iPad / 手机硬件另验。
@@ -289,6 +321,13 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
 `{zh,en}-review-1440-comparison-models.png`，宽度和布局数值另存 `review-layout-metrics.json`。
 官网截图使用无头浏览器直接访问本机开发服务器，不操作用户窗口或 Finder；长表可把
 无头视口高度加大，完整截图后裁剪，避免超出视口的裁切偏移。
+
+同日新模型与角色系统本地验收：无头 Chrome 在 `127.0.0.1:5173` 检查中文、英文的
+1440 与 390 宽对比表，50 个功能行包含 5 个角色行，两列并排且没有横向溢出。
+四张截图保留在 `/private/tmp/skycut-models-characters-2026-11-07/`：
+`{zh,en}-1440-comparison.png` 为完整对比表，`{zh,en}-390-characters-models.png`
+为角色与模型区，手机以 2 倍像素密度保存；布局测量另存 `layout-metrics.json`。
+截图已经复核，未操作用户窗口或 Finder；该官网更新仍须等新版 App 发布后再合并。
 
 ## SEO 与创始人身份
 

@@ -1,9 +1,17 @@
 // Sky Studio /models 的 2026-11-07 快照 只列 SkyCut 目录 不扩展到 Studio 网站的全部模型
-// 来源 revision 099d92b4237e20f93c351ee00dc6d48e521f26ba 详见官网架构文档
-const model=(id,title,kinds)=>({id,title,kinds});
+// 与角色功能共用同一发布快照 来源合同见官网架构文档
+export const skyStudioRevision='94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00';
+export const skyStudioApiSource=`https://github.com/skysf/skystudio-aigc-app/blob/${skyStudioRevision}/docs/agents/skycut-api.md`;
+const model=(id,title,kinds,operation)=>({id,title,kinds,...(operation?{operation}:{})});
 const video=(id,title)=>model(id,title,['text_to_video','image_to_video']);
 export const cloudModelGroups=[
-  {id:'images',models:[model('seedream5-flash','Seedream 5.0 Flash',['image']),model('nano2','Nano Banana 2',['image'])]},
+  {id:'images',models:[
+    model('seedream5-flash','Seedream 5.0 Flash',['image']),model('nano2','Nano Banana 2',['image']),
+    model('nano2-lite','Nano Banana 2 Lite',['image']),model('nano-banana-pro','Nano Banana Pro',['image']),
+    model('gpt-image-2','GPT Image 2',['image']),model('seedream5-pro','Seedream 5.0 Pro',['image']),
+  ]},
+  {id:'imageAngle',models:[model('qwen-angles','Qwen Angles',['image'],'camera_angle')]},
+  {id:'imageUpscale',models:[model('image-upscale','Image Upscale',['image'],'upscale')]},
   {id:'background',models:[model('ideogram-remove-background','Ideogram Remove Background',['image'])]},
   {id:'video',models:[
     video('minimax-h3','Minimax H3'),video('gemini-omni-1.1-flash','Gemini Omni 1.1 Flash'),
