@@ -979,6 +979,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-11-01 AI 权限与草稿预算](docs/bugfixes/2026-11-01-ai-approval-and-draft-budget.md) — 请求批准 / 全部权限共享低成本默认，代理改权限始终确认，日预算硬上限，余额不足提供充值入口。
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 - [2026-11-07 生成图片按实际字节确定扩展名](docs/bugfixes/2026-11-07-generated-image-extension-from-bytes.md) — Lite JPEG 下载后核对真实类型，纠正扩展名不重编码，原单交付失败不重新生成。
+- [2026-11-07 真积分验收后的五处 AI 工具结果](docs/bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md) — 角色列表有界摘要、图片操作按源命名、终态清旧阶段、完成与恢复分开、落盘图片实测尺寸；逐项反向验证。
 - [2026-10-29 两种视频拿到同一个确认码](docs/bugfixes/2026-10-29-sky-studio-confirmation-collides.md) — 摘要相同不等于同一件事；确认码绑定完整请求、精确报价、输入文件和落点，实际过闸回归钉住串码不消费不记账。
 - [提交返回瞬间取消丢任务号](docs/bugfixes/2026-10-29-cancelled-submit-loses-job-id.md)
 - [旁白多块词时间和音频尾端](docs/bugfixes/2026-10-29-voice-word-chunks-and-tail.md)

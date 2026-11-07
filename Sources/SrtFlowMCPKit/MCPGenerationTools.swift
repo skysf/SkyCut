@@ -81,7 +81,7 @@ enum MCPGenerationTools {
                     "generate_audio": MCPSchema.boolean("Video audio toggle, if offered."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "lyrics": MCPSchema.string("Music words; requires instrumental=false."),
-                    "name": MCPSchema.string("File name; default from prompt."),
+                    "name": MCPSchema.string("File name; default from prompt, or source name plus angle/x2/x3/x4 for image operations."),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["kind"]),
                 openWorld: true

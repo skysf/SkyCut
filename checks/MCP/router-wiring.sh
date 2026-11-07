@@ -239,3 +239,9 @@ if [ -z "${CHECK_AT}" ] || [ -z "${CALL_AT}" ] || [ "${CHECK_AT}" -gt "${CALL_AT
   exit 1
 fi
 echo "   ✓ 参数名在排队之前核对"
+
+# 最终 JSON 统一压掉终态的旧阶段，不能只在某一种云任务里修。
+if ! grep -qF 'return AIJobResult.json(object, status: job.status.rawValue)' Sources/SrtFlow/AIJobs.swift; then
+  echo "✗ get_job 没经共用终态清理，完成快照 / 后续刷新会重新带回旧 phase" >&2
+  exit 1
+fi

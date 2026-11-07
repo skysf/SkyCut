@@ -138,10 +138,8 @@ enum SkyStudioGenerateTool {
         case .reserved(let reserved): reservation = reserved
         }
 
-        let stem = ExportFileName.stem(
-            from: try args.string("name").map { AIVoiceoverPlacement.fileStem($0) } ?? AIVoiceoverPlacement.fileStem(prompt),
-            droppingExtension: "", fallback: fallbackStem(kind)
-        )
+        let stem = SkyStudioGenerationName.stem(name: try args.string("name"), generation: generation,
+            source: references.files.first(where: { $0.type == "image" })?.file, fallback: fallbackStem(kind))
         let run = SkyStudioGenerationRun(
             generation: generation, model: model, quote: quote, references: references, folder: folder, stem: stem, project: project, reservation: reservation, idempotencyKey: idempotencyKey, characterStamp: references.character == nil ? nil : accountStamp
         )

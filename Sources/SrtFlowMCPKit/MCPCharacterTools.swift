@@ -6,7 +6,7 @@ enum MCPCharacterTools {
         switch name {
         case .listCharacters:
             return MCPToolDefinition(name, title: "List characters", description:
-                "Read the current Sky Studio account's reusable characters for generate_media. Free, read-only; no uploads, reservation or generation. Default status=ready, limit=50; pass next_cursor as cursor for the next page. capabilities=true also reads native Character models, tiers, defaults, limits and prices, independently of the ordinary image catalog. Use get_character for available views and revision.",
+                "List Sky Studio characters as compact summaries: id, name, status, revision, available_roles, saved model/tier and dates. Each entry is at most 1 KiB; no asset/thumbnail URLs. Use get_character for complete details. Free, read-only; no upload, reservation or generation. Default status=ready, limit=50; pass next_cursor as cursor. capabilities=true also returns the unchanged native Character models, tiers, defaults, limits and prices, independently of the ordinary image catalog.",
                 input: MCPSchema.object([
                     "limit": MCPSchema.integer("Page size; default 50.", minimum: 1, maximum: 100),
                     "cursor": MCPSchema.string("Opaque next_cursor UUID from the preceding page."),

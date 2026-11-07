@@ -65,6 +65,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterSummary.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterCapabilities.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterNativeRequest.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioReceiptFile.swift \
@@ -91,6 +92,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioReferencePolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationName.swift \
+  Sources/SrtFlow/AIVoiceoverPlacement.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioImageOperation.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
@@ -146,6 +149,7 @@ xcrun swiftc \
   checks/SkyStudio/ImageOperationChecks.swift \
   checks/SkyStudio/ImageApprovalChecks.swift \
   checks/SkyStudio/ImageResultChecks.swift \
+  checks/SkyStudio/ToolResultChecks.swift \
   checks/SkyStudio/CharacterChecks.swift \
   checks/SkyStudio/CharacterApprovalChecks.swift \
   checks/SkyStudio/CharacterFixtures.swift \

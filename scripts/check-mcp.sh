@@ -407,6 +407,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/AIToolIO.swift \
+  Sources/SrtFlow/AIJobResult.swift \
   Sources/SrtFlow/AIProjectBinding.swift \
   Sources/SrtFlow/AIProjectTargeting.swift \
   Sources/SrtFlow/AIVersionName.swift \
