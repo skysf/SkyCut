@@ -3,8 +3,8 @@
 #   1. **只有 SkyStudioAPI 碰 Sky Studio 的地址和 URLSession**（认证头、版本号、机器号、错误怎么分都在那一处）；
 #      环境变量 SRTFLOW_SKYSTUDIO_API_BASE 只在那里读，而且只认回环地址（Key 不会因此发到别处）；
 #   2. **原始的硬件 UUID 不出 SkyStudioMachine**：IOPlatformUUID 只在那里读，`X-SkyCut-Machine` 只在 SkyStudioAPI 里写、写的是哈希；
-#   3. **后台问 Sky Studio 从不弹钥匙串授权框**：弹框的那一档读只在 KeychainSecret.swift；SkyStudioAccount 里弹框的取法只在
-#      `promptKeychain` 为真的那一支，而 `promptKeychain: true` 只出现在设置那一节（用户点了按钮）；
+#   3. **后台问 Sky Studio 从不弹钥匙串授权框**：原生读写只在串行执行器，静默读关闭进程交互并恢复；缓存有截止时间；
+#      会弹框的账号入口只有 allowKeychain，只有设置和全 App notice 的 Allow 按钮调用；
 #   4. 设置窗口里挂着「Sky Studio」一节，启动时 `SkyStudioAccount.shared.start()`；
 #   5. **照授权拦（第 5 刀第二步）接在该接的地方**：AI 的调用在核对参数名之后、建调用排队之前问 SkyStudioAccount.aiRefusal；
 #      让不让、带不带水印的判断只在 SkyStudioAccount 里调 SkyCutGates（生不生效另有 get_status 问一句）；导出面板底栏挂着「会带水印」那一行；
@@ -74,14 +74,53 @@ others="$(code_files_with 'X-SkyCut-Machine' | grep -v "^${API}\$" || true)"
 [ "$(count 'machine: String? = SkyStudioMachine.current' "${API}")" -eq 1 ] \
   || fail "${API}：机器号默认取 SkyStudioMachine.current（硬件 UUID 的哈希）"
 
-# 3. 后台从不弹钥匙串授权框。
-others="$(grep -rlE --include='*.swift' 'read\(\.interactive\)' Sources | grep -v "^${KEYCHAIN}\$" || true)"
-[ -z "${others}" ] || fail "这些文件自己做了会弹授权框的那一档读：$(tr '\n' ' ' <<<"${others}")—— 只经 KeychainSecretCache（一次运行最多弹一次）"
-[ "$(count 'promptKeychain ? await SkyStudioKey.cache.key() : await SkyStudioKey.cache.keyWithoutPrompt()' "${ACCOUNT}")" -eq 1 ] \
-  || fail "${ACCOUNT}：问 /me 时只有 promptKeychain 为真才走会弹框的 key()，否则 keyWithoutPrompt()"
-[ "$(count 'SkyStudioKey.cache.key(' "${ACCOUNT}")" -eq 1 ] || fail "${ACCOUNT}：会弹框的 SkyStudioKey.cache.key() 只许出现在那一处"
-prompters="$(grep -rl --include='*.swift' 'promptKeychain: true' Sources | LC_ALL=C sort | tr '\n' ' ')"
-[ "${prompters}" = "${SECTION} " ] || fail "promptKeychain: true 只许在设置那一节（用户点了按钮），实际在：${prompters}"
+# 3. 钥匙串读写互斥、静默读关闭进程交互，且不会占住协作线程或 actor。
+EXECUTOR="Sources/SrtFlow/KeychainSecretExecutor.swift"
+CACHE="Sources/SrtFlow/KeychainSecretCache.swift"
+KEY_NOTICE="Sources/SrtFlow/SkyStudio/SkyStudioKeychainNoticeView.swift"
+for file in "${EXECUTOR}" "${CACHE}" "${KEY_NOTICE}"; do
+  [ -f "${file}" ] || { fail "找不到 ${file}"; exit 1; }
+done
+others="$(code_files_with 'SecItem(Add|Update|Delete|CopyMatching)\(|SecKeychain(Set|Get)UserInteractionAllowed\(' | grep -v "^${KEYCHAIN}\$" || true)"
+[ -z "${others}" ] || fail "原生钥匙串读写只能在 KeychainSecret 的执行器入口：${others}"
+others="$(code_files_with '\.read\(\.interactive\)' || true)"
+[ -z "${others}" ] || fail "不许绕过缓存直接选择交互读，交互档只能由缓存的用户入口选择：${others}"
+[ "$(count 'await KeychainSecretExecutor.run' "${KEYCHAIN}")" -eq 4 ] \
+  && [ "$(count 'KeychainSecretExecutor.preconditionIsolated()' "${KEYCHAIN}")" -eq 3 ] \
+  && grep -qF 'queue.maxConcurrentOperationCount = 1' "${EXECUTOR}" \
+  && grep -qF 'queue.addOperation { continuation.resume(returning: work()) }' "${EXECUTOR}" \
+  || fail "钥匙串存在 / 读 / 写 / 删必须只在唯一串行执行器上运行"
+grep -qF 'SecKeychainSetUserInteractionAllowed(access == .interactive)' "${KEYCHAIN}" \
+  && grep -qF 'SecKeychainGetUserInteractionAllowed(&original)' "${KEYCHAIN}" \
+  && grep -qF 'SecKeychainSetUserInteractionAllowed(original.boolValue)' "${KEYCHAIN}" \
+  || fail "静默读必须关闭进程交互、保存并恢复原状态，不能只靠查询标记"
+grep -qF 'guard silentRead == nil, interactiveRead == nil else { return .needsPermission }' "${CACHE}" \
+  && grep -qF 'try await Task.sleep(for: timeout)' "${CACHE}" \
+  && grep -qF 'finish(.needsPermission)' "${CACHE}" \
+  && ! grep -qF 'Task.detached' "${CACHE}" \
+  || fail "缓存必须给静默读加期限，其他调用者不许排在卡住的读取后面"
+python3 - <<'PY' || fail "后台 / 启动混入了交互授权"
+from pathlib import Path
+source=Path('Sources/SrtFlow/SkyStudio/SkyStudioAccount.swift').read_text()
+allow=source.split('func allowKeychain() async {',1)[1].split('private func handleKeychainRead',1)[0]
+assert source.count('await SkyStudioKey.cache.key()') == 1
+assert 'await SkyStudioKey.cache.key()' in allow
+assert source.count('let read = await SkyStudioKey.keyWithoutPrompt()') == 2
+key=Path('Sources/SrtFlow/SkyStudio/SkyStudioKey.swift').read_text()
+assert key.count('await cache.keyWithoutPrompt()') == 1
+assert 'await cache.key()' not in key
+assert 'await prepareKeychain()' in source.split('func start()',1)[1].split('private func syncProviders',1)[0]
+assert 'promptKeychain' not in source
+assert 'secret.exists()' not in source
+PY
+prompters="$(code_files_with '\.allowKeychain\(\)' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${prompters}" = "${KEY_NOTICE} ${SECTION} " ] \
+  || fail "只有全 App notice 和设置的 Allow 按钮能触发授权，实际在：${prompters}"
+grep -qF 'SkyStudioKeychainNoticePolicy.permissionNeeded' "${ACCOUNT}" \
+  && grep -qF 'SkyStudioKeychainNoticePolicy.permissionNeeded' Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift \
+  && grep -qF 'plan["keychain_permission"] = .string("required")' Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
+  && grep -qF '.onAppear { account.keychainNoticeDidAppear() }' "${KEY_NOTICE}" \
+  || fail "钥匙串授权状态必须接到全 App 提示、每构建一次呈现和 get_status"
 
 # 4. 挂上了。
 [ "$(count 'SkyStudioSettingsSection()' Sources/SrtFlow/SettingsWindowView.swift)" -eq 1 ] || fail "${APP}：设置窗口里要挂 SkyStudioSettingsSection()"

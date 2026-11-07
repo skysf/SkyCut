@@ -95,10 +95,13 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIShortIDs.swift \
+  Sources/SrtFlow/KeychainSecretExecutor.swift \
   Sources/SrtFlow/KeychainSecret.swift \
+  Sources/SrtFlow/KeychainSecretCache.swift \
   Sources/SrtFlow/NativeSourceFrameSampler.swift \
   Sources/SrtFlow/SourceFrameEvidence.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioKey.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioKeychainNoticePolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \

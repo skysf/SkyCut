@@ -207,9 +207,12 @@ fi
 
 # 15. 收尾回执经同一个发布口，所有工程窗口可见；AI 下一次任意工具调用按原会话附言。
 for root in Sources/SrtFlow/MainWindowView.swift Sources/SrtFlow/ProjectWindowController.swift; do
-  grep -qF '.overlay(alignment: .top) { ScreenRecordingNotice() }' "${root}" \
+  grep -qF '.overlay(alignment: .top) { AppNotices() }' "${root}" \
     || fail "${root}：录屏结果 notice 必须挂在主窗口和每个工程窗口，不依赖后台工程自己的 notice"
 done
+grep -qF 'ScreenRecordingNotice()' Sources/SrtFlow/AppNotices.swift \
+  && grep -qF 'SkyStudioKeychainNoticeView()' Sources/SrtFlow/AppNotices.swift \
+  || fail "全 App notice 挂点必须同时保留录屏结果和钥匙串提示，不能互相覆盖"
 grep -qF 'ScreenRecordingFeedback.shared.publish(receipt)' Sources/SrtFlow/ScreenRecordingCompletion.swift \
   && grep -qF 'completion.deliver(.added(result, clipIDs: clipIDs), retainedFiles: retainedFiles)' "${COORDINATOR}" \
   && grep -qF 'completion.deliver(.failed(error.localizedText), retainedFiles: retainedFiles)' "${COORDINATOR}" \

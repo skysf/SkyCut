@@ -25,7 +25,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 - **证书**：自签名、只能签代码（EKU codeSigning）、20 年，名字「SrtFlow Signing」（2026-10-18 改名 SkyCut 之后照旧用它：证书名用户看不见，换证书 = 所有授权再给一次，[产品名与代码名](product-name.md)）。签出来的 designated
   requirement 是 `identifier "<bundle id>" and certificate leaf = H"<证书的 SHA-1>"`，换版本不变，系统里给过的
   权限跟着走。2026-10-03 的探针：同一把证书签的两个不同构建（cdhash 不同）互相满足对方的 requirement
-  （`codesign --verify -R`）；前一个构建在钥匙串里建的项，后一个构建不弹框就读得到（对照：两个 ad-hoc 构建读不到）。
+  （`codesign --verify -R`）；当时的钥匙串探针未覆盖 512 格式的分区名单，不能由 requirement 相同推断跨构建不弹框（见下方更正）。
 - **不是 Developer ID**：不花钱，Gatekeeper 的表现不变 —— 照样没公证，下载来的第一次打开照样要「仍要打开」
   （`spctl` 照样 rejected）。哪天换成 Developer ID，requirement 再变一次，用户再给一次权限。
 - **私钥在仓库外**：`~/.config/srtflow/signing/`（专用钥匙串 `srtflow-signing.keychain-db` + 它的密码
@@ -60,7 +60,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 
 App 本来只在用户点了设置里的按钮时才弹框，后台问 `/me` 和 AI 起的活都只用不弹框的那一档。但这次弹框出在启动时，AI 的调用一直等在框后面。
 
-经过和下一步见[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)「发现」第 1 条。
+修复与 512 格式探针见[钥匙串密码框堵住 AI 调用](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)：静默档关闭进程交互，全部读写共用专用串行执行器，静默等待有期限；启动显示非模态授权提示，用户点 Allow 后才问系统。每构建授权一次仍保留，实际新构建由用户验收。探针曾留下两张 SecurityAgent 框，杀进程不等于关框，之后禁止继续运行弹框变体。原始经过见[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)「发现」第 1 条。
 
 ## 三、规矩
 
@@ -97,7 +97,7 @@ App 本来只在用户点了设置里的按钮时才弹框，后台问 `/me` 和
 
 1. `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`。
 2. 装上之后录一次自定义区域：没授权时系统弹框问 → 打开 → 退出并重新打开 → 能录。
-3. 再装下一个版本（不同的 cdhash）：不用再授权，自定义区域照样能录；读下载文件夹不弹框；fal 的 Key 不弹框。
+3. 再装下一个版本（不同的 cdhash）：不用再授权，自定义区域照样能录；读下载文件夹不弹框。钥匙串按第二节更正：启动不弹框，用户点 Allow 后可询问一次，选 Always Allow 后同一构建不再问。
 4. 有完全磁盘访问的终端里：`sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select hex(csreq) from access
    where service='kTCCServiceScreenCapture' and client='com.srtflow.SrtFlow'"`，解出来（`xxd -r -p` → `csreq -r - -t`）
    是 `certificate leaf` 那种，不是 `cdhash`。

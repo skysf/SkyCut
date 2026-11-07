@@ -4,6 +4,7 @@ import Foundation
 // 规则的出处见 docs/architecture/sky-studio-account.md，接口合同在 Sky Studio 仓库的 docs/agents/skycut-api.md。
 
 runKeyChecks()
+await runKeychainCacheChecks()
 runMachineChecks()
 runMeChecks()
 await runAPIChecks()

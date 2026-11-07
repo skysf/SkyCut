@@ -3,8 +3,8 @@
 #
 # **不在 check-all.sh 里**：要一个能用的用户钥匙串（CI 的 runner 没有图形会话，钥匙串不一定开着，
 # 假红 / 假绿都不能接受 —— 跳过更不能报成通过）。改 `Sources/SrtFlow/SkyStudio/SkyStudioKey.swift` 或 `Sources/SrtFlow/KeychainSecret.swift`（钥匙串的读写，Sky Studio 的 Key 也用它）之后本机跑一遍。
-# 用专门的服务名（check.srtflow.keychain.<pid>），跑完一定删掉。同一个进程建的项自己读不弹授权框；「换了签名要弹框」
-# 那一半要两个不同签名的进程，见 docs/architecture/sky-studio-account.md 的人工回归清单。
+# 用专门的服务名（check.srtflow.keychain.<pid>），跑完一定删掉；检查进程全程禁用交互，任何需要授权的情况直接失败。
+# 不跑交互读、不跑换签弹框变体：杀进程不能关掉已弹出的 SecurityAgent 窗口，见 2026-11-07 钥匙串案例。
 #
 # 用法：
 #   scripts/check-keychain.sh
@@ -21,8 +21,11 @@ echo "==> 编译"
 xcrun swiftc \
   -target "$TRIPLE" \
   -o "$OUT" \
+  Sources/SrtFlow/KeychainSecretExecutor.swift \
   Sources/SrtFlow/KeychainSecret.swift \
+  Sources/SrtFlow/KeychainSecretCache.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioKey.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioKeychainNoticePolicy.swift \
   checks/Keychain/main.swift
 
 echo "==> 跑（真的钥匙串）"

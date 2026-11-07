@@ -90,6 +90,12 @@ asset 调 `cancelLoading`。还在队列中的 operation 直接取消、立即�
 
 拿不准的，一律按「会死锁」处理，挪出池子。
 
+钥匙串也属于此类：`SecItemCopyMatching` 可能等系统授权，不能直接放在缓存 actor 内，
+也不能用 `Task.detached` 承接。`KeychainSecretExecutor` 用独立串行 `OperationQueue`
+执行存在 / 读 / 存 / 删，互斥保护进程级交互开关；`KeychainSecretCache` 只管理等待和结果。
+静默等待最多 3 秒，其他调用快回需要授权；原生调用迟到成功仍可缓存，存换删后的旧结果作废。
+不能在超时线程恢复交互开关，原生调用未返回时也不能声称已经中断。见[钥匙串阻塞案例](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
+
 ## 子进程的异步退出
 
 `FFmpegProcess` 的退出要在启动前注册 `Process.terminationHandler`，和 stdout / stderr 的排空一起汇合后才返回。

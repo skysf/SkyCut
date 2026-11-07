@@ -83,11 +83,17 @@ enum SkyCutGates {
         if let days = license.trialDaysLeft(now: now) { plan["trial_days_left"] = .number(Double(days)) }
         if license.plan == .pro, let until = license.paidUntil { plan["pro_until"] = .string(day(until)) }
         if let snag = snag(problem) { plan["problem"] = .string(snag) }
-        if let message = license.unrecognizedPlanMessage { plan["plan_message"] = .string(message) }
-        if !license.mcp {
+        if problem == .needsKeychainPermission {
+            plan["keychain_permission"] = .string("required")
             plan["next_step"] = .string(nextStep(license, problem: problem))
-        } else if license.watermark {
-            plan["next_step"] = .string("Exports carry the Sky Studio watermark until SkyCut Pro. " + activatePro(license: license))
+        }
+        if let message = license.unrecognizedPlanMessage { plan["plan_message"] = .string(message) }
+        if problem != .needsKeychainPermission {
+            if !license.mcp {
+                plan["next_step"] = .string(nextStep(license, problem: problem))
+            } else if license.watermark {
+                plan["next_step"] = .string("Exports carry the Sky Studio watermark until SkyCut Pro. " + activatePro(license: license))
+            }
         }
         if let notice = license.proNotice {
             let details = proNoticeJSON(notice)
@@ -158,7 +164,7 @@ enum SkyCutGates {
             + "right → SkyCut) and paste it in SkyCut Settings → Sky Studio. "
         let machineAdvice = license.isMachineLimited ? " " + activatePro : ""
         switch problem {
-        case .needsKeychainPermission?: return "Ask the user to open SkyCut Settings → Sky Studio and click Allow…, then try again." + machineAdvice
+        case .needsKeychainPermission?: return SkyStudioKeychainNoticePolicy.aiNextStep + machineAdvice
         case .updateRequired?: return "Ask the user to update SkyCut, then try again." + machineAdvice
         case .keyRejected?: return pasteKey + activatePro
         case .unreachable?, .keychain?, .notAKey?, nil: break

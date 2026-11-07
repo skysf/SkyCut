@@ -31,16 +31,22 @@ final class SkyStudioAccount: ObservableObject {
     @Published private(set) var checking = false
     /// 设置那一节下面要说的一件事（AI 被挡住时回给它的话也照它说）。
     @Published private(set) var problem: SkyStudioProblem?
+    @Published private(set) var keychainNoticeVisible = false
+    @Published private(set) var authorizingKeychain = false
 
     private let defaults: UserDefaults
+    private let keychainNotice: SkyStudioKeychainNoticePolicy
+    private var keychainChecked = false
     private var lastFailure: Date?
     private var started = false
     private var timer: Timer?
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        hasKey = SkyStudioKey.secret.exists()
-        stored = Self.load(defaults)
+        let previous = Self.load(defaults)
+        stored = previous
+        hasKey = previous != nil
+        keychainNotice = SkyStudioKeychainNoticePolicy(build: ScreenCapturePermissionRepair.runningBuildHash())
     }
 
     /// 此刻作数的授权。
@@ -62,13 +68,15 @@ final class SkyStudioAccount: ObservableObject {
     /// 此刻的授权不作数（没问到过、过期了）又有 Key 时，先问一次再算：刚启动、离线好几天之后的第一个调用，不该因为还没问完就被挡。
     /// 正在问就等它；该问了就问（没问成过不到 5 分钟的不再问，照 SkyStudioRefresh）。最多等 `limit` 秒，到了按那时的算。
     func settledLicense(waitingUpTo limit: TimeInterval) async -> SkyCutLicense {
+        if !keychainChecked { await prepareKeychain() }
+        if problem == .needsKeychainPermission { return license }
         guard hasKey, license.basis != .server else { return license }
         refreshIfDue(.beforeUse)
         let deadline = Date().addingTimeInterval(limit)
         // 先睡一下再看：refreshIfDue 起的那一次要在主线程上轮到它才把 checking 设上。
         repeat {
             try? await Task.sleep(for: .milliseconds(100))
-        } while checking && Date() < deadline
+        } while checking && problem != .needsKeychainPermission && Date() < deadline
         return license
     }
 
@@ -79,6 +87,12 @@ final class SkyStudioAccount: ObservableObject {
         guard !started else { return }
         started = true
         syncProviders()
+        NotificationCenter.default.addObserver(forName: SkyStudioKeychainNoticePolicy.permissionNeeded, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.requireKeychainPermission() }
+        }
+        NotificationCenter.default.addObserver(forName: SkyStudioKeychainNoticePolicy.keyRead, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.keychainReadSucceeded() }
+        }
         NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
             MainActor.assumeIsolated { self?.refreshIfDue(.activation) }
         }
@@ -92,7 +106,10 @@ final class SkyStudioAccount: ObservableObject {
            let key = environment["SRTFLOW_SMOKE_SKYSTUDIO_KEY"] {
             Task { await saveKey(key) }
         } else {
-            refreshIfDue(.activation)
+            Task {
+                await prepareKeychain()
+                refreshIfDue(.activation)
+            }
         }
     }
 
@@ -109,41 +126,81 @@ final class SkyStudioAccount: ObservableObject {
         Task { await refresh() }
     }
 
-    /// 问一次 /me。`promptKeychain`：钥匙串要授权时弹不弹框 —— 只有用户在设置里点了按钮才传 true。
-    func refresh(promptKeychain: Bool = false) async {
+    /// 后台与「再查一次」只静默读；授权必须由独立的 Allow 按钮入口触发。
+    func refresh() async {
         guard hasKey, !checking else { return }
         checking = true
         defer { checking = false }
-        let read = promptKeychain ? await SkyStudioKey.cache.key() : await SkyStudioKey.cache.keyWithoutPrompt()
+        let read = await SkyStudioKey.keyWithoutPrompt()
+        await handleKeychainRead(read, checkPlan: true)
+    }
+
+    /// 启动先试 Key，即使 /me 的缓存尚未到刷新时间，也能及时提示新构建需要授权。
+    private func prepareKeychain() async {
+        let read = await SkyStudioKey.keyWithoutPrompt()
+        await handleKeychainRead(read, checkPlan: false)
+    }
+
+    /// 只有用户点了提示条或设置里的 Allow 才走这一条；不被后台的 checking 状态挡住。
+    func allowKeychain() async {
+        guard !authorizingKeychain else { return }
+        authorizingKeychain = true
+        defer { authorizingKeychain = false }
+        let read = await SkyStudioKey.cache.key()
+        await handleKeychainRead(read, checkPlan: true)
+    }
+
+    private func handleKeychainRead(_ read: KeychainSecret.ReadResult, checkPlan: Bool) async {
+        keychainChecked = true
         switch read {
         case .key(let key):
-            await ask(with: key)
+            hasKey = true
+            keychainReadSucceeded()
+            if checkPlan { await ask(with: key) }
         case .missing:
             // 在「钥匙串访问」里被删掉了：当没有 Key。
             forget()
         case .needsPermission:
-            problem = .needsKeychainPermission
+            requireKeychainPermission()
         case .failed(let status):
             problem = .keychain(KeychainSecret.StoreError(status: status).message)
         }
     }
 
+    func requireKeychainPermission() {
+        hasKey = true
+        problem = .needsKeychainPermission
+        if keychainNotice.shouldPresent(in: defaults) { keychainNoticeVisible = true }
+    }
+
+    func keychainReadSucceeded() {
+        if problem == .needsKeychainPermission { problem = nil }
+        keychainNoticeVisible = false
+    }
+
+    func keychainNoticeDidAppear() { keychainNotice.didPresent(in: defaults) }
+    func dismissKeychainNotice() { keychainNoticeVisible = false }
+
     // MARK: 存 / 删 Key
 
     /// 存一把新 Key：整理、存进钥匙串、马上问一次 /me。Sky Studio 不认（`invalid_key`）就不留着它；没连上就先留着，之后再问。
     func saveKey(_ raw: String) async {
-        guard !checking else { return }
+        guard !checking, !authorizingKeychain else { return }
         guard let key = SkyStudioKey.normalized(raw) else {
             problem = .notAKey
             return
         }
+        checking = true
+        defer { checking = false }
         do {
-            try SkyStudioKey.secret.save(key)
+            try await SkyStudioKey.secret.save(key)
         } catch {
             problem = .keychain((error as? KeychainSecret.StoreError)?.message ?? error.localizedDescription)
             return
         }
         await SkyStudioKey.cache.remember(key)
+        keychainChecked = true
+        keychainNoticeVisible = false
         hasKey = true
         SkyStudioCatalogCache.shared.forget()
         SkyStudioCharacterAccess.invalidate()
@@ -151,24 +208,25 @@ final class SkyStudioAccount: ObservableObject {
         replaceStored(nil)
         lastFailure = nil
         problem = nil
-        checking = true
         await ask(with: key)
-        checking = false
         if case .keyRejected? = problem {
-            try? SkyStudioKey.secret.delete()
+            try? await SkyStudioKey.secret.delete()
             await SkyStudioKey.cache.remember(nil)
             hasKey = false
         }
     }
 
-    func removeKey() {
+    func removeKey() async {
+        guard !checking, !authorizingKeychain else { return }
+        checking = true
+        defer { checking = false }
         do {
-            try SkyStudioKey.secret.delete()
+            try await SkyStudioKey.secret.delete()
         } catch {
             problem = .keychain((error as? KeychainSecret.StoreError)?.message ?? error.localizedDescription)
             return
         }
-        Task { await SkyStudioKey.cache.remember(nil) }
+        await SkyStudioKey.cache.remember(nil)
         forget()
     }
 
@@ -217,6 +275,7 @@ final class SkyStudioAccount: ObservableObject {
         replaceStored(nil)
         problem = nil
         lastFailure = nil
+        keychainNoticeVisible = false
     }
 
     private func replaceStored(_ answer: SkyStudioStoredAnswer?) {

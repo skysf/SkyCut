@@ -26,7 +26,7 @@ struct UpscaleJobStatusView: View {
                         .font(.caption)
                 }
                 if job.keyPrompt {
-                    Text("macOS is about to ask whether SkyCut may use your Sky Studio key. Click Always Allow.")
+                    Text("In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts.")
                         .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                 }
                 HStack {

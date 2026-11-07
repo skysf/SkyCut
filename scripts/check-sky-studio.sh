@@ -49,9 +49,13 @@ xcrun swiftc \
   -wmo \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
+  Sources/SrtFlow/KeychainSecretExecutor.swift \
   Sources/SrtFlow/KeychainSecret.swift \
+  Sources/SrtFlow/KeychainSecretCache.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioKey.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioKeychainNoticePolicy.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
@@ -115,6 +119,7 @@ xcrun swiftc \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \
   checks/SkyStudio/KeyChecks.swift \
+  checks/SkyStudio/KeychainCacheChecks.swift \
   checks/SkyStudio/MeChecks.swift \
   checks/SkyStudio/APIChecks.swift \
   checks/SkyStudio/LicenseChecks.swift \

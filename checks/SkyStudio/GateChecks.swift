@@ -109,6 +109,11 @@ private func runStatusChecks(free: SkyCutLicense, trial: SkyCutLicense, pro: Sky
     checkEqual(proPlan["plan"]?.stringValue, "pro", "pro: plan")
     checkEqual(proPlan["pro_until"]?.stringValue, "2027-10-27", "pro: until when (a date)")
     check(proPlan["next_step"] == nil && proPlan["trial_days_left"] == nil, "pro: nothing to do")
+    for license in [pro, trial, free, .free(.notChecked), .free(.expired)] {
+        let locked = SkyCutGates.statusJSON(license: license, problem: .needsKeychainPermission, now: now).objectValue ?? [:]
+        checkEqual(locked["keychain_permission"]?.stringValue, "required", "get_status exposes required keychain permission even with a cached Pro plan")
+        checkEqual(locked["next_step"]?.stringValue, SkyStudioKeychainNoticePolicy.aiNextStep, "permission recovery has priority over plan and watermark advice")
+    }
 
     let none = SkyCutGates.statusJSON(license: .free(.noKey), problem: nil, now: now).objectValue ?? [:]
     checkEqual(none["source"]?.stringValue, "no_key", "no key: source")

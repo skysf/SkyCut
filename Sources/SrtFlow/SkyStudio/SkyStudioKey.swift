@@ -15,8 +15,13 @@ enum SkyStudioKey {
 
     static let secret = KeychainSecret(service: defaultService, account: account, keychainName: "SkyCut Sky Studio API key")
 
-    /// 这一次运行里读到的 Key。**后台问 Sky Studio 时只走 `keyWithoutPrompt()`**：弹钥匙串授权框只在用户点了设置里的按钮之后。
+    /// 后台与 AI 只走 `keyWithoutPrompt()`；只有用户点授权按钮或手动起付费任务才走交互档。
     static let cache = KeychainSecretCache(secret)
+
+    /// 启动和后台共用的生产入口；自检注入假读取器，不可能隐式转到交互档。
+    static func keyWithoutPrompt(cache: KeychainSecretCache = SkyStudioKey.cache) async -> KeychainSecret.ReadResult {
+        await cache.keyWithoutPrompt()
+    }
 
     /// Sky Studio 的 Key 是 `sk-` 加 43 个 URL 安全的字符（Sky Studio 仓库 docs/agents/skycut-api.md「Keys」）。
     /// 用户常把 `Bearer ` 前缀、引号、首尾空白 / 换行一起粘进来：去掉；不是 `sk-` 开头、带了 URL 安全字符以外的东西、太短就不收。

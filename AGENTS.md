@@ -675,6 +675,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-07 新构建钥匙串密码框堵住 AI 调用](docs/bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md) — 512 格式分区 ACL 探针、进程交互开关与串行执行器、3 秒静默期限和迟到缓存、每构建一次的非模态授权提示；看门狗不会关闭残留的 SecurityAgent 框。
+
 - [2026-11-06 录屏已保存却没有清楚告知界面和 MCP](docs/bugfixes/2026-11-06-screen-recording-completion-feedback.md) — 全 App 非模态 notice、路径 / 后台工程 / 轨道与操作入口；停止来源锁定、真正完成历史、原会话下一次工具附言，隔离 App 对象回归与反向验证。
 - [2026-11-06 另一个构建接管正在录制的账本](docs/bugfixes/2026-11-06-screen-recording-manifest-cross-build.md) — 录屏账本按原 bundle id 隔离；旧共用账本保留不读，四种身份实写隔离与生产接线反向验证；已入轨后 Stop 误报取消另记待查。
 - [2026-11-06 台数满了却引导再买 Pro，水印说明固定叫人发邮件](docs/bugfixes/2026-11-06-machine-limit-purchase-guidance.md) — 台数原因优先管理 Mac / 客服、屏蔽购买入口；设置 / 导出本地化，AI 拒绝 / 状态 / 水印说明共用当前授权，含非空购买地址的满台数 fixture 与反向验证。
