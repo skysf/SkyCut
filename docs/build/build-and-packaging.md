@@ -265,6 +265,53 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
   和同一份结果，不再说什么都没录到。
 - 没有打 git tag，也没有创建 GitHub release，做法同前。
 
+2026-11-07，随全部图片模型和角色系统发布 **0.18.62**。用户授权「完成剩下的」，发版与验收事实由 Claude 提供。
+
+构建：
+- 源码：已通过 CI 的 main `5edfed3e6c3c0999718ccb2bd989f3bcfd4352da`，包含两个 PR：
+  - [#334](https://github.com/skysf/SkyCut/pull/334)：图片换角度、放大，以及生成图片按实际字节定扩展名；
+  - [#336](https://github.com/skysf/SkyCut/pull/336)：角色的 `list_characters` / `get_character` / `manage_characters`。
+- 打包命令：`VERSION=0.18.62 arch -arm64 /bin/bash scripts/build-app.sh`。
+- MCP 清单 58 个工具，总长度在用户 2026-11-07 抬到的 110,000 字以内。
+
+产物：
+- `SkyCut-0.18.62-arm64.dmg`，33,695,016 字节；SHA-256：`70a81b192e80912c8a00fe4f7c2d68f25943a255e64df3d5ff68aee35c41519e`。
+
+校验：
+- 包：
+  - `hdiutil verify` 通过；
+  - Info.plist 版本 `0.18.62`；
+  - App 主程序、ffmpeg、`skycut-mcp` 均为 arm64。
+- 签名：
+  - 钉在原固定证书 `76d275650223bc09efe7708900458dbdb0ab90ef`；
+  - 挂载 DMG 里的 App 深度签名校验通过。
+- 字节一致：DMG 里的三份二进制与本机安装的 `/Applications/SkyCut.app` 逐字节相同。
+- 运行：
+  - MCP 能初始化；
+  - ffmpeg 8.1 能运行；
+  - `scripts/check-dmg.sh` 通过。
+
+发布：
+- 公开对象：`skycut/SkyCut-0.18.62-70a81b192e80-arm64.dmg`，immutable 缓存。
+- 先上传，再用 `scripts/check-release-download.py --url` 从公开直链完整读回，大小与 SHA-256 一致。
+- 个人站 [skystudio PR #17](https://github.com/skysf/skystudio/pull/17)（合并提交 `645c73e`）把两条入口改到新对象，约 30 秒后 Cloudflare Pages 生效。
+- 不带 `--url` 再跑一次，经固定入口 302 拿到的完整内容与本地 DMG 一致；带尾斜杠的入口 302 到同一个对象。
+
+安装：
+- 本机 `/Applications/SkyCut.app` 和 `/Applications/SkyCut Beta.app` 都是 0.18.62。测试版用 `build-beta-app.sh` 打包，同一把证书。
+
+真积分验收：
+- 见[全部图片模型与角色系统的真积分验收](../reports/2026-11-07-image-models-and-characters-smoke.md)。
+- 新图片模型、换角度和角色全部成功，共 208 积分。
+- 图片放大坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大），已退款，由 Sky Studio 那边修。
+
+升级时的钥匙串：
+- 装上新版后第一次读 Sky Studio Key 会弹钥匙串框要登录密码，原因是没有 Team ID，钥匙串分区名单按构建的代码哈希记。
+- 这次 AI 调用一直等在框后面，详见同一份报告。
+- 要点「始终允许」，否则每次启动都会再问。
+
+没有打 git tag，也没有创建 GitHub release，做法同前。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
