@@ -211,9 +211,15 @@ Sky Studio。官网不接支付 SDK 或结账逻辑。12 个 canonical URL 和 s
 | 声音克隆 | Zonos 2 voice clone | 1 | Pro 经 AI，扣积分 |
 | 视频画质提升 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
 
-普通图片新增四个模型，现行 App 已可让 AI 点名使用。图片换角度、图片放大和角色系统的
-官网内容须等支持它们的新版 App 发布后再由用户确认合并；后台接口上线不等于客户端已发版。
-此 PR 的 CI 通过后也须停下等待 review 和客户端发布，不自动合并。
+普通图片新增的四个模型，0.18.61 就能让 AI 点名使用；图片换角度、图片放大和角色系统要
+SkyCut 0.18.62（2026-11-07 发布）。这一版官网在 0.18.62 发布、图片放大修好之后才合并上线
+（[PR #337](https://github.com/skysf/SkyCut/pull/337)）。以后同类内容照此办：后台接口上线不等于客户端已发版，
+等客户端发布、真积分验收过再合并官网。
+
+图片放大原来由 Sky Studio 调 Google Vertex 的 `imagen-4.0-upscale-preview`。2026-11-07 冒烟发现它被下线（404，
+网页端同样失效），当天 [Sky Studio PR #243](https://github.com/skysf/skystudio-aigc-app/pull/243) 换成 fal SeedVR2
+（`fal-ai/seedvr/upscale/image`）。对外 id `image-upscale`、显示名 `Image Upscale`、x2 / x3 / x4 和 8 积分都不变，
+所以本页文案不用改；实测见 SkyCut 的[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)。
 
 ### 角色系统来源与费用
 
@@ -327,7 +333,7 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
 四张截图保留在 `/private/tmp/skycut-models-characters-2026-11-07/`：
 `{zh,en}-1440-comparison.png` 为完整对比表，`{zh,en}-390-characters-models.png`
 为角色与模型区，手机以 2 倍像素密度保存；布局测量另存 `layout-metrics.json`。
-截图已经复核，未操作用户窗口或 Finder；该官网更新仍须等新版 App 发布后再合并。
+截图已经复核，未操作用户窗口或 Finder；该官网更新在 0.18.62 发布、图片放大修好之后合并部署。
 
 ## SEO 与创始人身份
 
