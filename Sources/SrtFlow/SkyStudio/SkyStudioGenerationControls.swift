@@ -14,7 +14,10 @@ enum SkyStudioGenerationControls {
             aspectRatio: try args.string("aspect_ratio"), instrumental: try args.bool("instrumental"), lyrics: try args.string("lyrics"),
             generateAudio: try args.bool("generate_audio"))
         ask.smartDuration = smart
-        ask.operation = try args.choice("operation", from: ["generate", "remove_background"]) ?? "generate"
+        ask.operation = try args.choice("operation", from: SkyStudioImageOperation.names) ?? "generate"
+        try SkyStudioImageOperation.validateRoute(args)
+        if let angle = args.raw["camera_angle"], !angle.isNull { ask.cameraAngle = try SkyStudioCameraAngle.read(angle) }
+        ask.upscaleFactor = try args.choice("upscale_factor", from: SkyStudioImageOperation.factors)
         for field in flags {
             if let flag = try args.bool(field) { ask.controls[field] = .bool(flag) }
         }
@@ -30,12 +33,15 @@ enum SkyStudioGenerationControls {
 
     static func problem(model: SkyStudioModel, ask: SkyStudioGeneration.Ask, prompt: String, references: SkyStudioReferencePlan) -> String? {
         if model.operation != ask.operation { return "\(model.title) serves operation=\(model.operation)." }
+        if let problem = SkyStudioImageOperation.problem(model: model, ask: ask, references: references) { return problem }
         let audioDriven = model.kind == "lipsync"
         let remove = ask.operation == "remove_background"
+        let camera = ask.operation == "camera_angle"
+        let upscale = ask.operation == "upscale"
         if ask.resolution != nil, model.params["resolution"] == nil { return "This model does not expose a resolution selector." }
-        if audioDriven || remove {
-            if !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return "This operation takes media, not a prompt." }
-            if ask.duration != nil || ask.smartDuration || ask.aspectRatio != nil || ask.generateAudio != nil || ask.instrumental != nil || ask.lyrics != nil {
+        if audioDriven || remove || camera || upscale {
+            if !prompt.isEmpty { return "This operation takes media, not a prompt." }
+            if ask.duration != nil || ask.smartDuration || (!camera && ask.aspectRatio != nil) || ask.generateAudio != nil || ask.instrumental != nil || ask.lyrics != nil {
                 return "This operation does not accept duration, aspect_ratio, generate_audio, instrumental or lyrics. Output duration follows the supplied audio/video."
             }
             if remove && ask.resolution != nil { return "Background removal has no resolution selector; use the actual output dimensions." }

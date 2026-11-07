@@ -283,6 +283,17 @@ grep -qF 'applyBilling(done)' "${GEN_RUN}" || fail "生成没接服务端 billin
 grep -qF 'job.refresh = ' "${GEN_RUN}" || fail "get_job 没有核查原单的接线"
 grep -qF 'payload["submission_keys"]' "${GEN_RUN}" || fail "未知提交未留下幂等 key"
 
+# 图片操作仍走生成任务；实际字节决定落盘格式，不能只测纯值却漏接生产下载之后。
+grep -qF 'SkyStudioImageOperation.problem(model: model' "${CONTROLS}" || fail "图片操作未接单图 / 角度 / 倍率合同"
+grep -qF 'SkyStudioImageOperation.names' "${CONTROLS}" || fail "图片操作枚举未接生产参数解析"
+grep -qF 'try SkyStudioImageOperation.validateRoute(args)' "${GEN_TOOL}" || fail "图片操作未在官方分派前拒绝 film"
+grep -qF 'if let operation { body["operation"] = .string(operation) }' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  || fail "图片操作没有进入报价和提交，也无法绑定确认码"
+grep -qF 'SkyStudioImageResult.format(at: downloaded)' "${GEN_RUN}" \
+  && grep -qF 'SkyStudioImageResult.finalize(downloaded, format: format)' "${GEN_RUN}" \
+  || fail "生产下载之后未按真实图片字节确定扩展名"
+grep -qF 'operation != "generate"' "${REFERENCE_FILES}" || fail "特殊图片操作没有把 image 接到 image_url"
+
 # 9c. 官方路线必须接到同一个生产运行器：显式准备、精确报价、先落回执、恢复只查原单。
 OFFICIAL="Sources/SrtFlow/SkyStudio/SkyStudioOfficialGenerateTool.swift"
 RECOVERY="Sources/SrtFlow/SkyStudio/SkyStudioOfficialRecoveryRun.swift"

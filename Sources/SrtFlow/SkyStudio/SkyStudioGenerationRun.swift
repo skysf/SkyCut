@@ -172,14 +172,28 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             if done.billing == nil { creditsUnconfirmed = true }
             serverFinished = true
             let pathExtension = SkyStudioGeneration.fileExtension(contentType: result.contentType, url: result.url, kind: generation.kind)
-            let destination = claimDestination(extension: pathExtension)
-            defer { Self.claimedPaths.remove(destination.path) }
+            var destination = claimDestination(extension: pathExtension)
+            var claimed = [destination.path]
+            defer { for path in claimed { Self.claimedPaths.remove(path) } }
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             advance(to: .downloading(fraction: nil))
             try await api.download(result.url, to: destination) { [weak self] fraction in
                 Task { @MainActor in self?.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction))) }
             }
             savedOriginal = destination
+            var fileContentType: String?
+            if generation.kind == .image {
+                let downloaded = destination
+                let measured = await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try SkyStudioImageResult.format(at: downloaded) } }
+                let format = try measured.get()
+                destination = try SkyStudioImageResult.finalize(downloaded, format: format) {
+                    let corrected = claimDestination(extension: $0)
+                    claimed.append(corrected.path)
+                    return corrected
+                }
+                savedOriginal = destination
+                fileContentType = format.contentType
+            }
             advance(to: .finishing)
             var editable = destination
             if await SkyStudioGeneratedVideo.needsCopy(destination) {
@@ -204,7 +218,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 } catch { captionIssue = "Video saved; optional SRT download failed. Query the original job to recover the sidecar; generation remains charged." }
             }
             try await official?.recovery.delivered(file: editable, original: destination)
-            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue)
+            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue, fileContentType: fileContentType)
         } catch let error as SkyStudioJobError {
             await recordRejection(error)
             switch error {
@@ -308,7 +322,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     // MARK: 结局
 
-    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?) {
+    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?, fileContentType: String?) {
         // SkyCut 自己做的文件：AI 接着把它放上时间线时不该再问「读点名文件夹以外的文件」。
         if project.map({ AIWorkspace.shared.allowsReading(file, project: $0) }) != true { AIReadGrants.shared.remember([file]) }
         let store = SkyStudioSpendStore.shared
@@ -338,6 +352,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             if let value = result.metadata[key] { detail[key] = value }
         }
         detail["result_url"] = .string(result.url.absoluteString)
+        if let fileContentType { detail["file_content_type"] = .string(fileContentType) }
         if let original = savedOriginal, original != file {
             AIReadGrants.shared.remember([original])
             detail["original_file"] = .string(original.path)
@@ -360,6 +375,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         // 交上了就带任务号（停不下来的那单、没做成的那单也说得出是哪一单）。
         if let id = submitted.jobID { payload["skystudio_job_id"] = .string(id) }
         payload["model_id"] = .string(modelID)
+        payload["operation"] = .string(generation.operation)
         payload["submission_keys"] = .array(requestKeys.map(JSONValue.string))
         payload["idempotency_key"] = .string(idempotencyKey)
         if let code = official?.recovery.value.submissionRejection {

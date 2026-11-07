@@ -673,6 +673,14 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     2026-10-30 起 `model` 可选，按 [Sky Studio 的任务](sky-studio-jobs.md)的用户偏好和完整输入兼容性选；`options` 仍不收。
     `get_status models=true` 只读查询模型默认值、可选参数和每种输入模式的图片 / 视频 / 音频数量、格式、字节、时长、组合限制（可 `model=<id>` 过滤）。
     分辨率 / 画幅不再用静态 H3 枚举限制所有模型。首尾帧是 `image` / `last_image`，多模态是三个有序 `reference_*` 数组；全部经授权、测量、报价、上传。
+    **2026-11-07 图片操作**：`kind=image operation=camera_angle` 换机位 / 换角度，`camera_angle:{rotate,tilt,zoom}` 为离散移动，
+    缺的轴为 0、全零拒绝；`operation=upscale upscale_factor=x2|x3|x4` 放大单张图片，默认 x2。
+    两者都必须正好一张 `image` 或一项 `reference_images`，省略 prompt；图片 upscale 还省略画幅 / 分辨率，不能调视频专用 `upscale_clip`。
+    两者均不收 film，模型、档位和画幅读目录，角度多步价格只问 `/quote`，确认码绑定完整角度 / 倍率、输入、模型和报价。
+    新普通图片模型均可用公开 id 点名；默认仍 Seedream Flash / Nano 2，Nano 2 的画幅不写死。JPEG / PNG 按实际下载字节定扩展名，
+    `get_job.file_content_type` 报本机格式；原单、扣退费规则照旧。完整合同和上线后人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)第十二节。
+    给 AI 的英文工具说明前 512 字写清两种用途、单图输入、禁用字段及 get_job / add_clips；角度与倍率字段都进入 schema，
+    没有新增别名，仍受每工具 2,048 / 全清单 100,000 字符守卫。
     音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
     真人参考拒绝和未知状态不自动切模型或重交；退款晚到只查原单。替换是新的明确操作，重新核对完整参考、规格、报价及批准。
     官方原创短片的公开 `film`、真实引用准备、报价锁定和双侧审查见 [官方原创短片](official-film.md)；普通 `quote_only` 仍不上传。

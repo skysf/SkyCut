@@ -28,6 +28,9 @@ await runVoiceBudgetChecks()
 runGenerationChecks()
 runModelPolicyChecks()
 await runModelExpansionChecks()
+await runImageOperationChecks()
+runImageApprovalChecks()
+await runImageResultChecks()
 runGenerationFrameChecks()
 
 if failures > 0 {

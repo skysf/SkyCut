@@ -15,6 +15,7 @@ import SrtFlowMCPKit
 @MainActor
 enum SkyStudioGenerateTool {
     static func generate(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+        try SkyStudioImageOperation.validateRoute(args)
         if SkyStudioOfficialGenerateTool.applies(args) { return try await SkyStudioOfficialGenerateTool.generate(args, project) }
         // 工具始终可发现；Key、授权和积分必须在调用时核对，不能把列清单当成已经获准消费。
         guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
@@ -28,7 +29,7 @@ enum SkyStudioGenerateTool {
         var ask = try SkyStudioGenerationControls.ask(args)
         let prompt = try args.string("prompt") ?? ""
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
-        if kind != .image, ask.operation != "generate" { throw AIToolError("operation=remove_background requires kind=image.") }
+        if kind != .image, ask.operation != "generate" { throw AIToolError("operation=\(ask.operation) requires kind=image; upscale_clip is video-only.") }
         let idempotencyKey = try args.string("idempotency_key")?.trimmingCharacters(in: .whitespacesAndNewlines) ?? UUID().uuidString.lowercased()
         var arguments = args.raw.objectValue ?? [:]
         arguments["confirm_token"] = nil
@@ -97,6 +98,7 @@ enum SkyStudioGenerateTool {
         }
         if quoteOnly {
             return .ok(["status": "quoted", "model_id": .string(model.id), "params": .object(generation.params),
+                "operation": .string(generation.operation),
                 "credits": .number(quote.credits), "approval_reasons": .array(deviations.map(JSONValue.string)),
                 "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue), "charged": false,
                 "next_step": "No generation, upload or reservation was started. Present the specification and quote in the conversation language; submitting requires quote_only=false and follows permissions and hard budgets."])
@@ -133,6 +135,7 @@ enum SkyStudioGenerateTool {
         var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(job.id), "kind": .string(kind.rawValue), "model": .string(model.title), "model_id": .string(model.id),
             "params": .object(generation.params), "idempotency_key": .string(idempotencyKey),
+            "operation": .string(generation.operation),
             "ai_access_mode": .string(AIAccessStore.shared.mode.rawValue),
             "approval_reasons": .array(deviations.map(JSONValue.string)),
             "notification": "Notify the user in their conversation language of the model, source specification and reserved credits. Report actual billing at completion. Keep source, canvas and export sizes distinct; explain any downscale before delivery.",

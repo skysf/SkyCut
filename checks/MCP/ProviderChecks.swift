@@ -48,7 +48,14 @@ private func checkCatalog() {
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
         "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides",
-        "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project"], "the parameters")
+        "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project", "camera_angle", "upscale_factor"], "the parameters")
+    let opening = String(definition.description.prefix(512))
+    for term in ["camera_angle", "upscale", "upscale_clip", "get_job", "add_clips"] { check(opening.contains(term), "first 512 characters route \(term)") }
+    checkEqual(properties["operation"]?["enum"], ["generate", "remove_background", "camera_angle", "upscale"], "all image operations are discoverable")
+    checkEqual(properties["upscale_factor"]?["enum"], ["x2", "x3", "x4"], "image upscale factors are discoverable")
+    for field in ["rotate", "tilt", "zoom"] { check(properties["camera_angle"]?["properties"]?[field] != nil, "typed camera axis: \(field)") }
+    check(MCPArgumentCheck.problem(tool: .generateMedia, arguments: ["kind": "image", "operation": "camera_angle", "camera_angle": ["rotate": 45, "typo": 0]]) != nil,
+          "unknown nested camera argument is rejected before execution")
     checkEqual(properties["kind"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.generationKinds, "kind lists the generation kinds")
     check(properties["resolution"]?["enum"] == nil && properties["aspect_ratio"]?["enum"] == nil, "model-specific sizes and shapes are not restricted by legacy enums")
     check(MCPToolName.getStatus.definition.inputSchema["properties"]?["models"] != nil, "AI can discover model limits without submitting generation")
