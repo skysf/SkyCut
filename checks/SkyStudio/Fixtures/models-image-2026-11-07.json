@@ -1,0 +1,706 @@
+{
+  "models": [
+    {
+      "id": "seedream5-flash",
+      "kind": "image",
+      "title": "Seedream 5.0 Flash",
+      "price": {
+        "per": "image",
+        "credits": 8,
+        "credits_by_resolution": {
+          "2K": 8
+        },
+        "credits_with_references_by_resolution": {
+          "2K": 8
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9"
+        ],
+        "resolution": [
+          "2K"
+        ],
+        "reference_image_count": [
+          0,
+          10
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "2K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 10,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 10,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "nano2",
+      "kind": "image",
+      "title": "Nano Banana 2",
+      "price": {
+        "per": "image",
+        "credits": 20,
+        "credits_by_resolution": {
+          "1K": 20,
+          "2K": 29,
+          "4K": 44
+        },
+        "credits_with_references_by_resolution": {
+          "1K": 25,
+          "2K": 39,
+          "4K": 64
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9",
+          "4:1",
+          "8:1"
+        ],
+        "resolution": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "reference_image_count": [
+          0,
+          14
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "1K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 14,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 14,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "nano2-lite",
+      "kind": "image",
+      "title": "Nano Banana 2 Lite",
+      "price": {
+        "per": "image",
+        "credits": 20,
+        "credits_by_resolution": {
+          "1K": 20
+        },
+        "credits_with_references_by_resolution": {
+          "1K": 20
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9",
+          "1:4",
+          "4:1",
+          "1:8",
+          "8:1"
+        ],
+        "resolution": [
+          "1K"
+        ],
+        "reference_image_count": [
+          0,
+          14
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "1K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 14,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 14,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "nano-banana-pro",
+      "kind": "image",
+      "title": "Nano Banana Pro",
+      "price": {
+        "per": "image",
+        "credits": 32,
+        "credits_by_resolution": {
+          "1K": 32,
+          "2K": 42,
+          "4K": 63
+        },
+        "credits_with_references_by_resolution": {
+          "1K": 33,
+          "2K": 43,
+          "4K": 78
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "16:9",
+          "9:16",
+          "21:9",
+          "3:4",
+          "4:3"
+        ],
+        "resolution": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "reference_image_count": [
+          0,
+          14
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "1K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 14,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 14,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "gpt-image-2",
+      "kind": "image",
+      "title": "GPT Image 2",
+      "price": {
+        "per": "image",
+        "credits": 32,
+        "credits_by_resolution": {
+          "1K": 32,
+          "2K": 42,
+          "4K": 63
+        },
+        "credits_with_references_by_resolution": {
+          "1K": 33,
+          "2K": 43,
+          "4K": 78
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "16:9",
+          "9:16",
+          "21:9",
+          "3:4",
+          "4:3"
+        ],
+        "resolution": [
+          "1K",
+          "2K",
+          "4K"
+        ],
+        "reference_image_count": [
+          0,
+          16
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "1K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 16,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 16,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "seedream5-pro",
+      "kind": "image",
+      "title": "Seedream 5.0 Pro",
+      "price": {
+        "per": "image",
+        "credits": 25,
+        "credits_by_resolution": {
+          "2K": 25
+        },
+        "credits_with_references_by_resolution": {
+          "2K": 25
+        }
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9"
+        ],
+        "resolution": [
+          "2K"
+        ],
+        "reference_image_count": [
+          0,
+          10
+        ]
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "2K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 10,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 10,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "qwen-angles",
+      "kind": "image",
+      "title": "Qwen Angles",
+      "operation": "camera_angle",
+      "description": "Exactly one source image and a camera move. 135 degrees costs two calls.",
+      "price": {
+        "per": "provider_call",
+        "credits": 8,
+        "credits_by_resolution": {
+          "1K": 8,
+          "2K": 30
+        },
+        "credits_with_references_by_resolution": {
+          "1K": 8,
+          "2K": 30
+        },
+        "max_calls": 2
+      },
+      "params": {
+        "aspect_ratio": [
+          "1:1",
+          "3:2",
+          "2:3",
+          "3:4",
+          "4:3",
+          "4:5",
+          "5:4",
+          "9:16",
+          "16:9",
+          "21:9"
+        ],
+        "resolution": [
+          "1K",
+          "2K"
+        ],
+        "reference_image_count": [
+          0,
+          1
+        ],
+        "camera_angle": {
+          "rotate": [
+            -180,
+            -135,
+            -90,
+            -45,
+            0,
+            45,
+            90,
+            135,
+            180
+          ],
+          "tilt": [
+            -45,
+            0,
+            45
+          ],
+          "zoom": [
+            -1,
+            0,
+            1,
+            2
+          ]
+        }
+      },
+      "defaults": {
+        "aspect_ratio": "16:9",
+        "resolution": "1K"
+      },
+      "inputs": {
+        "image_url": "optional reference image",
+        "references": "ordered array of {type: image, url: own upload}"
+      },
+      "limits": {
+        "max_prompt_characters": 4000,
+        "max_upload_bytes": 31457280,
+        "references": {
+          "max_images": 1,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 1,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "image-upscale",
+      "kind": "image",
+      "title": "Image Upscale",
+      "operation": "upscale",
+      "price": {
+        "per": "image",
+        "credits": 8
+      },
+      "params": {
+        "upscale_factor": [
+          "x2",
+          "x3",
+          "x4"
+        ]
+      },
+      "defaults": {
+        "upscale_factor": "x2"
+      },
+      "inputs": {
+        "image_url": "exactly one own image upload"
+      },
+      "limits": {
+        "references": {
+          "max_images": 1,
+          "max_videos": 0,
+          "max_audio": 0,
+          "max_total_files": 1,
+          "max_image_bytes": 31457280,
+          "image_mime_types": [
+            "image/jpeg",
+            "image/png",
+            "image/webp"
+          ]
+        },
+        "max_upload_bytes": 31457280,
+        "max_output_pixels": 16500000
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "ideogram-remove-background",
+      "kind": "image",
+      "title": "Ideogram Remove Background",
+      "operation": "remove_background",
+      "description": "Remove the background from one existing image, preserving the foreground in a PNG with alpha for compositing.",
+      "price": {
+        "per": "image",
+        "credits": 2.2
+      },
+      "inputs": {
+        "image_url": {
+          "required": true,
+          "upload_purpose": "background_removal_image"
+        }
+      },
+      "params": {
+        "sync_mode": [
+          false,
+          true
+        ],
+        "enable_safety_checker": [
+          true,
+          false
+        ]
+      },
+      "defaults": {
+        "sync_mode": false,
+        "enable_safety_checker": true
+      },
+      "parameter_descriptions": {
+        "sync_mode": "true requests a data URI and may remove provider request history. SkyCut still returns an asynchronous job and a durable PNG URL. Prefer false for recovery.",
+        "enable_safety_checker": "Enabled by default. fal permits false only for authorized callers; this setting grants no upstream authorization."
+      },
+      "outputs": {
+        "image": true,
+        "content_type": "image/png",
+        "has_alpha": true
+      },
+      "limits": {
+        "max_images": 1,
+        "max_total_files": 1,
+        "image_mime_types": [
+          "image/jpeg",
+          "image/png",
+          "image/webp"
+        ],
+        "max_image_bytes": 10000000,
+        "input_size_limit_basis": "conservative_provider_10MB",
+        "max_image_pixels": 64000000,
+        "pixel_limit_basis": "skycut_service",
+        "provider_image_dimensions": null,
+        "max_output_bytes": 268435456,
+        "output_limit_basis": "skycut_service",
+        "max_inline_recovery_characters": 1000000,
+        "inline_recovery_limit_basis": "skycut_service",
+        "still_images_only": true,
+        "output_mime_type": "image/png",
+        "output_has_alpha": true
+      },
+      "notes": [
+        "Exactly one image; no prompt, seed, image count, mask, resolution or aspect-ratio control.",
+        "The 10 MB limit is enforced as 10,000,000 bytes, not 10 MiB. Pixel/output/recovery limits are SkyCut service limits.",
+        "Actual returned dimensions and transparency are reported; the provider publishes no dimension maximum or guaranteed size preservation.",
+        "With sync_mode true, large inline results may require review after failed saving if the original provider result is no longer available. Never regenerate or refund a successful provider result automatically."
+      ],
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    }
+  ],
+  "billing_policy": {
+    "version": "2026-10-31",
+    "charge": "prepaid_personal_credits",
+    "success": "provider_final_success_with_expected_output",
+    "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+    "no_refund_after_provider_success": true,
+    "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+    "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+    "missing_output": "pending_review",
+    "known_provider_charge": "non_refundable",
+    "unused_reservation": "return_after_final_settlement",
+    "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+  }
+}

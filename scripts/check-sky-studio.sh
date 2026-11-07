@@ -74,6 +74,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioImageOperation.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioImageResult.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationRequests.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationFrame.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioSpend.swift \
@@ -122,6 +124,9 @@ xcrun swiftc \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
   checks/SkyStudio/ModelExpansionChecks.swift \
+  checks/SkyStudio/ImageOperationChecks.swift \
+  checks/SkyStudio/ImageApprovalChecks.swift \
+  checks/SkyStudio/ImageResultChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

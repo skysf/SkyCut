@@ -23,7 +23,7 @@ enum SkyStudioModelPolicy {
         let offered = catalog.models(kind: kind)
         if let requested { return offered.first { $0.id == requested && accepts($0) } }
         if kind == "music" || kind == "sound_effect" || kind == "lipsync" { return offered.first(where: accepts) }
-        if kind == "image", let removal = offered.first(where: { $0.operation == "remove_background" && accepts($0) }) { return removal }
+        if kind == "image", let operation = offered.first(where: { $0.operation != "generate" && accepts($0) }) { return operation }
         return ordered(kind: kind, imageContext: imageContext, quality: quality).compactMap { id in offered.first { $0.id == id } }.first(where: accepts)
     }
 

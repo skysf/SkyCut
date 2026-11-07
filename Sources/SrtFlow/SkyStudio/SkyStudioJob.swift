@@ -15,6 +15,7 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     var kind: String
     /// Sky Studio 自己的模型名（`/models` 的 id），不是 fal 的端点号。
     var model: String
+    var operation: String?
     var prompt: String?
     /// `video_url`、`image_url`、`reference_audio_url`：自己 `/uploads` 上去的文件，或 Sky Studio 的素材。
     var inputs: [String: String]
@@ -33,10 +34,11 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     init(
         kind: String, model: String, prompt: String? = nil, inputs: [String: String] = [:], params: [String: JSONValue] = [:],
         maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased(), references: [JSONValue] = [],
-        film: SkyStudioFilm? = nil, recipePin: String? = nil, seamReview: SkyStudioSeamReview? = nil
+        film: SkyStudioFilm? = nil, recipePin: String? = nil, seamReview: SkyStudioSeamReview? = nil, operation: String? = nil
     ) {
         self.kind = kind
         self.model = model
+        self.operation = operation
         self.prompt = prompt
         self.inputs = inputs
         self.references = references
@@ -58,6 +60,7 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     var quoteBody: JSONValue {
         var body: [String: JSONValue] = ["kind": .string(kind), "model": .string(model), "params": .object(params)]
         if let prompt { body["prompt"] = .string(prompt) }
+        if let operation { body["operation"] = .string(operation) }
         if let film {
             body["film"] = film.json
             body["inputs"] = .object(allInputs)

@@ -47,6 +47,7 @@
 | `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换；upscale 和生成共用 |
 | `SkyStudioSubmission.swift` | 交上了没有、任务号是多少（分清「没交上就停了」和「交上之后停不下来」，get_job 报 `skystudio_job_id`）；upscale 和生成共用 |
 | `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
+| `SkyStudioImageOperation.swift` / `SkyStudioImageResult.swift` | 图片操作的离散移动 / 单图 / 倍率合同；下载后按实际字节确认格式并纠正扩展名，不重编码 |
 | `SkyStudioGenerateTool.swift` / `SkyStudioGenerationRun.swift` / `SkyStudioGenerationActivity.swift` / `SkyStudioGenerationFrame.swift` | generate_media：工具（挑模型、问价、把关、回任务号）、任务（传首帧、交、等、下载）、状态行订阅的那张表、图生视频的首帧（宽高比、传哪个文件） |
 
 ### 模型目录的缓存与换账户
@@ -197,3 +198,40 @@
 ## 十一、草稿审批与硬预算（2026-11-01，取代旧越额询问规则）
 
 AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-操作权限与草稿2026-11-01)。`SkyStudioJobGate` 先检查每日硬预算，再检查草稿越档审批；全部权限和旧确认码均不能让日预算超额。`reserveReplacement` 同样遵守预算。配音超预算现在暂停并提示设置，不再悄悄退到本机音色；手动 upscale 按钮与任务开跑时都核对硬预算。余额不足保留服务器 `balance/needed/recharge_url` 并给出充值入口。未知结果只查原单；本次不改变服务端退款政策。
+
+## 十二、图片目录、换机位与图片放大（2026-11-07 客户端合同）
+
+本节对应 Sky Studio `feat/skycut-image-model-catalog` 的最终 image catalog 合同（Commit 2），不包含尚未定稿的角色操作。
+客户端完成不代表服务器已上线；生产启用和 App 发版另行安排。回归 fixture `models-image-2026-11-07.json`
+从该服务端实现的 `buildSkycutModelCatalog()` 导出九条 image 记录（服务端 `af648a67`），不是在线生产目录的证明。
+
+- 普通图片生成可点名 `nano2-lite`、`nano-banana-pro`、`gpt-image-2`、`seedream5-pro`，以及原来的 `seedream5-flash` / `nano2`。
+  不发送内部 `pro` 或已停售的名字。未点名模型仍按原 `SkyStudioModelPolicy.ordered` 的 Seedream Flash / Nano 2 顺序，
+  不把新模型插进默认优先级。所有画幅、档位、参考 MIME / 数量 / 字节限制只从目录读：Nano 2 目录已去掉 `1:4` / `1:8`，
+  Lite 的这两项仍可用。`credits_with_references_by_resolution` 只展示；实际价格只问 `/quote`，不乘参考图片数量。
+- `generate_media kind=image operation=camera_angle`：换机位、换角度，匹配目录中的 `qwen-angles`。
+  用 `camera_angle:{rotate,tilt,zoom}`，缺的轴为 0；rotate 收 `-180,-135,-90,-45,0,45,90,135,180`，
+  tilt 收 `-45,0,45`，zoom 收 `-1,0,1,2`。全零、非离散值先在客户端拒绝；还要核对所选模型公布的轴取值。
+  只收一张 `image` 或一项 `reference_images`，不收 prompt；画幅和 `1K` / `2K` 档位仍读目录。
+  `/quote` 与 `/jobs` 都显式带顶层 operation 和完整 camera_angle，不发普通生成的 reference count 提示；不在客户端组供应商提示词。
+  ±135° 的多步执行和全部价格由服务器决定，客户端不拆单、不计算、不重试付费调用。
+- `generate_media kind=image operation=upscale`：放大一张图片，匹配 `image-upscale`；
+  `upscale_factor=x2|x3|x4`，默认 x2，只发这一项 params。不收 prompt / aspect_ratio / resolution；也不收 film。
+  单图与读取授权走同一条参考路径；`upscale_clip` 继续只管视频片段，图片不走其换源或视频导出路径。
+  服务器可能为输出像素上限下调有效倍率；结果按实际返回的宽高报告，不能用请求倍率推算尺寸。
+- 两种新操作均不收 film，先于官方短片分派拒绝。报价只使用原 `/quote`；消费仍经 `SkyStudioJobGate`，
+  确认身份通过 `SkyStudioApproval` 绑定 operation、全部角度 / 倍率、模型、精确积分、输入文件身份和输出落点。
+  参数、文件、模型或报价变了，旧确认码不消费也不记账；每日硬预算照旧先于令牌和全部权限。
+- 任务继续走 `SkyStudioGenerationRun` / `SkyStudioJobRun`，复用任务号、稳定 key、`get_job` 和原单 GET 恢复；
+  generation / delivery / billing 分开读。中间步骤成功后失败可能仍有供应商成本，只认 billing 的最终净扣费，不能报整单退款。
+  图片放大 inline 结果未持久保存时保留待核查，不重新收费生成。
+- 下载初始名字读 `result.content_type`，最终经 ImageIO 读取实际图片格式再定扩展名；JPEG 用 `.jpg`，PNG 用 `.png`，
+  原字节不重编码。`file_content_type` 报本机实际格式，远端 `content_type` / `remote_result` 原样保留。
+  无法确认图片格式时保留已下载文件并报本地交付失败，不退款、不自动重生成。案例见 [图片扩展名](../bugfixes/2026-11-07-generated-image-extension-from-bytes.md)。
+
+验证：`scripts/check-sky-studio.sh` 的 ImageOperation / ImageApproval / ImageResult 组覆盖实际目录、全部离散角度、
+两种请求的精确 HTTP body、校验、报价 / 文件身份、硬预算、错误码、部分扣费与只 GET 原单，以及真 JPEG / PNG 下载落盘。
+`scripts/check-mcp.sh` 核对 schema、嵌套参数名与前 512 字用法；扫描守卫确认生产下载之后真的调用格式收口。
+
+上线后另行授权的人工回归：各一张真实换机位 / 放大结果核对画面、±135° 的账单和实际尺寸，
+Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 billing。免费假服务通过不等于真实提供方输出质量或生产联调通过。

@@ -22,8 +22,10 @@ enum SkyStudioReferenceFiles {
             guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("There is no reference file at \(path).") }
             picks.append(Pick(type: type, file: url, role: role))
         }
-        let removal = try args.string("operation") == "remove_background" || args.string("model") == "ideogram-remove-background"
-        if let path = try args.string("image") { try add(path, type: "image", role: kind == .lipsync || removal ? "image_url" : kind == .image ? "reference_image" : "first_frame") }
+        let operation = try args.string("operation")?.lowercased() ?? "generate"
+        let model = try args.string("model")
+        let imageOperation = kind == .image && (operation != "generate" || model == "ideogram-remove-background")
+        if let path = try args.string("image") { try add(path, type: "image", role: kind == .lipsync || imageOperation ? "image_url" : kind == .image ? "reference_image" : "first_frame") }
         if let path = try args.string("last_image") { try add(path, type: "image", role: "last_frame") }
         for type in ["video", "audio"] {
             if let path = try args.string(type) { try add(path, type: type, role: "\(type)_url") }

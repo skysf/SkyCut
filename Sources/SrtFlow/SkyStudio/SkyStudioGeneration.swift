@@ -46,6 +46,8 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var controls: [String: JSONValue] = [:]
         var smartDuration = false
         var operation = "generate"
+        var cameraAngle: SkyStudioCameraAngle?
+        var upscaleFactor: String?
 
         init(duration: Double? = nil, resolution: String? = nil, aspectRatio: String? = nil, instrumental: Bool? = nil, lyrics: String? = nil, generateAudio: Bool? = nil) {
             self.duration = duration
@@ -62,6 +64,7 @@ struct SkyStudioGeneration: Equatable, Sendable {
     var params: [String: JSONValue]
     /// 给了但这一种用不上、没送过去的参数（结果里说一句，AI 才知道它没生效）。
     var notes: [String]
+    var operation = "generate"
 
     /// `canvas`：工程画布的宽 / 高（图和文生视频默认跟它）；`frame`：图生视频首帧的宽 / 高（读不出来就跟画布）。
     static func make(_ kind: Kind, prompt: String, ask: Ask, canvas: Double, frame: Double? = nil, model: SkyStudioModel? = nil,
@@ -72,11 +75,16 @@ struct SkyStudioGeneration: Equatable, Sendable {
         switch kind {
         case .image:
             if ask.operation == "remove_background" { break }
+            if ask.operation == "upscale" {
+                params["upscale_factor"] = .string(ask.upscaleFactor ?? model?.defaults["upscale_factor"]?.stringValue ?? "x2")
+                break
+            }
             let choices = model?.choices("aspect_ratio") ?? []
             params["aspect_ratio"] = .string(ask.aspectRatio ?? nearestAspect(to: canvas, in: choices.isEmpty ? imageAspects : choices))
             if let model {
                 if let resolution = ask.resolution ?? AIDraftPolicy.resolution(model: model, mode: inputMode) { params["resolution"] = .string(resolution) }
             }
+            if ask.operation == "camera_angle", let angle = ask.cameraAngle { params["camera_angle"] = angle.json }
         case .textToVideo, .imageToVideo:
             params["duration"] = ask.smartDuration ? .null : .number((ask.duration ?? model?.defaults["duration"]?.doubleValue ?? defaultVideoSeconds).rounded())
             params["resolution"] = .string(ask.resolution ?? model.flatMap { AIDraftPolicy.resolution(model: $0, mode: inputMode) } ?? defaultResolution)
@@ -128,9 +136,9 @@ struct SkyStudioGeneration: Equatable, Sendable {
                 for file in references.files where file.type == "video" || file.type == "audio" {
                     if let duration = file.duration { params["\(file.type)_seconds"] = .number(duration) }
                 }
-            } else if ask.operation != "remove_background" { params.merge(references.quoteParams) { _, new in new } }
+            } else if ask.operation == "generate" { params.merge(references.quoteParams) { _, new in new } }
         }
-        return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes)
+        return SkyStudioGeneration(kind: kind, prompt: prompt, params: params, notes: notes, operation: ask.operation)
     }
 
     /// 送 `/quote`、`/jobs` 的那一份；实际生成必须传入本次操作固定的 idempotency_key。`imageURL`：图生视频的首帧（`/uploads` 上去的）；
@@ -140,7 +148,8 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var inputs = uploaded
         if let imageURL { inputs["image_url"] = imageURL.absoluteString }
         return SkyStudioJobRequest(kind: kind.rawValue, model: model, prompt: prompt.isEmpty ? nil : prompt, inputs: inputs, params: params,
-                                   maxCredits: maxCredits, idempotencyKey: idempotencyKey, references: references)
+                                   maxCredits: maxCredits, idempotencyKey: idempotencyKey, references: references,
+                                   operation: operation == "generate" ? nil : operation)
     }
 
     /// 「MiniMax H3 · 5 s · 768p」：确认码绑着它（SkyStudioJobGate），状态行上也写它。不带语言的几个记号。
@@ -148,6 +157,8 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var parts = [modelTitle]
         switch kind {
         case .image:
+            if let angle = params["camera_angle"] { parts.append("rotate \(angle["rotate"]?.intValue ?? 0), tilt \(angle["tilt"]?.intValue ?? 0), zoom \(angle["zoom"]?.intValue ?? 0)") }
+            if let factor = params["upscale_factor"]?.stringValue { parts.append(factor) }
             parts.append(params["aspect_ratio"]?.stringValue ?? "")
             if let resolution = params["resolution"]?.stringValue { parts.append(resolution) }
         case .imageToVideo, .textToVideo:
