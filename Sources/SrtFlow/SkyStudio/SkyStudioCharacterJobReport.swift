@@ -3,6 +3,11 @@ import SrtFlowMCPKit
 
 // 源图、角色整理、扣费三份独立事实；成功源图不会因为裁图 / 存储失败而被说成退款或需要重生成。
 enum SkyStudioCharacterJobReport {
+    static func completionMessage(resuming: Bool, previousStatus: String = "done") -> String {
+        if resuming || previousStatus != "done" { return "Original Character recovered; no new generation, upload or charge." }
+        return "Character ready; reuse character_id. No role images were inserted on the timeline."
+    }
+
     static func fields(_ status: SkyStudioJobStatus, freeImport: Bool) -> [String: JSONValue] {
         var fields: [String: JSONValue] = ["skystudio_job_id": .string(status.jobID),
             "skystudio_status": status.state.map { .string($0.rawValue) } ?? .null,

@@ -415,4 +415,11 @@ for source in SkyStudioCharacterNativeRequest.swift SkyStudioCharacterWorkflow.s
   grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色 B 生产路径没有编进假服务器检查：${source}"
 done
 
+# 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
+grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
+grep -qF 'SkyStudioGenerationName.stem(' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift || fail "图片操作未按源图起名"
+grep -qF 'detail.merge(localImage.dimensions)' Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift || fail "图片实际尺寸未进入最终 get_job 结果"
+grep -qF 'completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue)' "${CHAR_RUN}" || fail "角色完成后刷新未区分正常完成与原单恢复"
+grep -qF 'completionMessage(resuming: plan == nil)' "${CHAR_RUN}" || fail "角色首次完成未按实际恢复来源选文案"
+
 echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"

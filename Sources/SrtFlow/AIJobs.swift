@@ -162,6 +162,6 @@ final class AIJobs {
         if let detail = job.detail, case .object(let extra) = detail {
             object.merge(extra) { current, _ in current }
         }
-        return .object(object)
+        return AIJobResult.json(object, status: job.status.rawValue)
     }
 }
