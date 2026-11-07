@@ -219,6 +219,7 @@ final class AIToolRouter {
         // 不改工程：只起一个任务、回任务号（成品放上时间线是 add_clips 的事）。
         case .generateMedia: return try await SkyStudioGenerateTool.generate(args, project)
         case .listCharacters, .getCharacter: return try await SkyStudioCharacterReadTool.read(tool, args)
+        case .manageCharacters: return try await SkyStudioCharacterManageTool.run(args, project)
         // 起一个任务、回任务号；做完那一下的换源在任务里自己包一层 AIUndoGrouping.step（AIUpscaleTool.land）。
         case .upscaleClip: return try await AIUpscaleTool.upscale(args, project)
         // 起一个录屏会话就回来（AI 好接着操作电脑）；入轨那一下是异步落账，会话的 landing 包一层 AIUndoGrouping.step。
@@ -297,7 +298,7 @@ final class AIToolRouter {
             // 套路不碰工程：不排队、不摆窗口、不算这一轮的改动。
             case .recipes, .saveRecipe:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
-            case .setView, .setSettings:
+            case .setView, .setSettings, .manageCharacters:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .openFolder, .readDocument, .manageFiles, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .findAudio, .getSubtitles,
                  .saveProject, .exportVideo, .exportSubtitles, .compressVideos, .burnSubtitles, .convertSubtitles, .generateMedia:

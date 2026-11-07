@@ -36,6 +36,8 @@ struct SkyStudioJobRun: Sendable {
     var checkpoint: (@Sendable (SkyStudioJobStatus) async throws -> Void)?
     /// 每次真正 POST（包括容量重试）前核对易变的调用方状态；nil 保持普通生成原来的流程。
     var beforeSubmit: (@Sendable () async throws -> Void)?
+    /// 原生角色任务不能取消；停止本机等待也不能向 /cancel 发送请求。
+    var cancellable = true
 
     init(api: SkyStudioAPI, key: String) {
         self.api = api
@@ -134,7 +136,7 @@ struct SkyStudioJobRun: Sendable {
         while true {
             switch current.state {
             case .done?:
-                guard current.result != nil else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
+                guard current.result != nil || (current.characterID != nil && current.characterStatus == "ready") else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
                 return current
             case .failed?:
                 throw SkyStudioJobError.failed(current.failure ?? SkyStudioJobFailure(message: current.error ?? "Sky Studio could not make it.", jobID: current.jobID))
@@ -202,6 +204,7 @@ struct SkyStudioJobRun: Sendable {
 
     /// 用户要停：排着队的替它取消（退钱）；开始了的取消不了；问不到就说不准。后两种那单在服务器上照做，交出去接着查到底。
     private func stop(_ jobID: String) async -> SkyStudioJobError {
+        if !cancellable { keepFollowing(jobID); return .stopped(.characterContinuing) }
         let api = self.api, key = self.key
         let outcome = await Task.detached { try? await api.cancel(jobID, key: key) }.value
         switch outcome {
@@ -259,6 +262,7 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
         case alreadyStarted
         /// 取消请求没送到：可能还在做，做完会进作品库。
         case unknown
+        case characterContinuing
     }
 
     /// 服务器说没做成；只按明确证据认退款。
@@ -317,6 +321,8 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
                 + "a successful result is saved to the user's Sky Studio library."
         case .stopped(.unknown):
             return "SkyCut could not reach Sky Studio to cancel it; it may still finish and appear in the user's Sky Studio library."
+        case .stopped(.characterContinuing):
+            return "Character jobs cannot be cancelled. Only local waiting stopped; query this original job to recover its Character and billing. No cancellation request was sent."
         case .request(.server(let error)):
             return error.message
         case .request(.network(let detail)):

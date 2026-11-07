@@ -171,6 +171,8 @@ enum AIExportTools {
     // MARK: get_job / cancel_job
 
     static func job(_ args: AIToolArguments) async throws -> AIToolResult {
+        let id = try args.requiredString("job_id")
+        if AIJobs.shared.job(id) == nil { _ = try await SkyStudioCharacterJobs.restore(id, project: nil) }
         let job = try find(args)
         await job.refresh?()
         if let wait = try args.double("wait_seconds"), wait > 0 {

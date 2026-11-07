@@ -21,7 +21,7 @@ func runProviderChecks() {
 
 private func checkCatalog() {
     // 花钱的两个工具：generate_media（第 6 块）、upscale_clip（2026-10-02）；2026-10-28 起都走 Sky Studio、花积分（收费方案第 6 刀）。
-    let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip, .listCharacters, .getCharacter]
+    let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip, .listCharacters, .getCharacter, .manageCharacters]
     checkEqual(MCPToolName.generateMedia.provider, .skystudio, "generate_media belongs to Sky Studio")
     checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio")
     check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")

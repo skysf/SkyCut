@@ -108,7 +108,7 @@ struct SkyStudioAPI: Sendable {
     func submit(_ job: SkyStudioJobRequest, key: String) async throws -> SkyStudioJobStatus {
         if job.character != nil, job.character?.revision == nil { throw SkyStudioCharacterError.changed }
         try SkyStudioOfficialRequest.validate(job, submitting: true)
-        var post = request("jobs", key: key, method: "POST", body: try job.jobBody.encodedData())
+        var post = request(try job.nativeCharacter?.path ?? "jobs", key: key, method: "POST", body: try job.jobBody.encodedData())
         post.timeoutInterval = Self.submitTimeout
         return try Self.status(try await send(post))
     }
@@ -139,10 +139,12 @@ struct SkyStudioAPI: Sendable {
         guard let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.size] as? Int else {
             throw SkyStudioFailure.network("could not read \(fileURL.lastPathComponent)")
         }
-        let body = try JSONValue.object([
+        var fields: [String: JSONValue] = [
             "filename": .string(fileURL.lastPathComponent), "content_type": .string(contentType),
             "bytes": .number(Double(size)), "purpose": .string(purpose)
-        ]).encodedData()
+        ]
+        if purpose == "character_role" { fields["filename"] = nil }
+        let body = try JSONValue.object(fields).encodedData()
         let answer = try Self.json(try await send(request("uploads", key: key, method: "POST", body: body)))
         guard let target = answer["upload_url"]?.stringValue.flatMap(URL.init(string:)), target.scheme != nil,
               let link = answer["file_url"]?.stringValue.flatMap(URL.init(string:)), link.scheme != nil else {

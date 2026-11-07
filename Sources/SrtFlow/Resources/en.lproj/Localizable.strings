@@ -1372,3 +1372,5 @@
 "Open recorded project" = "Open recorded project";
 
 "The recording location is unavailable; this file could not be checked: %@" = "The recording location is unavailable; this file could not be checked: %@";
+
+"Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing." = "Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing.";

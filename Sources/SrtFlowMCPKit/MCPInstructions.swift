@@ -48,6 +48,6 @@ public enum MCPInstructions {
     - File output: compress_videos, burn_subtitles, convert_subtitles
     - App: get_settings, set_settings; set_view, seek, record_screen
     - Paid: \(skyStudioTools)
-    - Characters: list_characters, get_character
+    - Characters: list_characters, get_character, manage_characters
     """
 }

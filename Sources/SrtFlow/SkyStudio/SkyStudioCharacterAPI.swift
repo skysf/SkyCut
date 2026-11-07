@@ -10,6 +10,25 @@ enum SkyStudioCharacterPath {
 }
 
 extension SkyStudioAPI {
+    func characterCapabilities(key: String) async throws -> SkyStudioCharacterCapabilities {
+        try SkyStudioCharacterCapabilities(json: JSONValue.decode(try await send(request("characters/capabilities", key: key))))
+    }
+
+    func mutateCharacter(_ mutation: SkyStudioCharacterMutation, key: String) async throws -> JSONValue {
+        var path = try SkyStudioCharacterPath.detail(mutation.id)
+        if let role = mutation.role {
+            guard SkyStudioCharacter.roles.contains(role) else { throw AIToolError("Unknown character role.") }
+            path += "/images/" + role
+        }
+        let value = try JSONValue.decode(try await send(request(path, key: key, method: mutation.method, body: mutation.body.jsonData)))
+        if mutation.method == "DELETE" {
+            guard value["deleted"] == true, value["character_id"]?.stringValue == mutation.id else { throw SkyStudioFailure.badAnswer(status: 200) }
+        } else {
+            let character = try SkyStudioCharacter(json: value["character"] ?? .null)
+            guard character.id == mutation.id else { throw SkyStudioFailure.badAnswer(status: 200) }
+        }
+        return value
+    }
     func characters(limit: Int = 50, cursor: String? = nil, status: String = "ready", key: String) async throws -> SkyStudioCharacterPage {
         guard (1...100).contains(limit), SkyStudioCharacter.statuses.contains(status), cursor == nil || UUID(uuidString: cursor!) != nil else {
             throw AIToolError("Character pages require limit 1–100, a returned UUID cursor and a supported status.")
@@ -32,4 +51,8 @@ extension SkyStudioAPI {
         guard value.id.lowercased() == id.lowercased() else { throw SkyStudioFailure.badAnswer(status: 200) }
         return value
     }
+}
+
+private extension Dictionary where Key == String, Value == JSONValue {
+    var jsonData: Data { get throws { try JSONValue.object(self).encodedData() } }
 }

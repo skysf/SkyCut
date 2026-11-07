@@ -50,6 +50,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/KeychainSecret.swift \
+  Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioKey.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
@@ -60,6 +61,14 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyCutGates.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterCapabilities.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterNativeRequest.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReceiptFile.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterPlan.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterWorkflow.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterReceipt.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterJobReport.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReferenceImage.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterAssets.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterAccess.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterGeneration.swift \
@@ -134,6 +143,9 @@ xcrun swiftc \
   checks/SkyStudio/ImageResultChecks.swift \
   checks/SkyStudio/CharacterChecks.swift \
   checks/SkyStudio/CharacterApprovalChecks.swift \
+  checks/SkyStudio/CharacterFixtures.swift \
+  checks/SkyStudio/CharacterNativeChecks.swift \
+  checks/SkyStudio/CharacterRecoveryChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

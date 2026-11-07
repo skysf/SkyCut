@@ -390,4 +390,29 @@ for source in SkyStudioCharacter.swift SkyStudioCharacterAPI.swift SkyStudioChar
   grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色生产值未编进假服务器检查：${source}"
 done
 
+# 角色 B：生产工作流、付费闸、持久原单、免费删除确认与只读恢复接线。
+CHAR_MANAGE="Sources/SrtFlow/SkyStudio/SkyStudioCharacterManageTool.swift"
+CHAR_RUN="Sources/SrtFlow/SkyStudio/SkyStudioCharacterRun.swift"
+CHAR_WORKFLOW="Sources/SrtFlow/SkyStudio/SkyStudioCharacterWorkflow.swift"
+CHAR_RECEIPT="Sources/SrtFlow/SkyStudio/SkyStudioCharacterReceipt.swift"
+grep -qF 'case .manageCharacters: return try await SkyStudioCharacterManageTool.run(args, project)' "${ROUTER}" || fail "角色写工具未接生产入口"
+grep -qF 'SkyStudioCharacterJobs.restore(id, project: nil)' Sources/SrtFlow/AIExportTools.swift || fail "get_job 未接跨重启角色原单"
+grep -qF 'SkyStudioJobGate.decide(credits: plan.quote!.credits' "${CHAR_MANAGE}" || fail "付费角色未过统一确认 / 硬预算闸"
+grep -qF 'SkyStudioCharacterJobs.persist(receipt, creating: true)' "${CHAR_MANAGE}" || fail "角色任务未先持久化确认身份"
+grep -qF 'receipt.recovery(explicitFreeImport: retryFreeImport)' "${CHAR_RUN}" || fail "角色恢复未使用原单恢复政策"
+grep -qF 'if isFree && explicitFreeImport { return .freeImport }' "${CHAR_RECEIPT}" || fail "只有显式免费导入可以重送原 body/key"
+grep -qF 'case originalJob(String), libraryRead(String)' "${CHAR_RECEIPT}" || fail "换图恢复必须只读当前角色"
+grep -qF 'receipt.mutation = prepared.mutation' "${CHAR_RUN}" || fail "换图上传描述未进入回执"
+grep -qF 'runner.cancellable = false' "${CHAR_WORKFLOW}" || fail "原生角色不能调服务器 cancel"
+grep -qF 'runner.checkpoint = checkpoint' "${CHAR_WORKFLOW}" || fail "原生角色响应未即时保存原 job_id"
+grep -qF 'SkyStudioCharacterJobReport.fields(status, freeImport: isFree)' "${CHAR_RECEIPT}" || fail "角色源图 / 整理 / 账单未分开保留"
+grep -qF 'AIFileTools.confirmCharacterDeletion' "${CHAR_MANAGE}" || fail "免费角色删除未走现有确认入口"
+grep -qF 'SkyStudioReceiptFile.persist(data, at: file)' "${CHAR_RECEIPT}" || fail "角色回执没用共用私有原子字节边界"
+RECOVER_AT="$(line_of 'if isJob && !quoteOnly, let prior = try await SkyStudioCharacterJobs.read(localID)' "${CHAR_MANAGE}")"
+FILES_AT="$(line_of 'let paths = try SkyStudioCharacterPlan.paths' "${CHAR_MANAGE}")"
+if [ -z "${RECOVER_AT}" ] || [ -z "${FILES_AT}" ] || [ "${RECOVER_AT}" -ge "${FILES_AT}" ]; then fail "必须先恢复持久原单，再碰当前文件 / 角色 / 报价"; fi
+for source in SkyStudioCharacterNativeRequest.swift SkyStudioCharacterWorkflow.swift SkyStudioCharacterReceipt.swift SkyStudioCharacterJobReport.swift; do
+  grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色 B 生产路径没有编进假服务器检查：${source}"
+done
+
 echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"

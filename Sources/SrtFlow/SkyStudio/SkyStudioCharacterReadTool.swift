@@ -8,12 +8,17 @@ enum SkyStudioCharacterReadTool {
         let key = try await SkyStudioOfficialGenerateTool.readKey()
         let stamp = SkyStudioCharacterAccess.stamp(key)
         do {
-            let result: JSONValue
+            var result: JSONValue
             if tool == .getCharacter {
                 result = ["character": try await SkyStudioCharacterCache.shared.character(args.requiredString("character_id"), key: key).json]
             } else {
                 result = try await SkyStudioCharacterCache.shared.page(limit: args.int("limit") ?? 50, cursor: args.string("cursor"),
                     status: args.choice("status", from: SkyStudioCharacter.statuses) ?? "ready", key: key).json
+                if try args.bool("capabilities") == true {
+                    var fields = result.objectValue!
+                    fields["capabilities"] = try await SkyStudioCharacterCache.shared.capabilities(key: key).json
+                    result = .object(fields)
+                }
             }
             guard SkyStudioCharacterAccess.stamp(key) == stamp else { throw SkyStudioCharacterError.changed }
             return .ok(result)

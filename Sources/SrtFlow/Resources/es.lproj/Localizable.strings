@@ -1372,3 +1372,5 @@
 "Open recorded project" = "Abrir el proyecto de la grabación";
 
 "The recording location is unavailable; this file could not be checked: %@" = "La ubicación de la grabación no está disponible; no se ha podido comprobar este archivo: %@";
+
+"Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing." = "Los trabajos de personajes no se pueden cancelar. El trabajo original continúa; consúltalo para recuperar el personaje y comprobar el cobro.";

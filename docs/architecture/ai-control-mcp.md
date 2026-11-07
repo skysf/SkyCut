@@ -174,7 +174,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 把它删进废纸篓（会问）。
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
-   会回 `needs_confirmation` 的只许这三处（`AIFileTools`、`AIWorkspace.confirmReading`、`SkyStudioJobGate`），`scripts/check-mcp.sh` 扫描钉着。
+   操作确认的入口是以下四处（设置权限另见其合同）（`AIFileTools`（含服务器角色删除）、`AIWorkspace.confirmReading`、`SkyStudioJobGate`、`AISettingsApproval`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
    **拒绝说原因**：结果里的 `confirm_token_refused` 分过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的，`valid_for_minutes` 写着有效期
@@ -967,7 +967,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 
 55. **换旁白同步画面（2026-11-01）**：`sync_voiceover` 接收连续旧段落范围、新音频 id 和关联画面 / 文字 / 形状 / 字幕，实测新音频排段；字幕复用本机转写与字符对齐，原稿及繁简体不改。先全验，再用现有 `AIBatchEditTools.commit` 一步采用已算好的时间线，不重跑磁吸 / linkage。支持已有变速、裁切和末帧定格，超限及最终同轨冲突整批拒绝。返回 `job_id`，本地失败保留音频重试，无付费生成。参数、边界与回归见 [按旁白段落同步时间线](voiceover-timeline-sync.md)。
 
-56. **Sky Studio 角色 A（2026-11-07）**：`list_characters` / `get_character` 免费、只读、不碰工程，分页 / 状态与详情 / 视图 / revision 分开；不隐藏于无 Key 的会话清单。`generate_media` 收服务器角色 id、可选视图和报价 revision；服务器选择最终视图和视频模式，不把角色当本机路径或下载重传。报价不上传、不预留，确认和提交绑定 revision / 视图 / 模式 / 精确价格；换图重新报价，换 Key / 账户清缓存和待确认。`get_job` 独立报告实际用图与账单。完整合同、官方短片真实引用规则和回归见 [Sky Studio 的任务](sky-studio-jobs.md)第十三节。
+56. **Sky Studio 角色 A/B（2026-11-07）**：`list_characters` / `get_character` 免费、只读、不碰工程，分页 / 状态与详情 / 视图 / revision 分开；不隐藏于无 Key 的会话清单。`generate_media` 收服务器角色 id、可选视图和报价 revision；服务器选择最终视图和视频模式，不把角色当本机路径或下载重传。报价不上传、不预留，确认和提交绑定 revision / 视图 / 模式 / 精确价格；换图重新报价，换 Key / 账户清缓存和待确认。`get_job` 独立报告实际用图与账单。完整合同、官方短片真实引用规则和回归见 [Sky Studio 的任务](sky-studio-jobs.md)第十三节。
+    `list_characters capabilities=true` 读取原生角色模型 / 档位 / 价格；唯一写工具 `manage_characters` 的六个 action 是 create / import / update / replace_view / headshot / delete。创建 / 头像先报价、走同一个付费确认和硬预算；免费导入 / 编辑 / 换图不增加确认，删除在请求批准模式下由现有 `AIFileTools` 发码，全部权限直接通知。原生创建 / 头像 / 导入和换图用稳定 key、私有持久回执和跨重启 job_id；get_job 原单恢复不上传、不报价、不再次付费。原生任务不可服务器取消，源图 / 角色整理 / billing 三份状态分开；源图成功但整理失败只查原单。免费导入的显式同 key POST 恢复、换图丢答只现读，以及无 job_id 的付费丢答待核查，详见上述任务合同。角色 id 不自动成为四个时间线片段；库写入不进入工程撤销。
     工具清单总上限由用户 **2026-11-07 定为 110,000 字符**（原 100,000，角色 A/B 三工具）；每工具 2,048、前 512 字自成一体和英文规则保持。
 
 ## 五、这一轮、停止、撤销这一轮

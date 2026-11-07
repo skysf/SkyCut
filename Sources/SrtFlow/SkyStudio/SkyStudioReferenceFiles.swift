@@ -98,16 +98,7 @@ enum SkyStudioReferenceFiles {
                 }
             } else {
                 let measured: SkyStudioReference? = await MediaReadQueue.run(on: MediaReadQueue.analysis) {
-                    guard let source = CGImageSourceCreateWithURL(pick.file as CFURL, nil), let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-                          let width = properties[kCGImagePropertyPixelWidth] as? NSNumber, let height = properties[kCGImagePropertyPixelHeight] as? NSNumber else { return nil }
-                    let turned = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
-                    var image = SkyStudioReference(type: "image", file: pick.file, role: pick.role, bytes: bytes)
-                    image.width = turned >= 5 ? height.doubleValue : width.doubleValue
-                    image.height = turned >= 5 ? width.doubleValue : height.doubleValue
-                    image.contentType = (CGImageSourceGetType(source) as String?).flatMap { UTType($0)?.preferredMIMEType }
-                    image.imageCount = CGImageSourceGetCount(source)
-                    image.hasTransparency = StillImageClipFactory.usesTransparency(pick.file)
-                    return image
+                    SkyStudioReferenceImage.measure(pick.file, role: pick.role, bytes: bytes)
                 }
                 guard let measured else {
                     throw AIToolError("Reference is not a readable image: \(pick.file.lastPathComponent).")

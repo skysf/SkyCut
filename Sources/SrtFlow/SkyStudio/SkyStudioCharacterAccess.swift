@@ -9,8 +9,18 @@ final class SkyStudioCharacterCache {
     private var epoch = 0
     private var pages: [String: (SkyStudioCharacterPage, Date)] = [:]
     private var details: [String: SkyStudioCharacter] = [:]
+    private var storedCapabilities: (SkyStudioCharacterCapabilities, Date)?
 
-    static func digest(_ key: String) -> String { SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined() }
+    func capabilities(key: String, api: SkyStudioAPI = SkyStudioAPI(), now: Date = Date()) async throws -> SkyStudioCharacterCapabilities {
+        bind(key)
+        if let (value, at) = storedCapabilities, now >= at, now.timeIntervalSince(at) < 30 { return value }
+        let observed = epoch
+        let value = try await api.characterCapabilities(key: key)
+        if observed == epoch { storedCapabilities = (value, now) }
+        return value
+    }
+
+    nonisolated static func digest(_ key: String) -> String { SHA256.hash(data: Data(key.utf8)).map { String(format: "%02x", $0) }.joined() }
 
     func page(limit: Int, cursor: String?, status: String, key: String, api: SkyStudioAPI = SkyStudioAPI(), now: Date = Date()) async throws -> SkyStudioCharacterPage {
         bind(key)
@@ -36,7 +46,7 @@ final class SkyStudioCharacterCache {
 
     func cached(_ id: String) -> SkyStudioCharacter? { details[id] }
 
-    func forget() { epoch += 1; keyDigest = nil; pages = [:]; details = [:] }
+    func forget() { epoch += 1; keyDigest = nil; pages = [:]; details = [:]; storedCapabilities = nil }
 
     private func bind(_ key: String) {
         let digest = Self.digest(key)
@@ -54,5 +64,11 @@ enum SkyStudioCharacterAccess {
         SkyStudioCharacterCache.shared.forget()
         AIConfirmations.shared.discard(prefix: "skystudio:")
         SkyStudioOfficialPrepared.shared.forget()
+    }
+
+    static func invalidateLibrary(characterID: String) {
+        SkyStudioCharacterCache.shared.forget()
+        AIConfirmations.shared.discard(prefix: "skystudio:", containing: characterID)
+        SkyStudioOfficialPrepared.shared.forget(characterID: characterID)
     }
 }

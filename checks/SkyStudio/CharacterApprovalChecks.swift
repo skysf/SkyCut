@@ -46,5 +46,12 @@ func runCharacterApprovalChecks() {
         SkyStudioCharacterAccess.invalidate()
         check(stamp != SkyStudioCharacterAccess.stamp("same-key"), "account invalidation advances epoch even for the same Key")
         checkEqual(AIConfirmations.shared.redeem(accountToken, for: "skystudio:character-test"), .refused(.unknown), "account changes clear pending paid approvals")
+        let relatedAction = "skystudio:character:" + characterID
+        let related = AIConfirmations.shared.ask("Character view", action: relatedAction).payload["confirm_token"]!.stringValue!
+        let otherAction = "skystudio:unrelated-image"
+        let unrelated = AIConfirmations.shared.ask("Other image", action: otherAction).payload["confirm_token"]!.stringValue!
+        SkyStudioCharacterAccess.invalidateLibrary(characterID: characterID)
+        checkEqual(AIConfirmations.shared.redeem(related, for: relatedAction), .refused(.unknown), "view change clears related pending approvals")
+        checkEqual(AIConfirmations.shared.redeem(unrelated, for: otherAction), .accepted, "view change preserves unrelated approved work")
     } catch { check(false, "Character approval checks: \(error)") }
 }
