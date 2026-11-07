@@ -4,14 +4,20 @@ import SrtFlowMCPKit
 // 官方无素材请求只允许本账号上传的原创图片。这里只检查公开输入形状，归属 / 字节 / 模型能力仍由服务器核对。
 // 不下载引用、不猜账户、不把 generated URL 改装成 uploads，也不处理私有来源。
 enum SkyStudioFilmInputs {
-    static func validate(_ inputs: [String: JSONValue], kind: String, params: [String: JSONValue], at path: String = "inputs") throws {
+    static func validateOriginalURLs(_ inputs: [String: JSONValue]) throws {
+        _ = try image(inputs["image_url"], at: "inputs.image_url", allowCharacters: false)
+        _ = try image(inputs["last_frame_url"], at: "inputs.last_frame_url", allowCharacters: false)
+        _ = try references(inputs["references"], at: "inputs.references", allowCharacters: false)
+    }
+
+    static func validate(_ inputs: [String: JSONValue], kind: String, params: [String: JSONValue], at path: String = "inputs", allowCharacterDeclarations: Bool = false) throws {
         _ = try SkyStudioFilmReader.object(.object(inputs), keys: ["image_url", "last_frame_url", "references"], at: path)
         guard SkyStudioFilm.Render.Kind(rawValue: kind) != nil else {
             throw SkyStudioFilmReader.error("kind", "Official shots accept image, text_to_video or image_to_video.")
         }
-        let first = try image(inputs["image_url"], at: path + ".image_url")
-        let last = try image(inputs["last_frame_url"], at: path + ".last_frame_url")
-        let references = try references(inputs["references"], at: path + ".references")
+        let first = try image(inputs["image_url"], at: path + ".image_url", allowCharacters: allowCharacterDeclarations)
+        let last = try image(inputs["last_frame_url"], at: path + ".last_frame_url", allowCharacters: allowCharacterDeclarations)
+        let references = try references(inputs["references"], at: path + ".references", allowCharacters: allowCharacterDeclarations)
         let mode = params["mode"]?.stringValue ?? "frames"
         let count: Int
         if kind == "image" {
@@ -42,11 +48,11 @@ enum SkyStudioFilmInputs {
     }
 
     @discardableResult
-    private static func image(_ value: JSONValue?, at path: String) throws -> Bool {
+    private static func image(_ value: JSONValue?, at path: String, allowCharacters: Bool) throws -> Bool {
         guard let value, value != .null else { return false }
         guard let text = value.stringValue, let u = URLComponents(string: text), u.scheme == "https",
               u.host?.isEmpty == false, u.user == nil, u.password == nil, u.query == nil, u.fragment == nil,
-              u.path.hasPrefix("/originals/"), !u.path.contains(".."), !u.path.contains("\\"),
+              (u.path.hasPrefix("/originals/") || (allowCharacters && u.path.hasPrefix("/characters/"))), !u.path.contains(".."), !u.path.contains("\\"),
               u.path.unicodeScalars.allSatisfy({ !CharacterSet.controlCharacters.contains($0) }) else {
             throw SkyStudioFilmReader.error(path, "Use a durable original image file_url from this account's /uploads, without credentials, queries or fragments.")
         }
@@ -57,13 +63,13 @@ enum SkyStudioFilmInputs {
         return true
     }
 
-    private static func references(_ value: JSONValue?, at path: String) throws -> Int {
+    private static func references(_ value: JSONValue?, at path: String, allowCharacters: Bool) throws -> Int {
         guard let value, value != .null else { return 0 }
         guard let list = value.arrayValue else { throw SkyStudioFilmReader.error(path, "Expected an ordered image-reference array.") }
         for (index, item) in list.enumerated() {
             let p = path + "[\(index)]"
             let o = try SkyStudioFilmReader.object(item, keys: ["type", "url"], at: p)
-            guard o["type"] == "image", try image(o["url"], at: p + ".url") else {
+            guard o["type"] == "image", try image(o["url"], at: p + ".url", allowCharacters: allowCharacters) else {
                 throw SkyStudioFilmReader.error(p, "Official no-footage references must be original images.")
             }
         }

@@ -1372,3 +1372,5 @@
 "Open recorded project" = "打开录制工程";
 
 "The recording location is unavailable; this file could not be checked: %@" = "录屏位置暂时无法访问，无法核对这个文件：%@";
+
+"Character jobs cannot be cancelled. The original job continues; query it to recover the Character and billing." = "角色任务无法取消。原任务会继续，请查询原单以恢复角色并核对扣费。";

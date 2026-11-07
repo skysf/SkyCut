@@ -89,7 +89,7 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .getJob, title: "Job progress",
                 description: """
-                Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits for it before \
+                Progress and result of a long job (any call that returned a job id). Character jobs retain stable ids across App restarts: source generation, Character finalization and billing are independent; recovery never repeats paid generation. wait_seconds (up to 30) waits for it before \
                 answering; keep waiting instead of starting it again. Exports, transcribing (subtitles, transcripts) and \
                 translations run one at a time across all projects: a later one shows status queued with queue_position \
                 (1 = next) and starts by itself. If it shows waiting_for_user, tell the user what it says right away.

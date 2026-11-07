@@ -26,6 +26,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private let references: SkyStudioReferencePlan
     private let selectedModel: SkyStudioModel
     private let idempotencyKey: String
+    private let characterStamp: String?
+    private var characterUsage: SkyStudioCharacterUsage?
     private let official: SkyStudioOfficialOperation?
     private let folder: URL
     private let stem: String
@@ -60,6 +62,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private func applyBilling(_ server: SkyStudioJobStatus) {
         generationStatus = server.generationStatus
         deliveryStatus = server.deliveryStatus
+        if let usage = server.characterUsage { characterUsage = usage }
         if let result = server.result { remoteResult = result }
         if let billing = server.billing { settle(billing) }
     }
@@ -72,7 +75,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     init(
         generation: SkyStudioGeneration, model: SkyStudioModel, quote: SkyStudioQuote, references: SkyStudioReferencePlan, folder: URL, stem: String,
         project: VideoEditProject, reservation: SkyStudioJobGate.Reservation, idempotencyKey: String,
-        official: SkyStudioOfficialOperation? = nil
+        official: SkyStudioOfficialOperation? = nil, characterStamp: String? = nil
     ) {
         self.generation = generation
         modelID = model.id
@@ -82,6 +85,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         self.references = references
         self.selectedModel = model
         self.idempotencyKey = idempotencyKey
+        self.characterStamp = characterStamp
+        characterUsage = quote.characterUsage
         self.official = official
         self.folder = folder
         self.stem = stem
@@ -110,6 +115,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 var detail = self.progress?.json() ?? [:]
                 if self.status.waitingForRefund { detail["phase"] = "waiting_for_refund" }
                 if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }
+                if let usage = self.characterUsage { detail["character_usage"] = usage.json }
                 return detail
             },
             cancel: { [weak self] in self?.cancel() }
@@ -151,6 +157,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
         let api = SkyStudioAPI()
         do {
+            if let characterStamp, SkyStudioCharacterAccess.stamp(key) != characterStamp { throw SkyStudioJobError.notSubmitted("The Sky Studio account/key changed; obtain a fresh character quote. No new POST was sent.") }
             let uploaded: (inputs: [String: String], references: [JSONValue])
             if let official {
                 guard let project else { throw AIToolError("The official project was closed before submission; no request was sent.") }
@@ -288,6 +295,11 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 guard let self else { throw SkyStudioJobError.notSubmitted("The original official task is no longer available; no POST was sent.") }
                 try await self.beforeOfficialSubmit(official)
             }
+        } else if let characterStamp {
+            runner.beforeSubmit = { [weak self] in
+                guard let self else { throw SkyStudioJobError.notSubmitted("The original character request is unavailable.") }
+                try await self.beforeCharacterSubmit(characterStamp, key: key)
+            }
         } else { requestSent = true }
         do {
             return try await runner.run(request) { [weak self] update in
@@ -317,6 +329,14 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     private func beforeOfficialSubmit(_ official: SkyStudioOfficialOperation) async throws {
         try await SkyStudioOfficialSubmission.validate(official, references: references, project: project)
+        requestSent = true
+    }
+
+    private func beforeCharacterSubmit(_ expected: String, key: String) async throws {
+        guard case .success(let current) = await SkyStudioJobKey.key(.silent), current == key,
+              SkyStudioCharacterAccess.stamp(current) == expected else {
+            throw SkyStudioJobError.notSubmitted("The Sky Studio account/key changed; quote the character again. No new POST was sent.")
+        }
         requestSent = true
     }
 
@@ -389,11 +409,15 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let generationStatus { payload["generation_status"] = .string(generationStatus) }
         if let deliveryStatus { payload["delivery_status"] = .string(deliveryStatus) }
         if let remoteResult { payload["remote_result"] = .object(remoteResult.metadata) }
+        if let usage = characterUsage { payload["character_usage"] = usage.json }
         if let savedOriginal { payload["original_file"] = .string(savedOriginal.path) }
         if let lastFailure { payload["failure"] = lastFailure.json }
         if billing?.netCharged == nil && creditsUnconfirmed { payload["credits_unknown"] = true }
         if status != .done {
             payload["next_step"] = .string("Query this original job with get_job and preserve idempotency_key. Unknown or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. " + SkyStudioBilling.policyMessage)
+        }
+        if let code = lastFailure?.code, code.hasPrefix("character_") || code == "price_changed" || code == "not_found" {
+            payload["next_step"] = .string(SkyStudioCharacterError.nextStep(code))
         }
         if lastFailure?.code == "insufficient_credits" {
             payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
@@ -408,7 +432,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         refreshing = true
         defer { refreshing = false }
         guard case .success(let key) = await SkyStudioJobKey.key(.silent),
-              official == nil || official?.key == key else { return }
+              official == nil || official?.key == key,
+              characterStamp == nil || SkyStudioCharacterAccess.stamp(key) == characterStamp else { return }
         guard let server = try? await SkyStudioAPI().job(id, key: key) else { return }
         try? await official?.recovery.received(server)
         applyBilling(server)
@@ -422,6 +447,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let generationStatus { detail["generation_status"] = .string(generationStatus) }
         if let deliveryStatus { detail["delivery_status"] = .string(deliveryStatus) }
         if let result = server.result { detail["remote_result"] = .object(result.metadata) }
+        if let usage = characterUsage { detail["character_usage"] = usage.json }
         AIJobs.shared.updateDetail(job, detail)
     }
 

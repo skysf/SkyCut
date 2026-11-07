@@ -40,6 +40,12 @@ final class SkyStudioOfficialPrepared {
     private var assets: [String: Assets] = [:]
     private var quotes: [String: Quote] = [:]
 
+    func forget(characterID: String? = nil) {
+        guard let characterID else { assets = [:]; quotes = [:]; return }
+        assets = assets.filter { !$0.value.sources.encodedString().contains(characterID) }
+        quotes = quotes.filter { !$0.value.identity.encodedString().contains(characterID) }
+    }
+
     static func digest(_ value: JSONValue) -> String {
         SHA256.hash(data: Data(value.encodedString().utf8)).map { String(format: "%02x", $0) }.joined()
     }

@@ -31,6 +31,10 @@ await runModelExpansionChecks()
 await runImageOperationChecks()
 runImageApprovalChecks()
 await runImageResultChecks()
+await runCharacterChecks()
+runCharacterApprovalChecks()
+await runCharacterNativeChecks()
+await runCharacterRecoveryChecks()
 runGenerationFrameChecks()
 
 if failures > 0 {

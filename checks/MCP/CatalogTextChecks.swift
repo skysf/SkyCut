@@ -42,6 +42,16 @@ func runCatalogTextChecks() {
               "\(tool.rawValue) rejects credentials rather than silently ignoring them")
     }
     check(!containsChinese(MCPToolName.listJSON.encodedString()), "the tool list (names, descriptions, parameters, choices) is English only")
+    for tool: MCPToolName in [.listCharacters, .getCharacter, .manageCharacters] {
+        check(tool.definition.description.utf16.count <= 512, "\(tool.rawValue)'s complete minimum workflow fits its first 512 characters")
+        check(!tool.takesProject, "\(tool.rawValue) is an account library operation, not a timeline edit")
+    }
+    check(MCPToolName.listCharacters.definition.readOnly && MCPToolName.getCharacter.definition.readOnly, "character discovery is free and read-only")
+    check(!MCPToolName.manageCharacters.definition.readOnly && MCPToolName.manageCharacters.definition.destructive, "Character writes declare library mutations/deletion")
+    check(MCPToolName.listCharacters.definition.inputSchema["properties"]?["capabilities"] != nil, "Character capabilities have a read-only entry")
+    check(MCPArgumentCheck.problem(tool: .manageCharacters, arguments: ["action": "create", "aspect_ratio": "21:9"]) != nil, "native Character shapes cannot be caller parameters")
+    let total = JSONValue.object(["tools": MCPToolName.listJSON]).encodedString().utf16.count
+    print("MCP catalog including tools envelope: \(total)/110000 UTF-16 units; instructions: \(MCPInstructions.text.utf16.count)/2048.")
 }
 
 /// 名字作为一个整词出现：`look` 不算 `looks` 里的那个，`undo` 不算 `undoes`（下划线算词的一部分）。

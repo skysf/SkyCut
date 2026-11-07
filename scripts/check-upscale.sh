@@ -51,6 +51,12 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterCapabilities.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterNativeRequest.swift \
+  Sources/SrtFlow/AIToolIO.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterAssets.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCharacterAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioFilm.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioFilmReader.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioFilmInputs.swift \

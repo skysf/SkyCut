@@ -72,6 +72,15 @@ enum AIFileTools {
 
     // MARK: manage_files
 
+    /// 云端角色删除是库写入，不能伪称进了本机废纸篓；仍由同一确认入口按权限发码。
+    static func confirmCharacterDeletion(id: String, revision: String, accountStamp: String, args: AIToolArguments) throws -> AIToolResult? {
+        if AIAccessStore.shared.mode == .full { return nil }
+        let action = "skystudio:delete_character:" + accountStamp + ":" + id + ":" + revision
+        let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: action)
+        if redemption == .accepted { return nil }
+        return AIConfirmations.shared.ask("Delete this Character from the Sky Studio library? This server deletion cannot be undone in SkyCut and does not refund earlier generation.", action: action, refused: redemption.refusal)
+    }
+
     static func manageFiles(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
         let names = AIFileOperations.Action.allCases.map(\.rawValue)
         guard let raw = try args.choice("action", from: names), let action = AIFileOperations.Action(rawValue: raw) else {
