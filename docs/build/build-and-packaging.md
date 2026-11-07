@@ -303,7 +303,7 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 真积分验收：
 - 见[全部图片模型与角色系统的真积分验收](../reports/2026-11-07-image-models-and-characters-smoke.md)。
 - 新图片模型、换角度和角色全部成功，共 208 积分。
-- 图片放大坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大），已退款，由 Sky Studio 那边修。
+- 图片放大坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大），已退款。当天 Sky Studio PR #243 换成 fal SeedVR2 并受控发布，补测 x2 / x3 通过。
 
 升级时的钥匙串：
 - 装上新版后第一次读 Sky Studio Key 会弹钥匙串框要登录密码，原因是没有 Team ID，钥匙串分区名单按构建的代码哈希记。

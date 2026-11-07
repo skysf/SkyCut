@@ -426,7 +426,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
-- [2026-11-07 全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 四个新图片模型、换角度、角色的读 / 建 / 带角色生成图片和视频 / 改名 / 重做头像 / 删除全部成功（208 积分，和本机账一致），旧 revision 被拒不送出；图片放大坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大，已退款）；每个新构建第一次读 Key 弹钥匙串密码框、AI 调用等在框后面；`list_characters` 一页约 80 KB 太大。
+- [2026-11-07 全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 四个新图片模型、换角度、角色的读 / 建 / 带角色生成图片和视频 / 改名 / 重做头像 / 删除全部成功（208 积分，和本机账一致），旧 revision 被拒不送出；图片放大一开始坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大，已退款），当天换成 fal SeedVR2 后补测 x2 / x3 通过；每个新构建第一次读 Key 弹钥匙串密码框、AI 调用等在框后面；`list_characters` 一页约 80 KB 太大。
 
 - [Windows 版 SkyCut：讨论记录（暂缓）](docs/plans/2026-11-07-windows-version.md) — 2026-11-07 用户、Claude、Codex 讨论一轮后用户定「日后再讨论、现在都待定」：已定的（共享 Swift 核心不做第二套代码、Mac 新功能照常做、两边工程互开 + 随包一套开源字体、Windows 字幕识别用 whisper.cpp、先不签名、ARM 先不做、支持 Win10 / Win11、Pro 两台不分平台、用那台没独显的 Win11 当测试机），没定的（配音、翻译、字体带多少、声音场景 Mac 不变 Windows 另做、中日文分词、素材库随不随包、商店、测试机情况），以及 Codex 的技术草稿（苹果框架替代表、模型与安装包大小、测试分层、R1–R12 探针、41–68 人周）。
 
