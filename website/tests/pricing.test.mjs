@@ -16,6 +16,12 @@ const expected={
   de:['7 Tage Pro','1 000 Sky Studio Credits pro bezahltem Jahr','Keine Credits enthalten','2 Macs','ohne Steuern','Lokale Steuern','jederzeit kündbar','Keine Erstattung','gesetzlich vorgeschrieben','separat gekaufte'],
   es:['7 días de Pro','1 000 créditos de Sky Studio por cada año pagado','Sin créditos incluidos','2 Macs','sin impuestos','impuestos locales','cuando quieras','no son reembolsables','la ley disponga','comprados aparte'],
 };
+const featureLabels={
+  zh:{'model-narration':'旁白生成','model-effects':'音效生成','model-background':'图片背景去除',synth:'内置音效合成器',kokoro:'内置多语言声音合成'},
+  en:{'model-narration':'Narration generation','model-effects':'Sound effect generation','model-background':'Image background removal',synth:'Built-in sound effect synth',kokoro:'Built-in multilingual voices'},
+  de:{'model-narration':'Sprecherstimmen erzeugen','model-effects':'Soundeffekte erzeugen','model-background':'Bildhintergründe entfernen',synth:'Integrierter Soundeffekt-Synthesizer',kokoro:'Integrierte mehrsprachige Stimmen'},
+  es:{'model-narration':'Generación de locución','model-effects':'Generación de efectos de sonido','model-background':'Eliminación del fondo de imágenes',synth:'Sintetizador de efectos de sonido integrado',kokoro:'Voces multilingües integradas'},
+};
 for(const language of languages) {
   test(`${language}: pricing keeps real prices terms and the sole purchase destination`,async()=>{
     const {default:c}=await import(`../content/${language}.js`);
@@ -58,8 +64,14 @@ for(const language of languages) {
     assert.deepEqual(accessOf(table,'model-upscale'),['cloudUI','cloudBoth']);
     for(const group of cloudModelGroups.filter(g=>g.id!=='upscale'))assert.deepEqual(accessOf(table,`model-${group.id}`),['unavailable','cloudAI']);
     for(const model of cloudModelGroups.flatMap(g=>g.models))assert.ok(table.includes(model.title),model.title);
+    for(const [id,label] of Object.entries(featureLabels[language]))assert.ok(rowOf(table,id).includes(`<span class="comparison-label">${label}</span>`),label);
+    assert.doesNotMatch(section.replace(/<[^>]*>/g,' '),/Kokoro/i);
+    assert.ok(rowOf(table,'kokoro').includes(c.pricing.compare.features.kokoro[1]));
     for(const lang of localVoiceLanguages)assert.ok(rowOf(table,'kokoro').includes(c.pricing.compare.languages[lang]));
-    for(const preset of soundEffectPresets)assert.ok(rowOf(table,'synth').includes(`>${preset}</li>`));
+    const synth=rowOf(table,'synth');
+    assert.ok(synth.includes(c.pricing.compare.features.synth[1]));assert.ok(synth.includes(String(soundEffectPresets.length)));
+    assert.doesNotMatch(synth,/<ul\b/);
+    for(const preset of soundEffectPresets)assert.doesNotMatch(synth.replace(/<[^>]*>/g,' '),new RegExp(`\\b${preset}\\b`,'i'));
     assert.ok(table.includes(c.pricing.compare.access.noCredits));assert.ok(table.includes(c.pricing.compare.access.usesCredits));
     assert.ok(section.includes(c.pricing.compare.catalogNote));assert.doesNotMatch(table,/2 Macs|2 台 Mac/);
     const cards=section.match(/<div class="pricing-grid">([\s\S]*?)<div class="pricing-comparison"/)[1];

@@ -8,7 +8,7 @@ export default {
   catalogNote:'模型目录会更新 以 App 里看到的为准',
   groups:{pro:'Pro 多出来的',editing:'剪辑与工程',picture:'画面与动画',graphics:'文字与形状',sound:'声音',subtitles:'字幕',tools:'录屏与小工具',export:'导出'},
   access:{included:'包含',unavailable:'需要 Pro',ai:'让 AI 调用',watermarked:'带 Sky Studio 水印',clean:'无水印',none:'不赠送积分',inApp:'界面直接用',both:'界面或 AI',noCredits:'不扣积分',usesCredits:'消耗积分'},
-  models:{images:'图片生成',background:'去除背景',video:'视频生成',lipsync:'对口型',music:'音乐生成',narration:'云端旁白',effects:'云端音效',cloning:'声音克隆',upscale:'视频画质提升'},
+  models:{images:'图片生成',background:'图片背景去除',video:'视频生成',lipsync:'对口型',music:'音乐生成',narration:'旁白生成',effects:'音效生成',cloning:'声音克隆',upscale:'视频画质提升'},
   languages:{zh:'中文',en:'英语',ja:'日语',es:'西班牙语',fr:'法语',it:'意大利语',pt:'葡萄牙语',hi:'印地语'},
   features:{
     aiEditing:['Claude Code 与 Claude 桌面版及 Codex 来剪辑','通过 MCP 操作素材和时间线 口播精剪 音乐踩点 主体取景 图层与动画 字幕和配音 导出与成片检查'],
@@ -43,7 +43,7 @@ export default {
     translation:['Apple 翻译','本机翻译字幕 需要 macOS 15 及支持的已下载语言'],
     vision:['Apple Vision','识别画面主体与画面里的字'],
     shots:['SkyCut 分镜头检测','用本机画面分析寻找镜头切换点'],
-    kokoro:['SkyCut 的声音 Kokoro',`${localVoiceRoles} 个中英文预设角色 下载一次本机声音包 支持下列语言`],
-    synth:['SkyCut 音效合成器',`${soundEffectPresets.length} 种本机剪辑动效音预设`],
+    kokoro:['内置多语言声音合成',`${localVoiceRoles} 个中英文预设角色 下载一次本机声音包 支持下列语言`],
+    synth:['内置音效合成器',`${soundEffectPresets.length} 种本机剪辑动效音预设`],
   },
 };

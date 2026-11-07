@@ -8,7 +8,7 @@ export default {
   catalogNote:'The model catalog changes Check the models shown in your app',
   groups:{pro:'What Pro adds',editing:'Editing and projects',picture:'Picture and motion',graphics:'Text and shapes',sound:'Sound',subtitles:'Subtitles',tools:'Screen recording and tools',export:'Export'},
   access:{included:'Included',unavailable:'Requires Pro',ai:'Via AI',watermarked:'Sky Studio watermark',clean:'No watermark',none:'No credits included',inApp:'In the app',both:'In the app or via AI',noCredits:'No credits used',usesCredits:'Uses credits'},
-  models:{images:'Image generation',background:'Remove backgrounds',video:'Video generation',lipsync:'Lip sync',music:'Music generation',narration:'Cloud narration',effects:'Cloud sound effects',cloning:'Voice cloning',upscale:'Video upscaling'},
+  models:{images:'Image generation',background:'Image background removal',video:'Video generation',lipsync:'Lip sync',music:'Music generation',narration:'Narration generation',effects:'Sound effect generation',cloning:'Voice cloning',upscale:'Video upscaling'},
   languages:{zh:'Chinese',en:'English',ja:'Japanese',es:'Spanish',fr:'French',it:'Italian',pt:'Portuguese',hi:'Hindi'},
   features:{
     aiEditing:['AI editing with Claude Code Claude Desktop and Codex','MCP connects your AI to footage and timelines Speech edits Beat cuts Subject framing Layers and animation Subtitles and voiceovers Export and finished video inspection'],
@@ -43,7 +43,7 @@ export default {
     translation:['Apple Translation','Translate subtitles on this Mac Requires macOS 15 and supported downloaded languages'],
     vision:['Apple Vision','Identify subjects and recognize text in footage'],
     shots:['SkyCut shot detection','Find shot boundaries using local picture analysis'],
-    kokoro:['SkyCut voices with Kokoro',`${localVoiceRoles} preset characters for Chinese and English Download the local voice pack once Languages below`],
-    synth:['SkyCut sound synthesizer',`${soundEffectPresets.length} local presets for editing sounds`],
+    kokoro:['Built-in multilingual voices',`${localVoiceRoles} preset characters for Chinese and English Download the local voice pack once Languages below`],
+    synth:['Built-in sound effect synth',`${soundEffectPresets.length} local presets for editing sounds`],
   },
 };

@@ -8,7 +8,7 @@ export default {
   catalogNote:'Der Modellkatalog wird aktualisiert Maßgeblich ist die Anzeige in deiner App',
   groups:{pro:'Das kommt mit Pro hinzu',editing:'Schnitt und Projekte',picture:'Bild und Bewegung',graphics:'Text und Formen',sound:'Ton',subtitles:'Untertitel',tools:'Bildschirmaufnahme und Werkzeuge',export:'Export'},
   access:{included:'Enthalten',unavailable:'Erfordert Pro',ai:'Über KI',watermarked:'Sky Studio Wasserzeichen',clean:'Ohne Wasserzeichen',none:'Keine Credits enthalten',inApp:'Direkt in der App',both:'In der App oder über KI',noCredits:'Ohne Credits',usesCredits:'Nutzt Credits'},
-  models:{images:'Bilder erzeugen',background:'Hintergründe entfernen',video:'Videos erzeugen',lipsync:'Lippensynchronisation',music:'Musik erzeugen',narration:'Cloud Sprecherstimmen',effects:'Cloud Soundeffekte',cloning:'Stimmen klonen',upscale:'Video Upscaling'},
+  models:{images:'Bilder erzeugen',background:'Bildhintergründe entfernen',video:'Videos erzeugen',lipsync:'Lippensynchronisation',music:'Musik erzeugen',narration:'Sprecherstimmen erzeugen',effects:'Soundeffekte erzeugen',cloning:'Stimmen klonen',upscale:'Video Upscaling'},
   languages:{zh:'Chinesisch',en:'Englisch',ja:'Japanisch',es:'Spanisch',fr:'Französisch',it:'Italienisch',pt:'Portugiesisch',hi:'Hindi'},
   features:{
     aiEditing:['KI Schnitt mit Claude Code Claude Desktop und Codex','MCP verbindet deine KI mit Medien und Timeline Sprachschnitt Schnitte zum Beat Motivwahl Ebenen und Animation Untertitel und Vertonung Export und Prüfung des fertigen Videos'],
@@ -43,7 +43,7 @@ export default {
     translation:['Apple Übersetzung','Untertitel lokal übersetzen Erfordert macOS 15 und unterstützte heruntergeladene Sprachen'],
     vision:['Apple Vision','Motive erkennen und Text im Bild lesen'],
     shots:['SkyCut Szenenerkennung','Schnittgrenzen durch lokale Bildanalyse finden'],
-    kokoro:['SkyCut Stimmen mit Kokoro',`${localVoiceRoles} Rollen für Chinesisch und Englisch Das lokale Stimmenpaket einmal herunterladen Unterstützte Sprachen unten`],
-    synth:['SkyCut Sound Synthesizer',`${soundEffectPresets.length} lokale Vorlagen für Schnittsounds`],
+    kokoro:['Integrierte mehrsprachige Stimmen',`${localVoiceRoles} Rollen für Chinesisch und Englisch Das lokale Stimmenpaket einmal herunterladen Unterstützte Sprachen unten`],
+    synth:['Integrierter Soundeffekt-Synthesizer',`${soundEffectPresets.length} lokale Vorlagen für Schnittsounds`],
   },
 };

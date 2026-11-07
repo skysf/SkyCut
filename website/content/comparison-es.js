@@ -8,7 +8,7 @@ export default {
   catalogNote:'El catálogo de modelos se actualiza Consulta los modelos que aparecen en la app',
   groups:{pro:'Lo que añade Pro',editing:'Edición y proyectos',picture:'Imagen y movimiento',graphics:'Texto y formas',sound:'Sonido',subtitles:'Subtítulos',tools:'Grabación de pantalla y herramientas',export:'Exportación'},
   access:{included:'Incluido',unavailable:'Requiere Pro',ai:'Mediante IA',watermarked:'Marca de agua de Sky Studio',clean:'Sin marca de agua',none:'Sin créditos incluidos',inApp:'Directamente en la app',both:'En la app o mediante IA',noCredits:'Sin consumir créditos',usesCredits:'Consume créditos'},
-  models:{images:'Generación de imágenes',background:'Eliminar fondos',video:'Generación de vídeo',lipsync:'Sincronización labial',music:'Generación de música',narration:'Narración en la nube',effects:'Efectos en la nube',cloning:'Clonación de voz',upscale:'Mejora de vídeo'},
+  models:{images:'Generación de imágenes',background:'Eliminación del fondo de imágenes',video:'Generación de vídeo',lipsync:'Sincronización labial',music:'Generación de música',narration:'Generación de locución',effects:'Generación de efectos de sonido',cloning:'Clonación de voz',upscale:'Mejora de vídeo'},
   languages:{zh:'Chino',en:'Inglés',ja:'Japonés',es:'Español',fr:'Francés',it:'Italiano',pt:'Portugués',hi:'Hindi'},
   features:{
     aiEditing:['Edición con Claude Code Claude Desktop y Codex','MCP conecta tu IA con los medios y la línea de tiempo Edición de voz Cortes al ritmo Encuadre del sujeto Capas y animación Subtítulos y locución Exportación y revisión del vídeo final'],
@@ -43,7 +43,7 @@ export default {
     translation:['Traducción de Apple','Traduce subtítulos en el Mac Requiere macOS 15 e idiomas compatibles descargados'],
     vision:['Apple Vision','Identifica sujetos y reconoce texto en las imágenes'],
     shots:['Detección de planos de SkyCut','Encuentra cambios de plano mediante análisis local de imagen'],
-    kokoro:['Voces de SkyCut con Kokoro',`${localVoiceRoles} personajes para chino e inglés Descarga el paquete local una vez Idiomas disponibles abajo`],
-    synth:['Sintetizador de sonido de SkyCut',`${soundEffectPresets.length} preajustes locales para sonidos de edición`],
+    kokoro:['Voces multilingües integradas',`${localVoiceRoles} personajes para chino e inglés Descarga el paquete local una vez Idiomas disponibles abajo`],
+    synth:['Sintetizador de efectos de sonido integrado',`${soundEffectPresets.length} preajustes locales para sonidos de edición`],
   },
 };

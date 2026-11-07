@@ -195,12 +195,12 @@ CI 通过后等用户 review，不部署。
 | 类别 | 显示模型 | 记录数 | 界面与 AI 入口 |
 | --- | --- | --- | --- |
 | 图片 | Seedream 5.0 Flash、Nano Banana 2 | 2 | Pro 经 AI，扣积分 |
-| 去背景 | Ideogram Remove Background | 1 | Pro 经 AI，扣积分 |
+| 图片背景去除 | Ideogram Remove Background | 1 | Pro 经 AI，扣积分 |
 | 视频 | Minimax H3、Gemini Omni 1.1 Flash、Veo 3.1 Fast / Pro、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 15 | Pro 经 AI，扣积分 |
 | 对口型 | HeyGen v3 Lipsync Speed / Precision、MiniMax H3 Max Lip Sync (Image to Video) | 3 | Pro 经 AI，扣积分 |
 | 音乐 | Lyria 3 Pro | 1 | Pro 经 AI，扣积分 |
-| 旁白 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
-| 音效 | Sonilo sound effects | 1 | Pro 经 AI，扣积分 |
+| 旁白生成 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
+| 音效生成 | Sonilo sound effects | 1 | Pro 经 AI，扣积分 |
 | 声音克隆 | Zonos 2 voice clone | 1 | Pro 经 AI，扣积分 |
 | 放大 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
 
@@ -209,7 +209,10 @@ CI 通过后等用户 review，不部署。
 Kokoro 配音、音效合成、主体识别与扫字目前只有 AI 生成 / 分析入口，因此使用仍需 Pro，
 但本机计算不扣积分。Kokoro 在设置中下载声音包，下载按钮不等于有手动配音面板。
 它有 8 个中英文角色，支持中、英、日、西、法、意、葡、印地语；不把德语写进 Kokoro。
-合成器有 16 个预设，网页逐项列出。两者数量与语言由网站测试对照 App 代码。
+合成器有 16 个预设，网页只保留数量说明，不展示 whoosh 到 shutter 的预设名列表。
+页面将这两项分别写成“内置多语言声音合成”和“内置音效合成器”，不展示 Kokoro 名称，
+声音说明和语言标签保留；四语言采用同样口径。Kokoro 仍是内部实现和源码依据的名字。
+两者数量与语言由网站测试对照 App 代码；云端模型的 id、品牌名、类别归属与记录数不随此次文案改动。
 镜头切换检测实际是 `AIShotScan` / `AIShotDetector` 的本机画面差异分析；不冒称由
 Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
 
@@ -258,11 +261,12 @@ Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
 | Apple 翻译（`translation`） | [SubtitleTranslationService.swift](../../Sources/SrtFlow/SubtitleGen/SubtitleTranslationService.swift) |
 | Apple Vision（`vision`） | [AIVision.swift](../../Sources/SrtFlow/AIVision.swift) |
 | SkyCut 分镜头检测（`shots`） | [AIShotScan.swift](../../Sources/SrtFlow/AIShotScan.swift)、[AIShotDetector.swift](../../Sources/SrtFlow/AIShotDetector.swift) |
-| SkyCut 的声音 Kokoro（`kokoro`） | [AIVoiceRole.swift](../../Sources/SrtFlow/AIVoiceRole.swift)、[KokoroVoiceSettingsRow.swift](../../Sources/SrtFlow/KokoroVoiceSettingsRow.swift) |
-| SkyCut 音效合成器（`synth`） | [SoundEffectPreset.swift](../../Sources/SrtFlow/SoundEffects/SoundEffectPreset.swift)、[sound-effect-synth.md](sound-effect-synth.md) |
+| 内置多语言声音合成（内部键 `kokoro`） | [AIVoiceRole.swift](../../Sources/SrtFlow/AIVoiceRole.swift)、[KokoroVoiceSettingsRow.swift](../../Sources/SrtFlow/KokoroVoiceSettingsRow.swift) |
+| 内置音效合成器（`synth`） | [SoundEffectPreset.swift](../../Sources/SrtFlow/SoundEffects/SoundEffectPreset.swift)、[sound-effect-synth.md](sound-effect-synth.md) |
 
 验收：网站测试核对四语言同结构、每行 Free / Pro 两格、Pro 高亮差别、所有模型名与
-本机功能入口、源码证据路径、8 个声音角色 / 8 种语言 / 16 个音效预设。折合与节省金额
+本机功能入口、源码证据路径、8 个声音角色 / 8 种语言 / 16 个音效预设，以及新版类别与
+内置功能标题、页面不展示 Kokoro 和预设名列表。折合与节省金额
 用真实标价和另两组价格验证；生产构建后的 SEO 审计继续验证真实 offers 标价和周期。
 人工在本地 `npm run dev` 核对中文和英文的桌面、390 手机卡片与完整对比表 / 模型，
 确保长模型名能换行、两列持续并排、无横向溢出，并保留截图。真实 iPad / 手机硬件另验。

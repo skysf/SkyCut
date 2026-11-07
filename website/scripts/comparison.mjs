@@ -2,7 +2,7 @@
 import {escape as e} from './html.mjs';
 import {icon} from '../src/icons.js';
 import {featureGroups,localModelRows} from '../content/feature-matrix.js';
-import {cloudModelGroups,localVoiceLanguages,soundEffectPresets} from '../content/ai-models.js';
+import {cloudModelGroups,localVoiceLanguages} from '../content/ai-models.js';
 
 function access(key,p) {
   const c=p.compare,a=c.access;
@@ -21,8 +21,7 @@ export function comparison(p) {
   const c=p.compare;
   const features=featureGroups.map(group=>`<tbody class="${group.id==='pro'?'comparison-advantages':''}">${groupTitle(group.id,c.groups[group.id])}${group.rows.map(item=>row(item.id,...c.features[item.id],item.free,item.pro,p)).join('')}</tbody>`).join('');
   const local=localModelRows.map(item=>{
-    const extra=item.id==='kokoro'?list(localVoiceLanguages.map(key=>c.languages[key]),'comparison-tags'):
-      item.id==='synth'?list(soundEffectPresets,'comparison-tags'):'';
+    const extra=item.id==='kokoro'?list(localVoiceLanguages.map(key=>c.languages[key]),'comparison-tags'):'';
     return row(item.id,...c.features[item.id],item.free,item.pro,p,extra);
   }).join('');
   const cloud=cloudModelGroups.map(group=>row(`model-${group.id}`,c.models[group.id],'',group.id==='upscale'?'cloudUI':'unavailable',group.id==='upscale'?'cloudBoth':'cloudAI',p,list(group.models.map(model=>model.title),'comparison-model-list'))).join('');
