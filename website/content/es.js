@@ -1,6 +1,7 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-es.js';
 import {prices} from './pricing.js';
+import compare from './comparison-es.js';
 // 西班牙语官网文案；产品行为由 Mac App 决定。
 export default {
   showcase, seo:seoCopy.es,
@@ -27,17 +28,17 @@ export default {
   downloadNote: 'Versión pública actual para Mac Las versiones para Intel y Windows aún no están disponibles',
   getting: 'Primeros pasos',
   pricing: {
-    ...prices('es'),
+    ...prices('es'), compare,
     title: 'Precios', intro: 'Empieza gratis Edita con IA con Pro',
     trial: '7 días de Pro para cada cuenta nueva',
-    free: 'Gratis', freePrice: 'Descarga gratuita',
-    freeFeatures: ['Edición manual como siempre', 'Exportaciones con marca de agua de Sky Studio', 'La edición con IA requiere Pro'],
-    pro: 'Pro', proIntro: 'Edita con IA Exporta sin marca de agua',
-    proFeatures: ['Edición con IA por MCP con Claude o Codex', 'Exportaciones sin marca de agua'],
+    free: 'Gratis', freePrice: 'Gratis para siempre',
+    freeSummary: 'Edición completa subtítulos grabación de pantalla y herramientas Exporta con marca de agua', freeCompare: 'Ver toda la comparación',
+    billedYearly: 'Facturado anualmente', saving: 'Ahorra {amount} frente a 12 pagos mensuales',
+    pro: 'Pro',
     monthlyLabel: 'Mensual', yearlyLabel: 'Anual', month: '/ mes', year: '/ año',
     monthlyCredits: 'Sin créditos incluidos', yearlyCredits: '1 000 créditos de Sky Studio por cada año pagado',
     buy: 'Comprar Pro', login: 'Inicia sesión en Sky Studio para comprar',
-    devices: 'Una cuenta Una persona Hasta 2 Macs',
+    devices: 'Pro es para una persona en hasta 2 Macs',
     clients: 'Necesitas tu propio cliente Claude o Codex',
     tax: 'Precios en dólares sin impuestos Los impuestos locales se añaden al pagar',
     cancel: 'Cancela la renovación automática cuando quieras Pro sigue hasta el fin del periodo pagado',

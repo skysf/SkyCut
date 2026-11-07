@@ -1,6 +1,7 @@
 import {seoCopy} from './seo.js';
 import showcase from './showcase-zh.js';
 import {prices} from './pricing.js';
+import compare from './comparison-zh.js';
 // 中文官网文案；产品行为由 Mac App 决定。
 export default {
   showcase, seo:seoCopy.zh,
@@ -27,17 +28,17 @@ export default {
   downloadNote: '当前公开发布的 Mac 版 Intel 和 Windows 版尚未推出',
   getting: '开始使用',
   pricing: {
-    ...prices('zh'),
+    ...prices('zh'), compare,
     title: '价格', intro: '免费开始 用 Pro 让 AI 一起剪',
     trial: '新账号享 7 天 Pro 体验',
-    free: '免费版', freePrice: '免费下载',
-    freeFeatures: ['手动剪辑照常用', '导出带 Sky Studio 水印', 'AI 剪辑需要 Pro'],
-    pro: 'Pro', proIntro: 'AI 一起剪 导出无水印',
-    proFeatures: ['Claude 或 Codex 通过 MCP 剪辑', '导出不带水印'],
+    free: '免费版', freePrice: '永久免费',
+    freeSummary: '全部剪辑 字幕 录屏和小工具 导出带水印', freeCompare: '看完整对比',
+    billedYearly: '按年付费', saving: '比按月付一年省 {amount}',
+    pro: 'Pro',
     monthlyLabel: '月付', yearlyLabel: '年付', month: '/ 月', year: '/ 年',
     monthlyCredits: '月付不送积分', yearlyCredits: '每个付费年送 1,000 Sky Studio 积分',
     buy: '购买 Pro', login: '登录 Sky Studio 后购买',
-    devices: '一个账号 一人使用 最多 2 台 Mac',
+    devices: 'Pro 一个账号一人使用 最多 2 台 Mac',
     clients: 'Claude 或 Codex 客户端需自备',
     tax: '价格不含税 结账时按所在地另加',
     cancel: '随时取消自动续费 Pro 可用至已付期限',

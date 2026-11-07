@@ -134,32 +134,161 @@ Vercel 为 `/media/` 下所有 `.vtt` 显式设置 `text/vtt; charset=utf-8`，�
 
 ## 价格
 
-首页 `#pricing` 放在短片与下载之间，桌面导航、手机菜单和页脚都链接到各自语言首页的
-这一节，不新增页面。内容以[收费方案「自助购买 Pro」第 21–36 条](../plans/2026-10-27-paid-plans-and-sky-studio-key.md#自助购买-pro2026-11-05-拍的板)
-为准：免费版手动剪辑、Sky Studio 导出水印、新账号 7 天 Pro；Pro 提供 AI / MCP 剪辑与
-无水印导出，一个账号一人使用最多 2 台 Mac，Claude / Codex 客户端由用户自备。
+首页 `#pricing` 位于短片与下载之间，四语言导航均链接到这一节，不新增页面。
+标价、权益和购买条款以[收费方案「自助购买 Pro」第 21–38 条](../plans/2026-10-27-paid-plans-and-sky-studio-key.md#自助购买-pro2026-11-05-拍的板)
+及现行授权代码为准。新账号保留 7 天 Pro 体验提示；Free 手动功能照常，视频导出带
+Sky Studio 水印；Pro 开放 MCP 并导出无水印。Pro 一个账号一人使用、最多 2 台 Mac
+是购买限制，只放底部条款，不当作表内优势。Claude Code / Claude Desktop / Codex
+客户端由用户自备。
 
-英文、德文、西班牙文写 $19 / 月、$149 / 年；中文写 ¥129 / 月、¥999 / 年，并补充
-微信一次性买一年 ¥999、不自动续费。月付不送积分，年付每个付费年送 1,000 Sky Studio
-积分；生成图片、视频、配音所用积分另购。价格不含税、结账按所在地另加；可随时取消
-自动续费并用到已付期限，已付费用不退、法律另有规定的除外。官网不展示折扣百分比。
+### 价格卡片与逐行对比（2026-11-07）
 
-购买按钮只有一个目的地址 `https://skystudioai.com/app/skycut/pro`，新标签打开，说明先
-登录 Sky Studio 再购买。官网不放结账、支付 SDK、Dodo 代码或付款方式分流。
-`content/pricing.js` 是金额与币种的唯一来源，四语言文案在各自 `content` 文件；首页
-`SoftwareApplication.offers` 共用这份标价，标明免费版和 Pro 月付 / 年付周期与不含税，
-不在文档或隐私页额外声明 offers。周期采用
-[Schema.org UnitPriceSpecification](https://schema.org/UnitPriceSpecification) 的 `billingDuration`。
-sitemap 与 canonical 仍为 12 个 URL。
+两张卡片放价格、年付折合与节省金额、积分和下载 / 购买入口。免费卡片另放一行概括：
+完整剪辑、字幕、录屏和小工具，导出带水印；以大号 $0 / ¥0 与“永久免费”标明价格，
+提供“看完整对比”链接跳到 `#pricing-comparison`。详细功能集中在同一张
+原生 `table`：左列是功能，右边 Free / Pro 两列，公共功能同一行两边打勾；顶部高亮
+AI 剪辑、视频水印、让 AI 调云端模型、年付积分四项差别。下方按剪辑、画面、文字形状、
+声音、字幕、录屏工具、导出和本机 / 云端模型分组。手机 390 宽仍是左右对比、文字换行，
+不改成上下两份功能清单，不用横向滚动隐藏一边。表头滚动时保留方案列名。
 
-**2026-11-06 已合并发布**：Claude 确认 Sky Studio 购买页正式上线后，PR E（#325）
-已合并，并按既有 main 发布链路上线。四语言首页的价格区、购买外链与 JSON-LD `offers`
-均已上线；对应 main 提交与部署记录见下方「运行与部署」。
+`content/feature-matrix.js` 保存统一行序、授权差别与依据，四份 `content/comparison-*.js`
+只管翻译；`scripts/comparison.mjs` 统一渲染，`content/ai-models.js` 集中维护品牌模型名。
+首页可见文案不用句读标点，模型名称、金额的小数点等必要符号保留。
 
-验收：`npm test` 覆盖四语言价格、权益、条款、导航和唯一购买外链，`npm run build` 后
-`npm run check:seo` 核对真实产物的 offers、币种和周期。人工回归检查四语言在桌面、
-834 × 1112 iPad、390 × 844 手机的价格区，手机菜单跳转后关闭，价格与周期不折坏、
-文字和按钮无横向溢出；桌面左右并排、平板上下排列、手机逐项展开月付与年付。
+英文、德文、西班牙文用 $19 / 月、$149 / 年，中文用 ¥129 / 月、¥999 / 年。
+`content/pricing.js` 是金额与币种的唯一来源；`annualBreakdown` 按传入标价计算
+年价 ÷ 12（保留两位小数）与月价 × 12 − 年价。年付卡片以 $12.42 / ¥83.25 每月作为
+大号主价格，与月付数字同字号，下一行紧接“按年付费 $149 / ¥999 每年”的真实扣款。
+节省 $79 / ¥549 用深绿标签强调，中文写“比按月付一年省 ¥549”，四语言按完整句式
+插入现算金额，不把一条句子拆成生硬的两段。不能把折合数字写进 JSON-LD，结构化数据仍是
+免费 0、真实月价与真实年价，周期为 `P1M` / `P1Y`，沿用
+[Schema.org UnitPriceSpecification](https://schema.org/UnitPriceSpecification)。
+年付每个付费年送 1,000 Sky Studio 积分，月付不送；云端生成另用购买的积分。
+价格不含税、结账按所在地另加；取消自动续费后用到已付期限，已付费用不退，法律
+另有规定的除外。中文保留微信一次性买一年 ¥999、不自动续费，不展示折扣百分比。
+
+唯一购买目的地仍是 `https://skystudioai.com/app/skycut/pro`，新标签打开，说明先登录
+Sky Studio。官网不接支付 SDK 或结账逻辑。12 个 canonical URL 和 sitemap 不变。
+价格与购买入口已于 2026-11-06 通过 PR #325 合并上线；本轮只本地验收，另开 PR，
+CI 通过后等用户 review，不部署。
+
+### 模型目录来源与授权
+
+2026-11-07 快照来自只读 Sky Studio 仓库
+`cursor-skystudios-app-cinematic` 的 `origin/main`（`099d92b4237e20f93c351ee00dc6d48e521f26ba`）。
+只用 `git show origin/main:<路径>` 读取，不改该仓库、不调用真实生成服务：
+
+- `docs/agents/skycut-api.md` 的 `GET /models` 与 `Per kind` 是合同。
+- `api/_utils/skycut/catalog.ts`、`visualModels.ts` 和各 `*Contract.ts` 构建 SkyCut 专用目录；
+  只有 27 条记录、21 个不同 id。六个共享视频模型分别列文生视频和图生视频，所以
+  不能写成 27 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
+- `shared/modelDisplayNames.ts` 给图片与六个共享视频模型的显示名，`shared/musicModel.ts` 给音乐名；
+  `shared/skycutWan3.ts`、`skycutHeygen.ts`、`skycutH3LipSync.ts`、
+  `skycutRemoveBackground.ts`、`videoUpscale.ts` 给其他视频、口型、去背景与放大的名称。
+  `catalog.ts` 直接提供三种音频的标题。
+- 与任务草稿的简称相比，按代码显示 `Minimax H3`、`Ideogram Remove Background`、
+  `HeyGen v3 Lipsync Speed` / `Precision`、`MiniMax H3 Max Lip Sync (Image to Video)`、
+  `Eleven v4 narration`、`Sonilo sound effects`、`Zonos 2 voice clone`。
+- Sky Studio 的 SkyCut 目录或这些显示名变更时，**同步更新**本网站快照、四语言说明和
+  相关测试；页面提示“模型目录会更新，以 App 里看到的为准”。CI 不依赖另一仓库的本机路径。
+
+| 类别 | 显示模型 | 记录数 | 界面与 AI 入口 |
+| --- | --- | --- | --- |
+| 图片 | Seedream 5.0 Flash、Nano Banana 2 | 2 | Pro 经 AI，扣积分 |
+| 图片背景去除 | Ideogram Remove Background | 1 | Pro 经 AI，扣积分 |
+| 视频 | Minimax H3、Gemini Omni 1.1 Flash、Veo 3.1 Fast / Pro、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 15 | Pro 经 AI，扣积分 |
+| 对口型 | HeyGen v3 Lipsync Speed / Precision、MiniMax H3 Max Lip Sync (Image to Video) | 3 | Pro 经 AI，扣积分 |
+| 音乐 | Lyria 3 Pro | 1 | Pro 经 AI，扣积分 |
+| 旁白生成 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
+| 音效生成 | Sonilo sound effects | 1 | Pro 经 AI，扣积分 |
+| 声音克隆 | Zonos 2 voice clone | 1 | Pro 经 AI，扣积分 |
+| 放大 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
+
+**不扣积分不等于 MCP 免费**：`SkyCutGates.aiAllows` 除 `get_status` 外按授权拦所有 AI
+工具。Apple 语音识别（macOS 26）与 Apple 翻译（macOS 15）在字幕面板中可免费使用；
+Kokoro 配音、音效合成、主体识别与扫字目前只有 AI 生成 / 分析入口，因此使用仍需 Pro，
+但本机计算不扣积分。Kokoro 在设置中下载声音包，下载按钮不等于有手动配音面板。
+它有 8 个中英文角色，支持中、英、日、西、法、意、葡、印地语；不把德语写进 Kokoro。
+合成器有 16 个预设，网页只保留数量说明，不展示 whoosh 到 shutter 的预设名列表。
+页面将这两项分别写成“内置多语言声音合成”和“内置音效合成器”，不展示 Kokoro 名称，
+声音说明和语言标签保留；四语言采用同样口径。Kokoro 仍是内部实现和源码依据的名字。
+两者数量与语言由网站测试对照 App 代码；云端模型的 id、品牌名、类别归属与记录数不随此次文案改动。
+镜头切换检测实际是 `AIShotScan` / `AIShotDetector` 的本机画面差异分析；不冒称由
+Apple Vision 检测切点。Vision 用于主体、标签和画面文字识别。
+
+**upscale 的例外已复核**：检查器 / 右键 → `UpscalePanelModel` → `UpscaleJob`
+的面板路径只查 Key、报价与预算，没有 Pro 判断；`SkyStudioJobGate` 管积分预算和
+审批，不管软件授权。AI 的 `upscale_clip` 仍先经过 `AIToolRouter` 的 MCP 门。
+因此不能把界面画质提升也标成 Pro 独享。另见[视频 upscale](video-upscale.md)。
+
+### 功能逐行依据
+
+统一授权依据是 [Sky Studio 账号](sky-studio-account.md)、`SkyCutGates.swift` 和
+`AIToolRouter.swift`：本轮不修改任何 App 授权行为，只照已实现的入口写文案。
+每条功能的具体实现与长期合同如下，文件路径也存在 `feature-matrix.js` 的 `sources` 中：
+
+| 功能行 | 依据 |
+| --- | --- |
+| Claude Code 与 Claude 桌面版及 Codex 来剪辑（`aiEditing`） | [ai-control-mcp.md](ai-control-mcp.md)、[MCPToolCatalog.swift](../../Sources/SrtFlowMCPKit/MCPToolCatalog.swift)、[SkyCutGates.swift](../../Sources/SrtFlow/SkyStudio/SkyCutGates.swift) |
+| 视频导出水印（`watermark`） | [sky-studio-account.md](sky-studio-account.md) |
+| 让 AI 使用云端模型（`cloudAI`） | [sky-studio-jobs.md](sky-studio-jobs.md) |
+| 年付 Pro 赠送 Sky Studio 积分（`annualCredits`） | [2026-10-27-paid-plans-and-sky-studio-key.md](../plans/2026-10-27-paid-plans-and-sky-studio-key.md) |
+| 多轨剪辑（`multitrack`） | [video-tracks.md](video-tracks.md)、[clip-animation.md](clip-animation.md) |
+| 精细时间线工具（`timeline`） | [timeline-drag-gestures.md](timeline-drag-gestures.md)、[timeline-clipboard.md](timeline-clipboard.md)、[timeline-linkage.md](timeline-linkage.md) |
+| 变速与定格（`speed`） | [timeline-drag-gestures.md](timeline-drag-gestures.md)、[VideoEditFreezeFrame.swift](../../Sources/SrtFlow/VideoEditFreezeFrame.swift) |
+| 工程管理（`projects`） | [video-edit-project-file.md](video-edit-project-file.md)、[open-projects.md](open-projects.md)、[optimized-media.md](optimized-media.md) |
+| 画面摆放（`transform`） | [preview-free-transform.md](preview-free-transform.md) |
+| 动画与关键帧（`animation`） | [clip-animation.md](clip-animation.md)、[keyframe-animation.md](keyframe-animation.md)、[video-fades.md](video-fades.md) |
+| 转场（`transitions`） | [transition-handles.md](transition-handles.md) |
+| 调色与滤镜（`color`） | [filters.md](filters.md) |
+| 局部模糊与马赛克（`covers`） | [cover-blur-mosaic.md](cover-blur-mosaic.md) |
+| 画面文字（`text`） | [text-overlays.md](text-overlays.md) |
+| 文字与数字动画（`textAnimation`） | [text-overlays.md](text-overlays.md) |
+| 形状与绘制动画（`shapes`） | [shapes.md](shapes.md) |
+| 片段声音控制（`audioEdit`） | [audio-waveform.md](audio-waveform.md)、[audio-volume-curve.md](audio-volume-curve.md)、[audio-fades.md](audio-fades.md) |
+| 轨道与总线混音（`mixing`） | [audio-mixer.md](audio-mixer.md) |
+| 声音场景（`scenes`） | [sound-scenes.md](sound-scenes.md) |
+| 音乐与音效库（`library`） | [AudioLibraryPanel.swift](../../Sources/SrtFlow/AudioLibraryPanel.swift) |
+| 字幕编辑（`subtitleEdit`） | [README.md](../../README.md)、[subtitle-track-visibility-and-layout.md](subtitle-track-visibility-and-layout.md) |
+| 字幕样式（`subtitleStyle`） | [subtitle-track-visibility-and-layout.md](subtitle-track-visibility-and-layout.md)、[README.md](../../README.md) |
+| 录屏（`recording`） | [README.md](../../README.md)、[screen-recording-lifecycle.md](screen-recording-lifecycle.md) |
+| 视频压缩（`compression`） | [README.md](../../README.md)、[export-settings.md](export-settings.md) |
+| 字幕文件工具（`subtitleTools`） | [README.md](../../README.md) |
+| 视频导出（`videoExport`） | [export-settings.md](export-settings.md)、[VideoEncodeSettings.swift](../../Sources/SrtFlowCore/VideoEncodeSettings.swift) |
+| 声音导出（`audioExport`） | [export-settings.md](export-settings.md)、[export-audio-mixdown.md](export-audio-mixdown.md) |
+| 独立字幕文件（`subtitleExport`） | [export-settings.md](export-settings.md) |
+| Apple 语音识别（`speech`） | [SpeechTranscriptionService.swift](../../Sources/SrtFlow/SubtitleGen/SpeechTranscriptionService.swift) |
+| Apple 翻译（`translation`） | [SubtitleTranslationService.swift](../../Sources/SrtFlow/SubtitleGen/SubtitleTranslationService.swift) |
+| Apple Vision（`vision`） | [AIVision.swift](../../Sources/SrtFlow/AIVision.swift) |
+| SkyCut 分镜头检测（`shots`） | [AIShotScan.swift](../../Sources/SrtFlow/AIShotScan.swift)、[AIShotDetector.swift](../../Sources/SrtFlow/AIShotDetector.swift) |
+| 内置多语言声音合成（内部键 `kokoro`） | [AIVoiceRole.swift](../../Sources/SrtFlow/AIVoiceRole.swift)、[KokoroVoiceSettingsRow.swift](../../Sources/SrtFlow/KokoroVoiceSettingsRow.swift) |
+| 内置音效合成器（`synth`） | [SoundEffectPreset.swift](../../Sources/SrtFlow/SoundEffects/SoundEffectPreset.swift)、[sound-effect-synth.md](sound-effect-synth.md) |
+
+验收：网站测试核对四语言同结构、每行 Free / Pro 两格、Pro 高亮差别、所有模型名与
+本机功能入口、源码证据路径、8 个声音角色 / 8 种语言 / 16 个音效预设，以及新版类别与
+内置功能标题、页面不展示 Kokoro 和预设名列表。折合与节省金额
+用真实标价和另两组价格验证；生产构建后的 SEO 审计继续验证真实 offers 标价和周期。
+人工在本地 `npm run dev` 核对中文和英文的桌面、390 手机卡片与完整对比表 / 模型，
+确保长模型名能换行、两列持续并排、无横向溢出，并保留截图。真实 iPad / 手机硬件另验。
+价格卡片还需分别核对 1280 / 1440：同排两卡等高时，免费卡片的零元价格、概括、
+对比链接与下载按钮有合理间距，不出现中间整块空白。1440 另留完整对比表截图，
+包含顶部 Pro 差异和下方本机 / 云端模型；390 核对月付与年付的大字月价能直接比较、
+真实年扣款紧随年付月价、节省标签能换行，点击对比链接落到正确锚点。
+
+2026-11-07 本地验收：81 项网站测试、生产构建、12 个语言页面的 SEO 审计，以及
+原生 `scripts/check-local.sh docs-index-drift` 的全部扫描守卫和文档索引检查通过。
+Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 390 宽布局；
+六张验收截图保留在 `/private/tmp/skycut-pricing-2026-11-07/`，各语言包含桌面、手机
+价格卡片和完整功能 / 模型长表。未调用真实模型服务或付款，未进行云端预览或部署。
+
+同日 PR #333 review 补充：免费卡片改为零元价格、永久免费说明、一行功能概括和对比
+锚点链接；年付大字先呈现折合月价，下一行说明真实年扣款，用深绿标签突出节省金额。
+中英文分别以无头 Chrome 检查 1280 / 1440 / 390 宽，桌面两卡等高、免费内容间距均匀，
+月付 / 年付字号一致，无横向溢出；点击对比链接跳到正确锚点。新增八张截图仍存放在
+同一目录，文件名为 `{zh,en}-review-{1280,1440,390}-cards.png` 和
+`{zh,en}-review-1440-comparison-models.png`，宽度和布局数值另存 `review-layout-metrics.json`。
+官网截图使用无头浏览器直接访问本机开发服务器，不操作用户窗口或 Finder；长表可把
+无头视口高度加大，完整截图后裁剪，避免超出视口的裁切偏移。
 
 ## SEO 与创始人身份
 
