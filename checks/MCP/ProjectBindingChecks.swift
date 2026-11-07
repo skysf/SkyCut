@@ -168,7 +168,7 @@ private func runUsesProjectChecks() {
     for tool in MCPToolName.allCases {
         let expected: Bool
         switch tool {
-        case .getStatus, .getSettings, .setSettings, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
+        case .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .openProject, .newProject, .closeProject,
              .recordScreen:
             expected = false

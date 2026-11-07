@@ -205,7 +205,7 @@ expected_movers="$(printf '%s\n' "${JOB_GATE}" "${HELD}" | LC_ALL=C sort | tr '\
 [ "${movers}" = "${expected_movers}" ] || fail "积分的账只许在 SkyStudioJobGate（AI 起的）和 SkyStudioHeldCredits（面板起的、按实收换、退回）里动，实际在：${movers:-没有}"
 prompters="$(code_files_with '\.prompting' | grep -v "^${JOB_ACCESS}\$" | LC_ALL=C sort | tr '\n' ' ')"
 [ "${prompters}" = "${UP_JOB} " ] || fail "会弹钥匙串授权框的那一档（.prompting）只许面板起的 upscale 任务用（UpscaleJob），实际在：${prompters:-没有}"
-grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（调用时核对 Key）"
+grep -qE 'case .generateMedia, .upscaleClip.*return .skystudio' "${CATALOG}" || fail "${CATALOG}：upscale_clip 要属于 skystudio 提供方（调用时核对 Key）"
 grep -qF 'MCPProviderMarker.write(hasKey ? [.skystudio] : [], to: url)' "${ACCOUNT}" \
   || fail "Sky Studio 的工具标记必须只跟着自己的 Key 写"
 [ "$(grep -c '^        syncProviders()$' "${ACCOUNT}" || true)" -eq 1 ] || fail "Sky Studio 启动时必须同步工具提供方标记"
@@ -239,7 +239,7 @@ fi
 grep -qF 'held = SkyStudioHeldCredits(reservation)' "${GEN_RUN}" || fail "${GEN_RUN}：任务要用起任务之前记好的那一笔（退回、按实收换都按它）"
 grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_TOOL}" && grep -qF 'switch await SkyStudioJobKey.key(.silent) {' "${GEN_RUN}" \
   || fail "AI 起的生成取 Key 不弹钥匙串授权框（.silent）：工具问价、任务交活都是"
-grep -qF 'case .generateMedia, .upscaleClip: return .skystudio' "${CATALOG}" || fail "${CATALOG}：generate_media 要属于 skystudio 提供方（Key、授权、积分在调用时核对）"
+grep -qE 'case .generateMedia, .upscaleClip.*return .skystudio' "${CATALOG}" || fail "${CATALOG}：generate_media 要属于 skystudio 提供方（Key、授权、积分在调用时核对）"
 grep -qF 'case .generateMedia: return try await SkyStudioGenerateTool.generate(args, project)' "${ROUTER}" \
   || fail "${ROUTER}：generate_media 要分派给 SkyStudioGenerateTool"
 [ "$(count '.generateMedia' "${ROUTER}")" -eq 2 ] || fail "${ROUTER}：generate_media 应出现两处（分派、策略：不排撤销分组、不算这一轮的改动）"
@@ -372,4 +372,22 @@ if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
+# 角色 A：服务器引用与本机文件分开；报价选择进入确认身份、提交和 get_job。
+CHAR_READ="Sources/SrtFlow/SkyStudio/SkyStudioCharacterReadTool.swift"
+CHAR_MODEL="Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift"
+CHAR_REFS="Sources/SrtFlow/SkyStudio/SkyStudioCharacterGeneration.swift"
+CHAR_CACHE="Sources/SrtFlow/SkyStudio/SkyStudioCharacterAccess.swift"
+grep -qF 'case .listCharacters, .getCharacter: return try await SkyStudioCharacterReadTool.read(tool, args)' "${ROUTER}" || fail "角色只读路由未接上"
+grep -qF 'SkyStudioCharacterAccess.invalidate()' "${ACCOUNT}" || fail "换 Key 未清角色和待确认内容"
+grep -qF 'AIConfirmations.shared.discard(prefix: "skystudio:")' "${CHAR_CACHE}" || fail "换账号未废掉收费批准"
+grep -qF 'if observed == epoch' "${CHAR_CACHE}" || fail "旧账号迟到请求能回填角色缓存"
+grep -qF 'SkyStudioCharacterGeneration.accept(quote, generation: &generation, references: &references, model: model)' "${GEN_TOOL}" || fail "生成未接实际角色报价"
+grep -qF 'fields["character_revision"]' Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift || fail "确认身份漏角色 revision"
+grep -qF 'body["character_revision"]' Sources/SrtFlow/SkyStudio/SkyStudioJob.swift || fail "提交漏角色 revision"
+grep -qF 'payload["character_usage"]' "${GEN_RUN}" || fail "get_job 漏实际角色选择"
+if grep -E 'api\.(upload|download)|FileManager' "${CHAR_READ}" "${CHAR_REFS}" >/dev/null; then fail "角色服务器引用混进本机传输路径"; fi
+for source in SkyStudioCharacter.swift SkyStudioCharacterAPI.swift SkyStudioCharacterGeneration.swift SkyStudioCharacterAccess.swift; do
+  grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色生产值未编进假服务器检查：${source}"
+done
+
 echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"

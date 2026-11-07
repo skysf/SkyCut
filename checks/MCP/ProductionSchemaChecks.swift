@@ -48,8 +48,9 @@ func runProductionSchemaChecks() {
           "ordinary project saves preserve their argument surface")
     check(MCPArgumentCheck.problem(tool: .saveProject, arguments: ["production": .null, "expected_revision": 1]) == nil,
           "explicit plan clearing passes name validation")
+    // 2026-11-07 用户定：角色 A/B 的三个工具将全清单上限提高到 110,000。
     let count = JSONValue.object(["tools": MCPToolName.listJSON]).encodedString().utf16.count
-    check(count <= 100_000, "production authoring keeps the complete catalog within 100000 UTF16 units (\(count))")
+    check(count <= 110_000, "production authoring keeps the complete catalog within 110000 UTF16 units (\(count))")
     check(MCPToolName.freezeFrame.definition.description.contains("upright_source"), "native freeze evidence does not promise final composed pixels")
     let workflow = MCPFilmSchema.contract["production_workflow"]!.encodedString()
     for phrase in ["historical inputs", "GET-only", "expected_snapshots.shots[].output_binding", "actually auditioning"] {

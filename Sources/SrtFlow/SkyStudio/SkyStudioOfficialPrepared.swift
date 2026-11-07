@@ -40,6 +40,8 @@ final class SkyStudioOfficialPrepared {
     private var assets: [String: Assets] = [:]
     private var quotes: [String: Quote] = [:]
 
+    func forget() { assets = [:]; quotes = [:] }
+
     static func digest(_ value: JSONValue) -> String {
         SHA256.hash(data: Data(value.encodedString().utf8)).map { String(format: "%02x", $0) }.joined()
     }

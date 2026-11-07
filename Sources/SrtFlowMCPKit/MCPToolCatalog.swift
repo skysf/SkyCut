@@ -35,6 +35,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case syncVoiceover = "sync_voiceover"
     case recordScreen = "record_screen"
     case generateMedia = "generate_media"
+    case listCharacters = "list_characters"
+    case getCharacter = "get_character"
     case upscaleClip = "upscale_clip"
     case addClips = "add_clips"
     case editClip = "edit_clip"
@@ -81,7 +83,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 改 / 读工程内容的、默认值跟着工程走的都收。只碰文件、设置、任务的不收；open_project / new_project 是开工程的，回 id、不收。
     public var takesProject: Bool {
         switch self {
-        case .getStatus, .getSettings, .setSettings, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
+        case .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
@@ -95,6 +97,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
 
     private var groupDefinition: MCPToolDefinition {
         switch self {
+        case .listCharacters, .getCharacter: return MCPCharacterTools.definition(for: self)
         case .inspectVideo: return MCPInspectionTool.definition
         case .syncVoiceover: return MCPVoiceoverSyncTool.definition
         case .getSettings, .setSettings:
@@ -134,7 +137,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     public var provider: MCPProvider? {
         switch self {
         // 2026-10-28 起两个都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio（add_voiceover 一直列着）。
-        case .generateMedia, .upscaleClip: return .skystudio
+        case .generateMedia, .upscaleClip, .listCharacters, .getCharacter: return .skystudio
         default: return nil
         }
     }

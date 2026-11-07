@@ -57,12 +57,12 @@ enum SkyStudioReferenceFiles {
             return Picks(mode: "images", files: picks)
         }
         if mode == "multimodal" {
-            guard (!picks.isEmpty || webURL != nil), picks.allSatisfy({ $0.role.hasPrefix("reference_") || $0.role == "file_url" }) else {
+            guard (!picks.isEmpty || webURL != nil || args.has("character_id")), picks.allSatisfy({ $0.role.hasPrefix("reference_") || $0.role == "file_url" }) else {
                 throw AIToolError("Multimodal mode takes reference_images/reference_videos/reference_audio. Do not mix them with image/last_image.")
             }
         } else if kind.isVideo {
             guard !picks.contains(where: { $0.role.hasPrefix("reference_") }) else { throw AIToolError("Reference arrays require input_mode=multimodal.") }
-            if kind == .imageToVideo, !picks.contains(where: { $0.role == "first_frame" }) { throw AIToolError("image is required for image_to_video in frames mode.") }
+            if kind == .imageToVideo, !picks.contains(where: { $0.role == "first_frame" }), !args.has("character_id") { throw AIToolError("image is required for image_to_video in frames mode.") }
             if kind == .textToVideo, !picks.isEmpty { throw AIToolError("Use image_to_video for first/last frames.") }
             if picks.contains(where: { $0.role == "last_frame" }), !picks.contains(where: { $0.role == "first_frame" }) { throw AIToolError("last_image requires image.") }
         }

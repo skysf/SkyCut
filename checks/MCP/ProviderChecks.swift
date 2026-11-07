@@ -21,7 +21,7 @@ func runProviderChecks() {
 
 private func checkCatalog() {
     // 花钱的两个工具：generate_media（第 6 块）、upscale_clip（2026-10-02）；2026-10-28 起都走 Sky Studio、花积分（收费方案第 6 刀）。
-    let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip]
+    let paidTools: Set<MCPToolName> = [.generateMedia, .upscaleClip, .listCharacters, .getCharacter]
     checkEqual(MCPToolName.generateMedia.provider, .skystudio, "generate_media belongs to Sky Studio")
     checkEqual(MCPToolName.upscaleClip.provider, .skystudio, "upscale_clip belongs to Sky Studio")
     check(MCPToolName.allCases.filter { !paidTools.contains($0) }.allSatisfy { $0.provider == nil }, "every other tool is always listed")
@@ -44,7 +44,7 @@ private func checkCatalog() {
     let properties = schema["properties"]?.objectValue ?? [:]
     // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
     checkEqual(Set(properties.keys), ["kind", "prompt", "model", "image_context", "quality", "input_mode", "image", "last_image",
-        "reference_images", "reference_videos", "reference_audio", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
+        "reference_images", "reference_videos", "reference_audio", "character_id", "character_roles", "character_revision", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
         "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides",

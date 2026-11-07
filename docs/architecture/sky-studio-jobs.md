@@ -201,7 +201,7 @@ AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-�
 
 ## 十二、图片目录、换机位与图片放大（2026-11-07 客户端合同）
 
-本节对应 Sky Studio `feat/skycut-image-model-catalog` 的最终 image catalog 合同（Commit 2），不包含尚未定稿的角色操作。
+本节对应 Sky Studio `feat/skycut-image-model-catalog` 的最终 image catalog 合同（Commit 2），角色操作另见第十三节。
 客户端完成不代表服务器已上线；生产启用和 App 发版另行安排。回归 fixture `models-image-2026-11-07.json`
 从该服务端实现的 `buildSkycutModelCatalog()` 导出九条 image 记录（服务端 `af648a67`），不是在线生产目录的证明。
 
@@ -235,3 +235,20 @@ AI 权限与设置确认合同见 [统一设置](workbench-and-settings.md#ai-�
 
 上线后另行授权的人工回归：各一张真实换机位 / 放大结果核对画面、±135° 的账单和实际尺寸，
 Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 billing。免费假服务通过不等于真实提供方输出质量或生产联调通过。
+
+
+## 十三、Sky Studio 角色 A（2026-11-07）
+
+客户端依据同日最终角色合同 Commit 3；服务器 PR #242（角色 A `eab6b978`，A/B 定稿 head `b4e7a376`）的上线、客户端 CI 和 App 发版分别验收，不能把假服务通过称为生产可用。
+
+- `list_characters` 是账户的免费只读分页，limit 1–100（默认 50）、UUID cursor、ready（默认）/ draft / generating / failed / all；`get_character` 现读详情、可用视图与不透明 revision。安全 DTO 原样保留，不自行算 revision。
+- `generate_media` 的 `character_id` / 可选 `character_roles` 是服务器引用，不进入本机路径表，也不下载再上传。普通图片与视频支持；媒体专用操作 / 音乐 / 音效不收。显式视图不得重复、缺失或静默丢弃；省略时由 `/quote` 在剩余组合容量里决定。
+- 本机参考数量与角色数量分账：`params.reference_image_count` 只报本机图；`character_usage.roles` 是实际角色视图，usage 的 count 是合并后的图片数。最终 mode 和 revision 从报价取，提交发选择、`character_revision`、精确 `max_credits` 与稳定 key。无显式帧的多模态模型可用全部可用视图；frames 只让服务器提供一张 front，不能把 side/back 自动变成尾帧。
+- 确认身份包含角色、视图、revision、mode、全部本机参考与精确价格；角色的项目批准也绑定完整身份，不复用别的角色 / 旧 revision 的宽泛模型批准。换图后重新报价；旧确认不能消费或预留。每日硬预算仍先于确认和全部权限。
+- Key / 账户变化清角色缓存、待确认收费身份和官方准备 / 报价；缓存 epoch 阻止旧 Key 的晚到请求回填。任务收费 POST 前重新核对 Key 和 epoch。持久原单证据不删除，换账号不能拿它重新生成。
+- `character_not_ready` 等原单，`character_changed` / `price_changed` 现读并重报价，`not_found` 重新列当前账户；`character_checkpoint_failed` 保留原 job_id/key 和明确的零预留 / 未提交证据，只查原单。`get_job.character_usage` 报实际角色与视图，billing 单独处理；角色不授权自动付费替换或模型 fallback。
+- 官方短片准备从本账号 DTO 取实际角色资产声明，加入公开 render / reference sources；报价仍由服务器解析 ownership、真正选图并绑定 pin。原本机输入只收 uploads，公开邻镜声明可以含角色资产 URL，但单有 URL 不代表获准使用；新 quote 的 usage 与准备声明不一致就拒绝，要求重做制作图和两侧审查。客户端不下载这些图。
+
+验证：`scripts/check-sky-studio.sh` 的 Character / CharacterApproval 组覆盖精确请求体、只读报价、分页与 Key 变化、迟到缓存、组合上限、实际模式、revision 和确认闸、各错误码；生产接线由 `checks/sky-studio-wiring.sh` 与完整 App 编译核对。
+
+发版前真服务回归：各一张角色图片、H3 多模态视频和 frames 视频，核对实际视图 / 价格 / billing；换图后旧码拒绝、重新报价；官方短片核对真实角色声明、pin 和左右接缝。免费假服务不证明提供方的人物一致性。

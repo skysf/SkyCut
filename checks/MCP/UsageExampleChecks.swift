@@ -4,8 +4,9 @@ import SrtFlowMCPKit
 // 检查给模型的最小示例是否仍符合真实 schema；不模拟客户端选工具或 App 编辑结果。
 // 反射当前 schema，避免另一份手抄字段表；真实自然语言调用另走独立工程冒烟。
 func runUsageExampleChecks() {
+    // 2026-11-07 用户定：与 ProtocolChecks 一样守 110,000。
     let catalog = JSONValue.object(["tools": MCPToolName.listJSON]).encodedString()
-    check(catalog.utf16.count <= 100_000, "the complete tools/list JSON, including its envelope, fits the catalog budget")
+    check(catalog.utf16.count <= 110_000, "the complete tools/list JSON, including its envelope, fits the catalog budget")
     let opening = String(MCPInstructions.text.prefix(512))
     for name in ["edit_clips", "set_texts", "set_shapes", "sync_voiceover", "inspect_video", "preset=quick_review"] {
         check(opening.contains(name), "the short task map routes \(name) before the 512-character boundary")

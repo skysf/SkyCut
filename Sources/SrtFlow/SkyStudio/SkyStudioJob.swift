@@ -16,6 +16,8 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     /// Sky Studio 自己的模型名（`/models` 的 id），不是 fal 的端点号。
     var model: String
     var operation: String?
+    var character: SkyStudioCharacterReference?
+    var characterAssets: SkyStudioCharacterAssets?
     var prompt: String?
     /// `video_url`、`image_url`、`reference_audio_url`：自己 `/uploads` 上去的文件，或 Sky Studio 的素材。
     var inputs: [String: String]
@@ -34,11 +36,13 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     init(
         kind: String, model: String, prompt: String? = nil, inputs: [String: String] = [:], params: [String: JSONValue] = [:],
         maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased(), references: [JSONValue] = [],
-        film: SkyStudioFilm? = nil, recipePin: String? = nil, seamReview: SkyStudioSeamReview? = nil, operation: String? = nil
+        film: SkyStudioFilm? = nil, recipePin: String? = nil, seamReview: SkyStudioSeamReview? = nil, operation: String? = nil,
+        character: SkyStudioCharacterReference? = nil
     ) {
         self.kind = kind
         self.model = model
         self.operation = operation
+        self.character = character
         self.prompt = prompt
         self.inputs = inputs
         self.references = references
@@ -56,11 +60,25 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
         return value
     }
 
+    /// 公开制作图比较已解析的真实资产；传输仍只有原本机 inputs + character_id，服务器自己解析，不重复追加角色 URL。
+    var renderInputs: [String: JSONValue] { characterAssets?.inputs(addingTo: allInputs) ?? allInputs }
+    var renderParams: [String: JSONValue] {
+        var result = params
+        if let assets = characterAssets {
+            result["reference_image_count"] = .number(assets.usage.mode == "frames" ? 0 : Double(assets.usage.referenceImageCount))
+        }
+        return result
+    }
+
     /// 普通 /quote 不带 inputs；官方 /quote 必须绑定已经准备好的实际引用，不能用数量代替。
     var quoteBody: JSONValue {
         var body: [String: JSONValue] = ["kind": .string(kind), "model": .string(model), "params": .object(params)]
         if let prompt { body["prompt"] = .string(prompt) }
         if let operation { body["operation"] = .string(operation) }
+        if let character {
+            body["character_id"] = .string(character.id)
+            if let roles = character.roles { body["character_roles"] = .array(roles.map(JSONValue.string)) }
+        }
         if let film {
             body["film"] = film.json
             body["inputs"] = .object(allInputs)
@@ -72,6 +90,7 @@ struct SkyStudioJobRequest: Equatable, Sendable, Codable {
     var jobBody: JSONValue {
         guard case .object(var body) = quoteBody else { return quoteBody }
         body["inputs"] = .object(allInputs)
+        if let revision = character?.revision { body["character_revision"] = .string(revision) }
         if let recipePin { body["recipe_pin"] = .string(recipePin) }
         if let seamReview { body["seam_review"] = seamReview.json }
         body["idempotency_key"] = .string(idempotencyKey)
@@ -86,6 +105,7 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
     var typicalSeconds: Double?
     var plan: [String: JSONValue]
     var officialRecipe: SkyStudioOfficialRecipeQuote?
+    var characterUsage: SkyStudioCharacterUsage?
 
     init(credits: Double, typicalSeconds: Double? = nil, plan: [String: JSONValue] = [:], officialRecipe: SkyStudioOfficialRecipeQuote? = nil) {
         self.credits = credits
@@ -100,6 +120,10 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
         if let official = json["official_recipe"] {
             guard let parsed = try? SkyStudioOfficialRecipeQuote(json: official) else { return nil }
             officialRecipe = parsed
+        }
+        if let usage = json["character_usage"], !usage.isNull {
+            guard let parsed = try? SkyStudioCharacterUsage(json: usage) else { return nil }
+            characterUsage = parsed
         }
     }
 }
@@ -129,6 +153,7 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     var billing: SkyStudioBilling?
     var generationStatus: String?
     var deliveryStatus: String?
+    var characterUsage: SkyStudioCharacterUsage?
 
     var isFinished: Bool { state == .done || state == .failed || state == .cancelled }
 
@@ -150,6 +175,10 @@ struct SkyStudioJobStatus: Equatable, Sendable {
         billing = SkyStudioBilling(json["billing"])
         generationStatus = json["generation_status"]?.stringValue
         deliveryStatus = json["delivery_status"]?.stringValue
+        if let usage = json["character_usage"], !usage.isNull {
+            guard let parsed = try? SkyStudioCharacterUsage(json: usage) else { return nil }
+            characterUsage = parsed
+        }
         if let result = json["result"], !result.isNull { self.result = SkyStudioJobResult(json: result) }
         error = Self.errorText(json["error"])
         if let error { failure = SkyStudioJobFailure(message: error, fields: json["error"]?.objectValue ?? [:], jobID: id) }

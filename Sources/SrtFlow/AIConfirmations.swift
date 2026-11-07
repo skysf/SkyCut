@@ -69,6 +69,9 @@ final class AIConfirmations {
         self.now = now
     }
 
+    /// 换账户或角色视图后，旧收费批准不能继续使用；不碰文件读取 / 废纸篓的批准。
+    func discard(prefix: String) { issued = issued.filter { !$0.value.action.hasPrefix(prefix) } }
+
     /// 问一句、给一张令牌。`action` 写清楚放行的是哪一件事；这件事还有没用过、没过期的令牌就回它（有效期重新算），
     /// 不另发一张。`refused`：这次带来的令牌为什么没收，一并写进结果。
     func ask(_ question: String, action: String, refused: Refusal? = nil) -> AIToolResult {

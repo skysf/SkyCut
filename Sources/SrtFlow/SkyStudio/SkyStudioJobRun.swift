@@ -286,6 +286,8 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
     func canRefund(beforeAccepted: Bool) -> Bool {
         if case .notSubmitted = self { return beforeAccepted }
         if let billing = failure?.billing { return billing.returnedAll }
+        if case .request(.server(let error)) = self, error.code == "character_checkpoint_failed",
+           error.fields["credits_reserved"] == 0, error.fields["submission_state"] == "not_submitted" { return true }
         if failure?.creditsReturned == true { return true }
         if case .stopped(.nothingCharged) = self { return true }
         guard beforeAccepted, case .request(.server(let error)) = self, failure?.isRealPersonRefusal != true,
