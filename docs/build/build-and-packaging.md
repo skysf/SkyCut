@@ -312,6 +312,49 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 
 没有打 git tag，也没有创建 GitHub release，做法同前。
 
+2026-11-08，修完 0.18.62 验收里发现的问题，发布 **0.18.63**。用户 2026-11-07 说「把你发现的问题都优化了，按照你的建议来」，并决定暂不买 Apple 开发者账号。发版与验收事实由 Claude 提供。
+
+构建：
+- 源码：已通过 CI 的 main `29d811cf42abca07ea340efca967a9486e7b783a`，包含两个 PR：
+  - [#340](https://github.com/skysf/SkyCut/pull/340)：角色精简列表、换角度 / 放大的成品按源图起名、结束的任务不报阶段、角色正常完成的说法、图片宽高从文件读；
+  - [#341](https://github.com/skysf/SkyCut/pull/341)：新构建启动不弹钥匙串框、AI 调用不等框、每个构建提示一次。
+- 打包命令：`VERSION=0.18.63 arch -arm64 /bin/bash scripts/build-app.sh`。
+
+产物：
+- `SkyCut-0.18.63-arm64.dmg`，33,703,436 字节；SHA-256：`d70e816f5e47319d827be05da5f3fc52a24b151863df89b346044e624f4b917b`；App 的 CDHash `6d5415ca…`。
+
+校验：
+- 包：
+  - `hdiutil verify` 通过；
+  - Info.plist 版本 `0.18.63`；
+  - 主程序、ffmpeg、`skycut-mcp` 均为 arm64，挂载包里的三份与 `dist/SkyCut.app` 逐字节相同。
+- 签名：
+  - 钉在原固定证书 `76d2…90ef`，深度签名校验通过；
+  - `TeamIdentifier=not set`，和以前一样。
+- 运行：
+  - MCP 初始化报告 `skycut` / `0.18.63`；
+  - ffmpeg 8.1 能运行；
+  - 新提示条的文案在包内；
+  - `scripts/check-dmg.sh` 通过。
+
+发布：
+- 公开对象：`skycut/SkyCut-0.18.63-d70e816f5e47-arm64.dmg`，immutable 缓存。
+- 先上传，再用 `--url` 完整读回一致。
+- 个人站 [skystudio PR #18](https://github.com/skysf/skystudio/pull/18)（合并提交 `cb05b01`）切换两条入口；不带 `--url` 经固定入口完整下载一致，带尾斜杠的入口 302 到同一个对象。
+
+安装：
+- 本机正式版和测试版都换成 0.18.63，测试版的 identifier 是 `com.srtflow.SrtFlow.beta`，同一把证书；旧的两份进了废纸篓。
+
+升级时的钥匙串（实测）：
+- 启动没有系统框，`get_status` 报 `keychain_permission: "required"`，AI 的付费工具立刻回恢复步骤。
+- 用户点提示条的「允许…」、输登录密码、选「始终允许」之后，分区名单加上了这一构建。
+- 重开同一构建不再问。
+- 详见 [钥匙串的 bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)「实机验证」。
+
+真积分验证 #340（28 积分）：角色列表 28 条 10,786 字（原来 79,969 字），换角度成品叫 `<源图名> angle.png`，图片宽高从文件读，结束的任务不报阶段。
+
+没有打 git tag，也没有创建 GitHub release，做法同前。
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
