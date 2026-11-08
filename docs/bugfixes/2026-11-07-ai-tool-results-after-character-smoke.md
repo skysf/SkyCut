@@ -36,6 +36,17 @@
 - 反向验证只替换临时目录中的源码副本，仓库生产文件保持修复：Sky Studio 撤回摘要、命名、远端终态、完成文案和尺寸投影，实际 **252 / 6,351** 项断言失败；MCP 撤回共用终态边界，实际 **6 / 3,289** 项失败。五类各有红项，均为成功编译后运行时断言，不把编译失败算作验证。
 - 完整 App target 编译通过；正式源码运行 `scripts/check-local.sh sky-studio mcp`，顺序验证全部扫描守卫和上述两套检查；受共用任务 DTO / 摘要依赖影响的 upscale / 官方制作路径另验通过（123 / 304 项）。最终全部扫描守卫、6,351 项 Sky Studio、3,289 项 MCP 正向检查通过。首轮 MCP 的一条既有 2 秒音频读取超时在重跑时通过；未跳过或放宽该守卫。工具全清单连 envelope 为 106,306 / 110,000 UTF-16 单位，总说明 2,012 / 2,048，三个角色工具说明均在 512 内。
 
+### 实机验证（2026-11-08，正式版 0.18.63）
+
+用真 Key、真积分（28 积分）：
+- `list_characters`：同一账号 28 个角色，回答 10,786 字（UTF-8 10,890 字节），修复前 79,969 字。
+  - 每条只有 `available_roles`、`created_at`、`default_generation_model`、`default_generation_resolution`、`id`、`name`、`revision`、`status`、`updated_at`；
+  - 没有任何地址字段。
+- 换角度：源图 `A red vintage bicycle le.png` → `A red vintage bicycle le angle.png`，1376×768，8 积分。
+- nano2-lite：`A paper boat floating on.jpg`，`get_job` 报 1376×768。修复前同一模型宽高是 null。
+- 两单 done 之后 `phase`、`queue_position` 都不再出现。
+- 角色完成的文案没有再花积分去实测，由 `ToolResultChecks` 覆盖。
+
 ## 教训 / 防回归
 
 - 列表和详情是不同的上下文预算，不能因为 DTO 安全就整份透传。按真实 JSON 字节量边界，既测一条极值，也测默认页和实际规模。
