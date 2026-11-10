@@ -24,7 +24,7 @@ let sampleOneTimeQuote = """
    "languages": [{"language": "en", "share": 1, "seconds": 58}], "reason": "The default MiniMax English voice is not built yet.",
    "cross_language": false, "warnings": ["model_not_tested_for_language"],
    "fallback": {"selection": {"model": "minimax-speech-2.8-hd", "reference_language": "en"}, "available": false, "auto": false,
-                "one_time": [{"kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en", "credits": 377.3}]}},
+                "one_time": {"kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en"}}},
  "batches": [{"credits": 43.5, "credits_expected": 28, "characters": 760}],
  "one_time": [{"kind": "voice_enroll", "model": "minimax-voice-clone", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "language": "en",
                "credits": 377.3, "why": "Build the MiniMax English version once; English then reads with it.",
@@ -132,25 +132,33 @@ private func runQuoteReadingChecks() async {
     checkEqual(enroll?.voice?.oneTime.map(\.kind), ["voice_enroll"], "the one-time cost is listed")
     checkEqual(enroll?.voice?.oneTime.first?.credits, 377.3, "its credits")
     checkEqual(enroll?.voice?.oneTime.first?.then?["model"], "minimax-speech-2.8-hd", "what it changes to afterwards")
-    checkEqual(enroll?.voice?.plan?.fallback?.oneTime.first?.credits, 377.3, "the fallback's one-time cost")
+    checkEqual(enroll?.voice?.plan?.fallback?.oneTime.map(\.kind), ["voice_enroll"], "the fallback's one-time need (one object, as the server sends it)")
+    checkEqual(enroll?.voice?.plan?.fallback?.oneTime.first?.credits, nil, "the fallback's need carries no price: it is only a note")
     checkEqual(enroll?.voice?.plan?.fallback?.available, false, "the fallback is not available without it")
     checkEqual(enroll?.voice?.oneTime.first.flatMap { SkyStudioVoiceOneTime(json: $0.json) }, enroll?.voice?.oneTime.first, "one-time items round-trip")
 
     // 和钱有关的读不出来：整份不算回答（不能悄悄丢掉一笔一次性费用、一批的价）。
     let unreadable: [(String, String, String)] = [
         ("a one-time cost without credits", sampleOneTimeQuote, #""credits": 377.3, "why""#),
-        ("one_time that is not a list", sampleCloneQuote, #""one_time": []"#),
+        ("one_time that is not a list or an object", sampleCloneQuote, #""one_time": []"#),
         ("a batch without credits", sampleCloneQuote, #"{"credits": 21, "#),
         ("a voice_plan without a selection", sampleCloneQuote, #""selection": {"model": "index-tts-2", "reference_language": "zh"}, "#),
-        ("a fallback with an unreadable one-time cost", sampleOneTimeQuote, #""language": "en", "credits": 377.3}]}},"#)
+        ("a top-level one-time item that is not an object", sampleOneTimeQuote, #""one_time": [{"kind": "voice_enroll", "model": "minimax-voice-clone", "voice""#)
     ]
-    let replacements = [#""why""#, #""one_time": {"kind": "voice_enroll"}"#, "{", "", #""language": "en"}]}},"#]
+    let replacements = [#""why""#, #""one_time": "soon""#, "{", "", #""one_time": ["soon", {"kind": "voice_enroll", "model": "minimax-voice-clone", "voice""#]
     for ((name, sample, part), replacement) in zip(unreadable, replacements) {
         let broken = sample.replacingOccurrences(of: part, with: replacement)
         check(broken != sample, "the broken sample really differs: \(name)")
         check((try? JSONValue.decode(Data(broken.utf8))) != nil, "the broken sample is still JSON: \(name)")
         check((try? JSONValue.decode(Data(broken.utf8))).flatMap(SkyStudioQuote.init(json:)) == nil, "not an answer: \(name)")
     }
+    // 备用要的那一笔只是说明：读不出来当没有，整份报价照样读得出来。
+    let noisyFallback = sampleOneTimeQuote.replacingOccurrences(of: #""one_time": {"kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en"}}},"#,
+                                                                with: #""one_time": "soon"}},"#)
+    check(noisyFallback != sampleOneTimeQuote, "the noisy fallback sample really differs")
+    let noisy = (try? JSONValue.decode(Data(noisyFallback.utf8))).flatMap(SkyStudioQuote.init(json:))
+    check(noisy != nil && noisy?.voice?.plan?.fallback?.oneTime == [] && noisy?.voice?.oneTime.count == 1,
+          "an unreadable fallback need is dropped, the quote and its real one-time cost still read")
     // 整段报价：少一批的价、没有 voice_plan，也不算回答（每批交的时候要拿它们）。
     for (name, answer) in [
         ("fewer batches than asked", sampleCloneQuote.replacingOccurrences(of: #", {"credits": 21, "credits_expected": 13.5, "characters": 240}"#, with: "")),
@@ -196,7 +204,14 @@ private func runBatchChecks() async {
     checkEqual(after?.jobBody["params"]?["plan"]?["model"], "minimax-speech-2.8-hd", "after a fallback, later batches carry the fallback's selection")
     var named = segment
     named.model = "index-tts-2"
-    checkEqual((try? SkyStudioVoiceRequests.batch(0, of: named, quote: quote))?.model, "index-tts-2", "a named model stays named on each batch")
+    let namedBatch = try? SkyStudioVoiceRequests.batch(0, of: named, quote: quote)
+    checkEqual(namedBatch?.model, "index-tts-2", "a named model stays named on each batch")
+    check(namedBatch != nil && namedBatch?.params["plan"] == nil, "a named model's batches carry no params.plan (the server takes plan only with auto)")
+    check((try? SkyStudioVoiceRequests.batch(1, of: named, quote: quote, plan: fallback)) == nil, "a named segment cannot switch to another plan")
+    if let eleven = try? SkyStudioVoiceRequests.segmentQuote(kind: "voice", model: "eleven-v4", voice: "gemini:Charon", batches: texts, lines: texts) {
+        let narration = try? SkyStudioVoiceRequests.batch(1, of: eleven, quote: quote)
+        check(narration?.model == "eleven-v4" && narration?.params["plan"] == nil, "named narration: eleven-v4 on each batch, no plan")
+    } else { check(false, "a named narration segment builds") }
     let spanish = ["Hola a todos.", "Bienvenidos a esta clase de edición de vídeo."]
     if let hinted = try? SkyStudioVoiceRequests.segmentQuote(kind: "voice", voice: "gemini:Charon", batches: spanish, lines: spanish) {
         checkEqual((try? SkyStudioVoiceRequests.batch(1, of: hinted, quote: quote))?.params["language"], "es", "the language hint rides on every batch")

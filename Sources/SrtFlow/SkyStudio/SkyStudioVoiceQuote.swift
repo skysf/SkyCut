@@ -10,8 +10,8 @@ import SrtFlowMCPKit
 // - `batches`：带 `params.batches` 报价时每批的 `credits`（作这一批的 `max_credits`）、`credits_expected`、字数。
 // - `one_time`（SkyStudioVoiceOneTime）：一次性费用（建 MiniMax 版、设计声音），**单独列出来、先问再花**（约定第 2 条）。
 //   同样的条目也出现在 409 `one_time_required` 和任务结束码 `fallback_needs_one_time` 的附加字段里。
-// 读得严：和钱有关的（一次性费用、每批的积分）少一样、不像样，整份报价就不算回答 —— 不能悄悄丢掉一笔一次性费用。
-// 别的读得宽：认不出的 `rule`、`warnings` 原样留着。
+// 读得严：和钱有关的（顶层 `one_time` 的每一笔和它的价、每批的积分）少一样、不像样，整份报价就不算回答 —— 不能悄悄丢掉一笔一次性费用。
+// 别的读得宽：认不出的 `rule`、`warnings` 原样留着；备用要的那一笔（`fallback.one_time`，服务器给一项或 null、可能不带价）只是说明，读不出来当没有。
 // 不管什么：问不问用户（SkyStudioJobGate，声音 PR 6 / 7）、怎么分批（声音 PR 3）、`/quote` 整份的 credits（SkyStudioQuote）。
 
 /// 一次性费用：建 MiniMax 版（`voice_enroll`）或设计声音（`voice_design`）。
@@ -20,19 +20,21 @@ struct SkyStudioVoiceOneTime: Equatable, Sendable, Codable {
     var model: String?
     var voice: String?
     var language: String?
-    /// 这一笔的积分（交的时候当 `max_credits`）。
-    var credits: Double
+    /// 这一笔的积分（交的时候当 `max_credits`）。`/quote` 顶层的 `one_time` 必须有（SkyStudioVoiceQuote 核对）；
+    /// 备用要的那一笔（`voice_plan.fallback.one_time`）、409 / 任务结束码带的那一笔可能只说要建哪种语言的 MiniMax 版、不带价。
+    var credits: Double?
     /// 为什么要花（一句英文）。
     var why: String?
     /// 建了以后会改用什么、大概多少钱（原样）。
     var then: JSONValue?
 
     init?(json: JSONValue) {
-        guard let kind = json["kind"]?.stringValue, !kind.isEmpty, let credits = json["credits"]?.doubleValue, credits.isFinite, credits >= 0 else {
-            return nil
+        guard let kind = json["kind"]?.stringValue, !kind.isEmpty else { return nil }
+        if let value = json["credits"], !value.isNull {
+            guard let credits = value.doubleValue, credits.isFinite, credits >= 0 else { return nil }
+            self.credits = credits
         }
         self.kind = kind
-        self.credits = credits
         model = json["model"]?.stringValue
         voice = json["voice"]?.stringValue
         language = json["language"]?.stringValue
@@ -40,16 +42,18 @@ struct SkyStudioVoiceOneTime: Equatable, Sendable, Codable {
         if let then = json["then"], !then.isNull { self.then = then }
     }
 
-    /// 一个数组；没有 / null 是空的；不是数组或者有一项读不出来是 nil（整份不算回答）。
+    /// 没有 / null 是空的；一项（对象）或一串（数组）都认 —— 服务器的备用和 409 只带一项；有一项读不出来是 nil。
     static func list(_ value: JSONValue?) -> [SkyStudioVoiceOneTime]? {
         guard let value, !value.isNull else { return [] }
+        if value.objectValue != nil { return SkyStudioVoiceOneTime(json: value).map { [$0] } }
         guard let items = value.arrayValue else { return nil }
         let parsed = items.compactMap(SkyStudioVoiceOneTime.init(json:))
         return parsed.count == items.count ? parsed : nil
     }
 
     var json: JSONValue {
-        var value: [String: JSONValue] = ["kind": .string(kind), "credits": .number(credits)]
+        var value: [String: JSONValue] = ["kind": .string(kind)]
+        if let credits { value["credits"] = .number(credits) }
         if let model { value["model"] = .string(model) }
         if let voice { value["voice"] = .string(voice) }
         if let language { value["language"] = .string(language) }
@@ -115,11 +119,11 @@ struct SkyStudioVoiceModelPlan: Equatable, Sendable, Codable {
             guard let language = entry["language"]?.stringValue, let share = entry["share"]?.doubleValue else { return nil }
             return Share(language: language, share: share, seconds: entry["seconds"]?.doubleValue)
         }
+        // 备用要的一次性费用只是告诉人「换过去之前得先建」：读不出来就当没有，不拖累整份报价（真要建的时候另有报价）。
         if let fallback = root["fallback"]?.objectValue {
-            guard let oneTime = SkyStudioVoiceOneTime.list(fallback["one_time"]) else { return nil }
             self.fallback = Fallback(
                 selection: fallback["selection"]?.objectValue, available: fallback["available"]?.boolValue ?? false,
-                auto: fallback["auto"]?.boolValue ?? false, oneTime: oneTime
+                auto: fallback["auto"]?.boolValue ?? false, oneTime: SkyStudioVoiceOneTime.list(fallback["one_time"]) ?? []
             )
         }
     }
@@ -151,7 +155,8 @@ struct SkyStudioVoiceQuote: Equatable, Sendable, Codable {
             guard let parsed = SkyStudioVoiceModelPlan(json: plan) else { return nil }
             self.plan = parsed
         }
-        guard let oneTime = SkyStudioVoiceOneTime.list(json["one_time"]) else { return nil }
+        // 要先问用户、要当 max_credits 交的那几笔：每一笔都得有价。
+        guard let oneTime = SkyStudioVoiceOneTime.list(json["one_time"]), oneTime.allSatisfy({ $0.credits != nil }) else { return nil }
         self.oneTime = oneTime
         batches = []
         if let value = json["batches"], !value.isNull {

@@ -2,13 +2,13 @@ import Foundation
 import SrtFlowMCPKit
 
 // 声音 PR 1（SkyCut 声音方案 9.1 第 1 项）：`/models` 里声音的那一部分，对着目录快照读。
-// 快照：checks/SkyStudio/Fixtures/ 下最新的 models-voice-*.json。现在这一份（-draft-）是 SkyCut 按两份方案手写的临时样子，
-// Sky Studio 导出正式快照（tests/fixtures/skycut/models-voice-*.json）后换成它，再对着它跑。
+// 快照：checks/SkyStudio/Fixtures/models-voice-2026-11-10.json，原样拷自 Sky Studio 的 tests/fixtures/skycut/（feat/voice-service 的
+// 6793b038 从 buildSkycutModelCatalog() 导出；那边说明是临时导出：目录代码写完了、/models 还没上线，目录改了会重新导出，到时原样换掉再跑）。
 // 钉住：预设按语言分开（Gacrux 中文男 / 英文女）、名单只收 listed、中文 21 / 英文 27 / 藏 3、样音和 Eleven 备用、唯一的默认是 Charon；
 // 8 个角色都在、都指向那种语言名单里的声音（Iapetus 只在英文名单）；一次性费用的价目、Eleven 支持的语言、分批的字数上限；
 // DTO 和快照里没有服务商的 id。
 
-let voiceFixturePath = "checks/SkyStudio/Fixtures/models-voice-draft-2026-11-10.json"
+let voiceFixturePath = "checks/SkyStudio/Fixtures/models-voice-2026-11-10.json"
 
 func loadVoiceFixture() -> (text: String, catalog: SkyStudioCatalog)? {
     guard let data = FileManager.default.contents(atPath: voiceFixturePath), let text = String(data: data, encoding: .utf8),
@@ -43,6 +43,9 @@ private func runPresetChecks(_ voices: SkyStudioVoiceCatalog) {
     checkEqual(gacrux?.entry(for: "en")?.listed, true, "Gacrux is on the English list")
     check(gacrux?.entry(for: "zh")?.description != gacrux?.entry(for: "en")?.description, "descriptions are per language")
     checkEqual(gacrux?.entry(for: "es")?.gender, "female", "Spanish uses the English attributes")
+    checkEqual(voices.preset("gemini:Despina")?.entry(for: "zh")?.gender, "unknown", "a voice nobody could place is gender unknown")
+    let genders = Set(voices.presets.flatMap { $0.languages.values.compactMap(\.gender) })
+    check(genders.isSubset(of: ["male", "female", "unknown"]), "genders are male / female / unknown: \(genders.sorted())")
 
     checkEqual(voices.presets.filter(\.isDefault).map(\.id), ["gemini:Charon"], "Charon is the only default")
     checkEqual(voices.defaultPreset?.id, "gemini:Charon", "the default preset")
@@ -97,15 +100,21 @@ private func runVoiceModelChecks(_ catalog: SkyStudioCatalog) {
     checkEqual(catalog.models(kind: "voice").map(\.id).sorted(), ["eleven-v4", "gemini-3.8-flash-tts"], "narration models")
     checkEqual(catalog.models(kind: "voice_clone").map(\.id).sorted(), ["heygen-voice-turbo", "index-tts-2", "minimax-speech-2.8-hd"], "clone models")
     check(!catalog.models.contains { $0.id == "zonos2" }, "zonos2 is gone")
-    checkEqual(catalog.model("minimax-voice-clone", kind: "voice_enroll")?.typicalCredits, 377, "a MiniMax version costs about 377")
-    checkEqual(catalog.model("minimax-voice-design", kind: "voice_design")?.typicalCredits, 752, "MiniMax design costs about 752")
+    checkEqual(catalog.model("minimax-voice-clone", kind: "voice_enroll")?.typicalCredits, 377.6, "a MiniMax version costs about 377.6")
+    checkEqual(catalog.model("minimax-voice-design", kind: "voice_design")?.typicalCredits, 751.4, "MiniMax design costs about 751.4")
     checkEqual(catalog.model("qwen3-voice-design", kind: "voice_design")?.typicalCredits, 22.5, "Qwen3 design costs 22.5")
+    let oneTime = catalog.models.filter(\.isOneTime)
+    checkEqual(oneTime.map(\.id).sorted(), ["minimax-voice-clone", "minimax-voice-design", "qwen3-voice-design"], "the one-time records are flagged")
+    check(oneTime.allSatisfy { ["voice_enroll", "voice_design"].contains($0.kind) && $0.typicalCredits != nil }, "each one-time record has a typical price")
+    check(catalog.models.filter { !$0.isOneTime }.allSatisfy { !["voice_enroll", "voice_design"].contains($0.kind) }, "every enrol / design record is one-time")
 
     let eleven = catalog.model("eleven-v4", kind: "voice")?.supportedLanguages ?? []
     checkEqual(eleven.count, 94, "Eleven v4 lists its 94 languages")
     checkEqual(Set(eleven.filter { $0.count != 2 }), ["yue", "fil", "ceb", "ast", "kam", "ckb"], "six ISO 639-3 codes")
     check(["zh", "en", "ja", "es"].allSatisfy(eleven.contains), "Eleven covers zh, en, ja, es")
     checkEqual(catalog.model("gemini-3.8-flash-tts", kind: "voice")?.supportedLanguages, nil, "no languages listed: unknown, not none")
+    let qwen = catalog.model("qwen3-voice-design", kind: "voice_design")?.supportedLanguages ?? []
+    check(qwen.count == 10 && qwen.contains("zh") && qwen.contains("en"), "Qwen3 design lists its 10 languages")
 
     for kind in ["voice", "voice_clone"] {
         checkEqual(catalog.voiceCharacterLimit(kind: kind, language: "zh"), 300, "\(kind): Chinese batches up to 300")

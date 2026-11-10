@@ -33,6 +33,7 @@ private func runVoiceRequestChecks() {
     checkEqual(enroll?.quoteBody, ["kind": "voice_enroll", "model": "minimax-voice-clone", "params": ["voice": .string(sampleVoiceID), "language": "en"]],
                "voice_enroll /quote leaves out max_credits and the key")
     check((try? SkyStudioVoiceRequests.enroll(voice: "gemini:Charon", language: "en", model: "minimax-voice-clone")) == nil, "only library voices get a MiniMax version")
+    check((try? SkyStudioVoiceRequests.enroll(voice: sampleVoiceID, language: "en", model: "auto")) == nil, "enrolment does not take auto (accepts_auto: false)")
 
     let design = try? SkyStudioVoiceRequests.design(description: " 温暖、沉稳的中年男声，适合纪录片旁白。 ", name: "纪录片男声", sampleText: "大家好。", maxCredits: 752)
     checkEqual(design?.kind, "voice_design", "kind voice_design")
@@ -156,6 +157,10 @@ private func runVoiceJobRunChecks() async {
     check(refused?.canRefund(beforeAccepted: true) == true, "the local reservation can be returned")
     checkEqual(refused?.failure?.oneTime.map(\.kind), ["voice_enroll"], "the needed one-time cost comes along")
     if case .request(.server(let error))? = refused { checkEqual(error.voiceOneTime.first?.credits, 377.3, "readable from the server error too") }
+    let single = SkyStudioServerError(status: 409, code: SkyStudioVoiceCodes.oneTimeRequired, message: "Build it first.",
+                                      fields: ["one_time": ["kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en"]])
+    checkEqual(single.voiceOneTime.map(\.language), ["en"], "a single one_time object (the server's VoiceOneTimeNeed) reads too")
+    checkEqual(single.voiceOneTime.first?.credits, nil, "without a price it stays unpriced, not zero")
     SkyStudioStub.reset { _ in .http(409, #"{"error":{"code":"minimax_voice_exists","message":"English already has a MiniMax version.","language":"en"}}"#) }
     let exists = await jobFailure { _ = try await run.run(enroll) }
     checkEqual(exists?.rejectedBeforeAdmissionCode, SkyStudioVoiceCodes.minimaxVoiceExists, "minimax_voice_exists charges nothing")

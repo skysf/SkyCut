@@ -11,8 +11,9 @@ import SrtFlowMCPKit
 // - `voice_rules`：只给人看的选模型说明，**SkyCut 不照着算**（用哪个模型只认 `/quote` 回的 voice_plan），原样留着。
 // - `voice_consent`：两句授权文案（这一次的 `per_recording` / 长期的 `standing`）的当前版本和英文原文；界面显示本地化文字，
 //   交的时候带版本号（SkyStudioVoiceConsent）。
-// - 模型记录上：一次性费用的价目（`price.typical_credits`，打开全部权限时列给用户看）、`eleven-v4` 支持哪些语言（`languages`）、
-//   报价前分批用的字数上限（`limits.max_characters_by_language`，同一个 kind 取最小的那个）。
+// - 模型记录上：一次性费用的记录（`one_time: true`）和它的价目（`price.typical_credits`，打开全部权限时列给用户看）、
+//   支持哪些语言（`languages`：`eleven-v4` 的 94 种、Qwen3 设计的 10 种）、报价前分批用的字数上限
+//   （`limits.max_characters_by_language`，其余语言是 `other`；同一个 kind 取最小的那个）。
 // 从哪读：SkyStudioCatalog 把这四样原样留在 `voiceSection`，`catalog.voices` 现读成这里的类型（只用模型目录的地方不用编这个文件）。
 // 读得宽：认不出的字段不管；少了 id 的预设跳过；整块没有就是 nil（服务器还没上声音的那一版）。
 // 不管什么：认 AI 给的声音名、本机退档（声音 PR 3）；选模型（服务器）；价（`/quote`）；用户自己的声音（SkyStudioVoice）。
@@ -25,7 +26,7 @@ struct SkyStudioVoicePreset: Equatable, Sendable {
     struct Entry: Equatable, Sendable {
         /// 这种语言的名单里显示不显示。藏起来的点名照样能用。
         var listed: Bool
-        /// `male` / `female`；服务器说不确定时是 nil。**按这次读的语言报**，同一个声音两种语言可能不一样。
+        /// `male` / `female` / `unknown`（听不出来，比如 Despina）。**按这次读的语言报**，同一个声音两种语言可能不一样。
         var gender: String?
         /// 用户打的分（1–5）；没打分是 nil。
         var rating: Int?
@@ -168,11 +169,14 @@ extension SkyStudioModel {
     /// 这个模型支持哪些语言（`eleven-v4` 的 94 种；ISO 639-1，没有 639-1 的用 639-3）；没列就是 nil（不知道，不是「都不支持」）。
     var supportedLanguages: [String]? { metadata["languages"]?.arrayValue?.compactMap(\.stringValue) }
 
-    /// 一次请求最多多少字（Unicode code point）：先找这种语言，没有就用 `default` 那一项；都没写是 nil。
+    /// 一次请求最多多少字（Unicode code point）：先找这种语言，没有就用 `other`（其余语言）那一项；都没写是 nil。
     func characterLimit(language: String) -> Int? {
         let table = limits["max_characters_by_language"]
-        return (table?[language] ?? table?["default"])?.intValue
+        return (table?[language] ?? table?["other"])?.intValue
     }
+
+    /// 一次性费用的那几条记录（建 MiniMax 版、设计声音：`one_time: true`）：打开全部权限时的价目照它挑，不写死 id。
+    var isOneTime: Bool { metadata["one_time"]?.boolValue == true }
 }
 
 extension SkyStudioCatalog {
