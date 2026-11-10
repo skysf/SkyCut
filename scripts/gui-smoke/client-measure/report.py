@@ -75,9 +75,16 @@ def defaults(path):
 
 
 def scrub(value, run):
+    """路径换成 $RUN。模型在回答里会把路径写短（/tmp/…/work/…），跑完改过名的目录里记着旧名字（基线的 7-cover-v1 跑的时候叫 7-cover），
+    所以凡是指到某个 work 目录的临时路径都换成 $RUN/work；家目录换成 ~。还剩绝对路径就在 stderr 打一行，人再看一眼（2026-11-10：
+    基线的证据靠手补了这两种）。"""
     text = json.dumps(value, ensure_ascii=False)
     for prefix in (str(run), str(run).replace("/private/tmp/", "/tmp/", 1)):
         text = text.replace(prefix, "$RUN")
+    text = re.sub(r"(?:/private)?/(?:tmp|var/folders)/[^\s\"`]*?/work(?=[/\s\"`\\]|$)", "$RUN/work", text)
+    text = text.replace(str(Path.home()), "~")
+    for leftover in sorted(set(re.findall(r"(?:/private)?/(?:tmp|var/folders|Users)/[^\s\"`]{0,40}", text))):
+        print(f"warning: {run.name}: path left in the evidence: {leftover}", file=sys.stderr)
     return json.loads(text)
 
 
