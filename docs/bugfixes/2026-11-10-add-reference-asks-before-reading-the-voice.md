@@ -30,8 +30,8 @@ PR 6 写这条路时只排了「授权在传之前问」这一个顺序，没把
 
   | 临时撤掉 | 结果 |
   | --- | --- |
-  | 问之前查「已经有这种语言」那一步 | RESULT_B1 |
-  | 问句写名字（改回写 id） | RESULT_B2 |
+  | 问之前查「已经有这种语言」那一步 | 红：`a language the voice already has is refused before anything is asked`（照样先回了授权的问句） |
+  | 问句写名字（改回写 id） | 红：`the consent question names the voice, not its id`（问句里又是 `voice_9b1deb4d…`） |
 
 ## 教训 / 防回归
 
