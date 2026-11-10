@@ -48,9 +48,9 @@ func runProductionSchemaChecks() {
           "ordinary project saves preserve their argument surface")
     check(MCPArgumentCheck.problem(tool: .saveProject, arguments: ["production": .null, "expected_revision": 1]) == nil,
           "explicit plan clearing passes name validation")
-    // 2026-11-07 用户定：角色 A/B 的三个工具将全清单上限提高到 110,000。
-    let count = JSONValue.object(["tools": MCPToolName.listJSON]).encodedString().utf16.count
-    check(count <= 110_000, "production authoring keeps the complete catalog within 110000 UTF16 units (\(count))")
+    // 上限和量法只有 CatalogBudget 一份（迁移完收到 100,000）。
+    let count = catalogSize(MCPToolName.listJSON)
+    check(count <= catalogBudget, "production authoring keeps the complete catalog within \(catalogBudget) UTF-16 units (\(count))")
     // 2026-11-10 名片迁移：source_frame 证据的细节从名片搬进说明书（topic=freeze_frame 的 evidence 一节）。
     let freezeGuide = (MCPGuideTopics.topic(named: "freeze_frame")?.sections ?? []).map(\.text).joined(separator: "\n")
     check(freezeGuide.contains("upright_source"), "native freeze evidence does not promise final composed pixels")

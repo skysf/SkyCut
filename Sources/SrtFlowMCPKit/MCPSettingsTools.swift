@@ -23,10 +23,9 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .setSettings, title: "Change SkyCut settings",
                 description: """
-                Change preferences only when the user asks: theme, language, daily_ai_credit_limit, ai_access_mode, the \
-                optimized-media cache. Omitted fields stay; everything is checked before anything changes. Changing ai_access_mode or \
-                raising the credit limit always returns needs_confirmation, even in full_access: ask, then repeat with confirm_token. \
-                Never edits a project; keys and connections stay in Settings.
+                Change preferences only when the user asks: theme, language, daily_ai_credit_limit, ai_access_mode, the optimized-media cache. \
+                Omitted fields stay; all are checked before any change. Changing ai_access_mode or raising the credit limit always returns \
+                needs_confirmation, even in full_access: ask, repeat with confirm_token. Never edits a project; keys stay in Settings.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),
@@ -36,8 +35,8 @@ enum MCPSettingsTools {
                         "description": "Cache limit in decimal GB, matching the Settings picker."
                     ],
                     "clear_optimized_media_cache": MCPSchema.boolean("true clears regenerable preview media; false does nothing."),
-                    "daily_ai_credit_limit": MCPSchema.integer("Hard daily AI budget in credits; 0 blocks paid tasks. Raising it requires confirmation.", minimum: 0, maximum: 1_000_000),
-                    "ai_access_mode": MCPSchema.string("App-wide permission mode; any change ALWAYS needs user agreement and confirm_token.", oneOf: ["ask_for_approval", "full_access"]),
+                    "daily_ai_credit_limit": MCPSchema.integer("Hard daily AI budget in credits; 0 blocks paid tasks; raising it asks first.", minimum: 0, maximum: 1_000_000),
+                    "ai_access_mode": MCPSchema.string("App-wide permission mode; every change needs the user's yes and confirm_token.", oneOf: ["ask_for_approval", "full_access"]),
                     "confirm_token": MCPSchema.confirmToken
                 ])
             )

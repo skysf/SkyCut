@@ -15,13 +15,12 @@ enum MCPGuideTool {
         MCPToolDefinition(
             .skycutGuide, title: "Read the SkyCut guide",
             description: """
-            START HERE. SkyCut's manual: free, read-only, instant, no project. No topic: a map of every SkyCut tool by task. \
-            topic=<tool name>: that tool's guide (what it does, then every field with its type, choices and range); \
-            topic=rules, conventions, paid, workflows or errors: shared rules. Long topics list sections; pass section to read one. \
-            Read a tool's topic before its first use when its description asks, and after a failed call.
+            START HERE. SkyCut's manual: free, read-only, no project. No topic: a map of every tool by task. topic=<tool>: its guide (use, \
+            then every field with type, choices, range); rules, conventions, paid, workflows, errors: shared rules. Long topics list \
+            sections; pass section for one. Read a tool's topic first when its card asks, and after a failed call.
             """,
             input: MCPSchema.object([
-                "topic": MCPSchema.string("A tool name (e.g. edit_clip) or rules, conventions, paid, workflows, errors. Leave out for the map."),
+                "topic": MCPSchema.string("Tool name or rules/conventions/paid/workflows/errors; leave out for the map."),
                 "section": MCPSchema.string("One section of a long topic, named in that topic's sections.")
             ]),
             readOnly: true,

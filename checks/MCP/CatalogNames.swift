@@ -73,6 +73,8 @@ func catalogKnownNames() -> Set<String> {
     // 变声（声音 PR 9，MCPGuideVoiceChangeTopic）提到的结果字段和种类：做完时两段新音频的 voice_clip_id / background_clip_id、两个文件
     // voice_file / background_file（VoiceChangeJob.land），Sky Studio 的活的种类 voice_convert（get_status models=true 里列着它的上限）。
     names.formUnion(["voice_clip_id", "background_clip_id", "voice_file", "background_file", "voice_convert"])
+    // manage_voices 没给 language 时（2026-11-11，SkyStudioVoiceRecordingLanguage）：结果里的 language_detected、识别不出来的 reason。
+    names.formUnion(["language_detected", "language_undetected"])
     // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
     names.insert("overrides_not_applied")
     return names

@@ -18,6 +18,7 @@ func runVoiceLibraryChecks(_ root: URL) async throws {
     try await listChecks(root)
     try await createChecks(root)
     try await addReferenceChecks(root)
+    try await runVoiceLibraryLanguageChecks(root)
     try await deleteChecks(root)
     try await designChecks(root)
     try await narrationChecks(root)

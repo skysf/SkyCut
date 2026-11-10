@@ -38,15 +38,19 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      用途挨着的只能是一个只读、一个会改的（`transcribe` 只读、`generate_subtitles` 改字幕轨），说明里写清彼此的区别。
    - **只读的和写文件的不放进同一个工具**：客户端按 `readOnlyHint` 分组放行（Claude 桌面版分「只读 / 写入」两类，
      Codex 的 `writes` 模式也按它判），混在一起就只能按最严的标。
-   - **说明总长度有上限**：整份工具清单（`tools/list` 的 JSON）**11 万字符以内**，约 3.1 万 token（2026-09-28 是 5.4 万；上限 2026-09-28 定 7.2 万、
-     2026-10-02 抬到 8 万（给 `upscale_clip`）、2026-10-14 抬到 9 万（审美盲测的六样功能加完只剩 26 字，用户：「增加上限」）、2026-10-17 抬到
-     10 万（一个会话剪几个工程，碰工程的工具每个多一个 `project` 参数；加完配了 fal 的全清单约 91,300），2026-11-07 用户定再抬到 11 万（角色 A/B：list_characters / get_character / manage_characters），都是用户定的）。
-     上下文跟着说明总量走、不跟着个数走（合并工具省不了多少），用户那边还开着别的 MCP。超了先把说明写短。
-     `checks/MCP/ProtocolChecks.swift` 钉着。
+   - **说明总长度有上限**：整份工具清单（带外壳的 `tools/list` JSON，按 UTF-16 数）**10 万以内**（2026-11-10 MCP 按需说明迁移完收到这里，
+     [按需说明方案](../plans/2026-11-09-mcp-guide.md) 4.1、第八节第 2 条；之前 2026-09-28 定 7.2 万、2026-10-02 抬到 8 万（`upscale_clip`）、
+     2026-10-14 抬到 9 万（审美盲测的六样功能）、2026-10-17 抬到 10 万（碰工程的工具多一个 `project`）、2026-11-07 抬到 11 万（角色 A/B 的三个工具），
+     都是用户定的）。上下文跟着说明总量走、不跟着个数走（合并工具省不了多少），用户那边还开着别的 MCP。**以后加工具只能先把说明挪进说明书，
+     不再为说明文字抬上限**。上限和量法只有一份：`checks/MCP/CatalogBudget.swift`（ProtocolChecks 量小程序真发出去的那一份、UsageExampleChecks /
+     ProductionSchemaChecks 量清单本身，都调它；以前三处各写一个 110,000、口径还不一样）。
 6. **按客户端怎么读来写：总说明是目录**（2026-09-30 用户拍板，[案例](../bugfixes/2026-09-30-mcp-text-truncated-at-2048.md)）：
-   - **Claude Code**（默认开 tool search）会话开始只加载**工具名 + 总说明**，每个工具的完整定义用到才搜出来加载（一次最多 5 个）。
-     它**只保留总说明和每个工具说明的前 2,048 个字符**（JavaScript 的字符串长度，超了截掉、末尾加「… [truncated]」，对模型和用户都不提示，
-     只在它的 MCP 日志里记一行；参数的说明目前不截）。**Codex** 要求总说明的前 512 个字符自成一体。Codex 和 Claude 桌面版没有按需加载，整份清单每轮都进上下文。
+   - **Claude Code**（默认开 tool search）会话开始只加载**工具名 + 总说明**（加上预先加载的 `skycut_guide`），每个工具的完整定义用到才搜出来加载。
+     2.1.296 起总说明和预先加载的工具留 4,096 个字符、按需加载的工具留 16,384（之前一律 2,048，超了静默截掉）。
+     **Codex**（0.147 起，GPT-5.6 以后的模型）走代码模式：工具不在初始提示里，模型在 `exec` 里筛 `ALL_TOOLS` 打印条目来找，每个条目带一份整份总说明；
+     一次输出约 1 万 token 就截掉中间；参数定义超过 5,000 字节就删光参数说明（`tool_input_schema_max_bytes`）；0.167 在开发者消息里给每个 MCP 服务器
+     列一行、带总说明开头约 250 字（2026-11-10 实测，[试点实测](../reports/2026-11-10-mcp-guide-pilot.md)）。官方要求总说明的前 512 个字符自成一体。
+     Claude 桌面版的聊天没有核实，按整份清单每轮都进上下文算。
    - 所以给 AI 的文字分层，各管一件事：
      ① **总说明 = 入口 + 主动规矩 + 怎么读说明书**（2026-11-09 用户定，[按需说明方案](../plans/2026-11-09-mcp-guide.md)第八节第 1 条，
      改了 2026-09-30「总说明是目录、每个工具名都要在目录里」那条）：SkyCut 是什么、开头几步、几条要 AI **主动**做的规矩（开头问一次看着剪还是后台、
@@ -54,20 +58,17 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      ≤ 1,200；前 512 字就是完整的最短用法、点到 `skycut_guide`。按需求分组的工具目录（带上用户会说的词：9:16、水印、配乐……）搬进了
      **说明书的地图**（`skycut_guide` 不带 topic）：Codex 每打印一个工具条目就带一份整份总说明（2026-11-03 那批会话里重复的总说明占找工具输出的
      32–59%），Claude Code 本来就把工具名单独列给模型，地图在说明书里一次读全；清单里每个工具都要**作为一项列在地图上**（GuideChecks）。
-     ② **每个工具的说明 = 那一章**：这个工具怎么用，≤ 2,048；只跟某个参数有关的长话写进那个参数的说明（参数说明随工具一起加载）。
-     **迁移过的工具**（2026-11-10 起试点 5 个：edit_clip、generate_media、set_text、add_clips、look，加上随声音 PR 3 的 add_voiceover，第一批 25 个、
-     第二批 27 个两个 PR 都合了；只剩 skycut_guide 自己）的说明是**名片**：≤ 450、
-     按工具性质写固定说法、参数说明 ≤ 120 且范围写数字、参数定义 ≤ 4,500 字节（例外 edit_clip、generate_media），长话进说明书
-     （[MCP 说明书](mcp-guide.md)第三节第 14 条）。
+     ② **每个工具的说明 = 名片**（2026-11-10 两批迁移合完、方案 PR 6 起对**全部工具**）：≤ 450（目标 350），第一句说做什么、按工具性质写固定说法；
+     参数说明 ≤ 120 且范围写数字（Codex 不显示 minimum / maximum）；参数定义 ≤ 4,500 字节（Codex 默认 5,000 就删光参数说明；例外 edit_clip、
+     generate_media，名单不许变长，它们的名片要带上会影响对错的语义）；长话进说明书（[MCP 说明书](mcp-guide.md)第三节第 14 条）。
      ③ **出结果那一刻才用得上的规矩写在结果里**：`needs_confirmation` 的 `next_step`、任务结果的「用 get_job 等」、
      用户按了停止回的那句、`waiting_for_user` 的原话。
      ④ **说明书 `skycut_guide`**（2026-11-10 起，[MCP 说明书](mcp-guide.md)）：地图、每个工具的完整用法、五个通用主题（rules / conventions / paid /
      workflows / errors），用到才读、一次读一节；报错指到对应的主题（参数名写错的那句、路由 catch 的那一处）。
    - 往总说明里加东西之前先问：它是不是要 AI 主动去做？不是的话放进名片、说明书或者结果。
-   - 各客户端怎么读已经变了（Claude Code 2.1.296 起截在 4,096 / 16,384、Codex 走代码模式且每个条目背一份总说明，方案 1.3、1.5），
-     这一条的客户端事实按方案的 PR 6 重写；在那之前工具说明照旧按 2,048 守。
-   - 守卫：`checks/MCP/CatalogTextChecks.swift`（总说明 ≤ 1,200、每个工具说明 ≤ 2,048、前 512 字点到 open_folder / get_timeline /
-     look / export_video / skycut_guide、只用英文）；地图列全每个工具在 `checks/MCP/GuideChecks.swift`。
+   - 守卫：`checks/MCP/CatalogTextChecks.swift`（总说明 ≤ 1,200、前 512 字点到 open_folder / get_timeline / look / export_video / skycut_guide；
+     每个工具的名片 ≤ 450、参数说明 ≤ 120 且范围写数字、参数定义 ≤ 4,500 字节和例外名单；只用英文）；名片上按性质的固定说法和说明书主题在
+     `checks/MCP/GuidePilotChecks.swift`；地图列全每个工具在 `checks/MCP/GuideChecks.swift`。
    - **按需求找工具**（2026-11-03）：总说明前 512 字同时点到批量编辑、换旁白同步、成片检查和快速审阅；完整的需求 → 工具在说明书地图里；
      详细 JSON 示例只在对应工具。
      示例里的身份是占位，先读 `get_timeline` 换成真实 id。`UsageExampleChecks` 按真实 schema 校验字段、必填、类型、枚举和范围，
@@ -1016,8 +1017,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 58. **声音库：`list_voices`、`manage_voices`（2026-11-10 声音 PR 6，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.5、4.6；合同见 [声音库](voice-library.md)）**：
     读和写分开（同角色 A/B 的先例）。`list_voices` 只读免费：预设按语言（`listed` 的、按打分高到低、默认的标出来、按这种语言报性别和说明，
     没有自己名单的语言照英文那份）+ 我的声音（`GET /voices`，没有任何服务商 id）；声音库用不了时照回预设、`mine` 说暂时用不了。
-    `manage_voices` 写用户的声音库（服务器上的事，不登记时间线撤销）：`create` / `add_reference` 要 `file`、`language`（这一刀要 AI 给，本机检测随声音库界面接）
-    和 `name` / `voice`，本机做参考录音（[声音库](voice-library.md)第一节的规格）、问授权（问句带 `/models` 的 `voice_consent.per_recording` 原文和版本，
+    `manage_voices` 写用户的声音库（服务器上的事，不登记时间线撤销）：`create` / `add_reference` 要 `file` 和 `name` / `voice`；`language` 可选
+    （2026-11-11，[案例](../bugfixes/2026-11-11-manage-voices-language-required.md)）：给了就照给的、不识别、不盖掉；没给就在做好的参考录音上识别，
+    和新建声音对话框同一份（`VoiceSampleLanguage` → `SpokenLanguageProbe`），识别成了什么写进问句和结果（`language`、`language_detected`）；
+    识别不出来不猜，一样都不问、不传，报 `reason: language_undetected`、叫 AI 带上 `language` 再调（不叫它去点界面）；加一种语言时识别出来的
+    那种这个声音已经有，和 AI 给的那种一样在问之前就说。本机做参考录音（[声音库](voice-library.md)第一节的规格）、问授权（问句带 `/models` 的
+    `voice_consent.per_recording` 原文和版本，
     令牌绑文件身份、那段参考录音的内容哈希、用的那一段、语言、名字 / 声音、版本、账户）、点过头才传 `voice_reference`、建声音带 `consent: true` + 版本；
     `design` 先报价、问一次性费用、点过头记账起 `voice_design` 任务（`get_job` 报新声音和 1 小时的 `sample_url`，账按实收）；`rename` 直接改；`delete`
     请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`
@@ -1038,7 +1043,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     结果不明不重交）→ 下两个文件到原素材旁边 → **落地是异步落账、自己包一层 `AIUndoGrouping.step`**：原段静音、两条新音频轨、三段链接，一步撤销。
     这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（第十节第 1 条）。
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
-    （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（和说明书第二批、#373 的 `user_request` 合在一起）是 100,285 / 110,000。
+    （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
 
 ## 五、这一轮、停止、撤销这一轮
 

@@ -218,7 +218,7 @@
 | action | 参数 | 接口 | 请求批准模式要问 | 花钱 | 回 |
 |---|---|---|---|---|---|
 | `create` | `file`、`start` / `end`（可选，源文件秒数）、`language`（可选，自动识别）、`name` | 传 `/uploads` purpose `voice_reference` → `POST /voices`（`name`、`language`、`reference_url`、`source`：文件名 / 起止秒 / `auto_selected`、`consent`：`true` 或 `"standing_grant"`、`idempotency_key`） | 授权（每次） | 免费 | `voice_…`、用了哪一段、有效人声秒数 |
-| `add_reference` | `voice`、`file`、`start` / `end`、`language` | `POST /voices/{id}/references` | 授权 | 免费 | 这个声音现在有哪几种语言 |
+| `add_reference` | `voice`、`file`、`start` / `end`、`language`（可选，自动识别） | `POST /voices/{id}/references` | 授权 | 免费 | 这个声音现在有哪几种语言 |
 | `design` | `description`、`name`、`sample_text`（可选） | `/quote` + `/jobs` kind `voice_design`（`prompt` = 描述、`params.name`、`params.sample_text`） | 一次性费用 | 设计费（服务器按描述的语言选 `minimax-voice-design` / `qwen3-voice-design`） | `job_id` → `get_job` → 新声音 + `sample_url` |
 | `rename` | `voice`、`name` | `PATCH /voices/{id}` | — | 免费 | |
 | `delete` | `voice` | `DELETE /voices/{id}` | 确认一句 | 免费 | 已删除；不说「可以撤销」 |

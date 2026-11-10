@@ -1,22 +1,16 @@
 import Foundation
 import SrtFlowMCPKit
 
-// 迁移过的工具（名片写短、长话进说明书；方案 docs/plans/2026-11-09-mcp-guide.md 2.2、2.5、4.1、5.1、5.2）。只查 MCPGuideWrittenTopics.migrated 里的，
-// 没迁移的等方案的 PR 4–5，上限到 PR 6 才对全部工具生效：
-// - 名片 ≤ 450（目标 350，打印出来看）、按工具性质该写的固定说法都在（只读 / 一步撤销 / 任务号 / 花钱 / 会问 / 要先读说明书）；
-// - 每条参数说明 ≤ 120，带 minimum / maximum 的说明里写着数字（Codex 不显示范围）；
-// - 单个工具的参数定义 ≤ 4,500 UTF-8 字节，例外只有 edit_clip、generate_media（例外名单不许变长）；
+// 迁移过的工具（名片写短、长话进说明书；方案 docs/plans/2026-11-09-mcp-guide.md 2.2、2.5、4.1、5.1、5.2）。只查 MCPGuideWrittenTopics.migrated 里的
+// （2026-11-10 两批合完，除了 skycut_guide 自己都在里面）。名片 ≤ 450、参数说明 ≤ 120、参数定义 ≤ 4,500 字节这几条上限 PR 6 起对全部工具生效，
+// 搬到了 CatalogTextChecks；这里查的是迁移本身：
+// - 名片上按工具性质该写的固定说法都在（只读 / 一步撤销 / 任务号 / 花钱 / 会问 / 要先读说明书；名片多长打印出来看，目标 350）；
 // - 说明书的主题：overview 以迁移前的说明原文开头（一个字不丢）、迁移前后的名片不一样、几节都不空、有例子有相关主题；
 //   手写的几节只提真有的名字（参数定义写成的 fields 几节是自动生成的，不算手写）。
 //   没有可搬的原文的工具（行为和迁移一起改了，previousCard 为 nil）只许是写死的那几个（现在只有 add_voiceover，mcp-guide.md 第 14 条）。
 // - 每一节讲什么（2026-11-10 试点实测之后）：手写的每一节带一行 about、fields 几节自动生成；分节回的主题第一次回答列出 contents、
 //   next_step 叫它只读要用的那几节、常见的活只读哪一节（generate_media → spending、edit_clip → framing）。
 
-let pilotCardLimit = 450
-let pilotParameterLimit = 120
-let pilotSchemaByteLimit = 4_500
-/// 参数定义超过 4,500 字节的例外（方案 4.1：先列例外，名单不许变长）。
-let pilotSchemaExceptions: Set<MCPToolName> = [.editClip, .generateMedia]
 /// 没有可搬的原文的迁移工具：行为和迁移同一个 PR 改了，旧说明照抄进概要等于叫 AI 用已经没有的东西（add_voiceover：声音方案 4.10、4.2–4.4、
 /// 第十二节 —— 默认 gemini:Charon、去掉 clone_from、不再收 Rachel；旧说明每一句去了哪写在那个 PR 的说明里）；从第一天起就按名片 + 说明书写的
 /// 新工具（声音 PR 6 的 list_voices、manage_voices，声音 PR 9 的 change_voice）。名单写死：加一个要改这里。
@@ -123,7 +117,6 @@ func runGuidePilotChecks() {
         let definition = tool.definition
         let card = definition.description
         cards.append("\(tool.rawValue) \(card.utf16.count)")
-        check(card.utf16.count <= pilotCardLimit, "\(tool.rawValue): the card fits \(pilotCardLimit) characters (it is \(card.utf16.count))")
         for phrase in pilotNature[tool] ?? [] {
             check(card.contains(phrase), "\(tool.rawValue): the card says \"\(phrase)\"")
         }
@@ -131,19 +124,13 @@ func runGuidePilotChecks() {
         if definition.inputSchema["properties"]?["confirm_token"] != nil {
             check(card.contains("needs_confirmation"), "\(tool.rawValue): a tool that can ask says needs_confirmation")
         }
-        let bytes = definition.inputSchema.encodedString().utf8.count
-        if !pilotSchemaExceptions.contains(tool) {
-            check(bytes <= pilotSchemaByteLimit, "\(tool.rawValue): the parameters fit \(pilotSchemaByteLimit) bytes (they are \(bytes))")
-        }
-        walkPilotParameters(definition.inputSchema, path: tool.rawValue)
         checkWrittenTopic(tool)
     }
-    checkEqual(pilotSchemaExceptions, [.editClip, .generateMedia], "the over-4,500-byte exceptions stay edit_clip and generate_media only")
     let withoutPreviousCard = Set(MCPGuideWrittenTopics.migrated.filter { MCPGuideWrittenTopics.topic(for: $0)?.previousCard == nil })
     checkEqual(withoutPreviousCard, pilotToolsWithoutPreviousCard, "only the listed migrated tools have no pre-migration description to keep")
     checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice],
                "the tools without a pre-migration description stay add_voiceover and the new voice tools")
-    print("MCP pilot cards: \(cards.joined(separator: ", ")) (limit \(pilotCardLimit), target 350).")
+    print("MCP migrated cards: \(cards.joined(separator: ", ")) (limit \(cardLimit), target 350).")
     runGuideFieldSplitChecks()
     runGuideContentsChecks()
 }
@@ -164,8 +151,8 @@ private func runGuideContentsChecks() {
     print("MCP guide topics answered in parts: \(parts.joined(separator: ", ")).")
     for tool in MCPGuideWrittenTopics.migrated {
         for section in MCPGuideWrittenTopics.topic(for: tool)?.sections.dropFirst() ?? [] {
-            check(!section.about.isEmpty && section.about.utf16.count <= pilotParameterLimit,
-                  "\(tool.rawValue).\(section.name) says what it covers in at most \(pilotParameterLimit) characters")
+            check(!section.about.isEmpty && section.about.utf16.count <= parameterLimit,
+                  "\(tool.rawValue).\(section.name) says what it covers in at most \(parameterLimit) characters")
             let unknown = guideUnknownNames(section.about)
             check(unknown.isEmpty, "\(tool.rawValue).\(section.name)'s about line names only real names (unknown: \(unknown.joined(separator: ", ")))")
         }
@@ -241,20 +228,6 @@ private func problemsInFieldSections(_ sections: [MCPGuideSection], schema: JSON
         }
     }
     return problems
-}
-
-/// 每条参数说明 ≤ 120；带范围的写着数字。
-private func walkPilotParameters(_ schema: JSONValue, path: String) {
-    for (name, field) in schema["properties"]?.objectValue ?? [:] {
-        let here = "\(path).\(name)"
-        let description = field["description"]?.stringValue ?? ""
-        check(description.utf16.count <= pilotParameterLimit, "\(here): the description fits \(pilotParameterLimit) characters (it is \(description.utf16.count))")
-        if field["minimum"] != nil || field["maximum"] != nil {
-            check(description.range(of: #"\d"#, options: .regularExpression) != nil, "\(here): the description spells out its range in numbers")
-        }
-        walkPilotParameters(field, path: here)
-        if let items = field["items"] { walkPilotParameters(items, path: here + "[]") }
-    }
 }
 
 /// 说明书里这个工具的主题：迁移前的原文还在、手写的几节齐全、只提真有的名字。

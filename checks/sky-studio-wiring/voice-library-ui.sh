@@ -8,7 +8,9 @@
 #   - 参考录音只经 VoiceReferenceSample.prepare，交只经 SkyStudioVoiceRecordingSubmission（createVoice / addVoiceReference / deleteVoice
 #     别处不许直接调；删除碰上存储一时不可用再发一次只有 SkyStudioVoiceDeletion 那一份）；
 #   - 设计只经 SkyStudioVoiceDesignOrder，对话框按下去先过每日硬预算再起任务；
-#   - 界面不用确认码、Key 只静默读、不直接动积分的账；声音库的视图不读工程、不订阅播放器的时钟。
+#   - 界面不用确认码、Key 只静默读、不直接动积分的账；声音库的视图不读工程、不订阅播放器的时钟；
+#   - 录音的语言识别只有一份（SpokenLanguageProbe ← VoiceSampleLanguage）：对话框拿它预选，manage_voices 没给 language 时拿它定
+#     （给了就照给的、不识别；在参考录音做好之后、问授权之前）。
 # 长期约束见 docs/architecture/voice-library.md 第九节。
 
 VOICE_UI_DIR="Sources/SrtFlow/VoiceLibrary"
@@ -56,3 +58,44 @@ while IFS= read -r file; do
     fi
   fi
 done <<<"${voice_ui_files}"
+
+# manage_voices 没给 language 时的识别（2026-11-11，docs/bugfixes/2026-11-11-manage-voices-language-required.md）：和新建声音对话框
+# 同一份（VoiceSampleLanguage.detect → SpokenLanguageProbe），不另写一份候选 / 裁决；AI 给了就照它的、不识别；识别在参考录音做好之后、
+# 问授权之前（识别不出来时什么都不问、不传）。行为由 check-voice-recovery 的 LibraryLanguageChecks 钉。
+VOICE_RECORDING_LANGUAGE="${VOICE_DIR}/SkyStudioVoiceRecordingLanguage.swift"
+VOICE_SAMPLE_LANGUAGE="${VOICE_UI_DIR}/VoiceSampleLanguage.swift"
+VOICE_LIBRARY_SERVICES="${VOICE_DIR}/SkyStudioVoiceServices.swift"
+VOICE_HARVESTER="Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift"
+for file in "${VOICE_RECORDING_LANGUAGE}" "${VOICE_SAMPLE_LANGUAGE}" "${VOICE_LIBRARY_SERVICES}" "${VOICE_HARVESTER}"; do
+  [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
+done
+probe_users="$(code_files_with 'SpokenLanguageProbe\.' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
+expected_probe_users="$(printf '%s\n' "${VOICE_HARVESTER}" "${VOICE_SAMPLE_LANGUAGE}" | LC_ALL=C sort | tr '\n' ' ')"
+[ "${probe_users}" = "${expected_probe_users}" ] \
+  || fail "这段声音说的是哪种语言只有 SpokenLanguageProbe 一份，只许生成字幕（${VOICE_HARVESTER}）和参考录音（${VOICE_SAMPLE_LANGUAGE}）调：${probe_users:-没有}"
+sample_detectors="$(code_files_with 'VoiceSampleLanguage\.detect\(' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
+expected_sample_detectors="$(printf '%s\n' "${VOICE_LIBRARY_SERVICES}" "${NEW_VOICE_MODEL}" | LC_ALL=C sort | tr '\n' ' ')"
+[ "${sample_detectors}" = "${expected_sample_detectors}" ] \
+  || fail "参考录音的语言识别只许两个入口用：对话框（${NEW_VOICE_MODEL}）和 manage_voices（${VOICE_LIBRARY_SERVICES} 的 detectLanguage；变声也只经它，不另调一遍）：${sample_detectors:-没有}"
+grep -qF 'detect: services.detectLanguage' "${VOICE_RECORDING}" \
+  || fail "${VOICE_RECORDING}：没给 language 时识别只经 services.detectLanguage（默认就是对话框那一份）"
+recording_code="$(sed 's,//.*,,' "${VOICE_RECORDING}")"
+if grep -qE 'requiredString\("language"\)' <<<"${recording_code}"; then
+  fail "${VOICE_RECORDING}：language 是可选的（声音方案 4.6），不许再当必填"
+fi
+sample_line="$(grep -nF 'VoiceReferenceSample.prepare(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+resolve_line="$(grep -nF 'SkyStudioVoiceRecordingLanguage.resolve(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+ask_line="$(grep -nF 'SkyStudioJobGate.voiceConsent(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${sample_line}" ] || [ -z "${resolve_line}" ] || [ -z "${ask_line}" ] \
+  || [ "${sample_line}" -ge "${resolve_line}" ] || [ "${resolve_line}" -ge "${ask_line}" ]; then
+  fail "${VOICE_RECORDING}：语言要在参考录音做好之后（在它上面识别）、问授权之前定下来（识别不出来时什么都不问、不传）"
+fi
+language_code="$(sed 's,//.*,,' "${VOICE_RECORDING_LANGUAGE}")"
+if grep -qE 'SpokenLanguageProbe|SpeechTranscriptionService|SubtitleLanguageDetection|NLLanguageRecognizer' <<<"${language_code}"; then
+  fail "${VOICE_RECORDING_LANGUAGE}：这里不许自己识别（另写一份候选 / 裁决），只调传进来的那一个"
+fi
+given_line="$(grep -nF 'if let given { return' "${VOICE_RECORDING_LANGUAGE}" | head -1 | cut -d: -f1 || true)"
+detect_line="$(grep -nF 'await detect(' "${VOICE_RECORDING_LANGUAGE}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${given_line}" ] || [ -z "${detect_line}" ] || [ "${given_line}" -ge "${detect_line}" ]; then
+  fail "${VOICE_RECORDING_LANGUAGE}：AI 给了 language 就照它的，要在识别之前就回去（不识别、不拿识别的结果盖掉）"
+fi

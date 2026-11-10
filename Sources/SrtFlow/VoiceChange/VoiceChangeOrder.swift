@@ -9,8 +9,8 @@ import SrtFlowMCPKit
 // - 一次最长多少秒：只读 `/models` 的 `limits.max_source_seconds`（现在 5 分钟），SkyCut 不写死。
 // - **用哪种语言的参考**（`params.target_language`）：知道这段说的是什么语言、目标声音又有这种语言的参考时才带；不知道、或者没有这种
 //   参考就不带，照服务器的默认（中文参考，没有中文就随便一段）。实测都是同语言参考，拿中文参考去变英文片段没测过。
-// - 这段说的是什么语言：调用方给了就用它（AI 的 `language`）；否则本机检测（生成字幕那一套，只在已装的语言里裁决、不下载模型，
-//   收费之前做），等太久、检测不出来、macOS 15 都算不知道。
+// - 这段说的是什么语言：调用方给了就用它（AI 的 `language`）；否则本机检测（和新建声音的对话框、manage_voices 同一份：
+//   `SkyStudioVoiceServices.detectLanguage`，只在已装的语言里裁决、不下载模型，收费之前做），等太久、检测不出来、macOS 15 都算不知道。
 // - 报价用的那一份（kind `voice_convert`、`model: auto`、`params.target_voice`、`params.source.seconds`）；钱的事过了之后拿记上账的
 //   那一笔起任务（VoiceChangeJob）。花钱只判每日硬预算：不是一次性费用，两种权限模式都不问；面板上的报价就是确认。
 // 不管什么：截声音（VoiceChangeSource）、任务怎么跑和落地（VoiceChangeJob / VoiceChangeLanding）、参数怎么读（VoiceChangeTool）、界面。
@@ -47,8 +47,12 @@ struct VoiceChangeTarget: Equatable, Sendable {
 @MainActor
 struct VoiceChangeServices {
     var voice = SkyStudioVoiceServices()
-    /// 这段（截好的 WAV、多长）说的是什么语言；检测不出来是 nil。
-    var detectLanguage: @MainActor (URL, Double) async -> String? = { await VoiceSampleLanguage.detect(sample: $0, seconds: $1) }
+    /// 这段（截好的 WAV、多长）说的是什么语言；检测不出来是 nil。和新建声音的对话框、manage_voices 同一份
+    /// （`SkyStudioVoiceServices.detectLanguage`），这里不另调一遍识别。
+    var detectLanguage: @MainActor (URL, Double) async -> String? {
+        get { voice.detectLanguage }
+        set { voice.detectLanguage = newValue }
+    }
     /// 本机检测最多等多久（秒）：AI 的一次调用只等得起一分钟。
     var detectionTimeout: Double = 20
     /// 两个文件放哪个文件夹之外的退路（原素材的文件夹写不进去时）：nil = 工程的家、下载。
