@@ -179,14 +179,16 @@ Sky Studio。官网不接支付 SDK 或结账逻辑。12 个 canonical URL 和 s
 2026-11-07 快照来自只读 Sky Studio 仓库
 `cursor-skystudios-app-cinematic` 的 Sky Studio PR #242 合并版本
 `94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00`，对应已受控上线的目录。
-只用 `git show <revision>:<路径>` 读取，不改该仓库、不调用真实生成服务：
+只用 `git show <revision>:<路径>` 读取，不改该仓库、不调用真实生成服务。2026-11-10 起 pin 改到 Sky Studio PR #245（定价修正：
+Omni 换成 1.2、Veo 3.1 Pro 下架）的 head `86b797a9c935c3499674fce33525ab0255527745`，**改这一版时 #245 还没合并**：官网这一版
+要等 #245 在生产上线后再合（合进 main 就部署，见上面「后台接口上线不等于客户端已发版」那一条的同类规矩）。角色引用的两个锚点在这个 revision 里还在。
 
 - `docs/agents/skycut-api.md` 的 `GET /models` 与 `Per kind` 是合同。
 - `api/_utils/skycut/catalog.ts`、`visualModels.ts` 和各 `*Contract.ts` 构建 SkyCut 专用目录；
-  共 33 条记录、27 个不同 id，其中图片类 9 条。六个共享视频模型分别列文生视频和图生视频，
-  所以不能写成 33 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
+  共 31 条记录、26 个不同 id（2026-11-07 是 33 / 27；2026-11-10 Veo 3.1 Pro 下架少两条），其中图片类 9 条。五个共享视频模型分别列
+  文生视频和图生视频，所以不能写成 31 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
 - `shared/skycutImageModels.ts` 钉公开图片 id 与网页内部 id 的映射，`shared/modelDisplayNames.ts`
-  给普通图片与六个共享视频模型的显示名；`visualModels.ts` 直接给 `Qwen Angles` 与
+  给普通图片与五个共享视频模型的显示名；`visualModels.ts` 直接给 `Qwen Angles` 与
   `Image Upscale` 这两种特殊操作的名字和 operation。`shared/musicModel.ts` 给音乐名；
   `shared/skycutWan3.ts`、`skycutHeygen.ts`、`skycutH3LipSync.ts`、
   `skycutRemoveBackground.ts`、`videoUpscale.ts` 给其他视频、口型、去背景与放大的名称。
@@ -203,7 +205,7 @@ Sky Studio。官网不接支付 SDK 或结账逻辑。12 个 canonical URL 和 s
 | 图片换角度 | Qwen Angles（`qwen-angles`，`operation=camera_angle`） | 1 | Pro 经 AI，扣积分；一张图旋转、俯仰、推拉 |
 | 图片放大 | Image Upscale（`image-upscale`，`operation=upscale`） | 1 | Pro 经 AI，扣积分；2 / 3 / 4 倍，受 1650 万输出像素上限约束 |
 | 图片背景去除 | Ideogram Remove Background | 1 | Pro 经 AI，扣积分 |
-| 视频 | Minimax H3、Gemini Omni 1.1 Flash、Veo 3.1 Fast / Pro、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 15 | Pro 经 AI，扣积分 |
+| 视频 | Minimax H3、Gemini Omni 1.2 Flash、Veo 3.1 Fast、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 13 | Pro 经 AI，扣积分 |
 | 对口型 | HeyGen v3 Lipsync Speed / Precision、MiniMax H3 Max Lip Sync (Image to Video) | 3 | Pro 经 AI，扣积分 |
 | 音乐 | Lyria 3 Pro | 1 | Pro 经 AI，扣积分 |
 | 旁白生成 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
