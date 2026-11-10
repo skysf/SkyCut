@@ -190,7 +190,7 @@ private func runProNoticeAuthorizationChecks(_ fixture: SkyStudioMe) {
                     checkEqual(license.plan?.rawValue, plan == "future_plan" ? nil : plan, "renewal metadata cannot change plan")
                     if plan != "pro" { check(license.proNotice == nil, "only the current Mac's Pro gets Pro renewal notices") }
                     for tool in MCPToolName.allCases {
-                        checkEqual(SkyCutGates.aiAllows(tool, license: license, enforced: true), tool == .getStatus || mcp,
+                        checkEqual(SkyCutGates.aiAllows(tool, license: license, enforced: true), [.getStatus, .skycutGuide].contains(tool) || mcp,
                                    "renewal notices cannot change AI access to \(tool.rawValue)")
                     }
                 }

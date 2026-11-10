@@ -56,6 +56,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      ③ **出结果那一刻才用得上的规矩写在结果里**：`needs_confirmation` 的 `next_step`、任务结果的「用 get_job 等」、
      用户按了停止回的那句、`waiting_for_user` 的原话。
    - 往总说明里加东西之前先问：它是不是要 AI 主动去做？不是的话放进工具说明或者结果。
+   - **第四层：说明书 `skycut_guide`**（2026-11-10 起，[MCP 说明书](mcp-guide.md)）：工具的完整用法用到才读、一次读一节；迁移完之前上面三层照旧。
+     各客户端怎么读已经变了（Claude Code 2.1.296 起截在 4,096 / 16,384、Codex 走代码模式且每个条目背一份总说明，方案 1.3、1.5），
+     这一条按方案的 PR 6 重写；在那之前守卫的数字照旧。
    - 守卫：`checks/MCP/CatalogTextChecks.swift`（总说明和每个工具说明 ≤ 2,048、前 512 字点到 open_folder / get_timeline /
      look / export_video、目录里有清单的每个工具名、只用英文）。
    - **按需求找工具**（2026-11-03）：总说明前 512 字同时点到批量编辑、换旁白同步、成片检查和快速审阅；详细 JSON 示例只在对应工具。
@@ -930,7 +933,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
 53. **照授权拦：没开通的，AI 的工具一个都不做（收费方案第 5 刀第二步，2026-10-28；规矩全在 [Sky Studio 账号](sky-studio-account.md)）**：
     `AIToolRouter.handle` 核对参数名之后、建调用排队之前问 `SkyStudioAccount.aiRefusal`：此刻的授权不让用 MCP，就回「Not done」+ 为什么 + 请用户做什么
-    （粘 Key、发邮件开通、点「允许…」/「再查一次」、更新），一样都不做、不排队、不摆窗口。**`get_status` 照常回**，报 `skycut_plan`。
+    （粘 Key、发邮件开通、点「允许…」/「再查一次」、更新），一样都不做、不排队、不摆窗口。**`get_status` 照常回**，报 `skycut_plan`；说明书 `skycut_guide` 也照常回（第 57 条）。
     门在 App 里、不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。还没问完（刚启动、离线几天）时
     先问一次 `/me` 再判，最多等 20 秒。`export_video` 开始时、`get_job` 做完时带了水印就写 `watermark`（为什么、怎么去掉）。
     合进来时先关着，**2026-10-28 接口上线、用户给自己开了正式版之后打开**（`SkyCutGates.enforcedByDefault = true`）；测试开关 `skystudio.testGates` 关不掉它。
@@ -971,6 +974,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `list_characters capabilities=true` 读取原生角色模型 / 档位 / 价格；唯一写工具 `manage_characters` 的六个 action 是 create / import / update / replace_view / headshot / delete。创建 / 头像先报价、走同一个付费确认和硬预算；免费导入 / 编辑 / 换图不增加确认，删除在请求批准模式下由现有 `AIFileTools` 发码，全部权限直接通知。原生创建 / 头像 / 导入和换图用稳定 key、私有持久回执和跨重启 job_id；get_job 原单恢复不上传、不报价、不再次付费。原生任务不可服务器取消，源图 / 角色整理 / billing 三份状态分开；源图成功但整理失败只查原单。免费导入的显式同 key POST 恢复、换图丢答只现读，以及无 job_id 的付费丢答待核查，详见上述任务合同。角色 id 不自动成为四个时间线片段；库写入不进入工程撤销。
     **任务结果（2026-11-07）**：get_job 的 done / failed / cancelled 不再报告进行中 phase 或其排队 / 传输字段，不受远端旧 provider_meta 影响；正常完成不写成恢复。没有提示词的图片操作按源图短名加 angle / x2 起名，显式 name 优先；图片宽高从落盘字节补齐。完整约束与[真积分验收后修复](../bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md)见任务合同。
     工具清单总上限由用户 **2026-11-07 定为 110,000 字符**（原 100,000，角色 A/B 三工具）；每工具 2,048、前 512 字自成一体和英文规则保持。
+
+57. **说明书 `skycut_guide`（2026-11-10，[MCP 按需说明方案](../plans/2026-11-09-mcp-guide.md) PR 1；合同见 [MCP 说明书](mcp-guide.md)）**：
+    只读、免费、马上回、不碰工程；不带 topic 回目录，`topic=<工具名>` 回那个工具的说明书，长的分节、按 `section` 取。由 App 答（`AIGuideTools`，
+    Policy 和 recipes 同一行：不排队、不摆窗口、不算这一轮），内容在 `SrtFlowMCPKit`（`MCPGuide` / `MCPGuideTopics` / `MCPGuideFields`）；
+    没开通也照答（`SkyCutGates.alwaysAnswered`，第 53 条）；清单里排第一个、只有它带 `_meta` 的 `anthropic/alwaysLoad`。现在每个主题的概要就是
+    那个工具现在的说明原文、`fields` 从参数定义现算；之后的 PR 把长话搬进说明书、名片写短（先原样搬进去、再写名片），每一步的状态看合同的「现在做到哪」。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -1074,6 +1083,10 @@ edit_clip 2,074 字超长、清单里有汉字）。
 `checks/timeline-drag-wiring.sh` 的「落点单一」一节把 AI 放素材单独数：拖文件进来那套仍是恰好两处
 （画框、落地），`AITimelineEdits.swift` 里恰好一处 —— 一处都没有就是 AI 另算了一份落点
 （2026-09-27 反向验证：拿掉那一处调用，守卫当场红）。
+
+**说明书 skycut_guide（第 57 条）**：`checks/MCP/GuideChecks.swift`（跟着 `scripts/check-mcp.sh` 跑：位置、客户端提示、名片 ≤ 450、每个工具一个同名主题、
+目录列全、大小上限、分节、写错的 topic / section、手写的文字只提真有的名字、只用英文、App 那一头）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
+`checks/SkyStudio/GateChecks.swift`（没开通也照答）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
 
 **云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。
 

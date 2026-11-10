@@ -4,7 +4,7 @@ import SrtFlowMCPKit
 // MARK: - 照授权拦：AI 的工具让不让用、导出带不带水印，被挡住时跟 AI 怎么说（纯值）
 //
 // 管什么：收费方案第 5 刀第二步的规矩。
-// - 此刻的授权（SkyCutLicense）不让用 MCP：AI 的工具一个都不做，只有 get_status 照常回（AI 靠它看授权、跟用户说清楚）；
+// - 此刻的授权（SkyCutLicense）不让用 MCP：AI 的工具一个都不做，只有 get_status（AI 靠它看授权、跟用户说清楚）和说明书 skycut_guide 照常回；
 // - 导出带不带水印听服务器的 `watermark`（免费版、体验期带，正式版不带，都是服务器说了算）；
 // - 回给 AI 的几句话（英文）：没做、为什么、请用户做什么；导出带了水印时为什么、怎么去掉；get_status 里的 `skycut_plan`。
 // **照授权拦 2026-10-28 起默认打开**（`enforcedByDefault`）。合进来时先关着：Sky Studio 的接口上线、用户在后台给自己开了正式版之前
@@ -24,9 +24,13 @@ enum SkyCutGates {
         enforcedByDefault || defaults.bool(forKey: testingKey)
     }
 
-    /// AI 调这个工具让不让做。get_status 永远让：没开通时 AI 靠它看授权、跟用户说清楚。
+    /// 没开通也照答的工具。get_status：没开通时 AI 靠它看授权、跟用户说清楚。skycut_guide（说明书）：只读、免费、不碰工程、
+    /// 不含凭据和私有配方，没开通时 AI 也能把 SkyCut 能做什么说清楚（docs/plans/2026-11-09-mcp-guide.md 第八节第 5 条，2026-11-09 用户定）。
+    static let alwaysAnswered: Set<MCPToolName> = [.getStatus, .skycutGuide]
+
+    /// AI 调这个工具让不让做。`alwaysAnswered` 里的永远让。
     static func aiAllows(_ tool: MCPToolName, license: SkyCutLicense, enforced: Bool) -> Bool {
-        !enforced || tool == .getStatus || license.mcp
+        !enforced || alwaysAnswered.contains(tool) || license.mcp
     }
 
     /// 导出要不要因为授权带水印（测试开关另算，在 WatermarkPolicy）。

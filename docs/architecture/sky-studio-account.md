@@ -38,7 +38,7 @@
 | 自助购买说明字段 | `account_plan`、`pro_source`（subscription / one_time / manual / null）、`upgrade_url`、`manage_machines_url`、`plan_reason`、`plan_message`、`auto_renews`、`grace_until`、`machines` 全部可选，Mac 信息里的 limit / used / window_days / current_allowed 也可缺。随现有 `SkyStudioStoredAnswer` 一起缓存；未知套餐 / 来源 / 原因原样保留。**不能用 account_plan、paid_until、grace_until 或台数说明自行开启功能**，仍只听 plan / features / valid_until；grace_until 保留服务器时刻，比较时沿用 `stored.local` 换算，不另造钟差规则 |
 | 报错的话 | 服务器的 `message`（英文、写给人看）原样显示；没连上、回的不像话这两种是 SkyCut 自己的话，经 `L10n` 按界面语言 |
 | **照授权拦默认打开** | `SkyCutGates.enforcedByDefault = true`（2026-10-28 起，`checks/SkyStudio/GateChecks.swift` 钉着）。合进来时先关着：接口上线、用户给自己开了正式版之前谁都问不到授权，开早了用户自己的 AI 剪辑也被挡住。测试开关 `skystudio.testGates` 只能打开、**不能用它关掉**（不然一条 `defaults write` 就绕过去了），默认开着之后它不起作用，留着给哪天又得先关上时用 |
-| AI 的门 | 此刻的授权不让用 MCP：AI 的工具一个都不做。门在 `AIToolRouter.handle` **核对参数名之后、建调用排队之前**（`SkyStudioAccount.aiRefusal`），不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。**`get_status` 照常回**，报 `skycut_plan`（套餐、从哪来、AI 能不能用、带不带水印、体验还剩几天、正式版到哪天、出了什么事、请用户做什么）。被挡住的回「Not done」+ 为什么 + 请用户做什么（粘 Key、打开服务器给的购买地址 / 联系邮箱、点「允许…」、点「再查一次」、更新 SkyCut），话和规矩都在纯值的 `SkyCutGates`（英文；界面语言写的细节不带给 AI） |
+| AI 的门 | 此刻的授权不让用 MCP：AI 的工具一个都不做。门在 `AIToolRouter.handle` **核对参数名之后、建调用排队之前**（`SkyStudioAccount.aiRefusal`），不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。**`get_status` 照常回**，报 `skycut_plan`（套餐、从哪来、AI 能不能用、带不带水印、体验还剩几天、正式版到哪天、出了什么事、请用户做什么）。说明书 `skycut_guide` 也照常回（2026-11-10：只读、免费、不碰工程、不含凭据，没开通时 AI 也能说清 SkyCut 能做什么；`SkyCutGates.alwaysAnswered`，[MCP 说明书](mcp-guide.md)）。被挡住的回「Not done」+ 为什么 + 请用户做什么（粘 Key、打开服务器给的购买地址 / 联系邮箱、点「允许…」、点「再查一次」、更新 SkyCut），话和规矩都在纯值的 `SkyCutGates`（英文；界面语言写的细节不带给 AI） |
 | 还没问完时 | 此刻的授权不作数（没问到过、过期了）又有 Key：先问一次 `/me` 再判（正在问就等它；没问成过不到 5 分钟的不再问；最多等一次请求的超时 20 秒，`SkyStudioAccount.settledLicense`）。刚启动、离线几天之后的第一个调用不会因为还没问完就被挡 |
 | 导出水印 | 带不带听服务器的 `watermark`：`SkyStudioAccount.exportsWithWatermark`，导出器、导出面板那一行、`export_video` 都问它（[导出水印](export-watermark.md)）。要带却读不出 logo 就不导 |
 | 导出面板那一行 | 会带水印时底栏说明水印：台数满了给「管理 Mac」，否则给可用的「购买 SkyCut Pro」链接；各自的目标地址不可用就给邮箱 +「复制邮箱」。和设置共用 `SkyStudioContactRow`，英文 / 简体中文 / 西班牙语都走本地化。Pro 的续约提醒另用共享 `SkyStudioProNoticeRow`，没有水印时仍显示；只出声音时隐藏水印说明，续约提醒仍显示。**不拦导出**（方案第 19 条）。只订阅 `SkyStudioAccount` |
@@ -112,7 +112,7 @@
   续约提醒在 `ProNoticeChecks.swift`：one_time / manual / grace fixture 缓存往返，七天整及两侧一毫秒、一天边界、刚好到期 / 已过期、跨时区钟差 / 回答延迟、商务 / 已取消订阅 / 未知来源、无地址 / 不安全地址、宽限优先 / 台数优先、丢弃失效说明、英文 AI 状态；遍历 plan 和 features 的组合证明说明字段不参与功能判断。反向验证证据见[续约提醒案例](../bugfixes/2026-11-06-pro-renewal-and-payment-grace-notices.md)。
   假 URLSession 上看 `/me` 的地址、方法、四个头，401 / 426 / 429 留着 code 和附加字段，502 的网页 / 2xx 读不成 / 断网各是哪一种，环境变量只能指到本机；
   授权：没有 Key / 没问到过 / 过期都按免费版、钟差换算、往回拨不作数、开关只听服务器的；什么时候再问（`RefreshChecks`）：免费 / 体验前台 1 分钟、正式版 30 分钟的边界，后台仍是 6 小时，没问到过 / 过期马上问，5 分钟失败退避不会被前台规则绕过；
-  照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 永远让；水印听服务器的；
+  照授权拦（`GateChecks`）：默认打开、测试开关关不掉它；每个工具在没 Key / 免费 / 体验 / 正式 / 没给 mcp 的正式下让不让、`get_status` 和 `skycut_guide` 永远让；水印听服务器的；
   被挡住时的话（每种原因、请用户做什么、界面语言写的细节不带给 AI）；`skycut_plan`；带了水印时那一句。反向验证（2026-10-28）：规则不看授权，红 97 条。
 - `checks/sky-studio-wiring.sh`（扫描守卫）：地址和 URLSession 只在 `SkyStudioAPI`、环境变量只认回环地址；硬件 UUID 只在 `SkyStudioMachine` 读、`X-SkyCut-Machine` 只在 `SkyStudioAPI` 写；
   原生读写只在专用执行器，静默档关闭 / 恢复进程交互；`SkyStudioAccount.allowKeychain()` 只由设置 / 全 App notice 的按钮调用，后台和启动只静默；设置窗口挂着这一节、启动时 `start()`；
@@ -158,7 +158,7 @@ PR C（2026-11-06）在独立 `com.srtflow.SrtFlow.prc.skystudiosmoke` 真 App /
 - [ ] `get_status` 的 `keychain_permission=required` 和英文 `next_step` 能在套餐缓存仍为 Pro 时显示；正常编辑 / 水印仍按原授权判断。用户允许后真实 Key 能缓存，后续任务正常。
 - [ ] 真实 Security 调用若在无 UI 下仍迟迟不返回：首个静默调用最多等约 3 秒，其余调用快回；之后原生读取成功时可复用缓存。不得宣称看门狗或调用者超时已经硬中断系统调用。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
-- [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`。
+- [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`；`skycut_guide` 照常回。
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。
 - [ ] 后台给账号开正式版、点「再查一次」：导出不带水印，面板那一行没了。
 - [ ] 存的回答过期（或刚粘上 Key 还没问到）时 AI 的第一个调用：等问完再判（20 秒内回），不是一上来就挡。

@@ -54,7 +54,7 @@ final class AIToolRouter {
         if let problem = MCPArgumentCheck.problem(tool: tool, arguments: request.arguments) {
             return Answer(result: MCPBridge.textResult(problem, isError: true))
         }
-        // 照授权拦（收费方案第 5 刀第二步，规矩在 SkyCutGates）：没开通的，AI 的工具一个都不做、不排队；get_status 照常回，AI 靠它跟用户说清楚。
+        // 照授权拦（收费方案第 5 刀第二步，规矩在 SkyCutGates）：没开通的，AI 的工具一个都不做、不排队；get_status 和说明书 skycut_guide 照常回，AI 靠它们跟用户说清楚。
         if let refusal = await SkyStudioAccount.shared.aiRefusal(for: tool) {
             return Answer(result: MCPBridge.textResult(refusal, isError: true))
         }
@@ -199,6 +199,7 @@ final class AIToolRouter {
         case .setView: return try await AIProjectTools.setView(args, project)
         case .openFolder: return try await AIProjectTools.openFolder(args, project)
         case .readDocument: return try await AIFileTools.readDocument(args, project)
+        case .skycutGuide: return try AIGuideTools.guide(args)
         case .recipes: return try AIRecipeTools.recipes(args)
         case .saveRecipe:
             let result = try AIRecipeTools.save(args)
@@ -295,8 +296,8 @@ final class AIToolRouter {
             switch tool {
             case .getStatus, .getSettings, .getJob, .cancelJob, .listCharacters, .getCharacter:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
-            // 套路不碰工程：不排队、不摆窗口、不算这一轮的改动。
-            case .recipes, .saveRecipe:
+            // 套路和说明书不碰工程：不排队、不摆窗口、不算这一轮的改动（说明书照 recipes 的路子答，docs/architecture/mcp-guide.md）。
+            case .recipes, .saveRecipe, .skycutGuide:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
             case .setView, .setSettings, .manageCharacters:
                 (serialized, presentsEditor, startsRound) = (true, false, false)
