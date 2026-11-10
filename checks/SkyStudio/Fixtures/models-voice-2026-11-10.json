@@ -1,0 +1,1718 @@
+{
+  "models": [
+    {
+      "id": "gemini-3.8-flash-tts",
+      "kind": "voice",
+      "title": "Gemini 3.8 Flash TTS",
+      "default": true,
+      "accepts_auto": true,
+      "price": {
+        "per": "second",
+        "credits": 0.1125,
+        "credits_per_minute": 6.8,
+        "credits_per_1000_input_tokens": 0.25,
+        "minimum_credits": 1,
+        "settlement": "actual_output"
+      },
+      "params": {
+        "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
+        "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
+        "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
+        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+      },
+      "output": {
+        "content_type": "audio/wav",
+        "sample_rate": 24000,
+        "channels": 1,
+        "words": false
+      },
+      "limits": {
+        "max_characters_by_language": {
+          "zh": 300,
+          "ja": 330,
+          "ko": 300,
+          "other": 800
+        },
+        "max_estimated_seconds": 270
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "eleven-v4",
+      "kind": "voice",
+      "title": "Eleven v4 narration",
+      "default": false,
+      "accepts_auto": true,
+      "price": {
+        "per": "1000_characters",
+        "credits": 20,
+        "minimum_credits": 1,
+        "settlement": "exact"
+      },
+      "params": {
+        "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
+        "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
+        "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
+        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+      },
+      "output": {
+        "content_type": "audio/mpeg",
+        "words": true
+      },
+      "languages": [
+        "af",
+        "am",
+        "ar",
+        "hy",
+        "as",
+        "ast",
+        "az",
+        "be",
+        "bn",
+        "bs",
+        "bg",
+        "my",
+        "yue",
+        "ca",
+        "ceb",
+        "ny",
+        "hr",
+        "cs",
+        "da",
+        "nl",
+        "en",
+        "et",
+        "fil",
+        "fi",
+        "fr",
+        "ff",
+        "gl",
+        "ka",
+        "de",
+        "el",
+        "gu",
+        "ha",
+        "he",
+        "hi",
+        "hu",
+        "is",
+        "id",
+        "ga",
+        "it",
+        "ja",
+        "jv",
+        "kam",
+        "kn",
+        "kk",
+        "ky",
+        "ko",
+        "lo",
+        "lv",
+        "ln",
+        "lt",
+        "lg",
+        "lb",
+        "mk",
+        "ms",
+        "ml",
+        "mt",
+        "zh",
+        "mi",
+        "mr",
+        "mn",
+        "ne",
+        "no",
+        "oc",
+        "or",
+        "ps",
+        "fa",
+        "pl",
+        "pt",
+        "pa",
+        "ro",
+        "ru",
+        "sr",
+        "sn",
+        "sd",
+        "sk",
+        "sl",
+        "so",
+        "ckb",
+        "es",
+        "sw",
+        "sv",
+        "tg",
+        "ta",
+        "te",
+        "th",
+        "tr",
+        "uk",
+        "ur",
+        "uz",
+        "vi",
+        "cy",
+        "wo",
+        "yo",
+        "zu"
+      ],
+      "limits": {
+        "max_characters_by_language": {
+          "zh": 300,
+          "ja": 330,
+          "ko": 300,
+          "other": 800
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "index-tts-2",
+      "kind": "voice_clone",
+      "title": "IndexTTS2 cloned reading",
+      "accepts_auto": true,
+      "price": {
+        "per": "second",
+        "credits": 0.5,
+        "minimum_credits": 1,
+        "settlement": "actual_output"
+      },
+      "params": {
+        "voice": "a voice_… id from /voices",
+        "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
+        "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
+        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+      },
+      "output": {
+        "content_type": "audio/wav",
+        "expires_days": 60,
+        "words": false
+      },
+      "limits": {
+        "max_characters_by_language": {
+          "zh": 300,
+          "ja": 330,
+          "ko": 300,
+          "other": 800
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "minimax-speech-2.8-hd",
+      "kind": "voice_clone",
+      "title": "MiniMax Speech 2.8 HD cloned reading",
+      "accepts_auto": true,
+      "price": {
+        "per": "1000_characters",
+        "credits": 25,
+        "minimum_credits": 1,
+        "settlement": "exact"
+      },
+      "params": {
+        "voice": "a voice_… id from /voices",
+        "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
+        "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
+        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+      },
+      "requires": "the voice's MiniMax version in the reference language (voice_enroll, a one-time fee)",
+      "output": {
+        "content_type": "audio/mpeg",
+        "expires_days": 60,
+        "words": false
+      },
+      "limits": {
+        "max_characters_by_language": {
+          "zh": 300,
+          "ja": 330,
+          "ko": 300,
+          "other": 800
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "heygen-voice-turbo",
+      "kind": "voice_clone",
+      "title": "HeyGen Voice Turbo cloned reading",
+      "accepts_auto": true,
+      "price": {
+        "per": "1000_characters",
+        "credits": 0.5,
+        "minimum_credits": 1,
+        "settlement": "exact"
+      },
+      "params": {
+        "voice": "a voice_… id from /voices",
+        "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
+        "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
+        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+      },
+      "output": {
+        "content_type": "audio/wav",
+        "expires_days": 60,
+        "words": false
+      },
+      "limits": {
+        "max_characters_by_language": {
+          "zh": 300,
+          "ja": 330,
+          "ko": 300,
+          "other": 800
+        }
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "minimax-voice-clone",
+      "kind": "voice_enroll",
+      "title": "MiniMax version of a voice (one-time)",
+      "one_time": true,
+      "accepts_auto": false,
+      "price": {
+        "per": "voice",
+        "credits": 375,
+        "credits_per_preview_character": 0.0075,
+        "keep_alive_credits_per_1000_characters": 25,
+        "typical_credits": 377.6,
+        "settlement": "exact"
+      },
+      "params": {
+        "voice": "a voice_… id from /voices",
+        "language": "which of the voice's reference languages to make the MiniMax version for"
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "minimax-voice-design",
+      "kind": "voice_design",
+      "title": "MiniMax voice design (one-time)",
+      "one_time": true,
+      "accepts_auto": true,
+      "price": {
+        "per": "voice",
+        "credits": 750,
+        "credits_per_sample_character": 0.0075,
+        "keep_alive_credits_per_1000_characters": 25,
+        "typical_credits": 751.4,
+        "settlement": "exact"
+      },
+      "params": {
+        "name": "the new voice's name, 1–80 characters",
+        "language": "ISO 639-1, optional: the description's language when the text alone does not say",
+        "sample_text": "optional: the sentence the sample reads"
+      },
+      "limits": {
+        "max_prompt_characters": 2000,
+        "max_sample_characters": 500
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "qwen3-voice-design",
+      "kind": "voice_design",
+      "title": "Qwen3 voice design (one-time)",
+      "one_time": true,
+      "accepts_auto": true,
+      "price": {
+        "per": "request",
+        "credits": 22.5,
+        "typical_credits": 22.5,
+        "settlement": "exact"
+      },
+      "params": {
+        "name": "the new voice's name, 1–80 characters",
+        "language": "ISO 639-1, optional: the description's language when the text alone does not say",
+        "sample_text": "optional: the sentence the sample reads"
+      },
+      "languages": [
+        "en",
+        "zh",
+        "es",
+        "fr",
+        "de",
+        "it",
+        "ja",
+        "ko",
+        "pt",
+        "ru"
+      ],
+      "limits": {
+        "max_prompt_characters": 2000,
+        "max_sample_characters": 500
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "chatterbox-hd",
+      "kind": "voice_convert",
+      "title": "Chatterbox HD voice conversion",
+      "default": true,
+      "accepts_auto": true,
+      "price": {
+        "per": "source_second",
+        "separation": {
+          "per": "30_seconds",
+          "credits": 12.5
+        },
+        "conversion": {
+          "per": "minute",
+          "credits": 5,
+          "minimum_minutes": 1
+        },
+        "settlement": "exact"
+      },
+      "params": {
+        "target_voice": "a voice_… id from /voices, or a gemini:<Name> preset (its sample is the target)",
+        "target_language": "optional: which of the target voice's references to use",
+        "source": {
+          "seconds": "/quote only: the clip's length; /jobs measures the uploaded file"
+        }
+      },
+      "inputs": {
+        "source_audio_url": "a file_url from /uploads with purpose voice_convert_source"
+      },
+      "output": {
+        "content_type": "audio/wav",
+        "sample_rate": 48000,
+        "channels": 1,
+        "files": [
+          "voice_url",
+          "background_url"
+        ],
+        "expires_days": 60
+      },
+      "limits": {
+        "max_source_seconds": 300,
+        "max_upload_bytes": 35000000
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    },
+    {
+      "id": "chatterbox",
+      "kind": "voice_convert",
+      "title": "Chatterbox voice conversion",
+      "default": false,
+      "accepts_auto": true,
+      "price": {
+        "per": "source_second",
+        "separation": {
+          "per": "30_seconds",
+          "credits": 12.5
+        },
+        "conversion": {
+          "per": "minute",
+          "credits": 3.75,
+          "minimum_minutes": 1
+        },
+        "settlement": "exact"
+      },
+      "params": {
+        "target_voice": "a voice_… id from /voices, or a gemini:<Name> preset (its sample is the target)",
+        "target_language": "optional: which of the target voice's references to use",
+        "source": {
+          "seconds": "/quote only: the clip's length; /jobs measures the uploaded file"
+        }
+      },
+      "inputs": {
+        "source_audio_url": "a file_url from /uploads with purpose voice_convert_source"
+      },
+      "output": {
+        "content_type": "audio/wav",
+        "sample_rate": 48000,
+        "channels": 1,
+        "files": [
+          "voice_url",
+          "background_url"
+        ],
+        "expires_days": 60
+      },
+      "limits": {
+        "max_source_seconds": 300,
+        "max_upload_bytes": 35000000
+      },
+      "billing_policy": {
+        "version": "2026-10-31",
+        "charge": "prepaid_personal_credits",
+        "success": "provider_final_success_with_expected_output",
+        "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+        "no_refund_after_provider_success": true,
+        "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+        "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+        "missing_output": "pending_review",
+        "known_provider_charge": "non_refundable",
+        "unused_reservation": "return_after_final_settlement",
+        "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+      }
+    }
+  ],
+  "voice_presets": [
+    {
+      "id": "gemini:Achernar",
+      "name": "Achernar",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Soft",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 4,
+          "description": {
+            "zh": "女声 · 柔和",
+            "en": "Female voice · soft"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/achernar-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 4,
+          "description": {
+            "zh": "女声 · 柔和",
+            "en": "Female voice · soft"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/achernar-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Sarah"
+      }
+    },
+    {
+      "id": "gemini:Achird",
+      "name": "Achird",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Friendly",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 友好",
+            "en": "Male voice · friendly"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/achird-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 友好",
+            "en": "Male voice · friendly"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/achird-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Chris"
+      }
+    },
+    {
+      "id": "gemini:Algenib",
+      "name": "Algenib",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Gravelly",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 粗粝",
+            "en": "Male voice · gravelly"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/algenib-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 粗粝",
+            "en": "Male voice · gravelly"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/algenib-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Callum"
+      }
+    },
+    {
+      "id": "gemini:Algieba",
+      "name": "Algieba",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Smooth",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 顺滑",
+            "en": "Male voice · smooth"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/algieba-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 顺滑",
+            "en": "Male voice · smooth"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/algieba-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Eric"
+      }
+    },
+    {
+      "id": "gemini:Alnilam",
+      "name": "Alnilam",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Firm",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 中青年、活泼",
+            "en": "Male voice · young to middle-aged, lively"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/alnilam-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 中青年、活泼",
+            "en": "Male voice · young to middle-aged, lively"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/alnilam-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Aoede",
+      "name": "Aoede",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Breezy",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "female",
+          "rating": 1,
+          "description": {
+            "zh": "女声 · 知识型讲解、商业",
+            "en": "Female voice · knowledgeable explainer, business"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/aoede-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 4,
+          "description": {
+            "zh": "女声 · 知识型讲解、商业",
+            "en": "Female voice · knowledgeable explainer, business"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/aoede-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Jessica"
+      }
+    },
+    {
+      "id": "gemini:Autonoe",
+      "name": "Autonoe",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Bright",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "female",
+          "rating": 1,
+          "description": {
+            "zh": "女声 · 明亮",
+            "en": "Female voice · bright"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/autonoe-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 明亮",
+            "en": "Female voice · bright"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/autonoe-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Laura"
+      }
+    },
+    {
+      "id": "gemini:Callirrhoe",
+      "name": "Callirrhoe",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Easy-going",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 随性、轻松的成熟女性",
+            "en": "Female voice · casual, relaxed mature woman"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/callirrhoe-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 更有活力",
+            "en": "Female voice · more energetic"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/callirrhoe-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:River"
+      }
+    },
+    {
+      "id": "gemini:Charon",
+      "name": "Charon",
+      "model": "gemini-3.8-flash-tts",
+      "default": true,
+      "official_style": "Informative",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 讲解",
+            "en": "Male voice · informative"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/charon-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 讲解",
+            "en": "Male voice · informative"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/charon-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Despina",
+      "name": "Despina",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Smooth",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "unknown",
+          "rating": 3,
+          "description": {
+            "zh": "性别不明显 · 顺滑",
+            "en": "Gender-ambiguous voice · smooth"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/despina-zh.wav"
+        },
+        "en": {
+          "listed": false,
+          "gender": "unknown",
+          "rating": 5,
+          "description": {
+            "zh": "性别不明显 · 顺滑",
+            "en": "Gender-ambiguous voice · smooth"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/despina-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Lily"
+      }
+    },
+    {
+      "id": "gemini:Enceladus",
+      "name": "Enceladus",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Breathy",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 气声",
+            "en": "Male voice · breathy"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/enceladus-zh.wav"
+        },
+        "en": {
+          "listed": false,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 气声",
+            "en": "Male voice · breathy"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/enceladus-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Will"
+      }
+    },
+    {
+      "id": "gemini:Erinome",
+      "name": "Erinome",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Clear",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 清晰",
+            "en": "Female voice · clear"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/erinome-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 清晰",
+            "en": "Female voice · clear"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/erinome-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Alice"
+      }
+    },
+    {
+      "id": "gemini:Fenrir",
+      "name": "Fenrir",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Excitable",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "男声 · 偏中性 · 兴奋",
+            "en": "Male voice · leans gender-neutral · excitable"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/fenrir-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 略偏中性 · 兴奋",
+            "en": "Male voice · slightly gender-neutral · excitable"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/fenrir-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Liam"
+      }
+    },
+    {
+      "id": "gemini:Gacrux",
+      "name": "Gacrux",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Mature",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "青年男声",
+            "en": "Young male voice"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/gacrux-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": null,
+          "description": {
+            "zh": "成熟女声",
+            "en": "Mature female voice"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/gacrux-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:River"
+      }
+    },
+    {
+      "id": "gemini:Iapetus",
+      "name": "Iapetus",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Clear",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "male",
+          "rating": 3,
+          "description": {
+            "zh": "男声 · 清晰",
+            "en": "Male voice · clear"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/iapetus-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 清晰",
+            "en": "Male voice · clear"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/iapetus-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Kore",
+      "name": "Kore",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Firm",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 像广东普通话，不太标准，有点俏皮",
+            "en": "Female voice · Cantonese-accented Mandarin, not standard, a little playful"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/kore-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 坚定",
+            "en": "Female voice · firm"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/kore-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Sarah"
+      }
+    },
+    {
+      "id": "gemini:Laomedeia",
+      "name": "Laomedeia",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Upbeat",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 轻快",
+            "en": "Female voice · upbeat"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/laomedeia-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 轻快",
+            "en": "Female voice · upbeat"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/laomedeia-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Laura"
+      }
+    },
+    {
+      "id": "gemini:Leda",
+      "name": "Leda",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Youthful",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "青年女声 · 普通、正常",
+            "en": "Young female voice · plain, neutral"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/leda-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "青年女声 · 普通、正常",
+            "en": "Young female voice · plain, neutral"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/leda-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Jessica"
+      }
+    },
+    {
+      "id": "gemini:Orus",
+      "name": "Orus",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Firm",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "male",
+          "rating": 1,
+          "description": {
+            "zh": "男声 · 坚定",
+            "en": "Male voice · firm"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/orus-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 坚定",
+            "en": "Male voice · firm"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/orus-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Pulcherrima",
+      "name": "Pulcherrima",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Forward",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 少年感",
+            "en": "Male voice · boyish"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/pulcherrima-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 少年感",
+            "en": "Male voice · boyish"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/pulcherrima-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Puck",
+      "name": "Puck",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Upbeat",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "男声 · 轻快",
+            "en": "Male voice · upbeat"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/puck-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 轻快",
+            "en": "Male voice · upbeat"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/puck-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Liam"
+      }
+    },
+    {
+      "id": "gemini:Rasalgethi",
+      "name": "Rasalgethi",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Informative",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "青年男声",
+            "en": "Young male voice"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/rasalgethi-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "青年男声",
+            "en": "Young male voice"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/rasalgethi-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Sadachbia",
+      "name": "Sadachbia",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Lively",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "中青年男声 · 稳重",
+            "en": "Young to middle-aged male voice · steady"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sadachbia-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "中青年男声 · 稳重",
+            "en": "Young to middle-aged male voice · steady"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sadachbia-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Charlie"
+      }
+    },
+    {
+      "id": "gemini:Sadaltager",
+      "name": "Sadaltager",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Knowledgeable",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 知识型",
+            "en": "Male voice · knowledgeable"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sadaltager-zh.wav"
+        },
+        "en": {
+          "listed": false,
+          "gender": "male",
+          "rating": null,
+          "description": {
+            "zh": "男声 · 知识型",
+            "en": "Male voice · knowledgeable"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sadaltager-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Schedar",
+      "name": "Schedar",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Even",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "青年男声 · 均匀平稳",
+            "en": "Young male voice · even"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/schedar-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 4,
+          "description": {
+            "zh": "青年男声 · 均匀平稳",
+            "en": "Young male voice · even"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/schedar-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Daniel"
+      }
+    },
+    {
+      "id": "gemini:Sulafat",
+      "name": "Sulafat",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Warm",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 温暖",
+            "en": "Female voice · warm"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sulafat-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 温暖",
+            "en": "Female voice · warm"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sulafat-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Sarah"
+      }
+    },
+    {
+      "id": "gemini:Umbriel",
+      "name": "Umbriel",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Easy-going",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "中青年男声 · 随和",
+            "en": "Young to middle-aged male voice · easy-going"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/umbriel-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "中青年男声 · 随和",
+            "en": "Young to middle-aged male voice · easy-going"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/umbriel-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Will"
+      }
+    },
+    {
+      "id": "gemini:Vindemiatrix",
+      "name": "Vindemiatrix",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Gentle",
+      "languages": {
+        "zh": {
+          "listed": false,
+          "gender": "female",
+          "rating": 3,
+          "description": {
+            "zh": "女声 · 温和",
+            "en": "Female voice · gentle"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/vindemiatrix-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 温和",
+            "en": "Female voice · gentle"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/vindemiatrix-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Sarah"
+      }
+    },
+    {
+      "id": "gemini:Zephyr",
+      "name": "Zephyr",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Bright",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 明亮",
+            "en": "Female voice · bright"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/zephyr-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "female",
+          "rating": 5,
+          "description": {
+            "zh": "女声 · 明亮",
+            "en": "Female voice · bright"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/zephyr-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Jessica"
+      }
+    },
+    {
+      "id": "gemini:Zubenelgenubi",
+      "name": "Zubenelgenubi",
+      "model": "gemini-3.8-flash-tts",
+      "default": false,
+      "official_style": "Casual",
+      "languages": {
+        "zh": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 随意",
+            "en": "Male voice · casual"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/zubenelgenubi-zh.wav"
+        },
+        "en": {
+          "listed": true,
+          "gender": "male",
+          "rating": 5,
+          "description": {
+            "zh": "男声 · 随意",
+            "en": "Male voice · casual"
+          },
+          "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/zubenelgenubi-en.wav"
+        }
+      },
+      "other_languages": "en",
+      "fallback": {
+        "model": "eleven-v4",
+        "voice": "eleven:Roger"
+      }
+    }
+  ],
+  "voice_roles": {
+    "zh_female_lively": "gemini:Laomedeia",
+    "zh_female_warm": "gemini:Sulafat",
+    "zh_male": "gemini:Charon",
+    "en_female_lively": "gemini:Laomedeia",
+    "en_female_warm": "gemini:Sulafat",
+    "en_male": "gemini:Charon",
+    "en_female_british": "gemini:Erinome",
+    "en_male_british": "gemini:Iapetus"
+  },
+  "voice_rules": {
+    "note": "For people. Read the selection from /quote's voice_plan; do not recompute it from these numbers.",
+    "language_threshold": 0.8,
+    "shares_by": "estimated reading time, not characters",
+    "reading_speeds": {
+      "zh": 4.5,
+      "ja": 5.5,
+      "ko": 5.5,
+      "latin": 12.5,
+      "other": 10,
+      "unit": "characters per second"
+    },
+    "digit_seconds": 0.25,
+    "cloned_reading": [
+      {
+        "rule": "zh_80",
+        "when": "Chinese is at least 80% of the reading time",
+        "default": {
+          "model": "index-tts-2",
+          "reference": "zh"
+        },
+        "fallback": {
+          "model": "minimax-speech-2.8-hd",
+          "reference": "zh"
+        }
+      },
+      {
+        "rule": "en_80",
+        "when": "English is at least 80%",
+        "default": {
+          "model": "minimax-speech-2.8-hd",
+          "reference": "en"
+        },
+        "fallback": {
+          "model": "index-tts-2",
+          "reference": "en"
+        }
+      },
+      {
+        "rule": "zh_en_mixed",
+        "when": "Chinese and English are the two largest and together at least 80%, neither alone",
+        "default": {
+          "model": "index-tts-2",
+          "reference": "zh"
+        },
+        "fallback": {
+          "model": "minimax-speech-2.8-hd",
+          "reference": "zh"
+        }
+      },
+      {
+        "rule": "east_asian_80",
+        "when": "Japanese or Korean is at least 80%",
+        "default": {
+          "model": "heygen-voice-turbo",
+          "reference": "zh"
+        },
+        "fallback": {
+          "model": "minimax-speech-2.8-hd",
+          "reference": "zh"
+        }
+      },
+      {
+        "rule": "other_80",
+        "when": "another language is at least 80%",
+        "default": {
+          "model": "minimax-speech-2.8-hd",
+          "reference": "en"
+        },
+        "fallback": {
+          "model": "heygen-voice-turbo",
+          "reference": "en"
+        }
+      },
+      {
+        "rule": "top_language",
+        "when": "any other mix",
+        "default": "the row of the largest language",
+        "fallback": "the same row"
+      }
+    ],
+    "narration": {
+      "default": "gemini-3.8-flash-tts",
+      "fallback": "eleven-v4",
+      "default_voice": "gemini:Charon"
+    },
+    "voice_design": {
+      "zh": {
+        "default": "minimax-voice-design",
+        "fallback": "qwen3-voice-design"
+      },
+      "en": {
+        "default": "qwen3-voice-design",
+        "fallback": "minimax-voice-design"
+      }
+    },
+    "voice_conversion": {
+      "default": "chatterbox-hd",
+      "fallback": "chatterbox"
+    },
+    "limits": {
+      "max_voices": 50,
+      "reference_min_voiced_seconds": 10,
+      "reference_max_seconds": 180,
+      "max_upload_bytes": 35000000
+    }
+  },
+  "voice_consent": {
+    "per_recording": {
+      "version": "voice-consent-v1",
+      "statement": "I am the person in this recording, or I have their permission to create and use an AI copy of their voice."
+    },
+    "standing": {
+      "version": "voice-standing-consent-v1",
+      "statement": "For every recording I later use to create a voice in SkyCut, I am the person speaking or I have their permission to create and use an AI copy of their voice."
+    }
+  },
+  "billing_policy": {
+    "version": "2026-10-31",
+    "charge": "prepaid_personal_credits",
+    "success": "provider_final_success_with_expected_output",
+    "refund": "provider_failure_or_confirmed_cancellation_unless_known_billed",
+    "no_refund_after_provider_success": true,
+    "delivery_failure": "retry_delivery_of_the_original_result_without_regeneration",
+    "unknown_outcome": "keep_reserved_and_reconcile_the_original_request",
+    "missing_output": "pending_review",
+    "known_provider_charge": "non_refundable",
+    "unused_reservation": "return_after_final_settlement",
+    "retry": "reuse_job_id_and_idempotency_key; a_new_generation_is_a_new_paid_job"
+  }
+}

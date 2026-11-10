@@ -8,6 +8,7 @@ import SrtFlowMCPKit
 // **SkyCut 不写死模型、价格和上限**（收费方案第 5、16、17 条）：面板和 AI 能选什么、upscale 一次最长几秒 / 最高几帧，都从这里读；
 // 这里的价只给人看，**扣多少一律问 `/quote`**（宽于 16:9 按高一档收、4K 封顶、按 0.1 秒计这些规矩都在服务器上）。
 // 读得宽：认不出的字段、认不出的 kind 都留着不管；少了 id 或 kind 的那一条跳过。
+// 顶层声音的那几样（预设声音、角色、授权文案）原样留在 `voiceSection`，SkyStudioVoiceCatalog 把它读成类型（`voices`）。
 // 合同：Sky Studio 仓库 docs/agents/skycut-api.md「GET /models」。
 // 不管什么：去问（SkyStudioAPI.models）、每种活怎么用这些数（各自的调用方）。
 
@@ -75,6 +76,10 @@ struct SkyStudioModel: Equatable, Sendable, Codable {
 struct SkyStudioCatalog: Equatable, Sendable {
     var models: [SkyStudioModel]
     var billingPolicy: JSONValue?
+    /// 顶层声音的那几样原样（预设声音、角色、选模型说明、授权文案）；读成类型是 `voices`（SkyStudioVoiceCatalog）。
+    /// 这里只存原样，不依赖声音的类型：只用模型目录的自检不用跟着编声音那一摊。
+    var voiceSection: [String: JSONValue] = [:]
+    static let voiceKeys = ["voice_presets", "voice_roles", "voice_rules", "voice_consent"]
 
     init(models: [SkyStudioModel]) { self.models = models }
 
@@ -83,6 +88,7 @@ struct SkyStudioCatalog: Equatable, Sendable {
         guard let entries = json["models"]?.arrayValue else { return nil }
         self.init(models: entries.compactMap(SkyStudioModel.init(json:)))
         billingPolicy = json["billing_policy"]
+        for key in Self.voiceKeys { if let value = json[key] { voiceSection[key] = value } }
     }
 
     /// 某一种活能用的模型，顺序照服务器给的。

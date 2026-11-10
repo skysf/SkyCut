@@ -43,7 +43,11 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
         /// 不问服务器能照这份回答用到什么时候（服务器的钟）。
         var validUntil: Date
         var minVersion: String?
+        /// 同时开着的任务最多几个（图片、视频、upscale 这些共用的池，现在 3）。
         var maxRunningJobs: Int?
+        /// 声音类任务（读稿、克隆、建 MiniMax 版、设计、变声、音效）单独一个池最多几个（声音上线后 8）；
+        /// 没给 = 服务器还没上这个池，声音任务也算进上面那个共用的池（SkyCut 声音方案 8.2）。
+        var maxRunningAudioJobs: Int?
         var rechargeUrl: String?
         /// 自助购买合同 v1 的说明字段，全都可选；不能据此开启功能。
         var accountPlan: String?

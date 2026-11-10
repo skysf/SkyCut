@@ -121,6 +121,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibrary.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceQuote.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceResults.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioApproval.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioPublicRenderValidation.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
