@@ -116,14 +116,16 @@
 - 地图（`GuideChecks`）：每个工具作为一项列在地图上（去掉括号里的说明、按逗号 / 分号 / 斜杠切开认）、第一行列出五个通用主题、≤ 5,000；
   五个通用主题都在、不空、≤ 6,000、名字不和工具撞、按名字找得到、写错了猜得到（`rule` → `rules`）；地图和通用主题里提到的名字都真的存在。
 - `checks/MCP/CatalogTextChecks.swift`：总说明 ≤ 1,200、前 512 字点到 open_folder / get_timeline / look / export_video / skycut_guide；
+  **全部工具**（方案 PR 6 起）的名片 ≤ 450、每条参数说明 ≤ 120 且带范围的写数字、参数定义 ≤ 4,500 字节、例外名单正好是 edit_clip 和 generate_media；
+  全清单 ≤ 100,000（上限和量法只在 `checks/MCP/CatalogBudget.swift`，ProtocolChecks / UsageExampleChecks / ProductionSchemaChecks 都调它）；
   `ProtocolChecks` / `ProviderChecks` / `SoundEffectChecks` / `UpscaleToolChecks`：原来要求写在总说明目录里的（不用工程的文件工具、智能剪、`save_recipe`、
   `add_voiceover`、花积分的那一行、`add_clips sound_effect`）改查地图，要 AI 主动做的（只用 SkyCut、`find_audio`、剪整片先挑剪辑风格）还查总说明。
 - 报错指路：`ArgumentCheckChecks`（参数名写错的那句指到 `skycut_guide topic=<工具名>`）、`checks/MCP/router-wiring.sh`（路由 catch 那一处用
   `error.result(guide: call.tool)`，别处不许自己调 `result(guide:)`）、`GateChecks`（被挡住的那句以「skycut_guide (the manual) still answers.」结尾）。
 - `checks/MCP/GuideContentChecks.swift`：自己走一遍真实清单，每个参数的每一样事实（可选的值、范围、条数、长度、类型并集、`anyOf` 的写法、能不能带别的字段）
   都在它自己那一行，走空了算红；例子过参数定义、只挂在工具主题上，`related` 是真主题，不含 Key / 邮箱 / 链接 / Bearer —— 每条都拿手造的坏样本证明真会红。
-- `checks/MCP/GuidePilotChecks.swift`（迁移过的工具，第 14、15 条）：名片 ≤ 450 和按性质该写的固定说法（只读的、收 `confirm_token` 的从参数定义认，
-  别的写在检查里）；每条参数说明 ≤ 120、带范围的写数字；参数定义 ≤ 4,500 字节、例外名单正好是 edit_clip 和 generate_media；概要以迁移前的原文开头、
+- `checks/MCP/GuidePilotChecks.swift`（迁移过的工具，第 14、15 条）：按性质该写的固定说法（只读的、收 `confirm_token` 的从参数定义认，
+  别的写在检查里；名片、参数说明、参数定义的上限 PR 6 起搬到 CatalogTextChecks、对全部工具）；概要以迁移前的原文开头、
   原文的长度对得上、名片真的改写过；手写的几节不空、只提真有的名字（结果字段名记在 `CatalogNames.swift`）、有例子和相关主题；
   `fields` 几节：真实清单里每个工具切完一行不丢、顺序不变、名字依次、超上限的只许是单独一个参数，再拿手造的大参数定义证明真会切。末尾打印每张迁移过的名片各多少字、哪些工具切了几节。
   没有可搬的原文的名单正好是 add_voiceover、list_voices、manage_voices（拿概要真没以原文开头的工具反过来对一遍）。迁移过的工具的名片也和地图、通用主题一起查名字（`GuideChecks` 的 `runGuideWordingChecks`）。
@@ -141,6 +143,9 @@
   estimated_line_indices、字幕是稿子的字（声音 PR 5），batches_recovery 一节说批只在两句之间分、长句先在句末分，`subtitles` 参数指到 subtitle_timing。
 - `SkyStudioVoiceChecks`（声音库，声音 PR 6）：`list_voices` / `manage_voices` 的参数名、动作词表就是 App 分派的五样；名片必含（只读免费 / 不改时间线没有撤销 /
   design 花积分回任务号 / 先问 / 删除按模式 / 先读说明书）、说明书必含（分节照声音方案 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行。
+  2026-11-11 起：`manage_voices` 只有 `action` 必给，`language` 的参数说明写着可选和不给会怎样，`create` 一节写「可选、给了照给的、不给就本机识别、
+  `language_detected` / `language_undetected`、带上 language 再调」，有一个例子不带 `language`；同一节问不问按权限模式写（请求批准模式每段录音都先问、
+  读别处的文件先问；全部权限有长期授权就不问、没有的第一次问一次），不许再写成「每段录音都先问」。
 - `ArgumentCheckChecks`：名片写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过参数核对（[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。
 - `checks/MCP/CatalogTextChecks.swift`：总说明点到 `skycut_guide`（「目录里有清单的每个工具名」，PR 2 起改查说明书的地图）。
 

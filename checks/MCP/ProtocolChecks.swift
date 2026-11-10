@@ -165,16 +165,15 @@ func runProtocolChecks() {
     // 裁切的语义是故意和拖把手不同的（AI 给绝对值：时间线上的开头不动、结尾动），2026-10-16 之前只写在代码注释里，测试员试了才知道
     // （docs/bugfixes/2026-10-16-edit-clip-trim-semantics-undocumented.md）。
     check(servedDescription("edit_clip").contains("timeline start stays"), "edit_clip says a trim keeps the clip's timeline start and moves its end")
-    // 不按个数卡（2026-09-28 用户拍板，方案第 33 条），卡说明的总长度：工具说明每一轮都进 AI 的上下文，
-    // 用户那边还开着别的 MCP。上限 110,000 字符、约 3.1 万 token（按 3.6 个字符一个 token 估；2026-10-02 用户定从 72,000 抬到 80,000，
-    // 给 upscale_clip 腾地方；2026-10-14 审美盲测的六样功能加完只剩 26 字，用户定再抬到 90,000；2026-10-17 一个会话剪几个工程，每个碰工程的工具
-    // 多一个 project 参数，用户定抬到 100,000；2026-11-07 用户定抬到 110,000，给角色 A/B 的三个工具）；超了先把说明写短、或者并掉长得像的工具。
-    // 量的是**每个提供方都配好**时的全清单（最长的那种情况），不是某个用户此刻看到的。
+    // 不按个数卡（2026-09-28 用户拍板，方案第 33 条），卡说明的总长度：上限和量法只有 CatalogBudget 一份（迁移完收到 100,000，来历写在那里）；
+    // 超了先把说明挪进说明书、或者并掉长得像的工具，不再为说明文字抬上限。
+    // 量的是**每个提供方都配好**时小程序真发出去的全清单（最长的那种情况），不是某个用户此刻看到的。
     let fullList = talkToHelper([#"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#], socket: app.path, providers: Set(MCPProvider.allCases))
     let fullTools = reply(fullList.messages, id: 1)?["result"]?["tools"]?.arrayValue ?? []
     checkEqual(fullTools.compactMap { $0["name"]?.stringValue }, MCPToolName.allCases.map(\.rawValue), "the full tools/list order and names")
-    let catalogCharacters = fullTools.reduce(0) { $0 + $1.encodedString().count }
-    check(catalogCharacters <= 110_000, "the tool list stays under 110,000 characters (about 31k tokens); it is \(catalogCharacters)")
+    let served = catalogSize(.array(fullTools))
+    check(served <= catalogBudget, "the served tools/list stays within \(catalogBudget) UTF-16 units; it is \(served)")
+    checkEqual(served, catalogSize(MCPToolName.listJSON), "the helper serves exactly the catalog the checks measure")
 
     // 3. 工具调用原样转给 App，客户端名字是 initialize 里报的那个；字符串 id 原样回。
     checkEqual(reply(messages, id: "abc")?["result"]?["content"]?.arrayValue?.first?["text"]?.stringValue,

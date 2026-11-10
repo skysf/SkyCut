@@ -15,20 +15,20 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Paid (Sky Studio credits): images, video, lipsync, cutouts, music, sound effects; import results with add_clips, video \
-                upscale is upscale_clip. job_id: wait with get_job. quote_only=true is free. Beyond the draft: needs_confirmation, ask, \
-                repeat with confirm_token. user_requested_overrides needs user_request, the user's words naming it (4K, a model), never \
-                "best quality". A daily credit limit applies. Read skycut_guide topic=generate_media first.
+                Paid (Sky Studio credits): images, video, lipsync, cutouts, music, sound effects; import with add_clips (video upscale: \
+                upscale_clip). job_id: wait with get_job. quote_only=true is free. Beyond the draft: needs_confirmation, ask, repeat with \
+                confirm_token. user_requested_overrides needs user_request naming it in the user's words (4K, a model), never \"best quality\". A \
+                daily credit limit applies. Read skycut_guide topic=generate_media first.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
                     "prepare_references": MCPSchema.boolean("Official film: prepare and upload references only (no quote); wait with get_job."),
-                    "prepared_references": MCPSchema.string("Official film: the prepared-references token; invalid after account, project or file changes."),
+                    "prepared_references": MCPSchema.string("Official film: prepared-references token; void after account/project/file changes."),
                     "film": MCPSchema.object([:], description: "Original-film schema: get_status film_contract=true."),
                     "quote_token": MCPSchema.string("Official token; submit unchanged with seam_review."),
                     "seam_review": MCPFilmSchema.review,
                     "prompt": MCPSchema.string("Generators only; media operations omit it."),
-                    "operation": MCPSchema.string("Image job: generate (default), remove_background, camera_angle or upscale; no film.", oneOf: ["generate", "remove_background", "camera_angle", "upscale"]),
+                    "operation": MCPSchema.string("Image job: generate (default), remove_background, camera_angle, upscale; no film.", oneOf: ["generate", "remove_background", "camera_angle", "upscale"]),
                     "camera_angle": MCPSchema.object([
                         "rotate": ["type": "integer", "enum": [-180, -135, -90, -45, 0, 45, 90, 135, 180]],
                         "tilt": ["type": "integer", "enum": [-45, 0, 45]],
@@ -47,7 +47,7 @@ enum MCPGenerationTools {
                     "image_context": MCPSchema.string("Subject; mixed/unclear defaults other.", oneOf: ["asian", "other"]),
                     "quality": MCPSchema.string("Video quality; highest requires unrestricted request.", oneOf: ["standard", "highest"]),
                     "input_mode": MCPSchema.string("Video mode; default inferred.", oneOf: ["frames", "multimodal"]),
-                    "image": MCPSchema.string("Local image: first frame, reference or portrait; one image for camera_angle or upscale."),
+                    "image": MCPSchema.string("Local image: first frame, reference, portrait, or the camera_angle/upscale source."),
                     "last_image": MCPSchema.string("Optional final frame with image (frames mode)."),
                     "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references."),
                     "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV path."), "Ordered videos; catalog limits."),
@@ -71,8 +71,8 @@ enum MCPGenerationTools {
                     "resolution": MCPSchema.string("Catalog tier; default lowest image/720p-class video. Upgrades need approval."),
                     "quote_only": MCPSchema.boolean("Quote without upload, generation, reservation or charge."),
                     "approval_scope": MCPSchema.string("once default; project needs explicit spec/price-ceiling approval.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("true only with user_request naming this setting in the user's words (4K, a model); \"best quality\" is not one."),
-                    "user_request": MCPSchema.string("The user's own words naming the setting, e.g. \"4K\" or \"use GPT Image 2\"; required by user_requested_overrides."),
+                    "user_requested_overrides": MCPSchema.boolean("true only if user_request names the setting (4K, a model); not \"best quality\"."),
+                    "user_request": MCPSchema.string("User's own words naming the setting, e.g. \"4K\" or \"use GPT Image 2\"."),
                     "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
                     "generate_audio": MCPSchema.boolean("Video audio toggle, if offered."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
@@ -86,20 +86,20 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .upscaleClip, title: "Upscale clip",
                 description: """
-                Paid (Sky Studio credits): upscale a video clip's source file; when done it replaces every clip using that file (one \
-                undo step; revert later). Returns job_id: wait with get_job. Over-plan work returns needs_confirmation: ask, then \
-                repeat with confirm_token. The daily credit limit always applies. At most 30 s and 30 fps per job. Images: \
-                generate_media operation=upscale. Read skycut_guide topic=upscale_clip before the first call.
+                Paid (Sky Studio credits): upscale a video clip's source; when done it replaces every clip using that file (one undo step; \
+                revert later). job_id: wait with get_job. Over-plan work returns needs_confirmation: ask, repeat with confirm_token. The daily \
+                credit limit applies. At most 30 s and 30 fps per job. Images: generate_media operation=upscale. Read skycut_guide \
+                topic=upscale_clip first.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("The video clip whose source file to upscale (get_timeline)."),
                     "approval_scope": MCPSchema.string("once by default; project only with explicit project-wide agreement.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid upscale; quote their words in user_request."),
-                    "user_request": MCPSchema.string("The user's own words asking for the upscale, e.g. \"upscale this to 4K\"; required by user_requested_overrides."),
+                    "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid upscale; quote them in user_request."),
+                    "user_request": MCPSchema.string("User's own words asking for it, e.g. \"upscale this to 4K\"."),
                     "tier": MCPSchema.string("Which Sky Studio model (default topaz-starlight).", oneOf: MCPVocabulary.upscaleTiers),
                     "target": MCPSchema.string("Short side to reach (default: what the canvas needs).", oneOf: MCPVocabulary.upscaleTargets),
                     "range": MCPSchema.string(
-                        "How much of the file to send (default: longest when another clip uses more of it, else clip).", oneOf: MCPVocabulary.upscaleRanges
+                        "How much to send (default: the longest span other clips use, else this clip).", oneOf: MCPVocabulary.upscaleRanges
                     ),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["clip_id"]),

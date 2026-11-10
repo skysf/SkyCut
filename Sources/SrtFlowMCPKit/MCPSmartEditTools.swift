@@ -13,10 +13,9 @@ enum MCPSmartEditTools {
             return MCPToolDefinition(
                 .transcribe, title: "Transcribe speech",
                 description: """
-                Read-only. What is said where: sentences with start, end and text, and every word with words=true. Timeline clips give \
-                timeline seconds; a file gives file seconds. Media never transcribed returns job_id: wait with get_job, then call \
-                again with the same arguments. Long transcripts continue from next_from. Outside files may return needs_confirmation. \
-                Cut what you find with cut_speech.
+                Read-only. What is said where: sentences (start, end, text), every word with words=true; timeline seconds for clips, file \
+                seconds for a file. New media returns job_id: wait with get_job, then call again with the same arguments. Long transcripts \
+                continue from next_from. Outside files may return needs_confirmation. Cut with cut_speech.
                 """,
                 input: MCPSchema.object([
                     "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Clips to transcribe (default: video-track clips with sound)."),
@@ -26,7 +25,7 @@ enum MCPSmartEditTools {
                     "language": MCPSchema.string("Spoken language, e.g. en, zh-Hans, ja; auto (default) detects it."),
                     "from": MCPSchema.number("Read from this time on (≥ 0; timeline seconds, or file seconds with file).", minimum: 0),
                     "to": MCPSchema.number("Read up to this time, seconds (≥ 0).", minimum: 0),
-                    "words": MCPSchema.boolean("Also list every word with its start and end (estimates: 0.1-0.3 s off around pauses)."),
+                    "words": MCPSchema.boolean("Also list each word's start and end (estimates, 0.1-0.3 s off near pauses)."),
                     "max_chars": MCPSchema.integer("Roughly how much text per call (default 12000).", minimum: 1000, maximum: 60000),
                     "confirm_token": MCPSchema.confirmToken
                 ]),
@@ -40,21 +39,20 @@ enum MCPSmartEditTools {
             return MCPToolDefinition(
                 .cutSpeech, title: "Cut speech",
                 description: """
-                Tighten a talking clip on V1: cut ranges (sentence or word times from transcribe), keep only some ranges, shorten \
-                pauses, remove filler words and repeats (both need transcribe first). Cuts snap into measured pauses; moved lists \
-                every shifted time. Later V1 clips close up. Linkage on: subtitles and items on the clip follow its pieces; off: other \
-                tracks stay. One undo step. Read skycut_guide topic=cut_speech before the first call.
+                Tighten a talking clip on V1: cut ranges (times from transcribe), keep only some, shorten pauses, remove fillers and repeats \
+                (transcribe first). Cuts snap into measured pauses; moved lists shifted times. Later V1 clips close up. Linkage on: subtitles \
+                and items on the clip follow its pieces; off: other tracks stay. One undo step. Read skycut_guide topic=cut_speech first.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("The talking clip on V1."),
                     "remove": MCPSchema.array(of: range, "Ranges to cut out."),
                     "keep": MCPSchema.array(of: range, "Keep only these ranges of the clip; the rest of it is cut."),
-                    "snap": MCPSchema.boolean("false: cut remove / keep exactly at the given times, only rounded to frames (default true)."),
+                    "snap": MCPSchema.boolean("false: cut exactly at the given times, only rounded to frames (default true)."),
                     "remove_pauses": MCPSchema.number("Shorten pauses longer than this many seconds (e.g. 0.6).", minimum: 0.2),
                     "pause_left": MCPSchema.number("Seconds of each shortened pause to leave (default 0.25).", minimum: 0, maximum: 2),
                     "remove_fillers": MCPSchema.boolean("Cut filler words (needs transcribe first)."),
                     "remove_repeats": MCPSchema.boolean("Cut words said twice in a row, like \"I I\" (needs transcribe first)."),
-                    "silence_db": MCPSchema.number("Quieter than this counts as a pause, -80 to -10 dBFS (default: measured from the clip).", minimum: -80, maximum: -10),
+                    "silence_db": MCPSchema.number("Pause threshold, -80 to -10 dBFS (default: measured from the clip).", minimum: -80, maximum: -10),
                     "language": MCPSchema.string("Language of the transcript to use (default auto).")
                 ], required: ["clip_id"])
             )
@@ -68,7 +66,7 @@ enum MCPSmartEditTools {
                 """,
                 input: MCPSchema.object([
                     "music_clip_id": MCPSchema.string("The music clip whose beats to cut on."),
-                    "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "V1 clips next to each other (default: the V1 clips playing while the music does)."),
+                    "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Adjacent V1 clips (default: the V1 clips playing while the music does)."),
                     "beats_per_clip": MCPSchema.integer("Every clip lasts exactly this many beats (1–64).", minimum: 1, maximum: 64),
                     "on": MCPSchema.string("Cut on every beat (default) or only on the first beat of each bar.", oneOf: ["beats", "downbeats"])
                 ], required: ["music_clip_id"])

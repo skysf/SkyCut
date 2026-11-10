@@ -12,10 +12,9 @@ enum MCPEncodeTools {
             return MCPToolDefinition(
                 .compressVideos, title: "Compress videos",
                 description: """
-                Make video files smaller: one H.264 MP4 per file, <name>_compressed.mp4 in SkyCut/Exports or in folder; never \
-                overwrites. Without options it uses the user's Compress Video page settings; options apply to this batch only, and \
-                resolution and frame rate only go down. Files outside the opened folder may return needs_confirmation. Returns job_id: \
-                wait with get_job.
+                Make videos smaller: one H.264 MP4 each, <name>_compressed.mp4 in SkyCut/Exports or in folder; never overwrites. Uses the user's \
+                Compress Video settings; options apply to this batch only, and resolution and frame rate only go down. Outside files may return \
+                needs_confirmation. Returns job_id: wait with get_job.
                 """,
                 input: MCPSchema.object(encodeOptions.merging([
                     "files": MCPSchema.array(of: MCPSchema.string("Path of a video file."), "Videos to compress.", minItems: 1),
@@ -31,10 +30,9 @@ enum MCPEncodeTools {
             return MCPToolDefinition(
                 .burnSubtitles, title: "Burn subtitles",
                 description: """
-                Burn a subtitle file permanently into videos that are not in the project (the project's own subtitles: export_video). \
-                One output per video, <name>_sub.mp4 in SkyCut/Exports or in folder; never overwrites. Looks like the user's Burn In \
-                Subtitles page; style and encoding options change this batch only. Files outside the opened folder may return \
-                needs_confirmation. Returns job_id: wait with get_job.
+                Burn a subtitle file into videos outside the project (the project's own: export_video). One <name>_sub.mp4 per video in \
+                SkyCut/Exports or in folder; never overwrites. Styled like the user's Burn In Subtitles page; style and encoding options change \
+                this batch only. Outside files may return needs_confirmation. Returns job_id: wait with get_job.
                 """,
                 input: MCPSchema.object(encodeOptions.merging([
                     "items": MCPSchema.array(of: item, "Each video with its subtitle file.", minItems: 1),
@@ -66,16 +64,16 @@ enum MCPEncodeTools {
     /// 三个工具都收的「放哪」：和 export_subtitles 的 folder 同名同义（2026-10-15 用户转来的反馈：转出来的字幕文件固定落在
     /// 导出文件夹里，还得再调一次 manage_files 挪到位）。读法只在 App 的 AIEncodeTools.outputFolder 一处。
     private static let outputFolder = MCPSchema.string(
-        "Folder to write into (absolute, or relative to the opened folder; made if missing). Default: SkyCut/Exports."
+        "Folder: absolute or in the opened folder, made if missing. Default: SkyCut/Exports."
     )
 
     /// 压缩和烧录共用的编码参数。
     private static let encodeOptions: [String: JSONValue] = [
         "quality": MCPSchema.string(
-            "small (smaller file, slightly softer), balanced (looks the same as the original), high (bigger file).",
+            "small (smaller, slightly softer), balanced (looks like the original), high (bigger).",
             oneOf: MCPVocabulary.encodeQualities
         ),
-        "fast": MCPSchema.boolean("true: use the Mac's hardware encoder, about ten times faster but a bigger file at the same quality."),
+        "fast": MCPSchema.boolean("true: the Mac's hardware encoder, ~10x faster, bigger file at the same quality."),
         "resolution": MCPSchema.string("Largest size by the short side, e.g. 1080p; original keeps it.", oneOf: MCPVocabulary.resolutions),
         "frame_rate": MCPSchema.string("Highest frame rate; original keeps it.", oneOf: MCPVocabulary.frameRateLimits)
     ]

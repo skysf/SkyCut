@@ -36,7 +36,7 @@ public enum MCPSenseTools {
                 "silence_db": MCPSchema.number("Quieter than this counts as silence (default -45).", minimum: -80, maximum: -10),
                 "min_silence": MCPSchema.number("Shortest silence to report, seconds (default 0.5).", minimum: 0.1, maximum: 10),
                 "beats": MCPSchema.boolean("Also find the tempo and every beat (one clip or file)."),
-                "cuts": MCPSchema.boolean("Check every V1 cut: in a pause, or on speech with a better source_in / source_out."),
+                "cuts": MCPSchema.boolean("Check every V1 cut: in a pause, or on speech with a better source_in/source_out."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true
@@ -47,16 +47,15 @@ public enum MCPSenseTools {
         MCPToolDefinition(
             .look, title: "Look at the picture",
             description: """
-            Read-only. See frames instead of guessing: the composed timeline (time/times, or count across clip_id) or a file \
-            (source seconds). Returns a labelled contact sheet plus boxes for faces/people/text, brightness and black bars. Also: \
-            files (up to 24), shots=true (shot bounds), text_scan=true (burned-in subtitles, watermarks). Long scans return job_id; \
-            wait with get_job. Outside files may return needs_confirmation. Details: skycut_guide topic=look.
+            Read-only. See frames, don't guess: the timeline (time/times, or count over clip_id) or a file (source seconds) as a labelled \
+            contact sheet with face/people/text boxes, brightness, black bars. Also files (24 max), shots=true, text_scan=true (subtitles, \
+            watermarks). Long scans return job_id: wait with get_job. Outside files may return needs_confirmation. skycut_guide topic=look.
             """,
             input: MCPSchema.object([
                 "time": MCPSchema.number("One moment, seconds (≥ 0): timeline, or in the file with file.", minimum: 0),
                 "times": MCPSchema.array(of: MCPSchema.number("Seconds."), "Several moments (up to 12)."),
                 "clip_id": MCPSchema.string("Timeline: spread the frames over this clip's part of the timeline."),
-                "file": MCPSchema.string("A media file instead of the timeline: absolute, or relative to the opened folder."),
+                "file": MCPSchema.string("A media file instead of the timeline: absolute or relative to the opened folder."),
                 "source_in": MCPSchema.number("With file and no times: spread frames from here, seconds (≥ 0).", minimum: 0),
                 "source_out": MCPSchema.number("With file and no times: stop here, seconds (≥ 0).", minimum: 0),
                 "count": MCPSchema.integer("How many frames to spread (1–12).", minimum: 1, maximum: 12),
