@@ -1,8 +1,8 @@
 import Foundation
 
 // MARK: - 旁白的外部适配
-// 管什么：生产默认值仍是原来的 Sky Studio / 本机转写 / 全 App 一份的槽；回归可注入假 HTTP、一次失败的转写、自己的槽和短的等待，
-// 验证真实任务与入轨。
+// 管什么：生产默认值仍是原来的 Sky Studio / 本机转写 / 全 App 一份的槽；回归可注入假 HTTP、这台 Mac 转写不转写得了、装模型、
+// 一次失败的转写、自己的槽和短的等待，验证真实任务与入轨。
 // 不管什么：旁白流程、状态和恢复规则；没有运行时测试环境变量或付费旁路。
 
 @MainActor
@@ -14,7 +14,14 @@ struct SkyStudioVoiceServices {
         case .failure(let issue): throw AIToolError(issue.message)
         }
     }
-    var locale: SkyStudioVoiceRender.LocaleProvider = SkyStudioVoiceAudio.splitLocale
+    /// 这台 Mac 转写不转写得了这种语言（报价之前量，不下载）；恢复时要转写也问它。
+    var transcription: @MainActor (String) async -> SkyStudioVoiceTranscription.Availability = {
+        await SkyStudioVoiceTranscription.availability(language: $0)
+    }
+    /// 交第一批之前装转写模型（进度 0…1）。
+    var install: @MainActor (Locale, @escaping @MainActor (Double) -> Void) async throws -> Void = {
+        try await SkyStudioVoiceTranscription.install($0, progress: $1)
+    }
     var transcribe: SkyStudioVoiceRender.Transcribe = SkyStudioVoiceAudio.transcribe
     /// 各批在哪儿领槽：全 App 一份（槽数照 /me）；回归换成自己的一份、定好槽数。
     var slots: SkyStudioJobSlots = .shared

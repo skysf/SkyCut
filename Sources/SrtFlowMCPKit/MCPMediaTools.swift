@@ -50,7 +50,7 @@ enum MCPMediaTools {
                     "model": MCPSchema.string("Cloud model: auto (default) or a voice model id from get_status models=true."),
                     "speed": MCPSchema.number("0.5 to 2, 1 = normal (default). Local voices only.", minimum: 0.5, maximum: 2),
                     "track": MCPSchema.string(MCPSchema.trackDescription),
-                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice."),
+                    "subtitles": MCPSchema.boolean("Also add the script's words as subtitles, timed to the voice (see subtitle_timing)."),
                     "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
                                                    minimum: 1, maximum: 2),
                     "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (about 333 MB, returns job_id); no lines."),

@@ -12,7 +12,8 @@ func runVoiceRecoveryChecks() async {
         let lines = [String](repeating: "Hello world.", count: 6)
         let catalog = SkyStudioCatalog(models: [SkyStudioModel(id: "index-tts-2", kind: "voice_clone", title: "Clone",
                                                                limits: ["max_characters_by_language": ["other": 30]])])
-        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, model: "auto", language: "en", catalog: catalog)
+        let reading = SkyStudioVoiceReading(model: "auto", packs: true, timing: .aligned, transcribes: true, switchedForTiming: false)
+        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, reading: reading, language: "en", catalog: catalog)
         let selection: JSONValue = ["model": "index-tts-2", "reference_language": "en"]
         let quoted: JSONValue = ["credits": 7.5, "voice_plan": ["selection": selection, "rule": "en_80"],
                                  "batches": .array(draft.speech.map { _ in ["credits": 2.5] }), "one_time": []]
@@ -48,7 +49,9 @@ func runVoiceRecoveryChecks() async {
         checkEqual(read.plan.voicePlan.selection, selection.objectValue ?? [:], "the whole segment's selection survives a disk round trip")
         check(read.plan.batches.allSatisfy { $0.request.params["plan"] == selection }, "every saved batch request carries that selection")
         checkEqual(read.batches[1].model, "index-tts-2", "each batch's actual model survives")
+        checkEqual(read.plan.reading, reading, "how the script is read and timed (voice PR 5) survives a disk round trip")
         let detail = read.detail(recoveryFile: file.path)
+        checkEqual(detail["subtitle_timing"], "aligned", "before insertion get_job reports the planned subtitle timing")
         checkEqual(detail["voice_plan"]?["selection"], selection, "get_job reports the voice_plan")
         checkEqual(detail["batches"]?.arrayValue?.first?["model"], "index-tts-2", "get_job reports each batch's model")
         checkEqual(detail["failure_stage"], "local_split", "local failure is not reported as cloud failure")
@@ -68,6 +71,10 @@ func runVoiceRecoveryChecks() async {
         catch { check(true, "corrupt output line index rejected") }
         for line in lines.indices { checkpoint.outputs[line] = .init(url: folder.appendingPathComponent("local-\(line).m4a"), duration: 1, words: []) }
         checkpoint.outputs[99] = nil
+        checkpoint.outputs[1]?.timing = .estimated
+        try SkyStudioVoiceRecoveryStore.write(checkpoint, to: file)
+        let timed = try SkyStudioVoiceRecoveryStore.read(file)
+        check(timed.outputs[1]?.timing == .estimated && timed.outputs[0]?.timing == nil, "each line's subtitle timing survives (optional, version stays 2)")
         let localDetail = checkpoint.detail(recoveryFile: file.path)
         checkEqual(localDetail["not_generated_line_indices"], [], "completed local fallback lines are not falsely reported as missing narration")
         checkEqual(localDetail["not_generated_batch_indices"], [], "completed local fallback does not tell MCP to generate cloud batches")
@@ -100,7 +107,8 @@ private func fallbackSwitchChecks(folder: URL) {
         let lines = [String](repeating: "Hello world.", count: 6)
         let catalog = SkyStudioCatalog(models: [SkyStudioModel(id: "index-tts-2", kind: "voice_clone", title: "Clone",
                                                                limits: ["max_characters_by_language": ["other": 30]])])
-        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, model: "auto", language: "en", catalog: catalog)
+        let reading = SkyStudioVoiceReading(model: "auto", packs: true, timing: .aligned, transcribes: true, switchedForTiming: false)
+        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, reading: reading, language: "en", catalog: catalog)
         let backup: JSONValue = ["model": "minimax-speech-2.8-hd", "reference_language": "en"]
         let selection: JSONValue = ["model": "index-tts-2", "reference_language": "en", "fallback": backup]
         let quoted: JSONValue = ["credits": 7.5, "voice_plan": ["selection": selection, "rule": "en_80",

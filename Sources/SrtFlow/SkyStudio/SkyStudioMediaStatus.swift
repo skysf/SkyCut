@@ -19,6 +19,8 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published private(set) var progress: CloudJobProgress?
     @Published var waitingForRefund = false
     @Published var issue: String?
+    /// 当前这一步在本机做的事（已经本地化，比如配音交第一批之前「准备本机转写 45%」）；有它时状态行显示它、不显示阶段。
+    @Published var stepNote: String?
     /// 分几批交的配旁白：几批好了 / 共几批、几批在跑、几批等空位（状态行照它写，不造百分比）；一批的、别的生成是 nil。
     @Published private(set) var batches: SkyStudioVoiceBatchBoard?
     var onCancel: () -> Void = {}

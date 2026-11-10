@@ -23,8 +23,9 @@ private let primary: JSONValue = ["model": "gemini-3.8-flash-tts", "voice": "gem
 private let backup: JSONValue = ["model": "eleven-v4", "voice": "gemini:Charon"]
 
 /// 声音池 2 个、几批同时交：假协议按读的字认是第几批（`batches` 是每批读的字，一句一批时就是那几句）。
+/// 普通旁白转写得了就合批（声音 PR 5）：上限给 30，这几句（16–25 个字）两句放不进一批，一句一批。
 @MainActor
-private func concurrent(_ root: URL, _ name: String, lines batches: [String], cap: Int = 800) throws -> VoiceRecoveryFixture {
+private func concurrent(_ root: URL, _ name: String, lines batches: [String], cap: Int = 30) throws -> VoiceRecoveryFixture {
     let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent(name), cap: cap, audioSlots: 2)
     fixture.failSplitOnce = false
     VoiceRecoveryHTTP.deferred = true

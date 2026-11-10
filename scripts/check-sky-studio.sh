@@ -23,6 +23,8 @@
 #      请求和结果；429 的 pool、/me 的 max_running_audio_jobs、两个新上传用途。
 #      声音 PR 3：add_voiceover 的 voice 在 Sky Studio 上是谁（SkyStudioVoicePick：认声音的顺序、默认 gemini:Charon、角色只认 voice_roles、
 #      英式男声读非英文、本机退档按性别）；报价之前怎么分批、报价之后每批照报价交（SkyStudioVoicePlan）；恢复记录 version 2。
+#      声音 PR 5：报价之前怎么读（SkyStudioVoiceReading：合不合批、整段换 eleven-v4、按字数估）、一句超长先在句末分、
+#      原文切成词 / 对到原文上 / 按字数估（SpeechWordTokens / SpeechWordAlignment / SpeechWordEstimate）、Eleven 的字符时间切句。
 #      声音 PR 4：按池领槽（SkyStudioJobSlots：声音池 8 / 共用池 3、读不到声音池都进共用池、先来先得、等的时候被停就离队、
 #      对着假 Sky Studio 数同时开着的单、429 看 pool 拿着槽等、同一个 key 再交）；一段旁白几批各在哪一步（SkyStudioVoiceBatchBoard）。
 #
@@ -114,6 +116,11 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioHeldCredits.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatch.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceReading.swift \
+  Sources/SrtFlow/AIVoiceoverTiming.swift \
+  Sources/SrtFlow/SpeechWordTokens.swift \
+  Sources/SrtFlow/SpeechWordAlignment.swift \
+  Sources/SrtFlow/SpeechWordEstimate.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift \
@@ -163,6 +170,7 @@ xcrun swiftc \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
+  checks/SkyStudio/VoiceTimingChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \
   checks/SkyStudio/VoiceCatalogChecks.swift \
   checks/SkyStudio/VoiceLibraryChecks.swift \
