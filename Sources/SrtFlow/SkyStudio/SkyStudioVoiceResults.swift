@@ -112,7 +112,7 @@ enum SkyStudioVoiceCodes {
     static let referenceExists = "reference_exists"
     /// 409：这种语言已经有 MiniMax 版；附 `language`。不扣钱。
     static let minimaxVoiceExists = "minimax_voice_exists"
-    /// 503：Sky Studio 的私有声音桶没配（声音库暂时用不了，预设旁白照常）。
+    /// 503：Sky Studio 的私有声音桶没配（声音库暂时用不了，预设旁白照常）。在建任务、扣钱之前就回：本机记的那笔能退。
     static let libraryUnavailable = "voice_library_unavailable"
     /// 任务结束码：默认失败、备用要先花一次性费用；附 `one_time`、`refunded`。
     static let fallbackNeedsOneTime = "fallback_needs_one_time"
