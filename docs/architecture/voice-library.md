@@ -22,13 +22,17 @@
 ## 二、有效人声怎么数（SkyCut 和服务器必须一样）
 
 - 要上传的 16-bit 采样按服务器解码的方式换回 Float（÷ 32768），从文件开头起 **20 ms 一格**（44.1 kHz 是 882 个采样），
-  一格的均方根 **≥ −45 dBFS**（`AIVoiceLevel.activeFloor` = 0.0056，配音音量数「说话部分」的同一个门限）就算有声；
+  一格的**均方根 ≥ 0.0056**（均方 ≥ 3.136e-5，约 −45.04 dBFS，不是精确的 −45 dBFS）就算有声；
   **有效人声 = 有声的整格数 × 20 ms**，不满一格的尾巴不算。
+- **门限是和 Sky Studio 的跨仓库合同**：SkyCut 0.0056，服务器的 `too_little_speech` 兜底故意放宽到 **0.0055**（同一个 20 ms 的格子、
+  只数满格），吃掉两边浮点和取整的差别，保证服务器只会比 SkyCut 宽、不会更严。SkyCut 这边是单独写死的常量
+  `VoiceReferenceWindow.speechRMSFloor`，不借配音响度的 `AIVoiceLevel.activeFloor`——调配音的门限不许把合同带着变
+  （扫描守卫 `checks/MCP/voice-reference-wiring.sh`；案例：[门限借了配音响度的常量](../bugfixes/2026-11-10-voice-reference-floor-borrowed-from-voice-level.md)）。
 - 规则只在 `VoiceReferenceWindow` 一处（`Meter` 量响度、`voicedFrames` 数格、`minimumVoicedFrames` = 500）。挑段时按它数，
-  写好的采样再按它数一遍（`VoiceReferenceSample.voicedSeconds(of:)`）：不到 10 秒不写文件、不上传，报错说还差几秒，
-  结构化的 `reason` 是 `too_little_speech`，和服务器的同名。
-- 服务器的兜底（Sky Studio 3.4 第 4 条「按 −45 dBFS 门限数有能量的帧」）要用同一个格子和门限，或者比它宽；
-  比 SkyCut 严，就会出现 SkyCut 收了、服务器拒（`too_little_speech`）的情况。
+  写好的 16-bit 采样再按它数一遍（`VoiceReferenceSample.voicedSeconds(of:)`；浮点源刚过门限的格子量化之后可能就不够了，以后者为准）：
+  不到 10 秒不写文件、不上传，报错说还差几秒，`AIToolError` 带着结构化的 `reason: too_little_speech`（和服务器同名）、`voiced_seconds`、`missing_seconds`。
+- 重采样过来的素材（48 kHz、16 kHz、AAC）**正好 10.0 秒**的会被拒：重采样器在结尾少吐约 1 ms，第 500 格不满、不算。服务器数的就是上传的文件，
+  结果一样，不算破坏合同；录音要留余量，别卡着 10 秒。
 
 ## 三、挑哪一段（`VoiceReferenceWindow.choose`，纯值）
 
@@ -41,6 +45,7 @@
 4. 哪个起点都找不到自然的终点（一直有声、没有 0.2 秒的停顿）才退一步：终点放在 3:00 前后 1 秒里最安静的格子边上（两边两格加起来最轻，一样轻取早的）。
 5. 结果说清用了哪一段：`VoiceReferenceSample.Sample` 带原文件里的起止秒、有效人声、`autoSelected`，`summary(name:)` 是写给 AI / 用户的那一句
    （「Voice sample: 1:12–4:12 of talk.mov, 2 min 41 s of clear speech, picked automatically …」）；以后 `POST /voices` 的 `source` 带起止秒和 `auto_selected`（PR 6）。
+   时间都向下取整到秒：180.5 秒的样本写成 3:00、3 min 0 s，不会在「最长 3 分钟」旁边显示 3:01。
 
 和方案的一处不同：方案写「每 0.5 秒滑一次」，实现直接枚举全部合格的起点（开头和每个停顿后的开口）——那种滑法挑得到的起点都在里面，结果只会更好；
 每个起点二分找终点，几小时的文件也只是「停顿数 × log」。
@@ -51,15 +56,19 @@
 - 按 PTS 落到采样格上：第 n 个采样就是 `from + n / 44100` 秒，缺的补零、重叠的丢掉——AAC 的编码延迟、包边界都不挪时间，挑段算的时间和截出来的采样对得上。
 - **两遍**：先把给的那一段整个读一遍、只留 20 ms 的响度（几小时的视频也只占几 MB），挑完再只截那一段写 WAV；
   44.1 kHz 16-bit 单声道的源一个采样都不变（量化是 ×32768 四舍五入，和解码时的 ÷32768 互逆）。
+- 量化（`VoiceReferenceSample.quantize`）先排除坏采样再转整数：浮点源里的 NaN、±Inf 记成 0，特别大的数先在浮点上夹到满幅；
+  直接 `Int(_:)` 会让整个 App 崩掉（[坏采样让 App 崩掉](../bugfixes/2026-11-10-voice-reference-nan-sample-crash.md)）。
 - 阻塞的读取只在 `MediaReadQueue.analysis` 上跑；reader 的 `cancelReading` 只在读取体自己的 defer 里，外面的取消只置停止标记
   （[阻塞的媒体读取](blocking-media-reads.md)「读取中的取消与释放」）。字幕生成的 `AudioWindowReader`（16 kHz、async 里读的那个例外）不许再拿来做参考录音。
-- 文件写在调用方给的文件夹里，名字 `reference.wav`；被拒、被取消都不留文件。
+- 文件写在调用方给的文件夹里，名字 `reference.wav`；被拒、被取消都不留文件（读完到写之间再看一次取消，晚到的取消也不写）。
 
 ## 五、谁在用
 
-- **现在**：`add_voiceover` 的 `clone_from`（`SkyStudioVoiceCloudBatches.uploadReferenceIfNeeded`，只做一次、只传一次）。给了 `clone_seconds` 就是那一段
-  （不到 10 秒当场拒，`AIVoiceoverInput.cloneSource`），不给就从 `clone_start` 到结尾、超过 3 分钟自动挑；用了哪一段写进恢复记录的声音说明，
-  落地时随 `voice.note` 报给 AI（恢复也带着）。
+- **现在**：`add_voiceover` 的 `clone_from`。给了 `clone_seconds` 就是那一段（不到 10 秒当场拒，`AIVoiceoverInput.cloneSource`），
+  不给就从 `clone_start` 到结尾、超过 3 分钟自动挑。新任务在**报价、预留积分、写恢复记录之前**就做好参考录音（`SkyStudioVoiceoverRun.prepareReference`，
+  放临时文件夹、任务结束就删）：人声不够当场拒，`recovery_state` 是 `not_started`、`next_step` 是改了再调原来的 `add_voiceover`（去恢复只会再错一次），
+  `get_job` 带着 `reason` / `voiced_seconds` / `missing_seconds`。参考只传一次（`SkyStudioVoiceCloudBatches.uploadReferenceIfNeeded`）；
+  恢复的任务若参考还没传上去，传的时候才做、写进恢复文件夹。用了哪一段写进声音说明、跟着恢复记录走，落地时随 `voice.note` 报给 AI。
   **这条旧路在过渡期哪个服务器都走不通**：现在线上的 Sky Studio 不认 `voice_reference` 这个用途；新的声音服务（Sky Studio 声音 PR）的 `voice_clone`
   不再收 `inputs.reference_audio_url`。声音 PR 6 用 `manage_voices create` 取代它并删掉 `clone_from`（决定第七节第 8 条；过渡期不能克隆，用户已接受，决定第十二节）。
   MCP 清单里 `clone_seconds` 的说明（5–30、默认 10）是旧的，留到声音 PR 3 / 6 和清单一起改（这一刀不碰清单）。
@@ -69,9 +78,10 @@
 
 | 检查 | 守什么 |
 | --- | --- |
-| `scripts/check-mcp.sh` 的 `VoiceReferenceChecks`（纯值） | 10 秒下限、3 分钟上限、门限就是 `AIVoiceLevel.activeFloor`；整段、人声多的那段、一样多比前 15 秒、再比早；切口只在 ≥ 0.2 秒的停顿里且离两头 40 ms、尽头能当终点、一直有声时退到最安静的格子边；和照规矩直写的穷举对 16 组随机样本（含只有小停顿的）；分块量的响度 = 一口气量的；WAV 头、量化往返、写给 AI 的那一句、上传用途 |
-| `scripts/check-mcp.sh` 的 `VoiceReferenceFileChecks`（真读真写） | 现写素材走生产的 `prepare`、把写出来的 WAV 按字节读回来：44.1 kHz 16-bit 的源逐采样不变；48 kHz 立体声 4 分钟挑在说话密的 3 分钟、开口前 40 ms 起、停在最后一个字后 40 ms（和读到尽头人声一样多，取短的）、不到 181 秒、左右取平均；点名的一段原样截、采样数正好；AAC 的时间对得上；只有 8 秒人声的拒、说还差 2 秒、不留文件；取消不留文件 |
-| `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录、恢复出来的结果、一次就做完的结果都说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒 |
+| `scripts/check-mcp.sh` 的 `VoiceReferenceChecks`（纯值） | 门限是 0.0056（0.0056 和精确的 −45 dBFS 算有声，再小一点和服务器的 0.0055 不算）、10 秒下限、3 分钟上限（正好 3 分钟、结尾有停顿还是整段）；整段、人声多的那段、一样多比前 15 秒、再比早；切口只在 ≥ 0.2 秒的停顿里且离两头 40 ms、尽头能当终点、一直有声时退到最安静的格子边；和照规矩直写的穷举对 16 组随机样本（含只有小停顿的）；分块量的响度 = 一口气量的；WAV 头、量化往返、NaN / ±Inf 记 0 且特别大的夹住、写给 AI 的那一句（时间向下取整）、上传用途 |
+| `scripts/check-mcp.sh` 的 `VoiceReferenceFileChecks`（真读真写） | 现写素材走生产的 `prepare`、把写出来的 WAV 按字节读回来：44.1 kHz 16-bit 的源逐采样不变；48 kHz 立体声 4 分钟挑在说话密的 3 分钟、开口前 40 ms 起、停在最后一个字后 40 ms（和读到尽头人声一样多，取短的）、不到 181 秒、左右取平均；点名的一段原样截、采样数正好；AAC 的时间对得上；只有 8 秒人声的拒、说还差 2 秒、不留文件；取消不留文件；照审查的 `borderline.wav` 现写的贴边样本（9.9 秒 + 5 格 ±184）正好 10.0 秒、收；浮点刚过门限、量化后不够的 10 格按写出去的数（9.9 秒、拒）；带 NaN / ±Inf / 1e20 的浮点素材不崩、那几处写成 0 / 0 / 0 / 满幅 |
+| `checks/MCP/voice-reference-wiring.sh`（扫描，`check-mcp` 和 `check-guards` 都跑） | 门限是写死的 `speechRMSFloor = 0.0056`，`VoiceReferenceWindow` 的代码里不碰 `AIVoiceLevel` |
+| `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录、恢复出来的结果、一次就做完的结果都说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒；只有 6 秒人声的素材在报价之前就拒（一个 POST 都没有、不写恢复记录、`get_job` 带 `reason` 和差 4 秒） |
 
 反向验证（2026-11-10，每一处临时改回去、跑、再恢复）：
 

@@ -131,6 +131,18 @@ import SrtFlowMCPKit
             require(freshDone["status"] == "done" && freshDone["voice"]?["note"]?.stringValue?.contains("Voice sample: all of reference.wav") == true,
                     "a clone finished in one run tells the AI which part of the recording was used")
 
+            // 克隆的素材只有 6 秒人声：在问 Sky Studio 报价、预留积分、写恢复记录之前就拒（PR #346 审查第 3 条），
+            // get_job 带着结构化的原因，next_step 是改了再调原来的 add_voiceover、不是去恢复。
+            let short = try VoiceRecoveryFixture(folder: root.appendingPathComponent("short-reference"))
+            let shortSample = try await short.wait(SkyStudioVoiceoverRun(input: short.input(lines: ["Hello world."], reference: VoiceRecoveryHTTP.wave),
+                                                                          project: short.project, services: short.services).start())
+            require(shortSample["status"] == "failed" && shortSample["recovery_state"] == "not_started"
+                    && shortSample["reason"] == "too_little_speech" && shortSample["missing_seconds"]?.doubleValue == 4,
+                    "a 6 s voice sample is refused with its structured reason before anything is generated")
+            require(!VoiceRecoveryHTTP.log.contains { $0.0 == "POST" }, "a too-short voice sample is refused before any quote, upload or job")
+            let leftovers = (try? FileManager.default.contentsOfDirectory(atPath: root.appendingPathComponent("short-reference").path)) ?? []
+            require(!leftovers.contains { $0.hasSuffix(".recovery") }, "no recovery record is written for a refused voice sample")
+
             let cancelled = try VoiceRecoveryFixture(folder: root.appendingPathComponent("cancelled"))
             cancelled.failSplitOnce = false
             cancelled.cancelSplitOnce = true
