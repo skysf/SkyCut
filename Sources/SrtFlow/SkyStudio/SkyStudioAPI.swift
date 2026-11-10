@@ -137,8 +137,8 @@ struct SkyStudioAPI: Sendable {
     }
 
     /// `POST /uploads` 拿到地址，把文件 PUT 上去（流着发，不整个读进内存）；回 `/jobs` 的 inputs 要的那个 `file_url`。
-    /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`，声音的 `voice_reference`、`voice_convert_source`（各 ≤ 35 MB，
-    /// SkyStudioVoiceUpload）。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
+    /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`，声音的 `voice_reference`（VoiceReferenceSample）、
+    /// `voice_convert_source`（SkyStudioVoiceUpload；两种各 ≤ 35 MB）。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
     func upload(
         fileURL: URL, contentType: String, purpose: String, key: String, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> URL {

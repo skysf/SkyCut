@@ -309,7 +309,8 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
   `voice_convert`（`params.target_voice` = `voice_…` 或 `gemini:`、`params.source.seconds` 到毫秒只用来报价、可选的 `target_language`，传完才带
   `inputs.source_audio_url`）。结果没有 `url`：`SkyStudioVoiceJobResult`（变声的人声 + 背景两个文件、建 / 设计回的声音和样音链接），
   `SkyStudioJobRun` 把它也当「做完了」；读稿 / 克隆的结果照旧有 `url`，另带实际跑的 `model`、`fallback_used`、`voice_plan`（`SkyStudioVoiceOutcome`）。
-- **两个上传用途**（`SkyStudioVoiceUpload`）：`voice_reference`、`voice_convert_source`，各 ≤ 35,000,000 字节（十进制），照旧经 `SkyStudioAPI.upload`。
+- **两个上传用途**：参考录音的 `voice_reference` 只写在 `VoiceReferenceSample.uploadPurpose`（[声音库](voice-library.md)）；变声素材的 `voice_convert_source`
+  和两种共用的上限（十进制 35,000,000 字节）在 `SkyStudioVoiceUpload`；照旧经 `SkyStudioAPI.upload`。
 - **并发**：`/me` 的 `max_running_audio_jobs`（声音池，读不到 = 服务器还没上新池）；429 `too_many_jobs` 多了 `pool`（`audio` / `default`）照旧算容量拒绝、
   同一个 key 等着再交，**认不出的 pool 不算**（不能冒充未准入）。按池开槽是 PR 4。
 - **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，进了 `SkyStudioJobAdmission.rejectedCodes`

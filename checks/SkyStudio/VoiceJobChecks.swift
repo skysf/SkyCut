@@ -197,24 +197,24 @@ private func runVoicePoolChecks() async {
 }
 
 private func runVoiceUploadChecks() async {
-    checkEqual(SkyStudioVoiceUpload.referencePurpose, "voice_reference", "the reference recording's purpose")
+    // 参考录音的用途 voice_reference 只在 VoiceReferenceSample.uploadPurpose（check-mcp 的 VoiceReferenceChecks 钉着）。
     checkEqual(SkyStudioVoiceUpload.conversionSourcePurpose, "voice_convert_source", "the voice-change source's purpose")
     check(SkyStudioVoiceUpload.fits(bytes: 35_000_000), "35,000,000 bytes fits (decimal 35 MB)")
     check(!SkyStudioVoiceUpload.fits(bytes: 35_000_001) && !SkyStudioVoiceUpload.fits(bytes: 0), "one byte over, or empty, does not")
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("skycut-voice-upload-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
-    let file = folder.appendingPathComponent("reference.wav")
+    let file = folder.appendingPathComponent("clip-source.wav")
     try? Data(repeating: 7, count: 2048).write(to: file)
     SkyStudioStub.reset { seen in
         seen.url.hasSuffix("/uploads")
             ? .http(200, #"{"upload_url": "https://r2.example/put/1", "method": "PUT", "headers": {"Content-Type": "audio/wav"}, "file_url": "https://r2.example/uploads/u/1.wav"}"#)
             : .http(200, "")
     }
-    let link = try? await jobAPI().upload(fileURL: file, contentType: "audio/wav", purpose: SkyStudioVoiceUpload.referencePurpose, key: jobKey)
-    checkEqual(link?.absoluteString, "https://r2.example/uploads/u/1.wav", "the uploaded reference's file_url")
+    let link = try? await jobAPI().upload(fileURL: file, contentType: "audio/wav", purpose: SkyStudioVoiceUpload.conversionSourcePurpose, key: jobKey)
+    checkEqual(link?.absoluteString, "https://r2.example/uploads/u/1.wav", "the uploaded voice-change source's file_url")
     let ticket = SkyStudioStub.log.first?.body.flatMap { try? JSONValue.decode($0) }
-    checkEqual(ticket, ["filename": "reference.wav", "content_type": "audio/wav", "bytes": 2048, "purpose": "voice_reference"], "the /uploads ticket body")
+    checkEqual(ticket, ["filename": "clip-source.wav", "content_type": "audio/wav", "bytes": 2048, "purpose": "voice_convert_source"], "the /uploads ticket body")
     check(SkyStudioStub.log.last?.headers["Authorization"] == nil, "the PUT to storage carries no key")
 }
 

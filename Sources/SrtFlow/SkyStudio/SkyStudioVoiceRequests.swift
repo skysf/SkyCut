@@ -12,7 +12,8 @@ import SrtFlowMCPKit
 // - 语言提示 `params.language`（SkyStudioVoiceLanguageHint）：只在拉丁字母的那些句子判得出、而且不是英文时才带；
 //   中文、日文、韩文服务器自己分得清，英文是服务器的默认，都不带（SkyCut 声音方案 4.2 第 2 步、13.2 第 4 条）。
 // - 建 MiniMax 版（`voice_enroll`）、设计声音（`voice_design`）、视频变声（`voice_convert`）：同一个请求先 `/quote`、再 `/jobs`。
-// - 两个新上传用途（SkyStudioVoiceUpload）：参考录音 `voice_reference`、变声素材 `voice_convert_source`，各 ≤ 35 MB（十进制）。
+// - 两个新上传用途：参考录音 `voice_reference`（VoiceReferenceSample.uploadPurpose）、变声素材 `voice_convert_source`（SkyStudioVoiceUpload），
+//   各 ≤ 35 MB（十进制，上限在 SkyStudioVoiceUpload）。
 // 拼错了（没有字、声音的 id 不像样、批数和报价对不上）在发出去之前就拦下：一分不花、不碰服务器。
 // 不管什么：分批（声音 PR 3）、问不问用户（SkyStudioJobGate）、交和等（SkyStudioJobRun）、模型从哪个记录里挑（调用方读 `/models`）。
 
@@ -32,13 +33,13 @@ enum SkyStudioVoiceKind {
     static let reading: Set<String> = [narration, clone]
 }
 
-/// 声音的两种上传（`POST /uploads` 的 `purpose`）。服务器按十进制 35,000,000 字节卡；SkyCut 按单声道传，3 分钟参考约 16 MB、
-/// 5 分钟变声素材约 27 MB。立体声在上限以内服务器也收（转单声道）。
+/// 声音的两种上传（`POST /uploads` 的 `purpose`）：参考录音的 `voice_reference` 只写在 `VoiceReferenceSample.uploadPurpose`
+/// （参考录音那一摊，docs/architecture/voice-library.md），这里是变声素材的用途和两种共用的上限。服务器按十进制 35,000,000 字节卡；
+/// SkyCut 按单声道传，3 分钟参考约 16 MB、5 分钟变声素材约 27 MB。立体声在上限以内服务器也收（转单声道）。
 enum SkyStudioVoiceUpload {
-    /// 参考录音：WAV / MP3 / M4A / FLAC，落 Sky Studio 的私有桶，挂到声音上就删临时那份。
-    static let referencePurpose = "voice_reference"
     /// 变声的源音频：WAV / MP3 / FLAC（分离模型只认这三种），≤ 5 分钟。
     static let conversionSourcePurpose = "voice_convert_source"
+    /// 两种声音上传共用的上限（十进制 35 MB）。
     static let maxBytes = 35_000_000
 
     /// 传之前先看大小：超了就不传（服务器同样会拒，`upload_too_large`）。
