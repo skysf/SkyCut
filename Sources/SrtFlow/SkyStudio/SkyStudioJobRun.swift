@@ -51,7 +51,7 @@ struct SkyStudioJobRun: Sendable {
         case status(SkyStudioJobStatus)
     }
 
-    /// 交上去、等它做完；回的是做完那一刻的状态（`state == .done`、带 `result`）。
+    /// 交上去、等它做完；回的是做完那一刻的状态（`state == .done`、带 `result` 或 `voiceResult`）。
     func run(_ request: SkyStudioJobRequest, onUpdate: @escaping @Sendable (Update) -> Void = { _ in }) async throws -> SkyStudioJobStatus {
         let deadline = Date().addingTimeInterval(maxWait)
         let submitted = try await submit(request, deadline: deadline, onUpdate: onUpdate)
@@ -136,7 +136,10 @@ struct SkyStudioJobRun: Sendable {
         while true {
             switch current.state {
             case .done?:
-                guard current.result != nil || (current.characterID != nil && current.characterStatus == "ready") else { throw SkyStudioJobError.badAnswer("a finished job without a result") }
+                // 变声、建 MiniMax 版、设计声音的结果没有 `url`（SkyStudioVoiceJobResult），照样算做完了。
+                guard current.result != nil || current.voiceResult != nil || (current.characterID != nil && current.characterStatus == "ready") else {
+                    throw SkyStudioJobError.badAnswer("a finished job without a result")
+                }
                 return current
             case .failed?:
                 throw SkyStudioJobError.failed(current.failure ?? SkyStudioJobFailure(message: current.error ?? "Sky Studio could not make it.", jobID: current.jobID))
