@@ -19,6 +19,10 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published private(set) var progress: CloudJobProgress?
     @Published var waitingForRefund = false
     @Published var issue: String?
+    /// 当前这一步在本机做的事（已经本地化，比如配音交第一批之前「准备本机转写 45%」）；有它时状态行显示它、不显示阶段。
+    @Published var stepNote: String?
+    /// 分几批交的配旁白：几批好了 / 共几批、几批在跑、几批等空位（状态行照它写，不造百分比）；一批的、别的生成是 nil。
+    @Published private(set) var batches: SkyStudioVoiceBatchBoard?
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil,
@@ -37,9 +41,11 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
         if progress != next { progress = next }
     }
 
-    /// 一批配完开始下一批时，阶段时钟重新起步；不会把上一批的下载当成新一批的进度。
-    func reset(typicalSeconds: Double?) {
-        progress = CloudJobProgress(phase: .preparing, typicalSeconds: typicalSeconds)
+    /// 几批同时跑的配旁白：阶段照几批合出来的那一个，状态行另写几批各在哪（只有一批时照一批的样子显示）。
+    func show(_ board: SkyStudioVoiceBatchBoard) {
+        advance(to: board.phase, typicalSeconds: nil)
+        let next = board.total > 1 ? board : nil
+        if batches != next { batches = next }
     }
 
     func cancel() { onCancel() }

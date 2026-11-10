@@ -61,8 +61,10 @@ try:
     narration = job(started)
     assert len(narration["added"]) == 2 and narration["subtitles"]["added"] >= 2, narration
     assert narration["voice"]["quality"] == "Sky Studio voice" and narration["voice"]["name"] == "gemini:Charon"
-    assert len(narration["skystudio_job_ids"]) == 2
-    assert ledger() == before + 2
+    # 声音 PR 5：这台 Mac 转写得了英文，两句合一批交、在本机转写切开，字幕对到稿子上。
+    assert len(narration["skystudio_job_ids"]) == 1, narration
+    assert narration["subtitle_timing"] == "aligned", narration
+    assert ledger() == before + 1
     call("get_timeline")
     call("get_subtitles")
     call("undo")
@@ -85,16 +87,16 @@ try:
     cancelled = mcp.wait_job(started["job_id"], 30)
     assert cancelled["status"] == "cancelled", cancelled
     call("cancel_job", {"job_id": started["job_id"]})
-    assert ledger() == before + 2
+    assert ledger() == before + 1
     control(hold=False, quote_error=True)
     new_project()
     fallback = call("add_voiceover", {"lines": [{"text": "The local fallback is working."}]})
     assert "job_id" not in fallback and fallback["voice"]["quality"] != "Sky Studio voice" and fallback["voice"].get("note"), fallback
-    assert ledger() == before + 2
+    assert ledger() == before + 1
     logs = json.load(urllib.request.urlopen(SERVER + "/__log"))[log_start:]
     submits = [row for row in logs if row["method"] == "POST" and row["path"].endswith("/jobs")]
-    assert len(submits) == 3, submits
-    assert len({row["body"]["idempotency_key"] for row in submits}) == 3
+    assert len(submits) == 2, submits
+    assert len({row["body"]["idempotency_key"] for row in submits}) == 2
     assert all(row["body"]["model"] == "auto" and row["body"]["params"]["plan"]["voice"] == "gemini:Charon" for row in submits), submits
     quotes = [row for row in logs if row["method"] == "POST" and row["path"].endswith("/quote") and row["body"]["kind"] == "voice"]
     assert all("batches" in row["body"]["params"] and "prompt" not in row["body"] for row in quotes), quotes
@@ -106,7 +108,8 @@ try:
                 file = WORK / file
             subprocess.run([os.environ["SRTFLOW_FFMPEG"], "-v", "error", "-i", str(file), "-f", "null", "-"], check=True)
     (D / "voice-results.json").write_text(json.dumps(dict(narration=narration, fallback=fallback, cancelled=cancelled), ensure_ascii=False, indent=2))
-    print("PASS actual App: gemini:Charon by default, whole-segment quote, one selection per batch, subtitles by local transcription, one undo, "
+    print("PASS actual App: gemini:Charon by default, whole-segment quote, two lines packed into one batch, subtitles aligned by local "
+          "transcription, one undo, "
           "clone_from refused, queued cancellation/refund, native fallback before paying, file decode, no duplicate POSTs or key leakage")
 finally:
     mcp.close()

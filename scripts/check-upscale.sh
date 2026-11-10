@@ -69,6 +69,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceQuote.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceResults.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift \
   Sources/SrtFlow/VideoEditClipUpscaleRecord.swift \
   Sources/SrtFlow/Upscale/UpscaleTiers.swift \
   Sources/SrtFlow/Upscale/UpscaleRange.swift \

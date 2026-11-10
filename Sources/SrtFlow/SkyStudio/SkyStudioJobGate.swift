@@ -5,7 +5,8 @@ import Foundation
 // 管什么：先守每日硬预算；预算内按 AI 权限决定草稿越档是否需要确认，获准后才预留。
 // 令牌绑着完整请求（SkyStudioApproval：种类、模型、文字、全部参数、输入身份、精确报价和落点），换一样不认；给人看的 summary 只管显示。
 // 决定和记账在同一步里做完（中间没有 await），同时起的几个不会各自以为还在额度内。
-// 价格一律是 /quote 报的（不会有「不知道多少钱」）。upscale_clip（AIUpscaleTool）走这里；生成、配旁白改走 Sky Studio 时也走这里。
+// 价格一律是 /quote 报的（不会有「不知道多少钱」）。upscale_clip（AIUpscaleTool）走这里；生成、配旁白改走 Sky Studio 时也走这里；
+// 声音库的授权、一次性费用、删声音（声音 PR 6）也在这里，不另开确认入口。
 // 不管什么：报价（/quote）、退款（各任务自己：没花出去的退回）、面板起的（面板本身就是确认，不经这里）。
 
 @MainActor
@@ -80,6 +81,52 @@ enum SkyStudioJobGate {
         guard credits.isFinite, credits >= 0, approvedCeiling.isFinite, credits <= approvedCeiling,
               case .allow = store.decide(credits: credits) else { return nil }
         return record(store, credits)
+    }
+
+    // MARK: 声音库的三件事（SkyCut 声音方案 4.5；令牌绑什么、问句怎么写在 SkyStudioVoiceApproval）
+    //
+    // 用录音建声音的授权和一次性费用（建 MiniMax 版、设计）这一刀**两种模式都问**：全部权限下不问，要靠打开全部权限时那一次说明（价目 +
+    // 授权那句）和记下的长期授权（声音 PR 7）；在那之前照方案 4.5 末条「没有有效的长期授权，就照请求批准模式问」。
+    // 删声音不花钱、不要授权：请求批准模式问一句，全部权限直接删。每日硬预算两种模式都拦（一次性费用先判预算再问）。
+
+    /// 用录音建声音 / 加一种语言的录音：点过头（令牌收下）回 nil，调用方带 `consent: true` 发；否则回问句。
+    static func voiceConsent(action: String, question: String, token: String?) -> AIToolResult? {
+        let redemption = AIConfirmations.shared.redeem(token, for: action)
+        if redemption == .accepted { return nil }
+        return voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
+            next: "Show the statement to the user in their language. Only if they confirm it is true for this recording, repeat the "
+                + "same call with confirm_token. Never confirm on the user's behalf.")
+    }
+
+    /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码），点过头才记上账。
+    static func voiceOneTime(credits: Double, action: String, question: String, token: String?,
+                             store: SkyStudioSpendStore? = nil) throws -> Decision {
+        let store = store ?? SkyStudioSpendStore.shared
+        guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
+        guard case .allow = store.decide(credits: credits) else { return .needsConfirmation(budgetBlocked(credits: credits, store: store)) }
+        let redemption = AIConfirmations.shared.redeem(token, for: action)
+        guard redemption == .accepted else {
+            return .needsConfirmation(voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
+                next: "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
+                    + "Never treat your own plan as the user's approval."))
+        }
+        return .reserved(record(store, credits))
+    }
+
+    /// 删声音：请求批准模式问一句；全部权限直接删（结果里说删了）。点过头回 nil。
+    static func voiceDeletion(action: String, question: String, token: String?, access: AIAccessStore? = nil) -> AIToolResult? {
+        if (access ?? AIAccessStore.shared).mode == .full { return nil }
+        let redemption = AIConfirmations.shared.redeem(token, for: action)
+        if redemption == .accepted { return nil }
+        return AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal)
+    }
+
+    private static func voiceQuestion(_ result: AIToolResult, next: String) -> AIToolResult {
+        guard case .object(var value) = result.payload else { return result }
+        value["next_step"] = .string(next)
+        var copy = result
+        copy.payload = .object(value)
+        return copy
     }
 
     private static func record(_ store: SkyStudioSpendStore, _ credits: Double) -> Reservation {

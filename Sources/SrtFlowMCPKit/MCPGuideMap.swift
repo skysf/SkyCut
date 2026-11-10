@@ -31,6 +31,7 @@ enum MCPGuideMap {
     (titles), set_shape / set_shapes (lines, boxes, circles, arcs; blur or mosaic to hide logos, faces, watermarks)
     Audio: find_audio (music and sound effects), add_voiceover (narration spoken from text), sync_voiceover (retime \
     pictures and titles to existing narration), set_track (track volume, mute or hide a track, master fader)
+    Voices: list_voices (presets, my voices), manage_voices (clone my voice from a recording, design, rename, delete)
     Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles (text, timing, style), \
     export_subtitles (subtitle files)
     Check and export: inspect_video (seams, black frames, subtitle problems), export_video (final, or \
@@ -43,6 +44,6 @@ enum MCPGuideMap {
     /// 花积分的那一行（2026-10-30：始终列出，不能靠中途加了 Key 之后客户端重新发现工具；2026-10-28 起都走 Sky Studio）。
     static let paidTools = "generate_media (images, camera angles, image upscale, videos, lipsync, background cutout, music, sound effects), " +
         "upscale_clip (sharper, larger clips), manage_characters (create and headshot; import, edits and deletion are free), " +
-        "add_voiceover (Sky Studio voices; SkyCut and Mac voices are free); " +
-        "free: list_characters, get_character"
+        "add_voiceover (Sky Studio voices; SkyCut and Mac voices are free), manage_voices (design; recordings, rename and deletion are free); " +
+        "free: list_characters, get_character, list_voices"
 }

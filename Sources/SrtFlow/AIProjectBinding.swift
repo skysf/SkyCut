@@ -23,7 +23,7 @@ enum AIProjectBinding {
     static func usesProject(_ tool: MCPToolName, _ args: AIToolArguments) -> Bool {
         switch tool {
         case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
-             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob,
+             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .listVoices, .manageVoices,
              .openProject, .newProject, .closeProject:
             return false
         case .generateMedia:

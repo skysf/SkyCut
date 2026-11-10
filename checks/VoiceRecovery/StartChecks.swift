@@ -6,8 +6,8 @@ import SrtFlowMCPKit
 // 云端配旁白回任务号之前的那几步（SkyStudioVoiceoverStart，SkyCut 声音方案 4.2 第 1–4 步、4.3、4.4、9.1 第 2、6 项），真 App 对象 + 假协议：
 // - 不点名：gemini:Charon；整段 `/quote` 一次（kind voice、model auto、params.batches、英文稿不带语言提示），回 job_id 时带 voice_plan；
 //   每批 `/jobs` 带同一个 params.plan、这一批的 max_credits、各自的幂等 key；恢复记录记下选择和每批的模型；服务器在某一批换了备用也记下；
-// - 花钱之前就停下的：每日额度不够（daily_budget_exceeded，不换声音）、服务器拒（4xx，原话、不换声音）、要一次性费用、没有这个预设 / 模型、
-//   要字幕却转写不了；服务器不答（5xx）当场退本机；
+// - 花钱之前就停下的：每日额度不够（daily_budget_exceeded，不换声音）、服务器拒（4xx，原话、不换声音）、要一次性费用、没有这个预设 / 模型；
+//   服务器不答（5xx）当场退本机（要字幕却转写不了不再拒：声音 PR 5 换 eleven-v4 / 按字数估，见 TimingChecks.swift）；
 // - 英式男声读中文改用中文的旁白角色、服务器的 warnings 进 voice.note、next_step 叫 AI 先转告。
 
 @MainActor
@@ -21,7 +21,8 @@ private let geminiCharon: JSONValue = ["model": "gemini-3.8-flash-tts", "voice":
 
 @MainActor
 private func happyPathChecks(_ root: URL) async throws {
-    let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("narrate"), cap: 800)
+    // 上限 30：三句各自一批（看每批自己的价和 key）；几句合一批在 TimingChecks.swift。
+    let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("narrate"), cap: 30)
     fixture.failSplitOnce = false
     let spent = SkyStudioSpendStore.shared.spentToday()
     let lines = ["Welcome to the course.", "First, open the project.", "Then add a clip."]
@@ -54,7 +55,7 @@ private func happyPathChecks(_ root: URL) async throws {
             "three clips land in one step, each with its subtitles (got \(clips.count) clips, \(cues.count) subtitles)")
 
     // 服务器在第二批里自己换了备用：做好的不重做，记录和 get_job 都说哪一批用了哪个模型（之后的批改带备用是声音 PR 4）。
-    let fallback = try VoiceRecoveryFixture(folder: root.appendingPathComponent("fallback"), cap: 800)
+    let fallback = try VoiceRecoveryFixture(folder: root.appendingPathComponent("fallback"), cap: 12)
     VoiceRecoveryHTTP.fallbackAt = 1
     let switched = try await fallback.wait(fallback.started(fallback.narrate(["Hello world.", "Good night."], subtitles: false)))
     let record = try SkyStudioVoiceRecoveryStore.read(URL(fileURLWithPath: switched["recovery_file"]?.stringValue ?? ""))
@@ -108,9 +109,6 @@ private func refusalChecks(_ root: URL) async throws {
         try await fixture.narrate(["Hello world."], model: "no-such-model")
     }
     fixture.transcribes = false
-    await refused("subtitles this Mac cannot transcribe", ["Nothing was charged", "subtitles=false", "model=eleven-v4"]) {
-        try await fixture.narrate(["Hello world."])
-    }
     VoiceRecoveryHTTP.quoteOneTime = [["kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en", "credits": 377.6]]
     await refused("a quote asking for a one-time fee", ["one-time"]) { try await fixture.narrate(["Hello world."], subtitles: false) }
     VoiceRecoveryHTTP.quoteOneTime = []

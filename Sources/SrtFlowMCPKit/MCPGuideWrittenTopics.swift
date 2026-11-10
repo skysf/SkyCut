@@ -26,8 +26,9 @@ public enum MCPGuideWrittenTopics {
         public var readingTip: String? = nil
     }
 
-    /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3）。之后的两批加在这里。
-    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover]
+    /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices 随声音 PR 6 从第一天起就这么写）。
+    /// 之后的两批加在这里。
+    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices]
         // 第二批（方案 PR 5，2026-11-10）：工程、读时间线、整轨 / 整段的改动、批量、曲库、文稿、风格、角色等 27 个。
         + [.getStatus, .setView, .openProject, .newProject, .closeProject, .saveProject, .undo, .seek, .cancelJob,
            .getSettings, .getTimeline, .setTrack, .splitClip, .deleteItems, .duplicateItems, .setTransition, .setCanvas, .editClips,
@@ -41,6 +42,8 @@ public enum MCPGuideWrittenTopics {
         case .generateMedia: return MCPGuideMediaTopics.generateMedia
         case .look: return MCPGuideMediaTopics.look
         case .addVoiceover: return MCPGuideVoiceTopics.addVoiceover
+        case .listVoices: return MCPGuideVoiceLibraryTopics.listVoices
+        case .manageVoices: return MCPGuideVoiceLibraryTopics.manageVoices
         case .getStatus: return MCPGuideProjectTopics.getStatus
         case .setView: return MCPGuideProjectTopics.setView
         case .openProject: return MCPGuideProjectTopics.openProject

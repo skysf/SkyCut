@@ -3,8 +3,12 @@ import Foundation
 // MARK: - 交给 Sky Studio 一件活，等它做完
 //
 // 管什么：提交 → 照 `poll_after_seconds` 问（没有长轮询）→ 做完回最后那一份状态（带成品）。
-// - **同时开着的满了**（`too_many_jobs`，每个账号最多 `max_running_jobs` 个，现在 3）：在本机等着，隔一会儿用**同一个
-//   idempotency_key** 再交（服务器认得出是同一个，不会扣两次）。提交断网不重放收费 POST。
+// - **交之前先在本机领槽**（SkyStudioJobSlots：声音池 / 共用池，和服务器一样分，SkyCut 声音方案 8.2）：领不到就在本机排队、
+//   报一次 `waitingForSlot`；在等的时候被停 = 没交上、一分没花。这一单结束（做完、没做成、停了）就还。调用方先领好的（`lease`，
+//   一段旁白的各批）由调用方还；恢复已知原单（`resume`，只 GET）不领。
+// - **同时开着的满了**（`too_many_jobs`，每个账号每个池最多 `max_running_jobs` / `max_running_audio_jobs` 个）：网页、别的电脑上的
+//   本机看不见，照旧兜底 —— 拿着槽在本机等着，隔一会儿用**同一个 idempotency_key** 再交（服务器认得出是同一个，不会扣两次）。
+//   提交断网不重放收费 POST。
 // - **提交不跟着取消**：请求发出去一半被掐断，服务器那边可能已经扣了钱、建了任务；让它回来，拿到任务号再按下面的规矩停。
 // - **问的时候断网几次不算失败**：活在服务器上照做（连着问不到才算）。
 // - **Task 被取消 = 用户要停**：只有排着队的能取消（退钱）；已经开始的取消不了（`not_cancellable`），照实说：积分花了，成品照样进作品库。
@@ -38,6 +42,11 @@ struct SkyStudioJobRun: Sendable {
     var beforeSubmit: (@Sendable () async throws -> Void)?
     /// 原生角色任务不能取消；停止本机等待也不能向 /cancel 发送请求。
     var cancellable = true
+    /// 交之前在哪儿领槽：全 App 一份；自检换成自己的一份。nil = 不领（只给自检用）。
+    var slots: SkyStudioJobSlots? = .shared
+    /// 调用方已经按顺序领好的槽（一段旁白的各批，SkyStudioVoiceBatchQueue）：这里不另领、也**不还** —— 调用方记完这一批的结果再还，
+    /// 排在后面的批领到槽时一定看得见前面出了什么事。nil = 这里自己领、这一单结束就还。
+    var lease: SkyStudioJobSlots.Lease?
 
     init(api: SkyStudioAPI, key: String) {
         self.api = api
@@ -45,7 +54,7 @@ struct SkyStudioJobRun: Sendable {
     }
 
     enum Update: Equatable, Sendable {
-        /// 同时开着的满了，在本机等着再交。
+        /// 没有空槽：本机的池满了（在本机排队），或者服务器回 429（拿着槽在本机等着再交）。界面都写「排队」。
         case waitingForSlot(running: Int?, limit: Int?)
         /// 交上了 / 问到了一次。
         case status(SkyStudioJobStatus)
@@ -53,9 +62,23 @@ struct SkyStudioJobRun: Sendable {
 
     /// 交上去、等它做完；回的是做完那一刻的状态（`state == .done`、带 `result` 或 `voiceResult`）。
     func run(_ request: SkyStudioJobRequest, onUpdate: @escaping @Sendable (Update) -> Void = { _ in }) async throws -> SkyStudioJobStatus {
+        let held = try await claimSlot(for: request.kind, onUpdate: onUpdate)
+        defer { held?.release() }
+        // 最多等多久从领到槽算起：在本机排着队的时候还没交，不能说「交上去 5 小时还没做完」。
         let deadline = Date().addingTimeInterval(maxWait)
         let submitted = try await submit(request, deadline: deadline, onUpdate: onUpdate)
         return try await follow(submitted, deadline: deadline, onUpdate: onUpdate)
+    }
+
+    /// 本机领槽（调用方领好了就不另领）。要等就报一次 `waitingForSlot`；在等的时候被停：没交上、一分没花。
+    private func claimSlot(for kind: String, onUpdate: @escaping @Sendable (Update) -> Void) async throws -> SkyStudioJobSlots.Lease? {
+        guard lease == nil, let slots else { return nil }
+        do {
+            return try await slots.acquire(kind: kind) { running, limit in onUpdate(.waitingForSlot(running: running, limit: limit)) }
+        } catch {
+            throw beforeSubmit == nil ? SkyStudioJobError.stopped(.nothingCharged)
+                : .notSubmitted("Cancelled while waiting for a slot; Sky Studio did not accept the operation.")
+        }
     }
 
     /// 恢复已知原单：只 GET，沿用同一套轮询 / 取消规则，永不重新 POST。

@@ -21,6 +21,8 @@ final class AISpeechSynthesis: NSObject, AVSpeechSynthesizerDelegate {
         var duration: Double
         /// 文件里的秒。
         var words: [TimedWord]
+        /// 词的时间从哪来（结果里的 subtitle_timing）：本机的声音报词标记，是 provider；Sky Studio 的看 SkyStudioVoiceRender。
+        var timing: AIVoiceoverTiming = .provider
     }
 
     /// 这台 Mac 装的声音（抄成 AIVoiceChoice 认的样子）。
