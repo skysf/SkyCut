@@ -70,17 +70,21 @@
 | 检查 | 守什么 |
 | --- | --- |
 | `scripts/check-mcp.sh` 的 `VoiceReferenceChecks`（纯值） | 10 秒下限、3 分钟上限、门限就是 `AIVoiceLevel.activeFloor`；整段、人声多的那段、一样多比前 15 秒、再比早；切口只在 ≥ 0.2 秒的停顿里且离两头 40 ms、尽头能当终点、一直有声时退到最安静的格子边；和照规矩直写的穷举对 16 组随机样本（含只有小停顿的）；分块量的响度 = 一口气量的；WAV 头、量化往返、写给 AI 的那一句、上传用途 |
-| `scripts/check-mcp.sh` 的 `VoiceReferenceFileChecks`（真读真写） | 现写素材走生产的 `prepare`、把写出来的 WAV 按字节读回来：44.1 kHz 16-bit 的源逐采样不变；48 kHz 立体声 4 分钟挑在说话密的 3 分钟、开口前起、到尽头、不到 181 秒、左右取平均；点名的一段原样截；AAC 的时间对得上；只有 8 秒人声的拒、说还差 2 秒、不留文件；取消不留文件 |
-| `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录和最终结果说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒 |
+| `scripts/check-mcp.sh` 的 `VoiceReferenceFileChecks`（真读真写） | 现写素材走生产的 `prepare`、把写出来的 WAV 按字节读回来：44.1 kHz 16-bit 的源逐采样不变；48 kHz 立体声 4 分钟挑在说话密的 3 分钟、开口前 40 ms 起、停在最后一个字后 40 ms（和读到尽头人声一样多，取短的）、不到 181 秒、左右取平均；点名的一段原样截、采样数正好；AAC 的时间对得上；只有 8 秒人声的拒、说还差 2 秒、不留文件；取消不留文件 |
+| `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录、恢复出来的结果、一次就做完的结果都说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒 |
 
-反向验证（2026-11-10）：
+反向验证（2026-11-10，每一处临时改回去、跑、再恢复）：
 
-1. `VoiceReferenceReader.sampleRate` 改回 16 kHz → `VoiceReferenceChecks` 的采样率 / WAV 头、`VoiceReferenceFileChecks` 的逐采样往返、`check-voice-recovery` 的上传头全红。
-2. `minimumVoicedFrames` 改回 3 秒（150 格）→ 10 秒下限、9.98 秒不够、8 秒人声被拒三条红。
-3. 上传用途改回 `audio` → `VoiceReferenceChecks` 的用途和 `check-voice-recovery` 的上传断言红。
-4. 终点不再要求离停顿两头 40 ms、或停顿下限改成 0.18 秒 → 穷举对账和「小停顿不切」红。
+| 临时改成 | 红了什么 |
+| --- | --- |
+| `VoiceReferenceReader.sampleRate` = 16 kHz | `check-mcp` 12 条：采样率、有效人声的换算、整段 12 秒、WAV 头、逐采样往返、48 kHz 立体声、点名的一段、AAC 的长度和时间；`check-voice-recovery`：传上去的不是 44.1 kHz |
+| `minimumVoicedFrames` = 150（3 秒） | 10 秒的常量、9.98 秒不够、8 秒人声被拒且不留文件 |
+| `uploadPurpose` = `audio` | 上传用途那一条；`check-voice-recovery`：上传不是 `voice_reference` |
+| `pauseFrames` = 9（0.18 秒也算停顿） | 停顿的定义、「小停顿不能切」（终点挪到 180.84 秒）、穷举对账的 3 组只有小停顿的样本 |
+| `cloneSource` 换回「默认 10、夹在 5–30」 | `check-voice-recovery` 3 条：5 秒不拒、不给时成了 10 秒、45 秒被夹到 30 |
+| 去掉落地前从恢复记录同步声音说明的那一行 | 一次就做完的克隆，结果不说用了哪一段（恢复出来的那次照样有：说明从记录里读） |
 
-恢复后全绿（详细输出记在 PR 正文）。
+全部恢复后转绿。
 
 ## 七、人工回归（真 Key；声音库上线、新建声音的界面做好之后）
 

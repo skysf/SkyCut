@@ -78,8 +78,10 @@ private func runPickChecks() {
     solid[9_020] = 0.05
     checkClose(Window.choose(levels: solid, duration: 300).end, 180.4, "no pause anywhere: cut at the edge next to the quietest frame")
 
-    // 0.18 秒的小停顿不能切；3:00 附近只有一个 0.24 秒的真停顿，终点就落在它里面、离开头 40 ms。
-    let choppy = frames(cycles(89, [(1.82, true), (0.18, false)]) + [(2, true), (0.24, false)] + cycles(110, [(1.82, true), (0.18, false)]))
+    // 0.18 秒的小停顿不能切；3:00 附近只有一个 0.24 秒的真停顿，终点就落在它里面、离开头 40 ms
+    //（它后面 0.56 秒还有一个 0.18 秒的小停顿：小停顿要是也能切，终点就会挪到那里，多装 0.56 秒的声音）。
+    let choppy = frames(cycles(89, [(1.82, true), (0.18, false)]) + [(2, true), (0.24, false), (0.56, true), (0.18, false)]
+                        + cycles(110, [(1.82, true), (0.18, false)]))
     let gap = Window.choose(levels: choppy, duration: seconds(choppy))
     checkClose(gap.start, 0, "short gaps are not start points")
     checkClose(gap.end, 180.04, "the end sits 40 ms into the only real pause near 3:00")

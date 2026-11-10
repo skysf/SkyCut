@@ -117,7 +117,7 @@ enum VoiceReferenceSample {
         let have = (voiced * 10).rounded(.down) / 10
         let missing = max(0.1, ((minimum - voiced) * 10).rounded(.up) / 10)
         throw AIToolError(
-            "\(name) has only \(String(format: "%.1f", have)) s of clear speech there; a voice sample needs at least "
+            "The voice sample from \(name) has only \(String(format: "%.1f", have)) s of clear speech; it needs at least "
                 + "\(Int(minimum)) s (\(String(format: "%.1f", missing)) s more). Use a recording of one person talking for "
                 + "30 s to 1 min without music.",
             details: ["reason": "too_little_speech", "voiced_seconds": .number(have), "required_seconds": .number(minimum),

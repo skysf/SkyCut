@@ -124,6 +124,13 @@ import SrtFlowMCPKit
             require(single.count == 1 && abs(single[0].timelineDuration - 12) < 0.2, "long-line recovery joins each six-second batch exactly once")
             require(!subtitle.project.state.subtitleCues(of: .original).isEmpty, "recovered long line includes aligned subtitles")
 
+            // 一次就做完的克隆：参考是这一次传的，结果的 voice.note 也要说用了素材的哪一段（恢复时从记录里读，见上面）。
+            let fresh = try VoiceRecoveryFixture(folder: root.appendingPathComponent("fresh"))
+            fresh.failSplitOnce = false
+            let freshDone = try await fresh.wait(SkyStudioVoiceoverRun(input: fresh.input(lines: ["Hello world."]), project: fresh.project, services: fresh.services).start())
+            require(freshDone["status"] == "done" && freshDone["voice"]?["note"]?.stringValue?.contains("Voice sample: all of reference.wav") == true,
+                    "a clone finished in one run tells the AI which part of the recording was used")
+
             let cancelled = try VoiceRecoveryFixture(folder: root.appendingPathComponent("cancelled"))
             cancelled.failSplitOnce = false
             cancelled.cancelSplitOnce = true
