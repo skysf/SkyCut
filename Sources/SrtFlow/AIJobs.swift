@@ -17,6 +17,9 @@ final class AIJobs {
         case burnIn = "burn_in"
         case screenRecording = "screen_recording"
         case inspection
+        /// 声音库的两种收费任务（SkyStudioVoiceLibraryJob）：设计一个新声音、给一种语言建 MiniMax 版。
+        case voiceDesign = "voice_design"
+        case voiceEnroll = "voice_enroll"
     }
 
     enum Status: String {

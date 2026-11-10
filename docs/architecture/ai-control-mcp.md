@@ -184,6 +184,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 把它删进废纸篓（会问）。
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
+   - **声音库的三件事**（2026-11-10 声音 PR 6，第 58 条）也在 `SkyStudioJobGate`：用录音建声音 / 加录音的**授权**和**一次性费用**（建 MiniMax 版、
+     设计声音）这一刀**两种模式都问**（全部权限下不问要等打开时的价目说明和长期授权，声音 PR 7），一次性费用先判每日硬预算；**删声音**请求批准模式问一句、
+     全部权限直接删。
    操作确认的入口是以下四处（设置权限另见其合同）（`AIFileTools`（含服务器角色删除）、`AIWorkspace.confirmReading`、`SkyStudioJobGate`、`AISettingsApproval`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
@@ -714,9 +717,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      「send to Sky Studio」）。
 40. **云端配旁白（`add_voiceover`，方案第 42 条，2026-10-29 起走 Sky Studio；2026-11-10 声音 PR 3 起照 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.2–4.4）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。
     - **认声音**（`SkyStudioVoicePick`，4.3 的顺序）：不给 = `/models` 里 `default: true` 的预设（现在是 `gemini:Charon`，男声）；8 个角色照 `/models` 的 `voice_roles`（SkyCut 不写死，旧的 Eleven 角色表删了）；`gemini:<名字>` 或不带前缀的预设名；`eleven:<名字>`；不带前缀的旧 Eleven 名（`Rachel` 这类）不再收。英式男声碰上不是英文的文字改用那种语言的男声角色（没有就用默认预设）并在 `voice.note` 说一声。点名 Kokoro 的音色、这台 Mac 的声音照点名，不走云端。没有 Key 时不点名的默认改成旁白角色（中文 `zh_male`、英文 `en_male`，和 Charon 同一个人设）。
+      `voice_…`（用户声音库里的声音，2026-11-10 声音 PR 6）：读稿 kind 是 `voice_clone`、`params.voice` 原样，模型 `auto` 或点名 index-tts-2 /
+      minimax-speech-2.8-hd / heygen-voice-turbo；没有 Key 当场报错。
     - **`model`**：不给 = `auto`，服务器选；点名的要在 `/models` 里有（读稿的那几个），不然当场拒。
     - **整段报价挪到回任务号之前**（`SkyStudioVoiceoverStart`）：静默读 Key → `/models`（缓存 10 分钟）→ 分批（普通旁白现在一句一单、上限读 `limits.max_characters_by_language`）→ **整段 `POST /quote` 一次**（`params.batches`、拉丁字母的非英文稿带 `params.language`）→ 要字幕而选中的模型不报字的时间（`/models` 的 `output.words`，Gemini 不报）时先确认这台 Mac 能转写，不能就在花钱之前拒 → 按每批的 credits 整体预留，额度不够当场回 `daily_budget_exceeded`、什么都不起、不换声音 → 起任务，回 `job_id` + `voice_plan` + `voice.note`（服务器的 warnings、英式男声、语速被忽略），有 note 时 `next_step` 叫 AI 在用户听之前先转告。
-    - **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认）当场换本机的声音（角色照旧、预设按它在这种语言里的性别挑角色），`voice.note` 说为什么；服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持）原话转给 AI、一分不花、不换声音。付费请求交出去之后不再退本机。
+    - **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认）当场换本机的声音（角色照旧、预设按它在这种语言里的性别挑角色），`voice.note` 说为什么；服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持）原话转给 AI、一分不花、不换声音。付费请求交出去之后不再退本机。**声音库的声音（`voice_…`）从不退本机**：Key / 目录 / 报价读不到、声音库用不了（503 `voice_library_unavailable`）都报错、一分不花（`checks/sky-studio-wiring.sh` 第 11 节钉着）。
+    - **一次性费用**（声音 PR 6，`SkyStudioVoiceOneTimeStep`）：报价的 `one_time` 不为空（`voice_plan.rule: default_needs_one_time`：默认要的 MiniMax 版还没建，selection 先给不花钱的那个；或者点名的模型就要 MiniMax 版）时回任务号之前先定：`skip_one_time=true` 照不花钱的那个读（只对 `default_needs_one_time` 有用）；没带就经 `SkyStudioJobGate.voiceOneTime` 问（先判每日硬预算，问句带价、不建这一单用什么，令牌绑 kind / 模型 / 声音 / 语言 / 精确积分）；点过头记账、起一单 `voice_enroll`（`SkyStudioVoiceLibraryJob`，回它的任务号），做完叫 AI 再调一次 `add_voiceover`（那时报价不再要一次性费用）。不在旁白任务里串着建：建要几十秒、价要等建完再报，回任务号之前整段报价、整体预留这条规矩不能在任务里绕过去。任务里某一批的备用要先建 MiniMax 版（`fallback_needs_one_time`）跟中途换备用一起是声音 PR 4 的事。
     - 任务里：每批 `/jobs` 带同一个 `params.plan`（`voice_plan.selection`，整段一个模型）和这一批报价的 credits 当 `max_credits`；逐批结算，未知提交保留账并报任务号与幂等 key，不重生成。词时间：Eleven v4 拼全部全局时间 chunk、尾端按实际媒体时长夹住；不报字的模型在本机转写对齐。合批（声音库的声音、以后的普通旁白）在本机转写后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。
     - **`clone_from` 去掉了**（决定第七节第 8 条）：带了就是说明上没有的参数名，整个调用不做；克隆一律先进声音库（`manage_voices`，声音 PR 6）。
     - 名片照 MCP 按需说明的新规矩写（≤ 450，固定说法），用法在说明书的 `add_voiceover` 主题（`MCPGuideVoiceTopics`，和试点的五个同一张表 `MCPGuideWrittenTopics`，[MCP 说明书](mcp-guide.md)第 14 条）。
@@ -1003,6 +1009,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     太长时按整个参数自动切成 `fields`、`fields_2`……。迁移过的工具（2026-11-10 起试点 5 个和 add_voiceover）名片写短，概要以迁移前的说明原文开头、后面是手写的用法和坑（add_voiceover 例外：行为同时改了，
     概要按新行为写，[MCP 说明书](mcp-guide.md)第 14 条）；
     剩下的分两批搬，做到哪看 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
+58. **声音库：`list_voices`、`manage_voices`（2026-11-10 声音 PR 6，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.5、4.6；合同见 [声音库](voice-library.md)）**：
+    读和写分开（同角色 A/B 的先例）。`list_voices` 只读免费：预设按语言（`listed` 的、按打分高到低、默认的标出来、按这种语言报性别和说明，
+    没有自己名单的语言照英文那份）+ 我的声音（`GET /voices`，没有任何服务商 id）；声音库用不了时照回预设、`mine` 说暂时用不了。
+    `manage_voices` 写用户的声音库（服务器上的事，不登记时间线撤销）：`create` / `add_reference` 要 `file`、`language`（这一刀要 AI 给，本机检测随声音库界面接）
+    和 `name` / `voice`，本机做参考录音（[声音库](voice-library.md)第一节的规格）、问授权（问句带 `/models` 的 `voice_consent.per_recording` 原文和版本，
+    令牌绑文件身份、那段参考录音的内容哈希、用的那一段、语言、名字 / 声音、版本、账户）、点过头才传 `voice_reference`、建声音带 `consent: true` + 版本；
+    `design` 先报价、问一次性费用、点过头记账起 `voice_design` 任务（`get_job` 报新声音和 1 小时的 `sample_url`，账按实收）；`rename` 直接改；`delete`
+    请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`
+    （第 6 条），这一刀授权和一次性费用两种模式都问（长期授权是声音 PR 7）。错误码换成能照做的话（`SkyStudioVoiceLibraryErrors`）。
+    名片 + 说明书主题（`MCPGuideVoiceLibraryTopics`，新工具没有迁移前的原文）；全清单 2026-11-10 是 106,921 / 110,000。
 
 ## 五、这一轮、停止、撤销这一轮
 

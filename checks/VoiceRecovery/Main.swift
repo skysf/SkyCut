@@ -16,6 +16,7 @@ import SrtFlowMCPKit
         do {
             try await recoveryChecks(root)
             try await runVoiceStartChecks(root)
+            try await runVoiceLibraryChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -25,7 +26,8 @@ import SrtFlowMCPKit
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
         print("PASS: production voice: whole-segment quote before job_id, one selection per segment, budget / refusal / local fallback before paying, "
             + "second-batch split failure, local-only retry, missing-only generation with the saved selection, subtitle recovery, stable files, "
-            + "durable receipt, six clips/cues, one undo/redo and unknown-submit refusal")
+            + "durable receipt, six clips/cues, one undo/redo and unknown-submit refusal; voice library: list with an outage, consent before "
+            + "upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version")
         exit(0)
     }
 

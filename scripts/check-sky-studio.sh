@@ -121,6 +121,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceRequests.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePick.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceListing.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceApproval.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibraryErrors.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AITextLanguage.swift \
@@ -158,6 +161,7 @@ xcrun swiftc \
   checks/SkyStudio/ApprovalChecks.swift \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
+  checks/SkyStudio/VoiceLibraryToolChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \
   checks/SkyStudio/VoiceCatalogChecks.swift \
   checks/SkyStudio/VoiceLibraryChecks.swift \

@@ -9,6 +9,8 @@ import SrtFlowMCPKit
 // 为什么挪到回任务号之前：一次性费用要在花钱之前问（声音 PR 6 接上），generate_media 本来就是先报价、过关再起任务；一段旁白只多一个请求。
 // **退本机只在付费请求之前**（决定第七节第 4 条）：Key / 目录 / 报价读不到（断网、5xx、Key 不认）就当场换本机的声音；
 // 服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持……）原话转给 AI、一分不花、不换声音；额度不够也不换声音（2026-11-01 定）。
+// 用户声音库里的声音（`voice_…`，声音 PR 6）读稿是 `voice_clone`，**从不退本机**：Sky Studio 用不了就报错（声音库用不了的那句在
+// SkyStudioVoiceLibraryErrors）；报价要一次性费用（建 MiniMax 版）时交给 SkyStudioVoiceOneTimeStep 问 / 跳过 / 起建的任务。
 // 不管什么：交、等、下载、切句、落地（SkyStudioVoiceoverRun）；本机的那条路（AIVoiceoverTool）。
 
 /// 回任务号之前做完的：每批的请求（整段报价定下的）、预留好的积分、Key、本机转写的语言。交给 SkyStudioVoiceoverRun。
@@ -52,8 +54,12 @@ enum SkyStudioVoiceoverStart {
             key = try await services.key()
             catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: services.api)
         } catch is CancellationError { throw CancellationError() }
-        catch { return .local(note: unavailable(error), catalog: nil) }
+        catch {
+            if ask.isLibrary { throw AIToolError(SkyStudioVoiceLibraryErrors.uncharged(error)) }
+            return .local(note: unavailable(error), catalog: nil)
+        }
         guard let voices = catalog.voices else {
+            if ask.isLibrary { throw AIToolError("Sky Studio does not offer voice library reading yet. Nothing was charged.") }
             return .local(note: "Sky Studio does not list its voices yet, so a voice on this Mac read it.", catalog: nil)
         }
         let pick: SkyStudioVoicePick
@@ -66,12 +72,13 @@ enum SkyStudioVoiceoverStart {
                 + "\(SkyStudioVoicePick.listedNames(in: voices, language: input.language)); roles: \(AIVoiceRole.names); "
                 + "or a SkyCut or Mac voice name. Nothing was charged.")
         }
-        let kind = SkyStudioVoiceKind.narration
+        let kind = ask.kind
         if let named = input.model, catalog.model(named, kind: kind) == nil {
             throw AIToolError("Sky Studio has no narration model called \(named). Use model=auto or one of: "
                 + "\(catalog.models(kind: kind).map(\.id).joined(separator: ", ")). Nothing was charged.")
         }
         guard catalog.voiceCharacterLimit(kind: kind, language: input.language) != nil else {
+            if ask.isLibrary { throw AIToolError("Sky Studio gave no length limit for reading with library voices. Nothing was charged.") }
             return .local(note: "Sky Studio gave no length limit for \(languageName(input.language)) narration, "
                 + "so a voice on this Mac read it.", catalog: voices)
         }
@@ -91,9 +98,18 @@ enum SkyStudioVoiceoverStart {
         catch is CancellationError { throw CancellationError() }
         catch let failure as SkyStudioFailure {
             if let refusal = refusal(failure) { throw AIToolError(refusal) }
+            if resolved.kind == SkyStudioVoiceKind.clone { throw AIToolError(SkyStudioVoiceLibraryErrors.uncharged(failure)) }
             return .local(note: unavailable(failure), catalog: resolved.voices)
         }
-        let plan = try planned { try SkyStudioVoicePlan.quoted(draft, quote: quote) }
+        var skippingOneTime = false
+        if let voiceQuote = quote.voice, !voiceQuote.oneTime.isEmpty {
+            switch try SkyStudioVoiceOneTimeStep.decide(input, quote: voiceQuote, key: resolved.key, catalog: catalog, project: project,
+                                                         api: services.api) {
+            case .readWithoutFee: skippingOneTime = true
+            case .result(let result): return .result(result)
+            }
+        }
+        let plan = try planned { try SkyStudioVoicePlan.quoted(draft, quote: quote, skippingOneTime: skippingOneTime) }
         guard project.isCurrentGeneration(input.generation), OpenProjects.shared.all.contains(where: { $0 === project }) else {
             throw AIToolError("The project changed while Sky Studio was quoting the voiceover; nothing was charged.")
         }

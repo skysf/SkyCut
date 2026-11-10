@@ -8,8 +8,8 @@ import Foundation
 // **概要不以迁移前的原文开头**（试点的规矩里唯一的例外，docs/architecture/mcp-guide.md 第 14 条）：这个工具的行为和迁移同一个 PR 改了
 // （声音方案 4.2–4.4、第十二节：默认 gemini:Charon、去掉 clone_from、不再收不带前缀的 Rachel），旧说明照抄进来等于叫 AI 用已经没有的东西；
 // 旧说明每一句去了哪写在那个 PR（#355）的说明里。
-// 写的是**这一刀真有的**：声音库的声音（voice_…）、一次性费用（建 MiniMax 版）、list_voices / manage_voices / change_voice 是声音 PR 6 / 9 的事，
-// 到时候再补进来（提到不存在的工具名、参数名守卫会红：GuidePilotChecks）。只写英文（MCP 按需说明方案第八节第 7 条）。
+// 写的是**这一刀真有的**：声音库的声音（voice_…）和建 MiniMax 版的一次性费用是声音 PR 6 加的；全部权限下不再问（长期授权）是声音 PR 7、
+// change_voice 是声音 PR 9，到时候再补进来（提到不存在的工具名、参数名守卫会红：GuidePilotChecks）。只写英文（MCP 按需说明方案第八节第 7 条）。
 // 不管什么：名片（MCPMediaTools）、怎么答（MCPGuide）、挑哪个主题（MCPGuideTopics）。
 // 方案：docs/plans/2026-11-09-voice-features.md 4.2–4.4、4.10、第七节、8.4；docs/plans/2026-11-09-mcp-guide.md 2.3、5.1。
 
@@ -20,9 +20,10 @@ enum MCPGuideVoiceTopics {
         examples: [
             ["lines": [["text": "Welcome to the course."], ["text": "First, open the project.", "start": 4]], "subtitles": true],
             ["lines": [["text": "This is the quiet part of the story."]], "voice": "en_female_warm", "model": "auto"],
-            ["resume": "/path/to/Voiceover-1.recovery/voiceover-recovery.json", "generate_missing": true]
+            ["resume": "/path/to/Voiceover-1.recovery/voiceover-recovery.json", "generate_missing": true],
+            ["lines": [["text": "This is my own voice."]], "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "skip_one_time": true]
         ],
-        related: ["paid", "sync_voiceover", "generate_subtitles", "get_job", "add_clips"]
+        related: ["paid", "list_voices", "manage_voices", "sync_voiceover", "generate_subtitles", "get_job", "add_clips"]
     )
 
     // 出处：ai-control-mcp.md 第四节第 34、40 条；sky-studio-jobs.md 第五节；声音方案 4.2。
@@ -32,8 +33,9 @@ enum MCPGuideVoiceTopics {
     (track, or a new audio track), each at its start or 0.3 s after the previous line, the first at the playhead.
 
     Two kinds of voices:
-    - Sky Studio voices (cloud; the user's Sky Studio key): presets such as gemini:Charon, the default. Paid in credits. \
-    The call quotes the whole script first and only then returns job_id; wait with get_job.
+    - Sky Studio voices (cloud; the user's Sky Studio key): presets such as gemini:Charon, the default, and the user's own \
+    voices (voice_…, list_voices). Paid in credits. The call quotes the whole script first and only then returns job_id; \
+    wait with get_job.
     - Local voices: SkyCut's own voices (after download_voices=true) and the voices installed on this Mac. Free; they \
     finish in the same call and return the result directly.
     """)
@@ -49,10 +51,13 @@ enum MCPGuideVoiceTopics {
     - gemini:Name, or just the preset's name (Charon): a Sky Studio preset. A preset can sound different in another \
     language, and one that is not listed for the script's language still reads it, with a warning in voice.note.
     - eleven:Name: an Eleven v4 voice on Sky Studio.
+    - voice_…: a voice from the user's own library (list_voices; create one with manage_voices). Sky Studio reads it from \
+    the reference in the script's language, or from another language with a note in voice.note. It never falls back to \
+    a local voice: if Sky Studio cannot read it, the call says why and nothing is charged.
     - A SkyCut voice name such as af_heart (after download_voices=true) or a voice installed on this Mac: used as named, \
     never Sky Studio.
 
-    When Sky Studio cannot be used (no key, or it does not answer while quoting), the narration falls back to a local \
+    When Sky Studio cannot be used (no key, or it does not answer while quoting), a preset or role falls back to a local \
     voice at once, before anything is paid: a role keeps its own local voice, a preset uses the local role of the same \
     gender, and voice.note says why. Once a paid batch is sent there is no fallback.
     """)
@@ -64,8 +69,9 @@ enum MCPGuideVoiceTopics {
     reason (one English sentence), languages (each language's share of the reading time), cross_language, warnings and \
     fallback. job_id comes back with voice_plan; tell the user what is in voice.note before they listen.
 
-    A named model (a voice model from get_status models=true) reads every batch. A model that does not fit the voice or \
-    the script's language is refused while quoting, with Sky Studio's own words, and nothing is paid.
+    A named model (a voice model from get_status models=true) reads every batch. Presets take gemini-3.8-flash-tts or \
+    eleven-v4; voice_… voices take index-tts-2, minimax-speech-2.8-hd or heygen-voice-turbo. A model that does not fit the \
+    voice or the script's language is refused while quoting, with Sky Studio's own words, and nothing is paid.
 
     The whole script reads with one selection: every batch is sent with the same voice_plan selection. If one batch's \
     model fails, Sky Studio may finish that batch with the fallback; get_job reports each batch's model and \
@@ -80,8 +86,13 @@ enum MCPGuideVoiceTopics {
     - Over the daily credit limit: nothing starts and the result says daily_budget_exceeded. Tell the user; switch to a \
     local voice only if they ask.
     - Not enough Sky Studio credits: the job fails with recharge_url; tell the user.
-    - needs_confirmation from this tool asks to read a recovery file outside the opened folder (ask mode only): ask the \
-    user, then repeat the same call with confirm_token.
+    - One-time fee (voice_… only): the voice's best model for a language may first need its MiniMax version, built once \
+    per language. The call then returns needs_confirmation with one_time (the price) and voice_plan (the no-fee option \
+    it would read with). If the user agrees, repeat the same call with confirm_token: SkyCut builds the version and \
+    returns job_id (kind voice_enroll); wait with get_job, then call add_voiceover again with the same lines (nothing was \
+    narrated yet). If not, repeat the call with skip_one_time=true: it reads now with the no-fee model.
+    - needs_confirmation can also ask to read a recovery file outside the opened folder (ask mode only): ask the user, \
+    then repeat the same call with confirm_token.
     """)
 
     // 出处：ai-control-mcp.md 第四节第 34 条（字幕）、第 36 条（几行）；sky-studio-jobs.md 第五节（本机切句）；声音方案第七节。
@@ -126,6 +137,7 @@ enum MCPGuideVoiceTopics {
     pictures to new narration, let this job finish, then use sync_voiceover. Bare old Eleven names such as Rachel are not \
     voices; write eleven:Name. speed only changes local voices; Sky Studio voices ignore it (voice.note says so). After a \
     failed or cancelled job never send the same lines again: that pays twice; use resume. Over the daily credit limit, \
-    do not switch to a local voice unless the user asks.
+    do not switch to a local voice unless the user asks. voice_library_unavailable means Sky Studio's voice library is \
+    not available right now: voice_… voices cannot read until it is back (nothing was charged); presets still work.
     """)
 }

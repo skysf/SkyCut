@@ -42,6 +42,11 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 声音库（声音 PR 6，MCPGuideVoiceLibraryTopics 和 add_voiceover 的主题）提到的结果字段、任务种类、错误码：报价的 one_time、
+    // 两种收费任务 voice_design / voice_enroll（AIJobs.Kind）、设计的 sample_url（SkyStudioVoiceLibraryJob）、服务器的
+    // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。
+    names.formUnion(["one_time", "voice_design", "voice_enroll", "sample_url", "voice_library_unavailable", "voice_limit",
+                     "reference_exists", "too_little_speech"])
     return names
 }
 

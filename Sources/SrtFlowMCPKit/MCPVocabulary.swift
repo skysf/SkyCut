@@ -51,6 +51,10 @@ public enum MCPVocabulary {
         "en_female_lively", "en_female_warm", "en_male", "en_female_british", "en_male_british"
     ]
 
+    /// manage_voices 的动作、list_voices 列哪几样（SkyCut 声音方案 4.6；App 的 SkyStudioVoiceLibraryTool 照这两张表分派，check-mcp 对账）。
+    public static let voiceLibraryActions = ["create", "add_reference", "design", "rename", "delete"]
+    public static let voiceListIncludes = ["mine", "presets", "all"]
+
     /// 画面比例：`auto` + `CanvasRatio` 里固定比例的那几个（按界面上的写法）。
     public static let canvasRatios = ["auto", "16:9", "9:16", "4:3", "3:4", "1:1"]
 
