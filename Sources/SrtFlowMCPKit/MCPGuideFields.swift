@@ -47,8 +47,17 @@ public enum MCPGuideFields {
             }
         }
         return chunks.enumerated().map { index, lines in
-            MCPGuideSection(name: index == 0 ? "fields" : "fields_\(index + 1)", text: lines.joined(separator: "\n"))
+            MCPGuideSection(name: index == 0 ? "fields" : "fields_\(index + 1)", about: about(lines, part: chunks.count > 1),
+                            text: lines.joined(separator: "\n"))
         }
+    }
+
+    /// fields 一节讲什么：拆开时写这一节从哪个参数到哪个参数（第一层的名字，按顺序）。
+    private static func about(_ lines: [String], part: Bool) -> String {
+        let facts = "type, required, choices, range and meaning"
+        let names = lines.filter { $0.hasPrefix("- ") }.compactMap { $0.dropFirst(2).split(separator: " ").first.map(String.init) }
+        guard part, let first = names.first, let last = names.last else { return "every parameter: \(facts)" }
+        return first == last ? "the parameter \(first): \(facts)" : "parameters \(first) to \(last): \(facts)"
     }
 
     /// 每个参数一条，顺序同 `text`。

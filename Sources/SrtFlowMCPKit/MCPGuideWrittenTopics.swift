@@ -7,6 +7,7 @@ import Foundation
 // 再加最小的例子（守卫按真实参数定义核对）和相关主题；参数定义写成的 fields 几节由 MCPGuideTopics 自动接在最后。
 // 唯一的例外是没有可搬的原文的工具（previousCard 为 nil）：行为和迁移同一个 PR 改了、旧说明照抄进来等于叫 AI 用已经没有的东西
 // （add_voiceover，声音方案 4.10、4.2–4.4），名单写死在守卫里（docs/architecture/mcp-guide.md 第 14 条）。
+// 手写的每一节带一行 about（这一节讲什么，主题分节回时第一次回答按它列出 contents）；常见的活只要读一节的写进 readingTip。
 // 不管什么：没迁移的工具（主题 = 现在的说明原文 + fields）、怎么答（MCPGuide）。
 // 方案：docs/plans/2026-11-09-mcp-guide.md 5.1–5.3（试点 5 个：edit_clip、generate_media、set_text、add_clips、look）；
 // add_voiceover 随声音 PR 3 迁移（docs/plans/2026-11-09-voice-features.md 4.10）。
@@ -21,6 +22,8 @@ public enum MCPGuideWrittenTopics {
         public let sections: [MCPGuideSection]
         public let examples: [JSONValue]
         public let related: [String]
+        /// 分节回时 next_step 里的那句「常见的活只读哪一节」（没有就不写）。
+        public var readingTip: String? = nil
     }
 
     /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices 随声音 PR 6 从第一天起就这么写）。

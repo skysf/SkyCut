@@ -43,11 +43,14 @@
    以后的 PR 改短名片之前，**先把说明原样搬进主题**（一个字不丢），再写名片；手写的节里提到的工具名、参数名、选项值必须真的存在。
 6. **一次回多少**（量整份结果的 JSON 文字，UTF-16 —— App 原样写成一段文字交给客户端，模型读的就是它）：目录 ≤ 5,000；
    一个主题第一次回的、每一节 ≤ 6,000（方案定的硬限 8,000；守卫按 6,000 查，写超了就拆节）。放得下整份回（第一节不加标题，其余加
-   「## 名字」）；放不下先回 `overview` + 有哪些节 + `next_step`，再按 `section` 取。
+   「## 名字」）；放不下先回 `overview` + 有哪些节 + **每一节讲什么**（`contents`，「名字: 一行说明」）+ `next_step`，再按 `section` 取。
+   `next_step` 叫 AI **只读要用的那几节**，主题有「常见的活只读哪一节」就接在后面（`readingTip`：generate_media「报价再问只读 spending」、
+   edit_clip「改画幅取景只读 framing」）。2026-11-10 定：试点实测里只列节名、`next_step` 说「再按 section 取其中一节」时，模型把 generate_media 的
+   六节全读了，输入 +41%（[试点实测](../reports/2026-11-10-mcp-guide-pilot.md)）；总说明叫它照 `next_step` 做，这句话怎么写就决定它读多少。
 7. **写错了**：`topic` 写错回目录 + `unknown_topic` + `did_you_mean`（包含关系优先、再按编辑距离 ≤ 2，最多 3 个），不报错；`section` 写错回第一次的样子
    + `unknown_section`；只给 `section` 不给 `topic` 回目录 + `section_without_topic` + `next_step`（说清楚要一起给，不悄悄回目录）。
    名字不计较大小写、连字符、空格（`Edit-Clip` = `edit_clip`）。
-8. **回的样子**：主题 `{topic, sections, section, text, examples, related, next_step}`，空的不写；目录 `{text}`（写错时加 `unknown_topic` / `did_you_mean`，
+8. **回的样子**：主题 `{topic, sections, contents, section, text, examples, related, next_step}`，空的不写（`contents` 只在分节回的第一次回答里）；目录 `{text}`（写错时加 `unknown_topic` / `did_you_mean`，
    只给 section 时加 `section_without_topic` / `next_step`）。
 9. **例子和相关主题**：例子只许挂在工具主题上、必须过那个工具的参数定义（参数名过 `MCPArgumentCheck`、值过类型 / 可选值 / 范围 / 条数）；
    `related` 里的名字必须是真主题。
@@ -73,6 +76,8 @@
       每个迁移 PR 的说明里有「删了哪些句子、去了哪」的表。
     - **单个工具的参数定义 ≤ 4,500 UTF-8 字节**（Codex 超过 5,000 就删光参数说明），例外只有 `edit_clip`、`generate_media`（名单写死、不许变长；
       这两个的参数说明到 PR 7 才保得住，在那之前靠说明书的 `fields`）。
+    - **每一节讲什么**：手写的每一节都带一行 `about`（≤ 120，只提真有的名字），`fields` 几节的那一行自动生成（拆开的写从哪个参数到哪个参数）；
+      主题长到要分节回时，第一次回答按它列出 `contents`（第 6 条）。常见的活只要读一节的，写在主题的 `readingTip` 里。
     - **主题**：`overview` = **迁移前的说明原文**（一个字不丢；守卫钉着它的长度，PR 里另有逐字比对的记录）+ 一段新话；后面是手写的几节
       （用法、限制、坑，出处写在代码注释里：`ai-control-mcp.md` 第几条、哪个案例）、例子（过参数定义）、`related`；`fields` 几节自动接在最后。
     - **唯一的例外：没有可搬的原文**（`previousCard` 为 nil）。工具的行为和迁移在同一个 PR 里改了，旧说明照抄进概要等于叫 AI 用已经没有的东西：
@@ -187,6 +192,16 @@
 | `fields` 不切节（上限放大 100 倍） | GuidePilotChecks 4 条：generate_media 一节 4,771 字 53 个参数、手造的没切、超上限、大参数没单独成节 |
 | `fields` 切节时丢掉后几节的第一行 | GuidePilotChecks 3 条：generate_media 少行、手造的少行且有一节从里层开始、大参数那一节不对 |
 | 三个工具文件整份换回迁移前（说明书的文件和检查不动） | GuidePilotChecks 52 条：四张名片超长、五张都没改写、固定说法、超过 120 的、没写范围数字的 |
+
+**反向验证（2026-11-10，分节回答列出每一节讲什么）**：
+
+| 临时弄坏 | 红了 |
+| --- | --- |
+| 第一次回答不写 `contents` | 4 条：GuideChecks 手造的两个长主题、GuidePilotChecks 的 generate_media 和 edit_clip |
+| `next_step` 换回「再按 section 取其中一节：节名、节名……」 | 6 条：手造的两条（只读要用的、提示接在后面）、两个真主题各两条（只读要用的、常见的活只读哪一节） |
+| generate_media 去掉「报价再问只读 spending」 | GuidePilotChecks 1 条 |
+| spending 一节的 `about` 写成空的 | GuidePilotChecks 3 条：分节回的每一节要有说明、contents 对不上、手写的节要有说明 |
+| `fields` 几节不写 `about` | GuidePilotChecks 64 条：59 个工具的 fields 都没说明，外加两个分节回的主题、拆开的那一节没写参数范围 |
 
 ## 五、人工回归（发版前在真机上走一遍）
 

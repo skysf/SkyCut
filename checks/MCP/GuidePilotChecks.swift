@@ -9,6 +9,8 @@ import SrtFlowMCPKit
 // - 说明书的主题：overview 以迁移前的说明原文开头（一个字不丢）、迁移前后的名片不一样、几节都不空、有例子有相关主题；
 //   手写的几节只提真有的名字（参数定义写成的 fields 几节是自动生成的，不算手写）。
 //   没有可搬的原文的工具（行为和迁移一起改了，previousCard 为 nil）只许是写死的那几个（现在只有 add_voiceover，mcp-guide.md 第 14 条）。
+// - 每一节讲什么（2026-11-10 试点实测之后）：手写的每一节带一行 about、fields 几节自动生成；分节回的主题第一次回答列出 contents、
+//   next_step 叫它只读要用的那几节、常见的活只读哪一节（generate_media → spending、edit_clip → framing）。
 
 let pilotCardLimit = 450
 let pilotParameterLimit = 120
@@ -72,6 +74,37 @@ func runGuidePilotChecks() {
                "the tools without a pre-migration description stay add_voiceover and the new voice library tools")
     print("MCP pilot cards: \(cards.joined(separator: ", ")) (limit \(pilotCardLimit), target 350).")
     runGuideFieldSplitChecks()
+    runGuideContentsChecks()
+}
+
+/// 分节回的主题：第一次回答列出每一节讲什么（contents）、叫 AI 只读要用的那几节；迁移过的工具每个手写的节都写了讲什么；
+/// 常见的活只读哪一节写在 next_step 里（2026-11-10 试点实测之后：只列节名、说「再按 section 取」时，模型把 generate_media 的六节全读了，输入 +41%）。
+private func runGuideContentsChecks() {
+    var parts: [String] = []
+    for topic in MCPGuideTopics.all {
+        let first = MCPGuide.answer(topic: topic.name, section: nil)
+        guard first["next_step"] != nil else { continue }
+        parts.append(topic.name)
+        check(topic.sections.dropFirst().allSatisfy { !$0.about.isEmpty }, "\(topic.name): every section of a topic answered in parts says what it covers")
+        checkEqual(first["contents"], .array(topic.sections.dropFirst().map { .string("\($0.name): \($0.about)") }),
+                   "\(topic.name): the first answer lists what each section covers")
+        check((first["next_step"]?.stringValue ?? "").contains("Read only the sections you need"), "\(topic.name): the next step says to read only what is needed")
+    }
+    print("MCP guide topics answered in parts: \(parts.joined(separator: ", ")).")
+    for tool in MCPGuideWrittenTopics.migrated {
+        for section in MCPGuideWrittenTopics.topic(for: tool)?.sections.dropFirst() ?? [] {
+            check(!section.about.isEmpty && section.about.utf16.count <= pilotParameterLimit,
+                  "\(tool.rawValue).\(section.name) says what it covers in at most \(pilotParameterLimit) characters")
+            let unknown = guideUnknownNames(section.about)
+            check(unknown.isEmpty, "\(tool.rawValue).\(section.name)'s about line names only real names (unknown: \(unknown.joined(separator: ", ")))")
+        }
+    }
+    // 常见的活只读哪一节：花积分之前报价再问只要 spending、改画幅取景只要 framing。
+    for (tool, section) in [("generate_media", "spending"), ("edit_clip", "framing")] {
+        let next = MCPGuide.answer(topic: tool, section: nil)["next_step"]?.stringValue ?? ""
+        check(next.contains("read only section=\(section)"), "\(tool): the first answer says the common job needs only section=\(section)")
+        check(MCPGuideTopics.topic(named: tool)?.sections.contains { $0.name == section } == true, "\(tool): the tip names a real section")
+    }
 }
 
 /// fields 几节自动切（review-344 第 5 条，2026-11-10 定）：按整个第一层参数切成 fields、fields_2……，每节 ≤ sectionBudget，
@@ -82,6 +115,12 @@ private func runGuideFieldSplitChecks() {
         let sections = MCPGuideFields.sections(for: tool.definition.inputSchema)
         problemsInFieldSections(sections, schema: tool.definition.inputSchema).forEach { check(false, "\(tool.rawValue): \($0)") }
         if sections.count > 1 { split.append("\(tool.rawValue) (\(sections.count))") }
+        // 每一节讲什么：拆开的写从哪个参数到哪个参数（第一次回答的 contents 里列着）。
+        check(sections.allSatisfy { !$0.about.isEmpty }, "\(tool.rawValue): every fields section says what it covers")
+        if sections.count > 1 {
+            check(sections.allSatisfy { $0.about.hasPrefix("parameters ") || $0.about.hasPrefix("the parameter ") },
+                  "\(tool.rawValue): a split fields section names the parameters it holds")
+        }
         let topic = MCPGuideTopics.topic(named: tool.rawValue)?.sections.filter { $0.name == "fields" || $0.name.hasPrefix("fields_") }
         checkEqual(topic?.map(\.name), sections.map(\.name), "\(tool.rawValue): the topic carries every fields section")
     }
