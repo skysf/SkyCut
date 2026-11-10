@@ -1014,8 +1014,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 58. **声音库：`list_voices`、`manage_voices`（2026-11-10 声音 PR 6，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.5、4.6；合同见 [声音库](voice-library.md)）**：
     读和写分开（同角色 A/B 的先例）。`list_voices` 只读免费：预设按语言（`listed` 的、按打分高到低、默认的标出来、按这种语言报性别和说明，
     没有自己名单的语言照英文那份）+ 我的声音（`GET /voices`，没有任何服务商 id）；声音库用不了时照回预设、`mine` 说暂时用不了。
-    `manage_voices` 写用户的声音库（服务器上的事，不登记时间线撤销）：`create` / `add_reference` 要 `file`、`language`（这一刀要 AI 给，本机检测随声音库界面接）
-    和 `name` / `voice`，本机做参考录音（[声音库](voice-library.md)第一节的规格）、问授权（问句带 `/models` 的 `voice_consent.per_recording` 原文和版本，
+    `manage_voices` 写用户的声音库（服务器上的事，不登记时间线撤销）：`create` / `add_reference` 要 `file` 和 `name` / `voice`；`language` 可选
+    （2026-11-11，[案例](../bugfixes/2026-11-11-manage-voices-language-required.md)）：给了就照给的、不识别、不盖掉；没给就在做好的参考录音上识别，
+    和新建声音对话框同一份（`VoiceSampleLanguage` → `SpokenLanguageProbe`），识别成了什么写进问句和结果（`language`、`language_detected`）；
+    识别不出来不猜，一样都不问、不传，报 `reason: language_undetected`、叫 AI 带上 `language` 再调（不叫它去点界面）。本机做参考录音（[声音库](voice-library.md)第一节的规格）、问授权（问句带 `/models` 的 `voice_consent.per_recording` 原文和版本，
     令牌绑文件身份、那段参考录音的内容哈希、用的那一段、语言、名字 / 声音、版本、账户）、点过头才传 `voice_reference`、建声音带 `consent: true` + 版本；
     `design` 先报价、问一次性费用、点过头记账起 `voice_design` 任务（`get_job` 报新声音和 1 小时的 `sample_url`，账按实收）；`rename` 直接改；`delete`
     请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`

@@ -134,6 +134,8 @@
   estimated_line_indices、字幕是稿子的字（声音 PR 5），batches_recovery 一节说批只在两句之间分、长句先在句末分，`subtitles` 参数指到 subtitle_timing。
 - `SkyStudioVoiceChecks`（声音库，声音 PR 6）：`list_voices` / `manage_voices` 的参数名、动作词表就是 App 分派的五样；名片必含（只读免费 / 不改时间线没有撤销 /
   design 花积分回任务号 / 先问 / 删除按模式 / 先读说明书）、说明书必含（分节照声音方案 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行。
+  2026-11-11 起：`manage_voices` 只有 `action` 必给，`language` 的参数说明写着可选和不给会怎样，`create` 一节写「可选、给了照给的、不给就本机识别、
+  `language_detected` / `language_undetected`、带上 language 再调」，有一个例子不带 `language`。
 - `ArgumentCheckChecks`：名片写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过参数核对（[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。
 - `checks/MCP/CatalogTextChecks.swift`：总说明点到 `skycut_guide`（「目录里有清单的每个工具名」，PR 2 起改查说明书的地图）。
 
