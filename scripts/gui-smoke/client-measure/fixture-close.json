@@ -1,0 +1,4 @@
+[
+ {"name": "save_project", "arguments": {"project": "p2", "path": "/private/tmp/claude-501/-Users-sky-Downloads-Sky-Studio-All-SkyStudio-APP-Master-SkyCut-codex/ec7fdde6-ca37-4ebb-a538-e3aa2c85502e/scratchpad/measure-fixture/Review.skycut"}},
+ {"name": "close_project", "arguments": {"project": "p2"}}
+]
