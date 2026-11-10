@@ -10,6 +10,7 @@ import SrtFlowMCPKit
 func runSkyStudioVoiceChecks() {
     voiceoverGuideChecks()
     voiceLibraryGuideChecks()
+    voiceChangeGuideChecks()
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "generate_missing": true]) == nil,
           "the existing voiceover tool accepts recovery arguments without original lines")
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "regenerate_all": true]) != nil,
@@ -231,4 +232,40 @@ private func voiceLibraryGuideChecks() {
     let map = guideMapText()
     check(map.contains("Voices: list_voices (presets, my voices), manage_voices ("), "the guide map has a Voices line with both tools")
     check(map.contains("manage_voices (design;") && map.contains("list_voices"), "the paid line names manage_voices' design and lists list_voices as free")
+}
+
+/// 变声（声音 PR 9，SkyCut 声音方案 4.8、4.10）：参数名、名片必含、说明书必含、地图。只判每日硬预算：不收 confirm_token。
+private func voiceChangeGuideChecks() {
+    let definition = MCPToolName.changeVoice.definition
+    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "language": "en", "project": "p1"]) == nil,
+          "change_voice takes clip_id, voice, language and project")
+    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "confirm_token": "t"]) != nil,
+          "change_voice never asks, so it takes no confirm_token")
+    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip": "c1", "voice": "voice_x"]) != nil,
+          "the clip parameter is clip_id, like every other tool")
+    checkEqual(definition.inputSchema["required"], .array(["clip_id", "voice"]), "change_voice requires the clip and the voice")
+    check(!definition.readOnly && !definition.destructive && definition.openWorld, "change_voice writes, deletes nothing and reaches Sky Studio")
+    check(MCPToolName.changeVoice.takesProject, "change_voice lands on a project, so it takes project")
+    checkEqual(MCPToolName.changeVoice.provider, .skystudio, "change_voice belongs to Sky Studio")
+    let card = definition.description
+    for phrase in ["Paid (Sky Studio credits)", "Returns job_id; wait with get_job", "two new linked audio tracks", "original clip is muted",
+                   "One undo step", "The daily credit limit always applies", "Read skycut_guide topic=change_voice before the first call."] {
+        check(card.contains(phrase), "the change_voice card says \"\(phrase)\"")
+    }
+    check(!card.contains("needs_confirmation"), "the change_voice card promises no question: the daily limit is the only gate")
+    let topic = MCPGuideTopics.topic(for: .changeVoice)
+    checkEqual(topic.sections.map(\.name), ["overview", "cost_and_limits", "result", "language", "pitfalls", "fields"],
+               "the change_voice topic has its sections, fields last")
+    let text = topic.sections.map(\.text).joined(separator: "\n")
+    for phrase in ["list_voices mine", "untested", "daily_budget_exceeded", "split_clip", "muted, not deleted", "one undo step",
+                   "voice_clip_id", "background_clip_id", "landed is false", "ISO 639-1", "target_language", "check get_job first",
+                   "voice_library_unavailable"] {
+        check(text.contains(phrase), "the change_voice topic says \"\(phrase)\"")
+    }
+    check(!text.contains("5 minutes") && !text.contains("300"), "the topic names no source limit: it comes from Sky Studio's catalog")
+    let map = guideMapText()
+    check(map.contains("change_voice (re-voice a clip, dub it in my voice)"), "the guide map's Voices line lists change_voice")
+    check(map.contains("change_voice (re-voice a clip);"), "the paid line names change_voice")
+    let paid = MCPGuideTopics.topic(named: "paid")?.sections.map(\.text).joined(separator: "\n") ?? ""
+    check(paid.contains("change_voice"), "the paid topic lists change_voice")
 }

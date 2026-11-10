@@ -70,7 +70,8 @@ fi
 # 不是用户事件引起的异步落账（AI 起的生成字幕 / 翻译结束时、静帧转换失败删占位块）也各包一层：落账那一行的上一行是 step。
 for pair in "Sources/SrtFlow/SubtitleGen/TranscriptionTask.swift|project.replaceSubtitleForGeneration(" \
             "Sources/SrtFlow/SubtitleGen/SubtitleTranslationService.swift|project.applyTranslations(" \
-            "Sources/SrtFlow/AIUpscaleTool.swift|project.applyUpscale("; do
+            "Sources/SrtFlow/AIUpscaleTool.swift|project.applyUpscale(" \
+            "Sources/SrtFlow/VoiceChange/VoiceChangeJob.swift|project.perform { state in"; do
   file="${pair%%|*}"
   call="${pair#*|}"
   if [ "$(grep -cF "${call}" "${file}" || true)" -ne 1 ] \

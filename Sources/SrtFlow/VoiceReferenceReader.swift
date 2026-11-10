@@ -6,6 +6,7 @@ import Foundation
 // 管什么：用户点名的音频 / 视频 → 44.1 kHz 单声道 Float 采样，一块一块交出去。立体声取左右平均；多于两声道先让
 // AVFoundation 按立体声布局混下来（同 AIListenAudioWindow）。按 PTS 落到采样格上：第 n 个采样就是 `from + n / 44100`
 // 秒，缺的补零、重叠的丢掉，挑段算的时间和截出来的采样对得上。
+// 变声的源（VoiceChangeSource，声音 PR 9）用同一个读法、换一个采样率（`rate`：原素材的、最高 48 kHz）；参考录音永远是 44.1 kHz。
 // 阻塞的读取循环只在调用方交来的 MediaReadQueue 线程上跑（docs/architecture/blocking-media-reads.md）；
 // reader 的 `cancelReading` 只在读取体自己的 defer 里（它不许和 copyNextSampleBuffer 并发），外面只置停止标记。
 // 不管什么：挑哪一段（VoiceReferenceWindow）、写 WAV 和上传（VoiceReferenceSample）。
@@ -23,6 +24,8 @@ enum VoiceReferenceReader {
         let track: AVAssetTrack
         let channels: Int
         let duration: Double
+        /// 素材自己的采样率（读不出来是 nil）；参考录音不看它，变声的源照它读（最高 48 kHz）。
+        var nativeSampleRate: Double?
         var name: String { asset.url.lastPathComponent }
 
         static func load(_ url: URL) async throws -> Source {
@@ -41,8 +44,10 @@ enum VoiceReferenceReader {
             guard let track = found else { throw AIToolError("\(name) has no sound to make a voice sample from.") }
             guard duration.isFinite, duration > 0 else { throw AIToolError("SkyCut could not tell how long \(name) is.") }
             let formats = (try? await track.load(.formatDescriptions)) ?? []
-            let channels = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame } ?? 2
-            return Source(asset: asset, track: track, channels: max(1, Int(channels)), duration: duration)
+            let basic = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+            let native = basic.map(\.mSampleRate).flatMap { $0.isFinite && $0 > 0 ? $0 : nil }
+            return Source(asset: asset, track: track, channels: max(1, Int(basic?.mChannelsPerFrame ?? 2)), duration: duration,
+                          nativeSampleRate: native)
         }
     }
 
@@ -54,15 +59,15 @@ enum VoiceReferenceReader {
         func check() throws { if lock.withLock({ stopped }) { throw CancellationError() } }
     }
 
-    /// 同步阻塞段：读 `[from, to)` 秒，单声道 44.1 kHz 一块一块交给 `consume`，回交出去的采样数（声音比 `to` 先完就少）。
+    /// 同步阻塞段：读 `[from, to)` 秒，单声道 `rate`（默认 44.1 kHz）一块一块交给 `consume`，回交出去的采样数（声音比 `to` 先完就少）。
     /// **只在 MediaReadQueue 的线程上调。**
-    static func read(_ source: Source, from: Double, to: Double, stop: Stop,
+    static func read(_ source: Source, from: Double, to: Double, stop: Stop, rate: Double = sampleRate,
                      consume: (UnsafeBufferPointer<Float>) -> Void) throws -> Int {
         try stop.check()
         let reader = try AVAssetReader(asset: source.asset)
         // 唯一的取消点和 copy 在同一个同步读取体里；外面的取消只让循环在下一次 copy 之前停。
         defer { reader.cancelReading() }
-        let output = AVAssetReaderTrackOutput(track: source.track, outputSettings: outputSettings(channels: source.channels))
+        let output = AVAssetReaderTrackOutput(track: source.track, outputSettings: outputSettings(channels: source.channels, rate: rate))
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw AIToolError("SkyCut could not decode the sound in \(source.name).") }
         reader.add(output)
@@ -70,7 +75,7 @@ enum VoiceReferenceReader {
         reader.timeRange = CMTimeRange(start: CMTime(seconds: max(0, from - readMargin), preferredTimescale: 600_000),
                                        end: CMTime(seconds: min(to + readMargin, source.duration), preferredTimescale: 600_000))
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading \(source.name).") }
-        var grid = Grid(from: from, limit: Int(((to - from) * sampleRate).rounded()))
+        var grid = Grid(from: from, limit: Int(((to - from) * rate).rounded()), rate: rate)
         while true {
             try stop.check()
             guard let buffer = output.copyNextSampleBuffer() else { break }
@@ -81,9 +86,9 @@ enum VoiceReferenceReader {
         return grid.written
     }
 
-    private static func outputSettings(channels: Int) -> [String: Any] {
+    private static func outputSettings(channels: Int, rate: Double) -> [String: Any] {
         var settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: sampleRate, AVLinearPCMBitDepthKey: 32,
+            AVFormatIDKey: kAudioFormatLinearPCM, AVSampleRateKey: rate, AVLinearPCMBitDepthKey: 32,
             AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false, AVLinearPCMIsBigEndianKey: false,
             AVNumberOfChannelsKey: min(2, max(1, channels))
         ]
@@ -99,18 +104,19 @@ enum VoiceReferenceReader {
     private struct Grid {
         let from: Double
         let limit: Int
+        let rate: Double
         private(set) var written = 0
         private var mono: [Float] = []
 
-        init(from: Double, limit: Int) { self.from = from; self.limit = max(0, limit) }
+        init(from: Double, limit: Int, rate: Double) { self.from = from; self.limit = max(0, limit); self.rate = rate }
 
         mutating func append(_ buffer: CMSampleBuffer, name: String, consume: (UnsafeBufferPointer<Float>) -> Void) throws {
             let frames = CMSampleBufferGetNumSamples(buffer)
             guard frames > 0, written < limit else { return }
             guard let format = CMSampleBufferGetFormatDescription(buffer),
                   let description = CMAudioFormatDescriptionGetStreamBasicDescription(format)?.pointee,
-                  abs(description.mSampleRate - sampleRate) < 0.5 else {
-                throw AIToolError("SkyCut could not convert the sound in \(name) to 44.1 kHz.")
+                  abs(description.mSampleRate - rate) < 0.5 else {
+                throw AIToolError("SkyCut could not convert the sound in \(name) to \(Self.kilohertz(rate)) kHz.")
             }
             let time = CMSampleBufferGetPresentationTimeStamp(buffer).seconds
             guard time.isFinite else { throw AIToolError("SkyCut could not place the sound samples of \(name) in time.") }
@@ -127,7 +133,7 @@ enum VoiceReferenceReader {
             }
             let samples = data.assumingMemoryBound(to: Float.self)
             // 这一块第一个采样落在第几格：后面的缺口补零，前面重叠的丢掉。
-            let offset = Int(((time - from) * sampleRate).rounded())
+            let offset = Int(((time - from) * rate).rounded())
             if offset > written { pad(min(offset, limit) - written, consume: consume) }
             let skip = max(0, written - offset)
             let take = min(frames - skip, limit - written)
@@ -143,10 +149,16 @@ enum VoiceReferenceReader {
             written += take
         }
 
+        /// `44100` → `44.1`，`48000` → `48`。
+        private static func kilohertz(_ rate: Double) -> String {
+            let value = rate / 1000
+            return value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+        }
+
         /// 补零：一秒一块交出去，长的缺口（声音晚开头、中间断了）也不一次分配一大块。
         private mutating func pad(_ count: Int, consume: (UnsafeBufferPointer<Float>) -> Void) {
             guard count > 0 else { return }
-            let zeros = [Float](repeating: 0, count: min(count, Int(sampleRate)))
+            let zeros = [Float](repeating: 0, count: min(count, Int(rate)))
             var left = count
             while left > 0 {
                 let piece = min(left, zeros.count)

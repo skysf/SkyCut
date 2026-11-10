@@ -167,7 +167,7 @@ private struct AIProjectSidebarStatus {
         case .subtitles: return L10n("Making subtitles")
         case .translation: return L10n("Translating")
         case .upscale: return L10n("Upscaling")
-        case .generate, .voiceDesign, .voiceEnroll: return L10n("Generating")
+        case .generate, .voiceDesign, .voiceEnroll, .voiceChange: return L10n("Generating")
         case .voiceover: return L10n("Voiceover")
         case .transcript: return L10n("Transcribing")
         case .inspection, .shots, .compress, .voices, .burnIn, .screenRecording: return L10n("Working")

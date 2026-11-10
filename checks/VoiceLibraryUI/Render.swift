@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 
 // 声音库界面的离屏渲染（scripts/render-voice-library.sh）：生产的视图 + 假 Sky Studio（VoiceLibraryHTTP：目录快照、`/voices`、`/quote`），
 // 三种界面语言各出一套 PNG，给 PR 附图、发版前看排版（截字、漏翻、撑破）。不碰网络、不碰钥匙串、不录音、不花钱，窗口摆在屏幕外。
-// 出的是：设置 → 剪辑与声音（有声音 / 没接 Sky Studio / 声音库用不了）、浏览预设、新建声音（刚打开 / 填好）、给声音加录音、设计声音（带报价）。
+// 出的是：设置 → 剪辑与声音（有声音 / 没接 Sky Studio / 声音库用不了）、浏览预设、新建声音（刚打开 / 填好）、给声音加录音、设计声音（带报价）、
+// 变声面板（选了声音带报价 / 还没有自己的声音）。
 // 只是出图，不判对错；规矩由 scripts/check-voice-recovery.sh 的 LibraryUIChecks 和 scripts/check-sky-studio.sh 的 VoiceLibraryUIChecks 钉着。
 
 @main enum VoiceLibraryRender {
@@ -92,6 +93,9 @@ import SrtFlowMCPKit
         store.readKey = { .failure(.noKey) }
         await store.refresh()
         try await Snapshot.take(SettingsPane(), to: file("8-settings-no-key"))
+
+        // 9、10. 片段右键「换成我的声音…」的面板（声音 PR 9，RenderVoiceChange.swift）。
+        try await renderVoiceChange(language, file: file, work: work)
     }
 
     private static func seedVoices() {

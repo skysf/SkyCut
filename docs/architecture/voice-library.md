@@ -1,11 +1,11 @@
-# 声音库：克隆的参考录音、声音库的工具和界面（变声做到时补进来）
+# 声音库：克隆的参考录音、声音库的工具和界面、变声
 
 > 2026-11-10 起生效（SkyCut 声音 PR 2 `feat/voice-reference-sample`）。方案：[SkyCut 声音方案](../plans/2026-11-09-voice-features.md)
 > 第六节、9.1 第 3 条；拍板在仓库外的 `SkyVoiceForClone/决定汇总-2026-11-09.md` 第三节第 3 条、第七节第 2 条；服务器那边怎么查录音见
 > Sky Studio 那份方案（在 Sky Studio 仓库）3.3、3.4。这里只放长期约束。
 > 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），全部权限下的长期授权是声音 PR 7
-> （2026-11-10），都在第八节；设置里的声音库、声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；变声（`change_voice`，PR 9）
-> 做到时补进这份文档。2026-11-11：`manage_voices` 的 `language` 改成可选、不给就本机识别（第八节第 3 条）。
+> （2026-11-10），都在第八节；设置里的声音库、声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；变声（`change_voice` 和
+> 片段右键「换成我的声音…」）是声音 PR 9（2026-11-11），在第十一节。2026-11-11：`manage_voices` 的 `language` 改成可选、不给就本机识别（第八节第 3 条）。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md) 第五节（云端旁白 / 克隆）、[阻塞的媒体读取](blocking-media-reads.md)、[写代码的规范](coding-standards.md)。
 > 案例：[克隆的参考录音被降到 16 kHz、默认只截 10 秒](../bugfixes/2026-11-10-voice-reference-16khz-short-sample.md)。
 
@@ -343,3 +343,107 @@
 - [ ] 用自己的声音配英文旁白、点头建 MiniMax 版，**不等它做完**再让 AI 配一次：AI 说「已经在建」、不再问价；设置 → Sky Studio 里今天只多一笔。
 - [ ] （真遇上时）Sky Studio 升了授权那句：AI 和对话框都拿新文案再问一次，不用等十分钟。
 
+## 十一、变声：`change_voice` 和片段右键「换成我的声音…」（声音 PR 9）
+
+> 方案 4.8、4.9、5.5、9.1 第 7、11 项、9.3「变声与口型」；约定第 4 条（服务器只分离 + 变声、回两个文件，混音在 SkyCut 里做）。文件在
+> `Sources/SrtFlow/VoiceChange/`。接口合同在 Sky Studio 仓库 `docs/agents/skycut-api.md`（`voice_convert`：fal SAM Audio 分离 +
+> Chatterbox HD，人声在结尾补静音到源那么长、长了不裁，成品留 60 天）。相关：[联动](timeline-linkage.md)、[Sky Studio 的任务](sky-studio-jobs.md)、
+> [AI 接口](ai-control-mcp.md)第四节第 60 条、[阻塞的媒体读取](blocking-media-reads.md)、[预览性能 ratchet](preview-perf-ratchet.md)。
+
+1. **两个入口同一条路**（扫描守卫钉着）：AI 的 `change_voice`（`VoiceChangeTool`）和右键面板（`VoiceChangePanelModel`）都是
+   `VoiceChangeSource.prepare`（截声音）→ `VoiceChangeOrder.spokenLanguage`（这段说什么语言）→ `VoiceChangeOrder.draft`（报价用的那一份）→ `/quote` →
+   每日硬预算 → `VoiceChangeOrder.start`（`VoiceChangeJob` 只在那里造）。没有第二份「够不够格」、第二份请求、第二份落地。
+2. **哪些段能变**（`VoiceChangeSource`）：有声音、没静音的视频段和音频段（图片段没有声音；已经静音的变出来也听不见）。源秒数不超过
+   `/models` 里 `voice_convert` 的 `limits.max_source_seconds`（现在 5 分钟，**SkyCut 不写死**；读不到就不在本机拦）——超了在读文件、报价之前就拒，
+   话里叫 AI 先 `split_clip`、面板上说上限；几乎没声音的拒（20 ms 一格、均方根 ≥ 0.0056 的格子加起来不到 0.5 秒；门限是 `VoiceChangeSource`
+   自己的常量，不借参考录音和服务器的那个合同）。同一段正在变就不起第二单（`VoiceChangeActivity`）。
+3. **传什么**：这一段的源时间范围 `[sourceStart, sourceStart + sourceDuration)` → **单声道 16-bit WAV**，采样率取原素材的、最高 48 kHz
+   （5 分钟约 29 MB，在 35 MB 以内；超了本机先拒）。读法和参考录音同一份（`VoiceReferenceReader`，多一个 `rate` 参数：按 PTS 落格、立体声取平均），
+   阻塞读只在 `MediaReadQueue.analysis`。素材的声音比这一段先完就补零到这一段的长度（服务器把人声补到源那么长，源短了两条新轨都跟着短）。
+   用途 `voice_convert_source` 只写在 `SkyStudioVoiceUpload` 一处；PUT 不带 Key。**截声音在收费之前**（AI 的那次调用里、面板打开时）：
+   几乎没声音的要在报价之前拒，本机检测语言也要这段声音；没起任务就把它删掉，起了的由任务删。
+4. **用哪种语言的参考**（`params.target_language`，`VoiceChangeOrder.targetLanguage`）：知道这段说的是什么语言、目标声音又有这种语言的参考
+   （声音库的看有录音的语言，预设看有样音的语言）才带；不知道、或者没有这种参考就不带，照服务器的默认（中文参考，没有中文就随便一段）。
+   语言：AI 给了 `language` 就用它（不叫本机检测）；否则本机检测（和新建声音的对话框、`manage_voices` 同一份：只经 `SkyStudioVoiceServices.detectLanguage` → `VoiceSampleLanguage` → `SpokenLanguageProbe`，
+   这里不另调一遍——`checks/sky-studio-wiring/voice-library-ui.sh` 钉着直接调 `VoiceSampleLanguage.detect(` 的只有那两处；只在已装的语言里裁决、不下载模型），
+   最多等 20 秒，等不到、检测不出来、macOS 15 都算不知道。结果 / 面板上说清楚用的是不是同语言的录音。界面不加选项。
+5. **钱**：先 `/quote`（按源秒数，免费、不建任务），交任务时报价当 `max_credits`。**只判每日硬预算**——变声不是一次性费用，两种权限模式都不问、
+   不发确认码（超了回 `daily_budget_exceeded`、什么都不起）；面板上的报价就是确认（那一行标红、按钮灰着）。交和等只经 `SkyStudioJobRun`（声音池领槽、
+   满了等、**不重放收费 POST**：提交的回答丢了就是结果不明，那一笔留在账上、照实说；只有排着队的能取消）。做完按服务器的结算证据改账，没做成它退了的退回。
+6. **落地**（`VoiceChangeLanding`，纯值）：原片段**静音、不删**；**新开两条音频轨**（接在现有音频轨后面），人声、背景各一段，放在原片段同一时间；
+   带上原片段的变速、音量、渐入渐出、音量曲线（曲线锚在源时间上，平移到新文件自己的时间）、声音场景；三段同一个链接组（原片段本来就在组里就沿用）；
+   人声比原片段长的那几毫秒（Chatterbox HD 实测长 5–35 ms）只在时间线上裁到原长、文件不动。两段都用原片段的音量、不另加增益（导出的限幅器兜底）。
+   任务跑了几分钟，这一段可能被动过：**照它现在的样子落**（挪了落到新位置、裁短了只取还用着的那一截）；不在了、换了素材、往外拉出了没送去变声的
+   部分、工程换了 / 关了：**只留文件**，结果里 `landed: false`、说为什么，**不落到别的工程**（`CloudTaskOwner`）。
+7. **一步撤销**（方案 4.9）：落地是异步落账（不是用户事件）——`VoiceChangeJob.land` 里**恰好一次** `perform`、外面包一层 `AIUndoGrouping.step`，
+   AI 起的、面板起的都走这一份：⌘Z 一步回到原声，⇧⌘Z 再来。路由只起任务、不包撤销分组。撤销不退钱、不删文件。
+8. **联动**：落地本身不动主轨画面，联动什么都不挪。之后照[联动](timeline-linkage.md)的规矩：原片段在主轨上时，两段新音频压在它上面——挪它跟着挪、
+   真删它跟着删（规矩 2）；三段又在同一个链接组里，联动开着时裁、分割、变速一起（`linkedClipIDs`）。联动关着什么都不跟（规矩 10）。
+9. **文件**（`VoiceChangeOutputName`）：`<原名> - <声音名>.wav`、`<原名> - 背景.wav`（「背景」照界面语言写），放原素材的文件夹，写不进去退到工程的家、
+   再退到下载；撞名加编号、不覆盖；扩展名照服务器报的类型（背景不是 WAV 时它另报）。下载断了再试两次（钱已经花了，成品地址 60 天有效）。
+10. **界面**（方案 5.5）：时间线上的块右键「换成我的声音…」**只往 `VoiceChangeActivity` 写一个目标**（块不读工程、不做 IO）；面板由挂在检查器底下的
+    `VoiceChangePresenter` 摆（`Equatable` + `.equatable()`，同 `UpscalePresenter`；只在那一段所在的工程窗口里摆）。面板用共用的声音选择器
+    （`VoicePickerView`：我的声音、设计的声音、预设排最后——预设的样音只有几秒，当变声目标没验证过）。默认选谁（`defaultSelection`）：我的声音只有一个
+    就是它，有几个就是上次用过的那个（`SrtFlow.voiceChange.lastVoiceID`），一个都没有就不选、顶上放「新建声音…」。换了声音手里的报价作废、重新问。
+    「开始」按下去那一刻就锁（第十节第 1 条；`VoiceChangePanelModel.started` 在起任务之前置上）：一份报价只起一单、只记一笔，同一段还在变的也不再起。
+    面板的视图不读工程、不订阅时钟（工程只在 `VoiceChangePanelModel` 的方法里读）；sheet 套 `.appLanguage()`；不往检查器里加行。
+    做完提示条说「已换成『X』的声音，原声已静音，⌘Z 撤回」；没做成那一行留在云端任务浮层里（`SkyStudioMediaStatus`：上传 / 排队 / 处理 / 下载 / 收尾），
+    提示条也说一句。AI 起的不往提示条上写（AI 转告）。没有 Key、钥匙串要授权、声音库暂时用不了：面板说和声音库那一节同一句。
+11. **AI 那一面**：参数 `clip_id`（方案写的是 `clip`，照全清单的习惯改了）、`voice`（`voice_…` 或预设名）、`language`、`project`；回任务号（种类
+    `voice_change`），`get_job` 做完报两段新音频的 id 和轨、两个文件、`model` / `fallback_used`、实收。名片 + 说明书主题（`MCPGuideVoiceChangeTopic`）
+    都不写价和上限的数。
+
+**还没做的 / 已知不足**：没有恢复记录——SkyCut 中途退出，这一单在服务器上照样做完、成品留 60 天，但本机不会再落地（同 upscale）；
+下载两次都失败时任务以失败结束、只报 Sky Studio 的任务号。背景是单声道（决定第三节第 8 条已接受）。分割出来的右半段不继承「正在变声」。
+每次变声都新开两条轨（照约定第 4 条），一条时间线上变很多段时轨会很多：先变声再分割。
+
+| 检查 | 守什么 |
+| --- | --- |
+| `scripts/check-voice-recovery.sh` 的 `VoiceChangeChecks`（真 App 对象 + 假协议 `VoiceChangeHTTP`，方案 9.1 第 7、11 项） | 落地的规则（纯值）：原段静音、两条新轨接在后面、三段一个链接组（已有的组沿用）、变速 / 音量 / 渐变照抄、曲线平移、长 20 ms 裁到原长、背景短一点不拉长、被裁短挪走照现在的样子落、不在了 / 换了素材 / 往外拉长了什么都不改；联动开着挪 / 真删主轨的原片段两段跟着。下单的规则：上限从 `/models`（300）、正好等于上限的收、静音 / 没声音的不收、采样率最高 48 kHz、`target_language` 只在知道语言且目标有这种参考时带、文件名和撞名、放不进原文件夹的退路、面板默认选谁。`change_voice` 全程：先报价后上传、单声道 16-bit 48 kHz 正好 4 秒、`voice_convert_source`、一次 `/jobs`（`max_credits` 是报价）、落地的每一样、两个文件、get_job 的字段、账按实收、截好的那段删掉；预设当目标不问声音库；AI 给的语言优先于检测、检测出目标没有的语言不带、检测不出来不带；超上限 / 静音 / 几乎没声音 / 不认识的声音 / 声音库用不了 / 每日额度不够都在收费之前停；**一步撤销 / 重做**、之后的改动是另一步；这一段被删了 / 工程换了只留文件、同一段不交第二次；服务器说没做成退回那一笔、留在任务浮层里；提交的回答丢了不重交、那一笔留在账上。面板：默认选谁、选了才问价、换声音报价作废、超额度按不下去、按下去起同一个任务并自动落地、提示条、记住上次的声音、没有自己的声音不替用户选、超上限说上限 |
+| `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` / `ProviderChecks` | 参数名（`clip_id` / `voice` / `language` / `project`，不收 `confirm_token`、不收 `clip`）、名片必含（花积分、任务号、两条新轨、原段静音、一步撤销、每日上限、先读说明书）且不许诺确认、说明书的分节和必含、不写数、地图的 Voices 一行和 Paid 一行、paid 主题 |
+| `checks/sky-studio-wiring.sh` 第 14 节（`checks/sky-studio-wiring/voice-change.sh`）和 `checks/MCP/router-wiring.sh` 的异步落账扫描 | 两个入口都经 `prepare` / `draft` / `spokenLanguage`、都是先过每日硬预算再 `start`；`VoiceChangeJob` 只在 `VoiceChangeOrder` 里造；这一摊不用确认码、不弹框、不直接动账；落地恰好一次 `perform`、上一行是 `AIUndoGrouping.step`、规则只有 `VoiceChangeLanding.land` 一份；路由只起任务；上传用途只写一处；阻塞读在 `MediaReadQueue.analysis`；块只往 Activity 写目标；Presenter 挂在检查器底下且 `.equatable()`；面板的视图不读工程、用共用的选择器 |
+| `scripts/gui-smoke/sky-studio/voice_change.py`（真 App + 真 MCP + 本机假 Sky Studio，免费，**不在 check-all 里**） | `change_voice` 走全程：报价 → 上传（不带 Key）→ 一次任务 → 两条新轨、原段静音 → 撤销一步回去；账按实收；不认识的声音收费前拒 |
+| `scripts/render-voice-library.sh <输出目录>` 的第 9、10 张（要图形会话，**不在 check-all 里**） | 不判对错，只出图：变声面板（选了声音带报价 / 还没有自己的声音），英 / 中 / 西 |
+
+反向验证（2026-11-11，每一处临时改坏、跑、看红、再恢复）：
+
+| 临时改成 | 红了什么 |
+| --- | --- |
+| `targetLanguage` 不看目标有没有这种参考 | `check-voice-recovery` 4 条：纯值两条、「检测出目标没有的语言不带」、任务也不带 |
+| 落地不裁到原长 / 不静音原片段 / 曲线不平移 | 各自那几条：「长的那几毫秒」两条、「原段静音」三条、「曲线平移」两条 |
+| 默认选择在几个声音里取第一个 | 「几个且没用过：不替用户选」 |
+| 采样率上限改成 16 kHz | 「最高 48 kHz」、传上去的 WAV 头（16000、128000 字节） |
+| `spokenLanguage` 不认 AI 给的语言 | 「AI 给的语言不叫检测」「AI 的语言优先」 |
+| AI 的工具不过每日硬预算 | 「超了什么都不起、不发码」「什么都没传没记账」 |
+| 落地不核对工程还是不是那一次打开 | 「工程换了只留文件」「别的工程的时间线不许碰」 |
+| 没做成一律退回那一笔 | 「结果不明的那一笔留在账上」 |
+| 落地多登记一次 `perform` | 「一步撤销回到原声」「正好一步」「面板起的也是一步」 |
+| 面板换声音不作废报价 | 「换声音报价作废」「重新问」 |
+| 变声自己直接调 `VoiceSampleLanguage.detect(`（不经 `SkyStudioVoiceServices.detectLanguage`） | `checks/sky-studio-wiring.sh` 1 条：「参考录音的语言识别只许两个入口用」（合 #372 时真撞上的） |
+| 面板的「开始」不加闩（去掉 `guard !started`） | 「一份报价只起一单」（撤销回原声之后同一个面板再按，起了第二单、多记一笔） |
+| `tooLong` 实际不拦 | 纯值一条、「超上限收费之前拒」「超上限不问价」、面板那一条 |
+| 上传用途写成 `audio` | 「以 voice_convert_source 上传」 |
+| 去掉落地那层 `AIUndoGrouping.step` | 只有扫描红（`checks/MCP/router-wiring.sh`）。运行时红不了：回归进程的主循环一直在转，按事件自动开的那一组自己会关；那种「关不上」只在后台的真 App 里有（同 upscale 的换源，也只靠扫描） |
+| 面板里读 `OpenProjects`；任务里直接写 `"voice_convert_source"`；面板不过预算就起任务；块里直接造面板的模型；工具里用 `AIConfirmations` | `checks/sky-studio-wiring.sh` 第 14 节 7 条 |
+| 地图的 Voices 一行删掉 `change_voice`；名片删掉 `One undo step` | `check-mcp` 3 条 |
+
+全部恢复后转绿（`check-voice-recovery` 连跑两遍都绿）。
+
+人工回归（自动化够不着的；真 Sky Studio 的变声**要花积分，每次先请用户批准预算**，方案 9.3）：
+
+- [ ] 右键一段有声音的视频段、一段音频段：都有「换成我的声音…」；静音了的段、图片段没有。
+- [ ] 面板：默认选中「我的声音」（只有一个时是它；有几个时是上次用过的；没有时不选、顶上有「新建声音…」，点开能建），预设排在最后；▶ 能试听、
+      同一时间只响一个；选了声音出现「约 X 积分（最多 Y）」，换一个声音价会重问；每日额度调到比报价低：那一行标红、按钮灰着。
+- [ ] 一段超过 5 分钟的段：面板说上限和「先分割」，按钮灰着；一段接近 5 分钟的：能做（测试只做过 5–10 秒）。
+- [ ] 点「开始」：面板收起，工具栏的云端任务浮层里有这一条（上传 → 排队 → 处理 → 下载）；期间照常剪辑。做完：原片段静音（块上有静音图标）、
+      多出两条音频轨（人声、背景）、提示条说换成了谁；⌘Z 一步回到原声、⇧⌘Z 再来；背景轨的推子能单独调。
+- [ ] 三段素材各做一次：纯说话、有配乐、带笑声（同 `round5` A 节）；0.5 倍速看口型，和原片比（实测整体偏移 0 ms，局部差 0.1–0.3 秒以内属正常）。
+- [ ] 挑一段立体声背景的片子：背景变成单声道，听一遍能不能接受。
+- [ ] 英文片段换成有中、英两段录音的「我的声音」：面板写「用英语的录音」，听像不像；换成只有中文录音的声音：面板写「没有英语的录音…可能没那么像」。
+- [ ] 用预设（比如 Charon）当目标变一段：听效果（预设当目标没验证过；不行再给常用预设补 30 秒参考，另批）。
+- [ ] 联动开着：挪主轨上的原片段，两段新音频跟着走；删原片段，两段一起删；联动关着：不跟。
+- [ ] 任务跑着的时候把这一段删掉 / 关掉工程：做完只留两个文件（在原素材旁边），时间线不动，提示条 / `get_job` 说了为什么。
+- [ ] AI：让它对一段调 `change_voice`（先 `list_voices` 挑我的声音）：回任务号和价、`get_job` 的阶段在走、做完时间线上是两条新轨；
+      每日额度调到比报价低再调：回 `daily_budget_exceeded`、什么都没起；请求批准和全部权限两种模式都不问。
+- [ ] Sky Studio 没配声音桶时（或断网）：面板和 AI 都说「声音库暂时用不了 / 一分没花」。
+- [ ] 英 / 中 / 西三种界面：菜单项、面板、提示条无截字、无漏翻（`scripts/render-voice-library.sh` 的第 9、10 张先看一遍）。
