@@ -7,7 +7,8 @@ import SrtFlowMCPKit
 // 每批的词：模型报了字的时间就用（Eleven v4，按它切句），没报、又要切开几句或者要字幕（计划里定的是本机对齐）就在这台 Mac 上转写。
 // 每句的字幕时间（SkyCut 声音方案第七节，AIVoiceoverTiming）：词对到原文上（SpeechWordAlignment，字幕显示稿子的字）；对不上、
 // 或者这台 Mac 转写不了，就按字数估（SpeechWordEstimate）—— 声音是好的，不让整段失败。几句一批切不开照旧保留整批、报错、能恢复，不重新花钱；
-// **只有这台 Mac 转写不了时**（恢复多少次都一样切不开）才按字数估句界（SkyStudioVoiceSplitEstimate），估的那几句记在这一批的分析里、
+// **这台 Mac 转写不了时**（恢复多少次都一样切不开），**或者转写得了、但这一批第二次还切不开时**（`splitFailures`：第一次照旧报错、
+// 能恢复）才按字数估句界（SkyStudioVoiceSplitEstimate），估的那几句记在这一批的分析里、
 // 落地时叫 AI 转告。一句跨了几批、几片的采样率不一样（一片换了备用模型）：换成一样的再接（SkyStudioVoiceLineAudio）。
 // 不管什么：HTTP、积分、入轨；原始批次始终保留，本地失败永远不能要求重新生成。
 
@@ -48,7 +49,7 @@ final class SkyStudioVoiceRender {
         let analysis: SkyStudioVoiceCheckpoint.Analysis
         if let saved = recovery.value.batches[index].analysis { analysis = saved }
         else {
-            analysis = try await analyze(batch, file: file, result: result, pcm: pcm)
+            analysis = try await analyze(batch, index: index, file: file, result: result, pcm: pcm)
             recovery.value.batches[index].analysis = analysis
             try await recovery.save()
         }
@@ -87,22 +88,25 @@ final class SkyStudioVoiceRender {
     /// 这一批的词：模型报的字的时间；没有、又要切开几句或者要对齐字幕，就转写。一批一句时转写不成不算失败（这一句按字数估）。
     /// 几句一批、这台 Mac 又转写不了（计划里定的）：不去转写；模型报的词切不开（没报、用不了、对不回原文）就按字数估句界 ——
     /// 这条路恢复多少次都一样，报错就是把付过钱的声音卡死。
-    private func analyze(_ batch: SkyStudioVoicePlan.Batch, file: URL, result: SkyStudioJobResult,
+    /// **转写得了的 Mac 上切不开**：第一次照旧报错、能恢复（重试有意义：转写一时出错、模型刚装好）；这一批**第二次**还切不开
+    /// （`splitFailures`）就同样按字数估 —— 同一段音频、同一个模型，再试多少次都一样，不给出路就永远 local_split。
+    private func analyze(_ batch: SkyStudioVoicePlan.Batch, index: Int, file: URL, result: SkyStudioJobResult,
                          pcm: SkyStudioVoiceAudio.PCM) async throws -> SkyStudioVoiceCheckpoint.Analysis {
         let speech = batch.speech
         var timed = SpeechWordTimes.timedWords(SpeechWordTimes.parse(result.words ?? .null), text: speech.prompt, duration: pcm.duration)
         var timing: AIVoiceoverTiming? = timed.isEmpty ? nil : .provider
         let splits = speech.parts.count > 1
         let transcribes = recovery.value.plan.reading?.transcribes ?? true
-        let estimatesSplit = splits && !transcribes
-        if timed.isEmpty, !estimatesSplit, splits || (input.subtitles && transcribes) {
+        let failedBefore = splits && (recovery.value.batches[index].splitFailures ?? 0) >= 1
+        let estimatesSplit = splits && (!transcribes || failedBefore)
+        if timed.isEmpty, transcribes, splits || input.subtitles {
             do {
                 if locale == nil { locale = try await localeProvider(input.speechLanguage) }
                 timed = try await transcribe(file, locale!)
                 timing = timed.isEmpty ? nil : .aligned
             } catch {
-                if splits || Self.isCancellation(error) {
-                    throw SkyStudioVoiceProcessingError(stage: splits ? .localSplit : .subtitleAlignment, underlying: error)
+                if Self.isCancellation(error) || (splits && !failedBefore) {
+                    throw splitFailure(error, index: index, counts: splits)
                 }
                 timed = []
                 timing = nil
@@ -121,10 +125,18 @@ final class SkyStudioVoiceRender {
                     }
                 }
             }.get()
-        } catch { throw SkyStudioVoiceProcessingError(stage: .localSplit, underlying: error) }
+        } catch { throw splitFailure(error, index: index, counts: splits) }
         // 句界是估的：模型报的词（要是有）没对上原文，不拿来当字幕的时间，各句照样按字数估。
         if cut.estimated { return .init(words: [], slices: cut.slices, timing: nil, estimatedSplit: true) }
         return .init(words: timed, slices: cut.slices, timing: timing)
+    }
+
+    /// 切句没切成：几句一批的记一次（取消不算），下一次恢复还切不开就按字数估。记在恢复记录里，任务收尾时存盘。
+    private func splitFailure(_ error: Error, index: Int, counts: Bool) -> SkyStudioVoiceProcessingError {
+        if counts, !Self.isCancellation(error) {
+            recovery.value.batches[index].splitFailures = (recovery.value.batches[index].splitFailures ?? 0) + 1
+        }
+        return SkyStudioVoiceProcessingError(stage: counts ? .localSplit : .subtitleAlignment, underlying: error)
     }
 
     /// 一句的声音齐了：要字幕就把词对到原文上（字幕显示稿子的字）；有一片没有词、或者对不上，整句按字数估；写文件。
