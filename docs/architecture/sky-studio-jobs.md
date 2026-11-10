@@ -381,10 +381,13 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
 
 **目录快照**：`checks/SkyStudio/Fixtures/models-voice-2026-11-10.json` 原样拷自 Sky Studio 声音 PR #246（`feat/voice-service`）的
 `tests/fixtures/skycut/models-voice-2026-11-10.json`：最先拷的是 `6793b038` 的临时导出（sha256 `ec8604d8…`），2026-11-10 换成 #246 的最终导出
-`9babdcfa`（head `84b74d96` 里同一份，sha256 `6460fafb…`；和前一份只差 `params.plan` 的说明文字：点名的模型也能带 plan）。`/models` 还没上线；
+`9babdcfa`（head `84b74d96` 里同一份，sha256 `6460fafb…`；和前一份只差 `params.plan` 的说明文字：点名的模型也能带 plan），#246 合并后换成**最终导出**
+`6c08d0f0`（sha256 `26831ec8…`）：`params.plan` 的说明加了「原样带回、带着整段的 fallback」，用户听过样音后重新打分的五个预设 —— Enceladus、Sadaltager
+进了中英两种名单，Orus 中文、Schedar 英文仍不在名单上（各自另一种语言在），Despina 定为女声、仍藏着 —— 中文名单 21 → 23、英文 27 → 28、两种都藏的只剩 Despina，
+已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。`/models` 还没上线；
 目录改了 Sky Studio 会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
 对上的：预设 30 个、名单、角色、授权文案的形状和值，Eleven 的 94 种语言；没对上、照 Sky Studio 改了 SkyCut 的：其余语言的字数上限键是 `other`（不是手写时猜的 `default`）、
-一次性费用 377.6 / 751.4 / 22.5、Despina 的性别是 `unknown`、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码
+一次性费用 377.6 / 751.4 / 22.5、Despina 的性别（当时是 `unknown`，最终导出改成女声）、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码
 （`shared/voiceSelection.ts`）改的：点名的模型每批不带 plan、`fallback.one_time` 是一项或 null 且不带价。
 
 2026-11-10 对过 Sky Studio 的接口代码（`feat/voice-service` 工作区里还没提交的 `api/_utils/voice/quote.ts`、`library.ts`、`api/_utils/skycut/voiceJobs.ts` 等）：

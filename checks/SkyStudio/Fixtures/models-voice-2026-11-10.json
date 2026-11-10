@@ -18,7 +18,7 @@
         "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
+        "plan": "the voice_plan.selection that /quote returned for the whole script, sent back unchanged (it carries the script's fallback); with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",
@@ -65,7 +65,7 @@
         "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
+        "plan": "the voice_plan.selection that /quote returned for the whole script, sent back unchanged (it carries the script's fallback); with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/mpeg",
@@ -204,7 +204,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
+        "plan": "the voice_plan.selection that /quote returned for the whole script, sent back unchanged (it carries the script's fallback); with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",
@@ -248,7 +248,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
+        "plan": "the voice_plan.selection that /quote returned for the whole script, sent back unchanged (it carries the script's fallback); with model auto, or with a named model when plan.model is that model"
       },
       "requires": "the voice's MiniMax version in the reference language (voice_enroll, a one-time fee)",
       "output": {
@@ -293,7 +293,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
+        "plan": "the voice_plan.selection that /quote returned for the whole script, sent back unchanged (it carries the script's fallback); with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",
@@ -869,21 +869,21 @@
       "languages": {
         "zh": {
           "listed": false,
-          "gender": "unknown",
+          "gender": "female",
           "rating": 3,
           "description": {
-            "zh": "性别不明显 · 顺滑",
-            "en": "Gender-ambiguous voice · smooth"
+            "zh": "女声 · 顺滑",
+            "en": "Female voice · smooth"
           },
           "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/despina-zh.wav"
         },
         "en": {
           "listed": false,
-          "gender": "unknown",
+          "gender": "female",
           "rating": 5,
           "description": {
-            "zh": "性别不明显 · 顺滑",
-            "en": "Gender-ambiguous voice · smooth"
+            "zh": "女声 · 顺滑",
+            "en": "Female voice · smooth"
           },
           "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/despina-en.wav"
         }
@@ -902,9 +902,9 @@
       "official_style": "Breathy",
       "languages": {
         "zh": {
-          "listed": false,
+          "listed": true,
           "gender": "male",
-          "rating": null,
+          "rating": 4,
           "description": {
             "zh": "男声 · 气声",
             "en": "Male voice · breathy"
@@ -912,9 +912,9 @@
           "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/enceladus-zh.wav"
         },
         "en": {
-          "listed": false,
+          "listed": true,
           "gender": "male",
-          "rating": null,
+          "rating": 4,
           "description": {
             "zh": "男声 · 气声",
             "en": "Male voice · breathy"
@@ -1176,7 +1176,7 @@
         "zh": {
           "listed": false,
           "gender": "male",
-          "rating": 1,
+          "rating": 3,
           "description": {
             "zh": "男声 · 坚定",
             "en": "Male voice · firm"
@@ -1344,9 +1344,9 @@
       "official_style": "Knowledgeable",
       "languages": {
         "zh": {
-          "listed": false,
+          "listed": true,
           "gender": "male",
-          "rating": null,
+          "rating": 4,
           "description": {
             "zh": "男声 · 知识型",
             "en": "Male voice · knowledgeable"
@@ -1354,9 +1354,9 @@
           "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/sadaltager-zh.wav"
         },
         "en": {
-          "listed": false,
+          "listed": true,
           "gender": "male",
-          "rating": null,
+          "rating": 5,
           "description": {
             "zh": "男声 · 知识型",
             "en": "Male voice · knowledgeable"
@@ -1388,9 +1388,9 @@
           "sample_url": "https://assets.skystudios.app/site/voice-samples/gemini/v1/schedar-zh.wav"
         },
         "en": {
-          "listed": true,
+          "listed": false,
           "gender": "male",
-          "rating": 4,
+          "rating": 2,
           "description": {
             "zh": "青年男声 · 均匀平稳",
             "en": "Young male voice · even"
