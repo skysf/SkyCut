@@ -99,12 +99,26 @@ enum SkyStudioJobGate {
 
     // MARK: 声音库的三件事（SkyCut 声音方案 4.5；令牌绑什么、问句怎么写在 SkyStudioVoiceApproval）
     //
-    // 用录音建声音的授权和一次性费用（建 MiniMax 版、设计）这一刀**两种模式都问**：全部权限下不问，要靠打开全部权限时那一次说明（价目 +
-    // 授权那句）和记下的长期授权（声音 PR 7）；在那之前照方案 4.5 末条「没有有效的长期授权，就照请求批准模式问」。
-    // 删声音不花钱、不要授权：请求批准模式问一句，全部权限直接删。每日硬预算两种模式都拦（一次性费用先判预算再问）。
+    // 用录音建声音的授权和一次性费用（建 MiniMax 版、设计）照 `VoiceAsk`（SkyStudioVoiceStanding.voiceAsk 读出来的）：请求批准模式照问；
+    // 全部权限下这个账号有有效的长期授权就不问（声音 PR 7：打开全部权限时说明过价目、记过授权那句），没有就照请求批准模式问一次、
+    // 问句后面接那段说明（令牌另绑那一版），点过头调用方补记。删声音不花钱、不要授权：请求批准模式问一句，全部权限直接删。
+    // 每日硬预算两种模式都拦（一次性费用先判预算再问 / 再做）。
 
-    /// 用录音建声音 / 加一种语言的录音：点过头（令牌收下）回 nil，调用方带 `consent: true` 发；否则回问句。
-    static func voiceConsent(action: String, question: String, token: String?) -> AIToolResult? {
+    /// 声音这几件事此刻怎么问。
+    enum VoiceAsk: Equatable {
+        /// 请求批准模式：照问。
+        case ask
+        /// 全部权限，这个账号有有效的长期授权：不问（建声音带 `consent: "standing_grant"`），做完说。
+        case standing
+        /// 全部权限，还没有有效的长期授权：照请求批准模式问一次，问句后面接打开全部权限时那段说明；点过头补记 `statementVersion` 那一版。
+        case once(explanation: String, statementVersion: String)
+    }
+
+    /// 用录音建声音 / 加一种语言的录音：不用问（全部权限 + 长期授权）或点过头（令牌收下）回 nil；否则回问句。
+    /// 调用方：`.standing` 带 `consent: "standing_grant"` 发，别的带 `consent: true`（问的就是这一段录音）。
+    static func voiceConsent(action: String, question: String, token: String?, ask: VoiceAsk) -> AIToolResult? {
+        if ask == .standing { return nil }
+        let (action, question) = asking(action, question, ask)
         let redemption = AIConfirmations.shared.redeem(token, for: action)
         if redemption == .accepted { return nil }
         return voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
@@ -112,19 +126,28 @@ enum SkyStudioJobGate {
                 + "same call with confirm_token. Never confirm on the user's behalf.")
     }
 
-    /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码），点过头才记上账。
-    static func voiceOneTime(credits: Double, action: String, question: String, token: String?,
+    /// 一次性费用：每日硬预算先判（超了回 daily_budget_exceeded、不发码、不记账）；全部权限 + 长期授权直接记账，别的点过头才记。
+    static func voiceOneTime(credits: Double, action: String, question: String, token: String?, ask: VoiceAsk,
                              store: SkyStudioSpendStore? = nil) throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
         guard case .allow = store.decide(credits: credits) else { return .needsConfirmation(budgetBlocked(credits: credits, store: store)) }
-        let redemption = AIConfirmations.shared.redeem(token, for: action)
-        guard redemption == .accepted else {
-            return .needsConfirmation(voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
-                next: "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
-                    + "Never treat your own plan as the user's approval."))
+        if ask != .standing {
+            let (action, question) = asking(action, question, ask)
+            let redemption = AIConfirmations.shared.redeem(token, for: action)
+            guard redemption == .accepted else {
+                return .needsConfirmation(voiceQuestion(AIConfirmations.shared.ask(question, action: action, refused: redemption.refusal),
+                    next: "Ask the user in their language, with the price. Only if they agree, repeat the same call with confirm_token. "
+                        + "Never treat your own plan as the user's approval."))
+            }
         }
         return .reserved(record(store, credits))
+    }
+
+    /// 全部权限下补问的那一次：令牌另绑（带上点过头要补记的那一版，请求批准模式发的码不能拿来答它），问句后面接那段说明。
+    private static func asking(_ action: String, _ question: String, _ ask: VoiceAsk) -> (action: String, question: String) {
+        guard case .once(let explanation, let version) = ask else { return (action, question) }
+        return (action + ":standing:" + version, question + " " + explanation)
     }
 
     /// 删声音：请求批准模式问一句；全部权限直接删（结果里说删了）。点过头回 nil。
