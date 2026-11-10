@@ -17,6 +17,10 @@
 #   9. generate_media 送 Sky Studio 的那一份（SkyStudioGeneration，第 6 刀 6b）：词表和类型对账、每种的默认值（画幅跟画布 / 首帧、视频 5 秒 768p、
 #      音效 5 秒 wav、音乐纯音乐不给时长）、用不上的参数说一句不送、请求体、确认码的记号、离谁最近的画幅、成品的扩展名；
 #      图生视频的首帧（真写几张图：宽高比、EXIF 转了 90 度的对调、PNG 原样传、TIFF 转成 JPEG 传完删掉、不是图的说清楚）。
+#  10. 声音的接口合同（SkyCut 声音方案第十节 PR 1，还没接任何入口）：/models 的预设声音 / 角色 / 授权文案对着目录快照
+#      （checks/SkyStudio/Fixtures/models-voice-*.json）读；/voices 和长期授权的请求；读稿整段报价（params.batches）读回 voice_plan /
+#      每批的价 / 一次性费用、每批 /jobs 带同一个 params.plan、拉丁字母的非英文稿才带 params.language；建 MiniMax 版 / 设计 / 变声的
+#      请求和结果；429 的 pool、/me 的 max_running_audio_jobs、两个新上传用途。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -108,6 +112,13 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceCatalog.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibrary.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceQuote.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceResults.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceRequests.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceAPI.swift \
+  Sources/SrtFlow/AITextLanguage.swift \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/AIVoiceWords.swift \
   Sources/SrtFlow/AIToolIO.swift \
@@ -143,6 +154,10 @@ xcrun swiftc \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \
+  checks/SkyStudio/VoiceCatalogChecks.swift \
+  checks/SkyStudio/VoiceLibraryChecks.swift \
+  checks/SkyStudio/VoicePlanChecks.swift \
+  checks/SkyStudio/VoiceJobChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
   checks/SkyStudio/ModelExpansionChecks.swift \

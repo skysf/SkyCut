@@ -9,6 +9,7 @@ import SrtFlowMCPKit
 // 接口：`GET /me`（授权，收费方案第 5 刀）；生成、upscale、克隆的 `/models`、`/quote`、`/uploads`（+ 把文件 PUT 到它给的地址）、`/jobs`、
 // `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
+// 声音库的 `/voices`、`/voices/consent-grant` 在 SkyStudioVoiceAPI（用这里的 request / send）。
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
 //
 // 自检和冒烟用 `SRTFLOW_SKYSTUDIO_API_BASE` 把地址指到本机的假服务器，**只认回环地址**（Key 不会因此发到别处）。
@@ -99,6 +100,10 @@ struct SkyStudioAPI: Sendable {
         if let character = job.character {
             guard let usage = quote.characterUsage, usage.id == character.id else { throw SkyStudioFailure.badAnswer(status: 200) }
         }
+        // 读稿整段报价（`params.batches`）：要回服务器选的模型和每一批的价，批数对得上（每批交的时候拿它当 max_credits）。
+        if let asked = job.params["batches"]?.arrayValue {
+            guard let voice = quote.voice, voice.plan != nil, voice.batches.count == asked.count else { throw SkyStudioFailure.badAnswer(status: 200) }
+        }
         return quote
     }
 
@@ -132,7 +137,8 @@ struct SkyStudioAPI: Sendable {
     }
 
     /// `POST /uploads` 拿到地址，把文件 PUT 上去（流着发，不整个读进内存）；回 `/jobs` 的 inputs 要的那个 `file_url`。
-    /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
+    /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`，声音的 `voice_reference`、`voice_convert_source`（各 ≤ 35 MB，
+    /// SkyStudioVoiceUpload）。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
     func upload(
         fileURL: URL, contentType: String, purpose: String, key: String, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> URL {

@@ -49,6 +49,9 @@
 | `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
 | `SkyStudioImageOperation.swift` / `SkyStudioImageResult.swift` | 图片操作的离散移动 / 单图 / 倍率合同；下载后按实际字节确认格式并纠正扩展名，不重编码 |
 | `SkyStudioGenerateTool.swift` / `SkyStudioGenerationRun.swift` / `SkyStudioGenerationActivity.swift` / `SkyStudioGenerationFrame.swift` | generate_media：工具（挑模型、问价、把关、回任务号）、任务（传首帧、交、等、下载）、状态行订阅的那张表、图生视频的首帧（宽高比、传哪个文件） |
+| `SkyStudioVoiceCatalog.swift` | 纯值：`/models` 顶层的预设声音（属性按语言分开）、角色 → 预设、授权文案；声音模型记录上的一次性费用价目、Eleven 支持的语言、分批的字数上限（第十四节） |
+| `SkyStudioVoiceLibrary.swift` / `SkyStudioVoiceAPI.swift` | 声音库：用户自己的声音（只认 `voice_…`，没有服务商 id）、长期授权的状态、建声音 / 加录音的请求体；`/voices`、`/voices/consent-grant` 的请求（第十四节） |
+| `SkyStudioVoiceQuote.swift` / `SkyStudioVoiceResults.swift` / `SkyStudioVoiceRequests.swift` | 声音任务：`voice_plan`、每批的价、一次性费用；做完的结果（变声的两个文件、建 / 设计回的声音）和错误码；整段报价和每批 `/jobs`、建 MiniMax 版 / 设计 / 变声的请求、两个上传用途、语言提示（第十四节） |
 
 ### 模型目录的缓存与换账户
 
@@ -274,3 +277,51 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 上线后仍须真服务核对：文字 / 照片创建的四视图质量、头像一致性、同 key 丢答恢复与账单、进行中删除保护、免费导入 / 换图 / 改名、原生任务整理失败只恢复原单。未连接生产或使用真实 Key，本轮通过不代表服务端 PR 已部署。
 
 本轮结果合同与五处修复的反向验证证据见 [0.18.62 真积分验收后的工具结果](../bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md)。
+
+
+## 十四、声音的接口合同（声音 PR 1，2026-11-10）
+
+依据 SkyCut 声音方案（2026-11-09 批准：第二节约定、第三节「SkyCut 需要 Sky Studio 接口提供的东西」、第十节 PR 1、9.1 第 1、2 项）和
+Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**这一刀只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**：
+`add_voiceover`、MCP 清单、界面都没动，现有的配旁白（`SkyStudioVoicePlan`、`SkyStudioVoices`、`SkyStudioVoiceoverRun`）照旧，PR 3 起才换。
+Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
+
+- **目录**（`SkyStudioVoiceCatalog`，`catalog.voices`）：`/models` 顶层的 `voice_presets`、`voice_roles`、`voice_rules`、`voice_consent`
+  原样留在 `SkyStudioCatalog.voiceSection`（只用模型目录的自检不用编声音那一摊），`voices` 现读成类型。预设的性别 / 说明 / 打分 /
+  在不在名单 / 样音**按语言分开**（Gacrux 中文男、英文女），别的语言照 `other_languages`；名单只收 `listed`、按打分高到低、同分按名字；
+  角色表只在服务器（平的 `{角色: 预设 id}`）；`voice_rules` 只给人看，SkyCut 不照着算。模型记录上：`price.typical_credits`（打开全部权限时的价目）、
+  `languages`（`eleven-v4` 的 94 种）、`limits.max_characters_by_language`（报价前分批取同一个 kind 里最小的那个）。
+- **声音库**（`SkyStudioVoice`、`SkyStudioVoiceAPI`）：只认 Sky Studio 自己的 `voice_` + 32 位小写十六进制，路径里的 id 拼地址之前就核对；
+  DTO 只留认得的字段（不存原始 JSON），`languages[].minimax` 是布尔，**服务商的 id 永远不进 SkyCut**（约定第 3 条）；试听链接是 1 小时的临时链接，
+  不往外报。建声音带名字（1–80 个 UTF-16 单位）/ ISO 639-1 语言 / 上传地址 / 幂等 key / 授权：这一次的 `consent: true`（+ 文案版本）或长期的
+  `consent: "standing_grant"`。长期授权 `GET / POST / DELETE /voices/consent-grant`：`active` 已含「文案过期」，记了却不有效、撤了却还有效都不算回答。
+- **读稿整段报一次价**：`SkyStudioVoiceRequests.segmentQuote` 带 `params.batches`（不带 prompt）、`model` 是 `auto` 或点名；回答里的 `voice_plan`、
+  `credits` / `credits_expected` / `settlement`、每批的价、`one_time` 读成 `SkyStudioQuote.voice`。**和钱有关的读得严**：一次性费用、每批的积分少一样、
+  不像样，整份报价不算回答（不能悄悄丢掉一笔一次性费用）；带 `params.batches` 的报价要回 `voice_plan` 且批数对得上。**每批 `/jobs`**（`batch`）：
+  这一批的字、`params.plan` 原样带回 `voice_plan.selection`（中途换了备用就带 `fallback.selection`）、这一批报价的 `credits` 当 `max_credits`、
+  每批一个幂等 key；`model` 和整段报价时一样（点名的模型每批照样点名，服务器「点名的出错不自动换」靠它分得清）。
+- **语言提示**（`SkyStudioVoiceLanguageHint`）：只看字母全是拉丁字母的那几句，用 `AITextLanguage` 判出来、而且不是英文才带 `params.language`
+  （ISO 639-1）；带汉字 / 假名 / 谚文的句子交给服务器自己判，英文是服务器的默认。
+- **三种新活**：`voice_enroll`（建 MiniMax 版，模型从 `/models` 挑）、`voice_design`（描述当 prompt，`params.name` / 可选的 `sample_text`）、
+  `voice_convert`（`params.target_voice` = `voice_…` 或 `gemini:`、`params.source.seconds` 到毫秒只用来报价、可选的 `target_language`，传完才带
+  `inputs.source_audio_url`）。结果没有 `url`：`SkyStudioVoiceJobResult`（变声的人声 + 背景两个文件、建 / 设计回的声音和样音链接），
+  `SkyStudioJobRun` 把它也当「做完了」；读稿 / 克隆的结果照旧有 `url`，另带实际跑的 `model`、`fallback_used`、`voice_plan`（`SkyStudioVoiceOutcome`）。
+- **两个上传用途**（`SkyStudioVoiceUpload`）：`voice_reference`、`voice_convert_source`，各 ≤ 35,000,000 字节（十进制），照旧经 `SkyStudioAPI.upload`。
+- **并发**：`/me` 的 `max_running_audio_jobs`（声音池，读不到 = 服务器还没上新池）；429 `too_many_jobs` 多了 `pool`（`audio` / `default`）照旧算容量拒绝、
+  同一个 key 等着再交，**认不出的 pool 不算**（不能冒充未准入）。按池开槽是 PR 4。
+- **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，进了 `SkyStudioJobAdmission.rejectedCodes`
+  （本机记的那笔能退）；`fallback_needs_one_time` 的 `one_time` 读进 `SkyStudioJobFailure.oneTime`；`voice_limit`、`reference_exists`、
+  `voice_library_unavailable` 和 `invalid_request` 的几种 `reason` 先只认得，怎么说人话是 PR 6。
+
+**快照是临时的**：`checks/SkyStudio/Fixtures/models-voice-draft-2026-11-10.json` 是 SkyCut 照两份方案手写的（30 个预设照 Sky Studio 方案 4.2 的表，
+风格词照 `gemini-voices-2026-11-09/manifest.json`，Eleven 的 94 种语言照 ElevenLabs 自己的模型列表；顶上有 `_provisional` 一行），**不是 Sky Studio 的导出**。
+Sky Studio 导出 `buildSkycutModelCatalog()` 的声音部分之后换成它、对着它跑，对不上的以 Sky Studio 为准改 SkyCut。方案没写死、手写时先定的几处
+（换正式快照 / 接口上线时核对）：「其余语言」的字数上限键叫 `default`；`voice_consent.*` 是 `{version, statement}`；`voice_plan.languages` 是
+`[{language, share, seconds}]`、`fallback.one_time`、`batches[].characters` 这几个名字；`GET /voices` 回 `{voices, next_cursor}`，建 / 加录音 / 改名回
+`{voice}`，`POST /voices/consent-grant` 回和 GET 一样的形状；加录音不带幂等 key；预设性别不确定、没打分写 null。
+
+验证：`scripts/check-sky-studio.sh` 第 10 组（`VoiceCatalogChecks` 338 条对着快照、`VoiceLibraryChecks` 86 条、`VoicePlanChecks` 111 条、
+`VoiceJobChecks` 86 条，假协议不碰网络）。反向验证（2026-11-10，每项改完跑一遍、红了再原样恢复）：快照里 `zh_female_lively` 指向藏起来的 Despina →
+1 条红；只给第一批带 `params.plan` → 3 条红；中文稿也带 `params.language` → 4 条红；429 的 `pool` 不认 → 6 条红；`SkyStudioJobRun` 只认带 `url` 的结果 →
+1 条红；读不出来的一次性费用悄悄丢掉 → 2 条红；`/quote` 不核对整段报价的批数 / voice_plan → 4 条红；`one_time_required` 不算未准入 → 2 条红；
+每批都拿整段的 credits 当 `max_credits` → 2 条红；声音的 DTO 报原始回答 → 2 条红；只带一个 `model` 的结果也当声音的结果 → 1 条红。

@@ -3,8 +3,12 @@ import SrtFlowMCPKit
 
 // 服务端明确保证尚未入场的拒绝码；退款判定和官方提交回执共用，未知错误不加入。
 enum SkyStudioJobAdmission {
+    /// 声音的两种 409（`one_time_required`、`minimax_voice_exists`）合同写明不扣钱、不建任务（Sky Studio 声音方案 5.2 ⑤、5.3）。
     static let rejectedCodes: Set<String> = ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits",
-                                             "price_changed", "too_many_jobs", "recipe_unavailable", "character_not_ready", "character_changed", "not_found"]
+                                             "price_changed", "too_many_jobs", "recipe_unavailable", "character_not_ready", "character_changed", "not_found",
+                                             "one_time_required", "minimax_voice_exists"]
+    /// 429 `too_many_jobs` 的 `pool`：声音类任务单独一个池（`audio`，每账号 8 个），其余 `default`（3 个）。Sky Studio 声音方案第八节。
+    static let slotPools: Set<String> = ["audio", "default"]
 
     /// 代码不能盖过受理/供应商/扣费证据；全退只证明净额归零，不证明从未受理。
     static func hasAdmissionEvidence(_ error: SkyStudioServerError) -> Bool {
@@ -14,10 +18,12 @@ enum SkyStudioJobAdmission {
     }
 
     /// 只有现行合同明确的容量拒绝形状才能重新 POST；未知附加字段不能冒充未准入。
+    /// 形状：`limit`、`running`（非负整数），声音上线后多一个 `pool`（只认 `slotPools` 里的名字）。
     static func slotRefusal(_ error: SkyStudioServerError) -> Bool {
         guard error.status == 429, error.code == SkyStudioServerError.tooManyJobs,
-              Set(error.fields.keys).isSubset(of: ["limit", "running"]) else { return false }
-        return error.fields.values.allSatisfy { value in
+              Set(error.fields.keys).isSubset(of: ["limit", "running", "pool"]) else { return false }
+        if let pool = error.fields["pool"], !(pool.stringValue.map(slotPools.contains) ?? false) { return false }
+        return error.fields.filter { $0.key != "pool" }.values.allSatisfy { value in
             guard let n = value.doubleValue else { return false }
             return n.isFinite && n >= 0 && n.rounded() == n
         }
@@ -39,6 +45,8 @@ struct SkyStudioJobFailure: Equatable, Sendable {
     var balance: Double?
     var needed: Double?
     var rechargeURL: URL?
+    /// 声音：`one_time_required`（409）、`fallback_needs_one_time`（任务结束码）附带的一次性费用；没有是空的。
+    var oneTime: [SkyStudioVoiceOneTime] = []
 
     init(message: String, fields: [String: JSONValue] = [:], jobID: String? = nil) {
         self.message = message
@@ -52,6 +60,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         balance = fields["balance"]?.doubleValue
         needed = fields["needed"]?.doubleValue
         rechargeURL = SkyStudioLinks.webURL(fields["recharge_url"]?.stringValue)
+        oneTime = SkyStudioVoiceOneTime.list(fields["one_time"]) ?? []
     }
 
     var creditsReturned: Bool { billing?.returnedAll == true }
@@ -68,6 +77,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         if let balance { value["balance"] = .number(balance) }
         if let needed { value["needed"] = .number(needed) }
         if let rechargeURL { value["recharge_url"] = .string(rechargeURL.absoluteString) }
+        if !oneTime.isEmpty { value["one_time"] = .array(oneTime.map(\.json)) }
         return .object(value)
     }
 }
