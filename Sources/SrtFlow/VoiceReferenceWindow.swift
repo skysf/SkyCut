@@ -8,16 +8,19 @@ import Foundation
 //   一段最长不到 181 秒（服务器的上限 180 秒、容差 1 秒，Sky Studio 声音方案 3.4）。
 //   有效人声一样多时前 15 秒人声更密的优先（IndexTTS2 上游只用参考的前 15 秒），再一样取最早的、最短的。
 //   哪个起点都找不到这样的终点（一直有声、没有停顿）才退一步：终点放在 3:00 前后 1 秒内最安静的那个格子边上。
-// - 「有效人声几秒」也只在这里数：响度不低于 −45 dBFS 的整格（`AIVoiceLevel.activeFloor`，同一个门限）× 20 ms，
-//   不满 20 ms 的尾巴不算。挑段按它数，写好的文件再按它数一遍；不到 10 秒不收（MiniMax 克隆的硬要求；
-//   服务器的 too_little_speech 用同一个门限兜底）。
+// - 「有效人声几秒」也只在这里数：均方根 ≥ 0.0056（约 −45.04 dBFS）的整格 × 20 ms，不满 20 ms 的尾巴不算。
+//   挑段按它数，写好的文件再按它数一遍；不到 10 秒不收（MiniMax 克隆的硬要求）。门限是和 Sky Studio 的跨仓库合同
+//   （`speechRMSFloor`），服务器的 too_little_speech 故意放宽到 0.0055，只会比 SkyCut 宽、不会更严。
 // 不管什么：解码、重采样、写 WAV、上传（VoiceReferenceSample / VoiceReferenceReader）。
 
 struct VoiceReferenceWindow: Equatable, Sendable {
-    /// 一格 20 ms（和 AIVoiceLevel 数「说话部分」同一个格子）。
+    /// 一格 20 ms（44.1 kHz 是 882 个采样）。
     static let frameSeconds = 0.02
-    /// 比这个轻的一格算停顿：−45 dBFS。
-    static let silenceFloor: Float = AIVoiceLevel.activeFloor
+    /// 有声的门限：一格的均方根 ≥ 0.0056（均方 ≥ 3.136e-5，约 −45.04 dBFS），比它轻的一格算停顿。
+    /// 这是和 Sky Studio 的**跨仓库合同**：服务器的 too_little_speech 故意放宽到 0.0055，吃掉两边浮点和取整的差别。
+    /// 单独写死在这里，不借 AIVoiceLevel.activeFloor —— 那是配音响度的门限，调它不许把合同带着变
+    /// （docs/bugfixes/2026-11-10-voice-reference-floor-borrowed-from-voice-level.md）。
+    static let speechRMSFloor: Float = 0.0056
     /// 至少 10 秒有效人声 = 500 格。
     static let minimumVoicedFrames = 500
     /// 最长 3 分钟 = 9,000 格；超过时终点在 3:00 前后 1 秒（50 格）内，且不到 181 秒。
@@ -64,7 +67,7 @@ struct VoiceReferenceWindow: Equatable, Sendable {
     }
 
     /// 一段采样（写好的文件、或刚解码的一块）里有效人声多少格：按同一个格子、同一个门限。
-    static func voicedFrames(levels: [Float]) -> Int { levels.reduce(0) { $0 + ($1 >= silenceFloor ? 1 : 0) } }
+    static func voicedFrames(levels: [Float]) -> Int { levels.reduce(0) { $0 + ($1 >= speechRMSFloor ? 1 : 0) } }
 
     // MARK: 挑段
 
@@ -96,7 +99,7 @@ struct VoiceReferenceWindow: Equatable, Sendable {
         var runs: [Range<Int>] = []
         var begin: Int?
         for index in 0...levels.count {
-            let silent = index < levels.count && levels[index] < silenceFloor
+            let silent = index < levels.count && levels[index] < speechRMSFloor
             if silent, begin == nil { begin = index }
             if !silent, let first = begin {
                 if index - first >= pauseFrames { runs.append(first..<index) }
@@ -161,7 +164,7 @@ struct VoiceReferenceWindow: Equatable, Sendable {
             var sums = [0]
             sums.reserveCapacity(levels.count + 1)
             for level in levels {
-                running += level >= VoiceReferenceWindow.silenceFloor ? 1 : 0
+                running += level >= VoiceReferenceWindow.speechRMSFloor ? 1 : 0
                 sums.append(running)
             }
             self.sums = sums

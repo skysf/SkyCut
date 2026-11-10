@@ -81,13 +81,14 @@ private func checkCatalog() {
 
 private func checkInstructions() {
     checkEqual(MCPInstructions.text(providers: []), MCPInstructions.text, "without a provider the instructions are the plain ones")
-    check(!MCPInstructions.text.contains("fal.ai") && MCPInstructions.text.contains("generate_media") && MCPInstructions.text.contains("upscale_clip"),
-          "the initial instructions always explain the paid tools")
+    // 2026-11-10 起工具目录在说明书的地图里（方案第八节第 1 条）：花钱的工具始终列在地图上，总说明只指过去。
+    let map = guideMapText()
+    check(!MCPInstructions.text.contains("fal.ai") && MCPInstructions.text.contains("skycut_guide") && map.contains("generate_media")
+          && map.contains("upscale_clip"), "the guide map always lists the paid tools and the instructions point at it")
     let withSkyStudio = MCPInstructions.text(providers: [.skystudio])
     checkEqual(withSkyStudio, MCPInstructions.text, "adding a Key does not require reloading server instructions")
-    // 目录里那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily credit limit、credits）。
-    check(withSkyStudio.contains("generate_media") && withSkyStudio.contains("upscale_clip") && withSkyStudio.contains("Sky Studio credits")
-          && withSkyStudio.contains("Paid"), "a Sky Studio key lists both paid tools, paid with Sky Studio credits")
+    // 地图上那一行只指路：花钱怎么问、每日上限写在工具自己的说明里（上面查过 daily credit limit、credits）。
+    check(map.contains("Paid, Sky Studio credits: generate_media") && map.contains("upscale_clip"), "the map's paid line names both paid tools and Sky Studio credits")
 }
 
 // MARK: 协议核心（进程内）
@@ -195,7 +196,7 @@ private func checkHelperListing() {
         let initialize = reply(messages, id: 1)?["result"]
         checkEqual(initialize?["capabilities"]?["tools"]?["listChanged"]?.boolValue, true, "helper: the handshake says the list can change")
         let instructions = initialize?["instructions"]?.stringValue ?? ""
-        check(instructions.contains("generate_media"), "helper, providers \(providers.map(\.rawValue)): instructions always mention generate_media")
+        check(instructions.contains("skycut_guide"), "helper, providers \(providers.map(\.rawValue)): instructions always point at the guide's map")
     }
     let modern = #"{"jsonrpc":"2.0","id":9,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientInfo":{"name":"m","version":"1"}}}}"#
     let (messages, _) = talkToHelper([modern], socket: socket, providers: [.skystudio])

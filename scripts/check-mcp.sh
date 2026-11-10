@@ -123,6 +123,8 @@ source checks/MCP/batch-edit-wiring.sh
 source checks/MCP/tool-result-wiring.sh
 # shellcheck source=checks/MCP/clip-sound-wiring.sh
 source checks/MCP/clip-sound-wiring.sh
+# shellcheck source=checks/MCP/voice-reference-wiring.sh
+source checks/MCP/voice-reference-wiring.sh
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。

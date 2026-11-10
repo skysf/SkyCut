@@ -3,8 +3,8 @@ import Foundation
 // MARK: - 说明书的主题表
 //
 // 管什么：说明书里有哪些主题、每个主题有哪几节、按名字怎么找（大小写、连字符、空格不计较）、写错了猜哪个。
-// **每个工具一个同名主题**（checks/MCP/GuideChecks.swift 钉着）。
-// 不管什么：怎么答、一次回多少（MCPGuide），参数定义怎么写成文字（MCPGuideFields）。
+// **每个工具一个同名主题**，外加五个通用主题（rules、conventions、paid、workflows、errors，MCPGuideSharedTopics）；名字不许撞（checks/MCP/GuideChecks.swift 钉着）。
+// 不管什么：怎么答、一次回多少（MCPGuide），地图（MCPGuideMap），参数定义怎么写成文字（MCPGuideFields）。
 //
 // 方案的 PR 1（docs/plans/2026-11-09-mcp-guide.md 7.1）：主题先放**现有说明原文**，名片不动 —— 概要就是这个工具现在的说明
 // （一个字不改，从定义里现取，不另抄一份：抄的会漂），字段从它的参数定义现算（Codex 把超过 5,000 字节的参数定义的说明全删掉，
@@ -28,17 +28,14 @@ public struct MCPGuideSection: Sendable, Equatable {
 /// 说明书的一个主题。
 public struct MCPGuideTopic: Sendable, Equatable {
     public let name: String
-    /// 目录里跟在名字后面的一句话。
-    public let headline: String
     /// 第一节是 overview。
     public let sections: [MCPGuideSection]
     /// 最小的 JSON 例子（身份是写明的占位）；守卫按真实参数定义逐个校验。
     public let examples: [JSONValue]
     public let related: [String]
 
-    public init(name: String, headline: String, sections: [MCPGuideSection], examples: [JSONValue] = [], related: [String] = []) {
+    public init(name: String, sections: [MCPGuideSection], examples: [JSONValue] = [], related: [String] = []) {
         self.name = name
-        self.headline = headline
         self.sections = sections
         self.examples = examples
         self.related = related
@@ -46,12 +43,13 @@ public struct MCPGuideTopic: Sendable, Equatable {
 }
 
 public enum MCPGuideTopics {
-    /// 全部主题，按清单顺序。
-    public static var all: [MCPGuideTopic] { MCPToolName.allCases.map(topic(for:)) }
+    /// 全部主题：工具的按清单顺序，后面接五个通用主题。
+    public static var all: [MCPGuideTopic] { MCPToolName.allCases.map(topic(for:)) + MCPGuideSharedTopics.all }
 
-    /// 按名字找；不认识回 nil（MCPGuide 回目录 + 猜的）。
+    /// 按名字找；不认识回 nil（MCPGuide 回地图 + 猜的）。
     public static func topic(named raw: String) -> MCPGuideTopic? {
-        MCPToolName(rawValue: normalized(raw)).map(topic(for:))
+        let name = normalized(raw)
+        return MCPGuideSharedTopics.all.first { $0.name == name } ?? MCPToolName(rawValue: name).map(topic(for:))
     }
 
     /// 一个工具的主题。手写了的（`written`）：手写的几节 + 例子 + 相关主题，fields 接在最后；还没写的（方案 PR 1 的样子）：
@@ -60,10 +58,9 @@ public enum MCPGuideTopics {
         let definition = tool.definition
         let fields = MCPGuideSection(name: "fields", text: MCPGuideFields.text(for: definition.inputSchema))
         if let written = written(for: tool) {
-            return MCPGuideTopic(name: tool.rawValue, headline: definition.title, sections: written.sections + [fields],
-                                 examples: written.examples, related: written.related)
+            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + [fields], examples: written.examples, related: written.related)
         }
-        return MCPGuideTopic(name: tool.rawValue, headline: definition.title, sections: [
+        return MCPGuideTopic(name: tool.rawValue, sections: [
             MCPGuideSection(name: MCPGuideSection.overview, text: definition.description), fields
         ])
     }

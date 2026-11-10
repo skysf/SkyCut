@@ -12,7 +12,7 @@ import Foundation
 
 enum MCPGuideVoiceTopics {
     static let addVoiceover = MCPGuideTopic(
-        name: MCPToolName.addVoiceover.rawValue, headline: "Add a voiceover",
+        name: MCPToolName.addVoiceover.rawValue,
         sections: [overview, voices, models, paid, subtitles, recovery, local],
         examples: [
             ["lines": [["text": "Welcome to the course."], ["text": "First, open the project.", "start": 4]], "subtitles": true],

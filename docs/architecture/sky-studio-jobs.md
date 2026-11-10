@@ -294,20 +294,22 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
   94 种、Qwen3 设计的 10 种）；`limits.max_characters_by_language`（其余语言的键是 `other`；报价前分批取同一个 kind 里最小的那个）。
 - **声音库**（`SkyStudioVoice`、`SkyStudioVoiceAPI`）：只认 Sky Studio 自己的 `voice_` + 32 位小写十六进制，路径里的 id 拼地址之前就核对；
   DTO 只留认得的字段（不存原始 JSON），`languages[].minimax` 是布尔，**服务商的 id 永远不进 SkyCut**（约定第 3 条）；试听链接是 1 小时的临时链接，
-  不往外报。建声音带名字（1–80 个 UTF-16 单位）/ ISO 639-1 语言 / 上传地址 / 幂等 key / 授权：这一次的 `consent: true`（+ 文案版本）或长期的
-  `consent: "standing_grant"`。长期授权 `GET / POST / DELETE /voices/consent-grant`：`active` 已含「文案过期」，记了却不有效、撤了却还有效都不算回答。
+  不往外报。建声音带名字（1–80 个字，按 Unicode code point 数，和 Sky Studio 的 `characterCount` 一样）/ ISO 639-1 语言 / 上传地址 / 幂等 key /
+  用了哪一段（`source`：`file_name`、`start_seconds`、`end_seconds`、`auto_selected`，认不出的键服务器不报错、只是记成空的）/ 授权：这一次的
+  `consent: true`（+ 文案版本）或长期的 `consent: "standing_grant"`；加录音不带幂等 key（重复回 409 `reference_exists`）。长期授权 `GET / POST / DELETE /voices/consent-grant`：`active` 已含「文案过期」，记了却不有效、撤了却还有效都不算回答。
 - **读稿整段报一次价**：`SkyStudioVoiceRequests.segmentQuote` 带 `params.batches`（不带 prompt）、`model` 是 `auto` 或点名；回答里的 `voice_plan`、
   `credits` / `credits_expected` / `settlement`、每批的价、`one_time` 读成 `SkyStudioQuote.voice`。**和钱有关的读得严**：顶层 `one_time` 的每一笔都要有价、
   每批的积分少一样或不像样，整份报价不算回答（不能悄悄丢掉一笔一次性费用）；带 `params.batches` 的报价要回 `voice_plan` 且批数对得上。备用要的那一笔
   （`voice_plan.fallback.one_time`，服务器给一项或 null、只说要建哪种语言、不带价）只是说明，读不出来当没有。**每批 `/jobs`**（`batch`）：这一批的字、
-  这一批报价的 `credits` 当 `max_credits`、每批一个幂等 key；`model: auto` 时 `params.plan` 原样带回 `voice_plan.selection`（中途换了备用就带
-  `fallback.selection`）；**点名的模型每批照样点名、不带 plan**：服务器只在 `auto` 时认 plan（读稿点名又带 plan 回 `invalid_plan`，克隆点名时 plan 不起作用），
-  点名的本来就整段一个模型、出错不自动换。
+  这一批报价的 `credits` 当 `max_credits`、每批一个幂等 key、`params.plan` 原样带回 `voice_plan.selection`（中途换了备用就带 `fallback.selection`）。
+  **点名的模型每批照样点名、也带 plan**，`plan.model` 必须就是点名的那个（服务器同样卡）：克隆靠它整段用同一段参考（不带的话服务器按每批自己的字挑参考），
+  读稿靠它定住声音；点名的出错不自动换。（PR 1 合进去时还是「点名不带 plan」：那时的服务器只在 `auto` 时认 plan，2026-11-10 Sky Studio 改成收它。）
 - **语言提示**（`SkyStudioVoiceLanguageHint`）：只看字母全是拉丁字母的那几句，用 `AITextLanguage` 判出来、而且不是英文才带 `params.language`
   （ISO 639-1）；带汉字 / 假名 / 谚文的句子交给服务器自己判，英文是服务器的默认。
 - **三种新活**：`voice_enroll`（建 MiniMax 版，模型从 `/models` 挑、要点名：记录上 `accepts_auto: false`）、`voice_design`（描述当 prompt，`params.name` / 可选的 `sample_text`）、
   `voice_convert`（`params.target_voice` = `voice_…` 或 `gemini:`、`params.source.seconds` 到毫秒只用来报价、可选的 `target_language`，传完才带
-  `inputs.source_audio_url`）。结果没有 `url`：`SkyStudioVoiceJobResult`（变声的人声 + 背景两个文件、建 / 设计回的声音和样音链接），
+  `inputs.source_audio_url`）。结果没有 `url`：`SkyStudioVoiceJobResult`（变声的人声 + 背景两个文件，背景不是 WAV 时另有 `background_content_type`；
+  建 / 设计回的声音、样音链接和它过期的时刻 `sample_expires_at`、`warnings` 如 `keep_alive_failed`），
   `SkyStudioJobRun` 把它也当「做完了」；读稿 / 克隆的结果照旧有 `url`，另带实际跑的 `model`、`fallback_used`、`voice_plan`（`SkyStudioVoiceOutcome`）。
 - **两个上传用途**：参考录音的 `voice_reference` 只写在 `VoiceReferenceSample.uploadPurpose`（[声音库](voice-library.md)）；变声素材的 `voice_convert_source`
   和两种共用的上限（十进制 35,000,000 字节）在 `SkyStudioVoiceUpload`；照旧经 `SkyStudioAPI.upload`。
@@ -324,10 +326,12 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
 一次性费用 377.6 / 751.4 / 22.5、Despina 的性别是 `unknown`、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码
 （`shared/voiceSelection.ts`）改的：点名的模型每批不带 plan、`fallback.one_time` 是一项或 null 且不带价。
 
-还没定、等 Sky Studio 的 `/quote` 和 `/voices` 路由写出来核对（快照只管 `/models`）：顶层 `one_time` 每一笔带 `credits`（方案 5.4 这么写；选择层的
-`VoiceOneTimeNeed` 只有 kind / model / language，路由要补上，不然 SkyCut 读不出这份报价）；`voice_plan.languages` 是 `[{language, share, seconds}]`、
-`batches[].characters` 这两个名字；`GET /voices` 回 `{voices, next_cursor}`，建 / 加录音 / 改名回 `{voice}`，`POST /voices/consent-grant` 回和 GET 一样的形状；
-加录音不带幂等 key。
+2026-11-10 对过 Sky Studio 的接口代码（`feat/voice-service` 工作区里还没提交的 `api/_utils/voice/quote.ts`、`library.ts`、`api/_utils/skycut/voiceJobs.ts` 等）：
+`voice_plan.languages` 是 `[{language, share, seconds}]`（另有 `estimated_seconds`）、`batches[]` 是 `{characters, credits, credits_expected}`；`/voices` 的列表
+`{voices, next_cursor}`（游标是上一页最后一个 `voice_…`）、取 / 建 / 加录音 / 改名回 `{voice}`、删回 `{deleted: true}`；长期授权 GET / POST 同一个形状、
+DELETE 多一个 `revoked: true`；`/me` 的 `skycut.max_running_audio_jobs`；429 的 `limit` / `running` / `pool`；顶层和备用、409、任务结束码的 `one_time`
+每项都带 `credits` / `why` / `then`（后三处是一项的数组或 null）—— 都和这里读的对上。不一样的三处已照它改（`fix/voice-contract-follow-server`）：
+`source` 的字段名、名字按 code point 数、点名的模型也带 plan；另补读了变声的 `background_content_type`、建 / 设计的 `warnings`、`sample_expires_at`。
 
 验证：`scripts/check-sky-studio.sh` 第 10 组（`VoiceCatalogChecks` 344 条对着快照、`VoiceLibraryChecks` 86 条、`VoicePlanChecks` 117 条、
 `VoiceJobChecks` 89 条，假协议不碰网络）。反向验证（2026-11-10，对着导出的快照，每项改完跑一遍、红了再原样恢复）：快照里 `zh_female_lively` 指向藏起来的
@@ -335,3 +339,6 @@ Despina → 1 条红；只给第一批带 `params.plan` → 3 条红；中文稿
 的结果 → 1 条红；读不出来的一次性费用悄悄丢掉 → 1 条红；`/quote` 不核对整段报价的批数 / voice_plan → 4 条红；`one_time_required` 不算未准入 → 2 条红；
 每批都拿整段的 credits 当 `max_credits` → 2 条红；只带一个 `model` 的结果也当声音的结果 → 1 条红；点名的模型每批也带 plan → 3 条红；其余语言的上限照手写时的
 `default` 读 → 3 条红；顶层一次性费用不带价也收 → 1 条红；`voice_enroll` 收 `auto` → 1 条红；声音的 DTO 报原始回答 → 2 条红。
+（「点名的模型每批也带 plan → 红」那一条随服务器改了方向。）对齐 Sky Studio 接口代码那次（2026-11-10）的反向验证：`source` 用回 `filename` / `start` / `end` →
+1 条红；名字按 UTF-16 数 → 2 条红；点名的模型不带 plan → 2 条红；点名时收别的模型的 plan → 2 条红；只给第一批带 plan → 5 条红；不读 `background_content_type` →
+1 条红；丢掉 `warnings` → 1 条红；丢掉 `sample_expires_at` → 1 条红；快照里 `zh_female_lively` 指向 Despina → 1 条红。

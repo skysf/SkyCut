@@ -3,7 +3,8 @@ import SrtFlowMCPKit
 
 // 手写了说明书主题的工具（MCP 按需说明方案 5.1：先把说明搬进主题、再写短名片；第一个是 add_voiceover，SkyCut 声音方案 4.10、9.1 第 10 项）：
 // - 名片 ≤ 450；参数说明 ≤ 120、有范围（minimum / maximum / 条数）的说明里写着那几个数（Codex 不显示范围，方案 2.5）；参数定义 ≤ 4,500 字节；
-// - 手写的每一节和名片里提到的名字都存在、只用英文；例子过参数核对；related 是真主题；fields 不手写（GuideChecks 查它接在最后）；
+//   fields 不手写（GuideChecks 查它接在最后）；有例子。名片和手写的几节里提到的名字都存在（GuideChecks 的 runGuideWordingChecks）、
+//   例子过参数核对 / related 是真主题 / 不含凭据（GuideContentChecks）、只用英文（GuideChecks）：和别的手写文字同一套，不在这里另写一份；
 // - add_voiceover 的名片带按性质必写的固定说法（方案 2.2 第 4 条）、去掉的 clone_from 不再出现；
 // - 会回 needs_confirmation 的工具都收 confirm_token（docs/bugfixes/2026-11-10-voiceover-confirm-token-refused.md：
 //   add_voiceover 读别处的恢复文件会问，却不收 confirm_token，点过头再调被参数核对挡掉）。
@@ -11,13 +12,12 @@ import SrtFlowMCPKit
 func runGuideWrittenChecks() {
     let written = MCPToolName.allCases.filter { MCPGuideTopics.written(for: $0) != nil }
     check(written.contains(.addVoiceover), "add_voiceover has a hand-written guide topic")
-    let known = catalogKnownNames()
-    for tool in written { writtenTopicChecks(tool, known: known) }
+    for tool in written { writtenTopicChecks(tool) }
     voiceoverCardChecks()
     confirmTokenChecks()
 }
 
-private func writtenTopicChecks(_ tool: MCPToolName, known: Set<String>) {
+private func writtenTopicChecks(_ tool: MCPToolName) {
     guard let written = MCPGuideTopics.written(for: tool) else { return }
     let definition = tool.definition
     let name = tool.rawValue
@@ -37,20 +37,7 @@ private func writtenTopicChecks(_ tool: MCPToolName, known: Set<String>) {
                   "\(name).\(path): the description spells out its \(key) \(number) (Codex hides schema ranges)")
         }
     }
-    let texts = [("the card", definition.description)] + written.sections.map { ("section \($0.name)", $0.text) }
-    for (what, text) in texts {
-        let unknown = catalogIdentifiers(in: text).filter { !known.contains($0) }.sorted()
-        check(unknown.isEmpty, "\(name) \(what) names only real tools, parameters and result fields (unknown: \(unknown.joined(separator: ", ")))")
-        check(!containsChinese(text), "\(name) \(what) is English only")
-    }
     check(!written.examples.isEmpty, "\(name): the topic has minimal examples")
-    for (index, example) in written.examples.enumerated() {
-        check(MCPArgumentCheck.problem(tool: tool, arguments: example) == nil, "\(name): example \(index) uses only real parameter names")
-        check(!containsChinese(example.encodedString()), "\(name): example \(index) is English only")
-    }
-    for related in written.related {
-        check(MCPGuideTopics.topic(named: related) != nil, "\(name): related \(related) is a guide topic")
-    }
 }
 
 /// 参数定义里的每个参数（里层对象、数组里的对象也走），路径同 MCPGuideFields 的写法。
@@ -76,6 +63,8 @@ private func voiceoverCardChecks() {
     check(properties["clone_from"] == nil && properties["clone_start"] == nil && properties["clone_seconds"] == nil,
           "clone_from, clone_start and clone_seconds are gone (clones go through the voice library)")
     check(properties["model"] != nil, "add_voiceover takes model")
+    check(guideMapText().contains("add_voiceover (Sky Studio voices; SkyCut and Mac voices are free)"),
+          "the guide map's paid line names add_voiceover's Sky Studio voices")
     let sections = MCPGuideTopics.topic(for: .addVoiceover).sections.map(\.name)
     checkEqual(sections, ["overview", "voices", "models", "paid", "subtitles", "recovery", "local_voices", "fields"],
                "the add_voiceover guide has its sections, fields last")

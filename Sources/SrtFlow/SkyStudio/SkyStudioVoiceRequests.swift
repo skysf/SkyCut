@@ -5,10 +5,10 @@ import SrtFlowMCPKit
 //
 // 管什么：拼 `/quote`、`/jobs` 的请求（SkyStudioJobRequest），名字照 Sky Studio 声音方案文末的「名字对照」：
 // - **读稿（`voice` 预设 / `voice_clone` 声音库）整段报一次价**：`params.batches` 代替 prompt（一批一个字符串），服务器按整段算
-//   语言占比、选一个模型，回 voice_plan（约定第 1 条）。**每一批 `/jobs`**：prompt 是这一批的字、`max_credits` 用这一批报价的 `credits`；
-//   `model: auto` 时 `params.plan` 原样带回 `voice_plan.selection`（中途换了备用就带 `voice_plan.fallback.selection`）。
-//   **点名的模型每批照样点名、不带 `params.plan`**：服务器只在 `auto` 时认 plan（读稿点名又带 plan 回 `invalid_plan`，克隆点名时 plan 不起作用），
-//   点名的本来就整段同一个模型、出错不自动换（Sky Studio `shared/voiceSelection.ts` 的 planVoiceNarration / planVoiceClone）。
+//   语言占比、选一个模型，回 voice_plan（约定第 1 条）。**每一批 `/jobs`**：prompt 是这一批的字、`max_credits` 用这一批报价的 `credits`、
+//   `params.plan` 原样带回 `voice_plan.selection`（中途换了备用就带 `voice_plan.fallback.selection`）。
+//   **点名的模型每批照样点名、也带 plan**，`plan.model` 必须就是点名的那个：克隆靠它整段用同一段参考（不然服务器按每批自己的字挑参考），
+//   读稿靠它定住声音；点名的出错不自动换（Sky Studio `shared/voiceSelection.ts` 的 planVoiceNarration / planVoiceClone）。
 // - 语言提示 `params.language`（SkyStudioVoiceLanguageHint）：只在拉丁字母的那些句子判得出、而且不是英文时才带；
 //   中文、日文、韩文服务器自己分得清，英文是服务器的默认，都不带（SkyCut 声音方案 4.2 第 2 步、13.2 第 4 条）。
 // - 建 MiniMax 版（`voice_enroll`）、设计声音（`voice_design`）、视频变声（`voice_convert`）：同一个请求先 `/quote`、再 `/jobs`。
@@ -94,28 +94,27 @@ enum SkyStudioVoiceRequests {
         return SkyStudioJobRequest(kind: kind, model: model, params: params)
     }
 
-    /// 整段报价之后交第 `index` 批（从 0 起）：这一批的字、这一批报价的 `credits` 当 `max_credits`；`kind`、`model`、`voice`、
-    /// 语言提示照整段报价的。`model: auto` 时带 `params.plan`（不给就用报价的 `voice_plan.selection`）；点名的模型不带 plan，
-    /// 也不许另给一个 plan（换模型就是另一次决定：重新报价）。
+    /// 整段报价之后交第 `index` 批（从 0 起）：这一批的字、`params.plan` 原样（不给就用报价的 `voice_plan.selection`）、这一批报价的
+    /// `credits` 当 `max_credits`；`kind`、`model`、`voice`、语言提示照整段报价的。点名的模型也带 plan（克隆靠它整段用同一段参考、
+    /// 读稿靠它定住声音），但 `plan.model` 必须就是点名的那个（服务器同样卡），换模型就是另一次决定：重新报价。
     static func batch(
         _ index: Int, of segment: SkyStudioJobRequest, quote: SkyStudioQuote, plan: [String: JSONValue]? = nil,
         idempotencyKey: String = UUID().uuidString.lowercased()
     ) throws -> SkyStudioJobRequest {
         guard SkyStudioVoiceKind.reading.contains(segment.kind), let texts = segment.params["batches"]?.arrayValue?.compactMap(\.stringValue),
               texts.indices.contains(index) else { throw problem("That batch is not part of the quoted segment.") }
-        guard let voice = quote.voice, voice.plan != nil, voice.batches.count == texts.count else {
+        guard let voice = quote.voice, voice.batches.count == texts.count else {
             throw problem("Sky Studio's quote does not list the same batches; quote the segment again.")
+        }
+        guard let selection = plan ?? voice.plan?.selection, let planModel = selection["model"]?.stringValue, !planModel.isEmpty else {
+            throw problem("Sky Studio's quote has no voice plan to reuse.")
+        }
+        guard segment.model == autoModel || planModel == segment.model else {
+            throw problem("A named model reads every batch itself; to use another model, quote the segment again.")
         }
         var params = segment.params
         params["batches"] = nil
-        if segment.model == autoModel {
-            guard let selection = plan ?? voice.plan?.selection, selection["model"]?.stringValue?.isEmpty == false else {
-                throw problem("Sky Studio's quote has no voice plan to reuse.")
-            }
-            params["plan"] = .object(selection)
-        } else if plan != nil {
-            throw problem("A named model reads every batch itself; to use another model, quote the segment again.")
-        }
+        params["plan"] = .object(selection)
         return SkyStudioJobRequest(kind: segment.kind, model: segment.model, prompt: texts[index], params: params,
                                    maxCredits: voice.batches[index].credits, idempotencyKey: idempotencyKey)
     }

@@ -158,6 +158,8 @@ final class SkyStudioVoiceoverRun {
                 extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             }
         }
+        // 结构化的原因（比如参考录音人声不够的 reason / voiced_seconds / missing_seconds）照样交给 get_job，不只留一句话。
+        if let tool = error as? AIToolError { extra.merge(tool.details) { current, _ in current } }
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }

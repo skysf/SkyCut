@@ -34,6 +34,15 @@ enum SkyStudioVoiceoverStart {
         case macVoice(String)
     }
 
+    /// 读到的 Key、目录、认出来的声音：报价那一步要的。
+    private struct Resolved {
+        let key: String
+        let catalog: SkyStudioCatalog
+        let voices: SkyStudioVoiceCatalog
+        let pick: SkyStudioVoicePick
+        let kind: String
+    }
+
     static func start(_ input: AIVoiceoverInput, project: VideoEditProject, services: SkyStudioVoiceServices? = nil) async throws -> Outcome {
         let services = services ?? SkyStudioVoiceServices()
         guard let ask = input.ask else { return .local(note: "", catalog: nil) }
@@ -66,15 +75,23 @@ enum SkyStudioVoiceoverStart {
             return .local(note: "Sky Studio gave no length limit for \(languageName(input.language)) narration, "
                 + "so a voice on this Mac read it.", catalog: voices)
         }
+        let resolved = Resolved(key: key, catalog: catalog, voices: voices, pick: pick, kind: kind)
+        return try await quoteAndStart(input, project: project, resolved: resolved, services: services)
+    }
+
+    /// 整段报价一次 → 核对 → 要转写的先确认转写得了 → 整体预留 → 起任务。从这里往后不再换声音；花钱之前任何一步不行都停下、一分不花。
+    private static func quoteAndStart(_ input: AIVoiceoverInput, project: VideoEditProject, resolved: Resolved,
+                                      services: SkyStudioVoiceServices) async throws -> Outcome {
+        let catalog = resolved.catalog
         let draft = try planned { try SkyStudioVoicePlan.draft(
-            lines: input.lines.map(\.text), kind: kind, voice: pick.voice, model: input.model ?? SkyStudioVoiceRequests.autoModel,
-            language: input.language, catalog: catalog) }
+            lines: input.lines.map(\.text), kind: resolved.kind, voice: resolved.pick.voice,
+            model: input.model ?? SkyStudioVoiceRequests.autoModel, language: input.language, catalog: catalog) }
         let quote: SkyStudioQuote
-        do { quote = try await services.api.quote(draft.segment, key: key) }
+        do { quote = try await services.api.quote(draft.segment, key: resolved.key) }
         catch is CancellationError { throw CancellationError() }
         catch let failure as SkyStudioFailure {
             if let refusal = refusal(failure) { throw AIToolError(refusal) }
-            return .local(note: unavailable(failure), catalog: voices)
+            return .local(note: unavailable(failure), catalog: resolved.voices)
         }
         let plan = try planned { try SkyStudioVoicePlan.quoted(draft, quote: quote) }
         guard project.isCurrentGeneration(input.generation), OpenProjects.shared.all.contains(where: { $0 === project }) else {
@@ -87,14 +104,14 @@ enum SkyStudioVoiceoverStart {
             catch { throw AIToolError(transcriptionMissing(plan, subtitles: input.subtitles, catalog: catalog, language: input.language)) }
         }
         var ready = input
-        ready.choice = AIVoiceChoice(engine: .skyStudio(voice: pick.voice), note: notes(pick, plan: plan, input: input))
+        ready.choice = AIVoiceChoice(engine: .skyStudio(voice: resolved.pick.voice), note: notes(resolved.pick, plan: plan, input: input))
         ready.ask = nil
         // 预留放在最后：从这里到交给任务之间不再有会失败的步骤，预留的积分不会落在半路（任务结束时没花出去的退回）。
         guard let budget = SkyStudioVoiceBudget.reserve(plan.batchCredits) else {
             return .result(SkyStudioJobGate.budgetBlocked(credits: plan.batchCredits.reduce(0, +), store: .shared))
         }
         let title = plan.voicePlan.model.flatMap { model in catalog.models.first { $0.id == model }?.title } ?? "Sky Studio"
-        let prepared = SkyStudioVoiceoverPrepared(plan: plan, quote: quote, budget: budget, key: key, locale: locale, modelTitle: title)
+        let prepared = SkyStudioVoiceoverPrepared(plan: plan, quote: quote, budget: budget, key: resolved.key, locale: locale, modelTitle: title)
         return .result(SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start())
     }
 

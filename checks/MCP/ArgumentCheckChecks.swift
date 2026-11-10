@@ -18,6 +18,9 @@ func runArgumentCheckChecks() {
     checkEqual(MCPArgumentCheck.problem(tool: .getJob, arguments: ["job_id": "export-1", "wait_seconds": 30, "project": "p1"]), nil,
                "project is accepted even by a tool that does not take it")
     // 只收 project 的工具，别的名字都不认，话里列出它收什么。
+    // 报错指到说明书（方案 3.3）：那个工具的主题里有每个字段的类型、可选的值和范围。
+    check((MCPArgumentCheck.problem(tool: .editClip, arguments: ["clip_id": "c1", "end": 2]) ?? "").hasSuffix("Fields: skycut_guide topic=edit_clip."),
+          "an unknown parameter points at the tool's guide topic")
     let timeline = MCPArgumentCheck.problem(tool: .getTimeline, arguments: ["verbose": true])
     check(timeline?.contains("Its parameters: project.") == true, "a tool that only takes project lists it: \(timeline ?? "nil")")
 

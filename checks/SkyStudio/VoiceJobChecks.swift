@@ -72,6 +72,13 @@ private func runVoiceResultChecks() {
     checkEqual(files.channels, 1, "mono")
     checkEqual(files.sourceDuration, 10.005, "the source's length")
     checkEqual(files.paddedSeconds, 0, "padded seconds")
+    checkEqual(files.backgroundContentType, nil, "a WAV background needs no separate type")
+    let flac = convertDone.replacingOccurrences(of: #""content_type": "audio/wav","#, with: #""content_type": "audio/wav", "background_content_type": "audio/flac","#)
+    check(flac != convertDone, "the FLAC-background sample really differs")
+    if case .conversion(let other)? = (try? JSONValue.decode(Data(flac.utf8))).flatMap(SkyStudioJobStatus.init(json:))?.voiceResult {
+        checkEqual(other.backgroundContentType, "audio/flac", "background_content_type: the background's own type when it is not WAV")
+        checkEqual(other.contentType, "audio/wav", "content_type stays the voice's type")
+    } else { check(false, "a conversion with a FLAC background reads") }
     check(files.expiresAt != nil, "60-day links carry an expiry")
     checkEqual(status.voiceOutcome?.model, "chatterbox-hd", "the model that actually ran")
     checkEqual(status.voiceOutcome?.fallbackUsed, false, "no fallback")
@@ -85,17 +92,23 @@ private func runVoiceResultChecks() {
         english["minimax"] = true; languages[1] = .object(english); object["languages"] = .array(languages); enrolled = .object(object)
     }
     let enrollStatus = (try? JSONValue.decode(Data(done("enroll-1", result: ["voice": enrolled]).utf8))).flatMap(SkyStudioJobStatus.init(json:))
-    if case .voice(let voice, let sample)? = enrollStatus?.voiceResult {
-        checkEqual(voice.language("en")?.minimax, true, "voice_enroll: English now has a MiniMax version")
-        checkEqual(sample, nil, "no sample for an enrolment")
+    if case .voice(let enrolment)? = enrollStatus?.voiceResult {
+        checkEqual(enrolment.voice.language("en")?.minimax, true, "voice_enroll: English now has a MiniMax version")
+        check(enrolment.sampleURL == nil && enrolment.sampleExpiresAt == nil && enrolment.warnings.isEmpty, "no sample, no warnings for a clean enrolment")
     } else { check(false, "a voice_enroll result reads as the updated voice") }
+    let keptAlive = done("enroll-2", result: ["voice": enrolled, "model": "minimax-voice-clone", "warnings": ["keep_alive_failed"]])
+    if case .voice(let enrolment)? = (try? JSONValue.decode(Data(keptAlive.utf8))).flatMap(SkyStudioJobStatus.init(json:))?.voiceResult {
+        checkEqual(enrolment.warnings, [SkyStudioVoiceLibraryResult.keepAliveFailed], "warnings come along (keep_alive_failed)")
+    } else { check(false, "an enrolment with warnings still reads") }
     let designed: JSONValue = ["voice": ["id": .string(sampleVoiceID), "name": "纪录片男声", "source": "design",
                                          "languages": [["language": "zh", "kind": "design_sample", "minimax": true]]],
-                               "sample_url": "https://r2.example/voices/u/v/sample-zh.mp3?sig=3"]
+                               "sample_url": "https://r2.example/voices/u/v/sample-zh.mp3?sig=3", "sample_expires_at": "2026-11-20T11:00:00.000Z",
+                               "model": "minimax-voice-design"]
     let designStatus = (try? JSONValue.decode(Data(done("design-1", result: designed).utf8))).flatMap(SkyStudioJobStatus.init(json:))
-    if case .voice(let voice, let sample)? = designStatus?.voiceResult {
-        checkEqual(voice.source, "design", "voice_design: a designed voice")
-        checkEqual(sample?.query, "sig=3", "with its temporary sample link")
+    if case .voice(let design)? = designStatus?.voiceResult {
+        checkEqual(design.voice.source, "design", "voice_design: a designed voice")
+        checkEqual(design.sampleURL?.query, "sig=3", "with its temporary sample link")
+        checkEqual(design.sampleExpiresAt, SkyStudioJSON.parseDate("2026-11-20T11:00:00Z"), "and when that link expires (sample_expires_at)")
     } else { check(false, "a voice_design result reads as the new voice") }
     let foreign = done("design-2", result: ["voice": ["id": "Voice123", "name": "x"]])
     check((try? JSONValue.decode(Data(foreign.utf8))).flatMap(SkyStudioJobStatus.init(json:))?.voiceResult == nil, "a voice whose id is not Sky Studio's is no result")

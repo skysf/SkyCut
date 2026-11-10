@@ -188,6 +188,13 @@ others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | 
   || fail "${EXPORT_TOOLS}：export_video 开始时（会带）和做完时（带了）都要按此刻授权告诉 AI 水印的事"
 [ "$(count 'result["skycut_plan"] = SkyCutGates.statusJSON(' "${STATUS_TOOLS}")" -eq 1 ] \
   || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它照常回，另外只有说明书 skycut_guide）"
+# 说明书不等授权问完：aiRefusal 里放行它的那一句要在等授权（settledLicense）之前（docs/bugfixes/2026-11-10-guide-waits-for-license.md）。
+REFUSAL_BODY="$(awk '/func aiRefusal\(for tool: MCPToolName\) async -> String\? \{/,/^    \}/' "${ACCOUNT}")"
+EARLY_AT="$(grep -nF 'if SkyCutGates.answeredBeforeLicenseCheck.contains(tool) { return nil }' <<<"${REFUSAL_BODY}" | cut -d: -f1 || true)"
+WAIT_AT="$(grep -nF 'await settledLicense(' <<<"${REFUSAL_BODY}" | cut -d: -f1 || true)"
+if [ -z "${EARLY_AT}" ] || [ -z "${WAIT_AT}" ] || [ "${EARLY_AT}" -gt "${WAIT_AT}" ]; then
+  fail "${ACCOUNT}：aiRefusal 要在等授权（第 ${WAIT_AT:-?} 行）之前放行 answeredBeforeLicenseCheck 里的工具（现在：${EARLY_AT:-没有}），不然说明书要等钥匙串和 /me"
+fi
 
 # 6. 交任务、取消任务只经 SkyStudioJobRun。
 RUN="Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift"
@@ -398,7 +405,7 @@ grep -qF 'switch try await SkyStudioVoiceoverStart.start(input, project: project
 grep -qF 'SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start()' "${VOICE_START}" \
   || fail "整段报价、预留之后没有起任务"
 # 报价在预留之前、预留在起任务之前（中间不再有会失败的步骤，预留不会落在半路）。
-QUOTE_AT="$(line_of 'quote = try await services.api.quote(draft.segment, key: key)' "${VOICE_START}")"
+QUOTE_AT="$(line_of 'quote = try await services.api.quote(draft.segment, key: resolved.key)' "${VOICE_START}")"
 RESERVE_AT="$(line_of 'guard let budget = SkyStudioVoiceBudget.reserve(plan.batchCredits) else {' "${VOICE_START}")"
 RUN_AT="$(line_of 'SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start()' "${VOICE_START}")"
 if [ -z "${QUOTE_AT}" ] || [ -z "${RESERVE_AT}" ] || [ -z "${RUN_AT}" ] || [ "${QUOTE_AT}" -ge "${RESERVE_AT}" ] || [ "${RESERVE_AT}" -ge "${RUN_AT}" ]; then

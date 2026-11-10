@@ -20,11 +20,19 @@ struct AIToolError: Error {
     }
 
     /// 保留旧错误的纯文字合同；新校验 / 素材状态错误用结构化 payload，MCP 客户端可直接据此改参数或重试。
-    var result: JSONValue {
-        guard !details.isEmpty else { return MCPBridge.textResult(message, isError: true) }
+    var result: JSONValue { result(guide: nil) }
+
+    /// 回给 AI 的报错指到那个工具的说明书（方案 3.3：只在路由 catch AIToolError 那一处传 `guide`，约 430 处抛出的地方一个都不改）。
+    /// 纯文字的接在句末，结构化的多一个 `guide` 字段。
+    func result(guide tool: MCPToolName?) -> JSONValue {
+        let pointer = tool.map { "skycut_guide topic=\($0.rawValue)" }
+        guard !details.isEmpty else {
+            return MCPBridge.textResult(pointer.map { message + " Guide: " + $0 + "." } ?? message, isError: true)
+        }
         var payload = details
         payload["error"] = .string(message)
         payload["changed"] = false
+        if let pointer { payload["guide"] = .string(pointer) }
         return MCPBridge.textResult(JSONValue.object(payload).encodedString(), isError: true)
     }
 }

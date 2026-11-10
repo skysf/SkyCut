@@ -43,7 +43,7 @@ final class SkyStudioVoiceCloudBatches {
         let selection = plan.voicePlan.selection
         let segment = try SkyStudioVoiceRequests.segmentQuote(
             kind: plan.kind, model: plan.model, voice: plan.voice, batches: indices.map { plan.batches[$0].speech.prompt },
-            lines: recovery.value.input.lines.map(\.text), plan: plan.model == SkyStudioVoiceRequests.autoModel ? selection : nil)
+            lines: recovery.value.input.lines.map(\.text), plan: selection)
         let quote = try await api.quote(segment, key: key)
         guard let voice = quote.voice, voice.batches.count == indices.count, voice.oneTime.isEmpty else {
             throw AIToolError("Sky Studio's new quote does not cover the missing batches; nothing was generated. Try again later.")
