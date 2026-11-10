@@ -11,16 +11,20 @@ TOP_LEVEL = ("voice_presets", "voice_roles", "voice_rules", "voice_consent")
 
 
 def models(max_characters=None):
-    """快照里全部声音模型（读稿、建 MiniMax 版、设计、变声）。`max_characters`：并发冒烟把读稿每批的字数上限压小，
-    几句短句就分成几批（App 照 /models 的上限分批、缓存 10 分钟，所以只能在起服务时给）。"""
-    voices = [copy.deepcopy(model) for model in CATALOG["models"] if model["kind"].startswith("voice")]
+    """`/models` 里的声音模型：读稿的几个 + 声音库一次性费用的那几个（library_models）。`max_characters`：并发冒烟把读稿每批的
+    字数上限压小，几句短句就分成几批（App 照 /models 的上限分批、缓存 10 分钟，所以只能在起服务时给）。"""
+    reading = [copy.deepcopy(model) for model in CATALOG["models"] if model["kind"] in READING]
     if max_characters:
-        for model in voices:
+        for model in reading:
             limits = (model.get("limits") or {}).get("max_characters_by_language")
-            if model["kind"] in READING and limits:
-                for language in limits:
-                    limits[language] = max_characters
-    return voices
+            for language in limits or {}:
+                limits[language] = max_characters
+    return reading + library_models()
+
+
+def library_models():
+    """声音库的一次性费用那几个模型（设计、建 MiniMax 版）：打开全部权限时那段说明的价目从它们读（声音 PR 7）。"""
+    return [model for model in CATALOG["models"] if model["kind"] in ("voice_design", "voice_enroll")]
 
 
 def top_level():

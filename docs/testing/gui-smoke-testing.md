@@ -442,22 +442,28 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    （`voice_fixtures.py` 读 `checks/SkyStudio/Fixtures/models-voice-*.json`）。
 3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度时配旁白在回任务号之前就停（`daily_budget_exceeded`、
    不换本机声音），没有 `/jobs` 与花费。
-3a. **声音库**（声音 PR 6，方案 9.2）：重新 `run.sh` 后 `python3 scripts/gui-smoke/sky-studio/voice_library.py`。假服务的 `/voices`、设计、建 MiniMax 版、
-   用声音库的声音读稿的报价在 `voice_library_fixtures.py`（核对传上来的参考录音是 44.1 kHz 单声道 16-bit WAV）。请求批准、全部权限各走一遍：列声音、
-   用录音新建（授权问句、换了名字的令牌不收、人声不够在传之前就拒）、加一种语言（已有的那种回 `reference_exists`）、改名、删除（问 / 不问、存储一时
-   不可用再发一次）、`voice=voice_…` 读稿（问一次性费用 → `skip_one_time` 照 IndexTTS2 读、一步撤销 → 点头建 MiniMax 版再读）、设计、每日硬预算挡
-   一次性费用、声音库用不了（预设照回，写操作和 `voice_…` 读稿报错、不退本机）、`manage_voices` 不登记撤销。全部权限下建声音的授权这一刀照样问；
-   假服务记着有效的长期授权时（`/voices/consent-grant`，声音 PR 7）脚本改成核对「不问、带 `standing_grant`」。
+3a. **声音库**（声音 PR 6、7，方案 9.2）：重新 `run.sh` 后 `python3 scripts/gui-smoke/sky-studio/voice_library.py`。假服务的 `/voices`、设计、建 MiniMax 版、
+   用声音库的声音读稿的报价在 `voice_library_fixtures.py`（核对传上来的参考录音是 44.1 kHz 单声道 16-bit WAV；`standing_grant` 照 server.py 按账号记的长期授权认）。
+   请求批准模式：列声音、用录音新建（授权问句、换了名字的令牌不收、人声不够在传之前就拒）、加一种语言（问句写声音的名字；已经有的那种在问之前、传之前就拒）、
+   改名、删除（先问、存储一时不可用再发一次）、`voice=voice_…` 读稿（问一次性费用 → `skip_one_time` 照 IndexTTS2 读、一步撤销 → 点头建 MiniMax 版再读）、
+   设计、每日硬预算挡一次性费用、`manage_voices` 不登记撤销。全部权限（`set_settings` 点头后记上长期授权）：建声音带 `standing_grant`、建 MiniMax 版和
+   设计都不问、结果带 `full_access`，删除不问。最后声音库用不了（预设照回，写操作和 `voice_…` 读稿报错、不退本机）。
 3b. **几批同时交、中途换备用**（声音 PR 4–6）：`SKYSTUDIO_SMOKE_CONTROL='{"me_audio_jobs": 2, "me_running_jobs": 1, "voice_max_characters": 80}'` 起
    `run.sh`，再跑 `voice_concurrency.py` 和 `voice_fallback.py`（两句一批）。假服务的 `hold_kinds` + `POST /__release`（按种类、按先后放行）一步步放批，
    `pool_full` 让某个池回一次 429，`voice_job_outcomes` 让第几批「中途换了备用」/「备用要先建 MiniMax 版」；`GET /__jobs`、`/__voices` 给脚本核对。
    前者看声音池 2 个在飞、共用池不被挡、`get_job` 的 `batches_done / batch_count`、中途停（排队的退钱、开始了的照实说、没交的不交）、普通恢复不花钱、
    `generate_missing` 只补没做的（429 用同一个 key 再交）、一次落地一步撤销；后者看 `line_models` 和 `fallback_needs_one_time` 的问价 / 建 / 补。
    界面上任务浮层那一行（「n/5 batches · x running · y waiting」）进程内驱动打不开，要人看。
-   **机器满载时别跑**：测试 App 在后台被 App Nap 降到优先级 4，load 20 以上时本机转写、本机 Kokoro 会慢到超时（[报告](../reports/2026-11-10-voice-free-smoke.md)）。
+   **机器满载时别跑**：测试 App 在后台被 App Nap 降到优先级 4，load 20 以上时本机转写、本机 Kokoro 会慢到超时（[报告](../reports/2026-11-10-voice-free-smoke.md)；AI 的调用和任务进行期间不降速的修复在另一个 PR，合进来之后这条只剩工具调用之间的空档）。
 4. 工程任务卡片：重新 `run.sh` 后运行 `python3 scripts/gui-smoke/sky-studio/project_tasks.py`，留下两个可见工程、一个后台工程与一个已关工程的问题，核对视频 / 音频 / 图片、5 项排队、225 积分、真实 `get_job` 任务号、另一 MCP 会话只读查询及后台开窗。随后按 [任务浮层人工回归](../architecture/sky-studio-jobs.md)第九节点卡片 / 详情 / 打开按钮；夹具会留下窗口，不能把后端开窗通过当作按钮已点通。
 5. 统一设置：`python3 scripts/gui-smoke/sky-studio/settings.py` 验工具发现、五类快照、目录与实际 Store 的选项一致、整次拒绝错误参数、偏好持久化、工程 / 任务不变与密钥不回传。它留中文界面、10 GB 缓存上限、751 积分额度供 GUI 核对；清空只删本轮测试缓存，不更改客户端配置。随后实点三个设置入口与五个分类，并在额度页打开时再次用 MCP 改额度、切走切回，确认双向同步（[工作台回归清单](../architecture/workbench-and-settings.md)）。
-6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
+6. 全部权限下的长期授权（声音 PR 7）：`python3 scripts/gui-smoke/sky-studio/voice_consent.py` 验 `set_settings` 打开全部权限先问（问句带三样一次性费用、
+   额度和长期授权那句、版本）、没点头不记，点头后 `POST /voices/consent-grant` 正好一次（带问句里那一版）、结果报 `recorded`，关掉也先问、点头后 `DELETE` 一次、
+   报 `revoked`。再 `SRTFLOW_SMOKE_ACCESS_MODE=full_access scripts/gui-smoke/sky-studio/run.sh` 重起（模拟升级前就开着全部权限）后运行
+   `python3 scripts/gui-smoke/sky-studio/voice_consent.py migrated`：App 读到假 Key 时自己记上一次、`get_settings` 报 `recorded`，不问。假服务的
+   `/voices/consent-grant` 按账号记、`/models` 带声音库那几个模型的价。设置窗口里那张说明（选全部权限先弹、取消不改、三种语言）是人工回归，
+   清单在 [声音库](../architecture/voice-library.md)第八节。
+7. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 清理器本身的自动检查必须同时隔离进程、钥匙串、偏好与文件删除。`SKYSTUDIO_SMOKE_DIR` 不会改变
 App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在运行的 `.skystudiosmoke` socket / provider 文件。

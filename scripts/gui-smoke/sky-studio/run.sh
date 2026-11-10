@@ -90,6 +90,8 @@ else:
     raise SystemExit("Loopback fixture server did not become ready")
 READY
 defaults write "$BUNDLE" appLanguage "${SRTFLOW_SMOKE_LANGUAGE:-en}"
+# 升级前就开着全部权限（声音 PR 7）：起之前把权限模式写好，App 读到假 Key 时应当自己记上长期授权（voice_consent.py migrated）。
+if [ -n "${SRTFLOW_SMOKE_ACCESS_MODE:-}" ]; then defaults write "$BUNDLE" SrtFlow.ai.accessMode.v1 "${SRTFLOW_SMOKE_ACCESS_MODE}"; fi
 if [ -n "${1:-}" ]; then defaults write "$BUNDLE" SrtFlow.skystudio.dailyCreditLimit -float "$1"; fi
 open -g -n --env "SRTFLOW_SKYSTUDIO_API_BASE=http://127.0.0.1:$PORT/api/skycut/v1" \
   --env "SRTFLOW_SMOKE_CACHE_DIR=$D/optimized-media" \

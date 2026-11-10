@@ -1,17 +1,17 @@
-"""假 Sky Studio 的声音库（SkyCut 声音 PR 6）：`/voices` 的增删改查和长期授权、设计 / 建 MiniMax 版的报价和成品、
+"""假 Sky Studio 的声音库（SkyCut 声音 PR 6）：`/voices` 的增删改查、设计 / 建 MiniMax 版的报价和成品、
 用声音库的声音读稿时的整段报价（这种语言的 MiniMax 版还没建：`default_needs_one_time` + `one_time`）。
 合同照 Sky Studio 仓库 docs/agents/skycut-api.md「Voice library」，形状和 SkyCut 的 checks/VoiceRecovery/LibraryFixture.swift 一致。
-只在本机回环上答；不存任何服务商 id，录音只按 SkyCut 传上来的 WAV 头核对规格。所有函数都在 server.py 的 LOCK 里调。"""
+只在本机回环上答；不存任何服务商 id，录音只按 SkyCut 传上来的 WAV 头核对规格。所有函数都在 server.py 的 LOCK 里调。
+长期授权（`/voices/consent-grant`，声音 PR 7）按账号记在 server.py 的 GRANTS，建声音时把这个账号的那一条传进来（`grant`）。"""
 import datetime
 import uuid
 import wave
 
-STANDING_VERSION = "voice-standing-consent-v1"
 RECORDING_VERSION = "voice-consent-v1"
 ENROLL_CREDITS = 375.0
 DESIGN_CREDITS = {"qwen3-voice-design": 22.5, "minimax-voice-design": 750.0}
 CLONE_BATCH_CREDITS = 1.5
-STATE = {"voices": {}, "keys": {}, "hidden": set(), "grant": None, "reference_files": {}}
+STATE = {"voices": {}, "keys": {}, "hidden": set(), "reference_files": {}}
 
 
 def stamp(seconds=0):
@@ -40,10 +40,9 @@ def reference_spec(root, url):
         return None
 
 
-def handle(method, rest, body, control, root, base):
-    """`rest`：`/voices` 后面那一截（空、`/<id>`、`/<id>/references`、`/consent-grant`）。回 (状态码, JSON)。"""
-    if rest == "/consent-grant":
-        return consent(method, body)
+def handle(method, rest, body, control, root, base, grant=None):
+    """`rest`：`/voices` 后面那一截（空、`/<id>`、`/<id>/references`；长期授权那一条在 server.py）。`grant`：这个账号的长期授权。
+    回 (状态码, JSON)。"""
     if control.get("library_unavailable"):
         return error(503, "voice_library_unavailable", reason="not_configured", retryable=False)
     voices = STATE["voices"]
@@ -52,7 +51,7 @@ def handle(method, rest, body, control, root, base):
             listed = [public(v, base) for k, v in sorted(voices.items()) if k not in STATE["hidden"]]
             return 200, {"voices": listed, "next_cursor": None}
         if method == "POST":
-            return create(body, control, root, base)
+            return create(body, control, root, base, grant)
         return error(405, "method_not_allowed")
     parts = [p for p in rest.split("/") if p]
     voice_id = parts[0]
@@ -60,7 +59,7 @@ def handle(method, rest, body, control, root, base):
     if voice is None:
         return error(404, "not_found")
     if len(parts) == 2 and parts[1] == "references" and method == "POST":
-        return add_reference(voice, body, root, base)
+        return add_reference(voice, body, root, base, grant)
     if len(parts) != 1:
         return error(404, "not_found")
     if method == "DELETE":
@@ -84,22 +83,21 @@ def handle(method, rest, body, control, root, base):
     return error(405, "method_not_allowed")
 
 
-def consent_ok(body):
-    """`consent: true`（这一次点过头）或 `"standing_grant"`（要有有效的长期授权）。"""
+def consent_ok(body, grant):
+    """`consent: true`（这一次点过头）或 `"standing_grant"`（这个账号要有有效的长期授权）。"""
     given = body.get("consent")
     if given is True:
         return body.get("consent_statement_version", RECORDING_VERSION) == RECORDING_VERSION, "consent_outdated"
     if given == "standing_grant":
-        grant = STATE["grant"]
-        return bool(grant and grant["active"]), "no_standing_grant"
+        return bool(grant and grant.get("active")), "no_standing_grant"
     return False, "consent_required"
 
 
-def create(body, control, root, base):
+def create(body, control, root, base, grant):
     key = body.get("idempotency_key")
     if key and key in STATE["keys"] and STATE["keys"][key] in STATE["voices"]:
         return 200, {"voice": public(STATE["voices"][STATE["keys"][key]], base)}
-    ok, code = consent_ok(body)
+    ok, code = consent_ok(body, grant)
     if not ok:
         return error(403 if code == "no_standing_grant" else 400, code)
     if len(STATE["voices"]) >= control.get("voice_limit", 50):
@@ -119,8 +117,8 @@ def create(body, control, root, base):
     return 200, {"voice": public(STATE["voices"][voice_id], base)}
 
 
-def add_reference(voice, body, root, base):
-    ok, code = consent_ok(body)
+def add_reference(voice, body, root, base, grant):
+    ok, code = consent_ok(body, grant)
     if not ok:
         return error(403 if code == "no_standing_grant" else 400, code)
     language = body.get("language")
@@ -133,18 +131,6 @@ def add_reference(voice, body, root, base):
     voice["updated_at"] = stamp()
     STATE["reference_files"].setdefault(voice["id"], []).append(body.get("reference_url"))
     return 200, {"voice": public(voice, base)}
-
-
-def consent(method, body):
-    if method == "POST":
-        version = body.get("statement_version")
-        if version != STANDING_VERSION:
-            return error(400, "consent_outdated")
-        if not (STATE["grant"] and STATE["grant"]["active"]):
-            STATE["grant"] = {"statement_version": version, "granted_at": stamp(), "active": True}
-    elif method == "DELETE":
-        STATE["grant"] = None
-    return 200, {"grant": STATE["grant"], "current_statement_version": STANDING_VERSION}
 
 
 def enroll_item(voice, entry):
@@ -242,7 +228,7 @@ def finish(job, base, billing):
 
 
 def snapshot():
-    """测试脚本核对用（`GET /__voices`）：声音库里此刻有什么、长期授权、每个声音传过哪几段录音。"""
-    return {"voices": sorted(STATE["voices"]), "hidden": sorted(STATE["hidden"]), "grant": STATE["grant"],
+    """测试脚本核对用（`GET /__voices`，server.py 再并上测试账号的长期授权）：声音库里此刻有什么、每个声音传过哪几段录音。"""
+    return {"voices": sorted(STATE["voices"]), "hidden": sorted(STATE["hidden"]),
             "minimax": {k: [e["language"] for e in v["languages"] if e["minimax"]] for k, v in STATE["voices"].items()},
             "reference_files": STATE["reference_files"]}

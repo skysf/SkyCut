@@ -85,6 +85,8 @@
    可 `completed_line_indices`、`pending_recovery_line_indices`、`not_generated_line_indices` 都没有那两句；按句子读的 AI 会以为它们不存在。
 6. 旧账（不是声音）：`media.py`、`model_expansion.py` 从 2026-11-01 起在请求批准模式下红（见上表）。
 
+后续（2026-11-11）：第 2、3 条由声音 PR 7（#370）修好（加语言之前先看这个声音、问句写名字），`voice_library.py` 跟着改成核对新行为；第 1、4、5 条的修复在 #371（AI 的调用和任务进行期间持活动断言；停下几批逐批说清；`unknown_line_indices`）。
+
 另外：测试身份的主线程卡顿日志写进和正式版共用的 `~/Library/Logs/SrtFlow/main-thread-stalls.log`，本机 Kokoro 读的也是共用的
 `~/Library/Application Support/SrtFlow/Voices/`（只读）。和以前一样，这一轮没有改。
 

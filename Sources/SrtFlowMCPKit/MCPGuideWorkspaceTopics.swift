@@ -123,7 +123,9 @@ enum MCPGuideWorkspaceTopics {
             MCPGuideSection(name: "approval", about: "what always needs the user's agreement and confirm_token", text: """
             Approval. Change only what the user asked for. Any ai_access_mode change always needs the user's explicit agreement \
             and confirm_token, even in full_access; so does raising daily_ai_credit_limit. Ask in the conversation language, \
-            using the localized names from get_settings section=ai.
+            using the localized names from get_settings section=ai. Turning full_access on: the question also lists the \
+            one-time voice fees and the standing voice consent it records; turning it off revokes that consent (the result's \
+            voice_standing_consent says which).
             """),
             MCPGuideSection(name: "behaviour", about: "validation, omitted fields and what it never touches", text: """
             Behaviour. Omitted or null fields stay unchanged, and everything is validated before anything is applied. It never \

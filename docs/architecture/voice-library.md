@@ -3,8 +3,8 @@
 > 2026-11-10 起生效（SkyCut 声音 PR 2 `feat/voice-reference-sample`）。方案：[SkyCut 声音方案](../plans/2026-11-09-voice-features.md)
 > 第六节、9.1 第 3 条；拍板在仓库外的 `SkyVoiceForClone/决定汇总-2026-11-09.md` 第三节第 3 条、第七节第 2 条；服务器那边怎么查录音见
 > Sky Studio 那份方案（在 Sky Studio 仓库）3.3、3.4。这里只放长期约束。
-> 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），在第八节；设置里的声音库、
-> 声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；全部权限下的长期授权（PR 7）、变声（`change_voice`，PR 9）
+> 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），全部权限下的长期授权是声音 PR 7
+> （2026-11-10），都在第八节；设置里的声音库、声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；变声（`change_voice`，PR 9）
 > 做到时补进这份文档。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md) 第五节（云端旁白 / 克隆）、[阻塞的媒体读取](blocking-media-reads.md)、[写代码的规范](coding-standards.md)。
 > 案例：[克隆的参考录音被降到 16 kHz、默认只截 10 秒](../bugfixes/2026-11-10-voice-reference-16khz-short-sample.md)。
@@ -118,7 +118,7 @@
 - [ ] SkyCut 算出刚好 10 秒多一点有效人声的样本，服务器不回 `too_little_speech`（两边口径一致）。
 - [ ] 一段 3 分钟以上、背景有一点噪声（比 −45 dBFS 响）的录音：噪声也会被当成「有声」，挑段只按响度——确认界面的提示（一个人说、没有背景音乐）写到了。
 
-## 八、声音库的工具（`list_voices` / `manage_voices`，声音 PR 6）
+## 八、声音库的工具（`list_voices` / `manage_voices`，声音 PR 6）和全部权限下的长期授权（声音 PR 7）
 
 > 方案 4.5、4.6、9.1 第 8、9、12 项；AI 那一面的规矩在 [AI 接口](ai-control-mcp.md)第四节第 58 条（第 6 条：两种权限模式），用声音库的声音配旁白在
 > 第 40 条和 [Sky Studio 的任务](sky-studio-jobs.md)第五节。接口合同在 Sky Studio 仓库 `docs/agents/skycut-api.md`「Voice library」。
@@ -131,34 +131,61 @@
    **问授权**（`SkyStudioJobGate.voiceConsent`，问句带 `/models` 的 `voice_consent.per_recording` 英文原文和版本，AI 照会话语言转述）→ 点过头才传
    `voice_reference`、`POST /voices`（`consent: true` + 版本、`source` 写用了哪一段、`idempotency_key` 从令牌绑的身份算）或 `POST /voices/{id}/references`。
    令牌绑**完整身份**（`SkyStudioVoiceApproval.Recording`）：文件路径、大小、修改时间、做好的那段 WAV 的 SHA-256、用的那一段、语言、名字 / 声音、版本，外加账户戳；
-   换任何一样另发一张。AI 这一路的 `consent: true` 只在这个文件、点过头之后造（`checks/sky-studio-wiring.sh` 第 11 节；另一处是对话框里用户自己勾了那一句之后，
-   第九节）。录音的语言 AI 这一路要它给；界面上的对话框用本机检测预选（第九节第 4 条）。身份和「传、建 / 加」那一步在 `SkyStudioVoiceRecordingSubmission`，两个入口共用。
+   换任何一样另发一张。全部权限 + 有效的长期授权不问，带 `consent: "standing_grant"`（第 7 条）。**加一种语言**（`add_reference`）读到 Key 先 `GET /voices/{id}`：
+   已经有这种语言就当场说（`SkyStudioVoiceLibraryErrors.referenceExists`，和服务器的 409 同一句）、什么都不问不传；问句写声音的**名字**，令牌照旧绑 id
+   （[案例](../bugfixes/2026-11-10-add-reference-asks-before-reading-the-voice.md)）。AI 这一路的 `consent: true` 和 `"standing_grant"` 只在这个文件、
+   `voiceConsent` 放行之后造（`checks/sky-studio-wiring/voice-library.sh`；`consent: true` 另一处是对话框里用户自己勾了那一句之后，第九节）。
+   录音的语言 AI 这一路要它给；界面上的对话框用本机检测预选（第九节第 4 条）。身份和「传、建 / 加」那一步在 `SkyStudioVoiceRecordingSubmission`，两个入口共用。
 4. **设计**（`SkyStudioVoiceDesignTool`）：先 `/quote`（`voice_design`、`model: auto`，描述的语言决定 MiniMax / Qwen3，SkyCut 不挑），再问一次性费用
    （`SkyStudioJobGate.voiceOneTime`：先判每日硬预算，问句「约多少（最多多少）」），点过头记账、起任务（`SkyStudioVoiceLibraryJob`：`get_job` 报新声音、
    1 小时的 `sample_url`、实收；账按服务器的结算证据改，没花出去的退回）。价格一律从报价来，名片和说明书不写数。
 5. **建 MiniMax 版**（配旁白碰上 `default_needs_one_time`，`SkyStudioVoiceOneTimeStep`）：问、`skip_one_time` 照不花钱的那个读、点头起 `voice_enroll` 任务、
-   做完再调一次 `add_voiceover`（见 [AI 接口](ai-control-mcp.md)第 40 条）。旁白中途某一批的备用要先建（任务结束码 `fallback_needs_one_time`，
+   做完再调一次 `add_voiceover`（见 [AI 接口](ai-control-mcp.md)第 40 条）；全部权限 + 长期授权不问、直接起（第 7 条）。旁白中途某一批的备用要先建（任务结束码 `fallback_needs_one_time`，
    `SkyStudioVoiceFallbackFee`）：get_job 带问句、价和令牌，`resume` + 令牌建、做完 `resume` + `generate_missing=true`，`resume` + `skip_one_time=true`
-   照原来的模型重试（[Sky Studio 的任务](sky-studio-jobs.md)第五节）。
+   照原来的模型重试（[Sky Studio 的任务](sky-studio-jobs.md)第五节）；全部权限 + 长期授权直接建（get_job 带 `enroll_job_id`）。
 6. **删除**：请求批准模式问一句（问句写名字；正在删的声音 GET 不到，写 id）、全部权限直接删；存储一时不可用（503 `voice_library_unavailable` +
    `reason: storage_unavailable`）再发一次，还不行就说「已经看不见了，再调一次 delete 接着删」。
-7. **两种权限模式**：这一刀授权和一次性费用**两种模式都问**（方案 4.5 末条：没有有效的长期授权就照请求批准模式问；长期授权和打开全部权限时的价目说明是声音 PR 7），
-   删除按模式；每日硬预算两种模式都拦。问用户只经 `SkyStudioJobGate`（不另开确认入口，扫描钉着）。
+7. **两种权限模式**（声音 PR 7 起，方案 4.5）：照 `SkyStudioVoiceStanding.voiceAsk`（`SkyStudioJobGate.VoiceAsk` 三种）——
+   - 请求批准模式（`.ask`）：授权、一次性费用、删除都问；
+   - 全部权限 + 这个账号有有效的长期授权（`GET /voices/consent-grant` 说 `active`，`.standing`）：**不问**。建声音带 `consent: "standing_grant"`，设计、
+     建 MiniMax 版（配旁白开头和旁白中途的那一笔）直接做，删声音直接删；结果带 `full_access`（做了什么、最多花多少，AI 照转告），工程的提示条也说一句；
+   - 全部权限、还没有有效的长期授权（读不到、没记过、别的 Mac 关了全部权限撤了、文案升了版本，`.once`）：用录音建声音、设计、建 MiniMax 版**第一次照请求批准
+     模式问一次**，问句后面接打开全部权限时那段说明（`SkyStudioVoiceStandingNotice.missingText`：价目、额度、长期授权那句），令牌另绑那一版（请求批准模式发的码
+     答不了它）；点过头先记长期授权（`POST`，记不上不挡这一次），这一段录音照问过的带 `consent: true`；以后不再问。删声音不花钱、不要授权，照全部权限直接删；
+   - 带 `standing_grant` 被 Sky Studio 拒（`no_standing_grant` / `consent_outdated`：GET 之后刚被撤）：照 `.once` 问一次。
+   每日硬预算两种模式都拦（一次性费用先判预算）。问用户只经 `SkyStudioJobGate`（不另开确认入口，扫描钉着）。
 8. **声音库用不了**（503 `voice_library_unavailable`，`reason: not_configured`：Sky Studio 的私有声音桶没配）：`list_voices` 照回预设、`mine` 写一句；
    `manage_voices` 各个动作、`add_voiceover voice=voice_…` 都报「暂时用不了、一分没花、稍后再试、预设照常」，**不退本机**（`SkyStudioVoiceLibraryErrors`）。
+9. **长期授权怎么记、怎么撤**（`SkyStudioVoiceStanding`，方案 5.6；`/voices/consent-grant` 只经它，扫描钉着）：
+   - 设置里选「全部权限」先弹说明（`FullAccessConsentSheet`：不再先问的几件事、一次性费用价目从 `/models` 的 `minimax-voice-design` / `qwen3-voice-design` /
+     `minimax-voice-clone` 读 —— 按次收的写「约 `typical_credits`」，按字数收的（`price.per == "1000_characters"`，Sky Studio #247 起的 Qwen3 设计）写
+     「描述加试读句每开始 1,000 字 `credits`」，读不到写「以报价为准」；实际多少照旧只问 `/quote` —— 每日额度、打开即确认的那句 —— SkyCut 认识的版本显示译文，不认识的显示服务器的英文原文），
+     按「同意并打开」才写 Store、`POST` 用户看到的那一版；「取消」什么都不改；每次切到全部权限都弹。记不上（没 Key、没连上、Sky Studio 不收）照样打开，设置里写一行
+     「还没记上，第一次会问一次」。切回请求批准立刻写 Store、`DELETE`。
+   - `set_settings ai_access_mode=full_access`：照旧永远先回确认码（`AISettingsApproval`），问句后面接 `SkyStudioVoiceStandingNotice.turnOnText`，令牌另绑
+     那一句的版本；点过头写 Store、`POST`，结果报 `voice_standing_consent`（`recorded` / `not_recorded` + 原因）；关掉 `DELETE`、报 `revoked`。
+   - **升级前就开着全部权限**：新版第一次读到 Key（启动时静默读到、或存下新 Key）时 `migrateIfNeeded` 替用户记上、不问（用户 2026-11-09 定）；这台 Mac 上只做一次
+     （`SrtFlow.skystudio.voiceStandingConsentMigrated.v1`），开着的是请求批准就记成做过、什么都不发；已经有有效的不再记；记不上下次读到 Key 再试。
+   - 换了 Key：设置里那一行的状态清掉（账号不同，Sky Studio 那边各记各的）。
 
 | 检查 | 守什么 |
 | --- | --- |
-| `scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（纯值 + 真走 `SkyStudioJobGate`） | 预设名单（默认的标出来、没有名单的语言照英文并说明、性别按语言）；授权的令牌换路径 / 大小 / 修改时间 / 内容 / 起止 / 语言 / 名字 / 版本 / 账户都另发一张，一次性费用换价 / 语言 / 声音 / 模型、设计换描述 / 试读句 / 价都另发，全都以 `skystudio:` 开头；授权两种模式都问、同一件事回同一张、只收一次；一次性费用超了每日额度不发码不记账、问的时候不记账、点过头按报价记账；删除请求批准问、全部权限不问；`voice_library_unavailable` 两种 reason 分开说、`voice_limit` / `reference_exists` / `too_little_speech` 的话 |
+| `scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（纯值 + 真走 `SkyStudioJobGate`） | 预设名单（默认的标出来、没有名单的语言照英文并说明、性别按语言）；授权的令牌换路径 / 大小 / 修改时间 / 内容 / 起止 / 语言 / 名字 / 版本 / 账户都另发一张，一次性费用换价 / 语言 / 声音 / 模型、设计换描述 / 试读句 / 价都另发，全都以 `skystudio:` 开头；授权 `.ask` / `.once` 都问、同一件事回同一张、只收一次，`.once` 的问句带说明、请求批准模式的码答不了它，`.standing` 不问；一次性费用三种都先判每日额度（超了不发码不记账）、问的时候不记账、点过头按报价记账，`.standing` 不问直接按报价记账；删除请求批准问、全部权限不问；`voice_library_unavailable` 两种 reason 分开说、`voice_limit` / `reference_exists` / `too_little_speech` 的话 |
 | `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` | 两个工具的参数名、动作词表就是 App 分派的五样、只读 / 写 / 会删；名片必含、说明书必含（分节照 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行；名片 ≤ 450、按性质的固定说法、新工具没有迁移前的原文 |
 | `scripts/check-voice-recovery.sh` 的 `LibraryChecks`（真 App 对象 + 假协议 `VoiceLibraryHTTP`） | 列出（声音库用不了照回预设、只要预设不问声音库）；建声音没点头什么都不传、点过头传 `voice_reference` 一次、`POST /voices` 带授权和版本 / 私有上传名 / 用了哪一段 / 稳定的 key，换一段的令牌不认；删除请求批准问了才发、全部权限直接发、存储失败再发一次；设计没点头不起任务不记账、点过头 `max_credits` 是报价、get_job 报新声音和样音、账按实收；用声音库的声音配旁白：要建 MiniMax 版先问（一批都不交）、`skip_one_time` 每批 `voice_clone` 带同一个 plan、点头起 `voice_enroll`、声音库用不了报错不退本机 |
 | `scripts/check-voice-recovery.sh` 的 `FallbackFeeChecks`（真 App 对象） | 旁白中途备用要先花一次性费用：get_job 带价（结束码带的、声音照恢复记录）和令牌、两条路都写在 next_step、恢复记录记下这一笔；普通 resume 不建、这一笔留着且 get_job 再问一遍（同一张令牌）；`skip_one_time` 不建、照原来的选择重报价、全部落地；别的令牌再问（同一张）；那张令牌按报价记账、`voice_enroll` 带模型 / 声音 / 语言 / max_credits，之后 `generate_missing` 读完 |
-| `checks/sky-studio-wiring.sh` 第 11 节（扫描） | `consent: true` 只在建声音的工具里、过了授权之后造；长期授权这一刀没人用；`/voices` 的路径只在 `SkyStudioVoiceAPI`；源码和测试数据里没有 MiniMax voice_id 的样子；声音库的工具问用户只经 `SkyStudioJobGate`；声音库的声音不退本机 |
+| `scripts/check-sky-studio.sh` 的 `VoiceStandingNoticeChecks` / `AccessChecks`（纯值） | 说明的价目照目录快照读（751.4 / 22.5 / 377.6，没有 typical 用 credits、少了的模型那一行不写）、额度、授权那句和 Sky Studio 导出的 v1 一字不差、读不到 `/models` 的退路；给 AI 的两段英文；`set_settings` 打开全部权限的问句带说明、令牌绑那一句的版本（新版本另问）、关掉的问句不带 |
+| `scripts/check-voice-recovery.sh` 的 `StandingChecks`（真 App 对象 + 假协议） | 全部权限 + 长期授权：建声音不问、带 `standing_grant`、结果和提示条说一句，设计直接起任务，每日额度照拦，配旁白建 MiniMax 版直接起（`skip_one_time` 照收），旁白中途那一笔直接建（`enroll_job_id`）再 `generate_missing` 读完；没有长期授权：问一次（这段录音那句 + 说明）、点过头先 `POST` 问句里那一版再带 `consent: true` 建、之后不再问；Sky Studio 拒 `standing_grant` 时问一次；`set_settings` 打开问句带价目和那句、点过头记、关掉撤、记不上照样打开并报 `not_recorded`；升级补记：请求批准什么都不发、记不上下次再试、记上了只做一次、已经有有效的不再记 |
+| `checks/sky-studio-wiring/voice-library.sh`（`checks/sky-studio-wiring.sh` 第 11 节 source 进来，扫描） | `consent: true` 和 `standing_grant` 只在建声音的工具里、过了 `voiceConsent` 之后造，`standing_grant` 只在 `.standing` 时用；`/voices/consent-grant` 只经 `SkyStudioVoiceStanding`；改权限模式的文件和告诉长期授权的文件对得上、设置里只有「同意并打开」写全部权限、读到 / 存下 Key 时都补记；`/voices` 的路径只在 `SkyStudioVoiceAPI`；没有 MiniMax voice_id 的样子；声音库的工具和长期授权问用户只经 `SkyStudioJobGate`；声音库的声音不退本机 |
 
 人工回归（真 Key、要花积分的先请用户批准预算）：
 
 - [ ] 请求批准模式：用一段录音建声音，问句是 Sky Studio 那句授权（照会话语言转述）、点头后建成；换一段录音另问；删声音问一句、删了 `list_voices` 里没了。
-- [ ] 全部权限模式：删声音不问、结果说删了；建声音、设计这一版照样问（长期授权是声音 PR 7）。
+- [ ] 设置里切到全部权限：弹说明，价目对得上 `/models`（中 / 英 / 西三种界面、默认窗口大小下无截字）；取消就不改；同意之后 AI 用录音建声音、设计、建 MiniMax 版、
+      删声音都不问、做完说清楚花了多少，提示条也说一句。
+- [ ] AI 用 `set_settings` 切全部权限：问句里带同一段说明；同意之后记上授权（`voice_standing_consent: recorded`）；切回请求批准撤掉。
+- [ ] 换一个 Sky Studio 账号：全部权限下第一次用录音建声音会问一次（问句带说明），之后不问。
+- [ ] 升级前就开着全部权限：装上新版、第一次连上 Sky Studio 就记上长期授权，用录音建声音不问。
 - [ ] 设计一个英文描述的声音（Qwen3，便宜的那个）：报价、点头、`get_job` 给样音链接、听一遍；再用它读一句中文、一句英文。
 - [ ] 用自己的声音读一段英文：第一次问要不要建 MiniMax 版；不建（`skip_one_time`）照 IndexTTS2 读完；建了之后再调一次照默认读。
 - [ ] 旁白中途某一批的备用要先建 MiniMax 版（服务器回 `fallback_needs_one_time`；真遇上时）：get_job 问价、`resume` + 令牌建、再 `generate_missing` 读完；

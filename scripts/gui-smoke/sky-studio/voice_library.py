@@ -1,8 +1,9 @@
 """声音库的免费冒烟（SkyCut 声音 PR 6，方案 9.2）：真 App、真小程序、真入轨、真撤销，假 Sky Studio（run.sh 起的）。
-请求批准、全部权限两种模式各走一遍：列声音；用录音新建（授权的问法、换了参数的令牌不收、人声不够当场拒）；加一种语言；改名；删除（两种模式、
-存储一时不可用再发一次）；用 voice=voice_… 读一段旁白（还没建 MiniMax 版：问一次性费用、skip_one_time 照不花钱的读、点头先建再读）；
-设计（问价、点头起任务）；每日硬预算挡一次性费用；声音库用不了时预设照回、写操作和 voice_… 读稿报错不退本机；manage_voices 不登记撤销。
-全部权限这一刀（PR 6）建声音的授权和一次性费用照样问；假服务记着有效的长期授权（PR 7 接上之后）时改成「不问、带 standing_grant」。
+请求批准、全部权限两种模式各走一遍：列声音；用录音新建（授权的问法、换了参数的令牌不收、人声不够当场拒）；加一种语言（问句写声音的名字，
+已经有的那种语言在问之前、传之前就拒）；改名；删除（两种模式、存储一时不可用再发一次）；用 voice=voice_… 读一段旁白（还没建 MiniMax 版：
+问一次性费用、skip_one_time 照不花钱的读、点头先建再读）；设计（问价、点头起任务）；每日硬预算挡一次性费用；声音库用不了时预设照回、
+写操作和 voice_… 读稿报错不退本机；manage_voices 不登记撤销。
+全部权限（声音 PR 7）：打开时记上长期授权，之后建声音（带 standing_grant）、建 MiniMax 版、设计都不问、做完说（结果带 full_access）。
 结果留在测试目录的 voice-library-results.json。"""
 import json
 import os
@@ -56,15 +57,23 @@ def create_voice(name, mode):
 
 
 def narrate(project, voice, mode):
-    """用声音库的声音读稿：这种语言的 MiniMax 版没建 → 问一次性费用；skip_one_time 照 IndexTTS2 读；点头建了再读就照默认。"""
+    """用声音库的声音读稿：这种语言的 MiniMax 版没建 → 问一次性费用；skip_one_time 照 IndexTTS2 读；点头建了再读就照默认。
+    全部权限 + 长期授权：不问，直接建 MiniMax 版、做完说（full_access），再读就照默认。"""
     args = {"project": project, "lines": LINES, "voice": voice, "subtitles": True}
     mark = len(log())
     question = s.call("add_voiceover", args)
+    if mode == "full_access":
+        assert question["status"] == "started" and question["kind"] == "voice_enroll" and question.get("full_access"), question
+        built = s.wait(question["job_id"])
+        assert built["status"] == "done" and server("/__voices")["minimax"][voice] == ["en"], built
+        plain = s.call("add_voiceover", args)
+        assert plain["status"] == "started" and plain["voice_plan"]["selection"]["model"] == "minimax-speech-2.8-hd", plain
+        done = s.wait(plain["job_id"])
+        assert done["status"] == "done" and s.timeline_counts(project) == (2, 2), done
+        return {"enrolled_without_asking": question["full_access"], "enroll_charged": built.get("credits_charged")}
     token = asked(question, "voice_enroll", "skip_one_time")
     assert question["voice_plan"]["rule"] == "default_needs_one_time" and question["one_time"][0]["credits"] == 375, question
     assert not posts(mark, "/jobs"), "the one-time fee is asked before anything is submitted"
-    if mode == "full_access":
-        return {"asked": True}
     skipped = s.call("add_voiceover", {**args, "skip_one_time": True})
     assert skipped["status"] == "started" and skipped["voice_plan"]["selection"]["model"] == "index-tts-2", skipped
     read = s.wait(skipped["job_id"])
@@ -90,13 +99,16 @@ def narrate(project, voice, mode):
             "skip_subtitle_timing": read["subtitle_timing"], "after_enroll_subtitle_timing": done.get("subtitle_timing")}
 
 
-def design(project, name):
+def design(project, name, mode="ask_for_approval"):
     args = {"action": "design", "description": "A warm, calm male narrator with a slight smile.", "name": name}
     mark = len(log())
-    question = s.call("manage_voices", args)
-    token = asked(question, "22.5")
-    assert question["model"] == "qwen3-voice-design" and not posts(mark, "/jobs"), question
-    started = s.call("manage_voices", {**args, "confirm_token": token})
+    started = s.call("manage_voices", args)
+    if mode == "ask_for_approval":
+        token = asked(started, "22.5")
+        assert started["model"] == "qwen3-voice-design" and not posts(mark, "/jobs"), started
+        started = s.call("manage_voices", {**args, "confirm_token": token})
+    else:
+        assert started.get("full_access"), "full access with a standing consent designs without asking and says so"
     assert started["status"] == "started" and started["kind"] == "voice_design", started
     done = s.wait(started["job_id"])
     assert done["status"] == "done" and done["voice"]["source"] == "design" and done.get("sample_url"), done
@@ -141,13 +153,17 @@ try:
 
     # 请求批准模式
     voice = create_voice("Smoke Voice", "ask_for_approval")
-    token = asked(s.call("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh"}))
+    # 加一种语言：问句写声音的名字（不是 id）。
+    reference_question = s.call("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh"})
+    token = asked(reference_question, "Smoke Voice")
+    assert voice not in reference_question["question"], "the consent question names the voice, not its id"
     added = s.call("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh",
                                      "confirm_token": token})
     assert added["status"] == "reference_added" and [l["language"] for l in added["voice"]["languages"]] == ["en", "zh"], added
-    token = asked(s.call("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh"}))
-    exists = s.refused("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh",
-                                         "confirm_token": token})
+    # 已经有的那种语言：问之前、传之前就拒（本机先 GET 这个声音）。
+    mark = len(log())
+    exists = s.refused("manage_voices", {"action": "add_reference", "voice": voice, "file": "voice-sample.wav", "language": "zh"})
+    assert "already has a recording in Chinese" in exists and not posts(mark, "/uploads") and not posts(mark, "/references"), exists
     renamed = s.call("manage_voices", {"action": "rename", "voice": voice, "name": "Smoke Voice Renamed"})
     assert renamed["status"] == "renamed" and renamed["voice"]["name"] == "Smoke Voice Renamed", renamed
     assert [v["name"] for v in s.call("list_voices", {"include": "mine"})["mine"]] == ["Smoke Voice Renamed"]
@@ -172,10 +188,15 @@ try:
     assert "nothing to undo" in nothing
     s.call("close_project", {"project": undo_project})
 
-    # 全部权限模式
+    # 全部权限模式（声音 PR 7）：打开时点头记上长期授权，之后建声音、建 MiniMax 版、设计都不问。
     s.settings({"ai_access_mode": "full_access"})
+    assert (server("/__voices")["grant"] or {}).get("active"), "turning on full access records the standing voice consent"
     second = create_voice("Full Access Voice", "full_access")
-    report["full_access_narration"] = narrate(project, second, "full_access")
+    full_project = s.call("new_project", {"version": "library-full-" + str(time.time_ns())})["project"]
+    report["full_access_narration"] = narrate(full_project, second, "full_access")
+    s.call("close_project", {"project": full_project})
+    designed_full = design(project, "Full Access Design", "full_access")
+    delete(designed_full, "Full Access Design", "full_access")
     report["full_delete_requests"] = delete(second, "Full Access Voice", "full_access", storage_failures=1)
     assert report["full_delete_requests"] == 2, "a storage hiccup is retried once with a second DELETE"
 
@@ -197,7 +218,9 @@ try:
                   library_unavailable={"rename": rename[:200], "add_voiceover": reading[:200]})
     (D / "voice-library-results.json").write_text(json.dumps(report, ensure_ascii=False, indent=2))
     print("PASS voice library: list (presets per language, mine), create with consent (wrong token refused, short sample refused before "
-          "upload), add a language, rename, library narration (one-time fee asked, skip_one_time, enrol then default), design, "
-          "budget block, delete in both modes with storage retry, unavailable library without local fallback, no undo from manage_voices")
+          "upload), add a language (named in the question, an existing one refused before asking), rename, library narration (one-time "
+          "fee asked, skip_one_time, enrol then default), design, budget block, full access with the standing consent (create, enrol and "
+          "design without asking), delete in both modes with storage retry, unavailable library without local fallback, no undo from "
+          "manage_voices")
 finally:
     s.close()

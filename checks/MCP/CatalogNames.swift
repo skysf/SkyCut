@@ -49,6 +49,9 @@ func catalogKnownNames() -> Set<String> {
     // 句界是按字数估的那几句 estimated_split_line_indices（SkyStudioVoiceCheckpoint.detail，2026-11-10：没有词可对、这台 Mac 又转写不了）。
     names.insert("estimated_split_line_indices")
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 全部权限下的长期授权（声音 PR 7）：旁白中途那一笔直接建时 get_job 的 enroll_job_id（SkyStudioVoiceFallbackFee）、
+    // set_settings 结果里的 voice_standing_consent（AISettingsTools）。
+    names.formUnion(["enroll_job_id", "voice_standing_consent"])
     // 第一批迁移的工具主题提到的结果字段（2026-11-10）：edit_subtitles 的 own_style；listen 的 level_db / peak_db / loudest_at / tempo_bpm /
     // suggested_source_in / suggested_source_out；get_job 的 queue_position / export_settings / billing_note / remote_result；
     // upscale_clip 的 replaced_ids / source_size / transfer_percent / phase_seconds / typical_seconds；freeze_frame 的 tail_id / source_frame /
@@ -57,6 +60,11 @@ func catalogKnownNames() -> Set<String> {
                      "queue_position", "export_settings", "billing_note", "remote_result", "replaced_ids", "source_size",
                      "transfer_percent", "phase_seconds", "typical_seconds", "tail_id", "source_frame", "upright_source",
                      "stopped_by", "stop_method", "keyframe_scale"])
+    // 第二批迁移的工具主题提到的结果字段和报错代码（2026-11-10）：get_status 的 mcp_catalog / cloud_tasks；list_characters 的
+    // next_cursor / available_roles；get_character 的 not_found；read_document 的 next_from_char；cancel_job 说到的 billing_note；
+    // get_timeline 说到的 edit_limits 里的 keyframe_scale。
+    names.formUnion(["mcp_catalog", "cloud_tasks", "next_cursor", "available_roles", "not_found", "next_from_char", "billing_note",
+                     "keyframe_scale"])
     // 声音库（声音 PR 6，MCPGuideVoiceLibraryTopics 和 add_voiceover 的主题）提到的结果字段、任务种类、错误码：报价的 one_time、
     // 两种收费任务 voice_design / voice_enroll（AIJobs.Kind）、设计的 sample_url（SkyStudioVoiceLibraryJob）、服务器的
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。

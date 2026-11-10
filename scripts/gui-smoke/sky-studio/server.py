@@ -22,6 +22,8 @@ BASE = f"http://127.0.0.1:{PORT}"
 KEY = "sk-" + "S" * 43
 LOCK = threading.RLock()
 JOBS, KEYS, LOG, CONTROL = {}, {}, [], json.loads(os.environ.get("SKYSTUDIO_SMOKE_CONTROL") or "{}")
+# 每个账号的长期授权（/voices/consent-grant，声音 PR 7）。
+GRANTS, STANDING_VERSION = {}, voice_fixtures.CATALOG["voice_consent"]["standing"]["version"]
 OFFICIAL = OfficialRecipes(ROOT)
 # 和服务器 skycut_begin_job 同一份名单：这几种进声音池（SkyStudioJobSlots.audioKinds）。
 AUDIO_KINDS = {"voice", "voice_clone", "voice_enroll", "voice_design", "voice_convert", "sound_effect"}
@@ -128,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"admitted_jobs": len(JOBS)})
         if self.path == "/__voices":
             with LOCK:
-                return self.reply(200, library.snapshot())
+                return self.reply(200, {**library.snapshot(), "grant": GRANTS.get("local-smoke")})
         if self.path == "/__jobs":
             with LOCK:
                 return self.reply(200, [{k: v for k, v in job.items() if k not in ("prompt", "account")} for job in JOBS.values()])
@@ -166,7 +168,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"account": {"id": self.account()}, "credits": {"balance": 1000},
                 "skycut": {"plan": "pro", "features": {"mcp": True, "watermark": False},
                            "valid_until": stamp(86400), **pools}, "server_time": stamp()})
+        if self.path.endswith("/voices/consent-grant"):
+            with LOCK:
+                LOG.append({"method": "GET", "path": self.path, "has_auth": True})
+                return self.reply(200, {"grant": GRANTS.get(self.account()), "current_statement_version": STANDING_VERSION})
         if self.path.endswith("/models"):
+            # 快照里全部声音模型（读稿、设计、建 MiniMax 版、变声）：打开全部权限时那段说明的价目也从这里读（声音 PR 7）。
             voices = voice_fixtures.models(CONTROL.get("voice_max_characters"))
             return self.reply(200, {"models": voices + media_fixtures.models() + expansion.CATALOG["models"],
                                     "billing_policy": expansion.CATALOG["billing_policy"], **voice_fixtures.top_level()})
@@ -189,7 +196,7 @@ class Handler(BaseHTTPRequestHandler):
         """`/voices…`（声音库，voice_library_fixtures）。列表带 `?limit=50`，路由只看路径。"""
         rest = self.path.split("?", 1)[0].split("/voices", 1)[1]
         with LOCK:
-            status, value = library.handle(method, rest, data, CONTROL, ROOT, BASE)
+            status, value = library.handle(method, rest, data, CONTROL, ROOT, BASE, GRANTS.get(self.account()))
             LOG.append({"method": method, "path": self.path, "body": data, "status": status, "has_auth": True})
         return self.reply(status, value)
 
@@ -205,6 +212,11 @@ class Handler(BaseHTTPRequestHandler):
         self.body()
         if not self.authorized():
             return
+        if self.path.endswith("/voices/consent-grant"):
+            with LOCK:
+                LOG.append({"method": "DELETE", "path": self.path, "has_auth": True})
+                GRANTS.pop(self.account(), None)
+                return self.reply(200, {"revoked": True, "grant": None, "current_statement_version": STANDING_VERSION})
         if "/voices" in self.path:
             return self.voices("DELETE", {})
         self.error(404, "unknown_route")
@@ -239,7 +251,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.release(data)
         if not self.authorized():
             return
-        if "/voices" in self.path:
+        if "/voices" in self.path and not self.path.endswith("/voices/consent-grant"):
             return self.voices("POST", data)
         with LOCK:
             LOG.append({"method": "POST", "path": self.path, "body": data, "has_auth": True})
@@ -262,6 +274,13 @@ class Handler(BaseHTTPRequestHandler):
                     code, result = OFFICIAL.quote(data, self.account(), credits, CONTROL)
                     return self.error(code, result) if isinstance(result, str) else self.reply(code, result)
                 return self.reply(200, {"credits": credits, "typical_seconds": 5})
+            if self.path.endswith("/voices/consent-grant"):
+                version = data.get("statement_version") or ""
+                if not version:
+                    return self.reply(400, {"error": {"code": "invalid_request", "message": "statement_version", "field": "statement_version"}})
+                GRANTS[self.account()] = {"statement_version": version, "granted_at": stamp(), "active": version == STANDING_VERSION,
+                                          "inactive_reason": None if version == STANDING_VERSION else "outdated"}
+                return self.reply(200, {"grant": GRANTS[self.account()], "current_statement_version": STANDING_VERSION})
             if self.path.endswith("/uploads"):
                 suffix = Path(data["filename"]).suffix.lstrip(".")
                 name = f"upload-{len(LOG)}.{suffix}"
