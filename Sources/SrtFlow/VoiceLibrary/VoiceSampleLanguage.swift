@@ -7,6 +7,9 @@ import SrtFlowCore
 // （SpokenLanguageProbe：只在已装的语言里裁决，不下载模型），探针是做好的参考录音的前 20 秒（它本来就是从开口处起、人声最密的一段）。
 // 检测不出来、一个转写模型都没装、macOS 15：回 nil，界面上那一行空着、要用户手选（不许猜一个：语言记错了，服务器选模型就跟着错）。
 // 能选的语言是一份常用的名单；检测出名单外的也照样能用（对话框把它加进去）。
+// AI 的 manage_voices 没给 `language` 时也用这一份（SkyStudioVoiceServices.detectLanguage → SkyStudioVoiceRecordingLanguage，2026-11-11）：
+// 那一路检测不出来不是留空，是报错叫 AI 带上 language 再调。两个入口之外不许再有第三处调（checks/sky-studio-wiring/voice-library-ui.sh）。
+// 抽探针的阻塞读取在 MediaReadQueue.analysis 上（QueuedAudioWindow，docs/architecture/blocking-media-reads.md）。
 // 不管什么：参考录音怎么做（VoiceReferenceSample）、语言的名字怎么写（VoiceLibraryText）。
 
 @MainActor
@@ -19,14 +22,15 @@ enum VoiceSampleLanguage {
         guard #available(macOS 26.0, *), SpeechTranscriptionService.isAvailable else { return nil }
         let candidates = await SpokenLanguageProbe.candidates(metadataTag: nil)
         guard !candidates.isEmpty, !Task.isCancelled else { return nil }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SkyCut-voice-language-" + UUID().uuidString, isDirectory: true)
+        let folder = VoiceLibraryTemp.folder(.language)
         defer { try? FileManager.default.removeItem(at: folder) }
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let range = SourceRange(start: 0, end: min(seconds, TranscriptHarvester.detectionProbeSeconds))
             let stop = StopFlag()
             return try await withTaskCancellationHandler {
-                let probe = try await AudioWindowReader.extract(assetURL: sample, range: range, into: folder, isCancelled: { stop.stopped })
+                // 探针在 MediaReadQueue.analysis 上读（QueuedAudioWindow）：字幕生成那个写在 async 里的读取器是它独有的例外，这里不借。
+                let probe = try await QueuedAudioWindow.extract(assetURL: sample, range: range, into: folder, on: MediaReadQueue.analysis)
                 let winner = try await SpokenLanguageProbe.verdict(
                     probeFile: probe, probeStart: 0, candidates: candidates, service: SpeechTranscriptionService(),
                     isCancelled: { stop.stopped })

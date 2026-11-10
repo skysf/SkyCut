@@ -78,6 +78,9 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         /// 这一批实际跑的模型、服务器有没有在这一批里换备用（做完时服务器报的）。
         var model: String?
         var fallbackUsed: Bool?
+        /// 这一批在本机切句没切成过几次（转写得了的 Mac 上；没失败过不写）。第二次还切不开就按字数估（SkyStudioVoiceRender）：
+        /// 同一段音频、同一个转写模型，重试多少次结果都一样，一直报 local_split 就是把付过钱的声音卡死。
+        var splitFailures: Int?
         var generated: Bool { remote != nil || rawFile != nil }
         var missing: Bool { !generated && (!submitted || retryable) }
     }

@@ -168,6 +168,12 @@ private func voiceLibraryGuideChecks() {
     ]) == nil, "manage_voices create takes file, start, end, language, name and confirm_token")
     check(MCPArgumentCheck.problem(tool: .manageVoices, arguments: ["action": "design", "description": "calm", "name": "Calm", "sample_text": "Hi."]) == nil,
           "manage_voices design takes description, name and sample_text")
+    // language 可选（声音方案 4.6）：参数定义里只有 action 必给；说明写明可选、不给就识别（识别不出来会叫 AI 带上它）。
+    checkEqual(MCPToolName.manageVoices.definition.inputSchema["required"], .array(["action"]), "manage_voices requires only action: language is optional")
+    let languageField = MCPToolName.manageVoices.definition.inputSchema["properties"]?["language"]?["description"]?.stringValue ?? ""
+    for phrase in ["optional", "ISO 639-1", "omitted, SkyCut detects it or asks for it"] {
+        check(languageField.contains(phrase), "the manage_voices language parameter says \"\(phrase)\": \(languageField)")
+    }
     check(MCPArgumentCheck.problem(tool: .manageVoices, arguments: ["action": "delete", "voice": "voice_x", "model": "auto"]) != nil,
           "manage_voices does not take model")
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["lines": [["text": "Hi."]], "voice": "voice_x", "skip_one_time": true]) == nil,
@@ -207,6 +213,21 @@ private func voiceLibraryGuideChecks() {
         check(manageText.contains(phrase), "the manage_voices topic says \"\(phrase)\"")
     }
     check(!manageText.contains("750") && !manageText.contains("22.5"), "the design section names no prices: they come from Sky Studio's quote")
+    let createSection = manageTopic.sections.first { $0.name == "create" }?.text ?? ""
+    for phrase in ["language (the ISO 639-1 code of what is said) is optional", "used as given", "detects the language from the sample on this Mac",
+                   "language_detected", "language_undetected", "call again with language"] {
+        check(createSection.contains(phrase), "the manage_voices create section says \"\(phrase)\"")
+    }
+    check(!createSection.contains("name and language"), "the create section no longer lists language as needed")
+    // 问不问按权限模式（声音 PR 7）：请求批准模式每段录音都先问；全部权限有长期授权就不问、没有的第一次问一次。不许再写成「每段录音都先问」。
+    for phrase in ["In ask mode every recording first returns needs_confirmation",
+                   "In full access mode nothing asks once the user's standing voice consent is on record",
+                   "without it the first recording asks once"] {
+        check(createSection.contains(phrase), "the manage_voices create section says \"\(phrase)\"")
+    }
+    check(!createSection.contains("Every recording first returns"), "the create section does not say every recording asks in every mode")
+    check(manageTopic.examples.contains { $0["action"] == "add_reference" && $0["language"] == nil },
+          "one manage_voices example leaves language out")
     let map = guideMapText()
     check(map.contains("Voices: list_voices (presets, my voices), manage_voices ("), "the guide map has a Voices line with both tools")
     check(map.contains("manage_voices (design;") && map.contains("list_voices"), "the paid line names manage_voices' design and lists list_voices as free")

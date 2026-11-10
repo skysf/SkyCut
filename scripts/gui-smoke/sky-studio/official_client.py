@@ -16,7 +16,7 @@ from mcpclient import MCP
 D = Path(os.environ.get("SKYSTUDIO_SMOKE_DIR", "/private/tmp/srtflow-skystudio-smoke"))
 WORK = D / "work"
 APP = D / "SrtFlowSkyStudioSmoke.app"
-SERVER = "http://127.0.0.1:18766"
+SERVER = "http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766")
 
 
 def control(**value):

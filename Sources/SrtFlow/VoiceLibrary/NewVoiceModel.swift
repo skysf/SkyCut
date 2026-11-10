@@ -63,7 +63,7 @@ final class NewVoiceModel: ObservableObject {
         self.mode = mode
         self.store = store ?? VoiceLibraryStore.shared
         name = ""
-        folder = FileManager.default.temporaryDirectory.appendingPathComponent("SkyCut-new-voice-" + UUID().uuidString, isDirectory: true)
+        folder = VoiceLibraryTemp.folder(.dialog)
         recorder.onFinish = { [weak self] url in self?.use(file: url, recorded: true) }
     }
 
@@ -145,15 +145,26 @@ final class NewVoiceModel: ObservableObject {
             case .create: target = .create(name: name)
             case .addReference(let voice): target = .addReference(voice: voice.id)
             }
-            let submission = try SkyStudioVoiceRecordingSubmission(file: sourceFile, sample: sample, language: language, target: target, statement: statement)
+            let submission = try await SkyStudioVoiceRecordingSubmission.make(file: sourceFile, sample: sample, language: language, target: target,
+                                                                              statement: statement)
             let consent = SkyStudioVoiceConsent.thisRecording(statementVersion: statement.version)
             let voice = try await submission.send(consent: consent, key: key, api: store.api)
             store.adopt(voice)
             return voice
         } catch {
             problem = VoiceLibraryText.message(error)
+            if SkyStudioVoiceLibraryErrors.consentOutdated(error) { await renewConsentStatement() }
             return nil
         }
+    }
+
+    /// Sky Studio 把授权那句升了版本、手里 10 分钟一份的目录还是旧的（`consent_outdated`）：忘掉目录、取新的那一句显示出来；
+    /// 那一勾拿掉——用户同意的是旧的那句，新的要他自己再看、再勾（审查 #362 / #367 第 6 条）。
+    private func renewConsentStatement() async {
+        SkyStudioCatalogCache.shared.forget()
+        await store.refresh()
+        agreementTouched = true
+        agreed = false
     }
 
     /// 对话框关了：停录音、停试听、删掉临时文件。

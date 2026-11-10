@@ -49,7 +49,8 @@ enum MCPVoiceLibraryTools {
                 "start": MCPSchema.number("Seconds into file where the sample may start, 0 or more (default 0).", minimum: 0),
                 "end": MCPSchema.number("Seconds into file where it stops, 0 or more (default: end; 3 minutes are used at most).",
                                         minimum: 0),
-                "language": MCPSchema.string("ISO 639-1 code of what the recording says (zh, en…): create, add_reference."),
+                "language": MCPSchema.string(
+                    "create, add_reference: optional ISO 639-1 code of what is said (zh, en…); omitted, SkyCut detects it or asks for it."),
                 "name": MCPSchema.string("Voice name, 1 to 80 characters: create, design, rename."),
                 "description": MCPSchema.string("design: how the voice sounds, up to 2000 characters."),
                 "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters; counts toward the price."),

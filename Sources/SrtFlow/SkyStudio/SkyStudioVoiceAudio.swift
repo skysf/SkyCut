@@ -52,8 +52,9 @@ enum SkyStudioVoiceAudio {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let pcm = try await decode(url)
-        let caf = try await AudioWindowReader.extract(assetURL: url, range: SourceRange(start: 0, end: pcm.duration),
-                                                      into: folder, isCancelled: { Task.isCancelled })
+        // 读取在 MediaReadQueue.voice 上（QueuedAudioWindow）：字幕生成那个写在 async 里的读取器是它独有的例外，这里不借。
+        let caf = try await QueuedAudioWindow.extract(assetURL: url, range: SourceRange(start: 0, end: pcm.duration),
+                                                      into: folder, on: MediaReadQueue.voice)
         let service = SpeechTranscriptionService()
         try await service.ensureModel(locale: locale) { _ in }
         do {

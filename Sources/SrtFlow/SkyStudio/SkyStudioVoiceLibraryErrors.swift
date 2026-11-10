@@ -49,6 +49,13 @@ enum SkyStudioVoiceLibraryErrors {
         return reason == SkyStudioVoiceCodes.Reason.noStandingGrant || reason == SkyStudioVoiceCodes.Reason.consentOutdated
     }
 
+    /// 带这一次的 `consent: true` 被拒、说授权那句的版本旧了：Sky Studio 升了文案，手里的目录（10 分钟一份）还是旧的。
+    /// 调用方忘掉目录、读新的那一句，用新版本、新文案再问一次。
+    static func consentOutdated(_ error: Error) -> Bool {
+        guard let server = server(error), server.code == "invalid_request" else { return false }
+        return server.fields["reason"]?.stringValue == SkyStudioVoiceCodes.Reason.consentOutdated
+    }
+
     /// 服务器的错误是哪一种（给 AI 的话和界面上的话都从这一份分，SkyCut 声音方案 4.6、5.1）。`limit` 是服务器报的那个数写成的字。
     enum Kind: Equatable {
         /// 声音库用不了（私有声音桶没配）。
