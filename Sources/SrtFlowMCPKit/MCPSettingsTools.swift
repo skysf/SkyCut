@@ -23,11 +23,10 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .setSettings, title: "Change SkyCut settings",
                 description: """
-                Change only user-requested preferences; null/omitted fields stay unchanged. Validate everything before applying \
-                anything. Any ai_access_mode change ALWAYS needs explicit agreement and confirm_token, even in full_access; so does \
-                raising daily_ai_credit_limit. Ask in the conversation language, using localized names from get_settings section=ai. \
-                Daily budgets are hard caps: 0 pauses paid work. Cache clearing removes previews only; query clearing=false to verify. \
-                Language applies now; native menus after restart. No project edit. Keys/connections stay in Settings.
+                Change preferences only when the user asks: theme, language, daily_ai_credit_limit, ai_access_mode, the \
+                optimized-media cache. Omitted fields stay; everything is checked before anything changes. Changing ai_access_mode or \
+                raising the credit limit always returns needs_confirmation, even in full_access: ask, then repeat with confirm_token. \
+                Never edits a project; keys and connections stay in Settings.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),

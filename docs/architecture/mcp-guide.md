@@ -66,11 +66,16 @@
     被授权挡住的那句末尾说「说明书照常能用」（`SkyCutGates.aiRefusal`）。
 14. **迁移过的工具**（`MCPGuideWrittenTopics.migrated`；2026-11-10 试点 5 个：`edit_clip`、`generate_media`、`set_text`、`add_clips`、`look`，
     同一天 `add_voiceover` 随声音 PR 3 加进来（`MCPGuideVoiceTopics`）、新工具 `list_voices` / `manage_voices` 随声音 PR 6 从第一天起就这么写
-    （`MCPGuideVoiceLibraryTopics`），之后两批加在同一张表里，方案 5.3）：
+    （`MCPGuideVoiceLibraryTopics`），方案 PR 4 的第一批 25 个（时间线、字幕、声音、录屏、导出等：`MCPGuideSubtitleTopics` / `SpeechTopics` /
+    `OutputTopics` / `VisualTopics` / `WorkspaceTopics` / `PaidTopics`）也加进同一张表；第二批照样，方案 5.3）：
     - **名片 ≤ 450**（目标 350）：第一句说做什么、别的活指到哪个工具；按工具性质写**固定说法**（方案 2.2 第 4、5 条）：只读的 `Read-only`、
       改工程的 `One undo step`、回任务号的 `wait with get_job`、花积分的 `Paid (Sky Studio credits)` + `quote_only`（收它的工具才写：`add_voiceover`
       不收，整段报价在回任务号之前自动做）+ `daily credit limit`、收 `confirm_token` 的 `needs_confirmation`、要先读说明书的最后一句
-      `skycut_guide topic=<工具名>`（试点里是 edit_clip、generate_media、look，加上 add_voiceover）。
+      `skycut_guide topic=<工具名>`（试点里是 edit_clip、generate_media、look，加上 add_voiceover；第一批里是花积分的 upscale_clip、
+      manage_characters 和流程长的 record_screen、sync_voiceover、cut_speech，同方案 2.2 第 5 条）。第一批还按性质加了出片的 `never overwrites` /
+      `Never replaces a file`、删文件的 `Trash`、等用户的 `waiting_for_user`。改到联动的三张名片（`freeze_frame`、`cut_speech`、`delete_items`）
+      照旧写「Linkage on:」（`checks/timeline-drag-wiring/linkage.sh` 按这个记号认）。一行例子（`Example: {…}` 单独一行，`UsageExampleChecks`
+      按真实参数定义核对）留在 `sync_voiceover`、`export_video`、`inspect_video` 三张名片上：选工具那一刻就用得上。
       会调错、花错钱的话留在名片（方案 5.2 的「名片必含」，各检查照旧查说明）；怎么用好的进说明书（「说明书必含」，检查改查那个主题）。
     - **参数说明 ≤ 120**（目标 80）；带 `minimum` / `maximum` 的说明里写数字（Codex 不显示范围）。删掉的长话必须写进手写的那几节，
       每个迁移 PR 的说明里有「删了哪些句子、去了哪」的表。
@@ -78,8 +83,10 @@
       这两个的参数说明到 PR 7 才保得住，在那之前靠说明书的 `fields`）。
     - **每一节讲什么**：手写的每一节都带一行 `about`（≤ 120，只提真有的名字），`fields` 几节的那一行自动生成（拆开的写从哪个参数到哪个参数）；
       主题长到要分节回时，第一次回答按它列出 `contents`（第 6 条）。常见的活只要读一节的，写在主题的 `readingTip` 里。
-    - **主题**：`overview` = **迁移前的说明原文**（一个字不丢；守卫钉着它的长度，PR 里另有逐字比对的记录）+ 一段新话；后面是手写的几节
-      （用法、限制、坑，出处写在代码注释里：`ai-control-mcp.md` 第几条、哪个案例）、例子（过参数定义）、`related`；`fields` 几节自动接在最后。
+    - **主题**：`overview` = **迁移前的说明原文**（一个字不丢；守卫钉着它的长度，PR 里另有逐字比对的记录；第一批 25 个的原文在
+      `MCPGuidePreviousCards`，是从迁移前的清单用脚本照抄出来的，不是手打的）+ 一段新话；后面至少两节手写的
+      （用法、限制、结果、坑，出处写在代码注释里：`ai-control-mcp.md` 第几条、哪个案例）、例子（过参数定义）、`related`；`fields` 几节自动接在最后。
+      写了 `readingTip` 的，提示里点到的节必须真的有（守卫查每一个）。
     - **唯一的例外：没有可搬的原文**（`previousCard` 为 nil）。工具的行为和迁移在同一个 PR 里改了，旧说明照抄进概要等于叫 AI 用已经没有的东西：
       `add_voiceover`（声音方案 4.10 说旧说明过时；4.2–4.4、第十二节：默认 gemini:Charon、去掉 `clone_from`、不再收不带前缀的 Rachel）；
       还有从第一天起就按名片 + 说明书写的新工具（声音 PR 6 的 `list_voices`、`manage_voices`，本来就没有旧说明）。
