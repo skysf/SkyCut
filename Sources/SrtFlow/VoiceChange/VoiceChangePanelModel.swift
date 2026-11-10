@@ -139,6 +139,8 @@ final class VoiceChangePanelModel: ObservableObject {
 
     /// 按下「开始」：过每日硬预算、记账、起任务。起了回 true（面板关掉）。
     func start() -> Bool {
+        // 一份报价只起一单（声音库第十节第 1 条）：按下去那一刻就锁，连按、任务做完之后再按都不再起。
+        guard !started else { return false }
         guard case .ready(let quote) = offer, let quoted, case .ready(let prepared) = source else { return false }
         guard let clip = project.state.clip(with: clipID), VoiceChangeSource.refusal(for: clip) == nil else {
             problem = L10n("This clip is no longer on the timeline.")
@@ -152,10 +154,10 @@ final class VoiceChangePanelModel: ObservableObject {
             problem = L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")
             return false
         }
+        started = true
         _ = VoiceChangeOrder.start(clip: clip, source: prepared, draft: quoted.draft, quote: quote, target: quoted.target, key: quoted.key,
                                    reservation: reservation, project: project, notifies: true, services: services)
         VoiceChangeActivity.shared.lastVoiceID = quoted.target.id
-        started = true
         return true
     }
 

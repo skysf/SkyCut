@@ -12,6 +12,7 @@ import SrtFlowMCPKit
 // - 点过头 / 不用问（记上账）：起一单 `voice_enroll`（SkyStudioVoiceLibraryJob，回它的任务号），做完叫 AI 再调一次
 //   add_voiceover —— 那时 MiniMax 版有了，报价不再要一次性费用，照默认读。不在一单里串着读：建的这一步要几十秒、价也要等建完再报一次，
 //   回任务号之前的整段报价和整体预留这条规矩（声音 PR 3）不能在任务里绕过去。
+// **这个声音这种语言的 MiniMax 版已经在建就跟着那一单**（SkyStudioVoiceLibraryJob.running，问之前先看）：不再问、不再预留、不再起任务。
 // 不管什么：报价、分批、起旁白任务（SkyStudioVoiceoverStart）；任务里某一批的备用要先建 MiniMax 版（`fallback_needs_one_time`，
 // 问用户在 SkyStudioVoiceFallbackFee）。
 
@@ -47,23 +48,36 @@ enum SkyStudioVoiceOneTimeStep {
         let request: SkyStudioJobRequest
         do { request = try SkyStudioVoiceRequests.enroll(voice: voice, language: language, model: model, maxCredits: credits) }
         catch let problem as SkyStudioVoiceRequestProblem { throw AIToolError(problem.message + " Nothing was charged.") }
-        let action = SkyStudioVoiceApproval.oneTimeAction(item, account: SkyStudioCharacterAccess.stamp(key))
+        let account = SkyStudioCharacterAccess.stamp(key)
+        let identity = SkyStudioVoiceLibraryJob.enrollIdentity(voice: voice, language: language, account: account)
+        // 这个声音这种语言的 MiniMax 版已经在建（上一次点过头的那一单还没做完）：跟着它，不再问、不再预留。服务器对开着的建单本来就只回
+        // 原来那一单、只扣一次；本机再预留一笔、再起一个任务跟它，同一笔钱就记成两笔（审查 #362 第 2 条）。
+        if let open = SkyStudioVoiceLibraryJob.running(identity) { return .result(following(open, item: item, language: language)) }
+        let action = SkyStudioVoiceApproval.oneTimeAction(item, account: account)
         let question = SkyStudioVoiceApproval.oneTimeQuestion(item, credits: credits, noFeeModel: noFee)
         let standing = SkyStudioVoiceStanding.shared
         let ask = await standing.voiceAsk(key: key, api: api)
+        // 上面等了一下（读长期授权）：再看一眼有没有别的调用刚起了这一单。从这里到起任务之间没有 await。
+        if let open = SkyStudioVoiceLibraryJob.running(identity) { return .result(following(open, item: item, language: language)) }
         switch try SkyStudioJobGate.voiceOneTime(credits: credits, action: action, question: question, token: input.confirmToken, ask: ask) {
         case .needsConfirmation(let result):
             return .result(asked(result, item: item, plan: plan, noFee: noFee))
         case .reserved(let reservation):
-            await standing.recordAfterApproval(ask, key: key, api: api)
             let title = catalog.models.first { $0.id == model }?.title ?? "MiniMax"
-            let job = SkyStudioVoiceLibraryJob(
-                kind: .voiceEnroll, request: request, key: key, reservation: reservation, title: SkyStudioVoicePick.languageName(language),
-                modelTitle: title, project: project,
+            let enrolment = SkyStudioVoiceLibraryJob(
+                kind: .voiceEnroll, identity: identity, request: request, key: key, reservation: reservation,
+                title: SkyStudioVoicePick.languageName(language), modelTitle: title, project: project,
                 nextStep: "The voice's MiniMax version is ready. Call add_voiceover again with the same lines and voice, without "
                     + "confirm_token: nothing was narrated yet, and Sky Studio now reads it with that version.",
                 api: api
-            ).start()
+            )
+            enrolment.onFailure = { _, credits in
+                ["next_step": .string((credits.map { "Sky Studio's price changed to \(SkyStudioCredits.text($0)) credits and nothing was charged. " } ?? "")
+                    + "The MiniMax version was not built and nothing was narrated. Call add_voiceover again with the same lines and voice: "
+                    + "it quotes the current price and asks the user again (or pass skip_one_time=true). Never reuse the old confirm_token.")]
+            }
+            let job = enrolment.start()
+            await standing.recordAfterApproval(ask, key: key, api: api)
             var result: [String: JSONValue] = [
                 "status": "started", "job_id": .string(job.id), "kind": .string(AIJobs.Kind.voiceEnroll.rawValue), "provider": "Sky Studio",
                 "credits": .number(credits), "one_time": .array([item.json]),
@@ -79,6 +93,17 @@ enum SkyStudioVoiceOneTimeStep {
             }
             return .result(.ok(.object(result)))
         }
+    }
+
+    /// 已经在建的那一单：回它的任务号，说清楚这一次没有新花钱、没有新问题。
+    private static func following(_ job: AIJobs.Job, item: SkyStudioVoiceOneTime, language: String) -> AIToolResult {
+        .ok([
+            "status": "started", "job_id": .string(job.id), "kind": .string(AIJobs.Kind.voiceEnroll.rawValue), "provider": "Sky Studio",
+            "already_building": true, "one_time": .array([item.json]),
+            "next_step": .string("This voice's MiniMax version for \(SkyStudioVoicePick.languageName(language)) is already being built "
+                + "(job \(job.id), approved earlier): nothing new was charged and there is nothing to ask. Wait for it with get_job; when "
+                + "it is done, call add_voiceover again with the same lines and voice (no confirm_token). Nothing was narrated yet.")
+        ])
     }
 
     /// 问句的结果里带上一次性费用和不建时用的那个，next_step 写清两条路。额度不够（daily_budget_exceeded）的原样回。

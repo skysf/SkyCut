@@ -26,6 +26,9 @@
 #       `consent: "standing_grant"` 只在 SkyStudioVoiceRecordingTool 里、过了 SkyStudioJobGate.voiceConsent 之后造（standing_grant 只在
 #       全部权限 + 有效的长期授权时）；`/voices/consent-grant` 只经 SkyStudioVoiceStanding；改权限模式的地方改完都告诉它、设置里先弹说明；
 #       `/voices` 的路径只在 SkyStudioVoiceAPI 里拼；没有 MiniMax voice_id 的样子；只经 SkyStudioJobGate 问；声音库的声音不退本机。
+#   13. **声音库的收费单只下一次**（2026-11-11 审查之后），在 checks/sky-studio-wiring/voice-library-orders.sh：设计的对话框一份报价只下一单、
+#       同一件事只开一单（建 MiniMax 版过闸之前先看在建的）、旁白中途那笔费用的问题受理之后才清、没做成的单把原因和新价带进 get_job、
+#       每日预算的规矩不另抄、授权那句升了版本刷新目录再问、整份读录音在后台队列上、声音库的临时文件夹只在一处起名并在启动时清。
 #   12. **声音库的界面（声音 PR 8）**：界面和 AI 的工具走同一条路——`consent: true` 另一处只许在新建声音对话框的 NewVoiceModel 里、
 #       用户自己勾了那一句（`guard agreed`）之后造；参考录音只经 VoiceReferenceSample.prepare、交只经 SkyStudioVoiceRecordingSubmission
 #       （`createVoice` / `addVoiceReference` 别处不许直接调）；删除只经 SkyStudioVoiceDeletion（存储一时不可用再发一次只有这一份）；
@@ -518,7 +521,10 @@ source checks/sky-studio-wiring/voice-library.sh
 # 12. 声音库的界面（声音 PR 8）：拆在 checks/sky-studio-wiring/voice-library-ui.sh（这个文件到了行数上限），共用上面的 fail / code_files_with 和路径变量。
 source checks/sky-studio-wiring/voice-library-ui.sh
 
-# 13. 变声（声音 PR 9）：同样拆出去，checks/sky-studio-wiring/voice-change.sh。
+# 13. 声音库的收费单只下一次、账只记一次（2026-11-11 审查 #362 / #367 之后）：拆在 checks/sky-studio-wiring/voice-library-orders.sh。
+source checks/sky-studio-wiring/voice-library-orders.sh
+
+# 14. 变声（声音 PR 9）：同样拆出去，checks/sky-studio-wiring/voice-change.sh。
 source checks/sky-studio-wiring/voice-change.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
@@ -544,4 +550,4 @@ if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 长期授权 / 路径 / 服务商 id / 不退本机守住了、声音库的界面和 AI 的工具走同一条路、变声的两个入口同一条路且落地是一次 perform"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 长期授权 / 路径 / 服务商 id / 不退本机守住了、声音库的界面和 AI 的工具走同一条路、声音库的收费单只下一次、变声的两个入口同一条路且落地是一次 perform"

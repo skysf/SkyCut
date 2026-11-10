@@ -279,7 +279,51 @@
 - [ ] 没有 Key：那一节写「接上 Sky Studio」，按钮跳到 Sky Studio 那一类；钥匙串要授权时同样。Sky Studio 没配声音桶时：写「暂时用不了」，新建 / 设计灰着，预设照样能听。
 - [ ] 英 / 中 / 西三种界面（系统语言设成英文再切）：设置那一节、选择器、三个对话框、删除确认框无截字、无漏翻；900 pt 高的窗口里对话框完整（方案 9.3）。
 
-## 十、变声：`change_voice` 和片段右键「换成我的声音…」（声音 PR 9）
+## 十、收费单只下一次、账只记一次（2026-11-11 审查之后）
+
+> 案例：[设计声音连按下了好几单](../bugfixes/2026-11-11-design-voice-ordered-twice.md)、[声音库审查的后续](../bugfixes/2026-11-11-voice-library-review-followups.md)。
+> 相关：[Sky Studio 的任务](sky-studio-jobs.md)第五节（旁白中途那笔费用）、[阻塞的媒体读取](blocking-media-reads.md)「例外」。
+
+1. **会花钱的按钮按下去那一刻就锁**：设计声音的对话框一份报价只下一单（`DesignVoiceModel.ordered`，在起任务之前置上；按钮跟着灰）。
+   改了字是另一份报价，才能再下。新加收费按钮照 `submitting` / `saving` / `ordered` 的样子加闩。
+2. **一份报价一个 idempotency_key**，问价时随 `draft` 定下，交的时候不另起（`SkyStudioVoiceDesignOrder`）。**不从内容算**：
+   Sky Studio 的 key 永远绑着它那一单（做完的、失败的都是），按内容算的话同一份描述就再也设计不了第二次。
+3. **同一件事只开一单**（`SkyStudioVoiceLibraryJob.running(identity)`）：设计 = 这一份订单的 key；建 MiniMax 版 = 账户 + 声音 + 语言
+   （服务器对开着的建单按声音 + 语言去重，不看 key）。任务 `start()` 先看，还开着就回那一单、这一笔预留退回。**要问用户 / 记账的地方
+   在过闸之前先看**（`SkyStudioVoiceOneTimeStep`、`SkyStudioVoiceFallbackFee`；读长期授权那个 await 之后再看一次，从那里到起任务之间
+   没有 await）：在建就回它的任务号和 `already_building: true`，不问、不预留、不交。本机的账和服务器的账是两本：服务器去重只保它那一本。
+4. **问题答没答完以服务器受理为准**：旁白中途那笔一次性费用（恢复记录的 `fallbackFee`）在建的那一单被受理（回了任务号，
+   任务的 `onAccepted`）之后才清；受理之前没做成（改价、断网、等不到槽）问题原样留着，普通 `resume` / `get_job` 再问；受理之后才失败的
+   放回去；`price_changed` 把新价记进去、下一次按新价问；`minimax_voice_exists` 算答完。改这一个字段只经
+   `SkyStudioVoiceRecovery.updateFee`（现读现改现写）。
+5. **没做成的单把原因带进 `get_job`**：`failure`（服务器的原样）、`code`；改价的另有 `credits_now` / `credits_approved`；下一步由起它的
+   地方说（`onFailure`：重新问价、再问用户，旧令牌不能再用）。
+6. **每日预算的规矩只有 `SkyStudioSpendStore.decide` 一份**：界面上「超没超」问它，按下去时 `SkyStudioJobGate` 问的也是它。
+7. **授权那句升了版本**（`consent_outdated`，这一次的 `consent: true` 被拒）：忘掉目录（`SkyStudioCatalogCache.forget()`）、读新的那一句，
+   用新版本、新文案**再问一次**——AI 那一路另发令牌（令牌绑着版本）、结果带 `consent_statement_updated`；对话框显示新的那一句、
+   把那一勾拿掉。用户同意的必须是交上去的那一版。
+8. **整份读录音不在主线程**：`SkyStudioVoiceRecordingSubmission.make`（`MediaReadQueue.analysis`），同步的 `init` 只许它调。
+9. **临时文件夹只在 `VoiceLibraryTemp` 起名**（对话框、AI 的参考录音、语言探针三种），正常收尾各自删，崩溃留下的启动时后台清——
+   只清一天以前的（临时目录是几个 SkyCut 共用的）。转写开头那一处的清理（`AudioWindowReader.sweepTempResidue`）不许带上它们。
+10. **检测语言、配旁白的转写不借字幕生成的读取器**：走 `QueuedAudioWindow`（读取在 `MediaReadQueue` 上）。
+
+| 检查 | 守什么 |
+| --- | --- |
+| `scripts/check-voice-recovery.sh` 的 `LibraryOrderChecks`（真 App 对象 + 假协议，单会排队 / 去重 / 改价 / 退款，实扣 ≠ 上限） | 连按只下一单、同一份直接起两次回开着的那一单、改了字另一个 key；上限 760 实扣 751.4 账按实收、`price_changed` 一分不留且带新价和下一步、失败退款不留账；MiniMax 版在建时再调（不带令牌 / 带用过的令牌 / 全部权限 + 长期授权）跟着那一单、只记一笔；授权那句升版本用新文案再问、按新版本建；临时文件夹只清一天以前的三种；`QueuedAudioWindow` 出 16 kHz、能取消 |
+| 同上的 `FallbackFeeChecks.repricedChecks`、`LibraryUIChecks.outdatedStatementChecks` | 建的那一单改价没受理：问题还在、记下新价、普通 resume 按新价再问、新令牌按新价建成才清；对话框换成新的那一句、那一勾拿掉、再勾按新版本建 |
+| `checks/sky-studio-wiring/voice-library-orders.sh`（第 13 节）、`checks/blocking-media-reads.sh` | 上面 1–10 的接线；`AudioWindowReader.extract` 的调用方只在 `SubtitleGen/` |
+
+反向验证记录在两篇案例里（2026-11-11，每条都临时改回去看过红）。
+
+已知不足：SkyCut 重启后不记得在建的那一单，用户再点头本机会再记一笔（服务器仍只扣一次），当天的账多一笔、第二天清零。
+
+人工回归（真 Key，先请用户批准预算）：
+
+- [ ] 设计声音：报价出来后双击「设计」、按住回车：只出现一条「正在设计…」，Sky Studio 明细里只有一笔。
+- [ ] 用自己的声音配英文旁白、点头建 MiniMax 版，**不等它做完**再让 AI 配一次：AI 说「已经在建」、不再问价；设置 → Sky Studio 里今天只多一笔。
+- [ ] （真遇上时）Sky Studio 升了授权那句：AI 和对话框都拿新文案再问一次，不用等十分钟。
+
+## 十一、变声：`change_voice` 和片段右键「换成我的声音…」（声音 PR 9）
 
 > 方案 4.8、4.9、5.5、9.1 第 7、11 项、9.3「变声与口型」；约定第 4 条（服务器只分离 + 变声、回两个文件，混音在 SkyCut 里做）。文件在
 > `Sources/SrtFlow/VoiceChange/`。接口合同在 Sky Studio 仓库 `docs/agents/skycut-api.md`（`voice_convert`：fal SAM Audio 分离 +
@@ -320,6 +364,7 @@
     `VoiceChangePresenter` 摆（`Equatable` + `.equatable()`，同 `UpscalePresenter`；只在那一段所在的工程窗口里摆）。面板用共用的声音选择器
     （`VoicePickerView`：我的声音、设计的声音、预设排最后——预设的样音只有几秒，当变声目标没验证过）。默认选谁（`defaultSelection`）：我的声音只有一个
     就是它，有几个就是上次用过的那个（`SrtFlow.voiceChange.lastVoiceID`），一个都没有就不选、顶上放「新建声音…」。换了声音手里的报价作废、重新问。
+    「开始」按下去那一刻就锁（第十节第 1 条；`VoiceChangePanelModel.started` 在起任务之前置上）：一份报价只起一单、只记一笔，同一段还在变的也不再起。
     面板的视图不读工程、不订阅时钟（工程只在 `VoiceChangePanelModel` 的方法里读）；sheet 套 `.appLanguage()`；不往检查器里加行。
     做完提示条说「已换成『X』的声音，原声已静音，⌘Z 撤回」；没做成那一行留在云端任务浮层里（`SkyStudioMediaStatus`：上传 / 排队 / 处理 / 下载 / 收尾），
     提示条也说一句。AI 起的不往提示条上写（AI 转告）。没有 Key、钥匙串要授权、声音库暂时用不了：面板说和声音库那一节同一句。
@@ -335,7 +380,7 @@
 | --- | --- |
 | `scripts/check-voice-recovery.sh` 的 `VoiceChangeChecks`（真 App 对象 + 假协议 `VoiceChangeHTTP`，方案 9.1 第 7、11 项） | 落地的规则（纯值）：原段静音、两条新轨接在后面、三段一个链接组（已有的组沿用）、变速 / 音量 / 渐变照抄、曲线平移、长 20 ms 裁到原长、背景短一点不拉长、被裁短挪走照现在的样子落、不在了 / 换了素材 / 往外拉长了什么都不改；联动开着挪 / 真删主轨的原片段两段跟着。下单的规则：上限从 `/models`（300）、正好等于上限的收、静音 / 没声音的不收、采样率最高 48 kHz、`target_language` 只在知道语言且目标有这种参考时带、文件名和撞名、放不进原文件夹的退路、面板默认选谁。`change_voice` 全程：先报价后上传、单声道 16-bit 48 kHz 正好 4 秒、`voice_convert_source`、一次 `/jobs`（`max_credits` 是报价）、落地的每一样、两个文件、get_job 的字段、账按实收、截好的那段删掉；预设当目标不问声音库；AI 给的语言优先于检测、检测出目标没有的语言不带、检测不出来不带；超上限 / 静音 / 几乎没声音 / 不认识的声音 / 声音库用不了 / 每日额度不够都在收费之前停；**一步撤销 / 重做**、之后的改动是另一步；这一段被删了 / 工程换了只留文件、同一段不交第二次；服务器说没做成退回那一笔、留在任务浮层里；提交的回答丢了不重交、那一笔留在账上。面板：默认选谁、选了才问价、换声音报价作废、超额度按不下去、按下去起同一个任务并自动落地、提示条、记住上次的声音、没有自己的声音不替用户选、超上限说上限 |
 | `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` / `ProviderChecks` | 参数名（`clip_id` / `voice` / `language` / `project`，不收 `confirm_token`、不收 `clip`）、名片必含（花积分、任务号、两条新轨、原段静音、一步撤销、每日上限、先读说明书）且不许诺确认、说明书的分节和必含、不写数、地图的 Voices 一行和 Paid 一行、paid 主题 |
-| `checks/sky-studio-wiring.sh` 第 13 节（`checks/sky-studio-wiring/voice-change.sh`）和 `checks/MCP/router-wiring.sh` 的异步落账扫描 | 两个入口都经 `prepare` / `draft` / `spokenLanguage`、都是先过每日硬预算再 `start`；`VoiceChangeJob` 只在 `VoiceChangeOrder` 里造；这一摊不用确认码、不弹框、不直接动账；落地恰好一次 `perform`、上一行是 `AIUndoGrouping.step`、规则只有 `VoiceChangeLanding.land` 一份；路由只起任务；上传用途只写一处；阻塞读在 `MediaReadQueue.analysis`；块只往 Activity 写目标；Presenter 挂在检查器底下且 `.equatable()`；面板的视图不读工程、用共用的选择器 |
+| `checks/sky-studio-wiring.sh` 第 14 节（`checks/sky-studio-wiring/voice-change.sh`）和 `checks/MCP/router-wiring.sh` 的异步落账扫描 | 两个入口都经 `prepare` / `draft` / `spokenLanguage`、都是先过每日硬预算再 `start`；`VoiceChangeJob` 只在 `VoiceChangeOrder` 里造；这一摊不用确认码、不弹框、不直接动账；落地恰好一次 `perform`、上一行是 `AIUndoGrouping.step`、规则只有 `VoiceChangeLanding.land` 一份；路由只起任务；上传用途只写一处；阻塞读在 `MediaReadQueue.analysis`；块只往 Activity 写目标；Presenter 挂在检查器底下且 `.equatable()`；面板的视图不读工程、用共用的选择器 |
 | `scripts/gui-smoke/sky-studio/voice_change.py`（真 App + 真 MCP + 本机假 Sky Studio，免费，**不在 check-all 里**） | `change_voice` 走全程：报价 → 上传（不带 Key）→ 一次任务 → 两条新轨、原段静音 → 撤销一步回去；账按实收；不认识的声音收费前拒 |
 | `scripts/render-voice-library.sh <输出目录>` 的第 9、10 张（要图形会话，**不在 check-all 里**） | 不判对错，只出图：变声面板（选了声音带报价 / 还没有自己的声音），英 / 中 / 西 |
 
@@ -353,10 +398,11 @@
 | 没做成一律退回那一笔 | 「结果不明的那一笔留在账上」 |
 | 落地多登记一次 `perform` | 「一步撤销回到原声」「正好一步」「面板起的也是一步」 |
 | 面板换声音不作废报价 | 「换声音报价作废」「重新问」 |
+| 面板的「开始」不加闩（去掉 `guard !started`） | 「一份报价只起一单」（撤销回原声之后同一个面板再按，起了第二单、多记一笔） |
 | `tooLong` 实际不拦 | 纯值一条、「超上限收费之前拒」「超上限不问价」、面板那一条 |
 | 上传用途写成 `audio` | 「以 voice_convert_source 上传」 |
 | 去掉落地那层 `AIUndoGrouping.step` | 只有扫描红（`checks/MCP/router-wiring.sh`）。运行时红不了：回归进程的主循环一直在转，按事件自动开的那一组自己会关；那种「关不上」只在后台的真 App 里有（同 upscale 的换源，也只靠扫描） |
-| 面板里读 `OpenProjects`；任务里直接写 `"voice_convert_source"`；面板不过预算就起任务；块里直接造面板的模型；工具里用 `AIConfirmations` | `checks/sky-studio-wiring.sh` 第 13 节 7 条 |
+| 面板里读 `OpenProjects`；任务里直接写 `"voice_convert_source"`；面板不过预算就起任务；块里直接造面板的模型；工具里用 `AIConfirmations` | `checks/sky-studio-wiring.sh` 第 14 节 7 条 |
 | 地图的 Voices 一行删掉 `change_voice`；名片删掉 `One undo step` | `check-mcp` 3 条 |
 
 全部恢复后转绿（`check-voice-recovery` 连跑两遍都绿）。

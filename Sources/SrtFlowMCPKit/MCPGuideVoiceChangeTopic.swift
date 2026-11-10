@@ -6,7 +6,7 @@ import Foundation
 // 登记在 MCPGuideWrittenTopics（和别的迁移过的工具同一张表、同一套守卫 GuidePilotChecks）；新工具，没有迁移前的说明原文
 // （previousCard 为 nil，名单写死在 GuidePilotChecks）。fields 由 MCPGuideTopics 从参数定义现算、接在最后。只写英文。
 // 价、一次最长多少秒都不写数（只在 Sky Studio 的 /models、/quote；现在是 5 分钟，写「get_status models=true 列着」）。
-// 出处：docs/plans/2026-11-09-voice-features.md 4.8、4.9；docs/architecture/voice-library.md 第十节；Sky Studio 仓库
+// 出处：docs/plans/2026-11-09-voice-features.md 4.8、4.9；docs/architecture/voice-library.md 第十一节；Sky Studio 仓库
 // docs/agents/skycut-api.md「voice_convert」。
 // 不管什么：名片（MCPVoiceChangeTool）、声音库（MCPGuideVoiceLibraryTopics）、配旁白（MCPGuideVoiceTopics）、怎么答（MCPGuide）。
 

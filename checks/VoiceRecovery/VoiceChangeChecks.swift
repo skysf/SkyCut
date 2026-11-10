@@ -536,6 +536,12 @@ private func panelChecks(_ root: URL) async throws {
     let manager = fixture.project.effectiveUndoManager
     manager?.undo()
     require(fixture.project.state == before && manager?.canUndo == false, "a change started from the panel is one undo step too")
+    // 一份报价只起一单：任务做完、撤销回原声之后（这一段又能变了），同一个面板再按也不起第二单、不再记一笔。
+    let settled = SkyStudioSpendStore.shared.spentToday()
+    let pressedAgain = model.start()
+    require(!pressedAgain && VoiceChangeHTTP.calls("POST", "/jobs").count == 1 && SkyStudioSpendStore.shared.spentToday() == settled,
+            "the start button stays latched: one quote, one job, one charge (started again: \(pressedAgain), jobs: "
+            + "\(VoiceChangeHTTP.calls("POST", "/jobs").count), spend \(settled) -> \(SkyStudioSpendStore.shared.spentToday()))")
 
     // 没有自己的声音：不替用户选，顶上有「新建声音…」；设计的声音照样能选。
     let empty = try VoiceChangeFixture(folder: root.appendingPathComponent("change-panel-empty"))

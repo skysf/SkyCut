@@ -16,13 +16,15 @@ func runVoiceFallbackFeeChecks(_ root: URL) async throws {
     let lines = ["Our story starts here.", "The ship leaves at dawn.", "Nobody knows the way.", "But the stars do."]
     try await skipChecks(root, lines)
     try await buildChecks(root, lines)
+    try await repricedChecks(root, lines)
 }
 
 private let libraryVoice = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
 
 @MainActor
-private func failedNarration(_ root: URL, _ name: String, _ lines: [String]) async throws -> (VoiceRecoveryFixture, JSONValue) {
+private func failedNarration(_ root: URL, _ name: String, _ lines: [String], dailyLimit: Double? = nil) async throws -> (VoiceRecoveryFixture, JSONValue) {
     let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent(name), cap: 30, audioSlots: 2)
+    if let dailyLimit { SkyStudioSpendStore.shared.setDailyLimit(dailyLimit) }
     fixture.failSplitOnce = false
     VoiceRecoveryHTTP.promptIndex = Dictionary(uniqueKeysWithValues: lines.enumerated().map { ($0.element, $0.offset) })
     VoiceRecoveryHTTP.oneTimeAt = 1
@@ -94,4 +96,41 @@ private func buildChecks(_ root: URL, _ lines: [String]) async throws {
     let finished = try await fixture.wait(try await resume(fixture, ["resume": .string(file), "generate_missing": true]))
     require(finished["status"] == "done" && fixture.project.state.audioTracks.flatMap(\.clips).count == lines.count,
             "after building, generate_missing reads the missing parts and every line lands once")
+}
+
+/// 建的那一单在 Sky Studio 受理之前就没做成（价变了）：这一笔的问题还在（以前记上账就清，之后只剩 generate_missing、又回到同一个失败），
+/// 恢复记录记下新价，get_job 带新价和下一步；再 resume 按新价问、点过头按新价建成，这时才清。
+@MainActor
+private func repricedChecks(_ root: URL, _ lines: [String]) async throws {
+    // 前面的场景已经花了不少（每日额度 1,000）：这一个场景放宽额度、做完把自己记的账退掉，后面的场景照旧。
+    let start = SkyStudioSpendStore.shared.spentToday()
+    defer {
+        SkyStudioSpendStore.shared.refund(SkyStudioSpendStore.shared.spentToday() - start, on: Date())
+        SkyStudioSpendStore.shared.setDailyLimit(1_000)
+    }
+    let (fixture, failed) = try await failedNarration(root, "fallback-fee-repriced", lines, dailyLimit: 100_000)
+    let file = failed["recovery_file"]?.stringValue ?? ""
+    let token = failed["confirm_token"]?.stringValue ?? ""
+    let record = URL(fileURLWithPath: file)
+    let spent = SkyStudioSpendStore.shared.spentToday()
+    VoiceRecoveryHTTP.enrollPriceChange = 400
+    let refused = try await fixture.wait(try await resume(fixture, ["resume": .string(file), "confirm_token": .string(token)]))
+    require(refused["status"] == "failed" && refused["code"] == "price_changed" && refused["credits_now"] == 400 && refused["credits_approved"] == 377.6
+            && refused["next_step"]?.stringValue?.contains("resume=") == true && refused["one_time"]?.arrayValue?.first?["credits"] == 400,
+            "an enrolment refused for its price ends with the new price and how to be asked again: \(refused)")
+    require(SkyStudioSpendStore.shared.spentToday() == spent, "nothing stays on the day's spend")
+    require(try SkyStudioVoiceRecoveryStore.read(record).fallbackFee?.credits == 400,
+            "the question is still open in the recovery record, at the new price")
+
+    let plain = try await fixture.wait(try await resume(fixture, ["resume": .string(file)]))
+    let again = plain["confirm_token"]?.stringValue ?? ""
+    require(!again.isEmpty && again != token && plain["question"]?.stringValue?.contains("400") == true,
+            "a plain resume asks the same fee again at the new price, with a new token: \(plain["question"] ?? .null)")
+    let building = try await resume(fixture, ["resume": .string(file), "confirm_token": .string(again)])
+    let built = try await fixture.wait(building)
+    require(built["status"] == "done" && VoiceRecoveryHTTP.enrolls.last?["max_credits"] == 400, "the new approval builds it at the new price")
+    require(SkyStudioSpendStore.shared.spentToday() == spent + 400, "which is what the day is charged")
+    require(try SkyStudioVoiceRecoveryStore.read(record).fallbackFee == nil, "and only then is the question answered")
+    let finished = try await fixture.wait(try await resume(fixture, ["resume": .string(file), "generate_missing": true]))
+    require(finished["status"] == "done" && fixture.project.state.audioTracks.flatMap(\.clips).count == lines.count, "every line lands once")
 }

@@ -61,7 +61,8 @@
 | `SkyStudioVoiceBatchQueue.swift` / `SkyStudioVoiceCloudBatches.swift` / `SkyStudioVoiceBatchBoard.swift` | 一段旁白的几批怎么拿到本机：按原来的顺序领槽、同时交，一批出了事后面没交的不再交（队列）；一批怎么交 / 只 GET 原单 / 下载、中途换备用（批次）；几批各走到哪一步（纯值：状态行和 get_job 的「几批好了 / 在跑 / 等空位」，第五节） |
 | `SkyStudioVoiceLibraryTool.swift` / `SkyStudioVoiceRecordingTool.swift` / `SkyStudioVoiceDesignTool.swift` / `SkyStudioVoiceLibraryJob.swift` / `SkyStudioVoiceOneTimeStep.swift` | 声音库（声音 PR 6）：`list_voices`、`manage_voices` 的列、建 / 加录音（先问授权）、设计（先问一次性费用、起任务）、改名、删除；设计和建 MiniMax 版的任务；配旁白碰上一次性费用时问 / 跳过 / 起建的任务（[声音库](voice-library.md)第八节） |
 | `SkyStudioVoiceStanding.swift` / `SkyStudioVoiceStandingNotice.swift` / `FullAccessConsentSheet.swift`（不在 SkyStudio 目录） | 全部权限下的长期授权（声音 PR 7）：声音那几件事此刻怎么问（`.ask` / `.standing` / `.once`）、`/voices/consent-grant` 的记 / 撤、升级时补记、打开全部权限时那段说明（价目从 `/models` 读）和设置里的那张（[声音库](voice-library.md)第八节第 7、9 条） |
-| `VoiceChange/VoiceChangeSource.swift` / `VoiceChangeOrder.swift` / `VoiceChangeJob.swift` / `VoiceChangeLanding.swift` / `VoiceChangeOutputName.swift` / `VoiceChangeTool.swift` | 变声（声音 PR 9）：截这一段的声音、定语言和报价用的那一份、任务（传 → `voice_convert` → 下两个文件 → 一步落地）、落地的规则（纯值）、文件叫什么、AI 的 `change_voice`（[声音库](voice-library.md)第十节） |
+| `SubtitleGen/QueuedAudioWindow.swift` / `VoiceLibrary/VoiceLibraryTemp.swift` | 配旁白的转写、检测录音语言要的 16 kHz 音频：读取在 `MediaReadQueue` 上（字幕生成那个写在 async 里的读取器不借）；声音库三种临时文件夹的名字和启动时的清理（[声音库](voice-library.md)第十节） |
+| `VoiceChange/VoiceChangeSource.swift` / `VoiceChangeOrder.swift` / `VoiceChangeJob.swift` / `VoiceChangeLanding.swift` / `VoiceChangeOutputName.swift` / `VoiceChangeTool.swift` | 变声（声音 PR 9）：截这一段的声音、定语言和报价用的那一份、任务（传 → `voice_convert` → 下两个文件 → 一步落地）、落地的规则（纯值）、文件叫什么、AI 的 `change_voice`（[声音库](voice-library.md)第十一节） |
 | `SkyStudioVoiceListing.swift` / `SkyStudioVoiceApproval.swift` / `SkyStudioVoiceLibraryErrors.swift` | 纯值：`list_voices` 回什么、声音库三件事的令牌绑什么和问句、错误码换成能照做的话（声音库用不了不退本机、删除时存储一时不可用再发一次） |
 
 ### 模型目录的缓存与换账户
@@ -96,7 +97,7 @@
   服务端自己探真实素材并在扣费前核对 `max_credits`；输入不改写、不缩小；原始字节按目录约束上传。成品下载到「生成」文件夹，作品库也永久保留。
 - **不自动替换**（2026-10-31 用户要求，覆盖 10-30 的自动切模型策略）：任何模型失败、拒绝或状态未知都不自动重生成、切模型或重放收费 POST。
   `auto_fallback=true` 明确拒绝，false 只为旧客户端兼容。用户另行批准的新生成使用新 key / 新预算。`get_job` 在本机任务结束后也只 GET 原服务器任务，更新 billing 与原结果地址。
-- **变声**（声音 PR 9，2026-11-11）：`change_voice` 和片段右键的面板，规矩见 [声音库](voice-library.md)第十节。kind `voice_convert`、`model: auto`
+- **变声**（声音 PR 9，2026-11-11）：`change_voice` 和片段右键的面板，规矩见 [声音库](voice-library.md)第十一节。kind `voice_convert`、`model: auto`
   （服务器用 `chatterbox-hd`，出错自己换 `chatterbox`，结果的 `model` / `fallback_used` 照报）；先 `/quote`（`params.source.seconds`，可带
   `params.target_language`），过每日硬预算（只判这一样、不问），再传 `voice_convert_source`（单声道 WAV，≤ 35 MB）、交一次 `/jobs`
   （`inputs.source_audio_url`、`max_credits` = 报价）；在声音池领槽；结果是两个文件（`voice_url`、`background_url`，留 60 天），下到原素材旁边；
@@ -144,6 +145,9 @@
   `resume` + 那张令牌 = 过闸记账、起 `voice_enroll` 任务，做完 `resume` + `generate_missing=true` 读没做成的几批（MiniMax 版有了，默认再出错服务器能换上备用）；
   `resume` + `skip_one_time=true` = 不建、照原来的选择重试（同 `generate_missing=true`）；普通 `resume` 照旧只恢复已有的、这一笔留着等答复（get_job 再给一遍同一个问题、同一张令牌）。
   `resume` 那一次要是先问了「读别处的文件」，令牌就不当这一笔的答复。问不了（读不到 Key、报不出价）就照旧只说重试的办法。
+  **这一笔在建的那一单被 Sky Studio 受理之后才清**（2026-11-11，[案例](../bugfixes/2026-11-11-voice-library-review-followups.md)）：受理之前没做成
+  （改价、断网、等不到槽）问题留着、普通 `resume` 再问；`price_changed` 把新价记进恢复记录；这个声音这种语言的 MiniMax 版已经在建
+  （早先点过头的那一单）就跟着它、不再问不再记账（[声音库](voice-library.md)第十节）。
   **全部权限 + 长期授权**（声音 PR 7）：不问，结束那一刻直接建（每日硬预算照拦），get_job 带 `enroll_job_id` 和 `full_access`，工程的提示条说一句；
   还没有长期授权就照上面问一次、问句带打开全部权限时那段说明、点过头补记。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
@@ -169,6 +173,9 @@
     `estimatedSplit`、`get_job` 和结果报 `estimated_split_line_indices`、`voice.note` 叫 AI 转告用户听一下头尾。转写得了的 Mac 上
     切不准照旧报错、能恢复（重试有意义）；只有重试多少次都一样的这条路才估。
     [案例：拿不到字的时间卡死](../bugfixes/2026-11-10-packed-batch-without-word-times-stuck.md)。
+  - **转写得了、但这一批就是对不回原文**：第一次照旧报 `local_split`、能恢复；恢复记录记下这一批的 `splitFailures`，**第二次**还切不开
+    就同样按字数估、结果照样报 `estimated_split_line_indices`，`voice.note` 说试了两次（同一段音频、同一个模型，再试多少次都一样；
+    2026-11-11 审查的残留，`PaidAudioChecks.neverMatchesChecks`）。
 - **字幕时间**（声音 PR 5，方案第七节；约定第 5 条：由 SkyCut 定，服务器只照点名的模型读）。`subtitle_timing` 报在回任务号、`get_job` 和落地的结果里：
   - `provider`：模型报的字的时间（eleven-v4，本机的 Kokoro / macOS 声音的词标记）；`aligned`：这台 Mac 转写成品再对齐；`estimated`：按字数估，可能差半秒左右，
     `voice.note` 叫 AI 转告；`mixed`：几句不一样，`subtitles.estimated_line_indices` 列出估的那几句。

@@ -39,6 +39,18 @@ final class SkyStudioVoiceRecovery {
         catch { throw SkyStudioVoiceProcessingError(stage: .checkpoint, underlying: error) }
     }
 
+    /// 只改盘上那一份记录里「等答复的一次性费用」（SkyStudioVoiceFallbackFee：建的那一单受理了清掉、没做成放回 / 换新价）：
+    /// 现读现改现写，和 `save` 同一条串行队列——不拿手里可能已经旧了的整份记录去盖别的恢复任务刚存的进度。
+    static func updateFee(in file: URL, _ change: @escaping @Sendable (SkyStudioVoiceOneTime?) -> SkyStudioVoiceOneTime?) async {
+        await MediaReadQueue.run(on: MediaReadQueue.voice) {
+            guard var value = try? SkyStudioVoiceRecoveryStore.read(file) else { return }
+            let next = change(value.fallbackFee)
+            guard next != value.fallbackFee else { return }
+            value.fallbackFee = next
+            try? SkyStudioVoiceRecoveryStore.write(value, to: file)
+        }
+    }
+
     func input(for project: VideoEditProject) throws -> AIVoiceoverInput {
         let saved = value.input
         let samePath = value.projectPath.map { $0 == project.documentURL?.standardizedFileURL.path } ?? false

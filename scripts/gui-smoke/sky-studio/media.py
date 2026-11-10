@@ -13,7 +13,7 @@ from mcpclient import MCP
 
 D = Path(os.environ.get("SKYSTUDIO_SMOKE_DIR", "/private/tmp/srtflow-skystudio-smoke"))
 WORK = D / "work"
-SERVER = "http://127.0.0.1:18766"
+SERVER = "http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766")
 mcp = MCP(str(D / "SrtFlowSkyStudioSmoke.app/Contents/Helpers/skycut-mcp"), env={**os.environ, "SRTFLOW_MCP_NO_LAUNCH": "1"})
 
 

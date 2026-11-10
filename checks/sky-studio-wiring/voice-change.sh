@@ -12,7 +12,7 @@
 #   - 上传用途只写在 SkyStudioVoiceUpload 一处；截声音的阻塞读只在 MediaReadQueue 上；
 #   - 时间线上的块只往 VoiceChangeActivity 里写一个目标（不读工程、不做 IO），面板由挂在检查器底下的 VoiceChangePresenter 摆；
 #     面板的视图不读工程、不订阅播放器的时钟，声音选择器用共用的 VoicePickerView。
-# 长期约束见 docs/architecture/voice-library.md 第十节。
+# 长期约束见 docs/architecture/voice-library.md 第十一节。
 
 CHANGE_DIR="Sources/SrtFlow/VoiceChange"
 CHANGE_TOOL="${CHANGE_DIR}/VoiceChangeTool.swift"

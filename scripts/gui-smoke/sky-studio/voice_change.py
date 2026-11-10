@@ -1,7 +1,7 @@
 """真实 App / MCP 的免费变声冒烟（声音 PR 9）；先运行同目录 run.sh。结果保留在测试目录。
 假 Sky Studio 把传上去的那段源音频原样当成「变声后的人声」和「背景」两个文件回来：验的是 change_voice 走全程——先报价再上传
 （单声道 WAV、voice_convert_source、不带 Key）、一次 voice_convert 任务、做完两条新音频轨、原段静音、三段链接、撤销一步回去，
-不认识的声音收费之前就拒；不验声音像不像（那要真 Sky Studio、花积分，见 docs/architecture/voice-library.md 第十节的人工回归）。"""
+不认识的声音收费之前就拒；不验声音像不像（那要真 Sky Studio、花积分，见 docs/architecture/voice-library.md 第十一节的人工回归）。"""
 import json
 import os
 from pathlib import Path
@@ -16,7 +16,7 @@ from mcpclient import MCP
 
 D = Path(os.environ.get("SKYSTUDIO_SMOKE_DIR", "/private/tmp/srtflow-skystudio-smoke"))
 WORK = D / "work"
-SERVER = "http://127.0.0.1:18766"
+SERVER = "http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766")
 VOICE = "voice_" + "5" * 32
 mcp = MCP(str(D / "SrtFlowSkyStudioSmoke.app/Contents/Helpers/skycut-mcp"), env={**os.environ, "SRTFLOW_MCP_NO_LAUNCH": "1"})
 

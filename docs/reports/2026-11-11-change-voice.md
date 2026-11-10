@@ -1,6 +1,6 @@
 # 变声（声音 PR 9）：离屏渲染和免费冒烟（2026-11-11）
 
-> 做了什么、规矩和守卫在 [声音库](../architecture/voice-library.md)第十节；方案是 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.8、4.9、5.5。
+> 做了什么、规矩和守卫在 [声音库](../architecture/voice-library.md)第十一节；方案是 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.8、4.9、5.5。
 > 这里只记这一次的证据和没验到的。**没有对真 Sky Studio 跑过**（变声要花积分；留在人工回归里，先请用户批准预算）。
 
 ## 一、变声面板的离屏渲染
@@ -41,7 +41,7 @@
 | 假服务的日志 | 先 `/quote`（`voice_convert`、`model: auto`、按源秒数）→ `/uploads`（`voice_convert_source`、`audio/wav`）→ PUT（不带 Key）→ **一次** `/jobs`（`max_credits: 3`）；传上去的是单声道 16-bit、长度正好是这一段 |
 | `change_voice voice=eleven:Daniel` | 收费之前拒（叫它看 `list_voices`），没有新的 `/jobs` |
 
-## 三、没验到的（在[声音库](../architecture/voice-library.md)第十节的人工回归里）
+## 三、没验到的（在[声音库](../architecture/voice-library.md)第十一节的人工回归里）
 
 - **真 Sky Studio**：声音像不像、口型对不对、接近 5 分钟的片段、立体声背景变单声道、预设当目标、`target_language` 真起作用（要花积分）。
 - **真窗口**：右键菜单项、sheet 的出场和键盘焦点、云端任务浮层里那一行、提示条、「新建声音…」从面板里弹出来。
