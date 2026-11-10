@@ -83,7 +83,7 @@
 | `checks/MCP/voice-reference-wiring.sh`（扫描，`check-mcp` 和 `check-guards` 都跑） | 门限是写死的 `speechRMSFloor = 0.0056`，`VoiceReferenceWindow` 的代码里不碰 `AIVoiceLevel` |
 | `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录、恢复出来的结果、一次就做完的结果都说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒；只有 6 秒人声的素材在报价之前就拒（一个 POST 都没有、不写恢复记录、`get_job` 带 `reason` 和差 4 秒） |
 
-反向验证（2026-11-10，每一处临时改回去、跑、再恢复）：
+反向验证（2026-11-10，每一处临时改回去、跑、再恢复）。PR #346：
 
 | 临时改成 | 红了什么 |
 | --- | --- |
@@ -94,7 +94,19 @@
 | `cloneSource` 换回「默认 10、夹在 5–30」 | `check-voice-recovery` 3 条：5 秒不拒、不给时成了 10 秒、45 秒被夹到 30 |
 | 去掉落地前从恢复记录同步声音说明的那一行 | 一次就做完的克隆，结果不说用了哪一段（恢复出来的那次照样有：说明从记录里读） |
 
-全部恢复后转绿。
+审查之后的修正 PR：
+
+| 临时改成 | 红了什么 |
+| --- | --- |
+| `quantize` 换回 `Int16(clamping: Int(…))` | `check-mcp` 当场崩（Double value cannot be converted to Int…，SIGTRAP，退出码 133） |
+| `speechRMSFloor` = 0.0056234（精确的 −45 dBFS） | 扫描守卫先红；摘掉扫描再跑，运行时三条红：常量、边界两格、贴边样本（只剩 9.9 秒、被拒） |
+| `speechRMSFloor` = `AIVoiceLevel.activeFloor`（数值一样） | 只有扫描守卫红；摘掉扫描，运行时 4371 项全过 —— 比数值查不出耦合，所以要那条扫描 |
+| 写出去的采样不再数一遍（用挑段时的数） | 浮点刚过门限的样本没被拒；带坏采样的那份算成 14.98 秒 |
+| 3 分钟的边界 `>` 改成 `>=` | 正好 3 分钟、结尾有停顿的那份变成挑段（179.54 秒） |
+| 去掉报价之前做参考录音那一步 | `check-voice-recovery` 3 条：6 秒的素材没在报价之前拒、发了 POST、写了恢复记录 |
+| `fail()` 不把结构化的原因带进 get_job | `check-voice-recovery`：6 秒素材的 get_job 里没有 `reason` / `missing_seconds` |
+
+全部恢复后转绿。读完到写之间再看一次取消（第 6 条）没有确定的触发办法，没做反向验证。
 
 ## 七、人工回归（真 Key；声音库上线、新建声音的界面做好之后）
 

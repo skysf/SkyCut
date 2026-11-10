@@ -25,8 +25,8 @@ SkyCut 说够了、服务器说不够，用户要到上传之后才被拒。
 - `VoiceReferenceFileChecks`：照 `borderline.wav` 的形状现写一份（9.9 秒 + 5 格 ±184），走生产的 `prepare`：正好 10.0 秒，收。
 - 扫描守卫 `checks/MCP/voice-reference-wiring.sh`（由 `scripts/check-mcp.sh` source，`scripts/check-guards.sh` 也跑）：门限是写死的 0.0056，
   代码里不碰 `AIVoiceLevel`。
-- 反向验证：门限改成精确的 −45 dBFS（0.0056234）→ 常量、边界两格、borderline 样本三条红；改回 `= AIVoiceLevel.activeFloor`（数值一样）→
-  只有扫描守卫红，这正是要它的原因。恢复后转绿。
+- 反向验证：门限改成精确的 −45 dBFS（0.0056234）→ 扫描守卫先红；摘掉扫描再跑，运行时的常量、边界两格、borderline 样本（只剩 9.9 秒、被拒）三条红。
+  改回 `= AIVoiceLevel.activeFloor`（数值一样）→ 只有扫描守卫红；摘掉扫描，`check-mcp` 运行时 4371 项全过 —— 这正是要那条扫描的原因。恢复后转绿。
 
 ## 教训 / 防回归
 
