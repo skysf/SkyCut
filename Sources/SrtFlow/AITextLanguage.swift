@@ -22,4 +22,18 @@ enum AITextLanguage {
               (recognizer.languageHypotheses(withMaximum: 1)[language] ?? 0) >= 0.5 else { return nil }
         return language.rawValue
     }
+
+    /// 这台 Mac 转写这几句话用哪种语言（SpeechTranscriber 按它挑模型）。`language` 是稿子的主要语言（ISO 639-1，字形已经丢了）：
+    /// 中文按字形分 —— 繁体写法的字比简体写法的多就是 `zh-Hant`（系统给 zh_TW 的模型，写出来是繁体），不然照旧 `zh`（zh_CN）；
+    /// 别的语言原样。按字数（繁→简会改的字 vs 简→繁会改的字），不问 NLLanguageRecognizer：两种写法一样的短句（「你好」）它判成繁体。
+    /// 2026-11-10 之前繁体稿一律交给简体模型转写（docs/bugfixes/2026-11-10-traditional-chinese-batch-split-fails.md）。
+    static func speechLanguage(_ language: String, texts: [String]) -> String {
+        guard language.lowercased() == "zh" else { return language }
+        let text = texts.joined(separator: "\n")
+        func rewritten(_ transform: String) -> Int {
+            guard let other = text.applyingTransform(StringTransform(transform), reverse: false) else { return 0 }
+            return zip(text.unicodeScalars, other.unicodeScalars).reduce(0) { $0 + ($1.0 == $1.1 ? 0 : 1) }
+        }
+        return rewritten("Traditional-Simplified") > rewritten("Simplified-Traditional") ? "zh-Hant" : language
+    }
 }
