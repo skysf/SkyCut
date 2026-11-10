@@ -72,7 +72,9 @@ try:
         file = Path(name) if Path(name).is_absolute() else WORK / name
         with wave.open(str(file)) as audio:
             assert audio.getnchannels() == 1 and audio.getnframes() > 0, name
-    assert Path(done["voice_file"]).name == "voice-sample - Smoke voice.wav", done["voice_file"]
+    # 上一次跑留下的文件还在时撞名加编号（「… 2.wav」），不覆盖。
+    voice_name = Path(done["voice_file"]).name
+    assert voice_name.startswith("voice-sample - Smoke voice") and voice_name.endswith(".wav"), voice_name
 
     # 一步撤销回去；重做再回来。
     call("undo")

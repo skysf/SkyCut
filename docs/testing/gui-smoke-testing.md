@@ -443,7 +443,11 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    `python3 scripts/gui-smoke/sky-studio/voice_consent.py migrated`：App 读到假 Key 时自己记上一次、`get_settings` 报 `recorded`，不问。假服务的
    `/voices/consent-grant` 按账号记、`/models` 带声音库那几个模型的价。设置窗口里那张说明（选全部权限先弹、取消不改、三种语言）是人工回归，
    清单在 [声音库](../architecture/voice-library.md)第八节。
-7. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
+7. 变声（声音 PR 9）：`python3 scripts/gui-smoke/sky-studio/voice_change.py` 验 `change_voice` 走全程——先 `/quote`（按源秒数）再上传
+   （单声道 16-bit WAV、`voice_convert_source`、PUT 不带 Key）、一次 `voice_convert`（`max_credits` 是报价）、做完两条新音频轨、原段静音、
+   两个文件在源文件旁边（撞名加编号）、`undo` 一步回去、账按实收、不认识的声音收费之前拒。假服务把传上去的那段源音频原样当成人声和背景回来
+   （`voice_fixtures.py` 的 `finish_convert`），所以不验声音像不像；右键菜单、面板、任务浮层那一行、提示条走[声音库](../architecture/voice-library.md)第十节的人工回归。
+8. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 清理器本身的自动检查必须同时隔离进程、钥匙串、偏好与文件删除。`SKYSTUDIO_SMOKE_DIR` 不会改变
 App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在运行的 `.skystudiosmoke` socket / provider 文件。
