@@ -6,7 +6,7 @@ import SrtFlowMCPKit
 // 旁白中途：备用要先花一次性费用（任务结束码 fallback_needs_one_time，SkyCut 声音方案 4.5；声音 PR 4 让那一批停下，问用户是声音 PR 6），
 // 真 App 对象 + 假协议（VoiceRecoveryHTTP），用声音库的声音读（MiniMax 版是声音库的声音才有的）：
 // - 任务结束时 get_job 带问句、价（one_time，结束码带的价、声音照恢复记录）和 confirm_token，next_step 说两条路；恢复记录记下这一笔；
-// - 普通 resume 照旧只恢复已有的，这一笔留着等答复；
+// - 普通 resume 照旧只恢复已有的，这一笔留着等答复，get_job 再给一遍同一个问题（同一张令牌）；
 // - resume + skip_one_time：清掉这一笔，用原来的选择重报价、重交没做成的几批，不建 MiniMax 版；
 // - resume + 别的令牌：再问（同一件事回同一张）；resume + 那张令牌：按报价记账、起 voice_enroll（模型、声音、语言、max_credits），
 //   这一笔清掉，之后 resume + generate_missing 把没做成的读完、全部落地一次。
@@ -57,6 +57,8 @@ private func skipChecks(_ root: URL, _ lines: [String]) async throws {
     let waiting = try SkyStudioVoiceRecoveryStore.read(URL(fileURLWithPath: file)).fallbackFee
     require(plain["status"] != "done" && VoiceRecoveryHTTP.enrolls.isEmpty && waiting != nil,
             "a plain resume only recovers what exists and keeps the question waiting")
+    require(plain["confirm_token"] != nil && plain["confirm_token"] == failed["confirm_token"] && plain["one_time"] == failed["one_time"],
+            "and its get_job asks the same question again, with the same confirm_token")
 
     let quotes = VoiceRecoveryHTTP.bodies("/quote").count
     let retried = try await fixture.wait(try await resume(fixture, ["resume": .string(file), "skip_one_time": true]))

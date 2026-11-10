@@ -9,7 +9,7 @@ import SrtFlowMCPKit
 //   AI 问用户 —— **resume + confirm_token** = 建（起 voice_enroll 任务），做完 **resume + generate_missing=true** 接着做没做成的几批
 //   （MiniMax 版有了，默认再出错时服务器能自动换上备用）；**resume + skip_one_time=true** = 不建，用原来的模型重试那几批（同 generate_missing）。
 // - **resume 带着这两样**（`resume`）：skip → 清掉、交给 generate_missing；令牌 → 过闸（每日硬预算、令牌绑这一笔的完整身份）、记账、起建的任务、
-//   清掉；令牌过期 / 用过了 → 再问一次。不带的普通 resume 照旧只恢复已有结果，这一笔留着等答复。
+//   清掉；令牌过期 / 用过了 → 再问一次。不带的普通 resume 照旧只恢复已有结果，这一笔留着等答复（`waiting`：get_job 再给一遍同一个问题、同一张令牌）。
 // 和配旁白开头那一问（SkyStudioVoiceOneTimeStep）一样分两步：建要几十秒、建完的价要再报，不在旁白任务里串着做。
 // 这一刀两种模式都问（全部权限下直接建要等长期授权和打开时的价目说明，声音 PR 7）。
 // 不管什么：几批怎么交、中途换备用（SkyStudioVoiceBatchQueue / SkyStudioVoiceCloudBatches，声音 PR 4）。
@@ -31,12 +31,13 @@ enum SkyStudioVoiceFallbackFee {
               let fee = await priced(raw, voice: recovery.value.input.voice, key: key, api: services.api), let credits = fee.credits else { return nil }
         recovery.value.fallbackFee = fee
         do { try await recovery.save() } catch { return nil }
-        let decision = try? SkyStudioJobGate.voiceOneTime(credits: credits, action: action(fee, key: key),
-                                                          question: SkyStudioVoiceApproval.fallbackQuestion(fee, credits: credits), token: nil)
-        guard case .needsConfirmation(let result)? = decision, case .object(var value) = result.payload else { return nil }
-        value["one_time"] = .array([fee.json])
-        value["next_step"] = .string(nextStep(asking: value["status"] == "needs_confirmation", file: recovery.file.path))
-        return value
+        return question(fee, credits: credits, key: key, file: recovery.file.path)
+    }
+
+    /// 普通 resume 收好了已有的、这一笔还在等答复：get_job 把同一个问题（同一张令牌）再给一遍，免得 AI 只看到 generate_missing 那一句。
+    static func waiting(_ recovery: SkyStudioVoiceRecovery, services: SkyStudioVoiceServices) async -> [String: JSONValue]? {
+        guard let fee = recovery.value.fallbackFee, let credits = fee.credits, let key = try? await services.key() else { return nil }
+        return question(fee, credits: credits, key: key, file: recovery.file.path)
     }
 
     /// resume 带着 confirm_token / skip_one_time，答这一笔。`token` 只在这一次没有拿它去答「读别处的文件」时才传进来。
@@ -99,6 +100,16 @@ enum SkyStudioVoiceFallbackFee {
         fee.model = model
         fee.credits = quote.voice?.oneTime.first?.credits ?? quote.credits
         return fee
+    }
+
+    /// 问这一笔（不带令牌：同一件事等答复时 AIConfirmations 回同一张），回要并进 get_job 的字段；超了每日上限就只说重试的办法。
+    private static func question(_ fee: SkyStudioVoiceOneTime, credits: Double, key: String, file: String) -> [String: JSONValue]? {
+        let decision = try? SkyStudioJobGate.voiceOneTime(credits: credits, action: action(fee, key: key),
+                                                          question: SkyStudioVoiceApproval.fallbackQuestion(fee, credits: credits), token: nil)
+        guard case .needsConfirmation(let result)? = decision, case .object(var value) = result.payload else { return nil }
+        value["one_time"] = .array([fee.json])
+        value["next_step"] = .string(nextStep(asking: value["status"] == "needs_confirmation", file: file))
+        return value
     }
 
     private static func action(_ fee: SkyStudioVoiceOneTime, key: String) -> String {

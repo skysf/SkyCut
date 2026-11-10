@@ -136,6 +136,8 @@ final class SkyStudioVoiceoverRun {
         }
         guard recovery.value.ready else {
             try await recovery.save()
+            // 中途备用的一次性费用还在等答复（普通 resume）：同一个问题、同一张令牌再给一遍（SkyStudioVoiceFallbackFee）。
+            if let waiting = await SkyStudioVoiceFallbackFee.waiting(recovery, services: services) { extra.merge(waiting) { _, new in new } }
             return finish(.failed, "Available audio was recovered. Some batches have not been generated; resume with generate_missing=true to generate only those batches.")
         }
         stage = .insertion

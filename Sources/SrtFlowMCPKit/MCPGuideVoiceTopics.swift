@@ -143,7 +143,7 @@ enum MCPGuideVoiceTopics {
     - fallback_needs_one_time: get_job carries the question, one_time (the price) and a confirm_token. Ask the user: \
     resume=<recovery_file> with that confirm_token builds the voice's MiniMax version (a voice_enroll job; then call \
     resume=<recovery_file> generate_missing=true for the missing parts), and resume=<recovery_file> skip_one_time=true \
-    retries them with the same model instead. A plain resume keeps the question waiting.
+    retries them with the same model instead. A plain resume recovers what exists and asks again (same confirm_token).
     - Reopen the original project first; resume refuses another project. It never inserts twice, not even after the \
     user undid the insertion.
     get_job lists completed_line_indices, not_generated_line_indices, unknown_batch_indices and the recovery arguments.

@@ -134,7 +134,7 @@
   任务以可恢复的 `failed` 结束，`failure.one_time` 原样给 AI。**问用户（声音 PR 6，`SkyStudioVoiceFallbackFee`）**：结束那一刻补上价（结束码没带就 `/quote`
   一次 voice_enroll）和声音（照恢复记录），记进恢复记录（`fallbackFee`），经 `SkyStudioJobGate.voiceOneTime` 发问句和 `confirm_token` 并进 get_job；
   `resume` + 那张令牌 = 过闸记账、起 `voice_enroll` 任务，做完 `resume` + `generate_missing=true` 读没做成的几批（MiniMax 版有了，默认再出错服务器能换上备用）；
-  `resume` + `skip_one_time=true` = 不建、照原来的选择重试（同 `generate_missing=true`）；普通 `resume` 照旧只恢复已有的、这一笔留着等答复。
+  `resume` + `skip_one_time=true` = 不建、照原来的选择重试（同 `generate_missing=true`）；普通 `resume` 照旧只恢复已有的、这一笔留着等答复（get_job 再给一遍同一个问题、同一张令牌）。
   `resume` 那一次要是先问了「读别处的文件」，令牌就不当这一笔的答复。问不了（读不到 Key、报不出价）就照旧只说重试的办法。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
 - **合批**（声音 PR 5 起普通旁白和声音库的声音一样，方案 8.1）：这台 Mac 切得开（转写得了这种语言）、或者读的模型报字的时间（eleven-v4），`SkyStudioVoiceBatch`
