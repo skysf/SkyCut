@@ -24,7 +24,9 @@ private func kokoroChoiceChecks() {
     checkEqual(engine("zh_male", "zh"), .kokoro(voice: "zm_yunxi", language: "zh"), "zh_male is the young male Kokoro voice")
     checkEqual(engine("en_male", "en"), .kokoro(voice: "am_fenrir", language: "en"), "en_male is am_fenrir, not am_michael")
     checkEqual(engine("en_male_british", "en"), .kokoro(voice: "bm_george", language: "en"), "the British roles")
-    checkEqual(engine(nil, "zh"), .kokoro(voice: "zf_xiaoxiao", language: "zh"), "no voice given: the warm female voice of the text's language")
+    // 2026-11-10（SkyCut 声音方案 4.3）：不点名时和 Sky Studio 的默认（gemini:Charon）同一个人设 —— 中英文用旁白角色（男声）。
+    checkEqual(engine(nil, "zh"), .kokoro(voice: "zm_yunxi", language: "zh"), "no voice given: the narrator role's voice (zh_male), like gemini:Charon")
+    checkEqual(engine(nil, "en"), .kokoro(voice: "am_fenrir", language: "en"), "no voice given in English: en_male's voice")
     checkEqual(engine(nil, "ja"), .kokoro(voice: "jf_alpha", language: "ja"), "other Kokoro languages have their own default voice")
     checkEqual(engine("bf_emma", "zh"), .kokoro(voice: "bf_emma", language: "zh"), "a named voice reads the text's language")
     checkThrows("a Kokoro voice that is not in the model is refused") {

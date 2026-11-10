@@ -37,6 +37,11 @@ func catalogKnownNames() -> Set<String> {
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
+    // add_voiceover 的说明书（MCPGuideVoiceTopics，2026-11-10 声音 PR 3）提到的结果字段（SkyStudioVoiceoverRun、SkyStudioVoiceCheckpoint.detail、
+    // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
+    names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
+                     "unknown_batch_indices", "recharge_url"])
+    names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     return names
 }
 

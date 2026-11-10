@@ -42,6 +42,7 @@ enum MCPGuideMap {
 
     /// 花积分的那一行（2026-10-30：始终列出，不能靠中途加了 Key 之后客户端重新发现工具；2026-10-28 起都走 Sky Studio）。
     static let paidTools = "generate_media (images, camera angles, image upscale, videos, lipsync, background cutout, music, sound effects), " +
-        "upscale_clip (sharper, larger clips), manage_characters (create and headshot; import, edits and deletion are free); " +
+        "upscale_clip (sharper, larger clips), manage_characters (create and headshot; import, edits and deletion are free), " +
+        "add_voiceover (Sky Studio voices; SkyCut and Mac voices are free); " +
         "free: list_characters, get_character"
 }

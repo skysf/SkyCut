@@ -2,7 +2,8 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// 动态 code-point 上限、全球词时间、克隆句界及整批配额；均使用生产类型，不碰外网。
+// 动态 code-point 上限、全球词时间、克隆句界及整批配额；整段报价之前怎么分批、报价之后每批怎么交（SkyStudioVoicePlan，
+// 声音 PR 3，SkyCut 声音方案 4.2、8.1、8.4）；均使用生产类型，不碰外网。
 func runVoiceChecks() {
     func chunk(_ text: String, at start: Double) -> JSONValue {
         let chars = Array(text).map(String.init)
@@ -27,19 +28,7 @@ func runVoiceChecks() {
         check(SpeechWordTimes.parse(.array([chunk("ab", at: 1), chunk("cd", at: 0)])).isEmpty, "backward chunks refused")
         check(SpeechWordTimes.parse(.array([chunk("ab", at: 0), ["characters": ["c"]]])).isEmpty, "malformed later chunk refused")
         check(SpeechWordTimes.parse(chunk("你好世界", at: 0)).count == 4, "Chinese characters remain separately timed")
-        let cloneModel = SkyStudioModel(id: "server-clone-model", kind: "voice_clone", title: "Clone",
-                                       params: ["language": ["cmn", "en_us"]],
-                                       limits: ["max_characters_by_language": ["cmn": 12, "en_us": 40]])
-        let plan = try SkyStudioVoicePlan.make(lines: ["第一句。", "第二句。"], model: cloneModel, voice: "cloned voice", language: "zh")
-        check(plan.batches.count == 1, "the server cap combines Chinese lines")
-        check(plan.batches[0].request.model == "server-clone-model", "model id comes from the server")
-        check(plan.batches[0].request.params["language"] == "cmn", "Chinese maps to the contract language")
-        check(plan.batches[0].request.quoteBody["inputs"] == nil, "quote does not upload a reference")
-        check(plan.batches[0].request.maxCredits == nil, "agreed price is added after quoting")
-        do {
-            _ = try SkyStudioVoicePlan.make(lines: ["Здравствуйте"], model: cloneModel, voice: "", language: "ru")
-            check(false, "unsupported language refused before charging")
-        } catch { check(true, "unsupported language refused before charging") }
+        runVoiceDraftChecks()
         let capped = SpeechWordTimes.timedWords([.init(text: "hello", start: 0, end: 1.05), .init(text: "world", start: 1.1, end: 2)], text: "hello world", duration: 1)
         checkEqual(capped.map(\.end), [1], "no word extends beyond the decoded duration")
         let batch = try SkyStudioVoiceBatch.make(lines: ["Hello world", "Next line"], limit: 40, pack: true)[0]
@@ -67,7 +56,7 @@ func runVoiceBudgetChecks() {
     defer { defaults.removePersistentDomain(forName: suite) }
     let store = SkyStudioSpendStore(defaults: defaults)
     store.setDailyLimit(5)
-    let quotes = [SkyStudioQuote(credits: 2, typicalSeconds: nil), SkyStudioQuote(credits: 2, typicalSeconds: nil), SkyStudioQuote(credits: 1, typicalSeconds: nil)]
+    let quotes: [Double] = [2, 2, 1]
     guard var budget = SkyStudioVoiceBudget.reserve(quotes, store: store) else { return check(false, "whole voice budget reserved") }
     checkEqual(store.spentToday(), 5, "reserve all batches atomically")
     check(SkyStudioVoiceBudget.reserve(quotes, store: store) == nil, "another job cannot reuse the reserved allowance")
@@ -81,4 +70,66 @@ func runVoiceBudgetChecks() {
     checkEqual(budget.uncertain, 2, "uncertain charge reported separately")
     store.setDailyLimit(0)
     check(SkyStudioVoiceBudget.reserve(quotes, store: store) == nil, "zero daily limit never reserves voice credits")
+}
+
+/// 报价之前分批（上限读 `/models`、同一个 kind 里最小的那个）、整段报价的请求；报价之后每批照报价交、要不要本机转写。
+private func runVoiceDraftChecks() {
+    guard let catalog = loadVoiceFixture()?.catalog else { return check(false, "the voice catalog snapshot loads for the plan checks") }
+    do {
+        let lines = ["第一句。", "第二句。"]
+        let narration = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", model: "auto", language: "zh", catalog: catalog)
+        checkEqual(narration.speech.map(\.prompt), lines, "narration is still one request per line (packing narration is voice PR 5)")
+        let body = narration.segment.quoteBody
+        checkEqual(body["params"]?["batches"], .array(lines.map(JSONValue.string)), "the whole script is quoted once, as params.batches")
+        checkEqual(body["params"]?["voice"], "gemini:Charon", "the resolved preset goes as params.voice")
+        checkEqual(body["model"], "auto", "model auto unless one is named")
+        check(body["prompt"] == nil && body["params"]?["language"] == nil && body["params"]?["language_code"] == nil,
+              "a Chinese script: no prompt, no language hint, no old language_code")
+        let clone = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, model: "auto", language: "zh", catalog: catalog)
+        check(clone.speech.count == 1 && clone.speech[0].parts.count == 2, "cloned reading packs lines within the server's cap")
+        let chinese = try SkyStudioVoicePlan.draft(lines: [String(repeating: "你", count: 301)], kind: "voice", voice: "gemini:Charon",
+                                                   model: "auto", language: "zh", catalog: catalog)
+        checkEqual(chinese.speech.count, 2, "the Chinese cap (300 code points) comes from /models")
+        let english = try SkyStudioVoicePlan.draft(lines: [String(repeating: "word ", count: 170)], kind: "voice", voice: "gemini:Charon",
+                                                   model: "auto", language: "en", catalog: catalog)
+        checkEqual(english.speech.count, 2, "other languages use the `other` cap (800)")
+        check((try? SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", model: "auto", language: "zh",
+                                             catalog: SkyStudioCatalog(models: []))) == nil, "no character limit from Sky Studio: no plan")
+
+        let selection: JSONValue = ["model": "gemini-3.8-flash-tts", "voice": "gemini:Charon"]
+        let answer: JSONValue = ["credits": 5, "credits_expected": 3.2, "settlement": "actual_output",
+            "voice_plan": ["selection": selection, "requested_model": "auto", "rule": "preset", "reason": "A preset voice reads this text.",
+                           "languages": [["language": "zh", "share": 1, "seconds": 1.8]], "cross_language": false, "warnings": []],
+            "batches": [["credits": 2.5, "credits_expected": 1.6, "characters": 4], ["credits": 2.5, "credits_expected": 1.6, "characters": 4]],
+            "one_time": []]
+        guard let quote = SkyStudioQuote(json: answer) else { return check(false, "the whole-segment quote reads") }
+        let plan = try SkyStudioVoicePlan.quoted(narration, quote: quote)
+        checkEqual(plan.batches.map(\.request.prompt), lines, "each batch is sent with its own words")
+        check(plan.batches.allSatisfy { $0.request.params["plan"] == selection }, "every batch carries the same voice_plan selection")
+        check(plan.batches.allSatisfy { $0.request.params["batches"] == nil && $0.request.params["voice"] == "gemini:Charon" },
+              "batches carry the voice, not the whole script")
+        checkEqual(plan.batchCredits, [2.5, 2.5], "each batch's max_credits is its own quoted credits")
+        checkEqual(Set(plan.batches.map(\.request.idempotencyKey)).count, 2, "one idempotency key per batch")
+        checkEqual(plan.voicePlan.selection, selection.objectValue ?? [:], "the server's selection is kept for recovery and get_job")
+        check(plan.needsTranscription(subtitles: true, catalog: catalog), "Gemini gives no word times: subtitles need this Mac's transcription")
+        check(!plan.needsTranscription(subtitles: false, catalog: catalog), "one line per batch and no subtitles: nothing to transcribe")
+
+        var eleven = answer.objectValue ?? [:]
+        eleven["voice_plan"] = ["selection": ["model": "eleven-v4", "voice": "eleven:Daniel"], "rule": "named_model"]
+        if let quoted = SkyStudioQuote(json: .object(eleven)), let named = try? SkyStudioVoicePlan.quoted(narration, quote: quoted) {
+            check(!named.needsTranscription(subtitles: true, catalog: catalog), "Eleven v4 reports word times: no transcription needed")
+        } else { check(false, "an Eleven v4 quote reads") }
+
+        var short = answer.objectValue ?? [:]
+        short["batches"] = [["credits": 5, "credits_expected": 3.2]]
+        if let mismatched = SkyStudioQuote(json: .object(short)) {
+            check((try? SkyStudioVoicePlan.quoted(narration, quote: mismatched)) == nil, "a quote that does not cover every batch is refused")
+        }
+        var fee = answer.objectValue ?? [:]
+        fee["one_time"] = [["kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en", "credits": 377.6]]
+        if let withFee = SkyStudioQuote(json: .object(fee)) {
+            do { _ = try SkyStudioVoicePlan.quoted(narration, quote: withFee); check(false, "a quote asking for a one-time fee is not sent (voice PR 6 asks first)") }
+            catch { check("\(error)".contains("one-time"), "a quote asking for a one-time fee is not sent (voice PR 6 asks first)") }
+        }
+    } catch { check(false, "voice draft checks: \(error)") }
 }

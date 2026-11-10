@@ -257,9 +257,10 @@ public enum MCPSchema {
         ["type": "boolean", "description": .string(description)]
     }
 
-    public static func array(of items: JSONValue, _ description: String, minItems: Int? = nil) -> JSONValue {
+    public static func array(of items: JSONValue, _ description: String, minItems: Int? = nil, maxItems: Int? = nil) -> JSONValue {
         var schema: [String: JSONValue] = ["type": "array", "items": items, "description": .string(description)]
         if let minItems { schema["minItems"] = .number(Double(minItems)) }
+        if let maxItems { schema["maxItems"] = .number(Double(maxItems)) }
         return .object(schema)
     }
 

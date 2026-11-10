@@ -2,64 +2,65 @@ import Foundation
 import SrtFlowMCPKit
 
 // MARK: - 可恢复旁白的云端批次
-// 管什么：只为明确 missing 的批次报价 / 预留 / POST，已有原单只 GET；成品地址先持久化，再下载完整音频。
+// 管什么：只为明确 missing 的批次 POST，已有原单只 GET；成品地址先持久化，再下载完整音频。
+// 新的一段：整段报价和预留在回任务号之前就做完了（SkyStudioVoiceoverStart），每批照记录里定好的请求交（`params.plan` 是整段的选择）。
+// 恢复时补没生成的批次（generate_missing）：照记录里的选择把这几批再报一次价（`params.plan`，SkyCut 声音方案 8.4：恢复不重新选模型）、
+// 预留，只换这几批的 `max_credits`；服务器回的选择和记录的不一样就不交。
 // 不管什么：分句、字幕、入轨；统一提交 / 轮询 / 取消仍全部经 SkyStudioJobRun。
 
 @MainActor
 final class SkyStudioVoiceCloudBatches {
     private let recovery: SkyStudioVoiceRecovery
-    private let input: AIVoiceoverInput
     private let api: SkyStudioAPI
     private let key: String
     private let status: SkyStudioMediaStatus
     private let canSubmit: @MainActor () -> Bool
-    /// 新任务在报价之前做好的参考录音（SkyStudioVoiceoverRun.prepareReference）；恢复的任务是 nil，传参考时再做。
-    private let reference: VoiceReferenceSample.Sample?
     private var budget: SkyStudioVoiceBudget?
+    /// 批次号 → 它在预算里是第几笔。
     private var positions: [Int: Int] = [:]
-    private var quotes: [SkyStudioQuote] = []
+    private var credits: [Double] = []
 
-    init(recovery: SkyStudioVoiceRecovery, input: AIVoiceoverInput, api: SkyStudioAPI, key: String, status: SkyStudioMediaStatus,
-         reference: VoiceReferenceSample.Sample? = nil, canSubmit: @escaping @MainActor () -> Bool) {
-        self.recovery = recovery; self.input = input; self.api = api; self.key = key; self.status = status
-        self.reference = reference; self.canSubmit = canSubmit
+    /// `budget`：新的一段在回任务号之前预留好的那一笔（每批一份，顺序同批次）；恢复时是 nil，补批次之前现报价现预留。
+    init(recovery: SkyStudioVoiceRecovery, api: SkyStudioAPI, key: String, status: SkyStudioMediaStatus,
+         budget: SkyStudioVoiceBudget? = nil, canSubmit: @escaping @MainActor () -> Bool) {
+        self.recovery = recovery; self.api = api; self.key = key; self.status = status
+        self.canSubmit = canSubmit
+        if let budget {
+            self.budget = budget
+            credits = recovery.value.plan.batchCredits
+            positions = Dictionary(uniqueKeysWithValues: recovery.value.plan.batches.indices.map { ($0, $0) })
+        }
     }
 
     func refundUnused() { budget?.refundUnused() }
 
+    /// 恢复时补没生成的那几批：照记录的选择再报一次价、整体预留。
     func prepareMissing() async throws {
         guard budget == nil else { return }
         let indices = recovery.value.missing
         guard !indices.isEmpty else { return }
-        quotes = []
-        for index in indices { quotes.append(try await api.quote(recovery.value.plan.batches[index].request, key: key)) }
-        guard let reserved = SkyStudioVoiceBudget.reserve(quotes) else {
-            throw SkyStudioVoiceBudgetProblem(credits: quotes.reduce(0) { $0 + $1.credits })
+        let plan = recovery.value.plan
+        let selection = plan.voicePlan.selection
+        let segment = try SkyStudioVoiceRequests.segmentQuote(
+            kind: plan.kind, model: plan.model, voice: plan.voice, batches: indices.map { plan.batches[$0].speech.prompt },
+            lines: recovery.value.input.lines.map(\.text), plan: selection)
+        let quote = try await api.quote(segment, key: key)
+        guard let voice = quote.voice, voice.batches.count == indices.count, voice.oneTime.isEmpty else {
+            throw AIToolError("Sky Studio's new quote does not cover the missing batches; nothing was generated. Try again later.")
+        }
+        guard voice.plan?.selection == selection else {
+            throw AIToolError("Sky Studio would read the missing batches with another model than the rest of this voiceover "
+                + "(\(voice.plan?.model ?? "unknown")), so nothing was generated. Keep the recovery_file; the finished batches stay.")
+        }
+        let missingCredits = voice.batches.map(\.credits)
+        guard let reserved = SkyStudioVoiceBudget.reserve(missingCredits) else {
+            throw SkyStudioVoiceBudgetProblem(credits: missingCredits.reduce(0, +))
         }
         budget = reserved
+        credits = missingCredits
         positions = Dictionary(uniqueKeysWithValues: indices.enumerated().map { ($0.element, $0.offset) })
-        status.credits = quotes.reduce(0) { $0 + $1.credits }
-    }
-
-    /// 参考录音只传一次（44.1 kHz 单声道、10 秒–3 分钟，VoiceReferenceSample）。新任务用报价之前做好的那一份；
-    /// 恢复的任务这时才做，用了哪一段补进恢复记录的声音说明（已经有了就不重复），落地时随 voice.note 告诉 AI。
-    private func uploadReferenceIfNeeded() async throws {
-        guard let clone = input.clone, recovery.value.referenceURL == nil else { return }
-        let sample: VoiceReferenceSample.Sample
-        if let reference, FileManager.default.fileExists(atPath: reference.url.path) {
-            sample = reference
-        } else {
-            let folder = recovery.file.deletingLastPathComponent()
-            sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
-            let summary = sample.summary(name: clone.url.lastPathComponent)
-            if recovery.value.input.note?.contains(summary) != true {
-                recovery.value.input.note = [recovery.value.input.note, summary].compactMap { $0 }.joined(separator: " ")
-            }
-        }
-        status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
-        recovery.value.referenceURL = try await api.upload(fileURL: sample.url, contentType: VoiceReferenceSample.contentType,
-                                                            purpose: VoiceReferenceSample.uploadPurpose, key: key)
-        try await recovery.save()
+        for (offset, index) in indices.enumerated() { recovery.value.plan.batches[index].request.maxCredits = missingCredits[offset] }
+        status.credits = missingCredits.reduce(0, +)
     }
 
     func audio(_ index: Int, generateMissing: Bool) async throws -> (URL, SkyStudioJobResult)? {
@@ -87,7 +88,7 @@ final class SkyStudioVoiceCloudBatches {
             throw AIToolError("Sky Studio finished without a recoverable voice file; keep the original job id and do not generate it again.")
         }
         if let file = recovery.value.batches[index].rawFile, FileManager.default.fileExists(atPath: file.path) { return (file, result) }
-        let ext = result.url.pathExtension.isEmpty ? (recovery.value.plan.clones ? "wav" : "mp3") : result.url.pathExtension
+        let ext = result.url.pathExtension.isEmpty ? (result.contentType == "audio/mpeg" ? "mp3" : "wav") : result.url.pathExtension
         let file = recovery.file.deletingLastPathComponent().appendingPathComponent("batch-\(index).\(ext)")
         status.advance(to: .downloading(fraction: nil), typicalSeconds: nil)
         do {
@@ -102,11 +103,8 @@ final class SkyStudioVoiceCloudBatches {
 
     private func generate(_ index: Int) async throws {
         guard let position = positions[index] else { throw AIToolError("No budget was reserved for this missing batch.") }
-        try await uploadReferenceIfNeeded()
         var request = recovery.value.plan.batches[index].request
-        request.maxCredits = quotes[position].credits
-        if let reference = recovery.value.referenceURL { request.inputs["reference_audio_url"] = reference.absoluteString }
-        // 已确认失败的旧原单另起新 key；从未提交的批次沿用最初记录的 key。
+        // 已确认失败的旧原单另起新 key；从未提交的批次沿用报价时定下的 key。
         if recovery.value.batches[index].retryable { request.idempotencyKey = UUID().uuidString.lowercased() }
         recovery.value.plan.batches[index].request = request
         recovery.value.willSubmit(index)
@@ -123,7 +121,7 @@ final class SkyStudioVoiceCloudBatches {
             }
             // 下载、分句或字幕失败都不能撤销云端成功记录，也不能把它退回 missing。
             recovery.value.received(done, at: index)
-            let charged = done.billing?.netCharged ?? done.creditsCharged ?? quotes[position].credits
+            let charged = done.billing?.netCharged ?? done.creditsCharged ?? credits[position]
             budget?.settled(position, charged: charged)
             recovery.value.batches[index].charged = charged
             recovery.value.batches[index].uncertain = 0
@@ -137,7 +135,7 @@ final class SkyStudioVoiceCloudBatches {
                     recovery.value.batches[index].retryable = true
                 } else {
                     budget?.unknown(position)
-                    recovery.value.batches[index].uncertain = quotes[position].credits
+                    recovery.value.batches[index].uncertain = credits[position]
                 }
             }
             throw error

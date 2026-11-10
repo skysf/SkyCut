@@ -4,6 +4,9 @@ import SrtFlowMCPKit
 
 // MARK: - 旁白可恢复的进度（纯值）
 // 管什么：原文 / 批次 / 原单身份 / 完整音频 / 本地分析 / 成句文件 / 入轨回执；恢复只对 missing 批次允许付费。
+// version 2（2026-11-10，声音 PR 3）：记整段报价时服务器的选择（`plan.voicePlan`，每批 `params.plan` 带回它）和每批实际跑的模型、
+// 有没有换备用；恢复永远只 GET 原单、补没生成的批次也照这份选择（SkyCut 声音方案 8.4）。**只认 version 2**：只有用户本人在用，
+// 升级前没做完的配音先做完或放弃（用户 2026-11-09 定，方案风险第 15 条）。
 // 不管什么：HTTP、音频处理、工程；磁盘读写在 SkyStudioVoiceRecoveryStore，App 适配在 SkyStudioVoiceRecovery。
 
 struct SkyStudioVoiceCheckpoint: Codable, Sendable {
@@ -15,12 +18,12 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     struct Input: Codable, Sendable {
         var lines: [Line]
         var language: String
+        /// `params.voice`：预设 id（`gemini:Charon`）或 `voice_…`。
         var voice: String
+        /// add_voiceover 点名的模型；nil = auto。
+        var model: String?
         var note: String?
         var speed: Double
-        var cloneURL: URL?
-        var cloneStart: Double?
-        var cloneSeconds: Double?
         var audioTrack: Int?
         var subtitles: Bool
         var maxLines: Int?
@@ -64,11 +67,14 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         var uncertain: Double = 0
         /// 仅明确未扣费 / 全退且没有成品时允许重新生成。未知结果绝不变成 missing。
         var retryable = false
+        /// 这一批实际跑的模型、服务器有没有在这一批里换备用（做完时服务器报的）。
+        var model: String?
+        var fallbackUsed: Bool?
         var generated: Bool { remote != nil || rawFile != nil }
         var missing: Bool { !generated && (!submitted || retryable) }
     }
 
-    var version = 1
+    var version = 2
     var id = UUID()
     var input: Input
     var projectPath: String?
@@ -76,7 +82,6 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     var plan: SkyStudioVoicePlan
     var batches: [Batch]
     var outputs: [Int: Output] = [:]
-    var referenceURL: URL?
     var landingIDs: [UUID] = []
     /// 一旦入轨成功，即使用户随后撤销，也不能因重试自动再加。
     var applied: JSONValue?
@@ -104,6 +109,10 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     mutating func received(_ result: SkyStudioJobStatus, at index: Int) {
         batches[index].serverID = result.jobID
         if let remote = result.result { batches[index].remote = .object(remote.metadata) }
+        if let outcome = result.voiceOutcome {
+            batches[index].model = outcome.model ?? outcome.plan?.model
+            batches[index].fallbackUsed = outcome.fallbackUsed
+        }
         if let charge = result.billing?.netCharged ?? result.creditsCharged {
             batches[index].charged = charge
             batches[index].uncertain = 0
@@ -127,6 +136,8 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
                 "submission_key": .string(plan.batches[index].request.idempotencyKey)
             ]
             if let id = batch.serverID { value["skystudio_job_id"] = .string(id) }
+            if let model = batch.model { value["model"] = .string(model) }
+            if let fallback = batch.fallbackUsed { value["fallback_used"] = .bool(fallback) }
             if let file = batch.rawFile { value["complete_batch_file"] = .string(file.path) }
             if let remote = batch.remote { value["remote_result"] = remote }
             return .object(value)
@@ -139,6 +150,7 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
             "files": .array(completed.compactMap { outputs[$0].map { .string($0.url.path) } }),
             "credits_charged": .number(batches.reduce(0) { $0 + $1.charged }),
             "credits_unknown": .number(batches.reduce(0) { $0 + $1.uncertain }),
+            "voice_plan": plan.voicePlan.json,
             "inserted": .bool(applied != nil),
             "recovery_state": .string(applied != nil ? "complete" : (!unresolved.isEmpty ? "cloud_outcome_unknown" : (ready ? "ready_to_insert" : (pending.isEmpty ? "generation_needed" : "local_processing_needed")))),
             "recovery": ["tool": "add_voiceover", "arguments": ["resume": .string(recoveryFile)],
@@ -168,8 +180,9 @@ enum SkyStudioVoiceRecoveryStore {
 
     static func read(_ url: URL) throws -> SkyStudioVoiceCheckpoint {
         let checkpoint = try JSONDecoder().decode(SkyStudioVoiceCheckpoint.self, from: Data(contentsOf: url))
-        guard checkpoint.version == 1, !checkpoint.input.lines.isEmpty, checkpoint.input.lines.count <= 50,
+        guard checkpoint.version == 2, !checkpoint.input.lines.isEmpty, checkpoint.input.lines.count <= 50,
               !checkpoint.plan.batches.isEmpty, checkpoint.input.folder.isFileURL,
+              SkyStudioVoiceKind.reading.contains(checkpoint.plan.kind), !checkpoint.plan.voice.isEmpty,
               checkpoint.input.audioTrack.map({ $0 >= 0 }) ?? true,
               checkpoint.input.speed.isFinite, (0.5...2).contains(checkpoint.input.speed),
               checkpoint.batches.count == checkpoint.plan.batches.count,

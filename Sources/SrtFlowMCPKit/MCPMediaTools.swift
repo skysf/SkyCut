@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - 工具清单：素材从哪来（音乐库）
 //
-// 管什么：find_audio、add_voiceover 的说明文字和参数。以后「生成素材」（Sky Studio，方案第六块）也放这一组。
+// 管什么：find_audio、add_voiceover 的说明文字和参数（add_voiceover 是名片，用法在说明书的同名主题：MCPGuideVoiceTopics）。
 // 不管什么：怎么搜、怎么下载（App 里的 AIAudioLibraryTools.swift）；把一首放上时间线是 add_clips 的 library_id；
 // 配音怎么做（App 里的 AIVoiceoverTool / AISpeechSynthesis）。
 
@@ -27,38 +27,36 @@ enum MCPMediaTools {
                 readOnly: true
             )
         case .addVoiceover:
+            // 名片（≤ 450）照说明书试点的写法（docs/architecture/mcp-guide.md 第 14 条）：第一句做什么、录好的声音指到 add_clips；
+            // 只留不知道就会调错、花错钱的：撤销、默认声音、花积分、任务号、确认、每日上限、失败了别重发。
+            // 怎么挑声音、模型、字幕、恢复、坑都在说明书的 add_voiceover 主题（MCPGuideVoiceTopics）。SkyCut 声音方案 4.10。
             return MCPToolDefinition(
                 .addVoiceover, title: "Add a voiceover",
                 description: """
-                Generate narration + optional subtitles on one audio track (new unless track), one undo. Existing audio: \
-                add_clips. To retime visuals after replacement, finish this job then sync_voiceover. Sky Studio returns \
-                job_id; wait with get_job. On failure resume=recovery_file processes saved audio/queries original jobs \
-                without recharging; generate_missing=true adds only missing batches. Resume cannot duplicate inserts. \
-                Never resend original lines after failure. Cloud cloning may queue minutes; local finishes directly. \
-                Key prefers Sky Studio; hard budgets pause. Ordinary fallback: downloaded SkyCut then Mac; relay voice.note. \
-                Cloud ignores speed. voice: zh_female_lively, zh_female_warm, zh_male, en_female_lively, en_female_warm, \
-                en_male, en_female_british, en_male_british; Rachel/Brian; af_heart/zf_xiaoxiao; Mac names. Default warm \
-                female in text language. clone_from: one clear speaker, no fallback; multi-line paid batches need local \
-                transcription (macOS 26) before charging. subtitles=true skips overlaps. download_voices=true only \
-                downloads 333 MB; tell the user.
+                Narrate lines, optional subtitles (recordings: add_clips). One undo step. Voices: gemini:Name (default \
+                gemini:Charon), eleven:Name, a role or local voice. Cloud: Paid (Sky Studio credits), model=auto. \
+                Returns job_id; wait with get_job; relay voice.note. Ask mode may return needs_confirmation. The daily \
+                credit limit always applies. If it fails: resume=recovery_file, never resend lines. Read skycut_guide \
+                topic=add_voiceover before the first call.
                 """,
                 input: MCPSchema.object([
                     "lines": MCPSchema.array(of: MCPSchema.object([
-                        "text": MCPSchema.string("What to say."),
-                        "start": MCPSchema.number("Timeline seconds (default: right after the previous line; the first at the playhead).", minimum: 0)
-                    ], required: ["text"]), "The lines of narration, in order (not needed with download_voices).", minItems: 1),
-                    "voice": MCPSchema.string("A role or an installed voice's name."),
-                    "speed": MCPSchema.number("1 = normal (default). Not used by Sky Studio voices.", minimum: 0.5, maximum: 2),
-                    "clone_from": MCPSchema.string("A file of one person speaking; the lines are spoken in that voice (Sky Studio only)."),
-                    "clone_start": MCPSchema.number("Seconds into clone_from where the sample starts (default 0).", minimum: 0),
-                    "clone_seconds": MCPSchema.number("Length of the sample (default 10).", minimum: 5, maximum: 30),
+                        "text": MCPSchema.string("What to say, up to 1000 characters."),
+                        "start": MCPSchema.number("Timeline seconds, 0 or more; default 0.3 s after the previous line (the first: playhead).",
+                                                  minimum: 0)
+                    ], required: ["text"]), "The narration in order, 1 to 50 lines (not with resume or download_voices).",
+                        minItems: 1, maxItems: 50),
+                    "voice": MCPSchema.string("gemini:Name (default gemini:Charon), eleven:Name, a role, or a SkyCut or Mac voice name."),
+                    "model": MCPSchema.string("Cloud model: auto (default) or a voice model id from get_status models=true."),
+                    "speed": MCPSchema.number("0.5 to 2, 1 = normal (default). Local voices only.", minimum: 0.5, maximum: 2),
                     "track": MCPSchema.string(MCPSchema.trackDescription),
-                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice (one line each unless max_lines=2)."),
+                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice."),
                     "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
                                                    minimum: 1, maximum: 2),
-                    "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (returns a job); lines are ignored."),
-                    "resume": MCPSchema.string("recovery_file from get_job; omit original lines/voice. Reopen the original project first."),
-                    "generate_missing": MCPSchema.boolean("With resume: generate only missing batches; default false (existing audio only).")
+                    "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (about 333 MB, returns job_id); no lines."),
+                    "resume": MCPSchema.string("recovery_file from get_job; send no lines or voice. Reopen the original project first."),
+                    "generate_missing": MCPSchema.boolean("With resume: also pay for batches never generated (default false)."),
+                    "confirm_token": MCPSchema.confirmToken
                 ])
             )
         default:

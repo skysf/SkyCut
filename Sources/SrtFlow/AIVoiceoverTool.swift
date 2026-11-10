@@ -9,11 +9,13 @@ import SrtFlowMCPKit
 // 分两步（同 edit_clip）：`plan` 可以 await（合成、读文件），`apply` 同步提交、路由包在 `AIUndoGrouping.step` 里 ——
 // 放素材和加字幕在同一次 perform 里，一个工具 = 一步撤销。
 // 放上时间线走 add_clips 那一套（`AITimelineEdits.place`：撞上往上抬一轨；这一批都放进第一句新开的那条轨）。
-// 声音分三档（第 42、48 条）：用户接了 Sky Studio 就用 Sky Studio 的声音（`SkyStudioVoiceoverRun`：有 Key、没超每日上限、Key 读得出来；不行就退到下一档并在结果里说为什么），
+// 声音分三档（第 42、48 条）：用户接了 Sky Studio 就用 Sky Studio 的声音（预设 `gemini:<名字>`，不点名是 gemini:Charon；先整段报价、
+// 预留积分再回任务号：SkyStudioVoiceoverStart；那之前读不到 Key / 目录 / 报价就当场退到下一档并在结果里说为什么），
 // 其次下载了 SrtFlow 自己的声音（本机的 Kokoro），没下载 / 它读不了的语言用这台 Mac 的；
 // `download_voices=true` 开始下载、回任务号（第 50 条：AI 也能直接下，下的时候告诉用户）。
-// `clone_from`（第 52 条）：用一段素材里的声音当参考、让 Sky Studio 的克隆模型读 —— 只有 Sky Studio 能克隆，用不了就报错、不退档。
-// 不管什么：挑声音（AIVoiceChoice）、怎么合成（SkyStudioVoiceoverRun / KokoroVoiceSpeech / AISpeechSynthesis）、下载（KokoroVoicePack）。
+// 克隆（以前的 `clone_from`）2026-11-10 去掉了：克隆一律先进声音库（声音 PR 6 的 manage_voices，决定第七节第 8 条）。
+// 不管什么：认 Sky Studio 的声音（SkyStudioVoicePick）、挑本机声音（AIVoiceChoice）、怎么合成（SkyStudioVoiceoverRun / KokoroVoiceSpeech /
+// AISpeechSynthesis）、下载（KokoroVoicePack）。
 
 @MainActor
 enum AIVoiceoverTool {
@@ -60,12 +62,6 @@ enum AIVoiceoverTool {
             "next_step": .string("Tell the user SkyCut is downloading its own voices (about \(KokoroVoicePack.approximateSize); "
                 + "progress also shows in Settings → AI). Wait with get_job, then call add_voiceover again without download_voices.")
         ])
-    }
-
-    /// 克隆用的素材在点名的文件夹以外：要发给 Sky Studio，先问用户一次（同读别处的文件）。要问就回 needs_confirmation。
-    static func confirmations(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult? {
-        guard let clone = try AIVoiceoverInput.cloneSource(args) else { return nil }
-        return try AIWorkspace.shared.confirmReading([clone.url], verb: "send to Sky Studio", args: args, project: project)
     }
 
     static func plan(_ input: AIVoiceoverInput, _ project: VideoEditProject,

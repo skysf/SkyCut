@@ -429,8 +429,12 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 先 `swift build --arch arm64`，再设置 `SRTFLOW_FFMPEG=<仓库>/vendor/ffmpeg`：
 
 1. `scripts/gui-smoke/sky-studio/run.sh` 组装独立 `.skystudiosmoke` App、回环假服务和假 Key；不读取生产 Key，也不发真实收费请求。`SRTFLOW_SMOKE_CACHE_DIR` 只被 `.skystudiosmoke` 身份识别，启动监听和过期扫描前先隔离优化媒体缓存，改上限 / 清空均不动正式版共享缓存。
-2. `python3 scripts/gui-smoke/sky-studio/voice.py` 验证普通旁白、多句合批克隆、真实本机转写切句、字幕、一步撤销、queued 取消退款 / 重复取消、服务错误退本机、文件解码与密钥不随下载 / PUT 发送。
-3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度普通旁白退本机、克隆拒绝，没有 `/jobs` 与花费。
+2. `python3 scripts/gui-smoke/sky-studio/voice.py` 验证普通旁白（不点名 gemini:Charon、整段报价一次再回任务号、每批同一个 `params.plan`；Gemini 不报字的时间，
+   字幕靠真实本机转写对齐，要 macOS 26 和英文转写模型）、一步撤销、`clone_from` 被参数核对拒（2026-11-10 去掉，声音库的克隆是声音 PR 6）、
+   queued 取消退款 / 重复取消、报价时服务错误当场退本机（不起任务）、文件解码与密钥不随下载 / PUT 发送。假服务的声音目录照 Sky Studio 导出的快照
+   （`voice_fixtures.py` 读 `checks/SkyStudio/Fixtures/models-voice-*.json`）。
+3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度时配旁白在回任务号之前就停（`daily_budget_exceeded`、
+   不换本机声音），没有 `/jobs` 与花费。
 4. 工程任务卡片：重新 `run.sh` 后运行 `python3 scripts/gui-smoke/sky-studio/project_tasks.py`，留下两个可见工程、一个后台工程与一个已关工程的问题，核对视频 / 音频 / 图片、5 项排队、225 积分、真实 `get_job` 任务号、另一 MCP 会话只读查询及后台开窗。随后按 [任务浮层人工回归](../architecture/sky-studio-jobs.md)第九节点卡片 / 详情 / 打开按钮；夹具会留下窗口，不能把后端开窗通过当作按钮已点通。
 5. 统一设置：`python3 scripts/gui-smoke/sky-studio/settings.py` 验工具发现、五类快照、目录与实际 Store 的选项一致、整次拒绝错误参数、偏好持久化、工程 / 任务不变与密钥不回传。它留中文界面、10 GB 缓存上限、751 积分额度供 GUI 核对；清空只删本轮测试缓存，不更改客户端配置。随后实点三个设置入口与五个分类，并在额度页打开时再次用 MCP 改额度、切走切回，确认双向同步（[工作台回归清单](../architecture/workbench-and-settings.md)）。
 6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。

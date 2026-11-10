@@ -385,24 +385,39 @@ if [ -z "${CAPTURE_AT}" ] || [ -z "${KEY_AT}" ] || [ "${CAPTURE_AT}" -ge "${KEY_
 grep -qF 'project.documentGeneration == projectGeneration' "${OFFICIAL}" || fail "官方入口等待密钥后必须拒绝已换文档"
 grep -qF 'guard status.jobID == id else' "${API}" || fail "GET 原单必须在交给状态/结算回调前核对服务端 job_id"
 
-# 10. 云端配音返回任务号；整批预留、不询问付费，结束只入轨一整步。
+# 10. 云端配音：回任务号之前整段报价一次、整体预留（额度不够当场停、不问、不换声音），返回任务号；每批照报价带回同一个 params.plan；
+#     结束只入轨一整步（SkyCut 声音方案 4.2；2026-11-10 声音 PR 3 把报价从任务里挪到回任务号之前）。
 VOICE_RUN="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverRun.swift"
+VOICE_START="Sources/SrtFlow/SkyStudio/SkyStudioVoiceoverStart.swift"
+VOICE_PLAN="Sources/SrtFlow/SkyStudio/SkyStudioVoicePlan.swift"
 VOICE_INPUT="Sources/SrtFlow/AIVoiceoverInput.swift"
 VOICE_BUDGET="Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift"
 VOICE_CLOUD="Sources/SrtFlow/SkyStudio/SkyStudioVoiceCloudBatches.swift"
 VOICE_SERVICES="Sources/SrtFlow/SkyStudio/SkyStudioVoiceServices.swift"
 VOICE_CHECKPOINT="Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift"
-for file in "${VOICE_RUN}" "${VOICE_INPUT}" "${VOICE_BUDGET}"; do
+for file in "${VOICE_RUN}" "${VOICE_START}" "${VOICE_INPUT}" "${VOICE_BUDGET}"; do
   [ -f "${file}" ] || fail "找不到 ${file}"
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog|AIConfirmations' "${file}"; then
     fail "${file}：配音额度不够应退本机（克隆报错），不能停下来等确认"
   fi
 done
-grep -qF 'SkyStudioVoiceoverRun(input: input, project: project).start()' "${ROUTER}" || fail "配音路由没有启动云端任务"
+grep -qF 'switch try await SkyStudioVoiceoverStart.start(input, project: project) {' "${ROUTER}" || fail "配音路由没有先经 SkyStudioVoiceoverStart 报价再起任务"
+grep -qF 'SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start()' "${VOICE_START}" \
+  || fail "整段报价、预留之后没有起任务"
+# 报价在预留之前、预留在起任务之前（中间不再有会失败的步骤，预留不会落在半路）。
+QUOTE_AT="$(line_of 'quote = try await services.api.quote(draft.segment, key: resolved.key)' "${VOICE_START}")"
+RESERVE_AT="$(line_of 'guard let budget = SkyStudioVoiceBudget.reserve(plan.batchCredits) else {' "${VOICE_START}")"
+RUN_AT="$(line_of 'SkyStudioVoiceoverRun(input: ready, project: project, prepared: prepared, services: services).start()' "${VOICE_START}")"
+if [ -z "${QUOTE_AT}" ] || [ -z "${RESERVE_AT}" ] || [ -z "${RUN_AT}" ] || [ "${QUOTE_AT}" -ge "${RESERVE_AT}" ] || [ "${RESERVE_AT}" -ge "${RUN_AT}" ]; then
+  fail "云端配音要先整段报价、再整体预留、最后起任务（回任务号之前）"
+fi
+grep -qF 'SkyStudioVoiceRequests.segmentQuote(kind: kind, model: model, voice: voice, batches: speech.map(\.prompt), lines: lines)' "${VOICE_PLAN}" \
+  && grep -qF 'try SkyStudioVoiceRequests.batch(index, of: draft.segment, quote: quote)' "${VOICE_PLAN}" \
+  || fail "整段报价没有经 segmentQuote（params.batches），或每批没有照报价带回同一个 params.plan"
 grep -qF 'SkyStudioJobRun(api: api, key: key)' "${VOICE_CLOUD}" && grep -qF 'runner(index).run(request)' "${VOICE_CLOUD}" \
   && grep -qF 'run.checkpoint = ' "${VOICE_CLOUD}" || fail "云端配音没有复用统一任务执行器并持久化原单身份"
 grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_SERVICES}" || fail "云端配音不得弹钥匙串框"
-grep -qF 'SkyStudioVoiceBudget.reserve(quotes)' "${VOICE_CLOUD}" || fail "云端配音没有先预留整批报价"
+grep -qF 'SkyStudioVoiceBudget.reserve(missingCredits)' "${VOICE_CLOUD}" || fail "恢复补批次没有先预留这几批的报价"
 grep -qF 'SkyStudioJobGate.reserveWithoutAsking(credits: total' "${VOICE_BUDGET}" || fail "整批配音没有统一判断每日额度"
 [ "$(count 'AIUndoGrouping.step(project.effectiveUndoManager)' "${VOICE_RUN}")" -eq 1 ] || fail "云端配音落地必须只有一整步撤销"
 for token in 'SkyStudioGenerationActivity.shared.add(status)' 'SkyStudioGenerationActivity.shared.remove(status)' 'OpenProjects.shared.all.contains' 'submission_keys'; do

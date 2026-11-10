@@ -18,8 +18,7 @@ final class SkyStudioVoiceRecovery {
         if case .audio(let index) = input.target { track = index } else { track = nil }
         value = SkyStudioVoiceCheckpoint(input: .init(
             lines: input.lines.map { .init(text: $0.text, start: $0.start) }, language: input.language,
-            voice: input.choice.name, note: input.choice.note, speed: input.speed,
-            cloneURL: input.clone?.url, cloneStart: input.clone?.start, cloneSeconds: input.clone?.seconds,
+            voice: plan.voice, model: input.model, note: input.choice.note, speed: input.speed,
             audioTrack: track, subtitles: input.subtitles, maxLines: input.maxLines, folder: input.folder, playhead: project.clock.time
         ), projectPath: project.documentURL?.standardizedFileURL.path,
             projectToken: AIProjectBinding.token(generation: project.documentGeneration), plan: plan)
@@ -46,10 +45,11 @@ final class SkyStudioVoiceRecovery {
         guard samePath || value.projectToken == AIProjectBinding.token(generation: project.documentGeneration) else {
             throw AIToolError("This recovery belongs to another project. Open its original project and pass that project id; no audio was generated or inserted.")
         }
-        let clone = saved.cloneURL.map { AIVoiceoverInput.Clone(url: $0, start: saved.cloneStart ?? 0, seconds: saved.cloneSeconds) }
+        // 声音和模型照记录（整段报价时定下的），恢复不重新认声音、不重新选模型。
         return AIVoiceoverInput(lines: saved.lines.map { .init(text: $0.text, start: $0.start) }, speed: saved.speed,
-            language: saved.language, requestedVoice: saved.voice, choice: .init(engine: .skyStudio(voice: saved.voice), note: saved.note),
-            clone: clone, target: saved.audioTrack.map(TrackDropTarget.audio) ?? .newAudioBottom,
+            language: saved.language, requestedVoice: saved.voice, ask: nil, model: saved.model,
+            choice: .init(engine: .skyStudio(voice: saved.voice), note: saved.note),
+            target: saved.audioTrack.map(TrackDropTarget.audio) ?? .newAudioBottom,
             subtitles: saved.subtitles, maxLines: saved.maxLines, generation: project.documentGeneration, folder: saved.folder)
     }
 
@@ -70,8 +70,7 @@ final class SkyStudioVoiceRecovery {
         let recovery = SkyStudioVoiceRecovery(file: file, value: value)
         let input = try recovery.input(for: project)
         // 记录里的文件也过既有读取授权；恢复文件不是任意路径读权限的通行证。
-        var files = value.batches.compactMap(\.rawFile) + value.outputs.values.map(\.url)
-        if try args.bool("generate_missing") == true, !value.missing.isEmpty, let clone = value.input.cloneURL { files.append(clone) }
+        let files = value.batches.compactMap(\.rawFile) + value.outputs.values.map(\.url)
         if let ask = try AIWorkspace.shared.confirmReading(files, verb: "recover voiceover audio", args: args, project: project) { return ask }
         return SkyStudioVoiceoverRun(input: input, project: project, recovery: recovery,
                                     generateMissing: try args.bool("generate_missing") ?? false, services: services).start()

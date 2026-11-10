@@ -62,10 +62,11 @@
     那一处统一加 `Guide: skycut_guide topic=<工具名>.`（结构化的报错多一个 `guide` 字段），抛出的地方一个都不改、别处也不许自己再加一份；
     被授权挡住的那句末尾说「说明书照常能用」（`SkyCutGates.aiRefusal`）。
 14. **迁移过的工具**（`MCPGuideWrittenTopics.migrated`；2026-11-10 试点 5 个：`edit_clip`、`generate_media`、`set_text`、`add_clips`、`look`，
-    之后两批加在同一张表里，方案 5.3）：
+    同一天 `add_voiceover` 随声音 PR 3 加进来（`MCPGuideVoiceTopics`），之后两批加在同一张表里，方案 5.3）：
     - **名片 ≤ 450**（目标 350）：第一句说做什么、别的活指到哪个工具；按工具性质写**固定说法**（方案 2.2 第 4、5 条）：只读的 `Read-only`、
-      改工程的 `One undo step`、回任务号的 `wait with get_job`、花积分的 `Paid (Sky Studio credits)` + `quote_only` + `daily credit limit`、
-      收 `confirm_token` 的 `needs_confirmation`、要先读说明书的最后一句 `skycut_guide topic=<工具名>`（试点里是 edit_clip、generate_media、look）。
+      改工程的 `One undo step`、回任务号的 `wait with get_job`、花积分的 `Paid (Sky Studio credits)` + `quote_only`（收它的工具才写：`add_voiceover`
+      不收，整段报价在回任务号之前自动做）+ `daily credit limit`、收 `confirm_token` 的 `needs_confirmation`、要先读说明书的最后一句
+      `skycut_guide topic=<工具名>`（试点里是 edit_clip、generate_media、look，加上 add_voiceover）。
       会调错、花错钱的话留在名片（方案 5.2 的「名片必含」，各检查照旧查说明）；怎么用好的进说明书（「说明书必含」，检查改查那个主题）。
     - **参数说明 ≤ 120**（目标 80）；带 `minimum` / `maximum` 的说明里写数字（Codex 不显示范围）。删掉的长话必须写进手写的那几节，
       每个迁移 PR 的说明里有「删了哪些句子、去了哪」的表。
@@ -73,6 +74,11 @@
       这两个的参数说明到 PR 7 才保得住，在那之前靠说明书的 `fields`）。
     - **主题**：`overview` = **迁移前的说明原文**（一个字不丢；守卫钉着它的长度，PR 里另有逐字比对的记录）+ 一段新话；后面是手写的几节
       （用法、限制、坑，出处写在代码注释里：`ai-control-mcp.md` 第几条、哪个案例）、例子（过参数定义）、`related`；`fields` 几节自动接在最后。
+    - **唯一的例外：没有可搬的原文**（`previousCard` 为 nil）。工具的行为和迁移在同一个 PR 里改了，旧说明照抄进概要等于叫 AI 用已经没有的东西：
+      现在只有 `add_voiceover`（声音方案 4.10 说旧说明过时；4.2–4.4、第十二节：默认 gemini:Charon、去掉 `clone_from`、不再收不带前缀的 Rachel）。
+      它的概要按新行为写，旧说明每一句去了哪写在那个 PR（#355）的说明里；名单写死在 `GuidePilotChecks`（`pilotToolsWithoutPreviousCard`），加一个要改那里。
+      分节照声音方案 4.10：voices / models_languages / paid_confirmation / subtitles / batches_recovery / local_voices / pitfalls（合起来超过 6,000，
+      第一次只回概要 + 有哪些节）。
 15. **`fields` 自动切节**（2026-11-10 定，审查 review-344 第 5 条）：`MCPGuideFields.sections(for:)` 放得下就一节 `fields`；超过 4,500 字
     （留出 6,000 里 JSON 外壳和标题的余量）按**整个第一层参数**切成 `fields`、`fields_2`、`fields_3`……；一个参数连同它的里层不拆开，
     它自己就超过的单独成一节；切完一行不丢、顺序不变。不手工拆：这几节是从参数定义现算的，哪个参数定义一变长，手工拆好的一节就会超。
@@ -98,13 +104,19 @@
 - `checks/MCP/GuidePilotChecks.swift`（迁移过的工具，第 14、15 条）：名片 ≤ 450 和按性质该写的固定说法（只读的、收 `confirm_token` 的从参数定义认，
   别的写在检查里）；每条参数说明 ≤ 120、带范围的写数字；参数定义 ≤ 4,500 字节、例外名单正好是 edit_clip 和 generate_media；概要以迁移前的原文开头、
   原文的长度对得上、名片真的改写过；手写的几节不空、只提真有的名字（结果字段名记在 `CatalogNames.swift`）、有例子和相关主题；
-  `fields` 几节：真实清单里每个工具切完一行不丢、顺序不变、名字依次、超上限的只许是单独一个参数，再拿手造的大参数定义证明真会切。末尾打印五张名片各多少字、哪些工具切了几节。
+  `fields` 几节：真实清单里每个工具切完一行不丢、顺序不变、名字依次、超上限的只许是单独一个参数，再拿手造的大参数定义证明真会切。末尾打印每张迁移过的名片各多少字、哪些工具切了几节。
+  没有可搬的原文的名单正好是 add_voiceover（拿概要真没以原文开头的工具反过来对一遍）。迁移过的工具的名片也和地图、通用主题一起查名字（`GuideChecks` 的 `runGuideWordingChecks`）。
 - `ProviderChecks`（generate_media）：名片必含 Sky Studio / credits / get_job / needs_confirmation / confirm_token / daily credit limit / add_clips / upscale_clip，
   前 512 字点到 upscale / upscale_clip / get_job / add_clips；说明书必含 camera_angle / MiniMax H3 / image_to_video / library / generate_subtitles / add_voiceover。
 - `checks/MCP/router-wiring.sh`（扫描）：`skycut_guide` 交给 `AIGuideTools`，和 `recipes` 同一行 Policy、三个都是 false。
 - `checks/SkyStudio/GateChecks.swift`（`scripts/check-sky-studio.sh`）：`alwaysAnswered` 正好是 `get_status` 和 `skycut_guide`，没 Key / 免费版时只有这两个让用；
   `answeredBeforeLicenseCheck` 正好是 `skycut_guide`、是 `alwaysAnswered` 的子集；`ProNoticeChecks` 同一口径。
 - `checks/sky-studio-wiring.sh` 第 5 节：`aiRefusal` 放行 `answeredBeforeLicenseCheck` 的那一句在 `await settledLicense(` 之前。
+- `SkyStudioVoiceChecks`（add_voiceover，和 `ProviderChecks` 同一个做法）：名片必含 recordings: add_clips / default gemini:Charon / Returns job_id; wait with get_job /
+  relay voice.note / The daily credit limit always applies / resume=recovery_file, never resend lines / 先读说明书那一句，不再有 Rachel、`clone_from`；`speed` 的说明写着
+  「0.5 to 2」；地图「Paid」那一行带着它；主题正好是声音方案 4.10 的那几节、`fields` 在最后，说明书必含 gemini:Charon / eleven:Name / en_male_british / voice_plan /
+  cross_language / daily_budget_exceeded / recharge_url / confirm_token / recovery_file / generate_missing / eleven-v4 / download_voices=true / sync_voiceover。
+- `ArgumentCheckChecks`：名片写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过参数核对（[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。
 - `checks/MCP/CatalogTextChecks.swift`：总说明点到 `skycut_guide`（「目录里有清单的每个工具名」，PR 2 起改查说明书的地图）。
 
 **反向验证（2026-11-10，PR 1）**：每条单独临时弄坏、跑真的守卫、确认变红、再恢复（恢复后工作区和提交逐字节一致）。
