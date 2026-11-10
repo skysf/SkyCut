@@ -69,6 +69,8 @@
 1. **generate_media 的说明书读法**：名片最后一句「Read skycut_guide topic=generate_media before the first call」让模型读了概要之后把六节全读了。
    主题第一次回的 `next_step` 可以写明哪一节管什么、只读要用的那几节（例如花钱之前读 `spending`，不是图片时读 `kinds` / `inputs`，要确切的参数取值才读 `fields`）；
    或者名片直接点到 `section=spending`。在 PR 4 之前定，改完在全部迁移完那一次实测里看效果。
+   **2026-11-10 已做**（进度表 3a）：第一次回答列出每一节讲什么、`next_step` 叫它只读要用的那几节、generate_media 写明报价再问只读 `spending`；
+   名片不动。Codex 那一半量的是改过的版本。
 2. 没迁移的工具（`set_texts`、`export_video`）名片里没要求读，模型也读了（总说明最后一条写的是「名片这么说才读」）。每次只多 0–3% 的输入、换来第一次就用对，先不动。
 3. 任务 7 还读了三个这一场没调的主题（`export_video`、`workflows`、`rules`）；`export_video` 是在找能不能直接拿一帧当封面，算有用的探路。暂时只记录，全部迁移完那一次看是不是还这样。
 

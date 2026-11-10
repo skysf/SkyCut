@@ -39,7 +39,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：声音方案 4.3（认声音的顺序、本机退档）、第十二节（不再收不带前缀的 Eleven 旧名）；ai-control-mcp.md 第四节第 34、35 条。
-    static let voices = MCPGuideSection(name: "voices", text: """
+    static let voices = MCPGuideSection(name: "voices", about: "who speaks: the default, roles, Sky Studio presets, Eleven voices, local voices, fallbacks", text: """
     voice says who speaks (case does not matter):
     - Not given: Sky Studio's default preset, gemini:Charon, a male narrator. Without Sky Studio the local voice of \
     zh_male or en_male reads Chinese or English text.
@@ -58,7 +58,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：声音方案 4.2（model）、4.4（选模型、跨语言提示）、8.4（整段一个模型、每批带回 selection）。
-    static let modelsLanguages = MCPGuideSection(name: "models_languages", text: """
+    static let modelsLanguages = MCPGuideSection(name: "models_languages", about: "model=auto and voice_plan, named models, one selection for the whole script", text: """
     model only matters for Sky Studio voices. auto (the default) lets Sky Studio choose: SkyCut sends the whole script \
     and the voice, and the quote answers with voice_plan: selection (the model and voice that read every batch), rule, \
     reason (one English sentence), languages (each language's share of the reading time), cross_language, warnings and \
@@ -73,7 +73,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：sky-studio-jobs.md 第一节、第五节、第十一节（每日硬预算）；ai-control-mcp.md 第四节第 6、39、40 条；声音方案 4.2 第 2–5 步。
-    static let paidConfirmation = MCPGuideSection(name: "paid_confirmation", text: """
+    static let paidConfirmation = MCPGuideSection(name: "paid_confirmation", about: "quotes, reservations, the daily credit limit, missing credits and confirm_token", text: """
     Sky Studio narration costs credits. Before job_id comes back, SkyCut quotes the whole script once (each batch's \
     price is the most it can cost) and reserves that much against the daily credit limit; each batch is settled at \
     what Sky Studio actually charged and the rest is returned.
@@ -85,7 +85,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：ai-control-mcp.md 第四节第 34 条（字幕）、第 36 条（几行）；sky-studio-jobs.md 第五节（本机切句）；声音方案第七节。
-    static let subtitles = MCPGuideSection(name: "subtitles", text: """
+    static let subtitles = MCPGuideSection(name: "subtitles", about: "subtitles=true, max_lines, and how word times are found", text: """
     subtitles=true adds the spoken words to the original subtitle track, timed to the voice. Lines that would overlap \
     existing subtitles are skipped (the result says how many), and nothing is added when that track is in another \
     language. max_lines is 1 (default) or 2 lines per subtitle and stays with the project.
@@ -97,7 +97,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.4（恢复只 GET 原单、补的批照原来的 selection）。
-    static let batchesRecovery = MCPGuideSection(name: "batches_recovery", text: """
+    static let batchesRecovery = MCPGuideSection(name: "batches_recovery", about: "batches, recovery_file, resume and generate_missing after a failure", text: """
     Sky Studio reads the script in batches. A cloud job keeps what it paid for in recovery_file: every batch's audio, \
     which line is in which batch, and Sky Studio's job ids. When get_job reports failed or cancelled:
     - Never call add_voiceover with the original lines again: that pays twice.
@@ -112,7 +112,7 @@ enum MCPGuideVoiceTopics {
     """)
 
     // 出处：ai-control-mcp.md 第四节第 34、35 条（本机的声音、下载、语速）。
-    static let localVoices = MCPGuideSection(name: "local_voices", text: """
+    static let localVoices = MCPGuideSection(name: "local_voices", about: "download_voices, languages and speed for local voices", text: """
     download_voices=true only downloads SkyCut's own voices (about 333 MB) and returns job_id; tell the user it is \
     downloading. They read Chinese, English, Japanese, Spanish, French, Italian, Portuguese and Hindi; other languages \
     use this Mac's voices. speed (0.5 to 2) works for local voices only. A Mac voice of basic quality comes with \
@@ -121,7 +121,7 @@ enum MCPGuideVoiceTopics {
 
     // 出处：ai-control-mcp.md 第四节第 34 条（录好的声音走 add_clips、换了旁白之后 sync_voiceover）；声音方案第十二节（Rachel）、4.2（speed）；
     // sky-studio-jobs.md 第五节（失败后别重发原稿）。
-    static let pitfalls = MCPGuideSection(name: "pitfalls", text: """
+    static let pitfalls = MCPGuideSection(name: "pitfalls", about: "recordings, sync_voiceover, Eleven names, speed and never paying twice", text: """
     Pitfalls. This tool speaks text: recordings and existing narration files go on the timeline with add_clips. To move \
     pictures to new narration, let this job finish, then use sync_voiceover. Bare old Eleven names such as Rachel are not \
     voices; write eleven:Name. speed only changes local voices; Sky Studio voices ignore it (voice.note says so). After a \

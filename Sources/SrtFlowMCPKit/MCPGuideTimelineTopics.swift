@@ -22,7 +22,7 @@ enum MCPGuideTimelineTopics {
             set_text adds one text on screen (a title, caption or label) or changes one (text_id from get_timeline). Change many texts in \
             one call with set_texts. Each call is one undo step.
             """),
-            MCPGuideSection(name: "layout", text: """
+            MCPGuideSection(name: "layout", about: "position, box_width, alignment, font_size, and the lines / block in the result", text: """
             Layout. position is a named spot (top, upper_third, center, lower_third, bottom) or x / y, the block's centre as canvas \
             fractions. Text wraps inside box_width (a fraction of the frame width, default 0.8); alignment sets the lines inside the \
             block. font_size is pixels on a 1080-pixel-high frame and scales with the canvas: on a 9:16 frame (1920 high) the same number \
@@ -30,25 +30,25 @@ enum MCPGuideTimelineTopics {
             top, right, bottom as fractions) and warns when a word breaks in the middle or the block leaves the frame: make the text \
             smaller, the box wider or the words shorter, then look.
             """),
-            MCPGuideSection(name: "style", text: """
+            MCPGuideSection(name: "style", about: "font, color, outline, shadow, background box, letter spacing", text: """
             Style. font is a family name installed on this Mac (for example PingFang SC, Helvetica Neue, Avenir Next); bold and italic; \
             color for the text; stroke_color and stroke_width for an outline ("none" removes it); shadow for a soft drop shadow; \
             background_color for a box behind the text ("none" removes it); letter_spacing adds pixels between letters (-20 to 80). \
             Colours are #RRGGBB or #RRGGBBAA.
             """),
-            MCPGuideSection(name: "timing_animation", text: """
+            MCPGuideSection(name: "timing_animation", about: "start, duration, entrance and exit animations, emphasis, hidden", text: """
             Timing and animation. start is timeline seconds (default: the playhead), duration is seconds on screen (default 3, at least \
             0.2). animation_in and animation_out pick an entrance and exit (fade, rise, pop, typewriter, cascade, blur, focus, wipe, \
             strokeDraw); their durations default to 0.6 seconds and animation_intensity (0 to 1) sets how far they move. emphasis=breathe \
             adds a slow pulse while the text is on screen. hidden keeps the text but leaves it out of the preview and the export.
             """),
-            MCPGuideSection(name: "numbers", text: """
+            MCPGuideSection(name: "numbers", about: "rolling numbers with number", text: """
             Rolling numbers. number shows a number rolling from one value to another instead of text (text is not needed): from, to, \
             decimals (0 to 4), prefix and suffix (for example "$" or " days"), thousands (commas, default true), seconds (how long it \
             rolls, default 1.5), delay (seconds before it starts) and style (count counts up, odometer spins each digit). Only the \
             fields you pass change; number.remove=true turns it back into plain text.
             """),
-            MCPGuideSection(name: "pitfalls", text: """
+            MCPGuideSection(name: "pitfalls", about: "newlines, timeline rows and stacking, clamped font_size, batches with set_texts", text: """
             Pitfalls. A newline (or the two characters \\n) starts a new line. Each new text gets its own row on the timeline, and the row \
             order is the stacking order. font_size is clamped to 12 to 1000 and the result shows requested and applied. For many titles \
             use one set_texts call, not many set_text calls.
@@ -76,7 +76,7 @@ enum MCPGuideTimelineTopics {
             add_clips is the only way to put media on the timeline: files the user gave you or SkyCut made (generate_media results, \
             recordings), music and sound effects from find_audio, and sound effects made on this Mac. The whole call is one undo step.
             """),
-            MCPGuideSection(name: "placement", text: """
+            MCPGuideSection(name: "placement", about: "where items land: tracks, start, insert, new tracks, separate sound, subtitle files", text: """
             Where items land. Without start, video and images append to the end of their track (default V1); audio starts at 0 on the \
             first free audio track. With start, a video that would overlap is lifted to the track above (or track=new_video); insert=true \
             on V1 pushes the later V1 clips right instead. track names: V1 main, V2 and up for video above it, A1 and up for audio; \
@@ -84,7 +84,7 @@ enum MCPGuideTimelineTopics {
             sound=separate also puts a video's sound on its own audio track, linked to the muted picture (for J/L cuts); sound=only \
             adds just its sound. One subtitle file (.srt, .vtt…) replaces the current subtitle track.
             """),
-            MCPGuideSection(name: "music_sound_effects", text: """
+            MCPGuideSection(name: "music_sound_effects", about: "library_id from find_audio, sound effects made on this Mac, presets, hit_at", text: """
             Music and sound effects. library_id is a track id from find_audio; SkyCut downloads it if needed, and export_video reports \
             the music_credits to pass on to the user. sound_effect makes a sound on this Mac (no download, no credits): preset is whoosh \
             (peak at 60%), swoosh (short, bright), suction (rises and stops dead; peak at the end), riser (builds; peak at the end), \
@@ -94,13 +94,13 @@ enum MCPGuideTimelineTopics {
             (a cut, a word appearing): SkyCut sets the start from it (overriding start); without it a made sound effect lands at the \
             playhead.
             """),
-            MCPGuideSection(name: "windows", text: """
+            MCPGuideSection(name: "windows", about: "source_in / source_out, image length, checks before inserting, what comes back", text: """
             Source windows. source_in and source_out are seconds inside the file (default: the whole file). For an image, source_out is \
             its display length (default 5 seconds) and must fit edit_limits.image_source_duration. Every window is checked before \
             anything is inserted; clamped values come back as requested, applied and adjustments, with the new ids, hit_at and music \
             credits.
             """),
-            MCPGuideSection(name: "pitfalls", text: """
+            MCPGuideSection(name: "pitfalls", about: "relative paths, files outside the folder, narration recordings, changing clips afterwards", text: """
             Pitfalls. Relative paths are relative to the folder opened with open_folder. Files outside that folder ask once \
             (needs_confirmation) and the folder is remembered after the user agrees. Existing narration recordings are added with \
             add_clips; add_voiceover is only for narration spoken from text. To change a clip after adding it, use edit_clip with the \
