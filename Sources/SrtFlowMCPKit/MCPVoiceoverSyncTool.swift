@@ -8,7 +8,7 @@ enum MCPVoiceoverSyncTool {
         let id: JSONValue = ["type": "string"]
         let list: JSONValue = ["type": "array", "items": id]
         let paragraph = MCPSchema.object([
-            "from": MCPSchema.number("Old paragraph start.", minimum: 0),
+            "from": MCPSchema.number("Old paragraph start, seconds (≥ 0).", minimum: 0),
             "to": MCPSchema.number("Old paragraph end > from."),
             "voiceover_id": MCPSchema.string("New audio id; audible, speed 1."),
             "old_voiceover_id": MCPSchema.string("Old audio id to remove."),
@@ -20,18 +20,16 @@ enum MCPVoiceoverSyncTool {
             "texts": list, "shapes": list, "subtitles": list
         ], required: ["from", "to", "voiceover_id"])
         return MCPToolDefinition(.syncVoiceover, title: "Sync timeline to narration", description: """
-            Retime pictures/titles/shapes/cues to replacement narration; no paid generation, one undo. Returns \
-            job_id: wait with get_job. Import via add_clips or finish add_voiceover first. Subtitles realign to new \
-            audio, preserving exact script/Chinese variants (same language); never scale old times. Pictures keep \
-            style/framing/layers. Consecutive old from/to ranges follow voiceover_id lengths; include associated \
-            get_timeline ids (example ids are placeholders).
-            Example: {"language":"en","paragraphs":[{"from":0,"to":4,"voiceover_id":"c3","old_voiceover_id":"c2","clips":[{"clip_id":"c1"}],"texts":["t1"]}]}
-            Unmapped items stay. Cross-boundary/duplicate ids, fit/alignment errors or final collisions reject all. \
-            Reuse audio on failure; never regenerate.
+            Retime pictures, titles, shapes and subtitles to new narration already on the timeline (add_clips, or a finished \
+            add_voiceover). Returns job_id: wait with get_job; no paid generation; one undo step. Subtitles realign to the new \
+            audio.
+            Example: \
+            {"language":"en","paragraphs":[{"from":0,"to":4,"voiceover_id":"c3","old_voiceover_id":"c2","clips":[{"clip_id":"c1"}],"texts":["t1"]}]}
+            Read skycut_guide topic=sync_voiceover first.
             """, input: MCPSchema.object([
                 "paragraphs": MCPSchema.array(of: paragraph, "1–100 ordered mappings; old timeline seconds.", minItems: 1),
                 "language": MCPSchema.string("Spoken language; local model needed for subtitles."),
-                "start": MCPSchema.number("New first paragraph start; default first from.", minimum: 0)
+                "start": MCPSchema.number("New first paragraph start, seconds (≥ 0); default: the first from.", minimum: 0)
             ], required: ["paragraphs", "language"]), destructive: true)
     }
 }

@@ -24,30 +24,30 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setKeyframes, title: "Keyframes",
                 description: """
-                Animate position (centre x/y), scale (1 = default fit), rotation and opacity. Each list replaces that property's \
-                keys; [] removes them, keeping static values. Times are timeline seconds within the clip, or fractions 0–1 \
-                with relative=true. Default easing: easeInOut. Slow zoom: relative=true, scale [{time:0,value:1},{time:1,value:1.15}]. \
-                Position/scale keys block edit_clip fit/x/y/scale. Returns requested/applied/adjustments for native clamping and merged points.
+                Animate a clip's position (centre x/y), scale, rotation and opacity over time. Each list replaces that property's \
+                keys; [] removes them. Times are timeline seconds inside the clip, or 0–1 with relative=true; easing defaults to \
+                easeInOut. Position or scale keys block edit_clip fit/x/y/scale. One undo step; clamped values return \
+                requested/applied/adjustments.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("Clip id from get_timeline."),
                     "relative": MCPSchema.boolean("Times are fractions 0–1 of the clip instead of seconds."),
-                    "easing": MCPSchema.string("Curve of every move: easeInOut (default), easeIn, easeOut, linear (constant speed), snap (fast, then settles), overshoot (past it, back), spring (bounces).", oneOf: MCPVocabulary.keyframeEasings),
+                    "easing": MCPSchema.string("Curve of every move: easeInOut (default), easeIn, easeOut, linear, snap, overshoot or spring.", oneOf: MCPVocabulary.keyframeEasings),
                     "position": MCPSchema.array(of: MCPSchema.object([
-                        "time": MCPSchema.number("Timeline seconds.", minimum: 0),
+                        "time": MCPSchema.number("Timeline seconds (≥ 0), or 0–1 with relative=true.", minimum: 0),
                         "x": MCPSchema.number("Centre across, 0–1 on the frame (-2…3 for a picture bigger than the frame).", minimum: MCPFramingLimits.center.lowerBound, maximum: MCPFramingLimits.center.upperBound),
-                        "y": MCPSchema.number("Centre down, same range.", minimum: MCPFramingLimits.center.lowerBound, maximum: MCPFramingLimits.center.upperBound)
+                        "y": MCPSchema.number("Centre down, -2 to 3 (0–1 on the frame).", minimum: MCPFramingLimits.center.lowerBound, maximum: MCPFramingLimits.center.upperBound)
                     ], required: ["time", "x", "y"]), "Position."),
                     "scale": MCPSchema.array(of: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline seconds.", minimum: 0),
-                    "value": MCPSchema.number("Size, 1 = fits; clamps to runtime keyframe_scale limits.", minimum: MCPFramingLimits.keyframeScale.lowerBound, maximum: MCPFramingLimits.keyframeScale.upperBound)
+                    "time": MCPSchema.number("Timeline seconds (≥ 0), or 0–1 with relative=true.", minimum: 0),
+                    "value": MCPSchema.number("Size, 0.02–8 (1 = fits); clamps to runtime keyframe_scale limits.", minimum: MCPFramingLimits.keyframeScale.lowerBound, maximum: MCPFramingLimits.keyframeScale.upperBound)
                 ], required: ["time", "value"]), "Scale."),
                     "rotation": MCPSchema.array(of: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline seconds.", minimum: 0),
+                    "time": MCPSchema.number("Timeline seconds (≥ 0), or 0–1 with relative=true.", minimum: 0),
                     "degrees": MCPSchema.number("Clockwise degrees.")
                 ], required: ["time", "degrees"]), "Rotation."),
                     "opacity": MCPSchema.array(of: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline seconds.", minimum: 0),
+                    "time": MCPSchema.number("Timeline seconds (≥ 0), or 0–1 with relative=true.", minimum: 0),
                     "value": MCPSchema.number("0 = invisible, 1 = solid.")
                 ], required: ["time", "value"]), "Opacity.")
                 ], required: ["clip_id"])
@@ -83,15 +83,12 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .freezeFrame, title: "Freeze frame",
                 description: """
-                Freeze a video frame for duration (default 2s), shifting later clips on its track. Linkage on: linked content \
-                follow; off: other tracks stay. Default clip: V1 at time. Refuses audio, images, hidden clips and V1 transitions. \
-                PNG is saved next to the project. At the last used frame, a remainder shorter than one frame is dropped; \
-                longer tails resume afterward (tail_id). source_frame reports native requested/actual CMTime, half-open \
-                used source window and source/PNG identities: upright_source, excluding composites. Incomplete or \
-                out-of-window evidence cannot be a production anchor.
+                Hold one video frame for duration seconds (default 2), pushing later clips on its track. Linkage on: linked content \
+                follows; off: other tracks stay. Default clip: the V1 clip at time. Not for audio, images, hidden clips or V1 \
+                transitions. A tail shorter than one frame is dropped; a longer one resumes after the hold (tail_id). One undo step.
                 """,
                 input: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline time of the frame to hold.", minimum: 0),
+                    "time": MCPSchema.number("Timeline time of the frame to hold, seconds (≥ 0).", minimum: 0),
                     "clip_id": MCPSchema.string("The clip to freeze (default: the V1 clip at that time)."),
                     "duration": MCPSchema.number("Seconds to hold (default 2).", minimum: 0.2, maximum: 60)
                 ], required: ["time"])
@@ -146,21 +143,20 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setShape, title: "Shape",
                 description: """
-                Add a line, rectangle, square, circle, arc, blur or mosaic, or edit shape_id; only passed fields change. \
-                x/y and width/height are frame fractions; square/circle/arc use width for both. Rotation turns a line, or \
-                starts an arc clockwise from 12 o'clock (sweep = extent). Shapes sit under texts. blur/mosaic hide the \
-                picture beneath; look text_scan supplies cover boxes. Sizes/strength use a 1080-high frame. Animations \
-                apply to drawn shapes only. Native clamping returns requested/applied/adjustments; delete with delete_items.
+                Add a line, rectangle, square, circle, arc, blur or mosaic patch, or change one (shape_id); only passed fields change. \
+                Position and size are frame fractions; shapes sit under texts. blur and mosaic hide the picture beneath (look \
+                text_scan gives cover boxes). Delete with delete_items. One undo step; clamped values return \
+                requested/applied/adjustments.
                 """,
                 input: MCPSchema.object([
                     "shape_id": MCPSchema.string("Change this shape instead of adding one."),
                     "kind": MCPSchema.string("Shape (required when adding).", oneOf: ["line", "rectangle", "square", "circle", "arc", "blur", "mosaic"]),
-                    "start": MCPSchema.number("Timeline start in seconds (default: the playhead).", minimum: 0),
+                    "start": MCPSchema.number("Timeline start, seconds (≥ 0; default: the playhead).", minimum: 0),
                     "duration": MCPSchema.number("Seconds on screen (default 3).", minimum: 0.2),
                     "x": MCPSchema.number("Horizontal centre, 0–1.", minimum: 0, maximum: 1),
                     "y": MCPSchema.number("Vertical centre, 0–1.", minimum: 0, maximum: 1),
-                    "width": MCPSchema.number("Width (or a line's length) as a fraction of the frame.", minimum: 0.02, maximum: 1),
-                    "height": MCPSchema.number("Rectangle height as a fraction of the frame.", minimum: 0.02, maximum: 1),
+                    "width": MCPSchema.number("Width (or a line's length) as a fraction of the frame, 0.02–1.", minimum: 0.02, maximum: 1),
+                    "height": MCPSchema.number("Rectangle height as a fraction of the frame, 0.02–1.", minimum: 0.02, maximum: 1),
                     "rotation": MCPSchema.number("Clockwise degrees: a line's angle (±90), or where an arc starts from 12 o'clock.", minimum: -360, maximum: 360),
                     "sweep": MCPSchema.number("Arcs only: degrees the arc covers, clockwise (default 270).", minimum: 1, maximum: 359),
                     "color": MCPSchema.string("#RRGGBB or #RRGGBBAA."),
@@ -178,21 +174,14 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setFilter, title: "Filter",
                 description: """
-                Add a colour filter over a time range (it grades every video track there, not texts or subtitles), \
-                or change one \
-                when filter_id is given; only the fields you pass change. Presets: tealOrange (blockbuster teal \
-                shadows, warm \
-                skin), coldIron (cold, desaturated, hard, industrial), warmSun (warm golden daylight), flatGrey (flat \
-                low-saturation documentary), nightGold (night with amber highlights, deep blacks), fadedFilm (old \
-                faded film, \
-                lifted blacks), coldWhite (bright clean cool whites: products, interiors), mistBlue (misty morning \
-                blue, low \
-                contrast), inkShadow (hard black and white), neon (cyberpunk magenta and cyan, full saturation).
+                Add a colour grade over a time range (every video track there, not texts or subtitles), or change one (filter_id); \
+                only passed fields change. Presets: tealOrange, coldIron, warmSun, flatGrey, nightGold, fadedFilm, coldWhite, \
+                mistBlue, inkShadow, neon. One undo step.
                 """,
                 input: MCPSchema.object([
                     "filter_id": MCPSchema.string("Change this filter instead of adding one."),
                     "preset": MCPSchema.string("Look.", oneOf: MCPVocabulary.filterPresetIDs),
-                    "start": MCPSchema.number("Timeline start in seconds (default: the playhead).", minimum: 0),
+                    "start": MCPSchema.number("Timeline start, seconds (≥ 0; default: the playhead).", minimum: 0),
                     "duration": MCPSchema.number("Seconds (default 3).", minimum: 0.1),
                     "strength": MCPSchema.number("0 to 1 (default 1).", minimum: 0, maximum: 1),
                     "hidden": MCPSchema.boolean("Hide it without deleting it.")

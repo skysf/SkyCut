@@ -42,6 +42,14 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 第一批迁移的工具主题提到的结果字段（2026-11-10）：edit_subtitles 的 own_style；listen 的 level_db / peak_db / loudest_at / tempo_bpm /
+    // suggested_source_in / suggested_source_out；get_job 的 queue_position / export_settings / billing_note / remote_result；
+    // upscale_clip 的 replaced_ids / source_size / transfer_percent / phase_seconds / typical_seconds；freeze_frame 的 tail_id / source_frame /
+    // upright_source；record_screen 的 stopped_by / stop_method；set_keyframes 的 keyframe_scale（edit_limits 里的）。
+    names.formUnion(["own_style", "level_db", "peak_db", "loudest_at", "tempo_bpm", "suggested_source_in", "suggested_source_out",
+                     "queue_position", "export_settings", "billing_note", "remote_result", "replaced_ids", "source_size",
+                     "transfer_percent", "phase_seconds", "typical_seconds", "tail_id", "source_frame", "upright_source",
+                     "stopped_by", "stop_method", "keyframe_scale"])
     return names
 }
 
