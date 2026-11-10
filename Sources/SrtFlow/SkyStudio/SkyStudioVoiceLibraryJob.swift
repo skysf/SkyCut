@@ -112,7 +112,9 @@ final class SkyStudioVoiceLibraryJob {
             finish(outcome, SkyStudioVoiceLibraryErrors.message(error), detail: await failureDetail(error))
         } catch {
             if serverID == nil { held.refund() }
-            finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error), detail: [:])
+            // 别的错（不是 Sky Studio 说的）：没有原因可带，下一步照样由起它的地方说。
+            let next = await onFailure?(nil, nil) ?? [:]
+            finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error), detail: next)
         }
     }
 
@@ -181,6 +183,8 @@ final class SkyStudioVoiceLibraryJob {
 
     private func finish(_ outcome: AIJobs.Status, _ message: String, detail: [String: JSONValue]) {
         guard let job else { return }
+        // 这一单到头了：不再算「开着」（之后同一件事再来就是新的一单，照常问 / 记账）。
+        if Self.open[identity]?.id == job.id { Self.open[identity] = nil }
         var value = detail
         if outcome != .done, let serverID { value["skystudio_job_id"] = .string(serverID) }
         AIJobs.shared.finish(job, outcome, message: message, detail: value.isEmpty ? nil : .object(value))
