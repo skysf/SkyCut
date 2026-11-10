@@ -212,7 +212,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
-- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.63 的签名包与下载回读记录）：
+- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.64 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](docs/build/build-and-packaging.md)。
 - 音频库素材的制备与上传（音乐：选曲 → 规格化 → manifest → R2；音效：手写目录 → 峰值归一 + 落点 → manifest → R2）：
   [docs/build/audio-library-pipeline.md](docs/build/audio-library-pipeline.md)。
@@ -438,10 +438,12 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
-- [MCP 按需说明的基线实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半 2026-11-11 跑。
+- [MCP 按需说明的基线实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半（0.167、gpt-6.1-sol / max）：第一次请求里 SkyCut 占 64 token（0.167 给每个 MCP 服务器列一行带总说明开头，不是 0）、全打一遍工具 49,485 token 截在约 1 万、只看得到 12 个，找工具打印里 46% 是重复的总说明，任务 7 把「画质尽量好」当成点名、没停下来问；[Codex 证据](docs/reports/2026-11-10-mcp-guide-baseline-codex-evidence.json)。
 
-- [MCP 按需说明的试点实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
-  （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半 2026-11-11 跑。
+- [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
+  （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半（f76032e，0.167、gpt-6.1-sol / max，四个测试 App 并行）：和基线比没有退步，任务 7 两边都把「画质尽量好」当成用户点名、自带
+  `user_requested_overrides` 没停下来问；全打一遍的原始 token −27%、找工具打印的总字数 −13.6%、重复总说明占比 48% → 38%（6.4 的三条按字面没到，截断和方案自己的估算见报告）；
+  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)。
 
 - [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
