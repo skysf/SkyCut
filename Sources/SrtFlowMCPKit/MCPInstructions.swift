@@ -23,7 +23,7 @@ public enum MCPInstructions {
     }
 
     public static let text = """
-    SkyCut edits projects on this Mac. Start get_status and get_settings section=ai; open_folder, \
+    SkyCut edits projects on this Mac. Start get_status, get_settings section=ai, skycut_guide (tool manual); open_folder, \
     open_project/new_project; get_timeline for fresh ids. Inspect with look/listen/transcribe before edits. \
     Batch: edit_clips/set_texts/set_shapes. Replace narration + retime: sync_voiceover. Check output/seams: \
     inspect_video. Review: export_video preset=quick_review, then get_job. Use only these tools and given/returned files.

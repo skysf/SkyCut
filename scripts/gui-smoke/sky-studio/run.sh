@@ -56,6 +56,9 @@ SPEECH
   "$FF" -y -v error -i "$D/assets/narration.aiff" -ac 1 -ar 44100 "$D/assets/narration.wav"
 fi
 "$FF" -y -v error -stream_loop 2 -i "$D/assets/narration.wav" "$D/work/reference.wav"
+# 克隆的参考录音至少 10 秒有效人声（docs/architecture/voice-library.md）：同一句循环 7 遍约 17 秒、人声 14 秒多；
+# reference.wav 照旧约 7 秒，多模态参考的总时长上限（15 秒）还要它。
+"$FF" -y -v error -stream_loop 6 -i "$D/assets/narration.wav" "$D/work/voice-sample.wav"
 "$FF" -y -v error -f lavfi -i color=c=steelblue:s=640x640:r=24 -t 2 -an -c:v libx264 -pix_fmt yuv420p "$D/assets/video.mp4"
 "$FF" -y -v error -f lavfi -i color=c=steelblue:s=640x640 -frames:v 1 -update 1 "$D/assets/picture.png"
 cp "$D/assets/video.mp4" "$D/work/motion.mp4"

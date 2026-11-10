@@ -66,7 +66,7 @@ try:
     assert not any(t.get("clips") for t in after_undo.get("tracks", [])), after_undo
     # 两句克隆共享一单；真实转写 → 句界 → 两个文件与字幕 → 一步撤销。
     new_project()
-    cloned = job(call("add_voiceover", {"lines": lines, "clone_from": "reference.wav", "subtitles": True}))
+    cloned = job(call("add_voiceover", {"lines": lines, "clone_from": "voice-sample.wav", "subtitles": True}))
     assert len(cloned["added"]) == 2 and len(cloned["skystudio_job_ids"]) == 1, cloned
     assert cloned["subtitles"]["added"] >= 2
     assert ledger() == before + 4.5

@@ -94,7 +94,7 @@
 - **先回任务号**：Key 静默读取、模型、全部报价、音频处理都在任务里；调用方只用 `get_job` 等，不重复原始 `add_voiceover`。普通旁白服务不可用时可退本机；每日硬预算不足暂停，不换声音。克隆不退档、不问越额确认码。
 - **整批预留、逐批结算**：先从 `/models` 读模型与 cap，全部报价后一次预留总额（`SkyStudioVoiceBudget`）；每批复用 `SkyStudioJobRun`、同一幂等 key 重试。未提交的退回，取消 / 失败明确没花钱的退回且只退一次；提交结果未知的保留账，报告 `credits_unknown`、`submission_keys` 和已知服务器任务号，不自动重生成。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
-- **克隆合批**：`SkyStudioVoicePlan` 读取 `limits.max_characters_by_language`、按接口语言名选 cap；计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。短句装同一批、长句拆片记原句索引，不按每句收一次钱。参考段截成 16k 单声道 WAV，只上传一次。
+- **克隆合批**：`SkyStudioVoicePlan` 读取 `limits.max_characters_by_language`、按接口语言名选 cap；计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。短句装同一批、长句拆片记原句索引，不按每句收一次钱。参考录音（2026-11-10 起）是 44.1 kHz 单声道 16-bit WAV、至少 10 秒有效人声、最长 3 分钟（超过自动挑一段），用途 `voice_reference`、只上传一次，规矩见 [声音库](voice-library.md)。
 - **本机切句**：多句一批前先确认 macOS 26 转写模型已安装，否则收费前失败。拿到成品后复用系统转写和 `SubtitleCueWords` 字符对齐，每句必须覆盖足够原文；只在识别到的词之间找安静切口，不按字数猜时间。切不准保留完整批次文件并报错，禁止再次收费生成来掩盖失败。
 - **落地**：各句都经 `AIAudioFileWriter.writeVoiceover` 写到配音目录；最后核对原工程和 generation，一次 `AIUndoGrouping.step` 同时入轨 / 字幕、记本轮改动、未保存工程落盘。工程已换 / 关闭只留文件，不改别的工程。`get_job` 报批次、阶段、服务器任务号、文件和已收积分；状态行与生成共用 `SkyStudioMediaStatus`。
 

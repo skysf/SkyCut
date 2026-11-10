@@ -10,10 +10,13 @@ struct VoiceoverLine {
 }
 
 struct AIVoiceoverInput {
+    /// 克隆用的素材：从 `start` 秒起、`seconds` 秒长（nil = 到结尾；超过 3 分钟 VoiceReferenceSample 自动挑一段）。
     struct Clone {
         let url: URL
         let start: Double
-        let seconds: Double
+        let seconds: Double?
+
+        var end: Double? { seconds.map { start + $0 } }
     }
 
     let lines: [VoiceoverLine]
@@ -66,12 +69,19 @@ struct AIVoiceoverInput {
         )
     }
 
+    /// 参考录音不再「默认 10 秒、最多 30 秒」（决定第三节第 3 条）：给了 clone_seconds 就是那一段（放不下 10 秒有效人声的当场拒），
+    /// 没给就从 clone_start 到结尾，超过 3 分钟由 VoiceReferenceSample 挑有效人声最多的一段。
     @MainActor
     static func cloneSource(_ args: AIToolArguments) throws -> Clone? {
         guard let path = try args.string("clone_from"), !path.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
         let url = AIWorkspace.shared.resolve(path)
         guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("There is no file at \(path).") }
-        return Clone(url: url, start: max(0, try args.double("clone_start") ?? 0), seconds: min(max(try args.double("clone_seconds") ?? 10, 5), 30))
+        let seconds = try args.double("clone_seconds")
+        if let seconds, seconds < VoiceReferenceWindow.minimumVoicedSeconds {
+            throw AIToolError("clone_seconds must be at least \(Int(VoiceReferenceWindow.minimumVoicedSeconds)): a voice sample needs "
+                + "\(Int(VoiceReferenceWindow.minimumVoicedSeconds)) s of clear speech. Leave it out to let SkyCut pick the part with the most speech.")
+        }
+        return Clone(url: url, start: max(0, try args.double("clone_start") ?? 0), seconds: seconds)
     }
 
     @MainActor

@@ -60,8 +60,8 @@ private func mentions(_ text: String, _ name: String) -> Bool {
     text.range(of: "\\b\(name)\\b", options: .regularExpression) != nil
 }
 
-/// 汉字、中日文标点和全角符号。
-private func containsChinese(_ text: String) -> Bool {
+/// 汉字、中日文标点和全角符号（给 AI 的文字只用英文；GuideChecks 也用它查说明书）。
+func containsChinese(_ text: String) -> Bool {
     text.unicodeScalars.contains { scalar in
         switch scalar.value {
         case 0x3000...0x303F, 0x3400...0x4DBF, 0x4E00...0x9FFF, 0xF900...0xFAFF, 0xFF00...0xFFEF: return true
