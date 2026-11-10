@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 
 // **图只该解一次、缩一次**（静帧管线出过两次「产物完全正确、只是慢 20 倍」的 bug，
@@ -26,11 +27,11 @@ struct StillMarginalCost {
 
     /// 大图：解码、缩放都贵（自检里是 6000×4500 的 PNG）。
     var big: Timing
-    /// 同一张图先缩到产物尺寸：解码、缩放几乎不要钱，编码那 119 帧的活和大图一样。
+    /// 同一张图先无损缩到产物尺寸：解码、缩放几乎不要钱，编码那 119 帧的活和大图一样。
     var small: Timing
 
-    /// 大图的边际成本最多是小图的几倍。正确的实现是 1 倍；本机实测（2026-11-11，M1）逐帧重解 10–16 倍、
-    /// 逐帧重缩 6–8 倍。2.5 离两边都有两倍以上：慢 runner 上两边一起慢、比值不变，单边抖动到 2 倍也不红。
+    /// 大图的边际成本最多是小图的几倍。正确的实现是 1 倍；本机实测（2026-11-11，M1）逐帧重解 10–13 倍、
+    /// 逐帧重缩约 6 倍。2.5 离两边都有两倍以上：慢 runner 上两边一起慢、比值不变，单边抖动到 2 倍也不红。
     static let ratioLimit = 2.5
     /// 快机器上边际成本只有 0.1 秒上下，倍数那一条太紧：至少留这么多秒给计时的毛刺。
     static let slack = 0.25
@@ -134,8 +135,20 @@ private func fastestRuns(_ commands: [[String]], into best: inout [Double], roun
     return true
 }
 
-/// `native` 是给原生政策数解码次数用的那张图（4000×3000）。
-func checkDecodeOnce(native: URL) {
+/// 大图无损缩到 `size`（产物的尺寸）：小图那一侧的输入。**别从产物里取一帧来当小图** —— 编码过的画面再编一遍更便宜，
+/// 本机量出来它的边际成本系统性地小三成（CI 上大图 0.27 秒对它 0.17 秒），白白吃掉余量；无损缩的那张和大图的比值是 1.0。
+private func scaledCopy(of image: URL, to size: CGSize, name: String) -> URL? {
+    let url = root.appendingPathComponent(name)
+    let (code, _) = run(ffmpegPath, [
+        "-hide_banner", "-loglevel", "error", "-y", "-i", image.path,
+        "-vf", "scale=\(Int(size.width)):\(Int(size.height))", "-frames:v", "1", url.path,
+    ])
+    return code == 0 ? url : nil
+}
+
+/// `native` 是给原生政策数解码次数用的那张图（4000×3000）。和 main.swift 的顶层代码一样跑在主 actor 上（要改它的计数）。
+@MainActor
+func checkDecodeOnce(native: URL) async {
     checkMarginalCostRule()
 
     // 素材要够大：跟着源图大小走的活（解码、缩放）必须明显贵过「编 120 帧 1080p」，否则分不出好坏。
@@ -144,9 +157,11 @@ func checkDecodeOnce(native: URL) {
     checkDecodeCount(big, nativeResolution: false, label: "照片政策")
     checkDecodeCount(native, nativeResolution: true, label: "原生政策")
 
-    // 小图 = 大图的产物里取一帧：尺寸就是产物的尺寸、画面一样，于是多出来那 119 帧的编码活两边一样。
+    // 小图 = 大图无损缩到产物的尺寸（先转一遍、照生产读素材信息的办法读出产物多大）：画面一样、尺寸一样，
+    // 于是多出来那 119 帧的编码活两边一样。
     guard let product = convert(big, nativeResolution: false, name: "perf-product.mp4"),
-          let small = extractFrame(product.url, at: 0, name: "perf-small.png") else {
+          case .success(let info) = await MediaProbe.probe(url: product.url, ffmpeg: URL(fileURLWithPath: ffmpegPath)),
+          let small = scaledCopy(of: big, to: info.displaySize, name: "perf-small.png") else {
         failures += 1
         print("FAIL 边际成本：造不出产物尺寸的小图")
         return

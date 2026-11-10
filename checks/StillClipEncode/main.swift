@@ -221,7 +221,7 @@ if let made = convert(animated, nativeResolution: true, name: "still-anim.mp4") 
 // MARK: - 图只该解一次、缩一次（DecodeOnce.swift）
 
 // 数 ffmpeg 报的解码次数，再把多出来那 119 帧的边际成本和同一次运行里产物尺寸的小图比。
-checkDecodeOnce(native: bigImage)
+await checkDecodeOnce(native: bigImage)
 
 // MARK: - 同一张图同一条政策，产物必须逐字节稳定
 
