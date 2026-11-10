@@ -168,7 +168,8 @@ final class AIToolRouter {
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
             return Outcome(json: AIProjectTools.saveIfNeverSaved(project, after: result).json, stamp: result.stamp)
         } catch let error as AIToolError {
-            return Outcome(json: error.result, failed: true)
+            // 给 AI 的报错统一指到这个工具的说明书（方案 3.3，只在这一处加）。
+            return Outcome(json: error.result(guide: call.tool), failed: true)
         } catch {
             return Outcome(json: MCPBridge.textResult("SkyCut could not do that: \(error.localizedDescription)", isError: true), failed: true)
         }

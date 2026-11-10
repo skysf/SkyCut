@@ -51,6 +51,16 @@
    只给 section 时加 `section_without_topic` / `next_step`）。
 9. **例子和相关主题**：例子只许挂在工具主题上、必须过那个工具的参数定义（参数名过 `MCPArgumentCheck`、值过类型 / 可选值 / 范围 / 条数）；
    `related` 里的名字必须是真主题。
+10. **地图**（不带 topic 回的那一页，`MCPGuideMap`，2026-11-10 起）：手写、按任务分组、带用户会说的词（9:16、配乐、口头禅、马赛克……）；第一行列出五个通用主题；
+    **清单里每个工具都要作为一项列在地图上**（`组名: 工具 (说明), 工具 (说明)`，括号里顺带提到的不算）；≤ 5,000。新加工具时在合适的那一行加上它。
+    工具目录 2026-11-09 用户定从总说明搬到这里（方案第八节第 1 条）：Codex 每打印一个工具条目就带一份整份总说明。
+11. **五个通用主题**（`MCPGuideSharedTopics`）：rules（每个工具共守的规矩和要 AI 自己守的）、conventions（时间、轨道、id、位置大小、文件、范围、联动和磁吸）、
+    paid（Sky Studio 积分：哪些工具、报价、什么时候要点头、每日硬上限、任务）、workflows（常见的活从头到尾）、errors（报错是什么意思、下一步）。
+    手写、只用英文，每一段的出处写在代码注释里；名字不和工具撞；提到的名字必须真的存在（工具名、参数名、清单里的选项值、几个结果字段）。
+12. **总说明**（`MCPInstructions`）≤ 1,200：入口 + 主动规矩 + 什么时候先读说明书，前 512 字点到 `skycut_guide`（[AI 接口](ai-control-mcp.md)第一节第 6 条）。
+13. **报错指路**（方案 3.3）：参数名写错的那句末尾 `Fields: skycut_guide topic=<工具名>.`（`MCPArgumentCheck`）；别的工具报错只在路由 catch `AIToolError`
+    那一处统一加 `Guide: skycut_guide topic=<工具名>.`（结构化的报错多一个 `guide` 字段），抛出的地方一个都不改、别处也不许自己再加一份；
+    被授权挡住的那句末尾说「说明书照常能用」（`SkyCutGates.aiRefusal`）。
 
 ## 四、守卫
 
@@ -60,6 +70,13 @@
   写错的 section 回第一次的样子；名字的写法不计较、写错的 topic 回目录 + 猜的、只给 section 说清楚；手写的文字只提真有的名字（和剪辑风格卡共用
   `checks/MCP/CatalogNames.swift`，拿写错名字的样本证明它真会红）；回的每一样都只用英文；App 那一头（`AIGuideTools`）照答、参数名核对收
   `topic` / `section`、挡别的名字。末尾打印目录和最大的一次回答各多少字。
+- 地图（`GuideChecks`）：每个工具作为一项列在地图上（去掉括号里的说明、按逗号 / 分号 / 斜杠切开认）、第一行列出五个通用主题、≤ 5,000；
+  五个通用主题都在、不空、≤ 6,000、名字不和工具撞、按名字找得到、写错了猜得到（`rule` → `rules`）；地图和通用主题里提到的名字都真的存在。
+- `checks/MCP/CatalogTextChecks.swift`：总说明 ≤ 1,200、前 512 字点到 open_folder / get_timeline / look / export_video / skycut_guide；
+  `ProtocolChecks` / `ProviderChecks` / `SoundEffectChecks` / `UpscaleToolChecks`：原来要求写在总说明目录里的（不用工程的文件工具、智能剪、`save_recipe`、
+  `add_voiceover`、花积分的那一行、`add_clips sound_effect`）改查地图，要 AI 主动做的（只用 SkyCut、`find_audio`、剪整片先挑剪辑风格）还查总说明。
+- 报错指路：`ArgumentCheckChecks`（参数名写错的那句指到 `skycut_guide topic=<工具名>`）、`checks/MCP/router-wiring.sh`（路由 catch 那一处用
+  `error.result(guide: call.tool)`，别处不许自己调 `result(guide:)`）、`GateChecks`（被挡住的那句以「skycut_guide (the manual) still answers.」结尾）。
 - `checks/MCP/GuideContentChecks.swift`：自己走一遍真实清单，每个参数的每一样事实（可选的值、范围、条数、长度、类型并集、`anyOf` 的写法、能不能带别的字段）
   都在它自己那一行，走空了算红；例子过参数定义、只挂在工具主题上，`related` 是真主题，不含 Key / 邮箱 / 链接 / Bearer —— 每条都拿手造的坏样本证明真会红。
 - `checks/MCP/router-wiring.sh`（扫描）：`skycut_guide` 交给 `AIGuideTools`，和 `recipes` 同一行 Policy、三个都是 false。
@@ -101,6 +118,20 @@
 | 只给 section 时悄悄回目录（修复前那样） | 3 条：没有 section_without_topic、没有 next_step |
 | 放行说明书挪到等授权之后（修复前那样） | `checks/sky-studio-wiring.sh` 红（放行在第 5 行、等待在第 4 行） |
 | `answeredBeforeLicenseCheck` 改成空 | GateChecks 1 条 |
+
+**反向验证（2026-11-10，地图、通用主题、总说明、报错指路）**：
+
+| 临时弄坏 | 红了 |
+| --- | --- |
+| 总说明换回 `7a9d8c9` 那一版（2,012 字、没有 skycut_guide） | CatalogTextChecks 4 条：两种样子都超过 1,200、前 512 字没点到 skycut_guide |
+| 地图里删掉 `seek` | GuideChecks 1 条：地图没把 seek 列成一项 |
+| 把 `seek` 挪进 set_view 的括号里（整词还在地图上） | GuideChecks 1 条：括号里顺带提到的不算一项（按整词找会照样过） |
+| 通用主题少了 `errors` | GuideChecks 2 条：主题表不对、errors 主题不在 |
+| rules 主题里写一个不存在的参数名 | GuideChecks 1 条：措辞检查挑出 `clip_end_ms` |
+| 参数名写错的那句去掉说明书指路 | ArgumentCheckChecks 1 条 |
+| 路由 catch 换回不带指路的 `error.result` | `checks/MCP/router-wiring.sh` 红（`check-mcp.sh --scans-only` 退出非 0） |
+| 被挡住的那句去掉「skycut_guide 照常能用」 | GateChecks 7 条（七种被挡的原因） |
+| 地图的 Paid 那一行去掉 `upscale_clip` | GuideChecks 1 条：地图没把 upscale_clip 列成一项 |
 
 ## 五、人工回归（发版前在真机上走一遍）
 

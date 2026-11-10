@@ -76,7 +76,8 @@ enum SkyCutGates {
         var sentences = ["Not done: SkyCut's AI tools need SkyCut Pro or a SkyCut trial, and \(reason(license))."]
         if let snag = snag(problem) { sentences.append(snag) }
         sentences.append(nextStep(license, problem: problem))
-        sentences.append("Nothing was changed; get_status shows the plan.")
+        // 说明书照常能用（没开通也照答）：AI 被挡住时也能读它、把 SkyCut 能做什么说清楚（review-344 第 9 条，方案第八节第 5 条）。
+        sentences.append("Nothing was changed; get_status shows the plan, and skycut_guide (the manual) still answers.")
         return sentences.joined(separator: " ")
     }
 

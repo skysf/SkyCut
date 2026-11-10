@@ -13,7 +13,7 @@ func runSoundEffectChecks() {
     parameterChecks()
     soundEffectRequestChecks()
     checkEqual(MCPVocabulary.soundEffectPresets, SoundEffectPreset.allCases.map(\.rawValue), "the sound_effect presets match SoundEffectPreset")
-    check(MCPInstructions.text.contains("add_clips sound_effect"), "the instructions' Sound line points at add_clips sound_effect")
+    check(guideMapText().contains("add_clips sound_effect"), "the guide map points at add_clips sound_effect")
 }
 
 private func presetChecks() {
