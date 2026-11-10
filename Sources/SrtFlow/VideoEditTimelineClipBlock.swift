@@ -440,6 +440,10 @@ struct ClipBlockView: View, Equatable {
                 }
             }
         }
+        // 变声：有声音、没静音的段（视频段、音频段）。只交给 Activity 摆面板，块不读工程、不做 IO。
+        if clip.hasAudio, !clip.isMuted, !clip.isStillImage {
+            Button("Change Voice…") { VoiceChangeActivity.shared.present(panelFor: clip.id) }
+        }
         Divider()
         if let url = revealTarget {
             Button("Show in Finder") { revealInFinder(url) }

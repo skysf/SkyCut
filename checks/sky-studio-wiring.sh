@@ -34,6 +34,9 @@
 #       （`createVoice` / `addVoiceReference` 别处不许直接调）；删除只经 SkyStudioVoiceDeletion（存储一时不可用再发一次只有这一份）；
 #       设计只经 SkyStudioVoiceDesignOrder，对话框按下去先过每日硬预算（SkyStudioJobGate.reserveWithoutAsking）再起任务；
 #       界面不用确认码（AIConfirmations）、Key 只静默读；声音库的视图不读工程、不订阅播放器的时钟。
+#   13. **变声（声音 PR 9）**：AI 的 change_voice 和片段右键的面板同一条路（VoiceChangeSource.prepare → VoiceChangeOrder.draft → 先过每日
+#       硬预算 → VoiceChangeOrder.start，VoiceChangeJob 只在那里造）；只判每日硬预算、不用确认码；落地恰好一次 perform、规则只有
+#       VoiceChangeLanding.land 一份；上传用途只写一处；块只往 VoiceChangeActivity 写目标，面板的视图不读工程。
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -521,6 +524,9 @@ source checks/sky-studio-wiring/voice-library-ui.sh
 # 13. 声音库的收费单只下一次、账只记一次（2026-11-11 审查 #362 / #367 之后）：拆在 checks/sky-studio-wiring/voice-library-orders.sh。
 source checks/sky-studio-wiring/voice-library-orders.sh
 
+# 14. 变声（声音 PR 9）：同样拆出去，checks/sky-studio-wiring/voice-change.sh。
+source checks/sky-studio-wiring/voice-change.sh
+
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
 grep -qF 'SkyStudioGenerationName.stem(' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift || fail "图片操作未按源图起名"
@@ -544,4 +550,4 @@ if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 长期授权 / 路径 / 服务商 id / 不退本机守住了、声音库的界面和 AI 的工具走同一条路、声音库的收费单只下一次"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 长期授权 / 路径 / 服务商 id / 不退本机守住了、声音库的界面和 AI 的工具走同一条路、声音库的收费单只下一次、变声的两个入口同一条路且落地是一次 perform"

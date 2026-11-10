@@ -27,7 +27,7 @@ GRANTS, STANDING_VERSION = {}, voice_fixtures.CATALOG["voice_consent"]["standing
 OFFICIAL = OfficialRecipes(ROOT)
 # 和服务器 skycut_begin_job 同一份名单：这几种进声音池（SkyStudioJobSlots.audioKinds）。
 AUDIO_KINDS = {"voice", "voice_clone", "voice_enroll", "voice_design", "voice_convert", "sound_effect"}
-HIDDEN = ("prompt", "credits", "refuse", "polls", "account", "plan", "params", "held", "outcome")
+HIDDEN = ("prompt", "credits", "refuse", "polls", "account", "plan", "params", "held", "outcome", "inputs")
 
 
 def stamp(seconds=0):
@@ -52,6 +52,10 @@ def synthesize(job):
     if job["kind"] in ("image", "text_to_video", "image_to_video"):
         with LOCK:
             media_fixtures.finish(job, ROOT, BASE)
+        return
+    if job["kind"] == voice_fixtures.CONVERT:
+        with LOCK:
+            voice_fixtures.finish_convert(job, ROOT, BASE)
         return
     # 并发冒烟：每批在「处理中」停一会儿，几批同时在跑才看得见。
     time.sleep(CONTROL.get("voice_job_seconds", 0))
@@ -172,6 +176,10 @@ class Handler(BaseHTTPRequestHandler):
             with LOCK:
                 LOG.append({"method": "GET", "path": self.path, "has_auth": True})
                 return self.reply(200, {"grant": GRANTS.get(self.account()), "current_statement_version": STANDING_VERSION})
+        if self.path.endswith("/voices/" + voice_fixtures.VOICE_ID):
+            with LOCK:
+                LOG.append({"method": "GET", "path": self.path, "has_auth": True})
+            return self.reply(200, {"voice": voice_fixtures.VOICE})
         if self.path.endswith("/models"):
             # 快照里全部声音模型（读稿、设计、建 MiniMax 版、变声）：打开全部权限时那段说明的价目也从这里读（声音 PR 7）。
             voices = voice_fixtures.models(CONTROL.get("voice_max_characters"))
@@ -258,6 +266,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path.endswith("/quote"):
                 if CONTROL.get("quote_error"):
                     return self.error(503, "unavailable")
+                if data["kind"] == voice_fixtures.CONVERT:
+                    return self.reply(200, voice_fixtures.convert_quote())
                 if data["kind"] == "voice_clone" and "batches" in (data.get("params") or {}):
                     status, value = library.clone_quote(data, CONTROL)
                     return self.reply(status, value)
@@ -321,7 +331,7 @@ class Handler(BaseHTTPRequestHandler):
                     job = dict(job_id=identity, status="queued" if held else "running",
                                account=self.account(), held=held, params=data.get("params") or {},
                                kind=data["kind"], model=data["model"], prompt=data.get("prompt", ""), poll_after_seconds=2,
-                               plan=(data.get("params") or {}).get("plan"),
+                               plan=(data.get("params") or {}).get("plan"), inputs=data.get("inputs") or {},
                                credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity
                     # 冒烟让第几批「中途换了备用」/「备用要先建 MiniMax 版」：按交上来的先后从 voice_job_outcomes 里取。

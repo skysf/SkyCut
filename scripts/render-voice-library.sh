@@ -34,8 +34,8 @@ for table in "${BUILD_DIR}/SrtFlow_SrtFlow.bundle"/*.lproj; do
 done
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   -I "${BUILD_DIR}/Modules" \
-  checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/LibraryFixture.swift \
-  checks/VoiceLibraryUI/Render.swift \
+  checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/LibraryFixture.swift checks/VoiceRecovery/VoiceChangeFixture.swift \
+  checks/VoiceLibraryUI/Render.swift checks/VoiceLibraryUI/RenderVoiceChange.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceLibraryRender"
 SRTFLOW_VOICE_RENDER_OUT="${OUT_DIR}" SRTFLOW_VOICE_RENDER_WORK="${ROOT}/work" \

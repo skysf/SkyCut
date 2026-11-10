@@ -26,6 +26,7 @@ import SrtFlowMCPKit
             try await runVoiceFallbackFeeChecks(root)
             try await runVoiceStandingChecks(root)
             await runVoicePaidAudioChecks(root)
+            try await runVoiceChangeChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -46,7 +47,10 @@ import SrtFlowMCPKit
             + "a packed batch without usable word times on a Mac that cannot transcribe; voice.note in get_job while running and after a failure, "
             + "a batch that never matches its transcription estimated on the second try"
             + "; library orders: one design per quote, one open job per order or voice + language, the day's spend settled at the charge, "
-            + "price_changed / refunds leaving nothing, the fee question kept until Sky Studio accepts the build, a new consent statement asked again")
+            + "price_changed / refunds leaving nothing, the fee question kept until Sky Studio accepts the build, a new consent statement asked again"
+            + "; voice change: quote before a mono WAV upload, one voice_convert job, target_language only for a known language the voice has, "
+            + "refusals before paying, two new linked tracks with the clip muted as one undo / redo step, files only when the clip or project "
+            + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job")
         exit(0)
     }
 

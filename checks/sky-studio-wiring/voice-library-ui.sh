@@ -76,7 +76,7 @@ expected_probe_users="$(printf '%s\n' "${VOICE_HARVESTER}" "${VOICE_SAMPLE_LANGU
 sample_detectors="$(code_files_with 'VoiceSampleLanguage\.detect\(' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
 expected_sample_detectors="$(printf '%s\n' "${VOICE_LIBRARY_SERVICES}" "${NEW_VOICE_MODEL}" | LC_ALL=C sort | tr '\n' ' ')"
 [ "${sample_detectors}" = "${expected_sample_detectors}" ] \
-  || fail "参考录音的语言识别只许两个入口用：对话框（${NEW_VOICE_MODEL}）和 manage_voices（${VOICE_LIBRARY_SERVICES} 的 detectLanguage）：${sample_detectors:-没有}"
+  || fail "参考录音的语言识别只许两个入口用：对话框（${NEW_VOICE_MODEL}）和 manage_voices（${VOICE_LIBRARY_SERVICES} 的 detectLanguage；变声也只经它，不另调一遍）：${sample_detectors:-没有}"
 grep -qF 'detect: services.detectLanguage' "${VOICE_RECORDING}" \
   || fail "${VOICE_RECORDING}：没给 language 时识别只经 services.detectLanguage（默认就是对话框那一份）"
 recording_code="$(sed 's,//.*,,' "${VOICE_RECORDING}")"
