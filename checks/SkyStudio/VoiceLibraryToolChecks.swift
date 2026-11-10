@@ -92,8 +92,12 @@ private func gateChecks() {
     let spend = SkyStudioSpendStore(defaults: defaults)
 
     // 授权：两种模式都问；同一件事等答复时回同一张；收了一次就作废；别的录音拿不走。
+    // 授权的把关不收 access（这一刀两种模式一样），所以全 App 那一份也一起拨（拨完拨回去）：哪天有人照模式跳过，这里就红。
+    let shared = AIAccessStore.shared.mode
+    defer { AIAccessStore.shared.setMode(shared) }
     for mode in [AIAccessMode.ask, .full] {
         access.setMode(mode)
+        AIAccessStore.shared.setMode(mode)
         let action = "skystudio:voice_consent:test:\(mode)"
         let asked = SkyStudioJobGate.voiceConsent(action: action, question: "q", token: nil)
         let token = asked?.payload["confirm_token"]?.stringValue

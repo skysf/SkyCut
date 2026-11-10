@@ -433,10 +433,6 @@ grep -qF 'credits_unknown' "${VOICE_CHECKPOINT}" && grep -qF 'rawFile = file' "$
 grep -qF 'hasSuffix(".skystudiosmoke") == true' "${ACCOUNT}" && grep -qF 'SkyStudioAPI.isLoopback(host)' "${ACCOUNT}" \
   || fail "假 Sky Studio Key 钩子没有同时限定测试身份和回环"
 
-if [ "${FAILED}" -ne 0 ]; then
-  echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
-  exit 1
-fi
 # 角色 A：服务器引用与本机文件分开；报价选择进入确认身份、提交和 get_job。
 CHAR_READ="Sources/SrtFlow/SkyStudio/SkyStudioCharacterReadTool.swift"
 CHAR_MODEL="Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift"
@@ -492,8 +488,8 @@ done
 consent_makers="$(code_files_with '\.thisRecording\(' | grep -vxF "${VOICE_LIBRARY_DTO}" | sort -u || true)"
 [ "${consent_makers}" = "${VOICE_RECORDING}" ] \
   || fail "consent: true（SkyStudioVoiceConsent.thisRecording）只许在 ${VOICE_RECORDING} 里造（问到了才造）：${consent_makers:-没有}"
-gate_line="$(grep -nF 'SkyStudioJobGate.voiceConsent(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1)"
-consent_line="$(grep -nF '.thisRecording(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1)"
+gate_line="$(grep -nF 'SkyStudioJobGate.voiceConsent(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+consent_line="$(grep -nF '.thisRecording(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
 if [ -z "${gate_line}" ] || [ -z "${consent_line}" ] || [ "${gate_line}" -ge "${consent_line}" ]; then
   fail "${VOICE_RECORDING}：consent: true 要在 SkyStudioJobGate.voiceConsent 点过头之后才造"
 fi
@@ -524,4 +520,16 @@ grep -qF 'detail.merge(localImage.dimensions)' Sources/SrtFlow/SkyStudio/SkyStud
 grep -qF 'completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue)' "${CHAR_RUN}" || fail "角色完成后刷新未区分正常完成与原单恢复"
 grep -qF 'completionMessage(resuming: plan == nil)' "${CHAR_RUN}" || fail "角色首次完成未按实际恢复来源选文案"
 
+# 守卫自己：总闸只许在最后，所有检查都在它前面（2026-11-10 案例：总闸夹在中间时，后面三节的 ✗ 打出来、脚本照样绿，
+# docs/bugfixes/2026-11-10-sky-studio-wiring-checks-after-exit.md）。
+gate_at="$(grep -n 'if \[ "\${FAILED}" -ne 0 \]; then' "$0" | tail -1 | cut -d: -f1 || true)"
+last_fail="$(grep -nE '(\|\| |\{ |^ *)fail "' "$0" | tail -1 | cut -d: -f1 || true)"
+if [ -z "${gate_at}" ] || [ -z "${last_fail}" ] || [ "${last_fail}" -gt "${gate_at}" ]; then
+  fail "$0：总闸（if FAILED）要在最后一条检查之后（总闸第 ${gate_at:-?} 行、最后一条检查第 ${last_fail:-?} 行）"
+fi
+
+if [ "${FAILED}" -ne 0 ]; then
+  echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
+  exit 1
+fi
 echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 路径 / 服务商 id / 不退本机守住了"
