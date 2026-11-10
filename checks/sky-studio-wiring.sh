@@ -10,7 +10,8 @@
 #      让不让、带不带水印的判断只在 SkyStudioAccount 里调 SkyCutGates（生不生效另有 get_status 问一句）；导出面板底栏挂着「会带水印」那一行；
 #      export_video 开始和做完都告诉 AI 带了水印；get_status 报 skycut_plan。
 #   6. **交任务、取消任务只经 SkyStudioJobRun**（第 6 刀）：满了等着再交、同一个 idempotency_key、交的请求不跟着取消、停的时候排队中的退钱 /
-#      开始了的取消不了，这些规矩只在那一处；
+#      开始了的取消不了，这些规矩只在那一处；**领槽只经 SkyStudioJobSlots**（声音 PR 4）：SkyStudioJobRun 交之前领（只 GET 的恢复不领），
+#      一段旁白的各批由 SkyStudioVoiceBatchQueue 按顺序先领好、先记下出了什么事再还；槽数只照 /me（SkyStudioAccount adopt）；
 #   7. **Key 只发给 Sky Studio**：认证头只在 SkyStudioAPI.request 里写一次，上传的签名地址和成品地址都不经它；
 #   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好两处），
 #      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 SkyStudioHeldCredits（upscale 和生成共用的那一笔）里动；
@@ -21,6 +22,10 @@
 #   9. **generate_media 走 Sky Studio**（第 6 刀 6b，2026-10-28）：在建任务之前过 SkyStudioJobGate、任务用记好的那一笔（SkyStudioHeldCredits）；
 #      Key 不弹框；清单里它属于 skystudio；路由只起任务（不包撤销分组）；get_job 有阶段和 skystudio_job_id；任务起手登记进
 #      SkyStudioGenerationActivity、结束拿掉，状态行订阅它；能取消；这几个文件不弹模态框。
+#   11. **声音库（声音 PR 6）**：`consent: true` 只在 SkyStudioVoiceRecordingTool 里、过了 SkyStudioJobGate.voiceConsent 之后造；
+#       长期授权 `consent: "standing_grant"` 这一刀没人用（全部权限下不问是声音 PR 7）；`/voices` 的路径只在 SkyStudioVoiceAPI 里拼；
+#       源码和测试数据里没有 MiniMax voice_id 的样子（`Voice` + 一长串十六进制）；声音库的几个工具问用户只经 SkyStudioJobGate（不另开确认入口）；
+#       声音库的声音不退本机（SkyStudioVoiceoverStart 里认出 voice_… 的每一处都是报错）。
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -47,6 +52,8 @@ done
 FAILED=0
 fail() { echo "✗ $1" >&2; FAILED=1; }
 count() { grep -cF -- "$1" "$2" || true; }
+# 第一处出现在第几行（没有就是空的）。
+line_of() { { grep -nF -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
 # 去掉 // 注释再找（注释里提到名字不算）。查变量用 <<<：管道末端的 grep -q 在 pipefail 下会假报（checks/shell-pipe-grep-q.sh）。
 code_files_with() {
   local pattern="$1" file stripped
@@ -203,6 +210,31 @@ for call in 'submit\([^)]*, key:' 'cancel\([^)]*, key:'; do
   [ "${users}" = "${RUN} " ] || fail "SkyStudioAPI 的 ${call%%\\(*} 只许 SkyStudioJobRun 调（满了等着再交、停的规矩都在那里），实际在：${users:-没有}"
 done
 
+# 6b. 领槽只经 SkyStudioJobSlots（声音 PR 4，SkyCut 声音方案 8.2）：SkyStudioJobRun 在交之前领、这一单结束就还；只 GET 的恢复不领；
+#     一段旁白的各批由 SkyStudioVoiceBatchQueue 按原来的顺序领、交给 SkyStudioJobRun 拿着，记下这一批出了什么事之后才还（后面排着的批看得见）；
+#     槽数只有 SkyStudioAccount 照 /me 改；全 App 只有一份（别处不另建）。
+SLOTS="Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift"
+QUEUE="Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatchQueue.swift"
+[ -f "${SLOTS}" ] && [ -f "${QUEUE}" ] || fail "找不到 ${SLOTS} 或 ${QUEUE}"
+users="$(code_files_with '\.acquire\(kind:' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${RUN} ${QUEUE} " ] || fail "领槽（slots.acquire）只许 SkyStudioJobRun 和 SkyStudioVoiceBatchQueue 调，实际在：${users:-没有}"
+users="$(code_files_with 'SkyStudioJobSlots\(' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${SLOTS} " ] || fail "SkyStudioJobSlots 全 App 只许一份（static let shared），别处另建了：${users:-没有}"
+users="$(code_files_with 'SkyStudioJobSlots\.shared\.adopt' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${ACCOUNT} " ] || fail "槽数只许 SkyStudioAccount 照 /me 改（adopt），实际在：${users:-没有}"
+grep -qF 'let held = try await claimSlot(for: request.kind, onUpdate: onUpdate)' "${RUN}" && grep -qF 'defer { held?.release() }' "${RUN}" \
+  || fail "${RUN}：run 要在交之前领槽、这一单结束就还"
+[ "$(count 'claimSlot(' "${RUN}")" -eq 2 ] || fail "${RUN}：只有 run 领槽（resume 只 GET 原单、不领）"
+grep -qF 'lease = try await slots.acquire(kind: kind)' "${QUEUE}" && grep -qF 'runner.lease = lease' Sources/SrtFlow/SkyStudio/SkyStudioVoiceCloudBatches.swift \
+  || fail "一段旁白的各批要在 SkyStudioVoiceBatchQueue 里按顺序领槽、交给 SkyStudioJobRun 拿着"
+# 只看交一批的那个函数（submit）：出了事那一支先 record、再 release。
+SUBMIT_BODY="$(sed -n '/private func submit(/,/^    }$/p' "${QUEUE}")"
+RECORD_AT="$({ grep -nF 'record(index, error)' <<<"${SUBMIT_BODY}" || true; } | head -1 | cut -d: -f1)"
+RELEASE_AT="$({ grep -nF 'lease.release()' <<<"${SUBMIT_BODY}" || true; } | head -1 | cut -d: -f1)"
+if [ -z "${RECORD_AT}" ] || [ -z "${RELEASE_AT}" ] || [ "${RECORD_AT}" -ge "${RELEASE_AT}" ]; then
+  fail "${QUEUE}：一批出了事要先记下再还槽（不然排在后面的批领到槽时看不见，照样交出去）"
+fi
+
 # 7. Key 只发给 Sky Studio：认证头只在 request() 里写一次。
 [ "$(count 'forHTTPHeaderField: "Authorization"' "${API}")" -eq 1 ] \
   || fail "${API}：认证头只许在 request() 里写一次 —— 上传的签名地址、成品地址都不许带 Key"
@@ -219,7 +251,6 @@ CATALOG="Sources/SrtFlowMCPKit/MCPToolCatalog.swift"
 for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${JOB_ACCESS}" "${SPEND}" "${CATALOG}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done
-line_of() { { grep -nF -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
 UP_DECIDE="$(line_of 'try SkyStudioJobGate.decide(' "${UP_TOOL}")"
 UP_NEW_JOB="$(line_of 'let job = UpscaleJob(' "${UP_TOOL}")"
 if [ -z "${UP_DECIDE}" ] || [ -z "${UP_NEW_JOB}" ] || [ "${UP_DECIDE}" -ge "${UP_NEW_JOB}" ]; then
@@ -241,7 +272,7 @@ done
 grep -qF 'try SkyStudioApproval.file(request.originalURL)' "${UP_TOOL}" || fail "${UP_TOOL}：upscale 确认码没有绑定素材身份"
 grep -qF 'try frame.map(SkyStudioApproval.file)' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift \
   || fail "generate_media：确认码没有绑定首帧文件身份"
-[ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 3 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好三处（额度内直接做 / 收下令牌 / 配音整批预留）"
+[ "$(count 'record(store, credits)' "${JOB_GATE}")" -eq 4 ] || fail "${JOB_GATE}：记账 record(store, credits) 应恰好四处（额度内直接做 / 收下令牌 / 配音整批预留 / 声音库的一次性费用点过头）"
 movers="$(code_files_with 'SkyStudioSpendStore' | while read -r file; do
   # 只认真动账本的写法（SkyStudioSpendStore.shared.record / refund、拿着它的 store.record / refund）；held?.refund() 是经 SkyStudioHeldCredits 退。
   if grep -qE '(SkyStudioSpendStore\.shared|store)\.(record|refund)\(' <<<"$(sed 's,//.*,,' "${file}")"; then echo "${file}"; fi
@@ -414,7 +445,7 @@ fi
 grep -qF 'SkyStudioVoiceRequests.segmentQuote(kind: kind, model: model, voice: voice, batches: speech.map(\.prompt), lines: lines)' "${VOICE_PLAN}" \
   && grep -qF 'try SkyStudioVoiceRequests.batch(index, of: draft.segment, quote: quote)' "${VOICE_PLAN}" \
   || fail "整段报价没有经 segmentQuote（params.batches），或每批没有照报价带回同一个 params.plan"
-grep -qF 'SkyStudioJobRun(api: api, key: key)' "${VOICE_CLOUD}" && grep -qF 'runner(index).run(request)' "${VOICE_CLOUD}" \
+grep -qF 'SkyStudioJobRun(api: api, key: try await resolvedKey())' "${VOICE_CLOUD}" && grep -qF 'let done = try await runner.run(request)' "${VOICE_CLOUD}" \
   && grep -qF 'run.checkpoint = ' "${VOICE_CLOUD}" || fail "云端配音没有复用统一任务执行器并持久化原单身份"
 grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_SERVICES}" || fail "云端配音不得弹钥匙串框"
 grep -qF 'SkyStudioVoiceBudget.reserve(missingCredits)' "${VOICE_CLOUD}" || fail "恢复补批次没有先预留这几批的报价"
@@ -429,10 +460,6 @@ grep -qF 'credits_unknown' "${VOICE_CHECKPOINT}" && grep -qF 'rawFile = file' "$
 grep -qF 'hasSuffix(".skystudiosmoke") == true' "${ACCOUNT}" && grep -qF 'SkyStudioAPI.isLoopback(host)' "${ACCOUNT}" \
   || fail "假 Sky Studio Key 钩子没有同时限定测试身份和回环"
 
-if [ "${FAILED}" -ne 0 ]; then
-  echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
-  exit 1
-fi
 # 角色 A：服务器引用与本机文件分开；报价选择进入确认身份、提交和 get_job。
 CHAR_READ="Sources/SrtFlow/SkyStudio/SkyStudioCharacterReadTool.swift"
 CHAR_MODEL="Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift"
@@ -476,6 +503,43 @@ for source in SkyStudioCharacterNativeRequest.swift SkyStudioCharacterWorkflow.s
   grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色 B 生产路径没有编进假服务器检查：${source}"
 done
 
+# 11. 声音库（声音 PR 6，SkyCut 声音方案 4.5、4.6、9.1 第 12 项）。
+VOICE_DIR="Sources/SrtFlow/SkyStudio"
+VOICE_RECORDING="${VOICE_DIR}/SkyStudioVoiceRecordingTool.swift"
+VOICE_LIBRARY_DTO="${VOICE_DIR}/SkyStudioVoiceLibrary.swift"
+VOICE_API_FILE="${VOICE_DIR}/SkyStudioVoiceAPI.swift"
+VOICE_START_FILE="${VOICE_DIR}/SkyStudioVoiceoverStart.swift"
+for file in "${VOICE_RECORDING}" "${VOICE_LIBRARY_DTO}" "${VOICE_API_FILE}" "${VOICE_START_FILE}"; do
+  [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
+done
+consent_makers="$(code_files_with '\.thisRecording\(' | grep -vxF "${VOICE_LIBRARY_DTO}" | sort -u || true)"
+[ "${consent_makers}" = "${VOICE_RECORDING}" ] \
+  || fail "consent: true（SkyStudioVoiceConsent.thisRecording）只许在 ${VOICE_RECORDING} 里造（问到了才造）：${consent_makers:-没有}"
+gate_line="$(grep -nF 'SkyStudioJobGate.voiceConsent(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+consent_line="$(grep -nF '.thisRecording(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${gate_line}" ] || [ -z "${consent_line}" ] || [ "${gate_line}" -ge "${consent_line}" ]; then
+  fail "${VOICE_RECORDING}：consent: true 要在 SkyStudioJobGate.voiceConsent 点过头之后才造"
+fi
+standing="$(code_files_with '\.standingGrant\b' | grep -vxF "${VOICE_LIBRARY_DTO}" || true)"
+[ -z "${standing}" ] || fail "长期授权 consent: \"standing_grant\" 这一刀不许用（全部权限下不问是声音 PR 7）：${standing}"
+voice_paths="$(code_files_with 'SkyStudioVoicePath\.' | sort -u || true)"
+[ "${voice_paths}" = "${VOICE_API_FILE}" ] || fail "/voices 的路径只许在 ${VOICE_API_FILE} 里拼：${voice_paths:-没有}"
+provider_ids="$(grep -rEln 'Voice[0-9a-fA-F]{16,}' Sources checks/SkyStudio checks/VoiceRecovery checks/MCP || true)"
+[ -z "${provider_ids}" ] || fail "源码和测试数据里不许有 MiniMax voice_id 的样子（服务商的 id 永远不出服务器，约定第 3 条）：${provider_ids}"
+for tool in SkyStudioVoiceLibraryTool SkyStudioVoiceRecordingTool SkyStudioVoiceDesignTool SkyStudioVoiceOneTimeStep SkyStudioVoiceFallbackFee; do
+  file="${VOICE_DIR}/${tool}.swift"
+  [ -f "${file}" ] || { fail "找不到 ${file}"; continue; }
+  stripped="$(sed 's,//.*,,' "${file}")"
+  if grep -qF 'AIConfirmations.shared' <<<"${stripped}"; then
+    fail "${file}：声音库问用户只经 SkyStudioJobGate（voiceConsent / voiceOneTime / voiceDeletion），不另开确认入口"
+  fi
+done
+library_lines="$(grep -cF 'isLibrary' "${VOICE_START_FILE}" || true)"
+library_throws="$(grep -F 'isLibrary' "${VOICE_START_FILE}" | grep -cF 'throw AIToolError' || true)"
+if [ "${library_lines}" -lt 3 ] || [ "${library_lines}" != "${library_throws}" ]; then
+  fail "${VOICE_START_FILE}：认出声音库声音（isLibrary）的每一处都要报错、不许退本机（4.3）：${library_throws}/${library_lines}"
+fi
+
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
 grep -qF 'SkyStudioGenerationName.stem(' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift || fail "图片操作未按源图起名"
@@ -483,4 +547,16 @@ grep -qF 'detail.merge(localImage.dimensions)' Sources/SrtFlow/SkyStudio/SkyStud
 grep -qF 'completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue)' "${CHAR_RUN}" || fail "角色完成后刷新未区分正常完成与原单恢复"
 grep -qF 'completionMessage(resuming: plan == nil)' "${CHAR_RUN}" || fail "角色首次完成未按实际恢复来源选文案"
 
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"
+# 守卫自己：总闸只许在最后，所有检查都在它前面（2026-11-10 案例：总闸夹在中间时，后面三节的 ✗ 打出来、脚本照样绿，
+# docs/bugfixes/2026-11-10-sky-studio-wiring-checks-after-exit.md）。
+gate_at="$(grep -n 'if \[ "\${FAILED}" -ne 0 \]; then' "$0" | tail -1 | cut -d: -f1 || true)"
+last_fail="$(grep -nE '(\|\| |\{ |^ *)fail "' "$0" | tail -1 | cut -d: -f1 || true)"
+if [ -z "${gate_at}" ] || [ -z "${last_fail}" ] || [ "${last_fail}" -gt "${gate_at}" ]; then
+  fail "$0：总闸（if FAILED）要在最后一条检查之后（总闸第 ${gate_at:-?} 行、最后一条检查第 ${last_fail:-?} 行）"
+fi
+
+if [ "${FAILED}" -ne 0 ]; then
+  echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
+  exit 1
+fi
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 路径 / 服务商 id / 不退本机守住了"

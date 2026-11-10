@@ -26,8 +26,9 @@ public enum MCPGuideWrittenTopics {
         public var readingTip: String? = nil
     }
 
-    /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个，2026-11-10；add_voiceover 随声音 PR 3）。第二批加在这里。
-    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover]
+    /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices
+    /// 随声音 PR 6 从第一天起就这么写）。第二批加在这里。
+    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices]
         // 第一批（方案 PR 4，2026-11-10）：时间线、字幕、声音、录屏、导出等 25 个。
         + [.editSubtitles, .generateSubtitles, .translateSubtitles, .getSubtitles, .exportSubtitles, .transcribe, .listen, .cutSpeech, .cutToBeat,
            .syncVoiceover, .exportVideo, .inspectVideo, .compressVideos, .burnSubtitles, .getJob, .setShape, .setKeyframes, .setFilter,
@@ -41,6 +42,8 @@ public enum MCPGuideWrittenTopics {
         case .generateMedia: return MCPGuideMediaTopics.generateMedia
         case .look: return MCPGuideMediaTopics.look
         case .addVoiceover: return MCPGuideVoiceTopics.addVoiceover
+        case .listVoices: return MCPGuideVoiceLibraryTopics.listVoices
+        case .manageVoices: return MCPGuideVoiceLibraryTopics.manageVoices
         case .editSubtitles: return MCPGuideSubtitleTopics.editSubtitles
         case .generateSubtitles: return MCPGuideSubtitleTopics.generateSubtitles
         case .translateSubtitles: return MCPGuideSubtitleTopics.translateSubtitles

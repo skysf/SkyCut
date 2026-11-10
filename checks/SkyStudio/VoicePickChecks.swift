@@ -73,7 +73,13 @@ private func runLocalRoleChecks(_ voices: SkyStudioVoiceCatalog) {
     checkEqual(role(.role(AIVoiceRole.named("en_female_lively")!), "en"), "en_female_lively", "a role keeps its own local voice")
     checkEqual(role(.preset("gemini:Gacrux"), "zh", catalog: voices), "zh_male", "Gacrux reads Chinese as a man: the male role")
     checkEqual(role(.preset("gemini:Gacrux"), "en", catalog: voices), "en_female_warm", "Gacrux reads English as a woman: the warm female role")
-    checkEqual(role(.preset("gemini:Despina"), "en", catalog: voices), "en_male", "gender unknown: the narrator")
+    checkEqual(role(.preset("gemini:Despina"), "en", catalog: voices), "en_female_warm", "Despina reads English as a woman: the warm female role")
+    // 服务器可以报「性别不明」（gender unknown）；最终快照里已经没有这样的声音，拿一份改过的目录照样钉住：不明的退到旁白角色。
+    var unplaced = voices
+    if let index = unplaced.presets.firstIndex(where: { $0.id == "gemini:Despina" }) {
+        for language in unplaced.presets[index].languages.keys { unplaced.presets[index].languages[language]?.gender = "unknown" }
+    }
+    checkEqual(role(.preset("gemini:Despina"), "en", catalog: unplaced), "en_male", "gender unknown: the narrator")
     checkEqual(role(.preset("gemini:Sulafat"), "zh"), "zh_male", "no catalog: the narrator")
     checkEqual(role(.eleven("eleven:Daniel"), "en"), "en_male", "an Eleven voice falls back to the narrator, as before")
     // 本机不点名的那个角色和 Sky Studio 不点名的那个声音是同一个人设（4.3：照 voice_roles 里指向 Charon 的角色）。

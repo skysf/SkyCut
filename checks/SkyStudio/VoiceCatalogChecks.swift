@@ -2,9 +2,11 @@ import Foundation
 import SrtFlowMCPKit
 
 // 声音 PR 1（SkyCut 声音方案 9.1 第 1 项）：`/models` 里声音的那一部分，对着目录快照读。
-// 快照：checks/SkyStudio/Fixtures/models-voice-2026-11-10.json，原样拷自 Sky Studio 的 tests/fixtures/skycut/（feat/voice-service 的
-// 6793b038 从 buildSkycutModelCatalog() 导出；那边说明是临时导出：目录代码写完了、/models 还没上线，目录改了会重新导出，到时原样换掉再跑）。
-// 钉住：预设按语言分开（Gacrux 中文男 / 英文女）、名单只收 listed、中文 21 / 英文 27 / 藏 3、样音和 Eleven 备用、唯一的默认是 Charon；
+// 快照：checks/SkyStudio/Fixtures/models-voice-2026-11-10.json，原样拷自 Sky Studio 的 tests/fixtures/skycut/（声音 PR #246 合并的最终导出，
+// 6c08d0f0，用户听过样音后重新打分的五个：Enceladus、Sadaltager 进了两种名单，Orus 中文、Schedar 英文仍不在名单上，Despina 定为女声仍藏着；
+// /models 还没上线，目录改了 Sky Studio 会重新导出，到时原样换掉再跑）。
+// 钉住：预设按语言分开（Gacrux 中文男 / 英文女、Schedar 只在中文名单、Orus 只在英文名单）、名单只收 listed、中文 23 / 英文 28 / 藏 1、
+// 样音和 Eleven 备用、唯一的默认是 Charon；
 // 8 个角色都在、都指向那种语言名单里的声音（Iapetus 只在英文名单）；一次性费用的价目、Eleven 支持的语言、分批的字数上限；
 // DTO 和快照里没有服务商的 id。
 
@@ -30,10 +32,14 @@ func runVoiceCatalogChecks() {
 
 private func runPresetChecks(_ voices: SkyStudioVoiceCatalog) {
     checkEqual(voices.presets.count, 30, "30 preset voices")
-    checkEqual(voices.listed(language: "zh").count, 21, "21 on the Chinese list")
-    checkEqual(voices.listed(language: "en").count, 27, "27 on the English list")
+    checkEqual(voices.listed(language: "zh").count, 23, "23 on the Chinese list")
+    checkEqual(voices.listed(language: "en").count, 28, "28 on the English list")
     let hidden = voices.presets.filter { $0.languages.values.allSatisfy { !$0.listed } }.map(\.name).sorted()
-    checkEqual(hidden, ["Despina", "Enceladus", "Sadaltager"], "three hidden in both languages")
+    checkEqual(hidden, ["Despina"], "only Despina is hidden in both languages")
+    checkEqual(voices.preset("gemini:Schedar")?.entry(for: "zh")?.listed, true, "Schedar is on the Chinese list")
+    checkEqual(voices.preset("gemini:Schedar")?.entry(for: "en")?.listed, false, "Schedar is not on the English list")
+    checkEqual(voices.preset("gemini:Orus")?.entry(for: "zh")?.listed, false, "Orus is not on the Chinese list")
+    checkEqual(voices.preset("gemini:Orus")?.entry(for: "en")?.listed, true, "Orus is on the English list")
     checkEqual(voices.listed(language: "ja").map(\.id), voices.listed(language: "en").map(\.id), "other languages use the English list (other_languages)")
 
     let gacrux = voices.preset("gemini:Gacrux")
@@ -43,7 +49,7 @@ private func runPresetChecks(_ voices: SkyStudioVoiceCatalog) {
     checkEqual(gacrux?.entry(for: "en")?.listed, true, "Gacrux is on the English list")
     check(gacrux?.entry(for: "zh")?.description != gacrux?.entry(for: "en")?.description, "descriptions are per language")
     checkEqual(gacrux?.entry(for: "es")?.gender, "female", "Spanish uses the English attributes")
-    checkEqual(voices.preset("gemini:Despina")?.entry(for: "zh")?.gender, "unknown", "a voice nobody could place is gender unknown")
+    checkEqual(voices.preset("gemini:Despina")?.entry(for: "zh")?.gender, "female", "Despina was placed after listening: a woman (still hidden)")
     let genders = Set(voices.presets.flatMap { $0.languages.values.compactMap(\.gender) })
     check(genders.isSubset(of: ["male", "female", "unknown"]), "genders are male / female / unknown: \(genders.sorted())")
 

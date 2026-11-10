@@ -3,7 +3,8 @@ import SrtFlowCore
 import SrtFlowMCPKit
 
 // 动态 code-point 上限、全球词时间、克隆句界及整批配额；整段报价之前怎么分批、报价之后每批怎么交（SkyStudioVoicePlan，
-// 声音 PR 3，SkyCut 声音方案 4.2、8.1、8.4）；均使用生产类型，不碰外网。
+// 声音 PR 3，SkyCut 声音方案 4.2、8.1、8.4）；普通旁白也合批、批只在两句之间分、一句超长先在句末分、切不开的一句一单、
+// Eleven 读的按字符时间切（声音 PR 5，方案 8.1、9.1 第 5 项）；均使用生产类型，不碰外网。
 func runVoiceChecks() {
     func chunk(_ text: String, at start: Double) -> JSONValue {
         let chars = Array(text).map(String.init)
@@ -15,7 +16,7 @@ func runVoiceChecks() {
         let packed = try SkyStudioVoiceBatch.make(lines: ["First line.", "Second line."], limit: 80, pack: true)
         check(packed.count == 1 && packed[0].parts.count == 2, "several clone lines share one request")
         let separate = try SkyStudioVoiceBatch.make(lines: ["First line.", "Second line."], limit: 80, pack: false)
-        check(separate.count == 2, "narration remains one request per line")
+        check(separate.count == 2, "lines this Mac cannot split apart stay one request per line")
         let long = try SkyStudioVoiceBatch.make(lines: [String(repeating: "你好", count: 300), "Next."], limit: 220, pack: true)
         check(long.count == 3, "long Chinese lines fit three requests, not one request per short sentence")
         check(long.allSatisfy { $0.prompt.unicodeScalars.count <= 220 }, "all code point caps hold")
@@ -29,6 +30,7 @@ func runVoiceChecks() {
         check(SpeechWordTimes.parse(.array([chunk("ab", at: 0), ["characters": ["c"]]])).isEmpty, "malformed later chunk refused")
         check(SpeechWordTimes.parse(chunk("你好世界", at: 0)).count == 4, "Chinese characters remain separately timed")
         runVoiceDraftChecks()
+        runVoiceBatchSentenceChecks()
         let capped = SpeechWordTimes.timedWords([.init(text: "hello", start: 0, end: 1.05), .init(text: "world", start: 1.1, end: 2)], text: "hello world", duration: 1)
         checkEqual(capped.map(\.end), [1], "no word extends beyond the decoded duration")
         let batch = try SkyStudioVoiceBatch.make(lines: ["Hello world", "Next line"], limit: 40, pack: true)[0]
@@ -77,23 +79,32 @@ private func runVoiceDraftChecks() {
     guard let catalog = loadVoiceFixture()?.catalog else { return check(false, "the voice catalog snapshot loads for the plan checks") }
     do {
         let lines = ["第一句。", "第二句。"]
-        let narration = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", model: "auto", language: "zh", catalog: catalog)
-        checkEqual(narration.speech.map(\.prompt), lines, "narration is still one request per line (packing narration is voice PR 5)")
+        let packing = SkyStudioVoiceReading.decide(kind: "voice", voice: "gemini:Charon", model: nil, subtitles: true, language: "zh",
+                                                   transcribes: true, catalog: catalog)
+        let packed = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", reading: packing, language: "zh", catalog: catalog)
+        checkEqual(packed.speech.map(\.prompt), [lines.joined(separator: "\n")],
+                   "narration packs whole lines into one batch when this Mac can split them (voice PR 5)")
+        let perLine = SkyStudioVoiceReading.decide(kind: "voice", voice: "gemini:Charon", model: nil, subtitles: false,
+                                                   language: "zh", transcribes: false, catalog: catalog)
+        let narration = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", reading: perLine, language: "zh", catalog: catalog)
+        checkEqual(narration.speech.map(\.prompt), lines, "lines this Mac cannot split apart (and a model with no word timing): one request per line")
         let body = narration.segment.quoteBody
         checkEqual(body["params"]?["batches"], .array(lines.map(JSONValue.string)), "the whole script is quoted once, as params.batches")
         checkEqual(body["params"]?["voice"], "gemini:Charon", "the resolved preset goes as params.voice")
         checkEqual(body["model"], "auto", "model auto unless one is named")
         check(body["prompt"] == nil && body["params"]?["language"] == nil && body["params"]?["language_code"] == nil,
               "a Chinese script: no prompt, no language hint, no old language_code")
-        let clone = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, model: "auto", language: "zh", catalog: catalog)
+        let cloning = SkyStudioVoiceReading.decide(kind: "voice_clone", voice: sampleVoiceID, model: nil, subtitles: true, language: "zh",
+                                                   transcribes: true, catalog: catalog)
+        let clone = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, reading: cloning, language: "zh", catalog: catalog)
         check(clone.speech.count == 1 && clone.speech[0].parts.count == 2, "cloned reading packs lines within the server's cap")
         let chinese = try SkyStudioVoicePlan.draft(lines: [String(repeating: "你", count: 301)], kind: "voice", voice: "gemini:Charon",
-                                                   model: "auto", language: "zh", catalog: catalog)
+                                                   reading: packing, language: "zh", catalog: catalog)
         checkEqual(chinese.speech.count, 2, "the Chinese cap (300 code points) comes from /models")
         let english = try SkyStudioVoicePlan.draft(lines: [String(repeating: "word ", count: 170)], kind: "voice", voice: "gemini:Charon",
-                                                   model: "auto", language: "en", catalog: catalog)
+                                                   reading: packing, language: "en", catalog: catalog)
         checkEqual(english.speech.count, 2, "other languages use the `other` cap (800)")
-        check((try? SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", model: "auto", language: "zh",
+        check((try? SkyStudioVoicePlan.draft(lines: lines, kind: "voice", voice: "gemini:Charon", reading: packing, language: "zh",
                                              catalog: SkyStudioCatalog(models: []))) == nil, "no character limit from Sky Studio: no plan")
 
         let selection: JSONValue = ["model": "gemini-3.8-flash-tts", "voice": "gemini:Charon"]
@@ -111,8 +122,17 @@ private func runVoiceDraftChecks() {
         checkEqual(plan.batchCredits, [2.5, 2.5], "each batch's max_credits is its own quoted credits")
         checkEqual(Set(plan.batches.map(\.request.idempotencyKey)).count, 2, "one idempotency key per batch")
         checkEqual(plan.voicePlan.selection, selection.objectValue ?? [:], "the server's selection is kept for recovery and get_job")
-        check(plan.needsTranscription(subtitles: true, catalog: catalog), "Gemini gives no word times: subtitles need this Mac's transcription")
+        check(!plan.needsTranscription(subtitles: true, catalog: catalog),
+              "one line per batch and this Mac cannot transcribe (subtitles estimated): nothing to transcribe")
         check(!plan.needsTranscription(subtitles: false, catalog: catalog), "one line per batch and no subtitles: nothing to transcribe")
+        var aligned = plan
+        aligned.reading = packing
+        check(aligned.needsTranscription(subtitles: true, catalog: catalog), "Gemini gives no word times: aligned subtitles need this Mac's transcription")
+        var single = answer.objectValue ?? [:]
+        single["batches"] = [["credits": 5, "credits_expected": 3.2, "characters": 9]]
+        if let one = SkyStudioQuote(json: .object(single)), let together = try? SkyStudioVoicePlan.quoted(packed, quote: one) {
+            check(together.needsTranscription(subtitles: false, catalog: catalog), "two lines in one Gemini batch: splitting them needs transcription")
+        } else { check(false, "a one-batch quote reads") }
 
         var eleven = answer.objectValue ?? [:]
         eleven["voice_plan"] = ["selection": ["model": "eleven-v4", "voice": "eleven:Daniel"], "rule": "named_model"]

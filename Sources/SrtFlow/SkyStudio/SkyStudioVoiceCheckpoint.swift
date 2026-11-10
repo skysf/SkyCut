@@ -5,8 +5,10 @@ import SrtFlowMCPKit
 // MARK: - 旁白可恢复的进度（纯值）
 // 管什么：原文 / 批次 / 原单身份 / 完整音频 / 本地分析 / 成句文件 / 入轨回执；恢复只对 missing 批次允许付费。
 // version 2（2026-11-10，声音 PR 3）：记整段报价时服务器的选择（`plan.voicePlan`，每批 `params.plan` 带回它）和每批实际跑的模型、
-// 有没有换备用；恢复永远只 GET 原单、补没生成的批次也照这份选择（SkyCut 声音方案 8.4）。**只认 version 2**：只有用户本人在用，
+// 有没有换备用；恢复永远只 GET 原单、补没生成的批次也照这份选择（SkyCut 声音方案 8.4）。中途有一批换了备用（声音 PR 4）：还没交的批的
+// 请求改带备用的选择，`pendingSelection` 照记下的 `fallback_used` 现算（不加字段、不升版本）。**只认 version 2**：只有用户本人在用，
 // 升级前没做完的配音先做完或放弃（用户 2026-11-09 定，方案风险第 15 条）。
+// 声音 PR 5 加的几样都是可选的（版本号不变）：怎么读（`plan.reading`）、每批的词从哪来（`Analysis.timing`）、每句的字幕时间（`Output.timing`）。
 // 不管什么：HTTP、音频处理、工程；磁盘读写在 SkyStudioVoiceRecoveryStore，App 适配在 SkyStudioVoiceRecovery。
 
 struct SkyStudioVoiceCheckpoint: Codable, Sendable {
@@ -34,12 +36,16 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     struct Analysis: Codable, Sendable {
         var words: [TimedWord]
         var slices: [SkyStudioVoiceSplit.Slice]
+        /// 这批的词从哪来：provider（模型报的）、aligned（本机转写）；没有词是 nil。
+        var timing: AIVoiceoverTiming?
     }
 
     struct Output: Codable, Sendable {
         var url: URL
         var duration: Double
         var words: [TimedWord]
+        /// 这一句的字幕时间从哪来。
+        var timing: AIVoiceoverTiming?
     }
 
     enum Stage: String, Codable, Sendable {
@@ -86,6 +92,9 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     /// 一旦入轨成功，即使用户随后撤销，也不能因重试自动再加。
     var applied: JSONValue?
     var issue: Issue?
+    /// 某批以 `fallback_needs_one_time` 结束、还在等用户答的那一笔一次性费用（补好价、声音和语言，SkyStudioVoiceFallbackFee）：
+    /// resume 带 confirm_token 建、带 skip_one_time 不建，答了就清掉。老记录没有这个键 = 没有在等的。
+    var fallbackFee: SkyStudioVoiceOneTime?
 
     init(input: Input, projectPath: String?, projectToken: String, plan: SkyStudioVoicePlan) {
         self.input = input
@@ -98,6 +107,30 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     var missing: [Int] { batches.indices.filter { batches[$0].missing } }
     var unresolved: [Int] { batches.indices.filter { !batches[$0].generated && !batches[$0].missing } }
     var ready: Bool { input.lines.indices.allSatisfy { outputs[$0] != nil } }
+
+    /// 还没交的批该带哪份 `params.plan`：整段报价时的选择；有一批已经在服务器上换了备用（`fallback_used`），后面的就都带备用的那份
+    /// （`voice_plan.fallback.selection`，SkyCut 声音方案 8.4）。恢复补批次也照它，不重新选模型。
+    var pendingSelection: [String: JSONValue] {
+        guard batches.contains(where: { $0.fallbackUsed == true }), let fallback = plan.voicePlan.fallback?.selection else {
+            return plan.voicePlan.selection
+        }
+        return fallback
+    }
+
+    /// 各句不全是同一个模型读的（中途换了备用）：每句是哪个模型读的、有没有用备用；都一样是 nil（SkyCut 声音方案 4.2、8.4）。
+    /// 只报服务器说了是哪个模型读的那几批（还没读的不猜）；一句跨了几批（太长拆开的）报第一片的模型，几片里有一片用了备用就算用了。
+    var lineModels: [(line: Int, model: String, fallbackUsed: Bool)]? {
+        guard Set(batches.compactMap(\.model)).count > 1 || batches.contains(where: { $0.fallbackUsed == true }) else { return nil }
+        var models: [Int: (model: String, fallbackUsed: Bool)] = [:]
+        for (index, batch) in plan.batches.enumerated() {
+            guard let model = batches[index].model else { continue }
+            for part in batch.speech.parts {
+                let earlier = models[part.line]
+                models[part.line] = (earlier?.model ?? model, (earlier?.fallbackUsed ?? false) || batches[index].fallbackUsed == true)
+            }
+        }
+        return models.keys.sorted().map { ($0, models[$0]!.model, models[$0]!.fallbackUsed) }
+    }
 
     /// 在 POST 之前先写 submitted，崩溃 / 断网也不会把可能付过费的批次当成未生成。
     mutating func willSubmit(_ index: Int) {
@@ -159,6 +192,13 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         if let issue {
             result["failure_stage"] = .string(issue.stage.rawValue)
             result["recovery_issue"] = .string(issue.message)
+        }
+        // 入轨之前报定下的字幕时间（入轨的结果里换成每句实际的，可能是 mixed）。
+        if input.subtitles, let timing = plan.reading?.timing { result["subtitle_timing"] = .string(timing.rawValue) }
+        if let lineModels {
+            result["line_models"] = .array(lineModels.map {
+                ["line_index": .number(Double($0.line)), "model": .string($0.model), "fallback_used": .bool($0.fallbackUsed)]
+            })
         }
         result["next_step"] = .string(applied != nil
             ? "Already inserted. Do not add these lines again; repeating resume will not insert audio or subtitles."

@@ -14,6 +14,10 @@ struct CloudGenerationTaskRow: View {
                 Text("Needs attention").foregroundStyle(.orange)
             } else if run.waitingForRefund {
                 Text("Waiting for refund")
+            } else if let note = run.stepNote {
+                Text(verbatim: note)
+            } else if let batches = run.batches, batches.running + batches.waiting > 0 {
+                Text(verbatim: Self.batchText(batches))
             } else if let progress = run.progress {
                 CloudTaskPhaseView(progress: progress)
             } else {
@@ -29,6 +33,13 @@ struct CloudGenerationTaskRow: View {
                     .instantHelp("Dismiss this task")
             }
         }
+    }
+
+    /// 分几批的配旁白：几批好了 / 共几批、几批在跑、几批等空位（SkyCut 声音方案 8.2，不造百分比）。
+    private static func batchText(_ board: SkyStudioVoiceBatchBoard) -> String {
+        board.waiting == 0
+            ? String(format: L10n("%1$d/%2$d batches · %3$d running"), board.done, board.total, board.running)
+            : String(format: L10n("%1$d/%2$d batches · %3$d running · %4$d waiting"), board.done, board.total, board.running, board.waiting)
     }
 }
 

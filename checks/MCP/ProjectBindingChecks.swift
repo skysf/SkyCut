@@ -170,7 +170,7 @@ private func runUsesProjectChecks() {
         switch tool {
         case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .openProject, .newProject, .closeProject,
-             .recordScreen:
+             .recordScreen, .listVoices, .manageVoices:
             expected = false
         default:
             expected = true
@@ -198,7 +198,8 @@ private func runUsesProjectChecks() {
     check(!AIProjectBinding.usesProject(.setView, args(["mode": "background"])), "set_view without project sets the session's default")
     // 会改东西的工具，除了只碰文件 / 设置 / 任务、开关工程的那几个，全都碰工程（新加一个改工程的工具忘了归类，这里红）。
     let fileOnly: Set<MCPToolName> = [.setView, .setSettings, .saveRecipe, .manageFiles, .openProject, .newProject, .closeProject, .compressVideos,
-                                      .burnSubtitles, .convertSubtitles, .generateMedia, .manageCharacters, .cancelJob, .recordScreen]
+                                      .burnSubtitles, .convertSubtitles, .generateMedia, .manageCharacters, .cancelJob, .recordScreen,
+                                      .manageVoices]
     for tool in MCPToolName.allCases where !tool.definition.readOnly && !fileOnly.contains(tool) {
         check(AIProjectBinding.usesProject(tool, none), "\(tool.rawValue) changes something, so it must check the project")
     }

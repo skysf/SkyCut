@@ -59,22 +59,44 @@ final class SkyStudioVoiceRecovery {
             if args.has("generate_missing") { throw AIToolError("generate_missing requires resume=recovery_file.") }
             return nil
         }
-        let allowed = Set(["resume", "generate_missing", "project", "confirm_token"])
+        let allowed = Set(["resume", "generate_missing", "skip_one_time", "project", "confirm_token"])
         guard Set(args.raw.objectValue?.keys.map { $0 } ?? []).isSubset(of: allowed) else {
-            throw AIToolError("With resume, only pass recovery_file as resume, optional generate_missing and project. Original lines and voice are read from the recovery record.")
+            throw AIToolError("With resume, only pass recovery_file as resume, optional generate_missing or skip_one_time, confirm_token and project. "
+                + "Original lines and voice are read from the recovery record.")
         }
         let file = AIWorkspace.shared.resolve(path).standardizedFileURL.resolvingSymlinksInPath()
         if let id = active[file.path] { return .ok(["status": "started", "job_id": .string(id), "recovery_file": .string(file.path)]) }
+        // confirm_token 也可能是在答「读别处的文件」：这一次要问读的，令牌就不当一次性费用的答复（SkyStudioVoiceFallbackFee）。
+        var readAsked = !readsWithoutAsking([file], project: project)
         if let ask = try AIWorkspace.shared.confirmReading([file], verb: "read voiceover recovery", args: args, project: project) { return ask }
         let value = try await MediaReadQueue.run(on: MediaReadQueue.voice) { Result { try SkyStudioVoiceRecoveryStore.read(file) } }.get()
         let recovery = SkyStudioVoiceRecovery(file: file, value: value)
         let input = try recovery.input(for: project)
         // 记录里的文件也过既有读取授权；恢复文件不是任意路径读权限的通行证。
         let files = value.batches.compactMap(\.rawFile) + value.outputs.values.map(\.url)
+        readAsked = readAsked || !readsWithoutAsking(files, project: project)
         if let ask = try AIWorkspace.shared.confirmReading(files, verb: "recover voiceover audio", args: args, project: project) { return ask }
-        return SkyStudioVoiceoverRun(input: input, project: project, recovery: recovery,
-                                    generateMissing: try args.bool("generate_missing") ?? false, services: services).start()
+        var generateMissing = try args.bool("generate_missing") ?? false
+        let skip = try args.bool("skip_one_time") ?? false
+        if let fee = value.fallbackFee {
+            switch try await SkyStudioVoiceFallbackFee.resume(fee: fee, skip: skip, token: readAsked ? nil : try args.string("confirm_token"),
+                                                              recovery: recovery, project: project, services: services ?? SkyStudioVoiceServices()) {
+            case .retryWithSameModel: generateMissing = true
+            case .result(let result): return result
+            case .notAsked: break
+            }
+        } else if skip {
+            throw AIToolError("skip_one_time with resume answers a one-time fee question (fallback_needs_one_time), and this recovery has none "
+                + "waiting. To retry the missing batches, pass generate_missing=true.")
+        }
+        return SkyStudioVoiceoverRun(input: input, project: project, recovery: recovery, generateMissing: generateMissing, services: services).start()
     }
+}
+
+/// 这些文件不用问就能读（全部权限、或都在点名的地方）：confirm_token 就不会被「读别处的文件」那一问用掉。
+@MainActor
+private func readsWithoutAsking(_ files: [URL], project: VideoEditProject) -> Bool {
+    AIAccessStore.shared.mode == .full || files.allSatisfy { AIWorkspace.shared.allowsReading($0, project: project) }
 }
 
 struct SkyStudioVoiceProcessingError: LocalizedError {

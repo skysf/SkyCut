@@ -34,10 +34,10 @@ enum MCPMediaTools {
                 .addVoiceover, title: "Add a voiceover",
                 description: """
                 Narrate lines, optional subtitles (recordings: add_clips). One undo step. Voices: gemini:Name (default \
-                gemini:Charon), eleven:Name, a role or local voice. Cloud: Paid (Sky Studio credits), model=auto. \
-                Returns job_id; wait with get_job; relay voice.note. Ask mode may return needs_confirmation. The daily \
-                credit limit always applies. If it fails: resume=recovery_file, never resend lines. Read skycut_guide \
-                topic=add_voiceover before the first call.
+                gemini:Charon), voice_… (list_voices), eleven:Name, a role or local voice. Cloud: Paid (Sky Studio credits). \
+                Returns job_id; wait with get_job; relay voice.note. May return needs_confirmation. The daily credit limit \
+                always applies. On failure: resume=recovery_file, never resend lines. Read skycut_guide topic=add_voiceover \
+                before the first call.
                 """,
                 input: MCPSchema.object([
                     "lines": MCPSchema.array(of: MCPSchema.object([
@@ -46,16 +46,17 @@ enum MCPMediaTools {
                                                   minimum: 0)
                     ], required: ["text"]), "The narration in order, 1 to 50 lines (not with resume or download_voices).",
                         minItems: 1, maxItems: 50),
-                    "voice": MCPSchema.string("gemini:Name (default gemini:Charon), eleven:Name, a role, or a SkyCut or Mac voice name."),
+                    "voice": MCPSchema.string("gemini:Name (default gemini:Charon), voice_… (list_voices), eleven:Name, a role, or a local voice."),
                     "model": MCPSchema.string("Cloud model: auto (default) or a voice model id from get_status models=true."),
                     "speed": MCPSchema.number("0.5 to 2, 1 = normal (default). Local voices only.", minimum: 0.5, maximum: 2),
                     "track": MCPSchema.string(MCPSchema.trackDescription),
-                    "subtitles": MCPSchema.boolean("Also add the words as subtitles, timed to the voice."),
+                    "subtitles": MCPSchema.boolean("Also add the script's words as subtitles, timed to the voice (see subtitle_timing)."),
                     "max_lines": MCPSchema.integer("With subtitles=true: 1 (default) or 2 lines per subtitle; stays with the project.",
                                                    minimum: 1, maximum: 2),
                     "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (about 333 MB, returns job_id); no lines."),
                     "resume": MCPSchema.string("recovery_file from get_job; send no lines or voice. Reopen the original project first."),
                     "generate_missing": MCPSchema.boolean("With resume: also pay for batches never generated (default false)."),
+                    "skip_one_time": MCPSchema.boolean("No to a one-time fee: voice_… reads with the no-fee model; with resume, retries with the same model."),
                     "confirm_token": MCPSchema.confirmToken
                 ])
             )

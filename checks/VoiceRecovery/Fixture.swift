@@ -5,7 +5,11 @@ import SrtFlowMCPKit
 
 // 假 HTTP 与注入的本机转写；生产任务、解码、切句、写文件、字幕和撤销都照常执行。
 // `/models` 是 Sky Studio 导出的声音目录快照（checks/SkyStudio/Fixtures/models-voice-*.json），只把读稿模型的字数上限换成 `cap`，好造多批；
-// `/quote` 照声音方案 5.4 回整段的 voice_plan / 每批的价（带了 params.plan 就照它，没带自己选），`/jobs` 照它带回的 plan 做完。
+// `/quote` 照声音方案 5.4 回整段的 voice_plan / 每批的价（带了 params.plan 就照它，没带自己选），`/jobs` 照它带回的 plan 做完；
+// 读的模型是 eleven-v4 时像 Eleven 一样回每个字的时间（`words`，字均匀铺在 0.1–5.7 秒）。
+// 这台 Mac 转写得了 / 模型装没装 / 装不装得上、转写听错哪个词、哪一批听成别的话，都由 VoiceRecoveryFixture 的开关定（声音 PR 5）。
+// `deferred`（声音 PR 4）：`/jobs` 先回排队、问的时候才回结局，第几单等第几单回过结局才做完（`holdUntil`）—— 好造「几批同时在跑、后交的先回」；
+// 记下同时开着最多几单（`peakOpen`）。
 final class VoiceRecoveryHTTP: URLProtocol {
     static let lock = NSLock()
     static var requests: [(String, String, JSONValue)] = []
@@ -23,6 +27,24 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var quoteOneTime: JSONValue = []
     /// 第几个 `/jobs` 回答说服务器在这一批里换了备用。
     static var fallbackAt: Int?
+    /// 第几单以「默认失败、备用要先花一次性费用」结束（fallback_needs_one_time，钱退了）。
+    static var oneTimeAt: Int?
+    /// 交上来的建 MiniMax 版（voice_enroll）。
+    static var enrolls: [JSONValue] = []
+    /// 报价带上备用（voice_plan.fallback.selection），中途换了备用之后的批要带它。
+    static var offerFallback = false
+    /// `/jobs` 先回排队，问的时候才回结局；第几单（按交的顺序）要等第几单回过结局才做完。
+    static var deferred = false
+    static var holdUntil: [Int: Int] = [:]
+    /// 规矩（cloudFailure、oneTimeAt、fallbackAt、holdUntil）按哪一批说：给了就按这一单读的字认是第几批（几批同时交，交的顺序不一定是批的顺序），
+    /// 没给按交的顺序（第几单）。
+    static var promptIndex: [String: Int] = [:]
+    static var open: Set<Int> = []
+    static var peakOpen = 0
+    /// 回过结局的（按规矩的序号），先后照回的顺序。
+    static var finished: [Int] = []
+    static var jobBodies: [JSONValue] = []
+    static var ruleOf: [Int] = []
     static let catalog: JSONValue = {
         let data = FileManager.default.contents(atPath: "checks/SkyStudio/Fixtures/models-voice-2026-11-10.json") ?? Data()
         return (try? JSONValue.decode(data)) ?? [:]
@@ -40,6 +62,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
         requests = []; prompts = []
         self.cap = cap; self.cloudFailure = cloudFailure; self.unknownSubmission = unknownSubmission
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
+        oneTimeAt = nil; enrolls = []; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
+        open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
     }
@@ -47,7 +71,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var posts: Int { lock.lock(); defer { lock.unlock() }; return prompts.count }
     static var log: [(String, String, JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
     static func bodies(_ suffix: String) -> [JSONValue] { log.filter { $0.0 == "POST" && $0.1.hasSuffix(suffix) }.map(\.2) }
-    static func prompt(_ index: Int) -> String { lock.lock(); defer { lock.unlock() }; return prompts[index] }
+    static var peak: Int { lock.lock(); defer { lock.unlock() }; return peakOpen }
+    static var finishOrder: [Int] { lock.lock(); defer { lock.unlock() }; return finished }
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func stopLoading() {}
@@ -77,20 +102,35 @@ final class VoiceRecoveryHTTP: URLProtocol {
             value = Self.cappedCatalog()
         } else if path.hasSuffix("/quote") {
             if let (code, answer) = Self.quoteFailure { status = code; value = answer } else { value = Self.quote(body) }
+        } else if path.hasSuffix("/jobs"), method == "POST", body["kind"] == "voice_enroll" {
+            // 建 MiniMax 版（声音 PR 6：备用要先花的一次性费用点过头之后）：不是读稿的一批，回声音。
+            Self.enrolls.append(body)
+            value = ["job_id": "enroll-1", "status": "done", "credits_charged": 377.6, "billing": ["status": "charged", "credits_charged": 377.6],
+                     "result": ["model": "minimax-voice-clone", "voice": ["id": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "name": "Sky", "source": "recording",
+                                "languages": [["language": "en", "kind": "recording", "minimax": true]]]]]
         } else if path.hasSuffix("/jobs"), method == "POST" {
             let index = Self.prompts.count
-            Self.prompts.append(body["prompt"]?.stringValue ?? "")
+            let prompt = body["prompt"]?.stringValue ?? ""
+            Self.prompts.append(prompt)
+            Self.jobBodies.append(body)
+            Self.ruleOf.append(Self.promptIndex[prompt] ?? index)
             if Self.unknownSubmission {
                 status = 502; value = ["unexpected": "response lost"]
-            } else if Self.cloudFailure == index {
-                value = ["job_id": .string("voice-\(index)"), "status": "failed", "error": ["message": "Provider failed"],
-                         "billing": ["status": "refunded", "credits_charged": 0]]
+            } else if Self.deferred {
+                Self.open.insert(index)
+                Self.peakOpen = max(Self.peakOpen, Self.open.count)
+                value = ["job_id": .string("voice-\(index)"), "status": "queued", "poll_after_seconds": 2]
             } else {
-                let selection = body["params"]?["plan"] ?? .object(["model": body["model"] ?? "auto"])
-                let model = Self.fallbackAt == index ? JSONValue.string("eleven-v4") : (selection["model"] ?? .null)
-                value = ["job_id": .string("voice-\(index)"), "status": "done", "credits_charged": 2.5,
-                         "result": ["url": .string("http://127.0.0.1/files/voice-\(index).wav"), "content_type": "audio/wav", "duration": 6,
-                                    "model": model, "fallback_used": .bool(Self.fallbackAt == index), "voice_plan": ["selection": selection]]]
+                value = Self.outcome(index, body)
+            }
+        } else if path.contains("/jobs/voice-"), method == "GET", let index = Int(path.components(separatedBy: "/jobs/voice-").last ?? "") {
+            let rule = Self.ruleOf[index]
+            if let blocker = Self.holdUntil[rule], !Self.finished.contains(blocker) {
+                value = ["job_id": .string("voice-\(index)"), "status": "running", "phase": "processing", "poll_after_seconds": 2]
+            } else {
+                value = Self.outcome(index, Self.jobBodies[index])
+                Self.open.remove(index)
+                if !Self.finished.contains(rule) { Self.finished.append(rule) }
             }
         } else if path.hasPrefix("/files/") { bytes = Self.wave }
         Self.lock.unlock()
@@ -100,6 +140,15 @@ final class VoiceRecoveryHTTP: URLProtocol {
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: responseData)
         client?.urlProtocolDidFinishLoading(self)
+    }
+
+    /// Eleven v4 的样子：每个字（含换行）一个时间，均匀铺在 0.1–5.7 秒（6 秒的假音频里）。
+    private static func characterTimes(_ prompt: String) -> JSONValue {
+        let characters = Array(prompt).map(String.init)
+        let step = 5.6 / Double(max(characters.count, 1))
+        return [["characters": .array(characters.map(JSONValue.string)),
+                 "character_start_times_seconds": .array(characters.indices.map { .number(0.1 + Double($0) * step) }),
+                 "character_end_times_seconds": .array(characters.indices.map { .number(0.1 + Double($0 + 1) * step) })]]
     }
 
     /// 目录快照，读稿模型的字数上限换成 `cap`（每种语言都一样）。
@@ -116,19 +165,49 @@ final class VoiceRecoveryHTTP: URLProtocol {
         return .object(root)
     }
 
+    /// 第 `index` 单（按交的顺序）的结局：没做成（钱退了）、默认失败而备用要先花一次性费用，或者照带回的 plan 做完（`fallbackAt` 那一批换了备用）。
+    /// 规矩按 `ruleOf`（给了 promptIndex 就是第几批）。
+    private static func outcome(_ index: Int, _ body: JSONValue) -> JSONValue {
+        let rule = ruleOf[index]
+        if cloudFailure == rule {
+            return ["job_id": .string("voice-\(index)"), "status": "failed", "error": ["message": "Provider failed"],
+                    "billing": ["status": "refunded", "credits_charged": 0]]
+        }
+        if oneTimeAt == rule {
+            return ["job_id": .string("voice-\(index)"), "status": "failed",
+                    "error": ["code": "fallback_needs_one_time", "message": "The default model failed; its fallback needs a one-time fee.",
+                              "one_time": [["kind": "voice_enroll", "model": "minimax-voice-clone", "language": "en", "credits": 377.6,
+                                            "why": "The fallback reads with a MiniMax version of this voice."]], "refunded": true],
+                    "billing": ["status": "refunded", "credits_charged": 0]]
+        }
+        let selection = body["params"]?["plan"] ?? .object(["model": body["model"] ?? "auto"])
+        let model = fallbackAt == rule ? JSONValue.string("eleven-v4") : (selection["model"] ?? .null)
+        var result: [String: JSONValue] = ["url": .string("http://127.0.0.1/files/voice-\(index).wav"), "content_type": "audio/wav",
+            "duration": 6, "model": model, "fallback_used": .bool(fallbackAt == rule), "voice_plan": ["selection": selection]]
+        if model == "eleven-v4" { result["words"] = characterTimes(body["prompt"]?.stringValue ?? "") }
+        return ["job_id": .string("voice-\(index)"), "status": "done", "credits_charged": 2.5, "result": .object(result)]
+    }
+
     /// 整段报价：每批 2.5 积分（最多）、2 积分（大概）。带了 params.plan 就照它（恢复补批次），没带自己选（`rechoose` 时选成别的）。
     private static func quote(_ body: JSONValue) -> JSONValue {
         let batches = body["params"]?["batches"]?.arrayValue ?? []
         let voice = body["params"]?["voice"] ?? .null
         let model = body["model"]?.stringValue ?? "auto"
         let selection: JSONValue
+        var fallback: JSONValue = .null
         if let plan = body["params"]?["plan"] { selection = plan }
         else if body["kind"] == "voice_clone" { selection = ["model": rechoose ? "minimax-speech-2.8-hd" : "index-tts-2", "reference_language": "en"] }
+        else if offerFallback, model == "auto" {
+            // 整段的自动备用：选择里带着它，`voice_plan.fallback.selection` 是换过去之后每批该带的那份（它自己的 fallback 是 null）。
+            let backup: JSONValue = ["model": "eleven-v4", "voice": voice]
+            selection = ["model": "gemini-3.8-flash-tts", "voice": voice, "fallback": backup]
+            fallback = ["selection": backup, "available": true, "auto": true, "one_time": .null]
+        }
         else { selection = ["model": .string(model != "auto" ? model : (rechoose ? "eleven-v4" : "gemini-3.8-flash-tts")), "voice": voice] }
         return ["credits": .number(2.5 * Double(batches.count)), "credits_expected": .number(2.0 * Double(batches.count)), "settlement": "exact",
                 "voice_plan": ["selection": selection, "requested_model": .string(model), "rule": "preset", "reason": "A preset voice reads this text.",
                                "languages": [["language": "en", "share": 1, "seconds": 3]], "cross_language": false,
-                               "warnings": .array(quoteWarnings.map(JSONValue.string))],
+                               "warnings": .array(quoteWarnings.map(JSONValue.string)), "fallback": fallback],
                 "batches": .array(batches.map { ["credits": 2.5, "credits_expected": 2, "characters": .number(Double($0.stringValue?.count ?? 0))] }),
                 "one_time": quoteOneTime]
     }
@@ -141,11 +220,24 @@ final class VoiceRecoveryFixture {
     var failSplitOnce = true
     var failSubtitleOnce = false
     var cancelSplitOnce = false
+    /// 这台 Mac 转写得了这种语言（SpeechTranscriber 支持）；`installed` 是模型装没装，没装的任务里先装，`installFailure` 让装失败。
     var transcribes = true
+    var installed = true
+    var installFailure: String?
+    /// 每次装模型时已经交了几批（付费请求之前装的是 0）。
+    var installs: [Int] = []
+    var transcriptions = 0
+    /// 转写听错的词（原文的词 → 听成的）、哪一批整个听成别的话。
+    var mishear: [String: String] = [:]
+    var garbleAt: Int?
     var keyReads = 0
+    /// 这个场景自己的槽，不碰全 App 那一份：默认声音池 1 个（一批一批交，交的顺序就是批的顺序，老的恢复场景照旧算得准）；
+    /// 几批同时交的场景给 2 个（好造「几批同时在跑、还有几批等空位」）。
+    let slots: SkyStudioJobSlots
 
-    init(folder: URL, cap: Int = 30) throws {
+    init(folder: URL, cap: Int = 30, audioSlots: Int = 1) throws {
         self.folder = folder
+        slots = SkyStudioJobSlots(limits: .init(shared: 3, audio: audioSlots))
         project = OpenProjects.shared.primary
         project.linkageEnabled = false
         _ = AIUndoGrouping.step(project.effectiveUndoManager) { project.perform { $0 = TimelineState() } }
@@ -162,16 +254,30 @@ final class VoiceRecoveryFixture {
         var services = SkyStudioVoiceServices()
         services.api = SkyStudioAPI(session: VoiceRecoveryHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil)
         services.key = { self.keyReads += 1; return "local-recovery-fixture" }
-        services.locale = { _ in
-            guard self.transcribes else { throw AIToolError("No speech transcription model for English on this Mac.") }
-            return Locale(identifier: "en-US")
+        services.transcription = { _ in
+            guard self.transcribes else { return .unavailable }
+            return self.installed ? .installed(Locale(identifier: "en-US")) : .downloadable(Locale(identifier: "en-US"))
         }
+        services.install = { _, progress in
+            self.installs.append(VoiceRecoveryHTTP.posts)
+            progress(0.5)
+            if let failure = self.installFailure { throw AIToolError(failure) }
+            progress(1)
+            self.installed = true
+        }
+        services.slots = slots
+        services.jobSleep = { _ in try await Task.sleep(nanoseconds: 5_000_000) }
         services.transcribe = { file, _ in
+            self.transcriptions += 1
             let index = Int(file.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "batch-", with: ""))!
             if index == 1, self.cancelSplitOnce { self.cancelSplitOnce = false; throw CancellationError() }
             if index == 1, self.failSplitOnce { self.failSplitOnce = false; return [] }
             if self.failSubtitleOnce { self.failSubtitleOnce = false; return [] }
-            let tokens = VoiceRecoveryHTTP.prompt(index).split(whereSeparator: { $0.isWhitespace }).map(String.init)
+            if index == self.garbleAt { return [TimedWord(text: "Totally unrelated words", start: 0.1, end: 5.7)] }
+            // 这一批读的是哪几句：照恢复记录（几批同时交，交的顺序不一定是批的顺序）。
+            let record = try SkyStudioVoiceRecoveryStore.read(file.deletingLastPathComponent().appendingPathComponent("voiceover-recovery.json"))
+            let tokens = record.plan.batches[index].speech.prompt.split(whereSeparator: { $0.isWhitespace })
+                .flatMap { (self.mishear[String($0)] ?? String($0)).split(separator: " ").map(String.init) }
             let step = 5.6 / Double(tokens.count)
             return tokens.enumerated().map { TimedWord(text: ($0.offset == 0 ? "" : " ") + $0.element,
                 start: 0.1 + Double($0.offset) * step, end: 0.1 + Double($0.offset + 1) * step - 0.1) }
@@ -192,21 +298,25 @@ final class VoiceRecoveryFixture {
         try await SkyStudioVoiceoverStart.start(input(lines: lines, ask: ask, model: model, subtitles: subtitles), project: project, services: services)
     }
 
-    /// 声音库的声音（voice_clone）：MCP 的入口是声音 PR 6，这里照生产的那几块拼好报价、预留，直接起任务（合批、切句那一摊）。
-    func clone(_ lines: [String]) async throws -> AIToolResult {
+    /// 声音库的声音（voice_clone）：MCP 的入口是声音 PR 6，这里照生产的那几块拼好报价、预留，直接起任务（合批、切句那一摊）；
+    /// 怎么读照生产的 SkyStudioVoiceReading（这台 Mac 转写不了就一句一单、按字数估）。
+    func clone(_ lines: [String], subtitles: Bool = true) async throws -> AIToolResult {
         let services = services
         let key = try await services.key()
         let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: services.api)
-        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: SkyStudioVoiceKind.clone, voice: "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d",
-                                                 model: SkyStudioVoiceRequests.autoModel, language: "en", catalog: catalog)
+        let voice = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
+        let reading = SkyStudioVoiceReading.decide(kind: SkyStudioVoiceKind.clone, voice: voice, model: nil, subtitles: subtitles,
+                                                   language: "en", transcribes: transcribes, catalog: catalog)
+        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: SkyStudioVoiceKind.clone, voice: voice,
+                                                 reading: reading, language: "en", catalog: catalog)
         let quote = try await services.api.quote(draft.segment, key: key)
         let plan = try SkyStudioVoicePlan.quoted(draft, quote: quote)
         guard let budget = SkyStudioVoiceBudget.reserve(plan.batchCredits) else { throw AIToolError("No budget for the clone fixture") }
-        var input = input(lines: lines)
+        var input = input(lines: lines, subtitles: subtitles)
         input.ask = nil
         input.choice = .init(engine: .skyStudio(voice: plan.voice))
         let prepared = SkyStudioVoiceoverPrepared(plan: plan, quote: quote, budget: budget, key: key,
-                                                  locale: Locale(identifier: "en-US"), modelTitle: "IndexTTS2")
+                                                  locale: transcribes ? Locale(identifier: "en-US") : nil, modelTitle: "IndexTTS2")
         return SkyStudioVoiceoverRun(input: input, project: project, prepared: prepared, services: services).start()
     }
 
