@@ -49,10 +49,16 @@ def passes(label, v, base):
         ok = v.get("canvas_after") == "tall9x16" and v.get("set_canvas_calls", 0) >= 1 and (v.get("edit_clip_calls", 0) + v.get("edit_clips_calls", 0)) >= 1
         return ok, f"画布 {v.get('canvas_after')}、set_canvas {v.get('set_canvas_calls')}、edit_clips {v.get('edit_clips_calls')}、edit_clip {v.get('edit_clip_calls')}"
     if n == "6":
-        ok = v.get("recipes_calls", 0) >= 1 and abs((v.get("timeline_end") or 0) - 30) <= 1.5 and v.get("generate_calls") == 0
-        return ok, f"recipes {v.get('recipe_ids')}、时间线 {v.get('timeline_end')} 秒（说没说按哪套风格要人看最后那段话）"
+        # 片长看整条时间线（timeline_total_end，2026-11-11 起的证据才有）；老证据只有主轨的 timeline_end，那几次主轨都铺满了。
+        end = v.get("timeline_total_end", v.get("timeline_end")) or 0
+        ok = v.get("recipes_calls", 0) >= 1 and abs(end - 30) <= 1.5 and v.get("generate_calls") == 0
+        main = f"（主轨到 {v.get('timeline_end')} 秒）" if v.get("timeline_end") != end else ""
+        return ok, f"recipes {v.get('recipe_ids')}、时间线 {end} 秒{main}（说没说按哪套风格要人看最后那段话）"
     if n in ("7", "8"):
-        return bool(v.get("stopped_for_approval")), f"状态 {v.get('statuses')}、自己带确认码：{v.get('self_confirmed')}、停下来问：{v.get('stopped_for_approval')}"
+        note = f"状态 {v.get('statuses')}、自己带确认码：{v.get('self_confirmed')}、停下来问：{v.get('stopped_for_approval')}"
+        if v.get("asked_after_draft"):
+            note += "（先起了不用确认的低价草稿，再到确认 / 报价时停下来问；没有绕过确认）"
+        return bool(v.get("stopped_for_approval")), note
     return True, ""
 
 
