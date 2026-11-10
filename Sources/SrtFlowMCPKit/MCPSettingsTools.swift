@@ -28,7 +28,9 @@ enum MCPSettingsTools {
                 anything. Any ai_access_mode change ALWAYS needs explicit agreement and confirm_token, even in full_access; so does \
                 raising daily_ai_credit_limit. Ask in the conversation language, using localized names from get_settings section=ai. \
                 Daily budgets are hard caps: 0 pauses paid work. Cache clearing removes previews only; query clearing=false to verify. \
-                Language applies now; native menus after restart. No project edit. Keys/connections stay in Settings.
+                Language applies now; native menus after restart. No project edit. Keys/connections stay in Settings. \
+                Turning full_access on: the question also lists one-time voice fees and the standing voice consent it records; \
+                turning it off revokes that consent (result: voice_standing_consent).
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),

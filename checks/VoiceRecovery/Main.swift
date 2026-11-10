@@ -20,6 +20,7 @@ import SrtFlowMCPKit
             try await runVoiceConcurrencyChecks(root)
             try await runVoiceLibraryChecks(root)
             try await runVoiceFallbackFeeChecks(root)
+            try await runVoiceStandingChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -32,7 +33,7 @@ import SrtFlowMCPKit
             + "then missing-only recovery, second-batch split failure, local-only retry, missing-only generation with the saved selection, "
             + "estimated long line, stable files, durable receipt, six clips/cues, one undo/redo, unknown-submit refusal, packed narration, "
             + "eleven-v4 / estimated subtitle timing, model install before paying and re-quote when it fails, script words in subtitles, mixed timing"
-            + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version, a mid-script fallback fee asked in get_job and answered with resume (skip or build)")
+            + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version, a mid-script fallback fee asked in get_job and answered with resume (skip or build); full access: the standing consent used without asking (recordings, design, MiniMax versions, a mid-script fee), asked once and recorded when missing, asked again when Sky Studio refuses it, set_settings records / revokes it, recorded once at the upgrade")
         exit(0)
     }
 

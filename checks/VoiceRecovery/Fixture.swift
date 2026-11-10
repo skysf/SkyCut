@@ -31,6 +31,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var oneTimeAt: Int?
     /// 交上来的建 MiniMax 版（voice_enroll）。
     static var enrolls: [JSONValue] = []
+    /// 这个账号有没有有效的长期授权（GET /voices/consent-grant，声音 PR 7：全部权限下有就不问）。
+    static var standingActive = false
     /// 报价带上备用（voice_plan.fallback.selection），中途换了备用之后的批要带它。
     static var offerFallback = false
     /// `/jobs` 先回排队，问的时候才回结局；第几单（按交的顺序）要等第几单回过结局才做完。
@@ -62,7 +64,7 @@ final class VoiceRecoveryHTTP: URLProtocol {
         requests = []; prompts = []
         self.cap = cap; self.cloudFailure = cloudFailure; self.unknownSubmission = unknownSubmission
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
-        oneTimeAt = nil; enrolls = []; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
+        oneTimeAt = nil; enrolls = []; standingActive = false; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
         open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
@@ -100,6 +102,9 @@ final class VoiceRecoveryHTTP: URLProtocol {
         var bytes: Data?
         if path.hasSuffix("/models") {
             value = Self.cappedCatalog()
+        } else if path.hasSuffix("/voices/consent-grant") {
+            value = ["grant": Self.standingActive ? ["statement_version": "voice-standing-consent-v1", "active": true] : .null,
+                     "current_statement_version": "voice-standing-consent-v1"]
         } else if path.hasSuffix("/quote") {
             if let (code, answer) = Self.quoteFailure { status = code; value = answer } else { value = Self.quote(body) }
         } else if path.hasSuffix("/jobs"), method == "POST", body["kind"] == "voice_enroll" {

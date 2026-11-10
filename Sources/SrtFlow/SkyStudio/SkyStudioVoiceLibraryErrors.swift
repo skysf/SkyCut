@@ -35,6 +35,13 @@ enum SkyStudioVoiceLibraryErrors {
     /// 这个账号的声音库里没有这个 id（或正在删、已经看不见）。
     static func isNotFound(_ error: Error) -> Bool { server(error)?.code == "not_found" }
 
+    /// 带 `consent: "standing_grant"` 被拒：长期授权刚被撤（别的 Mac 关了全部权限）或文案升了版本。照方案 4.5 问一次。
+    static func refusedStanding(_ error: Error) -> Bool {
+        guard let server = server(error), server.code == "invalid_request" else { return false }
+        let reason = server.fields["reason"]?.stringValue
+        return reason == SkyStudioVoiceCodes.Reason.noStandingGrant || reason == SkyStudioVoiceCodes.Reason.consentOutdated
+    }
+
     /// 给 AI 的一句话。
     static func message(_ error: Error) -> String {
         guard let server = server(error) else {

@@ -1385,3 +1385,25 @@
 /* Voiceover: installing this Mac's speech model before a cloud voiceover is paid for */
 "Preparing transcription" = "准备本机转写";
 "Preparing transcription %d%%" = "准备本机转写 %d%%";
+
+/* Full access: the explanation shown when turning it on, the standing voice consent, notices for what Full access did without asking (voice PR 7) */
+"Turn on Full access" = "打开「全部权限」";
+"With Full access, AI does these without asking you first and tells you afterwards:" = "打开以后，AI 做这些事不再先问你，做完告诉你：";
+"Read files outside the folders you opened, and move files to the Trash" = "读点名文件夹以外的文件、把文件移到废纸篓";
+"Generate beyond the default specifications" = "超出默认规格的生成";
+"Create voices from recordings, build MiniMax versions, design and delete voices" = "用录音新建声音、建 MiniMax 版、设计声音、删声音";
+"One-time voice fees (Sky Studio's quote decides):" = "声音的一次性费用（以 Sky Studio 报价为准）：";
+"Design a voice from a Chinese description (MiniMax): about %@ credits" = "设计一个声音（中文描述，MiniMax）：约 %@ 积分";
+"Design a voice from an English description (Qwen3): about %@ credits" = "设计一个声音（英文描述，Qwen3）：约 %@ 积分";
+"Build a voice's MiniMax version (once per language): about %@ credits" = "给声音建 MiniMax 版（每种语言一次）：约 %@ 积分";
+"Sky Studio quotes each fee when it is needed." = "用到时以 Sky Studio 的报价为准。";
+"The daily budget stays a hard limit (now %@ credits a day)." = "每日额度照样是硬上限（现在每天 %@ 积分）。";
+"By turning it on, you confirm:" = "打开即表示你确认：";
+"Agree and Turn On" = "同意并打开";
+"For every recording I later use to create a voice in SkyCut, I am the person speaking or I have their permission to create and use an AI copy of their voice." = "以后我在 SkyCut 里用来建声音的每一段录音，都是我本人在说，或我已获得说话人的同意，可以制作并使用他们声音的 AI 副本。";
+"Your voice consent is not recorded on Sky Studio yet, so AI asks once before the first voice recording, voice design or MiniMax version." = "你的声音授权还没在 Sky Studio 记上：第一次用录音建声音、设计声音或建 MiniMax 版之前，AI 会先问你一次。";
+"Full access: SkyCut created the voice “%@” from a recording." = "全部权限：SkyCut 用录音建好了声音「%@」。";
+"Full access: SkyCut added a recording to the voice “%@”." = "全部权限：SkyCut 给声音「%@」加了一段录音。";
+"Full access: SkyCut is designing the voice “%@” (at most %@ credits)." = "全部权限：SkyCut 正在设计声音「%@」（最多 %@ 积分）。";
+"Full access: SkyCut is building a voice's MiniMax version (at most %@ credits)." = "全部权限：SkyCut 正在给声音建 MiniMax 版（最多 %@ 积分）。";
+"Full access: SkyCut deleted the voice “%@”." = "全部权限：SkyCut 删掉了声音「%@」。";

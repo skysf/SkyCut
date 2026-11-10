@@ -1385,3 +1385,25 @@
 /* Voiceover: installing this Mac's speech model before a cloud voiceover is paid for */
 "Preparing transcription" = "Preparando la transcripción";
 "Preparing transcription %d%%" = "Preparando la transcripción %d%%";
+
+/* Full access: the explanation shown when turning it on, the standing voice consent, notices for what Full access did without asking (voice PR 7) */
+"Turn on Full access" = "Activar el acceso completo";
+"With Full access, AI does these without asking you first and tells you afterwards:" = "Con el acceso completo, la IA hace esto sin preguntarte antes y te lo cuenta después:";
+"Read files outside the folders you opened, and move files to the Trash" = "Leer archivos fuera de las carpetas que abriste y mover archivos a la Papelera";
+"Generate beyond the default specifications" = "Generar por encima de las especificaciones predeterminadas";
+"Create voices from recordings, build MiniMax versions, design and delete voices" = "Crear voces a partir de grabaciones, crear versiones MiniMax, diseñar y eliminar voces";
+"One-time voice fees (Sky Studio's quote decides):" = "Cargos únicos de voz (manda el presupuesto de Sky Studio):";
+"Design a voice from a Chinese description (MiniMax): about %@ credits" = "Diseñar una voz a partir de una descripción en chino (MiniMax): unos %@ créditos";
+"Design a voice from an English description (Qwen3): about %@ credits" = "Diseñar una voz a partir de una descripción en inglés (Qwen3): unos %@ créditos";
+"Build a voice's MiniMax version (once per language): about %@ credits" = "Crear la versión MiniMax de una voz (una vez por idioma): unos %@ créditos";
+"Sky Studio quotes each fee when it is needed." = "Sky Studio presupuesta cada cargo cuando hace falta.";
+"The daily budget stays a hard limit (now %@ credits a day)." = "El presupuesto diario sigue siendo un límite estricto (ahora %@ créditos al día).";
+"By turning it on, you confirm:" = "Al activarlo, confirmas:";
+"Agree and Turn On" = "Aceptar y activar";
+"For every recording I later use to create a voice in SkyCut, I am the person speaking or I have their permission to create and use an AI copy of their voice." = "En cada grabación que use después para crear una voz en SkyCut, la persona que habla soy yo o tengo su permiso para crear y usar una copia de su voz con IA.";
+"Your voice consent is not recorded on Sky Studio yet, so AI asks once before the first voice recording, voice design or MiniMax version." = "Tu consentimiento de voz aún no consta en Sky Studio, así que la IA preguntará una vez antes de la primera grabación de voz, el primer diseño de voz o la primera versión MiniMax.";
+"Full access: SkyCut created the voice “%@” from a recording." = "Acceso completo: SkyCut creó la voz «%@» a partir de una grabación.";
+"Full access: SkyCut added a recording to the voice “%@”." = "Acceso completo: SkyCut añadió una grabación a la voz «%@».";
+"Full access: SkyCut is designing the voice “%@” (at most %@ credits)." = "Acceso completo: SkyCut está diseñando la voz «%@» (como máximo %@ créditos).";
+"Full access: SkyCut is building a voice's MiniMax version (at most %@ credits)." = "Acceso completo: SkyCut está creando la versión MiniMax de una voz (como máximo %@ créditos).";
+"Full access: SkyCut deleted the voice “%@”." = "Acceso completo: SkyCut eliminó la voz «%@».";

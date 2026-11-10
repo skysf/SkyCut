@@ -5,7 +5,7 @@ import Foundation
 // 管什么：声音库两个工具名片之外的话：列出来的是什么、怎么用录音建声音和加一种语言、授权怎么问、设计花多少、改名和删除、两种权限模式、坑。
 // 登记在 MCPGuideWrittenTopics（和别的迁移过的工具同一张表、同一套守卫 GuidePilotChecks）；两个都是新工具，没有迁移前的说明原文
 // （previousCard 为 nil，名单写死在 GuidePilotChecks）。fields 几节由 MCPGuideTopics 从参数定义现算、接在最后。分节照声音方案 4.10。
-// 写的是**这一刀真有的**：全部权限下的长期授权（不再问）是声音 PR 7，change_voice 是声音 PR 9，到时候再补进来。只写英文。
+// 写的是**真有的**：全部权限下的长期授权（有就不再问）是声音 PR 7 补上的；change_voice 是声音 PR 9，到时候再补进来。只写英文。
 // 出处：docs/plans/2026-11-09-voice-features.md 4.5、4.6、4.7；docs/architecture/voice-library.md；Sky Studio 仓库 docs/agents/skycut-api.md
 // 「Voice library」「Uploads and the SkyCut alignment」。
 // 不管什么：名片（MCPVoiceLibraryTools）、配旁白（MCPGuideVoiceTopics）、怎么答（MCPGuide）。
@@ -86,10 +86,13 @@ enum MCPGuideVoiceLibraryTopics {
             """),
             MCPGuideSection(name: "permission_modes", about: "what ask mode and full access mode ask, and what a token is bound to", text: """
             In ask mode: create and add_reference ask for consent for every recording, design asks before its one-time fee, and \
-            delete asks once. In full access mode delete happens directly and the result says so; recordings and design still \
-            return needs_confirmation, because this version has no standing consent or price notice for full access yet. A token is \
-            bound to the exact request: another file, part, language, name, description or price gets a new question. Tokens \
-            last 30 minutes and work once.
+            delete asks once. In full access mode, with the user's standing voice consent on record (recorded when they turned \
+            Full access on), nothing asks: create and add_reference use it, design starts, delete happens directly, and the \
+            result has full_access saying what was done; tell the user, with what it cost. Without a standing consent on \
+            record (another Sky Studio account, revoked on another Mac, or a new statement), the first recording, design or \
+            MiniMax version asks once like ask mode, with the Full access explanation; agreeing records it. The daily credit \
+            limit applies in both modes. A token is bound to the exact request: another file, part, language, name, \
+            description or price gets a new question. Tokens last 30 minutes and work once.
             """),
             MCPGuideSection(name: "pitfalls", about: "consent from the speaker, one voice per person, an unavailable voice library", text: """
             Pitfalls. Never call create on a recording of someone who did not agree. Do not pass the same recording again to \

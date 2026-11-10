@@ -7,11 +7,14 @@ import SrtFlowMCPKit
 // 1. 核对参数（file、language 必给，create 要 name、add_reference 要 voice）；
 // 2. 点名文件夹以外的文件先过 AIWorkspace.confirmReading（请求批准模式问、记住文件夹；全部权限不问）；
 // 3. 本机做参考录音（VoiceReferenceSample：44.1 kHz 单声道 16-bit、10 秒有效人声到 3 分钟、超过自动挑一段），免费、不碰服务器；
-// 4. **授权**：经 SkyStudioJobGate.voiceConsent 问（这一刀两种模式都问，长期授权是声音 PR 7），令牌绑录音的完整身份
+// 4. **授权**：经 SkyStudioJobGate.voiceConsent，照 SkyStudioVoiceStanding.voiceAsk：请求批准模式问；全部权限下有有效的长期授权
+//    不问（声音 PR 7），没有就问一次、问句带打开全部权限时那段说明、点过头补记。令牌绑录音的完整身份
 //    （SkyStudioVoiceApproval.Recording：文件、做好的那段的内容哈希、用的那一段、语言、名字 / 声音、授权那句的版本）；
-// 5. 点过头才传（`/uploads` 用途 `voice_reference`）、建（`POST /voices`）/ 加（`POST /voices/{id}/references`），带 `consent: true` +
-//    那句的版本；建声音的 idempotency_key 从同一个身份算（同一件事重发回同一个声音）。
-// `consent: true`（SkyStudioVoiceConsent.thisRecording）只在这里、只在点过头之后造（checks/sky-studio-wiring.sh 钉着）。
+// 5. 才传（`/uploads` 用途 `voice_reference`）、建（`POST /voices`）/ 加（`POST /voices/{id}/references`）：问过的带 `consent: true` +
+//    那句的版本，全部权限 + 长期授权带 `consent: "standing_grant"`（Sky Studio 拒了 —— 刚被撤或文案升版 —— 就照 4.5 问一次）；
+//    建声音的 idempotency_key 从同一个身份算（同一件事重发回同一个声音）。全部权限下没问的，结果和提示条都说一句做了什么。
+// `consent: true`（SkyStudioVoiceConsent.thisRecording）和 `consent: "standing_grant"`（.standingGrant）只在这里、只在
+// SkyStudioJobGate.voiceConsent 放行之后造（checks/sky-studio-wiring/voice-library.sh 钉着）。
 // 录音的语言这一刀要 AI 给（本机检测是生成字幕那一套，声音库界面那一刀一起接）。
 // 不管什么：列出 / 改名 / 删除（SkyStudioVoiceLibraryTool）、设计（SkyStudioVoiceDesignTool）、配旁白。
 
@@ -53,11 +56,14 @@ enum SkyStudioVoiceRecordingTool {
         let consentAction = SkyStudioVoiceApproval.consentAction(recording, account: SkyStudioCharacterAccess.stamp(key))
         let summary = sample.summary(name: file.lastPathComponent)
         let question = SkyStudioVoiceApproval.consentQuestion(statement: statement, doing: doing, sample: summary)
-        if let ask = SkyStudioJobGate.voiceConsent(action: consentAction, question: question, token: try args.string("confirm_token")) {
-            return ask
+        let standing = SkyStudioVoiceStanding.shared
+        let ask = await standing.voiceAsk(key: key, api: services.api)
+        if let asked = SkyStudioJobGate.voiceConsent(action: consentAction, question: question, token: try args.string("confirm_token"), ask: ask) {
+            return asked
         }
-        // 点过头了：这段录音的授权就是这一次的（consent: true + 问的那句的版本）。
-        let consent = SkyStudioVoiceConsent.thisRecording(statementVersion: statement.version)
+        await standing.recordAfterApproval(ask, key: key, api: services.api)
+        // 全部权限 + 长期授权：引用它；别的是这一次点过头（consent: true + 问的那句的版本）。
+        let consent: SkyStudioVoiceConsent = ask == .standing ? .standingGrant : .thisRecording(statementVersion: statement.version)
         let source = SkyStudioVoiceReferenceSource(fileName: file.lastPathComponent, startSeconds: sample.sourceStart,
                                                    endSeconds: sample.sourceEnd, autoSelected: sample.autoSelected)
         do {
@@ -73,12 +79,27 @@ enum SkyStudioVoiceRecordingTool {
                 let reference = try SkyStudioVoiceReference(language: language, referenceURL: link, source: source, consent: consent)
                 voice = try await services.api.addVoiceReference(reference, to: String(target.dropFirst("add_reference:".count)), key: key)
             }
-            return .ok([
+            var result: [String: JSONValue] = [
                 "status": .string(creating ? "created" : "reference_added"), "voice": voice.json, "sample": .string(summary),
-                "next_step": .string("Use voice=\(voice.id) with add_voiceover. The first narration in a language may ask once to build "
-                    + "the voice's MiniMax version (a one-time fee).")
-            ])
+                "next_step": .string("Use voice=\(voice.id) with add_voiceover. The first narration in a language may need the voice's "
+                    + "MiniMax version (a one-time fee).")
+            ]
+            if ask == .standing {
+                result["consent"] = "standing_grant"
+                result["full_access"] = .string("Full access: SkyCut used the user's standing voice consent and did not ask. Tell the user what "
+                    + "was created and which part of the recording was used (sample).")
+                standing.notify(creating
+                    ? String(format: L10n("Full access: SkyCut created the voice “%@” from a recording."), voice.name)
+                    : String(format: L10n("Full access: SkyCut added a recording to the voice “%@”."), voice.name), project: project)
+            }
+            return .ok(.object(result))
         } catch is CancellationError { throw CancellationError() }
+        catch where ask == .standing && SkyStudioVoiceLibraryErrors.refusedStanding(error) {
+            // 长期授权刚被撤（别的 Mac 关了全部权限）或文案升了版本：照方案 4.5 问一次，问句带那段说明，点过头补记。
+            let once = await standing.missing(key: key, api: services.api)
+            if let asked = SkyStudioJobGate.voiceConsent(action: consentAction, question: question, token: nil, ask: once) { return asked }
+            throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
+        }
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
     }
 

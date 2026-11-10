@@ -32,6 +32,7 @@ func runAccessChecks() {
     } catch { check(false, "settings approval: \(error)") }
     check((try? AISettingsApproval.check(settings, mode: .ask, limit: 2_000, access: access, currentLimit: 1_000)) != nil,
           "raising a hard budget always asks")
+    fullAccessQuestionChecks(defaults: defaults)
 
     func decide(_ args: JSONValue = [:], reason: String? = "2K exceeds the draft", profile: String = "h3-2k", project: String = "account/project") -> SkyStudioJobGate.Decision? {
         try? SkyStudioJobGate.decide(credits: 130, summary: "H3 2K", identity: "exact-request", args: AIToolArguments(args),
@@ -95,4 +96,32 @@ private func runDraftResolutionChecks() {
     checkEqual(AIDraftPolicy.resolution(model: omni, mode: "frames"), "720p", "720p-class does not silently choose 360p")
     let veo = SkyStudioModel(id: "veo", kind: "text_to_video", title: "Veo", params: ["resolution": ["1080p", "4K"]])
     checkEqual(AIDraftPolicy.resolution(model: veo, mode: "frames"), "1080p", "use a model's actual minimum when no 720p-class tier exists")
+}
+
+/// 打开全部权限（SkyCut 声音方案 5.6）：问句后面接那段说明（价目、额度、打开即记下的长期授权那句），令牌绑那一句的版本（版本换了另问）；
+/// 关掉的问句不带它。
+@MainActor
+private func fullAccessQuestionChecks(defaults: UserDefaults) {
+    let access = AIAccessStore(defaults: defaults)
+    access.setMode(.ask)
+    let notice = SkyStudioVoiceStandingNotice(catalog: nil, dailyLimit: 1_000)
+    let on = AIToolArguments(["ai_access_mode": "full_access"])
+    let asked = try? AISettingsApproval.check(on, mode: .full, limit: nil, fullAccess: notice, access: access, currentLimit: 1_000)
+    let token = asked?.payload["confirm_token"]?.stringValue ?? ""
+    check(!token.isEmpty && asked?.payload["question"]?.stringValue?.contains(notice.turnOnText) == true,
+          "turning Full access on asks with the explanation (fees, daily limit, the standing consent it records)")
+    var newer = notice
+    newer.statement = SkyStudioVoiceConsentStatement(version: "voice-standing-consent-v2", statement: "A newer statement.")
+    let answered = AIToolArguments(["ai_access_mode": "full_access", "confirm_token": .string(token)])
+    check((try? AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: newer, access: access, currentLimit: 1_000))?
+            .payload["confirm_token_refused"] != nil, "the answer covers the statement version shown: a newer one asks again")
+    do {
+        check(try AISettingsApproval.check(answered, mode: .full, limit: nil, fullAccess: notice, access: access, currentLimit: 1_000) == nil,
+              "the answer for the version shown is accepted")
+    } catch { check(false, "full access approval: \(error)") }
+    access.setMode(.full)
+    let off = try? AISettingsApproval.check(AIToolArguments(["ai_access_mode": "ask_for_approval"]), mode: .ask, limit: nil, fullAccess: notice,
+                                            access: access, currentLimit: 1_000)
+    check(off?.payload["confirm_token"] != nil && off?.payload["question"]?.stringValue?.contains(notice.turnOnText) == false,
+          "turning Full access off still asks, without the explanation")
 }

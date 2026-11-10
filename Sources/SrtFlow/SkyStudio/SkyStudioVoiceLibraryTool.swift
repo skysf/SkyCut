@@ -51,7 +51,7 @@ enum SkyStudioVoiceLibraryTool {
         case "create", "add_reference": return try await SkyStudioVoiceRecordingTool.run(action, args, project, services: services)
         case "design": return try await SkyStudioVoiceDesignTool.run(args, project, services: services)
         case "rename": return try await rename(args, services: services)
-        case "delete": return try await delete(args, services: services)
+        case "delete": return try await delete(args, project, services: services)
         // 词表多了一样、这里没跟上：什么都不做（删除不许是落空的那一支）。
         default: throw AIToolError("manage_voices cannot do \(action) yet. Nothing was changed.")
         }
@@ -68,7 +68,7 @@ enum SkyStudioVoiceLibraryTool {
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
     }
 
-    private static func delete(_ args: AIToolArguments, services: SkyStudioVoiceServices) async throws -> AIToolResult {
+    private static func delete(_ args: AIToolArguments, _ project: VideoEditProject, services: SkyStudioVoiceServices) async throws -> AIToolResult {
         let id = try voiceID(args)
         let key = try await services.key()
         // 名字只为问句：正在删的声音 GET 不到（404），照样问（写 id）、照样发 DELETE 把它删完。
@@ -91,8 +91,14 @@ enum SkyStudioVoiceLibraryTool {
         } catch {
             throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
         }
-        return .ok(["status": "deleted", "voice": .string(id), "name": name.map(JSONValue.string) ?? .null,
-                    "next_step": "Tell the user the voice was deleted for good; its recordings are gone too."])
+        var result: [String: JSONValue] = ["status": "deleted", "voice": .string(id), "name": name.map(JSONValue.string) ?? .null,
+                                           "next_step": "Tell the user the voice was deleted for good; its recordings are gone too."]
+        if AIAccessStore.shared.mode == .full {
+            // 全部权限下没问就删了（方案 4.5「直接删、通知」）：结果和提示条都说一句。
+            result["full_access"] = "Full access: SkyCut deleted this voice without asking."
+            SkyStudioVoiceStanding.shared.notify(String(format: L10n("Full access: SkyCut deleted the voice “%@”."), name ?? id), project: project)
+        }
+        return .ok(.object(result))
     }
 
     private static func deleteOnce(_ id: String, key: String, services: SkyStudioVoiceServices) async throws {
