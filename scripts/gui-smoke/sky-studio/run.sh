@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # 独立测试 App + 本机假 Sky Studio。只装假 Key，不碰生产钱包；stop 清理测试身份。
+# 同一台机器上几个会话同时跑：各自给 SKYSTUDIO_SMOKE_DIR、SKYSTUDIO_SMOKE_BUNDLE（必须以 .skystudiosmoke 结尾，假 Key 只认这种身份）、
+# SKYSTUDIO_SMOKE_PORT，冒烟脚本按同样的环境变量找自己的服务和 App（只换目录不够：默认的身份和端口是共用的）。
+# SKYSTUDIO_SMOKE_CONTROL（JSON）是假服务起手的控制项（/me 的两个池、读稿每批的字数上限这些 App 启动就读的），见 server.py。
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
 REPO="$PWD"
 D="${SKYSTUDIO_SMOKE_DIR:-/private/tmp/srtflow-skystudio-smoke}"
 APP="$D/SrtFlowSkyStudioSmoke.app"
-BUNDLE=com.srtflow.SrtFlow.skystudiosmoke
+BUNDLE="${SKYSTUDIO_SMOKE_BUNDLE:-com.srtflow.SrtFlow.skystudiosmoke}"
+case "$BUNDLE" in *.skystudiosmoke) ;; *) echo "SKYSTUDIO_SMOKE_BUNDLE must end with .skystudiosmoke" >&2; exit 2 ;; esac
 SUPPORT="$HOME/Library/Application Support/$BUNDLE"
-PORT=18766
+PORT="${SKYSTUDIO_SMOKE_PORT:-18766}"
 stop() {
   pkill -f "$APP/Contents/MacOS/SrtFlowSkyStudioSmoke" 2>/dev/null || true
   # PID 会被系统复用；App 只按完整路径停，服务器还要核对命令和本轮素材目录。

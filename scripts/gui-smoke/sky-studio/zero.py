@@ -27,7 +27,7 @@ try:
     status = call("get_status")
     assert status["generation"]["daily_limit_credits"] == 0
     before_spend = status["generation"]["spent_today_credits"]
-    before_logs = json.load(urllib.request.urlopen("http://127.0.0.1:18766/__log"))
+    before_logs = json.load(urllib.request.urlopen("http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766") + "/__log"))
     before_jobs = sum(row["path"].endswith("/jobs") for row in before_logs)
     args = {"lines": [{"text": "The daily limit fallback is working."}], "voice": "en_male"}
     narration = call("add_voiceover", args)
@@ -35,7 +35,7 @@ try:
     assert "confirm_token" not in narration and "daily_ai_credit_limit" == narration["settings_field"]
     preset = call("add_voiceover", {**args, "voice": "gemini:Charon"})
     assert preset["status"] == "blocked" and preset["code"] == "daily_budget_exceeded", preset
-    logs = json.load(urllib.request.urlopen("http://127.0.0.1:18766/__log"))
+    logs = json.load(urllib.request.urlopen("http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766") + "/__log"))
     assert sum(row["path"].endswith("/jobs") for row in logs) == before_jobs
     assert call("get_status")["generation"]["spent_today_credits"] == before_spend
     (D / "zero-results.json").write_text(json.dumps(dict(narration=narration, preset=preset), ensure_ascii=False, indent=2))
