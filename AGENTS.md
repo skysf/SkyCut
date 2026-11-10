@@ -82,6 +82,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 给用户和 AI 看的文字写 SkyCut；bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量这些**身份类的名字
   永远沿用 SrtFlow**，改了用户的授权、设置和数据就丢了。新加同类东西照旧用老前缀。由 `checks/product-name.sh` 钉住，
   细节见 [产品名与代码名](docs/architecture/product-name.md)。
+- **Sky Studio 的 Google Cloud 项目只有一个**：项目 ID `gen-lang-client-0288826272` 就是控制台里显示名为 `1st-gemini-project` 的那个
+  （用户 2026-11-10 确认；这个问题已经被问过很多次）。Sky Studio 生产的 Vertex / Gemini 调用、凭据里的 `project_id`、账单和配额说的
+  都是它。文档、日志里看到这两个名字，**不要再问用户是不是同一个项目**。
 
 ### 语言
 
