@@ -115,7 +115,7 @@ def main():
     from production_state_story import bind_outputs, lifecycle
     from production_state_support import StateRun, verify_contract
     assert os.environ.get("SKYSTUDIO_SMOKE_DIR"), "Root must select the exact isolated test directory"
-    assert network.SERVER == "http://127.0.0.1:18766", "This driver is only for the dedicated fake server"
+    assert network.SERVER.startswith("http://127.0.0.1:"), "This driver is only for the dedicated loopback fake server"
     assert network.WORK.is_dir() and all((network.WORK / name).is_file() for name in ("motion.mp4", "subject.png", "reference.wav"))
     # A read-only fake endpoint proves fixture service availability; no remote service is contacted.
     network.admitted()

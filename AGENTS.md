@@ -449,6 +449,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
+- [声音功能的免费冒烟补跑（声音 PR 3–6）](docs/reports/2026-11-10-voice-free-smoke.md) — 假 Sky Studio 上跑 `voice.py`（合批 + 对齐字幕）、声音库（两种权限模式的问法、加语言、改名、删除、`voice_…` 读稿的一次性费用、设计、撤销）、几批同时交（两个池、停、恢复、429）和中途换备用，全部通过；没跑到的（装转写模型、浮层那一行、PR 7 的长期授权）和看见的问题（AI 的活在后台被 App Nap 降到优先级 4、机器忙时超时等五条）。
+
 - [声音库界面的离屏渲染（声音 PR 8）](docs/reports/2026-11-10-voice-library-ui.md) — 生产的视图 + 假 Sky Studio，英 / 中 / 西各一张拼图（设置那一节的三种样子、浏览预设、新建声音、加录音、设计带报价）；看图撞出的两件事（`"Language"` 是「界面语言」、整个设置窗口会拍进用户自己的风格名）；没验到的（真麦克风、真 Sky Studio、真 sheet、本机语言检测）。
 
 - [MCP 按需说明的基线实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半（0.167、gpt-6.1-sol / max）：第一次请求里 SkyCut 占 64 token（0.167 给每个 MCP 服务器列一行带总说明开头，不是 0）、全打一遍工具 49,485 token 截在约 1 万、只看得到 12 个，找工具打印里 46% 是重复的总说明，任务 7 把「画质尽量好」当成点名、没停下来问；[Codex 证据](docs/reports/2026-11-10-mcp-guide-baseline-codex-evidence.json)。

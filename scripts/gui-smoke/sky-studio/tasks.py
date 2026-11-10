@@ -24,7 +24,7 @@ def call(tool, args=None):
 
 try:
     quotes = {f"cloud task {i:02}": credits for i, credits in enumerate([240, 112, 112, 176], 1)}
-    request = urllib.request.Request("http://127.0.0.1:18766/__control",
+    request = urllib.request.Request("http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766") + "/__control",
         json.dumps(dict(hold=True, quotes_by_prompt=quotes, cancel_already_started=False)).encode(),
         {"Content-Type": "application/json"})
     with urllib.request.urlopen(request) as response:

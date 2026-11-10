@@ -73,9 +73,9 @@ try:
     closed=True
     final,_=call('get_status')
     assert not final.get('jobs') and all(item['id']!=project for item in final['projects']),final
-    with urllib.request.urlopen('http://127.0.0.1:18766/__state',timeout=5) as response:
+    with urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('SKYSTUDIO_SMOKE_PORT', '18766') + '/__state',timeout=5) as response:
         assert json.load(response)['admitted_jobs']==0
-    with urllib.request.urlopen('http://127.0.0.1:18766/__log',timeout=5) as response:
+    with urllib.request.urlopen('http://127.0.0.1:' + os.environ.get('SKYSTUDIO_SMOKE_PORT', '18766') + '/__log',timeout=5) as response:
         rows=json.load(response)
     assert not any(row['method'] in ('POST','PUT','PATCH','DELETE') for row in rows),rows
     write('fake-server-summary.json',{'admitted_jobs':0,'requests':[{'method':r['method'],'path':r['path']} for r in rows]})
