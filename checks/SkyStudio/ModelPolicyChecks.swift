@@ -16,7 +16,7 @@ func runModelPolicyChecks() {
         var modes: [String: JSONValue] = ["frames": ["max_images": 2, "max_audio": 0, "max_videos": 0, "resolution": [.string(resolution)]]]
         if let caps { modes["multimodal"] = caps }
         return SkyStudioModel(id: id, kind: "image_to_video", title: id,
-            params: ["duration_values": .array((id == "veo-pro" ? [8] : Array(3...15)).map { .number(Double($0)) }),
+            params: ["duration_values": .array((id == "veo-fast" ? [8] : Array(3...15)).map { .number(Double($0)) }),
                      "resolution": [.string(resolution)], "aspect_ratio": ["16:9", "9:16"], "mode": ["frames", "multimodal"]],
             defaults: ["duration": .number(Double(seconds)), "resolution": .string(resolution)], inputs: ["modes": .object(modes)])
     }
@@ -25,15 +25,25 @@ func runModelPolicyChecks() {
     let nano = SkyStudioModel(id: "nano2", kind: "image", title: "Nano", params: ["resolution": ["1K", "2K", "4K"], "aspect_ratio": ["16:9", "4:1", "1:4"]],
         limits: ["references": imageCaps], defaults: ["resolution": "2K"])
     let h3 = video("minimax-h3", resolution: "768p", caps: h3Caps)
-    let omni = video("gemini-omni-1.1-flash", resolution: "720p", caps: omniCaps)
+    let omni = video("gemini-omni-1.2-flash", resolution: "720p", caps: omniCaps)
     let s25 = video("seedance-2-5", resolution: "720p", caps: s25Caps)
-    let veo = video("veo-pro", resolution: "1080p", seconds: 8)
+    let veo = video("veo-fast", resolution: "1080p", seconds: 8)
     let catalog = SkyStudioCatalog(models: [seedream, nano, veo, s25, omni, h3])
     checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image", requested: nil)?.id, "nano2", "mixed/unclear images default to Nano 2, independently of catalog order")
     checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image", requested: nil, imageContext: "asian")?.id, "seedream5-flash", "Asian subjects prefer Seedream Flash")
     checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image_to_video", requested: nil)?.id, "minimax-h3", "ordinary video prefers H3")
     checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image_to_video", requested: nil, quality: "highest")?.id, "seedance-2-5", "explicit unconstrained quality prefers Seedance 2.5")
-    checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image_to_video", requested: "veo-pro")?.id, "veo-pro", "a named model overrides the preference")
+    checkEqual(SkyStudioModelPolicy.select(catalog: catalog, kind: "image_to_video", requested: "veo-fast")?.id, "veo-fast", "a named model overrides the preference")
+    // 2026-11-10（Sky Studio PR #245）：Omni 的公开 id 是 gemini-omni-1.2-flash，veo-pro 下架。顺序里写旧 id，`/models` 不列它就悄悄跳过 Omni。
+    let withoutH3 = SkyStudioCatalog(models: [seedream, nano, veo, s25, omni])
+    checkEqual(SkyStudioModelPolicy.select(catalog: withoutH3, kind: "image_to_video", requested: nil)?.id, "gemini-omni-1.2-flash",
+               "without H3, ordinary video falls to Omni 1.2 (its current id is in the automatic order)")
+    let withoutS25 = SkyStudioCatalog(models: [seedream, nano, veo, omni, h3])
+    checkEqual(SkyStudioModelPolicy.select(catalog: withoutS25, kind: "image_to_video", requested: nil, quality: "highest")?.id, "minimax-h3",
+               "without Seedance 2.5, highest quality falls back to the ordinary order (Veo 3.1 Pro is withdrawn)")
+    let guide = SkyStudioModelPolicy.guidance
+    check(guide.contains("gemini-omni-1.2-flash") && !guide.contains("gemini-omni-1.1-flash") && !guide.contains("veo-pro"),
+          "the AI's model guidance names only ids Sky Studio still lists")
 
     let noReferences = SkyStudioReferencePlan(mode: "frames", files: [])
     let veoGeneration = SkyStudioGeneration.make(.imageToVideo, prompt: "x", ask: .init(), canvas: 16 / 9, model: veo)

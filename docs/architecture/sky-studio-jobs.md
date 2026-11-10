@@ -73,7 +73,9 @@
   同一件事重问回同一码，换 kind / 提示词 / 参数 / 输入 / 价格就另发，串码不消费、不记账。
 - **生成**（6b，2026-10-30 更新）：`generate_media` 收可选 `model`，不再取目录第一条；能力、默认时长 / 分辨率 / 画幅只读 `/models`，价格只问 `/quote`。
   图片亚洲人物、地点或文化主体优先 Seedream 5 Flash；非亚洲、混合、不明确优先 Nano 2。按主体判断，不按提示词语言；AI 用 `image_context` 表达判断。
-  普通视频依次 H3、Omni 1.1 Flash、Veo Fast、Seedance 2.0；明确不计成本 / 时间追求最高质量才 `quality=highest`，优先 Seedance 2.5、其次 Veo Pro。
+  普通视频依次 H3、Omni 1.2 Flash、Veo Fast、Seedance 2.0；明确不计成本 / 时间追求最高质量才 `quality=highest`，用 Seedance 2.5。
+  2026-11-10（Sky Studio PR #245）：Omni 的公开 id 换成 `gemini-omni-1.2-flash`（3–15 秒，首尾帧 3–10 秒），`veo-pro`（Veo 3.1）下架。
+  自动挑模型只挑 `/models` 列着的 id，顺序里写旧 id 会悄悄跳过那个模型（`SkyStudioModelPolicy`，`ModelPolicyChecks` 钉着）。
   点名模型优先；默认只从完整兼容输入的候选里挑。没有兼容模型就报告，不能丢引用、裁短时长来凑。
   `get_status models=true` 是只读目录（可 `model=<id>` 过滤），回所有默认值和输入限制，不生成、不记账。
 - **参考素材**：`image` + 可选 `last_image` 是首尾帧；`reference_images` / `reference_videos` / `reference_audio` 是有序多模态引用，不能和首尾帧混用。

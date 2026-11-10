@@ -1,6 +1,7 @@
-// Sky Studio /models 的 2026-11-07 快照 只列 SkyCut 目录 不扩展到 Studio 网站的全部模型
+// Sky Studio /models 的快照 只列 SkyCut 目录 不扩展到 Studio 网站的全部模型
 // 与角色功能共用同一发布快照 来源合同见官网架构文档
-export const skyStudioRevision='94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00';
+// 2026-11-10 按 Sky Studio PR #245 的 head 更新 Omni 换成 1.2 Veo 3.1 Pro 下架（写这一版时 #245 还没合并）
+export const skyStudioRevision='86b797a9c935c3499674fce33525ab0255527745';
 export const skyStudioApiSource=`https://github.com/skysf/skystudio-aigc-app/blob/${skyStudioRevision}/docs/agents/skycut-api.md`;
 const model=(id,title,kinds,operation)=>({id,title,kinds,...(operation?{operation}:{})});
 const video=(id,title)=>model(id,title,['text_to_video','image_to_video']);
@@ -14,8 +15,8 @@ export const cloudModelGroups=[
   {id:'imageUpscale',models:[model('image-upscale','Image Upscale',['image'],'upscale')]},
   {id:'background',models:[model('ideogram-remove-background','Ideogram Remove Background',['image'])]},
   {id:'video',models:[
-    video('minimax-h3','Minimax H3'),video('gemini-omni-1.1-flash','Gemini Omni 1.1 Flash'),
-    video('veo-fast','Veo 3.1 Fast'),video('veo-pro','Veo 3.1 Pro'),video('seedance-2-pro','Seedance 2.0 Pro'),video('seedance-2-5','Seedance 2.5'),
+    video('minimax-h3','Minimax H3'),video('gemini-omni-1.2-flash','Gemini Omni 1.2 Flash'),
+    video('veo-fast','Veo 3.1 Fast'),video('seedance-2-pro','Seedance 2.0 Pro'),video('seedance-2-5','Seedance 2.5'),
     model('wan-3.0-text-to-video','Wan 3.0 Text to Video',['text_to_video']),
     model('wan-3.0-image-to-video','Wan 3.0 Image to Video',['image_to_video']),
     model('wan-3.0-reference-to-video','Wan 3.0 Reference to Video',['image_to_video']),
