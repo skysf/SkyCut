@@ -119,6 +119,20 @@
 | 放行说明书挪到等授权之后（修复前那样） | `checks/sky-studio-wiring.sh` 红（放行在第 5 行、等待在第 4 行） |
 | `answeredBeforeLicenseCheck` 改成空 | GateChecks 1 条 |
 
+**反向验证（2026-11-10，地图、通用主题、总说明、报错指路）**：
+
+| 临时弄坏 | 红了 |
+| --- | --- |
+| 总说明换回 `7a9d8c9` 那一版（2,012 字、没有 skycut_guide） | CatalogTextChecks 4 条：两种样子都超过 1,200、前 512 字没点到 skycut_guide |
+| 地图里删掉 `seek` | GuideChecks 1 条：地图没把 seek 列成一项 |
+| 把 `seek` 挪进 set_view 的括号里（整词还在地图上） | GuideChecks 1 条：括号里顺带提到的不算一项（按整词找会照样过） |
+| 通用主题少了 `errors` | GuideChecks 2 条：主题表不对、errors 主题不在 |
+| rules 主题里写一个不存在的参数名 | GuideChecks 1 条：措辞检查挑出 `clip_end_ms` |
+| 参数名写错的那句去掉说明书指路 | ArgumentCheckChecks 1 条 |
+| 路由 catch 换回不带指路的 `error.result` | `checks/MCP/router-wiring.sh` 红（`check-mcp.sh --scans-only` 退出非 0） |
+| 被挡住的那句去掉「skycut_guide 照常能用」 | GateChecks 7 条（七种被挡的原因） |
+| 地图的 Paid 那一行去掉 `upscale_clip` | GuideChecks 1 条：地图没把 upscale_clip 列成一项 |
+
 ## 五、人工回归（发版前在真机上走一遍）
 
 - [ ] Claude Code（2.1.296 以后）连测试版、新会话：不经工具搜索就能调 `skycut_guide`（问它 skycut_guide 说明的第一句；或看 `/mcp` 里 skycut 的工具）。
