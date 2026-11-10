@@ -58,8 +58,10 @@ enum MCPGuideMediaTopics {
             low-cost draft (default model and settings) goes ahead in both permission modes. In ask_for_approval mode, going beyond the \
             draft (a higher resolution, a longer duration, quality=highest, a pricier model) returns needs_confirmation with the price and \
             the reason: ask the user, and only if they agree repeat the same call with confirm_token (approval_scope=project approves that \
-            model and specification for the project up to that price). Set user_requested_overrides=true only when the user explicitly \
-            asked for that specification themselves, never for your own choice. The daily hard credit limit applies in every mode: over \
+            model and specification for the project up to that price). Set user_requested_overrides=true only when the user's own words \
+            name that setting ("4K", "use GPT Image 2", "10 seconds"), and put those words in user_request. Wishes such as "best quality" \
+            or "as good as possible" name no setting: choose a specification, quote it and ask. If user_request does not name every \
+            setting beyond the draft, SkyCut asks anyway (needs_confirmation with overrides_not_applied). The daily hard credit limit applies in every mode: over \
             it nothing starts (daily_budget_exceeded); tell the user. Keep the same idempotency_key when retrying after a lost answer.
             """),
             MCPGuideSection(name: "jobs_results", about: "job_id and get_job, where files land, cancelling, refunds, file names", text: """

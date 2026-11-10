@@ -16,11 +16,11 @@ struct SkyStudioCharacterPlan: Sendable {
         guard let value = try args.choice("action", from: Action.allCases.map(\.rawValue)), let action = Action(rawValue: value) else { throw AIToolError("action is required.") }
         var allowed: Set<String> = ["action", "confirm_token", "project", "resume", "idempotency_key"]
         switch action {
-        case .create: allowed.formUnion(["source_type", "prompt", "image", "model", "resolution", "locale", "quote_only", "approval_scope", "user_requested_overrides"])
+        case .create: allowed.formUnion(["source_type", "prompt", "image", "model", "resolution", "locale", "quote_only", "approval_scope", "user_requested_overrides", "user_request"])
         case .importViews: allowed.formUnion(["roles", "name", "voice_description", "notes", "locale", "quote_only"])
         case .update: allowed.formUnion(["character_id", "character_revision", "name", "voice_description", "locale"])
         case .replaceView: allowed.formUnion(["character_id", "character_revision", "image", "role"])
-        case .headshot: allowed.formUnion(["character_id", "character_revision", "model", "resolution", "quote_only", "approval_scope", "user_requested_overrides"])
+        case .headshot: allowed.formUnion(["character_id", "character_revision", "model", "resolution", "quote_only", "approval_scope", "user_requested_overrides", "user_request"])
         case .delete: allowed.formUnion(["character_id", "character_revision"])
         }
         let extra = Set(args.raw.objectValue?.filter { !$0.value.isNull }.map(\.key) ?? []).subtracting(allowed)
