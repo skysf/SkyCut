@@ -26,9 +26,13 @@ public enum MCPGuideWrittenTopics {
         public var readingTip: String? = nil
     }
 
-    /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices 随声音 PR 6 从第一天起就这么写）。
-    /// 之后的两批加在这里。
+    /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices
+    /// 随声音 PR 6 从第一天起就这么写）。第二批加在这里。
     public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices]
+        // 第一批（方案 PR 4，2026-11-10）：时间线、字幕、声音、录屏、导出等 25 个。
+        + [.editSubtitles, .generateSubtitles, .translateSubtitles, .getSubtitles, .exportSubtitles, .transcribe, .listen, .cutSpeech, .cutToBeat,
+           .syncVoiceover, .exportVideo, .inspectVideo, .compressVideos, .burnSubtitles, .getJob, .setShape, .setKeyframes, .setFilter,
+           .freezeFrame, .recordScreen, .manageFiles, .openFolder, .setSettings, .upscaleClip, .manageCharacters]
 
     public static func topic(for tool: MCPToolName) -> Written? {
         switch tool {
@@ -40,6 +44,31 @@ public enum MCPGuideWrittenTopics {
         case .addVoiceover: return MCPGuideVoiceTopics.addVoiceover
         case .listVoices: return MCPGuideVoiceLibraryTopics.listVoices
         case .manageVoices: return MCPGuideVoiceLibraryTopics.manageVoices
+        case .editSubtitles: return MCPGuideSubtitleTopics.editSubtitles
+        case .generateSubtitles: return MCPGuideSubtitleTopics.generateSubtitles
+        case .translateSubtitles: return MCPGuideSubtitleTopics.translateSubtitles
+        case .getSubtitles: return MCPGuideSubtitleTopics.getSubtitles
+        case .exportSubtitles: return MCPGuideSubtitleTopics.exportSubtitles
+        case .transcribe: return MCPGuideSpeechTopics.transcribe
+        case .listen: return MCPGuideSpeechTopics.listen
+        case .cutSpeech: return MCPGuideSpeechTopics.cutSpeech
+        case .cutToBeat: return MCPGuideSpeechTopics.cutToBeat
+        case .syncVoiceover: return MCPGuideSpeechTopics.syncVoiceover
+        case .exportVideo: return MCPGuideOutputTopics.exportVideo
+        case .inspectVideo: return MCPGuideOutputTopics.inspectVideo
+        case .compressVideos: return MCPGuideOutputTopics.compressVideos
+        case .burnSubtitles: return MCPGuideOutputTopics.burnSubtitles
+        case .getJob: return MCPGuideOutputTopics.getJob
+        case .setShape: return MCPGuideVisualTopics.setShape
+        case .setKeyframes: return MCPGuideVisualTopics.setKeyframes
+        case .setFilter: return MCPGuideVisualTopics.setFilter
+        case .freezeFrame: return MCPGuideVisualTopics.freezeFrame
+        case .recordScreen: return MCPGuideWorkspaceTopics.recordScreen
+        case .manageFiles: return MCPGuideWorkspaceTopics.manageFiles
+        case .openFolder: return MCPGuideWorkspaceTopics.openFolder
+        case .setSettings: return MCPGuideWorkspaceTopics.setSettings
+        case .upscaleClip: return MCPGuidePaidTopics.upscaleClip
+        case .manageCharacters: return MCPGuidePaidTopics.manageCharacters
         default: return nil
         }
     }

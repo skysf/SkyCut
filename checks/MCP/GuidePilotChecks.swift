@@ -25,7 +25,12 @@ let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoice
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
 private let pilotPreviousCardLengths: [MCPToolName: Int] = [
-    .editClip: 737, .generateMedia: 978, .setText: 249, .addClips: 577, .look: 968
+    .editClip: 737, .generateMedia: 978, .setText: 249, .addClips: 577, .look: 968,
+    // 第一批 25 个（main ac61520 的清单量的；原文在 MCPGuidePreviousCards，脚本照抄）。
+    .editSubtitles: 819, .generateSubtitles: 542, .translateSubtitles: 548, .getSubtitles: 536, .exportSubtitles: 554, .transcribe:
+    698, .listen: 660, .cutSpeech: 1023, .cutToBeat: 568, .syncVoiceover: 746, .exportVideo: 457, .inspectVideo: 487, .compressVideos:
+    458, .burnSubtitles: 468, .getJob: 813, .setShape: 525, .setKeyframes: 466, .setFilter: 640, .freezeFrame: 584, .recordScreen:
+    947, .manageFiles: 480, .openFolder: 697, .setSettings: 565, .upscaleClip: 1022, .manageCharacters: 508
 ]
 
 /// 迁移过的工具按性质该写的固定说法（方案 2.2 第 4、5 条）。性质从工具本身看不全（会不会改时间线、要不要先读说明书），写在这里。
@@ -36,6 +41,33 @@ private let pilotNature: [MCPToolName: [String]] = [
     .look: ["Read-only", "wait with get_job", "needs_confirmation", "skycut_guide topic=look"],
     .generateMedia: ["Paid (Sky Studio credits)", "quote_only", "needs_confirmation", "confirm_token", "daily credit limit",
                      "wait with get_job", "skycut_guide topic=generate_media"],
+    // 第一批（2026-11-10）：改工程的 One undo step、回任务号的 wait with get_job、会问的 needs_confirmation、要先读的 skycut_guide topic=…；
+    // 出片的 never overwrites / Never replaces a file、删文件的 Trash、export_video 的 music_credits、等用户的 waiting_for_user。
+    .editSubtitles: ["One undo step"],
+    .generateSubtitles: ["One undo step", "wait with get_job"],
+    .translateSubtitles: ["One undo step", "wait with get_job", "waiting_for_user"],
+    .getSubtitles: ["Read-only"],
+    .exportSubtitles: ["Never replaces a file"],
+    .transcribe: ["Read-only", "wait with get_job", "needs_confirmation"],
+    .listen: ["Read-only", "needs_confirmation"],
+    .cutSpeech: ["One undo step", "skycut_guide topic=cut_speech"],
+    .cutToBeat: ["One undo step"],
+    .syncVoiceover: ["one undo step", "wait with get_job", "skycut_guide topic=sync_voiceover"],
+    .exportVideo: ["wait with get_job", "music_credits"],
+    .inspectVideo: ["never edits", "wait with get_job", "needs_confirmation"],
+    .compressVideos: ["wait with get_job", "needs_confirmation", "never overwrites"],
+    .burnSubtitles: ["wait with get_job", "needs_confirmation", "never overwrites"],
+    .getJob: ["Read-only", "waiting_for_user"],
+    .setShape: ["One undo step"],
+    .setKeyframes: ["One undo step"],
+    .setFilter: ["One undo step"],
+    .freezeFrame: ["One undo step"],
+    .recordScreen: ["one undo step", "needs_confirmation", "skycut_guide topic=record_screen"],
+    .manageFiles: ["needs_confirmation", "Trash"],
+    .openFolder: ["Read-only"],
+    .setSettings: ["needs_confirmation", "confirm_token"],
+    .upscaleClip: ["Paid (Sky Studio credits)", "needs_confirmation", "confirm_token", "daily credit limit", "wait with get_job", "skycut_guide topic=upscale_clip"],
+    .manageCharacters: ["Paid (Sky Studio credits)", "quote_only", "needs_confirmation", "confirm_token", "daily credit limit", "wait with get_job", "skycut_guide topic=manage_characters"],
     // add_voiceover 不收 quote_only（整段报价在回任务号之前自动做，声音方案 4.2），所以名片里没有它。
     .addVoiceover: ["One undo step", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
                     "skycut_guide topic=add_voiceover"],
@@ -97,6 +129,15 @@ private func runGuideContentsChecks() {
                   "\(tool.rawValue).\(section.name) says what it covers in at most \(pilotParameterLimit) characters")
             let unknown = guideUnknownNames(section.about)
             check(unknown.isEmpty, "\(tool.rawValue).\(section.name)'s about line names only real names (unknown: \(unknown.joined(separator: ", ")))")
+        }
+    }
+    // 写了 readingTip 的主题：提示里点到的节真的有；分节回时 next_step 以它收尾。
+    for topic in MCPGuideTopics.all {
+        guard let tip = topic.readingTip else { continue }
+        let named = tip.components(separatedBy: "section=").dropFirst().compactMap { $0.split(whereSeparator: { !$0.isLetter && $0 != "_" }).first.map(String.init) }
+        check(!named.isEmpty && named.allSatisfy { name in topic.sections.contains { $0.name == name } }, "\(topic.name): the reading tip names a real section (\(tip))")
+        if let next = MCPGuide.answer(topic: topic.name, section: nil)["next_step"]?.stringValue {
+            check(next.hasSuffix(" " + tip), "\(topic.name): the next step ends with the reading tip")
         }
     }
     // 常见的活只读哪一节：花积分之前报价再问只要 spending、改画幅取景只要 framing。
@@ -189,7 +230,8 @@ private func checkWrittenTopic(_ tool: MCPToolName) {
         check(previousCard != tool.definition.description, "\(tool.rawValue): the card was rewritten (the long text now lives in the guide)")
     }
     checkEqual(Set(topic.sections.map(\.name)).count, topic.sections.count, "\(tool.rawValue): section names are unique")
-    check(written.sections.count >= 4, "\(tool.rawValue): the written topic has its own sections beyond the overview")
+    // 至少两节手写的（概要之外）：试点那 5 个大工具都有四节以上，第一批里 set_filter 这类小工具两节就写全了。
+    check(written.sections.count >= 3, "\(tool.rawValue): the written topic has its own sections beyond the overview")
     check(!written.examples.isEmpty && !written.related.isEmpty, "\(tool.rawValue): the written topic has examples and related topics")
     for section in written.sections {
         check(!section.text.isEmpty, "\(tool.rawValue).\(section.name) is written")

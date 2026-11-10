@@ -237,9 +237,14 @@ private func checkRecordScreenDefinition() {
     for word in ["action=stop", "job id", "stopped_by", "stop_method", "next tool result"] {
         check(opening.contains(word), "the first 512 characters explain late Stop and user-stop receipts: \(word)")
     }
-    for word in ["get_status screen=true", "bottom left", "do not click there", "action=stop", "duration", "get_job", "clip ids",
-                 "Screen & System Audio Recording", "asks the user once", "30 days", "action=resolve", "set_canvas fps"] {
-        check(text.contains(word), "the description says \(word)")
+    // 2026-11-10 名片迁移（方案 5.2 的分类）：调错会出事的留在名片，怎么用好的进说明书（topic=record_screen）。
+    for word in ["get_status screen=true", "action=stop", "clip ids", "action=resolve", "skycut_guide topic=record_screen"] {
+        check(text.contains(word), "the card says \(word)")
+    }
+    let guide = (MCPGuideTopics.topic(named: "record_screen")?.sections ?? []).map(\.text).joined(separator: "\n")
+    for word in ["bottom left", "do not click there", "duration", "get_job", "Screen & System Audio Recording", "asks the user once", "30 days",
+                 "set_canvas fps"] {
+        check(guide.contains(word), "the record_screen guide topic says \(word)")
     }
     let status = MCPToolName.getStatus.definition
     checkEqual(status.inputSchema["properties"]?["screen"]?["type"]?.stringValue, "boolean", "get_status takes screen=true")

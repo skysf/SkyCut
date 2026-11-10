@@ -143,8 +143,8 @@ private func runGuideSplitChecks() {
     check(whole["next_step"] == nil && whole["section"] == nil && whole["contents"] == nil, "a whole answer needs no next step or contents")
     checkEqual(whole["examples"], [["a": "x"]], "examples come back with the topic")
     checkEqual(whole["related"], ["look"], "related topics come back with the topic")
-    // listen 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。
-    check(MCPGuide.answer(topic: "listen", section: nil)["examples"] == nil, "no examples key when a topic has none")
+    // seek 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。
+    check(MCPGuide.answer(topic: "seek", section: nil)["examples"] == nil, "no examples key when a topic has none")
 }
 
 /// 名字的写法不计较；写错的回目录 + 猜的。
