@@ -127,14 +127,17 @@ func runProtocolChecks() {
           "instructions forbid outside tools and downloads for media")
     // 配乐从 SrtFlow 的音乐库找（方案第 14 条）；署名句在导出那一刻用得上，写在 export_video 的说明里（下面第 2 节查）。
     check(instructions.contains("find_audio"), "instructions send the AI to the music library")
-    check(instructions.contains("compress_videos") && instructions.contains("convert_subtitles"),
-          "instructions say compressing and converting files needs no project")
-    check(instructions.contains("transcribe") && instructions.contains("cut_speech") && instructions.contains("cut_to_beat"),
-          "instructions point the AI at the smart cuts (block 3)")
+    // 2026-11-10 起按任务分组的目录在说明书地图里（总说明只留入口和主动规矩，方案第八节第 1 条）。
+    let map = guideMapText()
+    check(map.contains("Files without a project: compress_videos, burn_subtitles, convert_subtitles"),
+          "the guide map says compressing and converting files needs no project")
+    check(instructions.contains("transcribe") && map.contains("cut_speech") && map.contains("cut_to_beat"),
+          "the instructions and the map point the AI at the smart cuts (block 3)")
     // 套路由 AI 自己挑（方案第 39 条）：目录里写剪整片之前先读 recipes；「一句话告诉用户按哪套」写在 recipes 的说明里（第 2 节查）。
-    check(instructions.contains("recipes") && instructions.contains("save_recipe"),
-          "instructions send the AI to the recipes before editing a whole video (block 5)")
-    check(instructions.contains("add_voiceover"), "instructions say narration is spoken with add_voiceover")
+    check(instructions.contains("Whole video: pick an editing style with recipes first"),
+          "instructions send the AI to the recipes before editing a whole video (block 5): it must do this on its own")
+    check(map.contains("save_recipe") && map.contains("add_voiceover (narration spoken from text)"),
+          "the guide map lists save_recipe and says narration is spoken with add_voiceover")
 
     // 2. 工具清单：和 MCPToolName 一一对应、顺序一致、每个都有说明和对象型的参数表。
     let tools = reply(messages, id: 2)?["result"]?["tools"]?.arrayValue ?? []

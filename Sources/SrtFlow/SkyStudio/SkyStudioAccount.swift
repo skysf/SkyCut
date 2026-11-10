@@ -60,6 +60,8 @@ final class SkyStudioAccount: ObservableObject {
     /// AI 的这个调用让不让做；不让做回给 AI 的话（AIToolRouter 在排队之前问）。照授权拦关着时什么都不问、都让做。
     func aiRefusal(for tool: MCPToolName) async -> String? {
         guard SkyCutGates.enforced() else { return nil }
+        // 说明书不看授权：不等授权问完、不读钥匙串、不发请求（docs/bugfixes/2026-11-10-guide-waits-for-license.md）。
+        if SkyCutGates.answeredBeforeLicenseCheck.contains(tool) { return nil }
         let settled = await settledLicense(waitingUpTo: SkyStudioAPI.requestTimeout)
         if SkyCutGates.aiAllows(tool, license: settled, enforced: true) { return nil }
         return SkyCutGates.aiRefusal(license: settled, problem: problem, now: Date())

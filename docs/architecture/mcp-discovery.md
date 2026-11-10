@@ -39,7 +39,7 @@ App 升级后，helper 在一次已有工具调用（可用 `get_status`）后�
 
 ## 回归口径
 
-工具按需求选，参数示例放在对应工具的 `description`，目录不复制长示例：
+工具按需求选，参数示例放在对应工具的 `description`；完整的需求 → 工具在说明书的地图里（`skycut_guide` 不带 topic，[MCP 说明书](mcp-guide.md)），下表是回归时核对的四条：
 
 | 用户需求 | 入口与顺序 |
 | --- | --- |
@@ -49,7 +49,7 @@ App 升级后，helper 在一次已有工具调用（可用 `get_status`）后�
 | 导出审阅版 | `export_video preset=quick_review` → `get_job`；显式参数只覆盖本单，不改正式设置；短边上限不升采样 |
 
 `UsageExampleChecks` 只证明示例符合当前 schema，不能替代模型是否选对工具和真实工程是否成功。
-新增 / 改写说明时还要量实际 `tools/list` JSON、2,048 字上限及前 512 字，不能只量源码字数。
+新增 / 改写说明时还要量实际 `tools/list` JSON、总说明 1,200 字 / 工具说明 2,048 字的上限及前 512 字，不能只量源码字数；新工具同时列进说明书地图。
 旁白的自动语言识别也可能失败：看 `get_job.status` / `message`，不要只看调用是否返回。
 语言已知时按错误提示在原文件上显式传 `transcribe.language` 重试；不因此重新生成配音。
 

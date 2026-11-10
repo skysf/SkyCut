@@ -28,6 +28,10 @@ enum SkyCutGates {
     /// 不含凭据和私有配方，没开通时 AI 也能把 SkyCut 能做什么说清楚（docs/plans/2026-11-09-mcp-guide.md 第八节第 5 条，2026-11-09 用户定）。
     static let alwaysAnswered: Set<MCPToolName> = [.getStatus, .skycutGuide]
 
+    /// 连授权都不用等的：说明书的回答不看授权，等授权问完（读钥匙串、问 `/me`，最长 20 秒）只会让这个「START HERE」的调用卡住
+    /// （docs/bugfixes/2026-11-10-guide-waits-for-license.md）。get_status 不在这里：它的 skycut_plan 要等授权问完。
+    static let answeredBeforeLicenseCheck: Set<MCPToolName> = [.skycutGuide]
+
     /// AI 调这个工具让不让做。`alwaysAnswered` 里的永远让。
     static func aiAllows(_ tool: MCPToolName, license: SkyCutLicense, enforced: Bool) -> Bool {
         !enforced || alwaysAnswered.contains(tool) || license.mcp
@@ -72,7 +76,8 @@ enum SkyCutGates {
         var sentences = ["Not done: SkyCut's AI tools need SkyCut Pro or a SkyCut trial, and \(reason(license))."]
         if let snag = snag(problem) { sentences.append(snag) }
         sentences.append(nextStep(license, problem: problem))
-        sentences.append("Nothing was changed; get_status shows the plan.")
+        // 说明书照常能用（没开通也照答）：AI 被挡住时也能读它、把 SkyCut 能做什么说清楚（review-344 第 9 条，方案第八节第 5 条）。
+        sentences.append("Nothing was changed; get_status shows the plan, and skycut_guide (the manual) still answers.")
         return sentences.joined(separator: " ")
     }
 

@@ -34,6 +34,9 @@ func runGateChecks() {
     //    说明书只读、免费、不碰工程，没开通时 AI 也能说清 SkyCut 能做什么；docs/plans/2026-11-09-mcp-guide.md 第八节第 5 条）。
     let answeredWithoutPlan: Set<MCPToolName> = [.getStatus, .skycutGuide]
     checkEqual(SkyCutGates.alwaysAnswered, answeredWithoutPlan, "only get_status and skycut_guide answer without a plan")
+    // 说明书连授权都不用等（不读钥匙串、不问 /me）；get_status 要等，它的 skycut_plan 报的是问完的授权（docs/bugfixes/2026-11-10-guide-waits-for-license.md）。
+    checkEqual(SkyCutGates.answeredBeforeLicenseCheck, [.skycutGuide], "only skycut_guide skips waiting for the licence check")
+    check(SkyCutGates.answeredBeforeLicenseCheck.isSubset(of: SkyCutGates.alwaysAnswered), "whatever skips the licence wait is also answered without a plan")
     for tool in MCPToolName.allCases {
         check(SkyCutGates.aiAllows(tool, license: .free(.noKey), enforced: false), "gates off: \(tool.rawValue) runs")
         checkEqual(
@@ -66,7 +69,8 @@ private func runRefusalChecks(free: SkyCutLicense, now: Date) {
     let email = SkyStudioLinks.supportEmail
     func says(_ text: String, _ parts: [String], _ what: String) {
         check(text.hasPrefix("Not done: "), "\(what): starts with Not done")
-        check(text.hasSuffix("get_status shows the plan."), "\(what): points at get_status")
+        check(text.hasSuffix("get_status shows the plan, and skycut_guide (the manual) still answers."),
+              "\(what): points at get_status and says the guide still answers")
         for part in parts { check(text.contains(part), "\(what) mentions \(part): \(text)") }
     }
 
