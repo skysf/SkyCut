@@ -9,6 +9,10 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var requests: [(String, String, JSONValue)] = []
     static var prompts: [String] = []
     static var wave = Data()
+    /// 克隆用的参考素材：12 秒有声（参考录音至少 10 秒有效人声）。
+    static var reference = Data()
+    /// PUT 上去的原始字节（参考录音）。
+    static var uploaded: [Data] = []
     static var cloudFailure: Int?
     static var unknownSubmission = false
     static var cap = 30
@@ -22,13 +26,15 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static func reset(cap: Int = 30, cloudFailure: Int? = nil, unknownSubmission: Bool = false) {
         lock.lock()
         defer { lock.unlock() }
-        requests = []; prompts = []
+        requests = []; prompts = []; uploaded = []
         self.cap = cap; self.cloudFailure = cloudFailure; self.unknownSubmission = unknownSubmission
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
+        reference = VoiceReferenceSample.wavData(samples: (0..<529_200).map { Int16(sin(Double($0) * 0.08) * 4_000) }, sampleRate: 44_100)
     }
 
     static var posts: Int { lock.lock(); defer { lock.unlock() }; return prompts.count }
+    static var uploads: [Data] { lock.lock(); defer { lock.unlock() }; return uploaded }
     static var log: [(String, String, JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
     static func prompt(_ index: Int) -> String { lock.lock(); defer { lock.unlock() }; return prompts[index] }
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -53,6 +59,7 @@ final class VoiceRecoveryHTTP: URLProtocol {
         let body = data.flatMap { try? JSONValue.decode($0) } ?? .null
         Self.lock.lock()
         Self.requests.append((method, path, body))
+        if method == "PUT" { Self.uploaded.append(data ?? Data()) }
         var status = 200
         var value: JSONValue = [:]
         var bytes: Data?
@@ -128,9 +135,9 @@ final class VoiceRecoveryFixture {
 
     func input(lines: [String]) throws -> AIVoiceoverInput {
         let reference = folder.appendingPathComponent("reference.wav")
-        try VoiceRecoveryHTTP.wave.write(to: reference)
+        try VoiceRecoveryHTTP.reference.write(to: reference)
         return AIVoiceoverInput(lines: lines.map { .init(text: $0, start: nil) }, speed: 1, language: "en", requestedVoice: nil,
-            choice: .init(engine: .skyStudio(voice: "cloned voice")), clone: .init(url: reference, start: 0, seconds: 6),
+            choice: .init(engine: .skyStudio(voice: "cloned voice")), clone: .init(url: reference, start: 0, seconds: nil),
             target: .newAudioBottom, subtitles: true, maxLines: 1, generation: project.documentGeneration, folder: folder)
     }
 

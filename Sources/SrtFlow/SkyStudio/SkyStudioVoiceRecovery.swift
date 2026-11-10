@@ -46,7 +46,7 @@ final class SkyStudioVoiceRecovery {
         guard samePath || value.projectToken == AIProjectBinding.token(generation: project.documentGeneration) else {
             throw AIToolError("This recovery belongs to another project. Open its original project and pass that project id; no audio was generated or inserted.")
         }
-        let clone = saved.cloneURL.map { AIVoiceoverInput.Clone(url: $0, start: saved.cloneStart ?? 0, seconds: saved.cloneSeconds ?? 10) }
+        let clone = saved.cloneURL.map { AIVoiceoverInput.Clone(url: $0, start: saved.cloneStart ?? 0, seconds: saved.cloneSeconds) }
         return AIVoiceoverInput(lines: saved.lines.map { .init(text: $0.text, start: $0.start) }, speed: saved.speed,
             language: saved.language, requestedVoice: saved.voice, choice: .init(engine: .skyStudio(voice: saved.voice), note: saved.note),
             clone: clone, target: saved.audioTrack.map(TrackDropTarget.audio) ?? .newAudioBottom,
