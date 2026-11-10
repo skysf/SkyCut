@@ -39,12 +39,17 @@ final class SkyStudioVoiceCloudBatches {
         status.credits = quotes.reduce(0) { $0 + $1.credits }
     }
 
+    /// 参考录音只做一次、只传一次（44.1 kHz 单声道、10 秒–3 分钟，VoiceReferenceSample）；用了哪一段记进恢复记录的声音说明，
+    /// 落地时随 voice.note 告诉 AI（恢复也带着）。
     private func uploadReferenceIfNeeded() async throws {
         if let clone = input.clone, recovery.value.referenceURL == nil {
             let folder = recovery.file.deletingLastPathComponent()
-            let sample = try await VoiceReferenceSample.file(from: clone.url, start: clone.start, seconds: clone.seconds, folder: folder)
+            let sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
             status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
-            recovery.value.referenceURL = try await api.upload(fileURL: sample, contentType: "audio/wav", purpose: "audio", key: key)
+            recovery.value.referenceURL = try await api.upload(fileURL: sample.url, contentType: VoiceReferenceSample.contentType,
+                                                                purpose: VoiceReferenceSample.uploadPurpose, key: key)
+            recovery.value.input.note = [recovery.value.input.note, sample.summary(name: clone.url.lastPathComponent)]
+                .compactMap { $0 }.joined(separator: " ")
             try await recovery.save()
         }
     }

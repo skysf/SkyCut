@@ -42,7 +42,7 @@
 #  25. 生成类工具的提供方（方案第 36 条）：generate_media 只在配了 fal 时列出来（真起小程序：没配 / 配了各列什么、总说明配了才提 fal、
 #      握手声明清单会变、新一代清单缓存一分钟；用户中途添加 / 删掉 Key 时老一代客户端收 list_changed、新一代不收）、那个小文件读得宽且不带机密、
 #      说明和参数和词表 / App 的类型对账、全清单说明总长 ≤ 100,000 字符（2026-10-02 从 72,000 抬到 80,000、2026-10-14 再抬到 90,000、2026-10-17 再抬到 100,000）；add_voiceover 的 fal 那一档：挑音色的优先级、角色表对账、
-#      fal 报的词时间换成字幕认的词、克隆参考音频的 WAV（真去调 fal 在 scripts/check-fal.sh）。
+#      fal 报的词时间换成字幕认的词（克隆的参考录音见第 38 条）。
 #  23. 字幕长什么样（edit_subtitles / burn_subtitles 的 style）：参数全验过、只改工程自己的样式、给了位置收掉拖框的布局、
 #      只给字号把倍率归一、逐词高亮的开关和倍数、烧录一批时描边 / 底条互换、位置词表对账。
 #  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 对账、定义（参数、必填、枚举、只在存了 Sky Studio 的 Key 时列、上网）、
@@ -74,6 +74,8 @@
 #      （2026-09-30，docs/bugfixes/2026-09-30-mcp-text-truncated-at-2048.md）。
 #
 #  37. 批量改片段 / 文字 / 形状：副本上全验、坏项不落半份、一次提交与撤销；单项工具共用规则（BatchEditChecks + 扫描）。
+#  38. 克隆的参考录音（2026-11-10）：挑段（10 秒有效人声下限、3 分钟上限、人声最多、一样多比前 15 秒、切在停顿里，和穷举对账）、
+#      真读真写成 44.1 kHz 单声道 16-bit WAV、立体声取平均、AAC 时间对得上、不够 10 秒说差几秒（VoiceReferenceChecks / VoiceReferenceFileChecks）。
 #
 # 用法：
 #   scripts/check-mcp.sh
@@ -427,7 +429,8 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoices.swift \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/VoiceReferenceSample.swift \
-  Sources/SrtFlow/SubtitleGen/AudioWindowReader.swift \
+  Sources/SrtFlow/VoiceReferenceReader.swift \
+  Sources/SrtFlow/VoiceReferenceWindow.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/Upscale/UpscaleTiers.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \

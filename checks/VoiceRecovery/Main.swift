@@ -31,6 +31,16 @@ import SrtFlowMCPKit
             require(saved.batches.prefix(2).allSatisfy { $0.rawFile.map { FileManager.default.fileExists(atPath: $0.path) } == true }, "both complete originals must survive failure")
             require(saved.outputs.count == 2 && saved.batches[1].remote != nil, "line outputs, mappings, cloud result and progress are durable")
             require(fixture.project.state.audioTracks.allSatisfy { $0.clips.isEmpty }, "failed processing must not insert a partial voiceover")
+            // 克隆的参考录音（SkyCut 声音方案第六节）：只传一次、用途 voice_reference、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit WAV。
+            let uploadPosts = VoiceRecoveryHTTP.log.filter { $0.0 == "POST" && $0.1.hasSuffix("/uploads") }
+            require(uploadPosts.count == 1 && uploadPosts.first?.2["purpose"] == "voice_reference" && uploadPosts.first?.2["content_type"] == "audio/wav",
+                    "the voice sample is uploaded once, as audio/wav with the voice_reference purpose")
+            let wav = VoiceRecoveryHTTP.uploads.first ?? Data()
+            func field(_ offset: Int, _ size: Int) -> Int { wav.count < 44 ? -1 : (0..<size).reduce(0) { $0 | Int(wav[wav.startIndex + offset + $1]) << (8 * $1) } }
+            require(wav.count == 44 + 529_200 * 2 && field(22, 2) == 1 && field(24, 4) == 44_100 && field(34, 2) == 16,
+                    "the uploaded voice sample is the whole 12 s as a 44.1 kHz mono 16-bit WAV")
+            require(saved.input.note?.contains("Voice sample: all of reference.wav (0:12), 12 s of clear speech.") == true,
+                    "the recovery record says which part of the recording became the voice sample")
             let firstFiles = saved.outputs.mapValues(\.url)
             let reads = fixture.keyReads
             SkyStudioSpendStore.shared.setDailyLimit(0)
@@ -49,6 +59,8 @@ import SrtFlowMCPKit
             let beforeLocal = VoiceRecoveryHTTP.log.count
             let completed = try await fixture.resume(file, generate: true)
             require(completed["status"] == "done", "explicit missing-only generation completes the narration")
+            require(completed["voice"]?["note"]?.stringValue?.contains("Voice sample: all of reference.wav") == true,
+                    "the finished voiceover tells the AI which part of the recording was cloned")
             require(VoiceRecoveryHTTP.posts == 3, "recovery generates only the previously ungenerated third batch")
             require(SkyStudioSpendStore.shared.spentToday() == spent + 7.5, "missing-only generation reserves only the final batch")
             let newPosts = Array(VoiceRecoveryHTTP.log.dropFirst(beforeLocal)).filter { $0.0 == "POST" }
@@ -73,6 +85,16 @@ import SrtFlowMCPKit
             require(fixture.project.state.audioTracks.flatMap(\.clips).isEmpty, "retry after user undo must respect the saved insertion receipt")
             fixture.project.effectiveUndoManager!.redo()
             require(fixture.project.state == state, "one redo restores the complete recovered narration")
+
+            // clone_seconds 不再「默认 10、夹在 5–30」：不到 10 秒当场拒；不给就到结尾（超过 3 分钟自动挑一段）。
+            let referencePath = root.appendingPathComponent("split/reference.wav").path
+            var refusedShort = false
+            do { _ = try AIVoiceoverInput.cloneSource(AIToolArguments(["clone_from": .string(referencePath), "clone_seconds": 5])) } catch { refusedShort = true }
+            require(refusedShort, "clone_seconds under 10 s is refused before any job starts")
+            let open = try AIVoiceoverInput.cloneSource(AIToolArguments(["clone_from": .string(referencePath), "clone_start": 2]))
+            require(open?.start == 2 && open?.seconds == nil && open?.end == nil, "without clone_seconds the voice sample runs to the end of the file")
+            let named = try AIVoiceoverInput.cloneSource(AIToolArguments(["clone_from": .string(referencePath), "clone_start": 1, "clone_seconds": 45]))
+            require(named?.end == 46, "clone_seconds is no longer capped at 30 s")
 
             // 云端明确失败 / 全退：只补这一批与后面未提交的批次；成功批次仍不重复。
             let cloud = try VoiceRecoveryFixture(folder: root.appendingPathComponent("cloud"))

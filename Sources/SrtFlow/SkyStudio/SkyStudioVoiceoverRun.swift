@@ -208,6 +208,8 @@ final class SkyStudioVoiceoverRun {
             try await recovery.save()
             return finish(.done, "The saved insertion is already on the timeline; nothing was added again.")
         }
+        // 声音说明以恢复记录为准：克隆传参考时补了「用了素材的哪一段」。
+        input.choice.note = recovery.value.input.note
         var plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs, playhead: recovery.value.input.playhead)
         if !recovery.value.landingIDs.isEmpty {
             guard recovery.value.landingIDs.count == plan.spoken.count else { throw AIToolError("The saved voiceover insertion does not match its lines.") }

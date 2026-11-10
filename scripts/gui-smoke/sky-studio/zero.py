@@ -34,7 +34,7 @@ try:
     narration = mcp.wait_job(started["job_id"], 180)
     assert narration["status"] == "failed" and narration["code"] == "daily_budget_exceeded", narration
     assert "confirm_token" not in narration and "daily_ai_credit_limit" == narration["settings_field"]
-    clone = call("add_voiceover", {**args, "clone_from": "reference.wav"})
+    clone = call("add_voiceover", {**args, "clone_from": "voice-sample.wav"})
     refused = mcp.wait_job(clone["job_id"], 60)
     assert refused["status"] == "failed" and refused["code"] == "daily_budget_exceeded", refused
     assert "confirm_token" not in refused

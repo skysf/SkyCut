@@ -2,7 +2,7 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// 云端选声、词时间和参考 WAV；服务合同和任务测试在 check-sky-studio。
+// 云端选声、词时间；参考录音（挑段、44.1 kHz 的 WAV）在 VoiceReferenceChecks；服务合同和任务测试在 check-sky-studio。
 
 func runSkyStudioVoiceChecks() {
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "generate_missing": true]) == nil,
@@ -72,26 +72,6 @@ func runSkyStudioVoiceChecks() {
     check(SpeechWordTimes.timedWords(hello, text: "Hi", duration: 1.2).isEmpty, "words much longer than the text are not trusted either")
     check(SpeechWordTimes.timedWords([], text: "Hello", duration: 1).isEmpty && SpeechWordTimes.timedWords(hello, text: "Hello world.", duration: 0).isEmpty, "nothing to convert")
     check(SpeechWordTimes.timedWords(hello, text: "...", duration: 1).isEmpty, "a text without letters has nothing to match")
-
-    // ---- 参考音频的 WAV
-    let samples: [Int16] = [0, 1, -1, 32767, -32768, 1234]
-    let wav = VoiceReferenceSample.wavData(samples: samples, sampleRate: 16_000)
-    checkEqual(wav.count, 44 + samples.count * 2, "a 44-byte header and the samples")
-    checkEqual(String(decoding: wav.prefix(4), as: UTF8.self), "RIFF", "RIFF")
-    checkEqual(String(decoding: wav[8..<16], as: UTF8.self), "WAVEfmt ", "WAVE fmt")
-    checkEqual(String(decoding: wav[36..<40], as: UTF8.self), "data", "data chunk")
-    func le32(_ offset: Int) -> UInt32 { (0..<4).reduce(0) { $0 | UInt32(wav[wav.startIndex + offset + $1]) << (8 * UInt32($1)) } }
-    func le16(_ offset: Int) -> UInt16 { UInt16(wav[wav.startIndex + offset]) | UInt16(wav[wav.startIndex + offset + 1]) << 8 }
-    checkEqual(le32(4), UInt32(36 + samples.count * 2), "the RIFF size")
-    checkEqual(le16(20), 1, "PCM")
-    checkEqual(le16(22), 1, "mono")
-    checkEqual(le32(24), 16_000, "the sample rate")
-    checkEqual(le32(28), 32_000, "bytes per second")
-    checkEqual(le16(34), 16, "16 bits")
-    checkEqual(le32(40), UInt32(samples.count * 2), "the data size")
-    let back = (0..<samples.count).map { Int16(bitPattern: le16(44 + $0 * 2)) }
-    checkEqual(back, samples, "the samples come back unchanged, including the extremes")
-    checkEqual(VoiceReferenceSample.wavData(samples: [], sampleRate: 16_000).count, 44, "an empty sample is just a header")
 }
 
 func runSpeechParserChecks() {
