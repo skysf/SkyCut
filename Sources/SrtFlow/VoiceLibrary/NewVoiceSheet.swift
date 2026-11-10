@@ -83,6 +83,7 @@ struct NewVoiceSheet: View {
             if source == .file { model.recorder.discard() }
         }
         .onDisappear { model.close() }
+        .smokeVoiceSheet(newVoice: model, submit: submit)
     }
 
     private var voiceName: String? {

@@ -17,7 +17,8 @@ import SwiftUI
 //   {"do": "add", "kind": "text" | "shape" | "blur" | "filter" | "transition"}
 //   {"do": "show", "panel": "export" | "subtitles" | "record" | "settings" | "subtitleList"
 //                          | "library:transitions" | "library:filters" | "library:audio" | "dismiss"
-//                          | "section:compress" | "section:burnIn" | "section:batchConvert" | "section:videoEdit"}
+//                          | "section:compress" | "section:burnIn" | "section:batchConvert" | "section:videoEdit"
+//                          | "settings:general" | "settings:ai" | "settings:editing" | "settings:cache" | "settings:sky_studio"}
 //   {"do": "snapshot", "name": "export", "target": "sheet"}
 
 @MainActor
@@ -51,6 +52,25 @@ private struct SmokeUIRequestsModifier: ViewModifier {
     }
 }
 
+extension View {
+    /// 设置窗口：冒烟的 `settings:<类>` 把左边那一列切过去（和点那一行一样）。
+    func smokeSettingsRequests(selection: Binding<SettingsCategory>) -> some View {
+        modifier(SmokeSettingsRequestsModifier(selection: selection))
+    }
+}
+
+private struct SmokeSettingsRequestsModifier: ViewModifier {
+    let selection: Binding<SettingsCategory>
+
+    func body(content: Content) -> some View {
+        let _ = PerfCounters.body(Self.self)
+        content.onReceive(SmokeUIRequests.shared.panel) { request in
+            guard request.hasPrefix("settings:"), let category = SettingsCategory(rawValue: String(request.dropFirst("settings:".count))) else { return }
+            selection.wrappedValue = category
+        }
+    }
+}
+
 @MainActor
 enum SmokeUISteps {
     static func add(_ step: SmokeStep, project: VideoEditProject) throws -> String {
@@ -79,6 +99,12 @@ enum SmokeUISteps {
                 throw SmokeScriptError("show settings：应用菜单里找不到 ⌘, 那一项")
             }
             NSApp.sendAction(item.action ?? Selector(("showSettingsWindow:")), to: item.target, from: item)
+        case let panel? where panel.hasPrefix("settings:"):
+            // 设置窗口切到那一类：左边那一列是设置窗口的 @State，驱动的点击只到主窗口（SettingsWindowView 订阅这一声）。
+            guard SettingsCategory(rawValue: String(panel.dropFirst("settings:".count))) != nil else {
+                throw SmokeScriptError("show：设置里没有这一类 \(panel)")
+            }
+            SmokeUIRequests.shared.panel.send(panel)
         case "subtitleList": project.showsSubtitleList = true
         case "section:compress", "section:burnIn", "section:videoEdit", "section:batchConvert":
             // 切主窗口的栏目（驱动只在剪辑页里起得来，别的页要看就切过去）。
