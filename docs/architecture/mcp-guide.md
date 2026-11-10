@@ -89,7 +89,7 @@
       写了 `readingTip` 的，提示里点到的节必须真的有（守卫查每一个）。
     - **唯一的例外：没有可搬的原文**（`previousCard` 为 nil）。工具的行为和迁移在同一个 PR 里改了，旧说明照抄进概要等于叫 AI 用已经没有的东西：
       `add_voiceover`（声音方案 4.10 说旧说明过时；4.2–4.4、第十二节：默认 gemini:Charon、去掉 `clone_from`、不再收不带前缀的 Rachel）；
-      还有从第一天起就按名片 + 说明书写的新工具（声音 PR 6 的 `list_voices`、`manage_voices`，本来就没有旧说明）。
+      还有从第一天起就按名片 + 说明书写的新工具（声音 PR 6 的 `list_voices`、`manage_voices`，声音 PR 9 的 `change_voice`，本来就没有旧说明）。
       它的概要按新行为写，旧说明每一句去了哪写在那个 PR（#355）的说明里；名单写死在 `GuidePilotChecks`（`pilotToolsWithoutPreviousCard`），加一个要改那里。
       分节照声音方案 4.10：voices / models_languages / paid_confirmation / subtitles / batches_recovery / local_voices / pitfalls（合起来超过 6,000，
       第一次只回概要 + 有哪些节）。
@@ -119,7 +119,7 @@
   别的写在检查里）；每条参数说明 ≤ 120、带范围的写数字；参数定义 ≤ 4,500 字节、例外名单正好是 edit_clip 和 generate_media；概要以迁移前的原文开头、
   原文的长度对得上、名片真的改写过；手写的几节不空、只提真有的名字（结果字段名记在 `CatalogNames.swift`）、有例子和相关主题；
   `fields` 几节：真实清单里每个工具切完一行不丢、顺序不变、名字依次、超上限的只许是单独一个参数，再拿手造的大参数定义证明真会切。末尾打印每张迁移过的名片各多少字、哪些工具切了几节。
-  没有可搬的原文的名单正好是 add_voiceover、list_voices、manage_voices（拿概要真没以原文开头的工具反过来对一遍）。迁移过的工具的名片也和地图、通用主题一起查名字（`GuideChecks` 的 `runGuideWordingChecks`）。
+  没有可搬的原文的名单正好是 add_voiceover、list_voices、manage_voices、change_voice（拿概要真没以原文开头的工具反过来对一遍）。迁移过的工具的名片也和地图、通用主题一起查名字（`GuideChecks` 的 `runGuideWordingChecks`）。
 - `ProviderChecks`（generate_media）：名片必含 Sky Studio / credits / get_job / needs_confirmation / confirm_token / daily credit limit / add_clips / upscale_clip，
   前 512 字点到 upscale / upscale_clip / get_job / add_clips；说明书必含 camera_angle / MiniMax H3 / image_to_video / library / generate_subtitles / add_voiceover。
 - `checks/MCP/router-wiring.sh`（扫描）：`skycut_guide` 交给 `AIGuideTools`，和 `recipes` 同一行 Policy、三个都是 false。

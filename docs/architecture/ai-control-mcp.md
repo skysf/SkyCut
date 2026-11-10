@@ -1021,6 +1021,18 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`
     （第 6 条），这一刀授权和一次性费用两种模式都问（长期授权是声音 PR 7）。错误码换成能照做的话（`SkyStudioVoiceLibraryErrors`）。
     名片 + 说明书主题（`MCPGuideVoiceLibraryTopics`，新工具没有迁移前的原文）；全清单 2026-11-10 是 106,921 / 110,000。
+59. **变声：`change_voice`（2026-11-11 声音 PR 9，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.8、4.9；合同见 [声音库](voice-library.md)第十节）**：
+    把一段（视频段或音频段，有声音、没静音）的人声换成另一个声音。改时间线、是长任务、花积分，和 `upscale_clip` 同一类，单独一个工具（不能并进
+    `add_voiceover`：输入是一段现成的声音；也不能并进 `generate_media`：那个不改工程）。参数 `clip_id`（方案写 `clip`，照全清单的习惯）、`voice`
+    （声音库的 `voice_…`，或预设 `gemini:<名字>` / 不带前缀的预设名）、可选的 `language`（这段说什么语言，ISO 639-1）、`project`。
+    一次调用里、**收费之前**：核对这一段（超过 `/models` 的 `max_source_seconds` 拒、叫它先 `split_clip`；静音 / 没声音 / 几乎没声音拒；同一段正在变拒）→
+    认目标声音（声音库的问 Sky Studio 一次）→ 截这一段的声音（单声道 WAV，`MediaReadQueue.analysis`）→ 定语言（给了就用，否则本机检测、最多等 20 秒）→
+    `/quote` → **只判每日硬预算**（不是一次性费用：两种权限模式都不问，不发确认码、不收 `confirm_token`；超了回 `daily_budget_exceeded`）→ 起任务、回任务号
+    （种类 `voice_change`）。任务（`VoiceChangeJob`）：传 `voice_convert_source` → 一次 `voice_convert`（`max_credits` 是报价；只经 `SkyStudioJobRun`，
+    结果不明不重交）→ 下两个文件到原素材旁边 → **落地是异步落账、自己包一层 `AIUndoGrouping.step`**：原段静音、两条新音频轨、三段链接，一步撤销。
+    这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（第十节第 1 条）。
+    路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
+    （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11 是 101,199 / 110,000。
 
 ## 五、这一轮、停止、撤销这一轮
 

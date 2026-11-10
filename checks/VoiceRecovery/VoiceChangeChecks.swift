@@ -391,12 +391,19 @@ private func undoChecks(_ root: URL) async throws {
     require(after != before && after.audioTracks.count == 3, "the timeline changed")
     guard let manager = fixture.project.effectiveUndoManager else { return require(false, "the project has an undo manager") }
     require(manager.canUndo, "the landing registered an undo step")
+    // 落地是异步落账、不是用户事件：没包进 AIUndoGrouping.step 的话，按事件自动开的那一组在后台的 App 里关不上，之后 AI 的每一步都并进去。
+    // 这个进程里主循环一直在转、那一组自己会关，所以「包没包」由扫描钉着（checks/MCP/router-wiring.sh）；这里钉的是结果：落地之后再做一步，两步各是各的。
+    require(manager.groupingLevel == 0, "the landing leaves no undo group open behind it")
+    _ = AIUndoGrouping.step(manager) { fixture.project.perform { $0.masterVolume = 0.5 } }
+    manager.undo()
+    require(fixture.project.state == after, "the next edit is its own undo step: undoing it leaves the changed voice in place")
     manager.undo()
     require(fixture.project.state == before, "one undo brings back the original sound: unmuted, no new tracks, no link")
     require(!manager.canUndo, "the landing was exactly one undo step")
     manager.redo()
     require(fixture.project.state == after, "one redo lands everything again")
-    require(!manager.canRedo, "and that was the only redo step")
+    manager.redo()
+    require(fixture.project.state.masterVolume == 0.5 && !manager.canRedo, "and the later edit is the only other redo step")
 }
 
 // MARK: 工程换了 / 这一段没了：只留文件

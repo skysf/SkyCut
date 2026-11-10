@@ -60,6 +60,7 @@
 | `SkyStudioVoiceSplit.swift` / `SkyStudioVoiceSplitEstimate.swift` / `SkyStudioVoiceLineAudio.swift` | 批回到本机之后（纯值）：一批几句按词对回原文切开（不计较繁简）；没有词可对、这台 Mac 又转写不了时按字数估句界；一句的几片接成一条（采样率不一样换成一样的）（第五节「本机切句」） |
 | `SkyStudioVoiceBatchQueue.swift` / `SkyStudioVoiceCloudBatches.swift` / `SkyStudioVoiceBatchBoard.swift` | 一段旁白的几批怎么拿到本机：按原来的顺序领槽、同时交，一批出了事后面没交的不再交（队列）；一批怎么交 / 只 GET 原单 / 下载、中途换备用（批次）；几批各走到哪一步（纯值：状态行和 get_job 的「几批好了 / 在跑 / 等空位」，第五节） |
 | `SkyStudioVoiceLibraryTool.swift` / `SkyStudioVoiceRecordingTool.swift` / `SkyStudioVoiceDesignTool.swift` / `SkyStudioVoiceLibraryJob.swift` / `SkyStudioVoiceOneTimeStep.swift` | 声音库（声音 PR 6）：`list_voices`、`manage_voices` 的列、建 / 加录音（先问授权）、设计（先问一次性费用、起任务）、改名、删除；设计和建 MiniMax 版的任务；配旁白碰上一次性费用时问 / 跳过 / 起建的任务（[声音库](voice-library.md)第八节） |
+| `VoiceChange/VoiceChangeSource.swift` / `VoiceChangeOrder.swift` / `VoiceChangeJob.swift` / `VoiceChangeLanding.swift` / `VoiceChangeOutputName.swift` / `VoiceChangeTool.swift` | 变声（声音 PR 9）：截这一段的声音、定语言和报价用的那一份、任务（传 → `voice_convert` → 下两个文件 → 一步落地）、落地的规则（纯值）、文件叫什么、AI 的 `change_voice`（[声音库](voice-library.md)第十节） |
 | `SkyStudioVoiceListing.swift` / `SkyStudioVoiceApproval.swift` / `SkyStudioVoiceLibraryErrors.swift` | 纯值：`list_voices` 回什么、声音库三件事的令牌绑什么和问句、错误码换成能照做的话（声音库用不了不退本机、删除时存储一时不可用再发一次） |
 
 ### 模型目录的缓存与换账户
@@ -94,6 +95,11 @@
   服务端自己探真实素材并在扣费前核对 `max_credits`；输入不改写、不缩小；原始字节按目录约束上传。成品下载到「生成」文件夹，作品库也永久保留。
 - **不自动替换**（2026-10-31 用户要求，覆盖 10-30 的自动切模型策略）：任何模型失败、拒绝或状态未知都不自动重生成、切模型或重放收费 POST。
   `auto_fallback=true` 明确拒绝，false 只为旧客户端兼容。用户另行批准的新生成使用新 key / 新预算。`get_job` 在本机任务结束后也只 GET 原服务器任务，更新 billing 与原结果地址。
+- **变声**（声音 PR 9，2026-11-11）：`change_voice` 和片段右键的面板，规矩见 [声音库](voice-library.md)第十节。kind `voice_convert`、`model: auto`
+  （服务器用 `chatterbox-hd`，出错自己换 `chatterbox`，结果的 `model` / `fallback_used` 照报）；先 `/quote`（`params.source.seconds`，可带
+  `params.target_language`），过每日硬预算（只判这一样、不问），再传 `voice_convert_source`（单声道 WAV，≤ 35 MB）、交一次 `/jobs`
+  （`inputs.source_audio_url`、`max_credits` = 报价）；在声音池领槽；结果是两个文件（`voice_url`、`background_url`，留 60 天），下到原素材旁边；
+  账按结算证据改。任务浮层里是一行 `SkyStudioMediaStatus`（音频）；没有恢复记录。
 - **清单**（2026-10-30）：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，但不再按 Key 隐藏；工具及总说明末尾的「Paid」一行始终存在。
   Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
   新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。
