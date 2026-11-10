@@ -35,7 +35,8 @@ private func makeStore(_ fixture: VoiceLibraryFixture) -> VoiceLibraryStore {
 
 @MainActor
 private func eventually(_ what: String, _ done: @MainActor () -> Bool) async {
-    for _ in 0..<200 {
+    // 最多等 15 秒：CI 的 runner 只有三个核，读 15 秒的 WAV、起任务都比本机慢。
+    for _ in 0..<600 {
         if done() { return }
         try? await Task.sleep(nanoseconds: 25_000_000)
     }
