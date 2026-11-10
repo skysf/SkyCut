@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 存了 Sky Studio 的 Key 就问一次授权（到时候了才问；docs/architecture/sky-studio-account.md）。
         SkyStudioAccount.shared.start()
         expireOptimizedMedia()
+        // 上次崩溃 / 强退留在临时目录里的声音样本（新建声音的录音、参考录音、语言探针）：后台清掉一天以前的。
+        MediaReadQueue.analysis.addOperation { VoiceLibraryTemp.sweepResidue() }
     }
 
     /// 优化媒体的缓存：30 天没有任何工程用到的块删掉（docs/architecture/optimized-media.md 第二节第 6 条）。
