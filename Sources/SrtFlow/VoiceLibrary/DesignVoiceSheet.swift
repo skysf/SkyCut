@@ -4,6 +4,7 @@ import SwiftUI
 //
 // 管什么（SkyCut 声音方案 5.4）：描述（多行）、名字、可选的试读句；报价回来写「将用 MiniMax / Qwen3 设计 · 约 X 积分（最多 Y）」，
 // 按钮「设计（最多 Y 积分）」——按下就是确认（一次性费用，和 upscale 面板同一个口径）；超过每日额度那一行标红、按钮灰着。
+// 下过单按钮就灰着（`model.ordered`）：双击、回车键按着不放连发都只下一单。
 // 设计是任务：按下之后这张就收起来，云端任务浮层里看得见，做完的声音出现在声音库那一节，能试听样音。
 // 数和规矩在 DesignVoiceModel（和 AI 的 manage_voices design 同一份核对、同一个任务）；价只从 Sky Studio 的报价来，这里不写数。
 // 本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`。不读工程、不订阅播放器的时钟。
@@ -74,7 +75,7 @@ struct DesignVoiceSheet: View {
                     if model.design() { dismiss() }
                 }
                 .keyboardShortcut(.defaultAction)
-                .disabled(model.quote == nil || overLimit)
+                .disabled(model.quote == nil || overLimit || model.ordered)
                 .accessibilityIdentifier("design-voice-submit")
             }
         }
