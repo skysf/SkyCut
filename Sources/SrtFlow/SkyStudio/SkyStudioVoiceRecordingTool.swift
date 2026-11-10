@@ -52,7 +52,7 @@ enum SkyStudioVoiceRecordingTool {
         if let question = try AIWorkspace.shared.confirmReading([file], verb: "send to Sky Studio", args: args, project: project) { return question }
 
         let statement = try await consentStatement(key: key, services: services)
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SkyCut-voice-reference-" + UUID().uuidString)
+        let folder = VoiceLibraryTemp.folder(.reference)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: folder) }
         let sample = try await VoiceReferenceSample.prepare(from: file, start: start, end: end, folder: folder)
@@ -64,9 +64,7 @@ enum SkyStudioVoiceRecordingTool {
         case .create(let name): doing = "create the voice \"\(name)\""
         case .addReference(let id): doing = "add a \(language.name) recording to the voice \"\(existing?.name ?? id)\""
         }
-        let submission = try checked {
-            try SkyStudioVoiceRecordingSubmission(file: file, sample: sample, language: language.code, target: target, statement: statement)
-        }
+        let submission = try await submission(file: file, sample: sample, language: language.code, target: target, statement: statement)
         let consentAction = submission.consentAction(account: SkyStudioCharacterAccess.stamp(key))
         let summary = sample.summary(name: file.lastPathComponent)
         // 识别出来的语言接在「用了哪一段」后面：用户点头之前看得到。
@@ -105,7 +103,38 @@ enum SkyStudioVoiceRecordingTool {
             }
             throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
         }
+        catch where ask != .standing && SkyStudioVoiceLibraryErrors.consentOutdated(error) {
+            // Sky Studio 把授权那句升了版本，手里 10 分钟一份的目录还是旧的：忘掉目录、读新的那一句，用新版本、新文案再问一次
+            // （令牌绑着版本，旧的那张不认；审查 #362 第 6 条：以前每次都发旧版本，一直 consent_outdated 到缓存过期）。
+            SkyStudioCatalogCache.shared.forget()
+            let fresh = try await consentStatement(key: key, services: services)
+            guard fresh.version != statement.version else { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
+            let renewed = try await self.submission(file: file, sample: sample, language: language.code, target: target, statement: fresh)
+            let again = SkyStudioVoiceApproval.consentQuestion(statement: fresh, doing: doing, sample: sampleNote)
+            guard let asked = SkyStudioJobGate.voiceConsent(action: renewed.consentAction(account: SkyStudioCharacterAccess.stamp(key)),
+                                                            question: again, token: nil, ask: ask) else {
+                throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
+            }
+            return SkyStudioVoiceRecordingLanguage.adding(language, to: renewedStatement(asked))
+        }
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
+    }
+
+    private static func submission(file: URL, sample: VoiceReferenceSample.Sample, language: String, target: SkyStudioVoiceRecordingSubmission.Target,
+                                   statement: SkyStudioVoiceConsentStatement) async throws -> SkyStudioVoiceRecordingSubmission {
+        do { return try await SkyStudioVoiceRecordingSubmission.make(file: file, sample: sample, language: language, target: target, statement: statement) }
+        catch let problem as SkyStudioVoiceRequestProblem { throw AIToolError(problem.message) }
+    }
+
+    /// 文案升了版本之后的那一问：说清楚为什么又问（上一次点头的是旧的那句、什么都没建）。
+    private static func renewedStatement(_ asked: AIToolResult) -> AIToolResult {
+        guard case .object(var value) = asked.payload else { return asked }
+        value["consent_statement_updated"] = true
+        value["note"] = .string("Sky Studio updated its consent statement, so the earlier answer no longer counts and nothing was created. "
+            + "Show the user the new statement in the question and ask again.")
+        var copy = asked
+        copy.payload = .object(value)
+        return copy
     }
 
     /// 加一种语言之前读那个声音（问句写它的名字、查它有没有这种语言）。读不到就照声音库的错误说，什么都没传。

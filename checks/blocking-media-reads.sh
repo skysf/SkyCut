@@ -59,10 +59,33 @@ while IFS= read -r file; do
   fi
 done < <(find Sources -name '*.swift' | LC_ALL=C sort)
 
+# 那个例外只给字幕生成用：`AudioWindowReader.extract` 的调用方只许在 SubtitleGen/ 里。别处（配旁白回来的音频、新建声音时检测语言）
+# 借它，就是把「写在 async 里的阻塞读取」带到了理由不成立的地方 —— 上面的判据只看定义、看不见调用方（2026-11-11 审查 #367 第 4 条）。
+# 别处走 QueuedAudioWindow（同一份格式和落盘，读取在 MediaReadQueue 上）。
+BORROWERS=""
+while IFS= read -r file; do
+  case "${file}" in Sources/SrtFlow/SubtitleGen/*) continue ;; esac
+  stripped="$(sed 's,//.*,,' "${file}")"
+  if grep -qF 'AudioWindowReader.extract(' <<<"${stripped}"; then
+    BORROWERS="${BORROWERS}${file}
+"
+  fi
+done < <(find Sources -name '*.swift' | LC_ALL=C sort)
+if [ -n "${BORROWERS}" ]; then
+  echo "✗ 这些文件借用了只给字幕生成的 AudioWindowReader.extract（它的读取循环写在 async 函数里，是白名单上唯一的例外）：" >&2
+  printf '%s' "${BORROWERS}" >&2
+  echo "  改走 QueuedAudioWindow.extract（读取在 MediaReadQueue 上）；见 docs/architecture/blocking-media-reads.md「例外」" >&2
+  exit 1
+fi
+grep -qF 'MediaReadQueue.run(on: queue)' Sources/SrtFlow/SubtitleGen/QueuedAudioWindow.swift || {
+  echo "✗ QueuedAudioWindow 的读取要交给 MediaReadQueue 跑（MediaReadQueue.run(on: queue)）" >&2
+  exit 1
+}
+
 if [ -n "${HITS}" ]; then
   echo "✗ 这些阻塞读取写在了 async 函数里（会占住 Swift 并发线程池的线程，文件一多整档 QoS 死锁）：" >&2
   printf '%s' "${HITS}" >&2
   echo "  读采样的循环写成单独的同步函数，交给 MediaReadQueue 跑；见 docs/architecture/blocking-media-reads.md" >&2
   exit 1
 fi
-echo "✓ blocking-media-reads：没有写在 async 函数里的 copyNextSampleBuffer 循环"
+echo "✓ blocking-media-reads：没有写在 async 函数里的 copyNextSampleBuffer 循环，字幕生成的那个例外没有别处借用"

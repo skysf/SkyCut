@@ -22,7 +22,7 @@ STANDING = "voice-standing-consent-v1"
 
 
 def grants(method):
-    with urllib.request.urlopen("http://127.0.0.1:18766/__log", timeout=5) as response:
+    with urllib.request.urlopen("http://127.0.0.1:" + os.environ.get("SKYSTUDIO_SMOKE_PORT", "18766") + "/__log", timeout=5) as response:
         return [x for x in json.load(response) if x.get("method") == method and x.get("path", "").endswith("/voices/consent-grant")]
 
 

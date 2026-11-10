@@ -299,3 +299,47 @@
 - [ ] 没有 Key：那一节写「接上 Sky Studio」，按钮跳到 Sky Studio 那一类；钥匙串要授权时同样。Sky Studio 没配声音桶时：写「暂时用不了」，新建 / 设计灰着，预设照样能听。
 - [ ] 英 / 中 / 西三种界面（系统语言设成英文再切）：设置那一节、选择器、三个对话框、删除确认框无截字、无漏翻；900 pt 高的窗口里对话框完整（方案 9.3）。
 
+## 十、收费单只下一次、账只记一次（2026-11-11 审查之后）
+
+> 案例：[设计声音连按下了好几单](../bugfixes/2026-11-11-design-voice-ordered-twice.md)、[声音库审查的后续](../bugfixes/2026-11-11-voice-library-review-followups.md)。
+> 相关：[Sky Studio 的任务](sky-studio-jobs.md)第五节（旁白中途那笔费用）、[阻塞的媒体读取](blocking-media-reads.md)「例外」。
+
+1. **会花钱的按钮按下去那一刻就锁**：设计声音的对话框一份报价只下一单（`DesignVoiceModel.ordered`，在起任务之前置上；按钮跟着灰）。
+   改了字是另一份报价，才能再下。新加收费按钮照 `submitting` / `saving` / `ordered` 的样子加闩。
+2. **一份报价一个 idempotency_key**，问价时随 `draft` 定下，交的时候不另起（`SkyStudioVoiceDesignOrder`）。**不从内容算**：
+   Sky Studio 的 key 永远绑着它那一单（做完的、失败的都是），按内容算的话同一份描述就再也设计不了第二次。
+3. **同一件事只开一单**（`SkyStudioVoiceLibraryJob.running(identity)`）：设计 = 这一份订单的 key；建 MiniMax 版 = 账户 + 声音 + 语言
+   （服务器对开着的建单按声音 + 语言去重，不看 key）。任务 `start()` 先看，还开着就回那一单、这一笔预留退回。**要问用户 / 记账的地方
+   在过闸之前先看**（`SkyStudioVoiceOneTimeStep`、`SkyStudioVoiceFallbackFee`；读长期授权那个 await 之后再看一次，从那里到起任务之间
+   没有 await）：在建就回它的任务号和 `already_building: true`，不问、不预留、不交。本机的账和服务器的账是两本：服务器去重只保它那一本。
+4. **问题答没答完以服务器受理为准**：旁白中途那笔一次性费用（恢复记录的 `fallbackFee`）在建的那一单被受理（回了任务号，
+   任务的 `onAccepted`）之后才清；受理之前没做成（改价、断网、等不到槽）问题原样留着，普通 `resume` / `get_job` 再问；受理之后才失败的
+   放回去；`price_changed` 把新价记进去、下一次按新价问；`minimax_voice_exists` 算答完。改这一个字段只经
+   `SkyStudioVoiceRecovery.updateFee`（现读现改现写）。
+5. **没做成的单把原因带进 `get_job`**：`failure`（服务器的原样）、`code`；改价的另有 `credits_now` / `credits_approved`；下一步由起它的
+   地方说（`onFailure`：重新问价、再问用户，旧令牌不能再用）。
+6. **每日预算的规矩只有 `SkyStudioSpendStore.decide` 一份**：界面上「超没超」问它，按下去时 `SkyStudioJobGate` 问的也是它。
+7. **授权那句升了版本**（`consent_outdated`，这一次的 `consent: true` 被拒）：忘掉目录（`SkyStudioCatalogCache.forget()`）、读新的那一句，
+   用新版本、新文案**再问一次**——AI 那一路另发令牌（令牌绑着版本）、结果带 `consent_statement_updated`；对话框显示新的那一句、
+   把那一勾拿掉。用户同意的必须是交上去的那一版。
+8. **整份读录音不在主线程**：`SkyStudioVoiceRecordingSubmission.make`（`MediaReadQueue.analysis`），同步的 `init` 只许它调。
+9. **临时文件夹只在 `VoiceLibraryTemp` 起名**（对话框、AI 的参考录音、语言探针三种），正常收尾各自删，崩溃留下的启动时后台清——
+   只清一天以前的（临时目录是几个 SkyCut 共用的）。转写开头那一处的清理（`AudioWindowReader.sweepTempResidue`）不许带上它们。
+10. **检测语言、配旁白的转写不借字幕生成的读取器**：走 `QueuedAudioWindow`（读取在 `MediaReadQueue` 上）。
+
+| 检查 | 守什么 |
+| --- | --- |
+| `scripts/check-voice-recovery.sh` 的 `LibraryOrderChecks`（真 App 对象 + 假协议，单会排队 / 去重 / 改价 / 退款，实扣 ≠ 上限） | 连按只下一单、同一份直接起两次回开着的那一单、改了字另一个 key；上限 760 实扣 751.4 账按实收、`price_changed` 一分不留且带新价和下一步、失败退款不留账；MiniMax 版在建时再调（不带令牌 / 带用过的令牌 / 全部权限 + 长期授权）跟着那一单、只记一笔；授权那句升版本用新文案再问、按新版本建；临时文件夹只清一天以前的三种；`QueuedAudioWindow` 出 16 kHz、能取消 |
+| 同上的 `FallbackFeeChecks.repricedChecks`、`LibraryUIChecks.outdatedStatementChecks` | 建的那一单改价没受理：问题还在、记下新价、普通 resume 按新价再问、新令牌按新价建成才清；对话框换成新的那一句、那一勾拿掉、再勾按新版本建 |
+| `checks/sky-studio-wiring/voice-library-orders.sh`（第 13 节）、`checks/blocking-media-reads.sh` | 上面 1–10 的接线；`AudioWindowReader.extract` 的调用方只在 `SubtitleGen/` |
+
+反向验证记录在两篇案例里（2026-11-11，每条都临时改回去看过红）。
+
+已知不足：SkyCut 重启后不记得在建的那一单，用户再点头本机会再记一笔（服务器仍只扣一次），当天的账多一笔、第二天清零。
+
+人工回归（真 Key，先请用户批准预算）：
+
+- [ ] 设计声音：报价出来后双击「设计」、按住回车：只出现一条「正在设计…」，Sky Studio 明细里只有一笔。
+- [ ] 用自己的声音配英文旁白、点头建 MiniMax 版，**不等它做完**再让 AI 配一次：AI 说「已经在建」、不再问价；设置 → Sky Studio 里今天只多一笔。
+- [ ] （真遇上时）Sky Studio 升了授权那句：AI 和对话框都拿新文案再问一次，不用等十分钟。
+

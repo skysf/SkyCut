@@ -34,6 +34,21 @@ final class VoiceLibraryHTTP: URLProtocol {
     }
     static var prompts: [String] = []
     static var wave = Data()
+    // 设计 / 建 MiniMax 版的那几单（2026-11-11 审查补的：原来每一单 `/jobs` 当场回 done、实扣等于报价，去重、改价、失败退款、排队都照不到）。
+    /// 服务器上的一单：`final` 是它的结局；问到第 `hold` 次（`GET /jobs/{id}`）才回，之前回排队 / 进行中。
+    struct Order { var kind: String; var key: String; var subject: String; var final: JSONValue; var hold: Int; var polls = 0; var open: Bool }
+    static var orders: [String: Order] = [:]
+    static var orderIDs: [String] = []
+    /// 之后交的设计 / 建单先回排队中（202），问到第几次才回结局；0 = 交的时候就做完。
+    static var holdPolls = 0
+    /// 排着队的单先按住不放（问多少次都回进行中），场景拨回 false 才往下走。
+    static var holding = false
+    /// 下一单：服务器算出来比 `max_credits` 贵，回 409 `price_changed` 带真实的价，一分不扣、不建任务。
+    static var priceChange: Double?
+    /// 下一单做不成：供应商失败、钱全退了（任务以 failed 结束）。
+    static var failNext = false
+    /// 授权那一句此刻的版本（`/models` 报的和 `POST /voices` 认的）；改了它，带旧版本的 `consent: true` 回 `consent_outdated`。
+    static var consentVersion = "voice-consent-v1"
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -47,6 +62,7 @@ final class VoiceLibraryHTTP: URLProtocol {
         requests = []; uploads = []; prompts = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["en"], minimax: false)]
         listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false; standing = nil; refuseStanding = false; grantUnavailable = false
+        orders = [:]; orderIDs = []; holdPolls = 0; holding = false; priceChange = nil; failNext = false; consentVersion = "voice-consent-v1"
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
     }
@@ -100,7 +116,7 @@ final class VoiceLibraryHTTP: URLProtocol {
 
     // 调用时已经拿着锁。
     private static func answer(_ method: String, _ path: String, _ body: JSONValue, _ data: Data) -> (Int, JSONValue, Data?) {
-        if path.hasSuffix("/models") { return (200, VoiceRecoveryHTTP.catalog, nil) }
+        if path.hasSuffix("/models") { return (200, catalog(), nil) }
         if path.hasPrefix("/files/") { return (200, [:], wave) }
         if path.hasPrefix("/put/") { uploads.append(data.count); return (200, [:], Data()) }
         if path.hasSuffix("/uploads") {
@@ -109,13 +125,26 @@ final class VoiceLibraryHTTP: URLProtocol {
                           "file_url": .string("skystudio-private://voice/uploads/u/\(index).wav")], nil)
         }
         if path.hasSuffix("/quote") { return quoteFailure.map { ($0.0, $0.1, nil) } ?? (200, quote(body), nil) }
-        if path.hasSuffix("/jobs"), method == "POST" { return (200, job(body), nil) }
+        if path.hasSuffix("/jobs"), method == "POST" { return submit(body) }
+        if method == "GET", let range = path.range(of: "/jobs/") { return poll(String(path[range.upperBound...])) }
         guard let range = path.range(of: "/voices") else { return error(404, "not_found") }
         return library(method, String(path[range.upperBound...]), body)
     }
 
+    /// 目录快照；授权那一句升了版本（`consentVersion`）就照新的报。
+    private static func catalog() -> JSONValue {
+        guard consentVersion != "voice-consent-v1" else { return VoiceRecoveryHTTP.catalog }
+        let consent = merged(VoiceRecoveryHTTP.catalog["voice_consent"] ?? [:], ["per_recording": [
+            "version": .string(consentVersion), "statement": .string("NEW STATEMENT \(consentVersion): this is my voice or I may copy it.")]])
+        return merged(VoiceRecoveryHTTP.catalog, ["voice_consent": consent])
+    }
+
     private static func library(_ method: String, _ rest: String, _ body: JSONValue) -> (Int, JSONValue, Data?) {
         if rest == "/consent-grant" { return consentGrant(method, body) }
+        // 这一次的 `consent: true` 带的是旧版本的那一句：不收（文案升了版本）。
+        if method == "POST", body["consent"] == true, body["consent_statement_version"] != .string(consentVersion) {
+            return error(400, "invalid_request", ["field": "consent", "reason": "consent_outdated"])
+        }
         if body["consent"] == "standing_grant" {
             // Sky Studio 只在 GET 说有效时收 standing_grant（接口合同 Consent 一节）；拒的时候什么都不留。
             if refuseStanding { refuseStanding = false; standing = nil }
@@ -218,29 +247,82 @@ final class VoiceLibraryHTTP: URLProtocol {
         }
     }
 
-    private static func job(_ body: JSONValue) -> JSONValue {
-        switch body["kind"]?.stringValue {
-        case "voice_enroll"?:
-            needsEnroll = false
-            voices[voiceID] = voice(voiceID, name: "Sky", languages: ["en"], minimax: true)
-            return ["job_id": "enroll-1", "status": "done", "credits_charged": 377.6, "billing": ["status": "charged", "credits_charged": 377.6],
-                    "result": ["voice": voices[voiceID]!, "model": "minimax-voice-clone"]]
-        case "voice_design"?:
-            let id = "voice_" + String(repeating: "d", count: 32)
-            voices[id] = voice(id, name: body["params"]?["name"]?.stringValue ?? "", languages: ["en"], minimax: false, source: "design")
-            let charged = body["max_credits"] ?? 22.5
-            return ["job_id": "design-1", "status": "done", "credits_charged": charged, "billing": ["status": "charged", "credits_charged": charged],
-                    "result": ["voice": voices[id]!, "model": "qwen3-voice-design", "sample_url": "https://assets.example/voices/sample.wav",
-                               "sample_expires_at": "2026-11-20T11:00:00Z"]]
-        default:
-            let index = prompts.count
-            prompts.append(body["prompt"]?.stringValue ?? "")
-            let selection = body["params"]?["plan"] ?? .null
-            return ["job_id": .string("clone-\(index)"), "status": "done", "credits_charged": 1.5,
-                    "result": ["url": .string("http://127.0.0.1/files/clone-\(index).wav"), "content_type": "audio/wav", "duration": 6,
-                               "model": selection["model"] ?? .null, "fallback_used": false, "voice_plan": ["selection": selection]]]
+    /// `POST /jobs`。读稿的一批照旧当场做完；设计 / 建 MiniMax 版照 Sky Studio 的规矩：
+    /// - 同一个 idempotency_key 再交：回原来那一单、不再扣钱；
+    /// - 同一个声音 + 语言的建单还开着：不管 key 是什么都回那一单（202、同一个 job_id），一次性费用只扣一次；
+    /// - 比 `max_credits` 贵：409 `price_changed` 带真实的价，不建任务；
+    /// - 做完实扣不一定等于报价的上限（MiniMax 设计上限 760、实扣 751.4）。
+    private static func submit(_ body: JSONValue) -> (Int, JSONValue, Data?) {
+        guard let kind = body["kind"]?.stringValue, kind == "voice_enroll" || kind == "voice_design" else { return (200, reading(body), nil) }
+        let key = body["idempotency_key"]?.stringValue ?? ""
+        let subject = kind == "voice_enroll" ? "\(body["params"]?["voice"]?.stringValue ?? ""):\(body["params"]?["language"]?.stringValue ?? "")" : key
+        if let id = orderIDs.first(where: { orders[$0]?.key == key || (kind == "voice_enroll" && orders[$0]?.open == true && orders[$0]?.subject == subject) }) {
+            return orders[id]!.open ? (202, pending(id, "queued"), nil) : (200, orders[id]!.final, nil)
         }
+        if let price = priceChange {
+            priceChange = nil
+            return error(409, "price_changed", ["credits": .number(price)])
+        }
+        let id = "\(kind == "voice_enroll" ? "enroll" : "design")-\(orderIDs.count + 1)"
+        var final: JSONValue
+        if failNext {
+            failNext = false
+            final = ["job_id": .string(id), "status": "failed", "error": ["message": "Provider failed", "refunded": true],
+                     "billing": ["status": "refunded", "credits_charged": 0]]
+        } else if kind == "voice_enroll" {
+            final = ["job_id": .string(id), "status": "done", "credits_charged": 377.6, "billing": ["status": "charged", "credits_charged": 377.6],
+                     "result": ["voice": voice(voiceID, name: "Sky", languages: ["en"], minimax: true), "model": "minimax-voice-clone"]]
+        } else {
+            let voiceID = "voice_" + String(repeating: "d", count: 31) + String(orderIDs.count % 10)
+            let maximum = body["max_credits"]?.doubleValue ?? 22.5
+            let charged: JSONValue = .number(maximum == 760 ? 751.4 : maximum)
+            let designed = voice(voiceID, name: body["params"]?["name"]?.stringValue ?? "", languages: ["en"], minimax: false, source: "design")
+            final = ["job_id": .string(id), "status": "done", "credits_charged": charged, "billing": ["status": "charged", "credits_charged": charged],
+                     "result": ["voice": designed, "model": maximum == 760 ? "minimax-voice-design" : "qwen3-voice-design",
+                                "sample_url": "https://assets.example/voices/sample.wav", "sample_expires_at": "2026-11-20T11:00:00Z"]]
+        }
+        orders[id] = Order(kind: kind, key: key, subject: subject, final: final, hold: holdPolls, open: true)
+        orderIDs.append(id)
+        if holdPolls > 0 { return (202, pending(id, "queued"), nil) }
+        return (200, settle(id), nil)
     }
+
+    /// `GET /jobs/{id}`：还没问够次数回进行中，够了回结局（做成的这时才进声音库）。
+    private static func poll(_ id: String) -> (Int, JSONValue, Data?) {
+        guard var order = orders[id] else { return error(404, "not_found") }
+        guard order.open else { return (200, order.final, nil) }
+        order.polls += 1
+        orders[id] = order
+        return holding || order.polls < order.hold ? (200, pending(id, "running"), nil) : (200, settle(id), nil)
+    }
+
+    private static func pending(_ id: String, _ status: String) -> JSONValue {
+        ["job_id": .string(id), "status": .string(status), "poll_after_seconds": 2]
+    }
+
+    /// 这一单到结局了：做成的进声音库（设计出来的声音、建好的 MiniMax 版）。
+    private static func settle(_ id: String) -> JSONValue {
+        guard var order = orders[id] else { return .null }
+        order.open = false
+        orders[id] = order
+        if order.final["status"] == "done", let made = order.final["result"]?["voice"], let voiceID = made["id"]?.stringValue {
+            voices[voiceID] = made
+            if order.kind == "voice_enroll" { needsEnroll = false }
+        }
+        return order.final
+    }
+
+    private static func reading(_ body: JSONValue) -> JSONValue {
+        let index = prompts.count
+        prompts.append(body["prompt"]?.stringValue ?? "")
+        let selection = body["params"]?["plan"] ?? .null
+        return ["job_id": .string("clone-\(index)"), "status": "done", "credits_charged": 1.5,
+                "result": ["url": .string("http://127.0.0.1/files/clone-\(index).wav"), "content_type": "audio/wav", "duration": 6,
+                           "model": selection["model"] ?? .null, "fallback_used": false, "voice_plan": ["selection": selection]]]
+    }
+
+    /// 设计 / 建 MiniMax 版交了几单（`POST /jobs`，不算读稿的批）。
+    static func orderPosts(_ kind: String) -> [JSONValue] { calls("POST", "/jobs").filter { $0["kind"] == .string(kind) } }
 }
 
 @MainActor
@@ -260,6 +342,8 @@ final class VoiceLibraryFixture {
         try FileManager.default.createDirectory(at: folder.appendingPathComponent("allowed"), withIntermediateDirectories: true)
         project.documentURL = folder.appendingPathComponent("library.skycut")
         VoiceLibraryHTTP.reset()
+        // 设计 / 建 MiniMax 版的任务问 Sky Studio 的间隔不真等（排队的那几个场景）。
+        SkyStudioVoiceLibraryJob.pollSleep = { _ in try await Task.sleep(nanoseconds: 20_000_000) }
         SkyStudioCatalogCache.shared.forget()
         SkyStudioSpendStore.shared.setDailyLimit(100_000)
         AIReadGrants.shared.remember([folder.appendingPathComponent("allowed")])

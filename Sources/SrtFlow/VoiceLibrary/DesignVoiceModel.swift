@@ -7,6 +7,9 @@ import Foundation
 // （SkyStudioVoiceDesignOrder：和 AI 的 manage_voices design 同一份核对、同一个任务；AI 那一路的确认码这里不用）。
 // 设计是任务：关掉对话框不取消，云端任务浮层里看得见，做完进声音库。
 // 报价对的是哪一份就交哪一份：改了任何一个字，手里的报价作废、重新问，按钮先灰着。
+// **一份报价只下一单**：按下去起了任务，这份报价就用掉了（`ordered`），再按（双击、回车键连发）什么都不做——不再预留、不再起任务
+// （docs/bugfixes/2026-11-11-design-voice-ordered-twice.md）。请求的 idempotency_key 在问价时就定了（一份报价一个），
+// 同一份怎么重入，服务器认的都是同一单；改了字是另一份报价、另一个 key。
 // 不管什么：界面（DesignVoiceSheet）、任务（SkyStudioVoiceLibraryJob）、价（服务器的 /quote，这里不写数）。
 
 @MainActor
@@ -26,6 +29,8 @@ final class DesignVoiceModel: ObservableObject {
     @Published private(set) var offer: Offer = .none
     /// 按下去之后出的错（每日额度不够…）。
     @Published private(set) var problem: String?
+    /// 手里这份报价已经下过单了（按钮灰着）；改了字、重新问到价才能再下。
+    @Published private(set) var ordered = false
 
     /// 停多久再问报价（回归改短）。
     var quoteDelay: Double = 0.6
@@ -49,20 +54,24 @@ final class DesignVoiceModel: ObservableObject {
         return nil
     }
 
-    /// 报价加上今天已花的超没超每日额度（超了按钮灰着、那一行标红）。
+    /// 报价加上今天已花的超没超每日额度（超了按钮灰着、那一行标红）。规矩只有 SkyStudioSpendStore.decide 那一份
+    /// （按下去时 SkyStudioJobGate.reserveWithoutAsking 问的也是它）。
     func overLimit(spend: SkyStudioSpendStore) -> Bool {
         guard let quote else { return false }
-        return spend.spentToday() + quote.credits > spend.dailyLimit + 0.0005
+        return spend.decide(credits: quote.credits) != .allow
     }
 
-    /// 按下「设计」：判每日硬预算、记账、起任务。起了回 true（对话框关掉）。
+    /// 按下「设计」：判每日硬预算、记账、起任务。起了回 true（对话框关掉）。一份报价只下一单：下过了回 false、什么都不做。
     func design() -> Bool {
-        guard case .ready(let quote) = offer, let draft = quoted, store.canEdit else { return false }
+        guard !ordered, case .ready(let quote) = offer, let draft = quoted, store.canEdit else { return false }
         guard let key = lastKey else { return false }
+        // 这一份已经有一单开着（别处重入）：不预留、不再起。
+        guard SkyStudioVoiceDesignOrder.running(draft) == nil else { return false }
         guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: quote.credits) else {
             problem = L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")
             return false
         }
+        ordered = true
         let job = SkyStudioVoiceDesignOrder.start(draft, quote: quote, key: key, reservation: reservation, project: project(), api: store.api)
         store.designStarted(draft.params["name"]?.stringValue ?? name, job: job)
         return true
@@ -80,6 +89,7 @@ final class DesignVoiceModel: ObservableObject {
         asking?.cancel()
         problem = nil
         quoted = nil
+        if ordered { ordered = false }
         guard let draft = try? SkyStudioVoiceDesignOrder.draft(description: prompt, name: name, sampleText: sampleText) else {
             if offer != .none { offer = .none }
             return
