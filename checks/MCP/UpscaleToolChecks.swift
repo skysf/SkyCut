@@ -41,14 +41,18 @@ func runUpscaleToolChecks() {
     checkEqual(properties["tier"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTiers, "tier lists the models")
     checkEqual(properties["target"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTargets, "target lists the targets")
     checkEqual(properties["range"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleRanges, "range lists the ranges")
+    // 2026-11-10 名片迁移（方案 5.2 的分类）：花钱、确认、上限、撤销留在名片，结果字段、模型、目标、范围进说明书（topic=upscale_clip）。
     let text = definition.description
-    for word in ["Sky Studio", "credits", "get_job", "needs_confirmation", "confirm_token", "credits_charged", "replaced_ids", "source_size",
-                 "daily credit limit", "revert", "undo", "phase", "30 s", "30 fps", "cancel_job", "library"] {
-        check(text.contains(word), "the description mentions \(word)")
+    for word in ["Sky Studio", "credits", "get_job", "needs_confirmation", "confirm_token", "daily credit limit", "revert", "undo", "30 s", "30 fps"] {
+        check(text.contains(word), "the card mentions \(word)")
     }
-    check(!text.contains("fal.ai") && !text.contains("cost_usd"), "the description no longer talks about fal.ai or dollars")
-    for id in MCPVocabulary.upscaleTiers { check(text.contains(id), "the description names model \(id)") }
-    for name in MCPVocabulary.upscaleTargets + MCPVocabulary.upscaleRanges { check(text.contains(name), "the description names \(name)") }
+    let guide = (MCPGuideTopics.topic(named: "upscale_clip")?.sections ?? []).map(\.text).joined(separator: "\n")
+    for word in ["credits_charged", "replaced_ids", "source_size", "phase", "cancel_job", "library"] {
+        check(guide.contains(word), "the upscale_clip guide topic mentions \(word)")
+    }
+    check(!(text + guide).contains("fal.ai") && !(text + guide).contains("cost_usd"), "neither the card nor the guide talks about fal.ai or dollars")
+    for id in MCPVocabulary.upscaleTiers { check(guide.contains(id), "the guide topic names model \(id)") }
+    for name in MCPVocabulary.upscaleTargets + MCPVocabulary.upscaleRanges { check(guide.contains(name), "the guide topic names \(name)") }
     // 说明书地图的「Paid」那一行始终带着它（2026-11-10 起目录在地图里）。
     check(guideMapText().contains("upscale_clip (sharper, larger clips)"), "the guide map's paid line names upscale_clip")
 }
