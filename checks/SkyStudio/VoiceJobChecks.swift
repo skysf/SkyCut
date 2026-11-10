@@ -219,16 +219,34 @@ private func runVoiceUploadChecks() async {
     defer { try? FileManager.default.removeItem(at: folder) }
     let file = folder.appendingPathComponent("clip-source.wav")
     try? Data(repeating: 7, count: 2048).write(to: file)
+    // 声音的两种上传回的 file_url 不是链接，是 Sky Studio 私有桶里那份的名字（`skystudio-private://voice/uploads/<用户>/<uuid>.<ext>`），
+    // 服务器只认它自己发的那串（readOwnVoiceUploadKey 按前缀和整串比）：SkyCut 拿到什么就原样交回去，不当网址校验、不改写。
+    let privateName = "skystudio-private://voice/uploads/0b1d2c3e-1111-4a5b-9c8d-000000000001/7f3c2a90-5e4b-4c1d-8a2f-6b9e0d1c2a3b.wav"
     SkyStudioStub.reset { seen in
         seen.url.hasSuffix("/uploads")
-            ? .http(200, #"{"upload_url": "https://r2.example/put/1", "method": "PUT", "headers": {"Content-Type": "audio/wav"}, "file_url": "https://r2.example/uploads/u/1.wav"}"#)
+            ? .http(200, JSONValue.object(["upload_url": "https://r2.example/put/1", "method": "PUT", "headers": ["Content-Type": "audio/wav"],
+                                           "file_url": .string(privateName), "expires_at": "2026-11-10T12:00:00.000Z"]).encodedString())
             : .http(200, "")
     }
     let link = try? await jobAPI().upload(fileURL: file, contentType: "audio/wav", purpose: SkyStudioVoiceUpload.conversionSourcePurpose, key: jobKey)
-    checkEqual(link?.absoluteString, "https://r2.example/uploads/u/1.wav", "the uploaded voice-change source's file_url")
+    checkEqual(link?.absoluteString, privateName, "the voice upload's private file_url comes back exactly as Sky Studio wrote it")
     let ticket = SkyStudioStub.log.first?.body.flatMap { try? JSONValue.decode($0) }
     checkEqual(ticket, ["filename": "clip-source.wav", "content_type": "audio/wav", "bytes": 2048, "purpose": "voice_convert_source"], "the /uploads ticket body")
+    checkEqual(SkyStudioStub.log.last?.url, "https://r2.example/put/1", "the file goes to the presigned upload_url, not to the private name")
     check(SkyStudioStub.log.last?.headers["Authorization"] == nil, "the PUT to storage carries no key")
+    guard let link else { check(false, "the private upload reads"); return }
+    let creation = try? SkyStudioVoiceCreation(name: "Sky", language: "zh", referenceURL: link, consent: .standingGrant)
+    checkEqual(creation?.body["reference_url"], .string(privateName), "POST /voices sends the private name back verbatim")
+    let reference = try? SkyStudioVoiceReference(language: "en", referenceURL: link, consent: .thisRecording(statementVersion: nil))
+    checkEqual(reference?.body["reference_url"], .string(privateName), "adding a recording sends it back verbatim")
+    let convert = try? SkyStudioVoiceRequests.convert(targetVoice: sampleVoiceID, sourceSeconds: 10, sourceAudioURL: link, maxCredits: 17.5)
+    checkEqual(convert?.jobBody["inputs"]?["source_audio_url"], .string(privateName), "voice_convert sends it back verbatim as inputs.source_audio_url")
+    if let creation {
+        SkyStudioStub.reset { _ in .http(201, voiceAnswer()) }
+        _ = try? await jobAPI().createVoice(creation, key: jobKey)
+        let sent = SkyStudioStub.log.first?.body.flatMap { try? JSONValue.decode($0) }
+        checkEqual(sent?["reference_url"], .string(privateName), "the private name reaches the wire unchanged")
+    }
 }
 
 private func runVoiceMeChecks() {
