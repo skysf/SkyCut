@@ -91,47 +91,69 @@ private func gateChecks() {
     let access = AIAccessStore(defaults: defaults)
     let spend = SkyStudioSpendStore(defaults: defaults)
 
-    // 授权：两种模式都问；同一件事等答复时回同一张；收了一次就作废；别的录音拿不走。
-    // 授权的把关不收 access（这一刀两种模式一样），所以全 App 那一份也一起拨（拨完拨回去）：哪天有人照模式跳过，这里就红。
-    let shared = AIAccessStore.shared.mode
-    defer { AIAccessStore.shared.setMode(shared) }
-    for mode in [AIAccessMode.ask, .full] {
-        access.setMode(mode)
-        AIAccessStore.shared.setMode(mode)
-        let action = "skystudio:voice_consent:test:\(mode)"
-        let asked = SkyStudioJobGate.voiceConsent(action: action, question: "q", token: nil)
+    // 授权（照 SkyStudioJobGate.VoiceAsk，SkyStudioVoiceStanding 读出来的）：请求批准模式（.ask）和全部权限但还没有长期授权（.once）都问，
+    // 同一件事等答复时回同一张、收了一次就作废、别的录音拿不走；.once 的问句后面接那段说明、令牌另绑（请求批准模式发的码答不了它）；
+    // 全部权限 + 有效的长期授权（.standing）不问（声音 PR 7）。
+    let once = SkyStudioJobGate.VoiceAsk.once(explanation: "FULL-ACCESS-EXPLANATION", statementVersion: "voice-standing-consent-v1")
+    for (name, ask) in [("ask", SkyStudioJobGate.VoiceAsk.ask), ("once", once)] {
+        let action = "skystudio:voice_consent:test:\(name)"
+        let asked = SkyStudioJobGate.voiceConsent(action: action, question: "q", token: nil, ask: ask)
         let token = asked?.payload["confirm_token"]?.stringValue
-        check(token != nil, "\(mode) mode asks for recording consent (no standing grant yet)")
-        checkEqual(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: nil)?.payload["confirm_token"]?.stringValue, token,
-                   "asking again before the answer returns the same code")
-        check(SkyStudioJobGate.voiceConsent(action: action + ":other", question: "q", token: token)?.payload["confirm_token_refused"] != nil,
-              "another recording cannot use this consent")
-        check(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: token) == nil, "the consent is accepted once")
-        check(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: token)?.payload["confirm_token_refused"] != nil, "and only once")
+        check(token != nil, "\(name): asks for recording consent")
+        check((asked?.payload["question"]?.stringValue?.contains("FULL-ACCESS-EXPLANATION") == true) == (name == "once"),
+              "\(name): only the full-access question carries the explanation")
+        checkEqual(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: nil, ask: ask)?.payload["confirm_token"]?.stringValue, token,
+                   "\(name): asking again before the answer returns the same code")
+        check(SkyStudioJobGate.voiceConsent(action: action + ":other", question: "q", token: token, ask: ask)?.payload["confirm_token_refused"] != nil,
+              "\(name): another recording cannot use this consent")
+        check(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: token, ask: ask) == nil, "\(name): the consent is accepted once")
+        check(SkyStudioJobGate.voiceConsent(action: action, question: "q", token: token, ask: ask)?.payload["confirm_token_refused"] != nil,
+              "\(name): and only once")
     }
+    let askToken = SkyStudioJobGate.voiceConsent(action: "skystudio:voice_consent:cross", question: "q", token: nil, ask: .ask)?
+        .payload["confirm_token"]?.stringValue
+    check(SkyStudioJobGate.voiceConsent(action: "skystudio:voice_consent:cross", question: "q", token: askToken, ask: once)?
+            .payload["confirm_token_refused"] != nil, "a code asked in ask mode cannot answer the full-access question")
+    check(SkyStudioJobGate.voiceConsent(action: "skystudio:voice_consent:standing", question: "q", token: nil, ask: .standing) == nil,
+          "full access with the standing consent on record does not ask")
 
-    // 一次性费用：每日硬预算先判（不发码），问到了才记账；两种模式都问。
+    // 一次性费用：每日硬预算先判（不发码、不记账），三种一样；问到了才记账；全部权限 + 长期授权不问、直接按报价记账。
     spend.setDailyLimit(100)
-    for mode in [AIAccessMode.ask, .full] {
-        access.setMode(mode)
-        let blocked = try? SkyStudioJobGate.voiceOneTime(credits: 377.6, action: "skystudio:fee:\(mode)", question: "q", token: nil, store: spend)
+    for (name, ask) in [("ask", SkyStudioJobGate.VoiceAsk.ask), ("standing", .standing), ("once", once)] {
+        let before = spend.spentToday()
+        let blocked = try? SkyStudioJobGate.voiceOneTime(credits: 377.6, action: "skystudio:fee:\(name)", question: "q", token: nil, ask: ask,
+                                                         store: spend)
         if case .needsConfirmation(let result)? = blocked {
-            check(result.payload["code"] == "daily_budget_exceeded" && result.payload["confirm_token"] == nil,
-                  "\(mode) mode: over the daily limit nothing is asked or reserved")
-        } else { check(false, "\(mode) mode: an over-budget fee must be blocked") }
+            check(result.payload["code"] == "daily_budget_exceeded" && result.payload["confirm_token"] == nil && spend.spentToday() == before,
+                  "\(name): over the daily limit nothing is asked or reserved")
+        } else { check(false, "\(name): an over-budget fee must be blocked") }
     }
     spend.setDailyLimit(1_000)
     let before = spend.spentToday()
-    let first = try? SkyStudioJobGate.voiceOneTime(credits: 22.5, action: "skystudio:fee:design", question: "q", token: nil, store: spend)
+    let first = try? SkyStudioJobGate.voiceOneTime(credits: 22.5, action: "skystudio:fee:design", question: "q", token: nil, ask: .ask, store: spend)
     guard case .needsConfirmation(let asked)? = first, let token = asked.payload["confirm_token"]?.stringValue else {
         return check(false, "a one-time fee within the budget is asked first")
     }
     checkEqual(spend.spentToday(), before, "asking reserves nothing")
     if case .reserved(let reservation)? = try? SkyStudioJobGate.voiceOneTime(credits: 22.5, action: "skystudio:fee:design", question: "q",
-                                                                               token: token, store: spend) {
+                                                                               token: token, ask: .ask, store: spend) {
         checkEqual(reservation.credits, 22.5, "the approved fee is reserved at its quoted price")
         checkEqual(spend.spentToday(), before + 22.5, "and recorded against the daily limit")
     } else { check(false, "the approved fee is reserved") }
+    if case .reserved(let reservation)? = try? SkyStudioJobGate.voiceOneTime(credits: 377.6, action: "skystudio:fee:standing", question: "q",
+                                                                               token: nil, ask: .standing, store: spend) {
+        checkEqual(reservation.credits, 377.6, "full access with the standing consent reserves the quoted fee without asking")
+        checkEqual(spend.spentToday(), before + 22.5 + 377.6, "and records it against the daily limit")
+    } else { check(false, "full access with the standing consent does not ask about a fee") }
+    let onceFee = try? SkyStudioJobGate.voiceOneTime(credits: 22.5, action: "skystudio:fee:once", question: "q", token: nil, ask: once, store: spend)
+    if case .needsConfirmation(let result)? = onceFee, let onceToken = result.payload["confirm_token"]?.stringValue {
+        check(result.payload["question"]?.stringValue?.contains("FULL-ACCESS-EXPLANATION") == true,
+              "full access without a standing consent asks once, with the explanation")
+        if case .reserved? = try? SkyStudioJobGate.voiceOneTime(credits: 22.5, action: "skystudio:fee:once", question: "q", token: onceToken,
+                                                               ask: once, store: spend) {
+            check(true, "and the answered question reserves the fee")
+        } else { check(false, "and the answered question reserves the fee") }
+    } else { check(false, "full access without a standing consent asks once") }
 
     // 删除：请求批准模式问一句，全部权限直接删。
     access.setMode(.ask)

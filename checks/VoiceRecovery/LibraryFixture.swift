@@ -4,7 +4,8 @@ import SrtFlowMCPKit
 @testable import SrtFlow
 
 // 声音库（声音 PR 6）的假 Sky Studio：`/voices` 的增删改查、`/uploads` + PUT、设计 / 建 MiniMax 版 / 克隆读稿的 `/quote` 和 `/jobs`、
-// 成品的音频；`/models` 用 Sky Studio 导出的目录快照（和 VoiceRecoveryHTTP 同一份）。生产的工具、把关、任务、下载、切句、入轨照常执行。
+// 成品的音频、长期授权（声音 PR 7：`/voices/consent-grant` 的 GET / POST / DELETE，带 standing_grant 建声音时照它收或拒）；
+// `/models` 用 Sky Studio 导出的目录快照（和 VoiceRecoveryHTTP 同一份）。生产的工具、把关、任务、下载、切句、入轨照常执行。
 // 和旁白恢复那一份分开写（各自一个 URLProtocol），两边的场景互不影响。
 
 final class VoiceLibraryHTTP: URLProtocol {
@@ -20,6 +21,17 @@ final class VoiceLibraryHTTP: URLProtocol {
     static var deleteStorageFailures = 0
     /// 克隆读稿的默认要 MiniMax 版、还没建（`default_needs_one_time`）。
     static var needsEnroll = false
+    /// 这个账号的长期授权（nil = 没记过或撤了；active 为假 = 文案升了版本）。
+    static var standing: (version: String, active: Bool)?
+    /// 带 standing_grant 建声音时拒一次（GET 说有效、建的那一刻刚被别的 Mac 撤了）。
+    static var refuseStanding = false
+    /// `/voices/consent-grant` 回 503（声音库一时用不了）。
+    static var grantUnavailable = false
+    /// 这个账号记着一条有效的长期授权（声音库界面那一刀的检查照它拨；和上面 `standing` 是同一份）。
+    static var standingGrant: Bool {
+        get { standing?.active == true }
+        set { standing = newValue ? ("voice-standing-consent-v1", true) : nil }
+    }
     static var prompts: [String] = []
     static var wave = Data()
 
@@ -34,7 +46,7 @@ final class VoiceLibraryHTTP: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         requests = []; uploads = []; prompts = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["en"], minimax: false)]
-        listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false
+        listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false; standing = nil; refuseStanding = false; grantUnavailable = false
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
     }
@@ -103,6 +115,14 @@ final class VoiceLibraryHTTP: URLProtocol {
     }
 
     private static func library(_ method: String, _ rest: String, _ body: JSONValue) -> (Int, JSONValue, Data?) {
+        if rest == "/consent-grant" { return consentGrant(method, body) }
+        if body["consent"] == "standing_grant" {
+            // Sky Studio 只在 GET 说有效时收 standing_grant（接口合同 Consent 一节）；拒的时候什么都不留。
+            if refuseStanding { refuseStanding = false; standing = nil }
+            guard let standing, standing.active else {
+                return error(400, "invalid_request", ["field": "consent", "reason": .string(standing == nil ? "no_standing_grant" : "consent_outdated")])
+            }
+        }
         if rest.isEmpty || rest == "/" {
             if method == "GET" {
                 if let (status, value) = listFailure { return (status, value, nil) }
@@ -142,6 +162,29 @@ final class VoiceLibraryHTTP: URLProtocol {
         }
     }
 
+    /// `/voices/consent-grant`：GET 读、POST 记（带 statement_version）、DELETE 撤，回的样子照接口合同。
+    private static func consentGrant(_ method: String, _ body: JSONValue) -> (Int, JSONValue, Data?) {
+        if grantUnavailable { return error(503, "voice_library_unavailable", ["reason": "not_configured"]) }
+        switch method {
+        case "POST":
+            guard let version = body["statement_version"]?.stringValue, !version.isEmpty else {
+                return error(400, "invalid_request", ["field": "statement_version"])
+            }
+            standing = (version, version == "voice-standing-consent-v1")
+        case "DELETE":
+            standing = nil
+            return (200, ["revoked": true, "grant": .null, "current_statement_version": "voice-standing-consent-v1"], nil)
+        default:
+            break
+        }
+        var grant: JSONValue = .null
+        if let standing {
+            grant = ["statement_version": .string(standing.version), "granted_at": "2026-11-10T10:00:00Z", "active": .bool(standing.active),
+                     "inactive_reason": standing.active ? .null : "outdated"]
+        }
+        return (200, ["grant": grant, "current_statement_version": "voice-standing-consent-v1"], nil)
+    }
+
     private static func merged(_ value: JSONValue, _ fields: [String: JSONValue]) -> JSONValue {
         var object = value.objectValue ?? [:]
         for (key, entry) in fields { object[key] = entry }
@@ -155,7 +198,12 @@ final class VoiceLibraryHTTP: URLProtocol {
     private static func quote(_ body: JSONValue) -> JSONValue {
         switch body["kind"]?.stringValue {
         case "voice_design"?:
-            return ["credits": 22.5, "credits_expected": 22.5, "settlement": "exact", "model": "qwen3-voice-design"]
+            // 中文描述服务器用 MiniMax（贵的那个，「约」和「最多」不一样）；别的用 Qwen3，按描述 + 试读句每开始 1,000 字 22.5（Sky Studio #247）。
+            let chinese = (body["prompt"]?.stringValue ?? "").unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+            if chinese { return ["credits": 760, "credits_expected": 751.4, "settlement": "exact", "model": "minimax-voice-design"] }
+            let characters = (body["prompt"]?.stringValue ?? "").count + (body["params"]?["sample_text"]?.stringValue ?? "").count
+            let credits = 22.5 * Double(max(1, (characters + 999) / 1_000))
+            return ["credits": .number(credits), "credits_expected": .number(credits), "settlement": "exact", "model": "qwen3-voice-design"]
         default:
             let batches = body["params"]?["batches"]?.arrayValue ?? []
             let selection: JSONValue = body["params"]?["plan"] ?? (needsEnroll
@@ -180,7 +228,8 @@ final class VoiceLibraryHTTP: URLProtocol {
         case "voice_design"?:
             let id = "voice_" + String(repeating: "d", count: 32)
             voices[id] = voice(id, name: body["params"]?["name"]?.stringValue ?? "", languages: ["en"], minimax: false, source: "design")
-            return ["job_id": "design-1", "status": "done", "credits_charged": 22.5, "billing": ["status": "charged", "credits_charged": 22.5],
+            let charged = body["max_credits"] ?? 22.5
+            return ["job_id": "design-1", "status": "done", "credits_charged": charged, "billing": ["status": "charged", "credits_charged": charged],
                     "result": ["voice": voices[id]!, "model": "qwen3-voice-design", "sample_url": "https://assets.example/voices/sample.wav",
                                "sample_expires_at": "2026-11-20T11:00:00Z"]]
         default:

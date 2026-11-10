@@ -49,6 +49,9 @@ func catalogKnownNames() -> Set<String> {
     // 句界是按字数估的那几句 estimated_split_line_indices（SkyStudioVoiceCheckpoint.detail，2026-11-10：没有词可对、这台 Mac 又转写不了）。
     names.insert("estimated_split_line_indices")
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 全部权限下的长期授权（声音 PR 7）：旁白中途那一笔直接建时 get_job 的 enroll_job_id（SkyStudioVoiceFallbackFee）、
+    // set_settings 结果里的 voice_standing_consent（AISettingsTools）。
+    names.formUnion(["enroll_job_id", "voice_standing_consent"])
     // 第一批迁移的工具主题提到的结果字段（2026-11-10）：edit_subtitles 的 own_style；listen 的 level_db / peak_db / loudest_at / tempo_bpm /
     // suggested_source_in / suggested_source_out；get_job 的 queue_position / export_settings / billing_note / remote_result；
     // upscale_clip 的 replaced_ids / source_size / transfer_percent / phase_seconds / typical_seconds；freeze_frame 的 tail_id / source_frame /

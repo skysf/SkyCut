@@ -437,7 +437,13 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    不换本机声音），没有 `/jobs` 与花费。
 4. 工程任务卡片：重新 `run.sh` 后运行 `python3 scripts/gui-smoke/sky-studio/project_tasks.py`，留下两个可见工程、一个后台工程与一个已关工程的问题，核对视频 / 音频 / 图片、5 项排队、225 积分、真实 `get_job` 任务号、另一 MCP 会话只读查询及后台开窗。随后按 [任务浮层人工回归](../architecture/sky-studio-jobs.md)第九节点卡片 / 详情 / 打开按钮；夹具会留下窗口，不能把后端开窗通过当作按钮已点通。
 5. 统一设置：`python3 scripts/gui-smoke/sky-studio/settings.py` 验工具发现、五类快照、目录与实际 Store 的选项一致、整次拒绝错误参数、偏好持久化、工程 / 任务不变与密钥不回传。它留中文界面、10 GB 缓存上限、751 积分额度供 GUI 核对；清空只删本轮测试缓存，不更改客户端配置。随后实点三个设置入口与五个分类，并在额度页打开时再次用 MCP 改额度、切走切回，确认双向同步（[工作台回归清单](../architecture/workbench-and-settings.md)）。
-6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
+6. 全部权限下的长期授权（声音 PR 7）：`python3 scripts/gui-smoke/sky-studio/voice_consent.py` 验 `set_settings` 打开全部权限先问（问句带三样一次性费用、
+   额度和长期授权那句、版本）、没点头不记，点头后 `POST /voices/consent-grant` 正好一次（带问句里那一版）、结果报 `recorded`，关掉也先问、点头后 `DELETE` 一次、
+   报 `revoked`。再 `SRTFLOW_SMOKE_ACCESS_MODE=full_access scripts/gui-smoke/sky-studio/run.sh` 重起（模拟升级前就开着全部权限）后运行
+   `python3 scripts/gui-smoke/sky-studio/voice_consent.py migrated`：App 读到假 Key 时自己记上一次、`get_settings` 报 `recorded`，不问。假服务的
+   `/voices/consent-grant` 按账号记、`/models` 带声音库那几个模型的价。设置窗口里那张说明（选全部权限先弹、取消不改、三种语言）是人工回归，
+   清单在 [声音库](../architecture/voice-library.md)第八节。
+7. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 清理器本身的自动检查必须同时隔离进程、钥匙串、偏好与文件删除。`SKYSTUDIO_SMOKE_DIR` 不会改变
 App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在运行的 `.skystudiosmoke` socket / provider 文件。
@@ -544,6 +550,15 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 - `scripts/check-instant-tooltip-panel.sh` —— 提示面板的真实落点：摆好之后跑一轮
   排版再量一次，面板不许自己改尺寸或挪位置。改 `InstantTooltip.swift` 必跑。
   用 `.accessory` 策略，不抢焦点、不进 Dock，跑完即退。
+- `scripts/render-voice-library.sh <输出目录>` —— 声音库界面的离屏渲染（2026-11-10）：生产的视图 + 假 Sky Studio，英 / 中 / 西三种界面语言各出一套
+  PNG（设置里声音那两节的三种样子、浏览预设、新建声音空着 / 填好、给声音加录音、设计声音带报价）。**不判对错，只出图**：改
+  `Sources/SrtFlow/VoiceLibrary/` 的视图之后、发版前看排版（截字、漏翻、撑破），PR 的图也从这里来。几条实测：
+  - AppKit 的控件（输入框、分段、下拉、勾选框）`cacheDisplay` 画不对，要按窗口号用 `screencapture -l` 拍；**整个在屏幕外的窗口拍不到**
+    （"could not create image from window"），所以窗口摆在主屏左下角、排在所有窗口最底下（`.accessory`、`orderBack`，不抢前台、不成为 key）。
+  - 自建的窗口够不着 `.preferredColorScheme`：森林色固定浅色是靠它给的，系统在深色模式时自建窗口里的控件会是深色（输入框一片黑）——
+    照同一条规矩自己设 `window.appearance`。真 App 里的 sheet 没这个问题。
+  - 字符串表要另外平铺进 `Contents/Resources`（同 `build-app.sh`），只拷资源包的话三种语言出来都是英文。
+  - **别渲整个设置窗口**：「剪辑风格」那一节读的是这台 Mac 上用户自己的风格名，会进截图；脚本只摆声音的那两节。
 
 ## 五之二、屏幕锁着 / 不便抢鼠标的时候（2026-09-23）
 

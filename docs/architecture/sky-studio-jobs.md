@@ -60,6 +60,7 @@
 | `SkyStudioVoiceSplit.swift` / `SkyStudioVoiceSplitEstimate.swift` / `SkyStudioVoiceLineAudio.swift` | 批回到本机之后（纯值）：一批几句按词对回原文切开（不计较繁简）；没有词可对、这台 Mac 又转写不了时按字数估句界；一句的几片接成一条（采样率不一样换成一样的）（第五节「本机切句」） |
 | `SkyStudioVoiceBatchQueue.swift` / `SkyStudioVoiceCloudBatches.swift` / `SkyStudioVoiceBatchBoard.swift` | 一段旁白的几批怎么拿到本机：按原来的顺序领槽、同时交，一批出了事后面没交的不再交（队列）；一批怎么交 / 只 GET 原单 / 下载、中途换备用（批次）；几批各走到哪一步（纯值：状态行和 get_job 的「几批好了 / 在跑 / 等空位」，第五节） |
 | `SkyStudioVoiceLibraryTool.swift` / `SkyStudioVoiceRecordingTool.swift` / `SkyStudioVoiceDesignTool.swift` / `SkyStudioVoiceLibraryJob.swift` / `SkyStudioVoiceOneTimeStep.swift` | 声音库（声音 PR 6）：`list_voices`、`manage_voices` 的列、建 / 加录音（先问授权）、设计（先问一次性费用、起任务）、改名、删除；设计和建 MiniMax 版的任务；配旁白碰上一次性费用时问 / 跳过 / 起建的任务（[声音库](voice-library.md)第八节） |
+| `SkyStudioVoiceStanding.swift` / `SkyStudioVoiceStandingNotice.swift` / `FullAccessConsentSheet.swift`（不在 SkyStudio 目录） | 全部权限下的长期授权（声音 PR 7）：声音那几件事此刻怎么问（`.ask` / `.standing` / `.once`）、`/voices/consent-grant` 的记 / 撤、升级时补记、打开全部权限时那段说明（价目从 `/models` 读）和设置里的那张（[声音库](voice-library.md)第八节第 7、9 条） |
 | `SkyStudioVoiceListing.swift` / `SkyStudioVoiceApproval.swift` / `SkyStudioVoiceLibraryErrors.swift` | 纯值：`list_voices` 回什么、声音库三件事的令牌绑什么和问句、错误码换成能照做的话（声音库用不了不退本机、删除时存储一时不可用再发一次） |
 
 ### 模型目录的缓存与换账户
@@ -110,7 +111,7 @@
   （`SkyStudioVoiceReading`，下面「字幕时间」）→ 分批（下面「合批」；上限是这个 kind 下各模型 `limits.max_characters_by_language` 里最小的，`model: auto`
   时还不知道选哪个）→ **整段 `POST /quote` 一次**（`params.batches`、拉丁字母的非英文稿带 `params.language`；读稿不再发 `language_code`）→ 核对报价
   （有 `voice_plan`、批数对得上；报价要一次性费用（`one_time`，声音库的声音要先建 MiniMax 版）时交给 `SkyStudioVoiceOneTimeStep`（声音 PR 6）：
-  `skip_one_time=true` 照 selection 里不花钱的那个读；没带就经 `SkyStudioJobGate.voiceOneTime` 问；点过头记账、起 `voice_enroll` 任务回它的任务号，
+  `skip_one_time=true` 照 selection 里不花钱的那个读；没带就经 `SkyStudioJobGate.voiceOneTime` 问（全部权限 + 长期授权不问，声音 PR 7）；点过头 / 不用问就记账、起 `voice_enroll` 任务回它的任务号，
   做完叫 AI 再调一次；别的一次性费用不交）→ 要转写的记下语言，模型没装的交给任务在交第一批之前装 → 按每批的 credits
   整体预留：不够当场回 `daily_budget_exceeded`、什么都不起、不换声音 → 起任务，回 `job_id`、`voice_plan`、`voice.note`、`credits` / `credits_expected`、
   要字幕时定下的 `subtitle_timing`。
@@ -137,6 +138,8 @@
   `resume` + 那张令牌 = 过闸记账、起 `voice_enroll` 任务，做完 `resume` + `generate_missing=true` 读没做成的几批（MiniMax 版有了，默认再出错服务器能换上备用）；
   `resume` + `skip_one_time=true` = 不建、照原来的选择重试（同 `generate_missing=true`）；普通 `resume` 照旧只恢复已有的、这一笔留着等答复（get_job 再给一遍同一个问题、同一张令牌）。
   `resume` 那一次要是先问了「读别处的文件」，令牌就不当这一笔的答复。问不了（读不到 Key、报不出价）就照旧只说重试的办法。
+  **全部权限 + 长期授权**（声音 PR 7）：不问，结束那一刻直接建（每日硬预算照拦），get_job 带 `enroll_job_id` 和 `full_access`，工程的提示条说一句；
+  还没有长期授权就照上面问一次、问句带打开全部权限时那段说明、点过头补记。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
 - **合批**（声音 PR 5 起普通旁白和声音库的声音一样，方案 8.1）：这台 Mac 切得开（转写得了这种语言）、或者读的模型报字的时间（eleven-v4），`SkyStudioVoiceBatch`
   就按上限装批，整句往里装、**批只在两句之间分**；切不开的一句一单（要不要字幕都一样）。一句本身超过上限：先在句末标点（。！？.!?）分，一个句子都放不下才在逗号类、
@@ -217,9 +220,10 @@
   等 15 秒、同一个 key 再交、认不出的 `pool` 不重交；本机的槽满了报等空位、等的时候被停什么都没交；调用方先领好的槽不另领也不还；恢复原单不领槽；几批各在哪一步只往前走、
   合出来的阶段、`get_job` 的几个数。`VoiceRecoveryChecks` 另验恢复记录的 `pendingSelection`（有一批换了备用就是备用的那份）和 `line_models`。
 - `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数名（`clone_from` 那三个不收、`model` / `confirm_token` 收）、本机这一档挑谁（不点名是旁白角色）、词时间各种合同格式，名片必含 / 说明书必含（固定说法、默认 gemini:Charon、失败了别重发、主题照声音方案 4.10 分节）；名片长度、按性质的固定说法、参数说明 ≤ 120、参数定义 ≤ 4,500 字节、主题里的名字都存在、例子过参数核对和试点的五个工具一起在 `GuidePilotChecks` / `GuideContentChecks`，会问的工具收 `confirm_token` 在 `ArgumentCheckChecks`。
-- 声音库（声音 PR 6）：`scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（列出来的、令牌绑的身份、`SkyStudioJobGate` 三件事两种模式、错误的话）；
+- 声音库（声音 PR 6）和全部权限下的长期授权（声音 PR 7）：`scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（列出来的、令牌绑的身份、`SkyStudioJobGate` 三件事在 `.ask` / `.standing` / `.once` 下、错误的话）、`VoiceStandingNoticeChecks`（打开全部权限时那段说明）、`AccessChecks`（set_settings 的问句带说明、令牌绑那一版）；
   `scripts/check-voice-recovery.sh` 的 `LibraryChecks`（真 App 对象 + 假协议：列、建声音先问授权、删除按模式、设计、用声音库的声音配旁白的一次性费用）与 `FallbackFeeChecks`（旁白中途备用要先花一次性费用：get_job 带价和令牌、普通 resume 留着、`skip_one_time` 重试、令牌起 `voice_enroll` 再 `generate_missing`）；
-  `checks/sky-studio-wiring.sh` 第 11 节；细节见 [声音库](voice-library.md)第八节。
+  与 `StandingChecks`（真 App 对象：全部权限 + 长期授权什么都不问、没有就问一次并补记、Sky Studio 拒了再问、set_settings 记 / 撤、升级补记）；
+  `checks/sky-studio-wiring/voice-library.sh`（主脚本第 11 节 source 进来）；细节见 [声音库](voice-library.md)第八节。
 - `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果。回任务号之前（`StartChecks.swift`）：不点名用 gemini:Charon、整段 `/quote` 一次（kind voice、model auto、params.batches、英文不带提示）、回 `job_id` 带 `voice_plan`、每批同一个 `params.plan` / 各自的 `max_credits` / 各自的 key、记录记下选择和每批的模型、服务器在某一批换了备用也记下；额度不够 / 服务器拒 / 要一次性费用 / 没有这个预设或模型都在花钱之前停下、什么都不交，服务器不答当场退本机；英式男声读中文、warnings 进 `voice.note`、`next_step` 叫 AI 先转告。字幕时间（`TimingChecks.swift`，声音 PR 5）：三句合一批、转写切开、字幕是稿子的字；转写不了的预设整段 eleven-v4（不转写）、点名的模型和声音库的声音一句一单按字数估；模型没装在第一批之前装、装不上再报一次价（第一笔预留退回）；一句对不上按字数估（`mixed`）。恢复（`Main.swift`）：模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批（照记录的选择再报价：服务器这时自己选会选成别的，不带选择就被认出来）、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句在句末分开且第二批转写落空时按字数估（不再失败）、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录（只认 version 2），验证原单恢复只 GET。
   几批同时交（声音 PR 4，`ConcurrencyChecks.swift`，假协议先回排队、问的时候才回结局，声音池 2 个）：四批里同时开着的最多 2 单、后交的先回（完成顺序只断言假服务按住的那一对：第二批先于第一批；第三批和第一批谁先回看调度，不断言，[案例](../bugfixes/2026-11-10-voice-concurrency-check-finish-order.md)）、切句和落地照原来的顺序、
   一步撤销 / 重做；第二批换了备用，之后才交的两批带 `voice_plan.fallback.selection`、先交的不改，结果的 `line_models` / `voice.note` / `next_step`；第二批以
@@ -396,7 +400,10 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**PR 1 只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**；
 **声音 PR 3（2026-11-10）把 `add_voiceover` 的读稿接上了**：预设 / 角色从这里的目录认、整段报价和每批的 `params.plan` 照这里的请求拼（第五节）。
 **声音 PR 6（2026-11-10）接上了声音库**：`list_voices` / `manage_voices`（列、建、加一种语言、设计、改名、删）、`voice=voice_…` 读稿、建 MiniMax 版的一次性费用、
-`voice_library_unavailable` 怎么说（规矩在 [声音库](voice-library.md)第八节）。长期授权（全部权限下不问）、新建声音的界面、变声还没接（声音 PR 7–9）。
+`voice_library_unavailable` 怎么说（规矩在 [声音库](voice-library.md)第八节）。**声音 PR 8（2026-11-10）接上了界面**：设置里的声音库、声音选择器、
+新建 / 设计声音的对话框，和 AI 的工具共用建声音（`SkyStudioVoiceRecordingSubmission`）、删除（`SkyStudioVoiceDeletion`）、设计（`SkyStudioVoiceDesignOrder`）那几步
+（[声音库](voice-library.md)第九节）。**声音 PR 7（2026-11-10）**：全部权限下有有效的长期授权就不问（打开时的说明、`/voices/consent-grant` 的记 / 撤、升级时补记，
+`SkyStudioVoiceStanding`）。变声还没接（声音 PR 9）。
 Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
 
 - **目录**（`SkyStudioVoiceCatalog`，`catalog.voices`）：`/models` 顶层的 `voice_presets`、`voice_roles`、`voice_rules`、`voice_consent`
@@ -440,7 +447,10 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
 `9babdcfa`（head `84b74d96` 里同一份，sha256 `6460fafb…`；和前一份只差 `params.plan` 的说明文字：点名的模型也能带 plan），#246 合并后换成**最终导出**
 `6c08d0f0`（sha256 `26831ec8…`）：`params.plan` 的说明加了「原样带回、带着整段的 fallback」，用户听过样音后重新打分的五个预设 —— Enceladus、Sadaltager
 进了中英两种名单，Orus 中文、Schedar 英文仍不在名单上（各自另一种语言在），Despina 定为女声、仍藏着 —— 中文名单 21 → 23、英文 27 → 28、两种都藏的只剩 Despina，
-已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。`/models` 还没上线；
+已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。Sky Studio #247 合并后（`c050d948`，sha256 `3db3eb98…`）
+重新导出，只改了 Qwen3 设计：`price.per` 从 `request` 改成 `1000_characters`（`counted`：`prompt` 和 `params.sample_text`，`minimum_credits` 22.5），
+`sample_text` 的说明加了「字数算进价里」；SkyCut 从来照 `/quote` 给 `max_credits`（`scripts/check-voice-recovery.sh` 的 `LibraryChecks` 用一段超过 1,000 字的描述钉着报价 45、任务
+`max_credits` 45），打开全部权限时那段说明照 `per` 改说「描述加试读句每开始 1,000 字多少」（`SkyStudioVoiceStandingNotice`）。`/models` 还没上线；
 目录改了 Sky Studio 会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
 对上的：预设 30 个、名单、角色、授权文案的形状和值，Eleven 的 94 种语言；没对上、照 Sky Studio 改了 SkyCut 的：其余语言的字数上限键是 `other`（不是手写时猜的 `default`）、
 一次性费用 377.6 / 751.4 / 22.5、Despina 的性别（当时是 `unknown`，最终导出改成女声）、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码

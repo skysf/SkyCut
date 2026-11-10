@@ -12,6 +12,11 @@ def models():
     return [model for model in CATALOG["models"] if model["kind"] in READING]
 
 
+def library_models():
+    """声音库的一次性费用那几个模型（设计、建 MiniMax 版）：打开全部权限时那段说明的价目从它们读（声音 PR 7）。"""
+    return [model for model in CATALOG["models"] if model["kind"] in ("voice_design", "voice_enroll")]
+
+
 def top_level():
     return {key: CATALOG[key] for key in TOP_LEVEL if key in CATALOG}
 
