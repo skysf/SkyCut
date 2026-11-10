@@ -275,6 +275,9 @@ private func designChecks(_ root: URL) async throws {
     require(model.offer == .none && VoiceLibraryHTTP.calls("POST", "/quote").isEmpty, "no price is asked before the name is filled in")
     model.name = "Calm"
     await eventually("the design quote") { model.quote != nil }
+    // 用哪家只写在 voice_plan.selection.model（没有顶层 model）：面板照样写出 Qwen3（2026-11-11 真实冒烟写成了「Sky Studio」）。
+    let named = model.quote.map(VoiceLibraryText.designOffer) ?? ""
+    require(named.contains("Qwen3") && !named.contains("Sky Studio"), "the design offer names the model Sky Studio picked: \(named)")
     let quote = VoiceLibraryHTTP.calls("POST", "/quote").last
     require(quote?["kind"] == "voice_design" && quote?["model"] == "auto" && quote?["prompt"] == "A calm narrator in his thirties."
             && quote?["params"]?["name"] == "Calm" && model.quote?.credits == 22.5, "the filled-in design is quoted (model auto)")

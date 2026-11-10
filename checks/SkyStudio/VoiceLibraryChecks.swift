@@ -24,6 +24,25 @@ func runVoiceLibraryChecks() async {
     await runVoiceListChecks()
     await runVoiceWriteChecks()
     await runConsentGrantChecks()
+    runDesignQuoteChecks()
+}
+
+/// 设计的报价顶层没有 `model`，用哪个只在 `voice_plan.selection.model`（Sky Studio 2026-11-11 真实回的样子，去掉了说明文字）。
+private func runDesignQuoteChecks() {
+    let answer: JSONValue = [
+        "credits": 22.5, "credits_expected": 22.5, "settlement": "exact", "typical_seconds": 60,
+        "voice_plan": ["selection": ["model": "qwen3-voice-design"], "requested_model": "auto", "rule": "en_80", "reason": "The description is English.",
+                       "languages": [["language": "en", "share": 1, "seconds": 9]], "warnings": [],
+                       "fallback": ["selection": ["model": "minimax-voice-design"], "available": true, "auto": false, "credits": 752.8]],
+        "one_time": [["kind": "voice_design", "model": "qwen3-voice-design", "language": "en", "credits": 22.5,
+                      "why": "Designing a voice from a description is a one-time fee."]],
+    ]
+    let quote = SkyStudioQuote(json: answer)
+    checkEqual(quote?.credits, 22.5, "the real design quote reads")
+    checkEqual(quote?.model, "qwen3-voice-design", "a voice quote's model comes from voice_plan.selection")
+    var withTop = answer.objectValue ?? [:]
+    withTop["model"] = "image-model"
+    checkEqual(SkyStudioQuote(json: .object(withTop))?.model, "image-model", "a top-level model still wins")
 }
 
 private func runVoiceDTOChecks() {

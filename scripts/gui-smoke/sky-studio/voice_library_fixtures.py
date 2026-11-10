@@ -194,8 +194,14 @@ def library_quote(data, control):
             return error(409, "voice_limit", limit=control.get("voice_limit", 50))
         model = design_model(data.get("prompt", ""))
         credits = DESIGN_CREDITS[model]
-        return 200, {"credits": credits, "credits_expected": credits * 0.9, "settlement": "exact", "model": model,
-                     "typical_seconds": 30}
+        language = "zh" if model == "minimax-voice-design" else "en"
+        # Like the real Sky Studio (2026-11-11 real smoke): no top-level model; it is only in voice_plan.selection.model.
+        return 200, {"credits": credits, "credits_expected": credits * 0.9, "settlement": "exact", "typical_seconds": 30,
+                     "voice_plan": {"selection": {"model": model}, "requested_model": "auto",
+                                    "rule": "zh_80" if language == "zh" else "en_80", "reason": "The description is in one language.",
+                                    "languages": [{"language": language, "share": 1, "seconds": 9}], "warnings": []},
+                     "one_time": [{"kind": "voice_design", "model": model, "language": language, "credits": credits,
+                                   "why": "Designing a voice from a description is a one-time fee."}]}
     return 200, {"credits": ENROLL_CREDITS, "credits_expected": ENROLL_CREDITS, "settlement": "exact",
                  "model": "minimax-voice-clone", "typical_seconds": 30}
 

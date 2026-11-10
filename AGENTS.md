@@ -728,6 +728,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-11 设计声音的报价写「用 Sky Studio 设计」，说不出是 Qwen3 还是 MiniMax](docs/bugfixes/2026-11-11-design-quote-model-name.md) — 声音的报价顶层没有 `model`、用哪个只在 `voice_plan.selection.model`，SkyCut 只读顶层；两份假服务都补了顶层的 `model`，回归和离屏渲染一直是绿的。顶层没有时读 `voice_plan.selection.model`，假服务改成真回答的形状，真冒烟抄下来的回答进纯值检查。
 - [2026-11-11 manage_voices 建声音 / 加录音非要 AI 给 language，方案写的是可选、自动识别](docs/bugfixes/2026-11-11-manage-voices-language-required.md) — 声音 PR 6 把 `language` 做成必填、记了一句「本机检测随界面接」，PR 8 把检测挪进 `SpokenLanguageProbe` 只接了对话框；现在不给就在做好的参考录音上用同一份识别、识别成了什么写进问句和结果，给了照给的不盖，识别不出来不猜、叫 AI 带上 `language` 再调；实现、说明书、检查三处都照「必给」写所以谁也不红，期望值要从方案来。
 - [2026-11-11 设计声音的对话框连按，同一份报价下了好几单](docs/bugfixes/2026-11-11-design-voice-ordered-twice.md) — `design()` 没有「已下单」的闩、本机没有「同一件事只开一单」：连按 N 下本机账记 N 笔、起 N 个任务（实测发的是同一个 idempotency_key，照合同服务器只扣一次，和审查报告写的不一样）；按下去就锁（`ordered`）、任务按 `identity` 只开一单、一份报价一个 key 不从内容算。
 - [2026-11-11 声音库审查的后续](docs/bugfixes/2026-11-11-voice-library-review-followups.md) — MiniMax 版在建时再调又预留一笔（先看在建的那一单）；旁白中途那笔费用的问题记上账就清（改成受理后清、改价记新价）；检测语言和配旁白的转写借了字幕生成的读取器（`QueuedAudioWindow`，守卫钉调用方）；授权那句升版本要等缓存过期（刷新目录再问）；主线程读录音、临时文件残留、预算规矩抄了一份；每次都切不开的批第二次按字数估；假协议补上排队 / 去重 / 改价 / 退款。
