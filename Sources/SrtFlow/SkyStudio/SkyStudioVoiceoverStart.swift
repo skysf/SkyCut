@@ -133,6 +133,7 @@ enum SkyStudioVoiceoverStart {
                                      services: SkyStudioVoiceServices) async throws -> (plan: SkyStudioVoicePlan, quote: SkyStudioQuote, note: String) {
         let before = prepared.plan
         let language = languageName(input.language)
+        let failure = failure.trimmingCharacters(in: CharacterSet(charactersIn: ". \n"))
         guard let catalog = prepared.catalog else {
             throw AIToolError("SkyCut could not install this Mac's speech model for \(language) (\(failure)); nothing was charged.")
         }
