@@ -27,6 +27,10 @@ import SwiftUI
 //   {"do": "voice", "kind": "wait", "text": "T2 Voice", "timeout": 300}   等列表里出现这个名字（设计做完）
 //   {"do": "voice", "kind": "delete", "text": "T2 Voice"}     点那一行的垃圾桶（弹出「删除『X』？」）
 //   {"do": "voice", "kind": "confirm"}                         在「删除『X』？」里按「删除」：等它从列表里消失
+//   {"do": "voice", "kind": "change", "timeout": 120}          片段右键「换成我的声音…」（同一个入口）：等面板截好声音、报价回来
+//   {"do": "voice", "kind": "start", "text": "30"}             按「开始」—— 报价最多超过这个数就不按；等变声做完，日志写时间线和任务
+//   {"do": "voice", "kind": "timeline"}                        日志写时间线上的音频（每条轨、每段的起止、静音、链接组、文件）
+//   {"do": "voice", "kind": "job", "text": "voice_design"}     等这一种最后起的那个任务做完，日志写它的结果（和 get_job 同一份）
 
 @MainActor
 final class SmokeVoiceHub {
@@ -36,6 +40,7 @@ final class SmokeVoiceHub {
     /// 开着的那张 sheet 背后的那一份（sheet 出现时登记、收起时清掉）。
     weak var newVoice: NewVoiceModel?
     weak var design: DesignVoiceModel?
+    weak var change: VoiceChangePanelModel?
 }
 
 extension View {
@@ -50,6 +55,13 @@ extension View {
         modifier(SmokeVoiceSheetModifier(register: { SmokeVoiceHub.shared.newVoice = newVoice },
                                          unregister: { if SmokeVoiceHub.shared.newVoice === newVoice { SmokeVoiceHub.shared.newVoice = nil } },
                                          command: "submit", action: submit))
+    }
+
+    /// 变声面板（片段右键「换成我的声音…」）：登记它的模型；`start` 调「开始」按钮的那个函数。
+    func smokeVoiceSheet(change: VoiceChangePanelModel, start: @escaping () -> Void) -> some View {
+        modifier(SmokeVoiceSheetModifier(register: { SmokeVoiceHub.shared.change = change },
+                                         unregister: { if SmokeVoiceHub.shared.change === change { SmokeVoiceHub.shared.change = nil } },
+                                         command: "start", action: start))
     }
 
     /// 「设计声音」那张：登记它的模型；`order` 调「设计」按钮的那个函数。
@@ -106,16 +118,57 @@ enum SmokeVoiceSteps {
     private static var hub: SmokeVoiceHub { .shared }
     private static var store: VoiceLibraryStore { .shared }
 
-    static func run(_ step: SmokeStep) async throws -> String {
+    static func run(_ step: SmokeStep, project: VideoEditProject) async throws -> String {
         let text = step.text ?? ""
         switch step.kind {
+        case "change":
+            // 和片段右键「换成我的声音…」一样：只往 VoiceChangeActivity 里写一个目标，面板由检查器底下的 VoiceChangePresenter 摆出来。
+            guard let clip = (project.state.mainClips + project.state.overlayTracks.flatMap(\.clips) + project.state.audioTracks.flatMap(\.clips))
+                .first(where: { VoiceChangeSource.refusal(for: $0) == nil }) else { throw SmokeScriptError("voice change：时间线上没有能变声的段") }
+            forgetClosedSheets()
+            VoiceChangeActivity.shared.present(panelFor: clip.id)
+            try await until("变声面板出来", seconds: 10) { hub.change != nil }
+            guard let model = hub.change else { throw closed() }
+            try await until("截好声音、报价回来", seconds: step.timeout ?? 120) {
+                if case .failed = model.source { return true }
+                switch model.offer {
+                case .ready, .failed: return true
+                case .none, .loading: return model.selection == nil && { if case .ready = model.source { return true } else { return false } }()
+                }
+            }
+            return describe(model)
+        case "start":
+            guard let model = hub.change else { throw closed() }
+            guard let quote = model.quote else { throw SmokeScriptError("voice start：还没有报价（\(describe(model))）") }
+            if let most = Double(text), quote.credits > most + 0.0005 {
+                throw SmokeScriptError("voice start：报价最多 \(quote.credits) 积分，超过写好的 \(most)：不按（花钱之前停下）")
+            }
+            let clipID = model.clipID
+            let tracksBefore = project.state.audioTracks.count
+            hub.request.send("start")
+            try await until("「开始」按下去", seconds: 15) { VoiceChangeActivity.shared.isChanging(clipID) || model.problem != nil }
+            if let problem = model.problem, !VoiceChangeActivity.shared.isChanging(clipID) { return "没起：\(problem)" }
+            try await until("变声做完", seconds: step.timeout ?? 900) { !VoiceChangeActivity.shared.isChanging(clipID) }
+            try await Task.sleep(for: .seconds(1))
+            let job = latestJob(.voiceChange).map { AIJobs.shared.json($0).encodedString() } ?? "nil"
+            return "做完：音频轨 \(tracksBefore) → \(project.state.audioTracks.count)，提示条「\(project.notice ?? "")」，任务 \(job)；"
+                + describeTimeline(project)
+        case "timeline":
+            return describeTimeline(project) + "，提示条「\(project.notice ?? "")」"
+        case "job":
+            let kind = AIJobs.Kind(rawValue: text) ?? .voiceDesign
+            guard let job = latestJob(kind) else { return "没有 \(kind.rawValue) 任务" }
+            try await until("\(kind.rawValue) 任务做完", seconds: step.timeout ?? 600) { job.status != .running }
+            return "任务 " + AIJobs.shared.json(job).encodedString()
         case "list":
             return describe()
         case "new", "design":
+            forgetClosedSheets()
             hub.request.send(step.kind!)
             try await until("「\(step.kind!)」那张 sheet 出来", seconds: 10) { step.kind == "new" ? hub.newVoice != nil : hub.design != nil }
             return "摆出 \(step.kind!)"
         case "name":
+            forgetClosedSheets()
             if let model = hub.newVoice { model.name = text } else if let model = hub.design { model.name = text } else { throw closed() }
             return "名字：\(text)"
         case "file":
@@ -145,15 +198,17 @@ enum SmokeVoiceSteps {
             hub.request.send("submit")
             // 交完 = 不在交了，而且 sheet 收起了 / 出错了 / 列表里有了这个名字（收没收起另说，日志里写）。
             try await until("「新建」交完", seconds: step.timeout ?? 180) {
-                !model.submitting && (hub.newVoice == nil || model.problem != nil || store.voices.contains { $0.name == name })
+                !model.submitting && (attachedSheets().isEmpty || model.problem != nil || store.voices.contains { $0.name == name })
             }
             try await Task.sleep(for: .seconds(1))
-            return "交完：sheet \(hub.newVoice == nil ? "收起了" : "还开着")（挂着的 sheet \(attachedSheets())）"
-                + (model.problem.map { "，出错：\($0)" } ?? "") + "；" + describe()
+            let open = !attachedSheets().isEmpty
+            if !open { forgetClosedSheets() }
+            return "交完：sheet \(open ? "还开着" : "收起了")（挂着的 sheet \(attachedSheets())）" + (model.problem.map { "，出错：\($0)" } ?? "") + "；" + describe()
         case "close":
             // 和点「取消」一样把 sheet 收起来（那一节的状态清掉）。
             hub.request.send("close")
-            try await until("sheet 收起", seconds: 10) { hub.newVoice == nil && hub.design == nil }
+            try await until("sheet 收起", seconds: 10) { attachedSheets().isEmpty }
+            forgetClosedSheets()
             return "收起了 sheet（挂着的 sheet \(attachedSheets())）"
         case "prompt", "sample":
             guard let model = hub.design else { throw closed() }
@@ -175,9 +230,11 @@ enum SmokeVoiceSteps {
                 throw SmokeScriptError("voice order：报价 \(quote.credits) 积分，不是写好的 \(expected)：不按（花钱之前停下）")
             }
             hub.request.send("order")
-            try await until("「设计」按下去", seconds: step.timeout ?? 30) { hub.design == nil || model.problem != nil || model.ordered }
+            try await until("「设计」按下去", seconds: step.timeout ?? 30) { model.problem != nil || model.ordered }
             try await Task.sleep(for: .seconds(1))
-            return "按了：已下单 \(model.ordered)，sheet \(hub.design == nil ? "收起了" : "还开着")（挂着的 sheet \(attachedSheets())）"
+            let open = !attachedSheets().isEmpty
+            if !open { forgetClosedSheets() }
+            return "按了：已下单 \(model.ordered)，sheet \(open ? "还开着" : "收起了")（挂着的 sheet \(attachedSheets())）"
                 + (model.problem.map { "，出错：\($0)" } ?? "") + "；" + describe()
         case "wait":
             try await until("列表里出现「\(text)」", seconds: step.timeout ?? 300) {
@@ -201,12 +258,56 @@ enum SmokeVoiceSteps {
         }
     }
 
+    /// 没有哪个窗口还挂着 sheet 时，登记过的模型都是收起了的那几张的（后台起的 App 里 SwiftUI 不一定跑它们的 onDisappear）：忘掉。
+    private static func forgetClosedSheets() {
+        guard attachedSheets().isEmpty else { return }
+        hub.newVoice = nil
+        hub.design = nil
+        hub.change = nil
+    }
+
     /// 此刻挂在哪个窗口上的 sheet（窗口标题 → sheet 的类）。
     private static func attachedSheets() -> [String] {
         NSApp.windows.compactMap { window in window.attachedSheet.map { "\(window.title.isEmpty ? "#\(window.windowNumber)" : window.title) → \(type(of: $0))" } }
     }
 
-    private static func closed() -> SmokeScriptError { SmokeScriptError("voice：没有开着的「新建声音」/「设计声音」sheet") }
+    private static func closed() -> SmokeScriptError { SmokeScriptError("voice：没有开着的「新建声音」/「设计声音」/ 变声 sheet") }
+
+    /// 这次运行里最后起的那个这一种的任务（任务号是「种类-序号」，全 App 一个计数）。
+    private static func latestJob(_ kind: AIJobs.Kind) -> AIJobs.Job? {
+        (1...2000).reversed().lazy.compactMap { AIJobs.shared.job("\(kind.rawValue)-\($0)") }.first
+    }
+
+    /// 时间线上的音频：每条轨、每段的名字、起止、静音、链接组、文件（变声落地看这里：两条新轨、原声静音、和原段一样长）。
+    private static func describeTimeline(_ project: VideoEditProject) -> String {
+        func line(_ clip: EditClip) -> String {
+            String(format: "%@ %.3f–%.3f（%.3f 秒）%@%@ 组 %@", clip.name, clip.timelineStart, clip.timelineEnd, clip.timelineEnd - clip.timelineStart,
+                   clip.isMuted ? " 静音" : "", clip.hasAudio ? "" : " 无声", clip.linkGroup.map { String($0.uuidString.prefix(8)) } ?? "nil")
+                + " 文件 " + clip.sourceURL.lastPathComponent
+        }
+        let video = project.state.mainClips.map(line)
+        let audio = project.state.audioTracks.enumerated().map { "A\($0.offset + 1)：" + $0.element.clips.map(line).joined(separator: "；") }
+        return "V1 \(video)；音频 \(audio)"
+    }
+
+    private static func describe(_ model: VoiceChangePanelModel) -> String {
+        let source: String
+        switch model.source {
+        case .preparing: source = "在截"
+        case .failed(let message): source = "截不成：\(message)"
+        case .ready: source = "截好了"
+        }
+        let offer: String
+        switch model.offer {
+        case .none: offer = "没报价"
+        case .loading: offer = "在问价"
+        case .failed(let message): offer = "报不了价：\(message)"
+        case .ready(let quote):
+            offer = "报价 \(quote.credits) 积分（约 \(quote.creditsExpected.map { "\($0)" } ?? "?")），模型 \(quote.model ?? "nil")，结算 \(quote.settlement ?? "nil")"
+        }
+        return "变声：「\(model.clipName)」\(String(format: "%.2f", model.clipSeconds)) 秒，声音 \(source)，说的是 \(model.spoken ?? "nil")，"
+            + "选的是 \(model.target?.name ?? "nil")（\(model.selection ?? "nil")），\(offer)" + (model.problem.map { "，出错：\($0)" } ?? "")
+    }
 
     private static func until(_ what: String, seconds: Double, _ done: () -> Bool) async throws {
         let deadline = Date().addingTimeInterval(seconds)

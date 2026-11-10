@@ -75,9 +75,7 @@ struct VoiceChangePanel: View {
                 // 两个按钮不许被压缩（带价的那个最长）：左边那一句让它折行。
                 Button("Cancel") { dismiss() }
                     .fixedSize()
-                Button(VoiceChangeText.button(model.quote)) {
-                    if model.start() { dismiss() }
-                }
+                Button(VoiceChangeText.button(model.quote), action: start)
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.quote == nil || overLimit)
                 .fixedSize()
@@ -88,9 +86,15 @@ struct VoiceChangePanel: View {
         .frame(width: 520)
         .task { await model.open() }
         .onDisappear { model.close() }
+        .smokeVoiceSheet(change: model, start: start)
         .sheet(isPresented: $creatingVoice) {
             NewVoiceSheet(mode: .create, store: store).appLanguage()
         }
+    }
+
+    /// 按「开始」：就是确认（VoiceChangePanelModel.start）；起了任务就收起。
+    private func start() {
+        if model.start() { dismiss() }
     }
 
     /// 没有 Key / 钥匙串要授权 / 声音库暂时用不了：和设置里声音库那一节同一句。

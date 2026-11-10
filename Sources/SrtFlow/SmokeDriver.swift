@@ -141,7 +141,7 @@ enum SmokeDriver {
         case .show:
             note(try SmokeUISteps.show(step, project: project))
         case .voice:
-            note(try await SmokeVoiceSteps.run(step))
+            note(try await SmokeVoiceSteps.run(step, project: project))
         case .toggles:
             // 脚本里直接拨；冒烟里起手是默认值、拨了也不落盘（EditorToggles）。磁吸跟着工程走（`state.mainMagnet`），只走 setMagnet。
             if let magnet = step.magnet { project.setMagnet(magnet) }
