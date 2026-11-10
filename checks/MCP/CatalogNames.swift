@@ -40,7 +40,7 @@ func catalogKnownNames() -> Set<String> {
     // add_voiceover 的说明书（MCPGuideVoiceTopics，2026-11-10 声音 PR 3）提到的结果字段（SkyStudioVoiceoverRun、SkyStudioVoiceCheckpoint.detail、
     // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
-                     "unknown_batch_indices", "recharge_url"])
+                     "unknown_batch_indices", "unknown_line_indices", "recharge_url"])
     // 字幕时间（声音 PR 5）：AIVoiceoverTool 结果里的 subtitle_timing、subtitles.estimated_line_indices，任务里装转写模型时 get_job 的 local_step。
     names.formUnion(["subtitle_timing", "estimated_line_indices", "local_step"])
     // 声音 PR 4（几批同时交、中途换备用）：get_job 的 batches_done / batches_running / batches_waiting（SkyStudioVoiceBatchBoard.json）、

@@ -156,6 +156,7 @@ run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 /
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
 run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
+run_check "ai-keep-awake（扫描守卫：AI 的工具调用和任务领不降速的那一份、领和还成对，活动断言只在两处开关）" checks/ai-keep-awake.sh
 run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
