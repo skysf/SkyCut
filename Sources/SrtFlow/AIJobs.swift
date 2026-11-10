@@ -55,6 +55,8 @@ final class AIJobs {
         var refresh: (@MainActor () async -> Void)?
         /// 检查任务的疑点拼图；跟结局一起冻结，后来的工程和导出不改它。
         var images: [Data] = []
+        /// 跑着的时候别让 App Nap 降速（AIKeepAwake）：start 领、finish 还。
+        fileprivate var awake: AIKeepAwake.Lease?
 
         init(
             id: String, kind: Kind, progress: @escaping @MainActor () -> Double?, liveDetail: @escaping @MainActor () -> [String: JSONValue],
@@ -90,6 +92,7 @@ final class AIJobs {
             waitingForUser: waitingForUser, cancel: cancel
         )
         jobs[job.id] = job
+        job.awake = AIKeepAwake.shared.hold()
         return job
     }
 
@@ -100,6 +103,8 @@ final class AIJobs {
         job.message = message
         job.detail = detail
         job.finishedAt = Date()
+        job.awake?.release()
+        job.awake = nil
     }
 
     var running: [Job] {

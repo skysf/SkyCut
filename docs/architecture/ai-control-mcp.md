@@ -1032,7 +1032,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     改了价的带 `credits_now` / `credits_approved` 和下一步（重新调一次、按新价再问，旧令牌作废）；授权那句升了版本，`manage_voices` 用新文案
     再问一次（`consent_statement_updated: true`）。
     名片 + 说明书主题（`MCPGuideVoiceLibraryTopics`，新工具没有迁移前的原文）；全清单 2026-11-10 是 106,921 / 110,000。
-59. **变声：`change_voice`（2026-11-11 声音 PR 9，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.8、4.9；合同见 [声音库](voice-library.md)第十一节）**：
+59. **AI 在干活时别让 App Nap 把 SkyCut 降速（2026-11-10，[案例](../bugfixes/2026-11-10-ai-work-throttled-by-app-nap.md)）**：SkyCut 不在前台、
+    窗口藏起来或被挡住时（用户在别的 App 里干活、AI 用后台模式剪），macOS 的 App Nap 把它降到最低的调度优先级（`ps` 里是 4），机器一忙，本机转写、
+    本机读稿、等 Sky Studio 这些 AI 的活就慢到超时。规矩：AI 的一次工具调用（`AIToolRouter.handle`：从收到到回答，含排队）和 AI 起的每个长任务
+    （`AIJobs`：从 `start` 到 `finish`）各领一份 `AIKeepAwake.Lease`，还有没还的就持有**一个** `ProcessInfo.beginActivity`
+    （`.userInitiatedAllowingIdleSystemSleep`：不降速、不合并计时器，但不拦系统空闲睡眠 —— Mac 什么时候睡是用户的事），最后一份还掉就 `endActivity`。
+    **领和还成对**：路由领了下一行就 `defer` 还；任务只在 `start` 领、只在第一次 `finish` 还 —— 新写的长任务必须走 `AIJobs.start` / `finish`，
+    结局不写就一直不还（断言永远不放，整台 Mac 的耗电）。`beginActivity` / `endActivity` 只在 `AIKeepAwake` 和录屏（录屏另有一份，还要拦系统睡眠、
+    要低延迟）。用户在界面上起的活（面板导出、生成字幕）这一刀没有管。
+60. **变声：`change_voice`（2026-11-11 声音 PR 9，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.8、4.9；合同见 [声音库](voice-library.md)第十一节）**：
     把一段（视频段或音频段，有声音、没静音）的人声换成另一个声音。改时间线、是长任务、花积分，和 `upscale_clip` 同一类，单独一个工具（不能并进
     `add_voiceover`：输入是一段现成的声音；也不能并进 `generate_media`：那个不改工程）。参数 `clip_id`（方案写 `clip`，照全清单的习惯）、`voice`
     （声音库的 `voice_…`，或预设 `gemini:<名字>` / 不带前缀的预设名）、可选的 `language`（这段说什么语言，ISO 639-1）、`project`。
@@ -1041,7 +1049,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `/quote` → **只判每日硬预算**（不是一次性费用：两种权限模式都不问，不发确认码、不收 `confirm_token`；超了回 `daily_budget_exceeded`）→ 起任务、回任务号
     （种类 `voice_change`）。任务（`VoiceChangeJob`）：传 `voice_convert_source` → 一次 `voice_convert`（`max_credits` 是报价；只经 `SkyStudioJobRun`，
     结果不明不重交）→ 下两个文件到原素材旁边 → **落地是异步落账、自己包一层 `AIUndoGrouping.step`**：原段静音、两条新音频轨、三段链接，一步撤销。
-    这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（第十节第 1 条）。
+    这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（[声音库](voice-library.md)第十一节第 1 条）。
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
 
@@ -1091,6 +1099,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 | Claude 桌面版 | 没有能写的文件：「总是允许」存在它自己那里。连上之后的提示里告诉用户在它的连接器设置里一次设好（按只读 / 写入两类） | —— |
 
 以前连的、还没放行的显示「已连接 · 每次都会问」，再点一次「连接」补上。「复制一段话」里同样写了这一步。
+
+**连 Codex 时还写参数定义的字节上限**（[按需说明方案](../plans/2026-11-09-mcp-guide.md)第八节第 6 条、PR 7，2026-11-10）：`[mcp_servers.skycut]` 里
+`tool_input_schema_max_bytes = 8192`。Codex 默认把参数定义超过 5,000 字节的工具的参数说明全删掉，代码模式里只剩名字和类型；SkyCut 里超过的只有
+`edit_clip`、`generate_media`（约 6.7 KB，方案 4.1 的例外）。2026-11-10 在本机 Codex 0.167 实测：这个键被接受、不报「不认识的设置」，
+打印这两个工具的条目，参数注释从 0 条回到 58 / 54 条（条目各长约 3.1–3.4 千字）。跟着整张表去掉；这一版之前连上的没有这一行，状态照旧是「已连接」，
+再点一次「连接」就写上（`AIClientConfigFiles.tomlKeepsParameterDescriptions` 认它）。「复制一段话」里也写了这一行。自己手动配 Codex 的用户仍是
+默认的 5,000，所以 4,500 的上限和例外名单照留，这两个工具会影响对错的语义仍写在名片上。
 
 设置页**一行只放一个按钮**（2026-09-28 用户：没连上的时候不该显示断开，精简下）：连上了是「断开」；没连上、连着另一份、每次都会问都是「连接」；「连接」在这台机器上用不了（Claude Code 找不到命令行）时换成「复制一段话」（`AIClientSetup.canConnect`）。
 配置里写的是**这一份 App 包里**的小程序路径，状态里「连着另一份」= App 挪过位置或装过测试版，点一下重连。
@@ -1176,6 +1191,10 @@ edit_clip 2,074 字超长、清单里有汉字）。
 第一次探就说清楚、让 App 放弃、下一个调用不发；接忙的假 App：说还在做、不是卡死），扫描（`checks/MCP/router-wiring.sh`，由 check-mcp.sh source 进来：
 探一下不经主线程、断开即放弃、路由先问还做不做、主窗口开得回来、快捷键和菜单对账；路由的撤销分组、窗口什么时候摆、几个会话的核对也搬进了这个文件）；`scripts/check-main-thread-watchdog.sh` 第 1b 组（主线程卡了多久别的线程读得到）。
 
+`checks/ai-keep-awake.sh`（扫描）+ `scripts/check-voice-recovery.sh` 的 `KeepAwakeChecks`（真 App 对象）：AI 的工具调用和任务领不降速的那一份、
+领和还成对（第 59 条）：活动断言只在 `AIKeepAwake` 和录屏开关、路由领了紧跟 `defer` 还、任务 `start` 领 `finish` 还；几份同时领只开一次、
+最后一份还掉才关、同一份还两次只算一次、忘了还的放掉时也还；一次真的工具调用（`skycut_guide`）开过一次、回答之后还掉；跑完全部声音检查一份都不剩。
+
 ## 八、人工回归清单（发版前在真机上走一遍）
 
 - [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
@@ -1192,6 +1211,8 @@ edit_clip 2,074 字超长、清单里有汉字）。
 - [ ] 先在导出面板上导出一条长的，导出途中让 AI 导出（第 7 条）：AI 拿到 `queued`、`queue_position` 1，面板那条导完它自己开始；
       AI 的导出在导时，面板上的导出按钮是灰的（面板起的不进队，AI 的排在它后面）；AI 导的是别的工程时，面板底下写着在导哪个工程、没有停止键、
       导完也不挂它的成片（[案例](../bugfixes/2026-10-18-export-progress-shown-in-every-project-window.md)）。
+- [ ] SkyCut 藏起来（⌘H）或被别的 App 盖住时让 AI 配一段要等的旁白（第 59 条）：等的时候 `ps -o pri= -p <SkyCut 的 pid>` 不是 4（2026-11-10 实测 28），
+      做完、AI 不再调用之后过一会儿回到 4（断言还掉了）；活动监视器的「App Nap」一栏同样。
 - [ ] 设置里连接 Claude 桌面版 → 重启 Claude → 工具列表里有 srtflow 的全部工具（个数 = `MCPToolName` 的条数）。
 - [ ] 装上这一版、新开一个 Claude Code 会话（`claude -p` 就行，可以 `--strict-mcp-config --mcp-config` 只挂 srtflow），看它的 MCP 日志
       `~/Library/Caches/claude-cli-nodejs/<会话所在目录，/ 换成 ->/mcp-logs-srtflow/` 里最新的 .jsonl：服务器版本是这一版、**没有**

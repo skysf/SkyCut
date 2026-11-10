@@ -133,7 +133,10 @@
   对字幕，全部好了一次落地。要交的批按原来的顺序在声音池领槽（第一节「领槽」；服务器还没有声音池时是共用池），领到一个交一个、几批同时跑，回来的顺序不管；
   有原单的只 GET、下好的直接用，都不领槽。**一批出了事**（没做成、结果说不准、下载失败、工程换了）：还没交的不再交（留成 missing、预留退回），交出去的等它们
   做完、音频照样存进恢复记录，然后以第一件事结束（可恢复）；先记下出了事、再还这一批的槽，排在后面的批领到槽时一定看得见。用户停：等槽的离队，交上的照
-  第一节「停」。状态行写「几批好了 / 共几批 · 几批在跑 · 几批等空位」（`SkyStudioVoiceBatchBoard`，不造百分比；只剩一批时照那一批的阶段），`get_job`
+  第一节「停」。**停下之后结果那句话逐批说清**（`SkyStudioVoiceStopSummary`，2026-11-10，[案例](../bugfixes/2026-11-10-voiceover-stop-reports-one-batch.md)）：
+  按 `batch_index` 说每一批是做完了（恢复直接用、不再花钱）、在 Sky Studio 已经开始了取消不了（积分可能花了、恢复只取回原单）、开始之前停下（积分退了）、
+  还没交（没花钱）、还是交了没拿到任务号（结果不明、不会再交）；以前只有最先出事的那一批的话，哪一批先出事看调度。只有一批的照旧用那一批自己的话。
+  状态行写「几批好了 / 共几批 · 几批在跑 · 几批等空位」（`SkyStudioVoiceBatchBoard`，不造百分比；只剩一批时照那一批的阶段），`get_job`
   报 `batches_done`、`batches_running`、`batches_waiting`。
 - **中途换备用**（8.4）：某一批做完说服务器在它里面换了备用（`fallback_used`），还没交的批（包括明确没扣钱、要重交的）改带 `voice_plan.fallback.selection`
   （服务器合同：它自己的 `fallback` 是 null；每批报的 credits 本来就按默认和备用里预留大的那个算，照样当 `max_credits`），已经做好的、已经交出去的不重做；恢复记录照记下的 `fallback_used` 现算
@@ -202,7 +205,7 @@
 - `generate_missing` 补没生成的批次：照记录里的选择（`model: auto` 时 `params.plan` = 那份 `selection`）把这几批再报一次价、整体预留，只换这几批的 `max_credits`；
   服务器回的选择和记录的不一样就一批都不交（恢复不重新选模型，SkyCut 声音方案 8.4）。
 - “未生成”只能是从未提交，或失败 / 取消有明确无扣费、全退证据且没有成品。未知结果有原单号只复用 `SkyStudioJobRun.resume` GET 原单；无原单号保留原 key 待核查，显式补生成也不重放它。成功后下载 / 本地处理失败不能退款、不能退回 missing。
-- 结果给出 `recovery_state`、`completed_line_indices`、`pending_recovery_line_indices`、`not_generated_line_indices` / `not_generated_batch_indices`、`unknown_batch_indices`、每批 `parts`（原文与 `line_index`）、原音频 / 成句文件、原单身份与可执行 `recovery.arguments`。列表中的索引从 0 起；顶层历史 `batch_index` 仍从 1 起。可恢复的未完成任务仍以 `failed` / `cancelled` 结束，通过 `recovery_state` 与方法继续，不能再次提交原稿。
+- 结果给出 `recovery_state`、`completed_line_indices`、`pending_recovery_line_indices`、`not_generated_line_indices` / `not_generated_batch_indices`、`unknown_batch_indices` / `unknown_line_indices`（结果不明的那几批的句子，2026-11-10 起；以前哪个句子列表都不列它们）、每批 `parts`（原文与 `line_index`）、原音频 / 成句文件、原单身份与可执行 `recovery.arguments`。列表中的索引从 0 起；顶层历史 `batch_index` 仍从 1 起。可恢复的未完成任务仍以 `failed` / `cancelled` 结束，通过 `recovery_state` 与方法继续，不能再次提交原稿。
 - 入轨仍复用 `AIVoiceoverTool.plan/apply`、`AIVoiceoverSubtitles`。提交前先写稳定的片段 UUID；提交完成记回执。重复恢复不再插入，用户之后撤销也不自动补回；工程已存在那组 UUID、但最终回执没写成时认已有插入，不再生字幕。只存在部分 UUID 时拒绝自动补插，交还现有内容让调用方检查。
 - 恢复记录与音频是用户输出，持续保留；记录不是整份工程备份。已保存工程可在重开后按原路径核对恢复；未保存工程只能认原运行代号。收到结果前就退出且没有服务器任务号的未知提交不能凭 key 自动查单（服务端没有该端点）。
 
@@ -241,6 +244,7 @@
   几批同时交（声音 PR 4，`ConcurrencyChecks.swift`，假协议先回排队、问的时候才回结局，声音池 2 个）：四批里同时开着的最多 2 单、后交的先回（完成顺序只断言假服务按住的那一对：第二批先于第一批；第三批和第一批谁先回看调度，不断言，[案例](../bugfixes/2026-11-10-voice-concurrency-check-finish-order.md)）、切句和落地照原来的顺序、
   一步撤销 / 重做；第二批换了备用，之后才交的两批带 `voice_plan.fallback.selection`、先交的不改，结果的 `line_models` / `voice.note` / `next_step`；第二批以
   `fallback_needs_one_time` 结束：后面等槽的不再交、先交的收好、可恢复的 failed 带 `one_time`，`generate_missing` 照原来的选择补齐。老的恢复场景用 1 个槽（交的顺序就是批的顺序）。
+  停下几批（`StopChecks.swift`，五批、声音池 2 个：一批做完、一批在 Sky Studio 已经开始（取消回 409）、一批排着（取消退钱）、两批等槽）：结果那句话逐批说清、结果不明那批的句子在 `unknown_line_indices` 里、等槽的两批没交、放开之后普通恢复只 GET 那一单；纯值的五种停法在 `check-sky-studio` 的 `VoiceStopChecks`。
   付过钱的声音不卡死（2026-11-10 审查，`PaidAudioChecks.swift`，每个场景自己接住错误、互不遮挡）：繁体稿三句合一批、假转写写成简体（`simplifies`）照样切开、
   字幕是稿子的繁体字、问转写带的是 `zh-Hant`（起任务和 `resume` 都是）；长句两批一片 24 kHz 一片 44.1 kHz（`lowRate`，两种先后）接成 12 秒、文件 44.1 kHz；
   转写不了的 Mac 上 eleven-v4 合批而 `words` 是 null / 对不回原文（`brokenWords`）按字数估句界并报 `estimated_split_line_indices`；重新报价之后运行中、

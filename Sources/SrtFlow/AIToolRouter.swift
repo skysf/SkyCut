@@ -32,6 +32,9 @@ final class AIToolRouter {
 
     /// `begin`：轮到这个调用时（排完队之后）先问一句 —— 小程序不等了（App 卡过、它放弃了）就回 false，不做（AIBridgeCalls）。
     func handle(_ request: MCPBridge.Request, begin: @escaping @Sendable () -> Bool) async -> Answer {
+        // 从收到到回答（含排队）别让 App Nap 降速（AIKeepAwake）；回答之前还。checks/ai-keep-awake.sh 钉着下一行就是还。
+        let awake = AIKeepAwake.shared.hold()
+        defer { awake.release() }
         let note = ScreenRecordingFeedback.shared.takeNote(for: request.session ?? AIProjectSessions.anonymous)
         var answer = await handleRequest(request, begin: begin)
         if let note { answer.result = MCPBridge.addingNote(note, to: answer.result) }

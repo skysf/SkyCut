@@ -201,7 +201,7 @@ final class AIClientSetup: ObservableObject {
         case .claudeCode:
             return String(format: L10n("Please connect the SkyCut video editor to Claude Code: run this command in the terminal, add \"mcp__skycut\" to permissions.allow in ~/.claude/settings.json so its tools run without asking, then tell me to start a new session.\n\nclaude mcp add --scope user skycut -- \"%@\""), helper)
         case .codex:
-            return String(format: L10n("Please connect the SkyCut video editor to Codex: run this command in the terminal, add the line default_tools_approval_mode = \"approve\" under [mcp_servers.skycut] in ~/.codex/config.toml so its tools run without asking, then tell me to start a new session.\n\ncodex mcp add skycut -- \"%@\""), helper)
+            return String(format: L10n("Please connect the SkyCut video editor to Codex: run this command in the terminal, then under [mcp_servers.skycut] in ~/.codex/config.toml add the lines default_tools_approval_mode = \"approve\" (its tools run without asking) and tool_input_schema_max_bytes = 8192 (the larger tools keep their parameter notes), then tell me to start a new session.\n\ncodex mcp add skycut -- \"%@\""), helper)
         case .claudeDesktop:
             return nil
         }

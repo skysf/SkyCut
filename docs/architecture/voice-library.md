@@ -348,7 +348,7 @@
 > 方案 4.8、4.9、5.5、9.1 第 7、11 项、9.3「变声与口型」；约定第 4 条（服务器只分离 + 变声、回两个文件，混音在 SkyCut 里做）。文件在
 > `Sources/SrtFlow/VoiceChange/`。接口合同在 Sky Studio 仓库 `docs/agents/skycut-api.md`（`voice_convert`：fal SAM Audio 分离 +
 > Chatterbox HD，人声在结尾补静音到源那么长、长了不裁，成品留 60 天）。相关：[联动](timeline-linkage.md)、[Sky Studio 的任务](sky-studio-jobs.md)、
-> [AI 接口](ai-control-mcp.md)第四节第 59 条、[阻塞的媒体读取](blocking-media-reads.md)、[预览性能 ratchet](preview-perf-ratchet.md)。
+> [AI 接口](ai-control-mcp.md)第四节第 60 条、[阻塞的媒体读取](blocking-media-reads.md)、[预览性能 ratchet](preview-perf-ratchet.md)。
 
 1. **两个入口同一条路**（扫描守卫钉着）：AI 的 `change_voice`（`VoiceChangeTool`）和右键面板（`VoiceChangePanelModel`）都是
    `VoiceChangeSource.prepare`（截声音）→ `VoiceChangeOrder.spokenLanguage`（这段说什么语言）→ `VoiceChangeOrder.draft`（报价用的那一份）→ `/quote` →

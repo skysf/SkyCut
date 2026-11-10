@@ -127,6 +127,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplitEstimate.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceStopSummary.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCatalog.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibrary.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceQuote.swift \
@@ -186,6 +187,7 @@ xcrun swiftc \
   checks/SkyStudio/VoiceStandingNoticeChecks.swift \
   checks/SkyStudio/VoiceLibraryUIChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \
+  checks/SkyStudio/VoiceStopChecks.swift \
   checks/SkyStudio/VoiceCatalogChecks.swift \
   checks/SkyStudio/VoiceLibraryChecks.swift \
   checks/SkyStudio/VoicePlanChecks.swift \

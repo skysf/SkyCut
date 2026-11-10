@@ -173,8 +173,10 @@ final class SkyStudioVoiceoverRun {
         let cancelled = Self.isCancellation(error)
         let failureStage = (error as? SkyStudioVoiceProcessingError)?.stage ?? stage
         extra["failure_stage"] = .string(failureStage.rawValue)
+        // 停下几批的旁白：结果逐批说清（SkyStudioVoiceStopSummary）；只有一批的照旧用那一批自己的话。
+        let text = (cancelled ? recovery.flatMap { SkyStudioVoiceStopSummary.message($0.value) } : nil) ?? message(error)
         if let recovery {
-            recovery.value.issue = .init(stage: failureStage, batch: batchIndex, message: message(error))
+            recovery.value.issue = .init(stage: failureStage, batch: batchIndex, message: text)
             if failureStage == .subtitleAlignment {
                 // 失败的词表不能变成永久缓存；已完成句子仍保持不动。
                 for index in recovery.value.batches.indices where recovery.value.plan.batches[index].speech.parts.contains(where: { recovery.value.outputs[$0.line] == nil }) {
@@ -187,6 +189,7 @@ final class SkyStudioVoiceoverRun {
             extra["completed_line_indices"] = []
             extra["pending_recovery_line_indices"] = []
             extra["not_generated_line_indices"] = .array(input.lines.indices.map { .number(Double($0)) })
+            extra["unknown_line_indices"] = []
             extra["recovery_state"] = "not_started"
             extra["next_step"] = "No cloud generation was submitted. Resolve the reported setup problem, then retry the original add_voiceover call."
         }
@@ -213,7 +216,7 @@ final class SkyStudioVoiceoverRun {
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
-        finish(cancelled ? .cancelled : .failed, message(error))
+        finish(cancelled ? .cancelled : .failed, text)
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac
