@@ -13,21 +13,26 @@ public enum MCPBatchTools {
         let tool: MCPToolName
         let key: String
         let id: String
-        let need: String
+        /// 名片里例子前后的两段（2026-11-10 名片迁移：长话进说明书 topic=edit_clips / set_texts / set_shapes）。
+        let lead: String
         let example: String
+        let tail: String
     }
 
     private static func source(for name: MCPToolName) -> Source? {
         switch name {
         case .editClips:
-            return Source(tool: .editClip, key: "clips", id: "clip_id", need: "clip trims/moves/volumes",
-                          example: #"{"clips":[{"clip_id":"c1","volume_db":-6}]}"#)
+            return Source(tool: .editClip, key: "clips", id: "clip_id", lead: "Change many clips in one call with the same fields as edit_clip (ids from get_timeline). Everything is checked first and applied as one undo step; any error applies nothing.",
+                          example: #"{"clips":[{"clip_id":"c1","volume_db":-6}]}"#,
+                          tail: "Entries apply in order (1-\(maximumItems)); omitted fields stay. Returns the final state of each clip.")
         case .setTexts:
-            return Source(tool: .setText, key: "texts", id: "text_id", need: "title/text changes",
-                          example: #"{"texts":[{"text_id":"t1","text":"Review title","font_size":36}]}"#)
+            return Source(tool: .setText, key: "texts", id: "text_id", lead: "Add or change many texts in one call with the same fields as set_text (text_id from get_timeline; leave it out to add). Everything is checked first and applied as one undo step; any error applies nothing.",
+                          example: #"{"texts":[{"text_id":"t1","text":"Review title","font_size":36}]}"#,
+                          tail: "Entries apply in order (1-\(maximumItems)); omitted fields stay.")
         case .setShapes:
-            return Source(tool: .setShape, key: "shapes", id: "shape_id", need: "shape/style changes",
-                          example: ##"{"shapes":[{"shape_id":"s1","color":"#FFAA00"}]}"##)
+            return Source(tool: .setShape, key: "shapes", id: "shape_id", lead: "Add or change many shapes in one call with the same fields as set_shape (shape_id from get_timeline; leave it out to add). Everything is checked first and applied as one undo step; any error applies nothing.",
+                          example: ##"{"shapes":[{"shape_id":"s1","color":"#FFAA00"}]}"##,
+                          tail: "Entries apply in order (1-\(maximumItems)); omitted fields stay.")
         default: return nil
         }
     }
@@ -43,14 +48,7 @@ public enum MCPBatchTools {
         list["maxItems"] = .number(Double(maximumItems))
         return MCPToolDefinition(
             name, title: "Batch \(source.tool.rawValue)",
-            description: """
-            Batch \(source.need); fields/defaults: \(source.tool.rawValue). Use get_timeline ids; examples use placeholders.
-            Example: \(source.example)
-            1-\(maximumItems) ordered entries/results. All validate before one undo; zero-based errors apply nothing. \
-            Omitted fields stay; repeated ids repeat edits. \
-            \(source.tool == .editClip ? "Overlaps checked per entry; move obstructions first." : "Omit id to add; start defaults to the initial playhead.") \
-            Final states returned; one project per batch.
-            """,
+            description: source.lead + "\nExample: " + source.example + "\n" + source.tail,
             input: MCPSchema.object([source.key: .object(list)], required: [source.key])
         )
     }

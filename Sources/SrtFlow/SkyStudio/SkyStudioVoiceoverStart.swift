@@ -112,8 +112,8 @@ enum SkyStudioVoiceoverStart {
         }
         var skippingOneTime = false
         if let voiceQuote = quote.voice, !voiceQuote.oneTime.isEmpty {
-            switch try SkyStudioVoiceOneTimeStep.decide(input, quote: voiceQuote, key: resolved.key, catalog: catalog, project: project,
-                                                         api: services.api) {
+            switch try await SkyStudioVoiceOneTimeStep.decide(input, quote: voiceQuote, key: resolved.key, catalog: catalog, project: project,
+                                                               api: services.api) {
             case .readWithoutFee: skippingOneTime = true
             case .result(let result): return .result(result)
             }

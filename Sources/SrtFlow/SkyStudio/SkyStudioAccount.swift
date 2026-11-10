@@ -160,6 +160,8 @@ final class SkyStudioAccount: ObservableObject {
         case .key(let key):
             hasKey = true
             keychainReadSucceeded()
+            // 升级前就开着全部权限：新版第一次读到 Key 时替用户记上长期授权（这台 Mac 上只做一次，SkyStudioVoiceStanding）。
+            SkyStudioVoiceStanding.shared.migrateIfNeeded(key: key)
             if checkPlan { await ask(with: key) }
         case .missing:
             // 在「钥匙串访问」里被删掉了：当没有 Key。
@@ -208,6 +210,7 @@ final class SkyStudioAccount: ObservableObject {
         hasKey = true
         SkyStudioCatalogCache.shared.forget()
         SkyStudioCharacterAccess.invalidate()
+        SkyStudioVoiceStanding.shared.accountChanged()
         // 上一把 Key 问到的那份不算这一把的。
         replaceStored(nil)
         lastFailure = nil
@@ -217,6 +220,8 @@ final class SkyStudioAccount: ObservableObject {
             try? await SkyStudioKey.secret.delete()
             await SkyStudioKey.cache.remember(nil)
             hasKey = false
+        } else {
+            SkyStudioVoiceStanding.shared.migrateIfNeeded(key: key)
         }
     }
 
@@ -275,6 +280,7 @@ final class SkyStudioAccount: ObservableObject {
     private func forget() {
         SkyStudioCatalogCache.shared.forget()
         SkyStudioCharacterAccess.invalidate()
+        SkyStudioVoiceStanding.shared.accountChanged()
         hasKey = false
         replaceStored(nil)
         problem = nil

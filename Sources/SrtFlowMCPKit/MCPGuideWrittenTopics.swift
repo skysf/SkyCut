@@ -26,14 +26,18 @@ public enum MCPGuideWrittenTopics {
         public var readingTip: String? = nil
     }
 
-    /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices
-    /// 随声音 PR 6、change_voice 随声音 PR 9 从第一天起就这么写）。第二批加在这里。
+    /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个 + 第二批 27 个，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、
+    /// manage_voices 随声音 PR 6、change_voice 随声音 PR 9 从第一天起就这么写）。之后加的新工具也登记在这里。
     public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices,
                                                  .changeVoice]
         // 第一批（方案 PR 4，2026-11-10）：时间线、字幕、声音、录屏、导出等 25 个。
         + [.editSubtitles, .generateSubtitles, .translateSubtitles, .getSubtitles, .exportSubtitles, .transcribe, .listen, .cutSpeech, .cutToBeat,
            .syncVoiceover, .exportVideo, .inspectVideo, .compressVideos, .burnSubtitles, .getJob, .setShape, .setKeyframes, .setFilter,
            .freezeFrame, .recordScreen, .manageFiles, .openFolder, .setSettings, .upscaleClip, .manageCharacters]
+        // 第二批（方案 PR 5，2026-11-10）：工程、读时间线、整轨 / 整段的改动、批量、曲库、文稿、风格、角色等 27 个。
+        + [.getStatus, .setView, .openProject, .newProject, .closeProject, .saveProject, .undo, .seek, .cancelJob,
+           .getSettings, .getTimeline, .setTrack, .splitClip, .deleteItems, .duplicateItems, .setTransition, .setCanvas, .editClips,
+           .setTexts, .setShapes, .findAudio, .readDocument, .convertSubtitles, .recipes, .saveRecipe, .listCharacters, .getCharacter]
 
     public static func topic(for tool: MCPToolName) -> Written? {
         switch tool {
@@ -71,6 +75,33 @@ public enum MCPGuideWrittenTopics {
         case .setSettings: return MCPGuideWorkspaceTopics.setSettings
         case .upscaleClip: return MCPGuidePaidTopics.upscaleClip
         case .manageCharacters: return MCPGuidePaidTopics.manageCharacters
+        case .getStatus: return MCPGuideProjectTopics.getStatus
+        case .setView: return MCPGuideProjectTopics.setView
+        case .openProject: return MCPGuideProjectTopics.openProject
+        case .newProject: return MCPGuideProjectTopics.newProject
+        case .closeProject: return MCPGuideProjectTopics.closeProject
+        case .saveProject: return MCPGuideProjectTopics.saveProject
+        case .undo: return MCPGuideControlTopics.undo
+        case .seek: return MCPGuideControlTopics.seek
+        case .cancelJob: return MCPGuideControlTopics.cancelJob
+        case .getSettings: return MCPGuideControlTopics.getSettings
+        case .getTimeline: return MCPGuideTimelineEditTopics.getTimeline
+        case .setTrack: return MCPGuideTimelineEditTopics.setTrack
+        case .splitClip: return MCPGuideTimelineEditTopics.splitClip
+        case .deleteItems: return MCPGuideTimelineEditTopics.deleteItems
+        case .duplicateItems: return MCPGuideTimelineEditTopics.duplicateItems
+        case .setTransition: return MCPGuideTimelineEditTopics.setTransition
+        case .setCanvas: return MCPGuideTimelineEditTopics.setCanvas
+        case .editClips: return MCPGuideBatchTopics.editClips
+        case .setTexts: return MCPGuideBatchTopics.setTexts
+        case .setShapes: return MCPGuideBatchTopics.setShapes
+        case .findAudio: return MCPGuideLibraryTopics.findAudio
+        case .readDocument: return MCPGuideLibraryTopics.readDocument
+        case .convertSubtitles: return MCPGuideLibraryTopics.convertSubtitles
+        case .recipes: return MCPGuideLibraryTopics.recipes
+        case .saveRecipe: return MCPGuideLibraryTopics.saveRecipe
+        case .listCharacters: return MCPGuideLibraryTopics.listCharacters
+        case .getCharacter: return MCPGuideLibraryTopics.getCharacter
         default: return nil
         }
     }

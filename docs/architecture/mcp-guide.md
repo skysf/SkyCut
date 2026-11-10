@@ -93,6 +93,13 @@
       它的概要按新行为写，旧说明每一句去了哪写在那个 PR（#355）的说明里；名单写死在 `GuidePilotChecks`（`pilotToolsWithoutPreviousCard`），加一个要改那里。
       分节照声音方案 4.10：voices / models_languages / paid_confirmation / subtitles / batches_recovery / local_voices / pitfalls（合起来超过 6,000，
       第一次只回概要 + 有哪些节）。
+    - **第二批**（方案 PR 5，2026-11-10）：其余 27 个工具（工程、撤销 / 播放头 / 取消 / 读设置、读时间线和整轨 / 整段的改动、三个批量工具、曲库 /
+      文稿 / 字幕文件 / 剪辑风格 / 角色）。主题在 `MCPGuideProjectTopics` / `ControlTopics` / `TimelineEditTopics` / `BatchTopics` / `LibraryTopics`，
+      迁移前的原文在 `MCPGuidePreviousCardsBatch2`（脚本照抄，同第一批）。三个批量工具不再共用一个说明模板，每个有自己的名片（`MCPBatchTools.Source`
+      的 lead / tail），一行例子照旧单独一行。概要之外至少两节手写的（小工具两节就写全了）。这一批之后只有 `skycut_guide` 自己不迁移，
+      「没有例子的主题不写 examples」这条检查改拿它测。还要守的说法：`get_status` 的 screen recording 和
+      「and cloud_tasks grouped by project:」（`checks/cloud-task-projects.sh` 在源文件里找这一串，折行时别把它拆开）、`get_timeline` 的 edit_limits、
+      `list_characters` 的 compact summaries 和 1 KiB、`recipes` 的 which one you follow、`delete_items` 的「Linkage on:」、`convert_subtitles` 的 or in folder。
 15. **`fields` 自动切节**（2026-11-10 定，审查 review-344 第 5 条）：`MCPGuideFields.sections(for:)` 放得下就一节 `fields`；超过 4,500 字
     （留出 6,000 里 JSON 外壳和标题的余量）按**整个第一层参数**切成 `fields`、`fields_2`、`fields_3`……；一个参数连同它的里层不拆开，
     它自己就超过的单独成一节；切完一行不丢、顺序不变。不手工拆：这几节是从参数定义现算的，哪个参数定义一变长，手工拆好的一节就会超。
