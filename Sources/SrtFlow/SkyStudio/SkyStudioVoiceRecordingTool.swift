@@ -5,7 +5,9 @@ import SrtFlowMCPKit
 //
 // 管什么（SkyCut 声音方案 4.5、4.6、第六节）：
 // 1. 核对参数（file、language 必给，create 要 name、add_reference 要 voice）；
-// 2. 点名文件夹以外的文件先过 AIWorkspace.confirmReading（请求批准模式问、记住文件夹；全部权限不问）；
+// 2. 加一种语言（add_reference）先读那个声音（`GET /voices/{id}`）：已经有这种语言就当场说（一种语言一段，Sky Studio 会拒），
+//    什么都不问、不读文件、不传；问句里写声音的名字，不写 id（2026-11-10 案例，T 的免费冒烟）；
+//    点名文件夹以外的文件再过 AIWorkspace.confirmReading（请求批准模式问、记住文件夹；全部权限不问）；
 // 3. 本机做参考录音（VoiceReferenceSample：44.1 kHz 单声道 16-bit、10 秒有效人声到 3 分钟、超过自动挑一段），免费、不碰服务器；
 // 4. **授权**：经 SkyStudioJobGate.voiceConsent，照 SkyStudioVoiceStanding.voiceAsk：请求批准模式问；全部权限下有有效的长期授权
 //    不问（声音 PR 7），没有就问一次、问句带打开全部权限时那段说明、点过头补记。令牌绑录音的完整身份
@@ -25,6 +27,10 @@ enum SkyStudioVoiceRecordingTool {
         let file = AIWorkspace.shared.resolve(try args.requiredString("file"))
         guard FileManager.default.fileExists(atPath: file.path) else { throw AIToolError("There is no file at \(file.path).") }
         let language = try checked { try SkyStudioVoiceNaming.checkedLanguage(try args.requiredString("language").lowercased()) }
+        let start = max(0, try args.double("start") ?? 0)
+        let end = try args.double("end")
+        if let end, end <= start { throw AIToolError("end must be after start.") }
+        let key = try await services.key()
         let target: String
         let doing: String
         if creating {
@@ -32,17 +38,19 @@ enum SkyStudioVoiceRecordingTool {
             target = "create:" + name
             doing = "create the voice \"\(name)\""
         } else {
-            let voice = try args.requiredString("voice").trimmingCharacters(in: .whitespacesAndNewlines)
-            guard SkyStudioVoice.isVoiceID(voice) else { throw AIToolError("voice must be a voice_… id from list_voices.") }
-            target = "add_reference:" + voice
-            doing = "add a \(SkyStudioVoicePick.languageName(language)) recording to \(voice)"
+            let id = try args.requiredString("voice").trimmingCharacters(in: .whitespacesAndNewlines)
+            guard SkyStudioVoice.isVoiceID(id) else { throw AIToolError("voice must be a voice_… id from list_voices.") }
+            // 先读这个声音：已经有这种语言就当场说，不问、不读文件、不传；问句写它的名字（令牌照旧绑 id）。
+            let voice = try await existingVoice(id, key: key, services: services)
+            guard !voice.languages.contains(where: { $0.language == language }) else {
+                throw AIToolError(SkyStudioVoiceLibraryErrors.referenceExists(languageName: SkyStudioVoicePick.languageName(language),
+                                                                              voice: voice.name) + " Nothing was sent.")
+            }
+            target = "add_reference:" + id
+            doing = "add a \(SkyStudioVoicePick.languageName(language)) recording to the voice \"\(voice.name)\""
         }
-        let start = max(0, try args.double("start") ?? 0)
-        let end = try args.double("end")
-        if let end, end <= start { throw AIToolError("end must be after start.") }
         if let question = try AIWorkspace.shared.confirmReading([file], verb: "send to Sky Studio", args: args, project: project) { return question }
 
-        let key = try await services.key()
         let statement = try await consentStatement(key: key, services: services)
         let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SkyCut-voice-reference-" + UUID().uuidString)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -101,6 +109,13 @@ enum SkyStudioVoiceRecordingTool {
             throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
         }
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
+    }
+
+    /// 加一种语言之前读那个声音（问句写它的名字、查它有没有这种语言）。读不到就照声音库的错误说，什么都没传。
+    private static func existingVoice(_ id: String, key: String, services: SkyStudioVoiceServices) async throws -> SkyStudioVoice {
+        do { return try await services.api.voice(id, key: key) }
+        catch is CancellationError { throw CancellationError() }
+        catch { throw AIToolError(SkyStudioVoiceLibraryErrors.uncharged(error)) }
     }
 
     /// `/models` 的 `voice_consent.per_recording`：问句照它的英文原文，交的时候带它的版本。读不到就不问、不传。

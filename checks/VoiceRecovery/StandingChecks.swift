@@ -15,7 +15,14 @@ import SrtFlowMCPKit
 func runVoiceStandingChecks(_ root: URL) async throws {
     let access = AIAccessStore.shared
     let mode = access.mode
-    defer { access.setMode(mode) }
+    // 这一组花掉的（好几笔 MiniMax 版、设计）还回去：同一天的账跨组累计，后面的组（各自把额度设成 1,000）不该因为这一组被拦下。
+    let spend = SkyStudioSpendStore.shared
+    let spentBefore = spend.spentToday()
+    defer {
+        access.setMode(mode)
+        let spentHere = spend.spentToday() - spentBefore
+        if spentHere > 0 { spend.refund(spentHere, on: Date()) }
+    }
     try await standingLibraryChecks(root)
     try await missingStandingChecks(root)
     try await refusedStandingChecks(root)

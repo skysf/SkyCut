@@ -7,6 +7,7 @@ import SrtFlowMCPKit
 // - list_voices：预设按语言 + 我的声音；声音库用不了（503 voice_library_unavailable）照回预设，`mine` 说暂时用不了；只要预设就不问声音库。
 // - create：先问授权（问句带服务器那句英文和版本），没点头之前什么都不传；点过头才传 voice_reference、建声音（consent: true + 版本、
 //   idempotency_key、用了哪一段）；换一段录音的令牌不认。
+// - add_reference（2026-11-10 案例，T 的免费冒烟）：声音已经有这种语言就当场说，不问、不读文件、不传；问句写声音的名字，不写 id。
 // - delete：请求批准模式问一句、点过头才发 DELETE；全部权限直接删；存储一时不可用再发一次。
 // - design：先报价、问一次性费用（带价），没点头不起任务；点过头记账、起 voice_design 任务、get_job 报新声音和样音；本机账按实收。
 // - add_voiceover 用声音库的声音：报价要建 MiniMax 版时先问（不交任何一批）；skip_one_time 照不花钱的那个读（voice_clone、params.voice、
@@ -16,6 +17,7 @@ import SrtFlowMCPKit
 func runVoiceLibraryChecks(_ root: URL) async throws {
     try await listChecks(root)
     try await createChecks(root)
+    try await addReferenceChecks(root)
     try await deleteChecks(root)
     try await designChecks(root)
     try await narrationChecks(root)
@@ -69,6 +71,28 @@ private func createChecks(_ root: URL) async throws {
             && creation?["reference_url"] == "skystudio-private://voice/uploads/u/1.wav"
             && creation?["source"]?["file_name"] == "my-voice.wav" && creation?["idempotency_key"]?.stringValue?.count == 32,
             "POST /voices carries this recording's consent, its version, the private upload name, the part used and a stable key")
+}
+
+@MainActor
+private func addReferenceChecks(_ root: URL) async throws {
+    let fixture = try VoiceLibraryFixture(folder: root.appendingPathComponent("library-add-reference"))
+    let file = try fixture.recording()
+    let voice = JSONValue.string(VoiceLibraryHTTP.voiceID)
+    // 夹具里的声音「Sky」已经有英文：再加英文要在问之前就说，什么都不传。
+    do {
+        _ = try await fixture.manage(["action": "add_reference", "file": .string(file.path), "voice": voice, "language": "en"])
+        require(false, "a language the voice already has is refused before anything is asked")
+    } catch let error as AIToolError {
+        require(error.message.contains("The voice \"Sky\" already has a recording in English") && error.message.contains("Nothing was sent"),
+                "a language the voice already has is refused before anything is asked, naming the voice (got \(error.message))")
+    }
+    require(VoiceLibraryHTTP.calls("POST", "/uploads").isEmpty && VoiceLibraryHTTP.calls("POST", "/references").isEmpty,
+            "nothing is uploaded or sent for a language the voice already has")
+    // 新的一种语言：问授权，问句写声音的名字、不写 id。
+    let asked = try await fixture.manage(["action": "add_reference", "file": .string(file.path), "voice": voice, "language": "zh"])
+    let question = asked.payload["question"]?.stringValue ?? ""
+    require(asked.payload["confirm_token"] != nil && question.contains("to the voice \"Sky\"") && !question.contains(VoiceLibraryHTTP.voiceID),
+            "the consent question names the voice, not its id (got \(question))")
 }
 
 @MainActor

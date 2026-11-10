@@ -129,7 +129,9 @@
    **问授权**（`SkyStudioJobGate.voiceConsent`，问句带 `/models` 的 `voice_consent.per_recording` 英文原文和版本，AI 照会话语言转述）→ 点过头才传
    `voice_reference`、`POST /voices`（`consent: true` + 版本、`source` 写用了哪一段、`idempotency_key` 从令牌绑的身份算）或 `POST /voices/{id}/references`。
    令牌绑**完整身份**（`SkyStudioVoiceApproval.Recording`）：文件路径、大小、修改时间、做好的那段 WAV 的 SHA-256、用的那一段、语言、名字 / 声音、版本，外加账户戳；
-   换任何一样另发一张。全部权限 + 有效的长期授权不问，带 `consent: "standing_grant"`（第 7 条）。`consent: true` 和 `"standing_grant"` 只在这个文件、
+   换任何一样另发一张。全部权限 + 有效的长期授权不问，带 `consent: "standing_grant"`（第 7 条）。**加一种语言**（`add_reference`）读到 Key 先 `GET /voices/{id}`：
+   已经有这种语言就当场说（`SkyStudioVoiceLibraryErrors.referenceExists`，和服务器的 409 同一句）、什么都不问不传；问句写声音的**名字**，令牌照旧绑 id
+   （[案例](../bugfixes/2026-11-10-add-reference-asks-before-reading-the-voice.md)）。`consent: true` 和 `"standing_grant"` 只在这个文件、
    `voiceConsent` 放行之后造（`checks/sky-studio-wiring/voice-library.sh`）。录音的语言这一刀要 AI 给（本机检测随界面那一刀接）。
 4. **设计**（`SkyStudioVoiceDesignTool`）：先 `/quote`（`voice_design`、`model: auto`，描述的语言决定 MiniMax / Qwen3，SkyCut 不挑），再问一次性费用
    （`SkyStudioJobGate.voiceOneTime`：先判每日硬预算，问句「约多少（最多多少）」），点过头记账、起任务（`SkyStudioVoiceLibraryJob`：`get_job` 报新声音、

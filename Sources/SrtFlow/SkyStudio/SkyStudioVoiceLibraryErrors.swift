@@ -35,6 +35,12 @@ enum SkyStudioVoiceLibraryErrors {
     /// 这个账号的声音库里没有这个 id（或正在删、已经看不见）。
     static func isNotFound(_ error: Error) -> Bool { server(error)?.code == "not_found" }
 
+    /// 这个声音已经有这种语言的参考（一种语言一段）：服务器回 409 `reference_exists`，加之前本机读到的（SkyStudioVoiceRecordingTool）也照这一句说。
+    static func referenceExists(languageName: String, voice: String?) -> String {
+        "\(voice.map { "The voice \"\($0)\"" } ?? "This voice") already has a recording in \(languageName): one per language. To replace it, "
+            + "delete the voice and create it again."
+    }
+
     /// 带 `consent: "standing_grant"` 被拒：长期授权刚被撤（别的 Mac 关了全部权限）或文案升了版本。照方案 4.5 问一次。
     static func refusedStanding(_ error: Error) -> Bool {
         guard let server = server(error), server.code == "invalid_request" else { return false }
@@ -62,8 +68,7 @@ enum SkyStudioVoiceLibraryErrors {
             return "The user's voice library is full (at most \(limit ?? "50") voices). Delete one with manage_voices action=delete "
                 + "first. Nothing was charged."
         case SkyStudioVoiceCodes.referenceExists:
-            return "This voice already has a recording in \(language): one per language. To replace it, delete the voice and create "
-                + "it again. Nothing was changed."
+            return referenceExists(languageName: language, voice: nil) + " Nothing was changed."
         case SkyStudioVoiceCodes.minimaxVoiceExists:
             return "This voice already has its MiniMax version for \(language); nothing was charged. Call add_voiceover again."
         case "not_found":
