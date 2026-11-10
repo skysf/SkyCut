@@ -201,6 +201,7 @@ run_check "preference-reduce-keeps-value（扫描守卫：量出来的尺寸不�
 run_check "list-section-not-equatable（扫描守卫：List 里带 Section 的视图不许套 .equatable()）" checks/list-section-not-equatable.sh
 run_check "blocking-media-reads（扫描守卫）" checks/blocking-media-reads.sh
 run_check "docs-index-drift（扫描守卫）" checks/docs-index-drift.sh
+run_check "report-evidence-no-local-paths（扫描守卫：实测证据里没有本机的绝对路径）" checks/report-evidence-no-local-paths.sh
 run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在词表里）" checks/sfx-catalog.sh
 run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
