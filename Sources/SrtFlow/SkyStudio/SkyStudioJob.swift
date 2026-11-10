@@ -5,13 +5,16 @@ import SrtFlowMCPKit
 //
 // 管什么：`/quote`、`/jobs` 要发的那一份（kind、model、prompt、inputs、params；`/jobs` 另带 max_credits 和 idempotency_key），
 // 回来的报价（credits、typical_seconds、upscale 的 plan），任务此刻怎样（status、phase、排队位置、隔多久再问、扣了多少、成品），
-// 取消的结果。读得宽：认不出的字段不管、少了可选的不算错；少了必须的（报价没有 credits、任务没有 job_id、做完没有成品地址）就不算回答。
+// 取消的结果。声音任务多出来的（voice_plan、每批的积分、一次性费用、变声 / 建声音的结果）读成 SkyStudioVoiceQuote /
+// SkyStudioVoiceOutcome / SkyStudioVoiceJobResult，挂在报价和任务状态上。
+// 读得宽：认不出的字段不管、少了可选的不算错；少了必须的（报价没有 credits、任务没有 job_id、做完没有成品地址）就不算回答。
 // 合同：Sky Studio 仓库 docs/agents/skycut-api.md「POST /quote」「POST /jobs」「GET /jobs/{id}」「POST /jobs/{id}/cancel」「Per kind」
 // （2026-10-28 上线，从 Sky Studio main 的 5c8d6a0d 起冻结）。
 // 不管什么：发请求（SkyStudioAPI）、等它做完（SkyStudioJobRun）、每种活怎么拼参数（upscale、生成、配旁白各自的调用方）。
 
 struct SkyStudioJobRequest: Equatable, Sendable, Codable {
-    /// `upscale`、`image`、`text_to_video`、`image_to_video`、`lipsync`、`music`、`voice`、`sound_effect`、`voice_clone`。
+    /// `upscale`、`image`、`text_to_video`、`image_to_video`、`lipsync`、`music`、`voice`、`sound_effect`、`voice_clone`，
+    /// 和声音的三种新活 `voice_enroll`、`voice_design`、`voice_convert`（SkyStudioVoiceKind）。
     var kind: String
     /// Sky Studio 自己的模型名（`/models` 的 id），不是 fal 的端点号。
     var model: String
@@ -112,6 +115,12 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
     var model: String?
     var effectiveParams: [String: JSONValue] = [:]
     var billingPolicy: JSONValue?
+    /// 正常情况下大概收多少（`credits` 是按「最多」预留的上限，交任务时当 `max_credits`）；界面写「约 X，最多 Y」。
+    var creditsExpected: Double?
+    /// `exact`（交的时候就定了）/ `actual_output`（做完按实际输出结算，多的退）。
+    var settlement: String?
+    /// 声音的那几样：服务器选的模型、每批多少、一次性费用（SkyStudioVoiceQuote）。
+    var voice: SkyStudioVoiceQuote?
 
     init(credits: Double, typicalSeconds: Double? = nil, plan: [String: JSONValue] = [:], officialRecipe: SkyStudioOfficialRecipeQuote? = nil) {
         self.credits = credits
@@ -126,6 +135,12 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
         model = json["model"]?.stringValue
         effectiveParams = json["effective_params"]?.objectValue ?? [:]
         billingPolicy = json["billing_policy"]
+        creditsExpected = json["credits_expected"]?.doubleValue
+        settlement = json["settlement"]?.stringValue
+        if SkyStudioVoiceQuote.isPresent(in: json) {
+            guard let voice = SkyStudioVoiceQuote(json: json) else { return nil }
+            self.voice = voice
+        }
         if let official = json["official_recipe"] {
             guard let parsed = try? SkyStudioOfficialRecipeQuote(json: official) else { return nil }
             officialRecipe = parsed
@@ -167,6 +182,12 @@ struct SkyStudioJobStatus: Equatable, Sendable {
     var characterOperation: String?
     var characterStatus: String?
     var characterResult: JSONValue?
+    /// 声音任务：服务器选的模型（202 和 `GET /jobs/{id}` 顶层带，结果里也带）。
+    var voicePlan: SkyStudioVoiceModelPlan?
+    /// 声音任务做完时实际跑的模型、有没有换备用。
+    var voiceOutcome: SkyStudioVoiceOutcome?
+    /// 没有 `url` 的声音结果：变声的两个文件、建 MiniMax 版 / 设计回的声音。
+    var voiceResult: SkyStudioVoiceJobResult?
 
     var isFinished: Bool { state == .done || state == .failed || state == .cancelled }
 
@@ -198,7 +219,12 @@ struct SkyStudioJobStatus: Equatable, Sendable {
             guard let parsed = try? SkyStudioCharacterUsage(json: usage) else { return nil }
             characterUsage = parsed
         }
-        if let result = json["result"], !result.isNull { self.result = SkyStudioJobResult(json: result) }
+        if let result = json["result"], !result.isNull {
+            self.result = SkyStudioJobResult(json: result)
+            voiceOutcome = SkyStudioVoiceOutcome(json: result)
+            if self.result == nil { voiceResult = SkyStudioVoiceJobResult(json: result) }
+        }
+        voicePlan = SkyStudioVoiceModelPlan(json: json["voice_plan"]) ?? voiceOutcome?.plan
         error = Self.errorText(json["error"])
         if let error { failure = SkyStudioJobFailure(message: error, fields: json["error"]?.objectValue ?? [:], jobID: id) }
         if state == .failed || state == .cancelled, failure == nil { failure = SkyStudioJobFailure(message: "Sky Studio job \(state?.rawValue ?? "failed").", jobID: id) }
