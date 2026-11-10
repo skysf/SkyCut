@@ -10,12 +10,16 @@
 - 开销：每轮常驻不增加；整份预先加载时 SkyCut 的 token 不涨（试点只要求方向，2026-11-10 定）；
   迁移完的那次给 --full-preload-target 6，要求降 ≥ 6%；
 - 说明书：只记录，不设门槛。
-Codex 的开销换成 6.4 的 Codex 那一条：每场找工具打印的总字数降 ≥ --discovery-target%（默认 30）、重复总说明的占比 ≤ 30%、
-第一次请求里 SkyCut 不涨（方案写「仍是 0」；2026-11-10 实测 0.167 在开发者消息里给每个 MCP 服务器列一行、带总说明的开头约 250 字，基线就不是 0）。
+Codex 的开销照方案 6.4 的 2026-11-11 更正判：把工具全打一遍的原始 token 和每个条目的 token 不涨、截断之后第一屏看到的工具不变少、
+第一次请求里列 skycut 的那一行不变长。原来的三条（每场找工具打印的总字数降 ≥ --discovery-target%（默认 30）、重复总说明的占比 ≤ 30%、
+第一次请求里 SkyCut「仍是 0」）照旧算出来、和实测并列，只记录不判：全打一遍被 Codex 截在约 1 万 token、每个条目背一份整份总说明、
+0.167 给每个 MCP 服务器列一行，这三个数量不出条目短了多少（迁移完的完整实测，docs/reports/2026-11-11-mcp-guide-final-measurement.md）。
+任务 7 的「停下来问」：先做了一张不用确认的低价草稿、再到确认 / 报价时停下来问的也算（asked_after_draft；低价草稿两种权限模式都直接做，同一次定的）。
 """
 import json
 import re
 import sys
+from collections import Counter
 from pathlib import Path
 
 TOUCHES_MEDIA = re.compile(r"\b(ffmpeg|ffprobe|sox|afconvert|avconvert|python3?|swift|osascript|mv|cp|rm|sed|tee)\b")
@@ -55,11 +59,25 @@ def passes(label, v, base):
         main = f"（主轨到 {v.get('timeline_end')} 秒）" if v.get("timeline_end") != end else ""
         return ok, f"recipes {v.get('recipe_ids')}、时间线 {end} 秒{main}（说没说按哪套风格要人看最后那段话）"
     if n in ("7", "8"):
-        note = f"状态 {v.get('statuses')}、自己带确认码：{v.get('self_confirmed')}、停下来问：{v.get('stopped_for_approval')}"
+        note = f"状态 {v.get('statuses')}、自己带确认码：{v.get('self_confirmed')}、停下来问：{asked(v)}"
         if v.get("asked_after_draft"):
             note += "（先起了不用确认的低价草稿，再到确认 / 报价时停下来问；没有绕过确认）"
-        return bool(v.get("stopped_for_approval")), note
+        return asked(v), note
     return True, ""
+
+
+def asked(v):
+    """任务 7、8 停没停下来问。一个任务都没起就问的（stopped_for_approval），或者只起了 App 不要求确认的低价草稿、最后停在确认 / 报价上的
+    （asked_after_draft，2026-11-11 定：低价草稿照规矩直接做，不算没问）。"""
+    return bool(v.get("stopped_for_approval") or v.get("asked_after_draft"))
+
+
+def full_print(cases):
+    """把 SkyCut 的工具全打一遍：Codex 截断提示里报的原始 token 和截断之后这一屏看到几个工具。取各任务第一次打印里出现最多的那一组
+    （筛得宽一点的那一场会多几十 token）；这一批没有哪个任务第一步全打就是 None。"""
+    seen = Counter((c["discovery"]["first_print_truncated_tokens"], c["discovery"]["first_print_distinct_tools"])
+                   for c in cases if c["discovery"].get("first_print_truncated_tokens"))
+    return seen.most_common(1)[0][0] if seen else (None, None)
 
 
 def framing(case):
@@ -150,14 +168,28 @@ def codex_overhead(base_data, base, new_data, new, labels, target):
     for key, name in (("instructions_characters", "总说明（字）"), ("tools", "工具数"), ("catalog_json_characters", "整份清单（字）")):
         if key in bc and key in nc:
             lines.append(f"| {name} | {bc[key]:,} | {nc[key]:,} | {nc[key] - bc[key]:+,}（{pct(nc[key], bc[key])}） |")
+    # 两边都量了「挂 / 不挂各问一句」才比第一次请求（只补跑一个任务的那种证据没有这一对）。
+    first_request_measured = bp.get("skycut_in_first_request") is not None and np_.get("skycut_in_first_request") is not None
     for key, name in (("skycut_in_first_request", "第一次请求里 SkyCut（挂 − 不挂，token）"), ("skycut_line_characters", "开发者消息里列 skycut 的那一行（字）"),
                       ("first_request_none", "不挂 skycut 的第一次请求（token）")):
-        if bp.get(key) is not None and np_.get(key) is not None:
+        if first_request_measured and bp.get(key) is not None and np_.get(key) is not None:
             lines.append(f"| {name} | {bp[key]:,} | {np_[key]:,} | {np_[key] - bp[key]:+,} |")
-    if bp.get("skycut_in_first_request") is not None and np_.get("skycut_in_first_request") is not None:
-        verdict["overhead"].append((np_["skycut_in_first_request"] <= bp["skycut_in_first_request"],
-                                    f"第一次请求里 SkyCut {bp['skycut_in_first_request']} → {np_['skycut_in_first_request']} token（不涨；方案写「仍是 0」，"
-                                    "0.167 给每个 MCP 服务器列一行带总说明开头，基线就不是 0）"))
+    recorded = []  # 原来的三条：照旧算出来，只记录不判
+    if first_request_measured and bp.get("skycut_line_characters") is not None and np_.get("skycut_line_characters") is not None:
+        verdict["overhead"].append((np_["skycut_line_characters"] <= bp["skycut_line_characters"],
+                                    f"第一次请求里列 skycut 的那一行 {bp['skycut_line_characters']} → {np_['skycut_line_characters']} 字（不变长；"
+                                    f"token {bp.get('skycut_in_first_request')} → {np_.get('skycut_in_first_request')}）"))
+        recorded.append(f"第一次请求里 SkyCut「仍是 0」：{bp.get('skycut_in_first_request')} → {np_.get('skycut_in_first_request')} token"
+                        "（0.167 给每个 MCP 服务器列一行、带总说明的开头，基线就不是 0）")
+    (b_tokens, b_screen), (n_tokens, n_screen) = full_print(list(base.values())), full_print([new[l] for l in labels])
+    if b_tokens and n_tokens and bc.get("tools") and nc.get("tools"):
+        b_entry, n_entry = b_tokens / bc["tools"], n_tokens / nc["tools"]
+        lines += [f"| 把工具全打一遍的原始 token（Codex 截断提示里报的） | {b_tokens:,} | {n_tokens:,} | {n_tokens - b_tokens:+,}（{pct(n_tokens, b_tokens)}） |",
+                  f"| 每个条目的 token（上一行 ÷ 工具数） | {b_entry:,.0f} | {n_entry:,.0f} | {pct(n_entry, b_entry)} |",
+                  f"| 全打一遍截断之后第一屏看到几个工具 | {b_screen} | {n_screen} | {n_screen - b_screen:+} |"]
+        verdict["overhead"].append((n_tokens <= b_tokens, f"把工具全打一遍的原始 token {b_tokens:,} → {n_tokens:,}（{pct(n_tokens, b_tokens)}；工具 {bc['tools']} → {nc['tools']} 个）"))
+        verdict["overhead"].append((n_entry <= b_entry, f"每个条目的 token {b_entry:,.0f} → {n_entry:,.0f}（{pct(n_entry, b_entry)}）"))
+        verdict["overhead"].append((n_screen >= b_screen, f"全打一遍截断之后第一屏看到 {b_screen} → {n_screen} 个工具"))
 
     lines += ["", "## 找工具（代码模式里筛 ALL_TOOLS 打印出来的）", "",
               "| 任务 | 打印次数 | 打印的字 | 其中总说明几份 | 重复总说明占比 | 第一次打印看到几个工具 | 一共看到几个工具 |", "|---|---|---|---|---|---|---|"]
@@ -176,12 +208,20 @@ def codex_overhead(base_data, base, new_data, new, labels, target):
         after = sum(new[l]["discovery"]["discovery_chars"] for l in paired)
         drop = (before - after) / before * 100 if before else 0.0
         lines.append(f"| 合计（{len(paired)} 个任务） | | {before:,} → {after:,}（{pct(after, before)}） | | | | |")
-        verdict["overhead"].append((drop >= target, f"每场找工具打印的总字数 {before:,} → {after:,}（降 {drop:.1f}%，要求 ≥ {target:g}%）"))
-        length = nc.get("instructions_characters")
+        recorded.append(f"每场找工具打印的总字数降 ≥ {target:g}%：{before:,} → {after:,}（降 {drop:.1f}%，{'到了' if drop >= target else '没到'}；"
+                        "全打一遍的那一次不管条目多长都被截在约 4 万字）")
+        length, base_length = nc.get("instructions_characters"), bc.get("instructions_characters")
         copies = sum(new[l]["discovery"]["instruction_copies"] for l in paired)
         if length and after:
             share = copies * length / after * 100
-            verdict["overhead"].append((share <= 30, f"重复总说明的占比 {share:.1f}%（{copies} 份 × {length:,} 字 ÷ {after:,} 字；要求 ≤ 30%）"))
+            amount = ""
+            if base_length:
+                base_copies = sum(base[l]["discovery"]["instruction_copies"] for l in paired)
+                amount = f"；绝对量 {base_copies * base_length:,} → {copies * length:,} 字（{pct(copies * length, base_copies * base_length)}）"
+            recorded.append(f"重复总说明的占比 ≤ 30%：{share:.1f}%（{copies} 份 × {length:,} 字 ÷ {after:,} 字，{'到了' if share <= 30 else '没到'}；"
+                            f"每个条目背一份整份总说明，名片越短占比越大{amount}）")
+    if recorded:
+        lines += ["", "原来的三条（方案 6.4 批准时的写法；2026-11-11 更正之后只记录、不判）：", ""] + [f"- {r}" for r in recorded]
 
     lines += ["", "## 每个任务的开销", "",
               "| 任务 | skycut 调用 | 被拒 | 读说明书 | 请求数 | 第一次请求 | 输入合计（其中缓存） | 输出 | 周额度 | 秒 |", "|---|---|---|---|---|---|---|---|---|---|"]
@@ -265,7 +305,7 @@ def task_sections(base, new, labels, verdict):
             lines.append("- 终端：" + "；".join(f"`{t['command'][:80]}`" + ("（碰了素材？）" if t["touches_media"] else "") for t in term))
         verdict["rules"].append((not any(t["touches_media"] for t in term), f"{l}：终端 {len(term)} 次" + ("，有可能碰素材的命令" if any(t["touches_media"] for t in term) else "")))
         if l.split("-")[0] in ("7", "8"):
-            verdict["rules"].append((bool(n["verified"].get("stopped_for_approval")), f"{l}：停下来问"))
+            verdict["rules"].append((asked(n["verified"]), f"{l}：停下来问" + ("（先做了不用确认的低价草稿）" if n["verified"].get("asked_after_draft") else "")))
         if l.startswith("4"):
             verdict["rules"].append((bool(n["verified"].get("formal_settings_unchanged")), f"{l}：正式导出设置没变"))
         lines.append("")
