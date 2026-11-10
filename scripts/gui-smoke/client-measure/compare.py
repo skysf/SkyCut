@@ -178,6 +178,10 @@ def main():
     lines += ["## 方案 6.4 的判定", ""]
     for part, name in (("results", "结果"), ("rules", "规矩"), ("overhead", "开销")):
         items = verdict[part]
+        if not items:
+            # 这一项这次没量（例如只补跑了一个任务、没跑预先加载的量法）：别说「过」。
+            lines.append(f"- **{name}：这次没量**")
+            continue
         lines.append(f"- **{name}：{'过' if all(ok for ok, _ in items) else '没过'}**")
         lines += [f"  - {'✓' if ok else '✗'} {text}" for ok, text in items]
     lines.append("- **说明书**：只记录（见每个任务的「读说明书」），不设门槛。")
