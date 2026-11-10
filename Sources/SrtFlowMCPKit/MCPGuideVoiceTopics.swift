@@ -148,7 +148,8 @@ enum MCPGuideVoiceTopics {
     retries them with the same model instead. A plain resume recovers what exists and asks again (same confirm_token).
     - Reopen the original project first; resume refuses another project. It never inserts twice, not even after the \
     user undid the insertion.
-    get_job lists completed_line_indices, not_generated_line_indices, unknown_batch_indices and the recovery arguments.
+    get_job lists completed_line_indices, not_generated_line_indices, unknown_batch_indices, unknown_line_indices (sent, \
+    outcome not known yet) and the recovery arguments. After a stop, message says where each batch stopped.
     """)
 
     // 出处：ai-control-mcp.md 第四节第 34、35 条（本机的声音、下载、语速）。

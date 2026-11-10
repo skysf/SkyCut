@@ -14,10 +14,12 @@ import SrtFlowMCPKit
         _ = NSApplication.shared
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SRTFLOW_VOICE_RECOVERY_CHECK_DIR"]!)
         do {
+            await runKeepAwakeChecks()
             try await recoveryChecks(root)
             try await runVoiceStartChecks(root)
             try await runVoiceRecoveryTimingChecks(root)
             try await runVoiceConcurrencyChecks(root)
+            try await runVoiceStopChecks(root)
             try await runVoiceLibraryChecks(root)
             try await runVoiceFallbackFeeChecks(root)
             await runVoicePaidAudioChecks(root)
@@ -25,6 +27,8 @@ import SrtFlowMCPKit
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
         }
+        // 每个声音任务都还了不降速的那一份（AIKeepAwake）：领了不还，断言永远不放。
+        require(AIKeepAwake.shared.holders == 0, "every AI job in these checks gave its keep-awake lease back (\(AIKeepAwake.shared.holders) left)")
         ProjectTeardown.stopPreview(OpenProjects.shared.primary)
         UserDefaults.standard.removePersistentDomain(forName: domain)
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
@@ -34,6 +38,7 @@ import SrtFlowMCPKit
             + "estimated long line, stable files, durable receipt, six clips/cues, one undo/redo, unknown-submit refusal, packed narration, "
             + "eleven-v4 / estimated subtitle timing, model install before paying and re-quote when it fails, script words in subtitles, mixed timing"
             + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version, a mid-script fallback fee asked in get_job and answered with resume (skip or build)"
+            + "; stopping parallel batches says where each batch stopped and lists the unknown batch's lines; AI work holds a keep-awake lease and gives it back"
             + "; paid audio never stuck: a Traditional Chinese batch transcribed in Simplified, long-line halves at 24 kHz and 44.1 kHz, "
             + "a packed batch without usable word times on a Mac that cannot transcribe; voice.note in get_job while running and after a failure")
         exit(0)

@@ -168,6 +168,9 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         let pending = generatedLines.subtracting(completed).sorted()
         let missingBatches = missing.filter { plan.batches[$0].speech.parts.contains { outputs[$0.line] == nil } }
         let missingLines = Set(missingBatches.flatMap { plan.batches[$0].speech.parts.map(\.line) }).subtracting(completed).sorted()
+        // 结果不明的那几批（交上去了、没成品也不算没生成：停的时候已经开始了、或者没拿到任务号）的句子：不列出来，按句子读的 AI 以为它们不存在
+        // （docs/bugfixes/2026-11-10-voiceover-stop-reports-one-batch.md）。
+        let unknownLines = Set(unresolved.flatMap { plan.batches[$0].speech.parts.map(\.line) }).subtracting(completed).sorted()
         let batchDetails: [JSONValue] = batches.indices.map { index in
             let batch = batches[index]
             let locallyCompleted = plan.batches[index].speech.parts.allSatisfy { outputs[$0.line] != nil }
@@ -188,7 +191,7 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
             "recovery_file": .string(recoveryFile), "batches": .array(batchDetails),
             "completed_line_indices": list(completed), "pending_recovery_line_indices": list(pending),
             "not_generated_line_indices": list(missingLines), "not_generated_batch_indices": list(missingBatches),
-            "unknown_batch_indices": list(unresolved), "list_indices_are_zero_based": true,
+            "unknown_batch_indices": list(unresolved), "unknown_line_indices": list(unknownLines), "list_indices_are_zero_based": true,
             "files": .array(completed.compactMap { outputs[$0].map { .string($0.url.path) } }),
             "credits_charged": .number(batches.reduce(0) { $0 + $1.charged }),
             "credits_unknown": .number(batches.reduce(0) { $0 + $1.uncertain }),

@@ -54,6 +54,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
     /// eleven-v4 的 `words` 用不了：null，或者报的字对不回原文（字母全换成 x）。
     enum BrokenWords { case null, wrongLetters }
     static var brokenWords: BrokenWords?
+    /// 这一场自己答的请求（方法、路径 → 状态码、JSON；nil 照常）：StopChecks 用它答取消和停下之后的原单。调用时已经拿着锁。
+    static var override: ((String, String) -> (Int, JSONValue)?)?
     static let catalog: JSONValue = {
         let data = FileManager.default.contents(atPath: "checks/SkyStudio/Fixtures/models-voice-2026-11-10.json") ?? Data()
         return (try? JSONValue.decode(data)) ?? [:]
@@ -73,7 +75,7 @@ final class VoiceRecoveryHTTP: URLProtocol {
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
         oneTimeAt = nil; enrolls = []; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
         open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
-        lowRate = []; brokenWords = nil
+        lowRate = []; brokenWords = nil; override = nil
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
         // 同一个音（约 562 Hz）、同样 6 秒，24 kHz。
@@ -114,7 +116,9 @@ final class VoiceRecoveryHTTP: URLProtocol {
         var status = 200
         var value: JSONValue = [:]
         var bytes: Data?
-        if path.hasSuffix("/models") {
+        if let (code, answer) = Self.override?(method, path) {
+            status = code; value = answer
+        } else if path.hasSuffix("/models") {
             value = Self.cappedCatalog()
         } else if path.hasSuffix("/quote") {
             if let (code, answer) = Self.quoteFailure { status = code; value = answer } else { value = Self.quote(body) }
