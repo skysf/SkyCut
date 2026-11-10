@@ -127,5 +127,10 @@ private func longLineChecks(_ root: URL) async throws {
     let record = try SkyStudioVoiceRecoveryStore.read(URL(fileURLWithPath: done["recovery_file"]?.stringValue ?? ""))
     let words = record.outputs[0]?.words ?? []
     require(words.map(\.text).joined() == line && words.map(\.start) == words.map(\.start).sorted(),
-            "the halves are joined in their original order (got \(words.map(\.text).joined()))")
+            "the subtitle words are the script's, in order (got \(words.map(\.text).joined()))")
+    // 字幕的字永远照稿子（声音 PR 5），光看字的先后看不出拼反了：要看时间 —— 前半（6 秒）在前，后半的第一个词在 6 秒前后开口。
+    let first = words.first?.start ?? -1
+    let secondHalf = words.first { $0.text.trimmingCharacters(in: .whitespaces) == "nine" }?.start ?? -1
+    require(first >= 0 && first < 1 && secondHalf > 5.5 && secondHalf < 7,
+            "the halves are joined in their original order: One opens the clip, nine starts after the first half (One at \(first), nine at \(secondHalf))")
 }
