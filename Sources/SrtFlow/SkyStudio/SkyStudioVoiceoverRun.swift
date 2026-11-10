@@ -136,8 +136,8 @@ final class SkyStudioVoiceoverRun {
         }
         guard recovery.value.ready else {
             try await recovery.save()
-            // 中途备用的一次性费用还在等答复（普通 resume）：同一个问题、同一张令牌再给一遍（SkyStudioVoiceFallbackFee）。
-            if let waiting = await SkyStudioVoiceFallbackFee.waiting(recovery, services: services) { extra.merge(waiting) { _, new in new } }
+            // 中途备用的一次性费用还在等答复（普通 resume）：同一个问题、同一张令牌再给一遍；全部权限 + 长期授权就直接建（SkyStudioVoiceFallbackFee）。
+            if let waiting = await SkyStudioVoiceFallbackFee.waiting(recovery, project: project, services: services) { extra.merge(waiting) { _, new in new } }
             return finish(.failed, "Available audio was recovered. Some batches have not been generated; resume with generate_missing=true to generate only those batches.")
         }
         stage = .insertion
@@ -200,12 +200,13 @@ final class SkyStudioVoiceoverRun {
             }
             if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, let recovery {
                 // 默认模型出错、备用要先花一次性费用（SkyCut 声音方案 4.5）：这一批停下、没扣钱，别的批照常收好；补上价、记下、问用户
-                // （SkyStudioVoiceFallbackFee：resume + confirm_token 建、resume + skip_one_time 用原来的模型重试）。问不了就只说重试的办法。
+                // （SkyStudioVoiceFallbackFee：resume + confirm_token 建、resume + skip_one_time 用原来的模型重试；全部权限 + 长期授权直接建）。
+                // 问不了就只说重试的办法。
                 extra["next_step"] = .string("One batch failed on Sky Studio and its fallback first needs a one-time fee (failure.one_time); "
                     + "nothing was charged for that batch and the other batches are kept. SkyCut could not price that fee now. "
                     + "Tell the user. To retry the missing batches with the same model, call add_voiceover resume=recovery_file "
                     + "generate_missing=true. Never send the original lines again.")
-                if let asked = await SkyStudioVoiceFallbackFee.ask(failure, recovery: recovery, services: services) {
+                if let asked = await SkyStudioVoiceFallbackFee.ask(failure, recovery: recovery, project: project, services: services) {
                     extra.merge(asked) { _, new in new }
                 }
             }

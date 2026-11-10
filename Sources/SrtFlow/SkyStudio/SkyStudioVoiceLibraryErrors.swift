@@ -36,6 +36,19 @@ enum SkyStudioVoiceLibraryErrors {
     /// 这个账号的声音库里没有这个 id（或正在删、已经看不见）。
     static func isNotFound(_ error: Error) -> Bool { server(error)?.code == "not_found" }
 
+    /// 这个声音已经有这种语言的参考（一种语言一段）：服务器回 409 `reference_exists`，加之前本机读到的（SkyStudioVoiceRecordingTool）也照这一句说。
+    static func referenceExists(languageName: String, voice: String?) -> String {
+        "\(voice.map { "The voice \"\($0)\"" } ?? "This voice") already has a recording in \(languageName): one per language. To replace it, "
+            + "delete the voice and create it again."
+    }
+
+    /// 带 `consent: "standing_grant"` 被拒：长期授权刚被撤（别的 Mac 关了全部权限）或文案升了版本。照方案 4.5 问一次。
+    static func refusedStanding(_ error: Error) -> Bool {
+        guard let server = server(error), server.code == "invalid_request" else { return false }
+        let reason = server.fields["reason"]?.stringValue
+        return reason == SkyStudioVoiceCodes.Reason.noStandingGrant || reason == SkyStudioVoiceCodes.Reason.consentOutdated
+    }
+
     /// 服务器的错误是哪一种（给 AI 的话和界面上的话都从这一份分，SkyCut 声音方案 4.6、5.1）。`limit` 是服务器报的那个数写成的字。
     enum Kind: Equatable {
         /// 声音库用不了（私有声音桶没配）。
@@ -103,8 +116,7 @@ enum SkyStudioVoiceLibraryErrors {
             return "The user's voice library is full (at most \(limit ?? "50") voices). Delete one with manage_voices action=delete "
                 + "first. Nothing was charged."
         case .referenceExists(let language):
-            return "This voice already has a recording in \(name(language)): one per language. To replace it, delete the voice and create "
-                + "it again. Nothing was changed."
+            return referenceExists(languageName: name(language), voice: nil) + " Nothing was changed."
         case .minimaxVoiceExists(let language):
             return "This voice already has its MiniMax version for \(name(language)); nothing was charged. Call add_voiceover again."
         case .notFound:

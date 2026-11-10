@@ -120,7 +120,7 @@ final class NewVoiceModel: ObservableObject {
     /// 开了全部权限、这个账号有有效的长期授权：那一勾默认勾上（用户动过就不替他改）。
     func presetAgreementFromStandingGrant(access: AIAccessStore? = nil) async {
         guard (access ?? AIAccessStore.shared).mode == .full, !agreementTouched, case .success(let key) = await store.currentKey(),
-              let state = try? await store.api.voiceConsentGrant(key: key), state.hasActiveGrant, !agreementTouched else { return }
+              await SkyStudioVoiceStanding.shared.hasActiveGrant(key: key, api: store.api), !agreementTouched else { return }
         agreed = true
     }
 

@@ -398,15 +398,20 @@
       "one_time": true,
       "accepts_auto": true,
       "price": {
-        "per": "request",
+        "per": "1000_characters",
+        "counted": [
+          "prompt",
+          "params.sample_text"
+        ],
         "credits": 22.5,
+        "minimum_credits": 22.5,
         "typical_credits": 22.5,
         "settlement": "exact"
       },
       "params": {
         "name": "the new voice's name, 1–80 characters",
         "language": "ISO 639-1, optional: the description's language when the text alone does not say",
-        "sample_text": "optional: the sentence the sample reads"
+        "sample_text": "optional: the sentence the sample reads; its characters count toward the price"
       },
       "languages": [
         "en",
