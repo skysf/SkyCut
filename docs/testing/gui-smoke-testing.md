@@ -492,7 +492,8 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 
 量「每一轮模型读了多少 SkyCut 的字、找工具花了多少、八个任务选没选对、规矩守没守」。脚本在 `scripts/gui-smoke/client-measure/`，
 和 2026-11-03 那一轮（四之九）同一套隔离，只是身份、端口能换（并行的会话互不相撞）、每个任务前重启 App（干净的状态、不会开满 8 个工程）。
-**每次开跑前先问用户**（方案第八节第 8 条：用用户自己的 Claude Code / Codex 额度）。不花 Sky Studio 积分（假 Sky Studio）、不碰用户的工程、正式版和测试版。
+用用户自己的 Claude Code / Codex 额度：方案第八节第 8 条原定**每次开跑前先问用户**；2026-11-10 用户同意方案剩下的两次 Claude Code 实测（试点、全部迁移完）直接跑，Codex 那一半照旧等额度、命令里写死 gpt-6.1-sol / max。不花 Sky Studio 积分（假 Sky Studio）、不碰用户的工程、正式版和测试版。
+要和以前的某一次比，组装那一次的提交（基线 `7a9d8c9`、试点 `08fa1b3`），用**同一个母版**（`MEASURE_FIXTURE`）和同一份 `tasks.json`，输入才一样。
 
 1. **组装**：在要量的那个提交上 `swift build --arch arm64`，然后
    `MEASURE_DIR=<环境> smoke-env.sh assemble <仓库>`（拷出 App 和小程序、ffmpeg、假服务的最小仓库布局；之后仓库可以换提交）、
@@ -507,7 +508,16 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 4. **出表**：`report.py <runs/名字>`（Claude Code：每次请求的 token、ToolSearch 取了哪些、skycut 调用和被拒、读说明书、八个任务的落盘断言）；
    `report_codex.py <rollout.jsonl>`（Codex：每次请求的 token、代码模式里找工具打印了多少、几份重复的总说明、第一次打印看到几个工具）。
    `report_codex.py` 的量法拿 2026-11-03 那四场核对过，四行数字和方案 1.4 的表逐项相同。
-5. **收尾**：`smoke-env.sh stop`（停 App 和假服务，删这个测试身份的钥匙串项、设置、支持目录）。证据 JSON 里路径换成 `$RUN`。
+   **对照**：`compare.py <基线证据.json> <这次证据.json> [--tasks 1,4,5,7] [--full-preload-target 6]`：每轮常驻和整份预先加载、每个任务的开销、
+   选的工具、落盘断言、被拒后几次改对、终端、读说明书（第一次用之前 / 用过之后 / 这一场没调它），最后按方案 6.4 判。比开销看**输入合计**
+   （新 + 读缓存 + 写缓存），别比 Claude Code 报的花费：花费跟着缓存冷热走 —— 一批里第一个任务的第一次请求要把公共前缀写进缓存，
+   试点的任务 1 因此多写了约 9 千 token、花费 +26%，输入合计反而 −1.9%（[试点实测](../reports/2026-11-10-mcp-guide-pilot.md)）。
+5. **收尾**：`smoke-env.sh stop`（停 App 和假服务，删这个测试身份的钥匙串项、设置、支持目录）。
+6. **证据进仓库之前**：`report.py` 把路径换成 `$RUN`（这个任务的目录）和 `~`：模型在回答里会把路径写短（`/tmp/…/work/…`）、
+   跑完改过名的目录里记着旧名字，凡是指到某个 `work` 目录的临时路径都换成 `$RUN/work`；还剩绝对路径就在 stderr 打一行。
+   临时目录的名字里带着用户的账户名，**证据里不许有本机路径**：`checks/report-evidence-no-local-paths.sh` 扫 `docs/reports/*.json` 和这个目录自带的 JSON
+   （开发时手跑的调用表别跟着拷进来：组装母版的调用表由 `make_fixture.sh` 现写在临时目录里）
+   （[案例](../bugfixes/2026-11-10-measurement-evidence-local-paths.md)）。
 
 ## 五、要真实窗口、但已经自动化了的检查
 

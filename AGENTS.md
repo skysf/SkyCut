@@ -334,7 +334,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   结果里带选择、各段位置和每个视图重算了几次）：`scripts/gui-smoke/in-process/run.sh <步骤.json> [工程拷贝]`。
   **要图形会话，不在 `check-all.sh` 里**；格式与坑见 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md)「四之六」。
 - **真客户端实测**（真 Claude Code / Codex 跑八个任务：每轮 SkyCut 常驻多少 token、整份预先加载多少、找工具花多少、选没选对、规矩守没守）：
-  `scripts/gui-smoke/client-measure/`。用用户自己的额度、**每次开跑前问用户**，隔离的测试身份 + 假 Sky Studio，**不在 `check-all.sh` 里**；见 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md)「四之十」。
+  `scripts/gui-smoke/client-measure/`（`compare.py` 和上一次对照、按方案 6.4 判）。用用户自己的额度、**每次开跑前问用户**（2026-11-10 用户同意方案剩下的两次 Claude Code 实测直接跑），隔离的测试身份 + 假 Sky Studio，**不在 `check-all.sh` 里**；见 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md)「四之十」。
+- 实测证据（`docs/reports/*.json`）和实测脚本自带的数据（`scripts/gui-smoke/client-measure/*.json`）里没有本机的绝对路径（临时目录的名字里带着账户名）：`checks/report-evidence-no-local-paths.sh`。
 - **扮成 AI 客户端驱动测试版**（MCP 冒烟：起 App 包里的 `skycut-mcp`，照 JSON 调用表发工具调用，`look` 的图存成 jpg）：
   `scripts/gui-smoke/mcp-client/client.py`。要装好的测试版、素材复制到 scratchpad，见 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md)「四之七」。
 - 跨 App 的文件拖放重放（自带拖源，Finder 不吃合成事件）：
@@ -434,6 +435,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 ## 规划与实施报告索引
 
 - [MCP 按需说明的基线实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半 2026-11-11 跑。
+
+- [MCP 按需说明的试点实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；Codex 一半 2026-11-11 跑。
 
 - [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
@@ -693,6 +696,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-10 实测证据里漏了本机路径（带着账户名）](docs/bugfixes/2026-11-10-measurement-evidence-local-paths.md) — `report.py` 只换这个任务的目录前缀，跑完改过名的目录和模型写短的路径漏过去；改成按形状换（指到 work 的临时路径、家目录）、剩下的打提醒，`checks/report-evidence-no-local-paths.sh` 扫进仓库的证据；顺带删掉 #354 误带进来的两份草稿调用表。
 - [2026-11-10 浮点素材里有坏采样，做克隆参考录音时整个 App 崩掉](docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md) — `Int16(clamping: Int(…))` 在夹住之前 `Int(_:)` 就对 NaN / ±Inf / 特别大的数 trap；先排除非有限数、在浮点上夹范围，坏采样记 0；带 NaN 的 32 位浮点素材真走 `prepare` 的回归，撤掉修复当场崩。
 - [2026-11-10 参考录音的有声门限借了配音响度的常量，比服务器宽一点点](docs/bugfixes/2026-11-10-voice-reference-floor-borrowed-from-voice-level.md) — 借 `AIVoiceLevel.activeFloor`（0.0056 ≈ −45.04 dBFS）却写成「−45 dBFS」，服务器照字面更严，贴边样本 SkyCut 收、服务器拒；合同改成 SkyCut 0.0056、服务器放宽到 0.0055，常量单独写死，扫描守卫钉住不再借。
 - [2026-11-10 克隆的参考录音被降到 16 kHz、默认只截 10 秒](docs/bugfixes/2026-11-10-voice-reference-16khz-short-sample.md) — 参考段复用了字幕生成的 16 kHz 读取器、zonos2 的「默认 10 秒、夹在 5–30」、报错说 5 秒实际 3 秒就收；改成 44.1 kHz、10 秒有效人声到 3 分钟、超过自动挑一段，门限和报错只从一处来，两边一致的口径写进声音库。
