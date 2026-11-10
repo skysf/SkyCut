@@ -69,10 +69,12 @@ enum MCPGuideVoiceLibraryTopics {
             add_reference adds a recording in another language to voice: one reference per language; a \
             language that has one is reference_exists (delete and create again to replace it). SkyCut uses at most 3 minutes: \
             start and end pick the part, and a longer file is trimmed to the 3 minutes with the most speech; the result says \
-            which part. It needs at least 10 seconds of clear speech (too_little_speech otherwise). Free. Every recording first \
-            returns needs_confirmation with Sky Studio's consent statement: the user must confirm it is their own voice or that \
-            the speaker agreed; translate the statement for the user, then repeat the same call with confirm_token. Files \
-            outside the opened folder also ask before reading. 50 voices per account (voice_limit).
+            which part. It needs at least 10 seconds of clear speech (too_little_speech otherwise). Free. In ask mode every \
+            recording first returns needs_confirmation with Sky Studio's consent statement: the user must confirm it is their \
+            own voice or that the speaker agreed; translate the statement for the user, then repeat the same call with \
+            confirm_token; a file outside the opened folder also asks before it is read. In full access mode nothing asks once \
+            the user's standing voice consent is on record; without it the first recording asks once. 50 voices per account \
+            (voice_limit).
             """),
             MCPGuideSection(name: "design", about: "design from a description: the one-time fee, the job and its sample_url", text: """
             design creates a new voice from description (how it sounds; a Chinese description designs on MiniMax, any other \

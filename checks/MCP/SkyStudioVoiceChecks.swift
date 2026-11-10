@@ -219,6 +219,13 @@ private func voiceLibraryGuideChecks() {
         check(createSection.contains(phrase), "the manage_voices create section says \"\(phrase)\"")
     }
     check(!createSection.contains("name and language"), "the create section no longer lists language as needed")
+    // 问不问按权限模式（声音 PR 7）：请求批准模式每段录音都先问；全部权限有长期授权就不问、没有的第一次问一次。不许再写成「每段录音都先问」。
+    for phrase in ["In ask mode every recording first returns needs_confirmation",
+                   "In full access mode nothing asks once the user's standing voice consent is on record",
+                   "without it the first recording asks once"] {
+        check(createSection.contains(phrase), "the manage_voices create section says \"\(phrase)\"")
+    }
+    check(!createSection.contains("Every recording first returns"), "the create section does not say every recording asks in every mode")
     check(manageTopic.examples.contains { $0["action"] == "add_reference" && $0["language"] == nil },
           "one manage_voices example leaves language out")
     let map = guideMapText()
