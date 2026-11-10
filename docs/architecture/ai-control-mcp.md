@@ -588,8 +588,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      清单是远程数据，路径不许跳出模型目录（`KokoroVoiceManifest`）。怎么传上去见 [本机配音模型的整理与上传](../build/voice-model-pipeline.md)。
      `get_status` 的 `srtflow_voices` 报下没下。冒烟用 `SRTFLOW_VOICES_DIR` 换一个地方下，不碰用户那一份。
    - **挑音色**（`AIVoiceRole` / `AIVoiceChoice`）：八个角色各对应一个音色（用户听样音定的：中文 zf_xiaoyi / zf_xiaoxiao / zm_yunxi，
-     英文 af_bella / af_heart / am_fenrir，英式 bf_emma / bm_george），角色名和小程序的词表对账；54 个音色都能按名字点；没点名按文字的
-     语言用默认的那个。Kokoro 能读 8 种语言（英、普通话、日、西、法、意、巴西葡萄牙、印地），别的语言用 macOS 的声音。
+     英文 af_bella / af_heart / am_fenrir，英式 bf_emma / bm_george），角色名和小程序的词表对账；54 个音色都能按名字点；没点名时中英文用旁白角色
+     （zh_male / en_male 的音色，2026-11-10 起：和 Sky Studio 不点名的 gemini:Charon 同一个人设，SkyCut 声音方案 4.3），别的语言用那种语言默认的那个。Kokoro 能读 8 种语言（英、普通话、日、西、法、意、巴西葡萄牙、印地），别的语言用 macOS 的声音。
      没下载时用 macOS 的声音，结果里带「SrtFlow 自己的声音好得多，可以直接下载」（总说明和工具说明都写着，让 AI 知道）。
    - **读一句**（`KokoroVoiceSpeech`，在 `MediaReadQueue.voice` 上，模型闲置两分钟卸掉）：模型一次最多 128 个 token、5 秒声音。
      **放得下就整句读**（`KokoroVoicePieces.whole`，模型自己会在句号处停）；读不下才切成两半：句末 → 逗号 → 空隙，各挑离正中最近的
@@ -709,9 +709,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      令牌绑定完整请求与精确报价，不只显示摘要。配旁白整体预算不足同样暂停，不以退档绕开硬预算。
    - 图生视频的首帧图、克隆的素材都会传给 Sky Studio：点名文件夹以外的先问一次（同读别处的文件，`confirmReading` 的动词是
      「send to Sky Studio」）。
-40. **云端配旁白与克隆（`add_voiceover`，方案第 42、52 条，2026-10-29 起走 Sky Studio）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。点名本机音色仍照点名。云端立刻回 `job_id`，Key / 模型 / 全部报价在任务里核对，调用方只等 `get_job`；普通服务不可用可退本机并在 `voice.note` 说明，硬预算不足暂停不换声，克隆不退档、不索要越额确认码。全批预留积分后逐批提交 / 结算，未知提交保留账并报任务号与幂等 key，不重生成。
-    普通旁白拼全部全局时间 chunk，词的尾端按实际媒体时长夹住。克隆读取服务端语言 cap、按 code points 合批，多句共一单；参考素材截 WAV 上传一次，成品在本机转写对齐后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。完整合同、免费冒烟和人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)。
-    **失败恢复（2026-11-01）**：云端生成、本地分句、字幕对齐分别报 `failure_stage`；每批原音频、原文映射、原单与进度持久保留。`add_voiceover resume=<recovery_file>` 默认只处理已有结果；`generate_missing=true` 才报价 / 生成明确没成功的批次，未知单只 GET 不重放。`get_job` 返回完成 / 待恢复 / 未生成清单及恢复参数。入轨前记稳定 UUID、成功记回执，重复恢复或用户撤销后重试均不重复插入。实现与可重开工程恢复边界见上述任务文档第五节。
+40. **云端配旁白（`add_voiceover`，方案第 42 条，2026-10-29 起走 Sky Studio；2026-11-10 声音 PR 3 起照 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.2–4.4）**：声音三档 Sky Studio > SkyCut 自己的（Kokoro，第 35 条）> macOS（第 34 条）。
+    - **认声音**（`SkyStudioVoicePick`，4.3 的顺序）：不给 = `/models` 里 `default: true` 的预设（现在是 `gemini:Charon`，男声）；8 个角色照 `/models` 的 `voice_roles`（SkyCut 不写死，旧的 Eleven 角色表删了）；`gemini:<名字>` 或不带前缀的预设名；`eleven:<名字>`；不带前缀的旧 Eleven 名（`Rachel` 这类）不再收。英式男声碰上不是英文的文字改用那种语言的男声角色（没有就用默认预设）并在 `voice.note` 说一声。点名 Kokoro 的音色、这台 Mac 的声音照点名，不走云端。没有 Key 时不点名的默认改成旁白角色（中文 `zh_male`、英文 `en_male`，和 Charon 同一个人设）。
+    - **`model`**：不给 = `auto`，服务器选；点名的要在 `/models` 里有（读稿的那几个），不然当场拒。
+    - **整段报价挪到回任务号之前**（`SkyStudioVoiceoverStart`）：静默读 Key → `/models`（缓存 10 分钟）→ 分批（普通旁白现在一句一单、上限读 `limits.max_characters_by_language`）→ **整段 `POST /quote` 一次**（`params.batches`、拉丁字母的非英文稿带 `params.language`）→ 要字幕而选中的模型不报字的时间（`/models` 的 `output.words`，Gemini 不报）时先确认这台 Mac 能转写，不能就在花钱之前拒 → 按每批的 credits 整体预留，额度不够当场回 `daily_budget_exceeded`、什么都不起、不换声音 → 起任务，回 `job_id` + `voice_plan` + `voice.note`（服务器的 warnings、英式男声、语速被忽略），有 note 时 `next_step` 叫 AI 在用户听之前先转告。
+    - **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认）当场换本机的声音（角色照旧、预设按它在这种语言里的性别挑角色），`voice.note` 说为什么；服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持）原话转给 AI、一分不花、不换声音。付费请求交出去之后不再退本机。
+    - 任务里：每批 `/jobs` 带同一个 `params.plan`（`voice_plan.selection`，整段一个模型）和这一批报价的 credits 当 `max_credits`；逐批结算，未知提交保留账并报任务号与幂等 key，不重生成。词时间：Eleven v4 拼全部全局时间 chunk、尾端按实际媒体时长夹住；不报字的模型在本机转写对齐。合批（声音库的声音、以后的普通旁白）在本机转写后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。
+    - **`clone_from` 去掉了**（决定第七节第 8 条）：带了就是说明上没有的参数名，整个调用不做；克隆一律先进声音库（`manage_voices`，声音 PR 6）。
+    - 名片照 MCP 按需说明的新规矩写（≤ 450，固定说法），用法在说明书的 `add_voiceover` 主题（`MCPGuideVoiceTopics`，第一个手写的主题，[MCP 说明书](mcp-guide.md)）。
+    完整合同、免费冒烟和人工清单见 [Sky Studio 的任务](sky-studio-jobs.md) 第五节。
+    **失败恢复（2026-11-01）**：云端生成、本地分句、字幕对齐分别报 `failure_stage`；每批原音频、原文映射、原单与进度持久保留。`add_voiceover resume=<recovery_file>` 默认只处理已有结果；`generate_missing=true` 才报价 / 生成明确没成功的批次（照记录里的 `voice_plan.selection` 再报价，服务器回的选择不一样就不交：恢复不重新选模型），未知单只 GET 不重放。恢复记录 2026-11-10 起是 version 2（记整段的选择、每批实际跑的模型和 `fallback_used`），只认 version 2。`get_job` 返回完成 / 待恢复 / 未生成清单、`voice_plan`、每批的 `model` / `fallback_used` 及恢复参数。入轨前记稳定 UUID、成功记回执，重复恢复或用户撤销后重试均不重复插入。实现与可重开工程恢复边界见上述任务文档第五节。
 
 41. **婚礼工程那一轮之后补的五条小规矩（2026-09-29，[案例](../bugfixes/2026-09-29-mcp-tool-followups-from-wedding-session.md)）**：
     ① 说明里写的记号客户端会照字面传：`set_text` 的 `text` 把字面的 `\n` 也当换行（`AITextChange.unescapingNewlines`）。
@@ -935,6 +942,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - 值是 null 的不算；`project` 哪个工具都能带（不收它的工具带了也不碍事，子代理被要求每次都带）；里层没写字段的对象（`generate_media` 的 `options`）照收。
     - **实现里认、说明上没写的别名要登记进 `MCPArgumentCheck.aliases`**（现在只有 `set_shape` 的 `length`），不然会被挡掉；能写进说明更好。
       新加的参数只要写进说明就自动认（`ArgumentCheckChecks` 拿每个工具说明上的全部名字验一遍）。
+    - **会回 `needs_confirmation` 的工具说明里要有 `confirm_token`**：问的那一处（`AIWorkspace.confirmReading`、`SkyStudioJobGate`……）从参数里读令牌，
+      说明上没有它，点过头再调就被这里挡掉、永远做不成（`add_voiceover` 撞过，[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。
+      `GuideWrittenChecks` 钉着：名片写着 `needs_confirmation` 的工具都收 `confirm_token`。
     守卫：`checks/MCP/ArgumentCheckChecks.swift`（冒烟里那次原样的调用、null、project、猜名字、别名、两层里层、自由对象、每个工具说明上的全部名字），
     `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
 53. **照授权拦：没开通的，AI 的工具一个都不做（收费方案第 5 刀第二步，2026-10-28；规矩全在 [Sky Studio 账号](sky-studio-account.md)）**：

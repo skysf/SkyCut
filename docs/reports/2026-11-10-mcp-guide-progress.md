@@ -12,6 +12,7 @@
 | 1a `fix/mcp-guide-review-followups` | 2026-11-10 合并（#348） | 审查 review-344 第 1–4、6、7 条：fields 写全参数定义的事实、说明书不等授权、守卫按行首 / 路径认、例子 / related / 凭据的守卫、只给 section 时说清楚、进度挪到这里 |
 | 2 `feat/mcp-guide-map-and-pointers` | 进行中 | 按任务分组的地图（2,617 字）、rules / conventions / paid / workflows / errors 五个通用主题、总说明 2,037 → 1,115 字（目录搬进地图）、报错指路（两处，含 review-344 第 9 条：被挡住时说 `skycut_guide` 照常能用）；全清单 107,198 → 107,276（说明书的名片 383 → 429） |
 | 3 `feat/mcp-cards-pilot` | 未做 | 试点 5 个工具；`fields` 一节太长时怎么拆（review-344 第 5 条）；真客户端小测和实测脚本 |
+| （声音 PR 3）`feat/voiceover-auto-model` | 2026-11-10 开 PR | 试点之前先迁了 `add_voiceover`（协调者定：试点 5 个工具里没有它）：名片 1,069 → 444、第一个手写的工具主题（`MCPGuideTopics.written`、`MCPGuideVoiceTopics` 六节）、`GuideWrittenChecks`；行为同时改了（声音方案 4.2–4.4），所以主题是按新行为重写的，旧说明每一句去了哪写在那个 PR 里。试点要是改了写法，再开小 PR 跟着改 |
 | 4–5 | 未做 | 两批搬完：名片 ≤ 450（目标 350）、参数说明 ≤ 120（目标 80）、主题写全（先把说明原样搬进主题、再写名片） |
 | 6 `chore/mcp-catalog-budget` | 未做 | 收紧上限（全清单 100,000 等，方案 4.1）、三处 110,000 并成一处、文档 |
 | 7 `feat/codex-schema-size-on-connect` | 未做 | 连接 Codex 时写 `tool_input_schema_max_bytes = 8192`（先实测） |

@@ -41,6 +41,10 @@
    类型（含 `["string","null"]` 这种并集、`anyOf` / `oneOf` 的每一种写法和它自己的可选值）、必填、可选的值（任何类型：数字的也写）、范围写成数字、
    条数和长度的上下限、能不能带别的字段、说明，里层（对象、数组里的对象、`anyOf` 里的对象）往里缩进（[案例](../bugfixes/2026-11-10-guide-fields-drop-schema-facts.md)）。
    以后的 PR 改短名片之前，**先把说明原样搬进主题**（一个字不丢），再写名片；手写的节里提到的工具名、参数名、选项值必须真的存在。
+   **手写了的工具主题**（`MCPGuideTopics.written(for:)` 挑，按工具组分文件、每个 ≤ 400 行）：第一节 `overview`、几节手写的、例子和相关主题，`fields` 照旧现算、
+   接在最后；概要不再等于名片原文（GuideChecks 只对没手写的工具查「概要 = 说明原文」）。第一个是 `add_voiceover`（声音 PR 3，`MCPGuideVoiceTopics`：
+   voices / models / paid / subtitles / recovery / local_voices 六节，合起来超过 6,000，第一次只回概要 + 有哪些节）。它的说明是按新行为重写的
+   （声音 PR 3 同时改了 `add_voiceover` 的行为），旧说明的每一句去了哪写在那个 PR 里。名片和手写的几节跟地图、通用主题一起查名字（`runGuideWordingChecks`）。
 6. **一次回多少**（量整份结果的 JSON 文字，UTF-16 —— App 原样写成一段文字交给客户端，模型读的就是它）：目录 ≤ 5,000；
    一个主题第一次回的、每一节 ≤ 6,000（方案定的硬限 8,000；守卫按 6,000 查，写超了就拆节）。放得下整份回（第一节不加标题，其余加
    「## 名字」）；放不下先回 `overview` + 有哪些节 + `next_step`，再按 `section` 取。
@@ -83,6 +87,9 @@
 - `checks/SkyStudio/GateChecks.swift`（`scripts/check-sky-studio.sh`）：`alwaysAnswered` 正好是 `get_status` 和 `skycut_guide`，没 Key / 免费版时只有这两个让用；
   `answeredBeforeLicenseCheck` 正好是 `skycut_guide`、是 `alwaysAnswered` 的子集；`ProNoticeChecks` 同一口径。
 - `checks/sky-studio-wiring.sh` 第 5 节：`aiRefusal` 放行 `answeredBeforeLicenseCheck` 的那一句在 `await settledLicense(` 之前。
+- `checks/MCP/GuideWrittenChecks.swift`（手写了主题的工具）：名片 ≤ 450、参数说明 ≤ 120 且有范围的写着那几个数、参数定义 ≤ 4,500 字节、`fields` 不手写、有例子；
+  `add_voiceover` 名片的固定说法、六节、地图「Paid」那一行带着它；名片写着 `needs_confirmation` 的工具都收 `confirm_token`
+  （[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。名字、例子、`related`、凭据照上面两条（`GuideChecks`、`GuideContentChecks`）查，不另写一份。
 - `checks/MCP/CatalogTextChecks.swift`：总说明点到 `skycut_guide`（「目录里有清单的每个工具名」，PR 2 起改查说明书的地图）。
 
 **反向验证（2026-11-10，PR 1）**：每条单独临时弄坏、跑真的守卫、确认变红、再恢复（恢复后工作区和提交逐字节一致）。
