@@ -122,6 +122,7 @@ enum VoiceReferenceSample {
         // 有的往下取、差的往上取（到 0.1 秒）：两个数加起来不少于 10，也不会写出「还差 0.0 秒」。
         let have = (voiced * 10).rounded(.down) / 10
         let missing = max(0.1, ((minimum - voiced) * 10).rounded(.up) / 10)
+        // reason 和服务器 invalid_request 的同名（SkyStudioVoiceCodes.Reason.tooLittleSpeech）：AI 两边看到的是同一个词。
         throw AIToolError(
             "The voice sample from \(name) has only \(String(format: "%.1f", have)) s of clear speech; it needs at least "
                 + "\(Int(minimum)) s (\(String(format: "%.1f", missing)) s more). Use a recording of one person talking for "
