@@ -426,7 +426,14 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 
 日志必须保留真实退出码：`scripts/gui-smoke/run-logged.sh <日志> <命令> [参数…]`。不要用被测命令后面的 echo 当结果。共享客户端在 `scripts/gui-smoke/mcpclient.py`：EOF、坏 JSON、坏 id 类型（列表、对象、布尔）和 RPC 错误立即唤醒等待者并失败；超时表示结果未知，先核查任务和账，不重交付费请求。
 
-先 `swift build --arch arm64`，再设置 `SRTFLOW_FFMPEG=<仓库>/vendor/ffmpeg`：
+先 `swift build --arch arm64`，再设置 `SRTFLOW_FFMPEG=<仓库>/vendor/ffmpeg`（worktree 里没有 `vendor/ffmpeg`；仓库在「下载」里，新签名的测试 App 去跑它可能弹 TCC 框，
+最好拷一份到测试目录、指过去）。
+
+**同一台机器上几个会话同时跑**（2026-11-10 起）：默认的身份 `com.srtflow.SrtFlow.skystudiosmoke` 和端口 18766 是共用的，别人的 `run.sh` 一起手就 `stop` 掉你的
+测试域设置、socket 和钥匙串项，只换 `SKYSTUDIO_SMOKE_DIR` 不够。各自给 `SKYSTUDIO_SMOKE_DIR`、`SKYSTUDIO_SMOKE_BUNDLE`（必须以 `.skystudiosmoke` 结尾，
+假 Key 只认这种身份）、`SKYSTUDIO_SMOKE_PORT`，这一节的脚本都按同样的环境变量找自己的服务和 App。`SKYSTUDIO_SMOKE_CONTROL`（JSON）是假服务起手的
+控制项：`/me` 的两个池（`me_running_jobs`、`me_audio_jobs`，默认照线上 3 / 8，`me_audio_jobs: null` = 还没上声音池的服务器）和读稿每批的字数上限
+（`voice_max_characters`）App 一启动就读、之后缓存着，只能在起服务时给。
 
 1. `scripts/gui-smoke/sky-studio/run.sh` 组装独立 `.skystudiosmoke` App、回环假服务和假 Key；不读取生产 Key，也不发真实收费请求。`SRTFLOW_SMOKE_CACHE_DIR` 只被 `.skystudiosmoke` 身份识别，启动监听和过期扫描前先隔离优化媒体缓存，改上限 / 清空均不动正式版共享缓存。
 2. `python3 scripts/gui-smoke/sky-studio/voice.py` 验证普通旁白（不点名 gemini:Charon、整段报价一次再回任务号、每批同一个 `params.plan`；声音 PR 5 起
@@ -435,6 +442,19 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    （`voice_fixtures.py` 读 `checks/SkyStudio/Fixtures/models-voice-*.json`）。
 3. `scripts/gui-smoke/sky-studio/run.sh 0` 后运行 `python3 scripts/gui-smoke/sky-studio/zero.py`，验证零额度时配旁白在回任务号之前就停（`daily_budget_exceeded`、
    不换本机声音），没有 `/jobs` 与花费。
+3a. **声音库**（声音 PR 6，方案 9.2）：重新 `run.sh` 后 `python3 scripts/gui-smoke/sky-studio/voice_library.py`。假服务的 `/voices`、设计、建 MiniMax 版、
+   用声音库的声音读稿的报价在 `voice_library_fixtures.py`（核对传上来的参考录音是 44.1 kHz 单声道 16-bit WAV）。请求批准、全部权限各走一遍：列声音、
+   用录音新建（授权问句、换了名字的令牌不收、人声不够在传之前就拒）、加一种语言（已有的那种回 `reference_exists`）、改名、删除（问 / 不问、存储一时
+   不可用再发一次）、`voice=voice_…` 读稿（问一次性费用 → `skip_one_time` 照 IndexTTS2 读、一步撤销 → 点头建 MiniMax 版再读）、设计、每日硬预算挡
+   一次性费用、声音库用不了（预设照回，写操作和 `voice_…` 读稿报错、不退本机）、`manage_voices` 不登记撤销。全部权限下建声音的授权这一刀照样问；
+   假服务记着有效的长期授权时（`/voices/consent-grant`，声音 PR 7）脚本改成核对「不问、带 `standing_grant`」。
+3b. **几批同时交、中途换备用**（声音 PR 4–6）：`SKYSTUDIO_SMOKE_CONTROL='{"me_audio_jobs": 2, "me_running_jobs": 1, "voice_max_characters": 80}'` 起
+   `run.sh`，再跑 `voice_concurrency.py` 和 `voice_fallback.py`（两句一批）。假服务的 `hold_kinds` + `POST /__release`（按种类、按先后放行）一步步放批，
+   `pool_full` 让某个池回一次 429，`voice_job_outcomes` 让第几批「中途换了备用」/「备用要先建 MiniMax 版」；`GET /__jobs`、`/__voices` 给脚本核对。
+   前者看声音池 2 个在飞、共用池不被挡、`get_job` 的 `batches_done / batch_count`、中途停（排队的退钱、开始了的照实说、没交的不交）、普通恢复不花钱、
+   `generate_missing` 只补没做的（429 用同一个 key 再交）、一次落地一步撤销；后者看 `line_models` 和 `fallback_needs_one_time` 的问价 / 建 / 补。
+   界面上任务浮层那一行（「n/5 batches · x running · y waiting」）进程内驱动打不开，要人看。
+   **机器满载时别跑**：测试 App 在后台被 App Nap 降到优先级 4，load 20 以上时本机转写、本机 Kokoro 会慢到超时（[报告](../reports/2026-11-10-voice-free-smoke.md)）。
 4. 工程任务卡片：重新 `run.sh` 后运行 `python3 scripts/gui-smoke/sky-studio/project_tasks.py`，留下两个可见工程、一个后台工程与一个已关工程的问题，核对视频 / 音频 / 图片、5 项排队、225 积分、真实 `get_job` 任务号、另一 MCP 会话只读查询及后台开窗。随后按 [任务浮层人工回归](../architecture/sky-studio-jobs.md)第九节点卡片 / 详情 / 打开按钮；夹具会留下窗口，不能把后端开窗通过当作按钮已点通。
 5. 统一设置：`python3 scripts/gui-smoke/sky-studio/settings.py` 验工具发现、五类快照、目录与实际 Store 的选项一致、整次拒绝错误参数、偏好持久化、工程 / 任务不变与密钥不回传。它留中文界面、10 GB 缓存上限、751 积分额度供 GUI 核对；清空只删本轮测试缓存，不更改客户端配置。随后实点三个设置入口与五个分类，并在额度页打开时再次用 MCP 改额度、切走切回，确认双向同步（[工作台回归清单](../architecture/workbench-and-settings.md)）。
 6. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
@@ -452,7 +472,7 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 本次可复盘结果见[发现与选工具实测](../reports/2026-11-03-mcp-discovery-and-task-selection.md)及其中的调用证据。
 
 1. **先隔离**：沿用四之八的 `run.sh`，指定本轮 `SKYSTUDIO_SMOKE_DIR`，构建并启动独立 `.skystudiosmoke` App。
-   默认脚本共用 bundle id 和 18766 端口，同机多个会话要串行；仅换临时目录不够。
+   默认脚本共用 bundle id 和 18766 端口，同机多个会话要串行，或者照四之八各给 `SKYSTUDIO_SMOKE_BUNDLE` / `SKYSTUDIO_SMOKE_PORT`；仅换临时目录不够。
    并行时各自使用临时 App 身份、socket、回环端口和假账号；身份保留 `com.srtflow.SrtFlow` 前缀与
    `.skystudiosmoke` 后缀以限定假 Key / 缓存钩子，驱动显式指向自己的 App 和 socket。
    将现有 `vendor/ffmpeg` 复制到本轮临时目录，用 `SRTFLOW_FFMPEG` 显式指向该副本；检查测试 App 的引擎可用，
