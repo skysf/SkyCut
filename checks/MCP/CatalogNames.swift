@@ -34,6 +34,9 @@ func catalogKnownNames() -> Set<String> {
     // 说明书的通用主题提到的结果字段和报错代码（2026-11-10）：get_timeline 的 edit_limits、get_status 的 skycut_plan、
     // 没存过的工程存下来时的 project_saved_to、每日硬上限的 daily_budget_exceeded、几乎每个结果都有的 next_step、MCP 结果的 isError。
     names.formUnion(["edit_limits", "skycut_plan", "project_saved_to", "daily_budget_exceeded", "next_step", "isError"])
+    // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
+    // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
+    names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
     return names
 }
 

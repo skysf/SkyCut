@@ -18,10 +18,37 @@ public enum MCPGuideFields {
         public let line: String
     }
 
-    /// 整个参数定义的文字。必填的先写（按定义里的顺序），其余按名字排。
-    static func text(for schema: JSONValue) -> String {
-        let lines = entries(for: schema).map(\.line)
-        return lines.isEmpty ? "This tool takes no parameters." : lines.joined(separator: "\n")
+    /// 一节 fields 最多多少字（UTF-16，只算文字）：回答的 JSON 还要加转义和别的键，留出余量后整份仍在 6,000 以内。
+    public static let sectionBudget = 4_500
+
+    /// 参数定义写成的几节：放得下就一节 `fields`；放不下按**整个第一层参数**切成 `fields`、`fields_2`、`fields_3`……（2026-11-10 审查
+    /// review-344 第 5 条：自动导出的一节没法手工拆，哪个参数定义一变长，一节就会超过 6,000 —— 所以由这里自动拆，守卫查每一节）。
+    /// 一个第一层参数连同它的里层不拆开；它自己就超过上限时单独成一节。
+    public static func sections(for schema: JSONValue) -> [MCPGuideSection] {
+        let entries = entries(for: schema)
+        guard !entries.isEmpty else { return [MCPGuideSection(name: "fields", text: "This tool takes no parameters.")] }
+        var groups: [[String]] = []
+        for entry in entries {
+            if entry.path.contains(".") || entry.path.contains("[]"), !groups.isEmpty {
+                groups[groups.count - 1].append(entry.line)
+            } else {
+                groups.append([entry.line])
+            }
+        }
+        var chunks: [[String]] = []
+        for group in groups {
+            if let last = chunks.last, !last.isEmpty,
+               (last + group).joined(separator: "\n").utf16.count > sectionBudget {
+                chunks.append(group)
+            } else if chunks.isEmpty {
+                chunks.append(group)
+            } else {
+                chunks[chunks.count - 1] += group
+            }
+        }
+        return chunks.enumerated().map { index, lines in
+            MCPGuideSection(name: index == 0 ? "fields" : "fields_\(index + 1)", text: lines.joined(separator: "\n"))
+        }
     }
 
     /// 每个参数一条，顺序同 `text`。

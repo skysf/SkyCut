@@ -15,30 +15,25 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Generate with Sky Studio credits; wait with get_job; import via add_clips. get_status models=true lists limits. \
-                kind=image: camera_angle changes viewpoint with one image and camera_angle controls; upscale enlarges one image via \
-                upscale_factor. Video clips use upscale_clip. Both omit prompt; upscale also omits resolution/aspect_ratio. \
-                quote_only never uploads/reserves. Both modes obey the hard daily credit limit. ask_for_approval upgrades need \
-                needs_confirmation: ask, then repeat with confirm_token. full_access proceeds/notifies. \
-                image_to_video uses image/last_image; multimodal uses reference arrays. Official film: get_status film_contract=true \
-                for assets, stable idempotency_key and fresh seam review. Video default: MiniMax H3. Lipsync/cutouts omit prompt. \
-                Unknown/delivery errors: recover original, never replay. Refunds need billing proof; success stays charged in the library. \
-                cancel_job: queued cancellation. Narration: add_voiceover; subtitles: generate_subtitles.
+                Paid (Sky Studio credits): image, video, lipsync, cutout, music or sound effect from a prompt or files; never edits the \
+                timeline (import with add_clips; video upscale: upscale_clip). Returns job_id; wait with get_job. quote_only=true prices \
+                without spending. Over-plan requests return needs_confirmation: ask, then repeat with confirm_token. The daily credit \
+                limit always applies. Read skycut_guide topic=generate_media before the first call.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
-                    "prepare_references": MCPSchema.boolean("Prepare/upload images, no quote/reservation. Omit film/quote_only/tokens; wait via get_job."),
-                    "prepared_references": MCPSchema.string("Real-asset token; repeat paths/roles. Invalid after account/project/file changes."),
+                    "prepare_references": MCPSchema.boolean("Official film: prepare and upload references only (no quote); wait with get_job."),
+                    "prepared_references": MCPSchema.string("Official film: the prepared-references token; invalid after account, project or file changes."),
                     "film": MCPSchema.object([:], description: "Original-film schema: get_status film_contract=true."),
                     "quote_token": MCPSchema.string("Official token; submit unchanged with seam_review."),
                     "seam_review": MCPFilmSchema.review,
                     "prompt": MCPSchema.string("Generators only; media operations omit it."),
-                    "operation": MCPSchema.string("Default generate. camera_angle: qwen-angles; upscale: image-upscale. Neither accepts film.", oneOf: ["generate", "remove_background", "camera_angle", "upscale"]),
+                    "operation": MCPSchema.string("Image job: generate (default), remove_background, camera_angle or upscale; no film.", oneOf: ["generate", "remove_background", "camera_angle", "upscale"]),
                     "camera_angle": MCPSchema.object([
                         "rotate": ["type": "integer", "enum": [-180, -135, -90, -45, 0, 45, 90, 135, 180]],
                         "tilt": ["type": "integer", "enum": [-45, 0, 45]],
                         "zoom": ["type": "integer", "enum": [-1, 0, 1, 2]]
-                    ], description: "Rotate/tilt degrees; zoom stops. Omitted axes=0; all-zero refused. 135 degrees: two calls, price only from /quote."),
+                    ], description: "Rotate / tilt degrees and zoom steps; omitted axes are 0, all zero is refused."),
                     "upscale_factor": MCPSchema.string("Image only, default x2. May be reduced: read actual result size.", oneOf: ["x2", "x3", "x4"]),
                     "idempotency_key": MCPSchema.string("Stable 1-128 chars; reuse unchanged after lost answers."),
                     "video": MCPSchema.string("Local lipsync video; catalog formats."),
@@ -46,13 +41,13 @@ enum MCPGenerationTools {
                     "document": MCPSchema.string("Wan: local document, exclusive with web_url."),
                     "web_url": MCPSchema.string("Wan: public HTTP(S) page, exclusive with document."),
                     "model": MCPSchema.string("Public id; default compatible preference."),
-                    "character_id": MCPSchema.string("Sky Studio character UUID; server-owned references, never a file path. Image/video generation only."),
-                    "character_roles": MCPSchema.array(of: MCPSchema.string("View.", oneOf: ["front", "headshot", "side", "back"]), "Optional unique views; omitted lets the server select within combined caps. Explicit roles are never dropped."),
-                    "character_revision": MCPSchema.string("Opaque revision from the quote; changed views require refresh, requote and fresh approval."),
+                    "character_id": MCPSchema.string("A Sky Studio character id (list_characters), not a file; image and video only."),
+                    "character_roles": MCPSchema.array(of: MCPSchema.string("View.", oneOf: ["front", "headshot", "side", "back"]), "Optional character views; omitted lets the server choose."),
+                    "character_revision": MCPSchema.string("Revision from the quote; pass it back unchanged."),
                     "image_context": MCPSchema.string("Subject; mixed/unclear defaults other.", oneOf: ["asian", "other"]),
                     "quality": MCPSchema.string("Video quality; highest requires unrestricted request.", oneOf: ["standard", "highest"]),
                     "input_mode": MCPSchema.string("Video mode; default inferred.", oneOf: ["frames", "multimodal"]),
-                    "image": MCPSchema.string("Local frame/reference/portrait; camera_angle/upscale: one image or one reference_images entry."),
+                    "image": MCPSchema.string("Local image: first frame, reference or portrait; one image for camera_angle or upscale."),
                     "last_image": MCPSchema.string("Optional final frame with image (frames mode)."),
                     "reference_images": MCPSchema.array(of: MCPSchema.string("Image file path."), "Ordered image references."),
                     "reference_videos": MCPSchema.array(of: MCPSchema.string("MP4/MOV path."), "Ordered videos; catalog limits."),
@@ -66,7 +61,7 @@ enum MCPGenerationTools {
                     "disable_music_track": MCPSchema.boolean("HeyGen: omit provider music, default false."),
                     "enable_speech_enhancement": MCPSchema.boolean("HeyGen speech enhancement; false default."),
                     "start_time": MCPSchema.number("HeyGen source seconds; default 0.", minimum: 0),
-                    "end_time": MCPSchema.number("HeyGen: start < end <= source length; no discount.", minimum: 0),
+                    "end_time": MCPSchema.number("HeyGen: end in source seconds (≥ 0), after start_time.", minimum: 0),
                     "enable_transcription": MCPSchema.boolean("H3 Max: false waveform (default), true transcription."),
                     "enable_prompt_expansion": MCPSchema.boolean("Wan: true; required for document/page."),
                     "enable_thinking": MCPSchema.boolean("Wan: omitted is automatic; document/page requires true."),
@@ -76,12 +71,12 @@ enum MCPGenerationTools {
                     "resolution": MCPSchema.string("Catalog tier; default lowest image/720p-class video. Upgrades need approval."),
                     "quote_only": MCPSchema.boolean("Quote without upload, generation, reservation or charge."),
                     "approval_scope": MCPSchema.string("once default; project needs explicit spec/price-ceiling approval.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("true only for explicit user overrides, never the assistant's plan; budgets still apply."),
+                    "user_requested_overrides": MCPSchema.boolean("true only when the user explicitly asked for this specification; budgets still apply."),
                     "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
                     "generate_audio": MCPSchema.boolean("Video audio toggle, if offered."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
                     "lyrics": MCPSchema.string("Music words; requires instrumental=false."),
-                    "name": MCPSchema.string("File name; default from prompt, or source name plus angle/x2/x3/x4 for image operations."),
+                    "name": MCPSchema.string("File name (default from the prompt, or the source name plus the operation)."),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["kind"]),
                 openWorld: true

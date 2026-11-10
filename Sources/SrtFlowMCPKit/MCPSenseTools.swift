@@ -50,30 +50,25 @@ public enum MCPSenseTools {
         MCPToolDefinition(
             .look, title: "Look at the picture",
             description: """
-            Inspect frames instead of guessing. Without file: composed timeline (tracks, crop, placement, filters, shapes, \
-            text, subtitles), at time/times or count moments across clip_id; default playhead. With file: source seconds; \
-            no times uses count (default 6) across source_in/source_out or the whole file. Returns labelled contact sheet \
-            and Vision guesses (trust the images), face/person/subject/text boxes, brightness and black bars; timeline also \
-            lists visible items. image=false omits pictures. External-file approval follows the AI permission mode. files \
-            samples up to 24 files at their middle. shots=true with video file/clip_id gives shot bounds, middle-frame \
-            descriptions/thumbnails, 24 per call; paginate from=next_from. Long scans return job_id: wait with get_job, \
-            then repeat look. text_scan=true with video file/clip_id samples every 2 seconds for burned-in subtitle bands, \
-            watermarks and slides/screens with boxes; clip_id also reports project subtitle_overlaps.
+            Read-only. See frames instead of guessing: the composed timeline (time/times, or count across clip_id) or a file \
+            (source seconds). Returns a labelled contact sheet plus boxes for faces/people/text, brightness and black bars. Also: \
+            files (up to 24), shots=true (shot bounds), text_scan=true (burned-in subtitles, watermarks). Long scans return job_id; \
+            wait with get_job. Outside files may return needs_confirmation. Details: skycut_guide topic=look.
             """,
             input: MCPSchema.object([
-                "time": MCPSchema.number("One moment, seconds (timeline, or in the file with file).", minimum: 0),
+                "time": MCPSchema.number("One moment, seconds (≥ 0): timeline, or in the file with file.", minimum: 0),
                 "times": MCPSchema.array(of: MCPSchema.number("Seconds."), "Several moments (up to 12)."),
                 "clip_id": MCPSchema.string("Timeline: spread the frames over this clip's part of the timeline."),
-                "file": MCPSchema.string("Look at this media file instead of the timeline (absolute, or relative to the opened folder)."),
-                "source_in": MCPSchema.number("With file and no times: where to start spreading the frames, seconds.", minimum: 0),
-                "source_out": MCPSchema.number("With file and no times: where to stop, seconds.", minimum: 0),
+                "file": MCPSchema.string("A media file instead of the timeline: absolute, or relative to the opened folder."),
+                "source_in": MCPSchema.number("With file and no times: spread frames from here, seconds (≥ 0).", minimum: 0),
+                "source_out": MCPSchema.number("With file and no times: stop here, seconds (≥ 0).", minimum: 0),
                 "count": MCPSchema.integer("How many frames to spread (1–12).", minimum: 1, maximum: 12),
                 "files": MCPSchema.array(of: MCPSchema.string("A media file."), "Several media files at once (up to 24)."),
                 "shots": MCPSchema.boolean("Split file (a video) or clip_id into shots."),
                 "text_scan": MCPSchema.boolean("Scan file (a video) or clip_id for text that stays on screen."),
-                "from": MCPSchema.number("With shots: list shots from this time on (next_from of the last call).", minimum: 0),
+                "from": MCPSchema.number("With shots: start at this second (≥ 0), the previous next_from.", minimum: 0),
                 "size": MCPSchema.string("Picture size (default medium).", oneOf: ["small", "medium", "large"]),
-                "image": MCPSchema.boolean("false: only the text descriptions, no picture (for models that cannot see images)."),
+                "image": MCPSchema.boolean("false: text descriptions only, no picture."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

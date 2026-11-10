@@ -52,13 +52,15 @@ public enum MCPGuideTopics {
         return MCPGuideSharedTopics.all.first { $0.name == name } ?? MCPToolName(rawValue: name).map(topic(for:))
     }
 
-    /// 一个工具的主题：概要 = 它现在的说明原文，字段 = 参数定义写成的文字。
+    /// 一个工具的主题。迁移过的（名片写短了的，MCPGuideWrittenTopics）：手写的几节 + 例子 + 相关主题；没迁移的：概要 = 它现在的说明原文。
+    /// 两种都在最后接上参数定义写成的 fields 几节（MCPGuideFields.sections，太长自动按第一层参数拆）。
     public static func topic(for tool: MCPToolName) -> MCPGuideTopic {
         let definition = tool.definition
-        return MCPGuideTopic(name: tool.rawValue, sections: [
-            MCPGuideSection(name: MCPGuideSection.overview, text: definition.description),
-            MCPGuideSection(name: "fields", text: MCPGuideFields.text(for: definition.inputSchema))
-        ])
+        let fields = MCPGuideFields.sections(for: definition.inputSchema)
+        if let written = MCPGuideWrittenTopics.topic(for: tool) {
+            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + fields, examples: written.examples, related: written.related)
+        }
+        return MCPGuideTopic(name: tool.rawValue, sections: [MCPGuideSection(name: MCPGuideSection.overview, text: definition.description)] + fields)
     }
 
     /// 名字的写法不计较：前后空白、大小写、连字符和空格当下划线（Edit-Clip → edit_clip）。
