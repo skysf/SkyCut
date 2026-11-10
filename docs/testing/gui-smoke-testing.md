@@ -533,6 +533,8 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
    `MEASURE_DIR=<环境> smoke-env.sh assemble <仓库>`（拷出 App 和小程序、ffmpeg、假服务的最小仓库布局；之后仓库可以换提交）、
    `smoke-env.sh start`、`MEASURE_FIXTURE=<母版> make_fixture.sh <仓库>`（合成素材 + 经 MCP 建 `Review.skycut`）。
    身份默认 `com.srtflow.SrtFlow.measure.skystudiosmoke`（必须以 `.skystudiosmoke` 结尾，假 Key 只认这种）、端口 18797。
+   `assemble` 用系统的 `say` 造假服务的那句旁白；`say` 偶尔会挂住不返回（2026-11-11 一次等了 5 分钟）：`assets/narration.wav` 已经在就不再调它，
+   杀掉挂住的 `say`、从上一个环境把这个文件拷过来再 `assemble` 就行。
 2. **Claude Code**：`run_claude.py preload --label <名字>`（一问一答 4 次：默认按需加载 / `ENABLE_TOOL_SEARCH=false` 整份预先加载 ×
    挂 / 不挂 skycut；两两相减 = SkyCut 每轮常驻的 token 和整份清单的 token，真分词器）；`run_claude.py tasks --label <名字>`（八个任务）。
    嵌套的 `claude -p` 用干净的环境变量（不带父会话的 `CLAUDE_CODE_*`、`CMUX_*`）、`--strict-mcp-config` 只挂 skycut、
