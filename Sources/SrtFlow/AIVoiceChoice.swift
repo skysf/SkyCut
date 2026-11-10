@@ -2,10 +2,11 @@ import Foundation
 
 // MARK: - 配音用哪个声音（纯值）
 //
-// 管什么：这一次配音用 Sky Studio 的声音（用户接了 Sky Studio 时最优先，方案第 42 条）、SrtFlow 自己的声音（本机的 Kokoro，方案第 48 条）
-// 还是这台 Mac 的系统声音，用哪一个。Sky Studio 那一档：`skyStudioAvailable`（有 Key、没超额度、Key 读得出来 —— 这些由调用方判断）时，
-// 没点名 / 点名角色 / 点名 ElevenLabs 的音色都走 Sky Studio；点名 Kokoro 的音色或这台 Mac 的声音仍然照点名的来。
-// - 装了 Kokoro、这种语言它能读：用它 —— 点名的 Kokoro 音色、角色对应的音色（AIVoiceRole），或者这种语言默认的那个。
+// 管什么：本机的这一档用 SrtFlow 自己的声音（本机的 Kokoro，方案第 48 条）还是这台 Mac 的系统声音，用哪一个；以及选定之后的那份
+// 「用的是谁」（`engine`：Sky Studio 的预设 id 也记在这里，结果里报）。Sky Studio 那一档（有 Key 时最优先）先由调用方判：
+// 认声音的顺序和预设在 SkyStudioVoicePick（SkyCut 声音方案 4.3），点名 Kokoro 的音色或这台 Mac 的声音仍然照点名的来。
+// - 装了 Kokoro、这种语言它能读：用它 —— 点名的 Kokoro 音色、角色对应的音色（AIVoiceRole），或者这种语言默认的那个
+//   （没点名：中英文是旁白角色 zh_male / en_male，和 Sky Studio 的默认预设 gemini:Charon 一样是男声）。
 // - 没装、或者它读不了这种语言：用系统声音，同语言同性别里高级 > 增强 > 默认（英式角色找英国的声音），没有这个性别就退到
 //   另一个并说一声；只有默认质量时说去哪下载更好的；Kokoro 能读这种语言却没下载时，告诉 AI「SrtFlow 自己的声音好得多，
 //   可以直接下载」（第 50 条：让 AI 知道）。
@@ -38,7 +39,7 @@ struct AIVoiceChoice: Equatable {
         case kokoro(voice: String, language: String)
         /// 这台 Mac 的系统声音。
         case system(Voice)
-        /// Sky Studio 的声音（Eleven v4）：ElevenLabs 的预制音色名。
+        /// Sky Studio 的声音：预设的 id（`gemini:Charon`、`eleven:Daniel`），交给 `/quote`、`/jobs` 的 `params.voice` 就是它。
         case skyStudio(voice: String)
     }
 
@@ -64,24 +65,15 @@ struct AIVoiceChoice: Equatable {
         }
     }
 
+    /// 本机的声音（Kokoro / 这台 Mac 的）。Sky Studio 的那一档在调用方先判（AIVoiceoverInput、SkyStudioVoiceoverStart）。
     /// - Parameters:
-    ///   - requested: 角色名、Kokoro 音色名、系统声音的名字；nil = 按文字的语言挑。
+    ///   - requested: 角色名、Kokoro 音色名、系统声音的名字；nil = 按文字的语言用旁白角色（中英文是男声，和 Sky Studio 的默认一致）。
     ///   - kokoroVoices: 装好的 Kokoro 音色；nil = 没下载。
-    static func choose(_ requested: String?, textLanguage: String, kokoroVoices: [String]?,
-                       installed: [Voice], skyStudioAvailable: Bool = false) throws -> AIVoiceChoice {
-        if skyStudioAvailable, let voice = skyStudioVoice(requested, textLanguage: textLanguage) {
-            return AIVoiceChoice(engine: .skyStudio(voice: voice))
-        }
-        if !skyStudioAvailable, let requested, SkyStudioVoices.named(requested) != nil,
-           !installed.contains(where: { $0.name.caseInsensitiveCompare(requested) == .orderedSame || $0.identifier == requested }) {
-            var fallback = try choose(nil, textLanguage: textLanguage, kokoroVoices: kokoroVoices, installed: installed)
-            fallback.note = [fallback.note, "The Sky Studio voice was not used because no Sky Studio key is configured."].compactMap { $0 }.joined(separator: " ")
-            return fallback
-        }
+    static func choose(_ requested: String?, textLanguage: String, kokoroVoices: [String]?, installed: [Voice]) throws -> AIVoiceChoice {
         if let requested, AIVoiceRole.named(requested) == nil, AIVoiceRole.isKokoroName(requested) {
             return try kokoroByName(requested.lowercased(), textLanguage: textLanguage, installed: kokoroVoices)
         }
-        let role = requested.flatMap(AIVoiceRole.named)
+        let role = requested.map(AIVoiceRole.named) ?? AIVoiceRole.narrator(forLanguage: textLanguage)
         if let requested, role == nil {
             return try systemByName(requested, installed: installed)
         }
@@ -97,11 +89,10 @@ struct AIVoiceChoice: Equatable {
         return choice
     }
 
-    /// Sky Studio 的音色：没点名按文字的语言、点名角色换成对应的音色、点名 ElevenLabs 的预制音色照用；点名别的（Kokoro 的、这台 Mac 的）是 nil。
-    private static func skyStudioVoice(_ requested: String?, textLanguage: String) -> String? {
-        guard let requested else { return SkyStudioVoices.defaultVoice(forLanguage: textLanguage) }
-        if let role = AIVoiceRole.named(requested) { return SkyStudioVoices.voice(for: role) }
-        return SkyStudioVoices.named(requested)
+    /// 这台 Mac 装了这个名字的系统声音（Sky Studio 预设的名字不认识时，不带前缀的名字再按它找）。
+    static func isInstalled(_ name: String, in installed: [Voice]) -> Bool {
+        let wanted = name.lowercased()
+        return installed.filter(isUsable).contains { $0.name.lowercased() == wanted || $0.identifier.lowercased() == wanted }
     }
 
     /// 没下载 SrtFlow 的声音时给 AI 的那一句（第 50 条）。

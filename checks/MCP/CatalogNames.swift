@@ -29,6 +29,11 @@ func catalogKnownNames() -> Set<String> {
     // generate_media（只有存了 Sky Studio 的 Key 才在清单里，但 listJSON 是配好时的全份）的词表和结果字段：卡里提到它们时要对得上。
     names.formUnion(MCPVocabulary.generationKinds + MCPVocabulary.videoResolutions + MCPVocabulary.generationAspects)
     names.formUnion(["credits", "credits_charged", "waiting_for_user", "job_id", "needs_confirmation"])
+    // add_voiceover 的说明书（MCPGuideVoiceTopics）提到的结果字段（SkyStudioVoiceoverRun、SkyStudioVoiceCheckpoint.detail、
+    // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
+    names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
+                     "unknown_batch_indices", "recharge_url", "daily_budget_exceeded"])
+    names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     return names
 }
 

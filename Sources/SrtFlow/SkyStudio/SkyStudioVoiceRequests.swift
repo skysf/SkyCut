@@ -15,7 +15,7 @@ import SrtFlowMCPKit
 // - 两个新上传用途：参考录音 `voice_reference`（VoiceReferenceSample.uploadPurpose）、变声素材 `voice_convert_source`（SkyStudioVoiceUpload），
 //   各 ≤ 35 MB（十进制，上限在 SkyStudioVoiceUpload）。
 // 拼错了（没有字、声音的 id 不像样、批数和报价对不上）在发出去之前就拦下：一分不花、不碰服务器。
-// 不管什么：分批（声音 PR 3）、问不问用户（SkyStudioJobGate）、交和等（SkyStudioJobRun）、模型从哪个记录里挑（调用方读 `/models`）。
+// 不管什么：分批（SkyStudioVoicePlan）、问不问用户（SkyStudioJobGate）、交和等（SkyStudioJobRun）、模型从哪个记录里挑（调用方读 `/models`）。
 
 /// 声音的几种活（`kind`）。
 enum SkyStudioVoiceKind {
@@ -76,7 +76,9 @@ enum SkyStudioVoiceRequests {
     static let autoModel = "auto"
 
     /// 读稿整段报一次价：`params.batches` 代替 prompt；语言提示照 `lines`（原来那几句）判。
-    static func segmentQuote(kind: String, model: String = autoModel, voice: String, batches: [String], lines: [String]) throws -> SkyStudioJobRequest {
+    /// `plan`：恢复时补没生成的批次，照整段当初的选择（`voice_plan.selection`）再报价，服务器不重新选模型（SkyCut 声音方案 8.4）。
+    static func segmentQuote(kind: String, model: String = autoModel, voice: String, batches: [String], lines: [String],
+                             plan: [String: JSONValue]? = nil) throws -> SkyStudioJobRequest {
         guard SkyStudioVoiceKind.reading.contains(kind) else { throw problem("Only narration and cloned reading are quoted as a whole segment.") }
         try checkReadingVoice(voice, kind: kind)
         let model = try checkedModel(model)
@@ -85,6 +87,10 @@ enum SkyStudioVoiceRequests {
         }
         var params: [String: JSONValue] = ["voice": .string(voice), "batches": .array(batches.map(JSONValue.string))]
         if let language = SkyStudioVoiceLanguageHint.hint(for: lines) { params["language"] = .string(language) }
+        if let plan {
+            guard plan["model"]?.stringValue?.isEmpty == false else { throw problem("A plan to quote again needs the model it was quoted with.") }
+            params["plan"] = .object(plan)
+        }
         return SkyStudioJobRequest(kind: kind, model: model, params: params)
     }
 

@@ -54,7 +54,12 @@ private func runGuideTopicChecks() {
             continue
         }
         checkEqual(topic.sections.first?.name, MCPGuideSection.overview, "\(tool.rawValue): the topic starts with its overview")
-        checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
+        if MCPGuideTopics.written(for: tool) == nil {
+            checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
+        } else {
+            // 手写了主题的工具（方案 5.1，第一个是 add_voiceover）：概要不再是名片原文，手写的几节在 GuideWrittenChecks 里查；fields 照旧现算、接在最后。
+            checkEqual(topic.sections.last?.name, "fields", "\(tool.rawValue): a hand-written topic ends with the computed fields")
+        }
         let fields = topic.sections.first { $0.name == "fields" }?.text ?? ""
         for name in (tool.definition.inputSchema["properties"]?.objectValue ?? [:]).keys {
             check(fields.contains("- \(name) ("), "\(tool.rawValue): the fields section lists \(name)")

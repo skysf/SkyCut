@@ -1,4 +1,4 @@
-"""run.sh 0 后：真实 App 的每日硬预算为零：配音 / 克隆暂停，不改成本机音色，没有 /jobs。"""
+"""run.sh 0 后：真实 App 的每日硬预算为零：配音当场停（daily_budget_exceeded，回任务号之前），不改成本机音色，没有 /jobs。"""
 import json
 import os
 from pathlib import Path
@@ -29,19 +29,16 @@ try:
     before_spend = status["generation"]["spent_today_credits"]
     before_logs = json.load(urllib.request.urlopen("http://127.0.0.1:18766/__log"))
     before_jobs = sum(row["path"].endswith("/jobs") for row in before_logs)
-    args = {"lines": [{"text": "The daily limit fallback is working."}], "voice": "Rachel"}
-    started = call("add_voiceover", args)
-    narration = mcp.wait_job(started["job_id"], 180)
-    assert narration["status"] == "failed" and narration["code"] == "daily_budget_exceeded", narration
+    args = {"lines": [{"text": "The daily limit fallback is working."}], "voice": "en_male"}
+    narration = call("add_voiceover", args)
+    assert narration["status"] == "blocked" and narration["code"] == "daily_budget_exceeded" and "job_id" not in narration, narration
     assert "confirm_token" not in narration and "daily_ai_credit_limit" == narration["settings_field"]
-    clone = call("add_voiceover", {**args, "clone_from": "voice-sample.wav"})
-    refused = mcp.wait_job(clone["job_id"], 60)
-    assert refused["status"] == "failed" and refused["code"] == "daily_budget_exceeded", refused
-    assert "confirm_token" not in refused
+    preset = call("add_voiceover", {**args, "voice": "gemini:Charon"})
+    assert preset["status"] == "blocked" and preset["code"] == "daily_budget_exceeded", preset
     logs = json.load(urllib.request.urlopen("http://127.0.0.1:18766/__log"))
     assert sum(row["path"].endswith("/jobs") for row in logs) == before_jobs
     assert call("get_status")["generation"]["spent_today_credits"] == before_spend
-    (D / "zero-results.json").write_text(json.dumps(dict(narration=narration, clone=refused), ensure_ascii=False, indent=2))
-    print("PASS zero daily allowance: narration and clone paused without a voice change, zero paid submissions and zero local spending")
+    (D / "zero-results.json").write_text(json.dumps(dict(narration=narration, preset=preset), ensure_ascii=False, indent=2))
+    print("PASS zero daily allowance: narration paused before job_id without a voice change, zero paid submissions and zero local spending")
 finally:
     mcp.close()

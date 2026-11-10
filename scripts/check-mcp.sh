@@ -427,7 +427,6 @@ xcrun swiftc \
   Sources/SrtFlow/AIGuideTools.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
-  Sources/SrtFlow/SkyStudio/SkyStudioVoices.swift \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/VoiceReferenceSample.swift \
   Sources/SrtFlow/VoiceReferenceReader.swift \

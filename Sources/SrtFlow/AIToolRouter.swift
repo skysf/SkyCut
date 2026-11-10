@@ -229,11 +229,16 @@ final class AIToolRouter {
             if let recovery = try await SkyStudioVoiceRecovery.resumeIfAsked(args, project: project) { return recovery }
             // 只是下载 SrtFlow 自己的声音：回任务号，不改工程。
             if let download = try await AIVoiceoverTool.startDownloadIfAsked(args) { return download }
-            // 克隆的素材要发给 Sky Studio：点名的文件夹以外的先问一次。
-            if let ask = try AIVoiceoverTool.confirmations(args, project) { return ask }
+            var input = try AIVoiceoverInput.read(args, project)
+            // Sky Studio 的声音：整段报价、预留之后回任务号；报价之前用不了就当场换本机的声音，走下面那条路。
+            if input.ask != nil {
+                switch try await SkyStudioVoiceoverStart.start(input, project: project) {
+                case .result(let started): return started
+                case .local(let note, let catalog): input = try input.localFallback(note, catalog: catalog)
+                case .macVoice(let name): input = try input.usingLocal(named: name)
+                }
+            }
             // 先合成（要 await），再把同步的提交包起来（同 edit_clip）。
-            let input = try AIVoiceoverInput.read(args, project)
-            if case .skyStudio = input.choice.engine { return SkyStudioVoiceoverRun(input: input, project: project).start() }
             let plan = try await AIVoiceoverTool.plan(input, project)
             return try AIUndoGrouping.step(undo) { try AIVoiceoverTool.apply(plan, project) }
         case .syncVoiceover: return try AIVoiceoverSyncTool(args, project).start()
