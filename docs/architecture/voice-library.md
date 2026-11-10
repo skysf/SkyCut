@@ -1,8 +1,8 @@
 # 声音库：克隆的参考录音（声音库本身和变声做到时补进来）
 
-> 2026-11-10 起生效（SkyCut 声音 PR 2 `feat/voice-reference-sample`）。方案和拍板在仓库外：`SkyVoiceForClone/plan-drafts/SkyCut-声音方案.md`
-> 第六节、9.1 第 3 条，`SkyVoiceForClone/决定汇总-2026-11-09.md` 第三节第 3 条、第七节第 2 条；服务器那边怎么查录音见
-> `SkyVoiceForClone/plan-drafts/Sky-Studio-声音方案.md` 3.3、3.4。这里只放长期约束。
+> 2026-11-10 起生效（SkyCut 声音 PR 2 `feat/voice-reference-sample`）。方案：[SkyCut 声音方案](../plans/2026-11-09-voice-features.md)
+> 第六节、9.1 第 3 条；拍板在仓库外的 `SkyVoiceForClone/决定汇总-2026-11-09.md` 第三节第 3 条、第七节第 2 条；服务器那边怎么查录音见
+> Sky Studio 那份方案（在 Sky Studio 仓库）3.3、3.4。这里只放长期约束。
 > 声音库（`list_voices` / `manage_voices`，声音 PR 6）、新建声音的界面（PR 8）、变声（`change_voice`，PR 9）做到时补进这份文档。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md) 第五节（云端旁白 / 克隆）、[阻塞的媒体读取](blocking-media-reads.md)、[写代码的规范](coding-standards.md)。
 > 案例：[克隆的参考录音被降到 16 kHz、默认只截 10 秒](../bugfixes/2026-11-10-voice-reference-16khz-short-sample.md)。
