@@ -4,7 +4,7 @@ import Foundation
 //
 // 管什么：AI 调 skycut_guide 时回什么 —— 不带 topic 回地图（MCPGuideMap）；带 topic 回那个主题（短的整份回，长的先回概要 + 有哪些节，
 // 再按 section 取）；写错的 topic 回地图 + 「是不是想要 …」，写错的 section 回那个主题 + 有哪些节。结果是 JSON
-// （`{topic, sections, section, text, examples, related}`，空的不写），同别的工具结果，App 原样写成一段文字交给客户端。
+// （`{topic, sections, contents, section, text, examples, related, next_step}`，空的不写），同别的工具结果，App 原样写成一段文字交给客户端。
 // 不管什么：主题的内容（MCPGuideTopics、MCPGuideSharedTopics）、地图的内容（MCPGuideMap），参数定义怎么写成文字（MCPGuideFields），
 // 谁来答（App 的 AIGuideTools）。
 //
@@ -64,9 +64,11 @@ public enum MCPGuide {
             payload = base(topic)
             payload["section"] = .string(overview.name)
             payload["text"] = .string(overview.text)
-            let rest = topic.sections.dropFirst().map(\.name).joined(separator: ", ")
-            payload["next_step"] = .string("This topic is long, so only its \(overview.name) came back. "
-                + "Call skycut_guide again with section set to one of: \(rest).")
+            // 每一节讲什么列出来、叫 AI 只读要用的（2026-11-10 试点实测：只列节名、说「再按 section 取」时，它把六节全读了，输入 +41%）。
+            payload["contents"] = .array(topic.sections.dropFirst().map { .string($0.about.isEmpty ? $0.name : "\($0.name): \($0.about)") })
+            payload["next_step"] = .string("This topic is long, so only its \(overview.name) came back. Read only the sections you need: "
+                + "call skycut_guide again with this topic and section=<name>; contents says what each one covers."
+                + (topic.readingTip.map { " " + $0 } ?? ""))
         }
         if let unknownSection {
             payload["unknown_section"] = .string(unknownSection)
