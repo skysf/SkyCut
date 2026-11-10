@@ -5,6 +5,7 @@ import Foundation
 // 管什么：Claude 桌面版的 JSON、Codex 的 TOML 里加上 / 去掉 / 读出 SrtFlow 那一项；连上的同时放行 SrtFlow 的工具、
 // 不用每个工具都点一次「允许」（方案第 35 条）：Claude Code 在 ~/.claude/settings.json 的 permissions.allow 里加一条
 // `mcp__skycut`，Codex 在那张表里写 `default_tools_approval_mode = "approve"`。Claude 桌面版没有能写的地方。
+// Codex 那张表里还写 `tool_input_schema_max_bytes = 8192`：参数定义超过 5,000 字节的工具（edit_clip、generate_media）的参数说明才留得住。
 // 只动 `skycut` 这一项，别的原样留着；文件格式不对就报错、一个字节都不写。
 // 自检够得着（scripts/check-mcp.sh）。
 // 不管什么：文件在哪、要不要备份、Claude Code 走命令行（AIClientSetup）。
@@ -124,6 +125,10 @@ enum AIClientConfigFiles {
 
     /// Codex 里不问就放行这个服务器全部工具的写法（`[mcp_servers.<名字>]` 下面这一行）。
     static let codexApprovalLine = "default_tools_approval_mode = \"approve\""
+    /// Codex 默认把参数定义超过 5,000 字节的工具的参数说明全删掉（代码模式里那个工具只剩名字和类型）；edit_clip、generate_media 超了
+    /// （MCP 按需说明方案 4.1 的例外）。连接时把这个服务器的上限写成 8,192（方案第八节第 6 条；2026-11-10 在本机 Codex 0.167 实测：
+    /// 这个键被接受、不报「不认识的设置」，两个工具的参数注释从 0 条回到 58 / 54 条）。
+    static let codexSchemaBytesLine = "tool_input_schema_max_bytes = 8192"
 
     static func tomlAdding(command: String, to text: String) -> String {
         var body = tomlRemoving(from: text)
@@ -131,12 +136,17 @@ enum AIClientConfigFiles {
         if !body.isEmpty, !body.hasSuffix("\n") { body += "\n" }
         let escaped = command.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"")
         let separator = body.isEmpty ? "" : "\n"
-        return body + separator + "[mcp_servers.\(serverName)]\ncommand = \"\(escaped)\"\n\(codexApprovalLine)\n"
+        return body + separator + "[mcp_servers.\(serverName)]\ncommand = \"\(escaped)\"\n\(codexApprovalLine)\n\(codexSchemaBytesLine)\n"
     }
 
     /// SrtFlow 那张表里写没写「不问就放行」。
-    static func tomlApproves(in text: String) -> Bool {
-        let wanted = codexApprovalLine.replacingOccurrences(of: " ", with: "")
+    static func tomlApproves(in text: String) -> Bool { tomlHasLine(codexApprovalLine, in: text) }
+
+    /// SrtFlow 那张表里写没写参数定义的字节上限（没写的是这一版之前连上的：重新连一次就有）。
+    static func tomlKeepsParameterDescriptions(in text: String) -> Bool { tomlHasLine(codexSchemaBytesLine, in: text) }
+
+    private static func tomlHasLine(_ line: String, in text: String) -> Bool {
+        let wanted = line.replacingOccurrences(of: " ", with: "")
         return tomlTable(in: text).contains { $0.replacingOccurrences(of: " ", with: "") == wanted }
     }
 

@@ -54,7 +54,7 @@ private func tomlConfigChecks() {
     check(AIClientConfigFiles.tomlCommand(in: removed) == nil, "the skycut table is removed")
     check(removed.contains("[projects.\"/Users/me/code\"]"), "removing keeps the other tables")
     checkEqual(AIClientConfigFiles.tomlAdding(command: "/x", to: ""),
-               "[mcp_servers.skycut]\ncommand = \"/x\"\ndefault_tools_approval_mode = \"approve\"\n",
+               "[mcp_servers.skycut]\ncommand = \"/x\"\ndefault_tools_approval_mode = \"approve\"\ntool_input_schema_max_bytes = 8192\n",
                "an empty file gets just the table")
 }
 
@@ -94,6 +94,20 @@ private func permissionConfigChecks() {
         in: "[mcp_servers.other]\ndefault_tools_approval_mode = \"approve\"\n\n[mcp_servers.skycut]\ncommand = \"/x\"\n"
     ), "another server's line does not count")
     check(!AIClientConfigFiles.tomlApproves(in: AIClientConfigFiles.tomlRemoving(from: codex)), "disconnecting removes it with the table")
+    // 参数定义超过 5,000 字节的工具（edit_clip、generate_media）在 Codex 里只剩名字和类型；连接时把 skycut 这一项的上限写成 8,192（MCP 按需说明方案
+    // 第八节第 6 条、PR 7；2026-11-10 本机 Codex 0.167 实测这个键被接受、两个工具的参数注释从 0 条回到 58 / 54 条）。
+    check(AIClientConfigFiles.tomlKeepsParameterDescriptions(in: codex), "Codex: connecting keeps the large tools' parameter descriptions")
+    check(!AIClientConfigFiles.tomlKeepsParameterDescriptions(in: "[mcp_servers.skycut]\ncommand = \"/x\"\ndefault_tools_approval_mode = \"approve\"\n"),
+          "an earlier connection without the line is seen as missing it")
+    check(!AIClientConfigFiles.tomlKeepsParameterDescriptions(
+        in: "[mcp_servers.other]\ntool_input_schema_max_bytes = 8192\n\n[mcp_servers.skycut]\ncommand = \"/x\"\n"
+    ), "another server's limit does not count")
+    check(!AIClientConfigFiles.tomlKeepsParameterDescriptions(in: AIClientConfigFiles.tomlRemoving(from: codex)), "disconnecting removes the limit with the table")
+    checkEqual(AIClientConfigFiles.codexSchemaBytesLine, "tool_input_schema_max_bytes = 8192", "the limit leaves room above the two large tools (about 6.7 KB)")
+    for tool: MCPToolName in [.editClip, .generateMedia] {
+        let bytes = tool.definition.inputSchema.encodedString().utf8.count
+        check(bytes > 5_000 && bytes <= 8_192, "\(tool.rawValue): over Codex's default 5,000 bytes and within 8,192 (it is \(bytes))")
+    }
 }
 
 private func textChecks() {
