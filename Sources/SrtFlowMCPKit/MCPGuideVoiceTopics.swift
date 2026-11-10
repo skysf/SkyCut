@@ -118,7 +118,9 @@ enum MCPGuideVoiceTopics {
     When this Mac cannot transcribe the script's language, a preset reads the whole script with eleven-v4 and that \
     preset's Eleven voice (it sounds different; voice.note says so), so the timing still comes from the voice. With a \
     named model, or a language eleven-v4 does not read, the timing is estimated. A line whose transcription does not \
-    match the script is estimated too; its audio is kept and nothing is paid again.
+    match the script is estimated too; its audio is kept and nothing is paid again. On such a Mac, if the word times of \
+    a batch of several lines cannot be used, SkyCut cuts between those lines at the pauses nearest to where the \
+    character counts put them: estimated_split_line_indices lists them, so tell the user to listen to where they start and end.
     """)
 
     // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.1（合批）、8.2（几批同时交，声音 PR 4）、

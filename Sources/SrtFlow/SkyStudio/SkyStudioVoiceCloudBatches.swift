@@ -204,6 +204,9 @@ final class SkyStudioVoiceCloudBatches {
     }
 
     /// 服务器在某一批里换了备用：还没交的批（包括明确没扣钱、要重交的）改带备用的那份 plan，后面整段都用它。
+    /// 够不着的一个窗口：`generate()` 已经抄好请求、还没 POST 的那一批（它在等存恢复记录、取 Key）照旧带着默认模型的 plan 交出去。
+    /// 不碍事：那一批由默认模型读（或者服务器在它里面自己换备用），每批实际是谁读的照结果记（`line_models`）；一句的两片采样率
+    /// 不一样由 SkyStudioVoiceLineAudio 换成一样的再接。
     private func switchToFallback() {
         guard let fallback = recovery.value.plan.voicePlan.fallback?.selection else { return }
         for index in recovery.value.missing { recovery.value.plan.batches[index].request.params["plan"] = .object(fallback) }

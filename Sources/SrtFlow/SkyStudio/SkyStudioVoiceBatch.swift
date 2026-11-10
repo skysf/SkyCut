@@ -5,6 +5,8 @@ import Foundation
 // 批和批只在两句之间分，**不切在句子中间**；不 `pack`（这台 Mac 切不开）就一句一单。一句本身就超过上限：先在句末标点（。！？.!?）处分开，
 // 一个句子都放不下才在逗号类、空白处分，再不行才按字切；几片记住原来属于哪一句（全齐后拼回一句，SkyStudioVoiceRender）。
 // 同一句分出来的几片尽量少：放得下的几个句子留在同一片里（原文照抄，不在中间插换行）。
+// 上限可以每句不一样（`limit` 按这一句的字给：服务器按每一批自己的语言卡，SkyStudioModel.characterLimit(text:)）：一批的上限是
+// 它装着的几句里最小的那个。
 // 不管什么：价、HTTP、语音怎么切（SkyStudioVoiceSplit）；上限不在本机抄一份。
 
 struct SkyStudioVoiceBatch: Equatable, Sendable, Codable {
@@ -22,22 +24,32 @@ struct SkyStudioVoiceBatch: Equatable, Sendable, Codable {
     }
 
     static func make(lines: [String], limit: Int, pack: Bool) throws -> [SkyStudioVoiceBatch] {
-        guard limit > 0 else { throw Problem(message: "Sky Studio did not give a character limit for this voice's language.") }
+        try make(lines: lines, pack: pack) { _ in limit }
+    }
+
+    /// `limit`：这一句（按它的字）一次请求最多多少字。
+    static func make(lines: [String], pack: Bool, limit: (String) -> Int) throws -> [SkyStudioVoiceBatch] {
         var batches: [SkyStudioVoiceBatch] = []
         var pending: [Part] = []
         var used = 0
+        /// 这一批已经装的几句里最小的上限。
+        var cap = Int.max
         func flush() {
             if !pending.isEmpty { batches.append(SkyStudioVoiceBatch(parts: pending)) }
             pending = []
             used = 0
+            cap = .max
         }
         for (line, text) in lines.enumerated() {
-            for piece in try pieces(Substring(text), limit: limit, level: 0) {
+            let own = limit(text)
+            guard own > 0 else { throw Problem(message: "Sky Studio did not give a character limit for this voice's language.") }
+            for piece in try pieces(Substring(text), limit: own, level: 0) {
                 let count = piece.unicodeScalars.count
-                if used + count + (pending.isEmpty ? 0 : 1) > limit { flush() }
+                if used + count + (pending.isEmpty ? 0 : 1) > min(cap, own) { flush() }
                 if !pending.isEmpty { used += 1 }
                 pending.append(Part(line: line, text: piece))
                 used += count
+                cap = min(cap, own)
                 if !pack { flush() }
             }
         }
