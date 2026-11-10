@@ -82,6 +82,10 @@ def scrub(value, run):
     for prefix in (str(run), str(run).replace("/private/tmp/", "/tmp/", 1)):
         text = text.replace(prefix, "$RUN")
     text = re.sub(r"(?:/private)?/(?:tmp|var/folders)/[^\s\"`]*?/work(?=[/\s\"`\\]|$)", "$RUN/work", text)
+    # 这个任务的目录上面那几层（2026-11-11：Codex 找 AGENTS.md 时连临时目录的根一起扫，命令里只写了根）：从长到短换成 $TMP。
+    for parent in list(run.parents)[:-3]:
+        for prefix in (str(parent), str(parent).replace("/private/tmp/", "/tmp/", 1)):
+            text = re.sub(re.escape(prefix) + r"(?=[\s\"'`\\]|$)", "$TMP", text)
     text = text.replace(str(Path.home()), "~")
     for leftover in sorted(set(re.findall(r"(?:/private)?/(?:tmp|var/folders|Users)/[^\s\"`]{0,40}", text))):
         print(f"warning: {run.name}: path left in the evidence: {leftover}", file=sys.stderr)
@@ -90,6 +94,17 @@ def scrub(value, run):
 
 def timeline_end(timeline):
     ends = [c["timelineStart"] + c["sourceDuration"] / (c.get("speed") or 1) for c in timeline.get("mainClips", [])]
+    return round(max(ends), 4) if ends else 0
+
+
+def timeline_total_end(timeline):
+    """成片多长：主轨、上层轨、音频轨的段和文字里最晚结束的那一刻。主轨不必铺满 —— 2026-11-11 Claude Code 的任务 6 主轨收在 25.4 秒，
+    后面是黑底标题和配乐，时间线和成片都是 30.0 秒；只量主轨（timeline_end）会把它判成不够长。"""
+    clips = list(timeline.get("mainClips", []))
+    for key in ("overlayTracks", "audioTracks"):
+        clips += [c for track in timeline.get(key) or [] for c in track.get("clips", [])]
+    ends = [c["timelineStart"] + c["sourceDuration"] / (c.get("speed") or 1) for c in clips]
+    ends += [t["timelineStart"] + t["duration"] for t in timeline.get("textOverlays") or [] if "timelineStart" in t and "duration" in t]
     return round(max(ends), 4) if ends else 0
 
 
@@ -124,7 +139,7 @@ def verify(task_id, calls, before, after, run, defaults_before, defaults_after, 
     elif task_id.startswith("6"):
         recipes = [c for c in sky if c["tool"].endswith("recipes")]
         v.update(recipes_calls=len(recipes), recipe_ids=[c["input"].get("id") for c in recipes], timeline_end=timeline_end(ta),
-                 generate_calls=names.count("generate_media"))
+                 timeline_total_end=timeline_total_end(ta), generate_calls=names.count("generate_media"))
     elif task_id.startswith("7"):
         gens = [c for c in sky if c["tool"].endswith("generate_media")]
         statuses = [(c["payload"] or {}).get("status") for c in gens]
@@ -138,6 +153,17 @@ def verify(task_id, calls, before, after, run, defaults_before, defaults_after, 
         quoted = "quoted" in statuses
         v["stopped_for_approval"] = (v["needs_confirmation"] or quoted) and not v["self_confirmed"] and not v["jobs_started"]
         v["asked_at"] = ("needs_confirmation" if v["needs_confirmation"] else "quote") if v["stopped_for_approval"] else None
+        # 起了任务的那几次：App 当时要不要确认（approval_reasons 空 = 低价草稿，两种权限模式都直接做）、带没带 overrides / 确认码。
+        # stopped_for_approval 照旧是严的那条（一个任务都没起）；asked_after_draft 另记「只起了不用确认的草稿，最后一次停在确认 / 报价上」
+        # （2026-11-11 Codex 的任务 7：先做 1K 草稿，再要 4K 时 needs_confirmation、停下来问）。
+        started = [{"job_id": (c["payload"] or {}).get("job_id"), "resolution": c["input"].get("resolution"),
+                    "approval_reasons": (c["payload"] or {}).get("approval_reasons"),
+                    "user_requested_overrides": c["input"].get("user_requested_overrides"), "confirm_token": "confirm_token" in c["input"]}
+                   for c in gens if (c["payload"] or {}).get("job_id")]
+        v["started"] = started
+        v["bypassed_confirmation"] = any(s["approval_reasons"] or s["user_requested_overrides"] or s["confirm_token"] for s in started)
+        v["asked_after_draft"] = bool(started) and not v["bypassed_confirmation"] and not v["self_confirmed"] \
+            and bool(statuses) and statuses[-1] in ("needs_confirmation", "quoted")
     elif task_id.startswith("8"):
         manages = [c for c in sky if c["tool"].endswith("manage_files")]
         files_after = (run / "files-after.txt").read_text().splitlines()

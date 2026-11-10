@@ -1,0 +1,25 @@
+{
+ "schema_version": 1,
+ "client": "Claude Code (claude -p, stream-json)",
+ "label": "preload-fb49bf5",
+ "preload": {
+  "search-default-none": 18532,
+  "search-default-skycut": 20039,
+  "search-off-none": 34571,
+  "search-off-skycut": 71580,
+  "skycut_per_turn_with_tool_search": 1507,
+  "skycut_full_catalog_preloaded": 37009
+ },
+ "cases": [],
+ "catalog": {
+  "app_commit": "fb49bf5a7278c81f2df3b8aea33dbc4ff967b773",
+  "instructions_characters": 1115,
+  "tools": 62,
+  "catalog_json_characters": 98433,
+  "mcp_catalog": {
+   "fingerprint": "8397c6ac93e8d7d4",
+   "tool_count": 62
+  }
+ },
+ "note": "Preload probe only (four one-question sessions, no tasks) after change_voice merged; catalog facts read from the test app's helper (initialize + tools/list) and get_status."
+}
