@@ -15,14 +15,15 @@ def models():
     seedance = dict(max_images=30, max_videos=10, max_audio=10, max_total_files=50,
                     max_total_video_seconds=30.2, max_total_audio_seconds=30.2, resolution=["480p", "720p", "1080p"])
     result = []
-    titles = {"minimax-h3": "MiniMax H3", "gemini-omni-1.1-flash": "Google Omni 1.1", "seedance-2-5": "Seedance 2.5"}
+    # 2026-11-10（Sky Studio PR #245）：Omni 的公开 id 换成 gemini-omni-1.2-flash，veo-pro（Veo 3.1）下架。
+    titles = {"minimax-h3": "MiniMax H3", "gemini-omni-1.2-flash": "Gemini Omni 1.2 Flash", "seedance-2-5": "Seedance 2.5"}
     for model in ["seedream5-flash", "nano2"]:
         result.append(dict(id=model, kind="image", title=model,
                            params=dict(resolution=["1K", "2K", "4K"] if model == "nano2" else ["2K"], aspect_ratio=["16:9", "9:16", "4:1"]),
                            defaults=dict(resolution="2K"), limits=dict(references={**image_limits, "max_images": 10 if model == "seedream5-flash" else 14})))
     for model, resolution, seconds, caps in [("minimax-h3", "768p", 5, h3),
-            ("gemini-omni-1.1-flash", "720p", 5, omni), ("seedance-2-pro", "720p", 5, h3),
-            ("seedance-2-5", "720p", 5, seedance), ("veo-fast", "1080p", 8, None), ("veo-pro", "1080p", 8, None)]:
+            ("gemini-omni-1.2-flash", "720p", 5, omni), ("seedance-2-pro", "720p", 5, h3),
+            ("seedance-2-5", "720p", 5, seedance), ("veo-fast", "1080p", 8, None)]:
         for kind in ["image_to_video", "text_to_video"]:
             modes = {"frames": dict(max_images=2, max_videos=0, max_audio=0, max_total_files=2, resolution=[resolution])}
             if caps:

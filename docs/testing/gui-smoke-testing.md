@@ -492,6 +492,27 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
    清掉本轮测试 App、假账号和测试域设置。不要退出或替换用户正在使用的正式 App。
 
 
+## 四之十、真客户端实测：工具说明花了多少、选没选对（MCP 按需说明方案第六节）
+
+量「每一轮模型读了多少 SkyCut 的字、找工具花了多少、八个任务选没选对、规矩守没守」。脚本在 `scripts/gui-smoke/client-measure/`，
+和 2026-11-03 那一轮（四之九）同一套隔离，只是身份、端口能换（并行的会话互不相撞）、每个任务前重启 App（干净的状态、不会开满 8 个工程）。
+**每次开跑前先问用户**（方案第八节第 8 条：用用户自己的 Claude Code / Codex 额度）。不花 Sky Studio 积分（假 Sky Studio）、不碰用户的工程、正式版和测试版。
+
+1. **组装**：在要量的那个提交上 `swift build --arch arm64`，然后
+   `MEASURE_DIR=<环境> smoke-env.sh assemble <仓库>`（拷出 App 和小程序、ffmpeg、假服务的最小仓库布局；之后仓库可以换提交）、
+   `smoke-env.sh start`、`MEASURE_FIXTURE=<母版> make_fixture.sh <仓库>`（合成素材 + 经 MCP 建 `Review.skycut`）。
+   身份默认 `com.srtflow.SrtFlow.measure.skystudiosmoke`（必须以 `.skystudiosmoke` 结尾，假 Key 只认这种）、端口 18797。
+2. **Claude Code**：`run_claude.py preload --label <名字>`（一问一答 4 次：默认按需加载 / `ENABLE_TOOL_SEARCH=false` 整份预先加载 ×
+   挂 / 不挂 skycut；两两相减 = SkyCut 每轮常驻的 token 和整份清单的 token，真分词器）；`run_claude.py tasks --label <名字>`（八个任务）。
+   嵌套的 `claude -p` 用干净的环境变量（不带父会话的 `CLAUDE_CODE_*`、`CMUX_*`）、`--strict-mcp-config` 只挂 skycut、
+   `--allowedTools mcp__skycut`（终端、改文件一律在 `-p` 里被拒，试了也看得见）、`--no-session-persistence`、`--debug-file`。
+3. **Codex**：`run_codex.py tasks --label <名字>`：`codex exec --json --sandbox read-only`，本次进程 `-c` 覆盖 skycut 的连接、
+   别的 MCP 全部 `enabled=false`，模型和档位同 11-03（gpt-6.1-sol / max）；会话记录按 thread id 从 `~/.codex/sessions` 拷出来。
+4. **出表**：`report.py <runs/名字>`（Claude Code：每次请求的 token、ToolSearch 取了哪些、skycut 调用和被拒、读说明书、八个任务的落盘断言）；
+   `report_codex.py <rollout.jsonl>`（Codex：每次请求的 token、代码模式里找工具打印了多少、几份重复的总说明、第一次打印看到几个工具）。
+   `report_codex.py` 的量法拿 2026-11-03 那四场核对过，四行数字和方案 1.4 的表逐项相同。
+5. **收尾**：`smoke-env.sh stop`（停 App 和假服务，删这个测试身份的钥匙串项、设置、支持目录）。证据 JSON 里路径换成 `$RUN`。
+
 ## 五、要真实窗口、但已经自动化了的检查
 
 - 工作台 AI 徽章：`scripts/check-workbench-toolbar.sh` 真正渲染生产背景，浅色 / 深色、运行 / 完成时都不能让后景透过；与小窗口真实截图一起核对，见 [工作台](../architecture/workbench-and-settings.md)。

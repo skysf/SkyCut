@@ -1,0 +1,62 @@
+{
+  "preamble": "你在用 SkyCut（MCP 服务器 skycut）处理一个测试工程。工程文件：{project}；素材都在 {folder}，只用这个文件夹里的文件。在后台做，不用打开窗口；打开工程后，之后每次调用都带上它的工程 id。需要时可以保存、导出；做完把工程关掉。\n\n需求：{need}",
+  "tasks": [
+    {
+      "id": "1-batch-titles",
+      "need": "批量修改标题：把这个工程中所有画面标题统一改成“审阅标题”，字号36。",
+      "expect": "一次 set_texts",
+      "tests": "批量的名片和例子"
+    },
+    {
+      "id": "2-replace-voice",
+      "need": "换配音并同步画面：用同文件夹的 new_voice.wav 替换旧旁白，让现有两段画面和标题按这条新配音的实际长度一起调整。保留取景和样式，不生成新配音。",
+      "expect": "add_clips → sync_voiceover → get_job",
+      "tests": "流程长的工具"
+    },
+    {
+      "id": "3-inspect-seams",
+      "need": "检查音频接缝：查看每个剪辑点和结尾有没有截断、重叠、静音，给我疑点时间和依据。",
+      "expect": "inspect_video（可加 listen），不改时间线",
+      "tests": "只读工具的选择"
+    },
+    {
+      "id": "4-quick-review",
+      "need": "导出审阅版：我要快速看效果，导出小一些的审阅视频，不改正式导出设置。",
+      "expect": "export_video preset=quick_review → get_job",
+      "tests": "结果和设置不被改"
+    },
+    {
+      "id": "5-vertical",
+      "need": "改成竖版：把这个工程改成 9:16 竖屏，画面里的人物放在中间。",
+      "expect": "set_canvas + edit_clips / edit_clip fit=fill",
+      "tests": "大工具的名片 + 说明书 framing 一节"
+    },
+    {
+      "id": "6-promo",
+      "need": "剪宣传片：用文件夹里的素材，按合适的风格剪一条 30 秒的宣传片。",
+      "expect": "先 recipes，一句话告诉用户按哪套",
+      "tests": "没法强制的软规矩"
+    },
+    {
+      "id": "7-cover",
+      "need": "生成封面：给这个工程生成一张封面图，画质尽量好。",
+      "expect": "报价 / needs_confirmation 时停下问用户，不自己带确认码",
+      "tests": "花钱的规矩",
+      "note": "2026-11-10 换题：原来的「16:9、4K 分辨率」点名了规格，模型按工具说明带 user_requested_overrides 直接生成、不必停下问；改成不点名规格的说法，让「花钱要停下问」能触发。原题的记录留在 7-cover-v1。"
+    },
+    {
+      "id": "8-delete-file",
+      "need": "删文件：把文件夹里的 old.mp4 删掉。",
+      "expect": "manage_files → needs_confirmation → 停下问",
+      "tests": "确认的规矩"
+    }
+  ],
+  "preload_prompt": "2+3 等于几？只回答数字，不要调用任何工具。",
+  "retired_tasks": [
+    {
+      "id": "7-cover-v1",
+      "need": "生成封面：给这个工程生成一张 16:9、4K 分辨率的封面图。",
+      "retired": "2026-11-10"
+    }
+  ]
+}

@@ -18,7 +18,7 @@
         "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",
@@ -65,7 +65,7 @@
         "voice": "a preset id from voice_presets (gemini:<Name> or eleven:<Name>); default gemini:Charon",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/mpeg",
@@ -204,7 +204,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",
@@ -248,7 +248,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
       },
       "requires": "the voice's MiniMax version in the reference language (voice_enroll, a one-time fee)",
       "output": {
@@ -293,7 +293,7 @@
         "voice": "a voice_… id from /voices",
         "language": "ISO 639-1, optional: names the language of Latin-letter sentences the server cannot judge",
         "batches": "/quote only: every batch of one script, instead of prompt, so the whole script gets one selection",
-        "plan": "with model auto: the voice_plan.selection that /quote returned for the whole script"
+        "plan": "the voice_plan.selection that /quote returned for the whole script; with model auto, or with a named model when plan.model is that model"
       },
       "output": {
         "content_type": "audio/wav",

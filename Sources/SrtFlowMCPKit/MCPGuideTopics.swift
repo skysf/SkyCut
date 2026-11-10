@@ -8,8 +8,8 @@ import Foundation
 //
 // 方案的 PR 1（docs/plans/2026-11-09-mcp-guide.md 7.1）：主题先放**现有说明原文**，名片不动 —— 概要就是这个工具现在的说明
 // （一个字不改，从定义里现取，不另抄一份：抄的会漂），字段从它的参数定义现算（Codex 把超过 5,000 字节的参数定义的说明全删掉，
-// 在这里读得到）。之后的 PR 先把说明原样搬进手写的主题、再写短名片；手写的节按工具组分文件（每个 ≤ 400 行，`written` 挑），守卫查里面提到的
-// 名字和例子。第一个手写的是 add_voiceover（声音 PR 3，MCPGuideVoiceTopics）。只写英文（方案第八节第 7 条）。
+// 在这里读得到）。之后的 PR 先把说明原样搬进这里的常量、再写短名片；手写的节按工具组分文件（每个 ≤ 400 行），守卫查里面提到的
+// 名字和例子。只写英文（方案第八节第 7 条）。
 
 /// 说明书的一节。
 public struct MCPGuideSection: Sendable, Equatable {
@@ -52,26 +52,15 @@ public enum MCPGuideTopics {
         return MCPGuideSharedTopics.all.first { $0.name == name } ?? MCPToolName(rawValue: name).map(topic(for:))
     }
 
-    /// 一个工具的主题。手写了的（`written`）：手写的几节 + 例子 + 相关主题，fields 接在最后；还没写的（方案 PR 1 的样子）：
-    /// 概要 = 它现在的说明原文。两种的字段都从参数定义现算。
+    /// 一个工具的主题。迁移过的（名片写短了的，MCPGuideWrittenTopics）：手写的几节 + 例子 + 相关主题；没迁移的：概要 = 它现在的说明原文。
+    /// 两种都在最后接上参数定义写成的 fields 几节（MCPGuideFields.sections，太长自动按第一层参数拆）。
     public static func topic(for tool: MCPToolName) -> MCPGuideTopic {
         let definition = tool.definition
-        let fields = MCPGuideSection(name: "fields", text: MCPGuideFields.text(for: definition.inputSchema))
-        if let written = written(for: tool) {
-            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + [fields], examples: written.examples, related: written.related)
+        let fields = MCPGuideFields.sections(for: definition.inputSchema)
+        if let written = MCPGuideWrittenTopics.topic(for: tool) {
+            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + fields, examples: written.examples, related: written.related)
         }
-        return MCPGuideTopic(name: tool.rawValue, sections: [
-            MCPGuideSection(name: MCPGuideSection.overview, text: definition.description), fields
-        ])
-    }
-
-    /// 已经手写了主题的工具（名片缩短之前，原来说明里的话先搬进这里：方案 5.1）。手写的按工具组分文件，每个 ≤ 400 行；
-    /// 第一节叫 overview，不写 fields（上面现算）。守卫：checks/MCP/GuideChecks.swift（名字都存在、只用英文、每一节 ≤ 6,000）。
-    public static func written(for tool: MCPToolName) -> MCPGuideTopic? {
-        switch tool {
-        case .addVoiceover: return MCPGuideVoiceTopics.addVoiceover
-        default: return nil
-        }
+        return MCPGuideTopic(name: tool.rawValue, sections: [MCPGuideSection(name: MCPGuideSection.overview, text: definition.description)] + fields)
     }
 
     /// 名字的写法不计较：前后空白、大小写、连字符和空格当下划线（Edit-Clip → edit_clip）。

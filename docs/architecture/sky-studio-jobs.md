@@ -75,7 +75,9 @@
   同一件事重问回同一码，换 kind / 提示词 / 参数 / 输入 / 价格就另发，串码不消费、不记账。
 - **生成**（6b，2026-10-30 更新）：`generate_media` 收可选 `model`，不再取目录第一条；能力、默认时长 / 分辨率 / 画幅只读 `/models`，价格只问 `/quote`。
   图片亚洲人物、地点或文化主体优先 Seedream 5 Flash；非亚洲、混合、不明确优先 Nano 2。按主体判断，不按提示词语言；AI 用 `image_context` 表达判断。
-  普通视频依次 H3、Omni 1.1 Flash、Veo Fast、Seedance 2.0；明确不计成本 / 时间追求最高质量才 `quality=highest`，优先 Seedance 2.5、其次 Veo Pro。
+  普通视频依次 H3、Omni 1.2 Flash、Veo Fast、Seedance 2.0；明确不计成本 / 时间追求最高质量才 `quality=highest`，用 Seedance 2.5。
+  2026-11-10（Sky Studio PR #245）：Omni 的公开 id 换成 `gemini-omni-1.2-flash`（3–15 秒，首尾帧 3–10 秒），`veo-pro`（Veo 3.1）下架。
+  自动挑模型只挑 `/models` 列着的 id，顺序里写旧 id 会悄悄跳过那个模型（`SkyStudioModelPolicy`，`ModelPolicyChecks` 钉着）。
   点名模型优先；默认只从完整兼容输入的候选里挑。没有兼容模型就报告，不能丢引用、裁短时长来凑。
   `get_status models=true` 是只读目录（可 `model=<id>` 过滤），回所有默认值和输入限制，不生成、不记账。
 - **参考素材**：`image` + 可选 `last_image` 是首尾帧；`reference_images` / `reference_videos` / `reference_audio` 是有序多模态引用，不能和首尾帧混用。
@@ -147,7 +149,7 @@
 ## 七、配音验证与人工回归
 
 - `scripts/check-sky-studio.sh` 的 `VoiceChecks`：动态上限、code points、合批 / 长句拆片、所有 chunk 的全局词时间、实际时长、切句拒绝不可靠转写、整批配额与未知账；报价之前分批（上限读 `/models`、普通旁白一句一单）、整段报价的请求、报价之后每批带同一个 `params.plan` 和自己的 `max_credits`、批数对不上 / 要一次性费用不交、要不要本机转写；`VoicePickChecks` 对着目录快照认声音（4.3 的顺序、默认 Charon、角色只认 `voice_roles`、英式男声、本机退档按性别）；`JobRunChecks` 覆盖 POST 返回瞬间取消仍先报告 ID。
-- `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数名（`clone_from` 那三个不收、`model` / `confirm_token` 收）、本机这一档挑谁（不点名是旁白角色）、词时间各种合同格式；`GuideWrittenChecks`：名片的固定说法和长度、参数说明 ≤ 120 且写着范围、参数定义 ≤ 4,500 字节、说明书主题里的名字都存在、例子过参数核对、会问的工具收 `confirm_token`。
+- `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数名（`clone_from` 那三个不收、`model` / `confirm_token` 收）、本机这一档挑谁（不点名是旁白角色）、词时间各种合同格式，名片必含 / 说明书必含（固定说法、默认 gemini:Charon、失败了别重发、主题照声音方案 4.10 分节）；名片长度、按性质的固定说法、参数说明 ≤ 120、参数定义 ≤ 4,500 字节、主题里的名字都存在、例子过参数核对和试点的五个工具一起在 `GuidePilotChecks` / `GuideContentChecks`，会问的工具收 `confirm_token` 在 `ArgumentCheckChecks`。
 - `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果。回任务号之前（`StartChecks.swift`）：不点名用 gemini:Charon、整段 `/quote` 一次（kind voice、model auto、params.batches、英文不带提示）、回 `job_id` 带 `voice_plan`、每批同一个 `params.plan` / 各自的 `max_credits` / 各自的 key、记录记下选择和每批的模型、服务器在某一批换了备用也记下；额度不够 / 服务器拒 / 要一次性费用 / 没有这个预设或模型 / 要字幕却转写不了都在花钱之前停下、什么都不交，服务器不答当场退本机；英式男声读中文、warnings 进 `voice.note`、`next_step` 叫 AI 先转告。恢复（`Main.swift`）：模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批（照记录的选择再报价：服务器这时自己选会选成别的，不带选择就被认出来）、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句字幕对齐失败、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录（只认 version 2），验证原单恢复只 GET。
 - 免费端到端：`scripts/gui-smoke/sky-studio/run.sh`，再用 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/voice.py`。独立 `.skystudiosmoke` App、回环假服务和假 Key，真实 MCP / 本机合成 / 转写 / 文件 / 入轨 / 字幕 / 撤销。`run.sh stop` 只清理这个测试身份；不使用生产 Key。假 Key 钩子同时要求测试 bundle 和回环地址，Beta / 正式包不认。
 - [ ] 真实 Key：普通旁白跨多个 chunk、字幕尾端不超音频；两句克隆只付一批并切成两段，听接缝无截字；一步撤销音频字幕一起消失。
@@ -332,16 +334,19 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
   建 / 设计回的声音、样音链接和它过期的时刻 `sample_expires_at`、`warnings` 如 `keep_alive_failed`），
   `SkyStudioJobRun` 把它也当「做完了」；读稿 / 克隆的结果照旧有 `url`，另带实际跑的 `model`、`fallback_used`、`voice_plan`（`SkyStudioVoiceOutcome`）。
 - **两个上传用途**：参考录音的 `voice_reference` 只写在 `VoiceReferenceSample.uploadPurpose`（[声音库](voice-library.md)）；变声素材的 `voice_convert_source`
-  和两种共用的上限（十进制 35,000,000 字节）在 `SkyStudioVoiceUpload`；照旧经 `SkyStudioAPI.upload`。
+  和两种共用的上限（十进制 35,000,000 字节）在 `SkyStudioVoiceUpload`；照旧经 `SkyStudioAPI.upload`。这两种回的 `file_url` 不是链接，是私有桶里那份的
+  名字 `skystudio-private://voice/uploads/<用户>/<uuid>.<ext>`（文件 PUT 到 `upload_url`）：服务器只认它自己发的整串，SkyCut **原样交回**
+  （`reference_url`、`inputs.source_audio_url`），不当网址校验、不改写（`VoiceJobChecks` 钉着）。
 - **并发**：`/me` 的 `max_running_audio_jobs`（声音池，读不到 = 服务器还没上新池）；429 `too_many_jobs` 多了 `pool`（`audio` / `default`）照旧算容量拒绝、
   同一个 key 等着再交，**认不出的 pool 不算**（不能冒充未准入）。按池开槽是 PR 4。
-- **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，进了 `SkyStudioJobAdmission.rejectedCodes`
-  （本机记的那笔能退）；它们和 `fallback_needs_one_time` 带的 `one_time`（一项或一串）读进 `SkyStudioJobFailure.oneTime`；`voice_limit`、`reference_exists`、
+- **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，503 `voice_library_unavailable` 在建任务、扣钱之前就回
+  （#246 先查私有声音桶再 begin_job / 扣钱），三个都进了 `SkyStudioJobAdmission.rejectedCodes`（本机记的那笔能退、不重交）；它们和 `fallback_needs_one_time` 带的 `one_time`（一项或一串）读进 `SkyStudioJobFailure.oneTime`；`voice_limit`、`reference_exists`、
   `voice_library_unavailable` 和 `invalid_request` 的几种 `reason` 先只认得，怎么说人话是 PR 6。
 
-**目录快照**：`checks/SkyStudio/Fixtures/models-voice-2026-11-10.json` 原样拷自 Sky Studio `feat/voice-service` 的
-`tests/fixtures/skycut/models-voice-2026-11-10.json`（`6793b038`，从 `buildSkycutModelCatalog()` 导出，sha256 `ec8604d8…`）。Sky Studio 那边说明它是临时导出：
-目录代码写完了、`/models` 还没上线，目录改了会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
+**目录快照**：`checks/SkyStudio/Fixtures/models-voice-2026-11-10.json` 原样拷自 Sky Studio 声音 PR #246（`feat/voice-service`）的
+`tests/fixtures/skycut/models-voice-2026-11-10.json`：最先拷的是 `6793b038` 的临时导出（sha256 `ec8604d8…`），2026-11-10 换成 #246 的最终导出
+`9babdcfa`（head `84b74d96` 里同一份，sha256 `6460fafb…`；和前一份只差 `params.plan` 的说明文字：点名的模型也能带 plan）。`/models` 还没上线；
+目录改了 Sky Studio 会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
 对上的：预设 30 个、名单、角色、授权文案的形状和值，Eleven 的 94 种语言；没对上、照 Sky Studio 改了 SkyCut 的：其余语言的字数上限键是 `other`（不是手写时猜的 `default`）、
 一次性费用 377.6 / 751.4 / 22.5、Despina 的性别是 `unknown`、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码
 （`shared/voiceSelection.ts`）改的：点名的模型每批不带 plan、`fallback.one_time` 是一项或 null 且不带价。
@@ -352,6 +357,7 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
 DELETE 多一个 `revoked: true`；`/me` 的 `skycut.max_running_audio_jobs`；429 的 `limit` / `running` / `pool`；顶层和备用、409、任务结束码的 `one_time`
 每项都带 `credits` / `why` / `then`（后三处是一项的数组或 null）—— 都和这里读的对上。不一样的三处已照它改（`fix/voice-contract-follow-server`）：
 `source` 的字段名、名字按 code point 数、点名的模型也带 plan；另补读了变声的 `background_content_type`、建 / 设计的 `warnings`、`sample_expires_at`。
+同日 #246 提交后（head `84b74d96`）对着已提交的代码和合同（`docs/agents/skycut-api.md`「Voice …」一节）再核一遍：上面这些都没变，私有 `file_url` 原样交回也对上。
 
 验证：`scripts/check-sky-studio.sh` 第 10 组（`VoiceCatalogChecks` 344 条对着快照、`VoiceLibraryChecks` 86 条、`VoicePlanChecks` 117 条、
 `VoiceJobChecks` 89 条，假协议不碰网络）。反向验证（2026-11-10，对着导出的快照，每项改完跑一遍、红了再原样恢复）：快照里 `zh_female_lively` 指向藏起来的

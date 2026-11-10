@@ -34,7 +34,10 @@ func catalogKnownNames() -> Set<String> {
     // 说明书的通用主题提到的结果字段和报错代码（2026-11-10）：get_timeline 的 edit_limits、get_status 的 skycut_plan、
     // 没存过的工程存下来时的 project_saved_to、每日硬上限的 daily_budget_exceeded、几乎每个结果都有的 next_step、MCP 结果的 isError。
     names.formUnion(["edit_limits", "skycut_plan", "project_saved_to", "daily_budget_exceeded", "next_step", "isError"])
-    // add_voiceover 的说明书（MCPGuideVoiceTopics）提到的结果字段（SkyStudioVoiceoverRun、SkyStudioVoiceCheckpoint.detail、
+    // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
+    // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
+    names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
+    // add_voiceover 的说明书（MCPGuideVoiceTopics，2026-11-10 声音 PR 3）提到的结果字段（SkyStudioVoiceoverRun、SkyStudioVoiceCheckpoint.detail、
     // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])

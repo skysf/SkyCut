@@ -27,10 +27,11 @@
 
 ## 验证
 
-- `scripts/check-mcp.sh`：`SkyStudioVoiceChecks` 拿 `resume` + `confirm_token` 过参数核对；`GuideWrittenChecks` 的 `confirmTokenChecks`：
-  名片里写着 `needs_confirmation` 的工具都收 `confirm_token`，`add_voiceover` 单独再钉一条。
-- 反向验证（2026-11-10）：把 `confirm_token` 从 `add_voiceover` 的说明里拿掉，`check-mcp` 红 3 条（参数核对挡掉带令牌的恢复、名片说会问却不收、
-  add_voiceover 单独那条），恢复后转绿。记录在 PR 正文。
+- `scripts/check-mcp.sh`：`SkyStudioVoiceChecks` 拿 `resume` + `confirm_token` 过参数核对；`ArgumentCheckChecks`：
+  名片里写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过参数核对（反过来那一半 —— 收 `confirm_token` 的名片要写
+  `needs_confirmation` —— 在 `GuidePilotChecks`）。
+- 反向验证（2026-11-10）：把 `confirm_token` 从 `add_voiceover` 的说明里拿掉，`check-mcp` 变红（参数核对挡掉带令牌的恢复、名片说会问却不收），
+  恢复后转绿。守卫 2026-11-10 随说明书试点合进来时从 `GuideWrittenChecks` 挪到 `ArgumentCheckChecks`，挪完重做了一遍；记录在 PR #355 正文。
 
 ## 教训 / 防回归
 

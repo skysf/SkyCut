@@ -27,13 +27,14 @@ enum MCPMediaTools {
                 readOnly: true
             )
         case .addVoiceover:
-            // 名片（≤ 450）只留不知道就会调错、花错钱的：撤销、默认声音、花积分、任务号、确认、每日上限、失败了别重发；
-            // 怎么挑声音、模型、字幕、恢复都在说明书的 add_voiceover 主题（MCPGuideVoiceTopics）。SkyCut 声音方案 4.10。
+            // 名片（≤ 450）照说明书试点的写法（docs/architecture/mcp-guide.md 第 14 条）：第一句做什么、录好的声音指到 add_clips；
+            // 只留不知道就会调错、花错钱的：撤销、默认声音、花积分、任务号、确认、每日上限、失败了别重发。
+            // 怎么挑声音、模型、字幕、恢复、坑都在说明书的 add_voiceover 主题（MCPGuideVoiceTopics）。SkyCut 声音方案 4.10。
             return MCPToolDefinition(
                 .addVoiceover, title: "Add a voiceover",
                 description: """
-                Narrate lines on an audio track, optional subtitles; One undo step. Voices: gemini:Name (default \
-                gemini:Charon), eleven:Name, a role or a local voice. Cloud: Paid (Sky Studio credits), model=auto. \
+                Narrate lines, optional subtitles (recordings: add_clips). One undo step. Voices: gemini:Name (default \
+                gemini:Charon), eleven:Name, a role or local voice. Cloud: Paid (Sky Studio credits), model=auto. \
                 Returns job_id; wait with get_job; relay voice.note. Ask mode may return needs_confirmation. The daily \
                 credit limit always applies. If it fails: resume=recovery_file, never resend lines. Read skycut_guide \
                 topic=add_voiceover before the first call.

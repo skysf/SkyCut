@@ -112,11 +112,18 @@ test('annual price arithmetic rounds monthly equivalents to two decimals and han
   assert.deepEqual(annualBreakdown({monthly:20,yearly:120}),{perMonth:'10.00',saving:'120'});
   assert.deepEqual(annualBreakdown({monthly:9.99,yearly:99.5}),{perMonth:'8.29',saving:'20.38'});
 });
-test('the SkyCut-only snapshot accounts for 33 catalog records and all nine image entries',()=>{
+test('the SkyCut-only snapshot accounts for 31 catalog records and all nine image entries',()=>{
   const models=cloudModelGroups.flatMap(g=>g.models);
-  assert.equal(skyStudioRevision,'94c3dcd3c86ce005d15a34e1dba13ebe3fab7a00');
-  assert.equal(models.length,27);assert.equal(new Set(models.map(m=>m.id)).size,27);
-  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),33);
+  assert.equal(skyStudioRevision,'86b797a9c935c3499674fce33525ab0255527745');
+  assert.equal(models.length,26);assert.equal(new Set(models.map(m=>m.id)).size,26);
+  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),31);
+  // 2026-11-10 Sky Studio PR #245 Omni 的公开 id 换成 1.2 Veo 3.1 Pro 下架 五个共享视频模型各占文生和图生两条
+  assert.deepEqual(cloudModelGroups.find(g=>g.id==='video').models.map(m=>[m.id,m.title,m.kinds.length]),[
+    ['minimax-h3','Minimax H3',2],['gemini-omni-1.2-flash','Gemini Omni 1.2 Flash',2],['veo-fast','Veo 3.1 Fast',2],
+    ['seedance-2-pro','Seedance 2.0 Pro',2],['seedance-2-5','Seedance 2.5',2],
+    ['wan-3.0-text-to-video','Wan 3.0 Text to Video',1],['wan-3.0-image-to-video','Wan 3.0 Image to Video',1],
+    ['wan-3.0-reference-to-video','Wan 3.0 Reference to Video',1],
+  ]);
   assert.deepEqual(models.filter(m=>m.kinds.includes('image')).map(m=>[m.id,m.title,m.operation||null]),[
     ['seedream5-flash','Seedream 5.0 Flash',null],['nano2','Nano Banana 2',null],
     ['nano2-lite','Nano Banana 2 Lite',null],['nano-banana-pro','Nano Banana Pro',null],

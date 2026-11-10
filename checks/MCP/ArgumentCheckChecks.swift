@@ -49,4 +49,10 @@ func runArgumentCheckChecks() {
         for name in properties.keys { everything[name] = "x" }
         checkEqual(MCPArgumentCheck.problem(tool: tool, arguments: .object(everything)), nil, "\(tool.rawValue) accepts every name its description lists")
     }
+    // 名片说会回 needs_confirmation 的工具，点过头带着 confirm_token 再调，核对不能把它挡掉（docs/bugfixes/2026-11-10-voiceover-confirm-token-refused.md：
+    // add_voiceover 读别处的恢复文件会问，说明上却没有 confirm_token）。反过来那一半（收 confirm_token 的名片要写 needs_confirmation）在 GuidePilotChecks。
+    for tool in MCPToolName.allCases where tool.definition.description.contains("needs_confirmation") {
+        checkEqual(MCPArgumentCheck.problem(tool: tool, arguments: ["confirm_token": "t"]), nil,
+                   "\(tool.rawValue) may return needs_confirmation, so the confirmed retry with confirm_token passes the argument check")
+    }
 }

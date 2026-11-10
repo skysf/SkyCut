@@ -55,6 +55,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      **说明书的地图**（`skycut_guide` 不带 topic）：Codex 每打印一个工具条目就带一份整份总说明（2026-11-03 那批会话里重复的总说明占找工具输出的
      32–59%），Claude Code 本来就把工具名单独列给模型，地图在说明书里一次读全；清单里每个工具都要**作为一项列在地图上**（GuideChecks）。
      ② **每个工具的说明 = 那一章**：这个工具怎么用，≤ 2,048；只跟某个参数有关的长话写进那个参数的说明（参数说明随工具一起加载）。
+     **迁移过的工具**（2026-11-10 起试点 5 个：edit_clip、generate_media、set_text、add_clips、look，加上随声音 PR 3 的 add_voiceover；之后两批）的说明是**名片**：≤ 450、
+     按工具性质写固定说法、参数说明 ≤ 120 且范围写数字、参数定义 ≤ 4,500 字节（例外 edit_clip、generate_media），长话进说明书
+     （[MCP 说明书](mcp-guide.md)第三节第 14 条）。
      ③ **出结果那一刻才用得上的规矩写在结果里**：`needs_confirmation` 的 `next_step`、任务结果的「用 get_job 等」、
      用户按了停止回的那句、`waiting_for_user` 的原话。
      ④ **说明书 `skycut_guide`**（2026-11-10 起，[MCP 说明书](mcp-guide.md)）：地图、每个工具的完整用法、五个通用主题（rules / conventions / paid /
@@ -716,7 +719,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认）当场换本机的声音（角色照旧、预设按它在这种语言里的性别挑角色），`voice.note` 说为什么；服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持）原话转给 AI、一分不花、不换声音。付费请求交出去之后不再退本机。
     - 任务里：每批 `/jobs` 带同一个 `params.plan`（`voice_plan.selection`，整段一个模型）和这一批报价的 credits 当 `max_credits`；逐批结算，未知提交保留账并报任务号与幂等 key，不重生成。词时间：Eleven v4 拼全部全局时间 chunk、尾端按实际媒体时长夹住；不报字的模型在本机转写对齐。合批（声音库的声音、以后的普通旁白）在本机转写后按词间静音切句，切不准保留完整文件并失败。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。
     - **`clone_from` 去掉了**（决定第七节第 8 条）：带了就是说明上没有的参数名，整个调用不做；克隆一律先进声音库（`manage_voices`，声音 PR 6）。
-    - 名片照 MCP 按需说明的新规矩写（≤ 450，固定说法），用法在说明书的 `add_voiceover` 主题（`MCPGuideVoiceTopics`，第一个手写的主题，[MCP 说明书](mcp-guide.md)）。
+    - 名片照 MCP 按需说明的新规矩写（≤ 450，固定说法），用法在说明书的 `add_voiceover` 主题（`MCPGuideVoiceTopics`，和试点的五个同一张表 `MCPGuideWrittenTopics`，[MCP 说明书](mcp-guide.md)第 14 条）。
     完整合同、免费冒烟和人工清单见 [Sky Studio 的任务](sky-studio-jobs.md) 第五节。
     **失败恢复（2026-11-01）**：云端生成、本地分句、字幕对齐分别报 `failure_stage`；每批原音频、原文映射、原单与进度持久保留。`add_voiceover resume=<recovery_file>` 默认只处理已有结果；`generate_missing=true` 才报价 / 生成明确没成功的批次（照记录里的 `voice_plan.selection` 再报价，服务器回的选择不一样就不交：恢复不重新选模型），未知单只 GET 不重放。恢复记录 2026-11-10 起是 version 2（记整段的选择、每批实际跑的模型和 `fallback_used`），只认 version 2。`get_job` 返回完成 / 待恢复 / 未生成清单、`voice_plan`、每批的 `model` / `fallback_used` 及恢复参数。入轨前记稳定 UUID、成功记回执，重复恢复或用户撤销后重试均不重复插入。实现与可重开工程恢复边界见上述任务文档第五节。
 
@@ -944,7 +947,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
       新加的参数只要写进说明就自动认（`ArgumentCheckChecks` 拿每个工具说明上的全部名字验一遍）。
     - **会回 `needs_confirmation` 的工具说明里要有 `confirm_token`**：问的那一处（`AIWorkspace.confirmReading`、`SkyStudioJobGate`……）从参数里读令牌，
       说明上没有它，点过头再调就被这里挡掉、永远做不成（`add_voiceover` 撞过，[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。
-      `GuideWrittenChecks` 钉着：名片写着 `needs_confirmation` 的工具都收 `confirm_token`。
+      `ArgumentCheckChecks` 钉着：名片写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过核对。
     守卫：`checks/MCP/ArgumentCheckChecks.swift`（冒烟里那次原样的调用、null、project、猜名字、别名、两层里层、自由对象、每个工具说明上的全部名字），
     `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
 53. **照授权拦：没开通的，AI 的工具一个都不做（收费方案第 5 刀第二步，2026-10-28；规矩全在 [Sky Studio 账号](sky-studio-account.md)）**：
@@ -996,8 +999,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     只读、免费、马上回、不碰工程；不带 topic 回目录，`topic=<工具名>` 回那个工具的说明书，长的分节、按 `section` 取。由 App 答（`AIGuideTools`，
     Policy 和 recipes 同一行：不排队、不摆窗口、不算这一轮），内容在 `SrtFlowMCPKit`（`MCPGuide` / `MCPGuideTopics` / `MCPGuideFields`）；
     没开通也照答（`SkyCutGates.alwaysAnswered`，第 53 条），连授权都不等（`answeredBeforeLicenseCheck`）；清单里排第一个、只有它带 `_meta` 的
-    `anthropic/alwaysLoad`。现在每个主题的概要就是那个工具现在的说明原文、`fields` 从参数定义现算且一样事实都不漏（可选值、类型并集、anyOf、条数、长度）；
-    之后的 PR 把长话搬进说明书、名片写短（先原样搬进去、再写名片），做到哪看 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
+    `anthropic/alwaysLoad`。没迁移的工具，主题的概要就是它现在的说明原文；`fields` 从参数定义现算且一样事实都不漏（可选值、类型并集、anyOf、条数、长度），
+    太长时按整个参数自动切成 `fields`、`fields_2`……。迁移过的工具（2026-11-10 起试点 5 个和 add_voiceover）名片写短，概要以迁移前的说明原文开头、后面是手写的用法和坑（add_voiceover 例外：行为同时改了，
+    概要按新行为写，[MCP 说明书](mcp-guide.md)第 14 条）；
+    剩下的分两批搬，做到哪看 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -1105,7 +1110,8 @@ edit_clip 2,074 字超长、清单里有汉字）。
 
 **说明书 skycut_guide（第 57 条）**：`checks/MCP/GuideChecks.swift`（跟着 `scripts/check-mcp.sh` 跑：位置、客户端提示、名片 ≤ 450、每个工具一个同名主题、
 目录里每个工具有自己那一行、大小上限、分节、写错的 topic / section、手写的文字只提真有的名字、只用英文、App 那一头）、`checks/MCP/GuideContentChecks.swift`
-（走一遍真实清单：fields 写全每个参数的事实；例子、related、不含凭据，各配坏样本）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
+（走一遍真实清单：fields 写全每个参数的事实；例子、related、不含凭据，各配坏样本）、`checks/MCP/GuidePilotChecks.swift`（迁移过的工具：名片 ≤ 450 和固定说法、
+参数说明 ≤ 120 且写范围、参数定义 ≤ 4,500 字节、迁移前的原文还在、fields 切节不丢行）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
 `checks/SkyStudio/GateChecks.swift` + `checks/sky-studio-wiring.sh`（没开通也照答、不等授权）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
 
 **云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。

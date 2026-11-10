@@ -2,11 +2,13 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// add_voiceover 的参数名、本机这一档挑谁、词时间；参考录音（挑段、44.1 kHz 的 WAV）在 VoiceReferenceChecks。
+// add_voiceover 的名片和说明书主题该写的话、参数名、本机这一档挑谁、词时间；参考录音（挑段、44.1 kHz 的 WAV）在 VoiceReferenceChecks。
+// 名片的上限、按性质的固定说法、参数说明的长度和范围、主题的分节 / 例子 / 只提真有的名字，和试点的五个工具一起在 GuidePilotChecks。
 // Sky Studio 那一档认声音（SkyStudioVoicePick：默认 gemini:Charon、角色只认 voice_roles……）对着目录快照在 check-sky-studio 的
 // VoicePickChecks；整段报价、预留、退本机、起任务在 check-voice-recovery（真 App 对象）。
 
 func runSkyStudioVoiceChecks() {
+    voiceoverGuideChecks()
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "generate_missing": true]) == nil,
           "the existing voiceover tool accepts recovery arguments without original lines")
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "regenerate_all": true]) != nil,
@@ -110,4 +112,31 @@ func runSpeechParserChecks() {
     check(SpeechWordTimes.parse(raw(#"{"timestamps":[{"speaker":1}]}"#)).isEmpty, "entries in a shape SrtFlow does not know")
     check(SpeechWordTimes.parse(raw(#"{"timestamps":"00:00:01"}"#)).isEmpty, "a string instead of a list")
     check(SpeechWordTimes.parse(raw(#"{"timestamps":[{"characters":["a"],"character_start_times_seconds":[0,1],"character_end_times_seconds":[1]}]}"#)).isEmpty, "alignment arrays of different lengths")
+}
+
+/// add_voiceover 的「名片必含」和「说明书必含」（MCP 按需说明方案 5.2；声音方案 4.10、2.6：不知道就会调错、花错钱的留在名片）。
+private func voiceoverGuideChecks() {
+    let definition = MCPToolName.addVoiceover.definition
+    let card = definition.description
+    for phrase in ["recordings: add_clips", "default gemini:Charon", "Returns job_id; wait with get_job", "relay voice.note",
+                   "The daily credit limit always applies", "resume=recovery_file, never resend lines",
+                   "Read skycut_guide topic=add_voiceover before the first call."] {
+        check(card.contains(phrase), "the add_voiceover card says \"\(phrase)\"")
+    }
+    check(!card.contains("Rachel") && !card.contains("clone_from"), "the card no longer offers old Eleven names or clone_from")
+    // Codex 不显示范围：语速只对本机的声音有效，范围要写成数字（GuidePilotChecks 只查有没有数字，「1 = normal」也算）。
+    let speed = definition.inputSchema["properties"]?["speed"]?["description"]?.stringValue ?? ""
+    check(speed.contains("0.5 to 2"), "speed spells out its range: \(speed)")
+    check(guideMapText().contains("add_voiceover (Sky Studio voices; SkyCut and Mac voices are free)"),
+          "the guide map's paid line names add_voiceover's Sky Studio voices")
+    let topic = MCPGuideTopics.topic(for: .addVoiceover)
+    checkEqual(topic.sections.map(\.name),
+               ["overview", "voices", "models_languages", "paid_confirmation", "subtitles", "batches_recovery", "local_voices", "pitfalls", "fields"],
+               "the add_voiceover topic has the sections of voice plan 4.10, fields last")
+    let text = topic.sections.map(\.text).joined(separator: "\n")
+    for phrase in ["gemini:Charon", "eleven:Name", "en_male_british", "voice_plan", "cross_language", "daily_budget_exceeded",
+                   "recharge_url", "confirm_token", "recovery_file", "generate_missing", "eleven-v4", "download_voices=true",
+                   "Rachel are not voices", "sync_voiceover"] {
+        check(text.contains(phrase), "the add_voiceover topic says \"\(phrase)\"")
+    }
 }

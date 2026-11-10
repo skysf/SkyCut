@@ -2,14 +2,15 @@ import Foundation
 import SrtFlowMCPKit
 
 // MARK: - 生成模型的偏好顺序（纯值）
-// 管什么：用户 2026-10-30 定的顺序；只从服务器实际提供且能收完整输入的模型里挑。
+// 管什么：用户 2026-10-30 定的顺序；只从服务器实际提供且能收完整输入的模型里挑（id 不在 `/models` 里的就跳过，所以这里写旧 id 会悄悄跳过那个模型）。
+// 2026-11-10（Sky Studio PR #245）：Omni 的公开 id 换成 gemini-omni-1.2-flash；veo-pro（Veo 3.1）下架，最高质量只剩 Seedance 2.5。
 // 不管什么：猜人物国籍 / 文化背景（由理解需求的 AI 填 image_context）、模型能力或价格（只读 /models）、付费和重试。
 enum SkyStudioModelPolicy {
-    static let videoOrder = ["minimax-h3", "gemini-omni-1.1-flash", "veo-fast", "seedance-2-pro", "seedance-2-5", "veo-pro"]
-    static let qualityOrder = ["seedance-2-5", "veo-pro", "minimax-h3", "gemini-omni-1.1-flash", "veo-fast", "seedance-2-pro"]
+    static let videoOrder = ["minimax-h3", "gemini-omni-1.2-flash", "veo-fast", "seedance-2-pro", "seedance-2-5"]
+    static let qualityOrder = ["seedance-2-5", "minimax-h3", "gemini-omni-1.2-flash", "veo-fast", "seedance-2-pro"]
     static let guidance = "Images: Asian people, places or cultural scenes prefer seedream5-flash; non-Asian, mixed or unclear prefer nano2. "
-        + "Judge the subject, not the prompt language. Video: minimax-h3, then gemini-omni-1.1-flash, veo-fast, seedance-2-pro. "
-        + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5, then veo-pro. "
+        + "Judge the subject, not the prompt language. Video: minimax-h3, then gemini-omni-1.2-flash, veo-fast, seedance-2-pro. "
+        + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5. "
         + "Select lip-sync by its image/audio or video/audio inputs; use image operation=remove_background for cutouts. "
         + "After failure query the original job and billing. Unknown outcomes or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. Read each model's input modes and limits."
 

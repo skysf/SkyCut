@@ -43,7 +43,8 @@
 #      握手声明清单会变、新一代清单缓存一分钟；用户中途添加 / 删掉 Key 时老一代客户端收 list_changed、新一代不收）、那个小文件读得宽且不带机密、
 #      说明和参数和词表 / App 的类型对账、全清单说明总长 ≤ 100,000 字符（2026-10-02 从 72,000 抬到 80,000、2026-10-14 再抬到 90,000、2026-10-17 再抬到 100,000）；add_voiceover 的 Sky Studio 那一档：参数名（clone_from 去掉、model / confirm_token 收）、
 #      本机挑声音（不点名是旁白角色）、Eleven 报的词时间换成字幕认的词；认预设 / 角色在 check-sky-studio 的 VoicePickChecks（克隆的参考录音见第 38 条）。
-#      手写了说明书主题的工具（add_voiceover）：名片、参数说明、会问就收 confirm_token（GuideWrittenChecks）。
+#      add_voiceover 迁移过的名片和说明书主题：和试点的五个一起在 GuidePilotChecks，名片必含 / 说明书必含在 SkyStudioVoiceChecks；
+#      名片说会回 needs_confirmation 的工具带着 confirm_token 再调都过参数核对（ArgumentCheckChecks）。
 #  23. 字幕长什么样（edit_subtitles / burn_subtitles 的 style）：参数全验过、只改工程自己的样式、给了位置收掉拖框的布局、
 #      只给字号把倍率归一、逐词高亮的开关和倍数、烧录一批时描边 / 底条互换、位置词表对账。
 #  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 对账、定义（参数、必填、枚举、只在存了 Sky Studio 的 Key 时列、上网）、

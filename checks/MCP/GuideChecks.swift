@@ -66,12 +66,8 @@ private func runGuideTopicChecks() {
             continue
         }
         checkEqual(topic.sections.first?.name, MCPGuideSection.overview, "\(tool.rawValue): the topic starts with its overview")
-        if MCPGuideTopics.written(for: tool) == nil {
+        if MCPGuideWrittenTopics.topic(for: tool) == nil {
             checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
-        } else {
-            // 手写了主题的工具（方案 5.1，第一个是 add_voiceover）：概要不再是名片原文；手写的几节和别的手写文字一起查名字（runGuideWordingChecks），
-            // 名片和参数在 GuideWrittenChecks 里查；fields 照旧现算、接在最后。
-            checkEqual(topic.sections.last?.name, "fields", "\(tool.rawValue): a hand-written topic ends with the computed fields")
         }
         // 第一层的每个参数有自己那一行（不缩进），里层同名的不算。
         let entries = MCPGuideFields.entries(for: tool.definition.inputSchema)
@@ -136,7 +132,8 @@ private func runGuideSplitChecks() {
     check(whole["next_step"] == nil && whole["section"] == nil, "a whole answer needs no next step")
     checkEqual(whole["examples"], [["a": "x"]], "examples come back with the topic")
     checkEqual(whole["related"], ["look"], "related topics come back with the topic")
-    check(MCPGuide.answer(topic: "look", section: nil)["examples"] == nil, "no examples key when a topic has none")
+    // listen 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。
+    check(MCPGuide.answer(topic: "listen", section: nil)["examples"] == nil, "no examples key when a topic has none")
 }
 
 /// 名字的写法不计较；写错的回目录 + 猜的。
@@ -195,11 +192,9 @@ private func runGuideWordingChecks() {
     for topic in MCPGuideTopics.all where MCPToolName(rawValue: topic.name) == nil {
         handWritten += topic.sections.map { ("the \(topic.name) topic", $0.text) }
     }
-    // 手写了主题的工具：名片和手写的几节（fields 是现算的，不在这里查）。
-    for tool in MCPToolName.allCases {
-        guard let written = MCPGuideTopics.written(for: tool) else { continue }
+    // 迁移过的工具的名片也是手写的（它们手写的几节在 GuidePilotChecks 里查；迁移前的原文不查，fields 是现算的）。
+    for tool in MCPGuideWrittenTopics.migrated {
         handWritten.append(("the \(tool.rawValue) card", tool.definition.description))
-        handWritten += written.sections.map { ("the \(tool.rawValue) topic's \($0.name)", $0.text) }
     }
     for (what, text) in handWritten {
         check(!text.isEmpty, "\(what) is written")
