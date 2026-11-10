@@ -564,6 +564,15 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 - `scripts/check-instant-tooltip-panel.sh` —— 提示面板的真实落点：摆好之后跑一轮
   排版再量一次，面板不许自己改尺寸或挪位置。改 `InstantTooltip.swift` 必跑。
   用 `.accessory` 策略，不抢焦点、不进 Dock，跑完即退。
+- `scripts/render-voice-library.sh <输出目录>` —— 声音库界面的离屏渲染（2026-11-10）：生产的视图 + 假 Sky Studio，英 / 中 / 西三种界面语言各出一套
+  PNG（设置里声音那两节的三种样子、浏览预设、新建声音空着 / 填好、给声音加录音、设计声音带报价）。**不判对错，只出图**：改
+  `Sources/SrtFlow/VoiceLibrary/` 的视图之后、发版前看排版（截字、漏翻、撑破），PR 的图也从这里来。几条实测：
+  - AppKit 的控件（输入框、分段、下拉、勾选框）`cacheDisplay` 画不对，要按窗口号用 `screencapture -l` 拍；**整个在屏幕外的窗口拍不到**
+    （"could not create image from window"），所以窗口摆在主屏左下角、排在所有窗口最底下（`.accessory`、`orderBack`，不抢前台、不成为 key）。
+  - 自建的窗口够不着 `.preferredColorScheme`：森林色固定浅色是靠它给的，系统在深色模式时自建窗口里的控件会是深色（输入框一片黑）——
+    照同一条规矩自己设 `window.appearance`。真 App 里的 sheet 没这个问题。
+  - 字符串表要另外平铺进 `Contents/Resources`（同 `build-app.sh`），只拷资源包的话三种语言出来都是英文。
+  - **别渲整个设置窗口**：「剪辑风格」那一节读的是这台 Mac 上用户自己的风格名，会进截图；脚本只摆声音的那两节。
 
 ## 五之二、屏幕锁着 / 不便抢鼠标的时候（2026-09-23）
 

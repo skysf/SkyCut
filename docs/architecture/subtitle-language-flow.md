@@ -116,6 +116,9 @@
      守卫再钉一道（禁止 `state.mainClips + state.audioTracks` 复活）。
      （2026-09-27 起「定语言 → 备模型 → 按窗转写落缓存」这一段从 `TranscriptionTask` 原样挪进了
      `TranscriptHarvester`，生成字幕和 AI 的转写共用；任务状态机、串行槽、分段、写回还在 `TranscriptionTask`。）
+     （2026-11-10 起后一半——候选怎么挑、每个候选都过探针、裁决——从 `detectSourceLocale` 原样挪进了 `SpokenLanguageProbe`：
+     新建声音对话框检测参考录音的语言用同一份（[声音库](voice-library.md)第九节第 4 条）。探针从哪段素材抽仍是各自的事；
+     守卫跟着代码走，候选去重 / 排序 / 不许单候选捷径现在钉在 `SpokenLanguageProbe` 上。）
 
 8. **每次翻译任务的 `TranslationSession.Configuration` 必须换代。**
    它是带 `version` 的值类型，`==` 把 version 一起比；两次同样语言的任务各自
