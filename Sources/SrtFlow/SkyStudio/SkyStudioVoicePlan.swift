@@ -3,7 +3,8 @@ import SrtFlowMCPKit
 
 // MARK: - 一段旁白怎么交给 Sky Studio：先分批、整段报一次价，再每批照报价交（纯值）
 // 管什么（SkyCut 声音方案 4.2 第 2、5 步、8.1、8.4）：
-// - `draft`：报价之前按 `/models` 的字数上限分批（这个 kind 下各模型里最小的那个：`model: auto` 时还不知道选哪个），拼整段报价的请求
+// - `draft`：报价之前按 `/models` 的字数上限分批（这个 kind 下各模型里最小的那个：`model: auto` 时还不知道选哪个；每句按它自己的字，
+//   因为服务器按每一批自己的语言卡），拼整段报价的请求
 //   （`params.batches`、语言提示，SkyStudioVoiceRequests.segmentQuote）。合不合批、交哪个 model 照 SkyStudioVoiceReading（声音 PR 5）：
 //   这台 Mac 切得开、或者读的模型报字的时间就合批（普通旁白和克隆一样），切不开就一句一单；定下的那一份记进计划（恢复时照它）。
 // - `quoted`：整段报价回来之后，每批的 `/jobs` 请求定下来、记进恢复记录：这一批的字、这一批报价的 credits 当 `max_credits`、
@@ -71,7 +72,8 @@ struct SkyStudioVoicePlan: Sendable, Codable {
         guard let cap = catalog.voiceCharacterLimit(kind: kind, language: language), cap >= 1 else {
             throw Problem(message: "Sky Studio did not give a character limit for \(language) voices.")
         }
-        let speech = try SkyStudioVoiceBatch.make(lines: lines, limit: cap, pack: reading.packs)
+        // 每句按它自己的字定上限（服务器按每一批自己的语言卡，不是整稿的）：英文为主、夹一行长中文的稿子，那一行照中文的上限分。
+        let speech = try SkyStudioVoiceBatch.make(lines: lines, pack: reading.packs) { catalog.voiceCharacterLimit(kind: kind, text: $0) ?? cap }
         let model = reading.model
         let segment = try SkyStudioVoiceRequests.segmentQuote(kind: kind, model: model, voice: voice, batches: speech.map(\.prompt), lines: lines)
         return Draft(kind: kind, voice: voice, reading: reading, language: language, speech: speech, segment: segment)
