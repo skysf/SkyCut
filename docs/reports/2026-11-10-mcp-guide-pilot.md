@@ -74,6 +74,28 @@
 2. 没迁移的工具（`set_texts`、`export_video`）名片里没要求读，模型也读了（总说明最后一条写的是「名片这么说才读」）。每次只多 0–3% 的输入、换来第一次就用对，先不动。
 3. 任务 7 还读了三个这一场没调的主题（`export_video`、`workflows`、`rules`）；`export_video` 是在找能不能直接拿一帧当封面，算有用的探路。暂时只记录，全部迁移完那一次看是不是还这样。
 
+## 补跑：#358 之后的任务 7（main `f76032e`，2026-11-10）
+
+试点里任务 7 读了 11 次说明书、输入 +41%；#358 让分节回的第一次回答列出每一节讲什么、`next_step` 改成「只读要用的那几节」，
+generate_media 加了「报价再问只读 spending」。用 `f76032e`（#358 合进 main 之后）组装的隔离测试 App，同一句提示、同一个母版、同一个
+Claude Code（2.1.322、claude-opus-5-5）补跑了一次任务 7（协调者 2026-11-10 安排，在用户同意的实测范围里）。
+[证据 JSON](2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)。
+
+| 任务 7（新题） | skycut 调用 | 读说明书 | 请求数 | 输入合计 | 输出 | 秒 | 停在哪 |
+|---|---:|---:|---:|---:|---:|---:|---|
+| 基线 `7a9d8c9` | 10 | 0 | 9 | 324,550 | 3,669 | 47.9 | needs_confirmation |
+| 试点 `08fa1b3` | 21 | 11 | 12 | 457,683 | 5,364 | 76.6 | needs_confirmation |
+| 补跑 `f76032e` | 14 | **5** | 9 | **333,890**（比基线 +2.9%，比试点 −27.0%） | 3,856 | 54.2 | 报价之后 |
+
+- **读了什么**：地图；generate_media 的第一次回答（每一节讲什么 + 提示）；`workflows`；`generate_media` 的 `spending` 和 `inputs`。
+  没再读 kinds、jobs_results、official_film、fields、fields_2，也没再读 export_video、rules。提示管用：`spending` 读了，多出来的两次
+  （workflows、inputs）都不大。
+- **怎么停的**：先 `quote_only` 报价（模型自己选了 4K、1 积分），**报完价就停下来问用户**（中文：价格、今天已用、nano2 没有 1:1 所以
+  问 16:9 还是 9:16），没有再调一次去拿 `needs_confirmation`，也没带确认码、没起任务。方案 6.3 的期望是「报价 / needs_confirmation 时停下问用户，
+  不自己带确认码」，这次合规。实测脚本原来的断言只认 `needs_confirmation`、比方案的期望窄，这一次会被判成没停；`report.py` 改成报价之后
+  停下来问也算（`asked_at` 记停在哪一步），基线和试点的判定都不变（都停在 needs_confirmation；旧题 7-cover-v1 照旧算没停）。
+- **结论**：#358 把任务 7 读说明书的次数减了一半多，输入回到基线附近（+2.9%）。设计不改；全部迁移完的完整一轮再看一遍。
+
 ## 环境与隔离
 
 - **App**：`08fa1b3`（试点 #354 和 #352 合进 main 之后）的 debug 构建，组装进新的测量目录；独立身份 `com.srtflow.SrtFlow.measure.skystudiosmoke`、
