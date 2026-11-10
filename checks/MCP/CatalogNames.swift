@@ -47,6 +47,9 @@ func catalogKnownNames() -> Set<String> {
     // 各句是哪个模型读的 line_models（SkyStudioVoiceCheckpoint.detail）、任务结束码 fallback_needs_one_time（SkyStudioVoiceCodes）。
     names.formUnion(["batches_done", "batches_running", "batches_waiting", "line_models", "fallback_needs_one_time"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 全部权限下的长期授权（声音 PR 7）：旁白中途那一笔直接建时 get_job 的 enroll_job_id（SkyStudioVoiceFallbackFee）、
+    // set_settings 结果里的 voice_standing_consent（AISettingsTools）。
+    names.formUnion(["enroll_job_id", "voice_standing_consent"])
     // 声音库（声音 PR 6，MCPGuideVoiceLibraryTopics 和 add_voiceover 的主题）提到的结果字段、任务种类、错误码：报价的 one_time、
     // 两种收费任务 voice_design / voice_enroll（AIJobs.Kind）、设计的 sample_url（SkyStudioVoiceLibraryJob）、服务器的
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。

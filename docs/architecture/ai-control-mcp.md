@@ -185,8 +185,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
    - **声音库的三件事**（2026-11-10 声音 PR 6，第 58 条）也在 `SkyStudioJobGate`：用录音建声音 / 加录音的**授权**和**一次性费用**（建 MiniMax 版、
-     设计声音）这一刀**两种模式都问**（全部权限下不问要等打开时的价目说明和长期授权，声音 PR 7），一次性费用先判每日硬预算；**删声音**请求批准模式问一句、
-     全部权限直接删。
+     设计声音）请求批准模式问；**全部权限**下（声音 PR 7，`SkyStudioVoiceStanding.voiceAsk`）这个账号有有效的长期授权就不问 —— 建声音带
+     `consent: "standing_grant"`，设计、建 MiniMax 版直接做，结果的 `full_access` 和工程的提示条说做了什么、最多花多少 —— 没有就照请求批准模式问一次、
+     问句后面接打开全部权限时那段说明（令牌另绑那一版），点过头补记长期授权、以后不再问。一次性费用先判每日硬预算；**删声音**请求批准模式问一句、
+     全部权限直接删（也说一句）。长期授权怎么记、撤、升级时补记见 [声音库](voice-library.md)第八节第 9 条。
    操作确认的入口是以下四处（设置权限另见其合同）（`AIFileTools`（含服务器角色删除）、`AIWorkspace.confirmReading`、`SkyStudioJobGate`、`AISettingsApproval`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
@@ -722,7 +724,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - **`model`**：不给 = `auto`，服务器选；点名的要在 `/models` 里有（读稿的那几个），不然当场拒。
     - **整段报价挪到回任务号之前**（`SkyStudioVoiceoverStart`）：静默读 Key → `/models`（缓存 10 分钟）→ 分批（普通旁白现在一句一单、上限读 `limits.max_characters_by_language`）→ **整段 `POST /quote` 一次**（`params.batches`、拉丁字母的非英文稿带 `params.language`）→ 要字幕而选中的模型不报字的时间（`/models` 的 `output.words`，Gemini 不报）时先确认这台 Mac 能转写，不能就在花钱之前拒 → 按每批的 credits 整体预留，额度不够当场回 `daily_budget_exceeded`、什么都不起、不换声音 → 起任务，回 `job_id` + `voice_plan` + `voice.note`（服务器的 warnings、英式男声、语速被忽略），有 note 时 `next_step` 叫 AI 在用户听之前先转告。
     - **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认）当场换本机的声音（角色照旧、预设按它在这种语言里的性别挑角色），`voice.note` 说为什么；服务器明说这个请求不行（4xx：模型和声音配不上、语言不支持）原话转给 AI、一分不花、不换声音。付费请求交出去之后不再退本机。**声音库的声音（`voice_…`）从不退本机**：Key / 目录 / 报价读不到、声音库用不了（503 `voice_library_unavailable`）都报错、一分不花（`checks/sky-studio-wiring.sh` 第 11 节钉着）。
-    - **一次性费用**（声音 PR 6，`SkyStudioVoiceOneTimeStep`）：报价的 `one_time` 不为空（`voice_plan.rule: default_needs_one_time`：默认要的 MiniMax 版还没建，selection 先给不花钱的那个；或者点名的模型就要 MiniMax 版）时回任务号之前先定：`skip_one_time=true` 照不花钱的那个读（只对 `default_needs_one_time` 有用）；没带就经 `SkyStudioJobGate.voiceOneTime` 问（先判每日硬预算，问句带价、不建这一单用什么，令牌绑 kind / 模型 / 声音 / 语言 / 精确积分）；点过头记账、起一单 `voice_enroll`（`SkyStudioVoiceLibraryJob`，回它的任务号），做完叫 AI 再调一次 `add_voiceover`（那时报价不再要一次性费用）。不在旁白任务里串着建：建要几十秒、价要等建完再报，回任务号之前整段报价、整体预留这条规矩不能在任务里绕过去。任务里某一批的备用要先建 MiniMax 版（任务结束码 `fallback_needs_one_time`，声音 PR 4 让那一批停下）：get_job 带问句、价和 `confirm_token`，`resume` + 令牌 = 建、做完 `resume` + `generate_missing=true`，`resume` + `skip_one_time=true` = 照原来的模型重试（`SkyStudioVoiceFallbackFee`，[Sky Studio 的任务](sky-studio-jobs.md)第五节）。
+    - **一次性费用**（声音 PR 6，`SkyStudioVoiceOneTimeStep`）：报价的 `one_time` 不为空（`voice_plan.rule: default_needs_one_time`：默认要的 MiniMax 版还没建，selection 先给不花钱的那个；或者点名的模型就要 MiniMax 版）时回任务号之前先定：`skip_one_time=true` 照不花钱的那个读（只对 `default_needs_one_time` 有用）；没带就经 `SkyStudioJobGate.voiceOneTime` 问（先判每日硬预算，问句带价、不建这一单用什么，令牌绑 kind / 模型 / 声音 / 语言 / 精确积分；全部权限 + 长期授权不问，声音 PR 7）；点过头 / 不用问就记账、起一单 `voice_enroll`（`SkyStudioVoiceLibraryJob`，回它的任务号），做完叫 AI 再调一次 `add_voiceover`（那时报价不再要一次性费用）。不在旁白任务里串着建：建要几十秒、价要等建完再报，回任务号之前整段报价、整体预留这条规矩不能在任务里绕过去。任务里某一批的备用要先建 MiniMax 版（任务结束码 `fallback_needs_one_time`，声音 PR 4 让那一批停下）：get_job 带问句、价和 `confirm_token`，`resume` + 令牌 = 建、做完 `resume` + `generate_missing=true`，`resume` + `skip_one_time=true` = 照原来的模型重试；全部权限 + 长期授权直接建（get_job 带 `enroll_job_id`）（`SkyStudioVoiceFallbackFee`，[Sky Studio 的任务](sky-studio-jobs.md)第五节）。
     - 任务里：每批 `/jobs` 带同一个 `params.plan`（`voice_plan.selection`，整段一个模型）和这一批报价的 credits 当 `max_credits`；逐批结算，未知提交保留账并报任务号与幂等 key，不重生成。词时间：Eleven v4 拼全部全局时间 chunk、尾端按实际媒体时长夹住；不报字的模型在本机转写对齐。合批（声音库的声音和普通旁白，声音 PR 5 起）在本机转写后按词间静音切句（eleven-v4 读的按它的字符时间切），切不准保留完整文件并失败。字幕时间（声音 PR 5，`subtitle_timing`：provider / aligned / estimated / mixed）：字幕的字永远是稿子的字；转写模型没装的在第一批之前装；转写不了的预设要字幕整段点名 eleven-v4，声音库的声音、点名的模型、Eleven 不读的语言按字数估；一句对不上这一句按字数估，整段不失败（[Sky Studio 的任务](sky-studio-jobs.md) 第五节「字幕时间」）。所有声音只经 `AIAudioFileWriter.writeVoiceover` 落盘；完成后只对发起工程做一次音频 / 字幕撤销，工程已换或关闭只留文件。
       **几批同时交**（2026-11-10 声音 PR 4，方案第八节）：按原来的顺序在声音池领槽（`SkyStudioJobSlots`，`/me` 的 `max_running_audio_jobs`；服务器还没有声音池时和别的共用 3 个）、同时跑，回来的顺序不管，切句和落地照原来的顺序；一批出了事，后面还没交的不再交、交出去的收好再以可恢复的 failed 结束；`get_job` 报 `batches_done` / `batches_running` / `batches_waiting`。某一批服务器换了备用（`fallback_used`），后面还没交的改带 `voice_plan.fallback.selection`，结果带 `line_models`、`voice.note` 说前后可能听得出差别；`fallback_needs_one_time`（备用要先花一次性费用）这一批停下、钱退了，`generate_missing` 照原来的模型重试（付一次性费用是声音 PR 6）。
     - **`clone_from` 去掉了**（决定第七节第 8 条）：带了就是说明上没有的参数名，整个调用不做；克隆一律先进声音库（`manage_voices`，声音 PR 6）。
@@ -1018,7 +1020,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     令牌绑文件身份、那段参考录音的内容哈希、用的那一段、语言、名字 / 声音、版本、账户）、点过头才传 `voice_reference`、建声音带 `consent: true` + 版本；
     `design` 先报价、问一次性费用、点过头记账起 `voice_design` 任务（`get_job` 报新声音和 1 小时的 `sample_url`，账按实收）；`rename` 直接改；`delete`
     请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`
-    （第 6 条），这一刀授权和一次性费用两种模式都问（长期授权是声音 PR 7）。错误码换成能照做的话（`SkyStudioVoiceLibraryErrors`）。
+    （第 6 条），全部权限下有有效的长期授权就不问（声音 PR 7）。错误码换成能照做的话（`SkyStudioVoiceLibraryErrors`）。
     名片 + 说明书主题（`MCPGuideVoiceLibraryTopics`，新工具没有迁移前的原文）；全清单 2026-11-10 是 106,921 / 110,000。
 
 ## 五、这一轮、停止、撤销这一轮
@@ -1039,7 +1041,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
   也不做。查停止在路由定了工程之后、摆窗口之前（`checks/MCP/router-wiring.sh` 钉着），没有全 App 一份的停止。`cancel_job` 只能取消自己会话起的任务。
 - 工具栏的 AI 状态（`AIActivityBanner`）只订阅 `AISession` 和这个工程的 `AIRound`；每个剪辑页各一份。2026-10-31 用户确认改为单排顶部工作台：状态 / 停止不再占预览高度；详情可反复开关，工作时不能隐藏。百分比只报真实的单任务进度，不估整轮。布局与回归见 [顶部工作台与统一设置](workbench-and-settings.md)。
 
-全 App 的偏好由 `get_settings` / `set_settings` 提供：五类快照、语言 / 缓存 / AI 每日额度的白名单写入，与原生设置窗口共用 Store。参数全部验证后再写；不切工程、不开一轮，密钥与新权限不开放。合同见 [顶部工作台与统一设置](workbench-and-settings.md)「MCP 合同」。
+全 App 的偏好由 `get_settings` / `set_settings` 提供：五类快照、语言 / 缓存 / AI 每日额度的白名单写入，与原生设置窗口共用 Store。参数全部验证后再写；不切工程、不开一轮，密钥与新权限不开放。打开全部权限的问句后面接那段说明（不再先问的事、声音的一次性费用价目、额度、长期授权那句），点过头记长期授权、关掉撤掉，结果报 `voice_standing_consent`（声音 PR 7，[声音库](voice-library.md)第八节第 9 条）。合同见 [顶部工作台与统一设置](workbench-and-settings.md)「MCP 合同」。
 
 ## 六、「连接 AI」（设置 ⌘,）
 

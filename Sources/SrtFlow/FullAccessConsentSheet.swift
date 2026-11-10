@@ -12,6 +12,13 @@ struct FullAccessConsentSheet: View {
     let onCancel: () -> Void
     @State private var loaded: SkyStudioVoiceStandingNotice?
 
+    /// `notice`：已经有的那一份就先照它显示（离屏渲染、预览用）；打开以后照样再读一次 /models。
+    init(notice: SkyStudioVoiceStandingNotice? = nil, onAgree: @escaping (String) -> Void, onCancel: @escaping () -> Void) {
+        self.onAgree = onAgree
+        self.onCancel = onCancel
+        _loaded = State(initialValue: notice)
+    }
+
     var body: some View {
         let _ = PerfCounters.body(Self.self)
         let notice = loaded ?? SkyStudioVoiceStandingNotice(catalog: nil, dailyLimit: SkyStudioSpendStore.shared.dailyLimit)
@@ -44,7 +51,6 @@ struct FullAccessConsentSheet: View {
             HStack {
                 Spacer()
                 Button("Cancel", action: onCancel)
-                    .keyboardShortcut(.cancelAction)
                 Button("Agree and Turn On") { onAgree(notice.statement.version) }
                     .accessibilityIdentifier("full-access-agree")
             }
@@ -52,6 +58,8 @@ struct FullAccessConsentSheet: View {
         .fixedSize(horizontal: false, vertical: true)
         .padding(20)
         .frame(width: 480)
+        // Esc = 取消（快捷键不许和提示分家，checks/instant-tooltip-wiring.sh；同 BurnInView 用 onExitCommand）。
+        .onExitCommand(perform: onCancel)
         .task { loaded = await SkyStudioVoiceStanding.shared.notice() }
     }
 

@@ -59,6 +59,15 @@ if [ -z "${agree_line}" ] || [ -z "${full_line}" ] || [ "${full_line}" -lt "${ag
    || ! grep -qF 'FullAccessConsentSheet(' "${ACCESS_SECTION}"; then
   fail "${ACCESS_SECTION}：选全部权限先弹 FullAccessConsentSheet，只有「同意并打开」（agree）才写 Store"
 fi
+# 选的那一下（choose）：全部权限那一支先弹说明、直接 return，之后才轮到别的模式写 Store。
+choose_body="$(sed -n '/private func choose(/,/^    }/p' "${ACCESS_SECTION}")"
+choose_full="$(grep -nF 'if mode == .full {' <<<"${choose_body}" | head -1 | cut -d: -f1 || true)"
+choose_sheet="$(grep -nF 'explainingFullAccess = true' <<<"${choose_body}" | head -1 | cut -d: -f1 || true)"
+choose_write="$(grep -nF 'setMode(' <<<"${choose_body}" | head -1 | cut -d: -f1 || true)"
+if [ -z "${choose_full}" ] || [ -z "${choose_sheet}" ] || [ -z "${choose_write}" ] \
+   || [ "${choose_full}" -ge "${choose_sheet}" ] || [ "${choose_sheet}" -ge "${choose_write}" ]; then
+  fail "${ACCESS_SECTION}：choose 里选全部权限要先弹说明（explainingFullAccess = true）再 return，不许先写 Store"
+fi
 [ "$(grep -cF 'SkyStudioVoiceStanding.shared.migrateIfNeeded(key: key)' "${ACCOUNT}" || true)" -eq 2 ] \
   || fail "${ACCOUNT}：读到 Key、存下 Key 时都要补记升级前就开着全部权限的那一条（migrateIfNeeded 两处）"
 
