@@ -57,6 +57,11 @@ func catalogKnownNames() -> Set<String> {
                      "queue_position", "export_settings", "billing_note", "remote_result", "replaced_ids", "source_size",
                      "transfer_percent", "phase_seconds", "typical_seconds", "tail_id", "source_frame", "upright_source",
                      "stopped_by", "stop_method", "keyframe_scale"])
+    // 第二批迁移的工具主题提到的结果字段和报错代码（2026-11-10）：get_status 的 mcp_catalog / cloud_tasks；list_characters 的
+    // next_cursor / available_roles；get_character 的 not_found；read_document 的 next_from_char；cancel_job 说到的 billing_note；
+    // get_timeline 说到的 edit_limits 里的 keyframe_scale。
+    names.formUnion(["mcp_catalog", "cloud_tasks", "next_cursor", "available_roles", "not_found", "next_from_char", "billing_note",
+                     "keyframe_scale"])
     // 声音库（声音 PR 6，MCPGuideVoiceLibraryTopics 和 add_voiceover 的主题）提到的结果字段、任务种类、错误码：报价的 one_time、
     // 两种收费任务 voice_design / voice_enroll（AIJobs.Kind）、设计的 sample_url（SkyStudioVoiceLibraryJob）、服务器的
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。

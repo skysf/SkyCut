@@ -55,8 +55,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      **说明书的地图**（`skycut_guide` 不带 topic）：Codex 每打印一个工具条目就带一份整份总说明（2026-11-03 那批会话里重复的总说明占找工具输出的
      32–59%），Claude Code 本来就把工具名单独列给模型，地图在说明书里一次读全；清单里每个工具都要**作为一项列在地图上**（GuideChecks）。
      ② **每个工具的说明 = 那一章**：这个工具怎么用，≤ 2,048；只跟某个参数有关的长话写进那个参数的说明（参数说明随工具一起加载）。
-     **迁移过的工具**（2026-11-10 起试点 5 个：edit_clip、generate_media、set_text、add_clips、look，加上随声音 PR 3 的 add_voiceover 和第一批 25 个；
-     还剩第二批）的说明是**名片**：≤ 450、
+     **迁移过的工具**（2026-11-10 起试点 5 个：edit_clip、generate_media、set_text、add_clips、look，加上随声音 PR 3 的 add_voiceover，第一批 25 个、
+     第二批 27 个两个 PR 都合了；只剩 skycut_guide 自己）的说明是**名片**：≤ 450、
      按工具性质写固定说法、参数说明 ≤ 120 且范围写数字、参数定义 ≤ 4,500 字节（例外 edit_clip、generate_media），长话进说明书
      （[MCP 说明书](mcp-guide.md)第三节第 14 条）。
      ③ **出结果那一刻才用得上的规矩写在结果里**：`needs_confirmation` 的 `next_step`、任务结果的「用 get_job 等」、
