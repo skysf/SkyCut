@@ -11,8 +11,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .getTimeline, title: "Read the timeline",
                 description: """
-                Read all tracks, clips, texts, shapes and subtitles with ids, timing, settings, canvas and frame rate. \
-                edit_limits gives native ranges and reject/clamp policies. Read before editing for fresh ids; music_credits lists library music.
+                Read-only. Every track, clip, text, shape and subtitle with ids, timing and settings, plus canvas, frame rate, linkage \
+                and magnet. edit_limits gives the native ranges and whether out-of-range values fail or clamp. Read it before editing \
+                for fresh ids; music_credits lists library music to credit.
                 """,
                 readOnly: true
             )
@@ -56,10 +57,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setTrack, title: "Track settings",
                 description: """
-                Change a whole track: its fader (volume_db, on top of each clip's own volume) and whether it is \
-                hidden (left out \
-                of the preview and the export). track "master" is the fader after all tracks. Use it to duck music under a \
-                voice-over or mute a whole track.
+                Change a whole track: its fader (volume_db, on top of each clip's own volume) or hidden (left out of the preview and \
+                the export). track master is the fader after all tracks. Use it to duck music under a voice-over or mute a track. One \
+                undo step; clamped values return requested/applied/adjustments.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("V1, V2… / A1, A2…, or master."),
@@ -71,11 +71,11 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .splitClip, title: "Split clips",
                 description: """
-                Cut clips in two at a timeline time. Without clip_ids it cuts the V1 clip under that time. \
-                Returns the ids of the new right-hand pieces.
+                Cut clips in two at a timeline time: without clip_ids, the V1 clip under that time. Returns the ids of the new \
+                right-hand pieces. One undo step.
                 """,
                 input: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline time in seconds where to cut.", minimum: 0),
+                    "time": MCPSchema.number("Timeline time in seconds where to cut (≥ 0).", minimum: 0),
                     "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Only cut these clips.")
                 ], required: ["time"])
             )
@@ -97,9 +97,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .deleteItems, title: "Delete",
                 description: """
-                Delete clips, texts, filters or subtitle lines by id; kinds can be mixed. ripple=true closes the gaps this \
-                leaves on V1 by moving the later V1 clips left. Linkage on: what sits on deleted or moved V1 clips follows \
-                (a subtitle shrinks to the speech left under it, and goes when less than half is left); off: other tracks stay.
+                Delete clips, texts, shapes, filters or subtitle lines by id (kinds can be mixed). ripple=true closes the gaps on V1 \
+                by moving later V1 clips left. Linkage on: what sits on deleted or moved V1 clips follows (a subtitle shrinks to the \
+                speech left and goes when less than half is left); off: other tracks stay. One undo step.
                 """,
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to delete.", minItems: 1),
@@ -111,15 +111,13 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .duplicateItems, title: "Duplicate",
                 description: """
-                Copy clips, texts, shapes, filters or subtitle lines (ids can be mixed) and place the copies with the same \
-                spacing, the earliest at start (default: right after the last of them ends). Landing works like \
-                paste: a clip \
-                that would overlap goes up to the next free video track (or another audio track), groups keep their order, \
-                linked audio comes along. track picks where a single group of clips goes. Returns the new ids.
+                Copy clips, texts, shapes, filters or subtitle lines (ids can be mixed) with the same spacing, the earliest at start \
+                (default: right after the last one ends). A copy that would overlap moves up a track, like paste; linked audio comes \
+                along. Returns the new ids. One undo step.
                 """,
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to copy.", minItems: 1),
-                    "start": MCPSchema.number("Timeline time for the earliest copy.", minimum: 0),
+                    "start": MCPSchema.number("Timeline time for the earliest copy, seconds (≥ 0).", minimum: 0),
                     "track": MCPSchema.string("V1, V2… or A1, A2… (the next number opens a new track): where the copied clips should go.")
                 ], required: ["ids"])
             )
@@ -127,14 +125,14 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setTransition, title: "Set a transition",
                 description: """
-                Set the transition between a V1 clip and the V1 clip right after it; the two must touch. \
-                type none removes it. all=true applies it to every touching pair on V1.
+                Set the transition between a V1 clip and the touching V1 clip after it (after_clip_id), or between every touching pair \
+                with all=true. type none removes it. Returns where each transition went and its real length. One undo step.
                 """,
                 input: MCPSchema.object([
                     "after_clip_id": MCPSchema.string("The V1 clip before the cut."),
                     "all": MCPSchema.boolean("Apply to every touching pair of V1 clips."),
                     "type": MCPSchema.string("Transition.", oneOf: MCPVocabulary.transitions),
-                    "duration": MCPSchema.number("Seconds (default 0.5).", minimum: 0.1, maximum: 3)
+                    "duration": MCPSchema.number("Seconds, 0.1–3 (default 0.5).", minimum: 0.1, maximum: 3)
                 ], required: ["type"])
             )
         case .setText:
@@ -191,9 +189,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setCanvas, title: "Canvas",
                 description: """
-                Set the output frame shape and/or frame rate. auto follows the first V1 clip; \
-                9:16 is for TikTok, Reels and Shorts; 16:9 for YouTube. Clips keep their layout: to fill a new shape, \
-                call edit_clip fit=fill on each clip.
+                Set the output frame shape and/or frame rate: 9:16 for TikTok, Reels and Shorts, 16:9 for YouTube, auto follows the \
+                first V1 clip. Clips keep their layout: to fill a new shape, use edit_clips fit=fill. fps cannot change while the \
+                screen is recording. One undo step.
                 """,
                 input: MCPSchema.object([
                     "ratio": MCPSchema.string("Frame shape.", oneOf: MCPVocabulary.canvasRatios),

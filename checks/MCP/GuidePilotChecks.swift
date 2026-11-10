@@ -30,7 +30,12 @@ private let pilotPreviousCardLengths: [MCPToolName: Int] = [
     .editSubtitles: 819, .generateSubtitles: 542, .translateSubtitles: 548, .getSubtitles: 536, .exportSubtitles: 554, .transcribe:
     698, .listen: 660, .cutSpeech: 1023, .cutToBeat: 568, .syncVoiceover: 746, .exportVideo: 457, .inspectVideo: 487, .compressVideos:
     458, .burnSubtitles: 468, .getJob: 813, .setShape: 525, .setKeyframes: 466, .setFilter: 640, .freezeFrame: 584, .recordScreen:
-    947, .manageFiles: 480, .openFolder: 697, .setSettings: 565, .upscaleClip: 1022, .manageCharacters: 508
+    947, .manageFiles: 480, .openFolder: 697, .setSettings: 565, .upscaleClip: 1022, .manageCharacters: 508,
+    // 第二批 27 个（main f76032e 的清单量的；原文在 MCPGuidePreviousCardsBatch2，脚本照抄）。
+    .getStatus: 380, .setView: 442, .openProject: 710, .newProject: 556, .closeProject: 271, .saveProject: 158, .undo: 186, .seek: 93,
+    .cancelJob: 58, .getSettings: 394, .getTimeline: 231, .setTrack: 253, .splitClip: 136, .deleteItems: 325, .duplicateItems: 418,
+    .setTransition: 160, .setCanvas: 217, .editClips: 402, .setTexts: 420, .setShapes: 405, .findAudio: 516, .readDocument: 378,
+    .convertSubtitles: 248, .recipes: 672, .saveRecipe: 415, .listCharacters: 481, .getCharacter: 360
 ]
 
 /// 迁移过的工具按性质该写的固定说法（方案 2.2 第 4、5 条）。性质从工具本身看不全（会不会改时间线、要不要先读说明书），写在这里。
@@ -74,7 +79,37 @@ private let pilotNature: [MCPToolName: [String]] = [
     .listVoices: ["Read-only", "skycut_guide topic=list_voices"],
     // 声音库的写：服务器上的事，不改工程、没有撤销（名片写明 no undo）；设计花积分、回任务号；授权 / 一次性费用 / 删除会问。
     .manageVoices: ["no undo", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
-                    "skycut_guide topic=manage_voices"]
+                    "skycut_guide topic=manage_voices"],
+    // 第二批（2026-11-10）：只读的 Read-only、改工程的 One undo step、会问的 needs_confirmation，外加各检查和扫描守卫要的说法
+    // （get_status 的 screen recording 和 cloud_tasks、get_timeline 的 edit_limits、list_characters 的 compact summaries / 1 KiB、
+    // recipes 的 which one you follow、delete_items 的 Linkage on:、convert_subtitles 的 or in folder）。
+    .getStatus: ["Read-only", "screen recording", "and cloud_tasks grouped by project:"],
+    .setView: ["Ask the user once per conversation"],
+    .openProject: ["project=<id>"],
+    .newProject: ["A taken name gets a number"],
+    .closeProject: ["saved first"],
+    .saveProject: ["one undo step"],
+    .undo: ["one undo step"],
+    .seek: ["Read-only"],
+    .cancelJob: ["queued"],
+    .getSettings: ["Read-only"],
+    .getTimeline: ["Read-only", "edit_limits"],
+    .setTrack: ["One undo step"],
+    .splitClip: ["One undo step"],
+    .deleteItems: ["One undo step", "Linkage on:"],
+    .duplicateItems: ["One undo step"],
+    .setTransition: ["One undo step"],
+    .setCanvas: ["One undo step"],
+    .editClips: ["one undo step"],
+    .setTexts: ["one undo step"],
+    .setShapes: ["one undo step"],
+    .findAudio: ["Read-only", "music_credits", "never download"],
+    .readDocument: ["Read-only", "needs_confirmation"],
+    .convertSubtitles: ["never overwrites", "needs_confirmation", "or in folder"],
+    .recipes: ["Read-only", "which one you follow"],
+    .saveRecipe: ["only when they ask", "Trash"],
+    .listCharacters: ["Read-only", "compact summaries", "1 KiB"],
+    .getCharacter: ["Read-only"]
 ]
 
 func runGuidePilotChecks() {

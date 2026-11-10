@@ -54,6 +54,18 @@ enum SkyStudioVoiceRecordingLanguage {
         return Resolved(code: found, detected: true)
     }
 
+    /// 加一种语言：这个声音已经有这种语言了（一种语言一段，Sky Studio 会拒）就当场说，什么都不问、不传。识别出来的那种多说一句
+    /// 它是识别出来的、认错了怎么办。
+    static func refuseExisting(_ language: Resolved, in voice: SkyStudioVoice) throws {
+        guard voice.languages.contains(where: { $0.language == language.code }) else { return }
+        var message = SkyStudioVoiceLibraryErrors.referenceExists(languageName: language.name, voice: voice.name)
+        if language.detected {
+            message += " SkyCut detected \(language.name) (\(language.code)) in this recording; if it is in another language, call again "
+                + "with language."
+        }
+        throw AIToolError(message + " Nothing was sent.")
+    }
+
     /// 问之前：接在授权问句里「用了哪一段」后面的那一句（AI 给的语言不写）。用户点头之前看得到识别成了什么、认错了怎么改。
     static func questionNote(_ language: Resolved) -> String? {
         guard language.detected else { return nil }

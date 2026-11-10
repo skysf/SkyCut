@@ -47,9 +47,9 @@ enum MCPEncodeTools {
             return MCPToolDefinition(
                 .convertSubtitles, title: "Convert subtitles",
                 description: """
-                Convert subtitle files to another format (SRT, WebVTT, ASS, SSA or plain text), one output per file in \
-                SkyCut/Exports inside the opened folder, or in folder (never overwrites). Done at once; returns where each file \
-                went and which could not be read.
+                Convert subtitle files to SRT, WebVTT, ASS, SSA or plain text: one output per file in SkyCut/Exports inside the opened \
+                folder, or in folder; never overwrites. Done at once: returns where each file went and which could not be read. Files \
+                outside the opened folder may return needs_confirmation.
                 """,
                 input: MCPSchema.object([
                     "files": MCPSchema.array(of: MCPSchema.string("Path of a subtitle file."), "Files to convert.", minItems: 1),

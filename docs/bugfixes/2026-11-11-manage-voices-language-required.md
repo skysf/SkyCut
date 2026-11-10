@@ -25,6 +25,9 @@ AI 调 `manage_voices`（`create` 或 `add_reference`）不带 `language`，当�
   - 识别不出来（把握不够、一个模型都没装、macOS 15）：**不猜**，一样都不问、不传，回 `reason: language_undetected` 和一句 AI 能照做的话
     ——「Call manage_voices again with language (…ISO 639-1…); ask the user if you are not sure. Nothing was sent.」照 `AIHarvestFailure` 的说法，
     不叫它去点界面（[案例](2026-09-29-ai-told-to-pick-language-in-panel.md)）。
+- 加一种语言（`add_reference`）时「这个声音已经有这种语言」照 [2026-11-10 的案例](2026-11-10-add-reference-asks-before-reading-the-voice.md)在问之前就说，
+  分两处查、同一句（`SkyStudioVoiceRecordingLanguage.refuseExisting`）：AI 给的语言读到声音就查（不读文件）；识别出来的语言识别完再查，
+  并多说一句「SkyCut detected English (en) in this recording; if it is in another language, call again with language.」
 - `SkyStudioVoiceRecordingTool`：识别放在参考录音做好之后、问授权之前。识别成了什么写进授权的问句（「SkyCut detected the recording's language as
   Chinese (zh); tell the user, and if that is wrong call again with language.」）和结果（`language`、`language_detected: true`；做成之后再加
   `language_note`：认错了只能删了重建）。令牌照旧绑语言：点过头照原样再调（仍不带 `language`）和带上识别出来的 `language` 再调，认的是同一张。
@@ -36,7 +39,7 @@ AI 调 `manage_voices`（`create` 或 `add_reference`）不带 `language`，当�
 - `scripts/check-voice-recovery.sh` 的 `LibraryLanguageChecks`（真 App 对象 + 假 Sky Studio，识别换成假的、数它被叫了几次）：不给 `language` 时识别一次、
   问句和结果写识别成了什么、没点头之前什么都不传、照原样带令牌再调建成且 `POST /voices` 带识别出来的语言、带上识别出来的 `language` 再调认同一张令牌且不再识别；
   识别不出来回 `language_undetected` 和「带上 language 再调」、话里没有界面的词、什么都没传；给了 `EN`（识别会说 `zh`）照 `en` 建、识别一次都没叫；
-  写错的照旧报错；给空的算没给；`add_reference` 同一条路。
+  写错的照旧报错；给空的算没给；`add_reference` 同一条路，识别出来的语言那个声音已经有时问之前就拒、说它是识别出来的、什么都不传。
 - `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数定义只有 `action` 必给、`language` 的说明写着 optional 和不给会怎样、`create` 一节的几句、
   有一个例子不带 `language`。
 - `checks/sky-studio-wiring.sh`（拆出去的 `voice-library-ui.sh`）：`SpokenLanguageProbe` 只有生成字幕和 `VoiceSampleLanguage` 两处调；
@@ -53,6 +56,7 @@ AI 调 `manage_voices`（`create` 或 `add_reference`）不带 `language`，当�
   | 识别成了什么不写进问句和结果 | `check-voice-recovery` 5 条（问句、结果、加录音的问句……） |
   | 参数说明和说明书换回修复前 | `check-mcp` 10 条 |
   | 新文件里直接调 `SpokenLanguageProbe`、默认的识别换成永远 nil | 扫描守卫 3 条 |
+  | 识别出来的语言那个声音已经有时不查（合进 #370 之后补的） | `check-voice-recovery` 1 条（照样去问授权了） |
 
 - 自动化够不着的（真模型在真录音上识别得对不对）写进了 [声音库](../architecture/voice-library.md)第八节的人工回归。
 

@@ -37,10 +37,10 @@ enum MCPVoiceLibraryTools {
         MCPToolDefinition(
             .manageVoices, title: "Manage voices",
             description: """
-            Edit the user's Sky Studio voice library (no timeline change, no undo): create from a recording, add_reference \
-            (another language), design from a description, rename, delete. design: Paid (Sky Studio credits), one-time; Returns \
-            job_id; wait with get_job. The daily credit limit always applies. create, add_reference and design return \
-            needs_confirmation first; delete asks in ask mode. Read skycut_guide topic=manage_voices before the first call.
+            Edit the user's voice library (no timeline change, no undo): create from a recording, add_reference (another \
+            language), design from a description, rename, delete. design: Paid (Sky Studio credits), one-time; Returns job_id; \
+            wait with get_job. The daily credit limit always applies. Ask mode: create, add_reference, design and delete return \
+            needs_confirmation first; full access proceeds. Read skycut_guide topic=manage_voices before the first call.
             """,
             input: MCPSchema.object([
                 "action": MCPSchema.string("What to do.", oneOf: MCPVocabulary.voiceLibraryActions),
@@ -53,7 +53,7 @@ enum MCPVoiceLibraryTools {
                     "create, add_reference: optional ISO 639-1 code of what is said (zh, en…); omitted, SkyCut detects it or asks for it."),
                 "name": MCPSchema.string("Voice name, 1 to 80 characters: create, design, rename."),
                 "description": MCPSchema.string("design: how the voice sounds, up to 2000 characters."),
-                "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters."),
+                "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters; counts toward the price."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["action"]),
             destructive: true, openWorld: true

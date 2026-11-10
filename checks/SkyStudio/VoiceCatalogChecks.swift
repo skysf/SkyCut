@@ -4,6 +4,7 @@ import SrtFlowMCPKit
 // 声音 PR 1（SkyCut 声音方案 9.1 第 1 项）：`/models` 里声音的那一部分，对着目录快照读。
 // 快照：checks/SkyStudio/Fixtures/models-voice-2026-11-10.json，原样拷自 Sky Studio 的 tests/fixtures/skycut/（声音 PR #246 合并的最终导出，
 // 6c08d0f0，用户听过样音后重新打分的五个：Enceladus、Sadaltager 进了两种名单，Orus 中文、Schedar 英文仍不在名单上，Despina 定为女声仍藏着；
+// Sky Studio #247（c050d948）重新导出，只改了 Qwen3 设计的价：按描述 + 试读句每开始 1,000 字 22.5 积分；
 // /models 还没上线，目录改了 Sky Studio 会重新导出，到时原样换掉再跑）。
 // 钉住：预设按语言分开（Gacrux 中文男 / 英文女、Schedar 只在中文名单、Orus 只在英文名单）、名单只收 listed、中文 23 / 英文 28 / 藏 1、
 // 样音和 Eleven 备用、唯一的默认是 Charon；
@@ -109,6 +110,14 @@ private func runVoiceModelChecks(_ catalog: SkyStudioCatalog) {
     checkEqual(catalog.model("minimax-voice-clone", kind: "voice_enroll")?.typicalCredits, 377.6, "a MiniMax version costs about 377.6")
     checkEqual(catalog.model("minimax-voice-design", kind: "voice_design")?.typicalCredits, 751.4, "MiniMax design costs about 751.4")
     checkEqual(catalog.model("qwen3-voice-design", kind: "voice_design")?.typicalCredits, 22.5, "Qwen3 design costs 22.5")
+    // Sky Studio #247：Qwen3 设计按描述 + 试读句每开始 1,000 字收 22.5（最少 22.5）；MiniMax 那两个照旧按次。
+    let qwenPrice = catalog.model("qwen3-voice-design", kind: "voice_design")
+    check(qwenPrice?.pricedPerThousandCharacters == true && qwenPrice?.price["credits"] == 22.5 && qwenPrice?.price["minimum_credits"] == 22.5
+            && qwenPrice?.price["counted"] == ["prompt", "params.sample_text"],
+          "Qwen3 design charges 22.5 for every 1,000 characters started of the description and the sample text")
+    check(catalog.model("minimax-voice-design", kind: "voice_design")?.pricedPerThousandCharacters == false
+            && catalog.model("minimax-voice-clone", kind: "voice_enroll")?.pricedPerThousandCharacters == false,
+          "MiniMax design and the MiniMax version are priced per voice")
     let oneTime = catalog.models.filter(\.isOneTime)
     checkEqual(oneTime.map(\.id).sorted(), ["minimax-voice-clone", "minimax-voice-design", "qwen3-voice-design"], "the one-time records are flagged")
     check(oneTime.allSatisfy { ["voice_enroll", "voice_design"].contains($0.kind) && $0.typicalCredits != nil }, "each one-time record has a typical price")

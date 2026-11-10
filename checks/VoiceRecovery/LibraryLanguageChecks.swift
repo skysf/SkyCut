@@ -9,7 +9,8 @@ import SrtFlowMCPKit
 //   照原样带上确认码再调（仍不给 language）认同一张令牌，`POST /voices` 带识别出来的那个；带上识别出来的 language 再调也认、不再识别；
 // - 识别不出来：一样都不问、不传，回 `reason: language_undetected` 和「带上 language 再调」，不叫 AI 去点界面；
 // - 给了就照给的：识别的那一头一次都不叫、不被它的结果盖掉；大写收成小写；写错的照旧报错（不悄悄改成识别）；给空的算没给；
-// - add_reference 同一条路：问句写识别出来的语言，`POST /voices/{id}/references` 带它。
+// - add_reference 同一条路：问句写识别出来的语言，`POST /voices/{id}/references` 带它；识别出来的语言这个声音已经有：问之前就说
+//   （和 AI 给的那种同一句，另说它是识别出来的、认错了带上 language 再调），什么都不传。
 
 @MainActor
 func runVoiceLibraryLanguageChecks(_ root: URL) async throws {
@@ -127,4 +128,18 @@ private func referenceChecks(_ fixture: VoiceLibraryFixture, _ file: URL) async 
     let added = try await fixture.manage(.object(confirmed))
     require(added.payload["status"] == "reference_added" && VoiceLibraryHTTP.calls("POST", "/references").first?["language"] == "ja",
             "POST /voices/{id}/references carries the detected language: \(added.payload)")
+
+    // 夹具里的声音「Sky」已经有英文：识别出来的也是英文，问之前就说（另说它是识别出来的），什么都不传。
+    VoiceLibraryHTTP.reset()
+    fixture.detectedLanguage = "en"
+    do {
+        let result = try await fixture.manage(args)
+        require(false, "a detected language the voice already has is refused before anything is asked: \(result.payload)")
+    } catch let error as AIToolError {
+        require(error.message.contains("The voice \"Sky\" already has a recording in English") && error.message.contains("SkyCut detected English (en)")
+                && error.message.contains("call again with language") && error.message.contains("Nothing was sent"),
+                "a detected language the voice already has is refused, saying it was detected and how to correct it: \(error.message)")
+    }
+    require(VoiceLibraryHTTP.calls("POST", "/uploads").isEmpty && VoiceLibraryHTTP.calls("POST", "/references").isEmpty,
+            "nothing is uploaded or sent for a detected language the voice already has")
 }

@@ -143,8 +143,8 @@ private func runGuideSplitChecks() {
     check(whole["next_step"] == nil && whole["section"] == nil && whole["contents"] == nil, "a whole answer needs no next step or contents")
     checkEqual(whole["examples"], [["a": "x"]], "examples come back with the topic")
     checkEqual(whole["related"], ["look"], "related topics come back with the topic")
-    // seek 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。
-    check(MCPGuide.answer(topic: "seek", section: nil)["examples"] == nil, "no examples key when a topic has none")
+    // skycut_guide 自己不迁移（主题 = 它的名片 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。第二批之后别的工具都迁移了。
+    check(MCPGuide.answer(topic: "skycut_guide", section: nil)["examples"] == nil, "no examples key when a topic has none")
 }
 
 /// 名字的写法不计较；写错的回目录 + 猜的。
