@@ -217,7 +217,8 @@ final class VoiceLibraryFixture {
         var services = SkyStudioVoiceServices()
         services.api = SkyStudioAPI(session: VoiceLibraryHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil)
         services.key = { "local-library-fixture" }
-        services.locale = { _ in Locale(identifier: "en-US") }
+        services.transcription = { _ in .installed(Locale(identifier: "en-US")) }
+        services.install = { _, progress in progress(1) }
         services.transcribe = { file, _ in
             let index = Int(file.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "batch-", with: "")) ?? 0
             let prompt = VoiceLibraryHTTP.lock.withLock { VoiceLibraryHTTP.prompts.indices.contains(index) ? VoiceLibraryHTTP.prompts[index] : "" }

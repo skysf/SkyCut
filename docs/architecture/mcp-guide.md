@@ -122,7 +122,9 @@
 - `SkyStudioVoiceChecks`（add_voiceover，和 `ProviderChecks` 同一个做法）：名片必含 recordings: add_clips / default gemini:Charon / Returns job_id; wait with get_job /
   relay voice.note / The daily credit limit always applies / resume=recovery_file, never resend lines / 先读说明书那一句，不再有 Rachel、`clone_from`；`speed` 的说明写着
   「0.5 to 2」；地图「Paid」那一行带着它；主题正好是声音方案 4.10 的那几节、`fields` 在最后，说明书必含 gemini:Charon / eleven:Name / en_male_british / voice_plan /
-  cross_language / daily_budget_exceeded / recharge_url / confirm_token / recovery_file / generate_missing / eleven-v4 / download_voices=true / sync_voiceover。
+  cross_language / daily_budget_exceeded / recharge_url / confirm_token / recovery_file / generate_missing / eleven-v4 / download_voices=true / sync_voiceover；
+  subtitles 一节必含四种 subtitle_timing（provider / aligned / estimated / mixed）、半秒左右要转告、local_step 和「before anything is paid」、eleven-v4、
+  estimated_line_indices、字幕是稿子的字（声音 PR 5），batches_recovery 一节说批只在两句之间分、长句先在句末分，`subtitles` 参数指到 subtitle_timing。
 - `SkyStudioVoiceChecks`（声音库，声音 PR 6）：`list_voices` / `manage_voices` 的参数名、动作词表就是 App 分派的五样；名片必含（只读免费 / 不改时间线没有撤销 /
   design 花积分回任务号 / 先问 / 删除按模式 / 先读说明书）、说明书必含（分节照声音方案 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行。
 - `ArgumentCheckChecks`：名片写着 `needs_confirmation` 的工具，带着 `confirm_token` 再调都过参数核对（[案例](../bugfixes/2026-11-10-voiceover-confirm-token-refused.md)）。

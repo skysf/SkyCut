@@ -141,6 +141,18 @@ private func voiceoverGuideChecks() {
                    "index-tts-2"] {
         check(text.contains(phrase), "the add_voiceover topic says \"\(phrase)\"")
     }
+    // 字幕时间（声音 PR 5，声音方案第七节）：四种 subtitle_timing、估出来的要转告、模型没装先装、转写不了的预设整段换 eleven-v4、
+    // 估出来的那几句列在哪；合批只在两句之间分（8.1）。
+    let subtitles = topic.sections.first { $0.name == "subtitles" }?.text ?? ""
+    for phrase in ["subtitle_timing", "provider", "aligned", "estimated", "mixed", "half a second", "tell the user", "local_step",
+                   "before anything is paid", "eleven-v4", "estimated_line_indices", "script's own words"] {
+        check(subtitles.contains(phrase), "the add_voiceover subtitles section says \"\(phrase)\"")
+    }
+    let batches = topic.sections.first { $0.name == "batches_recovery" }?.text ?? ""
+    check(batches.contains("only breaks between lines") && batches.contains("sentence ends"),
+          "the batches section says batches break only between lines, long lines at sentence ends")
+    let subtitlesField = definition.inputSchema["properties"]?["subtitles"]?["description"]?.stringValue ?? ""
+    check(subtitlesField.contains("subtitle_timing"), "the subtitles parameter points at subtitle_timing: \(subtitlesField)")
 }
 
 /// 声音库的两个工具（声音 PR 6，SkyCut 声音方案 4.6、4.10）：参数名、名片必含、说明书必含、地图；动作词表就是 App 分派的那几样。

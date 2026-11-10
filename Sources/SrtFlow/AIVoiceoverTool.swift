@@ -156,23 +156,32 @@ enum AIVoiceoverTool {
         var voice: [String: JSONValue] = [
             "name": .string(plan.choice.name), "quality": .string(plan.choice.qualityName)
         ]
-        if let note = plan.choice.note { voice["note"] = .string(note) }
-        var result: [String: JSONValue] = ["added": .array(added), "voice": .object(voice),
-                                           "timeline_duration": AIFormat.seconds(state.duration)]
+        var notes = [plan.choice.note].compactMap { $0 }
+        var result: [String: JSONValue] = ["added": .array(added), "timeline_duration": AIFormat.seconds(state.duration)]
         if plan.subtitles {
             var summary: [String: JSONValue] = ["added": .number(Double(subtitles.added.count))]
             if subtitles.skipped > 0 {
                 summary["skipped"] = .string("\(subtitles.skipped) lines overlap subtitles that were already there and were not added.")
             }
             if let refusal = subtitles.refusal { summary["note"] = .string(refusal) }
-            // Sky Studio 没报词时间（或报的读不出来）：那几句就没有字幕，别让 AI 以为加上了。
-            if case .skyStudio = plan.choice.engine, plan.spoken.contains(where: { $0.output.words.isEmpty }) {
-                let note = "Sky Studio did not say when each word is spoken for some lines, so those lines have no subtitles. "
-                    + "Run generate_subtitles on the voiceover clips, or use SkyCut's own voice."
+            // 字幕时间从哪来（SkyCut 声音方案第七节）：每句一样报那一种，不一样报 mixed；按字数估的那几句列出来、voice.note 说一声。
+            let timed = plan.spoken.indices.filter { !plan.spoken[$0].output.words.isEmpty }
+            if let timing = AIVoiceoverTiming.summary(timed.map { plan.spoken[$0].output.timing }) { result["subtitle_timing"] = .string(timing) }
+            let estimated = timed.filter { plan.spoken[$0].output.timing == .estimated }
+            if !estimated.isEmpty {
+                summary["estimated_line_indices"] = .array(estimated.map { .number(Double($0)) })
+                notes.append(AIVoiceoverTiming.estimatedNote(estimated: estimated.count, of: timed.count))
+            }
+            // 有字的句子却一个词都没有：那几句就没有字幕，别让 AI 以为加上了。
+            let missing = plan.spoken.filter { $0.output.words.isEmpty && $0.line.text.contains { $0.isLetter || $0.isNumber } }.count
+            if missing > 0 {
+                let note = "\(missing) lines have no subtitles: SkyCut could not work out when their words are spoken."
                 summary["note"] = .string([summary["note"]?.stringValue, note].compactMap { $0 }.joined(separator: " "))
             }
             result["subtitles"] = .object(summary)
         }
+        if !notes.isEmpty { voice["note"] = .string(notes.joined(separator: " ")) }
+        result["voice"] = .object(voice)
         let first = plan.spoken.compactMap { state.clip(with: $0.clip.id)?.timelineStart }.min()
         AIEditorPresenter.reveal(.init(clips: Set(plan.spoken.map(\.clip.id)), time: first), project: project)
         return .ok(.object(result), changed: true)

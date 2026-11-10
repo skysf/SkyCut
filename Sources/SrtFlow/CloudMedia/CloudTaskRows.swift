@@ -14,6 +14,8 @@ struct CloudGenerationTaskRow: View {
                 Text("Needs attention").foregroundStyle(.orange)
             } else if run.waitingForRefund {
                 Text("Waiting for refund")
+            } else if let note = run.stepNote {
+                Text(verbatim: note)
             } else if let progress = run.progress {
                 CloudTaskPhaseView(progress: progress)
             } else {
