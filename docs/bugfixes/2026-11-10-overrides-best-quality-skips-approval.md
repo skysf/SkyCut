@@ -39,7 +39,7 @@ MCP 按需说明的 Codex 实测（[试点实测](../reports/2026-11-10-mcp-guid
   最高画质认「最高画质」、时长认「10 秒」「10 seconds」，「画质尽量好」「要最好的」「best quality」「as good as possible」「高清一点」一项都不算。
 - `scripts/check-mcp.sh`（`GuidePilotChecks`）：名片上钉着「user_requested_overrides needs user_request」「never "best quality"」；参数表加了 `user_request`。
 - 反向验证：把闸里的 `!userNamedIt` 换回 `!userRequested`（只认布尔值），`AccessChecks` 的三条「still asks」和「every setting must be named」变红；恢复后绿。
-- 真客户端：修完用 Codex 和 Claude Code 各补跑一次任务 7，结果记在 [试点实测](../reports/2026-11-10-mcp-guide-pilot.md)「任务 7 修了之后补跑」。
+- 真客户端：修完用 Codex 和 Claude Code 各补跑一次任务 7（同一句「画质尽量好」）：Codex 报价之后不带 overrides 提交、拿到 `needs_confirmation` 就停下来问；Claude Code 报价之后停下来问、原话说「"画质尽量好"没有指明具体规格，这一步不能跳过」。两边都没起任务、没花积分。见 [试点实测](../reports/2026-11-10-mcp-guide-pilot.md)「任务 7 的规矩修了之后补跑」。
 
 ## 教训 / 防回归
 

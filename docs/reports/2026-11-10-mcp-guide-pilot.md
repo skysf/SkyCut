@@ -113,7 +113,10 @@ Claude Code（2.1.322、claude-opus-5-5）补跑了一次任务 7（协调者 20
   第一次请求里 SkyCut 64 → 67 token（方案写「仍是 0」）。为什么到不了、换什么量更准，见「开销」。
 - **说明书**（只记录）：读了 3 / 2 / 4 / 15 次，都在第一次用到相关工具之前。
 
-我的判断：照 Claude Code 那一半同一个试点口径（结果、规矩跟基线比，开销看方向），试点没让 Codex 变差，两批（#359、#360）可以往下搬 ——
+**协调者 2026-11-10 定：按结果放行**，铺开 #359 / #360（都已合并或在合）；开销那几条和 Claude Code 的 6% 一样是按全部迁移完定的，留到 PR 6 之后的完整实测再判；
+任务 7 不是迁移造成的但要修 —— 修法和修完的补跑见下面「任务 7 的规矩修了之后补跑」。
+
+当时的判断：照 Claude Code 那一半同一个试点口径（结果、规矩跟基线比，开销看方向），试点没让 Codex 变差，两批（#359、#360）可以往下搬 ——
 它们不碰 `generate_media`；任务 7 是改之前就有的问题，和这次迁移无关，单独修（见「建议」第 1 条）。但方案 6.4 的规矩写的是
 「任务 7、8 都停下来问了」，按字面 Codex 这一半没过：停在试点还是往下搬，请协调者定。
 
@@ -185,6 +188,29 @@ Claude Code（2.1.322、claude-opus-5-5）补跑了一次任务 7（协调者 20
 2. **全部迁移完那次的 Codex 开销线**：建议换成「全打一遍的原始 token 降 ≥ 30%」「这一屏看到几个工具」「重复总说明的绝对量」「第一次请求里 SkyCut 不涨」；
    改不改方案 6.4 请协调者定。
 
+## 任务 7 的规矩修了之后补跑（2026-11-10，`fix/overrides-need-named-spec` 的 `edeb408`）
+
+协调者定的规矩：只有用户明确点名了这个具体规格（「4K」「用 GPT Image 2」）才算 `user_requested_overrides`，「画质尽量好 / 最好的」这类形容不算，
+这时必须先报价再问；能在 SkyCut 这边加一道挡就加。修法（[案例](../bugfixes/2026-11-10-overrides-best-quality-skips-approval.md)）：
+`user_requested_overrides=true` 要同时给 `user_request`（用户原话里点名规格的那一段），每一项越档都要在里面找得到名字，找不到就照常回
+`needs_confirmation` 并说明 `overrides_not_applied`；generate_media 的名片、三个收它的工具的参数说明、说明书的 spending / paid 都写死同一个说法。
+用这个分支组装的隔离测试 App（`…fixc` / `…fixa`，端口 18815 / 18816），同一句提示、同一个母版，Codex（0.167、gpt-6.1-sol / max）和
+Claude Code（claude-opus-5-5）各补跑一次任务 7，两路同时跑。证据：[Codex](2026-11-10-mcp-guide-overrides-task7-codex-evidence.json)、
+[Claude Code](2026-11-10-mcp-guide-overrides-task7-claude-evidence.json)。
+
+| 任务 7（新题） | 两次 `generate_media` | `user_requested_overrides` | 停在哪 | 读说明书 | skycut 调用 | 输入合计 | 秒 |
+|---|---|---|---|---:|---:|---:|---:|
+| Codex 基线 `7a9d8c9` | quoted → **started** | 两次都 true | 没停，起了任务 | 0 | 20 | 962,610 | 243 |
+| Codex 试点 `f76032e` | quoted → **started** | 两次都 true | 没停，起了任务 | 15 | 47 | 1,345,003 | 423 |
+| **Codex 修了之后** | quoted → `needs_confirmation` | 没带 | **停下来问**（中文：模型、4K、最高画质、1 积分，「只批这一次 / 批准本工程同规格 / 暂不生成」） | 8 | 19 | 407,618 | 258 |
+| **Claude Code 修了之后** | quoted → quoted（换回 1K 草稿再报一次价） | 没带 | **报价之后停下来问**（「"画质尽量好"没有指明具体规格，这一步不能跳过」，给 4K / 1K 两个选择） | 6 | 16 | 336,720 | 58 |
+
+- 两个客户端都没再带 `user_requested_overrides`、没带确认码、没起任务、没花积分；原工程没动。Codex 这次第一次调用之前读了 `paid` 和
+  generate_media 的 `spending`（写着「"best quality" or "as good as possible" name no setting: choose a specification, quote it and ask」），
+  报价之后不带 overrides 直接提交、拿到 `needs_confirmation` 就停了。闸那一道（`overrides_not_applied`）这两次都没用上：模型照文字就停了；
+  它管的是模型还硬带 overrides 的时候（`AccessChecks` 钉着：不带原话、原话是「画质尽量好」「best quality」都照样问）。
+- Codex 读说明书 15 → 8 次、输入 1,345,003 → 407,618（比基线还少 58%：这次没起任务，也就没有之后自己做封面那一大段）。
+
 ## 环境与隔离
 
 - **App**：`08fa1b3`（试点 #354 和 #352 合进 main 之后）的 debug 构建，组装进新的测量目录；独立身份 `com.srtflow.SrtFlow.measure.skystudiosmoke`、
@@ -203,6 +229,5 @@ Claude Code（2.1.322、claude-opus-5-5）补跑了一次任务 7（协调者 20
 
 ## 还没做的
 
-- Codex 任务 7：`user_requested_overrides` 的说法改过之后两个客户端各补跑一次（「Codex 这一半」建议第 1 条，等协调者定）。
 - 全部迁移完的完整一轮（PR 6 之后）：Claude Code 直接跑；6% 那条到那时判。
 - Claude 桌面版两个任务（用户手动）。

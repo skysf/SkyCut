@@ -443,7 +443,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
   （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半（f76032e，0.167、gpt-6.1-sol / max，四个测试 App 并行）：和基线比没有退步，任务 7 两边都把「画质尽量好」当成用户点名、自带
   `user_requested_overrides` 没停下来问；全打一遍的原始 token −27%、找工具打印的总字数 −13.6%、重复总说明占比 48% → 38%（6.4 的三条按字面没到，截断和方案自己的估算见报告）；
-  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)。
+  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)；协调者按结果放行两批；任务 7 的规矩修了之后（`user_requested_overrides` 要 `user_request` 原话点名规格）补跑，Codex、Claude Code 都停下来问（[Codex](docs/reports/2026-11-10-mcp-guide-overrides-task7-codex-evidence.json)、[Claude Code](docs/reports/2026-11-10-mcp-guide-overrides-task7-claude-evidence.json) 证据）。
 
 - [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
