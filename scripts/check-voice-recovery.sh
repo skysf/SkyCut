@@ -24,6 +24,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFl
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   -I "${BUILD_DIR}/Modules" \
   checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/StartChecks.swift checks/VoiceRecovery/TimingChecks.swift \
+  checks/VoiceRecovery/ConcurrencyChecks.swift \
   checks/VoiceRecovery/Main.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"

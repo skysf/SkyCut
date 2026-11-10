@@ -10,7 +10,8 @@
 #      让不让、带不带水印的判断只在 SkyStudioAccount 里调 SkyCutGates（生不生效另有 get_status 问一句）；导出面板底栏挂着「会带水印」那一行；
 #      export_video 开始和做完都告诉 AI 带了水印；get_status 报 skycut_plan。
 #   6. **交任务、取消任务只经 SkyStudioJobRun**（第 6 刀）：满了等着再交、同一个 idempotency_key、交的请求不跟着取消、停的时候排队中的退钱 /
-#      开始了的取消不了，这些规矩只在那一处；
+#      开始了的取消不了，这些规矩只在那一处；**领槽只经 SkyStudioJobSlots**（声音 PR 4）：SkyStudioJobRun 交之前领（只 GET 的恢复不领），
+#      一段旁白的各批由 SkyStudioVoiceBatchQueue 按顺序先领好、先记下出了什么事再还；槽数只照 /me（SkyStudioAccount adopt）；
 #   7. **Key 只发给 Sky Studio**：认证头只在 SkyStudioAPI.request 里写一次，上传的签名地址和成品地址都不经它；
 #   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好两处），
 #      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 SkyStudioHeldCredits（upscale 和生成共用的那一笔）里动；
@@ -47,6 +48,8 @@ done
 FAILED=0
 fail() { echo "✗ $1" >&2; FAILED=1; }
 count() { grep -cF -- "$1" "$2" || true; }
+# 第一处出现在第几行（没有就是空的）。
+line_of() { { grep -nF -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
 # 去掉 // 注释再找（注释里提到名字不算）。查变量用 <<<：管道末端的 grep -q 在 pipefail 下会假报（checks/shell-pipe-grep-q.sh）。
 code_files_with() {
   local pattern="$1" file stripped
@@ -203,6 +206,31 @@ for call in 'submit\([^)]*, key:' 'cancel\([^)]*, key:'; do
   [ "${users}" = "${RUN} " ] || fail "SkyStudioAPI 的 ${call%%\\(*} 只许 SkyStudioJobRun 调（满了等着再交、停的规矩都在那里），实际在：${users:-没有}"
 done
 
+# 6b. 领槽只经 SkyStudioJobSlots（声音 PR 4，SkyCut 声音方案 8.2）：SkyStudioJobRun 在交之前领、这一单结束就还；只 GET 的恢复不领；
+#     一段旁白的各批由 SkyStudioVoiceBatchQueue 按原来的顺序领、交给 SkyStudioJobRun 拿着，记下这一批出了什么事之后才还（后面排着的批看得见）；
+#     槽数只有 SkyStudioAccount 照 /me 改；全 App 只有一份（别处不另建）。
+SLOTS="Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift"
+QUEUE="Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatchQueue.swift"
+[ -f "${SLOTS}" ] && [ -f "${QUEUE}" ] || fail "找不到 ${SLOTS} 或 ${QUEUE}"
+users="$(code_files_with '\.acquire\(kind:' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${RUN} ${QUEUE} " ] || fail "领槽（slots.acquire）只许 SkyStudioJobRun 和 SkyStudioVoiceBatchQueue 调，实际在：${users:-没有}"
+users="$(code_files_with 'SkyStudioJobSlots\(' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${SLOTS} " ] || fail "SkyStudioJobSlots 全 App 只许一份（static let shared），别处另建了：${users:-没有}"
+users="$(code_files_with 'SkyStudioJobSlots\.shared\.adopt' | LC_ALL=C sort | tr '\n' ' ')"
+[ "${users}" = "${ACCOUNT} " ] || fail "槽数只许 SkyStudioAccount 照 /me 改（adopt），实际在：${users:-没有}"
+grep -qF 'let held = try await claimSlot(for: request.kind, onUpdate: onUpdate)' "${RUN}" && grep -qF 'defer { held?.release() }' "${RUN}" \
+  || fail "${RUN}：run 要在交之前领槽、这一单结束就还"
+[ "$(count 'claimSlot(' "${RUN}")" -eq 2 ] || fail "${RUN}：只有 run 领槽（resume 只 GET 原单、不领）"
+grep -qF 'lease = try await slots.acquire(kind: kind)' "${QUEUE}" && grep -qF 'runner.lease = lease' Sources/SrtFlow/SkyStudio/SkyStudioVoiceCloudBatches.swift \
+  || fail "一段旁白的各批要在 SkyStudioVoiceBatchQueue 里按顺序领槽、交给 SkyStudioJobRun 拿着"
+# 只看交一批的那个函数（submit）：出了事那一支先 record、再 release。
+SUBMIT_BODY="$(sed -n '/private func submit(/,/^    }$/p' "${QUEUE}")"
+RECORD_AT="$({ grep -nF 'record(index, error)' <<<"${SUBMIT_BODY}" || true; } | head -1 | cut -d: -f1)"
+RELEASE_AT="$({ grep -nF 'lease.release()' <<<"${SUBMIT_BODY}" || true; } | head -1 | cut -d: -f1)"
+if [ -z "${RECORD_AT}" ] || [ -z "${RELEASE_AT}" ] || [ "${RECORD_AT}" -ge "${RELEASE_AT}" ]; then
+  fail "${QUEUE}：一批出了事要先记下再还槽（不然排在后面的批领到槽时看不见，照样交出去）"
+fi
+
 # 7. Key 只发给 Sky Studio：认证头只在 request() 里写一次。
 [ "$(count 'forHTTPHeaderField: "Authorization"' "${API}")" -eq 1 ] \
   || fail "${API}：认证头只许在 request() 里写一次 —— 上传的签名地址、成品地址都不许带 Key"
@@ -219,7 +247,6 @@ CATALOG="Sources/SrtFlowMCPKit/MCPToolCatalog.swift"
 for file in "${UP_TOOL}" "${UP_JOB}" "${JOB_GATE}" "${JOB_ACCESS}" "${SPEND}" "${CATALOG}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done
-line_of() { { grep -nF -- "$1" "$2" || true; } | head -1 | cut -d: -f1; }
 UP_DECIDE="$(line_of 'try SkyStudioJobGate.decide(' "${UP_TOOL}")"
 UP_NEW_JOB="$(line_of 'let job = UpscaleJob(' "${UP_TOOL}")"
 if [ -z "${UP_DECIDE}" ] || [ -z "${UP_NEW_JOB}" ] || [ "${UP_DECIDE}" -ge "${UP_NEW_JOB}" ]; then
@@ -414,7 +441,7 @@ fi
 grep -qF 'SkyStudioVoiceRequests.segmentQuote(kind: kind, model: model, voice: voice, batches: speech.map(\.prompt), lines: lines)' "${VOICE_PLAN}" \
   && grep -qF 'try SkyStudioVoiceRequests.batch(index, of: draft.segment, quote: quote)' "${VOICE_PLAN}" \
   || fail "整段报价没有经 segmentQuote（params.batches），或每批没有照报价带回同一个 params.plan"
-grep -qF 'SkyStudioJobRun(api: api, key: key)' "${VOICE_CLOUD}" && grep -qF 'runner(index).run(request)' "${VOICE_CLOUD}" \
+grep -qF 'SkyStudioJobRun(api: api, key: try await resolvedKey())' "${VOICE_CLOUD}" && grep -qF 'let done = try await runner.run(request)' "${VOICE_CLOUD}" \
   && grep -qF 'run.checkpoint = ' "${VOICE_CLOUD}" || fail "云端配音没有复用统一任务执行器并持久化原单身份"
 grep -qF 'switch await SkyStudioJobKey.key(.silent)' "${VOICE_SERVICES}" || fail "云端配音不得弹钥匙串框"
 grep -qF 'SkyStudioVoiceBudget.reserve(missingCredits)' "${VOICE_CLOUD}" || fail "恢复补批次没有先预留这几批的报价"
@@ -483,4 +510,4 @@ grep -qF 'detail.merge(localImage.dimensions)' Sources/SrtFlow/SkyStudio/SkyStud
 grep -qF 'completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue)' "${CHAR_RUN}" || fail "角色完成后刷新未区分正常完成与原单恢复"
 grep -qF 'completionMessage(resuming: plan == nil)' "${CHAR_RUN}" || fail "角色首次完成未按实际恢复来源选文案"
 
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了"

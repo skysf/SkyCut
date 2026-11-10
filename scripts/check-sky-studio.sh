@@ -25,6 +25,8 @@
 #      英式男声读非英文、本机退档按性别）；报价之前怎么分批、报价之后每批照报价交（SkyStudioVoicePlan）；恢复记录 version 2。
 #      声音 PR 5：报价之前怎么读（SkyStudioVoiceReading：合不合批、整段换 eleven-v4、按字数估）、一句超长先在句末分、
 #      原文切成词 / 对到原文上 / 按字数估（SpeechWordTokens / SpeechWordAlignment / SpeechWordEstimate）、Eleven 的字符时间切句。
+#      声音 PR 4：按池领槽（SkyStudioJobSlots：声音池 8 / 共用池 3、读不到声音池都进共用池、先来先得、等的时候被停就离队、
+#      对着假 Sky Studio 数同时开着的单、429 看 pool 拿着槽等、同一个 key 再交）；一段旁白几批各在哪一步（SkyStudioVoiceBatchBoard）。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -99,6 +101,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioModelPolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioReferencePolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationName.swift \
   Sources/SrtFlow/AIVoiceoverPlacement.swift \
@@ -128,6 +131,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceRequests.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoicePick.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceBatchBoard.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AITextLanguage.swift \
@@ -141,6 +145,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIAccessStore.swift \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
+  Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   checks/SkyStudio/main.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \
@@ -172,6 +177,7 @@ xcrun swiftc \
   checks/SkyStudio/VoicePlanChecks.swift \
   checks/SkyStudio/VoiceJobChecks.swift \
   checks/SkyStudio/VoicePickChecks.swift \
+  checks/SkyStudio/VoiceSlotChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
   checks/SkyStudio/ModelExpansionChecks.swift \

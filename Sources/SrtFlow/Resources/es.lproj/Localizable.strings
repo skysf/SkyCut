@@ -1266,6 +1266,8 @@
 "Quote pending" = "Coste pendiente";
 "Needs attention" = "Requiere atención";
 "Waiting for refund" = "Esperando reembolso";
+"%1$d/%2$d batches · %3$d running" = "%1$d/%2$d lotes · %3$d en curso";
+"%1$d/%2$d batches · %3$d running · %4$d waiting" = "%1$d/%2$d lotes · %3$d en curso · %4$d en espera";
 "Dismiss this task" = "Ocultar esta tarea";
 "Cancel this task" = "Cancelar esta tarea";
 "Compare the original and upscaled video" = "Comparar el vídeo original y el ampliado";

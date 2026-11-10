@@ -136,7 +136,10 @@ private func voiceoverGuideChecks() {
     let text = topic.sections.map(\.text).joined(separator: "\n")
     for phrase in ["gemini:Charon", "eleven:Name", "en_male_british", "voice_plan", "cross_language", "daily_budget_exceeded",
                    "recharge_url", "confirm_token", "recovery_file", "generate_missing", "eleven-v4", "download_voices=true",
-                   "Rachel are not voices", "sync_voiceover"] {
+                   "Rachel are not voices", "sync_voiceover",
+                   // 声音 PR 4：几批同时交、中途换备用（声音方案 8.2、8.4）。
+                   "several at once", "batches_waiting", "line_models", "batches sent after that use the fallback too",
+                   "fallback_needs_one_time"] {
         check(text.contains(phrase), "the add_voiceover topic says \"\(phrase)\"")
     }
     // 字幕时间（声音 PR 5，声音方案第七节）：四种 subtitle_timing、估出来的要转告、模型没装先装、转写不了的预设整段换 eleven-v4、

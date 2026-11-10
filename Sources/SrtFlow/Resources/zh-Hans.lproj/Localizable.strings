@@ -1266,6 +1266,8 @@
 "Quote pending" = "积分待确认";
 "Needs attention" = "需处理";
 "Waiting for refund" = "等待退款确认";
+"%1$d/%2$d batches · %3$d running" = "%1$d/%2$d 批 · %3$d 批在跑";
+"%1$d/%2$d batches · %3$d running · %4$d waiting" = "%1$d/%2$d 批 · %3$d 批在跑 · %4$d 批等空位";
 "Dismiss this task" = "关闭此任务提示";
 "Cancel this task" = "取消此任务";
 "Compare the original and upscaled video" = "对比原始与放大后的视频";

@@ -43,6 +43,9 @@ func catalogKnownNames() -> Set<String> {
                      "unknown_batch_indices", "recharge_url"])
     // 字幕时间（声音 PR 5）：AIVoiceoverTool 结果里的 subtitle_timing、subtitles.estimated_line_indices，任务里装转写模型时 get_job 的 local_step。
     names.formUnion(["subtitle_timing", "estimated_line_indices", "local_step"])
+    // 声音 PR 4（几批同时交、中途换备用）：get_job 的 batches_done / batches_running / batches_waiting（SkyStudioVoiceBatchBoard.json）、
+    // 各句是哪个模型读的 line_models（SkyStudioVoiceCheckpoint.detail）、任务结束码 fallback_needs_one_time（SkyStudioVoiceCodes）。
+    names.formUnion(["batches_done", "batches_running", "batches_waiting", "line_models", "fallback_needs_one_time"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     return names
 }

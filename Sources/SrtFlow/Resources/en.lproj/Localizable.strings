@@ -1266,6 +1266,8 @@
 "Quote pending" = "Quote pending";
 "Needs attention" = "Needs attention";
 "Waiting for refund" = "Waiting for refund";
+"%1$d/%2$d batches · %3$d running" = "%1$d/%2$d batches · %3$d running";
+"%1$d/%2$d batches · %3$d running · %4$d waiting" = "%1$d/%2$d batches · %3$d running · %4$d waiting";
 "Dismiss this task" = "Dismiss this task";
 "Cancel this task" = "Cancel this task";
 "Compare the original and upscaled video" = "Compare the original and upscaled video";
