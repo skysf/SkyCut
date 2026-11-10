@@ -13,6 +13,8 @@ import SrtFlowMCPKit
 //   （同 AIHarvestFailure：不叫它去点界面，它没有界面），结构化的 `reason: language_undetected`。**不许猜一个**：语言记错了，
 //   服务器选模型、选参考就跟着错。
 // - 识别出来的写进授权的问句和结果（`language`、`language_detected: true`）：用户点头之前看得到识别成了什么，认错了带上 language 再调。
+// - 加一种语言（add_reference）时这个声音已经有这种语言：问之前就说、什么都不传（refuseExisting）。AI 给的那种读到声音就查，
+//   识别出来的那种识别完再查、多说一句它是识别出来的。
 // 不管什么：怎么识别（VoiceSampleLanguage / SpokenLanguageProbe）、参考录音怎么做（VoiceReferenceSample）、问授权和交
 // （SkyStudioVoiceRecordingTool）。
 
