@@ -20,6 +20,8 @@ final class VoiceLibraryHTTP: URLProtocol {
     static var deleteStorageFailures = 0
     /// 克隆读稿的默认要 MiniMax 版、还没建（`default_needs_one_time`）。
     static var needsEnroll = false
+    /// 这个账号记着一条有效的长期授权（`GET /voices/consent-grant`）。
+    static var standingGrant = false
     static var prompts: [String] = []
     static var wave = Data()
 
@@ -34,7 +36,7 @@ final class VoiceLibraryHTTP: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         requests = []; uploads = []; prompts = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["en"], minimax: false)]
-        listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false
+        listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false; standingGrant = false
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
     }
@@ -103,6 +105,10 @@ final class VoiceLibraryHTTP: URLProtocol {
     }
 
     private static func library(_ method: String, _ rest: String, _ body: JSONValue) -> (Int, JSONValue, Data?) {
+        if rest == "/consent-grant" {
+            let grant: JSONValue = standingGrant ? ["statement_version": "voice-standing-consent-v1", "active": true] : .null
+            return (200, ["grant": grant, "current_statement_version": "voice-standing-consent-v1"], nil)
+        }
         if rest.isEmpty || rest == "/" {
             if method == "GET" {
                 if let (status, value) = listFailure { return (status, value, nil) }
@@ -155,6 +161,9 @@ final class VoiceLibraryHTTP: URLProtocol {
     private static func quote(_ body: JSONValue) -> JSONValue {
         switch body["kind"]?.stringValue {
         case "voice_design"?:
+            // 中文描述服务器用 MiniMax（贵的那个，「约」和「最多」不一样），别的用 Qwen3。
+            let chinese = (body["prompt"]?.stringValue ?? "").unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+            if chinese { return ["credits": 760, "credits_expected": 751.4, "settlement": "exact", "model": "minimax-voice-design"] }
             return ["credits": 22.5, "credits_expected": 22.5, "settlement": "exact", "model": "qwen3-voice-design"]
         default:
             let batches = body["params"]?["batches"]?.arrayValue ?? []

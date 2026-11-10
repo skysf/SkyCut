@@ -21,6 +21,7 @@ import SrtFlowMCPKit
             try await runVoiceConcurrencyChecks(root)
             try await runVoiceStopChecks(root)
             try await runVoiceLibraryChecks(root)
+            try await runVoiceLibraryUIChecks(root)
             try await runVoiceFallbackFeeChecks(root)
             await runVoicePaidAudioChecks(root)
         } catch {

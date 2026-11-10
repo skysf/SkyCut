@@ -4,5 +4,5 @@
 
 "NSScreenCaptureUsageDescription" = "SkyCut graba la pantalla, la ventana o la región que elijas en una pista de video. Todo se queda en este Mac: no se sube nada.";
 "NSAudioCaptureUsageDescription" = "SkyCut graba en el video el sonido que está reproduciendo el ordenador. Todo se queda en este Mac: no se sube nada.";
-"NSMicrophoneUsageDescription" = "SkyCut graba tu narración en una pista de audio aparte mientras graba la pantalla. Está desactivado por defecto y solo funciona cuando lo activas.";
+"NSMicrophoneUsageDescription" = "SkyCut solo usa el micrófono cuando tú lo inicias: para grabar tu narración en una pista de audio aparte mientras graba la pantalla, o para grabar una muestra de voz al crear una voz.";
 "NSAppleEventsUsageDescription" = "Cuando le pides a tu asistente de IA que edite los archivos seleccionados en el Finder, SkyCut le pregunta al Finder cuáles son. No cambia nada en el Finder.";

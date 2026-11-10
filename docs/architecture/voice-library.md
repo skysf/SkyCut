@@ -1,10 +1,11 @@
-# 声音库：克隆的参考录音和声音库的工具（变声做到时补进来）
+# 声音库：克隆的参考录音、声音库的工具和界面（变声做到时补进来）
 
 > 2026-11-10 起生效（SkyCut 声音 PR 2 `feat/voice-reference-sample`）。方案：[SkyCut 声音方案](../plans/2026-11-09-voice-features.md)
 > 第六节、9.1 第 3 条；拍板在仓库外的 `SkyVoiceForClone/决定汇总-2026-11-09.md` 第三节第 3 条、第七节第 2 条；服务器那边怎么查录音见
 > Sky Studio 那份方案（在 Sky Studio 仓库）3.3、3.4。这里只放长期约束。
-> 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），在第八节；全部权限下的长期授权（PR 7）、
-> 新建声音的界面（PR 8）、变声（`change_voice`，PR 9）做到时补进这份文档。
+> 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），在第八节；设置里的声音库、
+> 声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；全部权限下的长期授权（PR 7）、变声（`change_voice`，PR 9）
+> 做到时补进这份文档。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md) 第五节（云端旁白 / 克隆）、[阻塞的媒体读取](blocking-media-reads.md)、[写代码的规范](coding-standards.md)。
 > 案例：[克隆的参考录音被降到 16 kHz、默认只截 10 秒](../bugfixes/2026-11-10-voice-reference-16khz-short-sample.md)。
 
@@ -72,8 +73,9 @@
   人声不够当场拒并把 `reason` / `voiced_seconds` / `missing_seconds` 带进 get_job」那一段随之删了；`AIToolError.details` 进 get_job 的那一手留着，声音 PR 6 用。
   `VoiceReferenceSample.prepare` 这段时间只有自检在调（第六节）。
 - **`manage_voices create` / `add_reference`（声音 PR 6）**：只调 `VoiceReferenceSample.prepare`，在问授权之前就做好（人声不够当场拒、什么都不传）；
-  授权的令牌绑做好的那段 WAV 的内容哈希（第八节）。设置里的新建声音对话框（声音 PR 8）照同一条路。用声音库的声音读稿（`voice=voice_…`）不再传参考，
-  参考从声音库拿。
+  授权的令牌绑做好的那段 WAV 的内容哈希（第八节）。用声音库的声音读稿（`voice=voice_…`）不再传参考，参考从声音库拿。
+- **设置里的新建声音对话框（声音 PR 8，第九节）**：选的文件、现录的那个文件都只过 `VoiceReferenceSample.prepare` 这一遍（`NewVoiceModel`），
+  没有第二份「够不够格」的算法；界面上「用了哪一段、有效人声多少」就是它回的 `Sample`。
 
 ## 六、回归
 
@@ -129,7 +131,8 @@
    **问授权**（`SkyStudioJobGate.voiceConsent`，问句带 `/models` 的 `voice_consent.per_recording` 英文原文和版本，AI 照会话语言转述）→ 点过头才传
    `voice_reference`、`POST /voices`（`consent: true` + 版本、`source` 写用了哪一段、`idempotency_key` 从令牌绑的身份算）或 `POST /voices/{id}/references`。
    令牌绑**完整身份**（`SkyStudioVoiceApproval.Recording`）：文件路径、大小、修改时间、做好的那段 WAV 的 SHA-256、用的那一段、语言、名字 / 声音、版本，外加账户戳；
-   换任何一样另发一张。`consent: true` 只在这个文件、点过头之后造（`checks/sky-studio-wiring.sh` 第 11 节）。录音的语言这一刀要 AI 给（本机检测随界面那一刀接）。
+   换任何一样另发一张。AI 这一路的 `consent: true` 只在这个文件、点过头之后造（`checks/sky-studio-wiring.sh` 第 11 节；另一处是对话框里用户自己勾了那一句之后，
+   第九节）。录音的语言 AI 这一路要它给；界面上的对话框用本机检测预选（第九节第 4 条）。身份和「传、建 / 加」那一步在 `SkyStudioVoiceRecordingSubmission`，两个入口共用。
 4. **设计**（`SkyStudioVoiceDesignTool`）：先 `/quote`（`voice_design`、`model: auto`，描述的语言决定 MiniMax / Qwen3，SkyCut 不挑），再问一次性费用
    （`SkyStudioJobGate.voiceOneTime`：先判每日硬预算，问句「约多少（最多多少）」），点过头记账、起任务（`SkyStudioVoiceLibraryJob`：`get_job` 报新声音、
    1 小时的 `sample_url`、实收；账按服务器的结算证据改，没花出去的退回）。价格一律从报价来，名片和说明书不写数。
@@ -161,3 +164,91 @@
 - [ ] 旁白中途某一批的备用要先建 MiniMax 版（服务器回 `fallback_needs_one_time`；真遇上时）：get_job 问价、`resume` + 令牌建、再 `generate_missing` 读完；
       另一次照 `skip_one_time` 用原来的模型重试。
 - [ ] Sky Studio 没配声音桶时（或断网）：`list_voices` 照回预设，用 `voice_…` 配旁白报错、没换成本机的声音。
+
+## 九、声音库的界面（设置里的一节、声音选择器、新建 / 设计声音，声音 PR 8）
+
+> 方案 5.1–5.4、5.7、9.1 第 13 项、9.3「界面」。文件在 `Sources/SrtFlow/VoiceLibrary/`。相关：[顶部工作台与统一设置](workbench-and-settings.md)（「剪辑与声音」那一类）、
+> [本地化](localization.md)、[预览性能 ratchet](preview-perf-ratchet.md)、[即时提示](instant-tooltips.md)、[签名与系统权限](code-signing-and-permissions.md)（麦克风）。
+
+1. **界面和 AI 的工具是同一条路，不另写一份逻辑**（扫描守卫钉着）：
+   - 建声音 / 加一种语言的录音：参考录音只经 `VoiceReferenceSample.prepare`，交只经 `SkyStudioVoiceRecordingSubmission`（身份、`voice_reference` 上传、
+     `POST /voices` / `…/references`、用了哪一段、从身份算的 idempotency_key）。同一段录音、同一个名字和语言，对话框和 `manage_voices` 发的是同一个 key。
+   - 删除只经 `SkyStudioVoiceDeletion`（存储一时不可用再发一次只有这一份）；设计只经 `SkyStudioVoiceDesignOrder`（核对、起 `SkyStudioVoiceLibraryJob`）。
+   - 服务器的错误是哪一种只在 `SkyStudioVoiceLibraryErrors.kind` 分一次：给 AI 的英文（`message`）和界面上照语言写的那一句（`VoiceLibraryText.message`）都从它来；
+     界面上的话不许出现「去调某个 AI 工具」。
+   - 「声音库变了」（`SkyStudioVoiceLibraryChange`：建、加录音、改名、删、设计好了，AI 做的也算）一声，开着的那一节自己再取一遍。
+2. **授权是对话框里的一勾**（方案 5.3：这是用户自己在操作，不是 AI 在问，两种权限模式都有）。**只有勾上了才造 `consent: true`**（带 `/models` 那一句的版本）：
+   `NewVoiceGate` 没勾就不让按，`NewVoiceModel.submit` 里 `guard agreed` 之后才造（两道，守卫钉着后一道）。勾的那句是 `voice_consent.per_recording` 的本地化版本：
+   **认得的版本（`voice-consent-v1`）显示译文，服务器换了新版本而表里还没有译文时显示服务器的英文原文**——用户同意的必须是交上去的那个版本说的话；
+   加一版译文 = `VoiceLibraryText.knownConsentVersion` 和三张表一起改。开了全部权限、`GET /voices/consent-grant` 说这个账号有有效的长期授权时默认勾上（用户动过就不替他改；
+   交的仍是这一次的 `consent: true`，长期授权那一种是声音 PR 7 的事）。
+3. **声音库的几种样子**（`VoiceLibraryStore.Phase`）：没有 Key →「接上 Sky Studio 才能用」+ 去「设置 → Sky Studio」的按钮；钥匙串要授权 → 同一个按钮（去那一页点「允许…」）；
+   `voice_library_unavailable` →「声音库暂时用不了，稍后再试」，新建、设计灰着（列表是空的，改名 / 删除无从点起），**预设照样能浏览、试听**；别的毛病 → 那一句 +「重试」。
+   Key 只静默读（打开设置不弹钥匙串框，`.prompting` 仍只有面板起的 upscale 任务用）。
+4. **录音的语言**先替用户选好、可改（`VoiceSampleLanguage`）：macOS 26 上用生成字幕那套两段式检测——候选和裁决 2026-11-10 从 `TranscriptHarvester` 原样挪进了
+   `SpokenLanguageProbe`，两边共用（只在已装的语言里裁决、不为它下载模型，探针是参考录音的前 20 秒）。检测不出来、一个模型都没装、macOS 15：**那一行空着、要用户选，不许猜**
+   （语言记错了，服务器选模型跟着错）。用户选过就不再替他改；加录音时检测出这个声音已有的语言也不替他选。能选的是一份常用语言的名单（检测出名单外的照样能用）。
+5. **现在录**（`VoiceSampleRecorder`）：第一次按「录」才请求麦克风授权（和录屏同一个请求口 `ScreenRecordingPermissions.requestMicrophoneAccess`）；被拒了说去
+   「系统设置 > 隐私与安全性 > 麦克风」打开、给一个打开系统设置的链接。录成和参考录音同一个规格的 WAV（44.1 kHz 单声道 16-bit），到 3 分钟自己停；录下来的文件
+   和选的文件一样过 `prepare`。一秒十次的电平只叫醒录音那一小块视图。麦克风的用途说明（`InfoPlist.strings` 三种语言 + `packaging/Info.plist`）写了「录屏的解说」和「新建声音时的样本」两样。
+6. **「新建」为什么还灰着**一次只说最要紧的一样（`NewVoiceGate`，纯值）：声音库用不了 → 满了（每个账号 50 个；服务器另外卡 `voice_limit`）→ 没起名字 → 还没有能用的录音
+   （人声不够的那一句由 `prepare` 给：有多少秒、至少要 10 秒）→ 没选语言 → 这种语言已经有录音了（加录音时；已有的语言本来就不列）→ 没勾授权。加录音不问名字、不数上限。
+   费用一行写明新建免费、MiniMax 版第一次用到再说（方案 5.3）。
+7. **设计声音**（`DesignVoiceModel` / `DesignVoiceSheet`）：填好描述和名字、停 0.6 秒才问 `/quote`（免费、不建任务）；显示「将用 MiniMax / Qwen3 设计 · 约 X 积分（最多 Y）」
+   （大概和最多一样时只写一个数）；按钮「设计（最多 Y 积分）」**按下就是确认**（和 upscale 面板同一个口径，不走确认码）：照报价先过每日硬预算
+   （`SkyStudioJobGate.reserveWithoutAsking`，超了那一行标红、按钮灰着）、记账、起任务。**报价对的是哪一份就交哪一份**：改了任何一个字，手里的报价作废、重新问。
+   设计是任务：关掉对话框不取消，云端任务浮层里看得见（挂在菜单作用的那个工程名下），做完自己出现在声音库那一节；没做成那一节说一句（任务自己的原话，不另编「没扣钱」）。
+   价只从报价来，界面和表里不写数。
+8. **声音选择器**（`VoicePickerView`，共用组件，变声面板也用它）：一排语言（中文 / English / 其他语言）+ 三组（我的声音、设计的声音、预设排最后）。列什么在
+   `VoicePickerRows`（纯值）：预设只列这种语言 `listed` 的、和 `list_voices` 同一个顺序；性别、说明、样音取**这一排的语言**的那一套；说明按界面语言挑（中文界面 `zh`，
+   英文、西语界面 `en`）；「其他语言」照 `other_languages`；默认哪一排：中文界面中文，其余 English。给了 `selection` 能点选，不给只浏览。
+9. **试听**只经 `VoiceAudition`：一个播放器、同一时间只放一个、面板关掉就停。预设的样音是公开地址；我的声音的试听是 1 小时的临时链接，
+   **只留在内存里、不存盘**，还剩不到一分钟就重取那一个声音（`VoiceLibraryStore.previewURL`）。
+10. **删除**先确认一句「删除『X』？」，不另加说明（决定第三节第 7 条）；删了立刻从列表消失。改名是一张小 sheet。这些都不碰时间线、不登记撤销。
+11. **界面的规矩**：每张 sheet 各套 `.appLanguage()`；确认框的标题和按钮走 `L10n`；新文案三张表都有；每个视图 body 第一行计数；提示用 `instantHelp`；
+    声音库的视图不读工程、不订阅播放器的时钟（只订阅 `VoiceLibraryStore` / `VoiceAudition` / 各自的小模型）；录音语言那一行的键是「Recording language」
+    （`"Language"` 在表里是「界面语言」，一个键一个含义）。新加的界面文件都在 400 行以内。
+
+| 检查 | 守什么 |
+| --- | --- |
+| `scripts/check-sky-studio.sh` 的 `VoiceLibraryUIChecks`（纯值，47 条） | 选择器三组的顺序、预设名单和 `list_voices` 同序、按这一排的语言取性别 / 样音、说明按界面语言挑、「其他语言」照英文、默认标出来、默认哪一排、我的声音试听哪种语言；`NewVoiceGate` 的顺序、50 个上限、加录音不问名字；错误分成哪一种、给 AI 的英文没变 |
+| `scripts/check-voice-recovery.sh` 的 `LibraryUIChecks`（真 App 对象 + 假协议 `VoiceLibraryHTTP`） | Store：取到了 / 用不了（预设还在、什么都不发）/ 没有 Key / 要授权；改名；删除再发一次、立刻消失；临时链接没过期不重取、快过期只重取那一个；「声音库变了」自己再取。新建：**没勾授权什么都不传**、勾了传一次 `voice_reference`、`POST /voices` 带 `consent: true` + 版本 / 用了哪一段 / key，和 `manage_voices` 同一个 key；人声不够当场说、不碰网络；语言照检测预选、用户选过不改、检测不出来留空；加录音不列已有的语言；那一勾的默认。设计：填够才问价、改字作废报价、按下去记账并起 `voice_design`（`max_credits` 是报价）、做完进列表、超了每日额度不记账不起任务、太长不问价。录音机：电平换算、规格、3 分钟、被拒不录。话：授权那句的两种版本、语言名照界面语言、界面不叫人去调 AI 工具 |
+| `checks/sky-studio-wiring.sh` 第 11、12 节（第 12 节拆在 `checks/sky-studio-wiring/voice-library-ui.sh`） | `consent: true` 只在两处造且各在问到之后；建 / 加 / 删的请求只从 `SkyStudioVoiceRecordingSubmission.swift` 发；设计只经 `SkyStudioVoiceDesignOrder`、先过每日硬预算再起任务；界面不用确认码、不弹钥匙串框、不直接动账；视图不读工程 / 时钟；拆出去的那一节在总闸之前装进来 |
+| `checks/project-file-wiring.sh` | 语言检测搬家之后守卫跟着走：候选去重 / 排序 / 不许单候选捷径钉在 `SpokenLanguageProbe`，生成字幕和参考录音都只走它 |
+| `scripts/check-localization-coverage.sh`、`checks/presented-views-app-language.sh`、`checks/preview-perf-wiring.sh`、`checks/instant-tooltip-wiring.sh`、`checks/source-file-size.sh` | 三张表、sheet 的语言、body 计数、提示、行数（方案 9.1 第 13 项，各自已有） |
+| `scripts/render-voice-library.sh <输出目录>`（要图形会话，**不在 check-all 里**） | 不判对错，只出图：生产的视图 + 假 Sky Studio，英 / 中 / 西各一套 PNG（设置那一节的三种样子、浏览预设、新建声音空着 / 填好、加录音、设计带报价），发版前和改这些视图之后看排版 |
+
+反向验证（2026-11-10，每一处临时改坏、跑、看红、再恢复）：
+
+| 临时改成 | 红了什么 |
+| --- | --- |
+| `NewVoiceGate` 不看那一勾、`submit` 里去掉 `guard agreed` | `check-voice-recovery` 4 条（缺的不是授权了、没勾也传了、传了两次、同一个 key 出现三次）；只去掉 `guard agreed`：扫描守卫红 |
+| 试听的临时链接永不重取 | 「快过期的重取那一个」 |
+| 声音库用不了当成普通失败 | 「用不了是单独一种样子」 |
+| 设计按 0 积分过每日额度 | 「按报价记账」「超了额度不记账不起任务」 |
+| 改字不作废手里的报价 | 「改了字报价作废」「交的就是报价的那一份」 |
+| 检测盖掉用户选的语言 | 「用户选过不改」（连带等样本超时） |
+| 录音上限改成 10 分钟、麦克风被拒照录 | 录音机 2 条 |
+| 选择器把预设排第一、说明一律 `en`；上限改 100；存储失败不单独分 | `check-sky-studio` 15 条（顺序 / 名单 / 默认 / 中文说明 / 上限 / 存储失败，连带旧的「再调一次 delete」那条） |
+| 删除不再发一次（`SkyStudioVoiceDeletion`） | `check-voice-recovery`：旧的 AI 删除那条先抛错（界面和 AI 共用这一份） |
+| 另一个文件里造 `consent: true`；Store 直接调 `deleteVoice`；对话框自己 `createVoice`；设计先起任务后过额度；视图里读 `OpenProjects`；界面里用 `AIConfirmations`；拆出去的那一节挪到总闸后面 | `checks/sky-studio-wiring.sh` 各红一条 |
+| `SpokenLanguageProbe` 里已装语言不排序 / 加单候选捷径；生成字幕不把元数据交给候选 | `checks/project-file-wiring.sh` 各红一条 |
+| sheet 去掉 `.appLanguage()`；一个 body 去掉计数；西语表删一条；`instantHelp` 换成 `.help` | 各自的守卫红 |
+
+全部恢复后转绿。
+
+人工回归（自动化够不着的；真 Key 的几条要花积分，先请用户批准预算）：
+
+- [ ] **第一次按「录」**：系统弹麦克风授权框，文案是新的那一句（提到录声音样本）；点允许后直接开始录，电平条跟着声音动、时间在走；录到 3 分钟自己停。
+- [ ] **拒绝麦克风之后**：那一块写「去系统设置 > 隐私与安全性 > 麦克风打开」，链接能打开那一页；打开之后回来再按「录」能录（不用重开 SkyCut；要重开的话把文案改掉）。
+- [ ] **装下一个版本之后**（固定签名）：麦克风不用再授权（[签名与系统权限](code-signing-and-permissions.md)）。
+- [ ] 新建声音：录 10 秒出头（刚够）、录 45 秒、选一个 3 分 30 秒的文件：「用的」那一行说出用了哪一段（自动挑的写明）、▶ 放的就是那一段；录 5 秒：说还差多少、「新建」灰着。
+- [ ] 语言：中文录音自动选中文、英文选英文（macOS 26、两种模型都装了）；一段这台 Mac 没装模型的语言：那一行空着、要手选；手选之后换一个文件不被改回去。
+- [ ] 不勾授权建不了；勾上、新建之后声音出现在列表里，▶ 能听到自己的录音；给它加一段另一种语言的录音，列表里多一种语言。
+- [ ] 改名、删除（确认一句、删了立刻消失）；同时让 AI 用 `manage_voices` 建 / 删一个：设置开着时列表自己跟着变。
+- [ ] 设计：英文描述（Qwen3，便宜的那个）报价 → 按下 → 对话框收起、设置里「正在设计…」、云端任务浮层里有这一条 → 做完出现在列表、▶ 能听样音；
+      每日额度调到比报价低：那一行标红、按钮灰着。中文描述看到的是 MiniMax 和「约 X（最多 Y）」（只看报价，不必真设计）。
+- [ ] 浏览预设：中文 / English / 其他语言三排，逐个 ▶ 能听、同一时间只响一个、关掉面板就停；Charon 标着「默认」。
+- [ ] 没有 Key：那一节写「接上 Sky Studio」，按钮跳到 Sky Studio 那一类；钥匙串要授权时同样。Sky Studio 没配声音桶时：写「暂时用不了」，新建 / 设计灰着，预设照样能听。
+- [ ] 英 / 中 / 西三种界面（系统语言设成英文再切）：设置那一节、选择器、三个对话框、删除确认框无截字、无漏翻；900 pt 高的窗口里对话框完整（方案 9.3）。
+
