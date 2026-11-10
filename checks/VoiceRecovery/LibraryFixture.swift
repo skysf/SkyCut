@@ -27,6 +27,11 @@ final class VoiceLibraryHTTP: URLProtocol {
     static var refuseStanding = false
     /// `/voices/consent-grant` 回 503（声音库一时用不了）。
     static var grantUnavailable = false
+    /// 这个账号记着一条有效的长期授权（声音库界面那一刀的检查照它拨；和上面 `standing` 是同一份）。
+    static var standingGrant: Bool {
+        get { standing?.active == true }
+        set { standing = newValue ? ("voice-standing-consent-v1", true) : nil }
+    }
     static var prompts: [String] = []
     static var wave = Data()
 
@@ -193,7 +198,9 @@ final class VoiceLibraryHTTP: URLProtocol {
     private static func quote(_ body: JSONValue) -> JSONValue {
         switch body["kind"]?.stringValue {
         case "voice_design"?:
-            // Qwen3（Sky Studio #247）：描述 + 试读句每开始 1,000 字 22.5。
+            // 中文描述服务器用 MiniMax（贵的那个，「约」和「最多」不一样）；别的用 Qwen3，按描述 + 试读句每开始 1,000 字 22.5（Sky Studio #247）。
+            let chinese = (body["prompt"]?.stringValue ?? "").unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
+            if chinese { return ["credits": 760, "credits_expected": 751.4, "settlement": "exact", "model": "minimax-voice-design"] }
             let characters = (body["prompt"]?.stringValue ?? "").count + (body["params"]?["sample_text"]?.stringValue ?? "").count
             let credits = 22.5 * Double(max(1, (characters + 999) / 1_000))
             return ["credits": .number(credits), "credits_expected": .number(credits), "settlement": "exact", "model": "qwen3-voice-design"]

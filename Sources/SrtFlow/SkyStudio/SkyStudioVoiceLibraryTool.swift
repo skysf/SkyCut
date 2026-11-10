@@ -63,6 +63,7 @@ enum SkyStudioVoiceLibraryTool {
         let key = try await services.key()
         do {
             let voice = try await services.api.renameVoice(id, to: name, key: key)
+            SkyStudioVoiceLibraryChange.post()
             return .ok(["status": "renamed", "voice": voice.json])
         } catch is CancellationError { throw CancellationError() }
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
@@ -83,14 +84,10 @@ enum SkyStudioVoiceLibraryTool {
             return question
         }
         do {
-            try await deleteOnce(id, key: key, services: services)
-        } catch where SkyStudioVoiceLibraryErrors.isStorageRetry(error) {
-            // 存储一时不可用：声音已经看不见了，再发一次接着删（Sky Studio 声音方案 3.3）。
-            do { try await deleteOnce(id, key: key, services: services) }
-            catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
-        } catch {
-            throw AIToolError(SkyStudioVoiceLibraryErrors.message(error))
-        }
+            // 存储一时不可用时再发一次（SkyStudioVoiceDeletion，设置里的删除走同一份）。
+            try await SkyStudioVoiceDeletion.run(id, key: key, api: services.api)
+        } catch is CancellationError { throw CancellationError() }
+        catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
         var result: [String: JSONValue] = ["status": "deleted", "voice": .string(id), "name": name.map(JSONValue.string) ?? .null,
                                            "next_step": "Tell the user the voice was deleted for good; its recordings are gone too."]
         if AIAccessStore.shared.mode == .full {
@@ -99,10 +96,6 @@ enum SkyStudioVoiceLibraryTool {
             SkyStudioVoiceStanding.shared.notify(String(format: L10n("Full access: SkyCut deleted the voice “%@”."), name ?? id), project: project)
         }
         return .ok(.object(result))
-    }
-
-    private static func deleteOnce(_ id: String, key: String, services: SkyStudioVoiceServices) async throws {
-        try await services.api.deleteVoice(id, key: key)
     }
 
     private static func voiceID(_ args: AIToolArguments) throws -> String {

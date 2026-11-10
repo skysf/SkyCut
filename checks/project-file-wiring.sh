@@ -291,18 +291,36 @@ require "metadata 查询必须吃 [SoundClip] 快照" \
 forbid "metadata 不许再从 TimelineState 自己枚举素材" \
   Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
   'state\.mainClips \+ state\.audioTracks'
-forbid "Auto-detect 不许留「单候选直接采用」的无证据捷径" \
+# 候选和裁决 2026-11-10 挪进了 SpokenLanguageProbe（生成字幕和新建声音对话框检测录音的语言共用）：守卫跟着代码走，
+# 两个文件都钉（forbid 留在老文件上会悄悄变成永远通过）。
+PROBE="Sources/SrtFlow/SubtitleGen/SpokenLanguageProbe.swift"
+[ -f "${PROBE}" ] || { echo "✗ 接线守卫：找不到 ${PROBE}（改名了就同步改这里）" >&2; WIRING_FAIL=1; }
+require "生成字幕的候选要从 SpokenLanguageProbe 来" \
   Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
-  'candidates\.count == 1'
+  'SpokenLanguageProbe\.candidates\(metadataTag: metadataTag\)'
+require "生成字幕的裁决要走 SpokenLanguageProbe（每个候选都过探针）" \
+  Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
+  'SpokenLanguageProbe\.verdict\('
+require "参考录音的语言检测也只走 SpokenLanguageProbe（不另写一份裁决）" \
+  Sources/SrtFlow/VoiceLibrary/VoiceSampleLanguage.swift \
+  'SpokenLanguageProbe\.verdict\('
+for detector in Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift "${PROBE}" Sources/SrtFlow/VoiceLibrary/VoiceSampleLanguage.swift; do
+  forbid "Auto-detect 不许留「单候选直接采用」的无证据捷径" \
+    "${detector}" \
+    'candidates\.count == 1'
+  forbid "候选不许再按 locale 标识符自己去重截断（同语言变体会吃光名额）" \
+    "${detector}" \
+    'candidates\.count < 3'
+done
 require "候选去重必须走按语言的 selectCandidates" \
-  Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
+  "${PROBE}" \
   'SubtitleLanguageDetection\.selectCandidates\('
-forbid "候选不许再按 locale 标识符自己去重截断（同语言变体会吃光名额）" \
-  Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
-  'candidates\.count < 3'
 require "已装语言那一档必须排序（系统返回顺序实测会变）" \
-  Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift \
+  "${PROBE}" \
   'installed\.map\(\\\.identifier\)\.sorted\(\)'
+require "裁决只走 SubtitleLanguageDetection.pick（fail-closed）" \
+  "${PROBE}" \
+  'SubtitleLanguageDetection\.pick\(results\)'
 # transcribe 读缓存那条路挑语言也只许走同一个裁决（门槛 + 按文字系统核对）：以前按平均可信度另挑一份，
 # 中文模型把英文旁白写成的拉丁乱码就这样被挑中（docs/bugfixes/2026-10-03-auto-detect-picks-chinese-for-english.md）。
 require "transcribe 读缓存挑语言要走 SubtitleLanguageDetection.pick" \

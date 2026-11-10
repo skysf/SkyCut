@@ -11,6 +11,7 @@ import SrtFlowMCPKit
 //   记不上照样打开（声音那几件事第一次还会问一次），设置里那一行看 `status`；
 // - **升级前就开着全部权限**（`migrateIfNeeded`：SkyStudioAccount 读到 Key 时调）：这台 Mac 上只做一次，直接替用户记上、不问
 //   （用户 2026-11-09 定：只有用户本人在用）；开着的是请求批准就什么都不做；记上了 / 不用记都不再来，没记上下次读到 Key 再试。
+// `/voices/consent-grant` 的三个请求只经这里（设置里的新建声音对话框要知道有没有有效的长期授权，也问 `hasActiveGrant`）。
 // 不管什么：问句和令牌（SkyStudioJobGate、SkyStudioVoiceApproval）、说明的文字（SkyStudioVoiceStandingNotice）、界面（FullAccessConsentSheet）。
 
 @MainActor
@@ -58,14 +59,24 @@ final class SkyStudioVoiceStanding: ObservableObject {
 
     func voiceAsk(key: String, api: SkyStudioAPI) async -> SkyStudioJobGate.VoiceAsk {
         guard access.mode == .full else { return .ask }
-        if let state = try? await api.voiceConsentGrant(key: key) {
-            if let grant = state.grant, grant.active {
-                status = .recorded(version: grant.statementVersion)
-                return .standing
-            }
-            status = .notRecorded("This Sky Studio account has no standing voice consent on record.")
-        }
+        if await readGrant(key: key, api: api) == true { return .standing }
         return await missing(key: key, api: api)
+    }
+
+    /// 这个账号此刻有没有有效的长期授权（设置里的新建声音对话框照它预先勾上那一句，NewVoiceModel）。读不到当没有。
+    func hasActiveGrant(key: String, api: SkyStudioAPI) async -> Bool {
+        await readGrant(key: key, api: api) == true
+    }
+
+    /// GET 一次：有效 = true，明说没有 / 文案过期 = false（状态跟着改），读不到 = nil（状态不动）。
+    private func readGrant(key: String, api: SkyStudioAPI) async -> Bool? {
+        guard let state = try? await api.voiceConsentGrant(key: key) else { return nil }
+        if let grant = state.grant, grant.active {
+            status = .recorded(version: grant.statementVersion)
+            return true
+        }
+        status = .notRecorded("This Sky Studio account has no standing voice consent on record.")
+        return false
     }
 
     /// 全部权限下还没有有效的长期授权（或者 Sky Studio 刚拒了 standing_grant）：问一次，问句后面接那段说明，点过头补记它说的那一版。

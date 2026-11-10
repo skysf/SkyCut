@@ -400,8 +400,10 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**PR 1 只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**；
 **声音 PR 3（2026-11-10）把 `add_voiceover` 的读稿接上了**：预设 / 角色从这里的目录认、整段报价和每批的 `params.plan` 照这里的请求拼（第五节）。
 **声音 PR 6（2026-11-10）接上了声音库**：`list_voices` / `manage_voices`（列、建、加一种语言、设计、改名、删）、`voice=voice_…` 读稿、建 MiniMax 版的一次性费用、
-`voice_library_unavailable` 怎么说（规矩在 [声音库](voice-library.md)第八节）。**声音 PR 7（2026-11-10）**：全部权限下有有效的长期授权就不问
-（打开时的说明、`/voices/consent-grant` 的记 / 撤、升级时补记，`SkyStudioVoiceStanding`）。新建声音的界面、变声还没接（声音 PR 8、9）。
+`voice_library_unavailable` 怎么说（规矩在 [声音库](voice-library.md)第八节）。**声音 PR 8（2026-11-10）接上了界面**：设置里的声音库、声音选择器、
+新建 / 设计声音的对话框，和 AI 的工具共用建声音（`SkyStudioVoiceRecordingSubmission`）、删除（`SkyStudioVoiceDeletion`）、设计（`SkyStudioVoiceDesignOrder`）那几步
+（[声音库](voice-library.md)第九节）。**声音 PR 7（2026-11-10）**：全部权限下有有效的长期授权就不问（打开时的说明、`/voices/consent-grant` 的记 / 撤、升级时补记，
+`SkyStudioVoiceStanding`）。变声还没接（声音 PR 9）。
 Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
 
 - **目录**（`SkyStudioVoiceCatalog`，`catalog.voices`）：`/models` 顶层的 `voice_presets`、`voice_roles`、`voice_rules`、`voice_consent`

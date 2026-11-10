@@ -1,8 +1,9 @@
 # shellcheck shell=bash
 # checks/sky-studio-wiring.sh 第 11 节（在同一个 shell 里 source，用它的 fail / line_of / code_files_with；总闸在主脚本最后）。
 # 声音库（声音 PR 6）和全部权限下的长期授权（声音 PR 7，SkyCut 声音方案 4.5、5.6、9.1 第 12 项）：
-#   - `consent: true`（.thisRecording）和 `consent: "standing_grant"`（.standingGrant）只在 SkyStudioVoiceRecordingTool 里、
-#     过了 SkyStudioJobGate.voiceConsent 之后造；standing_grant 只在问出来是 `.standing`（全部权限 + 有效的长期授权）时用；
+#   - `consent: true`（.thisRecording）只在 SkyStudioVoiceRecordingTool 里过了 SkyStudioJobGate.voiceConsent 之后造，另一处是新建声音
+#     对话框（NewVoiceModel，用户自己勾了那一句之后，声音 PR 8，第 12 节管）；`consent: "standing_grant"`（.standingGrant）只在
+#     SkyStudioVoiceRecordingTool 里、问出来是 `.standing`（全部权限 + 有效的长期授权）时用；
 #   - 长期授权的三个请求（GET / POST / DELETE /voices/consent-grant）只经 SkyStudioVoiceStanding；
 #   - 改权限模式的地方（设置那一节、set_settings）改完都告诉 SkyStudioVoiceStanding（打开记、关掉撤）；设置里选全部权限先弹说明，
 #     只有「同意并打开」才写 Store；读到 / 存下 Key 时补记升级前就开着全部权限的那一条；
@@ -17,15 +18,18 @@ VOICE_START_FILE="${VOICE_DIR}/SkyStudioVoiceoverStart.swift"
 VOICE_STANDING="${VOICE_DIR}/SkyStudioVoiceStanding.swift"
 ACCESS_SECTION="Sources/SrtFlow/AIAccessSettingsSection.swift"
 ACCESS_STORE="Sources/SrtFlow/AIAccessStore.swift"
+# 新建声音对话框（声音 PR 8）：第 12 节（voice-library-ui.sh）也用这个变量。
+NEW_VOICE_MODEL="Sources/SrtFlow/VoiceLibrary/NewVoiceModel.swift"
 for file in "${VOICE_RECORDING}" "${VOICE_LIBRARY_DTO}" "${VOICE_API_FILE}" "${VOICE_START_FILE}" "${VOICE_STANDING}" "${ACCESS_SECTION}" \
-            "${ACCESS_STORE}" "${ACCOUNT}"; do
+            "${ACCESS_STORE}" "${ACCOUNT}" "${NEW_VOICE_MODEL}"; do
   [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
 done
 
 # 授权的两种写法都只在建声音的工具里、过了 voiceConsent 之后造。
-consent_makers="$(code_files_with '\.thisRecording\(' | grep -vxF "${VOICE_LIBRARY_DTO}" | sort -u || true)"
-[ "${consent_makers}" = "${VOICE_RECORDING}" ] \
-  || fail "consent: true（SkyStudioVoiceConsent.thisRecording）只许在 ${VOICE_RECORDING} 里造（问到了才造）：${consent_makers:-没有}"
+consent_makers="$(code_files_with '\.thisRecording\(' | grep -vxF "${VOICE_LIBRARY_DTO}" | LC_ALL=C sort -u | tr '\n' ' ' || true)"
+expected_makers="$(printf '%s\n' "${VOICE_RECORDING}" "${NEW_VOICE_MODEL}" | LC_ALL=C sort | tr '\n' ' ')"
+[ "${consent_makers}" = "${expected_makers}" ] \
+  || fail "consent: true（SkyStudioVoiceConsent.thisRecording）只许在 ${VOICE_RECORDING}（确认码点过头）和 ${NEW_VOICE_MODEL}（用户自己勾了那一句）里造：${consent_makers:-没有}"
 standing_makers="$(code_files_with '\.standingGrant\b' | grep -vxF "${VOICE_LIBRARY_DTO}" | sort -u || true)"
 [ "${standing_makers}" = "${VOICE_RECORDING}" ] \
   || fail "consent: \"standing_grant\"（.standingGrant）只许在 ${VOICE_RECORDING} 里用：${standing_makers:-没有}"
