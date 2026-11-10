@@ -9,7 +9,7 @@
 | PR | 状态 | 做了什么 |
 | --- | --- | --- |
 | 1 `feat/mcp-guide-tool` | 2026-11-10 合并（#344） | `skycut_guide`：主题表（每个工具一个同名主题，概要 = 它现在的说明原文，`fields` 从参数定义现算）、App 答、路由 Policy、`alwaysLoad`、没开通也照答、`GuideChecks`；不带 topic 回按清单顺序的平铺目录 |
-| 1a `fix/mcp-guide-review-followups` | #348，CI 绿了等合 | 审查 review-344 第 1–4、6、7 条：fields 写全参数定义的事实、说明书不等授权、守卫按行首 / 路径认、例子 / related / 凭据的守卫、只给 section 时说清楚、进度挪到这里 |
+| 1a `fix/mcp-guide-review-followups` | 2026-11-10 合并（#348） | 审查 review-344 第 1–4、6、7 条：fields 写全参数定义的事实、说明书不等授权、守卫按行首 / 路径认、例子 / related / 凭据的守卫、只给 section 时说清楚、进度挪到这里 |
 | 2 `feat/mcp-guide-map-and-pointers` | 进行中 | 按任务分组的地图（2,617 字）、rules / conventions / paid / workflows / errors 五个通用主题、总说明 2,037 → 1,115 字（目录搬进地图）、报错指路（两处，含 review-344 第 9 条：被挡住时说 `skycut_guide` 照常能用）；全清单 107,198 → 107,276（说明书的名片 383 → 429） |
 | 3 `feat/mcp-cards-pilot` | 未做 | 试点 5 个工具；`fields` 一节太长时怎么拆（review-344 第 5 条）；真客户端小测和实测脚本 |
 | 4–5 | 未做 | 两批搬完：名片 ≤ 450（目标 350）、参数说明 ≤ 120（目标 80）、主题写全（先把说明原样搬进主题、再写名片） |
