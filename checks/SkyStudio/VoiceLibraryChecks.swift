@@ -91,7 +91,7 @@ private func runVoiceListChecks() async {
 private func runVoiceWriteChecks() async {
     let api = jobAPI()
     let upload = URL(string: "https://r2.example/uploads/u/1.wav")!
-    let source = SkyStudioVoiceReferenceSource(filename: "talk.m4a", start: 72, end: 252, autoSelected: true)
+    let source = SkyStudioVoiceReferenceSource(fileName: "talk.m4a", startSeconds: 72, endSeconds: 252, autoSelected: true)
     guard let asked = try? SkyStudioVoiceCreation(name: "  我的声音 ", language: "zh", referenceURL: upload, source: source,
                                                      consent: .thisRecording(statementVersion: "voice-consent-v1"), idempotencyKey: "voice-key-1"),
           let standing = try? SkyStudioVoiceCreation(name: "Sky", language: "zh", referenceURL: upload, consent: .standingGrant, idempotencyKey: "voice-key-2") else {
@@ -105,7 +105,8 @@ private func runVoiceWriteChecks() async {
     let body = seen?.body.flatMap { try? JSONValue.decode($0) }
     checkEqual(body, ["name": "我的声音", "language": "zh", "reference_url": "https://r2.example/uploads/u/1.wav", "idempotency_key": "voice-key-1",
                       "consent": true, "consent_statement_version": "voice-consent-v1",
-                      "source": ["filename": "talk.m4a", "start": 72, "end": 252, "auto_selected": true]], "the whole create body")
+                      "source": ["file_name": "talk.m4a", "start_seconds": 72, "end_seconds": 252, "auto_selected": true]],
+               "the whole create body (source fields named as Sky Studio reads them)")
     checkEqual(standing.body["consent"], "standing_grant", "full access cites the standing grant")
     check(standing.body["consent_statement_version"] == nil && standing.body["source"] == nil, "no version or source when there is none")
     checkEqual(SkyStudioVoiceConsent.thisRecording(statementVersion: nil).fields, ["consent": true], "consent: true alone means the current version")
@@ -119,12 +120,15 @@ private func runVoiceWriteChecks() async {
         checkEqual(error.fields["limit"]?.intValue, 50, "with the limit")
     } else { check(false, "voice_limit comes back as a server error") }
 
-    for name in ["   ", String(repeating: "声", count: 81), String(repeating: "🎙", count: 41)] {
+    // 名字按 Unicode code point 数（Sky Studio 的 characterCount = [...text].length）：80 个 emoji 是 80 个字（160 个 UTF-16 单位）。
+    for name in ["   ", String(repeating: "声", count: 81), String(repeating: "🎙", count: 81)] {
         check((try? SkyStudioVoiceCreation(name: name, language: "zh", referenceURL: upload, consent: .standingGrant)) == nil,
-              "a name that is empty or over 80 UTF-16 units is refused before sending")
+              "a name that is empty or over 80 code points is refused before sending")
     }
-    check((try? SkyStudioVoiceCreation(name: String(repeating: "声", count: 80), language: "zh", referenceURL: upload, consent: .standingGrant)) != nil,
-          "80 characters is fine")
+    for name in [String(repeating: "声", count: 80), String(repeating: "🎙", count: 80), String(repeating: "🎙", count: 41)] {
+        check((try? SkyStudioVoiceCreation(name: name, language: "zh", referenceURL: upload, consent: .standingGrant)) != nil,
+              "\(name.unicodeScalars.count) code points (\(name.utf16.count) UTF-16 units) is fine, as on the server")
+    }
     for language in ["ZH", "zh-Hans", "", "chinese"] {
         check((try? SkyStudioVoiceCreation(name: "Sky", language: language, referenceURL: upload, consent: .standingGrant)) == nil, "\(language) is not an ISO 639-1 code")
     }

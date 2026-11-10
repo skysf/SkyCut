@@ -19,7 +19,7 @@
 
 ## 修复
 
-- 新的纯值 `VoiceReferenceWindow`：20 ms 一格的响度 → 有效人声（≥ −45 dBFS，同 `AIVoiceLevel.activeFloor`）、10 秒下限、3 分钟上限，
+- 新的纯值 `VoiceReferenceWindow`：20 ms 一格的响度 → 有效人声（≥ −45 dBFS，同 `AIVoiceLevel.activeFloor`；同一天审查后改成单独写死的合同常量 0.0056、服务器放宽到 0.0055，见 [门限借了配音响度的常量](2026-11-10-voice-reference-floor-borrowed-from-voice-level.md)）、10 秒下限、3 分钟上限，
   超过 3 分钟挑有效人声最多的一段（切在 ≥ 0.2 秒的停顿里、离两头 40 ms；一样多比前 15 秒）。下限和报错里的数字都从 `minimumVoicedFrames` 来。
 - 新的 `VoiceReferenceReader`：AVAssetReader 直接出 44.1 kHz，立体声取平均，按 PTS 落格；阻塞读取只在 `MediaReadQueue.analysis` 上，取消只置标记。
 - `VoiceReferenceSample.prepare`：先整段量响度、挑段，再只截那一段写成 **44.1 kHz 单声道 16-bit WAV**，写好的采样再数一遍有效人声；

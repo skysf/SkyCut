@@ -133,9 +133,9 @@ final class VoiceRecoveryFixture {
         return services
     }
 
-    func input(lines: [String]) throws -> AIVoiceoverInput {
+    func input(lines: [String], reference data: Data = VoiceRecoveryHTTP.reference) throws -> AIVoiceoverInput {
         let reference = folder.appendingPathComponent("reference.wav")
-        try VoiceRecoveryHTTP.reference.write(to: reference)
+        try data.write(to: reference)
         return AIVoiceoverInput(lines: lines.map { .init(text: $0, start: nil) }, speed: 1, language: "en", requestedVoice: nil,
             choice: .init(engine: .skyStudio(voice: "cloned voice")), clone: .init(url: reference, start: 0, seconds: nil),
             target: .newAudioBottom, subtitles: true, maxLines: 1, generation: project.documentGeneration, folder: folder)

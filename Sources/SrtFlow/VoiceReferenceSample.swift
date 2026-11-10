@@ -68,9 +68,12 @@ enum VoiceReferenceSample {
             // 再数一遍的是要上传的那些采样本身（服务器解出来的就是它们）。
             let voiced = voicedSeconds(of: samples)
             try requireSpeech(voiced, name: input.name)
+            // 取消晚到（读完之后、写之前）也不写：「被拒、被取消都不留文件」。
+            try Task.checkCancellation()
             let url = folder.appendingPathComponent(fileName)
             let data = wavData(samples: samples, sampleRate: Int(sampleRate))
             try await onReadQueue {
+                try stop.check()
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 try data.write(to: url, options: .atomic)
             }
@@ -80,7 +83,7 @@ enum VoiceReferenceSample {
         } onCancel: { stop.stop() }
     }
 
-    /// 有效人声多少秒：16-bit 采样按服务器解码的方式换回 Float（÷ 32768），20 ms 一格、−45 dBFS 的门限（VoiceReferenceWindow）。
+    /// 有效人声多少秒：16-bit 采样按服务器解码的方式换回 Float（÷ 32768），20 ms 一格、均方根 ≥ 0.0056 的门限（VoiceReferenceWindow）。
     static func voicedSeconds(of samples: [Int16]) -> Double {
         var meter = VoiceReferenceWindow.Meter(sampleRate: sampleRate)
         meter.append(samples.map { Float($0) / 32_768 })
@@ -88,8 +91,11 @@ enum VoiceReferenceSample {
     }
 
     /// −1…1 的 Float → 16-bit（×32768 四舍五入、夹在范围里）：16-bit 的源原样回来，一个采样都不变。
+    /// 浮点源里的坏采样（NaN、±Inf）记成 0；特别大的数先夹到范围里再转整数 —— `Int(_:)` 碰到它们会直接让 App 崩掉
+    /// （docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md）。
     static func quantize(_ value: Float) -> Int16 {
-        Int16(clamping: Int((Double(value) * 32_768).rounded()))
+        guard value.isFinite else { return 0 }
+        return Int16(max(-32_768, min(32_767, (Double(value) * 32_768).rounded())))
     }
 
     /// 单声道 16-bit PCM 的 WAV：44 字节的头 + 小端采样。
@@ -116,6 +122,7 @@ enum VoiceReferenceSample {
         // 有的往下取、差的往上取（到 0.1 秒）：两个数加起来不少于 10，也不会写出「还差 0.0 秒」。
         let have = (voiced * 10).rounded(.down) / 10
         let missing = max(0.1, ((minimum - voiced) * 10).rounded(.up) / 10)
+        // reason 和服务器 invalid_request 的同名（SkyStudioVoiceCodes.Reason.tooLittleSpeech）：AI 两边看到的是同一个词。
         throw AIToolError(
             "The voice sample from \(name) has only \(String(format: "%.1f", have)) s of clear speech; it needs at least "
                 + "\(Int(minimum)) s (\(String(format: "%.1f", missing)) s more). Use a recording of one person talking for "
@@ -129,16 +136,16 @@ enum VoiceReferenceSample {
         try await MediaReadQueue.run(on: MediaReadQueue.analysis) { Result { try work() } }.get()
     }
 
-    /// `72.4` → `1:12`，`3725` → `1:02:05`（整秒）。
+    /// `72.4` → `1:12`，`180.5` → `3:00`，`3725` → `1:02:05`。向下取整到秒：旁边就写着「最长 3 分钟」，180.5 秒不能显示成 3:01。
     static func clock(_ seconds: Double) -> String {
-        let total = Int(max(0, seconds).rounded())
+        let total = Int(max(0, seconds).rounded(.down))
         let (hours, minutes, rest) = (total / 3600, total / 60 % 60, total % 60)
         return hours > 0 ? String(format: "%d:%02d:%02d", hours, minutes, rest) : String(format: "%d:%02d", minutes, rest)
     }
 
-    /// `161` → `2 min 41 s`，`38.2` → `38 s`。
+    /// `161` → `2 min 41 s`，`38.2` → `38 s`，`180.5` → `3 min 0 s`（同 `clock`，向下取整）。
     static func spoken(_ seconds: Double) -> String {
-        let total = Int(max(0, seconds).rounded())
+        let total = Int(max(0, seconds).rounded(.down))
         return total >= 60 ? "\(total / 60) min \(total % 60) s" : "\(total) s"
     }
 }
