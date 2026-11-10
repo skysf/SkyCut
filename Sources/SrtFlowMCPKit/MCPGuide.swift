@@ -2,18 +2,19 @@ import Foundation
 
 // MARK: - 说明书 skycut_guide 怎么答（纯值）
 //
-// 管什么：AI 调 skycut_guide 时回什么 —— 不带 topic 回目录；带 topic 回那个主题（短的整份回，长的先回概要 + 有哪些节，
-// 再按 section 取）；写错的 topic 回目录 + 「是不是想要 …」，写错的 section 回那个主题 + 有哪些节。结果是 JSON
+// 管什么：AI 调 skycut_guide 时回什么 —— 不带 topic 回地图（MCPGuideMap）；带 topic 回那个主题（短的整份回，长的先回概要 + 有哪些节，
+// 再按 section 取）；写错的 topic 回地图 + 「是不是想要 …」，写错的 section 回那个主题 + 有哪些节。结果是 JSON
 // （`{topic, sections, section, text, examples, related}`，空的不写），同别的工具结果，App 原样写成一段文字交给客户端。
-// 不管什么：主题的内容（MCPGuideTopics），参数定义怎么写成文字（MCPGuideFields），谁来答（App 的 AIGuideTools）。
+// 不管什么：主题的内容（MCPGuideTopics、MCPGuideSharedTopics）、地图的内容（MCPGuideMap），参数定义怎么写成文字（MCPGuideFields），
+// 谁来答（App 的 AIGuideTools）。
 //
-// 一次回多少（方案 4.1，checks/MCP/GuideChecks.swift 钉着）：目录 ≤ 5,000、每个主题第一次回的 / 每一节 ≤ 6,000（UTF-16，量整份结果的
+// 一次回多少（方案 4.1，checks/MCP/GuideChecks.swift 钉着）：地图 ≤ 5,000、每个主题第一次回的 / 每一节 ≤ 6,000（UTF-16，量整份结果的
 // JSON 文字 —— 客户端交给模型的就是它）。Claude Code 工具结果过 1 万 token 就警告、Codex 一次输出约 1 万 token 就截：方案定的硬限是 8,000，
 // 守卫按 6,000 查，一节写到超过 6,000 就拆成两节。
 // 方案：docs/plans/2026-11-09-mcp-guide.md 2.3；长期合同：docs/architecture/mcp-guide.md。
 
 public enum MCPGuide {
-    /// 目录的上限。
+    /// 地图的上限。
     public static let indexLimit = 5_000
     /// 一个主题第一次回的、每一节的上限。
     public static let answerLimit = 6_000
@@ -35,15 +36,11 @@ public enum MCPGuide {
         return one(topic, chosen)
     }
 
-    // MARK: 目录
+    // MARK: 地图
 
-    /// 不带 topic：每个主题一行（名字 + 一句话）。PR 1 是按清单顺序的平铺目录；按任务分组的地图是方案的 PR 2。
+    /// 不带 topic：按任务分组的地图（MCPGuideMap，手写；守卫查每个工具名都在里面）。
     static func index(unknownTopic: String? = nil) -> JSONValue {
-        let topics = MCPGuideTopics.all
-        var lines = ["SkyCut guide: \(topics.count) topics, one per tool. Call skycut_guide topic=<name> for one; "
-            + "a long topic lists its sections, and section=<name> reads one."]
-        lines += topics.map { "- \($0.name): \($0.headline)" }
-        var payload: [String: JSONValue] = ["text": .string(lines.joined(separator: "\n"))]
+        var payload: [String: JSONValue] = ["text": .string(MCPGuideMap.text)]
         if let unknownTopic {
             payload["unknown_topic"] = .string(unknownTopic)
             let guesses = MCPGuideTopics.suggestions(for: unknownTopic)

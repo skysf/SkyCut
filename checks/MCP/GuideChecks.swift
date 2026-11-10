@@ -80,7 +80,7 @@ private func runGuideTopicChecks() {
 
 /// 长主题先回概要 + 有哪些节；按 section 取；写错的 section 回第一次的样子。现有的主题都放得下，拿手造的测。
 private func runGuideSplitChecks() {
-    let long = MCPGuideTopic(name: "long_topic", headline: "A long topic", sections: [
+    let long = MCPGuideTopic(name: "long_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: String(repeating: "o", count: 2_500)),
         MCPGuideSection(name: "framing", text: String(repeating: "f", count: 2_500)),
         MCPGuideSection(name: "sound", text: String(repeating: "s", count: 2_500))
@@ -96,7 +96,7 @@ private func runGuideSplitChecks() {
     checkEqual(wrong["unknown_section"]?.stringValue, "volume", "an unknown section is named back")
     checkEqual(wrong["section"]?.stringValue, MCPGuideSection.overview, "an unknown section falls back to the first answer")
 
-    let short = MCPGuideTopic(name: "short_topic", headline: "A short topic", sections: [
+    let short = MCPGuideTopic(name: "short_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: "Overview."),
         MCPGuideSection(name: "fields", text: "- a (string)")
     ], examples: [["a": "x"]], related: ["look"])
@@ -143,7 +143,7 @@ private func runGuideAppChecks() {
 
 /// 手写的文字只提真有的名字；回的每一样都只用英文。
 private func runGuideWordingChecks() {
-    let long = MCPGuideTopic(name: "long_topic", headline: "A long topic", sections: [
+    let long = MCPGuideTopic(name: "long_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: String(repeating: "o", count: 4_000)),
         MCPGuideSection(name: "more", text: String(repeating: "m", count: 4_000))
     ])
