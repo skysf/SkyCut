@@ -9,7 +9,7 @@ import SrtFlowCore
 // 为什么非要量耗时：静帧管线出过两次「产物完全正确、只是慢 20 倍」的 bug
 // （见 docs/bugfixes/2026-08-08-still-clip-loop-decode-slow.md 与
 // 2026-08-08-still-clip-decode-per-frame.md）。这类差价**一点都不体现在产物上**，
-// 只看文件永远发现不了，所以这里必须有一条对着时间的断言。
+// 只看文件永远发现不了，所以这里必须数解码次数、再有一条对着时间的断言（DecodeOnce.swift）。
 //
 // 编译方式见 scripts/check-still-clip-encode.sh。
 
@@ -218,61 +218,10 @@ if let made = convert(animated, nativeResolution: true, name: "still-anim.mp4") 
     print("FAIL 动图输入转换失败 —— 参数里是不是又出现了只有 image2 认的选项？")
 }
 
-// MARK: - 解码只该发生一次
+// MARK: - 图只该解一次、缩一次（DecodeOnce.swift）
 
-// 判据是**边际成本**，不是绝对秒数、也不是「全程/单帧」的比值：
-//
-//   基线 = 同一套生产参数只出 1 帧 ≈ 起进程 + 解一次图 + 缩一次 + 编 1 帧
-//   全程 = 生产参数出满 120 帧
-//   delta = 全程 - 基线 = 多出来那 119 帧的**边际**成本
-//
-// 图只解一次时，那 119 帧只是编码 1080p，边际成本远小于一次解码；每帧重解一次
-// 的话边际成本就是 119 次解码，必然**几倍于**一次解码。所以上限取「一次解码
-// 再加 0.25s 余量」，两边都跨机器缩放，不用写死秒数。
-//
-// 本机实测（27MP PNG）：解一次 delta=0.17s / 上限 0.72s（余 4.3×）；
-// 每帧重解 delta=7.83s / 上限 1.27s（超 6.1×）。
-//
-// 素材要够大：解码成本必须明显大于「编 120 帧 1080p」，否则分不出好坏。
-// 只量照片政策 —— 原生政策要编 120 帧原尺寸，编码本身就占大头。
-let perfImage = makeImage("perf.png", size: "4000x3000", upscale: "6000:4500")
-
-func fastestRun(_ args: [String]) -> Double {
-    // 先热一遍（文件缓存），再取两次里更快的那次，压掉调度噪声。
-    _ = timed(args)
-    return min(timed(args).seconds, timed(args).seconds)
-}
-
-let fullArgs = StillImageClipFactory.conversionArguments(
-    image: perfImage,
-    output: root.appendingPathComponent("perf-full.mp4"),
-    nativeResolution: false
-)
-// 基线从**生产参数**改出来，而不是另写一条命令 —— 另写一条的话它俩会各走各的，
-// 生产参数改了基线还照着老路子跑。
-var baselineArgs = fullArgs
-if let index = baselineArgs.firstIndex(of: "-frames:v") {
-    baselineArgs[index + 1] = "1"
-    baselineArgs[baselineArgs.count - 1] = root.appendingPathComponent("perf-1.mp4").path
-} else {
-    failures += 1
-    print("FAIL 生产参数里没有 -frames:v，性能基线无从下手")
-}
-
-let baseline = fastestRun(baselineArgs)
-let full = fastestRun(fullArgs)
-let delta = full - baseline
-let allowance = baseline + 0.25
-check(
-    delta <= allowance,
-    String(
-        format: "解码次数：多出来的 %d 帧花了 %.2fs（上限 %.2fs = 一次解码 %.2fs + 0.25s）"
-            + " —— 这张图很可能被逐帧重解了",
-        expectedFrames - 1, delta, allowance, baseline
-    )
-)
-print(String(format: "     （耗时：1 帧 %.2fs、%d 帧 %.2fs，边际 %.2fs / 上限 %.2fs）",
-             baseline, expectedFrames, full, delta, allowance))
+// 数 ffmpeg 报的解码次数，再把多出来那 119 帧的边际成本和同一次运行里产物尺寸的小图比。
+await checkDecodeOnce(native: bigImage)
 
 // MARK: - 同一张图同一条政策，产物必须逐字节稳定
 

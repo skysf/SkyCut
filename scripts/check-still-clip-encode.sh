@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 图片转静帧的**真实产物**回归：拿 `StillImageClipFactory.conversionArguments()`
 # 的生产参数真跑 ffmpeg，量帧数 / 时长 / 尺寸政策 / 静不静 / 多帧输入截断 /
-# **解码次数（靠耗时比值）**。
+# **图只解一次、缩一次**（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比，
+# 不和写死的秒数、也不和「一次解码」比 —— 见 checks/StillClipEncode/DecodeOnce.swift）。
 #
 # 用法：
 #   scripts/check-still-clip-encode.sh
@@ -43,6 +44,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemeAppearance.swift \
   checks/StillClipEncode/main.swift \
   checks/StillClipEncode/Alpha.swift \
+  checks/StillClipEncode/DecodeOnce.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"
