@@ -1022,6 +1022,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `design` 先报价、问一次性费用、点过头记账起 `voice_design` 任务（`get_job` 报新声音和 1 小时的 `sample_url`，账按实收）；`rename` 直接改；`delete`
     请求批准模式问一句、全部权限直接删，存储一时不可用（503 + `reason: storage_unavailable`）再发一次。授权、一次性费用、删除都只经 `SkyStudioJobGate`
     （第 6 条），全部权限下有有效的长期授权就不问（声音 PR 7）。错误码换成能照做的话（`SkyStudioVoiceLibraryErrors`）。
+    **收费单只下一次**（2026-11-11 审查之后，[声音库](voice-library.md)第十节）：这个声音这种语言的 MiniMax 版还在建时再调 `add_voiceover`
+    （或 `resume` 答那笔费用），回在建那一单的任务号和 `already_building: true`，不再问、不再记账；设计 / 建没做成，`get_job` 带 `failure`、`code`，
+    改了价的带 `credits_now` / `credits_approved` 和下一步（重新调一次、按新价再问，旧令牌作废）；授权那句升了版本，`manage_voices` 用新文案
+    再问一次（`consent_statement_updated: true`）。
     名片 + 说明书主题（`MCPGuideVoiceLibraryTopics`，新工具没有迁移前的原文）；全清单 2026-11-10 是 106,921 / 110,000。
 59. **AI 在干活时别让 App Nap 把 SkyCut 降速（2026-11-10，[案例](../bugfixes/2026-11-10-ai-work-throttled-by-app-nap.md)）**：SkyCut 不在前台、
     窗口藏起来或被挡住时（用户在别的 App 里干活、AI 用后台模式剪），macOS 的 App Nap 把它降到最低的调度优先级（`ps` 里是 4），机器一忙，本机转写、

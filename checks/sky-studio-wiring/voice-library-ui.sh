@@ -25,8 +25,8 @@ if [ -z "${agreed_line}" ] || [ -z "${dialog_consent_line}" ] || [ "${agreed_lin
   fail "${NEW_VOICE_MODEL}：consent: true 要在用户勾了授权那一句（guard agreed else）之后才造"
 fi
 grep -qF 'VoiceReferenceSample.prepare(' "${NEW_VOICE_MODEL}" || fail "${NEW_VOICE_MODEL}：参考录音只经 VoiceReferenceSample.prepare（现录的也过这一遍）"
-grep -qF 'SkyStudioVoiceRecordingSubmission(' "${NEW_VOICE_MODEL}" || fail "${NEW_VOICE_MODEL}：建声音 / 加录音只经 SkyStudioVoiceRecordingSubmission"
-grep -qF 'SkyStudioVoiceRecordingSubmission(' "${VOICE_RECORDING}" || fail "${VOICE_RECORDING}：AI 的建声音 / 加录音也只经 SkyStudioVoiceRecordingSubmission"
+grep -qF 'SkyStudioVoiceRecordingSubmission.make(' "${NEW_VOICE_MODEL}" || fail "${NEW_VOICE_MODEL}：建声音 / 加录音只经 SkyStudioVoiceRecordingSubmission"
+grep -qF 'SkyStudioVoiceRecordingSubmission.make(' "${VOICE_RECORDING}" || fail "${VOICE_RECORDING}：AI 的建声音 / 加录音也只经 SkyStudioVoiceRecordingSubmission"
 senders="$(code_files_with '\.(createVoice|addVoiceReference|deleteVoice)\(' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
 [ "${senders}" = "${VOICE_SUBMISSION} " ] \
   || fail "建声音 / 加录音 / 删声音的请求只许从 ${VOICE_SUBMISSION} 发（界面和 AI 共用，删除的再发一次只有那一份）：${senders:-没有}"

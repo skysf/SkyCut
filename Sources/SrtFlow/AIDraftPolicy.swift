@@ -20,14 +20,19 @@ enum AIDraftPolicy {
     }
 
     static func deviations(_ generation: SkyStudioGeneration, model: SkyStudioModel) -> [String] {
-        var result: [String] = []
+        overrides(generation, model: model).map(\.reason)
+    }
+
+    /// 越档的每一项，连同用户点名它时会说的写法（user_requested_overrides 要 user_request 里找得到，AIOverrideQuote）。
+    static func overrides(_ generation: SkyStudioGeneration, model: SkyStudioModel) -> [AIOverrideQuote.Item] {
+        var result: [AIOverrideQuote.Item] = []
         let mode = generation.params["mode"]?.stringValue ?? "frames"
         if let actual = generation.params["resolution"]?.stringValue, let draft = resolution(model: model, mode: mode), rank(actual) > rank(draft) {
-            result.append("Resolution \(actual) exceeds this model's draft setting \(draft).")
+            result.append(.init(reason: "Resolution \(actual) exceeds this model's draft setting \(draft).", names: AIOverrideQuote.resolutionNames(actual)))
         }
         if let seconds = generation.params["duration"]?.doubleValue,
            let base = model.defaults["duration"]?.doubleValue, seconds > base {
-            result.append("Duration \(seconds)s exceeds the default \(base)s.")
+            result.append(.init(reason: "Duration \(seconds)s exceeds the default \(base)s.", names: AIOverrideQuote.durationNames(seconds)))
         }
         return result
     }

@@ -10,7 +10,7 @@ import SrtFlowMCPKit
 // （NewVoiceModel：用户自己勾了那一句才造授权）。**授权由调用方造、这里不造**（checks/sky-studio-wiring.sh 第 11 节钉着谁能造）。
 // 不管什么：参考录音怎么做（VoiceReferenceSample）、问不问用户、错误怎么说（SkyStudioVoiceLibraryErrors / VoiceLibraryText）。
 
-struct SkyStudioVoiceRecordingSubmission {
+struct SkyStudioVoiceRecordingSubmission: Sendable {
     /// 建一个新声音，还是给已有的声音加一种语言的录音。
     enum Target: Equatable, Sendable {
         case create(name: String)
@@ -33,8 +33,18 @@ struct SkyStudioVoiceRecordingSubmission {
     /// 授权的令牌、idempotency_key 都从它算。
     let recording: SkyStudioVoiceApproval.Recording
 
+    /// 生产的入口：整份读进参考录音算内容哈希（3 分钟约 16 MB）、读源文件的身份都是阻塞的文件读取，不在主线程上做
+    /// （点「新建」时会卡一下），也不占并发线程池：交给 MediaReadQueue.analysis（docs/architecture/blocking-media-reads.md）。
+    static func make(file: URL, sample: VoiceReferenceSample.Sample, language: String, target: Target,
+                     statement: SkyStudioVoiceConsentStatement) async throws -> SkyStudioVoiceRecordingSubmission {
+        try await MediaReadQueue.run(on: MediaReadQueue.analysis) {
+            Result { try SkyStudioVoiceRecordingSubmission(file: file, sample: sample, language: language, target: target, statement: statement) }
+        }.get()
+    }
+
     /// `file`：用户点名的那个源文件（界面上现录的就是录下来的那个文件）；`sample`：从它做好的参考录音。
     /// 名字、语言在这里核对（`SkyStudioVoiceRequestProblem`）；做好的 WAV 超过上传上限（35 MB）也在这里拒，什么都不传。
+    /// 同步、读文件：只在后台队列上调（`make`）。
     init(file: URL, sample: VoiceReferenceSample.Sample, language: String, target: Target, statement: SkyStudioVoiceConsentStatement) throws {
         let language = try SkyStudioVoiceNaming.checkedLanguage(language)
         let checked: Target

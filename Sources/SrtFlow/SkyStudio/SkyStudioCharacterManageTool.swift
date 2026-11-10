@@ -81,7 +81,9 @@ enum SkyStudioCharacterManageTool {
         let reservation: SkyStudioJobGate.Reservation?
         if plan.isPaid {
             switch try SkyStudioJobGate.decide(credits: plan.quote!.credits, summary: plan.title, identity: identity, args: args,
-                reason: "Approve this exact paid Character library operation, model and resolution.", project: account,
+                reason: "Approve this exact paid Character library operation, model and resolution.",
+                overrides: [.init(reason: "Approve this exact paid Character library operation, model and resolution.", names: AIOverrideQuote.characterNames)],
+                project: account,
                 profile: "character-native:" + SkyStudioCharacterCache.digest(identity)) {
             case .needsConfirmation(let question): return question
             case .reserved(let approved): reservation = approved

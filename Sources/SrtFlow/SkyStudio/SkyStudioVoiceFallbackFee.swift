@@ -27,10 +27,10 @@ enum SkyStudioVoiceFallbackFee {
         case result(AIToolResult)
     }
 
-    /// 定下来的样子：问 / 额度不够（原样的结果），或者起了建的任务。
+    /// 定下来的样子：问 / 额度不够（原样的结果），或者起了建的任务（`following`：早先点过头的那一单还在建，这一次没有新记账）。
     private enum Settled {
         case asked(AIToolResult)
-        case building(job: AIJobs.Job, credits: Double, standing: Bool)
+        case building(job: AIJobs.Job, credits: Double, standing: Bool, following: Bool)
     }
 
     /// 任务以 fallback_needs_one_time 结束：补价、记下，照此刻的权限问 / 建，回要并进 get_job 的字段。问不了（读不到 Key、报不出价、
@@ -63,13 +63,16 @@ enum SkyStudioVoiceFallbackFee {
         let key = try await services.key()
         switch try await settle(fee, token: token, key: key, recovery: recovery, project: project, services: services) {
         case .asked(let result): return .result(result)
-        case .building(let job, let credits, let standing):
+        case .building(let job, let credits, let standing, let following):
             var value: [String: JSONValue] = [
                 "status": "started", "job_id": .string(job.id), "kind": .string(AIJobs.Kind.voiceEnroll.rawValue), "provider": "Sky Studio",
-                "credits": .number(credits), "one_time": .array([fee.json]), "recovery_file": .string(recovery.file.path),
-                "next_step": .string("Building the voice's MiniMax version, a one-time fee. Wait with get_job; when it is done, call "
-                    + "add_voiceover resume=\(recovery.file.path) generate_missing=true. Never send the original lines again.")
+                "one_time": .array([fee.json]), "recovery_file": .string(recovery.file.path),
+                "next_step": .string((following ? "The voice's MiniMax version is already being built (job \(job.id), approved earlier): "
+                        + "nothing new was charged. " : "Building the voice's MiniMax version, a one-time fee. ")
+                    + "Wait with get_job; when it is done, call add_voiceover resume=\(recovery.file.path) generate_missing=true. "
+                    + "Never send the original lines again.")
             ]
+            if following { value["already_building"] = true } else { value["credits"] = .number(credits) }
             if standing { value["full_access"] = .string(fullAccessNote(credits)) }
             return .result(.ok(.object(value)))
         }
@@ -81,13 +84,14 @@ enum SkyStudioVoiceFallbackFee {
         switch try? await settle(fee, token: nil, key: key, recovery: recovery, project: project, services: services) {
         case .asked(let result)?:
             return result.payload.objectValue
-        case .building(let job, let credits, let standing)?:
+        case .building(let job, let credits, let standing, let following)?:
             var value: [String: JSONValue] = [
-                "enroll_job_id": .string(job.id), "one_time": .array([fee.json]), "credits": .number(credits),
+                "enroll_job_id": .string(job.id), "one_time": .array([fee.json]),
                 "next_step": .string("SkyCut is building the voice's MiniMax version (job \(job.id)), a one-time fee, because one part's "
                     + "fallback needs it. Wait for that job with get_job; then call add_voiceover resume=\(recovery.file.path) "
                     + "generate_missing=true to read the missing parts. Never send the original lines again.")
             ]
+            if following { value["already_building"] = true } else { value["credits"] = .number(credits) }
             if standing { value["full_access"] = .string(fullAccessNote(credits)) }
             return value
         case nil:
@@ -109,9 +113,15 @@ enum SkyStudioVoiceFallbackFee {
         let request: SkyStudioJobRequest
         do { request = try SkyStudioVoiceRequests.enroll(voice: voice, language: language, model: model, maxCredits: credits) }
         catch let problem as SkyStudioVoiceRequestProblem { throw AIToolError(problem.message + " Nothing was charged.") }
+        let account = SkyStudioCharacterAccess.stamp(key)
+        let identity = SkyStudioVoiceLibraryJob.enrollIdentity(voice: voice, language: language, account: account)
+        // 这个声音这种语言的 MiniMax 版已经在建（早先点过头的那一单还没做完）：跟着它，不再问、不再预留（审查 #362 第 2 条）。
+        if let open = SkyStudioVoiceLibraryJob.running(identity) { return .building(job: open, credits: credits, standing: false, following: true) }
         let standing = SkyStudioVoiceStanding.shared
         // 工程关了：起不了挂在它名下的任务，只问不建（点过头也要等工程开着再来）。
         let ask: SkyStudioJobGate.VoiceAsk = project == nil ? .ask : await standing.voiceAsk(key: key, api: services.api)
+        // 上面等了一下：再看一眼有没有别的调用刚起了这一单。从这里到起任务之间没有 await。
+        if let open = SkyStudioVoiceLibraryJob.running(identity) { return .building(job: open, credits: credits, standing: false, following: true) }
         switch try SkyStudioJobGate.voiceOneTime(credits: credits, action: action(fee, key: key),
                                                  question: SkyStudioVoiceApproval.fallbackQuestion(fee, credits: credits),
                                                  token: project == nil ? nil : token, ask: ask) {
@@ -123,22 +133,57 @@ enum SkyStudioVoiceFallbackFee {
             asked.payload = .object(value)
             return .asked(asked)
         case .reserved(let reservation):
-            await standing.recordAfterApproval(ask, key: key, api: services.api)
-            recovery.value.fallbackFee = nil
-            try? await recovery.save()
-            let job = SkyStudioVoiceLibraryJob(
-                kind: .voiceEnroll, request: request, key: key, reservation: reservation, title: SkyStudioVoicePick.languageName(language),
+            let file = recovery.file
+            let enrolment = SkyStudioVoiceLibraryJob(
+                kind: .voiceEnroll, identity: identity, request: request, key: key, reservation: reservation,
+                title: SkyStudioVoicePick.languageName(language),
                 modelTitle: catalog?.models.first { $0.id == model }?.title ?? "MiniMax", project: project,
-                nextStep: "The voice's MiniMax version is ready. Call add_voiceover resume=\(recovery.file.path) generate_missing=true to read "
+                nextStep: "The voice's MiniMax version is ready. Call add_voiceover resume=\(file.path) generate_missing=true to read "
                     + "the missing parts; the fallback can be used now. Never send the original lines again.",
                 api: services.api
-            ).start()
+            )
+            // 这一笔的问题留到 Sky Studio 受理了建的那一单才清：受理之前就没做成（改了价、断网、等不到槽）预留退了，问题还在，
+            // 普通 resume / get_job 照样再问（审查 #362 第 3 条：以前记上账就清，之后只剩 generate_missing、又回到同一个失败）。
+            enrolment.onAccepted = { [recovery] in
+                recovery.value.fallbackFee = nil
+                await SkyStudioVoiceRecovery.updateFee(in: file) { _ in nil }
+            }
+            enrolment.onFailure = { [recovery] code, changed in
+                await unanswered(fee, code: code, changed: changed, recovery: recovery)
+            }
+            let job = enrolment.start()
+            await standing.recordAfterApproval(ask, key: key, api: services.api)
             if ask == .standing {
                 standing.notify(String(format: L10n("Full access: SkyCut is building a voice's MiniMax version (at most %@ credits)."),
                                        SkyStudioCredits.text(credits)), project: project)
             }
-            return .building(job: job, credits: credits, standing: ask == .standing)
+            return .building(job: job, credits: credits, standing: ask == .standing, following: false)
         }
+    }
+
+    /// 建的那一单没做成：这一笔怎么办，回并进它 get_job 的字段。
+    /// - 这种语言的 MiniMax 版其实已经有了（`minimax_voice_exists`）：问题答完了，直接去读没做成的几批；
+    /// - 别的：问题还开着（受理之后才失败的把它放回恢复记录）；Sky Studio 改了价（`price_changed`）就把新价记下，下一次按新价问。
+    private static func unanswered(_ fee: SkyStudioVoiceOneTime, code: String?, changed: Double?,
+                                   recovery: SkyStudioVoiceRecovery) async -> [String: JSONValue] {
+        let file = recovery.file
+        if code == SkyStudioVoiceCodes.minimaxVoiceExists {
+            recovery.value.fallbackFee = nil
+            await SkyStudioVoiceRecovery.updateFee(in: file) { _ in nil }
+            return ["recovery_file": .string(file.path),
+                    "next_step": .string("The voice already has its MiniMax version for this language; nothing was charged. Call add_voiceover "
+                        + "resume=\(file.path) generate_missing=true to read the missing parts. Never send the original lines again.")]
+        }
+        var repriced = fee
+        if let changed { repriced.credits = changed }
+        let open = repriced
+        recovery.value.fallbackFee = open
+        await SkyStudioVoiceRecovery.updateFee(in: file) { _ in open }
+        return ["recovery_file": .string(file.path), "one_time": .array([open.json]),
+                "next_step": .string((changed.map { "Sky Studio's price changed to \(SkyStudioCredits.text($0)) credits and nothing was charged. " } ?? "")
+                    + "The MiniMax version was not built, so the one-time fee question is still open: call add_voiceover resume=\(file.path) "
+                    + "to be asked again with the current price, or resume=\(file.path) skip_one_time=true to retry the missing parts with "
+                    + "the same model. Never reuse the old confirm_token or send the original lines again.")]
     }
 
     /// 结束码带的那一笔没有价就报一次（`/quote` voice_enroll，免费）；声音没写就照恢复记录。

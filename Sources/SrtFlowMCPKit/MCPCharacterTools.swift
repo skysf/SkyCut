@@ -64,7 +64,8 @@ enum MCPCharacterTools {
                 "idempotency_key": MCPSchema.string("Required for create/import/headshot/replace_view: stable 1-128 chars before sending; reuse unchanged after lost answers."),
                 "resume": MCPSchema.string("Original job_id to recover; pass only action and resume. Recovery only reads the original job and never charges again."),
                 "approval_scope": MCPSchema.string("Default once; project requires explicit authorization for this exact Character operation.", oneOf: ["once", "project"]),
-                "user_requested_overrides": MCPSchema.boolean("True only for explicit user requests; hard budgets still apply."),
+                "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid Character change; quote their words in user_request."),
+                "user_request": MCPSchema.string("The user's own words asking for it, e.g. \"make a character from this photo\"; required by user_requested_overrides."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["action"]), destructive: true, openWorld: true)
     }

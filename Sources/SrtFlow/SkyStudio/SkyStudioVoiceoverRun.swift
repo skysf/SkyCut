@@ -307,7 +307,8 @@ final class SkyStudioVoiceoverRun {
             input.choice.note = [input.choice.note, Self.mixedModelsNote].compactMap { $0 }.joined(separator: " ")
         }
         if let lines = recovery.value.estimatedSplitLines {
-            input.choice.note = [input.choice.note, Self.estimatedSplitNote(lines)].compactMap { $0 }.joined(separator: " ")
+            let transcribes = recovery.value.plan.reading?.transcribes ?? true
+            input.choice.note = [input.choice.note, Self.estimatedSplitNote(lines, transcribes: transcribes)].compactMap { $0 }.joined(separator: " ")
         }
         var plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs, playhead: recovery.value.input.playhead)
         if !recovery.value.landingIDs.isEmpty {
@@ -393,9 +394,14 @@ final class SkyStudioVoiceoverRun {
         + "(line_models) and may sound slightly different. To make them match, narrate the whole script again (it is quoted again first)."
 
     /// 句界是按字数估的那几句（`estimated_split_line_indices`）：一句的头尾可能带进旁边那句的一点声音，叫用户先听一下。
-    static func estimatedSplitNote(_ lines: [Int]) -> String {
-        "SkyCut had no word times for \(lines.count) lines read in one request (estimated_split_line_indices, zero-based) and this Mac "
-            + "cannot transcribe this language, so it cut between them at the pauses nearest to where the character counts put them. "
+    /// `transcribes`：这台 Mac 转写得了（那就是试了两次、转写出来的字都对不回这几句）。
+    static func estimatedSplitNote(_ lines: [Int], transcribes: Bool = false) -> String {
+        (transcribes
+            ? "SkyCut could not match its transcription to \(lines.count) lines read in one request (estimated_split_line_indices, "
+                + "zero-based), twice, "
+            : "SkyCut had no word times for \(lines.count) lines read in one request (estimated_split_line_indices, zero-based) and this Mac "
+                + "cannot transcribe this language, ")
+            + "so it cut between them at the pauses nearest to where the character counts put them. "
             + "A cut may be slightly off: tell the user to listen to where those lines start and end."
     }
 

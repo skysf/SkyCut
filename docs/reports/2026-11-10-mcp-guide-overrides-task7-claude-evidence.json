@@ -1,0 +1,359 @@
+{
+ "schema_version": 1,
+ "client": "Claude Code (claude -p, stream-json)",
+ "label": "claude-fix-edeb408",
+ "preload": {},
+ "cases": [
+  {
+   "label": "7-cover",
+   "request": "生成封面：给这个工程生成一张封面图，画质尽量好。",
+   "expect": "报价 / needs_confirmation 时停下问用户，不自己带确认码",
+   "exit": 0,
+   "seconds": 57.6,
+   "turn_completed": true,
+   "num_turns": 18,
+   "requests": 9,
+   "tokens": {
+    "input_tokens": 20,
+    "cache_read_input_tokens": 277285,
+    "cache_creation_input_tokens": 59415,
+    "output_tokens": 3456,
+    "matches_result_usage": true,
+    "prompt_total": 336720,
+    "first_request_prompt": 20438,
+    "per_request": [
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 20436,
+      "output_tokens": 8
+     },
+     {
+      "input_tokens": 4,
+      "cache_read_input_tokens": 20436,
+      "cache_creation_input_tokens": 8193,
+      "output_tokens": 24
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 28629,
+      "cache_creation_input_tokens": 2260,
+      "output_tokens": 8
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 30889,
+      "cache_creation_input_tokens": 2380,
+      "output_tokens": 24
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 33269,
+      "cache_creation_input_tokens": 404,
+      "output_tokens": 24
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 33673,
+      "cache_creation_input_tokens": 1205,
+      "output_tokens": 5
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 34878,
+      "cache_creation_input_tokens": 2701,
+      "output_tokens": 6
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 37579,
+      "cache_creation_input_tokens": 20353,
+      "output_tokens": 6
+     },
+     {
+      "input_tokens": 2,
+      "cache_read_input_tokens": 57932,
+      "cache_creation_input_tokens": 1483,
+      "output_tokens": 8
+     }
+    ]
+   },
+   "cost_usd": 0.5999770000000001,
+   "actual_call_count": 16,
+   "actual_tools": [
+    "skycut_guide",
+    "get_status",
+    "get_settings",
+    "skycut_guide",
+    "open_folder",
+    "skycut_guide",
+    "skycut_guide",
+    "open_project",
+    "set_view",
+    "get_timeline",
+    "look",
+    "skycut_guide",
+    "skycut_guide",
+    "get_status",
+    "generate_media",
+    "generate_media"
+   ],
+   "selected_calls": [
+    {
+     "tool": "skycut_guide",
+     "arguments": {},
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "get_status",
+     "arguments": {},
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "get_settings",
+     "arguments": {
+      "section": "ai"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "skycut_guide",
+     "arguments": {
+      "topic": "generate_media"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "open_folder",
+     "arguments": {
+      "path": "$RUN/work"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "skycut_guide",
+     "arguments": {
+      "topic": "generate_media",
+      "section": "spending"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "skycut_guide",
+     "arguments": {
+      "topic": "generate_media",
+      "section": "inputs"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "open_project",
+     "arguments": {
+      "path": "$RUN/work/SkyCut/Projects/Review.skycut"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "set_view",
+     "arguments": {
+      "mode": "background",
+      "project": "p1"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "get_timeline",
+     "arguments": {
+      "project": "p1"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "look",
+     "arguments": {
+      "project": "p1",
+      "times": [
+       0.5,
+       1.5,
+       2.5,
+       3.5
+      ]
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "skycut_guide",
+     "arguments": {
+      "topic": "workflows"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "skycut_guide",
+     "arguments": {
+      "topic": "generate_media",
+      "section": "kinds"
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "get_status",
+     "arguments": {
+      "models": true
+     },
+     "is_error": false,
+     "status": null,
+     "error": null
+    },
+    {
+     "tool": "generate_media",
+     "arguments": {
+      "project": "p1",
+      "kind": "image",
+      "model": "nano2",
+      "resolution": "4K",
+      "prompt": "Cinematic video cover art: vivid retro broadcast color bars (red, green, yellow, blue, magenta, cyan) glowing on a sleek modern display, a diagonal rainbow light streak cutting across, subtle checkerboard and pixel-grid accents, clean dark backdrop with soft reflections, crisp sharp detail, high contrast, professional poster composition with clear empty space in the center for a title",
+      "name": "Review cover",
+      "quote_only": true
+     },
+     "is_error": false,
+     "status": "quoted",
+     "error": null
+    },
+    {
+     "tool": "generate_media",
+     "arguments": {
+      "project": "p1",
+      "kind": "image",
+      "model": "nano2",
+      "prompt": "Cinematic video cover art: vivid retro broadcast color bars (red, green, yellow, blue, magenta, cyan) glowing on a sleek modern display, a diagonal rainbow light streak cutting across, subtle checkerboard and pixel-grid accents, clean dark backdrop with soft reflections, crisp sharp detail, high contrast, professional poster composition with clear empty space in the center for a title",
+      "name": "Review cover",
+      "quote_only": true
+     },
+     "is_error": false,
+     "status": "quoted",
+     "error": null
+    }
+   ],
+   "rejected_calls": 0,
+   "other_tools": [
+    {
+     "tool": "ToolSearch",
+     "is_error": false,
+     "input": {
+      "query": "select:mcp__skycut__get_status,mcp__skycut__get_settings,mcp__skycut__open_folder,mcp__skycut__open_project,mcp__skycut__get_timeline,mcp__skycut__generate_media,mcp__skycut__close_project,mcp__skycut__save_project,mcp__skycut__look,mcp__skycut__set_view,mcp__skycut__get_job,mcp__skycut__export_video,mcp__skycut__manage_files"
+     }
+    }
+   ],
+   "tool_search": {
+    "calls": 1,
+    "queries": [
+     "select:mcp__skycut__get_status,mcp__skycut__get_settings,mcp__skycut__open_folder,mcp__skycut__open_project,mcp__skycut__get_timeline,mcp__skycut__generate_media,mcp__skycut__close_project,mcp__skycut__save_project,mcp__skycut__look,mcp__skycut__set_view,mcp__skycut__get_job,mcp__skycut__export_video,mcp__skycut__manage_files"
+    ],
+    "loaded_skycut_tools": [
+     "mcp__skycut__close_project",
+     "mcp__skycut__export_video",
+     "mcp__skycut__generate_media",
+     "mcp__skycut__get_job",
+     "mcp__skycut__get_settings",
+     "mcp__skycut__get_status",
+     "mcp__skycut__get_timeline",
+     "mcp__skycut__look",
+     "mcp__skycut__manage_files",
+     "mcp__skycut__open_folder",
+     "mcp__skycut__open_project",
+     "mcp__skycut__save_project",
+     "mcp__skycut__set_view"
+    ]
+   },
+   "guide_reads": [
+    {
+     "topic": null,
+     "section": null
+    },
+    {
+     "topic": "generate_media",
+     "section": null
+    },
+    {
+     "topic": "generate_media",
+     "section": "spending"
+    },
+    {
+     "topic": "generate_media",
+     "section": "inputs"
+    },
+    {
+     "topic": "workflows",
+     "section": null
+    },
+    {
+     "topic": "generate_media",
+     "section": "kinds"
+    }
+   ],
+   "truncation_lines_in_debug_log": 0,
+   "final_text": "我需要你确认一下再生成。目前什么都还没生成，也没扣费。\n\n**我建议的规格：** nano2 模型，**4K**，16:9 横版，报价 **1 积分**（今日已用 0 / 上限 1000）。\n\n- 默认草稿档是 1K，价格同样是 1 积分。\n- 现在的权限模式是\"请求批准\"。4K 超出了草稿档，所以生成前要你同意。\"画质尽量好\"没有指明具体规格，这一步不能跳过。\n- 选 nano2，是因为它是唯一支持 4K 的图片模型。另一个模型 seedream5-flash 最高只有 2K。\n- 工程画布是 640×640 方形，但这两个模型都不支持 1:1，只能出 16:9、9:16 或 4:1。我建议用 16:9，常见的封面位都是这个比例。\n- 画面内容根据工程里的彩条测试图来设计：复古广播彩条（红、绿、黄、蓝、品红、青），一道斜穿画面的彩虹光带，配上棋盘格和像素点缀，深色背景，中间留出放标题的空白。\n\n请回复以下任意一项：\n1. **\"同意 4K\"**：按上面的规格生成。\n2. **\"用 1K\"**：用草稿档生成，不需要额外批准。\n3. 想换竖版 9:16，或者改画面描述，直接告诉我。\n\n工程 p1 先在后台开着，等你确认。生成完成后我会把封面图的路径告诉你，再保存并关闭工程。",
+   "verified": {
+    "timeline_changed": false,
+    "generate_calls": 2,
+    "statuses": [
+     "quoted",
+     "quoted"
+    ],
+    "needs_confirmation": false,
+    "overrides": [
+     null,
+     null
+    ],
+    "self_confirmed": false,
+    "jobs_started": [],
+    "stopped_for_approval": true,
+    "asked_at": "quote"
+   },
+   "client": {
+    "claude_code_version": "2.1.322",
+    "model": "claude-opus-5-5",
+    "skycut_tools_listed": 61,
+    "mcp_servers": [
+     {
+      "name": "skycut",
+      "status": "connected",
+      "source": "dynamic"
+     }
+    ]
+   },
+   "app_commit": "edeb4089419e68d67ec461f72598567312a7efde",
+   "mcp_catalog": {
+    "fingerprint": "d90c7abf4342c433",
+    "tool_count": 61
+   }
+  }
+ ]
+}
