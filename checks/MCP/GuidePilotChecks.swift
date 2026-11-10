@@ -1,0 +1,144 @@
+import Foundation
+import SrtFlowMCPKit
+
+// 迁移过的工具（名片写短、长话进说明书；方案 docs/plans/2026-11-09-mcp-guide.md 2.2、2.5、4.1、5.1、5.2）。只查 MCPGuideWrittenTopics.migrated 里的，
+// 没迁移的等方案的 PR 4–5，上限到 PR 6 才对全部工具生效：
+// - 名片 ≤ 450（目标 350，打印出来看）、按工具性质该写的固定说法都在（只读 / 一步撤销 / 任务号 / 花钱 / 会问 / 要先读说明书）；
+// - 每条参数说明 ≤ 120，带 minimum / maximum 的说明里写着数字（Codex 不显示范围）；
+// - 单个工具的参数定义 ≤ 4,500 UTF-8 字节，例外只有 edit_clip、generate_media（例外名单不许变长）；
+// - 说明书的主题：overview 以迁移前的说明原文开头（一个字不丢）、迁移前后的名片不一样、几节都不空、有例子有相关主题；
+//   手写的几节只提真有的名字（参数定义写成的 fields 几节是自动生成的，不算手写）。
+
+let pilotCardLimit = 450
+let pilotParameterLimit = 120
+let pilotSchemaByteLimit = 4_500
+/// 参数定义超过 4,500 字节的例外（方案 4.1：先列例外，名单不许变长）。
+let pilotSchemaExceptions: Set<MCPToolName> = [.editClip, .generateMedia]
+
+/// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
+/// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
+private let pilotPreviousCardLengths: [MCPToolName: Int] = [
+    .editClip: 737, .generateMedia: 978, .setText: 249, .addClips: 577, .look: 968
+]
+
+/// 迁移过的工具按性质该写的固定说法（方案 2.2 第 4、5 条）。性质从工具本身看不全（会不会改时间线、要不要先读说明书），写在这里。
+private let pilotNature: [MCPToolName: [String]] = [
+    .editClip: ["One undo step", "skycut_guide topic=edit_clip"],
+    .setText: ["One undo step"],
+    .addClips: ["One undo step", "needs_confirmation"],
+    .look: ["Read-only", "wait with get_job", "needs_confirmation", "skycut_guide topic=look"],
+    .generateMedia: ["Paid (Sky Studio credits)", "quote_only", "needs_confirmation", "confirm_token", "daily credit limit",
+                     "wait with get_job", "skycut_guide topic=generate_media"]
+]
+
+func runGuidePilotChecks() {
+    checkEqual(Set(pilotNature.keys), Set(MCPGuideWrittenTopics.migrated), "every migrated tool has its required phrases listed")
+    var cards: [String] = []
+    for tool in MCPGuideWrittenTopics.migrated {
+        let definition = tool.definition
+        let card = definition.description
+        cards.append("\(tool.rawValue) \(card.utf16.count)")
+        check(card.utf16.count <= pilotCardLimit, "\(tool.rawValue): the card fits \(pilotCardLimit) characters (it is \(card.utf16.count))")
+        for phrase in pilotNature[tool] ?? [] {
+            check(card.contains(phrase), "\(tool.rawValue): the card says \"\(phrase)\"")
+        }
+        if definition.readOnly { check(card.contains("Read-only"), "\(tool.rawValue): a read-only tool says Read-only") }
+        if definition.inputSchema["properties"]?["confirm_token"] != nil {
+            check(card.contains("needs_confirmation"), "\(tool.rawValue): a tool that can ask says needs_confirmation")
+        }
+        let bytes = definition.inputSchema.encodedString().utf8.count
+        if !pilotSchemaExceptions.contains(tool) {
+            check(bytes <= pilotSchemaByteLimit, "\(tool.rawValue): the parameters fit \(pilotSchemaByteLimit) bytes (they are \(bytes))")
+        }
+        walkPilotParameters(definition.inputSchema, path: tool.rawValue)
+        checkWrittenTopic(tool)
+    }
+    checkEqual(pilotSchemaExceptions, [.editClip, .generateMedia], "the over-4,500-byte exceptions stay edit_clip and generate_media only")
+    print("MCP pilot cards: \(cards.joined(separator: ", ")) (limit \(pilotCardLimit), target 350).")
+    runGuideFieldSplitChecks()
+}
+
+/// fields 几节自动切（review-344 第 5 条，2026-11-10 定）：按整个第一层参数切成 fields、fields_2……，每节 ≤ sectionBudget，
+/// 一个参数连同里层不拆开、自己就超过的单独成一节；切完一行不丢、顺序不变。真实清单里每个工具都查，再拿手造的大参数定义证明真会切。
+private func runGuideFieldSplitChecks() {
+    var split: [String] = []
+    for tool in MCPToolName.allCases {
+        let sections = MCPGuideFields.sections(for: tool.definition.inputSchema)
+        problemsInFieldSections(sections, schema: tool.definition.inputSchema).forEach { check(false, "\(tool.rawValue): \($0)") }
+        if sections.count > 1 { split.append("\(tool.rawValue) (\(sections.count))") }
+        let topic = MCPGuideTopics.topic(named: tool.rawValue)?.sections.filter { $0.name == "fields" || $0.name.hasPrefix("fields_") }
+        checkEqual(topic?.map(\.name), sections.map(\.name), "\(tool.rawValue): the topic carries every fields section")
+    }
+    print("MCP guide fields split into several sections: \(split.isEmpty ? "none" : split.joined(separator: ", ")).")
+
+    // 手造：30 个第一层参数（每行约 230 字）+ 一个带 5 个里层字段的对象 + 一个自己就超过上限的参数。
+    var properties: [String: JSONValue] = [:]
+    for index in 1...30 { properties[String(format: "p%02d", index)] = ["type": "string", "description": .string(String(repeating: "word ", count: 44))] }
+    var inner: [String: JSONValue] = [:]
+    for index in 1...5 { inner["inner\(index)"] = ["type": "number", "description": .string(String(repeating: "deep ", count: 44))] }
+    properties["p15_nested"] = ["type": "object", "properties": .object(inner)]
+    properties["p31_huge"] = ["type": "string", "description": .string(String(repeating: "x", count: MCPGuideFields.sectionBudget + 100))]
+    let schema: JSONValue = ["type": "object", "properties": .object(properties)]
+    let sections = MCPGuideFields.sections(for: schema)
+    check(sections.count >= 3, "a parameter list over the budget is split (into \(sections.count) sections)")
+    let problems = problemsInFieldSections(sections, schema: schema)
+    check(problems.isEmpty, "the synthetic split keeps every line in order: \(problems.joined(separator: "; "))")
+    check(sections.contains { $0.text.hasPrefix("- p31_huge (") && !$0.text.contains("\n") }, "a parameter longer than the budget gets a section of its own")
+    let empty = MCPGuideFields.sections(for: ["type": "object", "properties": [:]])
+    checkEqual(empty.map(\.name), ["fields"], "a tool without parameters has one fields section")
+    checkEqual(empty.first?.text, "This tool takes no parameters.", "it says the tool takes no parameters")
+}
+
+/// 一组 fields 节对不对：名字依次是 fields、fields_2……；拼起来正好是每个参数的那一行、顺序不变；没有一节从里层的行开始；
+/// 超过上限的只许是单独一个第一层参数（连同它的里层）。
+private func problemsInFieldSections(_ sections: [MCPGuideSection], schema: JSONValue) -> [String] {
+    var problems: [String] = []
+    let names = sections.indices.map { $0 == 0 ? "fields" : "fields_\($0 + 1)" }
+    if sections.map(\.name) != names { problems.append("sections are named \(sections.map(\.name)), not \(names)") }
+    let lines = MCPGuideFields.entries(for: schema).map(\.line)
+    let joined = sections.flatMap { $0.text.components(separatedBy: "\n") }
+    if !lines.isEmpty, joined != lines { problems.append("the sections do not hold every parameter line exactly once, in order") }
+    for section in sections {
+        if section.text.hasPrefix("  ") { problems.append("\(section.name) starts inside a parameter (an indented line)") }
+        let topLevel = section.text.components(separatedBy: "\n").filter { $0.hasPrefix("- ") }.count
+        if section.text.utf16.count > MCPGuideFields.sectionBudget, topLevel > 1 {
+            problems.append("\(section.name) is \(section.text.utf16.count) characters with \(topLevel) parameters (budget \(MCPGuideFields.sectionBudget))")
+        }
+    }
+    return problems
+}
+
+/// 每条参数说明 ≤ 120；带范围的写着数字。
+private func walkPilotParameters(_ schema: JSONValue, path: String) {
+    for (name, field) in schema["properties"]?.objectValue ?? [:] {
+        let here = "\(path).\(name)"
+        let description = field["description"]?.stringValue ?? ""
+        check(description.utf16.count <= pilotParameterLimit, "\(here): the description fits \(pilotParameterLimit) characters (it is \(description.utf16.count))")
+        if field["minimum"] != nil || field["maximum"] != nil {
+            check(description.range(of: #"\d"#, options: .regularExpression) != nil, "\(here): the description spells out its range in numbers")
+        }
+        walkPilotParameters(field, path: here)
+        if let items = field["items"] { walkPilotParameters(items, path: here + "[]") }
+    }
+}
+
+/// 说明书里这个工具的主题：迁移前的原文还在、手写的几节齐全、只提真有的名字。
+private func checkWrittenTopic(_ tool: MCPToolName) {
+    guard let written = MCPGuideWrittenTopics.topic(for: tool), let topic = MCPGuideTopics.topic(named: tool.rawValue) else {
+        check(false, "\(tool.rawValue): a migrated tool has a written guide topic")
+        return
+    }
+    check(topic.sections.first?.text.hasPrefix(written.previousCard) == true, "\(tool.rawValue): the overview starts with the pre-migration description, word for word")
+    checkEqual(written.previousCard.utf16.count, pilotPreviousCardLengths[tool], "\(tool.rawValue): the pre-migration description is kept whole (its measured length)")
+    check(written.previousCard != tool.definition.description, "\(tool.rawValue): the card was rewritten (the long text now lives in the guide)")
+    checkEqual(Set(topic.sections.map(\.name)).count, topic.sections.count, "\(tool.rawValue): section names are unique")
+    check(written.sections.count >= 4, "\(tool.rawValue): the written topic has its own sections beyond the overview")
+    check(!written.examples.isEmpty && !written.related.isEmpty, "\(tool.rawValue): the written topic has examples and related topics")
+    for section in written.sections {
+        check(!section.text.isEmpty, "\(tool.rawValue).\(section.name) is written")
+        // overview 开头是迁移前的原文（名单之外的结果字段名照收），后面的手写部分只许提真有的名字。
+        let text = section.name == MCPGuideSection.overview ? String(section.text.dropFirst(written.previousCard.count)) : section.text
+        let unknown = guideUnknownNames(text)
+        check(unknown.isEmpty, "\(tool.rawValue).\(section.name) names only real tools and parameters (unknown: \(unknown.joined(separator: ", ")))")
+    }
+}

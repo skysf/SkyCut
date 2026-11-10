@@ -49,8 +49,13 @@ private func checkCatalog() {
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
         "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides",
         "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project", "camera_angle", "upscale_factor"], "the parameters")
+    // 2026-11-10 名片迁移（方案 5.2 的分类）：会调错 / 花错钱的留在名片，怎么用好的进说明书（topic=generate_media）。
     let opening = String(definition.description.prefix(512))
-    for term in ["camera_angle", "upscale", "upscale_clip", "get_job", "add_clips"] { check(opening.contains(term), "first 512 characters route \(term)") }
+    for term in ["upscale", "upscale_clip", "get_job", "add_clips"] { check(opening.contains(term), "first 512 characters route \(term)") }
+    let guide = (MCPGuideTopics.topic(named: "generate_media")?.sections ?? []).map(\.text).joined(separator: "\n")
+    for term in ["camera_angle", "MiniMax H3", "image_to_video", "library", "generate_subtitles", "add_voiceover"] {
+        check(guide.contains(term), "the generate_media guide topic mentions \(term)")
+    }
     checkEqual(properties["operation"]?["enum"], ["generate", "remove_background", "camera_angle", "upscale"], "all image operations are discoverable")
     checkEqual(properties["upscale_factor"]?["enum"], ["x2", "x3", "x4"], "image upscale factors are discoverable")
     for field in ["rotate", "tilt", "zoom"] { check(properties["camera_angle"]?["properties"]?[field] != nil, "typed camera axis: \(field)") }
@@ -69,12 +74,10 @@ private func checkCatalog() {
     checkEqual(properties["quote_only"]?["type"]?.stringValue, "boolean", "preflight is explicitly exposed")
     checkEqual(properties["approval_scope"]?["enum"], ["once", "project"], "approval scope is bounded")
     let text = definition.description
-    for word in ["Sky Studio", "get_job", "needs_confirmation", "confirm_token", "credits", "daily credit limit", "add_clips", "MiniMax H3", "image_to_video", "library"] {
-        check(text.contains(word), "the description mentions \(word)")
+    for word in ["Sky Studio", "get_job", "needs_confirmation", "confirm_token", "credits", "daily credit limit", "add_clips", "upscale_clip"] {
+        check(text.contains(word), "the card mentions \(word)")
     }
-    check(!text.contains("fal.ai") && !text.contains("cost_usd"), "the description no longer talks about fal.ai or dollars")
-    // 旁白和字幕走别的工具：说明里要指开
-    check(text.contains("generate_subtitles") && text.contains("add_voiceover"), "the description points narration and subtitles at their own tools")
+    check(!text.contains("fal.ai") && !text.contains("cost_usd") && !guide.contains("fal.ai"), "neither the card nor the guide talks about fal.ai or dollars")
 }
 
 // MARK: 总说明

@@ -66,7 +66,9 @@ private func runGuideTopicChecks() {
             continue
         }
         checkEqual(topic.sections.first?.name, MCPGuideSection.overview, "\(tool.rawValue): the topic starts with its overview")
-        checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
+        if MCPGuideWrittenTopics.topic(for: tool) == nil {
+            checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
+        }
         // 第一层的每个参数有自己那一行（不缩进），里层同名的不算。
         let entries = MCPGuideFields.entries(for: tool.definition.inputSchema)
         for name in (tool.definition.inputSchema["properties"]?.objectValue ?? [:]).keys {
@@ -130,7 +132,8 @@ private func runGuideSplitChecks() {
     check(whole["next_step"] == nil && whole["section"] == nil, "a whole answer needs no next step")
     checkEqual(whole["examples"], [["a": "x"]], "examples come back with the topic")
     checkEqual(whole["related"], ["look"], "related topics come back with the topic")
-    check(MCPGuide.answer(topic: "look", section: nil)["examples"] == nil, "no examples key when a topic has none")
+    // listen 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。
+    check(MCPGuide.answer(topic: "listen", section: nil)["examples"] == nil, "no examples key when a topic has none")
 }
 
 /// 名字的写法不计较；写错的回目录 + 猜的。
