@@ -27,6 +27,7 @@
 #      原文切成词 / 对到原文上 / 按字数估（SpeechWordTokens / SpeechWordAlignment / SpeechWordEstimate）、Eleven 的字符时间切句。
 #      声音 PR 4：按池领槽（SkyStudioJobSlots：声音池 8 / 共用池 3、读不到声音池都进共用池、先来先得、等的时候被停就离队、
 #      对着假 Sky Studio 数同时开着的单、429 看 pool 拿着槽等、同一个 key 再交）；一段旁白几批各在哪一步（SkyStudioVoiceBatchBoard）。
+#      2026-11-10 审查（VoiceSplitChecks）：切句对字不计较繁简、转写语言按字形、没有词可对时按字数估句界、每批按自己的文字定上限。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -123,6 +124,7 @@ xcrun swiftc \
   Sources/SrtFlow/SpeechWordEstimate.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceBudget.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplit.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceSplitEstimate.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCheckpoint.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceCatalog.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibrary.swift \
@@ -175,6 +177,7 @@ xcrun swiftc \
   checks/SkyStudio/AccessChecks.swift \
   checks/SkyStudio/VoiceChecks.swift \
   checks/SkyStudio/VoiceTimingChecks.swift \
+  checks/SkyStudio/VoiceSplitChecks.swift \
   checks/SkyStudio/VoiceLibraryToolChecks.swift \
   checks/SkyStudio/VoiceStandingNoticeChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \

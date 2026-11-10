@@ -57,6 +57,7 @@
 | `SkyStudioVoicePick.swift` | 纯值：add_voiceover 的 `voice` 在 Sky Studio 上是谁（SkyCut 声音方案 4.3：默认预设、角色只认 `voice_roles`、`gemini:` / `eleven:` / 不带前缀的预设名、英式男声读非英文）、本机退档用哪个角色（第五节） |
 | `SkyStudioVoicePlan.swift` / `SkyStudioVoiceoverStart.swift` | 一段旁白怎么交：报价之前分批、整段报价的请求，报价之后每批的请求（同一个 `params.plan`）、要不要本机转写（纯值）；回任务号之前的那几步：读 Key / 目录、认声音、量本机转写、整段报价、整体预留、起任务；任务里装不上转写模型时按「转写不了」再报一次价（第五节） |
 | `SkyStudioVoiceReading.swift` / `SkyStudioVoiceTranscription.swift` | 报价之前定怎么读：合不合批、交哪个 model（转写不了的预设要字幕整段点名 eleven-v4）、字幕时间从哪来（纯值）；这台 Mac 转写不转写得了这种语言、装转写模型（第五节「字幕时间」） |
+| `SkyStudioVoiceSplit.swift` / `SkyStudioVoiceSplitEstimate.swift` / `SkyStudioVoiceLineAudio.swift` | 批回到本机之后（纯值）：一批几句按词对回原文切开（不计较繁简）；没有词可对、这台 Mac 又转写不了时按字数估句界；一句的几片接成一条（采样率不一样换成一样的）（第五节「本机切句」） |
 | `SkyStudioVoiceBatchQueue.swift` / `SkyStudioVoiceCloudBatches.swift` / `SkyStudioVoiceBatchBoard.swift` | 一段旁白的几批怎么拿到本机：按原来的顺序领槽、同时交，一批出了事后面没交的不再交（队列）；一批怎么交 / 只 GET 原单 / 下载、中途换备用（批次）；几批各走到哪一步（纯值：状态行和 get_job 的「几批好了 / 在跑 / 等空位」，第五节） |
 | `SkyStudioVoiceLibraryTool.swift` / `SkyStudioVoiceRecordingTool.swift` / `SkyStudioVoiceDesignTool.swift` / `SkyStudioVoiceLibraryJob.swift` / `SkyStudioVoiceOneTimeStep.swift` | 声音库（声音 PR 6）：`list_voices`、`manage_voices` 的列、建 / 加录音（先问授权）、设计（先问一次性费用、起任务）、改名、删除；设计和建 MiniMax 版的任务；配旁白碰上一次性费用时问 / 跳过 / 起建的任务（[声音库](voice-library.md)第八节） |
 | `SkyStudioVoiceStanding.swift` / `SkyStudioVoiceStandingNotice.swift` / `FullAccessConsentSheet.swift`（不在 SkyStudio 目录） | 全部权限下的长期授权（声音 PR 7）：声音那几件事此刻怎么问（`.ask` / `.standing` / `.once`）、`/voices/consent-grant` 的记 / 撤、升级时补记、打开全部权限时那段说明（价目从 `/models` 读）和设置里的那张（[声音库](voice-library.md)第八节第 7、9 条） |
@@ -143,10 +144,25 @@
 - **合批**（声音 PR 5 起普通旁白和声音库的声音一样，方案 8.1）：这台 Mac 切得开（转写得了这种语言）、或者读的模型报字的时间（eleven-v4），`SkyStudioVoiceBatch`
   就按上限装批，整句往里装、**批只在两句之间分**；切不开的一句一单（要不要字幕都一样）。一句本身超过上限：先在句末标点（。！？.!?）分，一个句子都放不下才在逗号类、
   空白分，再不行才按字切；同一句放得下的几个句子留在同一片里（原文照抄）。计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。
+  **上限按每句自己的字**（2026-11-10，`SkyStudioModel.characterLimit(text:)`）：服务器按每一批自己的主要语言卡、不是整稿的，哪种算主要是它按语速估的，
+  SkyCut 不抄 —— 取这一句里出现了的每种文字（汉字 `zh`、假名 `ja`、谚文 `ko`、别的 = 表里其余的键）的上限里最小的，一批的上限是它装着的几句里最小的
+  （[案例](../bugfixes/2026-11-10-voiceover-review-followups.md)）。
   长句拆片记原句索引，不按每句收一次钱。参考录音不再随读稿上传：`clone_from` 2026-11-10 去掉了，参考进声音库（[声音库](voice-library.md)，声音 PR 6）。
 - **本机切句**：一批几句、模型又不报字的时间时，用这台 Mac 的转写和 `SubtitleCueWords` 字符对齐找句界，每句必须覆盖足够原文；只在识别到的词之间找安静切口，
   不按字数猜时间。切不准保留完整批次文件并报错，禁止再次收费生成来掩盖失败。eleven-v4 读的批按它报的字符时间切（同一个 `SkyStudioVoiceSplit`），不转写。
   切句在几批都拿到本机之后按原来的顺序做（一句可能跨两批）；前面那批这一次没让补（missing）就停在那里，后面的留到补齐了再切。
+  **付过钱的声音不许在本机卡死**（2026-11-10 审查后定的三条，各有案例）：
+  - 对字不计较繁简（`foldsChineseScript`，切句和 `SpeechWordAlignment` 同一个口径）；问这台 Mac 转写用哪种语言时带字形
+    （`AITextLanguage.speechLanguage`：繁体稿是 `zh-Hant` → zh_TW 的模型；`input.language` 的 `zh` 只管目录上限、预设、语言名）。
+    [案例：繁体稿切不开](../bugfixes/2026-11-10-traditional-chinese-batch-split-fails.md)。
+  - 一句的几片采样率不一样（一片 Gemini 的 24 kHz WAV、一片换了备用的 Eleven 44.1 kHz：几批同时交，换备用只管得到还没交的批）：
+    都换到高的那个再接（`SkyStudioVoiceLineAudio`，时长不变、词的时间不动），不报错。
+    [案例：两半接不起来](../bugfixes/2026-11-10-long-line-halves-with-different-sample-rates.md)。
+  - **计划里定的是这台 Mac 转写不了**（`plan.reading.transcribes == false`）而一批有几句：不去转写；模型报的词切不开（`words` 是 null、
+    字数对不上、时间倒退、对不回原文）就按字数估句界（`SkyStudioVoiceSplitEstimate`：估的位置前后找最长的安静窗），这几句记
+    `estimatedSplit`、`get_job` 和结果报 `estimated_split_line_indices`、`voice.note` 叫 AI 转告用户听一下头尾。转写得了的 Mac 上
+    切不准照旧报错、能恢复（重试有意义）；只有重试多少次都一样的这条路才估。
+    [案例：拿不到字的时间卡死](../bugfixes/2026-11-10-packed-batch-without-word-times-stuck.md)。
 - **字幕时间**（声音 PR 5，方案第七节；约定第 5 条：由 SkyCut 定，服务器只照点名的模型读）。`subtitle_timing` 报在回任务号、`get_job` 和落地的结果里：
   - `provider`：模型报的字的时间（eleven-v4，本机的 Kokoro / macOS 声音的词标记）；`aligned`：这台 Mac 转写成品再对齐；`estimated`：按字数估，可能差半秒左右，
     `voice.note` 叫 AI 转告；`mixed`：几句不一样，`subtitles.estimated_line_indices` 列出估的那几句。
@@ -160,7 +176,7 @@
     开口和收尾按响度找，中日韩一个字 / 数字一份、字母 0.3 份、句末停 2 份、逗号类停 1 份）。
   - 一句对不上（或长句跨批时有一片没拿到词）：这一句按字数估、整段不失败；一批几句切不开仍是上面「本机切句」的规矩。恢复时照记录里定的（`plan.reading`）：
     当时转写不了的不再去试。
-- **落地**：各句都经 `AIAudioFileWriter.writeVoiceover` 写到配音目录；最后核对原工程和 generation，一次 `AIUndoGrouping.step` 同时入轨 / 字幕、记本轮改动、未保存工程落盘。工程已换 / 关闭只留文件，不改别的工程。`get_job` 报批次、阶段、服务器任务号、文件和已收积分；状态行与生成共用 `SkyStudioMediaStatus`。
+- **落地**：各句都经 `AIAudioFileWriter.writeVoiceover` 写到配音目录；最后核对原工程和 generation，一次 `AIUndoGrouping.step` 同时入轨 / 字幕、记本轮改动、未保存工程落盘。工程已换 / 关闭只留文件，不改别的工程。`get_job` 报批次、阶段、服务器任务号、文件和已收积分，**运行中和没做成之后也带 `voice`**（名字、`note`：任务里重新报过价、整段换了读的模型时 AI 看得到为什么；点名的模型读的是预设的替身时 `note` 说实际是谁读的）；状态行与生成共用 `SkyStudioMediaStatus`。
 
 **2026-11-01：后续本地失败不否定已成功的生成。**
 
@@ -212,6 +228,11 @@
   几批同时交（声音 PR 4，`ConcurrencyChecks.swift`，假协议先回排队、问的时候才回结局，声音池 2 个）：四批里同时开着的最多 2 单、后交的先回（完成顺序只断言假服务按住的那一对：第二批先于第一批；第三批和第一批谁先回看调度，不断言，[案例](../bugfixes/2026-11-10-voice-concurrency-check-finish-order.md)）、切句和落地照原来的顺序、
   一步撤销 / 重做；第二批换了备用，之后才交的两批带 `voice_plan.fallback.selection`、先交的不改，结果的 `line_models` / `voice.note` / `next_step`；第二批以
   `fallback_needs_one_time` 结束：后面等槽的不再交、先交的收好、可恢复的 failed 带 `one_time`，`generate_missing` 照原来的选择补齐。老的恢复场景用 1 个槽（交的顺序就是批的顺序）。
+  付过钱的声音不卡死（2026-11-10 审查，`PaidAudioChecks.swift`，每个场景自己接住错误、互不遮挡）：繁体稿三句合一批、假转写写成简体（`simplifies`）照样切开、
+  字幕是稿子的繁体字、问转写带的是 `zh-Hant`（起任务和 `resume` 都是）；长句两批一片 24 kHz 一片 44.1 kHz（`lowRate`，两种先后）接成 12 秒、文件 44.1 kHz；
+  转写不了的 Mac 上 eleven-v4 合批而 `words` 是 null / 对不回原文（`brokenWords`）按字数估句界并报 `estimated_split_line_indices`；重新报价之后运行中、
+  失败后的 `get_job` 带 `voice.note`；点名 eleven-v4 说替身是谁。纯值的一半在 `scripts/check-sky-studio.sh` 的 `VoiceSplitChecks`（折叠繁简的切句、
+  `speechLanguage`、估句界挑哪个安静窗、每批按自己的文字定上限）。假协议别再「整齐」：按模型回不一样的格式、转写写出来的字和稿子不一样是常态。
 - 免费端到端：`scripts/gui-smoke/sky-studio/run.sh`，再用 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/voice.py`。独立 `.skystudiosmoke` App、回环假服务和假 Key，真实 MCP / 本机合成 / 转写 / 文件 / 入轨 / 字幕 / 撤销。`run.sh stop` 只清理这个测试身份；不使用生产 Key。假 Key 钩子同时要求测试 bundle 和回环地址，Beta / 正式包不认。
 - [ ] 真实 Key：普通旁白跨多个 chunk、字幕尾端不超音频；两句克隆只付一批并切成两段，听接缝无截字；一步撤销音频字幕一起消失。
 - [ ] 有窗口 / 后台工程：状态行显示积分、阶段与停止；取消 queued 只退一次，409 已开始继续查到结局；切 / 关工程不落到另一工程。
@@ -223,6 +244,10 @@
   稿子里的品牌名 / 数字（SkyCut、2026）字幕照稿子写。
 - [ ] 第一次用这台 Mac 没装转写模型的语言（照支持表挑一种）：任务先装模型（浮层里「准备本机转写 N%」、`get_job` 的 `local_step`），装完才交第一批；
   断网让它装不上：整段改按「转写不了」再报价（预设换 eleven-v4 并在 `voice.note` 说声音不一样了），积分只记新的那一笔。
+- [ ] 繁体中文的旁白两句以上（真 Key、macOS 26）：切成几段、字幕是稿子的繁体字；`get_job` 不出现 `local_split`。
+- [ ] 一句超过上限的长句（中文 320 字一整段）：两片接缝不吞字；要是其中一批换了备用（`line_models`），整句听一遍两个声音的接缝。
+- [ ] 转写不了的 Mac 上合批的 eleven-v4：看一眼真的 `words`（Eleven 的 `timestamps`）读不读得出来；读不出来时结果带
+  `estimated_split_line_indices`，那几句的头尾听一遍估得准不准。
 - [ ] 这台 Mac 转写不了的语言（或 macOS 15 的机器）：预设要字幕整段换 Eleven 并说一声；点名模型 / 声音库的声音一句一单、`subtitle_timing` 是 estimated、
   听一遍估出来的字幕差多少。
 

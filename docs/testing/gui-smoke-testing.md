@@ -513,12 +513,22 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
    挂 / 不挂 skycut；两两相减 = SkyCut 每轮常驻的 token 和整份清单的 token，真分词器）；`run_claude.py tasks --label <名字>`（八个任务）。
    嵌套的 `claude -p` 用干净的环境变量（不带父会话的 `CLAUDE_CODE_*`、`CMUX_*`）、`--strict-mcp-config` 只挂 skycut、
    `--allowedTools mcp__skycut`（终端、改文件一律在 `-p` 里被拒，试了也看得见）、`--no-session-persistence`、`--debug-file`。
-3. **Codex**：`run_codex.py tasks --label <名字>`：`codex exec --json --sandbox read-only`，本次进程 `-c` 覆盖 skycut 的连接、
-   别的 MCP 全部 `enabled=false`，模型和档位同 11-03（gpt-6.1-sol / max）；会话记录按 thread id 从 `~/.codex/sessions` 拷出来。
+3. **Codex**：`run_codex.py preload --label <名字>`（同一句「2+3 等于几」挂 / 不挂 skycut 各问一次：第一次请求里 SkyCut 占多少）、
+   `run_codex.py tasks --label <名字> [--only 1,4]`：`codex exec --json --sandbox read-only`，本次进程 `-c` 覆盖 skycut 的连接、
+   别的 MCP 全部 `enabled=false`，模型和档位同 11-03（gpt-6.1-sol / max）；会话记录按 thread id 从 `~/.codex/sessions` 拷出来，
+   这一批的目录里留一份 `catalog.json`（起 App 时问小程序要的总说明和清单长度）。用户配置里的 skycut 指着正式版：不挂时也先指到测试 App
+   的小程序再关掉。`~/.local/bin/codex` 是 npm 装的启动脚本、要 `node`，干净的 PATH 里补上 node 所在的目录；stdin 关掉（`codex exec`
+   发现 stdin 不是终端会把读到的接在提示后面）。**几个测试 App 同时跑**（2026-11-10 基线 8 个 + 试点 4 个分四路，约 29 分钟跑完）：
+   把组装好的环境目录拷一份，`PlistBuddy` 把 `CFBundleIdentifier` 改成另一个以 `.skystudiosmoke` 结尾的名字、`codesign --force --deep --sign -`
+   重签，各用各的 `MEASURE_DIR` / `MEASURE_BUNDLE` / `MEASURE_PORT`；同一个 App 里的任务照旧一个接一个（每个任务前重启）。
+   额度：会话记录里每次请求后的 `rate_limits` 报周额度用了百分之几，证据里记每场的头尾。
 4. **出表**：`report.py <runs/名字>`（Claude Code：每次请求的 token、ToolSearch 取了哪些、skycut 调用和被拒、读说明书、八个任务的落盘断言）；
-   `report_codex.py <rollout.jsonl>`（Codex：每次请求的 token、代码模式里找工具打印了多少、几份重复的总说明、第一次打印看到几个工具）。
-   `report_codex.py` 的量法拿 2026-11-03 那四场核对过，四行数字和方案 1.4 的表逐项相同。
-   **对照**：`compare.py <基线证据.json> <这次证据.json> [--tasks 1,4,5,7] [--full-preload-target 6]`：每轮常驻和整份预先加载、每个任务的开销、
+   `report_codex.py <runs/名字> [--out <证据.json>]`（Codex：每次请求的 token、代码模式里找工具打印了多少、几份重复的总说明、第一次打印看到几个工具、
+   skycut 调用和被拒、读说明书、终端命令；落盘断言和路径脱敏和 Claude Code 同一份，`report.verify` / `report.scrub`）；单看几份会话记录用
+   `report_codex.py <rollout.jsonl>…`。量法拿 2026-11-03 那四场核对过，四行数字和方案 1.4 的表逐项相同。Codex 自己的底子每场不一样
+   （2026-11-10 隔 8 分钟的两场差 1,476 token：服务器给的基础说明换了版本），**第一次请求只比同一场里挂 / 不挂的那一对**，别跨任务比。
+   **对照**：`compare.py <基线证据.json> <这次证据.json> [--tasks 1,4,5,7] [--full-preload-target 6] [--discovery-target 30]`（按证据里的 client 分：
+   Codex 的开销换成找工具打印的总字数、重复总说明的占比、第一次请求里的 SkyCut）：每轮常驻和整份预先加载、每个任务的开销、
    选的工具、落盘断言、被拒后几次改对、终端、读说明书（第一次用之前 / 用过之后 / 这一场没调它），最后按方案 6.4 判。比开销看**输入合计**
    （新 + 读缓存 + 写缓存），别比 Claude Code 报的花费：花费跟着缓存冷热走 —— 一批里第一个任务的第一次请求要把公共前缀写进缓存，
    试点的任务 1 因此多写了约 9 千 token、花费 +26%，输入合计反而 −1.9%（[试点实测](../reports/2026-11-10-mcp-guide-pilot.md)）。

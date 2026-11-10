@@ -8,6 +8,9 @@ import SrtFlowMCPKit
 // `/quote` 照声音方案 5.4 回整段的 voice_plan / 每批的价（带了 params.plan 就照它，没带自己选），`/jobs` 照它带回的 plan 做完；
 // 读的模型是 eleven-v4 时像 Eleven 一样回每个字的时间（`words`，字均匀铺在 0.1–5.7 秒）。
 // 这台 Mac 转写得了 / 模型装没装 / 装不装得上、转写听错哪个词、哪一批听成别的话，都由 VoiceRecoveryFixture 的开关定（声音 PR 5）。
+// 2026-11-10 审查补的（假协议原来太「整齐」，三个会卡死付费声音的 bug 都照不到）：转写写成简体（稿子是繁体，`simplifies`）、
+// 问转写时带的语言记下来（`transcriptionLanguages`）、某一批回 24 kHz 的 WAV（Gemini 的样子，`lowRate`；别的照旧 44.1 kHz）、
+// eleven-v4 的 `words` 用不了（`brokenWords`：null、或者字对不回原文）、点名 eleven-v4 读 Gemini 预设时选择里是它的 Eleven 替身。
 // `deferred`（声音 PR 4）：`/jobs` 先回排队、问的时候才回结局，第几单等第几单回过结局才做完（`holdUntil`）—— 好造「几批同时在跑、后交的先回」；
 // 记下同时开着最多几单（`peakOpen`）。
 final class VoiceRecoveryHTTP: URLProtocol {
@@ -47,6 +50,12 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var finished: [Int] = []
     static var jobBodies: [JSONValue] = []
     static var ruleOf: [Int] = []
+    /// 哪几批（按规矩的序号）回 24 kHz 的 WAV（Gemini）；别的回 44.1 kHz（Eleven 解出来的样子）。
+    static var lowRate: Set<Int> = []
+    static var lowWave = Data()
+    /// eleven-v4 的 `words` 用不了：null，或者报的字对不回原文（字母全换成 x）。
+    enum BrokenWords { case null, wrongLetters }
+    static var brokenWords: BrokenWords?
     static let catalog: JSONValue = {
         let data = FileManager.default.contents(atPath: "checks/SkyStudio/Fixtures/models-voice-2026-11-10.json") ?? Data()
         return (try? JSONValue.decode(data)) ?? [:]
@@ -66,9 +75,16 @@ final class VoiceRecoveryHTTP: URLProtocol {
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
         oneTimeAt = nil; enrolls = []; standingActive = false; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
         open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
+        lowRate = []; brokenWords = nil
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
+        // 同一个音（约 562 Hz）、同样 6 秒，24 kHz。
+        let low = (0..<144_000).map { Int16(sin(Double($0) * 0.08 * 44_100 / 24_000) * 4_000) }
+        lowWave = VoiceReferenceSample.wavData(samples: low, sampleRate: 24_000)
     }
+
+    /// 放开「等第几单」的规矩（一直卡着的那一单这就做完）。
+    static func release() { lock.lock(); holdUntil = [:]; lock.unlock() }
 
     static var posts: Int { lock.lock(); defer { lock.unlock() }; return prompts.count }
     static var log: [(String, String, JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -137,7 +153,11 @@ final class VoiceRecoveryHTTP: URLProtocol {
                 Self.open.remove(index)
                 if !Self.finished.contains(rule) { Self.finished.append(rule) }
             }
-        } else if path.hasPrefix("/files/") { bytes = Self.wave }
+        } else if path.hasPrefix("/files/") {
+            let index = Int(path.components(separatedBy: "voice-").last?.replacingOccurrences(of: ".wav", with: "") ?? "")
+            let low = index.map { $0 < Self.ruleOf.count && Self.lowRate.contains(Self.ruleOf[$0]) } ?? false
+            bytes = low ? Self.lowWave : Self.wave
+        }
         Self.lock.unlock()
         let responseData = bytes ?? (try! value.encodedData())
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
@@ -189,7 +209,14 @@ final class VoiceRecoveryHTTP: URLProtocol {
         let model = fallbackAt == rule ? JSONValue.string("eleven-v4") : (selection["model"] ?? .null)
         var result: [String: JSONValue] = ["url": .string("http://127.0.0.1/files/voice-\(index).wav"), "content_type": "audio/wav",
             "duration": 6, "model": model, "fallback_used": .bool(fallbackAt == rule), "voice_plan": ["selection": selection]]
-        if model == "eleven-v4" { result["words"] = characterTimes(body["prompt"]?.stringValue ?? "") }
+        if model == "eleven-v4" {
+            let prompt = body["prompt"]?.stringValue ?? ""
+            switch brokenWords {
+            case .null?: result["words"] = .null
+            case .wrongLetters?: result["words"] = characterTimes(String(prompt.map { $0.isLetter ? "x" : $0 }))
+            case nil: result["words"] = characterTimes(prompt)
+            }
+        }
         return ["job_id": .string("voice-\(index)"), "status": "done", "credits_charged": 2.5, "result": .object(result)]
     }
 
@@ -208,7 +235,13 @@ final class VoiceRecoveryHTTP: URLProtocol {
             selection = ["model": "gemini-3.8-flash-tts", "voice": voice, "fallback": backup]
             fallback = ["selection": backup, "available": true, "auto": true, "one_time": .null]
         }
-        else { selection = ["model": .string(model != "auto" ? model : (rechoose ? "eleven-v4" : "gemini-3.8-flash-tts")), "voice": voice] }
+        else {
+            // 点名 eleven-v4 读 Gemini 的预设：服务器换成这个预设的 Eleven 替身（voice_presets[].fallback.voice）。
+            let chosen = model != "auto" ? model : (rechoose ? "eleven-v4" : "gemini-3.8-flash-tts")
+            let standIn = catalog["voice_presets"]?.arrayValue?.first { $0["id"] == voice }?["fallback"]?["voice"]
+            let reads = chosen == "eleven-v4" && voice.stringValue?.hasPrefix("gemini:") == true ? (standIn ?? voice) : voice
+            selection = ["model": .string(chosen), "voice": reads]
+        }
         return ["credits": .number(2.5 * Double(batches.count)), "credits_expected": .number(2.0 * Double(batches.count)), "settlement": "exact",
                 "voice_plan": ["selection": selection, "requested_model": .string(model), "rule": "preset", "reason": "A preset voice reads this text.",
                                "languages": [["language": "en", "share": 1, "seconds": 3]], "cross_language": false,
@@ -235,6 +268,10 @@ final class VoiceRecoveryFixture {
     /// 转写听错的词（原文的词 → 听成的）、哪一批整个听成别的话。
     var mishear: [String: String] = [:]
     var garbleAt: Int?
+    /// 转写写成简体、一个字一个词（稿子是繁体：简体模型、或者系统自己写成简体）。
+    var simplifies = false
+    /// 每次问「这台 Mac 转写得了吗」时带的语言。
+    var transcriptionLanguages: [String] = []
     var keyReads = 0
     /// 这个场景自己的槽，不碰全 App 那一份：默认声音池 1 个（一批一批交，交的顺序就是批的顺序，老的恢复场景照旧算得准）；
     /// 几批同时交的场景给 2 个（好造「几批同时在跑、还有几批等空位」）。
@@ -259,7 +296,8 @@ final class VoiceRecoveryFixture {
         var services = SkyStudioVoiceServices()
         services.api = SkyStudioAPI(session: VoiceRecoveryHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil)
         services.key = { self.keyReads += 1; return "local-recovery-fixture" }
-        services.transcription = { _ in
+        services.transcription = { language in
+            self.transcriptionLanguages.append(language)
             guard self.transcribes else { return .unavailable }
             return self.installed ? .installed(Locale(identifier: "en-US")) : .downloadable(Locale(identifier: "en-US"))
         }
@@ -281,7 +319,15 @@ final class VoiceRecoveryFixture {
             if index == self.garbleAt { return [TimedWord(text: "Totally unrelated words", start: 0.1, end: 5.7)] }
             // 这一批读的是哪几句：照恢复记录（几批同时交，交的顺序不一定是批的顺序）。
             let record = try SkyStudioVoiceRecoveryStore.read(file.deletingLastPathComponent().appendingPathComponent("voiceover-recovery.json"))
-            let tokens = record.plan.batches[index].speech.prompt.split(whereSeparator: { $0.isWhitespace })
+            let prompt = record.plan.batches[index].speech.prompt
+            if self.simplifies {
+                let simplified = prompt.applyingTransform(StringTransform("Traditional-Simplified"), reverse: false) ?? prompt
+                let characters = simplified.filter { !$0.isWhitespace }.map(String.init)
+                let step = 5.6 / Double(characters.count)
+                return characters.enumerated().map { TimedWord(text: $0.element, start: 0.1 + Double($0.offset) * step,
+                                                                 end: 0.1 + Double($0.offset + 1) * step) }
+            }
+            let tokens = prompt.split(whereSeparator: { $0.isWhitespace })
                 .flatMap { (self.mishear[String($0)] ?? String($0)).split(separator: " ").map(String.init) }
             let step = 5.6 / Double(tokens.count)
             return tokens.enumerated().map { TimedWord(text: ($0.offset == 0 ? "" : " ") + $0.element,

@@ -46,10 +46,20 @@ func catalogKnownNames() -> Set<String> {
     // 声音 PR 4（几批同时交、中途换备用）：get_job 的 batches_done / batches_running / batches_waiting（SkyStudioVoiceBatchBoard.json）、
     // 各句是哪个模型读的 line_models（SkyStudioVoiceCheckpoint.detail）、任务结束码 fallback_needs_one_time（SkyStudioVoiceCodes）。
     names.formUnion(["batches_done", "batches_running", "batches_waiting", "line_models", "fallback_needs_one_time"])
+    // 句界是按字数估的那几句 estimated_split_line_indices（SkyStudioVoiceCheckpoint.detail，2026-11-10：没有词可对、这台 Mac 又转写不了）。
+    names.insert("estimated_split_line_indices")
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     // 全部权限下的长期授权（声音 PR 7）：旁白中途那一笔直接建时 get_job 的 enroll_job_id（SkyStudioVoiceFallbackFee）、
     // set_settings 结果里的 voice_standing_consent（AISettingsTools）。
     names.formUnion(["enroll_job_id", "voice_standing_consent"])
+    // 第一批迁移的工具主题提到的结果字段（2026-11-10）：edit_subtitles 的 own_style；listen 的 level_db / peak_db / loudest_at / tempo_bpm /
+    // suggested_source_in / suggested_source_out；get_job 的 queue_position / export_settings / billing_note / remote_result；
+    // upscale_clip 的 replaced_ids / source_size / transfer_percent / phase_seconds / typical_seconds；freeze_frame 的 tail_id / source_frame /
+    // upright_source；record_screen 的 stopped_by / stop_method；set_keyframes 的 keyframe_scale（edit_limits 里的）。
+    names.formUnion(["own_style", "level_db", "peak_db", "loudest_at", "tempo_bpm", "suggested_source_in", "suggested_source_out",
+                     "queue_position", "export_settings", "billing_note", "remote_result", "replaced_ids", "source_size",
+                     "transfer_percent", "phase_seconds", "typical_seconds", "tail_id", "source_frame", "upright_source",
+                     "stopped_by", "stop_method", "keyframe_scale"])
     // 声音库（声音 PR 6，MCPGuideVoiceLibraryTopics 和 add_voiceover 的主题）提到的结果字段、任务种类、错误码：报价的 one_time、
     // 两种收费任务 voice_design / voice_enroll（AIJobs.Kind）、设计的 sample_url（SkyStudioVoiceLibraryJob）、服务器的
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。

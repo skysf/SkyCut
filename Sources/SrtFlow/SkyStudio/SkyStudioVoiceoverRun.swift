@@ -245,6 +245,8 @@ final class SkyStudioVoiceoverRun {
         guard let current = prepared else { return }
         let replanned = try await SkyStudioVoiceoverStart.withoutTranscription(current, input: input, failure: failure, services: services)
         prepared?.budget.refundUnused()
+        // 先记下为什么换了（get_job 的 voice.note）：新的预留留不下、之后哪一步没做成，AI 都看得到整段换了读法。
+        input.choice.note = [input.choice.note, replanned.note].compactMap { $0 }.joined(separator: " ")
         guard let budget = SkyStudioVoiceBudget.reserve(replanned.plan.batchCredits) else {
             prepared = nil
             throw SkyStudioVoiceBudgetProblem(credits: replanned.plan.batchCredits.reduce(0, +))
@@ -256,7 +258,6 @@ final class SkyStudioVoiceoverRun {
         prepared?.installsTranscription = false
         locale = nil
         if let catalog = current.catalog { prepared?.modelTitle = SkyStudioVoiceoverStart.modelTitle(replanned.plan, catalog: catalog) }
-        input.choice.note = [input.choice.note, replanned.note].compactMap { $0 }.joined(separator: " ")
         status.credits = replanned.plan.batchCredits.reduce(0, +)
         if let title = prepared?.modelTitle { status.modelTitle = title }
     }
@@ -302,6 +303,9 @@ final class SkyStudioVoiceoverRun {
         if recovery.value.lineModels != nil {
             input.choice.note = [input.choice.note, Self.mixedModelsNote].compactMap { $0 }.joined(separator: " ")
         }
+        if let lines = recovery.value.estimatedSplitLines {
+            input.choice.note = [input.choice.note, Self.estimatedSplitNote(lines)].compactMap { $0 }.joined(separator: " ")
+        }
         var plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs, playhead: recovery.value.input.playhead)
         if !recovery.value.landingIDs.isEmpty {
             guard recovery.value.landingIDs.count == plan.spoken.count else { throw AIToolError("The saved voiceover insertion does not match its lines.") }
@@ -331,6 +335,10 @@ final class SkyStudioVoiceoverRun {
         if recovery?.value.lineModels != nil {
             extra["next_step"] = .string("Before the user listens, tell them what voice.note says: line_models lists which model read each line.")
         }
+        if recovery?.value.estimatedSplitLines != nil {
+            extra["next_step"] = .string([extra["next_step"]?.stringValue,
+                "Tell the user what voice.note says about estimated_split_line_indices before they listen."].compactMap { $0 }.joined(separator: " "))
+        }
         if let recovery {
             recovery.value.applied = result.payload
             recovery.value.projectPath = project.documentURL?.standardizedFileURL.path
@@ -350,6 +358,11 @@ final class SkyStudioVoiceoverRun {
         // 几批同时跑：好了几批、几批在跑、几批等空位（不造百分比）。
         if let board, board.total > 1 { value.merge(board.json) { _, new in new } }
         value["submission_keys"] = .array(recovery?.value.plan.batches.map { .string($0.request.idempotencyKey) } ?? [])
+        // 声音和要转告的话运行中、没做成之后也报（落地的结果里有它自己的一份，在 extra 里、盖过这一份）：任务里重新报过价
+        // （装不上转写模型，整段换了读的模型）之后，AI 光看新的 voice_plan 不知道为什么换了。
+        var voice: [String: JSONValue] = ["name": .string(input.choice.name), "quality": .string(input.choice.qualityName)]
+        if let note = input.choice.note, !note.isEmpty { voice["note"] = .string(note) }
+        value["voice"] = .object(voice)
         if let localStep {
             value["local_step"] = .string(localStep)
             if let localStepPercent { value["local_step_percent"] = .number(Double(localStepPercent)) }
@@ -375,6 +388,13 @@ final class SkyStudioVoiceoverRun {
     /// 中途换了备用（`line_models` 里各句不全是同一个模型）：前后可能听得出差别，要统一只能整段重读（另报价）。
     static let mixedModelsNote = "Sky Studio switched to its fallback model part-way, so some lines were read by another model "
         + "(line_models) and may sound slightly different. To make them match, narrate the whole script again (it is quoted again first)."
+
+    /// 句界是按字数估的那几句（`estimated_split_line_indices`）：一句的头尾可能带进旁边那句的一点声音，叫用户先听一下。
+    static func estimatedSplitNote(_ lines: [Int]) -> String {
+        "SkyCut had no word times for \(lines.count) lines read in one request (estimated_split_line_indices, zero-based) and this Mac "
+            + "cannot transcribe this language, so it cut between them at the pauses nearest to where the character counts put them. "
+            + "A cut may be slightly off: tell the user to listen to where those lines start and end."
+    }
 
     private static func isCancellation(_ error: Error) -> Bool {
         if let wrapped = error as? SkyStudioVoiceProcessingError { return isCancellation(wrapped.underlying) }

@@ -13,11 +13,9 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .generateSubtitles, title: "Generate subtitles",
                 description: """
-                Transcribe the speech on the timeline into the subtitle track, on this Mac (needs macOS 26). Replaces the \
-                current subtitles as one undoable step. Hidden clips are skipped. Optionally translate right after (the same \
-                language download dialog as translate_subtitles can appear). Each subtitle is one line; what does not fit \
-                becomes the next subtitle. Pass max_lines=2 only when the user wants two-line subtitles (the project remembers \
-                it). Set the style first (edit_subtitles style): lines are cut to fit it. Returns a job id; wait with get_job.
+                Transcribe the timeline's speech into the subtitle track on this Mac (macOS 26), replacing current subtitles; hidden \
+                clips are skipped; can translate right after. Each subtitle is one line; pass max_lines=2 only when the user wants \
+                two-line subtitles. Set the style first (edit_subtitles style). Returns job_id: wait with get_job. One undo step.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Spoken language: auto (default) or a locale such as en-US, zh-CN, ja-JP."),
@@ -33,11 +31,9 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .translateSubtitles, title: "Translate subtitles",
                 description: """
-                Translate the original subtitle track into a second track in another language, on this Mac. The original's \
-                language is read from its text (rewriting the original first is fine). scope all rebuilds every translated line \
-                (hand-edited ones are replaced); missing only fills lines with no translation or whose original changed. Returns \
-                a job id. If this Mac still has to download the languages, macOS shows a download dialog in SkyCut that only \
-                the user can click; the result and get_job then carry waiting_for_user, which you must pass on to the user.
+                Translate the original subtitle track into a second track on this Mac; the source language is read from the text. \
+                scope=all rebuilds every line, missing fills only lines without one. Returns job_id: wait with get_job. If macOS must \
+                download languages, waiting_for_user asks the user to click; tell them. One undo step.
                 """,
                 input: MCPSchema.object([
                     "target_language": MCPSchema.string("Language tag, e.g. zh-Hans, en, ja, ko, es."),
@@ -49,16 +45,14 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .getSubtitles, title: "Read subtitles",
                 description: """
-                Subtitle lines with ids, start and end on the timeline and text, from the original track, the translated track, \
-                or both; optionally only inside a time range. Each shown line also has box (where it is drawn on the canvas with \
-                the current style, [x, y, width, height] as fractions from the top left) and lines when it wraps: use them to keep \
-                subtitles clear of watermarks or to pick style.max_width. Also the style, max_lines (1 or 2: how many lines a \
-                generated subtitle may take) and how many lines know their word times (for highlight).
+                Read-only. Subtitle lines with ids, start, end and text from the original track, the translation or both, optionally \
+                in a time range. Each line has its box on the canvas (to avoid watermarks or pick style.max_width), plus the style, \
+                max_lines and how many lines know their word times.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"]),
-                    "start": MCPSchema.number("Only lines that end after this time.", minimum: 0),
-                    "end": MCPSchema.number("Only lines that start before this time.", minimum: 0),
+                    "start": MCPSchema.number("Only lines that end after this time, seconds (≥ 0).", minimum: 0),
+                    "end": MCPSchema.number("Only lines that start before this time, seconds (≥ 0).", minimum: 0),
                     "limit": MCPSchema.integer("At most this many lines per track (default 300).", minimum: 1, maximum: 2000)
                 ]),
                 readOnly: true
@@ -71,12 +65,9 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .exportSubtitles, title: "Export subtitle files",
                 description: """
-                Write the project's subtitles to files, one per track: the original, the translation, or both (default: every \
-                track that has lines). Files are named <name>.<language>.srt (or .vtt), the language read from each track's \
-                text (else the project's record), and go where export_video puts videos, so players pick them up; name \
-                defaults to the project's, so pass the exported video's name to pair them. Hidden \
-                lines are left out; times are timeline seconds. A taken name gets a number (the result has the real paths); \
-                SkyCut never replaces a file. Done at once.
+                Write the project's subtitles to .srt or .vtt files, one per track (original, translation or both), named \
+                <name>.<language>.srt next to where export_video puts videos; pass the exported video's name to pair them. Hidden \
+                lines are left out. Never replaces a file. Done at once.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both: every track with lines).", oneOf: ["original", "translation", "both"]),
@@ -89,16 +80,14 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .getJob, title: "Job progress",
                 description: """
-                Progress and result of a long job (any call that returned a job id). Character jobs retain stable ids across App restarts: source generation, Character finalization and billing are independent; recovery never repeats paid generation. wait_seconds (up to 30) waits for it before \
-                answering; keep waiting instead of starting it again. Exports, transcribing (subtitles, transcripts) and \
-                translations run one at a time across all projects: a later one shows status queued with queue_position \
-                (1 = next) and starts by itself. If it shows waiting_for_user, tell the user what it says right away.
-                Cloud generation also refreshes the original server job's billing and remote_result after a local failure; \
-                this never submits a replacement or repeats a charge. Explain billing_note; delivery failure does not imply a refund.
+                Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits before \
+                answering: keep waiting instead of starting the job again. Exports, transcriptions and translations run one at a time: \
+                queued shows queue_position. If it shows waiting_for_user, tell the user right away. Paid jobs: billing_note explains \
+                the charge.
                 """,
                 input: MCPSchema.object([
                     "job_id": MCPSchema.string("Job id."),
-                    "wait_seconds": MCPSchema.number("Wait up to this long for the job to finish.", minimum: 0, maximum: 30)
+                    "wait_seconds": MCPSchema.number("Wait up to this long for the job to finish, 0–30 seconds.", minimum: 0, maximum: 30)
                 ], required: ["job_id"]),
                 readOnly: true
             )
@@ -116,15 +105,15 @@ public enum MCPSubtitleExportTools {
     /// 字幕长什么样：edit_subtitles（这个工程的）和 burn_subtitles（那一批的）共用这一份。
     static let subtitleStyle = MCPSchema.object([
         "position": MCPSchema.string("Where the subtitles sit.", oneOf: MCPVocabulary.subtitlePositions),
-        "margin": MCPSchema.number("Edge distance / frame height (default 0.056).", minimum: 0, maximum: 0.45),
-        "size": MCPSchema.number("Pixels on a 1080-tall frame (a 9:16 frame is 1920 tall: 1.78x larger there); default 56; bold captions 56-64 on 16:9, 42-48 on 9:16.", minimum: 20, maximum: 140),
+        "margin": MCPSchema.number("Edge distance / frame height, 0–0.45 (default 0.056).", minimum: 0, maximum: 0.45),
+        "size": MCPSchema.number("Pixels on a 1080-tall frame, 20–140 (default 56); a 9:16 frame is 1920 tall.", minimum: 20, maximum: 140),
         "max_width": MCPSchema.number("Line width / frame width; wraps. Default 0.92 (16:9), 0.74 (9:16). Project only.", minimum: 0.3, maximum: 1),
-        "line_spacing": MCPSchema.number("Line-height multiple, default 1; full-height glyphs (Yuanti) suit 1.15-1.3.", minimum: 1, maximum: 2),
+        "line_spacing": MCPSchema.number("Line-height multiple, 1–2 (default 1); full-height glyphs (Yuanti) suit 1.15–1.3.", minimum: 1, maximum: 2),
         "font": MCPSchema.string("Installed burnable font: e.g. Hiragino Sans GB, Heiti SC, Helvetica Neue."),
         "bold": MCPSchema.boolean("Bold."),
         "color": MCPSchema.string("Text colour, #RRGGBB."),
         "outline": MCPSchema.string("Outline colour #RRGGBB, or none."),
-        "outline_width": MCPSchema.number("Outline thickness, or box padding.", minimum: 0, maximum: 12),
+        "outline_width": MCPSchema.number("Outline thickness, or box padding, 0–12.", minimum: 0, maximum: 12),
         "box": MCPSchema.string("Background bar replaces outline: #RRGGBBAA, or none."),
         "shadow": MCPSchema.string("Shadow with outline only: #RRGGBBAA, or none."),
         "highlight": MCPSchema.string("Spoken-word colour: #RRGGBB, or none. Project only."),
@@ -136,13 +125,13 @@ public enum MCPSubtitleExportTools {
         let change = MCPSchema.object([
             "id": MCPSchema.string("Line id from get_subtitles."),
             "text": MCPSchema.string("New text."),
-            "start": MCPSchema.number("New start, timeline seconds.", minimum: 0),
-            "end": MCPSchema.number("New end, timeline seconds.", minimum: 0)
+            "start": MCPSchema.number("New start, timeline seconds (≥ 0).", minimum: 0),
+            "end": MCPSchema.number("New end, timeline seconds (≥ 0).", minimum: 0)
         ], required: ["id"])
         let addition = MCPSchema.object([
             "track": MCPSchema.string("original (default) or translation.", oneOf: ["original", "translation"]),
-            "start": MCPSchema.number("Timeline seconds.", minimum: 0),
-            "end": MCPSchema.number("Timeline seconds.", minimum: 0),
+            "start": MCPSchema.number("Timeline seconds (≥ 0).", minimum: 0),
+            "end": MCPSchema.number("Timeline seconds (≥ 0).", minimum: 0),
             "text": MCPSchema.string("Text of the new line.")
         ], required: ["start", "end", "text"])
         let replacement = MCPSchema.object([
@@ -154,14 +143,9 @@ public enum MCPSubtitleExportTools {
         return MCPToolDefinition(
             .editSubtitles, title: "Edit subtitles",
             description: """
-            Change subtitle lines as one undoable step: edit text or times by id, add lines, delete lines, merge lines \
-            (merge keeps the word times; retyping loses them), replace text on every line (replace) or strip punctuation from \
-            every line (strip_punctuation, what generate_subtitles does); bulk edits keep the word times of unchanged words. \
-            Creates the subtitle track if the project has none. style \
-            sets how this project's subtitles look (the user's Burn In Subtitles page keeps its own; own_style in the result \
-            turns true once the project has its own look; the word highlight always belongs to the project). Set it before \
-            generate_subtitles or add_voiceover subtitles=true: lines are cut to fit that size. highlight only lights lines \
-            SkyCut made from speech or a voiceover (get_subtitles says how many know their word times).
+            Change subtitle lines in one call: edit text or times by id (get_subtitles), add, delete or merge lines (merge keeps \
+            word times), find and replace on every line, or strip_punctuation. style sets this project's subtitle look: set it \
+            before generate_subtitles or add_voiceover subtitles=true. Creates the subtitle track if there is none. One undo step.
             """,
             input: MCPSchema.object([
                 "changes": MCPSchema.array(of: change, "Lines to change."),
@@ -173,9 +157,7 @@ public enum MCPSubtitleExportTools {
                 ),
                 "replace": MCPSchema.array(of: replacement, "Find and replace on every line of a track; runs after changes, add and merge, before delete."),
                 "strip_punctuation": MCPSchema.boolean(
-                    "Remove pause punctuation from every line, the way SkyCut writes generated subtitles: commas, periods, semicolons, "
-                        + "colons (also Chinese ones) become a space mid-line and vanish at the end; ? ! quotes, numbers and abbreviations stay. "
-                        + "Runs after replace. The result lists lines left empty."
+                    "Remove pause punctuation from every line, the way generated subtitles are written; runs after replace."
                 ),
                 "style": subtitleStyle
             ])
@@ -186,12 +168,10 @@ public enum MCPSubtitleExportTools {
         MCPToolDefinition(
             .exportVideo, title: "Export the video",
             description: """
-            Final or fast review: final uses saved settings; quick_review uses hardware/720p short-side cap/small/AAC128, \
-            never upscales. encoder/resolution/quality override only this call.
+            Render the project to MP4 (audio-only: M4A), burning visible subtitles. preset=final uses the saved settings; \
+            preset=quick_review is a fast, small review copy; per-call fields override without changing saved settings. Never \
+            replaces a file. Returns job_id: wait with get_job. Pass on get_timeline music_credits.
             Example: {"preset":"quick_review"}
-            Returns job_id; get_job gives file/export_settings/timings. MP4 (audio-only M4A); burns visible subtitles. \
-            Defaults to project name in SkyCut/Exports under workspace/project/Downloads; numbered, never replaces. \
-            Relay get_timeline music_credits.
             """,
             input: MCPSchema.object([
                 "path": MCPSchema.string("Full output path. Leave out to use name and the default folder."),

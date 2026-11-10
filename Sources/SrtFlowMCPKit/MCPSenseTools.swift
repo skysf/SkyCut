@@ -22,20 +22,17 @@ public enum MCPSenseTools {
         MCPToolDefinition(
             .listen, title: "Measure the sound",
             description: """
-            Measure sound: clip_id is one timeline clip including volume/fades/faders; neither clip nor file lists all \
-            audible clips. from/to limits timeline seconds. file uses source seconds, source_in/source_out narrows it. \
-            Returns level_db (RMS excluding silence), peak_db, silences (silence_db/min_silence), loudest_at and per-step \
-            curve for one clip/file; dBFS -60 or less is silent. beats=true returns tempo_bpm, beats and downbeats for one \
-            clip/file. cuts=true with neither checks every V1 head/tail for pauses/speech, names words from transcribe and \
-            gives edit_clip suggested_source_in / suggested_source_out. External-file approval follows the AI permission mode.
+            Read-only. Measure sound: level, peak, silences, loudest moment and a level curve for one clip (with its volume, fades \
+            and faders), a file, or every audible clip. beats=true finds tempo, beats and downbeats; cuts=true checks every V1 cut \
+            for pauses and speech and suggests better in or out points. Outside files may return needs_confirmation.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A clip on the timeline."),
                 "file": MCPSchema.string("A media file instead (absolute, or relative to the opened folder)."),
-                "from": MCPSchema.number("Timeline seconds to start at.", minimum: 0),
-                "to": MCPSchema.number("Timeline seconds to stop at.", minimum: 0),
-                "source_in": MCPSchema.number("With file: start, seconds in the file.", minimum: 0),
-                "source_out": MCPSchema.number("With file: end, seconds in the file.", minimum: 0),
+                "from": MCPSchema.number("Timeline seconds to start at (≥ 0).", minimum: 0),
+                "to": MCPSchema.number("Timeline seconds to stop at (≥ 0).", minimum: 0),
+                "source_in": MCPSchema.number("With file: start, seconds in the file (≥ 0).", minimum: 0),
+                "source_out": MCPSchema.number("With file: end, seconds in the file (≥ 0).", minimum: 0),
                 "silence_db": MCPSchema.number("Quieter than this counts as silence (default -45).", minimum: -80, maximum: -10),
                 "min_silence": MCPSchema.number("Shortest silence to report, seconds (default 0.5).", minimum: 0.1, maximum: 10),
                 "beats": MCPSchema.boolean("Also find the tempo and every beat (one clip or file)."),
