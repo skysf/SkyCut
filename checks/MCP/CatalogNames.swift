@@ -62,6 +62,8 @@ func catalogKnownNames() -> Set<String> {
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。
     names.formUnion(["one_time", "voice_design", "voice_enroll", "sample_url", "voice_library_unavailable", "voice_limit",
                      "reference_exists", "too_little_speech"])
+    // manage_voices 没给 language 时（2026-11-11，SkyStudioVoiceRecordingLanguage）：结果里的 language_detected、识别不出来的 reason。
+    names.formUnion(["language_detected", "language_undetected"])
     return names
 }
 

@@ -207,6 +207,9 @@ final class VoiceLibraryHTTP: URLProtocol {
 final class VoiceLibraryFixture {
     let folder: URL
     let project: VideoEditProject
+    /// manage_voices 没给 language 时这台「Mac」识别出来的（nil = 识别不出来）；`detections` 数识别了几次。
+    var detectedLanguage: String?
+    private(set) var detections = 0
 
     init(folder: URL) throws {
         self.folder = folder
@@ -230,6 +233,10 @@ final class VoiceLibraryFixture {
         services.install = { _, progress in progress(1) }
         services.slots = SkyStudioJobSlots(limits: .init(shared: 3, audio: 8))
         services.jobSleep = { _ in try await Task.sleep(nanoseconds: 5_000_000) }
+        services.detectLanguage = { [unowned self] _, _ in
+            detections += 1
+            return detectedLanguage
+        }
         services.transcribe = { file, _ in
             let index = Int(file.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "batch-", with: "")) ?? 0
             let prompt = VoiceLibraryHTTP.lock.withLock { VoiceLibraryHTTP.prompts.indices.contains(index) ? VoiceLibraryHTTP.prompts[index] : "" }

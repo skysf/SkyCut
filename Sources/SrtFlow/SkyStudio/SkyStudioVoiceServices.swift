@@ -23,6 +23,9 @@ struct SkyStudioVoiceServices {
         try await SkyStudioVoiceTranscription.install($0, progress: $1)
     }
     var transcribe: SkyStudioVoiceRender.Transcribe = SkyStudioVoiceAudio.transcribe
+    /// manage_voices 没给 `language` 时，这段做好的参考录音（文件、多长）说的是哪种语言：和新建声音对话框同一份
+    /// （VoiceSampleLanguage → SpokenLanguageProbe）；识别不出来是 nil。回归换成假的。
+    var detectLanguage: @MainActor (URL, Double) async -> String? = { await VoiceSampleLanguage.detect(sample: $0, seconds: $1) }
     /// 各批在哪儿领槽：全 App 一份（槽数照 /me）；回归换成自己的一份、定好槽数。
     var slots: SkyStudioJobSlots = .shared
     /// 等 Sky Studio 的时候怎么睡（照 poll_after_seconds、满了等 15 秒）：nil = SkyStudioJobRun 的默认；回归换成短的。
