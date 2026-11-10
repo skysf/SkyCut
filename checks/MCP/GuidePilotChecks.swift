@@ -7,7 +7,8 @@ import SrtFlowMCPKit
 // - 每条参数说明 ≤ 120，带 minimum / maximum 的说明里写着数字（Codex 不显示范围）；
 // - 单个工具的参数定义 ≤ 4,500 UTF-8 字节，例外只有 edit_clip、generate_media（例外名单不许变长）；
 // - 说明书的主题：overview 以迁移前的说明原文开头（一个字不丢）、迁移前后的名片不一样、几节都不空、有例子有相关主题；
-//   手写的几节只提真有的名字（参数定义写成的 fields 几节是自动生成的，不算手写）；
+//   手写的几节只提真有的名字（参数定义写成的 fields 几节是自动生成的，不算手写）。
+//   没有可搬的原文的工具（行为和迁移一起改了，previousCard 为 nil）只许是写死的那几个（现在只有 add_voiceover，mcp-guide.md 第 14 条）。
 // - 每一节讲什么（2026-11-10 试点实测之后）：手写的每一节带一行 about、fields 几节自动生成；分节回的主题第一次回答列出 contents、
 //   next_step 叫它只读要用的那几节、常见的活只读哪一节（generate_media → spending、edit_clip → framing）。
 
@@ -16,6 +17,9 @@ let pilotParameterLimit = 120
 let pilotSchemaByteLimit = 4_500
 /// 参数定义超过 4,500 字节的例外（方案 4.1：先列例外，名单不许变长）。
 let pilotSchemaExceptions: Set<MCPToolName> = [.editClip, .generateMedia]
+/// 没有可搬的原文的迁移工具：行为和迁移同一个 PR 改了，旧说明照抄进概要等于叫 AI 用已经没有的东西（add_voiceover：声音方案 4.10、4.2–4.4、
+/// 第十二节 —— 默认 gemini:Charon、去掉 clone_from、不再收 Rachel）。旧说明每一句去了哪写在那个 PR 的说明里。名单写死：加一个要改这里。
+let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover]
 
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
@@ -30,7 +34,10 @@ private let pilotNature: [MCPToolName: [String]] = [
     .addClips: ["One undo step", "needs_confirmation"],
     .look: ["Read-only", "wait with get_job", "needs_confirmation", "skycut_guide topic=look"],
     .generateMedia: ["Paid (Sky Studio credits)", "quote_only", "needs_confirmation", "confirm_token", "daily credit limit",
-                     "wait with get_job", "skycut_guide topic=generate_media"]
+                     "wait with get_job", "skycut_guide topic=generate_media"],
+    // add_voiceover 不收 quote_only（整段报价在回任务号之前自动做，声音方案 4.2），所以名片里没有它。
+    .addVoiceover: ["One undo step", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
+                    "skycut_guide topic=add_voiceover"]
 ]
 
 func runGuidePilotChecks() {
@@ -56,6 +63,9 @@ func runGuidePilotChecks() {
         checkWrittenTopic(tool)
     }
     checkEqual(pilotSchemaExceptions, [.editClip, .generateMedia], "the over-4,500-byte exceptions stay edit_clip and generate_media only")
+    let withoutPreviousCard = Set(MCPGuideWrittenTopics.migrated.filter { MCPGuideWrittenTopics.topic(for: $0)?.previousCard == nil })
+    checkEqual(withoutPreviousCard, pilotToolsWithoutPreviousCard, "only the listed migrated tools have no pre-migration description to keep")
+    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover], "the tools without a pre-migration description stay add_voiceover only")
     print("MCP pilot cards: \(cards.joined(separator: ", ")) (limit \(pilotCardLimit), target 350).")
     runGuideFieldSplitChecks()
     runGuideContentsChecks()
@@ -167,16 +177,18 @@ private func checkWrittenTopic(_ tool: MCPToolName) {
         check(false, "\(tool.rawValue): a migrated tool has a written guide topic")
         return
     }
-    check(topic.sections.first?.text.hasPrefix(written.previousCard) == true, "\(tool.rawValue): the overview starts with the pre-migration description, word for word")
-    checkEqual(written.previousCard.utf16.count, pilotPreviousCardLengths[tool], "\(tool.rawValue): the pre-migration description is kept whole (its measured length)")
-    check(written.previousCard != tool.definition.description, "\(tool.rawValue): the card was rewritten (the long text now lives in the guide)")
+    if let previousCard = written.previousCard {
+        check(topic.sections.first?.text.hasPrefix(previousCard) == true, "\(tool.rawValue): the overview starts with the pre-migration description, word for word")
+        checkEqual(previousCard.utf16.count, pilotPreviousCardLengths[tool], "\(tool.rawValue): the pre-migration description is kept whole (its measured length)")
+        check(previousCard != tool.definition.description, "\(tool.rawValue): the card was rewritten (the long text now lives in the guide)")
+    }
     checkEqual(Set(topic.sections.map(\.name)).count, topic.sections.count, "\(tool.rawValue): section names are unique")
     check(written.sections.count >= 4, "\(tool.rawValue): the written topic has its own sections beyond the overview")
     check(!written.examples.isEmpty && !written.related.isEmpty, "\(tool.rawValue): the written topic has examples and related topics")
     for section in written.sections {
         check(!section.text.isEmpty, "\(tool.rawValue).\(section.name) is written")
         // overview 开头是迁移前的原文（名单之外的结果字段名照收），后面的手写部分只许提真有的名字。
-        let text = section.name == MCPGuideSection.overview ? String(section.text.dropFirst(written.previousCard.count)) : section.text
+        let text = section.name == MCPGuideSection.overview ? String(section.text.dropFirst(written.previousCard?.count ?? 0)) : section.text
         let unknown = guideUnknownNames(text)
         check(unknown.isEmpty, "\(tool.rawValue).\(section.name) names only real tools and parameters (unknown: \(unknown.joined(separator: ", ")))")
     }

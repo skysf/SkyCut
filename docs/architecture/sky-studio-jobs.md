@@ -52,6 +52,8 @@
 | `SkyStudioVoiceCatalog.swift` | 纯值：`/models` 顶层的预设声音（属性按语言分开）、角色 → 预设、授权文案；声音模型记录上的一次性费用价目、Eleven 支持的语言、分批的字数上限（第十四节） |
 | `SkyStudioVoiceLibrary.swift` / `SkyStudioVoiceAPI.swift` | 声音库：用户自己的声音（只认 `voice_…`，没有服务商 id）、长期授权的状态、建声音 / 加录音的请求体；`/voices`、`/voices/consent-grant` 的请求（第十四节） |
 | `SkyStudioVoiceQuote.swift` / `SkyStudioVoiceResults.swift` / `SkyStudioVoiceRequests.swift` | 声音任务：`voice_plan`、每批的价、一次性费用；做完的结果（变声的两个文件、建 / 设计回的声音）和错误码；整段报价和每批 `/jobs`、建 MiniMax 版 / 设计 / 变声的请求、两个上传用途、语言提示（第十四节） |
+| `SkyStudioVoicePick.swift` | 纯值：add_voiceover 的 `voice` 在 Sky Studio 上是谁（SkyCut 声音方案 4.3：默认预设、角色只认 `voice_roles`、`gemini:` / `eleven:` / 不带前缀的预设名、英式男声读非英文）、本机退档用哪个角色（第五节） |
+| `SkyStudioVoicePlan.swift` / `SkyStudioVoiceoverStart.swift` | 一段旁白怎么交：报价之前分批、整段报价的请求，报价之后每批的请求（同一个 `params.plan`）、要不要本机转写（纯值）；回任务号之前的那几步：读 Key / 目录、认声音、整段报价、转写预检、整体预留、起任务（第五节） |
 
 ### 模型目录的缓存与换账户
 
@@ -91,21 +93,38 @@
 
 ## 五、云端旁白与失败恢复
 
-云端配音（6c，2026-10-29）由 `SkyStudioVoiceoverRun` 执行；本机 Kokoro / macOS 仍走原来的同步路径。
+云端配音（6c，2026-10-29）由 `SkyStudioVoiceoverRun` 执行；本机 Kokoro / macOS 仍走原来的同步路径。2026-11-10 起（声音 PR 3，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.2–4.4、8.4）：
 
-- **先回任务号**：Key 静默读取、模型、全部报价、音频处理都在任务里；调用方只用 `get_job` 等，不重复原始 `add_voiceover`。普通旁白服务不可用时可退本机；每日硬预算不足暂停，不换声音。克隆不退档、不问越额确认码。
-- **整批预留、逐批结算**：先从 `/models` 读模型与 cap，全部报价后一次预留总额（`SkyStudioVoiceBudget`）；每批复用 `SkyStudioJobRun`、同一幂等 key 重试。未提交的退回，取消 / 失败明确没花钱的退回且只退一次；提交结果未知的保留账，报告 `credits_unknown`、`submission_keys` 和已知服务器任务号，不自动重生成。
+- **认声音**（`SkyStudioVoicePick`）：不点名 = `/models` 里 `default: true` 的预设（现在是 `gemini:Charon`）；角色只认 `voice_roles`（本机不再抄 Eleven 的角色表）；
+  `gemini:<名字>` 或不带前缀的预设名；`eleven:<名字>`；英式男声读非英文改用那种语言的男声角色并说一声。声音库的 `voice_…` 是声音 PR 6。
+  `model` 不给是 `auto`（服务器选，`voice_plan` 原样报给 AI）；点名的要是 `/models` 里这个 kind 的模型。
+- **先报价、再回任务号**（`SkyStudioVoiceoverStart`）：静默读 Key → `/models`（`SkyStudioCatalogCache`）→ 分批（普通旁白现在一句一单，克隆在上限里合批；
+  上限是这个 kind 下各模型 `limits.max_characters_by_language` 里最小的，`model: auto` 时还不知道选哪个）→ **整段 `POST /quote` 一次**（`params.batches`、
+  拉丁字母的非英文稿带 `params.language`；读稿不再发 `language_code`）→ 核对报价（有 `voice_plan`、批数对得上；要一次性费用的现在不交，那是声音 PR 6）→
+  选中的模型不报字的时间（`/models` 的 `output.words`）又要字幕、或一批要切成几句时，先确认这台 Mac 能转写，不能就拒 → 按每批的 credits 整体预留：
+  不够当场回 `daily_budget_exceeded`、什么都不起、不换声音 → 起任务，回 `job_id`、`voice_plan`、`voice.note`、`credits` / `credits_expected`。
+  一次性费用要在花钱之前问（决定第三节第 4 条），所以报价不能留在任务里；只多一个请求（一段一次）。
+- **退本机只在付费请求之前**：读不到 Key / 目录 / 报价（断网、5xx、Key 不认、目录还没有声音）就当场换本机的声音（角色照旧，预设按它在这种语言里的性别挑角色，
+  没点名用旁白角色 `zh_male` / `en_male`），`voice.note` 说为什么；服务器明说这个请求不行（4xx 除 401 / 403 / 426 / 429）原话转给 AI、一分不花、不换声音；
+  每日硬预算不足不换声音（2026-11-01 定）。任务里不再退本机。
+- **整批预留、逐批结算**：每批 `/jobs` 带同一个 `params.plan`（`voice_plan.selection`，整段一个模型）、这一批报价的 credits 当 `max_credits`、各自的幂等 key；
+  每批复用 `SkyStudioJobRun`、同一幂等 key 重试。未提交的退回，取消 / 失败明确没花钱的退回且只退一次；提交结果未知的保留账，报告 `credits_unknown`、
+  `submission_keys` 和已知服务器任务号，不自动重生成。每批实际跑的模型和服务器有没有在这一批里换备用（`fallback_used`）记进恢复记录、`get_job` 报
+  （之后的批改带备用的选择是声音 PR 4）。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
-- **克隆合批**：`SkyStudioVoicePlan` 读取 `limits.max_characters_by_language`、按接口语言名选 cap；计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。短句装同一批、长句拆片记原句索引，不按每句收一次钱。参考录音（2026-11-10 起）是 44.1 kHz 单声道 16-bit WAV、至少 10 秒有效人声、最长 3 分钟（超过自动挑一段），用途 `voice_reference`、只上传一次，规矩见 [声音库](voice-library.md)。
-- **本机切句**：多句一批前先确认 macOS 26 转写模型已安装，否则收费前失败。拿到成品后复用系统转写和 `SubtitleCueWords` 字符对齐，每句必须覆盖足够原文；只在识别到的词之间找安静切口，不按字数猜时间。切不准保留完整批次文件并报错，禁止再次收费生成来掩盖失败。
+- **合批**（声音库的声音；普通旁白合批是声音 PR 5）：`SkyStudioVoiceBatch` 按上限装批；计数用 Unicode code points（`unicodeScalars.count`），保持完整字形，包含句间换行。短句装同一批、长句拆片记原句索引，不按每句收一次钱。参考录音不再随读稿上传：`clone_from` 2026-11-10 去掉了，参考进声音库（[声音库](voice-library.md)，声音 PR 6）。
+- **本机切句**：多句一批、或要字幕而模型不报字的时间时，先确认 macOS 26 转写模型已安装，否则收费前失败（`SkyStudioVoiceoverStart`）。拿到成品后复用系统转写和 `SubtitleCueWords` 字符对齐，每句必须覆盖足够原文；只在识别到的词之间找安静切口，不按字数猜时间。切不准保留完整批次文件并报错，禁止再次收费生成来掩盖失败。
 - **落地**：各句都经 `AIAudioFileWriter.writeVoiceover` 写到配音目录；最后核对原工程和 generation，一次 `AIUndoGrouping.step` 同时入轨 / 字幕、记本轮改动、未保存工程落盘。工程已换 / 关闭只留文件，不改别的工程。`get_job` 报批次、阶段、服务器任务号、文件和已收积分；状态行与生成共用 `SkyStudioMediaStatus`。
 
 **2026-11-01：后续本地失败不否定已成功的生成。**
 
 - `SkyStudioVoiceCheckpoint` 将原始输入、原工程、原播放头、每批原文 / 原句索引、请求 key、服务器任务号、成品地址与元数据、完整原音频、本地切点 / 词时间、已完成成句文件和入轨回执记在配音目录的 `Voiceover-<UUID>.recovery/voiceover-recovery.json`。目录 700、记录 600；串行原子写，IO 经 `MediaReadQueue.voice`。原始批次不再由临时目录 defer 删除。
+  **version 2**（2026-11-10）：另记整段报价时服务器的选择（`plan.voicePlan`，每批的请求带着它）和每批实际跑的模型、`fallback_used`；**只认 version 2**（只有用户本人在用，升级前没做完的配音先做完或放弃，用户 2026-11-09 定）。
 - POST 前先持久化 `submitted`；云端成功先持久化原结果，再下载，再做本地分析；成句完成即保存进度。长句跨批时保留原音频与分析，恢复按批次原序重建未完成句；已完成句子不重复写文件。付费生成不在分句 / 字幕重试路径上。
 - `failure_stage` 区分 `cloud_generation`、`local_split`、`subtitle_alignment`，另有 `download`、`file_write`、`checkpoint`、`insertion`。要求字幕但没有可信词时间时明确留待恢复，不能把“音频成功但无字幕”当整项成功。
 - MCP 继续用 `add_voiceover` 和 `get_job`，不增加平行任务系统。`add_voiceover {resume: <recovery_file>}` 默认仅处理已有音频或 GET 已知原单，不重新报价、上传或 POST 生成；完整原音频在本机时连 Key 都不读。`generate_missing:true` 才会为明确未生成的批次报价 / 预留 / 提交。两种调用都回新 `job_id`，用 `get_job` 等；同一恢复文件并发请求复用正在跑的任务。
+- `generate_missing` 补没生成的批次：照记录里的选择（`model: auto` 时 `params.plan` = 那份 `selection`）把这几批再报一次价、整体预留，只换这几批的 `max_credits`；
+  服务器回的选择和记录的不一样就一批都不交（恢复不重新选模型，SkyCut 声音方案 8.4）。
 - “未生成”只能是从未提交，或失败 / 取消有明确无扣费、全退证据且没有成品。未知结果有原单号只复用 `SkyStudioJobRun.resume` GET 原单；无原单号保留原 key 待核查，显式补生成也不重放它。成功后下载 / 本地处理失败不能退款、不能退回 missing。
 - 结果给出 `recovery_state`、`completed_line_indices`、`pending_recovery_line_indices`、`not_generated_line_indices` / `not_generated_batch_indices`、`unknown_batch_indices`、每批 `parts`（原文与 `line_index`）、原音频 / 成句文件、原单身份与可执行 `recovery.arguments`。列表中的索引从 0 起；顶层历史 `batch_index` 仍从 1 起。可恢复的未完成任务仍以 `failed` / `cancelled` 结束，通过 `recovery_state` 与方法继续，不能再次提交原稿。
 - 入轨仍复用 `AIVoiceoverTool.plan/apply`、`AIVoiceoverSubtitles`。提交前先写稳定的片段 UUID；提交完成记回执。重复恢复不再插入，用户之后撤销也不自动补回；工程已存在那组 UUID、但最终回执没写成时认已有插入，不再生字幕。只存在部分 UUID 时拒绝自动补插，交还现有内容让调用方检查。
@@ -129,9 +148,9 @@
 
 ## 七、配音验证与人工回归
 
-- `scripts/check-sky-studio.sh` 的 `VoiceChecks`：动态上限、code points、合批 / 长句拆片、所有 chunk 的全局词时间、实际时长、切句拒绝不可靠转写、整批配额与未知账；`JobRunChecks` 覆盖 POST 返回瞬间取消仍先报告 ID。
-- `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：选声与本机退档、预制音色 / 角色、词时间各种合同格式、WAV 字节逐个对账。
-- `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果；模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句字幕对齐失败、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录，验证原单恢复只 GET。
+- `scripts/check-sky-studio.sh` 的 `VoiceChecks`：动态上限、code points、合批 / 长句拆片、所有 chunk 的全局词时间、实际时长、切句拒绝不可靠转写、整批配额与未知账；报价之前分批（上限读 `/models`、普通旁白一句一单）、整段报价的请求、报价之后每批带同一个 `params.plan` 和自己的 `max_credits`、批数对不上 / 要一次性费用不交、要不要本机转写；`VoicePickChecks` 对着目录快照认声音（4.3 的顺序、默认 Charon、角色只认 `voice_roles`、英式男声、本机退档按性别）；`JobRunChecks` 覆盖 POST 返回瞬间取消仍先报告 ID。
+- `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数名（`clone_from` 那三个不收、`model` / `confirm_token` 收）、本机这一档挑谁（不点名是旁白角色）、词时间各种合同格式，名片必含 / 说明书必含（固定说法、默认 gemini:Charon、失败了别重发、主题照声音方案 4.10 分节）；名片长度、按性质的固定说法、参数说明 ≤ 120、参数定义 ≤ 4,500 字节、主题里的名字都存在、例子过参数核对和试点的五个工具一起在 `GuidePilotChecks` / `GuideContentChecks`，会问的工具收 `confirm_token` 在 `ArgumentCheckChecks`。
+- `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果。回任务号之前（`StartChecks.swift`）：不点名用 gemini:Charon、整段 `/quote` 一次（kind voice、model auto、params.batches、英文不带提示）、回 `job_id` 带 `voice_plan`、每批同一个 `params.plan` / 各自的 `max_credits` / 各自的 key、记录记下选择和每批的模型、服务器在某一批换了备用也记下；额度不够 / 服务器拒 / 要一次性费用 / 没有这个预设或模型 / 要字幕却转写不了都在花钱之前停下、什么都不交，服务器不答当场退本机；英式男声读中文、warnings 进 `voice.note`、`next_step` 叫 AI 先转告。恢复（`Main.swift`）：模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批（照记录的选择再报价：服务器这时自己选会选成别的，不带选择就被认出来）、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句字幕对齐失败、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录（只认 version 2），验证原单恢复只 GET。
 - 免费端到端：`scripts/gui-smoke/sky-studio/run.sh`，再用 `SRTFLOW_FFMPEG=<ffmpeg> python3 scripts/gui-smoke/sky-studio/voice.py`。独立 `.skystudiosmoke` App、回环假服务和假 Key，真实 MCP / 本机合成 / 转写 / 文件 / 入轨 / 字幕 / 撤销。`run.sh stop` 只清理这个测试身份；不使用生产 Key。假 Key 钩子同时要求测试 bundle 和回环地址，Beta / 正式包不认。
 - [ ] 真实 Key：普通旁白跨多个 chunk、字幕尾端不超音频；两句克隆只付一批并切成两段，听接缝无截字；一步撤销音频字幕一起消失。
 - [ ] 有窗口 / 后台工程：状态行显示积分、阶段与停止；取消 queued 只退一次，409 已开始继续查到结局；切 / 关工程不落到另一工程。
@@ -284,8 +303,9 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 ## 十四、声音的接口合同（声音 PR 1，2026-11-10）
 
 依据 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md)（2026-11-09 批准：第二节约定、第三节「SkyCut 需要 Sky Studio 接口提供的东西」、第十节 PR 1、9.1 第 1、2 项）和
-Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**这一刀只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**：
-`add_voiceover`、MCP 清单、界面都没动，现有的配旁白（`SkyStudioVoicePlan`、`SkyStudioVoices`、`SkyStudioVoiceoverRun`）照旧，PR 3 起才换。
+Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**PR 1 只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**；
+**声音 PR 3（2026-11-10）把 `add_voiceover` 的读稿接上了**：预设 / 角色从这里的目录认、整段报价和每批的 `params.plan` 照这里的请求拼（第五节）。
+声音库（`/voices`、建 / 设计、`voice_…` 读稿）、一次性费用和变声的入口还没接（声音 PR 6–9）。
 Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
 
 - **目录**（`SkyStudioVoiceCatalog`，`catalog.voices`）：`/models` 顶层的 `voice_presets`、`voice_roles`、`voice_rules`、`voice_consent`

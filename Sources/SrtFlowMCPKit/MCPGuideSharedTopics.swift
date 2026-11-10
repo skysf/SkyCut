@@ -85,7 +85,7 @@ enum MCPGuideSharedTopics {
         Paid work uses the user's Sky Studio credits.
 
         Which tools. generate_media (images, camera angles, image upscale, videos, lipsync, background cutout, music, sound \
-        effects), upscale_clip, manage_characters (create and headshot) and add_voiceover with Sky Studio voices (cloning too). \
+        effects), upscale_clip, manage_characters (create and headshot) and add_voiceover with Sky Studio voices. \
         list_characters and get_character are free. \
         get_status models=true lists the current models with their defaults and limits, free and without generating anything.
 

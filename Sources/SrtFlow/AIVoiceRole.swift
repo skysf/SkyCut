@@ -4,8 +4,9 @@ import Foundation
 //
 // 管什么：配方卡里写的是角色，不是某个具体的声音（方案第 16、43、49 条）。每个角色：语言、性别、语气、用哪个 Kokoro 音色
 // （2026-09-28 用户听样音挑的），以及退到 macOS 声音时音调高一点还是原样。另外几样和 Kokoro 音色名有关的小规则：
-// 哪些语言它能读、每种语言默认用哪个音色、音色名的第一个字母是哪种语言。
-// 不管什么：这一次到底用哪个声音（AIVoiceChoice）。
+// 哪些语言它能读、每种语言默认用哪个音色、音色名的第一个字母是哪种语言。角色在 Sky Studio 上对应哪个预设声音由服务器给
+// （`/models` 的 voice_roles，SkyStudioVoicePick 读），这里不写。
+// 不管什么：这一次到底用哪个声音（AIVoiceChoice、SkyStudioVoicePick）。
 
 struct AIVoiceRole: Equatable {
     enum Style: String { case lively, warm, plain, british }
@@ -39,9 +40,20 @@ struct AIVoiceRole: Equatable {
 
     static var names: String { all.map(\.name).joined(separator: ", ") }
 
-    /// 没点名时：按文字的语言用温和女声。
-    static func fallback(forLanguage language: String) -> AIVoiceRole? {
-        all.first { $0.language == language && $0.style == .warm }
+    /// 没点名时的旁白：这种语言的男声（zh_male / en_male）。和 Sky Studio 不点名时的默认预设（gemini:Charon，男声）是同一个人设：
+    /// `/models` 的 voice_roles 里指向它的正是这两个角色（SkyCut 声音方案 4.3；check-mcp 对着目录快照核对）。
+    /// 没有角色的语言（日、西……）是 nil，按语言用默认的那个。
+    static func narrator(forLanguage language: String) -> AIVoiceRole? {
+        all.first { $0.language == language && $0.gender == .male && $0.style == .plain }
+    }
+
+    /// 同一种语言里这个性别的那个角色：男声是旁白（narrator），女声用温和的（Sky Studio 的预设退到本机时按它在这种语言里的性别挑）。
+    static func role(gender: String, language: String) -> AIVoiceRole? {
+        switch gender {
+        case "female": return all.first { $0.language == language && $0.gender == .female && $0.style == .warm }
+        case "male": return narrator(forLanguage: language)
+        default: return nil
+        }
     }
 
     /// 退到 macOS 声音时优先的地区（英式角色找英国的声音）。
@@ -62,9 +74,9 @@ struct AIVoiceRole: Equatable {
     /// Kokoro 能读的语言（2026-09-28 探针：一份模型管这 8 种；韩语、德语等读出来是乱的，用 macOS 的声音）。
     static let kokoroLanguages: Set<String> = ["zh", "en", "ja", "es", "fr", "it", "pt", "hi"]
 
-    /// 没点名、又不是中英文时，每种语言默认用哪个 Kokoro 音色。
+    /// 没点名时每种语言默认用哪个 Kokoro 音色：中英文是旁白角色的（narrator），别的语言照这张表。
     static func defaultKokoroVoice(forLanguage language: String) -> String? {
-        if let role = fallback(forLanguage: language) { return role.kokoroVoice }
+        if let role = narrator(forLanguage: language) { return role.kokoroVoice }
         return ["ja": "jf_alpha", "es": "ef_dora", "fr": "ff_siwis", "it": "if_sara", "pt": "pf_dora", "hi": "hf_alpha"][language]
     }
 

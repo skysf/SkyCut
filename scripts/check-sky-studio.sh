@@ -21,6 +21,8 @@
 #      （checks/SkyStudio/Fixtures/models-voice-*.json）读；/voices 和长期授权的请求；读稿整段报价（params.batches）读回 voice_plan /
 #      每批的价 / 一次性费用、每批 /jobs 带同一个 params.plan、拉丁字母的非英文稿才带 params.language；建 MiniMax 版 / 设计 / 变声的
 #      请求和结果；429 的 pool、/me 的 max_running_audio_jobs、两个新上传用途。
+#      声音 PR 3：add_voiceover 的 voice 在 Sky Studio 上是谁（SkyStudioVoicePick：认声音的顺序、默认 gemini:Charon、角色只认 voice_roles、
+#      英式男声读非英文、本机退档按性别）；报价之前怎么分批、报价之后每批照报价交（SkyStudioVoicePlan）；恢复记录 version 2。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -118,6 +120,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceResults.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceRequests.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceAPI.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoicePick.swift \
+  Sources/SrtFlow/AIVoiceRole.swift \
+  Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AITextLanguage.swift \
   Sources/SrtFlow/SpeechWordTimes.swift \
   Sources/SrtFlow/AIVoiceWords.swift \
@@ -158,6 +163,7 @@ xcrun swiftc \
   checks/SkyStudio/VoiceLibraryChecks.swift \
   checks/SkyStudio/VoicePlanChecks.swift \
   checks/SkyStudio/VoiceJobChecks.swift \
+  checks/SkyStudio/VoicePickChecks.swift \
   checks/SkyStudio/GenerationChecks.swift \
   checks/SkyStudio/ModelPolicyChecks.swift \
   checks/SkyStudio/ModelExpansionChecks.swift \

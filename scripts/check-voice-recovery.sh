@@ -23,7 +23,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_S
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   -I "${BUILD_DIR}/Modules" \
-  checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/Main.swift \
+  checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/StartChecks.swift checks/VoiceRecovery/Main.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
 # 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。

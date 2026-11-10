@@ -203,6 +203,10 @@ private func runGuideWordingChecks() {
     for topic in MCPGuideTopics.all where MCPToolName(rawValue: topic.name) == nil {
         handWritten += topic.sections.map { ("the \(topic.name) topic", $0.text) }
     }
+    // 迁移过的工具的名片也是手写的（它们手写的几节在 GuidePilotChecks 里查；迁移前的原文不查，fields 是现算的）。
+    for tool in MCPGuideWrittenTopics.migrated {
+        handWritten.append(("the \(tool.rawValue) card", tool.definition.description))
+    }
     for (what, text) in handWritten {
         check(!text.isEmpty, "\(what) is written")
         let unknown = guideUnknownNames(text)

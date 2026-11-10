@@ -9,6 +9,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import media_fixtures
 import model_expansion_fixtures as expansion
+import voice_fixtures
 from official_fixtures import OfficialRecipes
 
 PORT, ROOT, FFMPEG = int(sys.argv[1]), Path(sys.argv[2]), sys.argv[3]
@@ -59,7 +60,7 @@ def synthesize(job):
     with LOCK:
         job.update(status="done", result={"url": BASE + "/files/" + target.name,
                    "content_type": "audio/wav", "duration": duration,
-                   "words": chunks if job["kind"] == "voice" else None}, credits_charged=job["credits"])
+                   "words": chunks if voice_fixtures.gives_words(job) else None, **voice_fixtures.outcome(job)}, credits_charged=job["credits"])
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -137,11 +138,8 @@ class Handler(BaseHTTPRequestHandler):
                 "skycut": {"plan": "pro", "features": {"mcp": True, "watermark": False},
                            "valid_until": stamp(86400), "max_running_jobs": 3}, "server_time": stamp()})
         if self.path.endswith("/models"):
-            return self.reply(200, {"models": [
-                {"id": "local-narrator", "kind": "voice", "title": "Local narrator fixture", "limits": {"max_characters": 100}},
-                {"id": "local-clone", "kind": "voice_clone", "title": "Local clone fixture",
-                 "params": {"language": ["en_us", "cmn"]}, "limits": {"max_characters_by_language": {"en_us": 80, "cmn": 20}}}] + media_fixtures.models() + expansion.CATALOG["models"],
-                 "billing_policy": expansion.CATALOG["billing_policy"]})
+            return self.reply(200, {"models": voice_fixtures.models() + media_fixtures.models() + expansion.CATALOG["models"],
+                                    "billing_policy": expansion.CATALOG["billing_policy"], **voice_fixtures.top_level()})
         with LOCK:
             job = JOBS.get(self.path.split("/")[-1])
             if job and job.get("account") == self.account():
@@ -151,7 +149,7 @@ class Handler(BaseHTTPRequestHandler):
                 if job.get("refuse"):
                     job["polls"] = job.get("polls", 0) + 1
                     media_fixtures.refuse(job, job["polls"] >= CONTROL.get("refund_after_polls", 1))
-                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls", "account")}
+                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls", "account", "plan")}
                 return self.reply(200, public)
         self.error(404, "unknown_job")
 
@@ -178,6 +176,8 @@ class Handler(BaseHTTPRequestHandler):
                 if CONTROL.get("quote_error"):
                     return self.error(503, "unavailable")
                 credits = 2.5 if data["kind"] == "voice_clone" else 1
+                if data["kind"] in voice_fixtures.READING and "batches" in (data.get("params") or {}):
+                    return self.reply(200, voice_fixtures.quote(data, credits))
                 credits = CONTROL.get("quotes_by_prompt", {}).get(data.get("prompt"), credits)
                 if CONTROL.get("replacement_expensive") and data["model"] == "minimax-h3":
                     credits = 2
@@ -218,6 +218,7 @@ class Handler(BaseHTTPRequestHandler):
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
                                account=self.account(),
                                kind=data["kind"], model=data["model"], prompt=data.get("prompt", ""), poll_after_seconds=2,
+                               plan=(data.get("params") or {}).get("plan"),
                                credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity
                     if data["model"].startswith("seedance") and CONTROL.get("refuse_seedance"):

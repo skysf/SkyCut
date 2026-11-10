@@ -4,7 +4,10 @@ import SrtFlowMCPKit
 
 // MARK: - 云端配旁白 / 克隆：每批先保存，再本地处理，最后一次入轨
 // 管什么：现有长任务接口、恢复调度、失败阶段与入轨回执；所有批次的原音频 / 映射 / 进度永久留在恢复目录。
-// 不管什么：请求与预算（SkyStudioVoiceCloudBatches）、切句与字幕对齐（SkyStudioVoiceRender）、文件合同（SkyStudioVoiceCheckpoint）。
+// 新的一段在回任务号之前已经报过价、预留过积分（SkyStudioVoiceoverStart，2026-11-10 声音 PR 3 挪过去的）：任务里只剩记恢复记录、交、等、
+// 切、落地；退本机也只在那之前（付费请求交出去之后不再退本机）。
+// 不管什么：报价与认声音（SkyStudioVoiceoverStart）、请求与预算（SkyStudioVoiceCloudBatches）、切句与字幕对齐（SkyStudioVoiceRender）、
+// 文件合同（SkyStudioVoiceCheckpoint）。
 
 @MainActor
 final class SkyStudioVoiceoverRun {
@@ -12,6 +15,8 @@ final class SkyStudioVoiceoverRun {
     private weak var project: VideoEditProject?
     let status: SkyStudioMediaStatus
     private let services: SkyStudioVoiceServices
+    /// 新的一段：回任务号之前做完的报价、预留、Key；恢复的任务是 nil。
+    private var prepared: SkyStudioVoiceoverPrepared?
     private let generateMissing: Bool
     private let recoveryFile: URL
     private var recovery: SkyStudioVoiceRecovery?
@@ -19,24 +24,24 @@ final class SkyStudioVoiceoverRun {
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
     private var locale: Locale?
-    /// 新的克隆任务在报价之前做好的参考录音（临时文件夹，任务结束就删）；恢复的任务没有，传参考时再做。
-    private var reference: VoiceReferenceSample.Sample?
-    private var referenceFolder: URL?
     private var batchIndex = 0
     private var stage = SkyStudioVoiceCheckpoint.Stage.cloudGeneration
     private var extra: [String: JSONValue] = [:]
 
-    init(input: AIVoiceoverInput, project: VideoEditProject, recovery: SkyStudioVoiceRecovery? = nil,
+    init(input: AIVoiceoverInput, project: VideoEditProject, prepared: SkyStudioVoiceoverPrepared? = nil, recovery: SkyStudioVoiceRecovery? = nil,
          generateMissing: Bool = true, services: SkyStudioVoiceServices? = nil) {
         self.input = input
         self.project = project
+        self.prepared = prepared
         self.recovery = recovery
         self.generateMissing = generateMissing
         self.services = services ?? SkyStudioVoiceServices()
+        locale = prepared?.locale
         recoveryFile = (recovery?.file ?? input.folder.appendingPathComponent("Voiceover-\(UUID().uuidString).recovery").appendingPathComponent("voiceover-recovery.json"))
             .standardizedFileURL.resolvingSymlinksInPath()
-        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: recovery?.value.plan.model.title ?? "Sky Studio", credits: nil,
-            uploads: input.clone != nil, owner: CloudTasksActivity.owner(of: project), mediaKind: .audio)
+        let title = prepared?.modelTitle ?? recovery?.value.plan.voicePlan.model ?? "Sky Studio"
+        status = SkyStudioMediaStatus(kindLabel: L10n("Voiceover"), modelTitle: title, credits: prepared?.plan.batchCredits.reduce(0, +),
+            uploads: false, owner: CloudTasksActivity.owner(of: project), mediaKind: .audio)
     }
 
     func start() -> AIToolResult {
@@ -48,23 +53,37 @@ final class SkyStudioVoiceoverRun {
         status.onCancel = { [weak self] in self?.task?.cancel() }
         SkyStudioGenerationActivity.shared.add(status)
         task = Task { @MainActor in await self.execute() }
-        return .ok([
+        var result: [String: JSONValue] = [
             "status": "started", "job_id": .string(job.id), "provider": "Sky Studio", "recovery_file": .string(recoveryFile.path),
-            "next_step": "Wait with get_job. Cloud cloning may queue for several minutes. On failure preserve recovery_file; call add_voiceover resume=recovery_file for local recovery, never repeat the original lines. Only generate_missing=true may pay for missing batches."
-        ])
+            "next_step": "Wait with get_job. On failure preserve recovery_file; call add_voiceover resume=recovery_file for local recovery, never repeat the original lines. Only generate_missing=true may pay for missing batches."
+        ]
+        if let prepared {
+            var voice: [String: JSONValue] = ["name": .string(input.choice.name), "quality": .string(input.choice.qualityName)]
+            if let note = input.choice.note {
+                voice["note"] = .string(note)
+                result["next_step"] = .string("Before the user listens, tell them what voice.note says. " + (result["next_step"]?.stringValue ?? ""))
+            }
+            result["voice"] = .object(voice)
+            result["voice_plan"] = prepared.plan.voicePlan.json
+            result["batches"] = .number(Double(prepared.plan.batches.count))
+            result["credits"] = .number(prepared.plan.batchCredits.reduce(0, +))
+            if let expected = prepared.quote.creditsExpected { result["credits_expected"] = .number(expected) }
+        }
+        return .ok(.object(result))
     }
 
     private func execute() async {
         defer {
+            // 预留还没交给云端批次就停了（一开始就取消、工程关了）：在这里退回。交过去之后只在云端批次那一份里退，不会退两次。
+            if var unused = prepared?.budget { unused.refundUnused(); prepared = nil }
             cloud?.refundUnused()
-            if let referenceFolder { try? FileManager.default.removeItem(at: referenceFolder) }
             SkyStudioVoiceRecovery.active[recoveryFile.path] = nil
             SkyStudioGenerationActivity.shared.remove(status)
         }
         status.advance(to: .preparing, typicalSeconds: nil)
         do {
             try Task.checkCancellation()
-            if recovery == nil, !(try await prepareNew()) { return }
+            if recovery == nil { try await prepareNew() }
             guard let recovery else { throw AIToolError("The voiceover recovery record could not be created.") }
             if let applied = recovery.value.applied {
                 recovery.value.issue = nil
@@ -147,75 +166,31 @@ final class SkyStudioVoiceoverRun {
         finish(cancelled ? .cancelled : .failed, message(error))
     }
 
-    /// 只有付费请求之前可用普通本机退档；本地失败后的恢复绝不重新选声或生成。
-    private func prepareNew() async throws -> Bool {
-        let key: String
-        let plan: SkyStudioVoicePlan
-        do {
-            key = try await services.key()
-            let catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: services.api)
-            let kind = input.clone == nil ? "voice" : "voice_clone"
-            guard let model = catalog.models(kind: kind).first else { throw AIToolError("Sky Studio offers no \(kind) model right now.") }
-            plan = try SkyStudioVoicePlan.make(lines: input.lines.map(\.text), model: model, voice: input.choice.name, language: input.language)
-            if plan.clones, plan.batches.contains(where: { $0.speech.parts.count > 1 }) { locale = try await services.locale(input.language) }
-        } catch is CancellationError { throw CancellationError() }
-        catch { try await fallback(message(error)); return false }
-        guard projectUnchanged, let project else { throw AIToolError("The original project was closed or changed; nothing was charged.") }
-        try await prepareReference()
-        if input.speed != 1 {
-            input.choice.note = [input.choice.note, "The Sky Studio voice speaks at its own pace; speed was ignored."].compactMap { $0 }.joined(separator: " ")
-        }
-        let recovery = SkyStudioVoiceRecovery(input: input, project: project, plan: plan, file: recoveryFile)
+    /// 新的一段：报价和预留回任务号之前就做完了（SkyStudioVoiceoverStart），这里先把预留交给云端批次（任务结束时没花出去的退回），
+    /// 再写下恢复记录。付费请求交出去之后不再退本机；本地失败后的恢复绝不重新选声或生成。
+    private func prepareNew() async throws {
+        guard let prepared else { throw AIToolError("The voiceover's quote is missing; nothing was charged.") }
+        guard let project else { throw AIToolError("The original project was closed before the voiceover started; nothing was charged.") }
+        let recovery = SkyStudioVoiceRecovery(input: input, project: project, plan: prepared.plan, file: recoveryFile)
         self.recovery = recovery
+        cloud = SkyStudioVoiceCloudBatches(recovery: recovery, api: services.api, key: prepared.key, status: status, budget: prepared.budget,
+                                           canSubmit: { [weak self] in self?.projectUnchanged == true })
+        self.prepared = nil
+        guard projectUnchanged else { throw AIToolError("The original project was closed or changed; nothing was charged.") }
         stage = .checkpoint
         try await recovery.save()
         AIReadGrants.shared.remember([recoveryFile])
-        status.modelTitle = plan.model.title
-        cloud = SkyStudioVoiceCloudBatches(recovery: recovery, input: input, api: services.api, key: key, status: status,
-                                         reference: reference, canSubmit: { [weak self] in self?.projectUnchanged == true })
         stage = .cloudGeneration
-        do { try await cloud?.prepareMissing() }
-        catch is CancellationError { throw CancellationError() }
-        catch let failure as SkyStudioFailure { try await fallback(message(failure)); return false }
-        return true
-    }
-
-    /// 克隆的参考录音在报价、预留积分、写恢复记录之前做好：人声不够这类问题当场拒，`recovery_state` 是 not_started、
-    /// `next_step` 是改了再调原来的 add_voiceover（不是去恢复，恢复只会再错一次），get_job 带着 reason / voiced_seconds /
-    /// missing_seconds。用了哪一段写进声音说明，跟着恢复记录走（PR #346 审查第 3 条）。
-    private func prepareReference() async throws {
-        guard let clone = input.clone else { return }
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlow-voice-reference-\(UUID().uuidString)")
-        referenceFolder = folder
-        let sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
-        reference = sample
-        input.choice.note = [input.choice.note, sample.summary(name: clone.url.lastPathComponent)].compactMap { $0 }.joined(separator: " ")
     }
 
     private func cloudBatches() async throws -> SkyStudioVoiceCloudBatches {
         if let cloud { return cloud }
         guard let recovery else { throw AIToolError("Missing recovery record.") }
         let key = try await services.key()
-        let cloud = SkyStudioVoiceCloudBatches(recovery: recovery, input: input, api: services.api, key: key, status: status,
+        let cloud = SkyStudioVoiceCloudBatches(recovery: recovery, api: services.api, key: key, status: status,
                                              canSubmit: { [weak self] in self?.projectUnchanged == true })
         self.cloud = cloud
         return cloud
-    }
-
-    private func fallback(_ note: String) async throws {
-        try Task.checkCancellation()
-        input = try input.localFallback(note)
-        guard let project, projectUnchanged else { throw AIToolError("The original project was closed before the voiceover started.") }
-        stage = .fileWrite
-        let plan = try await AIVoiceoverTool.plan(input, project)
-        if let recovery {
-            for (line, spoken) in plan.spoken.enumerated() {
-                recovery.value.outputs[line] = .init(url: spoken.output.url, duration: spoken.output.duration, words: spoken.output.words)
-            }
-        }
-        try Task.checkCancellation()
-        stage = .insertion
-        try await land(plan: plan, project: project)
     }
 
     private func land(outputs: [AISpeechSynthesis.Output]) async throws {
@@ -227,7 +202,7 @@ final class SkyStudioVoiceoverRun {
             try await recovery.save()
             return finish(.done, "The saved insertion is already on the timeline; nothing was added again.")
         }
-        // 声音说明以恢复记录为准：克隆传参考时补了「用了素材的哪一段」。
+        // 声音说明以恢复记录为准（报价时写下的：认声音、服务器的 warnings、语速）。
         input.choice.note = recovery.value.input.note
         var plan = try await AIVoiceoverTool.plan(input, project, outputs: outputs, playhead: recovery.value.input.playhead)
         if !recovery.value.landingIDs.isEmpty {
@@ -246,7 +221,7 @@ final class SkyStudioVoiceoverRun {
     private func land(plan: AIVoiceoverTool.Plan, project: VideoEditProject) async throws {
         if let recovery {
             if recovery.value.landingIDs.isEmpty { recovery.value.landingIDs = plan.spoken.map(\.clip.id) }
-            try await recovery.save() // 云端与普通退档共用：先记稳定身份，再允许改工程。
+            try await recovery.save() // 先记稳定身份，再允许改工程。
         }
         try Task.checkCancellation()
         guard projectUnchanged else { throw AIToolError("The original project changed before insertion; all voice files were kept.") }

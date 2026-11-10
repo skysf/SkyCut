@@ -177,6 +177,10 @@ extension SkyStudioModel {
 
     /// 一次性费用的那几条记录（建 MiniMax 版、设计声音：`one_time: true`）：打开全部权限时的价目照它挑，不写死 id。
     var isOneTime: Bool { metadata["one_time"]?.boolValue == true }
+
+    /// 读稿的模型报不报每个字什么时候说（`output.words`：Eleven v4 报、Gemini / 克隆的几个不报）；没写是 nil（不知道，当不报）。
+    /// 不报的要字幕、要把一批切成几句就得在本机转写（SkyStudioVoiceoverStart、SkyCut 声音方案第七节）。
+    var givesWordTimes: Bool? { metadata["output"]?["words"]?.boolValue }
 }
 
 extension SkyStudioCatalog {

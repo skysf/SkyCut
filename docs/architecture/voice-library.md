@@ -64,15 +64,14 @@
 
 ## 五、谁在用
 
-- **现在**：`add_voiceover` 的 `clone_from`。给了 `clone_seconds` 就是那一段（不到 10 秒当场拒，`AIVoiceoverInput.cloneSource`），
-  不给就从 `clone_start` 到结尾、超过 3 分钟自动挑。新任务在**报价、预留积分、写恢复记录之前**就做好参考录音（`SkyStudioVoiceoverRun.prepareReference`，
-  放临时文件夹、任务结束就删）：人声不够当场拒，`recovery_state` 是 `not_started`、`next_step` 是改了再调原来的 `add_voiceover`（去恢复只会再错一次），
-  `get_job` 带着 `reason` / `voiced_seconds` / `missing_seconds`。参考只传一次（`SkyStudioVoiceCloudBatches.uploadReferenceIfNeeded`）；
-  恢复的任务若参考还没传上去，传的时候才做、写进恢复文件夹。用了哪一段写进声音说明、跟着恢复记录走，落地时随 `voice.note` 报给 AI。
-  **这条旧路在过渡期哪个服务器都走不通**：现在线上的 Sky Studio 不认 `voice_reference` 这个用途；新的声音服务（Sky Studio 声音 PR）的 `voice_clone`
-  不再收 `inputs.reference_audio_url`。声音 PR 6 用 `manage_voices create` 取代它并删掉 `clone_from`（决定第七节第 8 条；过渡期不能克隆，用户已接受，决定第十二节）。
-  MCP 清单里 `clone_seconds` 的说明（5–30、默认 10）是旧的，留到声音 PR 3 / 6 和清单一起改（这一刀不碰清单）。
-- **以后**：`manage_voices create` / `add_reference`、设置里的新建声音对话框（声音 PR 6、8）都只调 `VoiceReferenceSample.prepare`。
+- **现在没有生产入口**：`add_voiceover` 的 `clone_from`（参考录音随读稿现做现传一次）**2026-11-10 在声音 PR 3 里去掉了**（决定第七节第 8 条；
+  方案原排在 PR 6，PR 3 改写读稿的流程（先整段报价再回任务号）和恢复记录（version 2）时一起去掉，免得把一条哪个服务器都走不通的旧路搬进新流程：
+  线上的 Sky Studio 不认 `voice_reference` 这个用途，新的声音服务的 `voice_clone` 不再收 `inputs.reference_audio_url`）。带 `clone_from` / `clone_start` /
+  `clone_seconds` 就是说明上没有的参数名，整个调用不做。过渡期不能克隆，用户已接受（决定第十二节）。同一天 PR #350 加的「报价之前做好参考录音、
+  人声不够当场拒并把 `reason` / `voiced_seconds` / `missing_seconds` 带进 get_job」那一段随之删了；`AIToolError.details` 进 get_job 的那一手留着，声音 PR 6 用。
+  `VoiceReferenceSample.prepare` 这段时间只有自检在调（第六节）。
+- **以后**：`manage_voices create` / `add_reference`、设置里的新建声音对话框（声音 PR 6、8）都只调 `VoiceReferenceSample.prepare`（人声不够要在花钱之前拒、
+  原因带进 get_job，照 PR #350 那时的做法）；用声音库的声音读稿（`voice=voice_…`）不再传参考，参考从声音库拿。
 
 ## 六、回归
 
@@ -81,7 +80,7 @@
 | `scripts/check-mcp.sh` 的 `VoiceReferenceChecks`（纯值） | 门限是 0.0056（0.0056 和精确的 −45 dBFS 算有声，再小一点和服务器的 0.0055 不算）、10 秒下限、3 分钟上限（正好 3 分钟、结尾有停顿还是整段）；整段、人声多的那段、一样多比前 15 秒、再比早；切口只在 ≥ 0.2 秒的停顿里且离两头 40 ms、尽头能当终点、一直有声时退到最安静的格子边；和照规矩直写的穷举对 16 组随机样本（含只有小停顿的）；分块量的响度 = 一口气量的；WAV 头、量化往返、NaN / ±Inf 记 0 且特别大的夹住、写给 AI 的那一句（时间向下取整）、上传用途 |
 | `scripts/check-mcp.sh` 的 `VoiceReferenceFileChecks`（真读真写） | 现写素材走生产的 `prepare`、把写出来的 WAV 按字节读回来：44.1 kHz 16-bit 的源逐采样不变；48 kHz 立体声 4 分钟挑在说话密的 3 分钟、开口前 40 ms 起、停在最后一个字后 40 ms（和读到尽头人声一样多，取短的）、不到 181 秒、左右取平均；点名的一段原样截、采样数正好；AAC 的时间对得上；只有 8 秒人声的拒、说还差 2 秒、不留文件；取消不留文件；照审查的 `borderline.wav` 现写的贴边样本（9.9 秒 + 5 格 ±184）正好 10.0 秒、收；浮点刚过门限、量化后不够的 10 格按写出去的数（9.9 秒、拒）；带 NaN / ±Inf / 1e20 的浮点素材不崩、那几处写成 0 / 0 / 0 / 满幅 |
 | `checks/MCP/voice-reference-wiring.sh`（扫描，`check-mcp` 和 `check-guards` 都跑） | 门限是写死的 `speechRMSFloor = 0.0056`，`VoiceReferenceWindow` 的代码里不碰 `AIVoiceLevel` |
-| `scripts/check-voice-recovery.sh`（真 App 对象） | 克隆的参考只上传一次、用途 `voice_reference`、传上去的是整段 12 秒的 44.1 kHz 单声道 16-bit；恢复记录、恢复出来的结果、一次就做完的结果都说用了哪一段；`clone_seconds` 不到 10 秒当场拒、不给就到结尾、不再夹在 30 秒；只有 6 秒人声的素材在报价之前就拒（一个 POST 都没有、不写恢复记录、`get_job` 带 `reason` 和差 4 秒） |
+| ~~`scripts/check-voice-recovery.sh`（真 App 对象）~~ | 2026-11-10（声音 PR 3）去掉 `clone_from` 时这几条一起删了：读稿不再上传参考、不再在任务里做参考录音。上传用途、WAV 规格、人声不够的原因仍由上面三项钉着；声音库建声音时的真 App 检查跟声音 PR 6 一起加 |
 
 反向验证（2026-11-10，每一处临时改回去、跑、再恢复）。PR #346：
 
@@ -107,6 +106,7 @@
 | `fail()` 不把结构化的原因带进 get_job | `check-voice-recovery`：6 秒素材的 get_job 里没有 `reason` / `missing_seconds` |
 
 全部恢复后转绿。读完到写之间再看一次取消（第 6 条）没有确定的触发办法，没做反向验证。
+两张表里牵涉 `check-voice-recovery` 的几行是当时的记录；那几条检查在声音 PR 3 随 `clone_from` 一起删了。
 
 ## 七、人工回归（真 Key；声音库上线、新建声音的界面做好之后）
 
