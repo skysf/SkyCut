@@ -35,7 +35,9 @@ struct SkyStudioVoiceOutcome: Equatable, Sendable {
 struct SkyStudioVoiceConversion: Equatable, Sendable {
     var voiceURL: URL
     var backgroundURL: URL
+    /// 人声的类型（`audio/wav`）；背景不是 WAV 时另有 `backgroundContentType`（下载落盘时按它起扩展名）。
     var contentType: String?
+    var backgroundContentType: String?
     var sampleRate: Double?
     var channels: Int?
     var duration: Double?
@@ -48,6 +50,7 @@ struct SkyStudioVoiceConversion: Equatable, Sendable {
         voiceURL = voice
         backgroundURL = background
         contentType = json["content_type"]?.stringValue
+        backgroundContentType = json["background_content_type"]?.stringValue
         sampleRate = json["sample_rate"]?.doubleValue
         channels = json["channels"]?.intValue
         duration = json["duration"]?.doubleValue
@@ -62,12 +65,24 @@ struct SkyStudioVoiceConversion: Equatable, Sendable {
     }
 }
 
+/// `voice_enroll`（这种语言 `minimax: true` 了）、`voice_design`（新声音）做完回的东西。
+struct SkyStudioVoiceLibraryResult: Equatable, Sendable {
+    /// 服务器的 `warnings`：`keep_alive_failed` = MiniMax 版建好了、可那句保活朗读没读成（MiniMax 规定 7 天内不用就删）。
+    static let keepAliveFailed = "keep_alive_failed"
+
+    var voice: SkyStudioVoice
+    /// 设计的样音：1 小时的临时链接、到什么时候过期（过期就重取 `GET /voices/{id}`）。建 MiniMax 版没有。
+    var sampleURL: URL?
+    var sampleExpiresAt: Date?
+    var warnings: [String]
+}
+
 /// 没有 `url` 的三种结果。
 enum SkyStudioVoiceJobResult: Equatable, Sendable {
     /// `voice_convert`。
     case conversion(SkyStudioVoiceConversion)
-    /// `voice_enroll`（这种语言 `minimax: true` 了）、`voice_design`（新声音，带一段样音的 1 小时临时链接）。
-    case voice(SkyStudioVoice, sampleURL: URL?)
+    /// `voice_enroll`、`voice_design`。
+    case voice(SkyStudioVoiceLibraryResult)
 
     /// 认不出来（或者少了必须的）就是 nil。
     init?(json: JSONValue) {
@@ -76,7 +91,11 @@ enum SkyStudioVoiceJobResult: Equatable, Sendable {
             self = .conversion(conversion)
         } else if let voice = json["voice"], voice.objectValue != nil {
             guard let parsed = try? SkyStudioVoice(json: voice) else { return nil }
-            self = .voice(parsed, sampleURL: SkyStudioLinks.webURL(json["sample_url"]?.stringValue))
+            self = .voice(SkyStudioVoiceLibraryResult(
+                voice: parsed, sampleURL: SkyStudioLinks.webURL(json["sample_url"]?.stringValue),
+                sampleExpiresAt: json["sample_expires_at"]?.stringValue.flatMap(SkyStudioJSON.parseDate),
+                warnings: json["warnings"]?.arrayValue?.compactMap(\.stringValue) ?? []
+            ))
         } else {
             return nil
         }
