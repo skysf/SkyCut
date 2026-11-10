@@ -42,6 +42,11 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
+    // 第二批迁移的工具主题提到的结果字段和报错代码（2026-11-10）：get_status 的 mcp_catalog / cloud_tasks；list_characters 的
+    // next_cursor / available_roles；get_character 的 not_found；read_document 的 next_from_char；cancel_job 说到的 billing_note；
+    // get_timeline 说到的 edit_limits 里的 keyframe_scale。
+    names.formUnion(["mcp_catalog", "cloud_tasks", "next_cursor", "available_roles", "not_found", "next_from_char", "billing_note",
+                     "keyframe_scale"])
     return names
 }
 

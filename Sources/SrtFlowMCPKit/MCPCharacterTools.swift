@@ -6,7 +6,11 @@ enum MCPCharacterTools {
         switch name {
         case .listCharacters:
             return MCPToolDefinition(name, title: "List characters", description:
-                "List Sky Studio characters as compact summaries: id, name, status, revision, available_roles, saved model/tier and dates. Each entry is at most 1 KiB; no asset/thumbnail URLs. Use get_character for complete details. Free, read-only; no upload, reservation or generation. Default status=ready, limit=50; pass next_cursor as cursor. capabilities=true also returns the unchanged native Character models, tiers, defaults, limits and prices, independently of the ordinary image catalog.",
+                """
+                Read-only and free. List Sky Studio characters as compact summaries: id, name, status, revision, available_roles, \
+                saved model and dates; each at most 1 KiB, no image URLs. get_character gives the full details. Pages of limit \
+                (default 50); pass next_cursor as cursor. capabilities=true adds the character models, limits and prices.
+                """,
                 input: MCPSchema.object([
                     "limit": MCPSchema.integer("Page size; default 50.", minimum: 1, maximum: 100),
                     "cursor": MCPSchema.string("Opaque next_cursor UUID from the preceding page."),
@@ -15,7 +19,11 @@ enum MCPCharacterTools {
                 ]), readOnly: true, openWorld: true)
         case .getCharacter:
             return MCPToolDefinition(name, title: "Get character", description:
-                "Read one Sky Studio character, available front/headshot/side/back views and its opaque revision. Free and read-only; another account's id is not_found. Use character_id with generate_media; server resolves its views without downloading/re-uploading them. After replacing a view, refresh and requote: old revisions and approvals cannot authorize changed images.",
+                """
+                Read-only and free. One Sky Studio character: its front, headshot, side and back views and its revision. Pass \
+                character_id to generate_media to use it; Sky Studio uses the views directly. After a view changes, read it again and \
+                quote again: old revisions and approvals no longer apply.
+                """,
                 input: MCPSchema.object([
                     "character_id": MCPSchema.string("Full character UUID from list_characters or a Character job.")
                 ], required: ["character_id"]), readOnly: true, openWorld: true)

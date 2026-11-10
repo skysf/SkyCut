@@ -24,7 +24,12 @@ let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover]
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
 private let pilotPreviousCardLengths: [MCPToolName: Int] = [
-    .editClip: 737, .generateMedia: 978, .setText: 249, .addClips: 577, .look: 968
+    .editClip: 737, .generateMedia: 978, .setText: 249, .addClips: 577, .look: 968,
+    // 第二批 27 个（main f76032e 的清单量的；原文在 MCPGuidePreviousCardsBatch2，脚本照抄）。
+    .getStatus: 380, .setView: 442, .openProject: 710, .newProject: 556, .closeProject: 271, .saveProject: 158, .undo: 186, .seek: 93,
+    .cancelJob: 58, .getSettings: 394, .getTimeline: 231, .setTrack: 253, .splitClip: 136, .deleteItems: 325, .duplicateItems: 418,
+    .setTransition: 160, .setCanvas: 217, .editClips: 402, .setTexts: 420, .setShapes: 405, .findAudio: 516, .readDocument: 378,
+    .convertSubtitles: 248, .recipes: 672, .saveRecipe: 415, .listCharacters: 481, .getCharacter: 360
 ]
 
 /// 迁移过的工具按性质该写的固定说法（方案 2.2 第 4、5 条）。性质从工具本身看不全（会不会改时间线、要不要先读说明书），写在这里。
@@ -37,7 +42,37 @@ private let pilotNature: [MCPToolName: [String]] = [
                      "wait with get_job", "skycut_guide topic=generate_media"],
     // add_voiceover 不收 quote_only（整段报价在回任务号之前自动做，声音方案 4.2），所以名片里没有它。
     .addVoiceover: ["One undo step", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
-                    "skycut_guide topic=add_voiceover"]
+                    "skycut_guide topic=add_voiceover"],
+    // 第二批（2026-11-10）：只读的 Read-only、改工程的 One undo step、会问的 needs_confirmation，外加各检查和扫描守卫要的说法
+    // （get_status 的 screen recording 和 cloud_tasks、get_timeline 的 edit_limits、list_characters 的 compact summaries / 1 KiB、
+    // recipes 的 which one you follow、delete_items 的 Linkage on:、convert_subtitles 的 or in folder）。
+    .getStatus: ["Read-only", "screen recording", "and cloud_tasks grouped by project:"],
+    .setView: ["Ask the user once per conversation"],
+    .openProject: ["project=<id>"],
+    .newProject: ["A taken name gets a number"],
+    .closeProject: ["saved first"],
+    .saveProject: ["one undo step"],
+    .undo: ["one undo step"],
+    .seek: ["Read-only"],
+    .cancelJob: ["queued"],
+    .getSettings: ["Read-only"],
+    .getTimeline: ["Read-only", "edit_limits"],
+    .setTrack: ["One undo step"],
+    .splitClip: ["One undo step"],
+    .deleteItems: ["One undo step", "Linkage on:"],
+    .duplicateItems: ["One undo step"],
+    .setTransition: ["One undo step"],
+    .setCanvas: ["One undo step"],
+    .editClips: ["one undo step"],
+    .setTexts: ["one undo step"],
+    .setShapes: ["one undo step"],
+    .findAudio: ["Read-only", "music_credits", "never download"],
+    .readDocument: ["Read-only", "needs_confirmation"],
+    .convertSubtitles: ["never overwrites", "needs_confirmation", "or in folder"],
+    .recipes: ["Read-only", "which one you follow"],
+    .saveRecipe: ["only when they ask", "Trash"],
+    .listCharacters: ["Read-only", "compact summaries", "1 KiB"],
+    .getCharacter: ["Read-only"]
 ]
 
 func runGuidePilotChecks() {
@@ -183,7 +218,8 @@ private func checkWrittenTopic(_ tool: MCPToolName) {
         check(previousCard != tool.definition.description, "\(tool.rawValue): the card was rewritten (the long text now lives in the guide)")
     }
     checkEqual(Set(topic.sections.map(\.name)).count, topic.sections.count, "\(tool.rawValue): section names are unique")
-    check(written.sections.count >= 4, "\(tool.rawValue): the written topic has its own sections beyond the overview")
+    // 至少两节手写的（概要之外）：试点那 5 个大工具都有四节以上，第一批里 set_filter 这类小工具两节就写全了。
+    check(written.sections.count >= 3, "\(tool.rawValue): the written topic has its own sections beyond the overview")
     check(!written.examples.isEmpty && !written.related.isEmpty, "\(tool.rawValue): the written topic has examples and related topics")
     for section in written.sections {
         check(!section.text.isEmpty, "\(tool.rawValue).\(section.name) is written")

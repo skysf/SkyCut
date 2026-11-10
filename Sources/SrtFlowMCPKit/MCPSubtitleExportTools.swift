@@ -105,7 +105,10 @@ public enum MCPSubtitleExportTools {
         case .cancelJob:
             return MCPToolDefinition(
                 .cancelJob, title: "Cancel a job",
-                description: "Stop a running export, subtitle generation or translation.",
+                description: """
+                    Stop a job: a running export, subtitle generation or translation stops, and a queued job is dropped. Sky Studio jobs \
+                    can only be cancelled while queued; character jobs cannot. Check get_job afterwards.
+                    """,
                 input: MCPSchema.object(["job_id": MCPSchema.string("Job id.")], required: ["job_id"])
             )
         default:

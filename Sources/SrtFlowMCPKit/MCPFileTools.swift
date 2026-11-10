@@ -11,10 +11,9 @@ public enum MCPFileTools {
             return MCPToolDefinition(
                 .readDocument, title: "Read a document",
                 description: """
-                Read the text of a document the user gave you: a script, an outline, notes, selling points. PDF, Word (.doc, \
-                .docx), RTF, ODT, .txt and .md; not Pages files (ask for PDF or Word) or scanned PDFs (pictures of text). Long \
-                documents come in pieces of max_chars characters; call again with from_char = next_from_char for the rest. Files \
-                outside the opened folder need the user's OK.
+                Read-only. Read the text of a document the user gave you (a script, outline, notes): PDF, Word, RTF, ODT, .txt or .md; \
+                not Pages files or scanned PDFs. Long documents come in pieces: call again with from_char = next_from_char. Files \
+                outside the opened folder may return needs_confirmation.
                 """,
                 input: MCPSchema.object([
                     "file": MCPSchema.string("Path of the document (absolute, or relative to the opened folder)."),

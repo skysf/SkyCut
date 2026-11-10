@@ -14,10 +14,10 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .getStatus, title: "SkyCut status",
                 description: """
-                Read first: project name/path/length/unsaved; projects with ids/ownership/view; folders, jobs/Stop, \
-                screen recording/permission/leftovers and cloud_tasks grouped by project: background/closed too. mcp_catalog: App \
-                count/fingerprint, not client reload proof. models=true reads Sky Studio models/prices/defaults/reference \
-                limits free; model filters an id. screen=true lists sources.
+                Read-only. Call it first: the project (name, path, length, unsaved), open projects with ids and who edits them, \
+                folders, jobs and Stop, screen recording state, permission and leftovers, and cloud_tasks grouped by project: \
+                background and closed ones too. models=true lists Sky Studio models, prices and limits for free; screen=true lists \
+                recording sources; film_contract=true gives the film contract.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
@@ -31,11 +31,10 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .setView, title: "View mode",
                 description: """
-                visible (the default): a project's window comes forward once when you open it (or now), and each edit is \
-                selected and shown in its preview. background: SkyCut stays where it is and does not follow the edits; they \
-                still go into the project and can be undone. With project, only that project; without, your open projects and \
-                the ones you open next. Ask the user once per conversation which they want, unless they said. Lasts until \
-                SkyCut quits.
+                Choose how the user follows your edits: visible (default) brings a project's window forward once and shows each edit \
+                in the preview; background leaves SkyCut where it is while edits still land and can be undone. With project, only that \
+                project; without, all yours. Ask the user once per conversation which they want, unless they said. Lasts until SkyCut \
+                quits.
                 """,
                 input: MCPSchema.object([
                     "mode": MCPSchema.string("How the user follows your edits.", oneOf: ["visible", "background"])
@@ -64,12 +63,9 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .openProject, title: "Open a project",
                 description: """
-                Open an existing SkyCut project file (.skycut, or .srtflowproj from before the rename). The result's project is its id (p1, p2…). Several projects \
-                can be open at once: to edit several (for example with sub-agents), open or create them all first, then pass \
-                project=<id> on every call; a call without project goes to the project you opened last. It opens in SkyCut's \
-                main window when that is empty, otherwise in a window of its own, shown once; after set_view background it \
-                opens with no window (the user sees it in SkyCut's AI projects list). A file already open is not opened twice: you get its id, unless another AI session is editing it. \
-                SkyCut keeps at most 8 projects open: close_project the finished ones.
+                Open a SkyCut project file (.skycut, or .srtflowproj from before the rename); the result's project is its id (p1, \
+                p2…). To edit several, open them all, then pass project=<id> on every call; without project a call goes to the one you \
+                opened last. A file already open is not opened twice. At most 8 projects stay open: close_project finished ones.
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Absolute path of the project file (.skycut or .srtflowproj).")
@@ -79,12 +75,9 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .newProject, title: "New project",
                 description: """
-                Start a new, empty project and save it at once as <name>.skycut, so every later edit autosaves. It goes \
-                into the folder you pass, otherwise into SkyCut/Projects inside the folder the user named (open_folder), the \
-                open project's folder, or Downloads. A taken name gets a number (the result has the real path). Several cuts \
-                from one folder need version (the file becomes <name> - <version>): a second project in a folder where you \
-                already have one open is refused without it. The result's project is its id; it opens and counts like \
-                open_project (see there).
+                Start a new, empty project, saved at once as <name>.skycut so later edits autosave: in folder, else in SkyCut/Projects \
+                of the opened folder, the open project's folder or Downloads. A taken name gets a number. A second project in the same \
+                folder needs version (<name> - <version>). The result's project is its id; it opens like open_project.
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("Project name without extension. Default: the workspace folder's name."),
@@ -96,9 +89,9 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .closeProject, title: "Close a project",
                 description: """
-                Close one of your projects (project=p2) when you are done with it, for example after its export finished. \
-                It is saved first. SkyCut keeps at most 8 projects open. Refused while one of its jobs runs (export, \
-                subtitles, translation…): wait with get_job or cancel_job first.
+                Close one of your projects (project=p2) when you are done, for example after its export finished; it is saved first. \
+                At most 8 projects stay open. Refused while one of its jobs runs (export, subtitles, translation): wait with get_job \
+                or use cancel_job first.
                 """,
                 input: MCPSchema.object([:], required: ["project"])
             )
@@ -106,8 +99,8 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .saveProject, title: "Save the project",
                 description: """
-                Save now or to path; taken names get a number. Autosaves after edits. production authors one undoable \
-                film plan; full contract: get_status film_contract=true.
+                Save the project now, or a copy to path (a taken name gets a number). Edits autosave anyway. production writes the \
+                official film plan as one undo step (read get_status film_contract=true first).
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Save location (.skycut); default current."),
@@ -119,9 +112,8 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .undo, title: "Undo",
                 description: """
-                Undo the latest edits in SkyCut, like pressing Command-Z. \
-                round=true instead puts the project back to how it was before this round of AI edits started \
-                (that is itself one undoable step).
+                Undo the latest edits, like Command-Z (steps, default 1). round=true puts the project back to how it was before this \
+                round of AI edits began, itself one undo step. File moves by manage_files are not undone.
                 """,
                 input: MCPSchema.object([
                     "steps": MCPSchema.integer("How many edits to undo (default 1).", minimum: 1, maximum: 50),
@@ -132,9 +124,11 @@ public enum MCPProjectTools {
         case .seek:
             return MCPToolDefinition(
                 .seek, title: "Show a moment",
-                description: "Move SkyCut's playhead to a time on the timeline, so the user sees that frame in the preview.",
+                description: """
+                    Read-only for the project: move SkyCut's playhead to a timeline time so the user sees that frame in the preview.
+                    """,
                 input: MCPSchema.object([
-                    "time": MCPSchema.number("Timeline time in seconds.", minimum: 0)
+                    "time": MCPSchema.number("Timeline time in seconds (≥ 0).", minimum: 0)
                 ], required: ["time"]),
                 readOnly: true
             )

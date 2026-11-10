@@ -49,9 +49,9 @@ enum MCPEncodeTools {
             return MCPToolDefinition(
                 .convertSubtitles, title: "Convert subtitles",
                 description: """
-                Convert subtitle files to another format (SRT, WebVTT, ASS, SSA or plain text), one output per file in \
-                SkyCut/Exports inside the opened folder, or in folder (never overwrites). Done at once; returns where each file \
-                went and which could not be read.
+                Convert subtitle files to SRT, WebVTT, ASS, SSA or plain text: one output per file in SkyCut/Exports inside the opened \
+                folder, or in folder; never overwrites. Done at once: returns where each file went and which could not be read. Files \
+                outside the opened folder may return needs_confirmation.
                 """,
                 input: MCPSchema.object([
                     "files": MCPSchema.array(of: MCPSchema.string("Path of a subtitle file."), "Files to convert.", minItems: 1),
@@ -68,7 +68,7 @@ enum MCPEncodeTools {
     /// 三个工具都收的「放哪」：和 export_subtitles 的 folder 同名同义（2026-10-15 用户转来的反馈：转出来的字幕文件固定落在
     /// 导出文件夹里，还得再调一次 manage_files 挪到位）。读法只在 App 的 AIEncodeTools.outputFolder 一处。
     private static let outputFolder = MCPSchema.string(
-        "Folder to write into (absolute, or relative to the opened folder; made if missing). Default: SkyCut/Exports inside the opened folder."
+        "Folder to write into (absolute, or relative to the opened folder; made if missing). Default: SkyCut/Exports."
     )
 
     /// 压缩和烧录共用的编码参数。

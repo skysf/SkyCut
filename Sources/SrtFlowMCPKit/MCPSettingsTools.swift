@@ -11,10 +11,9 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .getSettings, title: "Read SkyCut settings",
                 description: """
-                Read app preferences without opening windows: general (language/theme), ai (clients/permissions), editing \
-                (styles/voices), cache, sky_studio (account/credits/hard budget). Omit section for all. Returns values, writable \
-                fields, localized modes and action hints; never keys/configs. Use set_settings, recipes/save_recipe, or \
-                add_voiceover download_voices=true for voices. MCP entitlement applies.
+                Read-only. App preferences without opening windows: general (language, theme), ai (clients, permission mode), editing \
+                (styles, voices), cache and sky_studio (account, credits, daily limit). Returns values, writable fields and the \
+                localized mode names; never keys. Change them with set_settings.
                 """,
                 input: MCPSchema.object([
                     "section": MCPSchema.string("Default all.", oneOf: ["all", "general", "ai", "editing", "cache", "sky_studio"])
