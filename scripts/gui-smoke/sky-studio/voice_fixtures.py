@@ -7,11 +7,16 @@ from pathlib import Path
 
 CATALOG = json.loads((Path(__file__).resolve().parents[3] / "checks/SkyStudio/Fixtures/models-voice-2026-11-10.json").read_text())
 READING = ("voice", "voice_clone")
+CONVERT = "voice_convert"
 TOP_LEVEL = ("voice_presets", "voice_roles", "voice_rules", "voice_consent")
+# 声音库里的一个声音（变声的目标，声音 PR 9）：有中文、英文两段录音。只回 Sky Studio 自己的 id，没有任何服务商 id。
+VOICE_ID = "voice_" + "5" * 32
+VOICE = {"id": VOICE_ID, "name": "Smoke voice", "source": "recording", "scope": "personal",
+         "languages": [{"language": code, "kind": "recording", "seconds": 30, "minimax": False} for code in ("zh", "en")]}
 
 
 def models(max_characters=None):
-    """`/models` 里的声音模型：读稿的几个 + 声音库一次性费用的那几个（library_models）。`max_characters`：并发冒烟把读稿每批的
+    """`/models` 里的声音模型：读稿的几个 + 声音库一次性费用的那几个（library_models）+ 变声的（声音 PR 9）。`max_characters`：并发冒烟把读稿每批的
     字数上限压小，几句短句就分成几批（App 照 /models 的上限分批、缓存 10 分钟，所以只能在起服务时给）。"""
     reading = [copy.deepcopy(model) for model in CATALOG["models"] if model["kind"] in READING]
     if max_characters:
@@ -19,7 +24,25 @@ def models(max_characters=None):
             limits = (model.get("limits") or {}).get("max_characters_by_language")
             for language in limits or {}:
                 limits[language] = max_characters
-    return reading + library_models()
+    return reading + library_models() + [model for model in CATALOG["models"] if model["kind"] == CONVERT]
+
+
+def convert_quote():
+    """变声的报价：「最多」和「大概」不一样（界面写「约 X（最多 Y）」）。"""
+    return {"credits": 3, "credits_expected": 2, "settlement": "actual_output", "typical_seconds": 5, "model": "chatterbox-hd"}
+
+
+def finish_convert(job, root, base):
+    """变声做完：人声、背景各一个文件（都拿传上来的那段源音频当内容，长度就是源的长度）。"""
+    source = root / Path(job["inputs"]["source_audio_url"]).name
+    result = {}
+    for part in ("voice", "background"):
+        target = root / f"{job['job_id']}-{part}.wav"
+        target.write_bytes(source.read_bytes())
+        result[part + "_url"] = f"{base}/files/{target.name}"
+    job.update(status="done", credits_charged=2, billing={"status": "charged", "credits_charged": 2},
+               result={**result, "content_type": "audio/wav", "channels": 1, "padded_seconds": 0, "model": "chatterbox-hd",
+                       "fallback_used": False})
 
 
 def library_models():
