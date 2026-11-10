@@ -66,12 +66,17 @@ struct VoiceLibrarySettingsSection: View {
             String(format: L10n("Delete “%@”?"), deleting?.name ?? ""),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }), titleVisibility: .visible
         ) {
-            Button(L10n("Delete"), role: .destructive) {
-                if let voice = deleting { Task { await store.delete(voice) } }
-                deleting = nil
-            }
+            Button(L10n("Delete"), role: .destructive, action: confirmDelete)
             Button(L10n("Cancel"), role: .cancel) { deleting = nil }
         }
+        // 冒烟驱动点不了这几个按钮（背后是 NSButton）：它发一声，这里照点按钮那样摆 sheet、按「删除」（SmokeVoiceSteps）。
+        .smokeVoiceLibrary(store: store, sheet: $sheet, deleting: $deleting, confirmDelete: confirmDelete)
+    }
+
+    /// 「删除『X』？」里的「删除」。
+    private func confirmDelete() {
+        if let voice = deleting { Task { await store.delete(voice) } }
+        deleting = nil
     }
 
     @ViewBuilder

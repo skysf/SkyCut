@@ -140,6 +140,8 @@ enum SmokeDriver {
             note(try SmokeUISteps.add(step, project: project))
         case .show:
             note(try SmokeUISteps.show(step, project: project))
+        case .voice:
+            note(try await SmokeVoiceSteps.run(step, project: project))
         case .toggles:
             // 脚本里直接拨；冒烟里起手是默认值、拨了也不落盘（EditorToggles）。磁吸跟着工程走（`state.mainMagnet`），只走 setMagnet。
             if let magnet = step.magnet { project.setMagnet(magnet) }
@@ -224,6 +226,12 @@ enum SmokeDriver {
         let folder = output.deletingLastPathComponent()
         let picture = folder.appendingPathComponent("\(name).png")
         try? FileManager.default.removeItem(at: picture)
+        // 拍照的那一边没有录屏权限时（`screencapture -l` 回 could not create image）：App 自己把窗口画成一张（只画得到自己的窗口，
+        // 不要录屏权限；视频画面这类图层画不出来，设置、sheet 这种表单够用）。
+        if ProcessInfo.processInfo.environment["SRTFLOW_SMOKE_SELF_SNAPSHOT"] != nil {
+            note(SmokeSelfSnapshot.write(window, to: picture) ? "截图 \(name)：App 自己画的" : "截图 \(name)：自己画不出来，跳过")
+            return
+        }
         try Data("\(window.windowNumber)".utf8).write(to: folder.appendingPathComponent("\(name).request"))
         let deadline = Date().addingTimeInterval(15)
         while Date() < deadline {

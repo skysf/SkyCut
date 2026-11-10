@@ -132,7 +132,9 @@ struct SkyStudioQuote: Equatable, Sendable, Codable {
     init?(json: JSONValue) {
         guard let credits = json["credits"]?.doubleValue else { return nil }
         self.init(credits: credits, typicalSeconds: json["typical_seconds"]?.doubleValue, plan: json["plan"]?.objectValue ?? [:])
-        model = json["model"]?.stringValue
+        // 声音的报价（读稿、克隆、设计、建 MiniMax 版、变声）顶层没有 `model`：用哪个模型只在 `voice_plan.selection.model`
+        // （Sky Studio 的合同 docs/agents/skycut-api.md「/quote answers」；2026-11-11 真实冒烟：设计面板因此写成「用 Sky Studio 设计」）。
+        model = json["model"]?.stringValue ?? json["voice_plan"]?["selection"]?["model"]?.stringValue
         effectiveParams = json["effective_params"]?.objectValue ?? [:]
         billingPolicy = json["billing_policy"]
         creditsExpected = json["credits_expected"]?.doubleValue

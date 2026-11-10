@@ -384,6 +384,18 @@ scripts/gui-smoke/in-process/run.sh <scratchpad>/steps.json <scratchpad>/southpo
 18. **起手的开关永远是默认值、拨了也不落盘**（2026-10-01）：磁吸 / 吸附 / 链接 / 播放跟随和字幕列表的跟随从此记在
    UserDefaults，脚本驱动时 `EditorToggles` 不读不写它（[剪辑页上记住的开关](../architecture/editor-remembered-toggles.md)）——
    本机存着「磁吸开」也不会把冒烟里的落点合拢。要拨就用 `toggles` 一步（四个键），日志里写出拨完的值。
+19. **设置里的声音库和变声面板用 `voice` 一步驱动**（2026-11-11，`Sources/SrtFlow/SmokeVoiceSteps.swift` 文件头是格式）：「新建声音…」「设计声音…」
+   「新建」「设计」「开始」这类按钮背后是 NSButton（第 12 条点不了），输入框要 key 窗口（第 10 条），「选择文件…」是系统的打开面板 —— `voice` 发一声，由那一节 /
+   那张 sheet 自己调按钮调的那个函数，字填进 sheet 自己的那一份模型（和输入框、打开面板写进去的一样）；变声面板走片段右键那个入口
+   （`VoiceChangeActivity.present`）。其余全照真的走（参考录音、语言检测、授权那句、报价、交、任务、落地）。`show` 多了 `settings:<类>`（`settings:editing` 是
+   剪辑与声音）。花钱的两步写明上限：`order` 的 `text` 是报价**必须等于**的数、`start` 的 `text` 是报价**最多**的数，不对就不按。
+20. **步骤表、结果、截图、素材都不能放在 `~/Downloads`、`~/Desktop`、`~/Documents` 下**（2026-11-11 实测，第 9 条的又一半）：新签名的测试 App
+   读**步骤表本身**就卡在 `open` 上（主线程停在 `SmokeStep.load` → `Data(contentsOf:)`），系统在等人点「允许访问下载文件夹」。全放 `/private/tmp`。
+21. **拍照的那一边没有录屏权限时**，`screencapture -l` 回 `could not create image from window`、每张等满 15 秒：设 `SRTFLOW_SMOKE_SELF_SNAPSHOT=1`，
+   App 自己把窗口画成 PNG（`SmokeSelfSnapshot`，不要录屏权限）。设置、sheet 这种表单画得出来；视频画面（播放器的图层）是黑的，确认框这类单独的弹窗
+   画不进去（只看得到它后面变暗的窗口）。
+22. **后台起的 App 里，sheet 收起之后 SwiftUI 不一定跑它的 `onDisappear`**（2026-11-11 实测：新建声音交完、sheet 已经不挂在窗口上了，sheet 的模型还活着、
+   登记一直没清）：判「收起了没有」看窗口上还挂不挂着 sheet（`attachedSheet`），别看 `onDisappear` 有没有跑。
 8. **坐标要避开块上叠着的东西，从截图上裁一块放大再量**：音频块中下部压着音量线（命中带只有
    几 pt 宽），落在那儿拖的是线不是块；裁切把手选中时只有 5 pt 宽，差 1 pt 就点进了块里。
    `state` 里每段带 `transition`（接缝上的转场）和 `volumePoints`（音量线上的点），验这两样

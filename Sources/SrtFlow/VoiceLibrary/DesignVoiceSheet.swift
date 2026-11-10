@@ -71,9 +71,7 @@ struct DesignVoiceSheet: View {
                     .foregroundStyle(overLimit ? .red : .secondary)
                 Spacer(minLength: 8)
                 Button("Cancel") { dismiss() }
-                Button(VoiceLibraryText.designButton(model.quote)) {
-                    if model.design() { dismiss() }
-                }
+                Button(VoiceLibraryText.designButton(model.quote), action: order)
                 .keyboardShortcut(.defaultAction)
                 .disabled(model.quote == nil || overLimit || model.ordered)
                 .accessibilityIdentifier("design-voice-submit")
@@ -82,6 +80,12 @@ struct DesignVoiceSheet: View {
         .padding(20)
         .frame(width: 500)
         .onDisappear { model.close() }
+        .smokeVoiceSheet(design: model, order: order)
+    }
+
+    /// 按「设计（最多 Y 积分）」：就是确认（DesignVoiceModel.design）；起了任务就收起。
+    private func order() {
+        if model.design() { dismiss() }
     }
 
     private func field<Content: View>(_ label: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {

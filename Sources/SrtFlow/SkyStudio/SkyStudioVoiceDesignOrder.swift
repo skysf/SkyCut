@@ -43,7 +43,7 @@ enum SkyStudioVoiceDesignOrder {
         request.maxCredits = quote.credits
         let job = SkyStudioVoiceLibraryJob(
             kind: .voiceDesign, identity: SkyStudioVoiceLibraryJob.designIdentity(draft), request: request, key: key, reservation: reservation,
-            title: draft.params["name"]?.stringValue ?? "", modelTitle: quote.model ?? "Sky Studio", project: project,
+            title: draft.params["name"]?.stringValue ?? "", modelTitle: VoiceLibraryText.designModel(quote.model), project: project,
             nextStep: "Tell the user the voice is ready and give them sample_url to listen to (valid one hour). Use voice=<voice.id> "
                 + "with add_voiceover.",
             api: api

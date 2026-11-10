@@ -128,6 +128,7 @@ private func designChecks(_ root: URL) async throws {
     let asked = try await fixture.manage(args)
     require(asked.payload["status"] == "needs_confirmation" && asked.payload["credits"] == 22.5
             && asked.payload["question"]?.stringValue?.contains("22.5") == true, "design asks first, with the quoted price")
+    require(asked.payload["model"] == "qwen3-voice-design", "the question names the model from voice_plan.selection (got \(asked.payload["model"] ?? .null))")
     require(VoiceLibraryHTTP.calls("POST", "/jobs").isEmpty && SkyStudioSpendStore.shared.spentToday() == spent,
             "nothing starts and nothing is reserved before the answer")
     var confirmed = args.objectValue ?? [:]
