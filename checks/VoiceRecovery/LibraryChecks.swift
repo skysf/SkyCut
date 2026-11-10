@@ -116,6 +116,18 @@ private func designChecks(_ root: URL) async throws {
     require(done["status"] == "done" && done["voice"]?["name"] == "Calm" && done["sample_url"] != nil && done["credits_charged"] == 22.5,
             "get_job reports the new voice, its sample and what was charged")
     require(SkyStudioSpendStore.shared.spentToday() == spent + 22.5, "the day's spend settles at what Sky Studio charged")
+
+    // Qwen3 按描述 + 试读句每开始 1,000 字收一次（Sky Studio #247）：长一点的描述照报价走，任务的 max_credits 就是报价，不是写死的 22.5。
+    let long: JSONValue = ["action": "design", "description": .string(String(repeating: "A calm, warm narrator with a soft voice. ", count: 30)),
+                           "name": "Long", "sample_text": "Hello there."]
+    let longAsked = try await fixture.manage(long)
+    require(longAsked.payload["credits"] == 45 && longAsked.payload["question"]?.stringValue?.contains("45") == true,
+            "a description and sample over 1,000 characters is asked at its quote (two blocks)")
+    var longConfirmed = long.objectValue ?? [:]
+    longConfirmed["confirm_token"] = longAsked.payload["confirm_token"] ?? .null
+    let longDone = try await fixture.wait(try await fixture.manage(.object(longConfirmed)))
+    require(longDone["status"] == "done" && VoiceLibraryHTTP.calls("POST", "/jobs").last?["max_credits"] == 45,
+            "and the job's max_credits is that quote")
 }
 
 @MainActor

@@ -52,7 +52,7 @@ enum MCPVoiceLibraryTools {
                 "language": MCPSchema.string("ISO 639-1 code of what the recording says (zh, en…): create, add_reference."),
                 "name": MCPSchema.string("Voice name, 1 to 80 characters: create, design, rename."),
                 "description": MCPSchema.string("design: how the voice sounds, up to 2000 characters."),
-                "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters."),
+                "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters; counts toward the price."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["action"]),
             destructive: true, openWorld: true

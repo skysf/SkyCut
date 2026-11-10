@@ -193,7 +193,10 @@ final class VoiceLibraryHTTP: URLProtocol {
     private static func quote(_ body: JSONValue) -> JSONValue {
         switch body["kind"]?.stringValue {
         case "voice_design"?:
-            return ["credits": 22.5, "credits_expected": 22.5, "settlement": "exact", "model": "qwen3-voice-design"]
+            // Qwen3（Sky Studio #247）：描述 + 试读句每开始 1,000 字 22.5。
+            let characters = (body["prompt"]?.stringValue ?? "").count + (body["params"]?["sample_text"]?.stringValue ?? "").count
+            let credits = 22.5 * Double(max(1, (characters + 999) / 1_000))
+            return ["credits": .number(credits), "credits_expected": .number(credits), "settlement": "exact", "model": "qwen3-voice-design"]
         default:
             let batches = body["params"]?["batches"]?.arrayValue ?? []
             let selection: JSONValue = body["params"]?["plan"] ?? (needsEnroll
@@ -218,7 +221,8 @@ final class VoiceLibraryHTTP: URLProtocol {
         case "voice_design"?:
             let id = "voice_" + String(repeating: "d", count: 32)
             voices[id] = voice(id, name: body["params"]?["name"]?.stringValue ?? "", languages: ["en"], minimax: false, source: "design")
-            return ["job_id": "design-1", "status": "done", "credits_charged": 22.5, "billing": ["status": "charged", "credits_charged": 22.5],
+            let charged = body["max_credits"] ?? 22.5
+            return ["job_id": "design-1", "status": "done", "credits_charged": charged, "billing": ["status": "charged", "credits_charged": charged],
                     "result": ["voice": voices[id]!, "model": "qwen3-voice-design", "sample_url": "https://assets.example/voices/sample.wav",
                                "sample_expires_at": "2026-11-20T11:00:00Z"]]
         default:

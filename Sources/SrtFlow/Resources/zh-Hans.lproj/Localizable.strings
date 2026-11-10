@@ -1407,3 +1407,5 @@
 "Full access: SkyCut is designing the voice “%@” (at most %@ credits)." = "全部权限：SkyCut 正在设计声音「%@」（最多 %@ 积分）。";
 "Full access: SkyCut is building a voice's MiniMax version (at most %@ credits)." = "全部权限：SkyCut 正在给声音建 MiniMax 版（最多 %@ 积分）。";
 "Full access: SkyCut deleted the voice “%@”." = "全部权限：SkyCut 删掉了声音「%@」。";
+"Design a voice from a Chinese description (MiniMax): %@ credits for every 1,000 characters started (description + sample text)" = "设计一个声音（中文描述，MiniMax）：描述加试读句每开始 1,000 字 %@ 积分";
+"Design a voice from an English description (Qwen3): %@ credits for every 1,000 characters started (description + sample text)" = "设计一个声音（英文描述，Qwen3）：描述加试读句每开始 1,000 字 %@ 积分";

@@ -63,13 +63,20 @@ struct FullAccessConsentSheet: View {
         .task { loaded = await SkyStudioVoiceStanding.shared.notice() }
     }
 
+    /// 设计按次收的写「约多少」，按字数收的（Sky Studio #247 起的 Qwen3）写「描述加试读句每开始 1,000 字多少」。
     @ViewBuilder
     private func fees(_ notice: SkyStudioVoiceStandingNotice) -> some View {
-        if let credits = notice.credits(.designChinese) {
-            bullet(Text("Design a voice from a Chinese description (MiniMax): about \(SkyStudioCredits.text(credits)) credits"))
+        if let fee = notice.fee(.designChinese) {
+            let credits = SkyStudioCredits.text(fee.credits)
+            bullet(fee.perThousandCharacters
+                ? Text("Design a voice from a Chinese description (MiniMax): \(credits) credits for every 1,000 characters started (description + sample text)")
+                : Text("Design a voice from a Chinese description (MiniMax): about \(credits) credits"))
         }
-        if let credits = notice.credits(.designEnglish) {
-            bullet(Text("Design a voice from an English description (Qwen3): about \(SkyStudioCredits.text(credits)) credits"))
+        if let fee = notice.fee(.designEnglish) {
+            let credits = SkyStudioCredits.text(fee.credits)
+            bullet(fee.perThousandCharacters
+                ? Text("Design a voice from an English description (Qwen3): \(credits) credits for every 1,000 characters started (description + sample text)")
+                : Text("Design a voice from an English description (Qwen3): about \(credits) credits"))
         }
         if let credits = notice.credits(.minimaxVersion) {
             bullet(Text("Build a voice's MiniMax version (once per language): about \(SkyStudioCredits.text(credits)) credits"))

@@ -72,8 +72,9 @@ enum MCPGuideVoiceLibraryTopics {
             MCPGuideSection(name: "design", about: "design from a description: the one-time fee, the job and its sample_url", text: """
             design creates a new voice from description (how it sounds; a Chinese description designs on MiniMax, any other \
             language on Qwen3), name and optional sample_text (the sentence its sample reads). It is a one-time fee in Sky Studio \
-            credits, and the MiniMax design costs far more than Qwen3 (get_status models=true lists typical prices); the exact \
-            price is quoted first and returned with needs_confirmation. After the user agrees, repeat with confirm_token: it \
+            credits, and the MiniMax design costs far more than Qwen3 (get_status models=true lists typical prices); Qwen3 \
+            counts the characters of description plus sample_text, each 1,000 started costing again. The exact price is quoted \
+            first and returned with needs_confirmation. After the user agrees, repeat with confirm_token: it \
             returns job_id (kind voice_design); wait with \
             get_job, which reports the new voice and a sample_url to listen to (valid one hour). The daily credit limit always \
             applies; a design that fails is refunded.

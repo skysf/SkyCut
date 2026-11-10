@@ -153,7 +153,8 @@
    `manage_voices` 各个动作、`add_voiceover voice=voice_…` 都报「暂时用不了、一分没花、稍后再试、预设照常」，**不退本机**（`SkyStudioVoiceLibraryErrors`）。
 9. **长期授权怎么记、怎么撤**（`SkyStudioVoiceStanding`，方案 5.6；`/voices/consent-grant` 只经它，扫描钉着）：
    - 设置里选「全部权限」先弹说明（`FullAccessConsentSheet`：不再先问的几件事、一次性费用价目从 `/models` 的 `minimax-voice-design` / `qwen3-voice-design` /
-     `minimax-voice-clone` 的 `typical_credits` 读、读不到写「以报价为准」、每日额度、打开即确认的那句 —— SkyCut 认识的版本显示译文，不认识的显示服务器的英文原文），
+     `minimax-voice-clone` 读 —— 按次收的写「约 `typical_credits`」，按字数收的（`price.per == "1000_characters"`，Sky Studio #247 起的 Qwen3 设计）写
+     「描述加试读句每开始 1,000 字 `credits`」，读不到写「以报价为准」；实际多少照旧只问 `/quote` —— 每日额度、打开即确认的那句 —— SkyCut 认识的版本显示译文，不认识的显示服务器的英文原文），
      按「同意并打开」才写 Store、`POST` 用户看到的那一版；「取消」什么都不改；每次切到全部权限都弹。记不上（没 Key、没连上、Sky Studio 不收）照样打开，设置里写一行
      「还没记上，第一次会问一次」。切回请求批准立刻写 Store、`DELETE`。
    - `set_settings ai_access_mode=full_access`：照旧永远先回确认码（`AISettingsApproval`），问句后面接 `SkyStudioVoiceStandingNotice.turnOnText`，令牌另绑

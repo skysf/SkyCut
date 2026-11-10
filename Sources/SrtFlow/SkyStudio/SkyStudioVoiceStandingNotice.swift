@@ -2,8 +2,9 @@ import Foundation
 
 // MARK: - 打开全部权限时的那段说明（SkyCut 声音方案 5.6、4.5）：纯值
 //
-// 管什么：从 /models 读的三样一次性费用（设计：MiniMax 中文描述 / Qwen3 英文描述；给声音建 MiniMax 版。各取 price 的
-// typical_credits，没有就取 credits；SkyCut 不写死数）、每日额度、长期授权那句（版本 + 英文原文，SkyStudioVoiceCatalog.standingConsent）；
+// 管什么：从 /models 读的三样一次性费用（设计：MiniMax 中文描述 / Qwen3 英文描述；给声音建 MiniMax 版。按次收的取 price 的
+// typical_credits、没有就取 credits；按字数收的（`price.per == "1000_characters"`，Sky Studio #247 起的 Qwen3 设计）取每开始 1,000 字的
+// credits、说法也换成「每开始 1,000 字」；SkyCut 不写死数）、每日额度、长期授权那句（版本 + 英文原文，SkyStudioVoiceCatalog.standingConsent）；
 // 拼成给 AI 的英文：
 // - `turnOnText`：set_settings 打开全部权限时接在问句后面（AISettingsApproval）；
 // - `missingText`：全部权限下这个账号还没有有效的长期授权时，声音那几件事第一次照请求批准模式问一次，问句后面接它（SkyStudioJobGate）。
@@ -15,7 +16,10 @@ struct SkyStudioVoiceStandingNotice: Equatable, Sendable {
     struct Fee: Equatable, Sendable {
         enum Kind: String, CaseIterable, Sendable { case designChinese, designEnglish, minimaxVersion }
         var kind: Kind
+        /// 按次收的：大概多少；按字数收的：每开始 1,000 字多少。
         var credits: Double
+        /// 按描述 + 试读句的字数收（每开始 1,000 字一次）。
+        var perThousandCharacters = false
     }
 
     /// 方案 5.6 点名的三个模型：价目从它们的 price 读。
@@ -36,14 +40,17 @@ struct SkyStudioVoiceStandingNotice: Equatable, Sendable {
     init(catalog: SkyStudioCatalog?, dailyLimit: Double) {
         fees = Fee.Kind.allCases.compactMap { kind in
             guard let id = Self.models[kind], let model = catalog?.models.first(where: { $0.id == id }) else { return nil }
-            let credits = model.price["typical_credits"]?.doubleValue ?? model.price["credits"]?.doubleValue
-            return credits.flatMap { $0.isFinite && $0 >= 0 ? Fee(kind: kind, credits: $0) : nil }
+            let perThousand = model.pricedPerThousandCharacters
+            let credits = perThousand ? model.price["credits"]?.doubleValue ?? model.typicalCredits
+                : model.typicalCredits ?? model.price["credits"]?.doubleValue
+            return credits.flatMap { $0.isFinite && $0 >= 0 ? Fee(kind: kind, credits: $0, perThousandCharacters: perThousand) : nil }
         }
         self.dailyLimit = dailyLimit
         statement = catalog?.voices?.standingConsent ?? Self.knownStatement
     }
 
-    func credits(_ kind: Fee.Kind) -> Double? { fees.first { $0.kind == kind }?.credits }
+    func fee(_ kind: Fee.Kind) -> Fee? { fees.first { $0.kind == kind } }
+    func credits(_ kind: Fee.Kind) -> Double? { fee(kind)?.credits }
 
     /// set_settings 打开全部权限：做什么不再先问、价目、额度、打开即记下的那句。
     var turnOnText: String {
@@ -63,18 +70,18 @@ struct SkyStudioVoiceStandingNotice: Equatable, Sendable {
 
     private var feeText: String {
         var parts: [String] = []
-        if let credits = credits(.designChinese) {
-            parts.append("design a voice from a Chinese description (MiniMax) about \(SkyStudioCredits.text(credits)) credits")
-        }
-        if let credits = credits(.designEnglish) {
-            parts.append("from an English description (Qwen3) about \(SkyStudioCredits.text(credits)) credits")
-        }
-        if let credits = credits(.minimaxVersion) {
-            parts.append("build a voice's MiniMax version (once per language) about \(SkyStudioCredits.text(credits)) credits")
-        }
+        if let fee = fee(.designChinese) { parts.append("design a voice from a Chinese description (MiniMax) " + price(fee)) }
+        if let fee = fee(.designEnglish) { parts.append("from an English description (Qwen3) " + price(fee)) }
+        if let fee = fee(.minimaxVersion) { parts.append("build a voice's MiniMax version (once per language) " + price(fee)) }
         let fees = parts.isEmpty ? "One-time voice fees: Sky Studio quotes each one." :
             "One-time voice fees (Sky Studio's quote decides): " + parts.joined(separator: "; ") + "."
         return fees + " The daily credit limit stays a hard cap (now \(SkyStudioCredits.text(dailyLimit)) credits a day)."
+    }
+
+    private func price(_ fee: Fee) -> String {
+        fee.perThousandCharacters
+            ? "\(SkyStudioCredits.text(fee.credits)) credits for every 1,000 characters started of description and sample text"
+            : "about \(SkyStudioCredits.text(fee.credits)) credits"
     }
 }
 

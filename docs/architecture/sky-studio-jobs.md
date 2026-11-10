@@ -420,7 +420,10 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
 `9babdcfa`（head `84b74d96` 里同一份，sha256 `6460fafb…`；和前一份只差 `params.plan` 的说明文字：点名的模型也能带 plan），#246 合并后换成**最终导出**
 `6c08d0f0`（sha256 `26831ec8…`）：`params.plan` 的说明加了「原样带回、带着整段的 fallback」，用户听过样音后重新打分的五个预设 —— Enceladus、Sadaltager
 进了中英两种名单，Orus 中文、Schedar 英文仍不在名单上（各自另一种语言在），Despina 定为女声、仍藏着 —— 中文名单 21 → 23、英文 27 → 28、两种都藏的只剩 Despina，
-已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。`/models` 还没上线；
+已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。Sky Studio #247 合并后（`c050d948`，sha256 `3db3eb98…`）
+重新导出，只改了 Qwen3 设计：`price.per` 从 `request` 改成 `1000_characters`（`counted`：`prompt` 和 `params.sample_text`，`minimum_credits` 22.5），
+`sample_text` 的说明加了「字数算进价里」；SkyCut 从来照 `/quote` 给 `max_credits`（`scripts/check-voice-recovery.sh` 的 `LibraryChecks` 用一段超过 1,000 字的描述钉着报价 45、任务
+`max_credits` 45），打开全部权限时那段说明照 `per` 改说「描述加试读句每开始 1,000 字多少」（`SkyStudioVoiceStandingNotice`）。`/models` 还没上线；
 目录改了 Sky Studio 会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
 对上的：预设 30 个、名单、角色、授权文案的形状和值，Eleven 的 94 种语言；没对上、照 Sky Studio 改了 SkyCut 的：其余语言的字数上限键是 `other`（不是手写时猜的 `default`）、
 一次性费用 377.6 / 751.4 / 22.5、Despina 的性别（当时是 `unknown`，最终导出改成女声）、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码

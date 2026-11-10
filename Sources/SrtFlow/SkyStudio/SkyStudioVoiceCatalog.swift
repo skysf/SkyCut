@@ -166,6 +166,10 @@ extension SkyStudioModel {
     /// 一次性费用这类记录的「大概多少」（`price.typical_credits`）：打开全部权限时的价目从这里读，SkyCut 不写死。
     var typicalCredits: Double? { price["typical_credits"]?.doubleValue }
 
+    /// 按字数收（`price.per == "1000_characters"`：Sky Studio #247 起 Qwen3 设计按描述 + 试读句每开始 1,000 字收一次 `price.credits`，
+    /// 算哪几样写在 `price.counted`）。实际多少照旧只问 `/quote`；这里只给打开全部权限时那段说明换个说法。
+    var pricedPerThousandCharacters: Bool { price["per"]?.stringValue == "1000_characters" }
+
     /// 这个模型支持哪些语言（`eleven-v4` 的 94 种；ISO 639-1，没有 639-1 的用 639-3）；没列就是 nil（不知道，不是「都不支持」）。
     var supportedLanguages: [String]? { metadata["languages"]?.arrayValue?.compactMap(\.stringValue) }
 

@@ -1407,3 +1407,5 @@
 "Full access: SkyCut is designing the voice “%@” (at most %@ credits)." = "Acceso completo: SkyCut está diseñando la voz «%@» (como máximo %@ créditos).";
 "Full access: SkyCut is building a voice's MiniMax version (at most %@ credits)." = "Acceso completo: SkyCut está creando la versión MiniMax de una voz (como máximo %@ créditos).";
 "Full access: SkyCut deleted the voice “%@”." = "Acceso completo: SkyCut eliminó la voz «%@».";
+"Design a voice from a Chinese description (MiniMax): %@ credits for every 1,000 characters started (description + sample text)" = "Diseñar una voz a partir de una descripción en chino (MiniMax): %@ créditos por cada 1.000 caracteres empezados (descripción + texto de muestra)";
+"Design a voice from an English description (Qwen3): %@ credits for every 1,000 characters started (description + sample text)" = "Diseñar una voz a partir de una descripción en inglés (Qwen3): %@ créditos por cada 1.000 caracteres empezados (descripción + texto de muestra)";
