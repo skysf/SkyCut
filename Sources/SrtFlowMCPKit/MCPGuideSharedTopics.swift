@@ -85,8 +85,8 @@ enum MCPGuideSharedTopics {
         Paid work uses the user's Sky Studio credits.
 
         Which tools. generate_media (images, camera angles, image upscale, videos, lipsync, background cutout, music, sound \
-        effects), upscale_clip, manage_characters (create and headshot) and add_voiceover with Sky Studio voices. \
-        list_characters and get_character are free. \
+        effects), upscale_clip, change_voice, manage_characters (create and headshot), manage_voices (design) and add_voiceover \
+        with Sky Studio voices. list_characters, get_character and list_voices are free. \
         get_status models=true lists the current models with their defaults and limits, free and without generating anything.
 
         Prices. quote_only=true returns the exact credit price without spending, uploading or reserving anything. By default SkyCut \
@@ -108,7 +108,8 @@ enum MCPGuideSharedTopics {
         paid request again blindly.
 
         Results. generate_media never edits the timeline: add the result with add_clips. upscale_clip replaces the clip's source \
-        when it finishes, as one undo step.
+        when it finishes, as one undo step. change_voice mutes the clip and adds the new voice and the background on two audio \
+        tracks when it finishes, as one undo step.
         """)
     ])
 

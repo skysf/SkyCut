@@ -225,6 +225,8 @@ final class AIToolRouter {
         // 声音库：服务器上的事，不改工程；设计 / 建 MiniMax 版回任务号（SkyStudioVoiceLibraryTool）。
         case .listVoices: return try await SkyStudioVoiceLibraryTool.list(args)
         case .manageVoices: return try await SkyStudioVoiceLibraryTool.manage(args, project)
+        // 变声：起一个任务、回任务号；做完那一下的落地（静音 + 两条新轨）在任务里自己包一层 AIUndoGrouping.step（VoiceChangeJob.land）。
+        case .changeVoice: return try await VoiceChangeTool.change(args, project)
         // 起一个任务、回任务号；做完那一下的换源在任务里自己包一层 AIUndoGrouping.step（AIUpscaleTool.land）。
         case .upscaleClip: return try await AIUpscaleTool.upscale(args, project)
         // 起一个录屏会话就回来（AI 好接着操作电脑）；入轨那一下是异步落账，会话的 landing 包一层 AIUndoGrouping.step。
@@ -324,7 +326,7 @@ final class AIToolRouter {
             case .undo, .addClips, .addVoiceover, .syncVoiceover, .editClip, .editClips, .setTexts, .setShapes, .setKeyframes, .setTrack, .splitClip, .deleteItems,
                  .duplicateItems, .freezeFrame, .cutSpeech, .cutToBeat,
                  .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles,
-                 .editSubtitles, .upscaleClip:
+                 .editSubtitles, .upscaleClip, .changeVoice:
                 (serialized, presentsEditor, startsRound) = (true, true, true)
             }
         }

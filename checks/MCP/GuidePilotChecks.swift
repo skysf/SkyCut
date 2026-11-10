@@ -19,8 +19,8 @@ let pilotSchemaByteLimit = 4_500
 let pilotSchemaExceptions: Set<MCPToolName> = [.editClip, .generateMedia]
 /// 没有可搬的原文的迁移工具：行为和迁移同一个 PR 改了，旧说明照抄进概要等于叫 AI 用已经没有的东西（add_voiceover：声音方案 4.10、4.2–4.4、
 /// 第十二节 —— 默认 gemini:Charon、去掉 clone_from、不再收 Rachel；旧说明每一句去了哪写在那个 PR 的说明里）；从第一天起就按名片 + 说明书写的
-/// 新工具（声音 PR 6 的 list_voices、manage_voices）。名单写死：加一个要改这里。
-let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices]
+/// 新工具（声音 PR 6 的 list_voices、manage_voices，声音 PR 9 的 change_voice）。名单写死：加一个要改这里。
+let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices, .changeVoice]
 
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
@@ -74,7 +74,9 @@ private let pilotNature: [MCPToolName: [String]] = [
     .listVoices: ["Read-only", "skycut_guide topic=list_voices"],
     // 声音库的写：服务器上的事，不改工程、没有撤销（名片写明 no undo）；设计花积分、回任务号；授权 / 一次性费用 / 删除会问。
     .manageVoices: ["no undo", "Paid (Sky Studio credits)", "needs_confirmation", "daily credit limit", "wait with get_job",
-                    "skycut_guide topic=manage_voices"]
+                    "skycut_guide topic=manage_voices"],
+    // 变声（声音 PR 9）：花积分、回任务号、做完那一下是一步撤销；只判每日硬预算，不问（名片里没有 needs_confirmation、不收 confirm_token）。
+    .changeVoice: ["Paid (Sky Studio credits)", "One undo step", "daily credit limit", "wait with get_job", "skycut_guide topic=change_voice"]
 ]
 
 func runGuidePilotChecks() {
@@ -102,8 +104,8 @@ func runGuidePilotChecks() {
     checkEqual(pilotSchemaExceptions, [.editClip, .generateMedia], "the over-4,500-byte exceptions stay edit_clip and generate_media only")
     let withoutPreviousCard = Set(MCPGuideWrittenTopics.migrated.filter { MCPGuideWrittenTopics.topic(for: $0)?.previousCard == nil })
     checkEqual(withoutPreviousCard, pilotToolsWithoutPreviousCard, "only the listed migrated tools have no pre-migration description to keep")
-    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices],
-               "the tools without a pre-migration description stay add_voiceover and the new voice library tools")
+    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice],
+               "the tools without a pre-migration description stay add_voiceover and the new voice tools")
     print("MCP pilot cards: \(cards.joined(separator: ", ")) (limit \(pilotCardLimit), target 350).")
     runGuideFieldSplitChecks()
     runGuideContentsChecks()

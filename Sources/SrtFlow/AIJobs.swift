@@ -20,6 +20,8 @@ final class AIJobs {
         /// 声音库的两种收费任务（SkyStudioVoiceLibraryJob）：设计一个新声音、给一种语言建 MiniMax 版。
         case voiceDesign = "voice_design"
         case voiceEnroll = "voice_enroll"
+        /// 变声（VoiceChangeJob）：把一段的人声换成另一个声音，做完两条新音频轨、原声静音。
+        case voiceChange = "voice_change"
     }
 
     enum Status: String {

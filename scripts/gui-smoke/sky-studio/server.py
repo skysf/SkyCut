@@ -39,6 +39,10 @@ def synthesize(job):
         with LOCK:
             media_fixtures.finish(job, ROOT, BASE)
         return
+    if job["kind"] == voice_fixtures.CONVERT:
+        with LOCK:
+            voice_fixtures.finish_convert(job, ROOT, BASE)
+        return
     target = ROOT / (job["job_id"] + ".wav")
     import wave
     with wave.open(str(ROOT / "narration.wav")) as audio:
@@ -137,6 +141,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {"account": {"id": self.account()}, "credits": {"balance": 1000},
                 "skycut": {"plan": "pro", "features": {"mcp": True, "watermark": False},
                            "valid_until": stamp(86400), "max_running_jobs": 3}, "server_time": stamp()})
+        if self.path.endswith("/voices/" + voice_fixtures.VOICE_ID):
+            with LOCK:
+                LOG.append({"method": "GET", "path": self.path, "has_auth": True})
+            return self.reply(200, {"voice": voice_fixtures.VOICE})
         if self.path.endswith("/models"):
             return self.reply(200, {"models": voice_fixtures.models() + media_fixtures.models() + expansion.CATALOG["models"],
                                     "billing_policy": expansion.CATALOG["billing_policy"], **voice_fixtures.top_level()})
@@ -149,7 +157,7 @@ class Handler(BaseHTTPRequestHandler):
                 if job.get("refuse"):
                     job["polls"] = job.get("polls", 0) + 1
                     media_fixtures.refuse(job, job["polls"] >= CONTROL.get("refund_after_polls", 1))
-                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls", "account", "plan")}
+                public = {k: v for k, v in job.items() if k not in ("prompt", "credits", "refuse", "polls", "account", "plan", "inputs")}
                 return self.reply(200, public)
         self.error(404, "unknown_job")
 
@@ -175,6 +183,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path.endswith("/quote"):
                 if CONTROL.get("quote_error"):
                     return self.error(503, "unavailable")
+                if data["kind"] == voice_fixtures.CONVERT:
+                    return self.reply(200, voice_fixtures.convert_quote())
                 credits = 2.5 if data["kind"] == "voice_clone" else 1
                 if data["kind"] in voice_fixtures.READING and "batches" in (data.get("params") or {}):
                     return self.reply(200, voice_fixtures.quote(data, credits))
@@ -218,7 +228,7 @@ class Handler(BaseHTTPRequestHandler):
                     job = dict(job_id=identity, status="queued" if CONTROL.get("hold") else "running",
                                account=self.account(),
                                kind=data["kind"], model=data["model"], prompt=data.get("prompt", ""), poll_after_seconds=2,
-                               plan=(data.get("params") or {}).get("plan"),
+                               plan=(data.get("params") or {}).get("plan"), inputs=data.get("inputs") or {},
                                credits=data.get("max_credits", 2.5 if data["kind"] == "voice_clone" else 1))
                     JOBS[identity], KEYS[key] = job, identity
                     if data["model"].startswith("seedance") and CONTROL.get("refuse_seedance"):
