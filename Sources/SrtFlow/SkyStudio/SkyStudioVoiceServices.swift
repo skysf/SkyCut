@@ -1,7 +1,8 @@
 import Foundation
 
 // MARK: - 旁白的外部适配
-// 管什么：生产默认值仍是原来的 Sky Studio / 本机转写；回归可注入假 HTTP 和一次失败的转写，验证真实任务与入轨。
+// 管什么：生产默认值仍是原来的 Sky Studio / 本机转写 / 全 App 一份的槽；回归可注入假 HTTP、一次失败的转写、自己的槽和短的等待，
+// 验证真实任务与入轨。
 // 不管什么：旁白流程、状态和恢复规则；没有运行时测试环境变量或付费旁路。
 
 @MainActor
@@ -15,6 +16,10 @@ struct SkyStudioVoiceServices {
     }
     var locale: SkyStudioVoiceRender.LocaleProvider = SkyStudioVoiceAudio.splitLocale
     var transcribe: SkyStudioVoiceRender.Transcribe = SkyStudioVoiceAudio.transcribe
+    /// 各批在哪儿领槽：全 App 一份（槽数照 /me）；回归换成自己的一份、定好槽数。
+    var slots: SkyStudioJobSlots = .shared
+    /// 等 Sky Studio 的时候怎么睡（照 poll_after_seconds、满了等 15 秒）：nil = SkyStudioJobRun 的默认；回归换成短的。
+    var jobSleep: (@Sendable (Double) async throws -> Void)?
 }
 
 struct SkyStudioVoiceBudgetProblem: LocalizedError {

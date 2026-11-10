@@ -41,6 +41,9 @@ func catalogKnownNames() -> Set<String> {
     // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])
+    // 声音 PR 4（几批同时交、中途换备用）：get_job 的 batches_done / batches_running / batches_waiting（SkyStudioVoiceBatchBoard.json）、
+    // 各句是哪个模型读的 line_models（SkyStudioVoiceCheckpoint.detail）、任务结束码 fallback_needs_one_time（SkyStudioVoiceCodes）。
+    names.formUnion(["batches_done", "batches_running", "batches_waiting", "line_models", "fallback_needs_one_time"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     return names
 }
