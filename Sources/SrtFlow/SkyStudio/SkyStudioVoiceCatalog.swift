@@ -175,6 +175,23 @@ extension SkyStudioModel {
         return (table?[language] ?? table?["other"])?.intValue
     }
 
+    /// 这段字一次请求最多多少字。服务器按**每一批自己**的主要语言卡（不是整稿的），哪种语言算主要是它按语速估的、SkyCut 不抄：
+    /// 取这段字里**出现了的**每种文字的上限里最小的那个（汉字 `zh`、假名 `ja`、谚文 `ko`，别的字 / 一个字母都没有 = 表里其余的键），
+    /// 一定不超过服务器卡的数。2026-11-10 之前按整稿的主要语言：英文为主、夹一行 350 字中文的稿子在 `/quote` 被拒，报的还是批次序号。
+    func characterLimit(text: String) -> Int? {
+        guard let table = limits["max_characters_by_language"]?.objectValue else { return nil }
+        func has(_ pattern: String) -> Bool { text.range(of: pattern, options: .regularExpression) != nil }
+        var languages: [String] = []
+        if has("\\p{Script=Han}") { languages.append("zh") }
+        if has("[\\p{Script=Hiragana}\\p{Script=Katakana}]") { languages.append("ja") }
+        if has("\\p{Script=Hangul}") { languages.append("ko") }
+        var caps = languages.compactMap { (table[$0] ?? table["other"])?.intValue }
+        if languages.isEmpty || has("[\\p{L}&&[^\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]]") {
+            caps += table.filter { !["zh", "ja", "ko"].contains($0.key) }.compactMap(\.value.intValue)
+        }
+        return caps.min()
+    }
+
     /// 一次性费用的那几条记录（建 MiniMax 版、设计声音：`one_time: true`）：打开全部权限时的价目照它挑，不写死 id。
     var isOneTime: Bool { metadata["one_time"]?.boolValue == true }
 
@@ -191,5 +208,10 @@ extension SkyStudioCatalog {
     /// 新加的模型不低于现在这一组，SkyCut 声音方案 8.1、13.3 第 7 条）。这个 kind 没有一个模型写了上限就是 nil。
     func voiceCharacterLimit(kind: String, language: String) -> Int? {
         models(kind: kind).compactMap { $0.characterLimit(language: language) }.min()
+    }
+
+    /// 同上，按这段字里出现的文字（一批一个数，SkyStudioModel.characterLimit(text:)）：装批用这个。
+    func voiceCharacterLimit(kind: String, text: String) -> Int? {
+        models(kind: kind).compactMap { $0.characterLimit(text: text) }.min()
     }
 }
