@@ -14,14 +14,13 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .getStatus, title: "SkyCut status",
                 description: """
-                Read-only. Call it first: the project (name, path, length, unsaved), open projects with ids and who edits them, \
-                folders, jobs and Stop, screen recording state, permission and leftovers, and cloud_tasks grouped by project: \
-                background and closed ones too. models=true lists Sky Studio models, prices and limits for free; screen=true lists \
-                recording sources; film_contract=true gives the film contract.
+                Read-only. Call it first: the project (name, path, length, unsaved), open projects with ids and owners, folders, jobs, screen \
+                recording state, permission and leftovers, and cloud_tasks grouped by project: closed ones too. models=true: Sky Studio models, \
+                prices, limits (free); screen=true: recording sources; film_contract=true: the film contract.
                 """,
                 input: MCPSchema.object([
                     "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
-                    "models": MCPSchema.boolean("Also query Sky Studio's model catalog and reference limits (read-only, no credits)."),
+                    "models": MCPSchema.boolean("Also list Sky Studio's models and reference limits (free, read-only)."),
                     "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3."),
                     "film_contract": MCPSchema.boolean("Public film/production contracts; local, free; no deployment proof.")
                 ]),
@@ -31,10 +30,9 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .setView, title: "View mode",
                 description: """
-                Choose how the user follows your edits: visible (default) brings a project's window forward once and shows each edit \
-                in the preview; background leaves SkyCut where it is while edits still land and can be undone. With project, only that \
-                project; without, all yours. Ask the user once per conversation which they want, unless they said. Lasts until SkyCut \
-                quits.
+                How the user follows your edits: visible (default) brings a project's window forward once and shows each edit; background leaves \
+                SkyCut where it is (edits still land and undo). With project, only that one; without, all yours. Ask the user once per \
+                conversation which they want, unless they said. Lasts until SkyCut quits.
                 """,
                 input: MCPSchema.object([
                     "mode": MCPSchema.string("How the user follows your edits.", oneOf: ["visible", "background"])
@@ -77,7 +75,7 @@ public enum MCPProjectTools {
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("Project name without extension. Default: the workspace folder's name."),
-                    "version": MCPSchema.string("Short version label, e.g. 30s, vertical, v2: the file is named <name> - <version>."),
+                    "version": MCPSchema.string("Short version label (30s, vertical, v2): the file is <name> - <version>."),
                     "folder": MCPSchema.string("Folder to save the project in, when there is no workspace yet.")
                 ])
             )

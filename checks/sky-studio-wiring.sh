@@ -22,10 +22,15 @@
 #   9. **generate_media 走 Sky Studio**（第 6 刀 6b，2026-10-28）：在建任务之前过 SkyStudioJobGate、任务用记好的那一笔（SkyStudioHeldCredits）；
 #      Key 不弹框；清单里它属于 skystudio；路由只起任务（不包撤销分组）；get_job 有阶段和 skystudio_job_id；任务起手登记进
 #      SkyStudioGenerationActivity、结束拿掉，状态行订阅它；能取消；这几个文件不弹模态框。
-#   11. **声音库（声音 PR 6）**：`consent: true` 只在 SkyStudioVoiceRecordingTool 里、过了 SkyStudioJobGate.voiceConsent 之后造；
-#       长期授权 `consent: "standing_grant"` 这一刀没人用（全部权限下不问是声音 PR 7）；`/voices` 的路径只在 SkyStudioVoiceAPI 里拼；
-#       源码和测试数据里没有 MiniMax voice_id 的样子（`Voice` + 一长串十六进制）；声音库的几个工具问用户只经 SkyStudioJobGate（不另开确认入口）；
-#       声音库的声音不退本机（SkyStudioVoiceoverStart 里认出 voice_… 的每一处都是报错）。
+#   11. **声音库（声音 PR 6）和全部权限下的长期授权（声音 PR 7）**，在 checks/sky-studio-wiring/voice-library.sh：`consent: true` 和
+#       `consent: "standing_grant"` 只在 SkyStudioVoiceRecordingTool 里、过了 SkyStudioJobGate.voiceConsent 之后造（standing_grant 只在
+#       全部权限 + 有效的长期授权时）；`/voices/consent-grant` 只经 SkyStudioVoiceStanding；改权限模式的地方改完都告诉它、设置里先弹说明；
+#       `/voices` 的路径只在 SkyStudioVoiceAPI 里拼；没有 MiniMax voice_id 的样子；只经 SkyStudioJobGate 问；声音库的声音不退本机。
+#   12. **声音库的界面（声音 PR 8）**：界面和 AI 的工具走同一条路——`consent: true` 另一处只许在新建声音对话框的 NewVoiceModel 里、
+#       用户自己勾了那一句（`guard agreed`）之后造；参考录音只经 VoiceReferenceSample.prepare、交只经 SkyStudioVoiceRecordingSubmission
+#       （`createVoice` / `addVoiceReference` 别处不许直接调）；删除只经 SkyStudioVoiceDeletion（存储一时不可用再发一次只有这一份）；
+#       设计只经 SkyStudioVoiceDesignOrder，对话框按下去先过每日硬预算（SkyStudioJobGate.reserveWithoutAsking）再起任务；
+#       界面不用确认码（AIConfirmations）、Key 只静默读；声音库的视图不读工程、不订阅播放器的时钟。
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -503,42 +508,12 @@ for source in SkyStudioCharacterNativeRequest.swift SkyStudioCharacterWorkflow.s
   grep -qF "Sources/SrtFlow/SkyStudio/${source}" scripts/check-sky-studio.sh || fail "角色 B 生产路径没有编进假服务器检查：${source}"
 done
 
-# 11. 声音库（声音 PR 6，SkyCut 声音方案 4.5、4.6、9.1 第 12 项）。
-VOICE_DIR="Sources/SrtFlow/SkyStudio"
-VOICE_RECORDING="${VOICE_DIR}/SkyStudioVoiceRecordingTool.swift"
-VOICE_LIBRARY_DTO="${VOICE_DIR}/SkyStudioVoiceLibrary.swift"
-VOICE_API_FILE="${VOICE_DIR}/SkyStudioVoiceAPI.swift"
-VOICE_START_FILE="${VOICE_DIR}/SkyStudioVoiceoverStart.swift"
-for file in "${VOICE_RECORDING}" "${VOICE_LIBRARY_DTO}" "${VOICE_API_FILE}" "${VOICE_START_FILE}"; do
-  [ -f "${file}" ] || fail "找不到 ${file} —— 改名了就同步改这里（扫空 = 假绿）"
-done
-consent_makers="$(code_files_with '\.thisRecording\(' | grep -vxF "${VOICE_LIBRARY_DTO}" | sort -u || true)"
-[ "${consent_makers}" = "${VOICE_RECORDING}" ] \
-  || fail "consent: true（SkyStudioVoiceConsent.thisRecording）只许在 ${VOICE_RECORDING} 里造（问到了才造）：${consent_makers:-没有}"
-gate_line="$(grep -nF 'SkyStudioJobGate.voiceConsent(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
-consent_line="$(grep -nF '.thisRecording(' "${VOICE_RECORDING}" | head -1 | cut -d: -f1 || true)"
-if [ -z "${gate_line}" ] || [ -z "${consent_line}" ] || [ "${gate_line}" -ge "${consent_line}" ]; then
-  fail "${VOICE_RECORDING}：consent: true 要在 SkyStudioJobGate.voiceConsent 点过头之后才造"
-fi
-standing="$(code_files_with '\.standingGrant\b' | grep -vxF "${VOICE_LIBRARY_DTO}" || true)"
-[ -z "${standing}" ] || fail "长期授权 consent: \"standing_grant\" 这一刀不许用（全部权限下不问是声音 PR 7）：${standing}"
-voice_paths="$(code_files_with 'SkyStudioVoicePath\.' | sort -u || true)"
-[ "${voice_paths}" = "${VOICE_API_FILE}" ] || fail "/voices 的路径只许在 ${VOICE_API_FILE} 里拼：${voice_paths:-没有}"
-provider_ids="$(grep -rEln 'Voice[0-9a-fA-F]{16,}' Sources checks/SkyStudio checks/VoiceRecovery checks/MCP || true)"
-[ -z "${provider_ids}" ] || fail "源码和测试数据里不许有 MiniMax voice_id 的样子（服务商的 id 永远不出服务器，约定第 3 条）：${provider_ids}"
-for tool in SkyStudioVoiceLibraryTool SkyStudioVoiceRecordingTool SkyStudioVoiceDesignTool SkyStudioVoiceOneTimeStep SkyStudioVoiceFallbackFee; do
-  file="${VOICE_DIR}/${tool}.swift"
-  [ -f "${file}" ] || { fail "找不到 ${file}"; continue; }
-  stripped="$(sed 's,//.*,,' "${file}")"
-  if grep -qF 'AIConfirmations.shared' <<<"${stripped}"; then
-    fail "${file}：声音库问用户只经 SkyStudioJobGate（voiceConsent / voiceOneTime / voiceDeletion），不另开确认入口"
-  fi
-done
-library_lines="$(grep -cF 'isLibrary' "${VOICE_START_FILE}" || true)"
-library_throws="$(grep -F 'isLibrary' "${VOICE_START_FILE}" | grep -cF 'throw AIToolError' || true)"
-if [ "${library_lines}" -lt 3 ] || [ "${library_lines}" != "${library_throws}" ]; then
-  fail "${VOICE_START_FILE}：认出声音库声音（isLibrary）的每一处都要报错、不许退本机（4.3）：${library_throws}/${library_lines}"
-fi
+# 11. 声音库（声音 PR 6）和全部权限下的长期授权（声音 PR 7）：拆在自己的文件里，同一个 shell 里 source（主脚本快到 600 行了）。
+# shellcheck source=checks/sky-studio-wiring/voice-library.sh
+source checks/sky-studio-wiring/voice-library.sh
+
+# 12. 声音库的界面（声音 PR 8）：拆在 checks/sky-studio-wiring/voice-library-ui.sh（这个文件到了行数上限），共用上面的 fail / code_files_with 和路径变量。
+source checks/sky-studio-wiring/voice-library-ui.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
@@ -554,9 +529,13 @@ last_fail="$(grep -nE '(\|\| |\{ |^ *)fail "' "$0" | tail -1 | cut -d: -f1 || tr
 if [ -z "${gate_at}" ] || [ -z "${last_fail}" ] || [ "${last_fail}" -gt "${gate_at}" ]; then
   fail "$0：总闸（if FAILED）要在最后一条检查之后（总闸第 ${gate_at:-?} 行、最后一条检查第 ${last_fail:-?} 行）"
 fi
+last_part="$(grep -n '^source checks/sky-studio-wiring/' "$0" | tail -1 | cut -d: -f1 || true)"
+if [ -z "${last_part}" ] || [ -z "${gate_at}" ] || [ "${last_part}" -gt "${gate_at}" ]; then
+  fail "$0：拆出去的几节（source checks/sky-studio-wiring/…）也要在总闸之前装进来"
+fi
 
 if [ "${FAILED}" -ne 0 ]; then
   echo "见 docs/architecture/sky-studio-account.md 和 docs/architecture/sky-studio-jobs.md" >&2
   exit 1
 fi
-echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 路径 / 服务商 id / 不退本机守住了"
+echo "✓ sky-studio-wiring：地址只在 SkyStudioAPI、原始硬件 UUID 不出本机、后台不弹钥匙串、设置和启动都接上了、照授权拦接在该接的地方、任务只经 SkyStudioJobRun、领槽只经 SkyStudioJobSlots、Key 只发给 Sky Studio、upscale 和生成的把关 / 积分 / 清单 / 路由接对了、声音库的授权 / 长期授权 / 路径 / 服务商 id / 不退本机守住了、声音库的界面和 AI 的工具走同一条路"

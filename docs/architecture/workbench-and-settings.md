@@ -27,7 +27,7 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 | --- | --- | --- |
 | general | 通用 | AppLanguagePicker / AppLanguageStore；AppThemePicker / AppThemeStore |
 | ai | 连接 AI | AIConnectSection / AIClientSetup / AIReadGrants |
-| editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary；KokoroVoiceSettingsRow / KokoroVoicePack |
+| editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary；KokoroVoiceSettingsRow / KokoroVoicePack；VoiceLibrarySettingsSection / VoiceLibraryStore（声音库：我的声音、新建 / 设计、浏览预设，见[声音库](voice-library.md)第九节） |
 | cache | 媒体缓存 | OptimizedMediaSettingsSection / OptimizedMediaCacheSettings |
 | sky_studio | Sky Studio | SkyStudioSettingsSection / SkyStudioAccount / SkyStudioSpendStore |
 
@@ -75,11 +75,17 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
   （[案例](../bugfixes/2026-11-10-overrides-best-quality-skips-approval.md)）。官方原创短片那一路暂时只查带没带原话。
 - 全部权限自动执行并通知；读外部文件与移入废纸篓复用现有工具执行而不再问。不改变系统权限、套餐、原文件不覆盖、服务能力、硬预算或原单结算规则。切回请求批准后，全部权限期间的外部读取不会被偷偷记成永久读取授权。
 - `set_settings ai_access_mode=...` 的实际模式变更始终先回确认码，当前已是全部权限也一样；用户同意后携原码重调才写入。所有参数在确认前验完，未批准、错误或串码时整批不写。
+- **打开全部权限时的说明与长期授权（2026-11-10 声音 PR 7，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 5.6）**：设置里选「全部权限」先弹
+  `FullAccessConsentSheet`（不再先问的几件事、声音的一次性费用价目从 `/models` 读、每日额度、打开即确认的那句长期授权），只有「同意并打开」才写 Store 并
+  `POST /voices/consent-grant`（用户看到的那一版），「取消」不改，每次切到全部权限都弹；记不上照样打开、这一节下面写一行「还没记上」。切回请求批准立刻写 Store、
+  `DELETE` 撤掉。`set_settings` 打开全部权限的问句后面接同一段说明（令牌另绑那一句的版本），点过头记上、关掉撤掉，结果报 `voice_standing_consent`。
+  升级前就开着全部权限的，新版第一次读到 Key 时替用户记上（一台 Mac 一次）。改模式的两处都告诉 `SkyStudioVoiceStanding`（扫描钉着）；全部权限下声音那几件事
+  怎么不再问见 [声音库](voice-library.md)第八节第 7、9 条。sheet 套 `.appLanguage()`、三张表都有译文。
 - UI 跟随 App 语言；代理询问与通知跟随会话语言。机器标识不变；`get_settings` 和确认结果返回本地化名称，中文「请求批准 / 全部权限」，西语也有对应译文。
 - `generate_media quote_only=true` 仅测输入和问价，不上传、不预留、不生成；规划讨论不构成消费授权。生成返回规格与预留；完成返回实际 billing。源片、画布、导出尺寸分别汇报，降规格须在交付前说明。
 - 失败与超时继续查询原任务及 billing；未知提交、下载或导入失败都恢复原单，不重新付费生成。只有明确的生成失败且已证实退款 / 未扣费，代理才按当前权限和硬预算决定新操作并使用新 key；用户要求停止不构成重试授权。现有原单幂等与恢复逻辑保留。
 
-验证：`scripts/check-sky-studio.sh` 的 AccessChecks 覆盖默认、旧目录、模式持久化、全部权限改设置仍询问、串码、硬预算和项目范围；`scripts/gui-smoke/sky-studio/settings.py` / `permissions.py` 用独立 App / 假服务器验证实际 MCP 与设置写入、只报价不消费、串码、同一操作只提交一次与全部权限的日预算阻止。中文原生窗口排版另作 GUI 回归，不把纯值检查说成已点通。
+验证：`scripts/check-sky-studio.sh` 的 AccessChecks 覆盖默认、旧目录、模式持久化、全部权限改设置仍询问、串码、硬预算和项目范围，以及打开全部权限的问句带说明、令牌绑那一版；`scripts/check-voice-recovery.sh` 的 StandingChecks 用真 App 对象验证 set_settings 记 / 撤长期授权和升级补记；`scripts/gui-smoke/sky-studio/settings.py` / `permissions.py` 用独立 App / 假服务器验证实际 MCP 与设置写入、只报价不消费、串码、同一操作只提交一次与全部权限的日预算阻止。中文原生窗口排版另作 GUI 回归，不把纯值检查说成已点通。
 
 ## 界面主题（2026-11-05）
 

@@ -97,7 +97,8 @@ App 本来只在用户点了设置里的按钮时才弹框，后台问 `/me` 和
 
 1. `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`。
 2. 装上之后录一次自定义区域：没授权时系统弹框问 → 打开 → 退出并重新打开 → 能录。
-3. 再装下一个版本（不同的 cdhash）：不用再授权，自定义区域照样能录；读下载文件夹不弹框。钥匙串按第二节更正：启动不弹框，用户点 Allow 后可询问一次，选 Always Allow 后同一构建不再问。
+3. 再装下一个版本（不同的 cdhash）：不用再授权，自定义区域照样能录；读下载文件夹不弹框；麦克风（录屏的解说、新建声音时「现在录」，
+   [声音库](voice-library.md)第九节）同样不用再给。钥匙串按第二节更正：启动不弹框，用户点 Allow 后可询问一次，选 Always Allow 后同一构建不再问。
 4. 有完全磁盘访问的终端里：`sqlite3 "/Library/Application Support/com.apple.TCC/TCC.db" "select hex(csreq) from access
    where service='kTCCServiceScreenCapture' and client='com.srtflow.SrtFlow'"`，解出来（`xxd -r -p` → `csreq -r - -t`）
    是 `certificate leaf` 那种，不是 `cdhash`。

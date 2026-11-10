@@ -25,15 +25,14 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setKeyframes, title: "Keyframes",
                 description: """
-                Animate a clip's position (centre x/y), scale, rotation and opacity over time. Each list replaces that property's \
-                keys; [] removes them. Times are timeline seconds inside the clip, or 0–1 with relative=true; easing defaults to \
-                easeInOut. Position or scale keys block edit_clip fit/x/y/scale. One undo step; clamped values return \
-                requested/applied/adjustments.
+                Animate a clip's position (centre x/y), scale, rotation and opacity. Each list replaces that property's keys; [] removes them. \
+                Times: timeline seconds inside the clip, or 0–1 with relative=true; easing defaults to easeInOut. Position or scale keys block \
+                edit_clip fit/x/y/scale. One undo step; clamped values return requested/applied/adjustments.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("Clip id from get_timeline."),
                     "relative": MCPSchema.boolean("Times are fractions 0–1 of the clip instead of seconds."),
-                    "easing": MCPSchema.string("Curve of every move: easeInOut (default), easeIn, easeOut, linear, snap, overshoot or spring.", oneOf: MCPVocabulary.keyframeEasings),
+                    "easing": MCPSchema.string("Curve: easeInOut (default), easeIn, easeOut, linear, snap, overshoot or spring.", oneOf: MCPVocabulary.keyframeEasings),
                     "position": MCPSchema.array(of: MCPSchema.object([
                         "time": MCPSchema.number("Timeline seconds (≥ 0), or 0–1 with relative=true.", minimum: 0),
                         "x": MCPSchema.number("Centre across, 0–1 on the frame (-2…3 for a picture bigger than the frame).", minimum: MCPFramingLimits.center.lowerBound, maximum: MCPFramingLimits.center.upperBound),
@@ -63,7 +62,7 @@ public enum MCPTimelineTools {
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("V1, V2… / A1, A2…, or master."),
-                    "volume_db": MCPSchema.number("Fader dB; clamps to edit_limits.volume_db. Returns requested/applied/adjustments."),
+                    "volume_db": MCPSchema.number("Fader dB within edit_limits.volume_db; returns requested/applied/adjustments."),
                     "hidden": MCPSchema.boolean("Hide or show the whole track (not for master).")
                 ], required: ["track"])
             )
@@ -118,7 +117,7 @@ public enum MCPTimelineTools {
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to copy.", minItems: 1),
                     "start": MCPSchema.number("Timeline time for the earliest copy, seconds (≥ 0).", minimum: 0),
-                    "track": MCPSchema.string("V1, V2… or A1, A2… (the next number opens a new track): where the copied clips should go.")
+                    "track": MCPSchema.string("Where copies go: V1, V2… or A1, A2… (the next number opens a new track).")
                 ], required: ["ids"])
             )
         case .setTransition:
@@ -141,10 +140,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setShape, title: "Shape",
                 description: """
-                Add a line, rectangle, square, circle, arc, blur or mosaic patch, or change one (shape_id); only passed fields change. \
-                Position and size are frame fractions; shapes sit under texts. blur and mosaic hide the picture beneath (look \
-                text_scan gives cover boxes). Delete with delete_items. One undo step; clamped values return \
-                requested/applied/adjustments.
+                Add a line, rectangle, square, circle, arc, blur or mosaic patch, or change one (shape_id); only passed fields change. Position \
+                and size are frame fractions; shapes sit under texts. blur/mosaic hide what is beneath (look text_scan gives cover boxes). \
+                Delete: delete_items. One undo step; clamped values return requested/applied/adjustments.
                 """,
                 input: MCPSchema.object([
                     "shape_id": MCPSchema.string("Change this shape instead of adding one."),
@@ -161,7 +159,7 @@ public enum MCPTimelineTools {
                     "line_width": MCPSchema.number("Pixels on a 1080-high frame (default 6).", minimum: 1, maximum: 24),
                     "strength": MCPSchema.number("blur/mosaic only, pixels on a 1080-high frame (blur 28, mosaic 22).", minimum: 2, maximum: 80),
                     "filled": MCPSchema.boolean("Rectangles, squares and circles: solid instead of an outline."),
-                    "animation_in": MCPSchema.string("Entrance; draw traces the outline from its start (a solid shape fills in that way).", oneOf: MCPVocabulary.shapeAnimations),
+                    "animation_in": MCPSchema.string("Entrance; draw traces the outline from its start (solid shapes fill that way).", oneOf: MCPVocabulary.shapeAnimations),
                     "animation_out": MCPSchema.string("Exit: the entrance played backwards.", oneOf: MCPVocabulary.shapeAnimations),
                     "animation_in_duration": MCPSchema.number("Entrance seconds (default 0.6).", minimum: 0.1, maximum: 5),
                     "animation_out_duration": MCPSchema.number("Exit seconds (default 0.6).", minimum: 0.1, maximum: 5),
@@ -206,7 +204,7 @@ public enum MCPTimelineTools {
     private static var addClips: MCPToolDefinition {
         let soundEffect = MCPSchema.object([
             "preset": MCPSchema.string(
-                "Which sound; peaks: whoosh 60%, suction and riser at the end, sparkle at the first twinkle.",
+                "Sound; peak: whoosh 60%, suction/riser at the end, sparkle at its first twinkle.",
                 oneOf: MCPVocabulary.soundEffectPresets
             ),
             "duration": MCPSchema.number("Seconds, 0.05-10 (default: the preset's own, 0.05-2).", minimum: 0.05, maximum: 10),
@@ -217,33 +215,33 @@ public enum MCPTimelineTools {
             "volume_db": MCPSchema.number("Clip dB (default -8), clamped to edit_limits.volume_db.")
         ], description: "Instead of file: a sound effect made on this Mac; place it with hit_at.")
         let item = MCPSchema.object([
-            "file": MCPSchema.string("Video, image, audio or subtitle file: absolute, or relative to the opened folder."),
+            "file": MCPSchema.string("Video, image, audio or subtitle file: absolute or relative to the opened folder."),
             "library_id": MCPSchema.string("Instead of file: a music or sound effect id from find_audio."),
             "sound_effect": soundEffect,
             "hit_at": MCPSchema.number(
-                "For a sound effect: the timeline second (≥ 0) its loudest moment lands on; sets start.",
+                "Sound effect: timeline second (≥ 0) its loudest moment lands on; sets start.",
                 minimum: 0
             ),
             "source_in": MCPSchema.number("Where to start in the file, seconds (default 0).", minimum: 0),
-            "source_out": MCPSchema.number("Where to stop in the file, seconds (default: the end); for an image, its display length."),
+            "source_out": MCPSchema.number("Where to stop in the file, seconds (default end); an image: its display length."),
             "track": MCPSchema.string(MCPSchema.trackDescription),
             "start": MCPSchema.number("Timeline start, seconds (≥ 0).", minimum: 0),
             "sound": MCPSchema.string(
-                "Video: separate puts its sound on a linked audio track (J/L cuts); only adds just the sound.",
+                "Video: separate = sound on a linked audio track (J/L cuts); only = just the sound.",
                 oneOf: MCPVocabulary.clipSounds
             )
         ])
         return MCPToolDefinition(
             .addClips, title: "Add clips",
             description: """
-            Put files, library music (find_audio) or local sound effects on the timeline, in order. Each item: one source (file, \
-            library_id or sound_effect), source_in/source_out (file seconds), track and start; hit_at lands a sound effect's peak. \
-            Video and images append to their track (default V1); overlaps lift a track; insert=true pushes later V1 clips. Files \
-            outside the opened folder may return needs_confirmation. One undo step.
+            Put files, library music (find_audio) or local sound effects on the timeline, in order. Each item: one source (file, library_id \
+            or sound_effect), source_in/source_out (file seconds), track, start; hit_at lands an effect's peak. Video and images append \
+            (default V1); overlaps lift a track; insert=true pushes later V1 clips. Outside files may return needs_confirmation. One undo \
+            step.
             """,
             input: MCPSchema.object([
                 "clips": MCPSchema.array(of: item, "Clips to add, in timeline order.", minItems: 1),
-                "insert": MCPSchema.boolean("On V1 with a start: push later V1 clips right instead of lifting to another track."),
+                "insert": MCPSchema.boolean("On V1 with a start: push later V1 clips right instead of lifting to a new track."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["clips"])
         )
@@ -251,7 +249,7 @@ public enum MCPTimelineTools {
 
     private static var editClip: MCPToolDefinition {
         let crop = MCPSchema.object([
-            "left": MCPSchema.number("Fraction to cut from the left, up to edit_limits.crop (0.45); beyond, use region."),
+            "left": MCPSchema.number("Fraction cut from the left, up to edit_limits.crop (0.45); beyond, use region."),
             "right": MCPSchema.number("Fraction to cut from the right, 0–0.45.", minimum: 0, maximum: 0.45),
             "top": MCPSchema.number("Fraction to cut from the top, 0–0.45.", minimum: 0, maximum: 0.45),
             "bottom": MCPSchema.number("Fraction to cut from the bottom, 0–0.45.", minimum: 0, maximum: 0.45)
@@ -260,9 +258,9 @@ public enum MCPTimelineTools {
             .editClip, title: "Change a clip",
             description: """
             Change one clip: trim (source_in/source_out, source seconds), speed, volume/fades, crop, reframe for 9:16 (fit=fill), \
-            region={x,y,width,height}, position/scale, entrance/exit, file swap. Batch: edit_clips; new clips: add_clips. clip_id from \
-            get_timeline. Trim: the timeline start stays, the end moves. One undo step; invalid values change nothing and return \
-            allowed values. Before framing, region or sound fields: skycut_guide topic=edit_clip.
+            region={x,y,width,height}, position/scale, entrance/exit, file swap. Batch: edit_clips; new: add_clips; ids: get_timeline. Trim: \
+            the timeline start stays, the end moves. One undo step; bad values change nothing and return allowed ones. Before framing, \
+            region or sound: skycut_guide topic=edit_clip.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("Clip id from get_timeline."),
@@ -271,7 +269,7 @@ public enum MCPTimelineTools {
                 ),
                 "start": MCPSchema.number("New timeline start, seconds (≥ 0).", minimum: 0),
                 "track": MCPSchema.string(MCPSchema.trackDescription),
-                "source_in": MCPSchema.number("New start inside the file, seconds (≥ 0); the timeline start stays, the end moves.", minimum: 0),
+                "source_in": MCPSchema.number("New start in the file, seconds (≥ 0); the timeline start stays, the end moves.", minimum: 0),
                 "source_out": MCPSchema.number("New end inside the file, seconds (≥ 0); the timeline end moves.", minimum: 0),
                 "speed": MCPSchema.number("Playback speed (1 = normal); see edit_limits.speed. Outside range fails."),
                 "volume_db": MCPSchema.number("Clip dB (0 = original), clamped to edit_limits.volume_db; shifts a volume_curve."),
@@ -375,7 +373,7 @@ public enum MCPTimelineTools {
                     "seconds": MCPSchema.number("How long it rolls (default 1.5).", minimum: 0.1, maximum: 20),
                     "delay": MCPSchema.number("Seconds to wait before rolling, 0–60.", minimum: 0, maximum: 60),
                     "remove": MCPSchema.boolean("true turns it back into plain text.")
-                ], description: "A number rolling from one value to another instead of text; only the fields you pass change."),
+                ], description: "A number rolling between two values instead of text; only passed fields change."),
                 "hidden": MCPSchema.boolean("Hide it without deleting it.")
             ])
         )

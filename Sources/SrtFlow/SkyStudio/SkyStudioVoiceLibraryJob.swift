@@ -63,6 +63,8 @@ final class SkyStudioVoiceLibraryJob {
                 return finish(.failed, "Sky Studio finished but returned no voice; query the original job before trying again.",
                               detail: ["skystudio_job_id": .string(done.jobID)])
             }
+            // 设计出来的声音进了声音库、建好的 MiniMax 版改了那个声音：设置里的声音库那一节听这一声刷新。
+            SkyStudioVoiceLibraryChange.post()
             finish(.done, message(result), detail: detail(result, server: done))
         } catch let error as SkyStudioJobError {
             if error.canRefund(beforeAccepted: serverID == nil) { held.refund() }

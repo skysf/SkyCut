@@ -28,6 +28,7 @@
 #      声音 PR 4：按池领槽（SkyStudioJobSlots：声音池 8 / 共用池 3、读不到声音池都进共用池、先来先得、等的时候被停就离队、
 #      对着假 Sky Studio 数同时开着的单、429 看 pool 拿着槽等、同一个 key 再交）；一段旁白几批各在哪一步（SkyStudioVoiceBatchBoard）。
 #      2026-11-10 审查（VoiceSplitChecks）：切句对字不计较繁简、转写语言按字形、没有词可对时按字数估句界、每批按自己的文字定上限。
+#      声音 PR 8：声音库界面里的纯值（VoiceLibraryUIChecks：选择器列什么、「新建」为什么还灰着、服务器的错误是哪一种）。
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写和 fal 共用 KeychainSecret，真钥匙串在 scripts/check-fal-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -137,6 +138,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceListing.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceApproval.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoiceLibraryErrors.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioVoiceStandingNotice.swift \
+  Sources/SrtFlow/VoiceLibrary/VoicePickerRows.swift \
+  Sources/SrtFlow/VoiceLibrary/NewVoiceGate.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AITextLanguage.swift \
@@ -179,6 +183,8 @@ xcrun swiftc \
   checks/SkyStudio/VoiceTimingChecks.swift \
   checks/SkyStudio/VoiceSplitChecks.swift \
   checks/SkyStudio/VoiceLibraryToolChecks.swift \
+  checks/SkyStudio/VoiceStandingNoticeChecks.swift \
+  checks/SkyStudio/VoiceLibraryUIChecks.swift \
   checks/SkyStudio/VoiceRecoveryChecks.swift \
   checks/SkyStudio/VoiceCatalogChecks.swift \
   checks/SkyStudio/VoiceLibraryChecks.swift \
