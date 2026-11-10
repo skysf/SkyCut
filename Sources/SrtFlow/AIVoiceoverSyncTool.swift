@@ -11,7 +11,7 @@ final class AIVoiceoverSyncTool {
     struct Services {
         var duration: (URL) async throws -> Double = MediaProbeCache.measuredAudioDuration
         var words: (URL, String) async throws -> [TimedWord] = { url, language in
-            let locale = try await SkyStudioVoiceAudio.splitLocale(language: language)
+            let locale = try await SkyStudioVoiceTranscription.locale(for: language)
             return try await SkyStudioVoiceAudio.transcribe(url, locale: locale)
         }
     }

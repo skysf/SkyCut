@@ -16,6 +16,7 @@ import SrtFlowMCPKit
         do {
             try await recoveryChecks(root)
             try await runVoiceStartChecks(root)
+            try await runVoiceRecoveryTimingChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -24,8 +25,9 @@ import SrtFlowMCPKit
         UserDefaults.standard.removePersistentDomain(forName: domain)
         if VoiceCheckLog.failures > 0 { print("FAIL: \(VoiceCheckLog.failures) production voice recovery checks"); exit(1) }
         print("PASS: production voice: whole-segment quote before job_id, one selection per segment, budget / refusal / local fallback before paying, "
-            + "second-batch split failure, local-only retry, missing-only generation with the saved selection, subtitle recovery, stable files, "
-            + "durable receipt, six clips/cues, one undo/redo and unknown-submit refusal")
+            + "second-batch split failure, local-only retry, missing-only generation with the saved selection, estimated long line, stable files, "
+            + "durable receipt, six clips/cues, one undo/redo, unknown-submit refusal, packed narration, eleven-v4 / estimated subtitle timing, "
+            + "model install before paying and re-quote when it fails, script words in subtitles, mixed timing")
         exit(0)
     }
 
@@ -114,19 +116,20 @@ import SrtFlowMCPKit
         require(cloudDone["status"] == "done" && VoiceRecoveryHTTP.posts == 4, "partial cloud success only generates the failed and unstarted batches")
         require(cloud.project.state.audioTracks.flatMap(\.clips).count == 6 && cloud.project.state.subtitleCues(of: .original).count == 6, "partial cloud recovery has no duplicate content")
 
-        // 普通旁白的长句跨批：第二批只需字幕对齐，失败后重新从两个原文件拼齐，不丢、不把第一片拼两次。
+        // 普通旁白的长句跨批（在句末分开）：第二批的转写一个词都没有 —— 声音是好的，这一句按字数估、不让整段失败（声音 PR 5），
+        // 两批各付一次、拼回一句不丢不重。
         let subtitle = try VoiceRecoveryFixture(folder: root.appendingPathComponent("subtitle"))
         subtitle.failSplitOnce = true
         let long = ["Hello world. Hello world. Hello world."]
-        let failedSubtitle = try await subtitle.wait(subtitle.started(subtitle.narrate(long)))
-        require(failedSubtitle["failure_stage"] == "subtitle_alignment", "subtitle alignment failure must be distinct from splitting and generation")
-        let subtitleFile = failedSubtitle["recovery_file"]!.stringValue!
-        require(VoiceRecoveryHTTP.posts == 2, "both parts of the long line were generated before subtitle failure")
-        let subtitleDone = try await subtitle.resume(subtitleFile)
-        require(subtitleDone["status"] == "done" && VoiceRecoveryHTTP.posts == 2, "subtitle recovery reuses both original batches")
+        let estimatedLine = try await subtitle.wait(subtitle.started(subtitle.narrate(long)))
+        require(estimatedLine["status"] == "done" && estimatedLine["subtitle_timing"] == "estimated",
+                "a long line whose second batch could not be transcribed is estimated, not failed (got \(estimatedLine["status"] ?? .null))")
+        require(VoiceRecoveryHTTP.bodies("/jobs").map { $0["prompt"]?.stringValue ?? "" } == ["Hello world. Hello world.", "Hello world."],
+                "the long line was split at a sentence end")
+        require(VoiceRecoveryHTTP.posts == 2, "both parts of the long line were generated once")
         let single = subtitle.project.state.audioTracks.flatMap(\.clips)
-        require(single.count == 1 && abs(single[0].timelineDuration - 12) < 0.2, "long-line recovery joins each six-second batch exactly once")
-        require(!subtitle.project.state.subtitleCues(of: .original).isEmpty, "recovered long line includes aligned subtitles")
+        require(single.count == 1 && abs(single[0].timelineDuration - 12) < 0.2, "the long line joins each six-second batch exactly once")
+        require(!subtitle.project.state.subtitleCues(of: .original).isEmpty, "the long line still has subtitles")
 
         let cancelled = try VoiceRecoveryFixture(folder: root.appendingPathComponent("cancelled"))
         cancelled.failSplitOnce = false
