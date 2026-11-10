@@ -29,7 +29,9 @@ import Foundation
 //   {"do": "snapshot", "name": "export", "target": "sheet"}   拍主窗口上的 sheet；"other" 拍别的窗口（设置）
 //   {"do": "add", "kind": "text"}                    往时间线上加东西：text / shape / blur / filter / transition（SmokeUISteps）
 //   {"do": "show", "panel": "export"}                摆出面板：export / subtitles / record / settings / subtitleList /
-//                                                    library:filters … / section:burnIn …（切主窗口的栏目）/ dismiss（收回导出、字幕、录屏面板）
+//                                                    library:filters … / section:burnIn …（切主窗口的栏目）/ dismiss（收回导出、字幕、录屏面板）/
+//                                                    settings:editing …（设置窗口切到那一类，SettingsCategory 的代号）
+//   {"do": "voice", "kind": "new", "text": "…", "path": "/abs/a.wav"}   设置里的声音库：新建 / 设计 / 删声音（SmokeVoiceSteps 的文件头）
 //   {"do": "projectWindow", "path": "/abs/B.srtflowproj"}   在一个新的工程窗口里开（OpenProjects.open），日志写它的短 id；
 //                                                    之后哪一步带 "project": "p2"，就作用在那个工程和它的窗口上（不带 = 主窗口那个）
 //   {"do": "undo"}                                   先让输入框辞职（像点一下时间线），再照编辑菜单的 ⌘Z 沿响应链发 undo:（菜单快捷键驱不动）
@@ -41,7 +43,7 @@ import Foundation
 struct SmokeStep: Decodable {
     enum Action: String, Decodable {
         case wait, settle, window, seek, play, pause, click, drag, scroll, key, hit, focus, toggles, open, menu, zoom
-        case copy, cut, paste, add, show
+        case copy, cut, paste, add, show, voice
         case projectWindow, undo, closeWindow
         case perfReset, perf, state, snapshot, quit
     }
@@ -76,6 +78,8 @@ struct SmokeStep: Decodable {
     var kind: String?
     var panel: String?
     var target: String?
+    /// `voice` 一步的字（名字、描述、语言、授权那一勾、报价应该是多少）。
+    var text: String?
     /// 这一步作用在哪个工程（短 id，`projectWindow` 开出来的那个）；不写 = 主窗口那个。
     var project: String?
 
@@ -83,7 +87,7 @@ struct SmokeStep: Decodable {
         case action = "do"
         case seconds, quiet, timeout, width, height, time, at, from, to, count, steps, hold
         case dx, dy, code, chars, flags, label, name, magnet, snapping, linkage, followPlayhead, path, factor, vertical
-        case kind, panel, target, project
+        case kind, panel, target, text, project
     }
 
     static func load(from url: URL) throws -> [SmokeStep] {

@@ -27,6 +27,7 @@ struct SettingsWindowView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(width: 750, height: 520)
+        .smokeSettingsRequests(selection: $selection)
         .navigationTitle("Settings")
         .background(AppThemePalette.current.panel)
     }
