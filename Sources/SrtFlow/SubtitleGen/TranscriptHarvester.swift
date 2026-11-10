@@ -157,65 +157,18 @@ struct TranscriptHarvester {
         let metadataTag = await Self.metadataLanguageTag(
             in: SubtitleAudibleClips.metadataOrder(in: clips, probe: probe.clip)
         )
-        // 候选来源按优先级排：元数据（唯一允许下载）→ 系统首选 → 其余已装。
-        // **已装那一档要排序**：`installedLocales()` 的顺序本机实测连续两次读
-        // 都可能不同，不排序的话「哪三个语言进探针」会随机漂移。
-        var sources: [SubtitleLanguageDetection.CandidateSource] = []
-        if let metadataTag,
-           let matched = await SpeechTranscriptionService.matchedLocale(for: metadataTag) {
-            sources.append(.init(localeIdentifier: matched.identifier, allowsDownload: true))
-        }
-        let installed = await SpeechTranscriptionService.installedLocales()
-        let installedIDs = Set(installed.map(\.identifier))
-        for id in Locale.preferredLanguages + installed.map(\.identifier).sorted() {
-            // 元数据之外的候选必须已装 —— 自动检测不许静默拉起 N 份模型下载。
-            guard let matched = await SpeechTranscriptionService.matchedLocale(for: id),
-                  installedIDs.contains(matched.identifier) else { continue }
-            sources.append(.init(localeIdentifier: matched.identifier, allowsDownload: false))
-        }
-        // 去重按**语言**不按 locale 标识符：en_US/en_SG/en_IN 是同一种语言的三个
-        // 变体，按标识符去重会让它们吃光三个名额（实测取到过
-        // ["en_US", "zh_CN", "en_IN"]），装了日语模型也永远探不到日语。
-        let candidates = SubtitleLanguageDetection.selectCandidates(sources)
-            .map { Locale(identifier: $0.localeIdentifier) }
+        // 候选（元数据指名的唯一允许下载 → 系统首选 → 其余已装，按语言去重、上限 3）和裁决（每个候选都过探针，
+        // **不因为「只有一个候选」跳过** —— 见方法头的说明）在 SpokenLanguageProbe，新建声音对话框检测录音的语言用同一份。
+        let candidates = await SpokenLanguageProbe.candidates(metadataTag: metadataTag)
         guard !candidates.isEmpty else {
             throw HarvestError(message: L10n(
                 "Couldn't detect the spoken language — no speech model is installed. Pick the language manually so its model can be downloaded."
             ))
         }
-
-        // **不因为「只有一个候选」跳过探针** —— 见方法头的说明。
-        let probeFile = probe.file
-        let probeRange = probe.range
-        var results: [SubtitleLanguageDetection.Candidate] = []
-        for candidate in candidates {
-            if token.isCancelled { throw CancellationError() }
-            do {
-                try await service.ensureModel(locale: candidate) { _ in }
-            } catch {
-                if token.isCancelled || Task.isCancelled { throw CancellationError() }
-                // 单个候选的模型装不上不致命：剩下的候选照样能裁决。
-                continue
-            }
-            do {
-                let words = try await service.transcribe(
-                    fileURL: probeFile, locale: candidate, sourceOffset: probeRange.start
-                )
-                results.append(SubtitleLanguageDetection.Candidate(
-                    localeIdentifier: candidate.identifier, words: words
-                ))
-                await service.releaseModel(locale: candidate)
-            } catch {
-                await service.releaseModel(locale: candidate)
-                if token.isCancelled || Task.isCancelled { throw CancellationError() }
-                // 转写栈的故障如实上抛，不许伪装成「检测不出语言」。
-                throw error
-            }
-        }
-        if token.isCancelled { throw CancellationError() }
-        guard let verdict = SubtitleLanguageDetection.pick(results),
-              let winner = candidates.first(where: { $0.identifier == verdict.localeIdentifier })
-        else {
+        guard let winner = try await SpokenLanguageProbe.verdict(
+            probeFile: probe.file, probeStart: probe.range.start, candidates: candidates, service: service,
+            isCancelled: { token.isCancelled }
+        ) else {
             throw LanguageUndetectedError()
         }
         return winner
