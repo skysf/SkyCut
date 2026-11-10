@@ -34,7 +34,12 @@ enum MCPCharacterTools {
 
     private static var manage: MCPToolDefinition {
         MCPToolDefinition(.manageCharacters, title: "Manage characters", description:
-            "Write the Sky Studio character library: create from text/photo, import views, edit metadata, replace a view, regenerate headshot or delete. Read list_characters capabilities=true. Create/headshot are paid: quote_only, then shared approval/hard daily budget. Other writes are free; deletion follows permission mode. Keep idempotency_key; get_job recovers the original across restarts, never creates or charges again. Ready results return character_id, never timeline clips. Character jobs cannot be cancelled.",
+            """
+            Write the Sky Studio character library: create from text or a photo, import views, rename, replace a view, regenerate \
+            the headshot or delete. Paid (Sky Studio credits) for create and headshot; quote_only prices first. Over-plan work or \
+            a delete may return needs_confirmation: ask, then repeat with confirm_token. The daily credit limit applies. Jobs \
+            return job_id: wait with get_job. Read skycut_guide topic=manage_characters first.
+            """,
             input: MCPSchema.object([
                 "action": MCPSchema.string("One library mutation.", oneOf: ["create", "import", "update", "replace_view", "headshot", "delete"]),
                 "character_id": MCPSchema.string("Existing full UUID for update/replace_view/headshot/delete."),
@@ -57,7 +62,7 @@ enum MCPCharacterTools {
                 "resolution": MCPSchema.string("Native Character tier; fixed source/headshot shapes, never pass aspect_ratio."),
                 "quote_only": MCPSchema.boolean("Create/headshot/import quote: no upload, Character insertion, reservation or spending."),
                 "idempotency_key": MCPSchema.string("Required for create/import/headshot/replace_view: stable 1-128 chars before sending; reuse unchanged after lost answers."),
-                "resume": MCPSchema.string("Original stable job_id; pass only action and resume. Paid/role recovery is GET-only. Unknown free import explicitly recovers saved key/body without re-upload."),
+                "resume": MCPSchema.string("Original job_id to recover; pass only action and resume. Recovery only reads the original job and never charges again."),
                 "approval_scope": MCPSchema.string("Default once; project requires explicit authorization for this exact Character operation.", oneOf: ["once", "project"]),
                 "user_requested_overrides": MCPSchema.boolean("True only for explicit user requests; hard budgets still apply."),
                 "confirm_token": MCPSchema.confirmToken

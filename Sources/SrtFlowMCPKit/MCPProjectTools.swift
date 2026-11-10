@@ -44,13 +44,9 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .openFolder, title: "Open a media folder",
                 description: """
-                Use a folder the user named as the workspace for this edit and list the media inside it and every subfolder: \
-                videos, images, audio and subtitle files with duration and size. Files in it can be imported without asking \
-                again. New files SkyCut makes (exports, projects) go into its "SkyCut" subfolder (or an older "SrtFlow" one). Paths in the result are \
-                relative to the folder. Only pass a folder the user gave you. When the user says to use what they selected in \
-                Finder, pass from_finder=true instead of path: the selected files are listed (their folder becomes the \
-                workspace), or the selected folder, or the folder open in the front Finder window. macOS asks the user once to \
-                let SkyCut see Finder.
+                Read-only. Use a folder the user named as the workspace: lists its videos, images, audio and subtitle files (with \
+                duration and size) in every subfolder; files in it import without asking again, and new files go to its SkyCut \
+                subfolder. Only pass a folder the user gave you; from_finder=true uses their Finder selection.
                 """,
                 input: MCPSchema.object([
                     "path": MCPSchema.string("Absolute path of the folder. ~ means the user's home folder."),

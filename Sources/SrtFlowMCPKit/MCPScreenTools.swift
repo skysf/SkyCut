@@ -15,15 +15,10 @@ public enum MCPScreenTools {
             return MCPToolDefinition(
                 .recordScreen, title: "Record the screen",
                 description: """
-                Record the Mac's screen to .mov and add it to the end of V1 (microphone: a new audio track). action=start starts \
-                recording; a late action=stop returns the completed job id, status, file, project, clip ids, stopped_by and \
-                stop_method. User Stop is also reported on your next tool result. get_status screen=true lists displays, windows \
-                and microphones. Choose a source yourself. A small Stop panel at the bottom left of the main display shows the \
-                countdown, then start returns while capture continues; it is invisible in screenshots, so do not click there. \
-                Recording ends on action=stop, duration, or the user's Stop. get_job shows progress and the same receipt. An \
-                incomplete recording still lands and says why. Frame rate follows set_canvas fps. Without Screen & System Audio \
-                Recording permission macOS asks the user once; the result explains next steps. macOS may remind them every \
-                30 days. action=resolve settles an earlier unfinished recording.
+                Record the Mac's screen to .mov, added to the end of V1 (microphone on its own track) as one undo step. Pick the \
+                source from get_status screen=true. action=start returns while recording; action=stop returns the job id, file, clip \
+                ids, stopped_by and stop_method; a user Stop shows up in your next tool result. action=resolve settles an unfinished \
+                one (discard may return needs_confirmation). Read skycut_guide topic=record_screen first.
                 """,
                 input: MCPSchema.object([
                     "action": MCPSchema.string(
@@ -35,10 +30,10 @@ public enum MCPScreenTools {
                     "display": MCPSchema.integer("Display number from get_status screen=true (default 1, the main one).", minimum: 1),
                     "window": MCPSchema.string("For window: app name, title words, or the window number from get_status; the frontmost match."),
                     "rect": MCPSchema.object([
-                        "x": MCPSchema.number("Left edge.", minimum: 0, maximum: 1),
-                        "y": MCPSchema.number("Top edge.", minimum: 0, maximum: 1),
-                        "width": MCPSchema.number("Width.", minimum: 0, maximum: 1),
-                        "height": MCPSchema.number("Height.", minimum: 0, maximum: 1)
+                        "x": MCPSchema.number("Left edge, 0–1.", minimum: 0, maximum: 1),
+                        "y": MCPSchema.number("Top edge, 0–1.", minimum: 0, maximum: 1),
+                        "width": MCPSchema.number("Width, 0–1.", minimum: 0, maximum: 1),
+                        "height": MCPSchema.number("Height, 0–1.", minimum: 0, maximum: 1)
                     ], required: ["x", "y", "width", "height"], description: "For region: the area as fractions of the display, 0,0 top left."),
                     "ratio": MCPSchema.string("For drag: lock the area's shape.", oneOf: MCPVocabulary.recordingRatios),
                     "computer_audio": MCPSchema.boolean("Record the computer's sound (default true)."),
@@ -47,7 +42,7 @@ public enum MCPScreenTools {
                         "shown (default), hidden, or clicks (shown, clicks highlighted).", oneOf: MCPVocabulary.recordingPointers
                     ),
                     "countdown": MCPSchema.integer("Seconds before it starts (default 3; 0 when you operate the Mac yourself).", minimum: 0, maximum: 10),
-                    "duration": MCPSchema.number("Stop by itself after this many seconds.", minimum: 1, maximum: 14_400),
+                    "duration": MCPSchema.number("Stop by itself after this many seconds (1–14400).", minimum: 1, maximum: 14_400),
                     "title": MCPSchema.string("File name (default Screen Recording <date time>), in SkyCut/Screen Recordings; a taken name gets a number."),
                     "add_to_timeline": MCPSchema.boolean("Put it on the timeline when it stops (default true); false keeps only the file."),
                     "decision": MCPSchema.string(
