@@ -71,7 +71,7 @@ vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Con
 用固定的签名身份签，见下方签名一节）→ `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
 再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）。
 
-产物：`dist/SkyCut.app`（约 52 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
+产物：`dist/SkyCut.app`（0.18.64 约 67 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
 
 版本号：**正式发版必须显式传** `VERSION=x.y.z ./scripts/build-app.sh`。不传时
 脚本兜底取最近的 git tag，并在 HEAD 领先该 tag 时警告「这是开发版产物」——
@@ -352,6 +352,53 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 - 详见 [钥匙串的 bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)「实机验证」。
 
 真积分验证 #340（28 积分）：角色列表 28 条 10,786 字（原来 79,969 字），换角度成品叫 `<源图名> angle.png`，图片宽高从文件读，结束的任务不报阶段。
+
+没有打 git tag，也没有创建 GitHub release，做法同前。
+
+2026-11-10，发布声音功能的中间版 **0.18.64**。Sky Studio 的声音服务当晚上线后，装着的 0.18.63 用不了 Sky Studio 的克隆和云端旁白。用户选了「中间版」并批准发版：声音 PR 6（声音库的 MCP 工具）和 PR 3–5 的审查修正一合进 main 就打包，先把 AI 旁白和用自己的声音克隆恢复；声音库界面（PR 8）、全部权限的长期授权（PR 7）、右键换声音（PR 9）下一版再发。发版与验收事实由 Claude 提供。
+
+构建：
+- 源码：main `d50b1db31aad8aa34b4baadf64de97a788910bf6`，等这个提交 push 那一轮 CI（5 组 + `check-all`）全绿才打包。0.18.63 之后合进来的客户端改动：
+  - 声音：#345、#349、#353（声音目录合同，对齐 Sky Studio）；#346、#350（克隆的参考录音）；#355（PR 3：先整段报价再回任务号，预设声音按名字）；#364（PR 4：按池领槽，几批同时交）；#361（PR 5：旁白的字幕时间）；#362（PR 6：`list_voices` / `manage_voices`，用声音库的声音读稿）；#365（PR 3–5 的审查修正：付过钱的旁白不再卡住）；
+  - 说明书 `skycut_guide`：#344、#348、#351、#354、#358；
+  - #352：视频模型目录跟 Sky Studio（Omni 1.2，撤下 Veo 3.1 Pro）。
+- 在单独的 worktree 里打包：`VERSION=0.18.64 arch -arm64 /bin/bash scripts/build-app.sh`，冷编 Release 约 10 分钟。
+- worktree 里没有 `vendor/ffmpeg`：先用 `FFMPEG_LOCAL=<主 checkout>/vendor/ffmpeg scripts/vendor-ffmpeg.sh` 拷进来并校验，和以前各版是同一个 ffmpeg 8.1。
+
+产物：
+- `SkyCut-0.18.64-arm64.dmg`，34,202,304 字节；SHA-256：`42a6bdac2af15ffa182b7a06b45efb19eceb98bc1bd7512f4b1474a3f317c771`；App 的 CDHash `13fd8329…`。
+
+校验：
+- 包：
+  - `hdiutil verify` 通过；
+  - Info.plist 版本 `0.18.64`；
+  - 主程序、ffmpeg、`skycut-mcp` 均为 arm64；挂载包里的整个 App 与 `dist/SkyCut.app` 逐字节相同（`diff -r`）。
+- 签名：
+  - App 和两个 Helpers 都钉在原固定证书 `76d2…90ef`，本地和挂载包内的深度签名校验都通过；
+  - `TeamIdentifier=not set`，和以前一样。
+- 运行：
+  - 挂载包里的 `skycut-mcp` 初始化报告 `skycut` / `0.18.64`。socket 指到不存在的路径，碰不到正在运行的 0.18.63；
+  - 清单 61 个工具，`skycut_guide` 排第一，`list_voices`、`manage_voices` 都在；
+  - ffmpeg 8.1 能运行；
+  - `voice_library_unavailable`、`estimated_split_line_indices` 等新字符串在包内；
+  - `scripts/check-dmg.sh` 通过。
+
+发布：
+- 公开对象：`skycut/SkyCut-0.18.64-42a6bdac2af1-arm64.dmg`，immutable 缓存。
+- 先上传，再用 `--url` 从公开直链完整读回一致。
+- 个人站 [skystudio PR #19](https://github.com/skysf/skystudio/pull/19)（合并提交 `38ad76c`）切换两条入口，Cloudflare Pages 部署成功。
+- 不带 `--url` 经固定入口完整下载一致；带尾斜杠的入口 302 到同一个对象。
+
+安装：
+- 发版时正式版在运行，`/Applications/SkyCut.app` 没有替换，仍是 0.18.63。
+- 测试版换成 0.18.64：
+  - `build-beta-app.sh` 从同一构建打包，同一把证书；
+  - 去掉签名后，三份二进制与正式版逐字节相同；
+  - 旧的进了废纸篓；只装好，没有启动。
+
+升级时的钥匙串：
+- 新构建第一次读 Sky Studio Key 时，要用户点提示条的「允许…」、输登录密码、选「始终允许」。和 0.18.63 一样，见[钥匙串的 bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
+- 写这份记录时，这一步还没做。
 
 没有打 git tag，也没有创建 GitHub release，做法同前。
 
