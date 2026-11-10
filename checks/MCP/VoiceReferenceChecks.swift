@@ -1,9 +1,10 @@
 import Foundation
 
 // 克隆参考录音（SkyCut 声音方案第六节、9.1 第 3 条）—— 纯值这一半：
-// VoiceReferenceWindow 的 10 秒下限、3 分钟上限、挑有效人声最多的一段、一样多比前 15 秒再比早、切口只在 ≥ 0.2 秒的停顿里
-// 且离两头 40 ms、尽头也能当终点、一直有声时退到最安静的格子边，并和一个照规矩直写的穷举对账（choose 里的二分和剪枝）；
-// 边读边算的响度和一口气算的一样；WAV 的头（44.1 kHz 单声道 16-bit）、量化、写给 AI 的那一句、上传用途。
+// VoiceReferenceWindow 的有声门限（和 Sky Studio 的合同：RMS ≥ 0.0056）、10 秒下限、3 分钟上限（正好 3 分钟还是整段）、
+// 挑有效人声最多的一段、一样多比前 15 秒再比早、切口只在 ≥ 0.2 秒的停顿里且离两头 40 ms、尽头也能当终点、一直有声时退到
+// 最安静的格子边，并和一个照规矩直写的穷举对账（choose 里的二分和剪枝）；边读边算的响度和一口气算的一样；
+// WAV 的头（44.1 kHz 单声道 16-bit）、量化（坏采样 NaN / ±Inf 记 0、特别大的夹住，不许崩）、写给 AI 的那一句、上传用途。
 // 真读真写（AVFoundation → 挑段 → WAV → 读回来）在 VoiceReferenceFileChecks.swift。规矩见 docs/architecture/voice-library.md。
 
 private typealias Window = VoiceReferenceWindow
@@ -25,7 +26,10 @@ private func checkClose(_ actual: Double, _ expected: Double, _ message: String,
 func runVoiceReferenceChecks() {
     checkEqual(Window.minimumVoicedSeconds, 10, "a voice sample needs at least 10 s of clear speech (MiniMax's hard minimum)")
     checkEqual(Window.maximumSeconds, 180, "a voice sample is at most 3 minutes")
-    checkEqual(Window.silenceFloor, AIVoiceLevel.activeFloor, "speech is measured with the voiceover level's −45 dBFS floor")
+    // 有声门限是和 Sky Studio 的合同：SkyCut RMS ≥ 0.0056（≈ −45.04 dBFS），服务器故意放宽到 0.0055，只会更宽不会更严。
+    checkEqual(Window.speechRMSFloor, 0.0056, "the speech floor is the contract with Sky Studio: frame RMS ≥ 0.0056 (the server relaxes to 0.0055)")
+    checkEqual(Window.voicedFrames(levels: [0.0056, Float(0.0056).nextDown, 0.0056234, 0.0055]), 2,
+               "0.0056 and exact −45 dBFS count as speech; just below 0.0056 and the server's 0.0055 do not")
     runWholeAndMinimumChecks()
     runPickChecks()
     runOracleChecks()
@@ -42,9 +46,12 @@ private func runWholeAndMinimumChecks() {
     check(exactly.hasEnoughSpeech && exactly.voicedFrames == 500, "exactly 10 s (500 frames) of speech is enough")
     let almost = Window.choose(levels: frames([(9.98, true), (5, false)]), duration: 15)
     check(!almost.hasEnoughSpeech && almost.voicedFrames == 499, "9.98 s of speech is not enough")
-    checkEqual(Window.choose(levels: frames([(180, true)]), duration: 180).autoSelected, false, "exactly 3 minutes is still the whole recording")
-    checkEqual(Window.voicedFrames(levels: [Window.silenceFloor, Window.silenceFloor.nextDown, 0, 1]), 2,
-               "the −45 dBFS floor itself counts as speech, just below it does not")
+    // 正好 3 分钟、结尾有 0.5 秒静音：还是整段（`>` 不是 `>=`：走了挑段就会切在结尾的停顿里、变成 179.54 秒）。
+    let threeMinutes = Window.choose(levels: frames([(179.5, true), (0.5, false)]), duration: 180)
+    check(!threeMinutes.autoSelected && threeMinutes.start == 0 && threeMinutes.end == 180,
+          "exactly 3 minutes is still the whole recording, trailing pause included: \(threeMinutes)")
+    checkEqual(Window.voicedFrames(levels: [Window.speechRMSFloor, Window.speechRMSFloor.nextDown, 0, 1]), 2,
+               "the floor itself counts as speech, just below it does not")
     checkEqual(Window.pauseRuns(frames([(0.3, false), (1, true), (0.18, false), (1, true), (0.2, false)])), [0..<15, 124..<134],
                "pauses are runs of at least 0.2 s below the floor, at the edges too; 0.18 s is not a pause")
 }
@@ -96,7 +103,7 @@ private func runPickChecks() {
 
 /// 起点：开头，或一个 ≥ 0.2 秒停顿之后的开口前 40 ms；终点：尽头，或停顿里离两头至少 40 ms。
 private func checkCuts(_ window: Window, in levels: [Float], _ label: String) {
-    let silent = { (frame: Int) in frame >= 0 && frame < levels.count && levels[frame] < Window.silenceFloor }
+    let silent = { (frame: Int) in frame >= 0 && frame < levels.count && levels[frame] < Window.speechRMSFloor }
     func run(around frame: Int) -> Int {
         var low = frame, high = frame
         while silent(low - 1) { low -= 1 }
@@ -150,7 +157,7 @@ private func randomLevels(seed: UInt64) -> [Float] {
 /// 照方案直写：每个起点 × 3:00 前后 1 秒里每个格子边都看一遍能不能切，再按同样的先后挑；一个都没有才退到最安静的格子边。
 private func bruteForce(_ levels: [Float], duration: Double) -> (start: Int, end: Int?, voiced: Int) {
     let count = levels.count
-    let silent = levels.map { $0 < Window.silenceFloor }
+    let silent = levels.map { $0 < Window.speechRMSFloor }
     var sums = [0]
     for quiet in silent { sums.append(sums[sums.count - 1] + (quiet ? 0 : 1)) }
     func voiced(_ from: Int, _ to: Int) -> Int { sums[min(to, count)] - sums[from] }
@@ -241,6 +248,9 @@ private func runSampleFormatChecks() {
     checkEqual(VoiceReferenceSample.quantize(0.5), 16_384, "half scale")
     check((-32_768...32_767).allSatisfy { VoiceReferenceSample.quantize(Float($0) / 32_768) == Int16($0) },
           "every 16-bit sample survives the Float round trip")
+    // 浮点源里的坏采样：以前 Int(_:) 在夹住之前就 trap，整个 App 崩掉（docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md）。
+    checkEqual([Float.nan, .infinity, -.infinity, 1e20, -1e20, .greatestFiniteMagnitude].map(VoiceReferenceSample.quantize),
+               [0, 0, 0, 32_767, -32_768, 32_767], "NaN and ±infinity become silence, huge values clamp, nothing crashes")
     let tone = (0..<44_100).map { VoiceReferenceSample.quantize(0.1 * Float(sin(Double($0) * 0.0627))) }
     let hum = (0..<44_100).map { VoiceReferenceSample.quantize(0.003 * Float(sin(Double($0) * 0.0627))) }
     checkClose(VoiceReferenceSample.voicedSeconds(of: tone + [Int16](repeating: 0, count: 44_100) + hum), 1,
@@ -248,6 +258,8 @@ private func runSampleFormatChecks() {
 
     checkEqual(VoiceReferenceSample.clock(72.4), "1:12", "minutes and seconds")
     checkEqual(VoiceReferenceSample.clock(3_725), "1:02:05", "hours when needed")
+    checkEqual(VoiceReferenceSample.clock(180.5), "3:00", "rounded down: a 180.5 s sample never shows as 3:01 next to 'at most 3 minutes'")
+    checkEqual(VoiceReferenceSample.spoken(180.5), "3 min 0 s", "speech time is rounded down too")
     checkEqual(VoiceReferenceSample.spoken(161), "2 min 41 s", "a long stretch of speech")
     checkEqual(VoiceReferenceSample.spoken(38.2), "38 s", "a short stretch of speech")
     let url = URL(fileURLWithPath: "/tmp/reference.wav")

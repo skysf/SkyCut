@@ -13,14 +13,16 @@ final class SkyStudioVoiceCloudBatches {
     private let key: String
     private let status: SkyStudioMediaStatus
     private let canSubmit: @MainActor () -> Bool
+    /// 新任务在报价之前做好的参考录音（SkyStudioVoiceoverRun.prepareReference）；恢复的任务是 nil，传参考时再做。
+    private let reference: VoiceReferenceSample.Sample?
     private var budget: SkyStudioVoiceBudget?
     private var positions: [Int: Int] = [:]
     private var quotes: [SkyStudioQuote] = []
 
     init(recovery: SkyStudioVoiceRecovery, input: AIVoiceoverInput, api: SkyStudioAPI, key: String, status: SkyStudioMediaStatus,
-         canSubmit: @escaping @MainActor () -> Bool) {
+         reference: VoiceReferenceSample.Sample? = nil, canSubmit: @escaping @MainActor () -> Bool) {
         self.recovery = recovery; self.input = input; self.api = api; self.key = key; self.status = status
-        self.canSubmit = canSubmit
+        self.reference = reference; self.canSubmit = canSubmit
     }
 
     func refundUnused() { budget?.refundUnused() }
@@ -39,19 +41,25 @@ final class SkyStudioVoiceCloudBatches {
         status.credits = quotes.reduce(0) { $0 + $1.credits }
     }
 
-    /// 参考录音只做一次、只传一次（44.1 kHz 单声道、10 秒–3 分钟，VoiceReferenceSample）；用了哪一段记进恢复记录的声音说明，
-    /// 落地时随 voice.note 告诉 AI（恢复也带着）。
+    /// 参考录音只传一次（44.1 kHz 单声道、10 秒–3 分钟，VoiceReferenceSample）。新任务用报价之前做好的那一份；
+    /// 恢复的任务这时才做，用了哪一段补进恢复记录的声音说明（已经有了就不重复），落地时随 voice.note 告诉 AI。
     private func uploadReferenceIfNeeded() async throws {
-        if let clone = input.clone, recovery.value.referenceURL == nil {
+        guard let clone = input.clone, recovery.value.referenceURL == nil else { return }
+        let sample: VoiceReferenceSample.Sample
+        if let reference, FileManager.default.fileExists(atPath: reference.url.path) {
+            sample = reference
+        } else {
             let folder = recovery.file.deletingLastPathComponent()
-            let sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
-            status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
-            recovery.value.referenceURL = try await api.upload(fileURL: sample.url, contentType: VoiceReferenceSample.contentType,
-                                                                purpose: VoiceReferenceSample.uploadPurpose, key: key)
-            recovery.value.input.note = [recovery.value.input.note, sample.summary(name: clone.url.lastPathComponent)]
-                .compactMap { $0 }.joined(separator: " ")
-            try await recovery.save()
+            sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
+            let summary = sample.summary(name: clone.url.lastPathComponent)
+            if recovery.value.input.note?.contains(summary) != true {
+                recovery.value.input.note = [recovery.value.input.note, summary].compactMap { $0 }.joined(separator: " ")
+            }
         }
+        status.advance(to: .uploading(fraction: nil), typicalSeconds: nil)
+        recovery.value.referenceURL = try await api.upload(fileURL: sample.url, contentType: VoiceReferenceSample.contentType,
+                                                            purpose: VoiceReferenceSample.uploadPurpose, key: key)
+        try await recovery.save()
     }
 
     func audio(_ index: Int, generateMissing: Bool) async throws -> (URL, SkyStudioJobResult)? {

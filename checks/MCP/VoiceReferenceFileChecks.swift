@@ -4,7 +4,8 @@ import Foundation
 // 克隆参考录音 —— 真读真写这一半（SkyCut 声音方案 9.1 第 3 条）：现写几种素材，走生产的 VoiceReferenceSample.prepare
 // （AVAssetReader → 挑段 → 44.1 kHz 单声道 16-bit WAV），再把写出来的文件按字节读回来（WAVHeader）：
 // 44.1 kHz 16-bit 的源一个采样都不变；48 kHz 立体声超过 3 分钟挑在说话密的那里、不到 181 秒、取左右平均；
-// 点名的一段原样截；AAC 的时间对得上；不到 10 秒的说差几秒、不留文件；取消也不留文件。纯值那一半在 VoiceReferenceChecks.swift。
+// 点名的一段原样截；AAC 的时间对得上；不到 10 秒的说差几秒、不留文件；取消也不留文件；贴着门限的样本按合同数（0.0056）；
+// 再数一遍数的是写出去的 16-bit 采样；浮点源里的 NaN / ±Inf / 特别大的数不崩。纯值那一半在 VoiceReferenceChecks.swift。
 
 func runVoiceReferenceFileChecks() async {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-voice-reference-\(UUID().uuidString)")
@@ -15,6 +16,9 @@ func runVoiceReferenceFileChecks() async {
         let long = try await checkStereoPick(root)
         try await checkExplicitRange(long, root)
         try await checkTooLittleSpeech(root)
+        try await checkContractFloor(root)
+        try await checkRecountOnWrittenSamples(root)
+        try await checkBadFloatSamples(root)
         try await checkCompressedTiming(root)
         await checkCancelled(long, root)
     } catch {
@@ -122,6 +126,63 @@ private func checkCompressedTiming(_ root: URL) async throws {
     check(abs(sample.voicedSeconds - 12.5) < 0.2, "12.5 s of speech in the range: \(sample.voicedSeconds)")
 }
 
+/// 门限的合同（RMS ≥ 0.0056，服务器放宽到 0.0055）：9.9 秒的声音 + 5 格正好贴着门限的声音（±184，RMS 0.0056152 ≈ −45.01 dBFS）
+/// = 正好 10.0 秒有效人声，收。按精确的 −45 dBFS（0.0056234）数就只剩 9.9 秒、被拒 —— 审查的 borderline.wav 就是这个形状
+/// （docs/bugfixes/2026-11-10-voice-reference-floor-borrowed-from-voice-level.md）。
+private func checkContractFloor(_ root: URL) async throws {
+    let rate = 44_100
+    var samples = (0..<(495 * 882)).map { VoiceReferenceSample.quantize(Float(0.2 * sin(2 * .pi * 220 * Double($0) / Double(rate)))) }
+    samples += [Int16](repeating: 0, count: 25 * 882)
+    samples += (0..<(5 * 882)).map { $0 % 2 == 0 ? 184 : -184 }
+    samples += [Int16](repeating: 0, count: 50 * 882)
+    let source = root.appendingPathComponent("borderline.wav")
+    try VoiceReferenceSample.wavData(samples: samples, sampleRate: rate).write(to: source)
+    do {
+        let sample = try await VoiceReferenceSample.prepare(from: source, folder: root.appendingPathComponent("borderline"))
+        check(abs(sample.voicedSeconds - 10) < 1e-9 && !sample.autoSelected,
+              "frames at RMS 0.0056152 count as speech: exactly 10.0 s, accepted: \(sample.voicedSeconds)")
+    } catch {
+        check(false, "a sample right at the contract floor (10.0 s at RMS ≥ 0.0056) must be accepted: \(error)")
+    }
+}
+
+/// 再数一遍数的是要上传的 16-bit 采样：浮点源里 10 格的均方根刚好高过门限（九成 ±183.49、一成 ±184.49，RMS 0.0056028），
+/// 量化成 ±183 / ±184 之后只剩 0.0055878。挑段时按浮点算 10.1 秒，写出去的只有 9.9 秒：拒，按写出去的说差多少。
+private func checkRecountOnWrittenSamples(_ root: URL) async throws {
+    let source = root.appendingPathComponent("borderline-float.wav")
+    try writeAudio(source, seconds: 11.1, rate: 44_100, channels: 1, float: true) { _, time in
+        let index = Int((time * 44_100).rounded())
+        if index < 495 * 882 { return Float(0.2 * sin(2 * .pi * 220 * time)) }
+        guard index < 505 * 882 else { return 0 }
+        let units: Float = index % 882 % 10 == 0 ? 184.49 : 183.49
+        return (index % 2 == 0 ? 1 : -1) * units / 32_768
+    }
+    do {
+        _ = try await VoiceReferenceSample.prepare(from: source, folder: root.appendingPathComponent("borderline-float"))
+        check(false, "speech counted on Float but not on the written 16-bit samples must be refused")
+    } catch let error as AIToolError {
+        check(error.message.contains("9.9 s") && error.details["voiced_seconds"]?.doubleValue == 9.9,
+              "the refusal counts the written 16-bit samples (9.9 s), not the Float scan (10.1 s): \(error.message)")
+    } catch {
+        check(false, "a recount shortfall is a tool error, got \(error)")
+    }
+}
+
+/// 浮点源里的坏采样（NaN、±Inf、1e20）：以前整个 App 崩掉；现在坏的记成 0、特别大的夹到满幅，其余照常
+/// （docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md）。
+private func checkBadFloatSamples(_ root: URL) async throws {
+    let bad: [Int: Float] = [5 * 44_100: .nan, 6 * 44_100: .infinity, 7 * 44_100: -.infinity, 8 * 44_100: 1e20, 9 * 44_100: -1e20]
+    let source = root.appendingPathComponent("bad-samples.wav")
+    try writeAudio(source, seconds: 15, rate: 44_100, channels: 1, float: true) { _, time in
+        bad[Int((time * 44_100).rounded())] ?? Float(0.2 * sin(2 * .pi * 220 * time))
+    }
+    let sample = try await VoiceReferenceSample.prepare(from: source, folder: root.appendingPathComponent("bad"))
+    let samples = WAVHeader(try Data(contentsOf: sample.url))?.samples ?? []
+    checkEqual(bad.keys.sorted().map { $0 < samples.count ? samples[$0] : 1 }, [0, 0, 0, 32_767, -32_768],
+               "NaN and ±infinity are written as silence, 1e20 clamps to full scale")
+    check(abs(sample.voicedSeconds - 15) < 1e-9, "the rest of the recording is untouched: \(sample.voicedSeconds) s of speech")
+}
+
 /// 取消：读取线程上停下，不写文件。
 private func checkCancelled(_ source: URL, _ root: URL) async {
     let folder = root.appendingPathComponent("cancelled")
@@ -131,8 +192,8 @@ private func checkCancelled(_ source: URL, _ root: URL) async {
     check(!FileManager.default.fileExists(atPath: folder.appendingPathComponent("reference.wav").path), "a cancelled sample writes nothing")
 }
 
-/// 现写一段 16-bit PCM（或 AAC）素材：每个声道每个时刻的值由 `signal` 给。
-private func writeAudio(_ url: URL, seconds: Double, rate: Double, channels: Int, aac: Bool = false,
+/// 现写一段 16-bit PCM（`float` 是 32 位浮点、原样写进去，NaN 也照写；或 AAC）素材：每个声道每个时刻的值由 `signal` 给。
+private func writeAudio(_ url: URL, seconds: Double, rate: Double, channels: Int, aac: Bool = false, float: Bool = false,
                         signal: (Int, Double) -> Float) throws {
     var settings: [String: Any] = [AVSampleRateKey: rate, AVNumberOfChannelsKey: channels]
     if aac {
@@ -140,8 +201,8 @@ private func writeAudio(_ url: URL, seconds: Double, rate: Double, channels: Int
         settings[AVEncoderBitRateKey] = 128_000
     } else {
         settings[AVFormatIDKey] = kAudioFormatLinearPCM
-        settings[AVLinearPCMBitDepthKey] = 16
-        settings[AVLinearPCMIsFloatKey] = false
+        settings[AVLinearPCMBitDepthKey] = float ? 32 : 16
+        settings[AVLinearPCMIsFloatKey] = float
         settings[AVLinearPCMIsBigEndianKey] = false
         settings[AVLinearPCMIsNonInterleaved] = false
     }

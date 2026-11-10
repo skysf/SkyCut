@@ -19,6 +19,9 @@ final class SkyStudioVoiceoverRun {
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
     private var locale: Locale?
+    /// 新的克隆任务在报价之前做好的参考录音（临时文件夹，任务结束就删）；恢复的任务没有，传参考时再做。
+    private var reference: VoiceReferenceSample.Sample?
+    private var referenceFolder: URL?
     private var batchIndex = 0
     private var stage = SkyStudioVoiceCheckpoint.Stage.cloudGeneration
     private var extra: [String: JSONValue] = [:]
@@ -54,6 +57,7 @@ final class SkyStudioVoiceoverRun {
     private func execute() async {
         defer {
             cloud?.refundUnused()
+            if let referenceFolder { try? FileManager.default.removeItem(at: referenceFolder) }
             SkyStudioVoiceRecovery.active[recoveryFile.path] = nil
             SkyStudioGenerationActivity.shared.remove(status)
         }
@@ -135,6 +139,8 @@ final class SkyStudioVoiceoverRun {
                 extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             }
         }
+        // 结构化的原因（比如参考录音人声不够的 reason / voiced_seconds / missing_seconds）照样交给 get_job，不只留一句话。
+        if let tool = error as? AIToolError { extra.merge(tool.details) { current, _ in current } }
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
@@ -155,6 +161,7 @@ final class SkyStudioVoiceoverRun {
         } catch is CancellationError { throw CancellationError() }
         catch { try await fallback(message(error)); return false }
         guard projectUnchanged, let project else { throw AIToolError("The original project was closed or changed; nothing was charged.") }
+        try await prepareReference()
         if input.speed != 1 {
             input.choice.note = [input.choice.note, "The Sky Studio voice speaks at its own pace; speed was ignored."].compactMap { $0 }.joined(separator: " ")
         }
@@ -165,12 +172,24 @@ final class SkyStudioVoiceoverRun {
         AIReadGrants.shared.remember([recoveryFile])
         status.modelTitle = plan.model.title
         cloud = SkyStudioVoiceCloudBatches(recovery: recovery, input: input, api: services.api, key: key, status: status,
-                                         canSubmit: { [weak self] in self?.projectUnchanged == true })
+                                         reference: reference, canSubmit: { [weak self] in self?.projectUnchanged == true })
         stage = .cloudGeneration
         do { try await cloud?.prepareMissing() }
         catch is CancellationError { throw CancellationError() }
         catch let failure as SkyStudioFailure { try await fallback(message(failure)); return false }
         return true
+    }
+
+    /// 克隆的参考录音在报价、预留积分、写恢复记录之前做好：人声不够这类问题当场拒，`recovery_state` 是 not_started、
+    /// `next_step` 是改了再调原来的 add_voiceover（不是去恢复，恢复只会再错一次），get_job 带着 reason / voiced_seconds /
+    /// missing_seconds。用了哪一段写进声音说明，跟着恢复记录走（PR #346 审查第 3 条）。
+    private func prepareReference() async throws {
+        guard let clone = input.clone else { return }
+        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlow-voice-reference-\(UUID().uuidString)")
+        referenceFolder = folder
+        let sample = try await VoiceReferenceSample.prepare(from: clone.url, start: clone.start, end: clone.end, folder: folder)
+        reference = sample
+        input.choice.note = [input.choice.note, sample.summary(name: clone.url.lastPathComponent)].compactMap { $0 }.joined(separator: " ")
     }
 
     private func cloudBatches() async throws -> SkyStudioVoiceCloudBatches {
