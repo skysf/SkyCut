@@ -219,6 +219,8 @@ final class VoiceLibraryFixture {
         services.key = { "local-library-fixture" }
         services.transcription = { _ in .installed(Locale(identifier: "en-US")) }
         services.install = { _, progress in progress(1) }
+        services.slots = SkyStudioJobSlots(limits: .init(shared: 3, audio: 8))
+        services.jobSleep = { _ in try await Task.sleep(nanoseconds: 5_000_000) }
         services.transcribe = { file, _ in
             let index = Int(file.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "batch-", with: "")) ?? 0
             let prompt = VoiceLibraryHTTP.lock.withLock { VoiceLibraryHTTP.prompts.indices.contains(index) ? VoiceLibraryHTTP.prompts[index] : "" }

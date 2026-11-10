@@ -62,8 +62,10 @@ enum MCPGuideVoiceTopics {
     gender, and voice.note says why. Once a paid batch is sent there is no fallback.
     """)
 
-    // 出处：声音方案 4.2（model）、4.4（选模型、跨语言提示）、8.4（整段一个模型、每批带回 selection）。
-    static let modelsLanguages = MCPGuideSection(name: "models_languages", about: "model=auto and voice_plan, named models, one selection for the whole script", text: """
+    // 出处：声音方案 4.2（model）、4.4（选模型、跨语言提示）、8.4（整段一个模型、每批带回 selection；中途换备用、line_models，声音 PR 4）、
+    // 4.5（备用要先花一次性费用：现在付不了，照原来的模型重试）。
+    static let modelsLanguages = MCPGuideSection(name: "models_languages",
+        about: "model=auto and voice_plan, named models, one selection for the whole script, a fallback part-way", text: """
     model only matters for Sky Studio voices. auto (the default) lets Sky Studio choose: SkyCut sends the whole script \
     and the voice, and the quote answers with voice_plan: selection (the model and voice that read every batch), rule, \
     reason (one English sentence), languages (each language's share of the reading time), cross_language, warnings and \
@@ -74,8 +76,12 @@ enum MCPGuideVoiceTopics {
     voice or the script's language is refused while quoting, with Sky Studio's own words, and nothing is paid.
 
     The whole script reads with one selection: every batch is sent with the same voice_plan selection. If one batch's \
-    model fails, Sky Studio may finish that batch with the fallback; get_job reports each batch's model and \
-    fallback_used.
+    model fails, Sky Studio may finish that batch with its fallback; batches sent after that use the fallback too \
+    (finished ones are not read again). get_job reports each batch's model and fallback_used, line_models says which \
+    model read each line, and voice.note says they may sound different: tell the user. Making them match means reading \
+    the whole script again (quoted again first). A batch whose fallback first needs a one-time fee stops with \
+    fallback_needs_one_time (nothing is charged for it; SkyCut cannot pay that fee yet): add_voiceover \
+    resume=<recovery_file> generate_missing=true retries the missing batches with the same model.
     """)
 
     // 出处：sky-studio-jobs.md 第一节、第五节、第十一节（每日硬预算）；ai-control-mcp.md 第四节第 6、39、40 条；声音方案 4.2 第 2–5 步。
@@ -115,15 +121,19 @@ enum MCPGuideVoiceTopics {
     match the script is estimated too; its audio is kept and nothing is paid again.
     """)
 
-    // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.1（合批）、8.4（恢复只 GET 原单、补的批照原来的 selection）。
+    // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.1（合批）、8.2（几批同时交，声音 PR 4）、
+    // 8.4（恢复只 GET 原单、补的批照原来的 selection）。
     static let batchesRecovery = MCPGuideSection(name: "batches_recovery",
-                                                 about: "batches of whole lines, recovery_file, resume and generate_missing after a failure", text: """
+                                                 about: "batches of whole lines read several at once, recovery_file, resume and generate_missing after a failure",
+                                                 text: """
     Sky Studio reads the script in batches of about a minute: whole lines go together and a batch only breaks between \
     lines (a line longer than a batch breaks at sentence ends first). SkyCut splits a batch back into lines by \
     transcribing it or by the model's word timing; when this Mac cannot transcribe the language and the model reports \
-    no word timing, every line is its own batch. batches in the result says how many. A cloud job keeps what it paid \
-    for in recovery_file: every batch's audio, which line is in which batch, and Sky Studio's job ids. When get_job \
-    reports failed or cancelled:
+    no word timing, every line is its own batch. batches in the result says how many. Batches are read several at once \
+    (as many as the account's voice job slots; the rest wait for a free one); while it runs, get_job reports \
+    batches_done, batches_running and batches_waiting. If one batch fails, batches not yet sent are not sent, and those \
+    already sent are kept. A cloud job keeps what it paid for in recovery_file: every batch's audio, which line is in \
+    which batch, and Sky Studio's job ids. When get_job reports failed or cancelled:
     - Never call add_voiceover with the original lines again: that pays twice.
     - add_voiceover resume=<recovery_file> finishes from what exists: it fetches finished batches, splits and aligns them \
     on this Mac and inserts once. It never pays.

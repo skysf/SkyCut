@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 //
 // 管什么：设置里存 / 删 Key（存的时候马上问一次，Sky Studio 不认就不留）；拿 Key 问 /me —— 启动时、回到 SkyCut 时、
 // 每小时看一眼，按 SkyStudioRefresh 的规矩到时候了才真去问；回答存进 UserDefaults，断网时照它用到 valid_until；
-// 此刻作数的授权（`license`，规则在 SkyCutLicense）；照授权拦的那几处从这里问（AI 的调用、导出带不带水印，规矩在 SkyCutGates）。
+// 此刻作数的授权（`license`，规则在 SkyCutLicense）；照授权拦的那几处从这里问（AI 的调用、导出带不带水印，规矩在 SkyCutGates）；
+// 每次存下回答，同时能开几个任务（两个池）交给 SkyStudioJobSlots 照它排。
 // 订阅它的只有设置那一节和导出面板上「会带水印」那一行（一个小对象，不读工程）。
 // 不管什么：HTTP（SkyStudioAPI）、钥匙串（SkyStudioKey / KeychainSecret）、拦在哪（AIToolRouter、VideoEditExporter）。
 //
@@ -46,6 +47,7 @@ final class SkyStudioAccount: ObservableObject {
         let previous = Self.load(defaults)
         stored = previous
         hasKey = previous != nil
+        Self.adoptSlots(previous)
         keychainNotice = SkyStudioKeychainNoticePolicy(build: ScreenCapturePermissionRepair.runningBuildHash())
     }
 
@@ -283,11 +285,18 @@ final class SkyStudioAccount: ObservableObject {
     private func replaceStored(_ answer: SkyStudioStoredAnswer?) {
         if stored?.me.account.id != answer?.me.account.id { SkyStudioCharacterAccess.invalidate() }
         stored = answer
+        Self.adoptSlots(answer)
         if let answer, let data = try? SkyStudioJSON.encoder().encode(answer) {
             defaults.set(data, forKey: Self.storedAnswerKey)
         } else {
             defaults.removeObject(forKey: Self.storedAnswerKey)
         }
+    }
+
+    /// 同时能开几个任务（两个池）照这份回答排（SkyStudioJobSlots）；没有回答按共用池 3 个、没有声音池。
+    private static func adoptSlots(_ answer: SkyStudioStoredAnswer?) {
+        let license = answer?.me.skycut
+        SkyStudioJobSlots.shared.adopt(.init(shared: license?.maxRunningJobs, audio: license?.maxRunningAudioJobs))
     }
 
     private static func load(_ defaults: UserDefaults) -> SkyStudioStoredAnswer? {

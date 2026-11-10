@@ -3,6 +3,7 @@ import SrtFlowCore
 import SrtFlowMCPKit
 
 // 恢复记录（version 2：整段报价时服务器的选择、每批实际跑的模型 / 有没有换备用）真写真读，以及已知原单恢复只 GET；
+// 中途换了备用（声音 PR 4）：还没交的批照备用的那份（pendingSelection），各句不全是同一个模型时报 line_models。
 // 实际任务 / 音频 / 字幕 / 撤销由 check-voice-recovery 运行 App 目标文件验证。
 func runVoiceRecoveryChecks() async {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("voice-checkpoint-\(UUID().uuidString)")
@@ -85,6 +86,7 @@ func runVoiceRecoveryChecks() async {
             catch { check(true, "a version \(version) record is rejected (only version 2)") }
         }
     } catch { check(false, "voice checkpoint checks: \(error)") }
+    fallbackSwitchChecks(folder: folder)
 
     SkyStudioStub.reset { _ in .http(200, sampleDoneJobFor("job-1")) }
     var run = SkyStudioJobRun(api: jobAPI(), key: jobKey)
@@ -97,4 +99,47 @@ func runVoiceRecoveryChecks() async {
         checkEqual(SkyStudioStub.log.map(\.method), ["GET"], "known job recovery never submits a paid POST")
         checkEqual(checkpoints.phases, ["done"], "original server identity is checkpointed before recovery returns")
     } catch { check(false, "original job recovery: \(error)") }
+}
+
+/// 声音 PR 4（SkyCut 声音方案 8.4）：整段带着自动备用；第二批在服务器上换了备用之后，还没交的批照备用的那份，记录里每句是哪个模型读的。
+private func fallbackSwitchChecks(folder: URL) {
+    do {
+        let lines = [String](repeating: "Hello world.", count: 6)
+        let catalog = SkyStudioCatalog(models: [SkyStudioModel(id: "index-tts-2", kind: "voice_clone", title: "Clone",
+                                                               limits: ["max_characters_by_language": ["other": 30]])])
+        let reading = SkyStudioVoiceReading(model: "auto", packs: true, timing: .aligned, transcribes: true, switchedForTiming: false)
+        let draft = try SkyStudioVoicePlan.draft(lines: lines, kind: "voice_clone", voice: sampleVoiceID, reading: reading, language: "en", catalog: catalog)
+        let backup: JSONValue = ["model": "minimax-speech-2.8-hd", "reference_language": "en"]
+        let selection: JSONValue = ["model": "index-tts-2", "reference_language": "en", "fallback": backup]
+        let quoted: JSONValue = ["credits": 7.5, "voice_plan": ["selection": selection, "rule": "en_80",
+                                 "fallback": ["selection": backup, "available": true, "auto": true, "one_time": .null]],
+                                 "batches": .array(draft.speech.map { _ in ["credits": 2.5] }), "one_time": []]
+        guard let quote = SkyStudioQuote(json: quoted) else { return check(false, "a quote with an automatic fallback reads") }
+        let plan = try SkyStudioVoicePlan.quoted(draft, quote: quote)
+        let input = SkyStudioVoiceCheckpoint.Input(lines: lines.map { .init(text: $0) }, language: "en", voice: sampleVoiceID, speed: 1,
+            subtitles: true, folder: folder, playhead: 0)
+        var checkpoint = SkyStudioVoiceCheckpoint(input: input, projectPath: nil, projectToken: "run-p1", plan: plan)
+        checkEqual(checkpoint.pendingSelection, selection.objectValue ?? [:], "before any switch, unsent batches carry the script's selection")
+        checkEqual(checkpoint.lineModels == nil, true, "nothing read yet: no line_models")
+        func finish(_ index: Int, model: String, fallback: Bool) {
+            checkpoint.willSubmit(index)
+            if let done = SkyStudioJobStatus(json: ["job_id": .string("original-\(index)"), "status": "done", "credits_charged": 2.5,
+                "result": ["url": "http://127.0.0.1/voice.wav", "model": .string(model), "fallback_used": .bool(fallback),
+                           "voice_plan": ["selection": selection]]]) {
+                checkpoint.received(done, at: index)
+            }
+        }
+        finish(0, model: "index-tts-2", fallback: false)
+        checkEqual(checkpoint.lineModels == nil, true, "every finished batch read by the same model: no line_models")
+        finish(1, model: "minimax-speech-2.8-hd", fallback: true)
+        checkEqual(checkpoint.pendingSelection, backup.objectValue ?? [:], "after a batch fell back, unsent batches carry voice_plan.fallback.selection")
+        let models = checkpoint.lineModels?.map { "\($0.line):\($0.model):\($0.fallbackUsed)" } ?? []
+        checkEqual(models, ["0:index-tts-2:false", "1:index-tts-2:false", "2:minimax-speech-2.8-hd:true", "3:minimax-speech-2.8-hd:true"],
+                   "line_models lists the lines that were read, with their model (batches not read yet are not guessed)")
+        checkEqual(checkpoint.detail(recoveryFile: "/r.json")["line_models"]?.arrayValue?.count, 4, "get_job reports line_models")
+        let file = folder.appendingPathComponent("fallback-recovery.json")
+        try SkyStudioVoiceRecoveryStore.write(checkpoint, to: file)
+        checkEqual(try SkyStudioVoiceRecoveryStore.read(file).pendingSelection, backup.objectValue ?? [:],
+                   "the switch survives a disk round trip (worked out from the recorded fallback_used, no new field)")
+    } catch { check(false, "fallback switch checks: \(error)") }
 }
