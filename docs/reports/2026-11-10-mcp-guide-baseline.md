@@ -1,8 +1,9 @@
-# MCP 按需说明：基线实测（Claude Code 这一半，main `7a9d8c9`）
+# MCP 按需说明：基线实测（main `7a9d8c9`，Claude Code + Codex）
 
 > 2026-11-10。[MCP 按需说明方案](../plans/2026-11-09-mcp-guide.md) 6.1 的基线：用改之前的 main `7a9d8c9` 组装的隔离测试 App 量，
-> 作为试点（PR 3 之后）和迁移完（PR 6）两次实测的对照。**Codex 那一半等 2026-11-11 13:11 额度重置后再跑**（用户 2026-11-10 定）；
-> Claude 桌面版的两个任务由用户手动跑。[证据 JSON](2026-11-10-mcp-guide-baseline-evidence.json)（每个任务的调用、参数、成败、token、落盘断言；路径换成 `$RUN`）；
+> 作为试点（PR 3 之后）和迁移完（PR 6）两次实测的对照。Codex 那一半原定 2026-11-11 额度重置后跑，当晚用户定不用等，见「Codex 这一半」；
+> Claude 桌面版的两个任务由用户手动跑。证据 JSON：[Claude Code](2026-11-10-mcp-guide-baseline-evidence.json)、[Codex](2026-11-10-mcp-guide-baseline-codex-evidence.json)
+> （每个任务的调用、参数、成败、token、落盘断言；路径换成 `$RUN`）；
 > 实测脚本在 `scripts/gui-smoke/client-measure/`，怎么跑见 [GUI 冒烟流程](../testing/gui-smoke-testing.md)四之十。进度见 [实施报告](2026-11-10-mcp-guide-progress.md)。
 
 ## 环境与隔离
@@ -88,7 +89,63 @@
   对 Claude Code 来说，SkyCut 的固定开销只有每轮那 1,605 token，大头是对话本身（工具结果、图）在每次请求里被带着走。
 - 一条都没读说明书（基线里还没有 `skycut_guide`）。
 
+## Codex 这一半（2026-11-10 晚）
+
+原定 2026-11-11 额度重置后跑；当晚用户定不用等、可以并行。同一个 `7a9d8c9` 的 App 拷成两个测量目录（身份 `…cxb1` / `…cxb2.skystudiosmoke`、
+端口 18811 / 18812），各跑四个任务（1、4、2、3 和 5、7、6、8），和试点的两路同时开跑；同一个母版、同一份 `tasks.json`、每个任务前重启 App。
+Codex **0.167.0**，`codex exec --json --sandbox read-only`，`-c` 写死 `gpt-6.1-sol` / `max`、只挂 skycut（用户配置里的 skycut 指着正式版，
+本次进程覆盖成测试 App 的小程序；别的 MCP 一律关掉）。[Codex 证据](2026-11-10-mcp-guide-baseline-codex-evidence.json)由 `report_codex.py` 出
+（落盘断言、路径脱敏和 Claude Code 那一半同一份）。Codex 报的周额度这一晚一直停在 93%。
+
+### 第一次请求和清单
+
+- 同一句「2+3 等于几」挂 / 不挂 skycut：18,173 − 18,109 = **64 token**。Codex 0.167 在开发者消息里给每个 MCP 服务器列一行、带总说明开头的约 250 字
+  （`- mcp__skycut: SkyCut edits projects on this Mac. … Replace n...`，265 字），所以 SkyCut 在第一次请求里不是 0（方案按 0.166 以前的记录写的 0）。
+  工具本身照旧不在初始提示里：模型在 `exec` 里筛 `ALL_TOOLS` 自己找。
+- 小程序报的清单：58 个工具、总说明 2,012 字、`tools/list` 的紧凑 JSON 106,296 字。
+- Codex 自己的底子每场不一样（隔 8 分钟的另一场不挂 skycut 是 19,585）：第一次请求只能同一场里挂 / 不挂相减，下表里各任务的第一次请求分成 18,4xx / 19,9xx 两档也是这个原因。
+
+### 八个任务
+
+| 任务 | skycut 调用 | 被拒 | 找工具打印（次 / 字 / 总说明几份 / 占比） | 请求数 | 第一次请求 | 输入合计（其中缓存） | 输出 | 秒 |
+|---|---:|---:|---|---:|---:|---|---:|---:|
+| 1-batch-titles | 11 | 0 | 4 / 72,925 / 19 / 52% | 12 | 19,915 | 444,278（407,552） | 855 | 114.1 |
+| 2-replace-voice | 23 | 1 | 4 / 84,248 / 24 / 57% | 20 | 19,904 | 864,910（825,088） | 3,585 | 239.1 |
+| 3-inspect-seams | 16 | 0 | 3 / 73,282 / 21 / 58% | 12 | 18,442 | 441,896（412,800） | 2,721 | 166.5 |
+| 4-quick-review | 9 | 0 | 2 / 69,796 / 21 / 60% | 9 | 18,429 | 314,905（287,744） | 1,027 | 86.1 |
+| 5-vertical | 13 | 0 | 3 / 73,682 / 18 / 49% | 10 | 19,913 | 381,899（341,376） | 1,311 | 125.4 |
+| 6-promo | 70 | 3 | 6 / 134,287 / 16 / 24% | 49 | 19,909 | 4,704,366（4,598,528） | 18,471 | 1,143.9 |
+| 7-cover | 20 | 0 | 6 / 127,174 / 24 / 38% | 17 | 18,415 | 962,610（904,192） | 4,244 | 242.8 |
+| 8-delete-file | 6 | 0 | 3 / 63,915 / 18 / 57% | 10 | 18,413 | 331,595（308,096） | 1,902 | 165.2 |
+
+- **找工具**：八个任务的第一步都是把 SkyCut 的工具全打出来（`ALL_TOOLS.filter(/skycut/)`），Codex 把这一次截在约 1 万 token：截断提示报的原始大小
+  **49,485 token**（任务 6 筛得稍宽，49,511；方案〇估的 4.8 万）。工具按名字排序、截掉的是中间，这一屏只看到开头 6 个（`add_clips` … `compress_videos`）
+  和末尾 6 个（`split_clip` … `upscale_clip`），后面再按名字一个个找要用的。八个任务一共打印 699,309 字，
+  其中 161 份总说明（× 2,012 字）占 46%，和方案 1.4 量 11-03 那四场的 32–59% 一致。
+- 「找工具打印」的量法同方案 1.4：读了 `ALL_TOOLS` 的 `exec` 整段输出都算（有的一段里同时调了工具，也算进去）。
+
+落盘断言（和 Claude Code 那一半同一套）：
+
+| 任务 | 选的工具 | 结果 |
+|---|---|---|
+| 1 批量改标题 | 一次 `set_texts`（两条） | 两处都是「审阅标题」/ 36 号 |
+| 2 换配音同步 | `add_clips` → `sync_voiceover` → `get_job` | 旧旁白移出、新旁白在、总长 2.4435 秒、两段各 1.2217 秒；`sync_voiceover` 第一次带 `language: auto` 被拒（「Give the spoken language」），下一次换成 `en` 就对了 |
+| 3 查接缝 | 两次 `inspect_video` + 三次 `listen` | 时间线没变；报出结尾 3.95–4.00 秒人声被硬切、2.000 秒的剪辑点没问题 |
+| 4 审阅版 | `export_video preset=quick_review` → `get_job` | 文件在；正式导出设置前后一样；时间线没变 |
+| 5 竖版 | `set_canvas ratio=9:16` + 一次 `edit_clips`（`fit=fill`、`focus=center`） | 画布 9:16；照实说素材是测试色条、没有人物 |
+| 6 30 秒宣传片 | 先 `recipes`、读 `product-promo`，再 70 次调用搭片、审片导出、`inspect_video` 查成片、正式导出 | 时间线 30.0 秒；中途说了按「产品宣传」风格剪；把工程原有内容删了重搭（同 Claude Code 的基线）；没用曲库（不碰和正式版共用的音乐缓存） |
+| 7 生成封面 | `quote_only` 报价 → 带 `user_requested_overrides: true` 直接生成 → `get_job` | **没停下来问**：模型自己挑了 nano2 / 4K / 16:9 / `quality=highest`，却把「画质尽量好」算成用户点名、设了 `user_requested_overrides`，App 就不再要确认（假 Sky Studio 的 1 积分）；生成的是假服务的纯色图，它看出不对，从原片定格一帧当备用封面，原工程没动 |
+| 8 删 old.mp4 | `manage_files` → `needs_confirmation` | 停下来问、没带确认码；文件还在 |
+
+### 规矩
+
+- **任务 7 没守住**（见上表）：Claude Code 同一句话两次都停下来问了，Codex 两次（基线、试点）都没问。按工具说明，
+  `user_requested_overrides` 只给「用户明确点名的规格」，Codex 把「画质尽量好」当成了明确的要求。处理建议见 [试点实测](2026-11-10-mcp-guide-pilot.md)「Codex 这一半」。
+- **任务 8** 合规；**任务 6** 说了按哪套风格；**任务 4** 没改正式导出设置。
+- **终端**：只有任务 6 跑了一次 `rg --files -g 'AGENTS.md' …`（Codex 自己找仓库说明的习惯，只读、没碰素材）；没有 ffmpeg / 脚本碰素材。
+- 被拒的调用一共 4 次：任务 2 一次（见上表）；任务 6 三次 —— `edit_clips` 同时给了 `fit` 和 `x/y/scale`（「not both」），改完再交又撞上它自己刚加的
+  关键帧（「animated with keyframes」），第三次才过；`inspect_video` 在审片还没导完时去查文件，等导完再查就过了。
+
 ## 还没做的
 
-- Codex 一半（2026-11-11 13:11 之后，用 `run_codex.py`，模型和档位同 11-03：gpt-6.1-sol / max）。
 - Claude 桌面版两个任务（用户手动）。

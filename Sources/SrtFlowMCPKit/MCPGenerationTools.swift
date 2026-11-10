@@ -85,15 +85,10 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .upscaleClip, title: "Upscale clip",
                 description: """
-                Paid upscale of a video clip's source through Sky Studio; requires its key. Completion replaces every clip using \
-                that file in this project (one undo); originals stay available to compare or revert. Use source_size below the canvas: \
-                plain scaling adds no detail. Returns job_id: get_job reports phase, queue_position, transfer_percent, phase_seconds, \
-                typical_seconds; completion gives replaced_ids, file, width, height, credits_charged. Results stay in the library. \
-                Models: topaz-starlight (default; 1080p/2160p) or bytedance-upscaler-pro. Targets: 1080p, 1440p, 2160p short side. \
-                range=clip adds up to 1s handles; longest covers other uses; file sends the whole source. At most 30 s including \
-                handles, 30 fps. The daily credit limit is a hard cap in both modes: notify users to raise it in Settings. \
-                Upscale exceeds draft settings: ask_for_approval returns needs_confirmation; ask then repeat with confirm_token. \
-                full_access proceeds and notifies. cancel_job attempts queued cancellation; check original billing afterward.
+                Paid (Sky Studio credits): upscale a video clip's source file; when done it replaces every clip using that file (one \
+                undo step; revert later). Returns job_id: wait with get_job. Over-plan work returns needs_confirmation: ask, then \
+                repeat with confirm_token. The daily credit limit always applies. At most 30 s and 30 fps per job. Images: \
+                generate_media operation=upscale. Read skycut_guide topic=upscale_clip before the first call.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("The video clip whose source file to upscale (get_timeline)."),

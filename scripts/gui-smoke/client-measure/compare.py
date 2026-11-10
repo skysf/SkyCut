@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""两次真客户端实测对照（Claude Code 这一半）：基线 vs 这一次，按 MCP 按需说明方案 6.4 判。
+"""两次真客户端实测对照：基线 vs 这一次，按 MCP 按需说明方案 6.4 判。Claude Code 读 report.py 的证据，Codex 读 report_codex.py 的（按证据里的 client 分）。
 
-  compare.py <基线证据.json> <这次证据.json> [--tasks 1,4,5,7] [--full-preload-target 6]
+  compare.py <基线证据.json> <这次证据.json> [--tasks 1,4,5,7] [--full-preload-target 6] [--discovery-target 30]
 
 读 report.py 出的证据 JSON，出 Markdown：整份预先加载 / 每轮常驻、每个任务的开销、选的工具、落盘断言、被拒后几次改对、
 规矩（停下问、终端）、读说明书（读了哪些、是不是第一次用那个工具之前）。最后一段是 6.4 的判定：
@@ -10,6 +10,8 @@
 - 开销：每轮常驻不增加；整份预先加载时 SkyCut 的 token 不涨（试点只要求方向，2026-11-10 定）；
   迁移完的那次给 --full-preload-target 6，要求降 ≥ 6%；
 - 说明书：只记录，不设门槛。
+Codex 的开销换成 6.4 的 Codex 那一条：每场找工具打印的总字数降 ≥ --discovery-target%（默认 30）、重复总说明的占比 ≤ 30%、
+第一次请求里 SkyCut 不涨（方案写「仍是 0」；2026-11-10 实测 0.167 在开发者消息里给每个 MCP 服务器列一行、带总说明的开头约 250 字，基线就不是 0）。
 """
 import json
 import re
@@ -98,8 +100,9 @@ def guide_reads(case):
 
 
 def terminal(case):
+    """终端命令：Claude Code 的 Bash、Codex 的 shell（CommandExecution）。"""
     return [{"command": (o.get("input") or {}).get("command", ""), "touches_media": bool(TOUCHES_MEDIA.search((o.get("input") or {}).get("command", "")))}
-            for o in case["other_tools"] if o["tool"] == "Bash"]
+            for o in case["other_tools"] if o["tool"] in ("Bash", "shell")]
 
 
 def pct(new, old):
@@ -111,8 +114,87 @@ def main():
     base_data, base = load(args[0])
     new_data, new = load(args[1])
     only = set(args[args.index("--tasks") + 1].split(",")) if "--tasks" in args else None
-    target = float(args[args.index("--full-preload-target") + 1]) if "--full-preload-target" in args else 0.0
     labels = [l for l in new if (only is None or l.split("-")[0] in only) and not l.endswith("-v1")]
+    if str(new_data.get("client", "")).startswith("Codex"):
+        target = float(args[args.index("--discovery-target") + 1]) if "--discovery-target" in args else 30.0
+        lines, verdict = codex_overhead(base_data, base, new_data, new, labels, target)
+    else:
+        target = float(args[args.index("--full-preload-target") + 1]) if "--full-preload-target" in args else 0.0
+        lines, verdict = claude_overhead(base_data, base, new_data, new, labels, target)
+    lines += task_sections(base, new, labels, verdict)
+    lines += ["## 方案 6.4 的判定", ""]
+    for part, name in (("results", "结果"), ("rules", "规矩"), ("overhead", "开销")):
+        items = verdict[part]
+        if not items:
+            # 这一项这次没量（例如只补跑了一个任务、没跑预先加载的量法）：别说「过」。
+            lines.append(f"- **{name}：这次没量**")
+            continue
+        lines.append(f"- **{name}：{'过' if all(ok for ok, _ in items) else '没过'}**")
+        lines += [f"  - {'✓' if ok else '✗'} {text}" for ok, text in items]
+    lines.append("- **说明书**：只记录（见每个任务的「读说明书」），不设门槛。")
+    print("\n".join(lines))
+
+
+def codex_overhead(base_data, base, new_data, new, labels, target):
+    """Codex：第一次请求里 SkyCut 占多少（挂 / 不挂各问一句）、每场找工具打印了多少、重复的总说明占几成、每个任务的 token。"""
+    lines, verdict = [], {"results": [], "rules": [], "overhead": []}
+    bp, np_ = base_data.get("preload") or {}, new_data.get("preload") or {}
+    bc, nc = base_data.get("catalog") or {}, new_data.get("catalog") or {}
+    lines += ["## 清单和第一次请求", "", "| | 基线 | 这次 | 变化 |", "|---|---:|---:|---:|"]
+    for key, name in (("instructions_characters", "总说明（字）"), ("tools", "工具数"), ("catalog_json_characters", "整份清单（字）")):
+        if key in bc and key in nc:
+            lines.append(f"| {name} | {bc[key]:,} | {nc[key]:,} | {nc[key] - bc[key]:+,}（{pct(nc[key], bc[key])}） |")
+    for key, name in (("skycut_in_first_request", "第一次请求里 SkyCut（挂 − 不挂，token）"), ("skycut_line_characters", "开发者消息里列 skycut 的那一行（字）"),
+                      ("first_request_none", "不挂 skycut 的第一次请求（token）")):
+        if bp.get(key) is not None and np_.get(key) is not None:
+            lines.append(f"| {name} | {bp[key]:,} | {np_[key]:,} | {np_[key] - bp[key]:+,} |")
+    if bp.get("skycut_in_first_request") is not None and np_.get("skycut_in_first_request") is not None:
+        verdict["overhead"].append((np_["skycut_in_first_request"] <= bp["skycut_in_first_request"],
+                                    f"第一次请求里 SkyCut {bp['skycut_in_first_request']} → {np_['skycut_in_first_request']} token（不涨；方案写「仍是 0」，"
+                                    "0.167 给每个 MCP 服务器列一行带总说明开头，基线就不是 0）"))
+
+    lines += ["", "## 找工具（代码模式里筛 ALL_TOOLS 打印出来的）", "",
+              "| 任务 | 打印次数 | 打印的字 | 其中总说明几份 | 重复总说明占比 | 第一次打印看到几个工具 | 一共看到几个工具 |", "|---|---|---|---|---|---|---|"]
+    paired = [l for l in labels if l in base]
+    for l in labels:
+        b, n = base.get(l), new[l]
+        def cell(f):
+            return f"{f(b):,} → {f(n):,}" if b else f"— → {f(n):,}"
+        def share(c):
+            return "—" if c["discovery"]["duplicate_instruction_share"] is None else f"{c['discovery']['duplicate_instruction_share'] * 100:.0f}%"
+        lines.append(f"| {l} | {cell(lambda c: c['discovery']['discovery_prints'])} | {cell(lambda c: c['discovery']['discovery_chars'])} | "
+                     f"{cell(lambda c: c['discovery']['instruction_copies'])} | {(share(b) + ' → ') if b else ''}{share(n)} | "
+                     f"{cell(lambda c: c['discovery']['first_print_distinct_tools'])} | {cell(lambda c: c['discovery'].get('distinct_tools_seen') or 0)} |")
+    if paired:
+        before = sum(base[l]["discovery"]["discovery_chars"] for l in paired)
+        after = sum(new[l]["discovery"]["discovery_chars"] for l in paired)
+        drop = (before - after) / before * 100 if before else 0.0
+        lines.append(f"| 合计（{len(paired)} 个任务） | | {before:,} → {after:,}（{pct(after, before)}） | | | | |")
+        verdict["overhead"].append((drop >= target, f"每场找工具打印的总字数 {before:,} → {after:,}（降 {drop:.1f}%，要求 ≥ {target:g}%）"))
+        length = nc.get("instructions_characters")
+        copies = sum(new[l]["discovery"]["instruction_copies"] for l in paired)
+        if length and after:
+            share = copies * length / after * 100
+            verdict["overhead"].append((share <= 30, f"重复总说明的占比 {share:.1f}%（{copies} 份 × {length:,} 字 ÷ {after:,} 字；要求 ≤ 30%）"))
+
+    lines += ["", "## 每个任务的开销", "",
+              "| 任务 | skycut 调用 | 被拒 | 读说明书 | 请求数 | 第一次请求 | 输入合计（其中缓存） | 输出 | 周额度 | 秒 |", "|---|---|---|---|---|---|---|---|---|---|"]
+    for l in labels:
+        b, n = base.get(l), new[l]
+        def cell(f):
+            return f"{f(b):,} → {f(n):,}" if b else f"— → {f(n):,}"
+        def quota(c):
+            q = c.get("rate_limit") or {}
+            return f"{q.get('first_used_percent')}→{q.get('last_used_percent')}%"
+        lines.append(f"| {l} | {cell(lambda c: c['actual_call_count'])} | {cell(lambda c: c['rejected_calls'])} | {cell(lambda c: len(c['guide_reads']))} | "
+                     f"{cell(lambda c: c['requests'])} | {cell(lambda c: c['tokens']['first_request_prompt'])} | "
+                     f"{cell(lambda c: c['tokens']['prompt_total'])}（{cell(lambda c: c['tokens']['cached_input_tokens'])}） | "
+                     f"{cell(lambda c: c['tokens']['output_tokens'])} | {(quota(b) + ' / ') if b else ''}{quota(n)} | {(str(b['seconds']) + ' → ') if b else ''}{n['seconds']} |")
+    lines.append("")
+    return lines, verdict
+
+
+def claude_overhead(base_data, base, new_data, new, labels, target):
     lines, verdict = [], {"results": [], "rules": [], "overhead": []}
 
     bp, np_ = base_data["preload"], new_data["preload"]
@@ -141,12 +223,19 @@ def main():
                      f"{cell(lambda c: c['requests'])} | {cell(lambda c: c['tokens']['first_request_prompt'])} | {cell(lambda c: c['tokens']['prompt_total'])} | "
                      f"{cell(lambda c: c['tokens']['output_tokens'])} | {(str(b['seconds']) + ' → ') if b else ''}{n['seconds']} |")
 
-    lines += ["", "## 选的工具、落盘断言、规矩", ""]
+    return lines, verdict
+
+
+def task_sections(base, new, labels, verdict):
+    """两个客户端共用：每个任务选的工具、落盘断言、被拒后改没改对、读说明书、终端、规矩；结果和规矩记进 verdict。"""
+    lines = ["", "## 选的工具、落盘断言、规矩", ""]
     for l in labels:
         b, n = base.get(l), new[l]
         ok, note = passes(l, n["verified"], b["verified"] if b else None)
         base_ok = passes(l, b["verified"], b["verified"])[0] if b else None
-        verdict["results"].append((ok and (base_ok is None or ok >= base_ok), f"{l}：{note}"))
+        # 6.4 的「结果」是「和基线一样或更好」：基线也没过的算一样（2026-11-10 Codex 的任务 7 两边都没停下来问），规矩那条另外照绝对的判。
+        same_as_base = not ok and base_ok is False
+        verdict["results"].append((ok or same_as_base, f"{l}：{note}" + ("（和基线一样：基线也没过）" if same_as_base else "")))
         lines.append(f"### {l}")
         if b:
             lines.append(f"- 基线：{' → '.join(b['actual_tools'])}")
@@ -174,18 +263,7 @@ def main():
         if l.startswith("4"):
             verdict["rules"].append((bool(n["verified"].get("formal_settings_unchanged")), f"{l}：正式导出设置没变"))
         lines.append("")
-
-    lines += ["## 方案 6.4 的判定", ""]
-    for part, name in (("results", "结果"), ("rules", "规矩"), ("overhead", "开销")):
-        items = verdict[part]
-        if not items:
-            # 这一项这次没量（例如只补跑了一个任务、没跑预先加载的量法）：别说「过」。
-            lines.append(f"- **{name}：这次没量**")
-            continue
-        lines.append(f"- **{name}：{'过' if all(ok for ok, _ in items) else '没过'}**")
-        lines += [f"  - {'✓' if ok else '✗'} {text}" for ok, text in items]
-    lines.append("- **说明书**：只记录（见每个任务的「读说明书」），不设门槛。")
-    print("\n".join(lines))
+    return lines
 
 
 if __name__ == "__main__":
