@@ -169,17 +169,19 @@ enum SkyStudioVoiceConsent: Equatable, Sendable {
 }
 
 /// SkyCut 从源文件里用了哪一段（服务器存进参考的 `source_range`，回执里不存）。
+/// 字段名照 Sky Studio 的 `readSourceRange`（`file_name`、`start_seconds`、`end_seconds`、`auto_selected`）：认不出的键服务器不报错、
+/// 直接忽略，写错了只会让「用了哪一段」的记录变成空的。
 struct SkyStudioVoiceReferenceSource: Equatable, Sendable {
-    var filename: String
-    var start: Double?
-    var end: Double?
+    var fileName: String
+    var startSeconds: Double?
+    var endSeconds: Double?
     /// 是 SkyCut 自动挑的那 3 分钟（源文件超过 3 分钟时）。
     var autoSelected: Bool
 
     var json: JSONValue {
-        var value: [String: JSONValue] = ["filename": .string(filename), "auto_selected": .bool(autoSelected)]
-        if let start { value["start"] = .number(start) }
-        if let end { value["end"] = .number(end) }
+        var value: [String: JSONValue] = ["file_name": .string(fileName), "auto_selected": .bool(autoSelected)]
+        if let startSeconds { value["start_seconds"] = .number(startSeconds) }
+        if let endSeconds { value["end_seconds"] = .number(endSeconds) }
         return .object(value)
     }
 }
@@ -191,14 +193,15 @@ struct SkyStudioVoiceRequestProblem: LocalizedError, Equatable {
 }
 
 enum SkyStudioVoiceNaming {
-    /// 声音名 1–80 个字（按 UTF-16 数，和服务器的 JS 同一个数法；角色名也是这么数的）。
-    static let maximumUTF16 = 80
+    /// 声音名 1–80 个字，**按 Unicode code point 数**：和 Sky Studio 的 `characterCount` / `countCharacters`（`[...text].length`）同一个数法
+    /// （建声音、改名、设计都这么数；角色名那边按 UTF-16，是另一个接口，别照搬）。
+    static let maximumCharacters = 80
 
     static func checked(_ name: String) throws -> String {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw SkyStudioVoiceRequestProblem(message: "Give the voice a name.") }
-        guard trimmed.utf16.count <= maximumUTF16 else {
-            throw SkyStudioVoiceRequestProblem(message: "A voice name is at most \(maximumUTF16) characters.")
+        guard trimmed.unicodeScalars.count <= maximumCharacters else {
+            throw SkyStudioVoiceRequestProblem(message: "A voice name is at most \(maximumCharacters) characters.")
         }
         return trimmed
     }

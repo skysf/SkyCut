@@ -204,14 +204,22 @@ private func runBatchChecks() async {
     checkEqual(after?.jobBody["params"]?["plan"]?["model"], "minimax-speech-2.8-hd", "after a fallback, later batches carry the fallback's selection")
     var named = segment
     named.model = "index-tts-2"
-    let namedBatch = try? SkyStudioVoiceRequests.batch(0, of: named, quote: quote)
-    checkEqual(namedBatch?.model, "index-tts-2", "a named model stays named on each batch")
-    check(namedBatch != nil && namedBatch?.params["plan"] == nil, "a named model's batches carry no params.plan (the server takes plan only with auto)")
-    check((try? SkyStudioVoiceRequests.batch(1, of: named, quote: quote, plan: fallback)) == nil, "a named segment cannot switch to another plan")
-    if let eleven = try? SkyStudioVoiceRequests.segmentQuote(kind: "voice", model: "eleven-v4", voice: "gemini:Charon", batches: texts, lines: texts) {
-        let narration = try? SkyStudioVoiceRequests.batch(1, of: eleven, quote: quote)
-        check(narration?.model == "eleven-v4" && narration?.params["plan"] == nil, "named narration: eleven-v4 on each batch, no plan")
-    } else { check(false, "a named narration segment builds") }
+    let namedBatches = (0..<texts.count).compactMap { try? SkyStudioVoiceRequests.batch($0, of: named, quote: quote) }
+    checkEqual(namedBatches.map(\.model), ["index-tts-2", "index-tts-2"], "a named model stays named on each batch")
+    checkEqual(namedBatches.map { $0.params["plan"] }, [.object(selection), .object(selection)],
+               "a named model's batches carry the quoted plan too, so a cloned script keeps one reference")
+    check((try? SkyStudioVoiceRequests.batch(1, of: named, quote: quote, plan: fallback)) == nil, "a named segment cannot switch to another model's plan")
+    var stale = named
+    stale.model = "heygen-voice-turbo"
+    check((try? SkyStudioVoiceRequests.batch(0, of: stale, quote: quote)) == nil, "plan.model must be the named model (the server refuses otherwise)")
+    let elevenQuote = (try? JSONValue.decode(Data(#"{"credits": 2, "voice_plan": {"selection": {"model": "eleven-v4", "voice": "eleven:Daniel"}, "rule": "named_model"}, "batches": [{"credits": 1}, {"credits": 1}], "one_time": []}"#.utf8)))
+        .flatMap(SkyStudioQuote.init(json:))
+    if let eleven = try? SkyStudioVoiceRequests.segmentQuote(kind: "voice", model: "eleven-v4", voice: "gemini:Charon", batches: texts, lines: texts),
+       let elevenQuote {
+        let narration = try? SkyStudioVoiceRequests.batch(1, of: eleven, quote: elevenQuote)
+        checkEqual(narration?.model, "eleven-v4", "named narration: eleven-v4 on each batch")
+        checkEqual(narration?.params["plan"], ["model": "eleven-v4", "voice": "eleven:Daniel"], "named narration: the plan pins the voice")
+    } else { check(false, "a named narration segment and its quote build") }
     let spanish = ["Hola a todos.", "Bienvenidos a esta clase de edición de vídeo."]
     if let hinted = try? SkyStudioVoiceRequests.segmentQuote(kind: "voice", voice: "gemini:Charon", batches: spanish, lines: spanish) {
         checkEqual((try? SkyStudioVoiceRequests.batch(1, of: hinted, quote: quote))?.params["language"], "es", "the language hint rides on every batch")
