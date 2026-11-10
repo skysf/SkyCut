@@ -4,8 +4,8 @@ import SrtFlowMCPKit
 
 // MARK: - 云端配旁白 / 克隆：每批先保存，再本地处理，最后一次入轨
 // 管什么：现有长任务接口、恢复调度、失败阶段与入轨回执；所有批次的原音频 / 映射 / 进度永久留在恢复目录。
-// 新的一段在回任务号之前已经报过价、预留过积分（SkyStudioVoiceoverStart，2026-11-10 声音 PR 3 挪过去的）：任务里只剩记恢复记录、交、等、
-// 切、落地；退本机也只在那之前（付费请求交出去之后不再退本机）。
+// 新的一段在回任务号之前已经报过价、预留过积分（SkyStudioVoiceoverStart，2026-11-10 声音 PR 3 挪过去的）：任务里只剩（要转写、模型没装的
+// 先明着装模型，声音 PR 5）记恢复记录、交、等、切、落地；退本机也只在那之前（付费请求交出去之后不再退本机）。
 // 不管什么：报价与认声音（SkyStudioVoiceoverStart）、请求与预算（SkyStudioVoiceCloudBatches）、切句与字幕对齐（SkyStudioVoiceRender）、
 // 文件合同（SkyStudioVoiceCheckpoint）。
 
@@ -27,6 +27,9 @@ final class SkyStudioVoiceoverRun {
     private var batchIndex = 0
     private var stage = SkyStudioVoiceCheckpoint.Stage.cloudGeneration
     private var extra: [String: JSONValue] = [:]
+    /// 交第一批之前在本机做的那一步（装转写模型），get_job 的 `local_step` / `local_step_percent`。
+    private var localStep: String?
+    private var localStepPercent: Int?
 
     init(input: AIVoiceoverInput, project: VideoEditProject, prepared: SkyStudioVoiceoverPrepared? = nil, recovery: SkyStudioVoiceRecovery? = nil,
          generateMissing: Bool = true, services: SkyStudioVoiceServices? = nil) {
@@ -59,10 +62,16 @@ final class SkyStudioVoiceoverRun {
         ]
         if let prepared {
             var voice: [String: JSONValue] = ["name": .string(input.choice.name), "quality": .string(input.choice.qualityName)]
+            if prepared.installsTranscription {
+                result["next_step"] = .string("SkyCut first installs this Mac's speech model for "
+                    + "\(SkyStudioVoicePick.languageName(input.language)) (get_job local_step), before anything is paid. "
+                    + (result["next_step"]?.stringValue ?? ""))
+            }
             if let note = input.choice.note {
                 voice["note"] = .string(note)
                 result["next_step"] = .string("Before the user listens, tell them what voice.note says. " + (result["next_step"]?.stringValue ?? ""))
             }
+            if input.subtitles, let timing = prepared.plan.reading?.timing { result["subtitle_timing"] = .string(timing.rawValue) }
             result["voice"] = .object(voice)
             result["voice_plan"] = prepared.plan.voicePlan.json
             result["batches"] = .number(Double(prepared.plan.batches.count))
@@ -83,7 +92,10 @@ final class SkyStudioVoiceoverRun {
         status.advance(to: .preparing, typicalSeconds: nil)
         do {
             try Task.checkCancellation()
-            if recovery == nil { try await prepareNew() }
+            if recovery == nil {
+                try await installTranscription()
+                try await prepareNew()
+            }
             guard let recovery else { throw AIToolError("The voiceover recovery record could not be created.") }
             if let applied = recovery.value.applied {
                 recovery.value.issue = nil
@@ -100,8 +112,9 @@ final class SkyStudioVoiceoverRun {
         for (line, output) in recovery.value.outputs where !FileManager.default.fileExists(atPath: output.url.path) {
             recovery.value.outputs[line] = nil
         }
-        let render = SkyStudioVoiceRender(input: input, recovery: recovery, locale: locale,
-            transcribe: services.transcribe, localeProvider: services.locale)
+        let transcription = services.transcription
+        let render = SkyStudioVoiceRender(input: input, recovery: recovery, locale: locale, transcribe: services.transcribe,
+            localeProvider: { language in try SkyStudioVoiceTranscription.locale(await transcription(language), language: language) })
         for index in recovery.value.plan.batches.indices {
             batchIndex = index
             try Task.checkCancellation()
@@ -164,6 +177,51 @@ final class SkyStudioVoiceoverRun {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
         finish(cancelled ? .cancelled : .failed, message(error))
+    }
+
+    /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac
+    /// 转写不了：照「不能转写」重新分批、报价、预留（还一分没花），voice.note 说为什么（SkyCut 声音方案第七节：下载失败当作不能转写）。
+    private func installTranscription() async throws {
+        guard let current = prepared, current.installsTranscription, let locale = current.locale else { return }
+        localStep = "installing_speech_model"
+        status.stepNote = L10n("Preparing transcription")
+        defer { localStep = nil; localStepPercent = nil; status.stepNote = nil }
+        do {
+            try await services.install(locale) { [weak self] fraction in self?.installed(fraction) }
+            prepared?.installsTranscription = false
+        } catch {
+            if Self.isCancellation(error) || Task.isCancelled { throw CancellationError() }
+            try await withoutTranscription(failure: message(error))
+        }
+    }
+
+    private func installed(_ fraction: Double) {
+        let percent = Int((min(max(fraction, 0), 1) * 100).rounded())
+        guard localStep != nil, percent != localStepPercent else { return }
+        localStepPercent = percent
+        status.stepNote = String(format: L10n("Preparing transcription %d%%"), percent)
+    }
+
+    /// 装不上转写模型：按「转写不了」再报一次价，先退旧的预留、再留新的。预留是值类型，在 `prepared` 上原地退（不能退一份拷贝，
+    /// 不然结束时又退一遍）；新的留不下（每日上限）就什么都不留、按额度不够停下。
+    private func withoutTranscription(failure: String) async throws {
+        guard let current = prepared else { return }
+        let replanned = try await SkyStudioVoiceoverStart.withoutTranscription(current, input: input, failure: failure, services: services)
+        prepared?.budget.refundUnused()
+        guard let budget = SkyStudioVoiceBudget.reserve(replanned.plan.batchCredits) else {
+            prepared = nil
+            throw SkyStudioVoiceBudgetProblem(credits: replanned.plan.batchCredits.reduce(0, +))
+        }
+        prepared?.plan = replanned.plan
+        prepared?.quote = replanned.quote
+        prepared?.budget = budget
+        prepared?.locale = nil
+        prepared?.installsTranscription = false
+        locale = nil
+        if let catalog = current.catalog { prepared?.modelTitle = SkyStudioVoiceoverStart.modelTitle(replanned.plan, catalog: catalog) }
+        input.choice.note = [input.choice.note, replanned.note].compactMap { $0 }.joined(separator: " ")
+        status.credits = replanned.plan.batchCredits.reduce(0, +)
+        if let title = prepared?.modelTitle { status.modelTitle = title }
     }
 
     /// 新的一段：报价和预留回任务号之前就做完了（SkyStudioVoiceoverStart），这里先把预留交给云端批次（任务结束时没花出去的退回），
@@ -247,6 +305,10 @@ final class SkyStudioVoiceoverRun {
         value["batch_index"] = .number(Double(batchIndex + 1))
         value["batch_count"] = .number(Double(recovery?.value.batches.count ?? 0))
         value["submission_keys"] = .array(recovery?.value.plan.batches.map { .string($0.request.idempotencyKey) } ?? [])
+        if let localStep {
+            value["local_step"] = .string(localStep)
+            if let localStepPercent { value["local_step_percent"] = .number(Double(localStepPercent)) }
+        }
         value.merge(extra) { _, new in new }
         return value
     }

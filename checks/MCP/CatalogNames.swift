@@ -41,6 +41,8 @@ func catalogKnownNames() -> Set<String> {
     // SkyStudioJobGate.budgetBlocked 里真有的键）和角色的本机音色名（af_heart 这种）。
     names.formUnion(["recovery_file", "voice_plan", "fallback_used", "cross_language", "completed_line_indices", "not_generated_line_indices",
                      "unknown_batch_indices", "recharge_url"])
+    // 字幕时间（声音 PR 5）：AIVoiceoverTool 结果里的 subtitle_timing、subtitles.estimated_line_indices，任务里装转写模型时 get_job 的 local_step。
+    names.formUnion(["subtitle_timing", "estimated_line_indices", "local_step"])
     names.formUnion(AIVoiceRole.all.map(\.kokoroVoice))
     return names
 }

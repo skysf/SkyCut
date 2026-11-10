@@ -7,6 +7,7 @@ import SrtFlowMCPKit
 // version 2（2026-11-10，声音 PR 3）：记整段报价时服务器的选择（`plan.voicePlan`，每批 `params.plan` 带回它）和每批实际跑的模型、
 // 有没有换备用；恢复永远只 GET 原单、补没生成的批次也照这份选择（SkyCut 声音方案 8.4）。**只认 version 2**：只有用户本人在用，
 // 升级前没做完的配音先做完或放弃（用户 2026-11-09 定，方案风险第 15 条）。
+// 声音 PR 5 加的几样都是可选的（版本号不变）：怎么读（`plan.reading`）、每批的词从哪来（`Analysis.timing`）、每句的字幕时间（`Output.timing`）。
 // 不管什么：HTTP、音频处理、工程；磁盘读写在 SkyStudioVoiceRecoveryStore，App 适配在 SkyStudioVoiceRecovery。
 
 struct SkyStudioVoiceCheckpoint: Codable, Sendable {
@@ -34,12 +35,16 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     struct Analysis: Codable, Sendable {
         var words: [TimedWord]
         var slices: [SkyStudioVoiceSplit.Slice]
+        /// 这批的词从哪来：provider（模型报的）、aligned（本机转写）；没有词是 nil。
+        var timing: AIVoiceoverTiming?
     }
 
     struct Output: Codable, Sendable {
         var url: URL
         var duration: Double
         var words: [TimedWord]
+        /// 这一句的字幕时间从哪来。
+        var timing: AIVoiceoverTiming?
     }
 
     enum Stage: String, Codable, Sendable {
@@ -160,6 +165,8 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
             result["failure_stage"] = .string(issue.stage.rawValue)
             result["recovery_issue"] = .string(issue.message)
         }
+        // 入轨之前报定下的字幕时间（入轨的结果里换成每句实际的，可能是 mixed）。
+        if input.subtitles, let timing = plan.reading?.timing { result["subtitle_timing"] = .string(timing.rawValue) }
         result["next_step"] = .string(applied != nil
             ? "Already inserted. Do not add these lines again; repeating resume will not insert audio or subtitles."
             : "Call add_voiceover with resume=recovery_file. Default recovery only processes existing audio / original jobs and never pays to generate. "

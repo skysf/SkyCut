@@ -84,22 +84,35 @@ enum MCPGuideVoiceTopics {
     user, then repeat the same call with confirm_token.
     """)
 
-    // 出处：ai-control-mcp.md 第四节第 34 条（字幕）、第 36 条（几行）；sky-studio-jobs.md 第五节（本机切句）；声音方案第七节。
-    static let subtitles = MCPGuideSection(name: "subtitles", about: "subtitles=true, max_lines, and how word times are found", text: """
-    subtitles=true adds the spoken words to the original subtitle track, timed to the voice. Lines that would overlap \
-    existing subtitles are skipped (the result says how many), and nothing is added when that track is in another \
+    // 出处：ai-control-mcp.md 第四节第 34 条（字幕）、第 36 条（几行）；sky-studio-jobs.md 第五节（本机切句、字幕时间）；声音方案第七节。
+    static let subtitles = MCPGuideSection(name: "subtitles",
+                                           about: "subtitles=true, max_lines, subtitle_timing: where the word times come from", text: """
+    subtitles=true adds the script's own words to the original subtitle track, timed to the voice. Lines that would \
+    overlap existing subtitles are skipped (the result says how many), and nothing is added when that track is in another \
     language. max_lines is 1 (default) or 2 lines per subtitle and stays with the project.
 
-    Timing: local voices and eleven-v4 report when each word is spoken. Gemini presets do not, so SkyCut transcribes the \
-    finished audio on this Mac, which needs macOS 26 and this Mac's speech model for the script's language. Without it \
-    the call is refused before anything is paid: run generate_subtitles once on any clip in that language to install \
-    the model, call again with subtitles=false, or name model=eleven-v4.
+    subtitle_timing (in the result and get_job) says where the timing came from:
+    - provider: the voice reports when each word is spoken (local voices, eleven-v4).
+    - aligned: this Mac transcribes the finished audio and matches it to the script (Gemini presets; needs macOS 26 and \
+    the script's language). If that language's speech model is not installed, the job installs it first, before \
+    anything is paid (get_job local_step).
+    - estimated: spread over the speech by character count; it may be off by about half a second, so tell the user.
+    - mixed: lines differ; subtitles.estimated_line_indices lists the estimated ones.
+    When this Mac cannot transcribe the script's language, a preset reads the whole script with eleven-v4 and that \
+    preset's Eleven voice (it sounds different; voice.note says so), so the timing still comes from the voice. With a \
+    named model, or a language eleven-v4 does not read, the timing is estimated. A line whose transcription does not \
+    match the script is estimated too; its audio is kept and nothing is paid again.
     """)
 
-    // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.4（恢复只 GET 原单、补的批照原来的 selection）。
-    static let batchesRecovery = MCPGuideSection(name: "batches_recovery", about: "batches, recovery_file, resume and generate_missing after a failure", text: """
-    Sky Studio reads the script in batches. A cloud job keeps what it paid for in recovery_file: every batch's audio, \
-    which line is in which batch, and Sky Studio's job ids. When get_job reports failed or cancelled:
+    // 出处：sky-studio-jobs.md 第五节「2026-11-01：后续本地失败不否定已成功的生成」；声音方案 8.1（合批）、8.4（恢复只 GET 原单、补的批照原来的 selection）。
+    static let batchesRecovery = MCPGuideSection(name: "batches_recovery",
+                                                 about: "batches of whole lines, recovery_file, resume and generate_missing after a failure", text: """
+    Sky Studio reads the script in batches of about a minute: whole lines go together and a batch only breaks between \
+    lines (a line longer than a batch breaks at sentence ends first). SkyCut splits a batch back into lines by \
+    transcribing it or by the model's word timing; when this Mac cannot transcribe the language and the model reports \
+    no word timing, every line is its own batch. batches in the result says how many. A cloud job keeps what it paid \
+    for in recovery_file: every batch's audio, which line is in which batch, and Sky Studio's job ids. When get_job \
+    reports failed or cancelled:
     - Never call add_voiceover with the original lines again: that pays twice.
     - add_voiceover resume=<recovery_file> finishes from what exists: it fetches finished batches, splits and aligns them \
     on this Mac and inserts once. It never pays.

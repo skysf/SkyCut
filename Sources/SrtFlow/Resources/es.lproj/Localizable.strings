@@ -1379,3 +1379,7 @@
 "After this SkyCut update, allow access to your Sky Studio key once." = "Tras esta actualización de SkyCut permite una vez el acceso a tu clave de Sky Studio.";
 "In the macOS dialog, enter your Mac login password and choose Always Allow. Choosing Allow only will ask again the next time SkyCut starts." = "En el diálogo de macOS introduce la contraseña de inicio de sesión del Mac y elige Permitir siempre. Si eliges solo Permitir se volverá a preguntar al iniciar SkyCut.";
 "Waiting for macOS permission…" = "Esperando el permiso de macOS…";
+
+/* Voiceover: installing this Mac's speech model before a cloud voiceover is paid for */
+"Preparing transcription" = "Preparando la transcripción";
+"Preparing transcription %d%%" = "Preparando la transcripción %d%%";

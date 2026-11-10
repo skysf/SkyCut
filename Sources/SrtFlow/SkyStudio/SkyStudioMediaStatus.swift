@@ -19,6 +19,8 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published private(set) var progress: CloudJobProgress?
     @Published var waitingForRefund = false
     @Published var issue: String?
+    /// 当前这一步在本机做的事（已经本地化，比如配音交第一批之前「准备本机转写 45%」）；有它时状态行显示它、不显示阶段。
+    @Published var stepNote: String?
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil,
