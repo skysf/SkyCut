@@ -38,6 +38,8 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         var slices: [SkyStudioVoiceSplit.Slice]
         /// 这批的词从哪来：provider（模型报的）、aligned（本机转写）；没有词是 nil。
         var timing: AIVoiceoverTiming?
+        /// 这一批几句的句界是按字数估的（没有词可对、这台 Mac 又转写不了，SkyStudioVoiceSplitEstimate）；不是就不写。
+        var estimatedSplit: Bool?
     }
 
     struct Output: Codable, Sendable {
@@ -132,6 +134,13 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         return models.keys.sorted().map { ($0, models[$0]!.model, models[$0]!.fallbackUsed) }
     }
 
+    /// 句界是按字数估的那几句（这一批没有词可对、这台 Mac 又转写不了）：落地时叫 AI 转告用户听一下头尾。没有是 nil。
+    var estimatedSplitLines: [Int]? {
+        let lines = Set(plan.batches.indices.filter { batches[$0].analysis?.estimatedSplit == true }
+            .flatMap { plan.batches[$0].speech.parts.map(\.line) }).sorted()
+        return lines.isEmpty ? nil : lines
+    }
+
     /// 在 POST 之前先写 submitted，崩溃 / 断网也不会把可能付过费的批次当成未生成。
     mutating func willSubmit(_ index: Int) {
         batches[index].submitted = true
@@ -195,6 +204,7 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
         }
         // 入轨之前报定下的字幕时间（入轨的结果里换成每句实际的，可能是 mixed）。
         if input.subtitles, let timing = plan.reading?.timing { result["subtitle_timing"] = .string(timing.rawValue) }
+        if let estimatedSplitLines { result["estimated_split_line_indices"] = list(estimatedSplitLines) }
         if let lineModels {
             result["line_models"] = .array(lineModels.map {
                 ["line_index": .number(Double($0.line)), "model": .string($0.model), "fallback_used": .bool($0.fallbackUsed)]

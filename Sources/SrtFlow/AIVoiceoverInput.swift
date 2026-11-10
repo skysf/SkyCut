@@ -32,6 +32,9 @@ struct AIVoiceoverInput {
     /// 一次性费用的确认码（请求批准模式；读别处的恢复文件那一问也用它，在别处收）。
     var confirmToken: String?
 
+    /// 本机转写这段旁白用哪种语言：`language` 只留了 `zh`，繁体稿要 `zh-Hant`（不然交给简体模型，AITextLanguage.speechLanguage）。
+    var speechLanguage: String { AITextLanguage.speechLanguage(language, texts: lines.map(\.text)) }
+
     @MainActor
     static func read(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIVoiceoverInput {
         guard let values = try args.array("lines"), !values.isEmpty, values.count <= 50 else {
