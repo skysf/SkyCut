@@ -50,7 +50,10 @@ private func fallbackChecks(_ root: URL) async throws {
     let done = try await fixture.wait(fixture.started(fixture.narrate(lines)))
     require(done["status"] == "done", "four batches read together and land (got \(done["message"] ?? .null))")
     require(VoiceRecoveryHTTP.peak == 2, "never more batches open on Sky Studio than the two audio slots (peak \(VoiceRecoveryHTTP.peak))")
-    require(Array(VoiceRecoveryHTTP.finishOrder.prefix(2)) == [1, 0], "the second batch came back before the first (\(VoiceRecoveryHTTP.finishOrder))")
+    // 假服务只按住第一批等第二批（holdUntil [0: 1]）：只断言这一对。第三批在第二批回来、空出槽之后才交，它和第一批谁先被问到
+    // 看调度（CI 上见过 [1, 2, 0, 3]），不断言（docs/bugfixes/2026-11-10-voice-concurrency-check-finish-order.md）。
+    let order = VoiceRecoveryHTTP.finishOrder
+    require((order.firstIndex(of: 1) ?? .max) < (order.firstIndex(of: 0) ?? .min), "the second batch came back before the first (\(order))")
     require(VoiceRecoveryHTTP.posts == 4 && SkyStudioSpendStore.shared.spentToday() == spent + 10, "each batch sent and charged once")
 
     // 第二批换了备用：先交的两批带整段的选择，之后才交的两批带备用的那份。

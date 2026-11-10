@@ -701,6 +701,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-10 几批同时交的检查断言了假服务没按住的完成顺序](docs/bugfixes/2026-11-10-voice-concurrency-check-finish-order.md) — `ConcurrencyChecks` 要求完成顺序前两个是 `[1, 0]`，可假服务只按住第一批等第二批，第三批和第一批谁先回看调度，3 核的 CI 上见过 `[1, 2, 0, 3]`；改成只比第二批和第一批的位置，反向验证确定地逼出 CI 上那个顺序。
 - [2026-11-10 Sky Studio 接线守卫最后三节的检查从来不会红](docs/bugfixes/2026-11-10-sky-studio-wiring-checks-after-exit.md) — 总闸（`if FAILED … exit 1`）夹在中间，后来加的角色 A、0.18.62、声音库三节接在它后面，✗ 打出来、脚本照样退出 0；总闸挪到最后，总闸前加一条读自己文件的检查（最后一条 fail 要在总闸之前）。
 - [2026-11-10 云端配音的字幕显示的是这台 Mac 听成的字](docs/bugfixes/2026-11-10-voiceover-subtitles-show-transcribed-text.md) — 模型不报字的时间时转写出来的词原样当了字幕（「SkyCut」成了「Sky cut」）；声音 PR 5 起每句先对到原文上（`SpeechWordAlignment`，字从稿子来、时间从转写来），对不上按字数估，假转写会「听错」才测得出。
 - [2026-11-10 add_voiceover 会问、却不收 confirm_token](docs/bugfixes/2026-11-10-voiceover-confirm-token-refused.md) — 读别处的恢复文件回 needs_confirmation，点过头带 confirm_token 再调被参数核对挡掉（说明上没写）；说明里加上，守卫钉住「名片写着 needs_confirmation 的工具都收 confirm_token」。
