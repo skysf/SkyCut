@@ -116,8 +116,19 @@ private func runGuideSplitChecks() {
     checkEqual(first["section"]?.stringValue, MCPGuideSection.overview, "a topic over the limit answers with its overview first")
     checkEqual(first["text"]?.stringValue, String(repeating: "o", count: 2_500), "only the overview text comes back")
     checkEqual(first["sections"], ["overview", "framing", "sound"], "the first answer lists every section")
+    checkEqual(first["contents"], ["framing", "sound"], "contents lists each later section (only its name when it has no about line)")
     let nextStep = first["next_step"]?.stringValue ?? ""
-    check(nextStep.contains("framing, sound") && nextStep.contains("section"), "the next step says which sections to ask for")
+    check(nextStep.contains("Read only the sections you need") && nextStep.contains("section="), "the next step says to read only the sections needed")
+    // 每一节讲什么、常见的活只读哪一节（2026-11-10 试点实测之后：只列节名时，模型把 generate_media 的六节全读了）。
+    let described = MCPGuideTopic(name: "described_topic", sections: [
+        MCPGuideSection(name: MCPGuideSection.overview, text: String(repeating: "o", count: 2_500)),
+        MCPGuideSection(name: "framing", about: "how to reframe", text: String(repeating: "f", count: 2_500)),
+        MCPGuideSection(name: "sound", about: "levels", text: String(repeating: "s", count: 2_500))
+    ], readingTip: "To reframe, read only section=framing.")
+    let firstDescribed = MCPGuide.answer(described, section: nil)
+    checkEqual(firstDescribed["contents"], ["framing: how to reframe", "sound: levels"], "contents says what each section covers")
+    check((firstDescribed["next_step"]?.stringValue ?? "").hasSuffix(" To reframe, read only section=framing."), "the topic's reading tip ends the next step")
+    check(MCPGuide.answer(described, section: "sound")["contents"] == nil, "a section answer carries no contents")
     checkEqual(MCPGuide.answer(long, section: "Sound")["text"]?.stringValue, String(repeating: "s", count: 2_500), "section reads one section (any case)")
     let wrong = MCPGuide.answer(long, section: "volume")
     checkEqual(wrong["unknown_section"]?.stringValue, "volume", "an unknown section is named back")
@@ -129,7 +140,7 @@ private func runGuideSplitChecks() {
     ], examples: [["a": "x"]], related: ["look"])
     let whole = MCPGuide.answer(short, section: nil)
     checkEqual(whole["text"]?.stringValue, "Overview.\n\n## fields\n- a (string)", "a short topic comes back whole, later sections under headings")
-    check(whole["next_step"] == nil && whole["section"] == nil, "a whole answer needs no next step")
+    check(whole["next_step"] == nil && whole["section"] == nil && whole["contents"] == nil, "a whole answer needs no next step or contents")
     checkEqual(whole["examples"], [["a": "x"]], "examples come back with the topic")
     checkEqual(whole["related"], ["look"], "related topics come back with the topic")
     // listen 还没迁移（主题 = 说明原文 + fields，没有例子）；迁移过的工具都带例子（GuidePilotChecks）。

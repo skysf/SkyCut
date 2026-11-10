@@ -12,6 +12,7 @@
 | 1a `fix/mcp-guide-review-followups` | 2026-11-10 合并（#348） | 审查 review-344 第 1–4、6、7 条：fields 写全参数定义的事实、说明书不等授权、守卫按行首 / 路径认、例子 / related / 凭据的守卫、只给 section 时说清楚、进度挪到这里 |
 | 2 `feat/mcp-guide-map-and-pointers` | 2026-11-10 合并（#351） | 按任务分组的地图（2,617 字）、rules / conventions / paid / workflows / errors 五个通用主题、总说明 2,037 → 1,115 字（目录搬进地图）、报错指路（两处，含 review-344 第 9 条：被挡住时说 `skycut_guide` 照常能用）；全清单 107,198 → 107,276（说明书的名片 383 → 429） |
 | 3 `feat/mcp-cards-pilot` | 2026-11-10 合并（#354） | 试点 5 个工具：名片 3,509 → 2,088 字（edit_clip 737 → 443、generate_media 978 → 442、set_text 249 → 331、add_clips 577 → 424、look 968 → 448）；54 条参数说明改到 ≤ 120 且写上范围；主题写全（迁移前的原文 + 手写几节 + 例子 + related，删掉的长话逐条有去处）；`fields` 太长按整个参数自动切成 `fields`、`fields_2`……（review-344 第 5 条，现在只有 generate_media 切成两节）；`GuidePilotChecks`；实测脚本和基线进仓库；全清单 107,276 → 104,824（−2,452，方案估 −2,100）。真客户端小测：Claude Code 一半 2026-11-10 跑完、**过线**（[试点实测](2026-11-10-mcp-guide-pilot.md)：结果和规矩都和基线一样、每轮常驻 −6.5%、整份预先加载 −2.2%；任务 7 读了 11 次说明书、输入 +41%，建议 PR 4 之前调 generate_media 主题的读法）；Codex 一半 2026-11-11 跑 |
+| 3a `feat/mcp-guide-section-contents` | 进行中 | 试点实测的建议：分节回的第一次回答列出每一节讲什么（`contents`）、`next_step` 改成「只读要用的那几节」，generate_media 加「报价再问只读 spending」、edit_clip 加「改画幅取景只读 framing」；清单不变（只改说明书的回答）。赶在 2026-11-11 Codex 实测之前合，让 Codex 量改过的版本 |
 | 4–5 | 未做 | 两批搬完：名片 ≤ 450（目标 350）、参数说明 ≤ 120（目标 80）、主题写全（先把说明原样搬进主题、再写名片） |
 | 6 `chore/mcp-catalog-budget` | 未做 | 收紧上限（全清单 100,000 等，方案 4.1）、三处 110,000 并成一处、文档 |
 | 7 `feat/codex-schema-size-on-connect` | 未做 | 连接 Codex 时写 `tool_input_schema_max_bytes = 8192`（先实测） |

@@ -26,10 +26,10 @@ enum MCPGuideMediaTopics {
         previousCard: generateMediaPreviousCard,
         sections: [
             MCPGuideWrittenTopics.overview(generateMediaPreviousCard, """
-            generate_media spends the user's Sky Studio credits to make new media files; it never changes the timeline. Read topic=paid for \
-            the shared spending rules.
+            generate_media spends the user's Sky Studio credits to make new media files; it never changes the timeline. Quotes, approval and \
+            the daily credit limit are in the spending section.
             """),
-            MCPGuideSection(name: "kinds", text: """
+            MCPGuideSection(name: "kinds", about: "what each kind and image operation makes, the default video model, tools for other jobs", text: """
             What it makes. kind is image, image_to_video, text_to_video, music, sound_effect or lipsync. With kind=image, operation picks \
             the job: generate (default), remove_background (a cutout with transparency), camera_angle (a new viewpoint of one image with \
             the qwen-angles model: camera_angle {rotate, tilt, zoom}, omitted axes are 0 and all zero is refused; a rotation of 135 or \
@@ -40,7 +40,7 @@ enum MCPGuideMediaTopics {
             defaults and reference limits for free; model picks one by its public id, otherwise SkyCut picks a compatible low-cost \
             default. Narration is add_voiceover and subtitles are generate_subtitles, not this tool.
             """),
-            MCPGuideSection(name: "inputs", text: """
+            MCPGuideSection(name: "inputs", about: "prompt, frames, references, characters, aspect ratio, resolution, model-specific fields", text: """
             Inputs. prompt drives the generators; camera_angle, upscale, remove_background and lipsync take no prompt. image_to_video uses \
             image as the first frame and optional last_image (frames mode); input_mode=multimodal uses the reference_images, \
             reference_videos and reference_audio lists within the model's limits. lipsync takes a local video and audio (MP3 or WAV). \
@@ -53,7 +53,7 @@ enum MCPGuideMediaTopics {
             Wan: document, web_url, enable_thinking, enable_prompt_expansion). HeyGen's end_time must be after start_time and within the \
             source; a shorter window does not lower the price.
             """),
-            MCPGuideSection(name: "spending", text: """
+            MCPGuideSection(name: "spending", about: "quote_only, when the user must approve, confirm_token, the daily credit limit", text: """
             Spending. quote_only=true returns the exact price and the approval reasons without uploading, reserving or charging. The \
             low-cost draft (default model and settings) goes ahead in both permission modes. In ask_for_approval mode, going beyond the \
             draft (a higher resolution, a longer duration, quality=highest, a pricier model) returns needs_confirmation with the price and \
@@ -62,7 +62,7 @@ enum MCPGuideMediaTopics {
             asked for that specification themselves, never for your own choice. The daily hard credit limit applies in every mode: over \
             it nothing starts (daily_budget_exceeded); tell the user. Keep the same idempotency_key when retrying after a lost answer.
             """),
-            MCPGuideSection(name: "jobs_results", text: """
+            MCPGuideSection(name: "jobs_results", about: "job_id and get_job, where files land, cancelling, refunds, file names", text: """
             Jobs and results. The call returns job_id; wait with get_job, which reports the phase, queue position and credits_charged. \
             Finished files land in the project's SkyCut folder and never change the timeline: add them with \
             add_clips. Only queued jobs can be cancelled with cancel_job; started jobs finish, are charged and stay in the user's Sky \
@@ -70,7 +70,7 @@ enum MCPGuideMediaTopics {
             send the same paid request again. name sets the file name; by default it comes from the prompt, or for an image operation \
             from the source name plus angle, x2, x3 or x4. A clashing name gets a number.
             """),
-            MCPGuideSection(name: "official_film", text: """
+            MCPGuideSection(name: "official_film", about: "the official original-film flow: film, prepared references, seam review", text: """
             Official original film. film, prepare_references, prepared_references, quote_token and seam_review belong to the official \
             original-film flow: read get_status film_contract=true first for the shot, context and sound contract and its steps. \
             prepare_references=true only prepares and uploads the references (no quote, no reservation; leave out film, quote_only and \
@@ -83,7 +83,8 @@ enum MCPGuideMediaTopics {
             ["kind": "image", "prompt": "A product photo on a white table", "quote_only": true],
             ["kind": "image", "operation": "camera_angle", "image": "photo.png", "camera_angle": ["rotate": 45]]
         ],
-        related: ["paid", "upscale_clip", "add_clips", "get_job"]
+        related: ["paid", "upscale_clip", "add_clips", "get_job"],
+        readingTip: "To quote and ask the user before spending, read only section=spending."
     )
 
     // MARK: look
@@ -104,7 +105,7 @@ enum MCPGuideMediaTopics {
             look is read-only: it never changes the project, the playhead or the windows. Use it before and after edits instead of guessing \
             what the picture shows.
             """),
-            MCPGuideSection(name: "timeline_and_files", text: """
+            MCPGuideSection(name: "timeline_and_files", about: "timeline or file frames, times and count, labels and boxes, picture sizes", text: """
             Timeline and files. Without file, look composes the timeline exactly as the preview shows it, at time, times (up to 12) or \
             count moments (1 to 12) across clip_id, and lists the visible items per frame. With file, times are seconds in that file; \
             without times it spreads count frames (default 6) across source_in to source_out or the whole file. Each frame comes with \
@@ -113,18 +114,18 @@ enum MCPGuideMediaTopics {
             export_video and get_job. image=false returns only the text (for models that cannot see images); size picks small, medium \
             or large pictures.
             """),
-            MCPGuideSection(name: "shots", text: """
+            MCPGuideSection(name: "shots", about: "shot changes with shots=true and paging with from / next_from", text: """
             Shots. shots=true with a video file or clip_id lists the shot changes with a description and thumbnail of each shot's middle \
             frame, 24 per call; continue with from set to the previous next_from. Long scans return job_id: wait with get_job, then call \
             look again with the same arguments.
             """),
-            MCPGuideSection(name: "text_scan", text: """
+            MCPGuideSection(name: "text_scan", about: "burned-in subtitles, watermarks and slides with text_scan=true, cover boxes", text: """
             Text on screen. text_scan=true with a video file or clip_id samples every 2 seconds and finds burned-in subtitle bands, fixed \
             text such as watermarks and logos, and slides or screens full of text, each with boxes. The result gives cover boxes that \
             set_shape kind=blur or kind=mosaic can use directly, and a crop hint for a subtitle band (it crops the whole band: look again \
             afterwards). With clip_id it also reports subtitle_overlaps, where the project's subtitles collide with on-screen text.
             """),
-            MCPGuideSection(name: "pitfalls", text: """
+            MCPGuideSection(name: "pitfalls", about: "files, outside files, videos SkyCut cannot open, Vision guesses", text: """
             Pitfalls. files samples up to 24 files at their middle in one sheet, which is cheaper than looking at them one by one. Files \
             outside the opened folder ask once (needs_confirmation). A video SkyCut cannot open (for example HEVC stored as hev1) is \
             reported with the reason: convert it with compress_videos first. Vision guesses are often wrong on generated or unusual \

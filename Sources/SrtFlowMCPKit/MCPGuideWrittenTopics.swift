@@ -5,6 +5,7 @@ import Foundation
 // 管什么：哪些工具已经迁移（名片写短了，长话搬进说明书），以及它们手写的主题从哪个文件来。每个迁移过的工具的主题：
 // 第一节 overview 以**迁移前的说明原文**开头（一个字不丢，方案 5.1、7.3），后面几节写全用法、限制、坑（出处写在每个文件的注释里），
 // 再加最小的例子（守卫按真实参数定义核对）和相关主题；参数定义写成的 fields 几节由 MCPGuideTopics 自动接在最后。
+// 手写的每一节带一行 about（这一节讲什么，主题分节回时第一次回答按它列出 contents）；常见的活只要读一节的写进 readingTip。
 // 不管什么：没迁移的工具（主题 = 现在的说明原文 + fields）、怎么答（MCPGuide）。
 // 方案：docs/plans/2026-11-09-mcp-guide.md 5.1–5.3（试点 5 个：edit_clip、generate_media、set_text、add_clips、look）。
 // 守卫：checks/MCP/GuidePilotChecks.swift（名片 ≤ 450 和该写的固定说法、参数说明 ≤ 120 且范围写成数字、迁移前的原文还在、单个工具的参数定义 ≤ 4,500 字节）。
@@ -17,6 +18,8 @@ public enum MCPGuideWrittenTopics {
         public let sections: [MCPGuideSection]
         public let examples: [JSONValue]
         public let related: [String]
+        /// 分节回时 next_step 里的那句「常见的活只读哪一节」（没有就不写）。
+        public var readingTip: String? = nil
     }
 
     /// 已经迁移的工具（方案 5.3 的试点，2026-11-10）。之后的两批加在这里。

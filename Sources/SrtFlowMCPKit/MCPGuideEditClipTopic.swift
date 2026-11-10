@@ -24,7 +24,7 @@ enum MCPGuideEditClipTopic {
             edit_clip changes one clip already on the timeline (clip_id from get_timeline); add new clips with add_clips and change many \
             at once with edit_clips (same fields, one undo step). Each call is one undo step and never edits the media file.
             """),
-            MCPGuideSection(name: "trim_speed", text: """
+            MCPGuideSection(name: "trim_speed", about: "trimming in file seconds, what stays put, speed, ripple, alone, keyframes after a trim", text: """
             Trimming and speed. source_in and source_out are seconds inside the media file, not timeline seconds. Changing source_in keeps \
             the clip's timeline start and moves its end; pass start too to keep the end where it was. Changing source_out moves the end. \
             This differs from dragging a trim handle in the editor on purpose: you give absolute values. For a still image, source_out is \
@@ -34,7 +34,7 @@ enum MCPGuideEditClipTopic {
             J/L cut. Clips with keyframes: keyframes=keep_frames (default) keeps the motion on its source frames, stretch re-times it to \
             the new window, clear removes it.
             """),
-            MCPGuideSection(name: "framing", text: """
+            MCPGuideSection(name: "framing", about: "fit=fill or fit=fit for another canvas shape, focus and follow, black bars, crop, region", text: """
             Framing for the canvas shape (for example after set_canvas ratio=9:16). fit=fill covers the whole frame: SkyCut takes a window \
             of the source with the canvas shape and maps it onto the canvas, cropping up to 0.45 per side and then scaling and moving the \
             picture. It aims at faces, then people, then text (slides, screen recordings), then the most salient object, and follows a \
@@ -48,14 +48,14 @@ enum MCPGuideEditClipTopic {
             past the usual crop limit. It cannot be combined with crop, focus or follow, or manual x / y / scale / rotation; clear a \
             rotation and any motion entrance or exit first. Results report the regions and the final transform.
             """),
-            MCPGuideSection(name: "placement", text: """
+            MCPGuideSection(name: "placement", about: "x / y, scale, rotation, opacity, flips, and the keyframes that block them", text: """
             Position and size. x and y are the picture's centre on the canvas (0 left / top, 1 right / bottom); a zoomed-in picture can be \
             centred from -2 to 3 so its own edges reach the canvas edges. scale is the size relative to the default fit (1 = the cropped \
             picture fits the canvas), 0.05 to 6. Changing only the crop keeps the centre and size and never stretches the picture. \
             rotation turns it clockwise in degrees (-360 to 360), opacity is 0 to 1, flip_horizontal and flip_vertical mirror it. \
             A clip with position or scale keyframes refuses static placement: remove the keyframes with set_keyframes first.
             """),
-            MCPGuideSection(name: "sound", text: """
+            MCPGuideSection(name: "sound", about: "volume_db, volume_curve, fades, muted, sound_scene", text: """
             Sound. volume_db sets the clip's level in dB (0 = original), clamped to edit_limits.volume_db; on a clip with a volume_curve \
             it shifts the whole curve and reports saturation. volume_curve replaces the whole curve with points in timeline seconds and \
             dB ([] removes it), joined by straight lines. fade_in and fade_out are audio fades in seconds. muted silences the clip. \
@@ -63,25 +63,25 @@ enum MCPGuideEditClipTopic {
             hall, outdoor, forest or valley: set room_size and distance); intensity is how much of the effect, all 0 to 1; kind=none \
             removes it.
             """),
-            MCPGuideSection(name: "animation_markers", text: """
+            MCPGuideSection(name: "animation_markers", about: "entrance and exit animations, markers, hidden", text: """
             Entrance, exit, markers and hiding. entrance and exit are none, fade, rise, pop, zoom or wipe; entrance_duration and \
             exit_duration are seconds (default 0.6 when one is chosen); animation_intensity (0 to 1, default 0.6) is how far rise, pop and \
             zoom move. A V1 transition replaces the entrance or exit on its edge. markers replaces all of the clip's markers with \
             {time (timeline seconds inside the clip), color, note}; [] removes them. hidden keeps the clip but leaves it out of the \
             preview and the export.
             """),
-            MCPGuideSection(name: "file_swap", text: """
+            MCPGuideSection(name: "file_swap", about: "swapping the clip's media file", text: """
             Swapping the media. file replaces the clip's media but keeps its place on the timeline, its length and its settings; \
             source_in then starts inside the new file (default 0). Use it for a better take or a re-exported file. SkyCut never edits the \
             media file itself.
             """),
-            MCPGuideSection(name: "results_limits", text: """
+            MCPGuideSection(name: "results_limits", about: "checks before changing, edit_limits, requested / applied, overlaps, linkage", text: """
             Results and limits. All values are checked before anything changes: an invalid value fails the whole call with the allowed or \
             suggested values, and get_timeline reports edit_limits (crop, speed, scale, volume_db, image_source_duration and more). Values \
             that are clamped come back as requested, applied and adjustments. Overlapping another clip on the same track fails. With \
             linkage on, texts, shapes, audio and subtitles over a V1 clip move with it; the result reports linkage and magnet.
             """),
-            MCPGuideSection(name: "pitfalls", text: """
+            MCPGuideSection(name: "pitfalls", about: "common mistakes: file seconds, no end parameter, keyframes that block placement", text: """
             Pitfalls. source_in and source_out are file seconds: to cut a clip at a timeline second, use split_clip. There is no end \
             parameter: shorten a clip with source_out or with split_clip and delete_items. Changing source_in moves the clip's end, not \
             its start. fit, region, x / y and scale fail on a clip with position or scale keyframes until those keyframes are removed.
@@ -92,6 +92,7 @@ enum MCPGuideEditClipTopic {
             ["clip_id": "c1", "fit": "fill", "focus": "subject"],
             ["clip_id": "c1", "region": ["x": 0.1, "y": 0.2, "width": 0.5, "height": 0.6], "fit": "fill"]
         ],
-        related: ["edit_clips", "split_clip", "set_keyframes", "conventions"]
+        related: ["edit_clips", "split_clip", "set_keyframes", "conventions"],
+        readingTip: "To reframe clips for another canvas shape, read only section=framing."
     )
 }
