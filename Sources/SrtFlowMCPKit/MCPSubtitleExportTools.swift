@@ -22,7 +22,7 @@ public enum MCPSubtitleExportTools {
                     "translate_to": MCPSchema.string("Also translate into this language, e.g. zh-Hans, en, ja."),
                     "clip_ids": MCPSchema.array(of: MCPSchema.string("Clip id."), "Only transcribe these clips (for example just the voice-over)."),
                     "max_lines": MCPSchema.integer(
-                        "Lines one subtitle may take: 1 (default) or 2. Stays with the project; add_voiceover subtitles follow it.",
+                        "Lines per subtitle: 1 (default) or 2; the project keeps it (add_voiceover too).",
                         minimum: 1, maximum: 2
                     )
                 ])
@@ -73,17 +73,16 @@ public enum MCPSubtitleExportTools {
                     "track": MCPSchema.string("Which track (default both: every track with lines).", oneOf: ["original", "translation", "both"]),
                     "format": MCPSchema.string("srt (default) or vtt (WebVTT).", oneOf: MCPVocabulary.subtitleFileFormats),
                     "name": MCPSchema.string("File name without language or extension, e.g. the exported video's name."),
-                    "folder": MCPSchema.string("Folder to write into (absolute, or relative to the opened folder). Default: where export_video puts videos.")
+                    "folder": MCPSchema.string("Folder (absolute or under the opened folder). Default: where export_video writes.")
                 ])
             )
         case .getJob:
             return MCPToolDefinition(
                 .getJob, title: "Job progress",
                 description: """
-                Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits before \
-                answering: keep waiting instead of starting the job again. Exports, transcriptions and translations run one at a time: \
-                queued shows queue_position. If it shows waiting_for_user, tell the user right away. Paid jobs: billing_note explains \
-                the charge.
+                Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits first: keep \
+                waiting, never restart the job. Exports, transcriptions and translations run one at a time (queued: queue_position). \
+                waiting_for_user: tell the user right away. Paid jobs: billing_note explains the charge.
                 """,
                 input: MCPSchema.object([
                     "job_id": MCPSchema.string("Job id."),
@@ -111,7 +110,7 @@ public enum MCPSubtitleExportTools {
         "margin": MCPSchema.number("Edge distance / frame height, 0–0.45 (default 0.056).", minimum: 0, maximum: 0.45),
         "size": MCPSchema.number("Pixels on a 1080-tall frame, 20–140 (default 56); a 9:16 frame is 1920 tall.", minimum: 20, maximum: 140),
         "max_width": MCPSchema.number("Line width / frame width; wraps. Default 0.92 (16:9), 0.74 (9:16). Project only.", minimum: 0.3, maximum: 1),
-        "line_spacing": MCPSchema.number("Line-height multiple, 1–2 (default 1); full-height glyphs (Yuanti) suit 1.15–1.3.", minimum: 1, maximum: 2),
+        "line_spacing": MCPSchema.number("Line-height multiple, 1–2 (default 1); full-height fonts (Yuanti) suit 1.15–1.3.", minimum: 1, maximum: 2),
         "font": MCPSchema.string("Installed burnable font: e.g. Hiragino Sans GB, Heiti SC, Helvetica Neue."),
         "bold": MCPSchema.boolean("Bold."),
         "color": MCPSchema.string("Text colour, #RRGGBB."),
@@ -139,7 +138,7 @@ public enum MCPSubtitleExportTools {
         ], required: ["start", "end", "text"])
         let replacement = MCPSchema.object([
             "find": MCPSchema.string("Text to find (case-sensitive); with regex=true an ICU regular expression."),
-            "with": MCPSchema.string("Replacement; an empty string removes the match. With regex, a template: $1 inserts the first group."),
+            "with": MCPSchema.string("Replacement; empty removes the match; with regex, $1 inserts the first group."),
             "regex": MCPSchema.boolean("find is a regular expression (default false)."),
             "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"])
         ], required: ["find", "with"])
@@ -158,9 +157,9 @@ public enum MCPSubtitleExportTools {
                     of: MCPSchema.array(of: MCPSchema.string("Line id."), "Two or more lines on one track, in order."),
                     "Groups of lines to join into one (text, times and word times combined)."
                 ),
-                "replace": MCPSchema.array(of: replacement, "Find and replace on every line of a track; runs after changes, add and merge, before delete."),
+                "replace": MCPSchema.array(of: replacement, "Find/replace on every line; runs after changes, add and merge, before delete."),
                 "strip_punctuation": MCPSchema.boolean(
-                    "Remove pause punctuation from every line, the way generated subtitles are written; runs after replace."
+                    "Drop pause punctuation from every line, as generated subtitles do; after replace."
                 ),
                 "style": subtitleStyle
             ])
@@ -179,13 +178,13 @@ public enum MCPSubtitleExportTools {
             input: MCPSchema.object([
                 "path": MCPSchema.string("Full output path. Leave out to use name and the default folder."),
                 "name": MCPSchema.string("File name without extension."),
-                "version": MCPSchema.string("Short version label: the file is named <name> - <version> (a project made with version already has it)."),
+                "version": MCPSchema.string("Version label: file <name> - <version> (projects made with one already have it)."),
                 "resolution": MCPSchema.string(
                     "Short-side cap; default saved; never upscales.", oneOf: MCPVocabulary.resolutions
                 ),
                 "encoder": MCPSchema.string("Per-call encoder.", oneOf: ["software", "hardware"]),
                 "quality": MCPSchema.string("Per-call quality.", oneOf: MCPVocabulary.encodeQualities),
-                "preset": MCPSchema.string("final: saved settings; quick_review: hardware/720p/small/AAC128. Explicit fields override.", oneOf: ["final", "quick_review"]),
+                "preset": MCPSchema.string("final: saved settings; quick_review: hardware 720p small AAC128; fields override.", oneOf: ["final", "quick_review"]),
                 "burn_subtitles": MCPSchema.boolean("Burn visible subtitles into the picture (default true).")
             ])
         )
