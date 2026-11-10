@@ -19,6 +19,7 @@ import SrtFlowMCPKit
             try await runVoiceRecoveryTimingChecks(root)
             try await runVoiceConcurrencyChecks(root)
             try await runVoiceLibraryChecks(root)
+            try await runVoiceFallbackFeeChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -31,7 +32,7 @@ import SrtFlowMCPKit
             + "then missing-only recovery, second-batch split failure, local-only retry, missing-only generation with the saved selection, "
             + "estimated long line, stable files, durable receipt, six clips/cues, one undo/redo, unknown-submit refusal, packed narration, "
             + "eleven-v4 / estimated subtitle timing, model install before paying and re-quote when it fails, script words in subtitles, mixed timing"
-            + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version")
+            + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version, a mid-script fallback fee asked in get_job and answered with resume (skip or build)")
         exit(0)
     }
 

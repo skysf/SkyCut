@@ -80,8 +80,8 @@ enum MCPGuideVoiceTopics {
     (finished ones are not read again). get_job reports each batch's model and fallback_used, line_models says which \
     model read each line, and voice.note says they may sound different: tell the user. Making them match means reading \
     the whole script again (quoted again first). A batch whose fallback first needs a one-time fee stops with \
-    fallback_needs_one_time (nothing is charged for it; SkyCut cannot pay that fee yet): add_voiceover \
-    resume=<recovery_file> generate_missing=true retries the missing batches with the same model.
+    fallback_needs_one_time (nothing is charged for it); get_job then asks whether to pay it, with the price and a \
+    confirm_token (how to answer is under recovery below).
     """)
 
     // 出处：sky-studio-jobs.md 第一节、第五节、第十一节（每日硬预算）；ai-control-mcp.md 第四节第 6、39、40 条；声音方案 4.2 第 2–5 步。
@@ -140,6 +140,10 @@ enum MCPGuideVoiceTopics {
     - Add generate_missing=true to also pay for batches that were never generated. They are quoted again with the saved \
     voice_plan selection, so the voice and model stay the same.
     - A batch whose outcome is unknown is only looked up on Sky Studio, never sent again.
+    - fallback_needs_one_time: get_job carries the question, one_time (the price) and a confirm_token. Ask the user: \
+    resume=<recovery_file> with that confirm_token builds the voice's MiniMax version (a voice_enroll job; then call \
+    resume=<recovery_file> generate_missing=true for the missing parts), and resume=<recovery_file> skip_one_time=true \
+    retries them with the same model instead. A plain resume keeps the question waiting.
     - Reopen the original project first; resume refuses another project. It never inserts twice, not even after the \
     user undid the insertion.
     get_job lists completed_line_indices, not_generated_line_indices, unknown_batch_indices and the recovery arguments.

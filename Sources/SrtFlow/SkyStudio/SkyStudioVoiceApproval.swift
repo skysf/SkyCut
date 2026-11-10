@@ -63,6 +63,14 @@ enum SkyStudioVoiceApproval {
         return text + " Build it?"
     }
 
+    /// 中途的备用要先建 MiniMax 版（任务结束码 fallback_needs_one_time）时的问句：建了用备用接着做，不建就用原来的模型重试没做成的几批。
+    static func fallbackQuestion(_ item: SkyStudioVoiceOneTime, credits: Double) -> String {
+        let language = item.language.map(SkyStudioVoicePick.languageName) ?? "this language"
+        return "One part of this narration failed on Sky Studio, and its fallback first needs the voice's MiniMax version for \(language): "
+            + "a one-time fee of \(SkyStudioCredits.text(credits)) credits, after which the missing parts can be read with the fallback. "
+            + "Without it, the missing parts can be retried with the same model at no extra fee. Build it?"
+    }
+
     static func designAction(description: String, name: String, sampleText: String?, credits: Double, account: String) -> String {
         "skystudio:voice_design:" + account + ":" + [
             sha256(Data(description.utf8)), name, sampleText.map { sha256(Data($0.utf8)) } ?? "", number(credits)

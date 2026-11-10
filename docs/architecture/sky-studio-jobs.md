@@ -131,8 +131,11 @@
   （`pendingSelection`，不加字段），恢复补批次也照它再报价。各句不全是同一个模型时结果带 `line_models`（每句的 `model`、`fallback_used`），`voice.note`
   说前后可能听得出差别、要统一只能整段重读（另报价），`next_step` 叫 AI 先转告。
 - **备用要先花一次性费用**（任务结束码 `fallback_needs_one_time`，带 `one_time`，钱退了；SkyCut 声音方案 4.5）：这一批停下、留成 missing，别的批照上一条收好，
-  任务以可恢复的 `failed` 结束，`failure.one_time` 原样给 AI，`next_step` 说 SkyCut 现在付不了一次性费用、`resume` + `generate_missing=true` 照原来的模型
-  重试没做成的几批。确认码 / `skip_one_time` 那一套（建了用备用接着做）是声音 PR 6。
+  任务以可恢复的 `failed` 结束，`failure.one_time` 原样给 AI。**问用户（声音 PR 6，`SkyStudioVoiceFallbackFee`）**：结束那一刻补上价（结束码没带就 `/quote`
+  一次 voice_enroll）和声音（照恢复记录），记进恢复记录（`fallbackFee`），经 `SkyStudioJobGate.voiceOneTime` 发问句和 `confirm_token` 并进 get_job；
+  `resume` + 那张令牌 = 过闸记账、起 `voice_enroll` 任务，做完 `resume` + `generate_missing=true` 读没做成的几批（MiniMax 版有了，默认再出错服务器能换上备用）；
+  `resume` + `skip_one_time=true` = 不建、照原来的选择重试（同 `generate_missing=true`）；普通 `resume` 照旧只恢复已有的、这一笔留着等答复。
+  `resume` 那一次要是先问了「读别处的文件」，令牌就不当这一笔的答复。问不了（读不到 Key、报不出价）就照旧只说重试的办法。
 - **旁白词时间**：`SpeechWordTimes` 拼接所有字符 chunk，时间都是全局秒数，跨 chunk 的词继续拼；坏的后半段不能只丢掉后半段。转成字幕时按实际解码时长夹住尾端，开始已超时长的词丢掉，20ms 最短词不能突破音频尾巴。
 - **合批**（声音 PR 5 起普通旁白和声音库的声音一样，方案 8.1）：这台 Mac 切得开（转写得了这种语言）、或者读的模型报字的时间（eleven-v4），`SkyStudioVoiceBatch`
   就按上限装批，整句往里装、**批只在两句之间分**；切不开的一句一单（要不要字幕都一样）。一句本身超过上限：先在句末标点（。！？.!?）分，一个句子都放不下才在逗号类、
@@ -199,7 +202,7 @@
   合出来的阶段、`get_job` 的几个数。`VoiceRecoveryChecks` 另验恢复记录的 `pendingSelection`（有一批换了备用就是备用的那份）和 `line_models`。
 - `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks`：参数名（`clone_from` 那三个不收、`model` / `confirm_token` 收）、本机这一档挑谁（不点名是旁白角色）、词时间各种合同格式，名片必含 / 说明书必含（固定说法、默认 gemini:Charon、失败了别重发、主题照声音方案 4.10 分节）；名片长度、按性质的固定说法、参数说明 ≤ 120、参数定义 ≤ 4,500 字节、主题里的名字都存在、例子过参数核对和试点的五个工具一起在 `GuidePilotChecks` / `GuideContentChecks`，会问的工具收 `confirm_token` 在 `ArgumentCheckChecks`。
 - 声音库（声音 PR 6）：`scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（列出来的、令牌绑的身份、`SkyStudioJobGate` 三件事两种模式、错误的话）；
-  `scripts/check-voice-recovery.sh` 的 `LibraryChecks`（真 App 对象 + 假协议：列、建声音先问授权、删除按模式、设计、用声音库的声音配旁白的一次性费用）；
+  `scripts/check-voice-recovery.sh` 的 `LibraryChecks`（真 App 对象 + 假协议：列、建声音先问授权、删除按模式、设计、用声音库的声音配旁白的一次性费用）与 `FallbackFeeChecks`（旁白中途备用要先花一次性费用：get_job 带价和令牌、普通 resume 留着、`skip_one_time` 重试、令牌起 `voice_enroll` 再 `generate_missing`）；
   `checks/sky-studio-wiring.sh` 第 11 节；细节见 [声音库](voice-library.md)第八节。
 - `scripts/check-voice-recovery.sh`（`check-all` 第 1 组）：链接真实 App 目标文件，只注入假 HTTP 与转写结果。回任务号之前（`StartChecks.swift`）：不点名用 gemini:Charon、整段 `/quote` 一次（kind voice、model auto、params.batches、英文不带提示）、回 `job_id` 带 `voice_plan`、每批同一个 `params.plan` / 各自的 `max_credits` / 各自的 key、记录记下选择和每批的模型、服务器在某一批换了备用也记下；额度不够 / 服务器拒 / 要一次性费用 / 没有这个预设或模型都在花钱之前停下、什么都不交，服务器不答当场退本机；英式男声读中文、warnings 进 `voice.note`、`next_step` 叫 AI 先转告。字幕时间（`TimingChecks.swift`，声音 PR 5）：三句合一批、转写切开、字幕是稿子的字；转写不了的预设整段 eleven-v4（不转写）、点名的模型和声音库的声音一句一单按字数估；模型没装在第一批之前装、装不上再报一次价（第一笔预留退回）；一句对不上按字数估（`mixed`）。恢复（`Main.swift`）：模拟第二批云端成功后真实 `SkyStudioVoiceSplit` 拒绝空词表，验证原音频 / 映射保留、本地恢复零新增生成、只补第三批（照记录的选择再报价：服务器这时自己选会选成别的，不带选择就被认出来）、最终 6 段 / 6 字幕、重复恢复及回执写失败窗口不重复、一步撤销 / 重做。另测云端部分失败 / 退款、跨批长句在句末分开且第二批转写落空时按字数估（不再失败）、未知提交拒绝重放。`VoiceRecoveryChecks` 在 `check-sky-studio` 中真写读恢复记录（只认 version 2），验证原单恢复只 GET。
   几批同时交（声音 PR 4，`ConcurrencyChecks.swift`，假协议先回排队、问的时候才回结局，声音池 2 个）：四批里同时开着的最多 2 单、后交的先回、切句和落地照原来的顺序、

@@ -193,12 +193,16 @@ final class SkyStudioVoiceoverRun {
             if failure.code == "insufficient_credits" {
                 extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             }
-            if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, recovery != nil {
-                // 默认模型出错、备用要先花一次性费用（SkyCut 声音方案 4.5）：这一批停下、没扣钱，别的批照常收好；付一次性费用要声音 PR 6。
+            if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, let recovery {
+                // 默认模型出错、备用要先花一次性费用（SkyCut 声音方案 4.5）：这一批停下、没扣钱，别的批照常收好；补上价、记下、问用户
+                // （SkyStudioVoiceFallbackFee：resume + confirm_token 建、resume + skip_one_time 用原来的模型重试）。问不了就只说重试的办法。
                 extra["next_step"] = .string("One batch failed on Sky Studio and its fallback first needs a one-time fee (failure.one_time); "
-                    + "nothing was charged for that batch and the other batches are kept. SkyCut cannot pay one-time voice fees yet. "
+                    + "nothing was charged for that batch and the other batches are kept. SkyCut could not price that fee now. "
                     + "Tell the user. To retry the missing batches with the same model, call add_voiceover resume=recovery_file "
                     + "generate_missing=true. Never send the original lines again.")
+                if let asked = await SkyStudioVoiceFallbackFee.ask(failure, recovery: recovery, services: services) {
+                    extra.merge(asked) { _, new in new }
+                }
             }
         }
         // 结构化的原因（比如参考录音人声不够的 reason / voiced_seconds / missing_seconds）照样交给 get_job，不只留一句话。

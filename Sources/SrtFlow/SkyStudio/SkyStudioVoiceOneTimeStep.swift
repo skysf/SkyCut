@@ -13,7 +13,7 @@ import SrtFlowMCPKit
 //   回任务号之前的整段报价和整体预留这条规矩（声音 PR 3）不能在任务里绕过去。
 // 这一刀两种模式都问：全部权限下直接建要等长期授权和打开时的价目说明（声音 PR 7）。
 // 不管什么：报价、分批、起旁白任务（SkyStudioVoiceoverStart）；任务里某一批的备用要先建 MiniMax 版（`fallback_needs_one_time`，
-// 中途换备用是声音 PR 4 的事）。
+// 问用户在 SkyStudioVoiceFallbackFee）。
 
 @MainActor
 enum SkyStudioVoiceOneTimeStep {

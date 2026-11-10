@@ -526,7 +526,7 @@ voice_paths="$(code_files_with 'SkyStudioVoicePath\.' | sort -u || true)"
 [ "${voice_paths}" = "${VOICE_API_FILE}" ] || fail "/voices 的路径只许在 ${VOICE_API_FILE} 里拼：${voice_paths:-没有}"
 provider_ids="$(grep -rEln 'Voice[0-9a-fA-F]{16,}' Sources checks/SkyStudio checks/VoiceRecovery checks/MCP || true)"
 [ -z "${provider_ids}" ] || fail "源码和测试数据里不许有 MiniMax voice_id 的样子（服务商的 id 永远不出服务器，约定第 3 条）：${provider_ids}"
-for tool in SkyStudioVoiceLibraryTool SkyStudioVoiceRecordingTool SkyStudioVoiceDesignTool SkyStudioVoiceOneTimeStep; do
+for tool in SkyStudioVoiceLibraryTool SkyStudioVoiceRecordingTool SkyStudioVoiceDesignTool SkyStudioVoiceOneTimeStep SkyStudioVoiceFallbackFee; do
   file="${VOICE_DIR}/${tool}.swift"
   [ -f "${file}" ] || { fail "找不到 ${file}"; continue; }
   stripped="$(sed 's,//.*,,' "${file}")"

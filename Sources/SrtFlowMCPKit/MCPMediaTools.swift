@@ -56,7 +56,7 @@ enum MCPMediaTools {
                     "download_voices": MCPSchema.boolean("Only download SkyCut's own voices (about 333 MB, returns job_id); no lines."),
                     "resume": MCPSchema.string("recovery_file from get_job; send no lines or voice. Reopen the original project first."),
                     "generate_missing": MCPSchema.boolean("With resume: also pay for batches never generated (default false)."),
-                    "skip_one_time": MCPSchema.boolean("voice_… only: read now with the no-fee model instead of the one-time fee asked about."),
+                    "skip_one_time": MCPSchema.boolean("No to a one-time fee: voice_… reads with the no-fee model; with resume, retries with the same model."),
                     "confirm_token": MCPSchema.confirmToken
                 ])
             )
