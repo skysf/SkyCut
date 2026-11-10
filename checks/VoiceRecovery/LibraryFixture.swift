@@ -224,15 +224,26 @@ final class VoiceLibraryHTTP: URLProtocol {
         "credits": 377.6, "why": "The default model reads this voice in English from its MiniMax version.",
         "then": ["model": "minimax-speech-2.8-hd", "credits_expected": 1.5]]
 
+    /// 设计的报价，照 Sky Studio 回的样子（没有顶层 model）。
+    private static func designQuote(model: String, credits: Double, expected: Double, language: String) -> JSONValue {
+        ["credits": .number(credits), "credits_expected": .number(expected), "settlement": "exact", "typical_seconds": 60,
+         "voice_plan": ["selection": ["model": .string(model)], "requested_model": "auto", "rule": .string(language == "zh" ? "zh_80" : "en_80"),
+                        "reason": "The description is in one language.", "languages": [["language": .string(language), "share": 1, "seconds": 9]],
+                        "warnings": []],
+         "one_time": [["kind": "voice_design", "model": .string(model), "language": .string(language), "credits": .number(credits),
+                       "why": "Designing a voice from a description is a one-time fee."]]]
+    }
+
     private static func quote(_ body: JSONValue) -> JSONValue {
         switch body["kind"]?.stringValue {
         case "voice_design"?:
             // 中文描述服务器用 MiniMax（贵的那个，「约」和「最多」不一样）；别的用 Qwen3，按描述 + 试读句每开始 1,000 字 22.5（Sky Studio #247）。
+            // 和真的 Sky Studio 一样：顶层没有 model，用哪个只在 voice_plan.selection.model（2026-11-11 真实冒烟抄下来的样子）。
             let chinese = (body["prompt"]?.stringValue ?? "").unicodeScalars.contains { (0x4E00...0x9FFF).contains($0.value) }
-            if chinese { return ["credits": 760, "credits_expected": 751.4, "settlement": "exact", "model": "minimax-voice-design"] }
+            if chinese { return designQuote(model: "minimax-voice-design", credits: 760, expected: 751.4, language: "zh") }
             let characters = (body["prompt"]?.stringValue ?? "").count + (body["params"]?["sample_text"]?.stringValue ?? "").count
             let credits = 22.5 * Double(max(1, (characters + 999) / 1_000))
-            return ["credits": .number(credits), "credits_expected": .number(credits), "settlement": "exact", "model": "qwen3-voice-design"]
+            return designQuote(model: "qwen3-voice-design", credits: credits, expected: credits, language: "en")
         default:
             let batches = body["params"]?["batches"]?.arrayValue ?? []
             let selection: JSONValue = body["params"]?["plan"] ?? (needsEnroll
