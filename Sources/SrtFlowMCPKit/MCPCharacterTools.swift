@@ -35,37 +35,37 @@ enum MCPCharacterTools {
     private static var manage: MCPToolDefinition {
         MCPToolDefinition(.manageCharacters, title: "Manage characters", description:
             """
-            Write the Sky Studio character library: create from text or a photo, import views, rename, replace a view, regenerate \
-            the headshot or delete. Paid (Sky Studio credits) for create and headshot; quote_only prices first. Over-plan work or \
-            a delete may return needs_confirmation: ask, then repeat with confirm_token. The daily credit limit applies. Jobs \
-            return job_id: wait with get_job. Read skycut_guide topic=manage_characters first.
+            Edit the Sky Studio character library: create (text or photo), import views, rename, replace a view, regenerate the \
+            headshot, delete. create and headshot: Paid (Sky Studio credits); quote_only prices first. Over-plan work or a delete \
+            may return needs_confirmation: ask, repeat with confirm_token. The daily credit limit applies. job_id: wait with \
+            get_job. Read skycut_guide topic=manage_characters first.
             """,
             input: MCPSchema.object([
                 "action": MCPSchema.string("One library mutation.", oneOf: ["create", "import", "update", "replace_view", "headshot", "delete"]),
                 "character_id": MCPSchema.string("Existing full UUID for update/replace_view/headshot/delete."),
-                "character_revision": MCPSchema.string("Latest server revision required for free edits/deletion; headshot uses the quote's revision."),
-                "source_type": MCPSchema.string("Create only: default inferred from image. Text needs prompt and no media; photo needs one still image.", oneOf: ["text", "reference_upload"]),
-                "prompt": MCPSchema.string("Create only; UTF-16 limit from capabilities. Photo prompt optional; no headshot prompt."),
-                "image": MCPSchema.string("Local create photo or replacement view. JPEG/PNG/WebP, 30 MiB; create photo <=64M pixels. No remote URL."),
+                "character_revision": MCPSchema.string("Latest revision for free edits/deletion; headshot: the quote's revision."),
+                "source_type": MCPSchema.string("Create only (default from image): text = prompt only; photo = one still image.", oneOf: ["text", "reference_upload"]),
+                "prompt": MCPSchema.string("Create only (limit: capabilities); optional with a photo; not for headshot."),
+                "image": MCPSchema.string("Local photo/view: JPEG, PNG or WebP, 30 MiB; create photo <=64M pixels; no URLs."),
                 "roles": MCPSchema.object([
                     "front": MCPSchema.string("Local front image path; required for import."),
                     "side": MCPSchema.string("Local side image path; required for import."),
                     "back": MCPSchema.string("Local back image path; required for import."),
                     "headshot": MCPSchema.string("Optional local headshot image path.")
-                ], description: "Import separate existing views, not a source sheet; required roles come from capabilities."),
+                ], description: "Import separate views, not a source sheet; required roles: capabilities."),
                 "role": MCPSchema.string("replace_view only.", oneOf: ["front", "side", "back", "headshot"]),
-                "name": MCPSchema.string("Import/update only; <=80 UTF-16 units. Create uses server's localized untitled name."),
+                "name": MCPSchema.string("Import/update only; <=80 UTF-16 units. Create gets the server's untitled name."),
                 "voice_description": MCPSchema.string("Import/update only; <=220 UTF-16 units; empty clears it."),
                 "notes": MCPSchema.string("Optional import notes, <=25000 UTF-16 units."),
                 "locale": MCPSchema.string("Optional create/import/update metadata language."),
                 "model": MCPSchema.string("Native Character id from capabilities; defaults from server/saved character."),
                 "resolution": MCPSchema.string("Native Character tier; fixed source/headshot shapes, never pass aspect_ratio."),
-                "quote_only": MCPSchema.boolean("Create/headshot/import quote: no upload, Character insertion, reservation or spending."),
-                "idempotency_key": MCPSchema.string("Required for create/import/headshot/replace_view: stable 1-128 chars before sending; reuse unchanged after lost answers."),
-                "resume": MCPSchema.string("Original job_id to recover; pass only action and resume. Recovery only reads the original job and never charges again."),
-                "approval_scope": MCPSchema.string("Default once; project requires explicit authorization for this exact Character operation.", oneOf: ["once", "project"]),
-                "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid Character change; quote their words in user_request."),
-                "user_request": MCPSchema.string("The user's own words asking for it, e.g. \"make a character from this photo\"; required by user_requested_overrides."),
+                "quote_only": MCPSchema.boolean("Create/headshot/import quote only: no upload, insertion, reservation or spending."),
+                "idempotency_key": MCPSchema.string("For create/import/headshot/replace_view: 1-128 chars, reused after lost answers."),
+                "resume": MCPSchema.string("Original job_id to recover (only action + resume); reads it, never charges."),
+                "approval_scope": MCPSchema.string("Default once; project needs explicit approval for this exact Character operation.", oneOf: ["once", "project"]),
+                "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid change; quote them in user_request."),
+                "user_request": MCPSchema.string("User's own words asking for it, e.g. \"make a character from this photo\"."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["action"]), destructive: true, openWorld: true)
     }

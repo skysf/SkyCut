@@ -52,7 +52,7 @@ public enum MCPFilmSchema {
 
     public static var review: JSONValue {
         object(["previous": ["type": ["string", "null"]], "next": ["type": ["string", "null"]]],
-               description: "Exact quote fingerprints; absent edge=null. Explicit preflight review, not output acceptance.")
+               description: "Quote fingerprints (absent edge=null); preflight review, not output acceptance.")
     }
 
     private static let text: JSONValue = ["type": "string", "minLength": 1, "maxLength": 80]

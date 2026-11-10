@@ -14,10 +14,9 @@ enum MCPRecipeTools {
             return MCPToolDefinition(
                 .recipes, title: "Read editing styles",
                 description: """
-                Read-only. SkyCut's editing styles (preset and the user's own): structure, shot lengths, transitions, filters, fonts, \
-                music and a checklist. Without id: every style with when to use it; with id: the whole style. Before cutting a whole \
-                video, pick the one that fits, tell the user in one sentence which one you follow, and follow it; what the user says \
-                always wins.
+                Read-only. SkyCut's editing styles (presets and the user's own): structure, shot lengths, transitions, filters, fonts, music, \
+                checklist. No id: every style and when to use it; id: the whole style. Before cutting a whole video, pick one that fits, tell \
+                the user in one sentence which one you follow, and follow it; the user's words win.
                 """,
                 input: MCPSchema.object([
                     "id": MCPSchema.string("A style's id or title; leave out to list them all.")

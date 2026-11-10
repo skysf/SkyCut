@@ -35,7 +35,7 @@ public enum MCPFileTools {
                     "action": MCPSchema.string("What to do.", oneOf: ["move", "rename", "make_folder", "trash"]),
                     "files": MCPSchema.array(of: MCPSchema.string("Path (absolute, or relative to the opened folder)."), "move / trash: the files or folders."),
                     "file": MCPSchema.string("rename: the file or folder to rename."),
-                    "new_name": MCPSchema.string("rename: the new name, without folders (the extension is kept if you leave it out)."),
+                    "new_name": MCPSchema.string("rename: the new name, no folders (the extension stays if left out)."),
                     "to": MCPSchema.string("move: the destination folder (made if missing)."),
                     "path": MCPSchema.string("make_folder: the new folder."),
                     "confirm_token": MCPSchema.confirmToken

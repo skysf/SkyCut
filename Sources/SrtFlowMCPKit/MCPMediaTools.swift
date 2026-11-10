@@ -13,13 +13,12 @@ enum MCPMediaTools {
             return MCPToolDefinition(
                 .findAudio, title: "Find audio",
                 description: """
-                Read-only. Search SkyCut's music (CC-BY or CC0) and its own sound effects (no credit needed) by English or Chinese \
-                words in title, artist and tags; kind narrows it. Put a result on the timeline with add_clips library_id, and pass on \
-                CC-BY credit lines from get_timeline music_credits. When nothing fits, add_clips sound_effect makes one; never \
-                download music or sound effects.
+                Read-only. Search SkyCut's music (CC-BY or CC0) and sound effects (no credit) by English or Chinese words in title, artist and \
+                tags; kind narrows it. Place one with add_clips library_id; pass on CC-BY credits from get_timeline music_credits. Nothing fits: \
+                add_clips sound_effect makes one; never download music or sound effects.
                 """,
                 input: MCPSchema.object([
-                    "query": MCPSchema.string("Words to search for, e.g. \"calm piano\", \"whoosh\" or \"epic\" (Chinese words work too)."),
+                    "query": MCPSchema.string("Search words, e.g. \"calm piano\", \"whoosh\", \"epic\" (Chinese works too)."),
                     "kind": MCPSchema.string("any (default), music or sound_effect.", oneOf: MCPVocabulary.audioKinds),
                     "max_results": MCPSchema.integer("How many tracks to return (default 10).", minimum: 1, maximum: 50)
                 ]),
