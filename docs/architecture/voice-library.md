@@ -5,7 +5,7 @@
 > Sky Studio 那份方案（在 Sky Studio 仓库）3.3、3.4。这里只放长期约束。
 > 声音库的两个 AI 工具（`list_voices` / `manage_voices`）和用声音库的声音配旁白是声音 PR 6（2026-11-10），全部权限下的长期授权是声音 PR 7
 > （2026-11-10），都在第八节；设置里的声音库、声音选择器、新建 / 设计声音的对话框是声音 PR 8（2026-11-10），在第九节；变声（`change_voice`，PR 9）
-> 做到时补进这份文档。
+> 做到时补进这份文档。2026-11-11：`manage_voices` 的 `language` 改成可选、不给就本机识别（第八节第 3 条）。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md) 第五节（云端旁白 / 克隆）、[阻塞的媒体读取](blocking-media-reads.md)、[写代码的规范](coding-standards.md)。
 > 案例：[克隆的参考录音被降到 16 kHz、默认只截 10 秒](../bugfixes/2026-11-10-voice-reference-16khz-short-sample.md)。
 
@@ -135,7 +135,19 @@
    已经有这种语言就当场说（`SkyStudioVoiceLibraryErrors.referenceExists`，和服务器的 409 同一句）、什么都不问不传；问句写声音的**名字**，令牌照旧绑 id
    （[案例](../bugfixes/2026-11-10-add-reference-asks-before-reading-the-voice.md)）。AI 这一路的 `consent: true` 和 `"standing_grant"` 只在这个文件、
    `voiceConsent` 放行之后造（`checks/sky-studio-wiring/voice-library.sh`；`consent: true` 另一处是对话框里用户自己勾了那一句之后，第九节）。
-   录音的语言 AI 这一路要它给；界面上的对话框用本机检测预选（第九节第 4 条）。身份和「传、建 / 加」那一步在 `SkyStudioVoiceRecordingSubmission`，两个入口共用。
+   身份和「传、建 / 加」那一步在 `SkyStudioVoiceRecordingSubmission`，两个入口共用。
+   **录音的语言可选**（方案 4.6；2026-11-11，`SkyStudioVoiceRecordingLanguage`，[案例](../bugfixes/2026-11-11-manage-voices-language-required.md)）：
+   - AI 给了 `language`：核对写法、照它的，**不识别、不拿识别的结果盖掉**（识别只在这台 Mac 装了的语言里裁决，认错的正是没装的那一种）；
+     写错的照旧报错，给空的算没给。
+   - 没给：在做好的参考录音上识别，和对话框**同一份**（`SkyStudioVoiceServices.detectLanguage` 的默认值就是 `VoiceSampleLanguage.detect`，
+     第九节第 4 条；不另写候选 / 裁决）。识别成了什么写进授权的问句和结果（`language`、`language_detected: true`，做成之后再加一句
+     `language_note` 叫 AI 转告：这一版换不了一段录音的语言，认错了只能删了重建）。
+   - 识别不出来（把握不够、一个模型都没装、macOS 15）：**不猜**，一样都不问、不传，报 `reason: language_undetected` 和「带上 language 再调，
+     不确定就问用户」；不叫 AI 去点界面（同 `AIHarvestFailure`）。
+   - 识别在参考录音做好之后、问授权之前。令牌照旧绑语言：点过头照原样再调（再识别一次）和带上识别出来的 `language` 再调，认的是同一张。
+     全部权限 + 长期授权不问的那一路（第 7 条），识别成了什么只在结果里（`language_detected`、`language_note`），AI 照转告。
+   - 加一种语言时「这个声音已经有这种语言」分两处查，都在问之前、同一句（`SkyStudioVoiceRecordingLanguage.refuseExisting`）：AI 给的语言读到声音就查
+     （不读文件）；识别出来的语言识别完再查，并多说一句它是识别出来的、认错了带上 `language` 再调。
 4. **设计**（`SkyStudioVoiceDesignTool`）：先 `/quote`（`voice_design`、`model: auto`，描述的语言决定 MiniMax / Qwen3，SkyCut 不挑），再问一次性费用
    （`SkyStudioJobGate.voiceOneTime`：先判每日硬预算，问句「约多少（最多多少）」），点过头记账、起任务（`SkyStudioVoiceLibraryJob`：`get_job` 报新声音、
    1 小时的 `sample_url`、实收；账按服务器的结算证据改，没花出去的退回）。价格一律从报价来，名片和说明书不写数。
@@ -171,12 +183,15 @@
 | 检查 | 守什么 |
 | --- | --- |
 | `scripts/check-sky-studio.sh` 的 `VoiceLibraryToolChecks`（纯值 + 真走 `SkyStudioJobGate`） | 预设名单（默认的标出来、没有名单的语言照英文并说明、性别按语言）；授权的令牌换路径 / 大小 / 修改时间 / 内容 / 起止 / 语言 / 名字 / 版本 / 账户都另发一张，一次性费用换价 / 语言 / 声音 / 模型、设计换描述 / 试读句 / 价都另发，全都以 `skystudio:` 开头；授权 `.ask` / `.once` 都问、同一件事回同一张、只收一次，`.once` 的问句带说明、请求批准模式的码答不了它，`.standing` 不问；一次性费用三种都先判每日额度（超了不发码不记账）、问的时候不记账、点过头按报价记账，`.standing` 不问直接按报价记账；删除请求批准问、全部权限不问；`voice_library_unavailable` 两种 reason 分开说、`voice_limit` / `reference_exists` / `too_little_speech` 的话 |
-| `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` | 两个工具的参数名、动作词表就是 App 分派的五样、只读 / 写 / 会删；名片必含、说明书必含（分节照 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行；名片 ≤ 450、按性质的固定说法、新工具没有迁移前的原文 |
+| `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` | 两个工具的参数名、动作词表就是 App 分派的五样、只读 / 写 / 会删；`manage_voices` 只有 `action` 必给、`language` 的说明写着可选和不给会怎样、`create` 一节照可选写、有一个例子不带 `language`；名片必含、说明书必含（分节照 4.10、设计一节不写价）、地图的 Voices 一行和 Paid 一行；名片 ≤ 450、按性质的固定说法、新工具没有迁移前的原文 |
 | `scripts/check-voice-recovery.sh` 的 `LibraryChecks`（真 App 对象 + 假协议 `VoiceLibraryHTTP`） | 列出（声音库用不了照回预设、只要预设不问声音库）；建声音没点头什么都不传、点过头传 `voice_reference` 一次、`POST /voices` 带授权和版本 / 私有上传名 / 用了哪一段 / 稳定的 key，换一段的令牌不认；删除请求批准问了才发、全部权限直接发、存储失败再发一次；设计没点头不起任务不记账、点过头 `max_credits` 是报价、get_job 报新声音和样音、账按实收；用声音库的声音配旁白：要建 MiniMax 版先问（一批都不交）、`skip_one_time` 每批 `voice_clone` 带同一个 plan、点头起 `voice_enroll`、声音库用不了报错不退本机 |
+| `scripts/check-voice-recovery.sh` 的 `LibraryLanguageChecks`（真 App 对象，识别换成假的、数它被叫了几次） | 不给 `language`：识别一次、问句和结果写识别成了什么、没点头什么都不传、照原样带令牌再调建成且 `POST /voices` 带识别出来的、带上识别出来的 `language` 再调认同一张且不再识别；识别不出来回 `language_undetected` 和「带上 language 再调」、话里没有界面的词、什么都没传；给了就照给的（识别一次都不叫）、写错的照旧报错、给空的算没给；`add_reference` 同一条路，识别出来的语言那个声音已经有时问之前就拒、说它是识别出来的、什么都不传 |
 | `scripts/check-voice-recovery.sh` 的 `FallbackFeeChecks`（真 App 对象） | 旁白中途备用要先花一次性费用：get_job 带价（结束码带的、声音照恢复记录）和令牌、两条路都写在 next_step、恢复记录记下这一笔；普通 resume 不建、这一笔留着且 get_job 再问一遍（同一张令牌）；`skip_one_time` 不建、照原来的选择重报价、全部落地；别的令牌再问（同一张）；那张令牌按报价记账、`voice_enroll` 带模型 / 声音 / 语言 / max_credits，之后 `generate_missing` 读完 |
 | `scripts/check-sky-studio.sh` 的 `VoiceStandingNoticeChecks` / `AccessChecks`（纯值） | 说明的价目照目录快照读（751.4 / 22.5 / 377.6，没有 typical 用 credits、少了的模型那一行不写）、额度、授权那句和 Sky Studio 导出的 v1 一字不差、读不到 `/models` 的退路；给 AI 的两段英文；`set_settings` 打开全部权限的问句带说明、令牌绑那一句的版本（新版本另问）、关掉的问句不带 |
 | `scripts/check-voice-recovery.sh` 的 `StandingChecks`（真 App 对象 + 假协议） | 全部权限 + 长期授权：建声音不问、带 `standing_grant`、结果和提示条说一句，设计直接起任务，每日额度照拦，配旁白建 MiniMax 版直接起（`skip_one_time` 照收），旁白中途那一笔直接建（`enroll_job_id`）再 `generate_missing` 读完；没有长期授权：问一次（这段录音那句 + 说明）、点过头先 `POST` 问句里那一版再带 `consent: true` 建、之后不再问；Sky Studio 拒 `standing_grant` 时问一次；`set_settings` 打开问句带价目和那句、点过头记、关掉撤、记不上照样打开并报 `not_recorded`；升级补记：请求批准什么都不发、记不上下次再试、记上了只做一次、已经有有效的不再记 |
 | `checks/sky-studio-wiring/voice-library.sh`（`checks/sky-studio-wiring.sh` 第 11 节 source 进来，扫描） | `consent: true` 和 `standing_grant` 只在建声音的工具里、过了 `voiceConsent` 之后造，`standing_grant` 只在 `.standing` 时用；`/voices/consent-grant` 只经 `SkyStudioVoiceStanding`；改权限模式的文件和告诉长期授权的文件对得上、设置里只有「同意并打开」写全部权限、读到 / 存下 Key 时都补记；`/voices` 的路径只在 `SkyStudioVoiceAPI`；没有 MiniMax voice_id 的样子；声音库的工具和长期授权问用户只经 `SkyStudioJobGate`；声音库的声音不退本机 |
+
+`language` 可选那一条的反向验证（2026-11-11，八处各临时改坏、看红、恢复）记在[案例](../bugfixes/2026-11-11-manage-voices-language-required.md)。
 
 人工回归（真 Key、要花积分的先请用户批准预算）：
 
@@ -191,6 +206,9 @@
 - [ ] 旁白中途某一批的备用要先建 MiniMax 版（服务器回 `fallback_needs_one_time`；真遇上时）：get_job 问价、`resume` + 令牌建、再 `generate_missing` 读完；
       另一次照 `skip_one_time` 用原来的模型重试。
 - [ ] Sky Studio 没配声音桶时（或断网）：`list_voices` 照回预设，用 `voice_…` 配旁白报错、没换成本机的声音。
+- [ ] 不带 `language` 建声音（macOS 26、中文和英文的转写模型都装了）：一段中文录音、一段英文录音，问句里写的是识别出来的那种语言，建成后
+      `list_voices` 里那个声音的语言对；一段这台 Mac 没装模型的语言（比如日语）：报 `language_undetected`、没有问句，带上 `language=ja` 再调能建。
+- [ ] 带着 `language` 建（故意和录音不一样，比如中文录音写 `en`）：照写的建，问句里没有「detected」。
 
 ## 九、声音库的界面（设置里的一节、声音选择器、新建 / 设计声音，声音 PR 8）
 
@@ -215,6 +233,7 @@
 4. **录音的语言**先替用户选好、可改（`VoiceSampleLanguage`）：macOS 26 上用生成字幕那套两段式检测——候选和裁决 2026-11-10 从 `TranscriptHarvester` 原样挪进了
    `SpokenLanguageProbe`，两边共用（只在已装的语言里裁决、不为它下载模型，探针是参考录音的前 20 秒）。检测不出来、一个模型都没装、macOS 15：**那一行空着、要用户选，不许猜**
    （语言记错了，服务器选模型跟着错）。用户选过就不再替他改；加录音时检测出这个声音已有的语言也不替他选。能选的是一份常用语言的名单（检测出名单外的照样能用）。
+   `manage_voices` 没给 `language` 时用的也是这一份（第八节第 3 条）：检测不出来时界面是留空等用户选，AI 那一路是报错叫它带上 `language` 再调。
 5. **现在录**（`VoiceSampleRecorder`）：第一次按「录」才请求麦克风授权（和录屏同一个请求口 `ScreenRecordingPermissions.requestMicrophoneAccess`）；被拒了说去
    「系统设置 > 隐私与安全性 > 麦克风」打开、给一个打开系统设置的链接。录成和参考录音同一个规格的 WAV（44.1 kHz 单声道 16-bit），到 3 分钟自己停；录下来的文件
    和选的文件一样过 `prepare`。一秒十次的电平只叫醒录音那一小块视图。麦克风的用途说明（`InfoPlist.strings` 三种语言 + `packaging/Info.plist`）写了「录屏的解说」和「新建声音时的样本」两样。
@@ -242,6 +261,7 @@
 | `scripts/check-voice-recovery.sh` 的 `LibraryUIChecks`（真 App 对象 + 假协议 `VoiceLibraryHTTP`） | Store：取到了 / 用不了（预设还在、什么都不发）/ 没有 Key / 要授权；改名；删除再发一次、立刻消失；临时链接没过期不重取、快过期只重取那一个；「声音库变了」自己再取。新建：**没勾授权什么都不传**、勾了传一次 `voice_reference`、`POST /voices` 带 `consent: true` + 版本 / 用了哪一段 / key，和 `manage_voices` 同一个 key；人声不够当场说、不碰网络；语言照检测预选、用户选过不改、检测不出来留空；加录音不列已有的语言；那一勾的默认。设计：填够才问价、改字作废报价、按下去记账并起 `voice_design`（`max_credits` 是报价）、做完进列表、超了每日额度不记账不起任务、太长不问价。录音机：电平换算、规格、3 分钟、被拒不录。话：授权那句的两种版本、语言名照界面语言、界面不叫人去调 AI 工具 |
 | `checks/sky-studio-wiring.sh` 第 11、12 节（第 12 节拆在 `checks/sky-studio-wiring/voice-library-ui.sh`） | `consent: true` 只在两处造且各在问到之后；建 / 加 / 删的请求只从 `SkyStudioVoiceRecordingSubmission.swift` 发；设计只经 `SkyStudioVoiceDesignOrder`、先过每日硬预算再起任务；界面不用确认码、不弹钥匙串框、不直接动账；视图不读工程 / 时钟；拆出去的那一节在总闸之前装进来 |
 | `checks/project-file-wiring.sh` | 语言检测搬家之后守卫跟着走：候选去重 / 排序 / 不许单候选捷径钉在 `SpokenLanguageProbe`，生成字幕和参考录音都只走它 |
+| `checks/sky-studio-wiring/voice-library-ui.sh` 末尾一段（2026-11-11） | 录音的语言识别只有一份：`SpokenLanguageProbe` 只有生成字幕和 `VoiceSampleLanguage` 调，`VoiceSampleLanguage.detect` 只有对话框和 `SkyStudioVoiceServices`（`manage_voices`）用；工具里 `language` 不许再当必填、识别在做参考录音之后问授权之前；`SkyStudioVoiceRecordingLanguage` 不许自己识别、给了就在识别之前回去 |
 | `scripts/check-localization-coverage.sh`、`checks/presented-views-app-language.sh`、`checks/preview-perf-wiring.sh`、`checks/instant-tooltip-wiring.sh`、`checks/source-file-size.sh` | 三张表、sheet 的语言、body 计数、提示、行数（方案 9.1 第 13 项，各自已有） |
 | `scripts/render-voice-library.sh <输出目录>`（要图形会话，**不在 check-all 里**） | 不判对错，只出图：生产的视图 + 假 Sky Studio，英 / 中 / 西各一套 PNG（设置那一节的三种样子、浏览预设、新建声音空着 / 填好、加录音、设计带报价），发版前和改这些视图之后看排版 |
 

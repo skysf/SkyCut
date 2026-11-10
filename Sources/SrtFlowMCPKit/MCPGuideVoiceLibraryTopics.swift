@@ -59,15 +59,22 @@ enum MCPGuideVoiceLibraryTopics {
             voice), add_reference for another language, design a voice from a description, rename and delete. It never touches \
             the timeline and has no undo: deleting a voice cannot be reversed. Use the new voice_… id with add_voiceover voice.
             """),
-            MCPGuideSection(name: "create", about: "create and add_reference: the recording, language, consent and confirm_token", text: """
-            create needs file (an audio or video file with one person speaking, no music), name and language (the ISO 639-1 \
-            code of what is said). add_reference adds a recording in another language to voice: one reference per language; a \
+            MCPGuideSection(name: "create", about: "create and add_reference: the recording, its language (given or detected), consent", text: """
+            create needs file (an audio or video file with one person speaking, no music) and name. language (the ISO 639-1 \
+            code of what is said) is optional: pass it when you know it, and it is used as given. Without it SkyCut detects \
+            the language from the sample on this Mac (macOS 26 or later, only among the speech languages installed here); the \
+            result has language and language_detected, and the consent question names what it found so the user can correct \
+            it. When it cannot tell, the call stops with reason language_undetected before anything is asked or sent: call \
+            again with language, and ask the user if you are not sure. \
+            add_reference adds a recording in another language to voice: one reference per language; a \
             language that has one is reference_exists (delete and create again to replace it). SkyCut uses at most 3 minutes: \
             start and end pick the part, and a longer file is trimmed to the 3 minutes with the most speech; the result says \
-            which part. It needs at least 10 seconds of clear speech (too_little_speech otherwise). Free. Every recording first \
-            returns needs_confirmation with Sky Studio's consent statement: the user must confirm it is their own voice or that \
-            the speaker agreed; translate the statement for the user, then repeat the same call with confirm_token. Files \
-            outside the opened folder also ask before reading. 50 voices per account (voice_limit).
+            which part. It needs at least 10 seconds of clear speech (too_little_speech otherwise). Free. In ask mode every \
+            recording first returns needs_confirmation with Sky Studio's consent statement: the user must confirm it is their \
+            own voice or that the speaker agreed; translate the statement for the user, then repeat the same call with \
+            confirm_token; a file outside the opened folder also asks before it is read. In full access mode nothing asks once \
+            the user's standing voice consent is on record; without it the first recording asks once. 50 voices per account \
+            (voice_limit).
             """),
             MCPGuideSection(name: "design", about: "design from a description: the one-time fee, the job and its sample_url", text: """
             design creates a new voice from description (how it sounds; a Chinese description designs on MiniMax, any other \
@@ -103,6 +110,7 @@ enum MCPGuideVoiceLibraryTopics {
         ],
         examples: [
             ["action": "create", "file": "my-voice.m4a", "name": "Sky", "language": "zh"],
+            ["action": "add_reference", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "file": "my-voice-english.m4a"],
             ["action": "design", "description": "A calm, warm male narrator in his forties", "name": "Calm narrator"],
             ["action": "delete", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"]
         ],
