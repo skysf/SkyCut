@@ -18,9 +18,9 @@ public enum MCPGuide {
     /// 一个主题第一次回的、每一节的上限。
     public static let answerLimit = 6_000
 
-    /// 回答一次调用。`topic` / `section` 空白等于没给。
+    /// 回答一次调用。`topic` / `section` 空白等于没给。只给 section 不给 topic：回目录，并说清楚 section 要和 topic 一起给。
     public static func answer(topic: String?, section: String?) -> JSONValue {
-        guard let topic = given(topic) else { return index() }
+        guard let topic = given(topic) else { return index(sectionWithoutTopic: given(section)) }
         guard let found = MCPGuideTopics.topic(named: topic) else { return index(unknownTopic: topic) }
         return answer(found, section: section)
     }
@@ -38,7 +38,7 @@ public enum MCPGuide {
     // MARK: 目录
 
     /// 不带 topic：每个主题一行（名字 + 一句话）。PR 1 是按清单顺序的平铺目录；按任务分组的地图是方案的 PR 2。
-    static func index(unknownTopic: String? = nil) -> JSONValue {
+    static func index(unknownTopic: String? = nil, sectionWithoutTopic: String? = nil) -> JSONValue {
         let topics = MCPGuideTopics.all
         var lines = ["SkyCut guide: \(topics.count) topics, one per tool. Call skycut_guide topic=<name> for one; "
             + "a long topic lists its sections, and section=<name> reads one."]
@@ -48,6 +48,10 @@ public enum MCPGuide {
             payload["unknown_topic"] = .string(unknownTopic)
             let guesses = MCPGuideTopics.suggestions(for: unknownTopic)
             if !guesses.isEmpty { payload["did_you_mean"] = .array(guesses.map { .string($0) }) }
+        }
+        if let sectionWithoutTopic {
+            payload["section_without_topic"] = .string(sectionWithoutTopic)
+            payload["next_step"] = .string("section reads one part of a topic: call skycut_guide again with topic=<name> and section.")
         }
         return .object(payload)
     }

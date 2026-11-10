@@ -6,8 +6,10 @@ import SrtFlowMCPKit
 // - 每个工具都有同名主题，目录里有每个工具名（整词）；目录 ≤ 5,000、每个主题第一次回的和每一节 ≤ 6,000（整份结果的 JSON 文字）；
 // - 方案的 PR 1：主题的概要就是工具现在的说明原文（一个字不丢），fields 一节列出它真收的每个参数；
 // - 长主题先回概要 + 有哪些节、按 section 取；写错的 topic 回目录 + 猜的；写错的 section 回那个主题 + unknown_section；
-// - 手写的文字（名片、目录开头、提示）里提到的名字都存在；回的每一样都只用英文；
+// - 手写的文字（名片、目录开头、提示）里提到的名字都存在（拿写错名字的样本证明它真会红）；回的每一样都只用英文；
 // - App 那一头（AIGuideTools）照答，参数名核对收 topic / section、挡别的名字。
+// 参数定义的每一样事实都写进 fields、例子对得上参数定义、related 是真主题、不含凭据和账号：GuideContentChecks.swift。
+// 2026-11-10 审查（review-344）补强：目录按行首「- 名字:」认、fields 按路径认那一行，免得别处顺带提到就算过。
 // 路由的 Policy 和 recipes 同一行在 checks/MCP/router-wiring.sh；没开通也照答在 checks/SkyStudio/GateChecks.swift。
 
 /// 名片的上限（方案 4.1：目标 350、硬限 450）。说明书是照新规矩生的第一个工具，现在就守；其余工具迁移完（方案 PR 6）才一起守。
@@ -20,6 +22,8 @@ func runGuideChecks() {
     runGuideLookupChecks()
     runGuideAppChecks()
     runGuideWordingChecks()
+    runGuideFieldFactChecks()
+    runGuideContentChecks()
 }
 
 private func size(_ value: JSONValue) -> Int { value.encodedString().utf16.count }
@@ -47,17 +51,21 @@ private func runGuideTopicChecks() {
     check(size(index) <= MCPGuide.indexLimit, "the guide index fits \(MCPGuide.indexLimit) characters (it is \(size(index)))")
     checkEqual(MCPGuideTopics.all.map(\.name), MCPToolName.allCases.map(\.rawValue), "one guide topic per tool, in catalog order")
     var largest = (name: "", size: 0)
+    let indexLines = indexText.components(separatedBy: "\n")
     for tool in MCPToolName.allCases {
-        check(indexText.range(of: "\\b\(tool.rawValue)\\b", options: .regularExpression) != nil, "the guide index names \(tool.rawValue)")
+        // 认它自己那一行（行首「- 名字:」），别处顺带提到不算（标题里的 skycut_guide、批量工具标题里的 edit_clip）。
+        check(indexLines.contains { $0.hasPrefix("- \(tool.rawValue): ") }, "the guide index has a line for \(tool.rawValue)")
         guard let topic = MCPGuideTopics.topic(named: tool.rawValue) else {
             check(false, "\(tool.rawValue) has a guide topic")
             continue
         }
         checkEqual(topic.sections.first?.name, MCPGuideSection.overview, "\(tool.rawValue): the topic starts with its overview")
         checkEqual(topic.sections.first?.text, tool.definition.description, "\(tool.rawValue): the overview keeps the current description word for word")
-        let fields = topic.sections.first { $0.name == "fields" }?.text ?? ""
+        // 第一层的每个参数有自己那一行（不缩进），里层同名的不算。
+        let entries = MCPGuideFields.entries(for: tool.definition.inputSchema)
         for name in (tool.definition.inputSchema["properties"]?.objectValue ?? [:]).keys {
-            check(fields.contains("- \(name) ("), "\(tool.rawValue): the fields section lists \(name)")
+            let line = entries.first { $0.path == name }?.line ?? ""
+            check(line.hasPrefix("- \(name) ("), "\(tool.rawValue): the fields section has a top-level line for \(name)")
         }
         let first = MCPGuide.answer(topic: tool.rawValue, section: nil)
         check(size(first) <= MCPGuide.answerLimit, "\(tool.rawValue): the first answer fits \(MCPGuide.answerLimit) characters (it is \(size(first)))")
@@ -123,6 +131,11 @@ private func runGuideLookupChecks() {
     for blank in [nil, "", "   "] as [String?] {
         check(MCPGuide.answer(topic: blank, section: nil)["unknown_topic"] == nil, "a blank topic is the index, not an unknown topic")
     }
+    // 只给 section 不给 topic：说清楚错在哪，不悄悄回目录（review-344 第 6 条）。
+    let lonely = MCPGuide.answer(topic: nil, section: "fields")
+    checkEqual(lonely["section_without_topic"]?.stringValue, "fields", "a section without a topic is named back")
+    check((lonely["next_step"]?.stringValue ?? "").contains("topic="), "a section without a topic says to pass topic too")
+    check(MCPGuide.answer(topic: nil, section: nil)["section_without_topic"] == nil, "no topic and no section is just the index")
 }
 
 /// App 那一头：照 MCPGuide 答；参数名核对只收 topic / section（和到处都收的 project）。
@@ -150,18 +163,28 @@ private func runGuideWordingChecks() {
     let handWritten = [
         ("the card", MCPToolName.skycutGuide.definition.description),
         ("the index header", MCPGuide.answer(topic: nil, section: nil)["text"]?.stringValue?.components(separatedBy: "\n").first ?? ""),
-        ("the long-topic next step", MCPGuide.answer(long, section: nil)["next_step"]?.stringValue ?? "")
+        ("the long-topic next step", MCPGuide.answer(long, section: nil)["next_step"]?.stringValue ?? ""),
+        ("the section-without-topic next step", MCPGuide.answer(topic: nil, section: "fields")["next_step"]?.stringValue ?? "")
     ]
-    let known = catalogKnownNames()
     for (what, text) in handWritten {
         check(!text.isEmpty, "\(what) is written")
-        let unknown = catalogIdentifiers(in: text).filter { !known.contains($0) }
-        check(unknown.isEmpty, "\(what) names only real tools and parameters (unknown: \(unknown.sorted().joined(separator: ", ")))")
+        let unknown = guideUnknownNames(text)
+        check(unknown.isEmpty, "\(what) names only real tools and parameters (unknown: \(unknown.joined(separator: ", ")))")
     }
+    // 这条检查真会红：写错的工具名、不存在的参数名都要挑出来（review-344 第 3 条：以前从名片里一个名字都抽不出来，等于没查）。
+    checkEqual(guideUnknownNames("Call skycut_guide topic=edit_clp, then edit_clip with clip_end_ms."), ["clip_end_ms", "edit_clp"],
+               "the name check catches a misspelt tool and an unknown parameter")
+    check(guideUnknownNames("Read skycut_guide topic=edit_clip before edit_clips.").isEmpty, "real names pass the name check")
     var answers = [MCPGuide.answer(topic: nil, section: nil), MCPGuide.answer(topic: "edit_clp", section: nil)]
     for topic in MCPGuideTopics.all {
         answers.append(MCPGuide.answer(topic: topic.name, section: nil))
         answers += topic.sections.map { MCPGuide.answer(topic: topic.name, section: $0.name) }
     }
     check(!answers.contains { containsChinese($0.encodedString()) }, "every guide answer is English only")
+}
+
+/// 手写的文字里看起来像名字（snake_case / camelCase）、却不是工具名、参数名、选项值、结果字段名的词，按字母排。
+func guideUnknownNames(_ text: String) -> [String] {
+    let known = catalogKnownNames()
+    return catalogIdentifiers(in: text).filter { !known.contains($0) }.sorted()
 }
