@@ -15,10 +15,10 @@ enum MCPGenerationTools {
             return MCPToolDefinition(
                 .generateMedia, title: "Generate media",
                 description: """
-                Paid (Sky Studio credits): image, video, lipsync, cutout, music or sound effect from a prompt or files; never edits the \
-                timeline (import with add_clips; video upscale: upscale_clip). Returns job_id; wait with get_job. quote_only=true prices \
-                without spending. Over-plan requests return needs_confirmation: ask, then repeat with confirm_token. The daily credit \
-                limit always applies. Read skycut_guide topic=generate_media before the first call.
+                Paid (Sky Studio credits): images, video, lipsync, cutouts, music, sound effects; import results with add_clips, video \
+                upscale is upscale_clip. job_id: wait with get_job. quote_only=true is free. Beyond the draft: needs_confirmation, ask, \
+                repeat with confirm_token. user_requested_overrides needs user_request, the user's words naming it (4K, a model), never \
+                "best quality". A daily credit limit applies. Read skycut_guide topic=generate_media first.
                 """,
                 input: MCPSchema.object([
                     "kind": MCPSchema.string("What to make.", oneOf: MCPVocabulary.generationKinds),
@@ -71,7 +71,8 @@ enum MCPGenerationTools {
                     "resolution": MCPSchema.string("Catalog tier; default lowest image/720p-class video. Upgrades need approval."),
                     "quote_only": MCPSchema.boolean("Quote without upload, generation, reservation or charge."),
                     "approval_scope": MCPSchema.string("once default; project needs explicit spec/price-ceiling approval.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("true only when the user explicitly asked for this specification; budgets still apply."),
+                    "user_requested_overrides": MCPSchema.boolean("true only with user_request naming this setting in the user's words (4K, a model); \"best quality\" is not one."),
+                    "user_request": MCPSchema.string("The user's own words naming the setting, e.g. \"4K\" or \"use GPT Image 2\"; required by user_requested_overrides."),
                     "aspect_ratio": MCPSchema.string("Catalog aspect; default canvas, frame video follows image."),
                     "generate_audio": MCPSchema.boolean("Video audio toggle, if offered."),
                     "instrumental": MCPSchema.boolean("Music only: no singing (default true)."),
@@ -93,7 +94,8 @@ enum MCPGenerationTools {
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("The video clip whose source file to upscale (get_timeline)."),
                     "approval_scope": MCPSchema.string("once by default; project only with explicit project-wide agreement.", oneOf: ["once", "project"]),
-                    "user_requested_overrides": MCPSchema.boolean("true only if the user explicitly requested this paid upscale; never infer from the assistant's plan."),
+                    "user_requested_overrides": MCPSchema.boolean("true only if the user asked for this paid upscale; quote their words in user_request."),
+                    "user_request": MCPSchema.string("The user's own words asking for the upscale, e.g. \"upscale this to 4K\"; required by user_requested_overrides."),
                     "tier": MCPSchema.string("Which Sky Studio model (default topaz-starlight).", oneOf: MCPVocabulary.upscaleTiers),
                     "target": MCPSchema.string("Short side to reach (default: what the canvas needs).", oneOf: MCPVocabulary.upscaleTargets),
                     "range": MCPSchema.string(

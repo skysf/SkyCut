@@ -44,8 +44,10 @@ private let pilotNature: [MCPToolName: [String]] = [
     .setText: ["One undo step"],
     .addClips: ["One undo step", "needs_confirmation"],
     .look: ["Read-only", "wait with get_job", "needs_confirmation", "skycut_guide topic=look"],
+    // 2026-11-10：Codex 把「画质尽量好」当成用户点名、自带 user_requested_overrides 跳过了确认 —— 名片上写死只有用户原话点名的规格才算。
     .generateMedia: ["Paid (Sky Studio credits)", "quote_only", "needs_confirmation", "confirm_token", "daily credit limit",
-                     "wait with get_job", "skycut_guide topic=generate_media"],
+                     "wait with get_job", "skycut_guide topic=generate_media", "user_requested_overrides needs user_request",
+                     "never \"best quality\""],
     // 第一批（2026-11-10）：改工程的 One undo step、回任务号的 wait with get_job、会问的 needs_confirmation、要先读的 skycut_guide topic=…；
     // 出片的 never overwrites / Never replaces a file、删文件的 Trash、export_video 的 music_credits、等用户的 waiting_for_user。
     .editSubtitles: ["One undo step"],

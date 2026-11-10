@@ -25,13 +25,17 @@ enum SkyStudioJobGate {
     }
 
     /// 硬预算先判断；请求批准模式只对偏离草稿的操作发码。全部权限只跳过操作审批。
+    /// user_requested_overrides 只在 user_request（用户点名规格的原话）里找得到每一项越档的名字时才免问（AIOverrideQuote）；
+    /// 找不到就照常发确认码、结果里说明为什么没免（2026-11-10：Codex 把「画质尽量好」当成点名，自己跳过了确认）。
+    /// overrides 是每一项越档和它的名字；不给就按 reason 算一项、没有能点名的写法（带了原话就算）。
     static func decide(credits: Double, summary: String, identity: String, args: AIToolArguments,
                        store: SkyStudioSpendStore? = nil, access: AIAccessStore? = nil,
-                       reason: String? = nil, project: String? = nil, profile: String = "") throws -> Decision {
+                       reason: String? = nil, overrides: [AIOverrideQuote.Item]? = nil, project: String? = nil, profile: String = "") throws -> Decision {
         let store = store ?? SkyStudioSpendStore.shared
         let access = access ?? AIAccessStore.shared
         let scope = try args.choice("approval_scope", from: ["once", "project"]) ?? "once"
         let userRequested = try args.bool("user_requested_overrides") ?? false
+        let userWords = try args.string("user_request")
         guard credits.isFinite, credits >= 0 else { throw AIToolError("Sky Studio returned an invalid price; nothing was started.") }
         guard case .allow = store.decide(credits: credits) else {
             return .needsConfirmation(budgetBlocked(credits: credits, store: store))
@@ -40,7 +44,11 @@ enum SkyStudioJobGate {
             credits > ceiling ? "The quote exceeds this project's approved per-task price of \(SkyStudioCredits.text(ceiling)) credits." : nil
         }
         let approvalReason = reason ?? priceChange
-        if let reason = approvalReason, access.mode == .ask, !userRequested, !access.allows(project: project, profile: profile, credits: credits) {
+        let items = (overrides ?? reason.map { [AIOverrideQuote.Item(reason: $0, names: [])] } ?? [])
+            + (priceChange.map { [AIOverrideQuote.Item(reason: $0, names: [])] } ?? [])
+        let unnamed = userRequested ? AIOverrideQuote.unnamed(items, in: userWords) : items
+        let userNamedIt = userRequested && unnamed.isEmpty
+        if let reason = approvalReason, access.mode == .ask, !userNamedIt, !access.allows(project: project, profile: profile, credits: credits) {
             let action = identity + ":approval_scope:" + scope
             let redemption = AIConfirmations.shared.redeem(try args.string("confirm_token"), for: action)
             guard redemption == .accepted else {
@@ -50,12 +58,18 @@ enum SkyStudioJobGate {
                 if case .object(var value) = result.payload {
                     value["approval_scope"] = .string(scope)
                     value["next_step"] = "Ask in the conversation language before proceeding; offer once or project approval. Keep the scope unchanged when redeeming its token. Never treat the assistant's own plan as user approval."
+                    if userRequested {
+                        // 说清楚为什么 user_requested_overrides 没免掉这一问：叫它去问用户，别编一段原话再试。
+                        value["overrides_not_applied"] = .string((userWords ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? "user_requested_overrides needs user_request: the user's own words that name the setting (for example \"4K\" or \"use GPT Image 2\")."
+                            : "user_request does not name: " + unnamed.map(\.reason).joined(separator: " ") + " Words like \"best quality\" are not a named setting.")
+                    }
                     result.payload = .object(value)
                 }
                 return .needsConfirmation(result)
             }
             if scope == "project", let project { access.approve(project: project, profile: profile, credits: credits) }
-        } else if userRequested, scope == "project", let project {
+        } else if userNamedIt, scope == "project", let project {
             access.approve(project: project, profile: profile, credits: credits)
         }
         return .reserved(record(store, credits))

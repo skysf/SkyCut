@@ -146,6 +146,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIConfirmations.swift \
   Sources/SrtFlow/AIAccessPolicy.swift \
   Sources/SrtFlow/AIDraftPolicy.swift \
+  Sources/SrtFlow/AIOverrideQuote.swift \
   Sources/SrtFlow/AISettingsApproval.swift \
   Sources/SrtFlow/AIAccessStore.swift \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \

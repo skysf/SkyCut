@@ -67,6 +67,8 @@ func catalogKnownNames() -> Set<String> {
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。
     names.formUnion(["one_time", "voice_design", "voice_enroll", "sample_url", "voice_library_unavailable", "voice_limit",
                      "reference_exists", "too_little_speech"])
+    // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
+    names.insert("overrides_not_applied")
     return names
 }
 
