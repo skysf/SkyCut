@@ -95,8 +95,9 @@ enum MCPGuideSharedTopics {
         When SkyCut asks. In ask_for_approval mode, a request beyond the low-cost draft (a higher resolution, a longer duration, the \
         highest quality, a pricier model) returns needs_confirmation with the price and the reason. Ask the user; only if they agree, \
         repeat the call with confirm_token (approval_scope=project approves that model and specification for the project up to that \
-        price). Set user_requested_overrides=true only when the user explicitly asked for that specification, never for your own \
-        plan. full_access skips these questions.
+        price). Set user_requested_overrides=true only when the user's own words name that setting ("4K", a model, a duration) and \
+        quote them in user_request; "best quality" names nothing, so quote and ask. Without such words SkyCut asks anyway \
+        (overrides_not_applied). full_access skips these questions.
 
         The daily budget. A hard daily credit limit applies in every mode: over it, the result is status blocked with \
         daily_budget_exceeded and nothing starts. Tell the user; they can raise it in SkyCut Settings or ask you to change it with \

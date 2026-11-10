@@ -47,7 +47,7 @@ private func checkCatalog() {
         "reference_images", "reference_videos", "reference_audio", "character_id", "character_roles", "character_revision", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
-        "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides",
+        "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides", "user_request",
         "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project", "camera_angle", "upscale_factor"], "the parameters")
     // 2026-11-10 名片迁移（方案 5.2 的分类）：会调错 / 花错钱的留在名片，怎么用好的进说明书（topic=generate_media）。
     let opening = String(definition.description.prefix(512))

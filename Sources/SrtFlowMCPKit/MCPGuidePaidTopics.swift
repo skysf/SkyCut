@@ -25,8 +25,9 @@ enum MCPGuidePaidTopics {
             MCPGuideSection(name: "spending", about: "price, approval, the daily limit and cancelling", text: """
             Spending. The upscale goes beyond the draft settings, so in ask_for_approval mode it returns needs_confirmation with \
             the price: ask the user, then repeat with confirm_token (approval_scope=project only with explicit project-wide \
-            agreement). full_access proceeds and notifies. Set user_requested_overrides=true only when the user explicitly asked \
-            for this paid upscale. The daily credit limit is a hard cap in both modes: if it blocks the job, tell the user they \
+            agreement). full_access proceeds and notifies. Set user_requested_overrides=true only when the user asked for this paid \
+            upscale, and quote their words in user_request ("upscale this to 4K"); otherwise SkyCut asks anyway. The daily credit \
+            limit is a hard cap in both modes: if it blocks the job, tell the user they \
             can raise it in Settings. cancel_job can only cancel a queued job; check the original billing afterwards.
             """),
             MCPGuideSection(name: "results", about: "progress fields, replacing clips, reverting and the library", text: """
@@ -63,7 +64,8 @@ enum MCPGuidePaidTopics {
             Spending. create and headshot are paid with Sky Studio credits: quote_only=true prices them without uploading, \
             creating, reserving or spending; then the shared approval rules and the hard daily budget apply (needs_confirmation, \
             confirm_token, approval_scope). Other writes are free; a delete follows the permission mode and may ask first. Set \
-            user_requested_overrides=true only for the user's explicit request.
+            user_requested_overrides=true only when the user asked for it, quoting their words in user_request ("make a character \
+            from this photo"); otherwise SkyCut asks anyway.
             """),
             MCPGuideSection(name: "jobs", about: "idempotency_key, revisions, recovering with resume, no cancelling", text: """
             Jobs and recovery. Give create, import, headshot and replace_view a stable idempotency_key (1–128 characters) and \

@@ -453,7 +453,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
   （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半（f76032e，0.167、gpt-6.1-sol / max，四个测试 App 并行）：和基线比没有退步，任务 7 两边都把「画质尽量好」当成用户点名、自带
   `user_requested_overrides` 没停下来问；全打一遍的原始 token −27%、找工具打印的总字数 −13.6%、重复总说明占比 48% → 38%（6.4 的三条按字面没到，截断和方案自己的估算见报告）；
-  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)。
+  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)；协调者按结果放行两批；任务 7 的规矩修了之后（`user_requested_overrides` 要 `user_request` 原话点名规格）补跑，Codex、Claude Code 都停下来问（[Codex](docs/reports/2026-11-10-mcp-guide-overrides-task7-codex-evidence.json)、[Claude Code](docs/reports/2026-11-10-mcp-guide-overrides-task7-claude-evidence.json) 证据）。
 
 - [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
@@ -722,6 +722,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-11-10 几批同时交的检查断言了假服务没按住的完成顺序](docs/bugfixes/2026-11-10-voice-concurrency-check-finish-order.md) — `ConcurrencyChecks` 要求完成顺序前两个是 `[1, 0]`，可假服务只按住第一批等第二批，第三批和第一批谁先回看调度，3 核的 CI 上见过 `[1, 2, 0, 3]`；改成只比第二批和第一批的位置，反向验证确定地逼出 CI 上那个顺序。
 - [2026-11-10 Sky Studio 接线守卫最后三节的检查从来不会红](docs/bugfixes/2026-11-10-sky-studio-wiring-checks-after-exit.md) — 总闸（`if FAILED … exit 1`）夹在中间，后来加的角色 A、0.18.62、声音库三节接在它后面，✗ 打出来、脚本照样退出 0；总闸挪到最后，总闸前加一条读自己文件的检查（最后一条 fail 要在总闸之前）。
 - [2026-11-10 云端配音的字幕显示的是这台 Mac 听成的字](docs/bugfixes/2026-11-10-voiceover-subtitles-show-transcribed-text.md) — 模型不报字的时间时转写出来的词原样当了字幕（「SkyCut」成了「Sky cut」）；声音 PR 5 起每句先对到原文上（`SpeechWordAlignment`，字从稿子来、时间从转写来），对不上按字数估，假转写会「听错」才测得出。
+- [2026-11-10 AI 把「画质尽量好」当成用户点名的规格，跳过了花积分前的确认](docs/bugfixes/2026-11-10-overrides-best-quality-skips-approval.md) — Codex 两次都自带 `user_requested_overrides` 起了生成，说明写得再死也拦不住；改成要 `user_request`（用户点名规格的原话），每一项越档都要在里面找得到名字（`AIOverrideQuote`），找不到照常回 `needs_confirmation` 并说明 `overrides_not_applied`；名片和说明书写死「best quality」不算。
 - [2026-11-10 add_voiceover 会问、却不收 confirm_token](docs/bugfixes/2026-11-10-voiceover-confirm-token-refused.md) — 读别处的恢复文件回 needs_confirmation，点过头带 confirm_token 再调被参数核对挡掉（说明上没写）；说明里加上，守卫钉住「名片写着 needs_confirmation 的工具都收 confirm_token」。
 - [2026-11-10 实测证据里漏了本机路径（带着账户名）](docs/bugfixes/2026-11-10-measurement-evidence-local-paths.md) — `report.py` 只换这个任务的目录前缀，跑完改过名的目录和模型写短的路径漏过去；改成按形状换（指到 work 的临时路径、家目录）、剩下的打提醒，`checks/report-evidence-no-local-paths.sh` 扫进仓库的证据；顺带删掉 #354 误带进来的两份草稿调用表。
 - [2026-11-10 浮点素材里有坏采样，做克隆参考录音时整个 App 崩掉](docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md) — `Int16(clamping: Int(…))` 在夹住之前 `Int(_:)` 就对 NaN / ±Inf / 特别大的数 trap；先排除非有限数、在浮点上夹范围，坏采样记 0；带 NaN 的 32 位浮点素材真走 `prepare` 的回归，撤掉修复当场崩。

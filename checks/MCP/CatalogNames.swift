@@ -72,6 +72,8 @@ func catalogKnownNames() -> Set<String> {
                      "reference_exists", "too_little_speech"])
     // manage_voices 没给 language 时（2026-11-11，SkyStudioVoiceRecordingLanguage）：结果里的 language_detected、识别不出来的 reason。
     names.formUnion(["language_detected", "language_undetected"])
+    // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
+    names.insert("overrides_not_applied")
     return names
 }
 
