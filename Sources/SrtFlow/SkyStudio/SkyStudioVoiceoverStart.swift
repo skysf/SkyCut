@@ -96,7 +96,7 @@ enum SkyStudioVoiceoverStart {
     private static func quoteAndStart(_ input: AIVoiceoverInput, project: VideoEditProject, resolved: Resolved,
                                       services: SkyStudioVoiceServices) async throws -> Outcome {
         let catalog = resolved.catalog
-        let transcription = await services.transcription(input.language)
+        let transcription = await services.transcription(input.speechLanguage)
         let reading = SkyStudioVoiceReading.decide(kind: resolved.kind, voice: resolved.pick.voice, model: input.model,
             subtitles: input.subtitles, language: input.language, transcribes: transcription.transcribes, catalog: catalog)
         let draft = try planned { try SkyStudioVoicePlan.draft(
@@ -230,6 +230,12 @@ enum SkyStudioVoiceoverStart {
         }
         if let reading = plan.reading, let timing = timingNote(reading, voice: pick.voice, language: input.language, catalog: catalog) {
             notes.append(timing)
+        }
+        // 点名的模型读不了这个预设自己的声音（Gemini 的预设点名 eleven-v4）：服务器换成它在那个模型上的替身，voice.name 还是点的那个
+        // 预设 —— 说清楚实际是谁读的、听起来不一样（为了字幕时间整段换的那种，上面那句已经说了）。
+        if plan.reading?.switchedForTiming != true, let reads = plan.voicePlan.voice, reads.lowercased() != pick.voice.lowercased() {
+            notes.append("\(plan.voicePlan.model ?? "The named model") reads this with \(reads), the voice that stands in for "
+                + "\(pick.voice) on that model. It sounds different from \(pick.voice); tell the user.")
         }
         if input.speed != 1 { notes.append("Sky Studio voices read at their own pace; speed was ignored.") }
         return notes.isEmpty ? nil : notes.joined(separator: " ")

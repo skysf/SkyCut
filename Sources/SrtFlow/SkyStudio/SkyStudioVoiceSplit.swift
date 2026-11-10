@@ -1,9 +1,12 @@
 import Foundation
 import SrtFlowCore
 
-// MARK: - 一批克隆语音按原来的几句切开（纯值）
-// 管什么：复用 SubtitleCueWords 的字符对齐，把本机转写的词映回原文，在两句的词之间找静音切口；不能对上就明确失败。
-// 不管什么：转写、解码、写文件（SkyStudioVoiceAudio）；不按字数猜时间，不因此重新花积分生成。
+// MARK: - 一批配音按原来的几句切开（纯值）
+// 管什么：复用 SubtitleCueWords 的字符对齐，把词（本机转写的、或读的模型报的）映回原文，在两句的词之间找静音切口；不能对上就明确失败。
+// 对字不计较繁简（和 SpeechWordAlignment 同一个口径）：稿子是繁体、转写写成简体（或反过来）时同一个字照样算对上 ——
+// 2026-11-10 之前这里没折叠，繁体稿的一批每句只对上一半的字、整批切不开（docs/bugfixes/2026-11-10-traditional-chinese-batch-split-fails.md）。
+// 不管什么：转写、解码、写文件（SkyStudioVoiceAudio）；不因此重新花积分生成。这里不按字数猜时间 —— 没有词可对、这台 Mac 又转写不了时
+// 的兜底在 SkyStudioVoiceSplitEstimate（调用方 SkyStudioVoiceRender 决定什么时候用）。
 
 enum SkyStudioVoiceSplit {
     struct Slice: Sendable, Codable {
@@ -31,7 +34,7 @@ enum SkyStudioVoiceSplit {
                                          start: word.start, end: min(word.end, duration)))
             recognized += word.text
         }
-        guard let aligned = SubtitleCueWords.realigned(timed, from: recognized, to: batch.prompt) else { throw Problem() }
+        guard let aligned = SubtitleCueWords.realigned(timed, from: recognized, to: batch.prompt, foldsChineseScript: true) else { throw Problem() }
         var offset = 0
         var spans: [(start: Double, end: Double)] = []
         for part in batch.parts {
@@ -41,7 +44,7 @@ enum SkyStudioVoiceSplit {
                 guard let source = timed.first(where: { $0.start == aligned.start && $0.end == aligned.end }) else { return nil }
                 return (recognized as NSString).substring(with: NSRange(location: source.location, length: source.length))
             }.joined()
-            let covered = SubtitleCueWords.matchingCharacterCount(ownRecognized, to: part.text)
+            let covered = SubtitleCueWords.matchingCharacterCount(ownRecognized, to: part.text, foldsChineseScript: true)
             guard let first = own.first, let last = own.last,
                   Double(covered) >= Double(part.text.filter { $0.isLetter || $0.isNumber }.count) * 0.65 else {
                 throw Problem()
@@ -60,8 +63,9 @@ enum SkyStudioVoiceSplit {
         return batch.parts.indices.map { Slice(part: batch.parts[$0], start: cuts[$0], end: cuts[$0 + 1]) }
     }
 
-    /// 有词时间给的空隙，优先切在其中最长的安静窗正中；没有静音也只在词之间切。
-    private static func quietBoundary(from lower: Double, to upper: Double, samples: [Float], sampleRate: Double) -> Double {
+    /// 有词时间给的空隙，优先切在其中最长的安静窗正中；没有静音也只在词之间切（`fallback` 不给就是空隙正中）。
+    static func quietBoundary(from lower: Double, to upper: Double, samples: [Float], sampleRate: Double,
+                              fallback: Double? = nil) -> Double {
         let chunk = max(1, Int(sampleRate * 0.01))
         let begin = min(samples.count, max(0, Int(ceil(lower * sampleRate))))
         let end = min(samples.count, max(begin, Int(floor(upper * sampleRate))))
@@ -85,6 +89,6 @@ enum SkyStudioVoiceSplit {
         }
         finish(end)
         if let best { return Double(best.lowerBound + best.count / 2) / sampleRate }
-        return (lower + upper) / 2
+        return fallback ?? (lower + upper) / 2
     }
 }
