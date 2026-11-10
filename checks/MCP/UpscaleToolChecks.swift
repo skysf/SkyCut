@@ -49,7 +49,6 @@ func runUpscaleToolChecks() {
     check(!text.contains("fal.ai") && !text.contains("cost_usd"), "the description no longer talks about fal.ai or dollars")
     for id in MCPVocabulary.upscaleTiers { check(text.contains(id), "the description names model \(id)") }
     for name in MCPVocabulary.upscaleTargets + MCPVocabulary.upscaleRanges { check(text.contains(name), "the description names \(name)") }
-    // 总说明的「Paid」那一行始终带着它（Claude Code 开场只看目录）。
-    check(MCPInstructions.text(providers: [.skystudio]).contains("upscale_clip"), "the instructions' paid line names upscale_clip")
-    check(MCPInstructions.text.contains("upscale_clip"), "without a key the initial instructions still mention upscale")
+    // 说明书地图的「Paid」那一行始终带着它（2026-11-10 起目录在地图里）。
+    check(guideMapText().contains("upscale_clip (sharper, larger clips)"), "the guide map's paid line names upscale_clip")
 }

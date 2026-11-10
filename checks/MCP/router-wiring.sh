@@ -260,3 +260,17 @@ assert ".recipes" in row.group(1), "skycut_guide must share recipes' Policy row,
 assert row.group(2).replace(" ", "") == "false,false,false", "skycut_guide must not queue, present the editor or start a round"
 PYTHON
 echo "   ✓ skycut_guide 交给 AIGuideTools，和 recipes 同一行 Policy（不排队、不摆窗口、不算这一轮）"
+
+echo "==> 路由：给 AI 的报错指到那个工具的说明书，只在 catch AIToolError 那一处加"
+# 方案 3.3：约 430 处抛 AIToolError 的地方一个都不改，路由统一加「Guide: skycut_guide topic=<工具名>」；参数名写错的那句在 MCPArgumentCheck 里加
+# （ArgumentCheckChecks 查）。别的地方自己调 result(guide:) 就会出现两份不一样的指路。
+python3 - <<'PYTHON'
+import re
+from pathlib import Path
+router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
+assert router.count("return Outcome(json: error.result(guide: call.tool), failed: true)") == 1, \
+    "the router's catch AIToolError must answer with error.result(guide: call.tool)"
+callers = [str(p) for p in Path("Sources").rglob("*.swift") if "result(guide:" in p.read_text() and p.name not in ("AIToolRouter.swift", "AIToolIO.swift")]
+assert not callers, "only the router adds the guide pointer, found: " + ", ".join(callers)
+PYTHON
+echo "   ✓ 报错的说明书指路只在路由的 catch 那一处加"

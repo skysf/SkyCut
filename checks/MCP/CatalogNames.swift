@@ -11,6 +11,8 @@ func catalogKnownNames() -> Set<String> {
         switch value {
         case .object(let object):
             if case .object(let properties)? = object["properties"] { names.formUnion(properties.keys) }
+            // 清单里的选项值（export_video 的 quick_review、ai_access_mode 的 full_access……）也是真名字。
+            if case .array(let choices)? = object["enum"] { names.formUnion(choices.compactMap(\.stringValue)) }
             object.values.forEach(walk)
         case .array(let items):
             items.forEach(walk)
@@ -29,6 +31,9 @@ func catalogKnownNames() -> Set<String> {
     // generate_media（只有存了 Sky Studio 的 Key 才在清单里，但 listJSON 是配好时的全份）的词表和结果字段：卡里提到它们时要对得上。
     names.formUnion(MCPVocabulary.generationKinds + MCPVocabulary.videoResolutions + MCPVocabulary.generationAspects)
     names.formUnion(["credits", "credits_charged", "waiting_for_user", "job_id", "needs_confirmation"])
+    // 说明书的通用主题提到的结果字段和报错代码（2026-11-10）：get_timeline 的 edit_limits、get_status 的 skycut_plan、
+    // 没存过的工程存下来时的 project_saved_to、每日硬上限的 daily_budget_exceeded、几乎每个结果都有的 next_step、MCP 结果的 isError。
+    names.formUnion(["edit_limits", "skycut_plan", "project_saved_to", "daily_budget_exceeded", "next_step", "isError"])
     return names
 }
 

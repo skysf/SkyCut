@@ -69,7 +69,8 @@ private func runRefusalChecks(free: SkyCutLicense, now: Date) {
     let email = SkyStudioLinks.supportEmail
     func says(_ text: String, _ parts: [String], _ what: String) {
         check(text.hasPrefix("Not done: "), "\(what): starts with Not done")
-        check(text.hasSuffix("get_status shows the plan."), "\(what): points at get_status")
+        check(text.hasSuffix("get_status shows the plan, and skycut_guide (the manual) still answers."),
+              "\(what): points at get_status and says the guide still answers")
         for part in parts { check(text.contains(part), "\(what) mentions \(part): \(text)") }
     }
 

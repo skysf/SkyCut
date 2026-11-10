@@ -79,7 +79,8 @@ public enum MCPArgumentCheck {
             text = "\(tool.rawValue) has no parameter \(quoted), so nothing was done. Its parameters: \(finding.fields.joined(separator: ", "))."
         }
         if let hint = hint(for: finding.key, fields: finding.fields) { text += " " + hint }
-        return text
+        // 指到说明书（方案 3.3）：那个工具的主题里有每个字段的类型、可选的值和范围。
+        return text + " Fields: skycut_guide topic=\(tool.rawValue)."
     }
 
     /// 两种最常见的写错：大小写 / 下划线不一样（fontSize → font_size）；给了结束时间而工具要的是时长。

@@ -49,12 +49,18 @@ private func runGuideTopicChecks() {
     let index = MCPGuide.answer(topic: nil, section: nil)
     let indexText = index["text"]?.stringValue ?? ""
     check(size(index) <= MCPGuide.indexLimit, "the guide index fits \(MCPGuide.indexLimit) characters (it is \(size(index)))")
-    checkEqual(MCPGuideTopics.all.map(\.name), MCPToolName.allCases.map(\.rawValue), "one guide topic per tool, in catalog order")
+    let shared = ["rules", "conventions", "paid", "workflows", "errors"]
+    checkEqual(MCPGuideTopics.all.map(\.name), MCPToolName.allCases.map(\.rawValue) + shared,
+               "one guide topic per tool in catalog order, then the five shared topics")
+    check(Set(shared).isDisjoint(with: MCPToolName.allCases.map(\.rawValue)), "no shared topic shares a name with a tool")
+    // 地图第一行列出五个通用主题。
+    let header = indexText.components(separatedBy: "\n").first ?? ""
+    for name in shared { check(header.range(of: "\\b\(name)\\b", options: .regularExpression) != nil, "the map's first line names the \(name) topic") }
     var largest = (name: "", size: 0)
-    let indexLines = indexText.components(separatedBy: "\n")
+    let listed = guideMapEntries(indexText)
     for tool in MCPToolName.allCases {
-        // 认它自己那一行（行首「- 名字:」），别处顺带提到不算（标题里的 skycut_guide、批量工具标题里的 edit_clip）。
-        check(indexLines.contains { $0.hasPrefix("- \(tool.rawValue): ") }, "the guide index has a line for \(tool.rawValue)")
+        // 认它作为一项列在地图上（括号里顺带提到的不算：add_clips 的括号里写着 sound_effect，批量工具的括号里提到单项工具）。
+        check(listed.contains(tool.rawValue), "the guide map lists \(tool.rawValue) as an entry")
         guard let topic = MCPGuideTopics.topic(named: tool.rawValue) else {
             check(false, "\(tool.rawValue) has a guide topic")
             continue
@@ -76,6 +82,17 @@ private func runGuideTopicChecks() {
             check(!section.text.isEmpty, "\(tool.rawValue).\(section.name) is not empty")
         }
     }
+    // 五个通用主题：都在、每一节不空、大小守上限。
+    for name in shared {
+        guard let topic = MCPGuideTopics.topic(named: name) else {
+            check(false, "the \(name) topic exists")
+            continue
+        }
+        check(topic.sections.allSatisfy { !$0.text.isEmpty }, "the \(name) topic has text")
+        let first = MCPGuide.answer(topic: name, section: nil)
+        check(size(first) <= MCPGuide.answerLimit, "\(name): the first answer fits \(MCPGuide.answerLimit) characters (it is \(size(first)))")
+        if size(first) > largest.size { largest = (name, size(first)) }
+    }
     // 范围写成数字（Codex 不显示 minimum / maximum），里层对象往里缩进。
     let editFields = MCPGuide.answer(topic: "edit_clip", section: "fields")["text"]?.stringValue ?? ""
     check(editFields.contains("- animation_intensity (number, 0 to 1)"), "fields spell a range out in numbers")
@@ -88,7 +105,7 @@ private func runGuideTopicChecks() {
 
 /// 长主题先回概要 + 有哪些节；按 section 取；写错的 section 回第一次的样子。现有的主题都放得下，拿手造的测。
 private func runGuideSplitChecks() {
-    let long = MCPGuideTopic(name: "long_topic", headline: "A long topic", sections: [
+    let long = MCPGuideTopic(name: "long_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: String(repeating: "o", count: 2_500)),
         MCPGuideSection(name: "framing", text: String(repeating: "f", count: 2_500)),
         MCPGuideSection(name: "sound", text: String(repeating: "s", count: 2_500))
@@ -104,7 +121,7 @@ private func runGuideSplitChecks() {
     checkEqual(wrong["unknown_section"]?.stringValue, "volume", "an unknown section is named back")
     checkEqual(wrong["section"]?.stringValue, MCPGuideSection.overview, "an unknown section falls back to the first answer")
 
-    let short = MCPGuideTopic(name: "short_topic", headline: "A short topic", sections: [
+    let short = MCPGuideTopic(name: "short_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: "Overview."),
         MCPGuideSection(name: "fields", text: "- a (string)")
     ], examples: [["a": "x"]], related: ["look"])
@@ -118,13 +135,15 @@ private func runGuideSplitChecks() {
 
 /// 名字的写法不计较；写错的回目录 + 猜的。
 private func runGuideLookupChecks() {
+    checkEqual(MCPGuide.answer(topic: "Paid", section: nil)["topic"]?.stringValue, "paid", "a shared topic is found by name (any case)")
+    check((MCPGuide.answer(topic: "rule", section: nil)["did_you_mean"]?.arrayValue ?? []).contains("rules"), "a near miss suggests a shared topic")
     for spelling in ["edit_clip", "Edit-Clip", "  EDIT_CLIP ", "edit clip"] {
         checkEqual(MCPGuide.answer(topic: spelling, section: nil)["topic"]?.stringValue, "edit_clip", "topic \"\(spelling)\" finds edit_clip")
     }
     let typo = MCPGuide.answer(topic: "edit_clp", section: nil)
     checkEqual(typo["unknown_topic"]?.stringValue, "edit_clp", "an unknown topic is named back")
     check((typo["did_you_mean"]?.arrayValue ?? []).contains("edit_clip"), "an unknown topic suggests the nearest names")
-    check((typo["text"]?.stringValue ?? "").contains("- seek: "), "an unknown topic answers with the index")
+    checkEqual(typo["text"]?.stringValue, guideMapText(), "an unknown topic answers with the map")
     let nothing = MCPGuide.answer(topic: "qqqqqqqqqq", section: nil)
     check(nothing["did_you_mean"] == nil && nothing["unknown_topic"] != nil, "no suggestion when nothing is close")
     checkEqual(MCPGuideTopics.suggestions(for: "clip").first, "add_clips", "a fragment suggests the names that contain it")
@@ -156,16 +175,20 @@ private func runGuideAppChecks() {
 
 /// 手写的文字只提真有的名字；回的每一样都只用英文。
 private func runGuideWordingChecks() {
-    let long = MCPGuideTopic(name: "long_topic", headline: "A long topic", sections: [
+    let long = MCPGuideTopic(name: "long_topic", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: String(repeating: "o", count: 4_000)),
         MCPGuideSection(name: "more", text: String(repeating: "m", count: 4_000))
     ])
-    let handWritten = [
+    var handWritten = [
         ("the card", MCPToolName.skycutGuide.definition.description),
         ("the index header", MCPGuide.answer(topic: nil, section: nil)["text"]?.stringValue?.components(separatedBy: "\n").first ?? ""),
         ("the long-topic next step", MCPGuide.answer(long, section: nil)["next_step"]?.stringValue ?? ""),
         ("the section-without-topic next step", MCPGuide.answer(topic: nil, section: "fields")["next_step"]?.stringValue ?? "")
     ]
+    handWritten.append(("the map", guideMapText()))
+    for topic in MCPGuideTopics.all where MCPToolName(rawValue: topic.name) == nil {
+        handWritten += topic.sections.map { ("the \(topic.name) topic", $0.text) }
+    }
     for (what, text) in handWritten {
         check(!text.isEmpty, "\(what) is written")
         let unknown = guideUnknownNames(text)
@@ -187,4 +210,23 @@ private func runGuideWordingChecks() {
 func guideUnknownNames(_ text: String) -> [String] {
     let known = catalogKnownNames()
     return catalogIdentifiers(in: text).filter { !known.contains($0) }.sorted()
+}
+
+/// 说明书的地图（不带 topic 回的那一页；2026-11-10 起按任务分组的工具目录在这里，不在总说明里）。
+func guideMapText() -> String {
+    MCPGuide.answer(topic: nil, section: nil)["text"]?.stringValue ?? ""
+}
+
+/// 地图上作为一项列着的名字：跳过第一行（标题），每行去掉「组名:」和括号里的说明，按逗号、分号、斜杠切开，取每一项最后一个「标签:」后面的词。
+func guideMapEntries(_ map: String) -> Set<String> {
+    var entries = Set<String>()
+    for line in map.components(separatedBy: "\n").dropFirst() {
+        let bare = line.replacingOccurrences(of: #"\([^()]*\)"#, with: "", options: .regularExpression)
+        guard let colon = bare.range(of: ": ") else { continue }
+        for item in bare[colon.upperBound...].components(separatedBy: CharacterSet(charactersIn: ",;/")) {
+            let word = item.components(separatedBy: ":").last?.trimmingCharacters(in: .whitespaces) ?? ""
+            if !word.isEmpty { entries.insert(word) }
+        }
+    }
+    return entries
 }

@@ -90,16 +90,16 @@ func runGuideContentChecks() {
     }
     // 每条都拿手造的坏样本证明真会红。
     let overview = MCPGuideSection(name: MCPGuideSection.overview, text: "Overview.")
-    let badExample = MCPGuideTopic(name: "edit_clip", headline: "", sections: [overview], examples: [["clip_id": "c1", "end": 2]])
+    let badExample = MCPGuideTopic(name: "edit_clip", sections: [overview], examples: [["clip_id": "c1", "end": 2]])
     check(guideContentProblems(badExample).contains { $0.contains("end") }, "an example with a parameter the tool does not take is caught")
-    let badValue = MCPGuideTopic(name: "set_settings", headline: "", sections: [overview], examples: [["optimized_media_cache_gb": 15]])
+    let badValue = MCPGuideTopic(name: "set_settings", sections: [overview], examples: [["optimized_media_cache_gb": 15]])
     check(guideContentProblems(badValue).contains { $0.contains("enum") }, "an example with a value outside the choices is caught")
-    let strayExample = MCPGuideTopic(name: "made_up_topic", headline: "", sections: [overview], examples: [["topic": "look"]])
+    let strayExample = MCPGuideTopic(name: "made_up_topic", sections: [overview], examples: [["topic": "look"]])
     check(guideContentProblems(strayExample).contains { $0.contains("tool topics") }, "an example on a topic that is not a tool is caught")
-    let badRelated = MCPGuideTopic(name: "look", headline: "", sections: [overview], related: ["no_such_topic"])
+    let badRelated = MCPGuideTopic(name: "look", sections: [overview], related: ["no_such_topic"])
     check(guideContentProblems(badRelated).contains { $0.contains("no_such_topic") }, "a related name that is not a topic is caught")
     for secret in ["key sk-" + String(repeating: "A", count: 20), "write to support@example.com", "see https://example.com/x", "Authorization: Bearer abc"] {
-        let leaky = MCPGuideTopic(name: "look", headline: "", sections: [MCPGuideSection(name: MCPGuideSection.overview, text: secret)])
+        let leaky = MCPGuideTopic(name: "look", sections: [MCPGuideSection(name: MCPGuideSection.overview, text: secret)])
         check(!guideContentProblems(leaky).isEmpty, "a credential, address or link in the guide is caught: \(secret.prefix(12))…")
     }
 }
