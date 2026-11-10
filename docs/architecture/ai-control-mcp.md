@@ -933,7 +933,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `checks/MCP/router-wiring.sh`（核对在建 Call 之前）。
 53. **照授权拦：没开通的，AI 的工具一个都不做（收费方案第 5 刀第二步，2026-10-28；规矩全在 [Sky Studio 账号](sky-studio-account.md)）**：
     `AIToolRouter.handle` 核对参数名之后、建调用排队之前问 `SkyStudioAccount.aiRefusal`：此刻的授权不让用 MCP，就回「Not done」+ 为什么 + 请用户做什么
-    （粘 Key、发邮件开通、点「允许…」/「再查一次」、更新），一样都不做、不排队、不摆窗口。**`get_status` 照常回**，报 `skycut_plan`；说明书 `skycut_guide` 也照常回（第 57 条）。
+    （粘 Key、发邮件开通、点「允许…」/「再查一次」、更新），一样都不做、不排队、不摆窗口。**`get_status` 照常回**，报 `skycut_plan`；说明书 `skycut_guide` 也照常回、而且不等授权问完（第 57 条）。
     门在 App 里、不在小程序里（谁都能自己写一个小程序连 App）；工具清单照常列（AI 知道有这些工具，才能告诉用户去开通）。还没问完（刚启动、离线几天）时
     先问一次 `/me` 再判，最多等 20 秒。`export_video` 开始时、`get_job` 做完时带了水印就写 `watermark`（为什么、怎么去掉）。
     合进来时先关着，**2026-10-28 接口上线、用户给自己开了正式版之后打开**（`SkyCutGates.enforcedByDefault = true`）；测试开关 `skystudio.testGates` 关不掉它。
@@ -978,8 +978,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 57. **说明书 `skycut_guide`（2026-11-10，[MCP 按需说明方案](../plans/2026-11-09-mcp-guide.md) PR 1；合同见 [MCP 说明书](mcp-guide.md)）**：
     只读、免费、马上回、不碰工程；不带 topic 回目录，`topic=<工具名>` 回那个工具的说明书，长的分节、按 `section` 取。由 App 答（`AIGuideTools`，
     Policy 和 recipes 同一行：不排队、不摆窗口、不算这一轮），内容在 `SrtFlowMCPKit`（`MCPGuide` / `MCPGuideTopics` / `MCPGuideFields`）；
-    没开通也照答（`SkyCutGates.alwaysAnswered`，第 53 条）；清单里排第一个、只有它带 `_meta` 的 `anthropic/alwaysLoad`。现在每个主题的概要就是
-    那个工具现在的说明原文、`fields` 从参数定义现算；之后的 PR 把长话搬进说明书、名片写短（先原样搬进去、再写名片），每一步的状态看合同的「现在做到哪」。
+    没开通也照答（`SkyCutGates.alwaysAnswered`，第 53 条），连授权都不等（`answeredBeforeLicenseCheck`）；清单里排第一个、只有它带 `_meta` 的
+    `anthropic/alwaysLoad`。现在每个主题的概要就是那个工具现在的说明原文、`fields` 从参数定义现算且一样事实都不漏（可选值、类型并集、anyOf、条数、长度）；
+    之后的 PR 把长话搬进说明书、名片写短（先原样搬进去、再写名片），做到哪看 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -1085,8 +1086,9 @@ edit_clip 2,074 字超长、清单里有汉字）。
 （2026-09-27 反向验证：拿掉那一处调用，守卫当场红）。
 
 **说明书 skycut_guide（第 57 条）**：`checks/MCP/GuideChecks.swift`（跟着 `scripts/check-mcp.sh` 跑：位置、客户端提示、名片 ≤ 450、每个工具一个同名主题、
-目录列全、大小上限、分节、写错的 topic / section、手写的文字只提真有的名字、只用英文、App 那一头）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
-`checks/SkyStudio/GateChecks.swift`（没开通也照答）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
+目录里每个工具有自己那一行、大小上限、分节、写错的 topic / section、手写的文字只提真有的名字、只用英文、App 那一头）、`checks/MCP/GuideContentChecks.swift`
+（走一遍真实清单：fields 写全每个参数的事实；例子、related、不含凭据，各配坏样本）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
+`checks/SkyStudio/GateChecks.swift` + `checks/sky-studio-wiring.sh`（没开通也照答、不等授权）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
 
 **云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。
 

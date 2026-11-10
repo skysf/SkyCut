@@ -20,8 +20,9 @@ func runUsageExampleChecks() {
         }
         check(MCPArgumentCheck.problem(tool: tool, arguments: value) == nil,
               "\(tool.rawValue)'s example uses documented parameter names")
-        checkUsageValue(value, schema: MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema,
-                        path: tool.rawValue)
+        let problems = usageValueProblems(value, schema: MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema,
+                                          path: tool.rawValue)
+        check(problems.isEmpty, "\(tool.rawValue)'s example fits the schema: \(problems.joined(separator: "; "))")
     }
     check(MCPArgumentCheck.problem(tool: .editClip, arguments: ["clip_id": "c1", "source_out": 2, "fade_out": 0.1]) == nil,
           "the audio overhang advice names accepted edit_clip parameters")
@@ -29,31 +30,33 @@ func runUsageExampleChecks() {
           "the former end advice would be rejected by the actual parameter checker")
 }
 
-private func checkUsageValue(_ value: JSONValue, schema: JSONValue, path: String) {
-    if let options = schema["enum"]?.arrayValue {
-        check(options.contains(value), "\(path) example uses a current enum value")
-    }
+/// 一个例子的值对不对得上参数定义：必填、类型、可选的值、范围、条数。回出问题的地方（空 = 对得上）。
+/// UsageExampleChecks（名片里那一行例子）和 GuideChecks（说明书里的例子）共用。
+func usageValueProblems(_ value: JSONValue, schema: JSONValue, path: String) -> [String] {
+    var problems: [String] = []
+    if let options = schema["enum"]?.arrayValue, !options.contains(value) { problems.append("\(path) is not one of the enum values") }
     switch schema["type"]?.stringValue {
     case "object":
-        guard let object = value.objectValue else { check(false, "\(path) example needs an object"); return }
-        for key in schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [] {
-            check(object[key] != nil, "\(path).\(key) is required in the example")
+        guard let object = value.objectValue else { return problems + ["\(path) needs an object"] }
+        for key in schema["required"]?.arrayValue?.compactMap(\.stringValue) ?? [] where object[key] == nil {
+            problems.append("\(path).\(key) is required")
         }
         for (key, field) in object {
-            if let child = schema["properties"]?[key] { checkUsageValue(field, schema: child, path: path + "." + key) }
+            if let child = schema["properties"]?[key] { problems += usageValueProblems(field, schema: child, path: path + "." + key) }
         }
     case "array":
-        guard let list = value.arrayValue else { check(false, "\(path) example needs an array"); return }
-        if let minimum = schema["minItems"]?.intValue { check(list.count >= minimum, "\(path) has enough example entries") }
-        if let maximum = schema["maxItems"]?.intValue { check(list.count <= maximum, "\(path) has bounded example entries") }
-        if let child = schema["items"] { for field in list { checkUsageValue(field, schema: child, path: path + "[]") } }
-    case "string": check(value.stringValue != nil, "\(path) example is a string")
-    case "boolean": check(value.boolValue != nil, "\(path) example is a boolean")
+        guard let list = value.arrayValue else { return problems + ["\(path) needs an array"] }
+        if let minimum = schema["minItems"]?.intValue, list.count < minimum { problems.append("\(path) has too few entries") }
+        if let maximum = schema["maxItems"]?.intValue, list.count > maximum { problems.append("\(path) has too many entries") }
+        if let child = schema["items"] { for field in list { problems += usageValueProblems(field, schema: child, path: path + "[]") } }
+    case "string": if value.stringValue == nil { problems.append("\(path) needs a string") }
+    case "boolean": if value.boolValue == nil { problems.append("\(path) needs a boolean") }
     case "number", "integer":
-        guard let number = value.doubleValue else { check(false, "\(path) example needs a number"); return }
-        if schema["type"]?.stringValue == "integer" { check(number.rounded() == number, "\(path) example is an integer") }
-        if let minimum = schema["minimum"]?.doubleValue { check(number >= minimum, "\(path) example meets the minimum") }
-        if let maximum = schema["maximum"]?.doubleValue { check(number <= maximum, "\(path) example meets the maximum") }
+        guard let number = value.doubleValue else { return problems + ["\(path) needs a number"] }
+        if schema["type"]?.stringValue == "integer", number.rounded() != number { problems.append("\(path) needs an integer") }
+        if let minimum = schema["minimum"]?.doubleValue, number < minimum { problems.append("\(path) is below the minimum") }
+        if let maximum = schema["maximum"]?.doubleValue, number > maximum { problems.append("\(path) is above the maximum") }
     default: break
     }
+    return problems
 }

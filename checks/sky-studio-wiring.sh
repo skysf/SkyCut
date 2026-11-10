@@ -188,6 +188,13 @@ others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | 
   || fail "${EXPORT_TOOLS}：export_video 开始时（会带）和做完时（带了）都要按此刻授权告诉 AI 水印的事"
 [ "$(count 'result["skycut_plan"] = SkyCutGates.statusJSON(' "${STATUS_TOOLS}")" -eq 1 ] \
   || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它照常回，另外只有说明书 skycut_guide）"
+# 说明书不等授权问完：aiRefusal 里放行它的那一句要在等授权（settledLicense）之前（docs/bugfixes/2026-11-10-guide-waits-for-license.md）。
+REFUSAL_BODY="$(awk '/func aiRefusal\(for tool: MCPToolName\) async -> String\? \{/,/^    \}/' "${ACCOUNT}")"
+EARLY_AT="$(grep -nF 'if SkyCutGates.answeredBeforeLicenseCheck.contains(tool) { return nil }' <<<"${REFUSAL_BODY}" | cut -d: -f1 || true)"
+WAIT_AT="$(grep -nF 'await settledLicense(' <<<"${REFUSAL_BODY}" | cut -d: -f1 || true)"
+if [ -z "${EARLY_AT}" ] || [ -z "${WAIT_AT}" ] || [ "${EARLY_AT}" -gt "${WAIT_AT}" ]; then
+  fail "${ACCOUNT}：aiRefusal 要在等授权（第 ${WAIT_AT:-?} 行）之前放行 answeredBeforeLicenseCheck 里的工具（现在：${EARLY_AT:-没有}），不然说明书要等钥匙串和 /me"
+fi
 
 # 6. 交任务、取消任务只经 SkyStudioJobRun。
 RUN="Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift"

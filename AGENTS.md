@@ -344,7 +344,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 从 Finder 拖文件进轨道的落点（撞上就抬一轨、多文件接龙、隐藏轨跳过、落地后
   主轨仍按时间排序）：`scripts/check-media-import.sh`；接线扫描（含「整条时间线
   只许一个 `.onDrop`」）在 `checks/timeline-drag-wiring.sh` 里。
-- AI 接口（MCP）：给 AI 的文字按客户端怎么读（总说明和每个工具说明 ≤ 2,048 字、前 512 字自成一体、目录里有每个工具名、只用英文，`CatalogTextChecks`）、说明书 `skycut_guide`（清单里第一个、只有它预先加载、名片 ≤ 450、每个工具一个同名主题、目录列全、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的、手写的文字只提真有的名字、只用英文、App 照答，`GuideChecks`；和 recipes 同一行 Policy 在 `checks/MCP/router-wiring.sh`）、小程序说的协议（老一代握手 / 新一代每个请求自带版本，真起小程序、假 App 接调用，几百 KB 的图原样穿过通道）、AI 改时间线的规则、客户端配置的增删、词表和 App 类型对账、打包把小程序装进 Helpers 且先签它，
+- AI 接口（MCP）：给 AI 的文字按客户端怎么读（总说明和每个工具说明 ≤ 2,048 字、前 512 字自成一体、目录里有每个工具名、只用英文，`CatalogTextChecks`）、说明书 `skycut_guide`（清单里第一个、只有它预先加载、名片 ≤ 450、每个工具一个同名主题、目录里每个工具有自己那一行、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的、手写的文字只提真有的名字、只用英文、App 照答，`GuideChecks`；fields 写全每个参数的可选值 / 类型并集 / anyOf / 条数 / 长度、例子过参数定义、related 是真主题、不含凭据，`GuideContentChecks`；和 recipes 同一行 Policy 在 `checks/MCP/router-wiring.sh`；不等授权在 `GateChecks` + `checks/sky-studio-wiring.sh`）、小程序说的协议（老一代握手 / 新一代每个请求自带版本，真起小程序、假 App 接调用，几百 KB 的图原样穿过通道）、AI 改时间线的规则、客户端配置的增删、词表和 App 类型对账、打包把小程序装进 Helpers 且先签它，
   新东西默认放哪（点名的文件夹 → 工程的家 → 下载，没有「影片」；AI 改了没存过的工程马上存）、窗口只在一轮开始时摆到前面，
   以及 AI 的手和眼：铺满时窗的四角正好落在画布四角（各种比例 × 焦点）、去黑边、对准主体（真让 Vision 认一张图、框不许上下反）、
   look 的拼图和文字描述、listen 的电平 / 静音段 / 曲线，总说明里「不用外部工具改素材」那一句；现有功能铺满的纯值规则
@@ -430,6 +430,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   所以漏一行等于那份文档不存在。
 
 ## 规划与实施报告索引
+
+- [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
 - [MCP 按需说明：名片常驻、说明书按需读](docs/plans/2026-11-09-mcp-guide.md) — 2026-11-09 用户审定第八节 8 条、11-10 批准施工：各客户端一轮里实际读了什么（Claude Code 按需加载、2.1.296 起 4,096 / 16,384；Codex 代码模式里每个条目背一份总说明、超过 5,000 字节的参数定义删光说明）、说明书工具 `skycut_guide`（没开通也照答、预先加载）、名片 ≤ 450 / 参数说明 ≤ 120 / 全清单 100,000 等新上限、先于声音的 3 个工具、分批迁移的七个 PR、真客户端验收每次开跑前问用户。
 
@@ -990,6 +992,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [2026-10-31 小窗口的分栏线穿过 AI 状态](docs/bugfixes/2026-10-31-ai-badge-divider-bleed.md) — 半透明徽章漏出后景；不透明系统底色再着浅金色，生产组件像素检查与反向验证；工程菜单按宽度先缩短，保住常用入口。
 - [2026-10-31 多工程的生成任务没有工程归属](docs/bugfixes/2026-10-31-cloud-tasks-without-project-context.md) — 轻盈卡片按原工程代号分组、媒体类型图标、只算进行中的全局 / 本工程数量；后台开窗复用注册表，MCP 同源查询全部进展。
 - [2026-11-01 AI 权限与草稿预算](docs/bugfixes/2026-11-01-ai-approval-and-draft-budget.md) — 请求批准 / 全部权限共享低成本默认，代理改权限始终确认，日预算硬上限，余额不足提供充值入口。
+- [2026-11-10 说明书的 fields 漏写参数定义里的可选值、类型和条数](docs/bugfixes/2026-11-10-guide-fields-drop-schema-facts.md) — 数字的可选值、类型并集、anyOf、maxItems 都没写，名片却承诺写全；改成参数定义里的事实一样不漏，守卫自己走一遍真实清单按路径核对每一行。
+- [2026-11-10 说明书要先等授权问完才回答](docs/bugfixes/2026-11-10-guide-waits-for-license.md) — 放行判断在 `settledLicense` 之后，START HERE 的调用会读钥匙串、等 `/me` 最长 20 秒；改成等授权之前就放行它，`get_status` 照旧等。
 - [Bugfix 模板](docs/bugfixes/TEMPLATE.md) — 新案例必须使用的结构。
 - [2026-11-07 生成图片按实际字节确定扩展名](docs/bugfixes/2026-11-07-generated-image-extension-from-bytes.md) — Lite JPEG 下载后核对真实类型，纠正扩展名不重编码，原单交付失败不重新生成。
 - [2026-11-07 真积分验收后的五处 AI 工具结果](docs/bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md) — 角色列表有界摘要、图片操作按源命名、终态清旧阶段、完成与恢复分开、落盘图片实测尺寸；逐项反向验证。
