@@ -92,7 +92,7 @@
 | fields 不认类型并集和 anyOf（修复前那样，写成 any） | 8 条：`production`、`seam_review.previous` / `next`、`duration` 的三种写法，外加点名的两处 |
 | fields 不写条数的上下限（修复前那样） | 12 条：三个批量工具的 1 到 100 项、`clips` / `ids` / `lines` / `paragraphs` 至少 1 项…… |
 | 目录漏掉 `edit_clip` 那一行（批量工具的标题里还提到它） | 1 条：目录里没有 edit_clip 自己那一行（以前按整词找会照样过） |
-| fields 漏掉第一层的 `x`（里层还有同名的） | 7 条：edit_clip / set_text / set_shape 各两条，外加「走到的事实不到 250 条」 |
+| fields 漏掉第一层的 `x`（里层还有同名的） | 6 条：edit_clip / set_text / set_shape 各两条（第一层那一行、按路径找那一行） |
 | 长主题的 next_step 里写一个不存在的参数名 | 1 条：措辞检查挑出 `clip_end_ms` |
 | `answerLimit` 降到 4,900 | 2 条：generate_media、edit_clip 的 fields 一节超长（真实主题的大小检查管用） |
 | 跳过例子的核对 | 3 条：坏样本（不存在的参数、选项外的值、挂在非工具主题上）没被挑出来 |

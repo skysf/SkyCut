@@ -26,8 +26,8 @@ func runGuideFieldFactChecks() {
             }
         }
     }
-    // 走空了等于没查：真实清单里至少有这么多条事实（2026-11-10 是 300 多条）。
-    check(facts >= 250, "the field-fact walk found the catalog's facts (\(facts))")
+    // 走空了等于没查：真实清单里至少有这么多条事实（2026-11-10 是 250 条；下限留了余量，正常删掉几个选项不会误报）。
+    check(facts >= 200, "the field-fact walk found the catalog's facts (\(facts))")
     // 审查点名的那几处（以前漏的）。
     func line(_ tool: MCPToolName, _ path: String) -> String {
         MCPGuideFields.entries(for: tool.definition.inputSchema).first { $0.path == path }?.line ?? ""
