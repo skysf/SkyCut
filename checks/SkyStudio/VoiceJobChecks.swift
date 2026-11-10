@@ -177,6 +177,12 @@ private func runVoiceJobRunChecks() async {
     SkyStudioStub.reset { _ in .http(409, #"{"error":{"code":"minimax_voice_exists","message":"English already has a MiniMax version.","language":"en"}}"#) }
     let exists = await jobFailure { _ = try await run.run(enroll) }
     checkEqual(exists?.rejectedBeforeAdmissionCode, SkyStudioVoiceCodes.minimaxVoiceExists, "minimax_voice_exists charges nothing")
+    // 503 voice_library_unavailable：服务器先查私有声音桶、再建任务扣钱（Sky Studio #246），所以是确定没受理、本机记的那笔能退，也不重交。
+    SkyStudioStub.reset { _ in .http(503, #"{"error":{"code":"voice_library_unavailable","message":"The voice library is not available right now. Preset voices still work.","reason":"not_configured"}}"#) }
+    let unavailable = await jobFailure { _ = try await run.run(batch) }
+    checkEqual(SkyStudioStub.log.map(\.method), ["POST"], "voice_library_unavailable is not retried")
+    checkEqual(unavailable?.rejectedBeforeAdmissionCode, SkyStudioVoiceCodes.libraryUnavailable, "voice_library_unavailable is a known non-admission")
+    check(unavailable?.canRefund(beforeAccepted: true) == true, "the local reservation is returned when the voice library is unavailable")
     SkyStudioStub.reset { _ in .http(409, #"{"error":{"code":"one_time_required","message":"x","charged":true}}"#) }
     let contradictory = await jobFailure { _ = try await run.run(batch) }
     check(contradictory?.canRefund(beforeAccepted: true) == false, "charge evidence still beats a non-admission code")

@@ -317,8 +317,8 @@ Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器
   （`reference_url`、`inputs.source_audio_url`），不当网址校验、不改写（`VoiceJobChecks` 钉着）。
 - **并发**：`/me` 的 `max_running_audio_jobs`（声音池，读不到 = 服务器还没上新池）；429 `too_many_jobs` 多了 `pool`（`audio` / `default`）照旧算容量拒绝、
   同一个 key 等着再交，**认不出的 pool 不算**（不能冒充未准入）。按池开槽是 PR 4。
-- **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，进了 `SkyStudioJobAdmission.rejectedCodes`
-  （本机记的那笔能退）；它们和 `fallback_needs_one_time` 带的 `one_time`（一项或一串）读进 `SkyStudioJobFailure.oneTime`；`voice_limit`、`reference_exists`、
+- **错误码**（`SkyStudioVoiceCodes`）：`one_time_required`、`minimax_voice_exists` 合同写明不扣钱，503 `voice_library_unavailable` 在建任务、扣钱之前就回
+  （#246 先查私有声音桶再 begin_job / 扣钱），三个都进了 `SkyStudioJobAdmission.rejectedCodes`（本机记的那笔能退、不重交）；它们和 `fallback_needs_one_time` 带的 `one_time`（一项或一串）读进 `SkyStudioJobFailure.oneTime`；`voice_limit`、`reference_exists`、
   `voice_library_unavailable` 和 `invalid_request` 的几种 `reason` 先只认得，怎么说人话是 PR 6。
 
 **目录快照**：`checks/SkyStudio/Fixtures/models-voice-2026-11-10.json` 原样拷自 Sky Studio 声音 PR #246（`feat/voice-service`）的

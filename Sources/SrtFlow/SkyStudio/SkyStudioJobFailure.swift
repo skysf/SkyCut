@@ -3,10 +3,11 @@ import SrtFlowMCPKit
 
 // 服务端明确保证尚未入场的拒绝码；退款判定和官方提交回执共用，未知错误不加入。
 enum SkyStudioJobAdmission {
-    /// 声音的两种 409（`one_time_required`、`minimax_voice_exists`）合同写明不扣钱、不建任务（Sky Studio 声音方案 5.2 ⑤、5.3）。
+    /// 声音的两种 409（`one_time_required`、`minimax_voice_exists`）合同写明不扣钱、不建任务（Sky Studio 声音方案 5.2 ⑤、5.3）；
+    /// 503 `voice_library_unavailable`（私有声音桶没配）在建任务、扣钱之前就回（Sky Studio #246 的 voiceJobs.ts 先查存储再 begin_job / 扣钱）。
     static let rejectedCodes: Set<String> = ["invalid_key", "upgrade_required", "invalid_request", "insufficient_credits",
                                              "price_changed", "too_many_jobs", "recipe_unavailable", "character_not_ready", "character_changed", "not_found",
-                                             "one_time_required", "minimax_voice_exists"]
+                                             "one_time_required", "minimax_voice_exists", "voice_library_unavailable"]
     /// 429 `too_many_jobs` 的 `pool`：声音类任务单独一个池（`audio`，每账号 8 个），其余 `default`（3 个）。Sky Studio 声音方案第八节。
     static let slotPools: Set<String> = ["audio", "default"]
 
