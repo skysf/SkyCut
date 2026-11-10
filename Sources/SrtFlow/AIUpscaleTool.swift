@@ -77,7 +77,8 @@ enum AIUpscaleTool {
         ])
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: quote.credits, summary: UpscaleJob.summary(of: request), identity: identity, args: args,
-            reason: "Paid upscaling exceeds draft settings.", project: (SkyStudioAccount.shared.stored?.me.account.id ?? "") + ":" + (project.documentURL?.path ?? project.shortID),
+            reason: "Paid upscaling exceeds draft settings.",
+            overrides: [.init(reason: "Paid upscaling exceeds draft settings.", names: AIOverrideQuote.upscaleNames)], project: (SkyStudioAccount.shared.stored?.me.account.id ?? "") + ":" + (project.documentURL?.path ?? project.shortID),
             profile: AIDraftPolicy.profile(row.quote)) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved

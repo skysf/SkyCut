@@ -34,9 +34,10 @@ func runAccessChecks() {
           "raising a hard budget always asks")
     fullAccessQuestionChecks(defaults: defaults)
 
-    func decide(_ args: JSONValue = [:], reason: String? = "2K exceeds the draft", profile: String = "h3-2k", project: String = "account/project") -> SkyStudioJobGate.Decision? {
+    func decide(_ args: JSONValue = [:], reason: String? = "2K exceeds the draft", overrides: [AIOverrideQuote.Item]? = nil,
+                profile: String = "h3-2k", project: String = "account/project") -> SkyStudioJobGate.Decision? {
         try? SkyStudioJobGate.decide(credits: 130, summary: "H3 2K", identity: "exact-request", args: AIToolArguments(args),
-            store: spend, access: access, reason: reason, project: project, profile: profile)
+            store: spend, access: access, reason: reason, overrides: overrides, project: project, profile: profile)
     }
     access.setMode(.ask)
     if case .needsConfirmation(let result) = decide() { checkEqual(result.payload["status"]?.stringValue, "needs_confirmation", "premium draft asks") }
@@ -44,8 +45,26 @@ func runAccessChecks() {
     checkEqual(spend.spentToday(), 0, "an approval question reserves no credits")
     if case .reserved = decide(reason: nil) { check(true, "ordinary drafts proceed") }
     else { check(false, "ordinary drafts proceed") }
-    if case .reserved = decide(["user_requested_overrides": true]) { check(true, "explicit user-requested specification is not asked twice") }
-    else { check(false, "explicit specification can proceed") }
+    // 2026-11-10：user_requested_overrides 只在 user_request 里找得到每一项越档的名字时才免问（Codex 把「画质尽量好」当成点名）。
+    let twoK = [AIOverrideQuote.Item(reason: "2K exceeds the draft", names: AIOverrideQuote.resolutionNames("2K"))]
+    let beforeNamed = spend.spentToday()
+    if case .reserved = decide(["user_requested_overrides": true, "user_request": "生成一张 2K 的封面"], overrides: twoK) {
+        check(true, "a specification the user named is not asked twice")
+    } else { check(false, "a specification the user named can proceed") }
+    checkEqual(spend.spentToday(), beforeNamed + 130, "the named specification reserves its credits")
+    for (words, why) in [(nil, "without user_request"), ("画质尽量好", "for a wish like 画质尽量好"), ("best quality please", "for \"best quality\"")] as [(JSONValue?, String)] {
+        var args: [String: JSONValue] = ["user_requested_overrides": true]
+        if let words { args["user_request"] = words }
+        if case .needsConfirmation(let result) = decide(.object(args), overrides: twoK) {
+            checkEqual(result.payload["status"]?.stringValue, "needs_confirmation", "user_requested_overrides still asks \(why)")
+            check(result.payload["overrides_not_applied"]?.stringValue != nil, "the question says why the override was not applied (\(why))")
+        } else { check(false, "user_requested_overrides must not skip the question \(why)") }
+    }
+    checkEqual(spend.spentToday(), beforeNamed + 130, "an override that did not apply reserves nothing")
+    if case .needsConfirmation = decide(["user_requested_overrides": true, "user_request": "就要 2K"],
+        overrides: twoK + [.init(reason: "Highest quality", names: AIOverrideQuote.highestQualityNames)]) {
+        check(true, "every setting beyond the draft must be named, not just one")
+    } else { check(false, "naming one of two settings must still ask") }
 
     if case .needsConfirmation(let result) = decide(["approval_scope": "project"]) {
         let projectToken = result.payload["confirm_token"]?.stringValue ?? ""
@@ -79,6 +98,32 @@ func runAccessChecks() {
     checkEqual(shortBalance.json["needed"], 20, "actual required credits are preserved")
     checkEqual(shortBalance.json["recharge_url"], "https://skystudioai.com/app?credits=1", "server recharge link survives the MCP error")
     runDraftResolutionChecks()
+    runOverrideQuoteChecks()
+}
+
+/// user_request 里找不找得到每一项越档的名字（纯值，AIOverrideQuote）。
+private func runOverrideQuoteChecks() {
+    let fourK = AIOverrideQuote.Item(reason: "4K", names: AIOverrideQuote.resolutionNames("4K"))
+    let model = AIOverrideQuote.Item(reason: "pricier model", names: ["gpt-image-2", "GPT Image 2"])
+    let highest = AIOverrideQuote.Item(reason: "highest", names: AIOverrideQuote.highestQualityNames)
+    let ten = AIOverrideQuote.Item(reason: "10 s", names: AIOverrideQuote.durationNames(10))
+    checkEqual(AIOverrideQuote.resolutionNames("4K"), ["4K", "2160p", "2160"], "4K can be said as 4K, 2160p or 2160")
+    check(AIOverrideQuote.unnamed([fourK], in: "给这个工程生成一张 4k 的封面").isEmpty, "4K named in Chinese, any case")
+    check(AIOverrideQuote.unnamed([fourK], in: "export a 2160p cover").isEmpty, "4K named as 2160p")
+    check(AIOverrideQuote.unnamed([model], in: "用 GPT Image 2 生成").isEmpty, "a model named with spaces matches its id")
+    check(AIOverrideQuote.unnamed([highest], in: "用最高画质").isEmpty, "the highest tier named as 最高画质")
+    check(AIOverrideQuote.unnamed([ten], in: "make it 10 seconds long").isEmpty, "a duration named in seconds")
+    check(AIOverrideQuote.unnamed([ten], in: "要 10 秒").isEmpty, "a duration named in 秒")
+    for wish in ["画质尽量好", "给这个工程生成一张封面图，画质尽量好。", "要最好的", "best quality", "as good as possible", "高清一点"] {
+        checkEqual(AIOverrideQuote.unnamed([fourK, highest, model], in: wish).count, 3, "\"\(wish)\" names no setting")
+    }
+    checkEqual(AIOverrideQuote.unnamed([fourK, model], in: nil).count, 2, "no user_request names nothing")
+    checkEqual(AIOverrideQuote.unnamed([fourK, model], in: "   ").count, 2, "blank user_request names nothing")
+    checkEqual(AIOverrideQuote.unnamed([fourK, model], in: "4K please"), [model], "only the unnamed setting is reported")
+    check(AIOverrideQuote.unnamed([.init(reason: "paid", names: [])], in: "yes do it").isEmpty, "an item with no name only needs the user's words")
+    check(!AIOverrideQuote.unnamed([.init(reason: "paid", names: [])], in: "").isEmpty, "…and still needs them")
+    check(AIOverrideQuote.unnamed([.init(reason: "upscale", names: AIOverrideQuote.upscaleNames)], in: "把这段放大到 4K").isEmpty, "upscale named as 放大")
+    check(!AIOverrideQuote.unnamed([.init(reason: "upscale", names: AIOverrideQuote.upscaleNames)], in: "画质尽量好").isEmpty, "a quality wish is not an upscale request")
 }
 
 private func runDraftResolutionChecks() {

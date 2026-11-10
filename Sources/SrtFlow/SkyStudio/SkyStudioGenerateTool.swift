@@ -26,6 +26,7 @@ enum SkyStudioGenerateTool {
         let quoteOnly = try args.bool("quote_only") ?? false
         _ = try args.choice("approval_scope", from: ["once", "project"])
         _ = try args.bool("user_requested_overrides")
+        _ = try args.string("user_request")
         var ask = try SkyStudioGenerationControls.ask(args)
         let prompt = try args.string("prompt") ?? ""
         if try args.string("model") == "ideogram-remove-background", !args.has("operation") { ask.operation = "remove_background" }
@@ -90,8 +91,12 @@ enum SkyStudioGenerateTool {
             throw SkyStudioCharacterError.tool(error)
         }
 
-        var deviations = AIDraftPolicy.deviations(generation, model: model)
-        if quality == "highest" { deviations.append("Highest-quality model selection exceeds the low-cost draft policy.") }
+        // 每一项越档连同用户点名它时会说的写法（user_requested_overrides 要 user_request 里找得到，AIOverrideQuote）。
+        var overrides = AIDraftPolicy.overrides(generation, model: model)
+        let modelNames = [model.id, model.title]
+        if quality == "highest" {
+            overrides.append(.init(reason: "Highest-quality model selection exceeds the low-cost draft policy.", names: AIOverrideQuote.highestQualityNames))
+        }
         // 换模型比较相同输入的草稿报价；这里只报价，绝不上传或发生成任务。
         var draftAsk = ask
         draftAsk.resolution = nil
@@ -106,11 +111,12 @@ enum SkyStudioGenerateTool {
                 model: preferred, inputMode: draftReferences.mode, references: draftReferences)
             if let baseline = try? await api.quote(draft.job(model: preferred.id), key: key) {
                 if quote.credits > baseline.credits {
-                    deviations.append("Selected model costs \(SkyStudioCredits.text(quote.credits)) credits; preferred draft \(preferred.title) costs \(SkyStudioCredits.text(baseline.credits)).")
+                    overrides.append(.init(reason: "Selected model costs \(SkyStudioCredits.text(quote.credits)) credits; preferred draft \(preferred.title) costs \(SkyStudioCredits.text(baseline.credits)).", names: modelNames))
                 }
-            } else { deviations.append("The preferred draft model's price could not be verified before switching models.") }
+            } else { overrides.append(.init(reason: "The preferred draft model's price could not be verified before switching models.", names: modelNames)) }
         }
         guard SkyStudioCharacterAccess.stamp(key) == accountStamp else { throw SkyStudioCharacterError.changed }
+        let deviations = overrides.map(\.reason)
         if quoteOnly {
             return .ok(["status": "quoted", "model_id": .string(model.id), "params": .object(generation.params),
                 "operation": .string(generation.operation), "character_usage": quote.characterUsage?.json ?? .null,
@@ -132,7 +138,7 @@ enum SkyStudioGenerateTool {
         ])
         let reservation: SkyStudioJobGate.Reservation
         switch try SkyStudioJobGate.decide(credits: quote.credits, summary: generation.summary(modelTitle: model.title), identity: identity, args: args,
-            reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), project: scope,
+            reason: deviations.isEmpty ? nil : deviations.joined(separator: " "), overrides: overrides, project: scope,
             profile: generation.character == nil ? AIDraftPolicy.profile(generation.job(model: model.id)) : "character:" + SkyStudioCharacterCache.digest(identity)) {
         case .needsConfirmation(let ask): return ask
         case .reserved(let reserved): reservation = reserved
