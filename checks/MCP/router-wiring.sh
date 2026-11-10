@@ -245,3 +245,18 @@ if ! grep -qF 'return AIJobResult.json(object, status: job.status.rawValue)' Sou
   echo "✗ get_job 没经共用终态清理，完成快照 / 后续刷新会重新带回旧 phase" >&2
   exit 1
 fi
+
+echo "==> 路由：说明书 skycut_guide 由 App 照 recipes 的路子答"
+# 不排队、不摆窗口、不算这一轮，和 recipes 同一行 Policy（docs/architecture/mcp-guide.md；方案 docs/plans/2026-11-09-mcp-guide.md 2.3）。
+# 没开通也照答在 checks/SkyStudio/GateChecks.swift；内容和大小在 checks/MCP/GuideChecks.swift。
+python3 - <<'PYTHON'
+import re
+from pathlib import Path
+router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
+assert router.count("case .skycutGuide: return try AIGuideTools.guide(args)") == 1, "skycut_guide must be answered by AIGuideTools"
+row = re.search(r"case ([^\n:]*\.skycutGuide\b[^\n:]*):\n\s*\(serialized, presentsEditor, startsRound\) = \(([^)]*)\)", router)
+assert row, "skycut_guide has no Policy row in the router"
+assert ".recipes" in row.group(1), "skycut_guide must share recipes' Policy row, found: case " + row.group(1)
+assert row.group(2).replace(" ", "") == "false,false,false", "skycut_guide must not queue, present the editor or start a round"
+PYTHON
+echo "   ✓ skycut_guide 交给 AIGuideTools，和 recipes 同一行 Policy（不排队、不摆窗口、不算这一轮）"

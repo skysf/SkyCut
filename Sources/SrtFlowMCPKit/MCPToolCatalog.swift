@@ -10,10 +10,13 @@ import Foundation
 // 说明文字用英文写（模型读英文最准）；AI 回用户时用用户的语言。每条说明写清三件事：
 // 做什么、不传的参数怎么办、什么时候会反过来问用户（needs_confirmation）。
 // 各组工具的文字在 MCPProjectTools / MCPTimelineTools / MCPSenseTools / MCPMediaTools / MCPFileTools /
-// MCPSubtitleExportTools / MCPEncodeTools / MCPSmartEditTools / MCPRecipeTools / MCPScreenTools 里。
+// MCPSubtitleExportTools / MCPEncodeTools / MCPSmartEditTools / MCPRecipeTools / MCPScreenTools 里；
+// 说明书工具 skycut_guide 的名片在 MCPGuideTool，说明书的内容在 MCPGuide / MCPGuideTopics。
 
 /// 全部工具的名字。**顺序就是 `tools/list` 的顺序**（2026-07-28 版协议要求清单顺序稳定）。
 public enum MCPToolName: String, CaseIterable, Sendable {
+    /// 说明书排第一个：按清单顺序展示的客户端最先看到它（docs/architecture/mcp-guide.md）。
+    case skycutGuide = "skycut_guide"
     case getStatus = "get_status"
     case setView = "set_view"
     case openFolder = "open_folder"
@@ -84,7 +87,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 改 / 读工程内容的、默认值跟着工程走的都收。只碰文件、设置、任务的不收；open_project / new_project 是开工程的，回 id、不收。
     public var takesProject: Bool {
         switch self {
-        case .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
+        case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
@@ -98,6 +101,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
 
     private var groupDefinition: MCPToolDefinition {
         switch self {
+        case .skycutGuide: return MCPGuideTool.definition
         case .listCharacters, .getCharacter, .manageCharacters: return MCPCharacterTools.definition(for: self)
         case .inspectVideo: return MCPInspectionTool.definition
         case .syncVoiceover: return MCPVoiceoverSyncTool.definition
@@ -170,10 +174,14 @@ public struct MCPToolDefinition: Sendable {
     public var destructive: Bool
     /// 会连到外面的服务、花用户的钱（云端媒体：Sky Studio）。其余工具都在这台 Mac 上做。
     public var openWorld: Bool
+    /// 清单条目上的 `_meta`（给客户端看的提示，不进模型）。现在只有说明书带 `anthropic/alwaysLoad`：
+    /// Claude Code 把它预先加载、不用先搜（docs/architecture/mcp-guide.md）。没有就不写这个键。
+    public var meta: JSONValue?
 
     public init(
         _ name: MCPToolName, title: String, description: String,
-        input: JSONValue = MCPSchema.object([:]), readOnly: Bool = false, destructive: Bool = false, openWorld: Bool = false
+        input: JSONValue = MCPSchema.object([:]), readOnly: Bool = false, destructive: Bool = false, openWorld: Bool = false,
+        meta: JSONValue? = nil
     ) {
         self.name = name
         self.title = title
@@ -182,6 +190,7 @@ public struct MCPToolDefinition: Sendable {
         self.readOnly = readOnly
         self.destructive = destructive
         self.openWorld = openWorld
+        self.meta = meta
     }
 
     /// 加上可选的 `project` 参数（`MCPToolName.takesProject` 的那些）。说明全清单只有这一句。
@@ -193,7 +202,7 @@ public struct MCPToolDefinition: Sendable {
     }
 
     public var json: JSONValue {
-        [
+        var entry: [String: JSONValue] = [
             "name": .string(name.rawValue),
             "title": .string(title),
             "description": .string(description),
@@ -208,6 +217,8 @@ public struct MCPToolDefinition: Sendable {
                 "openWorldHint": .bool(openWorld)
             ]
         ]
+        if let meta { entry["_meta"] = meta }
+        return .object(entry)
     }
 }
 

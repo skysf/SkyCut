@@ -422,6 +422,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIRecipeStore.swift \
   Sources/SrtFlow/AppResources.swift \
   Sources/SrtFlow/AIRecipeTools.swift \
+  Sources/SrtFlow/AIGuideTools.swift \
   Sources/SrtFlow/AIVoiceChoice.swift \
   Sources/SrtFlow/AIVoiceRole.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioVoices.swift \

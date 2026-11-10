@@ -187,7 +187,7 @@ others="$(code_files_with 'SkyCutGates\.enforced\(' | grep -v "^${ACCOUNT}\$" | 
   && [ "$(count 'watermarked: exporter.watermarked' "${EXPORT_TOOLS}")" -eq 1 ] \
   || fail "${EXPORT_TOOLS}：export_video 开始时（会带）和做完时（带了）都要按此刻授权告诉 AI 水印的事"
 [ "$(count 'result["skycut_plan"] = SkyCutGates.statusJSON(' "${STATUS_TOOLS}")" -eq 1 ] \
-  || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它是唯一照常回的工具）"
+  || fail "${STATUS_TOOLS}：get_status 要报 skycut_plan（没开通时它照常回，另外只有说明书 skycut_guide）"
 
 # 6. 交任务、取消任务只经 SkyStudioJobRun。
 RUN="Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift"

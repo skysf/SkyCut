@@ -1,7 +1,7 @@
 import Foundation
 import SrtFlowMCPKit
 
-// SkyCutGates：照授权拦（收费方案第 5 刀第二步）—— 2026-10-28 起默认打开、测试开关关不掉它；AI 的工具让不让用（get_status 永远让）；
+// SkyCutGates：照授权拦（收费方案第 5 刀第二步）—— 2026-10-28 起默认打开、测试开关关不掉它；AI 的工具让不让用（get_status 和说明书 skycut_guide 永远让）；
 // 导出带不带水印；被挡住时回给 AI 的话（没做、为什么、请用户做什么）；get_status 里的 skycut_plan；导出带了水印时那一句。
 
 func runGateChecks() {
@@ -30,14 +30,18 @@ func runGateChecks() {
     var proWithoutAI = pro
     proWithoutAI.mcp = false
 
-    // 2. AI 的工具：关着时都让；开着时只听 mcp，get_status 永远让。
+    // 2. AI 的工具：关着时都让；开着时只听 mcp，get_status 和说明书 skycut_guide 永远让（2026-11-09 用户定：
+    //    说明书只读、免费、不碰工程，没开通时 AI 也能说清 SkyCut 能做什么；docs/plans/2026-11-09-mcp-guide.md 第八节第 5 条）。
+    let answeredWithoutPlan: Set<MCPToolName> = [.getStatus, .skycutGuide]
+    checkEqual(SkyCutGates.alwaysAnswered, answeredWithoutPlan, "only get_status and skycut_guide answer without a plan")
     for tool in MCPToolName.allCases {
         check(SkyCutGates.aiAllows(tool, license: .free(.noKey), enforced: false), "gates off: \(tool.rawValue) runs")
         checkEqual(
-            SkyCutGates.aiAllows(tool, license: .free(.noKey), enforced: true), tool == .getStatus,
-            "no key: only get_status runs (\(tool.rawValue))"
+            SkyCutGates.aiAllows(tool, license: .free(.noKey), enforced: true), answeredWithoutPlan.contains(tool),
+            "no key: only get_status and skycut_guide run (\(tool.rawValue))"
         )
-        checkEqual(SkyCutGates.aiAllows(tool, license: free, enforced: true), tool == .getStatus, "free plan: only get_status (\(tool.rawValue))")
+        checkEqual(SkyCutGates.aiAllows(tool, license: free, enforced: true), answeredWithoutPlan.contains(tool),
+                   "free plan: only get_status and skycut_guide (\(tool.rawValue))")
         check(SkyCutGates.aiAllows(tool, license: trial, enforced: true), "trial: \(tool.rawValue) runs")
         check(SkyCutGates.aiAllows(tool, license: pro, enforced: true), "pro: \(tool.rawValue) runs")
     }
