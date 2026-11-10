@@ -78,6 +78,11 @@ asset 调 `cancelLoading`。还在队列中的 operation 直接取消、立即�
 - `SubtitleGen/AudioWindowReader.extract`：字幕生成按窗口抽音频，`TranscriptionTask` 里
   严格一个窗口读完再读下一个，同一时刻最多卡住一条线程，凑不满。**哪天要并行抽，先把它
   挪到 `MediaReadQueue`。** 守卫的白名单里写着同样的理由。
+- **这个例外只给字幕生成**：`extract` 的调用方只许在 `SubtitleGen/` 里（守卫钉着）。别处要同样的 16 kHz CAF，走
+  `QueuedAudioWindow.extract(…, on: 队列)`：格式、建文件、一块采样怎么落盘用的是 `AudioWindowReader` 的同一份零件，读取是单独的
+  同步函数、在点名的 `MediaReadQueue` 上跑，取消只置停止标记。现在两处：配旁白回到本机的音频要转写（`.voice`）、新建声音时检测
+  录音的语言（`.analysis`）。2026-11-11 之前这两处都借了 `extract`，白名单只看定义、看不见调用方
+  （[案例](../bugfixes/2026-11-11-voice-library-review-followups.md)）。
 
 ## 同类的别的阻塞
 
@@ -143,7 +148,7 @@ EOF 必须同时成立才能接受输出；后代继承写端时到期拒绝，�
 | 检查 | 守什么 |
 | --- | --- |
 | `scripts/check-waveform.sh` 第 7 节 | 同时读 `min(40, max(16, 2 × 核数))` 个文件，总览和原始采样块各一轮，必须全部读完；看门狗跑在普通线程上，30 秒没读完就判红（死锁时 await 永远不回来，没有看门狗的话守卫只会挂住，不会变红） |
-| `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
+| `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）；`AudioWindowReader.extract` 在 `SubtitleGen/` 以外被调就红；`QueuedAudioWindow` 的读取要交给 `MediaReadQueue`。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
 | `scripts/check-export-profile.sh` | 生产 `FFmpegProcess` 的立即退出、双管道 / 最后进度、错误和取消；独立线程的 30 秒看门狗在旧等待实现上实际变红 |
 | `scripts/check-engine-probe.sh` | 短探测的截止时间 / 双输出上限 / 退出码，父进程唯一回收、信号与描述符隔离、注册前后退出窗口、候选去重与单次定位任务 |
 | `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取；队列中超时/取消直接结束，已开读时等本次 copy 返回再由读取体单点取消与释放；原生探针固定线程交错，失败不发布半份统计 |
