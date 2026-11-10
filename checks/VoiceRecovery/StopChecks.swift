@@ -34,6 +34,10 @@ private final class StopServer: @unchecked Sendable {
 
 @MainActor
 func runVoiceStopChecks(_ root: URL) async throws {
+    // 这个场景记的账做完退掉：后面的场景（每日额度 1,000 的那一摊）看到的当天已花和以前一样（同 LibraryOrderChecks）。
+    let spend = SkyStudioSpendStore.shared
+    let base = spend.spentToday()
+    defer { spend.refund(spend.spentToday() - base, on: Date()) }
     let lines = ["Welcome to the harbour.", "The boats leave at six.", "Bring a warm jacket.", "Tickets are on board.", "Enjoy the ride home."]
     let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("stop"), audioSlots: 2)
     fixture.failSplitOnce = false
