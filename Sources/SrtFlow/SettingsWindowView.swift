@@ -76,6 +76,7 @@ struct SettingsWindowView: View {
         case .editing:
             Section { AIRecipesList() }
             Section { KokoroVoiceSettingsRow() }
+            Section { VoiceLibrarySettingsSection(openSkyStudioSettings: { selection = .skyStudio }) }
         case .cache:
             OptimizedMediaSettingsSection()
         case .skyStudio:
