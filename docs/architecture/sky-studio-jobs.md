@@ -281,7 +281,7 @@ Lite JPEG 能正常预览 / 入轨；服务器保存失败时只核查原单及 
 
 ## 十四、声音的接口合同（声音 PR 1，2026-11-10）
 
-依据 SkyCut 声音方案（2026-11-09 批准：第二节约定、第三节「SkyCut 需要 Sky Studio 接口提供的东西」、第十节 PR 1、9.1 第 1、2 项）和
+依据 [SkyCut 声音方案](../plans/2026-11-09-voice-features.md)（2026-11-09 批准：第二节约定、第三节「SkyCut 需要 Sky Studio 接口提供的东西」、第十节 PR 1、9.1 第 1、2 项）和
 Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末「名字对照」）。**这一刀只有纯值和 `SkyStudioAPI` 的请求，没接任何入口**：
 `add_voiceover`、MCP 清单、界面都没动，现有的配旁白（`SkyStudioVoicePlan`、`SkyStudioVoices`、`SkyStudioVoiceoverRun`）照旧，PR 3 起才换。
 Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
