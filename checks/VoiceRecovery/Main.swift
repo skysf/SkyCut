@@ -19,6 +19,7 @@ import SrtFlowMCPKit
             try await runVoiceRecoveryTimingChecks(root)
             try await runVoiceConcurrencyChecks(root)
             try await runVoiceLibraryChecks(root)
+            try await runVoiceLibraryUIChecks(root)
             try await runVoiceFallbackFeeChecks(root)
             await runVoicePaidAudioChecks(root)
         } catch {
