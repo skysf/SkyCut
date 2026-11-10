@@ -92,6 +92,9 @@ struct SkyStudioVoiceCheckpoint: Codable, Sendable {
     /// 一旦入轨成功，即使用户随后撤销，也不能因重试自动再加。
     var applied: JSONValue?
     var issue: Issue?
+    /// 某批以 `fallback_needs_one_time` 结束、还在等用户答的那一笔一次性费用（补好价、声音和语言，SkyStudioVoiceFallbackFee）：
+    /// resume 带 confirm_token 建、带 skip_one_time 不建，答了就清掉。老记录没有这个键 = 没有在等的。
+    var fallbackFee: SkyStudioVoiceOneTime?
 
     init(input: Input, projectPath: String?, projectToken: String, plan: SkyStudioVoicePlan) {
         self.input = input

@@ -9,7 +9,9 @@ import Foundation
 //    角色 → 预设只认服务器给的 `voice_roles`，默认声音只认 `default: true` 的那个预设（SkyCut 不写死）。
 // 本机退档（没 Key、报价时服务不可用）用哪个角色也在这里（`localRole`）：没给 = 旁白角色（中文 zh_male、英文 en_male）、角色照旧、
 // 预设按它在这种语言里的性别挑角色、Eleven 的照旧退到旁白。
-// 不管什么：声音库的 `voice_…`（声音 PR 6）、本机怎么挑 Kokoro / Mac 的声音（AIVoiceChoice）、读 Key 和目录（SkyStudioVoiceoverStart）。
+// 声音库的 `voice_…`（声音 PR 6）光看字就认得出（`voice_` + 32 位十六进制）：原样交给 `params.voice`，读稿的 kind 是 `voice_clone`；
+// 它没有本机退档（4.3：声音库的声音报错、不退本机）。
+// 不管什么：本机怎么挑 Kokoro / Mac 的声音（AIVoiceChoice）、读 Key 和目录（SkyStudioVoiceoverStart）。
 
 /// AI 要 Sky Studio 的哪个声音（读目录之前）。
 enum SkyStudioVoiceAsk: Equatable, Sendable {
@@ -22,6 +24,16 @@ enum SkyStudioVoiceAsk: Equatable, Sendable {
     case eleven(String)
     /// 不带前缀的名字：先当预设的名字找，不是的话当这台 Mac 的声音（4.3 的顺序：预设在本机声音之前）。
     case name(String)
+    /// 用户声音库里的声音（`voice_…`，list_voices 的 mine）：克隆读稿，不退本机。
+    case library(String)
+
+    var isLibrary: Bool {
+        if case .library = self { return true }
+        return false
+    }
+
+    /// 读稿交给 Sky Studio 的 kind：声音库的是克隆读稿，别的都是普通旁白（预设）。
+    var kind: String { isLibrary ? SkyStudioVoiceKind.clone : SkyStudioVoiceKind.narration }
 }
 
 /// 认出来的 Sky Studio 声音。
@@ -47,6 +59,7 @@ struct SkyStudioVoicePick: Equatable, Sendable {
         if lower.hasPrefix("gemini:") { return .preset(text) }
         if lower.hasPrefix("eleven:") { return .eleven(text) }
         if AIVoiceRole.isKokoroName(text) { return nil }
+        if SkyStudioVoice.isVoiceID(text) { return .library(text) }
         return .name(text)
     }
 
@@ -65,6 +78,8 @@ struct SkyStudioVoicePick: Equatable, Sendable {
             let name = String(id.dropFirst("eleven:".count))
             guard !name.isEmpty, !name.contains(where: \.isWhitespace) else { return .notPreset(id) }
             return .cloud(SkyStudioVoicePick(voice: "eleven:" + name))
+        case .library(let id):
+            return .cloud(SkyStudioVoicePick(voice: id))
         }
     }
 
@@ -98,6 +113,9 @@ struct SkyStudioVoicePick: Equatable, Sendable {
             let gender = catalog.flatMap { preset(named: id, in: $0) }?.entry(for: language)?.gender
             return gender.flatMap { AIVoiceRole.role(gender: $0, language: language) } ?? AIVoiceRole.narrator(forLanguage: language)
         case .standard, .eleven:
+            return AIVoiceRole.narrator(forLanguage: language)
+        case .library:
+            // 声音库的声音不退本机（调用方在退之前就报错）；真走到这里也只给旁白角色。
             return AIVoiceRole.narrator(forLanguage: language)
         }
     }

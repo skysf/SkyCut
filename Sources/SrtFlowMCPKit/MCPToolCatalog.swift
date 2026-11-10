@@ -36,6 +36,8 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case findAudio = "find_audio"
     case addVoiceover = "add_voiceover"
     case syncVoiceover = "sync_voiceover"
+    case listVoices = "list_voices"
+    case manageVoices = "manage_voices"
     case recordScreen = "record_screen"
     case generateMedia = "generate_media"
     case listCharacters = "list_characters"
@@ -88,7 +90,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     public var takesProject: Bool {
         switch self {
         case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
-             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob:
+             .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .listVoices, .manageVoices:
             return false
         // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
         case .setView, .generateMedia, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
@@ -103,6 +105,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         switch self {
         case .skycutGuide: return MCPGuideTool.definition
         case .listCharacters, .getCharacter, .manageCharacters: return MCPCharacterTools.definition(for: self)
+        case .listVoices, .manageVoices: return MCPVoiceLibraryTools.definition(for: self)
         case .inspectVideo: return MCPInspectionTool.definition
         case .syncVoiceover: return MCPVoiceoverSyncTool.definition
         case .getSettings, .setSettings:
@@ -142,7 +145,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     public var provider: MCPProvider? {
         switch self {
         // 2026-10-28 起两个都走 Sky Studio、花积分（收费方案第 6 刀）；云端配音也走 Sky Studio（add_voiceover 一直列着）。
-        case .generateMedia, .upscaleClip, .listCharacters, .getCharacter, .manageCharacters: return .skystudio
+        case .generateMedia, .upscaleClip, .listCharacters, .getCharacter, .manageCharacters, .listVoices, .manageVoices: return .skystudio
         default: return nil
         }
     }

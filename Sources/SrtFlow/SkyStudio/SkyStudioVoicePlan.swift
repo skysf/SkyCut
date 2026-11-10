@@ -77,15 +77,16 @@ struct SkyStudioVoicePlan: Sendable, Codable {
         return Draft(kind: kind, voice: voice, reading: reading, language: language, speech: speech, segment: segment)
     }
 
-    /// 整段报价回来：核对（有 voice_plan、批数对得上、不要一次性费用），每批的请求照报价定下来。
-    static func quoted(_ draft: Draft, quote: SkyStudioQuote) throws -> SkyStudioVoicePlan {
+    /// 整段报价回来：核对（有 voice_plan、批数对得上），每批的请求照报价定下来。报价里的一次性费用先由 SkyStudioVoiceOneTimeStep 问过：
+    /// `skippingOneTime` = 用户不建 MiniMax 版、照报价里不花钱的那个读（`default_needs_one_time` 时 selection 就是它）；别的一律不交。
+    static func quoted(_ draft: Draft, quote: SkyStudioQuote, skippingOneTime: Bool = false) throws -> SkyStudioVoicePlan {
         guard let voice = quote.voice, let plan = voice.plan, voice.batches.count == draft.speech.count else {
             throw Problem(message: "Sky Studio's quote did not cover this script's batches; nothing was charged. Try again.")
         }
-        guard voice.oneTime.isEmpty else {
+        guard voice.oneTime.isEmpty || (skippingOneTime && plan.needsOneTime) else {
             let kinds = voice.oneTime.map(\.kind).joined(separator: ", ")
-            throw Problem(message: "Sky Studio asked for a one-time fee (\(kinds)) before this voice can read; SkyCut cannot approve "
-                + "one-time voice fees yet, so nothing was charged. Use another voice or model.")
+            throw Problem(message: "Sky Studio asked for a one-time fee (\(kinds)) before this voice can read with this model; "
+                + "nothing was charged. Use model=auto, or approve the fee first.")
         }
         let batches = try draft.speech.indices.map { index in
             Batch(speech: draft.speech[index], request: try SkyStudioVoiceRequests.batch(index, of: draft.segment, quote: quote))

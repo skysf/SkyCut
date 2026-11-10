@@ -217,3 +217,13 @@ bash 5 不展开，本机跑是对的；和陷阱 5 不同，3.2 这回**不报�
 
 **防回归**：`checks/shell-brace-in-nested-quotes.sh`（进了 `scripts/check-all.sh` 第 1 组）扫全部 `.sh`：不是注释、不是「变量=」开头的行里，
 `"$(` 后面出现带 `{…,…}` 的双引号字符串就红。
+
+## 陷阱 7（2026-11-10）：「记一笔、最后一道总闸」的守卫，检查接在总闸后面就永远不红
+
+`checks/sky-studio-wiring.sh` 的写法是每条检查失败只 `fail`（`FAILED=1`），最后 `if [ "${FAILED}" -ne 0 ]; then exit 1; fi`。总闸原来夹在中间，
+后来加的三节（角色 A、0.18.62 的结果边界、声音库）接在它后面：`✗` 照样打出来，脚本退出 0、最后还打「✓」。案例：
+[Sky Studio 接线守卫最后三节的检查从来不会红](2026-11-10-sky-studio-wiring-checks-after-exit.md)。
+
+**改法**：总闸只放在最后；新加一节加在总闸前面。要算行号的 `$(grep … | head | cut)` 加 `|| true`，找不到时照常走到 `fail` 说原因（不然 `set -e` 半路掐断、不说为什么）。
+
+**防回归**：`checks/sky-studio-wiring.sh` 总闸前读自己这个文件，最后一条 `fail "…"` 要在总闸之前，不然就红并说出两个行号。

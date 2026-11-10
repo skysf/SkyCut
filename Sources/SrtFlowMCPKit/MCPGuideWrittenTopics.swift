@@ -26,8 +26,9 @@ public enum MCPGuideWrittenTopics {
         public var readingTip: String? = nil
     }
 
-    /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3）。之后的两批加在这里。
-    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover]
+    /// 已经迁移的工具（方案 5.3 的试点，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、manage_voices 随声音 PR 6 从第一天起就这么写）。
+    /// 之后的两批加在这里。
+    public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices]
 
     public static func topic(for tool: MCPToolName) -> Written? {
         switch tool {
@@ -37,6 +38,8 @@ public enum MCPGuideWrittenTopics {
         case .generateMedia: return MCPGuideMediaTopics.generateMedia
         case .look: return MCPGuideMediaTopics.look
         case .addVoiceover: return MCPGuideVoiceTopics.addVoiceover
+        case .listVoices: return MCPGuideVoiceLibraryTopics.listVoices
+        case .manageVoices: return MCPGuideVoiceLibraryTopics.manageVoices
         default: return nil
         }
     }

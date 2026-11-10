@@ -9,6 +9,7 @@ import SrtFlowMCPKit
 
 func runSkyStudioVoiceChecks() {
     voiceoverGuideChecks()
+    voiceLibraryGuideChecks()
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "generate_missing": true]) == nil,
           "the existing voiceover tool accepts recovery arguments without original lines")
     check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["resume": "/voiceover/recovery.json", "regenerate_all": true]) != nil,
@@ -118,7 +119,7 @@ func runSpeechParserChecks() {
 private func voiceoverGuideChecks() {
     let definition = MCPToolName.addVoiceover.definition
     let card = definition.description
-    for phrase in ["recordings: add_clips", "default gemini:Charon", "Returns job_id; wait with get_job", "relay voice.note",
+    for phrase in ["recordings: add_clips", "default gemini:Charon", "voice_… (list_voices)", "Returns job_id; wait with get_job", "relay voice.note",
                    "The daily credit limit always applies", "resume=recovery_file, never resend lines",
                    "Read skycut_guide topic=add_voiceover before the first call."] {
         check(card.contains(phrase), "the add_voiceover card says \"\(phrase)\"")
@@ -136,7 +137,8 @@ private func voiceoverGuideChecks() {
     let text = topic.sections.map(\.text).joined(separator: "\n")
     for phrase in ["gemini:Charon", "eleven:Name", "en_male_british", "voice_plan", "cross_language", "daily_budget_exceeded",
                    "recharge_url", "confirm_token", "recovery_file", "generate_missing", "eleven-v4", "download_voices=true",
-                   "Rachel are not voices", "sync_voiceover",
+                   "Rachel are not voices", "sync_voiceover", "voice_…", "skip_one_time=true", "voice_enroll", "voice_library_unavailable",
+                   "index-tts-2",
                    // 声音 PR 4：几批同时交、中途换备用（声音方案 8.2、8.4）。
                    "several at once", "batches_waiting", "line_models", "batches sent after that use the fallback too",
                    "fallback_needs_one_time"] {
@@ -154,4 +156,53 @@ private func voiceoverGuideChecks() {
           "the batches section says batches break only between lines, long lines at sentence ends")
     let subtitlesField = definition.inputSchema["properties"]?["subtitles"]?["description"]?.stringValue ?? ""
     check(subtitlesField.contains("subtitle_timing"), "the subtitles parameter points at subtitle_timing: \(subtitlesField)")
+}
+
+/// 声音库的两个工具（声音 PR 6，SkyCut 声音方案 4.6、4.10）：参数名、名片必含、说明书必含、地图；动作词表就是 App 分派的那几样。
+private func voiceLibraryGuideChecks() {
+    check(MCPArgumentCheck.problem(tool: .listVoices, arguments: ["language": "en", "include": "presets"]) == nil, "list_voices takes language and include")
+    check(MCPArgumentCheck.problem(tool: .manageVoices, arguments: [
+        "action": "create", "file": "a.m4a", "start": 0, "end": 30, "language": "zh", "name": "Sky", "confirm_token": "t"
+    ]) == nil, "manage_voices create takes file, start, end, language, name and confirm_token")
+    check(MCPArgumentCheck.problem(tool: .manageVoices, arguments: ["action": "design", "description": "calm", "name": "Calm", "sample_text": "Hi."]) == nil,
+          "manage_voices design takes description, name and sample_text")
+    check(MCPArgumentCheck.problem(tool: .manageVoices, arguments: ["action": "delete", "voice": "voice_x", "model": "auto"]) != nil,
+          "manage_voices does not take model")
+    check(MCPArgumentCheck.problem(tool: .addVoiceover, arguments: ["lines": [["text": "Hi."]], "voice": "voice_x", "skip_one_time": true]) == nil,
+          "add_voiceover takes skip_one_time")
+    checkEqual(MCPToolName.manageVoices.definition.inputSchema["properties"]?["action"]?["enum"],
+               .array(["create", "add_reference", "design", "rename", "delete"]), "manage_voices actions are the five the App handles")
+    checkEqual(MCPToolName.listVoices.definition.inputSchema["properties"]?["include"]?["enum"], .array(["mine", "presets", "all"]),
+               "list_voices include is mine, presets or all")
+    check(MCPToolName.listVoices.definition.readOnly && !MCPToolName.manageVoices.definition.readOnly && MCPToolName.manageVoices.definition.destructive,
+          "list_voices is read-only; manage_voices writes and can delete")
+
+    let list = MCPToolName.listVoices.definition.description
+    for phrase in ["Read-only, free", "voice_…", "gemini:Name", "Pass language", "presets still come back"] {
+        check(list.contains(phrase), "the list_voices card says \"\(phrase)\"")
+    }
+    let manage = MCPToolName.manageVoices.definition.description
+    for phrase in ["no timeline change, no undo", "create from a recording", "add_reference", "design: Paid (Sky Studio credits), one-time",
+                   "Returns job_id; wait with get_job", "The daily credit limit always applies", "needs_confirmation first",
+                   "delete asks in ask mode", "Read skycut_guide topic=manage_voices before the first call."] {
+        check(manage.contains(phrase), "the manage_voices card says \"\(phrase)\"")
+    }
+    let listTopic = MCPGuideTopics.topic(for: .listVoices)
+    checkEqual(listTopic.sections.map(\.name), ["overview", "mine", "presets", "pitfalls", "fields"], "the list_voices topic has its sections, fields last")
+    let listText = listTopic.sections.map(\.text).joined(separator: "\n")
+    for phrase in ["at most 50 voices", "minimax", "gemini:Charon", "returns the English one", "voice_library_unavailable", "Never invent a voice_… id"] {
+        check(listText.contains(phrase), "the list_voices topic says \"\(phrase)\"")
+    }
+    let manageTopic = MCPGuideTopics.topic(for: .manageVoices)
+    checkEqual(manageTopic.sections.map(\.name), ["overview", "create", "design", "rename_delete", "permission_modes", "pitfalls", "fields"],
+               "the manage_voices topic has the sections of voice plan 4.10, fields last")
+    let manageText = manageTopic.sections.map(\.text).joined(separator: "\n")
+    for phrase in ["consent statement", "confirm_token", "at least 10 seconds", "3 minutes", "reference_exists", "voice_limit", "voice_design",
+                   "sample_url", "cannot be reversed", "In full access mode delete happens directly", "voice_library_unavailable"] {
+        check(manageText.contains(phrase), "the manage_voices topic says \"\(phrase)\"")
+    }
+    check(!manageText.contains("750") && !manageText.contains("22.5"), "the design section names no prices: they come from Sky Studio's quote")
+    let map = guideMapText()
+    check(map.contains("Voices: list_voices (presets, my voices), manage_voices ("), "the guide map has a Voices line with both tools")
+    check(map.contains("manage_voices (design;") && map.contains("list_voices"), "the paid line names manage_voices' design and lists list_voices as free")
 }

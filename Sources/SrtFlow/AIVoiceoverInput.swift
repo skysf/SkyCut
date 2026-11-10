@@ -4,7 +4,8 @@ import Foundation
 // 管什么：调用刚到时核对全部参数、分出这次要不要先问 Sky Studio（`ask`）还是直接用本机的声音、落点；云端任务等几分钟时不再读后来变掉的
 // 文件夹 / 选项。认 Sky Studio 的声音要先读 `/models`（SkyStudioVoiceoverStart），这里只按字分类（SkyStudioVoicePick.ask）。
 // 不管什么：生成、报价、入轨。本机挑哪个声音由 AIVoiceChoice 负责。
-// 2026-11-10（声音 PR 3）去掉了 clone_from：克隆一律先进声音库（决定第七节第 8 条），声音库的声音是声音 PR 6。
+// 2026-11-10（声音 PR 3）去掉了 clone_from：克隆一律先进声音库（决定第七节第 8 条）；声音库的声音（`voice_…`）是声音 PR 6：
+// 要 Sky Studio 的 Key、不退本机，`skip_one_time` / `confirm_token` 管它的一次性费用（SkyStudioVoiceOneTimeStep）。
 
 struct VoiceoverLine {
     var text: String
@@ -26,6 +27,10 @@ struct AIVoiceoverInput {
     let maxLines: Int?
     let generation: Int
     let folder: URL
+    /// 声音库的声音：用户不肯花一次性费用（建 MiniMax 版）时，照报价里不花钱的那个读（SkyCut 声音方案 4.2、4.5）。
+    var skipOneTime = false
+    /// 一次性费用的确认码（请求批准模式；读别处的恢复文件那一问也用它，在别处收）。
+    var confirmToken: String?
 
     @MainActor
     static func read(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIVoiceoverInput {
@@ -53,6 +58,10 @@ struct AIVoiceoverInput {
         case .name(let name)? where !hasKey:
             // 没有 Sky Studio：不带前缀的名字只能是这台 Mac 的声音（找不到就报错，和以前一样）。
             choice = try local(name, language: language)
+        case .library(let id)? where !hasKey:
+            // 声音库的声音没有本机退档（4.3）。
+            throw AIToolError("\(id) is a voice from the user's Sky Studio voice library, which needs a Sky Studio key "
+                + "(SkyCut Settings > Sky Studio). Nothing was charged.")
         case let wanted? where hasKey:
             cloud = wanted
             choice = AIVoiceChoice(engine: .skyStudio(voice: ""))
@@ -63,6 +72,10 @@ struct AIVoiceoverInput {
         }
         if let model, cloud == nil {
             choice.note = joined(choice.note, "model \(model) only applies to Sky Studio voices, so it was not used.")
+        }
+        let skipOneTime = try args.bool("skip_one_time") ?? false
+        if skipOneTime, cloud?.isLibrary != true {
+            choice.note = joined(choice.note, "skip_one_time only applies to voice_… voices from the user's library, so it was not used.")
         }
         let target = try args.string("track").map { try AITrackName.target($0, in: project.state) } ?? .newAudioBottom
         switch target {
@@ -75,7 +88,8 @@ struct AIVoiceoverInput {
         return AIVoiceoverInput(
             lines: lines, speed: min(max(try args.double("speed") ?? 1, 0.5), 2), language: language, requestedVoice: requested,
             ask: cloud, model: model, choice: choice, target: target, subtitles: subtitles, maxLines: maxLines,
-            generation: project.documentGeneration, folder: AIWorkspace.shared.outputFolder(.voiceovers, project: project)
+            generation: project.documentGeneration, folder: AIWorkspace.shared.outputFolder(.voiceovers, project: project),
+            skipOneTime: skipOneTime && cloud?.isLibrary == true, confirmToken: try args.string("confirm_token")
         )
     }
 
