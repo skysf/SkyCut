@@ -20,6 +20,31 @@ func runVoicePaidAudioChecks(_ root: URL) async {
     await scenario("words null") { try await noWordTimesChecks(root, name: "words-null", broken: .null) }
     await scenario("words wrong") { try await noWordTimesChecks(root, name: "words-wrong", broken: .wrongLetters) }
     await scenario("voice note") { try await voiceNoteChecks(root) }
+    await scenario("never matches") { try await neverMatchesChecks(root) }
+}
+
+/// 转写得了的 Mac 上，合成一批的两句每次转写出来都对不回原文（2026-11-11 审查的残留）：第一次照旧 local_split、能恢复；
+/// 恢复时还对不上就按字数估句界、落地并说明 —— 不再永远 local_split，也不重新收费生成。
+@MainActor
+private func neverMatchesChecks(_ root: URL) async throws {
+    let fixture = try VoiceRecoveryFixture(folder: root.appendingPathComponent("never-matches"))
+    fixture.failSplitOnce = false
+    fixture.garbleAt = 0
+    let first = try await fixture.wait(fixture.clone([String](repeating: "Hello world.", count: 2)))
+    let file = first["recovery_file"]?.stringValue ?? ""
+    require(first["status"] == "failed" && first["failure_stage"] == "local_split" && !file.isEmpty,
+            "never matches: the first failed split is still reported and recoverable (got \(first["failure_stage"] ?? .null))")
+    require(try SkyStudioVoiceRecoveryStore.read(URL(fileURLWithPath: file)).batches.first?.splitFailures == 1,
+            "never matches: the recovery record counts the failed split")
+    let posts = VoiceRecoveryHTTP.posts
+    let done = try await fixture.resume(file)
+    require(done["status"] == "done" && done["estimated_split_line_indices"] == [0, 1] && VoiceRecoveryHTTP.posts == posts,
+            "never matches: the second failed split is estimated instead of failing forever, and nothing is generated again "
+            + "(got \(done["status"] ?? .null), \(done["failure_stage"] ?? .null), \(done["estimated_split_line_indices"] ?? .null))")
+    let note = done["voice"]?["note"]?.stringValue ?? ""
+    require(note.contains("twice") && note.contains("listen to where those lines start and end"),
+            "never matches: voice.note says the cuts are estimated and why (got: \(note))")
+    require(fixture.project.state.audioTracks.flatMap(\.clips).count == 2, "never matches: both lines land")
 }
 
 /// 一个场景抛了错只算它自己没过，后面的照跑（一处坏了不把别的守卫挡住）。

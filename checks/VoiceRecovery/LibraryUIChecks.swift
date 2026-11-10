@@ -19,6 +19,7 @@ import SrtFlowMCPKit
 func runVoiceLibraryUIChecks(_ root: URL) async throws {
     try await storeChecks(root)
     try await newVoiceChecks(root)
+    try await outdatedStatementChecks(root)
     try await addRecordingChecks(root)
     try await designChecks(root)
     await recorderChecks(root)
@@ -286,6 +287,8 @@ private func designChecks(_ root: URL) async throws {
 
     let before = spend.spentToday()
     require(model.design(), "pressing Design with a quote starts the job")
+    // 连按（双击、回车键连发）：同一份报价只下一单（docs/bugfixes/2026-11-11-design-voice-ordered-twice.md；排着队的场景在 LibraryOrderChecks）。
+    require(!model.design() && model.ordered, "a second press on the same quote orders nothing")
     require(abs(spend.spentToday() - before - 22.5) < 0.001 && store.designing == ["Calm"], "the quoted price is reserved against today's budget")
     await eventually("the designed voice") { store.designing.isEmpty && store.voices.contains { $0.source == "design" } }
     let job = VoiceLibraryHTTP.calls("POST", "/jobs").first
@@ -325,6 +328,34 @@ private func designChecks(_ root: URL) async throws {
     long.prompt = String(repeating: "a", count: SkyStudioVoiceDesignOrder.maxDescription + 1)
     try await Task.sleep(nanoseconds: 100_000_000)
     require(long.promptTooLong && long.offer == .none && VoiceLibraryHTTP.calls("POST", "/quote").count == quotes, "an over-long description is not quoted")
+}
+
+/// Sky Studio 把授权那句升了版本、手里的目录还是旧的（consent_outdated）：对话框取到新的那一句、那一勾拿掉，用户再勾才按新版本建。
+@MainActor
+private func outdatedStatementChecks(_ root: URL) async throws {
+    let fixture = try VoiceLibraryFixture(folder: root.appendingPathComponent("ui-new-statement"))
+    let store = makeStore(fixture)
+    await store.refresh()
+    let file = try fixture.recording()
+    let model = NewVoiceModel(mode: .create, store: store)
+    model.detectLanguage = { _, _ in "en" }
+    model.name = "Versioned"
+    await prepared(model, file, language: "en")
+    model.setAgreed(true)
+    VoiceLibraryHTTP.lock.withLock { VoiceLibraryHTTP.consentVersion = "voice-consent-v2" }
+    let voices = VoiceLibraryHTTP.lock.withLock { VoiceLibraryHTTP.voices.count }
+    let refused = await model.submit()
+    require(refused == nil && model.problem != nil && VoiceLibraryHTTP.lock.withLock({ VoiceLibraryHTTP.voices.count }) == voices,
+            "a statement Sky Studio has replaced creates nothing")
+    require(model.consentStatement?.version == "voice-consent-v2" && !model.agreed && model.blocker == .consent,
+            "the dialog shows the new statement and takes the tick back: \(model.consentStatement?.version ?? "nil")")
+    require(VoiceLibraryText.consent(model.consentStatement!).contains("NEW STATEMENT"), "an unknown version is shown in Sky Studio's own words")
+    model.setAgreed(true)
+    let created = await model.submit()
+    require(created != nil && VoiceLibraryHTTP.calls("POST", "/voices").last?["consent_statement_version"] == "voice-consent-v2",
+            "ticked again, the voice is created with the new version")
+    model.close()
+    await settled(store)
 }
 
 @MainActor

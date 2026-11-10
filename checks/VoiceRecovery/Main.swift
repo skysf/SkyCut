@@ -20,6 +20,7 @@ import SrtFlowMCPKit
             try await runVoiceConcurrencyChecks(root)
             try await runVoiceLibraryChecks(root)
             try await runVoiceLibraryUIChecks(root)
+            try await runVoiceLibraryOrderChecks(root)
             try await runVoiceFallbackFeeChecks(root)
             try await runVoiceStandingChecks(root)
             await runVoicePaidAudioChecks(root)
@@ -37,7 +38,10 @@ import SrtFlowMCPKit
             + "eleven-v4 / estimated subtitle timing, model install before paying and re-quote when it fails, script words in subtitles, mixed timing"
             + "; voice library: list with an outage, consent before upload, delete by permission mode with a storage retry, design fee, library narration asking / skipping / building the MiniMax version, a mid-script fallback fee asked in get_job and answered with resume (skip or build); full access: the standing consent used without asking (recordings, design, MiniMax versions, a mid-script fee), asked once and recorded when missing, asked again when Sky Studio refuses it, set_settings records / revokes it, recorded once at the upgrade"
             + "; paid audio never stuck: a Traditional Chinese batch transcribed in Simplified, long-line halves at 24 kHz and 44.1 kHz, "
-            + "a packed batch without usable word times on a Mac that cannot transcribe; voice.note in get_job while running and after a failure")
+            + "a packed batch without usable word times on a Mac that cannot transcribe; voice.note in get_job while running and after a failure, "
+            + "a batch that never matches its transcription estimated on the second try"
+            + "; library orders: one design per quote, one open job per order or voice + language, the day's spend settled at the charge, "
+            + "price_changed / refunds leaving nothing, the fee question kept until Sky Studio accepts the build, a new consent statement asked again")
         exit(0)
     }
 

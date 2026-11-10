@@ -34,6 +34,8 @@ final class VoiceRecoveryHTTP: URLProtocol {
     static var oneTimeAt: Int?
     /// 交上来的建 MiniMax 版（voice_enroll）。
     static var enrolls: [JSONValue] = []
+    /// 下一次建 MiniMax 版：服务器的价变了（409 `price_changed` 带这个数）。
+    static var enrollPriceChange: Double?
     /// 这个账号有没有有效的长期授权（GET /voices/consent-grant，声音 PR 7：全部权限下有就不问）。
     static var standingActive = false
     /// 报价带上备用（voice_plan.fallback.selection），中途换了备用之后的批要带它。
@@ -73,7 +75,7 @@ final class VoiceRecoveryHTTP: URLProtocol {
         requests = []; prompts = []
         self.cap = cap; self.cloudFailure = cloudFailure; self.unknownSubmission = unknownSubmission
         rechoose = false; quoteFailure = nil; quoteWarnings = []; quoteOneTime = []; fallbackAt = nil
-        oneTimeAt = nil; enrolls = []; standingActive = false; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
+        oneTimeAt = nil; enrolls = []; enrollPriceChange = nil; standingActive = false; offerFallback = false; deferred = false; holdUntil = [:]; promptIndex = [:]
         open = []; peakOpen = 0; finished = []; jobBodies = []; ruleOf = []
         lowRate = []; brokenWords = nil
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
@@ -126,9 +128,17 @@ final class VoiceRecoveryHTTP: URLProtocol {
         } else if path.hasSuffix("/jobs"), method == "POST", body["kind"] == "voice_enroll" {
             // 建 MiniMax 版（声音 PR 6：备用要先花的一次性费用点过头之后）：不是读稿的一批，回声音。
             Self.enrolls.append(body)
-            value = ["job_id": "enroll-1", "status": "done", "credits_charged": 377.6, "billing": ["status": "charged", "credits_charged": 377.6],
+            if let price = Self.enrollPriceChange {
+                // 服务器算出来比点头的那个数贵：409 price_changed 带真实的价，不建任务、一分不扣。
+                Self.enrollPriceChange = nil
+                status = 409
+                value = ["error": ["code": "price_changed", "message": "The price changed.", "credits": .number(price)]]
+            } else {
+            let charged = body["max_credits"] ?? 377.6
+            value = ["job_id": "enroll-1", "status": "done", "credits_charged": charged, "billing": ["status": "charged", "credits_charged": charged],
                      "result": ["model": "minimax-voice-clone", "voice": ["id": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "name": "Sky", "source": "recording",
                                 "languages": [["language": "en", "kind": "recording", "minimax": true]]]]]
+            }
         } else if path.hasSuffix("/jobs"), method == "POST" {
             let index = Self.prompts.count
             let prompt = body["prompt"]?.stringValue ?? ""
