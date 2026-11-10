@@ -141,7 +141,9 @@ private func voiceoverGuideChecks() {
                    "index-tts-2",
                    // 声音 PR 4：几批同时交、中途换备用（声音方案 8.2、8.4）。
                    "several at once", "batches_waiting", "line_models", "batches sent after that use the fallback too",
-                   "fallback_needs_one_time"] {
+                   "fallback_needs_one_time",
+                   // 声音 PR 7：全部权限下有长期授权就不问、直接建，结果带 full_access；没有就问一次、点过头记上。
+                   "standing voice consent on record", "builds it without asking", "enroll_job_id", "agreeing records the consent"] {
         check(text.contains(phrase), "the add_voiceover topic says \"\(phrase)\"")
     }
     // 字幕时间（声音 PR 5，声音方案第七节）：四种 subtitle_timing、估出来的要转告、模型没装先装、转写不了的预设整段换 eleven-v4、
@@ -183,8 +185,9 @@ private func voiceLibraryGuideChecks() {
     }
     let manage = MCPToolName.manageVoices.definition.description
     for phrase in ["no timeline change, no undo", "create from a recording", "add_reference", "design: Paid (Sky Studio credits), one-time",
-                   "Returns job_id; wait with get_job", "The daily credit limit always applies", "needs_confirmation first",
-                   "delete asks in ask mode", "Read skycut_guide topic=manage_voices before the first call."] {
+                   "Returns job_id; wait with get_job", "The daily credit limit always applies",
+                   "Ask mode: create, add_reference, design and delete return needs_confirmation first", "full access proceeds",
+                   "Read skycut_guide topic=manage_voices before the first call."] {
         check(manage.contains(phrase), "the manage_voices card says \"\(phrase)\"")
     }
     let listTopic = MCPGuideTopics.topic(for: .listVoices)
@@ -198,7 +201,9 @@ private func voiceLibraryGuideChecks() {
                "the manage_voices topic has the sections of voice plan 4.10, fields last")
     let manageText = manageTopic.sections.map(\.text).joined(separator: "\n")
     for phrase in ["consent statement", "confirm_token", "at least 10 seconds", "3 minutes", "reference_exists", "voice_limit", "voice_design",
-                   "sample_url", "cannot be reversed", "In full access mode delete happens directly", "voice_library_unavailable"] {
+                   "sample_url", "cannot be reversed", "delete happens directly", "voice_library_unavailable",
+                   // 声音 PR 7：全部权限 + 长期授权什么都不问、结果带 full_access；没有长期授权第一次照请求批准模式问一次、点过头记上。
+                   "standing voice consent on record", "nothing asks", "full_access", "asks once like ask mode", "agreeing records it"] {
         check(manageText.contains(phrase), "the manage_voices topic says \"\(phrase)\"")
     }
     check(!manageText.contains("750") && !manageText.contains("22.5"), "the design section names no prices: they come from Sky Studio's quote")

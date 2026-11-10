@@ -7,6 +7,7 @@ import SrtFlowMCPKit
 // - list_voices：预设按语言 + 我的声音；声音库用不了（503 voice_library_unavailable）照回预设，`mine` 说暂时用不了；只要预设就不问声音库。
 // - create：先问授权（问句带服务器那句英文和版本），没点头之前什么都不传；点过头才传 voice_reference、建声音（consent: true + 版本、
 //   idempotency_key、用了哪一段）；换一段录音的令牌不认。
+// - add_reference（2026-11-10 案例，T 的免费冒烟）：声音已经有这种语言就当场说，不问、不读文件、不传；问句写声音的名字，不写 id。
 // - delete：请求批准模式问一句、点过头才发 DELETE；全部权限直接删；存储一时不可用再发一次。
 // - design：先报价、问一次性费用（带价），没点头不起任务；点过头记账、起 voice_design 任务、get_job 报新声音和样音；本机账按实收。
 // - add_voiceover 用声音库的声音：报价要建 MiniMax 版时先问（不交任何一批）；skip_one_time 照不花钱的那个读（voice_clone、params.voice、
@@ -16,6 +17,7 @@ import SrtFlowMCPKit
 func runVoiceLibraryChecks(_ root: URL) async throws {
     try await listChecks(root)
     try await createChecks(root)
+    try await addReferenceChecks(root)
     try await deleteChecks(root)
     try await designChecks(root)
     try await narrationChecks(root)
@@ -72,6 +74,28 @@ private func createChecks(_ root: URL) async throws {
 }
 
 @MainActor
+private func addReferenceChecks(_ root: URL) async throws {
+    let fixture = try VoiceLibraryFixture(folder: root.appendingPathComponent("library-add-reference"))
+    let file = try fixture.recording()
+    let voice = JSONValue.string(VoiceLibraryHTTP.voiceID)
+    // 夹具里的声音「Sky」已经有英文：再加英文要在问之前就说，什么都不传。
+    do {
+        _ = try await fixture.manage(["action": "add_reference", "file": .string(file.path), "voice": voice, "language": "en"])
+        require(false, "a language the voice already has is refused before anything is asked")
+    } catch let error as AIToolError {
+        require(error.message.contains("The voice \"Sky\" already has a recording in English") && error.message.contains("Nothing was sent"),
+                "a language the voice already has is refused before anything is asked, naming the voice (got \(error.message))")
+    }
+    require(VoiceLibraryHTTP.calls("POST", "/uploads").isEmpty && VoiceLibraryHTTP.calls("POST", "/references").isEmpty,
+            "nothing is uploaded or sent for a language the voice already has")
+    // 新的一种语言：问授权，问句写声音的名字、不写 id。
+    let asked = try await fixture.manage(["action": "add_reference", "file": .string(file.path), "voice": voice, "language": "zh"])
+    let question = asked.payload["question"]?.stringValue ?? ""
+    require(asked.payload["confirm_token"] != nil && question.contains("to the voice \"Sky\"") && !question.contains(VoiceLibraryHTTP.voiceID),
+            "the consent question names the voice, not its id (got \(question))")
+}
+
+@MainActor
 private func deleteChecks(_ root: URL) async throws {
     let fixture = try VoiceLibraryFixture(folder: root.appendingPathComponent("library-delete"))
     let access = AIAccessStore.shared
@@ -116,6 +140,18 @@ private func designChecks(_ root: URL) async throws {
     require(done["status"] == "done" && done["voice"]?["name"] == "Calm" && done["sample_url"] != nil && done["credits_charged"] == 22.5,
             "get_job reports the new voice, its sample and what was charged")
     require(SkyStudioSpendStore.shared.spentToday() == spent + 22.5, "the day's spend settles at what Sky Studio charged")
+
+    // Qwen3 按描述 + 试读句每开始 1,000 字收一次（Sky Studio #247）：长一点的描述照报价走，任务的 max_credits 就是报价，不是写死的 22.5。
+    let long: JSONValue = ["action": "design", "description": .string(String(repeating: "A calm, warm narrator with a soft voice. ", count: 30)),
+                           "name": "Long", "sample_text": "Hello there."]
+    let longAsked = try await fixture.manage(long)
+    require(longAsked.payload["credits"] == 45 && longAsked.payload["question"]?.stringValue?.contains("45") == true,
+            "a description and sample over 1,000 characters is asked at its quote (two blocks)")
+    var longConfirmed = long.objectValue ?? [:]
+    longConfirmed["confirm_token"] = longAsked.payload["confirm_token"] ?? .null
+    let longDone = try await fixture.wait(try await fixture.manage(.object(longConfirmed)))
+    require(longDone["status"] == "done" && VoiceLibraryHTTP.calls("POST", "/jobs").last?["max_credits"] == 45,
+            "and the job's max_credits is that quote")
 }
 
 @MainActor

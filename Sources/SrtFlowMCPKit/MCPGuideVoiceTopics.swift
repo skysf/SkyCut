@@ -8,7 +8,7 @@ import Foundation
 // **概要不以迁移前的原文开头**（试点的规矩里唯一的例外，docs/architecture/mcp-guide.md 第 14 条）：这个工具的行为和迁移同一个 PR 改了
 // （声音方案 4.2–4.4、第十二节：默认 gemini:Charon、去掉 clone_from、不再收不带前缀的 Rachel），旧说明照抄进来等于叫 AI 用已经没有的东西；
 // 旧说明每一句去了哪写在那个 PR（#355）的说明里。
-// 写的是**这一刀真有的**：声音库的声音（voice_…）和建 MiniMax 版的一次性费用是声音 PR 6 加的；全部权限下不再问（长期授权）是声音 PR 7、
+// 写的是**真有的**：声音库的声音（voice_…）和建 MiniMax 版的一次性费用是声音 PR 6 加的；全部权限下有长期授权就不再问是声音 PR 7 补上的；
 // change_voice 是声音 PR 9，到时候再补进来（提到不存在的工具名、参数名守卫会红：GuidePilotChecks）。只写英文（MCP 按需说明方案第八节第 7 条）。
 // 不管什么：名片（MCPMediaTools）、怎么答（MCPGuide）、挑哪个主题（MCPGuideTopics）。
 // 方案：docs/plans/2026-11-09-voice-features.md 4.2–4.4、4.10、第七节、8.4；docs/plans/2026-11-09-mcp-guide.md 2.3、5.1。
@@ -81,7 +81,8 @@ enum MCPGuideVoiceTopics {
     model read each line, and voice.note says they may sound different: tell the user. Making them match means reading \
     the whole script again (quoted again first). A batch whose fallback first needs a one-time fee stops with \
     fallback_needs_one_time (nothing is charged for it); get_job then asks whether to pay it, with the price and a \
-    confirm_token (how to answer is under recovery below).
+    confirm_token (how to answer is under recovery below). In full access with the standing voice consent on record, \
+    SkyCut builds it right away instead (get_job has enroll_job_id and full_access).
     """)
 
     // 出处：sky-studio-jobs.md 第一节、第五节、第十一节（每日硬预算）；ai-control-mcp.md 第四节第 6、39、40 条；声音方案 4.2 第 2–5 步。
@@ -96,7 +97,9 @@ enum MCPGuideVoiceTopics {
     per language. The call then returns needs_confirmation with one_time (the price) and voice_plan (the no-fee option \
     it would read with). If the user agrees, repeat the same call with confirm_token: SkyCut builds the version and \
     returns job_id (kind voice_enroll); wait with get_job, then call add_voiceover again with the same lines (nothing was \
-    narrated yet). If not, repeat the call with skip_one_time=true: it reads now with the no-fee model.
+    narrated yet). If not, repeat the call with skip_one_time=true: it reads now with the no-fee model. In full access \
+    with the standing voice consent on record, SkyCut builds it without asking (job_id, kind voice_enroll, full_access \
+    says so; tell the user what it cost); without one, it asks once and agreeing records the consent.
     - needs_confirmation can also ask to read a recovery file outside the opened folder (ask mode only): ask the user, \
     then repeat the same call with confirm_token.
     """)
@@ -145,7 +148,9 @@ enum MCPGuideVoiceTopics {
     - fallback_needs_one_time: get_job carries the question, one_time (the price) and a confirm_token. Ask the user: \
     resume=<recovery_file> with that confirm_token builds the voice's MiniMax version (a voice_enroll job; then call \
     resume=<recovery_file> generate_missing=true for the missing parts), and resume=<recovery_file> skip_one_time=true \
-    retries them with the same model instead. A plain resume recovers what exists and asks again (same confirm_token).
+    retries them with the same model instead. A plain resume recovers what exists and asks again (same confirm_token). \
+    In full access with the standing voice consent on record nothing asks: SkyCut builds it (enroll_job_id); wait for \
+    that job, then call resume=<recovery_file> generate_missing=true.
     - Reopen the original project first; resume refuses another project. It never inserts twice, not even after the \
     user undid the insertion.
     get_job lists completed_line_indices, not_generated_line_indices, unknown_batch_indices and the recovery arguments.

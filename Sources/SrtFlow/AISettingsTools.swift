@@ -31,14 +31,24 @@ enum AISettingsTools {
             throw AIToolError("Pass at least one setting to change, or clear_optimized_media_cache=true. Use get_settings to read settings.")
         }
 
-        if let approval = try AISettingsApproval.check(args, mode: mode, limit: limit) { return approval }
+        // 打开全部权限：问句带上那段说明（价目、额度、长期授权那句），点过头记的就是问句里那一版（SkyCut 声音方案 5.6）。
+        let before = AIAccessStore.shared.mode
+        let standing = SkyStudioVoiceStanding.shared
+        let notice = mode == .full && before != .full ? await standing.notice() : nil
+        if let approval = try AISettingsApproval.check(args, mode: mode, limit: limit, fullAccess: notice) { return approval }
         if let mode { AIAccessStore.shared.setMode(mode) }
         if let language { AppLanguageStore.shared.language = language }
         if let theme { AppThemeStore.shared.setTheme(theme) }
         if let capacityGB { OptimizedMediaCacheSettings.shared.setCapacity(Int64(capacityGB) * 1_000_000_000) }
         if let limit { SkyStudioSpendStore.shared.setDailyLimit(limit) }
         if clear { OptimizedMediaCacheSettings.shared.clear() }
-        return .ok(await snapshot(section: "all"))
+        var result = await snapshot(section: "all").objectValue ?? [:]
+        if let mode, mode != before {
+            // 打开记一条长期授权、关掉撤掉（记不上照样打开：声音那几件事第一次还会问一次）。
+            let version = notice?.statement.version ?? SkyStudioVoiceStandingNotice.knownStatement.version
+            result["voice_standing_consent"] = await standing.modeChanged(to: mode, statementVersion: version).json
+        }
+        return .ok(.object(result))
     }
 
     private static func snapshot(section: String) async -> JSONValue {
@@ -65,6 +75,8 @@ enum AISettingsTools {
                     "permission_modes": .array(AIAccessMode.allCases.map { ["id": .string($0.rawValue), "names": $0.names] }),
                     "writable_fields": ["ai_access_mode"],
                     "approval_rule": "Changing permission mode through MCP always requires explicit user agreement and confirm_token, even in full_access. Use permission names in the conversation language. Both modes start with low-cost drafts; full_access proceeds with notifications. Daily budgets are hard limits.",
+                    "voice_standing_consent": SkyStudioVoiceStanding.shared.status.json,
+                    "voice_standing_consent_rule": "Turning on full_access records the user's standing voice consent on Sky Studio (the question shows its statement and the one-time voice fees); turning it off revokes it. In full_access with it on record, voice recordings, voice design and MiniMax versions proceed without asking and the result says what was done.",
                     "clients": .array(AIClientSetup.Client.allCases.map { client in
                         ["id": .string(client.rawValue), "name": .string(client.title), "status": .string(clientStatus(setup.statuses[client]))]
                     }),
