@@ -700,6 +700,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-10 Sky Studio 接线守卫最后三节的检查从来不会红](docs/bugfixes/2026-11-10-sky-studio-wiring-checks-after-exit.md) — 总闸（`if FAILED … exit 1`）夹在中间，后来加的角色 A、0.18.62、声音库三节接在它后面，✗ 打出来、脚本照样退出 0；总闸挪到最后，总闸前加一条读自己文件的检查（最后一条 fail 要在总闸之前）。
 - [2026-11-10 add_voiceover 会问、却不收 confirm_token](docs/bugfixes/2026-11-10-voiceover-confirm-token-refused.md) — 读别处的恢复文件回 needs_confirmation，点过头带 confirm_token 再调被参数核对挡掉（说明上没写）；说明里加上，守卫钉住「名片写着 needs_confirmation 的工具都收 confirm_token」。
 - [2026-11-10 实测证据里漏了本机路径（带着账户名）](docs/bugfixes/2026-11-10-measurement-evidence-local-paths.md) — `report.py` 只换这个任务的目录前缀，跑完改过名的目录和模型写短的路径漏过去；改成按形状换（指到 work 的临时路径、家目录）、剩下的打提醒，`checks/report-evidence-no-local-paths.sh` 扫进仓库的证据；顺带删掉 #354 误带进来的两份草稿调用表。
 - [2026-11-10 浮点素材里有坏采样，做克隆参考录音时整个 App 崩掉](docs/bugfixes/2026-11-10-voice-reference-nan-sample-crash.md) — `Int16(clamping: Int(…))` 在夹住之前 `Int(_:)` 就对 NaN / ±Inf / 特别大的数 trap；先排除非有限数、在浮点上夹范围，坏采样记 0；带 NaN 的 32 位浮点素材真走 `prepare` 的回归，撤掉修复当场崩。
