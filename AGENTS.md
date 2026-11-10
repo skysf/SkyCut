@@ -437,7 +437,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - [MCP 按需说明的基线实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半 2026-11-11 跑。
 
-- [MCP 按需说明的试点实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；Codex 一半 2026-11-11 跑。
+- [MCP 按需说明的试点实测（Claude Code 一半）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
+  （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半 2026-11-11 跑。
 
 - [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
 
