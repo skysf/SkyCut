@@ -17,10 +17,14 @@ public struct MCPGuideSection: Sendable, Equatable {
     public static let overview = "overview"
 
     public let name: String
+    /// 这一节讲什么（一行）。主题长到要分节回时，第一次回答按它列出每一节（`contents`），AI 挑要读的（2026-11-10：试点实测里
+    /// 只给节名、叫它「再按 section 取」，它把 generate_media 的六节全读了）。手写的节写在节旁边，fields 几节自动生成。
+    public let about: String
     public let text: String
 
-    public init(name: String, text: String) {
+    public init(name: String, about: String = "", text: String) {
         self.name = name
+        self.about = about
         self.text = text
     }
 }
@@ -33,12 +37,15 @@ public struct MCPGuideTopic: Sendable, Equatable {
     /// 最小的 JSON 例子（身份是写明的占位）；守卫按真实参数定义逐个校验。
     public let examples: [JSONValue]
     public let related: [String]
+    /// 分节回时写进第一次回答的 next_step：常见的活只要读哪一节（generate_media：报价再问只读 spending）。
+    public let readingTip: String?
 
-    public init(name: String, sections: [MCPGuideSection], examples: [JSONValue] = [], related: [String] = []) {
+    public init(name: String, sections: [MCPGuideSection], examples: [JSONValue] = [], related: [String] = [], readingTip: String? = nil) {
         self.name = name
         self.sections = sections
         self.examples = examples
         self.related = related
+        self.readingTip = readingTip
     }
 }
 
@@ -58,7 +65,8 @@ public enum MCPGuideTopics {
         let definition = tool.definition
         let fields = MCPGuideFields.sections(for: definition.inputSchema)
         if let written = MCPGuideWrittenTopics.topic(for: tool) {
-            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + fields, examples: written.examples, related: written.related)
+            return MCPGuideTopic(name: tool.rawValue, sections: written.sections + fields, examples: written.examples, related: written.related,
+                                 readingTip: written.readingTip)
         }
         return MCPGuideTopic(name: tool.rawValue, sections: [MCPGuideSection(name: MCPGuideSection.overview, text: definition.description)] + fields)
     }
