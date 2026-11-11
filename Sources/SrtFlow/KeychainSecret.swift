@@ -21,6 +21,9 @@ struct KeychainSecret: Sendable {
         case missing
         /// 只读了「不弹框」那档、而这一版还没被允许读：要 `.interactive` 才读得到。
         case needsPermission
+        /// 只由 `KeychainSecretCache` 的静默读给：钥匙串在期限内没回答，**不是要授权**（要授权时原生读零点几秒就拒了，
+        /// 2026-11-07 实测）。那次读还在跑、迟到的 Key 会缓存，过几秒再问就有；再问时它还没回来，缓存改报 `needsPermission`。
+        case slow
         case failed(OSStatus)
     }
 
