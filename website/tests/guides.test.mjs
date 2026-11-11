@@ -2,6 +2,7 @@
 // Article data, translations stay in step, and the wording rules stop a guide that breaks them.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import english from '../content/en.js';
 import {guides} from '../content/guides/index.js';
 import {guideCopy} from '../content/guide-copy.js';
@@ -81,6 +82,9 @@ test('guide-only languages borrow a site language for navigation and name their 
   assert.ok(text.includes('$19')&&text.includes('美元'));assert.ok(text.includes('簡體中文'));
   assert.ok(visibleText(japanese).includes('日本語表示はありません'));
   assert.deepEqual(GUIDE_LANGUAGES,['en','zh','de','es','zh-hant','ja']);
+  // Generated pages never enter the repository: every language folder the build writes is ignored.
+  const ignored=(await readFile(new URL('../../.gitignore',import.meta.url),'utf8')).split('\n');
+  for(const language of GUIDE_LANGUAGES)assert.ok(ignored.includes(`website/${language}/`),`website/${language}/ is generated and must be in .gitignore`);
 });
 
 test('a draft is built only for review: no route, no sitemap entry, not indexable',()=>{
