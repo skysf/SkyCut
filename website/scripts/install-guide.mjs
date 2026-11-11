@@ -7,6 +7,8 @@ import {LANGUAGE_TAGS} from './site-config.mjs';
 export const INSTALL_GUIDE={
   src:'/media/guides/how-to-install-skycut-on-mac.mp4',poster:'/media/guides/how-to-install-skycut-on-mac.jpg',
   width:1728,height:1080,duration:'PT32.5S',
+  // First published with the docs page: PR #329 merged and deployed on this day.
+  published:'2026-11-06',
 };
 
 export function installGuideTrack(language) {

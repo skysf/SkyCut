@@ -22,6 +22,8 @@ export default {
   filmBody: 'Un cortometraje de Sky Lu Creado con Sky Studio Editado en SkyCut',
   filmCaption: 'Ver el corto', previous: 'Fotograma anterior', next: 'Fotograma siguiente',
   filmAlt: 'Un fotograma de Antarctica el cortometraje editado en SkyCut',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['Un rompehielos visto desde arriba avanza entre el hielo marino antártico', 'Un hombre con chaqueta amarilla sentado entre pingüinos rey sobre el hielo', 'Un buzo se ajusta una máscara azul antes de sumergirse', 'Bailarines con tocados de plumas alrededor de una hoguera de noche'],
   native: 'Hecho para tu Mac', nativeBody: 'Una línea de tiempo real Una app nativa Tu forma de trabajar',
   available: 'Ya disponible', coming: 'Próximamente', notify: 'Avísame',
   platformNames: ['Mac Chip de Apple', 'Mac Intel', 'Windows'],

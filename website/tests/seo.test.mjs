@@ -5,8 +5,12 @@ import {readFile} from 'node:fs/promises';
 import {render} from '../scripts/template.mjs';
 import {renderSitemap,renderRobots} from '../scripts/sitemap.mjs';
 import {serializeStructuredData} from '../scripts/structured-data.mjs';
+import {INDEX_DIRECTIVES} from '../scripts/seo.mjs';
+import {readRevisions} from '../scripts/page-revisions.mjs';
 const languages=['en','zh','de','es'];
 const tags={en:'en',zh:'zh-CN',de:'de',es:'es'};
+// hreflang targets every Chinese locale with the one Chinese version, so it has no region.
+const hreflang={en:'en',zh:'zh',de:'de',es:'es'};
 const jsonGraph=html=>JSON.parse(html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/)[1])['@graph'];
 const meta=(html,name)=>html.match(new RegExp(`<meta (?:name|property)="${name}" content="([^"]*)"`))?.[1];
 for(const language of languages) {
@@ -19,14 +23,16 @@ for(const language of languages) {
       assert.match(html,new RegExp(`<link rel="canonical" href="${canonical}">`));
       assert.equal(meta(html,'og:url'),canonical);
       assert.equal(meta(html,'author'),'Sky Lu');
-      assert.equal(meta(html,'robots'),'index,follow,max-image-preview:large');
+      assert.equal(meta(html,'robots'),INDEX_DIRECTIVES);
+      assert.equal(INDEX_DIRECTIVES,'index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1');
       assert.equal(meta(html,'twitter:title'),meta(html,'og:title'));
       assert.equal(meta(html,'twitter:description'),meta(html,'description'));
       descriptions.push(meta(html,'description'));
       assert.match(html,/rel="author noopener">[^<]*Sky Lu/);
       assert.ok(html.includes(`https://skylu.ai/founder/?lang=${language}`));
       assert.ok(html.includes(c.seo.familyLabel));
-      for(const other of languages)assert.ok(html.includes(`hreflang="${tags[other]}" href="https://skycut.app/${other}/${page?page+'/':''}"`));
+      for(const other of languages)assert.ok(html.includes(`hreflang="${hreflang[other]}" href="https://skycut.app/${other}/${page?page+'/':''}"`));
+      assert.doesNotMatch(html,/hreflang="zh-CN"/,'a region on the Chinese hreflang would send other Chinese locales to English');
       const graph=jsonGraph(html);
       const person=graph.find(node=>node['@type']==='Person');
       const organization=graph.find(node=>node['@type']==='Organization');
@@ -71,10 +77,13 @@ test('the sitemap contains only the twelve public canonical pages with reciproca
     assert.match(path,/^\/(en|zh|de|es)\/(docs\/|privacy\/)?$/);
     assert.equal((entry.match(/<xhtml:link /g)||[]).length,5);
     const route=path.split('/')[2];
-    for(const language of languages)assert.ok(entry.includes(`hreflang="${tags[language]}" href="https://skycut.app/${language}/${route?route+'/':''}"`));
+    for(const language of languages)assert.ok(entry.includes(`hreflang="${hreflang[language]}" href="https://skycut.app/${language}/${route?route+'/':''}"`));
+    const stamp=readRevisions()[`${path.split('/')[1]}/${route||'home'}`];
+    assert.match(stamp.modified,/^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(entry.includes(`<lastmod>${stamp.modified}</lastmod>`),'lastmod is the recorded day the page changed, never a build date');
     assert.ok(entry.includes(`hreflang="x-default" href="https://skycut.app/en/${route?route+'/':''}"`));
   }
-  assert.doesNotMatch(sitemap,/404|updates|localhost|vercel|<lastmod>|<priority>|<changefreq>/);
+  assert.doesNotMatch(sitemap,/404|updates|localhost|vercel|<priority>|<changefreq>/);
   const robots=renderRobots();
   assert.match(robots,/Sitemap: https:\/\/skycut\.app\/sitemap\.xml/);
   assert.match(robots,/Disallow: \/api\//);

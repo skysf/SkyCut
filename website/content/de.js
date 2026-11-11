@@ -22,6 +22,8 @@ export default {
   filmBody: 'Ein Kurzfilm von Sky Lu Mit Sky Studio erstellt In SkyCut geschnitten',
   filmCaption: 'Film ansehen', previous: 'Vorheriges Bild', next: 'Nächstes Bild',
   filmAlt: 'Ein Bild aus Antarctica dem in SkyCut geschnittenen Kurzfilm',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['Ein Eisbrecher bahnt sich von oben gesehen den Weg durch antarktisches Meereis', 'Ein Mann in gelber Jacke sitzt zwischen Königspinguinen auf dem Eis', 'Ein Taucher richtet vor dem Tauchgang seine blaue Maske', 'Tänzer mit Federschmuck nachts um ein Lagerfeuer'],
   native: 'Für deinen Mac gemacht', nativeBody: 'Eine echte Timeline Eine native App Dein Workflow',
   available: 'Jetzt verfügbar', coming: 'Demnächst', notify: 'Benachrichtige mich',
   platformNames: ['Mac Apple-Chip', 'Mac Intel', 'Windows'],

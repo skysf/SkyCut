@@ -22,6 +22,8 @@ export default {
   filmBody: 'Sky Lu 的短片 由 Sky Studio 创作 SkyCut 剪辑',
   filmCaption: '观看短片', previous: '上一帧', next: '下一帧',
   filmAlt: '用 SkyCut 剪辑的短片 南极 中的画面',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['俯拍破冰船穿过南极海冰', '穿黄色外套的人坐在冰面上的王企鹅中间', '潜水员下水前调整蓝色面镜', '夜晚头戴羽饰的舞者围着篝火'],
   native: '为你的 Mac 而生', nativeBody: '原生 App 自由剪辑',
   available: '现已推出', coming: '即将推出', notify: '上线通知我',
   platformNames: ['Mac Apple 芯片', 'Mac Intel', 'Windows'],

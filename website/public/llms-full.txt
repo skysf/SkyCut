@@ -1,0 +1,195 @@
+# SkyCut: full fact sheet
+
+> SkyCut is an AI video editor for Mac. You edit on a native multitrack timeline, or connect Claude Code, Claude Desktop or Codex and direct the edit in your own words. It runs on Apple silicon Macs with macOS 15 or later and is made by Sky Lu as part of the Sky Studio product family.
+
+This file is generated from the same content as https://skycut.app. Short version: https://skycut.app/llms.txt
+
+## Key facts
+
+- Platform: Mac only. Apple silicon (arm64) and macOS 15 or later. There is no Intel Mac version and no Windows version.
+- Price: the Free plan costs $0 and has no time limit. Pro costs $19 per month or $149 per year in USD (¥129 or ¥999 in CNY on the Chinese site). Prices exclude tax.
+- Free includes the full manual editor, subtitles, screen recording and the file tools. Videos exported on Free carry a Sky Studio watermark.
+- Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. New accounts get 7 days of Pro.
+- AI editing: SkyCut includes a local MCP server with built-in setup for Claude Code, Claude Desktop and Codex. You bring your own AI client. The AI works on the real timeline, where you can inspect, change or undo what it did.
+- Cloud generation (images, video, music, narration, sound effects, lip sync, upscaling) uses Sky Studio credits, which are bought separately. Yearly Pro includes 1,000 Sky Studio credits for each paid year; monthly Pro includes none.
+- Download: https://skylu.ai/download/skycut
+- Buy Pro: https://skystudioai.com/app/skycut/pro (sign in to Sky Studio first)
+- Contact: support@skycut.app
+
+## Questions and answers
+
+### What is SkyCut?
+
+SkyCut is an AI video editor for Mac. You edit on a native multitrack timeline, or connect Claude Code, Claude Desktop or Codex and direct the edit in your own words. It runs on Apple silicon Macs with macOS 15 or later and is made by Sky Lu as part of the Sky Studio product family.
+
+### Which Mac do I need?
+
+An Apple silicon Mac running macOS 15 or later. Automatic transcription uses Apple speech recognition and needs macOS 26. Intel Mac and Windows versions are not available.
+
+### Is SkyCut free?
+
+Yes. The Free plan has no time limit and includes the full manual editor; exported videos carry a Sky Studio watermark. Pro ($19 per month or $149 per year) removes the watermark and adds AI editing.
+
+### How does AI editing work?
+
+SkyCut includes a local MCP server. In Settings, Connect AI sets up Claude Desktop, Claude Code or Codex. You describe the edit in the AI client, and the AI makes the changes on the SkyCut timeline, where you can inspect, refine or undo them. AI editing needs Pro. A regular ChatGPT web chat cannot connect to the local MCP server.
+
+### Do I need a Sky Studio account?
+
+Only for Pro and for cloud generation. SkyCut Pro is tied to a Sky Studio account (one person, up to 2 Macs), and cloud models are paid for with Sky Studio credits. Manual editing on Free needs no account.
+
+### Does my footage stay on my Mac?
+
+Editing and project files are local. A connected AI client and any cloud generation you ask for receive the content needed for that request.
+
+### Who makes SkyCut?
+
+Sky Lu, the founder of Sky Studio. SkyCut is part of the Sky Studio product family.
+
+## Plans and terms
+
+- Free: $0, no time limit.
+- Pro monthly: $19 per month (¥129 on the Chinese site). No credits included.
+- Pro yearly: $149 per year (¥999 on the Chinese site). Includes 1,000 Sky Studio credits for each paid year.
+- Pro is for one person on up to 2 Macs.
+- Prices exclude tax; local taxes are added at checkout.
+- Auto renewal can be cancelled at any time, and Pro stays active through the paid period.
+- Payments are nonrefundable except where required by law.
+- Image, video and voice generation use Sky Studio credits purchased separately.
+
+## Free and Pro, feature by feature
+
+### What Pro adds
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| AI editing with Claude Code Claude Desktop and Codex | MCP connects your AI to footage and timelines Speech edits Beat cuts Subject framing Layers and animation Subtitles and voiceovers Export and finished video inspection | Requires Pro | Via AI |
+| Video export watermark | The same editing tools with a different export finish | Sky Studio watermark | No watermark |
+| Let AI use cloud models | Generate images video music voices and effects directly in your editing workflow | Requires Pro | Via AI, Uses credits |
+| Sky Studio credits with annual Pro | Monthly Pro does not include credits | No credits included | 1,000 Sky Studio credits for each paid year |
+
+### Editing and projects
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Multitrack editing | Video images and audio Layer clips across tracks | Included | Included |
+| Precise timeline tools | Split trim move duplicate Cut copy and paste across projects Snapping main track magnet and linked edits | Included | Included |
+| Speed and freeze frames | Change clip speed Turn a moment into a still frame | Included | Included |
+| Project tools | Multiple open projects Undo and redo Autosave Media relinking and optimized preview media | Included | Included |
+
+### Picture and motion
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Frame your picture | Position scale crop rotate flip and adjust opacity | Included | Included |
+| Motion and keyframes | Entrance and exit animations Fades Position size rotation and opacity keyframes with easing | Included | Included |
+| Transitions | Dissolves pushes and wipes with preview | Included | Included |
+| Color and filters | Stack filters and adjust their strength | Included | Included |
+| Blur and mosaic regions | Cover a chosen area for a chosen time | Included | Included |
+
+### Text and shapes
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Text styling | Fonts colors gradients outlines shadows alignment and multiple text rows | Included | Included |
+| Animated titles and numbers | Typewriter reveals and other text animations Animated counters and rolling digits | Included | Included |
+| Shapes and drawing animations | Lines rectangles squares circles and arcs Filled or outlined Entrance and exit animations | Included | Included |
+
+### Sound
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Clip audio controls | Stereo waveforms Volume curves Mute and fades | Included | Included |
+| Track and master mixing | Independent faders Stereo meters and peak warnings | Included | Included |
+| Sound scenes | Speaker indoor and outdoor sound effects | Included | Included |
+| Music and sound effect library | Browse audition and add audio to the timeline | Included | Included |
+
+### Subtitles
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Subtitle editing | Edit wording and timing Original and translated tracks SRT WebVTT ASS SSA and text files | Included | Included |
+| Subtitle styles | Fonts outlines shadows positions and saved presets Word highlighting | Included | Included |
+
+### Screen recording and tools
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Screen recording | Screen window or selected region System audio and a separate microphone track | Included | Included |
+| Video compression | Batch queues Software or hardware H264 Resolution and frame rate limits | Included | Included |
+| Subtitle file tools | Convert formats in batches Burn styled subtitles into video | Included | Included |
+
+### Export
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Video export | Full timeline or selection MP4 Software or hardware H264 Quality and resolution controls | Included | Included |
+| Audio export | M4A from audio only timelines Mixed audio with peak limiting | Included | Included |
+| Separate subtitle files | Export subtitles beside the video with language tags | Included | Included |
+
+### Character system
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Read Sky Studio characters | Browse saved characters and read front side back and headshot references No credits used | Requires Pro | Via AI, No credits used |
+| Generate images and video with characters | Use Sky Studio character references to keep people consistent across images and video | Requires Pro | Via AI, Uses credits |
+| Create character sheets | Generate a character sheet from text or one photo directly in SkyCut | Requires Pro | Via AI, Uses credits |
+| Import and manage characters | Import existing front side and back images Rename replace images and delete No credits used | Requires Pro | Via AI, No credits used |
+| Regenerate character headshots | Generate a new headshot from the current front image | Requires Pro | Via AI, Uses credits |
+
+### Local models
+
+Local processing uses no Sky Studio credits. Calling these tools through AI requires Pro. The built-in voices cover Chinese, English, Japanese, Spanish, French, Italian, Portuguese, Hindi.
+
+| Feature | What it covers | Free | Pro |
+| --- | --- | --- | --- |
+| Apple speech recognition | Generate and transcribe subtitles on this Mac Requires macOS 26 and a supported speech model | In the app, No credits used | In the app or via AI, No credits used |
+| Apple Translation | Translate subtitles on this Mac Requires macOS 15 and supported downloaded languages | In the app, No credits used | In the app or via AI, No credits used |
+| Apple Vision | Identify subjects and recognize text in footage | Requires Pro | Via AI, No credits used |
+| SkyCut shot detection | Find shot boundaries using local picture analysis | Requires Pro | Via AI, No credits used |
+| Built-in multilingual voices | 8 preset characters for Chinese and English Download the local voice pack once Languages below | Requires Pro | Via AI, No credits used |
+| Built-in sound effect synth | 16 local presets for editing sounds | Requires Pro | Via AI, No credits used |
+
+### Cloud models
+
+Cloud models use Sky Studio credits. On Pro the AI calls them for you; video upscaling can also be used directly in the app on Free. The catalog changes, and the app shows the current list.
+
+- Image generation: Seedream 5.0 Flash, Nano Banana 2, Nano Banana 2 Lite, Nano Banana Pro, GPT Image 2, Seedream 5.0 Pro
+- Image camera angle: Qwen Angles
+- Image upscale: Image Upscale
+- Image background removal: Ideogram Remove Background
+- Video generation: Minimax H3, Gemini Omni 1.2 Flash, Veo 3.1 Fast, Seedance 2.0 Pro, Seedance 2.5, Wan 3.0 Text to Video, Wan 3.0 Image to Video, Wan 3.0 Reference to Video
+- Lip sync: HeyGen v3 Lipsync Speed, HeyGen v3 Lipsync Precision, MiniMax H3 Max Lip Sync (Image to Video)
+- Music generation: Lyria 3 Pro
+- Narration generation: Eleven v4 narration
+- Sound effect generation: Sonilo sound effects
+- Voice cloning: Zonos 2 voice clone
+- Video upscaling: Topaz Starlight, ByteDance Upscaler Pro
+
+## Getting started
+
+1. Install SkyCut: Download the Mac release, open the disk image and move SkyCut to Applications. You need an Apple silicon Mac and macOS 15 or later.
+2. Bring in your footage: Create a project and import your clips. Arrange video, sound and subtitles on the timeline.
+3. Connect your AI: In a build with Sky Studio settings, create a Key at Sky Studio and add it in SkyCut. Open Settings → Connect AI and choose Claude Desktop, Claude Code or Codex. AI access depends on your entitlement.
+4. Review and export: Play it back, refine the details and export. The export panel tells you if a watermark applies. Cloud generation is billed separately in Sky Studio credits.
+
+Supported AI clients: Claude Desktop, Claude Code and Codex have built-in setup. Other clients need local stdio MCP support. A regular ChatGPT web chat cannot connect directly to the local SkyCut MCP server.
+
+## Privacy
+
+- Email updates: When you sign up, we collect your email address, your three choices (SkyCut newsletter, Intel Mac availability and Windows availability), your language, and signup and update times. We store these in a Google spreadsheet belonging to Sky Studio, with Google acting as our data processor. We use them only to send the types of notifications you select.
+- Retention and unsubscribe: We keep your signup data until you unsubscribe or request deletion. To unsubscribe or have your data deleted, email support@skycut.app.
+- Website preferences: We store your language and animation preference in your browser. We do not add advertising trackers. Hosting and email providers may process technical information needed to deliver their services.
+- Film and downloads: Playing the demo loads video from downloads.skylu.ai. Downloading the Mac app takes you to the existing Sky Lu download service.
+- The Mac app: This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose.
+
+## Links
+
+- [SkyCut home](https://skycut.app/en/): overview, AI workflow demos, pricing and the full Free and Pro comparison
+- [Getting started](https://skycut.app/en/docs/): install SkyCut, import footage, connect an AI client, review and export
+- [Privacy](https://skycut.app/en/privacy/): what the website collects and why
+- [简体中文](https://skycut.app/zh/)
+- [Deutsch](https://skycut.app/de/)
+- [Español](https://skycut.app/es/)
+- [Sky Lu](https://skylu.ai/founder/): founder of Sky Studio and creator of SkyCut
+- [Sky Studio](https://skystudioai.com/): the AI image, video and audio generation platform in the same family; SkyCut Pro and credits are bought with a Sky Studio account

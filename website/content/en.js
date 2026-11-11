@@ -22,6 +22,8 @@ export default {
   filmBody: 'A short film by Sky Lu Created with Sky Studio Edited in SkyCut',
   filmCaption: 'Watch the film', previous: 'Previous frame', next: 'Next frame',
   filmAlt: 'A frame from Antarctica the short film edited in SkyCut',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['An icebreaker cutting through Antarctic sea ice seen from above', 'A man in a yellow jacket sitting among king penguins on the ice', 'A diver adjusting a blue mask before entering the water', 'Dancers in feathered headdresses around a campfire at night'],
   native: 'Made for your Mac', nativeBody: 'A real timeline A native app Your way of working',
   available: 'Available now', coming: 'Coming soon', notify: 'Notify me',
   platformNames: ['Mac Apple silicon', 'Mac Intel', 'Windows'],

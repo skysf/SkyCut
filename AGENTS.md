@@ -647,7 +647,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - [MCP 说明书（skycut_guide）](docs/architecture/mcp-guide.md) — 按需读的工具说明：App 照 recipes 的路子答、没开通也照答、清单里第一个且只有它预先加载（`anthropic/alwaysLoad`）；每个工具一个同名主题（概要 = 现在的说明原文、`fields` 从参数定义现算）、目录 ≤ 5,000、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的；迁移七个 PR 做到哪、守卫、反向验证、人工回归。
 
-- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/` 里的文件、没写发布日就是草稿、价格不许手写、只链自己的页面）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
 
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
 

@@ -40,7 +40,7 @@ function hero(c) {
 function film(c) {
   return `<section class="film-section section" id="film" aria-labelledby="film-title"><div class="container"><div class="section-heading"><div><h2 id="film-title">${e(c.filmTitle)}</h2><p>${e(c.filmBody)}</p></div><span class="film-name">${e(c.filmName)}</span></div>
     <button class="film-cover" data-film aria-label="${e(c.filmCaption)}">${photo('film', c.filmAlt)}<span class="film-play">${icon('play')}<span>${e(c.filmCaption)}</span></span></button>
-    <div class="film-stills">${shots.map(s => photo(s, c.filmAlt)).join('')}</div>
+    <div class="film-stills">${shots.map((s,i) => photo(s, c.filmStills[i])).join('')}</div>
     </div></section>
     <dialog class="film-dialog" aria-label="${e(c.filmName)}"><button class="dialog-close icon-button" aria-label="${e(c.close)}">${icon('close')}</button><video controls playsinline preload="none" poster="/media/film.webp" data-src="https://downloads.skylu.ai/founder/antarctica-720p.mp4"></video></dialog>`;
 }
