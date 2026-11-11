@@ -21,6 +21,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         DevHooks.prepareIsolatedCache()
         AIBridgeServer.shared.start()
         startMainThreadWatchdog()
+        // 从启动起就看着用户在不在：第一次建预览的音频引擎时要已经知道（docs/architecture/audio-engine.md 第二节第 11 条）。
+        AppUserPresence.shared.start()
         // 存了 Sky Studio 的 Key 就问一次授权（到时候了才问；docs/architecture/sky-studio-account.md）。
         SkyStudioAccount.shared.start()
         expireOptimizedMedia()

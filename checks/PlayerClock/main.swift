@@ -77,8 +77,10 @@ checkDetachDropsLateTicks(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 // 声音主时钟被系统停掉、恢复失败、换引擎和卸片之后的生命周期。
 checkAudioSourceRecovery(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
-// 播到片尾播放器自己停：声音主时钟也要跟着停（不然播放头一直往后走、引擎永远不算停着）。
+// 播到头由声音主时钟自己收尾（不然播放头一直往后走、引擎永远不算停着）；在尽头再按播放不开播。
 checkAudioSourceStopsAtEnd(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
+// 片尾的两种交错：自然播完不 seek 再按播放、旧的「播到头」通知晚到时已经回退重播（2 秒的短素材）。
+checkAudioSourceEndInterleavings(short: URL(fileURLWithPath: CommandLine.arguments[2]))
 
 // 12. 播放头的外推（电平条读它，不问播放器）：停着就是最近一跳；播放中补上过去的时间、最多补一跳；时钟倒退按没过时间算。
 check(PlaybackTimeEstimate.estimate(tick: 8, tickHost: 100, now: 100.02, isPlaying: false, maxLead: 0.05) == 8,

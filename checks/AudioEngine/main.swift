@@ -26,7 +26,7 @@ if CommandLine.arguments.contains("--realtime-recovery") {
 }
 // 开发机、真声卡、全程静音：空闲停图 / 冷着开播（Idle.swift 第 4 层）。
 if CommandLine.arguments.contains("--realtime-idle") {
-    checkRealtimeEngineIdle()
+    checkRealtimeEngineIdle(silentOnly: CommandLine.arguments.contains("--silent-only"))
     print("\(checks) realtime idle checks, \(failures) failures")
     exit(failures == 0 ? 0 : 1)
 }
@@ -283,6 +283,7 @@ print("==> 15. 引擎不是一直开着的：规矩、照规矩停 / 起、停�
 checkIdlePolicy()
 checkIdleKeeper()
 checkEngineIdle(tone: toneA)
+checkUserPresence()
 
 print("\(checks) checks, \(failures) failures")
 if failures == 0 { print("All checks passed") }

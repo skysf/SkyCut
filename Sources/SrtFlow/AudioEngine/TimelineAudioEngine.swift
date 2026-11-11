@@ -47,8 +47,16 @@ final class TimelineAudioEngine {
     private(set) var stoppedPlayingAt: TimeInterval?
     /// 时间线上有没有要出声的段。
     var hasSound: Bool { config.hasSound }
-    /// 故意停着的图要起回来了（`wake()`，主线程上叫）：管空闲的那一位从这儿知道要重新开始数。
+    /// 时间线总长（秒）：时钟按它收尾（PlaybackAudioSource.duration）。合成也正好这么长（builder 垫黑底铺到总长）。
+    var duration: Double { config.duration }
+    /// 图在跑或者正在起（管空闲的那一位只在这时候留着计时器）。
+    var graphIsUp: Bool { run.state == .running || run.state == .starting }
+    /// 故意停着的图要起回来了（`wake()` / 时钟要出声，主线程上叫）：管空闲的那一位从这儿知道要重新开始数。
     var onWake: (() -> Void)?
+    /// 后台那一次没起来（主线程上叫）：图还是故意停着的样子。
+    var onWakeFailed: (() -> Void)?
+    /// 怎么起原生图。只有自检换它（注一个起不来的，验「没有能用的输出设备」那条路）；生产就是 `start()`。
+    var startGraph: @Sendable (AVAudioEngine) throws -> Void = { try $0.start() }
     /// 一直挂着的静音节点：没有一条轨出声的时间线也要有人每拍更新时钟。
     private var clockNode: AVAudioSourceNode?
     private var running = false
@@ -287,13 +295,21 @@ final class TimelineAudioEngine {
     /// 把故意停着的图**提前**起回来（用户回到 SkyCut 动了一下，还没按播放）：在后台那条队列上起，马上回来。
     /// 冷的声卡起一次要 0.15–0.3 秒（M1 内置扬声器，2026-11-11），而且起的这段时间里**整个进程**都被拖住（哪条线程起都一样，
     /// 裸 HAL 也一样）—— 所以要赶在按播放之前起：按下去的时候图已经在跑，和一直开着一样。
-    /// 没起来：状态回到 `stopped`，时钟再要声音时当场起、拿到真的错误。
+    /// 没起来（没有能用的输出设备）：图还是故意停着的样子 —— 喂样线程接着歇、声卡没占着，告诉管空闲的那一位别一直重试；
+    /// 时钟再要声音时当场起、拿到真的错误。
     func wake() {
         guard run.state == .suspended else { return }
         for unit in units { unit.feeder.rest(false) }
-        let engine = self.engine
-        run.startInBackground { try engine.start() }
+        let engine = self.engine, start = startGraph
+        run.startInBackground({ try start(engine) }, failed: { [weak self] in self?.wakeFailed() })
         onWake?()
+    }
+
+    /// 后台那一次没起来（回到主线程上收拾）：状态已经回到故意停着；喂样线程重新歇下，不然它们从此每 50 ms 白醒一次。
+    private func wakeFailed() {
+        guard run.state == .suspended else { return }   // 这当口时钟已经当场把图起起来了：不用收拾
+        for unit in units { unit.feeder.rest(true) }
+        onWakeFailed?()
     }
 
     /// 时钟开播前和播放中每拍都调（PlayerClock）：要出声了，图得在跑。回 true = 图被别人停掉过、刚重启（时钟要重新对画面）。
@@ -301,7 +317,7 @@ final class TimelineAudioEngine {
     ///    起声卡时整个进程都被拖住，界面这会儿本来就不动；先走的话这一截画面和声音就被跳过去了。等它起来再从原处开播，一帧不少。
     ///    没有声音的时间线不起图，播放头一直按 host 时间走，声卡不用开。
     /// 2. 后台正在起（用户刚动了一下就按了播放）：等它起完。
-    /// 3. 被系统停掉的（输出设备换采样率 / 声道时系统会停图，但锚点的 playing 仍然为 true）、或者后台那一次没起来：
+    /// 3. 被系统停掉的（输出设备换采样率 / 声道时系统会停图，但锚点的 playing 仍然为 true）：
     ///    当场重启，回 true；起不来抛错，时钟停播。不在音频系统的配置通知回调里拆图。mainMixer 到 output 没写死格式，
     ///    重新 start 会跟随当前设备。手动渲染模式也走这里，自检无需声卡就能验证重启之后的时间连续性。
     @discardableResult
@@ -310,7 +326,12 @@ final class TimelineAudioEngine {
         if run.state == .suspended {
             guard config.hasSound else { return false }
             for unit in units { unit.feeder.rest(false) }
-            try engine.start()
+            do {
+                try startGraph(engine)
+            } catch {
+                for unit in units { unit.feeder.rest(true) }   // 没起来：还是故意停着的样子
+                throw error
+            }
             run.state = .running
             onWake?()
             return false
@@ -323,7 +344,7 @@ final class TimelineAudioEngine {
         // 重启之后发的在播锚点是待钉的，由第一拍渲染钉上 —— 不然播放头要么等着追上旧采样数，要么一下跳出去老远。
         renderClock.reset()
         anchor.publish(PlaybackAnchor(position: frame, sampleTime: 0, playing: false))
-        try engine.start()
+        try startGraph(engine)
         run.state = .running
         if mode == .realtime {
             running = true
@@ -378,10 +399,13 @@ final class TimelineAudioEngine {
         for unit in units { unit.feeder.seek(toFrame: frame) }
     }
 
+    /// 自检用：喂样线程是不是都歇着（图故意停着时该歇着；后台起图没起来之后也要歇回去）。
+    var feedersResting: Bool { units.allSatisfy(\.feeder.isResting) }
+
     /// 自检和实测用（量「按下播放到第一拍」）：在播的锚点被渲染块渲到了没有；渲到了给最近一拍出声卡的 host 时间。
     var renderedHostTime: UInt64? {
         guard let anchor = anchor.load(), anchor.playing, let start = anchor.sampleTime,
-              renderClock.ticked.load(ordering: .relaxed), currentSampleTime >= start else { return nil }
+              renderClock.hasTicked, currentSampleTime >= start else { return nil }
         return renderClock.hostTime.load(ordering: .relaxed)
     }
 
@@ -390,7 +414,7 @@ final class TimelineAudioEngine {
     /// host 时间：钉上之前播放头按它走，钉的时候把过去的这一截算进去。图在跑（刚起、还没报过时间）就不带：钉在第一拍、
     /// 位置不动，和平时「钉在下一拍上」是一回事。离线渲染没有 host 时间。
     private func publishAnchor(_ frame: Int64, playing: Bool) {
-        if playing, !renderClock.ticked.load(ordering: .relaxed) {
+        if playing, !renderClock.hasTicked {
             let onHostClock = mode == .realtime && run.state != .running
             anchor.publish(.pending(position: frame, hostTime: onHostClock ? mach_absolute_time() : 0, playing: true))
         } else {

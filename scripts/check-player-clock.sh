@@ -50,5 +50,9 @@ CLIP="$(dirname "$OUT")/clip.mp4"
 "$FFMPEG" -hide_banner -loglevel error -y -f lavfi -i testsrc2=s=64x64:r=10:d=60 -f lavfi -i sine=f=440:d=60 \
   -shortest -c:v libx264 -pix_fmt yuv420p -c:a aac "$CLIP"
 
+# 片尾的交错（自然播完再按播放、旧的「播到头」通知晚到）要一段很短的：2 秒、没有音轨。
+SHORT="$(dirname "$OUT")/short.mp4"
+"$FFMPEG" -hide_banner -loglevel error -y -f lavfi -i testsrc2=s=64x64:r=10:d=2 -c:v libx264 -pix_fmt yuv420p -an "$SHORT"
+
 echo "==> 运行"
-"$OUT" "$CLIP"
+"$OUT" "$CLIP" "$SHORT"

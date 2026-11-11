@@ -38,7 +38,9 @@ final class PlayerClock: ObservableObject {
     private var tickHostTime: TimeInterval = 0
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
-    private var endObservers: [NSObjectProtocol] = []
+    private var failureObserver: NSObjectProtocol?
+    /// 离总长不到这么多就算已经在尽头：没有东西可播了。
+    private static let endSlack: TimeInterval = 0.001
 
     /// 链式 seek（Apple QA1820）的两个状态：上一个 seek 还没完成时只记下最新目标，
     /// 完成后再续发。主线程读写。
@@ -87,23 +89,39 @@ final class PlayerClock: ObservableObject {
                 DispatchQueue.main.async { self?.isPlaying = playing }
             }
         }
-        // 播到片尾播放器自己停：声音引擎的锚点还标着在播，要有人停它（itemEnded）。
-        endObservers = [Notification.Name.AVPlayerItemDidPlayToEndTime, .AVPlayerItemFailedToPlayToEndTime].map { name in
-            NotificationCenter.default.addObserver(forName: name, object: nil, queue: .main) { [weak self] notification in
-                self?.itemEnded(notification.object as? AVPlayerItem, failed: name == .AVPlayerItemFailedToPlayToEndTime)
-            }
+        // 播放器播不下去了（条目出错）：声音和画面一起停。正常播到头不靠通知，声音主时钟自己按总长收尾（finishAtEnd）。
+        failureObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let self, (notification.object as? AVPlayerItem) === player.currentItem, audioSource?.isPlaying == true else { return }
+            pause()
         }
     }
 
-    /// 播放器的条目播到头了（或者播不下去了）：声音主时钟跟着停。2026-11-11 之前没人停它 —— 播放头照着引擎一直往后走，
-    /// 引擎也永远不算停着、图一直开着占着声卡（docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md）。
-    /// 认的是「条目播到头」这个通知，不看 rate：暂停之后马上再播时，rate 的变化晚到一拍，这会儿读到的还是 0。
-    /// 通知也可能晚到：只在还是当前条目、播放头确实到了片尾附近时才停（用户刚在片尾按了回到开头，这一下不该停）。
-    private func itemEnded(_ item: AVPlayerItem?, failed: Bool) {
-        guard let item, item === player.currentItem, let source = audioSource, source.isPlaying else { return }
-        let duration = item.duration.seconds
-        guard failed || !duration.isFinite || source.playhead >= duration - 0.5 else { return }
+    // MARK: 播到头
+
+    /// 声音源说的时间线总长；不知道（0）就不替它收尾。
+    private static func end(of source: PlaybackAudioSource) -> TimeInterval? {
+        source.duration > 0 ? source.duration : nil
+    }
+
+    /// 播放头已经在时间线的尽头（刚播完、被放到了总长上、或者上一跳读数略微超出）：没有东西可播。
+    private var isAtEnd: Bool {
+        guard let source = audioSource, let end = Self.end(of: source) else { return false }
+        return time >= end - Self.endSlack
+    }
+
+    /// 声音主时钟走到了时间线的总长：这一轮播完了，**主时钟自己收尾** —— 声音、画面都停，播放头钉在总长上（三处同一个位置）。
+    ///
+    /// 2026-11-11 之前没人收尾：播放器播到头自己停，声音引擎的锚点还标着在播，播放头照着它越过片尾一直往后走，引擎也永远
+    /// 不算停着、图一直开着占着声卡（docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md）。第一版改成听播放器的
+    /// 「播到头」通知，两处不对（同一份案例「审查之后」）：通知只停声音、不把播放头收回总长，在片尾直接再按播放时到了头的
+    /// 播放器不会再发第二次通知，声音主时钟又一直走下去；通知排着队还没处理时用户已经回退重播，旧通知把新一轮最后半秒的
+    /// 声音停掉。所以正常播完**不听通知**：播没播完只有主时钟自己知道。
+    private func finishAtEnd(_ end: TimeInterval, source: PlaybackAudioSource) {
         source.pause()
+        player.pause()
+        seek(to: end)
     }
 
     /// 播放器报来一次播放时间（播放时每 `observationInterval` 一次）。
@@ -137,7 +155,7 @@ final class PlayerClock: ObservableObject {
     deinit {
         if let timeObserver { player.removeTimeObserver(timeObserver) }
         rateObservation?.invalidate()
-        for observer in endObservers { NotificationCenter.default.removeObserver(observer) }
+        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         audioTimer?.invalidate()
         // 视图被销毁（比如切走了侧边栏那一栏）时别让声音还在响。
         player.pause()
@@ -155,7 +173,12 @@ final class PlayerClock: ObservableObject {
         let timer = Timer(timeInterval: observationInterval, repeats: true) { [weak self] _ in
             guard let self, let source = audioSource, source.isPlaying else { return }
             guard recoverAudioIfNeeded(source) else { return }
-            observePlaybackTime(source.playhead)
+            let position = source.playhead
+            if let end = Self.end(of: source), position >= end {
+                finishAtEnd(end, source: source)
+            } else {
+                observePlaybackTime(position)
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         audioTimer = timer
@@ -217,6 +240,12 @@ final class PlayerClock: ObservableObject {
     /// 开播（空格、重建之后接着播）：引擎驱动时声音先起、视频钉到同一个时刻；否则就是播放器自己播。
     func play() {
         if let source = audioSource {
+            // 播放头已经在尽头：没有东西可播，这一下不开播。照样开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走：
+            // 到了头的播放器不会再报一次「播完了」。回到开头是 Return 的事（goToStart）。
+            if isAtEnd {
+                if source.isPlaying { source.pause() }
+                return
+            }
             guard recoverAudioIfNeeded(source) else { return }
             source.play(from: time)
             anchorVideo(to: time)
@@ -346,7 +375,8 @@ final class PlayerClock: ObservableObject {
             // 悬停预览把画面带去了别处：播放必须从**播放头**起，先precise跳回去。
             // seek 后紧跟 play 是安全的（play 不取消在飞的 seek，完成后从目标续播）。
             // 引擎驱动时不用：`play()` 里的 setRate 自带定位。
-            if peekTime != nil {
+            // 在尽头按播放什么都不发生（`play()` 不开播）：悬停预览也照旧留着。
+            if peekTime != nil, !isAtEnd {
                 peekTime = nil
                 pendingScrubTarget = nil
                 if audioSource == nil {

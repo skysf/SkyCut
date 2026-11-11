@@ -21,10 +21,14 @@ protocol IdleSuspendableAudio: AnyObject {
     var stoppedPlayingAt: TimeInterval? { get }
     /// 图是不是故意停着。
     var isSuspended: Bool { get }
+    /// 图在跑或者正在起。既不是这个、也不是故意停着（从没起过、收掉了）时没有东西可管。
+    var graphIsUp: Bool { get }
     func suspend()
     func wake()
     /// 图要起回来了（不管是谁叫的：这里、还是时钟开播）。
     var onWake: (() -> Void)? { get set }
+    /// 后台那一次没起来（没有能用的输出设备）：图还是故意停着。
+    var onWakeFailed: (() -> Void)? { get set }
 }
 
 extension TimelineAudioEngine: IdleSuspendableAudio {}
@@ -40,6 +44,9 @@ final class AudioEngineIdleKeeper {
     private let note: (String) -> Void
     private weak var audio: (any IdleSuspendableAudio)?
     private var timer: Timer?
+    /// 上一次在后台起图没起来（没有能用的输出设备？）。之后「看一眼」不再替它重试 —— 不然用户在场的这两分钟里每 5 秒白起
+    /// 一次、白记一句；等用户下一次回来（`userReturned`）再试一次，时钟要出声时引擎自己会当场起、把真的错误报出来。
+    private var wakeFailed = false
 
     /// - Parameters:
     ///   - now: 此刻（和 `lastInput` 同一个钟：系统开机以来的秒）。
@@ -57,9 +64,15 @@ final class AudioEngineIdleKeeper {
     /// 接手一个引擎（刚建好、图已经起了）：马上看一眼，用不着就停。
     func keep(_ audio: any IdleSuspendableAudio) {
         self.audio = audio
+        wakeFailed = false
         audio.onWake = { [weak self] in
             self?.note("预览的音频引擎：起图（要出声了）")
             self?.arm()
+        }
+        audio.onWakeFailed = { [weak self] in
+            self?.wakeFailed = true
+            self?.note("预览的音频引擎：图没起来（没有能用的输出设备？），等用户下一次回来或者按播放再试")
+            self?.disarm()
         }
         reconcile()
     }
@@ -67,12 +80,14 @@ final class AudioEngineIdleKeeper {
     /// 引擎收掉了。
     func release() {
         audio?.onWake = nil
+        audio?.onWakeFailed = nil
         audio = nil
         disarm()
     }
 
-    /// 用户回到 SkyCut 动了一下。
+    /// 用户回到 SkyCut 动了一下（上一次没起来的话，这一下再试一次）。
     func userReturned() {
+        wakeFailed = false
         reconcile()
     }
 
@@ -90,12 +105,16 @@ final class AudioEngineIdleKeeper {
         let wanted = max(audio.stoppedPlayingAt ?? -.infinity, lastInput() ?? -.infinity)
         let shouldRun = policy.shouldRun(hasSound: audio.hasSound, isPlaying: audio.isPlaying, quietFor: now() - wanted)
         if shouldRun, audio.isSuspended {
-            audio.wake()   // onWake 里重新上计时器
-        } else if !shouldRun, !audio.isSuspended {
+            if !wakeFailed { audio.wake() }   // onWake 里重新上计时器
+        } else if !shouldRun, audio.graphIsUp {
             audio.suspend()
-            note(audio.hasSound ? "预览的音频引擎：停着没人用，停图（声卡放手）" : "预览的音频引擎：时间线没有声音，停图（声卡放手）")
+            // 只在真的停下来时记一句（图本来就没在跑的话 suspend 什么都不做）。
+            if audio.isSuspended {
+                note(audio.hasSound ? "预览的音频引擎：停着没人用，停图（声卡放手）" : "预览的音频引擎：时间线没有声音，停图（声卡放手）")
+            }
         }
-        if audio.isSuspended { disarm() } else { arm() }
+        // 图在跑（或者正在起）才留着计时器：故意停着、没起来、收掉了都不用再看。
+        if audio.graphIsUp { arm() } else { disarm() }
     }
 
     /// 图开着：隔一会儿看一次。

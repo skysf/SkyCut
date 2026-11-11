@@ -172,6 +172,9 @@ final class AudioTrackFeeder: @unchecked Sendable {
     /// 渲染块发现环快空了就叫一声（不阻塞）。
     func poke() { wake.signal() }
 
+    /// 此刻是不是歇着（自检看）。
+    var isResting: Bool { resting.load(ordering: .acquiring) }
+
     /// 引擎的图停着（`true`）/ 要起了（`false`）：停着时线程一直睡到有人叫，seek 照样把环填到新位置（开播就有数据）。
     func rest(_ resting: Bool) {
         self.resting.store(resting, ordering: .releasing)

@@ -13,7 +13,7 @@ import Synchronization
 
 final class AudioGraphRun: @unchecked Sendable {
     enum State: Int, Sendable {
-        /// 没在跑，也不是故意停的：从没起过、整个引擎收掉了、后台那一次没起来。时钟再要声音时当场起（起不来就报错）。
+        /// 没在跑，也不是故意停的：从没起过、整个引擎收掉了。
         case stopped
         case running
         /// 故意停的（空闲）：节点、流、播放头都留着，只是声卡放手了。
@@ -30,15 +30,21 @@ final class AudioGraphRun: @unchecked Sendable {
         set { raw.store(newValue.rawValue, ordering: .releasing) }
     }
 
-    /// 在后台起图：马上回来，状态先记成「正在起」，起完记成在跑；没起来记回 `stopped`（时钟下一拍当场再起一次、拿到真的错误）。
-    func startInBackground(_ start: @escaping @Sendable () throws -> Void) {
+    /// 在后台起图：马上回来，状态先记成「正在起」，起完记成在跑。没起来（没有能用的输出设备）：状态回到「故意停着」
+    /// —— 图本来就是那个样子，时钟再要声音时照常当场起、拿到真的错误 —— 再到主线程上叫一次 `failed`（收拾喂样线程、
+    /// 告诉管空闲的那一位别一直重试）。2026-11-11 审查之前记成 `stopped`：既不算停着也不算在跑，管空闲的每 5 秒记一句
+    /// 「停图」、喂样线程回到每 50 ms 轮询。
+    func startInBackground(_ start: @escaping @Sendable () throws -> Void, failed: @escaping @Sendable () -> Void) {
         state = .starting
         queue.async { [self] in
             do {
                 try start()
                 state = .running
             } catch {
-                state = .stopped
+                state = .suspended
+                // 回主线程：经主 RunLoop（不经主队列）—— 嵌套着泵 RunLoop 的地方（模态、自检）也收得到。
+                CFRunLoopPerformBlock(CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue, failed)
+                CFRunLoopWakeUp(CFRunLoopGetMain())
             }
         }
     }

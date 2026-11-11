@@ -27,7 +27,9 @@ func writeTone(_ url: URL, amplitude: Float, seconds: Double = 10) -> URL? {
     return url
 }
 
-func checkRealtimeEngineIdle() {
+/// `silentOnly`：只跑送给声卡的全是数字静音的那几段（有人在这台机器上录音 / 录课时用）；总表那一段要一点点声音
+/// （总推子压到 −100 dB 的正弦，听不见、但不是数字静音）才量得到 tap，这时候跳过。
+func checkRealtimeEngineIdle(silentOnly: Bool = false) {
     let folder = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-audioidle-\(UUID().uuidString)", isDirectory: true)
     try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }
@@ -148,6 +150,9 @@ func checkRealtimeEngineIdle() {
     }
 
     // 停过再起，总表的 tap 还在：总推子压到 −100 dB（听不见），表上还是量得到。
+    if silentOnly {
+        print("  --silent-only：跳过总表那一段（它要送一点点不是数字静音的声音）")
+    } else {
     do {
         var config = lane(tone)
         config.master = 0.000_01
@@ -169,6 +174,7 @@ func checkRealtimeEngineIdle() {
         check((meters.slotPeak(for: .master) ?? (1, 1)) == (0, 0), "图停着读电平表：取走之后是零，不崩")
     } catch {
         check(false, "真声卡电平表回归失败：\(error)")
+    }
     }
 }
 
