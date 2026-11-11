@@ -10,6 +10,9 @@
 # （一条 24pt 的提示报出 min 高度 332），面板随后被撑高，气泡垂直居中 ——
 # 用户看到的是「提示第一次弹在很远的地方」。
 #
+# 还量面板的浅 / 深（第 5 段）：系统深色 + 森林色时面板必须是浅色，不然深色材质上是森林色的深字
+#（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。只改这个进程的外观，不碰系统设置。
+#
 # 用法：
 #   scripts/check-instant-tooltip-panel.sh
 #
@@ -39,4 +42,6 @@ xcrun swiftc \
   checks/InstantTooltipPanel/main.swift
 
 echo "==> 运行"
-"$OUT"
+# 第 5 段要切主题：开着 PerfCounters 时主题 Store 不读写偏好（AppThemeAppearance.swift），
+# 切来切去不会在 ~/Library/Preferences 里留下这个自检的文件，也读不到上一次留下的主题。
+SRTFLOW_SMOKE_SCRIPT=check-instant-tooltip-panel "$OUT"

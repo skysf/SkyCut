@@ -47,6 +47,11 @@ struct AppThemeChecks {
         check(video == forest.trackFill(index: 6, audio: false, classic: sentinel), "video colors wrap by stable color index")
         check(forest.trackFill(index: -1, audio: true, classic: sentinel) == forest.trackFill(index: 4, audio: true, classic: sentinel), "negative legacy indices are safe")
         check(forest.subtitle(translated: false) != forest.subtitle(translated: true), "subtitle tracks remain distinguishable")
+        // 浅 / 深只有一条规矩，SwiftUI 和自建的 AppKit 面板读同一份（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。
+        check(forest.colorScheme == .light, "Forest is always the light look")
+        check(classic.colorScheme == nil, "Classic follows the system light / dark setting")
+        check(forest.windowAppearance?.name == .aqua, "hand-built panels are light in Forest, whatever the system")
+        check(classic.windowAppearance == nil, "hand-built panels follow the system in Classic")
         let iconBounds = CGRect(x: 0, y: 0, width: 20, height: 18)
         let magnet = TimelineMagnetSymbol().path(in: iconBounds)
         check(!magnet.isEmpty && iconBounds.contains(magnet.boundingRect), "the magnet outline fits the native toolbar icon")
@@ -54,6 +59,6 @@ struct AppThemeChecks {
             check(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil, "native symbol exists: \(symbol)")
         }
         if failures > 0 { exit(1) }
-        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette and native toolbar symbols.")
+        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule and native toolbar symbols.")
     }
 }

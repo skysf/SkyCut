@@ -112,11 +112,13 @@ grep -qF 'SecKeychainSetUserInteractionAllowed(access == .interactive)' "${KEYCH
   && grep -qF 'SecKeychainGetUserInteractionAllowed(&original)' "${KEYCHAIN}" \
   && grep -qF 'SecKeychainSetUserInteractionAllowed(original.boolValue)' "${KEYCHAIN}" \
   || fail "静默读必须关闭进程交互、保存并恢复原状态，不能只靠查询标记"
-grep -qF 'guard silentRead == nil, interactiveRead == nil else { return .needsPermission }' "${CACHE}" \
+grep -qF 'if interactiveRead != nil { return .needsPermission }' "${CACHE}" \
+  && grep -qF 'if let pending = silentRead { return pending == lateRead ? .needsPermission : .slow }' "${CACHE}" \
   && grep -qF 'try await Task.sleep(for: timeout)' "${CACHE}" \
-  && grep -qF 'finish(.needsPermission)' "${CACHE}" \
+  && grep -qF 'finish(.slow)' "${CACHE}" \
+  && ! grep -qF 'finish(.needsPermission)' "${CACHE}" \
   && ! grep -qF 'Task.detached' "${CACHE}" \
-  || fail "缓存必须给静默读加期限，其他调用者不许排在卡住的读取后面"
+  || fail "缓存必须给静默读加期限，其他调用者不许排在卡住的读取后面；期限到了报慢（先重试）、不报要授权（2026-11-11）"
 python3 - <<'PY' || fail "后台 / 启动混入了交互授权"
 from pathlib import Path
 source=Path('Sources/SrtFlow/SkyStudio/SkyStudioAccount.swift').read_text()
@@ -130,6 +132,17 @@ assert 'await cache.key()' not in key
 assert 'await prepareKeychain()' in source.split('func start()',1)[1].split('private func syncProviders',1)[0]
 assert 'promptKeychain' not in source
 assert 'secret.exists()' not in source
+PY
+python3 - <<'PY' || fail "钥匙串只是慢（没弹框）要先重试：后台 / 启动等一会儿再静默读一次、AI 收到 keychainSlow 且不挂「允许…」，重试还不行才是要授权（2026-11-11）"
+from pathlib import Path
+source=Path('Sources/SrtFlow/SkyStudio/SkyStudioAccount.swift').read_text()
+handle=source.split('private func handleKeychainRead',1)[1].split('func requireKeychainPermission',1)[0]
+assert 'case .slow where !retried:' in handle and 'SkyStudioKeychainNoticePolicy.slowRetryDelay' in handle
+assert 'await handleKeychainRead(await SkyStudioKey.keyWithoutPrompt(), checkPlan: checkPlan, retried: true)' in handle
+assert 'case .needsPermission, .slow:' in handle
+jobs=Path('Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift').read_text()
+assert 'case .slow: return .failure(.keychainSlow)' in jobs
+assert jobs.count('NotificationCenter.default.post(name: SkyStudioKeychainNoticePolicy.permissionNeeded') == 1
 PY
 prompters="$(code_files_with '\.allowKeychain\(\)' | LC_ALL=C sort | tr '\n' ' ')"
 [ "${prompters}" = "${KEY_NOTICE} ${SECTION} " ] \

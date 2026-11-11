@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 // 提示面板的**落点自检**：给一个已知位置的锚点，量提示面板真实落在哪、以及
-// 摆好之后会不会自己动。编译方式见 scripts/check-instant-tooltip-panel.sh。
+// 摆好之后会不会自己动；第 5 段量面板的浅 / 深跟不跟主题。编译方式见 scripts/check-instant-tooltip-panel.sh。
 //
 // 回归（docs/bugfixes/2026-08-12-instant-tooltip-first-show-far-off.md）：
 // `NSHostingView` 直接当 `NSPanel.contentView` 时，会把自己的尺寸约束灌成窗口的
@@ -206,6 +206,68 @@ func run() {
         print("FAIL 打断后再弹失败")
         failures += 1
     }
+
+    // ---- 5. 面板的浅 / 深跟主题的规矩走，不是跟系统（系统深色 + 森林色 = 深底深字的回归） ----
+    //
+    // 由来（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）：宿主视图垫在普通 NSView 下
+    //（第 1 段那条回归的修法），SwiftUI 的 `.preferredColorScheme` 改不到这个面板，面板跟着系统走 ——
+    // 系统深色时材质是深的，森林色给的字也是深的，对比度 1.17:1。这里只改这个进程的外观（`NSApp.appearance`，
+    // 不碰系统设置），量面板最终用的外观。主题 Store 不写偏好：脚本开着 PerfCounters（见 check-instant-tooltip-panel.sh）。
+    let systemAppearance = app.appearance
+    let appearanceCases: [(system: NSAppearance.Name, theme: AppTheme, expected: NSAppearance.Name)] = [
+        (.darkAqua, .forest, .aqua),   // 用户报的那一种
+        (.aqua, .forest, .aqua),
+        (.darkAqua, .classic, .darkAqua),
+        (.aqua, .classic, .aqua),
+    ]
+    for item in appearanceCases {
+        app.appearance = NSAppearance(named: item.system)
+        AppThemeStore.shared.setTheme(item.theme)
+        if showAndSettle(box, label: "Add video, audio or images to the timeline") != nil {
+            let actual = InstantTooltipController.shared.panelAppearanceForChecks
+            check(
+                actual == item.expected,
+                "系统 \(item.system.rawValue) + \(item.theme.rawValue)：提示面板应当是 \(item.expected.rawValue)，实际 \(actual?.rawValue ?? "nil")"
+            )
+        } else {
+            print("FAIL 外观用例没弹出面板（\(item.system.rawValue) + \(item.theme.rawValue)）")
+            failures += 1
+        }
+        InstantTooltipController.shared.hide(owner: box)
+    }
+    app.appearance = systemAppearance
+    AppThemeStore.shared.setTheme(.forest)
+
+    // ---- 6. 气泡外面的四个角是透明的（森林色「提示外面套一圈直角方框」的回归） ----
+    //
+    // 由来（docs/bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md）：根上的 `.appLanguage()` 带着主题的
+    // 窗口底色，森林色是整块矩形的暖白；面板是透明的、形状全由内容决定，根不裁成气泡的形状，暖白的直角就露在圆角
+    // 气泡外面，窗口服务器的影子 / 描边也按矩形算。这里把面板的内容离屏渲一张（`cacheDisplay`，不经窗口服务器、不要
+    // 录屏权限），量四个角和气泡中间的不透明度。修之前森林色的四个角是不透明的暖白（两种系统外观都是），经典色本来就透明。
+    for item in appearanceCases {
+        app.appearance = NSAppearance(named: item.system)
+        AppThemeStore.shared.setTheme(item.theme)
+        let tag = "系统 \(item.system.rawValue) + \(item.theme.rawValue)"
+        if showAndSettle(box, label: "Settings") != nil,
+           let content = InstantTooltipController.shared.panelContentForChecks,
+           let rep = content.bitmapImageRepForCachingDisplay(in: content.bounds) {
+            content.cacheDisplay(in: content.bounds, to: rep)
+            let (w, h) = (rep.pixelsWide, rep.pixelsHigh)
+            func opacity(_ x: Int, _ y: Int) -> CGFloat { rep.colorAt(x: x, y: y)?.alphaComponent ?? -1 }
+            let corners = [(0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1)].map { opacity($0.0, $0.1) }
+            check(
+                corners.allSatisfy { $0 >= 0 && $0 < 0.02 },
+                "\(tag)：气泡外面的四个角必须透明，不然提示外面是一圈直角方框；实际不透明度 \(corners)"
+            )
+            check(opacity(w / 2, h / 2) > 0.98, "\(tag)：气泡中间必须不透明（量的确实是气泡）；实际 \(opacity(w / 2, h / 2))")
+        } else {
+            print("FAIL 四角用例没弹出面板或渲不出来（\(tag)）")
+            failures += 1
+        }
+        InstantTooltipController.shared.hide(owner: box)
+    }
+    app.appearance = systemAppearance
+    AppThemeStore.shared.setTheme(.forest)
 
     window.close()
     bottomWindow.close()

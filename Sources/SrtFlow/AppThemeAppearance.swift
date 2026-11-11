@@ -42,8 +42,8 @@ private struct AppThemeModifier: ViewModifier {
             .background(palette.isForest ? palette.window : .clear)
             .toolbarBackground(palette.panel, for: .windowToolbar)
             .toolbarBackground(palette.isForest ? .visible : .automatic, for: .windowToolbar)
-            // 森林色就是用户确认的暖白稿；经典色继续跟随原来的系统浅 / 深外观。
-            .preferredColorScheme(palette.isForest ? .light : nil)
+            // 森林色就是用户确认的暖白稿；经典色继续跟随原来的系统浅 / 深外观（规矩只在 palette.colorScheme）。
+            .preferredColorScheme(palette.colorScheme)
     }
 }
 

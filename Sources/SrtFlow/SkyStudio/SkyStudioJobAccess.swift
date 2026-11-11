@@ -3,7 +3,8 @@ import Foundation
 // MARK: - 交活之前要的两样：Key、模型表（这一次运行里记一份）
 //
 // 管什么：（1）拿 Sky Studio 的 Key：用户点了按钮起的活可以弹钥匙串授权框（`.prompting`），AI 起的活不弹（`.silent`：没人在看，
-// 读不到就请用户去设置里点「允许…」，同 SkyStudioAccount 后台问 /me 的规矩）；没存 Key、读不到各说一句。
+// 读不到就请用户去设置里点「允许…」，同 SkyStudioAccount 后台问 /me 的规矩）；没存 Key、读不到各说一句。钥匙串只是慢（`.slow`，
+// 没弹框）先叫 AI 过几秒重试、不挂「允许…」的提示，重试时还没回来缓存才改报要授权（2026-11-11）。
 // （2）`GET /models` 记一份：10 分钟内不再问，同时只问一次；换了 Key 就作废（SkyStudioAccount 存 / 删 Key 时调 `forget`）。
 // 不管什么：HTTP（SkyStudioAPI）、钥匙串（SkyStudioKey / KeychainSecret）、每种活怎么用这些（upscale、生成、配旁白）。
 
@@ -15,6 +16,8 @@ enum SkyStudioJobKey {
     enum Problem: Error, Equatable {
         case noKey
         case needsPermission
+        /// 钥匙串在期限内没回答、没有弹框：过几秒同样的调用再来一次（迟到的 Key 会缓存）；那时还不行才是 `needsPermission`。
+        case keychainSlow
         case keychain(Int32)
 
         var message: String {
@@ -24,6 +27,8 @@ enum SkyStudioJobKey {
                     + "and paste it in SkyCut Settings → Sky Studio."
             case .needsPermission:
                 return "SkyCut needs the user's permission to read the Sky Studio key. " + SkyStudioKeychainNoticePolicy.aiNextStep
+            case .keychainSlow:
+                return SkyStudioKeychainNoticePolicy.aiSlowNextStep
             case .keychain(let status):
                 return "The macOS keychain did not give SkyCut the Sky Studio key (error \(status))."
             }
@@ -41,6 +46,8 @@ enum SkyStudioJobKey {
         case .needsPermission:
             NotificationCenter.default.post(name: SkyStudioKeychainNoticePolicy.permissionNeeded, object: nil)
             return .failure(.needsPermission)
+        // 慢不是要授权：不发 permissionNeeded（不挂「允许…」的提示），只叫调用方过几秒再来。
+        case .slow: return .failure(.keychainSlow)
         case .failed(let status): return .failure(.keychain(status))
         }
     }

@@ -49,6 +49,8 @@ final class VoiceLibraryHTTP: URLProtocol {
     static var failNext = false
     /// 授权那一句此刻的版本（`/models` 报的和 `POST /voices` 认的）；改了它，带旧版本的 `consent: true` 回 `consent_outdated`。
     static var consentVersion = "voice-consent-v1"
+    /// 下一单（设计 / 建 MiniMax 版）的回答丢了：服务器照样收下、建了那一单，SkyCut 只看到断网（交的那一刻 SkyCut 退出了也是这样）。
+    static var loseNextOrderAnswer = false
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -63,6 +65,7 @@ final class VoiceLibraryHTTP: URLProtocol {
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["en"], minimax: false)]
         listFailure = nil; quoteFailure = nil; deleteStorageFailures = 0; needsEnroll = false; standing = nil; refuseStanding = false; grantUnavailable = false
         orders = [:]; orderIDs = []; holdPolls = 0; holding = false; priceChange = nil; failNext = false; consentVersion = "voice-consent-v1"
+        loseNextOrderAnswer = false
         let samples = (0..<264_600).map { Int16(sin(Double($0) * 0.08) * 4_000) }
         wave = VoiceReferenceSample.wavData(samples: samples, sampleRate: 44_100)
     }
@@ -87,7 +90,14 @@ final class VoiceLibraryHTTP: URLProtocol {
         Self.lock.lock()
         Self.requests.append((method, path, body))
         let (status, value, bytes) = Self.answer(method, path, body, data)
+        let lost = Self.loseNextOrderAnswer && method == "POST" && path.hasSuffix("/jobs")
+            && ["voice_enroll", "voice_design"].contains(body["kind"]?.stringValue ?? "")
+        if lost { Self.loseNextOrderAnswer = false }
         Self.lock.unlock()
+        if lost {
+            client?.urlProtocol(self, didFailWithError: URLError(.networkConnectionLost))
+            return
+        }
         let payload = bytes ?? (try! value.encodedData())
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
             headerFields: ["Content-Length": String(payload.count), "Content-Type": bytes == nil ? "application/json" : "audio/wav"])!

@@ -52,6 +52,8 @@ enum SkyStudioVoiceOneTimeStep {
         let identity = SkyStudioVoiceLibraryJob.enrollIdentity(voice: voice, language: language, account: account)
         // 这个声音这种语言的 MiniMax 版已经在建（上一次点过头的那一单还没做完）：跟着它，不再问、不再预留。服务器对开着的建单本来就只回
         // 原来那一单、只扣一次；本机再预留一笔、再起一个任务跟它，同一笔钱就记成两笔（审查 #362 第 2 条）。
+        // 重启之前点过头的那一单（落了盘，这次运行里还没人跟）先接着跟起来，下面就认得出它（SkyStudioVoiceLibraryOrders）。
+        SkyStudioVoiceLibraryOrders.resume(key: key, api: api)
         if let open = SkyStudioVoiceLibraryJob.running(identity) { return .result(following(open, item: item, language: language)) }
         let action = SkyStudioVoiceApproval.oneTimeAction(item, account: account)
         let question = SkyStudioVoiceApproval.oneTimeQuestion(item, credits: credits, noFeeModel: noFee)

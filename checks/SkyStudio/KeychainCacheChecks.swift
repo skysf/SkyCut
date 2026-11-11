@@ -63,11 +63,14 @@ func runKeychainCacheChecks() async {
     check(await waitUntil { latch.count == 1 }, "the injected native read starts")
 
     let concurrentStart = ContinuousClock.now
-    checkEqual(await cache.keyWithoutPrompt(), .needsPermission, "a second caller does not wait behind a blocked read")
+    // 2026-11-11：钥匙串只是慢（没弹框；要授权时原生读零点几秒就拒），先叫调用方过几秒再试，不说要授权。
+    checkEqual(await cache.keyWithoutPrompt(), .slow, "a second caller does not wait behind a slow read and is told to retry, not to grant permission")
     check(ContinuousClock.now - concurrentStart < .milliseconds(300), "a concurrent caller returns promptly")
-    checkEqual(await first.value, .needsPermission, "a blocked read returns permission-needed at its deadline")
+    checkEqual(await first.value, .slow, "a read still running at its deadline is reported slow, not as permission-needed")
     let elapsed = ContinuousClock.now - started
     check(elapsed >= .milliseconds(60) && elapsed < .seconds(1), "the first caller observes the bounded silent deadline")
+    // 说过「慢」之后那次读还没回来，再问就不再叫人等了：改报要授权（叫用户点 Allow…）。
+    checkEqual(await cache.keyWithoutPrompt(), .needsPermission, "asking again while the late read is still pending escalates to permission-needed")
     checkEqual(latch.count, 1, "deadline and concurrent callers do not start more native reads")
     check(latch.onlySilent, "startup/background cache entry never tries the interactive reader")
     check(!latch.usedCooperativeTask, "native work is on the dedicated executor, outside Swift's cooperative tasks")
@@ -83,7 +86,7 @@ func runKeychainCacheChecks() async {
     var late: KeychainSecret.ReadResult = .needsPermission
     for _ in 0..<100 {
         late = await cache.keyWithoutPrompt()
-        if late != .needsPermission { break }
+        if case .key = late { break }
         try? await Task.sleep(for: .milliseconds(2))
     }
     checkEqual(late, .key("fake-late-key"), "success arriving after the deadline is cached")
@@ -93,7 +96,46 @@ func runKeychainCacheChecks() async {
     await runKeychainInvalidationChecks(replacement: nil)
     await runInteractiveCacheChecks()
     runKeychainNoticeChecks()
+    await runJobKeySlowChecks()
     await runJobKeyPermissionChecks()
+}
+
+/// 2026-11-11 真实冒烟：负载 8 时重启后第一次静默读超了 3 秒，AI 被叫去让用户点 Allow…，其实重试一次就好。
+/// 慢 → 先叫 AI 过几秒重试、不挂「允许…」的提示；重试时那次读还没回来 → 才是要授权和提示；读回来了 → 拿到缓存的 Key、不再读一遍。
+@MainActor
+private func runJobKeySlowChecks() async {
+    let latch = KeychainReadLatch()
+    defer { latch.resume() }
+    let cache = KeychainSecretCache(timeout: .milliseconds(60)) { access in
+        await KeychainSecretExecutor.run { latch.read(access) }
+    }
+    let raised = LockedKeychainFlag()
+    let observer = NotificationCenter.default.addObserver(forName: SkyStudioKeychainNoticePolicy.permissionNeeded, object: nil, queue: nil) { _ in raised.set() }
+    defer { NotificationCenter.default.removeObserver(observer) }
+
+    let first = await SkyStudioJobKey.key(.silent, cache: cache)
+    check(first == .failure(.keychainSlow), "a keychain that has not answered by the deadline is reported to the AI as slow (got \(first))")
+    check(!raised.value, "a slow keychain does not raise the Allow… notice")
+    let text = SkyStudioJobKey.Problem.keychainSlow.message
+    for phrase in ["Wait a few seconds", "repeat the same call", "no permission dialog"] {
+        check(text.contains(phrase), "the slow-keychain answer tells the AI to retry first: \(phrase)")
+    }
+    check(!text.contains("Mac login password"), "the slow-keychain answer does not send the user to the macOS dialog")
+
+    let again = await SkyStudioJobKey.key(.silent, cache: cache)
+    check(again == .failure(.needsPermission), "a retry while the same read is still pending asks for the user's permission (got \(again))")
+    check(raised.value, "only that escalation raises the Allow… notice")
+
+    latch.resume()
+    check(await waitUntil { latch.didFinish }, "the slow read finishes")
+    var third: Result<String, SkyStudioJobKey.Problem> = .failure(.needsPermission)
+    for _ in 0..<100 {
+        third = await SkyStudioJobKey.key(.silent, cache: cache)
+        if case .success = third { break }
+        try? await Task.sleep(for: .milliseconds(2))
+    }
+    check(third == .success("fake-late-key"), "a retry after the late read returned gets the key it cached")
+    checkEqual(latch.count, 1, "retries never start another native read")
 }
 
 @MainActor
