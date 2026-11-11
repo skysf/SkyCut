@@ -71,7 +71,7 @@ vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Con
 用固定的签名身份签，见下方签名一节）→ `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
 再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）。
 
-产物：`dist/SkyCut.app`（0.18.65 约 68 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
+产物：`dist/SkyCut.app`（0.18.66 约 68 MB）、`dist/SkyCut-<版本>-arm64.dmg`（2026-10-18 改名之前叫 `SrtFlow.app`、`SrtFlow-<版本>-arm64.dmg`）。
 
 版本号：**正式发版必须显式传** `VERSION=x.y.z ./scripts/build-app.sh`。不传时
 脚本兜底取最近的 git tag，并在 HEAD 领先该 tag 时警告「这是开发版产物」——
@@ -447,6 +447,55 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 升级时的钥匙串：
 - 新构建第一次读 Sky Studio Key 时，要用户点提示条的「允许…」、输登录密码、选「始终允许」。和 0.18.63 一样，见[钥匙串的 bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
 - 写这份记录时，这一步还没做。
+
+没有打 git tag，也没有创建 GitHub release，做法同前。
+
+2026-11-11，修完 0.18.65 之后发现的问题，发布 **0.18.66**。用户上午说「0.18.66 no rush, go on the public and my Mac when all bug and issues are fixed」，之后又说「修完直接合，然后发 0.18.66」。发版与验收事实由 Claude 提供。
+
+构建：
+- 源码：main `d74aacf402a743a763e2511865b54539827bf69f`，这个提交 push 那一轮 CI（5 组 + `check-all`）全绿。0.18.65 之后合进来的客户端改动：
+  - #386（钥匙串只是慢时，AI 收到「过几秒同样的调用再来一次」，不再被叫去让用户点「允许…」）；#387（SkyCut 重启之后接着跟在建的声音库那一单，不再问一遍价、多记一笔）；#383（`set_settings` 的回答里两处长期授权说的是同一件事）；
+  - 界面：#388（系统深色 + 森林色时提示是浅底深字）；#389（森林色的提示外面不再套一圈直角方框）；#390（系统深色时森林色切经典色，开着的窗口整个跟着变）；
+  - #391（预览的音频引擎停着 2 分钟没人用就停图，Mac 能空闲睡眠、App Nap 生效；用户回到 SkyCut 就在后台先起好）；
+  - 其余合进来的只有文档和报告：#382、#385（0.18.65 的发布记录）、#384（声音真实冒烟的 AI 工具那一半）。
+- 在单独的 worktree 里打包：`VERSION=0.18.66 arch -arm64 /bin/bash scripts/build-app.sh`，Release 编译 244 秒（整个脚本 260 秒）。
+- `vendor/ffmpeg` 还是 0.18.65 时从主 checkout 拷进来的那份，SHA-256 与主 checkout 相同，同一个 ffmpeg 8.1。
+
+产物：
+- `SkyCut-0.18.66-arm64.dmg`，34,481,396 字节；SHA-256：`ed755d81d1b766baebf0a2a29903a3042785c7939be0d6fed0c647e14cf5890b`；App 的 CDHash `05d6fc08…`。
+
+校验：
+- 包：
+  - `hdiutil verify` 通过；
+  - Info.plist 版本 `0.18.66`；
+  - 主程序、ffmpeg、`skycut-mcp` 均为 arm64；挂载包里的整个 App 与 `dist/SkyCut.app` 逐字节相同（`diff -r`）。
+- 签名：
+  - App 和两个 Helpers 都钉在原固定证书 `76d2…90ef`，本地和挂载包内的深度签名校验都通过，打包日志里没有退回 ad-hoc 的警告；
+  - `TeamIdentifier=not set`，和以前一样。
+- 运行：
+  - 挂载包里的 `skycut-mcp` 初始化报告 `skycut` / `0.18.66`。socket 指到不存在的路径、不许拉起 App，碰不到正在运行的正式版；
+  - 清单 62 个工具，`skycut_guide` 排第一；全清单 98,443（带外壳的 UTF-16），和 0.18.65 一样：这一批没有改工具清单；
+  - ffmpeg 8.1 能运行；
+  - `scripts/check-dmg.sh` 通过。
+- 这一批的改动都在包里（和 0.18.65 的主程序比，新包有、旧包没有）：
+  - #386：给 AI 的「The macOS keychain has not answered SkyCut yet…」；#387：在建单的 UserDefaults 键 `SrtFlow.skystudio.voiceLibraryOrders.v1`；
+  - #388：提示面板设外观用到的 `setAppearance:`、`appearanceNamed:`（0.18.65 的主程序里一处都没有）；#390：`SystemColorScheme`、KVO 的 `effectiveAppearance`；
+  - #391：`srtflow.audio-engine.idle-log`、`srtflow.audio-engine.start`、`running-but-stopped` 和停图 / 起图的日志；
+  - #389、#383 不带新字符串，查构建产物：发出去的主程序和 Release 构建产物 `strip -xS` 之后 38 个 section 逐字节相同（只差 `__LINKEDIT` 和签名的大小）。产物的符号里有 #389 的 `TooltipContent.bubble`，提示宿主的类型在 `AppThemeModifier` 外面再套 `_ClipEffect<RoundedRectangle>`（裁切在主题外面）；反汇编 `set_settings` 的 async 片段，`modeChanged` 返回之后才 `snapshot("all")`（#383 的顺序）。
+- 没做的：只能用真鼠标过的人工清单（系统深色 + 森林色时鼠标停在按钮上看提示、来回切主题看开着的窗口）这次发版没有实机过：发版时用户在主屏录课，不能动屏幕。
+
+发布：
+- 公开对象：`skycut/SkyCut-0.18.66-ed755d81d1b7-arm64.dmg`，immutable 缓存。
+- 先上传，再用 `--url` 从公开直链完整读回一致。这次上传很慢（经本机的代理，34 MB 约 13 分钟），没有出错。
+- 个人站 [skystudio PR #21](https://github.com/skysf/skystudio/pull/21)（合并提交 `f1c4c04`）切换两条入口，Cloudflare Pages 部署成功。
+- 不带 `--url` 经固定入口完整下载一致；带尾斜杠的入口 302 到同一个对象。
+
+安装：
+- 本机未替换，原因：录课中。发版时用户在用正式版 0.18.65 录课（Codex 在操作它，`/Applications/SkyCut.app` 的主程序和三个 `skycut-mcp` 都在跑），正式版和测试版都还是 0.18.65，等用户说录完再换。
+- 同一构建的测试版已经打好（`build-beta-app.sh`，同一把证书，去掉签名后三份二进制与正式版逐字节相同），没有装、没有启动。
+
+升级时的钥匙串：
+- 换上之后，新构建第一次读 Sky Studio Key 时，要用户点提示条的「允许…」、输登录密码、选「始终允许」。和 0.18.63 一样，见[钥匙串的 bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
 
 没有打 git tag，也没有创建 GitHub release，做法同前。
 
