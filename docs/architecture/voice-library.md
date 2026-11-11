@@ -176,6 +176,8 @@
      「还没记上，第一次会问一次」。切回请求批准立刻写 Store、`DELETE`。
    - `set_settings ai_access_mode=full_access`：照旧永远先回确认码（`AISettingsApproval`），问句后面接 `SkyStudioVoiceStandingNotice.turnOnText`，令牌另绑
      那一句的版本；点过头写 Store、`POST`，结果报 `voice_standing_consent`（`recorded` / `not_recorded` + 原因）；关掉 `DELETE`、报 `revoked`。
+     **先记 / 撤、再拍设置**：同一个回答里 `sections.ai.voice_standing_consent` 和顶层那一份必须一样（2026-11-11 之前先拍后记，关掉之后设置那一处还写
+     `recorded`，[案例](../bugfixes/2026-11-11-set-settings-stale-standing-consent.md)；`StandingChecks` 两处都查）。
    - **升级前就开着全部权限**：新版第一次读到 Key（启动时静默读到、或存下新 Key）时 `migrateIfNeeded` 替用户记上、不问（用户 2026-11-09 定）；这台 Mac 上只做一次
      （`SrtFlow.skystudio.voiceStandingConsentMigrated.v1`），开着的是请求批准就记成做过、什么都不发；已经有有效的不再记；记不上下次读到 Key 再试。
    - 换了 Key：设置里那一行的状态清掉（账号不同，Sky Studio 那边各记各的）。

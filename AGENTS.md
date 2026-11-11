@@ -215,7 +215,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](docs/architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](docs/reports/2026-11-02-video-inspection.md)。
 
-- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.64 的签名包与下载回读记录）：
+- 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.65 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](docs/build/build-and-packaging.md)。
 - 音频库素材的制备与上传（音乐：选曲 → 规格化 → manifest → R2；音效：手写目录 → 峰值归一 + 落点 → manifest → R2）：
   [docs/build/audio-library-pipeline.md](docs/build/audio-library-pipeline.md)。
@@ -459,7 +459,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
-- [声音功能的真实冒烟：界面那一半（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 测试账号是 SkyCut 免费套餐（AI 工具被拦），只走 App 的界面（进程内驱动 + 新的 `voice` 一步、隔离测试 App、临时 Key）：新建声音（授权那一勾）、Qwen3 设计、删声音、右键变声 10 秒（两条新轨、原声静音、一步撤销、都补齐到 10 秒）全过，40 积分 = USD 0.16，和 Sky Studio 的任务、余额、fal 账单逐笔对上；设计的报价写成「Sky Studio」修在 #379；`add_voiceover` 多批 / 繁体 / 长句、全部权限等用户开 AI 开关。
+- [声音功能的真实冒烟：界面那一半 + AI 工具那一半（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 夜里测试账号是 SkyCut 免费套餐（AI 工具被拦），只走 App 的界面（进程内驱动 + 新的 `voice` 一步、隔离测试 App、临时 Key）：新建声音（授权那一勾）、Qwen3 设计、删声音、右键变声 10 秒（两条新轨、原声静音、一步撤销、都补齐到 10 秒）全过，40 积分，设计的报价写成「Sky Studio」修在 #379；早上开了 AI 开关补跑第八节：库里的声音读中英混合稿 2 批（IndexTTS2）、繁体合批切句（转写是 zh_TW、没有 local_split）、967 字长句拆 2 批接缝无爆音、全部权限的长期授权（记 / 不问建删 / 提示条 / 撤）、App Nap（任务跑着优先级 28、做完回到 4）全过，34.2 积分；两半 74.2 积分 = USD 0.30，和 Sky Studio 的任务、余额、fal 账单、Vertex Monitoring 逐笔对上；`set_settings` 回答里长期授权说反修在 #383；主窗口有过声音之后音频引擎一直开着（Mac 不空闲睡眠、不 App Nap）待拍板。
 
 - [变声（声音 PR 9）：离屏渲染和免费冒烟](docs/reports/2026-11-11-change-voice.md) — 变声面板英 / 中 / 西各一张拼图（选了声音带报价、还没有自己的声音；看图撞出按钮被截字）；真 App + 真 MCP + 本机假 Sky Studio 走全程（报价 → 上传 → 一次任务 → 两条新轨 → 撤销）；没验到的（真 Sky Studio、真窗口、本机语言检测）。
 - [声音功能的免费冒烟补跑（声音 PR 3–6）](docs/reports/2026-11-10-voice-free-smoke.md) — 假 Sky Studio 上跑 `voice.py`（合批 + 对齐字幕）、声音库（两种权限模式的问法、加语言、改名、删除、`voice_…` 读稿的一次性费用、设计、撤销）、几批同时交（两个池、停、恢复、429）和中途换备用，全部通过；没跑到的（装转写模型、浮层那一行、PR 7 的长期授权）和看见的问题（AI 的活在后台被 App Nap 降到优先级 4、机器忙时超时等五条）。
@@ -734,6 +734,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 ## Bug 修复案例索引
 
 - [2026-11-11 SkyCut 重启之后不记得在建的声音库那一单](docs/bugfixes/2026-11-11-voice-library-job-after-restart.md) — 账在点头那一刻就进了 UserDefaults，要结的那一单（建 MiniMax 版、设计）只在内存里：重启后再点头又问一遍价、本机再记一笔（服务器同一个声音 + 语言只扣一次），重启前那一笔也没人结（做完不按实收换、退了不退）。在建的单交之前落盘（`SkyStudioVoiceLibraryOrders`），读到 Key / 看「已经在建」之前 / 任务起手都先接着跟（只 GET）、按原来那一笔结，先删记录再改账；交的回答丢了的那一单在受理时并进来（202、同一个 job_id）；实收记在预留那一天。修复前：重启后再点头当天 755.2（应为 377.6）、两单设计 782.5（应为 751.4）。检查第一次跑撞上另一个会话同时跑同一项、共用的 UserDefaults 被抹，改成每次运行一个 bundle id。**账在盘上，它要结的那一单也得在盘上；能去重的要在问用户之前去重。**
+- [2026-11-11 关掉全部权限的回答里，设置那一处还写着长期授权「已记上」](docs/bugfixes/2026-11-11-set-settings-stale-standing-consent.md) — `set_settings` 先拍设置、再去 Sky Studio 记 / 撤长期授权：同一个回答里顶层写 `revoked`、`sections.ai.voice_standing_consent` 还写 `recorded`（打开时是 `unknown`），真实冒烟撞出；改成先记 / 撤再拍，`StandingChecks` 两处都查、反向验证三条全红。**一个回答里同一件事出现两次，两份要在同一时刻取。**
 - [2026-11-11 静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md) — 上限是「一次解码 + 0.25 秒」，被量的是「编 119 帧」：两种活在共享 runner 上各有各的快慢，最近 10 轮 CI 一直在上限的 23%–75% 之间晃，0.86 / 0.87 秒两次超线、重跑就过。改成数 ffmpeg 报的解码次数（1 包 1 帧），耗时和同一次运行里无损缩到产物尺寸的小图比（2.5 倍或多 0.25 秒，超了先再量一遍；小图别从产物里取帧，编过的画面再编更便宜）；反向验证：旧规则把 CI 的数判红，逐帧重解（解了 123 帧、5.28 秒对 1.05 秒）和逐帧重缩（1.02 秒对 0.41 秒）照样红。**尺子要和被量的是同一种活、同一次运行里量；能数的别拿时间推；去 CI 的日志里看断言实际打印的数。**
 - [2026-11-11 设计声音的报价写「用 Sky Studio 设计」，说不出是 Qwen3 还是 MiniMax](docs/bugfixes/2026-11-11-design-quote-model-name.md) — 声音的报价顶层没有 `model`、用哪个只在 `voice_plan.selection.model`，SkyCut 只读顶层；两份假服务都补了顶层的 `model`，回归和离屏渲染一直是绿的。顶层没有时读 `voice_plan.selection.model`，假服务改成真回答的形状，真冒烟抄下来的回答进纯值检查。
 - [2026-11-11 manage_voices 建声音 / 加录音非要 AI 给 language，方案写的是可选、自动识别](docs/bugfixes/2026-11-11-manage-voices-language-required.md) — 声音 PR 6 把 `language` 做成必填、记了一句「本机检测随界面接」，PR 8 把检测挪进 `SpokenLanguageProbe` 只接了对话框；现在不给就在做好的参考录音上用同一份识别、识别成了什么写进问句和结果，给了照给的不盖，识别不出来不猜、叫 AI 带上 `language` 再调；实现、说明书、检查三处都照「必给」写所以谁也不红，期望值要从方案来。
