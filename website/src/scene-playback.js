@@ -14,6 +14,14 @@ export const SCENE_SEGMENTS = SCENE_CLIPS.map((clip,index)=>{
   return {start,duration,end:start+duration};
 });
 export const TURN_SECONDS = 48;
+// The turntable opens a touch to the left; the baked still freezes this same pose.
+export const OPENING_ANGLE = -.1;
+export const COMPACT_SCALE = .96;
+// The canvas and the still extend past the layout box by this share of its height on every side,
+// so soft shadows fade out instead of being cut at the box edge. Must match --scene-bleed in home.css.
+export const SCENE_BLEED = .1;
+// Phones get the two-card composition. Must match the phone breakpoint in responsive.css.
+export const COMPACT_QUERY = '(max-width: 600px)';
 
 export function playbackAt(seconds) {
   const time = Number.isFinite(seconds) ? Math.max(0,seconds) % REEL_SECONDS : 0;

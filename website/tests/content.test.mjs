@@ -34,6 +34,7 @@ test('progressive enhancement keeps required assets local, and future platforms 
   const html=home.slice(home.indexOf('class="platform-grid"'),home.indexOf('class="faq'));
   assert.equal((html.match(/https:\/\/skylu.ai\/download\/skycut/g)||[]).length,1);
   assert.match(html,/data-subscribe="intel"/);assert.match(html,/data-subscribe="windows"/);
-  const scene=await readFile(new URL('src/scene.js',root),'utf8');assert.match(scene,/IntersectionObserver/);assert.match(scene,/visibilitychange/);assert.match(scene,/prefers-reduced-motion/);assert.match(scene,/renderer\.dispose/);
+  const scene=await readFile(new URL('src/scene.js',root),'utf8');assert.match(scene,/IntersectionObserver/);assert.match(scene,/visibilitychange/);assert.match(scene,/prefers-reduced-motion/);assert.match(scene,/stage\.dispose/);
+  assert.match(await readFile(new URL('src/scene-stage.js',root),'utf8'),/renderer\.dispose/);
   const headers=JSON.parse(await readFile(new URL('vercel.json',root),'utf8'));assert.ok(headers.headers.some(h=>h.headers.some(i=>i.key==='Content-Security-Policy')));
 });

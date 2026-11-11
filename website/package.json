@@ -7,6 +7,7 @@
     "dev": "node scripts/generate.mjs && vite --host 127.0.0.1",
     "build": "node scripts/generate.mjs && vite build",
     "build:scene-media": "node scripts/build-scene-media.mjs",
+    "build:hero-still": "node scripts/build-hero-still.mjs",
     "preview": "vite preview --host 127.0.0.1",
     "test": "node --test tests/*.test.mjs",
     "build:social": "python3 scripts/build-social-images.py",

@@ -8,8 +8,9 @@ export function createSceneMedia() {
   video.preload='auto';video.src='/media/timeline-loop.mp4';
   const texture=new THREE.VideoTexture(video);
   texture.colorSpace=THREE.SRGBColorSpace;
-  texture.minFilter=THREE.LinearFilter;texture.magFilter=THREE.LinearFilter;
-  texture.generateMipmaps=false;
+  // Mipmaps and anisotropy keep the smaller and turned cards from shimmering.
+  texture.minFilter=THREE.LinearMipmapLinearFilter;texture.magFilter=THREE.LinearFilter;
+  texture.generateMipmaps=true;
   let wanted=false,disposed=false;
   const resume=()=>{
     if(wanted&&!disposed)void video.play().then(()=>{

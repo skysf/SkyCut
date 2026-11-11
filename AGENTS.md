@@ -142,7 +142,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 | 修改范围 | 动手前必读 |
 | --- | --- |
-| 官网 `website/`、本地网页预览、官网 Vercel 配置与部署 | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，功能分支不构建，最终 PR 合并 `main` 后才部署） |
+| 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、**首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段）** | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，功能分支不构建，最终 PR 合并 `main` 后才部署；「首屏的质感与渐进增强」：烤好的静图是默认画面，没有 WebGL / 减少动态效果 / 太慢 / 关 JS 都看它，不许退到另一种画面；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖） |
 | 构建、打包、版本、授权、shell、CI、**签名（`scripts/signing/`：发布版用固定的自签名证书，系统权限才跨版本有效）** | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永远不重建、换机器拷 `~/.config/srtflow/signing/`，仓库钉着它的 SHA-1；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | **App、小程序、MCP 服务器叫什么**（SkyCut / `skycut-mcp` / `skycut`），**新加身份类的字符串**（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）、界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份和代码名沿用 SrtFlow、永远不改的那张表；新加的同类东西照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md)（为什么只改看得见的、分几步、本机怎么收拾） |
 | 工程存盘、格式版本、素材路径、自动保存、**重建预览时开素材（`MediaAssetCache`）**、**新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零）** | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（四之末：运行中素材只开一次，按路径 + 文件身份认，原地改写也算换了文件；五：卸片之后播放器的时间回调晚到一拍、没挂条目就丢掉，换完整份时间线就要 `scheduleRebuild()`）、[新工程停在上一个工程的位置](docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md)、[工程生命周期事故](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[运行期素材重链接](docs/bugfixes/2026-08-08-runtime-media-relink.md)、[重建把每个素材重新打开一遍](docs/bugfixes/2026-09-25-rebuild-reopens-every-asset.md) |
@@ -206,6 +206,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 官方原创短片、`generate_media` 的 `film`、镜头状态 / 完成动作 / 声音计划、实际引用与报价 pin、左右接缝审查 | [官方原创短片](docs/architecture/official-film.md)（公开状态与服务端私有配方分开；真实引用报价、双侧审查、完成历史不能重演；客户端 / 生产启用 / 真实输出 / 并发验收分开报告）、[Sky Studio 的任务](docs/architecture/sky-studio-jobs.md)、[开着的工程](docs/architecture/open-projects.md) |
 
 ## 构建与检查入口
+
+- 官网首屏的静图与浏览器检查（在 `website/`）：改了场景外观后 `npm run build:hero-still` 重烤（无头 Chromium + Pillow），`tests/hero-scene.test.mjs` 的指纹钉着「改了没重烤」；浏览器级的手动检查 `npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs`（三个内核 36 格 + 版面框 + 18 项回退行为，全程无头、只在 Mac 上、Playwright 不是依赖，**不在 `check-all.sh` 里**），见 [SkyCut 官网](docs/architecture/skycut-website.md)「首屏的质感与渐进增强」。
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](docs/architecture/export-settings.md)与[子进程退出](docs/architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
 
@@ -647,7 +649,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - [MCP 说明书（skycut_guide）](docs/architecture/mcp-guide.md) — 按需读的工具说明：App 照 recipes 的路子答、没开通也照答、清单里第一个且只有它预先加载（`anthropic/alwaysLoad`）；每个工具一个同名主题（概要 = 现在的说明原文、`fields` 从参数定义现算）、目录 ≤ 5,000、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的；迁移七个 PR 做到哪、守卫、反向验证、人工回归。
 
-- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/<slug>/` 里的文件，多繁中、日文两种只给文章用的语言；没写发布日就是草稿、发布日用 `npm run publish:guides` 盖；价格不许手写、只链自己的页面、**对外不提 GitHub**；部署后跑 `npm run indexnow`）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、首屏的质感与渐进增强（烤好的静图是默认画面、实时场景什么时候接手和让位、帧预算、出血、重烤与指纹、浏览器级手动检查）、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/<slug>/` 里的文件，多繁中、日文两种只给文章用的语言；没写发布日就是草稿、发布日用 `npm run publish:guides` 盖；价格不许手写、只链自己的页面、**对外不提 GitHub**；部署后跑 `npm run indexnow`）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
 
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
 
