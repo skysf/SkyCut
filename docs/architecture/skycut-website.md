@@ -185,7 +185,7 @@ Omni 换成 1.2、Veo 3.1 Pro 下架）的 head `86b797a9c935c3499674fce33525ab0
 
 - `docs/agents/skycut-api.md` 的 `GET /models` 与 `Per kind` 是合同。
 - `api/_utils/skycut/catalog.ts`、`visualModels.ts` 和各 `*Contract.ts` 构建 SkyCut 专用目录；
-  共 31 条记录、26 个不同 id（2026-11-07 是 33 / 27；2026-11-10 Veo 3.1 Pro 下架少两条），其中图片类 9 条。五个共享视频模型分别列
+  共 31 条记录、26 个不同 id（2026-11-07 是 33 / 27；2026-11-10 Veo 3.1 Pro 下架少两条；**2026-11-11 声音模型改照声音目录快照之后是 39 / 34**，见下面「声音功能上线后」），其中图片类 9 条。五个共享视频模型分别列
   文生视频和图生视频，所以不能写成 31 个互不相同的模型，也不能搬 Studio 网站中未向 SkyCut 开放的模型。
 - `shared/skycutImageModels.ts` 钉公开图片 id 与网页内部 id 的映射，`shared/modelDisplayNames.ts`
   给普通图片与五个共享视频模型的显示名；`visualModels.ts` 直接给 `Qwen Angles` 与
@@ -195,7 +195,7 @@ Omni 换成 1.2、Veo 3.1 Pro 下架）的 head `86b797a9c935c3499674fce33525ab0
   `catalog.ts` 直接提供三种音频的标题。
 - 与任务草稿的简称相比，按代码显示 `Minimax H3`、`Ideogram Remove Background`、
   `HeyGen v3 Lipsync Speed` / `Precision`、`MiniMax H3 Max Lip Sync (Image to Video)`、
-  `Eleven v4 narration`、`Sonilo sound effects`、`Zonos 2 voice clone`。
+  `Eleven v4 narration`、`Sonilo sound effects`（`Zonos 2 voice clone` 2026-11-11 随声音目录去掉）。
 - Sky Studio 的 SkyCut 目录或这些显示名变更时，**同步更新**本网站快照、四语言说明和
   相关测试；页面提示“模型目录会更新，以 App 里看到的为准”。CI 不依赖另一仓库的本机路径。
 
@@ -208,9 +208,11 @@ Omni 换成 1.2、Veo 3.1 Pro 下架）的 head `86b797a9c935c3499674fce33525ab0
 | 视频 | Minimax H3、Gemini Omni 1.2 Flash、Veo 3.1 Fast、Seedance 2.0 Pro、Seedance 2.5；Wan 3.0 Text to Video / Image to Video / Reference to Video | 13 | Pro 经 AI，扣积分 |
 | 对口型 | HeyGen v3 Lipsync Speed / Precision、MiniMax H3 Max Lip Sync (Image to Video) | 3 | Pro 经 AI，扣积分 |
 | 音乐 | Lyria 3 Pro | 1 | Pro 经 AI，扣积分 |
-| 旁白生成 | Eleven v4 narration | 1 | Pro 经 AI，扣积分 |
+| 旁白生成 | Gemini 3.8 Flash TTS、Eleven v4 narration | 2 | Pro 经 AI，扣积分 |
 | 音效生成 | Sonilo sound effects | 1 | Pro 经 AI，扣积分 |
-| 声音克隆 | Zonos 2 voice clone | 1 | Pro 经 AI，扣积分 |
+| 用克隆的声音读旁白 | IndexTTS2 cloned reading、MiniMax Speech 2.8 HD cloned reading、HeyGen Voice Turbo cloned reading、MiniMax version of a voice (one-time) | 4 | Pro 经 AI，扣积分 |
+| 声音设计 | MiniMax voice design (one-time)、Qwen3 voice design (one-time) | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
+| 变声 | Chatterbox HD voice conversion、Chatterbox voice conversion | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
 | 视频画质提升 | Topaz Starlight、ByteDance Upscaler Pro | 2 | Free / Pro 界面直接用，Pro 也可经 AI，均扣积分 |
 
 普通图片新增的四个模型，0.18.61 就能让 AI 点名使用；图片换角度、图片放大和角色系统要
@@ -222,6 +224,18 @@ SkyCut 0.18.62（2026-11-07 发布）。这一版官网在 0.18.62 发布、图�
 网页端同样失效），当天 [Sky Studio PR #243](https://github.com/skysf/skystudio-aigc-app/pull/243) 换成 fal SeedVR2
 （`fal-ai/seedvr/upscale/image`）。对外 id `image-upscale`、显示名 `Image Upscale`、x2 / x3 / x4 和 8 积分都不变，
 所以本页文案不用改；实测见 SkyCut 的[真积分验收报告](../reports/2026-11-07-image-models-and-characters-smoke.md)。
+
+### 声音功能上线后的功能表和模型表（2026-11-11）
+
+0.18.65 的声音功能（声音库、右键「换成我的声音」、全部权限下的长期授权）进了对比表：
+
+- 功能行（「声音」一组）：`voiceLibrary`（Free / Pro 都包含：用自己的录音新建声音不扣积分、设计声音花积分、在设置里管理；全部权限下 AI 用和建声音不必每次再问）、
+  `voiceChange`（Free 界面直接用、Pro 界面或 AI，都花积分）。**界面这两条不看套餐**：[真实冒烟](../reports/2026-11-11-voice-real-smoke.md)在免费套餐下建、设计、变声、删都走通了。
+- 声音模型**照 SkyCut 仓库里的声音目录快照** `checks/SkyStudio/Fixtures/models-voice-2026-11-10.json`（Sky Studio `/models` 的导出原样拷来的），
+  `ai-models.js` 的 `voiceCatalogSnapshot` 指着它，网站测试逐条比 id、kind、标题：旁白 2 个（Gemini 3.8 Flash TTS、Eleven v4 narration）、
+  克隆读稿 3 个 + MiniMax 版一次性费用 1 个、声音设计 2 个、变声 2 个。Zonos 2 已经不在目录里，去掉了。
+- 模型行的可用性：旁白、克隆读稿只有 AI 入口（Pro）；声音设计、变声、视频画质提升在界面里就能用（`inApp`），Free 也行。
+- 目录从 26 个 id / 31 条记录变成 34 / 39。那边的快照换了，这里跟着换，`llms-full.txt` 自动跟着变。
 
 ### 角色系统来源与费用
 
@@ -354,12 +368,47 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `https://skylu.ai/#person` 和 `https://skystudioai.com/#organization`。
   Sky Studio 的 `founder`、SkyCut 的 `creator` / `publisher` 与 `applicationSuite`
   表达同一产品家族；价格只写方案里定的真实价格；不捏造成立时间、评分、下载量或尚未发布的系统支持。
-- 只有首页、文档、隐私三类 × 四语言 = **12 个 canonical URL** 进入 `sitemap.xml`。
+- 只有首页、文档、隐私三类 × 四语言 = **12 个 canonical URL** 进入 `sitemap.xml`（已发布的文章另加，见下面「文章栏目」）。
   每项都列四种语言与英文 `x-default`，与 HTML 的 reciprocal hreflang 对齐。
   根目录英文副本 canonical 指向 `/en/`，不重复进入 sitemap。
+- **hreflang 的中文不带地区**（2026-11-11）：`HREFLANG_TAGS.zh = 'zh'`。所有中文设备（含繁体）都进这一个中文版（见上面「设备语言」），
+  写成 `zh-CN` 的话台湾、香港的中文搜索会被 Google 送去英文的 `x-default`。`<html lang>` 和 JSON-LD 的 `inLanguage` 说的是页面用什么写的，仍是 `zh-CN`。
 - 404 为 `noindex,follow`，不进 sitemap；canonical 指向自己的 `/404.html`，不能指成首页。
-  `robots.txt` 开放页面、屏蔽 `/api/` 并声明正式域名的 sitemap 地址。
-  不把本机构建日期当成页面修改日期伪造 `lastmod`，不填无实际依据的更新时间。
+  可收录的页面的 robots meta 是 `index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1`（`INDEX_DIRECTIVES`，和 Sky Studio 的指南一样）。
+- **`robots.txt` 对 AI 爬虫全部放开**（用户 2026-11-11 定：搜索 / 回答用的和训练用的都放，让模型认识 SkyCut 也是曝光；`/api/` 照旧屏蔽）。
+  名单在 `site-config.mjs` 的 `AI_CRAWLERS`，只写运营方有公开说明的 token，别的照旧落在 `*` 那一组：
+  回答 / 搜索用的 OAI-SearchBot、ChatGPT-User（[OpenAI](https://developers.openai.com/api/docs/bots)）、Claude-SearchBot、Claude-User
+  （[Anthropic](https://support.claude.com/en/articles/8896518-does-anthropic-crawl-the-web)）、PerplexityBot、Perplexity-User
+  （[Perplexity](https://docs.perplexity.ai/guides/bots)）、DuckAssistBot、MistralAI-User、Meta-ExternalFetcher、Applebot；训练用的 GPTBot、ClaudeBot、
+  Google-Extended、Applebot-Extended、CCBot、meta-externalagent、Amazonbot。**爬虫找到点名自己的那一组就不再看 `*`**，所以每一组都要重复
+  `Disallow: /api/`（守卫数三组各一条）。加减名单只改 `AI_CRAWLERS`。
+- **`lastmod` / `dateModified` 只写真改过的那一天**（2026-11-11 起）：`content/page-revisions.json` 给 12 个页面各记一份静态 HTML 的指纹和日期，
+  sitemap 的 `lastmod` 和 JSON-LD `WebPage.dateModified` 都从它来。**改了页面（文案、价格、对比表、结构化数据、导航）就在同一次改动里跑
+  `npm run stamp:pages`**：只有指纹变了的页面换成当天，没变的保留原日期；`--date=YYYY-MM-DD` 记另一个真实的日子。指纹不算日期本身和页脚的年份。
+  漏了这一步 `tests/geo.test.mjs` 会红并说出是哪几页。不许用构建时间、不许手改日期；两个分支都动了同一页时合并后重新跑一遍。
+- **结构化数据只写页面上看得见的、有出处的**（2026-11-11 补全）：`SoftwareApplication` 加 `featureList`（就是对比表里的功能名，按页面语言）、
+  `applicationSubCategory`、`isAccessibleForFree`、`installUrl`、界面语言 `inLanguage`（`en` / `zh-Hans` / `es`，照 App 的 `Resources/*.lproj`），
+  offers 加 `category` 和 `availability`；首页加 `FAQPage`（问答就是页面上那几条，一条不多）；`Organization` 加 `alternateName`、`logo`、`sameAs`
+  （和 Sky Studio 自己 `shared/brandEntities.ts` 发的同一组：Wikidata `Q139824875`、YouTube、TikTok）；文档页安装视频的 `VideoObject` 加
+  `uploadDate: 2026-11-06`（PR #329 合并并部署的那天，[Google 要求](https://developers.google.com/search/docs/appearance/structured-data/video)这一项）。
+  **故意不写的**：`softwareVersion`（官网和发版分开部署，写了就会像文档页那句 0.18.47 一样过期；要写得先定「发版时谁改官网」）、`screenshot`
+  （没有真实的 App 截图素材）、评分 / 评论 / 下载量、首屏循环视频和三段演示的 `VideoObject`（装饰性的静音片段，不是能看的视频页）、
+  《南极》短片的 `VideoObject`（没有可核实的首发日期）。守卫钉着这几项不许凭空出现。
+- **对外的东西一个字不提 GitHub**（用户 2026-11-11 定）：`check:seo` 把构建出来的每个 HTML、两份 llms、sitemap、robots 都搜一遍，出现 `github`（不分大小写）就红；
+  `tests/seo.test.mjs`、`tests/guides.test.mjs` 在渲染那一层也拦。功能表里给测试用的合同链接（`feature-matrix.js` 的 `sources`）不上页面，不受影响。
+- **搜索结果里的标题和摘要是正常句子**（2026-11-11 协调者定）：文档页、隐私页的 `<title>` 用 `content/seo.js` 的 `titles`（说清这是什么页），页面上的大标题不变；
+  四种语言的摘要带标点。首页可见文案仍然不用标点。首页问答多了「SkyCut 是什么」「多少钱」两条，价格从 `pricing.js` 取。文档页不再写具体版本号
+  （原来写着 0.18.47，早就过期）。
+- **IndexNow**（2026-11-11 协调者定：做，部署后手动跑）：key 是公开的，在 `site-config.mjs` 的 `INDEXNOW_KEY`，对应 `public/<key>.txt`。
+  **部署成功之后**在 `website/` 跑 `npm run indexnow`（把 sitemap 里的地址交给 IndexNow；`-- --only=/guides/` 只交文章，`-- --dry-run` 只看不交）。
+  脚本先去线上读 key 文件，读不到就停（所以部署前跑不了）；构建和 CI 从不调它。Bing 和用 Bing 索引的 ChatGPT 搜索靠它尽快知道新页面。
+- **`/llms.txt` 和 `/llms-full.txt`**（[llmstxt.org](https://llmstxt.org)，2026-11-11）：`scripts/llms.mjs` 在构建时生成、写进 `public/`，
+  **不手写**。只有英文一份（助手回答时自己翻译；四种语言各写一份只会各自过期），文件里链到三种其他语言的首页，并写明中文站的人民币价格。
+  正文是带标点的英文事实句（是什么、给谁用、系统要求、没有 Intel / Windows 版、Free 和 Pro 各有什么、价格、怎么下载和购买、和 Sky Studio 的关系）；
+  价格、系统要求、功能表、模型名都从 `pricing.js`、`site-config.mjs`、`feature-matrix.js`、`ai-models.js` 和英文文案取，改了那些就跟着变。
+  `llms-full.txt` 再加逐行的 Free / Pro 对比、角色、本机与云端模型、上手四步和隐私说明。两份都列出**已发布且有英文版**的文章。不写版本号、不写评价性的词、不链仓库。
+  提交的那两份必须等于生成的（`tests/geo.test.mjs`；过期就跑 `npm run build`）。**没有哪家大引擎确认读 llms.txt**（Google 明说不需要，
+  [日志研究](https://ahrefs.com/blog/llmstxt-study/)里 97% 的文件没被读过）：它便宜、无害、给会读的助手一份干净的事实，不是排名手段。
 - 分享图片是四张 1200 × 630 PNG，沿用暖白 / 森林绿和 Outfit 字体，分别对应页面语言，
   带 Sky Lu 与 Sky Studio 家族信息；所有 OG / Twitter 图片链接都是正式域名的绝对地址。
   `npm run build:social` 重建 SVG 与 PNG，需要 Pillow、fontTools 与简体中文字体；
@@ -369,6 +418,9 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
 - `npm run check:seo` 在 Vite 构建后读取实际 `dist`，核对 12 个语言页面、根目录副本、
   404、JSON-LD、图片、构建资源、robots 与 sitemap；源模板测试不能代替这个产物检查。
   `tests/seo.test.mjs` 另外核对路由摘要、实体关系、语言互链、真实 PNG 尺寸与 JSON 安全序列化。
+  2026-11-11 起两边都加了：robots 里的 AI 爬虫名单与三组 `/api/`、llms 两份、hreflang 的 `zh`、摘要指令、`lastmod` 与 `dateModified` 同一天、
+  首页 `FAQPage` 与看得见的问答一一对应、`featureList`、安装视频的 `uploadDate`，以及文章页（见下）。`tests/geo.test.mjs`、`tests/guides.test.mjs` 是新的两份；
+  十处修复逐个撤掉，对应的测试都会红（反向验证见第一轮报告）。
 - 最终合并部署后再验证正式域名 HTTP 状态、实际分享预览，并在 Google Search Console
   提交 `https://skycut.app/sitemap.xml`；本地完成不代表已经部署、提交或被搜索引擎收录。
 
@@ -376,6 +428,53 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
 [Google sitemap](https://developers.google.com/search/docs/crawling-indexing/sitemaps/build-sitemap)、
 [站点名称](https://developers.google.com/search/docs/appearance/site-names) 与
 [Schema.org 软件应用](https://schema.org/SoftwareApplication)。
+
+## 文章栏目（Guides）
+
+2026-11-11 用户定：在官网开一个文章栏目，用文章把相关的搜索引进来（「让 Claude / Codex 剪视频」「CapCut 替代」「Mac 自动上字幕」这一类）；
+题目由我们按证据定，第一篇连同栏目页面先给协调者看质量，再批量写。做法参考 Sky Studio 的指南（它的 `docs/agents/seo.md`「Guides」），
+但官网是纯静态站，文章是仓库里的文件、构建时生成，不做后台。
+
+- **地址**：`/<语言>/guides/`（栏目页）和 `/<语言>/guides/<slug>/`；一篇文章一个英文 slug，各语言共用。**某种语言有了第一篇文章才生成它的栏目页、
+  导航和页脚才出现「Guides」入口**；没有文章的语言什么都不变。语言菜单里，这篇没有的语言指到那种语言的栏目页，栏目页也没有就指到首页。
+- **文章多两种语言：繁体中文 `zh-hant`（台湾用语，不是逐字转换）和日文 `ja`**（2026-11-11 协调者定，照 Sky Studio 指南的经验：这两种语言的窄题点击率最高）。
+  **只给文章用，官网页面还是四种**（`GUIDE_ONLY_LANGUAGES`）。这两种语言的文章页借一种官网语言的东西（`siteLanguage`）：`zh-hant` 的导航、页脚、文档链接指到 `/zh/`，
+  `ja` 指到 `/en/`；价格照借的那一边以外的规矩走 —— **只有简体中文文章写人民币，其余语言（含繁中、日文）都写美元**并在文中注明。导航和页脚的文字在
+  `content/guide-shell.js`。hreflang：一篇文章同时有简体和繁体时写 `zh-Hans` / `zh-Hant`（各管各的文字），只有简体时还是 `zh`；日文 `ja`；`x-default` 是英文版。
+  语言菜单在文章页列出这篇真有的语言（最多六种），官网页面仍是四种。`/zh-hant`、`/ja` 这两个光秃秃的地址由 `vercel.json` 302 到各自的栏目页
+  （**这一条只能在部署那一次验证**）。`src/language.js` 碰到这两种语言的地址不做 `?lang=` 跳转（它们没有可换的官网页面）。
+  **App 界面只有英文、简体中文、西班牙文**：繁中文章的按钮名用简体中文界面上的原文、括号里解释，日文和德文文章用英文界面的名字，并在文中说明。
+- **内容**：一篇一个文件夹 `content/guides/<slug>/`：`index.js` 放 slug、类型、日期、出处，每种语言一个文件（`en.js`、`zh-hant.js`……），登记进 `content/guides/index.js`；
+  栏目自己的界面文字在 `content/guide-copy.js`（六种语言）。**各语言版本结构必须一样**（节数、每节的块、步骤数、表格行列、问答数、价格占位符），测试逐篇比。
+  固定字段：`type`（`guide` 教程 / `list` 清单 / `alternatives` 替代品 / `compare` 对比）、`published` / `updated`、`asOf`（别家事实是哪个月核对的）、
+  `sources`（每条别家事实的出处：名称 + 一句话 + https 地址 + 核对日期；**页面上只列名称和核对日期，不带链接**，地址只留在文件里），每种语言的 `title`（≤ 60）、`description`（≤ 155）、
+  `heading`、`answer`（开头先给答案的那一段）、`sections`、`faq`。正文是一小套写法（`scripts/guide-markdown.mjs`）：段落、列表、步骤、表格、提示词、备注，
+  行内只有 `**粗体**`、`` `代码` ``、`[文字](链接)`，其余一律当文字转义，没有 HTML。
+- **试用怎么写**（照[收费方案](../plans/2026-10-27-paid-plans-and-sky-studio-key.md)第 6、20 条）：默认 7 天，从这个账号第一次用 SkyCut 查授权算起，每个账号一次、每台 Mac 一次。
+  文章和栏目的下载框写成「第一次把 SkyCut 连上 Sky Studio 账号时开始 7 天 Pro 试用」，不写「新账号都有 7 天」。
+- **草稿与发布**：`published: null` 就是草稿。草稿**只在** `SKYCUT_GUIDE_DRAFTS=1` 时生成（本机审稿：`SKYCUT_GUIDE_DRAFTS=1 npm run dev`），带「Draft」标记、
+  `noindex`、没有 JSON-LD、不进 sitemap；平常的构建（CI、Vercel）里它不存在，导航也没有入口。**发布 = 在上线那次改动里把 `published` / `updated`
+  写成真实上线的日子**：`npm run publish:guides -- --date=YYYY-MM-DD` 给草稿盖日期并重盖页面日期、重新生成；一批改动写了某天、部署却拖到另一天（还没上过线）时
+  `npm run publish:guides -- --redate=旧:新` 把文章和同一批的页面日期一起挪过去。以后改文章就手改 `updated`。不许写将来的日子（测试拦）、不许补写过去的日子。
+- **发布前的硬规矩**（`scripts/guide-model.mjs` 的 `guideProblems`，构建时不过就报错，`tests/guides.test.mjs` 逐条有反例）：
+  1. 标题、摘要长度；开头必须有真答案；每节有内容；问答成对；`asOf` 和每条出处齐全。
+  2. **价格不许手写**：正文里出现 `$19` 这种就拒，只能写 `{{pro.monthly}}`、`{{pro.yearly}}`、`{{free.price}}`，渲染时从 `content/pricing.js` 取（按文章语言的币种）。
+  3. **只链我们自己的页面**（本站路径、`skylu.ai`、`skystudioai.com`）；别家产品只点名、不给链接，正文里不出现裸网址（同 Sky Studio 的 G3）。
+     **对外不提 GitHub**（用户 2026-11-11 定：仓库以后转私有）：正文和出处名称里出现 GitHub、源码仓库就拒；别家的项目写「项目页」「README」。
+  4. **没有量过的最高级不许用**（smoothest、fastest、#1……）；「best」只许出现在清单类文章里。
+  5. 系统要求每篇都有：结尾的下载框固定写「只支持 Apple silicon、macOS 15 及以上，没有 Windows 和 Intel 版」。
+  写别家要公允、可核实：只写它自己的官方页面 / 仓库说的，出处记进 `sources`，页面底部写「别家的事实核对于某年某月」和「SkyCut 是本文发布方的产品」。
+  不编测评数据、不编用户评价；SkyCut 的功能、价格、限制照产品写（教程里的界面名称照 App 的英文字符串表）。
+- **页面**（`scripts/guide-page.mjs`，样式 `src/styles/guides.css`，只加载 `base` / `responsive` / `guides` 三份样式，不带首页的 3D 和演示）：
+  一栏 760 的阅读宽度，先是答案框，三节以上自动出目录，然后各节、问答、深绿的下载框（下载按钮 + 上手文档）、脚注。署名 Sky Lu（链创始人页，`rel="author"`）、
+  发布和更新日期、阅读时间。页面外壳（导航、页脚、语言菜单）和别的页面共用 `template.mjs` 的 `shell`。
+- **SEO**：`seo.mjs` 的 `headTags` 是所有页面共用的一份 head。文章页 `og:type=article`、`article:published_time`，hreflang 只列这篇真有的语言，
+  `x-default` 是英文版（没有英文版就是第一种）。JSON-LD：`Article`（`datePublished`、`dateModified`、作者 Person、发布方 Organization，这两个节点写全，
+  因为回答引擎一次只读一页）、`BreadcrumbList`（首页 → Guides → 文章）、`FAQPage`（就是页面上的问答）。栏目页是 `CollectionPage` + `ItemList`。
+  已发布的文章和栏目页进 `sitemap.xml`，`lastmod` = `updated`。
+- **已有的文章**（2026-11-11）：`edit-video-with-claude-code`（英、简中、繁中、日、德、西）、`edit-video-with-codex`（英、简中、日）、
+  `auto-subtitles-on-mac`（英、简中、繁中、日）、`video-editing-mcp-servers`（清单，英、日）。选题证据和后面的题目在第一轮报告里。
+  清单那篇写了五家别的工具：只写它们自己页面上的事实、不排名次、写明我们没做过对比测试。**文章先发文字版**（用户定），不配录屏。
 
 ## 运行与部署
 

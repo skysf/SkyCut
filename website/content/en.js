@@ -3,6 +3,7 @@ import showcase from './showcase-en.js';
 import {prices} from './pricing.js';
 import compare from './comparison-en.js';
 // English copy for the public website. Product behavior remains in the Mac app.
+const price=prices('en');
 export default {
   showcase, seo:seoCopy.en,
   lang: 'en', locale: 'en_US', name: 'English',
@@ -22,6 +23,8 @@ export default {
   filmBody: 'A short film by Sky Lu Created with Sky Studio Edited in SkyCut',
   filmCaption: 'Watch the film', previous: 'Previous frame', next: 'Next frame',
   filmAlt: 'A frame from Antarctica the short film edited in SkyCut',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['An icebreaker cutting through Antarctic sea ice seen from above', 'A man in a yellow jacket sitting among king penguins on the ice', 'A diver adjusting a blue mask before entering the water', 'Dancers in feathered headdresses around a campfire at night'],
   native: 'Made for your Mac', nativeBody: 'A real timeline A native app Your way of working',
   available: 'Available now', coming: 'Coming soon', notify: 'Notify me',
   platformNames: ['Mac Apple silicon', 'Mac Intel', 'Windows'],
@@ -48,8 +51,10 @@ export default {
   },
   faqTitle: 'A few things to know',
   faq: [
+    ['What is SkyCut', 'An AI video editor for Mac by Sky Lu Part of the Sky Studio family Edit by hand on a multitrack timeline or let Claude and Codex edit for you'],
     ['Which Mac do I need', 'An Apple silicon Mac running macOS 15 or later Automatic transcription requires macOS 26. Intel Mac and Windows versions are not available yet'],
     ['How does AI editing work', 'Connect a supported MCP client such as Claude Desktop Claude Code or Codex AI makes edits on the timeline where you can inspect and refine them Feature availability depends on your installed build and Sky Studio access'],
+    ['How much does it cost', `Free forever with a watermark on exports Pro is ${price.symbol}${price.monthly} a month or ${price.symbol}${price.yearly} a year and adds AI editing and exports without the watermark A 7 day Pro trial starts the first time you connect SkyCut to your Sky Studio account`],
     ['Do I need a Sky Studio account', 'AI access and watermark-free exports depend on your Sky Studio entitlement Generative services use Sky Studio credits Get a Key in Sky Studio and follow the setup guide for your build'],
     ['Does everything stay on my Mac', 'Editing and project files are local Connected AI clients and cloud generation may receive the content needed for your requests Review what you share and the services you connect']
   ],
@@ -82,8 +87,8 @@ export default {
     ['Connect your AI', 'In a build with Sky Studio settings, create a Key at Sky Studio and add it in SkyCut. Open Settings → Connect AI and choose Claude Desktop, Claude Code or Codex. AI access depends on your entitlement.'],
     ['Review and export', 'Play it back, refine the details and export. The export panel tells you if a watermark applies. Cloud generation is billed separately in Sky Studio credits.']
   ],
-  docsCompatibility: 'Build compatibility',
-  docsCompatibilityBody: 'The public download currently points to version 0.18.47. The AI setup above describes newer builds. If your build does not have Sky Studio settings, contact support for the current build before following those steps.',
+  docsCompatibility: 'Staying up to date',
+  docsCompatibilityBody: 'These steps describe the current public download. If your copy of SkyCut has no Sky Studio settings, download it again to get the latest version.',
   docsClients: 'Supported AI clients',
   docsClientsBody: 'Claude Desktop, Claude Code and Codex have built-in setup. Other clients need local stdio MCP support. A regular ChatGPT web chat cannot connect directly to the local SkyCut MCP server.',
   docsKey: 'Open Sky Studio',

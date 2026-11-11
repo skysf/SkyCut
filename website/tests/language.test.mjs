@@ -79,3 +79,9 @@ test('storage failures and stale saved languages cannot prevent automatic locali
 test('explicit localized URLs remain stable for shared links and search indexing',()=>{
   visit('https://skycut.app/es/privacy/',{languages:['zh-CN'],storage:new Map([[key,'de']])},({redirects})=>assert.deepEqual(redirects,[]));
 });
+test('a guide-only language has no site pages for ?lang= to move between, so its address is left alone',()=>{
+  visit('https://skycut.app/zh-hant/guides/edit-video-with-claude-code/?lang=de',{languages:['de-DE']},({redirects})=>assert.deepEqual(redirects,[]));
+  visit('https://skycut.app/ja/guides/',{languages:['en-US'],storage:new Map([[key,'es']])},({redirects})=>assert.deepEqual(redirects,[]));
+  // A site-language guide still follows an explicit choice the usual way.
+  visit('https://skycut.app/zh/guides/?lang=en',{languages:['zh-CN']},({redirects})=>assert.deepEqual(redirects,['https://skycut.app/en/guides/']));
+});

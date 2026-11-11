@@ -13,6 +13,12 @@
       "main": true
     }
   },
+  "redirects": [
+    { "source": "/zh-hant", "destination": "/zh-hant/guides/", "permanent": false },
+    { "source": "/zh-hant/", "destination": "/zh-hant/guides/", "permanent": false },
+    { "source": "/ja", "destination": "/ja/guides/", "permanent": false },
+    { "source": "/ja/", "destination": "/ja/guides/", "permanent": false }
+  ],
   "headers": [
     {
       "source": "/(.*)",

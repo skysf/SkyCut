@@ -1,0 +1,40 @@
+# SkyCut
+
+> SkyCut is an AI video editor for Mac. You edit on a native multitrack timeline, or connect Claude Code, Claude Desktop or Codex and direct the edit in your own words. It runs on Apple silicon Macs with macOS 15 or later and is made by Sky Lu as part of the Sky Studio product family.
+
+Key facts:
+
+- Platform: Mac only. Apple silicon (arm64) and macOS 15 or later. There is no Intel Mac version and no Windows version.
+- Price: the Free plan costs $0 and has no time limit. Pro costs $19 per month or $149 per year in USD (¥129 or ¥999 in CNY on the Chinese site). Prices exclude tax.
+- Free includes the full manual editor, subtitles, screen recording and the file tools. Videos exported on Free carry a Sky Studio watermark.
+- Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. A 7-day Pro trial starts the first time you connect SkyCut to a Sky Studio account, once per account and once per Mac.
+- AI editing: SkyCut includes a local MCP server with built-in setup for Claude Code, Claude Desktop and Codex. You bring your own AI client. The AI works on the real timeline, where you can inspect, change or undo what it did.
+- Cloud generation (images, video, music, narration, sound effects, lip sync, upscaling) uses Sky Studio credits, which are bought separately. Yearly Pro includes 1,000 Sky Studio credits for each paid year; monthly Pro includes none.
+- Download: https://skylu.ai/download/skycut
+- Buy Pro: https://skystudioai.com/app/skycut/pro (sign in to Sky Studio first)
+- Contact: support@skycut.app
+
+## Pages
+
+- [SkyCut home](https://skycut.app/en/): overview, AI workflow demos, pricing and the full Free and Pro comparison
+- [Getting started](https://skycut.app/en/docs/): install SkyCut, import footage, connect an AI client, review and export
+- [Privacy](https://skycut.app/en/privacy/): what the website collects and why
+- [Full fact sheet](https://skycut.app/llms-full.txt): every feature, plan difference and AI model in one file
+
+## Guides
+
+- [How to edit video with Claude Code on a Mac](https://skycut.app/en/guides/edit-video-with-claude-code/): Claude Code cannot open a video editor by itself. Connect it to SkyCut on a Mac and it cuts, captions and exports on a real timeline you can review.
+- [How to edit video with Codex on a Mac](https://skycut.app/en/guides/edit-video-with-codex/): Yes, Codex can edit video when it has an editor to control. Connect it to SkyCut on a Mac and it cuts, captions and exports on a real timeline.
+- [How to add automatic subtitles to a video on a Mac](https://skycut.app/en/guides/auto-subtitles-on-mac/): Generate subtitles from speech on your Mac, translate them, then burn them in or export SRT. SkyCut does it on the Mac, and the Free plan includes it.
+- [Video editing MCP servers for Claude and Codex: how to choose](https://skycut.app/en/guides/video-editing-mcp-servers/): Six ways to let Claude or Codex edit video through MCP, compared by platform, where the server runs and whether you can fix the timeline by hand.
+
+## Other languages
+
+- [简体中文](https://skycut.app/zh/)
+- [Deutsch](https://skycut.app/de/)
+- [Español](https://skycut.app/es/)
+
+## Optional
+
+- [Sky Lu](https://skylu.ai/founder/): founder of Sky Studio and creator of SkyCut
+- [Sky Studio](https://skystudioai.com/): the AI image, video and audio generation platform in the same family; SkyCut Pro and credits are bought with a Sky Studio account

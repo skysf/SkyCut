@@ -6,7 +6,7 @@ import {render,languages} from '../scripts/template.mjs';
 import {pricing} from '../scripts/pricing.mjs';
 import {prices,annualBreakdown} from '../content/pricing.js';
 import {featureGroups,characterRows,localModelRows} from '../content/feature-matrix.js';
-import {cloudModelGroups,skyStudioApiSource,skyStudioRevision,localVoiceLanguages,localVoiceRoles,soundEffectPresets} from '../content/ai-models.js';
+import {cloudModelGroups,skyStudioApiSource,skyStudioRevision,localVoiceLanguages,localVoiceRoles,soundEffectPresets,voiceCatalogSnapshot} from '../content/ai-models.js';
 const sectionOf=c=>render(c).match(/<section class="pricing\b[\s\S]*?<\/section>/)[0];
 const rowOf=(html,id)=>html.match(new RegExp(`<tr data-feature="${id}">([\\s\\S]*?)<\\/tr>`))?.[1];
 const accessOf=(html,id)=>[...rowOf(html,id).matchAll(/<td data-access="([^"]+)"/g)].map(m=>m[1]);
@@ -67,12 +67,19 @@ for(const language of languages) {
       assert.deepEqual(accessOf(table,`model-${id}`),['unavailable','cloudAI']);
     }
     assert.match(rowOf(table,'model-imageUpscale'),/2/);assert.match(rowOf(table,'model-imageUpscale'),/4/);
-    for(const group of featureGroups.filter(g=>g.id!=='pro'))for(const item of group.rows)assert.deepEqual(accessOf(table,item.id),['included','included']);
+    // Change Voice is the one editing row that spends credits: in the app on Free, in the app or via AI on Pro.
+    for(const group of featureGroups.filter(g=>g.id!=='pro'))for(const item of group.rows)assert.deepEqual(accessOf(table,item.id),item.id==='voiceChange'?['cloudUI','cloudBoth']:['included','included']);
+    for(const id of ['voiceLibrary','voiceChange'])for(const phrase of c.pricing.compare.features[id])assert.ok(rowOf(table,id).includes(phrase));
     for(const id of ['speech','translation'])assert.deepEqual(accessOf(table,id),['localUI','localBoth']);
     for(const id of ['vision','shots','kokoro','synth'])assert.deepEqual(accessOf(table,id),['unavailable','localAI']);
     assert.match(rowOf(table,'speech'),/macOS 26/);assert.match(rowOf(table,'translation'),/macOS 15/);
-    assert.deepEqual(accessOf(table,'model-upscale'),['cloudUI','cloudBoth']);
-    for(const group of cloudModelGroups.filter(g=>g.id!=='upscale'))assert.deepEqual(accessOf(table,`model-${group.id}`),['unavailable','cloudAI']);
+    // Upscaling, voice design and voice conversion work from the app on any plan; the rest are reached through AI on Pro.
+    assert.deepEqual(cloudModelGroups.filter(g=>g.inApp).map(g=>g.id),['voiceDesign','voiceChange','upscale']);
+    for(const group of cloudModelGroups)assert.deepEqual(accessOf(table,`model-${group.id}`),group.inApp?['cloudUI','cloudBoth']:['unavailable','cloudAI']);
+    for(const id of ['cloning','voiceDesign','voiceChange']) {
+      const voiceRow=rowOf(table,`model-${id}`);
+      assert.ok(voiceRow.includes(c.pricing.compare.models[id]));assert.ok(voiceRow.includes(c.pricing.compare.modelDetails[id]));
+    }
     for(const model of cloudModelGroups.flatMap(g=>g.models))assert.ok(table.includes(model.title),model.title);
     for(const [id,label] of Object.entries(featureLabels[language]))assert.ok(rowOf(table,id).includes(`<span class="comparison-label">${label}</span>`),label);
     assert.doesNotMatch(section.replace(/<[^>]*>/g,' '),/Kokoro/i);
@@ -112,11 +119,16 @@ test('annual price arithmetic rounds monthly equivalents to two decimals and han
   assert.deepEqual(annualBreakdown({monthly:20,yearly:120}),{perMonth:'10.00',saving:'120'});
   assert.deepEqual(annualBreakdown({monthly:9.99,yearly:99.5}),{perMonth:'8.29',saving:'20.38'});
 });
-test('the SkyCut-only snapshot accounts for 31 catalog records and all nine image entries',()=>{
+test('the SkyCut-only snapshot accounts for 39 catalog records, all nine image entries and the voice catalog',async()=>{
   const models=cloudModelGroups.flatMap(g=>g.models);
   assert.equal(skyStudioRevision,'86b797a9c935c3499674fce33525ab0255527745');
-  assert.equal(models.length,26);assert.equal(new Set(models.map(m=>m.id)).size,26);
-  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),31);
+  assert.equal(models.length,34);assert.equal(new Set(models.map(m=>m.id)).size,34);
+  assert.equal(models.reduce((sum,m)=>sum+m.kinds.length,0),39);
+  // Voice models are exactly the ones in the catalog snapshot the App is checked against: same ids, kinds and titles.
+  const catalog=JSON.parse(await readFile(new URL('../../'+voiceCatalogSnapshot,import.meta.url),'utf8')).models;
+  const voiceKinds=['voice','voice_clone','voice_enroll','voice_design','voice_convert'];
+  assert.deepEqual(models.filter(m=>m.kinds.some(kind=>voiceKinds.includes(kind))).map(m=>[m.id,m.kinds[0],m.title]).sort(),catalog.map(m=>[m.id,m.kind,m.title]).sort());
+  assert.ok(models.every(m=>m.id!=='zonos2'),'the old cloning model left the catalog');
   // 2026-11-10 Sky Studio PR #245 Omni 的公开 id 换成 1.2 Veo 3.1 Pro 下架 五个共享视频模型各占文生和图生两条
   assert.deepEqual(cloudModelGroups.find(g=>g.id==='video').models.map(m=>[m.id,m.title,m.kinds.length]),[
     ['minimax-h3','Minimax H3',2],['gemini-omni-1.2-flash','Gemini Omni 1.2 Flash',2],['veo-fast','Veo 3.1 Fast',2],
@@ -133,7 +145,7 @@ test('the SkyCut-only snapshot accounts for 31 catalog records and all nine imag
   ]);
   assert.deepEqual(cloudModelGroups.find(g=>g.id==='upscale').models.map(m=>m.kinds),[['upscale'],['upscale']]);
   assert.ok(models.every(m=>!['pro','nano-banana','seedream5-lite','dreamina','character-import'].includes(m.id)));
-  assert.deepEqual([...new Set(models.flatMap(m=>m.kinds))].sort(),['image','image_to_video','lipsync','music','sound_effect','text_to_video','upscale','voice','voice_clone']);
+  assert.deepEqual([...new Set(models.flatMap(m=>m.kinds))].sort(),['image','image_to_video','lipsync','music','sound_effect','text_to_video','upscale','voice','voice_clone','voice_convert','voice_design','voice_enroll']);
   assert.ok(models.every(m=>m.title && m.kinds.length));
 });
 test('features cite App sources or the pinned Character contract and local voice and sound counts match the App',async()=>{
