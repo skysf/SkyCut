@@ -15,7 +15,8 @@ import Foundation
 ///
 /// **引擎的图不是一直开着的**（2026-11-11，docs/architecture/audio-engine.md 第二节第 11 条）：图开着就占着声卡，
 /// 系统不会空闲睡眠、App Nap 也不生效。`idle`（AudioEngineIdleKeeper）照 AudioEngineIdlePolicy 停图 / 起图：没有声音的
-/// 时间线不开；停着 30 秒没人用就停；用户回到 SkyCut 动一下（AppUserPresence）先在后台起好；时钟开播时引擎自己也会起。
+/// 时间线不开；停着 2 分钟没人用就停；用户回到 SkyCut（切过来、动鼠标、按键：AppUserPresence）先在后台起好；时钟开播时
+/// 图还停着就当场起。
 /// 换工程 / 新建空工程 / 关工程整个引擎收掉（`stop()`）。
 @MainActor
 final class PreviewAudioEngineHost {

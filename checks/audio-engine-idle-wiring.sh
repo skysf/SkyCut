@@ -6,12 +6,12 @@
 # 退出。这几条钉住「什么时候停、怎么再起」的接线（规矩本身、停过再起播放头不跳在 scripts/check-audio-engine.sh 第 15 组真跑）：
 #   1. 宿主把引擎交给管空闲的那一位（keep），换配置之后让它看一眼（reconcile），收引擎先让它放手（release）；
 #   2. 没有东西可预览了（时间线空了、换工程）整个引擎收掉：unloadPreview = 卸片 + audioEngineHost.stop()；
-#   3. 停着 30 秒没人用才停（数字是用户定的），没有声音的时间线不开；
+#   3. 停着 2 分钟没人用才停（数字是用户定的），没有声音的时间线不开；
 #   4. 用户回来了先把图起好（wake 只经后台那条队列，不占主线程）；时钟要出声时图还停着就当场起、等它起来再开播
 #      （recoverIfNeeded 先等后台那一次、再认「故意停的」；没有声音不起）—— 不许让播放头先按 host 时间空走：那一截会被跳过；
 #   5. 图刚起 / 停着时发的在播锚点是待钉的（不许写死「采样时间从 0 起」）；
 #   6. 播到片尾播放器自己停，声音主时钟跟着停（不然引擎永远不算停着）；
-#   7. 只算用户在 SkyCut 里的动作（不在前台不算），宿主听「用户回来了」；
+#   7. 用户回到 SkyCut 就算（变成活动的 App、窗口变成主 / 键窗口、发给 SkyCut 的鼠标和键盘事件），宿主听「用户回来了」；
 #   8. 停图 / 起图的那句日志不在主线程上写。
 #
 # 用法：checks/audio-engine-idle-wiring.sh
@@ -64,8 +64,8 @@ grep -qF 'self.unloadPreview()' <<<"${EMPTY_BUILD}" \
 CLOSE="$(code "${DOCUMENT}" | awk '/    private func closeCurrentDocument\(\) \{/,/^    \}/')"
 grep -qF 'unloadPreview()' <<<"${CLOSE}" || fail "${DOCUMENT}：换工程（closeCurrentDocument）没走 unloadPreview()"
 
-# 3. 规矩：30 秒；没有声音不开。
-grep -qE 'var idleAfter: TimeInterval = 30$' "${POLICY}" || fail "${POLICY}：停着没人用 30 秒停图（用户 2026-11-11 定的数，改它先问用户）"
+# 3. 规矩：2 分钟；没有声音不开。
+grep -qE 'var idleAfter: TimeInterval = 120$' "${POLICY}" || fail "${POLICY}：停着没人用 2 分钟停图（用户 2026-11-11 定的数，改它先问用户：短了冷着按播放容易碰上，长了 Mac 晚睡）"
 grep -qF 'guard hasSound else { return false }' "${POLICY}" || fail "${POLICY}：没有声音的时间线不开图（在播也不开）"
 
 # 4. 起回来不占调用方的线程。
@@ -111,8 +111,15 @@ for name in 'AVPlayerItemDidPlayToEndTime' 'AVPlayerItemFailedToPlayToEndTime'; 
 done
 
 # 7. 只算在 SkyCut 里的动作；宿主听「用户回来了」。
-grep -qF 'guard appIsActive else { return }' "${PRESENCE}" || fail "${PRESENCE}：SkyCut 不在前台时的事件不算「在用」（guard appIsActive）"
-grep -qF 'appIsActive: NSApp.isActive' "${PRESENCE}" || fail "${PRESENCE}：事件监视器要按 NSApp.isActive 判在不在前台"
+PRESENCE_CODE="$(code "${PRESENCE}")"
+for signal in 'NSApplication.didBecomeActiveNotification' 'NSWindow.didBecomeKeyNotification' 'NSWindow.didBecomeMainNotification' \
+              '.mouseMoved' '.mouseEntered' '.keyDown' '.leftMouseDown' '.scrollWheel' '.activeAlways'; do
+  grep -qF -- "${signal}" <<<"${PRESENCE_CODE}" || fail "${PRESENCE}：用户回到 SkyCut 的信号少了 ${signal}（2026-11-11 用户定：变成活动的、窗口变成主 / 键窗口、鼠标移进窗口、按键都算）"
+done
+grep -qF 'NSEvent.addLocalMonitorForEvents(matching: Self.inputs)' <<<"${PRESENCE_CODE}" || fail "${PRESENCE}：鼠标 / 键盘事件要经本地事件监视器记下来"
+grep -qF 'observers = Self.returns.map' <<<"${PRESENCE_CODE}" || fail "${PRESENCE}：三个「回来了」的通知没挂上"
+grep -qF 'view.addTrackingArea(NSTrackingArea(' <<<"${PRESENCE_CODE}" \
+  || fail "${PRESENCE}：窗口上没挂「指针进来了」的跟踪区（.activeAlways：SkyCut 不在前台时指针移进窗口也要算回来了）"
 grep -qF 'AppUserPresence.shared.whenReturned(self)' <<<"${HOST_CODE}" || fail "${HOST}：宿主没听「用户回来了」（AppUserPresence.shared.whenReturned）—— 图只能等按下播放才起"
 
 # 8. 日志不在主线程上写。
@@ -120,4 +127,4 @@ grep -qF 'PreviewAudioEngineHost.logQueue.async { MainThreadWatchdog.shared.note
   || fail "${HOST}：停图 / 起图的日志要放到 logQueue 上写（起图那一句正落在按下播放的那一拍，主线程上写文件会慢半拍）"
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
-echo "✓ audio-engine-idle-wiring：引擎交给管空闲的、空了就收、30 秒、后台起图、待钉的锚点、片尾停主时钟、只算前台的动作"
+echo "✓ audio-engine-idle-wiring：引擎交给管空闲的、空了就收、2 分钟、用户回来在后台起图、待钉的锚点、片尾停主时钟"

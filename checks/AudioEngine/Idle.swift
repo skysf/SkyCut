@@ -5,8 +5,8 @@ import SrtFlowCore
 // 第 15 组：预览的音频引擎不是一直开着的（docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md）。
 //
 // 四层：
-//   1. 规矩本身（AudioEngineIdlePolicy，纯值）：没有声音不开、在播开着、停着 30 秒没人用就停。
-//   2. 照规矩办事的那一位（AudioEngineIdleKeeper）：假引擎 + 自己拨的钟，不用真等 30 秒；外加一遍真计时器
+//   1. 规矩本身（AudioEngineIdlePolicy，纯值）：没有声音不开、在播开着、停着 2 分钟没人用就停。
+//   2. 照规矩办事的那一位（AudioEngineIdleKeeper）：假引擎 + 自己拨的钟，不用真等 2 分钟；外加一遍真计时器
 //      （空闲时长注成 0.1 秒）：没人叫它，图自己停；停着的时候计时器不再跑。
 //   3. 引擎的停 / 起（手动渲染，CI 没有声卡也跑）：停了之后节点、播放头、播放状态都在；停着 seek 不起图；时钟开播时
 //      当场起、从原处开播、一帧不跳（不指望采样时间从 0 重来）；用户回来了先在后台起；没有声音的时间线不起图。
@@ -19,13 +19,16 @@ import SrtFlowCore
 
 func checkIdlePolicy() {
     let policy = AudioEngineIdlePolicy()
-    check(policy.idleAfter == 30, "停着没人用 30 秒停图（用户 2026-11-11 同意的数）")
+    check(policy.idleAfter == 120, "停着没人用 2 分钟停图（用户 2026-11-11 定的数：先定的 30 秒，看过量出来的数改成 2 分钟）")
     check(!policy.shouldRun(hasSound: false, isPlaying: false, quietFor: 0), "没有声音：停着不开")
     check(!policy.shouldRun(hasSound: false, isPlaying: true, quietFor: 0), "没有声音：在播也不开（播放头按 host 时间走）")
     check(policy.shouldRun(hasSound: true, isPlaying: true, quietFor: .infinity), "有声音、在播：开着，不管多久没人动")
     check(policy.shouldRun(hasSound: true, isPlaying: false, quietFor: 0), "有声音、停着、刚有人用：开着")
-    check(policy.shouldRun(hasSound: true, isPlaying: false, quietFor: 29.9), "有声音、停着、29.9 秒前有人用：还开着")
-    check(!policy.shouldRun(hasSound: true, isPlaying: false, quietFor: 30), "有声音、停着、30 秒没人用：停")
+    check(policy.shouldRun(hasSound: true, isPlaying: false, quietFor: 119.9), "有声音、停着、119.9 秒前有人用：还开着")
+    check(!policy.shouldRun(hasSound: true, isPlaying: false, quietFor: 120), "有声音、停着、2 分钟没人用：停")
+    let short = AudioEngineIdlePolicy(idleAfter: 0.5)
+    check(short.shouldRun(hasSound: true, isPlaying: false, quietFor: 0.4) && !short.shouldRun(hasSound: true, isPlaying: false, quietFor: 0.5),
+          "时长注成别的数照那个数算（自检注短的，不用真等）")
     check(!policy.shouldRun(hasSound: true, isPlaying: false, quietFor: .infinity), "有声音、停着、从来没人用：停")
     check(!AudioEngineConfig.empty.hasSound, "空配置没有声音")
 }
@@ -71,6 +74,8 @@ private final class FakeIdleAudio: IdleSuspendableAudio {
 func checkIdleKeeper() {
     var clock = 1_000.0
     var input: TimeInterval? = 1_000.0   // 用户刚在 App 里动过（打开工程的那一下）
+    /// 规矩里的空闲时长（2 分钟）：下面拨钟按它拨「差 1 秒不到」和「过了 1 秒」，不写死。
+    let idleAfter = AudioEngineIdlePolicy().idleAfter
     // checkEvery 给得很大：这一段每一步都自己叫 reconcile，不靠计时器。
     func keeper() -> AudioEngineIdleKeeper {
         AudioEngineIdleKeeper(checkEvery: 3_600, now: { clock }, lastInput: { input })
@@ -81,12 +86,12 @@ func checkIdleKeeper() {
         let idle = keeper()
         idle.keep(audio)
         check(!audio.isSuspended, "刚有人用过：接手之后图留着")
-        clock += 29
+        clock += idleAfter - 1
         idle.reconcile()
-        check(!audio.isSuspended, "停着 29 秒：图还开着")
+        check(!audio.isSuspended, "停着差 1 秒不到 2 分钟：图还开着")
         clock += 2
         idle.reconcile()
-        check(audio.isSuspended && audio.suspends == 1, "停着 31 秒没人用：图停了")
+        check(audio.isSuspended && audio.suspends == 1, "停着过了 2 分钟没人用：图停了")
         idle.reconcile()
         check(audio.suspends == 1, "已经停着就不再停一次")
 
@@ -99,15 +104,15 @@ func checkIdleKeeper() {
         idle.reconcile()
         check(!audio.isSuspended, "在播：十分钟没人动也不停")
         audio.setPlaying(false, at: clock)
-        clock += 29
+        clock += idleAfter - 1
         idle.reconcile()
-        check(!audio.isSuspended, "刚播完 29 秒：还开着（从停止播放那一刻起算）")
+        check(!audio.isSuspended, "刚播完、差 1 秒不到 2 分钟：还开着（从停止播放那一刻起算）")
         clock += 2
         idle.reconcile()
-        check(audio.isSuspended && audio.suspends == 2, "播完 31 秒没人用：停")
+        check(audio.isSuspended && audio.suspends == 2, "播完过了 2 分钟没人用：停")
 
         // 时钟开播时引擎自己起图（不经这里），只播了 2 秒就停 —— 夹在两次「看一眼」之间，这里从没看见它在播：
-        // 照样从停的那一刻起算 30 秒，不能因为「上一次有人动是很久以前」当场停掉。
+        // 照样从停的那一刻起算 2 分钟，不能因为「上一次有人动是很久以前」当场停掉。
         audio.setPlaying(true, at: clock)
         audio.wake()
         clock += 2
@@ -115,9 +120,9 @@ func checkIdleKeeper() {
         clock += 3
         idle.reconcile()
         check(!audio.isSuspended, "引擎自己起回来、短短播了 2 秒：停下 3 秒，图还开着")
-        clock += 28
+        clock += idleAfter - 2
         idle.reconcile()
-        check(audio.isSuspended && audio.suspends == 3, "引擎自己起回来的图，播完 31 秒照样停")
+        check(audio.isSuspended && audio.suspends == 3, "引擎自己起回来的图，播完过了 2 分钟照样停")
         idle.release()
     }
 
@@ -139,7 +144,7 @@ func checkIdleKeeper() {
         check(!audio.isSuspended && audio.wakes == 1, "换了配置有声音了、用户正在用：起好")
         audio.hasSound = false
         idle.reconcile()
-        check(audio.isSuspended, "换了配置没有声音了：当场停，不等 30 秒")
+        check(audio.isSuspended, "换了配置没有声音了：当场停，不等 2 分钟")
         idle.release()
     }
 

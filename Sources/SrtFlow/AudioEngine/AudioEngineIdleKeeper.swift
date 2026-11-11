@@ -5,11 +5,11 @@ import Foundation
 // 管什么：拿着一个引擎（`IdleSuspendableAudio`），按 `AudioEngineIdlePolicy` 决定此刻图该不该开着，该停就 `suspend()`、
 // 该起就 `wake()`。什么时候看一眼：
 //   - 换了配置之后（`reconcile()`，PreviewAudioEngineHost.apply 调）：没有声音了当场停；
-//   - 用户回到 SkyCut 动了一下（`userReturned()`）：停着的先在后台起好，等他按播放；
+//   - 用户回到 SkyCut（切过来、动鼠标、按键：`userReturned()`）：停着的先在后台起好，等他按播放；
 //   - 图开着的时候每 `checkEvery` 秒看一次：停着、也没人用够久了就停。图停着的时候不留计时器。
 // 不管什么：规矩本身（AudioEngineIdlePolicy）；图怎么停怎么起（TimelineAudioEngine）；用户动没动（AppUserPresence）。
 //
-// 时间和「用户上一次动是什么时候」都由外面给（`now` / `lastInput`）：自检把它们换成自己拨的钟，不用真等 30 秒。
+// 时间和「用户上一次动是什么时候」都由外面给（`now` / `lastInput`）：自检把它们换成自己拨的钟，不用真等 2 分钟。
 
 /// 能被空闲规矩停掉 / 起回来的声音引擎（`TimelineAudioEngine`；自检里是假的）。
 @MainActor
@@ -77,7 +77,7 @@ final class AudioEngineIdleKeeper {
     }
 
     /// 不等空闲时长、当场停图，而且不再自己看（直到用户回来 / 开播把图叫起来）。进程内冒烟量「停过之后第一次播放」用：
-    /// 等 30 秒太慢，光停引擎的话下一次「看一眼」又会因为刚有人用过把它起回来。
+    /// 等 2 分钟太慢，光停引擎的话下一次「看一眼」又会因为刚有人用过把它起回来。
     func suspendNow() {
         audio?.suspend()
         disarm()

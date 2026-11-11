@@ -280,8 +280,8 @@ scripts/gui-smoke/in-process/run.sh <scratchpad>/steps.json <scratchpad>/southpo
 
 - **步骤表**的格式写在 `Sources/SrtFlow/SmokeScript.swift` 文件头：`window` / `settle` / `seek` / `play` / `pause`（直接调时钟：空格是
   SwiftUI 的快捷键，合成的按键到不了；结果里 `audioEngine.underrunFrames` 是这一轮的欠载帧数；`play` 在日志里记这一句占了主线程
-  多久、图当时的状态）/ `userInput`（当作用户在 SkyCut 里动了一下鼠标：冒烟进程不在前台，真事件不算「在用」）/ `audioSuspend`
-  （当场把预览的音频引擎的图停掉，不等 30 秒空闲）/ `hideApp`（把 App 藏起来：App Nap 只在看不见时生效；驱动起手要一个看得见的
+  多久、图当时的状态）/ `userInput`（当作用户回到 SkyCut 动了一下鼠标：冒烟窗口对真鼠标关着，要步骤表自己说）/ `audioSuspend`
+  （当场把预览的音频引擎的图停掉，不等 2 分钟空闲）/ `hideApp`（把 App 藏起来：App Nap 只在看不见时生效；驱动起手要一个看得见的
   窗口，所以不能用 `open -j` 起，改成起来之后再藏）—— 这三步和 `state` 里的 `audioGraph`（running / suspended / starting / none）
   是 2026-11-11 验「引擎不是一直开着的」加的：外面每 0.5 秒记一次 `ps -o pri= -p <pid>` 和 `pmset -g assertions` 里
   `preventuseridlesleep` 那条的「Created for PID」，和卡顿日志里「预览的音频引擎：停图 / 起图」的时刻对着看

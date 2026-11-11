@@ -121,7 +121,7 @@ enum SmokeDriver {
         case .pause:
             project.clock.pause()
         case .userInput:
-            AppUserPresence.shared.note(at: ProcessInfo.processInfo.systemUptime, appIsActive: true)
+            AppUserPresence.shared.note(at: ProcessInfo.processInfo.systemUptime)
         case .audioSuspend:
             project.audioEngineHost.suspendNow()
         case .hideApp:
