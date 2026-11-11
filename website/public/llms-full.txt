@@ -197,6 +197,9 @@ Supported AI clients: Claude Desktop, Claude Code and Codex have built-in setup.
 - [How to translate subtitles and make bilingual subtitles on a Mac](https://skycut.app/en/guides/translate-subtitles-on-mac/): Translate an SRT file or generated subtitles on your Mac, show the original and the translation together, and export each language. Free in SkyCut.
 - [How to make an AI voiceover in your own voice on a Mac](https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/): Create a voice from a short recording in SkyCut, then have AI read your script in it or change the voice of a clip. What it needs and what it costs.
 - [Video editing MCP servers for Claude and Codex: how to choose](https://skycut.app/en/guides/video-editing-mcp-servers/): Six ways to let Claude or Codex edit video through MCP, compared by platform, where the server runs and whether you can fix the timeline by hand.
+- [CapCut alternatives for Mac: choose by the work you do](https://skycut.app/en/guides/capcut-alternatives-for-mac/): Compare six CapCut alternatives for Mac by workflow, platform and billing: iMovie, Final Cut Pro, Resolve, Premiere, Descript and SkyCut.
+- [How to choose an AI video editor for Mac](https://skycut.app/en/guides/ai-video-editors-for-mac/): Compare SkyCut, Final Cut Pro, Resolve, Premiere, Descript and Filmora by AI workflow, platform and billing, from captions to assistant-led editing.
+- [SkyCut vs Descript: which editing workflow fits?](https://skycut.app/en/guides/skycut-vs-descript/): Compare SkyCut and Descript by transcript editing, timeline control, AI assistants, media handling and plan limits, with reasons to choose each.
 
 ## Links
 
