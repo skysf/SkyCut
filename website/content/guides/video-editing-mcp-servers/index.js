@@ -2,6 +2,8 @@
 // We make SkyCut and have not benchmarked the other tools: every statement about
 // them is taken from their own pages (sources below) and nothing is ranked by quality.
 import en from './en.js';
+import zh from './zh.js';
+import zhHant from './zh-hant.js';
 import ja from './ja.js';
 export default {
   slug:'video-editing-mcp-servers',
@@ -15,5 +17,5 @@ export default {
     {name:'davinci-resolve-mcp by Samuel Gursky (project page)',claim:'A community MCP server controls DaVinci Resolve Studio through its scripting API on macOS, Windows and Linux; external scripting requires Resolve Studio; its installer can configure Claude Desktop, Claude Code, Codex CLI and other clients',url:'https://github.com/samuelgursky/davinci-resolve-mcp',checked:'2026-11-11'},
     {name:'claude-video, a Claude Code skill suite (project page)',claim:'Skills that edit video files drive FFmpeg and Whisper from the terminal and have no timeline',url:'https://github.com/agricidaniel/claude-video',checked:'2026-11-11'},
   ],
-  languages:{en,ja},
+  languages:{en,zh,'zh-hant':zhHant,ja},
 };

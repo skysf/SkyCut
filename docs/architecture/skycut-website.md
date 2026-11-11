@@ -472,8 +472,12 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `x-default` 是英文版（没有英文版就是第一种）。JSON-LD：`Article`（`datePublished`、`dateModified`、作者 Person、发布方 Organization，这两个节点写全，
   因为回答引擎一次只读一页）、`BreadcrumbList`（首页 → Guides → 文章）、`FAQPage`（就是页面上的问答）。栏目页是 `CollectionPage` + `ItemList`。
   已发布的文章和栏目页进 `sitemap.xml`，`lastmod` = `updated`。
-- **已有的文章**（2026-11-11）：`edit-video-with-claude-code`（英、简中、繁中、日、德、西）、`edit-video-with-codex`（英、简中、日）、
-  `auto-subtitles-on-mac`（英、简中、繁中、日）、`video-editing-mcp-servers`（清单，英、日）。选题证据和后面的题目在第一轮报告里。
+- **已有的文章**（2026-11-11，两批）：`edit-video-with-claude-code`（英、简中、繁中、日、德、西）、`edit-video-with-codex`（英、简中、繁中、日）、
+  `claude-code-vs-codex-for-video-editing`（对比，英、简中、日）、`remove-pauses-and-filler-words`（英、简中、繁中、日）、
+  `auto-subtitles-on-mac`（英、简中、繁中、日）、`translate-subtitles-on-mac`（英、简中、繁中、西）、
+  `ai-voiceover-in-your-own-voice`（英、简中、繁中、日）、`video-editing-mcp-servers`（清单，英、简中、繁中、日）。
+  **对比那篇只写量到的**：数字来自[两个客户端各 8 个任务的实测](../reports/2026-11-11-mcp-guide-final-measurement.md)，各跑一次、测试素材，文中写明；
+  `tests/guides.test.mjs` 把文章表格里的每个秒数和调用次数同那份报告逐个对，报告没变而文章的数字变了就红。声音那篇不写积分数字（App 在每一步收费前显示价格）。选题证据和后面的题目在第一轮报告里。
   清单那篇写了五家别的工具：只写它们自己页面上的事实、不排名次、写明我们没做过对比测试。**文章先发文字版**（用户定），不配录屏。
 
 ## 运行与部署

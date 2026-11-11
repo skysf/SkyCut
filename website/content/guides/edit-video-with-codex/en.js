@@ -69,7 +69,7 @@ export default {
   faq:[
     ['Can Codex edit video?','Yes, when it can control a video editor. With SkyCut connected, Codex edits on a real timeline on your Mac. On its own it can only run command line tools such as FFmpeg on files.'],
     ['Does ChatGPT in the browser work too?','No. The MCP server is local to your Mac, so you need Codex on that Mac: the CLI, the IDE extension or the desktop app.'],
-    ['Should I use Codex or Claude Code?','Both connect in the same place and use the same SkyCut tools. Use the one you already pay for. We have not published a quality comparison between them.'],
+    ['Should I use Codex or Claude Code?','Both connect in the same place and use the same SkyCut tools. Use the one you already pay for. Our [measured comparison](/en/guides/claude-code-vs-codex-for-video-editing/) has the times for eight tasks. It does not judge which makes the nicer cut.'],
     ['Is it free?','SkyCut is free to download and edit with by hand. Letting Codex edit needs SkyCut Pro at {{pro.monthly}} a month or {{pro.yearly}} a year once the 7-day trial ends, plus your own ChatGPT plan.'],
     ['Does it work on Windows?','No. SkyCut runs only on Apple silicon Macs with macOS 15 or later.'],
   ],
