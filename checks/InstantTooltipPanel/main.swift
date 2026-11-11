@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 // 提示面板的**落点自检**：给一个已知位置的锚点，量提示面板真实落在哪、以及
-// 摆好之后会不会自己动。编译方式见 scripts/check-instant-tooltip-panel.sh。
+// 摆好之后会不会自己动；第 5 段量面板的浅 / 深跟不跟主题。编译方式见 scripts/check-instant-tooltip-panel.sh。
 //
 // 回归（docs/bugfixes/2026-08-12-instant-tooltip-first-show-far-off.md）：
 // `NSHostingView` 直接当 `NSPanel.contentView` 时，会把自己的尺寸约束灌成窗口的
@@ -206,6 +206,37 @@ func run() {
         print("FAIL 打断后再弹失败")
         failures += 1
     }
+
+    // ---- 5. 面板的浅 / 深跟主题的规矩走，不是跟系统（系统深色 + 森林色 = 深底深字的回归） ----
+    //
+    // 由来（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）：宿主视图垫在普通 NSView 下
+    //（第 1 段那条回归的修法），SwiftUI 的 `.preferredColorScheme` 改不到这个面板，面板跟着系统走 ——
+    // 系统深色时材质是深的，森林色给的字也是深的，对比度 1.17:1。这里只改这个进程的外观（`NSApp.appearance`，
+    // 不碰系统设置），量面板最终用的外观。主题 Store 不写偏好：脚本开着 PerfCounters（见 check-instant-tooltip-panel.sh）。
+    let systemAppearance = app.appearance
+    let appearanceCases: [(system: NSAppearance.Name, theme: AppTheme, expected: NSAppearance.Name)] = [
+        (.darkAqua, .forest, .aqua),   // 用户报的那一种
+        (.aqua, .forest, .aqua),
+        (.darkAqua, .classic, .darkAqua),
+        (.aqua, .classic, .aqua),
+    ]
+    for item in appearanceCases {
+        app.appearance = NSAppearance(named: item.system)
+        AppThemeStore.shared.setTheme(item.theme)
+        if showAndSettle(box, label: "Add video, audio or images to the timeline") != nil {
+            let actual = InstantTooltipController.shared.panelAppearanceForChecks
+            check(
+                actual == item.expected,
+                "系统 \(item.system.rawValue) + \(item.theme.rawValue)：提示面板应当是 \(item.expected.rawValue)，实际 \(actual?.rawValue ?? "nil")"
+            )
+        } else {
+            print("FAIL 外观用例没弹出面板（\(item.system.rawValue) + \(item.theme.rawValue)）")
+            failures += 1
+        }
+        InstantTooltipController.shared.hide(owner: box)
+    }
+    app.appearance = systemAppearance
+    AppThemeStore.shared.setTheme(.forest)
 
     window.close()
     bottomWindow.close()
