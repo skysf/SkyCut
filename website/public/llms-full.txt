@@ -200,6 +200,8 @@ Supported AI clients: Claude Desktop, Claude Code and Codex have built-in setup.
 - [CapCut alternatives for Mac: choose by the work you do](https://skycut.app/en/guides/capcut-alternatives-for-mac/): Compare six CapCut alternatives for Mac by workflow, platform and billing: iMovie, Final Cut Pro, Resolve, Premiere, Descript and SkyCut.
 - [How to choose an AI video editor for Mac](https://skycut.app/en/guides/ai-video-editors-for-mac/): Compare SkyCut, Final Cut Pro, Resolve, Premiere, Descript and Filmora by AI workflow, platform and billing, from captions to assistant-led editing.
 - [SkyCut vs Descript: which editing workflow fits?](https://skycut.app/en/guides/skycut-vs-descript/): Compare SkyCut and Descript by transcript editing, timeline control, AI assistants, media handling and plan limits, with reasons to choose each.
+- [How to record your Mac screen with system audio and edit it](https://skycut.app/en/guides/screen-record-mac-with-system-audio/): Record a display, window or region with computer audio in SkyCut, add an optional microphone track, then trim the recording on the same Mac timeline.
+- [How to upscale a video to 4K on a Mac](https://skycut.app/en/guides/upscale-video-to-4k-on-mac/): Upscale video to 4K with SkyCut and Sky Studio. Check credits, the 30-second and 30 fps limits, then compare the result and verify output size.
 
 ## Links
 
