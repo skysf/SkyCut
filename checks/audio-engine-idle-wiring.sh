@@ -71,7 +71,7 @@ grep -qF 'guard hasSound else { return false }' "${POLICY}" || fail "${POLICY}�
 # 4. 起回来不占调用方的线程。
 WAKE="$(code "${ENGINE}" | awk '/    func wake\(\) \{/,/^    \}/')"
 grep -qF 'run.startInBackground { try engine.start() }' <<<"${WAKE}" \
-  || fail "${ENGINE}：wake() 要在后台那条队列上起图（run.startInBackground）—— 在调用方的线程上起，按下播放主线程卡 0.1–0.2 秒"
+  || fail "${ENGINE}：wake() 要在后台那条队列上起图（run.startInBackground）—— 在调用方的线程上起，用户回来的那一下主线程卡 0.15–0.3 秒"
 RECOVER="$(code "${ENGINE}" | awk '/    func recoverIfNeeded\(\) throws -> Bool \{/,/^    \}/')"
 SETTLE_LINE="$(grep -n 'if run.state == .starting { run.settle() }' <<<"${RECOVER}" | head -1 | cut -d: -f1)"
 SUSPENDED_LINE="$(grep -n 'if run.state == .suspended {' <<<"${RECOVER}" | head -1 | cut -d: -f1)"

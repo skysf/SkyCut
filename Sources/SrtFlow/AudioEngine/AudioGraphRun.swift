@@ -4,12 +4,12 @@ import Synchronization
 // MARK: - 渲染图此刻在不在跑、是谁停的，和后台起图的那条队列
 //
 // 管什么：`TimelineAudioEngine` 的渲染图的四种状态，和「用户回来了、先把故意停着的图起好」时不占调用方线程的那一次
-// `start`（冷的声卡起一次要 0.1–0.25 秒：2026-11-11 在 M1 的内置扬声器上量的，docs/architecture/audio-engine.md
+// `start`（冷的声卡起一次要 0.15–0.3 秒：2026-11-11 在 M1 的内置扬声器上量的，docs/architecture/audio-engine.md
 // 第二节第 11 条）。状态是原子的：后台那一次起完自己写结果。
 // 不管什么：图本身（TimelineAudioEngine）、什么时候该停该起（AudioEngineIdlePolicy / AudioEngineIdleKeeper）。
 //
 // 串行的规矩：动图的入口（换配置、改总推子、停、再停一次、时钟要出声了）先 `settle()` 等后台那一次做完，再碰
-// `AVAudioEngine` —— 它不是线程安全的，两条线程同时动它不行。`settle()` 平时立刻回来；只有正好撞上那 0.1–0.25 秒才等。
+// `AVAudioEngine` —— 它不是线程安全的，两条线程同时动它不行。`settle()` 平时立刻回来；只有正好撞上那 0.15–0.3 秒才等。
 
 final class AudioGraphRun: @unchecked Sendable {
     enum State: Int, Sendable {
