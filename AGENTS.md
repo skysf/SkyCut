@@ -142,7 +142,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 | 修改范围 | 动手前必读 |
 | --- | --- |
-| 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、**首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段）** | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，功能分支不构建，最终 PR 合并 `main` 后才部署；「首屏的质感与渐进增强」：烤好的静图是默认画面，没有 WebGL / 减少动态效果 / 太慢 / 关 JS 都看它，不许退到另一种画面；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖） |
+| 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、**首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段）** | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，功能分支不构建，最终 PR 合并 `main` 后才部署；「首屏的质感与渐进增强」：烤好的静图是默认画面，没有 WebGL / 减少动态效果 / 太慢 / 关 JS 都看它，不许退到另一种画面；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖；「样式表的先后」：构建不保留样式表挂的顺序，每份样式表自带自己的平板 / 手机规则，`responsive.css` 只管 `base.css` 的东西）、[首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md) |
 | 构建、打包、版本、授权、shell、CI、**签名（`scripts/signing/`：发布版用固定的自签名证书，系统权限才跨版本有效）** | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永远不重建、换机器拷 `~/.config/srtflow/signing/`，仓库钉着它的 SHA-1；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | **App、小程序、MCP 服务器叫什么**（SkyCut / `skycut-mcp` / `skycut`），**新加身份类的字符串**（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）、界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份和代码名沿用 SrtFlow、永远不改的那张表；新加的同类东西照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md)（为什么只改看得见的、分几步、本机怎么收拾） |
 | 工程存盘、格式版本、素材路径、自动保存、**重建预览时开素材（`MediaAssetCache`）**、**新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零）** | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（四之末：运行中素材只开一次，按路径 + 文件身份认，原地改写也算换了文件；五：卸片之后播放器的时间回调晚到一拍、没挂条目就丢掉，换完整份时间线就要 `scheduleRebuild()`）、[新工程停在上一个工程的位置](docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md)、[工程生命周期事故](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[运行期素材重链接](docs/bugfixes/2026-08-08-runtime-media-relink.md)、[重建把每个素材重新打开一遍](docs/bugfixes/2026-09-25-rebuild-reopens-every-asset.md) |
@@ -207,7 +207,9 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 构建与检查入口
 
-- 官网首屏的静图与浏览器检查（在 `website/`）：改了场景外观后 `npm run build:hero-still` 重烤（无头 Chromium + Pillow），`tests/hero-scene.test.mjs` 的指纹钉着「改了没重烤」；浏览器级的手动检查 `npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs`（三个内核 36 格 + 版面框 + 18 项回退行为，全程无头、只在 Mac 上、Playwright 不是依赖，**不在 `check-all.sh` 里**），见 [SkyCut 官网](docs/architecture/skycut-website.md)「首屏的质感与渐进增强」。
+- 官网样式表的先后（构建按共用关系分块，覆盖规则不许排在基础规则前面）：`website/tests/css-cascade.test.mjs`（源码级）和 `npm run check:seo`（按每个构建出来的页面实际加载的样式块核对），都在 CI 的网站那一步里。
+
+- 官网首屏的静图与浏览器检查（在 `website/`）：改了场景外观后 `npm run build:hero-still` 重烤（无头 Chromium + Pillow），`tests/hero-scene.test.mjs` 的指纹钉着「改了没重烤」；浏览器级的手动检查 `npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs`（三个内核 36 格（含首屏几栏的版面哨兵）+ 版面框 + 18 项回退行为，全程无头、只在 Mac 上、Playwright 不是依赖，**不在 `check-all.sh` 里**），见 [SkyCut 官网](docs/architecture/skycut-website.md)「首屏的质感与渐进增强」。
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](docs/architecture/export-settings.md)与[子进程退出](docs/architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](docs/reports/2026-11-02-export-profile-review.md)。
 
@@ -649,7 +651,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - [MCP 说明书（skycut_guide）](docs/architecture/mcp-guide.md) — 按需读的工具说明：App 照 recipes 的路子答、没开通也照答、清单里第一个且只有它预先加载（`anthropic/alwaysLoad`）；每个工具一个同名主题（概要 = 现在的说明原文、`fields` 从参数定义现算）、目录 ≤ 5,000、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的；迁移七个 PR 做到哪、守卫、反向验证、人工回归。
 
-- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、首屏的质感与渐进增强（烤好的静图是默认画面、实时场景什么时候接手和让位、帧预算、出血、重烤与指纹、浏览器级手动检查）、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/<slug>/` 里的文件，多繁中、日文两种只给文章用的语言；没写发布日就是草稿、发布日用 `npm run publish:guides` 盖；价格不许手写、只链自己的页面、**对外不提 GitHub**；部署后跑 `npm run indexnow`）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、首屏的质感与渐进增强（烤好的静图是默认画面、实时场景什么时候接手和让位、帧预算、出血、重烤与指纹、浏览器级手动检查）、样式表的先后（构建按共用关系分块、不保留挂的顺序，每份样式表自带自己的媒体查询）、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/<slug>/` 里的文件，多繁中、日文两种只给文章用的语言；没写发布日就是草稿、发布日用 `npm run publish:guides` 盖；价格不许手写、只链自己的页面、**对外不提 GitHub**；部署后跑 `npm run indexnow`）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
 
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
 
@@ -736,6 +738,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-11 官网首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md) — 首页的平板 / 手机规则都放在 `responsive.css`，靠排在 `home.css` 后面才生效；文章栏目给文章页另挂一组样式表后，Vite 按共用关系分块、`base + responsive` 先加载，这些规则全排到了基础规则前面（手机上首屏还是两栏、按钮被截）。没上线，发现时线上还是旧构建。规则搬到 `home.css` 末尾，`responsive.css` 只留 `base.css` 的东西；`tests/css-cascade.test.mjs` 和 `check:seo` 按构建实际的加载顺序核对，浏览器检查加版面哨兵，未修复时各自都红。**样式表之间的先后不是合同；一项检查全绿只说明它看的那件事没坏，合 main 之后要重新看手机整页。**
 - [2026-11-11 预览的音频引擎一直开着：Mac 不会空闲睡眠，App Nap 不生效](docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md) — 图从第一次建预览起一直开到退出（暂停只出静音、主窗口换工程不收引擎、播到片尾引擎还标着在播），coreaudiod 替 SkyCut 拦着系统空闲睡眠。改成没有声音不开、停着 2 分钟没人用就停、用户回到 SkyCut 就在后台先起好、离开 2 分钟以上回来第一下就是播放时当场起（画面和声音一起晚 0.15–0.3 秒）；顺带修掉 11-05 的恢复按「采样时间从 0 起」钉锚点（真声卡上不是）。第一版让播放头先按 host 时间走：引擎单独量 1 ms，放进 App 主线程照样卡 250 ms —— 起声卡拖住的是整个进程，先走只会把那一截跳过去。审查之后又改了一轮：片尾的收尾从「听播放器的『播到头』通知」改成声音主时钟按总长自己判（在片尾直接再按播放时通知不会再来、旧通知排到下一轮会把新一轮停掉，两处都被复现）、「报过时间没有」的内存序、起不来之后不空转、用户在不在从启动就看；复审又撞出 `graphIsUp` 把原子状态读了两次（starting → running 交接的那一下答成没在跑，计时器被撤）。**量主线程卡没卡看它用了多少 CPU；引擎单独量出来的数放进 App 要再量；状态按状态判、别按通知判。**
 - [2026-11-11 系统深色时森林色切经典色，开着的窗口只变一半](docs/bugfixes/2026-11-11-theme-switch-leaves-windows-half-light.md) — 呈现根给经典色交 `.preferredColorScheme(nil)`；交过 `.light` 再交 nil，SwiftUI 只把窗口外观还给系统、不撤掉内容里的浅色：主窗口、工程窗口、录屏控制条窗框深内容浅，sheet / popover 整个停在浅色，再切一次系统深浅色普通窗口才被捅醒。改成永远交明确值（`resolvedColorScheme(system:)`：经典色换成 `SystemColorScheme` 读到的系统此刻的浅 / 深，KVO 跟着系统切，只在经典色时才建），SkyCut 不设 `NSApp.appearance`；`scripts/check-theme-switch.sh` 六种宿主 × 八步，换回旧写法红 3 步，扫描守卫三条反向各自红。**`.preferredColorScheme` 交过明确值就别再交 nil；切换类的功能按「从哪到哪 × 外部条件」铺开测。**
 - [2026-11-11 森林色的提示外面套着一圈直角方框](docs/bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md) — 提示的根套 `.appLanguage()`，主题修饰器给呈现根铺窗口底色，森林色是整块矩形的暖白；面板透明、形状由内容决定，圆角气泡外面露出暖白的直角，窗口服务器也按矩形画影子 / 描边（系统浅色灰的一圈、深色浅色的一圈，#388 修完深底深字还在）。不是影子没刷新（换内容、换尺寸后按窗口号拍，影子都是当前的形状）。根在 `.appLanguage()` 外面裁成 `TooltipContent.bubble`（气泡的底、描边同一个形状），直角那一点从暖白 (242,240,232) 变成和经典色一样；GUI 自检离屏量四角、扫描守卫钉写法，去掉裁切 / 裁在里面都红。**一张截图里的每处异样都要对上原因再结案。**

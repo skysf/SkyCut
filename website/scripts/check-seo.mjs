@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile,access,readdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
+import {cascadeConflicts} from './css-cascade.mjs';
 const dist=fileURLToPath(new URL('../dist/',import.meta.url));
 const languages=['en','zh','de','es'];
 let audited=0;
@@ -127,4 +128,16 @@ for(const file of ['llms.txt','llms-full.txt']) {
   assert.doesNotMatch(text,/github|localhost|vercel\.app/i);
   assert.equal(text,await readFile(new URL(`../public/${file}`,import.meta.url),'utf8'),`${file} in the build is the generated one`);
 }
-console.log(`SEO audit passed for ${audited} localized pages, root, 404, sitemap, robots, llms files and four social cards`);
+// The build groups stylesheets by which pages share them, so a page loads them in an order of the
+// build's choosing. In that order, no tablet or phone override may come before the rule it overrides.
+let styled=0;
+for(const page of [...languages.flatMap(language=>['','docs/','privacy/'].map(kind=>`${language}/${kind}index.html`)),'index.html','404.html',
+  ...guideLocations.map(location=>`${location[2].replace(/^\//,'')}index.html`)]) {
+  const html=await readFile(join(dist,page),'utf8');
+  const links=[...html.matchAll(/<link rel="stylesheet"[^>]*href="(\/assets\/[^"]+\.css)"/g)].map(match=>match[1]);
+  assert.ok(links.length>0,`${page} links no stylesheet`);
+  const sheets=await Promise.all(links.map(async name=>({name,css:await readFile(join(dist,name),'utf8')})));
+  assert.deepEqual(cascadeConflicts(sheets),[],`${page} loads ${links.join(' then ')}: an override loads before its base rule`);
+  styled++;
+}
+console.log(`SEO audit passed for ${audited} localized pages, root, 404, sitemap, robots, llms files and four social cards; stylesheet order holds on ${styled} pages`);
