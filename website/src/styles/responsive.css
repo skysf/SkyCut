@@ -28,7 +28,7 @@
   h2 {font-size:36px;}
   .site-footer {grid-template-columns:1fr;gap:28px;padding-top:32px;}
   .footer-links {justify-content:start;gap:22px;font-size:13px;}
-  .footer-bottom {font-size:11px;flex-direction:column;gap:18px;}
+  .footer-bottom {font-size:12px;flex-direction:column;gap:18px;}
   .document {width:calc(100% - 40px);padding-block:44px 70px;}
   .document h1 {font-size:46px;}
   .document .lead {font-size:18px;margin-bottom:40px;}

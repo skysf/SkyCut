@@ -28,23 +28,31 @@ function closing(text,open){
   throw new Error('Unbalanced braces in stylesheet');
 }
 
-// Every style rule as {condition, selector, properties}; `condition` is the enclosing @media /
-// @container / @supports prelude, or null for a rule that always applies.
-export function cssRules(source,condition=null){
+// Every style rule as {condition, selector, declarations}, one per selector of a selector list.
+// `condition` is the enclosing @media / @container / @supports prelude, or null for a rule that
+// always applies; `declarations` maps each property to its value as written.
+export function cssStyles(source,condition=null){
   const text=clean(source),rules=[];
   for(let at=0;at<text.length;){
     const open=text.indexOf('{',at);
     if(open<0)break;
-    const prelude=text.slice(at,open).trim(),close=closing(text,open),body=text.slice(open+1,close);
+    // A statement such as `@import …;` may sit in front of the next rule: it is not part of its selector.
+    const prelude=text.slice(at,open).split(';').at(-1).trim(),close=closing(text,open),body=text.slice(open+1,close);
     at=close+1;
-    if(/^@(media|container|supports)\b/.test(prelude))rules.push(...cssRules(body,tidy(condition?`${condition} and ${prelude}`:prelude)));
+    if(/^@(media|container|supports)\b/.test(prelude))rules.push(...cssStyles(body,tidy(condition?`${condition} and ${prelude}`:prelude)));
     else if(!prelude.startsWith('@')){
-      const properties=split(body,';').map(declaration=>declaration.slice(0,declaration.indexOf(':')).trim().toLowerCase()).filter(Boolean);
-      for(const selector of split(prelude,','))rules.push({condition,selector:tidy(selector),properties});
+      const declarations={};
+      for(const declaration of split(body,';')){
+        const colon=declaration.indexOf(':');
+        if(colon>0)declarations[declaration.slice(0,colon).trim().toLowerCase()]=declaration.slice(colon+1).trim();
+      }
+      for(const selector of split(prelude,','))rules.push({condition,selector:tidy(selector),declarations});
     }
   }
   return rules;
 }
+// The same rules with property names only.
+export const cssRules=source=>cssStyles(source).map(({condition,selector,declarations})=>({condition,selector,properties:Object.keys(declarations)}));
 
 // `sheets` is [{name, css}] in load order. Returns one line per (selector, property) whose conditional
 // override loads before an unconditional declaration of the same selector and property.
