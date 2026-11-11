@@ -1,6 +1,7 @@
 // Progressive enhancements only. Static HTML carries navigation, copy and downloads.
 import { applyLanguage } from './language.js';
 import { attachSignup } from './signup.js';
+import { wantsLiveScene } from './scene-governor.js';
 applyLanguage();
 const copy = JSON.parse(document.querySelector('#site-copy')?.dataset.copy || '{}');
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
@@ -27,15 +28,23 @@ film?.addEventListener('click',event=>{if(event.target===film)film.close();});
 film?.addEventListener('close',()=>video.pause());
 
 attachSignup(copy);
+// The hero already shows a still baked from the same scene. The live one replaces it only where
+// WebGL 2 exists and motion is welcome, and only after that still has painted.
 const visual=document.querySelector('.hero-visual');
-if(visual && !reducedMotion.matches) {
+if(visual && 'WebGL2RenderingContext' in window) {
+  let mounted=false;
+  const still=visual.querySelector('.scene-still img');
+  const painted=!still||still.complete?Promise.resolve():new Promise(resolve=>{
+    still.addEventListener('load',resolve,{once:true});still.addEventListener('error',resolve,{once:true});
+  });
   const observer=new IntersectionObserver(entries=>{
-    if(entries.some(e=>e.isIntersecting)) {
-      observer.disconnect();
-      void import('./scene.js').then(({mountScene})=>mountScene(visual)).catch(()=>{});
-    }
+    if(mounted||!entries.some(e=>e.isIntersecting)||!wantsLiveScene({webgl2:true,reducedMotion:reducedMotion.matches}))return;
+    mounted=true;observer.disconnect();
+    void painted.then(()=>import('./scene.js')).then(({mountScene})=>mountScene(visual)).catch(()=>{});
   },{rootMargin:'150px'});
   observer.observe(visual);
+  // Asking again makes the observer report the current position once motion is allowed.
+  reducedMotion.addEventListener('change',()=>{if(!mounted){observer.unobserve(visual);observer.observe(visual);}});
 }
 if(document.body.dataset.page==='home' && !reducedMotion.matches) {
   void import('./motion.js').then(({animatePage})=>animatePage()).catch(()=>{});

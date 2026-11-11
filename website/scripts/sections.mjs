@@ -1,6 +1,6 @@
 // Homepage sections. Shared shell, metadata and secondary pages live in template.mjs.
 import { icon } from '../src/icons.js';
-import {SCENE_CLIPS} from '../src/scene-playback.js';
+import {heroStill} from './hero-still.mjs';
 import {escape} from './html.mjs';
 import {showcases} from './showcases.mjs';
 import {pricing} from './pricing.mjs';
@@ -9,19 +9,8 @@ const e = escape;
 import {DOWNLOAD_URL} from './site-config.mjs';
 export const downloadURL=DOWNLOAD_URL;
 const shots = ['ship', 'penguin', 'dive', 'campfire'];
-const sceneShots = SCENE_CLIPS.map(clip=>`scene-${clip.id}.jpg`);
 const photo = (name, alt = '', cls = '') => `<img class="${cls}" src="/media/${name.includes('.') ? name : name+'.webp'}" alt="${e(alt)}" width="640" height="360" loading="lazy">`;
 const button = (href, label, secondary = false) => `<a class="button ${secondary ? 'button-outline' : ''}" href="${href}">${secondary ? icon('play') : ''}${e(label)}${secondary ? '' : icon('arrow')}</a>`;
-
-function timeline(c, compact = false) {
-  return `<div class="timeline-illustration ${compact ? 'compact' : ''}" aria-label="${e(c.imageAlt)}">
-    <div class="timeline-header"><span class="window-dots"><i></i><i></i><i></i></span><span>Antarctica — SkyCut</span><span>00:01:24:10</span></div>
-    <div class="timeline-viewer">${photo('ship', c.filmAlt)}<span>${icon('play')}</span></div>
-    <div class="timeline-ruler"><span>00:00</span><span>00:30</span><span>01:00</span><span>01:30</span></div>
-    <div class="video-track">${(compact ? sceneShots : shots).map(s => photo(s)).join('')}</div>
-    <div class="subtitle-track"><i></i><i></i><i></i></div><div class="audio-track" aria-hidden="true"></div><div class="playhead" aria-hidden="true"></div>
-  </div>`;
-}
 
 function hero(c) {
   return `<section class="hero container" aria-labelledby="hero-title">
@@ -29,7 +18,7 @@ function hero(c) {
       <div class="hero-actions">${button(downloadURL, c.download)}${button('#film', c.watch, true)}</div><p class="compatibility">${e(c.compatibility)}</p>
     </div>
     <div class="hero-visual" aria-label="${e(c.sceneLabel)}">
-      <div class="fallback-scene" aria-hidden="true"><div class="floating-frames">${sceneShots.map((s,i) => photo(s, '', `frame frame-${i}`)).join('')}</div><div class="fallback-deck">${timeline(c, true)}</div></div>
+      ${heroStill(e(c.imageAlt))}
       <canvas id="timeline-scene" aria-hidden="true"></canvas>
       <button class="motion-toggle icon-button" aria-label="${e(c.motionPause)}" data-pause-label="${e(c.motionPause)}" data-play-label="${e(c.motionPlay)}">${icon('pause')}</button>
     </div>
