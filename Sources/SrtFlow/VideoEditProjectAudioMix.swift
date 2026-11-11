@@ -32,7 +32,8 @@ final class PreviewAudioEngineHost {
     /// 图此刻的状态（冒烟结果里看）：没有引擎是 none；记着在跑、原生图其实没在跑（被系统停了）会标出来。
     var graphStateName: String {
         guard let engine else { return "none" }
-        return engine.graphState == .running && !engine.engine.isRunning ? "running-but-stopped" : "\(engine.graphState)"
+        let state = engine.graphState   // 只读一次：后台起图随时会改它
+        return state == .running && !engine.engine.isRunning ? "running-but-stopped" : "\(state)"
     }
 
     init() {

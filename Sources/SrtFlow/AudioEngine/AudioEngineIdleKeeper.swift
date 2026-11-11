@@ -44,6 +44,8 @@ final class AudioEngineIdleKeeper {
     private let note: (String) -> Void
     private weak var audio: (any IdleSuspendableAudio)?
     private var timer: Timer?
+    /// 计时器上着没有（自检看：图开着的时候它得一直上着，不然没人在两分钟后停图）。
+    var isArmed: Bool { timer != nil }
     /// 上一次在后台起图没起来（没有能用的输出设备？）。之后「看一眼」不再替它重试 —— 不然用户在场的这两分钟里每 5 秒白起
     /// 一次、白记一句；等用户下一次回来（`userReturned`）再试一次，时钟要出声时引擎自己会当场起、把真的错误报出来。
     private var wakeFailed = false

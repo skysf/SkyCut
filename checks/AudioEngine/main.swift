@@ -283,6 +283,7 @@ print("==> 15. 引擎不是一直开着的：规矩、照规矩停 / 起、停�
 checkIdlePolicy()
 checkIdleKeeper()
 checkEngineIdle(tone: toneA)
+checkGraphHandoff(tone: toneA)
 checkUserPresence()
 
 print("\(checks) checks, \(failures) failures")

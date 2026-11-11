@@ -158,6 +158,7 @@ xcrun swiftc \
   checks/AudioEngine/Recovery.swift \
   checks/AudioEngine/Idle.swift \
   checks/AudioEngine/IdleEngine.swift \
+  checks/AudioEngine/IdleHandoff.swift \
   checks/AudioEngine/IdleRealtime.swift \
   checks/AudioEngine/Presence.swift \
   checks/AudioEngine/Measure.swift \

@@ -16,6 +16,7 @@
 #   7. 用户回到 SkyCut 就算（变成活动的 App、窗口变成主 / 键窗口、发给 SkyCut 的鼠标和键盘事件），宿主听「用户回来了」；
 #   8. 停图 / 起图的那句日志不在主线程上写；
 #   9. 后台起图没起来：图还是故意停着的样子（喂样线程歇回去、不留计时器、不每看一眼就重试、只在真停下来时记「停图」）。
+#  10. 一个判断只读一次图的状态（原子的，后台随时改）：「在跑或者正在起」在取出来的值上判。
 #
 # 用法：checks/audio-engine-idle-wiring.sh
 set -euo pipefail
@@ -195,6 +196,14 @@ SUSPEND_LINE="$({ grep -n 'audio.suspend()' <<<"${RECONCILE}" || true; } | head 
 NOTE_GUARD_LINE="$({ grep -n 'if audio.isSuspended {' <<<"${RECONCILE}" || true; } | head -1 | cut -d: -f1)"
 [ -n "${SUSPEND_LINE}" ] && [ -n "${NOTE_GUARD_LINE}" ] && [ "${SUSPEND_LINE}" -lt "${NOTE_GUARD_LINE}" ] \
   || fail "${KEEPER}：「停图」那一句只在真的停下来时记（suspend 之后 if audio.isSuspended）"
+
+# 10. 一个判断只读一次图的状态（它是原子的，后台起图随时把 starting 改成 running；同一句里读两次，两头可以都比不上）。
+grep -qF 'var isUp: Bool { self == .running || self == .starting }' <<<"${GRAPH_CODE}" \
+  || fail "${GRAPH_RUN}：「在跑或者正在起」要在取出来的那一个值上判（State.isUp）"
+grep -qF 'var graphIsUp: Bool { run.state.isUp }' <<<"${ENGINE_CODE}" \
+  || fail "${ENGINE}：graphIsUp 要只读一次状态、在那个值上判（run.state.isUp）—— 读两次的话 starting → running 交接的那一下答成「没在跑」，管空闲的把计时器撤了、图就一直开着"
+TWICE="$(grep -nE 'run\.state.*run\.state|graphState.*graphState' <<<"${ENGINE_CODE}"$'\n'"${HOST_CODE}"$'\n'"${KEEPER_CODE}" || true)"
+[ -z "${TWICE}" ] || fail "同一句里读了两次图的状态（先 let state = … 再判）：${TWICE}"
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi
 echo "✓ audio-engine-idle-wiring：引擎交给管空闲的、空了就收、2 分钟、用户回来在后台起图、待钉的锚点、主时钟自己收尾、起不来不空转"

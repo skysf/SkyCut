@@ -49,8 +49,8 @@ final class TimelineAudioEngine {
     var hasSound: Bool { config.hasSound }
     /// 时间线总长（秒）：时钟按它收尾（PlaybackAudioSource.duration）。合成也正好这么长（builder 垫黑底铺到总长）。
     var duration: Double { config.duration }
-    /// 图在跑或者正在起（管空闲的那一位只在这时候留着计时器）。
-    var graphIsUp: Bool { run.state == .running || run.state == .starting }
+    /// 图在跑或者正在起（管空闲的那一位只在这时候留着计时器）。状态只读一次、在那个值上判（AudioGraphRun.State.isUp）。
+    var graphIsUp: Bool { run.state.isUp }
     /// 故意停着的图要起回来了（`wake()` / 时钟要出声，主线程上叫）：管空闲的那一位从这儿知道要重新开始数。
     var onWake: (() -> Void)?
     /// 后台那一次没起来（主线程上叫）：图还是故意停着的样子。
