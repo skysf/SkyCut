@@ -575,6 +575,8 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   清单那篇写了五家别的工具：只写它们自己页面上的事实、不排名次、写明我们没做过对比测试。**文章先发文字版**（用户定），不配录屏。
   新增 `capcut-alternatives-for-mac`（替代品，繁中、日、英）、`ai-video-editors-for-mac`（清单，繁中、日、英）和 `skycut-vs-descript`（对比，英）。
   前两篇各列五个其他编辑器；Descript 对比只比较两款产品。官方出处分别保存在各篇 `index.js`，不写未实测的快慢与精度，明确免费水印、硬件、界面语言和 AI 数据流限制。
+  `screen-record-mac-with-system-audio` 和 `upscale-video-to-4k-on-mac`（教程，英、繁中、日）按录屏生命周期、画质提升、导出设置和实际界面撰写。
+  区分录屏原档 / 放大素材与 Free 时间线导出的水印；放大需积分、源范围含余料最多 30 秒、源最高 30 fps，手动完成先比较、AI 完成自动换源。4K 成片另需核对 Auto 首段画布与实际输出尺寸，不能承诺不存在的固定比例 4K 控件。
 
 ## 运行与部署
 
