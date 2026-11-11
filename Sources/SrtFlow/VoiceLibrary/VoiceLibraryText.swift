@@ -82,6 +82,7 @@ enum VoiceLibraryText {
         switch problem {
         case .noKey: return L10n("Connect your Sky Studio account to use the voice library.")
         case .needsPermission: return L10n("macOS needs your permission before SkyCut can read the key.")
+        case .keychainSlow: return L10n("The voice library is not available right now. Try again later.")
         case .keychain: return problem.message
         }
     }

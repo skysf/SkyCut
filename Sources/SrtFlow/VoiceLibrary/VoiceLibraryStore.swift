@@ -87,6 +87,8 @@ final class VoiceLibraryStore: ObservableObject {
             switch problem {
             case .noKey: set(.noKey)
             case .needsPermission: set(.needsPermission)
+            // 钥匙串只是慢、没弹框：「暂时用不了、稍后再试」，不叫用户去点 Allow…（迟到的 Key 会缓存，下次刷新就有）。
+            case .keychainSlow: set(.unavailable)
             case .keychain: set(.failed(VoiceLibraryText.keyProblem(problem)))
             }
             return

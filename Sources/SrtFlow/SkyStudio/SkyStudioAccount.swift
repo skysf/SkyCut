@@ -154,9 +154,14 @@ final class SkyStudioAccount: ObservableObject {
         await handleKeychainRead(read, checkPlan: true)
     }
 
-    private func handleKeychainRead(_ read: KeychainSecret.ReadResult, checkPlan: Bool) async {
+    private func handleKeychainRead(_ read: KeychainSecret.ReadResult, checkPlan: Bool, retried: Bool = false) async {
         keychainChecked = true
         switch read {
+        case .slow where !retried:
+            // 钥匙串慢、没弹框（要授权时零点几秒就拒）：先不挂「允许…」，过几秒再静默读一次（那次读迟到的 Key 会缓存）；
+            // 还不行（那次读还没回来，缓存改报要授权；或者又慢了）才照要授权处理。同 AI 那边「先重试」（2026-11-11）。
+            try? await Task.sleep(for: SkyStudioKeychainNoticePolicy.slowRetryDelay)
+            await handleKeychainRead(await SkyStudioKey.keyWithoutPrompt(), checkPlan: checkPlan, retried: true)
         case .key(let key):
             hasKey = true
             keychainReadSucceeded()
@@ -166,7 +171,7 @@ final class SkyStudioAccount: ObservableObject {
         case .missing:
             // 在「钥匙串访问」里被删掉了：当没有 Key。
             forget()
-        case .needsPermission:
+        case .needsPermission, .slow:
             requireKeychainPermission()
         case .failed(let status):
             problem = .keychain(KeychainSecret.StoreError(status: status).message)
