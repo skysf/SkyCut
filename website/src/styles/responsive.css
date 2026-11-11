@@ -1,25 +1,11 @@
-/* Tablet and phone compositions reflow the scene. Reduced motion keeps the baked still (see main.js). */
-@media(min-width:1600px) {
-  .hero {min-height:760px;}
-  .hero-visual {--scene-height:650px;}
-}
+/* Tablet and phone adjustments of what base.css styles: header, containers, documents, footer.
+   Every page links this file and base.css, so the build bundles the two together and may load them
+   before a page's own stylesheet. Rules for anything a page stylesheet styles go at the end of that
+   stylesheet instead (see home.css); tests/css-cascade.test.mjs keeps it that way. */
 @media(max-width:1150px) {
   .container {width:calc(100% - 72px);}
   .desktop-nav {margin-right:24px;gap:22px;}
   .header-actions {gap:16px;}
-  .hero {grid-template-columns:.9fr 1.15fr;min-height:610px;}
-  .hero h1 {font-size:clamp(52px,6.1vw,72px);}
-  .hero-visual {--scene-height:490px;margin-right:-30px;}
-  .hero-intro {font-size:17px;}
-  .hero-actions {gap:9px;}
-  .hero-actions .button {padding:13px 17px;gap:12px;font-size:13px;}
-  .hero-badges span {gap:32px;}
-  .hero-badges span:not(:last-child)::after {width:60px;}
-  .platform-card {padding:24px;}
-  .platform-status {right:20px;top:29px;font-size:10px;}
-  .platform-card h3 {font-size:20px;}
-  .faq {gap:50px;}
-  .signup-layout {gap:50px;}
 }
 @media(max-width:900px) {
   .site-header {min-height:78px;gap:16px;}
@@ -27,31 +13,7 @@
   .header-download {font-size:12px;padding:10px 12px;}
   .header-download .icon {display:none;}
   .desktop-nav {gap:16px;font-size:12px;margin-right:16px;}
-  .hero {grid-template-columns:1fr;text-align:center;padding-top:64px;min-height:0;}
-  .hero-copy {padding-bottom:0;}
-  .hero h1 {font-size:76px;}
-  .hero-intro {font-size:21px;margin-top:20px;}
-  .hero-actions {justify-content:center;margin-top:28px;}
-  .hero-actions .button {font-size:15px;padding:14px 23px;}
-  .hero-visual {--scene-height:510px;width:100%;margin:-6px 0 -34px;}
-  .motion-toggle {bottom:48px;right:20px;}
-  .hero-badges {padding-top:20px;font-size:10px;gap:16px;}
-  .hero-badges span {gap:26px;}
-  .hero-badges span:not(:last-child)::after {width:50px;}
   .section {padding-block:76px;}
-  .section-heading {align-items:start;}
-  .section-heading p {max-width:440px;font-size:14px;}
-  .platform-grid {gap:12px;}
-  .platform-card {padding:22px 17px;min-height:270px;}
-  .platform-card h3 {font-size:18px;}
-  .platform-card>.icon {margin-bottom:40px;}
-  .platform-status {top:72px;left:18px;right:auto;}
-  .platform-card .button {font-size:11px;padding:10px 12px;gap:5px;width:100%;}
-  .platform-card .button .icon {width:13px;}
-  .faq {grid-template-columns:1fr;gap:28px;}
-  .faq h2 {max-width:100%;}
-  .signup-layout {grid-template-columns:1fr;gap:36px;}
-  .signup-form {max-width:560px;}
   .document {width:calc(100% - 72px);}
 }
 @media(max-width:600px) {
@@ -62,53 +24,8 @@
   .header-actions {gap:16px;}
   .language-menu summary .icon:first-child {display:none;}
   .mobile-menu-button {display:grid;border:0;background:transparent;width:30px;height:40px;}
-  .hero {padding-top:42px;}
-  .hero-copy {display:contents;}
-  .hero h1 {order:1;}
-  .hero-intro {order:2;}
-  .hero-visual {order:3;}
-  .hero-copy>.hero-actions {order:4;width:100%;}
-  .hero .compatibility {order:5;}
-  .hero-badges {order:6;margin-top:24px;}
-  .hero h1 {font-size:clamp(42px,11vw,64px);line-height:1.02;}
-  .hero-intro {font-size:16px;margin-top:18px;}
-  .hero-copy>.hero-actions {flex-direction:column;align-items:stretch;margin:24px auto 0;max-width:330px;}
-  .hero-copy .button {min-height:48px;padding:12px 20px;font-size:14px;}
-  .hero-copy .button-outline {order:-1;}
-  .compatibility {font-size:11px;margin-top:13px;}
-  .hero-visual {--scene-height:320px;margin:8px -10px -10px;width:calc(100% + 20px);}
-  .motion-toggle {bottom:28px;right:14px;}
-  .hero-badges {font-size:9px;letter-spacing:.08em;gap:12px;padding-bottom:10px;}
-  .hero-badges span {gap:0;}
-  .hero-badges span:not(:last-child)::after {display:none;}
-  .hero-badges span:not(:last-child) {border-right:1px solid #9aa58e;padding-right:16px;}
   .section {padding-block:56px;}
   h2 {font-size:36px;}
-  .section-heading {display:block;margin-bottom:24px;}
-  .section-heading p {font-size:13px;}
-  .film-name {display:none;}
-  .film-cover {aspect-ratio:1.35;border-radius:10px;}
-  .film-play>.icon {width:52px;height:52px;padding:15px;}
-  .film-stills {grid-template-columns:repeat(2,1fr);gap:8px;margin-top:8px;}
-  .film-stills img {aspect-ratio:1.9;}
-  .platforms .section-heading .text-link {margin-top:20px;font-size:14px;}
-  .platform-grid {grid-template-columns:1fr;gap:14px;}
-  .platform-card {padding:26px;min-height:230px;}
-  .platform-card h3 {font-size:26px;}
-  .platform-card>.icon {margin-bottom:24px;width:30px;height:30px;}
-  .platform-status {left:auto;right:26px;top:33px;font-size:11px;}
-  .platform-card .button {width:auto;font-size:13px;margin-top:22px;padding:12px 20px;gap:14px;}
-  .faq {gap:24px;}
-  .faq h2 {font-size:36px;}
-  .faq summary {font-size:16px;padding-block:20px;}
-  .faq details p {font-size:13px;}
-  .signup-layout {gap:30px;}
-  .signup-layout h2 {font-size:44px;}
-  .signup-layout>div p {font-size:16px;margin-top:12px;}
-  .email-input-row {gap:8px;}
-  .email-input-row input {font-size:18px;}
-  .signup-form .button {padding:11px 12px;font-size:12px;gap:5px;}
-  .signup-form .button .icon {width:15px;}
   .site-footer {grid-template-columns:1fr;gap:28px;padding-top:32px;}
   .footer-links {justify-content:start;gap:22px;font-size:13px;}
   .footer-bottom {font-size:11px;flex-direction:column;gap:18px;}

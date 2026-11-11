@@ -62,6 +62,7 @@ const state=page=>page.evaluate(()=>{
   return {ready:host.classList.contains('scene-ready'),fallback:host.dataset.sceneFallback||null,canvas:shown(canvas),
     still:shown(still)&&image.complete&&image.naturalWidth>0,toggle:shown(host.querySelector('.motion-toggle')),
     size:`${canvas.width}x${canvas.height}`,box:JSON.stringify(host.getBoundingClientRect()),
+    columns:getComputedStyle(document.querySelector('.hero')).gridTemplateColumns.split(' ').length,
     sceneScripts:performance.getEntriesByType('resource').filter(entry=>/\/assets\/scene-/.test(entry.name)).length};
 });
 const draws=async(page,ms=1000)=>{const before=await page.evaluate(()=>window.__draws);await page.waitForTimeout(ms);return (await page.evaluate(()=>window.__draws))-before;};
@@ -80,10 +81,12 @@ async function open(browser,{init=[],...options}={}){
 const shoot=(target,name)=>out?target.screenshot({path:join(out,`${name}.png`)}):null;
 
 // 1. Every engine x layout x {motion, reduced motion} x {WebGL, no WebGL}: one picture, and one box.
+// `columns` is the hero grid of that layout: copy beside the scene on a desktop, stacked otherwise.
+// It fails when the tablet and phone rules do not apply at all, whatever the scene itself does.
 const layouts=[
-  {name:'desktop',viewport:{width:1440,height:900},deviceScaleFactor:2},
-  {name:'ipad',viewport:{width:834,height:1112},deviceScaleFactor:2},
-  {name:'phone',viewport:{width:390,height:844},deviceScaleFactor:3}
+  {name:'desktop',viewport:{width:1440,height:900},deviceScaleFactor:2,columns:2},
+  {name:'ipad',viewport:{width:834,height:1112},deviceScaleFactor:2,columns:1},
+  {name:'phone',viewport:{width:390,height:844},deviceScaleFactor:3,columns:1}
 ];
 for(const engine of engineNames){
   const browser=await launch[engine]();
@@ -97,7 +100,8 @@ for(const engine of engineNames){
       const now=await state(page),drawn=await draws(page);
       const expected=!reduced&&webgl?now.ready&&now.canvas&&!now.still&&now.toggle&&drawn>200:
         !now.ready&&now.still&&!now.canvas&&!now.toggle&&drawn===0&&(!reduced||now.sceneScripts===0);
-      check(name,expected&&errors.length===0,`${now.ready?'live':'still'}, ${drawn} draws/s${errors.length?`, ${errors.join(' | ')}`:''}`);
+      check(name,expected&&now.columns===layout.columns&&errors.length===0,
+        `${now.ready?'live':'still'}, ${drawn} draws/s, ${now.columns}-column hero${errors.length?`, ${errors.join(' | ')}`:''}`);
       boxes.add(now.box);
       await shoot(page,name.replace(/ /g,'-'));
       await context.close();
