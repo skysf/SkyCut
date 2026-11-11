@@ -35,11 +35,12 @@ struct SkyStudioHeldCredits {
         self.held = nil
     }
 
-    /// 做完：账上记的是报价，换成实收（一般一样）。
+    /// 做完：账上记的是报价，换成实收（一般一样）。实收记在预留的那一天：Sky Studio 交的时候就扣了，
+    /// 跨了零点（SkyCut 重启之后第二天才接着跟完的声音库收费单）也不挪到今天的额度上。
     mutating func settle(charged: Double) {
         guard let held, abs(held.credits - charged) > 0.0001 else { return }
         store.refund(held.credits, on: held.day)
-        store.record(charged)
-        self.held = SkyStudioJobGate.Reservation(credits: charged, day: Date())
+        store.record(charged, now: held.day)
+        self.held = SkyStudioJobGate.Reservation(credits: charged, day: held.day)
     }
 }

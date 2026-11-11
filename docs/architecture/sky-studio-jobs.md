@@ -46,7 +46,7 @@
 | `SkyStudioSpend.swift` | 积分的每日上限和按天的账（`SkyStudioSpendStore`）、积分怎么写（`SkyStudioCredits`） |
 | `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（额度内记账、超了回确认码） |
 | `SkyStudioApproval.swift` | 确认码对应的完整请求身份、输入文件身份；摘要只用于显示 |
-| `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换；upscale 和生成共用 |
+| `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换（实收记在预留的那一天，跨零点也不挪到今天，2026-11-11）；upscale 和生成共用 |
 | `SkyStudioSubmission.swift` | 交上了没有、任务号是多少（分清「没交上就停了」和「交上之后停不下来」，get_job 报 `skystudio_job_id`）；upscale 和生成共用 |
 | `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
 | `SkyStudioImageOperation.swift` / `SkyStudioImageResult.swift` | 图片操作的离散移动 / 单图 / 倍率合同；下载后按实际字节确认格式并纠正扩展名，不重编码 |
