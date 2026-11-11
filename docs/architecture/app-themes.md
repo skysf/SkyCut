@@ -17,6 +17,9 @@
   `window.appearance = AppThemePalette.current.windowAppearance`（由 `colorScheme` 换算）。不设的话系统深色时
   材质 / 原生控件画成深色，而字是森林色定死的深墨色：深底深字
   （[案例](../bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md)）。`checks/app-theme-wiring.sh` 钉着嵌套的宿主。
+  透明、形状由内容决定的自建面板（提示）还要把宿主的根在 `.appLanguage()` **外面**裁成自己的形状：呈现根会铺主题的
+  窗口底色（森林色是整块矩形的暖白），不裁就露出直角、窗口服务器也按矩形画影子 / 描边
+  （[即时提示](instant-tooltips.md)第五节第 7 条，[案例](../bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md)）。
 - `appLanguage()` 是既有的场景、sheet、popover、自建 `NSHostingView` 呈现根入口。
   它组合独立的语言与主题修饰器；主题逻辑不写在语言 Store 里。主题宿主只注入
   控件颜色、背景和外观，不用 `.id` 换树，不读播放器时钟或工程。
@@ -51,7 +54,7 @@ SF Symbol），自动吸附用 `arrow.right.and.line.vertical.and.arrow.left`，
 
 `scripts/check-app-theme.sh` 验证默认 / 坏值、持久化、脚本隔离、原配色精确保留、
 稳定色号、浅 / 深的规矩与 SF Symbols。`checks/app-theme-wiring.sh` 检查生产接线（含自建窗口里嵌套的宿主要设外观）。
-`scripts/check-instant-tooltip-panel.sh`（要图形会话）量提示面板在系统深 / 浅 × 两套主题下最终的外观。三张字符串表、
+`scripts/check-instant-tooltip-panel.sh`（要图形会话）量提示面板在系统深 / 浅 × 两套主题下最终的外观、气泡外面四个角透不透明。三张字符串表、
 呈现根、源文件清单及性能接线照原守卫检查。独立 Sky Studio 设置冒烟同时验证
 主题发现、修改、错误的原子性与持久化，不使用正式账号或缓存。
 `scripts/gui-smoke/sky-studio/themes.py` 在同一 MCP 会话里持有两个装入素材的工程，
@@ -65,6 +68,7 @@ id 冒充当前会话的工程（保护租约会正确拒绝）。
   经典色在系统深色下仍可读，森林色保持浅色。
 - [ ] 系统深色 + 森林色：鼠标停在按钮上，提示是浅底深字（和系统浅色时一样）；录屏控制条也是浅色。
   只在悬停 / 录制时才出现的界面要专门划过去看，只看窗口看不出来。
+- [ ] 两套主题 × 系统深 / 浅：提示是圆角的气泡，外面没有直角的方框（森林色以前有一圈）。
 - [ ] 播放中切换后继续播放，播放头、选择、窗口位置、缩放与撤销历史不变。
 - [ ] 主轨 / 上层轨 / 音频 / 两条字幕 / 文字 / 滤镜都可分辨，空轨色条和块对应，
   标签、选中框、标尺、波形在两套颜色里清楚。

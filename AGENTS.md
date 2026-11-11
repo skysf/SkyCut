@@ -188,7 +188,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 导出面板、编码设置、分辨率档位（压缩 / 烧录 / 剪辑导出）、导出文件名与撞名（面板上先问再替换；批量转换、压缩 / 烧录、AI 的输出加编号，`ExportFileName.unoccupied`）、**字幕文件名里的语言标签（`SubtitleFileLanguage`：按文字判 → 记的 → 省略，面板和 AI 同一份）**、**压缩 / 烧录记住的设置和全 App 的字幕样式** | [导出设置](docs/architecture/export-settings.md)（面板上只放管线真消费的设置；记住的设置在队列创建时读回来，不挂在页面的 `onAppear` 上）、[没记语言的轨导出的文件名不带标签](docs/bugfixes/2026-10-15-subtitle-file-export-missing-language-tag.md)、[字幕样式要先去烧录页转一圈](docs/bugfixes/2026-09-27-remembered-subtitle-style-waits-for-burn-in-page.md)、[导出面板改版方案](docs/plans/2026-09-24-export-panel.md)、[竖屏被缩小](docs/bugfixes/2026-09-24-resolution-cap-shrinks-portrait-video.md)、[音频原样复制是假话](docs/bugfixes/2026-09-24-export-panel-promised-audio-copy.md) |
 | **导出水印**（`Sources/SrtFlow/Watermark/`：logo 读成路径、画成 PNG、跳的表、进滤镜图；`WatermarkPolicy` 加不加；导出图里水印的落点；`Resources/watermark-logo.svg`；`SeededRandom`） | [导出水印](docs/architecture/export-watermark.md)（只加在剪辑导出的成片上；加不加只问 `WatermarkPolicy`（授权那一半只从 `SkyStudioAccount.exportsWithWatermark` 来，要加却读不出 logo 就不导）、只有导出器调 `plan()`；烧字幕之后、缩小之前；整段两个 overlay、平衡的分段树，不许一段一个 overlay；logo 只认 M / L / Z、读不全回 nil） |
 | 读用户给的文本文件（字幕文件、讲稿、笔记）的编码 | [用户文本文件的编码](docs/architecture/text-file-encoding.md)（只走 SrtFlowCore 的 `TextDecoding`；UTF-16 不许无条件排在 GBK 前面）、[GBK 字幕读成乱码](docs/bugfixes/2026-09-27-gbk-subtitles-read-as-utf16.md) |
-| 任何按钮的提示文案、快捷键、hover | [即时提示](docs/architecture/instant-tooltips.md)（第五节第 6 条：面板的浅 / 深按主题自己设） |
+| 任何按钮的提示文案、快捷键、hover | [即时提示](docs/architecture/instant-tooltips.md)（第五节第 6 条：面板的浅 / 深按主题自己设；第 7 条：宿主的根在 `.appLanguage()` 外面裁成气泡的形状，不然森林色的底色铺成一圈直角方框） |
 | 预览性能、性能计数与基线；**新写或改写任何 SwiftUI 视图 / 修饰器 / `NSViewRepresentable` / Canvas**（body 第一行要计数，写完跑 `checks/preview-perf-wiring.sh --fix` 自动补）；性能那一步红了但没动编辑器界面；**往时间线上加一种块 / 行里的列表项**；**任何要跟着播放头变的界面**（订阅播放器时钟、在 body 里读 `clock.time`、按钮能不能点看播放头）；**在视图 body 里读工程的属性、给 `VideoEditProject` 加属性**（工程是 `@Observable`） | [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（计数必须接满、只许降、**已知的偶发误报怎么认、怎么重跑**、什么时候能重定基线、**时间线上的块不读工程、按值比较 + `.equatable()`（List 里会产出几行的视图不许套）**、**第十二节：订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`**、**第十三节：body 读了什么就只被什么叫醒，大视图少读、不驱动界面的存储 `@ObservationIgnored`、读不可观察的东西要自己找叫醒的来源**）、[预览性能 ratchet 方案](docs/plans/2026-09-24-preview-perf-ratchet.md)、[每个块都订阅着整个工程](docs/bugfixes/2026-09-24-timeline-blocks-observe-whole-project.md)、[播放时每一跳叫醒整个编辑器](docs/bugfixes/2026-09-25-playback-wakes-whole-editor.md)、[播放丝滑方案](docs/plans/2026-09-25-smooth-playback.md)、[点一下选中一段整个编辑器跟着重算](docs/bugfixes/2026-09-26-selection-wakes-whole-editor.md) |
 | **AI 的一次工具调用、AI 起的长任务从哪开始到哪结束**（`AIToolRouter.handle`、`AIJobs.start` / `finish`）、**App Nap / 活动断言**（`AIKeepAwake`、`ProcessInfo.beginActivity`）、新写一种在后台跑的 AI 活 | [AI 接口（MCP）](docs/architecture/ai-control-mcp.md)第四节第 59 条（AI 的调用和任务各领一份不降速的、领和还成对；新的长任务走 `AIJobs.start` / `finish`；活动断言只在 `AIKeepAwake` 和录屏）、[App Nap 降速的案例](docs/bugfixes/2026-11-10-ai-work-throttled-by-app-nap.md)（量的时候 App 要真看不见、量等的那一段） |
 | 主线程卡顿（播放中按键慢半拍）、心跳看门狗 `MainThreadWatchdog`（含 AI「探一下」读的 `unresponsiveSeconds`）、卡顿日志、冒烟结果里的 `stalls`、**挂起主线程抓栈（`MainThreadStackCapture`）** | [主线程卡顿日志](docs/testing/main-thread-stalls.md)（默认开着、栈是超过阈值那一刻抓的一次快照、卡顿次数不进性能 ratchet 的账；日志突然断了 = 看门狗自己也可能卡住）、[挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md)（挂起期间只做系统调用和裸读写：不分配、不拿锁、不碰要现场取元数据的类型；挂起和恢复只在 `walkWhileSuspended`）、[导出两次卡死](docs/bugfixes/2026-10-06-watchdog-capture-deadlocks-main-thread.md)、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) |
@@ -312,13 +312,13 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
   `scripts/check-project-file.sh` 第 39 组；AI 的 `set_keyframes easing`（默认 easeInOut、词表对账、读回来带曲线）在 `scripts/check-mcp.sh`；缓动的缩放真合成
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
 - 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`。
-- 按钮提示与快捷键单一来源：`checks/instant-tooltip-wiring.sh`。
+- 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
   `checks/subtitle-editing-wiring.sh`。
 - 界面文案在 en 原文表和每一张译文表都配齐（表按 `Resources/*.lproj/` 现场找，`InfoPlist.strings` 一并对账）、无重复键、占位符一致：
   `scripts/check-localization-coverage.sh`。
-- 提示面板的真实落点（摆好之后不许自己变）和浅 / 深（系统深色 + 森林色时仍是浅色面板）：`scripts/check-instant-tooltip-panel.sh`。
+- 提示面板的真实落点（摆好之后不许自己变）、浅 / 深（系统深色 + 森林色时仍是浅色面板）和气泡外面四个角透明（森林色不许露出一圈直角方框）：`scripts/check-instant-tooltip-panel.sh`。
   **要图形会话，故意不在 `check-all.sh` 里**（无图形会话会假红），改
   `InstantTooltip.swift` 时按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 跑。
 - 时间线缩放的锚点（横向钉指针那一刻、工具栏钉播放头 / 视口正中、纵向按行认的那一处），以及播放跟随
@@ -733,6 +733,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-11 森林色的提示外面套着一圈直角方框](docs/bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md) — 提示的根套 `.appLanguage()`，主题修饰器给呈现根铺窗口底色，森林色是整块矩形的暖白；面板透明、形状由内容决定，圆角气泡外面露出暖白的直角，窗口服务器也按矩形画影子 / 描边（系统浅色灰的一圈、深色浅色的一圈，#388 修完深底深字还在）。不是影子没刷新（换内容、换尺寸后按窗口号拍，影子都是当前的形状）。根在 `.appLanguage()` 外面裁成 `TooltipContent.bubble`（气泡的底、描边同一个形状），直角那一点从暖白 (242,240,232) 变成和经典色一样；GUI 自检离屏量四角、扫描守卫钉写法，去掉裁切 / 裁在里面都红。**一张截图里的每处异样都要对上原因再结案。**
 - [2026-11-11 系统深色时按钮提示是深底深字，看不清](docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md) — 森林色把字定成深墨色、挂 `.preferredColorScheme(.light)`，可它只改得了宿主视图就是 contentView 的窗口；提示面板的宿主垫在一层 NSView 下（08-12 修「弹在很远」时加的），面板跟着系统深色走，深色材质上深字，对比度 1.17:1（录屏控制条、工程窗口的宿主是 contentView，探针量过没事）。浅 / 深只留 `AppThemePalette.colorScheme` 一条、提示面板每次 show 设 `windowAppearance`，修后 13.55:1；扫描守卫钉着嵌套的宿主，GUI 自检量四种组合。**`.preferredColorScheme` 是偏好不是外观；测试工具里的绕路注释多半就是生产代码里的 bug。**
 - [2026-11-11 钥匙串只是慢，AI 却被告知「请用户点 Allow…」](docs/bugfixes/2026-11-11-keychain-slow-read-told-to-click-allow.md) — 静默读 3 秒期限到了、或那次读还在跑时又有人问，缓存一律回「要授权」，可真要授权时零点几秒就被拒：机器忙时 AI 被叫去让用户点一个不存在的框（真实冒烟撞出）。期限到了回 `.slow`：AI 收到「过几秒同样的调用再来一次」、不挂「允许…」，后台 / 启动等 5 秒再静默读一次；回过一次慢之后那次读还没回来再问才是要授权。11-07 的两条期望改对、加 `runJobKeySlowChecks`，反向验证三种撤法都红。**期限到了只说明还没回答；能分开的原因别报成同一个结果。**
 - [2026-11-11 SkyCut 重启之后不记得在建的声音库那一单](docs/bugfixes/2026-11-11-voice-library-job-after-restart.md) — 账在点头那一刻就进了 UserDefaults，要结的那一单（建 MiniMax 版、设计）只在内存里：重启后再点头又问一遍价、本机再记一笔（服务器同一个声音 + 语言只扣一次），重启前那一笔也没人结（做完不按实收换、退了不退）。在建的单交之前落盘（`SkyStudioVoiceLibraryOrders`），读到 Key / 看「已经在建」之前 / 任务起手都先接着跟（只 GET）、按原来那一笔结，先删记录再改账；交的回答丢了的那一单在受理时并进来（202、同一个 job_id）；实收记在预留那一天。修复前：重启后再点头当天 755.2（应为 377.6）、两单设计 782.5（应为 751.4）。检查第一次跑撞上另一个会话同时跑同一项、共用的 UserDefaults 被抹，改成每次运行一个 bundle id。**账在盘上，它要结的那一单也得在盘上；能去重的要在问用户之前去重。**

@@ -199,8 +199,14 @@ final class InstantTooltipController {
         //（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。每次弹都按此刻的主题，切了主题下一次就对。
         panel.appearance = AppThemePalette.current.windowAppearance
 
+        // **根要裁成气泡的形状。** `.appLanguage()` 带着主题的窗口底色（森林色是整块矩形的暖白），面板又是透明的、
+        // 形状全由内容决定：不裁的话暖白的直角露在圆角气泡外面，窗口服务器的影子 / 描边也按矩形算 —— 提示外面套了
+        // 一圈直角方框（docs/bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md）。裁在 `.appLanguage()` 外面，
+        // 和气泡的底、描边是同一个形状（`TooltipContent.bubble`）。
         let hosting = NSHostingView(
-            rootView: TooltipContent(label: label, shortcut: shortcut).appLanguage()
+            rootView: TooltipContent(label: label, shortcut: shortcut)
+                .appLanguage()
+                .clipShape(TooltipContent.bubble)
         )
         // 取 fittingSize 之前必须先排一次版，否则拿到的是零，面板会被摆成一个
         // 看不见的点 —— 表现为「提示根本不出现」。
@@ -290,6 +296,9 @@ final class InstantTooltipController {
         panel?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
     }
 
+    /// 自检读取用：面板此刻的内容（nil = 还没建过面板）。「气泡外面露出主题底色的直角」的回归拿它离屏渲一张、量四角。
+    var panelContentForChecks: NSView? { panel?.contentView }
+
     private func makePanel() -> NSPanel {
         let panel = NSPanel(
             contentRect: .zero,
@@ -314,6 +323,9 @@ final class InstantTooltipController {
 }
 
 private struct TooltipContent: View {
+    /// 气泡的形状只有这一份：底、描边、面板根上的裁切都用它（`show` 里裁根，见那里的说明）。
+    static let bubble = RoundedRectangle(cornerRadius: 6)
+
     let label: Text
     let shortcut: String?
 
@@ -336,9 +348,9 @@ private struct TooltipContent: View {
         .padding(.vertical, 5)
         .frame(maxWidth: 320, alignment: .leading)
         .fixedSize(horizontal: false, vertical: true)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+        .background(.regularMaterial, in: Self.bubble)
         .overlay {
-            RoundedRectangle(cornerRadius: 6).strokeBorder(.primary.opacity(0.12))
+            Self.bubble.strokeBorder(.primary.opacity(0.12))
         }
     }
 }
