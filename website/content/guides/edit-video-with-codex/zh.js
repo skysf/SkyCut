@@ -69,7 +69,7 @@ export default {
   faq:[
     ['Codex 能剪视频吗？','能，只要它能操控一个剪辑软件。连上 SkyCut 之后，Codex 就在你 Mac 上真正的时间线里剪。只靠它自己，只能对文件跑 FFmpeg 这类命令行工具。'],
     ['浏览器里的 ChatGPT 也行吗？','不行。MCP 服务器在你的 Mac 本机，所以要用这台 Mac 上的 Codex：命令行版、IDE 扩展或桌面 App。'],
-    ['用 Codex 还是 Claude Code？','两者在同一个地方连接，用的是同一套 SkyCut 工具。用你已经在付费的那个就行。我们没有发布过两者的质量对比。'],
+    ['用 Codex 还是 Claude Code？','两者在同一个地方连接，用的是同一套 SkyCut 工具。用你已经在付费的那个就行。两者做同样八个任务的用时见[我们的实测](/zh/guides/claude-code-vs-codex-for-video-editing/)；谁剪得更好看，我们没有评判。'],
     ['是免费的吗？','SkyCut 免费下载，手动剪辑不花钱。让 Codex 来剪需要 SkyCut Pro：7 天体验结束后每月 {{pro.monthly}} 或每年 {{pro.yearly}}，另外还要你自己的 ChatGPT 套餐。'],
     ['Windows 能用吗？','不能。SkyCut 只支持 Apple 芯片的 Mac 和 macOS 15 或更新的系统。'],
   ],
