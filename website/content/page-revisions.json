@@ -1,50 +1,50 @@
 {
   "en/home": {
-    "hash": "695bdf2fd825b47d",
+    "hash": "d5af5948f8a417d5",
     "modified": "2026-11-11"
   },
   "en/docs": {
-    "hash": "be661732da17b545",
+    "hash": "11df6598e9f2b72b",
     "modified": "2026-11-11"
   },
   "en/privacy": {
-    "hash": "42747aaed7a0151d",
+    "hash": "efeb795a7bc0ec65",
     "modified": "2026-11-11"
   },
   "zh/home": {
-    "hash": "8f4e38b56e8715d1",
+    "hash": "d425b0ed42e4e280",
     "modified": "2026-11-11"
   },
   "zh/docs": {
-    "hash": "950f6203e28240d4",
+    "hash": "0c613724693c69b9",
     "modified": "2026-11-11"
   },
   "zh/privacy": {
-    "hash": "c20bdaa0dce11c5a",
+    "hash": "9524d9e5c10aadb7",
     "modified": "2026-11-11"
   },
   "de/home": {
-    "hash": "1fa7b308d806b395",
+    "hash": "3114407c05f51c5c",
     "modified": "2026-11-11"
   },
   "de/docs": {
-    "hash": "58d3e92f7ae5b7d3",
+    "hash": "c1ea057146e4bb58",
     "modified": "2026-11-11"
   },
   "de/privacy": {
-    "hash": "0d522b49d747d23b",
+    "hash": "a0086530065b46a3",
     "modified": "2026-11-11"
   },
   "es/home": {
-    "hash": "f3172d8fd6cb9575",
+    "hash": "5a59b11e664d41dd",
     "modified": "2026-11-11"
   },
   "es/docs": {
-    "hash": "99f1dbed34a00c4b",
+    "hash": "cf130f7767df6d12",
     "modified": "2026-11-11"
   },
   "es/privacy": {
-    "hash": "f5cfbb82a42bb749",
+    "hash": "fc6bb6989fdbf0da",
     "modified": "2026-11-11"
   }
 }

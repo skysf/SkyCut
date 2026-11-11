@@ -1,17 +1,17 @@
 // One canonical route inventory for all localized sitemap entries and robot discovery.
-import {LANGUAGES,HREFLANG_TAGS,INDEXABLE_PAGES,ORIGIN,AI_CRAWLERS,pageURL} from './site-config.mjs';
+import {LANGUAGES,GUIDE_LANGUAGES,INDEXABLE_PAGES,ORIGIN,AI_CRAWLERS,pageURL,hreflangFor} from './site-config.mjs';
 import {readRevisions,modifiedDate} from './page-revisions.mjs';
 import {visibleGuides,guideLanguages,guidesIn,hubPath,guidePath,absolute} from './guide-model.mjs';
 const entry=(loc,modified,alternates)=>`  <url>
     <loc>${loc}</loc>${modified?`\n    <lastmod>${modified}</lastmod>`:''}
-${Object.entries(alternates).map(([language,href])=>`    <xhtml:link rel="alternate" hreflang="${HREFLANG_TAGS[language]}" href="${href}"/>`).join('\n')}
+${Object.entries(alternates).map(([language,href])=>`    <xhtml:link rel="alternate" hreflang="${hreflangFor(language,Object.keys(alternates))}" href="${href}"/>`).join('\n')}
     <xhtml:link rel="alternate" hreflang="x-default" href="${alternates.en||Object.values(alternates)[0]}"/>
   </url>`;
 // Published guides only: a draft has no address the public should find.
 function guideEntries(list) {
   const options={drafts:false,...(list?{list}:{})};
   const published=visibleGuides(options);
-  const hubs=LANGUAGES.filter(language=>guidesIn(language,options).length);
+  const hubs=GUIDE_LANGUAGES.filter(language=>guidesIn(language,options).length);
   const hubAlternates=Object.fromEntries(hubs.map(language=>[language,absolute(hubPath(language))]));
   return [
     ...hubs.map(language=>entry(absolute(hubPath(language)),guidesIn(language,options).map(guide=>guide.updated).sort().at(-1),hubAlternates)),

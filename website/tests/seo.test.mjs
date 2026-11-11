@@ -65,12 +65,22 @@ for(const language of languages) {
     assert.equal(new Set(descriptions).size,3,'home docs and privacy must not reuse one generic description');
   });
 }
-test('the sitemap contains only the twelve public canonical pages with reciprocal language links',()=>{
+test('the sitemap contains the twelve public canonical pages with reciprocal language links, then published guides',()=>{
   const sitemap=renderSitemap();
   assert.match(sitemap,/xmlns:xhtml="http:\/\/www\.w3\.org\/1999\/xhtml"/);
-  const entries=[...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(m=>m[1]);
+  const all=[...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map(m=>m[1]);
+  const isGuide=entry=>/<loc>[^<]*\/guides\//.test(entry);
+  const entries=all.filter(entry=>!isGuide(entry));
   assert.equal(entries.length,12);
-  assert.equal(new Set(entries.map(entry=>entry.match(/<loc>(.*?)<\/loc>/)[1])).size,12);
+  assert.equal(new Set(all.map(entry=>entry.match(/<loc>(.*?)<\/loc>/)[1])).size,all.length);
+  // Guide entries: a real day, and every listed alternate is itself an entry (reciprocal links).
+  const locations=new Set(all.map(entry=>entry.match(/<loc>(.*?)<\/loc>/)[1]));
+  for(const entry of all.filter(isGuide)) {
+    assert.match(entry,/<lastmod>20\d{2}-\d{2}-\d{2}<\/lastmod>/);
+    assert.match(entry.match(/<loc>(.*?)<\/loc>/)[1],/^https:\/\/skycut\.app\/(en|zh|de|es|zh-hant|ja)\/guides\/([a-z0-9-]+\/)?$/);
+    for(const [,href] of entry.matchAll(/href="([^"]+)"/g))assert.ok(locations.has(href),`alternate ${href} is in the sitemap`);
+    assert.match(entry,/hreflang="x-default"/);
+  }
   for(const entry of entries) {
     const url=entry.match(/<loc>(.*?)<\/loc>/)[1];
     const path=new URL(url).pathname;

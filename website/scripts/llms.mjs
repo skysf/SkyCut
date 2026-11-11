@@ -7,6 +7,8 @@ import english from '../content/en.js';
 import {prices} from '../content/pricing.js';
 import {featureGroups,characterRows,localModelRows} from '../content/feature-matrix.js';
 import {cloudModelGroups,localVoiceLanguages} from '../content/ai-models.js';
+import {visibleGuides,guidePath,absolute} from './guide-model.mjs';
+import {plain} from './guide-markdown.mjs';
 import {ORIGIN,LANGUAGES,DOWNLOAD_URL,PRO_PURCHASE_URL,FOUNDER_URL,STUDIO_URL,SUPPORT_EMAIL,APP_FACTS,pageURL} from './site-config.mjs';
 
 const usd=prices('en'),cny=prices('zh');
@@ -26,7 +28,7 @@ const keyFacts=[
   `Platform: Mac only. Apple silicon (arm64) and ${APP_FACTS.operatingSystem}. There is no Intel Mac version and no Windows version.`,
   `Price: the Free plan costs ${usd.symbol}0 and has no time limit. Pro costs ${usd.symbol}${usd.monthly} per month or ${usd.symbol}${usd.yearly} per year in ${usd.currency} (${cny.symbol}${cny.monthly} or ${cny.symbol}${cny.yearly} in ${cny.currency} on the Chinese site). Prices exclude tax.`,
   'Free includes the full manual editor, subtitles, screen recording and the file tools. Videos exported on Free carry a Sky Studio watermark.',
-  'Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. New accounts get 7 days of Pro.',
+  'Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. A 7-day Pro trial starts the first time you connect SkyCut to a Sky Studio account, once per account and once per Mac.',
   'AI editing: SkyCut includes a local MCP server with built-in setup for Claude Code, Claude Desktop and Codex. You bring your own AI client. The AI works on the real timeline, where you can inspect, change or undo what it did.',
   'Cloud generation (images, video, music, narration, sound effects, lip sync, upscaling) uses Sky Studio credits, which are bought separately. Yearly Pro includes 1,000 Sky Studio credits for each paid year; monthly Pro includes none.',
   `Download: ${DOWNLOAD_URL}`,
@@ -44,6 +46,9 @@ const family=[
   `[Sky Studio](${STUDIO_URL}): the AI image, video and audio generation platform in the same family; SkyCut Pro and credits are bought with a Sky Studio account`,
 ];
 const bullets=items=>items.map(item=>`- ${item}`).join('\n');
+// Published guides that have an English version; drafts are never listed.
+const guideLinks=()=>visibleGuides({drafts:false}).filter(guide=>guide.languages.en).map(guide=>`[${guide.languages.en.heading}](${absolute(guidePath('en',guide.slug))}): ${plain(guide.languages.en.description,'en')}`);
+const guideSection=()=>guideLinks().length?`## Guides\n\n${bullets(guideLinks())}\n\n`:'';
 
 export function renderLlms() {
   return `# SkyCut
@@ -58,7 +63,7 @@ ${bullets(keyFacts)}
 
 ${bullets([...pages(),`[Full fact sheet](${ORIGIN}/llms-full.txt): every feature, plan difference and AI model in one file`])}
 
-## Other languages
+${guideSection()}## Other languages
 
 ${bullets(localized())}
 
@@ -138,7 +143,7 @@ ${english.docsClients}: ${english.docsClientsBody}
 
 ${english.privacySections.map(([title,body])=>`- ${title}: ${body}`).join('\n')}
 
-## Links
+${guideSection()}## Links
 
 ${bullets([...pages(),...localized(),...family])}
 `;

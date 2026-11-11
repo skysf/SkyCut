@@ -7,6 +7,7 @@ import {renderSitemap,renderRobots} from './sitemap.mjs';
 import {renderLlms,renderLlmsFull} from './llms.mjs';
 import {assertGuides,guideRoutes} from './guide-model.mjs';
 import {renderGuide,renderGuideHub} from './guide-page.mjs';
+import {shellCopy} from '../content/guide-shell.js';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const pages=PAGES;
 for (const language of languages) {
@@ -21,7 +22,7 @@ for (const language of languages) {
 assertGuides();
 const routes=guideRoutes();
 for (const {language,guide,path} of routes) {
-  const {default:copy} = await import(`../content/${language}.js`);
+  const copy = await shellCopy(language);
   await mkdir(`${root}${path.slice(1)}`, {recursive:true});
   await writeFile(`${root}${path.slice(1)}index.html`, guide ? renderGuide(copy,guide) : renderGuideHub(copy));
 }

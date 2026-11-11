@@ -3,7 +3,8 @@
 import {escape as e} from './html.mjs';
 import {prices} from '../content/pricing.js';
 export function placeholders(language) {
-  const p=prices(language);
+  // Simplified Chinese quotes the Chinese site's prices; every other language the dollar prices.
+  const p=prices(language==='zh'?'zh':'en');
   return {'pro.monthly':`${p.symbol}${p.monthly}`,'pro.yearly':`${p.symbol}${p.yearly}`,'free.price':`${p.symbol}0`};
 }
 export const fill=(text,language)=>text.replace(/\{\{([a-z.]+)\}\}/g,(match,key)=>{

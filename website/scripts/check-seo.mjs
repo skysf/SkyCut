@@ -7,7 +7,7 @@ const dist=fileURLToPath(new URL('../dist/',import.meta.url));
 const languages=['en','zh','de','es'];
 let audited=0;
 const sitemap=await readFile(join(dist,'sitemap.xml'),'utf8');
-const guideLocations=[...sitemap.matchAll(/<loc>(https:\/\/skycut\.app(\/[a-z]+\/guides\/[^<]*))<\/loc>\n    <lastmod>([^<]+)<\/lastmod>/g)];
+const guideLocations=[...sitemap.matchAll(/<loc>(https:\/\/skycut\.app(\/[a-z-]+\/guides\/[^<]*))<\/loc>\n    <lastmod>([^<]+)<\/lastmod>/g)];
 for(const language of languages) {
   for(const kind of ['','docs','privacy']) {
     const html=await readFile(join(dist,language,kind,'index.html'),'utf8');
@@ -96,7 +96,7 @@ for(const [,url,path,modified] of guideLocations) {
     assert.doesNotMatch(html,/\{\{[a-z.]+\}\}/);
   } else assert.ok(graph.some(node=>node['@type']==='CollectionPage'));
 }
-for(const language of languages) {
+for(const language of [...languages,'zh-hant','ja']) {
   let hub;
   try {hub=await readFile(join(dist,language,'guides','index.html'),'utf8');} catch {continue;}
   if(!sitemap.includes(`<loc>https://skycut.app/${language}/guides/</loc>`))assert.match(hub,/content="noindex,follow"/,'a draft build of the guides is never indexable');

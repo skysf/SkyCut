@@ -3,14 +3,14 @@
 // when SKYCUT_GUIDE_DRAFTS=1 (local review), never indexed, never in the sitemap.
 import {guides as inventory} from '../content/guides/index.js';
 import {guideCopy} from '../content/guide-copy.js';
-import {LANGUAGES,ORIGIN} from './site-config.mjs';
+import {GUIDE_LANGUAGES,ORIGIN} from './site-config.mjs';
 export const GUIDE_TYPES=['guide','list','alternatives','compare'];
 export const LIMITS={title:60,description:155,answerMin:160};
 const day=/^20\d{2}-\d{2}-\d{2}$/;
 export const draftsShown=()=>process.env.SKYCUT_GUIDE_DRAFTS==='1';
 export const isPublished=guide=>day.test(guide.published||'');
 export const visibleGuides=({drafts=draftsShown(),list=inventory}={})=>list.filter(guide=>drafts||isPublished(guide));
-export const guideLanguages=guide=>LANGUAGES.filter(language=>guide.languages[language]);
+export const guideLanguages=guide=>GUIDE_LANGUAGES.filter(language=>guide.languages[language]);
 export const guidesIn=(language,options)=>visibleGuides(options).filter(guide=>guide.languages[language]);
 export const hubPath=language=>`/${language}/guides/`;
 export const guidePath=(language,slug)=>`/${language}/guides/${slug}/`;
@@ -18,7 +18,7 @@ export const absolute=path=>`${ORIGIN}${path}`;
 // Every page of the section that the current build produces.
 export function guideRoutes(options) {
   const routes=[];
-  for(const language of LANGUAGES) {
+  for(const language of GUIDE_LANGUAGES) {
     const list=guidesIn(language,options);
     if(!list.length)continue;
     routes.push({language,guide:null,path:hubPath(language)});
@@ -42,8 +42,9 @@ export function guideProblems(guide) {
   fail(guide.published!==null&&!isPublished(guide),'published is null (draft) or the real day it went online');
   fail(isPublished(guide)&&!(day.test(guide.updated||'')&&guide.updated>=guide.published),'updated is a day on or after published');
   fail(!/^20\d{2}-\d{2}$/.test(guide.asOf||''),'asOf is the month the facts were checked (YYYY-MM)');
-  fail(!Array.isArray(guide.sources)||guide.sources.some(source=>!source.claim||!/^https:\/\//.test(source.url||'')||!day.test(source.checked||'')),'every source has a claim, an https url and the day it was checked');
-  fail(!guideLanguages(guide).length,'at least one site language');
+  fail(!Array.isArray(guide.sources)||guide.sources.some(source=>!source.name||!source.claim||!/^https:\/\//.test(source.url||'')||!day.test(source.checked||'')),'every source has a name, a claim, an https url and the day it was checked');
+  fail(!guideLanguages(guide).length,'at least one language');
+  fail(Object.keys(guide.languages||{}).some(language=>!GUIDE_LANGUAGES.includes(language)),`languages are ${GUIDE_LANGUAGES.join(', ')}`);
   for(const language of guideLanguages(guide)) {
     const copy=guide.languages[language],at=message=>`[${language}] ${message}`;
     fail(!guideCopy[language],at('the section has no interface copy in this language yet'));

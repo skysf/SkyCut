@@ -1,16 +1,17 @@
 // Static, route-specific search metadata and social cards. No client-side SEO injection.
 import {escape as e} from './html.mjs';
-import {ORIGIN,LANGUAGES,HREFLANG_TAGS,INDEXABLE_PAGES,FOUNDER_URL,pageURL} from './site-config.mjs';
+import {ORIGIN,LANGUAGES,GUIDE_LANGUAGES,INDEXABLE_PAGES,FOUNDER_URL,pageURL,hreflangFor,siteLanguage} from './site-config.mjs';
 import {structuredData,serializeStructuredData} from './structured-data.mjs';
 const titleKeys={docs:'docsTitle',privacy:'privacyTitle',error:'errorTitle'};
-const locales={en:'en_US',zh:'zh_CN',de:'de_DE',es:'es_ES'};
+const locales={en:'en_US',zh:'zh_CN',de:'de_DE',es:'es_ES','zh-hant':'zh_TW',ja:'ja_JP'};
 // Indexable pages let search and answer engines quote as much as they need.
 export const INDEX_DIRECTIVES='index,follow,max-snippet:-1,max-image-preview:large,max-video-preview:-1';
-export const socialImage=language=>`${ORIGIN}/media/og-card-${language}.png`;
+// Guide-only languages share the card of the site language they borrow from.
+export const socialImage=language=>`${ORIGIN}/media/og-card-${siteLanguage(language)}.png`;
 export function pageMetadata(c,kind='') {
   return {
     canonical:pageURL(c.lang,kind),
-    title:kind?`${c[titleKeys[kind]]} | SkyCut`:c.seo.title,
+    title:kind?`${c.seo.titles[kind]||c[titleKeys[kind]]} | SkyCut`:c.seo.title,
     description:c.seo.descriptions[kind||'home'],
     image:socialImage(c.lang),indexable:INDEXABLE_PAGES.includes(kind),
   };
@@ -18,8 +19,8 @@ export function pageMetadata(c,kind='') {
 // One head for every kind of page. `alternates` maps a site language to the URL of
 // the same page in that language; a page with no translations passes an empty map.
 export function headTags({c,title,description,canonical,image,indexable,alternates={},type='website',article=null,graph=null}) {
-  const languages=LANGUAGES.filter(l=>alternates[l]);
-  const alternate=languages.map(l=>`<link rel="alternate" hreflang="${HREFLANG_TAGS[l]}" href="${alternates[l]}">`).join('')
+  const languages=GUIDE_LANGUAGES.filter(l=>alternates[l]);
+  const alternate=languages.map(l=>`<link rel="alternate" hreflang="${hreflangFor(l,languages)}" href="${alternates[l]}">`).join('')
     +(languages.length?`<link rel="alternate" hreflang="x-default" href="${alternates.en||alternates[languages[0]]}">`:'');
   return `<title>${e(title)}</title>
 <meta name="description" content="${e(description)}">

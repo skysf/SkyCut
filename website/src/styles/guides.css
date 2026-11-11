@@ -55,6 +55,11 @@
 .guide-cta .button:hover {background:#f3f0e8;}
 .guide-cta .text-link {color:#fffef8;}
 .guide-requirement {margin-top:20px;font-size:14px !important;color:#c4d4c4 !important;}
+.guide .guide-sources h2 {margin-top:44px;margin-bottom:10px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);}
+.guide-sources ul {list-style:none;padding:0;margin:0;}
+.guide-sources li {font-size:14.5px;line-height:1.55;color:#4f574c;}
+.guide-sources li+li {margin-top:6px;}
+.guide-sources span {color:var(--muted);white-space:nowrap;}
 .guide-footnote {margin-top:26px;font-size:13.5px !important;color:var(--muted) !important;}
 
 .guide-list {list-style:none;margin:36px 0 0 !important;padding:0 !important;display:grid;gap:16px;}
@@ -66,6 +71,11 @@
 .guide-card .text-link {margin-top:16px;font-size:15px;}
 .guide .guide-more h2 {margin-bottom:0;}
 
+/* Traditional Chinese and Japanese guides: the right glyph shapes, and no tight Latin tracking. */
+:lang(zh-Hant) {font-family:'Outfit Variable','PingFang TC','Microsoft JhengHei',system-ui,sans-serif;}
+:lang(ja) {font-family:'Outfit Variable','Hiragino Sans','Yu Gothic','Meiryo',system-ui,sans-serif;}
+:lang(zh-Hant) .guide :is(h1,h2,h3),:lang(ja) .guide :is(h1,h2,h3),:lang(zh-CN) .guide :is(h1,h2,h3) {letter-spacing:0;line-height:1.3;}
+:lang(ja) .guide p,:lang(ja) .guide li,:lang(zh-Hant) .guide p,:lang(zh-Hant) .guide li,:lang(zh-CN) .guide p,:lang(zh-CN) .guide li {line-height:1.85;}
 @media (max-width:640px) {
   .guide {width:calc(100% - 40px);padding-block:28px 70px;}
   .guide p,.guide li {font-size:16.5px;}

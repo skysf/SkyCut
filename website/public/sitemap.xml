@@ -108,4 +108,136 @@
     <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/privacy/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/privacy/"/>
   </url>
+  <url>
+    <loc>https://skycut.app/en/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/de/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/es/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/ja/guides/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/en/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/de/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/es/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/ja/guides/edit-video-with-claude-code/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://skycut.app/de/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-claude-code/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-claude-code/"/>
+  </url>
 </urlset>

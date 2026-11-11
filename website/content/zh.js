@@ -3,6 +3,7 @@ import showcase from './showcase-zh.js';
 import {prices} from './pricing.js';
 import compare from './comparison-zh.js';
 // 中文官网文案；产品行为由 Mac App 决定。
+const price=prices('zh');
 export default {
   showcase, seo:seoCopy.zh,
   lang: 'zh', locale: 'zh_CN', name: '简体中文',
@@ -50,8 +51,10 @@ export default {
   },
   faqTitle: '开始前了解这些',
   faq: [
-    ['适合哪种 Mac', '支持 Apple 芯片 Mac 和 macOS 15 及以上系统 自动转写需要 macOS 26 Intel 和 Windows 版即将推出'],
+    ['SkyCut 是什么', 'Sky Lu 做的 Mac AI 视频剪辑软件 属于 Sky Studio 产品家族 可以自己在多轨时间线上剪 也可以让 Claude 和 Codex 替你剪'],
+    ['适合哪种 Mac', '支持 Apple 芯片 Mac 和 macOS 15 及以上系统 自动转写需要 macOS 26 Intel 和 Windows 版尚未推出'],
     ['AI 怎样参与剪辑', '连接 Claude Desktop 或 Claude Code 或 Codex 让 AI 直接调整时间线 随时查看和继续修改 功能取决于版本与 Sky Studio 授权'],
+    ['多少钱', `免费版永久可用 导出带水印 Pro 每月 ${price.symbol}${price.monthly} 或每年 ${price.symbol}${price.yearly} 可以让 AI 剪辑 导出无水印 第一次把 SkyCut 连上 Sky Studio 账号时开始 7 天 Pro 体验`],
     ['需要 Sky Studio 账号吗', 'AI 和无水印导出需要 Sky Studio 授权 云端生成另行消耗积分 具体设置请查看文档'],
     ['素材会上传吗', '工程保存在本机 连接 AI 或使用云端生成时 服务可能接收完成请求所需的内容']
   ],
@@ -84,8 +87,8 @@ export default {
     ['连接 AI', '如果所用版本包含 Sky Studio 设置，请先在 Sky Studio 创建 Key，再填入 SkyCut。打开「设置 → 连接 AI」，选择 Claude Desktop、Claude Code 或 Codex。AI 功能取决于你的授权。'],
     ['检查并导出', '播放检查、打磨细节，然后导出。导出面板会提示是否带水印。云端生成另行消耗 Sky Studio 积分。']
   ],
-  docsCompatibility: '版本兼容性',
-  docsCompatibilityBody: '公开下载目前指向 0.18.47 版。上面的 AI 设置步骤适用于较新版本。如果你的版本没有 Sky Studio 设置，请先联系支持获取当前版本，再按这些步骤操作。',
+  docsCompatibility: '保持最新',
+  docsCompatibilityBody: '以上步骤按当前公开下载的版本写。如果你的 SkyCut 里没有 Sky Studio 设置，请重新下载安装最新版。',
   docsClients: '支持的 AI 客户端',
   docsClientsBody: '内置 Claude Desktop、Claude Code 和 Codex 的连接设置。其他客户端需要支持本地 stdio MCP。普通 ChatGPT 网页对话无法直接连接本机 SkyCut MCP 服务器。',
   docsKey: '打开 Sky Studio',

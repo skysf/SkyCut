@@ -12,7 +12,9 @@
     "build:social": "python3 scripts/build-social-images.py",
     "check:seo": "node scripts/check-seo.mjs",
     "build:favicons": "node scripts/build-favicons.mjs",
-    "stamp:pages": "node scripts/stamp-pages.mjs"
+    "stamp:pages": "node scripts/stamp-pages.mjs",
+    "publish:guides": "node scripts/publish-guides.mjs",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "@fontsource-variable/outfit": "5.3.0",

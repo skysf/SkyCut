@@ -9,6 +9,10 @@ import {renderLlms,renderLlmsFull} from '../scripts/llms.mjs';
 import {AI_CRAWLERS,INDEXABLE_PAGES,APP_FACTS} from '../scripts/site-config.mjs';
 import {readRevisions,stalePages,stamped,fingerprint} from '../scripts/page-revisions.mjs';
 import {prices} from '../content/pricing.js';
+import {indexNowPayload,sitemapAddresses,keyLocation} from '../scripts/indexnow.mjs';
+import {renderSitemap} from '../scripts/sitemap.mjs';
+import {INDEXNOW_KEY} from '../scripts/site-config.mjs';
+import {visibleGuides} from '../scripts/guide-model.mjs';
 import {cloudModelGroups} from '../content/ai-models.js';
 import {featureGroups,characterRows,localModelRows} from '../content/feature-matrix.js';
 const languages=['en','zh','de','es'];
@@ -38,7 +42,7 @@ test('llms.txt states the product facts from the same sources as the pages',asyn
   assert.match(short,/^# SkyCut\n\n> SkyCut is an AI video editor for Mac\./,'llmstxt.org: an H1 then a one paragraph summary');
   for(const text of [short,full]) {
     for(const fact of [`$${usd.monthly} per month`,`$${usd.yearly} per year`,`¥${cny.monthly}`,`¥${cny.yearly}`,APP_FACTS.operatingSystem,'Apple silicon','no Windows version','no Intel Mac version',
-      'Claude Code','Claude Desktop','Codex','MCP','watermark','7 days of Pro','1,000 Sky Studio credits','Sky Lu','Sky Studio','https://skylu.ai/download/skycut','https://skystudioai.com/app/skycut/pro','support@skycut.app'])
+      'Claude Code','Claude Desktop','Codex','MCP','watermark','7-day Pro trial','once per account and once per Mac','1,000 Sky Studio credits','Sky Lu','Sky Studio','https://skylu.ai/download/skycut','https://skystudioai.com/app/skycut/pro','support@skycut.app'])
       assert.ok(text.includes(fact),`missing fact: ${fact}`);
     assert.doesNotMatch(text,/github|localhost|127\.0\.0\.1|vercel\.app|undefined|\[object Object\]/i);
     assert.doesNotMatch(text,/\b0\.\d+\.\d+\b/,'no hand written app version');
@@ -47,7 +51,10 @@ test('llms.txt states the product facts from the same sources as the pages',asyn
   for(const language of languages)for(const kind of INDEXABLE_PAGES)
     if(language==='en'||!kind)assert.ok(short.includes(`https://skycut.app/${language}/${kind?kind+'/':''}`));
   assert.ok(short.includes('https://skycut.app/llms-full.txt'));
-  assert.ok(short.length<4000,'the short file stays short');
+  // Published guides with an English version are listed in both files; drafts never are.
+  for(const guide of visibleGuides({drafts:false}).filter(guide=>guide.languages.en))
+    for(const text of [short,full])assert.ok(text.includes(`https://skycut.app/en/guides/${guide.slug}/`));
+  assert.ok(short.length<6000,'the short file stays short');
   const {default:english}=await import('../content/en.js');
   for(const group of cloudModelGroups)for(const model of group.models)assert.ok(full.includes(model.title),`missing model ${model.title}`);
   for(const row of [...featureGroups.flatMap(group=>group.rows),...characterRows,...localModelRows])
@@ -113,4 +120,23 @@ test('every page carries the day it really changed: edit a page, then run npm ru
   // Neither the stamped date nor the copyright year counts as a change.
   assert.equal(fingerprint(first.html),fingerprint(first.html.replace(/,"dateModified":"[^"]*"/,',"dateModified":"1999-01-01"').replace(/© \d{4}/,'© 1999')));
   assert.notEqual(fingerprint(first.html),fingerprint(edited[0].html));
+});
+
+test('IndexNow submits the sitemap addresses with the public key file that the site serves',async()=>{
+  assert.match(INDEXNOW_KEY,/^[0-9a-f]{32}$/);
+  assert.equal(await readFile(new URL(`../public/${INDEXNOW_KEY}.txt`,import.meta.url),'utf8'),INDEXNOW_KEY,'the key file holds exactly the key');
+  assert.equal(keyLocation,`https://skycut.app/${INDEXNOW_KEY}.txt`);
+  const addresses=sitemapAddresses(renderSitemap());
+  assert.ok(addresses.length>=12);assert.ok(addresses.every(address=>address.startsWith('https://skycut.app/')));
+  assert.deepEqual(indexNowPayload(addresses),{host:'skycut.app',key:INDEXNOW_KEY,keyLocation,urlList:addresses});
+  // Submitting is a manual step after a deploy: the build never calls it.
+  const scripts=JSON.parse(await readFile(new URL('../package.json',import.meta.url),'utf8')).scripts;
+  assert.equal(scripts.indexnow,'node scripts/indexnow.mjs');assert.doesNotMatch(scripts.build,/indexnow/);
+});
+
+test('the bare addresses of the guide-only languages lead to their guides',async()=>{
+  const config=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
+  for(const language of ['zh-hant','ja'])for(const source of [`/${language}`,`/${language}/`])
+    assert.deepEqual(config.redirects.find(rule=>rule.source===source),{source,destination:`/${language}/guides/`,permanent:false});
+  assert.equal(config.trailingSlash,undefined,'not changed in this round: it would also move /api/subscribe');
 });

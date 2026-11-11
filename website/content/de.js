@@ -3,6 +3,7 @@ import showcase from './showcase-de.js';
 import {prices} from './pricing.js';
 import compare from './comparison-de.js';
 // 德语官网文案；产品行为由 Mac App 决定。
+const price=prices('de');
 export default {
   showcase, seo:seoCopy.de,
   lang: 'de', locale: 'de_DE', name: 'Deutsch',
@@ -50,8 +51,10 @@ export default {
   },
   faqTitle: 'Gut zu wissen',
   faq: [
+    ['Was ist SkyCut', 'Ein KI Videoeditor für den Mac von Sky Lu Teil der Sky Studio Familie Schneide selbst auf der Mehrspur Timeline oder lass Claude und Codex schneiden'],
     ['Welchen Mac brauche ich', 'Einen Mac mit Apple-Chip und macOS 15 oder neuer Automatische Transkription benötigt macOS 26. Versionen für Intel-Macs und Windows sind noch nicht verfügbar'],
     ['Wie funktioniert KI-Schnitt', 'Verbinde einen unterstützten MCP-Client wie Claude Desktop Claude Code oder Codex Die KI bearbeitet die Timeline auf der du alles prüfen und verfeinern kannst Verfügbare Funktionen hängen von deiner installierten Version und deinem Sky Studio-Zugang ab'],
+    ['Was kostet SkyCut', `Dauerhaft kostenlos mit Wasserzeichen im Export Pro kostet ${price.symbol}${price.monthly} im Monat oder ${price.symbol}${price.yearly} im Jahr mit KI Schnitt und Export ohne Wasserzeichen Wenn du SkyCut zum ersten Mal mit deinem Sky Studio Konto verbindest beginnt ein 7 Tage Pro Test`],
     ['Brauche ich ein Sky Studio-Konto', 'KI-Zugriff und Exporte ohne Wasserzeichen hängen von deiner Sky Studio-Freischaltung ab Generative Dienste verbrauchen Sky Studio-Credits Erstelle in Sky Studio einen Key und folge der Anleitung für deine Version'],
     ['Bleibt alles auf meinem Mac', 'Schnitt und Projektdateien bleiben lokal Verbundene KI-Clients und Cloud-Generierung können Inhalte erhalten die für deine Anfragen nötig sind Achte darauf was du teilst und welche Dienste du verbindest']
   ],
@@ -84,8 +87,8 @@ export default {
     ['Deine KI verbinden', 'Hat deine Version Sky Studio-Einstellungen, erstelle einen Key in Sky Studio und füge ihn in SkyCut ein. Öffne Einstellungen → KI verbinden und wähle Claude Desktop, Claude Code oder Codex. Der KI-Zugriff hängt von deiner Freischaltung ab.'],
     ['Prüfen und exportieren', 'Spiele den Schnitt ab, verfeinere Details und exportiere. Das Exportfenster zeigt an, ob ein Wasserzeichen hinzugefügt wird. Cloud-Generierung wird separat in Sky Studio-Credits abgerechnet.']
   ],
-  docsCompatibility: 'Versionskompatibilität',
-  docsCompatibilityBody: 'Der öffentliche Download führt derzeit zu Version 0.18.47. Die KI-Anleitung oben beschreibt neuere Versionen. Fehlen bei dir die Sky Studio-Einstellungen, frage vor diesen Schritten beim Support nach der aktuellen Version.',
+  docsCompatibility: 'Aktuell bleiben',
+  docsCompatibilityBody: 'Diese Schritte beschreiben den aktuellen öffentlichen Download. Fehlen in deinem SkyCut die Sky Studio-Einstellungen, lade die App erneut herunter, um die neueste Version zu erhalten.',
   docsClients: 'Unterstützte KI-Clients',
   docsClientsBody: 'Claude Desktop, Claude Code und Codex lassen sich direkt einrichten. Andere Clients müssen lokales stdio MCP unterstützen. Ein gewöhnlicher ChatGPT-Webchat kann sich nicht direkt mit dem lokalen SkyCut-MCP-Server verbinden.',
   docsKey: 'Sky Studio öffnen',

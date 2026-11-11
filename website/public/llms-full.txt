@@ -9,7 +9,7 @@ This file is generated from the same content as https://skycut.app. Short versio
 - Platform: Mac only. Apple silicon (arm64) and macOS 15 or later. There is no Intel Mac version and no Windows version.
 - Price: the Free plan costs $0 and has no time limit. Pro costs $19 per month or $149 per year in USD (¥129 or ¥999 in CNY on the Chinese site). Prices exclude tax.
 - Free includes the full manual editor, subtitles, screen recording and the file tools. Videos exported on Free carry a Sky Studio watermark.
-- Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. New accounts get 7 days of Pro.
+- Pro adds AI editing through MCP, exports without the watermark, and lets AI call cloud models. A 7-day Pro trial starts the first time you connect SkyCut to a Sky Studio account, once per account and once per Mac.
 - AI editing: SkyCut includes a local MCP server with built-in setup for Claude Code, Claude Desktop and Codex. You bring your own AI client. The AI works on the real timeline, where you can inspect, change or undo what it did.
 - Cloud generation (images, video, music, narration, sound effects, lip sync, upscaling) uses Sky Studio credits, which are bought separately. Yearly Pro includes 1,000 Sky Studio credits for each paid year; monthly Pro includes none.
 - Download: https://skylu.ai/download/skycut
@@ -103,6 +103,8 @@ Sky Lu, the founder of Sky Studio. SkyCut is part of the Sky Studio product fami
 | Track and master mixing | Independent faders Stereo meters and peak warnings | Included | Included |
 | Sound scenes | Speaker indoor and outdoor sound effects | Included | Included |
 | Music and sound effect library | Browse audition and add audio to the timeline | Included | Included |
+| Voice library | Create voices from your own recordings at no charge Design a voice from a description with credits Manage them in Settings With Full access AI can use and create voices without asking each time | Included | Included |
+| Change a clip to your voice | Right click a clip and choose Change Voice The original sound stays on the timeline muted | In the app, Uses credits | In the app or via AI, Uses credits |
 
 ### Subtitles
 
@@ -161,9 +163,11 @@ Cloud models use Sky Studio credits. On Pro the AI calls them for you; video ups
 - Video generation: Minimax H3, Gemini Omni 1.2 Flash, Veo 3.1 Fast, Seedance 2.0 Pro, Seedance 2.5, Wan 3.0 Text to Video, Wan 3.0 Image to Video, Wan 3.0 Reference to Video
 - Lip sync: HeyGen v3 Lipsync Speed, HeyGen v3 Lipsync Precision, MiniMax H3 Max Lip Sync (Image to Video)
 - Music generation: Lyria 3 Pro
-- Narration generation: Eleven v4 narration
+- Narration generation: Gemini 3.8 Flash TTS, Eleven v4 narration
+- Narration in a cloned voice: IndexTTS2 cloned reading, MiniMax Speech 2.8 HD cloned reading, HeyGen Voice Turbo cloned reading, MiniMax version of a voice (one-time)
+- Voice design: MiniMax voice design (one-time), Qwen3 voice design (one-time)
+- Voice conversion: Chatterbox HD voice conversion, Chatterbox voice conversion
 - Sound effect generation: Sonilo sound effects
-- Voice cloning: Zonos 2 voice clone
 - Video upscaling: Topaz Starlight, ByteDance Upscaler Pro
 
 ## Getting started
@@ -182,6 +186,10 @@ Supported AI clients: Claude Desktop, Claude Code and Codex have built-in setup.
 - Website preferences: We store your language and animation preference in your browser. We do not add advertising trackers. Hosting and email providers may process technical information needed to deliver their services.
 - Film and downloads: Playing the demo loads video from downloads.skylu.ai. Downloading the Mac app takes you to the existing Sky Lu download service.
 - The Mac app: This page describes the website. Connected AI tools and Sky Studio services have their own data handling. Your editing project stays on your Mac; content used in a cloud request can be sent to the service you choose.
+
+## Guides
+
+- [How to edit video with Claude Code on a Mac](https://skycut.app/en/guides/edit-video-with-claude-code/): Claude Code cannot open a video editor by itself. Connect it to SkyCut on a Mac and it cuts, captions and exports on a real timeline you can review.
 
 ## Links
 
