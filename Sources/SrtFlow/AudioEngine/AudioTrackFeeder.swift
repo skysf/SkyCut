@@ -10,8 +10,8 @@ import Synchronization
 // 不管什么：增益、混音（AudioTrackRenderer）；时钟（TimelineAudioEngine）。
 //
 // 线程：实时播放时自己一条普通 `Thread`（阻塞读不进 Swift 并发池，docs/architecture/blocking-media-reads.md），
-// 每 50 ms 或被叫醒（seek、渲染块说环快空了）跑一遍 `service(at:)`；离线渲染时调用方在自己的线程上直接调
-// `service`，渲染块随后在同一条线程上取 —— 单写者单读者仍然成立。
+// 每 50 ms 或被叫醒（seek、渲染块说环快空了）跑一遍 `service(at:)`，引擎的图故意停着时（空闲，`rest`）只在被叫醒时跑；
+// 离线渲染时调用方在自己的线程上直接调 `service`，渲染块随后在同一条线程上取 —— 单写者单读者仍然成立。
 
 /// 段的增益（渲染块每拍取一次）：拖曲线 / 改音量时换一份新的，流不重开。
 final class GainBox: @unchecked Sendable {
@@ -123,6 +123,8 @@ final class AudioTrackFeeder: @unchecked Sendable {
     private let seekRequest = Atomic<Int64>(-1)
     private let wake = DispatchSemaphore(value: 0)
     private let running = Atomic<Bool>(false)
+    /// 引擎的图故意停着（空闲）：不用每 50 ms 醒一次，只在被叫（seek、换增益、图要起了）时跑一遍。
+    private let resting = Atomic<Bool>(false)
     private var thread: Thread?
     private let scratchLeft: UnsafeMutablePointer<Float>
     private let scratchRight: UnsafeMutablePointer<Float>
@@ -147,7 +149,7 @@ final class AudioTrackFeeder: @unchecked Sendable {
         let thread = Thread { [self] in
             while running.load(ordering: .acquiring) {
                 service(at: playhead())
-                _ = wake.wait(timeout: .now() + .milliseconds(50))
+                _ = wake.wait(timeout: resting.load(ordering: .acquiring) ? .distantFuture : .now() + .milliseconds(50))
             }
         }
         thread.name = "AudioTrackFeeder \(track.name)"
@@ -169,6 +171,12 @@ final class AudioTrackFeeder: @unchecked Sendable {
 
     /// 渲染块发现环快空了就叫一声（不阻塞）。
     func poke() { wake.signal() }
+
+    /// 引擎的图停着（`true`）/ 要起了（`false`）：停着时线程一直睡到有人叫，seek 照样把环填到新位置（开播就有数据）。
+    func rest(_ resting: Bool) {
+        self.resting.store(resting, ordering: .releasing)
+        wake.signal()
+    }
 
     /// 换这条轨各段的增益 / 场景（拖推子 / 曲线、改音量、拧场景的旋钮：结构没变，流不重开）。下一遍 `service` 落地。
     func update(_ newUpdates: [UUID: SegmentUpdate]) {

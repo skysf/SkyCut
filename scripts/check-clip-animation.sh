@@ -137,6 +137,9 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/AudioTrackFeeder.swift \
   Sources/SrtFlow/AudioEngine/AudioTrackRenderer.swift \
   Sources/SrtFlow/AudioEngine/TimelineAudioEngine.swift \
+  Sources/SrtFlow/AudioEngine/PlaybackAnchor.swift \
+  Sources/SrtFlow/AudioEngine/AudioGraphRun.swift \
+  Sources/SrtFlow/AudioEngine/AudioRenderClock.swift \
   Sources/SrtFlow/AudioEngine/PlaybackAudioSource.swift \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditPrerender.swift \

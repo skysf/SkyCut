@@ -56,9 +56,13 @@ func checkRealtimeEngineRecovery() {
         let stoppedAt = audio.playhead
         Thread.sleep(forTimeInterval: 0.1)
         check(abs(audio.playhead - stoppedAt) < 0.06, "前提：停图后声音时钟确实停住")
+        // 停久一点再恢复：真声卡上重启之后采样时间接着停之前的数往下走（不从 0 重来）。锚点要是按「从 0 起」钉，
+        // 播放头会一下跳出去和停的时间一样长（2026-11-11 量到的，之前这里只断言「在往前走」，跳出去也算过）。
+        Thread.sleep(forTimeInterval: 1.5)
         check(try audio.recoverIfNeeded(), "真实声卡的渲染图重启")
         Thread.sleep(forTimeInterval: 0.25)
         check(audio.playhead > stoppedAt + 0.15, "真实声卡重启后继续推进，实测 \(audio.playhead)")
+        check(audio.playhead < stoppedAt + 0.45, "真实声卡重启后从停的地方接着走、不跳出去（停在 \(stoppedAt)，0.25 秒后实测 \(audio.playhead)）")
     } catch {
         check(false, "真实声卡恢复失败：\(error)")
     }

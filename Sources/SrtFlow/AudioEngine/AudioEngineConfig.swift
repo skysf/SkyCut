@@ -74,6 +74,9 @@ struct AudioEngineConfig: Sendable {
 
     static let empty = AudioEngineConfig(tracks: [], master: 1, duration: 0)
 
+    /// 时间线上有没有要出声的段。没有就不用开声卡：引擎的图停着，播放头按 host 时间走（docs/architecture/audio-engine.md 第二节第 11 条）。
+    var hasSound: Bool { tracks.contains { !$0.segments.isEmpty } }
+
     /// 制作身份只取段落/增益/scene 参数时传 measuringSceneCompensation=false，避免在 metadata 路径运行响度 DSP；占位1不代表已测补偿。
     /// `requested` 传**用户那一份**：这里自己排序、展开转场（和 builder 插画面同一份几何，展开只许一次）。
     static func make(from requested: TimelineState, measuringSceneCompensation: Bool = true) -> AudioEngineConfig {

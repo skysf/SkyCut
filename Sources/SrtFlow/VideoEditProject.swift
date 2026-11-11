@@ -1183,7 +1183,7 @@ final class VideoEditProject {
             guard !Task.isCancelled, generation == self.rebuildGeneration, OpenProjects.shared.showsEditor(self) else { return }
             self.rebuildStatus.set(false)
             guard let built else {
-                self.clock.detach()
+                self.unloadPreview()
                 return
             }
             if self.renderSize != built.renderSize { self.renderSize = built.renderSize }  // 没变不写：读它的视图会被叫醒

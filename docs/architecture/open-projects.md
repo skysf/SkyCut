@@ -87,6 +87,11 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 `ProjectTeardown.close`（落盘已经由调用方做过）：作废后台导入、只取消**它自己的**转写和翻译（`invalidateDocumentGeneration`）、停自动存盘、
 停播卸片、**停音频引擎**（每条轨的喂样线程在 `stop` 之前一直留着自己）、作废优化媒体的转码、只作废**它自己的** upscale、清撤销栈。
 
+**主窗口换工程也收引擎**（2026-11-11）：主窗口那个工程对象不换，`closeCurrentDocument` 和「重建出来是空的」都走
+`unloadPreview()`（卸片 + `audioEngineHost.stop()`）—— 之前只卸片，换成空的 Untitled 之后上一个工程的音频引擎还开着、
+占着声卡（[案例](../bugfixes/2026-11-11-preview-audio-engine-never-idles.md)）。引擎平时什么时候开着见
+[音频引擎](audio-engine.md)第二节第 11 条。
+
 **换 / 关一个工程只停它自己的活**（几个工程开着时别把别人的停了）：转写按 `boundGeneration`（`cancelIfBound(toGeneration:)`）、
 翻译按 `ownerGeneration`（`cancel(ifOwnedBy:)`）、upscale 按任务的 `projectGeneration`（`cancelAll(projectGeneration:)`）认 ——
 都是换之前那个代号。以前是 `cancelIfBoundToProject()` / `cancel()` / `cancelAll()`：哪个工程换内容都会停掉别的工程的生成、翻译、upscale。

@@ -279,7 +279,11 @@ scripts/gui-smoke/in-process/run.sh <scratchpad>/steps.json <scratchpad>/southpo
 ```
 
 - **步骤表**的格式写在 `Sources/SrtFlow/SmokeScript.swift` 文件头：`window` / `settle` / `seek` / `play` / `pause`（直接调时钟：空格是
-  SwiftUI 的快捷键，合成的按键到不了；结果里 `audioEngine.underrunFrames` 是这一轮的欠载帧数）/
+  SwiftUI 的快捷键，合成的按键到不了；结果里 `audioEngine.underrunFrames` 是这一轮的欠载帧数；`play` 在日志里记这一句占了主线程
+  多久、图当时的状态）/ `userInput`（当作用户在 SkyCut 里动了一下鼠标：冒烟进程不在前台，真事件不算「在用」）/ `audioSuspend`
+  （当场把预览的音频引擎的图停掉，不等 30 秒空闲）—— 这两步和 `state` 里的 `audioGraph`（running / suspended / starting / none）
+  是 2026-11-11 验「引擎不是一直开着的」加的，怎么对着 `pmset -g assertions` 和进程优先级看见
+  [音频引擎](../architecture/audio-engine.md)第五节 /
   `click` / `drag` / `scroll` / `key` / `state` / `snapshot` / `perfReset` + `perf` / `hit` / `quit`，
   以及 `open`（换一个工程，走「打开工程」同一个入口）和 `menu`（把某一层菜单的每一项和亮不亮写进日志）、
   `zoom`（以窗口里某一点为锚缩放，横向或 `"vertical": true` 纵向；和捏合处理器同样的调用，前后各记一次指针底下

@@ -139,7 +139,7 @@
 
 1. **SkyCut（已修，#383）：`set_settings` 回答里的长期授权说了两样**。先拍设置、再去 Sky Studio 记 / 撤：打开时顶层写 `recorded`、`sections.ai.voice_standing_consent`
    写 `unknown`；**切回请求批准时顶层写 `revoked`、设置那一处还写 `recorded`**。改成先记 / 撤再拍，`StandingChecks` 两处都查（`docs/bugfixes/2026-11-11-set-settings-stale-standing-consent.md`）。
-2. **SkyCut（没改，要拍板）：主窗口的工程一旦有过声音，预览的音频引擎就一直开着**。停着也在渲静音（App 里一条优先级 97 的实时线程、约 0.6% CPU），
+2. **SkyCut（用户同日同意改，修在 [预览的音频引擎一直开着](../bugfixes/2026-11-11-preview-audio-engine-never-idles.md)）：主窗口的工程一旦有过声音，预览的音频引擎就一直开着**。停着也在渲静音（App 里一条优先级 97 的实时线程、约 0.6% CPU），
    coreaudiod 挂着 `PreventUserIdleSystemSleep`（`com.apple.audio.BuiltInSpeakerDevice.context.preventuseridlesleep`：**Mac 不会空闲睡眠**），App Nap 也不再生效；
    关掉那个工程、主窗口换成空的 Untitled 也一样（主窗口是同一个对象，`newProject()` 不停引擎），直到退出 App。证据：断言的起算时间正好是旁白落进主窗口那一刻，
    关工程之后还在、测试 App 一退出就没了。起点是 2026-10-01 音频引擎有意的设计（[音频引擎](../architecture/audio-engine.md)第二条：「暂停 = 锚点标成不播（出静音，图不停）」，第一次重建预览时起图），当时没量过它对睡眠和 App Nap 的影响。

@@ -5,6 +5,9 @@
 #
 # 用法：
 #   scripts/check-audio-engine.sh
+#   scripts/check-audio-engine.sh --realtime-recovery     开发机：真声卡上停图再恢复（静音）
+#   scripts/check-audio-engine.sh --realtime-idle         开发机：真声卡上空闲停图、冷着开播（静音）
+#   scripts/check-audio-engine.sh --measure-idle [停多少秒] [几轮]   开发机：量停过之后第一次播放多等多久（静音，只打印）
 #
 # 与 check-audio-fade.sh 同一套编法（源文件清单从它复制，再加 AudioEngine/ 下的文件）：被测代码在 SrtFlow
 # app target 里，SwiftPM 不允许两个 target 共用源文件，所以单独编成自检二进制来跑。
@@ -139,13 +142,21 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/AudioTrackFeeder.swift \
   Sources/SrtFlow/AudioEngine/AudioTrackRenderer.swift \
   Sources/SrtFlow/AudioEngine/TimelineAudioEngine.swift \
+  Sources/SrtFlow/AudioEngine/PlaybackAnchor.swift \
+  Sources/SrtFlow/AudioEngine/AudioGraphRun.swift \
+  Sources/SrtFlow/AudioEngine/AudioRenderClock.swift \
   Sources/SrtFlow/AudioEngine/PlaybackAudioSource.swift \
+  Sources/SrtFlow/AudioEngine/AudioEngineIdlePolicy.swift \
+  Sources/SrtFlow/AudioEngine/AudioEngineIdleKeeper.swift \
   checks/AudioEngine/main.swift \
   checks/AudioEngine/Compare.swift \
   checks/AudioEngine/ReaderChunks.swift \
   checks/AudioEngine/Timelines.swift \
   checks/AudioEngine/Replace.swift \
   checks/AudioEngine/Recovery.swift \
+  checks/AudioEngine/Idle.swift \
+  checks/AudioEngine/IdleRealtime.swift \
+  checks/AudioEngine/Measure.swift \
   checks/AudioEngine/Oracle.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

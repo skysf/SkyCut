@@ -121,3 +121,36 @@ func checkAudioSourceRecovery(clip: URL) {
     check(clock.time > 6.1, "重新接上声音时钟后，新预览能正常播放")
     clock.detach()
 }
+
+/// 播到片尾播放器自己停下来（rate 变 0），声音主时钟的锚点还标着在播：2026-11-11 之前没人停它 —— 播放头照着它一直
+/// 往后走，引擎也永远不算停着、图一直开着占着声卡（docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md）。
+/// 素材是 60 秒的真视频、真 AVPlayer；从 59.6 秒起播，0.4 秒之后播放器自己停。
+func checkAudioSourceStopsAtEnd(clip: URL) {
+    let clock = PlayerClock(observationInterval: 0.02)
+    clock.player.isMuted = true
+    clock.attachItem(AVPlayerItem(url: clip))
+    waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }
+    let source = RecoverableAudioSource()
+    clock.attachAudioSource(source)
+    clock.seek(to: 59.6)
+    clock.play()
+    waitForAudioClock { clock.isPlaying && source.isPlaying }
+    check(clock.isPlaying && source.isPlaying, "前提：片尾前 0.4 秒开播，画面和声音时钟都在播")
+    waitForAudioClock { !clock.isPlaying }
+    check(!clock.isPlaying, "前提：播到片尾，播放器自己停了")
+    waitForAudioClock { !source.isPlaying }
+    check(!source.isPlaying, "播到片尾：声音主时钟跟着停")
+    let stoppedAt = clock.time
+    pumpAudioClock(0.2)
+    check(clock.time == stoppedAt, "播到片尾之后播放头不再往后走（停在 \(stoppedAt)，0.2 秒后 \(clock.time)）")
+    check(stoppedAt < 60.2, "播放头停在片尾附近，实测 \(stoppedAt)")
+
+    // 停了之后回去再播照样行；用户自己暂停不受影响。
+    clock.seek(to: 3)
+    clock.play()
+    waitForAudioClock { clock.time > 3.1 }
+    check(source.isPlaying && clock.time > 3.1, "片尾停过之后回到 3 秒再播，照常走，实测 \(clock.time)")
+    clock.pause()
+    check(!source.isPlaying, "用户暂停：声音时钟停")
+    clock.detach()
+}
