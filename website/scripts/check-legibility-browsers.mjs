@@ -74,6 +74,8 @@ for(const engine of engineNames){
       const section=sections.nth(s);await section.evaluate(element=>element.scrollIntoView({block:'start',behavior:'instant'}));
       const chat=()=>section.locator('.show-chat').evaluate(element=>Math.round(element.getBoundingClientRect().height));
       const own=[await chat()],buttons=section.locator('[data-phase-button]');
+      // Coming into view starts the demo, which types the prompt for 1.8 s: the window must not change while it does.
+      if(name==='phone')for(let sample=0;sample<12;sample++){await page.waitForTimeout(200);own.push(await chat());}
       for(let i=0;i<await buttons.count();i++){
         await buttons.nth(i).evaluate(button=>button.click());await page.waitForTimeout(400);
         const found=await page.evaluate(survey,`.showcase:nth-of-type(${s+1})`);
@@ -89,7 +91,7 @@ for(const engine of engineNames){
     if(name==='phone'){
       check(`${engine} phone ${language} demo in every step: no text below 12 px`,small.size===0,[...small].slice(0,6).join(' | '));
       check(`${engine} phone ${language} demo: overlays stay inside the preview`,outside.size===0,[...outside].join(', '));
-      check(`${engine} phone ${language} demo: the chat window keeps one height from the first step to the end`,heights.every(own=>new Set(own).size===1),heights.map(own=>own.join('/')).join(' | '));
+      check(`${engine} phone ${language} demo: the chat window keeps one height while the prompt is typed and from the first step to the end`,heights.every(own=>new Set(own).size===1),heights.map(own=>[...new Set(own)].join('/')).join(' | '));
     }
     await context.close();
   }

@@ -116,6 +116,16 @@ test('the demo does not dim its status text through script',async()=>{
   assert.doesNotMatch(await read('src/showcase-view.js'),/thinking\.style\.opacity/);
 });
 
+test('the typed prompt keeps its whole sentence in the bubble, so the chat window has one height while it types',async()=>{
+  // Typing by replacing the bubble's text made a two-line prompt start on one line: on phones, where the
+  // bubble has no minimum height, the chat window shrank by a line when the demo started and grew back.
+  const view=await read('src/showcase-view.js');
+  assert.doesNotMatch(view,/prompt\.textContent\s*=/);
+  assert.match(view,/untyped\.textContent\s*=\s*sceneCopy\.prompt\.slice\(promptText\.length\)/);
+  const hidden=styles.showcases.filter(rule=>rule.selector==='.show-untyped'&&!rule.condition).at(-1)?.declarations.visibility;
+  assert.equal(hidden,'hidden');
+});
+
 // --- 3. Headings never skip a level ------------------------------------------------------------------
 test('no page skips a heading level, and each has one h1',async()=>{
   for(const language of languages){

@@ -27,6 +27,8 @@
 .show-chat-header div>span i {width:4px;height:4px;border-radius:50%;background:#4f795a;}
 .show-conversation {padding:20px 17px 12px;flex:1;min-height:0;overflow:hidden;}
 .show-user-message {background:#e5eadc;color:#234a3c;font-size:12px;line-height:1.8;padding:12px 14px;border-radius:11px 11px 2px 11px;margin-left:18px;min-height:66px;}
+/* The part of the prompt not typed yet: it takes its room, so the bubble never changes size while typing. */
+.show-untyped {visibility:hidden;}
 .show-agent {display:flex;align-items:center;gap:8px;margin-block:18px 14px;}
 .show-agent .agent-symbol {background:transparent;width:21px;height:21px;}
 .show-thinking {display:flex;align-items:center;gap:3px;color:var(--show-quiet);font-size:10px;}
