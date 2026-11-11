@@ -595,6 +595,37 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   按模板顺序和按构建的顺序排都没有覆盖规则在前）；`npm run check:seo` 在构建之后按每个页面实际加载的
   样式块再核对一遍；`scripts/check-hero-browsers.mjs` 每一格带版面哨兵（桌面首屏两栏，iPad 和手机一栏）。
 
+## 小字读得清
+
+2026-11-11 起的规矩，来由见
+[官网的小字](../bugfixes/2026-11-11-website-small-text-contrast-headings-font-shift.md)。
+
+- **手机上（≤ 600 px）看得见的字不小于 12 px。** 演示区的编辑器窗口是缩小的示意图：读的字放大到 12 px，
+  放不下的（片段名、字幕条里的字）在手机上不显示，别再往下缩字号。新加的小字要么在手机档给到 12 px，
+  要么在手机档 `display:none`；手机上整块收起来的部分登记在 `tests/legibility.test.mjs` 的 `HIDDEN_ON_PHONES`。
+- **演示区的灰绿小字用 `--show-quiet`**，它在用到的每种底色上都 ≥ 4.5:1。新加一种文字颜色，
+  要在 `tests/legibility.test.mjs` 的 `QUIET_TEXT` 里登记它压在哪块底色上（或写进 `NOT_QUIET_TEXT`
+  说明它不是压在已知底色上的字）。要表示「还没轮到 / 结束了」，别把整行的不透明度降到字读不清，
+  也别在脚本里改状态字的不透明度（样式表的检查看不见）。
+- **示意图里的标签不是标题。** 编辑器窗口里的「素材库」「检查器」是 `p.show-panel-title`；
+  页面的标题层级不许跳级（h2 后面不许直接 h4）。
+- **行高写死，别留 `normal`。** `normal` 取字体自己的度量，网页字体换上来那一下高度会变；
+  首屏的网格里一行变高，3D 场景就跟着挪。
+- **演示播放时版面不跳**：手机上对话窗的步骤说明固定三行高，结束语占同样的高度；用户那句话逐字打出来时，
+  气泡里一直放着整句（没打到的部分在 `.show-untyped` 里、不可见），气泡从第一个字起就是最终的大小。
+  会逐步出现的文字都这样做：先占好最终的位置，再显示。
+- 守卫：`tests/legibility.test.mjs`（按样式表算手机上的字号、演示区的对比度、四语言各页的标题层级、
+  首屏标签的行高、脚本不改状态字的不透明度、打字时气泡里留着整句）。浏览器里量的那一半是手动的：
+
+  ```sh
+  npm run build
+  npx -y -p playwright@1.65.0 node scripts/check-legibility-browsers.mjs --engines chromium,webkit,firefox
+  ```
+
+  它看手机上 8 个页面有没有不到 12 px 的字、标题跳不跳级，演示区静止和每一步的对比度，
+  手机上浮层出不出预览框、对话窗高度变不变（打字的那 1.8 秒里每 0.2 秒量一次，再加每一步），以及挡掉网页字体前后首屏的框一不一样。
+  和首屏那个脚本一样：全程无头、只在 Mac 上、Playwright 不是依赖、不进 CI（两个脚本共用 `scripts/pinned-playwright.mjs`）。
+
 ## 运行与部署
 
 - 在 `website/` 执行 `npm ci`、`npm test`、`npm run build`。

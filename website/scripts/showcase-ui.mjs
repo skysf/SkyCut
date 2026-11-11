@@ -12,11 +12,11 @@ const glyph=name=>`<span class="ui-glyph" aria-hidden="true">${icon(name)}</span
 const wave=()=>`<span class="show-wave" aria-hidden="true">${Array.from({length:80},(_,i)=>`<i style="--amp:${18+Math.abs(Math.sin(i*1.72)*Math.cos(i*.39))*80}%"></i>`).join('')}</span>`;
 function inspector(u,kind) {
   const duration=SHOWCASE_MEDIA[kind].duration;
-  return `<aside class="show-inspector"><h4>${e(u.inspector)}</h4><dl><div><dt>${e(u.duration)}</dt><dd>0:${String(duration).padStart(2,'0')}</dd></div><div><dt>${e(u.clips)}</dt><dd data-clip-count>${kind==='create'?3:1}</dd></div><div><dt>${e(u.audioClips)}</dt><dd>3</dd></div><div><dt>${e(u.resolution)}</dt><dd data-resolution>1920×1080</dd></div></dl><h4>${e(kind==='translate'?u.subtitles:u.output)}</h4><div class="inspector-check">${icon('check')}<span>${e(kind==='translate'?u.translateReady:u.keepFps)}</span></div><span class="inspector-resolution" data-output-resolution>1080p</span><span class="inspector-fps">24 fps</span></aside>`;
+  return `<aside class="show-inspector"><p class="show-panel-title">${e(u.inspector)}</p><dl><div><dt>${e(u.duration)}</dt><dd>0:${String(duration).padStart(2,'0')}</dd></div><div><dt>${e(u.clips)}</dt><dd data-clip-count>${kind==='create'?3:1}</dd></div><div><dt>${e(u.audioClips)}</dt><dd>3</dd></div><div><dt>${e(u.resolution)}</dt><dd data-resolution>1920×1080</dd></div></dl><p class="show-panel-title">${e(kind==='translate'?u.subtitles:u.output)}</p><div class="inspector-check">${icon('check')}<span>${e(kind==='translate'?u.translateReady:u.keepFps)}</span></div><span class="inspector-resolution" data-output-resolution>1080p</span><span class="inspector-fps">24 fps</span></aside>`;
 }
 function subtitleLanes(c) {
   const duration=SHOWCASE_MEDIA.translate.duration;
-  const cues=translated=>c.captions.en.map((line,i)=>`<span ${translated?'data-translated-cue':''} style="left:${CAPTION_STARTS[i]/duration*100}%;width:${(CAPTION_ENDS[i]-CAPTION_STARTS[i])/duration*100}%">${e(line)}</span>`).join('');
+  const cues=translated=>c.captions.en.map((line,i)=>`<span style="left:${CAPTION_STARTS[i]/duration*100}%;width:${(CAPTION_ENDS[i]-CAPTION_STARTS[i])/duration*100}%"><span class="show-cue-text" ${translated?'data-translated-cue':''}>${e(line)}</span></span>`).join('');
   return `<div class="show-subtitle-lane">${cues(false)}</div><div class="show-subtitle-lane translated">${cues(true)}</div>`;
 }
 function timeline(c,kind) {
@@ -32,7 +32,7 @@ function viewer(c,kind) {
 }
 export function editor(c,kind) {
   const u=c.ui;
-  return `<div class="show-window show-editor" aria-label="SkyCut ${e(u.project)}"><div class="show-titlebar"><span class="show-window-dots" aria-hidden="true"><i></i><i></i><i></i></span>${glyph('picture')}<strong>${e(u.project)}</strong><span class="titlebar-right">${glyph('arrow')}${glyph('ai')}</span></div><div class="show-workspace"><aside class="show-library"><div class="show-library-tabs">${glyph('picture')}${glyph('words')}${glyph('sound')}</div><h4>${e(u.library)}</h4><div class="show-assets">${c.shots.map((s,i)=>`<div data-asset="${i}">${footage(`shot-${i}`)}<span>${e(s)}</span></div>`).join('')}</div><h4>${e(u.transitions)}</h4><div class="show-transition">${footage()}<span>${icon('chevron')}</span>${footage('shot-2')}</div></aside>${viewer(c,kind)}${inspector(u,kind)}</div>${timeline(c,kind)}</div>`;
+  return `<div class="show-window show-editor" aria-label="SkyCut ${e(u.project)}"><div class="show-titlebar"><span class="show-window-dots" aria-hidden="true"><i></i><i></i><i></i></span>${glyph('picture')}<strong>${e(u.project)}</strong><span class="titlebar-right">${glyph('arrow')}${glyph('ai')}</span></div><div class="show-workspace"><aside class="show-library"><div class="show-library-tabs">${glyph('picture')}${glyph('words')}${glyph('sound')}</div><p class="show-panel-title">${e(u.library)}</p><div class="show-assets">${c.shots.map((s,i)=>`<div data-asset="${i}">${footage(`shot-${i}`)}<span>${e(s)}</span></div>`).join('')}</div><p class="show-panel-title">${e(u.transitions)}</p><div class="show-transition">${footage()}<span>${icon('chevron')}</span>${footage('shot-2')}</div></aside>${viewer(c,kind)}${inspector(u,kind)}</div>${timeline(c,kind)}</div>`;
 }
 export function chat(c,scene) {
   const u=c.ui;

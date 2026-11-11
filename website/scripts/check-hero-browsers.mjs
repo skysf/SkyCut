@@ -2,46 +2,14 @@
 // Playwright is not a dependency of this package and CI does not run this. On a Mac, after `npm run build`:
 //   npx -y playwright@1.65.0 install chromium webkit firefox     (once per machine)
 //   npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs [--out <folder>] [--engines chromium,webkit,firefox]
-import {createRequire} from 'node:module';
-import {execFileSync} from 'node:child_process';
-import {realpathSync} from 'node:fs';
-import {mkdir,access} from 'node:fs/promises';
-import {dirname,join} from 'node:path';
-import {fileURLToPath} from 'node:url';
-import {preview} from 'vite';
+import {mkdir} from 'node:fs/promises';
+import {join} from 'node:path';
+import {headlessSite,option,tally} from './pinned-playwright.mjs';
 
-const PLAYWRIGHT='1.65.0';
-const root=fileURLToPath(new URL('../',import.meta.url));
-const option=name=>{const at=process.argv.indexOf(`--${name}`);return at>0?process.argv[at+1]:null;};
 const out=option('out'),engineNames=(option('engines')||'chromium,webkit,firefox').split(',');
-
-// `npx -p playwright@x node …` puts the package's command on PATH; follow it back to the package itself.
-function loadPlaywright(){
-  let home;
-  try{home=dirname(realpathSync(execFileSync('which',['playwright'],{encoding:'utf8'}).trim()));}catch{
-    throw new Error(`Playwright is not on PATH. Run: npx -y -p playwright@${PLAYWRIGHT} node scripts/check-hero-browsers.mjs`);
-  }
-  const require=createRequire(join(home,'package.json')),version=require('./package.json').version;
-  if(version!==PLAYWRIGHT)throw new Error(`This check is pinned to playwright@${PLAYWRIGHT}, found ${version}`);
-  return require('./index.js');
-}
-if(process.platform!=='darwin')throw new Error('This check needs a Mac: headless Chromium only gets a real GPU through Metal here.');
-await access(join(root,'dist/en/index.html')).catch(()=>{throw new Error('Build the site first: npm run build');});
-const playwright=loadPlaywright();
-const launch={
-  chromium:()=>playwright.chromium.launch({headless:true,args:['--use-angle=metal','--enable-gpu','--ignore-gpu-blocklist','--mute-audio']}),
-  webkit:()=>playwright.webkit.launch({headless:true}),
-  firefox:()=>playwright.firefox.launch({headless:true,firefoxUserPrefs:{'media.volume_scale':'0.0'}})
-};
+const {playwright,launch,base,close}=await headlessSite('check-hero-browsers.mjs');
 if(out)await mkdir(out,{recursive:true});
-const server=await preview({root,logLevel:'silent',preview:{port:0,strictPort:false,host:'127.0.0.1'}});
-const base=`http://127.0.0.1:${server.httpServer.address().port}`;
-
-let failed=0,passed=0;
-function check(name,ok,detail=''){
-  if(ok)passed++;else failed++;
-  console.log(`${ok?'PASS':'FAIL'} ${name}${detail?`  ${detail}`:''}`);
-}
+const {check,finish}=tally();
 // Count what the hero itself draws; other parts of the page keep animation frames of their own.
 const countDraws=()=>{
   window.__draws=0;
@@ -194,6 +162,5 @@ if(engineNames.includes('chromium')){
     await shoot(page.locator('.hero'),'software-webgl');await context.close();await browser.close();
   }
 }
-await new Promise(resolve=>server.httpServer.close(resolve));
-console.log(failed?`${failed} of ${failed+passed} checks FAILED`:`All ${passed} checks passed`);
-process.exit(failed?1:0);
+await close();
+finish();

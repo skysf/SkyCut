@@ -31,6 +31,8 @@ test('the reader finds an override that loads first, through commas, nesting and
     {condition:'@media(max-width:600px) and @supports (gap:1px)',selector:'.deck>i',properties:['background']}
   ]);
   assert.deepEqual(cascadeConflicts([base,narrow]),[]);
+  // A statement before the first rule does not swallow it.
+  assert.deepEqual(cssRules("@import 'font';\n:root {--paper:#fff;}"),[{condition:null,selector:':root',properties:['--paper']}]);
   const conflicts=cascadeConflicts([narrow,base]);
   assert.equal(conflicts.length,2);
   assert.match(conflicts[0],/^\.hero \{ display \}: the @media\(max-width:600px\) override in shared\.css loads before the base rule in page\.css$/);

@@ -24,11 +24,16 @@ export function createShowcaseView(section, copy, sceneCopy) {
   const subtitle = pick('[data-preview-subtitle]');
   const timecode = pick('[data-timecode]');
   let selectedLanguage = null;
-  let previousPrompt = '';
+  let previousPrompt = sceneCopy.prompt;
+  // The whole prompt stays in the bubble while it is typed, the part still to come invisible:
+  // the bubble has its final size from the first letter, so the chat window does not grow by a line midway.
+  const typed = document.createElement('span'), untyped = document.createElement('span');
+  untyped.className = 'show-untyped'; untyped.setAttribute('aria-hidden', 'true');
+  typed.textContent = sceneCopy.prompt; prompt.replaceChildren(typed, untyped);
   function paint(frame) {
     stage.dataset.phase = frame.finished ? 'done' : String(frame.phase);
     const promptText = sceneCopy.prompt.slice(0, Math.ceil(sceneCopy.prompt.length * frame.prompt));
-    if (previousPrompt !== promptText) {prompt.textContent = promptText; previousPrompt = promptText;}
+    if (previousPrompt !== promptText) {typed.textContent = promptText; untyped.textContent = sceneCopy.prompt.slice(promptText.length); previousPrompt = promptText;}
     steps.forEach((step, i) => {
       step.classList.toggle('is-complete', frame.finished || i < frame.phase);
       step.classList.toggle('is-current', !frame.finished && i === frame.phase);
@@ -38,9 +43,9 @@ export function createShowcaseView(section, copy, sceneCopy) {
       button.setAttribute('aria-pressed', String(i === frame.phase));
       button.classList.toggle('is-complete', frame.finished || i < frame.phase);
     });
-    thinking.style.opacity = frame.finished ? '.35' : '1';
     thinking.querySelector('span').textContent = frame.finished ? copy.ui.complete : copy.ui.thinking;
-    [...thinking.querySelectorAll('i')].forEach((dot,i) => dot.style.opacity = String(.25 + .75 * Math.max(0, Math.sin(frame.time * 4 - i))));
+    // Finished: the label stays at full strength, only the dots rest.
+    [...thinking.querySelectorAll('i')].forEach((dot,i) => dot.style.opacity = frame.finished ? '.25' : String(.25 + .75 * Math.max(0, Math.sin(frame.time * 4 - i))));
     done.hidden = !frame.finished;
     clips.forEach((clip,i) => {clip.style.opacity = i < frame.clips ? '1' : '.08';});
     assets.forEach((asset,i) => {asset.style.opacity = i < frame.shots ? '1' : '.12';});

@@ -5,7 +5,7 @@
   font-family:'Outfit Variable', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
   color:#19221d; background:#f3f0e8; font-synthesis:none; text-rendering:optimizeLegibility;
   -webkit-font-smoothing:antialiased;
-  --paper:#f3f0e8; --ink:#19221d; --green:#123f32; --muted:#676d62;
+  --paper:#f3f0e8; --ink:#19221d; --green:#123f32; --muted:#5d6358;
   --line:#d7d5c8; --surface:#ebe8df; --radius:18px;
 }
 * {box-sizing:border-box;}
