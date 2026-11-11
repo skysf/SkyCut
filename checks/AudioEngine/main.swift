@@ -24,6 +24,18 @@ if CommandLine.arguments.contains("--realtime-recovery") {
     print("\(checks) realtime recovery checks, \(failures) failures")
     exit(failures == 0 ? 0 : 1)
 }
+// 开发机、真声卡、全程静音：空闲停图 / 冷着开播（Idle.swift 第 4 层）。
+if CommandLine.arguments.contains("--realtime-idle") {
+    checkRealtimeEngineIdle(silentOnly: CommandLine.arguments.contains("--silent-only"))
+    print("\(checks) realtime idle checks, \(failures) failures")
+    exit(failures == 0 ? 0 : 1)
+}
+// 量停过之后第一次播放多等多久（Measure.swift）：--measure-idle [停多少秒] [几轮]。
+if let flag = CommandLine.arguments.firstIndex(of: "--measure-idle") {
+    let numbers = CommandLine.arguments[(flag + 1)...].compactMap(Double.init)
+    measureIdleWake(idle: numbers.first ?? 2, rounds: Int(numbers.dropFirst().first ?? 10))
+    exit(0)
+}
 
 let ffmpegPath = ProcessInfo.processInfo.environment["SRTFLOW_FFMPEG"]
     ?? FileManager.default.currentDirectoryPath + "/vendor/ffmpeg"
@@ -266,6 +278,13 @@ checkReplace(toneC: toneC, toneD: toneD)
 
 print("==> 14. 原生图停止后的恢复：重启、时间连续性、暂停状态（无需声卡）")
 checkEngineRecovery()
+
+print("==> 15. 引擎不是一直开着的：规矩、照规矩停 / 起、停过再起播放头一帧不跳、没有声音不起图（无需声卡，Idle.swift）")
+checkIdlePolicy()
+checkIdleKeeper()
+checkEngineIdle(tone: toneA)
+checkGraphHandoff(tone: toneA)
+checkUserPresence()
 
 print("\(checks) checks, \(failures) failures")
 if failures == 0 { print("All checks passed") }

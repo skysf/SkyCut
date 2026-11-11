@@ -32,6 +32,8 @@ export const featureGroups=[
     row('mixing',[architecture('audio-mixer')]),
     row('scenes',[architecture('sound-scenes')]),
     row('library',['Sources/SrtFlow/AudioLibraryPanel.swift']),
+    row('voiceLibrary',[architecture('voice-library'),'docs/reports/2026-11-11-voice-real-smoke.md']),
+    row('voiceChange',[architecture('voice-library'),'docs/reports/2026-11-11-voice-real-smoke.md'],'cloudUI','cloudBoth'),
   ]},
   {id:'subtitles',rows:[
     row('subtitleEdit',['README.md',architecture('subtitle-track-visibility-and-layout')]),

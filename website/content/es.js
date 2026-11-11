@@ -3,6 +3,7 @@ import showcase from './showcase-es.js';
 import {prices} from './pricing.js';
 import compare from './comparison-es.js';
 // 西班牙语官网文案；产品行为由 Mac App 决定。
+const price=prices('es');
 export default {
   showcase, seo:seoCopy.es,
   lang: 'es', locale: 'es_ES', name: 'Español',
@@ -22,6 +23,8 @@ export default {
   filmBody: 'Un cortometraje de Sky Lu Creado con Sky Studio Editado en SkyCut',
   filmCaption: 'Ver el corto', previous: 'Fotograma anterior', next: 'Fotograma siguiente',
   filmAlt: 'Un fotograma de Antarctica el cortometraje editado en SkyCut',
+  // One description per still, in the order ship penguin dive campfire
+  filmStills: ['Un rompehielos visto desde arriba avanza entre el hielo marino antártico', 'Un hombre con chaqueta amarilla sentado entre pingüinos rey sobre el hielo', 'Un buzo se ajusta una máscara azul antes de sumergirse', 'Bailarines con tocados de plumas alrededor de una hoguera de noche'],
   native: 'Hecho para tu Mac', nativeBody: 'Una línea de tiempo real Una app nativa Tu forma de trabajar',
   available: 'Ya disponible', coming: 'Próximamente', notify: 'Avísame',
   platformNames: ['Mac Chip de Apple', 'Mac Intel', 'Windows'],
@@ -48,8 +51,10 @@ export default {
   },
   faqTitle: 'Antes de empezar',
   faq: [
+    ['Qué es SkyCut', 'Un editor de vídeo con IA para Mac de Sky Lu Parte de la familia Sky Studio Edita a mano en la línea de tiempo multipista o deja que Claude y Codex editen por ti'],
     ['Qué Mac necesito', 'Un Mac con chip de Apple y macOS 15 o posterior La transcripción automática requiere macOS 26. Las versiones para Mac Intel y Windows aún no están disponibles'],
     ['Cómo funciona la edición con IA', 'Conecta un cliente MCP compatible como Claude Desktop Claude Code o Codex La IA edita la línea de tiempo donde puedes revisar y afinar los cambios Las funciones disponibles dependen de tu versión instalada y del acceso a Sky Studio'],
+    ['Cuánto cuesta', `Gratis para siempre con marca de agua al exportar Pro cuesta ${price.symbol}${price.monthly} al mes o ${price.symbol}${price.yearly} al año con edición con IA y exportación sin marca de agua La primera vez que conectas SkyCut con tu cuenta de Sky Studio empieza una prueba de Pro de 7 días`],
     ['Necesito una cuenta de Sky Studio', 'El acceso a IA y las exportaciones sin marca de agua dependen de tu autorización de Sky Studio Los servicios generativos consumen créditos de Sky Studio Crea una Key en Sky Studio y sigue la guía de tu versión'],
     ['Todo se queda en mi Mac', 'La edición y los archivos del proyecto son locales Los clientes de IA conectados y la generación en la nube pueden recibir el contenido necesario para tus solicitudes Revisa qué compartes y los servicios que conectas']
   ],
@@ -82,8 +87,8 @@ export default {
     ['Conecta tu IA', 'Si tu versión incluye ajustes de Sky Studio, crea una Key en Sky Studio y añádela en SkyCut. Abre Ajustes → Conectar IA y elige Claude Desktop, Claude Code o Codex. El acceso a IA depende de tu autorización.'],
     ['Revisa y exporta', 'Reproduce, afina los detalles y exporta. El panel de exportación indica si se aplica una marca de agua. La generación en la nube se cobra aparte en créditos de Sky Studio.']
   ],
-  docsCompatibility: 'Compatibilidad de versiones',
-  docsCompatibilityBody: 'La descarga pública apunta actualmente a la versión 0.18.47. Los pasos de IA anteriores describen versiones más recientes. Si tu versión no tiene ajustes de Sky Studio, contacta con soporte para obtener la versión actual antes de seguirlos.',
+  docsCompatibility: 'Mantente al día',
+  docsCompatibilityBody: 'Estos pasos describen la descarga pública actual. Si tu SkyCut no tiene ajustes de Sky Studio, vuelve a descargarlo para obtener la última versión.',
   docsClients: 'Clientes de IA compatibles',
   docsClientsBody: 'Claude Desktop, Claude Code y Codex tienen configuración integrada. Otros clientes necesitan compatibilidad con MCP local mediante stdio. Un chat web normal de ChatGPT no puede conectarse directamente al servidor MCP local de SkyCut.',
   docsKey: 'Abrir Sky Studio',

@@ -16,7 +16,8 @@ export function applyLanguage() {
   }
   const preferences = navigator.languages?.length ? navigator.languages : [navigator.language];
   const target = hasExplicit ? explicit : supported.includes(preferred) ? preferred : browserLanguage(preferences);
-  if (url.pathname === '/' || hasExplicit) {
+  const guideOnly = /^\/(zh-hant|ja)(\/|$)/.test(url.pathname);
+  if (!guideOnly && (url.pathname === '/' || hasExplicit)) {
     const path = url.pathname.replace(/^\/(en|zh|de|es)(\/|$)/,'/');
     url.pathname = `/${target}${path === '/' ? '/' : path}`;
     if (hasExplicit) url.searchParams.delete('lang');
