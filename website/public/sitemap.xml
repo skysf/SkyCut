@@ -244,7 +244,8 @@
     <loc>https://skycut.app/en/guides/edit-video-with-codex/</loc>
     <lastmod>2026-11-11</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
   </url>
@@ -252,7 +253,17 @@
     <loc>https://skycut.app/zh/guides/edit-video-with-codex/</loc>
     <lastmod>2026-11-11</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/edit-video-with-codex/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
   </url>
@@ -260,9 +271,70 @@
     <loc>https://skycut.app/ja/guides/edit-video-with-codex/</loc>
     <lastmod>2026-11-11</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
-    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/edit-video-with-codex/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/edit-video-with-codex/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/edit-video-with-codex/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/claude-code-vs-codex-for-video-editing/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/ja/guides/claude-code-vs-codex-for-video-editing/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="zh" href="https://skycut.app/zh/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/claude-code-vs-codex-for-video-editing/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/claude-code-vs-codex-for-video-editing/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/en/guides/remove-pauses-and-filler-words/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/remove-pauses-and-filler-words/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/remove-pauses-and-filler-words/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/ja/guides/remove-pauses-and-filler-words/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/remove-pauses-and-filler-words/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/remove-pauses-and-filler-words/"/>
   </url>
   <url>
     <loc>https://skycut.app/en/guides/auto-subtitles-on-mac/</loc>
@@ -301,9 +373,101 @@
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/auto-subtitles-on-mac/"/>
   </url>
   <url>
+    <loc>https://skycut.app/en/guides/translate-subtitles-on-mac/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/translate-subtitles-on-mac/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/es/guides/translate-subtitles-on-mac/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/translate-subtitles-on-mac/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://skycut.app/es/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/translate-subtitles-on-mac/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/translate-subtitles-on-mac/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/ai-voiceover-in-your-own-voice/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/ai-voiceover-in-your-own-voice/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/ja/guides/ai-voiceover-in-your-own-voice/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/ai-voiceover-in-your-own-voice/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/ai-voiceover-in-your-own-voice/"/>
+  </url>
+  <url>
     <loc>https://skycut.app/en/guides/video-editing-mcp-servers/</loc>
     <lastmod>2026-11-11</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh/guides/video-editing-mcp-servers/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+  </url>
+  <url>
+    <loc>https://skycut.app/zh-hant/guides/video-editing-mcp-servers/</loc>
+    <lastmod>2026-11-11</lastmod>
+    <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/video-editing-mcp-servers/"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/video-editing-mcp-servers/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
   </url>
@@ -311,6 +475,8 @@
     <loc>https://skycut.app/ja/guides/video-editing-mcp-servers/</loc>
     <lastmod>2026-11-11</lastmod>
     <xhtml:link rel="alternate" hreflang="en" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hans" href="https://skycut.app/zh/guides/video-editing-mcp-servers/"/>
+    <xhtml:link rel="alternate" hreflang="zh-Hant" href="https://skycut.app/zh-hant/guides/video-editing-mcp-servers/"/>
     <xhtml:link rel="alternate" hreflang="ja" href="https://skycut.app/ja/guides/video-editing-mcp-servers/"/>
     <xhtml:link rel="alternate" hreflang="x-default" href="https://skycut.app/en/guides/video-editing-mcp-servers/"/>
   </url>

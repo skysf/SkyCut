@@ -175,3 +175,30 @@ test('the publishing rules refuse a guide that breaks them',()=>{
   assert.throws(()=>assertGuides([sample,sample]),/share a slug/);
   assert.deepEqual(guideProblems(sample),[]);
 });
+
+test('the Claude Code and Codex comparison states exactly what the measurement report recorded',async()=>{
+  const guide=guides.find(item=>item.slug==='claude-code-vs-codex-for-video-editing');
+  const report=await readFile(new URL('../../docs/reports/2026-11-11-mcp-guide-final-measurement.md',import.meta.url),'utf8');
+  // Each client's task table: `| 1-batch-titles | calls … | … | seconds |`, where the last value after an arrow is this run.
+  const last=cell=>Number(cell.split('→').at(-1).trim().split('（')[0].replace(/,/g,''));
+  const rows=section=>section.split('\n').filter(line=>/^\| \d-[a-z-]+ \| /.test(line)).map(line=>line.split('|').map(cell=>cell.trim())).filter(cells=>cells.length>=9)
+    .map(cells=>({calls:last(cells[2]),rejected:last(cells[3]),seconds:last(cells.at(-2))}));
+  const [claudePart,codexPart]=report.split('\n## Codex\n');
+  const claude=rows(claudePart.slice(claudePart.indexOf('### 八个任务'))),codex=rows(codexPart.slice(codexPart.indexOf('### 八个任务')));
+  assert.equal(claude.length,8);assert.equal(codex.length,8);
+  // The article gives the totals in whole minutes: about 14 for Claude Code and about 24 for Codex.
+  const total=list=>({minutes:Math.round(list.reduce((sum,row)=>sum+row.seconds,0)/60),calls:list.reduce((sum,row)=>sum+row.calls,0),rejected:list.reduce((sum,row)=>sum+row.rejected,0)});
+  assert.deepEqual([total(claude),total(codex)],[{minutes:14,calls:196,rejected:2},{minutes:24,calls:208,rejected:0}]);
+  for(const [language,copy] of Object.entries(guide.languages)) {
+    const table=copy.sections.flatMap(section=>section.blocks).find(block=>block.table).table;
+    assert.equal(table.rows.length,8);
+    table.rows.forEach((row,i)=>{
+      for(const [cell,measured] of [[row[1],claude[i]],[row[2],codex[i]]]) {
+        const numbers=cell.match(/\d+/g).map(Number);
+        assert.deepEqual(numbers,[Math.round(measured.seconds),measured.calls],`${language} task ${i+1}: ${cell}`);
+      }
+    });
+    const text=JSON.stringify(copy);
+    for(const figure of ['14','24','196','208','2.1.322','0.167.0','claude-opus-5-5','gpt-6.1-sol'])assert.ok(text.includes(figure),`${language} states ${figure}`);
+  }
+});
