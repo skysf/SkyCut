@@ -536,8 +536,8 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   **只给文章用，官网页面还是四种**（`GUIDE_ONLY_LANGUAGES`）。这两种语言的文章页借一种官网语言的东西（`siteLanguage`）：`zh-hant` 的导航、页脚、文档链接指到 `/zh/`，
   `ja` 指到 `/en/`；价格照借的那一边以外的规矩走 —— **只有简体中文文章写人民币，其余语言（含繁中、日文）都写美元**并在文中注明。导航和页脚的文字在
   `content/guide-shell.js`。hreflang：一篇文章同时有简体和繁体时写 `zh-Hans` / `zh-Hant`（各管各的文字），只有简体时还是 `zh`；日文 `ja`；`x-default` 是英文版。
-  语言菜单在文章页列出这篇真有的语言（最多六种），官网页面仍是四种。`/zh-hant`、`/ja` 这两个光秃秃的地址由 `vercel.json` 302 到各自的栏目页
-  （**这一条只能在部署那一次验证**）。`src/language.js` 碰到这两种语言的地址不做 `?lang=` 跳转（它们没有可换的官网页面）。
+  语言菜单在文章页列出这篇真有的语言（最多六种），官网页面仍是四种。`/zh-hant`、`/ja` 这两个光秃秃的地址由 `vercel.json` 临时跳转到各自的栏目页
+  （`permanent: false`，Vercel 回的是 307；带不带斜杠都跳，2026-11-11 部署时在线上核过）。`src/language.js` 碰到这两种语言的地址不做 `?lang=` 跳转（它们没有可换的官网页面）。
   **App 界面只有英文、简体中文、西班牙文**：繁中文章的按钮名用简体中文界面上的原文、括号里解释，日文和德文文章用英文界面的名字，并在文中说明。
 - **内容**：一篇一个文件夹 `content/guides/<slug>/`：`index.js` 放 slug、类型、日期、出处，每种语言一个文件（`en.js`、`zh-hant.js`……），登记进 `content/guides/index.js`；
   栏目自己的界面文字在 `content/guide-copy.js`（六种语言）。**各语言版本结构必须一样**（节数、每节的块、步骤数、表格行列、问答数、价格占位符），测试逐篇比。
@@ -666,6 +666,13 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `81b6ca887c00663f7e7d9de5dfb4f4b1a76e2a37`；按上述实际发布链路调用 `POST /v13/deployments`
   （`gitSource`、`ref=main`、`sha` 为该提交），Vercel 部署 `dpl_7MMY3iAmnbHuizVyfoewBFLt6S67` 为 READY。
   Claude 已核对四语言首页均有价格区、购买外链和 JSON-LD `offers`。
+- 首屏 3D、文章栏目（13 篇、六种语言共 46 个文章页）、SEO / GEO 和手机排版、小字修正于 2026-11-11 一次部署：main 提交
+  `ca0b84769c4b0bf156b463e24dc36712be2d1fb0`（PR #392–#395、#397–#399），照上述链路调用 `POST /v13/deployments`，
+  Vercel 部署 `dpl_A4j1hqmzBsNrCJVgwiNo4q2R2rMs` 为 READY。线上核对：sitemap 的 64 个地址全部 200、canonical 都指向自己，
+  sitemap 和 main 的 `public/sitemap.xml` 逐字节相同；`/ja`、`/zh-hant` 跳到栏目页；IndexNow 的 key 文件在线，
+  `npm run indexnow` 交了 64 个地址（202）；robots、`llms.txt`、404 正常；首页和一篇文章页引用的脚本、样式、图片全部 200。
+  真的 Safari、iPhone、iPad 没有实测。CLI 存的登录令牌大约 8 小时过期（过期了 API 回 403 `invalidToken`），
+  调 API 之前先跑一次 `vercel whoami` 刷新（只读、不部署）。
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，
