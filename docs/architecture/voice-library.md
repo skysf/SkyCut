@@ -305,7 +305,8 @@
 
 ## 十、收费单只下一次、账只记一次（2026-11-11 审查之后）
 
-> 案例：[设计声音连按下了好几单](../bugfixes/2026-11-11-design-voice-ordered-twice.md)、[声音库审查的后续](../bugfixes/2026-11-11-voice-library-review-followups.md)。
+> 案例：[设计声音连按下了好几单](../bugfixes/2026-11-11-design-voice-ordered-twice.md)、[声音库审查的后续](../bugfixes/2026-11-11-voice-library-review-followups.md)、
+> [重启之后不记得在建的那一单](../bugfixes/2026-11-11-voice-library-job-after-restart.md)。
 > 相关：[Sky Studio 的任务](sky-studio-jobs.md)第五节（旁白中途那笔费用）、[阻塞的媒体读取](blocking-media-reads.md)「例外」。
 
 1. **会花钱的按钮按下去那一刻就锁**：设计声音的对话框一份报价只下一单（`DesignVoiceModel.ordered`，在起任务之前置上；按钮跟着灰）。
@@ -330,21 +331,38 @@
 9. **临时文件夹只在 `VoiceLibraryTemp` 起名**（对话框、AI 的参考录音、语言探针三种），正常收尾各自删，崩溃留下的启动时后台清——
    只清一天以前的（临时目录是几个 SkyCut 共用的）。转写开头那一处的清理（`AudioWindowReader.sweepTempResidue`）不许带上它们。
 10. **检测语言、配旁白的转写不借字幕生成的读取器**：走 `QueuedAudioWindow`（读取在 `MediaReadQueue` 上）。
+11. **在建的单落盘，SkyCut 重启之后接着跟到底**（`SkyStudioVoiceLibraryOrders`）。账在点头那一刻就记进了 UserDefaults，要结的那一单
+    也得在盘上，不然重启把它们拆开：重启前那一笔没人结，再点头又记一笔。设计、建 MiniMax 版的任务**交之前**存一条
+    （`SrtFlow.skystudio.voiceLibraryOrders.v1`，按 idempotency_key 记：预留多少、哪一天、Key 的 SHA-256、请求、受理了的任务号），
+    有结局才删。**先删记录再改账**。
+    - **什么时候接着跟**（`resume`）：读到 Key 那一刻（启动、回到 SkyCut、每小时、点了 Allow，`SkyStudioAccount`）、建 MiniMax 版的
+      两处看「已经在建」之前、任务起手（最后一道）。只跟这把 Key 名下、这次运行里没人跟、有任务号的那几单，只 GET
+      （`SkyStudioJobRun.resume`），按原来那一笔结账：做完按实收、没做成退回。同一件事再点头时跟着它：不问、不预留、不交。
+    - **没有任务号的**（交的回答丢了，或者交的那一刻退出了，收没收不知道）：那一笔照旧算花了，记录留着。同一件事之后被 Sky Studio
+      受理时并进来（`accept`，同一次写盘）：服务器对同一个声音 + 语言开着的建单回的就是原来那一单（202、同一个 `job_id`），所以两笔只留
+      早先那一笔，这一单自己那一笔退回。
+    - **服务器上还没结局的留着记录**（`unresolved`：问不到、等满 5 小时、停不下来、交的回答丢了），下次接着跟。服务器给了结局的
+      （做完、没做成、退了、找不到这一单）才删。两天以前的丢掉、账不动；别的 Key 的留给那把 Key。
+    - 实收记在**预留的那一天**（`SkyStudioHeldCredits.settle`）：第二天早上才接着跟完的单，不挤占今天的额度。
 
 | 检查 | 守什么 |
 | --- | --- |
 | `scripts/check-voice-recovery.sh` 的 `LibraryOrderChecks`（真 App 对象 + 假协议，单会排队 / 去重 / 改价 / 退款，实扣 ≠ 上限） | 连按只下一单、同一份直接起两次回开着的那一单、改了字另一个 key；上限 760 实扣 751.4 账按实收、`price_changed` 一分不留且带新价和下一步、失败退款不留账；MiniMax 版在建时再调（不带令牌 / 带用过的令牌 / 全部权限 + 长期授权）跟着那一单、只记一笔；授权那句升版本用新文案再问、按新版本建；临时文件夹只清一天以前的三种；`QueuedAudioWindow` 出 16 kHz、能取消 |
 | 同上的 `FallbackFeeChecks.repricedChecks`、`LibraryUIChecks.outdatedStatementChecks` | 建的那一单改价没受理：问题还在、记下新价、普通 resume 按新价再问、新令牌按新价建成才清；对话框换成新的那一句、那一勾拿掉、再勾按新版本建 |
-| `checks/sky-studio-wiring/voice-library-orders.sh`（第 13 节）、`checks/blocking-media-reads.sh` | 上面 1–10 的接线；`AudioWindowReader.extract` 的调用方只在 `SubtitleGen/` |
+| 同上的 `LibraryRestartChecks`（真 App 对象 + 假协议；旧进程的任务停在下一次问之前，新进程只看盘上的：新建的账本对象、现读的记录） | 建 MiniMax 版在建时重启、AI 再调（带不带用过的令牌）：不问、不预留、不交，跟着那一单，做完一笔；两单设计在建时重启、读到 Key 就接着跟：上限 760 实扣 751.4 按实收、退了的退回、再读一次 Key 不跟两遍；交的回答丢了：那一笔留着，再点头时服务器回同一单、并成一笔；两天以前的丢掉、别的 Key 的不跟；`unresolved` 的纯值；前一天预留今天结、实收落在前一天 |
+| `checks/sky-studio-wiring/voice-library-orders.sh`（第 13 节）、`checks/blocking-media-reads.sh` | 上面 1–11 的接线；`AudioWindowReader.extract` 的调用方只在 `SubtitleGen/` |
 
-反向验证记录在两篇案例里（2026-11-11，每条都临时改回去看过红）。
+反向验证记录在三篇案例里（2026-11-11，每条都临时改回去看过红）。
 
-已知不足：SkyCut 重启后不记得在建的那一单，用户再点头本机会再记一笔（服务器仍只扣一次），当天的账多一笔、第二天清零。
+已知不足：交的回答丢了的那一单本机跟不了（没有任务号），同一件事再来时会再问一次价，账在受理时并成一笔。没人再来的话，
+那一笔照上限留在那一天。
 
 人工回归（真 Key，先请用户批准预算）：
 
 - [ ] 设计声音：报价出来后双击「设计」、按住回车：只出现一条「正在设计…」，Sky Studio 明细里只有一笔。
 - [ ] 用自己的声音配英文旁白、点头建 MiniMax 版，**不等它做完**再让 AI 配一次：AI 说「已经在建」、不再问价；设置 → Sky Studio 里今天只多一笔。
+- [ ] 同上，点头之后**马上退出 SkyCut（⌘Q）再打开**：设置 → Sky Studio 里今天的那一笔还在；再让 AI 配一次，说「已经在建」、不再问价；
+      做完今天仍只有一笔、按实收（和 Sky Studio 的明细对得上）。设计声音也照做一遍：退出再打开、不做任何事，做完那一笔按实收。
 - [ ] （真遇上时）Sky Studio 升了授权那句：AI 和对话框都拿新文案再问一次，不用等十分钟。
 
 ## 十一、变声：`change_voice` 和片段右键「换成我的声音…」（声音 PR 9）
@@ -397,7 +415,8 @@
     `voice_change`），`get_job` 做完报两段新音频的 id 和轨、两个文件、`model` / `fallback_used`、实收。名片 + 说明书主题（`MCPGuideVoiceChangeTopic`）
     都不写价和上限的数。
 
-**还没做的 / 已知不足**：没有恢复记录——SkyCut 中途退出，这一单在服务器上照样做完、成品留 60 天，但本机不会再落地（同 upscale）；
+**还没做的 / 已知不足**：没有恢复记录——SkyCut 中途退出，这一单在服务器上照样做完、成品留 60 天，但本机不会再落地（同 upscale），
+本机账上那一笔照报价留在那一天、不按实收换（声音库的两种收费单重启后会接着跟，第十节第 11 条；变声没有）；
 下载两次都失败时任务以失败结束、只报 Sky Studio 的任务号。背景是单声道（决定第三节第 8 条已接受）。分割出来的右半段不继承「正在变声」。
 每次变声都新开两条轨（照约定第 4 条），一条时间线上变很多段时轨会很多：先变声再分割。
 

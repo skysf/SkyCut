@@ -162,6 +162,8 @@ final class SkyStudioAccount: ObservableObject {
             keychainReadSucceeded()
             // 升级前就开着全部权限：新版第一次读到 Key 时替用户记上长期授权（这台 Mac 上只做一次，SkyStudioVoiceStanding）。
             SkyStudioVoiceStanding.shared.migrateIfNeeded(key: key)
+            // 重启之前在建的声音库收费单（设计、建 MiniMax 版）：接着跟到底、按原来那一笔结账（SkyStudioVoiceLibraryOrders）。
+            SkyStudioVoiceLibraryOrders.resume(key: key, api: SkyStudioAPI())
             if checkPlan { await ask(with: key) }
         case .missing:
             // 在「钥匙串访问」里被删掉了：当没有 Key。

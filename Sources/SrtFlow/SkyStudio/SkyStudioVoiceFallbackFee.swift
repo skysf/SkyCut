@@ -116,6 +116,8 @@ enum SkyStudioVoiceFallbackFee {
         let account = SkyStudioCharacterAccess.stamp(key)
         let identity = SkyStudioVoiceLibraryJob.enrollIdentity(voice: voice, language: language, account: account)
         // 这个声音这种语言的 MiniMax 版已经在建（早先点过头的那一单还没做完）：跟着它，不再问、不再预留（审查 #362 第 2 条）。
+        // 重启之前点过头的那一单先接着跟起来，下面就认得出它（SkyStudioVoiceLibraryOrders）。
+        SkyStudioVoiceLibraryOrders.resume(key: key, api: services.api)
         if let open = SkyStudioVoiceLibraryJob.running(identity) { return .building(job: open, credits: credits, standing: false, following: true) }
         let standing = SkyStudioVoiceStanding.shared
         // 工程关了：起不了挂在它名下的任务，只问不建（点过头也要等工程开着再来）。
