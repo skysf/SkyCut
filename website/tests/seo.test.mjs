@@ -60,7 +60,7 @@ for(const language of languages) {
         }
       }
       assert.equal(webpage.url,canonical);assert.equal(webpage.inLanguage,tags[language]);
-      assert.doesNotMatch(html,/localhost|127\.0\.0\.1|github\.com|vercel\.app/);
+      assert.doesNotMatch(html,/localhost|127\.0\.0\.1|github|vercel\.app/i,'no page mentions GitHub, a local address or the hosting domain');
     }
     assert.equal(new Set(descriptions).size,3,'home docs and privacy must not reuse one generic description');
   });

@@ -14,8 +14,8 @@ export default {
   asOf:'2026-11',
   // Where each statement about another product comes from. The page lists the names, not the links.
   sources:[
-    {name:'claude-video, a Claude Code skill suite (GitHub repository)',claim:'Claude Code skills that edit video files drive FFmpeg and Whisper from the terminal and have no timeline',url:'https://github.com/agricidaniel/claude-video',checked:'2026-11-11'},
-    {name:'davinci-resolve-mcp by Samuel Gursky (GitHub repository)',claim:'A community MCP server controls DaVinci Resolve Studio through its scripting API on macOS, Windows and Linux; external scripting requires Resolve Studio',url:'https://github.com/samuelgursky/davinci-resolve-mcp',checked:'2026-11-11'},
+    {name:'claude-video, a Claude Code skill suite (project page)',claim:'Claude Code skills that edit video files drive FFmpeg and Whisper from the terminal and have no timeline',url:'https://github.com/agricidaniel/claude-video',checked:'2026-11-11'},
+    {name:'davinci-resolve-mcp by Samuel Gursky (project page)',claim:'A community MCP server controls DaVinci Resolve Studio through its scripting API on macOS, Windows and Linux; external scripting requires Resolve Studio',url:'https://github.com/samuelgursky/davinci-resolve-mcp',checked:'2026-11-11'},
     {name:'Claude Code documentation, Connect Claude Code to tools via MCP',claim:'MCP servers are added with `claude mcp add`, user scope is stored in ~/.claude.json, and /mcp lists connected servers',url:'https://code.claude.com/docs/en/mcp',checked:'2026-11-11'},
   ],
   languages:{en,zh,'zh-hant':zhHant,ja,de,es},

@@ -50,6 +50,8 @@ test('translations of a guide keep the same structure, prices and requirement',a
       assert.ok(text.includes('Windows')&&text.includes('Intel'),'every language says there is no Windows or Intel version');
       assert.ok(html.includes(`<html lang="${LANGUAGE_TAGS[language]}">`));
       assert.doesNotMatch(html,/\{\{[a-z.]+\}\}|undefined|\[object Object\]/);
+      // Owner, 2026-11-11: nothing public mentions GitHub; where a source lives stays in the guide's file.
+      assert.doesNotMatch(html,/github/i,`${guide.slug} ${language} mentions GitHub`);
     }
   }
 });
@@ -161,6 +163,9 @@ test('the publishing rules refuse a guide that breaks them',()=>{
   refused(g=>{g.published='2026-11-20';g.updated='2026-11-01';},/updated is a day on or after published/);
   refused(g=>{g.sources=[{name:'x',claim:'x',url:'http://insecure.example',checked:'2026-11-11'}];},/every source has/);
   refused(g=>{delete g.sources[0].name;},/every source has a name/);
+  refused(g=>{g.sources[0].name='some-project (GitHub repository)';},/no mention of GitHub/);
+  refused((g,en)=>{en.sections[0].blocks.push('SkyCut is on GitHub.');},/no mention of GitHub/);
+  refused((g,en)=>{en.faq[0][1]='Read the source code to see how it works.';},/no mention of GitHub/);
   refused(g=>{g.slug='Not A Slug';},/slug is lowercase/);
   refused(g=>{g.languages.fr=g.languages.en;},/languages are/);
   assert.throws(()=>assertGuides([sample,sample]),/share a slug/);

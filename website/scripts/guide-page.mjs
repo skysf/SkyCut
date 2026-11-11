@@ -85,7 +85,7 @@ export function renderGuide(c,guide) {
     <section id="faq" class="guide-faq"><h2>${e(ui.questions)}</h2>${copy.faq.map(([question,answer])=>`<h3>${inline(question,language)}</h3><p>${inline(answer,language)}</p>`).join('')}</section>
     ${closing(c,ui)}
     ${guide.sources.length?`<section class="guide-sources"><h2>${e(ui.sources)}</h2><ul>${guide.sources.map(source=>`<li>${e(source.name)} <span>${e(ui.checkedOn)} ${e(formatDay(source.checked,language))}</span></li>`).join('')}</ul></section>`:''}
-    <p class="guide-footnote">${e(ui.checked.replace('{month}',formatMonth(guide.asOf,language)))} ${e(ui.disclosure)}</p>
+    <p class="guide-footnote">${guide.sources.length?`${e(ui.checked.replace('{month}',formatMonth(guide.asOf,language)))} `:''}${e(ui.disclosure)}</p>
     ${others.length?`<section class="guide-more"><h2>${e(ui.more)}</h2><ul class="guide-list">${others.map(other=>card(other,language,ui)).join('')}</ul></section>`:''}
   </article>`;
   return shell(c,{page:'guide',kind:'guides',head:head+fontPreload,main,languagePaths:languagePaths(guide),styles:['base','responsive','guides']});

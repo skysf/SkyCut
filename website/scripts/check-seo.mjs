@@ -1,6 +1,6 @@
 // Audit the real Vite output after build. Missing pages or assets must fail loudly.
 import assert from 'node:assert/strict';
-import {readFile,access} from 'node:fs/promises';
+import {readFile,access,readdir} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
 const dist=fileURLToPath(new URL('../dist/',import.meta.url));
@@ -101,6 +101,19 @@ for(const language of [...languages,'zh-hant','ja']) {
   try {hub=await readFile(join(dist,language,'guides','index.html'),'utf8');} catch {continue;}
   if(!sitemap.includes(`<loc>https://skycut.app/${language}/guides/</loc>`))assert.match(hub,/content="noindex,follow"/,'a draft build of the guides is never indexable');
 }
+// Nothing public mentions GitHub (owner, 2026-11-11: the repository will go private).
+// Every built page, the llms files, the sitemap and robots.txt are searched, in any letter case.
+async function htmlFiles(directory) {
+  const found=[];
+  for(const entry of await readdir(directory,{withFileTypes:true})) {
+    if(entry.isDirectory()&&entry.name!=='assets'&&entry.name!=='media')found.push(...await htmlFiles(join(directory,entry.name)));
+    else if(entry.name.endsWith('.html'))found.push(join(directory,entry.name));
+  }
+  return found;
+}
+const publicTexts=[...await htmlFiles(dist),...['llms.txt','llms-full.txt','sitemap.xml','robots.txt'].map(file=>join(dist,file))];
+assert.ok(publicTexts.length>=12+2+4);
+for(const file of publicTexts)assert.doesNotMatch(await readFile(file,'utf8'),/github/i,`${file.slice(dist.length)} mentions GitHub`);
 const robots=await readFile(join(dist,'robots.txt'),'utf8');
 assert.match(robots,/Sitemap: https:\/\/skycut.app\/sitemap.xml/);
 // Owner, 2026-11-11: AI crawlers for answers and for training are both welcome; /api/ stays closed.

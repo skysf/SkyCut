@@ -61,6 +61,8 @@ export function guideProblems(guide) {
     // Our own pages and the family's entry points only; other makers are named, not linked.
     fail(text.flatMap(linkTargets).some(target=>!/^(\/|#|https:\/\/(skylu\.ai|skystudioai\.com)\/)/.test(target)),at('links go to our own pages'));
     fail(text.some(part=>/(^|[^(])https?:\/\//.test(part.replace(/\]\([^)]+\)/g,''))),at('no bare web addresses in the text'));
+    // Nothing public mentions a code host: other projects are named, and where they live stays in `sources[].url`.
+    fail([...text,...guide.sources.map(source=>source.name)].some(part=>/github|gitlab|source code|open.?source repo/i.test(part)),at('no mention of GitHub or source repositories on the page'));
     // A superlative needs a measurement behind it; list titles may ask for "best".
     fail(text.some(part=>/\b(smoothest|fastest|most powerful|world'?s first|number one|#1|unrivall?ed)\b/i.test(part)),at('no superlatives without a measurement'));
     fail(guide.type!=='list'&&text.some(part=>/\bbest\b/i.test(part)),at('"best" belongs to list guides'));

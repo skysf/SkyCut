@@ -24,6 +24,9 @@ Key facts:
 ## Guides
 
 - [How to edit video with Claude Code on a Mac](https://skycut.app/en/guides/edit-video-with-claude-code/): Claude Code cannot open a video editor by itself. Connect it to SkyCut on a Mac and it cuts, captions and exports on a real timeline you can review.
+- [How to edit video with Codex on a Mac](https://skycut.app/en/guides/edit-video-with-codex/): Yes, Codex can edit video when it has an editor to control. Connect it to SkyCut on a Mac and it cuts, captions and exports on a real timeline.
+- [How to add automatic subtitles to a video on a Mac](https://skycut.app/en/guides/auto-subtitles-on-mac/): Generate subtitles from speech on your Mac, translate them, then burn them in or export SRT. SkyCut does it on the Mac, and the Free plan includes it.
+- [Video editing MCP servers for Claude and Codex: how to choose](https://skycut.app/en/guides/video-editing-mcp-servers/): Six ways to let Claude or Codex edit video through MCP, compared by platform, where the server runs and whether you can fix the timeline by hand.
 
 ## Other languages
 
