@@ -52,6 +52,22 @@ struct AppThemeChecks {
         check(classic.colorScheme == nil, "Classic follows the system light / dark setting")
         check(forest.windowAppearance?.name == .aqua, "hand-built panels are light in Forest, whatever the system")
         check(classic.windowAppearance == nil, "hand-built panels follow the system in Classic")
+        // 交给 SwiftUI 的永远是明确的浅 / 深（不交 nil，docs/bugfixes/2026-11-11-theme-switch-leaves-windows-half-light.md）。
+        for system in [ColorScheme.light, .dark] {
+            check(forest.resolvedColorScheme(system: system) == .light, "Forest resolves to light on a \(system) system")
+            check(classic.resolvedColorScheme(system: system) == system, "Classic resolves to the \(system) system scheme")
+        }
+        var systemRead = false
+        _ = forest.resolvedColorScheme(system: { systemRead = true; return .dark }())
+        check(!systemRead, "Forest never reads the system scheme (no observation of system flips)")
+        let schemes: [(NSAppearance.Name, ColorScheme)] = [
+            (.aqua, .light), (.darkAqua, .dark), (.vibrantLight, .light), (.vibrantDark, .dark),
+            (.accessibilityHighContrastAqua, .light), (.accessibilityHighContrastDarkAqua, .dark),
+        ]
+        for (name, expected) in schemes {
+            let actual = NSAppearance(named: name).map(SystemColorScheme.scheme(of:))
+            check(actual == expected, "system appearance \(name.rawValue) maps to \(expected), got \(String(describing: actual))")
+        }
         let iconBounds = CGRect(x: 0, y: 0, width: 20, height: 18)
         let magnet = TimelineMagnetSymbol().path(in: iconBounds)
         check(!magnet.isEmpty && iconBounds.contains(magnet.boundingRect), "the magnet outline fits the native toolbar icon")
@@ -59,6 +75,6 @@ struct AppThemeChecks {
             check(NSImage(systemSymbolName: symbol, accessibilityDescription: nil) != nil, "native symbol exists: \(symbol)")
         }
         if failures > 0 { exit(1) }
-        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule and native toolbar symbols.")
+        print("PASS: theme defaults, persistence, isolation, classic colors, forest palette, light / dark rule (never nil to SwiftUI) and native toolbar symbols.")
     }
 }

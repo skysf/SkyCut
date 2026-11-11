@@ -9,8 +9,17 @@ struct AppThemePalette {
     var isForest: Bool { theme == .forest }
 
     /// 界面的浅 / 深只有这一条：森林色固定用户确认的浅色稿，经典色跟系统（nil）。
-    /// SwiftUI 的呈现根交给 `.preferredColorScheme`（AppThemeModifier）。
+    /// SwiftUI 的呈现根不直接交它，交 `resolvedColorScheme(system:)`（见下）。
     var colorScheme: ColorScheme? { isForest ? .light : nil }
+
+    /// 交给 SwiftUI `.preferredColorScheme` 的浅 / 深：经典色换成系统此刻的那一个，**永远不交 nil**。
+    /// 交过 `.light` 再交 nil，SwiftUI 只把窗口的外观还给系统，不撤掉内容里的浅色：系统深色时森林色 → 经典色，
+    /// 主窗口、工程窗口、录屏控制条都是窗框深、内容浅，sheet 整个停在浅色
+    /// （docs/bugfixes/2026-11-11-theme-switch-leaves-windows-half-light.md）。明确的 `.light` ↔ `.dark` 它照常换。
+    /// `system` 只在经典色时才求值：森林色不订阅系统的深浅。
+    func resolvedColorScheme(system: @autoclosure () -> ColorScheme) -> ColorScheme {
+        colorScheme ?? system()
+    }
 
     /// 同一条规矩给 AppKit 自建的窗口：`.preferredColorScheme` 只改得了「宿主视图就是 contentView」的那个窗口，
     /// 宿主垫在普通 NSView 下的（提示面板）够不着，要自己设，不然系统深色时深底深字
