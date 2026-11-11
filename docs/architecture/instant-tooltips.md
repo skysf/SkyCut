@@ -86,6 +86,13 @@ ToolbarIcon(icon: "scissors", help: "Split at playhead", shortcut: .command("B")
    [界面主题](app-themes.md)）。`checks/app-theme-wiring.sh` 钉写法，`scripts/check-instant-tooltip-panel.sh`
    第 5 段量系统深 / 浅 × 两套主题下面板最终的外观。见
    [2026-11-11 案例](../bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md)。
+7. **宿主的根在 `.appLanguage()` 外面裁成气泡的形状**（`.clipShape(TooltipContent.bubble)`）。`appLanguage()` 会铺主题的
+   窗口底色（森林色是整块矩形的暖白），面板又是透明的、形状全由内容决定：不裁的话圆角气泡外面露出暖白的直角，
+   窗口服务器也按矩形画影子 / 描边，提示外面套了一圈直角方框（系统浅色时灰的一圈、深色时浅色的一圈）。裁在
+   `.appLanguage()` 里面不管用：底色在裁切之后才铺。气泡的形状只有 `TooltipContent.bubble` 一份，底、描边、裁切都用它。
+   影子跟着内容的透明度走，不用 `invalidateShadow()`（探针量过：换内容、换尺寸后影子都是当前的形状）。
+   `checks/instant-tooltip-wiring.sh` 第 6 段钉写法，`scripts/check-instant-tooltip-panel.sh` 第 6 段离屏量四个角透不透明。见
+   [2026-11-11 案例](../bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md)。
 
 摆位规则：默认在控件正下方居中；下方超出屏幕就翻到上方；左右夹进可见区域。
 
@@ -160,3 +167,5 @@ ToolbarIcon(icon: "scissors", help: "Split at playhead", …)   // 经 help: 转
    打字**不能**触发对应动作。
 8. 系统设成深色、主题是森林色时，提示是浅底深字（和系统浅色时一样）；切到经典色，提示跟着系统变成深底浅字。
    面板外面不能有一圈黑底白边。
+9. 提示是圆角的气泡，外面没有直角的方框：森林色 / 经典色 × 系统深 / 浅各看一眼（森林色以前系统浅色时是一圈灰的直角、
+   深色时是一圈暖白的直角，[案例](../bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md)）。

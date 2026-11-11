@@ -109,6 +109,49 @@ if ! grep -q 'panel.contentView = container' Sources/SrtFlow/InstantTooltip.swif
     FAIL=1
 fi
 
+# ---- 6. 提示的根要裁成气泡的形状（森林色「提示外面套一圈直角方框」） ----
+#
+# 根上的 `.appLanguage()` 带着主题的窗口底色（森林色是整块矩形的暖白），面板是透明的、形状全由内容决定：
+# 不裁的话暖白的直角露在圆角气泡外面，窗口服务器的影子 / 描边也按矩形算
+#（docs/bugfixes/2026-11-11-tooltip-square-frame-in-forest-theme.md）。裁切必须在 `.appLanguage()` 外面
+#（裁在里面，主题的底色照样铺满矩形），并且和气泡的底、描边是同一个形状 `TooltipContent.bubble`。
+# 四角真的透不透明由 scripts/check-instant-tooltip-panel.sh 第 6 段离屏渲一张量，这里只挡住写法回潮。
+# perl 放进带引号的 heredoc，一个字都不经 shell 展开（shell 陷阱 5）。
+read -r -d '' ROOT_PROG <<'PERL' || true
+local $/;
+my $src = <>;
+my $ok = 0;
+while ($src =~ /NSHostingView\(/g) {
+    my $start = pos($src) - 1;
+    my ($depth, $end) = (0, undef);
+    for (my $j = $start; $j < length($src); $j++) {
+        my $c = substr($src, $j, 1);
+        if ($c eq '(') { $depth++ }
+        elsif ($c eq ')') { $depth--; if ($depth == 0) { $end = $j; last } }
+    }
+    next unless defined $end;
+    my $args = substr($src, $start, $end - $start + 1);
+    $ok = 1 if $args =~ /TooltipContent\(.*?\)\s*\.appLanguage\(\)\s*\.clipShape\(TooltipContent\.bubble\)/s;
+}
+print $ok ? "ok" : "missing";
+PERL
+ROOT_CLIP="$(perl -e "${ROOT_PROG}" "${INSTANT}")"
+if [ "${ROOT_CLIP}" != "ok" ]; then
+    echo "✗ 提示面板的根必须在 .appLanguage() 外面裁成气泡的形状：.clipShape(TooltipContent.bubble)" >&2
+    echo "  （不裁的话森林色的暖白底铺满矩形，气泡外面露出一圈直角方框，影子也按矩形算）" >&2
+    FAIL=1
+fi
+# 气泡的形状只许有一份：底、描边、根上的裁切都用 TooltipContent.bubble，不然裁的和画的迟早不是一个形状。
+BUBBLE_LITERALS="$(grep -E 'RoundedRectangle\(cornerRadius: 6\)' "${INSTANT}" | grep -cvE '^[[:space:]]*//' || true)"
+if [ "${BUBBLE_LITERALS}" -ne 1 ] || ! grep -q 'static let bubble = RoundedRectangle(cornerRadius: 6)' "${INSTANT}"; then
+    echo "✗ 气泡的形状只许写一处（static let bubble），现在 RoundedRectangle(cornerRadius: 6) 出现 ${BUBBLE_LITERALS} 处" >&2
+    FAIL=1
+fi
+if ! grep -q 'background(.regularMaterial, in: Self.bubble)' "${INSTANT}" || ! grep -q 'Self.bubble.strokeBorder(' "${INSTANT}"; then
+    echo "✗ 气泡的底和描边必须用 TooltipContent.bubble（和根上裁的是同一个形状）" >&2
+    FAIL=1
+fi
+
 if [ "${FAIL}" -ne 0 ]; then
     exit 1
 fi
