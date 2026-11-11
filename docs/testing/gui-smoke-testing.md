@@ -601,6 +601,10 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 - `scripts/check-instant-tooltip-panel.sh` —— 提示面板的真实落点：摆好之后跑一轮
   排版再量一次，面板不许自己改尺寸或挪位置。改 `InstantTooltip.swift` 必跑。
   用 `.accessory` 策略，不抢焦点、不进 Dock，跑完即退。
+- `scripts/check-theme-switch.sh` —— 切主题、系统切深浅色之后，开着的主窗口（SwiftUI 场景）、工程窗口、录屏控制条、sheet、
+  popover、提示面板的窗框、SwiftUI 读到的浅 / 深、画出来的底色都和新主题一致（[界面主题](../architecture/app-themes.md)）。
+  改主题的浅 / 深、呈现根、自建窗口的外观必跑。系统的深浅色只在这个进程里模拟；窗口放在屏幕左下角、完全透明、不吃鼠标
+  （挪到屏幕外不行：挂上 sheet 的窗口会被 AppKit 拉回屏幕，锚在屏幕外的 popover 弹不出来），只有 SwiftUI 的场景窗口启动时可能闪一下。
 - `scripts/render-voice-library.sh <输出目录>` —— 声音库界面的离屏渲染（2026-11-10）：生产的视图 + 假 Sky Studio，英 / 中 / 西三种界面语言各出一套
   PNG（设置里声音那两节的三种样子、浏览预设、新建声音空着 / 填好、给声音加录音、设计声音带报价）。**不判对错，只出图**：改
   `Sources/SrtFlow/VoiceLibrary/` 的视图之后、发版前看排版（截字、漏翻、撑破），PR 的图也从这里来。几条实测：
