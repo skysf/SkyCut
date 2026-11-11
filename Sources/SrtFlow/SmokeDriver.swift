@@ -124,6 +124,8 @@ enum SmokeDriver {
             AppUserPresence.shared.note(at: ProcessInfo.processInfo.systemUptime, appIsActive: true)
         case .audioSuspend:
             project.audioEngineHost.suspendNow()
+        case .hideApp:
+            NSApp.hide(nil)
         case .click:
             try await events.click(SmokeStep.point(step.at, "click.at"), count: step.count ?? 1,
                                    flags: SmokeEvents.flags(step.flags))

@@ -15,7 +15,7 @@ final class AppUserPresence {
     static let shared = AppUserPresence()
 
     /// 两次动作隔了这么久，后一次才算「回来了」（连着动鼠标一秒几十个事件，不必每个都叫人）。
-    static let quietGap: TimeInterval = 1
+    nonisolated static let quietGap: TimeInterval = 1
     /// 算「在用」的事件：指针动、点、拖、滚、捏、按键。
     private static let inputs: NSEvent.EventTypeMask = [
         .mouseMoved, .mouseEntered, .mouseExited, .leftMouseDown, .rightMouseDown, .otherMouseDown,

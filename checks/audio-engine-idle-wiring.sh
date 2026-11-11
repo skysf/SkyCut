@@ -33,8 +33,12 @@ done
 
 FAILED=0
 fail() { echo "✗ $1" >&2; FAILED=1; }
-# 去掉注释再比：写在注释里的不算接上了。
+# 去掉注释再比：写在注释里的不算接上了。整份先存进变量，后面一律 grep … <<<"$变量"
+#（pipefail 下把管道接进 grep -q 会假红：checks/shell-pipe-grep-q.sh）。
 code() { sed 's,//.*,,' "$1"; }
+HOST_CODE="$(code "${HOST}")"
+ENGINE_CODE="$(code "${ENGINE}")"
+CLOCK_CODE="$(code "${CLOCK}")"
 
 # 1. 宿主：新建的引擎交给 keep，复用的换完配置 reconcile，收引擎先 release。
 APPLY="$(code "${HOST}" | awk '/    func apply\(_ config: AudioEngineConfig/,/^    \}/')"
@@ -92,7 +96,7 @@ done
 PUBLISH="$(code "${ENGINE}" | awk '/    private func publishAnchor\(/,/^    \}/')"
 grep -qF 'if playing, !renderClock.ticked.load(ordering: .relaxed) {' <<<"${PUBLISH}" && grep -qF 'anchor.publish(.pending(' <<<"${PUBLISH}" \
   || fail "${ENGINE}：publishAnchor 在时钟没数时（图刚起 / 还在起 / 停着）要发待钉的锚点（.pending）"
-if code "${ENGINE}" | grep -qE 'sampleTime: 0, playing: true'; then
+if grep -qE 'sampleTime: 0, playing: true' <<<"${ENGINE_CODE}"; then
   fail "${ENGINE}：在播的锚点写死了 sampleTime: 0 —— 真声卡上停过再起采样时间不从 0 重来，播放头会跳出去"
 fi
 grep -qF 'base.compareExchange(expected: Self.unlatched' "${ANCHOR}" || fail "${ANCHOR}：待钉的锚点要由第一个渲染块原子地钉上（compareExchange）"
@@ -103,16 +107,16 @@ grep -qF 'base.compareExchange(expected: Self.unlatched' "${ANCHOR}" || fail "${
 ENDED="$(code "${CLOCK}" | awk '/    private func itemEnded\(/,/^    \}/')"
 grep -qF 'source.pause()' <<<"${ENDED}" || fail "${CLOCK}：条目播到头（itemEnded）没停声音主时钟 —— 播放头一直往后走，引擎永远不算停着"
 for name in 'AVPlayerItemDidPlayToEndTime' 'AVPlayerItemFailedToPlayToEndTime'; do
-  code "${CLOCK}" | grep -qF "${name}" || fail "${CLOCK}：没听 ${name}"
+  grep -qF "${name}" <<<"${CLOCK_CODE}" || fail "${CLOCK}：没听 ${name}"
 done
 
 # 7. 只算在 SkyCut 里的动作；宿主听「用户回来了」。
 grep -qF 'guard appIsActive else { return }' "${PRESENCE}" || fail "${PRESENCE}：SkyCut 不在前台时的事件不算「在用」（guard appIsActive）"
 grep -qF 'appIsActive: NSApp.isActive' "${PRESENCE}" || fail "${PRESENCE}：事件监视器要按 NSApp.isActive 判在不在前台"
-code "${HOST}" | grep -qF 'AppUserPresence.shared.whenReturned(self)' || fail "${HOST}：宿主没听「用户回来了」（AppUserPresence.shared.whenReturned）—— 图只能等按下播放才起"
+grep -qF 'AppUserPresence.shared.whenReturned(self)' <<<"${HOST_CODE}" || fail "${HOST}：宿主没听「用户回来了」（AppUserPresence.shared.whenReturned）—— 图只能等按下播放才起"
 
 # 8. 日志不在主线程上写。
-code "${HOST}" | grep -qF 'PreviewAudioEngineHost.logQueue.async { MainThreadWatchdog.shared.note(text) }' \
+grep -qF 'PreviewAudioEngineHost.logQueue.async { MainThreadWatchdog.shared.note(text) }' <<<"${HOST_CODE}" \
   || fail "${HOST}：停图 / 起图的日志要放到 logQueue 上写（起图那一句正落在按下播放的那一拍，主线程上写文件会慢半拍）"
 
 if [ "${FAILED}" -ne 0 ]; then exit 1; fi

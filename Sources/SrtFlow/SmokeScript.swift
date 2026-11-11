@@ -14,6 +14,7 @@ import Foundation
 //   {"do": "play"} / {"do": "pause"}                  开播 / 暂停（直接调时钟：空格是 SwiftUI 的快捷键，合成的按键到不了）
 //   {"do": "userInput"}                              当作用户在 SkyCut 里动了一下鼠标（AppUserPresence：冒烟进程不在前台，真事件不算数）
 //   {"do": "audioSuspend"}                           当场把预览的音频引擎的图停掉（不等 30 秒空闲：量「停过之后第一次播放」用）
+//   {"do": "hideApp"}                                把 App 藏起来（⌘H）：App Nap 只在看不见时生效；之后不碰界面的步骤（等、开播、state）照常
 //   {"do": "click", "at": [x, y], "count": 1, "flags": ["cmd"]}
 //   {"do": "drag", "from": [x, y], "to": [x, y], "steps": 20, "hold": 0.3, "flags": []}
 //   {"do": "scroll", "at": [x, y], "dx": 0, "dy": -40, "steps": 10}
@@ -44,7 +45,7 @@ import Foundation
 
 struct SmokeStep: Decodable {
     enum Action: String, Decodable {
-        case wait, settle, window, seek, play, pause, userInput, audioSuspend, click, drag, scroll, key, hit, focus, toggles, open, menu, zoom
+        case wait, settle, window, seek, play, pause, userInput, audioSuspend, hideApp, click, drag, scroll, key, hit, focus, toggles, open, menu, zoom
         case copy, cut, paste, add, show, voice
         case projectWindow, undo, closeWindow
         case perfReset, perf, state, snapshot, quit
