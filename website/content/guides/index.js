@@ -8,5 +8,12 @@ import autoSubtitlesOnMac from './auto-subtitles-on-mac/index.js';
 import translateSubtitlesOnMac from './translate-subtitles-on-mac/index.js';
 import aiVoiceoverInYourOwnVoice from './ai-voiceover-in-your-own-voice/index.js';
 import videoEditingMcpServers from './video-editing-mcp-servers/index.js';
+import capcutAlternativesForMac from './capcut-alternatives-for-mac/index.js';
+import aiVideoEditorsForMac from './ai-video-editors-for-mac/index.js';
+import skycutVsDescript from './skycut-vs-descript/index.js';
+import screenRecordMacWithSystemAudio from './screen-record-mac-with-system-audio/index.js';
+import upscaleVideoTo4kOnMac from './upscale-video-to-4k-on-mac/index.js';
 export const guides=[editVideoWithClaudeCode,editVideoWithCodex,claudeCodeVsCodex,removePausesAndFillerWords,
-  autoSubtitlesOnMac,translateSubtitlesOnMac,aiVoiceoverInYourOwnVoice,videoEditingMcpServers];
+  autoSubtitlesOnMac,translateSubtitlesOnMac,aiVoiceoverInYourOwnVoice,videoEditingMcpServers,
+  capcutAlternativesForMac,aiVideoEditorsForMac,skycutVsDescript,
+  screenRecordMacWithSystemAudio,upscaleVideoTo4kOnMac];
