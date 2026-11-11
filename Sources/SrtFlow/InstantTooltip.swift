@@ -194,6 +194,10 @@ final class InstantTooltipController {
 
         let panel = panel ?? makePanel()
         self.panel = panel
+        // 浅 / 深按主题自己设：宿主视图垫在下面那层普通 NSView 里，`.preferredColorScheme` 改不到这个面板，
+        // 不设就跟系统走 —— 系统深色时材质是深的、森林色的字也是深的，看不见
+        //（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。每次弹都按此刻的主题，切了主题下一次就对。
+        panel.appearance = AppThemePalette.current.windowAppearance
 
         let hosting = NSHostingView(
             rootView: TooltipContent(label: label, shortcut: shortcut).appLanguage()
@@ -280,6 +284,11 @@ final class InstantTooltipController {
 
     /// 自检读取用：面板当前可见吗。「对话框弹出时提示必须收起」的回归靠它。
     var panelIsVisibleForChecks: Bool { panel?.isVisible ?? false }
+
+    /// 自检读取用：面板最终用的是浅色还是深色（nil = 还没建过面板）。「系统深色 + 森林色 = 深底深字」的回归靠它。
+    var panelAppearanceForChecks: NSAppearance.Name? {
+        panel?.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
+    }
 
     private func makePanel() -> NSPanel {
         let panel = NSPanel(

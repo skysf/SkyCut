@@ -79,6 +79,13 @@ ToolbarIcon(icon: "scissors", help: "Split at playhead", shortcut: .command("B")
    任何一条触发立刻收起；所有隐藏路径统一走 `dismiss()`（含监听拆除），
    不许直接 `orderOut`。见
    [2026-08-23 案例](../bugfixes/2026-08-23-tooltip-survives-open-panel.md)。
+6. **面板的浅 / 深按主题自己设，每次 `show` 都设。** 第 4 条那层普通 `NSView` 把 SwiftUI 的
+   `.preferredColorScheme` 挡在了面板外面（它只改宿主就是 contentView 的那个窗口），不设的话面板跟系统走：
+   系统深色 + 森林色时是深色材质上的森林色深字，对比度 1.17:1。所以 `show` 里
+   `panel.appearance = AppThemePalette.current.windowAppearance`（森林色浅色、经典色 nil = 跟系统，规矩见
+   [界面主题](app-themes.md)）。`checks/app-theme-wiring.sh` 钉写法，`scripts/check-instant-tooltip-panel.sh`
+   第 5 段量系统深 / 浅 × 两套主题下面板最终的外观。见
+   [2026-11-11 案例](../bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md)。
 
 摆位规则：默认在控件正下方居中；下方超出屏幕就翻到上方；左右夹进可见区域。
 
@@ -151,3 +158,5 @@ ToolbarIcon(icon: "scissors", help: "Split at playhead", …)   // 经 help: 转
 6. 切到中文界面，提示文案跟着翻译；显示路径/素材名的提示保持原样不被翻译。
 7. 提示里写着 ⌘B / ⇧⌘F 的，真按下去要有反应；写着 M / 空格的，在字幕文本框里
    打字**不能**触发对应动作。
+8. 系统设成深色、主题是森林色时，提示是浅底深字（和系统浅色时一样）；切到经典色，提示跟着系统变成深底浅字。
+   面板外面不能有一圈黑底白边。

@@ -9,7 +9,15 @@ require Sources/SrtFlow/AppThemeAppearance.swift 'PerfCounters.isEnabled ? nil :
 require Sources/SrtFlow/AppLanguage.swift 'modifier(AppLanguageModifier()).appTheme()'
 require Sources/SrtFlow/SettingsWindowView.swift 'AppThemePicker()'
 require Sources/SrtFlow/AppThemeAppearance.swift 'Picker("Theme"'
-require Sources/SrtFlow/AppThemeAppearance.swift '.preferredColorScheme(palette.isForest ? .light : nil)'
+require Sources/SrtFlow/AppThemeAppearance.swift '.preferredColorScheme(palette.colorScheme)'
+# 自建窗口里宿主视图垫在别的视图下（addSubview）时，`.preferredColorScheme` 改不到那个窗口（它只改「宿主就是 contentView」的）：
+# 窗口要自己按主题设外观，不然系统深色时森林色的深字落在深色材质上（docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。
+for file in $(grep -rl --include='*.swift' 'NSHostingView(' Sources/SrtFlow); do
+  if grep -q 'addSubview(' "${file}" && ! grep -qF '.appearance = AppThemePalette.current.windowAppearance' "${file}"; then
+    echo "FAIL: app-theme: ${file} nests an NSHostingView in another view but never sets the window's .appearance = AppThemePalette.current.windowAppearance" >&2
+    exit 1
+  fi
+done
 require Sources/SrtFlow/VideoEditTimelineClipBlock.swift 'AppThemePalette.current.trackFill('
 require Sources/SrtFlow/VideoEditTimelineHeaderColumn.swift 'AppThemePalette.current.trackAccent('
 require Sources/SrtFlow/VideoEditTimelineWaveform.swift 'normalColor: waveformColor'
@@ -23,4 +31,4 @@ if grep -E '\.id\(|scheduleRebuild|VideoEditProject|PlayerClock' Sources/SrtFlow
   echo 'FAIL: changing a theme must not replace the editor or rebuild its media' >&2
   exit 1
 fi
-echo 'PASS: theme roots, native settings, palette, toolbar and MCP wiring.'
+echo 'PASS: theme roots, hand-built panel appearance, native settings, palette, toolbar and MCP wiring.'

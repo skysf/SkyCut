@@ -1,11 +1,27 @@
+import AppKit
 import SwiftUI
 
 // MARK: - 界面的语义色
-// 管什么：森林色的暖白 / 森林绿、时间线的低饱和色；经典色调用方交回原有颜色。
+// 管什么：森林色的暖白 / 森林绿、时间线的低饱和色、界面的浅 / 深；经典色调用方交回原有颜色。
 // 不管什么：轨道色号的分配、形状 / 文字的内容颜色、预览滤镜与导出；那些都不是界面主题。
 struct AppThemePalette {
     let theme: AppTheme
     var isForest: Bool { theme == .forest }
+
+    /// 界面的浅 / 深只有这一条：森林色固定用户确认的浅色稿，经典色跟系统（nil）。
+    /// SwiftUI 的呈现根交给 `.preferredColorScheme`（AppThemeModifier）。
+    var colorScheme: ColorScheme? { isForest ? .light : nil }
+
+    /// 同一条规矩给 AppKit 自建的窗口：`.preferredColorScheme` 只改得了「宿主视图就是 contentView」的那个窗口，
+    /// 宿主垫在普通 NSView 下的（提示面板）够不着，要自己设，不然系统深色时深底深字
+    /// （docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md）。
+    var windowAppearance: NSAppearance? {
+        switch colorScheme {
+        case .light?: return NSAppearance(named: .aqua)
+        case .dark?: return NSAppearance(named: .darkAqua)
+        default: return nil
+        }
+    }
 
     /// Observation 只订阅主题；播放头和工程选择不会唤醒主题宿主。
     @MainActor static var current: Self { Self(theme: AppThemeStore.shared.theme) }
