@@ -1,7 +1,9 @@
 import Foundation
 
 // 一次运行的 Key 缓存与有界静默读；不直接调用 Security。原生读由 KeychainSecret 的专用执行器承接。
-// 超时只结束调用者的等待，不能硬中断 Security；保留那次读取，迟到成功仍缓存，其他调用立即回需要授权。
+// 超时只结束调用者的等待，不能硬中断 Security；保留那次读取，迟到成功仍缓存，其他调用立即回、不排在后面。
+// 立即回的是什么（2026-11-11）：期限到了、或者那次读还没过期限就有人问 = `.slow`（钥匙串忙、没弹框，过几秒再试）；
+// 说过一次「慢」之后它还没回来又有人问 = `.needsPermission`（再等也没用，叫用户点 Allow…）。交互读在跑 = 照旧要授权。
 actor KeychainSecretCache {
     typealias Reader = @Sendable (KeychainSecret.Access) async -> KeychainSecret.ReadResult
     private let reader: Reader
@@ -9,6 +11,8 @@ actor KeychainSecretCache {
     private var cached: String?
     private var generation = 0
     private var silentRead: UUID?
+    /// 过了期限还没回来的那次静默读（已经回过一次 `.slow`）。
+    private var lateRead: UUID?
     private var waiter: CheckedContinuation<KeychainSecret.ReadResult, Never>?
     private var deadline: Task<Void, Never>?
     private var interactiveRead: Task<KeychainSecret.ReadResult, Never>?
@@ -27,7 +31,8 @@ actor KeychainSecretCache {
 
     func keyWithoutPrompt() async -> KeychainSecret.ReadResult {
         if let cached { return .key(cached) }
-        guard silentRead == nil, interactiveRead == nil else { return .needsPermission }
+        if interactiveRead != nil { return .needsPermission }
+        if let pending = silentRead { return pending == lateRead ? .needsPermission : .slow }
         let id = UUID(), observedGeneration = generation
         silentRead = id
         return await withCheckedContinuation { continuation in
@@ -54,7 +59,8 @@ actor KeychainSecretCache {
         let quietGeneration = generation
         let quiet = await keyWithoutPrompt()
         guard generation == quietGeneration else { return current(quiet, generation: quietGeneration) }
-        guard quiet == .needsPermission else { return quiet }
+        // 用户点了 Allow…：静默读慢也照样走交互档（用户就是来授权的）。
+        guard quiet == .needsPermission || quiet == .slow else { return quiet }
         if let interactiveRead {
             let observed = interactiveGeneration
             return current(await interactiveRead.value, generation: observed)
@@ -83,14 +89,17 @@ actor KeychainSecretCache {
     private func complete(_ id: UUID, generation observed: Int, result: KeychainSecret.ReadResult) {
         guard silentRead == id else { return }
         silentRead = nil
+        lateRead = nil
         guard generation == observed else { return }
         if case .key(let key) = result { cached = key }
         finish(result)
     }
 
+    /// 期限到了还没回来：钥匙串慢，不是要授权（要授权时原生读零点几秒就拒）。等着的那个调用先回 `.slow`，读接着跑。
     private func expire(_ id: UUID) {
         guard silentRead == id else { return }
-        finish(.needsPermission)
+        lateRead = id
+        finish(.slow)
     }
 
     private func finish(_ result: KeychainSecret.ReadResult) {
