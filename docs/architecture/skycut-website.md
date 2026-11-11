@@ -475,6 +475,8 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
 - **已有的文章**（2026-11-11）：`edit-video-with-claude-code`（英、简中、繁中、日、德、西）、`edit-video-with-codex`（英、简中、日）、
   `auto-subtitles-on-mac`（英、简中、繁中、日）、`video-editing-mcp-servers`（清单，英、日）。选题证据和后面的题目在第一轮报告里。
   清单那篇写了五家别的工具：只写它们自己页面上的事实、不排名次、写明我们没做过对比测试。**文章先发文字版**（用户定），不配录屏。
+  新增 `capcut-alternatives-for-mac`（替代品，繁中、日、英）、`ai-video-editors-for-mac`（清单，繁中、日、英）和 `skycut-vs-descript`（对比，英）。
+  前两篇各列五个其他编辑器；Descript 对比只比较两款产品。官方出处分别保存在各篇 `index.js`，不写未实测的快慢与精度，明确免费水印、硬件、界面语言和 AI 数据流限制。
 
 ## 运行与部署
 
