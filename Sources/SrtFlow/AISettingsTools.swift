@@ -42,12 +42,16 @@ enum AISettingsTools {
         if let capacityGB { OptimizedMediaCacheSettings.shared.setCapacity(Int64(capacityGB) * 1_000_000_000) }
         if let limit { SkyStudioSpendStore.shared.setDailyLimit(limit) }
         if clear { OptimizedMediaCacheSettings.shared.clear() }
-        var result = await snapshot(section: "all").objectValue ?? [:]
+        var consent: SkyStudioVoiceStanding.Status?
         if let mode, mode != before {
             // 打开记一条长期授权、关掉撤掉（记不上照样打开：声音那几件事第一次还会问一次）。
             let version = notice?.statement.version ?? SkyStudioVoiceStandingNotice.knownStatement.version
-            result["voice_standing_consent"] = await standing.modeChanged(to: mode, statementVersion: version).json
+            consent = await standing.modeChanged(to: mode, statementVersion: version)
         }
+        // 记 / 撤完了再拍设置：`sections.ai.voice_standing_consent` 和顶层那一份说的是同一件事。2026-11-11 之前先拍后记，
+        // 关掉全部权限的回答里顶层写 revoked、设置里还写 recorded（docs/bugfixes/2026-11-11-set-settings-stale-standing-consent.md）。
+        var result = await snapshot(section: "all").objectValue ?? [:]
+        if let consent { result["voice_standing_consent"] = consent.json }
         return .ok(.object(result))
     }
 

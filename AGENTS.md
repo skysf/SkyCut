@@ -730,6 +730,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
+- [2026-11-11 关掉全部权限的回答里，设置那一处还写着长期授权「已记上」](docs/bugfixes/2026-11-11-set-settings-stale-standing-consent.md) — `set_settings` 先拍设置、再去 Sky Studio 记 / 撤长期授权：同一个回答里顶层写 `revoked`、`sections.ai.voice_standing_consent` 还写 `recorded`（打开时是 `unknown`），真实冒烟撞出；改成先记 / 撤再拍，`StandingChecks` 两处都查、反向验证三条全红。**一个回答里同一件事出现两次，两份要在同一时刻取。**
 - [2026-11-11 静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md) — 上限是「一次解码 + 0.25 秒」，被量的是「编 119 帧」：两种活在共享 runner 上各有各的快慢，最近 10 轮 CI 一直在上限的 23%–75% 之间晃，0.86 / 0.87 秒两次超线、重跑就过。改成数 ffmpeg 报的解码次数（1 包 1 帧），耗时和同一次运行里无损缩到产物尺寸的小图比（2.5 倍或多 0.25 秒，超了先再量一遍；小图别从产物里取帧，编过的画面再编更便宜）；反向验证：旧规则把 CI 的数判红，逐帧重解（解了 123 帧、5.28 秒对 1.05 秒）和逐帧重缩（1.02 秒对 0.41 秒）照样红。**尺子要和被量的是同一种活、同一次运行里量；能数的别拿时间推；去 CI 的日志里看断言实际打印的数。**
 - [2026-11-11 设计声音的报价写「用 Sky Studio 设计」，说不出是 Qwen3 还是 MiniMax](docs/bugfixes/2026-11-11-design-quote-model-name.md) — 声音的报价顶层没有 `model`、用哪个只在 `voice_plan.selection.model`，SkyCut 只读顶层；两份假服务都补了顶层的 `model`，回归和离屏渲染一直是绿的。顶层没有时读 `voice_plan.selection.model`，假服务改成真回答的形状，真冒烟抄下来的回答进纯值检查。
 - [2026-11-11 manage_voices 建声音 / 加录音非要 AI 给 language，方案写的是可选、自动识别](docs/bugfixes/2026-11-11-manage-voices-language-required.md) — 声音 PR 6 把 `language` 做成必填、记了一句「本机检测随界面接」，PR 8 把检测挪进 `SpokenLanguageProbe` 只接了对话框；现在不给就在做好的参考录音上用同一份识别、识别成了什么写进问句和结果，给了照给的不盖，识别不出来不猜、叫 AI 带上 `language` 再调；实现、说明书、检查三处都照「必给」写所以谁也不红，期望值要从方案来。
