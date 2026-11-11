@@ -55,6 +55,8 @@ enum SmokeStateDump {
             // 几个工程开着时（工程窗口）：这是哪一个、在不在播、撤销栈里有没有东西 —— 验「按键 / ⌘Z 只作用在自己的窗口」。
             "project": project.shortID,
             "playing": project.clock.isPlaying,
+            // 预览的音频引擎的图在不在跑（running / suspended / starting / stopped / none）：验空闲停图、开播再起。
+            "audioGraph": project.audioEngineHost.graphStateName,
             "canUndo": project.effectiveUndoManager?.canUndo ?? false,
             "playhead": round3(project.clock.time),
             "selection": [

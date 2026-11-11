@@ -93,7 +93,7 @@ extension VideoEditProject {
         autosaveTask?.cancel()
         autosaveTask = nil
         clock.pause()
-        clock.detach()
+        unloadPreview()  // 卸片 + 引擎整个收掉（新工程没有声音的话图不该还开着）
         optimizedMedia.reset()  // 路上的转码作废；块留在磁盘上
         UpscaleActivity.shared.cancelAll(projectGeneration: closing)  // 这个工程在飞的 upscale 作废（替 fal 也取消）；做完的文件留在磁盘上
         cancelLiveEdit()

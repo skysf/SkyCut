@@ -161,6 +161,7 @@ run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选�
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
 run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
+run_check "audio-engine-idle-wiring（扫描守卫：预览的音频引擎不是一直开着的 —— 空闲停图、用户回来先起、换工程收引擎、片尾停主时钟）" checks/audio-engine-idle-wiring.sh
 run_check "workbench-settings（扫描守卫：单排工作台、统一设置、MCP 共用 Store）" checks/workbench-settings-wiring.sh
 run_check "app-theme-wiring (presentation roots, settings, timeline colors and MCP)" checks/app-theme-wiring.sh
 run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号、钥匙串、照授权拦和任务只在该在的地方）" checks/sky-studio-wiring.sh

@@ -114,9 +114,18 @@ enum SmokeDriver {
         case .seek:
             project.clock.seek(to: step.time ?? 0, precise: true)
         case .play:
+            let started = ProcessInfo.processInfo.systemUptime
             project.clock.play()
+            // 开播这一句自己占了主线程多久（引擎的图停着时不许等声卡：docs/architecture/audio-engine.md 第二节第 11 条）。
+            note(String(format: "play() 用了 %.1f ms，图 %@", (ProcessInfo.processInfo.systemUptime - started) * 1000, project.audioEngineHost.graphStateName))
         case .pause:
             project.clock.pause()
+        case .userInput:
+            AppUserPresence.shared.note(at: ProcessInfo.processInfo.systemUptime)
+        case .audioSuspend:
+            project.audioEngineHost.suspendNow()
+        case .hideApp:
+            NSApp.hide(nil)
         case .click:
             try await events.click(SmokeStep.point(step.at, "click.at"), count: step.count ?? 1,
                                    flags: SmokeEvents.flags(step.flags))
