@@ -175,6 +175,8 @@ private func settingsChecks(_ root: URL) async throws {
     defer { standing.services = services }
     standing.services = fixture.services
     AIAccessStore.shared.setMode(.ask)
+    // 像刚开的 App 那样从「不知道」起（前面几组可能已经记上了）：不然回答里设置那一处拍早了也碰巧写 recorded，查不出来。
+    standing.accountChanged()
     let asked = try await AISettingsTools.update(AIToolArguments(["ai_access_mode": "full_access"]))
     let question = asked.payload["question"]?.stringValue ?? ""
     require(asked.payload["status"] == "needs_confirmation" && question.contains("751.4") && question.contains("22.5")
@@ -185,6 +187,9 @@ private func settingsChecks(_ root: URL) async throws {
     let on = try await AISettingsTools.update(AIToolArguments(["ai_access_mode": "full_access", "confirm_token": asked.payload["confirm_token"] ?? .null]))
     require(AIAccessStore.shared.mode == .full && on.payload["voice_standing_consent"]?["status"] == "recorded",
             "after the answer Full access is on and the standing consent is recorded")
+    // 同一个回答里的设置（get_settings 读的那一处）也要说 recorded：2026-11-11 真实冒烟里它还写着打开之前的 unknown。
+    require(on.payload["sections"]?["ai"]?["voice_standing_consent"] == on.payload["voice_standing_consent"],
+            "the settings in the same answer show the consent just recorded, not the state before the change")
     require(VoiceLibraryHTTP.calls("POST", "/voices/consent-grant").first?["statement_version"] == .string(standingVersion),
             "the recorded version is the one the question showed")
 
@@ -194,6 +199,9 @@ private func settingsChecks(_ root: URL) async throws {
     let off = try await AISettingsTools.update(AIToolArguments(["ai_access_mode": "ask_for_approval", "confirm_token": offAsked.payload["confirm_token"] ?? .null]))
     require(AIAccessStore.shared.mode == .ask && VoiceLibraryHTTP.calls("DELETE", "/voices/consent-grant").count == 1
             && off.payload["voice_standing_consent"]?["status"] == "revoked", "turning it off revokes the standing consent")
+    // 撤掉之后同一个回答里的设置不能还写着 recorded（冒烟里顶层 revoked、设置里 recorded，AI 读哪一处都可能）。
+    require(off.payload["sections"]?["ai"]?["voice_standing_consent"]?["status"] == "revoked",
+            "the settings in the same answer say revoked too, not the consent that was just taken back")
 
     VoiceLibraryHTTP.grantUnavailable = true
     let again = try await AISettingsTools.update(AIToolArguments(["ai_access_mode": "full_access"]))
@@ -201,6 +209,8 @@ private func settingsChecks(_ root: URL) async throws {
     require(AIAccessStore.shared.mode == .full && notRecorded.payload["voice_standing_consent"]?["status"] == "not_recorded"
             && standing.status != .recorded(version: standingVersion),
             "a consent Sky Studio cannot record still turns Full access on, and says the first voice task will ask once")
+    require(notRecorded.payload["sections"]?["ai"]?["voice_standing_consent"]?["status"] == "not_recorded",
+            "and the settings in that answer say not_recorded too")
     VoiceLibraryHTTP.grantUnavailable = false
 }
 
