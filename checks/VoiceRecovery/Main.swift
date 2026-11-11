@@ -8,8 +8,9 @@ import SrtFlowMCPKit
 // 回任务号之前的那几步（整段报价、预留、退本机、认声音）在 StartChecks.swift。
 @main enum VoiceRecoveryChecks {
     @MainActor static func main() async {
-        let domain = "com.srtflow.SrtFlow.voicerecoverycheck"
-        guard Bundle.main.bundleIdentifier == domain else { fatalError("Voice recovery checks require the isolated test bundle") }
+        // 脚本每次运行给一个自己的 bundle id（…voicerecoverycheck.run<pid>）：几个会话同时跑也各用各的 UserDefaults。
+        let domain = Bundle.main.bundleIdentifier ?? ""
+        guard domain.hasPrefix("com.srtflow.SrtFlow.voicerecoverycheck.") else { fatalError("Voice recovery checks require the isolated test bundle") }
         UserDefaults.standard.removePersistentDomain(forName: domain)
         _ = NSApplication.shared
         let root = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SRTFLOW_VOICE_RECOVERY_CHECK_DIR"]!)
@@ -23,6 +24,7 @@ import SrtFlowMCPKit
             try await runVoiceLibraryChecks(root)
             try await runVoiceLibraryUIChecks(root)
             try await runVoiceLibraryOrderChecks(root)
+            try await runVoiceLibraryRestartChecks(root)
             try await runVoiceFallbackFeeChecks(root)
             try await runVoiceStandingChecks(root)
             await runVoicePaidAudioChecks(root)
@@ -48,6 +50,8 @@ import SrtFlowMCPKit
             + "a batch that never matches its transcription estimated on the second try"
             + "; library orders: one design per quote, one open job per order or voice + language, the day's spend settled at the charge, "
             + "price_changed / refunds leaving nothing, the fee question kept until Sky Studio accepts the build, a new consent statement asked again"
+            + "; library orders across a restart: the open order on disk followed with GET only, not asked or reserved again, settled once at "
+            + "the charge, refunded when it failed, a lost POST answer merged into the order Sky Studio returns, stale / other-Key orders left alone"
             + "; voice change: quote before a mono WAV upload, one voice_convert job, target_language only for a known language the voice has, "
             + "refusals before paying, two new linked tracks with the clip muted as one undo / redo step, files only when the clip or project "
             + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job")

@@ -6,7 +6,9 @@ import SrtFlowMCPKit
 // 管什么（SkyCut 声音方案 4.5、4.7）：一次性费用点过头、记上账之后起的那一单：交给 Sky Studio（SkyStudioJobRun：满了等、不重放收费 POST、
 // 只有排着队的能取消）、等做完、按服务器的结算证据改本机的账（多的退回、没花出去的退回），`get_job` 报新声音 / 建好的那种语言。
 // 任务号立刻回（客户端对一次调用只等一分钟）；状态行和云端任务浮层沿用现有的（SkyStudioMediaStatus，挂在起它的那个工程上）。
-// 做完的东西在服务器的声音库里（设计出来的声音、`minimax: true`），本机丢了这个任务也不丢成品，所以不另存恢复记录。
+// 做完的东西在服务器的声音库里（设计出来的声音、`minimax: true`），本机丢了这个任务也不丢成品；**丢不得的是本机的那一笔账**：
+// 交之前落盘（SkyStudioVoiceLibraryOrders），SkyCut 中途退出、重启之后照它接着跟（`follow`，只 GET），按原来那一笔结账、只记一次
+// （docs/bugfixes/2026-11-11-voice-library-job-after-restart.md）。
 // **同一件事只开一单**（`identity`：同一份设计的订单、同一个声音 + 语言的 MiniMax 版）：还在跑就回那一单、这一笔预留退回，本机的账只记一次
 // （服务器对同一个 key、对同一个声音 + 语言开着的建单本来就只扣一次，回的是原来那一单；本机再起一个任务跟它就把同一笔钱记成两笔。
 // docs/bugfixes/2026-11-11-design-voice-ordered-twice.md）。调用方要在问用户、预留之前先看 `running`，这里是最后一道。
@@ -19,12 +21,16 @@ final class SkyStudioVoiceLibraryJob {
     private let request: SkyStudioJobRequest
     private let key: String
     private let api: SkyStudioAPI
+    /// 起任务时记上账的那一笔（落盘用；结账、退回走 `held`）。
+    private let reservation: SkyStudioJobGate.Reservation
     private var held: SkyStudioHeldCredits
     private let status: SkyStudioMediaStatus?
     /// 做完那一刻写给 AI 的下一步（建 MiniMax 版：回去再调 add_voiceover）。
     private let nextStep: String
     private var serverID: String?
     private var accepted = false
+    /// 重启之前交的那一单（SkyStudioVoiceLibraryOrders.resume）：只 GET 跟到底、不再交。
+    private var resumed: String?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
     private let identity: String
@@ -52,7 +58,20 @@ final class SkyStudioVoiceLibraryJob {
 
     /// 给这个账户的这个声音建这种语言的 MiniMax 版（服务器按声音 + 语言去重，不看 key）。
     static func enrollIdentity(voice: String, language: String, account: String) -> String {
-        "enroll:" + account + ":" + voice + ":" + language.lowercased()
+        "enroll:" + account + ":" + voice + ":" + language.trimmingCharacters(in: .whitespaces).lowercased()
+    }
+
+    /// 落了盘的那一单在这次运行里的身份（重启之后照它认「同一件事」；和上面两个同一份算法）。
+    static func identity(_ kind: AIJobs.Kind, request: SkyStudioJobRequest, key: String) -> String? {
+        switch kind {
+        case .voiceDesign:
+            return designIdentity(request)
+        case .voiceEnroll:
+            guard let voice = request.params["voice"]?.stringValue, let language = request.params["language"]?.stringValue else { return nil }
+            return enrollIdentity(voice: voice, language: language, account: SkyStudioCharacterAccess.stamp(key))
+        default:
+            return nil
+        }
     }
 
     init(kind: AIJobs.Kind, identity: String, request: SkyStudioJobRequest, key: String, reservation: SkyStudioJobGate.Reservation, title: String,
@@ -63,6 +82,7 @@ final class SkyStudioVoiceLibraryJob {
         self.key = key
         self.api = api
         self.nextStep = nextStep
+        self.reservation = reservation
         held = SkyStudioHeldCredits(reservation)
         status = project.map { project in
             SkyStudioMediaStatus(kindLabel: L10n("Voice"), modelTitle: modelTitle, credits: reservation.credits, uploads: false,
@@ -70,12 +90,42 @@ final class SkyStudioVoiceLibraryJob {
         }
     }
 
+    /// 重启之前交的那一单（SkyStudioVoiceLibraryOrders.resume 读出来的）：按原来那一笔结账，没做成时按种类说下一步（起它的那次调用早没了）。
+    convenience init(resuming record: SkyStudioVoiceLibraryOrders.Record, kind: AIJobs.Kind, identity: String, jobID: String, key: String,
+                     api: SkyStudioAPI) {
+        self.init(kind: kind, identity: identity, request: record.request, key: key,
+                  reservation: .init(credits: record.reservedCredits, day: record.reservedDay), title: "", modelTitle: "", project: nil,
+                  nextStep: record.nextStep, api: api)
+        serverID = jobID
+        accepted = true
+        resumed = jobID
+        onFailure = { _, _ in ["next_step": .string(Self.retryStep(kind))] }
+    }
+
     func start() -> AIJobs.Job {
+        // 最后一道：落了盘、这次运行里还没人跟的同一件事（重启之前交的）先接着跟起来，下面就认得出它。
+        SkyStudioVoiceLibraryOrders.resume(key: key, api: api)
         // 同一件事已经开着一单：跟它，这一笔预留退回（不起第二个任务、不记第二笔）。
         if let existing = Self.running(identity) {
             held.refund()
             return existing
         }
+        let job = launch()
+        // 交之前落盘：SkyCut 中途退出，重启之后照它接着跟、按这一笔结账（SkyStudioVoiceLibraryOrders）。
+        SkyStudioVoiceLibraryOrders.save(.init(kind: kind.rawValue, account: SkyStudioVoiceLibraryOrders.account(key), request: request,
+                                               reservedCredits: reservation.credits, reservedDay: reservation.day, jobID: nil, nextStep: nextStep))
+        task = Task { @MainActor in await self.execute() }
+        return job
+    }
+
+    /// 接着跟重启之前交的那一单（`resume` 已经看过这次运行里没人在跟）：记录已经在盘上，不另存。
+    func follow() -> AIJobs.Job {
+        let job = launch()
+        task = Task { @MainActor in await self.execute() }
+        return job
+    }
+
+    private func launch() -> AIJobs.Job {
         let job = AIJobs.shared.start(kind, progress: { nil }, liveDetail: { [weak self] in self?.live() ?? [:] },
                                       cancel: { [weak self] in self?.task?.cancel() })
         self.job = job
@@ -85,7 +135,6 @@ final class SkyStudioVoiceLibraryJob {
             status.onCancel = { [weak self] in self?.task?.cancel() }
             SkyStudioGenerationActivity.shared.add(status)
         }
-        task = Task { @MainActor in await self.execute() }
         return job
     }
 
@@ -94,10 +143,11 @@ final class SkyStudioVoiceLibraryJob {
         var runner = SkyStudioJobRun(api: api, key: key)
         if let sleep = Self.pollSleep { runner.sleep = sleep }
         runner.checkpoint = { [weak self] server in await self?.remember(server.jobID) }
+        let order = request.idempotencyKey
         do {
-            let done = try await runner.run(request) { [weak self] update in
-                Task { @MainActor in self?.observe(update) }
-            }
+            let done = try await runToEnd(runner)
+            // 有结局了：先删记录再改账（中间出事只会多算那一笔，不会结两次）。
+            SkyStudioVoiceLibraryOrders.remove(order)
             if let charged = done.billing?.netCharged ?? done.creditsCharged { held.settle(charged: charged) }
             guard case .voice(let result)? = done.voiceResult else {
                 return finish(.failed, "Sky Studio finished but returned no voice; query the original job before trying again.",
@@ -107,15 +157,32 @@ final class SkyStudioVoiceLibraryJob {
             SkyStudioVoiceLibraryChange.post()
             finish(.done, message(result), detail: detail(result, server: done))
         } catch let error as SkyStudioJobError {
-            if error.canRefund(beforeAccepted: serverID == nil) { held.refund() }
+            // 服务器上还没结局（问不到了、等太久、停不下来、交的回答丢了）：记录和那一笔都留着，下次读到 Key / 同一件事再来时接着跟、那时再结。
+            let refund = error.canRefund(beforeAccepted: serverID == nil)
+            if refund || !SkyStudioVoiceLibraryOrders.unresolved(error, accepted: serverID != nil) {
+                SkyStudioVoiceLibraryOrders.remove(order)
+                if refund { held.refund() }
+            }
             let outcome: AIJobs.Status = Task.isCancelled ? .cancelled : .failed
             finish(outcome, SkyStudioVoiceLibraryErrors.message(error), detail: await failureDetail(error))
         } catch {
-            if serverID == nil { held.refund() }
+            // 不是 Sky Studio 说的：没受理的退回；受理了的留着记录接着跟。
+            if serverID == nil {
+                SkyStudioVoiceLibraryOrders.remove(order)
+                held.refund()
+            }
             // 别的错（不是 Sky Studio 说的）：没有原因可带，下一步照样由起它的地方说。
             let next = await onFailure?(nil, nil) ?? [:]
             finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error), detail: next)
         }
+    }
+
+    /// 交上去等它做完；重启之前交的那一单只 GET（第一次问的错和后面问的一样算）。
+    private func runToEnd(_ runner: SkyStudioJobRun) async throws -> SkyStudioJobStatus {
+        let update: @Sendable (SkyStudioJobRun.Update) -> Void = { [weak self] update in Task { @MainActor in self?.observe(update) } }
+        guard let resumed else { return try await runner.run(request, onUpdate: update) }
+        do { return try await runner.resume(resumed, onUpdate: update) }
+        catch let failure as SkyStudioFailure { throw SkyStudioJobError.request(failure) }
     }
 
     /// 没做成：服务器的原因原样带上（`failure`）；改了价的把新价单独写出来（`credits_now`，旧的那个数在 `credits_approved`），
@@ -141,7 +208,27 @@ final class SkyStudioVoiceLibraryJob {
         if serverID == nil { serverID = id }
         guard !accepted else { return }
         accepted = true
+        adoptEarlier(id)
         await onAccepted?()
+    }
+
+    /// 受理了：记录上记下任务号。同一件事早先那一单（重启之前交的、交的回答丢了，账还没结）服务器只为它扣一次
+    /// （同一个声音 + 语言开着的建单回的就是原来那一单）：它的那一笔归这一单结，这一笔退回——账只记一次。
+    private func adoptEarlier(_ id: String) {
+        let identity = identity, key = key, account = SkyStudioVoiceLibraryOrders.account(key)
+        guard let earlier = SkyStudioVoiceLibraryOrders.accept(request.idempotencyKey, jobID: id, sameOrder: { record in
+            record.account == account && AIJobs.Kind(rawValue: record.kind).flatMap { Self.identity($0, request: record.request, key: key) } == identity
+        }) else { return }
+        held.refund()
+        held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: earlier.reservedCredits, day: earlier.reservedDay))
+    }
+
+    /// 重启之后接着跟的那一单没做成：起它的那次调用早没了，按种类说下一步。
+    private static func retryStep(_ kind: AIJobs.Kind) -> String {
+        kind == .voiceDesign
+            ? "No voice was designed. To try again, call manage_voices action=design again: it quotes the current price and asks the user again."
+            : "The MiniMax version was not built. Call add_voiceover again with the same lines and voice (or resume the narration's recovery "
+                + "file): it quotes the current price and asks the user again."
     }
 
     private func observe(_ update: SkyStudioJobRun.Update) {

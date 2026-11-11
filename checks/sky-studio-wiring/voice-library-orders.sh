@@ -7,6 +7,8 @@
 #   - 设计声音的对话框一份报价只下一单：`design()` 先看 `ordered`，下单那一刻置上、在起任务之前；按钮跟着灰；
 #     这一份订单的 idempotency_key 在问价时就定了，交的时候不另起；
 #   - 同一件事只开一单（SkyStudioVoiceLibraryJob.running）：任务自己起手先看；建 MiniMax 版的两处在过闸（问 / 记账）之前先看；
+#   - 重启之后接着跟（SkyStudioVoiceLibraryOrders，第十节第 11 条）：交之前落盘、先删记录再改账、只 GET 跟；读到 Key、看「已经在建」
+#     之前、任务起手都先把落了盘的接着跟起来；记录只在那一个文件里落盘，那一层不交单、不动账；
 #   - 旁白中途那笔一次性费用的问题，在 Sky Studio 受理了建的那一单之后才清（onAccepted），不在记上账那一刻清；
 #   - 没做成的单把服务器的原因和改过的价带进 get_job；
 #   - 每日预算的规矩只有 SkyStudioSpendStore.decide 一份，对话框不另抄；
@@ -59,6 +61,42 @@ for file in "${ORDER_ONE_TIME}" "${ORDER_FALLBACK}"; do
   [ "$(count 'SkyStudioVoiceLibraryJob.running(identity)' "${file}")" -ge 2 ] \
     || fail "${file}：读长期授权（await）之后、过闸之前要再看一次在建的那一单（两处 running(identity)）"
 done
+
+# 重启之后接着跟（案例 docs/bugfixes/2026-11-11-voice-library-job-after-restart.md）。
+ORDER_DISK="${VOICE_DIR}/SkyStudioVoiceLibraryOrders.swift"
+[ -f "${ORDER_DISK}" ] || fail "找不到 ${ORDER_DISK} —— 改名了就同步改这里（扫空 = 假绿）"
+disk_keys="$(code_files_with '"SrtFlow\.skystudio\.voiceLibraryOrders\.' | LC_ALL=C sort -u | tr '\n' ' ' || true)"
+[ "${disk_keys}" = "${ORDER_DISK} " ] || fail "在建的声音库收费单只在 ${ORDER_DISK} 落盘（一个键、一次写盘）：${disk_keys:-没有}"
+grep -qF 'SkyStudioVoiceLibraryOrders.resume(key: key' "${ACCOUNT}" \
+  || fail "${ACCOUNT}：读到 Key（启动、回到 SkyCut、每小时）要接着跟重启之前在建的那几单（SkyStudioVoiceLibraryOrders.resume）"
+for file in "${ORDER_ONE_TIME}" "${ORDER_FALLBACK}"; do
+  resumed_at="$(line_of 'SkyStudioVoiceLibraryOrders.resume(' "${file}")"
+  seen="$(line_of 'SkyStudioVoiceLibraryJob.running(identity)' "${file}")"
+  if [ -z "${resumed_at}" ] || [ -z "${seen}" ] || [ "${resumed_at}" -ge "${seen}" ]; then
+    fail "${file}：看「已经在建」之前先把重启之前落了盘的那一单接着跟起来（SkyStudioVoiceLibraryOrders.resume），不然再问一遍、再记一笔"
+  fi
+done
+job_resume="$(line_of 'SkyStudioVoiceLibraryOrders.resume(' "${ORDER_JOB}")"
+if [ -z "${job_resume}" ] || [ -z "${job_running}" ] || [ "${job_resume}" -ge "${job_running}" ]; then
+  fail "${ORDER_JOB}：start() 看同一件事开着的那一单之前，先把落了盘的接着跟起来（最后一道）"
+fi
+job_save="$(line_of 'SkyStudioVoiceLibraryOrders.save(' "${ORDER_JOB}")"
+job_task="$(line_of 'task = Task { @MainActor in await self.execute() }' "${ORDER_JOB}")"
+if [ -z "${job_save}" ] || [ -z "${job_task}" ] || [ "${job_save}" -ge "${job_task}" ]; then
+  fail "${ORDER_JOB}：交之前落盘（SkyStudioVoiceLibraryOrders.save 在起任务之前）"
+fi
+job_remove="$(line_of 'SkyStudioVoiceLibraryOrders.remove(order)' "${ORDER_JOB}")"
+job_settle="$(line_of 'held.settle(charged:' "${ORDER_JOB}")"
+if [ -z "${job_remove}" ] || [ -z "${job_settle}" ] || [ "${job_remove}" -ge "${job_settle}" ]; then
+  fail "${ORDER_JOB}：先删记录再改账（中间出事只会多算一笔，不会结两次）"
+fi
+[ "$(count 'SkyStudioVoiceLibraryOrders.remove(order)' "${ORDER_JOB}")" -ge 3 ] \
+  || fail "${ORDER_JOB}：做完、没做成、没交上三处都要先删记录再改账"
+grep -qF 'runner.resume(resumed' "${ORDER_JOB}" || fail "${ORDER_JOB}：重启之前交的那一单只 GET 跟（SkyStudioJobRun.resume），不再交"
+disk_code="$(sed 's,//.*,,' "${ORDER_DISK}")"
+if grep -qE '\.(submit|run|record|refund)\(' <<<"${disk_code}"; then
+  fail "${ORDER_DISK}：落盘这一层不交单、不动账（交和跟在 SkyStudioVoiceLibraryJob，账只经 SkyStudioHeldCredits）"
+fi
 
 # 费用的问题受理之后才清。
 reserved_at="$(line_of 'case .reserved(let reservation):' "${ORDER_FALLBACK}")"
