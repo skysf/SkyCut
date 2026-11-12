@@ -48,8 +48,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 合并与分支（2026-09-29 用户定）
 
-- 一个 PR 只做一件事、尽量小；CI 的汇总 job `check-all` 绿了就**马上合并**（`gh pr merge N --merge --delete-branch`，
-  绝不 squash），不攒着等人看。下一件事从合并后的最新 main 开分支，别在旧分支上叠。
+- 一个 PR 只做一件事、尽量小；CI 的汇总 job `check-all` 绿了就**马上合并**（`gh pr merge N --merge`，绝不 squash），
+  不攒着等人看。任务说明里写了由谁合并的，照任务说明。下一件事从合并后的最新 main 开分支，别在旧分支上叠。
+- 合并后删分支：`gh pr view N --json state` 是 MERGED 之后才 `git push origin --delete <分支>`。不用 `--delete-branch`：它会把检出着
+  这条分支的 worktree 整个删掉（2026-11-05）。merge 报错时先看 state，别接着删分支（2026-11-11 #394 就这样被 GitHub 关掉过）。
+  本地的 worktree 和分支照任务说明收尾；没写就留着，别删自己正开着的 worktree。
 - 「绿」指 CI 的结论，本地跑过不算。红了先看是不是已知的偶发（性能 ratchet、`check-audio-fade` 第 7b 组，认法见对应
   文档），是就 `gh run rerun --failed`，不是就修；不许带红合。
 - 合掉一个之后别的 PR 变 DIRTY（常见于本文件的索引行相邻）：把新 main 合进那条分支、两边都留、推上去等 CI 绿再合。
