@@ -203,6 +203,8 @@ run_check "preference-reduce-keeps-value（扫描守卫：量出来的尺寸不�
 run_check "list-section-not-equatable（扫描守卫：List 里带 Section 的视图不许套 .equatable()）" checks/list-section-not-equatable.sh
 run_check "blocking-media-reads（扫描守卫）" checks/blocking-media-reads.sh
 run_check "docs-index-drift（扫描守卫）" checks/docs-index-drift.sh
+# 这条守卫被绕过三轮，所以它自带一份负例：在最小副本上一个场景一个场景跑，该红的红在对的那一条上、该绿的绿（约 20 秒，不编译）。
+run_check "docs-index-drift-self-test（文档索引守卫的自测：一百多种写法，该红的红、该绿的绿）" checks/docs-index-drift.sh --self-test
 run_check "report-evidence-no-local-paths（扫描守卫：实测证据里没有本机的绝对路径）" checks/report-evidence-no-local-paths.sh
 run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在词表里）" checks/sfx-catalog.sh
 run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
