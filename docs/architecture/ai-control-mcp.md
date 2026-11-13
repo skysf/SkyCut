@@ -558,8 +558,17 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      ② 档位、模型、价格从目录读（`get_status models=true`；草稿由 `AIDraftPolicy` 挑），卡里不写死；③ 改了第 6、39 条、`SkyStudioJobGate`、
      `AIDraftPolicy`、清单怎么列、配旁白怎么花积分（第 40 条），同一次改动里把 `Sources/SrtFlow/Resources/recipe*.md` 和中文稿的共用规矩第 11、13 条一起改（先中文稿再英文）；
      ④ 检查对着生产行为和现行说法查、不钉旧说法的原词：`RecipeContractChecks` 查条件句不提 Key（清单不按 Key 过滤时）、讲到报价 / 确认码 /
-     `daily_budget_exceeded`、每日预算和确认码不写在同一句里、讲生成素材的句子不带档位、不提 fal；卡里叫 AI 用到的花钱工具（照说明书 `paid` 主题
-     「Which tools.」那一句认，不另抄名单）共用规矩里都有一条说它花积分 —— 2026-11-13 补：存了 Key 时配旁白也花，共用规矩第 13 条。
+     `daily_budget_exceeded`、每日预算和确认码不写在同一句里、讲生成素材的句子不带档位、不提 fal；卡里叫 AI 用到的花钱工具共用规矩里都有一条说它花积分
+     —— 2026-11-13 补：存了 Key 时配旁白也花，共用规矩第 13 条。同一天 Codex 审查（D6R）后补的：花钱的工具生产代码里没有结构化的清单
+     （`MCPToolName.provider` 说的是去哪消费，不是花不花钱），钉在检查里的 `recipePaidTools`，说明书 `paid` 主题「Which tools.」那一句和地图「Paid」
+     那一行认出来的都要正好是它（原来只照那一句认，说明书换个写法少认一个就悄悄少查）；每日预算的说法认 spending cap / ceiling / quota 这类，
+     嵌套的列表项带着父项的话算句；切法和词表是**受限的文字扫描**，扫不出来不等于卡对，所以各自带着坏话和合规的例子（`RecipeTextScan.swift`）。
+     ⑤ **卡里讲某个状态、某一步时，每个提前返回的分支上都要成立**（2026-11-13 后续二）：状态码不等于某一个原因 —— `needs_confirmation` 读点名
+     文件夹以外的文件也回（连 `quote_only=true` 都先问）、旁白的一次性费用也回，卡里只写「照结果的 `question` 问、同意才带 `confirm_token`」；
+     「会问」「回任务号之前整段预留」这种话照实际返回的写 —— 全部权限、用户点名过规格、工程里批准过的不问；声音库的声音要先建这种语言的版本时，
+     `add_voiceover` 先回建声音那一步（`kind: voice_enroll`，或在建的那一单 `already_building`），那一笔 `credits` 是建版本的钱，旁白还没读、没预留，
+     跟着 `next_step` 走。改第 11、13 条时对着 `SkyStudioGenerateTool`、`SkyStudioJobGate`、`SkyStudioVoiceoverStart` / `SkyStudioVoiceOneTimeStep`
+     里每个提前返回的地方核一遍；检查查「不写成某一个原因」「不把会问说满」「讲旁白积分的那一条讲到建声音那一步」。
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，

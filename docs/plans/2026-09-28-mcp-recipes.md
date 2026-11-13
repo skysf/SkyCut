@@ -49,25 +49,38 @@
     （[AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 39 条）。有它时：
     - 只补素材里没有的（缺的空镜、音效、音乐库里没有合适的配乐），用户已有的素材不用它替。它花用户的 Sky Studio 积分（没存 Key 时它直接报错，
       这条就跳过）。花积分的规矩以说明书 `skycut_guide topic=paid` 为准，下面几条是剪片时要记住的。
-    - 做之前先把价格告诉用户，视频尤其：`quote_only=true` 只问价、一分不花，回的 `credits` 就是价格。
-    - 结果是 `needs_confirmation`（请求批准模式下，要的超出了低成本草稿：更高分辨率、更长、最高画质、更贵的模型）：照它给的问题在聊天里问用户
-      （2026-10-17 起不在 App 顶部的提示条上问），用户同意才带着 `confirm_token` 再调一次。
+    - 做之前先把价格告诉用户，视频尤其：`quote_only=true` 只问价、一分不花，回的 `credits` 就是价格（请求批准模式下要读点名文件夹以外的
+      参考文件时，它可能先问能不能读）。
+    - 结果是 `needs_confirmation`：不管为什么问（读点名文件夹以外的文件、付费规格超出了低成本草稿……），都照结果里的 `question` 在聊天里问用户
+      （2026-10-17 起不在 App 顶部的提示条上问），用户同意才带着 `confirm_token` 再调一次；付费规格的那一问带着价格和原因（更高分辨率、更长、
+      最高画质、更贵的模型）。（2026-11-13 起不再写成「`needs_confirmation` 就是超出了低成本草稿」：读别处的文件也回它，连 `quote_only=true`
+      都会先问，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)的「后续二」。）
     - 结果是 `daily_budget_exceeded`（每日积分硬上限）就停：什么都没起、没扣，确认码和全部权限都越不过去。告诉用户可以在设置的 Sky Studio 一栏
       调高每日上限，用户明说要你改才用 `set_settings` 帮着改；也不许把请求拆小、改小去凑上限。（2026-11-01 起；之前超了上限是发确认码问一次，
       见[案例](../bugfixes/2026-11-01-ai-approval-and-draft-budget.md)；这一条到 11-13 才跟上，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)）
-    - 生成的视频**自带声音**，配乐 / 配音时把它压低或静音（`edit_clip volume_db` / `muted`）。
+    - 生成的视频**大多自带声音**（H3 自带；有 `generate_audio` 开关的模型，不传就照目录的默认），配乐 / 配音时把它压低或静音（`edit_clip volume_db` / `muted`）。
     - 视频先按 SkyCut 给这个模型挑的低成本草稿出（不传 `resolution`），留下的镜头再用这个模型在目录里有的更高档位重做（`get_status models=true`
-      列着每个模型有哪几档）：先报价，请求批准模式下这一步超出了草稿、会问用户。档位不写死：2026-10-31 扩充模型之后目录里有 1080p 的视频模型，
-      各模型的档位也不一样（原来这里写的「480p 出草稿、768p 重做、Sky Studio 的视频没有 1080p」只是 MiniMax H3 一个模型那时的事）。
+      列着每个模型有哪几档）：先报价，再照实际返回的走 —— 回 `needs_confirmation` 就照上一条问用户；直接回了任务号，就是这一步不用问
+      （比如全部权限下，或者用户点名过这个规格、这个工程批准过它）。原来写的「请求批准模式下这一步超出了草稿、会问用户」说满了（2026-11-13 改）。
+      档位不写死：2026-10-31 扩充模型之后目录里有 1080p 的视频模型，各模型的档位也不一样（原来这里写的「480p 出草稿、768p 重做、
+      Sky Studio 的视频没有 1080p」只是 MiniMax H3 一个模型那时的事）。
     - 生成内容的使用条款看 Sky Studio 的，SrtFlow 没替用户核对，署名句（`music_credits`）只管音乐库的音乐；不把生成的画面说成用户拍的。
 12. **音效按这个顺序**（2026-09-30 用户定，[音效方案](2026-09-30-sound-effects.md)）：先 `find_audio kind=sound_effect` 在音效库里找录音 / 制作好的
     （whoosh、撞击、riser、风、冰、水、机械……，用 `add_clips` 的 `library_id` + `hit_at` 放）；没有合适的再用 `add_clips` 的 `sound_effect`
     本机合成（转场的 whoosh / riser / impact、出字的 pop / ding、快门、提示音），落点用 `hit_at` 压在切点或出字那一刻；两种都默认 −8 dB 压在人声下面。
     `generate_media kind sound_effect` 只留给两边都没有的真实声音（环境声、人群、动物），而且仍是条件句。
 13. **配旁白也可能花积分**（2026-11-13 补，[Sky Studio 的任务](../architecture/sky-studio-jobs.md)第五节）：存了 Sky Studio 的 Key 时，`add_voiceover`
-    用 Sky Studio 的声音读（默认的预设、角色、声音库里的 `voice_…`），也花积分。回任务号之前它先给整段报一次价、按每日硬上限整体预留，
-    把价告诉用户（结果里的 `credits`）；结果是 `daily_budget_exceeded` 就和别的花钱的活一样停下（什么都没起，用户要才换本机的声音）。
-    Sky Studio 的声音不认 `speed`。细节以说明书为准：`skycut_guide` 的 `add_voiceover`、`paid` 两个主题。
+    用 Sky Studio 读默认的预设、角色和声音库里的 `voice_…`，花积分；SkyCut 自己的声音和这台 Mac 的声音不花。Sky Studio 这次用不了时，预设和角色
+    在花钱之前就换成本机的声音读（`voice.note` 说为什么）。细节以说明书为准：`skycut_guide` 的 `add_voiceover`（一次性费用和 `skip_one_time` 在它讲付费确认的
+    那一节）、`paid` 两个主题。剪片时要记住的：
+    - 读新的稿子（`lines`）：回任务号之前整段报一次价、按每日硬上限整体预留；把价告诉用户（结果里的 `credits`，实收看 `get_job`）。
+    - 声音库的声音要先建这种语言的版本时（一次性费用），回的是建声音那一步：要问用户的 `needs_confirmation`，或者已经起的 `kind: voice_enroll`
+      任务（同一个版本已经在建时回那一单、带 `already_building`，不另花钱）。这一笔是建版本的钱，不是旁白的价，旁白还没读、也还没预留；
+      照 `next_step` 做：它说怎么答（建，或者带 `skip_one_time=true` 不花一次性费用就读），建好了再调一次 `add_voiceover`，那时才整段报价、预留。
+      （2026-11-13 起：原来这里一概写「回任务号之前整段报价、整体预留，把价告诉用户（结果里的 `credits`）」，建声音那一步回的任务号和 `credits`
+      都是建版本的、在建的那一单连 `credits` 都没有，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)的「后续二」。）
+    - 结果是 `daily_budget_exceeded` 就和别的花钱的活一样停下（什么都没起，用户要才换本机的声音）。
+    - Sky Studio 的声音不认 `speed`。
     （五张卡都叫 AI 配旁白，2026-10-29 起存了 Key 就走 Sky Studio；这一条到 11-13 才补上，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)的「后续」。）
 
 ### 二之一、先出分镜表（2026-10-05）
@@ -219,7 +232,7 @@
 | 配乐 | 宏大、动情：`find_audio` 搜 epic / trailer / opening / orchestral / emotional。挪音乐让它最大的重音落在片名上（挪段或它的 `source_in`），片名前 0.5–1 秒用 `volume_curve` 压下 8–12 dB，结尾落在音乐自己的结尾上（二之二第 20 条）；用不了结尾才淡出 2–3 秒 |
 | 配音 | 一般不配；要旁白用 `zh_male` / `en_male`，语速 0.9×，句子短、句间留 1–2 秒 |
 | 音效 | 片名落下那一刻：`add_clips` 的 `sound_effect` 一个 riser 接一个 impact（或 boom），两个的 `hit_at` 都是片名落下那一秒；别的地方不放。本机合成，不花积分 |
-| 生成素材 | 如果你的工具里有 `generate_media`：缺远景空镜可以做（`kind text_to_video`，或用户给的照片 `kind image_to_video`），先出低成本草稿（共用规矩第 11 条）；音乐库里没有够宏大的就 `kind music`（「orchestral, rising, cinematic, no vocals」）；生成的视频自带声音，压在音乐下面 |
+| 生成素材 | 如果你的工具里有 `generate_media`：缺远景空镜可以做（`kind text_to_video`，或用户给的照片 `kind image_to_video`），先出低成本草稿（共用规矩第 11 条）；音乐库里没有够宏大的就 `kind music`（「orchestral, rising, cinematic, no vocals」）；生成的视频大多自带声音，压在音乐下面 |
 | 品味 | 克制就是风格：一个片名、一张地名卡、同一时间只有一种运动；让安静和静止做事。<br>情绪靠对比：片名前长而安静，片名后越切越快，结尾再慢下来。<br>像拍静帧一样构图：地平线在三分线上，主体不居中，朝它看或走的方向留空。<br>片名就是高潮：它落下时别的东西都不动、不响 |
 | 别这样 | 每个镜头都慢推；片名落在音乐随便一个地方；riser 后面没有砸下去的那一声；片名和一张地名卡之外还有字；字垫底框；前 15 秒就快切；`crossFade` 和 `blackFade` 之外的转场 |
 | 自检 | 遮幅上下对称、字不压在遮幅上；片名那一刻 `look`：它是整条片子构图最好的一帧；片名前有喘气的那一下；音乐和画面一起结束（自己的结尾，或 2–3 秒淡出）；开头先在黑场里出声音再渐入；然后做二之四的「交片前再看一遍」 |
@@ -314,7 +327,7 @@
 - 没装高级、增强音色时照样配出来（默认质量），结果里写明去「系统设置 → 辅助功能 → 朗读内容 → 系统声音 → 管理声音」下载哪一个。
 - 对话里点名能换：给角色名、系统音色的名字、Sky Studio 的预设声音，或者用户声音库里的声音（`voice_…`）。原来这里写的「第 ③ 刀之后给一段
   要克隆的声音」2026-11-10 去掉了：`add_voiceover` 不再收 `clone_from`，克隆先进声音库（`manage_voices`）。
-- 语速写在卡上（带货 1.1×、电影开头 0.9× 这类），AI 调 `add_voiceover` 时传 `speed`；系统的 rate 和实际语速不是线性的，App 里按实测的表换。
+- 语速写在卡上（带货 1.1×、电影开头 0.9× 这类），AI 调 `add_voiceover` 时传 `speed`（只对本机的声音有用，Sky Studio 的声音不认它，第二节第 13 条）；系统的 rate 和实际语速不是线性的，App 里按实测的表换。
 - 第 ② 刀已做：`add_voiceover`（一句一个文件放在 `SrtFlow/配音`、一批放进新开的一条音频轨、`subtitles` 按词的时间出字幕）。
 
 ## 五、要补的零件（第 37 条：缺的零件补上）

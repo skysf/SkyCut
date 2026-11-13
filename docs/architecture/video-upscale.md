@@ -58,7 +58,7 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
 | 决定 | 口径 |
 | --- | --- |
 | 同一份数 | 范围、档位送不送得了、默认目标 / 默认范围 / 默认模型都从 `UpscalePanelModel` 算，和面板一个数；模型照 `/models`、价问 `/quote`（和面板同一个请求）；词认成类型在 `AIUpscaleNames`（纯值，和清单的词表对账：模型名是 Sky Studio 的，目标 AI 叫 1080p / 1440p / 2160p） |
-| 花钱 | 面板起的：面板就是确认，开跑时在每日硬上限内记报价（`Approval.panel`，超了不起）。AI 起的：`upscale_clip` 问完 `/quote`、在建任务之前过 `SkyStudioJobGate.decide`（2026-11-01 起）：先守每日积分硬上限（默认 1,000，设置里改），超了当场回 `daily_budget_exceeded`、什么都不起；付费的 upscale 超出低成本草稿，请求批准模式下回确认码（AI 在聊天里问用户、带码再调才记账），全部权限直接记账；任务拿到记好的那一笔（`Approval.ai`）。问 Sky Studio 的那一两秒里工程换了就什么都不起 |
+| 花钱 | 面板起的：面板就是确认，开跑时在每日硬上限内记报价（`Approval.panel`，超了不起）。AI 起的：`upscale_clip` 问完 `/quote`、在建任务之前过 `SkyStudioJobGate.decide`（2026-11-01 起）：先守每日积分硬上限（默认 1,000，设置里改），超了当场回 `daily_budget_exceeded`、什么都不起；付费的 upscale 超出低成本草稿，请求批准模式下回确认码（AI 在聊天里问用户、带码再调才记账；用户原话点了名「放大」的、本工程批准过的不再问），全部权限直接记账；任务拿到记好的那一笔（`Approval.ai`）。问 Sky Studio 的那一两秒里工程换了就什么都不起 |
 | 做完 | **AI 起的直接换源**（用户 2026-10-02 定：不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里 `applyUpscale` 包一层 `AIUndoGrouping.step`、选中换了的段、没存过的工程存一下、结局记给 AI 的任务（`onEnded` 记失败 / 取消），这一行从状态行上拿掉。面板起的照旧先弹对比窗口 |
 | 钥匙串授权框 | AI 起的不弹（读不到就回一句「请用户去设置 → Sky Studio 点允许…」）；面板起的可以弹，检查器里提醒一句（用户就在电脑前） |
 | 看得见 | 状态行和检查器那一节对 AI 起的任务一视同仁（阶段、积分、Stop）；Stop = 取消 = AI 的任务 cancelled，结局照实说积分花没花 |
@@ -97,6 +97,6 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
   6b. 把窗口缩到最小宽度再起 upscale：右上任务入口与浮层可用，阶段 / 积分 / 操作不重叠；长名字截中间，可即时查看全文。
   7. 切工程：做到一半的任务取消，不弹对比窗口。
   8. AI：让 Claude Code 对一段 720p 的画面段调 `upscale_clip`（额度内）：请求批准模式下先回确认码、AI 在聊天里问你（说不要就什么都没发生、没扣积分，
-     说可以它带码再调才做）；全部权限直接做。起了就回任务号和积分、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
+     说可以它带码再调才做；你的原话点名了「放大」、AI 带上 `user_requested_overrides` 和原话时不问、直接做）；全部权限直接做。起了就回任务号和积分、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
      做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert。把每日积分上限调到比报价小再调一次：回 `daily_budget_exceeded`、
      什么都没起、没扣积分，AI 叫你去设置里调（两种权限模式一样，带码也越不过去）；面板上那一行标红、按钮灰着。
