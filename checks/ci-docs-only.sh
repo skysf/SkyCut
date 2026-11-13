@@ -142,8 +142,8 @@ while IFS="$(printf '\037')" read -r index id cond run uses; do
   done
   if [ "${run}" = "scripts/check-guards.sh" ]; then
     FAST_PATH=$((FAST_PATH + 1))
-    if [ "${cond}" != "steps.changes.outputs.docs_only == 'true' && matrix.shard == 1" ]; then
-      fail "快速通道那一步的 if 应该是「steps.changes.outputs.docs_only == 'true' && matrix.shard == 1」，现在是：${cond}"
+    if [ "${cond}" != "steps.changes.outputs.docs_only == 'true' && steps.verified.outputs.verified != 'true' && matrix.shard == 1" ]; then
+      fail "快速通道那一步的 if 应该是「steps.changes.outputs.docs_only == 'true' && steps.verified.outputs.verified != 'true' && matrix.shard == 1」，现在是：${cond}"
     fi
   fi
   if [ "${heavy}" = "1" ]; then
