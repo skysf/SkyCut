@@ -48,6 +48,11 @@
     ding, sparkle, beep, glitch, shutter): give hit_at = the timeline second the hit must land on (a cut, a word
     appearing) and SkyCut sets the start. Both sit at -8 dB under speech; change volume_db if needed. generate_media is
     only for real-world sounds neither has; find_audio is also where music comes from.
+13. Voiceover can spend credits too: with a Sky Studio key, add_voiceover reads with Sky Studio voices (the default
+    preset, the roles, voice_… voices). Before job_id comes back it quotes the whole script once and reserves that
+    against the daily credit limit; tell the user the price (credits in the result). daily_budget_exceeded stops it like
+    any paid work: nothing started; switch to a local voice only if the user asks. Sky Studio voices ignore speed.
+    skycut_guide topic=add_voiceover and topic=paid have the details.
 
 ## Plan before you cut
 

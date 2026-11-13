@@ -64,6 +64,11 @@
     （whoosh、撞击、riser、风、冰、水、机械……，用 `add_clips` 的 `library_id` + `hit_at` 放）；没有合适的再用 `add_clips` 的 `sound_effect`
     本机合成（转场的 whoosh / riser / impact、出字的 pop / ding、快门、提示音），落点用 `hit_at` 压在切点或出字那一刻；两种都默认 −8 dB 压在人声下面。
     `generate_media kind sound_effect` 只留给两边都没有的真实声音（环境声、人群、动物），而且仍是条件句。
+13. **配旁白也可能花积分**（2026-11-13 补，[Sky Studio 的任务](../architecture/sky-studio-jobs.md)第五节）：存了 Sky Studio 的 Key 时，`add_voiceover`
+    用 Sky Studio 的声音读（默认的预设、角色、声音库里的 `voice_…`），也花积分。回任务号之前它先给整段报一次价、按每日硬上限整体预留，
+    把价告诉用户（结果里的 `credits`）；结果是 `daily_budget_exceeded` 就和别的花钱的活一样停下（什么都没起，用户要才换本机的声音）。
+    Sky Studio 的声音不认 `speed`。细节以说明书为准：`skycut_guide` 的 `add_voiceover`、`paid` 两个主题。
+    （五张卡都叫 AI 配旁白，2026-10-29 起存了 Key 就走 Sky Studio；这一条到 11-13 才补上，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)的「后续」。）
 
 ### 二之一、先出分镜表（2026-10-05）
 
