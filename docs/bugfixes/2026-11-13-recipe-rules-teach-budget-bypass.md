@@ -182,7 +182,8 @@ Codex 读代码审了上面两次改动（审查 D6R-01、02、03、07，没跑�
 | 检查自己：嵌套项不带父项 | 10 条红（自带的例子） | — |
 | 检查自己：预算词退回 daily / budget / limit | 4 条红（spending cap、ceiling、quota、caps） | — |
 
-全部放回后整跑 `scripts/check-mcp.sh` 的自检：**7,797 条全过**（原来 7,739 条；多的是自带的例子和新的几条）。
+全部放回后整跑 `scripts/check-mcp.sh` 的自检：**7,797 条全过**（原来 7,739 条；多的 58 条是自带的例子和新的几条）。合进最新的 main（#417）之后
+推之前 `scripts/check-local.sh mcp`：全部扫描守卫绿，`check-mcp` **7,800 条全过**（#417 之后 main 上是 7,742 条）。
 
 **教训**
 
