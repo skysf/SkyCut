@@ -92,7 +92,7 @@
 | --- | --- |
 | `scripts/check-waveform.sh` | 用 ffmpeg 现造的「每个采样都知道该是多少」的素材：声道不串、静音是 0、单采样尖峰在 8 级里都在、跨块接缝不丢峰值、均方（正弦是振幅平方的一半、声道不串、跨块的桶都算进去）、5.1 混成立体声、原始采样块的起点与内容逐采样对得上、读不了的文件照样结束流；**很多文件同时读**（至少 16 个、核数的两倍，总览和原始采样块各一轮）必须全部读完，看门狗 30 秒判红 |
 | `checks/blocking-media-reads.sh` | 读采样的循环（`copyNextSampleBuffer`）不许写在 async 函数里，见 [阻塞的媒体读取](blocking-media-reads.md) |
-| `scripts/check-mcp.sh` 的 `ListenRangeChecks` | 文件显式短窗不启动整文件总览；晚时间点范围、原生读样帧数/PTS、源秒统计、容器边界、队列中/读取中超时及取消 |
+| `scripts/check-mcp.sh` 的 `ListenRangeChecks` | 文件显式短窗不启动整文件总览（`WaveformStore.peaks(for:)` 收到请求的那一刻同步记进被测调用的账 `MediaReadAudit`，显式短窗的那次调用一笔都没有；没给区间的短文件 listen 记到一笔，证明登记点是活的）；晚时间点范围、原生读样帧数/PTS、源秒统计、容器边界、队列中/读取中超时及取消 |
 | `checks/timeline-drag-wiring.sh` | 波形、标尺、缩略图按 `clipBoundingRect` 裁；波形走 `WaveformStore`；装饰仍 `allowsHitTesting(false)` |
 | `scripts/check-timeline-snap.sh`（深度缩放一节） | 缩放区间 4…4800（外部真值）、标尺分档（默认 5 秒、最大一帧、30fps 下 5 帧）、`mm:ss:ff` 标签不截错、缩略图网格按帧 / 2 的幂、网格在同一个 2 的幂区间里不变 |
 

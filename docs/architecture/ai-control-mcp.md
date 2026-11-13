@@ -322,7 +322,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      结果 `beat_note` 说清不只分析请求窗；文件总长超过该限制就不给节拍解码，结果明确说明限制（电平/静音仍可有界返回）。**因此只有 `beats=false` 的显式文件窗承诺不扩展为整首/整文件解码；压缩包边界可有少量相邻采样，统计必须裁回请求范围。**
      扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`；真实文件生产路径回归在 `ListenRangeChecks.swift`：
      本机合成的稀疏长 WAV、晚时间点短窗、暂停 overview 队列仍成功、原生实际帧数/PTS、范围统计、时长边界、原生 AAC 包边界、MOV 空编辑/偏移音轨，
-     以及生命周期探针确定真实 reader 已启动/已收尾的取消和超时。
+     以及生命周期探针确定真实 reader 已启动/已收尾的取消和超时。**「不扩展为整首/整文件解码」是在被测的那一次文件 listen 里数出来的**（`ListenReadTally.swift`，
+     账是绑在这次调用上的 `MediaReadAudit`）：恰好一个 reader、它自己的 `timeRange` 就是请求窗、原生交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、
+     没起节拍的读取；排队 / 读到一半的超时和取消先等阶段探针（`queued` / `started` / `stopRequested`）再触发。规矩见[阻塞的媒体读取](blocking-media-reads.md)「回归」。
    - **一次查完 V1 的剪辑点**（`cuts=true`，2026-10-16 测试员的第 10 条，[方案](../plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md)）：
      不另开工具（会和 listen 长得像）。V1 每一段的头和尾都是剪辑点（`AICutCheck.boundaries`：挨着的两段合成一个、跨着转场的带 `transition`、
      开着缝的各报各的、第一段的头和最后一段的尾也报、from / to 只留落在里面的），每一头在**它声音自己的源时间轴**上判 —— 声音从哪段来
