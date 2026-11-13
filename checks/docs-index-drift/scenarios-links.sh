@@ -4,7 +4,8 @@
 #
 # **不单独跑**：由 self-test.sh 用 `source` 装进来，用它的 scenario / edit / fill_to 和 A（AGENTS.md）、B（INDEX.md）、
 # E_ALPHA / E_BETA …（最小副本里的那几行）。一行 scenario 一个场景：该绿还是该红、红在哪个代号上、名字、怎么改副本。
-# 标着 D6R-04 / 08 的是 Codex 2026-11-13 审查时实跑出来的输入（改之前的守卫全都退出 0 或报错了对象）。
+# 标着 D6R-04 / 08 的是 Codex 2026-11-13 审查时实跑出来的输入（改之前的守卫全都退出 0 或报错了对象）；
+# 标着 D6R-12 / 14 的是同一天收口核查时又跑出来的（白名单那一版照样退出 0）。
 # shellcheck disable=SC2016,SC2154  # 单引号里的反引号和 $ 是要原样写进副本的字；A、B、E_* 在 self-test.sh 里
 
 GROUP="links"
@@ -49,6 +50,15 @@ scenario red fence "波浪线围栏" hide_beta '
 [Beta](docs/architecture/beta.md)
 ~~~'
 scenario red fence "两对反引号的行内代码里藏链接" hide_beta '- 见 ``[Beta](docs/architecture/beta.md)``。'
+# 一份新文档唯一的索引放进套在引用 / 列表里的波浪线围栏：围栏只认行首的时候守卫退出 0，那个路径还算索引（D6R-12）
+s_probe() { new_doc docs/architecture/probe.md && edit after "${A}" "两份索引是全的" "$1"; }
+scenario red fence "唯一的索引在引用里的波浪线围栏里（D6R-12）" s_probe '
+> ~~~
+> [Probe](docs/architecture/probe.md)
+> ~~~'
+scenario red fence "唯一的索引在列表项里的波浪线围栏里、围栏不闭合（D6R-12）" s_probe '- ~~~
+  [Probe](docs/architecture/probe.md)'
+scenario green - "对照：同一个路径写成普通的链接（上面两个红在围栏上）" s_probe '- 见 [Probe](docs/architecture/probe.md)。'
 scenario red unindexed "唯一的索引写成行内代码" hide_beta '- 见 `[Beta](docs/architecture/beta.md)`。'
 scenario red unindexed "唯一的索引只剩括号里的路径（老正则当它是索引）" hide_beta '- beta 的文档 (docs/architecture/beta.md) 在这里。'
 scenario red codeblock "唯一的索引挪进缩进的代码块（空行后面缩进四格）" hide_beta '
@@ -60,6 +70,16 @@ scenario red image "图片写法" hide_beta '- 见 ![Beta](docs/architecture/bet
 scenario red link_text "链接的文字是空的" hide_beta '- 见 [](docs/architecture/beta.md)。'
 scenario red link_text "链接的文字只有空格" hide_beta '- 见 [ ](docs/architecture/beta.md)。'
 scenario red invisible "链接的文字是零宽空格" hide_beta "- 见 [$(printf '\342\200\213')](docs/architecture/beta.md)。"
+# 链接的文字正着认：至少一个字母、数字或汉字（行内代码里的也算），不再往黑名单里补空白（D6R-14）
+scenario red link_text "链接的文字是细空格 U+2009（D6R-14）" hide_beta "- 见 [$(printf '\342\200\211')](docs/architecture/beta.md)。"
+scenario red link_text "链接的文字是 EN 空格 U+2002（D6R-14）" hide_beta "- 见 [$(printf '\342\200\202')](docs/architecture/beta.md)。"
+scenario red link_text "链接的文字是窄的不换行空格 U+202F（D6R-14）" hide_beta "- 见 [$(printf '\342\200\257')](docs/architecture/beta.md)。"
+scenario red link_text "链接的文字是盲文空白 U+2800（D6R-14）" hide_beta "- 见 [$(printf '\342\240\200')](docs/architecture/beta.md)。"
+scenario red link_text "链接的文字是只有细空格的行内代码" hide_beta "- 见 [\`$(printf '\342\200\211')\`](docs/architecture/beta.md)。"
+scenario red link_text "链接的文字只有标点" hide_beta '- 见 [——](docs/architecture/beta.md)。'
+scenario green - "链接的文字只有汉字" hide_beta '- 见 [贝塔](docs/architecture/beta.md)。'
+scenario green - "链接的文字只有行内代码" hide_beta '- 见 [`Beta`](docs/architecture/beta.md)。'
+scenario green - "链接的文字里字和字之间夹着细空格" hide_beta "- 见 [Beta$(printf '\342\200\211')文档](docs/architecture/beta.md)。"
 scenario red invisible "不换行空格" edit after "${A}" "${RULE}" "- 规则三：$(printf '\302\240')看不见的空格。"
 scenario red invisible "全角空格" edit after "${A}" "${RULE}" "- 规则三：$(printf '\343\200\200')全角空格。"
 scenario red invisible "文字方向控制符（U+202E）" edit after "${A}" "${RULE}" "- 规则三：$(printf '\342\200\256')反着写。"
