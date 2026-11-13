@@ -85,7 +85,8 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 
 ## Sky Studio 定稿之后（2026-10-27，Sky Studio 仓库 `feat/skycut-api` 的 08bd908a）
 
-接口还没上线（后端在做），先照文档写。和这份方案上面写的不一样、SkyCut 要跟着改的（第 6 刀，除了注明 5a 的）：
+写这一节时（2026-10-27）接口还没上线（后端在做），先照文档写；**2026-10-28 接口已上线**（见文档开头的记录：上线后用户给自己开了正式版、
+测试版对着真服务器回归过，5b 的开关随后打开）。和这份方案上面写的不一样、SkyCut 要跟着改的（第 6 刀，除了注明 5a 的）：
 
 - 每个请求带 `X-SkyCut-Machine`（硬件 UUID 加 SkyCut 的盐做 SHA-256），`/me` 缺它回 400；`/me` 新字段 `trial_started_at`、`trial_unavailable`、`valid_until`、`max_running_jobs`（5a 已做）。
 - 没有长轮询：`GET /jobs/{id}` 立刻回、带 `poll_after_seconds`，照这个间隔再问。

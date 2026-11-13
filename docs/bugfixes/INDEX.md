@@ -31,7 +31,7 @@
 - [2026-11-10 繁体旁白合批后切不开，付过钱卡死](2026-11-10-traditional-chinese-batch-split-fails.md) — 对字要折叠繁简、转写语言带字形；假转写不能照抄稿子。
 - [2026-11-10 Sky Studio 接线守卫最后三节从来不会红](2026-11-10-sky-studio-wiring-checks-after-exit.md) — 总闸（失败就 `exit 1`）必须在脚本最后。
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
-- [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 越档要在 `user_request` 的原话里找得到规格的名字。
+- [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 普通生成 / upscale / 角色越档要在 `user_request` 的原话里找得到规格的名字；官方原创短片只查带没带原话。
 - [2026-11-10 实测证据里漏了本机路径](2026-11-10-measurement-evidence-local-paths.md) — 脱敏按形状换（临时目录、家目录）；进仓库的证据有守卫扫。
 - [2026-11-10 一句拆两批，两种采样率接不起来](2026-11-10-long-line-halves-with-different-sample-rates.md) — 拼接前换成同一个采样率；假协议要按模型回不一样的格式。
 - [2026-11-10 说明书要等授权问完才回答](2026-11-10-guide-waits-for-license.md) — `skycut_guide` 在等授权之前就放行。
@@ -79,7 +79,7 @@
 - [2026-10-31 多工程的生成任务没有工程归属](2026-10-31-cloud-tasks-without-project-context.md) — 任务卡片按原工程分组，数量只算进行中的。
 - [2026-10-31 小窗口的分栏线穿过 AI 状态](2026-10-31-ai-badge-divider-bleed.md) — 半透明徽章会漏出后景：垫不透明的底色。
 - [2026-10-30 添加 Key 后旧 AI 会话仍缺生成工具](2026-10-30-generation-tools-missing-after-key-added.md) — 工具始终列全，Key、授权和积分在执行时核对。
-- [2026-10-30 生成固定首个模型且缺少多参考](2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和参考限制可查询；真人拒绝只在退款明确后替换一次。
+- [2026-10-30 生成固定首个模型且缺少多参考](2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和参考限制可查询；当时的「退款明确后替换一次」10-31 已移除，现在拒绝和未知结果都只查原单。
 - [2026-10-30 多项生成横幅挤占预览](2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口 + 滚动浮层汇总任务；取消不先删状态。
 - [2026-10-29 旁白只读第一块词时间、字幕越过音频尾端](2026-10-29-voice-word-chunks-and-tail.md) — 完整性和时间边界按整份回答和实际文件验，不只测首块样例。
 - [2026-10-29 冒烟清理只凭陈旧 PID 停进程](2026-10-29-smoke-stop-stale-pid.md) — 持久 PID 不是进程身份：清理前核对当前命令和测试目录。
@@ -91,9 +91,9 @@
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](2026-10-28-upscale-inspector-still-says-fal.md) — 换提供方要连 verbatim 写死的名字一起搜。
 - [2026-10-28 停不下来的 upscale 没人再查](2026-10-28-uncancellable-upscale-left-unfinished.md) — 没有长轮询：取消不了的那单接着查到底（`followToEnd`）。
 - [2026-10-28 体验显示「还剩 8 天」、到期日晚一天](2026-10-28-trial-and-pro-dates-shown-a-day-late.md) — 「拿到回答 − 服务器时间」不全是钟差；日历上的哪一天照服务器给的。
-- [2026-10-27 AI 传了说明上没有的参数，悄悄丢掉、照样做](2026-10-27-unknown-tool-arguments-silently-ignored.md) — 「读得宽」只能对值、不能对名字：不认识的参数名整个调用不做。
+- [2026-10-27 AI 传了说明上没有的参数，悄悄丢掉、照样做](2026-10-27-unknown-tool-arguments-silently-ignored.md) — 「读得宽」只能对值、不能对名字：参数名按说明核对，有不认识的整个调用不做；null、`project`、没写字段的里层对象、登记的别名照收。
 - [2026-10-27 连接 AI 客户端时留的配置备份谁都能读](2026-10-27-client-config-backup-world-readable.md) — 「另写一份」不等于「拷一份」：备份的权限从原文件来。
-- [2026-10-18 字幕自动折行把中文的词拆在两行](2026-10-18-subtitle-wrap-splits-chinese-words.md) — 「能断」和「断在这儿好」是两件事：中日文只在词和词之间断，同一件事别写两份。
+- [2026-10-18 字幕自动折行把中文的词拆在两行](2026-10-18-subtitle-wrap-splits-chinese-words.md) — 「能断」和「断在这儿好」是两件事：中日文在词和词之间断、比一整行还宽的词才拆；先求最少行数再挑断点，同一件事别写两份。
 - [2026-10-18 别的工程的导出显示在每个工程窗口里](2026-10-18-export-progress-shown-in-every-project-window.md) — 单例的状态在多开之后要问「是谁的」（`exporter.belongs(to:)`）。
 - [2026-10-18 listen cuts=true 说可以不改，cut_speech 却说切在字上](2026-10-18-cut-check-disagrees-with-cut-speech.md) — 检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定（`AISpeechHearing`）。
 - [2026-10-18 仓库改名后 CI 五组全部编不过](2026-10-18-ci-build-cache-breaks-after-repo-rename.md) — 记着绝对路径的缓存，key 里就得有那个路径。
@@ -115,7 +115,7 @@
 - [2026-10-14 配音的字幕在逗号处切成短条](2026-10-14-voiceover-subtitles-split-at-commas.md) — 同一套规则用在两种来源上，差别做成显式参数（`splitsAtClauses`），不复制一份。
 - [2026-10-14 带入场动画的字在成片里闪没一帧](2026-10-14-text-blinks-at-animation-seam.md) — 序列末尾多渲两帧、各段左闭右开；自检场景要像用户的工程（不对齐的输入）。
 - [2026-10-14 App 升级后会话里的小程序还是旧的](2026-10-14-stale-helper-tool-list.md) — 一份接口编在两个活得不一样长的进程里，就在通道上比版本（清单指纹）。
-- [2026-10-14 AI 用 look 看转场和成片对不上](2026-10-14-look-transitions-differ-from-export.md) — 写下的「做不到」要么去做、要么在用到的地方说出来；压黑 / 闪白照 xfade 的公式算。
+- [2026-10-14 AI 用 look 看转场和成片对不上](2026-10-14-look-transitions-differ-from-export.md) — 写下的「做不到」要么去做、要么在用到的地方说出来；压黑 / 闪白在两侧盖满且不透明时照 xfade 的公式算，否则仍是半程近似。
 - [2026-10-14 Kokoro 的 speed 调到 0.85 几乎听不出慢](2026-10-14-kokoro-speed-barely-changes.md) — 参数名叫 speed 不等于线性管语速：量结果、按结果调（按时长对准）。
 - [2026-10-14 滤镜把纯黑抬成灰](2026-10-14-filters-lift-pure-black.md) — 纯黑不抬（`FilterLUT.holdingBlack`）：调色作用于画面，不作用于编辑出来的黑。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
@@ -164,9 +164,9 @@
 - [2026-09-29 婚礼工程之后的五处工具小毛病](2026-09-29-mcp-tool-followups-from-wedding-session.md) — 共用串行槽的任务取消要分清谁的；整批拒绝要说「一个都没做」。
 - [2026-09-29 修完爆音，en_male 反倒几乎听不见](2026-09-29-kokoro-short-pieces-explode.md) — 验证修复要走生产那条路；一个尖峰不许决定整句的音量。
 - [2026-09-29 AI 改了入点、分割后关键帧跑到片段外面](2026-09-29-keyframes-outside-clip-after-ai-edits.md) — 给 AI 的接口不照搬给真人的惯例：报出来的关键帧永远在片段范围里。
-- [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 切出来不到一帧的那截不是内容，切的操作自己收拾；够一帧的要指出来。
+- [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 定格切出的右半不到一源帧（算上变速）、帧率已知、后面没接转场才拿掉；够一帧的留着，AI 定格后剩不到 1 秒的报 `tail_id`。
 - [2026-09-29 没下载苹方的 Mac 上中文字幕烧成方框](2026-09-29-chinese-burns-as-boxes-without-pingfang.md) — CoreText 找得到不等于 libass 找得到：回退到私有字体时两边一起换内置字体。
-- [2026-09-29 listen 说 63.5 BPM，cut_to_beat 按 95.3 切](2026-09-29-beat-analysis-window-differs-between-listen-and-cut-to-beat.md) — 同一个量两个工具各算一份迟早两个答案：整首歌分析一次、各自取用。
+- [2026-09-29 listen 说 63.5 BPM，cut_to_beat 按 95.3 切](2026-09-29-beat-analysis-window-differs-between-listen-and-cut-to-beat.md) — 同一个量两个工具各算一份迟早两个答案：落在前 15 分钟里的请求共用一份整段分析（到结尾或 15 分钟）；更晚的按自己的区间，也封顶 15 分钟。
 - [2026-09-29 转写认不出语言，AI 被叫去「面板里选」](2026-09-29-ai-told-to-pick-language-in-panel.md) — 给界面写的报错不能原样交给 AI；要按种类换说法，错误就得有类型。
 - [2026-09-28 删掉分割出来的一块，整条素材连声音全没了](2026-09-28-split-links-every-piece-together.md) — 从旧段构造新段时身份类字段（id、组号）不能照抄：分割走 `LinkRegrouping.split`。
 - [2026-09-28 点名新开轨的第二首配乐接在了 A1 后面](2026-09-28-new-audio-lands-on-a1.md) — 要记的是意图，不是副作用。
@@ -218,7 +218,7 @@
 - [2026-09-23 磁吸开着时拖文件的落点框画错位置](2026-09-23-file-drop-frame-ignores-magnet.md) — 画框要在副本上把落地原样走一遍（含 `packMain`）。
 - [2026-09-23 滤镜卡片、音频库素材拖不进时间线（类型没声明）](2026-09-23-custom-drag-types-not-declared.md) — 自定义拖放类型必须在 Info.plist 声明。
 - [2026-09-21 时间线右边小半个视口是死区](2026-09-21-timeline-right-padding-dead-zone.md) — `minWidth` 撑出来的空白不自带命中区：命中区要盖在填满视口之后。
-- [2026-09-21 刚加进轨道的素材没贴左边](2026-09-21-timeline-content-centered-horizontally.md) — 上一条的横向孪生：居中的毛病两轴一起钉。
+- [2026-09-21 刚加进轨道的素材没贴左边](2026-09-21-timeline-content-centered-horizontally.md) — 09-20 播放头断线那次的横向孪生：`ScrollView` 两轴都会居中，内容可能比视口小的容器两轴一起钉。
 - [2026-09-21 源文件清单守卫只盯着枢纽文件](2026-09-21-source-list-guard-only-watched-the-hub.md) — 守卫要扫清单里的每一个文件；别开只有 extension 的文件。
 - [2026-09-20 磁吸关着时转场预览有、成片没有](2026-09-20-transition-preview-export-divergence.md) — 「两段是否相叠」两条管线只许一套判据；断言要造不相叠的几何。
 - [2026-09-20 拖短转场时遮罩整块往右挪](2026-09-20-transition-mask-drifts-when-shortened.md) — 宽度有下限时，位置要跟着补偿。
