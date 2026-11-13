@@ -151,12 +151,32 @@ EOF 必须同时成立才能接受输出；后代继承写端时到期拒绝，�
 | `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）；`AudioWindowReader.extract` 在 `SubtitleGen/` 以外被调就红；`QueuedAudioWindow` 的读取要交给 `MediaReadQueue`。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
 | `scripts/check-export-profile.sh` | 生产 `FFmpegProcess` 的立即退出、双管道 / 最后进度、错误和取消；独立线程的 30 秒看门狗在旧等待实现上实际变红 |
 | `scripts/check-engine-probe.sh` | 短探测的截止时间 / 双输出上限 / 退出码，父进程唯一回收、信号与描述符隔离、注册前后退出窗口、候选去重与单次定位任务 |
-| `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReadEndChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取（数原生 reader 交出的帧、挂起的 overview 上多没多出活）；队列中超时/取消直接结束（回来时队列还挂着、一次没开读），已开读时等本次 copy 返回再由读取体单点取消与释放；原生探针固定线程交错，失败不发布半份统计 |
+| `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReadTally` / `ListenReadEndChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取：**被测的那一次文件 listen 里**恰好起一个 reader、它自己的 `timeRange` 就是请求的那一窗、原生一共交出的帧数不超过这一窗，一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取（账是 `MediaReadAudit`，绑在这次调用上）；队列中超时/取消直接结束（先等 `queued` 探针证明排上了队；回来时队列还挂着、一次没开读），已开读时等本次 copy 返回再由读取体单点取消与释放（先等 `started`，读取体停住，等 `stopRequested` 再往下读）；原生探针固定线程交错，失败不发布半份统计 |
 
 **自检里的期限只拦卡死**（2026-11-13，[案例](../bugfixes/2026-11-13-listen-range-checks-timed-out-under-load.md)）：读取类自检传给生产入口的截止时间、整组的看门狗、
 等闸门的时间只为卡死时有个头，和真工具一样宽（listen 是 40 秒）；要证明的事 —— 读了几帧、排没排进别的队列、开没开读、回来的是结果还是超时 —— 数出来，
 不拿「几秒内回来」去推：机器满载时几十毫秒的读取能拖过 2 秒，那几次红的都是自检的期限，不是生产路径。测「超时 / 取消怎么结束」的，用探针把 reader 停在
 开读那一刻，等停的原因有了再往下读，不赌读得比截止时间快或慢。真要比快慢，只和同一次运行里同一种活比（[定格](freeze-frame.md)）。
+
+**数，要数在被测的那一次调用上；测哪个阶段，先证明走到了那个阶段**（2026-11-13，同一份[案例](../bugfixes/2026-11-13-listen-range-checks-timed-out-under-load.md)的「后续」：
+改成数以后，审查查出三处「说守住了、其实没守住」，负例放进去检查照样绿）：
+
+1. **数接在被测的那一次调用上。** 另起一次同样的读取去数，数的是另一次调用 —— 入口里先多读一遍、再正常读窗，另起的那一次照样只读一窗。
+   账绑在被测调用的 task 上（`MediaReadAudit`，task-local）：这一次调用里起了几个 reader、各自的 `timeRange`、原生一共交出多少帧，都记在同一本账上。
+   往下传的观察参数不够：只看得见交到它手上的那次读取。
+2. **登记点要是同步的：在「要」的那一刻记。** 不数「之后才异步排上去的活」：`WaveformStore.peaks(for:)` 先回一条流，之后才找音轨、往 overview 上排活，
+   数队列长度会漏掉还没排上的那一件。不许靠多 sleep 一会儿、轮询快一点去补这个窗口。
+3. **要测某个阶段，先用探针证明走到了那个阶段，再触发停。** 探针是生产代码报的（`AIListenAudioWindow.Event`：`queued` 已交给队列、`started` 已开读、
+   `stopRequested` 停的原因登记了、`finished` 收尾完）。起了 Task 之后 sleep 20 ms、给一个 0.05 秒的截止时间，都是在猜走到哪了：机器一忙，停就打在读元数据那一段，
+   要测的排队分支一行没跑、检查照样绿。没走到的那一轮不算测到：放长重来，有总限度，最后必须真的走到。「墙上时钟过了截止时间」也不等于「停的信号到了」，等 `stopRequested`。
+   探针报的得是那一刻的真事：`queued` 在交给队列之后、`stopRequested` 在恢复调用方之后才报，位置由 `checks/MCP/listen-wiring.sh` 钉着（挪早了，自检等到的就不是它要测的阶段）。
+4. **「一次都没有」的断言旁边要有正例。** 登记点被挪走、删掉之后，「一次都没要整文件波形」永远是绿的；同一组里得有一处该要的调用确实被记到（没给区间的短文件 listen）。
+5. **反向验证时负例要在「条件不利」的那一档也红。** 负例放进去是红的，还要看它是被数拦下的还是被期限拦下的：这台机器整小时读不进 40 秒，「多读一遍整份文件」红在超时上，
+   换成多读 10 分钟就绿了 —— 红在期限上的不算守住。
+
+**自检的观察点在生产代码里怎么加**：行为不变；平时没有观察者（参数是 nil、task-local 没人绑）时只是一次可选链；不加在实时音频的路径上；
+新的读法要进这本账，就在它「要」的那一刻加一笔（`MediaReadAudit.Entry`），读取体在 `MediaReadQueue` 的线程上跑时由 async 那一头取出账交给它。
+`MediaReadAudit` 够不着 `Task.detached` 里另起的读取和没经过登记点的读法，这两样仍然靠审查。
 
 **人工回归**（自动化够不着的真实工程，发版前实机验证）：
 

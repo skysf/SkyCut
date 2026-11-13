@@ -145,6 +145,8 @@ actor WaveformStore {
     /// 读完（或失败）即结束。
     func peaks(for url: URL) -> AsyncStream<WaveformPeaks> {
         let key = url.standardizedFileURL
+        // 自检的登记点（MediaReadAudit，平时没人绑定）：要的这一刻同步记，找音轨、往 overview 上排活都在这之后。
+        MediaReadAudit.current?.note(.wholeFileWaveform(key, startsDecode: entries[key] == nil))
         let token = UUID()
         let (stream, continuation) = AsyncStream<WaveformPeaks>.makeStream(
             bufferingPolicy: .bufferingNewest(1)

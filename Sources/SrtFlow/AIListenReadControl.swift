@@ -7,6 +7,8 @@ import Foundation
 final class AIListenReadControl: @unchecked Sendable {
     private let lock = NSLock()
     private let asset: AVURLAsset
+    /// 阶段探针（自检用，平时 nil）：排上队、停的原因登记了，各报一声。
+    private let observe: (@Sendable (AIListenAudioWindow.Event) -> Void)?
     private var failure: Error?
     private var operation: BlockOperation?
     private var continuation: CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?
@@ -15,7 +17,10 @@ final class AIListenReadControl: @unchecked Sendable {
     private var finished = false
     private var timer: DispatchSourceTimer?
 
-    init(asset: AVURLAsset) { self.asset = asset }
+    init(asset: AVURLAsset, observe: (@Sendable (AIListenAudioWindow.Event) -> Void)? = nil) {
+        self.asset = asset
+        self.observe = observe
+    }
 
     func start(until deadline: Date) {
         let timer = DispatchSource.makeTimerSource(queue: .global(qos: .utility))
@@ -54,7 +59,10 @@ final class AIListenReadControl: @unchecked Sendable {
                 return nil
             }
             if let error { continuation.resume(returning: .failure(error)) }
-            else { MediaReadQueue.analysis.addOperation(operation) }
+            else {
+                MediaReadQueue.analysis.addOperation(operation)
+                observe?(.queued)
+            }
         }
         try check()
         return try result.get()
@@ -90,16 +98,19 @@ final class AIListenReadControl: @unchecked Sendable {
     }
 
     private func stop(_ error: Error) {
-        let resources = lock.withLock { () -> (AVURLAsset?, BlockOperation?, CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?) in
-            guard !finished, failure == nil else { return (nil, nil, nil) }
+        let resources = lock.withLock { () -> (AVURLAsset?, BlockOperation?, CheckedContinuation<Result<AIListenAudioWindow.Reading, Error>, Never>?)? in
+            guard !finished, failure == nil else { return nil }
             failure = error
             let pending = running ? nil : continuation
             if !running { continuation = nil }
             return (loading ? asset : nil, operation, pending)
         }
+        // 已经收尾、或者早有别的原因在先：这一次不算数，也不报探针。
+        guard let resources else { return }
         // AVAssetReader.cancelReading 不许与 copyNextSampleBuffer 并发；读取阶段只让 check() 停循环。
         resources.0?.cancelLoading()
         resources.1?.cancel()
         resources.2?.resume(returning: .failure(error))
+        observe?(.stopRequested)
     }
 }

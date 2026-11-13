@@ -44,8 +44,14 @@ assert "defer { reader.cancelReading(); observe?(.finished) }" in window, "✗ n
 assert "loading = false" in control and "loading ? asset : nil" in control, "✗ metadata cancellation must end atomically before the read operation can start"
 assert "autoreleasepool { Result" in control, "✗ native reader release must finish on analysis before continuation completion"
 assert "runListenReaderLifecycleChecks(url)" in pathlib.Path("checks/MCP/ListenRangeChecks.swift").read_text(), "✗ native lifecycle regression is not called by the production range checks"
+# 阶段探针和读取账报的得是那一刻的真事（2026-11-13，docs/architecture/blocking-media-reads.md「回归」）：探针挪早了，
+# 自检等到的就不是它要测的那个阶段，照样绿。登记点活不活由自检里的正例管（没给区间的短文件 listen），这里只钉位置。
+import re
+assert re.search(r"MediaReadQueue\.analysis\.addOperation\(operation\)\s+observe\?\(\.queued\)", control), "✗ the queued probe must fire only after the read operation is handed to the analysis queue"
+assert re.search(r"resources\.2\?\.resume\(returning: \.failure\(error\)\)\s+observe\?\(\.stopRequested\)", control), "✗ the stopRequested probe must fire only after a queued caller has been resumed"
+assert "audit?.note(.windowStarted(asset.url, from: reader.timeRange.start.seconds, to: reader.timeRange.end.seconds))" in window, "✗ the read audit must record the reader's own timeRange, not the range the caller asked for"
 PY
-echo "   ✓ 外部取消只发信号；metadata 移交后不再取消 asset；reader 单点收尾并在恢复调用方前释放"
+echo "   ✓ 外部取消只发信号；metadata 移交后不再取消 asset；reader 单点收尾并在恢复调用方前释放；阶段探针在交给队列 / 恢复调用方之后才报"
 
 echo "==> listen cuts=true：V1 的剪辑点一次查完，转写只读缓存、声音从哪段来和判的输入都和 cut_speech 同一份"
 # 2026-10-16（docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md；第四节第 13 条）；纯值在 checks/MCP/CutCheckChecks.swift。
