@@ -28,18 +28,20 @@
     then skip this rule). skycut_guide topic=paid has the rules for paid work; these are the ones to keep in mind while
     you edit:
     - Tell the user the price before making anything, especially video: quote_only=true returns the credits without
-      spending any.
-    - needs_confirmation means a request beyond the low-cost draft in ask_for_approval mode (a higher resolution, a
-      longer duration, the highest quality, a pricier model): ask the user its question in the chat and call again with
-      confirm_token only if they agree.
+      spending any (in ask_for_approval mode it may first ask to read a reference file outside the opened folder).
+    - needs_confirmation, whatever the reason (reading a file outside the opened folder, a paid setting beyond the
+      low-cost draft…): ask the user the result's question in the chat and call again with confirm_token only if they
+      agree. For a paid setting the question gives the price and the reason (a higher resolution, a longer duration,
+      the highest quality, a pricier model).
     - daily_budget_exceeded is the daily hard credit limit: stop there. Nothing started or was charged, and no token or
       permission mode gets past it. Tell the user they can raise the limit in SkyCut Settings → Sky Studio; change it
       with set_settings only when they ask you to, and never split or shrink a request to get under it.
-    - Generated video comes with its own sound: mute it or turn it down under music and voice (edit_clip volume_db or
+    - Generated video usually has its own sound: mute it or turn it down under music and voice (edit_clip volume_db or
       muted).
     - Draft video with the low-cost draft SkyCut picks for the model (leave resolution out). Remake only the shots you
       keep, at a higher resolution that model offers (get_status models=true lists each model's resolutions): quote it
-      first; in ask_for_approval mode that goes beyond the draft, so SkyCut asks the user.
+      first, then go by what the call returns. needs_confirmation: ask, as above. A job_id: it started without asking
+      (for example in full_access, or the user named that setting or approved it for this project).
     - The terms of use for generated content are Sky Studio's, not SkyCut's; music_credits covers only library music.
       Never present generated pictures as the user's own footage.
 12. Sound effects, in this order: first find_audio kind=sound_effect for a recorded or produced one (whooshes, impacts,
@@ -48,11 +50,20 @@
     ding, sparkle, beep, glitch, shutter): give hit_at = the timeline second the hit must land on (a cut, a word
     appearing) and SkyCut sets the start. Both sit at -8 dB under speech; change volume_db if needed. generate_media is
     only for real-world sounds neither has; find_audio is also where music comes from.
-13. Voiceover can spend credits too: with a Sky Studio key, add_voiceover reads with Sky Studio voices (the default
-    preset, the roles, voice_… voices). Before job_id comes back it quotes the whole script once and reserves that
-    against the daily credit limit; tell the user the price (credits in the result). daily_budget_exceeded stops it like
-    any paid work: nothing started; switch to a local voice only if the user asks. Sky Studio voices ignore speed.
-    skycut_guide topic=add_voiceover and topic=paid have the details.
+13. Voiceover can spend credits too: with a Sky Studio key, add_voiceover reads the default preset, the roles and
+    voice_… voices with Sky Studio, which spends credits; SkyCut's own voices and the Mac's are free. When Sky Studio
+    cannot be used, a preset or role is read by a local voice before anything is paid (voice.note says why).
+    skycut_guide topic=add_voiceover (its section on the one-time fee covers skip_one_time) and topic=paid have the
+    details; keep these in mind:
+    - Narrating new lines: before the job_id comes back, add_voiceover quotes the whole script once and reserves that
+      against the daily credit limit. Tell the user the credits in the result (get_job reports what was charged).
+    - A voice_… voice that must first be built for this language (a one-time fee) returns that step instead:
+      needs_confirmation, or a job of kind voice_enroll (already_building when that version is already being built,
+      with nothing new charged). Those credits pay for building the voice, not for the narration, which is not read or
+      reserved yet. Follow next_step: it says how to answer (build it, or skip_one_time=true to read without the fee)
+      and to call add_voiceover again once the voice is built.
+    - daily_budget_exceeded stops it like any paid work: nothing started; switch to a local voice only if the user asks.
+    - Sky Studio voices ignore speed.
 
 ## Plan before you cut
 

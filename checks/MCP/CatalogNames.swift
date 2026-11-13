@@ -71,6 +71,8 @@ func catalogKnownNames() -> Set<String> {
     // voice_library_unavailable / voice_limit / reference_exists / too_little_speech（SkyStudioVoiceCodes）。
     names.formUnion(["one_time", "voice_design", "voice_enroll", "sample_url", "voice_library_unavailable", "voice_limit",
                      "reference_exists", "too_little_speech"])
+    // 同一个版本已经在建时 add_voiceover 回那一单带的 already_building（SkyStudioVoiceOneTimeStep.following；2026-11-13 写进说明书和共用规矩第 13 条）。
+    names.insert("already_building")
     // 变声（声音 PR 9，MCPGuideVoiceChangeTopic）提到的结果字段和种类：做完时两段新音频的 voice_clip_id / background_clip_id、两个文件
     // voice_file / background_file（VoiceChangeJob.land），Sky Studio 的活的种类 voice_convert（get_status models=true 里列着它的上限）。
     names.formUnion(["voice_clip_id", "background_clip_id", "voice_file", "background_file", "voice_convert"])

@@ -87,19 +87,22 @@ enum MCPGuideVoiceTopics {
 
     // 出处：sky-studio-jobs.md 第一节、第五节、第十一节（每日硬预算）；ai-control-mcp.md 第四节第 6、39、40 条；声音方案 4.2 第 2–5 步。
     static let paidConfirmation = MCPGuideSection(name: "paid_confirmation", about: "quotes, the daily credit limit, the one-time fee for a voice_… voice, skip_one_time and confirm_token", text: """
-    Sky Studio narration costs credits. Before job_id comes back, SkyCut quotes the whole script once (each batch's \
-    price is the most it can cost) and reserves that much against the daily credit limit; each batch is settled at \
-    what Sky Studio actually charged and the rest is returned.
+    Sky Studio narration costs credits. Before a narration's job_id comes back, SkyCut quotes the whole script once \
+    (each batch's price is the most it can cost) and reserves that much against the daily credit limit; each batch is \
+    settled at what Sky Studio actually charged and the rest is returned.
     - Over the daily credit limit: nothing starts and the result says daily_budget_exceeded. Tell the user; switch to a \
     local voice only if they ask.
     - Not enough Sky Studio credits: the job fails with recharge_url; tell the user.
     - One-time fee (voice_… only): the voice's best model for a language may first need its MiniMax version, built once \
-    per language. The call then returns needs_confirmation with one_time (the price) and voice_plan (the no-fee option \
-    it would read with). If the user agrees, repeat the same call with confirm_token: SkyCut builds the version and \
-    returns job_id (kind voice_enroll); wait with get_job, then call add_voiceover again with the same lines (nothing was \
-    narrated yet). If not, repeat the call with skip_one_time=true: it reads now with the no-fee model. In full access \
-    with the standing voice consent on record, SkyCut builds it without asking (job_id, kind voice_enroll, full_access \
-    says so; tell the user what it cost); without one, it asks once and agreeing records the consent.
+    per language. The call then stops before narrating and returns that step instead, usually needs_confirmation with \
+    one_time (the price) and voice_plan (the no-fee option it would read with). If the user agrees, repeat the same call with confirm_token: \
+    SkyCut builds the version and returns job_id (kind voice_enroll; its credits are the fee, not the narration's \
+    price); wait with get_job, then call add_voiceover again with the same lines (nothing was narrated or reserved for \
+    them yet). If not, and next_step offers it, repeat the call with skip_one_time=true: it reads now with the no-fee \
+    model (a named model that needs the MiniMax version has none: use model=auto or another model). If that version is \
+    already being built, the call returns that job with already_building: nothing new is charged or asked. In full \
+    access with the standing voice consent on record, SkyCut builds it without asking (job_id, kind voice_enroll, \
+    full_access says so; tell the user what it cost); without one, it asks once and agreeing records the consent.
     - needs_confirmation can also ask to read a recovery file outside the opened folder (ask mode only): ask the user, \
     then repeat the same call with confirm_token.
     """)

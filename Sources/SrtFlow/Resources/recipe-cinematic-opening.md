@@ -64,7 +64,7 @@ landing like a held breath let go. Fewer, longer, better shots.
 - A missing wide establishing shot: generate_media kind text_to_video, or kind image_to_video from a photo the user gave;
   start with the low-cost draft (shared rule 11).
 - Music when the library has nothing big enough: kind music ("orchestral, rising, cinematic, no vocals").
-- Generated video has its own sound: keep it under the music.
+- Generated video usually has its own sound: keep it under the music.
 
 ## Taste
 
