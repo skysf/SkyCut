@@ -566,7 +566,7 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     跑检查、性能 ratchet、快速通道的扫描守卫都不跑。汇总 job 照样跑官网检查、照样给结论。
   - 写法：每一步都写成 `steps.verified.outputs.verified != 'true'`（和快速通道同一个写法：判断出岔子就照常全跑）；备缓存的几步是
     「没验过，或者第 1 组」；编 App 那一步不看它。顶层 `permissions` 给 `contents: read`、`actions: read`（读 artifact 和运行记录要它）。
-    `checks/ci-verified-tree.sh` 钉着：判断本身 22 个用例（临时仓库里真的合并提交 + 假的 `gh`，每个用例只改一个事实）、
+    `checks/ci-verified-tree.sh` 钉着：判断本身的用例（临时仓库里真的合并提交 + 假的 `gh`，每个用例只改一个事实）、
     workflow 每一步的条件、记号只在 PR 的那一轮最后留。
   - 丢掉的是同一棵树的第二遍。到 11-13，main 上红过的 24 轮里 0 次是「PR 没跟上 main、合出来才坏」：12 次是检查自己不稳定（其中
     11 次是同一棵树的第二遍，以后要等下一个 PR 撞上），12 次是没分到 runner。PR 绿了之后到合并之间 runner 的镜像换了，也要等下一个 PR 才测到，
