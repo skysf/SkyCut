@@ -468,7 +468,9 @@ Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末
 已经没有性别 `unknown` 的预设（「不明就退旁白角色」改用改过的目录钉，`VoicePickChecks`）。Sky Studio #247 合并后（`c050d948`，sha256 `3db3eb98…`）
 重新导出，只改了 Qwen3 设计：`price.per` 从 `request` 改成 `1000_characters`（`counted`：`prompt` 和 `params.sample_text`，`minimum_credits` 22.5），
 `sample_text` 的说明加了「字数算进价里」；SkyCut 从来照 `/quote` 给 `max_credits`（`scripts/check-voice-recovery.sh` 的 `LibraryChecks` 用一段超过 1,000 字的描述钉着报价 45、任务
-`max_credits` 45），打开全部权限时那段说明照 `per` 改说「描述加试读句每开始 1,000 字多少」（`SkyStudioVoiceStandingNotice`）。`/models` 还没上线；
+`max_credits` 45），打开全部权限时那段说明照 `per` 改说「描述加试读句每开始 1,000 字多少」（`SkyStudioVoiceStandingNotice`）。写这一节时（2026-11-10）`/models`
+的声音那部分还没上线；2026-11-11 的[真实冒烟](../reports/2026-11-11-voice-real-smoke.md)已经对着真 Sky Studio 用过声音目录：繁体旁白用的预设
+`gemini:Charon`，打开全部权限时列出的一次性费用是 MiniMax 设计约 751.4、Qwen3 每开始 1,000 字 22.5、MiniMax 版约 377.6（快照里也是这组数）。
 目录改了 Sky Studio 会重新导出，到时原样换掉再跑 `scripts/check-sky-studio.sh`。PR 1 先按两份方案手写过一份，换成导出之后
 对上的：预设 30 个、名单、角色、授权文案的形状和值，Eleven 的 94 种语言；没对上、照 Sky Studio 改了 SkyCut 的：其余语言的字数上限键是 `other`（不是手写时猜的 `default`）、
 一次性费用 377.6 / 751.4 / 22.5、Despina 的性别（当时是 `unknown`，最终导出改成女声）、一次性费用的记录带 `one_time: true`、`voice_enroll` 不收 `auto`；照 Sky Studio 的代码

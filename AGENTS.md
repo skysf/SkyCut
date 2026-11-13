@@ -360,14 +360,14 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [剪辑美感：先把审美写下来，再补零件](docs/plans/2026-10-05-editing-aesthetics.md) — 为什么 AI 剪得普通、导演手册式的卡、参考片只量用户给的文件。
 - [让 AI 录屏：record_screen](docs/plans/2026-10-03-screen-recording-mcp.md) — AI 自己选来源、没授权弹一次、开录不问、一边录一边操作；我定的十条。
 - [视频 upscale：片段送去放大，比过再换](docs/plans/2026-10-02-video-upscale.md) — 用户拍的 16 条板、实测定下的事实（声音自己封回、帧数要核对）、四刀。
-- [联动：主轨块挪到哪、删没删，压在它上面的东西跟着走](docs/plans/2026-10-02-timeline-linkage.md) — 「和剪映一样」：跟画面不跟 id、完全在一段里的才跟、真删才连带删；场景表就是自检用例。
+- [联动：主轨块挪到哪、删没删，压在它上面的东西跟着走](docs/plans/2026-10-02-timeline-linkage.md) — 「和剪映一样」：跟画面不跟 id；跨段的要底下画面全部同移才跟；字幕句两头各自换算、说的话剩不到一半就删（10-15 起裁切也删）；别的东西真删才连带删；场景表就是自检用例。
 - [预览和成片的声音：自己的音频引擎](docs/plans/2026-10-01-audio-engine.md) — 为什么不用 AVPlayer 的合成（每条音轨 40 ms）、架构、时钟对齐、三刀。
 - [预览的画面：优化媒体](docs/plans/2026-10-01-video-optimized-media.md) — 只转长 GOP 的源和时间线用到的块、成片永远原片、缓存 10 GB LRU；V1–V3 已合。
 - [导出真峰值限幅 + 响度报告，关键帧缓动](docs/plans/2026-09-30-export-limiter-and-easing.md) — −1 dBFS 限幅、响度只报不归一；`easing` AI 默认 ease_in_out、手打默认线性。
 - [音效：合成器（给 AI）+ 录音素材库（给用户）](docs/plans/2026-09-30-sound-effects.md) — AI 先搜素材库、没有再合成；样音点头才写代码；`hit_at` 落点。
 - [界面语言：加西班牙语、法语、土耳其语](docs/plans/2026-09-30-ui-languages.md) — 先把枚举和守卫改成任意多种语言；译文 AI 出、不审、直接算正式。
 - [剪辑风格：五种预设风格（中文稿）](docs/plans/2026-09-28-mcp-recipes.md) — 共用规矩 + 五张卡 + 配音角色表；改套路先改它、再同步 App 资源里的英文卡。
-- [让 AI 调用 SkyCut 剪视频：MCP 方案](docs/plans/2026-09-27-mcp.md) — 用户拍的 58 条板（第一期客户端、看得见、什么时候问用户、不靠外部工具、剪辑风格、配音、fal 生成…）、架构与六块；真实状态看实施报告。
+- [让 AI 调用 SkyCut 剪视频：MCP 方案](docs/plans/2026-09-27-mcp.md) — 用户历次拍的板（第一期客户端、看得见、什么时候问用户、不靠外部工具、剪辑风格、配音、fal 生成…）、架构与六块；真实状态看实施报告。
 - [隐藏扩到所有块、回到开头、对齐线、字幕拆成两条独立轨](docs/plans/2026-09-26-hide-guides-independent-subtitles.md) — 2026-09-26 五件事拍过的板，字幕独立轨那部分最细。
 - [时间线复制 / 剪切 / 粘贴 + 缩放以鼠标为中心 + 纵向缩放](docs/plans/2026-09-26-timeline-clipboard-and-zoom.md) — 2026-09-26 逐条拍的板和实现细节（Z1–Z7、C1–C9）。
 - [生成的字幕：去标点、断句、只留一条、藏起来的不转写](docs/plans/2026-09-26-subtitle-generation-style.md) — 调研（主流剪辑软件、Netflix / BBC 的数字）和逐条拍的板。
@@ -377,8 +377,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [声音场景 + 成片声音改从预览混音读](docs/plans/2026-09-24-sound-scenes.md) — 九个场景、余音越过段尾、效果在段增益之后；成片的声音只做一遍。
 - [预览性能 ratchet 方案](docs/plans/2026-09-24-preview-perf-ratchet.md) — 为什么数「活」不数 CPU、只许降不许涨、不拿画质换数字。
 - [声音编辑：波形、深度缩放、音量曲线、推子与电平表](docs/plans/2026-09-23-audio-mixing.md) — 曲线属于段、推子属于轨等拍过的板，和三个探针的实测地基。
-- [音频库（音乐 / 音效）](docs/plans/2026-09-22-audio-library.md) — R2 按需下载 + 本地导入；**只收 CC-BY / CC0**（SA 会传染给用户成片）；manifest、试听、ducking。
-- [从 Finder 拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) — 拖到哪落到哪、占着就往上抬一轨、多文件首尾相接、⌘V 粘贴文件；和 `addMedia` 的分工。
+- [音频库（音乐 / 音效）](docs/plans/2026-09-22-audio-library.md) — R2 按需下载 + 本地导入；网上的素材**只收 CC-BY / CC0**（SA 会传染给用户成片），用户确认可分发的自有素材标 `owned`（09-30 加）；manifest、试听、ducking。
+- [从 Finder 拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) — 拖到指针处：画面撞上往上抬一轨、声音放不下从头找；磁吸开着时主轨落在拼紧之后的位置；多文件首尾相接、⌘V 粘贴文件；和 `addMedia` 的分工。
 - [画面段的入场 / 出场动画](docs/plans/2026-09-18-clip-animation.md) — 效果清单、吞掉画面渐变、不露边口径、选型约束与分刀。
 - [转场库扩充](docs/plans/2026-08-23-transition-library.md) — 推移 / 擦除 8 种新转场的选型约束（预览斜坡能精确表达才收）与悬停预览选择器。
 - [定格方案](docs/plans/2026-08-08-freeze-frame.md) — 产品参数、提交模型、分辨率政策与已知代价。
@@ -406,11 +406,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [测试版 0.18.48：导出水印和 Claude 桌面版「连接」的冒烟](docs/reports/2026-10-27-beta-watermark-and-claude-desktop-smoke.md) — 水印落点对表；桌面版要真重启才重读配置。
 - [真 Codex 连 SkyCut 的冒烟（0.18.47）](docs/reports/2026-10-26-codex-client-smoke.md) — 连接 / 断开、12 步全通；撞出悄悄丢参数和备份权限两个问题。
 - [AI 多开补测：屏幕亮着走界面项（0.18.42 → 0.18.45）](docs/reports/2026-10-18-ai-multi-project-ui-smoke.md) — 撞出并修掉三个问题（#241–#243）；怎么在用户用着电脑时测。
-- [第四批 AI 反馈的测试版冒烟（0.18.46）](docs/reports/2026-10-18-ai-feedback-batch4-smoke.md) — 折行断在词组边界；`listen cuts` 和 cut_speech 的建议一致。
+- [第四批 AI 反馈的测试版冒烟（0.18.46）](docs/reports/2026-10-18-ai-feedback-batch4-smoke.md) — 折行断在词组边界、预览和成片一样；同一份完整转写下 `listen cuts` 和 cut_speech 的建议一致，只转写四段时入点差一帧。
 - [改名 SkyCut 之后的冒烟（0.18.47）](docs/reports/2026-10-18-skycut-rename-smoke.md) — 授权不用重给、两种工程后缀都能开；菜单栏的 App 名取可执行文件名。
 - [AI 多开第 ① 刀的冒烟（0.18.38）](docs/reports/2026-10-17-open-projects-slice1-smoke.md) — 两个工程窗口各管各的；撞出「先放内容后挂 delegate」并修好。
 - [AI 多开第 ② 刀的冒烟（0.18.39）](docs/reports/2026-10-17-ai-project-routing-slice2-smoke.md) — 一个会话两个工程各进各的、别的会话碰不到；撞出 open_folder 报旧文件夹。
-- [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程（0 个窗口）全流程；锁屏时别拿 CG 窗口列表判断窗口关没关。
+- [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程的 MCP 流程跑通；屏幕锁着，真的一个窗口都不开和侧边栏没目检；锁屏时别拿 CG 窗口列表判断窗口关没关。
 - [AI 多开第 ④ 刀的冒烟（0.18.42）](docs/reports/2026-10-17-ai-queue-version-slice4-smoke.md) — 一个文件夹两个版本、导出和字幕排队；方案四刀做完。
 - [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 和字幕行距真机过一遍，撞出 quiet_spot 的 bug。
 - [字幕默认单行 + 行数开关的测试版冒烟（0.18.37）](docs/reports/2026-10-16-subtitle-line-count-smoke.md) — `max_lines` 和面板两条路结果一样、撤销各退一层。
@@ -418,7 +418,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [AI 接口（MCP）第六块实施报告](docs/reports/2026-09-29-mcp-slice6-report.md) — fal.ai 生成：模型表、Key、每日上限、`generate_media`；没对真 fal 验过的。
 - [AI 接口（MCP）第三块实施报告](docs/reports/2026-09-28-mcp-slice3-report.md) — 分析数据 + 智能剪：`transcribe`、`listen beats`、`cut_speech`、`cut_to_beat`。
 - [AI 接口（MCP）第四块实施报告](docs/reports/2026-09-28-mcp-slice4-report.md) — 本机识别画面：分镜头、一次看几个文件、铺满跟拍；探针实测。
-- [AI 接口（MCP）第五块实施报告（进行中）](docs/reports/2026-09-28-mcp-slice5-report.md) — 剪辑风格、配音（macOS / Kokoro 的探针与接入）、逐词高亮字幕；验收实剪第一轮。
+- [AI 接口（MCP）第五块实施报告（2026-09-28–29 阶段记录）](docs/reports/2026-09-28-mcp-slice5-report.md) — 剪辑风格、配音（macOS / Kokoro 的探针与接入）、逐词高亮字幕；验收实剪跑了两轮，PR #81 09-29 合并后的核对和没做完的见正文。
 - [AI 接口（MCP）第一块实施报告](docs/reports/2026-09-27-mcp-slice1-report.md) — 23 个工具、CI 与端到端证据、测试版怎么出（`scripts/build-beta-app.sh`）。
 - [AI 接口（MCP）第二块实施报告](docs/reports/2026-09-27-mcp-slice2-report.md) — AI 的手和眼（画面放法、去黑边、`look`、`listen`）和现有功能铺满，工具 23 → 37 个。
 - [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) — Phase 0–5 的真实进度、实测证据、偏差和未完成项。
