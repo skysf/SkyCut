@@ -72,7 +72,8 @@ App 的行为一直是对的（硬上限、草稿、清单都照合同做），�
   - 只把草稿那条换回「480p 出草稿、768p 重做（Sky Studio has no 1080p video）」：**1 条红**。
   每次换完逐字节放回修好的文件（`cmp` 对过），再跑全绿：**7,736 条 MCP 检查全过**。
 - 第一次整跑（边编译边跑、机器负载高）有一条和这次无关的检查红了：`ListenRangeChecks` 的「bounded file listen must work with overview
-  suspended」（等 2 秒就超时）；不重编、直接再跑一遍全过，没算进上面的证据。
+  suspended」（等 2 秒就超时）；不重编、直接再跑一遍全过，没算进上面的证据。原因（自检对着墙上时钟的期限）和修法见
+  [后来的案例](2026-11-13-listen-range-checks-timed-out-under-load.md)。
 - 推之前 `scripts/check-local.sh mcp docs-index-drift`：全部扫描守卫绿，`check-mcp` 7,736 条全过，`docs-index-drift` 绿。
 
 ## 教训 / 防回归
