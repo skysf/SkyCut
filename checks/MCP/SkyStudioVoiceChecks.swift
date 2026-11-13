@@ -144,7 +144,9 @@ private func voiceoverGuideChecks() {
                    "several at once", "batches_waiting", "line_models", "batches sent after that use the fallback too",
                    "fallback_needs_one_time",
                    // 声音 PR 7：全部权限下有长期授权就不问、直接建，结果带 full_access；没有就问一次、点过头记上。
-                   "standing voice consent on record", "builds it without asking", "enroll_job_id", "agreeing records the consent"] {
+                   "standing voice consent on record", "builds it without asking", "enroll_job_id", "agreeing records the consent",
+                   // 2026-11-13（审查 D6R-01）：建声音那一步的任务号和 credits 是建版本的，不是旁白的；同一个版本在建时回那一单。
+                   "not the narration's price", "already_building"] {
         check(text.contains(phrase), "the add_voiceover topic says \"\(phrase)\"")
     }
     // 字幕时间（声音 PR 5，声音方案第七节）：四种 subtitle_timing、估出来的要转告、模型没装先装、转写不了的预设整段换 eleven-v4、
