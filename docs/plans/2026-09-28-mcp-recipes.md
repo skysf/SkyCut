@@ -70,9 +70,12 @@
     本机合成（转场的 whoosh / riser / impact、出字的 pop / ding、快门、提示音），落点用 `hit_at` 压在切点或出字那一刻；两种都默认 −8 dB 压在人声下面。
     `generate_media kind sound_effect` 只留给两边都没有的真实声音（环境声、人群、动物），而且仍是条件句。
 13. **配旁白也可能花积分**（2026-11-13 补，[Sky Studio 的任务](../architecture/sky-studio-jobs.md)第五节）：存了 Sky Studio 的 Key 时，`add_voiceover`
-    用 Sky Studio 读默认的预设、角色和声音库里的 `voice_…`，花积分；SkyCut 自己的声音和这台 Mac 的声音不花。Sky Studio 这次用不了时，预设和角色
-    在花钱之前就换成本机的声音读（`voice.note` 说为什么）。细节以说明书为准：`skycut_guide` 的 `add_voiceover`（一次性费用和 `skip_one_time` 在它讲付费确认的
-    那一节）、`paid` 两个主题。剪片时要记住的：
+    用 Sky Studio 读默认的预设、角色和声音库里的 `voice_…`，花积分；SkyCut 自己的声音和这台 Mac 的声音不花。只有 Sky Studio 这次用不了时（比如连不上、
+    服务出错、Key 不认），预设和角色才在花钱之前换成本机的声音读，换没换以结果里的 `voice.note` 为准；服务器明确拒绝这次请求时（参数不符，比如点名的模型
+    和声音、语言配不上，或者没有这个模型）是报错，一分不花、也不换声音（每日预算不够见下面第三项）。（2026-11-13 收口：原来写的「Sky Studio 这次用不了时，
+    预设和角色在花钱之前就换成本机的声音读」说满了 —— `SkyStudioVoiceoverStart` 里服务器明说不行、点名的模型不对的那几支原话报错、不换声音，
+    见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)「后续二」最后的收口核查。）细节以说明书为准：`skycut_guide` 的 `add_voiceover`
+    （一次性费用和 `skip_one_time` 在它讲付费确认的那一节）、`paid` 两个主题。剪片时要记住的：
     - 读新的稿子（`lines`）：回任务号之前整段报一次价、按每日硬上限整体预留；把价告诉用户（结果里的 `credits`，实收看 `get_job`）。
     - 声音库的声音要先建这种语言的版本时（一次性费用），回的是建声音那一步：要问用户的 `needs_confirmation`，或者已经起的 `kind: voice_enroll`
       任务（同一个版本已经在建时回那一单、带 `already_building`，不另花钱）。这一笔是建版本的钱，不是旁白的价，旁白还没读、也还没预留；

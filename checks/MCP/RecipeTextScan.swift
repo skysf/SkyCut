@@ -4,19 +4,34 @@ import Foundation
 // 审查 D6R-03：换个说法（spending cap）就认不出预算，嵌套列表把父项的条件和子项的动作切成两段，两种都漏掉了教 AI 越过每日预算的话）。
 // 这是**受限的文字扫描**：认得出的写法才查得到，扫不出来不等于卡里的话对得上合同。所以切法和词表各自带着坏话（必须抓到）和
 // 合规的话（不许误报），在 runRecipeTextScanSelfChecks 里先过一遍；改切法、改词表时先让这些例子说话，再看卡。
+// 定位：它防的是照规矩写卡的人无心写错（换一种常见的说法、换一种列表的写法），不是防故意绕 —— 要故意构造才绕得过去的写法记在下面
+// 「拦不住的」里，不再一种一种补。
 // 切法：标题、空行隔开的段、列表的每一项各算一段，续行（不管缩不缩进）接在上一行后面；**嵌套的列表项带着上面每一层父项的话**，
 // 段落后面的列表项带着那一段（「超了每日上限：」下面一项「带 confirm_token 再调」要算成一句）。句子在段里按句号 / 问号 / 叹号切，
-// 冒号、分号不切，所以父项结尾的「…：」和子项的第一句连成一句。标题不带给下面：标题是名字不是条件（同一节里分开写的两条不算一句）。
+// 冒号、分号不切，所以父项结尾的「…：」和子项的第一句连成一句；**切句之前去掉认出来的列表记号**：「1.」「12.」的句点是记号、不是句号
+// （审查 D6R-13：嵌套的编号子项把父项带下来的条件切掉了，「1)」反倒没事）。标题不带给下面：标题是名字不是条件（同一节里分开写的两条不算一句）。
+// 拦不住的（文字扫描本来就够不着）：每日预算和确认码拆进两句、只靠意思连着（代词、「然后」、标题）；词表以外的说法。
 // 不管什么：卡里该写什么、合同是什么（RecipeContractChecks）。
 
 /// 卡里的段：标题、空行隔开的段、列表的每一项各算一段；续行接在上一行后面；嵌套的列表项、段落后面的列表项前面带着父项的话。
+/// 列表记号留着（读得出是哪一层）；切句（recipeSentences）用的是去掉记号的。
 func recipeBlocks(_ text: String) -> [String] {
-    var blocks: [String] = []
+    recipeLayers(text).map { $0.map { $0.marker + $0.text }.joined(separator: " ") }
+}
+
+/// 段里的一层：列表项的记号连着后面的空白（「- 」「1. 」；段落和标题没有）和记号后面的话。
+private struct RecipeLayer {
+    var marker = ""
+    var text: String
+}
+
+/// recipeBlocks 和 recipeSentences 共用的切法：每段是几层，父项在前、这一项在最后。
+private func recipeLayers(_ text: String) -> [[RecipeLayer]] {
+    var blocks: [[RecipeLayer]] = []
     // 还开着的父项：段落记 -1（它后面的列表项都带着它），列表项记它的缩进（缩进更深的才是它的子项）。
-    var parents: [(indent: Int, text: String)] = []
-    // 续行接到哪一段；接的那一段就是 parents 最上面那一层时，父项的话也一起长。
+    var parents: [(indent: Int, layer: RecipeLayer)] = []
+    // 续行接到哪一段：接在那一段的最后一层上，它就是 parents 最上面那一层，父项的话也一起长。
     var current: Int?
-    var currentIsParent = false
     for line in text.components(separatedBy: "\n") {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
         let indent = line.prefix { $0 == " " || $0 == "\t" }.count
@@ -24,43 +39,42 @@ func recipeBlocks(_ text: String) -> [String] {
             current = nil
         } else if trimmed.hasPrefix("#") {
             parents = []
-            blocks.append(trimmed)
+            blocks.append([RecipeLayer(text: trimmed)])
             current = nil
-        } else if recipeListItem(trimmed) {
+        } else if let marker = recipeListMarker(trimmed) {
             while let last = parents.last, last.indent >= indent { parents.removeLast() }
-            blocks.append((parents.map(\.text) + [trimmed]).joined(separator: " "))
-            parents.append((indent, trimmed))
+            let item = RecipeLayer(marker: marker, text: String(trimmed.dropFirst(marker.count)))
+            blocks.append(parents.map(\.layer) + [item])
+            parents.append((indent, item))
             current = blocks.count - 1
-            currentIsParent = true
         } else if let open = current {
-            blocks[open] += " " + trimmed
-            if currentIsParent, !parents.isEmpty { parents[parents.count - 1].text += " " + trimmed }
+            blocks[open][blocks[open].count - 1].text += " " + trimmed
+            if !parents.isEmpty { parents[parents.count - 1].layer.text += " " + trimmed }
         } else if let last = parents.last, last.indent >= 0, indent > last.indent {
             // 列表项里空行之后缩进的又一段：还是那一项的话。
-            blocks.append((parents.map(\.text) + [trimmed]).joined(separator: " "))
-            parents[parents.count - 1].text += " " + trimmed
+            blocks.append(parents.map(\.layer) + [RecipeLayer(text: trimmed)])
+            parents[parents.count - 1].layer.text += " " + trimmed
             current = blocks.count - 1
-            currentIsParent = true
         } else {
-            parents = [(-1, trimmed)]
-            blocks.append(trimmed)
+            parents = [(-1, RecipeLayer(text: trimmed))]
+            blocks.append([RecipeLayer(text: trimmed)])
             current = blocks.count - 1
-            currentIsParent = true
         }
     }
     return blocks
 }
 
-/// 列表项的开头：`- `、`* `、`+ `、`1. `、`1) `。
-func recipeListItem(_ trimmed: String) -> Bool {
-    trimmed.range(of: #"^([-*+]|\d+[.)])\s"#, options: .regularExpression) != nil
+/// 列表项开头的记号，连着后面的空白：`- `、`* `、`+ `、`1. `、`1) `；不是列表项回 nil。
+func recipeListMarker(_ trimmed: String) -> String? {
+    trimmed.range(of: #"^([-*+]|\d+[.)])\s+"#, options: .regularExpression).map { String(trimmed[$0]) }
 }
 
-/// 卡里的句子：段（recipeBlocks）里再按句号 / 问号 / 叹号切，去掉重复的（父项的话会跟着每个子项再出现一次）。
-/// 冒号、分号不切：「超了每日上限：回 needs_confirmation」这种写法要算在同一句里。
+/// 卡里的句子：段里去掉列表记号、再按句号 / 问号 / 叹号切，去掉重复的（父项的话会跟着每个子项再出现一次）。
+/// 冒号、分号不切：「超了每日上限：回 needs_confirmation」这种写法要算在同一句里。记号先去掉：「1.」的句点不是句号（审查 D6R-13）。
 func recipeSentences(_ text: String) -> [String] {
     var seen = Set<String>()
-    return recipeBlocks(text)
+    return recipeLayers(text)
+        .map { $0.map(\.text).joined(separator: " ") }
         .flatMap { $0.replacingOccurrences(of: #"([.!?])\s+"#, with: "$1\n", options: .regularExpression).components(separatedBy: "\n") }
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty && seen.insert($0).inserted }
@@ -100,6 +114,7 @@ func recipeClaimsSkyCutAsks(_ sentence: String) -> Bool {
 /// 切法和词表自带的例子：坏话必须抓到、合规的话不许误报（审查 D6R-03：以后改检查不会又漏）。
 func runRecipeTextScanSelfChecks() {
     wordingSelfChecks()
+    nestedListSelfChecks()
     checkEqual(recipeBlocks("- a\n  b\nc"), ["- a b c"], "continuation lines join their block, indented or not")
     checkEqual(recipeBlocks("- a\n  - b\n- c"), ["- a", "- a - b", "- c"], "a nested item carries its parent; a sibling does not")
     checkEqual(recipeBlocks("1. a\n   - b\n     - c\n   - d"), ["1. a", "1. a - b", "1. a - b - c", "1. a - d"],
@@ -111,6 +126,8 @@ func runRecipeTextScanSelfChecks() {
     checkEqual(recipeBlocks("* a\n+ b\n2) c"), ["* a", "+ b", "2) c"], "every list marker starts an item")
     checkEqual(recipeSentences("A b. C d? E! F: g; h."), ["A b.", "C d?", "E!", "F: g; h."],
                "sentences end at . ? ! but not at : or ;")
+    checkEqual(recipeSentences("- a:\n  1. b. c\n  2) d"), ["a:", "a: b.", "c", "a: d"],
+               "list markers are dropped before splitting: a numbered item's period is not a full stop")
 
     let bad = [
         ("a spending cap", "Over the spending cap, retry with confirm_token."),
@@ -136,6 +153,33 @@ func runRecipeTextScanSelfChecks() {
     ]
     for (name, text) in fine {
         check(recipeBudgetConfirmationSentences(text).isEmpty, "the scan does not flag what keeps them apart (\(name)): \(text)")
+    }
+}
+
+/// 各种列表记号的嵌套（审查 D6R-13）：父项带下来的条件，不管子项用 -、1. 还是 1)、隔几层，都和子项连成一句；兄弟项不合并。
+private func nestedListSelfChecks() {
+    let markers = ["-", "1.", "1)"]
+    var bad: [String] = []
+    for parent in markers {
+        for child in markers { bad.append("\(parent) Over the daily limit:\n   \(child) retry with confirm_token.") }
+        bad.append("\(parent) Paid work:\n   \(parent) Over the daily limit:\n      \(parent) retry with confirm_token.")
+    }
+    bad += ["- Over the daily limit:\n  1. retry with confirm_token.",  // Codex 的原例
+            "- Paid work:\n  - Over the daily limit:\n    12. retry with confirm_token.",
+            "1. With a confirm_token:\n   1. go past the daily limit.",
+            "Past the daily credit limit:\n1. call again with confirm_token.",
+            "- Over the daily limit:\n\n  1. retry with confirm_token."]
+    for text in bad {
+        check(!recipeBudgetConfirmationSentences(text).isEmpty, "the scan carries the daily limit into a nested item, whatever the markers: \(text)")
+    }
+    var fine: [String] = []
+    for (first, second) in [("-", "-"), ("1.", "2."), ("1)", "2)")] {
+        let siblings = "\(first) daily_budget_exceeded: stop there.\n\(second) needs_confirmation: ask the user, then call again with confirm_token."
+        fine += [siblings, "- Paid work:\n" + siblings.split(separator: "\n").map { "  " + $0 }.joined(separator: "\n")]
+    }
+    fine.append("1. Over the daily limit, stop.\n   1. needs_confirmation: ask the user, then call again with confirm_token.")
+    for text in fine {
+        check(recipeBudgetConfirmationSentences(text).isEmpty, "the scan keeps siblings and a closed sentence apart, whatever the markers: \(text)")
     }
 }
 

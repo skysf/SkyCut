@@ -9,8 +9,11 @@
 #   整份文件（不设上限的小节也算）——
 #     · 链接只有一种：[字](相对路径.md)，可以带 #锚点；路径只用字母、数字、. _ - /，不带 ./、不带标题、不链网址。
 #     · 方括号只许用在这种链接里（行内代码里的不算）：引用式链接和它的定义、脚注、任务框、图片都红。
-#     · 行内代码只许一对反引号、不跨行、不是空的；代码围栏、行内代码以外的 < 反斜杠 $ 和 HTML 实体、控制字符、
-#       看不见的字符都红（它们都能让一个链接看着在、其实点不开或看不见）。
+#     · 行内代码只许一对反引号、不跨行、不是空的；代码围栏（反引号或波浪线，不管套在引用、列表里还是顶格：一行里有连着的
+#       两个反引号或三个波浪线就红）、行内代码以外的 < 反斜杠 $ 和 HTML 实体、控制字符、看不见的字符都红
+#       （它们都能让一个链接看着在、其实点不开或看不见）。
+#     · 链接的文字里至少要有一个看得见的字：ASCII 的字母或数字、汉字（行内代码里的也算）。正着认、不列空白 ——
+#       细空格、盲文空白这类 Unicode 空白列不完（D6R-14）。
 #     · 第一行是「# 标题」（不许 front matter）；缩进的行只许接在列表项后面、列表记号后面只空一格
 #       （空行后面缩进的行、记号后面空五格的内容会成代码块，里面的链接点不开）。
 #   索引小节和整份 INDEX.md ——
@@ -78,6 +81,9 @@ BEGIN {
   inv[++ninv] = "\342\201\246"; inv[++ninv] = "\342\201\247"; inv[++ninv] = "\342\201\250"
   inv[++ninv] = "\342\201\251"; inv[++ninv] = "\343\200\200"; inv[++ninv] = "\343\205\244"
   inv[++ninv] = "\357\273\277"
+  # a visible letter in link text, named positively (D6R-14): ASCII letter or digit, or a Han character
+  # U+3400..U+9FFF (UTF-8 E3 90 80 .. E9 BF BF); whitespace is not listed because it cannot be listed in full
+  letter = "[A-Za-z0-9]|\343[\220-\277][\200-\277]|[\344-\351][\200-\277][\200-\277]"
   mode = (whole ? "index" : "free")
   prevk = "blank"; tstate = 0; seen_entry = 0; extra = 0
 }
@@ -87,13 +93,16 @@ BEGIN {
   # ---- 1. whole file: characters ----
   if (line ~ /[\001-\037\177]/) { err("ctrl"); gsub(/[\001-\037\177]/, "", line) }
   for (i = 1; i <= ninv; i++) if (index(line, inv[i])) { err("invisible"); break }
-  if (index(line, "``") || line ~ /^ *~~~/) err("fence")
+  # a fence is red inside any container: matching only at the line start let "> ~~~" and "- ~~~" through (D6R-12)
+  if (index(line, "``") || index(line, "~~~")) err("fence")
   t = line
   if (gsub(/`/, "`", t) % 2) err("tick")
+  # vis: each code span becomes one mark, \001 when it holds a visible letter, \003 when it does not
   vis = ""; t = line
   while (match(t, /`[^`]*`/)) {
-    if (substr(t, RSTART + 1, RLENGTH - 2) ~ /^ *$/) err("blank_code")
-    vis = vis substr(t, 1, RSTART - 1) "\001"
+    code = substr(t, RSTART + 1, RLENGTH - 2)
+    if (code ~ /^ *$/) err("blank_code")
+    vis = vis substr(t, 1, RSTART - 1) (code ~ letter ? "\001" : "\003")
     t = substr(t, RSTART + RLENGTH)
   }
   vis = vis t
@@ -116,8 +125,8 @@ BEGIN {
     nshape++
     if (nshape == 1) { start1 = RSTART; len1 = RLENGTH; text1 = text }
     rest = substr(rest, 1, RSTART - 1) "\002" substr(rest, RSTART + RLENGTH)
-    if (text ~ /^ *$/) err("link_text")
     if (index(text, "\002")) { err("bracket"); continue }
+    if (text !~ letter && !index(text, "\001")) err("link_text")
     path = target; anchor = ""
     h = index(target, "#")
     if (h) { path = substr(target, 1, h - 1); anchor = substr(target, h) }

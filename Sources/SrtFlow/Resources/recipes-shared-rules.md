@@ -51,10 +51,13 @@
     appearing) and SkyCut sets the start. Both sit at -8 dB under speech; change volume_db if needed. generate_media is
     only for real-world sounds neither has; find_audio is also where music comes from.
 13. Voiceover can spend credits too: with a Sky Studio key, add_voiceover reads the default preset, the roles and
-    voice_… voices with Sky Studio, which spends credits; SkyCut's own voices and the Mac's are free. When Sky Studio
-    cannot be used, a preset or role is read by a local voice before anything is paid (voice.note says why).
-    skycut_guide topic=add_voiceover (its section on the one-time fee covers skip_one_time) and topic=paid have the
-    details; keep these in mind:
+    voice_… voices with Sky Studio, which spends credits; SkyCut's own voices and the Mac's are free. Only when Sky
+    Studio cannot be used this time (for example no connection, a server error or a key it does not accept) does a
+    preset or role switch to a local voice, before anything is paid, and voice.note in the result says so: go by it.
+    When Sky Studio refuses the request itself (for example a named model that does not fit the voice or the
+    language, or one it does not have), the call returns that error: nothing is charged and the voice does not change;
+    the same goes for the daily limit (below). skycut_guide topic=add_voiceover (its section on the one-time fee
+    covers skip_one_time) and topic=paid have the details; keep these in mind:
     - Narrating new lines: before the job_id comes back, add_voiceover quotes the whole script once and reserves that
       against the daily credit limit. Tell the user the credits in the result (get_job reports what was charged).
     - A voice_… voice that must first be built for this language (a one-time fee) returns that step instead:
