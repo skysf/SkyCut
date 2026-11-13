@@ -151,7 +151,12 @@ EOF 必须同时成立才能接受输出；后代继承写端时到期拒绝，�
 | `checks/blocking-media-reads.sh` | `copyNextSampleBuffer` 写在 async 函数里就红（白名单只有 `AudioWindowReader`，理由见上）；`AudioWindowReader.extract` 在 `SubtitleGen/` 以外被调就红；`QueuedAudioWindow` 的读取要交给 `MediaReadQueue`。已知盲区：同步函数里再包一层 `Task { }`，这条看不出来 |
 | `scripts/check-export-profile.sh` | 生产 `FFmpegProcess` 的立即退出、双管道 / 最后进度、错误和取消；独立线程的 30 秒看门狗在旧等待实现上实际变红 |
 | `scripts/check-engine-probe.sh` | 短探测的截止时间 / 双输出上限 / 退出码，父进程唯一回收、信号与描述符隔离、注册前后退出窗口、候选去重与单次定位任务 |
-| `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取；队列中超时/取消直接结束，已开读时等本次 copy 返回再由读取体单点取消与释放；原生探针固定线程交错，失败不发布半份统计 |
+| `scripts/check-mcp.sh` 的 `ListenRangeChecks` / `ListenReadEndChecks` / `ListenReaderLifecycleChecks` | 显式文件范围在 `analysis` 上有界读取（数原生 reader 交出的帧、挂起的 overview 上多没多出活）；队列中超时/取消直接结束（回来时队列还挂着、一次没开读），已开读时等本次 copy 返回再由读取体单点取消与释放；原生探针固定线程交错，失败不发布半份统计 |
+
+**自检里的期限只拦卡死**（2026-11-13，[案例](../bugfixes/2026-11-13-listen-range-checks-timed-out-under-load.md)）：读取类自检传给生产入口的截止时间、整组的看门狗、
+等闸门的时间只为卡死时有个头，和真工具一样宽（listen 是 40 秒）；要证明的事 —— 读了几帧、排没排进别的队列、开没开读、回来的是结果还是超时 —— 数出来，
+不拿「几秒内回来」去推：机器满载时几十毫秒的读取能拖过 2 秒，那几次红的都是自检的期限，不是生产路径。测「超时 / 取消怎么结束」的，用探针把 reader 停在
+开读那一刻，等停的原因有了再往下读，不赌读得比截止时间快或慢。真要比快慢，只和同一次运行里同一种活比（[定格](freeze-frame.md)）。
 
 **人工回归**（自动化够不着的真实工程，发版前实机验证）：
 
