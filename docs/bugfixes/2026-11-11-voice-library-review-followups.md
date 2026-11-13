@@ -77,5 +77,9 @@
 - **「重试多少次都一样」的失败要有出路**，不管原因是这台 Mac 转写不了，还是这段音频对不上。
 - 没验到的：真 Sky Studio 上的去重 / 改价 / `consent_outdated`（不发付费请求，照接口合同写的）；SkyCut 重启后本机不记得在建的那一单，
   用户再点头会再记一笔（服务器仍只扣一次），当天的账会多出一笔，第二天清零。
+  - 后续（2026-11-11 当天）：上面「重启后不记得」那半句记的是写这份案例时的状态，同一天已由
+    [重启后不记得在建的声音库那一单](2026-11-11-voice-library-job-after-restart.md)修掉：在建的设计 / 建 MiniMax 版的单落盘，
+    已受理的单重启后只 GET 原单、按原来那一笔结账。交的回答丢了、没有任务号的那一单仍会再问一次价（账在受理时并成一笔），
+    变声、upscale、生成重启前那一笔的结账不在那次范围里，见那份案例的「没做的」。真 Sky Studio 上没验到的那几项照旧没验。
 - 长期约束：[声音库](../architecture/voice-library.md)第十节、[阻塞的媒体读取](../architecture/blocking-media-reads.md)「例外」、
   [Sky Studio 的任务](../architecture/sky-studio-jobs.md)第五节。
