@@ -21,6 +21,12 @@ concurrency:
   group: checks-${{ github.event.pull_request.number || github.sha }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# 合并之后 main 上那一轮要读本仓库的 artifact 和运行记录（scripts/ci-verified-tree.sh），所以 token 要有 actions: read。
+# 这里写了 permissions，没列出来的权限就都没有了：两个 job 用到的只有读代码这一项。
+permissions:
+  contents: read
+  actions: read
+
 jobs:
   shard:
     name: shard ${{ matrix.shard }}/5
@@ -60,8 +66,20 @@ jobs:
         id: changes
         run: echo "docs_only=$(scripts/ci-docs-only.sh)" >> "$GITHUB_OUTPUT"
 
+      # 合并之后 main 上这一轮：合出来的树和这个 PR 最后一次绿的那一轮测的树一模一样时（那一轮在汇总 job 里留了记号，
+      # 见下面的 check-all），这棵树已经原样验过，不再跑检查：第 1 组只编一遍 App、把 .build 缓存存下来给下一个 PR 用，
+      # 其余四组到这里就绿了。PR 上永远是 false。和上一步同一个写法：下面每一步都写成 `verified != 'true'`，这一步
+      # 出了任何岔子（查不到、接口出错、记号过期、输出不是 true）都照常全跑。checks/ci-verified-tree.sh 钉着；
+      # 关掉它不用改代码：把仓库变量 CI_VERIFIED_TREE 设成 off。docs/build/build-and-packaging.md「CI」一节。
+      - name: Already verified? (main only, same tree as the pull request's green run)
+        id: verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_TREE_SWITCH: ${{ vars.CI_VERIFIED_TREE }}
+        run: echo "verified=$(scripts/ci-verified-tree.sh)" >> "$GITHUB_OUTPUT"
+
       - name: Scan guards only (docs-only change)
-        if: steps.changes.outputs.docs_only == 'true' && matrix.shard == 1
+        if: steps.changes.outputs.docs_only == 'true' && steps.verified.outputs.verified != 'true' && matrix.shard == 1
         run: scripts/check-guards.sh
 
       # .build 缓存（docs/bugfixes/2026-11-04-ci-build-cache-never-saved-a-compile.md）：
@@ -74,19 +92,21 @@ jobs:
       #   （docs/bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md）。checks/ci-build-cache-key.sh 钉着这些；
       #   「按内容设的时间比上次编译还早时照样重编」由 scripts/check-ci-build-cache.sh 每次真验一遍。
       - name: Stable file times (content-derived)
-        if: steps.changes.outputs.docs_only != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1)
         run: python3 scripts/ci-stable-mtimes.py
 
       - name: Restore SwiftPM build products
-        if: steps.changes.outputs.docs_only != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1)
         uses: actions/cache/restore@v4
         with:
           path: .build
           key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard${{ matrix.shard }}-${{ github.sha }}
           restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard${{ matrix.shard }}-
 
+      # 已经验过的那种轮里第 1 组照样过一遍这两步（命中只要 2 秒）：PR 上存的缓存别的 PR 取不到，改了 vendor-ffmpeg.sh
+      # 的那次合并之后，要靠 main 上这一轮把新的 ffmpeg 存进大家都取得到的那一份。
       - name: Cache vendor/ffmpeg
-        if: steps.changes.outputs.docs_only != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1)
         id: ffmpeg-cache
         uses: actions/cache@v4
         with:
@@ -94,7 +114,7 @@ jobs:
           key: ffmpeg-${{ hashFiles('scripts/vendor-ffmpeg.sh') }}
 
       - name: Fetch ffmpeg (on cache miss)
-        if: steps.changes.outputs.docs_only != 'true' && steps.ffmpeg-cache.outputs.cache-hit != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1) && steps.ffmpeg-cache.outputs.cache-hit != 'true'
         run: scripts/vendor-ffmpeg.sh
 
       # 只在第 1 组单独编一遍完整 App：编译错误在自己的步骤里完整可见；恢复了 main 上的缓存就只编改了的那些。
@@ -105,20 +125,20 @@ jobs:
         run: swift build --arch arm64
 
       - name: Run checks (shard ${{ matrix.shard }} of ${{ strategy.job-total }})
-        if: steps.changes.outputs.docs_only != 'true'
+        if: steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true'
         run: scripts/check-all.sh --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
 
       # 预览性能 ratchet：起真 App 按固定场景数「做了多少件活」，只许降不许涨
       # （docs/architecture/preview-perf-ratchet.md）。要图形会话，所以不在 check-all.sh 里；
       # 放第 1 组是因为这台已经编好了完整 App。上一步红了它照跑：一次看全。
       - name: Preview performance ratchet
-        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' }}
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
         env:
           PREVIEW_PERF_OUT: ${{ runner.temp }}/preview-perf
         run: scripts/check-preview-perf.sh
 
       - name: Upload preview performance results
-        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' }}
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: preview-perf
@@ -126,7 +146,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Save SwiftPM build products (main only)
-        if: github.event_name == 'push' && success() && steps.changes.outputs.docs_only != 'true'
+        if: github.event_name == 'push' && success() && steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1)
         uses: actions/cache/save@v4
         with:
           path: .build
@@ -160,3 +180,25 @@ jobs:
         run: |
           echo "shards: ${{ needs.shard.result }}"
           test "${{ needs.shard.result }}" = "success"
+
+      # 记号：PR 的这一轮全绿（上面每一步都过了才走得到这里）之后，留一个名字里带着「这一轮检出的那棵树」的 artifact。
+      # 合并之后 main 上那一轮拿自己的树去找它（scripts/ci-verified-tree.sh），认的不是这个文件，是 GitHub 对上传它的
+      # 那一轮的记录（是不是本仓库 checks.yml 的 pull_request 绿轮、是不是这个 PR 的头提交）。只留一天；两步都是
+      # continue-on-error：留不下记号只会让 main 上那一轮照常全跑，不许让必需的 check-all 因此变红。
+      - name: Name the verified tree
+        id: tree
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          printf '%s\n' "${tree}" > "${RUNNER_TEMP}/verified-tree.txt"
+          echo "tree=${tree}" >> "$GITHUB_OUTPUT"
+      - name: Leave the verified-tree marker
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ runner.temp }}/verified-tree.txt
+          retention-days: 1
+          overwrite: true

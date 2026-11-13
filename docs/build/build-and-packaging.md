@@ -164,6 +164,10 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 `https://downloads.skylu.ai/skycut/SkyCut-<版本>-<内容标识>-arm64.dmg`。因此单独更新软件包不需要
 重建 Vercel 官网，也不要在官网里写死版本 URL。
 
+「已通过 CI 的 main」= 这个提交上 main 那一轮（push）的 `check-all` 绿了就算（用户 2026-11-13 定）。那一轮是短轮时
+（树已经在 PR 那一轮原样验过，见「CI」一节「合并之后 main 上那一轮」），每组的摘要里写着是哪一轮 PR 的 CI 验的这棵树；
+不另要求发版前再完整跑一轮。
+
 流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包，用原固定身份验签；核对包内版本、
 arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App。再复用 `scripts/r2.py`
 上传新版本对象（凭证位置见该文件开头），从公开地址完整读回，比对大小与 SHA-256 后，
@@ -547,6 +551,38 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     输出不是 true）就照常全跑。
   - `checks/ci-docs-only.sh` 钉着：判断本身（含在临时仓库里真提交的改名、合并提交、根提交）、每一步重活的条件、
     快速通道只在第 1 组、触发条件里没有 paths、汇总 job 照旧。
+- **合并之后 main 上那一轮：树已经验过就不再跑检查**（2026-11-13 起，用户定；量了什么、几种做法比下来怎样见
+  [合并后 main 上那一轮的实测](../reports/2026-11-13-main-ci-verified-tree.md)）。
+  - 为什么：改代码的 PR 合进来，main 上要再跑一轮完整的，占满 5 台约 7.5 分钟。合出来的树和这个 PR 最后一次绿的那一轮测的树
+    （GitHub 替它合的 `refs/pull/N/merge`）一模一样时，这一轮没有新东西可验：2026-08-16 到 11-13 能查到的 358 次合并里 308 次是这样，
+    几件事并行的 11-04 到 11-13 是 104 次里 77 次。树不一样（ruleset 没开「合并前必须跟上 main」，PR 可以没跟上就合）照旧完整跑。
+  - 记号：PR 那一轮全绿，汇总 job `check-all` 最后上传一个叫 `verified-tree-<这一轮检出的树>` 的 artifact（只留 1 天；两步都
+    `continue-on-error`：留不下只是 main 上多跑一轮，不许让必需的检查变红）。main 上的那一轮不留。
+  - 判断：每组在「只改了文档？」之后跑 `scripts/ci-verified-tree.sh`。它拿合并提交的树去找同名的 artifact，但认的是 GitHub 对上传它的
+    那一轮的记录：本仓库 `.github/workflows/checks.yml`、`pull_request`、completed + success（重跑过的看最后一次）、头提交 = 合并提交的
+    第二个父提交、不是 fork、建出来不到 24 小时（用户定）；合并提交要正好两个父提交（`gh pr merge --merge`，squash / rebase 合的不认）。
+    查不到、接口出错、`gh` 不在、记号过期，一律打印 false、照常全跑。原因写进每组的摘要（`ci-verified-tree: …` 那一行）。
+  - 短轮做什么：第 1 组取 `.build` 缓存、编 App、存缓存（约 1 分钟，下一个 PR 照样取到新的缓存）；其余四组十几秒就结束；
+    跑检查、性能 ratchet、快速通道的扫描守卫都不跑。汇总 job 照样跑官网检查、照样给结论。
+  - 写法：每一步都写成 `steps.verified.outputs.verified != 'true'`（和快速通道同一个写法：判断出岔子就照常全跑）；备缓存的几步是
+    「没验过，或者第 1 组」；编 App 那一步不看它。顶层 `permissions` 给 `contents: read`、`actions: read`（读 artifact 和运行记录要它）。
+    `checks/ci-verified-tree.sh` 钉着：判断本身 22 个用例（临时仓库里真的合并提交 + 假的 `gh`，每个用例只改一个事实）、
+    workflow 每一步的条件、记号只在 PR 的那一轮最后留。
+  - 丢掉的是同一棵树的第二遍。到 11-13，main 上红过的 24 轮里 0 次是「PR 没跟上 main、合出来才坏」：12 次是检查自己不稳定（其中
+    11 次是同一棵树的第二遍，以后要等下一个 PR 撞上），12 次是没分到 runner。PR 绿了之后到合并之间 runner 的镜像换了，也要等下一个 PR 才测到，
+    所以记号只认 24 小时（历史上从那一轮建出来到合并最长 8.8 小时）。
+  - **关掉**：`gh variable set CI_VERIFIED_TREE --body off`（仓库变量），下一轮起全部照常全跑，不用改代码；
+    `gh variable delete CI_VERIFIED_TREE` 恢复。要把某个 main 提交完整跑一遍：关掉开关再重跑那一轮（重跑检出的还是原来那个提交，变量读的是
+    重跑那一刻的值：2026-11-13 在只跑 ubuntu 的测试分支上实测），或者等记号过期（1 天）再重跑。
+  - **上线之后看这几个数**：
+    - main 上短轮占多少（摘要里 `was verified by run`）：应该和「树一模一样」的比例差不多（并行的日子一半多，顺着做的日子接近全部）。
+      一直是 0 是查记号坏了：没漏验，只是没省。
+    - **对账**（漏验只会出在这里）：挑短轮，摘要里写着 `verified by run R`；`gh run view R --log | grep -m1 'HEAD is now at'` 读出
+      `Merge <头> into <当时的 main>`，`git merge-tree --write-tree <当时的 main> <头>` 的第一行要等于 `git rev-parse <main 的提交>^{tree}`。
+      有一次不等，马上关掉开关。
+    - PR 第 1 组「Build app」的中位数（11-04 到 11-13 是 40 秒）不该涨：涨了是第 1 组的缓存没存上。
+    - PR 第 2–5 组「Run checks」的中位数（同期 307 秒）涨 30 秒以内：短轮不刷新这几组的缓存（用户定），涨得多再给短轮加一步刷新。
+    - PR 第一次红、原样重跑就绿的次数：明显变多，说明有不稳定的检查没人发现，单独去修。
 - **第 1 组多一步「预览性能 ratchet」**（`scripts/check-preview-perf.sh`，不在 check-all.sh 里：
   要图形会话）。它起第 1 组已经编好的 App，按固定场景数「做了多少件活」，和
   `checks/PreviewPerf/baseline.json` 比，只许降不许涨；结果和 App 日志作为附件 `preview-perf`
@@ -562,6 +598,8 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     组号和这次的提交；restore-keys 去掉提交，恢复同一组、同一工具链最新的那份。
   - 只在 main 上、整组绿了才存。PR 恢复 main 上最新的那份（GitHub 的缓存按分支隔开，PR 上存的只有这个 PR 自己用得上）；
     所以 main 上合并之后那一轮也是在给下一个 PR 备缓存。缓存一份按提交存、存了不能改，旧的 GitHub 七天没人用会自己清掉。
+    树已经验过的那种 main 短轮（上面「合并之后 main 上那一轮」）里只有第 1 组取、编、存；第 2–5 组的缓存只在完整的那几轮里刷新
+    （用户 2026-11-13 定：先不刷新，上线后看它们「Run checks」的中位数）。
   - `checks/ci-build-cache-key.sh` 钉着上面这些写法。
 - **`.build` 缓存的 key 和 restore-keys 都带检出目录（`github.workspace`）**：`.build` 里的模块缓存记着编它时的绝对路径，
   换了目录恢复回来就编不过。2026-10-18 仓库改名 SkyCut、检出目录从 `…/SrtFlow/SrtFlow` 变成 `…/SkyCut/SkyCut`，旧缓存被恢复、
@@ -604,7 +642,8 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   （中位数，括号里是 p90；汇总的 `check-all` 再加十几秒）：没有别的 7.5 分钟（10.7，110 轮）；约 1 轮 11.3 分钟（16.6，57 轮）；约 2 轮 17.6 分钟（22.7，29 轮）；
   3 轮以上 25.1 分钟（48.3，21 轮）。两个同时开着，后一个多等约 4 分钟；三个，最后一个约 18 分钟出结果。
 - **合进 main 也跑一轮完整的**（给下一个 PR 备 `.build` 缓存、验真正合出来的那份）：同一时期跑完的 217 轮完整 CI 里 85 轮是 main 上的。
-  合一个改代码的 PR 一共占两轮，合并之后约 7 分钟里新建的轮都得等它让出 runner。
+  合一个改代码的 PR 一共占两轮，合并之后约 7 分钟里新建的轮都得等它让出 runner。（后续：2026-11-13 起，树已经在 PR 那一轮原样验过时，
+  这一轮只占第 1 组约 1 分钟，见上面「合并之后 main 上那一轮」。）
 - **只改文档的快速通道也占名额**：一样起 5 个 macOS job，第 1 组跑扫描守卫约 2.4 分钟，其余四组各十几秒；没别的在跑时 2.5 分钟出结果，
   排在完整的轮后面时中位 5.7 分钟。占得少、可以多开，但不是不占。
 - 变 DIRTY 就要再合 main、再跑一轮：哪些文件最常撞、为什么不用 `merge=union`（GitHub 不认），见[文档索引怎么写](../architecture/doc-indexes.md)第五节。
