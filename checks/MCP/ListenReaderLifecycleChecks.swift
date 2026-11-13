@@ -3,6 +3,7 @@ import Foundation
 
 // 在真实 reader 的 started 探针处暂停读取队列，尚未调用 copy；外部取消因此能安全、确定地复现旧跨线程收尾。
 // 子类只记录取消/释放的队列，仍由原生 AVAssetReader 建立和收尾；不伪造音频统计，也不赌原生崩溃概率。
+// 截止时间和闸门的等待只拦卡死（listenCheckHangBound）：闸门总会被放开，等多久不是要证明的事（2026-11-13 之前 2 秒，满载时会误报）。
 @MainActor
 func runListenReaderLifecycleChecks(_ url: URL) async {
     await checkListenLoadingCancellation(url)
@@ -11,12 +12,12 @@ func runListenReaderLifecycleChecks(_ url: URL) async {
     let (events, feed) = AsyncStream<AIListenAudioWindow.Event>.makeStream()
     let task = Task {
         defer { feed.finish() }
-        return try await AIListenAudioWindow.read(url, from: 0, to: 1, until: Date().addingTimeInterval(5),
+        return try await AIListenAudioWindow.read(url, from: 0, to: 1, until: Date().addingTimeInterval(listenCheckHangBound),
             observe: { event in
                 switch event {
                 case .started:
                     feed.yield(event)
-                    trace.noteWait(release.wait(timeout: .now() + 2) == .success)
+                    trace.noteWait(release.wait(timeout: .now() + listenCheckHangBound) == .success)
                 case .finished:
                     trace.noteFinished()
                 }
@@ -58,7 +59,7 @@ private func checkListenLoadingCancellation(_ url: URL) async {
         return try await withTaskCancellationHandler {
             try await active.run {
                 feed.yield(true)
-                guard release.wait(timeout: .now() + 2) == .success else { throw AIToolError("Lifecycle gate timed out.") }
+                guard release.wait(timeout: .now() + listenCheckHangBound) == .success else { throw AIToolError("Lifecycle gate timed out.") }
                 try active.check()
                 throw AIToolError("Cancelled work must stop at its next check.")
             }

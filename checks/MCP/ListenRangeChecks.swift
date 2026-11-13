@@ -4,14 +4,23 @@ import SrtFlowMCPKit
 
 // 文件 listen 的真实生产路径回归：本机现造稀疏长 WAV，仅写晚时间点的三秒声音；不使用用户媒体。
 // 暂停测试进程的 overview 队列，文件生产入口仍必须成功，避免悄悄落回整文件 WaveformStore。
+// **要证明的事一律数出来，不量快慢**（2026-11-13，docs/bugfixes/2026-11-13-listen-range-checks-timed-out-under-load.md）：
+// 原生 reader 交出了多少帧、挂起的 overview 上多没多出活、reader 开没开读、回来的是结果还是超时 / 取消。传给生产入口的截止时间
+// 只为卡死时有个头（listenCheckHangBound）；超时、取消怎么结束在 ListenReadEndChecks.swift，判的是「回来的是什么」，不是「几秒内回来」。
+
+/// 这一组每次读的都是几十毫秒的活。传给生产入口的截止时间只拦卡死，和真工具的 `AIListenTool.waitSeconds` 一样是 40 秒
+///（那个类型不在这个自检的编译清单里）。2026-11-13 之前是 2 秒：机器满载时读三秒音频也等不到它，这一组就红。
+let listenCheckHangBound: TimeInterval = 40
+/// 整组的看门狗：只防有谁的 await 永远不回来（截止时间都没管住的那种卡死），不量整组多快。
+private let listenSuiteHangBound: TimeInterval = 300
 
 @MainActor
 func runListenRangeChecks() async {
     let watchdog = DispatchWorkItem {
-        FileHandle.standardError.write(Data("✗ listen range production checks did not finish in 15 seconds\n".utf8))
+        FileHandle.standardError.write(Data("✗ listen range production checks did not finish in \(Int(listenSuiteHangBound)) seconds\n".utf8))
         exit(1)
     }
-    DispatchQueue.global().asyncAfter(deadline: .now() + 15, execute: watchdog)
+    DispatchQueue.global().asyncAfter(deadline: .now() + listenSuiteHangBound, execute: watchdog)
     defer { watchdog.cancel() }
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("SrtFlow-ListenRange-\(UUID().uuidString)")
     do {
@@ -31,7 +40,7 @@ func runListenRangeChecks() async {
     }
 }
 
-private let listenRangeStart = 3_200.125
+let listenRangeStart = 3_200.125
 private let listenFixtureRate = 48_000.0
 
 /// RIFF PCM16：一小时、双声道，未写的部分为文件系统稀疏洞（0），实际只写 3.2 秒，不整片编码/拷贝。
@@ -78,7 +87,7 @@ private func fileListen(_ url: URL, sourceIn: Double?, sourceOut: Double?, beats
     if let sourceOut { values["source_out"] = .number(sourceOut) }
     return try await AIListenFileAudio.listen(
         url, args: AIToolArguments(.object(values)), display: url.lastPathComponent,
-        silenceDB: -45, minSilence: 0.5, beats: beats, until: Date().addingTimeInterval(2)
+        silenceDB: -45, minSilence: 0.5, beats: beats, until: Date().addingTimeInterval(listenCheckHangBound)
     )
 }
 
@@ -87,7 +96,7 @@ private func checkListenFileRange(_ url: URL) async {
     MediaReadQueue.overview.isSuspended = true
     defer { MediaReadQueue.overview.cancelAllOperations(); MediaReadQueue.overview.isSuspended = false }
     do {
-        let result = try await fileListen(url, sourceIn: listenRangeStart, sourceOut: listenRangeStart + 3)
+        let result = try await listenBesideSuspendedOverview(url, sourceIn: listenRangeStart, sourceOut: listenRangeStart + 3)
         checkEqual(result["from"]?.doubleValue, listenRangeStart, "late file range starts at the requested source second")
         checkEqual(result["to"]?.doubleValue, listenRangeStart + 3, "late file range completes without a whole-file overview")
         check(abs((result["peak_db"]?.doubleValue ?? 0) + 6) < 0.1, "window excludes louder samples just outside its bounds")
@@ -99,18 +108,38 @@ private func checkListenFileRange(_ url: URL) async {
                   "silence timestamps stay in the late source range")
         } else { check(false, "missing source-window silence timestamps") }
         check(result["note"] == nil, "an explicit window returns a complete report, never a partial waveform snapshot")
-        let tail = try await fileListen(url, sourceIn: 3_599, sourceOut: nil)
+        let tail = try await listenBesideSuspendedOverview(url, sourceIn: 3_599, sourceOut: nil)
         checkEqual(tail["to"]?.doubleValue, 3_600, "source_in alone ends at reliable container duration")
-        let head = try await fileListen(url, sourceIn: nil, sourceOut: 0.2)
+        let head = try await listenBesideSuspendedOverview(url, sourceIn: nil, sourceOut: 0.2)
         checkEqual(head["from"]?.doubleValue, 0, "source_out alone starts at the file origin")
     } catch { check(false, "bounded file listen must work with overview suspended: \(error)") }
+}
+
+/// 一次带区间的文件 listen，同时数挂起的 overview 上多出了几件活。显式区间只走有界读取（读了多少帧，checkNativeListenRange 对同一个文件、
+/// 同一窗数）；要是又走了整文件波形，WaveformStore 就往 overview 上排一件整条音轨的解码 —— 队列挂着，那件活永远轮不到，调用只能干等到截止时间。
+/// 所以一看见多出来的活就停掉这次调用、当场判红：不等截止时间，也不看它多快回来。
+@MainActor
+private func listenBesideSuspendedOverview(_ url: URL, sourceIn: Double?, sourceOut: Double?) async throws -> [String: JSONValue] {
+    let queuedBefore = MediaReadQueue.overview.operationCount
+    let call = Task { try await fileListen(url, sourceIn: sourceIn, sourceOut: sourceOut) }
+    let watcher = Task {
+        while !Task.isCancelled {
+            if MediaReadQueue.overview.operationCount > queuedBefore { call.cancel(); return }
+            try? await Task.sleep(nanoseconds: 5_000_000)
+        }
+    }
+    let result = await call.result
+    watcher.cancel()
+    let queuedDuring = MediaReadQueue.overview.operationCount - queuedBefore
+    check(queuedDuring <= 0, "an explicit file range queues nothing on the suspended overview queue, so no whole-file waveform (queued \(queuedDuring))")
+    return try result.get()
 }
 
 @MainActor
 private func checkNativeListenRange(_ url: URL) async {
     do {
         let reading = try await AIListenAudioWindow.read(url, from: listenRangeStart, to: listenRangeStart + 3,
-                                                       until: Date().addingTimeInterval(2))
+                                                       until: Date().addingTimeInterval(listenCheckHangBound))
         checkEqual(reading.fileDuration, 3_600, "duration comes from the container, not decoded coverage")
         checkEqual(reading.peaks.channelCount, 2, "bounded decoder preserves stereo")
         checkEqual(reading.peaks.sampleRate, listenFixtureRate, "bounded decoder keeps the native sample rate")
@@ -122,66 +151,12 @@ private func checkNativeListenRange(_ url: URL) async {
         check(abs((reading.windows.last?.end ?? 0) - listenRangeStart - 3) < 1 / listenFixtureRate,
               "the last reported window ends at the requested source out")
         do {
-            _ = try await AIListenAudioWindow.read(url, from: 3_601, to: 3_602, until: Date().addingTimeInterval(2))
+            _ = try await AIListenAudioWindow.read(url, from: 3_601, to: 3_602, until: Date().addingTimeInterval(listenCheckHangBound))
             check(false, "out-of-container range must fail")
         } catch let error as AIToolError {
             check(error.message.contains("3600.00") && !error.message.contains("s read"), "range errors use real file duration")
         }
     } catch { check(false, "native bounded audio reading failed: \(error)") }
-}
-
-@MainActor
-private func checkListenReadEnds(_ url: URL) async {
-    // 排队等待也计入截止时间；不能只取消 await、把无效解码留在后台。
-    MediaReadQueue.analysis.isSuspended = true
-    do {
-        defer { MediaReadQueue.analysis.cancelAllOperations(); MediaReadQueue.analysis.isSuspended = false }
-        let began = Date()
-        do {
-            _ = try await AIListenAudioWindow.read(url, from: 3_200, to: 3_201, until: Date().addingTimeInterval(0.05))
-            check(false, "a queued range past its deadline must fail, without a partial report")
-        } catch let error as AIToolError {
-            check(error.message.contains("timed out"), "queued timeout has an explicit failure message")
-        } catch { check(false, "wrong queued timeout: \(error)") }
-        check(Date().timeIntervalSince(began) < 1, "timeout does not wait for the suspended decode queue")
-        let task = Task { try await AIListenAudioWindow.read(url, from: 3_200, to: 3_201, until: Date().addingTimeInterval(5)) }
-        try? await Task.sleep(nanoseconds: 20_000_000)
-        task.cancel()
-        do { _ = try await task.value; check(false, "cancelled source window must not succeed") }
-        catch is CancellationError { check(true, "queued source-window cancellation propagates") }
-        catch { check(false, "wrong cancellation error: \(error)") }
-    }
-    await checkActiveListenReadEnds(url, timeout: true)
-    await checkActiveListenReadEnds(url, timeout: false)
-    // 取消之后同一队列马上可再用，结束的是这一窗，不会停掉别的调用。
-    do {
-        let reading = try await AIListenAudioWindow.read(url, from: listenRangeStart, to: listenRangeStart + 0.1,
-                                                       until: Date().addingTimeInterval(2))
-        check(reading.peaks.isComplete, "a fresh bounded read succeeds after cancellation/timeout")
-    } catch { check(false, "reader/queue did not recover: \(error)") }
-}
-
-@MainActor
-private func checkActiveListenReadEnds(_ url: URL, timeout: Bool) async {
-    let (events, feed) = AsyncStream<AIListenAudioWindow.Event>.makeStream()
-    let task = Task {
-        defer { feed.finish() }
-        return try await AIListenAudioWindow.read(url, from: 0, to: 3_600,
-                                                 until: Date().addingTimeInterval(timeout ? 1 : 5), observe: { feed.yield($0) })
-    }
-    var began = false
-    for await event in events {
-        if case .started = event { began = true; break }
-    }
-    check(began, "active-read regression observes actual native startReading on its owner queue")
-    if !timeout { task.cancel() }
-    do { _ = try await task.value; check(false, "active timeout/cancellation must not return partial statistics") }
-    catch is CancellationError { check(!timeout, "active native cancellation propagates") }
-    catch let error as AIToolError { check(timeout && error.message.contains("timed out"), "active native timeout is explicit") }
-    catch { check(false, "wrong active read completion: \(error)") }
-    var ended = false
-    for await event in events { if case .finished = event { ended = true } }
-    check(ended, "native reader has cancelled/finished before the active call returns")
 }
 
 @MainActor
@@ -225,7 +200,7 @@ private func checkCompressedListenRange(in directory: URL) async {
         try file?.write(from: buffer)
         file = nil
         let from = 0.12371, to = 0.45679
-        let reading = try await AIListenAudioWindow.read(url, from: from, to: to, until: Date().addingTimeInterval(2))
+        let reading = try await AIListenAudioWindow.read(url, from: from, to: to, until: Date().addingTimeInterval(listenCheckHangBound))
         check(reading.sourceStart >= from - 1 / listenFixtureRate, "AAC package preroll is excluded from statistical buckets")
         check(abs((reading.windows.last?.end ?? 0) - to) <= 2 / listenFixtureRate, "AAC range ends within two native samples")
         check(reading.peaks.framesAvailable <= Int(ceil((to - from) * listenFixtureRate)) + 1, "AAC statistics contain only the requested source span")
@@ -273,7 +248,7 @@ private func checkListenEditCoverage(in directory: URL) async {
 @MainActor
 private func checkCoverageOrRefusal(_ url: URL, from: Double, to: Double, gap: Bool) async {
     do {
-        let reading = try await AIListenAudioWindow.read(url, from: from, to: to, until: Date().addingTimeInterval(2))
+        let reading = try await AIListenAudioWindow.read(url, from: from, to: to, until: Date().addingTimeInterval(listenCheckHangBound))
         // 某些解码器会原生填零；那就必须确实覆盖全窗，不能把不连续的 PTS 压成连续时间。
         check(abs(reading.sourceStart - from) < 0.001 && abs((reading.windows.last?.end ?? 0) - to) < 0.001,
               "a completed edit-list report covers its full requested range: \(url.lastPathComponent) \(from)–\(to)")
