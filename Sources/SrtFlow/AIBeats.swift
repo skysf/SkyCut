@@ -47,6 +47,7 @@ enum AIBeats {
         // AVAssetTrack 没标 Sendable；它是只读的，交给读取线程之后这边不再碰（同 WaveformDetail）。
         nonisolated(unsafe) let track = found
         let rate = sampleRate
+        MediaReadAudit.current?.note(.beats(url, from: window.from, to: window.to))
         let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { () -> Reading? in
             guard let pcm = readMono(asset: asset, track: track, from: window.from, to: window.to, sampleRate: rate) else { return nil }
             return Reading(analysis: AudioBeatTracker.analyze(pcm.samples, sampleRate: rate).map { shifted($0, by: pcm.start) })

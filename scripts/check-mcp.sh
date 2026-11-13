@@ -525,6 +525,7 @@ xcrun swiftc \
   Sources/SrtFlow/AICoverBox.swift \
   Sources/SrtFlow/AIVision.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
+  Sources/SrtFlow/MediaReadAudit.swift \
   Sources/SrtFlow/AIContactSheet.swift \
   Sources/SrtFlow/AIFrameDescription.swift \
   Sources/SrtFlow/AIAudioLevels.swift \

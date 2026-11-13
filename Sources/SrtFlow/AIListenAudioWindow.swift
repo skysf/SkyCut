@@ -5,8 +5,17 @@ import Foundation
 // 不管什么：共享的整文件波形、AI 参数和权限、节拍、试听。阻塞循环只在 MediaReadQueue.analysis 上跑。
 
 enum AIListenAudioWindow {
-    /// 内部生产读取探针：自检等待真实 start/finish，不以 sleep 或别的队列任务推测 reader 状态。
-    enum Event: Sendable { case started, finished }
+    /// 内部生产读取探针：自检等真实的阶段，不以 sleep 或别的队列任务推测读到哪一步了。平时没有观察者，什么都不做。
+    enum Event: Sendable {
+        /// 元数据读完，读取 operation 已经交给 analysis 队列。队列没挂着时可能马上轮到它：这一声不保证早于 `started`。
+        case queued
+        /// reader 已经 `startReading`，第一次 copy 之前。
+        case started
+        /// 停的原因（截止时间 / 取消）登记了：排队中的当场回失败，读取中的等读取体下一次检查。
+        case stopRequested
+        /// 读取体收尾完（reader 已取消，随后释放）。
+        case finished
+    }
     /// 生命周期守卫可替换 reader 并记录原生收尾；实际工具默认仍建同一个 AVAssetReader。
     typealias ReaderFactory = @Sendable (AVAsset) throws -> AVAssetReader
     struct Reading: Sendable {
@@ -43,7 +52,9 @@ enum AIListenAudioWindow {
         readerFactory: ReaderFactory? = nil
     ) async throws -> Reading {
         let asset = AVURLAsset(url: url)
-        let control = AIListenReadControl(asset: asset)
+        let control = AIListenReadControl(asset: asset, observe: observe)
+        // 自检绑在这次调用上的账（平时 nil）：读取体在 analysis 的线程上跑，task-local 带不过去，在这一头取出来交给它。
+        let audit = MediaReadAudit.current
         control.start(until: deadline)
         defer { control.finish() }
         return try await withTaskCancellationHandler {
@@ -67,8 +78,8 @@ enum AIListenAudioWindow {
                 let channels = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame } ?? 2
                 nonisolated(unsafe) let track = found
                 return try await control.run {
-                    try read(asset, track: track, channels: Int(channels), from: start, to: end,
-                             duration: duration, control: control, observe: observe, readerFactory: readerFactory)
+                    try read(asset, track: track, channels: Int(channels), from: start, to: end, duration: duration,
+                             control: control, observe: observe, readerFactory: readerFactory, audit: audit)
                 }
             } catch {
                 try control.check()
@@ -80,7 +91,8 @@ enum AIListenAudioWindow {
     /// 同步阻塞段：timeRange 限制解码，PTS 再限制进统计的采样；失败/取消不发布半份结果。
     private static func read(
         _ asset: AVURLAsset, track: AVAssetTrack, channels: Int, from: Double, to: Double,
-        duration: Double, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?, readerFactory: ReaderFactory?
+        duration: Double, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?, readerFactory: ReaderFactory?,
+        audit: MediaReadAudit?
     ) throws -> Reading {
         try control.check()
         let reader = try readerFactory?(asset) ?? AVAssetReader(asset: asset)
@@ -94,9 +106,15 @@ enum AIListenAudioWindow {
                                        end: CMTime(seconds: to, preferredTimescale: 600_000))
         try control.check()
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading this audio range.") }
+        var accumulation = Accumulation()
+        // 记的是 reader 自己的 timeRange 和它真交出来的帧数（失败 / 被停也记），不是调用方要的那一窗。
+        audit?.note(.windowStarted(asset.url, from: reader.timeRange.start.seconds, to: reader.timeRange.end.seconds))
+        defer {
+            audit?.note(.windowFinished(asset.url, decodedFrames: accumulation.decodedFrames,
+                                        decodedFrom: accumulation.decodedFrom, decodedTo: accumulation.decodedTo))
+        }
         try control.check()
         observe?(.started)
-        var accumulation = Accumulation()
         while true {
             try control.check()
             guard let buffer = output.copyNextSampleBuffer() else { break }
