@@ -1,313 +1,195 @@
 #!/usr/bin/env bash
-# 扫描守卫：AGENTS.md 是**唯一入口**，那它的索引就必须是全的。
+# 扫描守卫：AGENTS.md 是**唯一入口**，那它的索引就必须是全的、点得开的、不长回去的。
 #
 # AGENTS.md 只保留「全局规则」+「按任务查文档的索引」，细节全在 docs/ 下。Bug 案例的索引例外：2026-11-13 起单独放在
 # docs/bugfixes/INDEX.md，AGENTS.md 只链到它 —— 两百多条每个会话一开就整份读进来（约 2.4 万 token），可只有修 bug、
 # 碰到眼熟的症状时才用得上，那时按关键词搜那一份就行；改某块代码时该读的案例，必读表里已经逐行链着。
-# 这套分工要成立，有三件事必须一直为真：
+# 这套分工要成立，有五件事必须一直为真：
 #
-#   1. docs/ 下的每一份文档都找得到 —— 否则写了等于没写：
-#      别的代理（Codex / Kimi / Gemini…）只读 AGENTS.md，索引里没有的文档它们
-#      永远不会打开。**这不是假设，是已经发生过的事**：2026-09-20 那四份案例
-#      （播放头断线、转场遮罩漂移、转场预览与成片分叉、悬停光标卡住）写完之后
-#      都没进索引，一直到 2026-09-21 才被发现，而其中「播放头断线」那份正好是
-#      当天新 bug 的孪生兄弟 —— 索引里有的话，横向那一半当场就能想到。
-#      分两份查：docs/bugfixes/ 下的每一份（INDEX.md 自己除外）列在 docs/bugfixes/INDEX.md 里；其余每一份、
-#      连同 docs/bugfixes/INDEX.md，列在 AGENTS.md 里 —— AGENTS.md 一断了指向 INDEX.md 的链，整份案例就没人打开了。
-#   2. 索引里的链接都指向真实存在的文件 —— 文档改名/挪窝之后留下的死链，比没有
-#      索引更坏：它会让人以为查过了。INDEX.md 里的链接按它所在的文件夹解析
-#      （同文件夹写 xxx.md，别的文件夹写 ../architecture/xxx.md）。
+#   1. docs/ 下的每一份文档都找得到 —— 否则写了等于没写：别的代理（Codex / Kimi / Gemini…）只读 AGENTS.md，索引里没有的
+#      文档它们永远不会打开。**这不是假设，是已经发生过的事**：2026-09-20 那四份案例写完之后都没进索引，一直到 09-21 才被
+#      发现，而其中「播放头断线」那份正好是当天新 bug 的孪生兄弟。分两份查：docs/bugfixes/ 下的每一份（INDEX.md 自己除外）
+#      在 docs/bugfixes/INDEX.md 里当条目列着；其余每一份、连同 INDEX.md，能从 AGENTS.md 的链接找到。
+#   2. 索引里的链接都指向真实存在的文件 —— 死链比没有索引更坏：它会让人以为查过了。
+#   3. 索引每条只有「链接 + 一句话」，AGENTS.md 整份不再长回去 —— 它每个会话一开就整份读进来。2026-11-13 之前每条索引都带着
+#      一大段摘要：339 KB，一个会话光读它就约 14.7 万 token，而规则本身只有 11 KB。小节分三类（索引小节、指路的小节、
+#      不设单条上限的小节），名单、几个数和它们的来历在 docs-index-drift/config.sh。
+#   4. docs/bugfixes/INDEX.md 整份按文件名里日期后面那一段排、一份案例只列一次 —— 两个同时开着的 PR 各加一条，落在不同的
+#      地方就不撞。以前都加在模板下面（200 个 PR 里真撞 14 回）；改成按文件名从大到小之后，同一天的头两条还撞（历史上两边
+#      各加一行的 15 次合并重放还剩 5 次）；按日期后面那一段排，重放 0 次。GitHub 的 PR 合并不认 merge=union，所以靠排序。
+#   5. 上面四条查的都是「守卫认得出来的写法」—— 所以两份索引里**只许出现规定的几种写法**（白名单），别的一律红、并说出是
+#      哪一行。以前是认出不许的写法才红，被绕过三轮：换一种 Markdown 里合法的写法（别的列表记号、缩进的续行、不成表格的
+#      竖线行、引用、注释和代码围栏里的路径、引用式链接、a 标签），守卫认不出就当没看见。
 #
-#   3. 索引每条只有「链接 + 一句话」，AGENTS.md 整份不再长回去 —— AGENTS.md 每个会话一开就整份读进来。
-#      2026-11-13 之前每条索引都带着一大段摘要：339 KB，一个会话光读它就约 14.7 万 token，而规则本身
-#      只有 11 KB。那天收成每条一行（153 KB），细节留在各自的文档里；同一天又把 Bug 案例的索引搬了出去（100 KB）。
-#      守的办法见第 3 节，分三类小节：
-#        · 索引小节（AGENTS.md 里除下面两类以外的每个「## 」小节 —— 规划与实施报告索引、架构与长期约束索引、根目录文档，
-#          以后新加的小节也照这个管 —— 和整份 docs/bugfixes/INDEX.md）：一条索引只许两种写法，顶格的「- [」列表行或表格行，
-#          每行不超过 ENTRY_MAX_BYTES；条目以外的行（开头的说明、小标题）每节最多 INTRO_MAX_LINES 行、也不超过 ENTRY_MAX_BYTES；
-#          别的列表记号（+、*、1.）、缩进的行、接在条目后面的行都红 —— 它们在 Markdown 里照样是列表或上一条的续行，
-#          2026-11-13 复审时用这几种写法把约 600 字节、1,800 字节的摘要塞回了只认顶格「- [」一个物理行的老守卫，退出 0
-#          （docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md）。
-#        · 「Bug 修复案例索引」一节：只留指路的话（同样有界），出现任何写法的条目都红 —— 条目只进 docs/bugfixes/INDEX.md。
-#        · 不设单条上限的小节（FREE_SECTIONS）：唯一入口约定、开始任务前、全局规则、文档目录职责四节是规则本身；
-#          「按修改范围选必读文档」和「构建与检查入口」**有意不设单独的预算**：必读表一行要带一串检索线索和几份文档的链接、
-#          一两条硬约束，检查入口每个脚本一行，都不是「链接 + 一句话」，按条数或每行设上限只会逼人把检索线索删掉
-#          （2026-11-13 复审的 F2 就是删了左列的检索词）。它们和别的小节一起只受整份上限约束。
-#      整份上限 = SIZE_BASE_BYTES + SIZE_PER_DOC_BYTES × docs/bugfixes/ 以外的文档数 —— 多一份文档多一条索引是应该的，
-#      所以上限跟着文档数走，不用每加一份文档就来改数字；必读表、检查入口这些不随文档数涨的部分算在基数里。
-#      Bug 案例不再往 AGENTS.md 里加一行，所以不算进文档数；它们在必读表里加的链接从基数的余量里出（见第 3 节）。
-#      超了的修法见第 3 节（摘要挪进它指向的文档；必读表里的旧案例链接只许撤一种），不是抬这几个数。
+# 文件分工（主文件只管读清单、串起来、算整份大小；每一节不单独跑，由这里 source）：
+#   docs-index-drift/config.sh     小节的名单、几个数
+#   docs-index-drift/lines.sh      逐行认写法：链接、方括号、行内代码、条目、表格、说明
+#   docs-index-drift/judge.sh      链接对着磁盘：死链、漏索引、案例只进 INDEX.md、重复、顺序
+#   docs-index-drift/messages.sh   每个代号对应的那句话
+#   docs-index-drift/self-test.sh  自测：在最小副本上一个场景一个场景跑，该红的红在对的那一条、该绿的绿
+#                                  （场景在 docs-index-drift/scenarios-*.sh；每条都是真被绕过去过、或当对手试出来的写法）
 #
-#   4. docs/bugfixes/INDEX.md 整份按文件名从大到小排，一份案例只列一次（2026-11-13 起，见 1d）。以前新案例一律加在模板那一行下面：
-#      两个同时开着的 PR 都往同一处加一行，后合的那个必撞 —— 2026-10-15 到 11-13 合的 200 个 PR 里 88 个加过案例索引，真撞了
-#      14 回，回回是在 PR 开着以后（得把 main 合进去、再等一轮 CI）。按文件名插，同一天已经有条目时两行多半落在不同的地方：
-#      拿那 15 次「两边各加了一行」的合并重放，10 次不再撞。顺带，同一份案例列了两次（解冲突时两边的改动都留下了）也红。
-#      GitHub 的 PR 合并不认 .gitattributes 的 merge=union（2026-11-13 实测），所以靠排序，不靠 union。
-#      为什么、撞了怎么解见 docs/architecture/doc-indexes.md 第五节。
+# 用法：
+#   checks/docs-index-drift.sh                 # 查仓库
+#   checks/docs-index-drift.sh --self-test     # 跑自测（改这条守卫之前之后都跑；CI 上 check-all 也跑）
+#   checks/docs-index-drift.sh --root <目录>   # 查另一棵树（自测用：目录里要有 AGENTS.md 和 docs/）
 #
-# 「手抄的清单会漂」在这个仓库已经栽过两回（见
-# docs/bugfixes/2026-09-18-check-script-source-list-drift.md 与
-# docs/bugfixes/2026-09-21-source-list-guard-only-watched-the-hub.md），
-# 分类目录职责见 AGENTS.md 的「文档目录职责」；索引怎么写见 docs/architecture/doc-indexes.md。
+# 规矩写在 docs/architecture/doc-indexes.md；细目在 docs/testing/check-catalog.md。「手抄的清单会漂」在这个仓库已经栽过两回
+# （docs/bugfixes/2026-09-18-check-script-source-list-drift.md、docs/bugfixes/2026-09-21-source-list-guard-only-watched-the-hub.md）。
+# 按 docs/bugfixes/2026-08-06-build-version-and-shell-traps.md 写：变量一律 ${VAR}，awk 程序放在带引号的 heredoc 里，
+# 总闸在最后，用 /bin/bash（3.2）调试。
 
 set -euo pipefail
-cd "$(dirname "$0")/.."
+
+SELF_DIR="$(cd "$(dirname "$0")" && pwd)"
+PARTS="${SELF_DIR}/docs-index-drift"
+ROOT="${SELF_DIR}/.."
+case "${1:-}" in
+  "") ;;
+  --self-test)
+    shift
+    exec /bin/bash "${PARTS}/self-test.sh" "${SELF_DIR}/docs-index-drift.sh" "$@" ;;
+  --root)
+    if [ -z "${2:-}" ] || [ ! -d "${2}" ]; then
+      echo "✗ --root 后面要跟一个存在的目录" >&2
+      exit 2
+    fi
+    ROOT="$2" ;;
+  *)
+    echo "✗ 不认识的参数：${1}（用法见文件开头）" >&2
+    exit 2 ;;
+esac
+for part in config lines judge messages; do
+  if [ ! -f "${PARTS}/${part}.sh" ]; then
+    echo "✗ 找不到 ${PARTS}/${part}.sh：守卫的一节没了" >&2
+    exit 1
+  fi
+  # shellcheck source=/dev/null
+  . "${PARTS}/${part}.sh"
+done
+cd "${ROOT}"
 
 INDEX="AGENTS.md"
 BUG_DIR="docs/bugfixes"
 BUG_INDEX="${BUG_DIR}/INDEX.md"
+SEP="$(printf '\037')"
+NL='
+'
 FAILED=0
-TAB="$(printf '\t')"
+FOUND=""   # 攒下来的问题，一行一个：E␟A|B|F␟行号␟代号␟值 1␟值 2␟值 3
 
-fail() {
-  echo "✗ $1" >&2
-  FAILED=1
+# found <A|B|F> <行号> <代号> [值 1] [值 2] [值 3]
+found() {
+  FOUND="${FOUND}E${SEP}$1${SEP}$2${SEP}$3${SEP}${4:--}${SEP}${5:--}${SEP}${6:--}${NL}"
 }
 
-[ -f "${INDEX}" ] || { echo "✗ 找不到 ${INDEX}：唯一入口没了，守卫失去目标" >&2; exit 1; }
-[ -f "${BUG_INDEX}" ] || { echo "✗ 找不到 ${BUG_INDEX}：Bug 案例的索引没了，守卫失去目标（2026-11-13 从 AGENTS.md 搬出来的，AGENTS.md「Bug 修复案例索引」一节链着它）" >&2; exit 1; }
+[ -f "${INDEX}" ] || { echo "✗ [missing] 找不到 ${INDEX}：唯一入口没了，守卫失去目标" >&2; exit 1; }
+[ -f "${BUG_INDEX}" ] || { echo "✗ [missing] 找不到 ${BUG_INDEX}：Bug 案例的索引没了，守卫失去目标（2026-11-13 从 AGENTS.md 搬出来的，AGENTS.md「Bug 修复案例索引」一节链着它）" >&2; exit 1; }
 
-# 一份索引里所有形如 (path.md) 的链接目标，原样、去重。
-links_in() {
-  grep -o '([^()]*\.md)' "$1" | tr -d '()' | sort -u || true
-}
+# ── 1. 磁盘上的文档：一份清单，漏索引、死链、算上限都用它 ─────────────
+# 只数普通文件：叫 xxx.md 的文件夹不是文档（以前查漏索引的两处 find 没带 -type f，会说它「没索引」，补了链接又成死链）。
+DOCS_ALL="$(find docs -type f -name '*.md' | LC_ALL=C sort)"
+ROOT_MD="$(find . -maxdepth 1 -type f -name '*.md' | sed 's|^\./||' | LC_ALL=C sort)"
+DOC_COUNT="$(LC_ALL=C awk -v p="${BUG_DIR}/" '$0 != "" && index($0, p) != 1 { n++ } END { print n + 0 }' <<< "${DOCS_ALL}")"
+BUG_COUNT="$(LC_ALL=C awk -v p="${BUG_DIR}/" -v idx="${BUG_INDEX}" 'index($0, p) == 1 && $0 != idx { n++ } END { print n + 0 }' <<< "${DOCS_ALL}")"
 
-# 把链接换成仓库根目录下的路径：前面接上索引所在的文件夹（$1），再消掉 "." 和 ".."。
-# INDEX.md 里写的 xxx.md、../architecture/xxx.md 由此变成 docs/bugfixes/xxx.md、docs/architecture/xxx.md。
-resolve_from() {
-  awk -v base="$1" '
-    {
-      path = (base == "." ? $0 : base "/" $0)
-      n = split(path, parts, "/")
-      m = 0
-      for (i = 1; i <= n; i++) {
-        if (parts[i] == "" || parts[i] == ".") continue
-        if (parts[i] == ".." && m > 0 && out[m] != "..") { m--; continue }
-        out[++m] = parts[i]
-      }
-      line = ""
-      for (i = 1; i <= m; i++) line = line (i > 1 ? "/" : "") out[i]
-      print line
-    }'
-}
-
-AGENTS_LINKS="$(links_in "${INDEX}")"
-BUG_LINKS="$(links_in "${BUG_INDEX}")"
-AGENTS_RESOLVED="$(resolve_from . <<< "${AGENTS_LINKS}")"
-BUG_RESOLVED="$(resolve_from "${BUG_DIR}" <<< "${BUG_LINKS}")"
-
-# ── 1. docs/ 下的每一份 .md 都找得到 ─────────────────────────────────
-# 1a. docs/bugfixes/ 下的每一份（INDEX.md 自己除外）列在 INDEX.md 里。
-BUG_DOCS="$(find "${BUG_DIR}" -name '*.md' -not -path "${BUG_INDEX}" | sort)"
+# 1a. 文件名只许字母、数字、. _ -：索引里的链接只认这样的路径（所以不用去支持带括号、空格的链接写法）。
 while IFS= read -r doc; do
   [ -n "${doc}" ] || continue
-  grep -qxF "${doc}" <<< "${BUG_RESOLVED}" \
-    || fail "${doc} 没有列在 ${BUG_INDEX} 里：只读 AGENTS.md 的代理顺着它找案例，漏一行等于这份案例不存在 —— 补一行（日期 + 链接 + 一句教训），按文件名插到文件名比它小的第一条上面（整份按文件名从大到小排，别都加在模板下面），链接写同文件夹的 ${doc#"${BUG_DIR}"/}"
-done <<< "${BUG_DOCS}"
-
-# 1b. 其余每一份、连同 INDEX.md，列在 AGENTS.md 里。
-REST_DOCS="$({ find docs -name '*.md' -not -path "${BUG_DIR}/*"; echo "${BUG_INDEX}"; } | sort)"
+  found F 0 name "${doc}"
+done <<< "$(LC_ALL=C grep -vE '^docs/[A-Za-z0-9._/-]+\.md$' <<< "${DOCS_ALL}" || true)"
+# 1b. docs/bugfixes/ 下只放带日期的案例、TEMPLATE.md、INDEX.md（顺序的键是文件名里日期后面那一段）。
 while IFS= read -r doc; do
   [ -n "${doc}" ] || continue
-  if grep -qxF "${doc}" <<< "${AGENTS_RESOLVED}"; then
-    continue
-  fi
-  if [ "${doc}" = "${BUG_INDEX}" ]; then
-    fail "${INDEX} 没有链到 ${BUG_INDEX}：Bug 案例的索引从入口断了，只读 AGENTS.md 的代理一份案例都找不到 —— 「Bug 修复案例索引」一节要链着它"
-  else
-    fail "${doc} 没有出现在 ${INDEX} 的索引里：只读 AGENTS.md 的代理永远打不开它 —— 按「文档目录职责」补一行到对应的索引小节"
-  fi
-done <<< "${REST_DOCS}"
+  found F 0 case_name "${doc}"
+done <<< "$(LC_ALL=C grep -E "^${BUG_DIR}/" <<< "${DOCS_ALL}" \
+  | LC_ALL=C grep -vE "^${BUG_DIR}/([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[A-Za-z0-9._-]+|TEMPLATE|INDEX)\.md$" || true)"
+# 1c. 符号链接、别的后缀：守卫当它不是文档，所以不许有。
+while IFS= read -r doc; do
+  [ -n "${doc}" ] || continue
+  found F 0 symlink "${doc}"
+done <<< "$(find docs -type l -name '*.md' | LC_ALL=C sort)"
+while IFS= read -r doc; do
+  [ -n "${doc}" ] || continue
+  found F 0 ext "${doc}"
+done <<< "$(find docs -type f \( -iname '*.md' -o -iname '*.markdown' -o -iname '*.mdown' -o -iname '*.mkd' -o -iname '*.mdx' \) -not -name '*.md' | LC_ALL=C sort)"
 
-# 1c. AGENTS.md 的「Bug 修复案例索引」一节只留指路的话，条目只写进 INDEX.md —— 和第 3 节的小节规则一起查（见 3a）。
-
-# 1d. INDEX.md 整份按每条的链接（文件名）从大到小排，一份案例只列一次（文件开头第 4 条）。按字节比（LC_ALL=C）：
-#     文件名以日期开头，所以是从新到旧、同一天的按文件名；模板 TEMPLATE.md 比任何日期都大，自然在最上面。
-#     每个问题输出一行「行号<TAB>dup<TAB>先列的行号<TAB>链接」或「行号<TAB>order<TAB>上一条的行号<TAB>链接<TAB>上一条的链接」。
-read -r -d '' ORDER_AWK <<'AWK' || true
-index($0, "- [") == 1 {
-  p = index($0, "](")
-  if (p == 0) next
-  rest = substr($0, p + 2)
-  q = index(rest, ")")
-  if (q == 0) next
-  key = substr(rest, 1, q - 1)
-  if (key in seen) { print NR "\tdup\t" seen[key] "\t" key; next }
-  seen[key] = NR
-  if (have && key > prev) print NR "\torder\t" prev_nr "\t" key "\t" prev
-  prev = key; prev_nr = NR; have = 1
+# ── 2. 逐行认两份索引的写法（docs-index-drift/lines.sh）──────────────
+for file in "${INDEX}" "${BUG_INDEX}"; do
+  if [ "$(LC_ALL=C tr -d '\000' < "${file}" | wc -c | tr -d ' ')" != "$(wc -c < "${file}" | tr -d ' ')" ]; then
+    found F 0 nul "${file}"
+  fi
+done
+scan_lines() {
+  DRIFT_FREE_SECTIONS="${FREE_SECTIONS}" DRIFT_INDEX_SECTIONS="${INDEX_SECTIONS}" DRIFT_POINTER_SECTION="${POINTER_SECTION}" \
+    DRIFT_DASH=" — " LC_ALL=C awk -v tag="$2" -v whole="$3" -v max="${ENTRY_MAX_BYTES}" -v intro_max="${INTRO_MAX_LINES}" \
+    "${LINES_AWK}" "$1"
 }
-AWK
-ORDER_HITS="$(LC_ALL=C awk "${ORDER_AWK}" "${BUG_INDEX}")"
-ORDER_SHOWN=0
-ORDER_MORE=0
-while IFS="${TAB}" read -r o_n o_code o_other o_key o_prev; do
-  [ -n "${o_n}" ] || continue
-  if [ "${o_code}" = "dup" ]; then
-    fail "${BUG_INDEX} 第 ${o_n} 行又列了一次 ${o_key}（第 ${o_other} 行已经有了）：同一份案例列了两次 —— 多半是解冲突时两边的改动都留下了；留一条，把两边的改动并进那一条"
-  elif [ "${ORDER_SHOWN}" -lt 5 ]; then
-    ORDER_SHOWN=$((ORDER_SHOWN + 1))
-    fail "${BUG_INDEX} 第 ${o_n} 行的 ${o_key} 比上一条（第 ${o_other} 行）的 ${o_prev} 大，该排在它上面：整份按文件名从大到小排（文件名以日期开头，所以是从新到旧）—— 新案例插到文件名比它小的第一条上面，别都加在模板下面：两个同时开着的 PR 都加在同一处，后合的那个必撞"
-  else
-    ORDER_MORE=$((ORDER_MORE + 1))
-  fi
-done <<< "${ORDER_HITS}"
-if [ "${ORDER_MORE}" -gt 0 ]; then
-  fail "${BUG_INDEX} 还有 ${ORDER_MORE} 处顺序不对（上面只列了前 5 处）：整份按文件名从大到小排"
+A_OUT="$(scan_lines "${INDEX}" A 0)"
+B_OUT="$(scan_lines "${BUG_INDEX}" B 1)"
+LINES_OUT="${A_OUT}${NL}${B_OUT}"
+
+# ── 3. 链接对着磁盘：死链、漏索引、重复、顺序（docs-index-drift/judge.sh）──
+JUDGE_OUT="$({
+  sed "s/^/K${SEP}/" <<< "${DOCS_ALL}"
+  sed "s/^/K${SEP}/" <<< "${ROOT_MD}"
+  printf '%s\n' "${LINES_OUT}"
+} | LC_ALL=C awk -v bug_dir="${BUG_DIR}" "${JUDGE_AWK}")"
+
+# 指向 docs/ 和根目录以外的链接（平时没有）：一段一段对着目录里真实的名字核，大小写不对也算死链。
+exists_exact() {
+  local rest="$1" dir="." seg
+  while [ "${rest#*/}" != "${rest}" ]; do
+    seg="${rest%%/*}"
+    rest="${rest#*/}"
+    [ -n "$(find "${dir}" -mindepth 1 -maxdepth 1 -type d -name "${seg}" 2>/dev/null | head -n 1)" ] || return 1
+    dir="${dir}/${seg}"
+  done
+  [ -n "$(find "${dir}" -mindepth 1 -maxdepth 1 -type f -name "${rest}" 2>/dev/null | head -n 1)" ]
+}
+while IFS="${SEP}" read -r kind tag nr resolved written; do
+  [ "${kind}" = "X" ] || continue
+  exists_exact "${resolved}" || found "${tag}" "${nr}" dead "${written}"
+done <<< "${JUDGE_OUT}"
+
+# 扫空 = 假绿：两份索引都真的读过（各有一行 N）、文档清单和两份里的链接都不是空的（一行 J），才往下算。
+SCANNED="$(LC_ALL=C awk -F "${SEP}" '
+  $1 == "N" && $3 > 0 { n++ }
+  $1 == "J" && $2 > 0 && $3 > 0 && $4 > 0 { j++ }
+  END { print ((n == 2 && j == 1) ? "yes" : "no") }' <<< "${LINES_OUT}${NL}${JUDGE_OUT}")"
+if [ "${SCANNED}" != "yes" ]; then
+  echo "✗ [empty] 守卫扫空了：${INDEX} 或 ${BUG_INDEX} 是空的、里面一个链接都没有，或者 docs/ 下一份文档都没找到 —— 扫空就是假绿，看看这两份文件和守卫的几节（${PARTS}/）" >&2
+  exit 1
 fi
 
-# ── 2. 两份索引里的链接都必须指向真实文件 ─────────────────────────────
-# 只管仓库内的相对链接；http(s):// 之类交给别处。链接按索引所在的文件夹解析，和点开它时一样。
-check_links() {
-  local file="$1" base="$2" hint="$3" links link
-  links="$(links_in "${file}")"
-  while IFS= read -r link; do
-    [ -n "${link}" ] || continue
-    case "${link}" in
-      http://*|https://*) continue ;;
-    esac
-    [ -f "${base}/${link}" ] \
-      || fail "${file} 指向了不存在的 ${link}：死链比没有索引更坏 —— 它会让人以为查过了${hint}"
-  done <<< "${links}"
-}
-check_links "${INDEX}" "." ""
-check_links "${BUG_INDEX}" "${BUG_DIR}" "（这份索引里的链接按 ${BUG_DIR}/ 解析：同文件夹写 xxx.md，别的文件夹写 ../architecture/xxx.md）"
-
-# ── 3. 索引每条一行，AGENTS.md 整份不许再长回去 ──────────────────────
-# 数字是 2026-11-13 定的，那天定了三回：
-#   · 收短索引那次：400 份文档、约 153 KB（最长的一条索引 303 字节），上限 58,000 + 250 × 400 = 158,000。
-#   · Bug 案例的索引搬去 docs/bugfixes/INDEX.md 之后：AGENTS.md 100,067 字节，docs/bugfixes/ 以外 137 份文档。
-#     基数 = 100,067 − 250 × 137 = 65,817，加余量取整到 71,000：上限 105,250，余量 5,183 字节。
-#     余量留给新案例在必读表里加的链接：案例不算进文档数，上限不跟着它涨，可修 bug 的人常要在必读表那一行加一个
-#     案例链接。表里当时 103 个案例链接，平均 112 字节（含顿号）；10-14 到 11-13 这 30 天新写了 118 份案例，22 份链进了
-#     必读表，约 2.5 KB / 月。余量 ≈ 35 个这样的链接（约 3.9 KB，照这个速度约一个半月）+ 约 1.2 KB 规则和左列的零碎改动。
-#     用完了照下面「超了怎么收」收，别抬基数。
-#   · 复审之后（条目识别能绕过去，docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md）：400、71,000、250 都没动；
-#     新加 INTRO_MAX_LINES —— 那时条目以外的行最多的是「Bug 修复案例索引」一节的 4 行（一段话 + 三条要点），留一行。
-# 超了怎么收（2026-11-13 用户定），只有两种：① 摘要挪进它指向的文档；② 撤掉必读表里的旧案例链接，但**只许撤这一种**：
-#   同一行链着的架构文档已经写了那条规矩，并且那份架构文档里链着这份案例 —— 规矩和案例都还找得到，只是不在入口上重复；
-#   案例本身照旧留在 docs/bugfixes/INDEX.md。别的链接（规矩只写在案例里的、架构文档没链它的）不许撤；这几个数也不许抬。
-ENTRY_MAX_BYTES=400
-INTRO_MAX_LINES=5
-SIZE_BASE_BYTES=71000
-SIZE_PER_DOC_BYTES=250
-
-# 不设单条上限的小节（只受整份上限，为什么见文件开头第 3 条）。标题要和 AGENTS.md 里一字不差：改了标题就同步改这里，
-# 不然那一节会被当成索引小节来管（守卫也会先说找不到它）。
-FREE_SECTIONS="## 唯一入口约定
-## 开始任务前
-## 全局规则（必须遵守）
-## 文档目录职责
-## 按修改范围选必读文档
-## 构建与检查入口"
-POINTER_SECTION="## Bug 修复案例索引"
-
-# 3a. 逐行认小节、认条目。awk 程序放在带引号的 heredoc 里，一个字都不经 shell 展开（shell 陷阱 5）；LC_ALL=C 下 length 数的是字节。
-# 每个问题输出一行「行号<TAB>代号<TAB>附带的值」，代号的意思见下面的 case。
-#   AGENTS.md（whole=0）：第一个「## 」之前（标题和开头那段话）和 FREE_SECTIONS 不管；POINTER_SECTION 只许说明；别的「## 」小节按索引管。
-#   docs/bugfixes/INDEX.md（whole=1）：整份按索引管，条目以外的行整份一起数。
-read -r -d '' SCAN_AWK <<'AWK' || true
-function kind_of(line) {
-  if (line ~ /^[ \t]*$/) return "blank"
-  if (line ~ /^#+([ \t]|$)/) return "heading"
-  if (index(line, "- [") == 1) return "list"
-  if (substr(line, 1, 1) == "|") return "table"
-  if (line ~ /^[ \t]/) return "indent"
-  if (line ~ /^[-+*]([ \t]|$)/ || line ~ /^[0-9]+[.)]([ \t]|$)/) return "marker"
-  return "prose"
-}
-BEGIN {
-  n = split(ENVIRON["DRIFT_FREE_SECTIONS"], parts, "\n")
-  for (i = 1; i <= n; i++) if (parts[i] != "") { is_free[parts[i]] = 1; free_seen[parts[i]] = 0 }
-  pointer_title = ENVIRON["DRIFT_POINTER_SECTION"]
-  mode = (whole ? "index" : "free")
-  seen_entry = 0; extra = 0; prev = "blank"; pointer_seen = 0
-}
-{
-  line = $0
-  k = kind_of(line)
-  if (!whole && index(line, "## ") == 1) {
-    if (line in is_free) { mode = "free"; free_seen[line]++ }
-    else if (line == pointer_title) { mode = "pointer"; pointer_seen++ }
-    else mode = "index"
-    if (mode != "free" && length(line) > max) print NR "\tlong\t" length(line)
-    seen_entry = 0; extra = 0; prev = "heading"
-    next
-  }
-  if (mode == "free" || k == "blank") { prev = k; next }
-  if (length(line) > max) print NR "\tlong\t" length(line)
-  if (mode == "pointer") {
-    if (line ~ /^[ \t]*([-+*]|[0-9]+[.)])[ \t]+\[/ || line ~ /^[ \t]*\|/) print NR "\tstray\t0"
-    if (++extra > intro_max) print NR "\tintro\t" extra
-    prev = k; next
-  }
-  if (k == "list") { seen_entry = 1 }
-  else if (k == "table") { if (prev == "list") print NR "\tglued\t0"; seen_entry = 1 }
-  else if (k == "indent") print NR "\tindent\t0"
-  else if (k == "marker") print NR "\tmarker\t0"
-  else if (k == "prose" && seen_entry) print NR "\tafter\t0"
-  else {
-    if (++extra > intro_max) print NR "\tintro\t" extra
-    if (k == "heading") seen_entry = 0
-  }
-  prev = k
-}
-END {
-  if (whole) exit
-  for (t in free_seen) if (free_seen[t] != 1) print "0\tfree_missing\t" t
-  if (pointer_seen != 1) print "0\tpointer_missing\t0"
-}
-AWK
-
-scan_index() {
-  DRIFT_FREE_SECTIONS="${FREE_SECTIONS}" DRIFT_POINTER_SECTION="${POINTER_SECTION}" LC_ALL=C awk \
-    -v whole="$2" -v max="${ENTRY_MAX_BYTES}" -v intro_max="${INTRO_MAX_LINES}" "${SCAN_AWK}" "$1"
-}
-
-for file in "${INDEX}" "${BUG_INDEX}"; do
-  whole=0
-  if [ "${file}" = "${BUG_INDEX}" ]; then
-    whole=1
-  fi
-  HITS="$(scan_index "${file}" "${whole}")"
-  while IFS="${TAB}" read -r n code extra; do
-    [ -n "${n}" ] || continue
-    case "${code}" in
-      long)
-        fail "${file} 第 ${n} 行有 ${extra} 字节，超过 ${ENTRY_MAX_BYTES}：索引小节里每一行（条目、表格行、开头的说明）只写「链接 + 一句话」，摘要和细节写进它指向的文档" ;;
-      marker)
-        fail "${file} 第 ${n} 行：索引条目只许两种写法 —— 顶格的「- [链接](…) — 一句话」或表格行；别的列表记号（+、*、1.）和不以链接开头的「- 」都不算条目，每条 ${ENTRY_MAX_BYTES} 字节的上限也就管不到它" ;;
-      indent)
-        fail "${file} 第 ${n} 行是缩进的行：在索引里它是上一条的续行或嵌套的列表，摘要会借它长回去 —— 条目写成顶格的一行，细节写进它指向的文档" ;;
-      after)
-        fail "${file} 第 ${n} 行接在索引条目后面，既不是条目也不是小标题：紧跟着条目时它是那一条的续行，隔了空行就是夹在索引里的一段摘要 —— 并进那一条的一句话，或写进它指向的文档；说明写在这一节的条目前面" ;;
-      glued)
-        fail "${file} 第 ${n} 行的表格行紧跟在一条「- [」索引后面、中间没有空行：在 Markdown 里它是那一条的续行 —— 表格前面空一行，或者并进那一条" ;;
-      intro)
-        fail "${file} 第 ${n} 行：这一节条目以外的行（开头的说明、小标题）到这里是 ${extra} 行，超过 ${INTRO_MAX_LINES}：说明只写怎么用这份索引，摘要写进文档" ;;
-      stray)
-        fail "${INDEX} 第 ${n} 行：Bug 案例的条目写进 ${BUG_INDEX}（按文件名插进去，链接写同文件夹的 xxx.md），AGENTS.md「Bug 修复案例索引」一节只留指路的话" ;;
-      free_missing)
-        fail "守卫登记的不设单条上限的小节「${extra}」在 ${INDEX} 里没有、或不止一个：改了标题就同步改守卫的 FREE_SECTIONS，不然那一节会被当成索引小节来管" ;;
-      pointer_missing)
-        fail "${INDEX} 里没有「${POINTER_SECTION}」一节、或不止一个：守卫失去目标，Bug 案例的条目会混进别的小节 —— 改了标题就同步改守卫的 POINTER_SECTION" ;;
-      *)
-        fail "${file} 第 ${n} 行：守卫自己认不出的代号「${code}」（检查脚本写错了）" ;;
-    esac
-  done <<< "${HITS}"
-done
-
-# 3b. AGENTS.md 整份的大小。文档数只数 docs/bugfixes/ 以外的普通文件（Bug 案例的条目在 INDEX.md 里，不占 AGENTS.md；
-#     叫 xxx.md 的文件夹、符号链接不算 —— 上限不能靠它们涨。没进索引的那些第 1 节已经红了，这里不再只数 git 跟踪的）。
-DOC_COUNT="$(find docs -type f -name '*.md' -not -path "${BUG_DIR}/*" | wc -l | tr -d ' ')"
+# ── 4. AGENTS.md 整份的大小 ──────────────────────────────────────────
+# 文档数只数 docs/bugfixes/ 以外的普通文件（Bug 案例的条目在 INDEX.md 里，不占 AGENTS.md；没进索引的那些第 3 步已经红了）。
 SIZE_NOW="$(wc -c < "${INDEX}" | tr -d ' ')"
 SIZE_LIMIT=$((SIZE_BASE_BYTES + SIZE_PER_DOC_BYTES * DOC_COUNT))
 if [ "${SIZE_NOW}" -gt "${SIZE_LIMIT}" ]; then
-  fail "${INDEX} 有 ${SIZE_NOW} 字节，超过上限 ${SIZE_LIMIT}（${SIZE_BASE_BYTES} + ${SIZE_PER_DOC_BYTES} × ${DOC_COUNT} 份 ${BUG_DIR}/ 以外的文档）：每个会话一开就整份读它 —— 必读表右列只留链接和一两条硬约束、检查入口每个脚本一行、索引每条一句话，细节挪进文档（docs/testing/check-catalog.md 或对应的架构文档），Bug 案例的条目只进 ${BUG_INDEX}；必读表里的旧案例链接只许撤一种：同一行链着的架构文档已经写了那条规矩、并且那份架构文档里链着这份案例（案例照旧留在 ${BUG_INDEX}）；别抬上限"
+  found A 0 size "${SIZE_NOW}" "${SIZE_LIMIT}" "${DOC_COUNT}"
 fi
+
+# ── 5. 把问题说出来 ──────────────────────────────────────────────────
+# 同一份文件上同一种问题最多说 SHOWN_MAX 处，再说一共还有几处（整份换了顺序、整份带回车时一行一处，会刷屏）。
+SHOWN_MAX=5
+read -r -d '' TALLY_AWK <<'AWK' || true
+BEGIN { FS = "\037"; OFS = "\037" }
+$1 == "E" { n++; row[n] = $0; key[n] = $2 FS $4; seq[n] = ++count[key[n]] }
+END { for (i = 1; i <= n; i++) print row[i], seq[i], count[key[i]] }
+AWK
+ALL="$(printf '%s\n' "${FOUND}" "${LINES_OUT}" "${JUDGE_OUT}" | LC_ALL=C awk "${TALLY_AWK}")"
+while IFS="${SEP}" read -r kind tag nr code d1 d2 d3 seq total; do
+  [ "${kind}" = "E" ] || continue
+  FAILED=1
+  if [ "${seq}" -le "${SHOWN_MAX}" ]; then
+    echo "✗ [${code}] $(explain "${tag}" "${nr}" "${code}" "${d1}" "${d2}" "${d3}")" >&2
+  elif [ "${seq}" -eq $((SHOWN_MAX + 1)) ]; then
+    echo "✗ [${code}] 同样的问题还有 $((total - SHOWN_MAX)) 处（上面只列了前 ${SHOWN_MAX} 处）" >&2
+  fi
+done <<< "${ALL}"
 
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
-BUG_COUNT="$(grep -c . <<< "${BUG_DOCS}" || true)"
-echo "✓ docs-index-drift：${BUG_DIR}/ 下 ${BUG_COUNT} 份全部列在 INDEX.md 里（按文件名从大到小、没有重复），其余 ${DOC_COUNT} 份连同 INDEX.md 全部在 AGENTS.md 索引中，两份都没有死链，索引条目都是一行；AGENTS.md ${SIZE_NOW} 字节（上限 ${SIZE_LIMIT}）"
+echo "✓ docs-index-drift：${BUG_DIR}/ 下 ${BUG_COUNT} 份全部在 INDEX.md 里当条目列着（按文件名里日期后面那一段排、没有重复），其余 ${DOC_COUNT} 份连同 INDEX.md 全部在 AGENTS.md 索引中，两份都没有死链、只有规定的写法，索引条目都是一行；AGENTS.md ${SIZE_NOW} 字节（上限 ${SIZE_LIMIT}）"
