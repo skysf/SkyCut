@@ -1,0 +1,67 @@
+# Throwaway probe (ubuntu only): does "leave a marker on a green pull_request run, look it up on the push after the merge" work?
+# Lives only on test/x4-* branches; deleted after the measurement.
+name: x4-probe
+
+on:
+  pull_request:
+  push:
+    branches: [test/x4-verified-base]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  shard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: What is checked out
+        run: |
+          echo "event=${GITHUB_EVENT_NAME} sha=${GITHUB_SHA} ref=${GITHUB_REF} attempt=${GITHUB_RUN_ATTEMPT}"
+          echo "HEAD=$(git rev-parse HEAD) tree=$(git rev-parse 'HEAD^{tree}')"
+          git log -1 --format='parents=%P subject=%s'
+      - name: Already verified?
+        id: verified
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERIFIED_TREE_WORKFLOW: .github/workflows/x4-probe.yml
+        run: echo "verified=$(scripts/ci-verified-tree.sh)" >> "$GITHUB_OUTPUT"
+      - name: Result
+        run: echo "RESULT event=${GITHUB_EVENT_NAME} verified=${{ steps.verified.outputs.verified }}"
+      - name: Checks (skipped when verified)
+        if: steps.verified.outputs.verified != 'true'
+        run: echo "RAN the checks"
+
+  check-all:
+    needs: shard
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: All shards passed
+        run: test "${{ needs.shard.result }}" = "success"
+      - name: Name the verified tree
+        id: tree
+        if: github.event_name == 'pull_request' && hashFiles('flags/no-marker') == ''
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          echo "tree=${tree}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${tree}" > "${RUNNER_TEMP}/verified-tree.txt"
+          echo "MARKER tree=${tree} sha=${GITHUB_SHA} attempt=${GITHUB_RUN_ATTEMPT}"
+      - name: Leave the verified-tree marker
+        if: github.event_name == 'pull_request' && hashFiles('flags/no-marker') == ''
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ runner.temp }}/verified-tree.txt
+          retention-days: 1
+          overwrite: true
+      - name: Fail after the marker (negative test)
+        if: github.event_name == 'pull_request' && hashFiles('flags/fail-after-marker') != ''
+        run: exit 1

@@ -1,0 +1,26 @@
+# Throwaway probe (ubuntu only): another workflow uploads an artifact with the marker's name. The lookup must not accept it.
+name: x4-forger
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  forge:
+    if: ${{ hashFiles('flags/forge') != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - id: tree
+        run: |
+          tree="$(git rev-parse 'HEAD^{tree}')"
+          echo "tree=${tree}" >> "$GITHUB_OUTPUT"
+          printf '%s\n' "${tree}" > "${RUNNER_TEMP}/verified-tree.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ runner.temp }}/verified-tree.txt
+          retention-days: 1
