@@ -260,9 +260,18 @@
 - 本地推之前那一步：`scripts/check-local.sh <相关的检查>`（扫描守卫 + 点名的几项；完整的一遍交给 CI）。本地跑检查的三个入口
   （check-local / check-guards / check-all）在 Rosetta 下会换成原生 arm64 的 `/bin/bash` 重跑自己（`scripts/native-arch.sh`）、
   起检查用 `/bin/bash` 不用 PATH 上的 bash：`checks/native-local-checks.sh`（装了 Rosetta 就真起一个 x86_64 的探针看它换没换成原生）。
-- AGENTS.md 的索引必须是全的、每条一行、整份不许再长回去 —— `checks/docs-index-drift.sh`：
-  - `docs/` 下每一份文档都要能从 AGENTS.md 找到，且没有死链。只读 AGENTS.md 的代理打不开索引外的文档，所以漏一行等于那份文档不存在。
-  - 以 `- [` 开头的索引行每条不超过 400 字节（链接 + 一句话）；整份不超过 58,000 + 250 × `docs/` 下的文档数 字节。
+- AGENTS.md 和 Bug 案例索引（`docs/bugfixes/INDEX.md`）必须是全的、每条一行，AGENTS.md 整份不许再长回去 —— `checks/docs-index-drift.sh`：
+  - `docs/bugfixes/` 下每一份（`INDEX.md` 自己除外）都要列在 `docs/bugfixes/INDEX.md` 里；`docs/` 下其余每一份、连同 `docs/bugfixes/INDEX.md`，
+    都要能从 AGENTS.md 找到。只读 AGENTS.md 的代理打不开索引外的文档，所以漏一行等于那份文档不存在。
+  - 两份都没有死链；`INDEX.md` 里的链接按它所在的文件夹解析（同文件夹写 `xxx.md`，别的文件夹写 `../architecture/xxx.md`）。
+    AGENTS.md 的「Bug 修复案例索引」一节只留指路的话，那里出现以 `- [` 开头的条目就红（开工早的会话还会照旧规矩往那里补一行）。
+  - 两份里以 `- [` 开头的索引行每条不超过 400 字节（链接 + 一句话）；AGENTS.md 整份不超过 71,000 + 250 × `docs/bugfixes/` 以外的文档数 字节。
     2026-11-13 之前每条索引都带一大段摘要，AGENTS.md 有 339 KB，每个会话一开就读约 14.7 万 token；那天收成每条一行（400 份文档、153 KB）。
+    同一天又把 Bug 案例的索引搬去 `docs/bugfixes/INDEX.md`（AGENTS.md 100 KB），案例不再往 AGENTS.md 里加一行，所以文档数只数 `docs/bugfixes/` 以外的；
+    基数里留了约 5 KB 余量，给新案例在必读表里加的链接（怎么算的写在守卫第 3 节的注释里）。
     超了就把摘要挪进它指向的文档（或这份细目），不是抬上限。反向验证（2026-11-13）：往必读表里加 6 KB 的一行 → 红（整份超上限）；
     给一条索引接上一段摘要 → 红（那一行超 400 字节）；恢复后绿。
+    搬出 Bug 案例索引那次（2026-11-13，`/bin/bash` 跑）逐道又验了一遍，每道都红、报的是对的那一句：从 `INDEX.md` 删一条；往 `INDEX.md` 加一条死链；
+    `INDEX.md` 里照老写法写 `docs/bugfixes/xxx.md`；去掉 AGENTS.md 里指向 `INDEX.md` 的两处链接；`INDEX.md` 一条 401 字节（正好 400 是绿的）；
+    AGENTS.md 比上限多 1 字节（正好等于上限是绿的）；新加一份架构文档不进 AGENTS.md（只列进 `INDEX.md` 也不算）；
+    AGENTS.md 那一节加回一条案例；`INDEX.md` 整份删掉。恢复后绿，文件和改坏之前逐字节相同。
