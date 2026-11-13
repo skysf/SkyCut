@@ -5,9 +5,10 @@ import Foundation
 // 管什么：先守每日硬预算；预算内按 AI 权限决定草稿越档是否需要确认，获准后才预留。
 // 令牌绑着完整请求（SkyStudioApproval：种类、模型、文字、全部参数、输入身份、精确报价和落点），换一样不认；给人看的 summary 只管显示。
 // 决定和记账在同一步里做完（中间没有 await），同时起的几个不会各自以为还在额度内。
-// 价格一律是 /quote 报的（不会有「不知道多少钱」）。upscale_clip（AIUpscaleTool）走这里；生成、配旁白改走 Sky Studio 时也走这里；
+// 价格一律是 /quote 报的（不会有「不知道多少钱」）。upscale_clip（AIUpscaleTool）、generate_media（SkyStudioGenerateTool）走 decide；
+// 不问、只守每日硬上限的走 reserveWithoutAsking：配旁白（整段一次）、变声，和面板 / 按钮起的 upscale、设计声音（按下去就是确认）。
 // 声音库的授权、一次性费用、删声音（声音 PR 6）也在这里，不另开确认入口。
-// 不管什么：报价（/quote）、退款（各任务自己：没花出去的退回）、面板起的（面板本身就是确认，不经这里）。
+// 不管什么：报价（/quote）、退款（各任务自己：没花出去的退回）。
 
 @MainActor
 enum SkyStudioJobGate {
@@ -82,7 +83,8 @@ enum SkyStudioJobGate {
              "next_step": "Nothing started or charged. Notify the user in their conversation language that the daily hard budget is exhausted. They can raise it in SkyCut Settings > Sky Studio, or explicitly ask you to help change it with set_settings. Do not ask for a one-off budget bypass or silently raise it. Full access obeys the same cap."])
     }
 
-    /// 配旁白不能停下来问：整体额度内一次预留，额度不够由调用方退本机（克隆报错）。
+    /// 不停下来问、只守每日硬上限：额度内一次预留；超了回 nil，调用方回 daily_budget_exceeded（AI 起的）或不起任务（面板、按钮），
+    /// 配旁白也不换本机的声音（2026-11-01）。
     static func reserveWithoutAsking(credits: Double, store: SkyStudioSpendStore? = nil) -> Reservation? {
         let store = store ?? SkyStudioSpendStore.shared
         guard case .allow = store.decide(credits: credits) else { return nil }

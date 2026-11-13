@@ -43,7 +43,7 @@ private func checkCatalog() {
     let schema = definition.inputSchema
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["kind"], "kind is required; prompt depends on operation")
     let properties = schema["properties"]?.objectValue ?? [:]
-    // confirm_token：超了每日额度 / 价格不明时回的确认码（2026-10-17 起不在提示条上问，AI 多开方案板 9）。
+    // confirm_token：请求批准模式下超出低成本草稿时回的确认码（2026-11-01 起；超了每日硬上限回 daily_budget_exceeded、不发码；不在提示条上问）。
     checkEqual(Set(properties.keys), ["kind", "prompt", "model", "image_context", "quality", "input_mode", "image", "last_image",
         "reference_images", "reference_videos", "reference_audio", "character_id", "character_roles", "character_revision", "auto_fallback", "duration", "resolution", "aspect_ratio", "generate_audio",
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",

@@ -138,13 +138,12 @@ final class VideoEditProject {
     }
 
     /// 不算用户改动的时间线修补（打开工程后补静帧、重新链接素材）：不标脏，预览要跟着重建。
-    /// `annotation: true` 是查到 fal 实收补进 upscale 记录那种：标脏存盘、不进撤销栈、不重建预览。
-    func applyDocumentRepair(annotation: Bool = false, _ mutate: (inout TimelineState) -> Void) {
+    func applyDocumentRepair(_ mutate: (inout TimelineState) -> Void) {
         var next = state
         mutate(&next)
         guard next != state else { return }
-        if annotation { state = next } else { replaceStateForDocument(next) }
-        if !annotation { scheduleRebuild() }
+        replaceStateForDocument(next)
+        scheduleRebuild()
     }
 
     /// 剪辑 / 形状 / 字幕 cue 三类选择的唯一存放处。互斥规则写在

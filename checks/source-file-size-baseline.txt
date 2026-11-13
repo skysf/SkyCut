@@ -8,7 +8,7 @@
 846 Sources/SrtFlow/VideoEditCompositionBuilder.swift
 717 Sources/SrtFlow/VideoEditMediaFileDrop.swift
 935 Sources/SrtFlow/VideoEditModels.swift
-1204 Sources/SrtFlow/VideoEditProject.swift
+1203 Sources/SrtFlow/VideoEditProject.swift
 922 Sources/SrtFlowCore/ScreenRecordingModels.swift
 1223 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
 690 Sources/SrtFlowCoreChecks/main.swift

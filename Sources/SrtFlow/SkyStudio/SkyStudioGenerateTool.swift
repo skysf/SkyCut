@@ -5,7 +5,8 @@ import SrtFlowMCPKit
 // MARK: - 工具：生成素材（generate_media），送 Sky Studio、花积分
 //
 // 管什么：AI 的参数读成一次生成（`SkyStudioGeneration`：图 / 视频 / 音乐 / 音效），按 kind 挑 `/models` 里的模型，问 `/quote` 多少积分，
-// 在起任务之前过 `SkyStudioJobGate`（额度内直接记账；超了当场回确认码），然后**回任务号**：一次生成要几秒到几分钟，客户端对一次调用
+// 在起任务之前过 `SkyStudioJobGate`（先守每日硬上限：超了回 daily_budget_exceeded、什么都不起；请求批准模式下超出低成本草稿回确认码），
+// 然后**回任务号**：一次生成要几秒到几分钟，客户端对一次调用
 // 大多只等一分钟。真正的活在 `SkyStudioGenerationRun` 里跑。成品放在用户的「生成」文件夹（点名的文件夹 → 工程的家 → 下载，撞名加编号），
 // 也长期留在用户的 Sky Studio 作品库里。2026-10-28 起（收费方案第 6 刀 6b）；之前送 fal、花美元。
 // 不管什么：参数怎么换成 Sky Studio 的写法（SkyStudioGeneration）；跑、等、下载（SkyStudioGenerationRun）；配旁白（add_voiceover）。

@@ -82,3 +82,31 @@ App 的行为一直是对的（硬上限、草稿、清单都照合同做），�
 - 卡里不写死会变的目录事实（档位、模型、「没有 …」）；花钱的合同细节指到说明书，卡里只写剪片时要记住的那一层。
 - 守卫对着事实查（清单真的怎么列、结果码叫什么、哪两件事不能写成一回事）；钉原词的守卫会替过期的那句站岗。
 - 长期约束见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 32 条。
+
+## 后续（2026-11-13，同一天另一个 PR）：边界外同一类的几处一起清了
+
+上面那个 PR 只改剪辑风格，报告里留了几处同一类的过期说法在边界外；这一次照「合同改了，别处的话没跟上」逐处清掉（不改 App 的行为）：
+
+- **代码里的死常量和过期的注释**：`MCPVocabulary.videoResolutions` / `generationAspects`、`SkyStudioGeneration.videoResolutions`
+  （注释写「H3 只有这两档」「没有 1080p」，没有一个工具用它们）删了，`SkyStudioGeneration` 剩下的画幅 / 768p 注明是「目录没给取值时的兜底」；
+  `DailySpendPolicy` 里 fal 时代的两条死路（价格不明每次问、配旁白超额度退档）和「超了就问」的叫法（`.ask` 改 `.overLimit`）、
+  `applyDocumentRepair` 的 `annotation:`（查 fal 实收回写工程那一路，10-28 删了）也删了。`AIUpscaleTool`、`SkyStudioGenerateTool`、`SkyStudioJobGate`、
+  `UpscaleJob`、`UpscalePanel`、`AISession`、`SkyStudioAccount`、`MCPGenerationTools` 等注释里还写着 11-01 之前的规矩（超了每日上限回确认码、
+  面板超了只标红、确认码绑着摘要、存了 Key 才列）或把 fal 当现行的，改成现在的说法；检查和脚本的说明（`ProviderChecks`、`UpscaleToolChecks`、
+  两份 `SpendChecks`、`scripts/check-mcp.sh`、`scripts/check-sky-studio.sh`、`checks/sky-studio-wiring.sh`、指向已删的 fal 脚本的几处）同样。
+- **架构文档**：[AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 7 条的「送 fal 的任务跑着时 get_job 带阶段」改成 Sky Studio 的阶段和
+  `skystudio_job_id`；第 6、34、44、45 条、人工清单和已知不足里把 fal、旧预算规矩、旧上限当现行的话改掉或注明当时；
+  [Sky Studio 的任务](../architecture/sky-studio-jobs.md)、[视频 upscale](../architecture/video-upscale.md)（含人工回归第 8 步：超了上限现在是
+  `daily_budget_exceeded`，不是确认码）、[合成音效](../architecture/sound-effect-synth.md)同样；[检查细目](../testing/check-catalog.md)补上
+  `RecipeContractChecks`。
+- **共用规矩补第 13 条**（中文稿先改，再同步英文资源）：存了 Sky Studio 的 Key 时 `add_voiceover` 也花积分 —— 回任务号之前整段报一次价、
+  按每日硬上限整体预留，超了 `daily_budget_exceeded` 就停、用户要才换本机的声音；细节指到说明书的 `add_voiceover`、`paid` 两个主题。
+  对着 [Sky Studio 的任务](../architecture/sky-studio-jobs.md)第五节和说明书核过。
+- **守卫**：`RecipeContractChecks` 加一条事实型的：卡里叫 AI 用到的花钱工具（照说明书 `paid` 主题「Which tools.」那一句认，不另抄名单），
+  共用规矩里都得有一条同时讲到它和积分。反向验证（编好的自检二进制直接读资源）：删掉第 13 条 **1 条红**（点名 add_voiceover）；
+  留着第 13 条但去掉 credits 这个词 **1 条红**；把第 13 条改成「超了每日上限回 needs_confirmation、带 confirm_token 再调」，原有的那条
+  **1 条红**；逐字节放回（`cmp` 对过）后 **7,739 条 MCP 检查全过**。
+- 方案、报告、案例里写当时目录事实的句子是那一天的记录，照[文档索引怎么写](../architecture/doc-indexes.md)第三节第 5 条只补注记、不改写：
+  收费方案「H3 只有 480p / 768p」那一句补了「这是 10-27 那一版合同，档位以 `/models` 为准」。
+- 判断为不是同一类、没动的：文档里写的 `SrtFlow/配音` 这类文件夹名照 AGENTS.md「名字」一节，docs 里的 SrtFlow 指的就是 SkyCut
+  （新建的叫 `SkyCut/`、老的照认，[产品名](../architecture/product-name.md)）。

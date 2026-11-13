@@ -2,33 +2,23 @@ import Foundation
 
 // MARK: - 每日额度与按天记账（纯值）
 // 管什么：本机自然日的花费、预留、退款与额度判断；金额单位由调用方决定，当前 Sky Studio 用积分。
+// 每日额度是硬上限（2026-11-01）：超了就不做 —— AI 起的回 daily_budget_exceeded（SkyStudioJobGate），面板的按钮灰着、开跑时再核一次；
+// 没有「问一下再做」，也没有价格不明的情况（价一律是 /quote 报的）。
 // 不管什么：报价、确认码、账的持久化（SkyStudioSpendStore），或 HTTP。
 
 enum DailySpendPolicy {
-    enum Reason: Equatable {
-        /// 这个模型没登记单价：估不出来，每次都先问。
-        case unknownPrice
-        /// 这一次做完今天就超过上限了。
+    enum Decision: Equatable {
+        case allow
+        /// 这一次做完今天就超过上限了：不做。
         case overLimit(spent: Double, estimate: Double, limit: Double)
     }
 
-    enum Decision: Equatable {
-        case allow
-        case ask(Reason)
-    }
-
-    /// 一单位的千分之一以内的误差不算（浮点加出来的 9.999999999 不该多问一次）。
+    /// 一单位的千分之一以内的误差不算（浮点加出来的 9.999999999 不该算超）。
     private static let slack = 0.0005
 
-    static func decide(estimate: Double?, spentToday: Double, dailyLimit: Double) -> Decision {
-        guard let estimate else { return .ask(.unknownPrice) }
+    static func decide(estimate: Double, spentToday: Double, dailyLimit: Double) -> Decision {
         if spentToday + estimate <= dailyLimit + slack { return .allow }
-        return .ask(.overLimit(spent: spentToday, estimate: estimate, limit: dailyLimit))
-    }
-
-    /// 配旁白不会停下来索要花钱确认：额度不够时直接退到下一档声音（本机的 / macOS 的）。
-    static func allowsWithoutAsking(estimate: Double?, spentToday: Double, dailyLimit: Double) -> Bool {
-        decide(estimate: estimate, spentToday: spentToday, dailyLimit: dailyLimit) == .allow
+        return .overLimit(spent: spentToday, estimate: estimate, limit: dailyLimit)
     }
 }
 

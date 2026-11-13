@@ -1,34 +1,29 @@
 import Foundation
 
-// 第二组：花钱的把关（方案第 18 条）和按天记账。
-// 只设每天的上限，不设单次上限；额度内不问，超了先问；没登记单价的每次都问。
+// 第二组：每日额度（方案第 18 条；2026-11-01 起是硬上限）和按天记账。
+// 只设每天的上限，不设单次上限；额度内照做，超了不做（AI 起的回 daily_budget_exceeded、面板的按钮灰着，SkyStudioJobGate / 面板各自转），
+// 不问、不发越额的确认码。价一律是 /quote 报的，没有「价格不明」这一档（那是 fal 时代没登记单价的模型，2026-11-13 删了）。
 
 func runSpendChecks() {
     typealias Policy = DailySpendPolicy
 
-    // 额度内不问
-    checkEqual(Policy.decide(estimate: 0.40, spentToday: 0, dailyLimit: 10), .allow, "well inside the limit: no question")
+    // 额度内照做
+    checkEqual(Policy.decide(estimate: 0.40, spentToday: 0, dailyLimit: 10), .allow, "well inside the limit: go ahead")
     checkEqual(Policy.decide(estimate: 0.40, spentToday: 9.60, dailyLimit: 10), .allow, "landing exactly on the limit is inside it")
-    checkEqual(Policy.decide(estimate: 0.40, spentToday: 9.5999999, dailyLimit: 10), .allow, "float dust does not cost a question")
-    // 超了先问
-    if case .ask(.overLimit(let spent, let estimate, let limit)) = Policy.decide(estimate: 0.50, spentToday: 9.60, dailyLimit: 10) {
-        checkClose(spent, 9.60, "the question carries what was spent")
-        checkClose(estimate, 0.50, "the question carries the estimate")
-        checkClose(limit, 10, "the question carries the limit")
+    checkEqual(Policy.decide(estimate: 0.40, spentToday: 9.5999999, dailyLimit: 10), .allow, "float dust does not count as over")
+    // 超了不做，说清差多少
+    if case .overLimit(let spent, let estimate, let limit) = Policy.decide(estimate: 0.50, spentToday: 9.60, dailyLimit: 10) {
+        checkClose(spent, 9.60, "over the limit carries what was spent")
+        checkClose(estimate, 0.50, "over the limit carries the estimate")
+        checkClose(limit, 10, "over the limit carries the limit")
     } else {
-        check(false, "0.50 on top of 9.60 goes over a 10.00 limit: ask")
+        check(false, "0.50 on top of 9.60 goes over a 10.00 limit")
     }
-    // 没有单次上限：一次就超过整天的额度也只是「超了要问」，不是拒绝
-    check(Policy.decide(estimate: 25, spentToday: 0, dailyLimit: 10) != .allow, "a single call above the daily limit asks")
-    // 没登记单价：每次都问，哪怕额度还很多
-    checkEqual(Policy.decide(estimate: nil, spentToday: 0, dailyLimit: 1000), .ask(.unknownPrice), "an unknown price always asks")
-    // 上限调成 0：什么要钱的都问
-    check(Policy.decide(estimate: 0.01, spentToday: 0, dailyLimit: 0) != .allow, "a limit of zero asks for everything that costs")
-    checkEqual(Policy.decide(estimate: 0, spentToday: 0, dailyLimit: 0), .allow, "something free never asks")
-    // 配旁白这种同步的工具不能停下来等：额度不够 / 价格不明时退到下一档
-    check(Policy.allowsWithoutAsking(estimate: 0.04, spentToday: 1, dailyLimit: 10), "a small voiceover inside the limit goes ahead")
-    check(!Policy.allowsWithoutAsking(estimate: 0.04, spentToday: 9.99, dailyLimit: 10), "a voiceover over the limit does not")
-    check(!Policy.allowsWithoutAsking(estimate: nil, spentToday: 0, dailyLimit: 10), "an unknown price does not")
+    // 没有单次上限：一次就超过整天的额度也只是超了上限
+    check(Policy.decide(estimate: 25, spentToday: 0, dailyLimit: 10) != .allow, "a single call above the daily limit is over it")
+    // 上限调成 0：要钱的都不做（暂停收费任务）
+    check(Policy.decide(estimate: 0.01, spentToday: 0, dailyLimit: 0) != .allow, "a limit of zero pauses everything that costs")
+    checkEqual(Policy.decide(estimate: 0, spentToday: 0, dailyLimit: 0), .allow, "something free always goes ahead")
 
     // 按天记账（固定时区和日期，别让自检跟着跑的那天和机器变）
     var calendar = Calendar(identifier: .gregorian)

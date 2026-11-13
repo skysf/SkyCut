@@ -2,8 +2,9 @@ import Foundation
 
 // MARK: - 用户点了「开始」之后的那个任务：记账 → 取 Key → 跑流水线 → 按实收对账
 //
-// 管什么：面板起的，面板上的报价（/quote 的积分）就是用户的确认（upscale 方案第 10 条：记进积分的账、超限只标红不拦），不再问；
-// AI 起的（upscale_clip）在起任务之前按每日积分上限把关过了（SkyStudioJobGate.decide，超了是聊天里的确认码），任务拿到已经记上的那一笔（`Approval.ai`）。
+// 管什么：面板起的，面板上的报价（/quote 的积分）就是用户的确认（upscale 方案第 10 条），不再问；开跑时照每日硬上限再核一次（2026-11-01：
+// 超了不记账、不起任务，`reserveWithoutAsking`）。AI 起的（upscale_clip）在起任务之前过了 SkyStudioJobGate.decide（硬上限、请求批准模式的确认码），
+// 任务拿到已经记上的那一笔（`Approval.ai`）。
 // 取 Sky Studio 的 Key：面板起的可以弹钥匙串授权框（用户刚点了按钮，`keyPrompt` 让界面说一句），AI 起的不弹（读不到就请用户去设置里点「允许…」）；
 // 跑 `UpscalePipeline`，阶段（含上传 / 下载的字节比例、这一阶段过了多久）发给界面；做完按实收（credits_charged）改账。
 // 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。账的那一笔是 `SkyStudioHeldCredits`（和生成共用）。
@@ -22,8 +23,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
         case cancelled(SkyStudioJobError.Stop)
     }
 
-    /// 花钱怎么把关：面板上的报价就是用户的确认（直接记账）；AI 起的（upscale_clip）在起任务之前按每日积分上限把关过了
-    /// （SkyStudioJobGate.decide），这里拿到的是已经记上的那一笔。
+    /// 花钱怎么把关：面板上的报价就是用户的确认（开跑时在每日硬上限内记账，超了不起）；AI 起的（upscale_clip）在起任务之前
+    /// 过了 SkyStudioJobGate.decide，这里拿到的是已经记上的那一笔。
     enum Approval {
         case panel
         case ai(SkyStudioJobGate.Reservation)
@@ -80,7 +81,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         task?.cancel()
     }
 
-    /// 「Topaz Starlight · 4K · 7.0 s」：确认码绑着它（SkyStudioJobGate）。
+    /// 「Topaz Starlight · 4K · 7.0 s」：确认的问句（SkyStudioJobGate）里给人看的摘要；令牌绑的是完整请求（SkyStudioApproval.identity）。
     static func summary(of request: UpscaleRequest) -> String {
         "\(request.tier.title) · \(request.target.label) · " + String(format: "%.1f s", request.range.duration)
     }

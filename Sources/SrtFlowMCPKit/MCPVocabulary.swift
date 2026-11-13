@@ -72,12 +72,8 @@ public enum MCPVocabulary {
     public static let upscaleTiers = ["topaz-starlight", "bytedance-upscaler-pro"]
     public static let upscaleTargets = ["1080p", "1440p", "2160p"]
     public static let upscaleRanges = ["clip", "longest", "file"]
-
-    /// 生成视频的分辨率档（= `SkyStudioGeneration.videoResolutions`：Sky Studio 的 MiniMax H3 只有这两档）。
-    public static let videoResolutions = ["480p", "768p"]
-
-    /// 生成图 / 视频的画幅（= `SkyStudioGeneration.imageAspects`，Sky Studio 的图片认的那十种；视频只认其中六种，不认的由 Sky Studio 回话）。
-    public static let generationAspects = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]
+    // generate_media 的分辨率和画幅不在词表里：每个模型认哪几档、哪几种由 `/models` 的目录说了算（说明写 Catalog tier / Catalog aspect，
+    // get_status models=true 列着），不是一张抄死的表（2026-11-13 删了 10-28 只有 MiniMax H3 时抄的那两张，没有工具用它们）。
 
     /// 文字的几个常用位置（画面高度的比例见 App 里的 `AITextPlacement`）。
     public static let textPositions = ["top", "upper_third", "center", "lower_third", "bottom"]

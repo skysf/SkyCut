@@ -54,7 +54,7 @@ enum AIProjectTools {
         } else {
             result["subtitle_generation"] = false
         }
-        // 存了 Sky Studio 的 Key（generate_media、upscale_clip 在清单里）：告诉 AI 花的是积分、今天还剩多少（2026-10-28 起；之前是 fal 的美元）。
+        // 存了 Sky Studio 的 Key：告诉 AI 花的是积分、今天还剩多少（2026-10-28 起；之前是 fal 的美元）。花钱的工具 2026-10-30 起始终在清单里。
         if let generation = SkyStudioGenerateTool.statusJSON() { result["generation"] = generation }
         if try args.bool("models") == true {
             result["generation_models"] = await SkyStudioModelStatus.read(model: try args.string("model"))

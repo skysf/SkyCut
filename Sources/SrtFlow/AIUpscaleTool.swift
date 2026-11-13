@@ -6,16 +6,16 @@ import SrtFlowMCPKit
 // MARK: - 工具：upscale_clip（把一段的原片送 Sky Studio 放大，做完直接换源）
 //
 // 管什么：参数读成一次 upscale —— 和面板同一份数（UpscalePanelModel 算范围、档位能不能送），模型和上限照 Sky Studio 的 /models、
-// 价问 /quote（收费方案第 6 刀，2026-10-28 起；之前走 fal）；起 `UpscaleJob`（花积分按每日上限把关，在起任务之前：额度内直接记账、
-// 超了当场回确认码，SkyStudioJobGate）→ **回任务号**，`get_job` 带阶段；做完**直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口，
-// 做完就换、一步撤销；用户随时右键「Compare with Original…」/「Revert」），任务的结局带 replaced_ids / file / 尺寸 / 实收的积分。
+// 价问 /quote（收费方案第 6 刀，2026-10-28 起；之前走 fal）；起 `UpscaleJob`（花积分在起任务之前过 SkyStudioJobGate：先守每日硬上限，
+// 超了回 daily_budget_exceeded、什么都不起；upscale 超出低成本草稿，请求批准模式下回确认码）→ **回任务号**，`get_job` 带阶段；
+// 做完**直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口，做完就换、一步撤销；用户随时右键「Compare with Original…」/「Revert」），任务的结局带 replaced_ids / file / 尺寸 / 实收的积分。
 // 换源是异步落账：那一下自己包一层 `AIUndoGrouping.step`（scripts/check-mcp.sh 钉着）。Key 不弹钥匙串授权框（AI 起的，没人在看）。
 // 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源的规则（VideoEditClipUpscale）、积分怎么问（SkyStudioJobGate）、说明文字（MCPGenerationTools）。
 
 @MainActor
 enum AIUpscaleTool {
     static func upscale(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        // 小程序没存 Sky Studio 的 Key 就不列这个工具，但客户端可能缓存着旧清单：这里再认一次。
+        // 清单始终列出这个工具（2026-10-30），Key 在调用时才核对：没存就在这里说清楚。
         guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
         let state = project.state
         let ids = AIShortIDs(state: state)
@@ -68,7 +68,8 @@ enum AIUpscaleTool {
         try refuseIfRunning(model.originalURL)
 
         let request = model.request(choice: choice, target: target, tier: tier, quote: quote)
-        // 花积分的把关在起任务之前（AI 多开方案板 9）：超了每日上限当场回确认码，AI 在聊天里问用户、带码再调。
+        // 花积分的把关在起任务之前（AI 多开方案板 9、2026-11-01）：超了每日硬上限回 daily_budget_exceeded、什么都不起；请求批准模式下
+        // 回确认码，AI 在聊天里问用户、带码再调；全部权限直接记账。
         let identity = SkyStudioApproval.identity(job: row.quote, credits: quote.credits, context: [
             "source": try SkyStudioApproval.file(request.originalURL),
             "from": .number(request.range.start), "to": .number(request.range.end),

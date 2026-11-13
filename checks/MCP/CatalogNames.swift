@@ -28,8 +28,9 @@ func catalogKnownNames() -> Set<String> {
     names.insert("music_credits")  // get_timeline 的结果里的字段
     names.insert("lines_with_word_times")  // get_subtitles 的结果里的字段
     names.formUnion(["new_video", "new_audio"])  // track 参数开新轨的两个值（只写在说明里，不是参数名）
-    // generate_media（2026-10-30 起清单始终列出它，Key 在调用时才核对）的词表和结果字段：卡里提到它们时要对得上。
-    names.formUnion(MCPVocabulary.generationKinds + MCPVocabulary.videoResolutions + MCPVocabulary.generationAspects)
+    // generate_media（2026-10-30 起清单始终列出它，Key 在调用时才核对）的种类和结果字段：卡里提到它们时要对得上。
+    // （分辨率、画幅照 /models 的目录、不在词表里；480p、16:9 这样的值本来也不是 catalogIdentifiers 认的词。）
+    names.formUnion(MCPVocabulary.generationKinds)
     names.formUnion(["credits", "credits_charged", "waiting_for_user", "job_id", "needs_confirmation"])
     // 说明书的通用主题提到的结果字段和报错代码（2026-11-10）：get_timeline 的 edit_limits、get_status 的 skycut_plan、
     // 没存过的工程存下来时的 project_saved_to、每日硬上限的 daily_budget_exceeded、几乎每个结果都有的 next_step、MCP 结果的 isError。

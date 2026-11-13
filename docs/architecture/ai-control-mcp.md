@@ -177,7 +177,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    否则开自己的窗口（第 46 条 ⑦）—— 主窗口里「从没存过、又剪了东西」的工程不再被换掉，也就不会弹「要不要存」（以前是先替它存进
    `SkyCut/工程` 再换、结果里写 `previous_project_saved_to`）。`close_project` 关主窗口那个之前先替它存好（方案第 34 条：不问也不丢）。
 6. **批准只用于删文件、读别处的文件、预算内偏离已授权的生成规格；硬预算不能一次性绕过**（方案第 34 条，2026-09-28 用户拍板：「少问几次，越少越好。核心就是删除文件需要问」；
-   2026-10-17 AI 多开方案板 9 把 fal 花钱也收进这一套）：
+   2026-10-17 AI 多开方案板 9 把花钱也收进这一套 —— 当时是 fal 的美元，2026-10-28 起是 Sky Studio 的积分）：
    - 删进废纸篓先问（`AIFileTools`）。
    - 读点名文件夹以外的文件**问一次**，同意了就记住那个文件夹（`AIReadGrants`：含子文件夹，重启也记得，设置 → 连接 AI 里
      列出来、能删）。文件夹太大（根目录、顶层文件夹、卷的根、个人文件夹本身）时只记那个文件 —— 不然同意读一个文件
@@ -186,7 +186,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 把它删进废纸篓（会问）。
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
-     改这几条（什么时候问、硬上限、草稿怎么挑）时，同一次改动里一起改剪辑风格共用规矩第 11 条（中文稿和英文资源，第 32 条），
+     改这几条（什么时候问、硬上限、草稿怎么挑）时，同一次改动里一起改剪辑风格共用规矩第 11、13 条（中文稿和英文资源，第 32 条），
      它教 AI 的就是这一套（[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)：11-01 改了这里，那条还教了 AI 十几天用确认码越过每日预算）。
    - **声音库的三件事**（2026-11-10 声音 PR 6，第 58 条）也在 `SkyStudioJobGate`：用录音建声音 / 加录音的**授权**和**一次性费用**（建 MiniMax 版、
      设计声音）请求批准模式问；**全部权限**下（声音 PR 7，`SkyStudioVoiceStanding.voiceAsk`）这个账号有有效的长期授权就不问 —— 建声音带
@@ -206,9 +206,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局；**开始和做完的结果都带 `video`：成片的宽、高、帧率**（`AIVideoSize.output`，
    和导出管线同一个 `cappedSize`：画布封短边、只降不升，帧率是工程帧率）。AI 指定的分辨率只用于这一次
    （`settingsOverride`），不写回用户在面板上记住的设置；压缩 / 烧录同理（第 24 条）。
-   送 fal 的任务（`generate_media`、upscale）跑着时 `get_job` 带阶段：`phase`（queued / processing / downloading…）、`queue_position`、
-   `transfer_percent`、`phase_seconds`、`typical_seconds`（`AIJobs.Job.liveDetail`，[fal.ai 生成](fal-generation.md) 第十三节：fal 处理中没有百分比，
-   给的是阶段 + 排队位置 + 已用时间 + 典型时长）。
+   送 Sky Studio 的任务（`generate_media`、`upscale_clip`、`change_voice`；2026-10-28 起，之前送 fal）跑着时 `get_job` 带阶段：`phase`（preparing /
+   uploading / queued / processing / downloading / finishing，生成在等退款时是 waiting_for_refund）、`queue_position`、`transfer_percent`、
+   `phase_seconds`、`typical_seconds`（`CloudJobProgress.json`，经 `AIJobs.Job.liveDetail` 并进来；处理中没有百分比，给的是阶段 + 排队位置 +
+   已用时间 + 典型时长，[Sky Studio 的任务](sky-studio-jobs.md)第一节「阶段」）；交上之后还带 Sky Studio 的任务号 `skystudio_job_id`
+   （跑着、做完、没做成、停了都带，第 44 条）。结束了 `get_job` 统一去掉阶段那几个字段（`AIJobResult`）。配旁白报的是几批各在哪（第 40 条）。
    **一次一个的活排队**（2026-10-17，[AI 多开方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 6、K 节；`AIWorkQueue`）：导出（导出器只有一个）、
    转写 / 生成字幕（一个串行槽）、翻译（一个宿主）占着时，AI 的调用不再回「已经在做了」：照样回任务号，`get_job` 报 `status: queued` 和
    `queue_position`（1 = 下一个），道空了自己开始、先来先做。界面上起的（导出面板、生成字幕面板）不进队、照旧在空着时直接开始，队里的等它们做完。
@@ -552,9 +554,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `needs_confirmation`、带 `confirm_token` 再调」「480p 出草稿、768p 重做」；原来的检查还钉着 `480p`、`needs_confirmation` 这几个词，等于替过期的那句站岗。
      所以：① 花积分的规矩（报价、什么时候问、每日硬上限）以说明书 `skycut_guide topic=paid` 为准，卡里只留剪片时要记住的几句、并指过去；
      ② 档位、模型、价格从目录读（`get_status models=true`；草稿由 `AIDraftPolicy` 挑），卡里不写死；③ 改了第 6、39 条、`SkyStudioJobGate`、
-     `AIDraftPolicy`、清单怎么列，同一次改动里把 `Sources/SrtFlow/Resources/recipe*.md` 和中文稿的共用规矩第 11 条一起改（先中文稿再英文）；
+     `AIDraftPolicy`、清单怎么列、配旁白怎么花积分（第 40 条），同一次改动里把 `Sources/SrtFlow/Resources/recipe*.md` 和中文稿的共用规矩第 11、13 条一起改（先中文稿再英文）；
      ④ 检查对着生产行为和现行说法查、不钉旧说法的原词：`RecipeContractChecks` 查条件句不提 Key（清单不按 Key 过滤时）、讲到报价 / 确认码 /
-     `daily_budget_exceeded`、每日预算和确认码不写在同一句里、讲生成素材的句子不带档位、不提 fal。
+     `daily_budget_exceeded`、每日预算和确认码不写在同一句里、讲生成素材的句子不带档位、不提 fal；卡里叫 AI 用到的花钱工具（照说明书 `paid` 主题
+     「Which tools.」那一句认，不另抄名单）共用规矩里都有一条说它花积分 —— 2026-11-13 补：存了 Key 时配旁白也花，共用规矩第 13 条。
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -566,8 +569,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      导出的画法在 `ShapePNGRenderer`（v24，见 [工程文件](video-edit-project-file.md)）。
    - `get_timeline` 回数字、强调、字距和实心。
 
-34. **配旁白（add_voiceover，方案第 42、43 条；声音两档：下载了 SrtFlow 自己的声音就用它，见第 35 条，没有 / 读不了的语言用 macOS 的；
-   fal 以后从同一个工具再分出去）**：
+34. **配旁白（add_voiceover，方案第 42、43 条；本机的两档：下载了 SrtFlow 自己的声音就用它，见第 35 条，没有 / 读不了的语言用 macOS 的；
+   存了 Sky Studio 的 Key 时先走 Sky Studio 的声音、花积分，见第 40 条 —— 当时写的「fal 以后从同一个工具再分出去」，2026-10-29 起是它）**：
+   下面讲的是本机这两档和几档共用的部分（落点、撤销、字幕、写文件）。
    - 一次给几句旁白，一句一个文件（`<起点>/SrtFlow/配音`，文件名取这句的开头、撞名加编号），放上音频轨：落点走 add_clips 那一套
      （`AITimelineEdits.place`，撞上往上抬一轨），这一批都放进第一句新开的那条轨；没给 start 的接在上一句后面留 0.3 秒，第一句没给就在播放头
      （`AIVoiceoverPlacement`）。两步：`plan` 合成（await），`apply` 同步提交、包 `AIUndoGrouping.step`，放素材和加字幕在同一次 perform 里。
@@ -589,7 +593,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      也绝不压动态」一个口径）。词的时间按它返回的那份（写进去的）算。**一个尖峰不许决定整句的音量**：2026-09-28 第一版是「整句一个增益、
      按峰值封顶」，被 Kokoro 炸出来的满幅 90 倍带偏，整句压没（[案例](../bugfixes/2026-09-29-kokoro-short-pieces-explode.md)；
      更早的「啪」见 [案例](../bugfixes/2026-09-28-kokoro-voiceover-clipping.md)）。各个声音原始响度差 6 dB（−15.6 到 −21.6 dBFS），
-     统一之后一批旁白换角色音量也齐。真句子写成 AAC 读回来峰值和写进去的差不到 0.05 dB，所以留 1 dB 够。以后加声音（fal 等）也只许经这一处写文件。
+     统一之后一批旁白换角色音量也齐。真句子写成 AAC 读回来峰值和写进去的差不到 0.05 dB，所以留 1 dB 够。以后加声音也只许经这一处写文件
+     （Sky Studio 的声音 2026-10-29 起也经它，第 40 条）。
    - **词**（`AIVoiceWords`，纯值）：标点也会被报成一个词，并进前一个词；词尾 = 下一个词的开头再往回收掉静音；写法照识别器
      （英文词带前面的空格、标点贴在后面）。
    - **字幕**（`subtitles=true`，`AIVoiceoverSubtitles`，纯值）：词直接喂 `SubtitleSegmenter.segment` + `assemble`（断句、去标点、一行多长、
@@ -708,7 +713,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     新普通图片模型均可用公开 id 点名；默认仍 Seedream Flash / Nano 2，Nano 2 的画幅不写死。JPEG / PNG 按实际下载字节定扩展名，
     `get_job.file_content_type` 报本机格式；原单、扣退费规则照旧。完整合同和上线后人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)第十二节。
     给 AI 的英文工具说明前 512 字写清两种用途、单图输入、禁用字段及 get_job / add_clips；角度与倍率字段都进入 schema，
-    没有新增别名，仍受每工具 2,048 / 全清单 110,000 字符守卫。
+    没有新增别名，受清单的上限守着（当时每工具 2,048 / 全清单 110,000；2026-11-10 起名片 ≤ 450、全清单 ≤ 100,000，第一节）。
     音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
     真人参考拒绝和未知状态不自动切模型或重交；退款晚到只查原单。替换是新的明确操作，重新核对完整参考、规格、报价及批准。
     官方原创短片的公开 `film`、真实引用准备、报价锁定和双侧审查见 [官方原创短片](official-film.md)；普通 `quote_only` 仍不上传。
@@ -774,7 +779,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
     [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
    - **始终列出来**（2026-10-30，和 `generate_media` 同一条规则，第 39 条）；总说明末尾的「Paid」那一行始终带着它，Key、授权和积分在 App 核对。
-     清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000、2026-10-17 抬到 100,000、2026-11-07 用户定抬到 110,000，见第一节）。
+     清单的说明总长度上限为它从 72,000 抬到 **80,000 字符**（2026-10-02 用户定；`ProtocolChecks`；2026-10-14 又抬到 90,000、2026-10-17 抬到 100,000、2026-11-07 用户定抬到 110,000、2026-11-10 说明书迁移完收回 100,000，见第一节）。
    - **参数和面板同一份数**：`clip_id`，可选 `tier`（Sky Studio 的模型名，词表 `MCPVocabulary.upscaleTiers`：`topaz-starlight`（默认）/ `bytedance-upscaler-pro`；
      词表里有、Sky Studio 此刻 `/models` 里没有的说清楚）、`target`（`1080p` / `1440p` / `2160p`，按短边叫，4K 写成 2160p，换成 Sky Studio 的 1080p / 2K / 4K）、
      `range`（`clip` / `longest` / `file`）；默认和面板一样（目标按画布、范围别处用得更长就 longest）；范围、模型送不送得了（没有这一档、超过 30 秒、超过 30 fps）
@@ -785,15 +790,17 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `skystudio_job_id`**（跑着、做完、没做成、停了都带，2026-10-28 真积分测试时补的：对账、找客服时说得出是哪一单，停不下来的那单也一样；
      `checks/sky-studio-wiring.sh` 第 8 条钉着）；任务种类 `upscale`；`cancel_job` / 停止把它从
      `UpscaleActivity` 拿掉：**排队中的替它向 Sky Studio 取消、退钱；已经开始的取消不了**，结局照实说积分花了、成品在作品库里。
-   - **花积分按每日上限把关**（`SkyStudioJobGate.decide`，在问完 `/quote` 之后、建任务之前：额度内直接记账；超了当场回确认码、带码再调才记账，
-     任务拿到的是记好的那一笔 `Approval.ai`），和 fal 那一关同一套确认码。**Key 不弹钥匙串授权框**（读不到就请用户去设置里点「允许…」）。面板起的 upscale
-     不经它（面板本身就是确认）。`checks/sky-studio-wiring.sh` 第 8 条钉着。
+   - **花积分先守每日硬上限、再看权限**（`SkyStudioJobGate.decide`，和 `generate_media` 同一关，在问完 `/quote` 之后、建任务之前；2026-11-01 起，第 6 条）：
+     超了每日硬上限当场回 `daily_budget_exceeded`、什么都不起；付费的 upscale 本身超出低成本草稿，请求批准模式下回确认码、带码再调才记账
+     （用户原话点了名的、本工程批准过的不再问），全部权限直接记账；任务拿到的是记好的那一笔 `Approval.ai`。**Key 不弹钥匙串授权框**
+     （读不到就请用户去设置里点「允许…」）。面板起的不经 `decide`（面板本身就是确认），开跑时照每日硬上限记账，超了不起。`checks/sky-studio-wiring.sh` 第 8 条钉着。
    - **做完直接换源**（2026-10-02 用户定：AI 起的不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里一次
      `applyUpscale`（工程里用这个原片且范围被盖住的段一起换），**自己包一层 `AIUndoGrouping.step`**（异步落账，第 1 条；
      `scripts/check-mcp.sh` 的扫描钉着）、算这一轮的一处改动、选中换了的段并把播放头放过去（后台模式不动）、没存过的工程存一下；
-     结局带 `replaced_ids` / `file` / 宽高 / `cost_usd`（查到实收前是估价，`cost_is_estimate`）。原片留在旁边：用户随时右键
+     结局带 `replaced_ids` / `file` / 宽高 / `credits_charged`（Sky Studio 的实收，做完就知道；fal 时代是 `cost_usd`，查到实收前是估价）。原片留在旁边：用户随时右键
      「Compare with Original…」/「Revert to Original Clip」，⌘Z 一步撤回。工程中途换了（`documentGeneration` 变了）就不换、结果里说明。
-   - 失败 / 取消 / 用户没点头各自一句话（`settle`），都不扣钱（fal 只对做出来的收）；用户在状态行上按 Stop 也算取消。
+   - 失败 / 取消各自一句话（`settle`），交上了的带 `skystudio_job_id`；用户在状态行上按 Stop 也算取消。花没花照 Sky Studio 的规矩：没交上、排队中取消、
+     它说没做成的退回；已经开始的停不下来、积分花了、成品进作品库（上面「是任务」那条）。用户没点头就什么都没起、没记账。
 45. **录屏（`record_screen`，2026-10-03，[方案](../plans/2026-10-03-screen-recording-mcp.md)）**：手动录屏那一整套（`ScreenRecordingCoordinator`、journal 提交、
     崩溃恢复、入轨）不另写一份，AI 起的录制只是一个 driver 为 AI 的 `ScreenRecordingSession`（[录屏生命周期](screen-recording-lifecycle.md)「AI 起的会话」）：
    - **AI 自己挑来源、从不开系统的选择窗口**（用户：「授权了以后，日后就不要再自己弹了」）：整屏按编号（`get_status screen=true` 列出来，主屏 1、其余从左到右）、
@@ -830,12 +837,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - **上次没收完的**（崩溃恢复的 `pendingRecovery`、手动录制的残缺结果）：`get_status` 的 `screen_recording.leftover` 报出来（报**保存之后叫什么**，
      不报隐藏的 `.partial` 临时文件名；还没保存的带 `saved: false`）、挡住新开录（manifest 只有一份）；
      `action=resolve decision=add|keep|discard` 走恢复框 / 残缺框那同一份处置（`resolveRecovery` / `resolvePartial`）；discard 是删文件：**先问**
-     （`AIFileTools.confirmTrash`，和 manage_files 同一处 —— 会问的地方照旧只有第 6 条那两处）、**进废纸篓**，已经提交成用户文件的不给丢（同恢复框）。
+     （`AIFileTools.confirmTrash`，和 manage_files 同一处 —— 会问的入口照旧只有第 6 条列的那四处）、**进废纸篓**，已经提交成用户文件的不给丢（同恢复框）。
    - **录制中的锁换成 AI 能照做的话**：换工程（`open_project` / `new_project`）、`set_canvas` 改帧率先挡（以前 `set_canvas` 静默不改还回成功，
      [案例](../bugfixes/2026-10-03-set-canvas-fps-ignored-while-recording.md)），**按为什么锁来说**（`AIScreenRecordingTool.lockMessage`）：在录 / 在收尾说 stop 或等它完，
      在等决定说先问用户、resolve —— 那时根本没在录（[真机首测](../bugfixes/2026-10-03-record-screen-first-device-test.md)）。
    - **没授权时不列窗口**：系统那时只把 SrtFlow 自己的窗口算作能录（真机：授权前 1 个、授权后 8 个），`get_status screen=true` 的 `windows` 换成一句「授权后才列得出」。
-   - 预算：加它之后全清单 79,483 / 80,000；总说明配了 fal 2,044 / 2,048（目录里加了 Record 一行，别的几行收了措辞）。往后再加东西先腾地方。
+   - 预算（2026-10-03 当时）：加它之后全清单 79,483 / 80,000；总说明配了 fal 2,044 / 2,048（目录里加了 Record 一行，别的几行收了措辞）。往后再加东西先腾地方。
+     （后来：2026-10-30 起总说明不再按提供方多一行，2026-11-10 起目录搬进说明书的地图、上限按第一节第 5、6 条。）
 
 46. **几个工程、几个 AI 会话：一个会话一组工程，改动只落在会话自己的工程上**（2026-10-14 起会话只改自己的工程，
     [案例](../bugfixes/2026-10-14-ai-edits-land-in-another-sessions-project.md)；2026-10-17 起一个会话能同时剪几个，
@@ -997,7 +1005,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - **异步准备不覆盖用户修改**：片段批量准备期间换了工程代号、时间线或联动开关，提交前整批拒绝，叫 AI get_timeline 后重试。
       准备阶段的抽帧 / 素材缓存不属于时间线修改；失败时不会把已经算好的前半批落下去。
     - **清单和结果**：批量条目的发现 schema 只列身份字段，允许其余字段；完整参数说明引用对应单项工具，不复制三套，
-      仍受全清单 110,000 字符限制。`MCPArgumentCheck` 核对批量调用时用 `MCPBatchTools.validationSchema` 展开单项完整 schema
+      受全清单的上限守着（当时 110,000；2026-11-10 起 100,000，第一节）。`MCPArgumentCheck` 核对批量调用时用 `MCPBatchTools.validationSchema` 展开单项完整 schema
       （去掉条目里的 project、保留形状 length 别名），未知和嵌套字段照样整批拦；实际类型 / 范围继续由原编辑规则核对。
       结果按输入顺序回各项最终状态、`count`，保留单项的排版警告 / 取景发现 / 关键帧提示；
       `linkage` / `magnet` 汇总在批次层，空改动带 `unchanged: true`。
@@ -1016,15 +1024,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `list_characters capabilities=true` 读取原生角色模型 / 档位 / 价格；唯一写工具 `manage_characters` 的六个 action 是 create / import / update / replace_view / headshot / delete。创建 / 头像先报价、走同一个付费确认和硬预算；免费导入 / 编辑 / 换图不增加确认，删除在请求批准模式下由现有 `AIFileTools` 发码，全部权限直接通知。原生创建 / 头像 / 导入和换图用稳定 key、私有持久回执和跨重启 job_id；get_job 原单恢复不上传、不报价、不再次付费。原生任务不可服务器取消，源图 / 角色整理 / billing 三份状态分开；源图成功但整理失败只查原单。免费导入的显式同 key POST 恢复、换图丢答只现读，以及无 job_id 的付费丢答待核查，详见上述任务合同。角色 id 不自动成为四个时间线片段；库写入不进入工程撤销。
     **任务结果（2026-11-07）**：get_job 的 done / failed / cancelled 不再报告进行中 phase 或其排队 / 传输字段，不受远端旧 provider_meta 影响；正常完成不写成恢复。没有提示词的图片操作按源图短名加 angle / x2 起名，显式 name 优先；图片宽高从落盘字节补齐。完整约束与[真积分验收后修复](../bugfixes/2026-11-07-ai-tool-results-after-character-smoke.md)见任务合同。
     工具清单总上限由用户 **2026-11-07 定为 110,000 字符**（原 100,000，角色 A/B 三工具）；每工具 2,048、前 512 字自成一体和英文规则保持。
+    （后来：2026-11-10 说明书迁移完收回 100,000，每工具的 2,048 换成名片 ≤ 450 等几条，第一节第 5、6 条。）
 
 57. **说明书 `skycut_guide`（2026-11-10，[MCP 按需说明方案](../plans/2026-11-09-mcp-guide.md) PR 1；合同见 [MCP 说明书](mcp-guide.md)）**：
     只读、免费、马上回、不碰工程；不带 topic 回目录，`topic=<工具名>` 回那个工具的说明书，长的分节、按 `section` 取。由 App 答（`AIGuideTools`，
     Policy 和 recipes 同一行：不排队、不摆窗口、不算这一轮），内容在 `SrtFlowMCPKit`（`MCPGuide` / `MCPGuideTopics` / `MCPGuideFields`）；
     没开通也照答（`SkyCutGates.alwaysAnswered`，第 53 条），连授权都不等（`answeredBeforeLicenseCheck`）；清单里排第一个、只有它带 `_meta` 的
     `anthropic/alwaysLoad`。没迁移的工具，主题的概要就是它现在的说明原文；`fields` 从参数定义现算且一样事实都不漏（可选值、类型并集、anyOf、条数、长度），
-    太长时按整个参数自动切成 `fields`、`fields_2`……。迁移过的工具（2026-11-10 起试点 5 个和 add_voiceover）名片写短，概要以迁移前的说明原文开头、后面是手写的用法和坑（add_voiceover 例外：行为同时改了，
+    太长时按整个参数自动切成 `fields`、`fields_2`……。迁移过的工具（2026-11-10 起试点 5 个和 add_voiceover，同一天两批把其余的都迁了）名片写短，概要以迁移前的说明原文开头、后面是手写的用法和坑（add_voiceover 例外：行为同时改了，
     概要按新行为写，[MCP 说明书](mcp-guide.md)第 14 条）；
-    剩下的分两批搬，做到哪看 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
+    剩下的分两批搬，2026-11-10 都搬完了（PR 4、5，#359、#360；只有 `skycut_guide` 自己不迁移），过程见 [实施报告](../reports/2026-11-10-mcp-guide-progress.md)。
 58. **声音库：`list_voices`、`manage_voices`（2026-11-10 声音 PR 6，[SkyCut 声音方案](../plans/2026-11-09-voice-features.md) 4.5、4.6；合同见 [声音库](voice-library.md)）**：
     读和写分开（同角色 A/B 的先例）。`list_voices` 只读免费：预设按语言（`listed` 的、按打分高到低、默认的标出来、按这种语言报性别和说明，
     没有自己名单的语言照英文那份）+ 我的声音（`GET /voices`，没有任何服务商 id）；声音库用不了时照回预设、`mine` 说暂时用不了。
@@ -1141,10 +1150,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 真落到带链接声音的时间线上）、cut_to_beat 的排法和落到时间线上；压缩 / 烧录的参数怎么落到设置上（不给就是页面记住的、
 只改那四项、两种编码器的画质档）、输出起名（硬盘上撞、同一批里撞都加编号）、三个文件工具和 export_subtitles 都收 `folder`、GBK 字幕转格式，以及扫描：队列跑一条先用
 它自带的设置、重算输出位置跳过 AI 的条目、有用户没开始的条目就不排、不改页面上的设置、`folder` 只在一处读；什么时候问（扫描：会回
-`needs_confirmation` 的只有删文件和读别处的文件两处、点过头就记住那个文件夹、导出 / 新建 / 另存撞名走
+`needs_confirmation` 的只有第四节第 6 条那四处（删文件、读别处的文件、Sky Studio 花积分和声音库、改设置）、点过头就记住那个文件夹、导出 / 新建 / 另存撞名走
 `ExportFileName.unoccupied`）、记住哪里（`ReadGrantChecks`：文件所在的文件夹，太大的只记文件，子文件夹算、名字相像的兄弟
 不算）、确认令牌（`ConfirmationChecks`：同一件事回同一张且续期、别的事不认也不消耗、一次有效、三十分钟过期、拒绝按原因说）、连接时写的放行配置（Claude Code 那条规则的增删不碰别的设置、坏文件不写；Codex 那一行只认 srtflow 那张表里的）、
-工具清单的总长度（11 万字符以内，2026-11-07 用户定）；第 4 块：镜头切点的规则（硬切、摇镜头、动作里的硬切、几帧的转场、淡出淡入、闪光、
+工具清单的总长度（10 万字符以内：2026-11-07 用户定抬到 11 万，2026-11-10 说明书迁移完收回 10 万，第一节）；第 4 块：镜头切点的规则（硬切、摇镜头、动作里的硬切、几帧的转场、淡出淡入、闪光、
 太近的两刀、片尾片头的黑）、镜头按区间裁和翻页，跟拍（要不要跟、只跟人、人只在少数帧出现不跟、平滑与精简、换镜头处一帧之内
 跳过去、一个点就是固定的那扇窗、每个关键帧那一刻窗的两边正好落在画布两边、关键帧写在源秒上、铺满换掉位置 / 大小关键帧而
 旋转和不透明度留着）；第 5 块：配方卡的格式和写回、名字 → id、内置和用户的合并与查找、存一套（同名改那一套、旧的挪走、内置的名字 =
@@ -1228,8 +1237,9 @@ edit_clip 2,074 字超长、清单里有汉字）。
 - [ ] 装上这一版、新开一个 Claude Code 会话（`claude -p` 就行，可以 `--strict-mcp-config --mcp-config` 只挂 srtflow），看它的 MCP 日志
       `~/Library/Caches/claude-cli-nodejs/<会话所在目录，/ 换成 ->/mcp-logs-srtflow/` 里最新的 .jsonl：服务器版本是这一版、**没有**
       「truncated」（截了会写「Server instructions truncated from … to 2048 chars」「Tool "…" description truncated from …」）。
-      再让模型照抄总说明的最后两行、用 ToolSearch 加载 edit_clip 照抄说明结尾，都不是「… [truncated]」。配了 fal 的机器上多看一眼 generate_media。
-      Claude Code 改了这个上限（它的 MCP 客户端里写死的 2048）就要跟着改 `CatalogTextChecks` 的 `claudeCodeTextLimit`。
+      再让模型照抄总说明的最后两行、用 ToolSearch 加载 edit_clip、generate_media 照抄说明结尾，都不是「… [truncated]」（generate_media
+      2026-10-30 起不管存没存 Key 都在清单里）。Claude Code 的截断上限 2.1.296 起是总说明和预先加载的 4,096、按需加载的 16,384（第一节第 6 条），
+      SkyCut 自己的上限更严（`CatalogTextChecks`：总说明 ≤ 1,200、名片 ≤ 450）；它哪天改到比这还小，才要跟着改那几个上限。
 - [ ] SrtFlow 没开时让 AI 调一个工具：SrtFlow 在后台启动，对话窗口不被挤下去，调用成功；结果最前面一句「SrtFlow was not running,
       so it was just started…」（AI 会重新打开文件夹 / 工程）。
 - [ ] 开着一个工程时关掉 SrtFlow 的主窗口（红点 / ⌘W）：App 留在 Dock 里没退出；点 Dock 图标窗口回来、还是那个工程；
@@ -1334,7 +1344,10 @@ edit_clip 2,074 字超长、清单里有汉字）。
       也不会变得几乎听不见**（2026-09-29 第一版修法之后就是这样）；同一批里再换 zh_female_warm、en_male_british 各配一句，几句听起来一样响。
       再配几句只有一两个字的（「Go!」「好。」「我们开始吧。」），听着是正常的字、没有杂音。
 
-- [ ] fal.ai 生成、fal 的声音、克隆：整套人工回归清单在 [fal.ai 生成](fal-generation.md) 第十一节（要真 Key）。
+- [ ] Sky Studio 的生成、旁白、声音库、变声：人工回归清单在 [Sky Studio 的任务](sky-studio-jobs.md)第七节（配音）、第八节（多模型 / 多参考）、
+      第十二节（图片）和 [声音库](voice-library.md)各节末尾（花真积分的先请用户批准预算），免费的端到端在 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八；
+      upscale 在 [视频 upscale](video-upscale.md)第四节。
+      fal 时代那一套（[fal.ai 生成](fal-generation.md) 第十一节）2026-10-28 起只是历史。
 - [ ] 录屏（第 45 条）在一台没给过 SrtFlow「屏幕与系统音频录制」的机器上让 AI「录 10 秒屏幕」：macOS 弹一次授权框，AI 说去系统设置哪儿开、退出重开；
       再让它录一次不再弹授权框。照做之后让 AI 录：**不弹任何窗口**，主屏左下角的浮窗倒数 3、2、1 后红点计时，10 秒后自己停；V1 末尾多一段，⌘Z 一步退掉；
       AI 报出文件在 `<点名文件夹>/SrtFlow/录屏/`（中文界面）。
@@ -1368,7 +1381,8 @@ edit_clip 2,074 字超长、清单里有汉字）。
 - 「一轮」按 30 秒没动静划分：AI 想得久会被切成两轮。
 - 「撤销这一轮」换回的是整条时间线：这一轮里用户自己动过的也会一起退回。
 - 压缩 / 烧录的进度在各自工具页；从工作台「更多」打开。AI 起的任务不会把主窗口切到那一页。
-- 音效库还没做（App 里只有音乐）；接了 fal 的用户可以让 AI 生成音效（`generate_media` 的 `sound_effect`），没接的 AI 找不到音效。
+- 音效：写这一条时（2026-09-28）音效库还没做；2026-09-30 起有音效库（`find_audio kind=sound_effect`）和本机合成（第 43 条），
+  两边都没有的真实声音存了 Sky Studio 的 Key 才能生成（`generate_media` 的 `sound_effect`，花积分）。
 - 转写要 macOS 26（SpeechAnalyzer）；macOS 15 上 transcribe 报「需要 macOS 26」，cut_speech 只能删停顿和按时间剪。
 - 鼓点对很平、没有鼓的音乐不可靠（照实说「拍子不清楚」）；小节头是猜的（四种相位里起音最强的那个）。
 - Claude 桌面版的「总是允许」只能用户自己在它的界面里设，Claude 更新之后可能被重置（官方已知问题）。

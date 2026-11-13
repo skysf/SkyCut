@@ -25,12 +25,11 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var isSound: Bool { self == .music || self == .soundEffect }
     }
 
-    /// 图片（Seedream 5 Flash）认的画幅：Sky Studio 的 `ARK_IMAGE_2K_ASPECT_RATIOS`（= `MCPVocabulary.generationAspects`）。
+    // 下面三样只在目录没给的时候兜底：这个模型在 `/models` 里没列画幅 / 分辨率的取值、也没有默认值（或者根本没给模型）。
+    // 取自 2026-10-28 的第一版目录（图片 Seedream 5 Flash 的 `ARK_IMAGE_2K_ASPECT_RATIOS`，视频 MiniMax H3 的画幅和 768p）；
+    // 哪个模型认哪几档、哪几种一律以 `/models` 为准（AIDraftPolicy 挑草稿、SkyStudioModelPolicy 拒不认的），这里不是「Sky Studio 只认这些」。
     static let imageAspects = ["21:9", "16:9", "3:2", "4:3", "5:4", "1:1", "4:5", "3:4", "2:3", "9:16"]
-    /// 视频（MiniMax H3）认的画幅：`MINIMAX_H3_ASPECT_RATIOS`，都在图片那几种里。
     static let videoAspects = ["21:9", "16:9", "4:3", "1:1", "3:4", "9:16"]
-    /// 视频的分辨率：`MINIMAX_H3_FRAMES_RESOLUTIONS`，没有 1080p（= `MCPVocabulary.videoResolutions`）。
-    static let videoResolutions = ["480p", "768p"]
     static let defaultResolution = "768p"
     static let defaultVideoSeconds = 5.0
     static let defaultEffectSeconds = 5.0
@@ -158,7 +157,8 @@ struct SkyStudioGeneration: Equatable, Sendable {
         return request
     }
 
-    /// 「MiniMax H3 · 5 s · 768p」：确认码绑着它（SkyStudioJobGate），状态行上也写它。不带语言的几个记号。
+    /// 「MiniMax H3 · 5 s · 768p」：确认的问句（SkyStudioJobGate）和状态行上给人看的几个记号，不带语言。
+    /// 令牌绑的是完整请求（SkyStudioApproval.identity），不是它：同价同摘要的两单曾拿到同一张码（2026-10-29）。
     func summary(modelTitle: String) -> String {
         var parts = [modelTitle]
         switch kind {

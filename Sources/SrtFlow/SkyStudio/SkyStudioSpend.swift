@@ -46,7 +46,7 @@ final class SkyStudioSpendStore: ObservableObject {
 
     func spentToday(now: Date = Date()) -> Double { ledger.spent(on: now) }
 
-    /// 判断本笔是否在预算内；历史 .ask 表示额度不足，由收费闸转成 blocked，不再索要越额批准。
+    /// 判断本笔是否在预算内；超了是 .overLimit，由收费闸转成 blocked（daily_budget_exceeded），不索要越额批准。
     func decide(credits: Double, now: Date = Date()) -> DailySpendPolicy.Decision {
         DailySpendPolicy.decide(estimate: credits, spentToday: spentToday(now: now), dailyLimit: dailyLimit)
     }

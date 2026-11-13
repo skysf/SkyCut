@@ -9,7 +9,9 @@ import SrtFlowMCPKit
 // 2. 共用规矩讲到报价（quote_only）、要点头（needs_confirmation + confirm_token）和每日硬上限（daily_budget_exceeded），而且没有
 //    一句话把每日预算和 needs_confirmation / confirm_token 写在一起（SkyStudioJobGate.decide：先守硬上限，超了直接 blocked、不发码）；
 // 3. 讲生成素材的句子不写死档位（480p、768p、1080p、2K……）：草稿由 SkyCut 按目录挑（AIDraftPolicy），更高档看 get_status models=true；
-// 4. 不再提 fal（2026-10-28 起都走 Sky Studio、花积分）。
+// 4. 不再提 fal（2026-10-28 起都走 Sky Studio、花积分）；
+// 5. 卡里叫 AI 用到的花钱工具（说明书 paid 主题「Which tools.」那一句列的），共用规矩里都有一条说它花积分（2026-11-13：
+//    五张卡都叫 AI 配旁白，2026-10-29 起存了 Key 就走 Sky Studio、整段报价、守每日硬上限，共用规矩却只在 generate_media 那条讲花钱）。
 // 不管什么：卡的格式、名字存不存在、各节在不在（RecipeChecks）；字号（RecipeSizeChecks）；合同本身（SkyStudioJobGate、说明书的 paid 主题
 // 各有各的检查）。长期约束见 docs/architecture/ai-control-mcp.md 第四节第 32 条。
 
@@ -20,6 +22,7 @@ func runRecipeContractChecks() {
     let texts = cards.map { ($0.id, $0.body) } + [("shared rules", shared)]
     conditionalChecks(cards: cards, shared: shared)
     paidFlowChecks(shared: shared, texts: texts)
+    paidToolChecks(texts: texts, shared: shared)
     for (name, text) in texts {
         tierChecks(name, text)
         check(text.range(of: #"(?i)\bfal\b|fal\.ai|cost_usd"#, options: .regularExpression) == nil,
@@ -59,6 +62,24 @@ private func paidFlowChecks(shared: String, texts: [(String, String)]) {
     }
 }
 
+/// 花钱的工具照说明书 paid 主题（AI 读到的那份合同）认，不另抄一份名单：卡里提到哪一个，共用规矩就要有一条（列表的一项）同时讲到它和积分。
+private func paidToolChecks(texts: [(String, String)], shared: String) {
+    let overview = MCPGuideTopics.topic(named: "paid")?.sections.first?.text ?? ""
+    guard let start = overview.range(of: "Which tools.") else {
+        check(false, "the paid guide topic says which tools spend credits (\"Which tools.\")")
+        return
+    }
+    let sentence = overview[start.upperBound...].prefix { $0 != "." }
+    func names(_ tool: String, in text: some StringProtocol) -> Bool { text.range(of: #"\b"# + tool + #"\b"#, options: .regularExpression) != nil }
+    let paid = MCPToolName.allCases.map(\.rawValue).filter { names($0, in: sentence) }
+    check(!paid.isEmpty, "the paid guide topic's \"Which tools.\" sentence names the paid tools (an empty list would check nothing)")
+    let rules = recipeBlocks(shared)
+    for tool in paid where texts.contains(where: { names(tool, in: $0.1) }) {
+        check(rules.contains { names(tool, in: $0) && $0.localizedCaseInsensitiveContains("credits") },
+              "the shared rules have a rule saying \(tool) spends Sky Studio credits (the recipes tell the AI to use it; skycut_guide topic=paid lists it)")
+    }
+}
+
 /// 讲生成素材的句子不写死档位：草稿由 SkyCut 按目录挑（AIDraftPolicy：视频取 720p 同档），留下的再按那个模型在目录里有的更高档做；
 /// 10-31 之后目录里有 1080p 的视频模型，768p 也不是每个模型都有。
 private func tierChecks(_ name: String, _ text: String) {
@@ -71,9 +92,8 @@ private func tierChecks(_ name: String, _ text: String) {
           + "through AIDraftPolicy, higher tiers from get_status models=true). Sentences: \(fixed)")
 }
 
-/// 卡里的句子：先分段（标题、列表的每一项、空行隔开的段各算一段，缩进的续行接在上一行后面），段里再按句号 / 问号 / 叹号切。
-/// 冒号、分号不切：「超了每日上限：回 needs_confirmation」这种写法要算在同一句里。
-func recipeSentences(_ text: String) -> [String] {
+/// 卡里的段：标题、列表的每一项、空行隔开的段各算一段，缩进的续行接在上一行后面。
+func recipeBlocks(_ text: String) -> [String] {
     var blocks: [String] = []
     for line in text.components(separatedBy: "\n") {
         let trimmed = line.trimmingCharacters(in: .whitespaces)
@@ -82,6 +102,12 @@ func recipeSentences(_ text: String) -> [String] {
         if startsBlock || blocks.isEmpty { blocks.append(trimmed) } else { blocks[blocks.count - 1] += " " + trimmed }
     }
     return blocks
+}
+
+/// 卡里的句子：段（recipeBlocks）里再按句号 / 问号 / 叹号切。
+/// 冒号、分号不切：「超了每日上限：回 needs_confirmation」这种写法要算在同一句里。
+func recipeSentences(_ text: String) -> [String] {
+    recipeBlocks(text)
         .flatMap { $0.replacingOccurrences(of: #"([.!?])\s+"#, with: "$1\n", options: .regularExpression).components(separatedBy: "\n") }
         .map { $0.trimmingCharacters(in: .whitespaces) }
         .filter { !$0.isEmpty }

@@ -44,11 +44,11 @@
 | `SkyStudioJobSlots.swift` | 同时开着的任务按池领槽（全 App 一份）：两个池和服务器一样分、槽数照 `/me`、同一个池先来先得、等的时候被停就离队（第一节「领槽」） |
 | `SkyStudioJobAccess.swift` | 交活之前要的两样：Key（`SkyStudioJobKey`：`.prompting` 只给用户点了按钮起的、`.silent` 别的都用）、`/models` 记一份（`SkyStudioCatalogCache`） |
 | `SkyStudioSpend.swift` | 积分的每日上限和按天的账（`SkyStudioSpendStore`）、积分怎么写（`SkyStudioCredits`） |
-| `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（额度内记账、超了回确认码） |
+| `SkyStudioJobGate.swift` | AI 起的活花积分之前那一关（先守每日硬上限，超了回 `daily_budget_exceeded`；预算内的草稿越档按权限模式发确认码，第十一节）；不问、只守上限的一次预留（`reserveWithoutAsking`：旁白、变声、面板 / 按钮起的） |
 | `SkyStudioApproval.swift` | 确认码对应的完整请求身份、输入文件身份；摘要只用于显示 |
 | `SkyStudioHeldCredits.swift` | 一单活记在本机积分账上的那一笔：没花出去退回（只退一次）、做完按实收换（实收记在预留的那一天，跨零点也不挪到今天，2026-11-11）；upscale 和生成共用 |
 | `SkyStudioSubmission.swift` | 交上了没有、任务号是多少（分清「没交上就停了」和「交上之后停不下来」，get_job 报 `skystudio_job_id`）；upscale 和生成共用 |
-| `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句）、确认码的记号、离谁最近的画幅、成品的扩展名 |
+| `SkyStudioGeneration.swift` | 纯值：generate_media 的参数换成 Sky Studio 的 kind / prompt / params（默认值、取整、用不上的说一句；目录没给取值时的兜底）、问句和状态行上的记号、离谁最近的画幅、成品的扩展名 |
 | `SkyStudioImageOperation.swift` / `SkyStudioImageResult.swift` | 图片操作的离散移动 / 单图 / 倍率合同；下载后按实际字节确认格式并纠正扩展名，不重编码 |
 | `SkyStudioGenerateTool.swift` / `SkyStudioGenerationRun.swift` / `SkyStudioGenerationActivity.swift` / `SkyStudioGenerationFrame.swift` | generate_media：工具（挑模型、问价、把关、回任务号）、任务（传首帧、交、等、下载）、状态行订阅的那张表、图生视频的首帧（宽高比、传哪个文件） |
 | `SkyStudioVoiceCatalog.swift` | 纯值：`/models` 顶层的预设声音（属性按语言分开）、角色 → 预设、授权文案；声音模型记录上的一次性费用价目、Eleven 支持的语言、分批的字数上限（第十四节） |
@@ -77,8 +77,9 @@
 
 - **upscale**（6a-2，2026-10-28）：面板和 `upscale_clip`，规矩见 [视频 upscale](video-upscale.md)。模型从 `/models`（`SkyStudioCatalogCache`：这一次运行里 10 分钟内不再问，换了 Key 作废）；
   价问 `/quote`；`params.source` 照送上去的那个文件探；Key 面板起的可以弹授权框、别的不弹（`SkyStudioJobKey`）。
-- **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：AI 起的过 `SkyStudioJobGate`
-  （额度内直接记账、超了回确认码，和删文件、fal 花钱同一套 `AIConfirmations`）；面板起的面板本身就是确认（超了只标红不拦）；做完按实收改账，没花出去的退回。
+- **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：2026-11-01 起是硬上限（第十一节）。
+  AI 起的过 `SkyStudioJobGate`：超了回 `daily_budget_exceeded`、什么都不起；预算内的草稿越档在请求批准模式下发确认码（和删文件同一套 `AIConfirmations`）。
+  面板起的面板本身就是确认：超了那一行标红、按钮灰着，开跑时再核一次。做完按实收改账，没花出去的退回。（2026-11-01 之前超了是发确认码问一次、面板只标红，[案例](../bugfixes/2026-11-01-ai-approval-and-draft-budget.md)。）
   账按本地时区的自然日，`DailySpendLedger` / `DailySpendPolicy` 是共用纯值，序列化格式保持不变。
   **确认码绑完整请求**（2026-10-29，`SkyStudioApproval`）：kind、model、prompt、全部参数 / 输入、精确报价，加首帧或原片的文件身份和落点；
   生成还绑文件夹 / 名字，upscale 还绑源范围 / 被替换的段 / 工程。显示摘要只给人看，不能拿它当 action；提交的随机 key 不参与。
@@ -216,14 +217,14 @@
 ## 六、守卫
 
 - `scripts/check-sky-studio.sh` 第 7 组（`checks/SkyStudio/JobChecks.swift`、`JobRunChecks.swift`）：`/models` 照合同的样例读（认不出的 kind 留着、没有 id 的跳过、上限和取值）；`/quote` 去掉 inputs / max_credits / idempotency_key、读回 credits / typical_seconds / plan、没有 credits 不算回答；`/jobs` 带上 inputs / max_credits / idempotency_key、这一个请求等 120 秒、202 读成排队中；做完的状态和成品（null 的宽高是不知道、克隆的过期时间、旁白的字符时间原样）、没做成的两种写法、认不出的状态；任务号只当一节路径；取消的两种结果；`/uploads` 之后 PUT 只带服务器给的头、不带 Key、文件原样、进度只升不降到 1；下载成品不带 Key、下到一半不留半个文件。`SkyStudioJobRun`：一路做完（每一份都报、照服务器说的间隔问、夹到 2 秒）、满了等 15 秒用同一个 key 再交、提交断网只 POST 一次并保留原 key、问的时候断网几次不算 / 连着 10 次才算、没做成 / 做完没成品 / 认不出的状态 / 余额不够（服务器的话原样）、停的三种（排队中退钱、开始了取消不了、取消没送到）且后两种把任务号交出去接着查、服务器那边已经取消、等太久；接着查到底（问到 done / failed 就停、不下载不取消、照服务器说的间隔、断网几次照问、连着 10 次问不到就算了）。全程走假协议，不碰真的网络。
-- `scripts/check-sky-studio.sh` 第 8 组（`SpendChecks.swift`）：积分的每日上限默认 1,000、额度内不问 / 超了问、记账退回按那一天、上限夹住取整、存下来读回来一样。
-- `scripts/check-sky-studio.sh` 第 9 组（`GenerationChecks.swift`）：generate_media 的词表和 `SkyStudioGeneration` 对账、每种的默认值（画幅跟画布 / 首帧、
-  视频 5 秒 768p、音效 5 秒 wav、音乐纯音乐不给时长）、秒数取整、用不上的参数说一句不送、请求体（首帧放 `inputs.image_url`、`/jobs` 才带 `max_credits`）、
-  确认码的记号、离谁最近的画幅、成品的扩展名。
+- `scripts/check-sky-studio.sh` 第 8 组（`SpendChecks.swift`）：积分的每日上限默认 1,000、额度内照做 / 超了不做、记账退回按那一天、上限夹住取整、存下来读回来一样。
+- `scripts/check-sky-studio.sh` 第 9 组（`GenerationChecks.swift`）：generate_media 种类的词表和 `SkyStudioGeneration` 对账、每种的默认值（画幅跟画布 / 首帧、
+  目录没给取值时视频 5 秒 768p、音效 5 秒 wav、音乐纯音乐不给时长）、秒数取整、用不上的参数说一句不送、请求体（首帧放 `inputs.image_url`、`/jobs` 才带 `max_credits`）、
+  问句和状态行上的记号、离谁最近的画幅、成品的扩展名。
 - `checks/sky-studio-wiring.sh` 第 6、7 条：交任务 / 取消只经 `SkyStudioJobRun`；认证头只在 `SkyStudioAPI.request()` 里写一次。第 6b 条（声音 PR 4）：
   领槽只有 `SkyStudioJobRun.run`（交之前，`resume` 不领）和 `SkyStudioVoiceBatchQueue`（各批按顺序）调、`SkyStudioJobSlots` 全 App 只有一份、
   槽数只有 `SkyStudioAccount` 照 `/me` 改、各批的槽交给 `SkyStudioJobRun` 拿着、出了事先记下再还槽。第 8 条（upscale）：把关在建任务之前、
-  积分的账只在 `SkyStudioJobGate` 和 `SkyStudioHeldCredits` 里动、只有面板起的任务可能弹钥匙串授权框、清单跟着 Sky Studio 的 Key 走。第 9 条（生成）：把关在建任务之前、
+  积分的账只在 `SkyStudioJobGate` 和 `SkyStudioHeldCredits` 里动、只有面板起的任务可能弹钥匙串授权框、清单里它属于 skystudio（2026-10-30 起始终列出）。第 9 条（生成）：把关在建任务之前、
   任务用记好的那一笔、Key 不弹框、清单属于 skystudio、路由只起任务不包撤销分组、get_job 有阶段和 `skystudio_job_id`、状态行订阅生成任务、能取消、不弹模态框。
 
 
