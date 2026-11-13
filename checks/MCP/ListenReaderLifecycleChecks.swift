@@ -20,6 +20,8 @@ func runListenReaderLifecycleChecks(_ url: URL) async {
                     trace.noteWait(release.wait(timeout: .now() + listenCheckHangBound) == .success)
                 case .finished:
                     trace.noteFinished()
+                case .queued, .stopRequested:
+                    break
                 }
             }, readerFactory: { try ListenReaderLifecycleProbe(asset: $0, trace: trace) })
     }
