@@ -394,7 +394,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [声音库界面的离屏渲染（声音 PR 8）](docs/reports/2026-11-10-voice-library-ui.md) — 英 / 中 / 西各一张拼图；看图撞出的两件事；没验到的（真麦克风、真 sheet）。
 - [MCP 按需说明的基线实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前每轮常驻 1,605 token、整份预先加载 39,646 token；八个任务的调用和脱敏证据。
 - [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — Claude Code 过线（常驻 −6.5%、预先加载 −2.2%）；Codex 三条数值线没到，协调者按结果放行；任务 7 的规矩修了之后两个客户端补测都停下来问。
-- [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线在哪、本机跑检查的偶发。
+- [MCP 按需说明的实施报告（2026-11-10–11 阶段记录）](docs/reports/2026-11-10-mcp-guide-progress.md) — 截至 11-11 方案的七个 PR 都合了（最后是 #377）、三次实测在哪、本机跑检查的偶发；Claude 桌面版的两个任务（用户手动）仓库里没有记录。
 - [全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 新图片模型、换角度、角色全流程成功（208 积分）；撞出的问题和放大超时已修（0.18.63）。
 - [一个 PR 从本地到能合要多久：改之前和改之后](docs/reports/2026-11-04-ci-speedup.md) — 本地 24 分钟 → 1.5–3 分钟；PR 的 CI 约 11 分钟 → 缓存热、原样重跑约 6 分钟（冷 7 分 40 秒–8 分钟）；五个 PR 各改了什么。
 - [官方原创短片客户端接入](docs/reports/2026-11-04-official-film-client.md) — API 合同、生成接入、公开制作状态的逐项证据；客户端、生产启用、真实输出分开报告。
