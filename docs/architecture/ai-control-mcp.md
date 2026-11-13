@@ -186,6 +186,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 把它删进废纸篓（会问）。
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
+     改这几条（什么时候问、硬上限、草稿怎么挑）时，同一次改动里一起改剪辑风格共用规矩第 11 条（中文稿和英文资源，第 32 条），
+     它教 AI 的就是这一套（[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)：11-01 改了这里，那条还教了 AI 十几天用确认码越过每日预算）。
    - **声音库的三件事**（2026-11-10 声音 PR 6，第 58 条）也在 `SkyStudioJobGate`：用录音建声音 / 加录音的**授权**和**一次性费用**（建 MiniMax 版、
      设计声音）请求批准模式问；**全部权限**下（声音 PR 7，`SkyStudioVoiceStanding.voiceAsk`）这个账号有有效的长期授权就不问 —— 建声音带
      `consent: "standing_grant"`，设计、建 MiniMax 版直接做，结果的 `full_access` 和工程的提示条说做了什么、最多花多少 —— 没有就照请求批准模式问一次、
@@ -544,6 +546,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      清单最后一行指向共用规矩的「交片前再看一遍」；共用规矩有「先出分镜表 / 品味（带数字）/ AI 剪片的通病 / 交片前再看一遍 /
      从参考片学一种风格」五节（`RecipeChecks` 钉着这几节都在）。品味只写现有零件做得到的事；分镜表发给用户就接着做，不等点头
      （第 34 条：少问）；参考片只量用户给的文件，不从网上下（第 31 条），学语法不学内容。
+   - **卡里讲花积分、讲目录的话只写剪片时要记住的那一层，合同本身指到说明书**（2026-11-13，[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)）：
+     卡是 App 资源、AI 调 `recipes` 时原样读到，合同却改在别处，改的时候没有一处提醒要同步 —— 2026-10-30 清单始终列出 `generate_media`、
+     10-31 目录里有了 1080p 的视频模型、11-01 每日预算改成硬上限，共用规矩第 11 条一直照旧教 AI「存了 Key 才有这个工具」「超了每日上限回
+     `needs_confirmation`、带 `confirm_token` 再调」「480p 出草稿、768p 重做」；原来的检查还钉着 `480p`、`needs_confirmation` 这几个词，等于替过期的那句站岗。
+     所以：① 花积分的规矩（报价、什么时候问、每日硬上限）以说明书 `skycut_guide topic=paid` 为准，卡里只留剪片时要记住的几句、并指过去；
+     ② 档位、模型、价格从目录读（`get_status models=true`；草稿由 `AIDraftPolicy` 挑），卡里不写死；③ 改了第 6、39 条、`SkyStudioJobGate`、
+     `AIDraftPolicy`、清单怎么列，同一次改动里把 `Sources/SrtFlow/Resources/recipe*.md` 和中文稿的共用规矩第 11 条一起改（先中文稿再英文）；
+     ④ 检查对着生产行为和现行说法查、不钉旧说法的原词：`RecipeContractChecks` 查条件句不提 Key（清单不按 Key 过滤时）、讲到报价 / 确认码 /
+     `daily_budget_exceeded`、每日预算和确认码不写在同一句里、讲生成素材的句子不带档位、不提 fal。
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -707,7 +718,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     完整制作 schema 按需由 film_contract 提供，常驻工具预算不扩张；状态详情和失效规则见上述合同。
     风格卡里提它**只写条件句**（2026-09-29 用户拍板：「如果你的工具里有 generate_media……」）—— 旧版清单可能没有这个工具，当前清单始终列出，是否能消费在调用时核对；
     共用规矩第 11 条和每张卡的「Generated media」一节说了有它时能补什么、不能替什么（`RecipeChecks` 钉着：提到就得在条件句下、
-    词表和结果字段名都得对得上）：
+    词表和结果字段名都得对得上；不写死档位、硬上限和确认码分开说，`RecipeContractChecks`，第 32 条）：
    - **工具和总说明始终列出生成、upscale**（2026-10-30 替代方案第 36 条的按 Key 隐藏）：客户端可以在会话开始时缓存清单，不能靠
      `list_changed` 或短 TTL 保证添加 Key 后获得新工具。`MCPToolName.provider` 只描述服务归属；Key、套餐和积分在 App 执行时核对。
      App 给旧 helper 的清单不携带提供方过滤条件，新 helper 也忽略旧 App 的过滤条件；升级 App 的通知照旧保留，Key 变化不再发清单通知。
