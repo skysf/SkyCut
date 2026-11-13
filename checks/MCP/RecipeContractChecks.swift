@@ -16,6 +16,8 @@ import SrtFlowMCPKit
 //    原来只照那一句认、只防「一个都没认出」，说明书换个写法少认一个就悄悄少查）；
 // 6. 讲 add_voiceover 花积分的那一条要讲到建声音那一步（kind voice_enroll、已经在建的 already_building、跟着 next_step）：那一单的
 //    credits 是建版本的钱，旁白还没读、没预留（审查 D6R-01：原来一概说「回任务号之前整段报价、整体预留，结果里的 credits 就是价」）；
+//    说到换本机的声音时，同一条也说到服务器明确拒绝的那一支（refuses：原话报错、不换声音）和以 voice.note 为准（审查 D6R-15：原来说
+//    「Sky Studio 用不了时预设和角色在花钱之前换本机的声音」，SkyStudioVoiceoverStart 的 refusal、点名的模型不对都是报错）；
 // 7. needs_confirmation 不等于某一个原因（读点名文件夹以外的参考文件也回它，连 quote_only 都先问）：不写成「needs_confirmation means …」，
 //    共用规矩留着总的那句（照结果的 question 问、同意才带 confirm_token）；「SkyCut 会问」不说满 —— 全部权限、用户点名过这个规格、
 //    这个工程批准过的都不问（审查 D6R-07）。
@@ -94,8 +96,11 @@ private func paidToolChecks(texts: [(String, String)], shared: String) {
     }
 }
 
-/// 配旁白：说明书讲 add_voiceover 可能先回建声音那一步时，共用规矩里讲它花积分的那一条也讲到（审查 D6R-01）。
+/// 配旁白：说明书讲 add_voiceover 可能先回建声音那一步时，共用规矩里讲它花积分的那一条也讲到（审查 D6R-01）；那一条说到换本机的声音时，
+/// 也说到服务器明确拒绝的那一支和以 voice.note 为准（审查 D6R-15）。
 private func voiceoverChecks(shared: String) {
+    check(recipeVoiceoverFallbackScoped(shared), "the shared rule on add_voiceover's credits that mentions a local voice also says that a "
+          + "request Sky Studio refuses returns that error and keeps the voice (SkyStudioVoiceoverStart.refusal), and to go by voice.note")
     let guide = MCPGuideTopics.topic(for: .addVoiceover).sections.map(\.text).joined(separator: "\n")
     guard guide.contains("voice_enroll") else { return }  // 哪天不再先建声音的版本，这条自己让开（说明书必含它，SkyStudioVoiceChecks）
     check(recipeVoiceoverCoversEnrolment(shared), "the shared rule on add_voiceover's credits says a voice_enroll or already_building "
@@ -163,6 +168,15 @@ func recipeVoiceoverCoversEnrolment(_ shared: String) -> Bool {
         .contains { $0.contains("voice_enroll") && $0.contains("already_building") && $0.contains("next_step") }
 }
 
+/// 讲 add_voiceover 花积分的那一条（段，子项带着父项的话）说到本机的声音（local voice）时，同一段里也说到服务器明确拒绝的那一支
+/// （refuses：原话报错、一分不花、不换声音）和 voice.note（换没换以它为准）。一段都没说到本机的声音就不用讲。
+func recipeVoiceoverFallbackScoped(_ shared: String) -> Bool {
+    recipeBlocks(shared)
+        .filter { recipeNames("add_voiceover", in: $0) && $0.localizedCaseInsensitiveContains("credits")
+            && $0.localizedCaseInsensitiveContains("local voice") }
+        .allSatisfy { $0.contains("voice.note") && $0.range(of: #"(?i)\brefuses?\b"#, options: .regularExpression) != nil }
+}
+
 /// 上面几样自带的例子：把说明书的那一句拆开、把建声音那一步写进别的一条，都要认得出来（审查 D6R-01、02 的坏例子）。
 private func contractSelfChecks() {
     let split = "Paid work uses the user's Sky Studio credits.\n\nWhich tools. generate_media spends credits. Other paid tools include "
@@ -179,4 +193,12 @@ private func contractSelfChecks() {
           "the enrolment step written in another rule than add_voiceover's credits is caught")
     check(recipeVoiceoverCoversEnrolment("13. add_voiceover spends credits:\n    - a job of kind voice_enroll (already_building: nothing new is "
           + "charged) pays for building the voice: follow next_step."), "a sub-item of the add_voiceover rule covers the enrolment step")
+    let oldFallback = "13. Voiceover can spend credits too: add_voiceover reads presets with Sky Studio. When Sky Studio cannot be used, a "
+        + "preset or role is read by a local voice before anything is paid (voice.note says why).\n    - Sky Studio voices ignore speed."
+    check(!recipeVoiceoverFallbackScoped(oldFallback), "the voiceover rule that switches to a local voice whenever Sky Studio cannot read is caught")
+    check(recipeVoiceoverFallbackScoped("13. add_voiceover spends credits. Only when Sky Studio cannot be used this time does a role switch to a "
+          + "local voice; voice.note says so. When Sky Studio refuses the request, the call returns that error.\n    - Sky Studio voices ignore speed."),
+          "a voiceover rule that scopes the local voice and names the refusal passes")
+    check(recipeVoiceoverFallbackScoped("13. add_voiceover spends credits.\n    - Sky Studio voices ignore speed."),
+          "a voiceover rule that never mentions a local voice has nothing to scope")
 }
