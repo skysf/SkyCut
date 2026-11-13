@@ -13,10 +13,11 @@
 #      开始了的取消不了，这些规矩只在那一处；**领槽只经 SkyStudioJobSlots**（声音 PR 4）：SkyStudioJobRun 交之前领（只 GET 的恢复不领），
 #      一段旁白的各批由 SkyStudioVoiceBatchQueue 按顺序先领好、先记下出了什么事再还；槽数只照 /me（SkyStudioAccount adopt）；
 #   7. **Key 只发给 Sky Studio**：认证头只在 SkyStudioAPI.request 里写一次，上传的签名地址和成品地址都不经它；
-#   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好两处），
+#   8. **upscale 走 Sky Studio**（第 6 刀，2026-10-28）：AI 起的在建任务之前过 SkyStudioJobGate（把关 → 收令牌 → 没收下才发确认码，记账恰好四处），
 #      面板起的面板本身就是确认；积分的账只在 SkyStudioJobGate 和 SkyStudioHeldCredits（upscale 和生成共用的那一笔）里动；
 #      **只有面板起的任务可能弹钥匙串授权框**（`.prompting`），
-#      AI 起的、面板取模型和报价都不弹；upscale_clip 跟着 Sky Studio 的 Key 列（提供方 skystudio，Key 变了同步那个小文件）；
+#      AI 起的、面板取模型和报价都不弹；upscale_clip 属于 skystudio 提供方（2026-10-30 起始终列出、调用时核对 Key；给旧版小程序的
+#      那个标记小文件照旧跟着 Key 同步）；
 #      路由只起任务（起步不包撤销分组，换源那一下在任务里自己包），AI 起的不弹对比窗口、阶段交给 get_job；这几个文件不弹模态框；
 #      get_job 报 Sky Studio 的任务号 skystudio_job_id（交上了就有：跑着、做完、没做成、停了都带）；
 #   9. **generate_media 走 Sky Studio**（第 6 刀 6b，2026-10-28）：在建任务之前过 SkyStudioJobGate、任务用记好的那一笔（SkyStudioHeldCredits）；

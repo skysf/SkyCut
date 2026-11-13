@@ -20,7 +20,7 @@ final class SkyStudioAccount: ObservableObject {
     /// 上一次问到的 /me 存在这里（UserDefaults，身份类的名字照旧用 SrtFlow 前缀，docs/architecture/product-name.md）。
     static let storedAnswerKey = "SrtFlow.skystudio.me.v1"
 
-    /// 有没有存 Key。变了：记着的 /models 作废、同步「配了哪些提供方」的小文件（upscale_clip 跟着 Sky Studio 的 Key 列不列）。
+    /// 有没有存 Key。变了：记着的 /models 作废、同步「配了哪些提供方」的小文件（给旧版小程序看的；2026-10-30 起清单始终列出花钱的工具，不跟着 Key 变）。
     @Published private(set) var hasKey: Bool {
         didSet {
             guard hasKey != oldValue else { return }

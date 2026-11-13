@@ -36,7 +36,7 @@ func runUpscaleToolChecks() {
     checkEqual(schema["required"]?.arrayValue?.compactMap(\.stringValue), ["clip_id"], "only clip_id is required")
     let properties = schema["properties"]?.objectValue ?? [:]
     // `project`：碰工程的工具都收（2026-10-17 起一个会话剪几个工程，MCPToolName.takesProject）。
-    // confirm_token：超了每日积分上限时回的确认码（AI 多开方案板 9）。
+    // confirm_token：请求批准模式下 upscale 超出低成本草稿时回的确认码（2026-11-01 起；超了每日硬上限回 daily_budget_exceeded、不发码）。
     checkEqual(Set(properties.keys), ["clip_id", "tier", "target", "range", "project", "confirm_token", "approval_scope", "user_requested_overrides", "user_request"], "the parameters")
     checkEqual(properties["tier"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTiers, "tier lists the models")
     checkEqual(properties["target"]?["enum"]?.arrayValue?.compactMap(\.stringValue), MCPVocabulary.upscaleTargets, "target lists the targets")

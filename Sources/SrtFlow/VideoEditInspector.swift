@@ -221,7 +221,7 @@ struct VideoEditInspectorView: View {
             }
         }
 
-        // 送 fal 放大（画面段才有；mockup 定的位置：头部信息下面、Speed 上面；VideoEditInspector+Upscale.swift）。
+        // 送 Sky Studio 放大（画面段才有；mockup 定的位置：头部信息下面、Speed 上面；VideoEditInspector+Upscale.swift）。
         if !clip.isAudioOnly, !clip.isStillImage {
             Divider()
             upscaleSection(clip)

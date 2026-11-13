@@ -6,7 +6,8 @@ import SrtFlowCore
 //
 // 管什么：`viewMode`；提示条上要用户动手的那一句（`hint`：macOS 的下载框、钥匙串授权框 —— 苹果不给代点，只能请用户点；只有横幅订阅）；
 // 每个工程一份的「这一轮」（`AIRound`，2026-10-17 起，docs/plans/2026-10-17-multi-project-ai-editing.md 板 4、E 节）按短 id 发出去。
-// 要用户点头的事（花钱超了额度、删文件、读别处的文件）一律走聊天里的确认码（`AIConfirmations`，板 9），不在提示条上问。
+// 要用户点头的事（请求批准模式下删文件、读别处的文件、花积分超出低成本草稿，还有改权限 / 提高每日上限）一律走聊天里的确认码
+// （`AIConfirmations`，板 9；每日硬上限不问、超了就不做），不在提示条上问。
 // 产品口径见 docs/plans/2026-09-27-mcp.md 第 7、9、10 条，长期约束见 docs/architecture/ai-control-mcp.md 第五节。
 // 不管什么：一轮怎么算、停止之后拒绝多久（AIRound）；工具怎么做（AI*Tools）、调用怎么排队（AIToolRouter）。
 //

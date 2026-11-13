@@ -40,15 +40,16 @@
 #  25. 盖一块（模糊 / 马赛克）的 AI 这一侧：set_shape 认 blur / mosaic（默认大小、strength 夹紧、不画东西所以没有颜色 / 线宽 / 实心、写回给 AI 的样子），
 #      工具目录的种类词表和 ShapeKind 对账；look text_scan 对时间线上的一段把源画面的框换成画布的框（裁切 / 翻转 / 摆放 / 旋转）、给出 set_shape 能抄的参数。
 #  24. 扫画面里的字（look text_scan）：字幕带、固定的字、满屏的字各认得出来；铺满时没人、字多就对准字，focus=text，字比窗宽说多少。
-#  25. 生成类工具的提供方（方案第 36 条）：generate_media 只在配了 fal 时列出来（真起小程序：没配 / 配了各列什么、总说明配了才提 fal、
-#      握手声明清单会变、新一代清单缓存一分钟；用户中途添加 / 删掉 Key 时老一代客户端收 list_changed、新一代不收）、那个小文件读得宽且不带机密、
+#  25. 生成类工具的提供方（方案第 36 条；2026-10-30 起只说明去哪消费、不决定列不列）：generate_media、upscale_clip 始终列出（真起小程序：
+#      没配 / 配了都列全、总说明始终指向说明书的地图、握手声明清单会变、新一代清单缓存一分钟；用户中途添加 / 删掉 Key 时已经拿到的清单不变、
+#      不发 list_changed）、那个小文件读得宽且不带机密（旧版的 fal 标记照读）、
 #      说明和参数和词表 / App 的类型对账、全清单说明总长 ≤ 100,000 字符（2026-10-02 从 72,000 抬到 80,000、2026-10-14 再抬到 90,000、2026-10-17 再抬到 100,000）；add_voiceover 的 Sky Studio 那一档：参数名（clone_from 去掉、model / confirm_token 收）、
 #      本机挑声音（不点名是旁白角色）、Eleven 报的词时间换成字幕认的词；认预设 / 角色在 check-sky-studio 的 VoicePickChecks（克隆的参考录音见第 38 条）。
 #      add_voiceover 迁移过的名片和说明书主题：和试点的五个一起在 GuidePilotChecks，名片必含 / 说明书必含在 SkyStudioVoiceChecks；
 #      名片说会回 needs_confirmation 的工具带着 confirm_token 再调都过参数核对（ArgumentCheckChecks）。
 #  23. 字幕长什么样（edit_subtitles / burn_subtitles 的 style）：参数全验过、只改工程自己的样式、给了位置收掉拖框的布局、
 #      只给字号把倍率归一、逐词高亮的开关和倍数、烧录一批时描边 / 底条互换、位置词表对账。
-#  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 对账、定义（参数、必填、枚举、只在存了 Sky Studio 的 Key 时列、上网）、
+#  27. upscale_clip（2026-10-02）：词表（档位 / 目标 / 范围）和 App 对账、定义（参数、必填、枚举、属于 Sky Studio 且始终列出、上网）、
 #      说明里每个模型都点了名、说清积分 / 30 秒 / 30 fps / 只有排队中能取消、总说明的「Paid」那一行带着它（UpscaleToolChecks；2026-10-28 起走 Sky Studio）；
 #      做完换源的那一下包在 AIUndoGrouping.step 里（异步落账，扫描）。
 #  28. record_screen（2026-10-03）：参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 App 的类型对账、工具的定义
@@ -241,11 +242,12 @@ echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
 echo "==> 什么时候问：按操作权限处理文件与草稿越档；改权限 / 提高硬预算始终确认"
 # 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
 # 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
-# 从提示条改成同一套确认码。2026-10-28（收费方案第 6 刀）：generate_media、upscale_clip 改走 Sky Studio，积分超每日上限同一套
-# （SkyStudioJobGate）；fal 那一处（旧生成把关）跟着生成一起删了，配旁白超额度不问、退档。
+# 从提示条改成同一套确认码。2026-10-28（收费方案第 6 刀）：generate_media、upscale_clip 改走 Sky Studio（SkyStudioJobGate）；fal 那一处
+# （旧生成把关）跟着生成一起删了。2026-11-01：每日预算是硬上限（超了回 daily_budget_exceeded、不发码，配旁白也不退档），SkyStudioJobGate
+# 只为请求批准模式下超出低成本草稿的、声音库的授权和一次性费用发码；改权限 / 提高硬预算走 AISettingsApproval，全部权限下也问。
 ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
 if [ "${ASKERS}" != "AIFileTools.swift AISettingsApproval.swift AIWorkspace.swift SkyStudioJobGate.swift " ]; then
-  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、Sky Studio 花积分的 SkyStudioJobGate）" >&2
+  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、Sky Studio 花积分的 SkyStudioJobGate、改设置的 AISettingsApproval）" >&2
   exit 1
 fi
 if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then

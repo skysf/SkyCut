@@ -427,7 +427,7 @@ struct ClipBlockView: View, Equatable {
             } else if case .overlay = slot {
                 Button("Move to Main Track") { project.toggleOverlay(clip.id) }
             }
-            // 送 fal 放大（图片段没有）。已经换过源的多两项：比一比、换回原片（原片不在了就提示，不在菜单里查文件：块不做 IO）。
+            // 送 Sky Studio 放大（图片段没有）。已经换过源的多两项：比一比、换回原片（原片不在了就提示，不在菜单里查文件：块不做 IO）。
             if !clip.isStillImage {
                 if clip.upscale == nil {
                     Button("Upscale…") { UpscaleActivity.shared.present(panelFor: clip.id) }

@@ -1,7 +1,7 @@
 import Foundation
 
 // SkyStudioKey：粘进来的 Key 怎么整理、钥匙串那一条叫什么；SkyStudioMachine：发出去的机器号怎么算。
-// 钥匙串本身不碰（同 fal：真钥匙串在 scripts/check-fal-keychain.sh，本机手动；两把 Key 的读写是同一份 KeychainSecret）。
+// 钥匙串本身不碰（真钥匙串在 scripts/check-keychain.sh，本机手动；读写只有一份 KeychainSecret，旧 fal 那一项不再读）。
 
 func runKeyChecks() {
     let key = "sk-" + "abcdefghijklmnopqrstuvwxyz0123456789-_ABCDE"

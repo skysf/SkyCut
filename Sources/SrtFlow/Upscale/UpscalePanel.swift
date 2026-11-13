@@ -3,7 +3,8 @@ import SwiftUI
 // MARK: - Upscale 面板（sheet）
 //
 // 管什么：选范围（这一段 / 工程里最长的那处 / 整个文件）、目标分辨率、模型，看 Sky Studio 的报价（积分），点「开始」起任务。
-// 面板本身就是花钱的确认（upscale 方案第 10 条）：超过每日积分上限只标红不拦；没有 Sky Studio 的 Key、报价没回来、这一段送不了才拦。
+// 面板本身就是花钱的确认（upscale 方案第 10 条），不再问；每日积分上限是硬上限（2026-11-01）：超了那一行标红、按钮灰着（任务开跑时再核一次）；
+// 没有 Sky Studio 的 Key、报价没回来、这一段送不了也拦。
 // 模型和价从 Sky Studio 来（UpscaleOffers：/models、/quote），别的数从 UpscalePanelModel 来；起的任务进 UpscaleActivity（做完弹对比窗口，不自动替换）。
 // 本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`（checks/presented-views-app-language.sh）。
 // 不管什么：任务本身（UpscaleJob）、换源（VideoEditProject+Upscale）。
