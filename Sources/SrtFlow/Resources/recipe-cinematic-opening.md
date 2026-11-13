@@ -57,12 +57,12 @@ landing like a held breath let go. Fewer, longer, better shots.
 ## Sound effects
 
 - Under the moment the title lands: add_clips sound_effect riser, then impact (or boom), both with hit_at = that second
-  (the riser builds into it, the impact lands on it). Nothing else; made on this Mac, no fal needed.
+  (the riser builds into it, the impact lands on it). Nothing else; made on this Mac, no credits needed.
 
 ## Generated media (only if generate_media is among your tools)
 
 - A missing wide establishing shot: generate_media kind text_to_video, or kind image_to_video from a photo the user gave;
-  draft at 480p first.
+  start with the low-cost draft (shared rule 11).
 - Music when the library has nothing big enough: kind music ("orchestral, rising, cinematic, no vocals").
 - Generated video has its own sound: keep it under the music.
 

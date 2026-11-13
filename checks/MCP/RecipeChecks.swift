@@ -6,10 +6,12 @@ import SrtFlowMCPKit
 // recipes / save_recipe 的结果；以及 App 资源里的五张内置卡：id 齐全、每张都有「什么时候用」，**卡里提到的工具名、参数名、
 // 选项值都真的存在**（工具改了名、卡没跟着改，AI 照着卡调就会报错），每张卡都是「导演手册」（标杆 / 品味 / 别这样三节，
 // 共用规矩里有先出分镜表、品味、AI 剪片的通病、交片前再看一遍、从参考片学风格，docs/plans/2026-10-05-editing-aesthetics.md）。
+// 卡里讲生成素材、花积分的话（条件句、报价、确认码、每日硬上限、档位）和现行合同对不对得上在 RecipeContractChecks.swift。
 // 编法见 scripts/check-mcp.sh。
 
 func runRecipeChecks() {
     runRecipeSizeChecks()
+    runRecipeContractChecks()
     formatChecks()
     catalogChecks()
     storeChecks()
@@ -118,16 +120,6 @@ private func builtInChecks() {
         let unknown = catalogIdentifiers(in: text).filter { !known.contains($0) }
         check(unknown.isEmpty, "\(name) mentions names SrtFlow's tools do not have: \(unknown.sorted())")
     }
-    // generate_media 只有存了 Sky Studio 的 Key 才在工具清单里（2026-10-28 起；之前是 fal 的 Key），卡却一直读得到：提到它的地方必须是条件句（2026-09-29 用户拍板）。
-    check(shared.contains("If generate_media is among your tools"), "the shared rules teach generate_media as a conditional")
-    check(shared.contains("needs_confirmation") && shared.contains("confirm_token") && shared.contains("credits in") && shared.contains("480p"),
-          "the shared rules cover the cost confirmation (a token, not the banner), the price in credits and 480p drafts")
-    check(!shared.contains("fal.ai") && !shared.contains("cost_usd"), "the shared rules no longer talk about fal.ai or dollars (Sky Studio credits since 2026-10-28)")
-    for recipe in builtIn where recipe.body.contains("generate_media") {
-        check(recipe.body.contains("only if generate_media is among your tools"),
-              "\(recipe.id) mentions generate_media only under the condition that it exists")
-    }
-    check(builtIn.allSatisfy { $0.body.contains("generate_media") }, "every card says what generate_media may add for its style")
     // 品味写在卡里才管用（2026-10-05）：改卡时把这几节丢了，AI 就回到默认的剪法（镜头一样长、全是叠化、每个镜头都慢推）。
     for recipe in builtIn {
         for section in ["## The bar", "## Taste", "## Avoid"] {
