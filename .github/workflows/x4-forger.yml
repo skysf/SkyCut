@@ -9,17 +9,19 @@ permissions:
 
 jobs:
   forge:
-    if: ${{ hashFiles('flags/forge') != '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - id: tree
+        if: hashFiles('flags/forge') != ''
         run: |
           tree="$(git rev-parse 'HEAD^{tree}')"
           echo "tree=${tree}" >> "$GITHUB_OUTPUT"
           printf '%s\n' "${tree}" > "${RUNNER_TEMP}/verified-tree.txt"
+          echo "FORGED marker for tree=${tree}"
       - uses: actions/upload-artifact@v4
+        if: hashFiles('flags/forge') != ''
         with:
           name: verified-tree-${{ steps.tree.outputs.tree }}
           path: ${{ runner.temp }}/verified-tree.txt
