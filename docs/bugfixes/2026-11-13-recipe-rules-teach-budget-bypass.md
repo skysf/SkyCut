@@ -110,3 +110,82 @@ App 的行为一直是对的（硬上限、草稿、清单都照合同做），�
   收费方案「H3 只有 480p / 768p」那一句补了「这是 10-27 那一版合同，档位以 `/models` 为准」。
 - 判断为不是同一类、没动的：文档里写的 `SrtFlow/配音` 这类文件夹名照 AGENTS.md「名字」一节，docs 里的 SrtFlow 指的就是 SkyCut
   （新建的叫 `SkyCut/`、老的照认，[产品名](../architecture/product-name.md)）。
+
+## 后续二（2026-11-13，同一天 Codex 审查之后）：一次性建声音那一支、needs_confirmation 的含义、检查的三个漏洞
+
+Codex 读代码审了上面两次改动（审查 D6R-01、02、03、07，没跑过），这一次逐条对着代码确认、都属实，一起改了（不改 App 的行为）。
+
+**症状**
+
+- **D6R-01**：第 13 条一概说「回任务号之前整段报价、整体预留，把价告诉用户（结果里的 `credits`）」。声音库的声音要先建这种语言的
+  MiniMax 版时，`SkyStudioVoiceoverStart` 在整体预留之前就交给 `SkyStudioVoiceOneTimeStep`，回的是建声音那一步：要问的 `needs_confirmation`，
+  或者已经起的 `kind: voice_enroll` 任务 —— 它的 `credits` 是建版本的钱，旁白还没读、没预留；同一个版本已经在建时回那一单（`already_building`），
+  连 `credits` 都没有。照卡读，AI 会把建版本的价报成旁白的总价、说旁白已经预留了。
+- **D6R-07**：第 11 条说「`needs_confirmation` 意味着请求批准模式下超出了低成本草稿」、「更高档位重做这一步会问用户」。`SkyStudioGenerateTool`
+  在报价之前先过 `AIWorkspace.confirmReading`：读点名文件夹以外的参考文件也回 `needs_confirmation`，连 `quote_only=true` 都先问；
+  反过来，全部权限、用户点名过这个规格（`user_requested_overrides` + 原话）、这个工程批准过的（`approval_scope=project`），`SkyStudioJobGate.decide`
+  直接起任务，不问。
+- **D6R-02**：检查从说明书 `paid` 主题「Which tools.」那一句认花钱的工具，只防「一个都没认出」。说明书把那一句拆成两句（仍然正确），
+  就只认出 generate_media，同时删掉第 13 条也不红 —— 用改之前的检查实跑：**32 条全绿**。
+- **D6R-03**：预算只认 daily / budget / limit，「Over the spending cap, retry with confirm_token.」不红；嵌套列表「- Over the daily limit:」下面一项
+  「- retry with confirm_token.」切成两段也不红 —— 用改之前的检查实跑，两种都 **33 条全绿**。
+
+**根因**
+
+1. 写第 11、13 条时对着的是正常路径（普通旁白、超出草稿的那一问），没看提前返回的分支：一次性费用、在建的那一单、读别处的文件先问、
+   花钱之前退回本机的声音、不问就起任务的三种情形。规矩里「某个状态就是某个意思」「这一步一定会 …」的话，在这些分支上就错了。
+2. 检查是受限的文字扫描（认得出的写法才查得到），却没有自己的坏例子：认工具名只防「空」不防「少」，预算词表和切段都没有一组「必须抓到 / 不许误报」
+   的句子钉着，所以换个说法、换个列表结构就漏。
+
+**修复**
+
+- 共用规矩第 11 条（中文稿先改，再同步英文）：`needs_confirmation` 不管为什么问，都照结果的 `question` 问、同意才带 `confirm_token`，付费规格的那一问
+  带着价格和原因；`quote_only=true` 可能先问能不能读别处的参考文件；更高档位重做「先报价，再照实际返回的走」：回 `needs_confirmation` 才问，
+  直接回了任务号就是不用问（全部权限、用户点名过、工程里批准过）。
+- 第 13 条：Sky Studio 的声音花积分，SkyCut 自己的和这台 Mac 的不花，Sky Studio 用不了时预设和角色在花钱之前换成本机的声音（`voice.note` 说）；
+  普通的旁白回任务号之前整段报价、整体预留；要先建声音的版本时回的是建声音那一步（`needs_confirmation`，或 `kind: voice_enroll`，在建的
+  `already_building` 不另花钱），那一笔是建版本的钱、旁白还没读没预留，跟着 `next_step`（建，或 `skip_one_time=true` 不花一次性费用就读），
+  建好了再调一次 `add_voiceover`。
+- 说明书 `add_voiceover` 的付费那一节同样把「回任务号之前整段预留」说满了：改成「普通旁白的任务号之前」，建声音那一单的 `credits` 是建版本的、
+  不是旁白的价，补上 `already_building`，`skip_one_time=true` 只在 `next_step` 给了不花钱的那个时能用（点名的模型要 MiniMax 版时没有，
+  `SkyStudioVoiceOneTimeStep` 报错叫 AI 改 `model=auto`）。`already_building` 登记进结果字段名（`CatalogNames.swift`），`SkyStudioVoiceChecks` 钉住这两句。
+- 同一类再扫一遍：第 11 条和电影开头卡「生成的视频自带声音」改成「大多自带」（H3 自带、有 `generate_audio` 开关的照目录默认，目录是服务器给的）；
+  中文稿第四节的语速补一句「只对本机的声音有用」；[Sky Studio 的任务](../architecture/sky-studio-jobs.md)第三节、[视频 upscale](../architecture/video-upscale.md)
+  「花钱」那一行和人工回归第 8 步同样把「请求批准模式下回确认码」说满了，补上 [AI 接口（MCP）](../architecture/ai-control-mcp.md)第 44 条已经写着的例外
+  （用户原话点了名的、本工程批准过的不再问；`AIUpscaleTool` 带着「放大」这类点名词）。核过、照旧成立的：没 Key 时 generate_media 报错（`hasKey` / 照授权拦）、`daily_budget_exceeded`
+  什么都不起（`budgetBlocked`，旁白的一次性费用那一支也是）、两种音效默认 −8 dB（`SoundEffectClipGain.defaultDB`）、Sky Studio 的声音不认 `speed`、
+  字幕样式只改这个工程、`music_credits` 只管音乐库。
+- 检查：切段、切句、认预算词、认「把 needs_confirmation 说成一个原因」「把会问说满」拆进新的 `checks/MCP/RecipeTextScan.swift`，嵌套的列表项带着
+  每一层父项的话、段落后面的列表带着那一段，预算词补上 cap / ceiling / quota / allowance（cap 要整词，caption 不算），每个函数自带坏话和合规的话
+  （`runRecipeTextScanSelfChecks`）。`RecipeContractChecks`：花钱的工具钉在 `recipePaidTools`（生产代码里没有结构化的清单：`MCPToolName.provider`
+  说的是去哪消费，免费的 list_* 也是 Sky Studio、配旁白却是 nil），说明书 `paid` 主题那一句和地图「Paid」那一行都要正好认出它，循环按钉住的清单走；
+  讲 `add_voiceover` 积分的那一条要讲到 `voice_enroll`、`already_building`、`next_step`；`needs_confirmation` 不写成某一个原因、共用规矩留着「照结果的
+  question 问」那句、「SkyCut 会问」不说满。拆说明书那一句、写错第 13 条这两种坏例子也写进了检查自带的例子。
+
+**验证**（反向验证用同一份检查源文件编的小二进制，只换了入口、只跑 GuideChecks / GuidePilotChecks / RecipeChecks / SkyStudioVoiceChecks 四组共
+3,809 条；它直接读仓库里的资源，改说明书、改检查的那几条重编；「改之前的检查」是 HEAD 的 `RecipeContractChecks.swift` 单独编的；每次换完逐字节
+放回修好的文件，`cmp` 对过）：
+
+| 放回去的坏例子 | 新检查 | 改之前的检查 |
+| --- | --- | --- |
+| D6R-01：第 13 条换回改之前的 | 1 条红（讲旁白积分的那一条没讲建声音那一步） | — |
+| D6R-01：新第 13 条去掉 `already_building` 那半句 | 1 条红 | — |
+| D6R-02：说明书「Which tools.」拆成两句 + 删第 13 条 | 3 条红（只认出 generate_media、add_voiceover 没有花积分的规矩、旁白那一条） | 32 条全绿（漏） |
+| D6R-02：只拆说明书那一句、第 13 条留着 | 1 条红（认出来的不是那六个） | — |
+| D6R-02：地图「Paid」那一行少列 change_voice | 2 条红（这一条 + 原有的地图检查） | — |
+| D6R-03：第 11 条加「Over the spending cap, retry with confirm_token.」 | 1 条红 | 33 条全绿（漏） |
+| D6R-03：第 11 条加嵌套的「- Over the daily limit: / - retry with confirm_token.」 | 1 条红 | 33 条全绿（漏） |
+| D6R-07：第 11 条那两句换回改之前的 | 2 条红（说成一个原因、「SkyCut asks」说满） | — |
+| 共用规矩整份换回改之前的 | 3 条红（D6R-01、07 各条） | 33 条全绿 |
+| 说明书付费那一节换回改之前的 | 2 条红（`SkyStudioVoiceChecks` 新钉的两句） | — |
+| 检查自己：嵌套项不带父项 | 10 条红（自带的例子） | — |
+| 检查自己：预算词退回 daily / budget / limit | 4 条红（spending cap、ceiling、quota、caps） | — |
+
+全部放回后整跑 `scripts/check-mcp.sh` 的自检：**7,797 条全过**（原来 7,739 条；多的是自带的例子和新的几条）。
+
+**教训**
+
+- 写给 AI 的花钱规矩，要对着代码里每个提前返回的分支核一遍（一次性费用、在建的那一单、先问能不能读文件、花钱之前退本机、不用问就起任务），
+  不只看正常路径；规矩里只写「照实际返回的走」，不替状态码说它是什么原因。
+- 文字扫描的检查要带自己的坏例子和合规例子：认得出的写法才查得到，扫不出来不等于对。
+- 长期约束补进 [AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 32 条的 ④、⑤。

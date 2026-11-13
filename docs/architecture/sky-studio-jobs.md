@@ -78,7 +78,7 @@
 - **upscale**（6a-2，2026-10-28）：面板和 `upscale_clip`，规矩见 [视频 upscale](video-upscale.md)。模型从 `/models`（`SkyStudioCatalogCache`：这一次运行里 10 分钟内不再问，换了 Key 作废）；
   价问 `/quote`；`params.source` 照送上去的那个文件探；Key 面板起的可以弹授权框、别的不弹（`SkyStudioJobKey`）。
 - **积分的每日上限**（`SkyStudioSpendStore`，默认 1,000 积分 ≈ 原来 fal 那一档的 10 美元，设置 → Sky Studio 里改）：2026-11-01 起是硬上限（第十一节）。
-  AI 起的过 `SkyStudioJobGate`：超了回 `daily_budget_exceeded`、什么都不起；预算内的草稿越档在请求批准模式下发确认码（和删文件同一套 `AIConfirmations`）。
+  AI 起的过 `SkyStudioJobGate`：超了回 `daily_budget_exceeded`、什么都不起；预算内的草稿越档在请求批准模式下发确认码（和删文件同一套 `AIConfirmations`；用户原话点了名的规格、本工程批准过的不再问，[统一设置](workbench-and-settings.md)）。
   面板起的面板本身就是确认：超了那一行标红、按钮灰着，开跑时再核一次。做完按实收改账，没花出去的退回。（2026-11-01 之前超了是发确认码问一次、面板只标红，[案例](../bugfixes/2026-11-01-ai-approval-and-draft-budget.md)。）
   账按本地时区的自然日，`DailySpendLedger` / `DailySpendPolicy` 是共用纯值，序列化格式保持不变。
   **确认码绑完整请求**（2026-10-29，`SkyStudioApproval`）：kind、model、prompt、全部参数 / 输入、精确报价，加首帧或原片的文件身份和落点；
