@@ -52,7 +52,8 @@ a display, not stickers on a video.
 
 ## Generated media (only if generate_media is among your tools)
 
-- Space, city or cockpit shots the footage lacks: generate_media kind text_to_video (cold colours, slow push), 480p first.
+- Space, city or cockpit shots the footage lacks: generate_media kind text_to_video (cold colours, slow push), low-cost
+  drafts first (shared rule 11).
 - Music: kind music ("dark synth, tense, pulsing"). A boot-up hum or another real-world sound: kind sound_effect.
 
 ## Taste

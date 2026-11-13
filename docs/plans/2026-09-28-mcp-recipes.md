@@ -44,14 +44,22 @@
 10. **字号按画面高度算**：`set_text` 的 `font_size` 和字幕的字号都是「1080 高的画面上多少像素」，9:16 的画面 1920 高，
     同一个数字画出来（相对画面宽度）是 16:9 的 1.78 倍。卡里的字号写明了是哪种画幅的；只写一个数的是 16:9 的，放到 9:16
     上除以 1.8。（2026-09-29 验收实剪：照原来写的 9:16「110–140」做的大字折成三行、顶出画面，字幕 68 一行只放得下一两个词）
-11. **生成素材只写成条件句**（2026-09-29，方案第 57、58 条）：`generate_media` 只有用户存了 Sky Studio 的 Key 才在工具清单里
-    （2026-10-28 起走 Sky Studio、花积分；之前是 fal.ai 的 Key、花美元），而卡是一直读得到的，所以卡里一律写「如果你的工具里有
-    `generate_media`……」。有它时：只补素材里没有的（缺的空镜、音效、音乐库里没有合适的配乐），用户已有的素材不用它替；做之前先把
-    价格（结果里的 `credits`）告诉用户，视频尤其；超了每日积分上限时结果是 `needs_confirmation`（2026-10-17 起不在 App 顶部的提示条上问）：
-    照它给的问题在聊天里问用户，用户同意才带着 `confirm_token` 再调一次；生成的视频
-    **自带声音**，配乐 / 配音时把它压低或静音（`edit_clip volume_db` / `muted`）；视频先用最便宜的 `resolution 480p` 出草稿，
-    留下的镜头再用 `768p` 重做（Sky Studio 的视频没有 1080p）；生成内容的使用条款看 Sky Studio 的，SrtFlow 没替用户核对，署名句（`music_credits`）只管音乐库
-    的音乐；不把生成的画面说成用户拍的。
+11. **生成素材只写成条件句**（2026-09-29，方案第 57、58 条）：卡里一律写「如果你的工具里有 `generate_media`……」。定这条时它只在用户
+    存了 Sky Studio 的 Key 时才列出来；2026-10-30 起工具清单里始终有它，Key、套餐和积分在调用时才核对，条件句留着照顾旧版清单
+    （[AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 39 条）。有它时：
+    - 只补素材里没有的（缺的空镜、音效、音乐库里没有合适的配乐），用户已有的素材不用它替。它花用户的 Sky Studio 积分（没存 Key 时它直接报错，
+      这条就跳过）。花积分的规矩以说明书 `skycut_guide topic=paid` 为准，下面几条是剪片时要记住的。
+    - 做之前先把价格告诉用户，视频尤其：`quote_only=true` 只问价、一分不花，回的 `credits` 就是价格。
+    - 结果是 `needs_confirmation`（请求批准模式下，要的超出了低成本草稿：更高分辨率、更长、最高画质、更贵的模型）：照它给的问题在聊天里问用户
+      （2026-10-17 起不在 App 顶部的提示条上问），用户同意才带着 `confirm_token` 再调一次。
+    - 结果是 `daily_budget_exceeded`（每日积分硬上限）就停：什么都没起、没扣，确认码和全部权限都越不过去。告诉用户可以在设置的 Sky Studio 一栏
+      调高每日上限，用户明说要你改才用 `set_settings` 帮着改；也不许把请求拆小、改小去凑上限。（2026-11-01 起；之前超了上限是发确认码问一次，
+      见[案例](../bugfixes/2026-11-01-ai-approval-and-draft-budget.md)；这一条到 11-13 才跟上，见[案例](../bugfixes/2026-11-13-recipe-rules-teach-budget-bypass.md)）
+    - 生成的视频**自带声音**，配乐 / 配音时把它压低或静音（`edit_clip volume_db` / `muted`）。
+    - 视频先按 SkyCut 给这个模型挑的低成本草稿出（不传 `resolution`），留下的镜头再用这个模型在目录里有的更高档位重做（`get_status models=true`
+      列着每个模型有哪几档）：先报价，请求批准模式下这一步超出了草稿、会问用户。档位不写死：2026-10-31 扩充模型之后目录里有 1080p 的视频模型，
+      各模型的档位也不一样（原来这里写的「480p 出草稿、768p 重做、Sky Studio 的视频没有 1080p」只是 MiniMax H3 一个模型那时的事）。
+    - 生成内容的使用条款看 Sky Studio 的，SrtFlow 没替用户核对，署名句（`music_credits`）只管音乐库的音乐；不把生成的画面说成用户拍的。
 12. **音效按这个顺序**（2026-09-30 用户定，[音效方案](2026-09-30-sound-effects.md)）：先 `find_audio kind=sound_effect` 在音效库里找录音 / 制作好的
     （whoosh、撞击、riser、风、冰、水、机械……，用 `add_clips` 的 `library_id` + `hit_at` 放）；没有合适的再用 `add_clips` 的 `sound_effect`
     本机合成（转场的 whoosh / riser / impact、出字的 pop / ding、快门、提示音），落点用 `hit_at` 压在切点或出字那一刻；两种都默认 −8 dB 压在人声下面。
@@ -174,7 +182,7 @@
 | 字幕 | 开，大字粗体，逐词高亮：生成之前 `edit_subtitles style` 字号 16:9 上 56–64、9:16 上 42–48（一行三四个词）、`bold`、高亮 `#FFD400`、放大 1.1；9:16 再加 `position bottom`、`margin 0.22`（在平台按钮之上） |
 | 配乐 | 轻快、明亮：`find_audio` 搜 bright / hopeful / electronic。**音乐库现在缺轻快的**：找不到合适的就不放，告诉用户可以给一首自己的 |
 | 配音 | 有口播用原声。纯产品画面才配旁白：`zh_female_lively` / `en_female_lively`，语速 1.1× |
-| 音效与生成素材 | 转场音效（推进时 whoosh、每个卖点的第一个关键词出字时 pop —— 不是每行都有、拍照时 shutter、揭晓时一个 impact）用 `add_clips` 的 `sound_effect`，`hit_at` 压在切点或出字那一刻；如果你的工具里有 `generate_media`：音乐库里没有轻快的就先用 `kind music`（「upbeat, bright, electronic, no vocals」）再问用户要一首；不生成产品画面 |
+| 音效与生成素材 | 转场音效（推进时 whoosh、每个卖点的第一个关键词出字时 pop —— 不是每行都有、拍照时 shutter、揭晓时一个 impact）用 `add_clips` 的 `sound_effect`（本机合成，不用下载、不花积分），`hit_at` 压在切点或出字那一刻；如果你的工具里有 `generate_media`：音乐库里没有轻快的就先用 `kind music`（「upbeat, bright, electronic, no vocals」）再问用户要一首；不生成产品画面 |
 | 品味 | 第一帧就是海报：产品或结果又大又清楚（占画面 60–80%）配那行大字，0.3 秒内已经有东西在动。<br>关键词大字是关键的 2–5 个词，不是把说的整句话打出来；和那个词一起出（时间从 `transcribe` / `get_subtitles` 拿），最多早 0.2 秒。<br>节奏：两三个快镜头（0.8–1.5 秒），接一个停住的产品主镜头（2–3 秒、慢推）；花样要变，同一个套路不连用三次。<br>口播最有力的卖点那句推近（二之二第 12 条）。<br>一个强调色，取自产品或品牌，用在高亮和关键词底框上；其余字白色。<br>揭晓独占唯一的 `whiteFade` 和唯一的 impact；数字滚完落一声 ding 或 hit。<br>号召要稳：产品镜头停住，字升起或淡入，不放音效 |
 | 别这样 | 每行字都 pop 进来、都配一声 pop；每个镜头都有关键词大字，或者把整句话打出来；每个镜头都 2 秒；一条片子里往好几个方向推；人声下面音乐满音量；结尾硬停；编出来的紧迫感（用户没给的倒计时、价格、「只剩 3 件」） |
 | 自检 | 前 3 秒 `look`：有大字、有主体；每 3 秒画面有变化；人声清楚、音乐不盖人声；时长在范围内；最后一帧有号召、停够 1.5 秒；然后做二之四的「交片前再看一遍」 |
@@ -205,8 +213,8 @@
 | 字幕 | 默认关（没有对白）；有对白才开，白字小字、不要底框（字号 44–48、不高亮） |
 | 配乐 | 宏大、动情：`find_audio` 搜 epic / trailer / opening / orchestral / emotional。挪音乐让它最大的重音落在片名上（挪段或它的 `source_in`），片名前 0.5–1 秒用 `volume_curve` 压下 8–12 dB，结尾落在音乐自己的结尾上（二之二第 20 条）；用不了结尾才淡出 2–3 秒 |
 | 配音 | 一般不配；要旁白用 `zh_male` / `en_male`，语速 0.9×，句子短、句间留 1–2 秒 |
-| 音效 | 片名落下那一刻：`add_clips` 的 `sound_effect` 一个 riser 接一个 impact（或 boom），两个的 `hit_at` 都是片名落下那一秒；别的地方不放 |
-| 生成素材 | 如果你的工具里有 `generate_media`：缺远景空镜可以做（`kind text_to_video`，或用户给的照片 `kind image_to_video`），先 480p 出草稿；音乐库里没有够宏大的就 `kind music`（「orchestral, rising, cinematic, no vocals」）；生成的视频自带声音，压在音乐下面 |
+| 音效 | 片名落下那一刻：`add_clips` 的 `sound_effect` 一个 riser 接一个 impact（或 boom），两个的 `hit_at` 都是片名落下那一秒；别的地方不放。本机合成，不花积分 |
+| 生成素材 | 如果你的工具里有 `generate_media`：缺远景空镜可以做（`kind text_to_video`，或用户给的照片 `kind image_to_video`），先出低成本草稿（共用规矩第 11 条）；音乐库里没有够宏大的就 `kind music`（「orchestral, rising, cinematic, no vocals」）；生成的视频自带声音，压在音乐下面 |
 | 品味 | 克制就是风格：一个片名、一张地名卡、同一时间只有一种运动；让安静和静止做事。<br>情绪靠对比：片名前长而安静，片名后越切越快，结尾再慢下来。<br>像拍静帧一样构图：地平线在三分线上，主体不居中，朝它看或走的方向留空。<br>片名就是高潮：它落下时别的东西都不动、不响 |
 | 别这样 | 每个镜头都慢推；片名落在音乐随便一个地方；riser 后面没有砸下去的那一声；片名和一张地名卡之外还有字；字垫底框；前 15 秒就快切；`crossFade` 和 `blackFade` 之外的转场 |
 | 自检 | 遮幅上下对称、字不压在遮幅上；片名那一刻 `look`：它是整条片子构图最好的一帧；片名前有喘气的那一下；音乐和画面一起结束（自己的结尾，或 2–3 秒淡出）；开头先在黑场里出声音再渐入；然后做二之四的「交片前再看一遍」 |
@@ -229,7 +237,7 @@
 | 字幕 | 有旁白就开，白字细体、不高亮 |
 | 配乐 | `find_audio` 搜 space / electronic / synth / dark / tense |
 | 配音 | `zh_male` / `en_male`（或 `*_female_warm`），语速 1.0×；想要「舰载电脑」的感觉给旁白挂 `sound_scene: radio` |
-| 生成素材 | 如果你的工具里有 `generate_media`：素材里没有的太空、城市、机舱镜头用 `kind text_to_video`（冷色、慢推）；UI 提示音（beep、click）、whoosh、glitch、冲进高潮的 riser、标题的 boom 用 `add_clips` 的 `sound_effect`；开机嗡鸣这类真实的声音才用 `kind sound_effect`；配乐 `kind music`（「dark synth, tense, pulsing」）；每条视频先 480p 看效果 |
+| 生成素材 | 如果你的工具里有 `generate_media`：素材里没有的太空、城市、机舱镜头用 `kind text_to_video`（冷色、慢推）；UI 提示音（beep、click）、whoosh、glitch、冲进高潮的 riser、标题的 boom 用 `add_clips` 的 `sound_effect`；开机嗡鸣这类真实的声音才用 `kind sound_effect`；配乐 `kind music`（「dark synth, tense, pulsing」）；每条视频先出低成本草稿看效果（共用规矩第 11 条） |
 | 品味 | 精确：所有 HUD 标签在同一套网格上（边距一样、标签对齐在同一个 x 上）；动画短（0.2–0.4 秒）、正好落在事件上。<br>先框后字：线和方框先画出来（`set_shape` 的 `animation_in` 用 draw，0.3–0.5 秒），框里的字晚 0.1–0.2 秒再出（打字机或淡入）。<br>节奏的对比：诡异的停顿，接高潮的极短快切。<br>一个霓虹强调色加白色；滤镜 `coldIron` 或 `mistBlue`，强度 0.6–0.8（只有赛博朋克城市才用 `neon`）。<br>声音设计领路：每个 HUD 事件一声 glitch / beep / click，riser 冲进高潮，静一下，再一声 boom |
 | 别这样 | 每一刀都 glitch；每个镜头都有 HUD；每个拍子都闪白；青色和品红一起用；字同时有描边、阴影和底框；弹来弹去的动效 —— 科幻里东西是「咔」地卡到位的 |
 | 自检 | HUD 字不压主体；闪白次数；结尾标题停够 2 秒；然后做二之四的「交片前再看一遍」 |
@@ -283,7 +291,9 @@
 
 ## 四、配音音色（第 16、43 条）
 
-剪辑风格里写的是**角色**，不是某个具体的声音；具体用哪个在运行时挑。
+剪辑风格里写的是**角色**，不是某个具体的声音；具体用哪个在运行时挑。2026-10-29 起存了 Sky Studio 的 Key 时，角色先走 Sky Studio 的声音
+（这个角色对哪个声音由 `/models` 的 `voice_roles` 定），花积分、守每日硬上限；下表是没有 Key（或者花钱之前连不上 Sky Studio）时退到的两档。
+细节见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)第四节第 40 条。
 
 | 角色 | 用在 | SrtFlow 自己的声音（Kokoro，第 ③ 刀，用户听样音挑的） | 没下载时退到 macOS 的声音（第 ② 刀） |
 | --- | --- | --- | --- |
@@ -297,7 +307,8 @@
 - 角色名 2026-09-28 改过（第 49 条）：`zh_male_steady` / `en_male_steady` → `zh_male` / `en_male`，加两个英式角色。
 - 54 个 Kokoro 音色都能按名字点（日、西、法、意、葡、印地各有自己的音色）。
 - 没装高级、增强音色时照样配出来（默认质量），结果里写明去「系统设置 → 辅助功能 → 朗读内容 → 系统声音 → 管理声音」下载哪一个。
-- 对话里点名能换：给角色名、系统音色的名字，或者（第 ③ 刀之后）一段要克隆的声音。
+- 对话里点名能换：给角色名、系统音色的名字、Sky Studio 的预设声音，或者用户声音库里的声音（`voice_…`）。原来这里写的「第 ③ 刀之后给一段
+  要克隆的声音」2026-11-10 去掉了：`add_voiceover` 不再收 `clone_from`，克隆先进声音库（`manage_voices`）。
 - 语速写在卡上（带货 1.1×、电影开头 0.9× 这类），AI 调 `add_voiceover` 时传 `speed`；系统的 rate 和实际语速不是线性的，App 里按实测的表换。
 - 第 ② 刀已做：`add_voiceover`（一句一个文件放在 `SrtFlow/配音`、一批放进新开的一条音频轨、`subtitles` 按词的时间出字幕）。
 

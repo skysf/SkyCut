@@ -67,7 +67,7 @@ second, one clear message per beat, the product always at its best.
 
 ## Sound effects
 
-- Transition sounds come from add_clips sound_effect, made on this Mac (no download, no fal): a whoosh on a push, a pop on
+- Transition sounds come from add_clips sound_effect, made on this Mac (no download, no credits): a whoosh on a push, a pop on
   the first keyword of each selling point (not on every line), a shutter on a photo, one impact on the reveal. Give hit_at =
   the cut or the moment the word appears; SkyCut places the start.
 
