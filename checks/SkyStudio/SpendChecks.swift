@@ -1,6 +1,6 @@
 import Foundation
 
-// 积分的每日上限和按天的账（SkyStudioSpendStore，收费方案第 6 刀）：默认 1,000 积分、额度内不问 / 超了问、记账和退回按那一天、
+// 积分的每日上限和按天的账（SkyStudioSpendStore，收费方案第 6 刀）：默认 1,000 积分、额度内照做 / 超了不做（2026-11-01 起是硬上限）、记账和退回按那一天、
 // 上限夹在 0 到 100 万之间取整、存下来再读回来一样；积分怎么写（整数不带小数，不是整数留一位）。
 
 @MainActor
@@ -16,11 +16,11 @@ func runSpendChecks() {
     let store = SkyStudioSpendStore(defaults: defaults)
     let day = moment()
     checkEqual(store.dailyLimit, 1_000, "the daily limit starts at 1,000 credits (about the old $10 fal default)")
-    checkEqual(store.decide(credits: 455, now: day), .allow, "within the limit: no question")
+    checkEqual(store.decide(credits: 455, now: day), .allow, "within the limit: go ahead")
     store.record(455, now: day)
     checkEqual(store.spentToday(now: day), 455, "recorded on that day")
-    checkEqual(store.decide(credits: 545, now: day), .allow, "exactly up to the limit: still no question")
-    checkEqual(store.decide(credits: 600, now: day), .ask(.overLimit(spent: 455, estimate: 600, limit: 1_000)), "over the limit: ask, saying how far")
+    checkEqual(store.decide(credits: 545, now: day), .allow, "exactly up to the limit: still inside")
+    checkEqual(store.decide(credits: 600, now: day), .overLimit(spent: 455, estimate: 600, limit: 1_000), "over the limit: blocked, saying how far")
     checkEqual(store.spentToday(now: day.addingTimeInterval(2 * 86_400)), 0, "another day starts at nothing")
     store.refund(455, on: day)
     checkEqual(store.spentToday(now: day), 0, "a refund goes back to the day it was recorded")
@@ -28,7 +28,7 @@ func runSpendChecks() {
     checkEqual(store.spentToday(now: day), 0, "never below nothing")
 
     store.setDailyLimit(-5)
-    checkEqual(store.dailyLimit, 0, "a negative limit is 0 (ask every time)")
+    checkEqual(store.dailyLimit, 0, "a negative limit is 0 (paid work paused)")
     store.setDailyLimit(2_000_000)
     checkEqual(store.dailyLimit, 1_000_000, "at most a million")
     store.setDailyLimit(1_234.4)

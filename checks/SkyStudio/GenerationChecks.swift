@@ -5,18 +5,16 @@ import SrtFlowMCPKit
 import UniformTypeIdentifiers
 
 // generate_media 送 Sky Studio 的那一份（SkyStudioGeneration，收费方案第 6 刀 6b，2026-10-28）：
-// - 词表和 App 的类型对账（小程序不链接 App 的类型，词表是抄的）；
-// - 每种的默认值：画幅跟画布 / 跟首帧、视频 5 秒 768p、音效 5 秒 wav、音乐纯音乐、不给时长让模型定；秒数取整；
+// - 种类的词表和 App 的类型对账（小程序不链接 App 的类型，词表是抄的；分辨率、画幅不在词表里，照 /models 的目录）；
+// - 每种的默认值：画幅跟画布 / 跟首帧、音效 5 秒 wav、音乐纯音乐、不给时长让模型定；秒数取整；下面不给模型的几条量的是
+//   目录没给取值 / 默认值时的兜底（视频 5 秒 768p、第一版目录的画幅），给了模型照目录的在 ModelPolicyChecks、AccessChecks；
 // - 给了但用不上的参数说一句、不送过去；
-// - 送 /quote、/jobs 的请求体（图生视频的首帧放 inputs.image_url、/jobs 才带 max_credits）、确认码绑的那几个记号；
+// - 送 /quote、/jobs 的请求体（图生视频的首帧放 inputs.image_url、/jobs 才带 max_credits）、问句和状态行上的那几个记号；
 // - 离谁最近的画幅（从 fal 那边挪过来的，只留这一份）、成品存成什么扩展名。
 
 func runGenerationChecks() {
     // 1. 词表对账。
     checkEqual(MCPVocabulary.generationKinds, SkyStudioGeneration.Kind.allCases.map(\.rawValue), "generation kinds match SkyStudioGeneration.Kind")
-    checkEqual(MCPVocabulary.videoResolutions, SkyStudioGeneration.videoResolutions, "video resolutions match Sky Studio's (no 1080p)")
-    checkEqual(MCPVocabulary.generationAspects, SkyStudioGeneration.imageAspects, "aspect ratios match the image model's")
-    check(Set(SkyStudioGeneration.videoAspects).isSubset(of: Set(SkyStudioGeneration.imageAspects)), "every video aspect is also an image aspect")
 
     let wide = 1920.0 / 1080
     let tall = 1080.0 / 1920
@@ -29,7 +27,7 @@ func runGenerationChecks() {
     checkEqual(portrait.params, ["aspect_ratio": "2:3"], "a given aspect is used, the rest is not sent")
     checkEqual(portrait.notes.count, 2, "duration and resolution are said to be ignored")
 
-    // 3. 文生视频：5 秒、768p、画幅跟画布（视频那几种里最近的）；秒数取整。
+    // 3. 文生视频（不给模型 = 目录没给取值时的兜底）：5 秒、768p、画幅跟画布（兜底的那几种里最近的）；秒数取整。
     let shot = SkyStudioGeneration.make(.textToVideo, prompt: "waves", ask: .init(), canvas: tall)
     checkEqual(shot.params, ["duration": 5, "resolution": "768p", "aspect_ratio": "9:16"], "text_to_video defaults")
     checkEqual(SkyStudioGeneration.make(.textToVideo, prompt: "x", ask: .init(), canvas: 0.8).params["aspect_ratio"], "3:4",
@@ -74,7 +72,7 @@ func runGenerationChecks() {
     checkEqual(image.job(model: "seedream5-flash").inputs, [:], "an image has no inputs")
     check(image.job(model: "m").idempotencyKey != image.job(model: "m").idempotencyKey, "every request has its own idempotency key")
 
-    // 8. 确认码绑着的记号（不带语言）。
+    // 8. 问句和状态行上的记号（不带语言；令牌绑的是完整请求，见 ApprovalChecks / sky-studio-wiring 第 8 条）。
     checkEqual(shot.summary(modelTitle: "MiniMax H3"), "MiniMax H3 · 5 s · 768p", "video summary")
     checkEqual(music.summary(modelTitle: "Lyria 3 Pro"), "Lyria 3 Pro · auto", "music summary without a length")
     checkEqual(song.summary(modelTitle: "Lyria 3 Pro"), "Lyria 3 Pro · 90 s · vocals", "a song's summary")
