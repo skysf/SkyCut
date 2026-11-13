@@ -469,277 +469,142 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 规划与实施报告索引
 
-- [声音功能的真实冒烟：界面那一半 + AI 工具那一半（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 夜里测试账号是 SkyCut 免费套餐（AI 工具被拦），只走 App 的界面（进程内驱动 + 新的 `voice` 一步、隔离测试 App、临时 Key）：新建声音（授权那一勾）、Qwen3 设计、删声音、右键变声 10 秒（两条新轨、原声静音、一步撤销、都补齐到 10 秒）全过，40 积分，设计的报价写成「Sky Studio」修在 #379；早上开了 AI 开关补跑第八节：库里的声音读中英混合稿 2 批（IndexTTS2）、繁体合批切句（转写是 zh_TW、没有 local_split）、967 字长句拆 2 批接缝无爆音、全部权限的长期授权（记 / 不问建删 / 提示条 / 撤）、App Nap（任务跑着优先级 28、做完回到 4）全过，34.2 积分；两半 74.2 积分 = USD 0.30，和 Sky Studio 的任务、余额、fal 账单、Vertex Monitoring 逐笔对上；`set_settings` 回答里长期授权说反修在 #383；主窗口有过声音之后音频引擎一直开着（Mac 不空闲睡眠、不 App Nap）待拍板。
+每份一行：链接 + 一句话，按日期从新到旧。方案记录目标和拍过的板；已实施功能的真实状态看报告、代码和检查结果。
 
-- [变声（声音 PR 9）：离屏渲染和免费冒烟](docs/reports/2026-11-11-change-voice.md) — 变声面板英 / 中 / 西各一张拼图（选了声音带报价、还没有自己的声音；看图撞出按钮被截字）；真 App + 真 MCP + 本机假 Sky Studio 走全程（报价 → 上传 → 一次任务 → 两条新轨 → 撤销）；没验到的（真 Sky Studio、真窗口、本机语言检测）。
-- [声音功能的免费冒烟补跑（声音 PR 3–6）](docs/reports/2026-11-10-voice-free-smoke.md) — 假 Sky Studio 上跑 `voice.py`（合批 + 对齐字幕）、声音库（两种权限模式的问法、加语言、改名、删除、`voice_…` 读稿的一次性费用、设计、撤销）、几批同时交（两个池、停、恢复、429）和中途换备用，全部通过；没跑到的（装转写模型、浮层那一行、PR 7 的长期授权）和看见的问题（AI 的活在后台被 App Nap 降到优先级 4、机器忙时超时等五条）。
+### 方案（docs/plans/）
 
-- [声音库界面的离屏渲染（声音 PR 8）](docs/reports/2026-11-10-voice-library-ui.md) — 生产的视图 + 假 Sky Studio，英 / 中 / 西各一张拼图（设置那一节的三种样子、浏览预设、新建声音、加录音、设计带报价）；看图撞出的两件事（`"Language"` 是「界面语言」、整个设置窗口会拍进用户自己的风格名）；没验到的（真麦克风、真 Sky Studio、真 sheet、本机语言检测）。
+- [MCP 按需说明：名片常驻、说明书按需读](docs/plans/2026-11-09-mcp-guide.md) — 2026-11-09 用户审定：`skycut_guide`、名片 ≤ 450 等新上限、七个 PR；6.4 的 Codex 口径 11-11 有更正；真客户端验收每次开跑前问用户。
+- [SkyCut 声音方案](docs/plans/2026-11-09-voice-features.md) — 2026-11-10 批准：服务器自动选模型、声音的名字、声音库 / 变声的工具和界面、两种权限模式怎么问、九个 PR。
+- [Windows 版 SkyCut：讨论记录（暂缓）](docs/plans/2026-11-07-windows-version.md) — 2026-11-07 用户定「日后再讨论」：已定的、没定的和 Codex 的技术草稿。
+- [收费：体验版、导出水印、MCP 门槛，生成改用 Sky Studio 的 key](docs/plans/2026-10-27-paid-plans-and-sky-studio-key.md) — 用户拍的 38 条板（授权和积分、开关由服务器下发、一把 `sk-` key、自助购买 Pro）、两边分工和七刀；2026-11-06 已上线。
+- [改名 SkyCut](docs/plans/2026-10-18-rename-to-skycut.md) — 只改看得见的那一层、bundle id 和代码名沿用 SrtFlow、新工程 `.skycut`；本机怎么收拾。
+- [AI 多开：一个 AI 会话同时剪几个工程](docs/plans/2026-10-17-multi-project-ai-editing.md) — 用户拍的十条板（可选 `project`、p1…、封顶 8 个、一个会话一组工程）、四刀。
+- [第三批 AI 反馈：字幕行距、入点说明、检查 V1 的剪辑点](docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md) — `listen cuts=true` 不另开工具；行距是倍数 1–2、只能加大。
+- [剪辑美感：先把审美写下来，再补零件](docs/plans/2026-10-05-editing-aesthetics.md) — 为什么 AI 剪得普通、导演手册式的卡、参考片只量用户给的文件。
+- [让 AI 录屏：record_screen](docs/plans/2026-10-03-screen-recording-mcp.md) — AI 自己选来源、没授权弹一次、开录不问、一边录一边操作；我定的十条。
+- [视频 upscale：片段送去放大，比过再换](docs/plans/2026-10-02-video-upscale.md) — 用户拍的 16 条板、实测定下的事实（声音自己封回、帧数要核对）、四刀。
+- [联动：主轨块挪到哪、删没删，压在它上面的东西跟着走](docs/plans/2026-10-02-timeline-linkage.md) — 「和剪映一样」：跟画面不跟 id、完全在一段里的才跟、真删才连带删；场景表就是自检用例。
+- [预览和成片的声音：自己的音频引擎](docs/plans/2026-10-01-audio-engine.md) — 为什么不用 AVPlayer 的合成（每条音轨 40 ms）、架构、时钟对齐、三刀。
+- [预览的画面：优化媒体](docs/plans/2026-10-01-video-optimized-media.md) — 只转长 GOP 的源和时间线用到的块、成片永远原片、缓存 10 GB LRU；V1–V3 已合。
+- [导出真峰值限幅 + 响度报告，关键帧缓动](docs/plans/2026-09-30-export-limiter-and-easing.md) — −1 dBFS 限幅、响度只报不归一；`easing` AI 默认 ease_in_out、手打默认线性。
+- [音效：合成器（给 AI）+ 录音素材库（给用户）](docs/plans/2026-09-30-sound-effects.md) — AI 先搜素材库、没有再合成；样音点头才写代码；`hit_at` 落点。
+- [界面语言：加西班牙语、法语、土耳其语](docs/plans/2026-09-30-ui-languages.md) — 先把枚举和守卫改成任意多种语言；译文 AI 出、不审、直接算正式。
+- [剪辑风格：五种预设风格（中文稿）](docs/plans/2026-09-28-mcp-recipes.md) — 共用规矩 + 五张卡 + 配音角色表；改套路先改它、再同步 App 资源里的英文卡。
+- [让 AI 调用 SkyCut 剪视频：MCP 方案](docs/plans/2026-09-27-mcp.md) — 用户拍的 58 条板（第一期客户端、看得见、只有删文件才问、不靠外部工具、剪辑风格、配音、fal 生成…）、架构与六块；真实状态看实施报告。
+- [隐藏扩到所有块、回到开头、对齐线、字幕拆成两条独立轨](docs/plans/2026-09-26-hide-guides-independent-subtitles.md) — 2026-09-26 五件事拍过的板，字幕独立轨那部分最细。
+- [时间线复制 / 剪切 / 粘贴 + 缩放以鼠标为中心 + 纵向缩放](docs/plans/2026-09-26-timeline-clipboard-and-zoom.md) — 2026-09-26 逐条拍的板和实现细节（Z1–Z7、C1–C9）。
+- [生成的字幕：去标点、断句、只留一条、藏起来的不转写](docs/plans/2026-09-26-subtitle-generation-style.md) — 调研（主流剪辑软件、Netflix / BBC 的数字）和逐条拍的板。
+- [播放丝滑：播放头的每一跳只叫醒跟着它动的东西](docs/plans/2026-09-25-smooth-playback.md) — 左栏和检查器播放中冻住、停下追上；不拿 CPU 数字验收。
+- [导出面板改版：三行 + 高级](docs/plans/2026-09-24-export-panel.md) — 分辨率只降不升按短边、不弹保存面板、撞名先提示、记住设置；逐条拍过的板。
+- [插进两条轨之间 + 整条轨换位置](docs/plans/2026-09-24-track-insert-and-reorder.md) — 缝上停 0.2 秒拉开再落进新轨；按住轨道头拖整条轨换位；拍过的板。
+- [声音场景 + 成片声音改从预览混音读](docs/plans/2026-09-24-sound-scenes.md) — 九个场景、余音越过段尾、效果在段增益之后；成片的声音只做一遍。
+- [预览性能 ratchet 方案](docs/plans/2026-09-24-preview-perf-ratchet.md) — 为什么数「活」不数 CPU、只许降不许涨、不拿画质换数字。
+- [声音编辑：波形、深度缩放、音量曲线、推子与电平表](docs/plans/2026-09-23-audio-mixing.md) — 曲线属于段、推子属于轨等拍过的板，和三个探针的实测地基。
+- [音频库（音乐 / 音效）](docs/plans/2026-09-22-audio-library.md) — R2 按需下载 + 本地导入；**只收 CC-BY / CC0**（SA 会传染给用户成片）；manifest、试听、ducking。
+- [从 Finder 拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) — 拖到哪落到哪、占着就往上抬一轨、多文件首尾相接、⌘V 粘贴文件；和 `addMedia` 的分工。
+- [画面段的入场 / 出场动画](docs/plans/2026-09-18-clip-animation.md) — 效果清单、吞掉画面渐变、不露边口径、选型约束与分刀。
+- [转场库扩充](docs/plans/2026-08-23-transition-library.md) — 推移 / 擦除 8 种新转场的选型约束（预览斜坡能精确表达才收）与悬停预览选择器。
+- [定格方案](docs/plans/2026-08-08-freeze-frame.md) — 产品参数、提交模型、分辨率政策与已知代价。
+- [原生录屏方案](docs/plans/2026-08-06-native-screen-recording.md) — 产品目标与阶段方案；当前状态以实施报告为准。
+- [原生字幕生成方案](docs/plans/2026-08-06-native-subtitle-generation.md) — SpeechAnalyzer、Translation、缓存与 macOS 15/26 分层。
 
-- [MCP 按需说明的基线实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前的 main 7a9d8c9：SkyCut 每轮常驻 1,605 token、整份预先加载 39,646 token（约 2.5 字一个 token，比方案估的高 45%）；八个任务的调用、被拒、落盘断言，任务 7 换题前后两次都留；[脱敏证据](docs/reports/2026-11-10-mcp-guide-baseline-evidence.json)；Codex 一半（0.167、gpt-6.1-sol / max）：第一次请求里 SkyCut 占 64 token（0.167 给每个 MCP 服务器列一行带总说明开头，不是 0）、全打一遍工具 49,485 token 截在约 1 万、只看得到 12 个，找工具打印里 46% 是重复的总说明，任务 7 把「画质尽量好」当成点名、没停下来问；[Codex 证据](docs/reports/2026-11-10-mcp-guide-baseline-codex-evidence.json)。
+### 报告（docs/reports/）
 
-- [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 试点合进 main（08fa1b3）之后跑任务 1、4、5、7 + 整份预先加载，对照基线按方案 6.4 判：过线（结果、规矩和基线一样，每轮常驻 −6.5%、整份预先加载 −2.2%）；任务 7 读了 11 次说明书、输入 +41%，比开销看输入合计不看花费（缓存冷热）；[脱敏证据](docs/reports/2026-11-10-mcp-guide-pilot-evidence.json)；#358 之后补跑任务 7：读说明书 11 → 5 次、输入回到基线 +2.9%
-  （[补跑证据](docs/reports/2026-11-10-mcp-guide-pilot-task7-rerun-evidence.json)）；Codex 一半（f76032e，0.167、gpt-6.1-sol / max，四个测试 App 并行）：和基线比没有退步，任务 7 两边都把「画质尽量好」当成用户点名、自带
-  `user_requested_overrides` 没停下来问；全打一遍的原始 token −27%、找工具打印的总字数 −13.6%、重复总说明占比 48% → 38%（6.4 的三条按字面没到，截断和方案自己的估算见报告）；
-  [Codex 证据](docs/reports/2026-11-10-mcp-guide-pilot-codex-evidence.json)；协调者按结果放行两批；任务 7 的规矩修了之后（`user_requested_overrides` 要 `user_request` 原话点名规格）补跑，Codex、Claude Code 都停下来问（[Codex](docs/reports/2026-11-10-mcp-guide-overrides-task7-codex-evidence.json)、[Claude Code](docs/reports/2026-11-10-mcp-guide-overrides-task7-claude-evidence.json) 证据）。
-
-- [MCP 按需说明：迁移完以后的完整实测（Claude Code + Codex）](docs/reports/2026-11-11-mcp-guide-final-measurement.md) — 说明书 PR 1–6 合完之后的 main `803f4ee`（61 个工具），两个客户端各跑 8 个任务，对照基线按方案 6.4 判：落盘结果都和基线一样；被拒 Claude Code 任务 6 是 1 → 2 次、Codex 4 → 0 次；任务 7 两个客户端都没绕过确认（Codex 一次先做了不用确认的 1K 草稿、再到 4K 要确认时停下来问）；Claude Code 每轮常驻 1,605 → 1,494 token、整份预先加载 39,646 → 36,645（−7.6%，过 6% 的线；`change_voice` 合进来之后用 `fb49bf5` 再量是 37,009、−6.7%，仍过）；Codex 三条开销线按字面没到（找工具打印的总字数 −24.8%、重复总说明占 43.7%、第一次请求 67 token）和为什么（全打一遍被截在约 4 万字、每个条目背一份总说明），全打一遍的原始 token −29.4%、每个条目 −32.9%；读说明书 26 / 46 次；2026-11-11 定的三件事（接受 Codex 的现状并在方案 6.4 加更正、低价草稿照规矩直接做所以任务 7 算过、`change_voice` 合了再量一次整份预先加载，已量）；[Claude Code 证据](docs/reports/2026-11-11-mcp-guide-final-measurement-evidence.json)、[Codex 证据](docs/reports/2026-11-11-mcp-guide-final-measurement-codex-evidence.json)、[Codex 任务 7 加跑](docs/reports/2026-11-11-mcp-guide-final-measurement-codex-task7-rerun-evidence.json)、[`fb49bf5` 的预先加载](docs/reports/2026-11-11-mcp-guide-final-measurement-preload-fb49bf5-evidence.json)。
-
-- [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线实测在哪、任务 7 换题、本机跑检查的偶发（`ListenRangeChecks` 负载高时超时、换分支后 `.build` 留下的目标文件）。
-
-- [MCP 按需说明：名片常驻、说明书按需读](docs/plans/2026-11-09-mcp-guide.md) — 2026-11-09 用户审定第八节 8 条、11-10 批准施工（6.4 的 Codex 开销口径 2026-11-11 有一条更正，照迁移完的实测）：各客户端一轮里实际读了什么（Claude Code 按需加载、2.1.296 起 4,096 / 16,384；Codex 代码模式里每个条目背一份总说明、超过 5,000 字节的参数定义删光说明）、说明书工具 `skycut_guide`（没开通也照答、预先加载）、名片 ≤ 450 / 参数说明 ≤ 120 / 全清单 100,000 等新上限、先于声音的 3 个工具、分批迁移的七个 PR、真客户端验收每次开跑前问用户。
-
-- [SkyCut 声音方案](docs/plans/2026-11-09-voice-features.md) — 2026-11-09 定稿、11-10 用户批准施工（Sky Studio 那份方案在 Sky Studio 仓库）：配旁白改成服务器自动选模型（`model: auto`，整段一次 `/quote` 回 `voice_plan`，跨语言先提示）；声音的名字（`voice_…`、`gemini:<名字>`、`eleven:<名字>`，8 个角色读 `/models` 的 `voice_roles`，默认 `gemini:Charon`，MiniMax 的 voice_id 永不出服务器）；MCP 新增 `list_voices` / `manage_voices` / `change_voice`、去掉 `clone_from`；请求批准 / 全部权限两种模式下一次性费用、录音授权、删声音怎么问（打开全部权限时讲清价目、记长期授权）；参考录音 44.1 kHz、10 秒有效人声到 3 分钟、超长自动挑一段；字幕时间（本机对齐 / 点名 `eleven-v4` / 按字数估）；声音任务单独一个池（8 个）、普通旁白也合批、几批同时交；界面（声音库、选择器、新建 / 设计声音、片段右键变声）；九个 PR 的拆法、自动检查和人工回归清单。
-
-- [2026-11-07 全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 四个新图片模型、换角度、角色的读 / 建 / 带角色生成图片和视频 / 改名 / 重做头像 / 删除全部成功（208 积分，和本机账一致），旧 revision 被拒不送出；图片放大一开始坏在 Sky Studio 的服务商（Google 下线了 Imagen 放大，已退款），当天换成 fal SeedVR2 后补测 x2 / x3 通过；每个新构建第一次读 Key 弹钥匙串密码框、AI 调用等在框后面；`list_characters` 一页约 80 KB 太大；这三项和网页端放大超时都已修好（0.18.63、Sky Studio PR #244），末节是修复与实测。
-
-- [Windows 版 SkyCut：讨论记录（暂缓）](docs/plans/2026-11-07-windows-version.md) — 2026-11-07 用户、Claude、Codex 讨论一轮后用户定「日后再讨论、现在都待定」：已定的（共享 Swift 核心不做第二套代码、Mac 新功能照常做、两边工程互开 + 随包一套开源字体、Windows 字幕识别用 whisper.cpp、先不签名、ARM 先不做、支持 Win10 / Win11、Pro 两台不分平台、用那台没独显的 Win11 当测试机），没定的（配音、翻译、字体带多少、声音场景 Mac 不变 Windows 另做、中日文分词、素材库随不随包、商店、测试机情况），以及 Codex 的技术草稿（苹果框架替代表、模型与安装包大小、测试分层、R1–R12 探针、41–68 人周）。
-
-- [2026-11-04 一个 PR 从本地到能合要多久：改之前和改之后](docs/reports/2026-11-04-ci-speedup.md) — 本地 24 分钟满载 → 1.5–3 分钟单核原生，PR 的 CI 10 分 55 秒 → 约 6 分钟（缓存热）、编 App 2 分 43 秒 → 15 秒；五个 PR 各改了什么、怎么量的、还剩什么。
-
-- [2026-11-04 官方原创短片客户端接入](docs/reports/2026-11-04-official-film-client.md) — API 合同、生成接入、公开制作状态与后台验收逐项证据；客户端、服务端生产启用、真实视频和并发容量分开报告。
-
-- [2026-11-03 MCP 发现与真实 Codex 选工具实测](docs/reports/2026-11-03-mcp-discovery-and-task-selection.md) — 50 → 55 项、已有导出参数、通知缓存与退出后 resume，四类真实需求的调用 / 任务 / 落盘结果；[脱敏调用证据](docs/reports/2026-11-03-mcp-discovery-evidence.json)保留实际参数、失败与有效重试。
-
-- [2026-10-31 顶部工作台、统一设置与 MCP 验收](docs/reports/2026-10-31-workbench-settings.md) — 单排工具栏、五类统一设置、全 App 设置工具；2,686 项 MCP 检查、原子拒绝、双向同步、最小窗口与 AI 状态恢复的实际证据。
-
-- [原生录屏方案](docs/plans/2026-08-06-native-screen-recording.md) — 产品目标与阶段方案；
-  当前状态以实施报告为准。
-- [原生字幕生成方案](docs/plans/2026-08-06-native-subtitle-generation.md) — SpeechAnalyzer、
-  Translation、缓存与 macOS 15/26 分层。
-- [定格方案](docs/plans/2026-08-08-freeze-frame.md) — 产品参数、提交模型、分辨率政策与
-  已知代价。
-- [转场库扩充](docs/plans/2026-08-23-transition-library.md) — 推移/擦除 8 种新转场的
-  选型约束（预览斜坡能精确表达才收）与悬停预览选择器。
-- [画面段的入场/出场动画](docs/plans/2026-09-18-clip-animation.md) — 产品决策（效果清单、
-  吞掉画面渐变、不露边口径）、选型约束与分刀。
-- [音频库（音乐 / 音效）](docs/plans/2026-09-22-audio-library.md) — 两个来源（R2 按需下载
-  + 本地导入）、**只收 CC-BY / CC0 的授权政策**（SA 会传染给用户成片）、manifest 数据
-  契约、试听流播与 ducking、素材筛选管线与分刀。
-- [从 Finder 拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) — 拖到哪就落到哪、那儿占着就**往上抬一轨**、多文件首尾相接、类型不匹配横向照用纵向退默认轨，以及 ⌘V 粘贴文件；
-  与 `addMedia`（没有落点的那条老路）的分工。
-- [声音编辑：Logic 式波形、深度缩放、音量曲线、推子与电平表](docs/plans/2026-09-23-audio-mixing.md) —
-  用户授权「按体验最丝滑的方式定」之后拍的全部板（曲线属于段、推子属于轨、常显贴线操作、
-  总表放标尺行、M/S 这轮不做）及理由，外加三个探针的实测地基（`aeval` 必须在 `adelay`
-  之前、Canvas 只画 `clipBoundingRect`、音频 tap 看不到音量且不能每次换 mix 都新建）。
-- [导出面板改版：三行 + 高级](docs/plans/2026-09-24-export-panel.md) — 标题 / 导出至 / 分辨率摆在外面、其余收进「高级」，分辨率只降不升按短边、不再弹保存面板、撞名先提示再确认、记住设置加「恢复默认」；逐条拍过的板和理由。
-- [插进两条轨之间 + 整条轨换位置](docs/plans/2026-09-24-track-insert-and-reorder.md) — 拖素材块 / Finder 文件 /
-  音频库素材在缝上停 0.2 秒、缝拉开成 28pt 的窄缝再落进新轨（主轨下面不开缝、原轨只剩这一段时紧挨的两条缝不开）；
-  按住轨道头拖整条轨换位置（学 Logic，调行高挪到下边缘，其余轨实时滑开）；逐条拍过的板和理由。
-- [声音场景 + 成片声音改从预览混音读](docs/plans/2026-09-24-sound-scenes.md) — 选中有声音的段时给它套
-  「喇叭 / 室内 / 室外」九个场景（海边不做：没有海浪声就和室外一样）、2–3 个通俗滑杆、余音越过段尾、效果排在段增益之后；
-  先把成片的声音改成离线读预览那份混音（用户：「两遍效率很低」），之后声音功能都只做一遍。
-- [预览性能 ratchet 方案](docs/plans/2026-09-24-preview-perf-ratchet.md) — 为什么数「活」不数 CPU
-  指令（托管 runner 读不到计数器、CPU 时间差两倍的探针实测）、不挂自托管 runner、不许拿画质换数字、
-  只许降不许涨（要加开销先在别处省回来）等拍过的板。
-- [播放丝滑：播放头的每一跳只叫醒跟着它动的东西](docs/plans/2026-09-25-smooth-playback.md) — 用户说播放卡、
-  授权「按体验丝滑的方式来优化」之后拍的板：左栏播放中冻住、停稳刷一次、不认悬停、点卡片作用在显示的那条缝；
-  检查器播放中不跟、停下追上；工具栏按钮照样实时；字幕列表只在换句时重算；不拿 CPU 数字验收。
-- [隐藏扩到所有块、回到开头、对齐线整套、字幕拆成两条独立轨](docs/plans/2026-09-26-hide-guides-independent-subtitles.md) —
-  2026-09-26 一个 PR 里的五件事拍过的板；字幕独立轨那部分最细：译文有自己的 ID 和来源表、「过期」现算、
-  两条轨画面上默认叠成一块（`translationLayout` 为 nil）、拖一条就分开、预览和烧录读同一份按时间切好的块、
-  两个重译按钮各自动哪些句子。
-- [时间线上的复制 / 剪切 / 粘贴 + 缩放以鼠标为中心 + 纵向缩放](docs/plans/2026-09-26-timeline-clipboard-and-zoom.md) —
-  2026-09-26 用户逐条拍的板（撞上了照拖文件往上抬一轨、单独的纵向缩放用 ⌥ 捏合、只动视频 / 音频轨、
-  纵向缩放时全部统一成一样高、工具栏缩放钉播放头）、讨论时列的默认做法，以及我定的实现细节（Z1–Z7、C1–C9）。
-- [生成的字幕：去标点、按主流规范断句、同时有字只留一条、藏起来的不转写](docs/plans/2026-09-26-subtitle-generation-style.md) —
-  用户看着南极工程提的四件事（重叠、藏起来的还在生成、字幕不该有标点、长句拆开）、先查清的事实（重叠两个来源、翻译是一条一条送的）、
-  调研（Premiere / Resolve / FCP / 剪映 / Descript 怎么选声音和处理同时说话；Netflix 英文与简体中文、BBC 的数字）、
-  逐条拍的板（跟随素材「先不用」、双语顺序「不改」）和我定的实现细节。
-- [让 AI 调用 SrtFlow 剪视频：MCP 方案](docs/plans/2026-09-27-mcp.md) — PR #81 已合并（2026-09-29，main 40a16a5）：第一到第四块、第五块的 ①–④ 和扫画面里的字做完，随后模糊 / 马赛克块（PR #84）和第 6 块 fal.ai 生成（PR #85）也合进了 main（真实状态看实施报告）。2026-09-27 访谈拍的 28 条板 + 实测后补的 4 条（AI 改了没存过的工程自动存、默认位置不要「影片」没给文件夹放「下载」、第 31 条 AI 不靠外部工具——裁切 / 看 / 听做成 SrtFlow 自己的工具、第 32 条窗口一轮只摆一次），以及 2026-09-28 讨论工具上限时补的 4 条（第 33 条不按个数卡、守三条；第 34 条只有删文件才问、别处的文件问一次记住文件夹；第 35 条「连接」顺带放行客户端的权限；第 36 条 SkyStudio 的 MCP 以后另做、生成类工具提供方可换），和同一天讨论第 5 块拍的板（第 37–56 条：HyperFrames 不装、学它的长处自己做；逐词高亮字幕；剪辑风格 AI 自己挑、不做斜杠命令、中文叫「剪辑风格」不叫「套路」；配方卡中文稿；自存套路；配音三档 fal > 本机开源模型 > macOS；本机模型用 CoreML 不用 MLX、听完样音选 Kokoro、八个角色的音色、模型放我们的 R2；克隆放第 6 块走 fal；五刀的顺序；AI 改字幕样式只改当前工程、第 ④ 刀之后插「扫画面里的字」和模糊 / 马赛克块），以及 2026-09-29 第 6 块动工时追加的两条（第 57 条：视频只用 `minimax/h3-max/`、加音乐音效、预设只用最新的模型；第 58 条：花钱超了额度在提示条上问、配旁白同步不问、额度不够退档）：
-  第一期 Claude + Codex（ChatGPT 聊天框要隧道、用 Codex 代替）、除录屏外全部功能、默认看得见（每步定位高亮）、
-  ⌘Z + 撤销这一轮、只有动硬盘才问（后来收成只有删文件才问）、本机 Vision 识别画面、按文字剪 / 删静音 / 踩点、剪辑套路（MCP Prompts）、
-  fal.ai 生成（每日上限）；架构（`srtflow-mcp` 只传话、干活的只有 App 本体、协议自己写不引 SDK）、六块分块与两个真实验收任务。
-- [剪辑风格：五种预设风格（中文稿）](docs/plans/2026-09-28-mcp-recipes.md) — MCP 第 5 块的剪辑风格内容：怎么用（AI 自己挑、一句话告诉用户、用户的话优先）、
-  所有剪辑风格共用的规矩（先摸清素材、先问平台、9:16 安全区、字和声音的口径、不编造、导出前自检）、带货 / 课程推广、电影开头、科幻、纪录片、
-  日常 vlog 五张卡（画幅、时长、按秒的结构、镜头、转场、动画、滤镜、字体、字幕、配乐、配音、自检）、配音音色的角色表、要补的零件、给 App 用的 .md 格式。
-- [导出真峰值限幅 + 响度报告，关键帧缓动](docs/plans/2026-09-30-export-limiter-and-easing.md) — 2026-09-30 用户拍板「先做 1 和 2」：
-  写 f32 之前把硬削换成流式真峰值限幅器（−1 dBFS、前瞻 5 ms、释放 80 ms、总长不变）+ BS.1770 整段响度只报不归一（面板一行、`get_job` 四个字段）；
-  关键帧加 `easing`（linear / easeIn / easeOut / easeInOut，AI 默认 ease_in_out、手打默认线性）、预览按帧加密切片；检查器曲线选择器单独一个小 PR；
-  然后出 Beta 0.18.5 让用户真剪。
-- [音效：合成器（给 AI）+ 录音素材库（给用户）](docs/plans/2026-09-30-sound-effects.md) — 2026-09-30 用户拍的板：合成器先在 scratchpad 渲样音试听、点头才写产品代码；
-  AI 先搜素材库、没有再合成、真实声音才走 fal；63 个 SouthPole 录音全收进 R2 素材库（默认不随 App 带）、授权加「自有 / 已授权」一类；
-  三个 PR 的分刀、`hit_at` 落点、原型里学到的（Freeverb 湿声按干声峰值比例混）、决策门。
-- [预览和成片的声音：自己的音频引擎（播放 / seek 无感）](docs/plans/2026-10-01-audio-engine.md) — 2026-10-01 用户拍板：大工程播放中点时间线等 1–1.5 秒、
-  按空格播放头 0.5 秒才动，压力测试量到 AVPlayer 的合成「每条音轨 40 ms、串行、参数无效」是固有开销；自己做音频引擎
-  （AVAudioEngine 做图 / 设备 / 求和，自己写按游标取样 + 增益 / 渐变 / 曲线 / 推子 / 场景 / 电平的渲染核心，每轨后台解码预读、
-  **不缓存**，22 轨 seek 9 ms）、成片同步切到引擎离线渲染、视频留在 AVPlayer 只做优化媒体；全部数字、架构、时钟对齐怎么验、
-  每个功能怎么搬、三刀、风险；用户看过再动代码。
-- [预览的画面：优化媒体（长 GOP 的源转成密关键帧的代理）](docs/plans/2026-10-01-video-optimized-media.md) — 音频引擎之后的下一刀（用户看过再动代码；V1–V3 都已合进 main，2026-10-01）：
-  探每个源的关键帧间隔 + 这台机器的解码速度，只转长 GOP 的源、只转时间线用到的块（源时间 10 秒一块）、原分辨率 H.264 0.5 秒一个关键帧无 B 帧、
-  4K 减半、HDR 出 HEVC Main10；builder 按段换源、转好之前照用原片、停着时才换；预览窗口「优化媒体 / 原片」默认优化、成片永远原片；
-  缓存 ~/Library/Caches 上限 10 GB、LRU、30 天不用自动删；探针数字（关键帧 0.5 秒 → seek 27–36 ms）、自检、三刀。
-- [视频 upscale：轨道上的片段一键送 fal 放大，比过再换](docs/plans/2026-10-02-video-upscale.md) — 2026-10-02 用户拍的 16 条板（画布自由选、带余料、换当前工程里用到的所有处、
-  文件名 `<原名>_<宽x高>_<档位>.mp4`、做完先弹对比窗口点 Replace 才换、留 Topaz precision / generative + FLUX + 字节 standard / pro），实测定下的事实（声音要自己封回去、帧数要核对），
-  四刀的分法（地基 / 换源 / 任务 / 界面）。
-- [联动：主轨块挪到哪、删没删，压在它上面的东西跟着走](docs/plans/2026-10-02-timeline-linkage.md) — 2026-10-02 用户要「和剪映一样」、授权我按用户体验定全部细节：
-  跟着画面走不跟块的 id（分割 / cut_speech / 定格切出来的新 id 照样认）、完全在一段里的才跟、跨段的全部挪同一个量才跟（配乐铺整片永远不被顺手删掉）、
-  只有真删才连带删（裁切让画面没了的留在原地）、单向、撞上让开、同一个开关语义扩大且默认改成开、AI 按开关走、一处收口（`perform` 收尾）；
-  场景表就是自检的用例。
-- [界面语言：加西班牙语、法语、土耳其语，按系统自动选](docs/plans/2026-09-30-ui-languages.md) — 2026-09-30 用户定：「按系统自动选」本来就有（`.system` + 包里的 `.lproj`）；
-  先一个 PR 把枚举和守卫改成任意多种语言，再先做西班牙语一种在真窗口看排版、之后定法语 / 土耳其语；泛化的 `es` / `fr` / `tr`；
-  译文由 AI 出、**用户不做审核、直接算正式、不标 Beta**；复数和小数点先照英文。风险：法 / 西比英文长两到三成而检查器是窄栏、每个 PR 从此要给每种语言译文。
-- [让 AI 录屏：record_screen](docs/plans/2026-10-03-screen-recording-mcp.md) — 2026-10-03 用户要「把录屏相关的所有功能变成 MCP」、拍板 AI 自己选来源
-  （没授权弹一次、授权后 SrtFlow 不再弹任何窗口；macOS 自己约 30 天的提醒关不掉）、开录不问、AI 能一边录一边操作电脑；我定的十条（浮窗放左下角、录制中不摆窗口、
-  残缺的不弹框照样落地、从不覆盖、停止 = 留着、丢弃先问进废纸篓……）、查清的事实、分刀。
-- [剪辑美感：先把审美写下来，再补零件，最后做画面特效](docs/plans/2026-10-05-editing-aesthetics.md) — 2026-10-05 用户说 AI 剪出来
-  「质感、美感很普通」、看过分析后「按你的建议来」：为什么普通（卡只写用量、画面层只有三种斜坡、AI 只看静帧不查美感）、
-  从 HyperFrames 的技能文件学到的（带数字的品味规则、标杆和交片前自查、先分镜后动手）、拍的板（先写导演手册式的卡；分镜表
-  发了接着做；参考片只量用户给的文件、不从网上下；像素层特效先走「特效那一小段预渲染」的探针；审美回归集盲选）、分刀，
-  以及《起义》那个链接为什么不下载、Greengrass 式的「我的风格」怎么来的。
-- [第三批 AI 反馈：字幕行距、入点说明、一次检查 V1 的剪辑点](docs/plans/2026-10-16-ai-feedback-line-spacing-and-cut-check.md) — 2026-10-16 用户转来测试员的
-  第 8–10 条、定「按你的建议来」：三条都做、顺序 9 → 10 → 8 各一个 PR；检查剪辑点做成 `listen cuts=true` 不另开工具（只查 V1、转写只读缓存、
-  相邻的两段合成一个剪辑点）；字幕行距是倍数 1–2、下限 1，烧录用一行很矮的空行当垫片（ASS 没有行距、只能加大）且必须真烧量过，工程文件不 +1 版本；
-  圆体挨得紧的量化原因（win 量度 1.008 em vs 苹方 1.400）。
-- [AI 多开：一个 AI 会话同时剪几个工程](docs/plans/2026-10-17-multi-project-ai-editing.md) — 2026-10-17 用户拍的十条板（工具带可选 `project`、
-  `open_project` / `new_project` 回 p1…、不给 = 这个会话最后打开的那个；`close_project`、封顶 8 个；看得见的工程开时摆一次窗口；停止 / 撤销按工程；
-  版本名；`get_job` 报队列位置；一个会话一组工程、别人的不许碰；headless = 0 个窗口、主窗口「AI 在剪的工程」列表；要点头的走聊天里的确认码；
-  清单上限抬到 100,000），我定的细节（同一个文件只开一份、主窗口空着才装进去、别的会话安静 5 分钟算放手、路由按工程排队、工作区文件夹按工程、
-  每个工程自己的撤销管理器先探针、`set_view` 不带 project 也改开着的），四刀各拆两个 PR。
-- [改名 SkyCut](docs/plans/2026-10-18-rename-to-skycut.md) — 2026-10-18 用户拍板：名字 SkyCut（和 SkyDict、SkySheet 一个家族；看过没选的几个和理由）、
-  只改用户和 AI 看得见的那一层、bundle id 和代码名沿用 SrtFlow、MCP 服务器名改 `skycut`、新工程用 `.skycut` 老的照开、AI 的子文件夹改名但已有的
-  SrtFlow 子文件夹接着用、只有用户自己装着所以不写迁移代码；分两个 PR，外加本机收拾的顺序（装新包删旧包、重新注册 MCP、GitHub 仓库改名、
-  代码目录挪到 `SkyStudio_APP_Master/SkyCut/`、Claude Code 的记忆目录跟着改名）。
-- [收费：体验版、导出水印、MCP 门槛，生成改用 Sky Studio 的 key](docs/plans/2026-10-27-paid-plans-and-sky-studio-key.md) — 2026-10-26 / 27 用户拍的 20 条板：
-  软件授权和 Sky Studio 积分都卖、B 端学电商 ERP（席位 + 积分 + 开通服务、年付、前几个客户手动开通）、仓库先公开省 CI、不限分辨率、没付费的导出带 Sky Studio logo 水印
-  （四角 + 正中随机跳）、MCP 是付费核心、服务器下发 `mcp` / `watermark` 开关、体验默认 7 天且改默认不影响已在体验的人、一把 Sky Studio 的 `sk-` key 管授权和积分、
-  接口放 Sky Studio 网站仓库的 `api/skycut/v1`（用户另开窗口做）、Sky Studio 接好后删掉自带 fal Key 那条路、upscale 和 Sky Studio 网页同一套上限（一次最长 30 秒、
-  两头的余料算在里面，最高 30 fps，服务器在 `/models` 里报、SkyCut 不写死）、先做 B 端（C 端先只写开通的邮箱 support@skystudioai.com、不开网页，导出面板那一行不拦导出）、
-  体验每台 Mac 一次、每个账号一次；两边的分工和七刀（第 5 刀拆成 5a 账号 / 5b 照开关拦，5b 合进去先关着、10-28 接口上线后打开），以及 Sky Studio 定稿之后 SkyCut 要跟着改的（没有长轮询、只能取消排队中的、
-  成品永久进作品库、同时最多 3 个任务、`/quote` 每种都报、克隆一次送多句再在本机切开、旁白的时间是字符级）；2026-11-05 / 06 加「自助购买 Pro」（第 21–38 条）：
-  **2026-11-06 已上线**：Sky Studio PR #238 已合并并发布至 6 个正式域名，官网 PR #325 已合并发布价格与购买入口；SkyCut 客户端 #319、#321–#323 已随 0.18.59 于 2026-11-06 发布，本机 App 同日已更新到 0.18.61。
-  第 34 条的积分包调整（恢复每档一个按钮，有存卡一键付款，否则到 Dodo 自选付款方式，地址照旧、结账语言跟网站）与第 37、38 条（购买页价格按语言、切换方案自动关闭未付旧结账）已随 Sky Studio PR #239 于 2026-11-06 上线。
-  只有一个 Pro、银行卡月付 $19 / ¥129 和年付 $149 / ¥999 订阅、一次性的一年只给微信（Dodo 的微信 / 支付宝香港都不能自动续费）、不退款只能取消续费、不含税、
-  微信一次性款超限时的含税例外、扣款失败才有 7 天宽限（单独的 `grace_until`，补交后到期日照 Dodo 的新周期）、不会续费的到期前 7 天在 SkyCut 里提醒、Dodo 后台的设置、软件费和积分分开、月付不送年付每年送 1,000、
-  Pro 记在 Sky Studio 账号上（Key 只认人、按登录的账号 id 不按邮箱）、一个 Pro 默认最多 2 台 Mac（按机器号数、和 Key 无关，商务可后台调）、结账语言跟网站、Pro 按微信 / 其他方式分地址入口、没有外部老用户所以不保护不回填、拒付只记账 + 人工复核、商务按 pro_source 写邮箱续约，以及两边要做的事。
-- [AI 接口（MCP）第一块实施报告](docs/reports/2026-09-27-mcp-slice1-report.md) — 23 个工具做到了哪、CI 与端到端实测的证据、测试版怎么出（`scripts/build-beta-app.sh`）、过程中修掉的事（撤销分组、提示条位置、文字折断、翻译语言与下载引导、自动存盘与默认位置）、还差什么（第二块起的功能、Claude 桌面版 / Codex 要用户点「连接」）。
-- [AI 接口（MCP）第二块实施报告](docs/reports/2026-09-27-mcp-slice2-report.md) — 第二块起手「AI 的手和眼」（方案第 31 条）：`edit_clip` 的画面放法、去黑边、对准主体、`look`、`listen`、总说明里不用外部工具那一句，窗口一轮只摆一次（第 32 条）；然后现有功能铺满（后台模式、读文稿、整理文件、访达选中、剪辑的其余设置、推子关键帧、形状、复制、定格、音乐库、压缩烧录转换，工具 23 → 37 个）；每一刀的 CI、本机自检、测试版冒烟的证据，过程中撞上的事（三个老 bug），还差什么。
-- [AI 接口（MCP）第三块实施报告](docs/reports/2026-09-28-mcp-slice3-report.md) — 分析数据 + 智能剪：`transcribe`（词级时间，和生成字幕同一套 `TranscriptHarvester`）、`listen beats=true`（鼓点）、`cut_speech`（按文字剪、删停顿、口头禅、说重了）、`cut_to_beat`（音乐踩点），工具 37 → 40 个（到预算）；CI 与测试版冒烟的证据、撞上的事（切开之后链接成对、new_audio 接在 A1 后面两个老 bug），还差什么（音频库没有鼓点清楚的音乐、转写要 macOS 26）。
-- [AI 接口（MCP）第四块实施报告](docs/reports/2026-09-28-mcp-slice4-report.md) — 本机识别画面：`look shots=true` 分镜头（切点学 PySceneDetect、整个文件扫一遍缓存、长视频走任务）、`look files` 一次看 24 个文件、`edit_clip fit=fill` 跟着人走（位置关键帧、换镜头跳过去）；解码速度和切点的探针实测、测试版冒烟（素材A 47 个镜头、14.6 分钟的课 130 个镜头）、跟拍第一版乱晃怎么改的、还差什么。
-- [AI 接口（MCP）第五块实施报告（进行中）](docs/reports/2026-09-28-mcp-slice5-report.md) — 剪辑风格 + 配音 + 逐词高亮字幕：第 ① 刀剪辑风格与零件（recipes / save_recipe、实心形状 v24、set_text 补参数）、第 ② 刀 macOS 配音（add_voiceover，词的标记只从代理方法来、语速按实测表换）、第 ③ 刀 Kokoro 与 Qwen3-TTS 的 CoreML 探针（M1 上 Kokoro 实时 10 倍、Qwen3 实时 0.2 倍、段尾逗号让 Kokoro 冒杂音）、用户选 Kokoro 之后接进 App（模块、R2、八个角色、按字 / 词的时间）、用户试用撞上的爆音、**⑤ 验收实剪第一轮**（AI 剪了两条，撞出的十几件事逐条怎么处理的、哪些等用户听、哪些功能等拍板），还差什么（第 ④ 刀起的顺序见方案第 54–56 条）。
-- [Sky Studio 生成与配音真实验收](docs/reports/2026-10-29-sky-studio-generation-and-voice.md) — 6b 五类、6c 旁白 / 合批克隆 / 排队退款、累计积分账、固定签名 Beta 与检查证据。
-- [视频 upscale 实测：六个 fal 模型、八个档位、19 条真素材](docs/reports/2026-10-02-upscale-smoke-test.md) — 2026-10-02 南极工程上真跑：每条的帧数 / 耗时 / 估价 / 实收 / 账单 units，
-  三家的计费规律（字节按秒精确、FLUX 按像素·秒线性、Topaz 按 unit 且台阶没公开）、只有 FLUX 原样保留声音、FLUX ±1 帧、上传要 `fal-cdn-v3`、画质印象。
-- [AI 接口（MCP）第六块实施报告](docs/reports/2026-09-29-mcp-slice6-report.md) — fal.ai 生成：用户定「视频只用 minimax/h3-max/、加音乐音效、只用最新的模型」之后的模型表、Key（钥匙串）、每日上限与提示条上先问、`generate_media`、清单按 Key 列不列、配旁白的 fal 档与克隆；证据（373 + 1132 项、反向验证、端到端冒烟）、撞上的事（取消发不出去、钥匙串授权框、冒烟把文件放进了下载文件夹）、没对真 fal 验过的、等用户拍板的（钥匙串授权框取舍、默认模型）。
-- [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 在 L30 口播上的五个剪辑点怎么报、照建议改完撞出的
-  quiet_spot bug；字幕行距 1 → 1.3 预览第一行上移 21 px、成片和预览两行上下沿差 ≤ 2 px；这台 Mac 的圆体进不了烧录字体清单。
-- [字幕默认单行 + 行数开关的测试版冒烟（0.18.37）](docs/reports/2026-10-16-subtitle-line-count-smoke.md) — PR #222 合并后真机过一遍：`max_lines=3` 报错、默认 59 条全单行、`max_lines=2` 39 条 / 19 条两行且框报 `lines: 2`、撤销两步各退一层；面板拨到「2 行」生成和 AI 那一路一样、工程文件写进 `subtitleMaxLines: 2`；面板下拉两套自动化都点不了、是用户点的。
-- [AI 多开第 ① 刀的冒烟（0.18.38）](docs/reports/2026-10-17-open-projects-slice1-smoke.md) — 拆单例 + 工程窗口合进 main 之后：两个工程窗口按键 / 撤销 / 开关 / 关窗各管各的
-  （进程内驱动；第一次跑撞出「先放内容后挂 delegate、撤销撤不到工程」并修好），装好的测试版上 AI 单工程的老流程（建、放、加字、撤销、看、导出、存）全通；
-  Rosetta 终端里打包要用 `/bin/bash`；还没验到的留给第 ② 刀。
-- [AI 多开第 ② 刀的冒烟（0.18.39）](docs/reports/2026-10-17-ai-project-routing-slice2-smoke.md) — 一个会话开两个工程：不带 project 的落在最后打开的、
-  两个文件夹里同名的 C0001.MP4 各进各的工程、导出中关工程被拒、撤销这一轮只退一个工程；另一个会话碰不到 / 开不了 / 取消不了别人的；撞出 open_folder 报旧
-  output_folder（#232 已修）；点不了横幅上的停止（自动化工具没授权），留人工回归。
-- [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程（0 个窗口）开 / 建、放素材、看、导出、挂上窗口后撤得到
-  后台时的那一步、摘回后台、关掉都对；fal 确认码用假 fal 跑（17 过 1 没验到）；锁屏时 CG 的屏幕上窗口列表不更新、别拿它判断窗口关没关；侧边栏和用户操作
-  那几样屏幕锁着没验到，留人工回归。
-- [AI 多开第 ④ 刀的冒烟（0.18.42）](docs/reports/2026-10-17-ai-queue-version-slice4-smoke.md) — 一个文件夹两个版本：第二个工程不给 `version` 被拒、
-  给了叫「Trip cut - vertical」；连着四个导出一个接一个（`queue_position` 1 / 2 / 3）、排着的取消不写文件、版本名不叠、撞名加编号；生成字幕也排队；
-  没撞出新问题，方案四刀到这里做完；面板导出和 AI 排着的交替留人工回归。
-- [AI 多开补测：屏幕亮着把界面那几项走一遍（0.18.42 → 0.18.45）](docs/reports/2026-10-18-ai-multi-project-ui-smoke.md) — 四刀冒烟时屏幕锁着留下的界面项
-  补测：两个窗口各自 ⌘Z / 空格 / ⌫、编辑菜单跟着键窗口、横幅停止只停一个、撤销这一轮只退一个、关窗转后台 / 安静 5 分钟后真关、新建 / 打开开到新窗口、
-  面板和 AI 排队、翻译排队、后台模式不开窗口；撞出三个问题并修掉（#241 侧边栏的行出不来、#242 导出进度显示在每个窗口还能停别人的、#243 侧边栏一行截字 /
-  排队写成导出中）；怎么在用户用着电脑时测（常驻会话、辅助功能、按键只发给测试版、切前台等空闲）；用户离开后用真鼠标补完右键菜单、悬停提示、
-  真录屏落进工程、⌘O 开到新窗口（中文输入法下改系统打开面板的「前往」框会让面板服务崩，要先切 US 布局）。
-- [第四批 AI 反馈的测试版冒烟（0.18.46）](docs/reports/2026-10-18-ai-feedback-batch4-smoke.md) — #246、#248 合进 main 之后在 L16 测试工程上真跑（后台模式、不开窗口）：max_width 0.6 下五句全断在词组边界、预览和成片抽帧一模一样；77.417 报 on_speech / available. / 77.75，照改再查 in_pause；另外两个入点也切在上一句的尾音上；cut_speech 剪同一刀挪到 71.75 / 77.75，完整转写下检查的建议和它一字不差（只转写几段时入点差一帧：转写窗口切进半个词）。
-- [改名 SkyCut 之后的冒烟（0.18.47）](docs/reports/2026-10-18-skycut-rename-smoke.md) — 装好的正式版和测试版：TCC 里录屏和下载文件夹的记录新包全部核得过（不用再授权）、双击 `.skycut` / `.srtflowproj` 都交给 SkyCut.app、Claude Code 连得上 `skycut`、设置和数据文件夹都在；测试版后台真跑：新文件夹存 `SkyCut/…/*.skycut`、老文件夹接着用 `SrtFlow/`、老工程原名存回去、报错是新措辞；**菜单栏的 App 名取可执行文件名**（不是 CFBundleName），没发现 App 的问题。
-- [真 Codex 连 SkyCut 的冒烟（0.18.47）](docs/reports/2026-10-26-codex-client-smoke.md) — 第一次用真的 Codex（命令行 0.147、最便宜的 GPT-5.6-Luna、低推理）：设置里「连接」写对配置、
-  断开后逐字节还原，12 步（开工程、后台、看、听、读字幕、加字、导出、看成片）约 60 秒全通，Codex 看得到 `look` 的图（问只有图里才有的东西才分得清）；
-  每次调用约 2.7 万输入 token（整份清单每轮都发），免费版撑不完一次完整剪辑；撞出两个问题：工具悄悄丢掉不认识的参数（`set_text` 的 `end`）、连接时留的配置备份权限变宽。
-- [测试版 0.18.48：导出水印和 Claude 桌面版「连接」的冒烟](docs/reports/2026-10-27-beta-watermark-and-claude-desktop-smoke.md) — 装好的测试版导出就带水印
-  （16:9 每 4 秒一段逐帧和原片比、落点和大小对表；9:16 看图）；Claude 桌面版连接 → 重启 → `Connected to skycut (48 tools)` → 断开还原，备份和原配置同为 600；
-  View → Reload 不重读配置要真重启、它自己会改这份配置、「断开」内容一样字节不一样；聊天里真调工具留给用户。
-- [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) —
-  Phase 0–5 的真实进度、实测证据、偏差和未完成项。
+- [声音功能的真实冒烟：界面 + AI 工具（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 新建 / 设计 / 删声音、变声、读稿、长期授权全过，74.2 积分和账单逐笔对上；撞出的问题修在 #379、#383，音频引擎一直开着当时待拍板。
+- [变声（声音 PR 9）：离屏渲染和免费冒烟](docs/reports/2026-11-11-change-voice.md) — 面板三种语言的图、假 Sky Studio 上走全程；没验到真 Sky Studio 和真窗口。
+- [MCP 按需说明：迁移完以后的完整实测](docs/reports/2026-11-11-mcp-guide-final-measurement.md) — 61 个工具、两个客户端各 8 个任务：Claude Code 过线（预先加载 −6.7%），Codex 三条开销线按字面没到（已接受）。
+- [声音功能的免费冒烟补跑（声音 PR 3–6）](docs/reports/2026-11-10-voice-free-smoke.md) — 假 Sky Studio 上合批、声音库、并发、换备用全过；没跑到的和看见的五条问题。
+- [声音库界面的离屏渲染（声音 PR 8）](docs/reports/2026-11-10-voice-library-ui.md) — 英 / 中 / 西各一张拼图；看图撞出的两件事；没验到的（真麦克风、真 sheet）。
+- [MCP 按需说明的基线实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-baseline.md) — 改之前每轮常驻 1,605 token、整份预先加载 39,646 token；八个任务的调用和脱敏证据。
+- [MCP 按需说明的试点实测（Claude Code + Codex）](docs/reports/2026-11-10-mcp-guide-pilot.md) — 对照基线过线（常驻 −6.5%、预先加载 −2.2%）；任务 7 的规矩修了之后两个客户端都停下来问。
+- [MCP 按需说明的实施报告（进行中）](docs/reports/2026-11-10-mcp-guide-progress.md) — 七个 PR 各做到哪、基线在哪、本机跑检查的偶发。
+- [全部图片模型与角色系统的真积分验收（0.18.62）](docs/reports/2026-11-07-image-models-and-characters-smoke.md) — 新图片模型、换角度、角色全流程成功（208 积分）；撞出的问题和放大超时已修（0.18.63）。
+- [一个 PR 从本地到能合要多久：改之前和改之后](docs/reports/2026-11-04-ci-speedup.md) — 本地 24 分钟 → 1.5–3 分钟，PR 的 CI 约 11 → 6 分钟；五个 PR 各改了什么。
+- [官方原创短片客户端接入](docs/reports/2026-11-04-official-film-client.md) — API 合同、生成接入、公开制作状态的逐项证据；客户端、生产启用、真实输出分开报告。
+- [MCP 发现与真实 Codex 选工具实测](docs/reports/2026-11-03-mcp-discovery-and-task-selection.md) — 50 → 55 项、四类真实需求的调用和落盘结果。
+- [顶部工作台、统一设置与 MCP 验收](docs/reports/2026-10-31-workbench-settings.md) — 单排工具栏、五类统一设置、设置工具的实际证据。
+- [Sky Studio 生成与配音真实验收](docs/reports/2026-10-29-sky-studio-generation-and-voice.md) — 6b 五类、6c 旁白 / 合批克隆 / 排队退款、累计积分账。
+- [测试版 0.18.48：导出水印和 Claude 桌面版「连接」的冒烟](docs/reports/2026-10-27-beta-watermark-and-claude-desktop-smoke.md) — 水印落点对表；桌面版要真重启才重读配置。
+- [真 Codex 连 SkyCut 的冒烟（0.18.47）](docs/reports/2026-10-26-codex-client-smoke.md) — 连接 / 断开、12 步全通；撞出悄悄丢参数和备份权限两个问题。
+- [AI 多开补测：屏幕亮着走界面项（0.18.42 → 0.18.45）](docs/reports/2026-10-18-ai-multi-project-ui-smoke.md) — 撞出并修掉三个问题（#241–#243）；怎么在用户用着电脑时测。
+- [第四批 AI 反馈的测试版冒烟（0.18.46）](docs/reports/2026-10-18-ai-feedback-batch4-smoke.md) — 折行断在词组边界；`listen cuts` 和 cut_speech 的建议一致。
+- [改名 SkyCut 之后的冒烟（0.18.47）](docs/reports/2026-10-18-skycut-rename-smoke.md) — 授权不用重给、两种工程后缀都能开；菜单栏的 App 名取可执行文件名。
+- [AI 多开第 ① 刀的冒烟（0.18.38）](docs/reports/2026-10-17-open-projects-slice1-smoke.md) — 两个工程窗口各管各的；撞出「先放内容后挂 delegate」并修好。
+- [AI 多开第 ② 刀的冒烟（0.18.39）](docs/reports/2026-10-17-ai-project-routing-slice2-smoke.md) — 一个会话两个工程各进各的、别的会话碰不到；撞出 open_folder 报旧文件夹。
+- [AI 多开第 ③ 刀的冒烟（0.18.41）](docs/reports/2026-10-17-ai-headless-slice3-smoke.md) — 后台工程（0 个窗口）全流程；锁屏时别拿 CG 窗口列表判断窗口关没关。
+- [AI 多开第 ④ 刀的冒烟（0.18.42）](docs/reports/2026-10-17-ai-queue-version-slice4-smoke.md) — 一个文件夹两个版本、导出和字幕排队；方案四刀做完。
+- [第三批 AI 反馈的测试版冒烟（0.18.35）](docs/reports/2026-10-16-ai-feedback-batch3-smoke.md) — `listen cuts=true` 和字幕行距真机过一遍，撞出 quiet_spot 的 bug。
+- [字幕默认单行 + 行数开关的测试版冒烟（0.18.37）](docs/reports/2026-10-16-subtitle-line-count-smoke.md) — `max_lines` 和面板两条路结果一样、撤销各退一层。
+- [视频 upscale 实测：六个 fal 模型、19 条真素材](docs/reports/2026-10-02-upscale-smoke-test.md) — 各家的计费规律、只有 FLUX 保留声音、帧数的坑。
+- [AI 接口（MCP）第六块实施报告](docs/reports/2026-09-29-mcp-slice6-report.md) — fal.ai 生成：模型表、Key、每日上限、`generate_media`；没对真 fal 验过的。
+- [AI 接口（MCP）第三块实施报告](docs/reports/2026-09-28-mcp-slice3-report.md) — 分析数据 + 智能剪：`transcribe`、`listen beats`、`cut_speech`、`cut_to_beat`。
+- [AI 接口（MCP）第四块实施报告](docs/reports/2026-09-28-mcp-slice4-report.md) — 本机识别画面：分镜头、一次看几个文件、铺满跟拍；探针实测。
+- [AI 接口（MCP）第五块实施报告（进行中）](docs/reports/2026-09-28-mcp-slice5-report.md) — 剪辑风格、配音（macOS / Kokoro 的探针与接入）、逐词高亮字幕；验收实剪第一轮。
+- [AI 接口（MCP）第一块实施报告](docs/reports/2026-09-27-mcp-slice1-report.md) — 23 个工具、CI 与端到端证据、测试版怎么出（`scripts/build-beta-app.sh`）。
+- [AI 接口（MCP）第二块实施报告](docs/reports/2026-09-27-mcp-slice2-report.md) — AI 的手和眼（画面放法、去黑边、`look`、`listen`）和现有功能铺满，工具 23 → 37 个。
+- [原生录屏实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md) — Phase 0–5 的真实进度、实测证据、偏差和未完成项。
 
 ## 架构与长期约束索引
 
-- [MCP 说明书（skycut_guide）](docs/architecture/mcp-guide.md) — 按需读的工具说明：App 照 recipes 的路子答、没开通也照答、清单里第一个且只有它预先加载（`anthropic/alwaysLoad`）；每个工具一个同名主题（概要 = 现在的说明原文、`fields` 从参数定义现算）、目录 ≤ 5,000、一次 ≤ 6,000 且长的分节、写错的回目录 + 猜的；迁移七个 PR 做到哪、守卫、反向验证、人工回归。
+每份一行：链接 + 这份文档管什么。约束本身在文档里；改哪块该读哪几份，见上面「按修改范围选必读文档」。
 
-- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`、C 版四语言与三端排版、Three.js 首屏与三个 AI 流程、首屏的质感与渐进增强（烤好的静图是默认画面、实时场景什么时候接手和让位、帧预算、出血、重烤与指纹、浏览器级手动检查）、样式表的先后（构建按共用关系分块、不保留挂的顺序，每份样式表自带自己的媒体查询）、小字读得清（手机上 ≥ 12 px、演示区对比度 ≥ 4.5:1、标题不跳级、行高写死）、南极视频和七种字幕、Sky Lu / Sky Studio 身份与 SEO / sitemap、GEO（robots 对 AI 爬虫全放开、生成的 `llms.txt`、`lastmod` 只写真改过的那天且改了页面要跑 `npm run stamp:pages`）、文章栏目 Guides（文章是 `content/guides/<slug>/` 里的文件，多繁中、日文两种只给文章用的语言；没写发布日就是草稿、发布日用 `npm run publish:guides` 盖；价格不许手写、只链自己的页面、**对外不提 GitHub**；部署后跑 `npm run indexnow`）、本地预览与合并后部署、Free / Pro 功能对比、模型快照、角色系统与积分标记、年付折合和真实标价、Google 表格邮箱登记、Apps Script 合同与本地假服务验收、Zoho 品牌邮件。
-
-- [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md)：分别核对 App、helper 与客户端实际 schema；需求对应工具、最小示例、重连与真实客户端验收。
-
-- [写代码的规范](docs/architecture/coding-standards.md) — 模块化的六条（一个文件一件事、抽有名字的顶层类型、
-  别开只有 extension 的文件、纯计算和副作用分开、同一规则只有一处实现、函数别太长），单文件目标 400 / 上限 600
-  行与老文件只许降的基线、审查清单。
-- [开着的工程（OpenProjects）](docs/architecture/open-projects.md) — 2026-10-17 起工程不再是单例：注册表持有开着的全部工程（主窗口那个 `primary`、
-  工程窗口里或后台（没有窗口、不建预览，第 ③a 刀）的 `others`、菜单作用的 `focused`、退出要问的 `all`、最多 8 个、同一个文件只开一份）、只许它建工程；短 id 一次运行不重用；工程代号全 App 一个计数
-  （跨对象当身份比较，各自从 0 数会撞号）；撤销：工程窗口由 AppKit 建、delegate 交出工程自己的（先挂 delegate 再放内容），主窗口是 SwiftUI 的、改不了（探针），
-  不许退到键窗口的；工程窗口里按键、时间线几何、录屏框、upscale 面板只认自己的，开关和「优化 / 原片」全 App 一份；关工程的收拾、换 / 关一个工程只停它自己的活；
-  后台工程不建预览、关 AI 在剪的工程窗口转后台、侧边栏「AI 在剪的工程」（停止 / 打开窗口 / 关掉）、用户在 AI 正剪着的工程上新建 / 打开开到新窗口；
-  谁该找哪一个工程的表；守卫、探针、冒烟与人工回归。
-- [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — 2026-10-03 起发布版和测试版用一把固定的自签名证书「SrtFlow Signing」签：
-  系统权限（录屏、麦克风、下载文件夹、钥匙串）按签名记账，ad-hoc 的每个新版本都是「另一个 App」，录屏那条拨开关都救不回来（TCC 只改开关、不换钉着的签名）；
-  私钥在仓库外 `~/.config/srtflow/signing/`、仓库钉证书的 SHA-1、永不重建；签名只经 `sign-app.sh`（签名那几秒把专用钥匙串挂上搜索列表）；
-  App 每个构建最多删一次自己的录屏记录再请求；第一次换签每台机器再授权一次；**钥匙串例外**：没有 Team ID，分区名单按代码哈希记，每个新构建第一次读 Key 仍要输一次密码（2026-11-07 更正）；守卫与人工回归。
-- [产品名与代码名](docs/architecture/product-name.md) — 2026-10-18 起看得见的叫 SkyCut（App、可执行文件、DMG、界面和权限弹框的文案、给 AI 的话、
-  MCP 服务器 `skycut`、小程序 `skycut-mcp`），身份沿用 SrtFlow 且永远不改（bundle id、UTType、签名证书、钥匙串、UserDefaults、数据文件夹、AI 通道、
-  环境变量）、代码名沿用 SrtFlow；为什么（授权按 bundle id + 证书认、数据在老文件夹里、老会话的小程序要连得上）、规矩、守卫与人工回归。
-- [AI 接口（MCP）](docs/architecture/ai-control-mcp.md) — 三段结构（客户端 → `skycut-mcp` → App，活只在 App 里做）、工具清单只有一份且小程序给、不按个数卡守三条（不许两个长得像、只读和写文件不混、说明总长度有上限）、选项词表抄一份就要对账、两代协议（老的 initialize / 新的 `_meta` + `server/discover`）、通道（按 bundle id 分 socket、一次调用一条连接、不抢别人的 socket、阻塞收发只在自己的线程上）、工具在 App 里的十三条规矩（一个工具 = 一步撤销、复用手动操作的规则、排队、看得见但不抢键盘且一轮只摆一次窗口、不许弹模态框、只有删文件才问（读别处的文件问一次、记住文件夹；撞名加编号）、长任务回任务号、AI 看不见就替它量、短 id 与 V1/A1 轨道名、做出来的文件放哪、画面怎么放（铺满 = 窗映满画布）、look 看、listen 听，第 4 块的分镜头、一次看几个文件、铺满跟拍，第 5 块的剪辑风格（AI 自己挑、内置卡在资源里不用 Bundle.module、用户的存 Application Support、卡里的名字必须存在）与配方卡要用的零件、配旁白（按角色挑声音、词的标记只从代理方法来、语速按实测表换、字幕走生成字幕那一套），SrtFlow 自己的声音（本机的 Kokoro：模块从 speech-swift 搬来改过、模型从我们的 R2 下载并核校验值、按字切 token 拿到每个字的时刻、在第一段安静处切掉尾巴杂音））、总说明里「只用 SrtFlow 的工具」、这一轮 / 停止 / 撤销这一轮、「连接 AI」三个客户端各用什么办法（连上顺带放行工具）、人工回归清单。
-- [视频 upscale](docs/architecture/video-upscale.md) — 轨道上的片段送 Sky Studio 放大（2026-10-02 起送 fal，2026-10-28 起送 Sky Studio、花积分）：模型和上限从 `/models` 读（`topaz-starlight` / `bytedance-upscaler-pro`，一次最长 30 秒含余料、最高 30 fps），价问 `/quote`；范围三选一带余料按原片算、放不下先少留余料、裁出来的只有画面（`MediaReadQueue.export`）、送上去之前探那个文件当 `params.source`、上传 / 排队 / 下载、成品的声音一律不要（ffmpeg 把原片那一段封回去，HEVC 点名 hvc1）、`<原名>_<宽x高>_<模型>.mp4` 放原片旁边撞名加编号、做完不替换（对比窗口里点替换才换源）、面板上的报价就是确认、AI 起的过每日积分上限、做完按实收改账、没花出去的退回、中间文件不留；回归与人工清单。
-- [优化媒体](docs/architecture/optimized-media.md) — 预览画面的代理（2026-10-01 V1 + V2）：关键帧间隔进 `MediaInfo`（老工程缺键 = 不知道，打开时补探不标脏）、解码速度按机型记、只转长 GOP 且一个 GOP 要解超过两帧时间的、原分辨率 4K 减半、H.264 0.5 秒一个关键帧无 B 帧只有画面、**经视频合成读、块的轨从块头盖到块尾**（变帧率的录屏静止期一帧撑住）、源时间 10 秒一块、缓存按路径找按身份认（改参数 +1 版本、10 GB LRU、30 天过期）、读和编只在 `MediaReadQueue`、10-bit / HDR 第一版不转；**换源只换画面不动时间账**（`CompositionClipInsert`：格子相加正好、差一块 / 插不进去退回原片、几何按插进去的源轨算）、**只在停着时换、某段的块齐了才换、最多 3 秒一次、先转播放头附近的**、切工程作废、一个源转不了就用原片（只在菜单里标，不进提示条）、「优化媒体 / 原片」记 UserDefaults、性能台架量原片、协调者只有菜单订阅、成片 / 预渲染 / AI 看永远原片；**V3（设置里的「优化媒体」一节）**：上限十进制几档、键只经 Store、改小当场 enforce；启动时 proxy 队列上过期 30 天没用的；清空 = proxy 队列上删 → 协调者 `reset()` → `scheduleRebuild()`（不然表上写着「齐了」就不再排转码）、`removeAll` 只许那一处调、不弹框；设置那一节只订阅自己的小对象；还没做的；人工回归。
-- [音频引擎](docs/architecture/audio-engine.md) — 时间线的声音只有这一份：预览实时播、成片离线渲（`Sources/SrtFlow/AudioEngine/`；2026-10-01 PR3b 起 AVPlayer 那条声音路删了，播放器的合成里只有画面）：配置是从时间线算出来的纯值（自己排序、展开转场；增益表 `AudioGainTable.swift`）、播放头只是几个数（锚点）、渲染块实时安全、喂样在普通线程、一段一条流、不缓存、离线和实时同一张图；声音是主时钟、视频 `setRate` 钉到引擎；配乐比画面长时 builder 垫黑底铺到总长；电平表是无锁槽；引擎的时钟只从渲染块的时间戳来（声卡 44.1 kHz 的采样时间不能拿来算 48 kHz 的位置）；自检对着纯 Swift 的 oracle 混音器比。**2026-11-11 起图不是一直开着的**（第二节第 11 条：占着声卡 = Mac 不睡、App Nap 不生效）：没有声音不开、停着 2 分钟没人用就停、用户回到 SkyCut（变成活动的、窗口变成主 / 键窗口、鼠标移进窗口、按键）就在后台先起好、离开 2 分钟以上回来第一下就是播放时当场起并从原处开播；量出来的数（回来先有动作的和一直开着一样，冷着按画面和声音一起晚 0.15–0.3 秒、开头不少）、为什么是 2 分钟、睡眠断言和 App Nap 的前后对比、为什么不能让播放头先走（起声卡拖住整个进程）。
-- [fal.ai 生成](docs/architecture/fal-generation.md) — Key（钥匙串：只读属性不弹框、读密钥每个新签名弹一次、`.silent` / `.interactive` 两档、`FalKeyCache` 一次运行最多弹一次、别改成 `LAContext`）、每日上限（只设每天的、额度内不问、超了 / 价格不明先在提示条上问、决定和记账同一步、没做出来的退回）、模型表（2026-09-29 用户定：视频只用 `minimax/h3-max/`、其余各类当前最新的；挑法、价格、更新办法）、请求体对着接口定义快照验、队列接口（照 fal 给的地址、取消要在 detached Task 里发）、`generate_media`（任务、成品放哪、不改工程；2026-10-28 起走 Sky Studio，这一节成了历史）、历史上清单跟着 Key 走（2026-10-30 已替代：始终列全，执行时核对授权；现行合同见 Sky Studio 的任务）、配旁白三档与克隆、已知不足（真 Key 第一次要对的六条）、回归与人工清单。
-- [合成音效](docs/architecture/sound-effect-synth.md) — SrtFlow 自己合成的 16 个剪辑动效音（AI 用 `add_clips` 的 `sound_effect`）：落点 `hit_at` 是合同（自检钉 ±25 ms）、混响按干声峰值比例混、峰值 −1 dBFS + K 加权 ≤ −9 LUFS、同参数同种子同文件（改声音要 +1 version 并再给用户听）、默认都短、写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis`；riser / downlifter 照 ElevenLabs 参照量出来的形状做。
-- [声音库：克隆的参考录音、声音库的工具和界面、变声](docs/architecture/voice-library.md) — 2026-11-10 起（声音 PR 2）：参考录音是 44.1 kHz 单声道 16-bit WAV、至少 10 秒有效人声、最长 3 分钟（终点在 3:00 前后 1 秒、不到 181 秒），用途 `voice_reference`；有效人声 = 20 ms 一格、均方根 ≥ 0.0056 的整格（≈ −45.04 dBFS；和服务器的合同，服务器放宽到 0.0055，常量单独写死、不借 `AIVoiceLevel`）；超过 3 分钟挑人声最多的一段（一样多比前 15 秒、再比早），切在 ≥ 0.2 秒的停顿里离两头 40 ms，一直有声才退到最安静的格子边；先整段量响度再只截那一段、按 PTS 落格、立体声取平均、读只在 `MediaReadQueue.analysis`；旧的 `clone_from` 用它但过渡期走不通、声音 PR 3 删了（生产入口等声音 PR 6）；声音库本身和变声做到时补进来。 **第九节（声音 PR 8）：设置里的声音库、声音选择器、新建 / 设计声音的对话框**——和 AI 的工具同一条路（建 / 加 / 删 / 设计各只有一份）、授权是对话框里的一勾、设计的按钮就是确认并先过每日硬预算、语言本机检测预选（检测不出来留空）、现在录到 3 分钟自己停、声音库用不了时预设照常；守卫、反向验证、人工回归（麦克风授权、真 Sky Studio）。 **第十节（2026-11-11 审查之后）：收费单只下一次、账只记一次**——会花钱的按钮按下去就锁、一份报价一个 key（不从内容算）、同一件事只开一单（过闸之前先看在建的）、费用的问题受理后才清、没做成的单把原因和新价带进 get_job、预算规矩只有一份、授权那句升版本刷新目录再问、临时文件夹只在一处起名并在启动时清。 **第十一节（声音 PR 9）：变声**——`change_voice` 和片段右键的面板同一条路；传单声道 WAV、截声音在收费之前；只判每日硬预算；落地是一步撤销（原段静音、两条新音频轨、三段链接），这一段没了 / 工程换了只留文件；守卫、反向验证、人工回归（真 Sky Studio 要花积分）。
-- [联动：压在主轨块上的东西跟着它的画面走](docs/architecture/timeline-linkage.md) — 2026-10-02 起「联动」开关（原「链接」，默认开）：十条规矩（跟着画面走、完全在一段里的才跟、
-  跨段的全部挪同一个量才跟、真删才删、这次操作碰过的不再碰、撞上让开、规则只在 `TimelineLinkage.follow` 一处且钩在 `perform` / `liveApply` 收尾、拖动中压着的东西是没有障碍的成员并按宿主的实际落点再平、
-  哪些算「任何东西」、关着只剩显式链接组）、场景表、给 AI 的那一面（`get_timeline` 的 `linkage`、结果里的 `linkage`）、已知不足、守卫、人工回归。
-- [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md) — 2026-10-01 用户拍板：播放跟随是开关、默认关（关着播放头走出视口、停下不滚回；开着翻页式，`PlayheadFollow` 纯值、只碰横向；Return 回到开头照旧滚回最左）；磁吸 / 吸附 / 联动（2026-10-02 起默认开）/ 播放跟随四个工具栏开关和剪辑页字幕列表的跟随按钮都记在 UserDefaults，键、默认值、读写只有 `EditorToggles` 一份（默认值的字面量就是产品口径）；冒烟 / 性能场景起手永远默认值、拨了不落盘；加一个记住的开关怎么做；人工回归。
-- [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — local NSEvent monitor 与失败方案、**锚点**（捏合钉指针底下那一刻、工具栏钉播放头，滚动视图只从 `TimelineScrollGeometry` 拿、`keepAnchored` 同一拍挪 + 下一轮补挪）、**纵向缩放**（⌥ 捏合 / ⌥ + Ctrl + 滚轮 / ⌘↓ ⌘↑，视频和音频轨统一成一个高度、细行不变、按行认锚点）、人工回归清单。
-- [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 能拷什么（标记、转场跟着段走）、入口（编辑菜单在响应链末端、右键菜单是函数不是视图）、系统剪贴板一套自己的类型且不写纯文本（滤镜那套并进来了）、落点鼠标优先否则播放头（右键菜单用右键按下的那一处）、换新身份走编码往返、各类落到哪（剪辑整组同轨、撞上往上抬、画面组上下关系不变；文字 / 滤镜往上找空的；字幕句按指着的轨）、粘完选中且一步撤销、剪切 = 拷贝 + ⌫、人工回归清单。
-- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式（版本表到 v34）、定位、脏标记与自动保存、换成 upscale 文件的段（四之五：原片配书签不进 mediaURLs、换源 = 源时间整体平移、分割要抄记录）。
-- [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、刷新、吸附、唯一落点算法，
-  **对齐线**（§4：对齐点含字幕 cue / 标记 / 藏起来的段、多选只看整组外沿、磁吸也亮线、裁切也吸按 FCP、吸附关了线也不亮），
-  **拖动 / 拉框的会话不进时间线的 `@State`**（§0b：`TimelineDragBox` 持有不订阅、块只 `onReceive`
-  自己那份、覆盖层唯一订阅者），
-  框选（相交即选中、混选与「预览最多一套框」、整组一起移动），以及命中区必须盖在填满视口
-  之后、点非素材处移播放头、扫帧 peek 的唯一所有者、**整条时间线只许一个拖放落点**（§5e-2），
-  插入缝（停 0.2 秒拉开、行的位置一份纯值、纵向按指针判，§5h）、整条轨换位（§5i）、文字块上下换行（§5j）、
-  框选框滤镜 / ⌘A 全选 / ⌘⇧A 取消（§3.5b）与多段一起裁（§3.6）。
-- [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览/导出同账。
-- [关键帧动画](docs/architecture/keyframe-animation.md) — 源时间锚定、切片与 fill + matte。
+- [MCP 说明书（skycut_guide）](docs/architecture/mcp-guide.md) — 按需读的工具说明：只有它预先加载、每个工具一个同名主题、目录 ≤ 5,000、一次 ≤ 6,000 且长的分节。
+- [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`：只在本地预览、合并 main 后才部署；首屏静图与渐进增强、样式表的先后、小字读得清、SEO / GEO、Guides 文章、对外不提 GitHub。
+- [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md) — 分别核对 App、helper 与客户端实际的 schema；最小示例、重连步骤。
+- [写代码的规范](docs/architecture/coding-standards.md) — 模块化六条、单文件目标 400 / 上限 600 行、老文件只许降的基线、审查清单。
+- [开着的工程（OpenProjects）](docs/architecture/open-projects.md) — 工程不再是单例：注册表、短 id、全 App 一个代号计数、每个工程自己的撤销、工程窗口、后台工程；谁该找哪一个工程。
+- [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — 固定的自签名证书「SrtFlow Signing」（永不重建、仓库钉 SHA-1）；系统授权按签名记账；钥匙串每个新构建仍要输一次密码。
+- [产品名与代码名](docs/architecture/product-name.md) — 看得见的叫 SkyCut；身份（bundle id、UTType、钥匙串、数据文件夹…）和代码名永远沿用 SrtFlow。
+- [AI 接口（MCP）](docs/architecture/ai-control-mcp.md) — 三段结构（客户端 → `skycut-mcp` → App）、工具清单只有一份、通道、工具在 App 里的规矩（一个工具 = 一步撤销、不弹模态框、只有删文件才问…）、「连接 AI」。
+- [视频 upscale](docs/architecture/video-upscale.md) — 片段送 Sky Studio 放大：范围带余料、成品的声音自己封回原片的、做完不替换（对比后才换源）、花积分的规矩。
+- [优化媒体](docs/architecture/optimized-media.md) — 预览画面的代理：只转长 GOP 的源、换源只换画面不动时间账、停着才换、成片永远原片；缓存与设置。
+- [音频引擎](docs/architecture/audio-engine.md) — 时间线的声音只有这一份（预览实时、成片离线）；渲染块实时安全；图只在要出声时开着（空闲 2 分钟停）。
+- [fal.ai 生成](docs/architecture/fal-generation.md) — 历史文档：2026-10-29 起都已迁到 Sky Studio，仅供复盘，不作新实现的依据。
+- [合成音效](docs/architecture/sound-effect-synth.md) — 16 个预设：落点 `hit_at` 是合同、同参数同文件（改声音要 +1 version）、写文件只经 `AIAudioFileWriter`。
+- [声音库：参考录音、工具和界面、变声](docs/architecture/voice-library.md) — 参考录音的规格和有声门限、界面和 AI 工具同一条路、收费单只下一次、变声的落地。
+- [联动](docs/architecture/timeline-linkage.md) — 压在主轨块上的东西跟着它的画面走：十二条规矩、规则只在 `TimelineLinkage.follow` 一处、场景表。
+- [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md) — 默认值和记忆只有 `EditorToggles` 一份；播放跟随默认关、联动默认开；磁吸跟着工程走。
+- [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — 锚点（捏合钉指针、工具栏钉播放头）从滚动几何量；纵向缩放统一行高。
+- [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 剪贴板只有一套且不写纯文本、换新身份走编码往返、落点鼠标优先、撞上往上抬。
+- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式（版本表到 v34）、定位、脏标记与自动保存、换成 upscale 文件的段。
+- [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、吸附与对齐线、唯一落点、拖动会话不进 `@State`、框选、整条时间线只许一个拖放落点、插入缝与整轨换位。
+- [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览 / 导出同账；合成的一份时间账。
+- [关键帧动画](docs/architecture/keyframe-animation.md) — 源时间锚定、切片与 fill + matte、缓动、AI 接口。
 - [工程帧率](docs/architecture/project-frame-rate.md) — 唯一事实来源、容差空间与回归矩阵。
-- [声音：音量与渐入渐出](docs/architecture/audio-fades.md) — 唯一夹紧点、转场仲裁、dB 换算、只换增益的快路径（引擎 `updateGains`）、每段增益表从段起点起就有确定的值。
-- [声音场景](docs/architecture/sound-scenes.md) — 九个场景的模型与 v20、效果跑在引擎的渲染块里（预览和成片同一份；效果在段增益之后、推子之前）、每段一条效果链各自散余音（段尾之后喂零，不用载体）、加 / 去掉场景重开流、seek 复位、不载入出厂预设、喇叭类先削波后限带、响度补偿用同一串处理量（渲染前记输入）、回归与人工清单。
-- [成片的声音](docs/architecture/export-audio-mixdown.md) — 成片的声音就是预览那份混音，2026-10-01 起由同一个音频引擎离线渲出来（之前是 AVFoundation 读合成；导出图里不许有声音滤镜）、读用户那一份状态（展开只许一次）、正好画面那么长、f32 中间文件、`MediaReadQueue.export`、和以前的成片比变了什么（单声道响 3 dB、变速换成预览的算法）。
-- [音量曲线](docs/architecture/audio-volume-curve.md) — 曲线属于段（dB、锚源时间、有点时取代 `volume`）、编辑动作本身不改声音、两条管线同一张折线表、导出 `aeval` 平衡树的六条实测约束（放在 `adelay` 之前并减掉首帧定格、最右叶子必须是常数、全精度数字、超大图走文件）。
-- [波形与深度缩放](docs/architecture/audio-waveform.md) — 一个文件读一次的三层精度（多级峰值 / 按需原始采样块 / 顶替）、粗级是 min/max 不是平均、画「听到的声音」且爆音涂红、**Canvas 只画 `clipBoundingRect`**（超宽内容的实测地基）。
-- [推子与电平表](docs/architecture/audio-mixer.md) — 三级增益一条账（段 × 渐变 × 轨道推子 × 总推子，配置里分开记、渲染块按同一个顺序乘）、只动推子走快路径；电平表：峰值从渲染块来（无锁槽）、总表从混音器出口来、槽按键登记、界面每拍取走、读播放头不问播放器；tap 那条路的七条约束 2026-10-01 PR3b 起退役（案例还在）。
-- [画面渐入渐出](docs/architecture/video-fades.md) — 渐变露出的是下一层、alpha 斜坡两条管线同账、与声音共用的夹紧规则。
-- [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md) — 不挪用户片段、三种几何与容量、余料不够用首尾帧定格补足（2026-09-23 拍板）、定格字段只在渲染副本里且只许展开函数写、两条管线怎么做定格。
-- [画面段的入场 / 出场动画](docs/architecture/clip-animation.md) — 五种效果都落在三种斜坡上、效果与画面渐变共用一个槽（老工程零迁移）、铺满画布不露边的补偿、逐帧效果走预渲染的代价。
-- [视频轨对等化](docs/architecture/video-tracks.md) — 取消画中画、一轨一色、⌥ 点击穿透、轨道头这一列的动作（按住拖 = 整条轨换位置、拖下边缘 = 调行高），以及尚未对齐的两项。
-- [用户文本文件的编码](docs/architecture/text-file-encoding.md) — 字幕、讲稿这类用户给的文本文件，编码识别只有 SrtFlowCore 的 `TextDecoding` 一处：BOM → 严格 UTF-8 → 像 UTF-16 才 UTF-16 → GBK；为什么 UTF-16 不能无条件排在 GBK 前面。
-- [画面文字](docs/architecture/text-overlays.md) — 唯一的绘制入口、1080p 基准、版面框即定位框、包络位图、把手的三种数学、九种动画与「只逐帧渲动画段」、数字元件（等宽自己排，苹方没实现字体特性）、数字的等待、**老虎机位数不同的两头**（不存在的那一位滚成空白收掉、居中和右对齐右边不动、正在收的那一位原地滚走）、**时间线上的行**（行号进模型、行序 = 叠放序、新字开新行、换行往上找空行、老工程迁移）。
-- [滤镜](docs/architecture/filters.md) — 时间轴上的调色段、层号进模型（LUT 不可交换）、强度=表的线性插值、预览挂图层滤镜的实测地基（backgroundFilters 会污染整个窗口）、两条管线的四条对齐约束。
-- [画面上的形状](docs/architecture/shapes.md) — 线条 / 长方形 / 正方形 / 圆 / 圆弧（2026-10-03 加了圆和圆弧、入场 / 出场动画）：种类和几何（`keepsSquare`、`defaultSize`、`drawsFilled`、`strokeWidth(in:)`）、所有种类画什么只有 `ShapeOutline.drawing` 一份（预览、导出、AI 的「看」同一条路径，各自上色；y 向下顺时针；线头在长度以内；什么都没露出来时给空路径）、入场 / 出场动画（淡入淡出 / 弹性缩放 / 擦除 / 画出来，和文字同名同曲线、出场倒放、时刻钉到帧上、导出只逐帧渲那两截、和文字共用 `OverlayExportFile`）、拍过的板、`set_shape`、v30 / v31、守卫与人工回归。
-- [盖一块：模糊 / 马赛克](docs/architecture/cover-blur-mosaic.md) — 形状的一种、时间线上的一段（`ShapeKind.blur` / `.mosaic`，不画东西、不算总长、不进 `renderedShapes`、格式 v26）、**不跟着片段走**（为什么：预览没有片段级的钩子、「从旧段构造新段」漏字段的教训）；盖谁：合成 + 调色之后、形状之前；三条管线按构造一致（预览第二层播放器 + 区域容器 + 边缘外延、导出 `split → crop → gblur / pixelize → overlay`、AI 的「看」CoreImage）；八条硬约束（层序、蒙版与滤镜别同层、边缘外延、格子从左上角起算、框取偶数、高斯半径是标准差、力度按画面高、没有盖一块时不建第二层）；AI（`set_shape` 的 blur / mosaic + `strength`、`text_scan` 给的 `cover`）；实测地基、已知不足、回归与人工清单。
-- [录屏生命周期](docs/architecture/screen-recording-lifecycle.md) — 状态机、journal、恢复、退出与快照，AI 起的会话（2026-10-03：同一条流程、差别只在 `ScreenRecordingSession`）。
+- [声音：音量与渐入渐出](docs/architecture/audio-fades.md) — 唯一夹紧点、转场仲裁、dB 换算、只换增益的快路径。
+- [声音场景](docs/architecture/sound-scenes.md) — 效果跑在引擎的渲染块里（段增益之后、推子之前）、一段一条链、余音越过段尾。
+- [成片的声音](docs/architecture/export-audio-mixdown.md) — 就是预览那个引擎离线渲出来的；导出图里不许有声音滤镜；真峰值限幅、响度只报。
+- [音量曲线](docs/architecture/audio-volume-curve.md) — 曲线属于段（有点时取代 `volume`）、两条管线同一张折线表。
+- [波形与深度缩放](docs/architecture/audio-waveform.md) — 一个文件读一次的三层精度；Canvas 只画 `clipBoundingRect`。
+- [推子与电平表](docs/architecture/audio-mixer.md) — 三级增益一条账；电平从渲染块来（无锁槽）；已知的偶发。
+- [画面渐入渐出](docs/architecture/video-fades.md) — 渐变露出的是下一层、alpha 斜坡两条管线同账、和声音共用夹紧规则。
+- [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md) — 不挪用户片段、余料不够用首尾帧定格补、定格字段只在渲染副本里。
+- [画面段的入场 / 出场动画](docs/architecture/clip-animation.md) — 五种效果落在三种斜坡上、和画面渐变共用一个槽、铺满不露边。
+- [视频轨对等化](docs/architecture/video-tracks.md) — 取消画中画、一轨一色、⌥ 点击穿透、轨道头这一列的动作。
+- [用户文本文件的编码](docs/architecture/text-file-encoding.md) — 只走 SrtFlowCore 的 `TextDecoding`；UTF-16 不许无条件排在 GBK 前面。
+- [画面文字](docs/architecture/text-overlays.md) — 唯一的绘制入口、版面框即定位框、九种动画与「只逐帧渲动画段」、数字元件、文字行。
+- [滤镜](docs/architecture/filters.md) — 时间轴上的调色段、层号进模型、预览挂图层滤镜、纯黑不抬、两条管线的对齐约束。
+- [画面上的形状](docs/architecture/shapes.md) — 所有种类画什么只有 `ShapeOutline.drawing` 一份（预览 / 导出 / look 同一条路径）；入场 / 出场动画。
+- [盖一块：模糊 / 马赛克](docs/architecture/cover-blur-mosaic.md) — 形状的一种、不跟着片段走；三条管线按构造一致；八条硬约束。
+- [录屏生命周期](docs/architecture/screen-recording-lifecycle.md) — 状态机、journal、恢复、退出与快照；AI 起的会话走同一条流程。
 - [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md) — 写入、取消、焦点与光标合同。
-- [检查器的排版](docs/architecture/inspector-layout.md) — 固定的窄栏（约 220pt）：一行的最小宽度不许超过它，否则整列被撑宽、右边被裁；菜单 Picker 不许锁宽度；长名字的下拉标题单独一行。
+- [检查器的排版](docs/architecture/inspector-layout.md) — 固定窄栏（约 220pt）：一行不许比它宽、菜单 Picker 不许锁宽度。
 - [定格](docs/architecture/freeze-frame.md) — 一次性提交、PNG 归属、波纹范围与静帧管线。
 - [字幕语言流](docs/architecture/subtitle-language-flow.md) — 目标语言可见性、预检与自动检测。
-- [字幕轨可见性与布局](docs/architecture/subtitle-track-visibility-and-layout.md) — 一语言一轨、**两条轨独立**（2026-09-26 起：各自的 ID 和时间、来源表现算过期 / 缺译文、两个翻译按钮各动哪些句子）、画面上的布局（译文叠在原文下面或各摆各的、预览和烧录读同一份按时间切好的块）、**工程自己的样式与逐词高亮**（2026-09-28：样式两层只问 `subtitleStyle(appWide:)`、词的时间记在句子上并跟着编辑走、按词切段、ASS 标签与预览同一份位置）、选择模型（点选互斥 / 框选混选），以及三个编辑入口共用的合同。
-- [轨道块标记](docs/architecture/clip-markers.md) — 源时间锚定、标记对所有选择互斥、命中区分层。
-- [即时提示](docs/architecture/instant-tooltips.md) — 不许用系统 `.help`、快捷键单一来源、面板四条硬约束。
-- [本地化](docs/architecture/localization.md) — 写死的文案必须每张表都有（一张原文表 + 每种语言一张译文表，有几张不写死）、L10n 与 Text 的分工、lproj 小写坑、**sheet / popover 不继承应用内语言**与已知盲区、**加一种界面语言只做两件事**。
-- [阻塞的媒体读取](docs/architecture/blocking-media-reads.md) — `copyNextSampleBuffer` 这类会卡住线程的读取不许进 Swift 并发的线程池（同一档 QoS 上卡满核数就整档死锁）、`MediaReadQueue` 的两种用法与宽度、唯一的例外（字幕生成逐窗口读）、什么样的阻塞会死锁。
-- [挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md) — 看门狗挂起主线程走栈的那几十微秒里只做系统调用和裸读写：不分配也不释放内存（主线程可能正握着分配器的锁，挂起方再要就永远等下去、主线程永远恢复不了）、不拿锁、不碰要现场取类型元数据的导入 C 结构 / 没特化的泛型；挂起和恢复只在 `walkWhileSuspended`；为什么只靠压力撞的测试抓不住（分配器快路径无锁，原写法 10 轮只撞上 5 轮）、确定性的守卫怎么数（`malloc_logger` 钩子问挂起计数）。
-- [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) — 量的是活不是 CPU、**每个视图 body
-  第一行计数**（守卫钉着，`--fix` 自动补）、时钟连跳走真播放的入口、合成负载当 GPU 代理数字、要有两遍
-  一模一样、计数逐项相等（进步必须登记）、基线只许降（抬基线的 PR 不许动产品代码）、**已知的偶发误报**
-  （检查器数值框和时间线缩放桥接多一轮 → 重跑）、盲区、**时间线上的块不读工程、按值比较**（守卫钉着）、**只有一个小视图关心的状态不放在工程上发**（第十节，「正在重建」的转圈）、**点一下选中一段的时间花在哪**（第十一节：release 和 debug 一样慢、活在框架里；换 Observation 之前块的选中高亮只在根视图那一遍更新）、**播放头的每一跳只叫醒跟着它动的东西**（第十二节：订阅时钟按类型名单、大视图持有不订阅、只关心变没变的 `onReceive` 自己那份、停着才有意义的读 `PacedPlayhead`，守卫钉着）、**工程是 `@Observable`**（第十三节：body 读了什么就只被什么叫醒、按属性不按值、不驱动界面的存储 `@ObservationIgnored`、读撤销栈 / 最近列表这类不可观察的东西要自己找叫醒的来源、冒烟看 `event:project.changed.<属性>`、剩下的一半是命中测试）。
-- [导出设置](docs/architecture/export-settings.md) — 分辨率档位封的是**短边**（竖屏 1080×1920 的 1080p 就是它本身）、只降不升、各管线在哪一步缩；**面板上只放这条管线真消费的设置**（按管线声明，不按控件加开关）；标题→文件名只有一个函数、导出位置的记忆链、视频和字幕文件同一条撞名规则、记住与恢复默认，以及人工回归清单。
-- [导出水印](docs/architecture/export-watermark.md) — 只加在剪辑导出的成片上（`VideoEditExporter`：面板和 AI 的 export_video），预览、look、生成 / upscale 的成品、压缩 / 烧录、录屏都不加；加不加只有 `WatermarkPolicy` 说了算（授权说要加 —— 照授权拦生效时听服务器的 `watermark` —— 或测试开关 `export.testWatermark`；照授权拦 2026-10-28 起打开，没开通正式版的导出都带）、`plan()` 的 `watermark` 没有默认值；落点在烧字幕之后、缩小之前；Sky Studio 的 logo（`Resources/watermark-logo.svg` 读成矢量路径现画）带阴影、70%，每 4 秒在四角 + 正中随机跳、不连续同一处，四角宽 = 短边 25%、正中 15%；整段只两个 overlay、位置是平衡的分段 if 树；要加却读不出 logo 就不导；导出面板「会带水印」那一行不拦导出；已知能绕过去的；守卫与人工回归。
-- [Sky Studio 账号](docs/architecture/sky-studio-account.md) — 2026-10-27 / 28 收费方案第 5 刀（5a 只读授权；5b 照授权拦，**2026-10-28 打开**）：用户粘一把 `sk-` Key（钥匙串 `<bundle id>.skystudio`，和 fal 的 Key 共用 `KeychainSecret` 的两档读法）、存的时候马上问 `/me`、Sky Studio 不认就不留；每个请求带机器号（硬件 UUID 加盐的 SHA-256，原始编号不出本机，盐永远不改）；只有 `SkyStudioAPI` 碰 `https://skystudioai.com/api/skycut/v1`（自检用回环地址的假服务器）；此刻的授权是纯函数 `SkyCutLicense`：开关、天数全照服务器的，没有 Key / 没问到过 / 过了 `valid_until` 按免费版，服务器的钟换成本机的、往回拨不作数；启动 / 回到 SkyCut / 每小时看一眼，后台从不弹钥匙串框；设置里「Sky Studio」一节（账号、套餐、积分、问不成时为什么、开通优先服务器购买地址、台数满了只给管理 Mac / 客服邮箱和「复制邮箱」，Pro 快到期 / 续费失败宽限共用提醒，商务续约只给邮箱、说明字段不改功能）；照授权拦（`SkyCutGates`：AI 的门在核对参数名之后、建调用排队之前，`get_status` 照常回并报 `skycut_plan`；还没问完先问一次再判；导出水印听服务器的；导出面板「会带水印」那一行不拦导出；告诉 AI 带了水印；`enforcedByDefault` 自 2026-10-28 起打开，接口已上线并完成真服务器验收）；能绕过去的；守卫与人工回归。接口合同在 Sky Studio 仓库的 `docs/agents/skycut-api.md`。
-- [Sky Studio 的任务](docs/architecture/sky-studio-jobs.md) — 2026-10-28 收费方案第 6 刀起：生成、upscale、克隆走 Sky Studio 的 `/models`、`/quote`、`/uploads`、`/jobs`（合同从 Sky Studio main 5c8d6a0d 起冻结）。模型、价、上限 SkyCut 不写死；扣多少一律问 `/quote`、交任务时当 `max_credits`；每件活一个 idempotency_key，满了（每个账号同时 3 个）在本机等 15 秒用同一个 key 再交、提交断网保留原 key 并核查原单，不重放收费 POST；交的请求不跟着取消、等 120 秒；没有长轮询，照 `poll_after_seconds`（2–60 秒）问，断网 10 次才算失败、最多等 5 小时；只有排着队的能取消（退钱），开始了的照实说取消不了、积分花了、成品照样进作品库；成品永久在作品库（克隆留 60 天），宽高帧率是 null 的从文件读；Key 只发给 Sky Studio（上传签名地址、成品地址都不带）；Sky Studio 真服务器实测的细节（PUT 原样带头、upscale 的 source 从导出的文件探、图生视频带 aspect_ratio、克隆冷启动 4 分钟）；谁在用（upscale；generate_media 2026-10-28 起：`SkyStudioGeneration` 换参数、按种类挑 `/models` 里的模型、规矩在服务器上、图生视频的首帧走 `/uploads`）；停不下来的那单接着查到底；第 6 刀后面几个 PR 还没做的；守卫。
-- [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md) — 先断句、后去标点、最后在整条轨上排时间；去标点的规则（句中换一个半角空格、行尾删，问号叹号引号书名号省略号列举顿号留着，数字缩写撇号不动，只在生成和机器翻译落字时去）；断句（逗号拆小句、太短的并、放不下的用动态规划挑切法、每一刀的代价表、中文按系统分词且按整句判语言）；一行多长（全角 1 半角 0.5 的字数 + 按字号和画面宽度的「放得下」，竖屏更短）；几行（2026-10-16 用户定默认单行，生成面板 / AI 的 `max_lines` 跟着工程走；两行时折行点两行差不多宽 + 断在好断的地方 + 中文不切词、一样好时下面那行长）；显示时间（5/6 秒、7 秒、2 帧、不到半秒接上、说完多停半秒、不越过素材结尾）；几段素材同时有字只留一条（零碎杂音、谁清楚留谁、同一段素材不算撞）；转写哪些声音（藏起来的不转、只用选中的片段）；已知不足、回归与人工清单。
-
+- [字幕轨可见性与布局](docs/architecture/subtitle-track-visibility-and-layout.md) — 原文 / 译文两条独立轨、画面上的布局、工程自己的样式与逐词高亮；折行和行框与成片同一份。
+- [轨道块标记](docs/architecture/clip-markers.md) — 源时间锚定、标记对所有选择互斥、单击只选中双击才弹面板。
+- [即时提示](docs/architecture/instant-tooltips.md) — 不许用系统 `.help`、快捷键单一来源、面板的硬约束。
+- [本地化](docs/architecture/localization.md) — 写死的文案每张表都要有、sheet / popover 不继承应用内语言、加一种语言只做两件事。
+- [阻塞的媒体读取](docs/architecture/blocking-media-reads.md) — 会卡住线程的读取不许进 Swift 并发线程池；`MediaReadQueue`；引擎启动探测。
+- [挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md) — 挂起期间只做系统调用和裸读写：不分配、不拿锁；挂起和恢复只在 `walkWhileSuspended`。
+- [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) — 量的是活不是 CPU、每个视图 body 第一行计数、基线只许降、已知的偶发误报、块不读工程、订阅时钟的名单。
+- [导出设置](docs/architecture/export-settings.md) — 分辨率档位封的是短边、只降不升；面板上只放管线真消费的设置；文件名与撞名。
+- [导出水印](docs/architecture/export-watermark.md) — 只加在剪辑导出的成片上、加不加只问 `WatermarkPolicy`、落在烧字幕之后缩小之前。
+- [Sky Studio 账号](docs/architecture/sky-studio-account.md) — `sk-` Key 存钥匙串、只有 `SkyStudioAPI` 碰地址、此刻的授权是纯函数 `SkyCutLicense`、照授权拦（`SkyCutGates`）。
+- [Sky Studio 的任务](docs/architecture/sky-studio-jobs.md) — 生成 / upscale / 声音走 `/models`、`/quote`、`/uploads`、`/jobs`：价只问 `/quote`、交任务只经 `SkyStudioJobRun`、只有排队中的能取消。
+- [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md) — 先断句后去标点、一行多长、默认单行、显示时间、几段素材同时有字只留一条。
 - [按旁白段落同步时间线](docs/architecture/voiceover-timeline-sync.md) — 显式映射、实测音频与原稿对齐，共用批量事务，一次撤销且不重复联动。
-
-- [官方原创短片](docs/architecture/official-film.md) — 公开镜头 / context / 声音合同、真实引用报价、不透明 pin、两侧预检与输出验收的边界；私有配方不进客户端。
+- [官方原创短片](docs/architecture/official-film.md) — 公开镜头 / 声音合同、真实引用报价、不透明 pin；私有配方不进客户端。
 
 ## Bug 修复案例索引
 
