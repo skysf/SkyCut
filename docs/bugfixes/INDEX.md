@@ -3,6 +3,7 @@
 每条一行：日期 + 链接 + 一句教训，新案例加在模板下面（按日期从新到旧）。经过、根因、验证都在案例里，这里不写摘要。
 
 - [Bugfix 模板](TEMPLATE.md) — 新案例必须使用的结构。
+- [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守卫按 Markdown 认一条索引，不按一种前缀；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-11 官网小字：手机上小于 12 px、对比度不够、标题跳级](2026-11-11-website-small-text-contrast-headings-font-shift.md) — 缩小的示意图到手机上要么读得了、要么不显示；小字颜色用量过的变量，行高别留 normal。
 - [2026-11-11 官网首页在手机和 iPad 上版面全乱](2026-11-11-website-phone-layout-lost-to-stylesheet-order.md) — 样式表之间的先后不是合同：每份样式表自带自己的平板 / 手机规则。
 - [2026-11-11 预览的音频引擎一直开着，Mac 不睡](2026-11-11-preview-audio-engine-never-idles.md) — 图只在要出声时开着；状态按状态判、别按通知判；引擎单独量的数放进 App 要再量。
@@ -50,7 +51,7 @@
 - [2026-11-05 声音主时钟停住导致预览无法播放](2026-11-05-audio-master-clock-stops-playback.md) — 播放意图不代表音频图仍在运行：开播前和播放中恢复停图、重钉锚点。
 - [2026-11-04 CI 的 .build 缓存从没省下过一次编译](2026-11-04-ci-build-cache-never-saved-a-compile.md) — 修改时间按内容设、每组一份按提交存、只在 main 上存。
 - [2026-11-04 四条扫描守卫 CI 一次都没跑过](2026-11-04-scan-guards-never-ran-in-ci.md) — 新守卫必须进 check-all 的清单（`checks/check-all-shards.sh` 钉着）。
-- [2026-11-04 非零起点让原生尾帧请求落到前一个刻度](2026-11-04-native-frame-request-truncation.md) — 换格子显式取最近的 1/600，不靠截断。
+- [2026-11-04 非零起点让原生尾帧请求落到前一个刻度](2026-11-04-native-frame-request-truncation.md) — 只有原生抽帧的请求取最近的 1/600，证据守卫不放宽；合成的时间照旧截断（预览自由变换的合同）。
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。

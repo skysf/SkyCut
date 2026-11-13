@@ -420,8 +420,9 @@ Sky Studio 声音方案（接口的主人：3.3、4.1、5.3、5.4、5.6、文末
 `voice_library_unavailable` 怎么说（规矩在 [声音库](voice-library.md)第八节）。**声音 PR 8（2026-11-10）接上了界面**：设置里的声音库、声音选择器、
 新建 / 设计声音的对话框，和 AI 的工具共用建声音（`SkyStudioVoiceRecordingSubmission`）、删除（`SkyStudioVoiceDeletion`）、设计（`SkyStudioVoiceDesignOrder`）那几步
 （[声音库](voice-library.md)第九节）。**声音 PR 7（2026-11-10）**：全部权限下有有效的长期授权就不问（打开时的说明、`/voices/consent-grant` 的记 / 撤、升级时补记，
-`SkyStudioVoiceStanding`）。变声还没接（声音 PR 9）。
-Sky Studio 的声音接口还没上线；客户端检查通过不代表服务器已上线。
+`SkyStudioVoiceStanding`）。**声音 PR 9（2026-11-11）接上了变声**（第四节「变声」、[声音库](voice-library.md)第十一节）。
+写这一节时（2026-11-10）Sky Studio 的声音接口还没上线；2026-11-11 的[真实冒烟](../reports/2026-11-11-voice-real-smoke.md)已经对着真 Sky Studio
+走通了建 / 设计 / 删声音、变声、读稿和长期授权。客户端检查通过照旧不代表服务器已上线。
 
 - **目录**（`SkyStudioVoiceCatalog`，`catalog.voices`）：`/models` 顶层的 `voice_presets`、`voice_roles`、`voice_rules`、`voice_consent`
   原样留在 `SkyStudioCatalog.voiceSection`（只用模型目录的自检不用编声音那一摊），`voices` 现读成类型。预设的性别 / 说明 / 打分 /
