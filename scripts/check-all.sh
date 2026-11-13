@@ -190,6 +190,7 @@ run_check "no-swallowed-build-output（扫描守卫）" checks/no-swallowed-buil
 run_check "client-config-backup（扫描守卫：连接 AI 客户端时配置的备份和原文件同样的权限）" checks/client-config-backup.sh
 run_check "ci-build-cache-key（扫描守卫：CI 的 .build 缓存 key 带检出目录，仓库改名后不捡旧目录编的缓存）" checks/ci-build-cache-key.sh
 run_check "ci-docs-only（CI 的「只改了文档」快速通道只在真的只改了文档时走，重活都看判断的结论）" checks/ci-docs-only.sh
+run_check "ci-verified-tree（合并之后 main 上那一轮只在树已经原样验过时才不跑检查）" checks/ci-verified-tree.sh
 run_check "native-local-checks（扫描守卫：本地跑检查的入口都换成原生 arm64、起检查用 /bin/bash）" checks/native-local-checks.sh
 run_check "release-signing（扫描守卫：发布版用固定签名身份签、录屏的旧授权记录 App 自己删）" checks/release-signing.sh
 run_check "product-name（扫描守卫：看得见的名字是 SkyCut，bundle id、数据文件夹、钥匙串、通道这些身份沿用 SrtFlow）" checks/product-name.sh
