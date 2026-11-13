@@ -149,7 +149,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | --- | --- |
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，合并 `main` 后才部署；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖）、[官网首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md)、[官网小字：手机上小于 12 px、对比度不够、标题跳级](docs/bugfixes/2026-11-11-website-small-text-contrast-headings-font-shift.md) |
 | 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`） | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
-| AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了 | [文档索引怎么写](docs/architecture/doc-indexes.md)（条目只许顶格的 `- [` 或表格行；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
+| AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（条目只许顶格的 `- [` 或表格行；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名插，不用 `merge=union`：GitHub 不认）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
 | 工程存盘、格式版本、素材路径、自动保存、重建预览时开素材（`MediaAssetCache`）、新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零） | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（素材只开一次、按路径 + 文件身份认；换完整份时间线就要 `scheduleRebuild()`）、[新建工程后播放头停在上一个工程的位置](docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md)、[工程文件生命周期](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[运行期素材重链接](docs/bugfixes/2026-08-08-runtime-media-relink.md)、[松手重建预览把每个素材重开一遍](docs/bugfixes/2026-09-25-rebuild-reopens-every-asset.md) |
 | 哪个工程：`OpenProjects`（`primary` / `others` / `focused` / `all`）、`VideoEditProject` 的建法、短 id（p1…）、工程代号（`DocumentGenerations`）、每个工程的撤销管理器、退出问每个工程、录屏落回开录的工程、工程窗口（`ProjectWindowController`、`ProjectTeardown`）、导出器归谁（`exporter.belongs(to:)`）；任何新代码要用到工程时 | [开着的工程（OpenProjects）](docs/architecture/open-projects.md)（工程只由注册表建；要工程时找注册表或调用方给的那一个，别假设只有一个；撤销不许退到键窗口的）、[AI 多开方案](docs/plans/2026-10-17-multi-project-ai-editing.md) |
@@ -213,7 +213,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## 构建与检查入口
 
-- 构建、打包、DMG、公开下载发布、CI 怎么分组、本地怎么跑检查：[构建与打包](docs/build/build-and-packaging.md)。素材管线（制备素材、不是检查，**不在 `check-all.sh` 里**）：[音频库素材管线](docs/build/audio-library-pipeline.md)（`scripts/audio-library/`）、[本机配音模型管线](docs/build/voice-model-pipeline.md)（`scripts/voice-models/`，R2 签名只有 `scripts/r2.py` 一份）。
+- 构建、打包、DMG、公开下载发布、CI 怎么分组、同时能跑几个、本地怎么跑检查：[构建与打包](docs/build/build-and-packaging.md)。素材管线（制备素材、不是检查，**不在 `check-all.sh` 里**）：[音频库素材管线](docs/build/audio-library-pipeline.md)（`scripts/audio-library/`）、[本机配音模型管线](docs/build/voice-model-pipeline.md)（`scripts/voice-models/`，R2 签名只有 `scripts/r2.py` 一份）。
 - **推之前**：`scripts/check-local.sh <相关检查>` = 全部扫描守卫（`scripts/check-guards.sh`：`checks/*.sh` + `scripts/check-mcp.sh --scans-only`，约一分钟、不编译）+ 点名的几项。本地的入口都自己换成原生 arm64 的 `/bin/bash`（`scripts/native-arch.sh`）。
 - **全部自动检查**：`scripts/check-all.sh`。CI（`.github/workflows/checks.yml`）在每个 PR 上按 `--shard N --of 5` 分到 5 台 macOS runner 跑同一入口，汇总 job `check-all` 给结论；只改了文档的 PR 走快速通道（`scripts/ci-docs-only.sh` 判，只跑扫描守卫）。
 - **新加检查**要放进 `check-all.sh` 的某个 `shard`：要链接完整 App 目标文件的放第 1 组（只有那台编了完整 App），别的放第 2–5 组里最空的那组；`checks/` 顶层的守卫没进 check-all，CI 一次都不跑（`checks/check-all-shards.sh` 钉着）。文档里提到检查时别写组号（分组只以 `check-all.sh` 为准）。
@@ -283,7 +283,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/cloud-task-projects.sh` — 生成任务带工程归属，卡片和 MCP 共用分组。
 - `checks/copy-project-guard.sh` — 冒烟拷工程不整夹拷「下载」这类大文件夹。
 - `checks/dmg-packaging.sh` — DMG 安装引导的接线与模板。
-- `checks/docs-index-drift.sh` — 本文件和 `docs/bugfixes/INDEX.md` 的索引是全的、没有死链、每条一行，本文件总大小不超上限。
+- `checks/docs-index-drift.sh` — 本文件和 `docs/bugfixes/INDEX.md` 的索引是全的、没有死链、每条一行，`INDEX.md` 按文件名排、一份案例只列一次，本文件总大小不超上限。
 - `checks/encode-settings-memory.sh` — 压缩 / 烧录记住的设置在队列创建时读回来；字幕样式都经 `subtitleStyle(appWide:)`。
 - `checks/export-audio-single-pipeline.sh` — 导出图里不许出现声音滤镜。
 - `checks/export-watermark-wiring.sh` — 加不加水印只问 `WatermarkPolicy`、落在烧字幕之后缩小之前。
@@ -431,7 +431,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [SkyCut 官网](docs/architecture/skycut-website.md) — `website/`：只在本地预览、合并 main 后才部署；首屏静图与渐进增强、样式表的先后、小字读得清、SEO / GEO、Guides 文章、对外不提 GitHub。
 - [MCP 功能发现与升级后的重连](docs/architecture/mcp-discovery.md) — 分别核对 App、helper 与客户端实际的 schema；最小示例、重连步骤。
 - [写代码的规范](docs/architecture/coding-standards.md) — 模块化六条、单文件目标 400 / 上限 600 行、老文件只许降的基线、审查清单。
-- [文档索引怎么写](docs/architecture/doc-indexes.md) — AGENTS.md 和 `docs/bugfixes/INDEX.md` 的三类小节、条目只许顶格的 `- [` 或表格行、整份上限和超了怎么收；收成一句话时例外、条件、适用范围不能丢。
+- [文档索引怎么写](docs/architecture/doc-indexes.md) — AGENTS.md 和 `docs/bugfixes/INDEX.md` 的三类小节、条目只许顶格的 `- [` 或表格行、整份上限和超了怎么收；收成一句话时例外、条件、适用范围不能丢；并行的 PR 别撞在同一行（为什么不用 `merge=union`）。
 - [开着的工程（OpenProjects）](docs/architecture/open-projects.md) — 工程不再是单例：注册表、短 id、全 App 一个代号计数、每个工程自己的撤销、工程窗口、后台工程；谁该找哪一个工程。
 - [签名与系统权限](docs/architecture/code-signing-and-permissions.md) — 固定的自签名证书「SrtFlow Signing」（永不重建、仓库钉 SHA-1）；系统授权按签名记账；钥匙串每个新构建仍要输一次密码。
 - [产品名与代码名](docs/architecture/product-name.md) — 看得见的叫 SkyCut；身份（bundle id、UTType、钥匙串、数据文件夹…）和代码名永远沿用 SrtFlow。
@@ -493,11 +493,11 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ## Bug 修复案例索引
 
-全部案例的索引在 [docs/bugfixes/INDEX.md](docs/bugfixes/INDEX.md)：每条一行（日期 + 链接 + 一句教训），按日期从新到旧。
+全部案例的索引在 [docs/bugfixes/INDEX.md](docs/bugfixes/INDEX.md)：每条一行（日期 + 链接 + 一句教训），按文件名从大到小（也就是从新到旧）。
 
 - 修 bug 之前、碰到眼熟的症状时，先在那份索引里按关键词搜一遍，有同类案例就先读它。
 - 改某块代码时该读的案例，上面「按修改范围选必读文档」已经逐行链好，不用翻整份索引。
-- 新案例照 [Bugfix 模板](docs/bugfixes/TEMPLATE.md) 写，写完在那份索引的模板下面补一行。
+- 新案例照 [Bugfix 模板](docs/bugfixes/TEMPLATE.md) 写，写完按文件名插进那份索引：插到文件名比它小的第一条上面，别都加在模板下面（同时开着的 PR 会撞在同一处）。
 
 ## 根目录文档
 

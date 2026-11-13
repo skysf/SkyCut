@@ -38,6 +38,13 @@
 #      Bug 案例不再往 AGENTS.md 里加一行，所以不算进文档数；它们在必读表里加的链接从基数的余量里出（见第 3 节）。
 #      超了的修法见第 3 节（摘要挪进它指向的文档；必读表里的旧案例链接只许撤一种），不是抬这几个数。
 #
+#   4. docs/bugfixes/INDEX.md 整份按文件名从大到小排，一份案例只列一次（2026-11-13 起，见 1d）。以前新案例一律加在模板那一行下面：
+#      两个同时开着的 PR 都往同一处加一行，后合的那个必撞 —— 2026-10-15 到 11-13 合的 200 个 PR 里 88 个加过案例索引，真撞了
+#      14 回，回回是在 PR 开着以后（得把 main 合进去、再等一轮 CI）。按文件名插，同一天已经有条目时两行多半落在不同的地方：
+#      拿那 15 次「两边各加了一行」的合并重放，10 次不再撞。顺带，同一份案例列了两次（解冲突时两边的改动都留下了）也红。
+#      GitHub 的 PR 合并不认 .gitattributes 的 merge=union（2026-11-13 实测），所以靠排序，不靠 union。
+#      为什么、撞了怎么解见 docs/architecture/doc-indexes.md 第五节。
+#
 # 「手抄的清单会漂」在这个仓库已经栽过两回（见
 # docs/bugfixes/2026-09-18-check-script-source-list-drift.md 与
 # docs/bugfixes/2026-09-21-source-list-guard-only-watched-the-hub.md），
@@ -50,6 +57,7 @@ INDEX="AGENTS.md"
 BUG_DIR="docs/bugfixes"
 BUG_INDEX="${BUG_DIR}/INDEX.md"
 FAILED=0
+TAB="$(printf '\t')"
 
 fail() {
   echo "✗ $1" >&2
@@ -94,7 +102,7 @@ BUG_DOCS="$(find "${BUG_DIR}" -name '*.md' -not -path "${BUG_INDEX}" | sort)"
 while IFS= read -r doc; do
   [ -n "${doc}" ] || continue
   grep -qxF "${doc}" <<< "${BUG_RESOLVED}" \
-    || fail "${doc} 没有列在 ${BUG_INDEX} 里：只读 AGENTS.md 的代理顺着它找案例，漏一行等于这份案例不存在 —— 在模板那一行下面补一行（日期 + 链接 + 一句教训），链接写同文件夹的 ${doc#"${BUG_DIR}"/}"
+    || fail "${doc} 没有列在 ${BUG_INDEX} 里：只读 AGENTS.md 的代理顺着它找案例，漏一行等于这份案例不存在 —— 补一行（日期 + 链接 + 一句教训），按文件名插到文件名比它小的第一条上面（整份按文件名从大到小排，别都加在模板下面），链接写同文件夹的 ${doc#"${BUG_DIR}"/}"
 done <<< "${BUG_DOCS}"
 
 # 1b. 其余每一份、连同 INDEX.md，列在 AGENTS.md 里。
@@ -112,6 +120,41 @@ while IFS= read -r doc; do
 done <<< "${REST_DOCS}"
 
 # 1c. AGENTS.md 的「Bug 修复案例索引」一节只留指路的话，条目只写进 INDEX.md —— 和第 3 节的小节规则一起查（见 3a）。
+
+# 1d. INDEX.md 整份按每条的链接（文件名）从大到小排，一份案例只列一次（文件开头第 4 条）。按字节比（LC_ALL=C）：
+#     文件名以日期开头，所以是从新到旧、同一天的按文件名；模板 TEMPLATE.md 比任何日期都大，自然在最上面。
+#     每个问题输出一行「行号<TAB>dup<TAB>先列的行号<TAB>链接」或「行号<TAB>order<TAB>上一条的行号<TAB>链接<TAB>上一条的链接」。
+read -r -d '' ORDER_AWK <<'AWK' || true
+index($0, "- [") == 1 {
+  p = index($0, "](")
+  if (p == 0) next
+  rest = substr($0, p + 2)
+  q = index(rest, ")")
+  if (q == 0) next
+  key = substr(rest, 1, q - 1)
+  if (key in seen) { print NR "\tdup\t" seen[key] "\t" key; next }
+  seen[key] = NR
+  if (have && key > prev) print NR "\torder\t" prev_nr "\t" key "\t" prev
+  prev = key; prev_nr = NR; have = 1
+}
+AWK
+ORDER_HITS="$(LC_ALL=C awk "${ORDER_AWK}" "${BUG_INDEX}")"
+ORDER_SHOWN=0
+ORDER_MORE=0
+while IFS="${TAB}" read -r o_n o_code o_other o_key o_prev; do
+  [ -n "${o_n}" ] || continue
+  if [ "${o_code}" = "dup" ]; then
+    fail "${BUG_INDEX} 第 ${o_n} 行又列了一次 ${o_key}（第 ${o_other} 行已经有了）：同一份案例列了两次 —— 多半是解冲突时两边的改动都留下了；留一条，把两边的改动并进那一条"
+  elif [ "${ORDER_SHOWN}" -lt 5 ]; then
+    ORDER_SHOWN=$((ORDER_SHOWN + 1))
+    fail "${BUG_INDEX} 第 ${o_n} 行的 ${o_key} 比上一条（第 ${o_other} 行）的 ${o_prev} 大，该排在它上面：整份按文件名从大到小排（文件名以日期开头，所以是从新到旧）—— 新案例插到文件名比它小的第一条上面，别都加在模板下面：两个同时开着的 PR 都加在同一处，后合的那个必撞"
+  else
+    ORDER_MORE=$((ORDER_MORE + 1))
+  fi
+done <<< "${ORDER_HITS}"
+if [ "${ORDER_MORE}" -gt 0 ]; then
+  fail "${BUG_INDEX} 还有 ${ORDER_MORE} 处顺序不对（上面只列了前 5 处）：整份按文件名从大到小排"
+fi
 
 # ── 2. 两份索引里的链接都必须指向真实文件 ─────────────────────────────
 # 只管仓库内的相对链接；http(s):// 之类交给别处。链接按索引所在的文件夹解析，和点开它时一样。
@@ -221,7 +264,6 @@ scan_index() {
     -v whole="$2" -v max="${ENTRY_MAX_BYTES}" -v intro_max="${INTRO_MAX_LINES}" "${SCAN_AWK}" "$1"
 }
 
-TAB="$(printf '\t')"
 for file in "${INDEX}" "${BUG_INDEX}"; do
   whole=0
   if [ "${file}" = "${BUG_INDEX}" ]; then
@@ -244,7 +286,7 @@ for file in "${INDEX}" "${BUG_INDEX}"; do
       intro)
         fail "${file} 第 ${n} 行：这一节条目以外的行（开头的说明、小标题）到这里是 ${extra} 行，超过 ${INTRO_MAX_LINES}：说明只写怎么用这份索引，摘要写进文档" ;;
       stray)
-        fail "${INDEX} 第 ${n} 行：Bug 案例的条目写进 ${BUG_INDEX}（模板那一行下面，链接写同文件夹的 xxx.md），AGENTS.md「Bug 修复案例索引」一节只留指路的话" ;;
+        fail "${INDEX} 第 ${n} 行：Bug 案例的条目写进 ${BUG_INDEX}（按文件名插进去，链接写同文件夹的 xxx.md），AGENTS.md「Bug 修复案例索引」一节只留指路的话" ;;
       free_missing)
         fail "守卫登记的不设单条上限的小节「${extra}」在 ${INDEX} 里没有、或不止一个：改了标题就同步改守卫的 FREE_SECTIONS，不然那一节会被当成索引小节来管" ;;
       pointer_missing)
@@ -268,4 +310,4 @@ if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
 BUG_COUNT="$(grep -c . <<< "${BUG_DOCS}" || true)"
-echo "✓ docs-index-drift：${BUG_DIR}/ 下 ${BUG_COUNT} 份全部列在 INDEX.md 里，其余 ${DOC_COUNT} 份连同 INDEX.md 全部在 AGENTS.md 索引中，两份都没有死链，索引条目都是一行；AGENTS.md ${SIZE_NOW} 字节（上限 ${SIZE_LIMIT}）"
+echo "✓ docs-index-drift：${BUG_DIR}/ 下 ${BUG_COUNT} 份全部列在 INDEX.md 里（按文件名从大到小、没有重复），其余 ${DOC_COUNT} 份连同 INDEX.md 全部在 AGENTS.md 索引中，两份都没有死链，索引条目都是一行；AGENTS.md ${SIZE_NOW} 字节（上限 ${SIZE_LIMIT}）"
