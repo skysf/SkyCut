@@ -11,7 +11,7 @@
   `SoundEffectPreset`（预设清单、参数、渲染入口）、三个预设文件 `SFXAirPresets` / `SFXHitPresets` / `SFXTonePresets`。
   不引第三方，不用 AudioUnit（离线渲染不确定、不好测）。
 - **16 个预设**：whoosh、swoosh、suction、riser、downlifter、impact、boom、hit、pop、click、tick、ding、sparkle、beep、glitch、shutter。
-  **只做剪辑动效音，不做真实拟音和环境声**（海浪、人群、脚步合成不像：录音素材库或 fal）。
+  **只做剪辑动效音，不做真实拟音和环境声**（海浪、人群、脚步合成不像：录音素材库，或 `generate_media`（Sky Studio、花积分；2026-10-28 之前是 fal））。
 - 给 AI 的入口是 `add_clips` 的 `sound_effect` 条目（`AISoundEffectRequest` 读参数、`AISoundEffectTool` 渲染写文件、
   `AITimelineTools.addClips` 放上时间线），不另开工具（[AI 接口](ai-control-mcp.md) 第一节第 5 条）。
   旋钮五个：`duration`、`pitch`（倍数）、`brightness` 0–1、`size` 0–1（干 / 房间 / 大厅）、`variation`（变体种子）；外加段的 `volume_db`。
@@ -42,7 +42,8 @@
 7. **词表只有一份要对账**：小程序的 `MCPVocabulary.soundEffectPresets` 和 App 的 `SoundEffectPreset.allCases` 逐项相等
    （`ConfigChecks` / `SoundEffectChecks`）；预设名只用英文小写单词。
 8. **AI 的顺序（用户定）**：先 `find_audio` 找录音（音效库做完之后）、没有合适的用 `sound_effect` 合成、真实声音都没有才
-   `generate_media`（配了 fal 才有）。`find_audio`、`generate_media` 的说明和风格卡都这么写。
+   `generate_media`（Sky Studio、花积分，2026-10-30 起清单里始终有它、调用时才核对 Key；当时写的是「配了 fal 才有」）。
+   `find_audio`、`generate_media` 的说明和风格卡都这么写。
 
 ## 三、参照文件量出来的形状（riser / downlifter 第二版的依据）
 
@@ -63,7 +64,7 @@
 - 变体只换随机数和 ±5–10% 的抖动；没有 ADSR、没有自定义波形，五个旋钮就是全部。
 - 落点的容差按预设分两档，噪声主导的 120 ms 是「最响的那个采样」的随机性，不是听感上的偏差。
 - 音效库（方案第五节的第 2、3 个 PR，2026-09-30 做完）：`find_audio kind=sound_effect` 能搜到 63 条录音 / 制作好的，
-  `add_clips {library_id, hit_at}` 按清单里的 `hit` 放；默认音量和合成的同一个 `SoundEffectClipGain`。AI 的顺序：先搜库、再合成、再 fal。
+  `add_clips {library_id, hit_at}` 按清单里的 `hit` 放；默认音量和合成的同一个 `SoundEffectClipGain`。AI 的顺序：先搜库、再合成、再 `generate_media`。
 
 ## 五、回归与人工清单
 

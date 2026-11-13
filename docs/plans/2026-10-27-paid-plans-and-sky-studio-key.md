@@ -100,6 +100,8 @@ upscale 那一份复用 Sky Studio 网站 10-27 上线的视频 upscale（Sky St
 - upscale 的 `params.source` 要取自**导出后的那个片段文件**（宽、高、秒数、帧率），不用时间线上的数；服务器重读文件，差太多回 `price_changed`。
 - 模型 id 用 Sky Studio 的：`seedream5-flash`、`minimax-h3`（文生视频、图生视频两个 kind 都用它）、`lyria-3-pro`、`topaz-starlight`、`bytedance-upscaler-pro`、
   `eleven-v4`、`sonilo-sfx`、`zonos2`。MiniMax H3 的分辨率只有 `480p` / `768p`（小写，没有 1080p），时长 5–15 秒。
+  （这是 10-27 那一版合同；10-30 的多模型合同起 H3 多模态还有 2K / 4K、10-31 起有别的 1080p 视频模型，档位一律以 `/models` 为准，
+  [Sky Studio 的任务](../architecture/sky-studio-jobs.md)第四节。）
 - 每种用哪些字段见文档的「Per kind」：旁白、克隆、音效的文字都放 `prompt`，克隆的声音样本放 `inputs.reference_audio_url`（走 `/uploads`，不收 data URI）。
 - `phase` 只有 `queued` / `processing` / `saving`（下载是 SkyCut 自己的阶段）。
 - `/uploads` 的 `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`（jpeg / png / webp，≤ 30 MB）、`audio`（wav / mp3，≤ 15 MB），60 天后自动删。

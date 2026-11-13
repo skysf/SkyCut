@@ -20,9 +20,9 @@ App 把原片的那一段裁出来送 Sky Studio，做完**先弹对比窗口**�
 | 声音 | `UpscaleAudioMux` | **送上去的就没有声音**（裁出来的只有画面；整个 mp4 直接传的，服务器那边的成品也不可信 —— fal 时代实测只有 FLUX 原样复制，Topaz 裁到画面长度、字节重采样）：用 App 自带的 ffmpeg 把原片 `[sourceOffset, +时长)` 的声音封回去 —— 画面流原样复制（**HEVC 要点名 `hvc1`**，不然 AVFoundation 不认）、声音从原片解码后精确裁、重编 AAC 256k（流复制只能在 AAC 帧边界上切，差 ±20 ms）、`-shortest` 按画面收尾。原片没声音就不封。ffmpeg 不在时文件照落、`audioRestored` 为假 |
 | 落盘 | `UpscaleOutputName` | `<原名>_<宽x高>_<模型>.mp4`，宽高是**探测出来的输出尺寸**（服务器按 4K 像素上限封顶，和目标不一定一样）；放原片的文件夹，写不进去退到工程的家、再退到下载；撞名加编号（`ExportFileName.unoccupied`，全 App 一个规矩，不覆盖） |
 | 结果 | `UpscaleOutcome` | 文件、探测信息、`ClipUpscaleRecord`（原片、偏移、模型名、原片的探测信息、**实收的积分 `credits`**；fal 时代的记录记着 `costUSD`）、Sky Studio 的任务号、实收的积分、耗时。换源时拼成 `ClipSourceSwap.Replacement` 交给 `VideoEditProject.applyUpscale` |
-| 账 | `UpscaleJob` / `SkyStudioHeldCredits` / `SkyStudioSpendStore` | 面板上的报价（`/quote` 的积分）就是用户的确认（方案第 10 条）：开跑先记进积分的账，不再问（超了每日上限只标红不拦）；AI 起的在起任务之前过 `SkyStudioJobGate`（见第五节）。做完按实收（`credits_charged`，服务器按实际的文件算、比报价低就收低的）改账；**没花出去的退回**：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。交上之后停不下来的（已经开始了、取消没送到）照实说积分花了。fal 时代那套「做完几分钟后查账单、回写工程」2026-10-28 删了：实收做完就知道，随换源一起记进记录 |
+| 账 | `UpscaleJob` / `SkyStudioHeldCredits` / `SkyStudioSpendStore` | 面板上的报价（`/quote` 的积分）就是用户的确认（方案第 10 条）：开跑先记进积分的账，不再问；每日上限是硬上限（2026-11-01）：超了那一行标红、按钮灰着，开跑时再核一次、超了不起；AI 起的在起任务之前过 `SkyStudioJobGate`（见第五节）。做完按实收（`credits_charged`，服务器按实际的文件算、比报价低就收低的）改账；**没花出去的退回**：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。交上之后停不下来的（已经开始了、取消没送到）照实说积分花了。fal 时代那套「做完几分钟后查账单、回写工程」2026-10-28 删了：实收做完就知道，随换源一起记进记录 |
 | Key | `UpscaleJob` / `SkyStudioJobKey` | Sky Studio 的 Key（钥匙串，[Sky Studio 账号](sky-studio-account.md)）：**面板起的可以弹授权框**（用户刚点了按钮，`keyPrompt` 让界面提醒点「始终允许」）；面板取模型和报价、AI 起的任务都不弹（读不到就请用户去设置里点「允许…」） |
-| 进度 | `UpscaleJob.state` / `UpscaleActivity.shared` | 阶段（`CloudJobPhase`，[fal.ai 生成](fal-generation.md) 第十三节）：裁 → 上传（字节比例，1% 一格）→ 排队（带位置；同时开着的满了在本机等也算排队）→ 处理（这一阶段过了多久 + 这一档通常几分钟，`/quote` 报的 `typical_seconds`；服务器的 saving 也算处理）→ 下载（字节比例）→ 封声落盘。同一阶段同一比例只报一次；换阶段才重记开始时刻（`CloudJobProgress`）。界面从 `UpscaleActivity` 读：检查器那一节和工具栏任务浮层（`CloudTasksButton` / `CloudTaskRows`）同一份文字；切工程 `cancelAll` |
+| 进度 | `UpscaleJob.state` / `UpscaleActivity.shared` | 阶段（`CloudJobPhase`，[Sky Studio 的任务](sky-studio-jobs.md)第一节「阶段」；fal 时代的在 [fal.ai 生成](fal-generation.md) 第十三节）：裁 → 上传（字节比例，1% 一格）→ 排队（带位置；同时开着的满了在本机等也算排队）→ 处理（这一阶段过了多久 + 这一档通常几分钟，`/quote` 报的 `typical_seconds`；服务器的 saving 也算处理）→ 下载（字节比例）→ 封声落盘。同一阶段同一比例只报一次；换阶段才重记开始时刻（`CloudJobProgress`）。界面从 `UpscaleActivity` 读：检查器那一节和工具栏任务浮层（`CloudTasksButton` / `CloudTaskRows`）同一份文字；切工程 `cancelAll` |
 
 ## 二、硬约束
 
@@ -42,7 +42,7 @@ App 把原片的那一段裁出来送 Sky Studio，做完**先弹对比窗口**�
 | 检查器一节 | `VideoEditInspector+Upscale.swift`（检查器的一段 body）+ `Upscale/UpscaleJobStatusView.swift` | 画面段才有，放在头部信息下面、Speed 上面。三个状态：还没做（一句说明 + Upscale…）、做着（`UpscaleJobStatusView` **只订阅那一个任务**：阶段、估价、取消、钥匙串授权的提醒）、做完还没处理（Compare… / Discard）、已换源（档位、日期、扣费、原片在哪、Compare… / Revert to Original）。**不是单独的视图**：预览性能 ratchet 数的是 body 次数，选一段多一个视图就是多一次（CI 2026-10-02 逮到 +1 body、+1 update）；任务的增删由检查器上的 `upscaleActivity` 订阅（很少变）；「Upscale…」不挂提示（提示是一层 NSViewRepresentable，每选一段多一次 update） |
 | 右键菜单 | `VideoEditTimelineClipBlock.swift` | 图片段没有；普通块一项 Upscale…；换过源的块三项 Compare with Original… / Revert to Original Clip / Upscale Again…。**块不做 IO**：换回原片找不到文件时用 `project.notice` 说一句，菜单不灰 |
 | 块角标 | 同上 | 换过源的块名字旁一枚短边的标（`1080p`），和静音图标同一处，不盖缩略图 |
-| 面板 | `Upscale/UpscalePanel.swift` + `UpscalePanelModel.swift` | sheet（套 `.appLanguage()`）。范围三选一（默认：别处用得更长就选最长的那处，否则这一段；有另一处更长就提示）、目标三档（默认按画布短边能到的那档，比画布大提示画布也要改）、六个档位各一行（一句话、大约几分钟、夹过的输出尺寸、估价；超过模型的时长 / 大小上限灰掉）、文件名预览、今天已花 / 上限（超限只标红）、没有 Key 才拦。点开始：`UpscaleJob` 进 `UpscaleActivity` |
+| 面板 | `Upscale/UpscalePanel.swift` + `UpscalePanelModel.swift` | sheet（套 `.appLanguage()`）。范围三选一（默认：别处用得更长就选最长的那处，否则这一段；有另一处更长就提示）、目标三档（默认按画布短边能到的那档，比画布大提示画布也要改）、六个档位各一行（一句话、大约几分钟、夹过的输出尺寸、估价；超过模型的时长 / 大小上限灰掉）、文件名预览、今天已花 / 上限（超了标红、按钮灰着，2026-11-01 起）、没有 Key、报价没回来、这一段送不了也拦。点开始：`UpscaleJob` 进 `UpscaleActivity` |
 | 摆出来 | `Upscale/UpscalePresenter.swift` | 挂在检查器底下的不画东西的小视图，只订阅 `UpscaleActivity.panel` / `.compare`；右键、检查器、做完的任务都往那两个字段里写。`Equatable`（按工程的身份）+ `.equatable()`：检查器每重算一次不重算它 |
 | 对比窗口 | `Upscale/UpscaleCompareView.swift` + `UpscaleCompareStage.swift` + `UpscaleComparePlayback.swift` | 做完先弹（已经在看别的就不抢）。两个 AVPlayer 同一个主机时间起步（`setRate(_:time:atHostTime:)`，不读 `currentTime`），原片出声、upscale 文件静音，原片加 `sourceOffset`。分割线（点哪儿到哪儿、能拖、底下有滑杆）/ 并排；缩放 适合 / 100% / 200%（按 upscale 文件的像素，默认 100%：缩到窗口大小看不出差别），滚轮平移。按钮：Replace Clip（`applyUpscale`，工程里用这个原片且范围被盖住的段一起换，一步撤销）/ Keep Original（文件留着）/ Try Another Model…（回面板）；看已换源的段时是 Revert to Original / Close。实际扣费那一行单独订阅任务（账单几分钟后才有） |
 | 任务浮层 | `CloudMedia/CloudTasksButton.swift` / `CloudTaskRows.swift` | 2026-10-30 用户选择的右上角「生成任务 N」入口；打开后每项显示段名、模型、阶段、预计积分与可取消阶段的取消。关闭浮层不取消；取消直接 `job.cancel()`、保留 409 / 未知结局；做完可 Compare / Dismiss。任务很多时内部滚动，不挤预览。规则见 [Sky Studio 的任务](sky-studio-jobs.md)第九节 |
@@ -53,12 +53,12 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
 
 ## 五、AI 的工具 `upscale_clip`（2026-10-02 起）
 
-> 怎么接进 MCP（只在存了 Sky Studio 的 Key 时列、任务号、`get_job` 的阶段、结果字段）在 [AI 接口（MCP）](ai-control-mcp.md) 第四节第 44 条；这里记任务那一层的差别。
+> 怎么接进 MCP（2026-10-30 起始终列出、调用时核对 Key，任务号、`get_job` 的阶段、结果字段）在 [AI 接口（MCP）](ai-control-mcp.md) 第四节第 44 条；这里记任务那一层的差别。
 
 | 决定 | 口径 |
 | --- | --- |
 | 同一份数 | 范围、档位送不送得了、默认目标 / 默认范围 / 默认模型都从 `UpscalePanelModel` 算，和面板一个数；模型照 `/models`、价问 `/quote`（和面板同一个请求）；词认成类型在 `AIUpscaleNames`（纯值，和清单的词表对账：模型名是 Sky Studio 的，目标 AI 叫 1080p / 1440p / 2160p） |
-| 花钱 | 面板起的：面板就是确认，直接记报价（`Approval.panel`）。AI 起的：`upscale_clip` 问完 `/quote`、在建任务之前过 `SkyStudioJobGate.decide`：每日积分上限（默认 1,000，设置里改）以内直接记账、超了当场回确认码（AI 在聊天里问用户、带码再调才记账），任务拿到记好的那一笔（`Approval.ai`）。问 Sky Studio 的那一两秒里工程换了就什么都不起 |
+| 花钱 | 面板起的：面板就是确认，开跑时在每日硬上限内记报价（`Approval.panel`，超了不起）。AI 起的：`upscale_clip` 问完 `/quote`、在建任务之前过 `SkyStudioJobGate.decide`（2026-11-01 起）：先守每日积分硬上限（默认 1,000，设置里改），超了当场回 `daily_budget_exceeded`、什么都不起；付费的 upscale 超出低成本草稿，请求批准模式下回确认码（AI 在聊天里问用户、带码再调才记账），全部权限直接记账；任务拿到记好的那一笔（`Approval.ai`）。问 Sky Studio 的那一两秒里工程换了就什么都不起 |
 | 做完 | **AI 起的直接换源**（用户 2026-10-02 定：不弹对比窗口）：`UpscaleActivity.add(job, opensCompare: false)`，`onFinished` 里 `applyUpscale` 包一层 `AIUndoGrouping.step`、选中换了的段、没存过的工程存一下、结局记给 AI 的任务（`onEnded` 记失败 / 取消），这一行从状态行上拿掉。面板起的照旧先弹对比窗口 |
 | 钥匙串授权框 | AI 起的不弹（读不到就回一句「请用户去设置 → Sky Studio 点允许…」）；面板起的可以弹，检查器里提醒一句（用户就在电脑前） |
 | 看得见 | 状态行和检查器那一节对 AI 起的任务一视同仁（阶段、积分、Stop）；Stop = 取消 = AI 的任务 cancelled，结局照实说积分花没花 |
@@ -76,7 +76,7 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
   反向验证：去掉 hvc1 的点名、把 `-ss` 挪到原片的 `-i` 之后、阶段重复报、整文件判定不看时长上限，各红。
 - `scripts/check-sky-studio.sh` 第 7、8 组（交任务、等、取消；积分的每日上限）；`scripts/check-project-file.sh` 第 41 组（换源；记录里的积分存得下读得回）。
 - `checks/sky-studio-wiring.sh` 第 8 条：AI 起的 upscale 在建任务之前过 `SkyStudioJobGate`、积分的账只在它和 `UpscaleJob` 里动、只有面板起的任务可能弹钥匙串授权框、
-  清单跟着 Sky Studio 的 Key 走、不弹对比窗口、阶段交给 AIJobs。`checks/no-legacy-generation.sh`：upscale 的几个文件不许再碰 fal 的 Key、账和把关。
+  清单里它属于 skystudio（2026-10-30 起始终列出）、不弹对比窗口、阶段交给 AIJobs。`checks/no-legacy-generation.sh`：upscale 的几个文件不许再碰 fal 的 Key、账和把关。
   `scripts/check-mcp.sh`：`upscale_clip` 的词表和 App 对账、定义、说明说清积分 / 30 秒 / 30 fps / 只有排队中能取消、总说明的「Paid」那一行带着它（`UpscaleToolChecks`）；
   做完换源那一下包在 `AIUndoGrouping.step` 里（异步落账扫描）。
 - 界面这一层自动化够不着（真窗口、两个播放器、分割线手感），走人工回归；扫描守卫钉着：sheet 套 `.appLanguage()`、提示走 `.instantHelp`、
@@ -96,6 +96,7 @@ SkyCut 退出了、任务在服务器上照样做完：重开之后按记下的�
   6. 积分：对比窗口 / 检查器 / 状态行的积分是 Sky Studio 实收的；设置 → Sky Studio 的「今天已花」跟着变；网站的积分明细里多一行「SkyCut · …」，作品库里多一条放大的片段。
   6b. 把窗口缩到最小宽度再起 upscale：右上任务入口与浮层可用，阶段 / 积分 / 操作不重叠；长名字截中间，可即时查看全文。
   7. 切工程：做到一半的任务取消，不弹对比窗口。
-  8. AI：让 Claude Code 对一段 720p 的画面段调 `upscale_clip`（额度内）：回任务号和积分、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
-     做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert；把每日积分上限调到比报价小再调一次：AI 在聊天里问你（回的是确认码，
-     没起任务）；说不要就什么都没发生、没扣积分，说可以它带码再调才做。
+  8. AI：让 Claude Code 对一段 720p 的画面段调 `upscale_clip`（额度内）：请求批准模式下先回确认码、AI 在聊天里问你（说不要就什么都没发生、没扣积分，
+     说可以它带码再调才做）；全部权限直接做。起了就回任务号和积分、状态行多一行、`get_job` 的 phase 从 uploading 走到 finishing；
+     做完片段已换成新文件、块名字旁有「1080p」、⌘Z 一步撤回、右键能 Compare / Revert。把每日积分上限调到比报价小再调一次：回 `daily_budget_exceeded`、
+     什么都没起、没扣积分，AI 叫你去设置里调（两种权限模式一样，带码也越不过去）；面板上那一行标红、按钮灰着。
