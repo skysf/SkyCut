@@ -8,6 +8,7 @@ import SrtFlowMCPKit
 // 或者整条时间线上每一段有声音的片段 —— 电平（有声音部分的 RMS）、峰值、静音段、最响的地方、一条粗的响度曲线；
 // 要鼓点时（beats，只对一段片段或一个文件）再给速度、每一拍、小节头（AIBeats，另读一遍 11025 Hz 的单声道）。
 // 整文件/时间线复用 WaveformStore；点名 source_in/source_out 交给 AIListenFileAudio，只原生解码请求窗。
+// mix=true 交给 AIListenMix：用音频引擎按层离线渲，量混在一起之后的声音（每层、每帧、每个频段，整条的响度和过线），到帧。
 // 不管什么：怎么算（AIAudioLevels）、文件怎么读（AIListenFileAudio）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
 //
 // 只读：不改工程、不动界面。点名文件夹以外的文件照「动硬盘才问」的规矩先问。
@@ -27,6 +28,15 @@ enum AIListenTool {
         settings.from = try args.double("from").map { max(0, $0) }
         settings.to = try args.double("to")
         if let from = settings.from, let to = settings.to, to <= from { throw AIToolError("to must be after from.") }
+        // mix=true：用引擎按层量混在一起之后的声音，到帧（AIListenMix；2026-11-16，MCP-3 / MCP-10）。
+        if try args.bool("mix") ?? false {
+            return try await AIListenMix.listen(
+                args, project, from: settings.from, to: settings.to, silenceDB: settings.silenceDB, minSilence: settings.minSilence
+            )
+        }
+        if try args.stringArray("layers") != nil || (try args.bool("frames") ?? false) {
+            throw AIToolError("layers and frames go with mix=true.")
+        }
         // cuts=true：V1 的每个剪辑点一次查完（AIListenCuts）。门限不给就按每段自己量的（同 cut_speech），所以单独读。
         if try args.bool("cuts") ?? false {
             guard try args.string("clip_id") == nil, try args.string("file") == nil else {

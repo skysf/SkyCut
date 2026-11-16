@@ -14,6 +14,12 @@
 画面走 —— 画面挪到哪它挪到哪，画面被删了它也删。** 显式的链接组（视频 + 分离出来的音频、录屏画面 + 麦克风，`linkGroup`）照旧，
 而且更强（拉开了也跟）。单向：主轨带别的，别的不带主轨。
 
+**When the AI pushes or pulls V1 from a point on** (`delete_items` / `edit_clip` ripple, `add_clips` insert, `cut_to_beat`:
+`AITimelineEdits.shiftMain`), a link group comes along only when none of its V1 pictures stays behind (`RippleLinkPartners`,
+2026-11-17). A V1 clip before the ripple point never moves, and a sound shared with it stays with it — a group can hold two V1 pictures
+(a split made with the switch off keeps picture–sound–picture as one chain; a freeze tail saved before that day), and dragging the
+whole group put the earlier picture on top of its neighbour ([case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md)).
+
 ## 二、规矩（`TimelineLinkage`）
 
 | # | 规矩 | 代码 |

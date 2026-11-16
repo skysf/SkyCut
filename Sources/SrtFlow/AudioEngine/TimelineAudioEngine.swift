@@ -69,13 +69,19 @@ final class TimelineAudioEngine {
         let node: AVAudioSourceNode
     }
     private var units: [TrackUnit] = []
+    /// 离线渲一块最多多少帧（manual rendering 的上限）：成片、自检、按层量都按它一块一块渲，块的边界都从起点按它数。
+    static let offlineQuantum = 4096
+    /// 离线渲用的那一块缓冲（`beginOffline` 时建）。
+    private var offlineBuffer: AVAudioPCMBuffer?
 
     init(config: AudioEngineConfig, mode: Mode, meters: AudioMeterEngine? = nil) throws {
         self.mode = mode
         self.config = config
         self.meters = meters
         if mode == .offline {
-            try engine.enableManualRenderingMode(.offline, format: Self.format, maximumFrameCount: 4096)
+            try engine.enableManualRenderingMode(
+                .offline, format: Self.format, maximumFrameCount: AVAudioFrameCount(Self.offlineQuantum)
+            )
         }
         anchor.publish(PlaybackAnchor(position: 0, sampleTime: 0, playing: false))
         attachClockNode()
@@ -156,29 +162,53 @@ final class TimelineAudioEngine {
     func renderOffline(duration: Double, consumer: (UnsafeBufferPointer<Float>, Int) -> Bool) throws {
         precondition(mode == .offline, "renderOffline 只在离线模式下用")
         let total = Int64((duration * Self.sampleRate).rounded())
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: Self.format, frameCapacity: engine.manualRenderingMaximumFrameCount)
-        else { return }
-        try engine.start()
-        defer { engine.stop() }
-        // 离线：渲染块的时间戳从 manualRenderingSampleTime 起，锚点钉在它上面。
-        anchor.publish(PlaybackAnchor(position: 0, sampleTime: Int64(engine.manualRenderingSampleTime), playing: true))
-        var interleaved = [Float](repeating: 0, count: Int(buffer.frameCapacity) * 2)
+        try beginOffline(atFrame: 0)
+        defer { endOffline() }
+        let interleaved = UnsafeMutablePointer<Float>.allocate(capacity: Self.offlineQuantum * 2)
+        defer { interleaved.deallocate() }
         var position: Int64 = 0
         while position < total {
-            let frames = Int(min(Int64(buffer.frameCapacity), total - position))
-            for unit in units { unit.feeder.service(at: position) }
-            let status = try engine.renderOffline(AVAudioFrameCount(frames), to: buffer)
-            guard status == .success, let data = buffer.floatChannelData else { throw RenderError(status: status) }
-            let got = Int(buffer.frameLength)
-            masterSlot.offer(frames: got, left: data[0], right: data[1])
-            for index in 0..<got {
-                interleaved[2 * index] = data[0][index]
-                interleaved[2 * index + 1] = data[1][index]
-            }
-            let keepGoing = interleaved.withUnsafeBufferPointer { consumer(UnsafeBufferPointer(rebasing: $0[0..<(got * 2)]), got) }
-            guard keepGoing else { return }
+            let got = try renderOfflineQuantum(
+                at: position, frames: Int(min(Int64(Self.offlineQuantum), total - position)), into: interleaved
+            )
+            guard consumer(UnsafeBufferPointer(start: interleaved, count: got * 2), got) else { return }
             position += Int64(got)
         }
+    }
+
+    /// 离线渲的开头：起图，锚点钉在时间线的第 `frame` 帧（渲染块的时间戳从 manualRenderingSampleTime 起）。
+    /// 之后一块一块 `renderOfflineQuantum`，完了 `endOffline`。整段渲（上面）和按层渲（AudioStemRender，几个引擎一块一块
+    /// 同步往下走）都走这三步，渲染代码是同一段。
+    func beginOffline(atFrame frame: Int64) throws {
+        precondition(mode == .offline, "离线渲只在离线模式下用")
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: Self.format, frameCapacity: engine.manualRenderingMaximumFrameCount)
+        else { throw RenderError(status: .error) }
+        offlineBuffer = buffer
+        try engine.start()
+        anchor.publish(PlaybackAnchor(position: frame, sampleTime: Int64(engine.manualRenderingSampleTime), playing: true))
+    }
+
+    /// 渲下一块：时间线第 `position` 帧起 `frames` 帧（≤ `offlineQuantum`），交错的立体声写进 `interleaved`（至少 2 × `frames` 个），
+    /// 回渲出来的帧数。各轨的喂样先在这条线程上同步把这一块读进环里（`service`）。`position` 必须接着上一块（从 `beginOffline` 的
+    /// 那一帧起数）。
+    func renderOfflineQuantum(at position: Int64, frames: Int, into interleaved: UnsafeMutablePointer<Float>) throws -> Int {
+        guard let buffer = offlineBuffer else { throw RenderError(status: .error) }
+        for unit in units { unit.feeder.service(at: position) }
+        let status = try engine.renderOffline(AVAudioFrameCount(frames), to: buffer)
+        guard status == .success, let data = buffer.floatChannelData else { throw RenderError(status: status) }
+        let got = Int(buffer.frameLength)
+        masterSlot.offer(frames: got, left: data[0], right: data[1])
+        for index in 0..<got {
+            interleaved[2 * index] = data[0][index]
+            interleaved[2 * index + 1] = data[1][index]
+        }
+        return got
+    }
+
+    /// 离线渲完（或中途停下）：停图。
+    func endOffline() {
+        engine.stop()
+        offlineBuffer = nil
     }
 
     // MARK: 换配置

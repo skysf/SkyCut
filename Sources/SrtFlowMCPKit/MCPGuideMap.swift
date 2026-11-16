@@ -20,7 +20,8 @@ enum MCPGuideMap {
     Projects: open_project, new_project, save_project, close_project, set_view (watch or background), seek (show a \
     moment), undo (one step, or round=true for this round)
     See and hear: get_timeline (ids, tracks, edit_limits), look (frames, shots, faces, burned-in text, watermarks, black \
-    bars), listen (levels, silence, beats, cut check), transcribe (words with times)
+    bars), listen (levels, silence, beats, cut check, mixed loudness and peaks per track to the frame), transcribe (words \
+    with times)
     Whole video: recipes (editing styles: pick one before cutting a whole video, tell the user which), save_recipe (keep \
     the user's own style)
     Clips: add_clips (files, library music, add_clips sound_effect for local sound effects), edit_clip (trim, speed, \
