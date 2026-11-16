@@ -18,32 +18,31 @@ public enum MCPSenseTools {
         }
     }
 
+    // 2026-11-16: mix=true (per-layer mix measurement) arrived with about 940 units left in the whole catalog, so the card and the
+    // parameter notes were cut down and the long wording lives in the skycut_guide listen topic (what / levels / beats / cuts / mix);
+    // the catalog is no longer than before mix=true.
     private static var listen: MCPToolDefinition {
         MCPToolDefinition(
             .listen, title: "Measure the sound",
             description: """
-            Read-only. Measure sound: level, peak, silences, loudest moment and a level curve for one clip (with its volume, fades \
-            and faders), a file, or every audible clip. mix=true: the mixed timeline per track and frame (loudness, peak, over \
-            -1 dBFS, bands). beats=true finds tempo, beats and downbeats; cuts=true checks every V1 cut for pauses and speech and \
-            suggests better in or out points. Outside files may return needs_confirmation.
+            Read-only. Level, peak, silences, loudest moment and curve of a clip (with its volume, fades and faders), a file or \
+            every audible clip; mix=true: the mix itself per track, to the frame. beats=true finds the beat; cuts=true checks V1 \
+            cuts. Outside files may return needs_confirmation.
             """,
             input: MCPSchema.object([
-                "clip_id": MCPSchema.string("A clip on the timeline."),
-                "file": MCPSchema.string("A media file instead (absolute, or relative to the opened folder)."),
-                "from": MCPSchema.number("Timeline seconds to start at (≥ 0).", minimum: 0),
-                "to": MCPSchema.number("Timeline seconds to stop at (≥ 0).", minimum: 0),
-                "source_in": MCPSchema.number("With file: start, seconds in the file (≥ 0).", minimum: 0),
-                "source_out": MCPSchema.number("With file: end, seconds in the file (≥ 0).", minimum: 0),
-                "silence_db": MCPSchema.number("Quieter than this counts as silence (default -45).", minimum: -80, maximum: -10),
-                "min_silence": MCPSchema.number("Shortest silence to report, seconds (default 0.5).", minimum: 0.1, maximum: 10),
-                "beats": MCPSchema.boolean("Also find the tempo and every beat (one clip or file)."),
-                "cuts": MCPSchema.boolean("Check every V1 cut: in a pause, or on speech with a better source_in/source_out."),
-                "mix": MCPSchema.boolean("Measure the mix itself, as exported: each track a layer, to the frame."),
-                "layers": MCPSchema.array(
-                    of: MCPSchema.string("A1, tracks joined by + (V1+V2), or rest."), "With mix: the layers (≤ 12; default each track).",
-                    maxItems: 12
-                ),
-                "frames": MCPSchema.boolean("With mix: also per-frame levels and bands (a few seconds at most)."),
+                "clip_id": MCPSchema.string("A timeline clip."),
+                "file": MCPSchema.string("A media file (absolute, or in the opened folder)."),
+                "from": MCPSchema.number("Timeline start (≥ 0 s).", minimum: 0),
+                "to": MCPSchema.number("Timeline end (≥ 0 s).", minimum: 0),
+                "source_in": MCPSchema.number("File start (≥ 0 s).", minimum: 0),
+                "source_out": MCPSchema.number("File end (≥ 0 s).", minimum: 0),
+                "silence_db": MCPSchema.number("Silence below this (default -45 dB).", minimum: -80, maximum: -10),
+                "min_silence": MCPSchema.number("Shortest silence (default 0.5 s).", minimum: 0.1, maximum: 10),
+                "beats": MCPSchema.boolean("Tempo and beats (one clip or file)."),
+                "cuts": MCPSchema.boolean("Check V1 cuts for pauses and speech."),
+                "mix": MCPSchema.boolean("Measure the mix itself."),
+                "layers": MCPSchema.array(of: ["type": "string"], "With mix: A1, V1+V2 or rest (≤ 12).", maxItems: 12),
+                "frames": MCPSchema.boolean("With mix: per frame."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

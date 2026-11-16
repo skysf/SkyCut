@@ -355,6 +355,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      建议最后一帧的帧头。**长任务**：`AIJobs` 的 `listen` 任务（第 59 条）、`AIWorkQueue` 的 `mix` 道（一次一个），离线渲在 `MediaReadQueue.export` 上；
      当场最多等 20 秒（62 秒、8 层约 1 秒，3 分钟约 3 秒），等不到回任务号，`get_job` 拿同一份结果。只读：不改工程、不进撤销、不碰预览的引擎。
      名片 + 说明书 `listen` 主题的 `mix` 一节。量法在 `scripts/check-mix-layers.sh` 真跑，接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节。
+     Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened
+     and the wording moved into the listen guide topic; the catalog is no longer than before mix=true (99,059 vs 99,063 on 2026-11-16).
 
 14. **读文稿（read_document，方案第 22 条）**：用户给的讲稿、大纲、卖点清单读成文字（`AIDocumentReader`）：PDF 用 PDFKit，
    Word / RTF / ODT 用系统的富文本导入，txt / md 按 [用户文本文件的编码](text-file-encoding.md) 读；Pages 和扫描件读不了，

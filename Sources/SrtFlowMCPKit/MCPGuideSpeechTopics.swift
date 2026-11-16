@@ -51,8 +51,9 @@ enum MCPGuideSpeechTopics {
             """),
             MCPGuideSection(name: "what", about: "one clip, a file, or every audible clip, and time ranges", text: """
             What it measures. clip_id measures one timeline clip including its volume, fades and track faders; file measures a \
-            media file in source seconds (source_in and source_out narrow it; outside files may return needs_confirmation); with \
-            neither it lists every audible clip. from and to limit the timeline seconds.
+            media file (absolute, or relative to the opened folder) in source seconds (source_in and source_out narrow it; outside \
+            files may return needs_confirmation); with neither it lists every audible clip. from and to limit the timeline \
+            seconds. mix=true measures the mix itself instead (the mix section).
             """),
             MCPGuideSection(name: "levels", about: "level, peak, silences, the loudest moment and the curve", text: """
             Levels. level_db is the RMS level excluding silence, peak_db the peak, silences the quiet stretches (quieter than \
