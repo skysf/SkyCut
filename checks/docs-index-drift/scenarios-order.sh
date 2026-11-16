@@ -72,6 +72,11 @@ scenario red case_entry "条目带 #锚点" edit swap "${B}" "${E_ZEBRA}" '- [20
 scenario red case_entry "条目指向别的文件夹" edit after "${B}" "${E_ZEBRA}" '- [2026-01-01 Alpha](../architecture/alpha.md) — 不是案例。'
 scenario red entry_date "条目的文字不带日期" edit swap "${B}" "${E_ZEBRA}" '- [斑马案例](2026-02-01-zebra-case.md) — 教训四。'
 scenario red entry_date "条目文字里的日期和文件名对不上" edit swap "${B}" "${E_ZEBRA}" '- [2026-02-02 斑马案例](2026-02-01-zebra-case.md) — 教训四。'
+# English case entries (new doc text is English since 2026-11-16, AGENTS.md「语言」): same date and order rules.
+E_LEMON_EN='- [2026-04-01 Lemon case](2026-04-01-lemon-case.md) — Lesson five, written in English.'
+scenario green - "English case entry inserted in order" s_add 2026-04-01-lemon-case after "${E_KIWI}" "${E_LEMON_EN}"
+scenario red order "English case entry added under the template" s_add 2026-04-01-lemon-case after "TEMPLATE.md" "${E_LEMON_EN}"
+scenario red entry_date "English case entry without the date" s_add 2026-04-01-lemon-case after "${E_KIWI}" '- [Lemon case](2026-04-01-lemon-case.md) — Lesson five.'
 scenario red intro_case "案例只在说明里提了一句、没当条目" edit after "${B}" "怎么排见" '另见[芒果](2026-01-05-mango-case.md)。'
 s_case_gone() { rm docs/bugfixes/2026-02-01-zebra-case.md; }
 scenario red dead "条目指向的案例文件没了" s_case_gone
