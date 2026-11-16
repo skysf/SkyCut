@@ -96,7 +96,7 @@ private let pilotNature: [MCPToolName: [String]] = [
     .splitClip: ["One undo step"],
     .deleteItems: ["One undo step", "Linkage on:"],
     .duplicateItems: ["One undo step"],
-    .setTransition: ["One undo step"],
+    .setTransition: ["One undo step", "skycut_guide topic=set_transition"],
     .setCanvas: ["One undo step"],
     .editClips: ["one undo step"],
     .setTexts: ["one undo step"],
