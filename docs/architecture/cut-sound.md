@@ -18,12 +18,12 @@ AI 点名一刀（画面换了的地方），选一种过法、给帧数，一�
 
 | sound | 改哪一边 | 落成什么 | 不给 frames 时 |
 | --- | --- | --- | --- |
-| `crossfade` 叠着换 | 两边 | 上一个的声音拖过切点 N 帧、下一个的提前 N 帧；两边都在整段 2N 帧里渐变（交叉） | 0.25 秒 |
+| `crossfade` 叠着换 | 两边 | 上一个的声音拖过切点 N 帧、下一个的提前 N 帧；两边都在整段 2N 帧里渐变（交叉）. Equal power (rule 6); one continuous take stays linear | 0.25 秒 |
 | `lead` 先进（J） | 下一个 | 提前 N 帧开始、在这 N 帧里淡进来；上一个的声音不动 | 0.667 秒 |
 | `lag` 拖后（L） | 上一个 | 拖过切点 N 帧、在这 N 帧里淡掉；下一个的声音不动 | 0.875 秒 |
-| `bed` 垫一层底 | 底那一段 + 两边的电平 | 音频轨上的一段声音伸到切点两边各 N 帧；两边的原声比底响 6 dB 以上的整段压到「底 + 6 dB」 | 2 秒 |
+| `bed` 垫一层底 | 底那一段（+ 两边的电平） | 音频轨上的一段声音伸到切点两边各 N 帧. If it is more than 6 dB under the louder side at the cut, the bed is raised around the cut; only what the volume limit leaves uncovered comes off the loud side (rule 9) | 2 秒 |
 | `on_beat` 落在拍子上硬换 | 两边 | 一刀切，切口挪到 ±N 帧里最近的一拍（取整到帧），报挪了几帧 | ±0.333 秒 |
-| `gain` 调增益 | 下一个 | 整段平移：给了 gain_db 照它，没给就调到和上一个切点前的电平一样 | — |
+| `gain` 调增益 | the louder side (gain_db: 下一个) | 整段平移：给了 gain_db 照它（下一个）. Without gain_db the louder side comes down to the quieter side's level (rule 11) | — |
 | `cut` 回到一刀切 | 两边 | 两边的声音都正好断在画面的切点上，没有渐变 | — |
 
 默认帧数按工程帧率换算（24 帧 / 秒：6、16、21、48、8）。出处：真人剪的南极正片 45 刀实测 —— 下一场的声音先进 21 次、中位 16 帧，上一场的
@@ -48,7 +48,15 @@ gain_db 也能跟着 crossfade / lead / on_beat / cut（加在下一个的声音
    不早于时间线的开头。
 5. **挪过的声音撞上同一条轨上的别的段就让开**：另找一条放得下的音频轨、都放不下新开一条（`TimelineLinkageLanding.settle`，同联动 / 拖文件的梯子）。
    叠着换的两段因此一个在 A1、一个在 A2；一串刀叠下来是棋盘似的两条轨。
-6. **渐变用引擎现有的**（线性斜坡，[声音：音量与渐入渐出](audio-fades.md)第 4 条）：两段不同的声音叠着换，正中会塌下去约 3 dB。改成等功率是另一个产品决定。
+6. **Crossfades are equal power** (2026-11-16 decision). The engine's fades stay linear ([声音：音量与渐入渐出](audio-fades.md) rule 4, and the
+   engine is not touched): the crossfade keeps the linear fades (both 2N frames) and draws a compensating bump into each sound's volume curve
+   (`CutSoundCurves`: fade-in × sin(πu/2)/u, fade-out × cos(πu/2)/(1−u), 8 segments, 0 dB at both window ends, at most about +3.9 dB), so the
+   summed power of two different sounds stays within 0.5 dB of flat instead of dipping 3 dB in the middle. Keys already in the window (a duck)
+   are raised by the same bump, not replaced. The bump is 0 dB at the window ends, so the clip's line still starts at its body level (edit_clip
+   `volume_db` reads the curve at the clip start). **One continuous take** (same file, the next sound carries on where the previous one is at
+   the cut) stays linear: identical material sums exactly with linear fades and would bump +3 dB with equal power. Setting an edge again
+   first removes the previous crossfade's keys from that edge's window (an edge still carries a crossfade when its fade is twice its overhang
+   past the cut): the window's level shape belongs to the join, so curve keys a user drew inside it go too.
 7. **一次调用 = 一步撤销**（路由包 `AIUndoGrouping.step`，先 await 量完再同步提交；中途时间线变了就不落、叫 AI 重来）。`all=true` 是 V1 上每一刀，
    一刀缺这种过法要的声音（静音、图片）就跳过、在结果里列出来（`skipped_no_sound`）；别的原因做不到照第 4 条整个不做。
 8. **电平怎么量**（`gain`、`bed`）：切点前 [−0.32, −0.02) 秒、切点后 [+0.02, +0.32) 秒（躲开切点上那一帧左右），底在切点两边各 0.3 秒 ——
@@ -57,12 +65,17 @@ gain_db 也能跟着 crossfade / lead / on_beat / cut（加在下一个的声音
    （retryable）。
 9. **垫底拿哪段、多长、压多少**：layer_id 给了用它（必须是音频轨上的声音、不是两边自己的）；没给就是音频轨上和「切点 ± N 帧」重叠最多的那段
    （一样多取长的：整段配乐，不是切点上的一下音效）。伸到切点两边各 N 帧（默认 2 秒），不够就照第 4 条。电平按真人的规矩：一层底在切点上
-   **不比较响的一边低 6 dB 以上**才盖得住跳变（真人片里没东西盖着的刀两边最多差 3.4 dB，盖住的差 6–40 dB），所以比「底 + 6 dB」还响的那一边
-   整段压到「底 + 6 dB」；**只压不抬**（不替用户把镜头的声音推响）。底在切点上是静的就不压、结果里说一句。
+   **不比较响的一边低 6 dB 以上**才盖得住跳变（真人片里没东西盖着的刀两边最多差 3.4 dB，盖住的差 6–40 dB）. When it is quieter than that,
+   **the bed is raised around the cut** (2026-11-16 decision: that is how the human editor covered cuts) with a swell drawn into its volume
+   curve: full over the cut ± 0.5 s (the measuring windows), ramps of 0.5 s on each side (both shrink to reach / 2 for a short reach), on top of
+   any curve already there (a duck stays a duck). Only if the volume limit stops the swell short is the loud side lowered, by what is still
+   missing (down to the raised bed + 6 dB). A bed that already carries the cut is left alone; a second call only adds what is missing, it
+   never lowers the bed. A bed that is silent at the cut changes nothing and the result says so.
 10. **落在拍子上**：拍子来自 `AIBeats`（listen 的 beats、cut_to_beat 同一份分析），换到时间线、只留那段音乐放着的那几拍；拍子不清楚
     （可信度低于 `AudioBeatTracker.clearConfidence`）不踩，同 cut_to_beat。窗里挪不过去的拍子（余料不够、会把一边裁没）跳过、取下一个近的；
     一样近取往后的。正好落在切点上（0 帧）而且画面带着声音、没有转场时不分离，只把那一刀的渐变清掉。
-11. **调增益**：默认挪下一个镜头的声音去对上一个（一刀一刀往后对，已经对好的不再动）；给了 gain_db 照它。整段平移，有音量曲线就整条平移
+11. **调增益**: without gain_db **the louder side comes down** to the quieter side's level at the cut (2026-11-16 decision: keeps headroom and
+    never lifts noise); equal levels change nothing. gain_db moves the next shot's sound by that much. 整段平移，有音量曲线就整条平移
     （同 `edit_clip volume_db`）；顶到音量上下限被夹住，结果里 `gain_db` 是实际的、`requested_gain_db` 是要的。
 12. **联动**：分出去的声音跟着它自己的画面走（[联动](timeline-linkage.md)规矩 13）—— J / L 切伸到隔壁镜头底下的声音，磁吸重排、裁隔壁、删第一个镜头
     之后照样和画面对得上（[案例](../bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md)）。
@@ -87,19 +100,24 @@ gain_db 也能跟着 crossfade / lead / on_beat / cut（加在下一个的声音
 - 路由：`checks/MCP/router-wiring.sh` 钉着 `AICutSoundTool.apply` 包在 `AIUndoGrouping.step` 里。
 - **反向验证**（2026-11-16）：一次撤掉六处，各自的检查都红（共 17 项）—— 上限不拦（余料 / 隔壁镜头 / bed 的文件）、分离时不照实际响的样子
   （另一头的转场）、切点不取叠的正中（磁吸）、bed 不压、on_beat 不跳过挪不过去的拍子、all=true 不跳过缺声音的刀；恢复后全绿。
+- The 2026-11-16 decisions: `checks/MCP/CutSoundDecisionChecks.swift` (equal power within 0.5 dB against a linear control that dips 3 dB,
+  bump replaced not stacked, `cut` removes it, one continuous take stays linear; bed raised around the cut, on top of a duck, left alone when
+  it already carries the cut) and `CutSoundLevelChecks` (gain brings the louder side down, the clamp is reported; the clamped bed lowers the
+  loud side by the rest). Reverse verification (2026-11-17), two runs restored byte for byte: no bump + gain always on the next shot → 10 red
+  (4 equal power, 6 gain direction); bump never cleared + bed never raised → 11 red (3 cleanup, 8 bed raise).
 
 ## 六、人工回归（要耳朵和真窗口，发版前过一遍）
 
-- 两段不同地方的环境声，叠着换 6 帧：听不到一刀硬换；正中那一下塌得不明显。⌘Z 一步回去，声音回到画面里（分出去的轨收掉）。
+- 两段不同地方的环境声，叠着换 6 帧：听不到一刀硬换, and no dip in the middle (equal power). ⌘Z 一步回去，声音回到画面里（分出去的轨收掉）。
 - 先进 16 帧：下一场的声音在切点前淡进来、画面照旧在切点上换；拖后 21 帧同理。
-- 有配乐的工程 bed：配乐被伸长盖住切点，响的那一边压低了几 dB（结果里的 levels_db 对得上听感）。
+- 有配乐的工程 bed：配乐被伸长盖住切点, the music swells up around the cut (the amber line rises there) and the shot's own sound keeps its level unless the music hit its limit（结果里的 levels_db / raised_db 对得上听感）。
 - on_beat：声音换的那一下落在音乐的重拍上，画面没动。
 - 时间线上看：分出去的声音在 A1 / A2 交替，和画面链接着；拖画面声音跟着走；磁吸开着把前一个镜头拖到最后，后面镜头的 J 切声音还贴着自己的画面。
 
 ## 七、已知不足
 
-- 线性渐变，叠着换的正中约 −3 dB（见第三节第 6 条）。
+- The equal-power bump lives in the volume curves: removing a curve (inspector "remove volume curve") or replacing it with edit_clip `volume_curve` falls back to a linear crossfade there.
 - lead 的那几帧一直在淡入：对白要「提前进来、一开口就是满的」时，lead 之后对分出来的声音 `edit_clip fade_in 0`。
-- bed 只压不抬：底太轻时它只说一句，不替用户把底推响（用 `edit_clip volume_curve` 在切点附近抬）。
+- bed only raises the bed (never lowers it back) and the swell's shape is fixed (0.5 s ramps); to shape it differently, edit the bed's curve with `edit_clip volume_curve`.
 - 只认画面的切点：音频轨上两段声音之间的接缝（两段环境声首尾相接）不收，照旧用 edit_clip 的 start / source_in / fade_in。
 - 界面上没有入口（这次只给 AI）。

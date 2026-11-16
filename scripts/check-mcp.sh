@@ -483,6 +483,7 @@ xcrun swiftc \
   Sources/SrtFlow/CutSoundRequest.swift \
   Sources/SrtFlow/CutSoundCut.swift \
   Sources/SrtFlow/CutSoundEdges.swift \
+  Sources/SrtFlow/CutSoundCurves.swift \
   Sources/SrtFlow/CutSoundLimits.swift \
   Sources/SrtFlow/CutSoundPlanner.swift \
   Sources/SrtFlow/CutSoundLevelPlan.swift \
