@@ -68,15 +68,20 @@ enum ShapeOverlayExport {
     }
 
     /// 入场或出场那一截，逐帧渲。时刻先钉到工程帧的网格上（预览同一把尺子：`TextAnimator.quantize`）。
+    /// Frame k is drawn for the section's k-th output frame, exactly on the grid (`OverlayExportFile.frameTime`), and
+    /// placed by the same count; `from + k / fps` floored drew the previous frame now and then.
     private static func writeSequence(
         _ shape: ShapeAnnotation, name: String, from: Double, to: Double,
         canvas: CGSize, frameRate: ProjectFrameRate, into workspace: URL
     ) throws -> [OverlayExportFile] {
         let fps = Double(max(1, frameRate.fps))
         let count = OverlayExportFile.sequenceFrameCount(span: to - from, fps: fps)
+        let grid = FrameGrid(frameRate)
         var written = 0
         for frame in 0..<count {
-            let time = TextAnimator.quantize(from + Double(frame) / fps, frameRate: frameRate)
+            let time = TextAnimator.quantize(
+                OverlayExportFile.frameTime(frame, sectionStart: from, grid: grid), frameRate: frameRate
+            )
             guard let png = ShapePNGRenderer.render(shape, canvas: canvas, state: ShapeAnimator.state(for: shape, at: time)) else { break }
             try png.write(to: workspace.appendingPathComponent(String(format: "%@_%05d.png", name, frame)))
             written += 1

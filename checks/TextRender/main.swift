@@ -581,6 +581,9 @@ func main() async {
     // MARK: 19 —— 一段文字切成的几段首尾相接：接缝上每一帧正好贴一层，不空、不叠（SeamFrames.swift）
     await checkSeamFrames()
 
+    // MARK: 20 — moving text / shape: every exported frame is the frame for its own time (MovingFrames.swift)
+    await checkMovingOverlayFrames()
+
     print("\(checks - failures)/\(checks) 通过")
     // MARK: 10 —— 主字体里没有的字用回退字体画（FontFallback.swift）
     runFontFallbackChecks()

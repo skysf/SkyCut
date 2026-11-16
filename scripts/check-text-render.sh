@@ -169,6 +169,7 @@ xcrun swiftc \
   checks/TextRender/FontFallback.swift \
   checks/TextRender/Focus.swift \
   checks/TextRender/SeamFrames.swift \
+  checks/TextRender/MovingFrames.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"
