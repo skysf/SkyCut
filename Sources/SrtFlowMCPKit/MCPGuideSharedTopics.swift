@@ -145,7 +145,7 @@ enum MCPGuideSharedTopics {
         Subtitles. generate_subtitles (wait with get_job), get_subtitles to read them, edit_subtitles to fix text, timing or style, \
         export_subtitles for subtitle files. export_video burns visible subtitles into the video.
 
-        Check and export. inspect_video reports suspected seams, black frames and subtitle problems with evidence and changes \
+        Check and export. inspect_video reports suspected seams, stray frames, black frames and subtitle problems with evidence and changes \
         nothing. export_video preset=quick_review makes a fast, small review copy without changing the user's export settings; a \
         final export uses their saved settings. Wait with get_job, then look at the file.
 

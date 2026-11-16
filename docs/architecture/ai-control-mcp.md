@@ -505,6 +505,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      （`AIJobs` 的 `shots`，get_job 看进度、cancel_job 能停），扫完的结果照样进缓存，再调一次当场就有。
    - 一页 24 个镜头，多了回 `next_from`。看文件时时间是文件里的秒（直接当 add_clips 的 source_in / source_out），
      看一段时是时间线秒、另附源秒（在那儿 split_clip 就按镜头切开）。
+   - 同一次扫描还留着逐帧的小信号（`AIFrameSignals`），放素材时的夹帧提醒和成片逐帧扫都读它（第 62 条）。查夹帧**不用**这里的切点：
+     两刀至少隔 0.6 秒、片尾不切正好把夹帧滤掉，另有逐帧的刀 `AIShotDetector.hardCuts`（[夹帧提醒与成片逐帧扫](stray-frames.md)）。
 30. **一次看好几个文件（look 的 files）**：最多 24 个，视频取正中那一帧、图片就是它，每格标文件名；点名文件夹以外的文件
    这一批只问一次。素材A那种几十个小文件，AI 两次调用就看完（2026-09-28 冒烟：47 个镜头，Vision 的标签把企鹅、冰山、
    冰面和丛林、城市分得开；少数中间那一帧没有把握够的标签，要看图）。
@@ -1083,7 +1085,6 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（[声音库](voice-library.md)第十一节第 1 条）。
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
-
 61. **声音怎么过一刀：`set_transition` 的 `sound`（2026-11-16，生产反馈 MCP-32；合同全在 [声音怎么过一刀](cut-sound.md)）**：
     以前 J / L 切、叠着换只能 `add_clips sound=separate` + `edit_clip alone` 一段一段对帧，24 个接点就是 24 次手工。现在选一刀（`after_clip_id`，V1 或上层轨；
     或 `all=true`）、一种过法（crossfade / lead / lag / bed / on_beat / gain / cut）、给帧数，一次调用 = 一步撤销，画面一帧不动；
@@ -1093,6 +1094,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     （同 cut_to_beat）。全清单 2026-11-16 是 99,063 / 100,000。
     守卫：`checks/MCP/CutSoundChecks.swift` / `CutSoundLevelChecks.swift`、`checks/MCP/router-wiring.sh`（提交包在 step 里）；分出去的声音跟着画面走见
     [联动](timeline-linkage.md)规矩 13。
+
+62. **放素材、改入点出点时提醒夹帧（2026-11-16，MCP-36；合同见 [夹帧提醒与成片逐帧扫](stray-frames.md)）**：add_clips 落地之后、edit_clip / edit_clips
+    给了 `source_in` / `source_out` / `file` 时，看每段用到的源范围跨没跨过素材自己的刀（`AISourceCuts`），跨了就在结果里加 `source_cuts`
+    （刀在素材第几帧、刀前刀后各露几帧、建议的入点或出点）。**只提醒、不改**（用户定）。不加工具、不加参数：结果里多一个字段，说明书的
+    add_clips / edit_clip 主题写着它。接线在共用文件里只有一行（add_clips）和 `AIClipTools` 的两行，逻辑都在 `AISourceCutCheck`。
+    扫素材不让调用干等：短素材当场扫、一次调用最多等 10 秒，长的放的时候不扫（列进 `source_cuts_unchecked`），交片前 inspect_video 再查一遍。
 
 ## 五、这一轮、停止、撤销这一轮
 

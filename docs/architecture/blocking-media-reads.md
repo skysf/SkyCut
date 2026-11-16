@@ -41,7 +41,7 @@
 | `overview` | utility | 2 | 波形总览，整个文件从头读到尾；打开工程时几十个文件一起排队 |
 | `detail` | userInitiated | 2 | 深度放大时读原始采样，一秒一块，用户正盯着看 |
 | `export` | userInitiated | 1 | 导出时把整条混音离线读成文件（[成片的声音](export-audio-mixdown.md)）；一次只导一个，单独一条不占波形那两条 |
-| `shots` | utility | 1 | AI 找镜头切换点（`AIShotScan`）：一个视频从头解到尾，1440p 的课 M1 上约 17 倍速、分段并行也不更快（硬件解码器只有一个），长的要几十秒；单独一条，扫着的时候不占 `analysis` 那两条（[AI 接口](ai-control-mcp.md)） |
+| `shots` | utility | 1 | AI 找镜头切换点（`AIShotScan`）：一个视频从头解到尾，1440p 的课 M1 上约 17 倍速、分段并行也不更快（硬件解码器只有一个），长的要几十秒；单独一条，扫着的时候不占 `analysis` 那两条（[AI 接口](ai-control-mcp.md)）。同一次扫描也给放素材时的夹帧提醒和成片逐帧扫（[夹帧提醒与成片逐帧扫](stray-frames.md)），一个文件只解一遍 |
 | `voice` | userInitiated | 1 | 本机配音（`KokoroVoiceSpeech`）：CoreML 的一次推理同样卡线程（一句约 0.4 秒，第一次要等神经网络引擎编译约 10 秒），模型不同时跑两次、加载也在这条上（[AI 接口](ai-control-mcp.md) 第四节第 35 条） |
 | `proxy` | utility | 1 | 优化媒体的转码（`OptimizedMediaTranscoder`）：读一块、硬编一块，解码器和编码器各只有一个，并行也不更快；在后台转，不和播放抢（[优化媒体](optimized-media.md)）。关键帧间隔和解码速度的探测（`MediaKeyframeProbe` / `DecodeSpeedProbe`）走 `detail` |
 | `alpha` | userInitiated | 1 | 带透明的视频转预乘副本 / 抽遮罩（`AlphaSourceCopies`）：一个源从头读到尾、逐帧换算再写；预览重建等着它，高一档（[定格 / 静帧管线](freeze-frame.md) 第 4a3 节） |

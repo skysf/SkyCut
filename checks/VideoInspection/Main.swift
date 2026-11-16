@@ -134,6 +134,9 @@ import SrtFlowMCPKit
             require(!MCPToolName.inspectVideo.definition.readOnly, "temporary evidence is honestly declared as file writing")
             // MCP-14：只拿人声判「切在说话上」（会换掉工程的时间线，放在最后）。
             try await SpeechRuleChecks.run(project, source: source, info: info, require: require)
+            // 夹帧提醒、成片逐帧扫、成片比工程旧（MCP-36 / 64 / 65）：纯值规则，再走真文件、真工具。
+            FrameSignalChecks.run(require: require)
+            try await StrayFrameChecks.run(project, root: root, require: require)
             // 清掉本次的短试听，避免验收给机器留下合成媒体。
             if let path = auditions.first?["path"]?.stringValue { try? FileManager.default.removeItem(at: URL(fileURLWithPath: path).deletingLastPathComponent()) }
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }
