@@ -169,7 +169,9 @@ final class AIToolRouter {
             guard result.changedProject, onProject else { return Outcome(json: result.json, stamp: result.stamp) }
             AISession.shared.round(for: project).noteChange()
             // 改的是一个从来没存过的工程：马上存下来，之后交给自动保存（见那个函数）。
-            return Outcome(json: AIProjectTools.saveIfNeverSaved(project, after: result).json, stamp: result.stamp)
+            let saved = AIProjectTools.saveIfNeverSaved(project, after: result)
+            // The round's first change names the saved version from before the round (AIRoundVersions).
+            return Outcome(json: AIRoundVersions.reporting(project, in: saved).json, stamp: result.stamp)
         } catch let error as AIToolError {
             // 给 AI 的报错统一指到这个工具的说明书（方案 3.3，只在这一处加）。
             return Outcome(json: error.result(guide: call.tool), failed: true)
@@ -214,7 +216,7 @@ final class AIToolRouter {
         case .newProject: return try await AIProjectOpenTools.newProject(args, inFront: Self.opensInFront)
         case .closeProject: return try AIProjectOpenTools.closeProject(args)
         case .saveProject: return try await AIFilmProductionTool.save(args, project)
-        case .undo: return try AIProjectTools.undo(args, project)
+        case .undo: return try await AIProjectTools.undo(args, project)
         case .seek: return try AIProjectTools.seek(args, project)
         case .getTimeline: return try await AIFilmProductionTool.timeline(project)
         case .look: return try await AILookTool.look(args, project)

@@ -31,6 +31,7 @@ enum AIProjectTools {
         if !project.missingMedia.isEmpty {
             projectInfo["missing_media"] = .array(project.missingMedia.map { .string($0.path) })
         }
+        projectInfo.merge(AIRoundVersions.statusJSON(project)) { current, _ in current }  // saved versions, newest first
         var result: [String: JSONValue] = [
             "app_version": .string(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"),
             "mcp_catalog": MCPCatalogSync.statusJSON,
@@ -231,7 +232,9 @@ enum AIProjectTools {
 
     // MARK: 撤销、播放头
 
-    static func undo(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
+    static func undo(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+        // version=<id>: the whole project back to a saved version (AIRoundVersions, docs/architecture/project-versions.md).
+        if args.has("version") { return try await AIRoundVersions.goBack(args, project) }
         if try args.bool("round") == true {
             guard AIUndoGrouping.step(project.effectiveUndoManager, { AISession.shared.round(for: project).undoRound(project: project) }) else {
                 throw AIToolError("There is nothing from this round of AI edits to undo.")

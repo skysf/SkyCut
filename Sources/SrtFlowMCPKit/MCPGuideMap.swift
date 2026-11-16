@@ -18,7 +18,7 @@ enum MCPGuideMap {
     Files: open_folder (a folder or the Finder selection), read_document (scripts, notes, PDF, Word), manage_files (move, \
     rename, Trash; asks first)
     Projects: open_project, new_project, save_project, close_project, set_view (watch or background), seek (show a \
-    moment), undo (one step, or round=true for this round)
+    moment), undo (one step, round=true for this round, or version=<id> for a version saved before / after a round)
     See and hear: get_timeline (ids, tracks, edit_limits), look (frames, shots, faces, burned-in text, watermarks, black \
     bars), listen (levels, silence, beats, cut check), transcribe (words with times)
     Whole video: recipes (editing styles: pick one before cutting a whole video, tell the user which), save_recipe (keep \
