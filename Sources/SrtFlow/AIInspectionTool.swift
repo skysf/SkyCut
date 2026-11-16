@@ -72,7 +72,8 @@ enum AIInspectionTool {
             }
         } else { limitations.append("No audible segments: there was no mixed audio to analyze.") }
         try cancelled(token)
-        findings += try await cuts(state, config: config, scope: scope, limitations: &limitations, token: token)
+        var unchecked: Set<UUID> = []
+        findings += try await cuts(state, config: config, scope: scope, limitations: &limitations, unchecked: &unchecked, token: token)
         let hasPicture = !VideoEditExportGraph.isAudioOnly(state)
         let sampling = hasPicture ? AIInspection.sampleTimes(scope, frame: state.frameRate.secondsPerFrame) : (times: [Double](), omitted: 0)
         var frames: [AIFrameSampler.Frame] = []
@@ -128,26 +129,37 @@ enum AIInspectionTool {
             "screenshot_times": .array((image ? frames : []).map { AIFormat.seconds($0.time) }),
             "subtitle_style": ["font": .string(style.fontName), "font_size": .number(style.fontSize)],
             "limitations": .array(Array(Set(limitations)).sorted().map { .string($0) }),
-            "note": "Suspects only, not proof of defects. Pictures are sampled (0.5 s spacing, up to 120); brief flashes may be missed. Source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Transcripts are cache-only; no automatic edits. Auditions last this session."
+            "note": "Suspects only, not proof of defects. Pictures are sampled (0.5 s spacing, up to 120); brief flashes may be missed. Source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Cuts on speech are judged only from cached transcripts and narration subtitles; no automatic edits. Auditions last this session."
         ]
+        if !unchecked.isEmpty {
+            payload["speech_unchecked"] = [
+                "clips": .array(unchecked.map { ids.short($0) }.sorted().map { .string($0) }),
+                "why": "These clips are cut where sound plays, but they have no transcript or narration subtitles, so SkyCut cannot tell whether a word is cut. Call transcribe on the ones with speech, then inspect again."
+            ]
+        }
         // 没有疑点就没有截图请求；仅在实际请求证据后失败才报告画不出来。
         return AILookTool.finish(&payload, frames: frames, size: .medium, wantsImage: image && !wanted.isEmpty)
     }
 
+    /// 素材切口：电平上切在有声处、又有人声证据说这一刻在说话，才报「切在说话上」（`AIInspectionSpeech`，MCP-14）；
+    /// 没有人声证据的记进 `unchecked`（结果里的 `speech_unchecked`）。
     private static func cuts(
         _ state: TimelineState, config: AudioEngineConfig, scope: AIInspection.Scope,
-        limitations: inout [String], token: ExportCancellationToken
+        limitations: inout [String], unchecked: inout Set<UUID>, token: ExportCancellationToken
     ) async throws -> [AIInspection.Finding] {
         var result: [AIInspection.Finding] = []
         let deadline = Date().addingTimeInterval(40)
         var heard: [URL: AISpeechHearing] = [:]
+        let subtitled = AIInspectionSpeech.subtitled(in: state)
+        let frame = state.frameRate.secondsPerFrame
         for track in config.tracks where track.fader > 0 && config.master > 0 {
             for segment in track.segments {
                 try cancelled(token)
                 guard scope.contains(segment.start) || scope.contains(segment.end), let clip = state.clip(with: segment.clipID) else { continue }
+                // 这一段的转写（缓存得盖住它用到的源秒才算；判切在不在词上用识别器原样的词）。
+                let transcript = await AISpeechCutTool.transcript(of: clip, in: state, language: "auto")
                 if heard[segment.url] == nil {
                     if case .ready(let peaks) = await AISpeechCutTool.wholeFile(of: clip, until: deadline) {
-                        let transcript = await AISpeechCutTool.transcript(of: clip, in: state, language: "auto")
                         heard[segment.url] = AISpeechHearing(levels: AIAudioLevels.windows(peaks, from: 0, to: peaks.duration), transcript: transcript?.words)
                     }
                 }
@@ -156,11 +168,19 @@ enum AIInspectionTool {
                     // 渐变/转场已把声音降下来的边不再当作截断。
                     let inside = side == .start ? at + 0.01 : at - 0.01
                     guard segment.gain.gain(at: inside) * track.fader * config.master > 0.1 else { continue }
+                    // 素材自己的头尾：什么都没切掉（音效、旁白、从头放的音乐都从第 0 秒开始）。
+                    guard !AIInspectionSpeech.isFileEdge(clip, start: side == .start, tolerance: frame) else { continue }
                     let checked = AICutCheck.side(of: clip, end: side, at: at, sound: clip,
-                                                 points: hearing.points(silenceDB: nil), frame: state.frameRate.secondsPerFrame)
-                    if case .onSpeech(let word, let why) = checked.verdict {
+                                                 points: hearing.points(silenceDB: nil), frame: frame)
+                    guard case .onSpeech(_, let why) = checked.verdict else { continue }
+                    switch AIInspectionSpeech.voice(atSource: clip.sourceTime(atTimeline: at), words: transcript?.words, subtitles: subtitled[clip.sourceURL]) {
+                    case .on(let said):
                         result.append(.init(kind: "audio_cutoff", from: at, to: at,
-                                            reason: "Source cut on audible sound (\(word ?? "no cached word")): \(why). May be intentional music or an effect.", items: [clip.id]))
+                                            reason: "Source cut on speech (\"\(said)\"): \(why).", items: [clip.id]))
+                    case .off:
+                        continue
+                    case .unknown:
+                        unchecked.insert(clip.id)
                     }
                 }
             }

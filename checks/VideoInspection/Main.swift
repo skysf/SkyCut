@@ -132,6 +132,8 @@ import SrtFlowMCPKit
             require(cancelled.status == .cancelled && project.state == before, "cancellation leaves project untouched")
             require(MCPToolName.inspectVideo.takesProject && AIProjectBinding.usesProject(.inspectVideo, args), "inspection is bound to its calling project")
             require(!MCPToolName.inspectVideo.definition.readOnly, "temporary evidence is honestly declared as file writing")
+            // MCP-14：只拿人声判「切在说话上」（会换掉工程的时间线，放在最后）。
+            try await SpeechRuleChecks.run(project, source: source, info: info, require: require)
             // 清掉本次的短试听，避免验收给机器留下合成媒体。
             if let path = auditions.first?["path"]?.stringValue { try? FileManager.default.removeItem(at: URL(fileURLWithPath: path).deletingLastPathComponent()) }
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }
