@@ -92,9 +92,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 语言
 
-- GitHub 对外可见文字一律使用英文：commit message、分支名、PR、issue、release，
-  以及 Actions 的 workflow、job、step 名称与正文。
-- `README.md` 保持中英双语；仓库内部 `docs/`、本文件和代码注释维持现状使用中文。
+- English: GitHub text (commits, branches, PRs, issues, releases, Actions) and, from 2026-11-16 (user's call), all new code comments and doc text, AGENTS.md and check messages included. Existing Chinese isn't translated.
+- Bilingual: README. Chinese: reports to the user.
 
 ### 工程原则
 

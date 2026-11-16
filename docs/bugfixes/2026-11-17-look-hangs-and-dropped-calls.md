@@ -1,6 +1,6 @@
 # 2026-11-17 `look` silently took minutes, the calls behind it were dropped and its result was lost
 
-## Symptoms
+## Symptom
 
 From the production feedback (to-do item MCP-1, high priority), seen by both AI teams that cut the South Pole trailers on 2026-11-13
 and again by the web-motion probe on 2026-11-16:
