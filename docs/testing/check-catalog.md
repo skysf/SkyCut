@@ -7,6 +7,13 @@
 > 分组只以 `scripts/check-all.sh` 为准，下面提到的组号是写下那一条时的位置。条目的顺序是当时往 AGENTS.md 里加的顺序，没有重排；
 > 找某个脚本直接搜它的名字。
 
+- Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
+  (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory`
+  runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
+  hostile pages, a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
+  `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
+  verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
+
 - 官网样式表的先后（构建按共用关系分块，覆盖规则不许排在基础规则前面）：`website/tests/css-cascade.test.mjs`（源码级）和 `npm run check:seo`（按每个构建出来的页面实际加载的样式块核对），都在 CI 的网站那一步里。
 
 - 官网的小字（手机上不小于 12 px、演示区对比度、标题层级、首屏不随字体挪动、演示打字时对话窗不变高）：`website/tests/legibility.test.mjs` 在 CI 的网站那一步里；浏览器里量的那一半 `npx -y -p playwright@1.65.0 node scripts/check-legibility-browsers.mjs` 是手动的（无头、只在 Mac 上，**不在 `check-all.sh` 里**），见 [SkyCut 官网](../architecture/skycut-website.md)「小字读得清」。
