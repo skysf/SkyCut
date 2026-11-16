@@ -76,3 +76,44 @@ if [ "$(grep -c 'args.bool("cuts")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
   exit 1
 fi
 echo "   ✓ listen 读 cuts；剪辑点检查和 cut_speech 判切口的输入同一份（AISpeechHearing）、转写只读缓存、建议对齐到帧"
+
+echo "==> listen mix=true：用引擎按层离线渲（和成片同一份配置、同一套限幅和响度量法），是排队的 AI 任务、不碰预览的引擎"
+# 2026-11-16（MCP-3 / MCP-10；docs/architecture/export-audio-mixdown.md「五、按层量」、ai-control-mcp.md 第四节第 13、59 条）。
+# 量法本身在 scripts/check-mix-layers.sh 真跑（oracle、和导出逐位对账）；这里只扫「真的接上了、接的是那一份」。
+python3 - <<'PY'
+import pathlib, re
+def code(path):
+    return "\n".join(line.split("//", 1)[0] for line in pathlib.Path(path).read_text().splitlines())
+tool, mix = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenMix.swift")
+plan = code("Sources/SrtFlow/AIListenMixPlan.swift")
+measure = code("Sources/SrtFlow/AudioEngine/MixMeasurement.swift")
+stems = code("Sources/SrtFlow/AudioEngine/AudioStemRender.swift")
+bus = code("Sources/SrtFlow/AudioEngine/MixBusMeter.swift")
+band = code("Sources/SrtFlow/AudioEngine/MixBandMeter.swift")
+assert tool.count('args.bool("mix")') == 1 and tool.count("AIListenMix.listen(") == 1, "✗ listen 要读 mix 并交给 AIListenMix"
+# 长任务的规矩（第 59 条）：AIJobs.start / finish 成对；一次一个（AIWorkQueue 的 mix 道）；排着时取消只从队里拿掉。
+assert mix.count("AIJobs.shared.start(.listen") == 1, "✗ listen mix 要是 AIJobs 的任务（App Nap 不降速、get_job 拿得到结果）"
+assert mix.count("AIWorkQueue.shared.submit(.mix, jobID: job.id)") == 1, "✗ listen mix 要排在 AIWorkQueue 的 mix 道上（一次一个）"
+assert mix.count("work.cancel(") == 1, "✗ listen mix 的取消要经 AIQueuedWork.cancel（排着的从队里拿掉）"
+assert mix.count("AIJobs.shared.finish(job, .done") == 1 and mix.count("AIJobs.shared.finish(job, .failed") == 1 \
+    and mix.count("AIJobs.shared.finish(job, .cancelled") == 1, "✗ listen mix 每种结局都要 finish（还掉不降速的那一份）"
+# 阻塞的离线渲在 MediaReadQueue.export 上（和导出的混音一条宽度 1 的队列），配置和成片同一份（带场景的响度补偿）。
+assert mix.count("MediaReadQueue.run(on: MediaReadQueue.export)") == 1, "✗ listen mix 的离线渲要在 MediaReadQueue.export 上（不进 Swift 并发池、不和导出的混音同时跑）"
+assert mix.count("AudioEngineConfig.make(from: state)") == 1, "✗ 量的那一份配置要和成片同一个算法（AudioEngineConfig.make(from:)，带场景的响度补偿）"
+assert mix.count("MixMeasurement.measure(") == 1 and mix.count("AIListenMixReport.json(") == 1, "✗ listen mix 要经 MixMeasurement 量、AIListenMixReport 写"
+assert "MixFrameGrid(fps: state.frameRate.fps)" in plan and not re.search(r"MixFrameGrid\(fps: *[0-9]", plan + mix), "✗ 帧率只从工程来（不许写死）"
+# 按层渲只用离线引擎：不碰预览那个实时引擎、不起 / 停图（空闲的图照旧停着，docs/architecture/audio-engine.md 第二节第 11 条）。
+assert measure.count("AudioStemRender.render(") == 1, "✗ MixMeasurement 要经 AudioStemRender 渲"
+assert stems.count("mode: .offline") == 2 and ".realtime" not in stems, "✗ 按层渲只建离线引擎（混音一个、每层一个）"
+for name, text in [("AudioStemRender", stems), ("MixMeasurement", measure), ("AIListenMix", mix)]:
+    for banned in ["suspend(", "wake(", "recoverIfNeeded(", "AudioEngineIdleKeeper", "audioEngineHost"]:
+        assert banned not in text, f"✗ {name} 不许碰预览引擎的起停（{banned}）"
+# 量法复用成片那一份：限幅器同样的参数、整体响度 ExportLoudnessMeter、K 加权 AudioKWeighting；不许另写一套系数。
+assert "ExportPeakLimiter(channels: 2, sampleRate: grid.sampleRate)" in bus and "limiter.recordsGains = true" in bus, "✗ MixBusMeter 要用成片同样参数的限幅器"
+assert "ExportLoudnessMeter(channels: 2)" in bus and "ExportLoudnessMeter(channels: 2)" in band, "✗ 整体响度要用 ExportLoudnessMeter（成片同一个门限算法）"
+assert "AudioKWeighting()" in bus, "✗ 瞬时 / 短时响度的 K 加权要用 AudioKWeighting"
+for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
+    if path.name != "AudioKWeighting.swift" and "1.53512485958697" in path.read_text():
+        raise AssertionError(f"✗ {path} 另写了一份 K 加权的系数（只许在 AudioKWeighting）")
+PY
+echo "   ✓ mix=true 交给 AIListenMix：AIJobs 任务、mix 道排队、MediaReadQueue.export 上离线渲、成片同一份配置和量法、不碰预览引擎"

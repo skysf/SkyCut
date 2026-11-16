@@ -13,6 +13,11 @@ import Foundation
 // - 暗下去又亮起来（淡出淡入、黑场过渡）：在最暗那一截的正中切一刀；
 // - 两刀之间至少 `minimumShot` 秒（闪光、一两帧的抖动不切碎）。
 // 叠化（两个镜头慢慢交叠）认不出来，照一个镜头算（已知不足）。
+//
+// 另有一份**逐帧的刀**（`hardCuts`，夹帧提醒和成片逐帧扫用）：上面那一套为了把一个文件分成看得清的镜头，两刀之间至少隔
+// `minimumShot` 秒、片头片尾的刀也不要 —— 恰好把「刀前后只差几帧」「开头三帧是另一个画面」这种夹帧滤掉了。逐帧的刀不设这两条，
+// 只看这一帧和附近的帧比突然大多少倍：拿前后各 `hardCutNeighbours` 帧变化的**中位数**比（预览板 v1.2 的量法），两刀挨着时
+// 另一刀不会把中位数抬上去。门槛和来历见 docs/architecture/stray-frames.md。
 // 不管什么：帧从哪来、缓存（AIShotScan）、怎么写给 AI（AILookShots）。
 
 enum AIShotDetector {
@@ -112,6 +117,33 @@ enum AIShotDetector {
             }
         }
         return middles
+    }
+
+    // MARK: 逐帧的刀（夹帧提醒、成片逐帧扫）
+
+    /// 一帧至少变这么多才可能是一刀（0…1；预览板 v1.2 的 15 / 255）。
+    static let hardCutMinimum = 15.0 / 255
+    /// 比前后几帧变化的中位数（加 1 / 255，免得几乎不动的画面里噪点也成倍数）高出这么多倍才算一刀。
+    static let hardCutRatio = 3.5
+    static let hardCutNeighbours = 6
+
+    /// 哪几帧是一刀：这一帧和上一帧不是同一个画面（下标，升序，第 0 帧不算）。两刀可以挨着、可以贴着片头片尾。
+    static func hardCuts(changes: [Double]) -> [Int] {
+        guard changes.count > 1 else { return [] }
+        return (1..<changes.count).filter { changes[$0] >= hardCutMinimum && cutRatio(changes, at: $0) >= hardCutRatio }
+    }
+
+    /// 第 `index` 帧的变化是前后各 `hardCutNeighbours` 帧变化的中位数（加 1 / 255）的几倍（自检拿它量合成片上刀和别的帧差多远）。
+    static func cutRatio(_ changes: [Double], at index: Int) -> Double {
+        let before = changes[max(1, index - hardCutNeighbours)..<index]
+        let after = changes[min(changes.count, index + 1)..<min(changes.count, index + 1 + hardCutNeighbours)]
+        return changes[index] / (median(Array(before) + Array(after)) + 1.0 / 255)
+    }
+
+    private static func median(_ values: [Double]) -> Double {
+        guard !values.isEmpty else { return 0 }
+        let sorted = values.sorted()
+        return sorted.count % 2 == 1 ? sorted[sorted.count / 2] : (sorted[sorted.count / 2 - 1] + sorted[sorted.count / 2]) / 2
     }
 
     /// 只要 `range` 里的那些镜头，两头裁到区间里（被区间切掉一截的照样留着，只是短了）。

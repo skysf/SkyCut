@@ -76,6 +76,7 @@
 - [2026-10-14 滤镜把纯黑抬成灰](2026-10-14-filters-lift-pure-black.md) — 纯黑不抬（`FilterLUT.holdingBlack`）：调色作用于画面，不作用于编辑出来的黑。
 - [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 定格切出的右半不到一源帧（算上变速）、帧率已知、后面没接转场才拿掉；够一帧的留着，AI 定格后剩不到 1 秒的报 `tail_id`。
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。
+- [2026-11-17 Ripple-deleting a freeze hold moves the clip before it](2026-11-17-freeze-tail-ripple-drags-its-clip.md) — A piece that moves away from its partners keeps no link group; a V1 ripple never moves a clip before its point.
 - [2026-09-27 GBK 字幕读出来是乱码](2026-09-27-gbk-subtitles-read-as-utf16.md) — 编码识别只走 `TextDecoding`；宽容的解码器（UTF-16）只能放最后或先用特征确认。
 - [2026-11-07 生成图片的扩展名和实际字节不符](2026-11-07-generated-image-extension-from-bytes.md) — 下载后按实际字节定扩展名、不重编码；交付失败不重新生成。
 - [2026-10-30 生成固定首个模型且缺少多参考](2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和参考限制可查询；当时的「退款明确后替换一次」10-31 已移除，现在拒绝和未知结果都只查原单。
@@ -89,6 +90,7 @@
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。
+- [2026-11-16 成片检查把音效、音乐的起点报成「切在说话上」](2026-11-16-inspection-reports-sound-onsets-as-speech.md) — 有声不等于在说话：语义结论要有词或旁白字幕作证据，没有就说判不了；素材自己的头尾什么都没切掉。
 - [2026-08-05 Inspector 拖调](2026-08-05-inspector-scrub-field-gestures.md) — 编辑态、焦点与亚像素容差。
 - [2026-08-12 提示弹在很远的地方、还没翻译](2026-08-12-instant-tooltip-first-show-far-off.md) — `NSHostingView` 会把尺寸约束灌给面板，摆好 ≠ 摆定；本地化查不到是静默降级。
 - [2026-10-01 带插值的界面文案从没进过字符串表](2026-10-01-interpolated-keys-never-localized.md) — 判不出类型就把几种可能都试一遍，比跳过强。

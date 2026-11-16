@@ -29,6 +29,9 @@
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](../architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](../reports/2026-11-02-video-inspection.md)。
+  同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
+  add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
+  门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
 
 - 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.66 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](../build/build-and-packaging.md)。
@@ -120,6 +123,9 @@
   尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
   4 分钟就判红，并说出卡在哪一组；CI 上第 7b 组「2 倍速曲线 · 导出」差 1–2 dB 偶发，认法见
   [推子与电平表](../architecture/audio-mixer.md)「已知的偶发」）。
+- 按层量混在一起之后的声音（listen mix=true 的地基）：现造的 WAV 当 oracle —— 四个频段各一个正弦（24 / 30 / 60 fps：那一段的电平 = 整体、别的段低 40 dB 以上、四段加起来 = 整体）、脉冲（峰值到采样、最响的帧到帧）、0.56 秒的音效（loudest_at 到帧、clip_id 的问法）、EBU Tech 3341 的 −23 / −33 dBFS 正弦（瞬时 / 短时 / 整体响度）；
+  整条时间线的峰值、过线、压得最深、整体响度和 `ExportAudioMixdown.render` 逐位一样（有 / 没有声音场景各一条）；每层逐采样相加 = 混音；只量 29–44、43–49 秒 = 整段里那几帧，过线标在 31.0 / 40.5 秒；单声道人声的电平 = 素材 RMS + 增益 = 真导出（ffmpeg）的成片；listen 的计划（层的写法、越界给合法建议、逐帧的数放得下才给）和结果：
+  `scripts/check-mix-layers.sh`（要 ffmpeg；接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节）。合同和反向验证见 [成片的声音](../architecture/export-audio-mixdown.md)第五节。
 - 波形数据（多级峰值、原始采样块）逐采样对账，以及**很多文件同时读**必须全部读完、
   不许把线程池堵死（看门狗判红）：`scripts/check-waveform.sh`。
 - 成片的声音只有一条管线（导出图里不许出现声音滤镜，混音是预览那个音频引擎按同一份 `AudioEngineConfig`
@@ -133,7 +139,9 @@
 - 关键帧的缓动（每种曲线的值、linear 逐位一致、set / clipped / stretched / remapped 保曲线、存盘按需写键 + 老文件 + v27 / v32、冲过头时宽高留下限和最低不透明度放宽、切片按帧 / 线性一片不多 / 400 片上限）：
   `scripts/check-project-file.sh` 第 39 组；AI 的 `set_keyframes easing`（默认 easeInOut、词表对账、读回来带曲线）在 `scripts/check-mcp.sh`；缓动的缩放真合成
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
-- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`。
+- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
+  group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
