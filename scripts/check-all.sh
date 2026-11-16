@@ -125,6 +125,8 @@ run_check "listening（听声音的纯计算：ESTOI、拿掉谁涨多少、原�
 run_check "upscale（视频 upscale 的任务：范围、Sky Studio 的档位和上限、起名、封回原声、真裁一段、流水线对着假 Sky Studio 走全程）" scripts/check-upscale.sh
 run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
 run_check "film-production (public plans, persisted evidence, sound and native anchors)" scripts/check-film-production.sh
+# Renders real pages with WebKit in the helper (about a minute): needs a logged-in session, which CI's runners have.
+run_check "web-motion (the web-motion renderer: page clock, nothing leaves a page, alpha, hostile pages, memory kills, identical renders)" scripts/check-web-motion.sh
 # 真跑好几遍 ffmpeg 导出，全场最慢的一项（CI 上约 45 秒），配的伙伴最少。
 run_check "export-frame-rate（生产导出滤镜：帧率 + 拼接链 + 分辨率）" scripts/check-export-frame-rate.sh
 
@@ -143,6 +145,7 @@ shard 4
 # 扫描守卫（接线类）：秒级、不编译、不要 App，放在本组最前（最慢的 check-script-source-lists 殿后）。
 run_check "export-audio-single-pipeline（扫描守卫：成片的声音就是预览那份混音）" checks/export-audio-single-pipeline.sh
 run_check "export-watermark-wiring（扫描守卫：加不加水印只问 WatermarkPolicy、叠在烧字幕之后缩小之前）" checks/export-watermark-wiring.sh
+run_check "web-motion-wiring (scan guard: helper packaged and signed in order, pages only in the helper, every page locked)" checks/web-motion-wiring.sh
 run_check "film-production-wiring (authoring, authority and metadata-only evaluation)" checks/film-production-wiring.sh
 run_check "timeline-drag-wiring（扫描守卫）" checks/timeline-drag-wiring.sh
 run_check "timeline-clipboard-wiring（扫描守卫：复制粘贴的接线、落点鼠标优先）" checks/timeline-clipboard-wiring.sh
