@@ -130,7 +130,9 @@
 - 关键帧的缓动（每种曲线的值、linear 逐位一致、set / clipped / stretched / remapped 保曲线、存盘按需写键 + 老文件 + v27 / v32、冲过头时宽高留下限和最低不透明度放宽、切片按帧 / 线性一片不多 / 400 片上限）：
   `scripts/check-project-file.sh` 第 39 组；AI 的 `set_keyframes easing`（默认 easeInOut、词表对账、读回来带曲线）在 `scripts/check-mcp.sh`；缓动的缩放真合成
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
-- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`。
+- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
+  group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
