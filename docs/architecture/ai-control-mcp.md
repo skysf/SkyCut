@@ -1084,6 +1084,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
 
+61. **声音怎么过一刀：`set_transition` 的 `sound`（2026-11-16，生产反馈 MCP-32；合同全在 [声音怎么过一刀](cut-sound.md)）**：
+    以前 J / L 切、叠着换只能 `add_clips sound=separate` + `edit_clip alone` 一段一段对帧，24 个接点就是 24 次手工。现在选一刀（`after_clip_id`，V1 或上层轨；
+    或 `all=true`）、一种过法（crossfade / lead / lag / bed / on_beat / gain / cut）、给帧数，一次调用 = 一步撤销，画面一帧不动；
+    要挪的那一边的声音先照分离音频那一份分出去，另一头照它此刻实际响的样子；余料不够、会伸过隔壁镜头就整个不做、回最多几帧。
+    **没开新工具**：全清单离上限只剩约 1.5k 字，而 sound 和画面转场都是「怎么过一刀」（同 MCP-32 的建议）；名片多一句、四个参数，长话在说明书
+    set_transition 主题的三节。和 `type` 不在同一次调用里。路由先 await 量电平 / 找拍子（`AICutSoundTool.plan`），再把同步的提交包进 `AIUndoGrouping.step`
+    （同 cut_to_beat）。全清单 2026-11-16 是 99,063 / 100,000。
+    守卫：`checks/MCP/CutSoundChecks.swift` / `CutSoundLevelChecks.swift`、`checks/MCP/router-wiring.sh`（提交包在 step 里）；分出去的声音跟着画面走见
+    [联动](timeline-linkage.md)规矩 13。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **每个工程一份**（`AIRound`，2026-10-17 用户定，[方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 4、E 节）：剪 5 条时停一条，别的照剪；
@@ -1228,6 +1238,7 @@ edit_clip 2,074 字超长、清单里有汉字）。
 
 ## 八、人工回归清单（发版前在真机上走一遍）
 
+- [ ] 让 AI 给一刀做 `set_transition sound=lead frames=16`（第 61 条）：下一场的声音在切点前淡进来、画面照旧在切点上换，分出来的声音在音频轨上、和画面链接着；⌘Z 一步回去。`all=true sound=crossfade`：一串刀的声音在 A1 / A2 交替叠着换，结果里 `room_frames` 对得上剩下的素材。
 - [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；
