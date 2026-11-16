@@ -41,6 +41,8 @@ enum MediaReadQueue {
     /// 优化媒体的转码（OptimizedMediaTranscoder）：读一块、硬编一块，解码器和编码器各只有一个，一条就够；在后台转，
     /// 用户正在剪，低一档，不和播放抢。
     static let proxy = make("SrtFlow.MediaRead.proxy", qos: .utility, width: 1)
+    /// 带透明的视频转预乘副本 / 抽遮罩（AlphaSourceCopies）：一个源从头读到尾、逐帧换算再写；预览重建等着它，高一档；一条就够。
+    static let alpha = make("SrtFlow.MediaRead.alpha", qos: .userInitiated, width: 1)
 
     /// 在 `queue` 上把一段阻塞的读取跑完，结果交回来（等的这一方只是挂起，不占线程）。
     static func run<T: Sendable>(on queue: OperationQueue, _ work: @escaping @Sendable () -> T) async -> T {

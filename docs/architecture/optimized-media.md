@@ -23,6 +23,7 @@
 | `OptimizedMediaCoordinator.swift` | 工程上的协调者（`VideoEditProject.optimizedMedia`，`ObservableObject`，只有工具条的菜单订阅）：模式、队列、转、停着时请重建、补探、量解码速度、转不了的源（`unavailable`） |
 | `OptimizedMediaCacheSettings.swift` | 设置里「优化媒体」那一节的状态（`ObservableObject`，只有那一节订阅）：占了多少（proxy 队列上算）、上限几档、清空（proxy 队列上 `removeAll` → 协调者 `reset()` → `scheduleRebuild()`） |
 | `../CompositionClipInsert.swift` | builder 插画面的那一步：原片一片，或代理几块首尾相接；差一块 / 插不进去退回原片 |
+| `../CompositionSource.swift` | builder 插之前挑源轨：原片、直通源的预乘副本、或这一段的块（带透明的段不给块） |
 | `../OptimizedMediaMenu.swift` | 预览工具条上的「优化媒体 / 原片」菜单 + 转码中的小转圈 + 转不了的小感叹号（菜单里列文件名） |
 | `../OptimizedMediaSettingsSection.swift` | 设置窗口里的「优化媒体」一节：占用、「清空」、上限的几档；只订阅 `OptimizedMediaCacheSettings` |
 | `../SrtFlowApp.swift` | 启动时在 proxy 队列上 `expire(olderThan: expiryDays)`（`expireOptimizedMedia`）；设置窗口里摆上那一节 |
@@ -59,6 +60,9 @@
 7. **读和编都是阻塞的，只在 `MediaReadQueue` 上跑**：探在 `detail`、转在 `proxy`（utility，宽度 1 —— 解码器和编码器各只有一个，
    并行也不更快；在后台转，不和播放抢）。转码每读一帧看一眼取消标记。
 8. **10-bit / HDR 的源第一版不转**（H.264 只有 8-bit，转了会灰）：`load` 报 `unsupportedSource`，照用原片。HEVC Main10 是后面一刀。
+8b. **带透明的源不转、也不换块**（2026-11-16）：代理是 H.264，没有 alpha，HEVC 带透明又是长 GOP —— 换进预览透明处就成了黑块。
+   `needsProxy` 看 `MediaInfo.alpha` 说不；builder 挑源轨时（`CompositionSource.track`）对带透明的段也不给块（老工程转过的也不换）。
+   规矩见 [定格 / 静帧管线](freeze-frame.md) 第 4a3 节「带透明的段」；回归在 `scripts/check-video-fade.sh` 的 `AlphaVideo.swift`。
 9. **成片永远用原片。** 代理只在预览合成里出现：`VideoEditCompositionBuilder.build` 只有预览重建那一处传 `proxies`
    （`VideoEditProject.scheduleRebuild`）；导出、预渲染（`VideoEditPrerender`）、AI 看（`AIFrameComposer`）、缩略图、波形都不碰缓存目录。
    守卫 `checks/optimized-media-wiring.sh` 钉着。

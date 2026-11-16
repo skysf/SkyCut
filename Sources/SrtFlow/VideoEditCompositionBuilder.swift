@@ -103,6 +103,8 @@ enum VideoEditCompositionBuilder {
             assets[url] = hit.asset
             return hit.asset
         }
+        // 老工程的段没记带不带透明（`MediaInfo.alpha`）：只认要画的段，导出图在同一个位置调同一个函数（CompositionSource）。
+        state = await CompositionSource.resolvingAlpha(in: state, asset: asset)
 
         // MARK: 主轨（A/B 交替）
 
@@ -122,15 +124,15 @@ enum VideoEditCompositionBuilder {
             guard !state.mainHidden, !clip.isHidden, !clip.needsStillConversion else { continue }
             let slot = index % 2
             guard let videoTrack = (slot == 0 ? videoA : videoB) else { continue }
-            let sourceAsset = asset(for: clip.sourceURL)
-            guard let sourceVideo = try? await sourceAsset.loadTracks(withMediaType: .video).first else { continue }
+            // 插哪条源轨：原片、直通源的预乘副本、或优化媒体的块（带透明的段不用块），见 CompositionSource。
+            guard let source = await CompositionSource.track(for: clip, proxies: proxies, asset: asset) else { continue }
 
             // 不到 `mainGapTolerance` 的缝不是空隙（成片的分节同一口径）：接在前一段真正的末尾上。前一段收在
             // 19.9598、这一段从 19.96 起，各自截断落在相邻两格，A/B 两条轨之间就空出一格 —— 接缝上一帧黑。
             let gap = clip.timelineStart - previousMainEnd
             let startsAt = gap > 0 && gap < TimelineState.mainGapTolerance ? previousMainEnd : clip.timelineStart
             guard let geometrySource = await CompositionClipInsert.insert(
-                original: sourceVideo, proxies: await proxyTracks(for: clip, in: proxies, asset: asset),
+                original: source.track, proxies: source.proxies,
                 clip: clip, into: videoTrack, cursor: &videoCursors[slot], at: startsAt
             ) else { continue }
             previousMainEnd = clip.timelineEnd
@@ -249,12 +251,10 @@ enum VideoEditCompositionBuilder {
             for clip in ClipVisibility.visible(lane.clips)
                 .sorted(by: { $0.timelineStart < $1.timelineStart })
             where !clip.needsStillConversion {
-                let sourceAsset = asset(for: clip.sourceURL)
-                guard let sourceVideo = try? await sourceAsset.loadTracks(withMediaType: .video).first else { continue }
-                guard let geometrySource = await CompositionClipInsert.insert(
-                    original: sourceVideo, proxies: await proxyTracks(for: clip, in: proxies, asset: asset),
-                    clip: clip, into: videoTrack, cursor: &videoCursor
-                ) else { continue }
+                guard let source = await CompositionSource.track(for: clip, proxies: proxies, asset: asset),
+                      let geometrySource = await CompositionClipInsert.insert(
+                        original: source.track, proxies: source.proxies, clip: clip, into: videoTrack, cursor: &videoCursor
+                      ) else { continue }
 
                 let naturalSize = (try? await geometrySource.load(.naturalSize)) ?? renderSize
                 let preferred = (try? await geometrySource.load(.preferredTransform)) ?? .identity
@@ -331,8 +331,8 @@ enum VideoEditCompositionBuilder {
             $0.clip.minimumOpacity < 0.999 || $0.fadeIn != nil || $0.fadeOut != nil
                 || $0.pushIn != nil || $0.pushOut != nil || $0.wipeOut != nil
                 // 预设入/出场：头尾要么半透明、要么带裁切，两样都会把默认合成器
-                // 切到混合路径（未覆盖区变暗绿色），必须垫黑底；带透明的静帧（透明处同样走混合路径）同理。
-                || !$0.preset.isEmpty || $0.clip.isAlphaStill
+                // 切到混合路径（未覆盖区变暗绿色），必须垫黑底；带透明的段（静帧和视频一个判断，透明处同样走混合路径）同理。
+                || !$0.preset.isEmpty || $0.clip.sourceAlpha != .opaque
         }
         // 画面收得比时间线早（配乐比画面长、纯音频时间线）：合成里没有音轨撑长度（声音在引擎里），播放器的条目
         // 就会比时间线短 —— 播到画面结尾停在最后一帧上，而引擎的播放头还在走、时钟每拍都去对表。所以从画面结尾
@@ -409,19 +409,6 @@ enum VideoEditCompositionBuilder {
 
     static func renderSize(for state: TimelineState) -> CGSize {
         TimelineRenderSize.size(for: state)
-    }
-
-    /// 这一段的优化媒体块（都转好了才给；没有代理 / 没转全 / 块文件打不开 → nil，插原片）。只开真要用的那几块。
-    private static func proxyTracks(
-        for clip: EditClip, in lookup: OptimizedMediaLookup, asset: (URL) -> AVURLAsset
-    ) async -> [Int: AVAssetTrack]? {
-        guard let chunks = lookup.readyChunks(for: clip) else { return nil }
-        var tracks: [Int: AVAssetTrack] = [:]
-        for (chunk, url) in chunks {
-            guard let track = try? await asset(url).loadTracks(withMediaType: .video).first else { return nil }
-            tracks[chunk] = track
-        }
-        return tracks
     }
 
     /// 素材画面摆进输出画布的完整变换：源自带旋转摆正 → 裁切区挪到原点 →

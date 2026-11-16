@@ -23,6 +23,7 @@
 - [2026-09-27 AI 放素材顺带挂字幕，之后撤一步全空](2026-09-27-ai-undo-swallowed-by-subtitle-attach.md) — 一次调用里所有登记都在同一个 step 里；异步落账各包一层。
 - [2026-09-27 有音量曲线的段，AI 调 volume_db 听不出变化](2026-09-27-ai-volume-ignored-on-curved-clips.md) — 给 AI 开参数前先看检查器改同一个值时做了什么（整条曲线平移）。
 - [2026-11-10 后台的 AI 活被 App Nap 降速](2026-11-10-ai-work-throttled-by-app-nap.md) — AI 的调用和任务各领一份 `AIKeepAwake`，领和还成对。
+- [2026-11-16 带透明的视频：预览当预乘、成片当直通](2026-11-16-alpha-video-premultiplied-or-straight.md) — 预乘还是直通要读文件里的标记，先弄清「没写」长什么样；平台没开关就换一份数据，不换合成器。
 - [2026-09-30 动画行的「In」「Out」从没进过字符串表](2026-09-30-animation-in-out-labels-never-localized.md) — 同一个教训撞第三次别再补清单：从声明里找 `LocalizedStringKey` 参数。
 - [2026-10-06 挪了一段音频，画面挪了、声音还在原地](2026-10-06-audio-engine-replace-keeps-old-segment-positions.md) — 「结构没变」按开流时抄死了什么来定，不是按 id；自检要有「换配置」这一步。
 - [2026-08-12 渐入开头爆音](2026-08-12-audio-fade-in-pop.md) — 混音器的增益有 de-zipper：别拿常量提前量赌平台的平滑窗口，断言上移到结构不变量。
@@ -177,6 +178,7 @@
 - [2026-08-07 录屏 Phase 2–4 复审](2026-08-07-screen-recording-phase2-4-review.md) — 接线、恢复、退出与真实首测。
 - [2026-08-03 逐帧预览](2026-08-03-scrub-preview-keyframe-snap.md) — 零容差与链式 seek。
 - [2026-09-26 点一下选中一段，整个编辑器跟着重算](2026-09-26-selection-wakes-whole-editor.md) — 工程换成 `@Observable`；换机制后把「以前被顺带刷新」的地方逐个找出来。
+- [2026-11-16 A J/L-cut sound drifts off its picture after a magnet repack](2026-11-16-separated-sound-left-behind-on-magnet-repack.md) — A sound split from a picture follows that picture, not what lies under it; a clip moved before 0 is trimmed, never clamped.
 - [2026-10-03 录屏中 AI 改帧率：静默不改还回成功](2026-10-03-set-canvas-fps-ignored-while-recording.md) — 执行入口的闸只亮提示时，AI 那一路要自己先挡。
 - [2026-11-11 关掉全部权限的回答里长期授权还写「已记上」](2026-11-11-set-settings-stale-standing-consent.md) — 一个回答里同一件事出现两次，两份要在同一时刻取。
 - [2026-08-16 形状叠层不跟播放头](2026-08-16-shape-overlay-ignores-playhead.md) — 按 displayTime 取内容的叠层必须直接订阅 `PlayerClock`。

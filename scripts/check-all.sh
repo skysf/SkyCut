@@ -121,6 +121,7 @@ run_check "timeline-zoom（缩放的锚点：钉指针 / 钉播放头 / 纵向�
 run_check "media-import（拖文件进轨道的落点）" scripts/check-media-import.sh
 run_check "optimized-media（优化媒体：判据、关键帧间隔、解码速度、真转一块、缓存）" scripts/check-optimized-media.sh
 run_check "cloud-media（共用每日额度、按天账与任务阶段）" scripts/check-cloud-media.sh
+run_check "listening（听声音的纯计算：ESTOI、拿掉谁涨多少、原声特征，和研究的 numpy 版逐数对账）" scripts/check-listening.sh
 run_check "upscale（视频 upscale 的任务：范围、Sky Studio 的档位和上限、起名、封回原声、真裁一段、流水线对着假 Sky Studio 走全程）" scripts/check-upscale.sh
 run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
 run_check "film-production (public plans, persisted evidence, sound and native anchors)" scripts/check-film-production.sh
