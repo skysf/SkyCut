@@ -22,8 +22,8 @@ enum MemoryChecks {
         watch.memory.policy = WebMotionMemoryPolicy(budget: 600 << 20, warningBudget: 600 << 20)
         let run = await runHelper(Fixture.job(Pages.memoryHog, name: "hog", limits: Fixture.tight, workers: 1), watch: watch,
                                   within: 40)
-        check(run.killed?.reason == .memoryBudget && (run.killed?.footprint ?? 0) > 600 << 20,
-              "a page eating 128 MB a frame is killed past its budget: \(run.killed?.message ?? run.outcome)")
+        check(run.killed?.reason == .memoryBudget && (run.killed?.footprint ?? 0) > 600 << 20 && run.report.helperSignal == SIGKILL,
+              "a page eating 128 MB a frame is killed (SIGKILL) past its budget: \(run.killed?.message ?? run.outcome)")
         check(run.processesEnded && run.report.killedLeftovers.isEmpty && !run.report.processes.isEmpty,
               "…its \(run.report.processes.count) WebKit processes ended with the helper (peak \(run.report.peakFootprint >> 20) MB, "
               + String(format: "%.1f", run.seconds) + " s; " + run.processSummary + ")")
@@ -33,13 +33,14 @@ enum MemoryChecks {
         var critical = WebMotionHelperProcess.Watch()
         critical.memory.pressure = { .critical }
         let out = await runHelper(Fixture.job(Pages.plain, name: "critical", limits: Fixture.tight), watch: critical, within: 40)
-        check(out.killed?.reason == .memoryPressure && out.seconds < 10 && out.processesEnded,
+        check(out.killed?.reason == .memoryPressure && out.report.helperSignal == SIGKILL && out.seconds < 10 && out.processesEnded,
               "the Mac out of memory: SkyCut kills a normal render at once: \(out.killed?.message ?? out.outcome)")
         var low = WebMotionHelperProcess.Watch()
         low.memory.pressure = { .warning }
         low.memory.policy = WebMotionMemoryPolicy(budget: 3 << 30, warningBudget: 1 << 20)
         let warned = await runHelper(Fixture.job(Pages.plain, name: "warning", limits: Fixture.tight), watch: low, within: 40)
-        check(warned.killed?.reason == .memoryBudget && warned.killed?.message.contains("low on memory") == true,
+        check(warned.killed?.reason == .memoryBudget && warned.report.helperSignal == SIGKILL
+              && warned.killed?.message.contains("low on memory") == true,
               "low memory: over the smaller budget is killed: \(warned.killed?.message ?? warned.outcome)")
     }
 

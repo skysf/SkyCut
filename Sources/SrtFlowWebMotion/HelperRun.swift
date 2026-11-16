@@ -23,6 +23,9 @@ final class HelperRun {
     private var deviceScale = 1.0
     private var path: WebMotionAlphaPath = .fast
     private var workers: [PageWorker] = []
+    /// Every page instance made, kept until the process exits: a page rejected while loading stays alive (and keeps its
+    /// WebKit process) until the result is out, instead of being torn down mid-attempt by going out of scope.
+    private var created: [PageWorker] = []
 
     init(request: WebMotionRequest) {
         self.request = request
@@ -74,6 +77,7 @@ final class HelperRun {
         let pixels = (Int(size.width), Int(size.height))
         let wantFast = request.alpha != .public
         let page = PageWorker(configuration: try configuration(), points: size, zoom: 1, pixels: pixels, transparent: wantFast)
+        created.append(page)
         let limit = request.limits.load
         let loaded = try await Deadline.within(limit, "The calibration page did not load within \(Deadline.format(limit)) s.") {
             try await page.load(WebMotionPageHTML.locked(WebMotionAlphaCalibration.html))
@@ -134,6 +138,7 @@ final class HelperRun {
         for index in 0..<count {
             let worker = PageWorker(configuration: try configuration(), points: points, zoom: zoom,
                                     pixels: (request.width, request.height), transparent: path == .fast)
+            created.append(worker)
             let loaded: PageWorker.Loaded
             do {
                 loaded = try await Deadline.within(limit, "The page did not finish loading within \(Deadline.format(limit)) s "

@@ -51,6 +51,8 @@ final class WebMotionHelperProcess: @unchecked Sendable {
         let processes: [Int32]
         /// WebKit processes still running after the grace period, killed by SkyCut (normally none).
         let killedLeftovers: [Int32]
+        /// The signal that ended the helper (SIGKILL when SkyCut stopped it); nil when it exited by itself.
+        let helperSignal: Int32?
     }
 
     private let lock = NSLock()
@@ -89,7 +91,7 @@ final class WebMotionHelperProcess: @unchecked Sendable {
             try? errors.fileHandleForWriting.close()
             return Report(outcome: .finished(result: nil, status: -1, signaled: false,
                                              log: "The renderer could not start: \(error.localizedDescription)"),
-                          peakFootprint: 0, processes: [], killedLeftovers: [])
+                          peakFootprint: 0, processes: [], killedLeftovers: [], helperSignal: nil)
         }
         send(request, to: input)
         let timer = startWatch(request.limits, watch)
@@ -102,15 +104,16 @@ final class WebMotionHelperProcess: @unchecked Sendable {
             stop()
         }
         timer.cancel()
+        let status = process.terminationStatus
+        let signaled = process.terminationReason == .uncaughtSignal
         let (identities, outcome, peak) = withLock { () -> ([WebMotionProcessIdentity], Outcome, UInt64) in
-            let status = process.terminationStatus
-            let signaled = process.terminationReason == .uncaughtSignal
             if cancelled { return (processes, .cancelled, peakFootprint) }
             if let kill { return (processes, .killed(kill, log: log.text), peakFootprint) }
             return (processes, .finished(result: result, status: status, signaled: signaled, log: log.text), peakFootprint)
         }
         let leftovers = await WebMotionProcessTeardown.ensureGone(identities, grace: watch.teardownGrace)
-        return Report(outcome: outcome, peakFootprint: peak, processes: identities.map(\.pid), killedLeftovers: leftovers)
+        return Report(outcome: outcome, peakFootprint: peak, processes: identities.map(\.pid), killedLeftovers: leftovers,
+                      helperSignal: signaled ? status : nil)
     }
 
     // MARK: Watch
