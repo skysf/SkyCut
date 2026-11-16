@@ -81,6 +81,12 @@ enum MediaFileTypes {
         ["png", "jpg", "jpeg", "heic", "heif", "webp", "bmp", "tif", "tiff", "gif"]
             .contains(url.pathExtension.lowercased())
     }
+
+    /// Audio files by name extension (add media, Finder drops, the AI's folder scan; `VideoEditProject.looksLikeAudio` asks here).
+    static func isAudio(_ url: URL) -> Bool {
+        ["mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "opus", "wma", "caf"]
+            .contains(url.pathExtension.lowercased())
+    }
 }
 
 extension SubtitleColor {
