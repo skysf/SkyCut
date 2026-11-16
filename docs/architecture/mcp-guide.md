@@ -72,7 +72,7 @@
       改工程的 `One undo step`、回任务号的 `wait with get_job`、花积分的 `Paid (Sky Studio credits)` + `quote_only`（收它的工具才写：`add_voiceover`
       不收，整段报价在回任务号之前自动做）+ `daily credit limit`、收 `confirm_token` 的 `needs_confirmation`、要先读说明书的最后一句
       `skycut_guide topic=<工具名>`（试点里是 edit_clip、generate_media、look，加上 add_voiceover；第一批里是花积分的 upscale_clip、
-      manage_characters 和流程长的 record_screen、sync_voiceover、cut_speech，同方案 2.2 第 5 条）。第一批还按性质加了出片的 `never overwrites` /
+      manage_characters 和流程长的 record_screen、sync_voiceover、cut_speech，同方案 2.2 第 5 条；2026-11-16 起还有 set_transition：加了 sound，那几节在说明书里，[声音怎么过一刀](cut-sound.md)）。第一批还按性质加了出片的 `never overwrites` /
       `Never replaces a file`、删文件的 `Trash`、等用户的 `waiting_for_user`。改到联动的三张名片（`freeze_frame`、`cut_speech`、`delete_items`）
       照旧写「Linkage on:」（`checks/timeline-drag-wiring/linkage.sh` 按这个记号认）。一行例子（`Example: {…}` 单独一行，`UsageExampleChecks`
       按真实参数定义核对）留在 `sync_voiceover`、`export_video`、`inspect_video` 三张名片上：选工具那一刻就用得上。

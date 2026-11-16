@@ -27,7 +27,8 @@ enum MCPGuideMap {
     volume, fades, crop, 9:16 reframe, position, animation, file swap), edit_clips (batch), split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes (animate position, size, rotation, opacity)
     Speech and beat cuts: cut_speech (filler words, pauses, retakes), cut_to_beat (cut V1 to music beats)
-    Picture: set_canvas (9:16, 1:1, 16:9, frame rate), set_transition, set_filter (looks, colour), set_text / set_texts \
+    Picture: set_canvas (9:16, 1:1, 16:9, frame rate), set_transition (dissolves, wipes; or the sound across a cut: J/L \
+    cut, crossfade, bed, on the beat), set_filter (looks, colour), set_text / set_texts \
     (titles), set_shape / set_shapes (lines, boxes, circles, arcs; blur or mosaic to hide logos, faces, watermarks)
     Audio: find_audio (music and sound effects), add_voiceover (narration spoken from text), sync_voiceover (retime \
     pictures and titles to existing narration), set_track (track volume, mute or hide a track, master fader)
