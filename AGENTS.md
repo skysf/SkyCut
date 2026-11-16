@@ -173,6 +173,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 画面文字、字体、Core Text 渲染、文字动画、逐帧导出、预览上文字的选中框和可点范围、文字行（行号进模型、上下换行）、数字的等待、老虎机位数不同的两头（`NumberOdometer`） | [画面文字](docs/architecture/text-overlays.md)（把手的可点范围写在 `.offset` 之前；行号进模型、预览与导出同一份叠放序；导出时序列末尾多渲两帧、几段左闭右开）、[拖动手势 §5j](docs/architecture/timeline-drag-gestures.md) |
 | 滤镜调色、LUT、预览图层滤镜、导出 `lut3d` 段、滤镜段的选中（多选）、任何滤镜下纯黑的地方（空档、黑场、黑底字卡） | [滤镜](docs/architecture/filters.md)（纯黑不抬：`FilterLUT.holdingBlack`） |
 | 画面上的形状（线条 / 长方形 / 正方形 / 圆 / 圆弧）：种类、几何、怎么画（`ShapeOutline`、`ShapePreviewDrawing`、`ShapePNGRenderer`、`ShapeOverlayCanvas`）、入场 / 出场动画（`ShapeAnimation` / `ShapeAnimator`、导出切段 `ShapeOverlayExport`、形状和文字共用的 `OverlayExportFile`）、`set_shape` | [画面上的形状](docs/architecture/shapes.md)（画什么只有 `ShapeOutline.drawing` 一份，预览和导出同一条路径；什么都没露出来时给空路径）、[画面文字](docs/architecture/text-overlays.md)（只逐帧渲动画进行中的那段）、[盖一块：模糊 / 马赛克](docs/architecture/cover-blur-mosaic.md)（模糊 / 马赛克也是形状的一种） |
+| 动效预设（`MotionPreset*`、加字的「动效预设」一栏、检查器「动画」区的「预设」和「落点」、set_text 的 `motion_preset` / `hit_at` / `small_text`、`motionPreset` 标记） | [动效预设](docs/architecture/motion-presets.md)（放上去的是普通的字和形状、规则只在 `MotionPresetGroups`；标题是锚；组的标记不抬格式版本）、[画面文字](docs/architecture/text-overlays.md)、[画面上的形状](docs/architecture/shapes.md) |
 | 盖一块（模糊 / 马赛克，`ShapeKind.blur` / `.mosaic`）、预览的第二层播放器（`CoverPreviewLayer`）、导出里的 `gblur` / `pixelize`（`VideoEditCoverExport`）、`set_shape` 的 blur / mosaic、`look text_scan` 给的 `cover`（`AICoverBox`）、遮水印 / 遮旧字幕 | [盖一块：模糊 / 马赛克](docs/architecture/cover-blur-mosaic.md)（不跟着片段走；落点在调色之后、形状之前；预览的蒙版和滤镜别挂同一层）、[滤镜](docs/architecture/filters.md)、[预览自由变换](docs/architecture/preview-free-transform.md)、[AI 接口（MCP）第 38 条](docs/architecture/ai-control-mcp.md)、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（没有盖一块时第二层不建） |
 | 工程帧率、关键帧容差、AI 读写关键帧（`edit_clip keyframes` 策略、`relative` 时间）、关键帧的缓动（`Keyframe.easing`、`KeyframeEasing`、预览按帧加密 `KeyframeSliceTimes`） | [工程帧率](docs/architecture/project-frame-rate.md)、[关键帧动画](docs/architecture/keyframe-animation.md)（「AI 接口」「缓动」：报给 AI 的关键帧永远在片段范围里；linear 逐位一致）、[限幅 + 缓动方案](docs/plans/2026-09-30-export-limiter-and-easing.md) |
 | 音量、dB、渐入渐出、增益表（`AudioGainTable.swift`）、音频引擎（`Sources/SrtFlow/AudioEngine/`：配置、环、喂样、渲染块、离线渲染）、引擎的图什么时候开着（空闲停图 / 再起 `AudioEngineIdlePolicy` / `AudioEngineIdleKeeper`、`suspend` / `wake` / `recoverIfNeeded`、待钉的锚点 `PlaybackAnchor`、用户在不在 `AppUserPresence`、换工程收引擎 `unloadPreview`、播到头收尾 `PlayerClock.finishAtEnd` / `PlaybackAudioSource.duration`、`AudioRenderClock.hasTicked`）、读素材 / 重采样（`AudioSegmentReader`）、预览合成里没有音轨（配乐比画面长要垫黑底） | [声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[成片的声音](docs/architecture/export-audio-mixdown.md)、[音频引擎](docs/architecture/audio-engine.md)（「结构没变」= 轨 + 段的身份 + 段的几何（`Segment.Structure`）；图只在马上要出声时开着：停着 2 分钟没人用就停（用户定的数，改它先问用户）、停图只许经 `AudioEngineIdleKeeper`；播到头由声音主时钟按总长自己收尾）、[预览的音频引擎一直开着，Mac 不睡](docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md)、[音频引擎方案](docs/plans/2026-10-01-audio-engine.md) |
@@ -342,7 +343,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/gui-smoke/sky-studio/` — 对着假 Sky Studio 的免费端到端冒烟（含 `voice_change.py`）。
 - `scripts/gui-smoke/client-measure/` — 真 Claude Code / Codex 实测。用用户自己的额度，**每次开跑前问用户**。
 - `scripts/gui-smoke/external-file-drag/replay.sh`、`scripts/gui-smoke/drop-routing-probe/probe.sh` — 跨 App 文件拖放重放、SwiftUI 落点路由探针。要图形会话。
-- `scripts/render-voice-library.sh <输出目录>` — 声音库 / 变声界面的离屏出图。要图形会话。
+- `scripts/render-voice-library.sh <输出目录>`、`scripts/render-motion-presets.sh <输出目录>` — 声音库 / 变声、动效预设的离屏出图（动效预设还要 ffmpeg）。要图形会话。
 - `scripts/signing/create-identity.sh` — 建签名身份，一次性的；见到签名目录不在先停下来告诉用户，别去跑它。
 - 官网（在 `website/`）：`tests/*.test.mjs` 和 `npm run check:seo` 在 CI 的网站那一步里；浏览器级的 `scripts/check-hero-browsers.mjs`、`scripts/check-legibility-browsers.mjs`（`npx -y -p playwright@1.65.0 node …`）是手动的、无头、只在 Mac 上；改了首屏场景的外观要 `npm run build:hero-still` 重烤。
 
@@ -468,6 +469,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [画面文字](docs/architecture/text-overlays.md) — 唯一的绘制入口、版面框即定位框、九种动画与「只逐帧渲动画段」、数字元件、文字行。
 - [滤镜](docs/architecture/filters.md) — 时间轴上的调色段、层号进模型、预览挂图层滤镜、纯黑不抬、两条管线的对齐约束。
 - [画面上的形状](docs/architecture/shapes.md) — 所有种类画什么只有 `ShapeOutline.drawing` 一份（预览 / 导出 / look 同一条路径）；入场 / 出场动画。
+- [动效预设](docs/architecture/motion-presets.md) — 一套 = 普通的字和形状 + 组的标记：规则只在 `MotionPresetGroups`、标题是锚、按短边和墨迹摆、不抬格式版本。
 - [盖一块：模糊 / 马赛克](docs/architecture/cover-blur-mosaic.md) — 形状的一种、不跟着片段走；三条管线按构造一致；八条硬约束。
 - [录屏生命周期](docs/architecture/screen-recording-lifecycle.md) — 状态机、journal、恢复、退出与快照；AI 起的会话走同一条流程。
 - [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md) — 写入、取消、焦点与光标合同。
