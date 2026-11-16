@@ -75,6 +75,7 @@
 - [2026-10-14 滤镜把纯黑抬成灰](2026-10-14-filters-lift-pure-black.md) — 纯黑不抬（`FilterLUT.holdingBlack`）：调色作用于画面，不作用于编辑出来的黑。
 - [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 定格切出的右半不到一源帧（算上变速）、帧率已知、后面没接转场才拿掉；够一帧的留着，AI 定格后剩不到 1 秒的报 `tail_id`。
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。
+- [2026-11-17 Ripple-deleting a freeze hold moves the clip before it](2026-11-17-freeze-tail-ripple-drags-its-clip.md) — A piece that moves away from its partners keeps no link group; a V1 ripple never moves a clip before its point.
 - [2026-09-27 GBK 字幕读出来是乱码](2026-09-27-gbk-subtitles-read-as-utf16.md) — 编码识别只走 `TextDecoding`；宽容的解码器（UTF-16）只能放最后或先用特征确认。
 - [2026-11-07 生成图片的扩展名和实际字节不符](2026-11-07-generated-image-extension-from-bytes.md) — 下载后按实际字节定扩展名、不重编码；交付失败不重新生成。
 - [2026-10-30 生成固定首个模型且缺少多参考](2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和参考限制可查询；当时的「退款明确后替换一次」10-31 已移除，现在拒绝和未知结果都只查原单。
