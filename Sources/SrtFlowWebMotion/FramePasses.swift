@@ -17,6 +17,8 @@ final class FramePasses {
     private let scratch: FrameMemory
     private var hashes: [String] = []
     private var blank: [Bool] = []
+    /// Some frame has a pixel below alpha 255 (the movie must carry alpha).
+    private var translucent = false
     private var slowest = 0.0
 
     init(request: WebMotionRequest, workers: [PageWorker], path: WebMotionAlphaPath) {
@@ -38,7 +40,8 @@ final class FramePasses {
         report.timing.finishSeconds = report.elapsed - finishing
         try checkBlankFrames()
         try await drawSamplesAgain()
-        try await FrameEncoder.verify(url, frames: frames, fps: request.fps)
+        try await FrameEncoder.verify(url, frames: frames, fps: request.fps, translucent: translucent)
+        report.transparent = translucent
         report.pass(.noTimeout, "Slowest frame " + String(format: "%.2f", slowest) + " s (limits: script "
             + "\(Deadline.format(request.limits.script)) s, snapshot \(Deadline.format(request.limits.snapshot)) s, total "
             + "\(Deadline.format(request.limits.total)) s).")
@@ -74,9 +77,10 @@ final class FramePasses {
             for offset in 0..<batch {
                 guard let frame = try captured[offset]?.get() else { throw HelperFailure(description: "A frame went missing.") }
                 let buffer = try encoder.makeBuffer()
-                let (hash, isBlank) = try FrameCapture.write(frame, into: buffer, scratch: scratch)
+                let (hash, isBlank, isOpaque) = try FrameCapture.write(frame, into: buffer, scratch: scratch)
                 hashes.append(hash)
                 blank.append(isBlank)
+                translucent = translucent || !isOpaque
                 try await encoder.append(buffer, frame: first + offset)
             }
             first += batch

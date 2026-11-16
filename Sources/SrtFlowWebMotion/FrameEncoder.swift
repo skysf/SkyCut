@@ -85,8 +85,10 @@ final class FrameEncoder {
         }
     }
 
-    /// Reads the written file back: one video track with alpha, the `almo` premultiplied tag, frames / fps long.
-    static func verify(_ url: URL, frames: Int, fps: Int) async throws {
+    /// Reads the written file back: one video track with alpha and the `almo` premultiplied tag, frames / fps long.
+    /// When every frame was fully opaque the encoder leaves the alpha channel out (measured 2026-11-17): that movie is
+    /// accepted without alpha (SkyCut reads it as opaque video); a translucent frame without alpha in the file fails.
+    static func verify(_ url: URL, frames: Int, fps: Int, translucent: Bool) async throws {
         let asset = AVURLAsset(url: url)
         guard let track = try await asset.loadTracks(withMediaType: .video).first,
               let format = try await track.load(.formatDescriptions).first else {
@@ -96,9 +98,10 @@ final class FrameEncoder {
         let atoms = CMFormatDescriptionGetExtension(
             format, extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms) as? [String: Any]
         let mode = CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_AlphaChannelMode) as? String
-        guard alpha == true, atoms?["almo"] != nil, mode == (kCMFormatDescriptionAlphaChannelMode_PremultipliedAlpha as String) else {
+        let tagged = alpha == true && atoms?["almo"] != nil && mode == (kCMFormatDescriptionAlphaChannelMode_PremultipliedAlpha as String)
+        guard tagged || (alpha != true && !translucent) else {
             throw Failure(description: "The written movie is not tagged as premultiplied alpha (alpha \(String(describing: alpha)), "
-                + "almo \(atoms?["almo"] != nil), mode \(mode ?? "none")).")
+                + "almo \(atoms?["almo"] != nil), mode \(mode ?? "none"), translucent frames \(translucent)).")
         }
         let duration = try await track.load(.timeRange).duration
         let expected = CMTime(value: Int64(frames), timescale: Int32(fps))

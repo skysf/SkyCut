@@ -27,6 +27,7 @@ final class HelperReport {
     var frameHashes: [String] = []
     var blankFrames: [Int] = []
     var alpha: WebMotionAlphaReport?
+    var transparent = true
     var versions: WebMotionVersions?
     var timing = WebMotionTiming()
     private var processes: [Int32] = []
@@ -74,7 +75,8 @@ final class HelperReport {
             accepted: accepted,
             checks: WebMotionCheckName.allCases.map { checks[$0] ?? WebMotionCheck(name: $0, passed: nil, detail: "Not reached.") },
             failure: failure, pageErrors: pageErrors, frameCount: frameCount, frameHashes: frameHashes,
-            blankFrames: blankFrames, alpha: alpha, versions: versions, timing: timing, webKitProcesses: processes)
+            blankFrames: blankFrames, alpha: alpha, transparent: transparent, versions: versions, timing: timing,
+            webKitProcesses: processes)
     }
 
     /// Prints the result line once, runs the cleanups, exits.

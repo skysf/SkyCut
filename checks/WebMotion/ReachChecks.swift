@@ -23,19 +23,24 @@ enum ReachChecks {
         }
         defer { listener.stop() }
         check(listener.selfTest(), "positive control: this process reaches the listener on port \(listener.port) by TCP and UDP")
-        Fixture.setEnvironment(linger, "2.5")
-        let run = await runHelper(Fixture.job(ReachPages.network(port: listener.port), name: "network", limits: Fixture.tight))
-        Fixture.setEnvironment(linger, nil)
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
-        let seen = listener.counts
-        check(seen.connections.isEmpty && seen.datagrams == 0, "no request, connection or datagram left the page "
-            + "(fetch, XHR, beacon, sockets, event source, images, styles, fonts, scripts, media, frames, forms, navigation, "
-            + "popups, workers, preconnect, prefetch, WebRTC): \(seen.connections.count) connections \(seen.connections), "
-            + "\(seen.datagrams) datagrams")
-        let errors = run.rejected?.pageErrors ?? []
-        check(errors.contains { $0.hasPrefix("Blocked:") }, "the page's attempts come back as page errors for the AI: "
-            + (errors.first ?? String(describing: run.error)))
-        check(run.processesEnded, "the network page's WebKit processes ended")
+        for (name, page) in [("network", ReachPages.network(port: listener.port)), ("navigation", ReachPages.navigation(port: listener.port))] {
+            listener.reset()
+            Fixture.setEnvironment(linger, "2.5")
+            let run = await runHelper(Fixture.job(page, name: name, limits: Fixture.tight))
+            Fixture.setEnvironment(linger, nil)
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            let seen = listener.counts
+            check(seen.connections.isEmpty && seen.datagrams == 0, "\(name) page: no request, connection or datagram left it "
+                + (name == "network" ? "(fetch, XHR, beacon, sockets, event source, images, styles, fonts, scripts, media, frames, "
+                    + "workers, preconnect, prefetch, WebRTC)" : "(meta refresh, form post, link and ping, location, popup)")
+                + ": \(seen.connections.count) connections \(seen.connections), \(seen.datagrams) datagrams")
+            check(run.processesEnded && !run.timedOut, "\(name) page: the helper and its WebKit processes ended (\(run.processSummary))")
+            if name == "network" {
+                let errors = run.rejected?.pageErrors ?? []
+                check(errors.contains { $0.hasPrefix("Blocked:") }, "the page's attempts come back as page errors for the AI: "
+                    + (errors.first ?? run.outcome))
+            }
+        }
     }
 
     private static func files() async {

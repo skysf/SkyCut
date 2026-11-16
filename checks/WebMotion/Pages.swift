@@ -70,6 +70,16 @@ enum Pages {
         <div id="disc"></div><script>window.motion = { frame() {} };</script></body></html>
         """
 
+    /// A full opaque background (a title card): every frame opaque, so the movie has no alpha channel.
+    static let opaque = """
+        <!doctype html><html><head><meta charset="utf-8"><style>
+        html,body{margin:0;background:#204060;overflow:hidden}
+        #box{position:absolute;top:60px;width:40px;height:40px;background:#fff}
+        </style></head><body><div id="box"></div><script>
+        window.motion = { frame(t) { document.getElementById('box').style.left = (20 + t * 100) + 'px'; } };
+        </script></body></html>
+        """
+
     static let loopInFrame = """
         <!doctype html><html><body style="margin:0;background:transparent"><div id="d" style="position:absolute;width:40px;height:40px;background:#fff"></div><script>
         window.motion = { frame(t) { if (t >= 0.5) { while (true) {} } document.getElementById('d').style.left = (t * 100) + 'px'; } };

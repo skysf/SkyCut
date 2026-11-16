@@ -10,13 +10,15 @@ Task { @MainActor in
         exit(1)
     }
     let started = ProcessInfo.processInfo.systemUptime
-    let heartbeat = Heartbeat()
-    heartbeat.start()
     // `SRTFLOW_WEB_MOTION_CHECKS=reach,clock` runs only those groups (reverse verification); unset runs all of them.
     let only = Set((ProcessInfo.processInfo.environment["SRTFLOW_WEB_MOTION_CHECKS"] ?? "").split(separator: ",").map(String.init))
     func wanted(_ group: String) -> Bool { only.isEmpty || only.contains(group) }
     if wanted("pure") { PureChecks.run() }
     if wanted("clock") { await ClockChecks.run() }
+    // From here on everything goes through SkyCut's API: its main thread must keep beating (the clock group above drives
+    // its own WKWebView on the main thread, which SkyCut never does).
+    let heartbeat = Heartbeat()
+    heartbeat.start()
     if wanted("normal") { await NormalChecks.run() }
     if wanted("alpha") { await AlphaChecks.run() }
     if wanted("hostile") { await HostileChecks.run() }

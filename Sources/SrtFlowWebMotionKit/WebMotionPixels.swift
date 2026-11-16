@@ -34,18 +34,21 @@ public struct WebMotionFrameBytes {
 }
 
 public enum WebMotionPixels {
-    /// True when every pixel is fully transparent (alpha 0).
-    public static func isBlank(_ frame: WebMotionFrameBytes) -> Bool {
+    /// The lowest and highest alpha in the frame: max 0 = empty (fully transparent), min 255 = fully opaque.
+    public static func alphaRange(_ frame: WebMotionFrameBytes) -> (min: UInt8, max: UInt8) {
+        var low: UInt8 = 255
+        var high: UInt8 = 0
         for y in 0..<frame.height {
             let row = frame.row(y)
             var x = 3
             let end = frame.width * 4
             while x < end {
-                if row[x] != 0 { return false }
+                low = min(low, row[x])
+                high = max(high, row[x])
                 x += 4
             }
         }
-        return true
+        return (low, high)
     }
 
     /// SHA-256 of the visible bytes, row by row (padding excluded), as lowercase hex.

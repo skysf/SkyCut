@@ -114,6 +114,9 @@ public struct WebMotionResult: Codable, Sendable, Equatable {
     public var frameHashes: [String]
     public var blankFrames: [Int]
     public var alpha: WebMotionAlphaReport?
+    /// Some frame has a translucent or transparent pixel, so the movie carries alpha. False: every frame is fully
+    /// opaque and the movie has no alpha channel (the encoder leaves an all-255 alpha out); SkyCut reads it as opaque.
+    public var transparent: Bool
     public var versions: WebMotionVersions?
     public var timing: WebMotionTiming
     /// The WebKit processes (WebContent, GPU, Networking) the helper's pages used.
@@ -123,7 +126,7 @@ public struct WebMotionResult: Codable, Sendable, Equatable {
 
     public init(accepted: Bool, checks: [WebMotionCheck], failure: WebMotionFailure?, pageErrors: [String],
                 frameCount: Int, frameHashes: [String], blankFrames: [Int], alpha: WebMotionAlphaReport?,
-                versions: WebMotionVersions?, timing: WebMotionTiming, webKitProcesses: [Int32]) {
+                transparent: Bool = true, versions: WebMotionVersions?, timing: WebMotionTiming, webKitProcesses: [Int32]) {
         self.accepted = accepted
         self.checks = checks
         self.failure = failure
@@ -132,6 +135,7 @@ public struct WebMotionResult: Codable, Sendable, Equatable {
         self.frameHashes = frameHashes
         self.blankFrames = blankFrames
         self.alpha = alpha
+        self.transparent = transparent
         self.versions = versions
         self.timing = timing
         self.webKitProcesses = webKitProcesses

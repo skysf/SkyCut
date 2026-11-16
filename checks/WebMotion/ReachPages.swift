@@ -5,8 +5,10 @@ import Foundation
 // their own error text ("SUMMARY {…}", the side channel every page has: SkyCut returns page errors verbatim).
 
 enum ReachPages {
-    /// Everything fires while loading (a page rejected at load must still have tried everything: the check keeps the
-    /// helper alive a little after the result, `SRTFLOW_WEB_MOTION_TEST_LINGER`).
+    /// Every network path fires while loading (a page rejected at load must still have tried everything: the check keeps
+    /// the helper alive a little after the result, `SRTFLOW_WEB_MOTION_TEST_LINGER`). No navigation here: a refused
+    /// navigation stops the page's pending network work (WebRTC gathering, preconnects) before it reaches the network,
+    /// and the first version of this page hid those two leaks that way (reverse verification, 2026-11-17).
     static func network(port: UInt16) -> String {
         let base = "http://127.0.0.1:\(port)"
         return """
@@ -17,13 +19,10 @@ enum ReachPages {
             <style>@import url("\(base)/import.css"); body{background-image:url("\(base)/bg.png")}
             @font-face{font-family:X;src:url("\(base)/font.woff2")} .f{font-family:X}</style>
             <script src="\(base)/script.js"></script>
-            <meta http-equiv="refresh" content="1;url=\(base)/refresh">
             </head><body style="margin:0;background:transparent"><span class="f">x</span>
             <img src="\(base)/img.png"><video src="\(base)/v.mp4" autoplay muted></video><audio src="\(base)/a.mp3" autoplay></audio>
             <object data="\(base)/object"></object><embed src="\(base)/embed"><iframe src="\(base)/iframe"></iframe>
             <svg><image href="\(base)/svg.png" width="9" height="9"/></svg>
-            <form id="form" action="\(base)/form" method="post"><input name="a" value="b"></form>
-            <a id="link" href="\(base)/link" ping="\(base)/ping">x</a>
             <script>
             const B = '\(base)';
             const tryIt = (f) => { try { const r = f(); if (r && r.catch) r.catch(() => {}); } catch (e) {} };
@@ -35,7 +34,6 @@ enum ReachPages {
             tryIt(() => navigator.sendBeacon(B + '/beacon', 'x'));
             tryIt(() => new FontFace('Y', 'url(' + B + '/fontface.woff2)').load());
             tryIt(() => { const i = new Image(); i.src = B + '/image.png'; });
-            tryIt(() => window.open(B + '/popup'));
             tryIt(() => new Worker(URL.createObjectURL(new Blob(["fetch('" + B + "/worker')"]))));
             tryIt(() => typeof WebTransport === 'function' && new WebTransport('https://127.0.0.1:\(port)/wt'));
             tryIt(() => {
@@ -50,10 +48,28 @@ enum ReachPages {
               const R = f.contentWindow && f.contentWindow.RTCPeerConnection; if (!R) return;
               const pc = new R({ iceServers: [{ urls: 'stun:127.0.0.1:\(port)' }] }); pc.createDataChannel('d');
               return pc.createOffer().then((o) => pc.setLocalDescription(o)); });
+            window.motion = { frame(t) { tryIt(() => fetch(B + '/frame?t=' + t)); } };
+            </script></body></html>
+            """
+    }
+
+    /// The ways a page can try to leave itself: a meta refresh, a form post, a link with ping, location, a popup.
+    static func navigation(port: UInt16) -> String {
+        let base = "http://127.0.0.1:\(port)"
+        return """
+            <!doctype html><html><head><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=\(base)/refresh"></head>
+            <body style="margin:0;background:transparent"><div style="width:20px;height:20px;background:#fff"></div>
+            <form id="form" action="\(base)/form" method="post"><input name="a" value="b"></form>
+            <a id="link" href="\(base)/link" ping="\(base)/ping">x</a>
+            <script>
+            const B = '\(base)';
+            const tryIt = (f) => { try { f(); } catch (e) {} };
+            tryIt(() => window.open(B + '/popup'));
             tryIt(() => document.getElementById('form').submit());
             tryIt(() => document.getElementById('link').click());
             tryIt(() => { location.href = B + '/navigate'; });
-            window.motion = { frame(t) { tryIt(() => fetch(B + '/frame?t=' + t)); } };
+            tryIt(() => { location.replace(B + '/replace'); });
+            window.motion = { frame() {} };
             </script></body></html>
             """
     }

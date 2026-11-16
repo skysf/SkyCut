@@ -5,51 +5,6 @@ import SrtFlowWebMotionKit
 // and takes its WebKit processes with it; a page error comes back verbatim with its time; a page that keeps state between
 // frames fails "same t twice"; a page without motion.frame fails "frame entry"; a huge canvas changes nothing.
 
-/// One helper run through the low-level runner (pids, peak memory, how long it took).
-struct RawRun {
-    let report: WebMotionHelperProcess.Report
-    let seconds: Double
-
-    var error: WebMotionRenderError? {
-        do {
-            _ = try WebMotionRenderer.accepted(report.outcome)
-            return nil
-        } catch let error as WebMotionRenderError {
-            return error
-        } catch {
-            return nil
-        }
-    }
-
-    var rejected: WebMotionResult? {
-        if case .rejected(let result)? = error { return result }
-        return nil
-    }
-
-    var killed: WebMotionKill? {
-        if case .killed(let kill)? = error { return kill }
-        return nil
-    }
-
-    /// Every WebKit process the helper reported has ended.
-    var processesEnded: Bool { report.processes.allSatisfy { !isRunning($0) } }
-
-    /// Each reported process, its name and whether it still runs (for failure messages).
-    var processSummary: String {
-        report.processes.map { pid in
-            "\(pid) \(WebMotionProcessIdentity.current(pid)?.name ?? "-") \(isRunning(pid) ? "RUNNING" : "ended")"
-        }.joined(separator: ", ") + "; killed by SkyCut: \(report.killedLeftovers)"
-    }
-}
-
-func runHelper(_ job: WebMotionJob, watch: WebMotionHelperProcess.Watch = .init()) async -> RawRun {
-    let start = ProcessInfo.processInfo.systemUptime
-    let helper = WebMotionRenderer.helperURL() ?? URL(fileURLWithPath: Fixture.helper)
-    let report = await WebMotionHelperProcess().run(job.request(writingTo: job.output), helper: helper, watch: watch)
-    try? FileManager.default.removeItem(at: job.output)
-    return RawRun(report: report, seconds: elapsed(since: start))
-}
-
 enum HostileChecks {
     static func run() async {
         section("Hostile pages")

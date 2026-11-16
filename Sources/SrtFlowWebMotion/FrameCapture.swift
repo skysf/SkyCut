@@ -66,13 +66,15 @@ enum FrameCapture {
         }
     }
 
-    /// Writes into a pixel buffer from the movie's pool.
-    static func write(_ frame: CapturedFrame, into buffer: CVPixelBuffer, scratch: FrameMemory) throws -> (hash: String, blank: Bool) {
+    /// Writes into a pixel buffer from the movie's pool. `blank`: fully transparent; `opaque`: no pixel below alpha 255.
+    static func write(_ frame: CapturedFrame, into buffer: CVPixelBuffer,
+                      scratch: FrameMemory) throws -> (hash: String, blank: Bool, opaque: Bool) {
         CVPixelBufferLockBaseAddress(buffer, [])
         defer { CVPixelBufferUnlockBaseAddress(buffer, []) }
         guard let base = CVPixelBufferGetBaseAddress(buffer) else { throw Failure(description: "A frame buffer has no memory.") }
         let bytes = try write(frame, into: base, bytesPerRow: CVPixelBufferGetBytesPerRow(buffer), scratch: scratch)
-        return (WebMotionPixels.digest(bytes), WebMotionPixels.isBlank(bytes))
+        let alpha = WebMotionPixels.alphaRange(bytes)
+        return (WebMotionPixels.digest(bytes), alpha.max == 0, alpha.min == 255)
     }
 
     private static func copy(_ image: CGImage, into base: UnsafeMutableRawPointer, bytesPerRow: Int) throws {

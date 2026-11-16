@@ -20,9 +20,10 @@ enum MemoryChecks {
         var watch = WebMotionHelperProcess.Watch()
         watch.interval = 0.05
         watch.memory.policy = WebMotionMemoryPolicy(budget: 600 << 20, warningBudget: 600 << 20)
-        let run = await runHelper(Fixture.job(Pages.memoryHog, name: "hog", limits: Fixture.tight, workers: 1), watch: watch)
+        let run = await runHelper(Fixture.job(Pages.memoryHog, name: "hog", limits: Fixture.tight, workers: 1), watch: watch,
+                                  within: 40)
         check(run.killed?.reason == .memoryBudget && (run.killed?.footprint ?? 0) > 600 << 20,
-              "a page eating 128 MB a frame is killed past its budget: \(run.killed?.message ?? String(describing: run.error))")
+              "a page eating 128 MB a frame is killed past its budget: \(run.killed?.message ?? run.outcome)")
         check(run.processesEnded && run.report.killedLeftovers.isEmpty && !run.report.processes.isEmpty,
               "…its \(run.report.processes.count) WebKit processes ended with the helper (peak \(run.report.peakFootprint >> 20) MB, "
               + String(format: "%.1f", run.seconds) + " s; " + run.processSummary + ")")
@@ -31,36 +32,37 @@ enum MemoryChecks {
     private static func injectedPressure() async {
         var critical = WebMotionHelperProcess.Watch()
         critical.memory.pressure = { .critical }
-        let out = await runHelper(Fixture.job(Pages.plain, name: "critical", limits: Fixture.tight), watch: critical)
+        let out = await runHelper(Fixture.job(Pages.plain, name: "critical", limits: Fixture.tight), watch: critical, within: 40)
         check(out.killed?.reason == .memoryPressure && out.seconds < 10 && out.processesEnded,
-              "the Mac out of memory: SkyCut kills a normal render at once: \(out.killed?.message ?? String(describing: out.error))")
+              "the Mac out of memory: SkyCut kills a normal render at once: \(out.killed?.message ?? out.outcome)")
         var low = WebMotionHelperProcess.Watch()
         low.memory.pressure = { .warning }
         low.memory.policy = WebMotionMemoryPolicy(budget: 3 << 30, warningBudget: 1 << 20)
-        let warned = await runHelper(Fixture.job(Pages.plain, name: "warning", limits: Fixture.tight), watch: low)
+        let warned = await runHelper(Fixture.job(Pages.plain, name: "warning", limits: Fixture.tight), watch: low, within: 40)
         check(warned.killed?.reason == .memoryBudget && warned.killed?.message.contains("low on memory") == true,
-              "low memory: over the smaller budget is killed: \(warned.killed?.message ?? String(describing: warned.error))")
+              "low memory: over the smaller budget is killed: \(warned.killed?.message ?? warned.outcome)")
     }
 
-    /// Fake helpers that keep no limits: one silent, one chatty forever.
+    /// Fake helpers that keep no limits: one silent, one chatty forever. Both loop in the script's own shell (no exec), so
+    /// a run that outlives its bound can still be stopped by the script's path.
     private static func backstops() async {
-        let silent = script("silent", "exec /bin/sleep 120")
+        let silent = script("silent", "while true; do /bin/sleep 1; done")
         let chatty = script("chatty", "while true; do echo '{\"kind\":\"progress\"}'; /bin/sleep 0.2; done")
         let limits = WebMotionLimits(load: 1, script: 0.5, snapshot: 1, total: 5)
         var watch = WebMotionHelperProcess.Watch()
         watch.grace = 1
         watch.interval = 0.1
         Fixture.setEnvironment("SRTFLOW_WEB_MOTION_HELPER", silent.path)
-        let stalled = await runHelper(Fixture.job(Pages.plain, name: "stalled", limits: limits), watch: watch)
+        let stalled = await runHelper(Fixture.job(Pages.plain, name: "stalled", limits: limits), watch: watch, within: 20)
         Fixture.setEnvironment("SRTFLOW_WEB_MOTION_HELPER", chatty.path)
-        let late = await runHelper(Fixture.job(Pages.plain, name: "late", limits: limits), watch: watch)
+        let late = await runHelper(Fixture.job(Pages.plain, name: "late", limits: limits), watch: watch, within: 20)
         Fixture.setEnvironment("SRTFLOW_WEB_MOTION_HELPER", Fixture.helper)
         check(stalled.killed?.reason == .stalled && stalled.seconds >= 3 && stalled.seconds < 10,
               "a helper that goes silent is killed after its quiet limit (3.5 s): "
-              + String(format: "%.1f", stalled.seconds) + " s, \(stalled.killed?.message ?? String(describing: stalled.error))")
+              + String(format: "%.1f", stalled.seconds) + " s, \(stalled.killed?.message ?? stalled.outcome)")
         check(late.killed?.reason == .overTime && late.seconds >= 5 && late.seconds < 12,
               "a helper that never finishes is killed after its total limit (5 s + 1 s): "
-              + String(format: "%.1f", late.seconds) + " s, \(late.killed?.message ?? String(describing: late.error))")
+              + String(format: "%.1f", late.seconds) + " s, \(late.killed?.message ?? late.outcome)")
     }
 
     private static func script(_ name: String, _ body: String) -> URL {

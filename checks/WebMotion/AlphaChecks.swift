@@ -37,11 +37,28 @@ enum AlphaChecks {
         } else {
             check(false, "auto with a broken fast path still renders (\(switched.summary))")
         }
+        await opaque()
         if case .failed(.rendererFailed(let message)) = refused {
             check(message.contains("fast transparent background is wrong"), "fast-only with a broken fast path is refused: \(message)")
         } else {
             check(false, "fast-only with a broken fast path is refused (\(refused.summary))")
         }
+    }
+
+    /// A page with a full opaque background: the encoder leaves the unused alpha out; the movie must still be accepted,
+    /// read by SkyCut as opaque, and show the page's color.
+    private static func opaque() async {
+        let outcome = await render(Fixture.job(Pages.opaque, name: "opaque"))
+        guard let done = outcome.render, let frame = await MovieFrames.decode(done.file, frames: [0])[0] else {
+            check(false, "a page with an opaque background is accepted (\(outcome.summary))")
+            return
+        }
+        let tag = await MovieFrames.alphaTag(done.file)
+        let background = frame.pixel(x: 200, y: 20)
+        check(!done.result.transparent && (tag == .opaque || tag == .premultiplied),
+              "a page with an opaque background is accepted as opaque video (alpha tag \(String(describing: tag)))")
+        check(abs(background.r - 0x20) <= 2 && abs(background.g - 0x40) <= 2 && abs(background.b - 0x60) <= 2 && background.a == 255,
+              "…and shows its background color (\(background))")
     }
 
     /// Patch centers in premultiplied BGRA, ± 2 (ProRes 4444 round trip).
