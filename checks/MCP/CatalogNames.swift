@@ -87,6 +87,8 @@ func catalogKnownNames() -> Set<String> {
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
                      "extended_frames", "levels_db", "skipped_no_sound", "equal_power", "raised_db"])
+    // set_canvas's reply (2026-11-17, AICanvasReframe): clips that covered the old frame but not the new one.
+    names.insert("no_longer_fill")
     return names
 }
 
