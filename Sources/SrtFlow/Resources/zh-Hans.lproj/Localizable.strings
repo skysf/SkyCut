@@ -1533,3 +1533,15 @@
 "macOS needs your permission before SkyCut can read the key. Open Settings > Sky Studio and click Allow." = "macOS 要你先允许 SkyCut 读取密钥。打开「设置 → Sky Studio」点「允许…」。";
 "Preparing this clip's sound…" = "正在准备这一段的声音…";
 "Pick a voice to see the price. The price comes from Sky Studio; a change that fails is refunded." = "选一个声音就能看到价格。价格来自 Sky Studio；没做成会退回。";
+"Versions…" = "版本…";
+"Versions" = "版本";
+"SkyCut saves a version before and after each round of AI edits, when the project changed. Going back is one step: ⌘Z returns." = "每一轮 AI 编辑之前和之后，只要工程有改动，SkyCut 都会存一个版本。回到某个版本只算一步，按 ⌘Z 就能回来。";
+"No saved versions yet." = "还没有存过版本。";
+"Before AI round" = "AI 这一轮之前";
+"After AI round" = "AI 这一轮之后";
+"Before going back" = "回到旧版本之前";
+"Saved version" = "存下的版本";
+"Go Back" = "回到这一版";
+"Put the whole project back to this version in one step; ⌘Z returns" = "把整个工程恢复成这一版（一步，按 ⌘Z 可以回来）";
+"Could not go back to %@." = "没能回到 %@。";
+"Saved before this round as %@ (project menu ▸ Versions…)." = "这一轮之前的样子已存为 %@（工程菜单 ▸ 版本…）。";

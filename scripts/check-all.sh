@@ -108,6 +108,7 @@ run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频�
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
+run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 
 # ---- 第 2 组 ----
 shard 2
@@ -169,6 +170,7 @@ run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号�
 run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
 run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
 run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
+run_check "project-versions-wiring (scan guard: router hook, undo version=, the round's save points, one-step restore, one writer)" checks/project-versions-wiring.sh
 run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
 # 小包上真走一遍 CI 的 .build 缓存：改过的文件（时间拨早了）照样重编、新 checkout 按内容设时间放回 .build 重编 0 样。
 run_check "ci-build-cache（.build 缓存不拿旧目标文件测新代码，也真省得下编译）" scripts/check-ci-build-cache.sh

@@ -1533,3 +1533,15 @@
 "macOS needs your permission before SkyCut can read the key. Open Settings > Sky Studio and click Allow." = "macOS needs your permission before SkyCut can read the key. Open Settings > Sky Studio and click Allow.";
 "Preparing this clip's sound…" = "Preparing this clip's sound…";
 "Pick a voice to see the price. The price comes from Sky Studio; a change that fails is refunded." = "Pick a voice to see the price. The price comes from Sky Studio; a change that fails is refunded.";
+"Versions…" = "Versions…";
+"Versions" = "Versions";
+"SkyCut saves a version before and after each round of AI edits, when the project changed. Going back is one step: ⌘Z returns." = "SkyCut saves a version before and after each round of AI edits, when the project changed. Going back is one step: ⌘Z returns.";
+"No saved versions yet." = "No saved versions yet.";
+"Before AI round" = "Before AI round";
+"After AI round" = "After AI round";
+"Before going back" = "Before going back";
+"Saved version" = "Saved version";
+"Go Back" = "Go Back";
+"Put the whole project back to this version in one step; ⌘Z returns" = "Put the whole project back to this version in one step; ⌘Z returns";
+"Could not go back to %@." = "Could not go back to %@.";
+"Saved before this round as %@ (project menu ▸ Versions…)." = "Saved before this round as %@ (project menu ▸ Versions…).";

@@ -152,7 +152,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`） | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红：链接只有 `[字](相对路径.md)`（可带 `#锚点`），条目只有顶格的 `- [标题](路径.md) — 一句话`、AGENTS.md 的索引小节另许成形的表格；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插，不用 `merge=union`：GitHub 不认）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
-| 工程存盘、格式版本、素材路径、自动保存、重建预览时开素材（`MediaAssetCache`）、新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零） | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（素材只开一次、按路径 + 文件身份认；换完整份时间线就要 `scheduleRebuild()`）、[工程文件生命周期](docs/bugfixes/2026-08-03-project-file-lifecycle.md) |
+| 工程存盘、格式版本、素材路径、自动保存、重建预览时开素材（`MediaAssetCache`）、新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零）; saved versions around AI rounds (`ProjectVersionStore`, `undo version=`, the Versions sheet) | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（素材只开一次、按路径 + 文件身份认；换完整份时间线就要 `scheduleRebuild()`）、[工程文件生命周期](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[Saved project versions](docs/architecture/project-versions.md) (restore as is, one undo step; only `saveNow` and the store write project files) |
 | 哪个工程：`OpenProjects`（`primary` / `others` / `focused` / `all`）、`VideoEditProject` 的建法、短 id（p1…）、工程代号（`DocumentGenerations`）、每个工程的撤销管理器、退出问每个工程、录屏落回开录的工程、工程窗口（`ProjectWindowController`、`ProjectTeardown`）、导出器归谁（`exporter.belongs(to:)`）；任何新代码要用到工程时 | [开着的工程（OpenProjects）](docs/architecture/open-projects.md)（工程只由注册表建；要工程时找注册表或调用方给的那一个，别假设只有一个；撤销不许退到键窗口的）、[AI 多开方案](docs/plans/2026-10-17-multi-project-ai-editing.md) |
 | 时间线捏合、滚动、移动、裁切（`TimelineTrim`：多段一起裁、链接伙伴一起裁）、吸附与对齐线、框选、点击落点（`VideoEditProject.seekFromTimeline`）、扫帧预览、拖动 / 拉框进行中的视图状态（`TimelineDragBox`）、缩放的锚点与纵向缩放 | [时间线缩放](docs/architecture/timeline-pinch-zoom.md)（锚点从时间线自己的滚动几何量，别按坐标 hitTest 找滚动视图）、[时间线拖动手势](docs/architecture/timeline-drag-gestures.md)（会话不进时间线的 `@State`；裁的算法只有 `TimelineTrim` 一份）、[拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) |
 | [联动](docs/architecture/timeline-linkage.md)（跟着画面走不跟 id (except a picture's own separated sound: rule 13)；规则只在 `perform` / `liveApply` 收尾一处；字幕句按词两头各自换算、说的话剩不到一半就删）、[方案](docs/plans/2026-10-02-timeline-linkage.md)、[拖动手势 §3.7](docs/architecture/timeline-drag-gestures.md) |
@@ -251,6 +251,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾。
 - `scripts/check-preview-composition.sh` — 预览合成真取帧：素材缓存、时间账、切片表、按块换源、转场的样子。
 - `scripts/check-project-file.sh` — 工程存盘与重链接、选择模型、标记、隐藏、关键帧缓动、形状动画等纯值合同。
+- `scripts/check-project-versions.sh` — Saved versions around AI rounds: one step back to the start field by field, nothing saved when nothing changed, pruning, two projects.
 - `scripts/check-region-framing.sh` — 源矩形取景的 look / 预览 / 导出。
 - `scripts/check-screen-recording-feedback.sh` — 录屏收尾的通知、晚到的 Stop、会话附言。
 - `scripts/check-screen-recording-writer.sh` — 录屏产物的画面轨盖到结尾（尾部不黑）。
@@ -311,6 +312,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/preview-perf-wiring.sh` — 每个视图 / `updateNSView` / Canvas 接了性能计数（漏了跑 `--fix` 自动补）；时间线上的块不读工程；订阅时钟的名单。
 - `checks/product-name.sh` — 看得见的叫 SkyCut，身份类的名字沿用 SrtFlow。
 - `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它。
+- `checks/project-versions-wiring.sh` — Saved versions: the router hook, `undo version=`, the round's save points, the one-step restore, one writer of project files.
 - `checks/region-framing-wiring.sh` — 源矩形取景接进现有编辑 / 批量和原生渲染。
 - `checks/release-signing.sh` — 发布版用固定的签名身份签；`tccutil` 只在一处。
 - `checks/report-evidence-no-local-paths.sh` — 进仓库的实测证据里没有本机的绝对路径。
@@ -345,6 +347,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/gui-smoke/client-measure/` — 真 Claude Code / Codex 实测。用用户自己的额度，**每次开跑前问用户**。
 - `scripts/gui-smoke/external-file-drag/replay.sh`、`scripts/gui-smoke/drop-routing-probe/probe.sh` — 跨 App 文件拖放重放、SwiftUI 落点路由探针。要图形会话。
 - `scripts/render-voice-library.sh <输出目录>` — 声音库 / 变声界面的离屏出图。要图形会话。
+- `scripts/render-project-versions.sh <folder>` — Off-screen images of the Versions sheet and the AI banner's version line. Needs a graphical session.
 - `scripts/signing/create-identity.sh` — 建签名身份，一次性的；见到签名目录不在先停下来告诉用户，别去跑它。
 - 官网（在 `website/`）：`tests/*.test.mjs` 和 `npm run check:seo` 在 CI 的网站那一步里；浏览器级的 `scripts/check-hero-browsers.mjs`、`scripts/check-legibility-browsers.mjs`（`npx -y -p playwright@1.65.0 node …`）是手动的、无头、只在 Mac 上；改了首屏场景的外观要 `npm run build:hero-still` 重烤。
 
@@ -453,6 +456,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — 锚点（捏合钉指针、工具栏钉播放头）从滚动几何量；纵向缩放统一行高。
 - [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 剪贴板只有一套且不写纯文本、换新身份走编码往返、落点鼠标优先、撞上往上抬。
 - [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式（版本表到 v34）、定位、脏标记与自动保存、换成 upscale 文件的段。
+- [Saved project versions](docs/architecture/project-versions.md) — Versions saved around each AI round: when (only if changed), where (per project file), pruning (30, 60 days), going back in one undo step, the AI's contract.
 - [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、吸附与对齐线、唯一落点、拖动会话不进 `@State`、框选、整条时间线只许一个拖放落点、插入缝与整轨换位。
 - [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览 / 导出同账；合成的一份时间账。
 - [关键帧动画](docs/architecture/keyframe-animation.md) — 源时间锚定、切片与 fill + matte、缓动、AI 接口。

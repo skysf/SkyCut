@@ -335,3 +335,5 @@
     `--self-test --against <另一份守卫>` 拿老守卫跑同一批场景打表（写「改之前 / 改之后」用）。
     改成白名单那一轮（2026-11-13，PR #424）：改之前的守卫（上一版）在链接和形状两组的 147 个场景里有 83 个该红的退出 0、2 个该绿的红了（顺序那一组只对新顺序有意义，没拿它跑）；改之后当时的 190 个全对。
     整份副本上 Codex 的 9 个输入（L1–L4、T1–T3、S1–S2）改之前都退出 0、改之后都红；它报的两处误报（唯一的索引带 `#锚点`、`mkdir docs/fake.md`）改之后绿。
+
+- Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).

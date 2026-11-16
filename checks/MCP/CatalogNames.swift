@@ -83,6 +83,9 @@ func catalogKnownNames() -> Set<String> {
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
                      "extended_frames", "levels_db", "skipped_no_sound"])
+    // Saved versions (2026-11-17, the undo topic's versions section): the round's first change returns before_round_version,
+    // undo version= returns saved_before_going_back (AIRoundVersions).
+    names.formUnion(["before_round_version", "saved_before_going_back"])
     return names
 }
 
