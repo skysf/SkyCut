@@ -114,10 +114,11 @@ ffmpeg 做不了干净的逐帧缩放（流尺寸中途不能变）和透明度�
   fill 除回真实色，见下面第 3 条。两条的摆放基准都固化成显式 placement
   （matte 的素材尺寸和原素材不同，靠素材推默认布局会各说各话）；关键帧要
   经由时间线时刻**换算到 matte 自己的源轴**（remappedAnimation）。
-  **带透明的静帧（`isAlphaStill`，2026-10-03）不用纯白素材**：matte 换成它自己的灰度遮罩（`StillAlphaNaming.matteURL`，
-  同一张图的 alpha 转成的、几何帧数和静帧一模一样），裁切、翻转、时间、关键帧都照抄不用换算 —— 于是 matte =
-  `图的 alpha × coverage × opacity`，和 fill（预乘过的内容压黑底）的权重仍然一样，除法照样约得干净。用纯白的话透明的
-  地方照样不透明，透明 PNG 一带关键帧就是黑方块（[案例](../bugfixes/2026-10-03-png-transparency-lost.md)）。
+  **带透明的段不用纯白素材**（`EditClip.sourceAlpha` 不是不透明）：matte 换成源自己的灰度遮罩 —— 透明静帧（2026-10-03）用
+  `StillAlphaNaming.matteURL`，带透明的视频（2026-11-16）用 `AlphaSourceCopies` 逐帧抽的，几何、时间戳和源一模一样，裁切、翻转、
+  时间、关键帧都照抄不用换算 —— 于是 matte = `源的 alpha × coverage × opacity`，和 fill（预乘过的内容压黑底；直通的源 fill 读的是
+  预乘副本）的权重仍然一样，除法照样约得干净。用纯白的话透明的地方照样不透明，一带关键帧就是黑方块
+  （[案例](../bugfixes/2026-10-03-png-transparency-lost.md)；规矩见 [定格 / 静帧管线](freeze-frame.md) 第 4a3 节「带透明的段」）。
 
 四个踩过的坑（前两个详见
 [2026-08-04-prerender-avfoundation-pitfalls](../bugfixes/2026-08-04-prerender-avfoundation-pitfalls.md)，
@@ -169,7 +170,8 @@ matte 角落纯黑。`scripts/check-export-alpha-compositing.sh`（4 项）：�
 也必须明显跑偏（两个反例都是防止坑被「优化」回去）。工程文件侧
 （`check-project-file.sh`）：动画往返、v3 版本、插值/变速/分割连续性。
 带透明的静帧（2026-10-03）：`scripts/check-video-fade.sh` 的 `AlphaStill.swift` —— 透明 PNG 经生产的工厂转成静帧放在白色主轨上，
-预览、静态的成片、带关键帧（fill + matte）的成片都是透明处白、不透明处黑；单独在 V1 时透明处是黑。
+预览、静态的成片、带关键帧（fill + matte）的成片都是透明处白、不透明处黑；单独在 V1 时透明处是黑。带透明的视频（2026-11-16）：
+同一个脚本的 `AlphaVideo.swift`（预乘 / 直通的带关键帧的段，预览和成片都和参考比）。
 
 人工回归（自动化够不着）：
 - [ ] 透明 PNG 单独放在 V1（或放在上层轨、下面是空的那一截）：**真播放器窗口里**透明的地方是黑的，不是暗绿（取帧器出的是
