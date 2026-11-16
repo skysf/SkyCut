@@ -7,8 +7,8 @@ import Foundation
 // 什么时候出来、用哪种入场 / 出场动画、动多久。
 // 不管什么：几块怎么量、怎么摆（MotionPresetLayout）、放进时间线 / 换预设 / 挪落点（MotionPresetGroups）。
 //
-// 数是照南极预告片的 8 套动效样片量的（Internal_Research/2026-11-13-southpole-practice/recut-v2/titles/：credits.py、titles.py，
-// 720p 上的像素 ×1.5 换到 1080）：样片「盒子框」= 框住再放开，「对焦」= 对焦出字，「两极之间的距离」= 标题 + 滚动的数字。
+// 数是照南极预告片的 8 套动效样片量的（样片的出图脚本 credits.py、titles.py，720p 上的像素 ×1.5 换到 1080）：
+// 样片「盒子框」= 框住再放开，「对焦」= 对焦出字，「两极之间的距离」= 标题 + 滚动的数字。
 // 用户没有品牌字体（2026-11-16）：默认用这台 Mac 自带的 Avenir Next、DIN Alternate 一路，用户可以换。
 // 动画只用 SkyCut 现成的（文字：擦除、淡入淡出、对焦、弹性缩放；形状：画出来、淡入淡出），不另造一种：预览和成片走同一条
 // 绘制路径（TextRenderer、ShapeOutline），预设只是把它们配好。
