@@ -56,9 +56,12 @@ enum MotionPresetGroups {
             title.number = number
         }
         let sizeBefore = title.style.fontSize
+        let boxBefore = title.boxWidth
         adjustTitle(&title)
         // 给了字号就照给的，不替它收。
         if title.style.fontSize == sizeBefore { MotionPresetLayout.fitWidth(&title, canvas: canvas) }
+        // A box_width the caller passed stays; otherwise the wrap width hugs the words (MotionPresetLayout.snugBoxWidth).
+        if title.boxWidth == boxBefore { title.boxWidth = MotionPresetLayout.snugBoxWidth(title, canvas: canvas) }
         members.texts.append(title)
 
         if let small = spec.small, !small.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, spec.kind != .titleCounter {
@@ -67,6 +70,7 @@ enum MotionPresetGroups {
                             beat: design.beat(role, kind: spec.kind, duration: duration), id: nil)
             line.motionPreset = tag(role)
             MotionPresetLayout.fitWidth(&line, canvas: canvas)
+            line.boxWidth = MotionPresetLayout.snugBoxWidth(line, canvas: canvas)
             members.texts.append(line)
         }
         if spec.kind == .titleCounter {
@@ -75,6 +79,7 @@ enum MotionPresetGroups {
             counter.number = spec.number ?? counterRoll(from: nil)
             counter.motionPreset = tag(.counter)
             MotionPresetLayout.fitWidth(&counter, canvas: canvas)
+            counter.boxWidth = MotionPresetLayout.snugBoxWidth(counter, canvas: canvas)
             members.texts.append(counter)
             members.shapes.append(shape(.line, role: .rule, design: design, spec: spec, canvas: canvas, duration: duration, tag: tag(.rule)))
         }
@@ -261,7 +266,20 @@ enum MotionPresetGroups {
     static func update(_ id: UUID, in state: inout TimelineState, _ change: (inout TextOverlay) -> Void) {
         let before = state.textOverlays.first { $0.id == id }
         state.updateTextOverlay(id, change)
-        if let before, before.motionPreset != nil { follow(id, before: before, in: &state) }
+        guard let before, before.motionPreset != nil else { return }
+        keepSnug(id, before: before, in: &state)
+        follow(id, before: before, in: &state)
+    }
+
+    /// New words or type in a preset text: its wrap width keeps hugging them (the wipe sweeps the box), unless this edit
+    /// set the width or someone had set it by hand before (then it is no longer the snug width and stays as it is).
+    private static func keepSnug(_ id: UUID, before: TextOverlay, in state: inout TimelineState) {
+        guard let after = state.textOverlays.first(where: { $0.id == id }), after.boxWidth == before.boxWidth,
+              after.settledText != before.settledText || after.style != before.style else { return }
+        let canvas = TimelineRenderSize.size(for: state)
+        guard MotionPresetLayout.isSnug(before, canvas: canvas) else { return }
+        let snug = MotionPresetLayout.snugBoxWidth(after, canvas: canvas)
+        state.updateTextOverlay(id) { $0.boxWidth = snug }
     }
 
     /// 标题挪了：别的几块平移同样多（各自的微调留着）。标题（或框住的那行小字）改了字、字号、字体：按标题重新排一遍

@@ -59,6 +59,11 @@
    （同链接组，`MotionPresetTag.renew`，在 `TimelinePaste.apply` 里）。
 10. **字体**：用户没有品牌字体，默认用这台 Mac 自带的 Avenir Next、DIN Alternate 一路（存字体的全名，Core Text 和字体选择器都认），
     用户可以换；数字那一行不跟着换（老虎机要等宽的数字）。
+11. **Preset texts hug their words** (added 2026-11-17): a preset text's wrap width (`boxWidth`) is its longest line plus a small margin
+    (`MotionPresetLayout.snugBoxWidth`), because the text wipe sweeps the layout box, not the ink — in the default 0.9-wide box a short
+    centred title is wiped in a third of the entrance and looks like a cut. New words or type keep it snug (`MotionPresetGroups.update`),
+    unless that edit set the width itself or the width had already been set by hand (then it is no longer snug and stays as it is);
+    a `box_width` the AI passes with `motion_preset` stays too.
 
 ## 三、三套的数（照样片量的，720p × 1.5）
 
@@ -83,6 +88,7 @@
   不留半套；换一套标题 id 不变、字和颜色留着、旧框没了；`hit_at` 整套挪、长短不变；一段普通的字变成一套；标题改了字框跟着变宽、标题挪了
   框和小字跟着挪、小字自己挪不牵动标题；几种报错（`hit_at` / `small_text` 用在不是一套的字上、加的时候缺 `motion_preset` 或标题、
   不认识的名字）一样都不改；`set_texts` 一项一套；粘贴出来的自成一组、只粘一块的不留标记；存盘往返、普通的字不写键、读不懂的当普通的字。
+  Also (2026-11-17): a short title's wrap width hugs it, grows with longer words and keeps them on one line, and a `box_width` set by hand is kept.
 - 说明书和清单的上限、名字都真的存在：`GuideChecks` / `GuidePilotChecks` / `CatalogTextChecks`（set_text 的参数定义 ≤ 4,500 字节）。
 - 界面：`checks/preview-perf-wiring.sh`（新视图第一行计数）、`checks/presented-views-app-language.sh`（「动效预设」那一栏是 popover，
   套 `.appLanguage()`）、`checks/inspector-live-binding-wiring.sh`（「预设」下拉和「落点」的打字走离散写入）、`checks/inspector-fits-width.sh`、

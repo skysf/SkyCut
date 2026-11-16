@@ -187,12 +187,14 @@ enum Backdrop {
         guard writer.status == .completed else { throw AIToolError("backdrop video: \(writer.error?.localizedDescription ?? "failed")") }
     }
 
-    /// 成片在 `time` 那一帧（`-ss` 落在这一帧之前四分之一帧），缩到 `size`。时刻先照预览那样钉到帧的网格上
-    //（`TextAnimator.quantize`），不然两边差一帧。
+    /// The exported frame at `time`, picked by frame index (the same frame the preview's quantised time shows,
+    /// `TextAnimator.quantize`), scaled to `size`. Decoding from the start and selecting the index avoids `-ss` landing a
+    /// frame early or late.
     static func frame(of video: URL, at time: Double, fps: Double, size: CGSize, to file: URL) throws {
-        let frame = (TextAnimator.quantize(time, frameRate: .fps30) * fps).rounded()
-        let (code, log) = run(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-ss", String(format: "%.4f", (frame - 0.25) / fps),
-                                       "-i", video.path, "-frames:v", "1", "-vf", "scale=\(Int(size.width)):\(Int(size.height))", file.path])
+        let index = Int((TextAnimator.quantize(time, frameRate: .fps30) * fps).rounded())
+        let (code, log) = run(ffmpeg, ["-hide_banner", "-loglevel", "error", "-y", "-i", video.path,
+                                       "-vf", "select=eq(n\\,\(index)),scale=\(Int(size.width)):\(Int(size.height))",
+                                       "-frames:v", "1", "-fps_mode", "passthrough", file.path])
         guard code == 0 else { throw AIToolError("frame \(time): \(log.suffix(300))") }
     }
 

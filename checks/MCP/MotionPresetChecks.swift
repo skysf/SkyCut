@@ -184,6 +184,10 @@ private func motionPresetFollowChecks() {
           let title = longer.text(.title) else { return }
     let canvas = TimelineRenderSize.size(for: state)
     check(wide.width > frame.width + 0.1, "retyping a longer title widens the frame (\(frame.width) → \(wide.width))")
+    // The wrap width hugs the words (the wipe sweeps the layout box) and keeps hugging them after retyping, on one line.
+    check((start.text(.title)?.boxWidth ?? 1) < 0.3, "a short title's wrap width hugs it (\(start.text(.title)?.boxWidth ?? -1))")
+    check(title.boxWidth > (start.text(.title)?.boxWidth ?? 1), "the wrap width grows with the words")
+    checkEqual(TextTypesetter.layout(title, canvas: canvas, text: title.settledText).lines.count, 1, "the longer title stays on one line")
     check(wide.frame(in: canvas).insetBy(dx: 2, dy: 2).contains(MotionPresetLayout.ink(title, canvas: canvas)),
           "the frame still goes around the new words")
     // 标题挪了：别的几块平移同样多。
@@ -193,6 +197,10 @@ private func motionPresetFollowChecks() {
     check(near(movedFrame.centerX, wide.centerX - 0.2), "moving the title moves the frame with it")
     check(near(movedSmall.centerX, shiftedSmall.centerX - 0.2), "and the small line")
     check(near(movedSmall.centerY, small.centerY, 0.05), "the small line stays above the title")
+    // A wrap width set by hand stays when the words change.
+    _ = try? AIOverlayEdits.text(args(["text_id": .string(id), "box_width": 0.8]), at: 0, in: &state)
+    _ = try? AIOverlayEdits.text(args(["text_id": .string(id), "text": "SKY"]), at: 0, in: &state)
+    checkEqual(MotionPresetGroups.members(start.group, in: state)?.text(.title)?.boxWidth, 0.8, "a box_width set by hand is kept")
     // 别的几块自己挪：不牵动标题。
     let smallID = AIShortIDs(state: state).short(movedSmall.id)
     _ = try? AIOverlayEdits.text(args(["text_id": .string(smallID), "y": 0.1]), at: 0, in: &state)

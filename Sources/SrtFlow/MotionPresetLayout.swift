@@ -130,6 +130,24 @@ enum MotionPresetLayout {
         }
     }
 
+    /// Wrap width that just holds the words: the longest typeset line plus a small margin, as a fraction of the frame.
+    /// Preset texts use it because the text wipe sweeps the layout box, not the ink: in the default 0.9-wide box a short
+    /// centred title is wiped in a third of the entrance and looks like a cut. Text too long for the frame stays at 1.
+    static func snugBoxWidth(_ overlay: TextOverlay, canvas: CGSize) -> Double {
+        guard canvas.width > 0, !overlay.isBlank else { return overlay.boxWidth }
+        var wide = overlay
+        wide.boxWidth = 1
+        let lines = TextTypesetter.layout(wide, canvas: canvas, text: wide.settledText).lines
+        let longest = lines.map { $0.width - $0.trailingWhitespace }.max() ?? 0
+        let margin = max(4, 0.01 * canvas.width)
+        return min(1, max(TextOverlay.boxWidthRange.lowerBound, (longest + margin) / canvas.width))
+    }
+
+    /// The text's wrap width is still the snug one (within rounding): nobody set it by hand.
+    static func isSnug(_ overlay: TextOverlay, canvas: CGSize) -> Bool {
+        abs(overlay.boxWidth - snugBoxWidth(overlay, canvas: canvas)) < 0.002
+    }
+
     // MARK: 排
 
     /// 以标题为锚把别的几块排好：标题不动，小字、框、细线、数字按标题的墨迹摆。放进时间线时排一次，
