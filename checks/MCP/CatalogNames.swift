@@ -85,6 +85,9 @@ func catalogKnownNames() -> Set<String> {
                      "extended_frames", "levels_db", "skipped_no_sound"])
     // inspect_video 只拿人声判切在说话上（2026-11-16，MCP-14，AIInspectionSpeech）：疑点种类 audio_cutoff、没有人声证据的 speech_unchecked。
     names.formUnion(["audio_cutoff", "speech_unchecked"])
+    // 夹帧和成片逐帧扫（2026-11-16，MCP-36 / 64，AISourceCuts、AIFrameScan）：add_clips / edit_clip 结果里的 source_cuts，
+    // inspect_video 的 frame_scan 和疑点种类 stray_frames / frozen_picture / black_frame / source_cut。
+    names.formUnion(["source_cuts", "frame_scan", "stray_frames", "frozen_picture", "black_frame", "source_cut"])
     return names
 }
 
