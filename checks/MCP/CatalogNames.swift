@@ -80,6 +80,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["language_detected", "language_undetected"])
     // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
     names.insert("overrides_not_applied")
+    // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
+    names.insert("waiting_for")
     return names
 }
 

@@ -108,6 +108,7 @@
 - [2026-11-04 取消 listen 时跨线程拆掉正在读的 reader](2026-11-04-listen-reader-cancel-during-copy.md) — 原生 copy 和取消不能并发，取消只在读取体那一处收。
 - [2026-11-03 本地构建后缀进了版本头，模型目录被拒](2026-11-03-local-version-header.md) — 版本头只在共享的请求边界规范化。
 - [2026-11-10 一句拆两批，两种采样率接不起来](2026-11-10-long-line-halves-with-different-sample-rates.md) — 拼接前换成同一个采样率；假协议要按模型回不一样的格式。
+- [2026-11-17 look silently took minutes, the calls behind it were dropped and its result lost](2026-11-17-look-hangs-and-dropped-calls.md) — A read lets its line go once it has read the project; work that can outlast the helper's 120 s answers with a job id first.
 - [2026-10-14 AI 用 look 看转场和成片对不上](2026-10-14-look-transitions-differ-from-export.md) — 写下的「做不到」要么去做、要么在用到的地方说出来；压黑 / 闪白在两侧盖满且不透明时照 xfade 的公式算，否则仍是半程近似。
 - [2026-11-06 台数满了却引导再买 Pro](2026-11-06-machine-limit-purchase-guidance.md) — 台数的原因优先：只给管理 Mac / 客服，不给购买入口。
 - [2026-10-02 磁吸开着时改一条音量曲线就合上 V1 的缝](2026-10-02-magnet-closes-v1-gaps-on-any-edit.md) — 会改工程内容的开关是工程的属性；一次编辑只许改它碰到的东西。

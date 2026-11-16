@@ -108,6 +108,7 @@ run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频�
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
+run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
 
 # ---- 第 2 组 ----
 shard 2
