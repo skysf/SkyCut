@@ -1083,6 +1083,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（[声音库](voice-library.md)第十一节第 1 条）。
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
+61. **动效预设：`set_text` 的 `motion_preset`（2026-11-16，研究清单 MCP-45，[动效预设](motion-presets.md)）**：一次调用放一套现成的动效
+    （`frame_reveal` 框住再放开、`focus_pull` 对焦出字、`title_counter` 标题 + 滚动的数字）= 一组普通的字和形状，一步撤销；`hit_at` 是落在哪一下、
+    `small_text` / `small_text_below` 是标题上下那行小字，`text`、`number`、位置、字体、颜色用 set_text 原来的参数。带某一块的 `text_id`：
+    `motion_preset` 换一套（字不变、标题 id 不变），只给 `hit_at` 整套挪；标题挪了、改了字，同一套的别的几块跟上。规则只在 `MotionPresetGroups`
+    （和界面上加字的「动效预设」、检查器「预设」同一份，`AIMotionPresetEdit` 只读参数、报结果）；结果带 `motion_preset`（哪一套、落点、尾、每一块的 id），
+    `get_timeline` 的字和形状带 `motion_preset`。不另开工具（第一节第 5 条）：set_text 的参数定义加了四个参数仍是 4,372 / 4,500 字节，
+    全清单 99,010 / 100,000；怎么用写在说明书 `topic=set_text` 的 `motion_presets` 一节。`set_texts` 每一项也可以是一套。
 
 ## 五、这一轮、停止、撤销这一轮
 

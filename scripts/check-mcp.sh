@@ -80,6 +80,8 @@
 #  37. 批量改片段 / 文字 / 形状：副本上全验、坏项不落半份、一次提交与撤销；单项工具共用规则（BatchEditChecks + 扫描）。
 #  38. 克隆的参考录音（2026-11-10）：挑段（10 秒有效人声下限、3 分钟上限、人声最多、一样多比前 15 秒、切在停顿里，和穷举对账）、
 #      真读真写成 44.1 kHz 单声道 16-bit WAV、立体声取平均、AAC 时间对得上、不够 10 秒说差几秒（VoiceReferenceChecks / VoiceReferenceFileChecks）。
+#  39. 动效预设（set_text 的 motion_preset，2026-11-16，docs/architecture/motion-presets.md）：一次放一套普通的字和形状、三套的几块和时间、
+#      框按墨迹框住、竖屏按短边、换一套字不变、hit_at 整套挪、标题动了别的跟着走、粘贴自成一组、存盘（MotionPresetChecks + 扫描）。
 #
 # 用法：
 #   scripts/check-mcp.sh
@@ -332,6 +334,15 @@ if [ "$(grep -c 'MediaReadQueue.run(on: MediaReadQueue.analysis)' Sources/SrtFlo
 fi
 echo "   ✓ 合成音效：写文件只经 AIAudioFileWriter，渲染在 MediaReadQueue 上"
 
+# 动效预设（docs/architecture/motion-presets.md 第二节第 5、9 条）：界面上改字的两个入口都经 MotionPresetGroups.update（标题挪了、
+# 改了字，同一套跟着走）；粘贴给预设换新组号（粘出来的一套不和原来那套连在一起）。
+if [ "$(grep -c 'MotionPresetGroups.update(id, in: &\$0, change)' Sources/SrtFlow/VideoEditProject+Text.swift || true)" -ne 2 ] \
+   || [ "$(grep -c 'MotionPresetTag.renew(' Sources/SrtFlow/VideoEditClipboardPaste.swift || true)" -ne 2 ]; then
+  echo "✗ 动效预设：VideoEditProject.updateTextOverlay / liveUpdateTextOverlay 要经 MotionPresetGroups.update，粘贴要给文字和形状都换新组号"
+  exit 1
+fi
+echo "   ✓ 动效预设：界面上改字经 MotionPresetGroups.update、粘贴换新组号"
+
 # 上面全是扫描（不编译）。check-guards 推之前只跑到这儿：这些扫描以前只在 CI 上跑得到，本地挑着跑漏掉的那一条首跑就红
 #（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md，同 PR #71、#84、#132）。
 if [ "${1:-}" = "--scans-only" ]; then
@@ -483,6 +494,11 @@ xcrun swiftc \
   Sources/SrtFlow/AIClipEdit.swift \
   Sources/SrtFlow/AIClipEditPlan.swift \
   Sources/SrtFlow/AIOverlayEdits.swift \
+  Sources/SrtFlow/AIMotionPresetEdit.swift \
+  Sources/SrtFlow/MotionPresetDesign.swift \
+  Sources/SrtFlow/MotionPresetLayout.swift \
+  Sources/SrtFlow/MotionPresetGroups.swift \
+  Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/AIBatchEdit.swift \
   Sources/SrtFlow/AIBatchEditPlans.swift \
   Sources/SrtFlow/ClipFileReplacement.swift \

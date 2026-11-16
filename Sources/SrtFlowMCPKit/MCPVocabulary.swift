@@ -44,6 +44,9 @@ public enum MCPVocabulary {
     /// = `NumberRollStyle.allCases` 的原始值（数字滚动：整体数上去 / 每一位各自转的老虎机）。
     public static let numberStyles = ["count", "odometer"]
 
+    /// = `MotionPresetKind.allCases` 的原始值（set_text 的动效预设，2026-11-16：框住再放开、对焦出字、标题 + 滚动的数字）。
+    public static let motionPresets = ["frame_reveal", "focus_pull", "title_counter"]
+
     /// = `AIVoiceRole.all` 的名字：配音的角色（配方卡里写的是角色；装了 SrtFlow 自己的声音用对应的 Kokoro 音色，没装按这台 Mac
     /// 的声音挑；方案第 16、43、49 条）。
     public static let voiceRoles = [

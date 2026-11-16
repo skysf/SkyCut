@@ -332,8 +332,8 @@ public enum MCPTimelineTools {
             description: """
             Add on-screen text (titles, captions, labels) or change one (text_id); omitted fields stay. Batch: set_texts. Position is \
             the block's centre: a named spot or x/y canvas fractions. \
-            Sizes use a 1080-high frame; colours #RRGGBB or #RRGGBBAA. Text wraps in box_width. One undo step; clamped values return \
-            requested/applied/adjustments.
+            Sizes use a 1080-high frame; colours #RRGGBB or #RRGGBBAA. Text wraps in box_width. motion_preset adds a ready-made \
+            animated title (texts + shapes) landing on hit_at. One undo step; clamped values return requested/applied/adjustments.
             """,
             input: MCPSchema.object([
                 "text_id": MCPSchema.string("Change this text instead of adding one."),
@@ -374,7 +374,11 @@ public enum MCPTimelineTools {
                     "delay": MCPSchema.number("Seconds to wait before rolling, 0–60.", minimum: 0, maximum: 60),
                     "remove": MCPSchema.boolean("true turns it back into plain text.")
                 ], description: "A number rolling between two values instead of text; only passed fields change."),
-                "hidden": MCPSchema.boolean("Hide it without deleting it.")
+                "hidden": MCPSchema.boolean("Hide it without deleting it."),
+                "motion_preset": MCPSchema.string("Ready-made animated title (texts + shapes); see skycut_guide.", oneOf: MCPVocabulary.motionPresets),
+                "hit_at": MCPSchema.number("Preset: second (≥ 0) it lands on; with text_id moves the whole group.", minimum: 0),
+                "small_text": MCPSchema.string("Preset: small line above the title (FROM); \"\" removes it."),
+                "small_text_below": MCPSchema.boolean("Put small_text under the title (PRESENTS).")
             ])
         )
     }
