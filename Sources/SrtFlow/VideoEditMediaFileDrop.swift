@@ -653,11 +653,10 @@ extension VideoEditProject {
             self.perform { $0.insertImported(clips, at: landings) }
 
             // 图片是**先上轨再转静帧**（占位块马上能拖能剪），转完无感替换。
-            // 逐个 await：和 `addImages` 同一条路，任务活到全部转完为止，
+            // All converted together (StillClipBatch, same as `addImages`); the task lives until every one is done,
             // 这样它才在 `trackImportTask` 的登记里，切工程时能被取消。
-            for (clip, media) in zip(clips, imports) where media.kind == .image {
-                await self.convertStillClip(clip.id, from: media.url, generation: generation)
-            }
+            let images = zip(clips, imports).filter { $0.1.kind == .image }.map { (clip: $0.0.id, image: $0.1.url) }
+            await StillClipBatch.convert(images, generation: generation, in: self)
         })
     }
 

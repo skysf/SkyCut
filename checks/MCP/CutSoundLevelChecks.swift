@@ -3,12 +3,15 @@ import SrtFlowCore
 import SrtFlowMCPKit
 
 // 声音怎么过一刀（续，CutSoundChecks 的后半）：调增益（对齐电平、给定 dB、到顶被夹住、音量曲线整条平移、推子算进去）、
-// 垫一层底（伸到两边各 N 帧、余料不够、自动挑最长的那段、不许拿两边自己的声音、比底响 6 dB 以上的压下来、底是静的不压）、
+// 垫一层底（伸到两边各 N 帧、余料不够、自动挑最长的那段、不许拿两边自己的声音、底是静的不动）、
+// (2026-11-16 decisions — gain brings the louder side down, the bed is raised to carry the cut, equal-power crossfades —
+// are checked in CutSoundDecisionChecks.swift.)
 // 落在拍子上（取整到帧、窗外没拍子、挪不过去的拍子跳过、正好在切点上不分离）、几刀一起（棋盘似的两条轨、缺声音的跳过）、
 // 结果的样子、联动开着时后来的改动（删掉第一个镜头：J 切的声音裁掉伸到 0 之前的头、和画面对得上）。
 // 素材电平和拍子是 App 量好传进来的（CutSoundMeasure），这里直接给数。规矩见 docs/architecture/cut-sound.md。
 
 func runCutSoundLevelChecks() {
+    runCutSoundDecisionChecks()
     gainChecks()
     bedChecks()
     onBeatChecks()
@@ -21,9 +24,9 @@ private func gainChecks() {
     let (state, a, b) = cutPair()
     let quiet = CutSoundPlanner.Material(outgoing: -20, incoming: -30)
     if let done = try? joinSound(state, after: a.id, .gain, material: quiet) {
-        checkEqual(done.state.clip(with: b.id)?.volume, AudioGain.maximumLinear, "gain: +10 dB asked, the clip volume tops out at +6 dB")
-        checkNear(done.outcome.gains.first?.requested, 10, "gain: the result keeps what was asked")
-        checkNear(done.outcome.gains.first?.applied, AudioGain.maximumDB, "gain: …and what was applied")
+        checkNear(done.state.clip(with: a.id).map { AudioGain.decibels(fromLinear: $0.volume) }, -10,
+                  "gain: a louder previous shot comes down 10 dB (the quieter next shot is not lifted)")
+        checkEqual(done.state.clip(with: b.id)?.volume, 1, "gain: the quieter side is left alone")
         checkEqual(done.state.audioTracks.isEmpty, true, "gain: nothing is separated (only the level changes)")
         checkNear(done.outcome.levels?.outgoing, -20, "gain: the heard level before the cut is reported")
     } else { check(false, "gain with measured levels works") }
@@ -48,8 +51,9 @@ private func gainChecks() {
     if let sound = ClipSoundSeparation.separate(b.id, in: &fader) {
         fader.audioTracks[0].volume = 0.5
         if let done = try? joinSound(fader, after: a.id, .gain, material: .init(outgoing: -20, incoming: -20)) {
-            checkEqual(done.outcome.incoming, sound, "gain: a separated sound is the one that changes")
-            checkNear(done.outcome.gains.first?.requested, -AudioGain.decibels(fromLinear: 0.5), "gain: the track fader counts in the level")
+            checkEqual(done.outcome.incoming, sound, "gain: the next shot's sound is the separated one")
+            checkEqual(done.outcome.gains.first?.clip, a.id, "gain: A1's -6 dB fader makes the next sound quieter, so A comes down")
+            checkNear(done.outcome.gains.first?.requested, AudioGain.decibels(fromLinear: 0.5), "gain: the track fader counts in the level")
         } else { check(false, "gain on a separated sound works") }
     }
 }
@@ -65,13 +69,15 @@ private func bedChecks() {
         checkNear(done.state.clip(with: music.id)?.timelineEnd, 6, "bed: it is made to reach 2 s (48 frames) past the cut")
         checkEqual(done.outcome.bed?.extendedAfter, 72, "bed: 72 frames were added after it")
         checkEqual(done.outcome.bed?.extendedBefore, 0, "bed: it already reached 2 s before the cut")
-        checkNear(done.state.clip(with: a.id).map { AudioGain.decibels(fromLinear: $0.volume) }, -9,
-                  "bed: the side 15 dB over the bed comes down to bed + 6 dB")
-        checkEqual(done.state.clip(with: b.id)?.volume, 1, "bed: the side under bed + 6 dB is left alone (never raised)")
+        checkNear(done.outcome.bed?.raised, AudioGain.maximumDB, "bed: raised 9 dB asked, the bed tops out at +6 dB")
+        checkNear(done.state.clip(with: a.id).map { AudioGain.decibels(fromLinear: $0.volume) }, AudioGain.maximumDB - 9,
+                  "bed: only the part the bed could not cover comes off the loud side")
+        checkEqual(done.state.clip(with: b.id)?.volume, 1, "bed: the quiet side is left alone")
         check(done.state.audioTracks.count == 1 && !done.state.mainClips.contains(where: \.isMuted), "bed: no sound is separated")
     } else { check(false, "bed works") }
     if let done = try? joinSound(state, after: a.id, .bed, material: .init(outgoing: -10, incoming: -30, layer: nil)) {
         checkEqual(done.state.clip(with: a.id)?.volume, 1, "bed silent at the cut: the sides are left as they are")
+        check(done.state.clip(with: music.id)?.volumeCurve.isEmpty == true, "bed silent at the cut: the bed is not raised")
         check(!done.outcome.notes.isEmpty, "bed silent at the cut: the result says why")
     } else { check(false, "bed with a silent bed works") }
 
@@ -182,10 +188,13 @@ private func reportChecks() {
     checkEqual(cut?["out"]?["ends"]?.doubleValue, 4, "report: the previous sound (still the picture's) ends on the cut")
     checkEqual(cut?["room_frames"]?["in"]?.doubleValue, 480, "report: frames of sound left in the next file before the cut")
     checkEqual(cut?["room_frames"]?["out"]?.doubleValue, 1104, "report: …and in the previous file after it")
-    guard let loud = try? joinSound(state, after: a.id, .gain, material: .init(outgoing: -20, incoming: -30)) else { return }
-    let clamped = CutSoundReport.json([loud.outcome], in: loud.state, ids: AIShortIDs(state: loud.state))["cuts"]?.arrayValue?.first?["in"]
-    checkEqual(clamped?["requested_gain_db"]?.doubleValue, 10, "report: a clamped gain shows what was asked")
-    checkEqual(clamped?["gain_db"]?.doubleValue, 6, "report: …and what was applied")
+    // A sits at -55 dB and is 15 dB louder than B at the cut: it should come down 15 dB, but -60 dB is silence, so only 5 dB apply.
+    var low = state
+    low.mainClips[0].volume = AudioGain.linear(fromDecibels: -55)
+    guard let loud = try? joinSound(low, after: a.id, .gain, material: .init(outgoing: 0, incoming: -70)) else { return check(false, "gain to the floor works") }
+    let clamped = CutSoundReport.json([loud.outcome], in: loud.state, ids: AIShortIDs(state: loud.state))["cuts"]?.arrayValue?.first?["out"]
+    checkEqual(clamped?["requested_gain_db"]?.doubleValue, -15, "report: a clamped gain shows what was asked")
+    checkEqual(clamped?["gain_db"]?.doubleValue, -5, "report: …and what was applied")
 }
 
 private func laterEditChecks() {

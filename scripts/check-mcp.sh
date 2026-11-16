@@ -483,6 +483,7 @@ xcrun swiftc \
   Sources/SrtFlow/CutSoundRequest.swift \
   Sources/SrtFlow/CutSoundCut.swift \
   Sources/SrtFlow/CutSoundEdges.swift \
+  Sources/SrtFlow/CutSoundCurves.swift \
   Sources/SrtFlow/CutSoundLimits.swift \
   Sources/SrtFlow/CutSoundPlanner.swift \
   Sources/SrtFlow/CutSoundLevelPlan.swift \
@@ -503,6 +504,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIParameterReport.swift \
   Sources/SrtFlow/AIOverlayParameterReport.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
+  Sources/SrtFlow/StillFrameSharing.swift \
   Sources/SrtFlow/AIRegionFraming.swift \
   Sources/SrtFlow/AIClipDetails.swift \
   Sources/SrtFlow/AITrackSettings.swift \

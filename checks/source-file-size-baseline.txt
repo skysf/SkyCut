@@ -6,7 +6,7 @@
 769 Sources/SrtFlow/ScreenRecordingCoordinator.swift
 638 Sources/SrtFlow/ScreenRecordingWriter.swift
 833 Sources/SrtFlow/VideoEditCompositionBuilder.swift
-717 Sources/SrtFlow/VideoEditMediaFileDrop.swift
+716 Sources/SrtFlow/VideoEditMediaFileDrop.swift
 862 Sources/SrtFlow/VideoEditModels.swift
 1203 Sources/SrtFlow/VideoEditProject.swift
 922 Sources/SrtFlowCore/ScreenRecordingModels.swift
