@@ -9,7 +9,8 @@ import Foundation
 // 管什么（长期约束见 docs/architecture/freeze-frame.md 第 4a3 节「带透明的段」）：
 // - **直通的源 → 预乘的 ProRes 4444**：预览的默认合成器把源一律当预乘的用、不看文件里的标记，直通的半透明处会过亮（光成了
 //   一条白带）；AVFoundation 里没有「按标记预乘」的开关（2026-11-16 查过、试过），只能换一份预乘过的源。预览、AI 的 look、
-//   带关键帧段的预渲染都读它；成片读原片（ffmpeg 按直通叠，`ExportTransformChain`）。
+//   带关键帧段的预渲染都读它；成片读原片（ffmpeg 按直通叠，`ExportTransformChain`）。The preview only takes it once it is on
+//   disk (`readyURL`) — it never waits for a conversion; the optimized-media coordinator has it made and swaps it in (2026-11-17).
 // - **带透明的源 → 灰度遮罩**（白 = 不透明，ProRes 422，没有 alpha）：带关键帧的上层轨段走 fill + matte 预渲染，matte 要是
 //   源自己的 alpha（同透明静帧的那份遮罩），纯白的话透明的地方照样不透明。
 // 两份都**逐帧照抄时间戳、照抄旋转矩阵**：和原片逐帧对得上，段的起止、变速、关键帧一个数都不用换算。按「路径 + 文件身份 + 版本」
@@ -33,6 +34,13 @@ enum AlphaSourceCopies {
         guard let target = cacheURL(kind, for: source) else { return nil }
         if FileManager.default.fileExists(atPath: target.path) { return target }
         return await Flights.shared.run(target) { await convert(kind, source: source, to: target) }
+    }
+
+    /// The copy if it is already on disk — never converts, never waits. The preview rebuild asks this (it shows the original
+    /// until the copy is made, `CompositionSource.track`); a half-written copy is never at this path (it is moved in when done).
+    static func readyURL(_ kind: Kind, for source: URL) -> URL? {
+        guard let target = cacheURL(kind, for: source), FileManager.default.fileExists(atPath: target.path) else { return nil }
+        return target
     }
 
     /// 副本该放在哪（不管转没转）：文件名里带源的路径和身份（inode、卷、大小、修改时间）—— 原地改写过、换了文件都是另一份。

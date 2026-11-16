@@ -1,15 +1,20 @@
 import Foundation
 
-// MARK: - 声音怎么过一刀：要量电平的两种 —— 调增益、垫一层底（纯值）
+// MARK: - Sound across a cut: the two joins that measure levels — gain and bed (pure)
 //
-// 管什么：
-// - **调增益**（gain）：下一个镜头的声音整段平移，给了 gain_db 就照它，没给就调到和上一个镜头切点前的电平一样（「两边电平对齐」）。
-// - **垫一层底**（bed）：拿音频轨上的一段（音乐、环境、长音；layer_id 或跨过切点最长的那段）当底，伸到切点两边各 N 帧（默认 2 秒，
-//   真人南极正片里「从下面穿过去」= 两边都待 2 秒以上），余料不够照实报；然后两边的原声比底响 6 dB 以上的整段压到「底 + 6 dB」——
-//   真人的规矩：一层底在切点上不比较响的一边低 6 dB 以上才盖得住（joins-human.md；没东西盖着的刀两边最多差 3.4 dB）。只压不抬。
-// 听到的电平 = 素材在测量窗里的均方（App 量好传进来，CutSoundMeasure）+ 段的音量线在那一刻的 dB + 所在轨的推子。
-// 不量渐变：调的是镜头本身的电平，渐变是过切点那一下的事。
-// 不管什么：量（CutSoundMeasure）、挪声音（CutSoundPlanner / CutSoundEdges）。规矩见 docs/architecture/cut-sound.md。
+// Owns:
+// - **gain**: with gain_db the next shot's sound moves by it; without, the louder side comes down to the quieter side's level
+//   (2026-11-16 decision: keeps headroom and never lifts noise).
+// - **bed**: a sound on an audio track (layer_id, or the longest across the cut) is stretched to reach N frames on each side
+//   (default 2 s: the human film's "passes underneath" means 2 s or more on both sides); too little footage is refused. A bed
+//   carries a jump only when it is no more than 6 dB under the louder side at the cut (joins-human.md: uncovered human cuts
+//   differ by 3.4 dB at most). If it is quieter than that, the bed is **raised** around the cut with a swell in its volume
+//   curve, which is how the human editor covered cuts (2026-11-16 decision). Only what the volume limit leaves uncovered
+//   is taken off the loud side.
+// Heard level = the material's mean square in the measuring window (measured by the App, CutSoundMeasure) + the clip's volume
+// line at that moment + its track fader. Fades are left out: this is about the shot's level, fades are the join itself.
+// Not here: measuring (CutSoundMeasure), moving edges (CutSoundPlanner / CutSoundEdges), drawing curves (CutSoundCurves).
+// Rules: docs/architecture/cut-sound.md.
 
 enum CutSoundLevelPlan {
     /// 底至少不比两边较响的那一边低这么多 dB，才算盖得住切点上的跳变。
@@ -39,7 +44,12 @@ enum CutSoundLevelPlan {
                     + "Pass gain_db to set the next clip's sound yourself. Nothing was changed."
             )
         }
-        try work.shiftGain(of: .incoming, by: outLevel - inLevel)
+        // The louder side comes down to the quieter one (2026-11-16 decision); equal levels change nothing.
+        if inLevel > outLevel {
+            try work.shiftGain(of: .incoming, by: outLevel - inLevel)
+        } else if outLevel > inLevel {
+            try work.shiftGain(of: .outgoing, by: inLevel - outLevel)
+        }
     }
 
     static func bed(_ work: inout CutSoundPlanner.Work, layer: EditClip?, material: CutSoundPlanner.Material) throws {
@@ -62,11 +72,15 @@ enum CutSoundLevelPlan {
             work.touched.insert(clip.id)
         }
         work.outcome.bed = CutSoundOutcome.Bed(clip: clip.id, extendedBefore: before, extendedAfter: after)
-        try duckSides(&work, under: clip.id, material: material)
+        try carry(&work, with: clip.id, reach: reach, material: material)
     }
 
-    /// 两边的原声比底响 6 dB 以上的，整段压到「底 + 6 dB」（只压不抬）。
-    private static func duckSides(_ work: inout CutSoundPlanner.Work, under bed: UUID, material: CutSoundPlanner.Material) throws {
+    /// Makes the bed carry the cut: raise it around the cut until it is within 6 dB of the louder side (a swell of `reach / 2`
+    /// at most on each side, full over the measuring windows); if the volume limit stops the swell short, lower each side that is
+    /// still more than 6 dB over the raised bed down to bed + 6 dB.
+    private static func carry(
+        _ work: inout CutSoundPlanner.Work, with bed: UUID, reach: Double, material: CutSoundPlanner.Material
+    ) throws {
         let state = work.state
         let middle = CutSoundWindows.middle
         let bedLevel = heard(material: material.layer, clip: state.clip(with: bed), at: work.time, in: state)
@@ -75,15 +89,25 @@ enum CutSoundLevelPlan {
         work.outcome.levels = CutSoundOutcome.Levels(outgoing: outLevel, incoming: inLevel, bed: bedLevel)
         guard let bedLevel else {
             work.outcome.notes.append(
-                "The bed is silent right at the cut, so it cannot cover the jump and the two sides were left as they are. "
-                    + "Raise the bed there (edit_clip volume_curve) or pick another layer_id."
+                "The bed is silent right at the cut, so it cannot cover the jump and nothing was raised or lowered. "
+                    + "Pick another layer_id, or a stretch of the bed that sounds at the cut."
             )
             return
         }
+        guard let louder = [outLevel, inLevel].compactMap({ $0 }).max() else { return }
+        let missing = louder - bedMargin - bedLevel
+        guard missing > 0.05 else { return }
+        let half = min(swellHalf, reach / 2)
+        let raised = CutSoundCurves.swell(bed, at: work.time, by: missing, half: half, in: &work.state)
+        work.outcome.bed?.raised = raised
+        work.touched.insert(bed)
+        let carried = bedLevel + raised
         for (side, level) in [(CutSoundPlanner.Side.outgoing, outLevel), (.incoming, inLevel)] {
-            guard let level, level > bedLevel + bedMargin + 0.05 else { continue }
-            try work.shiftGain(of: side, by: bedLevel + bedMargin - level)
+            guard let level, level > carried + bedMargin + 0.05 else { continue }
+            try work.shiftGain(of: side, by: carried + bedMargin - level)
         }
     }
 
+    /// The bed swell's full-level half-width around the cut (and the length of each ramp): it covers the 0.3 s measuring windows.
+    static let swellHalf = 0.5
 }

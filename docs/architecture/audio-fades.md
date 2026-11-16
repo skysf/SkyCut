@@ -43,6 +43,8 @@
 4. **渐变曲线是线性的**（`setVolumeRamp` 的线性斜坡）。`check-audio-fade.sh` 的「渐入中点 =
    半音量」那条断言钉着 —— 改成等功率 / 对数曲线是产品决定，要先改那条断言。
    （2026-09-24 之前这条讲的是「两边都线性」：导出的 `afade` 默认 `curve=tri` 恰好也是线性。）
+   The equal-power crossfade of `set_transition sound=crossfade` (2026-11-16) does not change this: it keeps these linear fades and draws a
+   compensating bump into the clips' volume curves ([声音怎么过一刀](cut-sound.md) rule 6).
 
 5. **转场那条边归转场管。** 主轨接缝上有转场时，转场自己就在做交叉淡变，
    用户设的渐变在那一边**不生效**：

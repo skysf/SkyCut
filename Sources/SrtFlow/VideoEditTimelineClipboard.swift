@@ -166,9 +166,7 @@ extension VideoEditProject {
             guard let self else { return }
             self.beginBackgroundImport()
             defer { self.endBackgroundImport() }
-            for still in stills {
-                await self.convertStillClip(still.clip, from: still.image, generation: generation)
-            }
+            await StillClipBatch.convert(stills.map { (clip: $0.clip, image: $0.image) }, generation: generation, in: self)
         })
     }
 

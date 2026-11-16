@@ -21,8 +21,8 @@ enum CutSoundReport {
         if outcomes.contains(where: { !$0.separated.isEmpty }) {
             notes.append("separated_from: that clip's sound now plays from an audio track, linked to its picture (it moves and trims with it).")
         }
-        if outcomes.contains(where: { $0.mode == .crossfade }) {
-            notes.append("Fades are linear: two different sounds dip about 3 dB in the middle of a crossfade.")
+        if outcomes.contains(where: { $0.crossfadeShape == "equal_power" }) {
+            notes.append("equal_power: each sound's volume curve carries a small bump over the crossfade, so the loudness holds through the middle.")
         }
         if !notes.isEmpty { result["note"] = .string(notes.joined(separator: " ")) }
         return .object(result)
@@ -36,6 +36,7 @@ enum CutSoundReport {
             "cut": AIFormat.seconds(time)
         ]
         if let frames = outcome.frames { entry["frames"] = .number(Double(frames)) }
+        if let shape = outcome.crossfadeShape { entry["shape"] = .string(shape) }
         if let transition = outcome.cut.transition { entry["picture_transition"] = .string(transition.rawValue) }
         var room: [String: JSONValue] = [:]
         if let id = outcome.outgoing, let clip = state.clip(with: id) {
@@ -58,7 +59,8 @@ enum CutSoundReport {
         if let bed = outcome.bed, let clip = state.clip(with: bed.clip) {
             var object: [String: JSONValue] = [
                 "id": .string(ids.short(clip.id)), "from": AIFormat.seconds(clip.timelineStart), "to": AIFormat.seconds(clip.timelineEnd),
-                "extended_frames": ["before": .number(Double(bed.extendedBefore)), "after": .number(Double(bed.extendedAfter))]
+                "extended_frames": ["before": .number(Double(bed.extendedBefore)), "after": .number(Double(bed.extendedAfter))],
+                "raised_db": decibels(bed.raised)
             ]
             if let slot = state.location(of: clip.id)?.track { object["track"] = .string(AITrackName.name(of: slot)) }
             entry["bed"] = .object(object)

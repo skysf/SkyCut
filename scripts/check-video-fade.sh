@@ -43,6 +43,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
+  Sources/SrtFlow/StillFrameSharing.swift \
   Sources/SrtFlow/VideoEditMediaReferences.swift \
   Sources/SrtFlow/VideoEditClipUpscale.swift \
   Sources/SrtFlow/VideoEditClipUpscaleRecord.swift \
@@ -159,6 +160,7 @@ xcrun swiftc \
   checks/VideoFade/AlphaStill.swift \
   checks/VideoFade/AlphaVideo.swift \
   checks/VideoFade/AlphaVideoProbes.swift \
+  checks/VideoFade/AlphaVideoNoWait.swift \
   checks/VideoFade/PresetWipe.swift \
   checks/VideoFade/EasedOverlay.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o

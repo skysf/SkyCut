@@ -82,7 +82,7 @@ func catalogKnownNames() -> Set<String> {
     names.insert("overrides_not_applied")
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
-                     "extended_frames", "levels_db", "skipped_no_sound"])
+                     "extended_frames", "levels_db", "skipped_no_sound", "equal_power", "raised_db"])
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
     return names

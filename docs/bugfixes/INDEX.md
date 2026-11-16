@@ -23,6 +23,7 @@
 - [2026-09-27 AI 放素材顺带挂字幕，之后撤一步全空](2026-09-27-ai-undo-swallowed-by-subtitle-attach.md) — 一次调用里所有登记都在同一个 step 里；异步落账各包一层。
 - [2026-09-27 有音量曲线的段，AI 调 volume_db 听不出变化](2026-09-27-ai-volume-ignored-on-curved-clips.md) — 给 AI 开参数前先看检查器改同一个值时做了什么（整条曲线平移）。
 - [2026-11-10 后台的 AI 活被 App Nap 降速](2026-11-10-ai-work-throttled-by-app-nap.md) — AI 的调用和任务各领一份 `AIKeepAwake`，领和还成对。
+- [2026-11-17 Every transparent still cost ~107 MB and showed late; a straight-alpha clip held the whole preview](2026-11-17-alpha-media-waits-and-oversized-stills.md) — An intra-only codec stores every repeated frame: repeat it in the sample table; a preview-only substitute is used when ready and swapped in while stopped, never waited for.
 - [2026-11-16 带透明的视频：预览当预乘、成片当直通](2026-11-16-alpha-video-premultiplied-or-straight.md) — 预乘还是直通要读文件里的标记，先弄清「没写」长什么样；平台没开关就换一份数据，不换合成器。
 - [2026-09-30 动画行的「In」「Out」从没进过字符串表](2026-09-30-animation-in-out-labels-never-localized.md) — 同一个教训撞第三次别再补清单：从声明里找 `LocalizedStringKey` 参数。
 - [2026-10-06 挪了一段音频，画面挪了、声音还在原地](2026-10-06-audio-engine-replace-keeps-old-segment-positions.md) — 「结构没变」按开流时抄死了什么来定，不是按 id；自检要有「换配置」这一步。
