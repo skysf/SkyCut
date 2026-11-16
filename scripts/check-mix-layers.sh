@@ -37,6 +37,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditClipPlacement.swift \
   Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
@@ -90,6 +91,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/VideoEditExportGraph.swift \
+  Sources/SrtFlow/CompositionSource.swift \
   Sources/SrtFlow/Watermark/WatermarkExport.swift \
   Sources/SrtFlow/Watermark/WatermarkImage.swift \
   Sources/SrtFlow/Watermark/WatermarkPlacement.swift \
@@ -124,6 +126,7 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/AudioGainTable.swift \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditPrerender.swift \
+  Sources/SrtFlow/AlphaSourceCopies.swift \
   Sources/SrtFlow/BurnInWorkspace.swift \
   Sources/SrtFlow/SubtitleFontScale.swift \
   Sources/SrtFlow/SubtitleLineWrap.swift \

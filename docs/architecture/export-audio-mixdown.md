@@ -116,6 +116,8 @@ tap 那条路在这条 5 秒的时间线上余音载体要被拉长，余音比�
 南极预告片撞出来的（待办总清单 MCP-3、MCP-10，两组 AI 都撞上）：`listen` 只回每一段各自的电平、0.5 秒一格，量不了混在一起之后的，
 也到不了帧；在 SkyCut 外面从素材文件按增益估，单声道的旁白比它在成片里实际响了约 3 dB（铺成立体声时每声道 −3 dB、量的时候没算）。
 这一节是「听声音的引擎」的第 1 步（量）：以后的人声清不清楚（ESTOI）、声音报告都从这里拿采样和数。
+The engine as a whole, and steps 2–3 that consume these samples (ESTOI, masker attribution, source-sound features), are in
+[the listening engine](listening-engine.md).
 
 1. **从引擎量，不从文件估。** `AudioStemRender` 用和成片同一份配置（`AudioEngineConfig.make(from:)`，带场景的响度补偿）离线渲：
    整条混音一个 `TimelineAudioEngine(.offline)`（就是第二节那一份），每一层一个（同一份配置只留那几条轨，总推子、总长照旧）；几个引擎
