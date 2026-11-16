@@ -23,10 +23,11 @@ enum OptimizedMediaPolicy {
     /// 全帧内 / 图片序列类编码：本来就没有 GOP，不转。
     static let intraCodecs: Set<String> = ["prores", "apch", "apcn", "apcs", "apco", "ap4h", "ap4x", "mjpeg", "mjpg", "jpeg", "png", "dnxhd", "dnxhr", "avdn"]
 
-    /// 要不要给这个源转代理。`keyframeInterval` 不知道（老工程没探过）→ 不转；静帧、全帧内 → 不转；
+    /// 要不要给这个源转代理。`keyframeInterval` 不知道（老工程没探过）→ 不转；静帧、全帧内 → 不转；带透明的（HEVC 带透明是长 GOP）
+    /// → 不转：代理是 H.264，没有 alpha，换进预览透明的地方就成了黑块（builder 那边对带透明的段也不用块）；
     /// 一个 GOP 按这台机器的解码速度要解超过两帧的时间才转。
     static func needsProxy(info: MediaInfo, isStillImage: Bool, decodeFPS: Double) -> Bool {
-        guard !isStillImage, decodeFPS > 0, info.frameRate > 0 else { return false }
+        guard !isStillImage, decodeFPS > 0, info.frameRate > 0, (info.alpha ?? .opaque) == .opaque else { return false }
         guard let interval = info.keyframeInterval, interval > 0 else { return false }
         if intraCodecs.contains(info.videoCodec.lowercased()) { return false }
         let gopFrames = interval * info.frameRate

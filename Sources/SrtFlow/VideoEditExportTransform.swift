@@ -4,7 +4,7 @@ import Foundation
 // MARK: - 导出里一段画面的 Transform 滤镜链
 //
 // 管什么：Transform 面板那一套（裁切 → 翻转 → 缩放进摆放框 → 旋转 → 不透明度 → 画面渐变）在 ffmpeg 里的那一串，
-// 外加带透明的静帧要先反预乘（静帧是预乘过的 ProRes 4444，`StillAlphaNaming`），主轨和上层轨共用。
+// 外加带透明的段（静帧和视频一个判断，`EditClip.sourceAlpha`）在预乘的画面上裁切缩放、叠之前反预乘，主轨和上层轨共用。
 // 不管什么：这一段在图里接到哪、和谁叠（`VideoEditExportGraph`）、时间账（trim / setpts 在调用处）。
 // 2026-10-03 从 VideoEditExportGraph.swift 拆出来（那个文件在行数基线里只许降，见 docs/architecture/coding-standards.md）。
 
@@ -29,9 +29,10 @@ enum ExportTransformChain {
         let target = clip.resolvedPlacement(canvas: renderSize)
             .frame(in: renderSize)
         var steps: [String] = []
-        // 带透明的静帧是预乘过的（预览的合成器要的就是预乘），overlay 默认按直通混合：先标明预乘、缩放完再反预乘
-        //（在预乘的画面上缩放，边缘不发黑）。ffmpeg 8 起 unpremultiply 看帧上的 alpha_mode，不标它就原样放过去。
-        if clip.isAlphaStill { steps.append("setparams=alpha_mode=premultiplied") }
+        // 带透明的段：先换成预乘的画面（和预览的合成器同一种约定），在它上面裁切缩放（边缘不发黑），缩放完再反预乘交给
+        // overlay（它按直通混合）。认文件里的标记：预乘的（没有标记的也算）标明预乘，直通的标明直通再预乘
+        //（docs/architecture/freeze-frame.md 第 4a3 节）。
+        steps += premultipliedEntry(clip.sourceAlpha)
         if let crop = clip.crop, !crop.isEmpty, let display = clip.info?.displaySize {
             let rect = crop.rect(in: display)
             // 4:2:0 的奇数边界不能直接裁 YUV：色度仍从隔壁的采样格起，放大局部时整幅色边会错开。
@@ -47,7 +48,7 @@ enum ExportTransformChain {
         if clip.flippedHorizontally { steps.append("hflip") }
         if clip.flippedVertically { steps.append("vflip") }
         steps.append("scale=\(evenPixel(target.width)):\(evenPixel(target.height))")
-        if clip.isAlphaStill { steps.append("unpremultiply=inplace=1") }
+        if clip.sourceAlpha != .opaque { steps.append("unpremultiply=inplace=1") }
         steps.append("setsar=1")
         let rotated = abs(clip.rotationDegrees) > 0.01
         let translucent = clip.opacity < 0.999
@@ -64,5 +65,16 @@ enum ExportTransformChain {
             "\(Int(target.midX.rounded()))-w/2",
             "\(Int(target.midY.rounded()))-h/2"
         )
+    }
+
+    /// 带透明的段进链的第一步：换成标明了预乘的画面。ffmpeg 8 起 premultiply / unpremultiply 看帧上的 alpha_mode，
+    /// 不标就原样放过去 —— 所以预乘的也要标明，直通的先标明直通再预乘。主轨的轻量路径也用它：收尾丢掉 alpha 之前换成预乘
+    /// （= 压在黑底上，和预览垫的黑底一样）。
+    static func premultipliedEntry(_ alpha: SourceAlpha) -> [String] {
+        switch alpha {
+        case .opaque: return []
+        case .premultiplied: return ["setparams=alpha_mode=premultiplied"]
+        case .straight: return ["setparams=alpha_mode=straight", "premultiply=inplace=1"]
+        }
     }
 }

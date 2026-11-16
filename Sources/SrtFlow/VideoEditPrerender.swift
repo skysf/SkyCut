@@ -65,8 +65,9 @@ final class ExportCancellationToken: @unchecked Sendable {
 /// 忽略，文档明说），透明背景根本出不来 —— 所以走 fill + matte 双渲染：
 /// - fill：内容本身（带完整不透明度）合在黑底上；
 /// - matte：一块纯白素材套上**同一份**摆放/旋转/不透明度动画合在黑底上，
-///   白 = 可见、黑 = 透明，边缘的抗锯齿灰阶就是 alpha 渐变。带透明的静帧不用纯白，用它自己的灰度遮罩
-///   （`StillAlphaNaming.matteURL`），这样 matte = 图的 alpha × coverage × opacity，和 fill 的权重仍然一样。
+///   白 = 可见、黑 = 透明，边缘的抗锯齿灰阶就是 alpha 渐变。带透明的段不用纯白，用源自己的灰度遮罩（透明静帧：
+///   `StillAlphaNaming.matteURL`；带透明的视频：`AlphaSourceCopies` 逐帧抽的），这样 matte = 源的 alpha × coverage × opacity，
+///   和 fill（预乘过的内容压黑底）的权重仍然一样。
 /// 两条的权重必须一字不差（都是 coverage×opacity）：ffmpeg 里先用 matte
 /// 把 fill 除回真实色再 `alphamerge` 合回带 alpha 的流，原位叠放——
 /// 权重不一致除法就约不干净（细节见 VideoEditExporter 的上层轨滤镜段）。
@@ -147,10 +148,20 @@ enum AnimatedClipPrerenderer {
         matte.stillImageURL = nil
         matte.needsStillConversion = false
         matte.placement = basePlacement
+        // 遮罩自己是不透明的灰度片：别让 builder 把它当带透明的段（垫底、换预乘副本）。
+        matte.info?.alpha = .opaque
         if source.isAlphaStill {
             // 带透明的静帧：matte 是它自己的 alpha（同一张图转出来的灰度片，几何、帧数和静帧一模一样）—— 裁切、翻转、
             // 时间、关键帧都照抄。纯白那块只管摆放框，透明的地方照样不透明：透明 PNG 带了关键帧就是黑方块（2026-10-03）。
             matte.sourceURL = StillAlphaNaming.matteURL(forStill: source.sourceURL)
+        } else if source.sourceAlpha != .opaque {
+            // 带透明的视频（2026-11-16）：同理，matte 是源逐帧抽出来的 alpha（时间戳、几何和源一样），裁切、翻转、时间、关键帧照抄。
+            guard let alphaMatte = await AlphaSourceCopies.url(.matte, for: source.sourceURL) else {
+                throw PrerenderError(
+                    message: String(format: L10n("Could not prepare the animated clip %@ for export."), clip.name)
+                )
+            }
+            matte.sourceURL = alphaMatte
         } else {
             guard let whiteURL = await BlackBaseVideoFactory.whiteVideoURL() else {
                 throw PrerenderError(
