@@ -37,7 +37,7 @@ enum MCPGuideMap {
     change_voice (re-voice a clip, dub it in my voice)
     Subtitles: generate_subtitles, translate_subtitles, get_subtitles, edit_subtitles (text, timing, style), \
     export_subtitles (subtitle files)
-    Check and export: inspect_video (seams, black frames, subtitle problems), export_video (final, or \
+    Check and export: inspect_video (seams, stray frames, black frames, subtitle problems), export_video (final, or \
     preset=quick_review for a fast small copy), get_job (wait for any job), cancel_job
     Files without a project: compress_videos, burn_subtitles, convert_subtitles
     Screen: record_screen (the screen, a window or an area, with the microphone if wanted)

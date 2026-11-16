@@ -32,7 +32,8 @@ enum MCPGuideEditClipTopic {
             edit_limits.speed; a value outside fails. ripple=true on a V1 clip moves the later V1 clips by the same amount its end moved. \
             alone=true leaves linked clips (the separated sound or picture of a J/L cut) as they are, for example to trim one side of a \
             J/L cut. Clips with keyframes: keyframes=keep_frames (default) keeps the motion on its source frames, stretch re-times it to \
-            the new window, clear removes it.
+            the new window, clear removes it. A new source_in, source_out or file whose window crosses a cut inside the file itself \
+            adds source_cuts to the result (a reminder, as in add_clips).
             """),
             MCPGuideSection(name: "framing", about: "fit=fill or fit=fit for another canvas shape, focus and follow, black bars, crop, region", text: """
             Framing for the canvas shape (for example after set_canvas ratio=9:16). fit=fill covers the whole frame: SkyCut takes a window \
