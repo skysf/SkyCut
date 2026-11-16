@@ -31,7 +31,7 @@ ad-hoc 签名（`codesign --sign -`）的 designated requirement 就是 `cdhash 
 - **私钥在仓库外**：`~/.config/srtflow/signing/`（专用钥匙串 `srtflow-signing.keychain-db` + 它的密码
   `keychain-password`，目录 700、文件 600，同 `r2.env`）。仓库里只钉证书的 SHA-1：`packaging/signing-identity.sha1`。
 - **签名只经一处**：`scripts/signing/sign-app.sh`（`build-app.sh`、`build-beta-app.sh` 都调它）。先签
-  `Contents/Helpers` 里的 ffmpeg、skycut-mcp，再签外层。有签名身份就用它签，签完核对 requirement 真的钉在
+  `Contents/Helpers` 里的 ffmpeg、skycut-mcp、skycut-web-motion (the web-motion renderer, since 2026-11-17)，再签外层。有签名身份就用它签，签完核对 requirement 真的钉在
   证书上；没有就退回 ad-hoc 并警告（README 里自己编着用的人不受影响）。只换了签名身份：没开 hardened runtime、
   没有 entitlement，和 ad-hoc 时一样。
 - **专用钥匙串只在签名那几秒挂上搜索列表**：codesign 只在搜索列表里的钥匙串中找身份，`--keychain` 只是在

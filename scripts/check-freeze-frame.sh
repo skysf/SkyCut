@@ -127,6 +127,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
   checks/FreezeFrame/BoundaryChecks.swift \
+  checks/FreezeFrame/LinkChecks.swift \
   checks/FreezeFrame/main.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

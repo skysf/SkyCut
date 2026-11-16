@@ -92,6 +92,13 @@ cp "$BUILD_DIR/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"
 strip -xS "$APP/Contents/Helpers/skycut-mcp" 2>/dev/null || true
 chmod +x "$APP/Contents/Helpers/skycut-mcp"
 
+# The web-motion renderer: it runs AI-written page code, so it runs outside SkyCut's own process (SkyCut can kill it).
+# Same place and same signing as skycut-mcp (docs/architecture/web-motion-renderer.md).
+echo "==> 内置 skycut-web-motion"
+cp "$BUILD_DIR/skycut-web-motion" "$APP/Contents/Helpers/skycut-web-motion"
+strip -xS "$APP/Contents/Helpers/skycut-web-motion" 2>/dev/null || true
+chmod +x "$APP/Contents/Helpers/skycut-web-motion"
+
 # 图标：脚本生成 iconset → iconutil 合成 icns（仓库中不放二进制图标文件）
 echo "==> 生成图标"
 ICONSET="$(mktemp -d)/SkyCut.iconset"

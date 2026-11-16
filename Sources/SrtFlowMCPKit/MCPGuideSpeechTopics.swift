@@ -51,8 +51,9 @@ enum MCPGuideSpeechTopics {
             """),
             MCPGuideSection(name: "what", about: "one clip, a file, or every audible clip, and time ranges", text: """
             What it measures. clip_id measures one timeline clip including its volume, fades and track faders; file measures a \
-            media file in source seconds (source_in and source_out narrow it; outside files may return needs_confirmation); with \
-            neither it lists every audible clip. from and to limit the timeline seconds.
+            media file (absolute, or relative to the opened folder) in source seconds (source_in and source_out narrow it; outside \
+            files may return needs_confirmation); with neither it lists every audible clip. from and to limit the timeline \
+            seconds. mix=true measures the mix itself instead (the mix section).
             """),
             MCPGuideSection(name: "levels", about: "level, peak, silences, the loudest moment and the curve", text: """
             Levels. level_db is the RMS level excluding silence, peak_db the peak, silences the quiet stretches (quieter than \
@@ -67,12 +68,34 @@ enum MCPGuideSpeechTopics {
             Cuts. cuts=true with neither clip nor file checks the head and tail of every V1 clip: whether the cut sits in a \
             pause or on speech, which words (from transcribe) it cuts, and suggested_source_in / suggested_source_out for \
             edit_clip. It uses the same measurements as cut_speech. Apply a suggestion, then check again.
+            """),
+            // 出处：docs/architecture/export-audio-mixdown.md「五、按层量」、ai-control-mcp.md 第四节第 13 条（mix=true）。
+            MCPGuideSection(name: "mix", about: "mix=true: the mixed timeline per track layer and per frame, as exported", text: """
+            Mix. mix=true measures the timeline's mix itself instead of clips: SkyCut renders it offline with the engine that \
+            makes the exported sound (clip volume, curves, fades, scenes, track and master faders) and measures the whole mix and \
+            each layer, frame by frame at the project frame rate. Nothing is estimated from the media files, so a mono voice reads \
+            as loud as it plays. from and to limit the timeline seconds (whole timeline by default); clip_id measures that clip's \
+            seconds and splits the sound into its own track and rest.
+            Layers. layers lists the layers, each a track (A1), tracks joined by + (V1+V2), or rest (every audible track not \
+            named). The default is one layer per audible track. V1 is the main track's own sound; hidden or muted tracks are not \
+            in the mix. Layers are as they enter the master bus, before the limiter, so they add up to the mix wherever nothing \
+            is over.
+            Results. The mix: loudness_lufs (integrated, after the limiter: the number export_video reports), max_momentary and \
+            max_short_term (the loudest 400 ms and 3 s), peak_db and peak_at (before the limiter), loudest_at (the start of the \
+            loudest frame), over (frames above the -1 dBFS limiter ceiling, with the peak and how much the limiter takes off: \
+            reported, never blocked), limited_seconds, max_reduction_db and a level curve. Each layer: level_db, loudness_lufs, \
+            peak_db, peak_at, loudest_at and bands_db (low below 300 Hz, low_mid 300-800, high_mid 800-3000, high above 3000). \
+            To pull a mix down, lower the master with set_track. frames=true adds per-frame values for a few seconds: the more \
+            layers, the fewer frames, and a longer range is refused with a to that fits. A long timeline may return job_id: wait \
+            with get_job.
             """)
         ],
         examples: [
             ["clip_id": "c1"],
             ["cuts": true],
-            ["clip_id": "m1", "beats": true]
+            ["clip_id": "m1", "beats": true],
+            ["mix": true, "from": 70, "to": 76],
+            ["mix": true, "layers": ["A1", "rest"], "frames": true, "from": 29, "to": 31]
         ],
         related: ["transcribe", "cut_speech", "cut_to_beat", "inspect_video"]
     )

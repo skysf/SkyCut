@@ -348,6 +348,7 @@ do {
 }
 
 checkFreezeBoundaries()
+checkFreezeLinks()
 
 print("\(checks - failures)/\(checks) 项通过")
 if failures > 0 {

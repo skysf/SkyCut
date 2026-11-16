@@ -27,6 +27,11 @@
 | `AudioEngineIdleKeeper.swift` | 照上面那条规矩停图 / 起图：换配置之后、图开着时每 5 秒、用户回来时各看一眼 |
 | `MeterSlot.swift` | 电平表的无锁槽：渲染块按拍「比大就换」写峰值，界面每拍取走并清零 |
 | `PlaybackAudioSource.swift` | 时钟驱动引擎的那几个方法（协议，不依赖任何东西，`PlayerClock` 的自检只编它） |
+| `AudioStemRender.swift` | 按层离线渲：整条混音一个离线引擎（成片那一份）、每层一个（只留那几条轨），一块一块同步往下走（[成片的声音](export-audio-mixdown.md)第五节） |
+| `MixFrameGrid.swift` | 按工程帧率切帧：时间线的第几帧 ↔ 第几个采样 |
+| `MixBandMeter.swift` | 一层每帧的电平、峰值、四个频段（两帧长的汉宁窗 + vDSP FFT），和这一层的整体响度 |
+| `MixBusMeter.swift` | 整条混音每帧：过没过线、成片同样的限幅器压了多少、瞬时 / 短时响度；整体响度和导出报的同一个数 |
+| `MixMeasurement.swift` | 把上面几样串起来：前面多渲几秒、渲、量，给纯值的结果；`observe` 把每一块原样的采样交出去 |
 
 ## 二、合同
 
@@ -47,6 +52,9 @@
 6. **音频不缓存**：直接读 mp3 / aac / wav 原件；mp3 的精确定位 `AVAudioFile` 自己做。
 7. **离线和实时是同一张图**：成片（PR3a 起，`ExportAudioMixdown` → `renderOffline`，[成片的声音](export-audio-mixdown.md)）
    和自检都走 `renderOffline`，和实时播放的渲染块是同一段代码；`renderOffline` 的 consumer 回 false 就停（导出取消）。
+   `renderOffline` 是三步（2026-11-16 拆开）：`beginOffline(atFrame:)` 起图、锚点钉在那一帧，`renderOfflineQuantum` 一块一块渲
+   （最多 `offlineQuantum` = 4096 帧），`endOffline` 停图。按层量（`AudioStemRender`）用同样三步让几个离线引擎同步往下走，
+   起点取 4096 的整数倍，块的边界和成片从 0 渲的一样（[成片的声音](export-audio-mixdown.md)第五节）。离线引擎不碰声卡，预览的图起停照旧只经第 11 条。
 8. **引擎的时钟只从渲染块的时间戳来**（节点的 48 kHz 域）。`outputNode.lastRenderTime` 是声卡自己的采样率
    （这台机器 44.1 kHz），拿它算位置播放头会以 0.92 倍速走：2026-10-01 冒烟欠载 51k 帧、视频对表 60 次。
    一个静音的时钟节点一直挂着，没有一条轨出声的时间线也有人每拍更新时钟（图在跑的时候；图停着时见第 11 条）。

@@ -22,6 +22,8 @@ final class AIJobs {
         case voiceEnroll = "voice_enroll"
         /// 变声（VoiceChangeJob）：把一段的人声换成另一个声音，做完两条新音频轨、原声静音。
         case voiceChange = "voice_change"
+        /// listen mix=true（AIListenMix）：按层离线渲、量混在一起之后的声音；当场量不完才让 AI 用 get_job 等。
+        case listen
         /// A look not done within about 25 s (AILookCall): its result and picture come with get_job.
         case look
     }

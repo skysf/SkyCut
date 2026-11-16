@@ -170,7 +170,7 @@ private struct AIProjectSidebarStatus {
         case .generate, .voiceDesign, .voiceEnroll, .voiceChange: return L10n("Generating")
         case .voiceover: return L10n("Voiceover")
         case .transcript: return L10n("Transcribing")
-        case .inspection, .shots, .compress, .voices, .burnIn, .screenRecording, .look: return L10n("Working")
+        case .inspection, .shots, .compress, .voices, .burnIn, .screenRecording, .listen, .look: return L10n("Working")
         }
     }
 }

@@ -68,6 +68,7 @@ enum AITimelineEdits {
     // MARK: V1 往后推 / 往前拉
 
     /// V1 上从 `time` 起（含）的片段整体挪 `delta` 秒；链接开着时链接伙伴跟着挪。
+    /// Partners come along only when none of their group's V1 pictures stays behind (`RippleLinkPartners`).
     static func shiftMain(
         from time: Double, by delta: Double, excluding: Set<UUID>, linkage: Bool, in state: inout TimelineState
     ) {
@@ -76,7 +77,7 @@ enum AITimelineEdits {
             .filter { $0.timelineStart >= time - epsilon && !excluding.contains($0.id) }
             .map(\.id)
         var ids = Set(movers)
-        if linkage { for id in movers { ids.formUnion(state.linkedClipIDs(of: id)) } }
+        if linkage { ids.formUnion(RippleLinkPartners.following(movers, excluding: excluding, in: state)) }
         ids.subtract(excluding)
         for id in ids { state.update(id) { $0.timelineStart = max(0, $0.timelineStart + delta) } }
         sortLanes(&state)
