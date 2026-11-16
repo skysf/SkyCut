@@ -138,19 +138,16 @@ Reverse verification (2026-11-17; each broken alone, the check run, the file res
 | `forgetRound` keeps the store | wiring: forgets the store |
 | `get_status` without versions | wiring: lists the versions |
 
-The full-App check (same procedure, 87 checks when this was written):
+The full-App check (same procedure; "of 86" is the check before the magnet case was added, "of 87" after):
 
 | Broken | Red |
 | --- | --- |
-| `save` writes even when nothing changed | 10: the second round reuses v2, the same state again / after a restart, a round without changes, going back to the same version, undo round=true's version count, get_status |
-| Going back through `perform` | 1: the magnet's gap in V1 comes back with the version (V1 packed to 0, 2 instead of 0, 3) |
-| No pruning | 2: 33 saved keep 30; numbers keep counting |
-| The starting point taken from the state after the first change | 14: v1 holds the starting point, one step back equals it, the never-saved project's v1, two projects' starting points, … |
-| The folder without the path hash | 2: two projects with the same name keep separate folders, the folder starts with the name |
-| The round's end saves nothing | 8: v2 at the round's end, v3 after the second round, two projects' v2, the moves project's v2, … |
-
-The first full-App run (before the magnet case was added) stayed green with the restore going through `perform`: the scenarios had
-the magnet off. The magnet-gap scenario was added for it and turns red as above.
+| `save` writes even when nothing changed | 10 of 86: the second round reuses v2, the same state again / after a restart, a round without changes, going back to the same version, undo round=true's version count, get_status |
+| No pruning | 2 of 86: 33 saved keep 30; numbers keep counting |
+| The folder without the path hash | 2 of 86: two projects with the same name keep separate folders, the folder starts with the name |
+| The round's end saves nothing | 8 of 86: v2 at the round's end, v3 after the second round, two projects' v2, the moves project's v2, … |
+| The starting point taken from the state after the first change | 15 of 87: v1 holds the starting point, one step back equals it, the never-saved project's v1, the magnet gap, two projects' starting points, the moved file, … |
+| Going back through `perform` | 0 of 86 — the scenarios had the magnet off, so the magnet-gap scenario was added: 1 of 87 (V1 packed to 0, 2 instead of 0, 3) |
 
 `scripts/render-project-versions.sh <folder>` (not in `check-all.sh`, graphical session) draws the Versions sheet with six
 versions and with none, and the AI banner's details, in en / zh-Hans / es, forest and classic on dark. Without Screen Recording
