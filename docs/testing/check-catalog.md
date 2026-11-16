@@ -91,7 +91,10 @@
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
   以及动画的「模型给多少、成片就是多少」、预览上的可点范围、老虎机首帧 / 末帧就是起止值，
   还有主字体里没有的字（✨、汉字）用回退字体画（和直接用那款字体画的墨迹重合），以及带动画的字切成的几段在接缝上每一帧正好贴一层（几段拼接的主轨 +
-  起点不在帧格子上，`SeamFrames.swift`）：
+  起点不在帧格子上，`SeamFrames.swift`）, and every exported frame of moving text and shapes being the frame for its own
+  time — none repeated, late or missing (wiping titles and a wiping shape, starts on and off the grid, a still square
+  starting on the grid, over cuts and crossfades, at 24 / 30 / 60 fps, each frame's lit width against the renderer at that
+  frame's time; plus the `FrameGrid` rule at 24 / 25 / 30 / 60 fps; `MovingFrames.swift`, group 20)：
   `scripts/check-text-render.sh`。
 - 形状：预览那个画法（`ShapePreviewDrawing`，离屏渲一张）和导出那张（`ShapePNGRenderer`）逐像素重合（白色形状铺黑底：最亮的一点、墨迹外框、
   重合度、平均差；五种形状 × 描边 / 实心 × 不动 / 画到一半 / 擦除 / 缩放 / 半透明，「画了 0」两边都空），以及入场 / 出场动画真跑导出抽帧
