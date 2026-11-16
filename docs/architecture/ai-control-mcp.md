@@ -1261,7 +1261,7 @@ read of the project and before its first await (`shots=true` never).
       `scripts/gui-smoke/sky-studio/look_jobs.py` against the isolated smoke App ([GUI smoke](../testing/gui-smoke-testing.md) 四之八, 7a).
       Every look of two sessions' four parallel 12-frame looks answers within 30 s with its picture or a job_id whose get_job brings it;
       an edit right behind a look answers first; looks behind a long `edit_clips` answer as queued jobs with `queue_position` and
-      `waiting_for`, and `cancel_job` on a queued one says it never started.
+      `waiting_for`, and `cancel_job` cancels one.
 - [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；

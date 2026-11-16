@@ -5,7 +5,7 @@ docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md. Checks what CI cannot 
    get_job brings the picture; nothing is dropped;
 2. an edit sent right behind a look on the same project answers before the look;
 3. two looks sent behind a long edit_clips (fit=fill on every clip) answer as queued jobs (queue_position 1 and 2, waiting_for names
-   edit_clips) once the edit takes longer than 25 s; cancel_job on the second says it never started; get_job brings the first's picture.
+   edit_clips) when the edit takes longer than 25 s; cancel_job cancels the second; get_job brings the first's picture.
 Footage: synthetic one-keyframe clips made here. Projects are closed at the end.
 """
 import json
@@ -75,10 +75,11 @@ def twelve(start):
 
 
 MEDIA.mkdir(parents=True, exist_ok=True)
-for name in ('testsrc2', 'smptehdbars', 'mandelbrot'):
+# Mixed shapes (the first sets the 16:9 canvas): fit=fill has to find the subject in the other two, as with real footage.
+for name, size in (('testsrc2', '1920x1080'), ('smptehdbars', '1440x1080'), ('mandelbrot', '1080x1350')):
     target = MEDIA / f'{name}.mp4'
     if not target.exists():
-        subprocess.run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-nostdin', '-f', 'lavfi', '-i', f'{name}=size=1920x1080:rate=24',
+        subprocess.run([FFMPEG, '-hide_banner', '-loglevel', 'error', '-nostdin', '-f', 'lavfi', '-i', f'{name}=size={size}:rate=24',
                         '-t', '6.5', '-c:v', 'libx264', '-preset', 'veryfast', '-g', '1000', '-keyint_min', '1000', '-sc_threshold', '0',
                         '-pix_fmt', 'yuv420p', str(target)], check=True, timeout=120)
 files = sorted(p.name for p in MEDIA.glob('*.mp4'))
@@ -89,9 +90,9 @@ try:
         call(mcp, 'set_view', {'mode': 'background'})
         created = call(mcp, 'new_project', {'folder': str(MEDIA), 'name': f'Look jobs {index}', 'version': time.strftime('%H%M%S')})
         projects.append(created['value']['project'])
-        clips = [{'file': files[i % len(files)], 'source_in': 0.2, 'source_out': 6.2, 'start': i * 6.0, 'track': 'V1'} for i in range(20)]
+        clips = [{'file': files[i % len(files)], 'source_in': 0.2, 'source_out': 6.2, 'start': i * 6.0, 'track': 'V1'} for i in range(30)]
         added = call(mcp, 'add_clips', {'project': projects[-1], 'clips': clips})
-        check(not added['error'], f'session {index}: 20 clips on V1')
+        check(not added['error'], f'session {index}: 30 clips on V1')
         clip_ids.append([item['id'] for item in added['value']['added']])
     a, b = sessions
     pa, pb = projects
@@ -103,17 +104,35 @@ try:
     look, edit = at_once([(a, 'look', {'project': pa, 'times': twelve(30)}, 0), (a, 'set_track', {'project': pa, 'track': 'V1', 'hidden': False}, 0.1)])
     check(edit['seconds'] < look['seconds'], f'an edit behind a look answered first ({edit["seconds"]} s, the look {look["seconds"]} s)')
     long_edit = [{'clip_id': clip, 'fit': 'fill', 'focus': 'subject'} for clip in clip_ids[0]]
-    edit, first, second = at_once([(a, 'edit_clips', {'project': pa, 'clips': long_edit}, 0),
-                                   (a, 'look', {'project': pa, 'times': twelve(40)}, 1.0), (a, 'look', {'project': pa, 'times': twelve(90)}, 1.2)])
-    print(f'edit_clips took {edit["seconds"]} s; the looks answered after {first["seconds"]} s and {second["seconds"]} s', flush=True)
-    if edit['seconds'] > 27:
+    results = {}
+    def run(key, name, args, delay):
+        time.sleep(delay)
+        results[key] = call(a, name, args)
+    jobs = {'edit': ('edit_clips', {'project': pa, 'clips': long_edit}, 0), 'first': ('look', {'project': pa, 'times': twelve(40)}, 1.0),
+            'second': ('look', {'project': pa, 'times': twelve(90)}, 1.2)}
+    threads = {key: threading.Thread(target=run, args=(key, *job)) for key, job in jobs.items()}
+    for thread in threads.values():
+        thread.start()
+    threads['first'].join()
+    threads['second'].join()
+    first, second = results['first'], results['second']
+    edit_running = threads['edit'].is_alive()
+    if isinstance(first['value'], dict) and first['value'].get('job_id'):
         check(first['value'].get('status') == 'queued' and first['value'].get('queue_position') == 1
               and str(first['value'].get('waiting_for', '')).startswith('edit_clips from this AI session'), f'first look queued behind edit_clips: {first["value"]}')
         check(second['value'].get('queue_position') == 2, f'second look second in line: {second["value"]}')
         cancelled = call(a, 'cancel_job', {'job_id': second['value']['job_id']})['value']
-        check(cancelled.get('status') == 'cancelled' and 'never started' in cancelled.get('message', ''), f'queued look cancelled: {cancelled}')
+        if edit_running and threads['edit'].is_alive():
+            check(cancelled.get('status') == 'cancelled' and 'never started' in cancelled.get('message', ''),
+                  f'the second look, cancelled while the edit still ran, never started: {cancelled.get("message")}')
+        else:
+            check(cancelled.get('status') == 'cancelled', f'the second look cancelled: {cancelled.get("message")}')
     else:
-        print('edit_clips finished within 25 s on this Mac: the queued case was not exercised here (scripts/check-look-jobs.sh covers it)')
+        print('edit_clips ended within 25 s on this Mac: the queued case was not exercised here (scripts/check-look-jobs.sh covers it)')
+    threads['edit'].join()
+    edit = results['edit']
+    print(f'edit_clips took {edit["seconds"]} s; the looks answered after {first["seconds"]} s and {second["seconds"]} s', flush=True)
+    check(not edit['error'], f'edit_clips fit=fill went through: {str(edit["value"])[:200]}')
     check(picture(a, first), 'the look behind the edit brought its picture')
 finally:
     for mcp, project in zip(sessions, projects):

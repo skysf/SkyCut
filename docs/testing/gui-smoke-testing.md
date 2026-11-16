@@ -488,8 +488,8 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 7a. Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `python3 scripts/gui-smoke/sky-studio/look_jobs.py`
    drives the router's real path, which CI cannot reach (the license gate): two AI sessions each send two 12-frame looks at once and every
    look answers within 30 s with its picture or a job_id whose get_job brings it; an edit sent right behind a look answers first; two looks
-   sent behind a long `edit_clips` (`fit=fill` on 20 clips) answer as queued jobs (`queue_position` 1 and 2, `waiting_for` names
-   edit_clips) when the edit takes longer than 25 s, `cancel_job` on the second says it never started, get_job brings the first's picture.
+   sent behind a long `edit_clips` (`fit=fill` on 30 clips of mixed shapes) answer as queued jobs (`queue_position` 1 and 2, `waiting_for`
+   names edit_clips) when the edit takes longer than 25 s, `cancel_job` cancels the second, get_job brings the first's picture.
    It makes its own one-keyframe 1080p clips; `edit_clips` with `fit=fill` runs Vision on every clip, so do not run it while the Mac is
    already loaded by builds. On a fast Mac the edit may finish within 25 s: the script then says the queued case was not exercised
    (`scripts/check-look-jobs.sh` covers it with real App objects).
