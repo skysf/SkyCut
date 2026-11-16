@@ -491,6 +491,13 @@ xcrun swiftc \
   Sources/SrtFlow/AITimelineEdits.swift \
   Sources/SrtFlow/AILinkageReport.swift \
   Sources/SrtFlow/ClipSoundSeparation.swift \
+  Sources/SrtFlow/CutSoundRequest.swift \
+  Sources/SrtFlow/CutSoundCut.swift \
+  Sources/SrtFlow/CutSoundEdges.swift \
+  Sources/SrtFlow/CutSoundLimits.swift \
+  Sources/SrtFlow/CutSoundPlanner.swift \
+  Sources/SrtFlow/CutSoundLevelPlan.swift \
+  Sources/SrtFlow/CutSoundReport.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
   Sources/SrtFlow/AIClipEditPlan.swift \
