@@ -7,6 +7,13 @@
 > 分组只以 `scripts/check-all.sh` 为准，下面提到的组号是写下那一条时的位置。条目的顺序是当时往 AGENTS.md 里加的顺序，没有重排；
 > 找某个脚本直接搜它的名字。
 
+- Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
+  (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory`
+  runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
+  hostile pages, a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
+  `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
+  verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
+
 - 官网样式表的先后（构建按共用关系分块，覆盖规则不许排在基础规则前面）：`website/tests/css-cascade.test.mjs`（源码级）和 `npm run check:seo`（按每个构建出来的页面实际加载的样式块核对），都在 CI 的网站那一步里。
 
 - 官网的小字（手机上不小于 12 px、演示区对比度、标题层级、首屏不随字体挪动、演示打字时对话窗不变高）：`website/tests/legibility.test.mjs` 在 CI 的网站那一步里；浏览器里量的那一半 `npx -y -p playwright@1.65.0 node scripts/check-legibility-browsers.mjs` 是手动的（无头、只在 Mac 上，**不在 `check-all.sh` 里**），见 [SkyCut 官网](../architecture/skycut-website.md)「小字读得清」。
@@ -79,7 +86,9 @@
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
   （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
-  在做不出来的机器上打 `SKIP` 明说没跑）：`scripts/check-video-fade.sh`。
+  在做不出来的机器上打 `SKIP` 明说没跑）, and the preview not waiting for a straight source's premultiplied copy (`AlphaVideoNoWait.swift`:
+  on a cold cache the preview build neither makes nor waits for the copy and draws the original at once; `missingAlphaCopies` names
+  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits)：`scripts/check-video-fade.sh`。
 - 检查器的 live 绑定只准接滑块和 scrub（离散控件没有结束信号，快照会挂着把
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
@@ -178,7 +187,7 @@
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
-- 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
+- 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
@@ -222,7 +231,9 @@
   声音各找一条、链接组换新号、文字 / 滤镜 / 字幕句各自的行规矩），外加分割不丢字段、分割后链接组一对还是一对：
   `scripts/check-timeline-clipboard.sh`；接线（编辑菜单三项、右键菜单、落点鼠标优先含 Finder 文件、标尺不算轨道、
   剪贴板只有一套且不写纯文本）：`checks/timeline-clipboard-wiring.sh`。
-- 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）：`scripts/check-still-clip-encode.sh`。
+- 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）, and a transparent still being one encoded frame shared by 120 samples (`SharedFrame.swift`: identical ffmpeg frames to writing
+  every frame under export-style trims and identical AVFoundation decode, one frame big, layouts the rewrite does not know refused and
+  left untouched, six factory conversions at once)：`scripts/check-still-clip-encode.sh`。
 - 翻译配对预检与接线：`scripts/check-translation-preflight.sh`。
 - 音频库清单：解析的宽容边界（不认识的字段忍、单条坏数据跳过、**版本号更高整份
   拒绝**）与双语搜索（中英都能命中同一个 tag、多词是「与」），以及音效清单的 `title_zh` / `hit` / `owned` 不署名 / 按中文标题搜：

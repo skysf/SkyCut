@@ -29,6 +29,8 @@ struct CutSoundOutcome {
         var clip: UUID
         var extendedBefore: Int
         var extendedAfter: Int
+        /// How much the bed was raised at the cut (dB, 0 = it already carried the cut).
+        var raised = 0.0
     }
 
     /// 两边和底在切点附近听到的电平（dB：素材 + 段的音量线 + 推子），没量就是 nil。
@@ -50,6 +52,8 @@ struct CutSoundOutcome {
     var beat: Beat?
     var bed: Bed?
     var levels: Levels?
+    /// crossfade only: "equal_power", or "linear" for two pieces of one continuous take (those sum exactly with linear fades).
+    var crossfadeShape: String?
     var notes: [String] = []
 }
 
@@ -178,7 +182,11 @@ enum CutSoundPlanner {
         /// 要挪这一边的声音：画面自己带着的先分出去（另一头照它此刻实际响的样子），返回放声音的那段。
         mutating func movable(_ side: Side) throws -> UUID {
             guard let voice = voice(side) else { throw noSound(side) }
-            guard voice.embedded else { touched.insert(voice.id); return voice.id }
+            guard voice.embedded else {
+                clearCrossfadeCurve(side, of: voice.id)
+                touched.insert(voice.id)
+                return voice.id
+            }
             let picture = picture(side)
             guard let id = CutSoundEdges.separate(picture, keeping: side == .outgoing ? .start : .end, from: original, in: &state) else {
                 throw noSound(side)
@@ -203,6 +211,29 @@ enum CutSoundPlanner {
             let i = try movable(.incoming)
             CutSoundEdges.set(.end, of: o, to: time + reach, fade: 2 * reach, in: &state)
             CutSoundEdges.set(.start, of: i, to: time - reach, fade: 2 * reach, in: &state)
+            // Equal power by default (2026-11-16 decision): a bump on each curve turns the linear fades into cos / sin, so two
+            // different sounds keep their loudness through the middle. One continuous take stays linear: it sums exactly.
+            guard !continuousTake(o, i) else { outcome.crossfadeShape = "linear"; return }
+            CutSoundCurves.shapeCrossfade(o, from: time - reach, to: time + reach, incoming: false, in: &state)
+            CutSoundCurves.shapeCrossfade(i, from: time - reach, to: time + reach, incoming: true, in: &state)
+            outcome.crossfadeShape = "equal_power"
+        }
+
+        /// Both sounds read the same file and the next one carries on where the previous one is at the cut.
+        private func continuousTake(_ outgoing: UUID, _ incoming: UUID) -> Bool {
+            guard let a = state.clip(with: outgoing), let b = state.clip(with: incoming), a.sourceURL == b.sourceURL,
+                  abs(a.speed - b.speed) < 1e-9 else { return false }
+            return abs(a.sourceTime(atTimeline: time) - b.sourceTime(atTimeline: time)) < 0.001
+        }
+
+        /// Setting an edge again: if it still carries a crossfade (fade = twice its overhang past the cut), the bump that crossfade
+        /// drew into the curve goes first, so a join never stacks on the previous one.
+        private mutating func clearCrossfadeCurve(_ side: Side, of id: UUID) {
+            guard let clip = state.clip(with: id), !clip.volumeCurve.isEmpty else { return }
+            let overhang = side == .outgoing ? clip.timelineEnd - time : time - clip.timelineStart
+            let fade = side == .outgoing ? clip.fadeOutDuration : clip.fadeInDuration
+            guard overhang > 1e-6, abs(fade - 2 * overhang) < 1e-6 else { return }
+            CutSoundCurves.clear(id, from: time - overhang, to: time + overhang, in: &state)
         }
 
         mutating func lead() throws {

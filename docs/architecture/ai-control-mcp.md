@@ -571,6 +571,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `add_voiceover` 先回建声音那一步（`kind: voice_enroll`，或在建的那一单 `already_building`），那一笔 `credits` 是建版本的钱，旁白还没读、没预留，
      跟着 `next_step` 走。改第 11、13 条时对着 `SkyStudioGenerateTool`、`SkyStudioJobGate`、`SkyStudioVoiceoverStart` / `SkyStudioVoiceOneTimeStep`
      里每个提前返回的地方核一遍；检查查「不写成某一个原因」「不把会问说满」「讲旁白积分的那一条讲到建声音那一步」。
+   - **The shared editing rules are for every SkyCut user, with or without a style** (2026-11-16, user decision: general rules and
+     checks live in SkyCut; how to cut one kind of film lives on the Sky Studio server later). ① After rules 1–13 the shared rules have
+     four sections — Sound belongs to the picture, Cuts, Voice and music, Title cards — that **hold in every style; only the user's own
+     words override them**. A style card wins only over the shared Taste section ("When a style says otherwise, the style wins"); a card
+     line that contradicts the four sections gets changed in the same edit (2026-11-16: the cinematic opening's generated sound, the
+     documentary's 15–18 dB, the sci-fi title's 2 s). ② `recipes id=shared-rules` (`MCPRecipeTools.sharedRulesID`, one value for the
+     parameter text, the guide and `AIRecipeTools`) returns only the shared rules; a style that already has that id or title wins, and its
+     full text still ends with the rules. The `workflows` guide topic sends edits in no style there and only points: the rules live in
+     `recipes-shared-rules.md` alone, never copied into the guide. ③ What goes in comes from the research draft in tiers (only tier 1 on
+     2026-11-16; the Chinese draft's 2026-11-16 note lists what waits); later items are **appended at the end of their section**, since
+     cards cite them by number. ④ The size: one `recipes id=<style>` answer is the card plus the whole shared rules (largest built-in on
+     2026-11-16: product-promo, about 28,400 JSON characters, about 7.9 thousand tokens at 3.6 characters each); Claude Code warns above
+     10 thousand tokens, so new tiers need room first (shorter paid rules, or server recipes that do not repeat the shared rules).
+     `RecipeChecks` pins the four sections and checks the reserved id (any spelling, a user's style of that name winning, the parameter
+     text and the workflows topic naming it).
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，

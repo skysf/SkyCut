@@ -64,6 +64,27 @@ require "几何按插进去的那条源轨算（4K 减半的代理尺寸是它�
 # 带透明的源（HEVC 带透明是长 GOP）不转代理、表上有块也不换进来：代理是 H.264，没有 alpha（2026-11-16）。
 require "带透明的源不转代理" Sources/SrtFlow/OptimizedMedia/OptimizedMediaPolicy.swift '\(info\.alpha \?\? \.opaque\) == \.opaque'
 require "带透明的段不用优化媒体的块" Sources/SrtFlow/CompositionSource.swift 'guard alpha == \.opaque else \{ return Choice\(track: track, proxies: nil\) \}'
+# The preview never waits for a straight-alpha source's premultiplied copy (2026-11-17): only the coordinator's lookup says so
+# (both modes — the copy is for a correct picture, not speed); export prerender / AI look pass none and wait. After each rebuild
+# the coordinator makes the missing copies and swaps them in while stopped, by the same swap rule as proxies.
+require "预览的表在两种模式下都标「只拿已经转好的预乘副本」" "$COORDINATOR" \
+  'OptimizedMediaLookup\(chunks: mode == \.optimized \? ready : \[:\], readyAlphaCopiesOnly: true\)'
+OTHER_READY_ONLY="$(grep -rlE --include='*.swift' 'readyAlphaCopiesOnly: true' Sources/SrtFlow | grep -v "^${COORDINATOR}$" || true)"
+if [ -n "${OTHER_READY_ONLY}" ]; then
+  echo "✗ optimized-media-wiring：只有协调者的表能让 build 不等预乘副本（成片 / 预渲染 / AI 看要等），这些文件也标了：${OTHER_READY_ONLY}" >&2
+  FAIL=1
+fi
+if ! perl -0ne 'exit(($_ =~ /\n\s*prepareAlphaCopies\(in: state\)\n\s*guard mode == \.optimized else \{/) ? 0 : 1)' "$COORDINATOR"; then
+  echo "✗ optimized-media-wiring：重建落地之后先补预乘副本，再看「原片」模式（${COORDINATOR}）" >&2
+  FAIL=1
+fi
+require "补副本：问 CompositionSource 预览缺哪几份" "$COORDINATOR" 'CompositionSource\.missingAlphaCopies\(in: state\)'
+require "补副本：在 AlphaSourceCopies 里转（alpha 队列、同一份只转一次）" "$COORDINATOR" 'await AlphaSourceCopies\.url\(\.premultiplied, for: url\)'
+if ! perl -0ne 'exit(($_ =~ /self\.swapPending = true\n\s*self\.requestSwapIfIdle\(force: true\)/) ? 0 : 1)' "$COORDINATOR"; then
+  echo "✗ optimized-media-wiring：补好的副本按换块的规矩换进来（停着才换，${COORDINATOR}）" >&2
+  FAIL=1
+fi
+require "切工程：补副本的账清空" "$COORDINATOR" 'alphaCopiesInFlight = \[\]'
 
 # 转码在 proxy 队列上、登记后台读（性能测试和冒烟的「落定」要等它）。
 require "转码在 MediaReadQueue.proxy 上" "$COORDINATOR" 'MediaReadQueue\.run\(on: MediaReadQueue\.proxy\)'
@@ -136,4 +157,4 @@ require "转不了的记在 unavailable" "$COORDINATOR" '@Published private\(set
 require "菜单列出转不了的" "$MENU" 'coordinator\.unavailable'
 
 if [ "${FAIL}" -ne 0 ]; then exit 1; fi
-echo "✓ optimized-media-wiring：换源只在预览重建、成片 / 预渲染 / AI 看永远原片、转码在 proxy 队列并登记后台读、停着才换、切工程作废、菜单不读工程、清空之后 reset + 重建、缓存只经 Store、启动时过期、转不了的只在菜单里标"
+echo "✓ optimized-media-wiring：换源只在预览重建、预览不等直通源的预乘副本（停着才换）、成片 / 预渲染 / AI 看永远原片、转码在 proxy 队列并登记后台读、停着才换、切工程作废、菜单不读工程、清空之后 reset + 重建、缓存只经 Store、启动时过期、转不了的只在菜单里标"

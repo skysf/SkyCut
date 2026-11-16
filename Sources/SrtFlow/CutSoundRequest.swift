@@ -11,17 +11,20 @@ import SrtFlowMCPKit
 
 /// 声音怎么过一刀（词表 = `MCPVocabulary.cutSounds`，自检对账）。画面一律不动。
 enum CutSoundMode: String, CaseIterable {
-    /// 叠着换：两边的声音在切点前后各叠 N 帧，交叉渐变（整段重叠 2N 帧）。
+    /// 叠着换：两边的声音在切点前后各叠 N 帧，交叉渐变（整段重叠 2N 帧）。Equal power by default (a bump drawn on each volume
+    /// curve, CutSoundCurves); two pieces of one continuous take stay linear (2026-11-16 decision).
     case crossfade
     /// 先进（J）：下一个镜头的声音提前 N 帧、在这 N 帧里淡进来；上一个镜头的声音不动。
     case lead
     /// 拖后（L）：上一个镜头的声音拖过切点 N 帧、在这 N 帧里淡掉；下一个镜头的声音不动。
     case lag
-    /// 垫一层底：一层连续的声音（音乐、环境）在切点两边各铺 N 帧；两边的原声比底响 6 dB 以上的压下来。
+    /// 垫一层底：一层连续的声音（音乐、环境）在切点两边各铺 N 帧. The bed is raised around the cut until it is within 6 dB
+    /// of the louder side; only what the volume limit leaves uncovered comes off the loud side (2026-11-16 decision).
     case bed
     /// 落在拍子上硬换：声音一刀切，切口挪到 ±N 帧里最近的一拍上（画面的切点不动）。
     case onBeat = "on_beat"
-    /// 调增益：下一个镜头的声音整段调到和上一个镜头切点前的电平一样（或给定 dB）。
+    /// 调增益：with gain_db the next shot's sound moves by it; without, the louder side comes down to the quieter one's level
+    /// (2026-11-16 decision: keeps headroom, never lifts noise).
     case gain
     /// 回到一刀切：两边的声音都正好断在画面的切点上，没有渐变。
     case cut
@@ -56,7 +59,7 @@ struct CutSoundRequest: Equatable {
     var mode: CutSoundMode
     /// 帧数（工程帧率）；nil = 按 `defaultSeconds`。
     var frames: Int?
-    /// 增益（dB）：gain 给了就照这个调下一个镜头的声音（不给 = 和上一个对齐）；lead / crossfade / on_beat / cut 调下一个、
+    /// 增益（dB）：gain 给了就照这个调下一个镜头的声音（not given: the louder side comes down）；lead / crossfade / on_beat / cut 调下一个、
     /// lag 调上一个。bed 不收（它自己按底压两边）。
     var gainDB: Double?
     /// bed：铺在底下的那一层；on_beat：找拍子的那段音乐。nil = 跨过切点最长的那段声音。

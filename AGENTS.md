@@ -92,9 +92,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 语言
 
-- GitHub 对外可见文字一律使用英文：commit message、分支名、PR、issue、release，
-  以及 Actions 的 workflow、job、step 名称与正文。
-- `README.md` 保持中英双语；仓库内部 `docs/`、本文件和代码注释维持现状使用中文。
+- English: GitHub text (commits, branches, PRs, issues, releases, Actions) and, from 2026-11-16 (user's call), all new code comments and doc text, AGENTS.md and check messages included. Existing Chinese isn't translated.
+- Bilingual: README. Chinese: reports to the user.
 
 ### 工程原则
 
@@ -150,6 +149,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | --- | --- |
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，合并 `main` 后才部署；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖）、[官网首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md)、[官网小字：手机上小于 12 px、对比度不够、标题跳级](docs/bugfixes/2026-11-11-website-small-text-contrast-headings-font-shift.md) |
 | 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`） | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
+| Web-motion renderer: the helper `skycut-web-motion` (`Sources/SrtFlowWebMotion/`), its kit (`Sources/SrtFlowWebMotionKit/`), SkyCut's side `WebMotionRenderer` (`Sources/SrtFlow/WebMotion/`); page locks, page clock, alpha calibration, page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红：链接只有 `[字](相对路径.md)`（可带 `#锚点`），条目只有顶格的 `- [标题](路径.md) — 一句话`、AGENTS.md 的索引小节另许成形的表格；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插，不用 `merge=union`：GitHub 不认）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
 | 工程存盘、格式版本、素材路径、自动保存、重建预览时开素材（`MediaAssetCache`）、新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零） | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（素材只开一次、按路径 + 文件身份认；换完整份时间线就要 `scheduleRebuild()`）、[工程文件生命周期](docs/bugfixes/2026-08-03-project-file-lifecycle.md) |
@@ -270,6 +270,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-voice-recovery.sh` — 旁白 / 声音库 / 变声 / 长期授权 / `KeepAwakeChecks`：真 App 对象对着假 Sky Studio。
 - `scripts/check-voiceover-sync.sh` — 按旁白段落同步时间线。
 - `scripts/check-waveform.sh` — 波形数据逐采样对账、很多文件同时读不死锁。
+- `scripts/check-web-motion.sh` — web-motion renderer: the page clock, nothing leaves a page, alpha, hostile pages, memory kills and backstops, identical renders.
 - `python3 checks/MCP/SmokeClientChecks.py` — 冒烟客户端的断线、协议错误、超时和退出码。
 
 ### 扫描守卫（`checks/*.sh`，都在 `check-all.sh` 里；秒级、不编译）
@@ -327,6 +328,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/timeline-drag-wiring.sh` — 时间线拖动 / 框选 / 缩放 / 联动 / 开关的接线，整条时间线只许一个 `.onDrop`（分节在 `checks/timeline-drag-wiring/`）。
 - `checks/transition-handles-wiring.sh` — 主轨转场借余料、定格补足、可点选可删除的接线。
 - `checks/voiceover-sync-wiring.sh` — 旁白同步复用生产路径、只有一处提交。
+- `checks/web-motion-wiring.sh` — web-motion helper packaged and signed in order, pages only in the helper, every page locked.
 - `checks/workbench-settings-wiring.sh` — 单排工作台、统一设置、MCP 共用 Store。
 
 ### 不在 `check-all.sh` 里的
@@ -465,6 +467,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [波形与深度缩放](docs/architecture/audio-waveform.md) — 一个文件读一次的三层精度；Canvas 只画 `clipBoundingRect`。
 - [推子与电平表](docs/architecture/audio-mixer.md) — 三级增益一条账；电平从渲染块来（无锁槽）；已知的偶发。
 - [听声音的引擎](docs/architecture/listening-engine.md) — 替 AI 听声音的薄引擎分几层、谁调谁、只报不拦；ESTOI、拿掉谁涨多少、原声描述的纯计算和 numpy 版怎么对账；哪几条线是盲听定的。
+- [Web-motion renderer](docs/architecture/web-motion-renderer.md) — a motion web page rendered into a transparent ProRes 4444 movie by the helper `skycut-web-motion`: locks, page clock, alpha, page checks, memory and time limits, versions.
 - [画面渐入渐出](docs/architecture/video-fades.md) — 渐变露出的是下一层、alpha 斜坡两条管线同账、和声音共用夹紧规则。
 - [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md) — 不挪用户片段、余料不够用首尾帧定格补、定格字段只在渲染副本里。
 - [画面段的入场 / 出场动画](docs/architecture/clip-animation.md) — 五种效果落在三种斜坡上、和画面渐变共用一个槽、铺满不露边。

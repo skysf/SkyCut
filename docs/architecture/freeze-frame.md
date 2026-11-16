@@ -134,6 +134,8 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
    5MB 图 5s、9.5MB 图 8.8s，而产物一模一样。配套必须有 `-frames:v`
    （不是 `-t`）截断：`loop` 复制完之后会把输入剩下的帧接着往下吐，动图/多页图
    会超过 `stillDuration`。
+   (The transparent path, ProRes, goes one step further since 2026-11-17: it encodes the one frame once and repeats it in the
+   sample table instead of with `loop` — an intra-only codec stores every repeated frame; see 4a3.)
 2. **只能用所有 demuxer 都认的选项**。`-loop` / `-framerate` 是 image2 专属，
    gif（gif demuxer）和 heic（mov demuxer）会在开文件那一步就死；输入帧率用
    `-r`。tile grid 型 heic 目前仍不支持，**不许**用 `-filter_complex "[0:v]"`
@@ -163,9 +165,29 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
 - **哪张图算用到了透明**：文件头带 alpha 通道（`hasAlphaChannel`，只读文件头）**并且**缩到长边 1024 之后有像素不是全不透明
   （`usesTransparency`，要解码，在转码那一刻、别的线程上做）。截图、导出的 PNG 常带 alpha 通道却全不透明，照旧 H.264 ——
   透明静帧一张 1080×1080 约 30 MB，不值得给每张图都转。定格帧的 PNG 本来就没有 alpha 通道（RGB），不受影响。
+  (Those 30 MB were 120 stored frames; since 2026-11-17 a transparent still is about one frame, see below — H.264 is still
+  smaller and cheaper to decode for opaque images.)
 - **透明的**：`alphaConversionArguments` —— 先 `format=rgba`、补边透明（`color=black@0`）、`premultiply=inplace=1`，
   ProRes 4444 `yuva444p10le`，帧数帧率同不透明那条。**必须预乘**：预览的默认合成器把源当预乘的用（直通的半透明处会过亮）。
   外加 `matteConversionArguments` —— 同一套几何 `alphaextract` 成灰度 H.264（白 = 不透明），给带关键帧的上层轨段当 matte。
+- **One encoded frame, shared by all 120 samples** (2026-11-17, MCP-76,
+  [case](../bugfixes/2026-11-17-alpha-media-waits-and-oversized-stills.md)). ProRes is intra-only: "decode once, `loop` 119
+  copies" still *stored* the picture 120 times (a 1080p title 107–441 MB and 3.5–5.6 s; a 96-frame PNG sequence 10–12 GB). Now the
+  arguments encode one frame lasting the whole still (output rate `1/60`) and `StillFrameSharing.shareSingleFrame` rewrites the
+  sample table — 120 samples × 0.5 s, every one pointing at that frame's bytes — before the file lands. Every reader sees the
+  same 120 frames at 2 fps as before (identical ffmpeg frames after export-style trims, identical AVFoundation decode); on
+  disk it is one frame (1–4 MB at 1080p; 0.4 s with the matte). Rules:
+  1. **Repeat in the container, not as one long sample.** A single 60-second sample would break both pipelines: ffmpeg's
+     `trim` drops a frame whose pts is before the start (the right half of a split image would export as nothing), and
+     AVFoundation reports a 60-second `minFrameDuration` (the transition hold, `CompositionHold`, would insert 60 s).
+  2. The rewrite only accepts ffmpeg's single-intra-frame layout (one video track, moov after mdat, stbl = stsd / stts / stsc /
+     stsz / stco with one sample, a duration that divides by 120). Anything else throws `Unsupported`, leaves the file as it
+     was, and the factory writes every frame (`everyFrame: true`: the old big file, same picture) — never a broken still.
+  3. **No name version bump**: the shared file decodes identically to the 120-frame one, so old caches stay valid (just bigger).
+     Changing the codec, pixel format, frame rate or geometry still bumps `StillAlphaNaming`.
+  4. Image placeholders convert **together** (`StillClipBatch`: `addImages`, drops, pastes; the AI's add_clips starts one task
+     per image anyway) and the factory runs at most `ConversionSlots.width` conversions at once (2–4 by core count), whoever
+     asks: 96 frames at once used to be 96 ProRes encoders on 8 cores.
 - **起名只有 `StillAlphaNaming` 一份**：`<指纹>-alpha-v1.mov` / `-alpha-native-v1.mov`，遮罩同名接 `-matte.mp4`；
   带 alpha 通道其实全不透明的叫 `-opaque-v1.mp4` / `-opaque-native-v1.mp4`（编码同老的）。**带 alpha 通道的图不再认老名字**
   （`-v3.mp4` 里混着透明图转成的黑方块）：打开老工程时重转一次。透明静帧要连遮罩一起在才算命中。
@@ -186,6 +208,15 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
    `CompositionSource.track` 里换）：逐帧照抄时间戳和旋转矩阵（段的时间账、几何一个数都不换算），颜色标记照抄解码器给第一帧标的
    （原片没写时那是猜的，写死 709 饱和色偏 10 级），按「路径 + 文件身份 + 版本」缓存在 `~/Library/Caches/SrtFlow/AlphaSources/`，同一份
    只转一次，在 `MediaReadQueue.alpha` 上跑；转不出来退回原片（亮一点，不黑、不丢段）。**成片读原片**。改转法要 +1 `AlphaSourceCopies.version`。
+   **The preview never waits for the copy** (2026-11-17, [case](../bugfixes/2026-11-17-alpha-media-waits-and-oversized-stills.md)):
+   the build is one task for the whole timeline, so awaiting one long straight clip's copy held every edit's preview for
+   seconds. The preview's lookup (`OptimizedMediaLookup.readyAlphaCopiesOnly`, set only by the optimized-media coordinator, in
+   both modes) takes the copy only if it is on disk (`AlphaSourceCopies.readyURL`, never converts) and otherwise inserts the
+   original at once — semi-transparent edges a little bright for that moment. After the rebuild lands the coordinator asks
+   `CompositionSource.missingAlphaCopies`, makes them in the background and swaps them in **only while stopped**, by the
+   proxies' swap rule ([optimized media](optimized-media.md) rule 11); the copy has the original's timestamps and geometry, so
+   only the picture changes, never the time ledger. A copy that cannot be made is not retried that run. Export prerender and
+   the AI's look pass no lookup and **wait** for the copy: what they show must match the export.
 4. **导出：在预乘的画面上裁切缩放，叠之前反预乘**（`ExportTransformChain.premultipliedEntry`）：预乘的先 `setparams=alpha_mode=premultiplied`，
    直通的先 `setparams=alpha_mode=straight` 再 `premultiply=inplace=1`；缩放完 `unpremultiply=inplace=1` 交给 overlay（它按直通混合）。
    ffmpeg 8 起 premultiply / unpremultiply 看帧上的 alpha_mode，**不标就原样放过去**；`format=rgba`、裁切、缩放都带着它走。
@@ -202,12 +233,22 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
 回归：`scripts/check-video-fade.sh` 的 `AlphaStill.swift`、`AlphaVideo.swift`（预乘 / 直通 / 不写标记 × ProRes 4444 / HEVC，静态、不透明度、
 渐变、奇数边裁切 + 缩小、关键帧、入场动画、单独在 V1、老段、2560×1440、硬件编码、优化媒体的块，预览和成片各和参考比；做不出 HEVC 带透明
 或用不了硬件编码的机器明说 `SKIP`）；接线：`checks/project-file-wiring.sh`、`checks/optimized-media-wiring.sh`。
+Since 2026-11-17 also: `scripts/check-still-clip-encode.sh` → `SharedFrame.swift` (one encoded frame; after sharing 120 frames
+at 2 fps for ffmpeg and AVFoundation; identical to writing every frame under export-style trims and in AVFoundation decode; one
+frame big; unknown layouts refused and left untouched; six factory conversions at once) and `scripts/check-video-fade.sh` →
+`AlphaVideoNoWait.swift` (cold cache: the preview build neither makes nor waits for the copy and draws the original; the
+coordinator is told which source; after the copy the preview matches; the exact build still waits). Wiring: the preview-only
+flag set only by the coordinator, its prepare-and-swap, the frame sharing with its fallback, conversions together and bounded.
 
 人工回归（发版前实机）：
 
 - [ ] 网页动效渲的带透明视频（预乘、直通各一份）放 V2 压在真实画面上：预览里光、羽化、闪白和成片一样（不发白、不发灰），透明处露出下面。
 - [ ] 同一段放 V1、下面什么都没有：真播放器窗口里透明处是黑的，不是暗绿。
-- [ ] 直通的一段第一次放上去：预览先等副本（片名级一两秒），之后改别的不再等；`~/Library/Caches/SrtFlow/AlphaSources/` 清掉再播，照样对。
+- [ ] A straight-alpha clip placed for the first time (2026-11-17): it shows in the preview at once, glow edges a little bright;
+      stopped, within the time the copy takes (a few seconds for 10 s of 1080p) the edges turn right without any click; while
+      playing the swap waits for the pause; other edits never wait. Clear `~/Library/Caches/SrtFlow/AlphaSources/` and play: same.
+- [ ] Drop a 96-frame transparent PNG sequence (1080p) on V2: the placeholders appear at once, all frames show within seconds,
+      `~/Library/Caches/SrtFlow/StillClips/` grows by about one frame per image (under 1 MB each, not 100 MB); export matches.
 
 ## 4b. 分辨率政策只有一个判据
 

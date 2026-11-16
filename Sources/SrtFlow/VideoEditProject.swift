@@ -842,9 +842,9 @@ final class VideoEditProject {
         guard isCurrentGeneration(generation), !Task.isCancelled else { return }
         importingCount += urls.count
         defer { importingCount = max(0, importingCount - urls.count) }
-        for url in urls {
+        let clipIDs = urls.map { _ in UUID() }  // every placeholder first, then all converted together (StillClipBatch)
+        for (url, clipID) in zip(urls, clipIDs) {
             guard isCurrentGeneration(generation) else { return }
-            let clipID = UUID()
             let playhead = clock.time
             perform(rebuildsPreview: false) { state in
                 var clip = EditClip(
@@ -862,8 +862,8 @@ final class VideoEditProject {
                     state.mainClips.append(clip)
                 }
             }
-            await convertStillClip(clipID, from: url, generation: generation)
         }
+        await StillClipBatch.convert(zip(clipIDs, urls).map { (clip: $0, image: $1) }, generation: generation, in: self)
     }
 
     /// 图片占位块 → 静帧循环视频，转完**无感替换**（不占撤销栈，用户没做任何操作）。

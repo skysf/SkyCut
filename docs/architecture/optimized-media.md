@@ -20,7 +20,7 @@
 | `OptimizedMediaTranscoder.swift` | 把一块转出来：`AVAssetReader` 经视频合成解（块的轨从块头盖到块尾）→ `AVAssetWriter` 硬编 H.264，落到 Store。跑在 `MediaReadQueue.proxy` 上 |
 | `OptimizedMediaLookup.swift` | 纯值：builder 换源用的那张表（源 → 块号 → 块文件），一段用到的块齐不齐（`readyChunks(for:)`） |
 | `OptimizedMediaPlan.swift` | 纯值：这份时间线还差哪些块、先转哪块（播放头附近的段先）、哪些源要转、哪些源还没探关键帧间隔 |
-| `OptimizedMediaCoordinator.swift` | 工程上的协调者（`VideoEditProject.optimizedMedia`，`ObservableObject`，只有工具条的菜单订阅）：模式、队列、转、停着时请重建、补探、量解码速度、转不了的源（`unavailable`） |
+| `OptimizedMediaCoordinator.swift` | 工程上的协调者（`VideoEditProject.optimizedMedia`，`ObservableObject`，只有工具条的菜单订阅）：模式、队列、转、停着时请重建、补探、量解码速度、转不了的源（`unavailable`）；straight-alpha sources' premultiplied copies: the preview doesn't wait, the coordinator makes them and swaps them in while stopped (rule 8c) |
 | `OptimizedMediaCacheSettings.swift` | 设置里「优化媒体」那一节的状态（`ObservableObject`，只有那一节订阅）：占了多少（proxy 队列上算）、上限几档、清空（proxy 队列上 `removeAll` → 协调者 `reset()` → `scheduleRebuild()`） |
 | `../CompositionClipInsert.swift` | builder 插画面的那一步：原片一片，或代理几块首尾相接；差一块 / 插不进去退回原片 |
 | `../CompositionSource.swift` | builder 插之前挑源轨：原片、直通源的预乘副本、或这一段的块（带透明的段不给块） |
@@ -63,6 +63,14 @@
 8b. **带透明的源不转、也不换块**（2026-11-16）：代理是 H.264，没有 alpha，HEVC 带透明又是长 GOP —— 换进预览透明处就成了黑块。
    `needsProxy` 看 `MediaInfo.alpha` 说不；builder 挑源轨时（`CompositionSource.track`）对带透明的段也不给块（老工程转过的也不换）。
    规矩见 [定格 / 静帧管线](freeze-frame.md) 第 4a3 节「带透明的段」；回归在 `scripts/check-video-fade.sh` 的 `AlphaVideo.swift`。
+8c. **The coordinator also brings in straight-alpha sources' premultiplied copies — without making the preview wait**
+   (2026-11-17). `lookup(for:)` sets `readyAlphaCopiesOnly` in **both** modes (the copy is for a correct picture, not speed; 「原片」
+   needs it too), so the preview build takes a copy only if it is on disk and otherwise inserts the original at once. `sync`
+   first calls `prepareAlphaCopies` (before the mode check): `CompositionSource.missingAlphaCopies` names the sources, each is
+   made once in the background (`AlphaSourceCopies` on `MediaReadQueue.alpha`), then swapped in by rule 11 (`swapPending` +
+   `requestSwapIfIdle(force: true)`: at once when stopped, at the pause when playing). A copy that cannot be made is not retried
+   that run; `reset()` forgets both lists. Nothing else sets the flag: export prerender and AI look wait for the copy.
+   Rules and regression: [定格 / 静帧管线](freeze-frame.md) 4a3, `AlphaVideoNoWait.swift`.
 9. **成片永远用原片。** 代理只在预览合成里出现：`VideoEditCompositionBuilder.build` 只有预览重建那一处传 `proxies`
    （`VideoEditProject.scheduleRebuild`）；导出、预渲染（`VideoEditPrerender`）、AI 看（`AIFrameComposer`）、缩略图、波形都不碰缓存目录。
    守卫 `checks/optimized-media-wiring.sh` 钉着。
@@ -128,7 +136,9 @@
 V3：清空在 proxy 队列上且**紧跟 `reset()` + `scheduleRebuild()`**、`removeAll` 只许设置那一节的模型调、改上限经 Store 写并立刻
 `enforceCapacity`、占用在 proxy 队列上算、缓存目录的路径和上限的键只在 Store 里出现、设置那一节不碰 `FileManager` / `UserDefaults` /
 工程、设置窗口里有这一节、启动时在 proxy 队列上 `expire(olderThan: expiryDays)` 并登记后台读、协调者不许写 `notice`、
-转不了的记在 `unavailable` 且菜单列出来。
+转不了的记在 `unavailable` 且菜单列出来。Rule 8c (2026-11-17): only the coordinator's lookup sets `readyAlphaCopiesOnly`, in both
+modes; `sync` prepares the copies before the mode check, via `missingAlphaCopies` and `AlphaSourceCopies`; a made copy is swapped
+in by `requestSwapIfIdle(force: true)`; `reset()` clears the copy lists.
 
 反向验证（2026-10-01）：转码不设关键帧间隔 → 第 4 组「0.5 秒内必有关键帧」红；判据不看解码速度（只按 GOP 帧数定一个阈值）→
 第 1 组「慢机器要转」红；V2：`CompositionClipInsert.append` 每片按自己的秒数各自截断 → 格子加起来少一格、`append` 判没插够、

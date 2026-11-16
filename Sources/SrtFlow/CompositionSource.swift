@@ -7,6 +7,8 @@ import Foundation
 // - builder 插每一段画面之前挑源轨（`track(for:proxies:asset:)`）：**带透明的段不用优化媒体的块**（代理是 H.264，没有 alpha，
 //   换进去透明的地方就成了黑块）；**直通的段插预乘的副本**（`AlphaSourceCopies`：默认合成器把源一律当预乘的用，直通的半透明处
 //   会过亮），副本转不出来就退回原片（亮一点，不黑、不丢段）；别的段照旧：块都转好了给块（`CompositionClipInsert` 按块插），不然原片。
+//   The preview's build does not wait for a copy that is not made yet (original now, swapped later); `missingAlphaCopies`
+//   tells the coordinator which ones to make (2026-11-17).
 // - 渲染的入口补认老段的透明（`resolvingAlpha`）：`MediaInfo.alpha` 是 2026-11-16 起探测时才读的，之前放上去的段没有。预览合成和
 //   导出图在入口各调一次（同 `expandingTransitionHandles` 的做法：两条管线看同一份），只认真要画出来的段 —— 那些素材 builder
 //   本来就要开，不多开一个文件。
@@ -23,25 +25,48 @@ enum CompositionSource {
     }
 
     /// nil = 这段的源打不开（builder 跳过它）。
+    ///
+    /// The preview (`lookup.readyAlphaCopiesOnly`) takes a straight source's premultiplied copy only if it is already on disk
+    /// and otherwise inserts the original at once — it never waits for a conversion (a long straight-alpha clip used to hold
+    /// the whole rebuild for seconds). The coordinator then makes the copy (`missingAlphaCopies`) and swaps it in while
+    /// stopped; the copy has the original's timestamps and geometry, so only the picture changes. Every other build (export
+    /// prerender, AI look) waits for the copy.
     static func track(
         for clip: EditClip, proxies lookup: OptimizedMediaLookup, asset: (URL) -> AVURLAsset
     ) async -> Choice? {
         let alpha = clip.sourceAlpha
         var url = clip.sourceURL
-        if alpha == .straight, let premultiplied = await AlphaSourceCopies.url(.premultiplied, for: clip.sourceURL) {
-            url = premultiplied
+        if alpha == .straight {
+            let premultiplied = lookup.readyAlphaCopiesOnly
+                ? AlphaSourceCopies.readyURL(.premultiplied, for: clip.sourceURL)
+                : await AlphaSourceCopies.url(.premultiplied, for: clip.sourceURL)
+            if let premultiplied { url = premultiplied }
         }
         guard let track = try? await asset(url).loadTracks(withMediaType: .video).first else { return nil }
         guard alpha == .opaque else { return Choice(track: track, proxies: nil) }
         return Choice(track: track, proxies: await proxyTracks(for: clip, in: lookup, asset: asset))
     }
 
+    /// Straight-alpha sources among the clips the preview draws whose premultiplied copy is not on disk yet — the ones the
+    /// preview just inserted as the original. Old clips that never recorded `MediaInfo.alpha` are recognised first (same
+    /// function as the builder). The coordinator converts these after each rebuild lands.
+    static func missingAlphaCopies(in state: TimelineState, asset: (URL) -> AVURLAsset) async -> Set<URL> {
+        let resolved = await resolvingAlpha(in: state, asset: asset)
+        return Set(drawnPictures(in: resolved).filter { $0.sourceAlpha == .straight }.map(\.sourceURL))
+            .filter { AlphaSourceCopies.readyURL(.premultiplied, for: $0) == nil }
+    }
+
+    /// The video clips a render draws: main track and visible upper tracks, visible clips, no audio, no still still converting.
+    private static func drawnPictures(in state: TimelineState) -> [EditClip] {
+        ClipVisibility.visible(
+            (state.mainHidden ? [] : state.mainClips) + state.overlayTracks.filter { !$0.isHidden }.flatMap(\.clips)
+        ).filter { !$0.needsStillConversion && !$0.isAudioOnly }
+    }
+
     /// 要画出来的段里没记带不带透明的（老工程），从素材的格式描述补认，写进这一份渲染用的状态（不写回用户的工程）。
     /// 静帧不用认（透明静帧按名字认）；还在转静帧的、藏起来的不画，不认。
     static func resolvingAlpha(in state: TimelineState, asset: (URL) -> AVURLAsset) async -> TimelineState {
-        let pictures = ClipVisibility.visible(
-            (state.mainHidden ? [] : state.mainClips) + state.overlayTracks.filter { !$0.isHidden }.flatMap(\.clips)
-        ).filter { $0.info != nil && $0.info?.alpha == nil && !$0.isStillImage && !$0.needsStillConversion && !$0.isAudioOnly }
+        let pictures = drawnPictures(in: state).filter { $0.info != nil && $0.info?.alpha == nil && !$0.isStillImage }
         guard !pictures.isEmpty else { return state }
         var state = state
         var known: [URL: SourceAlpha] = [:]
