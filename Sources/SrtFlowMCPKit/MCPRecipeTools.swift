@@ -7,7 +7,13 @@ import Foundation
 // 不管什么：剪辑风格的内容（App 资源里的 recipe-*.md）、怎么读写（App 里的 AIRecipeTools / AIRecipeStore）。
 // 产品决定见 docs/plans/2026-09-27-mcp.md 第 39–41 条：剪辑风格由 AI 自己挑，不做斜杠命令。
 
-enum MCPRecipeTools {
+public enum MCPRecipeTools {
+    /// The id that makes `recipes` return only the rules every style follows (recipes-shared-rules.md), for edits in no style
+    /// (2026-11-16: the shared editing rules are for every SkyCut user, with or without a style). One value for the parameter
+    /// description, the workflows guide topic and the App that answers it (AIRecipeTools); a style that already has this id
+    /// or title wins, and its full text ends with the same rules anyway.
+    public static let sharedRulesID = "shared-rules"
+
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
         switch name {
         case .recipes:
@@ -19,7 +25,7 @@ enum MCPRecipeTools {
                 the user in one sentence which one you follow, and follow it; the user's words win.
                 """,
                 input: MCPSchema.object([
-                    "id": MCPSchema.string("A style's id or title; leave out to list them all.")
+                    "id": MCPSchema.string("A style's id or title; leave out to list them all; \(sharedRulesID) for only the rules every style follows.")
                 ]),
                 readOnly: true
             )

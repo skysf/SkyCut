@@ -103,6 +103,26 @@ private func storeChecks() {
     checkThrows("save_recipe needs use_for") {
         _ = try AIRecipeTools.save(args(["name": "a", "text": "b"]), store: store, builtIn: builtIn)
     }
+    sharedRulesOnlyChecks(store: store, builtIn: builtIn, catalog: catalog)
+}
+
+/// Edits in no style read only the shared rules (2026-11-16, docs/architecture/ai-control-mcp.md section 4, item 32):
+/// recipes answers the reserved id in any spelling, a style with that name still wins (and still ends with the rules),
+/// and the parameter description and the workflows guide topic point there.
+private func sharedRulesOnlyChecks(store: AIRecipeStore, builtIn: [AIRecipe], catalog: () -> AIRecipeCatalog) {
+    let id = MCPRecipeTools.sharedRulesID
+    for spelling in [id, "Shared rules", "shared_rules"] {
+        let rules = try? AIRecipeTools.recipes(args(["id": .string(spelling)]), store: store, builtIn: builtIn, sharedRules: "SHARED")
+        checkEqual(rules?.payload["text"]?.stringValue, "SHARED", "recipes id=\(spelling) returns only the shared rules")
+        checkEqual(rules?.payload["id"]?.stringValue, id, "recipes id=\(spelling) says it answered \(id)")
+    }
+    let parameter = MCPToolName.recipes.definition.json["inputSchema"]?["properties"]?["id"]?["description"]?.stringValue ?? ""
+    check(parameter.contains(id), "the recipes id parameter tells the AI about \(id): \(parameter)")
+    let workflows = MCPGuideTopics.topic(named: "workflows")?.sections.map(\.text).joined(separator: "\n") ?? ""
+    check(workflows.contains("recipes id=\(id)"), "the workflows guide topic sends edits in no style to recipes id=\(id)")
+    _ = try? store.save(name: "Shared rules", useFor: "Mine.", body: "my rules", catalog: catalog())
+    let mine = try? AIRecipeTools.recipes(args(["id": .string(id)]), store: store, builtIn: builtIn, sharedRules: "SHARED")
+    checkEqual(mine?.payload["text"]?.stringValue, "my rules\n\nSHARED", "a style of the user's called \(id) wins, and still ends with the shared rules")
 }
 
 /// App 资源里的内置卡（自检从仓库根目录跑，直接读 Sources/SrtFlow/Resources）。
@@ -130,5 +150,11 @@ private func builtInChecks() {
     for section in ["## Plan before you cut", "## Taste for every style", "## AI tells to avoid", "## Look again before export",
                     "## Learning a style from a reference video"] {
         check(shared.contains(section), "the shared rules have \(section)")
+    }
+    // The shared editing rules for every SkyCut user (2026-11-16): four sections every style keeps, above the style cards.
+    // Dropping one when editing the file would quietly bring the old habits back (a silent car, music ducked 15 dB, a card
+    // that flashes by), so each is pinned like the five above.
+    for section in ["## Sound belongs to the picture", "## Cuts", "## Voice and music", "## Title cards"] {
+        check(shared.contains("\n" + section + "\n"), "the shared rules have \(section)")
     }
 }
