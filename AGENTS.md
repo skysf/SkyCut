@@ -185,7 +185,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 音量曲线（段上的音量自动化）、轨道推子 / 总推子、电平表（引擎的槽 `MeterSlot`） | [音量曲线](docs/architecture/audio-volume-curve.md)、[推子与电平表](docs/architecture/audio-mixer.md)（峰值从渲染块来、总表从混音器出口来）、[声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[声音编辑方案](docs/plans/2026-09-23-audio-mixing.md) |
 | Inspector 数值框、拖调、Transform 写入、检查器里的滑杆行（`labelledSlider` / `InspectorSliderRow`）、「Shows for」、Transform 区的关键帧 ‹ ◇ › 和「曲线」菜单 | [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md)（打字提交要立刻 `endLiveEdit`）、[关键帧动画「交互约定」](docs/architecture/keyframe-animation.md) |
 | 往检查器里加任何一行（标题 + 控件、下拉、滑杆行） | [检查器的排版](docs/architecture/inspector-layout.md)（一行不许比窄栏宽；菜单 Picker 不许 `.fixedSize()`） |
-| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md) |
+| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩）、带透明的视频（`SourceAlpha`、`AlphaSourceCopies`） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比；带透明的段认文件里的预乘 / 直通标记）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md)、[带透明的视频：预览当预乘、成片当直通](docs/bugfixes/2026-11-16-alpha-video-premultiplied-or-straight.md) |
 | 原生录屏、恢复、退出、导入、录屏的系统授权（`ScreenRecordingPermissions`、`ScreenCapturePermissionRepair`）、AI 录屏（`record_screen`；`ScreenRecordingSession` 的 AI 会话、`ScreenRecordingFileCommit`、`ScreenRecordingOptions.preset`、`AIScreenRecording*` / `AIScreenSource*`） | [录屏生命周期](docs/architecture/screen-recording-lifecycle.md)（AI 起的会话走同一条流程、从不覆盖、入轨包一步撤销）、[让 AI 录屏的方案](docs/plans/2026-10-03-screen-recording-mcp.md)、[录屏中 AI 改帧率：静默不改还回成功](docs/bugfixes/2026-10-03-set-canvas-fps-ignored-while-recording.md)、[签名与系统权限](docs/architecture/code-signing-and-permissions.md)（授权记录钉着签名；文案不写「关掉再打开」）、[实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md)（方案中的旧结论不得覆盖它）、[录屏 Phase 2–4 复审](docs/bugfixes/2026-08-07-screen-recording-phase2-4-review.md) |
 | 字幕生成、语言检测、翻译、任务取消、转写哪些声音（可听快照）、生成 / 翻译结束时回写工程 | [字幕语言流](docs/architecture/subtitle-language-flow.md)（可听快照与预览同一份隐藏过滤）、[AI 放素材顺带挂字幕，之后撤一步全空](docs/bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md)（回写包在 `AIUndoGrouping.step` 里）、[原生字幕生成方案](docs/plans/2026-08-06-native-subtitle-generation.md)、[字幕生成复审](docs/bugfixes/2026-08-06-subtitle-generation-review.md)、[PR #22 后续复审](docs/bugfixes/2026-08-09-pr22-review-followups.md) |
 | 生成出来的字幕长什么样：去标点、断句、一行多长（字数 + 画面宽度）、几行（默认单行；面板的「每条字幕的行数」/ AI 的 `max_lines`）、显示时间、几段素材同时有字只留一条、面板上「只用选中的片段」、机器翻译落字去标点、AI 点名 `strip_punctuation` | [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md)（先断句后去标点；停顿被识别器并进相邻的词，先估开口；默认单行是用户定的）、[方案与调研](docs/plans/2026-09-26-subtitle-generation-style.md) |
@@ -263,7 +263,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-timeline-zoom.sh` — 缩放的锚点、播放跟随、记住的开关。
 - `scripts/check-translation-preflight.sh` — 翻译配对预检与接线。
 - `scripts/check-upscale.sh` — 视频 upscale 的任务对着假 Sky Studio 走全程。
-- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG。
+- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG 和带透明的视频（预乘 / 直通）。
 - `scripts/check-video-inspection.sh` — 成片疑点检查（`inspect_video`）。
 - `scripts/check-voice-recovery.sh` — 旁白 / 声音库 / 变声 / 长期授权 / `KeepAwakeChecks`：真 App 对象对着假 Sky Studio。
 - `scripts/check-voiceover-sync.sh` — 按旁白段落同步时间线。
@@ -474,7 +474,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [录屏生命周期](docs/architecture/screen-recording-lifecycle.md) — 状态机、journal、恢复、退出与快照；AI 起的会话走同一条流程。
 - [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md) — 写入、取消、焦点与光标合同。
 - [检查器的排版](docs/architecture/inspector-layout.md) — 固定窄栏（约 220pt）：一行不许比它宽、菜单 Picker 不许锁宽度。
-- [定格](docs/architecture/freeze-frame.md) — 一次性提交、PNG 归属、波纹范围与静帧管线。
+- [定格](docs/architecture/freeze-frame.md) — 一次性提交、PNG 归属、波纹范围与静帧管线、带透明的段怎么认怎么叠。
 - [字幕语言流](docs/architecture/subtitle-language-flow.md) — 目标语言可见性、预检与自动检测。
 - [字幕轨可见性与布局](docs/architecture/subtitle-track-visibility-and-layout.md) — 原文 / 译文两条独立轨、画面上的布局、工程自己的样式与逐词高亮；折行和行框与成片同一份。
 - [轨道块标记](docs/architecture/clip-markers.md) — 源时间锚定、标记对所有选择互斥、单击只选中双击才弹面板。
