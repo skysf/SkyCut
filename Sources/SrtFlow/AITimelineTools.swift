@@ -233,6 +233,8 @@ enum AITimelineTools {
                 soundEnd, pictureEnd
             ))
         }
+        // 用到的源范围跨过素材自己的刀（夹帧）：只提醒、不改（AISourceCutCheck，MCP-36）。
+        await AISourceCutCheck.note(&result, clips: plans.map(\.clip.id), in: project)
         return .ok(.object(result), changed: true)
     }
 

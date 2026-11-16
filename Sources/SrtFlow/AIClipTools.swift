@@ -53,6 +53,8 @@ enum AIClipTools {
             )
             plan.change.replacement = replacement
         }
+        // 改了源范围或换了文件：先把素材扫好（只等短素材），summary 里读缓存提醒夹帧（AISourceCutCheck，MCP-36）。
+        if AISourceCutCheck.movesSourceWindow(plan.change) { await AISourceCutCheck.prepare([subject]) }
         let needsPicture = request.touchesPicture || details.touchesPicture
         let needsMetadata = needsPicture || (!subject.isAudioOnly && !subject.isStillImage
             && (change.sourceIn != nil || change.sourceOut != nil || change.volumeDB != nil || change.fadeIn != nil || change.fadeOut != nil))
@@ -121,7 +123,11 @@ enum AIClipTools {
             ids: AIShortIDs(state: state), workspace: AIWorkspace.shared.current, playhead: project.clock.time,
             selection: [], renderSize: VideoEditCompositionBuilder.renderSize(for: state)
         )
-        return plan.summary(old: old, in: state, context: context)
+        var summary = plan.summary(old: old, in: state, context: context)
+        if AISourceCutCheck.movesSourceWindow(plan.change), let clip = state.clip(with: plan.id) {
+            AISourceCutCheck.add(to: &summary, clips: [clip], ids: context.ids)
+        }
+        return summary
     }
 
     /// edit_clip 的 file：探好（图片先转成静帧视频，同拖图片进来那条路）才提交。点名文件夹以外的文件不在这里问：
