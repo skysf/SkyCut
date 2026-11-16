@@ -18,7 +18,11 @@ let package = Package(
         // 给 AI 客户端（Claude、Codex……）启动的 MCP 小程序，打包时放进
         // SkyCut.app/Contents/Helpers/。它只传话，活都在 App 里做
         //（docs/architecture/ai-control-mcp.md）。
-        .executable(name: "skycut-mcp", targets: ["SrtFlowMCP"])
+        .executable(name: "skycut-mcp", targets: ["SrtFlowMCP"]),
+        // Renders a motion web page (AI-written or a template) into a transparent movie, outside SkyCut's own process,
+        // with the network / file / time locks. Packaged into SkyCut.app/Contents/Helpers/ like skycut-mcp
+        // (docs/architecture/web-motion-renderer.md).
+        .executable(name: "skycut-web-motion", targets: ["SrtFlowWebMotion"])
     ],
     targets: [
         .target(name: "SrtFlowCore"),
@@ -29,14 +33,21 @@ let package = Package(
         // 署名见 Sources/SrtFlow/Resources/THIRD-PARTY-NOTICES.md（随 App 分发）。只依赖系统框架；模型本身不在包里，App 从我们的 R2 下载
         //（docs/plans/2026-09-27-mcp.md 第 44、48、51 条）。
         .target(name: "SrtFlowKokoro"),
+        // What SkyCut and the web-motion helper say to each other (request, result, events) and the pure rules both
+        // sides use (validation, pixel math, alpha calibration, memory policy). Foundation + CryptoKit only.
+        .target(name: "SrtFlowWebMotionKit"),
         .executableTarget(
             name: "SrtFlow",
-            dependencies: ["SrtFlowCore", "SrtFlowMCPKit", "SrtFlowKokoro"],
+            dependencies: ["SrtFlowCore", "SrtFlowMCPKit", "SrtFlowKokoro", "SrtFlowWebMotionKit"],
             resources: [.process("Resources")]
         ),
         .executableTarget(
             name: "SrtFlowMCP",
             dependencies: ["SrtFlowMCPKit"]
+        ),
+        .executableTarget(
+            name: "SrtFlowWebMotion",
+            dependencies: ["SrtFlowWebMotionKit"]
         ),
         .executableTarget(
             name: "SrtFlowCoreChecks",
