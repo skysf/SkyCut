@@ -34,7 +34,8 @@ moment; its WebKit processes (WebContent, GPU, Networking) end with it (measured
   (default 1080), seed, clock epoch, page instances (default 3), sample count for "same t twice" (default 8), alpha path
   (default `.auto`), limits (default `WebMotionLimits.standard(frames:)`).
 - `WebMotionRender`: the movie (moved into place only after every check passed; written next to it first), the
-  `WebMotionResult` (checks, frame hashes, alpha path and calibration, versions, timing) and the peak memory.
+  `WebMotionResult` (checks, frame hashes, alpha path and calibration, whether any frame is translucent, versions, timing)
+  and the peak memory.
 - Errors (`WebMotionRenderError`): `.rejected(result)` — the page failed a check or a time limit, `result.failure.message`
   is the page's own text (give it back to the AI verbatim); `.killed` — SkyCut stopped it (memory, or a helper that ignored
   its own limits); `.rendererFailed` — not the page's fault (a lock unavailable on this macOS, the encoder, a crash);
@@ -59,7 +60,8 @@ moment; its WebKit processes (WebContent, GPU, Networking) end with it (measured
 
 Measured 2026-11-17 with a page that aims every network path at a local TCP + UDP listener (`checks/WebMotion/ReachPages.swift`).
 The probe's lockdown (first four rows) let two kinds of traffic out: **WebRTC sent STUN over UDP and TURN over TCP, and
-link preconnect opened TCP connections** — content rules and CSP do not cover either.
+link preconnect opened TCP connections** (from `<link rel=preconnect>`, and from a clicked link even though the navigation
+itself is refused) — content rules and CSP do not cover either.
 
 | Lock | How | Closes |
 | --- | --- | --- |
@@ -81,6 +83,8 @@ link preconnect opened TCP connections** — content rules and CSP do not cover 
   `document.fonts.status` is `loaded` (measured): the clock waits for fonts only while they are loading. Before that fix the
   render waited out its load limit and blamed "an endless loop". A navigation in `<head>` can also stop the parser: the
   page then fails "frame entry".
+- Every page instance is kept until the helper exits, also one rejected while loading (released at once, WebKit tore it
+  down before anything was done with it; the checks need it alive to prove nothing leaks afterwards).
 
 ## 5. Time limits
 
@@ -109,7 +113,9 @@ pressure (`kern.memorystatus_vm_pressure_level`). `WebMotionMemoryPolicy` decide
 | warning (low memory) | the render uses more than 1 GB |
 | critical (out of memory) | always: the render is the one thing SkyCut can give back right away |
 
-A normal render measured 50–700 MB in all. After the helper ends, SkyCut waits until every reported WebKit process is really
+Measured: the check pages (320 × 180) peak at 45–80 MB in all; the probe measured 300–400 MB at 1080p (helper 70–130,
+GPU process 200–280, each page about 25). The hog check is killed at 610–770 MB against a 600 MB budget (it grows 128 MB a
+frame; the watch looks every 50 ms there). After the helper ends, SkyCut waits until every reported WebKit process is really
 gone (an exiting process can no longer be described while its pid still exists: that counts as not gone yet) and kills any
 still running as the same process after 3 s (`WebMotionProcessTeardown`; only a process still identifiable as the same one
 is ever signalled).
@@ -148,15 +154,19 @@ non-deterministic, which "same t twice" catches.
   reports why; `.fast` refuses.
 - **Public path**: each frame drawn over opaque black and over opaque white (an inline `!important` background on `<html>`,
   restored before the next frame); alpha = 255 − mean(W − B) over the three channels, color = B clamped to alpha
-  (`WebMotionPixels.deriveAlpha`). Half the speed; pages must not blend against what is behind them (`mix-blend-mode`).
-- Measured 2026-11-17 (`check-web-motion.sh`): fast and public paths decode to identical frames on the alpha page (max 0;
-  the probe: max 2 on its pages before encoding).
+  (`WebMotionPixels.deriveAlpha`). Two snapshots a frame (0–35 % slower measured, section 11); pages must not blend against
+  what is behind them (`mix-blend-mode`).
+- Measured 2026-11-17: fast and public paths decode to identical frames on the check's alpha page, and differ by at most
+  0 / 1 / 2 levels on the probe's three titles (the probe: 0 / 1 / 2).
 - **The movie**: ProRes 4444 from premultiplied BGRA (WebKit's snapshot is already sRGB premultiplied BGRA: the copy changes
   no pixel), every buffer tagged `AlphaChannelMode = premultiplied` so AVFoundation writes the `almo` box SkyCut reads
   (`SourceAlpha`, [freeze frame 4a3](freeze-frame.md)); BT.709 color tags like `AlphaSourceCopies`. Premultiplied on purpose:
   the preview's compositor wants premultiplied sources, so these movies never need the premultiplied copy SkyCut makes for
   straight-alpha files. The helper reads the file back: alpha, premultiplied tag and frames / fps length, or the render fails.
   HEVC with alpha waits for a quality measurement.
+- **A fully opaque page** (a title card on its own background): the encoder leaves an alpha that is 255 everywhere out of the
+  file (measured). The helper accepts a movie without alpha only when no frame had a pixel below 255; the result says
+  `transparent: false` and SkyCut reads the movie as opaque video. A translucent frame in a movie without alpha fails.
 
 ## 9. Checks before a movie is accepted (MCP-75)
 
@@ -181,9 +191,20 @@ in the checks. Different macOS / WebKit versions may change text pixels (probe, 
 
 ## 11. Speed
 
-Measured 2026-11-17 on the M1 (8 cores, 16 GB) while other sessions compiled (load 15–50): a 320 × 180, 12-frame page
-renders in 1–2 s in all (about 1 s is the lock, the calibration and loading three pages). The probe's three 1080p pages: see
-the G10 report (internal) for frames per second with one and three page instances.
+Measured 2026-11-17 on the M1 (8 cores, 16 GB, load 8–12 from other sessions), release build, the probe's three 1080p titles
+(4 s at 24 fps = 96 frames), whole helper run including the lock, calibration, loading and the second draws:
+
+| Title | 3 page instances | 1 page instance | public alpha path (3 instances) |
+| --- | --- | --- | --- |
+| light SVG with a glow | 3.6 s (48 frames/s drawing) | 5.1 s | 3.6 s |
+| particles, motion blur, flash | 5.3 s (25) | 10.5 s | 6.9 s |
+| three large blurs and a mask | 5.2 s (26) | 10.3 s | 6.6 s |
+
+The probe's tool took 2.7 / 5.1 / 6.4 s with three pages at load ~30 (no checks). Renders with one and three instances are
+hash-identical; fast and public alpha differ by at most 0 / 1 / 2 levels on decoded frames (the probe: 0 / 1 / 2). The public
+path costs 0–35 % here, not the probe's half: the derivation is a tight loop in the release build (the debug build used by the
+checks is several times slower on it). A small check page (320 × 180, 12 frames) takes about 1 s, most of it the lock, the
+calibration and loading three pages.
 
 ## 12. Packaging and signing
 
@@ -203,9 +224,28 @@ Test-only environment variables the helper reads: `SRTFLOW_WEB_MOTION_TEST_BREAK
 macOS without it would) and `SRTFLOW_WEB_MOTION_TEST_LINGER=<s>` (keep the pages alive after the result, so a lock that
 failed has time to leak before the process is gone).
 
-**Reverse verification (2026-11-17)**: each lock and rule sabotaged on its own, the relevant group run, restored. See the
-G10 report for the table; in short every load-bearing lock turned its check red, and the redundant pair (content rules alone
-or CSP alone) stayed green for the network check while losing the "Blocked:" page errors (CSP).
+**Reverse verification (2026-11-17)**: each lock and rule sabotaged on its own, the relevant group run, restored.
+
+| Sabotage | What went red |
+| --- | --- |
+| WebRTC switch left on | network page: 8 STUN datagrams and a TURN-over-TCP allocation reached the listener |
+| link preconnect switch left on | navigation page: a bare TCP connection (a clicked link preconnects although the navigation is refused) |
+| content rules and CSP both removed | 233 HTTP requests reached the listener |
+| content rules removed (CSP kept) / CSP removed (rules kept) | nothing leaks either way (each blocks the HTTP paths by itself); without CSP the attempts no longer come back as page errors (red) |
+| `document.fonts.ready` awaited unconditionally | the network page waits out its load limit |
+| `Math.random`, timers, `requestAnimationFrame`, CSS settling, `Date` back on the wall clock | the clock harness and the pixel bands |
+| no premultiplied tag; calibration that never objects; the opaque-page rule reverted | the helper's file check; the broken-fast-path switch; the opaque page |
+| memory budget ignored; SkyCut never kills; no-progress backstop off | the hog; the SIGKILL and bounded-run checks; the silent fake helper |
+| teardown treating an unreadable process as gone | "WebKit processes ended" |
+| no per-frame or load limit | the loops are stopped only by SkyCut's backstop after 24 s |
+| empty frames, same t twice, page errors or frame entry not checked | the flicker, kept-state, error and no-entry pages are accepted |
+
+Two of these were missed by the first version of the checks, and the fixes are why the checks look as they do: the network
+page also navigated (a refused navigation stops the page's pending WebRTC and preconnects before they reach the network), and a
+page rejected while loading was released at once (the linger window had no page left). `checks/web-motion-wiring.sh`: ten
+sabotages (copy after signing, helper unsigned or not required, a `WKWebView` in SkyCut, an unlocked load, the WebRTC switch
+dropped, a switch not read back, unguarded `fonts.ready`, a probe-tool clock name, a second configuration), each red with its
+own message.
 
 ## 14. Manual regression (before a release)
 
