@@ -61,6 +61,9 @@ if [ "${INSERTS}" != "2" ]; then
 fi
 forbid "builder 里不许再有自己的 insert(source:" "$BUILDER" 'private static func insert\('
 require "几何按插进去的那条源轨算（4K 减半的代理尺寸是它自己的）" "$BUILDER" 'geometrySource\.load\(\.naturalSize\)'
+# 带透明的源（HEVC 带透明是长 GOP）不转代理、表上有块也不换进来：代理是 H.264，没有 alpha（2026-11-16）。
+require "带透明的源不转代理" Sources/SrtFlow/OptimizedMedia/OptimizedMediaPolicy.swift '\(info\.alpha \?\? \.opaque\) == \.opaque'
+require "带透明的段不用优化媒体的块" Sources/SrtFlow/CompositionSource.swift 'guard alpha == \.opaque else \{ return Choice\(track: track, proxies: nil\) \}'
 
 # 转码在 proxy 队列上、登记后台读（性能测试和冒烟的「落定」要等它）。
 require "转码在 MediaReadQueue.proxy 上" "$COORDINATOR" 'MediaReadQueue\.run\(on: MediaReadQueue\.proxy\)'

@@ -16,9 +16,12 @@ struct MediaInfo: Hashable, Sendable {
     /// 画面轨的关键帧间隔（秒，前 60 秒里相邻两个关键帧的最大距离；全帧内 = 0）。优化媒体靠它判长 GOP
     /// （OptimizedMediaPolicy）。老工程没探过 = nil；ffmpeg 退路也探不出 = nil。
     var keyframeInterval: Double?
+    /// 画面带不带透明、存的是预乘还是直通（`SourceAlpha`，2026-11-16 起探测时读）。老工程没探过、ffmpeg 退路 = nil：
+    /// 渲染的入口再从文件补认（`CompositionSource.resolvingAlpha`）。
+    var alpha: SourceAlpha?
 
     init(duration: Double, displaySize: CGSize, frameRate: Double, videoCodec: String, audioCodec: String?,
-         hasAudio: Bool, audioCanCopyToMP4: Bool, fileBytes: Int64, keyframeInterval: Double? = nil) {
+         hasAudio: Bool, audioCanCopyToMP4: Bool, fileBytes: Int64, keyframeInterval: Double? = nil, alpha: SourceAlpha? = nil) {
         self.duration = duration
         self.displaySize = displaySize
         self.frameRate = frameRate
@@ -28,6 +31,7 @@ struct MediaInfo: Hashable, Sendable {
         self.audioCanCopyToMP4 = audioCanCopyToMP4
         self.fileBytes = fileBytes
         self.keyframeInterval = keyframeInterval
+        self.alpha = alpha
     }
 
     var width: Int { Int(displaySize.width.rounded()) }
@@ -41,12 +45,38 @@ struct MediaInfo: Hashable, Sendable {
     var resolutionLabel: String { "\(width)×\(height)" }
 }
 
+/// 画面带不带透明、颜色存的是预乘还是直通。认它只看文件里的标记，规矩见 docs/architecture/freeze-frame.md 第 4a3 节「带透明的段」。
+///
+/// AVFoundation 写带透明的 ProRes 4444 / HEVC 时在样本描述里放一个 `almo` 盒子（预乘 0x0102、直通 0x0100），CoreMedia 读成
+/// `AlphaChannelMode`。**没有这个盒子的按预乘**：ffmpeg 写的 ProRes（透明静帧就是）、`concat -c copy` 接过的都没有，这时 CoreMedia
+/// 照样报「直通」，内容却多半是预乘的 —— 所以先看盒子在不在，不信 CoreMedia 替它补的那个值（2026-11-16 实测）。
+enum SourceAlpha: String, Hashable, Sendable {
+    /// 没有 alpha 通道。
+    case opaque
+    case premultiplied
+    case straight
+
+    init(format: CMFormatDescription?) {
+        guard let format,
+              (CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_ContainsAlphaChannel) as? Bool) == true
+        else {
+            self = .opaque
+            return
+        }
+        let atoms = CMFormatDescriptionGetExtension(
+            format, extensionKey: kCMFormatDescriptionExtension_SampleDescriptionExtensionAtoms
+        ) as? [String: Any]
+        let mode = CMFormatDescriptionGetExtension(format, extensionKey: kCMFormatDescriptionExtension_AlphaChannelMode) as? String
+        self = atoms?["almo"] != nil && mode == (kCMFormatDescriptionAlphaChannelMode_StraightAlpha as String) ? .straight : .premultiplied
+    }
+}
+
 /// 探测结果会随工程存盘（省得每次打开都重探一遍所有素材），所以跟工程里
 /// 别的模型一样宽容解码：字段缺了取默认值，不让老工程整份打不开。
 extension MediaInfo: Codable {
     private enum CodingKeys: String, CodingKey {
         case duration, displaySize, frameRate, videoCodec, audioCodec
-        case hasAudio, audioCanCopyToMP4, fileBytes, keyframeInterval
+        case hasAudio, audioCanCopyToMP4, fileBytes, keyframeInterval, alpha
     }
 
     init(from decoder: Decoder) throws {
@@ -60,6 +90,8 @@ extension MediaInfo: Codable {
         audioCanCopyToMP4 = try c.decodeIfPresent(Bool.self, forKey: .audioCanCopyToMP4) ?? false
         fileBytes = try c.decodeIfPresent(Int64.self, forKey: .fileBytes) ?? 0
         keyframeInterval = try c.decodeIfPresent(Double.self, forKey: .keyframeInterval)
+        // 不认识的值（以后的版本多一种）当没探过，渲染的入口再从文件认 —— 不许让整份工程打不开。
+        alpha = (try? c.decodeIfPresent(String.self, forKey: .alpha)).flatMap { $0.flatMap(SourceAlpha.init(rawValue:)) }
     }
 
     func encode(to encoder: Encoder) throws {
@@ -73,6 +105,7 @@ extension MediaInfo: Codable {
         try c.encode(audioCanCopyToMP4, forKey: .audioCanCopyToMP4)
         try c.encode(fileBytes, forKey: .fileBytes)
         try c.encodeIfPresent(keyframeInterval, forKey: .keyframeInterval)
+        try c.encodeIfPresent(alpha?.rawValue, forKey: .alpha)
     }
 }
 
@@ -154,7 +187,8 @@ enum MediaProbe {
             hasAudio: !audioTracks.isEmpty,
             audioCanCopyToMP4: audioCodec.map(canCopyToMP4) ?? false,
             fileBytes: fileBytes,
-            keyframeInterval: keyframeInterval
+            keyframeInterval: keyframeInterval,
+            alpha: SourceAlpha(format: formats.first)
         )
     }
 

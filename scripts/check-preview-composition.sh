@@ -30,6 +30,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditClipPlacement.swift \
   Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
@@ -81,6 +82,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/VideoEditCompositionBuilder.swift \
+  Sources/SrtFlow/CompositionSource.swift \
   Sources/SrtFlow/CompositionFade.swift \
   Sources/SrtFlow/CompositionClipInsert.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaLookup.swift \
@@ -99,6 +101,7 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/MeterSlot.swift \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditPrerender.swift \
+  Sources/SrtFlow/AlphaSourceCopies.swift \
   Sources/SrtFlow/MediaProbe.swift \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/MediaReadQueue.swift \

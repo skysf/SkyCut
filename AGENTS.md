@@ -177,7 +177,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 工程帧率、关键帧容差、AI 读写关键帧（`edit_clip keyframes` 策略、`relative` 时间）、关键帧的缓动（`Keyframe.easing`、`KeyframeEasing`、预览按帧加密 `KeyframeSliceTimes`） | [工程帧率](docs/architecture/project-frame-rate.md)、[关键帧动画](docs/architecture/keyframe-animation.md)（「AI 接口」「缓动」：报给 AI 的关键帧永远在片段范围里；linear 逐位一致）、[限幅 + 缓动方案](docs/plans/2026-09-30-export-limiter-and-easing.md) |
 | 音量、dB、渐入渐出、增益表（`AudioGainTable.swift`）、音频引擎（`Sources/SrtFlow/AudioEngine/`：配置、环、喂样、渲染块、离线渲染）、引擎的图什么时候开着（空闲停图 / 再起 `AudioEngineIdlePolicy` / `AudioEngineIdleKeeper`、`suspend` / `wake` / `recoverIfNeeded`、待钉的锚点 `PlaybackAnchor`、用户在不在 `AppUserPresence`、换工程收引擎 `unloadPreview`、播到头收尾 `PlayerClock.finishAtEnd` / `PlaybackAudioSource.duration`、`AudioRenderClock.hasTicked`）、读素材 / 重采样（`AudioSegmentReader`）、预览合成里没有音轨（配乐比画面长要垫黑底） | [声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[成片的声音](docs/architecture/export-audio-mixdown.md)、[音频引擎](docs/architecture/audio-engine.md)（「结构没变」= 轨 + 段的身份 + 段的几何（`Segment.Structure`）；图只在马上要出声时开着：停着 2 分钟没人用就停（用户定的数，改它先问用户）、停图只许经 `AudioEngineIdleKeeper`；播到头由声音主时钟按总长自己收尾）、[预览的音频引擎一直开着，Mac 不睡](docs/bugfixes/2026-11-11-preview-audio-engine-never-idles.md)、[音频引擎方案](docs/plans/2026-10-01-audio-engine.md) |
 | 声音场景（喇叭 / 室内 / 室外）、引擎渲染块里的效果链（`SceneBox` / `mixScene`）、余音越过段尾、检查器的声音那一块 | [声音场景](docs/architecture/sound-scenes.md)（效果在段增益之后、推子之前；加 / 去掉场景重开流）、[推子与电平表](docs/architecture/audio-mixer.md)、[成片的声音](docs/architecture/export-audio-mixdown.md)、[声音场景方案](docs/plans/2026-09-24-sound-scenes.md) |
-| 导出的声音、离线混音（`ExportAudioMixdown`）、导出图里接音轨的地方、限幅器（`ExportPeakLimiter`）、整段响度（`ExportLoudnessMeter`、`AudioKWeighting`）、面板和 `get_job` 里的响度 / 峰值 | [成片的声音](docs/architecture/export-audio-mixdown.md)（导出图里不许有声音滤镜；成片 = 预览那个音频引擎离线渲出来的；限幅上限 −1 dBFS、响度只报不归一）、[限幅 + 缓动方案](docs/plans/2026-09-30-export-limiter-and-easing.md)、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md) |
+| 导出的声音、离线混音（`ExportAudioMixdown`）、导出图里接音轨的地方、限幅器（`ExportPeakLimiter`）、整段响度（`ExportLoudnessMeter`、`AudioKWeighting`）、面板和 `get_job` 里的响度 / 峰值、听声音的纯计算（ESTOI、拿掉谁涨多少 `MaskerAttribution`、原声特征 `SourceSoundFeatures`：`Sources/SrtFlow/Listening/`） | [成片的声音](docs/architecture/export-audio-mixdown.md)（导出图里不许有声音滤镜；成片 = 预览那个音频引擎离线渲出来的；限幅上限 −1 dBFS、响度只报不归一）、[限幅 + 缓动方案](docs/plans/2026-09-30-export-limiter-and-easing.md)、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md)、[听声音的引擎](docs/architecture/listening-engine.md)（只报不拦；线是盲听定的、没证实） |
 | 优化媒体（`Sources/SrtFlow/OptimizedMedia/`：`MediaInfo.keyframeInterval`、协调者 `OptimizedMediaCoordinator`、换源表）、builder 插画面（`CompositionClipInsert`）、预览重建传 `proxies` 的那一处、预览工具条的「优化媒体 / 原片」（`OptimizedMediaMenu`）、`MediaReadQueue.proxy`、设置里的「优化媒体」一节（`OptimizedMediaCacheSettings` / `OptimizedMediaSettingsSection`）、启动时的过期扫描、转不了的提示 | [优化媒体](docs/architecture/optimized-media.md)（换源只换画面不动时间账、只在停着时换；成片 / 预渲染 / AI 看永远原片；清空之后紧跟 `reset()` + `scheduleRebuild()`；改参数要 +1 版本）、[方案](docs/plans/2026-10-01-video-optimized-media.md)、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md)、[预览性能 ratchet 第十四节](docs/architecture/preview-perf-ratchet.md) |
 | 波形显示、深度缩放（缩放上限、标尺刻度、缩略图、超宽内容的绘制） | [波形与深度缩放](docs/architecture/audio-waveform.md)、[时间线缩放](docs/architecture/timeline-pinch-zoom.md)、[拖动手势 §5](docs/architecture/timeline-drag-gestures.md)、[阻塞的媒体读取](docs/architecture/blocking-media-reads.md) |
 | `AVAssetReader` 读采样（`copyNextSampleBuffer`），以及在 async 函数 / `Task` 里做任何会卡住线程的事（等信号量、同步 IO、等子进程） | [阻塞的媒体读取](docs/architecture/blocking-media-reads.md)（阻塞的读取走 `MediaReadQueue`；`AudioWindowReader.extract` 只许 `SubtitleGen/` 调，别处要 16 kHz 音频走 `QueuedAudioWindow`） |
@@ -185,7 +185,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 音量曲线（段上的音量自动化）、轨道推子 / 总推子、电平表（引擎的槽 `MeterSlot`） | [音量曲线](docs/architecture/audio-volume-curve.md)、[推子与电平表](docs/architecture/audio-mixer.md)（峰值从渲染块来、总表从混音器出口来）、[声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[声音编辑方案](docs/plans/2026-09-23-audio-mixing.md) |
 | Inspector 数值框、拖调、Transform 写入、检查器里的滑杆行（`labelledSlider` / `InspectorSliderRow`）、「Shows for」、Transform 区的关键帧 ‹ ◇ › 和「曲线」菜单 | [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md)（打字提交要立刻 `endLiveEdit`）、[关键帧动画「交互约定」](docs/architecture/keyframe-animation.md) |
 | 往检查器里加任何一行（标题 + 控件、下拉、滑杆行） | [检查器的排版](docs/architecture/inspector-layout.md)（一行不许比窄栏宽；菜单 Picker 不许 `.fixedSize()`） |
-| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md) |
+| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩）、带透明的视频（`SourceAlpha`、`AlphaSourceCopies`） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比；带透明的段认文件里的预乘 / 直通标记）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md)、[带透明的视频：预览当预乘、成片当直通](docs/bugfixes/2026-11-16-alpha-video-premultiplied-or-straight.md) |
 | 原生录屏、恢复、退出、导入、录屏的系统授权（`ScreenRecordingPermissions`、`ScreenCapturePermissionRepair`）、AI 录屏（`record_screen`；`ScreenRecordingSession` 的 AI 会话、`ScreenRecordingFileCommit`、`ScreenRecordingOptions.preset`、`AIScreenRecording*` / `AIScreenSource*`） | [录屏生命周期](docs/architecture/screen-recording-lifecycle.md)（AI 起的会话走同一条流程、从不覆盖、入轨包一步撤销）、[让 AI 录屏的方案](docs/plans/2026-10-03-screen-recording-mcp.md)、[录屏中 AI 改帧率：静默不改还回成功](docs/bugfixes/2026-10-03-set-canvas-fps-ignored-while-recording.md)、[签名与系统权限](docs/architecture/code-signing-and-permissions.md)（授权记录钉着签名；文案不写「关掉再打开」）、[实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md)（方案中的旧结论不得覆盖它）、[录屏 Phase 2–4 复审](docs/bugfixes/2026-08-07-screen-recording-phase2-4-review.md) |
 | 字幕生成、语言检测、翻译、任务取消、转写哪些声音（可听快照）、生成 / 翻译结束时回写工程 | [字幕语言流](docs/architecture/subtitle-language-flow.md)（可听快照与预览同一份隐藏过滤）、[AI 放素材顺带挂字幕，之后撤一步全空](docs/bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md)（回写包在 `AIUndoGrouping.step` 里）、[原生字幕生成方案](docs/plans/2026-08-06-native-subtitle-generation.md)、[字幕生成复审](docs/bugfixes/2026-08-06-subtitle-generation-review.md)、[PR #22 后续复审](docs/bugfixes/2026-08-09-pr22-review-followups.md) |
 | 生成出来的字幕长什么样：去标点、断句、一行多长（字数 + 画面宽度）、几行（默认单行；面板的「每条字幕的行数」/ AI 的 `max_lines`）、显示时间、几段素材同时有字只留一条、面板上「只用选中的片段」、机器翻译落字去标点、AI 点名 `strip_punctuation` | [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md)（先断句后去标点；停顿被识别器并进相邻的词，先估开口；默认单行是用户定的）、[方案与调研](docs/plans/2026-09-26-subtitle-generation-style.md) |
@@ -240,6 +240,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-film-production.sh` — 官方原创短片的公开制作状态。
 - `scripts/check-filters.sh` — 调色：LUT 数学、预览与成片逐像素、纯黑不抬。
 - `scripts/check-freeze-frame.sh` — 定格的时间线变换。
+- `scripts/check-listening.sh` — 听声音的纯计算：ESTOI 和研究的 numpy 版逐数对账、论文的性质、拿掉谁涨多少、原声特征和描述。
 - `scripts/check-localization-coverage.sh` — 界面文案在每张字符串表都配齐、占位符一致。
 - `scripts/check-main-thread-watchdog.sh` — 主线程心跳看门狗、挂起抓栈期间不分配。
 - `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。
@@ -262,7 +263,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-timeline-zoom.sh` — 缩放的锚点、播放跟随、记住的开关。
 - `scripts/check-translation-preflight.sh` — 翻译配对预检与接线。
 - `scripts/check-upscale.sh` — 视频 upscale 的任务对着假 Sky Studio 走全程。
-- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG。
+- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG 和带透明的视频（预乘 / 直通）。
 - `scripts/check-video-inspection.sh` — 成片疑点检查（`inspect_video`）。
 - `scripts/check-voice-recovery.sh` — 旁白 / 声音库 / 变声 / 长期授权 / `KeepAwakeChecks`：真 App 对象对着假 Sky Studio。
 - `scripts/check-voiceover-sync.sh` — 按旁白段落同步时间线。
@@ -460,6 +461,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [音量曲线](docs/architecture/audio-volume-curve.md) — 曲线属于段（有点时取代 `volume`）、两条管线同一张折线表。
 - [波形与深度缩放](docs/architecture/audio-waveform.md) — 一个文件读一次的三层精度；Canvas 只画 `clipBoundingRect`。
 - [推子与电平表](docs/architecture/audio-mixer.md) — 三级增益一条账；电平从渲染块来（无锁槽）；已知的偶发。
+- [听声音的引擎](docs/architecture/listening-engine.md) — 替 AI 听声音的薄引擎分几层、谁调谁、只报不拦；ESTOI、拿掉谁涨多少、原声描述的纯计算和 numpy 版怎么对账；哪几条线是盲听定的。
 - [画面渐入渐出](docs/architecture/video-fades.md) — 渐变露出的是下一层、alpha 斜坡两条管线同账、和声音共用夹紧规则。
 - [主轨转场：借余料与定格补足](docs/architecture/transition-handles.md) — 不挪用户片段、余料不够用首尾帧定格补、定格字段只在渲染副本里。
 - [画面段的入场 / 出场动画](docs/architecture/clip-animation.md) — 五种效果落在三种斜坡上、和画面渐变共用一个槽、铺满不露边。
@@ -472,7 +474,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [录屏生命周期](docs/architecture/screen-recording-lifecycle.md) — 状态机、journal、恢复、退出与快照；AI 起的会话走同一条流程。
 - [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md) — 写入、取消、焦点与光标合同。
 - [检查器的排版](docs/architecture/inspector-layout.md) — 固定窄栏（约 220pt）：一行不许比它宽、菜单 Picker 不许锁宽度。
-- [定格](docs/architecture/freeze-frame.md) — 一次性提交、PNG 归属、波纹范围与静帧管线。
+- [定格](docs/architecture/freeze-frame.md) — 一次性提交、PNG 归属、波纹范围与静帧管线、带透明的段怎么认怎么叠。
 - [字幕语言流](docs/architecture/subtitle-language-flow.md) — 目标语言可见性、预检与自动检测。
 - [字幕轨可见性与布局](docs/architecture/subtitle-track-visibility-and-layout.md) — 原文 / 译文两条独立轨、画面上的布局、工程自己的样式与逐词高亮；折行和行框与成片同一份。
 - [轨道块标记](docs/architecture/clip-markers.md) — 源时间锚定、标记对所有选择互斥、单击只选中双击才弹面板。
