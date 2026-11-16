@@ -104,6 +104,9 @@
   尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
   4 分钟就判红，并说出卡在哪一组；CI 上第 7b 组「2 倍速曲线 · 导出」差 1–2 dB 偶发，认法见
   [推子与电平表](../architecture/audio-mixer.md)「已知的偶发」）。
+- 按层量混在一起之后的声音（listen mix=true 的地基）：现造的 WAV 当 oracle —— 四个频段各一个正弦（24 / 30 / 60 fps：那一段的电平 = 整体、别的段低 40 dB 以上、四段加起来 = 整体）、脉冲（峰值到采样、最响的帧到帧）、0.56 秒的音效（loudest_at 到帧、clip_id 的问法）、EBU Tech 3341 的 −23 / −33 dBFS 正弦（瞬时 / 短时 / 整体响度）；
+  整条时间线的峰值、过线、压得最深、整体响度和 `ExportAudioMixdown.render` 逐位一样（有 / 没有声音场景各一条）；每层逐采样相加 = 混音；只量 29–44、43–49 秒 = 整段里那几帧，过线标在 31.0 / 40.5 秒；单声道人声的电平 = 素材 RMS + 增益 = 真导出（ffmpeg）的成片；listen 的计划（层的写法、越界给合法建议、逐帧的数放得下才给）和结果：
+  `scripts/check-mix-layers.sh`（要 ffmpeg；接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节）。合同和反向验证见 [成片的声音](../architecture/export-audio-mixdown.md)第五节。
 - 波形数据（多级峰值、原始采样块）逐采样对账，以及**很多文件同时读**必须全部读完、
   不许把线程池堵死（看门狗判红）：`scripts/check-waveform.sh`。
 - 成片的声音只有一条管线（导出图里不许出现声音滤镜，混音是预览那个音频引擎按同一份 `AudioEngineConfig`

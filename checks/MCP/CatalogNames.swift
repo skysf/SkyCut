@@ -80,6 +80,10 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["language_detected", "language_undetected"])
     // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
     names.insert("overrides_not_applied")
+    // listen mix=true 的结果字段（AIListenMixReport，2026-11-16）：整体响度、最响的 400 ms / 3 s、最响的采样、过线压了多久多深、
+    // 每层的四个频段。
+    names.formUnion(["loudness_lufs", "max_momentary", "max_short_term", "peak_at", "limited_seconds", "max_reduction_db",
+                     "bands_db", "low_mid", "high_mid"])
     return names
 }
 
