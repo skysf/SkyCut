@@ -142,7 +142,8 @@
   `checks/timeline-drag-wiring/toggles.sh`。
 - 时间线吸附、框选命中与生产落点，以及点一下播放头落到哪（全局夹紧、点块不出这一块：`TimelineSeek`），还有**联动**（压在主轨块上的东西跟着
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
-  同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`）：
+  同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
+  挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
@@ -176,6 +177,7 @@
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
+- 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
