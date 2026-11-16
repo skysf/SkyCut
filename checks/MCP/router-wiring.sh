@@ -33,7 +33,7 @@ if [ "$(grep -cE 'return try AIUndoGrouping\.step\(undo\) \{ try AISubtitleTools
   echo "✗ ${ROUTER} 里 edit_subtitles 的提交没包在 AIUndoGrouping.step 里" >&2
   exit 1
 fi
-for tool in AISpeechCutTool AIBeatCutTool AIVoiceoverTool; do
+for tool in AISpeechCutTool AIBeatCutTool AIVoiceoverTool AICutSoundTool; do
   # 先赋给变量再比较：直接写在 [ "$(…)" ] 里，CI 的 /bin/bash 3.2 会把 "…{ … , … }…" 当花括号展开、拆成两个词，
   # [ 报 too many arguments、if 走 else —— 这条到 2026-10-03 为止从来没生效过
   # （docs/bugfixes/2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md，checks/shell-brace-in-nested-quotes.sh 钉着）。

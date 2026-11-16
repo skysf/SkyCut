@@ -80,6 +80,9 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["language_detected", "language_undetected"])
     // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
     names.insert("overrides_not_applied")
+    // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
+    names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
+                     "extended_frames", "levels_db", "skipped_no_sound"])
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
     return names

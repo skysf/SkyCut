@@ -179,6 +179,7 @@
 - [2026-08-07 录屏 Phase 2–4 复审](2026-08-07-screen-recording-phase2-4-review.md) — 接线、恢复、退出与真实首测。
 - [2026-08-03 逐帧预览](2026-08-03-scrub-preview-keyframe-snap.md) — 零容差与链式 seek。
 - [2026-09-26 点一下选中一段，整个编辑器跟着重算](2026-09-26-selection-wakes-whole-editor.md) — 工程换成 `@Observable`；换机制后把「以前被顺带刷新」的地方逐个找出来。
+- [2026-11-16 A J/L-cut sound drifts off its picture after a magnet repack](2026-11-16-separated-sound-left-behind-on-magnet-repack.md) — A sound split from a picture follows that picture, not what lies under it; a clip moved before 0 is trimmed, never clamped.
 - [2026-10-03 录屏中 AI 改帧率：静默不改还回成功](2026-10-03-set-canvas-fps-ignored-while-recording.md) — 执行入口的闸只亮提示时，AI 那一路要自己先挡。
 - [2026-11-11 关掉全部权限的回答里长期授权还写「已记上」](2026-11-11-set-settings-stale-standing-consent.md) — 一个回答里同一件事出现两次，两份要在同一时刻取。
 - [2026-08-16 形状叠层不跟播放头](2026-08-16-shape-overlay-ignores-playhead.md) — 按 displayTime 取内容的叠层必须直接订阅 `PlayerClock`。

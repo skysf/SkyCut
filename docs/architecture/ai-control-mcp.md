@@ -590,6 +590,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `add_voiceover` 先回建声音那一步（`kind: voice_enroll`，或在建的那一单 `already_building`），那一笔 `credits` 是建版本的钱，旁白还没读、没预留，
      跟着 `next_step` 走。改第 11、13 条时对着 `SkyStudioGenerateTool`、`SkyStudioJobGate`、`SkyStudioVoiceoverStart` / `SkyStudioVoiceOneTimeStep`
      里每个提前返回的地方核一遍；检查查「不写成某一个原因」「不把会问说满」「讲旁白积分的那一条讲到建声音那一步」。
+   - **The shared editing rules are for every SkyCut user, with or without a style** (2026-11-16, user decision: general rules and
+     checks live in SkyCut; how to cut one kind of film lives on the Sky Studio server later). ① After rules 1–13 the shared rules have
+     four sections — Sound belongs to the picture, Cuts, Voice and music, Title cards — that **hold in every style; only the user's own
+     words override them**. A style card wins only over the shared Taste section ("When a style says otherwise, the style wins"); a card
+     line that contradicts the four sections gets changed in the same edit (2026-11-16: the cinematic opening's generated sound, the
+     documentary's 15–18 dB, the sci-fi title's 2 s). ② `recipes id=shared-rules` (`MCPRecipeTools.sharedRulesID`, one value for the
+     parameter text, the guide and `AIRecipeTools`) returns only the shared rules; a style that already has that id or title wins, and its
+     full text still ends with the rules. The `workflows` guide topic sends edits in no style there and only points: the rules live in
+     `recipes-shared-rules.md` alone, never copied into the guide. ③ What goes in comes from the research draft in tiers (only tier 1 on
+     2026-11-16; the Chinese draft's 2026-11-16 note lists what waits); later items are **appended at the end of their section**, since
+     cards cite them by number. ④ The size: one `recipes id=<style>` answer is the card plus the whole shared rules (largest built-in on
+     2026-11-16: product-promo, about 28,400 JSON characters, about 7.9 thousand tokens at 3.6 characters each); Claude Code warns above
+     10 thousand tokens, so new tiers need room first (shorter paid rules, or server recipes that do not repeat the shared rules).
+     `RecipeChecks` pins the four sections and checks the reserved id (any spelling, a user's style of that name winning, the parameter
+     text and the workflows topic naming it).
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -1105,6 +1120,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
 
+61. **声音怎么过一刀：`set_transition` 的 `sound`（2026-11-16，生产反馈 MCP-32；合同全在 [声音怎么过一刀](cut-sound.md)）**：
+    以前 J / L 切、叠着换只能 `add_clips sound=separate` + `edit_clip alone` 一段一段对帧，24 个接点就是 24 次手工。现在选一刀（`after_clip_id`，V1 或上层轨；
+    或 `all=true`）、一种过法（crossfade / lead / lag / bed / on_beat / gain / cut）、给帧数，一次调用 = 一步撤销，画面一帧不动；
+    要挪的那一边的声音先照分离音频那一份分出去，另一头照它此刻实际响的样子；余料不够、会伸过隔壁镜头就整个不做、回最多几帧。
+    **没开新工具**：全清单离上限只剩约 1.5k 字，而 sound 和画面转场都是「怎么过一刀」（同 MCP-32 的建议）；名片多一句、四个参数，长话在说明书
+    set_transition 主题的三节。和 `type` 不在同一次调用里。路由先 await 量电平 / 找拍子（`AICutSoundTool.plan`），再把同步的提交包进 `AIUndoGrouping.step`
+    （同 cut_to_beat）。全清单 2026-11-16 是 99,063 / 100,000。
+    守卫：`checks/MCP/CutSoundChecks.swift` / `CutSoundLevelChecks.swift`、`checks/MCP/router-wiring.sh`（提交包在 step 里）；分出去的声音跟着画面走见
+    [联动](timeline-linkage.md)规矩 13。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **每个工程一份**（`AIRound`，2026-10-17 用户定，[方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 4、E 节）：剪 5 条时停一条，别的照剪；
@@ -1262,6 +1287,7 @@ read of the project and before its first await (`shots=true` never).
       Every look of two sessions' four parallel 12-frame looks answers within 30 s with its picture or a job_id whose get_job brings it;
       an edit right behind a look answers first; looks behind a long `edit_clips` answer as queued jobs with `queue_position` and
       `waiting_for`, and `cancel_job` cancels one.
+- [ ] 让 AI 给一刀做 `set_transition sound=lead frames=16`（第 61 条）：下一场的声音在切点前淡进来、画面照旧在切点上换，分出来的声音在音频轨上、和画面链接着；⌘Z 一步回去。`all=true sound=crossfade`：一串刀的声音在 A1 / A2 交替叠着换，结果里 `room_frames` 对得上剩下的素材。
 - [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。
 - [ ] 让 AI 把一个文件删进废纸篓、先不回答它，让它再调一次：拿到的是同一张确认码（结果里 `valid_for_minutes` 30）；回答同意后它带码再调一次成功；

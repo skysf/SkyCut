@@ -284,6 +284,10 @@ final class AIToolRouter {
             return try AIUndoGrouping.step(undo) { try AIBeatCutTool.apply(plan, project) }
         case .deleteItems: return try AIUndoGrouping.step(undo) { try AITimelineTools.delete(args, project) }
         case .duplicateItems: return try AIUndoGrouping.step(undo) { try AITimelineTools.duplicate(args, project) }
+        // 声音怎么过一刀（sound）：先 await 量电平 / 找拍子，再把同步的提交包起来（同 cut_to_beat；docs/architecture/cut-sound.md）。
+        case .setTransition where args.has("sound"):
+            let plan = try await AICutSoundTool.plan(args, project)
+            return try AIUndoGrouping.step(undo) { try AICutSoundTool.apply(plan, project) }
         case .setTransition: return try AIUndoGrouping.step(undo) { try AITimelineTools.transition(args, project) }
         case .setText: return try AIOverlayTools.setText(args, project)
         case .setShape: return try AIOverlayTools.setShape(args, project)
