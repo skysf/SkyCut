@@ -36,7 +36,7 @@ a display, not stickers on a video.
 - Small HUD labels in the corners (coordinates, a timecode, "REC"), font_size 28–36 on 16:9, 16–20 on 9:16; thin lines and outlined rectangles from
   set_shape (line_width 2–3) as a viewfinder; a translucent filled rectangle (e.g. #00E5FF33) as a panel behind a label.
 - Numbers roll (set_text number) for countdowns and data.
-- Title: strokeDraw needs an outline (stroke_color), or use wipe. Hold it at least 2 s.
+- Title: strokeDraw needs an outline (stroke_color), or use wipe. Hold it at least 3 s (shared rules, Title cards).
 - Subtitles: on when there is narration, white light text, no word highlight.
 
 ## Sound
@@ -76,5 +76,5 @@ a display, not stickers on a video.
 
 - HUD text does not cover the subject.
 - Count the white flashes.
-- The title at the end holds at least 2 s.
+- The title at the end holds at least 3 s.
 - Then "Look again before export" in the shared rules.

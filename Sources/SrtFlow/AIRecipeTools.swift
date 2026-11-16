@@ -6,6 +6,7 @@ import SrtFlowMCPKit
 // 管什么：`recipes` 列出全部剪辑风格（每套一句「什么时候用」）、按名字回全文（后面接上所有剪辑风格共用的规矩）；
 // `save_recipe` 存用户自己的一套（用户开口才存；同名改那一套、旧的进废纸篓；和内置同名 = 用户改过的那一版）。
 // 剪辑风格由 AI 自己挑（方案第 39 条），总说明里写着「剪整片之前先挑一套、一句话告诉用户」。
+// `recipes id=shared-rules` (MCPRecipeTools.sharedRulesID) returns only the shared rules, for edits in no style (2026-11-16).
 // 不管什么：卡的格式和合并（AIRecipe）、读写文件（AIRecipeStore）、设置里的列表（AIRecipeSettingsList，存完由路由叫它刷新）。
 
 enum AIRecipeTools {
@@ -25,16 +26,20 @@ enum AIRecipeTools {
                     ]
                 }),
                 "folder": .string((store.directory.path as NSString).abbreviatingWithTildeInPath),
-                "next_step": """
+                "next_step": .string("""
                 Pick the editing style that fits what the user wants, tell the user in one sentence which one you follow \
                 (call them editing styles; 剪辑风格 in Chinese), then read it with recipes {id}. The user's own words always \
-                win over the style.
-                """
+                win over the style. For an edit in no style, read only the rules every style follows with recipes \
+                {id: \(MCPRecipeTools.sharedRulesID)}.
+                """)
             ])
         }
         guard let recipe = catalog.find(name) else {
+            // Only the shared rules, for edits in no style (2026-11-16). A style with this id or title wins above.
+            if AIRecipe.slug(name) == MCPRecipeTools.sharedRulesID { return sharedRulesOnly(sharedRules) }
             let ids = catalog.recipes.map(\.id).joined(separator: ", ")
-            throw AIToolError("There is no editing style called \(name). Styles: \(ids).")
+            throw AIToolError("There is no editing style called \(name). Styles: \(ids); \(MCPRecipeTools.sharedRulesID) "
+                + "has only the rules every style follows.")
         }
         var text = recipe.body
         if !sharedRules.isEmpty { text += "\n\n" + sharedRules }
@@ -44,6 +49,16 @@ enum AIRecipeTools {
             "use_for": .string(recipe.useFor),
             "source": .string(recipe.source.rawValue),
             "text": .string(text)
+        ])
+    }
+
+    /// `recipes id=shared-rules`: the rules every style follows, without a style in front of them.
+    private static func sharedRulesOnly(_ sharedRules: String) -> AIToolResult {
+        .ok([
+            "id": .string(MCPRecipeTools.sharedRulesID),
+            "title": "Rules every style follows",
+            "use_for": "Every edit, with or without an editing style.",
+            "text": .string(sharedRules)
         ])
     }
 

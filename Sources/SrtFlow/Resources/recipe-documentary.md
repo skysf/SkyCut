@@ -39,8 +39,9 @@ narration adds what the picture cannot say, and the type has the calm of a museu
 
 ## Sound
 
-- Music: find_audio "documentary", "nature", "calm", "piano", "hopeful" or "emotional". 15–18 dB under the narration.
-  In the gaps between narration lines, let the real sound (wind, animal calls) come through.
+- Music: find_audio "documentary", "nature", "calm", "piano", "hopeful" or "emotional". About 10 dB under the narration,
+  only while it speaks (shared rules, Voice and music, 1). In the gaps between narration lines, let the real sound (wind,
+  animal calls) come through.
 - Keep meaningful real sound: listen for the loud moments and look at what they are.
 - Voice: add_voiceover with zh_male or en_male, or zh_female_warm / en_female_warm, at speed 0.95, subtitles true. Write short narration lines
   (Chinese ≤ 20 characters, English ≤ 15 words) with 1–2 s between them for the pictures. Put each line over the matching

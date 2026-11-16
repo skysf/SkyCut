@@ -115,6 +115,8 @@ enum MCPGuideSharedTopics {
     ])
 
     // 出处：mcp-discovery.md（需求 → 工具）、ai-control-mcp.md 第四节第 22、29–33、45、54、55 条、voiceover-timeline-sync.md。
+    // The edit-in-no-style paragraph points at the shared editing rules and never copies them (ai-control-mcp.md section 4,
+    // item 32, 2026-11-16).
     static let workflows = MCPGuideTopic(name: "workflows", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: """
         Common SkyCut workflows. Each tool's own topic has the details.
@@ -132,6 +134,9 @@ enum MCPGuideSharedTopics {
 
         Cut a whole video in a style. recipes lists the editing styles: pick the one that fits, tell the user in one sentence which \
         one you follow, read it with recipes id=<id>, then build it. The user's own words win over the style.
+
+        Edit in no style (join clips, add music, trim). Before the first cut, read the rules every style follows with recipes \
+        id=\(MCPRecipeTools.sharedRulesID) and keep to them; the user's own words win.
 
         Clean up speech. transcribe for words with times, cut_speech for filler words, pauses or retakes, then listen cuts=true to \
         check that every cut lands in a pause.
