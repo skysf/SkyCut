@@ -141,6 +141,7 @@
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
+- [2026-11-17 Exported text and shape animations repeat a frame now and then](2026-11-17-overlay-export-repeats-a-frame.md) — Count overlay frames as frame numbers (`FrameGrid`), never floor time × fps; nothing ffmpeg matches to an output frame may sit exactly on the grid.
 - [2026-10-05 上层轨带缓动的关键帧，成片里边缘错开](2026-10-05-overlay-matte-drops-keyframe-easing.md) — 从旧关键帧构造新关键帧只走 remapped / clipped / stretched。
 - [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 普通生成 / upscale / 角色越档要在 `user_request` 的原话里找得到规格的名字；官方原创短片只查带没带原话。
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。

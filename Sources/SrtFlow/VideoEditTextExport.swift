@@ -112,13 +112,18 @@ enum TextOverlayExport {
     // MARK: - 落盘
 
     /// 单帧。返回贴图落点；渲不出来返回 nil（调用方据此整段跳过）。
+    ///
+    /// Drawn for the first output frame of its section (the first frame at or after `time`), like frame 0 of a sequence.
+    /// The frame below it comes before the section starts: a middle still drawn there caught the entrance before it ended
+    /// (a wipe 98 % through, the plate's right edge missing for the whole middle).
     private static func writeStill(
         _ overlay: TextOverlay, at time: Double, name: String,
         canvas: CGSize, frameRate: ProjectFrameRate, into workspace: URL
     ) throws -> CGPoint? {
+        let frame = OverlayExportFile.frameTime(0, sectionStart: time, grid: FrameGrid(frameRate))
         let state = TextAnimator.state(
             for: overlay,
-            at: TextAnimator.quantize(time, frameRate: frameRate),
+            at: TextAnimator.quantize(frame, frameRate: frameRate),
             canvas: canvas, frameRate: frameRate
         )
         guard let rendered = TextRenderer.render(overlay, canvas: canvas, state: state),
@@ -143,9 +148,11 @@ enum TextOverlayExport {
             count = OverlayExportFile.sequenceFrameCount(span: span, fps: fps)
         }
 
+        let grid = FrameGrid(frameRate)
         var origin: CGPoint?
         for frame in 0..<count {
-            let time = from + Double(frame) / fps
+            // The section's k-th output frame, exactly on the grid (`OverlayExportFile.frameTime`); placed by the same count.
+            let time = OverlayExportFile.frameTime(frame, sectionStart: from, grid: grid)
             let state = TextAnimator.state(
                 for: overlay,
                 at: TextAnimator.quantize(time, frameRate: frameRate),
