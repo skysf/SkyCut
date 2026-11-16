@@ -87,6 +87,9 @@ func catalogKnownNames() -> Set<String> {
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
                      "extended_frames", "levels_db", "skipped_no_sound", "equal_power", "raised_db"])
+    // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
+    names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
+                     "audio_max_reduction_db"])
     return names
 }
 
