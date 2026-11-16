@@ -11,12 +11,17 @@ enum AIInspection {
         var to: Double
         var reason: String
         var items: [UUID] = []
+        /// 这一种疑点自己多带的几样（`source_cut` 的素材第几帧、建议的入点 / 出点）。
+        var details: [String: JSONValue] = [:]
 
         var time: Double { (from + to) / 2 }
         func json(ids: AIShortIDs) -> JSONValue {
-            ["kind": .string(kind), "from": AIFormat.seconds(from), "to": AIFormat.seconds(to),
-             "at": AIFormat.seconds(time), "reason": .string(reason), "suspected": true,
-             "items": .array(items.map { .string(ids.short($0)) })]
+            let object: [String: JSONValue] = [
+                "kind": .string(kind), "from": AIFormat.seconds(from), "to": AIFormat.seconds(to),
+                "at": AIFormat.seconds(time), "reason": .string(reason), "suspected": true,
+                "items": .array(items.map { .string(ids.short($0)) })
+            ]
+            return .object(object.merging(details) { current, _ in current })
         }
     }
 
@@ -155,6 +160,28 @@ enum AIInspection {
     static func isBlack(_ luma: AIBlackBars.Luma) -> Bool {
         guard !luma.pixels.isEmpty else { return false }
         return Double(luma.pixels.filter { $0 <= 16 }.count) / Double(luma.pixels.count) > 0.995
+    }
+
+    /// 抽帧时几乎全黑的那几刻（`black`，取自 `sampled`）里，按抽帧的先后连着都黑的合成一条，写从哪到哪（MCP-14 B：以前一帧
+    /// 一条，一秒的黑场报成好几条）。中间隔着一帧不黑的、或者那一刻没取到画面的，算两段。
+    static func blackRuns(sampled: [Double], black: [Double]) -> [Finding] {
+        let dark = Set(black)
+        var result: [Finding] = []
+        var run: [Double] = []
+        func close() {
+            guard let first = run.first, let last = run.last else { return }
+            let reason = run.count == 1
+                ? "More than 99.5% of sampled pixels are near black; this may be an intended fade or dark shot."
+                : String(format: "The %d sampled pictures from %.2f to %.2f s are near black (more than 99.5%% of pixels); "
+                    + "this may be an intended fade or dark shot.", run.count, first, last)
+            result.append(Finding(kind: "black_frame", from: first, to: last, reason: reason))
+            run = []
+        }
+        for time in sampled.sorted() {
+            if dark.contains(time) { run.append(time) } else { close() }
+        }
+        close()
+        return result
     }
 
     /// 证据先给结尾，再按疑点出现顺序；避免开头几个切口用光名额，结尾反而没法复核。
