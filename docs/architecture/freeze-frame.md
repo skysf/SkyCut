@@ -15,6 +15,12 @@
 
 **别为定格另起一条渲染路径。** 真要加什么，先想清楚为什么图片段不够用。
 
+The one place where an image clip is not "just a video" (2026-11-17): **in a transition its first or last frame may be held
+for free** (`EditClip.showsOnePicture`: every frame is the same picture). Planned as footage, the 60-second clip has 56 s of
+tail and nothing before its first frame, and a transition next to a still played entirely after the cut. A seam next to an
+image clip is always centred on the cut ([transition handles](transition-handles.md),
+[case](../bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md)).
+
 ## 2. 提交模型：转码成功后一次性提交（和图片导入相反）
 
 图片导入是「占位块先上轨、后台转完再替换」。定格**刻意不抄这个**，原因有三：
