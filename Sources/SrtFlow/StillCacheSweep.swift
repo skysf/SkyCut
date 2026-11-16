@@ -76,7 +76,7 @@ enum StillCacheSweep {
     static func isTransparentStillName(_ name: String) -> Bool {
         let key = name.prefix(32)
         let rest = name.dropFirst(32)
-        return key.count == 32 && key.allSatisfy { $0.isHexDigit && !$0.isUppercase }
+        return key.count == 32 && key.allSatisfy { $0.isASCII && $0.isHexDigit && !$0.isUppercase }
             && (rest == "-alpha-v1.mov" || rest == "-alpha-native-v1.mov")
     }
 
