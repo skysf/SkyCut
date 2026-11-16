@@ -82,9 +82,8 @@ enum ProjectVersionFiles {
     /// Reads a version file's name back: the number after the last " - v" and, when SkyCut knows the words after it, the kind.
     /// Anything else (the project file itself, notes the user left there) is not a version.
     static func parse(fileName: String) -> (number: Int, kind: ProjectVersionKind?)? {
-        let name = fileName as NSString
-        guard name.pathExtension.lowercased() == VideoEditProjectFile.fileExtension else { return nil }
-        let stem = name.deletingPathExtension
+        guard VideoEditProjectFile.isProjectFile(URL(fileURLWithPath: fileName)) else { return nil }
+        let stem = (fileName as NSString).deletingPathExtension
         guard let marker = stem.range(of: " - v", options: .backwards) else { return nil }
         let rest = stem[marker.upperBound...]
         let digits = rest.prefix { $0.isASCII && $0.isNumber }
