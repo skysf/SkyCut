@@ -181,6 +181,14 @@ Finder**。App 只负责「快速回到最近那几条」。
 - **不开新的 formatVersion**：旧版丢掉这个键，丢的只是这个工程的开关 —— 成片一帧不变，和行高同一个口径。
 - 新建工程用上次拨的值（`VideoEditProject.newTimeline()` 读 `EditorToggles.magnet`），见 [剪辑页上记住的开关](editor-remembered-toggles.md)。
 
+### Saved versions are project files too (2026-11-17)
+
+The versions SkyCut saves around AI rounds are complete project files written by the same `VideoEditProjectIO.save` (with the
+project's `mediaRecords` as `knownRecords`) and read back by the same `load` — no new format and no format version. They live in
+`~/Library/Application Support/SrtFlow/Versions/<project name> <hash>/`, not next to the project; going back restores the timeline
+with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore` write project files. Rules:
+[saved project versions](project-versions.md).
+
 ### 不进工程文件的东西
 
 - `EditClip.needsStillConversion` —— 导入过程中的临时状态。

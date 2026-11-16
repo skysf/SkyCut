@@ -1096,6 +1096,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
   只许走 `VideoEditProject.restoreTimeline`（和 ⌘Z 同一条收尾 `adopt`），**不许走 `perform`**：那是一次编辑的收尾，磁吸会把快照里
   V1 的缝又合上、联动再按合拢挪一遍，结果音频字幕回了原位、V1 没回（[案例](../bugfixes/2026-10-02-undo-round-repacks-v1.md)，
   守卫 `checks/timeline-drag-wiring/linkage.sh` 第 12e 节）。
+- **Saved versions** (2026-11-17, [saved project versions](project-versions.md)): the round's first change saves its starting point
+  as a version and names it in that result (`before_round_version`), the round's end (idle or Stop) saves what it made, and going back
+  (`undo version=<id>`, the Versions sheet, "Undo This Round") saves the state it leaves first — each only when the project changed
+  since its newest version. `undo version=` puts the whole project back to a saved version as one undo step; `get_status` lists them.
+  "Undo This Round" above is unchanged (in memory, exact, latest round only); the versions are what survive a restart.
 - **停止按工程**：取消跟着这个工程停的任务（`AIJobs.cancel(stoppingWith:)`：碰这个工程的导出 / 生成字幕 / 翻译 / upscale / 生成，加上剪它的
   会话起的、不碰工程的任务里记在它身上的 —— 起任务时这个会话最后打开的那个，`AICallContext.stopsWith`），它们挂着的问题算「不要」；之后 AI 落在
   **这个工程**上的调用一律回「用户按了停止」，直到它安静 10 秒 —— AI 收到拒绝会停下来问用户，用户再说话时新的一轮照常开。排在队里、还没轮到的
