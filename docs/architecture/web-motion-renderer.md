@@ -1,0 +1,217 @@
+# Web-motion renderer: a page becomes a transparent movie, outside SkyCut
+
+> Covers: `skycut-web-motion` (the helper process that renders a motion web page), SkyCut's API for it
+> (`WebMotionRenderer.render`), the page contract, the locks, the time and memory limits, the page clock, the transparent
+> background, the page checks before a movie is accepted (MCP-75), versions, packaging, and the checks that pin all of it.
+> Not covered yet: the AI tool, the inspector / motion panel and storing a rendered clip in the project (MCP-74, next task);
+> where rendered movies live and how they are fingerprinted (MCP-74).
+>
+> Origin (2026-11-16/17): the web-motion probe (internal research, `2026-11-16-web-motion-probe/report.md`) showed that an
+> AI-written page rendered with the Mac's own WebKit gives frame-exact, transparent titles whose text matches SkyCut's own.
+> The precondition — alpha video on upper tracks, the same in preview and export — was merged as #430
+> ([freeze frame 4a3](freeze-frame.md)). The user decided (「按建议」, 2026-11-16): the network lock is never relaxed;
+> transparency uses the fast non-public switch with a calibration before every render and switches to the public way by
+> itself when wrong; movies are ProRes 4444 until HEVC with alpha has been measured. Task G10 built the renderer.
+
+## 1. Why a helper process
+
+The page is code written by an AI, run on the user's Mac. WebKit has no public way to stop one page or to cap its memory:
+inside SkyCut, a page stuck in `while (true) {}` could only be waited out, and the probe watched a page grow to 1.5 GB.
+So pages render in a separate command-line process, `skycut-web-motion`, started per render. SkyCut can kill it at any
+moment; its WebKit processes (WebContent, GPU, Networking) end with it (measured: 0.1–0.3 s later, killed or not).
+
+- **No window, no `NSApplication`.** A run loop and windowless `WKWebView`s. Measured 2026-11-17: as fast as the probe's
+  off-screen window (the probe's lightest 1080p title: 25 frames/s on one page, 66 on three), and nothing can ever appear on
+  screen.
+- **Command line, not XPC**: same pattern, packaging and signing as `skycut-mcp`; no launchd plist, nothing to register.
+- **One render at a time** (`WebMotionRenderGate`): three helpers at once measured slower than one helper drawing on three pages.
+
+## 2. The API (for MCP-74)
+
+`WebMotionRenderer.render(_ job: WebMotionJob) async throws -> WebMotionRender`
+
+- `WebMotionJob`: page HTML, parameters (a JSON object), duration, output size, fps, output URL; optional layout height
+  (default 1080), seed, clock epoch, page instances (default 3), sample count for "same t twice" (default 8), alpha path
+  (default `.auto`), limits (default `WebMotionLimits.standard(frames:)`).
+- `WebMotionRender`: the movie (moved into place only after every check passed; written next to it first), the
+  `WebMotionResult` (checks, frame hashes, alpha path and calibration, versions, timing) and the peak memory.
+- Errors (`WebMotionRenderError`): `.rejected(result)` — the page failed a check or a time limit, `result.failure.message`
+  is the page's own text (give it back to the AI verbatim); `.killed` — SkyCut stopped it (memory, or a helper that ignored
+  its own limits); `.rendererFailed` — not the page's fault (a lock unavailable on this macOS, the encoder, a crash);
+  `.invalid`, `.helperMissing`, `.cancelled` (cancelling the task kills the helper).
+- Callers that run it for AI work run it inside `AIJobs` (App Nap, [AI interface (MCP) rule 59](ai-control-mcp.md)).
+- The helper is found at `SRTFLOW_WEB_MOTION_HELPER` (checks), `SkyCut.app/Contents/Helpers/skycut-web-motion`, or next to
+  SkyCut's own executable (`swift run` builds every product into one folder).
+
+## 3. The page contract
+
+| What | Rule |
+| --- | --- |
+| Entry point | `window.motion = { frame(t), duration?, ready? }`. `frame(t)` draws the picture for t seconds and nothing else. It may return a promise; `ready` (a promise) is awaited once after load (decode images, wait for fonts) — it must not wait on timers |
+| Parameters | `window.MOTION_PARAMS`: the job's JSON object, frozen, defined before any page script |
+| What is rendered | `window.MOTION_RENDER`: `{ width, height }` in CSS px, `pixelWidth`, `pixelHeight`, `fps`, `duration`, `frames` |
+| Viewport | 1080 CSS px tall by default, width from the output's aspect ratio (607.5 for 1080 × 1920): SkyCut's text sizes are defined on a 1080-high canvas ([text overlays](text-overlays.md)), so a page's px match them. The page is drawn straight at the output size (vector zoom), never scaled from a bitmap |
+| Fonts | The Mac's own (same as SkyCut's text). No web fonts, no images except `data:` / `blob:` |
+| Pure function of t | No state carried between frames, randomness only from `Math.random` / `crypto` (seeded), CSS animations that exist at load (they run from t = 0). Frames are drawn by several page instances, out of order in the second pass |
+| Not allowed | Network, files, frames, workers, eval, navigation, new windows, camera / microphone / location / clipboard / notifications, storage that survives |
+
+## 4. The locks
+
+Measured 2026-11-17 with a page that aims every network path at a local TCP + UDP listener (`checks/WebMotion/ReachPages.swift`).
+The probe's lockdown (first four rows) let two kinds of traffic out: **WebRTC sent STUN over UDP and TURN over TCP, and
+link preconnect opened TCP connections** — content rules and CSP do not cover either.
+
+| Lock | How | Closes |
+| --- | --- | --- |
+| Content rules | `WKContentRuleList`, one rule blocking every URL | fetch, XHR, beacon, sockets, event source, images, styles, fonts, scripts, media, frames |
+| CSP in the page | `WebMotionPageHTML.locked`: Content-Security-Policy + `x-dns-prefetch-control: off` before any page markup (after a leading doctype), no line break added | the same loads in the page (each also by itself), workers, eval, form posts; violations become page errors the AI can read |
+| Navigation | only the first main-frame load (`about:blank` from `loadHTMLString(_:baseURL: nil)`); later navigations and subframes cancelled; `createWebViewWith` → nil | navigation, popups, downloads, subframe loads; no file URL, no origin |
+| Storage | non-persistent data store | cookies / localStorage / IndexedDB surviving a render |
+| Permissions | media capture denied in the UI delegate; no geolocation or notification delegate; JS dialogs answered at once | camera, microphone, location, notifications, clipboard (no user gesture), a dialog blocking a frame |
+| **WebKit feature switches** (non-public) | `Lockdown.switchOff`: `PeerConnectionEnabled`, `LinkPreconnect` (both leaked), `LinkDNSPrefetchEnabled`, `WebTransportEnabled`, `LinkPreconnectEarlyHintsEnabled`, `BeaconAPIEnabled`, each read back after setting | WebRTC (even from a fresh `about:blank` iframe realm: deleting the constructor in JS would not do), preconnect, DNS prefetch |
+
+- **Fail closed.** A missing switch, a switch that stays on, or a rule list that does not compile refuses the render
+  (`rendererFailed`). The network lock is never relaxed (user, 2026-11-16).
+- DNS prefetch cannot be observed without touching the Mac's DNS (not allowed on this machine): it is locked by the switch
+  and the meta tag and verified by reading the switch back, not by watching DNS.
+- Pages only ever load in the helper: SkyCut's own web-motion code has no `WKWebView` (`checks/web-motion-wiring.sh`).
+- What no lock can stop: a page can draw anything (a fake interface, misleading text) — a person looks at the result;
+  a page can tell which fonts this Mac has (nothing leaves the Mac).
+- **A page that navigates** (`location.href = …`) is refused, and WebKit then never settles `document.fonts.ready` although
+  `document.fonts.status` is `loaded` (measured): the clock waits for fonts only while they are loading. Before that fix the
+  render waited out its load limit and blamed "an endless loop". A navigation in `<head>` can also stop the parser: the
+  page then fails "frame entry".
+
+## 5. Time limits
+
+`WebMotionLimits` (defaults `standard(frames:)`): load 15 s (per page instance: load, fonts, `motion.ready`), script 4 s
+(one frame's JavaScript), snapshot 15 s, total 60 s + 2 s per frame, at most 30 min. Caps: output ≤ 3840 × 2160 either
+way, even sizes ≥ 16, ≤ 60 s, 1–120 fps, page ≤ 2 MB, parameters ≤ 256 KB.
+
+- **The helper enforces them and exits.** The page's JavaScript runs in WebKit's own process, so the helper's main thread
+  stays free while a page loops forever and its timers fire on time (`Deadline.within`). The probe's first version waited
+  inside a task group for the stuck call and hung until the total limit.
+- **SkyCut backstops a helper that does not**: no event for longer than its slowest single step allows
+  (max(load, script + 2 × snapshot)) + 10 s, or past its total + 10 s → SIGKILL.
+- The helper also stops when SkyCut is gone (its parent changed).
+- Frames are drawn several at a time; when several fail, the earliest is reported.
+
+## 6. Memory
+
+WebKit has no public per-page cap, so SkyCut watches the render every 0.25 s: the footprint (`proc_pid_rusage` physical
+footprint, what Activity Monitor shows) of the helper plus the WebKit processes it reported (non-public accessors
+`_webProcessIdentifier`, `_gpuProcessIdentifier`, `_networkProcessIdentifier`; a missing one is skipped), and the Mac's
+pressure (`kern.memorystatus_vm_pressure_level`). `WebMotionMemoryPolicy` decides:
+
+| Mac | Kill when |
+| --- | --- |
+| normal | the render uses more than its budget: min(3 GB, a quarter of memory, at least 0.5 GB) |
+| warning (low memory) | the render uses more than 1 GB |
+| critical (out of memory) | always: the render is the one thing SkyCut can give back right away |
+
+A normal render measured 50–700 MB in all. After the helper ends, SkyCut waits until every reported WebKit process is really
+gone (an exiting process can no longer be described while its pid still exists: that counts as not gone yet) and kills any
+still running as the same process after 3 s (`WebMotionProcessTeardown`; only a process still identifiable as the same one
+is ever signalled).
+
+Real machine-wide pressure is not simulated in checks: `memory_pressure -S` would push every app on a shared Mac into
+purging. The checks inject "critical" / "warning" readings and use a real hog page against a small budget.
+
+## 7. The page clock
+
+Before any page script runs, `PageClock.bootstrap` puts the page's time under the renderer:
+
+- `performance.now()`, `Date.now()`, `new Date()` / `Date()` (from the job's epoch), `document.timeline.currentTime` read the
+  render time;
+- `setTimeout` / `setInterval` / `requestIdleCallback` run when the render time passes them, in due order, each seeing its
+  due time (at most 10 000 per frame, an interval at least 1 ms); zero-delay timers from load run before the first frame;
+- `requestAnimationFrame` callbacks run once per frame with the frame's time, before `frame(t)`;
+- `Math.random`, `crypto.getRandomValues`, `crypto.randomUUID` come from a seeded generator re-seeded from (seed, t) at
+  every frame: a frame's random numbers do not depend on what was drawn before;
+- CSS animations and transitions, Web Animations and SVG (SMIL) animations are paused and set to the render time; those that
+  exist when loading ends run from t = 0, later ones count from the frame that first saw them (differs per page instance:
+  such a page fails "same t twice");
+- errors (uncaught, unhandled rejections, thrown by `frame(t)`, blocked loads) are recorded verbatim with the frame time;
+- the control object is non-writable and non-configurable.
+
+**Rule: the takeover is written from the idea, for SkyCut** (2026-11-17). The probe tool's version was derived from
+OpenFilm's code and must not be copied or adapted; the probe tool's names (`CLOCK_SHIM`, `FILM_CLOCK`) must not appear in
+`Sources/` (scan guard). Not covered: `Intl` formatting of "now", a fresh iframe realm's own `Math.random` — both make a page
+non-deterministic, which "same t twice" catches.
+
+## 8. Transparent background
+
+- **Fast path** (default): WebKit's non-public "draws background" switch, so snapshots carry alpha.
+- **Calibration before every render**: a 64 × 16 page (nothing / 50 % green / opaque red / 25 % white) drawn with the same
+  locked configuration and zoom; each patch must read its premultiplied value ± 3 (`WebMotionAlphaCalibration`). Wrong
+  (e.g. a macOS without the switch: the clear patch reads opaque white) → `.auto` switches to the public path by itself and
+  reports why; `.fast` refuses.
+- **Public path**: each frame drawn over opaque black and over opaque white (an inline `!important` background on `<html>`,
+  restored before the next frame); alpha = 255 − mean(W − B) over the three channels, color = B clamped to alpha
+  (`WebMotionPixels.deriveAlpha`). Half the speed; pages must not blend against what is behind them (`mix-blend-mode`).
+- Measured 2026-11-17 (`check-web-motion.sh`): fast and public paths decode to identical frames on the alpha page (max 0;
+  the probe: max 2 on its pages before encoding).
+- **The movie**: ProRes 4444 from premultiplied BGRA (WebKit's snapshot is already sRGB premultiplied BGRA: the copy changes
+  no pixel), every buffer tagged `AlphaChannelMode = premultiplied` so AVFoundation writes the `almo` box SkyCut reads
+  (`SourceAlpha`, [freeze frame 4a3](freeze-frame.md)); BT.709 color tags like `AlphaSourceCopies`. Premultiplied on purpose:
+  the preview's compositor wants premultiplied sources, so these movies never need the premultiplied copy SkyCut makes for
+  straight-alpha files. The helper reads the file back: alpha, premultiplied tag and frames / fps length, or the render fails.
+  HEVC with alpha waits for a quality measurement.
+
+## 9. Checks before a movie is accepted (MCP-75)
+
+| Check | Fails when |
+| --- | --- |
+| `loads` | load, fonts or `motion.ready` not done within the load limit; the page's WebKit process ended while loading |
+| `frame_entry` | no `window.motion.frame` function |
+| `same_twice` | a sample frame (8 spread evenly) drawn again, last first, on the next page instance, differs in any pixel (SHA-256) |
+| `no_blank_frames` | every frame is fully transparent, or a 1–2 frame empty gap sits between drawn frames (an image or font not ready). Empty frames at the start (fade in) and end (fade out), and longer gaps, pass |
+| `no_page_errors` | any error at load or while drawing (verbatim, with t); a blocked load (CSP: says what and why); the page's WebKit process ended |
+| `no_timeout` | a time limit was hit (says which, at which t) |
+
+The result lists every check (passed / failed / not reached) and the first failure with the page's own text, e.g.
+`ReferenceError: Can't find variable: undefinedFunction (at frame@about:blank:2:63) (while drawing t = 0.500 s)`.
+
+## 10. Versions and determinism
+
+The result carries `WebMotionVersion.renderer` (bump it whenever the same page, parameters and system can draw different
+pixels: clock rules, alpha handling, zoom / layout, capture, encoding), macOS version and build, and WebKit's version.
+Same page + parameters + versions → the same frame hashes: two renders compared hash for hash and decoded frame for frame
+in the checks. Different macOS / WebKit versions may change text pixels (probe, inferred): MCP-74 stores the versions.
+
+## 11. Speed
+
+Measured 2026-11-17 on the M1 (8 cores, 16 GB) while other sessions compiled (load 15–50): a 320 × 180, 12-frame page
+renders in 1–2 s in all (about 1 s is the lock, the calibration and loading three pages). The probe's three 1080p pages: see
+the G10 report (internal) for frames per second with one and three page instances.
+
+## 12. Packaging and signing
+
+`scripts/build-app.sh` copies `skycut-web-motion` into `SkyCut.app/Contents/Helpers/` (next to ffmpeg and `skycut-mcp`);
+`scripts/signing/sign-app.sh` refuses to sign without it and signs it before the outer bundle (only through `sign-app.sh`,
+[code signing](code-signing-and-permissions.md)). No entitlements: the helper needs none (no camera, no network).
+
+## 13. Checks and guards
+
+| Check | Pins |
+| --- | --- |
+| `scripts/check-web-motion.sh` (`checks/WebMotion/`) | the clock (production script driven directly in a WKWebView); normal pages pass, two renders identical, movie tagged premultiplied; alpha values, fast = public, broken fast path switches / is refused; hostile pages (loops, error, kept state, no entry, flicker, huge canvas); a listener sees no connection or datagram, no file read, no permission, no surviving storage; hog killed at budget, injected pressure kills, both backstops; the check's own main thread never stalls (it stands in for SkyCut). `SRTFLOW_WEB_MOTION_CHECKS=group,…` runs some groups |
+| `checks/web-motion-wiring.sh` | packaging and signing order; pages only in the helper; one HTML loader, every load locked, every configuration from `Lockdown` with its locks; the fonts rule; no probe-tool clock names; the check in check-all |
+| `checks/release-signing.sh` | `sign-app.sh` signs four things (ffmpeg, `skycut-mcp`, `skycut-web-motion`, the app) |
+
+Test-only environment variables the helper reads: `SRTFLOW_WEB_MOTION_TEST_BREAK_FAST_ALPHA=1` (skip the fast switch, as a
+macOS without it would) and `SRTFLOW_WEB_MOTION_TEST_LINGER=<s>` (keep the pages alive after the result, so a lock that
+failed has time to leak before the process is gone).
+
+**Reverse verification (2026-11-17)**: each lock and rule sabotaged on its own, the relevant group run, restored. See the
+G10 report for the table; in short every load-bearing lock turned its check red, and the redundant pair (content rules alone
+or CSP alone) stayed green for the network check while losing the "Blocked:" page errors (CSP).
+
+## 14. Manual regression (before a release)
+
+- [ ] Packaged app: `Contents/Helpers/skycut-web-motion` exists, is arm64, signed with the pinned certificate
+      (`codesign -d -r-`), and a render from the packaged app works.
+- [ ] A downloaded (quarantined) app: the helper is not killed by the system (else the error carries the fix command).
+- [ ] Real memory pressure on a spare Mac: a render under "critical" is stopped and SkyCut keeps running.
+- [ ] A non-Retina display (backing scale 1) and a Retina one give the same frame hashes for the same page.
+- [ ] A 4K, 60 s page: total time stays within its limit; SkyCut stays responsive.

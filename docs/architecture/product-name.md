@@ -14,6 +14,8 @@
 
 打包脚本把 SwiftPM 的可执行产品 `SrtFlow` 拷成 `SkyCut.app/Contents/MacOS/SkyCut`（`APP_NAME` 和 `PRODUCT` 两个变量，`scripts/build-app.sh`）。
 小程序的 SwiftPM 产品直接叫 `skycut-mcp`：客户端配置里写的就是这个路径，`ps` 里看到的也是它。
+The web-motion renderer's product is named the same way, `skycut-web-motion` (target `SrtFlowWebMotion`), as Activity Monitor
+shows it ([web-motion renderer](web-motion-renderer.md)); its test-only environment variables keep the `SRTFLOW_` prefix.
 
 用户在 Finder 里看得见、又早就散在用户文件夹里的两样，新的叫 SkyCut、老的照认：
 

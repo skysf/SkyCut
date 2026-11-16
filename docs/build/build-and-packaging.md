@@ -66,8 +66,9 @@ Claude Code 里 PATH 上的 bash 是原生的 5.x，命令 shell 也是原生的
 
 Release 构建 → 手写 Info.plist 组装 `dist/SkyCut.app`（SwiftPM 的可执行产品 `SrtFlow` 拷成 `Contents/MacOS/SkyCut`，产品名与代码名见 [产品名与代码名](../architecture/product-name.md)） → 拷入 SwiftPM 资源包、
 vendor/ffmpeg 和 AI 客户端启动的 MCP 小程序 `skycut-mcp`（都在 `Contents/Helpers/`，
-见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)）→ 生成图标 → 签名（只经 `scripts/signing/sign-app.sh`：
-**先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 skycut-mcp 这一条；
+见 [AI 接口（MCP）](../architecture/ai-control-mcp.md)）, and the web-motion renderer `skycut-web-motion` (also in
+`Contents/Helpers/`, [web-motion renderer](../architecture/web-motion-renderer.md)) → 生成图标 → 签名（只经 `scripts/signing/sign-app.sh`：
+**先签嵌套二进制再签外层**，顺序反了外层签名立即失效，`scripts/check-mcp.sh` 钉着 skycut-mcp 这一条，`checks/web-motion-wiring.sh` 钉着 skycut-web-motion；
 用固定的签名身份签，见下方签名一节）→ `scripts/build-dmg.sh` 生成 Retina 引导背景、复制 Finder 布局模板，
 再由 `hdiutil` 生成 DMG（HFS+、卷名仍是 `SkyCut`）。
 
@@ -148,6 +149,8 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 - `lipo -archs dist/SkyCut.app/Contents/MacOS/SkyCut` → `arm64`
 - `dist/SkyCut.app/Contents/Helpers/skycut-mcp` 在、能跑：往它的 stdin 喂一行 `initialize`，
   stdout 回一行带 `"serverInfo":{"name":"skycut"` 的 JSON
+- `dist/SkyCut.app/Contents/Helpers/skycut-web-motion` is there, arm64 and signed like the app; fed `{}` on stdin it prints
+  one result line saying the request could not be read and exits with code 2
 - `strings ... | grep <新增字符串>` → 命中
 - 脚本自带 `codesign --verify --deep --strict` → "签名校验通过"
 - `codesign -d -r- dist/SkyCut.app` → `certificate leaf = H"<packaging/signing-identity.sha1 里那一行>"`，
