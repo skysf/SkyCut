@@ -9,6 +9,9 @@ import Foundation
 // `replaceCurrentItem` 画面会闪一下，等暂停再换）；老工程缺关键帧间隔的先补探；这台机器的解码速度第一次用到时量一次；
 // 转不了的源（编码器拒绝、10-bit / HDR）记在 `unavailable` 里，只在工具栏的菜单里标一下，不进提示条（提示条常驻、要用户点掉，
 // 而「用原片」不需要用户做什么）。
+// Also, in both modes: the preview never waits for a straight-alpha source's premultiplied copy (`readyAlphaCopiesOnly` in the
+// lookup); after each rebuild lands the missing copies are made in the background and swapped in while stopped, by the same
+// swap rule (`prepareAlphaCopies`, docs/architecture/freeze-frame.md 4a3).
 // 不管什么：判据和分块（OptimizedMediaPolicy）、块怎么转（OptimizedMediaTranscoder）、缓存目录（OptimizedMediaStore）、
 // 合成里怎么插（CompositionClipInsert）、设置里的占用 / 上限 / 清空（OptimizedMediaCacheSettings：清空之后调这里的 `reset()`
 // 再让工程重建）。长期约束见 docs/architecture/optimized-media.md。
@@ -55,6 +58,9 @@ final class OptimizedMediaCoordinator: ObservableObject {
     private var lastSwap = Date.distantPast
     private var pauseObserver: AnyCancellable?
     private var swapTimer: Task<Void, Never>?
+    /// Straight-alpha sources whose premultiplied copy is being made for the preview; those that could not be made this run.
+    private var alphaCopiesInFlight: Set<URL> = []
+    private var alphaCopiesFailed: Set<URL> = []
 
     final class CancelFlag: @unchecked Sendable {
         var cancelled = false
@@ -73,15 +79,16 @@ final class OptimizedMediaCoordinator: ObservableObject {
         }
     }
 
-    /// 重建时问：哪些块能换进合成。「原片」模式什么都不换。
+    /// 重建时问：哪些块能换进合成。「原片」模式什么都不换。In both modes the preview takes premultiplied copies only when ready.
     func lookup(for state: TimelineState) -> OptimizedMediaLookup {
-        guard mode == .optimized else { return .none }
-        return OptimizedMediaLookup(chunks: ready)
+        OptimizedMediaLookup(chunks: mode == .optimized ? ready : [:], readyAlphaCopiesOnly: true)
     }
 
     /// 每次预览重建落地之后：按这份时间线算还差哪些块，排队去转；缺关键帧间隔的源先补探；解码速度没量过先量。
     func sync(state: TimelineState, playhead: Double) {
         guard let project else { return }
+        // Before the mode check: the copies are for a correct picture, not for speed — 「原片」 needs them too.
+        prepareAlphaCopies(in: state)
         guard mode == .optimized else {
             queue = []
             pendingCount = 0
@@ -128,7 +135,36 @@ final class OptimizedMediaCoordinator: ObservableObject {
         probed = []
         sources = [:]
         swapPending = false
+        alphaCopiesInFlight = []
+        alphaCopiesFailed = []
         if !unavailable.isEmpty { unavailable = [] }
+    }
+
+    // MARK: - Premultiplied copies of straight-alpha sources (the preview shows the original until the copy is made)
+
+    /// After a rebuild lands: the straight-alpha sources the preview had to insert as the original get their copy made in
+    /// the background (`AlphaSourceCopies`, one at a time on `MediaReadQueue.alpha`), then swapped in while stopped — the same
+    /// rule as proxies. A copy that cannot be made is not retried this run: the preview keeps the original (a little bright).
+    private func prepareAlphaCopies(in state: TimelineState) {
+        let generation = generation
+        Task { [weak self] in
+            let missing = await CompositionSource.missingAlphaCopies(in: state) { MediaAssetCache.asset(for: $0).asset }
+            guard let self, self.generation == generation else { return }
+            for url in missing where !self.alphaCopiesFailed.contains(url) {
+                guard self.alphaCopiesInFlight.insert(url).inserted else { continue }
+                Task { [weak self] in
+                    let made = await AlphaSourceCopies.url(.premultiplied, for: url)
+                    guard let self, self.generation == generation else { return }
+                    self.alphaCopiesInFlight.remove(url)
+                    guard made != nil else {
+                        self.alphaCopiesFailed.insert(url)
+                        return
+                    }
+                    self.swapPending = true
+                    self.requestSwapIfIdle(force: true)
+                }
+            }
+        }
     }
 
     // MARK: - 探

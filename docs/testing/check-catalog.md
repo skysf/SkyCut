@@ -76,7 +76,9 @@
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
   （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
-  在做不出来的机器上打 `SKIP` 明说没跑）：`scripts/check-video-fade.sh`。
+  在做不出来的机器上打 `SKIP` 明说没跑）, and the preview not waiting for a straight source's premultiplied copy (`AlphaVideoNoWait.swift`:
+  on a cold cache the preview build neither makes nor waits for the copy and draws the original at once; `missingAlphaCopies` names
+  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits)：`scripts/check-video-fade.sh`。
 - 检查器的 live 绑定只准接滑块和 scrub（离散控件没有结束信号，快照会挂着把
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
@@ -219,7 +221,9 @@
   声音各找一条、链接组换新号、文字 / 滤镜 / 字幕句各自的行规矩），外加分割不丢字段、分割后链接组一对还是一对：
   `scripts/check-timeline-clipboard.sh`；接线（编辑菜单三项、右键菜单、落点鼠标优先含 Finder 文件、标尺不算轨道、
   剪贴板只有一套且不写纯文本）：`checks/timeline-clipboard-wiring.sh`。
-- 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）：`scripts/check-still-clip-encode.sh`。
+- 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）, and a transparent still being one encoded frame shared by 120 samples (`SharedFrame.swift`: identical ffmpeg frames to writing
+  every frame under export-style trims and identical AVFoundation decode, one frame big, layouts the rewrite does not know refused and
+  left untouched, six factory conversions at once)：`scripts/check-still-clip-encode.sh`。
 - 翻译配对预检与接线：`scripts/check-translation-preflight.sh`。
 - 音频库清单：解析的宽容边界（不认识的字段忍、单条坏数据跳过、**版本号更高整份
   拒绝**）与双语搜索（中英都能命中同一个 tag、多词是「与」），以及音效清单的 `title_zh` / `hit` / `owned` 不署名 / 按中文标题搜：
