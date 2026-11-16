@@ -351,18 +351,34 @@ require "导出图里的形状走 ShapeOverlayExport" \
 require "形状和文字叠进导出图只有 OverlayExportFile 一份接法" \
   Sources/SrtFlow/VideoEditExportGraph.swift 'OverlayExportFile\.append\('
 
-# 带透明的静帧（2026-10-03，docs/bugfixes/2026-10-03-png-transparency-lost.md）：认它只问 isAlphaStill；预览垫黑底（取帧器看不见
-# 暗绿，自检够不着，只能在这里钉）、「盖满画布不透明」把它排除、导出叠之前反预乘、带关键帧的段用它自己的遮罩当 matte。
-require "预览给带透明的静帧垫黑底（不垫的话播放器里透明处是暗绿）" \
-  Sources/SrtFlow/VideoEditCompositionBuilder.swift '\|\| \$0\.clip\.isAlphaStill'
-require "盖满画布且不透明的判据把带透明的静帧排除（叠化 / 擦除走近似路径）" \
-  Sources/SrtFlow/VideoEditModels.swift '!needsPerFrameAnimation, !isAlphaStill'
-require "导出叠带透明的静帧之前先标明预乘、缩放完反预乘" \
-  Sources/SrtFlow/VideoEditExportTransform.swift 'unpremultiply=inplace=1'
+# 带透明的段（2026-10-03 透明静帧、2026-11-16 带透明的视频，docs/architecture/freeze-frame.md 第 4a3 节）：静帧和视频一个判断
+# `EditClip.sourceAlpha`（透明静帧按 StillAlphaNaming 认、视频看文件里的标记）；预览垫黑底（取帧器看不见暗绿，自检够不着，只能在
+# 这里钉）、「盖满画布不透明」把它排除、导出叠之前换成预乘 / 缩放完反预乘、带关键帧的段用源自己的遮罩当 matte。
+require "预览给带透明的段垫黑底（不垫的话播放器里透明处是暗绿）" \
+  Sources/SrtFlow/VideoEditCompositionBuilder.swift '\|\| \$0\.clip\.sourceAlpha != \.opaque'
+require "盖满画布且不透明的判据把带透明的段排除（叠化 / 擦除走近似路径）" \
+  Sources/SrtFlow/VideoEditModels.swift '!needsPerFrameAnimation, sourceAlpha == \.opaque'
+require "带透明的静帧只按 StillAlphaNaming 认、认作预乘" \
+  Sources/SrtFlow/VideoEditModels.swift 'StillAlphaNaming\.isAlphaStill\(sourceURL\)'
+require "静帧和视频一个判断：透明静帧是预乘、视频看探测时读的标记" \
+  Sources/SrtFlow/VideoEditModels.swift 'return stillImageURL == nil \? info\?\.alpha \?\? \.opaque : \.opaque'
+require "认文件里的标记：没有 almo 盒子的按预乘（不信 CoreMedia 补的「直通」）" \
+  Sources/SrtFlow/MediaProbe.swift 'atoms\?\["almo"\] != nil && mode == '
+require "导出叠带透明的段之前换成预乘的画面（预乘的标明、直通的先预乘）" \
+  Sources/SrtFlow/VideoEditExportTransform.swift 'steps \+= premultipliedEntry\(clip\.sourceAlpha\)'
+require "导出叠带透明的段：缩放完反预乘" \
+  Sources/SrtFlow/VideoEditExportTransform.swift 'if clip\.sourceAlpha != \.opaque \{ steps\.append\("unpremultiply=inplace=1"\) \}'
+require "主轨的轻量路径丢 alpha 之前也换成预乘（直通的源压在黑底上）" \
+  Sources/SrtFlow/VideoEditExportGraph.swift 'ExportTransformChain\.premultipliedEntry\(clip\.sourceAlpha\)'
 require "带关键帧的透明静帧用它自己的遮罩当 matte" \
   Sources/SrtFlow/VideoEditPrerender.swift 'StillAlphaNaming\.matteURL\(forStill:'
-require "带透明的静帧只按 StillAlphaNaming 认" \
-  Sources/SrtFlow/VideoEditModels.swift 'StillAlphaNaming\.isAlphaStill\(sourceURL\)'
+require "带关键帧的带透明视频用逐帧抽的遮罩当 matte" \
+  Sources/SrtFlow/VideoEditPrerender.swift 'AlphaSourceCopies\.url\(\.matte, for: source\.sourceURL\)'
+require "直通的段在 AVFoundation 那一边插预乘副本" \
+  Sources/SrtFlow/CompositionSource.swift 'alpha == \.straight, let premultiplied = await AlphaSourceCopies\.url\(\.premultiplied'
+for f in Sources/SrtFlow/VideoEditCompositionBuilder.swift Sources/SrtFlow/VideoEditExportGraph.swift; do
+  require "渲染的入口补认老段的透明（预览合成和导出图同一个函数）" "$f" 'CompositionSource\.resolvingAlpha\(in: state'
+done
 
 # 可听性只有一份合同：快照判「有没有声音」只能用 EditClip.hasAudio。
 require "可听快照必须用 clip.hasAudio" \

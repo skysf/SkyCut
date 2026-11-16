@@ -23,6 +23,7 @@ import SrtFlowCore
 //    没了的，东西留在原地不动 —— 字幕句除外（第 5 条）。
 // 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半就删，裁切让它没了的也删（2026-10-15，`LinkageCueFollow`）；
 //    底下的段整个没了又不是真删才留在原地、报出来。
+// 6. 一段画面自己分出去的声音（J / L 切伸到隔壁镜头底下的也是）跟着那段画面走，不看底下压着哪几段（2026-11-16，`LinkagePartnerSound`）。
 // 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift、LinkageCues.swift）。
 
 enum TimelineLinkage {
@@ -205,7 +206,11 @@ enum TimelineLinkage {
         let oldClips = Dictionary(before.laneClips.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for clip in after.laneClips {
             guard let old = oldClips[clip.id], old == clip else { continue }
-            Plan.take(ledger.outcome(for: old.span, deletesContent: deletesContent), id: clip.id, start: old.timelineStart, into: &plan.clips)
+            // 规矩 13：一段画面自己分出去的声音（J / L 切伸到隔壁镜头底下的也是）跟着那段画面走，不看底下压着哪几段。
+            let own = LinkagePartnerSound.outcome(of: old, before: before, after: after, deletesContent: deletesContent) {
+                ledger.outcome(for: $0.span, deletesContent: deletesContent)
+            }
+            Plan.take(own ?? ledger.outcome(for: old.span, deletesContent: deletesContent), id: clip.id, start: old.timelineStart, into: &plan.clips)
         }
         let oldShapes = Dictionary(before.shapes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for shape in after.shapes {
@@ -291,23 +296,24 @@ enum TimelineLinkage {
             )
         }
 
+        /// 记下的起点不夹：段挪到时间线开头之前的那一截要裁掉头（`movedForLinkage`），别的东西照旧夹在 0。
         static func take(_ outcome: Outcome, id: UUID, start: Double, into kind: inout Kind) {
             switch outcome {
             case .stay: break
-            case .move(let delta): kind.moves[id] = max(0, start + delta)
+            case .move(let delta): kind.moves[id] = start + delta
             case .delete: kind.deletes.insert(id)
             }
         }
 
         func apply(to state: inout TimelineState) {
             for id in clips.deletes { state.remove(id) }
-            for (id, start) in clips.moves { state.update(id) { $0.timelineStart = start } }
+            for (id, start) in clips.moves { state.update(id) { $0.moveForLinkage(to: start) } }
             if !shapes.deletes.isEmpty { state.shapes.removeAll { shapes.deletes.contains($0.id) } }
-            for (id, start) in shapes.moves { state.updateShape(id) { $0.timelineStart = start } }
+            for (id, start) in shapes.moves { state.updateShape(id) { $0.timelineStart = max(0, start) } }
             if !texts.deletes.isEmpty { state.textOverlays.removeAll { texts.deletes.contains($0.id) } }
-            for (id, start) in texts.moves { state.updateTextOverlay(id) { $0.timelineStart = start } }
+            for (id, start) in texts.moves { state.updateTextOverlay(id) { $0.timelineStart = max(0, start) } }
             if !filters.deletes.isEmpty { state.filters.removeAll { filters.deletes.contains($0.id) } }
-            for (id, start) in filters.moves { state.updateFilter(id) { $0.timelineStart = start } }
+            for (id, start) in filters.moves { state.updateFilter(id) { $0.timelineStart = max(0, start) } }
             if !cues.deletes.isEmpty || !cues.timings.isEmpty {
                 state.editSubtitleTracks { original, companion in
                     SubtitleTrackEditing.removeCues(ids: cues.deletes, original: &original, companion: &companion)
@@ -362,6 +368,44 @@ enum TimelineLinkage {
     }
 }
 
+// MARK: - 规矩 13：一段画面分出去的声音跟着它自己的画面走
+//
+// 管什么：音频轨上的一段声音如果是某段画面**自己**分出去的（同一个链接组、同一个文件、「源 ↔ 时间线」的换算和画面对得上 ——
+// 分离音频、add_clips sound=separate、set_transition 的 sound 分出来的都是），联动收尾时它按**那段画面**挪了多少挪，
+// 不按它底下压着哪几段主轨块（规矩 2、3）。
+// 为什么（docs/bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md）：J / L 切的声音会伸到隔壁镜头底下，
+// 跨在两段主轨块上；磁吸开着时调换镜头、裁隔壁那段，自己那段画面被排挪了、隔壁那段没挪（或挪了别的量），按「底下的画面全部
+// 挪同一个量才跟」它就留在原地 —— 声音和自己的画面错开一整段。显式的链接组本来就说「更强、拉开了也跟」（timeline-linkage.md 一）。
+// 不管什么：别的东西怎么跟（`TimelineLinkage.followMain`）、这次操作自己碰过的不再碰（规矩 5，调用方只问没碰过的）。
+
+enum LinkagePartnerSound {
+    /// 这段声音是哪段画面分出去的：同组、同文件、有画面、换算对得上（速度一样、同一个源时刻在时间线上同一刻）。不是就 nil。
+    static func picture(of sound: EditClip, in state: TimelineState) -> EditClip? {
+        guard sound.isAudioOnly, let group = sound.linkGroup else { return nil }
+        return state.allClips.first { picture in
+            picture.linkGroup == group && !picture.isAudioOnly && picture.sourceURL == sound.sourceURL
+                && abs(picture.speed - sound.speed) < 1e-9
+                && abs(picture.timelineTime(atSource: 0) - sound.timelineTime(atSource: 0)) <= TimelineLinkage.epsilon
+        }
+    }
+
+    /// 这段声音这次该怎么办：跟着它的画面挪同样多（画面的换算挪了多少就是多少；裁头尾不挪）；画面被真删了就删、
+    /// 不是真删就留着；画面变了速、换了文件、或者画面本身是被联动挪的（`pictureOutcome` 给它那一份），照画面那一份。
+    /// 不是哪段画面分出去的声音回 nil，调用方照老规矩按底下的画面算。
+    static func outcome(
+        of sound: EditClip, before: TimelineState, after: TimelineState, deletesContent: Bool,
+        pictureOutcome: (EditClip) -> TimelineLinkage.Outcome
+    ) -> TimelineLinkage.Outcome? {
+        guard let was = picture(of: sound, in: before) else { return nil }
+        guard let now = after.clip(with: was.id) else { return deletesContent ? .delete : .stay }
+        // 画面这次没被碰过（上层轨的画面，等着联动挪）：声音和它拿同一份。
+        if now == was { return before.mainClips.contains(where: { $0.id == was.id }) ? .stay : pictureOutcome(was) }
+        guard abs(now.speed - was.speed) < 1e-9, now.sourceURL == was.sourceURL else { return nil }
+        let delta = now.timelineTime(atSource: 0) - was.timelineTime(atSource: 0)
+        return abs(delta) <= TimelineLinkage.epsilon ? .stay : .move(by: delta)
+    }
+}
+
 // MARK: - 各种块的时间段（只给联动用的小读法）
 
 extension TimelineState {
@@ -371,6 +415,23 @@ extension TimelineState {
 
 extension EditClip {
     var span: TimelineSpan { TimelineSpan(start: timelineStart, end: timelineEnd) }
+
+    /// 联动把这段挪到 `start`。挪到时间线开头之前的那一截头裁掉（入点跟着挪、头上的渐入减掉裁去的那么多），不整段往后错开 ——
+    /// 以前一律夹在 0：J 切伸到第一个镜头之前的声音整段晚了那么多，和自己的画面对不上（规矩 13 的案例）。整段都在 0 之前（少见）照旧夹在 0。
+    mutating func moveForLinkage(to start: Double) {
+        guard start < 0, start + timelineDuration > 0 else {
+            timelineStart = max(0, start)
+            return
+        }
+        // 窗口按「挪过去之后时间线 0 那一刻是素材的第几秒」重新定（同 AI 改入出点给绝对值的写法），换算不变。
+        let sourceEnd = sourceStart + sourceDuration
+        timelineStart = start
+        let firstHeard = sourceTime(atTimeline: 0)
+        sourceStart = firstHeard
+        sourceDuration = sourceEnd - firstHeard
+        fadeInDuration = max(0, fadeInDuration + start)
+        timelineStart = 0
+    }
 }
 
 extension ShapeAnnotation {

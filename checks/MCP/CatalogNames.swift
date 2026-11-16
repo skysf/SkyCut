@@ -80,6 +80,9 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["language_detected", "language_undetected"])
     // user_requested_overrides 没免掉确认时，确认结果里说为什么（SkyStudioJobGate，2026-11-10）。
     names.insert("overrides_not_applied")
+    // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
+    names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
+                     "extended_frames", "levels_db", "skipped_no_sound"])
     // inspect_video 只拿人声判切在说话上（2026-11-16，MCP-14，AIInspectionSpeech）：疑点种类 audio_cutoff、没有人声证据的 speech_unchecked。
     names.formUnion(["audio_cutoff", "speech_unchecked"])
     return names

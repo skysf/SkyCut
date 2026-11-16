@@ -35,6 +35,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditClipPlacement.swift \
   Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
   Sources/SrtFlow/StillAlphaNaming.swift \
@@ -111,6 +112,7 @@ xcrun swiftc \
   checks/TimelineSnap/LinkageCaptions.swift \
   checks/TimelineSnap/LinkageCues.swift \
   checks/TimelineSnap/LinkageSwap.swift \
+  checks/TimelineSnap/LinkagePartner.swift \
   checks/TimelineSnap/Magnet.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

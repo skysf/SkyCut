@@ -104,63 +104,6 @@ enum ClipTransition: String, CaseIterable, Identifiable, Hashable, Sendable {
     }
 }
 
-// MARK: - 自由变换
-
-/// 画面段在输出画布上的自由摆放：中心和宽高都是相对画布的 0…1 归一化值。
-///
-/// `nil`（不设）表示默认布局 —— 等比铺满居中（所有视频轨同一份账）。
-/// 一旦用户在预览里拖过缩放框，
-/// 就换成这份显式的摆放；预览（AVFoundation 变换）和导出（ffmpeg scale+overlay）
-/// 都按同一份归一化值换算，所见即所得。宽高各自独立 —— 拉边把手允许变形。
-struct ClipPlacement: Hashable, Sendable {
-    var centerX: Double
-    var centerY: Double
-    /// 相对画布宽的比例。
-    var width: Double
-    /// 相对画布高的比例。
-    var height: Double
-
-    /// 画布上的像素框。
-    func frame(in canvas: CGSize) -> CGRect {
-        CGRect(
-            x: (centerX - width / 2) * canvas.width,
-            y: (centerY - height / 2) * canvas.height,
-            width: width * canvas.width,
-            height: height * canvas.height
-        )
-    }
-
-    init(centerX: Double, centerY: Double, width: Double, height: Double) {
-        self.centerX = centerX
-        self.centerY = centerY
-        self.width = width
-        self.height = height
-    }
-
-    init(frame: CGRect, in canvas: CGSize) {
-        guard canvas.width > 0, canvas.height > 0 else {
-            self.init(centerX: 0.5, centerY: 0.5, width: 1, height: 1)
-            return
-        }
-        self.init(
-            centerX: frame.midX / canvas.width,
-            centerY: frame.midY / canvas.height,
-            width: frame.width / canvas.width,
-            height: frame.height / canvas.height
-        )
-    }
-
-    /// 兜住失控的值：尺寸别缩没，中心别整个飞出画面。
-    var clamped: ClipPlacement {
-        ClipPlacement(
-            centerX: min(max(centerX, 0), 1),
-            centerY: min(max(centerY, 0), 1),
-            width: min(max(width, 0.02), 4),
-            height: min(max(height, 0.02), 4)
-        )
-    }
-}
-
 // MARK: - 剪辑
 
 /// 时间线上的一段素材。
@@ -385,14 +328,22 @@ struct EditClip: Identifiable, Hashable, Sendable {
     /// 动画的段同样保守走近似路径（逐时刻判定不值得）。
     func coversCanvasOpaquely(canvas: CGSize) -> Bool {
         guard opacity >= 0.999, abs(rotationDegrees) <= 0.01, !isAnimated,
-              !hasVideoFade, !needsPerFrameAnimation, !isAlphaStill else { return false }
+              !hasVideoFade, !needsPerFrameAnimation, sourceAlpha == .opaque else { return false }
         let frame = resolvedPlacement(canvas: canvas).frame(in: canvas)
         return frame.minX <= 0.5 && frame.minY <= 0.5
             && frame.maxX >= canvas.width - 0.5 && frame.maxY >= canvas.height - 0.5
     }
 
-    /// 素材是带透明的静帧（透明 PNG 转出来的预乘 ProRes 4444，`StillAlphaNaming`）：预览要垫黑底、盖不满画布、导出先反预乘。
+    /// 素材是带透明的静帧（透明 PNG 转出来的预乘 ProRes 4444，`StillAlphaNaming`）：带关键帧时 matte 用它自己的那份遮罩。
     var isAlphaStill: Bool { stillImageURL != nil && StillAlphaNaming.isAlphaStill(sourceURL) }
+
+    /// 画面带不带透明、存的是预乘还是直通 —— **静帧和视频一个判断**：透明静帧是自己转的预乘 ProRes（ffmpeg 不写标记），
+    /// 别的静帧不透明，视频看文件里的标记（`MediaInfo.alpha`）。预览垫黑底、盖不满画布、换预乘副本、导出怎么叠、
+    /// 预渲染的遮罩都只问它（docs/architecture/freeze-frame.md 第 4a3 节）。
+    var sourceAlpha: SourceAlpha {
+        if isAlphaStill { return .premultiplied }
+        return stillImageURL == nil ? info?.alpha ?? .opaque : .opaque
+    }
 
     /// 此刻实际生效的画面摆放：用户摆过的优先；没摆过按默认布局换算。
     /// 预览里的选中框和拖动起点都从这里取，跟合成/导出的默认摆法一致。
@@ -697,30 +648,6 @@ extension ClipTransition: LenientCodableEnum {
 
 extension CanvasRatio: LenientCodableEnum {
     static var decodingFallback: CanvasRatio { .auto }
-}
-
-extension ClipPlacement: Codable {
-    private enum CodingKeys: String, CodingKey {
-        case centerX, centerY, width, height
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.init(
-            centerX: try c.decodeIfPresent(Double.self, forKey: .centerX) ?? 0.5,
-            centerY: try c.decodeIfPresent(Double.self, forKey: .centerY) ?? 0.5,
-            width: try c.decodeIfPresent(Double.self, forKey: .width) ?? 1,
-            height: try c.decodeIfPresent(Double.self, forKey: .height) ?? 1
-        )
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(centerX, forKey: .centerX)
-        try c.encode(centerY, forKey: .centerY)
-        try c.encode(width, forKey: .width)
-        try c.encode(height, forKey: .height)
-    }
 }
 
 extension EditClip: Codable {

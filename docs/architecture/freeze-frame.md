@@ -153,7 +153,9 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
 解码和编码在 CI 的共享 runner 上各有各的快慢，正确的实现被判红过两次（[案例](../bugfixes/2026-11-11-still-clip-encode-timing-flake.md)）。
 能数的（解码次数）就数，不拿时间去推。
 
-### 4a3. 真用到了透明的图：预乘的 ProRes 4444 + 一份灰度遮罩（2026-10-03）
+### 4a3. 带透明的段：透明静帧（预乘的 ProRes 4444 + 一份灰度遮罩）和带透明的视频
+
+这一节是「带透明的段」的唯一一份规矩（2026-10-03 透明静帧，2026-11-16 推广到带透明的视频）；关键帧、优化媒体、预览自由变换那几份文档链到这里。
 
 透明 PNG 的台标、圆环、字幕条以前和别的图一样转成 H.264 yuv420p —— 没有 alpha，透明的地方成了黑方块
 （[案例](../bugfixes/2026-10-03-png-transparency-lost.md)）。现在：
@@ -167,11 +169,45 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
 - **起名只有 `StillAlphaNaming` 一份**：`<指纹>-alpha-v1.mov` / `-alpha-native-v1.mov`，遮罩同名接 `-matte.mp4`；
   带 alpha 通道其实全不透明的叫 `-opaque-v1.mp4` / `-opaque-native-v1.mp4`（编码同老的）。**带 alpha 通道的图不再认老名字**
   （`-v3.mp4` 里混着透明图转成的黑方块）：打开老工程时重转一次。透明静帧要连遮罩一起在才算命中。
-- **认它只问 `EditClip.isAlphaStill`**：预览垫黑底（`needsOpaqueBase`）、「盖满画布且不透明」把它排除、导出叠之前
-  `setparams=alpha_mode=premultiplied` + 缩放完 `unpremultiply=inplace=1`（`ExportTransformChain`；ffmpeg 8 起 unpremultiply
-  看帧上的 alpha_mode，不标就原样放过去）、带关键帧的段 matte 用这份遮罩（[关键帧动画](keyframe-animation.md)「导出」）。
-  主轨上的透明静帧不用另做：主轨那条路收尾 `format=yuv420p` 丢掉 alpha，预乘过的颜色就是「压在黑底上」。
+- **认透明静帧只问 `EditClip.isAlphaStill`**（按名字），它带关键帧时 matte 用这份遮罩。怎么叠见下面「带透明的段」。
 - 改编码参数（codec、像素格式、帧率、几何）要给 `StillAlphaNaming` 的名字 +1 版本。
+
+**带透明的段（静帧和视频一个判断，2026-11-16，[案例](../bugfixes/2026-11-16-alpha-video-premultiplied-or-straight.md)）**。
+以前预览一律当预乘、导出只给透明静帧反预乘，带透明的视频（ProRes 4444、HEVC 带透明）存预乘的成片发暗、存直通的预览发白。规矩：
+
+1. **认文件里的标记，只有 `SourceAlpha` 一处**（`MediaProbe.swift`）。AVFoundation 写带透明的 ProRes 4444 / HEVC 时在样本描述里放
+   `almo` 盒子（预乘 `0x0102`、直通 `0x0100`）。有 alpha 通道、有盒子 → 按盒子；**没有盒子 → 按预乘**（ffmpeg 写的 ProRes —— 透明静帧
+   就是 —— 和 `concat -c copy` 接过的都没有，内容多半是预乘的；这时 CoreMedia 的 `AlphaChannelMode` 照样报「直通」，**不许信它补的值**）。
+   探测时写进 `MediaInfo.alpha`；老工程没记的，预览合成和导出图在入口用同一个函数补认（`CompositionSource.resolvingAlpha`，只认要画的段）。
+2. **静帧和视频一个判断：`EditClip.sourceAlpha`**（透明静帧按名字认作预乘，别的静帧不透明，视频看 `MediaInfo.alpha`）。
+   垫黑底（`needsOpaqueBase`）、「盖满画布且不透明」把它排除、导出怎么叠、预渲染的 matte、优化媒体，都只问它。
+3. **预览、AI 的 look、带关键帧段的预渲染（AVFoundation 那一边）一律给预乘的源**：默认合成器只认预乘、没有「按标记预乘」的开关（解码器
+   不替你预乘，图层指令只有整层的不透明度），自写合成器产品不许。所以直通的源换成一份预乘的 ProRes 4444 副本（`AlphaSourceCopies`，
+   `CompositionSource.track` 里换）：逐帧照抄时间戳和旋转矩阵（段的时间账、几何一个数都不换算），颜色标记照抄解码器给第一帧标的
+   （原片没写时那是猜的，写死 709 饱和色偏 10 级），按「路径 + 文件身份 + 版本」缓存在 `~/Library/Caches/SrtFlow/AlphaSources/`，同一份
+   只转一次，在 `MediaReadQueue.alpha` 上跑；转不出来退回原片（亮一点，不黑、不丢段）。**成片读原片**。改转法要 +1 `AlphaSourceCopies.version`。
+4. **导出：在预乘的画面上裁切缩放，叠之前反预乘**（`ExportTransformChain.premultipliedEntry`）：预乘的先 `setparams=alpha_mode=premultiplied`，
+   直通的先 `setparams=alpha_mode=straight` 再 `premultiply=inplace=1`；缩放完 `unpremultiply=inplace=1` 交给 overlay（它按直通混合）。
+   ffmpeg 8 起 premultiply / unpremultiply 看帧上的 alpha_mode，**不标就原样放过去**；`format=rgba`、裁切、缩放都带着它走。
+   主轨的轻量路径收尾 `format=yuv420p` 丢 alpha 之前也走第一步（= 压在黑底上，和预览垫的黑底一样）。
+   **别用 `overlay=alpha=premultiplied`**：ffmpeg 9.0.2 在 RGB 下叠连不透明的像素都偏 17 级（试验实测）。
+   本仓库的 ffmpeg 8.1 把苹果的 HEVC 带透明解成 `yuva420p`（带 alpha 平面），导出图就是这样拿到透明度的。
+5. **带关键帧的段：matte 是源自己的 alpha** —— 透明静帧用它的遮罩，带透明的视频用 `AlphaSourceCopies` 逐帧抽的灰度片（ProRes 422，
+   时间戳和几何同源），裁切、翻转、时间、关键帧照抄（[关键帧动画](keyframe-animation.md)「导出」）。纯白的话透明处就是黑方块。
+6. **优化媒体不碰带透明的源**：代理是 H.264、没有 alpha（HEVC 带透明是长 GOP，以前会被转）。`needsProxy` 不转，`CompositionSource`
+   对带透明的段也不给块（老工程转过的块不换进来）（[优化媒体](optimized-media.md)）。
+7. **预览垫黑底**：带透明的段和透明静帧一样垫。2026-11-16 本机（macOS 26）真窗口里拍屏，不垫底也没出暗绿（连已知的「不透明度斜坡、
+   不垫底」也是黑的），量不出区别；按同一种源、同一条混合路径的规矩垫，代价只是有带透明的段时多一层黑底。
+
+回归：`scripts/check-video-fade.sh` 的 `AlphaStill.swift`、`AlphaVideo.swift`（预乘 / 直通 / 不写标记 × ProRes 4444 / HEVC，静态、不透明度、
+渐变、奇数边裁切 + 缩小、关键帧、入场动画、单独在 V1、老段、2560×1440、硬件编码、优化媒体的块，预览和成片各和参考比；做不出 HEVC 带透明
+或用不了硬件编码的机器明说 `SKIP`）；接线：`checks/project-file-wiring.sh`、`checks/optimized-media-wiring.sh`。
+
+人工回归（发版前实机）：
+
+- [ ] 网页动效渲的带透明视频（预乘、直通各一份）放 V2 压在真实画面上：预览里光、羽化、闪白和成片一样（不发白、不发灰），透明处露出下面。
+- [ ] 同一段放 V1、下面什么都没有：真播放器窗口里透明处是黑的，不是暗绿。
+- [ ] 直通的一段第一次放上去：预览先等副本（片名级一两秒），之后改别的不再等；`~/Library/Caches/SrtFlow/AlphaSources/` 清掉再播，照样对。
 
 ## 4b. 分辨率政策只有一个判据
 
