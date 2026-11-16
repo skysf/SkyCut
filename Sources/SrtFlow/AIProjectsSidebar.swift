@@ -145,7 +145,7 @@ private struct AIProjectSidebarStatus {
             (text, icon, detail) = (L10n("Stopped"), "stop.circle", nil)
         } else if let waiting {
             (text, icon, detail) = (L10n("Needs you"), "hand.point.up.left", waiting)
-        } else if let job = jobs.first, AIWorkQueue.shared.position(of: job.id) != nil {
+        } else if let job = jobs.first, AIWorkQueue.shared.position(of: job.id) != nil || job.inLine?() != nil {
             // 排着队、还没开始（导出器、转写、翻译一次只做一件）：别写成「导出中」。
             (text, icon, detail) = (L10n("Waiting in line"), "hourglass", nil)
         } else if let job = jobs.first {
@@ -170,7 +170,7 @@ private struct AIProjectSidebarStatus {
         case .generate, .voiceDesign, .voiceEnroll, .voiceChange: return L10n("Generating")
         case .voiceover: return L10n("Voiceover")
         case .transcript: return L10n("Transcribing")
-        case .inspection, .shots, .compress, .voices, .burnIn, .screenRecording: return L10n("Working")
+        case .inspection, .shots, .compress, .voices, .burnIn, .screenRecording, .look: return L10n("Working")
         }
     }
 }

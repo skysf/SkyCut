@@ -1,7 +1,7 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - AI 起的长任务：导出、生成字幕、翻译、压缩、烧录、转写、找镜头、录屏
+// MARK: - AI 起的长任务：导出、生成字幕、翻译、压缩、烧录、转写、找镜头、录屏；a look that takes long (AILookCall)
 //
 // 管什么：任务号、进度、结局。工具起了任务就立刻回任务号（客户端对一次调用大多只等一分钟），
 // AI 用 get_job 等结果。结局在任务结束的**那一刻**记下（由各工具挂的完成回调写），
@@ -22,6 +22,8 @@ final class AIJobs {
         case voiceEnroll = "voice_enroll"
         /// 变声（VoiceChangeJob）：把一段的人声换成另一个声音，做完两条新音频轨、原声静音。
         case voiceChange = "voice_change"
+        /// A look not done within about 25 s (AILookCall): its result and picture come with get_job.
+        case look
     }
 
     enum Status: String {
@@ -55,6 +57,9 @@ final class AIJobs {
         var refresh: (@MainActor () async -> Void)?
         /// 检查任务的疑点拼图；跟结局一起冻结，后来的工程和导出不改它。
         var images: [Data] = []
+        /// Still waiting in the router's lines (a look that became a job before its turn, AILookCall): its position (1 = next)
+        /// and which call holds the line; nil once it runs.
+        var inLine: (@MainActor () -> (position: Int, waitingFor: String?)?)?
         /// 跑着的时候别让 App Nap 降速（AIKeepAwake）：start 领、finish 还。
         fileprivate var awake: AIKeepAwake.Lease?
 
@@ -157,6 +162,13 @@ final class AIJobs {
             object["status"] = "queued"
             object["queue_position"] = .number(Double(position))
             object.merge(job.liveDetail()) { current, _ in current }
+            return .object(object)
+        }
+        // A look waiting in the router's lines (AILookCall): its place and what holds the line.
+        if job.status == .running, let line = job.inLine?() {
+            object["status"] = "queued"
+            object["queue_position"] = .number(Double(line.position))
+            if let holder = line.waitingFor { object["waiting_for"] = .string(holder) }
             return .object(object)
         }
         if job.status == .running, let progress = job.progress() {

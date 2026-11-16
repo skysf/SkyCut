@@ -127,7 +127,9 @@ enum MCPGuideOutputTopics {
             MCPGuideSection(name: "waiting", about: "wait_seconds, waiting instead of restarting, the shared queue", text: """
             Waiting. wait_seconds (up to 30) waits for the job before answering; keep calling get_job instead of starting the \
             job again. Exports, transcriptions (subtitles, transcripts) and translations run one at a time across all projects: \
-            a later one shows status queued with queue_position (1 = next) and starts by itself.
+            a later one shows status queued with queue_position (1 = next) and starts by itself. A look still working after about \
+            25 seconds is a job too (kind look): while it waits behind earlier calls on its project it shows status queued, \
+            queue_position and waiting_for; when done its answer is under result, with the picture.
             """),
             MCPGuideSection(name: "user", about: "waiting_for_user and what to tell the user", text: """
             The user. If the job shows waiting_for_user (for example a language download only the user can click), tell the user \

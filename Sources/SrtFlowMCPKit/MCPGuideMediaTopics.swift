@@ -132,6 +132,16 @@ enum MCPGuideMediaTopics {
             outside the opened folder ask once (needs_confirmation). A video SkyCut cannot open (for example HEVC stored as hev1) is \
             reported with the reason: convert it with compress_videos first. Vision guesses are often wrong on generated or unusual \
             pictures.
+            """),
+            // docs/architecture/ai-control-mcp.md section 4 item 12; docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md.
+            MCPGuideSection(name: "slow_looks", about: "a look still working after about 25 s: job_id, queue_position, waiting_for, cancel_job", text: """
+            Slow looks. A look still working after about 25 seconds (waiting behind earlier edits on its project, or rendering on a busy \
+            Mac) answers with job_id instead of the picture: status running, or queued with queue_position (1 = next) and waiting_for \
+            (the call it waits behind). Call get_job with that job_id and wait_seconds 30 until the status is done: the look's own answer \
+            is under result and the picture comes with it. Do not send the same look again; cancel_job stops it, and a queued look then \
+            never starts. Looks do not wait for each other: several looks on one project, or from several AI sessions, run side by side. \
+            A look waits only for the edits sent before it, and edits sent after it do not wait for its frames; shots=true is the \
+            exception and keeps its project's calls waiting until it is done.
             """)
         ],
         examples: [

@@ -485,6 +485,14 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
    （单声道 16-bit WAV、`voice_convert_source`、PUT 不带 Key）、一次 `voice_convert`（`max_credits` 是报价）、做完两条新音频轨、原段静音、
    两个文件在源文件旁边（撞名加编号）、`undo` 一步回去、账按实收、不认识的声音收费之前拒。假服务把传上去的那段源音频原样当成人声和背景回来
    （`voice_fixtures.py` 的 `finish_convert`），所以不验声音像不像；右键菜单、面板、任务浮层那一行、提示条走[声音库](../architecture/voice-library.md)第十节的人工回归。
+7a. Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `python3 scripts/gui-smoke/sky-studio/look_jobs.py`
+   drives the router's real path, which CI cannot reach (the license gate): two AI sessions each send two 12-frame looks at once and every
+   look answers within 30 s with its picture or a job_id whose get_job brings it; an edit sent right behind a look answers first; two looks
+   sent behind a long `edit_clips` (`fit=fill` on 20 clips) answer as queued jobs (`queue_position` 1 and 2, `waiting_for` names
+   edit_clips) when the edit takes longer than 25 s, `cancel_job` on the second says it never started, get_job brings the first's picture.
+   It makes its own one-keyframe 1080p clips; `edit_clips` with `fit=fill` runs Vision on every clip, so do not run it while the Mac is
+   already loaded by builds. On a fast Mac the edit may finish within 25 s: the script then says the queued case was not exercised
+   (`scripts/check-look-jobs.sh` covers it with real App objects).
 8. `scripts/gui-smoke/sky-studio/run.sh stop` 清理测试 App / 服务、测试钥匙串项和测试域设置。App 按完整路径停，服务器 PID 必须先核对脚本 / 端口 / assets 目录；不能只凭旧 PID 直接 kill。测试文件留在 `/private/tmp/srtflow-skystudio-smoke/` 可复盘。
 
 清理器本身的自动检查必须同时隔离进程、钥匙串、偏好与文件删除。`SKYSTUDIO_SMOKE_DIR` 不会改变
