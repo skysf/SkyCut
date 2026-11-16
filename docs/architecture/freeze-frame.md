@@ -108,6 +108,13 @@ image clip is always centred on the cut ([transition handles](transition-handles
 源帧率（算上变速）判断，`insertFreeze` 拿掉它、后面的内容少挪这一截（不留缝）；后面接着转场、不知道帧率的不动。
 够一帧的右半照旧留着 —— 那是还在动的画面和声音，删不删由人定（AI 的结果里带 `tail_id`）。
 
+**The right piece after the hold keeps no link group** (2026-11-17, [case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md)).
+The freeze cuts only its target and moves the right piece on by the hold, while that clip's partners (its separated sound, a
+recording's mic) stay where they were, so the right piece is no longer their pair. While it kept the group, deleting it (what the
+`tail_id` note suggests) also deleted the clip and its sound, and the AI's ripple dragged the clip back onto its neighbour on V1.
+The left piece and the partners stay a pair; a freeze at the first frame cuts nothing and keeps the group (linkage then moves the
+partners along with the clip). Checks: `checks/FreezeFrame/LinkChecks.swift`, `checks/MCP/FreezeRippleChecks.swift`.
+
 ## 4a. 为什么牵扯转场的主轨段不给定格
 
 禁用最初的理由是声画错位：转场时长有个「不超过两边任一段 45%」的上限

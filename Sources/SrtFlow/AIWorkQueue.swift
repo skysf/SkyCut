@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - 一次只能做一个的活，给 AI 排队（导出、转写 / 生成字幕、翻译）
+// MARK: - 一次只能做一个的活，给 AI 排队（导出、转写 / 生成字幕、翻译、listen 按层量混音）
 //
 // 管什么：导出器只有一个（`VideoEditExporter.shared`）、转写只有一个串行槽（`TranscriptionTask`）、翻译只有一个宿主（`TranslationJobCoordinator`）。
 // 以前 AI 遇上占着的直接报「已经在做了」，几个子代理剪几个工程时一个个撞墙、自己轮询重试。现在 AI 起的这三样**排队**：
@@ -17,6 +17,8 @@ final class AIWorkQueue {
 
     enum Lane: String {
         case export, transcription, translation
+        /// listen mix=true（AIListenMix）：按层离线渲一遍时间线，一次一个；界面上没有对应的活，道空不空只看 AI 起的那一个。
+        case mix
     }
 
     private struct Entry {
@@ -78,6 +80,8 @@ final class AIWorkQueue {
         case .translation:
             if #available(macOS 15.0, *), case .running = TranslationJobCoordinator.shared.phase { return false }
             return true
+        case .mix:
+            return true
         }
     }
 
@@ -86,7 +90,7 @@ final class AIWorkQueue {
         guard pump == nil else { return }
         pump = Task { @MainActor [weak self] in
             while let self, !self.waiting.isEmpty {
-                for lane in [Lane.export, .transcription, .translation] where self.laneIsFree(lane) {
+                for lane in [Lane.export, .transcription, .translation, .mix] where self.laneIsFree(lane) {
                     guard let index = self.waiting.firstIndex(where: { $0.lane == lane }) else { continue }
                     let next = self.waiting.remove(at: index)
                     self.active[lane] = next.jobID
