@@ -214,6 +214,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    **一次一个的活排队**（2026-10-17，[AI 多开方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 6、K 节；`AIWorkQueue`）：导出（导出器只有一个）、
    转写 / 生成字幕（一个串行槽）、翻译（一个宿主）占着时，AI 的调用不再回「已经在做了」：照样回任务号，`get_job` 报 `status: queued` 和
    `queue_position`（1 = 下一个），道空了自己开始、先来先做。界面上起的（导出面板、生成字幕面板）不进队、照旧在空着时直接开始，队里的等它们做完。
+   `listen mix=true` 的按层量（2026-11-16）排在第四条道 `mix` 上（界面上没有对应的活，道空不空只看 AI 起的那一个；第 13 条）。
    取消排着的只从队里拿掉，开始了的才去停那件事（`AIQueuedWork.cancel`，不然会停掉正在做的别人的那个）；排着的导出用的是调用那一刻的时间线，
    几个排着的导出各占各的文件名（`reservedOutputs`）。分镜本来就在 `MediaReadQueue.shots` 上排着、配旁白是同步工具，都不进这条队。
    `checks/ai-work-queue-wiring.sh` 钉着。
@@ -339,6 +340,21 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `suggested_source_out`（= cut_speech 落刀的地方、对齐到工程的帧，换回这一段 V1 片段自己的源时间，AI 直接拿去 edit_clip；落到素材外面的不给）。
      转写**只读缓存、不起任务**（listen 是只读工具），没有就说一句；波形要读完整个文件，没读完的那几头报「还在读」；一个素材文件只听一遍；一次最多
      80 个剪辑点。纯值在 `checks/MCP/CutCheckChecks.swift`、`checks/MCP/SpeechHearingChecks.swift`（L16 原片真量的电平），接线扫描在 `checks/MCP/listen-wiring.sh`。
+   - **混在一起之后的声音（`mix=true`，2026-11-16，待办总清单 MCP-3、MCP-10）**：前面几种都是一段一段各量各的、0.5 秒一格；`mix=true`
+     量整条混音和每一层、到帧，用的是 SkyCut 自己的音频引擎按层离线渲（和成片同一份配置、同一套限幅和响度量法，合同在
+     [成片的声音](export-audio-mixdown.md)第五节）。参数：`from` / `to`（时间线秒，落在帧上，不给就是整条）；`layers`（一项一层：`A1`、
+     `V1+V2`、`rest`，最多 12 层；不给就每条出声的轨一层，主轨叫 V1）；`clip_id` 是「这一段的那几秒、分成它那条轨和 rest」；`frames=true`
+     再给逐帧的数。`file` / `beats` / `cuts` 和它不同时用（报错说清楚）；不带 `mix` 给 `layers` / `frames` 也报错。
+     **回的东西**（`AIListenMixReport`，先摘要、逐帧的数只在要的时候）：混音的 `loudness_lufs`（限幅之后，= 导出的 `audio_loudness_lufs`）、
+     `max_momentary` / `max_short_term`（最响的 400 ms / 3 s 窗）、`peak_db` / `peak_at`（限幅之前，= 导出的 `audio_peak_dbfs`）、`loudest_at`
+     （最响那一帧的帧头）、`over`（限幅之前超过 −1 dBFS 的那几帧，连着的并成一段，带峰值和限幅器压了多少，最多列 20 段；**只报不拦**）、
+     `limited_seconds` / `max_reduction_db` / `output_peak_db`、粗曲线；每层的 `level_db`、`loudness_lufs`、`peak_db`、`peak_at`、`loudest_at`、
+     `bands_db`（low / low_mid / high_mid / high）。**回多大**（南极 62 秒、8 层实测）：摘要 1.6–2.4 KB；逐帧的数一次最多 2,400 个（混音每帧 4 个、
+     每层每帧 5 个，层越多帧越少：8 层 54 帧、1 层 266 帧），带逐帧的结果最多约 12 KB —— 一次读得完，又够看一个切点前后一两秒；超了按
+     [MCP 编辑参数合同](mcp-edit-parameters.md)拒绝（`invalid_parameter`，`suggested` 是放得下的 `to`，话里说可以少要几层）。`from` 过了结尾同样拒绝、
+     建议最后一帧的帧头。**长任务**：`AIJobs` 的 `listen` 任务（第 59 条）、`AIWorkQueue` 的 `mix` 道（一次一个），离线渲在 `MediaReadQueue.export` 上；
+     当场最多等 20 秒（62 秒、8 层约 1 秒，3 分钟约 3 秒），等不到回任务号，`get_job` 拿同一份结果。只读：不改工程、不进撤销、不碰预览的引擎。
+     名片 + 说明书 `listen` 主题的 `mix` 一节。量法在 `scripts/check-mix-layers.sh` 真跑，接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节。
 
 14. **读文稿（read_document，方案第 22 条）**：用户给的讲稿、大纲、卖点清单读成文字（`AIDocumentReader`）：PDF 用 PDFKit，
    Word / RTF / ODT 用系统的富文本导入，txt / md 按 [用户文本文件的编码](text-file-encoding.md) 读；Pages 和扫描件读不了，
