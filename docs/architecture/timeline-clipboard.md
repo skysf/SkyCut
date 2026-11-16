@@ -70,8 +70,10 @@
 链接关系就是「同一个组号」（`TimelineState.linkedClipIDs`：删除、拖动、裁切、检查器、复制都按它带上伙伴）。
 所以**分割不能原样抄组号**：一对（画面 + 分离出来的声音、录屏的画面 + 麦克风）切开之后是两对，不是四段连成一串。
 切都走 `LinkRegrouping.split`：切完把切到的组按时间上重叠重分，连在一起的一串一个组号（最早那串留原号），
-落单的段不再链接（[案例](../bugfixes/2026-09-28-split-links-every-piece-together.md)）。定格只切一段、不带伙伴，
-分出来和原来一样，不走它。代价：链接关着时把一对拉开到不重叠，之后再切其中一段，拉开的那一边会落单。
+落单的段不再链接（[案例](../bugfixes/2026-09-28-split-links-every-piece-together.md)）。The freeze does not use it: it
+cuts only its target and moves the right piece on by the hold while the partners stay put, so the right piece simply keeps no link
+group (2026-11-17, [case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md); before that it kept the group, and deleting
+the tail deleted the clip and its sound). 代价：链接关着时把一对拉开到不重叠，之后再切其中一段，拉开的那一边会落单。
 
 ## 四、回归
 
