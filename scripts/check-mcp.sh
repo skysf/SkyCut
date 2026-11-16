@@ -496,6 +496,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIParameterReport.swift \
   Sources/SrtFlow/AIOverlayParameterReport.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
+  Sources/SrtFlow/StillFrameSharing.swift \
   Sources/SrtFlow/AIRegionFraming.swift \
   Sources/SrtFlow/AIClipDetails.swift \
   Sources/SrtFlow/AITrackSettings.swift \

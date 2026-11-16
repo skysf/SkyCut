@@ -241,6 +241,10 @@ if let first = convert(bigImage, nativeResolution: false, name: "stable-1.mp4"),
 
 checkAlphaStills()
 
+// MARK: - A transparent still is one encoded frame shared by 120 samples (SharedFrame.swift)
+
+await checkSharedFrameStills()
+
 print("\(checks - failures)/\(checks) 通过")
 if failures > 0 {
     print("❌ \(failures) 项失败")

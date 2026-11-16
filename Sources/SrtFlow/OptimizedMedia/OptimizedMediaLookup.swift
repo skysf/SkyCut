@@ -3,13 +3,19 @@ import Foundation
 // MARK: - 优化媒体：builder 换源用的那张表（纯值）
 //
 // 管什么：按源文件记「哪几块已经转好、文件在哪」。builder 插画面时拿它问一段用到的块齐不齐
-//（`CompositionClipInsert`），齐了按块插、差一块插原片。
+//（`CompositionClipInsert`），齐了按块插、差一块插原片。Also whether this build is the preview's, which takes a straight-alpha
+// source's premultiplied copy only when it is ready (`readyAlphaCopiesOnly`).
 // 不管什么：转哪几块、先转哪块（OptimizedMediaPlan）、怎么转（OptimizedMediaTranscoder）、什么时候重建换源
 //（OptimizedMediaCoordinator）。长期约束见 docs/architecture/optimized-media.md。
 
 struct OptimizedMediaLookup: Sendable, Equatable {
     /// 源路径 → 已转好的块（块号 → 块文件）。
     var chunks: [URL: [Int: URL]] = [:]
+    /// Preview only (only the coordinator sets it, in both modes): a straight-alpha source whose premultiplied copy is not on
+    /// disk yet goes in as the original — no waiting for the copy (semi-transparent edges a little bright for a moment); the
+    /// coordinator makes the copy and swaps it in while stopped. `.none` (export prerender, AI look) waits for the copy: those
+    /// must look like the export (docs/architecture/freeze-frame.md 4a3).
+    var readyAlphaCopiesOnly = false
 
     /// 什么都不换：预览窗口选了「原片」、或者成片 / 预渲染 / AI 看那几条永远用原片的路。
     static let none = OptimizedMediaLookup()
