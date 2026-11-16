@@ -7,7 +7,7 @@ import Foundation
 // samples of equal length — 120 × 0.5 s, exactly the layout the old 120-frame file had — and every sample points at the bytes of
 // that one frame. Every reader sees the same samples at the same times as before (AVFoundation in the preview, the AI's look and
 // the keyframe prerender; ffmpeg in the export: identical frame counts, timestamps and pixels, checked in
-// `checks/StillClipEncode/SharedFrame.swift`), but the file holds one frame (~0.5–0.9 MB at 1080p) instead of 120 (60–107 MB).
+// `checks/StillClipEncode/SharedFrame.swift`), but the file holds one frame (1–4 MB at 1080p) instead of 120 (107–441 MB measured).
 // ProRes has no inter-frame compression, so writing the same picture 120 times really stored it 120 times (MCP-76).
 // What it does not do: encode anything, or accept any layout other than the one ffmpeg writes for a single intra frame (one video
 // track, `moov` after `mdat`, a sample table of exactly stsd / stts / stsc / stsz / stco holding one sample). Anything else throws

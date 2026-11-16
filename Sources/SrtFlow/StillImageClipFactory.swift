@@ -12,7 +12,7 @@ import ImageIO
 ///（预览的默认合成器把源当预乘的用），外加一份灰度遮罩给带关键帧的上层轨段当 matte；起名见 `StillAlphaNaming`。
 /// 不透明的图照旧 H.264 —— 透明静帧一张 1080×1080 约 30 MB，不值得给每张图都转。
 /// (Those 30 MB were 120 stored copies of one frame. Since 2026-11-17 the ProRes holds one encoded frame that all 120 samples
-/// share — `StillFrameSharing` — about one frame, ~0.5–0.9 MB at 1080p; H.264 is still smaller and cheaper to decode.)
+/// share — `StillFrameSharing` — about one frame, 1–4 MB at 1080p; H.264 is still smaller and cheaper to decode.)
 ///
 /// Conversions run at most `ConversionSlots.width` at a time, whoever asks (drop, paste, the AI's add_clips).
 enum StillImageClipFactory {
@@ -141,7 +141,7 @@ enum StillImageClipFactory {
     ///
     /// Only **one** frame is encoded, lasting the whole `stillDuration` (output rate 1/60); `StillFrameSharing` then repeats it
     /// `stillFrameCount` times in the sample table, so the track is the same 120 frames at 2 fps as before. ProRes is intra-only:
-    /// encoding the picture 120 times stored it 120 times (a 1080p title 60–107 MB and 2–3 s, MCP-76; now one frame, ~0.1 s).
+    /// encoding the picture 120 times stored it 120 times (a 1080p title 107–441 MB and 3.5–5.6 s, MCP-76; now one frame, 0.4 s with the matte).
     /// `everyFrame: true` writes all 120 frames — the fallback when the movie is not a layout `StillFrameSharing` rewrites.
     static func alphaConversionArguments(image: URL, output: URL, nativeResolution: Bool, everyFrame: Bool = false) -> [String] {
         let filter = geometryFilter(nativeResolution: nativeResolution, transparent: true)

@@ -7,7 +7,7 @@ import UniformTypeIdentifiers
 
 // **A transparent still is one encoded frame shared by 120 samples** (2026-11-17, MCP-76,
 // docs/bugfixes/2026-11-17-alpha-media-waits-and-oversized-stills.md). ProRes 4444 is intra-only, so the old conversion (decode
-// once, `loop` 119 copies) still stored the picture 120 times: a 1080p title was 60–107 MB and took 2–3 s, a 96-frame PNG
+// once, `loop` 119 copies) still stored the picture 120 times: a 1080p title was 107–441 MB and took 3.5–5.6 s, a 96-frame PNG
 // sequence about 10 GB. Now the production arguments encode one frame lasting the whole still and `StillFrameSharing` points
 // 120 samples of 0.5 s at it. Checked on the production arguments and the production rewrite:
 // - the encoder writes one frame; after sharing the track is 120 frames at 2 fps over 60 s, for ffmpeg and for AVFoundation;
