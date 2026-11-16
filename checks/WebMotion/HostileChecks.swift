@@ -80,6 +80,11 @@ enum HostileChecks {
         let entry = await runHelper(Fixture.job(Pages.noFrameEntry, name: "entry", limits: Fixture.tight))
         check(entry.rejected?.failure?.check == .frameEntry, "a page without motion.frame(t) fails \"frame entry\"")
 
+        let flicker = await runHelper(Fixture.job(Pages.flicker, name: "flicker", limits: Fixture.tight))
+        check(flicker.rejected?.failure?.check == .noBlankFrames && flicker.rejected?.failure?.time == 0.5,
+              "one empty frame between drawn frames fails \"no empty frame\" at t = 0.5: "
+              + (flicker.rejected?.failure?.message ?? String(describing: flicker.error)))
+
         let huge = await runHelper(Fixture.job(Pages.hugeCanvas, name: "huge", limits: Fixture.tight))
         let hugeResult: WebMotionResult? = {
             if case .finished(let result, _, _, _) = huge.report.outcome { return result }

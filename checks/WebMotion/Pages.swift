@@ -94,6 +94,13 @@ enum Pages {
 
     static let noFrameEntry = "<!doctype html><html><body><script>window.motion = { duration: 1 };</script></body></html>"
 
+    /// Draws every frame except the one at t = 0.5: the flicker of an image not ready in time.
+    static let flicker = """
+        <!doctype html><html><body style="margin:0;background:transparent"><div id="d" style="width:40px;height:40px;background:#fff"></div><script>
+        window.motion = { frame(t) { document.getElementById('d').style.visibility = Math.abs(t - 0.5) < 0.01 ? 'hidden' : 'visible'; } };
+        </script></body></html>
+        """
+
     /// A 40000×40000 canvas and a 60000 px body: the output size must not move and nothing may crash.
     static let hugeCanvas = """
         <!doctype html><html><body style="margin:0;background:transparent;width:60000px;height:60000px"><script>
