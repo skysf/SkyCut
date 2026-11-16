@@ -117,13 +117,13 @@ func info(_ size: CGSize, seconds: Double) -> MediaInfo {
 // MARK: - 真导出 + 抽帧
 
 /// 跑一遍**生产**导出，返回成品路径。
-func export(_ state: TimelineState, name: String) async -> URL? {
+func export(_ state: TimelineState, name: String, settings: VideoEncodeSettings = VideoEncodeSettings(), allowFailure: Bool = false) async -> URL? {
     let output = root.appendingPathComponent(name)
     let plan: VideoEditExportGraph.Plan
     do {
         plan = try await VideoEditExportGraph.plan(
             state: state,
-            settings: VideoEncodeSettings(),
+            settings: settings,
             subtitleStyle: BurnInStyle(name: "check"),
             subtitleFontURL: nil,
             output: output, watermark: nil
@@ -135,7 +135,7 @@ func export(_ state: TimelineState, name: String) async -> URL? {
     let (code, out) = run(ffmpegPath, plan.arguments)
     guard code == 0 else {
         try? FileManager.default.removeItem(at: plan.workspace)
-        check(false, "\(name) 的 ffmpeg 执行失败：\(out.suffix(800))")
+        if !allowFailure { check(false, "\(name) 的 ffmpeg 执行失败：\(out.suffix(800))") }
         return nil
     }
     // `tempOutput` 就在 workspace 里，清掉 workspace 等于把成品一起删了 ——
@@ -609,8 +609,8 @@ func main() async {
 
     // MARK: 藏起来的上层段不进成片（2026-09-26，用例在 HiddenClips.swift）
     await checkHiddenClips(white: white, black: black, info: landscape)
-    // MARK: 带透明的静帧：透明处露出下面那一层，预览和成片（静态 / 带关键帧）都是（2026-10-03，用例在 AlphaStill.swift）
-    await checkAlphaStill(white: white, info: landscape)
+    // MARK: 带透明的段：透明静帧（2026-10-03，AlphaStill.swift）、带透明的视频按文件里的标记叠（2026-11-16，AlphaVideo.swift）
+    await checkAlphaSources(white: white, info: landscape)
 
     if failures == 0 {
         print("\(checks) checks, 0 failures")

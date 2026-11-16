@@ -17,6 +17,8 @@
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
+- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。
+
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](../architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](../reports/2026-11-02-video-inspection.md)。
@@ -72,7 +74,9 @@
 - 上层视频轨动画段 fill + matte：`scripts/check-export-alpha-compositing.sh`。
 - 入场/出场动画的两条管线对账（预览取帧 vs 真导出抽帧）：`scripts/check-clip-animation.sh`。
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
-  （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走：`scripts/check-video-fade.sh`。
+  （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
+  （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
+  在做不出来的机器上打 `SKIP` 明说没跑）：`scripts/check-video-fade.sh`。
 - 检查器的 live 绑定只准接滑块和 scrub（离散控件没有结束信号，快照会挂着把
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
