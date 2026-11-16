@@ -27,7 +27,9 @@ enum MCPGuideOutputTopics {
             replaced. Audio-only projects export M4A.
             """),
             MCPGuideSection(name: "results", about: "job_id, what get_job returns, subtitles and music credits", text: """
-            Results. It returns job_id: wait with get_job, which gives the file, export_settings and timings. burn_subtitles \
+            Results. It returns job_id: wait with get_job, which gives the file, export_settings and timings, and its sound: \
+            audio_loudness_lufs and audio_peak_dbtp (the true peak of the exported file itself). When the -1 dBTP limiter had to \
+            work it adds audio_peak_before_limiter_dbtp, audio_limited_seconds and audio_max_reduction_db. burn_subtitles \
             (default true) burns the visible subtitles into the picture. When the timeline uses library music, pass \
             get_timeline's music_credits on to the user. Exports run one at a time with transcriptions and translations.
             """)

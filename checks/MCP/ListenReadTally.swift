@@ -12,7 +12,8 @@ import SrtFlowMCPKit
 enum ListenReadPlan: Sendable {
     /// 显式区间：恰好一个有界 reader，timeRange 就是这一段（源秒）；不要整文件波形，不起节拍的读取。
     case window(from: Double, to: Double)
-    /// 没给区间：走共享的整文件波形（`beats` = 还会起节拍的读取）；不起有界 reader。
+    /// 没给区间：since 2026-11-17 one bounded reader over the whole file, from 0 (the true peak and the loudest frame need
+    /// the samples); never the shared whole-file waveform. `beats` = also the beat read.
     case wholeFile(beats: Bool)
 }
 
@@ -67,7 +68,8 @@ func fileListen(_ url: URL, sourceIn: Double?, sourceOut: Double?, beats: Bool =
     if let sourceOut { values["source_out"] = .number(sourceOut) }
     return try await AIListenFileAudio.listen(
         url, args: AIToolArguments(.object(values)), display: url.lastPathComponent,
-        silenceDB: -45, minSilence: 0.5, beats: beats, until: Date().addingTimeInterval(listenCheckHangBound)
+        silenceDB: -45, minSilence: 0.5, beats: beats, frames: AIListenFrameGrid(fps: 30),
+        until: Date().addingTimeInterval(listenCheckHangBound)
     )
 }
 
@@ -125,8 +127,10 @@ private final class ListenCallStop: @unchecked Sendable {
         case (.windowStarted(let url, let from, let to), .window(let wantFrom, let wantTo)) where listenSameFile(url, file):
             windows += 1
             return windows == 1 && listenSameSecond(from, wantFrom) && listenSameSecond(to, wantTo)
-        case (.windowStarted(let url, _, _), .wholeFile) where listenSameFile(url, file): return false
-        case (.wholeFileWaveform(let url, _), .window) where listenSameFile(url, file): return false
+        case (.windowStarted(let url, let from, _), .wholeFile) where listenSameFile(url, file):
+            windows += 1
+            return windows == 1 && listenSameSecond(from, 0)
+        case (.wholeFileWaveform(let url, _), _) where listenSameFile(url, file): return false
         case (.beats(let url, _, _), .window) where listenSameFile(url, file): return false
         case (.beats(let url, _, _), .wholeFile(let beats)) where listenSameFile(url, file): return beats
         default: return true

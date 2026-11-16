@@ -169,6 +169,12 @@ final class VideoEditExporter: ObservableObject {
                 // 不然临场点 Stop 会被吞掉，文件照样被替换。
                 if token.isCancelled { throw CancellationError() }
                 measured.begin("finalize")
+                // 成片自己的声音的真峰值（AAC 编出来比喂给它的混音还高一点）：get_job 和面板报的「峰值」就是这个数。
+                if var levels = finishedAudioLevels {
+                    levels.deliveredPeak = await ExportDeliveredPeak.measure(plan.tempOutput, cancellation: token)
+                    finishedAudioLevels = levels
+                }
+                if token.isCancelled { throw CancellationError() }
                 // ffmpeg 退出码 0 之后才碰用户目标：先落到 workspace 里的临时
                 // 文件，这里再原子替换过去——预渲染或 ffmpeg 中途任何失败都
                 // 还没碰过 output，用户原有文件（覆盖导出场景）不会被牵连。

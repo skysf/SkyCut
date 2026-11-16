@@ -174,13 +174,21 @@ private func checkListenShortFile(in directory: URL) async {
         try file?.write(from: buffer)
         file = nil
         let (outcome, tally) = await talliedFileListen(url, sourceIn: nil, sourceOut: nil, beats: true, plan: .wholeFile(beats: true))
-        // 登记点是活的：上面那些「一次都没要整文件波形 / 没起节拍的读取」不是因为没人记 —— 没给区间的 listen 就该看得见这两样。
-        check(tally.wholeFileRequests == 1 && tally.wholeFileDecodes == 1,
-              "a whole-file listen is seen asking WaveformStore once for a new whole-file decode (saw \(tally.wholeFileRequests) requests, \(tally.wholeFileDecodes) new decodes)")
+        // 登记点是活的：上面那些「没起节拍的读取」不是因为没人记 —— 要节拍的 listen 就该看得见它。
         checkEqual(tally.beatReads, 1, "short-file beats are seen starting their own read")
-        checkEqual(tally.windows.count, 0, "a whole-file listen starts no bounded range reader")
+        // Since 2026-11-17 a whole-file listen reads the file once with a bounded reader (the true peak and the loudest frame
+        // need the samples) and never asks for the shared whole-file waveform.
+        check(tally.readsOnly(from: 0, to: 1) && tally.wholeFileRequests == 0,
+              "a whole-file listen starts one bounded reader over the whole file and no whole-file waveform (saw \(tally.windows), \(tally.wholeFileRequests) waveform requests)")
+        // …and the waveform registration point is alive: the zero above is not because nobody records it.
+        let audit = MediaReadAudit()
+        _ = await MediaReadAudit.$current.withValue(audit) {
+            await AIListenFileAudio.waveform(of: url, until: Date().addingTimeInterval(listenCheckHangBound))
+        }
+        checkEqual(ListenReadTally(audit.entries, file: url).wholeFileRequests, 1, "asking for the whole-file waveform is seen")
         let result = try outcome.get()
-        checkEqual(result["level_db"]?.stringValue, "silent", "normal short-file shared-waveform listen remains compatible")
+        checkEqual(result["level_db"]?.stringValue, "silent", "a silent short file reads as silent")
+        checkEqual(result["peak_db"]?.doubleValue, -60, "a silent file's true peak is the -60 floor")
         check(result["beat_note"]?.stringValue?.contains("whole-song") == true, "short-file beat result explains its independent analysis window")
     } catch { check(false, "short-file listen compatibility failed: \(error)") }
 }

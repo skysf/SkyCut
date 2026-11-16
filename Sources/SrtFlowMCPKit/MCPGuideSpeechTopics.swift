@@ -55,10 +55,12 @@ enum MCPGuideSpeechTopics {
             files may return needs_confirmation); with neither it lists every audible clip. from and to limit the timeline \
             seconds. mix=true measures the mix itself instead (the mix section).
             """),
-            MCPGuideSection(name: "levels", about: "level, peak, silences, the loudest moment and the curve", text: """
-            Levels. level_db is the RMS level excluding silence, peak_db the peak, silences the quiet stretches (quieter than \
-            silence_db, default -45, for at least min_silence seconds, default 0.5), loudest_at the loudest moment, plus a \
-            per-step curve for one clip or file. Around -60 dBFS or lower is silent.
+            // 2026-11-17: peaks are true peaks and loudest_at is a frame (docs/architecture/ai-control-mcp.md section 4 item 13).
+            MCPGuideSection(name: "levels", about: "level, true peak, silences, the loudest frame and the curve", text: """
+            Levels. level_db is the RMS level excluding silence, peak_db the true peak in dBTP (between samples too: the \
+            measure the export limiter holds at -1), silences the quiet stretches (quieter than silence_db, default -45, for at \
+            least min_silence seconds, default 0.5), loudest_at the start of the loudest frame at the project frame rate, plus \
+            peak_at (when the true peak is) and a per-step curve for one clip or file. Around -60 dBFS or lower is silent.
             """),
             MCPGuideSection(name: "beats", about: "tempo, beats and downbeats, the analysis cut_to_beat uses", text: """
             Beats. beats=true with one clip or file returns tempo_bpm, beats and downbeats; cut_to_beat uses the same analysis. \
@@ -81,8 +83,8 @@ enum MCPGuideSpeechTopics {
             in the mix. Layers are as they enter the master bus, before the limiter, so they add up to the mix wherever nothing \
             is over.
             Results. The mix: loudness_lufs (integrated, after the limiter: the number export_video reports), max_momentary and \
-            max_short_term (the loudest 400 ms and 3 s), peak_db and peak_at (before the limiter), loudest_at (the start of the \
-            loudest frame), over (frames above the -1 dBFS limiter ceiling, with the peak and how much the limiter takes off: \
+            max_short_term (the loudest 400 ms and 3 s), peak_db and peak_at (true peak before the limiter), loudest_at (the start \
+            of the loudest frame), over (frames above the -1 dBTP limiter ceiling, with the peak and how much the limiter takes off: \
             reported, never blocked), limited_seconds, max_reduction_db and a level curve. Each layer: level_db, loudness_lufs, \
             peak_db, peak_at, loudest_at and bands_db (low below 300 Hz, low_mid 300-800, high_mid 800-3000, high above 3000). \
             To pull a mix down, lower the master with set_track. frames=true adds per-frame values for a few seconds: the more \
