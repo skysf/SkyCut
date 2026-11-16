@@ -1088,8 +1088,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `small_text` / `small_text_below` 是标题上下那行小字，`text`、`number`、位置、字体、颜色用 set_text 原来的参数。带某一块的 `text_id`：
     `motion_preset` 换一套（字不变、标题 id 不变），只给 `hit_at` 整套挪；标题挪了、改了字，同一套的别的几块跟上。规则只在 `MotionPresetGroups`
     （和界面上加字的「动效预设」、检查器「预设」同一份，`AIMotionPresetEdit` 只读参数、报结果）；结果带 `motion_preset`（哪一套、落点、尾、每一块的 id），
-    `get_timeline` 的字和形状带 `motion_preset`。不另开工具（第一节第 5 条）：set_text 的参数定义加了四个参数仍是 4,372 / 4,500 字节，
-    全清单 99,010 / 100,000；怎么用写在说明书 `topic=set_text` 的 `motion_presets` 一节。`set_texts` 每一项也可以是一套。
+    `get_timeline` 的字和形状带 `motion_preset`。不另开工具（第一节第 5 条）。Catalog kept flat (2026-11-17): the four parameters carry
+    one-line descriptions, and wording the guide already had moved out of set_text's card and of some set_text / set_shape parameter
+    descriptions, so the whole catalog went from about 99,063 to 99,051 / 100,000 and set_text's schema is 4,040 / 4,500 bytes;
+    怎么用写在说明书 `topic=set_text` 的 `motion_presets` 一节。`set_texts` 每一项也可以是一套。
 
 61. **声音怎么过一刀：`set_transition` 的 `sound`（2026-11-16，生产反馈 MCP-32；合同全在 [声音怎么过一刀](cut-sound.md)）**：
     以前 J / L 切、叠着换只能 `add_clips sound=separate` + `edit_clip alone` 一段一段对帧，24 个接点就是 24 次手工。现在选一刀（`after_clip_id`，V1 或上层轨；

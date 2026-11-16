@@ -56,7 +56,7 @@ enum MCPGuideTimelineTopics {
             the title, then lets go while the words stay (credits such as FROM / SKY STUDIO). focus_pull: thin wide-spaced words \
             pull into focus and blur away at the end (calm credits). title_counter: the title pops in, a short line draws under \
             it and a number rolls like a slot machine (needs number with at least to; suffix for units, e.g. " KM"). text is the \
-            title; small_text is a small line above it, small_text_below=true puts it under (e.g. PRESENTS). hit_at is the \
+            title; small_text is a small line above it ("" removes it), small_text_below=true puts it under (e.g. PRESENTS). hit_at is the \
             timeline second it lands on (a drum hit or a cut; default start, then the playhead); duration runs from hit_at to the \
             end (default 3, title_counter 3.5). x / y or position place the whole group; font and color change the title and the \
             small line. Sizes follow the frame's short side, so the same call works on 9:16. With text_id of any text in a group: \
