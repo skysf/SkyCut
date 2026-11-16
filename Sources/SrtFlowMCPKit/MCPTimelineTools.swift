@@ -121,18 +121,24 @@ public enum MCPTimelineTools {
                 ], required: ["ids"])
             )
         case .setTransition:
+            // sound（声音怎么过一刀，2026-11-16 MCP-32）加在这里、不另开工具：清单只剩约 1.5k 字，说明在说明书 set_transition 主题里。
             return MCPToolDefinition(
                 .setTransition, title: "Set a transition",
                 description: """
-                Set the transition between a V1 clip and the touching V1 clip after it (after_clip_id), or between every touching pair \
-                with all=true. type none removes it. Returns where each transition went and its real length. One undo step.
+                Set the picture transition between a V1 clip and the touching clip after it (after_clip_id), or every touching V1 pair \
+                (all=true); type none removes it. sound instead sets how the sound crosses the cut (any video track; picture \
+                untouched). Returns each cut's result. One undo step. Sound: skycut_guide topic=set_transition.
                 """,
                 input: MCPSchema.object([
-                    "after_clip_id": MCPSchema.string("The V1 clip before the cut."),
+                    "after_clip_id": MCPSchema.string("The clip before the cut (V1; any video track with sound)."),
                     "all": MCPSchema.boolean("Apply to every touching pair of V1 clips."),
                     "type": MCPSchema.string("Transition.", oneOf: MCPVocabulary.transitions),
-                    "duration": MCPSchema.number("Seconds, 0.1–3 (default 0.5).", minimum: 0.1, maximum: 3)
-                ], required: ["type"])
+                    "duration": MCPSchema.number("Seconds, 0.1–3 (default 0.5).", minimum: 0.1, maximum: 3),
+                    "sound": MCPSchema.string("How the sound crosses the cut.", oneOf: MCPVocabulary.cutSounds),
+                    "frames": MCPSchema.integer("sound: crossfade/lead/lag length, bed reach, on_beat search; 0–600.", minimum: 0, maximum: 600),
+                    "gain_db": MCPSchema.number("sound: dB on the next clip's sound (lag: previous); gain without it levels them."),
+                    "layer_id": MCPSchema.string("bed / on_beat: the sound under the cut (default: longest across it).")
+                ])
             )
         case .setText:
             return setText

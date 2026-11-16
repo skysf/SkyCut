@@ -121,6 +121,9 @@ public enum MCPVocabulary {
     /// add_clips 的 sound：视频文件的声音怎么放（`ClipSoundMode`：separate = 分离音频、和画面链接；only = 只要声音）。
     public static let clipSounds = ["separate", "only"]
 
+    /// set_transition 的 sound：声音怎么过一刀（`CutSoundMode`，docs/architecture/cut-sound.md）。
+    public static let cutSounds = ["crossfade", "lead", "lag", "bed", "on_beat", "gain", "cut"]
+
     /// edit_clip 改素材窗口时关键帧怎么办（`AIKeyframePolicy`）。
     public static let keyframePolicies = ["keep_frames", "stretch", "clear"]
 

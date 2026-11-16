@@ -134,7 +134,8 @@ enum MCPGuideTimelineEditTopics {
         previousCard: MCPGuidePreviousCardsBatch2.setTransition,
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.setTransition, """
-            set_transition sets transitions between V1 clips; each call is one undo step.
+            set_transition sets picture transitions between V1 clips, or with sound how the sound crosses a cut on any video \
+            track (the three sound sections); each call is one undo step.
             """),
             MCPGuideSection(name: "types", about: "the transition types and their length", text: """
             Types. type is crossFade, blackFade, whiteFade, pushLeft, pushRight, pushUp, pushDown, wipeLeft, wipeRight, wipeUp \
@@ -149,12 +150,13 @@ enum MCPGuideTimelineEditTopics {
             Results. For each cut it reports where the transition went, its real length and whether it was shortened or held \
             a frame.
             """)
-        ],
+        ] + MCPGuideCutSound.sections,
         examples: [
             ["type": "crossFade", "after_clip_id": "c1"],
             ["type": "blackFade", "all": true, "duration": 0.8]
-        ],
-        related: ["get_timeline", "edit_clip"]
+        ] + MCPGuideCutSound.examples,
+        related: ["get_timeline", "edit_clip", "listen"],
+        readingTip: MCPGuideCutSound.readingTip
     )
 
     static let setCanvas = MCPGuideWrittenTopics.Written(

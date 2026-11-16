@@ -75,6 +75,9 @@ scenario red entry_form "破折号后面是空的" edit swap "${A}" "${E_BETA}" 
 scenario red entry_links "一条里两个链接" edit swap "${A}" "${E_BETA}" '- [Beta](docs/architecture/beta.md) — 管 beta，另见 [Alpha](docs/architecture/alpha.md)。'
 scenario red dup_agents "同一份文档在同一节里列两次" edit after "${A}" "${E_BETA}" '- [Beta 又一次](docs/architecture/beta.md) — 摘要的第二段。'
 scenario red dup_agents "同一份文档在另一节里又列一次" edit after "${A}" "- [README.md](README.md)" '- [Beta 又一次](docs/architecture/beta.md#别的锚点) — 摘要的第二段。'
+# English entries (new doc text is English since 2026-11-16, AGENTS.md「语言」): same shape rules, nothing looser.
+scenario green - "English entry: English title and sentence" edit swap "${A}" "${E_BETA}" "- [Beta notes](docs/architecture/beta.md) — Owns beta; written in English."
+scenario red entry_form "English entry with an en dash instead of the em dash" edit swap "${A}" "${E_BETA}" "- [Beta notes](docs/architecture/beta.md) – Owns beta."
 
 # ── AGENTS.md 索引小节里的表格：表头 + 分隔行 + 每行正好一个链接 ──
 # s_table <表头> <分隔行> <alpha 那一行> [更多行…]：把架构索引的三条换成一张表。
@@ -94,6 +97,7 @@ T_BETA='| [Beta](docs/architecture/beta.md) | 管 beta。 |'
 T_GAMMA='| [Gamma](docs/build/gamma.md) | 管 `a` 和 `b`。 |'
 scenario green - "成形的表格：表头、分隔行、每行一个链接" s_table "${T_HEAD}" "${T_SEP}" "${T_ALPHA}" "${T_BETA}" "${T_GAMMA}"
 scenario green - "分隔行带对齐的冒号" s_table "${T_HEAD}" '| :--- | ---: |' "${T_ALPHA}" "${T_BETA}" "${T_GAMMA}"
+scenario green - "English table: header and rows in English" s_table '| Doc | What it governs |' "${T_SEP}" '| [Alpha](docs/architecture/alpha.md) | Owns alpha. |' '| [Beta](docs/architecture/beta.md) | Owns beta. |' '| [Gamma](docs/build/gamma.md) | Owns `a` and `b`. |'
 scenario red table_head "表头下面不是分隔行" s_table "${T_HEAD}" "${T_ALPHA}" "${T_BETA}" "${T_GAMMA}"
 scenario red table_head "分隔行的列数和表头对不上" s_table "${T_HEAD}" '| --- |' "${T_ALPHA}" "${T_BETA}" "${T_GAMMA}"
 scenario red table_head "表头行尾没有竖线" s_table '| 文档 | 管什么' "${T_SEP}" "${T_ALPHA}" "${T_BETA}" "${T_GAMMA}"
