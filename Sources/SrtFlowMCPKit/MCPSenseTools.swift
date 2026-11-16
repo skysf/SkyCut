@@ -23,8 +23,9 @@ public enum MCPSenseTools {
             .listen, title: "Measure the sound",
             description: """
             Read-only. Measure sound: level, peak, silences, loudest moment and a level curve for one clip (with its volume, fades \
-            and faders), a file, or every audible clip. beats=true finds tempo, beats and downbeats; cuts=true checks every V1 cut \
-            for pauses and speech and suggests better in or out points. Outside files may return needs_confirmation.
+            and faders), a file, or every audible clip. mix=true: the mixed timeline per track and frame (loudness, peak, over \
+            -1 dBFS, bands). beats=true finds tempo, beats and downbeats; cuts=true checks every V1 cut for pauses and speech and \
+            suggests better in or out points. Outside files may return needs_confirmation.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A clip on the timeline."),
@@ -37,6 +38,12 @@ public enum MCPSenseTools {
                 "min_silence": MCPSchema.number("Shortest silence to report, seconds (default 0.5).", minimum: 0.1, maximum: 10),
                 "beats": MCPSchema.boolean("Also find the tempo and every beat (one clip or file)."),
                 "cuts": MCPSchema.boolean("Check every V1 cut: in a pause, or on speech with a better source_in/source_out."),
+                "mix": MCPSchema.boolean("Measure the mix itself, as exported: each track a layer, to the frame."),
+                "layers": MCPSchema.array(
+                    of: MCPSchema.string("A1, tracks joined by + (V1+V2), or rest."), "With mix: the layers (≤ 12; default each track).",
+                    maxItems: 12
+                ),
+                "frames": MCPSchema.boolean("With mix: also per-frame levels and bands (a few seconds at most)."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true
