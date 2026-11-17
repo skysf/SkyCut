@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import SrtFlowCore
 
 // MARK: - 导出图里的「盖一块」（模糊 / 马赛克）
 //
@@ -38,7 +39,7 @@ enum VideoEditCoverExport {
 
     /// 一块盖一块翻成的滤镜段。`input` 是接上来的画面标签，返回新的画面标签。
     static func steps(
-        _ cover: ShapeAnnotation, canvas: CGSize, total: Double,
+        _ cover: ShapeAnnotation, canvas: CGSize, total: Double, grid: FrameGrid,
         input: String, nextLabel: (String) -> String
     ) -> (filters: [String], output: String)? {
         guard cover.timelineEnd > 0, cover.timelineStart < total,
@@ -54,23 +55,23 @@ enum VideoEditCoverExport {
             effect = "gblur=sigma=\(VideoEditExportGraph.fmt(amount)):steps=\(gaussianSteps)"
         }
         let original = nextLabel("v"), copy = nextLabel("v"), region = nextLabel("v"), output = nextLabel("v")
-        let start = VideoEditExportGraph.fmt(max(0, cover.timelineStart))
-        let end = VideoEditExportGraph.fmt(min(total, cover.timelineEnd))
+        let window = OverlayExportFile.enableWindow(max(0, cover.timelineStart), min(total, cover.timelineEnd), grid: grid)
         return ([
             "[\(input)]split[\(original)][\(copy)]",
             "[\(copy)]crop=\(w):\(h):\(x):\(y),\(effect)[\(region)]",
             // format=auto：两路同一种像素格式就原样出，不悄悄换成 yuv420（调色之后是 gbrp）。
-            "[\(original)][\(region)]overlay=x=\(x):y=\(y):format=auto:eof_action=pass:enable='between(t,\(start),\(end))'[\(output)]"
+            "[\(original)][\(region)]overlay=x=\(x):y=\(y):format=auto:eof_action=pass:enable='\(window)'[\(output)]"
         ], output)
     }
 
     /// 把一串盖一块接到 `video` 后面（数组顺序：先加的先盖）。
     static func append(
-        _ covers: [ShapeAnnotation], canvas: CGSize, total: Double,
+        _ covers: [ShapeAnnotation], canvas: CGSize, total: Double, frameRate: ProjectFrameRate,
         video: inout String, filters: inout [String], nextLabel: (String) -> String
     ) {
+        let grid = FrameGrid(frameRate)
         for cover in covers {
-            guard let step = steps(cover, canvas: canvas, total: total, input: video, nextLabel: nextLabel) else { continue }
+            guard let step = steps(cover, canvas: canvas, total: total, grid: grid, input: video, nextLabel: nextLabel) else { continue }
             filters += step.filters
             video = step.output
         }
