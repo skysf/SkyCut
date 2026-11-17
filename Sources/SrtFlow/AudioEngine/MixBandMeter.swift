@@ -5,7 +5,8 @@ import Foundation
 //
 // 管什么：一层（AudioStemRender 渲出来的交错立体声 f32，48 kHz）一块一块喂进来，按工程帧率切帧（MixFrameGrid），每一帧给出：
 // - **整体**：这一帧的均方（两个声道平均 —— 同 listen 的 level_db 口径：满幅正弦 −3 dB；单声道的素材引擎铺到两边、两边一样，
-//   量出来就是它自己在成片里的电平，不会像「先 −3 dB 铺成立体声、量的时候又按单声道算」那样偏 3 dB）和采样峰值；
+//   量出来就是它自己在成片里的电平，不会像「先 −3 dB 铺成立体声、量的时候又按单声道算」那样偏 3 dB）和真峰值
+//   （TruePeak，dBTP 的口径：这一帧的采样和它们后面插出来的点，用的是前后真有的采样，时间线外面当静音）；
 // - **四个频段**（<300 Hz、300–800、800–3000、>3000 Hz）的均方：以这一帧为中心、两帧长的汉宁窗做 FFT（vDSP），
 //   一段的均方 = 落在这一段的频点的能量 ÷ 窗的能量（Parseval：四段加起来 = 窗加权的均方，稳态的信号就是整体电平）。
 //   两帧长是因为一帧长的窗会把帧边上的声音压没（帧头的一下敲击在频段里看不见）；两帧长、50% 叠，帧边上的声音在相邻两帧里
@@ -18,7 +19,7 @@ import Foundation
 struct MixFrameLevel: Sendable, Equatable {
     /// 这一帧的均方（两个声道平均；只算这一帧在时间线里的那部分）。
     var meanSquare: Double
-    /// 这一帧的采样峰值（线性）。
+    /// 这一帧的真峰值（线性）。
     var peak: Float
     /// 四个频段的均方：<300、300–800、800–3000、>3000 Hz。
     var bands: SIMD4<Double>
@@ -34,7 +35,7 @@ final class MixBandMeter {
     let limit: Int64
     /// 量的范围里每一帧（顺序同 `frameRange`）。
     private(set) var levels: [MixFrameLevel] = []
-    /// 量的范围里最响的采样（线性）和它在时间线的第几个采样。
+    /// 量的范围里的真峰值（线性）和它在时间线的第几个采样。
     private(set) var peak: Float = 0
     private(set) var peakSample: Int64?
     /// 量的范围里的整段响度（LUFS）；全是静音是 nil。
@@ -128,21 +129,16 @@ final class MixBandMeter {
         var level = MixFrameLevel(meanSquare: 0, peak: 0, bands: .zero)
         if to > from {
             let offset = Int(from - origin), count = Int(to - from)
-            var sumL: Float = 0, sumR: Float = 0, maxL: Float = 0, maxR: Float = 0
-            var indexL: vDSP_Length = 0, indexR: vDSP_Length = 0
-            left.withUnsafeBufferPointer { l in
-                vDSP_svesq(l.baseAddress! + offset, 1, &sumL, vDSP_Length(count))
-                vDSP_maxmgvi(l.baseAddress! + offset, 1, &maxL, &indexL, vDSP_Length(count))
-            }
-            right.withUnsafeBufferPointer { r in
-                vDSP_svesq(r.baseAddress! + offset, 1, &sumR, vDSP_Length(count))
-                vDSP_maxmgvi(r.baseAddress! + offset, 1, &maxR, &indexR, vDSP_Length(count))
-            }
+            var sumL: Float = 0, sumR: Float = 0
+            left.withUnsafeBufferPointer { l in vDSP_svesq(l.baseAddress! + offset, 1, &sumL, vDSP_Length(count)) }
+            right.withUnsafeBufferPointer { r in vDSP_svesq(r.baseAddress! + offset, 1, &sumR, vDSP_Length(count)) }
             level.meanSquare = (Double(sumL) + Double(sumR)) / Double(2 * count)
-            level.peak = max(maxL, maxR)
-            if level.peak > peak || peakSample == nil, level.peak > 0 {
+            let truePeak = TruePeak.peak(left: left, right: right, origin: origin, range: from ..< to,
+                                         valid: max(0, origin) ..< min(limit, available))
+            level.peak = truePeak.peak
+            if level.peak > peak || peakSample == nil, level.peak > 0, let sample = truePeak.sample {
                 peak = level.peak
-                peakSample = from + Int64(maxL >= maxR ? indexL : indexR)
+                peakSample = sample
             }
         }
         // 频段：两帧长的窗，时间线外面（和还没渲到的地方）当静音、不算窗的能量。

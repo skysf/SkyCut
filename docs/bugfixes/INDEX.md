@@ -38,6 +38,7 @@
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
 - [2026-10-01 烧录页默认宽度下字幕列被裁](2026-10-01-burn-in-subtitle-column-clipped-at-default-width.md) — `HSplitView` 最后一栏的 ideal 要放得进；截图按用户默认的窗口大小拍。
 - [2026-10-29 提交返回的瞬间取消，丢了任务号](2026-10-29-cancelled-submit-loses-job-id.md) — 付费提交的身份先交给调用方，然后才能抛停止。
+- [2026-11-17 Changing the canvas stretches rectangles and resizes texts and shapes out of proportion](2026-11-17-canvas-change-resizes-texts-and-shapes.md) — A length stored against one edge of the frame needs a rule for a new shape: one factor for all of an item's lengths, one that a switch back undoes.
 - [2026-11-17 Changing the canvas silently stretches clips framed for the old shape](2026-11-17-canvas-change-stretches-framed-clips.md) — Values stored relative to the canvas need a rule for when it changes: keep x, y and scale, never re-crop, and tell the AI.
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
 - [2026-10-03 一条扫描被 bash 3.2 花括号展开拆开，从没生效](2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md) — 守卫里先把命令替换赋给变量再比；反向验证用 `/bin/bash`。
@@ -68,6 +69,7 @@
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
+- [2026-11-17 get_job reported the peak before the limiter; listen's loudest moment was a curve step's middle](2026-11-17-export-peak-before-limiter-and-binned-loudest.md) — Give the AI the delivered number under its measure's name (the file's true peak, dBTP); a time reported "at" must come from data at that resolution.
 - [2026-08-05 导出预渲染复审](2026-08-05-export-prerender-review.md) — 覆盖、alpha、取消与临时文件。
 - [2026-10-18 别的工程的导出显示在每个工程窗口里](2026-10-18-export-progress-shown-in-every-project-window.md) — 单例的状态在多开之后要问「是谁的」（`exporter.belongs(to:)`）。
 - [2026-11-02 导出反复解码静止的文字和形状](2026-11-02-export-redecodes-static-overlays.md) — 静止叠层只解码一次、按本段复制已解的帧；默认质量不变。

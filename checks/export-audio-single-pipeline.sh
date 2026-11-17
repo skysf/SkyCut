@@ -54,7 +54,28 @@ grep -qF 'TimelineAudioEngine(config: config, mode: .offline)' <<<"${MIXDOWN_COD
 grep -qF 'engine.renderOffline(' <<<"${MIXDOWN_CODE}" \
   || fail "混音没有走引擎的 renderOffline"
 
+# 4. Since 2026-11-17 every peak is a true peak and get_job names the delivered one
+#    (docs/architecture/export-audio-mixdown.md section 2 item 3, docs/bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md):
+#    the limiter's requirement is the true-peak span on both sides of a frame, the f32's peak is metered on what is written,
+#    the exporter measures the delivered file before it moves into place, and get_job's audio fields come from ExportAudioReport.
+LIMITER_CODE="$(code_of Sources/SrtFlow/ExportPeakLimiter.swift)"
+grep -qF 'TruePeak.Stream(channels: channels)' <<<"${LIMITER_CODE}" \
+  && grep -qF 'max(pointsBefore, span.sample, span.after)' <<<"${LIMITER_CODE}" \
+  || fail "限幅器没按真峰值算（要 TruePeak 的 span：这一帧的采样和两边插出来的点）"
+grep -qF 'written.feed(' <<<"${MIXDOWN_CODE}" \
+  || fail "写进 f32 的那一串没量真峰值（FrameSink 的 written）"
+EXPORTER_CODE="$(code_of Sources/SrtFlow/VideoEditExporter.swift)"
+[ "$(grep -cF 'ExportDeliveredPeak.measure(plan.tempOutput' <<<"${EXPORTER_CODE}" || true)" -eq 1 ] \
+  || fail "导出器没在 ffmpeg 之后量成片文件自己的真峰值（ExportDeliveredPeak.measure(plan.tempOutput…）"
+TOOLS_CODE="$(code_of Sources/SrtFlow/AIExportTools.swift)"
+grep -qF 'ExportAudioReport.detail(levels)' <<<"${TOOLS_CODE}" \
+  || fail "get_job 的声音字段不是 ExportAudioReport 给的"
+for file in Sources/SrtFlow/AIExportTools.swift Sources/SrtFlow/ExportAudioReport.swift; do
+  [ "$(code_of "${file}" | grep -c 'audio_peak_dbfs' || true)" -eq 0 ] \
+    || fail "${file} 又报了 audio_peak_dbfs：get_job 的峰值是成片自己的真峰值（audio_peak_dbtp），限幅前的另起名字"
+done
+
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
-echo "✓ export-audio-single-pipeline：导出图里没有声音滤镜，成片的声音就是预览那份混音"
+echo "✓ export-audio-single-pipeline：导出图里没有声音滤镜，成片的声音就是预览那份混音；峰值都是真峰值，get_job 报成片自己的"

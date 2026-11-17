@@ -122,12 +122,15 @@
 - 预览上的盖一块真的盖上了（生产的 `CoverHostView` 放进真窗口、拍屏数像素：块里糊成混色块外还是硬的、改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照）：`scripts/check-cover-preview-attach.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
 - 声音渐入渐出、音量曲线与推子的真实包络（预览 = 引擎离线渲、导出 = 真跑 ffmpeg 两条管线），电平表（挂着表离线渲，
   对账轨道表 / 总表 / 红灯），以及过 0 dBFS 的混音过真峰值限幅器（没过顶逐采样原样、过顶一个采样不超上限、稳态正弦不削成方波、
-  尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
+  尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）；true peak (group 10c, since 2026-11-17:
+  the BS.1770 meter on sines to 20 kHz at every phase, the limiter holding hard signals at −1 dBTP, a crest between samples pulled down; the f32's and the
+  delivered file's true peaks in 10b)：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
   4 分钟就判红，并说出卡在哪一组；CI 上第 7b 组「2 倍速曲线 · 导出」差 1–2 dB 偶发，认法见
   [推子与电平表](../architecture/audio-mixer.md)「已知的偶发」）。
 - 按层量混在一起之后的声音（listen mix=true 的地基）：现造的 WAV 当 oracle —— 四个频段各一个正弦（24 / 30 / 60 fps：那一段的电平 = 整体、别的段低 40 dB 以上、四段加起来 = 整体）、脉冲（峰值到采样、最响的帧到帧）、0.56 秒的音效（loudest_at 到帧、clip_id 的问法）、EBU Tech 3341 的 −23 / −33 dBFS 正弦（瞬时 / 短时 / 整体响度）；
   整条时间线的峰值、过线、压得最深、整体响度和 `ExportAudioMixdown.render` 逐位一样（有 / 没有声音场景各一条）；每层逐采样相加 = 混音；只量 29–44、43–49 秒 = 整段里那几帧，过线标在 31.0 / 40.5 秒；单声道人声的电平 = 素材 RMS + 增益 = 真导出（ffmpeg）的成片；listen 的计划（层的写法、越界给合法建议、逐帧的数放得下才给）和结果：
   `scripts/check-mix-layers.sh`（要 ffmpeg；接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节）。合同和反向验证见 [成片的声音](../architecture/export-audio-mixdown.md)第五节。
+  Since 2026-11-17 its peaks are true peaks, and get_job's sound fields (`ExportAudioReport`: the delivered `audio_peak_dbtp`, the limiter's work under its own names) are checked there too.
 - 波形数据（多级峰值、原始采样块）逐采样对账，以及**很多文件同时读**必须全部读完、
   不许把线程池堵死（看门狗判红）：`scripts/check-waveform.sh`。
 - 成片的声音只有一条管线（导出图里不许出现声音滤镜，混音是预览那个音频引擎按同一份 `AudioEngineConfig`
@@ -202,9 +205,12 @@
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
 - 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
+- 动效预设（set_text 的 `motion_preset`；在 `scripts/check-mcp.sh` 的 `MotionPresetChecks` 和它编译之前的扫描）：三套各自的几块、时间和动画，框按墨迹框住、竖屏按短边、换一套字不变、`hit_at` 整套挪、标题动了别的跟着走、粘贴自成一组、存盘往返；界面上改字的两个入口都经 `MotionPresetGroups.update`、粘贴换新组号（扫描）。规矩见 [动效预设](../architecture/motion-presets.md)。
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
-  set_canvas reply's `reframed` / `no_longer_fill`); wiring in `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
+  set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
+  back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
+  `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - Does the picture cover the frame (`fills_frame`, `fill_scale`, `fills_except`, look's `uncovered`): `scripts/check-mcp.sh` → `PictureCoverageChecks`
   (the geometry against an independent pixel-centre bitmap over 1,092 turns / sizes / offsets) and `ClipCoverageChecks` (the walkthrough's
   turn and drift, flips, crop, keys, a spring's dip, look with V2 / hidden / transparent / gap / wipe / transition / rise); wiring in
@@ -213,7 +219,9 @@
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
-  多出来的读取一登记，这次调用当场停掉、判红；没给区间的短文件 listen 记到一次整文件波形和一次节拍读取（证明登记点是活的）。
+  多出来的读取一登记，这次调用当场停掉、判红；没给区间的短文件 listen 记到一次节拍读取（证明登记点是活的）；since 2026-11-17 it is one bounded reader from 0 and no
+  whole-file waveform (a direct waveform request proves that registration point alive). listen's true peak and loudest frame (an 80 s clip's hit to the frame, a 12 kHz
+  crest between samples, a clip's gains and speed, window edges): `ListenPeakChecks`.
   怎么结束在 `ListenReadEndChecks`：截止时间早就过了的不排队不开读；排队中的超时 / 取消先等 `queued` 探针（没排上队就结束的那一轮放长四倍重来），
   没人恢复调用方就等满 40 秒判红；读到一半的先等 `started`、读取体停住，等 `stopRequested` 再往下读。reader 在哪个队列收尾在 `ListenReaderLifecycleChecks`。
   期限（40 秒、整组 300 秒）只拦卡死。规矩见 [阻塞的媒体读取](../architecture/blocking-media-reads.md)「回归」，
@@ -277,6 +285,8 @@
   接口出错、别的头提交、fork、别的 workflow、不是 pull_request、没跑完、红了 / 取消了、别的仓库、超过 24 小时）、跑检查的每一步都写成 `verified != 'true'`、
   备缓存的几步只在第 1 组做、编 App 不看它、判断那一步紧跟「只改了文档？」、记号只在 PR 那一轮的汇总 job 最后留、token 有 `actions: read`：
   `checks/ci-verified-tree.sh`。规矩和上线后看的数在[构建与打包](../build/build-and-packaging.md)「CI」一节。
+  The same guard pins the workflow's `concurrency` block word for word: PR runs keyed by PR number, pushes to main by `github.ref`
+  (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：

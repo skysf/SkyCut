@@ -121,8 +121,8 @@ enum AIExportTools {
         return .ok(.object(result))
     }
 
-    /// 成品的路径和画面（宽、高、帧率），带了水印的说为什么、怎么去掉，加混音的电平和响度：限幅器压过的说明压了多久多深，
-    /// 压得超过 3 dB 的再叫 AI 把主推子降下来（docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
+    /// 成品的路径和画面（宽、高、帧率），带了水印的说为什么、怎么去掉，加混音的电平和响度（ExportAudioReport：成片自己的真峰值、
+    /// 限幅器干的活单独标出来，docs/architecture/export-audio-mixdown.md 第二节第 3 条）。
     static func finishedDetail(
         _ output: URL, video: JSONValue?, levels: ExportAudioMixdown.Levels?, watermarked: Bool
     ) -> [String: JSONValue] {
@@ -130,20 +130,7 @@ enum AIExportTools {
         if let video { detail["video"] = video }
         if watermarked { detail["watermark"] = .string(SkyCutGates.watermarkNote(license: SkyStudioAccount.shared.license)) }
         guard let levels else { return detail }
-        func tenths(_ value: Double) -> JSONValue { .number((value * 10).rounded() / 10) }
-        if let loudness = levels.loudnessLUFS { detail["audio_loudness_lufs"] = tenths(loudness) }
-        detail["audio_peak_dbfs"] = tenths(levels.peakDBFS)
-        if levels.isLimited {
-            detail["audio_limited_seconds"] = .number((levels.limitedSeconds * 100).rounded() / 100)
-            detail["audio_max_reduction_db"] = tenths(levels.maxReductionDB)
-        }
-        if levels.needsAttention {
-            detail["note"] = .string(String(
-                format: "The mix went over -1 dBFS for %.2f s and the limiter pushed it down by up to %.1f dB. Lower the master fader "
-                    + "(set_track master volume_db) by about %.1f dB, or the loud clips, and export again for a cleaner mix.",
-                levels.limitedSeconds, levels.maxReductionDB, levels.suggestedReductionDB
-            ))
-        }
+        detail.merge(ExportAudioReport.detail(levels)) { _, audio in audio }
         return detail
     }
 

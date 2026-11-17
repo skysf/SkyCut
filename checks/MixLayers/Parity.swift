@@ -43,8 +43,32 @@ func checkExportParity() async {
         check(measured.maxReductionDB == exported.maxReductionDB, "\(label)：压得最深一样（\(measured.maxReductionDB) vs \(exported.maxReductionDB)）")
         check(measured.loudnessLUFS == exported.loudnessLUFS,
               "\(label)：整体响度一样（\(String(describing: measured.loudnessLUFS)) vs \(String(describing: exported.loudnessLUFS))）")
+        if label == "无场景" { checkExportAudioReport(exported) }
         try? FileManager.default.removeItem(at: file)
     }
+}
+
+/// get_job after an export (ExportAudioReport): the peak it names is the delivered one (the exported file's true peak);
+/// the limiter's work comes under its own names, the pre-limiter peak among them (until 2026-11-17 `audio_peak_dbfs` was the
+/// pre-limiter peak alone: +5.6 on a mix whose file peaked at −0.5).
+private func checkExportAudioReport(_ exported: ExportAudioMixdown.Levels) {
+    var levels = exported
+    levels.deliveredPeak = 0.92
+    let detail = ExportAudioReport.detail(levels)
+    check(detail["audio_peak_dbtp"]?.doubleValue == (20 * log10(0.92) * 10).rounded() / 10,
+          "get_job's audio_peak_dbtp is the delivered true peak (got \(String(describing: detail["audio_peak_dbtp"])))")
+    check(detail["audio_peak_dbfs"] == nil, "no peak field without its measure: audio_peak_dbfs is gone")
+    check(detail["audio_peak_before_limiter_dbtp"]?.doubleValue.map { $0 > -1 && abs($0 - exported.peakDBTP) < 0.06 } == true
+              && detail["audio_limited_seconds"] != nil && detail["audio_max_reduction_db"] != nil,
+          "the limiter's work is reported under its own names, with the true peak before it (\(String(describing: detail["audio_peak_before_limiter_dbtp"])))")
+    var unmeasured = exported
+    unmeasured.deliveredPeak = nil
+    check(ExportAudioReport.detail(unmeasured)["audio_peak_dbtp"] == nil, "no delivered measurement: no audio_peak_dbtp (never the mix's number under that name)")
+    let quiet = ExportAudioMixdown.Levels(peak: 0.5, outputPeak: 0.5, limitedFrames: 0, maxReductionDB: 0, loudnessLUFS: -20, deliveredPeak: 0.52)
+    let calm = ExportAudioReport.detail(quiet)
+    check(calm["audio_peak_before_limiter_dbtp"] == nil && calm["audio_limited_seconds"] == nil && calm["note"] == nil
+              && calm["audio_loudness_lufs"]?.doubleValue == -20,
+          "nothing limited: only loudness and the delivered peak")
 }
 
 func checkLayersAddUp() {
@@ -61,12 +85,13 @@ func checkLayersAddUp() {
     }) else { return }
     check(blocks > 0 && result.layers.count == 3, "三层（V1、A1、A2）都渲了（\(result.layers.count) 层、\(blocks) 块）")
     check(worst < 1e-5, "每个采样：三层相加 = 混音（最大差 \(worst)）")
+    // True peaks read a sample or two of the next frame, which may already be on the limiter's ramp: equal within 0.01 dB.
     let untouched = result.mix.filter { $0.minGain == 1 && $0.peak > 0 }
-    check(!untouched.isEmpty && untouched.allSatisfy { $0.outputPeak == $0.peak },
-          "限幅器没动的 \(untouched.count) 帧：写出去的峰值 = 进来的")
+    check(!untouched.isEmpty && untouched.allSatisfy { abs($0.outputPeak - $0.peak) <= $0.peak * 0.0012 },
+          "限幅器没动的 \(untouched.count) 帧：写出去的真峰值 = 进来的")
     let pressed = result.mix.filter { $0.overSamples > 0 }
-    check(!pressed.isEmpty && pressed.allSatisfy { $0.minGain < 1 && $0.outputPeak <= 0.891 + 1e-4 },
-          "过线的 \(pressed.count) 帧：限幅器压了、写出去的不超过 −1 dBFS")
+    check(!pressed.isEmpty && pressed.allSatisfy { $0.minGain < 1 && $0.outputPeak <= 0.891 * 1.0012 },
+          "过线的 \(pressed.count) 帧：限幅器压了、写出去的真峰值不超过 −1 dBTP")
 }
 
 /// 只量中间一段（前面多渲几秒接上限幅器、K 加权和 3 秒的窗）= 整段量出来的同样那几帧。
@@ -125,7 +150,7 @@ func checkWindowMatchesWhole() {
     let plan = AIListenMixPlan(grid: part.grid, frames: part.frames, layers: part.layers.map(\.layer), perFrame: false,
                                silenceDB: -45, minSilence: 0.5, duration: state.duration)
     let mix = AIListenMixReport.json(part, plan: plan)["mix"]?.objectValue ?? [:]
-    check(mix["level_db"]?.doubleValue != nil && (mix["peak_db"]?.doubleValue ?? -99) > -1, "29–44 秒：有平均电平、峰值过了 −1 dBFS")
+    check(mix["level_db"]?.doubleValue != nil && (mix["peak_db"]?.doubleValue ?? -99) > -1, "29–44 秒：有平均电平、真峰值过了 −1 dBTP")
     let over = mix["over"]?.arrayValue ?? []
     let starts = over.compactMap { $0["from"]?.doubleValue }
     check(starts.count == 2 && starts.first == 31 && starts.last == 40.5,

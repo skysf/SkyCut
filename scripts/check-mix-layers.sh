@@ -107,6 +107,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditExportFilterScript.swift \
   Sources/SrtFlow/VideoEditExportMixdown.swift \
   Sources/SrtFlow/ExportPeakLimiter.swift \
+  Sources/SrtFlow/TruePeak.swift \
   Sources/SrtFlow/ExportLoudnessMeter.swift \
   Sources/SrtFlow/AudioKWeighting.swift \
   Sources/SrtFlow/MediaReadQueue.swift \
@@ -162,6 +163,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIListenMixPlan.swift \
   Sources/SrtFlow/AIListenMixReport.swift \
   Sources/SrtFlow/AIAudioLevels.swift \
+  Sources/SrtFlow/AIListenSampleFrames.swift \
+  Sources/SrtFlow/ExportAudioReport.swift \
   Sources/SrtFlow/AIToolIO.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/VideoEditWaveformData.swift \
