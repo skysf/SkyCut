@@ -2,7 +2,7 @@
 # CI 用：这一次改动是不是「只改了文档」。是就打印 true，别的情况（包括算不出来）一律打印 false。
 #
 # Docs-only PRs skip compilation and self-checks; one shard runs scan guards (including docs-index-drift).
-# Main pushes always run all checks so a docs merge cannot cancel an ancestor's full run and replace it with scans.
+# Pushes never select this scan-only path: a docs merge must cover any ancestor's full run that it cancelled.
 # Standard-input mode only classifies paths (used by verified-tree). Originally both PR and main runs occupied all
 # five macOS runners for about ten minutes each.
 # 2026-10 下旬到 11-04 合的 60 个 PR 里有 10 个只改了文档。
