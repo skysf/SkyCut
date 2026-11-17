@@ -46,6 +46,10 @@
 按高度换算，不是按宽度：按宽度算的话，同一套样式在 16:9 和 9:16 之间切换时
 字号会突变。
 
+A canvas change of shape is the exception (2026-11-17): by height alone, 16:9 → 9:16 made every text 1.78× bigger on a frame 0.56×
+as wide. Now the stored sizes are re-expressed so a text keeps its size against the frame's short side and its x, y and wrap share
+(`OverlayReframe`; rule in [预览自由变换](preview-free-transform.md)「A canvas change keeps every clip's shape」).
+
 ## 版面框 = 定位框
 
 文字块的定位框是**版面框**（宽 = 用户设的折行宽度，高 = 排出来的总高），

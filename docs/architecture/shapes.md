@@ -18,6 +18,10 @@
 - 「画成实心」只问 `drawsFilled`（线条、圆弧永远不是），预览和导出都问它。
 - 线宽按 1080 高的画面算，只问 `ShapeAnnotation.strokeWidth(in:)`（`lineWidth × 画面高 / 1080`），描边**全在框内**：长方形往里收半个线宽，
   圆和圆弧的半径也减半个线宽，线条的圆线头在长度以内（可见长度就是 `width`）—— 选中框、可点范围和画出来的东西是同一个框。
+- A canvas change of shape (2026-11-17): widths are fractions of the frame's width, a rectangle's height of its height and the line
+  width is in 1080-high pixels, so on another shape they stretched and drifted apart. Every shape keeps its centre and its pixels
+  against the frame's short side (`OverlayReframe`; rule in [预览自由变换](preview-free-transform.md)「A canvas change keeps every
+  clip's shape」).
 
 ## 二、怎么画：只有 `ShapeOutline` 一份（所有种类）
 
