@@ -316,7 +316,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/presented-views-app-language.sh` — 每个 sheet / popover / 自建 `NSHostingView` 都套 `.appLanguage()`。
 - `checks/preview-perf-wiring.sh` — 每个视图 / `updateNSView` / Canvas 接了性能计数（漏了跑 `--fix` 自动补）；时间线上的块不读工程；订阅时钟的名单。
 - `checks/product-name.sh` — 看得见的叫 SkyCut，身份类的名字沿用 SrtFlow。
-- `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它。
+- `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它；cover/grade frame-window selection.
 - `checks/project-versions-wiring.sh` — Saved versions: the router hook, `undo version=`, the round's save points, the one-step restore, one writer of project files.
 - `checks/region-framing-wiring.sh` — 源矩形取景接进现有编辑 / 批量和原生渲染。
 - `checks/release-signing.sh` — 发布版用固定的签名身份签；`tccutil` 只在一处。
