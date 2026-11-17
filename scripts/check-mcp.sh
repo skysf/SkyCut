@@ -96,28 +96,8 @@ cd "$(dirname "$0")/.."
 ARCH_FLAG="--arch arm64"
 TRIPLE="arm64-apple-macosx15.0"
 
-echo "==> 打包脚本：小程序进 Helpers、先签它再签外层"
-# 签名只经 scripts/signing/sign-app.sh 一处（docs/architecture/code-signing-and-permissions.md）：
-# build-app.sh 要先把小程序拷进去再调它，它里面要先签小程序再签外层。
-BUILD_SCRIPT="scripts/build-app.sh"
-SIGN_SCRIPT="scripts/signing/sign-app.sh"
-COPY_LINE="$(grep -n 'cp "$BUILD_DIR/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
-CALL_SIGN="$(grep -n '^scripts/signing/sign-app.sh "$APP"$' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_HELPER="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-mcp"' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_APP="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}"$' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
-if [ -z "${COPY_LINE}" ] || [ -z "${CALL_SIGN}" ] || [ -z "${SIGN_HELPER}" ] || [ -z "${SIGN_APP}" ]; then
-  echo "✗ ${BUILD_SCRIPT} 没把 skycut-mcp 拷进 Contents/Helpers，或 ${SIGN_SCRIPT} 没签它：AI 客户端配置里写的那个路径会不存在" >&2
-  exit 1
-fi
-if [ "${COPY_LINE}" -gt "${CALL_SIGN}" ]; then
-  echo "✗ ${BUILD_SCRIPT} 先签名再拷 skycut-mcp：拷进去的小程序没签名，外层签名也立即失效" >&2
-  exit 1
-fi
-if [ "${SIGN_HELPER}" -gt "${SIGN_APP}" ]; then
-  echo "✗ ${SIGN_SCRIPT} 先签了外层再签 skycut-mcp：嵌套的可执行文件必须先签，否则外层签名立即失效" >&2
-  exit 1
-fi
-echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} 行才签；${SIGN_SCRIPT} 第 ${SIGN_HELPER} 行签小程序、第 ${SIGN_APP} 行才签外层"
+# shellcheck source=checks/MCP/packaging-wiring.sh
+source checks/MCP/packaging-wiring.sh
 
 # shellcheck source=checks/MCP/clip-file-wiring.sh
 source checks/MCP/clip-file-wiring.sh
@@ -280,30 +260,8 @@ for engine in Sources/SrtFlow/KokoroVoiceSpeech.swift Sources/SrtFlow/AISpeechSy
 done
 echo "   ✓ Kokoro、macOS 和 Sky Studio 的声音都经 writeVoiceover 写文件"
 
-echo "==> 认不出语言时，AI 拿到的是它能照做的话"
-# 自动检测没认出语言，界面那句「去面板里选」AI 做不到（docs/bugfixes/2026-09-29-ai-told-to-pick-language-in-panel.md）。
-# 检测处抛 LanguageUndetectedError，transcribe、generate_subtitles 的任务失败都经 AIHarvestFailure 换成「带上 language 再调」。
-if [ "$(grep -c 'throw LanguageUndetectedError()' Sources/SrtFlow/SubtitleGen/TranscriptHarvester.swift || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIHarvestFailure.message(' Sources/SrtFlow/AITranscribeTool.swift || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIHarvestFailure.message(' Sources/SrtFlow/AISubtitleTools.swift || true)" -ne 1 ]; then
-  echo "✗ 认不出语言没抛成 LanguageUndetectedError，或 transcribe / generate_subtitles 的失败没经 AIHarvestFailure：AI 会被叫去面板里选" >&2
-  exit 1
-fi
-echo "   ✓ 检测处抛 LanguageUndetectedError，两个任务的失败都经 AIHarvestFailure"
-
-echo "==> 关掉主窗口不退出；小程序把 App 拉起来的那次，结果里告诉 AI"
-# 2026-10-02 南极工程：SwiftUI 单 Window 场景关窗就退出，AI 下一次调用拉起来的是空的 Untitled、打开的文件夹也没了，
-# 它只看到「文件不存在」（docs/bugfixes/2026-10-03-closing-window-quits-app.md）。
-if [ "$(grep -c 'func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }' Sources/SrtFlow/SrtFlowApp.swift || true)" -ne 1 ]; then
-  echo "✗ 关掉主窗口会退出 App（SwiftUI 单 Window 场景的默认）：工程、AI 打开的文件夹全没了" >&2
-  exit 1
-fi
-if [ "$(grep -c 'return launched ? MCPBridge.addingNote(MCPBridge.relaunchNote, to: result) : result' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ] \
-   || [ "$(grep -c 'return (fd, true)' Sources/SrtFlowMCP/AppConnection.swift || true)" -ne 1 ]; then
-  echo "✗ 小程序把 App 拉起来之后没在结果里告诉 AI（之前打开的工程、文件夹都不在了）" >&2
-  exit 1
-fi
-echo "   ✓ 关窗口不退出；拉起 App 的那一次结果带 relaunchNote"
+# shellcheck source=checks/MCP/ai-messages-wiring.sh
+source checks/MCP/ai-messages-wiring.sh
 
 echo "==> 画面多大：export_video / get_job 报成片的宽高帧率，look 看文件报文件本身的尺寸"
 # 2026-10-06 盲测：三条片子 AI 都以为成片是 720p —— 导出不报尺寸，它拿 look 回的缩略图尺寸（最长边 1280）当了成片的

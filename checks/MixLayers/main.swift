@@ -75,6 +75,8 @@ checkWindowMatchesWhole()
 await checkMonoVoiceMatchesExport()
 checkPlan()
 checkReport()
+checkVoiceCheck()
+checkVoiceHints()
 
 try? FileManager.default.removeItem(at: root)
 print("\(checks) checks, \(failures) failures")

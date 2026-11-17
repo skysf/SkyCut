@@ -28,8 +28,9 @@ enum MCPGuideEditClipTopic {
             Trimming and speed. source_in and source_out are seconds inside the media file, not timeline seconds. Changing source_in keeps \
             the clip's timeline start and moves its end; pass start too to keep the end where it was. Changing source_out moves the end. \
             This differs from dragging a trim handle in the editor on purpose: you give absolute values. For a still image, source_out is \
-            its display length and must fit edit_limits.image_source_duration. speed sets playback speed (1 = normal) within \
-            edit_limits.speed; a value outside fails. ripple=true on a V1 clip moves the later V1 clips by the same amount its end moved. \
+            its display length and must fit edit_limits.image_source_duration. speed sets playback speed from 0.1 to 8 (1 = normal), \
+            keeping the audio's pitch. The range is reported in edit_limits.speed; a value outside fails. ripple=true on a V1 clip \
+            moves the later V1 clips by the same amount its end moved. \
             alone=true leaves linked clips (the separated sound or picture of a J/L cut) as they are, for example to trim one side of a \
             J/L cut. Clips with keyframes: keyframes=keep_frames (default) keeps the motion on its source frames, stretch re-times it to \
             the new window, clear removes it. A new source_in, source_out or file whose window crosses a cut inside the file itself \

@@ -106,12 +106,13 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .undo, title: "Undo",
                 description: """
-                Undo the latest edits, like Command-Z (steps, default 1). round=true puts the project back to how it was before this \
-                round of AI edits began, itself one undo step. File moves by manage_files are not undone.
+                Undo like Command-Z (steps, default 1), this AI round (round=true) or to a saved version (version=<id>). Each is one \
+                undo step.
                 """,
                 input: MCPSchema.object([
                     "steps": MCPSchema.integer("How many edits to undo (default 1).", minimum: 1, maximum: 50),
-                    "round": MCPSchema.boolean("Undo everything done since this round of AI edits began.")
+                    "round": MCPSchema.boolean("Undo this whole round of AI edits."),
+                    "version": MCPSchema.string("A saved version's id (v3); get_status lists them.")
                 ]),
                 destructive: true
             )

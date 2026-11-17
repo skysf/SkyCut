@@ -33,6 +33,8 @@ xcrun swiftc \
   Sources/SrtFlow/Listening/SourceSoundFeatures.swift \
   Sources/SrtFlow/Listening/SourceSoundSpectrogram.swift \
   Sources/SrtFlow/Listening/SourceSoundTrait.swift \
+  Sources/SrtFlow/Listening/VoiceClarity.swift \
+  Sources/SrtFlow/Listening/VoiceLines.swift \
   checks/Listening/main.swift \
   checks/Listening/Harness.swift \
   checks/Listening/Signals.swift \
@@ -40,6 +42,7 @@ xcrun swiftc \
   checks/Listening/ESTOIChecks.swift \
   checks/Listening/MaskerChecks.swift \
   checks/Listening/TraitChecks.swift \
+  checks/Listening/VoiceChecks.swift \
   checks/Listening/ParityCases.swift \
   checks/Listening/ParityChecks.swift \
   checks/Listening/PythonReference.swift \
