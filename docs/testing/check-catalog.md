@@ -213,6 +213,11 @@
   set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
   back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
   `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
+- Does the picture cover the frame (`fills_frame`, `fill_scale`, `fills_except`, look's `uncovered`): `scripts/check-mcp.sh` → `PictureCoverageChecks`
+  (the geometry against an independent pixel-centre bitmap over 1,092 turns / sizes / offsets) and `ClipCoverageChecks` (the walkthrough's
+  turn and drift, flips, crop, keys, a spring's dip, look with V2 / hidden / transparent / gap / wipe / transition / rise); wiring in
+  `checks/MCP/coverage-wiring.sh`; real preview frames against the same geometry in `scripts/check-preview-composition.sh`
+  (`RotatedPictures.swift`). Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - add_clips tracks and made sound effects (2026-11-17): `scripts/check-mcp.sh` → `TrackLandingChecks` (an audio clip on a taken or
   hidden named track opens another new track, never one with content; 13 crowded new_audio clips; A1–A7 in one call in any order,
   no gaps; video lifts noted; the `track` adjustment), `SoundEffectChecks` (every preset renders at 0.05–0.3 s, a trap ends the

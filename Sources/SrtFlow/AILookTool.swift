@@ -19,6 +19,8 @@ import SrtFlowMCPKit
 // Each way of looking reads the project only before its first await and then lets the project's line go (AICallLines.letGo()): edits
 // and looks sent after it do not wait for its frames. shots=true keeps the line until it is done (it reads the project at its end).
 // A cancelled look (cancel_job on a look that became a job, AILookCall) stops between frames.
+// Timeline frames also say which edges and corners of the canvas no picture covers (`uncovered`, AIPictureCoverage: from the clips'
+// geometry, the same that decides get_timeline's fills_frame; docs/architecture/preview-free-transform.md).
 
 @MainActor
 enum AILookTool {
@@ -78,6 +80,8 @@ enum AILookTool {
             try Task.checkCancellation()
             var entry = await describe(frame).objectValue ?? [:]
             entry["on_screen"] = onScreen(state, at: frame.time, ids: ids)
+            // Bare edges and corners of the canvas, from the clips' geometry (never from dark pixels): AIPictureCoverage.
+            if let uncovered = AIPictureCoverage.uncovered(state, at: frame.time) { entry["uncovered"] = uncovered }
             described.append(.object(entry))
         }
         let canvas = VideoEditCompositionBuilder.renderSize(for: state)
@@ -91,13 +95,9 @@ enum AILookTool {
 
     /// 这一刻画面上有谁：看得见的片段（哪条轨）、文字、字幕 —— 看不了图的模型靠它对上号。
     private static func onScreen(_ state: TimelineState, at time: Double, ids: AIShortIDs) -> JSONValue {
-        var clips: [JSONValue] = []
-        var lanes: [(TrackSlot, [EditClip], Bool)] = [(.main, state.mainClips, state.mainHidden)]
-        for (index, lane) in state.overlayTracks.enumerated() { lanes.append((.overlay(index), lane.clips, lane.isHidden)) }
-        for (slot, laneClips, hidden) in lanes where !hidden {
-            for clip in ClipVisibility.visible(laneClips) where clip.contains(time: time) || abs(clip.timelineStart - time) < 0.001 {
-                clips.append(.string("\(ids.short(clip.id)) \(clip.name) (\(AITrackName.name(of: slot)))"))
-            }
+        // The same clips the uncovered field counts (ClipCoverage.onScreen).
+        let clips: [JSONValue] = ClipCoverage.onScreen(in: state, at: time).map { slot, clip in
+            .string("\(ids.short(clip.id)) \(clip.name) (\(AITrackName.name(of: slot)))")
         }
         var object: [String: JSONValue] = ["clips": .array(clips)]
         let texts = state.renderedTextOverlays.filter { $0.contains(time: time) }

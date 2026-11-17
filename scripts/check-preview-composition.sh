@@ -81,6 +81,8 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineLinkageLanding.swift \
   Sources/SrtFlow/VideoEditTimelineSnap.swift \
   Sources/SrtFlow/TimelineRenderSize.swift \
+  Sources/SrtFlow/PictureCoverage.swift \
+  Sources/SrtFlow/ClipCoverage.swift \
   Sources/SrtFlow/VideoEditCompositionBuilder.swift \
   Sources/SrtFlow/CompositionSource.swift \
   Sources/SrtFlow/CompositionFade.swift \
@@ -119,6 +121,7 @@ xcrun swiftc \
   checks/PreviewComposition/ScaleKeyframes.swift \
   checks/PreviewComposition/TransitionLook.swift \
   checks/PreviewComposition/ProxySwap.swift \
+  checks/PreviewComposition/RotatedPictures.swift \
   checks/OptimizedMedia/RampVideo.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
