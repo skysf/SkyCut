@@ -85,7 +85,8 @@ enum AIBeatCuts {
                 moved.insert(partner)
                 state.update(partner) { sound in
                     let end = sound.timelineEnd + endDelta
-                    sound.timelineStart = max(0, sound.timelineStart + startDelta)
+                    // Pushed before 0:00 (a J cut's lead-in): lose the head and stay in sync, never clamp (LinkageHeadTrims).
+                    sound.moveForLinkage(to: sound.timelineStart + startDelta)
                     let wanted = max(minLength, end - sound.timelineStart) * sound.speed
                     sound.sourceDuration = min(wanted, sound.assetDuration - sound.sourceStart)
                 }

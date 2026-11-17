@@ -146,7 +146,8 @@
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
 - 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
   group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
-  `FreezeRippleChecks`, which also covers `RippleLinkPartners`).
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`); a J cut's sound that the AI's ripple or cut_to_beat pushes before 0:00
+  loses its head, stays in sync and is listed in the reply's `trimmed_heads` (`RippleHeadTrimChecks`).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
