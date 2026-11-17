@@ -92,7 +92,7 @@ enum AITimelineSummary {
         if !clip.isAudioOnly, let info = clip.info { object["source_size"] = .string(info.resolutionLabel) }
         if abs(clip.speed - 1) > 0.0001 { object["speed"] = .number(clip.speed) }
         if abs(clip.volume - 1) > 0.0001 || clip.hasVolumeCurve {
-            object["volume_db"] = AIParameterReport.number(clip.volumeLineDecibels(atTimeline: clip.timelineStart))
+            object["volume_db"] = AIParameterReport.decibels(clip.volumeLineDecibels(atTimeline: clip.timelineStart))
             if clip.hasVolumeCurve { object["volume_db_at"] = "clip_start" }
         }
         if clip.isMuted { object["muted"] = true }

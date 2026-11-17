@@ -64,13 +64,36 @@ enum AIParameterReport {
                 curveAdjustment = [
                     "parameter": "volume_curve", "derived_from": "volume_db",
                     "requested": .array(old.volumeCurve.keys.map { ["time": number(clip.timelineTime(atSource: $0.time)), "db": number($0.value + shift)] }),
-                    "applied": values["volume_curve"]!, "reason": "shifting_existing_volume_curve_clamps_keyframe_gains"
+                    "applied": shown(values["volume_curve"]!, key: "volume_curve"), "reason": "shifting_existing_volume_curve_clamps_keyframe_gains"
                 ]
             }
         }
-        var report = make(requested: raw, values: values, reasons: reasons)
+        var report = make(requested: comparable(raw), values: values, reasons: reasons)
         if let curveAdjustment { report["adjustments"] = .array((report["adjustments"]?.arrayValue ?? []) + [curveAdjustment]) }
         return report
+    }
+
+    /// The parts of a request that are clip values. A sound_effect entry's preset, duration… shape the file, not the clip: only its
+    /// volume_db is compared (comparing the whole object reported every made sound as a gain_limits adjustment, MCP-15,
+    /// docs/bugfixes/2026-11-17-sound-effect-fake-gain-adjustment.md).
+    private static func comparable(_ raw: JSONValue) -> JSONValue {
+        guard case .object(var object) = raw, let effect = object["sound_effect"] else { return raw }
+        object["sound_effect"] = effect["volume_db"].map { ["volume_db": $0] }
+        return .object(object)
+    }
+
+    /// A requested and an applied dB value (volume_db, a curve point's db) closer than this are the same: the gain is stored linear,
+    /// and the round trip leaves float noise (-8 comes back as -8.000000000000002). Only a real limit is an adjustment.
+    static let decibelTolerance = 0.001
+    private static let decibelKeys: Set<String> = ["volume_db", "db"]
+
+    /// A dB value as reported: the actual value read back from the linear gain, with the round trip's float noise cleaned
+    /// (-8.000000000000002 → -8). A real value is never rounded: the clamp at the linear maximum stays 6.020599913279624, not
+    /// 6.0 or 6.02 (docs/architecture/mcp-edit-parameters.md: rounding the limit turns it into another limit).
+    static func decibels(_ value: Double) -> JSONValue {
+        guard value.isFinite else { return number(value) }
+        let cents = (value * 100).rounded() / 100
+        return .number(abs(cents - value) <= 1e-9 ? cents : value)
     }
 
     static func make(requested raw: JSONValue, values: [String: JSONValue], reasons: [String: String] = [:]) -> [String: JSONValue] {
@@ -81,9 +104,9 @@ enum AIParameterReport {
             guard let rawInput = raw[key], !rawInput.isNull, let actual = values[key] else { continue }
             let input = canonical(rawInput, like: actual)
             requested[key] = input
-            applied[key] = actual
-            if !matches(input, actual) {
-                adjustments.append(["parameter": .string(key), "requested": input, "applied": actual,
+            applied[key] = shown(actual, key: key)
+            if !matches(input, actual, key: key) {
+                adjustments.append(["parameter": .string(key), "requested": input, "applied": shown(actual, key: key),
                                     "reason": .string(reasons[key] ?? "final_timeline_settlement; see magnet/linkage or later entries in this batch")])
             }
         }
@@ -137,12 +160,25 @@ enum AIParameterReport {
         }
     }
 
-    private static func matches(_ requested: JSONValue, _ applied: JSONValue) -> Bool {
+    /// `key`: the field the value sits under (an array's items sit under the array's key), so dB values get the dB tolerance.
+    private static func matches(_ requested: JSONValue, _ applied: JSONValue, key: String) -> Bool {
         switch (requested, applied) {
-        case (.number(let a), .number(let b)): return abs(a - b) <= 1e-9 * max(1, abs(a), abs(b))
-        case (.object(let a), .object(let b)): return a.allSatisfy { key, value in b[key].map { matches(value, $0) } ?? false }
-        case (.array(let a), .array(let b)): return a.count == b.count && zip(a, b).allSatisfy { matches($0.0, $0.1) }
+        case (.number(let a), .number(let b)):
+            if decibelKeys.contains(key) { return abs(a - b) <= decibelTolerance }
+            return abs(a - b) <= 1e-9 * max(1, abs(a), abs(b))
+        case (.object(let a), .object(let b)): return a.allSatisfy { name, value in b[name].map { matches(value, $0, key: name) } ?? false }
+        case (.array(let a), .array(let b)): return a.count == b.count && zip(a, b).allSatisfy { matches($0.0, $0.1, key: key) }
         default: return requested == applied
+        }
+    }
+
+    /// The applied value as reported: dB values without the float noise (`decibels`), everything else as read from the timeline.
+    private static func shown(_ value: JSONValue, key: String) -> JSONValue {
+        switch value {
+        case .number(let number) where decibelKeys.contains(key): return decibels(number)
+        case .object(let object): return .object(object.reduce(into: [String: JSONValue]()) { $0[$1.key] = shown($1.value, key: $1.key) })
+        case .array(let list): return .array(list.map { shown($0, key: key) })
+        default: return value
         }
     }
 }

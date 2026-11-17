@@ -109,6 +109,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["source_cut_crossing", "audio_hole", "audio_limiter", "audio_overload", "audio_thin", "audio_true_peak", "loudest_layers", "sentence_cut"])
     // Does the picture cover the frame (2026-11-17, AIPictureCoverage): picture's fills_frame / fill_scale / fills_except, look's uncovered.
     names.formUnion(["fills_frame", "fill_scale", "fills_except", "top_right"])
+    // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).
+    names.insert("audible_duration")
     return names
 }
 
