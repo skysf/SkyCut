@@ -4,8 +4,9 @@ import Foundation
 
 // MARK: - 找一个视频文件的镜头：从头解到尾、缓存、慢的交给任务
 //
-// 管什么：一个视频文件整个扫一遍（每帧让解码器直接缩到长边 48 像素，逐帧算和上一帧差多少、有多亮），交给
-// `AIShotDetector` 找切点，结果按「路径 + 大小 + 修改时间」记在内存里（再问秒回；文件换了、改了就重扫）。
+// 管什么：一个视频文件整个扫一遍（每帧让解码器直接缩到长边 48 像素，逐帧记几样小信号：`AIFrameSignals`），交给
+// `AIShotDetector` 找切点，结果（镜头 + 逐帧的信号）按「路径 + 大小 + 修改时间」记在内存里（再问秒回；文件换了、改了就重扫）。
+// 逐帧的信号也给放素材时的夹帧提醒（AISourceCutCheck）和成片逐帧扫（AIInspectionPicture）用：同一个文件只解一遍。
 // 同一个文件同时只扫一次（第二个来问的接着等那一次）。解码是这件事的全部成本：M1 上 1440p 约 17 倍速，
 // 分段并行也不更快（2026-09-28 实测，硬件解码器只有一个），14 分钟的课要 50 秒 —— 所以调用方最多等一会儿，
 // 没扫完就把它变成 AI 的任务（`job(for:)`，get_job 看进度、cancel_job 能停），扫完的结果照样进缓存。
@@ -17,6 +18,8 @@ enum AIShotScan {
     struct Result: Sendable {
         var shots: [AIShotDetector.Shot]
         var duration: Double
+        /// 逐帧的小信号（找刀、夹帧、闪白、不动、黑场都从它算）。
+        var signals: AIFrameSignals
     }
 
     /// 解码器直接缩到这么大（长边像素）：够分辨换没换镜头，一帧几 KB。
@@ -71,6 +74,16 @@ enum AIShotScan {
     }
 
     static let quickScanSeconds = 120.0
+
+    /// 这个文件正在扫（排着或解着，还没扫完）。
+    static func isScanning(_ url: URL) -> Bool {
+        scans[key(for: url)] != nil
+    }
+
+    /// 上一次扫这个文件没扫成的原因；扫成了、没扫过、又开始扫了是 nil。
+    static func failure(of url: URL) -> String? {
+        failures[key(for: url)]
+    }
 
     /// 还在扫的那个文件给 AI 的任务（同一次扫描只有一个任务）。扫完 / 没在扫回 nil。
     static func job(for url: URL) -> AIJobs.Job? {
@@ -134,19 +147,14 @@ enum AIShotScan {
         }
         let cuts = AIShotDetector.cutIndices(changes: signals.changes, brightness: signals.brightness, times: signals.times)
         let end = max(duration, signals.times.last ?? 0)
-        return .success(Result(shots: AIShotDetector.shots(cutTimes: cuts.map { signals.times[$0] }, from: 0, to: end), duration: end))
+        let shots = AIShotDetector.shots(cutTimes: cuts.map { signals.times[$0] }, from: 0, to: end)
+        return .success(Result(shots: shots, duration: end, signals: signals))
     }
 
-    private struct Signals: Sendable {
-        var times: [Double] = []
-        var changes: [Double] = []
-        var brightness: [Double] = []
-    }
-
-    /// 阻塞地把整个文件解一遍：每帧的时间、和上一帧差多少、多亮。**只在 `MediaReadQueue` 上调。**
+    /// 阻塞地把整个文件解一遍：每帧的小信号（`AIFrameSignals.Builder`）。**只在 `MediaReadQueue` 上调。**
     nonisolated private static func readSignals(
         asset: AVURLAsset, track: AVAssetTrack, width: Int, height: Int, duration: Double, control: AIShotScanControl
-    ) -> Signals? {
+    ) -> AIFrameSignals? {
         guard let reader = try? AVAssetReader(asset: asset) else { return nil }
         let output = AVAssetReaderTrackOutput(track: track, outputSettings: [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
@@ -157,8 +165,7 @@ enum AIShotScan {
         guard reader.canAdd(output) else { return nil }
         reader.add(output)
         guard reader.startReading() else { return nil }
-        var signals = Signals()
-        var previous: [UInt8]?
+        var builder = AIFrameSignals.Builder()
         while let sample = output.copyNextSampleBuffer() {
             if control.isCancelled {
                 reader.cancelReading()
@@ -166,13 +173,10 @@ enum AIShotScan {
             }
             guard let buffer = CMSampleBufferGetImageBuffer(sample), let rgb = rgbBytes(of: buffer) else { continue }
             let time = CMSampleBufferGetPresentationTimeStamp(sample).seconds
-            signals.times.append(time)
-            signals.changes.append(previous.map { AIShotDetector.change($0, rgb) } ?? 0)
-            signals.brightness.append(AIShotDetector.brightness(rgb))
-            previous = rgb
-            if signals.times.count % 30 == 0, duration > 0 { control.setProgress(min(1, time / duration)) }
+            builder.add(rgb, at: time)
+            if builder.signals.count % 30 == 0, duration > 0 { control.setProgress(min(1, time / duration)) }
         }
-        return reader.status == .completed ? signals : nil
+        return reader.status == .completed ? builder.signals : nil
     }
 
     /// BGRA 的像素缓冲 → 紧挨着的 RGB 字节（去掉每行末尾的填充）。

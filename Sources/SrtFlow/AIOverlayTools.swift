@@ -164,17 +164,22 @@ enum AIOverlayTools {
         if let fps, fps != project.state.frameRate.fps, ScreenRecordingCoordinator.shared.isBusy {
             throw AIToolError(AIScreenRecordingTool.lockMessage("the frame rate cannot be changed now"))
         }
+        let before = project.state
         if let ratioText {
             let ratio = CanvasRatio.allCases.first { ($0 == .auto ? "auto" : $0.title) == ratioText } ?? .auto
             project.setCanvasRatio(ratio)
         }
         if let fps, let rate = ProjectFrameRate(rawValue: fps) { project.setFrameRate(rate) }
         let size = VideoEditCompositionBuilder.renderSize(for: project.state)
-        return .ok([
+        var result: [String: JSONValue] = [
             "ratio": .string(project.state.canvasRatio == .auto ? "auto" : project.state.canvasRatio.title),
             "width": .number(Double(Int(size.width))),
             "height": .number(Double(Int(size.height))),
             "fps": .number(Double(project.state.frameRate.fps))
-        ], changed: true)
+        ]
+        // A new frame shape keeps every clip's shape (`CanvasReframe`, run by perform): say which clips that re-expressed and which
+        // no longer fill the frame (docs/bugfixes/2026-11-17-canvas-change-stretches-framed-clips.md).
+        result.merge(AICanvasReframe.fields(before: before, after: project.state, ids: AIShortIDs(state: project.state))) { kept, _ in kept }
+        return .ok(.object(result), changed: true)
     }
 }

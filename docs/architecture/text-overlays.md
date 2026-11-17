@@ -192,6 +192,9 @@
 **二、时刻必须先钉到工程帧的网格上**（`TextAnimator.quantize`）。预览和导出
 都从它进 —— 不量化的话预览停在两帧之间、成片停在帧上，逐点比对永远差一点，
 而"预览所见 = 成片所得"是这整套东西的前提。
+Which frame a time is on is `FrameGrid.frame(containing:)` (SrtFlowCore), which allows for floating-point noise; never
+floor `time × fps` yourself: 123 / 30 s times 30 is 122.99999999999999, and a plain floor put the preview and the AI's
+look a frame behind on such frames (2026-11-17, [case](../bugfixes/2026-11-17-overlay-export-repeats-a-frame.md)).
 
 ### 时长夹紧与声音、画面渐变共用一份
 
@@ -231,9 +234,9 @@ Fade 当场退回 None；同一个错误也让「勾了粗体再拖字号」掉�
 
 | 片段 | ffmpeg |
 | --- | --- |
-| 静止 | 只解一帧 PNG，`loop` 复制到此段长度加两帧，`setpts=N/fps/TB+起点/TB`；与形状同款 |
-| 一次性序列 | `-itsoffset <起点> -framerate <fps> -i text0-in_%05d.png`，帧与时间线精确对齐（实测） |
-| 循环 | `-framerate <fps> -i …`，再 `loop=loop=-1:size=N,setpts=N/fps/TB+起点/TB` |
+| 静止 | 只解一帧 PNG，`loop` 复制到此段长度加两帧，then placed by frame number (`OverlayExportFile.placement`, below)；与形状同款 |
+| 一次性序列 | `-framerate <fps> -i text0-in_%05d.png`, placed by frame number (until 2026-11-17 `-itsoffset <起点>`, which rounded to the nearest frame) |
+| 循环 | `-framerate <fps> -i …`，再 `loop=loop=-1:size=N`, placed by frame number |
 
 **静止 PNG 不许用输入侧 `-loop 1` 铺满整条时间线**（2026-11-02）：它会每帧重新解码同一张
 PNG，短标题和形状也会解完整片。复用静帧工厂的「解一帧、滤镜 loop 复制」做法，
@@ -246,12 +249,38 @@ PNG，短标题和形状也会解完整片。复用静帧工厂的「解一帧�
 `end - 1/fps`（2026-09-17 多补一帧补的是这个）；`-itsoffset <起点>` 被换算到序列的 1/fps 格子上（四舍五入），**起点不在格子上时**
 （AI 按词的时间放字）整串最多提前半帧；主轨几段拼接（concat）之后画面的时间戳是微秒、比格子晚几微秒，正好落在「最后一帧之后」。
 只多一帧时后两条一凑就漏一帧（2026-10-06 盲测，[案例](../bugfixes/2026-10-14-text-blinks-at-animation-seam.md)）；多两帧，最后一帧至少在
-`end` 之后半帧。
+`end` 之后半帧。Since 2026-11-17 a sequence starts at its section's first output frame and is placed by frame number (next
+paragraphs), so the `-itsoffset` rounding is gone; the two extra frames keep the stream going more than a frame past the end.
 
 一段文字的几段**首尾相接、左闭右开**：每段的 `enable` 是 `gte(t,起点)*lt(t,终点)`（`OverlayExportFile.enableWindow`），和预览的
 `contains(time:)` 同一个口径。两头都闭的 `between` 在接缝正好落在一帧上时让两段同时贴，那一帧字和阴影叠成两层。
 守卫：`scripts/check-text-render.sh` 第 19 组（`checks/TextRender/SeamFrames.swift`：几段拼起来的主轨 + 起点不在格子上的一串字，
 逐帧量，字该在的帧不许暗、不许叠）。
+
+**Frames on the grid** (2026-11-17, [case](../bugfixes/2026-11-17-overlay-export-repeats-a-frame.md)): every exported frame of
+a text or shape is the frame for its own time, the one the preview shows there. Four rules, all in `OverlayExportFile`:
+
+1. **Draw by frame number.** The k-th PNG of a section is drawn for the section's k-th output frame:
+   `OverlayExportFile.frameTime(k, sectionStart:grid:)`, counting from the first frame at or after the section's start.
+   Never `start + k / fps` run through a floor: it lands a hair below some frames and draws the one before (at 30 fps frames
+   24 and 25 identical, frame 26 caught up). Stills (a still overlay, the middle of an animated one) are drawn for the
+   section's first output frame too: the frame below can come before the entrance ends (a wipe 98 % through for the whole
+   middle).
+2. **Place by frame number, half a frame early.** `OverlayExportFile.placement` puts frame N of a section's stream half a
+   frame before output frame `first + N` (`settb=1/(2·fps)`, `setpts=2*N±…`, integers only). After cuts and crossfades the
+   output frames' timestamps sit microseconds before or after the grid; an overlay frame exactly on the grid lost to the
+   one before (every third frame repeated at 30 fps after a crossfade), and `-itsoffset` rounded an off-grid start to the
+   nearest frame while the drawing used the one below (the whole entrance a frame late).
+3. **Switch on by frame number.** `enableWindow` is on from half a frame before the section's first output frame to half a
+   frame before the first frame at or after its end — still left-closed, right-open. Compared with raw seconds, a frame a
+   hair before the grid fell on the wrong side: after a cut the frame at 7.2 s has t = 7.199999999999999 and `gte(t,7.2)`
+   dropped it.
+4. **Frame numbers come from `FrameGrid`** (`firstFrame(atOrAfter:)`, `frame(containing:)`), with its tolerance for
+   floating-point noise; don't floor or ceil `time × fps` yourself.
+
+Guard: `scripts/check-text-render.sh` group 20 (`checks/TextRender/MovingFrames.swift`): wiping titles and a wiping shape,
+starts on and off the grid, a still square starting on the grid, over cuts and crossfades, at 24 / 30 / 60 fps; every frame's
+lit width must equal the renderer's for that frame's own time, and no frame may repeat the one before while it moves.
 
 **循环动画只渲一个周期。** 呼吸是周期性的，整段逐帧渲会随文字时长线性膨胀 ——
 10 分钟的呼吸文字能写出几个 GB，把磁盘撑爆。所以中间那段只渲一个周期，交给
@@ -466,6 +495,7 @@ N 倍，但标题就几十个字，而且**只在动画进行中**才走这条�
 | 对焦：终点精确收口、曲线接近匀速（中点落在两端正中）、出场继续放大、起手不透明度两头、逐帧不被裁、只做入场时包络不白扩 | `scripts/check-text-render.sh` 第 17 组 |
 | 预览上的可点范围：渲染图里看得见的像素全落在可点范围里（含两行大行距，量的是 y 轴翻没翻对）、短字不按整框判且跟着对齐走、空文字 = 整框、底板整块都算、数字按定版串 | `scripts/check-text-render.sh` 第 18 组（`checks/TextRender/HitGeometry.swift`） |
 | 底板贴着字：真渲出来的底板横向 = 字宽 + 两边内边距，跟着对齐走，几行按最宽那一行，折行处的空格不算；可点范围和画出来的同一块 | `scripts/check-text-render.sh` 第 18b 组（`checks/TextRender/Plate.swift`） |
+| Moving text and shapes: every exported frame is the frame for its own time (none repeated, late or missing) at 24 / 30 / 60 fps, starts on and off the grid, over cuts and crossfades | `scripts/check-text-render.sh` group 20 (`checks/TextRender/MovingFrames.swift`) |
 | 把手（以及全部源码）的 `.contentShape` 不写在 `.offset` / `.rotationEffect` / `.scaleEffect` 之后 | `checks/hit-shape-before-offset.sh` |
 | v11 / v12 / v13 / v14 登记、样式与动画与数字与对焦往返（含"关掉的投影不许自己长回来"）、没有文字不写键、没设动画不写键、五类选择的互斥 | `scripts/check-project-file.sh` |
 | 四类成员共用同一个拖动位移 | `scripts/check-timeline-snap.sh` |

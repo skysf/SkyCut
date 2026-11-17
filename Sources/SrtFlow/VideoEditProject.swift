@@ -439,6 +439,8 @@ final class VideoEditProject {
         mutate(&next)
         // 磁吸：只在改到了 V1 的排布（或者磁吸这次才打开）时排紧 V1 —— 改字幕、音量、别的轨永远不动 V1（`MainMagnet`）。
         let packed = MainMagnet.settle(&next, after: before)
+        // The canvas changed shape (set_canvas, auto following a new first V1 clip): clips this edit did not frame keep their shape.
+        CanvasReframe.keepShapes(&next, after: before)
         // 联动：主轨的画面挪了，压在上面、这次没被碰过的东西跟着挪 / 删 —— 磁吸合拢之后、补色之前。
         var linkage = linkageEnabled
             ? TimelineLinkage.follow(from: before, to: &next, deletesContent: deletesContent) : TimelineLinkage.Report()
@@ -764,10 +766,7 @@ final class VideoEditProject {
         }
     }
 
-    static func looksLikeAudio(_ url: URL) -> Bool {
-        ["mp3", "m4a", "aac", "wav", "aiff", "aif", "flac", "ogg", "opus", "wma", "caf"]
-            .contains(url.pathExtension.lowercased())
-    }
+    static func looksLikeAudio(_ url: URL) -> Bool { MediaFileTypes.isAudio(url) }
 
     /// 视频素材：探测完再上轨，时长、尺寸一步到位。
     /// `generation` 是**发起导入那一刻**的工程代号（默认取当前的，给冒烟钩子
@@ -842,9 +841,9 @@ final class VideoEditProject {
         guard isCurrentGeneration(generation), !Task.isCancelled else { return }
         importingCount += urls.count
         defer { importingCount = max(0, importingCount - urls.count) }
-        for url in urls {
+        let clipIDs = urls.map { _ in UUID() }  // every placeholder first, then all converted together (StillClipBatch)
+        for (url, clipID) in zip(urls, clipIDs) {
             guard isCurrentGeneration(generation) else { return }
-            let clipID = UUID()
             let playhead = clock.time
             perform(rebuildsPreview: false) { state in
                 var clip = EditClip(
@@ -862,8 +861,8 @@ final class VideoEditProject {
                     state.mainClips.append(clip)
                 }
             }
-            await convertStillClip(clipID, from: url, generation: generation)
         }
+        await StillClipBatch.convert(zip(clipIDs, urls).map { (clip: $0, image: $1) }, generation: generation, in: self)
     }
 
     /// 图片占位块 → 静帧循环视频，转完**无感替换**（不占撤销栈，用户没做任何操作）。

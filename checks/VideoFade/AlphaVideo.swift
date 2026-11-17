@@ -128,6 +128,9 @@ private func checkAlphaVideo() async {
         }
         let previewOverlay = premultipliedBands(previewSource, stored: fixture.stored)
         let exportOverlay = premultipliedBands(exportSource, stored: fixture.stored)
+        if fixture.recognised == .straight, fixture.full {  // AlphaVideoNoWait.swift: the preview shows the original until the copy exists
+            await checkPreviewDoesNotWait(fixture.url, info: info, base: red, baseInfo: redInfo, overlay: previewOverlay, label: "预览不等副本 · \(fixture.name)")
+        }
         for scenario in alphaScenarios where fixture.full || scenario.name == alphaScenarios[0].name {
             await runAlphaScenario(scenario, fixture: fixture, info: info, base: scenario.scale > 1 ? (redLarge, redLargeInfo) : (red, redInfo),
                                    previewOverlay: previewOverlay, exportOverlay: exportOverlay)

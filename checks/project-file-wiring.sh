@@ -374,8 +374,41 @@ require "带关键帧的透明静帧用它自己的遮罩当 matte" \
   Sources/SrtFlow/VideoEditPrerender.swift 'StillAlphaNaming\.matteURL\(forStill:'
 require "带关键帧的带透明视频用逐帧抽的遮罩当 matte" \
   Sources/SrtFlow/VideoEditPrerender.swift 'AlphaSourceCopies\.url\(\.matte, for: source\.sourceURL\)'
-require "直通的段在 AVFoundation 那一边插预乘副本" \
-  Sources/SrtFlow/CompositionSource.swift 'alpha == \.straight, let premultiplied = await AlphaSourceCopies\.url\(\.premultiplied'
+require "直通的段在 AVFoundation 那一边插预乘副本（成片那一边的 build 等副本转好）" \
+  Sources/SrtFlow/CompositionSource.swift ': await AlphaSourceCopies\.url\(\.premultiplied, for: clip\.sourceURL\)'
+# The preview never waits for that copy (2026-11-17): only a copy already on disk (readyURL never converts); the coordinator
+# makes the missing ones after the rebuild and swaps them in while stopped (checks/optimized-media-wiring.sh pins that half).
+require "预览不等预乘副本：只拿已经在盘上的（readyURL 不转、不等）" \
+  Sources/SrtFlow/CompositionSource.swift '\? AlphaSourceCopies\.readyURL\(\.premultiplied, for: clip\.sourceURL\)'
+require "预览不等预乘副本：只有表上标了 readyAlphaCopiesOnly 的 build 才不等" \
+  Sources/SrtFlow/CompositionSource.swift 'let premultiplied = lookup\.readyAlphaCopiesOnly$'
+# A transparent still is one encoded frame shared by all samples (2026-11-17, MCP-76): the factory shares it before the file
+# lands, and falls back to writing every frame only when the rewrite refuses the layout.
+require "透明静帧只编一帧、落盘之前让 120 个样本共用它" \
+  Sources/SrtFlow/StillImageClipFactory.swift 'finishing: \{ try StillFrameSharing\.shareSingleFrame\(in: \$0, count: stillFrameCount\) \}'
+require "共用不了（别的 ffmpeg 写的布局）才退回逐帧写" \
+  Sources/SrtFlow/StillImageClipFactory.swift '\} catch is StillFrameSharing\.Unsupported \{'
+require "静帧转码同时最多几路（不管谁要）" \
+  Sources/SrtFlow/StillImageClipFactory.swift 'await ConversionSlots\.shared\.acquire\(\)'
+# Transparent stills made before that stored their frame 120 times: at launch they are rewritten in place to one frame, only in
+# the still cache folder, off the main thread and out of the Swift concurrency pool; never deleted (behaviour:
+# scripts/check-still-clip-encode.sh → CacheSweep.swift; rule: docs/architecture/freeze-frame.md 4a3).
+require "launch rewrites the old every-frame transparent stills" Sources/SrtFlow/SrtFlowApp.swift 'StillCacheSweep\.startAtLaunch\(\)'
+require "the rewrite looks only in the still cache folder" \
+  Sources/SrtFlow/StillCacheSweep.swift 'sweep\(directory: StillImageClipFactory\.cacheDirectoryURL\)'
+require "the rewrite runs on a MediaReadQueue (blocking file IO)" Sources/SrtFlow/StillCacheSweep.swift 'MediaReadQueue\.proxy\.addOperation \{'
+forbid "the rewrite never deletes a still: only its own temporary file may go" \
+  Sources/SrtFlow/StillCacheSweep.swift 'removeItem\(at: (url|directory)|unlink\('
+# Image placeholders convert together, not one after another (a 96-frame PNG sequence waited for 96 conversions in a row).
+for f in Sources/SrtFlow/VideoEditProject.swift Sources/SrtFlow/VideoEditMediaFileDrop.swift Sources/SrtFlow/VideoEditTimelineClipboard.swift; do
+  require "图片占位块一起转（StillClipBatch），不逐个 await" "$f" 'await StillClipBatch\.convert\('
+done
+SEQUENTIAL_STILLS="$(grep -rnE --include='*.swift' -B1 'await (self\.)?convertStillClip\(' Sources/SrtFlow \
+  | grep -E '^[^:]+-[0-9]+-[[:space:]]*for .* in ' || true)"
+if [ -n "${SEQUENTIAL_STILLS}" ]; then
+  echo "✗ 接线守卫：图片占位块不许在 for 循环里逐个 await convertStillClip（走 StillClipBatch.convert）：${SEQUENTIAL_STILLS}" >&2
+  WIRING_FAIL=1
+fi
 for f in Sources/SrtFlow/VideoEditCompositionBuilder.swift Sources/SrtFlow/VideoEditExportGraph.swift; do
   require "渲染的入口补认老段的透明（预览合成和导出图同一个函数）" "$f" 'CompositionSource\.resolvingAlpha\(in: state'
 done

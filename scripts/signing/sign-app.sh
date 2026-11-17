@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 给组装好的 SkyCut.app / SkyCut Beta.app 签名（build-app.sh、build-beta-app.sh 都只经这一处签）。
 #
-# 先签 Contents/Helpers 里的两个可执行文件、再签外层：顺序反了外层签名立即失效（scripts/check-mcp.sh 钉着）。
+# 先签 Contents/Helpers 里的三个可执行文件（ffmpeg、skycut-mcp、skycut-web-motion）、再签外层：顺序反了外层签名立即失效
+# （scripts/check-mcp.sh、checks/web-motion-wiring.sh 钉着）。
 #
 # 用哪把签：
 # - 有发布用的签名身份（scripts/signing/create-identity.sh 建在 ~/.config/srtflow/signing/）就用它。签名的
@@ -21,7 +22,7 @@ APP="$(cd "$(dirname "$1")" && pwd -P)/$(basename "$1")"
 cd "$(dirname "$0")/../.."
 source scripts/signing/common.sh
 
-for helper in ffmpeg skycut-mcp; do
+for helper in ffmpeg skycut-mcp skycut-web-motion; do
   if [ ! -f "${APP}/Contents/Helpers/${helper}" ]; then
     echo "✗ ${APP}/Contents/Helpers/${helper} 不在：先组装完再签" >&2
     exit 1
@@ -32,6 +33,7 @@ done
 sign_bundle() {
   codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/ffmpeg"
   codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-mcp"
+  codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-web-motion"
   codesign --force "$@" --timestamp=none "${APP}"
 }
 

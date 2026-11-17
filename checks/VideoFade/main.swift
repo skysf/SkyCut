@@ -153,14 +153,6 @@ func export(_ state: TimelineState, name: String, settings: VideoEncodeSettings 
     return kept
 }
 
-/// 容量是不是「能放、最长约 `expected` 秒」。容量是乘出来的（长度 × 0.4），
-/// 1.5 × 0.4 在 Double 里是 0.6000000000000001 —— 枚举的 `==` 是精确比较，
-/// 拿它断言浮点结果会假红。
-func capacity(_ value: TransitionCapacity, isAbout expected: Double) -> Bool {
-    if case .available(let maxDuration) = value { return abs(maxDuration - expected) < 1e-9 }
-    return false
-}
-
 func main() async {
     guard FileManager.default.isExecutableFile(atPath: ffmpegPath) else {
         print("找不到 ffmpeg：\(ffmpegPath)（跑 scripts/vendor-ffmpeg.sh，或设 SRTFLOW_FFMPEG）")
@@ -611,6 +603,8 @@ func main() async {
     await checkHiddenClips(white: white, black: black, info: landscape)
     // MARK: 带透明的段：透明静帧（2026-10-03，AlphaStill.swift）、带透明的视频按文件里的标记叠（2026-11-16，AlphaVideo.swift）
     await checkAlphaSources(white: white, info: landscape)
+    // MARK: A crossFade between two stills is centred on the cut and keeps their keyframes (2026-11-17, StillCrossfade.swift)
+    await checkStillCrossfade()
 
     if failures == 0 {
         print("\(checks) checks, 0 failures")

@@ -1,23 +1,26 @@
-# <YYYY-MM-DD> <一句话标题>
+# <YYYY-MM-DD> <one-line title>
 
-## 症状
+> Template note, drop it from the case: new cases use these English headings (since 2026-11-16, AGENTS.md「语言」). Older cases use the Chinese ones: 症状 = Symptom, 根因 = Root cause, 修复 = Fix, 验证 = Verification, 教训 / 防回归 (or 教训) = Lessons.
 
-用户视角看到了什么、如何触发。
+## Symptom
 
-## 根因
+What the user saw and how to trigger it.
 
-真正的原因（可以不止一个）。如果之前有过失败的修复尝试，写清楚它们为什么
-看起来修好了、实际为什么没修好——这是案例最有价值的部分。
+## Root cause
 
-## 修复
+The real cause (there can be more than one). If earlier fix attempts failed, say why they
+looked fixed and why they were not — this is the most valuable part of a case.
 
-改了什么、为什么这样改。列出关键文件与入口。
+## Fix
 
-## 验证
+What changed and why it was done this way. List the key files and entry points.
 
-怎么证明真的修好了（真机操作 / 注入测试 / 自检命令），以及回归面查了哪些。
+## Verification
 
-## 教训 / 防回归
+How you proved it is really fixed (real-device steps / injected test / check command), and
+which regression surfaces you checked.
 
-以后改到相关代码要注意什么。若形成了长期约束，落到 `docs/architecture/`
-并在此链接，不要只写在案例里。
+## Lessons
+
+What to watch for when changing related code later. If this produced a long-term constraint,
+put it in `docs/architecture/` and link it from here; don't leave it only in the case.

@@ -25,6 +25,10 @@ enum AILookText {
         case .ask(let question): return question
         case .target(let found): target = found
         }
+        // What this scan needs from the project, read before its first await; then the calls behind it may go (AICallLines).
+        let state = project.state
+        let label = target.label(project)
+        AICallLines.letGo()
         let duration = (try? await MediaAssetCache.asset(for: target.url).asset.load(.duration).seconds) ?? 0
         let upper = min(target.range.upperBound, duration)
         let lower = min(target.range.lowerBound, upper)
@@ -36,6 +40,7 @@ enum AILookText {
         guard !frames.isEmpty else { throw AIToolError(await AIUnreadableVideo.reason(for: target.url)) }
         var scanned: [AITextRegions.Frame] = []
         for frame in frames {
+            try Task.checkCancellation()
             scanned.append(.init(time: frame.time, texts: await AIVision.analyze(frame.image, .text).texts))
         }
         let report = AITextRegions.report(scanned)
@@ -43,16 +48,16 @@ enum AILookText {
         var payload = AITextRegions.json(report, timeline: timeline)
         // 看的是时间线上的一段：再给出盖住它的 set_shape 参数（源画面上的框换成画布上的；方案第 56 条）。
         if let clip = target.clip {
-            let canvas = VideoEditCompositionBuilder.renderSize(for: project.state)
+            let canvas = VideoEditCompositionBuilder.renderSize(for: state)
             AICoverBox.annotate(&payload, report: report, clip: clip, canvas: canvas, timeline: timeline)
             // 这一段期间显示的工程字幕，哪几句画在认出来的字上面（2026-10-15 用户转来的反馈：三行字幕碰到左下角的台标）。
             AISubtitleOverlaps.annotate(
-                &payload, report: report, clip: clip, state: project.state,
-                style: project.state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle), canvas: canvas,
-                ids: AIShortIDs(state: project.state)
+                &payload, report: report, clip: clip, state: state,
+                style: state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle), canvas: canvas,
+                ids: AIShortIDs(state: state)
             )
         }
-        payload["looked_at"] = .string(target.label(project))
+        payload["looked_at"] = .string(label)
         payload["scanned_frames"] = .number(Double(scanned.count))
         payload["every_seconds"] = AIFormat.seconds((upper - lower) / Double(count))
         payload["note"] = .string(

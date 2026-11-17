@@ -129,6 +129,8 @@ source checks/MCP/batch-edit-wiring.sh
 source checks/MCP/tool-result-wiring.sh
 # shellcheck source=checks/MCP/clip-sound-wiring.sh
 source checks/MCP/clip-sound-wiring.sh
+# shellcheck source=checks/MCP/canvas-wiring.sh
+source checks/MCP/canvas-wiring.sh
 # shellcheck source=checks/MCP/voice-reference-wiring.sh
 source checks/MCP/voice-reference-wiring.sh
 
@@ -489,11 +491,13 @@ xcrun swiftc \
   Sources/SrtFlow/AISubtitleOverlaps.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
+  Sources/SrtFlow/RippleLinkPartners.swift \
   Sources/SrtFlow/AILinkageReport.swift \
   Sources/SrtFlow/ClipSoundSeparation.swift \
   Sources/SrtFlow/CutSoundRequest.swift \
   Sources/SrtFlow/CutSoundCut.swift \
   Sources/SrtFlow/CutSoundEdges.swift \
+  Sources/SrtFlow/CutSoundCurves.swift \
   Sources/SrtFlow/CutSoundLimits.swift \
   Sources/SrtFlow/CutSoundPlanner.swift \
   Sources/SrtFlow/CutSoundLevelPlan.swift \
@@ -511,6 +515,9 @@ xcrun swiftc \
   Sources/SrtFlow/AIBatchEditPlans.swift \
   Sources/SrtFlow/ClipFileReplacement.swift \
   Sources/SrtFlow/AIFrameFit.swift \
+  Sources/SrtFlow/CanvasReframe.swift \
+  Sources/SrtFlow/AICanvasReframe.swift \
+  Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/AIFollowSubject.swift \
   Sources/SrtFlow/AIShotDetector.swift \
   Sources/SrtFlow/AIFramingRequest.swift \
@@ -519,6 +526,7 @@ xcrun swiftc \
   Sources/SrtFlow/AIParameterReport.swift \
   Sources/SrtFlow/AIOverlayParameterReport.swift \
   Sources/SrtFlow/StillImageClipFactory.swift \
+  Sources/SrtFlow/StillFrameSharing.swift \
   Sources/SrtFlow/AIRegionFraming.swift \
   Sources/SrtFlow/AIClipDetails.swift \
   Sources/SrtFlow/AITrackSettings.swift \

@@ -12,7 +12,8 @@ import Foundation
 //   2. 前瞻：往后看 `lookahead` 帧里最小的 r（单调队列，O(1) 均摊），信号本身延迟同样多的帧 —— 峰值到之前增益就到位了。
 //   3. 平滑：把这条「最小值」再做同样长的滑动平均，台阶变成斜坡（不「咔」一声）；数学上每一帧的增益仍然 ≤ 它自己的 r，
 //      所以一个采样都不会超过上限。往上回只按释放时间（一阶）慢慢来，低频不会被抽成锯齿。
-// 用在哪：只在 ExportAudioMixdown 写 f32 之前那一步（预览走 AVPlayer，不经过这里，是已知差异）。
+// 用在哪：ExportAudioMixdown 写 f32 之前那一步（预览走实时引擎，不经过这里，是已知差异）；listen 按层量混音时
+// MixBusMeter 照同样的参数过一遍（`recordsGains` 记下每帧压了多少），量出来的峰值、压了多少和导出报的是同一个数。
 // 不管什么：读混音、写文件、量响度（ExportLoudnessMeter）。
 // 长期约束：docs/architecture/export-audio-mixdown.md 第二节第 3 条。
 
@@ -42,6 +43,10 @@ struct ExportPeakLimiter {
     private(set) var received = 0
     /// 写出去的帧数（比 `received` 晚 `lookahead` 帧，`flush` 之后相等）。
     private(set) var emitted = 0
+    /// 记不记每个写出去的帧乘了多少（按层量混音要「限幅器压了多少，到帧」，MixBusMeter）。成片不记，照旧。
+    var recordsGains = false
+    /// 记下来的增益：写出去的每一帧一个、顺序同输出；调用方取走后自己清空。
+    var appliedGains: [Float] = []
 
     // 延迟线：最近 `lookahead` 帧的原样采样。
     private var delay: [Float]
@@ -144,6 +149,7 @@ struct ExportPeakLimiter {
         guard emitted < received else { return }
         let source = (out % lookahead) * channels
         let applied = Float(gain)
+        if recordsGains { appliedGains.append(applied) }
         for channel in 0 ..< channels {
             let value = delay[source + channel] * applied
             let magnitude = abs(value)

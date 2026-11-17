@@ -69,6 +69,9 @@
 入场和出场那两截（`shape0-in_%05d.png` / `shape0-out_%05d.png`，末尾多渲两帧、各段左闭右开，见 [画面文字](text-overlays.md)「导出：只逐帧渲动画进行中的那段」），中间一张图。三种片段怎么进滤镜图只有
 `OverlayExportFile.append` 一份（`VideoEditOverlayExportFile.swift`，2026-10-03 从文字那边抽出来，文字和形状共用）；叠放次序：先形状、后文字。
 静止片段只解一帧 PNG、复制到本段结束加接缝余量，不按整片反复解码；合同和回归见上述文字文档的同一节。
+Each frame of an entrance / exit is drawn for its own output frame, placed half a frame before it and switched on by frame
+number (2026-11-17: the export repeated a frame now and then, and a shape starting off the grid came a whole frame late) —
+the four rules are in [画面文字](text-overlays.md)「Frames on the grid」, guarded by `scripts/check-text-render.sh` group 20.
 
 **格式**：`animation` 按需写键（没设动画的不落），设了就是 **v31** 数据 —— 只认 v30 的旧版读进来当没有，随手存一下就把动画抹掉了
 （[工程文件](video-edit-project-file.md)）。
@@ -116,6 +119,8 @@
   - 真导出抽帧（30fps，白色圆环 0.5 秒起、2 秒长，入场画出来 0.8 秒、出场淡出 0.6 秒）：入场画到一半时 3 点亮、9 点黑；中间一整圈；
     出场淡到一半只剩一成左右的亮；段外全黑；只逐帧渲入场 / 出场那两截、中间一张图；没有动画的照旧一张 `shape0.png`。
   - 反向验证：导出的线改回线头在外 → 1 条红（外框差 4 像素）；预览不裁 `reveal` → 12 条红；导出不切段 → 5 条红。
+- `scripts/check-text-render.sh` group 20 (`checks/TextRender/MovingFrames.swift`) also exports a wiping rectangle (start off
+  the grid) and a still square (start on the grid) at 24 / 30 / 60 fps: every frame is the frame for its own time.
 - `scripts/check-mcp.sh` 的 `ShapeChecks`：set_shape 读圆 / 圆弧、夹紧、实心规矩、动画参数、回报；**真像素**（`ShapePNGRenderer` 渲 200×200）：
   圆一圈都有、里面空、框角空；圆弧从 12 点扫 90° 盖住 1:30、不盖 6 点和 9 点；起点转 180° 从 6 点开始。反向验证：`clockwise` 写反 → 3 条红。
 - `scripts/check-project-file.sh` 第 43 组：v30 判据、只有圆弧写 `arcSweep`、往返、缺键读作 270°、圆的高跟着宽。

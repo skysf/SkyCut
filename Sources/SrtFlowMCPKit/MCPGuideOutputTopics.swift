@@ -48,12 +48,19 @@ enum MCPGuideOutputTopics {
             MCPGuideSection(name: "range", about: "the timeline or a matching export, and the range checked", text: """
             What it checks. By default the seams plus the last 3 seconds of the timeline; from and to choose a range in \
             timeline seconds. file points at a matching export (same length and timestamps). It uses the project's subtitle \
-            style. Outside files may return needs_confirmation.
+            style. Outside files may return needs_confirmation. Pictures are sampled every 0.5 s; with file every frame of the \
+            export is also scanned (frame_scan) for stray_frames (a few frames of another picture), flash, frozen_picture (6 s \
+            or more without movement) and black_frame, over the whole file or the from and to range. Every visible clip is also \
+            checked against cuts inside its own source file: a few frames of another shot come back as source_cut with \
+            suggested_source_in or suggested_source_out.
             """),
             MCPGuideSection(name: "results", about: "suspect times, reasons, screenshots and WAV clips", text: """
             Results. It returns job_id: get_job gives suspect times and reasons, screenshots (image=false leaves them out) and \
             temporary WAV clips to listen to. silence_db (default -45) and min_silence (default 0.5 s) set what counts as \
-            silence. Suspects are sampled: a person should review them.
+            silence. Suspects are sampled: a person should review them. A cut is reported as cutting speech (audio_cutoff) only \
+            where a cached transcript or narration subtitles show words there; clips cut where sound plays without either are \
+            listed in speech_unchecked: transcribe the ones with speech, then inspect again. When the file was made before the \
+            project's last change, attention says so first: export again and inspect the new file.
             """),
             MCPGuideSection(name: "limits", about: "what it does not do: transcription and source levels", text: """
             Limits. It does no transcription. For source levels and beats use listen; for words use transcribe.
@@ -127,7 +134,9 @@ enum MCPGuideOutputTopics {
             MCPGuideSection(name: "waiting", about: "wait_seconds, waiting instead of restarting, the shared queue", text: """
             Waiting. wait_seconds (up to 30) waits for the job before answering; keep calling get_job instead of starting the \
             job again. Exports, transcriptions (subtitles, transcripts) and translations run one at a time across all projects: \
-            a later one shows status queued with queue_position (1 = next) and starts by itself.
+            a later one shows status queued with queue_position (1 = next) and starts by itself. A look still working after about \
+            25 seconds is a job too (kind look): while it waits behind earlier calls on its project it shows status queued, \
+            queue_position and waiting_for; when done its answer is under result, with the picture.
             """),
             MCPGuideSection(name: "user", about: "waiting_for_user and what to tell the user", text: """
             The user. If the job shows waiting_for_user (for example a language download only the user can click), tell the user \

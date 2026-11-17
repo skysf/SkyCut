@@ -35,9 +35,16 @@
 多少、其中多少是定格。两侧之和恒等于转场时长 d，所以展开之后正好相叠 d，片段位置
 和总时长都不变。
 
-- **余料够**（出场段尾料 + 进场段头料 ≥ d）：照旧先吃出场段的尾料、不够再借进场段
-  的头料（`borrowSplit`），**一帧都不定格** —— 有真素材就不用静止画面。
-- **余料不够**：两边的余料全用上，差额用**首尾帧定格**补（Premiere 的 repeated
+- **Centred on the cut whenever no moving picture has to freeze** (2026-11-17,
+  [case](../bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md)): each side reaches d/2 past the cut,
+  which is where the timeline mask and set_transition put it. A side reaches with its footage; **a still
+  (`EditClip.showsOnePicture`: photo, freeze frame) reaches as far as needed by holding its first or last frame — the
+  same picture, so the hold is free** and a seam next to a still is always centred. A side that cannot reach d/2 hands the
+  rest to the other side's footage (`centredSplit`): with footage left, **一帧都不定格** —— 有真素材就不用静止画面, and
+  the window then leans towards the side that has the footage. Until 2026-11-17 the outgoing tail was eaten first
+  (`borrowSplit`): every outgoing still (60 s of tail, nothing before its first frame) and every outgoing clip trimmed at
+  its end put the whole transition after the cut, half a transition later than drawn and reported.
+- **余料不够**（two moving pictures whose footage together is shorter than d）：两边的余料全用上，差额用**首尾帧定格**补（Premiere 的 repeated
   frames、达芬奇的 freeze 同一个做法）。差额优先把窗口摆成「缝 ± d/2」，和时间线上
   的遮罩一致：出场段一侧先补到 d/2，剩下的归进场段。
   - 零余料时就是两边各定格 d/2：接缝前半程 A 照常播、B 的首帧定住淡入；后半程 B
@@ -84,11 +91,14 @@
 
 ## 已知未对齐
 
-余料够、但只从一边借（例如只有出场段有尾料）时，渲染出来的转场窗口整个落在接缝
-的一侧（`borrowSplit` 先吃尾料），而时间线遮罩画的是「缝 ± d/2」。两者最多差 d/2：
-遮罩说转场从缝前开始，成片里它从缝上才开始。这是 2026-09-20 就有的行为，这次没动
-（改成对称借料会让一部分原本不用定格的缝开始定格）。要修的话，改 `borrowSplit` 的
-分配，同时核对 4b / 4b-2 两组断言。
+Since 2026-11-17 only one case is left: one side is a moving picture with less than d/2 of footage beyond the cut and
+the other side has footage (or is a still) to make up for it. Centring would freeze the short side's first or last
+frame, so the window leans towards the other side by up to d/2 instead, while the timeline mask still draws
+「缝 ± d/2」 (and `isInsideMainTransition`, which greys out freeze frame, follows the mask). **set_transition reports
+where it really plays** (`renderedTransitionWindow`, from the same `transitionExtension` both pipelines render), so the
+AI looks at the right frames. Moving the mask too would be a UI change (the drop box and the mask are centred on the cut
+on purpose, 2026-09-20); not done. Before 2026-11-17 the window also leaned when both sides had footage (tail first) and
+whenever a still was outgoing — the bug in the case above.
 
 ## 守卫
 
@@ -96,6 +106,8 @@
 | --- | --- |
 | 容量、展开的纯值规则（零余料可用、太短放不下、余料够时不定格、定格两边各 d/2、总长不变） | `scripts/check-video-fade.sh` 4b–4c |
 | 成片里定格那一截真的有画面（白→黑、黑→白两组抽帧），总长不变 | `scripts/check-video-fade.sh` 4b-5 |
+| Two stills: centred plan (the incoming still holds its first frame), preview and export at a quarter in and out (H.264 stills both ways), keyframed stills keep their keys in both pipelines (one of them the shared-frame ProRes) | `scripts/check-video-fade.sh` → `StillCrossfade.swift` |
+| set_transition reports where it really plays (footage on one side only: from the cut on) and never calls a still's hold frozen | `scripts/check-mcp.sh` → `TransitionReportChecks.swift` |
 | 预览里同一场景、同一时刻、同一个数 | `scripts/check-preview-composition.sh` 定格那一组 |
 | 拖转场卡片的落点（零余料能落、太短不能落、按正在拖的那张卡算） | `scripts/check-timeline-snap.sh` §28 / §30 |
 | 两条管线都在入口展开、定格字段只有展开函数写、两条管线都消费定格、接缝的零头两边读同一个常量 | `checks/transition-handles-wiring.sh` |
@@ -108,3 +120,6 @@
       不变。
 - [ ] 裁过、两头有余料的两段：转场期间没有静止画面。
 - [ ] 很短的段（< 0.125s）两侧：只有黑场过渡可用，提示「这两段太短」。
+- [ ] Two photos touching on V1 with a crossFade (2026-11-17): in the player the first one starts to fade at the mask's
+      left edge and is gone at its right edge, the cut in the middle; the export the same. Trimmed video on both sides:
+      the same, no still picture.

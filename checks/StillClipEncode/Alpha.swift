@@ -74,6 +74,12 @@ func checkAlphaStills() {
         image: transparent, output: still, nativeResolution: false
     ))
     check(stillCode == 0, "透明静帧转码失败：\(stillOut.suffix(300))")
+    // The arguments encode one frame; the production rewrite shares it across all samples (SharedFrame.swift has the details).
+    do {
+        try StillFrameSharing.shareSingleFrame(in: still, count: StillImageClipFactory.stillFrameCount)
+    } catch {
+        check(false, "透明静帧：the one encoded frame could not be shared: \(error)")
+    }
     check(frameCount(still) == StillImageClipFactory.stillFrameCount, "透明静帧帧数应为 \(StillImageClipFactory.stillFrameCount)")
     let (_, probe) = run(ffmpegPath, ["-hide_banner", "-i", still.path])
     check(probe.contains("prores") && probe.contains("yuva444"), "透明静帧是带 alpha 的 ProRes 4444：\(probe.suffix(200))")

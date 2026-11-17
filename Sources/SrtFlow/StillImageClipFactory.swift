@@ -11,6 +11,10 @@ import ImageIO
 /// **真用到了透明的图**（2026-10-03，透明 PNG 的台标、圆环以前成了黑方块）：转成**预乘过**的 ProRes 4444
 ///（预览的默认合成器把源当预乘的用），外加一份灰度遮罩给带关键帧的上层轨段当 matte；起名见 `StillAlphaNaming`。
 /// 不透明的图照旧 H.264 —— 透明静帧一张 1080×1080 约 30 MB，不值得给每张图都转。
+/// (Those 30 MB were 120 stored copies of one frame. Since 2026-11-17 the ProRes holds one encoded frame that all 120 samples
+/// share — `StillFrameSharing` — about one frame, 1–4 MB at 1080p; H.264 is still smaller and cheaper to decode.)
+///
+/// Conversions run at most `ConversionSlots.width` at a time, whoever asks (drop, paste, the AI's add_clips).
 enum StillImageClipFactory {
 
     struct ConversionError: LocalizedError {
@@ -134,13 +138,20 @@ enum StillImageClipFactory {
 
     /// 透明的图：预乘过的 ProRes 4444（帧数、帧率、几何和不透明的那条一样）。**预乘**是预览那边定的：默认合成器把源的
     /// 颜色当预乘的用（直通的 alpha 在透明处会透出存着的颜色）；导出那边叠之前先 `unpremultiply`（`VideoEditExportGraph`）。
-    static func alphaConversionArguments(image: URL, output: URL, nativeResolution: Bool) -> [String] {
+    ///
+    /// Only **one** frame is encoded, lasting the whole `stillDuration` (output rate 1/60); `StillFrameSharing` then repeats it
+    /// `stillFrameCount` times in the sample table, so the track is the same 120 frames at 2 fps as before. ProRes is intra-only:
+    /// encoding the picture 120 times stored it 120 times (a 1080p title 107–441 MB and 3.5–5.6 s, MCP-76; now one frame, 0.4 s with the matte).
+    /// `everyFrame: true` writes all 120 frames — the fallback when the movie is not a layout `StillFrameSharing` rewrites.
+    static func alphaConversionArguments(image: URL, output: URL, nativeResolution: Bool, everyFrame: Bool = false) -> [String] {
         let filter = geometryFilter(nativeResolution: nativeResolution, transparent: true)
+        let repeats = everyFrame ? ",loop=loop=\(stillFrameCount - 1):size=1:start=0" : ""
         return [
             "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
             "-r", String(Int(stillFrameRate)), "-i", image.path,
-            "-vf", "\(filter),premultiply=inplace=1,loop=loop=\(stillFrameCount - 1):size=1:start=0",
-            "-frames:v", String(stillFrameCount), "-r", String(Int(stillFrameRate)),
+            "-vf", "\(filter),premultiply=inplace=1\(repeats)",
+            "-frames:v", String(everyFrame ? stillFrameCount : 1),
+            "-r", everyFrame ? String(Int(stillFrameRate)) : "1/\(Int(stillDuration))",
             "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le",
             "-an", output.path
         ]
@@ -195,6 +206,25 @@ enum StillImageClipFactory {
 
     static func stillVideo(for image: URL, ffmpeg: URL, nativeResolution: Bool = false) async throws -> URL {
         if let cached = cachedStillVideo(for: image, nativeResolution: nativeResolution) { return cached }
+        // At most `ConversionSlots.width` images at once. Look again once a slot is ours: the same image may have just been
+        // converted by someone else (a PNG sequence that repeats a frame by path, two pastes of one image).
+        await ConversionSlots.shared.acquire()
+        do {
+            let made: URL
+            if let cached = cachedStillVideo(for: image, nativeResolution: nativeResolution) {
+                made = cached
+            } else {
+                made = try await convert(image, ffmpeg: ffmpeg, nativeResolution: nativeResolution)
+            }
+            await ConversionSlots.shared.release()
+            return made
+        } catch {
+            await ConversionSlots.shared.release()
+            throw error
+        }
+    }
+
+    private static func convert(_ image: URL, ffmpeg: URL, nativeResolution: Bool) async throws -> URL {
         let directory = try cacheDirectory()
         let key = cacheKey(for: image)
         let alphaChannel = hasAlphaChannel(image)
@@ -208,10 +238,20 @@ enum StillImageClipFactory {
                 { matteConversionArguments(image: image, output: $0, nativeResolution: nativeResolution) },
                 into: StillAlphaNaming.matteURL(forStill: still), in: directory, image: image, ffmpeg: ffmpeg
             )
-            return try await encode(
-                { alphaConversionArguments(image: image, output: $0, nativeResolution: nativeResolution) },
-                into: still, in: directory, image: image, ffmpeg: ffmpeg
-            )
+            do {
+                // One encoded frame, shared by all 120 samples (StillFrameSharing): same frames and times, one frame's bytes.
+                return try await encode(
+                    { alphaConversionArguments(image: image, output: $0, nativeResolution: nativeResolution) },
+                    into: still, in: directory, image: image, ffmpeg: ffmpeg,
+                    finishing: { try StillFrameSharing.shareSingleFrame(in: $0, count: stillFrameCount) }
+                )
+            } catch is StillFrameSharing.Unsupported {
+                // Another ffmpeg build wrote a layout the rewrite does not know: write every frame (big, same picture).
+                return try await encode(
+                    { alphaConversionArguments(image: image, output: $0, nativeResolution: nativeResolution, everyFrame: true) },
+                    into: still, in: directory, image: image, ffmpeg: ffmpeg
+                )
+            }
         }
         let name = alphaChannel ? opaqueName(key: key, nativeResolution: nativeResolution) : fileName(key: key, nativeResolution: nativeResolution)
         return try await encode(
@@ -220,18 +260,21 @@ enum StillImageClipFactory {
         )
     }
 
-    /// 按给定参数（只差输出路径）转一份，落到 `output`。
+    /// 按给定参数（只差输出路径）转一份，落到 `output`。`finishing` runs on the finished temporary file before it is moved
+    /// into place (the transparent still's frame sharing); if it throws, nothing lands.
     ///
     /// 先写临时文件、成功后原子改名。直接写最终路径的话，转码被中断（切工程、
     /// 退出 App、磁盘满）会留下一个**永远命中**的半成品 —— 之后这张图
     /// 每次都解析到那段坏视频，还没有任何线索。
     @discardableResult
     private static func encode(
-        _ arguments: (URL) -> [String], into output: URL, in directory: URL, image: URL, ffmpeg: URL
+        _ arguments: (URL) -> [String], into output: URL, in directory: URL, image: URL, ffmpeg: URL,
+        finishing: (URL) throws -> Void = { _ in }
     ) async throws -> URL {
         let temporary = directory.appendingPathComponent("partial-\(UUID().uuidString).\(output.pathExtension)")
         do {
             try await run(ffmpeg: ffmpeg, arguments: arguments(temporary), imageName: image.lastPathComponent)
+            try finishing(temporary)
         } catch {
             try? FileManager.default.removeItem(at: temporary)
             throw error
@@ -255,6 +298,32 @@ enum StillImageClipFactory {
         }
     }
 
+    /// At most `width` images convert at once (each is one or two ffmpeg runs). The AI's add_clips starts every image's
+    /// conversion together — a 96-frame PNG sequence was 96 encoders fighting for the cores and several GB of memory (MCP-76).
+    private actor ConversionSlots {
+        static let shared = ConversionSlots()
+        static let width = max(2, min(4, ProcessInfo.processInfo.activeProcessorCount / 2))
+        private var busy = 0
+        private var waiting: [CheckedContinuation<Void, Never>] = []
+
+        func acquire() async {
+            guard busy >= Self.width else {
+                busy += 1
+                return
+            }
+            await withCheckedContinuation { waiting.append($0) }
+        }
+
+        /// A waiter takes the slot over directly (it never goes back to `busy`).
+        func release() {
+            if waiting.isEmpty {
+                busy -= 1
+            } else {
+                waiting.removeFirst().resume()
+            }
+        }
+    }
+
     /// 缓存文件名。带参数版本号：编码参数变了旧缓存就作废。
     /// 两种分辨率政策分开存，互不覆盖。
     ///
@@ -275,11 +344,17 @@ enum StillImageClipFactory {
     }
 
     private static func cacheDirectory() throws -> URL {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let directory = base.appendingPathComponent("SrtFlow/StillClips", isDirectory: true)
+        let directory = cacheDirectoryURL
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    /// Where converted stills live (`~/Library/Caches/SrtFlow/StillClips/`), not created. The only folder the launch rewrite
+    /// of old transparent stills looks in (`StillCacheSweep`).
+    static var cacheDirectoryURL: URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("SrtFlow/StillClips", isDirectory: true)
     }
 
     /// 路径 + 修改时间 + 大小的指纹。图换了内容，指纹就变，不会用到旧缓存。
