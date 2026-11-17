@@ -237,7 +237,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-dmg.sh` — DMG 的真实组装、挂载和 Retina 背景。
 - `scripts/check-engine-probe.sh` — 引擎启动探测：超时、输出上限、子进程回收、单次定位。
 - `scripts/check-export-alpha-compositing.sh` — 上层轨动画段的 fill + matte。
-- `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）。
+- `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）；per-frame upper-video, cover and grade windows.
 - `scripts/check-export-profile.sh` — 导出阶段计时、快速审阅、排队 / 取消、PNG 只解码一次。
 - `scripts/check-export-watermark.sh` — 导出水印真的叠上了、只在该在的地方。
 - `scripts/check-film-production.sh` — 官方原创短片的公开制作状态。
