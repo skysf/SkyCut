@@ -29,6 +29,7 @@ enum LayerWindowChecks {
     }
 
     static func runAll() async {
+        checkNativeRequests()
         let baseGraph = "nullsrc=s=320x180:r=10:d=30,format=yuv444p," +
             "geq=lum='if(lt(Y,40),16,if(lt(Y,120),if(mod(floor(X/2)+floor(Y/2),2),235,16),81))':" +
             "cb='if(lt(Y,120),128,90)':cr='if(lt(Y,120),128,240)'"
@@ -37,9 +38,9 @@ enum LayerWindowChecks {
             let fps = rate.fps
             let graph = "nullsrc=s=320x40:r=\(fps):d=2,geq=lum='if(lt(X,32+12*mod(N,16)),235,16)':cb=128:cr=128"
             guard let upper = await source("windows-upper-\(fps)", graph: graph) else { continue }
-            let windows = [3.16, 7.2, 9.5, 12.0, 15.1].enumerated().map { index, start in
+            let windows = [3.16, 131.0 / 30, 7.2, 9.5, 12.0, 15.1].map { start in
                 let first = Int((start * Double(fps)).rounded())
-                return Window(first: first, end: first + fps, fps: fps, prerendered: index == 3)
+                return Window(first: first, end: first + fps, fps: fps, prerendered: start == 12)
             }
             let state = scene(rate, base: base, upper: upper, windows: windows)
             guard let product = await export(state, name: "windows-\(fps)"),
@@ -48,6 +49,20 @@ enum LayerWindowChecks {
             check(abs(samples.count - expectedCount) <= 2, "layer windows @\(fps): complete export (\(samples.count) frames)")
             measure(samples, state: state, windows: windows, fps: fps)
             await preview(state, samples: samples, windows: windows, rate: rate)
+        }
+    }
+
+    private static func checkNativeRequests() {
+        for rate in ProjectFrameRate.allCases {
+            let wrong = (0..<100_000).filter { frame in
+                [0.0, 0.75].contains { fraction in
+                    let time = (Double(frame) + fraction) / Double(rate.fps)
+                    let quantized = TextAnimator.quantize(time, frameRate: rate)
+                    let request = NativeSourceFrameSampler.requestedTime(for: quantized)
+                    return CMTimeCompare(request, CMTime(value: Int64(frame), timescale: Int32(rate.fps))) != 0
+                }
+            }
+            check(wrong.isEmpty, "native look requests @\(rate.fps): exact frames must stay on their ticks; wrong \(wrong.prefix(8))")
         }
     }
 
@@ -201,6 +216,11 @@ enum LayerWindowChecks {
         generator.videoComposition = video
         generator.requestedTimeToleranceBefore = .zero
         generator.requestedTimeToleranceAfter = .zero
+        let look = AVAssetImageGenerator(asset: built.composition)
+        look.videoComposition = video
+        let half = CMTime(seconds: rate.halfFrameTolerance, preferredTimescale: 6000)
+        look.requestedTimeToleranceBefore = half
+        look.requestedTimeToleranceAfter = half
         for window in windows {
             var wrong: [String] = []
             // Every active frame and both adjacent frames; this also detects selecting the previous moving source frame
@@ -209,6 +229,11 @@ enum LayerWindowChecks {
                 do {
                     let image = try await generator.image(at: CMTime(value: Int64(frame), timescale: Int32(rate.fps))).image
                     let value = await MediaReadQueue.run(on: MediaReadQueue.analysis) { whiteWidth(image) }
+                    let lookTime = TextAnimator.quantize((Double(frame) + 0.75) / Double(rate.fps), frameRate: rate)
+                    let requested = NativeSourceFrameSampler.requestedTime(for: lookTime)
+                    let looked = try await look.image(at: requested).image
+                    let lookWidth = await MediaReadQueue.run(on: MediaReadQueue.analysis) { whiteWidth(looked) }
+                    if abs(lookWidth - value) > 2 { wrong.append("\(frame): look \(lookWidth), preview \(value)") }
                     let expected = window.contains(frame)
                     if (value > 20) != expected { wrong.append("\(frame): preview \(value)") }
                     if expected {

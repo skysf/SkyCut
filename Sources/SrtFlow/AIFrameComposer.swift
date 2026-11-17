@@ -48,7 +48,8 @@ enum AIFrameComposer {
             try Task.checkCancellation()
             var video: CGImage?
             if let generator, time < state.duration {
-                video = try? await generator.image(at: CMTime(seconds: max(0, time), preferredTimescale: 600)).image
+                let lookTime = TextAnimator.quantize(time, frameRate: state.frameRate)
+                video = try? await generator.image(at: NativeSourceFrameSampler.requestedTime(for: lookTime)).image
             }
             let subtitles = await MainActor.run { subtitleImages(state, at: time, canvas: canvas, style: subtitleStyle) }
             let still = video

@@ -153,6 +153,10 @@ frames, and clone two tail frames before placing. After cuts / crossfades the ma
 microseconds off the grid; exact-grid placement can select the previous moving frame, and EOF can drop the last one.
 The window still removes the layer exactly at its end. `scripts/check-export-frame-rate.sh` checks every frame of
 ordinary and prerendered upper video at 24 / 30 / 60 fps against the native preview composition, over cuts and crossfades.
+Timeline look requests first use the containing project frame (`TextAnimator.quantize`, shared with the overlays),
+then `NativeSourceFrameSampler.requestedTime`: an exact frame converted by raw
+`CMTime(seconds:preferredTimescale:)` can land one native tick early. The existing nearest-tick request policy preserves
+the grid; the look generator's half-frame tolerance and the composition's truncating insertion/slice times stay unchanged.
 
 **预览的黑底轨**：时间线上有任何半透明图层（不透明度、转场淡入淡出）时，
 CompositionBuilder 会垫一条 `BlackBaseVideoFactory` 的不透明黑视频当底 ——

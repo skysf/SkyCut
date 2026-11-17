@@ -107,6 +107,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditCoverExport.swift \
   Sources/SrtFlow/VideoEditCoverPreview.swift \
   Sources/SrtFlow/VideoEditCoverFilters.swift \
+  Sources/SrtFlow/NativeSourceFrameSampler.swift \
   Sources/SrtFlow/VideoEditFilterPreview.swift \
   Sources/SrtFlow/VideoEditShapePNGRenderer.swift \
   Sources/SrtFlow/VideoEditShapeOutline.swift \

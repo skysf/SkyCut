@@ -241,6 +241,10 @@ for frame_reader in Sources/SrtFlow/VideoEditCoverPreview.swift Sources/SrtFlow/
   require "Cover selection uses the tested frame window in preview and AI look" \
     "${frame_reader}" 'state\.renderedCovers\.filter \{ grid\.contains\(time, from: \$0\.timelineStart, to: \$0\.timelineEnd\) \}'
 done
+require "AI timeline look uses the native nearest-tick frame request" \
+  Sources/SrtFlow/AIFrameComposer.swift 'generator\.image\(at: NativeSourceFrameSampler\.requestedTime\(for: lookTime\)\)'
+require "AI timeline video uses the same containing project frame as its overlays" \
+  Sources/SrtFlow/AIFrameComposer.swift 'let lookTime = TextAnimator\.quantize\(time, frameRate: state\.frameRate\)'
 require "轨道头的眼睛仍是整轨显隐的入口" \
   Sources/SrtFlow/VideoEditTimelineHeaderColumn.swift 'toggleLaneHidden\('
 
