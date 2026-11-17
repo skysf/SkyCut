@@ -25,7 +25,7 @@ fail() {
 # ---- 一、判断本身 ----
 expect() {
   local want="$1" input="$2" got
-  got="$(printf '%b' "${input}" | /bin/bash "${CLASSIFIER}" -)"
+  got="$(printf '%b' "${input}" | env GITHUB_EVENT_NAME=pull_request /bin/bash "${CLASSIFIER}" -)"
   if [ "${got}" != "${want}" ]; then
     fail "scripts/ci-docs-only.sh 对「${input}」说 ${got}，应该是 ${want}"
   fi
@@ -59,7 +59,7 @@ git_in() {
   git -C "${REPO}" -c user.name=check -c user.email=check@example.invalid -c commit.gpgsign=false "$@" >/dev/null
 }
 classify_repo() {
-  (cd "${REPO}" && /bin/bash "${CLASSIFIER}")
+  (cd "${REPO}" && GITHUB_EVENT_NAME=pull_request /bin/bash "${CLASSIFIER}")
 }
 git_in init -q -b main
 mkdir -p "${REPO}/Sources" "${REPO}/docs"

@@ -171,10 +171,9 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 （树已经在 PR 那一轮原样验过，见「CI」一节「合并之后 main 上那一轮」），每组的摘要里写着是哪一轮 PR 的 CI 验的这棵树；
 不另要求发版前再完整跑一轮。
 Since 2026-11-17 a new merge cancels the older main runs (「CI」), so an older commit's run is usually cancelled: release
-the newest, or re-run that commit's run (a re-run cancels nothing) and wait for green. When the release commit's merge
-only touched docs (`docs/`, `AGENTS.md`, `README.md`, `SrtFlow-Requirements.md`), its run didn't check any code: the
-newest code merge below it (`git log --first-parent`) needs a green main run of its own too; if that run was
-cancelled, re-run it and wait for green.
+the newest, or re-run that commit's run (a re-run cancels nothing) and wait for green. Docs-only main merges now run
+the full checks too, so their own green `check-all` is sufficient. For commits using the earlier scan-only main
+workflow, a docs-only release commit also needs its newest code ancestor's green main run; re-run it if cancelled.
 
 流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包，用原固定身份验签；核对包内版本、
 arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App。再复用 `scripts/r2.py`
@@ -552,11 +551,13 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   - Why that's safe: the newest main tree contains every earlier merge. Its run either checks it, or skips the checks
     because its pull request's green run checked exactly that tree (「合并之后 main 上那一轮」 below); the cancelled
     merges get checked as part of it.
-  - The exception is a docs-only merge: its run only does the scan guards (or nothing, when its pull request's run
-    checked that exact tree). If it cancels the run of a code merge whose tree nothing had checked (that pull request
-    was behind main), that code isn't checked as merged until a later code merge's run completes. Replaying the 141 main
-    runs from 2026-11-04 to 11-17 with their real timings: 32 would have been cancelled (29 of them full runs) and this
-    happened twice (#359 and #395, each followed by a docs-only merge). Releases check for it (「公开下载发布」).
+  - Docs-only main merges always run the full checks, even if their tree matches a green PR marker: that PR only
+    ran scans and cannot verify inherited code. Both `ci-docs-only.sh` and `ci-verified-tree.sh` return false for
+    these pushes. This deliberately spends a full main run on docs merges instead of tracking ancestor runs and
+    their cancellations through the API. Docs-only PRs keep the scan-only fast path; code merges keep exact-tree
+    reuse. The earlier rule could cancel the only run checking a code merge's actual tree and replace it with scans:
+    replaying 141 main runs from 2026-11-04 to 11-17 found two cases (#359 and #395, followed by docs-only merges).
+    Regression and reverse-verification evidence: [docs-only cancellation gap](../bugfixes/2026-11-17-docs-only-main-cancels-unverified-code.md).
   - A re-run (`run_attempt` > 1) keeps a per-commit group. In the shared group, re-running an older main run cancels the
     newest one: tried on a throwaway branch on 2026-11-17 (ubuntu only), the re-run cancelled the newer run ("Canceling
     since a higher priority waiting request for … exists"); with the per-commit group both finished. So re-running a
@@ -565,10 +566,11 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     `.build` cache, so the next pull request restores the newest one saved and compiles the difference.
   - `checks/ci-verified-tree.sh` pins the block word for word (PR runs by number, pushes by `github.ref`, re-runs by
     commit, `cancel-in-progress: true`, no job-level block).
-- **只改了文档的 PR / 合并走快速通道**（2026-11-04 起）：每组第一步跑 `scripts/ci-docs-only.sh` 判一下，是就不编 App、
-  不跑自检，第 1 组跑一遍 `scripts/check-guards.sh`（文档索引 docs-index-drift 在里面）就收工，其余四组到这一步就绿了，
-  汇总 job `check-all` 照常给结论。原来一个只改文档的 PR 要占满 5 台 runner 两轮（PR 一轮、合并后 main 一轮），
-  各约 10 分钟；10 月下旬到 11-04 合的 60 个 PR 里有 10 个是这样的。
+- **Docs-only PRs take a fast path** (since 2026-11-04): each shard first runs `scripts/ci-docs-only.sh`. When true,
+  compilation and self-checks are skipped; shard 1 runs `scripts/check-guards.sh` (including docs-index-drift), the
+  others finish, and `check-all` still reports the result. Since 2026-11-17 main pushes always return false here,
+  including docs-only merges, to cover cancelled ancestors. Standard-input mode (`-`) only classifies the supplied
+  paths, regardless of event, so `ci-verified-tree.sh` can reuse the same whitelist.
   - **白名单是严格的**：`docs/` 下的文件，根目录的 `AGENTS.md`、`README.md`、`SrtFlow-Requirements.md`。查过
     （2026-11-04），自检里读这几样内容的只有扫描守卫 docs-index-drift，编译、跑二进制的一样都不读。白名单外的任何一个
     文件、一个文件都没改、git 算不出来、路径被 git 加了引号，都按「不是」照常全跑；改名按「删旧的 + 加新的」算
@@ -580,6 +582,8 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     快速通道只在第 1 组、触发条件里没有 paths、汇总 job 照旧。
 - **合并之后 main 上那一轮：树已经验过就不再跑检查**（2026-11-13 起，用户定；量了什么、几种做法比下来怎样见
   [合并后 main 上那一轮的实测](../reports/2026-11-13-main-ci-verified-tree.md)）。
+  - Since 2026-11-17 this reuse applies only to code merges. A docs-only merge always runs the full checks; a green
+    scan-only PR marker does not prove that code inherited from a cancelled main run was tested.
   - 为什么：改代码的 PR 合进来，main 上要再跑一轮完整的，占满 5 台约 7.5 分钟。合出来的树和这个 PR 最后一次绿的那一轮测的树
     （GitHub 替它合的 `refs/pull/N/merge`）一模一样时，这一轮没有新东西可验：2026-08-16 到 11-13 能查到的 358 次合并里 308 次是这样，
     几件事并行的 11-04 到 11-13 是 104 次里 77 次。树不一样（ruleset 没开「合并前必须跟上 main」，PR 可以没跟上就合）照旧完整跑。
