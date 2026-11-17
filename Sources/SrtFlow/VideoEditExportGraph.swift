@@ -92,6 +92,7 @@ enum VideoEditExportGraph {
             .filter { !$0.isMuted }
 
         let hasVisual = !mainVisible.isEmpty || !overlayVisible.isEmpty
+            || (state.minimumDuration > 0 && !Self.isAudioOnly(state))
         guard hasVisual || !audioClips.isEmpty else {
             throw PlanError(message: L10n("Add at least one clip to the main track first."))
         }
@@ -233,7 +234,7 @@ enum VideoEditExportGraph {
             segments.append(segment)
             cursor = max(cursor, clip.timelineEnd)
         }
-        if total > cursor + 0.01 {
+        if (segments.isEmpty && state.minimumDuration > 0) || total > cursor + 0.01 {
             segments.append(MainSegment(clip: nil, duration: total - cursor))
         }
 

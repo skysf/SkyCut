@@ -156,30 +156,49 @@ enum AIOverlayTools {
     static func setCanvas(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
         let ratioText = try args.choice("ratio", from: MCPVocabulary.canvasRatios)
         let fps = try args.int("fps")
-        guard ratioText != nil || fps != nil else { throw AIToolError("Pass ratio, fps, or both.") }
+        let duration = try args.double("duration")
+        guard ratioText != nil || fps != nil || duration != nil else { throw AIToolError("Pass ratio, fps, or duration.") }
         if let fps, ProjectFrameRate(rawValue: fps) == nil {
             throw AIToolError("fps must be one of \(ProjectFrameRate.allCases.map { String($0.fps) }.joined(separator: ", ")).")
+        }
+        try AIEditLimits.nonnegative("duration", duration)
+        if let duration, duration > 0 {
+            let rate = fps.flatMap(ProjectFrameRate.init(rawValue:)) ?? project.state.frameRate
+            let minimum = max(TimelineDuration.contentEnd(project.state), rate.secondsPerFrame)
+            if duration < minimum { throw AIEditLimits.invalid("duration", duration, minimum: minimum) }
         }
         // 录屏中帧率冻结（setFrameRate 那一道闸只亮一句提示、不改）：以前这里照样回成功，AI 以为改了。先挡、一样都不改。
         if let fps, fps != project.state.frameRate.fps, ScreenRecordingCoordinator.shared.isBusy {
             throw AIToolError(AIScreenRecordingTool.lockMessage("the frame rate cannot be changed now"))
         }
         let before = project.state
-        if let ratioText {
-            let ratio = CanvasRatio.allCases.first { ($0 == .auto ? "auto" : $0.title) == ratioText } ?? .auto
-            project.setCanvasRatio(ratio)
+        let ratio = ratioText.map { text in CanvasRatio.allCases.first { ($0 == .auto ? "auto" : $0.title) == text } ?? .auto }
+        let changes = ratio.map { $0 != before.canvasRatio } == true
+            || fps.map { $0 != before.frameRate.fps } == true
+            || duration.map { $0 != before.minimumDuration } == true
+        let apply = {
+            if let ratio { project.setCanvasRatio(ratio) }
+            if let fps, let rate = ProjectFrameRate(rawValue: fps) { project.setFrameRate(rate) }
+            if let duration, duration != project.state.minimumDuration { project.perform { $0.minimumDuration = duration } }
         }
-        if let fps, let rate = ProjectFrameRate(rawValue: fps) { project.setFrameRate(rate) }
+        if changes {
+            AIUndoGrouping.step(project.effectiveUndoManager) { apply() }
+        } else {
+            // A repeated ratio still marks explicit canvas intent for recording import, without an empty undo group.
+            apply()
+        }
         let size = VideoEditCompositionBuilder.renderSize(for: project.state)
         var result: [String: JSONValue] = [
             "ratio": .string(project.state.canvasRatio == .auto ? "auto" : project.state.canvasRatio.title),
             "width": .number(Double(Int(size.width))),
             "height": .number(Double(Int(size.height))),
-            "fps": .number(Double(project.state.frameRate.fps))
+            "fps": .number(Double(project.state.frameRate.fps)),
+            "duration": AIFormat.seconds(project.state.duration),
+            "minimum_duration": .number(project.state.minimumDuration)
         ]
         // A new frame shape keeps every clip's shape (`CanvasReframe`, run by perform): say which clips that re-expressed and which
         // no longer fill the frame (docs/bugfixes/2026-11-17-canvas-change-stretches-framed-clips.md).
         result.merge(AICanvasReframe.fields(before: before, after: project.state, ids: AIShortIDs(state: project.state))) { kept, _ in kept }
-        return .ok(.object(result), changed: true)
+        return .ok(.object(result), changed: before != project.state)
     }
 }

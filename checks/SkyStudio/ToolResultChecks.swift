@@ -5,6 +5,7 @@ import SrtFlowMCPKit
 // 真 API 页 → MCP 摘要、真实文件命名器与远端任务状态；不碰账户或付费供应商。
 @MainActor
 func runToolResultChecks() async {
+    runGenerationDurationChecks()
     do {
         for count in [28, 50] {
             let characters = (0..<count).map { index -> JSONValue in

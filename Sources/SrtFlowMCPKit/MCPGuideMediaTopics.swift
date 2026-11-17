@@ -66,6 +66,10 @@ enum MCPGuideMediaTopics {
             """),
             MCPGuideSection(name: "jobs_results", about: "job_id and get_job, where files land, cancelling, refunds, file names", text: """
             Jobs and results. The call returns job_id; wait with get_job, which reports the phase, queue position and credits_charged. \
+            For timed media, requested_duration is the submitted numeric target (null for automatic length), and duration is the \
+            length Sky Studio reports in its result (null when unknown). A difference greater than 1 second adds duration_warning; \
+            tell the user before placing the file. This notice never trims, pads or regenerates it. The reported duration is not a \
+            local measurement of the file or of its audible sound. \
             Finished files land in the project's SkyCut folder and never change the timeline: add them with \
             add_clips. Only queued jobs can be cancelled with cancel_job; started jobs finish, are charged and stay in the user's Sky \
             Studio library. Refunds need billing proof. After an unknown or delivery error, recover the original job with get_job; never \

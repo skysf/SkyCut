@@ -24,7 +24,7 @@ public enum MCPBatchTools {
         case .editClips:
             return Source(tool: .editClip, key: "clips", id: "clip_id", lead: "Change many clips in one call with the same fields as edit_clip (ids from get_timeline). Everything is checked first and applied as one undo step; any error applies nothing.",
                           example: #"{"clips":[{"clip_id":"c1","volume_db":-6}]}"#,
-                          tail: "Entries apply in order (1-\(maximumItems)); omitted fields stay. Returns the final state of each clip.")
+                          tail: "Entries apply in order (1-\(maximumItems)); omitted fields stay. compact returns ids and notices; otherwise final states.")
         case .setTexts:
             return Source(tool: .setText, key: "texts", id: "text_id", lead: "Add or change many texts in one call with the same fields as set_text (text_id from get_timeline; leave it out to add). Everything is checked first and applied as one undo step; any error applies nothing.",
                           example: #"{"texts":[{"text_id":"t1","text":"Review title","font_size":36}]}"#,
@@ -46,10 +46,12 @@ public enum MCPBatchTools {
         ]
         var list = MCPSchema.array(of: item, "Arguments of \(source.tool.rawValue).", minItems: 1).objectValue ?? [:]
         list["maxItems"] = .number(Double(maximumItems))
+        var properties: [String: JSONValue] = [source.key: .object(list)]
+        if name == .editClips { properties["compact"] = MCPSchema.boolean("Return ids and notices only (default false).") }
         return MCPToolDefinition(
             name, title: "Batch \(source.tool.rawValue)",
             description: source.lead + "\nExample: " + source.example + "\n" + source.tail,
-            input: MCPSchema.object([source.key: .object(list)], required: [source.key])
+            input: MCPSchema.object(properties, required: [source.key])
         )
     }
 

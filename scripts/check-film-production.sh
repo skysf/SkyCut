@@ -21,6 +21,7 @@ xcrun swiftc \
   -I "${BUILD_DIR}/Modules" \
   -o "${OUT_DIR}/productioncheck" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/TimelineDuration.swift \
   Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \

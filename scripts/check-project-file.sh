@@ -37,6 +37,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/TimelineDuration.swift \
   Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
@@ -141,6 +142,7 @@ xcrun swiftc \
   checks/ProjectFile/ShapeAnimations.swift \
   checks/ProjectFile/ExitCurves.swift \
   checks/ProjectFile/Regions.swift \
+  checks/ProjectFile/Duration.swift \
   checks/ProjectFile/OldFreezeTails.swift \
   checks/ProjectFile/WebMotion.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o

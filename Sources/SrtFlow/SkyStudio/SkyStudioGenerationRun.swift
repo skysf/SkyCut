@@ -361,7 +361,6 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             detail["height"] = .number(height.rounded())
         }
         if let localImage { detail.merge(localImage.dimensions) { _, actual in actual } }
-        if let duration = result.duration { detail["duration"] = .number(duration) }
         if let charged { detail["credits_charged"] = .number(SkyStudioCredits.number(charged)) }
         if let caption {
             AIReadGrants.shared.remember([caption])
@@ -393,6 +392,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             self.status.issue = message
         }
         var payload = detail?.objectValue ?? [:]
+        payload.merge(SkyStudioGenerationDuration.fields(for: generation, result: remoteResult)) { _, current in current }
         // 交上了就带任务号（停不下来的那单、没做成的那单也说得出是哪一单）。
         if let id = submitted.jobID { payload["skystudio_job_id"] = .string(id) }
         payload["model_id"] = .string(modelID)
@@ -448,6 +448,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let generationStatus { detail["generation_status"] = .string(generationStatus) }
         if let deliveryStatus { detail["delivery_status"] = .string(deliveryStatus) }
         if let result = server.result { detail["remote_result"] = .object(result.metadata) }
+        detail.merge(SkyStudioGenerationDuration.fields(for: generation, result: server.result)) { _, current in current }
         if let usage = characterUsage { detail["character_usage"] = usage.json }
         AIJobs.shared.updateDetail(job, detail)
     }

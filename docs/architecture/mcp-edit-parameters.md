@@ -49,6 +49,23 @@ section 4 item 2).
 旧的 start/end 等摘要字段保留兼容的展示精度；核对本次数值请使用 applied。后续批量条目、磁吸或联动改变了落点，
 也必须按最后的状态报告，不能逐项报中间候选状态。
 
+## Compact batch feedback and project endings (2026-11-17)
+
+`edit_clips compact=true` changes only the reply: processed clip ids stay in input order, with `count` and per-entry `notices`
+for adjustments and findings. Each adjustment retains its requested/applied values and reason from the final timeline. Source-cut
+warnings, uncertain/detected bars, subject warnings/following, explicit region framing, keyframe/replacement notes, actual
+requested-track destinations and replacement windows remain visible. A requested fill that still leaves corners uncovered retains
+`fills_frame`, `fill_scale` and `fills_except`. Batch-level `linkage`, `magnet` and `unchanged` are retained. Normal numeric edits
+do not repeat names, paths, picture descriptions or transforms; the 76-entry production check enforces a reply below 2,000 JSON
+characters. Exception-heavy replies may be longer rather than losing warnings. Omitting `compact` preserves detailed replies.
+The option is parsed before asynchronous preparation; invalid values leave the project and undo history untouched.
+
+`set_canvas duration` is a saved minimum ending, not a trim. Zero clears it; a positive request must cover current content and
+at least one frame at the requested/current project rate. All canvas arguments validate before any setting changes, and the
+tool opens its undo group only after validation and an actual state change, covering the whole call. A repeated ratio still marks
+explicit canvas intent for recording import without creating an empty undo step. Persistence and rendering rules are in
+[project files](video-edit-project-file.md#explicit-project-ending-v37-2026-11-17).
+
 ## 原子性与素材就绪
 
 所有参数解析、素材读取和几何计算先在副本中完成；探到的 `MediaInfo` 也随有效编辑一起采用，不提前写进工程。

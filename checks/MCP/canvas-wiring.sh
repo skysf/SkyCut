@@ -27,3 +27,13 @@ if [ "$(grep -c 'AICanvasReframe.fields(before: before, after: project.state' So
   exit 1
 fi
 echo "   ✓ perform keeps clips' shapes after the magnet; set_canvas reports reframed / no_longer_fill"
+
+# The explicit ending must reach the same saved duration consumed by preview and export.
+if ! grep -Fq 'project.perform { $0.minimumDuration = duration }' Sources/SrtFlow/AIOverlayTools.swift \
+  || ! grep -Fq 'AIUndoGrouping.step(project.effectiveUndoManager) { apply() }' Sources/SrtFlow/AIOverlayTools.swift \
+  || ! grep -Fq 'var duration: Double { TimelineDuration.end(self) }' Sources/SrtFlow/VideoEditModels.swift \
+  || ! grep -Fq 'decodeIfPresent(Double.self, forKey: .minimumDuration)' Sources/SrtFlow/VideoEditModels.swift; then
+  echo "✗ The explicit canvas ending lost its production commit, duration, or persistence path" >&2
+  exit 1
+fi
+echo "   ✓ set_canvas retains the ending through the saved timeline duration"

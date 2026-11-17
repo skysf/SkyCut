@@ -13,11 +13,14 @@ enum AIBatchEditTools {
         var batch: AIClipBatch
         let generation: Int
         let linkage: Bool
+        let compact: Bool
     }
 
     static func planClips(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> ClipsPlan {
+        let compact = try args.bool("compact") ?? false
         let items = try AIBatchItems.read(args, key: "clips", tool: .editClips)
-        var plan = ClipsPlan(batch: AIClipBatch(project.state), generation: project.documentGeneration, linkage: project.linkageEnabled)
+        var plan = ClipsPlan(batch: AIClipBatch(project.state), generation: project.documentGeneration,
+                             linkage: project.linkageEnabled, compact: compact)
         for (index, item) in items.enumerated() {
             do {
                 try Task.checkCancellation()
@@ -41,7 +44,11 @@ enum AIBatchEditTools {
         let time = project.state.allClips.filter { ids.contains($0.id) }.map(\.timelineStart).min()
         AIEditorPresenter.reveal(.init(clips: ids, time: time), project: project)
         let results = plan.batch.entries.map { JSONValue.object(AIClipTools.summary($0.plan, old: $0.old, project)) }
-        return result("clips", results, edit: plan.batch.edit, report: report, project)
+        let detailed = result("clips", results, edit: plan.batch.edit, report: report, project)
+        guard plan.compact else { return detailed }
+        var payload = detailed.payload.objectValue ?? [:]
+        payload.merge(AIClipBatchReply.compact(results, requests: plan.batch.entries.map { $0.plan.requestedParameters })) { _, compact in compact }
+        return .ok(.object(payload), changed: detailed.changedProject)
     }
 
     static func setTexts(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
