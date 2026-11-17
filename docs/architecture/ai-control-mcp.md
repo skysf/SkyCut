@@ -352,7 +352,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      等当前 native copy 返回后由同一 `analysis` 读取体单点取消和释放 reader。不能硬中断不返回的 native copy，也不能跨线程 `cancelReading`；失败/超时不返回成功的部分统计。
      生命周期约束与实际等待边界见[阻塞的媒体读取](blocking-media-reads.md#读取中的取消与释放)。
      Since 2026-11-17 a file without a range is read the same way, whole (no partial waveform report any more); the shared
-     waveform stays for the tools that only need levels (cut_speech, cuts=true, inspect_video).`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
+     waveform stays for the tools that only need levels (cut_speech, cuts=true, inspect_video). **The refusal above is for a
+     named range only.** A clip's window and a whole file take the file's sound where it is (`AIListenAudioWindow.Edges.sound`):
+     what plays where a file has no sound is silence, and an audio track that stops a few ms before its picture is common
+     (2 of 7 sampled camera / generated files, by 14 and 28 ms), so such a clip is measured over its sound at its true times,
+     not refused as "incomplete coverage", and nothing is said about the part without sound. A gap inside is refused either way
+     (`checkListenSoundEdges` in `ListenRangeChecks.swift`).`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
      结果 `beat_note` 说清不只分析请求窗；文件总长超过该限制就不给节拍解码，结果明确说明限制（电平/静音仍可有界返回）。**因此只有 `beats=false` 的显式文件窗承诺不扩展为整首/整文件解码；压缩包边界可有少量相邻采样，统计必须裁回请求范围。**
      扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`；真实文件生产路径回归在 `ListenRangeChecks.swift`：
      本机合成的稀疏长 WAV、晚时间点短窗、暂停 overview 队列仍成功、原生实际帧数/PTS、范围统计、时长边界、原生 AAC 包边界、MOV 空编辑/偏移音轨，

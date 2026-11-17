@@ -36,6 +36,7 @@ func runListenRangeChecks() async {
         await checkListenShortFile(in: directory)
         await checkCompressedListenRange(in: directory)
         await checkListenEditCoverage(in: directory)
+        await checkListenSoundEdges(in: directory)
     } catch {
         check(false, "listen range fixture/production path failed: \(error)")
     }
@@ -251,6 +252,47 @@ private func checkListenEditCoverage(in directory: URL) async {
         await checkCoverageOrRefusal(offsetURL, from: 0.25, to: 1.5, gap: false)
         await checkCoverageOrRefusal(offsetURL, from: 1.5, to: 2.75, gap: false)
     } catch { check(false, "native edit-list coverage fixture failed: \(error)") }
+}
+
+/// A clip's window and a whole file take the file's sound where it is (AIListenAudioWindow.Edges.sound, 2026-11-17): an
+/// audio track that stops before the picture (2 of 7 sampled camera / generated files, by 14 and 28 ms) or starts after it is
+/// measured, not refused as "incomplete coverage" — what plays there is silence. A named file range keeps the rule above.
+@MainActor
+private func checkListenSoundEdges(in directory: URL) async {
+    do {
+        // Keep the asset: a track only holds its asset weakly (inserting from a released one fails with -11800 / -12780).
+        let toneAsset = AVURLAsset(url: directory.appendingPathComponent("synthetic-tone.m4a"))
+        let tone = try await toneAsset.loadTracks(withMediaType: .audio)[0]
+        let video = AVURLAsset(url: directory.appendingPathComponent("synthetic-picture.mp4"))
+        let picture = try await video.loadTracks(withMediaType: .video)[0]
+        // Picture 0–3 s, sound 0–1 s.
+        let short = AVMutableComposition()
+        try short.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid)!
+            .insertTimeRange(CMTimeRange(start: .zero, duration: try await video.load(.duration)), of: picture, at: .zero)
+        try short.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)!
+            .insertTimeRange(CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 1)), of: tone, at: .zero)
+        let shortURL = directory.appendingPathComponent("synthetic-short-sound.mov")
+        try await AVAssetExportSession(asset: short, presetName: AVAssetExportPresetPassthrough)!.export(to: shortURL, as: .mov)
+        let (outcome, tally) = await talliedFileListen(shortURL, sourceIn: nil, sourceOut: nil, plan: .wholeFile(beats: false))
+        check(tally.windows.count == 1, "a whole file whose sound stops before its picture is read once (\(tally.windows))")
+        let whole = try outcome.get()
+        check((whole["peak_db"]?.doubleValue ?? -60) > -20 && (whole["loudest_at"]?.doubleValue ?? 9) < 1,
+              "…and measured where its sound is, not refused (peak \(whole["peak_db"]?.doubleValue ?? -99), loudest at \(whole["loudest_at"]?.doubleValue ?? -1))")
+        let deadline = Date().addingTimeInterval(listenCheckHangBound)
+        let tail = try await AIListenAudioWindow.read(shortURL, from: 0, to: 2, until: deadline,
+                                                      frames: { from, to in [from, 0.5, 1.5, to] }, edges: .sound)
+        let frames = tail.frames?.frames ?? []
+        check(frames.count == 3 && frames[0].meanSquare > 0 && frames[2].meanSquare == 0
+              && abs((tail.windows.last?.end ?? 0) - 1) < 0.03 && abs(tail.sourceStart) < 0.001,
+              "a clip's window past the end of the file's sound: the sound up to 1 s at its true times, nothing after (\(tail.sourceStart)–\(tail.windows.last?.end ?? -1))")
+        // Picture 0–3 s, sound 1–2 s (made by checkListenEditCoverage). Some decoders fill the empty edit with zeros.
+        let late = try await AIListenAudioWindow.read(directory.appendingPathComponent("synthetic-offset.mov"), from: 0.25, to: 1.5,
+                                                      until: deadline, frames: { from, to in [from, 1, to] }, edges: .sound)
+        let lateFrames = late.frames?.frames ?? []
+        check((abs(late.sourceStart - 0.25) < 0.001 || abs(late.sourceStart - 1) < 0.01) && abs((late.windows.last?.end ?? 0) - 1.5) < 0.01
+              && lateFrames.count == 2 && lateFrames[0].meanSquare == 0 && lateFrames[1].meanSquare > 0,
+              "a clip's window over a sound that starts late: the sound from where it starts, never moved earlier (from \(late.sourceStart))")
+    } catch { check(false, "a clip's window or a whole file with less sound than picture was refused: \(error)") }
 }
 
 @MainActor
