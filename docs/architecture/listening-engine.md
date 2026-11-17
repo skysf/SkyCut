@@ -9,6 +9,7 @@
 > （能听的大模型认环境声约六成、问「什么时候、几次」基本不可用；苹果的识别器没有「轰鸣」这一类），所以在 SkyCut 里自己做一层薄的：
 > 量 + 成熟指标 + 苹果自带的识别，不加第三方依赖、不训模型。用户同意用 ESTOI 量「人声被盖住」、只报不拦。
 > 2026-11-16 合入的是第 2、3 步里不依赖第 1 步的纯计算（`Sources/SrtFlow/Listening/`），**还没接到任何地方**。
+> **2026-11-17: step 2 is wired**: `listen voice=…` (section 2 item 3 below; the lines are in code: `VoiceClarity`).
 
 ## 一、分层
 
@@ -16,7 +17,7 @@
 | --- | --- | --- | --- |
 | 0 来路 | 这层声音是什么、为什么在这 | 读工程：生成时的提示词、音乐库 / 音效库的标签、旁白的文字、合成音效的预设 | 工程里本来就有，**不用听** |
 | 1 量 | 每层、每帧、每个频段多响；整条的响度、峰值 | 音频引擎按层离线渲（`AudioStemRender`、`MixMeasurement`，[成片的声音](export-audio-mixdown.md)「按层量」） | Merged 2026-11-16 (`listen mix=true`); since 2026-11-17 every peak is a true peak (`TruePeak`, dBTP, the limiter's measure) and a clip's or file's `loudest_at` is a frame |
-| 2 成熟指标 | 每句人声清不清楚；主要是谁盖住了它、压哪层最管用；ESTOI 看不见的低频有多响 | `Listening/ESTOIAnalysis`、`ESTOI`（含 `ESTOIReference`）、`MaskerAttribution` | 纯计算合了，没接 |
+| 2 成熟指标 | 每句人声清不清楚；主要是谁盖住了它、压哪层最管用；ESTOI 看不见的低频有多响 | `Listening/ESTOIAnalysis`、`ESTOI`（含 `ESTOIReference`）、`MaskerAttribution` | Wired 2026-11-17: `listen voice=…` (`AIListenVoiceCheck`) |
 | 3 描述没来路的原声 | 素材自带的声音大概是什么：低沉长音 / 宽频噪声 / 有音高 / 有拍子 / 像说话 | `Listening/SourceSoundFeatures`、`SourceSoundSpectrogram`、`SourceSoundTrait`（含 `SourceSoundDescription`） | 九个特征和描述合了，没接；苹果 SoundAnalysis「每个标签自己的分数」、SpeechTranscriber「有没有字」要系统接口和真文件，没做 |
 | 4 声音报告 | 把 1–3 拼成一张按时间的表，AI 一次读完；「要人听」的几处 | — | 没做 |
 | 5 以后 | 拆开（素材原声里的人声和别的）、认（更细的名字）、第二只耳朵（云端窄问题）、人的耳朵（一键打点） | — | 都没做；要下载模型或花钱的，先问用户 |
@@ -25,7 +26,7 @@
 可重用的 `Plan`；`ListeningLevel` 是 RMS → dBFS 的口径）、`ListeningMath`（照 numpy 写的汉宁窗、频点的频率、中位数、标准差）。
 全是纯值、纯函数：不依赖 App 里的别的类型，`scripts/check-listening.sh` 只编这几个文件。
 
-## 二、谁调谁（接线以后应该是这样）
+## 二、谁调谁（接线以后应该是这样；step 2 wired 2026-11-17, item 3a）
 
 1. **来路已知的声音不用听。** 旁白轨、音乐库的曲子、音效、生成的音乐是什么、为什么在这，工程里都有（第 0 层），直接用来路。
    要「听」的只有两样：**素材自带的原声**（来路不明）和**混在一起的结果**（谁盖住了谁）。
@@ -34,6 +35,24 @@
    交给 `MaskerAttribution.rank(clean:others:sampleRate:)`，回：整句 ESTOI（和每段的中间值，`worstWindow()` 是最差 1 秒）、每层「拿掉 / 压低 6 dB，
    ESTOI 涨多少」和这一层多响、别的声音在 20–150 Hz 多响、人声整句多响。只要一个数时用 `ESTOI.score(clean:mix:sampleRate:)`。
    混音必须是各层之和（限幅之前）：拿掉一层 = 不加它；传限幅以后的成片，减出来的就不是「没有这一层」。
+3a. **How `listen voice=…` does it (2026-11-17, MCP-39).** The AI names the voice: an audio track (`voice=A1`, several joined by +)
+   or `auto` (the audio tracks holding only SkyCut's voice-overs, recognised by the folder SkyCut writes them to in any interface
+   language). A video track's sound is refused with the reason: a voice there was recorded with everything around it and can't be
+   taken out (on-camera speech, research E37 / E38). `AIListenVoicePlan`: the voice tracks first, then every other audible track
+   as its own layer (beyond 12 in all the rest are joined as `rest`), each with what its clips are from where they came
+   (`Provenance`: our voice-overs and sound effects by folder, library music / effects by manifest id, generated audio as music,
+   a video clip's sound as `clip_sound`, anything else `other`) — rule 1 above: the masker is named by its source, not guessed.
+   `AIListenVoiceMeasure` renders the layers with `AudioStemRender` (the export's configuration, before the limiter, so they add
+   up to the mix), starting `MixMeasurement.preroll` before the first voice clip; each voice clip's stretch ± 0.2 s is kept from
+   every layer as (L + R) / 2, and once the render has passed it its own voice layer is cut into lines at its pauses
+   (`VoiceLines`: 20 ms frames, quiet = 40 dB under the clip's loudest frame and never above −60 dBFS, a line ends at 0.6 s of
+   quiet — longer than a breath or a comma), each line padded 0.2 s and handed to `MaskerAttribution.rank` with every other
+   layer, other voices included; then the stretch's samples are dropped (memory stays a few seconds). `AIListenVoiceReport`
+   writes each line (clip, where it is spoken, ESTOI, the verdict, the two strongest maskers with their kind and gains,
+   `low_150_db` next to `voice_db`) and counts the verdicts. It is a listen job like mix=true (`AIListenMix.queued`: AIJobs,
+   the mix lane, `MediaReadQueue.export`, 20 s inline); read-only; never the preview's engine.
+   Voice-over clips are one line each already; a long narration file is split by its pauses, not by a transcript (listen is
+   read-only and starts no transcription).
 4. **没来路的原声**（每个留着原声的镜头）：那一层的采样交给 `SourceSoundDescription.describe(_:sampleRate:)`，回每 3 秒一窗的九个数和描述词。
 5. 第 4 步把这些拼成表交给 AI；**只报不拦**（第三节）。
 6. 都是纯 CPU 的计算，不读文件、不碰声卡：接线时放在后台（AI 起的走 `AIJobs`，[AI 接口](ai-control-mcp.md)第四节第 59 条），别放主线程。
@@ -121,7 +140,10 @@
 
 ## 七、哪几条线是盲听定的（只来自一个人、几十题，定了不等于证实）
 
-**这些线都还没写进代码**（接线的任务按这里写）。来历：
+**Since 2026-11-17 these lines are in code** (`VoiceClarity`, used by `listen voice=…`; item 3 below as written: another voice
+speaking → `two_voices` on its own; otherwise < 0.31 `probably_unintelligible`, 0.31–0.41 `may_be_hard`; with music the main masker
+only < 0.20, as `may_be_hard`; the 20–150 Hz level is numbers only). Whether to add the grey "clear, but [layer] may be loud" hint
+(FL-61) is waiting for the user. 来历：
 
 1. 第一次小验证（15 句、用户一个人）：ESTOI 把用户听不清的两句（0.332、0.377）和听得清的 13 句（最低 0.445）分开了，线暂画在 0.41。
    听不清的只有同一句话的两稿，同一个东西盖住的（镜头原声的轰鸣）。
@@ -156,3 +178,11 @@
 后者这几个边界上正好没有频点（第六节），两样都不影响结果。
 
 **没验到的**：真录音、真的按层渲出来的采样（接线的任务）；SoundAnalysis、SpeechTranscriber；描述词的线在别的片子上灵不灵。
+
+**`listen voice=…` (2026-11-17)**: `scripts/check-listening.sh` checks the verdict table (`VoiceClarity`, every edge) and the line
+split (`VoiceLines`: two stretches a second apart are two lines, a 0.4 s pause inside one is not, silence has none, a quieter voice
+is still one line). `scripts/check-mix-layers.sh` group 3 runs the real path on synthetic signals: a speech-like voice on A1 in two
+lines, loud noise under the second, quiet "library music" all along → two lines at the right timeline seconds, the first clear,
+the second `probably_unintelligible` with A2 (`other`) its main masker and removing it worth most; V tracks refused with the
+reason; `auto` finds the voice-over track by its folder; two voice tracks speaking at once → `two_voices`. Not verified: real
+narration under real music (the blind-test items are not in the repo); the lines themselves (one listener).
