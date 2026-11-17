@@ -37,6 +37,7 @@
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
 - [2026-10-01 烧录页默认宽度下字幕列被裁](2026-10-01-burn-in-subtitle-column-clipped-at-default-width.md) — `HSplitView` 最后一栏的 ideal 要放得进；截图按用户默认的窗口大小拍。
 - [2026-10-29 提交返回的瞬间取消，丢了任务号](2026-10-29-cancelled-submit-loses-job-id.md) — 付费提交的身份先交给调用方，然后才能抛停止。
+- [2026-11-17 Changing the canvas silently stretches clips framed for the old shape](2026-11-17-canvas-change-stretches-framed-clips.md) — Values stored relative to the canvas need a rule for when it changes: keep x, y and scale, never re-crop, and tell the AI.
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
 - [2026-10-03 一条扫描被 bash 3.2 花括号展开拆开，从没生效](2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md) — 守卫里先把命令替换赋给变量再比；反向验证用 `/bin/bash`。
 - [2026-09-18 自检脚本的源文件清单漏掉新依赖](2026-09-18-check-script-source-list-drift.md) — 手抄的清单会漂。
@@ -141,6 +142,7 @@
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
+- [2026-11-17 Exported text and shape animations repeat a frame now and then](2026-11-17-overlay-export-repeats-a-frame.md) — Count overlay frames as frame numbers (`FrameGrid`), never floor time × fps; nothing ffmpeg matches to an output frame may sit exactly on the grid.
 - [2026-10-05 上层轨带缓动的关键帧，成片里边缘错开](2026-10-05-overlay-matte-drops-keyframe-easing.md) — 从旧关键帧构造新关键帧只走 remapped / clipped / stretched。
 - [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 普通生成 / upscale / 角色越档要在 `user_request` 的原话里找得到规格的名字；官方原创短片只查带没带原话。
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
@@ -204,6 +206,7 @@
 - [2026-08-08 静帧逐帧解码](2026-08-08-still-clip-decode-per-frame.md) — 单帧解码、loop 滤镜与性能守卫。
 - [2026-11-11 静帧自检的耗时断言在 CI 上误报](2026-11-11-still-clip-encode-timing-flake.md) — 尺子要和被量的是同一种活、同一次运行里量；能数的别拿时间推。
 - [2026-08-08 静帧循环解码过慢](2026-08-08-still-clip-loop-decode-slow.md) — image2 输入帧率。
+- [2026-11-17 A crossfade between two stills played half a transition late](2026-11-17-still-crossfade-half-a-transition-late.md) — A still's held frame is free and footage from both sides needs no freeze: centre the transition on the cut, and report where it really plays.
 - [2026-08-22 编辑译文退格删字，整条 cue 消失](2026-08-22-subtitle-editing-backspace-deletes-cue.md) — 全局快捷键要给字幕草稿让路，⌫ 的每条到达路径都得堵。
 - [2026-08-12 字幕编辑复审的六条后续](2026-08-12-subtitle-editing-review-followups.md) — 视图里的草稿会被「先写盘再销毁视图」漏掉；CAS 基线必须是会话快照。
 - [2026-08-12 字幕三入口首测](2026-08-12-subtitle-editing-surfaces-smoke-fixes.md) — `HSplitView` 不保护最后一栏；临时行不能给自己上焦点。

@@ -33,6 +33,29 @@
 - `resolvedPlacement(canvas:isOverlay:)` 是唯一的"此刻实际框"换算口；
   预览选中框、拖动起点、Inspector 的 Position/Scale 都从它取。
 
+### A canvas change keeps every clip's shape (2026-11-17)
+
+The stored numbers are fractions of the canvas, so the same numbers on a canvas of another shape stretch the picture: a clip filled
+into 9:16 came out 3.16× wide after set_canvas 16:9 ([case](../bugfixes/2026-11-17-canvas-change-stretches-framed-clips.md)). Rule
+(`CanvasReframe`, run at the end of `VideoEditProject.perform` after the magnet; every path that changes the canvas's shape goes through
+it: set_canvas, the canvas menu, auto following a new first V1 clip, a screen recording setting the ratio):
+
+- Every picture clip whose framing that edit did not set keeps what the inspector and the AI read — its centre (x, y on the canvas)
+  and its size relative to the default layout (scale), each axis on its own. So its shape stays (a deliberately stretched clip stays
+  stretched by the same factors), its crop stays, and switching back restores the old numbers exactly. Position / size keyframes
+  are re-expressed the same way; rotation and opacity are untouched.
+- Nothing is re-cropped or re-filled: this is how the default layout (nil) already behaves on a new canvas (contain, letterbox).
+  A clip that filled the old frame may not fill the new one. set_canvas lists `reframed` (the clips whose numbers were redone) and
+  `no_longer_fill` (picture clips that covered the old frame and not this one, default-layout clips included) so the AI can call
+  edit_clips fit=fill on them (`AICanvasReframe`). Re-filling on its own would have to guess the window and could bring back what a
+  crop had removed (black bars, a watermark); keeping the shape never shows anything the clip did not show before.
+- A clip framed by the same edit that changes the canvas is left as that edit set it.
+- Out of scope: texts, shapes and subtitle layouts are not touched by it.
+- Checks: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's fill, a corner picture, size keyframes, auto canvas,
+  the reply), wiring in `checks/MCP/canvas-wiring.sh` (perform runs it after the magnet; set_canvas reports it).
+- [ ] Manual, before a release: in the editor, zoom a clip to cover a 9:16 frame and put a small picture in a corner, switch the
+  canvas menu to 16:9 and back: nothing stretches in the preview or the export, and 9:16 looks exactly as before; ⌘Z undoes each switch.
+
 Transform 面板追加的四个字段（都有「无操作」默认值，全默认走原来的轻量路径，
 `hasVisualTransform` 是统一的判定口）：
 

@@ -8,12 +8,12 @@
 833 Sources/SrtFlow/VideoEditCompositionBuilder.swift
 716 Sources/SrtFlow/VideoEditMediaFileDrop.swift
 862 Sources/SrtFlow/VideoEditModels.swift
-1203 Sources/SrtFlow/VideoEditProject.swift
+1202 Sources/SrtFlow/VideoEditProject.swift
 922 Sources/SrtFlowCore/ScreenRecordingModels.swift
 1223 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
 690 Sources/SrtFlowCoreChecks/main.swift
 650 checks/PreviewComposition/main.swift
 2495 checks/ProjectFile/main.swift
 1778 checks/TimelineSnap/main.swift
-624 checks/VideoFade/main.swift
+618 checks/VideoFade/main.swift
 948 checks/timeline-drag-wiring.sh

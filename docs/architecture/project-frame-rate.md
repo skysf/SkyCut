@@ -46,6 +46,15 @@
      否则这类问题按顺序才现形。事故见
      [转场前面有硬切就导不出](../bugfixes/2026-08-12-xfade-timebase-mismatch.md)。
 
+7. **Time ↔ frame number goes through `FrameGrid` (SrtFlowCore, 2026-11-17).** `frame(containing:)`,
+   `firstFrame(atOrAfter:)` and `time(ofFrame:)` allow for floating-point noise (1e-6 of a frame). A plain
+   `floor(time × fps)` is wrong on exact frame times — 123 / 30 s × 30 = 122.99999999999999 — and on sums like
+   `0.5 + 10 / 30`; it made exported text and shapes repeat a frame, and the preview stopped on such a frame drew the
+   overlays one frame behind ([case](../bugfixes/2026-11-17-overlay-export-repeats-a-frame.md)). Output frames of the export graph are not exactly on
+   the grid either: after `concat` / `xfade` their AVTB timestamps sit microseconds before or after it (at 30 fps after a
+   crossfade, 0.7 µs early). Anything ffmpeg must line up with an output frame (an overlay frame, an `enable` edge) sits
+   half a frame away from the grid, never on it — see [画面文字](text-overlays.md)「Frames on the grid」.
+
 ## 回归矩阵（谁守什么）
 
 | 检查 | 守什么 | 局限 |
@@ -55,6 +64,7 @@
 | `scripts/check-preview-composition.sh` | 预览合成 `frameDuration` + 真导出出帧率 | `AVAssetReaderVideoCompositionOutput` 直通时按源帧透传，必须真导出才测得出 |
 | `scripts/check-export-alpha-compositing.sh` | alpha 合成数学与帧率无关 | 只取第一帧，**帧率写错它发现不了** —— 别拿它当帧率回归 |
 | `SrtFlowCoreChecks` | `ProjectFrameRate` 纯逻辑 + v5 持久化 + 容差 | 纯逻辑 |
+| `scripts/check-text-render.sh` group 20 | every exported frame of moving text / shapes is the frame for its own time at 24 / 30 / 60 fps (constraint 7) | needs vendor/ffmpeg |
 
 ## 反向验证要求
 

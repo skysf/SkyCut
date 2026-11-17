@@ -73,9 +73,13 @@ struct TextAnimationState: Equatable {
 enum TextAnimator {
 
     /// 把时刻钉到工程帧的网格上。**预览和导出的唯一入口**。
+    ///
+    /// The frame is `FrameGrid.frame(containing:)`, which allows for floating-point noise: a plain floor of time × fps put
+    /// 0.8333333333333333 (= 0.5 + 10 / 30) on frame 24 instead of 25, and the exported title repeated a frame
+    /// (docs/bugfixes/2026-11-17-overlay-export-repeats-a-frame.md).
     static func quantize(_ time: Double, frameRate: ProjectFrameRate) -> Double {
-        let fps = Double(max(1, frameRate.fps))
-        return (time * fps).rounded(.down) / fps
+        let grid = FrameGrid(frameRate)
+        return grid.time(ofFrame: grid.frame(containing: time))
     }
 
     /// 这一刻的动画状态。`timelineTime` 请先经 `quantize`。
