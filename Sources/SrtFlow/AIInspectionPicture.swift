@@ -85,7 +85,7 @@ enum AIInspectionPicture {
             guard from < range.upperBound, to > range.lowerBound else { return nil }
             let items = visiblePictures(state, from: from, to: to)
             // 画面上只有静帧（图片、定格）时一直不动是本来就该的样子。
-            if found.kind == .frozen, !items.isEmpty, items.allSatisfy(\.isStillImage) { return nil }
+            if found.kind == .frozen, !items.isEmpty, items.allSatisfy({ $0.isStillImage || $0.isScreenRecording }) { return nil }
             return AIInspection.Finding(kind: found.kind.rawValue, from: from, to: to,
                                         reason: reason(found, frames: found.last - found.first + 1, seconds: to - from, total: signals.count),
                                         items: items.map(\.id))
@@ -135,9 +135,17 @@ enum AIInspectionPicture {
                 continue
             }
             let step = scanned.signals.frameDuration
-            // 交片前只报夹进来的一小截（两边都够长的一刀是一段里有两个镜头，放的时候已经提醒过）。
-            for crossing in crossings where crossing.kind != .twoShots {
+            // Short fragments and longer retained joins have separate report kinds.
+            for crossing in crossings {
                 let cut = clip.timelineTime(atSource: crossing.time)
+                if crossing.kind == .twoShots {
+                    if range.contains(cut) {
+                        result.append(.init(kind: "source_cut_crossing", from: cut, to: cut,
+                            reason: "\(clip.name) crosses a cut inside its source at frame \(crossing.frame); review whether keeping both shots is intentional.",
+                            items: [clip.id], details: sourceCutDetails(crossing)))
+                    }
+                    continue
+                }
                 let (from, to): (Double, Double)
                 switch crossing.kind {
                 case .head: (from, to) = (clip.timelineStart, cut)

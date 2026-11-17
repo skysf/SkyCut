@@ -97,6 +97,8 @@ enum StrayFrameChecks {
         require(job.status == .done && detail["attention"] != nil && detail.encodedString().hasPrefix("{\"attention\""),
                 "the stale-file note is the first thing in the finished result: \(job.message ?? "")")
         let findings = detail["findings"]?.arrayValue ?? []
+        require(findings.contains { $0["kind"] == "source_cut_crossing" }, "long retained joins inside a source are reported separately from stray fragments")
+        require(findings.contains { $0["kind"] == "stale_export" }, "stale export is a markable finding as well as an attention note")
         func spans(_ kind: String) -> [(Double, Double)] {
             findings.filter { $0["kind"]?.stringValue == kind }.compactMap { finding in
                 finding["from"]?.doubleValue.flatMap { from in finding["to"]?.doubleValue.map { (from, $0) } }

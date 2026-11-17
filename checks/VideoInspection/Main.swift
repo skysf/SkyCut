@@ -8,6 +8,7 @@ import SrtFlowMCPKit
 // 真正的 MCP 工具/任务/混音/取帧，不注入分析结果；只创建临时工程，不启动用户 App。
 @main enum VideoInspectionChecks {
     @MainActor static func main() async {
+        setbuf(stdout, nil)
         let domain = "com.srtflow.SrtFlow.inspectioncheck"
         guard Bundle.main.bundleIdentifier == domain else { fatalError("Isolated check bundle required") }
         UserDefaults.standard.removePersistentDomain(forName: domain)
@@ -17,6 +18,21 @@ import SrtFlowMCPKit
         func require(_ condition: Bool, _ why: String) {
             count += 1
             if !condition { failures += 1; print("FAIL: \(why)") }
+        }
+        if let selected = ProcessInfo.processInfo.environment["SRTFLOW_INSPECTION_CASE"] {
+            do {
+                let project = OpenProjects.shared.primary
+                project.newProject()
+                project.documentURL = root.appendingPathComponent("delivery-only.skycut")
+                AIWorkspace.shared.register(root)
+                if selected == "screen" {
+                    try await DeliveryChecks.frozenScreen(project, root: root, require: require)
+                } else {
+                    try await DeliveryChecks.run(project, root: root, require: require, rulesOnly: selected == "rules", screen: false)
+                }
+            } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }
+            print("Delivery \(selected): \(count) assertions, \(failures) failures")
+            exit(failures == 0 ? 0 : 1)
         }
         do {
             let source = root.appendingPathComponent("source.mp4")
@@ -50,7 +66,7 @@ import SrtFlowMCPKit
             await AIJobs.shared.wait(for: job, seconds: 30)
             let result = try await AIExportTools.job(AIToolArguments(["job_id": .string(job.id)]))
             print(result.payload.encodedString())
-            require(job.status == .done, "production inspection finishes: \(job.message ?? "")")
+            guard job.status == .done else { throw AIToolError("Production inspection: \(job.status), \(job.message ?? "still running")") }
             let kinds = Set(result.payload["findings"]?.arrayValue?.compactMap { $0["kind"]?.stringValue } ?? [])
             for kind in ["audio_cutoff", "audio_overlap", "audio_silence", "black_frame", "subtitle_bounds", "subtitle_overlap"] {
                 require(kinds.contains(kind), "deliberate \(kind) is found through the real tool")
@@ -137,6 +153,7 @@ import SrtFlowMCPKit
             // 夹帧提醒、成片逐帧扫、成片比工程旧（MCP-36 / 64 / 65）：纯值规则，再走真文件、真工具。
             FrameSignalChecks.run(require: require)
             try await StrayFrameChecks.run(project, root: root, require: require)
+            try await DeliveryChecks.run(project, root: root, require: require)
             // 清掉本次的短试听，避免验收给机器留下合成媒体。
             if let path = auditions.first?["path"]?.stringValue { try? FileManager.default.removeItem(at: URL(fileURLWithPath: path).deletingLastPathComponent()) }
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

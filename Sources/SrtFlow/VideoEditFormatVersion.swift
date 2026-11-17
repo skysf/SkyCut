@@ -468,4 +468,7 @@ extension TimelineState {
         companion.normalize(originalCueIDs: ids)
         subtitleCompanion = companion.hasPersistentData ? companion : nil
     }
+    /// Review reasons and screen-recording provenance must survive saving in a newer reader.
+    var requiresFormatVersion35: Bool { !deliveryIntentions.isEmpty || allClips.contains(where: \.isScreenRecording) }
+
 }

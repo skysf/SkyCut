@@ -3,11 +3,17 @@ import Foundation
 import SrtFlowCore
 import SrtFlowMCPKit
 
-// MCP 成片检查的执行适配：冻结调用时的工程，长任务、权限、取消与媒体证据；没有提交/撤销/存工程的路径。
+// Inspection freezes the project and reports suspects through a job. Explicit review requests
+// delegate to AIInspectionReview and save only the requested intentional decision.
 // 画面那一半（抽帧黑场、成片逐帧扫、每段对着素材的刀）在 AIInspectionPicture；成片比工程旧先说一句在 AIInspectionFreshness。
 @MainActor
 enum AIInspectionTool {
+    private final class Run { var task: Task<Void, Never>? }
+
     static func start(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+        if let reviewed = try AIInspectionReview.change(args, project: project) { return reviewed }
+        let generation = project.documentGeneration
+        let session = AICallContext.current?.session
         let state = project.state
         let scope = try AIInspection.scope(state: state, from: args.double("from"), to: args.double("to"))
         // AI 点名的范围（画面逐帧的那几样只报这一段；没点名报整条，默认范围是声音的接缝）。
@@ -33,14 +39,16 @@ enum AIInspectionTool {
         }
         let style = state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
         let token = ExportCancellationToken()
-        let job = AIJobs.shared.start(.inspection, progress: { nil }, cancel: { token.cancel() })
+        let run = Run()
+        let job = AIJobs.shared.start(.inspection, progress: { nil }, cancel: { token.cancel(); run.task?.cancel() })
         let input = file
-        Task {
+        run.task = Task {
+            defer { run.task = nil }
             let folder = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-inspection-\(UUID().uuidString)")
             do {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let result = try await inspect(state, style: style, scope: scope, named: named, file: input, attention: attention,
-                                               db: db, minimum: minimum, image: image, folder: folder, token: token)
+                                               db: db, minimum: minimum, image: image, folder: folder, token: token, job: job.id, generation: generation, session: session)
                 if token.isCancelled { throw CancellationError() }
                 job.images = result.images
                 AIJobs.shared.finish(job, .done, detail: result.payload)
@@ -58,34 +66,32 @@ enum AIInspectionTool {
 
     private static func inspect(
         _ state: TimelineState, style: BurnInStyle, scope: AIInspection.Scope, named: ClosedRange<Double>?, file: URL?,
-        attention: String?, db: Double, minimum: Double, image: Bool, folder: URL, token: ExportCancellationToken
+        attention: String?, db: Double, minimum: Double, image: Bool, folder: URL, token: ExportCancellationToken,
+        job: String, generation: Int, session: String?
     ) async throws -> AIToolResult {
         let ids = AIShortIDs(state: state)
-        var findings = AIInspection.subtitles(state, style: style, scope: scope)
-        let config = AudioEngineConfig.make(from: state)
-        findings += AIInspection.overlaps(config, scope: scope)
+        let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
         var limitations: [String] = []
         let audio: URL?
         if let file { audio = file } else { audio = try await AIInspectionAudio.mix(state, into: folder, cancellation: token) }
-        if let audio {
-            guard let peaks = await AIListenTool.waveform(of: audio, until: Date().addingTimeInterval(40)), peaks.isComplete else {
-                throw AIToolError("Audio analysis is incomplete or unreadable; inspection has not passed. Try again.")
-            }
-            let levels = AIAudioLevels.windows(peaks, from: 0, to: scope.duration)
-            findings += AIInspection.silence(levels, scope: scope, db: db, minimum: minimum)
-            if scope.contains(scope.duration), let last = levels.last, last.decibels > -32 {
-                findings.append(.init(kind: "audio_cutoff", from: max(0, scope.duration - 0.05), to: scope.duration,
-                                      reason: "The mix is still above -32 dBFS in its final audio window; the ending may cut off abruptly."))
-            }
-        } else { limitations.append("No audible segments: there was no mixed audio to analyze.") }
+        let measurement = try await AIInspectionMeasurement.measure(state, config: config, file: file, audio: audio, token: token)
         try cancelled(token)
         var unchecked: Set<UUID> = []
-        findings += try await cuts(state, config: config, scope: scope, limitations: &limitations, unchecked: &unchecked, token: token)
+        var sourceSpeech = try await cuts(state, config: config, scope: scope, limitations: &limitations, unchecked: &unchecked, token: token)
         let hasPicture = !VideoEditExportGraph.isAudioOnly(state)
         let picture = try await AIInspectionPicture.inspect(state, style: style, scope: scope, named: named, file: file,
                                                             limitations: &limitations, token: token)
-        findings += picture.findings
-        findings.sort { $0.from < $1.from }
+        if scope.contains(scope.duration), let last = measurement.frames.last, last.db > -32 {
+            sourceSpeech.append(.init(kind: "audio_cutoff", from: max(0, scope.duration - 0.05), to: scope.duration,
+                                      reason: "The final mixed frame is above -32 dBFS; review whether the abrupt ending is intentional."))
+        }
+        let spoken = try await AIDeliverySentences.collect(state, config: config, scope: scope, unchecked: &unchecked, token: token)
+        try cancelled(token)
+        let all = try await AIDeliveryChecks.run(.init(state: state, scope: scope, style: style, config: config, measurement: measurement,
+            spoken: spoken, picture: picture.findings, sourceSpeech: sourceSpeech, attention: attention,
+            silenceDB: db, minimum: minimum, file: file != nil))
+        let reviewed = AIInspectionReview.partition(all, state: state, job: job, generation: generation, session: session)
+        let findings = reviewed.findings
         var frames: [AIFrameSampler.Frame] = []
         let shown = Array(findings.prefix(150))
         let evidence = AIInspection.evidence(findings, duration: scope.duration)
@@ -97,7 +103,7 @@ enum AIInspectionTool {
         var auditions: [JSONValue] = []
         if let audio {
             var selected: [AIInspection.Finding] = []
-            for finding in evidence where finding.kind.hasPrefix("audio_") {
+            for finding in evidence where finding.kind.hasPrefix("audio_") || finding.kind == "sentence_cut" {
                 if !selected.contains(where: { abs($0.time - finding.time) < 0.25 }) { selected.append(finding) }
             }
             for (index, finding) in selected.prefix(6).enumerated() {
@@ -117,12 +123,14 @@ enum AIInspectionTool {
             "inspected": .string(file?.path ?? "timeline snapshot"), "changed": false,
             "coverage_complete": .bool(limitations.isEmpty && picture.omitted == 0),
             "findings": .array(shown.map { $0.json(ids: ids) }), "more_findings": .number(Double(findings.count - shown.count)),
+            "intentional": .array(reviewed.intentional), "mix_measurement": measurement.summary,
+            "checks": .array(AIDeliveryChecks.registry.map { .string($0.id) }),
             "checked_ranges": scope.json, "sampled_picture_times": .array(picture.sampled.map(AIFormat.seconds)),
             "omitted_picture_samples": .number(Double(picture.omitted)), "auditions": .array(auditions),
             "screenshot_times": .array((image ? frames : []).map { AIFormat.seconds($0.time) }),
             "subtitle_style": ["font": .string(style.fontName), "font_size": .number(style.fontSize)],
             "limitations": .array(Array(Set(limitations)).sorted().map { .string($0) }),
-            "note": "Suspects only, not proof of defects. With file, every frame is scanned (frame_scan); without it pictures are only sampled (0.5 s spacing, up to 120) and brief flashes may be missed. Source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Cuts on speech are judged only from cached transcripts and narration subtitles; no automatic edits. Auditions last this session."
+            "note": "Suspects only, not proof of defects. With file, every frame is scanned (frame_scan); without it pictures are only sampled (0.5 s spacing, up to 120) and brief flashes may be missed. Layers, limiter history, source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Cuts on speech are judged only from cached transcripts and narration subtitles; no automatic edits. Intentional findings are listed separately; mark one with intentional={job_id,key,reason}. Auditions last this session."
         ]
         if let scanned = picture.frameScan { payload["frame_scan"] = scanned }
         // 成片比工程旧：键名排在最前面（结果按键名排序），AI 第一眼就看到（MCP-65）。
@@ -130,7 +138,7 @@ enum AIInspectionTool {
         if !unchecked.isEmpty {
             payload["speech_unchecked"] = [
                 "clips": .array(unchecked.map { ids.short($0) }.sorted().map { .string($0) }),
-                "why": "These clips are cut where sound plays, but they have no transcript or narration subtitles, so SkyCut cannot tell whether a word is cut. Call transcribe on the ones with speech, then inspect again."
+                "why": "These clips are cut where sound plays, but they have no transcript or narration subtitles, so SkyCut cannot tell whether a word or sentence is cut. Call transcribe on the ones with speech, then inspect again."
             ]
         }
         // 没有疑点就没有截图请求；仅在实际请求证据后失败才报告画不出来。
