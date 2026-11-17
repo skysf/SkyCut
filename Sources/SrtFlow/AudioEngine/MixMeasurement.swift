@@ -7,7 +7,7 @@ import Foundation
 // 给出纯值的结果。要采样的（以后的 ESTOI）传 `observe`，每一块渲出来的混音和各层原样给它。只读：不改工程。
 // 前面多渲几秒（`preroll`）：3 秒的短时响度窗、限幅器、K 加权都要从前面接上；挂了声音场景的再多 6 秒（余音最长
 // `SceneRecipe.maximumTail`，前面那段的余音会拖进量的范围）。起点按 `TimelineAudioEngine.offlineQuantum` 往前取整，块的边界
-// 和成片从 0 渲的那一份对齐。后面多渲一点（限幅器的前瞻、频段窗的半帧），渲到时间线的尽头就照成片那样冲干净限幅器。
+// 和成片从 0 渲的那一份对齐。后面多渲一点（限幅器的延迟、真峰值晚到的几个采样、频段窗的半帧），渲到时间线的尽头就照成片那样冲干净限幅器。
 // 不管什么：哪几条轨算一层、参数、写给 AI（AIListenMix）；排队和任务（AIListenMix）。
 // 只在 MediaReadQueue 的队列上调（引擎的喂样同步读文件，docs/architecture/blocking-media-reads.md）。
 // 长期约束：docs/architecture/export-audio-mixdown.md「五、按层量」。
@@ -72,9 +72,9 @@ enum MixMeasurement {
         let quantum = Int64(TimelineAudioEngine.offlineQuantum)
         let early = first - Int64((preroll(request.config) * Double(rate)).rounded(.up))
         let start = early > 0 ? early / quantum * quantum : 0
-        // 后面多渲：限幅器的前瞻（5 ms）和频段窗的半帧，都够了再多一点。
-        let lookahead = Int64((ExportPeakLimiter.defaultLookaheadSeconds * Double(rate)).rounded()) + 1
-        let end = min(limit, last + max(lookahead, grid.halfFrame) + 1)
+        // 后面多渲：限幅器的延迟（前瞻 5 ms + 真峰值晚到的几个采样）、写出去那一串的真峰值再晚几个、频段窗的半帧，都够了再多一点。
+        let latency = Int64(ExportPeakLimiter.defaultLatency(sampleRate: grid.sampleRate) + TruePeak.lag) + 1
+        let end = min(limit, last + max(latency, grid.halfFrame) + 1)
         let bus = MixBusMeter(grid: grid, frames: request.frames, limit: limit, renderStart: start)
         let meters = request.layers.map { _ in MixBandMeter(grid: grid, frames: request.frames, limit: limit) }
         var cancelled = false

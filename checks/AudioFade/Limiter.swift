@@ -4,6 +4,8 @@ import Foundation
 //
 // ExportPeakLimiter：没过顶的地方逐采样原样；过顶的一个采样都不超过上限；稳态的 +6 dB 正弦出来是 −1 dBFS 的干净正弦
 //（不是削平的方波）；尖峰的时刻不变、前面是斜坡不是台阶、后面按释放时间慢慢回；分块喂和整段喂逐位一样、总长度不变。
+// Since 2026-11-17 the limiter works on the true peak (TruePeak): its peaks and over counts are on that scale (the
+// hard-signal cases are in TruePeakChecks.swift).
 // ExportLoudnessMeter：EBU Tech 3341 的口径 —— 立体声 997 Hz 正弦 −23 dBFS ≈ −23 LUFS、−20 ≈ −20；后面接一段静音结果不变（门限）；
 // 只有一个声道时低 3 dB；全静音是 nil。
 
@@ -84,8 +86,9 @@ func checkLimiterAndLoudness() {
     var worst: Float = 0
     for i in (rate * 2) ..< (rate * 2 * 2) { worst = max(worst, abs(hotOut[i] - ideal[i])) }
     check(worst < ceiling * 0.02, "和等幅正弦逐采样差 < 2%（最大差 \(worst)）")
-    check(abs(Double(hotLimiter.inputPeak) - 2) < 1e-6 && hotLimiter.overFrames > rate * 2 / 2,
-          "统计：限幅前峰值 2.0、过顶的帧数过半（得到 \(hotLimiter.inputPeak)、\(hotLimiter.overFrames)）")
+    // A 440 Hz sine's true peak is its crest; the Recommendation's filter reads low tones up to 0.015 dB over.
+    check(abs(Double(hotLimiter.inputPeak) - 2) < 0.004 && hotLimiter.overFrames > rate * 2 / 2,
+          "统计：限幅前的真峰值 2.0、过顶的帧数过半（得到 \(hotLimiter.inputPeak)、\(hotLimiter.overFrames)）")
     let expectedReduction = -20 * log10(Double(ceiling) / 2)
     let gotReduction = -20 * log10(Double(hotLimiter.minimumGain))
     check(abs(gotReduction - expectedReduction) < 0.05, "压得最深 = 峰值到上限的差（\(gotReduction) vs \(expectedReduction) dB）")
@@ -110,7 +113,8 @@ func checkLimiterAndLoudness() {
     checkEqual(spikeIndex, at, "尖峰的时刻不变")
     check(abs(spikeMax - ceiling) < 1e-3, "尖峰压到正好上限（得到 \(spikeMax)）")
     check(abs(spikeOut[at * 2 + 1] + ceiling) < 1e-3, "两个声道同一个增益（右声道 \(spikeOut[at * 2 + 1])）")
-    checkEqual(spikeLimiter.overFrames, 1, "只有那一帧过顶")
+    // On the true-peak scale the points just before the spike are over too (0.2 + 1.8 × 0.97): that frame and the spike's.
+    checkEqual(spikeLimiter.overFrames, 2, "只有尖峰那一帧和它前面那一格过顶")
     // 前面 lookahead 帧：单调往下、每一步不超过一小格（台阶会一步跳 0.2 × (1 − 0.4455) ≈ 0.11）
     var monotone = true, biggestStep: Float = 0
     for i in (at - lookahead) ..< at {

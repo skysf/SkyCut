@@ -6,6 +6,8 @@
 > 引擎本身的合同见 [音频引擎](audio-engine.md)。
 > **2026-11-16 起第五节**：按层量混在一起之后的声音（`listen mix=true`；`AudioStemRender`、`MixMeasurement`、`MixBusMeter`、
 > `MixBandMeter`）用的是这一份配置、这一个引擎、这一套限幅和响度量法，改它们之前读第五节。
+> **Since 2026-11-17 every peak is a true peak** (`TruePeak`, ITU-R BS.1770-4 Annex 2, dBTP): the limiter holds −1 dBTP, and
+> get_job reports the exported file's own peak (`ExportDeliveredPeak`) apart from the limiter's work — section 2 item 3.
 
 ## 一、一条管线
 
@@ -30,7 +32,7 @@ ffmpeg 只负责把它编成 AAC、和画面合在一起。导出图里**不许�
 2. **正好 `duration` 秒。** 引擎按时间线的帧渲到正好 `frames`（最后一截只有画面时渲出来的就是静音）；
    `FrameSink` 照旧补短截长，和画面一样长 —— 以前的滤镜链靠 `anullsrc` 补齐，这条账不能丢。
    配置里一条轨都没有（时间线上没有一个出声的段）时 `.silent`，导出图垫一路 `anullsrc`，成片照样有一条音轨。
-3. **中间文件是 f32，写之前过真峰值限幅器（上限 −1 dBFS），限幅前的峰值、压了多久多深、整段响度都要报出去。**
+3. **中间文件是 f32，写之前过真峰值限幅器（上限 −1 dBTP；2026-11-17 之前名叫真峰值、量的其实是采样峰值，上限 −1 dBFS），限幅前的峰值、压了多久多深、整段响度都要报出去。**
    各轨直接相加、不压不限（同以前的 `amix normalize=0`），和可以过 0 dBFS；引擎渲出来的 float 也不削。可是交给 AAC 编码器的
    信号过了 0 就不可预期（2026-09-30 探针：两轨各 +6 dB 叠加，成片 RMS 比混音掉 4.5 dB、峰值冒到 +12 dBFS、主推子降 3 dB 成片只降 2 dB，
    [案例](../bugfixes/2026-09-30-export-mix-over-0dbfs-into-aac.md)）。第一版（#102）是逐采样硬削；同一天用户拍板换成限幅器
@@ -43,10 +45,31 @@ ffmpeg 只负责把它编成 AAC、和画面合在一起。导出图里**不许�
    - **`ExportLoudnessMeter`（流式、纯值）**：BS.1770-4 的整段响度 —— K 加权（`AudioKWeighting`，48 kHz 系数只写这一处，合成音效也用它）
      → 400 ms 块、100 ms 步 → 绝对门限 −70 LUFS → 相对门限 −10 LU → 平均。喂的是限幅之后、真写进文件的采样。只报、不归一
      （用户不要响度目标）。
-   - **`Levels`**：`peak`（限幅前）、`outputPeak`、`limitedFrames`、`maxReductionDB`、`loudnessLUFS`；压得超过 `attentionThresholdDB`（3 dB）
-     才 `needsAttention`，建议降的量 = 压得最深的那一下。经 `Plan.audioLevels` → `VideoEditExporter.finishedAudioLevels` 到导出面板
-     （总是一行「响度 · 峰值」，压过的再一句橙字）和 AI 的 `get_job` 结果（`audio_loudness_lufs`、`audio_peak_dbfs`，压过的带
-     `audio_limited_seconds`、`audio_max_reduction_db`，超过 3 dB 才带 `note`）。
+   - **True peak (2026-11-17)**: a peak between samples can be higher than any sample (a 12 kHz tone read 45° off its crest shows
+     samples 3 dB under it), and decoders and the AAC encoder reproduce it. `TruePeak` measures it the BS.1770-4 Annex 2 way: 4×
+     oversampling with the Recommendation's 48-tap interpolator (four phases of 12), absolute values; a sample's span is its own
+     magnitude and the four points after it (the sample is included, so true peak ≥ sample peak; the filter's ripple is −0.3 … +0.22 dB
+     on steady sines up to 20 kHz). Spans arrive `TruePeak.lag` = 6 samples late and depend only on 12 samples, so any chunking gives
+     bit-identical numbers. **The limiter measures a frame on this scale** (its samples and the interpolated points on both sides):
+     its requirement enters the queue 6 frames later and the signal waits 6 frames longer (`latency` = lookahead − 1 + 6); window,
+     smoothing and release are unchanged. Every sample stays under the ceiling as before; the points between samples stay under it up
+     to how much the gain moves across 12 samples (white noise at +17 dBTP comes out 0.002 dB over; checks allow 0.01 dB).
+     **Every peak SkyCut reports is this measure**: the limiter's input peak, the f32's peak (`FrameSink` runs its own meter on what it
+     writes), each frame and layer of `listen mix=true` (section 5), and listen's clips and files ([AI interface](ai-control-mcp.md)
+     section 4 item 13).
+   - **`Levels`**：`peak`（限幅前的真峰值）、`outputPeak`（写进 f32 的真峰值）、`limitedFrames`（真峰值过线的帧）、`maxReductionDB`、`loudnessLUFS`、
+     `deliveredPeak`（see below）；压得超过 `attentionThresholdDB`（3 dB）才 `needsAttention`，建议降的量 = 压得最深的那一下。
+     经 `Plan.audioLevels` → `VideoEditExporter.finishedAudioLevels` 到导出面板和 AI 的 `get_job` 结果。
+   - **The delivered peak (2026-11-17)**: right after ffmpeg, before the file moves into place, `VideoEditExporter` measures the
+     exported file's own sound (`ExportDeliveredPeak`: AVAssetReader with `AudioDecodeSettings`, the decode `listen file=` uses, on
+     `MediaReadQueue.export`) into `Levels.deliveredPeak` — AAC swings past what it was given, so the delivered number is measured,
+     never assumed. get_job (`ExportAudioReport`) reports `audio_loudness_lufs`
+     and **`audio_peak_dbtp` = the delivered peak** (left out when the file could not be measured); the limiter's work only when it
+     worked, under its own names: `audio_peak_before_limiter_dbtp`, `audio_limited_seconds`, `audio_max_reduction_db`, and a `note`
+     past 3 dB. Until 2026-11-17 the only peak was `audio_peak_dbfs` = the peak *before* the limiter (+5.6 on a mix whose file peaked
+     at −0.5: it read like a clipped file; [case](../bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md)). The panel
+     shows one line「响度 · 真峰值」(the delivered peak; the f32's if it was not measured) and, when limited, the orange line about
+     −1 dBTP.
    - **预览不限幅**（已知差异）：预览是同一个引擎的实时模式直接出声卡，不经这条路；过顶的地方预览里是线性和（也不削），
      成片是压过的。电平表的红灯照旧管预览。
    30 分钟立体声约 675MB，放在导出的工作目录里，导出结束随目录删。
@@ -84,7 +107,7 @@ ffmpeg 只负责把它编成 AAC、和画面合在一起。导出图里**不许�
 
 | 检查 | 守什么 |
 | --- | --- |
-| `scripts/check-audio-fade.sh` | 真跑导出（`plan()` + ffmpeg）量包络，和预览逐窗对：渐变、变速、曲线、推子、接缝；第 6 组断言导出图里没有声音滤镜、混音文件以 f32le 输入接进去；第 6b 组断言正在播的预览换上的 mix（用户状态 + plan）在两种要展开的缝上和成片一致，且符合绝对期望；第 10a 组（`checks/AudioFade/Limiter.swift`，纯值）：限幅器没过顶逐采样原样、过顶一个采样不超上限、+6 dB 稳态正弦出来是干净的等幅正弦、50 Hz 不被抽扁、尖峰时刻不变 / 前 5 ms 是斜坡 / 1 s 后回到原样、分块喂 = 整段喂且总长不变；响度表按 EBU Tech 3341（−23 → −23、门限、单声道低 3.01）；第 10b 组（`Ceiling.swift`，真跑导出）：过 0 dBFS 的混音限幅前的峰值 / 压了多久多深照实记、f32 里没有一个采样超过 −1 dBFS 且峰值 / 均方根 = √2（不是削平）、整段响度和 ffmpeg `ebur128` 差 < 0.5 LU、成片峰值不冒出 0、成片响度和混音一致、主推子压下来不压且峰值 / 响度都线性 |
+| `scripts/check-audio-fade.sh` | 真跑导出（`plan()` + ffmpeg）量包络，和预览逐窗对：渐变、变速、曲线、推子、接缝；第 6 组断言导出图里没有声音滤镜、混音文件以 f32le 输入接进去；第 6b 组断言正在播的预览换上的 mix（用户状态 + plan）在两种要展开的缝上和成片一致，且符合绝对期望；第 10a 组（`checks/AudioFade/Limiter.swift`，纯值）：限幅器没过顶逐采样原样、过顶一个采样不超上限、+6 dB 稳态正弦出来是干净的等幅正弦、50 Hz 不被抽扁、尖峰时刻不变 / 前 5 ms 是斜坡 / 1 s 后回到原样、分块喂 = 整段喂且总长不变；响度表按 EBU Tech 3341（−23 → −23、门限、单声道低 3.01）；第 10b 组（`Ceiling.swift`，真跑导出）：过 0 dBFS 的混音限幅前的峰值 / 压了多久多深照实记、f32 里没有一个采样超过 −1 dBFS 且峰值 / 均方根 = √2（不是削平）、整段响度和 ffmpeg `ebur128` 差 < 0.5 LU、成片峰值不冒出 0、成片响度和混音一致、主推子压下来不压且峰值 / 响度都线性；since 2026-11-17 also: the f32's true peak ≤ −1 dBTP + 0.01 dB and = the reported `outputPeak`, the delivered peak (`ExportDeliveredPeak`) = ffmpeg's decode of the same file within 0.1 dB and far under the pre-limiter peak; group 10c (`TruePeakChecks.swift`, pure values): the meter on sines 100 Hz–20 kHz at 24 phases (−0.4 … +0.25 dB, 997 Hz within 0.02), never under the sample peak, the 12 kHz 45° tone reads its crest, chunking gives identical spans; the limiter holds hard signals (12 kHz 45°, 19 kHz, white noise ×8, a spike) at −1 dBTP within 0.01 dB and pulls down a crest that only exists between samples |
 | `checks/export-audio-single-pipeline.sh` | 导出图的真代码里没有声音滤镜；导出图调了混音、接了它的文件；混音是 `AudioEngineConfig.make` 那份配置交给 `TimelineAudioEngine(mode: .offline)` 的 `renderOffline` 渲出来的 |
 | `scripts/check-audio-engine.sh` | 引擎离线渲染 = 纯 Swift 的 oracle 混音器（12 组，含电平表、场景、变速，[音频引擎](audio-engine.md) 第五节）—— 成片和预览用的就是这一份渲染代码 |
 | `scripts/check-mix-layers.sh` | 按层量（第五节）：整条时间线量出来的峰值、过线、压得最深、整体响度和这里导出报的逐位一样，单声道人声的电平和真导出的成片一样 |
@@ -96,6 +119,11 @@ ffmpeg 只负责把它编成 AAC、和画面合在一起。导出图里**不许�
 第 6b 组红（见 [案例](../bugfixes/2026-09-24-preview-mix-ignores-transition-expansion.md)）。
 **（2026-09-30）**：限幅器不乘增益 → 10a 大片红、10b「f32 没有一个采样超过 −1 dBFS」红；换回硬削 → 10a「均方根 = 上限 / √2」
 「逐采样差 < 2%」红、10b「峰值 / 均方根 = √2」红。
+**(2026-11-17, true peak)**: the limiter's requirement back on the samples alone (`span.sample`) → 10c's hard signals red (the 12 kHz
+45° tone out at +2.1 dBTP, white noise ×8 at +3.7) and the crest between samples not pulled down, 10b's real f32 at −0.99 dBTP,
+`check-mix-layers` 2b, the scan guard; get_job back on the pre-limiter peak → `check-mix-layers` 2a's report lines and the scan guard;
+listen's `loudest_at` back on the curve step's middle → `check-mcp`'s JSON line. Details in the
+[case](../bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md).
 
 **（2026-10-01 PR3a，成片换成引擎渲）**：混音不走 `.offline` 的引擎 → 守卫点名那一行；不用 `AudioEngineConfig.make` →
 守卫两行红。换了渲染器之后 `check-audio-fade.sh` 真跑导出的那几组照常全绿 —— 成片的包络仍和预览逐窗一致；只有
@@ -108,8 +136,10 @@ tap 那条路在这条 5 秒的时间线上余音载体要被拉长，余音比�
 - [ ] 有变速段（1.5x / 0.75x）的工程：成片的变速听感和预览一样。
 - [ ] 最后几秒只有画面的工程：成片总长不变，结尾那几秒是静音，不是提前结束。
 - [ ] 导出进行到「读声音」那一段（进度条还在 0）点 Stop：马上停下，不留临时文件。
-- [ ] 几个音效叠在音乐上、故意推过 0 dBFS 的工程：导出面板那一行「响度 · 峰值」出来，橙字说压了多久多深；成片听音效的那几下
+- [ ] 几个音效叠在音乐上、故意推过 0 dBFS 的工程：导出面板那一行「响度 · 真峰值」出来，橙字说压了多久多深；成片听音效的那几下
       不「啪」也不闷，音乐部分和预览一样响。
+- [ ] The same project exported by the AI: get_job's `audio_peak_dbtp` (the file's own true peak) is close to −1 and equals
+      `listen file=<the export>`'s `peak_db`; the pre-limiter peak only appears as `audio_peak_before_limiter_dbtp`.
 
 ## 五、按层量：混在一起之后，每一层、每一帧有多响（listen mix=true，2026-11-16）
 
@@ -133,8 +163,11 @@ The engine as a whole, and steps 2–3 that consume these samples (ESTOI, masker
 4. **整条混音**（`MixBusMeter`）：限幅之前每帧的均方、峰值、有几个采样过了线（限幅器的上限 −1 dBFS）；再过一遍**和成片同样参数**的
    `ExportPeakLimiter`（`recordsGains` 记下每帧乘了多少；成片不记，照旧）；限幅之后的 K 加权瞬时（400 ms）、短时（3 s）响度量在每帧的末尾
    （`AudioKWeighting`，窗按采样算、不按帧凑），整体响度喂 `ExportLoudnessMeter`。**量整条时间线时，喂进去的就是导出写进 f32 的那一串采样**：
-   限幅前的峰值、写出去的峰值、过线的帧数、压得最深、整体响度和导出报的（`audio_peak_dbfs`、`audio_loudness_lufs`……）逐位一样（自检钉着，
-   挂了场景的那条也一样）。峰值是采样峰值，和导出同一个口径，不是 4 倍过采样的 dBTP。过线**只报不拦**。
+   限幅前的峰值、写出去的峰值、过线的帧数、压得最深、整体响度和导出报的（`audio_peak_before_limiter_dbtp`、`audio_loudness_lufs`……）逐位一样（自检钉着，
+   挂了场景的那条也一样）。Since 2026-11-17 these peaks and the over counts are true peaks (dBTP, section 2 item 3), the
+   limiter's own measure; a span arrives 6 samples late, so the bus keeps its own input and output true-peak meters and drops each
+   span into its frame when it comes, and MixMeasurement renders past the range by the limiter's latency plus the output lag.
+   Each layer's frame peak (`MixBandMeter`) is the true peak over the frame with the real samples around it (`TruePeak.peak`). 过线**只报不拦**。
 5. **只量一段**：前面多渲 3 秒（短时响度的窗、限幅器和 K 加权要接上），有段挂了声音场景再多 6 秒（前面那段的余音拖进来，最长
    `SceneRecipe.maximumTail`）；起点按 `offlineQuantum`（4096 帧）往前取整，块的边界和从 0 渲的那一份对齐（增益按块插值，逐采样一样）。
    后面多渲限幅器的前瞻和半帧；渲到时间线的尽头就照成片那样冲干净限幅器。只量一段 = 整段量里同样那几帧（自检：电平、峰值、过线逐位，

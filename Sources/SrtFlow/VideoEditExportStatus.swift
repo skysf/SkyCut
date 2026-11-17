@@ -54,20 +54,21 @@ struct VideoEditExportStatus: View {
         }
     }
 
-    /// 总是一行「响度 · 峰值」；限幅器压过的再加一句橙字：压了多久多深，压得超过 3 dB 就建议把主音量降下来。
+    /// 总是一行「响度 · 真峰值」（成片文件自己的；没量出来时是写进混音的那一份）；限幅器压过的再加一句橙字：压了多久多深，
+    /// 压得超过 3 dB 就建议把主音量降下来。
     @ViewBuilder
     private func audioLevelsRows(_ levels: ExportAudioMixdown.Levels) -> some View {
-        let peak = String(format: "%.1f", levels.outputPeakDBFS)
-        Text(levels.loudnessLUFS.map { String(format: L10n("Loudness %@ LUFS · Peak %@ dBFS"), String(format: "%.1f", $0), peak) }
-             ?? String(format: L10n("Peak %@ dBFS"), peak))
+        let peak = String(format: "%.1f", levels.deliveredPeakDBTP ?? levels.outputPeakDBTP)
+        Text(levels.loudnessLUFS.map { String(format: L10n("Loudness %@ LUFS · True peak %@ dBTP"), String(format: "%.1f", $0), peak) }
+             ?? String(format: L10n("True peak %@ dBTP"), peak))
             .font(.caption)
             .foregroundStyle(.secondary)
         if levels.isLimited {
             let seconds = String(format: "%.2f", levels.limitedSeconds), depth = String(format: "%.1f", levels.maxReductionDB)
             Text(levels.needsAttention
-                 ? String(format: L10n("The sound went over -1 dBFS for %@ s and was pushed down by up to %@ dB. Lowering the master volume by %@ dB would be cleaner."),
+                 ? String(format: L10n("The sound went over -1 dBTP for %@ s and was pushed down by up to %@ dB. Lowering the master volume by %@ dB would be cleaner."),
                           seconds, depth, String(format: "%.1f", levels.suggestedReductionDB))
-                 : String(format: L10n("The sound went over -1 dBFS for %@ s and was pushed down by up to %@ dB."), seconds, depth))
+                 : String(format: L10n("The sound went over -1 dBTP for %@ s and was pushed down by up to %@ dB."), seconds, depth))
                 .font(.caption)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)

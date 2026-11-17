@@ -122,12 +122,15 @@
 - 预览上的盖一块真的盖上了（生产的 `CoverHostView` 放进真窗口、拍屏数像素：块里糊成混色块外还是硬的、改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照）：`scripts/check-cover-preview-attach.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
 - 声音渐入渐出、音量曲线与推子的真实包络（预览 = 引擎离线渲、导出 = 真跑 ffmpeg 两条管线），电平表（挂着表离线渲，
   对账轨道表 / 总表 / 红灯），以及过 0 dBFS 的混音过真峰值限幅器（没过顶逐采样原样、过顶一个采样不超上限、稳态正弦不削成方波、
-  尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
+  尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）；true peak (group 10c, since 2026-11-17:
+  the BS.1770 meter on sines to 20 kHz at every phase, the limiter holding hard signals at −1 dBTP, a crest between samples pulled down; the f32's and the
+  delivered file's true peaks in 10b)：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
   4 分钟就判红，并说出卡在哪一组；CI 上第 7b 组「2 倍速曲线 · 导出」差 1–2 dB 偶发，认法见
   [推子与电平表](../architecture/audio-mixer.md)「已知的偶发」）。
 - 按层量混在一起之后的声音（listen mix=true 的地基）：现造的 WAV 当 oracle —— 四个频段各一个正弦（24 / 30 / 60 fps：那一段的电平 = 整体、别的段低 40 dB 以上、四段加起来 = 整体）、脉冲（峰值到采样、最响的帧到帧）、0.56 秒的音效（loudest_at 到帧、clip_id 的问法）、EBU Tech 3341 的 −23 / −33 dBFS 正弦（瞬时 / 短时 / 整体响度）；
   整条时间线的峰值、过线、压得最深、整体响度和 `ExportAudioMixdown.render` 逐位一样（有 / 没有声音场景各一条）；每层逐采样相加 = 混音；只量 29–44、43–49 秒 = 整段里那几帧，过线标在 31.0 / 40.5 秒；单声道人声的电平 = 素材 RMS + 增益 = 真导出（ffmpeg）的成片；listen 的计划（层的写法、越界给合法建议、逐帧的数放得下才给）和结果：
   `scripts/check-mix-layers.sh`（要 ffmpeg；接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节）。合同和反向验证见 [成片的声音](../architecture/export-audio-mixdown.md)第五节。
+  Since 2026-11-17 its peaks are true peaks, and get_job's sound fields (`ExportAudioReport`: the delivered `audio_peak_dbtp`, the limiter's work under its own names) are checked there too.
 - 波形数据（多级峰值、原始采样块）逐采样对账，以及**很多文件同时读**必须全部读完、
   不许把线程池堵死（看门狗判红）：`scripts/check-waveform.sh`。
 - 成片的声音只有一条管线（导出图里不许出现声音滤镜，混音是预览那个音频引擎按同一份 `AudioEngineConfig`
@@ -211,7 +214,9 @@
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
-  多出来的读取一登记，这次调用当场停掉、判红；没给区间的短文件 listen 记到一次整文件波形和一次节拍读取（证明登记点是活的）。
+  多出来的读取一登记，这次调用当场停掉、判红；没给区间的短文件 listen 记到一次节拍读取（证明登记点是活的）；since 2026-11-17 it is one bounded reader from 0 and no
+  whole-file waveform (a direct waveform request proves that registration point alive). listen's true peak and loudest frame (an 80 s clip's hit to the frame, a 12 kHz
+  crest between samples, a clip's gains and speed, window edges): `ListenPeakChecks`.
   怎么结束在 `ListenReadEndChecks`：截止时间早就过了的不排队不开读；排队中的超时 / 取消先等 `queued` 探针（没排上队就结束的那一轮放长四倍重来），
   没人恢复调用方就等满 40 秒判红；读到一半的先等 `started`、读取体停住，等 `stopRequested` 再往下读。reader 在哪个队列收尾在 `ListenReaderLifecycleChecks`。
   期限（40 秒、整组 300 秒）只拦卡死。规矩见 [阻塞的媒体读取](../architecture/blocking-media-reads.md)「回归」，

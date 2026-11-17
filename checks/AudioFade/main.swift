@@ -460,6 +460,7 @@ func main() async {
 
     // ---- 10. 过 0 dBFS 的混音：限幅器与响度表（checks/AudioFade/Limiter.swift 纯值、Ceiling.swift 真跑导出）----
     checkLimiterAndLoudness()
+    checkTruePeak()
     await checkMixCeiling()
 
     print("\(checks) checks, \(failures) failures")

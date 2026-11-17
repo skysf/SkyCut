@@ -2,6 +2,10 @@ import AVFoundation
 import Foundation
 
 // 管什么：listen 点名文件区间的原生有界读取，复用 ChunkBuilder 攒峰值/均方；只保存这一窗。
+// Since 2026-11-17 every listen of a clip or a file reads this way (the true peak and the loudest frame need the samples):
+// the same pass also gives each project frame's level and true peak (AIListenSampleFrames) when the caller hands in the
+// frame boundaries. A named file range must be covered whole; a clip's window and a whole file take the sound where it is
+// (`Edges`).
 // 不管什么：共享的整文件波形、AI 参数和权限、节拍、试听。阻塞循环只在 MediaReadQueue.analysis 上跑。
 
 enum AIListenAudioWindow {
@@ -18,8 +22,19 @@ enum AIListenAudioWindow {
     }
     /// 生命周期守卫可替换 reader 并记录原生收尾；实际工具默认仍建同一个 AVAssetReader。
     typealias ReaderFactory = @Sendable (AVAsset) throws -> AVAssetReader
+    /// The frame boundaries (source seconds, first = from, last = to) for the window the read settled on.
+    typealias FrameBounds = @Sendable (_ from: Double, _ to: Double) -> [Double]
+    /// How much of the window the file's sound must cover.
+    /// `.exact`: an explicit file range (source_in / source_out): the read covers [from, to] or is refused.
+    /// `.sound`: a clip's window or a whole file. What plays where the file has no sound is silence, so its sound may start
+    /// later or stop sooner than the window (an audio track a few ms shorter than the picture is common: 2 of 7 sampled
+    /// camera and generated files); the reading then holds the sound where it is, at its true times, and says nothing about
+    /// the rest. A gap inside the sound is refused either way.
+    enum Edges: Sendable { case exact, sound }
     struct Reading: Sendable {
         var peaks: WaveformPeaks
+        /// Each frame's level and true peak, when the caller asked for frames.
+        var frames: AIListenSampleFrames?
         /// 本地波形第零帧对应的源秒；压缩音频按真实 PTS 裁掉包边界外的采样。
         var sourceStart: Double
         var from: Double
@@ -47,10 +62,12 @@ enum AIListenAudioWindow {
     }
 
     static func read(
-        _ url: URL, from: Double?, to: Double?, until deadline: Date,
+        _ url: URL, from: Double?, to: Double?, until deadline: Date, frames: FrameBounds? = nil, edges: Edges? = nil,
         observe: (@Sendable (Event) -> Void)? = nil,
         readerFactory: ReaderFactory? = nil
     ) async throws -> Reading {
+        // No range = the whole file: its sound is taken where it is (`.sound`); a named range must be covered.
+        let edges = edges ?? (from == nil && to == nil ? .sound : .exact)
         let asset = AVURLAsset(url: url)
         let control = AIListenReadControl(asset: asset, observe: observe)
         // 自检绑在这次调用上的账（平时 nil）：读取体在 analysis 的线程上跑，task-local 带不过去，在这一头取出来交给它。
@@ -77,9 +94,10 @@ enum AIListenAudioWindow {
                 try control.check()
                 let channels = formats.first.flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee.mChannelsPerFrame } ?? 2
                 nonisolated(unsafe) let track = found
+                let bounds = frames?(start, end)
                 return try await control.run {
-                    try read(asset, track: track, channels: Int(channels), from: start, to: end, duration: duration,
-                             control: control, observe: observe, readerFactory: readerFactory, audit: audit)
+                    try read(asset, track: track, channels: Int(channels), from: start, to: end, duration: duration, bounds: bounds,
+                             edges: edges, control: control, observe: observe, readerFactory: readerFactory, audit: audit)
                 }
             } catch {
                 try control.check()
@@ -91,14 +109,14 @@ enum AIListenAudioWindow {
     /// 同步阻塞段：timeRange 限制解码，PTS 再限制进统计的采样；失败/取消不发布半份结果。
     private static func read(
         _ asset: AVURLAsset, track: AVAssetTrack, channels: Int, from: Double, to: Double,
-        duration: Double, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?, readerFactory: ReaderFactory?,
-        audit: MediaReadAudit?
+        duration: Double, bounds: [Double]?, edges: Edges, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?,
+        readerFactory: ReaderFactory?, audit: MediaReadAudit?
     ) throws -> Reading {
         try control.check()
         let reader = try readerFactory?(asset) ?? AVAssetReader(asset: asset)
         // 唯一取消点与 copy 在同一个同步读取体；外部超时/取消不能拆掉还在 copy 的原生对象。
         defer { reader.cancelReading(); observe?(.finished) }
-        let output = AVAssetReaderTrackOutput(track: track, outputSettings: outputSettings(channels: channels))
+        let output = AVAssetReaderTrackOutput(track: track, outputSettings: AudioDecodeSettings.floatInterleaved(channels: channels))
         output.alwaysCopiesSampleData = false
         guard reader.canAdd(output) else { throw AIToolError("SkyCut could not decode this audio range.") }
         reader.add(output)
@@ -106,7 +124,7 @@ enum AIListenAudioWindow {
                                        end: CMTime(seconds: to, preferredTimescale: 600_000))
         try control.check()
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading this audio range.") }
-        var accumulation = Accumulation()
+        var accumulation = Accumulation(bounds: bounds, edges: edges)
         // 记的是 reader 自己的 timeRange 和它真交出来的帧数（失败 / 被停也记），不是调用方要的那一窗。
         audit?.note(.windowStarted(asset.url, from: reader.timeRange.start.seconds, to: reader.timeRange.end.seconds))
         defer {
@@ -126,22 +144,13 @@ enum AIListenAudioWindow {
         return try accumulation.finish(from: from, to: to, duration: duration)
     }
 
-    private static func outputSettings(channels: Int) -> [String: Any] {
-        var settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatLinearPCM, AVLinearPCMBitDepthKey: 32,
-            AVLinearPCMIsFloatKey: true, AVLinearPCMIsNonInterleaved: false,
-            AVLinearPCMIsBigEndianKey: false, AVNumberOfChannelsKey: min(2, max(1, channels))
-        ]
-        if channels > 2 {
-            var layout = AudioChannelLayout()
-            layout.mChannelLayoutTag = kAudioChannelLayoutTag_Stereo
-            settings[AVChannelLayoutKey] = Data(bytes: &layout, count: MemoryLayout<AudioChannelLayout>.size)
-        }
-        return settings
-    }
-
     private struct Accumulation {
+        /// Frame boundaries in source seconds (nil = no frames asked for); the frames start with the first stored sample.
+        let bounds: [Double]?
+        /// `.sound`: the first sample may come after `from` and the last before `to` (the file's sound is shorter there).
+        let edges: Edges
         var builder: ChunkBuilder?
+        var frameStats: AIListenSampleFrames?
         var chunks: [WaveformChunk] = []
         var sampleRate = 0.0
         var sourceStart = 0.0
@@ -169,11 +178,12 @@ enum AIListenAudioWindow {
                 sampleRate = rate
                 sourceStart = time + Double(first) / rate
                 builder = ChunkBuilder(channels: channels, startFrame: 0)
+                if let bounds { frameStats = AIListenSampleFrames(seconds: bounds, start: sourceStart, rate: rate, channels: channels) }
             }
             let start = time + Double(first) / rate
             guard abs(rate - sampleRate) < 0.01,
                   abs(start - sourceStart - Double(storedFrames) / rate) <= 2 / rate,
-                  abs(sourceStart - from) <= 2 / rate else {
+                  edges == .sound || abs(sourceStart - from) <= 2 / rate else {
                 throw AIToolError("This source range has discontinuous or missing audio coverage; no complete audio report was returned.")
             }
             var block: CMBlockBuffer?
@@ -190,17 +200,19 @@ enum AIListenAudioWindow {
             let samples = UnsafeBufferPointer(start: data.assumingMemoryBound(to: Float.self) + first * channels,
                                               count: (last - first) * channels)
             builder?.append(interleaved: samples) { chunks.append($0) }
+            frameStats?.append(samples, frames: last - first)
             storedFrames += last - first
         }
 
         mutating func finish(from: Double, to: Double, duration: Double) throws -> Reading {
             guard var builder else { throw AIToolError("No audio samples were found in the requested source range.") }
-            guard abs(sourceStart + Double(storedFrames) / sampleRate - to) <= 2 / sampleRate else {
+            guard edges == .sound || abs(sourceStart + Double(storedFrames) / sampleRate - to) <= 2 / sampleRate else {
                 throw AIToolError("This source range has incomplete audio coverage; no complete audio report was returned.")
             }
             if let tail = builder.finishChunk() { chunks.append(tail) }
+            frameStats?.finish()
             return Reading(peaks: WaveformPeaks(sampleRate: sampleRate, channelCount: builder.channels,
-                                               chunks: chunks, isComplete: true),
+                                               chunks: chunks, isComplete: true), frames: frameStats,
                            sourceStart: sourceStart, from: from, to: to, fileDuration: duration,
                            decodedFrames: decodedFrames, decodedFrom: decodedFrom, decodedTo: decodedTo)
         }

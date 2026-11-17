@@ -16,6 +16,7 @@ func runListenChecks() {
     checkHeardOnTimeline(peaks)
     checkListenJSON(peaks)
     checkTimelineRange()
+    runListenPeakChecks()
 }
 
 /// listen 的 from / to（时间线秒，2026-10-14）：片段只量落在里面的那一截，变速按源时间换算，不相交的不量。
@@ -87,7 +88,6 @@ private func checkCurve(_ peaks: WaveformPeaks) {
     checkEqual(curve.decibels.first, -9, "the loud part is −9 dB")
     checkEqual(curve.decibels[2], -60, "the silent part is −60 dB (silent or quieter)")
     checkEqual(curve.decibels.last, -23, "the quiet tone is −23 dB")
-    checkEqual(AIAudioLevels.loudest(curve), 0.25, "the loudest step's middle")
     let long = AIAudioLevels.Curve(from: 0, step: AIAudioLevels.curveSteps.first { 3600 / $0 <= 40 } ?? 0, decibels: [])
     checkEqual(long.step, 120, "an hour: two-minute steps (at most 40 points)")
 }
@@ -113,13 +113,17 @@ private func checkHeardOnTimeline(_ peaks: WaveformPeaks) {
 private func checkListenJSON(_ peaks: WaveformPeaks) {
     let windows = AIAudioLevels.windows(peaks, from: 0, to: 3)
     let report = AIAudioLevels.report(windows, silenceDB: -45, minSilence: 0.5)
-    let detailed = AIAudioLevels.json(report, curve: AIAudioLevels.curve(windows), detailed: true)
+    let measured = AIListenPeaks(truePeakDB: -6.0206, peakAt: 0.0057, loudestAt: 0.1667)
+    let detailed = AIAudioLevels.json(report, curve: AIAudioLevels.curve(windows), peaks: measured, detailed: true)
     checkEqual(detailed["silences"]?.arrayValue?.count, 1, "one clip: the silences are listed")
     checkEqual(detailed["curve"]?["step"]?.doubleValue, 0.5, "one clip: the curve is there")
-    checkEqual(detailed["peak_db"]?.doubleValue, -6, "peak rounded to a tenth of a dB")
-    let brief = AIAudioLevels.json(report, curve: AIAudioLevels.curve(windows), detailed: false)
+    checkEqual(detailed["peak_db"]?.doubleValue, -6, "peak (the measured true peak) rounded to a tenth of a dB")
+    checkEqual(detailed["loudest_at"]?.doubleValue, 0.167, "loudest_at is the measured frame start, not a curve step's middle")
+    checkEqual(detailed["peak_at"]?.doubleValue, 0.006, "one clip: when the true peak is")
+    let brief = AIAudioLevels.json(report, curve: AIAudioLevels.curve(windows), peaks: measured, detailed: false)
     checkEqual(brief["silences"]?.intValue, 1, "whole timeline: only how many silences")
-    check(brief["curve"] == nil, "whole timeline: no curve")
+    check(brief["curve"] == nil && brief["peak_at"] == nil, "whole timeline: no curve, no peak_at")
     let silent = AIAudioLevels.Report(levelDB: nil, peakDB: -60, silences: [], silentSeconds: 0)
-    checkEqual(AIAudioLevels.json(silent, curve: nil, detailed: false)["level_db"]?.stringValue, "silent", "all silent says so")
+    let quiet = AIListenPeaks(truePeakDB: -60, peakAt: nil, loudestAt: nil)
+    checkEqual(AIAudioLevels.json(silent, curve: nil, peaks: quiet, detailed: false)["level_db"]?.stringValue, "silent", "all silent says so")
 }
