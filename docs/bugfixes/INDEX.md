@@ -140,6 +140,7 @@
 - [2026-11-04 官方生成把确认问题缓存成已完成](2026-11-04-official-confirmation-cached-as-completion.md) — 只缓存有真实任务号的启动结果；确认解除后重新过闸。
 - [2026-11-04 官方镜头等到名额后仍用旧提交条件](2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 之前重新核对账户 / 工程 / 文件 / 有效期。
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
+- [2026-11-17 Projects saved before the freeze fix still delete the clip with its freeze tail](2026-11-17-old-freeze-tails-stay-linked.md) — Fixing how data is made leaves the data already made: repair old files on open; pieces of one clip in one link group play in step.
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
 - [2026-11-17 Exported text and shape animations repeat a frame now and then](2026-11-17-overlay-export-repeats-a-frame.md) — Count overlay frames as frame numbers (`FrameGrid`), never floor time × fps; nothing ffmpeg matches to an output frame may sit exactly on the grid.
