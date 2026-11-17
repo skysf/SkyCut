@@ -96,6 +96,8 @@ func catalogKnownNames() -> Set<String> {
     names.insert("no_longer_fill")
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
+    // Does the picture cover the frame (2026-11-17, AIPictureCoverage): picture's fills_frame / fill_scale / fills_except, look's uncovered.
+    names.formUnion(["fills_frame", "fill_scale", "fills_except", "top_right"])
     return names
 }
 

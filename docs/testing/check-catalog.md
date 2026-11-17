@@ -205,6 +205,11 @@
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
   set_canvas reply's `reframed` / `no_longer_fill`); wiring in `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
+- Does the picture cover the frame (`fills_frame`, `fill_scale`, `fills_except`, look's `uncovered`): `scripts/check-mcp.sh` → `PictureCoverageChecks`
+  (the geometry against an independent pixel-centre bitmap over 1,092 turns / sizes / offsets) and `ClipCoverageChecks` (the walkthrough's
+  turn and drift, flips, crop, keys, a spring's dip, look with V2 / hidden / transparent / gap / wipe / transition / rise); wiring in
+  `checks/MCP/coverage-wiring.sh`; real preview frames against the same geometry in `scripts/check-preview-composition.sh`
+  (`RotatedPictures.swift`). Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
