@@ -13,6 +13,17 @@ func runBlackBarChecks() {
     checkDarkEdgesWithoutAnEdge()
     checkCombineTakesTheSmallest()
     checkLumaIsTopDown()
+    checkBoundaryAllowance()
+}
+
+private func checkBoundaryAllowance() {
+    let luma = frame(1280, 720) { _, y in y >= 15 && y < 705 }
+    let measured = AIBlackBars.Reading(top: 15.0 / 720, bottom: 15.0 / 720, left: 0, right: nil)
+    let crop = AIBlackBars.includingBoundary(measured, in: luma)
+    check(abs((crop.top ?? 0) - 16.0 / 720) < 1e-12, "removal includes the one mixed boundary row after a measured bar")
+    check(abs((crop.bottom ?? 0) - 16.0 / 720) < 1e-12, "both boundaries get the same one-pixel allowance")
+    checkEqual(crop.left, 0, "an edge with picture content never gains an automatic crop")
+    check(crop.right == nil, "an uncertain edge never gains an automatic crop")
 }
 
 /// 造一帧：`width`×`height`，`bright(x, y)` 为真的地方是亮的内容（带点起伏），其余是带噪点的黑。

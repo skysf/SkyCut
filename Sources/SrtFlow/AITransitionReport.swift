@@ -51,6 +51,9 @@ enum AITransitionReport {
         entry["duration"] = AIFormat.seconds(window.duration)
         if let asked, asked - window.duration > 0.01 {
             entry["shortened_from"] = AIFormat.seconds(asked)
+            let limit = TransitionDurationLimit.between(outgoing, incoming, kind: kind)
+            entry["max_duration"] = AIFormat.seconds(limit.maximum)
+            entry["shortened_reason"] = .string(limit.reason)
         }
         if outgoing.isHidden || incoming.isHidden {
             entry["not_shown"] = "one of the two clips is hidden; the transition comes back when it is shown"

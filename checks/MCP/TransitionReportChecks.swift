@@ -41,6 +41,64 @@ func runTransitionReportChecks() {
     report = transition(.crossFade, 3, after: 0, in: &short, ids: &shortIDs)
     checkEqual(report["seams"]?.arrayValue?.first?["duration"]?.doubleValue, 0.8, "clamped to what fits between the two clips")
     checkEqual(report["seams"]?.arrayValue?.first?["shortened_from"]?.doubleValue, 3, "says what was asked")
+    checkEqual(report["seams"]?.arrayValue?.first?["max_duration"]?.doubleValue, 0.8, "reports the native maximum alongside a shortened duration")
+    check(report["seams"]?.arrayValue?.first?["shortened_reason"]?.stringValue?.contains("40%") == true,
+          "a shortened transition explains the touching-clip ceiling")
+
+    // MCP-6: enough real footage on both sides permits the requested 25-frame dissolve on 1.5-second shots.
+    var long = TimelineState()
+    long.mainClips = [videoClip(0, 1.5, asset: 5.17), videoClip(1.5, 1.5, asset: 5.17, sourceStart: 3)]
+    var longIDs = AIShortIDs(state: long)
+    report = transition(.crossFade, 1.042, after: 0, in: &long, ids: &longIDs)
+    let requested = report["seams"]?.arrayValue?.first
+    checkEqual(requested?["duration"]?.doubleValue, 1.042, "1.5-second shots with handles retain a 1.042-second dissolve")
+    check(requested?["shortened_from"] == nil && requested?["holds_first_frame"] == nil && requested?["holds_last_frame"] == nil,
+          "the requested long dissolve needs neither shortening nor frozen frames")
+    let expandedLong = long.expandingTransitionHandles()
+    check(abs(expandedLong.transitionOverlap(afterMainIndex: 0) - 1.042) < 1e-9,
+          "rendering reads the full geometric overlap instead of clipping it back to packing's percentage")
+    check(abs(expandedLong.duration - 3) < 1e-9, "the long dissolve preserves the timeline length")
+    check(abs(TimelineState.transitionOverlap(in: long.mainClips, afterIndex: 0) - 0.675) < 1e-9,
+          "magnet packing retains its separate legacy 45% ceiling")
+    report = transition(.crossFade, 1.8, after: 0, in: &long, ids: &longIDs)
+    checkEqual(report["seams"]?.arrayValue?.first?["duration"]?.doubleValue, 1.35, "a centred window leaves room for the clip's other end")
+    checkEqual(report["seams"]?.arrayValue?.first?["max_duration"]?.doubleValue, 1.35, "the centred ceiling is reported")
+    check(report["seams"]?.arrayValue?.first?["shortened_reason"]?.stringValue?.contains("Each half") == true,
+          "the centred ceiling explains which part of the clip it protects")
+    report = transition(.blackFade, 1.8, after: 0, in: &long, ids: &longIDs)
+    let dipReason = report["seams"]?.arrayValue?.first?["shortened_reason"]?.stringValue ?? ""
+    check(dipReason.contains("blackFade") && dipReason.contains("40%") && !dipReason.contains("needs unused footage"),
+          "blackFade explains its own limit without promising that more footage would raise it")
+    _ = transition(.crossFade, 1.35, after: 0, in: &long, ids: &longIDs)
+
+    var packed = long
+    packed.packMain()
+    let settledPacked = packed.expandingTransitionHandles()
+    check(abs(settledPacked.mainClips[0].transitionDuration - 0.675) < 1e-9,
+          "an originally overlapping seam settles its native ceiling before rendering")
+    check(abs(settledPacked.transitionOverlap(afterMainIndex: 0) - 0.675) < 1e-9,
+          "the settled overlapping seam keeps the legacy duration")
+
+    var legacy = TimelineState()
+    legacy.mainClips = [videoClip(0, 10), videoClip(7, 10)]
+    legacy.mainClips[0].transitionAfter = .crossFade
+    legacy.mainClips[0].transitionDuration = 3
+    let renderedLegacy = legacy.expandingTransitionHandles()
+    checkEqual(renderedLegacy.mainClips[0].transitionDuration, 3, "a saved 3-second overlapping seam is not rewritten to today's 2-second UI ceiling")
+    checkEqual(renderedLegacy.transitionOverlap(afterMainIndex: 0), 3, "the legacy seam still renders its full 3-second overlap")
+    checkEqual(renderedLegacy.duration, 17, "the legacy overlapping timeline keeps its saved length")
+
+    var chain = TimelineState()
+    chain.mainClips = (0..<3).map { videoClip(Double($0) * 1.5, 1.5, asset: 10, sourceStart: 2) }
+    _ = try? AITimelineEdits.setTransition(.crossFade, duration: 1.35, after: nil, all: true, in: &chain)
+    let renderedChain = chain.expandingTransitionHandles()
+    check(abs(renderedChain.transitionOverlap(afterMainIndex: 0) - 1.35) < 1e-9
+            && abs(renderedChain.transitionOverlap(afterMainIndex: 1) - 1.35) < 1e-9,
+          "two long centred dissolves retain their full windows around a short middle shot")
+    if let left = chain.renderedTransitionWindow(afterMainIndex: 0), let right = chain.renderedTransitionWindow(afterMainIndex: 1) {
+        check(left.start + left.duration < right.start, "the half-window ceiling keeps neighbouring transitions apart")
+    } else { check(false, "both adjacent centred windows must exist") }
+    checkEqual(renderedChain.duration, 4.5, "the two-transition chain keeps its total length")
 
     // Two stills (2026-11-17, docs/bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md): centred on the cut as the
     // timeline draws it; the incoming still holds its first frame, which is its one picture, so nothing is called frozen.

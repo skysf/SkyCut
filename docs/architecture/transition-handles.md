@@ -22,12 +22,26 @@
 | --- | --- | --- |
 | 中间有空隙 | 不是一条缝，不替用户合拢 | `.notAdjacent` |
 | 已相叠（磁吸排的） | 转场就发生在重叠区上，不借料、不展开 | 较短那段 × 0.45，且 ≤ 2s |
-| **首尾相接**（磁吸关着，默认） | 借余料 + 不够的定格补足，展开成相叠 | 较短那段 × 0.4，且 ≤ 2s；短于 0.125s 放不下（`.tooShort`） |
+| Touching clips (magnet off, the default) | Borrow handles, holding boundary frames where necessary | At most 2 s; the conservative allowance is 40% of the shorter clip; with real footage on both sides, the centred allowance below can be longer. A computed allowance at or below 0.05 s is too short. |
 
-首尾相接时的长度上限为什么是 `0.4 × min(a, b)`：展开之后 `transitionOverlap` 那条
-45% 的护栏会按**展开后**的长度再夹一次，夹到了成片就会比时间线长出一截；推导见
-2026-09-20 那篇案例。定格补出来的那一截和借来的素材一样算进展开后的长度，这笔账
-不变。
+Since 2026-11-17 ([case](../bugfixes/2026-11-17-crossfade-shortened-without-reason.md)), `TransitionDurationLimit` owns the native
+ceiling and its explanation. A touching cut with real footage on both sides allows the larger of `0.4 × min(a, b)` and
+`min(0.9 × min(a, b), 2 × min(outgoing tail, incoming head))`, capped at 2 s. A request beyond the conservative allowance
+therefore has at least half its duration as footage on each side and stays centred. Each half uses at most 45% of its adjacent
+clip, leaving room for a transition at that clip's other end. A dip to black retains the conservative allowance.
+
+Packing still uses the static `TimelineState.transitionOverlap(in:afterIndex:)` 45% rule. Rendering first settles the native
+packing ceiling on an originally overlapping seam, then expands touching seams. Saved overlaps retain their original
+rendering, including an already stored 3 s transition; the current 2 s ceiling applies when a transition is newly set.
+The instance `transitionOverlap(afterMainIndex:)`
+and export both read the resulting geometric overlap through `TransitionDurationLimit.overlap`; they must never apply the
+packing percentage a second time. Previously the conservative 40% cap existed to avoid that second clamp stretching the
+export, but it also shortened a valid 1.042 s dissolve on two 1.5 s shots to 0.6 s despite enough footage on both sides.
+
+When `set_transition` shortens a request, each affected seam reports `shortened_from`, `max_duration` and `shortened_reason`
+alongside the actual `duration`. Reasons distinguish the 2 s product ceiling, an already overlapping pair's 45% ceiling,
+the conservative touching limit, and the real-footage or half-window limit of a longer centred transition. A notice only
+describes the committed edit; it adds no mutation or undo step.
 
 ## 首尾相接：先借余料，不够的定格补足
 
@@ -108,6 +122,7 @@ whenever a still was outgoing — the bug in the case above.
 | 成片里定格那一截真的有画面（白→黑、黑→白两组抽帧），总长不变 | `scripts/check-video-fade.sh` 4b-5 |
 | Two stills: centred plan (the incoming still holds its first frame), preview and export at a quarter in and out (H.264 stills both ways), keyframed stills keep their keys in both pipelines (one of them the shared-frame ProRes) | `scripts/check-video-fade.sh` → `StillCrossfade.swift` |
 | set_transition reports where it really plays (footage on one side only: from the cut on) and never calls a still's hold frozen | `scripts/check-mcp.sh` → `TransitionReportChecks.swift` |
+| A requested 1.042 s dissolve on two 1.5 s shots with handles: full preview/export window and unchanged 3 s output; packing keeps its legacy ceiling; shortening states its maximum and reason | `scripts/check-video-fade.sh` → `LongCrossfade.swift`; `scripts/check-mcp.sh` → `TransitionReportChecks.swift` |
 | 预览里同一场景、同一时刻、同一个数 | `scripts/check-preview-composition.sh` 定格那一组 |
 | 拖转场卡片的落点（零余料能落、太短不能落、按正在拖的那张卡算） | `scripts/check-timeline-snap.sh` §28 / §30 |
 | 两条管线都在入口展开、定格字段只有展开函数写、两条管线都消费定格、接缝的零头两边读同一个常量 | `checks/transition-handles-wiring.sh` |
@@ -123,3 +138,6 @@ whenever a still was outgoing — the bug in the case above.
 - [ ] Two photos touching on V1 with a crossFade (2026-11-17): in the player the first one starts to fade at the mask's
       left edge and is gone at its right edge, the cut in the middle; the export the same. Trimmed video on both sides:
       the same, no still picture.
+- [ ] Two 1.5 s shots with at least 1 s of tail/head footage: request a 1.042 s crossFade, check that the player and export
+      show the whole requested window and keep the timeline length, then undo once. A request above the reported maximum
+      must explain the shortening in the tool reply.

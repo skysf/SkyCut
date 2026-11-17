@@ -146,11 +146,14 @@ enum MCPGuideTimelineEditTopics {
             MCPGuideSection(name: "where", about: "one cut or every cut, touching clips, handles", text: """
             Where. after_clip_id is the V1 clip before the cut; the two clips must touch. all=true applies it to every \
             touching pair on V1. A transition uses handles (media beyond the clips' ends); when there is not enough, it holds \
-            the first or last frame, and a duration that does not fit is shortened.
+            the first or last frame, and a duration that does not fit is shortened. With unused footage on both sides, a \
+            longer centred window can be used; each half covers at most 45% of its adjacent clip. A touching cut otherwise \
+            allows 40% of the shorter clip, an already overlapping pair 45%, and every transition at most 2 seconds.
             """),
             MCPGuideSection(name: "results", about: "what the result reports for each cut", text: """
             Results. For each cut it reports where the transition went, its real length and whether it was shortened or held \
-            a frame.
+            a frame. A shortened result includes shortened_from, max_duration and shortened_reason; tell the user why and \
+            how much was possible. The reported duration is what the preview and export render, never just the request.
             """)
         ] + MCPGuideCutSound.sections,
         examples: [

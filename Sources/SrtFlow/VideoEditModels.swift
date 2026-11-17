@@ -508,12 +508,12 @@ struct TimelineState: Hashable, Sendable {
         return starts
     }
 
-    /// 第 index 段和下一段之间实际叠掉的时长。
+    /// The overlap settled in a render copy; on touching user clips this answers the native fade-suppression test.
     ///
-    /// xfade 要求叠的部分不能超过两边任何一段，这里再收紧到 45%，
-    /// 免得一段短素材被两头的转场吃光。
+    /// Packing uses the static overload below. Rendering must not apply that percentage to expanded clips again,
+    /// otherwise a longer centred dissolve is shortened a second time and the exported timeline can grow.
     func transitionOverlap(afterMainIndex index: Int) -> Double {
-        Self.transitionOverlap(in: mainClips, afterIndex: index)
+        TransitionDurationLimit.overlap(in: mainClips, after: index)
     }
 
     /// 同上，但对任意一组「排成主轨」的块算 —— 拖动中的插入位置预览

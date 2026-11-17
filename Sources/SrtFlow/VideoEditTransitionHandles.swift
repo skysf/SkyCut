@@ -25,6 +25,57 @@ enum TransitionCapacity: Equatable {
     case tooShort
 }
 
+/// The native duration ceiling and its explanation. Packing keeps its legacy 45% overlap rule; a touching cut can
+/// use a longer centred window when both sides have real footage for it. Each half then uses at most 45% of its clip,
+/// leaving room for another transition at the other end. No rendering or project state is stored here.
+struct TransitionDurationLimit {
+    let maximum: Double
+    let reason: String
+
+    static func between(_ outgoing: EditClip, _ incoming: EditClip, kind: ClipTransition) -> Self {
+        let shorter = min(outgoing.timelineDuration, incoming.timelineDuration)
+        let ceiling = TimelineState.transitionMaxDuration
+        let productReason = "Transitions are limited to \(String(format: "%g", ceiling)) seconds."
+        if incoming.timelineStart - outgoing.timelineEnd < -TimelineState.seamTolerance {
+            return Self(maximum: min(shorter * 0.45, ceiling), reason: shorter * 0.45 < ceiling
+                ? "Overlapping clips allow at most 45% of the shorter clip." : productReason)
+        }
+        let fallback = shorter * 0.4
+        let footage = 2 * min(outgoing.trailingHandle, incoming.leadingHandle)
+        let centred = TimelineState.rendersAsDipInPlace(kind) ? 0 : min(shorter * 0.9, footage)
+        let maximum = min(max(fallback, centred), ceiling)
+        let reason: String
+        if maximum >= ceiling {
+            reason = productReason
+        } else if TimelineState.rendersAsDipInPlace(kind) {
+            reason = "A blackFade uses at most 40% of the shorter clip, without borrowing footage."
+        } else if centred > fallback {
+            reason = footage < shorter * 0.9
+                ? "A longer centred transition needs half its duration as unused footage on each side of the cut."
+                : "Each half of a centred transition may cover at most 45% of its adjacent clip."
+        } else {
+            reason = "This cut allows 40% of the shorter clip; a longer centred transition needs unused footage on both sides."
+        }
+        return Self(maximum: maximum, reason: reason)
+    }
+
+    /// On a render copy the overlap has already been settled by expandingTransitionHandles. Read its geometry without
+    /// applying packing's percentage ceiling again. On an unexpanded touching cut, preserve the native fade-suppression test.
+    static func overlap(in clips: [EditClip], after index: Int) -> Double {
+        guard index >= 0, index + 1 < clips.count else { return 0 }
+        return overlap(clips[index], clips[index + 1])
+    }
+
+    static func overlap(_ outgoing: EditClip, _ incoming: EditClip) -> Double {
+        guard outgoing.transitionAfter != .none else { return 0 }
+        if TimelineState.needsHandles(outgoing: outgoing, incoming: incoming) {
+            return min(outgoing.transitionDuration, between(outgoing, incoming, kind: outgoing.transitionAfter).maximum)
+        }
+        return min(outgoing.transitionDuration, max(0, outgoing.timelineEnd - incoming.timelineStart),
+                   outgoing.timelineDuration, incoming.timelineDuration)
+    }
+}
+
 /// 拖动中画在主轨上的那个落点框。纯值 —— 画框、落地、断言都读同一份。
 struct TransitionDropPreview: Equatable {
     /// 出场段在 `mainClips` 里的下标（= 缝的编号）。
@@ -122,30 +173,16 @@ extension TimelineState {
     ) -> TransitionCapacity {
         let gap = incoming.timelineStart - outgoing.timelineEnd
         if gap > seamTolerance { return .notAdjacent }
-        let byLength = min(outgoing.timelineDuration, incoming.timelineDuration)
         // 「取消转场」在哪条缝上都得能做。
         if kind == .none { return .available(maxDuration: transitionMaxDuration) }
-        if gap < -seamTolerance {
-            // 已相叠：老规矩，和 `transitionOverlap` 那条 45% 护栏同一个数。
-            return .available(maxDuration: min(byLength * 0.45, transitionMaxDuration))
-        }
+        let capped = TransitionDurationLimit.between(outgoing, incoming, kind: kind).maximum
+        if gap < -seamTolerance { return .available(maxDuration: capped) }
         // 相接 + 压黑：走原地斜坡，一点余料都不用（见 rendersAsDipInPlace）。
         if rendersAsDipInPlace(kind) {
-            return .available(maxDuration: min(byLength * 0.4, transitionMaxDuration))
+            return .available(maxDuration: capped)
         }
-        // 相接 + 其余种类：先借余料，不够的用首尾帧定格补足（见
-        // `transitionExtension`）。所以**余料多少不再决定能不能放**，只有长度说了算。
-        //
-        // 长度上限：展开之后 `transitionOverlap` 那条 45% 的护栏会按**展开后**
-        // 的长度再夹一次 d，夹到了就说明实际叠掉的量 < d，而展开时已经按 d 让
-        // 出去了长度 —— 收不回来，成片会比时间线长出一截。
-        //
-        // 要让护栏夹不动，得 d ≤ 0.45·a' 且 d ≤ 0.45·b'（a'、b' 是展开后的长度）。
-        // 最坏情况是 d 全加在一边（全借尾料时 a' = a + d、b' = b），于是
-        // d ≤ 0.45·b 是紧的那道；全加在头上时对称地变成 d ≤ 0.45·a。定格补出来的
-        // 那一截和借来的素材一样算进展开后的长度，这笔账不变。
-        // 两种都要满足 ⇒ d ≤ 0.45·min(a, b)。取 0.4 留一点余量。
-        let capped = min(byLength * 0.4, transitionMaxDuration)
+        // Touching cuts retain the conservative fallback, with a longer centred allowance when both handles suffice.
+        // Rendering consumes the settled geometric overlap, so it does not clip that allowance back to packing's 45%.
         // 半秒的一成：比这还短做不出一帧像样的转场。
         guard capped > 0.05 else { return .tooShort }
         return .available(maxDuration: capped)
@@ -457,7 +494,12 @@ extension TimelineState {
             // 刚写好的渐变当成"不成立"——用 mainClips（原件）问，不是 expanded。
             // 一侧藏起来的缝同样摘掉：两条管线看到的就是「这里没有转场」，渐变归用户自己设的管。
             let renders = index + 1 < mainClips.count && seamRenders(afterMainIndex: index)
-            if renders, case .available = transitionCapacity(afterMainIndex: index) {} else {
+            if renders, case .available = transitionCapacity(afterMainIndex: index) {
+                // Keep saved overlapping seams' original packing limit, including durations above today's UI ceiling.
+                if !Self.needsHandles(outgoing: mainClips[index], incoming: mainClips[index + 1]) {
+                    expanded.mainClips[index].transitionDuration = Self.transitionOverlap(in: mainClips, afterIndex: index)
+                }
+            } else {
                 expanded.mainClips[index].transitionAfter = .none
             }
             if after > 0 {

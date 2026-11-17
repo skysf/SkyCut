@@ -66,11 +66,19 @@ enum AIClipTools {
         }
         if request.touchesPicture {
             try requirePicture(subject)
+            // Analyze the same validated source window that this edit will commit, including a simultaneous trim.
+            try AIClipEdit.applySourceWindow(change, to: &subject, stillDuration: StillImageClipFactory.stillDuration)
+            if let speed = change.speed { subject.speed = speed }
             var usable: CGRect?
-            if request.removeBlackBars {
+            if request.removeBlackBars || (request.fit == .fill && request.region == nil && request.crop == nil) {
                 let bars = await AIPictureProbe.blackBars(of: subject)
-                plan.findings["black_bars"] = AIBlackBars.json(bars)
-                if let bars, !bars.isEmpty { usable = bars.active }
+                if request.removeBlackBars {
+                    plan.findings["black_bars"] = AIBlackBars.json(bars.measured)
+                    usable = bars.active
+                } else if let measured = bars.measured, !measured.isEmpty {
+                    plan.findings["black_bars"] = AIBlackBars.json(measured)
+                    plan.findings["warning"] = "The source contains baked-in black bars. fit=fill sizes the full picture; use remove_black_bars=true to frame inside the detected bars."
+                }
             }
             let crop = chosenCrop(request, usable: usable)
             var focus = request.focusPoint

@@ -223,11 +223,7 @@ enum VideoEditExportGraph {
             // 转场只在两段实际首尾相叠时成立（磁吸排出来的就是这样）。
             if index + 1 < ordered.count, clip.transitionAfter != .none {
                 let next = ordered[index + 1]
-                let overlap = min(
-                    clip.transitionDuration,
-                    clip.timelineDuration * 0.45,
-                    next.timelineDuration * 0.45
-                )
+                let overlap = TransitionDurationLimit.overlap(clip, next)
                 if overlap > 0.01, abs(next.timelineStart - (clip.timelineEnd - overlap)) < 0.02 {
                     segment.transition = clip.transitionAfter
                     segment.transitionDuration = overlap
