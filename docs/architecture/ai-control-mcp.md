@@ -290,7 +290,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - `edit_clip` 分两步：`AIClipTools.plan` 可以 await（要看画面的在这一步抽帧、识别），`apply` 同步提交、
      包在 `AIUndoGrouping.step` 里；中途画布变了（用户换了画面比例）就不提交、请 AI 重来。
    - 读回来：`get_timeline` / `edit_clip` 的结果里每段画面带 `picture`（`fills_frame`，非默认时 x / y / scale / crop）；
-     默认布局又正好盖满的段不写，省 token。
+     默认布局又正好盖满的段不写，省 token。Since 2026-11-17 `fills_frame` counts rotation, crop, flips and position / size / rotation
+     keyframes over every frame the clip is on screen; when it is false the picture adds `fill_scale` (the smallest steady scale that
+     covers throughout) and, when it fails only part of the time, `fills_except`; set_keyframes returns `picture` too. One geometry
+     with look's `uncovered`: [预览自由变换](preview-free-transform.md) "Does the picture cover the frame".
 12. **看（look，方案第 31 条）**：AI 看不见画面，就给它看。两种看法、一次回一张图 + 每帧一段文字：
    - **时间线**（不给 file）：成片在那一刻的样子。`AIFrameComposer` 按预览的层序合成 —— 视频轨（自己调
      `VideoEditCompositionBuilder.build`，**不借播放器上挂着的那份**：AI 刚改完就看时，预览的重建可能还在防抖里）→
@@ -310,6 +313,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - 每帧的文字（`AIFrameDescription`）：Vision 的标签（前 6 个、把握 ≥ 0.3；**只是粗猜**，AI 生成的、少见的画面常认错 ——
      2026-09-29 验收里潜水员认成水母、冰面航拍认成地图，工具说明叫 AI 以画面为准）、人脸框（大的在前）、人数、主体、
      画面上的字（accurate + 自动判语言，**连同它的框**，最多 6 块）、平均亮度、黑边。看不了图的模型传 `image=false` 只拿文字。
+   - **uncovered** (2026-11-17): a timeline frame where no picture covers part of the canvas also says where — a bare edge with how deep
+     the gap reaches, a bare corner with how far it runs along each edge, in canvas pixels (`AIPictureCoverage.uncovered`). Worked out
+     from the clips' geometry at that moment (the same clips `on_screen` lists, with their entrance / exit motion), never from pixels:
+     dark footage is not uncovered; black bars inside the footage stay under `black_bars`. Rule: [预览自由变换](preview-free-transform.md)
+     "Does the picture cover the frame".
    - 只读：不改工程、不挪播放头、不摆窗口；排队（刚发的改动先做完再看）。
    - **Never more than about 25 s without an answer** (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the
      router runs look through `AILookCall`. Not done within 25 s (waiting behind edits on its project, or rendering on a busy Mac), the

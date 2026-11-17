@@ -139,10 +139,13 @@ enum AIFrameFit {
         /// 宽高被拉成了不同的比例（用户拖过边上的把手）。
         var stretched: Bool
         var crop: ClipCrop?
-        /// 画面盖满整个画布（四边都没露出下面那一层）。旋转不算在里面。
+        /// The picture covers the whole canvas at every frame it is on screen: rotation, crop, flips and position / size / rotation
+        /// keyframes included (`ClipCoverage.fill`; until 2026-11-17 only the static box counted, rotated or moving pictures did not).
         var fillsFrame: Bool
         /// 用的是默认布局、没有裁切。
         var isDefault: Bool
+        /// The whole answer: when it fails, the times it fails and the smallest steady scale that covers (`AIPictureCoverage.fields`).
+        var fill: ClipCoverage.Fill
     }
 
     static func describe(_ clip: EditClip, canvas: CGSize) -> Summary {
@@ -150,15 +153,14 @@ enum AIFrameFit {
         let current = clip.resolvedPlacement(canvas: canvas)
         let scaleX = base.width > 0 ? current.width / base.width : 1
         let scaleY = base.height > 0 ? current.height / base.height : 1
-        let frame = current.frame(in: canvas)
-        let fills = frame.minX <= 0.5 && frame.minY <= 0.5
-            && frame.maxX >= canvas.width - 0.5 && frame.maxY >= canvas.height - 0.5
+        let fill = ClipCoverage.fill(clip, canvas: canvas)
         return Summary(
             x: current.centerX, y: current.centerY, scale: scaleX,
             stretched: abs(scaleX - scaleY) > 0.01 * max(abs(scaleX), abs(scaleY), 0.0001),
             crop: clip.crop.flatMap { $0.isEmpty ? nil : $0 },
-            fillsFrame: fills,
-            isDefault: clip.placement == nil && (clip.crop?.isEmpty ?? true)
+            fillsFrame: fill.fillsFrame,
+            isDefault: clip.placement == nil && (clip.crop?.isEmpty ?? true),
+            fill: fill
         )
     }
 }

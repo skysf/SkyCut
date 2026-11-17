@@ -67,7 +67,8 @@ enum MCPGuideVisualTopics {
             Interactions. Position or scale keys block edit_clip fit, x, y and scale until you remove them. After a trim, \
             edit_clip keyframes decides whether keys keep their frames, stretch or clear. Values are clamped to the runtime \
             keyframe_scale limits and points that land on the same time are merged; the result returns requested, applied and \
-            adjustments.
+            adjustments. Motion that leaves part of the canvas bare at some frame adds picture to the result: fills_frame false, \
+            fills_except (the timeline seconds it is bare) and fill_scale (the steady scale that covers throughout).
             """)
         ],
         examples: [
