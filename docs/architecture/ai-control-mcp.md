@@ -1154,6 +1154,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     （刀在素材第几帧、刀前刀后各露几帧、建议的入点或出点）。**只提醒、不改**（用户定）。不加工具、不加参数：结果里多一个字段，说明书的
     add_clips / edit_clip 主题写着它。接线在共用文件里只有一行（add_clips）和 `AIClipTools` 的两行，逻辑都在 `AISourceCutCheck`。
     扫素材不让调用干等：短素材当场扫、一次调用最多等 10 秒，长的放的时候不扫（列进 `source_cuts_unchecked`），交片前 inspect_video 再查一遍。
+
 63. **动效预设：`set_text` 的 `motion_preset`（2026-11-16，研究清单 MCP-45，[动效预设](motion-presets.md)）**：一次调用放一套现成的动效
     （`frame_reveal` 框住再放开、`focus_pull` 对焦出字、`title_counter` 标题 + 滚动的数字）= 一组普通的字和形状，一步撤销；`hit_at` 是落在哪一下、
     `small_text` / `small_text_below` 是标题上下那行小字，`text`、`number`、位置、字体、颜色用 set_text 原来的参数。带某一块的 `text_id`：
