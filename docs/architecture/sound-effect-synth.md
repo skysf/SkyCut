@@ -34,16 +34,32 @@
    （参数 + `SoundEffectSynth.version`）的哈希（`fileStem`）。同参数 = 同文件：已经在就不再渲不再写（不算覆盖、不用问）。
    **改了任何预设的声音设计就把 `version` +1**（不然旧文件被当成同一个声音复用），**并且要再渲样音给用户听**
    （2026-09-30 用户逐个听过三轮才定稿，声音好不好听自动化够不着）。
+   Also bump it when any file's content changes without a sound change: version 2 (2026-11-17) pads short files (item 5); a
+   0.04 s version-1 click left by a failed call would otherwise come back under the same name. No new listening is needed when the
+   samples before the change are bit-identical (checked for 5,472 parameter combinations then).
 5. **默认都短。** 用户原话「就像别的，裁剪到就开始那一次声音就可以了」：默认时长在 `SoundEffectPreset.defaultDuration`
    （0.05–2 秒）；尾巴按 −60 dB 裁、末尾 10 ms 淡出（suction 2 ms，结尾就是落点）；riser / downlifter / ding 的混响尾巴不靠门限裁
    （还是太长），固定只留 dur + 0.35–0.4 秒再淡出（`SFX.limitTail`）。
+   **The file is the clip it becomes** (2026-11-17, [case](../bugfixes/2026-11-17-tick-and-click-cannot-be-placed.md)): a sound
+   shorter than `max(duration, 0.1 s)` (the timeline's shortest clip, `TimelineTrim.clipMinimumDuration`) gets silence after it up
+   to that, and far enough past its hit that `hit_at` at second 0 still leaves a whole clip (`SoundEffectSynth.fileSeconds`). So
+   `duration` is the clip length of a short sound (click 0.15 → 0.15 s) and no made sound is under 0.1 s (tick 0.08 s and click
+   0.04 s could not be placed at all). A sound that is long enough is untouched: its tail past `duration` is part of the preset
+   (impact `duration 1` is a 2.7 s clip), so `add_clips` reports `audible_duration` (how long it is heard at the clip's volume, by
+   `listen`'s 43 ms windows and -45 dB silence floor, `AISoundEffectRequest.audibleEnd`) next to the clip's start and end.
 6. **写文件只经 `AIAudioFileWriter.writeSoundEffect`**（同配音：音量和格式只有一处说了算）；**渲染 + 写盘在
    `MediaReadQueue.analysis` 上跑**（几十毫秒的纯计算也不占 Swift 并发的线程池）。两条 `scripts/check-mcp.sh` 扫描钉着。
+   A call that fails after making files removes the ones it wrote (`AISoundEffectFiles`: not the ones that were already there, not
+   one another running call uses or an open project's clip points at): a failed call changes nothing.
 7. **词表只有一份要对账**：小程序的 `MCPVocabulary.soundEffectPresets` 和 App 的 `SoundEffectPreset.allCases` 逐项相等
    （`ConfigChecks` / `SoundEffectChecks`）；预设名只用英文小写单词。
 8. **AI 的顺序（用户定）**：先 `find_audio` 找录音（音效库做完之后）、没有合适的用 `sound_effect` 合成、真实声音都没有才
    `generate_media`（Sky Studio、花积分，2026-10-30 起清单里始终有它、调用时才核对 Key；当时写的是「配了 fal 才有」）。
    `find_audio`、`generate_media` 的说明和风格卡都这么写。
+9. **Every accepted parameter renders** (2026-11-17, [case](../bugfixes/2026-11-17-short-sparkle-and-shutter-crash.md)): the render
+   runs inside the App, so a trap quits SkyCut. A loop over a computed start must handle a start past the end of the sound (sparkle
+   under 0.47 s and shutter under 0.085 s trapped on `from..<n` with `from > n`). Put such a guard after the random draws it skips,
+   so the sounds that rendered before stay the same; `SoundEffectChecks` renders every preset at the short end of `duration`.
 
 ## 三、参照文件量出来的形状（riser / downlifter 第二版的依据）
 
@@ -71,7 +87,13 @@
 - 自检：`scripts/check-mcp.sh` 的 `SoundEffectChecks`（16 个预设：渲得出、峰值 / 响度封顶、落点在声音里且实测峰值离它不远、
   末尾淡完、无 NaN；同参数逐采样一致、换 variation 就不同、同参数同文件名；whoosh 先升后降、riser / suction 升、downlifter 降；
   参数范围；`sound_effect` 条目怎么读、落点怎么算开头；词表对账、总说明提到它）+ 两条扫描（第二节第 6 条）。
+  Since 2026-11-17 also: every preset renders at 0.05–0.3 s without trapping; every file is at least `max(duration, 0.1 s)` and
+  placeable (also with `hit_at` 0); `audibleEnd`. On real App objects, `scripts/check-parameter-limits.sh` (`AddClipsChecks`):
+  tick and click placed (a version-1 file planted under the old name is not reused), click honours `duration`, `audible_duration`
+  in the reply, an in-range `volume_db` is no adjustment, a failed call leaves no files, short sparkle / shutter placed.
 - 人工（发版前）：
   - [ ] 听一遍 16 个预设（原型的顺序：whoosh、swoosh、suction、riser、downlifter、impact、boom、hit、pop、click、tick、ding、sparkle、beep、glitch、shutter）。
   - [ ] 让 AI 「在 12.0 秒的切点上放一个 whoosh」：时间线上块的最响处压在 12.0 秒、块开头在前面约 0.55 秒；结果里 `hit_at` = 12.0。
   - [ ] 同参数再放一次：`SrtFlow/音效` 里不多出文件。
+  - [ ] Ask the AI for a click and a tick (`duration` 0.15): both land, and the click's block is 0.15 s long; listen: no click or
+        dropout at the end of either (the padding is silence).

@@ -36,7 +36,14 @@
 成功结果的 `requested` / `applied` 从本次输入及**提交收尾后的最终工程**产生，`adjustments` 列出差异及原因。
 默认值相同也返回 applied；原生限幅不能只回请求值。例如请求音量 +8.1 dB 时，applied 必须来自实际线性增益的
 反算，不能把 dB 四舍五入成另一个限制。曲线按段首读值，并说明平移后部分点饱和。
+dB values (2026-11-17, MCP-15, [case](../bugfixes/2026-11-17-sound-effect-fake-gain-adjustment.md)): a requested and an applied
+value within 0.001 dB (`AIParameterReport.decibelTolerance`) are the same, so only a real limit is an adjustment; a reported value
+drops only the float noise of the linear round trip (`AIParameterReport.decibels`: -8.000000000000002 → -8; get_timeline, faders
+and set_track use it too), a real value is never rounded (the limit stays 6.020599913279624). Of add_clips' `sound_effect` entry
+only `volume_db` is compared: its `preset`, `duration`… shape the file, not the clip.
 `set_track`、`set_keyframes`、文字 / 形状单项与批量、`add_clips` 和定格时长同样提供实际值。
+add_clips also reports a `track` adjustment when a clip is not on the track it asked for ([AI interface](ai-control-mcp.md)
+section 4 item 2).
 关键帧的 applied 从实际轨直接读取，不能复用三位小数的展示摘要再当精确值。
 
 旧的 start/end 等摘要字段保留兼容的展示精度；核对本次数值请使用 applied。后续批量条目、磁吸或联动改变了落点，
@@ -62,7 +69,9 @@
 
 - `scripts/check-mcp.sh`：各类边界 / 越界 / 正常值、合法建议、原生限幅与精确反馈、后项失败、单项 / 批量共用。
 - `scripts/check-parameter-limits.sh`：完整 App 对象、临时工程与合成视频 / 图片；失败零修改、成功一次提交 / 撤销、
-  实际 gain/fades、真实探测、图片转换前后相同请求重试，缺失与不支持素材区分。
+  实际 gain/fades、真实探测、图片转换前后相同请求重试，缺失与不支持素材区分。Since 2026-11-17 also add_clips with made
+  sound effects and audio tracks (`AddClipsChecks`): clean `volume_db` feedback, `track` adjustments, A1–A7 in one call, a failed
+  call leaving no files.
 - 修改限制或结果字段时做反向验证：撤掉生产修复必须使对应守卫变红，然后逐字恢复并重跑。
 
 人工回归：真实录屏图片刚拖入后立即用 MCP 取景，若返回 loading，等转换后同请求应成功；同时在检查器核对 applied，

@@ -46,8 +46,8 @@ enum AITrackSettings {
         }
     }
 
-    /// MCP 回实际 dB，不能把线性增益上限舍入成另一条限制。
+    /// MCP 回实际 dB，不能把线性增益上限舍入成另一条限制。Only the float noise of the linear round trip is cleaned.
     static func decibels(_ linear: Double) -> JSONValue {
-        .number(AudioGain.decibels(fromLinear: linear))
+        AIParameterReport.decibels(AudioGain.decibels(fromLinear: linear))
     }
 }

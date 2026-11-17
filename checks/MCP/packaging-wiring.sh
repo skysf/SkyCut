@@ -24,4 +24,3 @@ if [ "${SIGN_HELPER}" -gt "${SIGN_APP}" ]; then
   exit 1
 fi
 echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} 行才签；${SIGN_SCRIPT} 第 ${SIGN_HELPER} 行签小程序、第 ${SIGN_APP} 行才签外层"
-

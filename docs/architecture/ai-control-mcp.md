@@ -156,6 +156,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    [案例](../bugfixes/2026-10-02-magnet-closes-v1-gaps-on-any-edit.md)）。
    同一次 add_clips 里两段都点名「新开一条轨」时第二段放进第一段开的那条；**只认点名要新开的**，前一段只是因为还没有
    音频轨才开了 A1，不算（[案例](../bugfixes/2026-09-28-new-audio-lands-on-a1.md)）。
+   **An audio clip that names a track never lands on a track that already had content** (2026-11-17, MCP-2 / MCP-4,
+   `AITrackLanding`, [case](../bugfixes/2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md)): on the named track (`A<n>`
+   or the call's `new_audio` track) when it has room at that time, otherwise on another new track (one chain per asked-for track).
+   The drop rule's fallback to the first free track sent effects to the voice and music tracks. A-numbers past the last audio track
+   are created in the same call, right after the existing ones in number order and without gaps (`A5` with none becomes A1), so one
+   call fills A1–A7 in one undo step. Audio that names no track still takes the first free track; video keeps the lift rule. Every
+   clip that is not where it asked to be gets a `track` entry in its `adjustments` (`track_busy` / `track_hidden` /
+   `tracks_numbered_without_gaps`, `overlaps`). add_voiceover's lines take the same path. duplicate_items still only opens one track
+   past the last (`AITrackName.target`).
 3. **排队**：改工程的调用按到达顺序一个接一个做（`AIToolRouter` 的 lines, `AICallLines`）。Claude 会在一条消息里并排发
    几个调用，不排队的话「接在 V1 最后」看谁先探完素材。`get_status` / `get_job`（最多等 30 秒）/ `cancel_job`
    不排队。
@@ -882,6 +891,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     没有合适的用 `sound_effect`、真实声音都没有才 `generate_media` —— `find_audio` 和 `generate_media` 的说明、风格卡都这么写；总说明目录
     Sound 那一行带着它。清单预算：加它之前 71,612 / 72,000，把二十几个工具的说明各收了一截才放进去（71,813；音效库的 kind 加上后又收了
     find_audio 的说明）。音效库那一半在第 23 条。
+    2026-11-17 (MCP-8, MCP-15, P5 walkthrough item 2; [synthesized sound effects](sound-effect-synth.md) section 2 items 4–6 and 9):
+    `duration` is the clip length of a short sound (padded with silence, never under the timeline's 0.1 s), a tail runs past it and
+    the reply's `audible_duration` says how long it is heard; only `sound_effect.volume_db` is compared for `adjustments` (in range =
+    none); a call that fails leaves none of the files it made. The wording is in the guide's add_clips topic, not the catalog.
 44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
     [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
    - **始终列出来**（2026-10-30，和 `generate_media` 同一条规则，第 39 条）；总说明末尾的「Paid」那一行始终带着它，Key、授权和积分在 App 核对。
@@ -1336,6 +1349,7 @@ edit_clip 2,074 字超长、清单里有汉字）。
 真录要真屏幕和授权，靠第八节；第一轮真机测试的记录在[真机首测](../bugfixes/2026-10-03-record-screen-first-device-test.md)。
 
 合成音效（第 43 条，`SoundEffectChecks`）：16 个预设渲得出、峰值 −1 dBFS / 响度 −9 LUFS 封顶、落点在声音里且实测峰值离它不远、末尾淡完、同参数逐采样一致、换 variation 就不同、同参数同文件名、频谱走向（whoosh 先升后降、riser / suction 升、downlifter 降）、参数范围、`sound_effect` 条目怎么读、落点怎么算开头、词表对账、总说明提到它；扫描：合成器和工具不碰 `AVAudioFile`、渲染在 `MediaReadQueue.analysis` 上。
+Since 2026-11-17: short durations render, every file is placeable, `audible_duration`; `TrackLandingChecks` (the track rules of item 2); on real App objects `scripts/check-parameter-limits.sh` (`AddClipsChecks`: 13 crowded new_audio effects, A1–A7 in one call, tick / click, clean gain, failed-call files).
 **几个工程、几个会话（第 46 条）**：`scripts/check-mcp.sh` 的 `ProjectBindingChecks`（小程序记一组工程：开 / 建收进来、关拿掉、退到哪个、
 带 `project` 的带那个的身份章、App 重启过的同名 id 是另一个；真起小程序接假 App，子代理并排带不同的 `project` 各带各的、一个进程一个会话号；
 每个工具碰不碰工程的表、收不收 `project` 和碰不碰对得上；老格式照样解得开）、`ProjectTargetingChecks`（落在哪 / 归谁 / 什么时候拒、每种拒绝

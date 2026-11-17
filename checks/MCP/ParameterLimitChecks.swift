@@ -90,6 +90,28 @@ private func parameterWindowChecks() {
 
 private let parameterCanvas = CGSize(width: 1920, height: 1080)
 
+/// MCP-15 (docs/bugfixes/2026-11-17-sound-effect-fake-gain-adjustment.md): add_clips' sound_effect entry also names the preset,
+/// duration… Only its volume_db is a clip value: an in-range value is not an adjustment and reads back without float noise; a real
+/// clamp is gain_limits at the exact native limit (never rounded into another limit).
+private func soundEffectGainChecks(clip: EditClip, in state: TimelineState) {
+    for db in [-8.0, -4, -3, -2, 0, AudioGain.maximumDB, 20, -70] {
+        var gained = clip
+        gained.volume = AudioGain.linear(fromDecibels: AudioGain.clampedDecibels(db))
+        let raw: JSONValue = ["sound_effect": ["preset": "pop", "duration": 0.2, "volume_db": .number(db)], "hit_at": 1, "track": "new_audio"]
+        let report = AIParameterReport.clip(requested: raw, old: nil, clip: gained, state: state, canvas: parameterCanvas)
+        let clamped = !AIEditLimits.volume.contains(db)
+        let adjustments = report["adjustments"]?.arrayValue ?? []
+        checkEqual(adjustments.count, clamped ? 1 : 0, "sound_effect volume_db \(db): an adjustment only for a real gain limit (\(adjustments))")
+        if clamped { checkEqual(adjustments.first?["reason"]?.stringValue, "gain_limits", "a clamped sound effect gain says gain_limits") }
+        let applied = report["applied"]?["sound_effect"]?["volume_db"]?.doubleValue
+        checkEqual(applied, AudioGain.clampedDecibels(db), "sound_effect volume_db \(db) reads back as the exact applied gain, no float noise")
+        checkEqual(report["requested"]?["sound_effect"]?.objectValue?.keys.sorted(), ["volume_db"], "only volume_db of the sound_effect entry is compared")
+    }
+    checkEqual(AIParameterReport.decibels(-8.000000000000002), .number(-8), "float noise of the linear round trip is cleaned")
+    checkEqual(AIParameterReport.decibels(AudioGain.maximumDB), .number(AudioGain.maximumDB), "a real value (the gain limit) is never rounded")
+    checkEqual(AITrackSettings.decibels(AudioGain.linear(fromDecibels: -8)), .number(-8), "faders read back without float noise")
+}
+
 private func parameterFeedbackChecks() {
     do {
         var state = TimelineState()
@@ -100,11 +122,13 @@ private func parameterFeedbackChecks() {
             let updated = next.clip(with: clip.id)!
             let report = AIParameterReport.clip(requested: ["volume_db": .number(db)], old: clip, clip: updated, state: next, canvas: parameterCanvas)
             checkEqual(report["requested"]?["volume_db"]?.doubleValue, db, "volume request retained")
-            checkEqual(report["applied"]?["volume_db"]?.doubleValue, updated.volumeLineDecibels(atTimeline: 0), "volume feedback reads actual model, no one-decimal rounding")
+            let applied = report["applied"]?["volume_db"]?.doubleValue ?? .nan
+            check(abs(applied - updated.volumeLineDecibels(atTimeline: 0)) <= 1e-9, "volume feedback reads actual model, no one-decimal rounding (\(applied))")
             let expectedAdjustment = !AIEditLimits.volume.contains(db)
             checkEqual(report["adjustments"]?.arrayValue?.isEmpty, !expectedAdjustment, "only changed gain values have an adjustment")
             if expectedAdjustment { check(report["adjustments"]?.arrayValue?.first?["reason"]?.stringValue?.isEmpty == false, "gain clamp explains why") }
         }
+        soundEffectGainChecks(clip: clip, in: state)
         let fadeChange = AIClipChange(fadeIn: 5, fadeOut: 5)
         let next = try AIClipEdit.apply(fadeChange, to: clip.id, linkage: false, stillDuration: 60, in: state)
         let report = AIParameterReport.clip(requested: ["fade_in": 5, "fade_out": 5], old: clip, clip: next.clip(with: clip.id)!, state: next, canvas: parameterCanvas)

@@ -87,6 +87,8 @@ func catalogKnownNames() -> Set<String> {
     // 每层的四个频段。
     names.formUnion(["loudness_lufs", "max_momentary", "max_short_term", "peak_at", "limited_seconds", "max_reduction_db",
                      "bands_db", "low_mid", "high_mid"])
+    // listen describe=true (AIListenSourceReport / SourceSoundTrait, 2026-11-17): SkyCut's trait words.
+    names.formUnion(["low_drone", "broadband_noise", "speech_like"])
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
                      "extended_frames", "levels_db", "skipped_no_sound", "equal_power", "raised_db"])
@@ -105,10 +107,12 @@ func catalogKnownNames() -> Set<String> {
                      "audio_max_reduction_db"])
     // listen voice=… (AIListenVoiceReport / VoiceClarity, 2026-11-17): a masker's kind, the low band and the verdicts.
     names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short", "may_be_loud"])
-    // listen describe=true (AIListenSourceReport / SourceSoundTrait, 2026-11-17): SkyCut's trait words.
-    names.formUnion(["low_drone", "broadband_noise", "speech_like"])
+    // Delivery report kinds and measured layer context (AIDeliveryChecks / AIDeliveryMix).
+    names.formUnion(["source_cut_crossing", "audio_hole", "audio_limiter", "audio_overload", "audio_thin", "audio_true_peak", "loudest_layers", "sentence_cut"])
     // Does the picture cover the frame (2026-11-17, AIPictureCoverage): picture's fills_frame / fill_scale / fills_except, look's uncovered.
     names.formUnion(["fills_frame", "fill_scale", "fills_except", "top_right"])
+    // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).
+    names.insert("audible_duration")
     return names
 }
 

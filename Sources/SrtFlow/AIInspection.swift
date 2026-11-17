@@ -11,6 +11,8 @@ enum AIInspection {
         var to: Double
         var reason: String
         var items: [UUID] = []
+        /// Other contributors affect identity, while items keep the actual subject unambiguous.
+        var contextItems: [UUID] = []
         /// 这一种疑点自己多带的几样（`source_cut` 的素材第几帧、建议的入点 / 出点）。
         var details: [String: JSONValue] = [:]
 
@@ -45,11 +47,7 @@ enum AIInspection {
             }
             return Scope(ranges: [a...min(b, duration)], duration: duration)
         }
-        let config = AudioEngineConfig.make(from: state)
-        let edges = config.tracks.flatMap(\.segments).flatMap { [$0.start, $0.end] }
-        let ranges = edges.map { min(duration, max(0, $0 - 0.75))...min(duration, max(0, $0 + 0.75)) }
-            + [max(0, duration - 3)...duration]
-        return Scope(ranges: merged(ranges), duration: duration)
+        return Scope(ranges: [0...duration], duration: duration)
     }
 
     static func merged(_ ranges: [ClosedRange<Double>]) -> [ClosedRange<Double>] {
