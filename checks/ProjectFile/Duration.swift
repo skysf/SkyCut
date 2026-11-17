@@ -15,14 +15,18 @@ enum ProjectDurationChecks {
         try Data(repeating: 7, count: 128).write(to: media)
         var state = TimelineState()
         state.mainClips = [EditClip(sourceURL: media, sourceDuration: 139.08)]
-        check(!state.requiresFormatVersion36, "following content adds no v36 ending data")
+        check(!state.requiresFormatVersion37, "following content adds no v37 ending data")
         state.minimumDuration = 141
-        check(state.duration == 141 && !state.isEmpty && state.requiresFormatVersion36,
+        check(state.duration == 141 && !state.isEmpty && state.requiresFormatVersion37,
               "an explicit ending keeps the project through 141 seconds without a placeholder")
+        var withMotion = state
+        withMotion.mainClips[0].webMotion = WebMotionClipRecord(page: "<html></html>", fps: 24)
+        check(withMotion.requiresFormatVersion36 && withMotion.requiresFormatVersion37,
+              "web-motion source and an explicit ending retain their separate v36 and v37 gates")
         let destination = root.appendingPathComponent("explicit-ending.skycut")
         try VideoEditProjectIO.save(state, to: destination)
         let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: destination)) as! [String: Any]
-        checkEqual(raw["formatVersion"] as? Int, 36, "the explicit ending is protected from older writers by v36")
+        checkEqual(raw["formatVersion"] as? Int, 37, "the explicit ending is protected from older writers by v37")
         checkEqual((raw["timeline"] as? [String: Any])?["minimumDuration"] as? Double, 141,
                    "the explicit ending is stored in the timeline")
         let restored = try VideoEditProjectIO.load(from: destination).timeline
@@ -43,8 +47,8 @@ enum ProjectDurationChecks {
               "clearing the ending removes its optional key and follows content again")
 
         // Keep this an external version truth, rather than comparing the writer's constant to itself.
-        let future = root.appendingPathComponent("v37.skycut")
-        try Data("{\"formatVersion\":37,\"timeline\":{},\"media\":[]}".utf8).write(to: future)
-        check((try? VideoEditProjectIO.load(from: future)) == nil, "the reader rejects the next unsupported format v37")
+        let future = root.appendingPathComponent("v38.skycut")
+        try Data("{\"formatVersion\":38,\"timeline\":{},\"media\":[]}".utf8).write(to: future)
+        check((try? VideoEditProjectIO.load(from: future)) == nil, "the reader rejects the next unsupported format v38")
     }
 }

@@ -14,6 +14,10 @@ enum MCPGuideVisualTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.setShape, """
             set_shape adds or changes one shape on the timeline; each call is one undo step.
+
+            Add a line, rectangle, square, circle, arc, blur or mosaic patch, or change one (shape_id); only passed fields change. Position \
+            and size are frame fractions; shapes sit under texts. blur/mosaic hide what is beneath (look text_scan gives cover boxes). \
+            Delete: delete_items. One undo step; clamped values return requested/applied/adjustments.
             """),
             MCPGuideSection(name: "kinds", about: "lines, rectangles, squares, circles, arcs, blur and mosaic", text: """
             Kinds. kind (required when adding) is line, rectangle, square, circle, arc, blur or mosaic. Drawn shapes use color \
@@ -50,6 +54,10 @@ enum MCPGuideVisualTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.setKeyframes, """
             set_keyframes animates one clip; each call is one undo step.
+
+            Animate a clip's position (centre x/y), scale, rotation and opacity. Each list replaces that property's keys; [] removes them. \
+            Times: timeline seconds inside the clip, or 0–1 with relative=true; easing defaults to easeInOut. Position or scale keys block \
+            edit_clip fit/x/y/scale. One undo step; clamped values return requested/applied/adjustments.
             """),
             MCPGuideSection(name: "keys", about: "position, scale, rotation and opacity lists, and what replacing means", text: """
             Keys. position takes {time, x, y} (the centre, 0–1 on the frame; -2 to 3 for a picture bigger than the frame), scale \
@@ -82,6 +90,10 @@ enum MCPGuideVisualTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.setFilter, """
             set_filter grades the picture over a time range; each call is one undo step.
+
+            Add a colour grade over a time range (every video track there, not texts or subtitles), or change one (filter_id); \
+            only passed fields change. Presets: tealOrange, coldIron, warmSun, flatGrey, nightGold, fadedFilm, coldWhite, \
+            mistBlue, inkShadow, neon. One undo step.
             """),
             MCPGuideSection(name: "presets", about: "the ten looks and what each is for", text: """
             Presets. tealOrange (blockbuster teal shadows, warm skin), coldIron (cold, desaturated, hard, industrial), warmSun \

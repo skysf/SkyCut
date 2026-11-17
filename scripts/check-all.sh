@@ -110,6 +110,7 @@ run_check "parameter-limits（参数边界、实际生效值与素材加载重�
 run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
 run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
+run_check "motion-placement (stored web pages: real renders, approval modes, same-clip edits, undo and cache recovery)" scripts/check-motion-placement.sh
 
 # ---- 第 2 组 ----
 shard 2

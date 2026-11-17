@@ -27,7 +27,7 @@ enum ClipSourceSwap {
 
     /// 新文件盖不盖得住这段用到的范围（差一帧以内算盖住）。
     static func fits(_ clip: EditClip, _ replacement: Replacement) -> Bool {
-        guard !clip.isAudioOnly, clip.stillImageURL == nil else { return false }
+        guard !clip.isAudioOnly, clip.stillImageURL == nil, clip.webMotion == nil else { return false }
         let newStart = originalStart(of: clip) - replacement.record.sourceOffset
         return newStart >= -slack && newStart + clip.sourceDuration <= replacement.info.duration + slack
     }
@@ -78,7 +78,8 @@ extension TimelineState {
     /// 当前工程里用这个文件（原片）的画面段：此刻直接用着它的，和已经换成它的 upscale 文件的。分离出来的音频不算。
     func clipIDs(usingPicture url: URL) -> [UUID] {
         allClips.filter { clip in
-            !clip.isAudioOnly && clip.stillImageURL == nil && (clip.sourceURL == url || clip.upscale?.originalURL == url)
+            !clip.isAudioOnly && clip.stillImageURL == nil && clip.webMotion == nil
+                && (clip.sourceURL == url || clip.upscale?.originalURL == url)
         }.map(\.id)
     }
 

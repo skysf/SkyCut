@@ -25,9 +25,9 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setKeyframes, title: "Keyframes",
                 description: """
-                Animate a clip's position (centre x/y), scale, rotation and opacity. Each list replaces that property's keys; [] removes them. \
-                Times: timeline seconds inside the clip, or 0–1 with relative=true; easing defaults to easeInOut. Position or scale keys block \
-                edit_clip fit/x/y/scale. One undo step; clamped values return requested/applied/adjustments.
+                Animate clip position, scale, rotation and opacity. Each list replaces its keys; [] removes them. \
+                Timeline seconds or relative 0–1. One undo step; clamping reports requested/applied/adjustments. \
+                Placement limits: skycut_guide topic=set_keyframes.
                 """,
                 input: MCPSchema.object([
                     "clip_id": MCPSchema.string("Clip id from get_timeline."),
@@ -56,9 +56,8 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setTrack, title: "Track settings",
                 description: """
-                Change a whole track: its fader (volume_db, on top of each clip's own volume) or hidden (left out of the preview and \
-                the export). track master is the fader after all tracks. Use it to duck music under a voice-over or mute a track. One \
-                undo step; clamped values return requested/applied/adjustments.
+                Set track volume_db or hidden; master is the final fader. One undo step; clamping reports \
+                requested/applied/adjustments. Hidden tracks are excluded from preview and export.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("V1, V2… / A1, A2…, or master."),
@@ -110,9 +109,8 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .duplicateItems, title: "Duplicate",
                 description: """
-                Copy clips, texts, shapes, filters or subtitle lines (ids can be mixed) with the same spacing, the earliest at start \
-                (default: right after the last one ends). A copy that would overlap moves up a track, like paste; linked audio comes \
-                along. Returns the new ids. One undo step.
+                Copy mixed ids at start (default after the last ends), keeping spacing and linked audio. Overlaps lift a \
+                track. Returns new ids. One undo step.
                 """,
                 input: MCPSchema.object([
                     "ids": MCPSchema.array(of: MCPSchema.string("Id from get_timeline or get_subtitles."), "What to copy.", minItems: 1),
@@ -146,9 +144,8 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setShape, title: "Shape",
                 description: """
-                Add a line, rectangle, square, circle, arc, blur or mosaic patch, or change one (shape_id); only passed fields change. Position \
-                and size are frame fractions; shapes sit under texts. blur/mosaic hide what is beneath (look text_scan gives cover boxes). \
-                Delete: delete_items. One undo step; clamped values return requested/applied/adjustments.
+                Add a shape or change shape_id; omitted fields stay. blur/mosaic cover the picture. Shapes sit under texts. \
+                One undo step; clamping reports requested/applied/adjustments. Details: skycut_guide topic=set_shape.
                 """,
                 input: MCPSchema.object([
                     "shape_id": MCPSchema.string("Change this shape instead of adding one."),
@@ -176,9 +173,8 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setFilter, title: "Filter",
                 description: """
-                Add a colour grade over a time range (every video track there, not texts or subtitles), or change one (filter_id); \
-                only passed fields change. Presets: tealOrange, coldIron, warmSun, flatGrey, nightGold, fadedFilm, coldWhite, \
-                mistBlue, inkShadow, neon. One undo step.
+                Add a grade over video tracks (texts and subtitles stay), or change filter_id; omitted fields stay. \
+                One undo step. Choices are in preset.
                 """,
                 input: MCPSchema.object([
                     "filter_id": MCPSchema.string("Change this filter instead of adding one."),
@@ -337,9 +333,8 @@ public enum MCPTimelineTools {
         MCPToolDefinition(
             .setText, title: "Text",
             description: """
-            Add on-screen text (titles, captions, labels) or change one (text_id); omitted fields stay. Batch: set_texts. Position is \
-            the block's centre: a named spot or x/y canvas fractions. Colours #RRGGBB or #RRGGBBAA. One undo step; clamped values \
-            return requested/applied/adjustments.
+            Add text or change text_id; omitted fields stay. Batch: set_texts. One undo step; clamping reports \
+            requested/applied/adjustments. Layout, style, native motion_preset: skycut_guide topic=set_text.
             """,
             input: MCPSchema.object([
                 "text_id": MCPSchema.string("Change this text instead of adding one."),

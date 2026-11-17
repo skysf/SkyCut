@@ -120,13 +120,18 @@ done
 #    AI 放素材（AITimelineEdits.place，2026-09-27）是**用**这份落点的第三个入口、不是第二份账：
 #    它不画框、只落地，单独数 —— 恰好一处；一处都没有反倒要红（那就是 AI 另算了一份落点）。
 AI_EDITS="Sources/SrtFlow/AITimelineEdits.swift"
-LANDING_CALLS="$(grep -rhE 'mediaImportLandings\(' Sources/SrtFlow --include='*.swift' --exclude='AITimelineEdits.swift' \
+# Web motion is another consumer of the same landing rule; count it independently like the AI importer.
+LANDING_CALLS="$(grep -rhE 'mediaImportLandings\(' Sources/SrtFlow --include='*.swift' --exclude='AITimelineEdits.swift' --exclude='WebMotionActions.swift' \
   | grep -vE '^[[:space:]]*(//|\*)' | grep -v 'func mediaImportLandings' | wc -l | tr -d ' ')"
 [ "$LANDING_CALLS" -eq 2 ] \
   || fail "mediaImportLandings 被调了 ${LANDING_CALLS} 次（应为 2：画框一处、落地一处）—— 多出来的那处就是第二份账"
 AI_LANDING_CALLS="$(grep -vE '^[[:space:]]*(//|\*)' "$AI_EDITS" | grep -cE 'mediaImportLandings\(' || true)"
 [ "$AI_LANDING_CALLS" -eq 1 ] \
   || fail "AI 放素材（${AI_EDITS}）调了 ${AI_LANDING_CALLS} 次 mediaImportLandings（应为 1）：不走它就是第二份落点账"
+MOTION_EDITS="Sources/SrtFlow/WebMotion/WebMotionActions.swift"
+MOTION_LANDING_CALLS="$(grep -vE '^[[:space:]]*(//|\*)' "$MOTION_EDITS" | grep -cE 'mediaImportLandings\(' || true)"
+[ "$MOTION_LANDING_CALLS" -eq 1 ] \
+  || fail "Web motion must call the shared mediaImportLandings exactly once; found ${MOTION_LANDING_CALLS} in ${MOTION_EDITS}"
 # 起点也只有一份账（指针对中点 / ⌘V 对播放头都在 importFirstStart 里收口）。
 START_CALLS="$(grep -rhE 'importFirstStart\(' Sources/SrtFlow --include='*.swift' \
   | grep -vE '^[[:space:]]*(//|\*)' | grep -v 'func importFirstStart' | wc -l | tr -d ' ')"

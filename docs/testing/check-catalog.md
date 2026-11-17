@@ -14,6 +14,13 @@
   `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
 
+- Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
+  defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
+  library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
+  both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery and
+  portable font/system warnings. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
+
 - 官网样式表的先后（构建按共用关系分块，覆盖规则不许排在基础规则前面）：`website/tests/css-cascade.test.mjs`（源码级）和 `npm run check:seo`（按每个构建出来的页面实际加载的样式块核对），都在 CI 的网站那一步里。
 
 - 官网的小字（手机上不小于 12 px、演示区对比度、标题层级、首屏不随字体挪动、演示打字时对话窗不变高）：`website/tests/legibility.test.mjs` 在 CI 的网站那一步里；浏览器里量的那一半 `npx -y -p playwright@1.65.0 node scripts/check-legibility-browsers.mjs` 是手动的（无头、只在 Mac 上，**不在 `check-all.sh` 里**），见 [SkyCut 官网](../architecture/skycut-website.md)「小字读得清」。
@@ -220,7 +227,7 @@
   `scripts/check-mcp.sh` checks bounded pixel-edge padding. Rule: [Preview transforms](../architecture/preview-free-transform.md).
 - Explicit black endings and compact batch replies: `scripts/check-parameter-limits.sh` → `EditingFeedbackChecks` runs actual
   tools, one undo, atomic rejection, 76 edits below 2,000 JSON characters, final-value notices, and rendered preview/export black
-  endings including black-only video. `scripts/check-project-file.sh` → `ProjectDurationChecks` covers v36 persistence and
+  endings including black-only video. `scripts/check-project-file.sh` → `ProjectDurationChecks` covers v37 persistence and
   selected-export isolation; `scripts/check-mcp.sh` covers projection, schemas and production wiring.
 - Generated duration notices: `scripts/check-sky-studio.sh` → `GenerationDurationChecks` compares requested and server-reported
   lengths with a strict 1-second warning threshold, unknown values and refresh clearing. `checks/sky-studio-wiring.sh` requires

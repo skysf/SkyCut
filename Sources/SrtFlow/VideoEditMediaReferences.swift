@@ -27,7 +27,7 @@ extension TimelineState {
     var mediaURLs: [URL] {
         var seen = Set<URL>()
         var result: [URL] = []
-        for clip in allClips where seen.insert(MediaReferences.fileURL(of: clip)).inserted {
+        for clip in allClips where clip.webMotion == nil && seen.insert(MediaReferences.fileURL(of: clip)).inserted {
             result.append(MediaReferences.fileURL(of: clip))
         }
         if let subtitleURL, seen.insert(subtitleURL).inserted { result.append(subtitleURL) }

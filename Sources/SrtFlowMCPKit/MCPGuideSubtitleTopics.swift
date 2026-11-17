@@ -60,6 +60,10 @@ enum MCPGuideSubtitleTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.generateSubtitles, """
             generate_subtitles makes the subtitle track from the speech on the timeline, on this Mac.
+
+            Transcribe the timeline's speech into the subtitle track on this Mac (macOS 26), replacing current subtitles; hidden \
+            clips are skipped; can translate right after. Each subtitle is one line; pass max_lines=2 only when the user wants \
+            two-line subtitles. Set the style first (edit_subtitles style). Returns job_id: wait with get_job. One undo step.
             """),
             MCPGuideSection(name: "transcribing", about: "what gets transcribed, languages, macOS 26, translating right after", text: """
             Transcribing. It needs macOS 26 and transcribes the audible clips with speech, skipping hidden clips; clip_ids limits \
@@ -120,6 +124,10 @@ enum MCPGuideSubtitleTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.getSubtitles, """
             get_subtitles reads the project's subtitle lines; it never changes anything.
+
+            Read-only. Subtitle lines with ids, start, end and text from the original track, the translation or both, optionally \
+            in a time range. Each line has its box on the canvas (to avoid watermarks or pick style.max_width), plus the style, \
+            max_lines and how many lines know their word times.
             """),
             MCPGuideSection(name: "lines", about: "tracks, time ranges and limits", text: """
             Lines. track picks original, translation or both (default). start and end keep only lines inside that time range, in \

@@ -104,7 +104,8 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v33 | `EditClip.crop` 的有效精确源矩形允许单边超过 45%，并保留低于旧空裁切容差的源像素边界（2026-11-02；沿用原四个键） | 只认 v32 的旧版会夹回 45% 或吞掉微小边界，露出区域外内容，自动保存即改坏。新版保留合法四边原值；读旧工程时将当年被忽略的微小裁切迁移为无裁切，保住旧成片。检查器只改一边不夹坏其它边。见 [预览自由变换](preview-free-transform.md)「MCP 的源矩形取景」 |
 | v34 | `TimelineState.production`：公开故事 / 镜头图、世界状态与完成历史、输出 / 原生帧锚点、观察证据及声音 cue（2026-11-04，按需写入） | 旧版会在自动保存时抹掉制作计划与待复查记录；新版缺键默认 nil，故事板本身也算非空工程。只存公开值，不存 pin、凭据、私有配方或来源。见 [官方原创短片](official-film.md) |
 | v35 | `TimelineState.deliveryIntentions` and `EditClip.isScreenRecording` (2026-11-17, omitted when empty/false) | Older writers would discard human review reasons and native screen-capture provenance. See [finished video inspection](finished-video-inspection.md). |
-| v36 | `TimelineState.minimumDuration` (2026-11-17, omitted when zero) | Older writers would discard an explicit ending and shorten the film. Missing keys retain the old content-driven length. |
+| v36 | `EditClip.webMotion`: source page, canonical parameter object, parameter form, complete source duration / local hit, render dimensions / fps, and fingerprint / renderer / OS / WebKit / font provenance (2026-11-17, optional) | Older builds would discard the only source capable of rebuilding a deleted motion cache; they must refuse the project rather than silently turn a recoverable title into missing media. See [Web-motion renderer](web-motion-renderer.md). |
+| v37 | `TimelineState.minimumDuration` (2026-11-17, omitted when zero) | Older writers would discard an explicit ending and shorten the film. Missing keys retain the old content-driven length. |
 
 > 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
 > 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存
@@ -133,11 +134,11 @@ Finder**。App 只负责「快速回到最近那几条」。
 
 `TimelineState.deliveryIntentions` stores intentional finding anchors and one-line reasons, omitted when
 empty and decoded as an empty array in older projects. `EditClip.isScreenRecording` records native capture
-provenance, omitted when false and decoded as false when missing. Older writers would discard these values,
-so the reader/writer version is v35. Inspection itself does not save; explicit mark/clear requests use normal
+provenance, omitted when false and decoded as false when missing. These values were introduced in v35,
+which prevents older writers from discarding them; current writers use the latest project format. Inspection itself does not save; explicit mark/clear requests use normal
 project undo and autosave. Matching and report behavior are in [finished video inspection](finished-video-inspection.md).
 
-### Explicit project ending (v36, 2026-11-17)
+### Explicit project ending (v37, 2026-11-17)
 
 `TimelineState.minimumDuration` retains an absolute project ending without a placeholder clip. `TimelineDuration` computes the
 content end with the existing rules (all video/audio items, texts and ordinary shapes; covers and grades do not extend it), then
@@ -223,6 +224,51 @@ Guard: `scripts/check-project-file.sh` group 49, a literal project file saved be
 - **打开时不排 V1**：文件里写着开、V1 却有缝（手改过的文件），打开也照原样；之后只有改到 V1 的排布才排（`MainMagnet`）。
 - **不开新的 formatVersion**：旧版丢掉这个键，丢的只是这个工程的开关 —— 成片一帧不变，和行高同一个口径。
 - 新建工程用上次拨的值（`VideoEditProject.newTimeline()` 读 `EditorToggles.magnet`），见 [剪辑页上记住的开关](editor-remembered-toggles.md)。
+
+### Generated web-motion movies are project caches (v36)
+
+A web-motion clip stores its source in `EditClip.webMotion` (`WebMotionClipRecord`), not in a media bookmark. The page and
+canonical JSON parameters are authoritative; the parameter fields describe the inspector form. Declared page `fonts` are
+separate from editable font parameters and the preceding render's `provenance.fonts`; replacing a font cannot keep a stale
+missing-font dependency. The record retains the full
+rendered source duration and local hit even after a trim, split or speed change. Splitting carries the full record to the new
+piece; copying uses the existing Codable identity renewal. An explicit `edit_clip file=…` replacement clears the old record:
+that user-supplied file becomes ordinary imported media and can never be replaced by recovery of the old page.
+
+`WebMotionProjectFiles` owns project-relative paths and carrying movies. A completed render has a 64-character lowercase SHA-256
+fingerprint, used as `SkyCut/Motion/motion-<fingerprint>.mov` beside the project. No page-supplied path is trusted. Saving,
+including Save As, copies an existing movie to that location before atomically writing the project JSON; copy failure fails
+the save and preserves the old project. A missing cache does not prevent saving its recoverable source. Generated movies
+are excluded from `TimelineState.mediaURLs` and the media table, so deleting one cannot become a request to relink media.
+
+Opening prefers the carried file beside the project over an absolute path from the previous Mac. An existing carried render
+is used unchanged across OS/font differences; the rendering service reports the differences and a later parameter edit renders
+on this Mac. If no carried or original movie exists, `LoadResult.motionsToRegenerate` lists the clip IDs for the project's
+generation-checked background recovery. `refreshWebMotionCaches` also supports runtime recovery after a cache is deleted.
+The page, parameters and provenance survive a missing movie and subsequent saves. A clip's display name comes from the stored
+motion name, not its cache filename.
+
+Internal saved versions use the same writer with `motionCaches: .reference`: they keep the source page and existing movie URL,
+without copying videos beside the version file. Normal saves keep the default `.carry` policy. Version comparison normalizes
+only generated cache URLs; restore explicitly starts missing-cache recovery even for projects without an editor window.
+
+Checks: `scripts/check-project-file.sh` group 50 exercises source/form/provenance round trips, missing-key defaults, split
+identity, save and Save As carrying, moving to another Mac's folder while the old path still exists, missing-cache requests,
+exclusion from media bookmarks, fingerprint path safety and failed-copy preservation. `scripts/check-mcp.sh` also checks
+explicit file replacement and refusal preserving its source. Actual page rendering and cache regeneration are covered by the
+App-side motion checks, not by these synthetic-byte I/O fixtures.
+
+Reverse verification (2026-11-17): the full project-file check passed 1,364 assertions; omitting the split record failed one,
+treating generated movies as imported media failed five, disabling carried-file preference failed one, and omitting source
+encoding failed ten. Each production change was restored individually, then all 1,364 assertions passed again. SwiftPM's
+nested manifest sandbox was rejected by macOS; these same checks ran with the user-authorized scoped command escalation.
+
+- [ ] Before a release: save a project containing a web-motion clip, carry the project and `SkyCut/Motion` to a Mac with
+      another OS or a missing font, open it and confirm the original video is used with a warning; change a parameter and
+      re-render on that Mac, then undo once.
+- [ ] Delete a motion movie while the project is closed and open it again: the stored page restores it without a missing-media
+      prompt. Repeat while the editor is open and verify recovery or a visible render failure; exporting must not omit it.
+- [ ] Save As to another folder, remove the original folder, and reopen the saved copy: the title is still available.
 
 ### Saved versions are project files too (2026-11-17)
 

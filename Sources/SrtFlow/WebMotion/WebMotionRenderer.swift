@@ -1,7 +1,7 @@
 import Foundation
 import SrtFlowWebMotionKit
 
-// MARK: - Rendering a motion web page into a transparent movie (the API the next task builds on)
+// MARK: - Rendering a motion web page into a transparent movie
 //
 // `WebMotionRenderer.render(job)` → a ProRes 4444 movie with premultiplied alpha at `job.output`, the page checks
 // (MCP-75: loads, frame entry, same t twice, no empty frame, no page error, no timeout) and the renderer / system
@@ -9,8 +9,8 @@ import SrtFlowWebMotionKit
 // (the AI fixes the page with it). The page runs in the helper process `skycut-web-motion`, never in SkyCut; SkyCut
 // watches its memory and time and kills it when needed. One render at a time (three helpers at once measured slower
 // than one helper drawing three pages).
-// Callers driving this from AI work run it inside `AIJobs` (App Nap, ai-control-mcp.md rule 59). Not here yet: no AI
-// tool, no UI, no project-file change (MCP-74). docs/architecture/web-motion-renderer.md.
+// AI callers run inside `AIJobs` (App Nap, ai-control-mcp.md rule 59). Project persistence and placement are owned by
+// WebMotionCache / WebMotionActions, and the tool by AIMotionTool. docs/architecture/web-motion-renderer.md.
 
 struct WebMotionJob: Sendable {
     var page: String

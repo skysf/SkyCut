@@ -101,7 +101,8 @@ final class ProjectVersionStore: ObservableObject {
         let url = folder.appendingPathComponent(ProjectVersionFiles.fileName(projectStem: project.projectName, number: number, kind: kind))
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-            try VideoEditProjectIO.save(state, to: url, knownRecords: project.mediaRecords, rowHeights: project.rowHeights)
+            try VideoEditProjectIO.save(state, to: url, knownRecords: project.mediaRecords, rowHeights: project.rowHeights,
+                                        motionCaches: .reference)
         } catch {
             return .notSaved(.failed(error.localizedDescription))
         }
@@ -160,7 +161,11 @@ final class ProjectVersionStore: ObservableObject {
         }
         guard project.isCurrentGeneration(generation) else { throw GoBackError.projectChanged }
         let leaving = project.state
-        guard loaded.timeline != leaving else { return WentBack(version: version, savedBefore: nil, changed: false) }
+        if let saved = ProjectVersionFiles.canonical(loaded.timeline), let current = ProjectVersionFiles.canonical(leaving),
+           saved == current {
+            WebMotionRecovery.start(for: project)
+            return WentBack(version: version, savedBefore: nil, changed: false)
+        }
         let savedBefore = save(leaving, kind: .beforeGoingBack).version
         // The version's media records go into the project's table (paths it does not know yet), so a file that moved since can
         // still be followed by its bookmark when the project relinks after the rebuild.
@@ -168,6 +173,7 @@ final class ProjectVersionStore: ObservableObject {
         // Restored as is, like "Undo This Round": not through `perform`, whose magnet and linkage would change the version.
         // Its own undo group: the restore lands after an await, never inside a user event.
         AIUndoGrouping.step(project.effectiveUndoManager) { project.restoreTimeline(loaded.timeline) }
+        WebMotionRecovery.start(for: project)
         if !loaded.stillsToRegenerate.isEmpty {
             let stills = loaded.stillsToRegenerate
             let current = project.documentGeneration

@@ -1563,3 +1563,11 @@
 "FROM" = "出品";
 "PRESENTS" = "荣誉出品";
 "TITLE" = "标题";
+
+"This motion was rendered on another system. Its carried video is kept; re-rendering may change the lettering." = "这段动效在另一套系统上渲染。继续使用随工程带来的视频；重新渲染后字形可能有变化。";
+
+"Missing motion fonts: %@. The carried video is kept; choose installed fonts before re-rendering." = "缺少动效字体：%@。继续使用随工程带来的视频；重新渲染前请选择本机已安装的字体。";
+
+"Motion could not be rebuilt: %@" = "动效未能重建：%@";
+
+"Motion is still being rebuilt. Wait for rendering to finish before exporting." = "动效仍在重建。请等渲染完成后再导出。";

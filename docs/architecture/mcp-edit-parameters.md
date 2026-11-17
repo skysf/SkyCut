@@ -64,7 +64,7 @@ The option is parsed before asynchronous preparation; invalid values leave the p
 at least one frame at the requested/current project rate. All canvas arguments validate before any setting changes, and the
 tool opens its undo group only after validation and an actual state change, covering the whole call. A repeated ratio still marks
 explicit canvas intent for recording import without creating an empty undo step. Persistence and rendering rules are in
-[project files](video-edit-project-file.md#explicit-project-ending-v36-2026-11-17).
+[project files](video-edit-project-file.md#explicit-project-ending-v37-2026-11-17).
 
 ## 原子性与素材就绪
 

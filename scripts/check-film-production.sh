@@ -22,6 +22,7 @@ xcrun swiftc \
   -o "${OUT_DIR}/productioncheck" \
   Sources/SrtFlow/VideoEditModels.swift \
   Sources/SrtFlow/TimelineDuration.swift \
+  Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
@@ -81,6 +82,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditFormatVersion.swift \
   Sources/SrtFlow/VideoEditProjectFile.swift \
+  Sources/SrtFlow/WebMotionProjectFiles.swift \
   Sources/SrtFlow/LinkGroupRepair.swift \
   Sources/SrtFlow/VideoEditMediaBookmarkCache.swift \
   Sources/SrtFlow/AudioLibraryCache.swift \

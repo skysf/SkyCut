@@ -213,12 +213,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `consent: "standing_grant"`，设计、建 MiniMax 版直接做，结果的 `full_access` 和工程的提示条说做了什么、最多花多少 —— 没有就照请求批准模式问一次、
      问句后面接打开全部权限时那段说明（令牌另绑那一版），点过头补记长期授权、以后不再问。一次性费用先判每日硬预算；**删声音**请求批准模式问一句、
      全部权限直接删（也说一句）。长期授权怎么记、撤、升级时补记见 [声音库](voice-library.md)第八节第 9 条。
+   - **AI-written motion pages** (2026-11-17, item 64): new or changed page code asks once in request-approval mode and proceeds
+     in full access. An approved stored page does not ask again for parameter-only rendering. The token binds the exact request;
+     the network lock is never relaxed. This is approval to execute the page in the locked helper, separate from editing the timeline.
    操作确认的入口是以下四处（设置权限另见其合同）（`AIFileTools`（含服务器角色删除）、`AIWorkspace.confirmReading`、`SkyStudioJobGate`、`AISettingsApproval`），`scripts/check-mcp.sh` 扫描钉着。
    `AIConfirmations`（自己的文件，时钟可注入）发的令牌绑着具体那件事（`action` 字符串），一次有效、**三十分钟**过期（2026-10-15 从十分钟延长），
    换一件事拿它来不认、也不消耗它；**同一件事还在等答复就回同一张**（有效期重新算：AI 等用户回话时又调一次，拿到的还是它，不会误以为过期）；
    **拒绝说原因**：结果里的 `confirm_token_refused` 分过期 / 用过了 / 是别的请求的 / 不是 SrtFlow 发的，`valid_for_minutes` 写着有效期
    （[案例](../bugfixes/2026-10-15-confirmation-token-refused-without-reason.md)：反馈说「过期太快」，其实是每问一次发一张新码、被拒又不说为什么）。
-   时间线上的改动一律不问。
+   时间线上的改动一律不问。 The additional motion-page approval entry is described in item 64.
 7. **长任务回任务号**（客户端对一次调用大多只等一分钟）。结局在任务结束的**那一刻**记下（导出挂在
    `isExporting` 变回 false 上 —— `@Published` 在赋值前发，那时成品路径 / 错误已经写好；导出的结果带 `audio_loudness_lufs`、
    `audio_peak_dbtp`（since 2026-11-17: the exported file's own true peak, measured after encoding; before that `audio_peak_dbfs` was the
@@ -1216,6 +1219,30 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     one-line descriptions, and wording the guide already had moved out of set_text's card and of some set_text / set_shape parameter
     descriptions, so the whole catalog went from about 99,063 to 99,051 / 100,000 and set_text's schema is 4,040 / 4,500 bytes;
     怎么用写在说明书 `topic=set_text` 的 `motion_presets` 一节。`set_texts` 每一项也可以是一套。
+
+64. **Web motion inside a project** (2026-11-17, MCP-74): `set_motion` places a stored web template or an AI-written page on an
+    upper video track. Native presets remain `set_text motion_preset`: try those first, then a ready-made web template, then write
+    a page. `get_timeline.motion_library` exposes that single library in that order. A project web template identifies the stored
+    page by its clip's full UUID; another placement keeps an independent parameter set. A new tool is needed because the result is
+    a movie clip, not a native text id, and page parameters would exceed set_text's 4,500-byte schema limit.
+
+    - `template` reuses a web entry; `page` supplies full HTML as a fallback. `parameters` merges top-level keys with stored values;
+      `fields` describes the editable text / font / colour / number controls, and `fonts` records the page's installed fonts.
+      `clip_id` updates the same web-motion clip. `at` is the start, while `hit_at` places the page-relative `hit` at a timeline second;
+      they are exclusive. `duration` covers the full page. Only upper video tracks are allowed; overlapping additions lift to a free track.
+    - Rendering uses the existing isolated helper and its unchanged locks, page clock, memory/time limits and six page checks
+      ([renderer contract](web-motion-renderer.md)). New page code follows the two permission modes (item 6); approved stored code
+      and parameter-only changes do not ask again. The confirmation request is bound to the whole request, including page and parameters.
+    - Work runs through `AIJobs` and may answer with `job_id` before completion. The accepted result carries the clip, `render_seconds`,
+      `checks` and suggested `look_times`. Page errors are returned verbatim with all check states; failed rendering keeps the old clip
+      and cache. The successful commit uses `AIUndoGrouping.step` and one `perform`; an obsolete document or timeline is refused.
+    - Page and parameters belong to the project; the movie is a fingerprinted cache next to it under `SkyCut/Motion/`, excluded from
+      ordinary missing-media repair. Moving a project carries its rendered movie without redrawing on a different OS. A parameter
+      change renders locally and updates provenance; system or font differences are reported. A missing movie can be regenerated
+      from the stored page. The cache and project-file contract are in [project files](video-edit-project-file.md).
+    - The new tool uses a short card and a written guide from its first version. Its schema stays below 4,500 bytes and the whole
+      catalog stays below 100,000 UTF-16 units. Existing utility cards were shortened; their full previous descriptions remain verbatim
+      in the corresponding written-topic overviews. No catalog budget or exception list was raised.
 
 ## 五、这一轮、停止、撤销这一轮
 

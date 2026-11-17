@@ -28,6 +28,8 @@
    The comparison is of the timeline in **canonical form**: written and read back with the project file's own coder
    (`ProjectVersionFiles.canonical`, `VideoEditProjectIO.makeEncoder` / `makeDecoder`), so it sees exactly what a file can hold
    (dates keep whole seconds). Row heights are written into the version but not compared (decoration, not in undo).
+   Generated web-motion movie URLs compare by their stored fingerprint, because cache relocation is not a timeline edit;
+   `canonicalTimeline(ofFile:)` applies the same normalization. Ordinary imported media references remain exact.
 2. **Never an empty timeline** (nothing to keep) and **never a project without a file** (a version belongs to a project file).
 3. Writing is synchronous on the main actor, like `saveNow`. If it fails (full disk), that moment has no version and the round goes
    on; the AI's result then names no version.
@@ -39,6 +41,9 @@
 - **A complete project file**, written by the same `VideoEditProjectIO.save` as the project (latest format version, media
   bookmarks from the project's `mediaRecords`) and read back by the same `load` (format gate, migrations by version, relinking,
   image stills). No new format, no format version bump.
+  Web-motion pages, parameters and provenance are included, but their movies stay referenced in the actual project cache:
+  snapshots use `VideoEditProjectIO.save(..., motionCaches: .reference)`. Normal project saves and Save As use `.carry`.
+  Versions never copy movies into Application Support, so pruning the version files cannot leave large history-cache orphans.
 - **Folder per project file**: the project's name (cut to 120 UTF-8 bytes) plus the first 8 hex of the SHA-256 of its standardized,
   symlink-resolved path (the identity `ProjectFileIdentity.same` uses). Two projects never share a list, even with the same name in
   one folder (`X/Trip.skycut` and `X/SkyCut/Projects/Trip.skycut` share a project home).
@@ -76,6 +81,8 @@ One function for both sides, `ProjectVersionStore.goBack(to:)`:
    as is — never through `perform`, whose magnet and linkage would change the version
    ([the same rule for "Undo This Round"](../bugfixes/2026-10-02-undo-round-repacks-v1.md)).
 7. Image stills whose cache was cleared are converted again (`regenerateStills`).
+8. Missing web-motion movies are rebuilt from the saved page by `WebMotionRecovery`, explicitly even for a background project
+   with no preview. Going back to an otherwise identical version also starts missing-cache recovery without an undo step.
 
 Command-Z returns to the state before going back. With the media where they were, the project equals the saved state field by
 field, media references included.
@@ -154,6 +161,12 @@ versions and with none, and the AI banner's details, in en / zh-Hans / es, fores
 permission for the shell (an agent's), `SRTFLOW_RENDER_DRAW_FALLBACK=1` draws the views with `cacheDisplay` instead of
 `screencapture` (text and buttons come out right; text fields and pickers may not). The native project menu item itself cannot be
 drawn off screen.
+
+Motion/history integration is also exercised by `scripts/check-motion-placement.sh`: the async motion call reports its
+before-round version, snapshots retain cache references without copying movies into history, relocation and restart create no
+false changes, ordinary media URLs stay exact, restoration is one undo step, and a missing movie rebuilds in a headless project.
+Reverse verification (2026-11-17): changing only the snapshot writer from `.reference` to `.carry` failed four of 109 assertions;
+restoring that exact line returned all 109 to green.
 
 ## 10. Manual regression (before a release, real windows)
 

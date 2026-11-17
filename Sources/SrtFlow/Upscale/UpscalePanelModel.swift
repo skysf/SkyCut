@@ -34,7 +34,8 @@ struct UpscalePanelModel {
     /// 从工程里算。音频段、图片段、没探测信息的段没有面板（返回 nil）。
     @MainActor
     init?(project: VideoEditProject, clipID: UUID) {
-        guard let clip = project.state.allClips.first(where: { $0.id == clipID }), !clip.isAudioOnly, !clip.isStillImage else { return nil }
+        guard let clip = project.state.allClips.first(where: { $0.id == clipID }),
+              !clip.isAudioOnly, !clip.isStillImage, clip.webMotion == nil else { return nil }
         let original = clip.upscale?.originalURL ?? clip.sourceURL
         guard let info = clip.upscale?.originalInfo ?? clip.info else { return nil }
         self.clipID = clipID

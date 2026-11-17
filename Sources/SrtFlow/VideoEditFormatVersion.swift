@@ -448,6 +448,9 @@ extension TimelineState {
     /// v34：公开制作计划/状态/观察/声音记录；旧版静默丢掉会破坏后续连续性与审查。
     var requiresFormatVersion34: Bool { production != nil }
 
+    /// v36 retains the page, parameters and render provenance needed to rebuild disposable motion movies.
+    var requiresFormatVersion36: Bool { allClips.contains { $0.webMotion != nil } }
+
     /// 旧版忽略的微小裁切仍当无裁切；v33 起才按真实源像素显示，不能让升级改变旧成片。
     mutating func normalizeLegacyEmptyCrops() {
         for clip in allClips where clip.crop?.isLegacyEmpty == true {
@@ -470,7 +473,7 @@ extension TimelineState {
     }
     /// Review reasons and screen-recording provenance must survive saving in a newer reader.
     var requiresFormatVersion35: Bool { !deliveryIntentions.isEmpty || allClips.contains(where: \.isScreenRecording) }
-    /// v36 preserves an explicit black ending; older writers would silently shorten the finished film.
-    var requiresFormatVersion36: Bool { minimumDuration > 0 }
+    /// v37 preserves an explicit black ending; older writers would silently shorten the finished film.
+    var requiresFormatVersion37: Bool { minimumDuration > 0 }
 
 }

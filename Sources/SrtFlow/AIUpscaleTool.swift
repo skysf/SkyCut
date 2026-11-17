@@ -15,14 +15,17 @@ import SrtFlowMCPKit
 @MainActor
 enum AIUpscaleTool {
     static func upscale(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        // 清单始终列出这个工具（2026-10-30），Key 在调用时才核对：没存就在这里说清楚。
-        guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
         let state = project.state
         let ids = AIShortIDs(state: state)
         let id = try ids.resolve(try args.requiredString("clip_id"))
         guard let clip = state.clip(with: id) else {
             throw AIToolError("\(ids.short(id)) is not a clip; only video clips can be upscaled.")
         }
+        guard clip.webMotion == nil else {
+            throw AIToolError("This clip is generated web motion. Re-render its page at a larger size instead of upscaling its cache.")
+        }
+        // Check account availability only after rejecting generated caches; they never need a key, quote or upload.
+        guard SkyStudioAccount.shared.hasKey else { throw AIToolError(SkyStudioJobKey.Problem.noKey.message) }
         guard !clip.isAudioOnly, !clip.isStillImage, let model = UpscalePanelModel(project: project, clipID: id) else {
             throw AIToolError("\(clip.name) is \(clip.isAudioOnly ? "audio" : "a still image"); only video clips can be upscaled.")
         }

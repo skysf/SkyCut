@@ -13,9 +13,7 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .generateSubtitles, title: "Generate subtitles",
                 description: """
-                Transcribe the timeline's speech into the subtitle track on this Mac (macOS 26), replacing current subtitles; hidden \
-                clips are skipped; can translate right after. Each subtitle is one line; pass max_lines=2 only when the user wants \
-                two-line subtitles. Set the style first (edit_subtitles style). Returns job_id: wait with get_job. One undo step.
+                Local macOS 26 transcription replaces timeline subtitles; hidden clips skipped. Each subtitle is one line; max_lines=2 only when the user wants two. Set edit_subtitles style first. job_id: wait with get_job. One undo step.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Spoken language: auto (default) or a locale such as en-US, zh-CN, ja-JP."),
@@ -45,9 +43,7 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .getSubtitles, title: "Read subtitles",
                 description: """
-                Read-only. Subtitle lines with ids, start, end and text from the original track, the translation or both, optionally \
-                in a time range. Each line has its box on the canvas (to avoid watermarks or pick style.max_width), plus the style, \
-                max_lines and how many lines know their word times.
+                Read-only. Read original/translation/both subtitle tracks with ids, times, text and canvas boxes; includes style, max_lines and word-time coverage. Optional time range.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("Which track (default both).", oneOf: ["original", "translation", "both"]),
@@ -80,9 +76,7 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .getJob, title: "Job progress",
                 description: """
-                Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits first: keep \
-                waiting, never restart the job. Exports, transcriptions and translations run one at a time (queued: queue_position). \
-                waiting_for_user: tell the user right away. Paid jobs: billing_note explains the charge.
+                Read-only. Job progress/result; wait_seconds up to 30, never restart it. queued reports queue_position. waiting_for_user: tell the user immediately. Paid-job billing_note explains charges.
                 """,
                 input: MCPSchema.object([
                     "job_id": MCPSchema.string("Job id."),
@@ -94,8 +88,7 @@ public enum MCPSubtitleExportTools {
             return MCPToolDefinition(
                 .cancelJob, title: "Cancel a job",
                 description: """
-                    Stop a job: a running export, subtitle generation or translation stops, and a queued job is dropped. Sky Studio jobs \
-                    can only be cancelled while queued; character jobs cannot. Check get_job afterwards.
+                    Cancel a job; queued jobs are dropped. Sky Studio cancels only queued work; character jobs cannot cancel. Then get_job.
                     """,
                 input: MCPSchema.object(["job_id": MCPSchema.string("Job id.")], required: ["job_id"])
             )

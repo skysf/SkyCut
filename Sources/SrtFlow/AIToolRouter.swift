@@ -292,6 +292,7 @@ final class AIToolRouter {
             return try AIUndoGrouping.step(undo) { try AICutSoundTool.apply(plan, project) }
         case .setTransition: return try AIUndoGrouping.step(undo) { try AITimelineTools.transition(args, project) }
         case .setText: return try AIOverlayTools.setText(args, project)
+        case .setMotion: return try await AIMotionTool.set(args, project)
         case .setShape: return try AIOverlayTools.setShape(args, project)
         case .setFilter: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setFilter(args, project) }
         case .setCanvas: return try AIOverlayTools.setCanvas(args, project)
@@ -337,7 +338,7 @@ final class AIToolRouter {
                 (serialized, presentsEditor, startsRound) = (true, false, false)
             case .undo, .addClips, .addVoiceover, .syncVoiceover, .editClip, .editClips, .setTexts, .setShapes, .setKeyframes, .setTrack, .splitClip, .deleteItems,
                  .duplicateItems, .freezeFrame, .cutSpeech, .cutToBeat,
-                 .setTransition, .setText, .setShape, .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles,
+                 .setTransition, .setText, .setMotion, .setShape, .setFilter, .setCanvas, .generateSubtitles, .translateSubtitles,
                  .editSubtitles, .upscaleClip, .changeVoice:
                 (serialized, presentsEditor, startsRound) = (true, true, true)
             }

@@ -21,8 +21,10 @@ undo step even when no state changed.
 accepts `duration`: a positive value must cover current content and one frame; zero clears it. All arguments validate before
 any write, and a local undo group opens only for a real state change and covers the whole call. Repeating a ratio still preserves
 its recording-import intent marker without an empty undo step. The normal preview/export black-base paths and audio clock
-consume the same duration, without creating a clip. Format v36 protects this optional value from older writers. Selected-only
+consume the same duration, without creating a clip. Format v37 protects this optional value from older writers. Selected-only
 exports exclude the project-wide ending; black-only projects can export video, including a tiny manually saved ending.
+The integration keeps web-motion source at its already merged v36 gate and registers the ending separately at v37; the
+reader's future-version refusal is v38. Both model companions remain in every standalone check source list.
 
 `edit_clips compact=true` returns input-order ids and exception notices derived from final single-edit summaries. It preserves
 requested/applied adjustments, warnings, source-cut findings, requested fills that remain uncovered, explicit region framing,
@@ -35,7 +37,7 @@ The compact option changes only the reply and is validated before asynchronous p
   duration-only / compact calls (4 failures in 48 assertions). No private media or installed application was used.
 - The first full production run measured 873 JSON characters for the 76-entry compact reply versus 28,275 for the detailed
   reply. It exposed three empty-undo failures on repeated/invalid duration requests; grouping now follows validation.
-- `scripts/check-project-file.sh` covers optional old-file defaults, round-trip persistence, literal v36 protection, clearing,
+- `scripts/check-project-file.sh` covers optional old-file defaults, round-trip persistence, literal v37 protection, clearing,
   later content and selected-export isolation.
 - `scripts/check-parameter-limits.sh` exercises the real tools, one undo/redo, all-or-nothing rejection, saved-version and audio
   duration flow, 76 actual edits, final-value notices, and native preview plus FFmpeg export of black endings and black-only video.
@@ -54,5 +56,5 @@ The compact option changes only the reply and is validated before asynchronous p
 
 Project duration is saved editing intent, not a reason to manufacture media. A compact reply must keep exceptions and final
 values, even when an exception-heavy batch is longer. The lasting contracts are in
-[project files](../architecture/video-edit-project-file.md#explicit-project-ending-v36-2026-11-17) and
+[project files](../architecture/video-edit-project-file.md#explicit-project-ending-v37-2026-11-17) and
 [MCP editing parameters](../architecture/mcp-edit-parameters.md#compact-batch-feedback-and-project-endings-2026-11-17).
