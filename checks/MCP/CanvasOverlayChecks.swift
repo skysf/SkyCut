@@ -11,6 +11,7 @@ func runCanvasOverlayChecks() {
     presetSwitchChecks()
     otherCanvasChecks()
     replyChecks()
+    CanvasPresetChecks.run()
 }
 
 private let wide = CGSize(width: 1920, height: 1080)

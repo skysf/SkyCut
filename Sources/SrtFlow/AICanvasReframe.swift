@@ -36,7 +36,7 @@ enum AICanvasReframe {
             notes.append("Clips keep their shape: reframed clips keep x, y and scale (as get_timeline reports them) on the new frame; nothing is stretched or cropped differently.")
         }
         if !overlays.resized.isEmpty {
-            notes.append("Texts and shapes keep their size on the frame: reframed ones got new font_size, width, height and line_width numbers; x, y and a text's box_width stay.")
+            notes.append("Texts and shapes keep their size on the frame: reframed ones have updated font_size, box_width, width, height or line_width values; x and y stay. Preset text wraps still hug their words; other box_width values stay.")
         }
         reframed += overlays.resized.map { ids.short($0) }
         if !reframed.isEmpty { fields["reframed"] = .array(reframed.map { .string($0) }) }
@@ -61,7 +61,7 @@ enum AICanvasReframe {
             let texts = Dictionary(before.textOverlays.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             for text in after.textOverlays {
                 guard let previous = texts[text.id] else { continue }
-                if previous.style != text.style { resized.append(text.id) }
+                if previous.style != text.style || previous.boxWidth != text.boxWidth { resized.append(text.id) }
                 if !text.isBlank, Self.inside(TextRenderer.layoutFrame(previous, canvas: old), old),
                    !Self.inside(TextRenderer.layoutFrame(text, canvas: new), new) {
                     offFrame.append(text.id)

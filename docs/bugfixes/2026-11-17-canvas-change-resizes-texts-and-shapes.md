@@ -63,3 +63,9 @@ of one overlay drift apart. #445 fixed the same thing for clips' placements and 
 - A "unit" that is defined against one edge of the frame (1080 high) is only shape-independent within one aspect ratio; any stored
   length needs a rule for when the frame changes shape, and every part of one thing must follow the same factor.
 - When a choice must survive a round trip (switch and switch back), check the reverse direction before picking the factor.
+
+## Follow-up: automatic preset wraps
+
+The wrap-fraction rule above still applies to ordinary and manually wrapped text. A native preset's automatic snug
+width is now remeasured after scaling and clamping the style so it continues to hug the words; see the
+[preset wrap case](2026-11-17-canvas-preset-wrap-width.md).

@@ -56,14 +56,19 @@ it: set_canvas, the canvas menu, auto following a new first V1 clip, a screen re
   frame's width or height (a shape's width, a rectangle's height) — so on another shape they stretched and drifted apart. Every text
   and shape the edit did not size itself keeps its centre (x, y) and its size against the frame's **short side**: all its lengths get
   one factor, so nothing is stretched. Every preset is 1080 on its short side, so a preset switch keeps the pixels; switching back
-  restores the numbers (unless a text value hits its range). A text's wrap width (`boxWidth`) keeps its share of the frame's width:
-  it is where lines wrap, like x and y; a line that no longer fits wraps. (Fitting the old frame inside the new one was rejected: it
-  shrinks again on the way back.) set_canvas lists them in `reframed`, and in `off_frame` those that sat inside the old frame and
+  restores the numbers (unless a text value hits its range). Ordinary and manually set text wrap widths (`boxWidth`) keep their
+  share of the frame's width; a line that no longer fits wraps. A preset text whose wrap width hugged its words is remeasured with
+  `MotionPresetLayout.snugBoxWidth` after its style is scaled and clamped: the wrap still hugs the words and remains automatic when
+  they are edited later. Each member keeps its own centre; do not rearrange the group or overwrite manual offsets.
+  (Fitting the old frame inside the new one was rejected: it shrinks again on the way back.) set_canvas lists them in `reframed`,
+  including a text whose only change is its wrap width, and in `off_frame` those that sat inside the old frame and
   stick out of the new one.
 - Out of scope: subtitle layouts (their size follows the subtitle style).
 - Checks: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's fill, a corner picture, size keyframes, auto canvas,
   the reply) and `CanvasOverlayChecks` (texts and shapes keep their pixels and proportions, the way back, 4:3, auto 4K, the reply's
-  `off_frame`), wiring in `checks/MCP/canvas-wiring.sh` (perform runs it after the magnet; set_canvas reports it).
+  `off_frame`), plus `CanvasPresetChecks` (all three native presets on 16:9 → 9:16 → 16:9 and auto 4K → 720p phone → 4K;
+  snug wraps, typing after the switch, manual widths, style clamping and width-only replies), wiring in
+  `checks/MCP/canvas-wiring.sh` (perform runs it after the magnet; set_canvas reports it).
 - [ ] Manual, before a release: in the editor, zoom a clip to cover a 9:16 frame and put a small picture in a corner, switch the
   canvas menu to 16:9 and back: nothing stretches in the preview or the export, and 9:16 looks exactly as before; ⌘Z undoes each switch.
 - [ ] Manual, before a release: on 16:9 add a title, a rectangle, a ring and a tilted line, switch the canvas menu to 9:16: the

@@ -13,8 +13,9 @@ import Foundation
 // its centre (x, y on the frame) and its size against the frame's short side — all its lengths are multiplied by one factor,
 // so nothing is stretched and its parts keep their proportions. Every preset frame is 1080 on its short side, so on those
 // switches a text or shape keeps its pixels; switching back restores the numbers (except where a range clamps a text value).
-// A text's wrap width stays the same share of the frame's width: it is where lines wrap, like x and y, not the size of the
-// letters; a line that no longer fits wraps. Rotation, opacity, timing and animation are untouched.
+// Ordinary and manually set wrap widths keep their share of the frame's width. A preset text whose wrap hugged its words
+// keeps that automatic width snug, measured again after its style is scaled and clamped for the new canvas. Rotation,
+// opacity, timing and animation are untouched; each member keeps its own centre without rearranging the preset group.
 // Not: clips (`CanvasReframe`), subtitles (their size follows the subtitle style), the canvas size (`TimelineRenderSize`).
 // Called by `CanvasReframe.keepShapes` (run at the end of `VideoEditProject.perform`). Pure value: scripts/check-mcp.sh compiles it
 // (checks/MCP/CanvasOverlayChecks.swift).
@@ -44,7 +45,16 @@ enum OverlayReframe {
         let oldTexts = Dictionary(before.textOverlays.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         for text in state.textOverlays {
             guard let was = oldTexts[text.id], sameSize(was, text) else { continue }
-            state.updateTextOverlay(text.id) { $0.style = scaled($0.style, by: factors.height) }
+            let snug = was.motionPreset != nil && text.motionPreset == was.motionPreset
+                && MotionPresetLayout.isSnug(was, canvas: old)
+            state.updateTextOverlay(text.id) {
+                $0.style = scaled($0.style, by: factors.height)
+                if snug {
+                    // Measure the actual stored style, including a font or tracking value that reaches its range.
+                    $0.style.clampToValidRange()
+                    $0.boxWidth = MotionPresetLayout.snugBoxWidth($0, canvas: new)
+                }
+            }
             if state.textOverlays.first(where: { $0.id == text.id }) != text { changed.append(text.id) }
         }
         let oldShapes = Dictionary(before.shapes.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
