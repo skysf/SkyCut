@@ -198,6 +198,19 @@ Inspector 的 ±1px 步进整个吞回默认值，点了没反应。
 改任何一边都要对照另一边；验收标准是同一时刻预览截图和导出抽帧长一样。
 像素尺寸过 `evenPixel`（正偶数，yuv420 要求），坐标取整。
 
+**Upper video on the frame grid** (2026-11-17): its window is left-closed, right-open, just like the native preview
+composition used by the player and AI look. Count its first frame and the first frame after its end with `FrameGrid`;
+reuse `OverlayExportFile.enableWindow` (half-frame edges), never `between(t, start, end)` on raw seconds. Both ordinary
+video and prerendered fill + matte are placed with `OverlayExportFile.placement`, half a frame before their output
+frames, and clone two tail frames before placing. After cuts / crossfades the main stream has AVTB timestamps a few
+microseconds off the grid; exact-grid placement can select the previous moving frame, and EOF can drop the last one.
+The window still removes the layer exactly at its end. `scripts/check-export-frame-rate.sh` checks every frame of
+ordinary and prerendered upper video at 24 / 30 / 60 fps against the native preview composition, over cuts and crossfades.
+Timeline look requests first use the containing project frame (`TextAnimator.quantize`, shared with the overlays),
+then `NativeSourceFrameSampler.requestedTime`: an exact frame converted by raw
+`CMTime(seconds:preferredTimescale:)` can land one native tick early. The existing nearest-tick request policy preserves
+the grid; the look generator's half-frame tolerance and the composition's truncating insertion/slice times stay unchanged.
+
 **预览的黑底轨**：时间线上有任何半透明图层（不透明度、转场淡入淡出）时，
 CompositionBuilder 会垫一条 `BlackBaseVideoFactory` 的不透明黑视频当底 ——
 默认合成器在混合路径上不铺 `backgroundColor`，见

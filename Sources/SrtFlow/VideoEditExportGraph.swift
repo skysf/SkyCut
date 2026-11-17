@@ -388,8 +388,13 @@ enum VideoEditExportGraph {
 
         // MARK: 上层视频轨
 
+        let grid = FrameGrid(state.frameRate)
         // 同一份 overlayVisible（见上面预渲染那一圈）：轨按数组顺序、轨内按段的顺序，叠放次序不变。
         for clip in overlayVisible {
+            // Framesync must pick this frame even when concat/xfade's AVTB time drifts before the grid. Two cloned
+            // tail frames keep EOF beyond the last visible frame; the half-frame window removes the layer at its end.
+            let place = "tpad=stop_mode=clone:stop=\(OverlayExportFile.sequenceTailFrames)," +
+                OverlayExportFile.placement(firstFrame: grid.firstFrame(atOrAfter: clip.timelineStart), grid: grid)
             let source = input(for: clip.sourceURL)
             let scaled = nextLabel("ov")
             let x: String
@@ -430,7 +435,7 @@ enum VideoEditExportGraph {
                 )
                 filters.append(
                     "[\(straightLabel)][\(matteLabel)]alphamerge,format=rgba," +
-                    "setpts=PTS+\(fmt(clip.timelineStart))/TB[\(scaled)]"
+                    "\(place)[\(scaled)]"
                 )
                 x = "0"
                 y = "0"
@@ -459,13 +464,13 @@ enum VideoEditExportGraph {
                     "[\(source):v]trim=start=\(fmt(clip.sourceStart)):end=\(fmt(end))," +
                     "setpts=(PTS-STARTPTS)/\(fmt(clip.speed)),fps=\(fps)," +
                     "\(chain)," +
-                    "setpts=PTS+\(fmt(clip.timelineStart))/TB[\(scaled)]"
+                    "\(place)[\(scaled)]"
                 )
             }
             let outV = nextLabel("v")
             filters.append(
                 "[\(video)][\(scaled)]overlay=x=\(x):y=\(y):eof_action=pass:" +
-                "enable='between(t,\(fmt(clip.timelineStart)),\(fmt(clip.timelineEnd)))'[\(outV)]"
+                "enable='\(OverlayExportFile.enableWindow(clip.timelineStart, clip.timelineEnd, grid: grid))'[\(outV)]"
             )
             video = outV
         }
@@ -477,7 +482,8 @@ enum VideoEditExportGraph {
 
         // MARK: 盖一块（模糊 / 马赛克）：盖的是调完色的画面，形状 / 文字 / 字幕压在它上面（预览同一个层序）
         VideoEditCoverExport.append(
-            state.renderedCovers, canvas: renderSize, total: total, video: &video, filters: &filters, nextLabel: nextLabel
+            state.renderedCovers, canvas: renderSize, total: total, frameRate: state.frameRate,
+            video: &video, filters: &filters, nextLabel: nextLabel
         )
 
         // MARK: 形状，然后文字（文字压在形状之上、字幕之下）

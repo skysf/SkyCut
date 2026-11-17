@@ -70,6 +70,7 @@
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
+- [2026-11-17 Upper video, covers and grades switch on the wrong export frame](2026-11-17-export-layer-frame-windows.md) — Share FrameGrid windows and native look requests; use half-frame export edges and video placement, with EOF past the last visible frame.
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
 - [2026-11-17 get_job reported the peak before the limiter; listen's loudest moment was a curve step's middle](2026-11-17-export-peak-before-limiter-and-binned-loudest.md) — Give the AI the delivered number under its measure's name (the file's true peak, dBTP); a time reported "at" must come from data at that resolution.
@@ -98,6 +99,7 @@
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。
+- [2026-11-17 Static screen recordings reported as frozen pictures](2026-11-17-inspection-frozen-screen-recordings.md) — Preserve capture provenance and exempt expected static screens.
 - [2026-11-16 成片检查把音效、音乐的起点报成「切在说话上」](2026-11-16-inspection-reports-sound-onsets-as-speech.md) — 有声不等于在说话：语义结论要有词或旁白字幕作证据，没有就说判不了；素材自己的头尾什么都没切掉。
 - [2026-08-05 Inspector 拖调](2026-08-05-inspector-scrub-field-gestures.md) — 编辑态、焦点与亚像素容差。
 - [2026-08-12 提示弹在很远的地方、还没翻译](2026-08-12-instant-tooltip-first-show-far-off.md) — `NSHostingView` 会把尺寸约束灌给面板，摆好 ≠ 摆定；本地化查不到是静默降级。

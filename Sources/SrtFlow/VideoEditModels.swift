@@ -1,109 +1,6 @@
 import Foundation
 import SrtFlowCore
 
-// MARK: - 转场
-
-/// 主轨相邻两段之间的转场。
-///
-/// 全部按「重叠 d 秒」来算：前一段的尾巴和后一段的开头叠在一起渐变/推移/擦除。
-/// 这样预览（AVFoundation 斜坡）和导出（ffmpeg xfade）的时间账完全一致。
-/// 预览侧三族的合成模型见 docs/architecture/preview-free-transform.md。
-///
-/// 方向语义与 xfade 实测对齐（2026-08-23 纯色实测）：名字里的方向 = 画面内容
-/// / 擦除边的运动方向。pushLeft/wipeLeft 后段从**右**边进来，以此类推。
-enum ClipTransition: String, CaseIterable, Identifiable, Hashable, Sendable {
-    case none
-    case crossFade
-    case blackFade
-    case whiteFade
-    case pushLeft
-    case pushRight
-    case pushUp
-    case pushDown
-    case wipeLeft
-    case wipeRight
-    case wipeUp
-    case wipeDown
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .none: return "None"
-        case .blackFade: return "Black fade"
-        case .crossFade: return "Cross dissolve"
-        case .whiteFade: return "White fade"
-        case .pushLeft: return "Push left"
-        case .pushRight: return "Push right"
-        case .pushUp: return "Push up"
-        case .pushDown: return "Push down"
-        case .wipeLeft: return "Wipe left"
-        case .wipeRight: return "Wipe right"
-        case .wipeUp: return "Wipe up"
-        case .wipeDown: return "Wipe down"
-        }
-    }
-
-    /// ffmpeg `xfade` 滤镜里对应的名字。
-    var xfadeName: String? {
-        switch self {
-        case .none: return nil
-        case .blackFade: return "fadeblack"
-        case .crossFade: return "fade"
-        case .whiteFade: return "fadewhite"
-        case .pushLeft: return "slideleft"
-        case .pushRight: return "slideright"
-        case .pushUp: return "slideup"
-        case .pushDown: return "slidedown"
-        case .wipeLeft: return "wipeleft"
-        case .wipeRight: return "wiperight"
-        case .wipeUp: return "wipeup"
-        case .wipeDown: return "wipedown"
-        }
-    }
-
-    /// 三族：淡变（透明度）、推移（平移）、擦除（裁切窗口）。选择器分组
-    /// 和预览合成的路径分派都以它为准。
-    enum Family {
-        case fade, push, wipe
-    }
-
-    var family: Family {
-        switch self {
-        case .none, .crossFade, .blackFade, .whiteFade: return .fade
-        case .pushLeft, .pushRight, .pushUp, .pushDown: return .push
-        case .wipeLeft, .wipeRight, .wipeUp, .wipeDown: return .wipe
-        }
-    }
-
-    /// 推移的内容运动方向 / 擦除边的运动方向（单位向量，视频坐标 y 向下）。
-    /// 淡变族没有方向。
-    var motion: (dx: CGFloat, dy: CGFloat)? {
-        switch self {
-        case .pushLeft, .wipeLeft: return (-1, 0)
-        case .pushRight, .wipeRight: return (1, 0)
-        case .pushUp, .wipeUp: return (0, -1)
-        case .pushDown, .wipeDown: return (0, 1)
-        case .none, .crossFade, .blackFade, .whiteFade: return nil
-        }
-    }
-
-    /// 擦除到进度 p 时，**出场段**还占着的画布区（进场段从对面那条边露出来）。
-    func wipeRemainingRect(progress: Double, canvas: CGSize) -> CGRect {
-        let p = min(max(progress, 0), 1)
-        guard let motion else { return CGRect(origin: .zero, size: canvas) }
-        if motion.dx < 0 {
-            return CGRect(x: 0, y: 0, width: canvas.width * (1 - p), height: canvas.height)
-        } else if motion.dx > 0 {
-            return CGRect(x: canvas.width * p, y: 0, width: canvas.width * (1 - p), height: canvas.height)
-        } else if motion.dy < 0 {
-            return CGRect(x: 0, y: 0, width: canvas.width, height: canvas.height * (1 - p))
-        } else {
-            return CGRect(x: 0, y: canvas.height * p, width: canvas.width, height: canvas.height * (1 - p))
-        }
-    }
-}
-
 // MARK: - 剪辑
 
 /// 时间线上的一段素材。
@@ -182,6 +79,8 @@ struct EditClip: Identifiable, Hashable, Sendable {
     /// 按成员构造器只会让每个调用点都多写一行。合同见
     /// docs/architecture/clip-visibility.md。
     var isHidden = false
+    /// Native screen-capture provenance: static screens are expected.
+    var isScreenRecording = false
 
     /// 画在这段声音上的音量曲线（值是 **dB**，点锚在源时间上，同关键帧）。
     ///
@@ -448,6 +347,8 @@ struct TimelineState: Hashable, Sendable {
     var frameRate: ProjectFrameRate = .fallback
     /// 公开故事/观察/声音计划，和剪辑共用撤销与普通自动保存；老工程缺键即 nil。
     var production: FilmProductionState?
+    /// Reviewed delivery findings, preserved with the project and undo history.
+    var deliveryIntentions: [DeliveryIntentionalMark] = []
 
     var isEmpty: Bool {
         mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty)
@@ -662,7 +563,7 @@ extension EditClip: Codable {
         case fadeInDuration, fadeOutDuration
         case isHidden
         case volumeCurve, soundScene
-        case upscale
+        case upscale, isScreenRecording
     }
 
     init(from decoder: Decoder) throws {
@@ -712,6 +613,7 @@ extension EditClip: Codable {
         soundScene = (try? c.decodeIfPresent(SoundScene.self, forKey: .soundScene)) ?? nil
         // v29 起才有。缺键 = 用的就是原片。认不出的记录整个不认（只有原片路径是必需的，其余缺了走默认）。
         upscale = (try? c.decodeIfPresent(ClipUpscaleRecord.self, forKey: .upscale)) ?? nil
+        isScreenRecording = try c.decodeIfPresent(Bool.self, forKey: .isScreenRecording) ?? false
         // v14 及更早：画面渐变只有时长、没有"效果"这个概念。合并成一个槽之后，
         // 这些段就是 In/Out = Fade —— 不认回来的话，老工程一打开，调好的淡入淡出
         // 会因为 `kind == .none` 当场失效（不变量见 `ClipPresetAnimation.isEmpty`）。
@@ -776,6 +678,7 @@ extension EditClip: Codable {
         try c.encodeIfPresent(soundScene, forKey: .soundScene)
         // 没换过源的段不写这个键（判据与格式版本闸门 `requiresFormatVersion29` 同源）。
         try c.encodeIfPresent(upscale, forKey: .upscale)
+        if isScreenRecording { try c.encode(true, forKey: .isScreenRecording) }
     }
 }
 
@@ -783,7 +686,7 @@ extension TimelineState: Codable {
     private enum CodingKeys: String, CodingKey {
         case mainClips, mainHidden, overlayTracks, audioTracks
         case mainVolume, masterVolume
-        case production
+        case production, deliveryIntentions
         case subtitle, subtitleHidden, translationHidden
         case subtitleLayout, translationLayout, subtitleURL, subtitleCompanion, shapes, textOverlays, canvasRatio
         case frameRate, filters, projectSubtitleStyle, subtitleHighlight, rulerMarkers, mainMagnet, subtitleMaxLines
@@ -793,6 +696,7 @@ extension TimelineState: Codable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init()
         production = try c.decodeIfPresent(FilmProductionState.self, forKey: .production)
+        deliveryIntentions = try c.decodeIfPresent([DeliveryIntentionalMark].self, forKey: .deliveryIntentions) ?? []
         mainClips = try c.decodeIfPresent([EditClip].self, forKey: .mainClips) ?? []
         mainHidden = try c.decodeIfPresent(Bool.self, forKey: .mainHidden) ?? false
         mainMagnet = try c.decodeIfPresent(Bool.self, forKey: .mainMagnet) ?? false   // 2026-10-02 起才有：缺键 = 关
@@ -825,6 +729,7 @@ extension TimelineState: Codable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(production, forKey: .production)
+        if !deliveryIntentions.isEmpty { try c.encode(deliveryIntentions, forKey: .deliveryIntentions) }
         try c.encode(mainClips, forKey: .mainClips)
         try c.encode(mainHidden, forKey: .mainHidden)
         if mainMagnet { try c.encode(true, forKey: .mainMagnet) }   // 按需写键：磁吸关着的工程存一轮 diff 是空的

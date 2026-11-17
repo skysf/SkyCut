@@ -219,8 +219,8 @@ require "预览上的形状读 renderedShapes" \
   Sources/SrtFlow/VideoEditProject.swift 'state\.renderedShapes\.filter'
 require "预览上的文字读 renderedTextOverlays" \
   Sources/SrtFlow/VideoEditProject+Text.swift 'state\.renderedTextOverlays\.filter'
-require "预览的调色读不含隐藏的 activeFilters" \
-  Sources/SrtFlow/VideoEditFilterModels.swift 'renderedFilters\.filter \{ \$0\.contains\(time: time\) \}'
+require "Preview grades use visible filters on the frame grid" \
+  Sources/SrtFlow/VideoEditFilterModels.swift 'renderedFilters\.filter \{ grid\.contains\(time, from: \$0\.timelineStart, to: \$0\.timelineEnd\) \}'
 require "导出的形状读 renderedShapes" \
   Sources/SrtFlow/VideoEditExportGraph.swift '^ *state\.renderedShapes, canvas: renderSize'
 require "导出的文字读 renderedTextOverlays" \
@@ -234,6 +234,17 @@ require "导出的盖一块读 renderedCovers" \
   Sources/SrtFlow/VideoEditExportGraph.swift 'state\.renderedCovers, canvas:'
 require "AI 的「看」里的盖一块读 renderedCovers" \
   Sources/SrtFlow/AIFrameComposer.swift 'state\.renderedCovers\.filter'
+# ExportFrameRate/LayerWindows checks the frame-window behaviour; pin AI look and preview to that same read-side rule.
+for frame_reader in Sources/SrtFlow/VideoEditCoverPreview.swift Sources/SrtFlow/AIFrameComposer.swift; do
+  require "Cover selection uses the project's frame grid" \
+    "${frame_reader}" 'let grid = FrameGrid\(state\.frameRate\)'
+  require "Cover selection uses the tested frame window in preview and AI look" \
+    "${frame_reader}" 'state\.renderedCovers\.filter \{ grid\.contains\(time, from: \$0\.timelineStart, to: \$0\.timelineEnd\) \}'
+done
+require "AI timeline look uses the native nearest-tick frame request" \
+  Sources/SrtFlow/AIFrameComposer.swift 'generator\.image\(at: NativeSourceFrameSampler\.requestedTime\(for: lookTime\)\)'
+require "AI timeline video uses the same containing project frame as its overlays" \
+  Sources/SrtFlow/AIFrameComposer.swift 'let lookTime = TextAnimator\.quantize\(time, frameRate: state\.frameRate\)'
 require "轨道头的眼睛仍是整轨显隐的入口" \
   Sources/SrtFlow/VideoEditTimelineHeaderColumn.swift 'toggleLaneHidden\('
 

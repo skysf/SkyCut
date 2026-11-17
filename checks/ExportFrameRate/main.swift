@@ -377,6 +377,8 @@ func main() async {
               "\(item.name) 的像素应当是方的（实得像素宽高比 \(geometry.pixelAspect)）")
     }
 
+    await LayerWindowChecks.runAll()
+
     print("\(checks) checks, \(failures) failures")
     print("实测帧数：\(measured.sorted { $0.key < $1.key }.map { "\($0.key)fps→\($0.value)帧" }.joined(separator: "  "))")
     if failures == 0 { print("All checks passed") }

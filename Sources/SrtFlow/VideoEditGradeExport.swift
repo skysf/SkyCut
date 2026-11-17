@@ -1,4 +1,5 @@
 import Foundation
+import SrtFlowCore
 
 // MARK: - 导出图里的调色（lut3d）
 //
@@ -35,6 +36,7 @@ enum VideoEditGradeExport {
         let rgb = nextLabel("v")
         filters.append("[\(video)]format=gbrp[\(rgb)]")
         video = rgb
+        let grid = FrameGrid(state.frameRate)
         for (index, grade) in gradeFilters.enumerated() {
             let filename = "filter\(index).cube"
             try FilterLUT.cubeFileText(for: grade.preset, strength: grade.strength)
@@ -45,7 +47,7 @@ enum VideoEditGradeExport {
             let outV = nextLabel("v")
             filters.append(
                 "[\(video)]lut3d=file=\(filename):interp=trilinear:" +
-                "enable='between(t,\(VideoEditExportGraph.fmt(max(0, grade.timelineStart))),\(VideoEditExportGraph.fmt(min(total, grade.timelineEnd))))'" +
+                "enable='\(OverlayExportFile.enableWindow(max(0, grade.timelineStart), min(total, grade.timelineEnd), grid: grid))'" +
                 "[\(outV)]"
             )
             video = outV

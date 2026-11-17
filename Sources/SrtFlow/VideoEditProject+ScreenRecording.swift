@@ -63,6 +63,7 @@ extension VideoEditProject {
                 timelineStart: state.mainClips.map(\.timelineEnd).max() ?? 0,
                 info: videoInfo
             )
+            clip.isScreenRecording = true
             clip.linkGroup = linkGroup
             state.mainClips.append(clip)
             // 磁吸开着就走既有 pack 规则（磁吸跟着工程走，看这个工程的）。
@@ -157,6 +158,7 @@ extension VideoEditProject {
                 timelineStart: state.mainClips.map(\.timelineEnd).max() ?? 0,
                 info: info
             )
+            clip.isScreenRecording = true
             clip.linkGroup = linkGroup
             state.mainClips.append(clip)
             if state.mainMagnet { state.packMain() }

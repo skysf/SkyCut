@@ -40,6 +40,8 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditClipTransition.swift \
+  Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
   Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
@@ -105,6 +107,10 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditExportPlan.swift \
   Sources/SrtFlow/VideoEditGradeExport.swift \
   Sources/SrtFlow/VideoEditCoverExport.swift \
+  Sources/SrtFlow/VideoEditCoverPreview.swift \
+  Sources/SrtFlow/VideoEditCoverFilters.swift \
+  Sources/SrtFlow/NativeSourceFrameSampler.swift \
+  Sources/SrtFlow/VideoEditFilterPreview.swift \
   Sources/SrtFlow/VideoEditShapePNGRenderer.swift \
   Sources/SrtFlow/VideoEditShapeOutline.swift \
   Sources/SrtFlow/VideoEditExportFilterScript.swift \
@@ -156,6 +162,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
   checks/ExportFrameRate/main.swift \
+  checks/ExportFrameRate/LayerWindows.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"
