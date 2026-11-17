@@ -193,7 +193,8 @@ enum AILookTool {
     static func describe(_ frame: AIFrameSampler.Frame) async -> JSONValue {
         let small = AIContactSheet.scaled(frame.image, maxSide: 768) ?? frame.image
         let vision = await AIVision.analyze(small, [.subject, .labels, .text])
-        return AIFrameDescription.describe(.init(time: frame.time, luma: AIBlackBars.luma(of: small), vision: vision))
+        return AIFrameDescription.describe(.init(time: frame.time,
+                                                luma: AIBlackBars.luma(of: frame.image, maxSide: AIBlackBars.measurementSide), vision: vision))
     }
 
     /// 拼图、写上「图怎么读」，装进结果。每格标它的时刻，给了 `labels` 就标那个。

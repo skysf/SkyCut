@@ -28,12 +28,12 @@ enum AIFrameSampler {
     }
 
     /// 一段素材用到的那一截里均匀取 `count` 帧（图片素材就是原图那一张）。
-    static func frames(of clip: EditClip, count: Int, maxSide: Int) async -> [Frame] {
+    static func frames(of clip: EditClip, count: Int, maxSide: Int, tolerance: Double = 0.25) async -> [Frame] {
         if let still = clip.stillImageURL {
             return image(at: still, maxSide: maxSide).map { [Frame(time: 0, image: $0)] } ?? []
         }
         let at = times(from: clip.sourceStart, to: clip.sourceStart + clip.sourceDuration, count: count)
-        return await frames(ofVideo: clip.sourceURL, at: at, maxSide: maxSide, tolerance: 0.25)
+        return await frames(ofVideo: clip.sourceURL, at: at, maxSide: maxSide, tolerance: tolerance)
     }
 
     /// 视频在这几个源时刻的画面；取不到的跳过。`tolerance`（秒）越宽越快（可以就近取关键帧）。
@@ -42,7 +42,7 @@ enum AIFrameSampler {
         generator.appliesPreferredTrackTransform = true
         generator.dynamicRangePolicy = .forceSDR
         generator.maximumSize = CGSize(width: maxSide, height: maxSide)
-        let window = CMTime(seconds: max(0.001, tolerance), preferredTimescale: 600)
+        let window = CMTime(seconds: max(0, tolerance), preferredTimescale: 600)
         generator.requestedTimeToleranceBefore = window
         generator.requestedTimeToleranceAfter = window
         var frames: [Frame] = []

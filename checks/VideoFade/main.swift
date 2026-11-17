@@ -604,7 +604,7 @@ func main() async {
     // MARK: 带透明的段：透明静帧（2026-10-03，AlphaStill.swift）、带透明的视频按文件里的标记叠（2026-11-16，AlphaVideo.swift）
     await checkAlphaSources(white: white, info: landscape)
     // MARK: A crossFade between two stills is centred on the cut and keeps their keyframes (2026-11-17, StillCrossfade.swift)
-    await checkStillCrossfade()
+    await LongCrossfadeChecks.run()
 
     if failures == 0 {
         print("\(checks) checks, 0 failures")

@@ -10,15 +10,26 @@ import SrtFlowMCPKit
 // 不管什么：裁切怎么算（AIFrameFit）、改工程（AIClipTools / AIClipEdit）。
 
 enum AIPictureProbe {
-    /// 抽几帧：5 帧够分辨「一直黑的遮幅」和「某一帧碰巧暗」，又不慢（小图，一共一两百毫秒）。
+    // Five midpoint frames distinguish a steady matte from a dark frame without decoding the whole source.
     static let sampleCount = 5
 
-    /// 这一段的黑边。nil = 看不出来（抽不到帧，或者抽到的全是黑场）；`.none` = 看了，没有黑边。
-    static func blackBars(of clip: EditClip) async -> AIBlackBars.Insets? {
-        let frames = await AIFrameSampler.frames(of: clip, count: sampleCount, maxSide: 320)
-        return AIBlackBars.combine(frames.map { frame in
-            AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(in:))
-        })
+    struct BlackBars {
+        var measured: AIBlackBars.Insets?
+        var crop: AIBlackBars.Insets?
+
+        var active: CGRect? { crop.flatMap { $0.isEmpty ? nil : $0.active } }
+    }
+
+    // Probe the clip's exact source window. Zero tolerance cannot borrow an unbarred frame from the next shot.
+    // The measured values match look; the crop includes one analysis pixel at each detected boundary.
+    static func blackBars(of clip: EditClip) async -> BlackBars {
+        let frames = await AIFrameSampler.frames(of: clip, count: sampleCount, maxSide: AIBlackBars.measurementSide, tolerance: 0)
+        let readings = frames.compactMap { frame -> (AIBlackBars.Reading, AIBlackBars.Reading)? in
+            guard let luma = AIBlackBars.luma(of: frame.image, maxSide: AIBlackBars.measurementSide),
+                  let reading = AIBlackBars.reading(in: luma) else { return nil }
+            return (reading, AIBlackBars.includingBoundary(reading, in: luma))
+        }
+        return BlackBars(measured: AIBlackBars.combine(readings.map { $0.0 }), crop: AIBlackBars.combine(readings.map { $0.1 }))
     }
 
     /// 每秒两帧、至少 5 帧、最多 30 帧：固定的窗取中位数 5 帧就够，跟拍要看得出主体怎么走（第四块）。

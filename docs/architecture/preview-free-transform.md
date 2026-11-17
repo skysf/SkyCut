@@ -118,6 +118,27 @@ Transform 面板追加的四个字段（都有「无操作」默认值，全默�
   v33 的空裁切判定只容纳浮点零误差，不再用固定 0.05% 吞掉高分辨率素材里的真实像素；
   读 v32 及更早工程时，将当年被忽略的微小裁切迁移为无裁切，保住旧成片。
 
+### Automatic black-bar removal (2026-11-17)
+
+`edit_clip` and `edit_clips` analyze the source window that the call will commit, including simultaneous source_in / source_out
+changes. Source-window validation is shared with the actual edit (`AIClipEdit.applySourceWindow`); probing never applies a partial
+edit. Five midpoint samples use zero decoding tolerance, so a nearby shot outside the window cannot cancel its bars.
+
+Removal and look measure with `AIBlackBars` at the same 1280-pixel long side, before Vision's separate thumbnail. The default
+256-pixel luma helper stays unchanged for other consumers. Each edge still takes the minimum across the confident samples, with
+zero cancelling that edge and uncertain readings not voting; content in a full-frame shot is never cropped to match another shot.
+The reported `black_bars` are the measured widths. Automatic cropping includes one more analysis pixel at a detected boundary,
+because a row mixing picture and black fails the fully-black threshold. Zero and uncertain edges gain no crop. The actual crop is
+visible in `picture`, as for any framing edit. `fit=fill` without removal reports baked-in bars and a warning; that notice never
+adds a crop of its own.
+
+Regression: `scripts/check-parameter-limits.sh` uses synthetic thin asymmetric bars and two shots with different framing. It
+checks the production single-call plan, look before / after removal, simultaneous trim, conservative mixed-shot handling, and one
+undo for the complete change. Pure boundary-allowance checks are in `scripts/check-mcp.sh`.
+
+- [ ] Before a release, remove bars from a real clip in one call, including a simultaneous source trim; compare preview and export
+  with look at the beginning, middle and end. One undo restores both its source window and framing.
+
 ### MCP 的源矩形取景（2026-11-02）
 
 `edit_clip` / `edit_clips` 的 `region={x,y,width,height}` 是**按素材旋转信息摆正后的源显示画面**上的比例，

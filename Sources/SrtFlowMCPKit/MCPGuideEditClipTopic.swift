@@ -42,7 +42,10 @@ enum MCPGuideEditClipTopic {
             picture. It aims at faces, then people, then text (slides, screen recordings), then the most salient object, and follows a \
             moving subject with position keyframes unless follow=false (it jumps at shot changes). focus=text aims at text, focus=center \
             skips detection, focus_x / focus_y give the point yourself (0–1 on the source). fit=fit shows the whole picture (or the crop). \
-            remove_black_bars detects letterbox or pillarbox bars and frames inside them. crop removes source edges (fractions per side, \
+            remove_black_bars detects letterbox or pillarbox bars in this call's source window and frames inside them. It uses the same \
+            measurement as look, allowing one analysis pixel at each detected boundary so resampling leaves no thin black strip. \
+            A fill without removal reports detected baked-in bars and a warning; it does not remove them automatically. \
+            crop removes source edges (fractions per side, \
             up to edit_limits.crop); all 0 resets.
 
             region={x,y,width,height} selects an upright source rectangle (0–1 from the top-left, at least 2 pixels per side). fit=fit \

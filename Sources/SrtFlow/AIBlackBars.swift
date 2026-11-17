@@ -62,6 +62,8 @@ enum AIBlackBars {
     static let blackMax: UInt8 = 40
     static let blackMean = 20.0
     static let minimumBar = 0.005
+    // Look and automatic removal measure the decoded frame at the same resolution, before Vision's thumbnail.
+    static let measurementSide = 1280
     /// 黑边和画面之间那道边：紧挨着的一两行比黑边最后几行至少亮这么多（0…255）。真遮幅实测 25–200（暗场的地面也有 25），
     /// 水下 / 暗棚 0–2。
     static let edgeStep = 20.0
@@ -126,6 +128,18 @@ enum AIBlackBars {
         guard !valid.isEmpty else { return nil }
         func smallest(_ side: (Reading) -> Double?) -> Double { valid.compactMap(side).min() ?? 0 }
         return Insets(top: smallest(\.top), bottom: smallest(\.bottom), left: smallest(\.left), right: smallest(\.right))
+    }
+
+    // A resampled boundary row can mix picture and black, so the count of wholly black rows stops early.
+    // Only removal includes that one boundary pixel; a zero or uncertain side never gains a crop.
+    static func includingBoundary(_ reading: Reading, in luma: Luma) -> Reading {
+        func extended(_ value: Double?, pixels: Int) -> Double? {
+            value.map { $0 > 0 ? min(1, $0 + 1 / Double(max(1, pixels))) : 0 }
+        }
+        return Reading(
+            top: extended(reading.top, pixels: luma.height), bottom: extended(reading.bottom, pixels: luma.height),
+            left: extended(reading.left, pixels: luma.width), right: extended(reading.right, pixels: luma.width)
+        )
     }
 
     /// 写给 AI 看。nil = 看不出来（抽不到帧，或者抽到的全是黑场）。

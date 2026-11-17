@@ -44,8 +44,10 @@ if [ "$(grep -c 'FontFamilyNames.names(of: font)' Sources/SrtFlow/FontCatalog.sw
   exit 1
 fi
 # 几帧合起来去黑边用每边的读数（说不准的帧不参加），不用单帧的 bars（说不准当 0，一帧夜景就认不出遮幅）。
-if [ "$(grep -c 'AIBlackBars.luma(of: frame.image).flatMap(AIBlackBars.reading(in:))' Sources/SrtFlow/AIPictureProbe.swift || true)" -ne 1 ]; then
-  echo "✗ Sources/SrtFlow/AIPictureProbe.swift 去黑边没按每边的读数合起来" >&2
+if [ "$(grep -Fc 'let reading = AIBlackBars.reading(in: luma)' Sources/SrtFlow/AIPictureProbe.swift || true)" -ne 1 ] \
+  || [ "$(grep -Fc 'AIBlackBars.combine(readings.map { $0.0 })' Sources/SrtFlow/AIPictureProbe.swift || true)" -ne 1 ] \
+  || [ "$(grep -Fc 'AIBlackBars.combine(readings.map { $0.1 })' Sources/SrtFlow/AIPictureProbe.swift || true)" -ne 1 ]; then
+  echo "✗ Black-bar measurements and crops must combine per-edge readings, preserving uncertain edges." >&2
   exit 1
 fi
 # 配音的字幕只从 AIVoiceoverSubtitles.config 拿参数（不按逗号拆小句），不直接用生成字幕那一套

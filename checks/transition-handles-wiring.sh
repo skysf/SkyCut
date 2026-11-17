@@ -176,6 +176,11 @@ need "$LIBRARY" "selectedTransitionSeamIndex\(in: clips\)$" "库面板回退链�
 # 5) 「无」不在库的网格里 —— 它不是一种转场（拖不了、点了是删除）。
 deny "$PICKER" "return \[\.none, " "库网格里的「无」那张卡"
 
+# MCP-6: both render paths read the settled geometric overlap; packing's 45% ceiling must not shorten it again.
+need "Sources/SrtFlow/VideoEditModels.swift" 'TransitionDurationLimit\.overlap\(in: mainClips, after: index\)' "shared geometric overlap in the preview and audio paths"
+need "$GRAPH" 'TransitionDurationLimit\.overlap\(clip, next\)' "shared geometric overlap in the export"
+deny "$GRAPH" 'timelineDuration \* 0\.45' "a second packing percentage ceiling in the export"
+
 if [ "$FAILED" -ne 0 ]; then
     echo "✗ 转场选中/删除接线守卫失败" >&2
     exit 1

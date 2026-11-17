@@ -143,7 +143,7 @@ enum AIClipEdit {
     }
 
     /// 入点 / 出点。图片只看长度（素材是一段循环的静帧，最长 `stillDuration`）。
-    private static func applySourceWindow(_ change: AIClipChange, to clip: inout EditClip, stillDuration: Double) throws {
+    static func applySourceWindow(_ change: AIClipChange, to clip: inout EditClip, stillDuration: Double) throws {
         guard change.sourceIn != nil || change.sourceOut != nil else { return }
         let window = try AIClipSourceWindow.resolve(
             sourceIn: change.sourceIn, sourceOut: change.sourceOut, oldIn: clip.sourceStart,
