@@ -332,6 +332,8 @@ enum AITimelineTools {
         AIEditorPresenter.reveal(.init(clips: [id], time: clip.timelineStart), project: project)
         var result: [String: JSONValue] = ["id": .string(ids.short(id))]
         result["keyframes"] = AIKeyframes.summary(clip, canvas: canvas, frameRate: project.state.frameRate) ?? "none"
+        // Motion that leaves the canvas bare shows up here (fills_frame, fills_except, fill_scale), not only in a later look.
+        if let picture = AITimelineSummary.picture(clip, canvas: canvas, always: false) { result["picture"] = picture }
         for (key, value) in AIParameterReport.keyframes(args.raw, clip: clip, request: request, canvas: canvas, frameRate: state.frameRate) { result[key] = value }
         return .ok(.object(result), changed: true)
     }
