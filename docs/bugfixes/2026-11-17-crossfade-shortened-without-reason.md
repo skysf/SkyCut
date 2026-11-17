@@ -31,6 +31,8 @@ native limits and tells the AI to relay a shortening notice. The edit still foll
 - `scripts/check-video-fade.sh`: synthetic white/black clips go through the production preview and export pipelines;
   quarter-window brightness proves the full dissolve renders, and the output remains 3 s. Passed: 246 checks, zero failures,
   including the existing zero-handle, one-sided-handle and still cases.
+- `scripts/check-timeline-snap.sh`: drop-preview fixtures distinguish a cut with two 0.5 s handles (a 1 s window) from
+  a zero-handle 0.6 s shot (the existing 0.24 s fallback), and still compare the preview with its rendered mask.
 - `checks/transition-handles-wiring.sh`: both render overlap consumers use the shared geometric rule and export does not
   reintroduce the packing percentage. Restoring export's old 45% calculation made this guard exit 1; restoring the shared
   rule made it pass again.

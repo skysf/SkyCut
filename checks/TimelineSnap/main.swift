@@ -1374,17 +1374,17 @@ do {
     let preview = TimelineState.transitionDropPreview(
         atX: 48, pps: pps, mainClips: clips, kind: .pushLeft
     )
-    checkClose(preview?.duration ?? -1, 0.8, "已有转场的缝保留用户调过的秒数（这里被容量 0.8 夹住）")
+    checkClose(preview?.duration ?? -1, 1.0, "A touching drop borrows both 0.5-second handles, capping 1.2 seconds at 1.0")
     checkEqual(TimelineState.transitionDropDuration(existing: first), nil, "已有转场 → 落地不传时长")
     checkPreviewMatchesMask(clips, seam: 0, kind: .pushLeft, atX: 48, "已有转场 + 换种类")
 }
 
 // 30c. 容量夹紧：0.5s 放不下时按容量来，框跟着变窄
 do {
-    // 出场段只有 0.6s → byLength*0.4 = 0.24 → 容量 0.24。
-    //（2026-09-23 之前这里用「两头各 0.12s 余料」造容量；余料不够现在改成定格
-    // 补足，不再限制容量，只有长度说了算。）缝在 0.6s = 14.4pt。
-    let clips = [seamClip(start: 0, duration: 0.6), seamClip(start: 0.6, duration: 3)]
+    // Without spare footage, the 0.6-second outgoing shot retains its 40% fallback (0.24 seconds).
+    // Real handles can now allow a longer centred transition; this fixture deliberately has none.
+    // The cut is at 0.6 seconds = 14.4 points.
+    let clips = [seamClip(start: 0, duration: 0.6, spare: 0), seamClip(start: 0.6, duration: 3, spare: 0)]
     let preview = TimelineState.transitionDropPreview(
         atX: 14.4, pps: pps, mainClips: clips, kind: .crossFade
     )
