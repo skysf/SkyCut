@@ -94,6 +94,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditFormatVersion.swift \
   Sources/SrtFlow/VideoEditProjectFile.swift \
+  Sources/SrtFlow/LinkGroupRepair.swift \
   Sources/SrtFlow/VideoEditMediaBookmarkCache.swift \
   Sources/SrtFlow/AudioLibraryCache.swift \
   Sources/SrtFlow/AudioLibraryManifest.swift \
@@ -136,6 +137,7 @@ xcrun swiftc \
   checks/ProjectFile/ShapeAnimations.swift \
   checks/ProjectFile/ExitCurves.swift \
   checks/ProjectFile/Regions.swift \
+  checks/ProjectFile/OldFreezeTails.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # ---- 真实媒体素材（探针「文件存在 ≠ 音轨可读」那一组要用）----

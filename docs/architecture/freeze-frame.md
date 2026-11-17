@@ -114,6 +114,8 @@ recording's mic) stay where they were, so the right piece is no longer their pai
 `tail_id` note suggests) also deleted the clip and its sound, and the AI's ripple dragged the clip back onto its neighbour on V1.
 The left piece and the partners stay a pair; a freeze at the first frame cuts nothing and keeps the group (linkage then moves the
 partners along with the clip). Checks: `checks/FreezeFrame/LinkChecks.swift`, `checks/MCP/FreezeRippleChecks.swift`.
+Projects saved before the fix still carry linked tails: opening one takes them out of the group (`LinkGroupRepair`, run by
+`VideoEditProjectIO.load`; [case](../bugfixes/2026-11-17-old-freeze-tails-stay-linked.md), [project file](video-edit-project-file.md)).
 
 ## 4a. 为什么牵扯转场的主轨段不给定格
 

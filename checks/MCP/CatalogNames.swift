@@ -94,6 +94,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["source_cuts", "frame_scan", "stray_frames", "frozen_picture", "black_frame", "source_cut"])
     // set_canvas's reply (2026-11-17, AICanvasReframe): clips that covered the old frame but not the new one.
     names.insert("no_longer_fill")
+    // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
+    names.insert("waiting_for")
     // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).
     names.insert("audible_duration")
     return names

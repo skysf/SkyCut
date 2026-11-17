@@ -143,7 +143,11 @@
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
 - 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
   group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
-  `FreezeRippleChecks`, which also covers `RippleLinkPartners`).
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`); a J cut's sound that the AI's ripple or cut_to_beat pushes before 0:00
+  loses its head, stays in sync and is listed in the reply's `trimmed_heads` (`RippleHeadTrimChecks`).
+- Opening a project saved before the freeze fix takes the freeze tail out of its clip's link group: `scripts/check-project-file.sh` group 49
+  (`OldFreezeTails.swift`, a literal old project file through the production `load`, plus the rule's controls: a split left in place, a
+  nudged sound, a recording's mic, another speed all stay linked).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
@@ -372,3 +376,13 @@
     `--self-test --against <另一份守卫>` 拿老守卫跑同一批场景打表（写「改之前 / 改之后」用）。
     改成白名单那一轮（2026-11-13，PR #424）：改之前的守卫（上一版）在链接和形状两组的 147 个场景里有 83 个该红的退出 0、2 个该绿的红了（顺序那一组只对新顺序有意义，没拿它跑）；改之后当时的 190 个全对。
     整份副本上 Codex 的 9 个输入（L1–L4、T1–T3、S1–S2）改之前都退出 0、改之后都红；它报的两处误报（唯一的索引带 `#锚点`、`mkdir docs/fake.md`）改之后绿。
+- Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `scripts/check-look-jobs.sh` (shard 1, real App objects, synthetic
+  one-keyframe clips; `checks/LookJobs/`): `LineChecks.swift` — the router's lines (`AICallLines`): turns in joining order, a call in two lines
+  waits for both, a read letting go from inside its call, positions and the holder, no letting go before the turn, `waitForLast`;
+  `LookCallChecks.swift` — real 12-frame looks through `AILookCall` and get_job / cancel_job (`AIExportTools`): two sessions x two parallel looks
+  all answered with their pictures (directly or through get_job, at the production 25 s), a look behind a held edit becomes a queued job
+  (positions 1 and 2, `waiting_for`) and runs after it with its 12 frames and picture, cancelled while queued it never starts, another session
+  cannot cancel it, cancelled while running it stops at its next frame, an edit behind a look gets its turn before the look's frames are done.
+  A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
+  after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
+  license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).

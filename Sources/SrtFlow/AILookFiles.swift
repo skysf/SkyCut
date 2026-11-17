@@ -28,10 +28,13 @@ enum AILookFiles {
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "look at", args: args, project: project) {
             return ask
         }
+        // Files only: the calls behind this look in its line may go now (AICallLines).
+        AICallLines.letGo()
         var entries: [JSONValue] = []
         var frames: [AIFrameSampler.Frame] = []
         var labels: [String] = []
         for url in urls {
+            try Task.checkCancellation()
             var entry: [String: JSONValue] = ["file": .string(AIWorkspace.shared.display(url))]
             var frame: AIFrameSampler.Frame?
             if MediaFileTypes.isImage(url) {

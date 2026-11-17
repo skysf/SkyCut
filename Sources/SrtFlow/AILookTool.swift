@@ -16,6 +16,9 @@ import SrtFlowMCPKit
 // 不管什么：合成 / 抽帧 / 描述 / 拼图本身（各自的文件）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
 //
 // 只读：不改工程、不动界面（不挪播放头、不摆窗口）。点名文件夹以外的文件照「动硬盘才问」的规矩先问。
+// Each way of looking reads the project only before its first await and then lets the project's line go (AICallLines.letGo()): edits
+// and looks sent after it do not wait for its frames. shots=true keeps the line until it is done (it reads the project at its end).
+// A cancelled look (cancel_job on a look that became a job, AILookCall) stops between frames.
 
 @MainActor
 enum AILookTool {
@@ -29,6 +32,7 @@ enum AILookTool {
             throw AIToolError("count must be between 1 and \(maxFrames).")
         }
         if try args.bool("shots") == true {
+            // Keeps the project's line until it is done: AILookShots reads the project again at its end.
             return try await AILookShots.look(args, project, size: size, wantsImage: wantsImage)
         }
         if try args.bool("text_scan") == true {
@@ -63,12 +67,15 @@ enum AILookTool {
             throw AIToolError("The timeline is \(String(format: "%.2f", state.duration)) s long; \(beyond) s is past the end.")
         }
         times = times.map { min(max(0, $0), lastFrame) }
+        // Everything below reads only `state` and `times`: the calls behind this look may go now (AICallLines).
+        AICallLines.letGo()
         let frames = try await AIFrameComposer.frames(
             of: state, at: times, subtitleStyle: state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
         )
         guard !frames.isEmpty else { throw AIToolError("SkyCut could not render the timeline at those times.") }
         var described: [JSONValue] = []
         for frame in frames {
+            try Task.checkCancellation()
             var entry = await describe(frame).objectValue ?? [:]
             entry["on_screen"] = onScreen(state, at: frame.time, ids: ids)
             described.append(.object(entry))
@@ -110,6 +117,8 @@ enum AILookTool {
         if let ask = try AIWorkspace.shared.confirmReading([url], verb: "look at", args: args, project: project) {
             return ask
         }
+        // A file look does not read the timeline: the calls behind it may go now (AICallLines).
+        AICallLines.letGo()
         var frames: [AIFrameSampler.Frame]
         var realSize: JSONValue?
         if MediaFileTypes.isImage(url) {
@@ -140,7 +149,10 @@ enum AILookTool {
         // 一帧都取不出来：说为什么（hev1、这台 Mac 解不开、文件不在了）、怎么办（compress_videos 转一份）。
         guard !frames.isEmpty else { throw AIToolError(await AIUnreadableVideo.reason(for: url)) }
         var described: [JSONValue] = []
-        for frame in frames { described.append(await describe(frame)) }
+        for frame in frames {
+            try Task.checkCancellation()
+            described.append(await describe(frame))
+        }
         var payload: [String: JSONValue] = [
             "looked_at": .string(AIWorkspace.shared.display(url)),
             "frames": .array(described)
