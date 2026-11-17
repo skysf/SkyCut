@@ -545,6 +545,8 @@ source checks/sky-studio-wiring/voice-change.sh
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
 grep -qF 'SkyStudioGenerationName.stem(' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift || fail "图片操作未按源图起名"
 grep -qF 'detail.merge(localImage.dimensions)' Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift || fail "图片实际尺寸未进入最终 get_job 结果"
+grep -qF 'payload.merge(SkyStudioGenerationDuration.fields(for: generation, result: remoteResult))' "${GEN_RUN}" || fail "Generated duration comparison must reach the terminal get_job result"
+grep -qF 'detail.merge(SkyStudioGenerationDuration.fields(for: generation, result: server.result))' "${GEN_RUN}" || fail "Refreshing the original generation must refresh requested and result durations"
 grep -qF 'completionMessage(resuming: plan == nil, previousStatus: job.status.rawValue)' "${CHAR_RUN}" || fail "角色完成后刷新未区分正常完成与原单恢复"
 grep -qF 'completionMessage(resuming: plan == nil)' "${CHAR_RUN}" || fail "角色首次完成未按实际恢复来源选文案"
 

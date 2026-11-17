@@ -25,11 +25,16 @@ enum MCPGuideBatchTopics {
             entry first. One project per batch.
             """),
             MCPGuideSection(name: "results", about: "final states and the undo step", text: """
-            Results. The whole batch is one undo step, and the result lists each clip's final state in order.
+            Results. The whole batch is one undo step. For large batches pass compact=true: clips contains the processed ids in \
+            input order (including repeats), with count and notices only for adjustments or findings that need attention. \
+            Adjustments retain requested/applied values and reasons; source cut warnings, framing findings, keyframe and \
+            replacement notes, actual destination tracks and replacement windows remain visible. linkage and magnet stay at \
+            the batch level. No notices means the requested fields took effect without such exceptions; it does not mean \
+            every entry changed. Read get_timeline for full final states. Omit compact or pass false for the original detailed reply.
             """)
         ],
         examples: [
-            ["clips": [["clip_id": "c1", "volume_db": -6], ["clip_id": "c2", "fit": "fill"]]]
+            ["compact": true, "clips": [["clip_id": "c1", "volume_db": -6], ["clip_id": "c2", "fit": "fill"]]]
         ],
         related: ["edit_clip", "get_timeline"]
     )

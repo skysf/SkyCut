@@ -47,6 +47,8 @@ require(commit, 'AIUndoGrouping.step(undo) { perform(next) }', '同步提交只�
 require(tools, 'project.isCurrentGeneration(plan.generation)', '异步批量准备后必须核对工程代号')
 require(tools, 'project.linkageEnabled == plan.linkage', '异步批量准备后必须核对联动开关')
 require(tools, 'AIClipTools.plan(item, project, state: plan.batch.edit.next)', '批量片段复用单项准备，按候选时间线算轨道和取景')
+require(tools, 'AIClipBatchReply.compact(results, requests: plan.batch.entries.map { $0.plan.requestedParameters })',
+        'compact replies must project final summaries without dropping per-entry exceptions')
 require(plans, 'plan.applying(to: edit.next', '批量片段复用单项的候选计算')
 require(clip, 'plan.applying(', '单项片段也必须走共同的候选计算')
 for name in ['text', 'shape']:

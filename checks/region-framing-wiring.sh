@@ -25,7 +25,7 @@ require("ClipCrop(keeping: kept)" in region, "精确区域必须用原生裁切"
 require(not any(name in region for name in ("ShapeAnnotation(", "perform(", "registerUndo", "FFmpegProcess", "CIFilter(")), "不得另造遮挡或渲染 / 提交机制")
 require("self.leading = leading" in crop and "self.trailing = trailing" in crop, "解码要保留扩展裁切值")
 require("exact=1" in export and 'steps.append("format=rgba")' in export, "奇数像素裁切必须精确，并在裁前处理色度采样")
-require("static let latestFormatVersion = 35" in read("Sources/SrtFlow/VideoEditProjectFile.swift"), "project v35 retains v33 extended-crop protection")
+require("static let latestFormatVersion = 36" in read("Sources/SrtFlow/VideoEditProjectFile.swift"), "project v36 retains v33 extended-crop protection")
 require("requiresFormatVersion33" in read("Sources/SrtFlow/VideoEditFormatVersion.swift"), "格式语义需要登记")
 fixture = read("checks/RegionFraming/Fixture.swift")
 for call in ("AIClipTools.plan(", "AIClipTools.apply(", "AILookTool.look(", "VideoEditCompositionBuilder.build(", "VideoEditExportGraph.plan(", "FFmpegProcess().run("):

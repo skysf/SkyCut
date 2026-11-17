@@ -193,13 +193,14 @@ public enum MCPTimelineTools {
             return MCPToolDefinition(
                 .setCanvas, title: "Canvas",
                 description: """
-                Set the output frame shape and/or frame rate: 9:16 for TikTok, Reels and Shorts, 16:9 for YouTube, auto follows the \
+                Set the output frame shape, frame rate or minimum duration: 9:16 for TikTok, Reels and Shorts, 16:9 for YouTube, auto follows the \
                 first V1 clip. Clips keep their layout: to fill a new shape, use edit_clips fit=fill. fps cannot change while the \
                 screen is recording. One undo step.
                 """,
                 input: MCPSchema.object([
                     "ratio": MCPSchema.string("Frame shape.", oneOf: MCPVocabulary.canvasRatios),
-                    "fps": MCPSchema.integer("Frames per second: 24, 30 or 60.", minimum: 24, maximum: 60)
+                    "fps": MCPSchema.integer("Frames per second: 24, 30 or 60.", minimum: 24, maximum: 60),
+                    "duration": MCPSchema.number("Minimum timeline seconds; 0 clears. Retains a black ending without placeholders.", minimum: 0)
                 ])
             )
         default:

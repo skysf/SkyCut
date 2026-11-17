@@ -87,6 +87,7 @@ import SrtFlowMCPKit
             require(f.project.state == f.before && !f.project.effectiveUndoManager!.canUndo, "one undo restores entire batch")
             print("PASS: shared single / batch limits and actual gain/fade feedback")
 
+            try await EditingFeedbackChecks.run(f, root: root, ffmpeg: ffmpeg, require: require)
             try await BlackBarAppChecks.run(f, root: root, ffmpeg: ffmpeg, require: require)
             print("CHECKED: black-bar measurement, requested source window and complete removal")
 

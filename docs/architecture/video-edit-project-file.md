@@ -104,6 +104,7 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v33 | `EditClip.crop` 的有效精确源矩形允许单边超过 45%，并保留低于旧空裁切容差的源像素边界（2026-11-02；沿用原四个键） | 只认 v32 的旧版会夹回 45% 或吞掉微小边界，露出区域外内容，自动保存即改坏。新版保留合法四边原值；读旧工程时将当年被忽略的微小裁切迁移为无裁切，保住旧成片。检查器只改一边不夹坏其它边。见 [预览自由变换](preview-free-transform.md)「MCP 的源矩形取景」 |
 | v34 | `TimelineState.production`：公开故事 / 镜头图、世界状态与完成历史、输出 / 原生帧锚点、观察证据及声音 cue（2026-11-04，按需写入） | 旧版会在自动保存时抹掉制作计划与待复查记录；新版缺键默认 nil，故事板本身也算非空工程。只存公开值，不存 pin、凭据、私有配方或来源。见 [官方原创短片](official-film.md) |
 | v35 | `TimelineState.deliveryIntentions` and `EditClip.isScreenRecording` (2026-11-17, omitted when empty/false) | Older writers would discard human review reasons and native screen-capture provenance. See [finished video inspection](finished-video-inspection.md). |
+| v36 | `TimelineState.minimumDuration` (2026-11-17, omitted when zero) | Older writers would discard an explicit ending and shorten the film. Missing keys retain the old content-driven length. |
 
 > 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
 > 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存
@@ -135,6 +136,30 @@ empty and decoded as an empty array in older projects. `EditClip.isScreenRecordi
 provenance, omitted when false and decoded as false when missing. Older writers would discard these values,
 so the reader/writer version is v35. Inspection itself does not save; explicit mark/clear requests use normal
 project undo and autosave. Matching and report behavior are in [finished video inspection](finished-video-inspection.md).
+
+### Explicit project ending (v36, 2026-11-17)
+
+`TimelineState.minimumDuration` retains an absolute project ending without a placeholder clip. `TimelineDuration` computes the
+content end with the existing rules (all video/audio items, texts and ordinary shapes; covers and grades do not extend it), then
+`duration` is the greater of that end and the explicit minimum. New content may extend beyond the minimum. Zero clears it;
+missing keys decode as zero and invalid negative/nonfinite values normalize to zero. Zero is omitted when saving.
+
+`set_canvas duration=141` sets the minimum as part of the ordinary undo transaction; all fields validate before any write. A
+positive request must cover the current content and at least one project frame. It never trims content. `get_timeline` reports
+the active `minimum_duration` beside `duration`, so a retained tail can be identified and cleared. Versions and undo preserve it.
+Selected-only exports and isolated prerender timelines start from a new state and exclude the project-wide ending.
+
+The existing preview black-base and export black-segment paths fill the tail to `state.duration`; audio config and the playback
+clock receive the same end. An otherwise empty project with a positive ending can export black video. Audio-only routing remains
+audio-only, including its existing refusal of entirely muted content. A tiny manually authored ending still creates an export
+segment instead of indexing an empty segment list. No user clips or rendering frame-grid rules are changed.
+
+Regression: `scripts/check-project-file.sh` exercises defaults, optional encoding, version protection, round-trip, clearing and
+selected-export isolation. `scripts/check-parameter-limits.sh` exercises the actual tool, one undo/redo, atomic rejection,
+audio/preview/version data flow, and real preview/export black frames and duration, including black-only output.
+
+- [ ] Before a release, retain a black ending from the editor's AI connection, scrub to the end, export, undo/redo, save and
+  reopen. The displayed/project length and the export agree, with no placeholder block on the timeline.
 
 ### Opening a project repairs link groups (2026-11-17)
 

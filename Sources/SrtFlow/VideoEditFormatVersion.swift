@@ -470,5 +470,7 @@ extension TimelineState {
     }
     /// Review reasons and screen-recording provenance must survive saving in a newer reader.
     var requiresFormatVersion35: Bool { !deliveryIntentions.isEmpty || allClips.contains(where: \.isScreenRecording) }
+    /// v36 preserves an explicit black ending; older writers would silently shorten the finished film.
+    var requiresFormatVersion36: Bool { minimumDuration > 0 }
 
 }

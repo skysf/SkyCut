@@ -6,11 +6,45 @@ import SrtFlowMCPKit
 
 func runBatchEditChecks() {
     batchCatalogChecks()
+    batchCompactReplyChecks()
     batchTextChecks()
     batchShapeChecks()
     batchClipChecks()
     batchCommitChecks()
     batchForwardingChecks()
+}
+
+private func batchCompactReplyChecks() {
+    let ordinary: JSONValue = ["id": "c1", "name": "source.mp4", "picture": ["fills_frame": true],
+                               "requested": ["opacity": 0.5], "applied": ["opacity": 0.5], "adjustments": []]
+    let compact = AIClipBatchReply.compact(Array(repeating: ordinary, count: 76), requests: Array(repeating: ["opacity": 0.5], count: 76))
+    checkEqual(compact["clips"]?.arrayValue?.count, 76, "compact results retain every processed id, including repeats")
+    check(compact["notices"] == nil && JSONValue.object(compact).encodedString().utf16.count < 2_000,
+          "ordinary 76-entry compact replies omit repeated picture and transform details")
+    let adjustment: JSONValue = ["parameter": "opacity", "requested": 2, "applied": 1, "reason": "opacity_limits"]
+    let detailed: JSONValue = ["id": "c2", "adjustments": [adjustment], "source_cuts": [["frame": 20]],
+                               "source_cuts_unchecked": ["source.mp4"], "more_source_cuts": 2,
+                               "keyframes_note": "kept frames", "picture_note": "new aspect", "warning": "source bars",
+                               "black_bars": "could not tell", "subject": ["kind": "text", "note": "text outside", "text_cut": 0.1],
+                               "framing": ["region": [0, 0, 1, 1]], "track": "A2", "source_in": 3, "source_out": 4,
+                               "start": 5, "end": 6, "file": "replacement.wav"]
+    let request: JSONValue = ["file": "replacement.wav", "track": "new_audio", "region": ["x": 0, "y": 0, "width": 1, "height": 1]]
+    let fields = AIClipBatchReply.compact([ordinary, detailed], requests: [[:], request])
+    let notice = fields["notices"]?.arrayValue?.first
+    check(notice?["id"] == "c2" && notice?["index"] == 1, "a compact exception identifies the entry and id")
+    for key in ["adjustments", "source_cuts", "source_cuts_unchecked", "more_source_cuts", "keyframes_note", "picture_note", "warning",
+                "black_bars", "subject", "framing", "track", "source_in", "source_out", "start", "end", "file"] {
+        checkEqual(notice?[key], detailed[key], "compact results preserve \(key)")
+    }
+    let uncovered: JSONValue = ["id": "c3", "picture": ["fills_frame": false, "fill_scale": 1.5, "fills_except": [[1, 2]], "transform": ["rotation": 45]]]
+    let fill = AIClipBatchReply.compact([uncovered], requests: [["fit": "Fill"]])["notices"]?.arrayValue?.first?["picture"]
+    check(fill?["fills_frame"] == false && fill?["fill_scale"] == 1.5 && fill?["fills_except"] == [[1, 2]],
+          "a requested fill that still exposes corners retains its final coverage warning")
+    check(fill?["transform"] == nil, "a compact coverage warning omits the full transform")
+    checkEqual(MCPArgumentCheck.problem(tool: .editClips, arguments: ["compact": true, "clips": [["clip_id": "c1", "opacity": 0.5]]]), nil,
+               "compact is an outer edit_clips parameter")
+    check(MCPArgumentCheck.problem(tool: .editClips, arguments: ["clips": [["clip_id": "c1", "compact": true]]]) != nil,
+          "compact inside an item is not silently accepted")
 }
 
 private func batchCatalogChecks() {

@@ -49,6 +49,7 @@ enum AITimelineSummary {
         ]
         // 工程文件叫什么（几个会话 / 工程时一眼看出是哪一个）；`project` 留给短 id（p2，路由加）。
         result["project_name"] = .string(context.project ?? "unsaved")
+        if state.minimumDuration > 0 { result["minimum_duration"] = .number(state.minimumDuration) }
         if abs(state.masterVolume - 1) > 0.0001 { result["master_volume_db"] = AITrackSettings.decibels(state.masterVolume) }
         if !state.shapes.isEmpty { result["shapes"] = .array(state.shapes.map { AIShapeChange.summary($0, ids: context.ids) }) }
         if !context.selection.isEmpty {

@@ -294,7 +294,7 @@ final class AIToolRouter {
         case .setText: return try AIOverlayTools.setText(args, project)
         case .setShape: return try AIOverlayTools.setShape(args, project)
         case .setFilter: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setFilter(args, project) }
-        case .setCanvas: return try AIUndoGrouping.step(undo) { try AIOverlayTools.setCanvas(args, project) }
+        case .setCanvas: return try AIOverlayTools.setCanvas(args, project)
         case .generateSubtitles: return try await AISubtitleTools.generate(args, project)
         case .translateSubtitles: return try await AISubtitleTools.translate(args, project)
         case .getSubtitles: return try AISubtitleTools.read(args, project)

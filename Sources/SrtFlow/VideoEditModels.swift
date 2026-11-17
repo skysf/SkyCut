@@ -349,25 +349,17 @@ struct TimelineState: Hashable, Sendable {
     var production: FilmProductionState?
     /// Reviewed delivery findings, preserved with the project and undo history.
     var deliveryIntentions: [DeliveryIntentionalMark] = []
+    /// Explicit project ending, in timeline seconds. Zero follows the content; later content can extend beyond it.
+    var minimumDuration = 0.0
 
     var isEmpty: Bool {
         mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty)
             && audioTracks.allSatisfy(\.clips.isEmpty) && subtitle == nil && shapes.isEmpty
-            && textOverlays.isEmpty && filters.isEmpty && production == nil
+            && textOverlays.isEmpty && filters.isEmpty && production == nil && minimumDuration == 0
     }
 
-    /// 整条时间线的长度：所有轨里最晚结束的那一刻。
-    var duration: Double {
-        var end = mainClips.map(\.timelineEnd).max() ?? 0
-        for lane in overlayTracks { end = max(end, lane.clips.map(\.timelineEnd).max() ?? 0) }
-        for lane in audioTracks { end = max(end, lane.clips.map(\.timelineEnd).max() ?? 0) }
-        for shape in shapes where !shape.kind.isCover { end = max(end, shape.timelineEnd) }  // 盖一块不算总长（同滤镜段）
-        for text in textOverlays { end = max(end, text.timelineEnd) }
-        // **滤镜段不算**（产品口径，2026-09-21 拍板）：形状和文字自己就是画面，
-        // 拖到末尾之后理应把成片拉长；滤镜只是调色，染一段空白没有意义，
-        // 把工程撑长反而会凭空多出一截黑场。
-        return end
-    }
+    /// Content end, extended by the explicit ending when one is set.
+    var duration: Double { TimelineDuration.end(self) }
 
     mutating func updateShape(_ id: UUID, _ change: (inout ShapeAnnotation) -> Void) {
         guard let index = shapes.firstIndex(where: { $0.id == id }) else { return }
@@ -684,6 +676,7 @@ extension EditClip: Codable {
 
 extension TimelineState: Codable {
     private enum CodingKeys: String, CodingKey {
+        case minimumDuration
         case mainClips, mainHidden, overlayTracks, audioTracks
         case mainVolume, masterVolume
         case production, deliveryIntentions
@@ -695,6 +688,7 @@ extension TimelineState: Codable {
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init()
+        minimumDuration = TimelineDuration.sanitized(try c.decodeIfPresent(Double.self, forKey: .minimumDuration) ?? 0)
         production = try c.decodeIfPresent(FilmProductionState.self, forKey: .production)
         deliveryIntentions = try c.decodeIfPresent([DeliveryIntentionalMark].self, forKey: .deliveryIntentions) ?? []
         mainClips = try c.decodeIfPresent([EditClip].self, forKey: .mainClips) ?? []
@@ -729,6 +723,7 @@ extension TimelineState: Codable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encodeIfPresent(production, forKey: .production)
+        if minimumDuration > 0 { try c.encode(minimumDuration, forKey: .minimumDuration) }
         if !deliveryIntentions.isEmpty { try c.encode(deliveryIntentions, forKey: .deliveryIntentions) }
         try c.encode(mainClips, forKey: .mainClips)
         try c.encode(mainHidden, forKey: .mainHidden)
