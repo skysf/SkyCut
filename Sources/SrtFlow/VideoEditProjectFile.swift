@@ -226,15 +226,26 @@ enum VideoEditProjectIO {
             MediaRecord(url: $0, projectDirectory: directory, previous: knownRecords[$0.path])
         }
         let file = VideoEditProjectFile(timeline: timeline, media: media, rowHeights: rowHeights)
+        let data = try makeEncoder().encode(file)
+        // 原子写：中途崩了也不会把上一份好工程截断成半截。
+        try data.write(to: url, options: .atomic)
+        return Dictionary(media.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+    }
 
+    /// How a project file is written and read. Saving, loading and the saved versions' "changed since the last version"
+    /// comparison (ProjectVersionFiles.canonical) all use these two, so the comparison sees exactly what a file keeps.
+    nonisolated static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         // 存得可读：工程文件进了 git 或者要人肉看一眼时有用，几十 KB 不心疼。
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
-        let data = try encoder.encode(file)
-        // 原子写：中途崩了也不会把上一份好工程截断成半截。
-        try data.write(to: url, options: .atomic)
-        return Dictionary(media.map { ($0.path, $0) }, uniquingKeysWith: { a, _ in a })
+        return encoder
+    }
+
+    nonisolated static func makeDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }
 
     // MARK: 读
@@ -247,11 +258,9 @@ enum VideoEditProjectIO {
 
     nonisolated static func load(from url: URL) throws -> LoadResult {
         let data = try Data(contentsOf: url)
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
         let file: VideoEditProjectFile
         do {
-            file = try decoder.decode(VideoEditProjectFile.self, from: data)
+            file = try makeDecoder().decode(VideoEditProjectFile.self, from: data)
         } catch {
             throw IOError(message: String(
                 format: L10n("“%@” isn’t a SkyCut project file."),
