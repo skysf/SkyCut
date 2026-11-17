@@ -35,6 +35,7 @@
 - [2026-09-24 改得勤就隔一会儿卡一下：自动保存重建书签](2026-09-24-autosave-rebuilds-bookmarks-every-save.md) — 书签按「路径 + inode + 卷」缓存，同名换文件才重建。
 - [2026-09-27 批量转换字幕把同名文件悄悄盖掉](2026-09-27-batch-convert-overwrites-existing-files.md) — 写用户文件夹默认不覆盖：先问，或加编号（`ExportFileName.unoccupied`）。
 - [2026-09-29 listen 说 63.5 BPM，cut_to_beat 按 95.3 切](2026-09-29-beat-analysis-window-differs-between-listen-and-cut-to-beat.md) — 同一个量两个工具各算一份迟早两个答案：落在前 15 分钟里的请求共用一份整段分析（到结尾或 15 分钟）；更晚的按自己的区间，也封顶 15 分钟。
+- [2026-11-17 Black-bar removal disagreed with look and left thin edges](2026-11-17-black-bar-removal-keeps-residual-edges.md) — Measure the requested source window at one shared resolution and include the resampled boundary in the corrective crop.
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
 - [2026-10-01 烧录页默认宽度下字幕列被裁](2026-10-01-burn-in-subtitle-column-clipped-at-default-width.md) — `HSplitView` 最后一栏的 ideal 要放得进；截图按用户默认的窗口大小拍。
 - [2026-10-29 提交返回的瞬间取消，丢了任务号](2026-10-29-cancelled-submit-loses-job-id.md) — 付费提交的身份先交给调用方，然后才能抛停止。
@@ -56,6 +57,7 @@
 - [2026-10-15 删除确认码被拒不说原因](2026-10-15-confirmation-token-refused-without-reason.md) — 凭据被拒要说原因；同一个问题等答复时回同一张码。
 - [2026-09-27 拼图函数叫 `sheet(`，被 sheet 语言守卫误判](2026-09-27-contact-sheet-name-trips-sheet-guard.md) — 按名字扫的守卫，名字就是接口：别给函数取 SwiftUI 修饰器的名字。
 - [2026-10-17 冒烟拷工程把整个「下载」拷走、写满磁盘](2026-10-17-copy-project-copied-all-of-downloads.md) — 整夹拷之前先看来源是什么文件夹；测试工具也要设防。
+- [2026-11-17 A valid crossfade was shortened without an explanation](2026-11-17-crossfade-shortened-without-reason.md) — Let sufficient handles support a longer centred dissolve and report the native maximum and reason whenever it is shortened.
 - [2026-08-12 双击字幕的浮层弹在很偏左](2026-08-12-cue-popover-anchored-at-row-origin.md) — `.offset` 只改渲染不改布局框；验位置的样本别挑在原点附近。
 - [2026-09-23 滤镜卡片、音频库素材拖不进时间线（类型没声明）](2026-09-23-custom-drag-types-not-declared.md) — 自定义拖放类型必须在 Info.plist 声明。
 - [2026-10-18 listen cuts=true 说可以不改，cut_speech 却说切在字上](2026-10-18-cut-check-disagrees-with-cut-speech.md) — 检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定（`AISpeechHearing`）。

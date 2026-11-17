@@ -38,6 +38,8 @@ func catalogKnownNames() -> Set<String> {
     // Saved versions (2026-11-17, the undo topic's versions section): the round's first change returns before_round_version,
     // undo version= returns saved_before_going_back (AIRoundVersions).
     names.formUnion(["before_round_version", "saved_before_going_back"])
+    // set_transition explains shortened picture transitions with the native ceiling (MCP-6).
+    names.formUnion(["max_duration", "shortened_from", "shortened_reason"])
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
