@@ -90,6 +90,22 @@ enum MCPGuideSpeechTopics {
             To pull a mix down, lower the master with set_track. frames=true adds per-frame values for a few seconds: the more \
             layers, the fewer frames, and a longer range is refused with a to that fits. A long timeline may return job_id: wait \
             with get_job.
+            """),
+            // Since 2026-11-17 (MCP-39; docs/architecture/listening-engine.md section 2, ai-control-mcp.md section 4 item 13).
+            MCPGuideSection(name: "voice", about: "voice=: is each narration line covered, by what, and how much", text: """
+            Voice. voice checks narration against the mix: name the voice track (voice=A1; several joined by +) or voice=auto (the \
+            audio tracks holding SkyCut's voice-overs). A voice inside a clip's own sound (V1, V2: on-camera speech) can't be \
+            measured and is refused. Each voice clip is cut into lines at its pauses; each line gets estoi (0–1: how much of it \
+            survives in the whole mix), a verdict, maskers (the two layers covering it most, with kind music, effects, clip_sound, \
+            voice or other, and how much removing it or lowering it 6 dB would add) and low_150_db next to voice_db (ESTOI can't \
+            hear below ~134 Hz: compare them yourself). Verdicts: probably_unintelligible below 0.31, may_be_hard 0.31–0.41 \
+            (listen to it); when music covers it most, only below 0.20; two_voices when another voice track speaks in the line; \
+            too_short. A separate grey hint says "clear, but [layer] may be loud — try 3–6 dB lower" only for a clear line with \
+            estoi < 0.50 whose main masker is one added music, ambience or effects layer (never clip_sound, a voice or rest) and \
+            removing it adds at least 0.25; summary.may_be_loud counts these hints. Report only: nothing blocks, and the lines \
+            come from one listener, so treat them as where to listen. To fix \
+            a line, lower the masker it names (set_track, edit_clip volume_db or a volume curve) and check again. from and to \
+            narrow it; a long timeline may return job_id.
             """)
         ],
         examples: [
@@ -97,7 +113,8 @@ enum MCPGuideSpeechTopics {
             ["cuts": true],
             ["clip_id": "m1", "beats": true],
             ["mix": true, "from": 70, "to": 76],
-            ["mix": true, "layers": ["A1", "rest"], "frames": true, "from": 29, "to": 31]
+            ["mix": true, "layers": ["A1", "rest"], "frames": true, "from": 29, "to": 31],
+            ["voice": "A1"]
         ],
         related: ["transcribe", "cut_speech", "cut_to_beat", "inspect_video"]
     )

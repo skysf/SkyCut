@@ -23,6 +23,7 @@ runDFTChecks()
 runESTOIChecks()
 runMaskerChecks()
 runTraitChecks()
+runVoiceChecks()
 runParityChecks()
 print("和 Python 版最大的相对差：\(largestParityGap)（容差 \(ListeningParity.tolerance)）")
 if failures > 0 {

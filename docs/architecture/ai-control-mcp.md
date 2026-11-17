@@ -393,6 +393,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      建议最后一帧的帧头。**长任务**：`AIJobs` 的 `listen` 任务（第 59 条）、`AIWorkQueue` 的 `mix` 道（一次一个），离线渲在 `MediaReadQueue.export` 上；
      当场最多等 20 秒（62 秒、8 层约 1 秒，3 分钟约 3 秒），等不到回任务号，`get_job` 拿同一份结果。只读：不改工程、不进撤销、不碰预览的引擎。
      名片 + 说明书 `listen` 主题的 `mix` 一节。量法在 `scripts/check-mix-layers.sh` 真跑，接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节。
+   - **Is each narration line covered? (`voice=…`, 2026-11-17, MCP-39)**: `voice=A1` (several joined by +, or `auto` = the audio tracks
+     holding SkyCut's voice-overs) measures every line of that voice against the mix: ESTOI, the verdict in the user's tiers
+     (`VoiceClarity`: `probably_unintelligible` < 0.31, `may_be_hard` 0.31–0.41, music only < 0.20, `two_voices`, `too_short`), the two
+     layers covering it most with what they are from where they came, and the 20–150 Hz level next to the voice's. A video track's sound
+     is refused with the reason (a voice inside a clip's own sound can't be taken out). A separate grey `hint` may suggest
+     lowering one added main masker 3–6 dB: only a `clear` line below 0.50 whose removal gain is at least 0.25; clip sound,
+     detached camera audio, other voices and `rest` are excluded. `summary.may_be_loud` counts hints separately. Report only. Same job shape as mix=true
+     (`AIListenMix.queued`). Contract in [the listening engine](listening-engine.md) section 2 item 3a; the guide's listen topic has a
+     `voice` section; one parameter and a few words on the card.
      Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened
      and the wording moved into the listen guide topic; the catalog is no longer than before mix=true (99,059 vs 99,063 on 2026-11-16).
 
