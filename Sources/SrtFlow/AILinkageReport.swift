@@ -8,6 +8,8 @@ import SrtFlowMCPKit
 // 字幕另报三样（规矩 12，2026-10-15）：底下有画面被剪掉、收短了的（字里可能还留着剪掉的词，`shortened_subtitles`），
 // 说的话被删掉 / 裁掉、跟着没了的有几句（`deleted_subtitles`：只报 deleted 一个数 AI 会以为删了段），
 // 和底下的段整个没了又不是真删所以留在原地的（`left_subtitles`，少见）—— 人在时间线上一眼看得见，AI 只能从这里知道。
+// Clips moved before 0:00 with their picture lost their head to stay in sync (`trimmed_heads`, 2026-11-17): a J cut's lead-in is
+// shorter afterwards, which the AI cannot see.
 // 什么都没动就不带（开关关着、或者这次没碰主轨的画面）。
 // 不管什么：联动本身（`TimelineLinkage`）、开关（`get_timeline` 的 `linkage` 字段报着）。
 
@@ -30,6 +32,13 @@ enum AILinkageReport {
         if !report.leftCues.isEmpty {
             entry["left_subtitles"] = list(report.leftCues, ids)
             notes.append("Left subtitles sat on picture that is gone without a delete, so they stayed where they were: delete them with delete_items if they no longer belong.")
+        }
+        if !report.trimmedHeads.isEmpty {
+            // Pushed before 0:00 with their picture (a J cut's lead-in): trimmed to stay in sync, not clamped (LinkageHeadTrims).
+            entry["trimmed_heads"] = .array(report.trimmedHeads.map { (id: ids.short($0.key), seconds: $0.value) }
+                .sorted { $0.id < $1.id }
+                .map { .object(["id": .string($0.id), "seconds": AIFormat.seconds($0.seconds)]) })
+            notes.append("Clips in trimmed_heads were moved before 0:00 with the V1 clip they belong to: their first seconds were cut so they stay in sync with it (a J cut's lead-in is shorter now).")
         }
         entry["note"] = .string(notes.joined(separator: " "))
         return .object(entry)
