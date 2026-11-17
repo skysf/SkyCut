@@ -245,6 +245,10 @@ checkAlphaStills()
 
 await checkSharedFrameStills()
 
+// MARK: - Old every-frame stills in the cache are rewritten to one frame, nothing else is touched (CacheSweep.swift)
+
+await checkStillCacheSweep()
+
 print("\(checks - failures)/\(checks) 通过")
 if failures > 0 {
     print("❌ \(failures) 项失败")

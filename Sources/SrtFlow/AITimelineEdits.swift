@@ -69,6 +69,8 @@ enum AITimelineEdits {
 
     /// V1 上从 `time` 起（含）的片段整体挪 `delta` 秒；链接开着时链接伙伴跟着挪。
     /// Partners come along only when none of their group's V1 pictures stays behind (`RippleLinkPartners`).
+    /// A clip pushed before 0:00 loses its head instead of being clamped (`moveForLinkage`, linkage rule 13): clamped, a J cut's
+    /// sound ran late by its lead-in (docs/bugfixes/2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md).
     static func shiftMain(
         from time: Double, by delta: Double, excluding: Set<UUID>, linkage: Bool, in state: inout TimelineState
     ) {
@@ -79,7 +81,7 @@ enum AITimelineEdits {
         var ids = Set(movers)
         if linkage { ids.formUnion(RippleLinkPartners.following(movers, excluding: excluding, in: state)) }
         ids.subtract(excluding)
-        for id in ids { state.update(id) { $0.timelineStart = max(0, $0.timelineStart + delta) } }
+        for id in ids { state.update(id) { $0.moveForLinkage(to: $0.timelineStart + delta) } }
         sortLanes(&state)
     }
 

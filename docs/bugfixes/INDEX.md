@@ -15,6 +15,7 @@
 - [2026-09-27 AI 的改动撤一步，整条时间线空了](2026-09-27-ai-edits-share-one-undo-group.md) — 「按事件分组」只对用户事件成立：每个改动工具包一层 `AIUndoGrouping.step`，别去关自动开的组。
 - [2026-10-18 侧边栏那一行看不到百分比、排队也写「导出中」](2026-10-18-ai-projects-sidebar-row-status.md) — 窄栏里给长短不定的字整行；「有任务」不等于「在做」。
 - [2026-10-18 侧边栏「AI 在剪的工程」只有标题、没有行](2026-10-18-ai-projects-sidebar-rows-never-shown.md) — List 里 body 带 `Section` 的视图不许套 `.equatable()`。
+- [2026-11-17 An AI ripple clamps a J cut's sound at 0:00, so it runs late by its lead-in](2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md) — A clip with source time is never clamped at 0:00: whatever moves clips in bulk trims the head (`moveForLinkage`), and the reply says so.
 - [2026-10-14 AI 以为成片是 720p](2026-10-14-ai-thinks-export-is-720p.md) — AI 会拿手边任何数字当答案：该说的事实在产出它的工具结果里说。
 - [2026-09-29 转写认不出语言，AI 被叫去「面板里选」](2026-09-29-ai-told-to-pick-language-in-panel.md) — 给界面写的报错不能原样交给 AI；要按种类换说法，错误就得有类型。
 - [2026-11-07 真积分验收后的五处 AI 工具结果](2026-11-07-ai-tool-results-after-character-smoke.md) — 列表回有界的摘要；终态清掉旧阶段；落盘图片报实测尺寸。
@@ -37,6 +38,8 @@
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
 - [2026-10-01 烧录页默认宽度下字幕列被裁](2026-10-01-burn-in-subtitle-column-clipped-at-default-width.md) — `HSplitView` 最后一栏的 ideal 要放得进；截图按用户默认的窗口大小拍。
 - [2026-10-29 提交返回的瞬间取消，丢了任务号](2026-10-29-cancelled-submit-loses-job-id.md) — 付费提交的身份先交给调用方，然后才能抛停止。
+- [2026-11-17 Changing the canvas stretches rectangles and resizes texts and shapes out of proportion](2026-11-17-canvas-change-resizes-texts-and-shapes.md) — A length stored against one edge of the frame needs a rule for a new shape: one factor for all of an item's lengths, one that a switch back undoes.
+- [2026-11-17 Changing the canvas silently stretches clips framed for the old shape](2026-11-17-canvas-change-stretches-framed-clips.md) — Values stored relative to the canvas need a rule for when it changes: keep x, y and scale, never re-crop, and tell the AI.
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
 - [2026-10-03 一条扫描被 bash 3.2 花括号展开拆开，从没生效](2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md) — 守卫里先把命令替换赋给变量再比；反向验证用 `/bin/bash`。
 - [2026-09-18 自检脚本的源文件清单漏掉新依赖](2026-09-18-check-script-source-list-drift.md) — 手抄的清单会漂。
@@ -112,6 +115,7 @@
 - [2026-11-04 取消 listen 时跨线程拆掉正在读的 reader](2026-11-04-listen-reader-cancel-during-copy.md) — 原生 copy 和取消不能并发，取消只在读取体那一处收。
 - [2026-11-03 本地构建后缀进了版本头，模型目录被拒](2026-11-03-local-version-header.md) — 版本头只在共享的请求边界规范化。
 - [2026-11-10 一句拆两批，两种采样率接不起来](2026-11-10-long-line-halves-with-different-sample-rates.md) — 拼接前换成同一个采样率；假协议要按模型回不一样的格式。
+- [2026-11-17 look silently took minutes, the calls behind it were dropped and its result lost](2026-11-17-look-hangs-and-dropped-calls.md) — A read lets its line go once it has read the project; work that can outlast the helper's 120 s answers with a job id first.
 - [2026-10-14 AI 用 look 看转场和成片对不上](2026-10-14-look-transitions-differ-from-export.md) — 写下的「做不到」要么去做、要么在用到的地方说出来；压黑 / 闪白在两侧盖满且不透明时照 xfade 的公式算，否则仍是半程近似。
 - [2026-11-06 台数满了却引导再买 Pro](2026-11-06-machine-limit-purchase-guidance.md) — 台数的原因优先：只给管理 Mac / 客服，不给购买入口。
 - [2026-10-02 磁吸开着时改一条音量曲线就合上 V1 的缝](2026-10-02-magnet-closes-v1-gaps-on-any-edit.md) — 会改工程内容的开关是工程的属性；一次编辑只许改它碰到的东西。
@@ -139,6 +143,7 @@
 - [2026-11-04 官方生成把确认问题缓存成已完成](2026-11-04-official-confirmation-cached-as-completion.md) — 只缓存有真实任务号的启动结果；确认解除后重新过闸。
 - [2026-11-04 官方镜头等到名额后仍用旧提交条件](2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 之前重新核对账户 / 工程 / 文件 / 有效期。
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
+- [2026-11-17 Projects saved before the freeze fix still delete the clip with its freeze tail](2026-11-17-old-freeze-tails-stay-linked.md) — Fixing how data is made leaves the data already made: repair old files on open; pieces of one clip in one link group play in step.
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
 - [2026-11-17 Exported text and shape animations repeat a frame now and then](2026-11-17-overlay-export-repeats-a-frame.md) — Count overlay frames as frame numbers (`FrameGrid`), never floor time × fps; nothing ffmpeg matches to an output frame may sit exactly on the grid.
@@ -205,6 +210,7 @@
 - [2026-08-08 静帧逐帧解码](2026-08-08-still-clip-decode-per-frame.md) — 单帧解码、loop 滤镜与性能守卫。
 - [2026-11-11 静帧自检的耗时断言在 CI 上误报](2026-11-11-still-clip-encode-timing-flake.md) — 尺子要和被量的是同一种活、同一次运行里量；能数的别拿时间推。
 - [2026-08-08 静帧循环解码过慢](2026-08-08-still-clip-loop-decode-slow.md) — image2 输入帧率。
+- [2026-11-17 A crossfade between two stills played half a transition late](2026-11-17-still-crossfade-half-a-transition-late.md) — A still's held frame is free and footage from both sides needs no freeze: centre the transition on the cut, and report where it really plays.
 - [2026-08-22 编辑译文退格删字，整条 cue 消失](2026-08-22-subtitle-editing-backspace-deletes-cue.md) — 全局快捷键要给字幕草稿让路，⌫ 的每条到达路径都得堵。
 - [2026-08-12 字幕编辑复审的六条后续](2026-08-12-subtitle-editing-review-followups.md) — 视图里的草稿会被「先写盘再销毁视图」漏掉；CAS 基线必须是会话快照。
 - [2026-08-12 字幕三入口首测](2026-08-12-subtitle-editing-surfaces-smoke-fixes.md) — `HSplitView` 不保护最后一栏；临时行不能给自己上焦点。

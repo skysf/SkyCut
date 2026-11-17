@@ -38,6 +38,10 @@ Found by a session walking the editing knowledge cards in SkyCut 0.18.66 over MC
 - `listen` for a clip or a file reads exactly its window once (`AIListenAudioWindow`, also for whole files and the timeline
   listing) and measures each project frame there (`AIListenFrameGrid` → `AIListenSampleFrames` → `AIListenPeaks`): `peak_db` is the
   heard true peak, `loudest_at` the start of the loudest frame, `peak_at` when the true peak is. `AIAudioLevels.loudest` is gone.
+- That read used to be only for a named file range, where the sound must cover the whole range or the call is refused. A clip's
+  window and a whole file now take the sound where it is (`AIListenAudioWindow.Edges.sound`): found before merging, when 2 of 7
+  sampled camera / generated files had an audio track 14 and 28 ms shorter than their picture — a full-length clip of either would
+  have read "unreadable: incomplete audio coverage". The old waveform path measured what was there; so does this, at the true times.
 
 ## Verification
 
@@ -49,7 +53,9 @@ Found by a session walking the editing knowledge cards in SkyCut 0.18.66 over MC
 - Real paths: `check-audio-fade` 10b exports a mix two tracks +6 dB hot through `plan()` + ffmpeg: the f32's true peak ≤ −1 dBTP and
   equals the reported `outputPeak`; the delivered peak (AVFoundation decode) equals ffmpeg's decode within 0.1 dB and sits far under
   the pre-limiter peak. `check-mix-layers` 2a: whole-timeline measurement = export, bit for bit, and get_job's fields from those
-  levels. `ListenRangeChecks`: a whole-file listen is one bounded reader from 0 and asks for no shared waveform.
+  levels. `ListenRangeChecks`: a whole-file listen is one bounded reader from 0 and asks for no shared waveform; a file whose
+  sound stops at 1 s under a 3 s picture is measured whole-file and as a clip's window (the sound up to 1 s, nothing after),
+  and a sound that starts at 1 s is read from where it starts, never moved earlier (`checkListenSoundEdges`).
 - Reverse verification: see the table below (each broken on purpose, run, restored).
 
 | Broken on purpose | What went red |
@@ -57,6 +63,7 @@ Found by a session walking the editing knowledge cards in SkyCut 0.18.66 over MC
 | The limiter's requirement back to the samples alone (`span.sample`) | `check-audio-fade` 10c: the 12 kHz 45° tone comes out at +2.1 dBTP, 19 kHz at −0.83, white noise ×8 at +3.7, the crest between samples stays over; 10b: the real export's f32 at −0.99 dBTP; `check-mix-layers` 2b (pressed frames over −1 dBTP); `checks/export-audio-single-pipeline.sh` |
 | get_job's peak back to the pre-limiter one (`audio_peak_dbfs = peakDBTP`) | `check-mix-layers` 2a: `audio_peak_dbtp` missing, `audio_peak_dbfs` present (2 lines); `checks/export-audio-single-pipeline.sh` |
 | `loudest_at` back to the middle of the loudest curve step | `check-mcp` ListenChecks: "loudest_at is the measured frame start" (got 0.25, the step's middle, for 0.167) |
+| Clip windows and whole files held to the named-range rule (no `Edges.sound`) | `check-mcp` ListenRangeChecks `checkListenSoundEdges` (1 of 8172): the whole-file listen of the file whose sound stops at 1 s is refused, "This source range has incomplete audio coverage" |
 
 All restored, all green again.
 

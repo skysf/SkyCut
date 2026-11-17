@@ -23,6 +23,9 @@ LISTEN_CONTROL="Sources/SrtFlow/AIListenReadControl.swift"
 if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
    || [ "$(grep -c 'AIListenAudioWindow.read(url, from: sourceIn, to: sourceOut, until: deadline,' "${LISTEN_FILE}" || true)" -ne 1 ] \
    || [ "$(grep -c 'AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline,' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'edges: .sound)' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'let edges = edges ?? (from == nil && to == nil ? .sound : .exact)' "${LISTEN_WINDOW}" || true)" -ne 1 ] \
+   || ! grep -q 'checkListenSoundEdges(in: directory)' checks/MCP/ListenRangeChecks.swift \
    || [ "$(grep -c 'await waveform(of:' "${LISTEN_FILE}" || true)" -ne 0 ] \
    || [ "$(grep -c 'waveform(of: clip.sourceURL' "${LISTEN_TOOL}" || true)" -ne 0 ] \
    || [ "$(grep -c 'static func loudest(' Sources/SrtFlow/AIAudioLevels.swift || true)" -ne 0 ] \
@@ -35,7 +38,7 @@ if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
   echo "✗ 片段 / 文件的 listen 没有完整接到有界原生读取/取消路径（真峰值和最响的那一帧要从这一遍采样里来，不从共享波形、不报曲线格子的中点），或长文件未在节拍解码前受限" >&2
   exit 1
 fi
-echo "   ✓ 片段和文件都是一遍有界读取（真峰值、最响的那一帧）；原生 timeRange、生产取消/截止时间、长文件节拍限制已接上"
+echo "   ✓ 片段和文件都是一遍有界读取（真峰值、最响的那一帧）；片段的窗和整个文件按声音在哪儿量（音轨比画面短不拒绝），点名的区间照旧要盖满；原生 timeRange、生产取消/截止时间、长文件节拍限制已接上"
 
 echo "==> listen 原生生命周期：copy 与取消只由同一 analysis 读取体拥有"
 python3 - "${LISTEN_WINDOW}" "${LISTEN_CONTROL}" <<'PY'

@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // 存了 Sky Studio 的 Key 就问一次授权（到时候了才问；docs/architecture/sky-studio-account.md）。
         SkyStudioAccount.shared.start()
         expireOptimizedMedia()
+        // Transparent stills made before 2026-11-17 stored their one frame 120 times: rewritten in place to one frame, in the background.
+        StillCacheSweep.startAtLaunch()
         // 上次崩溃 / 强退留在临时目录里的声音样本（新建声音的录音、参考录音、语言探针）：后台清掉一天以前的。
         MediaReadQueue.analysis.addOperation { VoiceLibraryTemp.sweepResidue() }
     }

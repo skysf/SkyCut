@@ -46,6 +46,10 @@
 按高度换算，不是按宽度：按宽度算的话，同一套样式在 16:9 和 9:16 之间切换时
 字号会突变。
 
+A canvas change of shape is the exception (2026-11-17): by height alone, 16:9 → 9:16 made every text 1.78× bigger on a frame 0.56×
+as wide. Now the stored sizes are re-expressed so a text keeps its size against the frame's short side and its x, y and wrap share
+(`OverlayReframe`; rule in [预览自由变换](preview-free-transform.md)「A canvas change keeps every clip's shape」).
+
 ## 版面框 = 定位框
 
 文字块的定位框是**版面框**（宽 = 用户设的折行宽度，高 = 排出来的总高），
@@ -473,7 +477,8 @@ N 倍，但标题就几十个字，而且**只在动画进行中**才走这条�
 ## 还没做的
 
 1. **样式预设库**：一键套用「字体 + 颜色 + 描边 + 动画」的组合，结构照抄
-   `BurnInStyle` 的 `isBuiltIn` + 内置预设列表。
+   `BurnInStyle` 的 `isBuiltIn` + 内置预设列表。（2026-11-16 起有了**动效预设**：一组字 + 形状 + 动画落在某一下上，放上去的是普通的字和形状，
+   标题挪了、改了字同一套跟着走，见 [动效预设](motion-presets.md)；单段字的样式预设库仍没做。）
 2. **毛玻璃底板**：好看但代价是文字层要知道底下那一帧长什么样 —— 导出要在
    ffmpeg 里抠一块区域模糊再贴回去，预览也要另走一条路。用户当前口径是不做。
 3. **发光 / 抖动**：真辉光要加模糊卷积，成本比其余效果跳一档，暂缓。
