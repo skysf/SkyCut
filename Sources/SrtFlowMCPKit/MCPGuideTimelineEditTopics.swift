@@ -165,13 +165,16 @@ enum MCPGuideTimelineEditTopics {
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.setCanvas, """
             set_canvas changes the output frame; each call is one undo step.
             """),
-            MCPGuideSection(name: "shape", about: "ratios and what happens to the clips", text: """
+            MCPGuideSection(name: "shape", about: "ratios and what happens to clips, texts and shapes", text: """
             Shape. ratio is auto (follows the first V1 clip), 16:9, 9:16, 4:3, 3:4 or 1:1. 9:16 is for TikTok, Reels and \
             Shorts, 16:9 for YouTube. Clips keep their shape: x, y and scale stay as get_timeline reports them, nothing is \
             stretched or cropped differently, so a clip that filled the old frame may not fill the new one. The reply lists \
             reframed (framed clips whose stored numbers were redone for the new frame) and no_longer_fill (clips that covered \
             the old frame but not this one). To fill the new shape, reframe those with edit_clips fit=fill (edit_clip's \
-            framing section explains how).
+            framing section explains how). Texts and shapes keep their size on the frame (against its short side, so the \
+            preset ratios keep their pixels): their font_size, width, height and line_width are redone and listed in reframed; \
+            x, y and a text's box_width stay. off_frame lists texts and shapes that now stick out of the frame: move or \
+            resize them with set_texts or set_shapes.
             """),
             MCPGuideSection(name: "frame_rate", about: "fps, and screen recordings", text: """
             Frame rate. fps is 24, 30 or 60. Screen recordings use the canvas fps, so it cannot change while one is recording.

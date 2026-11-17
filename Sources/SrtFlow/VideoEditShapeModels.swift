@@ -105,6 +105,8 @@ struct ShapeAnnotation: Identifiable, Hashable, Sendable {
     var markers: [ClipMarker] = []
     /// 入场 / 出场动画（VideoEditShapeAnimation.swift）。盖一块不用它。v31 字段，按需写键。
     var animation = ShapeAnimation()
+    /// 动效预设放上去的那一组里的哪一块（框、细线；`MotionPresetTag`，VideoEditTextModels.swift）。nil = 普通形状。按需写键，不抬格式版本。
+    var motionPreset: MotionPresetTag?
 
     /// 这一个真的画成实心（线条、圆弧永远是一条线）。预览和导出都问它，不各判一份。
     var drawsFilled: Bool { isFilled && kind != .line && kind != .arc }
@@ -186,7 +188,7 @@ extension ShapeAnnotation: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, kind, timelineStart, duration, color, lineWidth
         case centerX, centerY, width, height, rotationDegrees, isHidden, isFilled, coverAmount, markers, arcSweep
-        case animation
+        case animation, motionPreset
     }
 
     init(from decoder: Decoder) throws {
@@ -216,6 +218,8 @@ extension ShapeAnnotation: Codable {
         arcSweep = try c.decodeIfPresent(Double.self, forKey: .arcSweep) ?? Self.defaultArcSweep
         // 缺键 = 没有动画（v30 及更早只会突然出现、突然消失）。
         animation = try c.decodeIfPresent(ShapeAnimation.self, forKey: .animation) ?? ShapeAnimation()
+        // 缺键或读不懂 = 普通形状（同文字）。
+        motionPreset = MotionPresetTag.decode(c, forKey: .motionPreset)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -243,5 +247,7 @@ extension ShapeAnnotation: Codable {
         if kind == .arc { try c.encode(arcSweep, forKey: .arcSweep) }
         // 同上：设了动画的才落键，两处（这里和 requiresFormatVersion31）同源。
         if !animation.isEmpty { try c.encode(animation, forKey: .animation) }
+        // 按需写键、不抬格式版本：旧版读不懂就当普通形状，成片一帧不变（同文字的 `motionPreset`）。
+        try c.encodeIfPresent(motionPreset, forKey: .motionPreset)
     }
 }

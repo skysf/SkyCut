@@ -61,6 +61,11 @@ enum TimelinePaste {
             result.shapes.insert(copy.id)
         }
         pasteTexts(payload.texts, delta: delta, pointing: row, into: &state, result: &result)
+        // 动效预设的组号换新（同链接组）：粘出来的一套自成一组，不和原来那套连在一起（docs/architecture/motion-presets.md）。
+        let presetCounts = MotionPresetTag.counts(payload.texts, payload.shapes)
+        var presetGroups: [UUID: UUID] = [:]
+        MotionPresetTag.renew(&state.textOverlays, pasted: result.texts, counts: presetCounts, renamed: &presetGroups)
+        MotionPresetTag.renew(&state.shapes, pasted: result.shapes, counts: presetCounts, renamed: &presetGroups)
         pasteFilters(payload.filters, delta: delta, pointing: row, into: &state, result: &result)
         pasteCues(payload.cues, delta: delta, pointing: row, into: &state, result: &result)
         return result

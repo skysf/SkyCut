@@ -154,6 +154,8 @@ enum AITimelineSummary {
         if abs(overlay.style.letterSpacing) > 0.01 { object["letter_spacing"] = AIFormat.seconds(overlay.style.letterSpacing) }
         if abs(overlay.rotationDegrees) > 0.01 { object["rotation"] = AIFormat.seconds(overlay.rotationDegrees) }
         if overlay.isHidden { object["hidden"] = true }
+        // 是哪一套动效预设里的（set_text 带它的 id 加 motion_preset 换一套、加 hit_at 整套挪）。
+        if let tag = overlay.motionPreset { object["motion_preset"] = .string(tag.preset.rawValue) }
         return .object(object)
     }
 

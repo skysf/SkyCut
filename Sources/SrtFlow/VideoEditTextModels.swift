@@ -83,6 +83,8 @@ struct TextOverlay: Identifiable, Hashable, Sendable {
     /// 用户打在这一块上的标记（离块起点多少秒；裁头时留在原来的时间线时刻）。只影响编辑期的显示，
     /// 不进合成和导出。类型与读写见 VideoEditClipMarker.swift。v28 字段，按需写键。
     var markers: [ClipMarker] = []
+    /// 动效预设放上去的那一组里的哪一块（下面 `MotionPresetTag`）。nil = 普通文字。按需写键，不抬格式版本。
+    var motionPreset: MotionPresetTag?
 
     /// 新建时的时长，与形状一致（3 秒）。
     static let defaultDuration = 3.0
@@ -209,6 +211,7 @@ extension TextOverlay: Codable {
     private enum CodingKeys: String, CodingKey {
         case id, text, timelineStart, duration
         case centerX, centerY, boxWidth, rotationDegrees, style, animation, number, row, isHidden, markers
+        case motionPreset
     }
 
     init(from decoder: Decoder) throws {
@@ -231,6 +234,8 @@ extension TextOverlay: Codable {
         isHidden = try c.decodeIfPresent(Bool.self, forKey: .isHidden) ?? false
         // 缺键 = 没打过标记（v27 及更早文字上打不了）。
         markers = try c.decodeIfPresent([ClipMarker].self, forKey: .markers) ?? []
+        // 缺键或读不懂（以后的版本多出来的预设）= 普通文字：字和动画都在自己的字段里，丢的只是「是一组」。
+        motionPreset = MotionPresetTag.decode(c, forKey: .motionPreset)
     }
 
     func encode(to encoder: Encoder) throws {
@@ -255,8 +260,102 @@ extension TextOverlay: Codable {
         if isHidden { try c.encode(isHidden, forKey: .isHidden) }
         // 同上：一枚标记都没有的不落键，免得被抬进 v28。
         if !markers.isEmpty { try c.encode(markers, forKey: .markers) }
+        // 按需写键（同形状）。**不抬格式版本**：旧版读不懂就当普通文字，成片一帧不变（同 `rowHeights` 的口径）。
+        try c.encodeIfPresent(motionPreset, forKey: .motionPreset)
     }
 }
+
+// MARK: - 动效预设的成员标记
+//
+// 一套动效预设（MCP-45，docs/architecture/motion-presets.md）放上时间线的是**普通的字和形状**，各自的样式、动画都在它们
+// 自己的字段里，照常能一块一块地改；这里只记「这一块是哪一组、哪一套、在组里是什么」，换预设、挪落点、标题动了别的跟着走
+// 都按它认。文字和形状共用（`ShapeAnnotation.motionPreset`）。
+
+/// 一套现成能拼的动效。rawValue 是 AI 用的名字（set_text 的 `motion_preset`，词表 `MCPVocabulary.motionPresets` 对账）。
+enum MotionPresetKind: String, CaseIterable, Identifiable, Hashable, Sendable, Codable {
+    /// 框住再放开：细框顺时针画出来框住名字，随后倒着收走，字留下（样片「盒子框」）。
+    case frameReveal = "frame_reveal"
+    /// 对焦出字：细字、字距宽，从虚收清进来，出的时候虚掉（样片「对焦」）。
+    case focusPull = "focus_pull"
+    /// 标题 + 滚动的数字：标题弹出来，下面一条细线画出来，数字像老虎机滚到一个数（样片「两极之间的距离」）。
+    case titleCounter = "title_counter"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .frameReveal: return "Frame Reveal"
+        case .focusPull: return "Focus Pull"
+        case .titleCounter: return "Title + Counter"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .frameReveal: return "rectangle.dashed"
+        case .focusPull: return "camera.aperture"
+        case .titleCounter: return "textformat.123"
+        }
+    }
+}
+
+/// 一块在组里是什么。
+enum MotionPresetRole: String, Hashable, Sendable, Codable {
+    /// 主标题（组的锚：它挪了、改了字，别的跟着它走）。
+    case title
+    /// 标题上面 / 下面的一行小字（FROM、PRESENTS）。
+    case smallAbove, smallBelow
+    /// 标题下面滚动的数字。
+    case counter
+    /// 框住标题的长方形、标题下面的细线。
+    case frame, rule
+}
+
+struct MotionPresetTag: Hashable, Sendable, Codable {
+    /// 同一组的几块共用这一个号（粘贴、复制出来的换新号：`TimelinePaste.apply`）。
+    var group: UUID
+    var preset: MotionPresetKind
+    var role: MotionPresetRole
+
+    /// 宽容读：缺键、读不懂（以后多出来的预设 / 角色）都当没有 —— 那一块照样是普通的字或形状。
+    static func decode<Key: CodingKey>(_ container: KeyedDecodingContainer<Key>, forKey key: Key) -> MotionPresetTag? {
+        (try? container.decodeIfPresent(MotionPresetTag.self, forKey: key)) ?? nil
+    }
+
+    /// 粘贴 / 复制出来的几块换新组号（`TimelinePaste.apply`，同剪辑的链接组）：同一组在这一批里至少两块，换成同一个新号
+    ///（粘出来的一套自成一组，不和原来那套连在一起 —— 不然换预设、挪落点会连原来那套一起动）；只拿到一块的不留标记。
+    /// `renamed` 让文字和形状两次调用换成同一个新号。
+    static func renew<Member: MotionPresetMember>(
+        _ items: inout [Member], pasted: Set<UUID>, counts: [UUID: Int], renamed: inout [UUID: UUID]
+    ) {
+        for index in items.indices where pasted.contains(items[index].id) {
+            guard let tag = items[index].motionPreset else { continue }
+            guard (counts[tag.group] ?? 0) >= 2 else {
+                items[index].motionPreset = nil
+                continue
+            }
+            let fresh = renamed[tag.group] ?? UUID()
+            renamed[tag.group] = fresh
+            items[index].motionPreset?.group = fresh
+        }
+    }
+
+    /// 这一批里每一组有几块（`renew` 的 `counts`）。
+    static func counts(_ texts: [TextOverlay], _ shapes: [ShapeAnnotation]) -> [UUID: Int] {
+        var counts: [UUID: Int] = [:]
+        for tag in texts.compactMap(\.motionPreset) + shapes.compactMap(\.motionPreset) { counts[tag.group, default: 0] += 1 }
+        return counts
+    }
+}
+
+/// 能是预设里一块的东西：文字和形状。
+protocol MotionPresetMember {
+    var id: UUID { get }
+    var motionPreset: MotionPresetTag? { get set }
+}
+
+extension TextOverlay: MotionPresetMember {}
+extension ShapeAnnotation: MotionPresetMember {}
 
 // MARK: - 老工程的自动排布（只剩迁移在用）
 //

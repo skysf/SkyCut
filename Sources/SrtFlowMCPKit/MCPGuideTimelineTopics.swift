@@ -48,6 +48,21 @@ enum MCPGuideTimelineTopics {
             rolls, default 1.5), delay (seconds before it starts) and style (count counts up, odometer spins each digit). Only the \
             fields you pass change; number.remove=true turns it back into plain text.
             """),
+            // 出处：docs/architecture/motion-presets.md（三套的样子和时间照南极样片、一套 = 普通的字和形状 + 组的标记、换一套字不变、
+            // hit_at 整套挪、标题挪了 / 改了字别的跟着走）。
+            MCPGuideSection(name: "motion_presets", about: "motion_preset: ready-made animated titles and credits, hit_at, small_text, swapping and moving one", text: """
+            Motion presets. motion_preset puts a ready-made animated title on the timeline in one call: ordinary texts and shapes \
+            you can still change one by one afterwards (set_text, set_shape, delete_items). frame_reveal: a thin box draws around \
+            the title, then lets go while the words stay (credits such as FROM / SKY STUDIO). focus_pull: thin wide-spaced words \
+            pull into focus and blur away at the end (calm credits). title_counter: the title pops in, a short line draws under \
+            it and a number rolls like a slot machine (needs number with at least to; suffix for units, e.g. " KM"). text is the \
+            title; small_text is a small line above it ("" removes it), small_text_below=true puts it under (e.g. PRESENTS). hit_at is the \
+            timeline second it lands on (a drum hit or a cut; default start, then the playhead); duration runs from hit_at to the \
+            end (default 3, title_counter 3.5). x / y or position place the whole group; font and color change the title and the \
+            small line. Sizes follow the frame's short side, so the same call works on 9:16. With text_id of any text in a group: \
+            motion_preset swaps it for another preset and keeps the words; hit_at alone moves the whole group. Moving or retyping \
+            the title brings the rest along. The result's motion_preset lists the ids of every piece; get_timeline marks them.
+            """),
             MCPGuideSection(name: "pitfalls", about: "newlines, timeline rows and stacking, clamped font_size, batches with set_texts", text: """
             Pitfalls. A newline (or the two characters \\n) starts a new line. Each new text gets its own row on the timeline, and the row \
             order is the stacking order. font_size is clamped to 12 to 1000 and the result shows requested and applied. For many titles \
@@ -56,7 +71,9 @@ enum MCPGuideTimelineTopics {
         ],
         examples: [
             ["text": "Day 1", "position": "lower_third", "font_size": 48],
-            ["text_id": "t1", "number": ["from": 0, "to": 365, "style": "odometer"]]
+            ["text_id": "t1", "number": ["from": 0, "to": 365, "style": "odometer"]],
+            ["text": "SKY STUDIO", "small_text": "FROM", "motion_preset": "frame_reveal", "hit_at": 25.25],
+            ["text": "POLE TO POLE", "motion_preset": "title_counter", "number": ["to": 20004, "suffix": " KM"], "hit_at": 58.79]
         ],
         related: ["set_texts", "conventions", "recipes"]
     )

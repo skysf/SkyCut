@@ -14,6 +14,9 @@ extension VideoEditInspectorView {
         VStack(alignment: .leading, spacing: 8) {
             Text("Animation").font(.callout).fontWeight(.medium)
 
+            // 最上面：动效预设（换一套字不变、整套挪落点；VideoEditInspector+MotionPreset.swift）。
+            MotionPresetInspectorRow(project: project, overlayID: overlay.id)
+
             animationRow(
                 overlay, title: "In",
                 kind: animationBinding(overlay, \.entrance),

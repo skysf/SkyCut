@@ -92,8 +92,9 @@ func catalogKnownNames() -> Set<String> {
     // 夹帧和成片逐帧扫（2026-11-16，MCP-36 / 64，AISourceCuts、AIFrameScan）：add_clips / edit_clip 结果里的 source_cuts，
     // inspect_video 的 frame_scan 和疑点种类 stray_frames / frozen_picture / black_frame / source_cut。
     names.formUnion(["source_cuts", "frame_scan", "stray_frames", "frozen_picture", "black_frame", "source_cut"])
-    // set_canvas's reply (2026-11-17, AICanvasReframe): clips that covered the old frame but not the new one.
-    names.insert("no_longer_fill")
+    // set_canvas's reply (2026-11-17, AICanvasReframe): clips that covered the old frame but not the new one; texts and shapes that
+    // now stick out of it.
+    names.formUnion(["no_longer_fill", "off_frame"])
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
     // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).

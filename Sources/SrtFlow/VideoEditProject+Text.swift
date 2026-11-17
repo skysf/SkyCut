@@ -53,13 +53,15 @@ extension VideoEditProject {
     }
 
     /// 文字不参与 AV 合成，改它不用重建预览。
+    /// 走 `MotionPresetGroups.update`：动效预设里的标题挪了、改了字，同一组的框、小字、数字跟着走（同一步撤销）；
+    /// 普通的字和以前一样只改它自己。
     func updateTextOverlay(_ id: UUID, _ change: @escaping (inout TextOverlay) -> Void) {
-        perform(rebuildsPreview: false) { $0.updateTextOverlay(id, change) }
+        perform(rebuildsPreview: false) { MotionPresetGroups.update(id, in: &$0, change) }
     }
 
     /// 拖动中的实时版本（不进撤销栈，松手时由 `endLiveEdit` 收一次）。
     func liveUpdateTextOverlay(_ id: UUID, _ change: @escaping (inout TextOverlay) -> Void) {
-        liveApply { $0.updateTextOverlay(id, change) }
+        liveApply { MotionPresetGroups.update(id, in: &$0, change) }
     }
 
     // MARK: - 时间线上的拖动

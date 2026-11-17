@@ -139,6 +139,7 @@ struct AIShapeChange {
         if shape.animation.entrance != .none { object["animation_in"] = .string(shape.animation.entrance.rawValue) }
         if shape.animation.exit != .none { object["animation_out"] = .string(shape.animation.exit.rawValue) }
         if shape.isHidden { object["hidden"] = true }
+        if let tag = shape.motionPreset { object["motion_preset"] = .string(tag.preset.rawValue) }  // 一套动效预设里的框 / 细线
         return .object(object)
     }
 }
