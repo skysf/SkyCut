@@ -76,13 +76,15 @@ enum MCPGuideTimelineTopics {
             add_clips is the only way to put media on the timeline: files the user gave you or SkyCut made (generate_media results, \
             recordings), music and sound effects from find_audio, and sound effects made on this Mac. The whole call is one undo step.
             """),
+            // 2026-11-17 (MCP-2, MCP-4): an A-number past the last audio track is created; audio that does not fit on its track goes
+            // on another new track; moves are adjustments (ai-control-mcp.md section 4 item 2, AITrackLanding).
             MCPGuideSection(name: "placement", about: "where items land: tracks, start, insert, new tracks, separate sound, subtitle files", text: """
-            Where items land. Without start, video and images append to the end of their track (default V1); audio starts at 0 on the \
-            first free audio track. With start, a video that would overlap is lifted to the track above (or track=new_video); insert=true \
-            on V1 pushes the later V1 clips right instead. track names: V1 main, V2 and up for video above it, A1 and up for audio; \
-            new_video and new_audio create a track, and two items in one call that both ask for a new track share the first one. \
-            sound=separate also puts a video's sound on its own audio track, linked to the muted picture (for J/L cuts); sound=only \
-            adds just its sound. One subtitle file (.srt, .vtt…) replaces the current subtitle track.
+            Where items land. Without start, video and images append to their track (default V1); audio without track starts at 0 \
+            on the first free audio track. With start, overlapping video is lifted a track (or use new_video); insert=true on V1 \
+            pushes later V1 clips right. Tracks: V1 main, V2+ video above it, A1+ audio; missing A-numbers are created (A1 to A7 in \
+            one call, numbered without gaps). new_video and new_audio: one new track per call. Audio that does not fit on its track \
+            goes on another new track, never on one with sound; moved items get a track entry in adjustments. sound=separate puts a \
+            video's sound on a linked audio track (J/L cuts); sound=only adds just its sound. One subtitle file replaces the subtitles.
             """),
             MCPGuideSection(name: "music_sound_effects", about: "library_id from find_audio, sound effects made on this Mac, presets, hit_at", text: """
             Music and sound effects. library_id is a track id from find_audio; SkyCut downloads it if needed, and export_video reports \
@@ -92,13 +94,14 @@ enum MCPGuideTimelineTopics {
             twinkle), beep, glitch or shutter; duration, pitch, brightness, size (dry to hall), variation (another take) and volume_db \
             (default -8) shape it. hit_at, for a made or a library sound effect, is the timeline second where its loudest moment lands \
             (a cut, a word appearing): SkyCut sets the start from it (overriding start); without it a made sound effect lands at the \
-            playhead.
+            playhead. duration is the clip length (at least 0.1 seconds); tails (impact, boom, riser) run past it: audible_duration \
+            says how long it is heard, end where the clip ends.
             """),
             MCPGuideSection(name: "windows", about: "source_in / source_out, image length, checks before inserting, what comes back", text: """
             Source windows. source_in and source_out are seconds inside the file (default: the whole file). For an image, source_out is \
             its display length (default 5 seconds) and must fit edit_limits.image_source_duration. Every window is checked before \
-            anything is inserted; clamped values come back as requested, applied and adjustments, with the new ids, hit_at and music \
-            credits. When a window crosses a cut inside the file itself (generated clips often switch shots), the result adds \
+            anything is inserted (a failed call changes nothing); clamped values come back as requested, applied and adjustments, \
+            with the new ids, hit_at and music credits. When a window crosses a cut inside the file itself (generated clips often switch shots), the result adds \
             source_cuts: the source_frame, how many frames of the other shot are in and a suggested_source_in or \
             suggested_source_out. It is only a reminder; nothing is changed. look shots=true lists every cut of a file.
             """),

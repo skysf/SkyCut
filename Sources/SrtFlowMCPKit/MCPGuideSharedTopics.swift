@@ -58,7 +58,8 @@ enum MCPGuideSharedTopics {
         keeps the clip's timeline start and moves its end, unless you also pass start.
 
         Tracks. V1 is the main video track: its clips play one after another. V2, V3… are video tracks above it (pictures over V1). \
-        A1, A2… are audio tracks. track=new_video or new_audio creates a track. Texts, shapes, filters and subtitles have their own \
+        A1, A2… are audio tracks; add_clips creates the A-numbers it is given that do not exist yet. track=new_video or new_audio \
+        creates a track. Texts, shapes, filters and subtitles have their own \
         rows; get_timeline lists everything.
 
         Ids. get_timeline returns short ids; any unique prefix works. Splitting, cutting and syncing create new items, so read \
