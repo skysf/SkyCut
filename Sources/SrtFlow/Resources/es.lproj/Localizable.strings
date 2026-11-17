@@ -1571,3 +1571,47 @@
 "Motion could not be rebuilt: %@" = "No se pudo reconstruir la animación: %@";
 
 "Motion is still being rebuilt. Wait for rendering to finish before exporting." = "La animación se está reconstruyendo. Espera a que termine antes de exportar.";
+
+// Web-motion templates and parameter forms.
+"Choose a native title first, or reuse a motion from this project." = "Elige un título nativo o reutiliza una animación de este proyecto.";
+"Project Templates" = "Plantillas del proyecto";
+"Rendered motions; change their words and style in the inspector." = "Animaciones renderizadas; cambia el texto y el estilo en el inspector.";
+"Starts at the playhead on an upper video track." = "Empieza en el cabezal, en una pista de vídeo superior.";
+"Rendering motion…" = "Renderizando animación…";
+"Add or drag to the timeline" = "Añadir o arrastrar a la línea de tiempo";
+"Add this motion at the playhead, or drag it to an upper video track" = "Añade esta animación en el cabezal o arrástrala a una pista de vídeo superior";
+"Motion Template" = "Plantilla de animación";
+"Change the parameters, then re-render to update this clip." = "Cambia los parámetros y vuelve a renderizar para actualizar este clip.";
+"This motion changed. Reload its parameters before re-rendering." = "Esta animación ha cambiado. Recarga sus parámetros antes de renderizarla.";
+"Reload Parameters" = "Recargar parámetros";
+"Discard this draft and load the clip's current parameters" = "Descarta este borrador y carga los parámetros actuales del clip";
+"Re-render" = "Volver a renderizar";
+"Render these parameters and replace this motion in one undo step" = "Renderiza estos parámetros y sustituye la animación en un solo paso de deshacer";
+"Show Page in Finder" = "Mostrar página en Finder";
+"Show this motion's saved page and parameters in Finder" = "Muestra la página y los parámetros guardados de esta animación en Finder";
+"Render length" = "Duración de la animación";
+"Hit within motion" = "Golpe dentro de la animación";
+"Duration and hit are measured within the full motion; the clip's timeline start stays in place" = "La duración y el golpe se miden dentro de la animación completa; el inicio del clip no cambia";
+"Choose an installed typeface before re-rendering." = "Elige una tipografía instalada antes de volver a renderizar.";
+"The project changed before this motion could be added. Try again in the current project." = "El proyecto cambió antes de añadir la animación. Inténtalo de nuevo en el proyecto actual.";
+"clip_id must identify an existing web-motion clip." = "clip_id debe identificar un clip de animación web existente.";
+"This motion is already rendering. Wait for that render to finish." = "Esta animación ya se está renderizando. Espera a que termine.";
+"The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied." = "El proyecto, el clip o la pista de origen cambió durante el renderizado. El vídeo se conserva; no se aplicó ningún cambio.";
+"The new duration does not cover this trimmed clip. Increase duration or shorten the clip first." = "La nueva duración no cubre este clip recortado. Amplía la duración o acorta primero el clip.";
+"The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track." = "La nueva duración se solapa con otro clip en su pista oculta. Acórtala o elige otra pista superior.";
+"The rendered motion could not be placed." = "No se pudo colocar la animación renderizada.";
+"Pass at or hit_at, not both." = "Indica at o hit_at, no ambos.";
+"The hit is outside this trimmed clip. Choose a hit inside its source range first." = "El golpe está fuera de este clip recortado. Elige primero un golpe dentro del intervalo conservado.";
+"The requested hit would start before the timeline. Move hit_at later or reduce hit." = "El golpe solicitado empezaría antes de la línea de tiempo. Retrasa hit_at o reduce hit.";
+"Web motion needs an upper video track (V2 or higher)." = "La animación web necesita una pista de vídeo superior (V2 o posterior).";
+"parameters must be a JSON object." = "parameters debe ser un objeto JSON.";
+"hit must be inside the motion: 0 <= hit < duration (%@ s)." = "hit debe estar dentro de la animación: 0 ≤ hit < duración (%@ s).";
+"fields must have at most 64 entries, with unique keys." = "fields admite como máximo 64 entradas con claves únicas.";
+"Every field needs a key, a label, and a matching parameter value." = "Cada campo necesita una clave, una etiqueta y un valor de parámetro correspondiente.";
+"Field minimum must be finite." = "El mínimo del campo debe ser un número finito.";
+"Field maximum must be finite." = "El máximo del campo debe ser un número finito.";
+"Field minimum exceeds maximum." = "El mínimo del campo supera el máximo.";
+"Parameter %@ must be a number within its field's bounds." = "El parámetro %@ debe ser un número dentro de los límites de su campo.";
+"Parameter %@ must be a string." = "El parámetro %@ debe ser una cadena de texto.";
+"Parameter %@ must be #RRGGBB or #RRGGBBAA." = "El parámetro %@ debe tener el formato #RRGGBB o #RRGGBBAA.";
+"Render length must include at least one frame and be at most %@ seconds." = "La duración debe incluir al menos un fotograma y no superar %@ segundos.";

@@ -18,7 +18,7 @@ enum WebMotionEnvironment {
                      webKit: kit?.infoDictionary?["CFBundleVersion"] as? String ?? "unknown")
     }
 
-    private static func hasFont(_ name: String) -> Bool {
+    static func hasFont(_ name: String) -> Bool {
         let font = CTFontCreateWithName(name as CFString, 12, nil)
         return [CTFontCopyFullName(font), CTFontCopyFamilyName(font), CTFontCopyPostScriptName(font)]
             .contains { ($0 as String) == name }

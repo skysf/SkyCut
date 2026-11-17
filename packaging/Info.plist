@@ -90,6 +90,16 @@
 		</dict>
 		<dict>
 			<key>UTTypeIdentifier</key>
+			<string>com.srtflow.motion-preset</string>
+			<key>UTTypeDescription</key>
+			<string>SkyCut Motion Preset</string>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+			</array>
+		</dict>
+		<dict>
+			<key>UTTypeIdentifier</key>
 			<string>com.srtflow.project</string>
 			<key>UTTypeDescription</key>
 			<string>SkyCut Video Project</string>

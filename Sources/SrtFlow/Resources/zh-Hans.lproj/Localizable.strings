@@ -1571,3 +1571,47 @@
 "Motion could not be rebuilt: %@" = "动效未能重建：%@";
 
 "Motion is still being rebuilt. Wait for rendering to finish before exporting." = "动效仍在重建。请等渲染完成后再导出。";
+
+// Web-motion templates and parameter forms.
+"Choose a native title first, or reuse a motion from this project." = "先选现成标题，也可以复用这个工程里的动效。";
+"Project Templates" = "工程模板";
+"Rendered motions; change their words and style in the inspector." = "渲好的动效；在检查器里改文字和样式。";
+"Starts at the playhead on an upper video track." = "从播放头开始，放到上层视频轨。";
+"Rendering motion…" = "正在渲染动效…";
+"Add or drag to the timeline" = "添加或拖到时间线";
+"Add this motion at the playhead, or drag it to an upper video track" = "从播放头添加这套动效，或拖到上层视频轨";
+"Motion Template" = "动效模板";
+"Change the parameters, then re-render to update this clip." = "改好参数后，点重新渲染更新这一段。";
+"This motion changed. Reload its parameters before re-rendering." = "这段动效已被改过。重新载入参数后再渲染。";
+"Reload Parameters" = "重新载入参数";
+"Discard this draft and load the clip's current parameters" = "放弃这份草稿，载入片段当前的参数";
+"Re-render" = "重新渲染";
+"Render these parameters and replace this motion in one undo step" = "按这些参数重新渲染并替换动效，一步即可撤销";
+"Show Page in Finder" = "在 Finder 中显示网页";
+"Show this motion's saved page and parameters in Finder" = "在 Finder 中显示这套动效保存的网页和参数";
+"Render length" = "动效总长";
+"Hit within motion" = "动效内的落点";
+"Duration and hit are measured within the full motion; the clip's timeline start stays in place" = "总长和落点都从完整动效内部计算；片段在时间线上的起点不变";
+"Choose an installed typeface before re-rendering." = "请先选择这台 Mac 上有的字体，再重新渲染。";
+"The project changed before this motion could be added. Try again in the current project." = "添加动效前工程已切换。请在当前工程里重试。";
+"clip_id must identify an existing web-motion clip." = "clip_id 必须指向已有的网页动效片段。";
+"This motion is already rendering. Wait for that render to finish." = "这套动效正在渲染，请等它完成。";
+"The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied." = "渲染期间工程、片段或原轨道已改变。视频已保留，没有应用改动。";
+"The new duration does not cover this trimmed clip. Increase duration or shorten the clip first." = "新动效的总长盖不住这一段。请增加总长，或先裁短片段。";
+"The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track." = "新动效的总长会和隐藏轨道上的另一段重叠。请缩短动效，或改放另一条上层轨。";
+"The rendered motion could not be placed." = "无法放入渲好的动效。";
+"Pass at or hit_at, not both." = "at 和 hit_at 只能提供一个。";
+"The hit is outside this trimmed clip. Choose a hit inside its source range first." = "落点不在裁好的片段范围里。请先把落点设在片段保留的范围内。";
+"The requested hit would start before the timeline. Move hit_at later or reduce hit." = "按这个落点放置会从时间线起点之前开始。请推迟 hit_at，或减小动效内的 hit。";
+"Web motion needs an upper video track (V2 or higher)." = "网页动效需要放在上层视频轨（V2 或更高）。";
+"parameters must be a JSON object." = "parameters 必须是 JSON 对象。";
+"hit must be inside the motion: 0 <= hit < duration (%@ s)." = "hit 必须在动效内部：0 ≤ hit < 总长（%@ 秒）。";
+"fields must have at most 64 entries, with unique keys." = "参数字段最多 64 项，键名不能重复。";
+"Every field needs a key, a label, and a matching parameter value." = "每个参数字段都需要键名、标签和对应的参数值。";
+"Field minimum must be finite." = "参数下限必须是有限数值。";
+"Field maximum must be finite." = "参数上限必须是有限数值。";
+"Field minimum exceeds maximum." = "参数下限不能大于上限。";
+"Parameter %@ must be a number within its field's bounds." = "参数 %@ 必须是字段范围内的数值。";
+"Parameter %@ must be a string." = "参数 %@ 必须是文字。";
+"Parameter %@ must be #RRGGBB or #RRGGBBAA." = "参数 %@ 必须采用 #RRGGBB 或 #RRGGBBAA 颜色格式。";
+"Render length must include at least one frame and be at most %@ seconds." = "动效总长至少要有一帧，且不能超过 %@ 秒。";

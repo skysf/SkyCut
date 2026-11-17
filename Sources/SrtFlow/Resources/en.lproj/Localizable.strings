@@ -1571,3 +1571,47 @@
 "Motion could not be rebuilt: %@" = "Motion could not be rebuilt: %@";
 
 "Motion is still being rebuilt. Wait for rendering to finish before exporting." = "Motion is still being rebuilt. Wait for rendering to finish before exporting.";
+
+// Web-motion templates and parameter forms.
+"Choose a native title first, or reuse a motion from this project." = "Choose a native title first, or reuse a motion from this project.";
+"Project Templates" = "Project Templates";
+"Rendered motions; change their words and style in the inspector." = "Rendered motions; change their words and style in the inspector.";
+"Starts at the playhead on an upper video track." = "Starts at the playhead on an upper video track.";
+"Rendering motion…" = "Rendering motion…";
+"Add or drag to the timeline" = "Add or drag to the timeline";
+"Add this motion at the playhead, or drag it to an upper video track" = "Add this motion at the playhead, or drag it to an upper video track";
+"Motion Template" = "Motion Template";
+"Change the parameters, then re-render to update this clip." = "Change the parameters, then re-render to update this clip.";
+"This motion changed. Reload its parameters before re-rendering." = "This motion changed. Reload its parameters before re-rendering.";
+"Reload Parameters" = "Reload Parameters";
+"Discard this draft and load the clip's current parameters" = "Discard this draft and load the clip's current parameters";
+"Re-render" = "Re-render";
+"Render these parameters and replace this motion in one undo step" = "Render these parameters and replace this motion in one undo step";
+"Show Page in Finder" = "Show Page in Finder";
+"Show this motion's saved page and parameters in Finder" = "Show this motion's saved page and parameters in Finder";
+"Render length" = "Render length";
+"Hit within motion" = "Hit within motion";
+"Duration and hit are measured within the full motion; the clip's timeline start stays in place" = "Duration and hit are measured within the full motion; the clip's timeline start stays in place";
+"Choose an installed typeface before re-rendering." = "Choose an installed typeface before re-rendering.";
+"The project changed before this motion could be added. Try again in the current project." = "The project changed before this motion could be added. Try again in the current project.";
+"clip_id must identify an existing web-motion clip." = "clip_id must identify an existing web-motion clip.";
+"This motion is already rendering. Wait for that render to finish." = "This motion is already rendering. Wait for that render to finish.";
+"The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied." = "The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied.";
+"The new duration does not cover this trimmed clip. Increase duration or shorten the clip first." = "The new duration does not cover this trimmed clip. Increase duration or shorten the clip first.";
+"The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track." = "The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track.";
+"The rendered motion could not be placed." = "The rendered motion could not be placed.";
+"Pass at or hit_at, not both." = "Pass at or hit_at, not both.";
+"The hit is outside this trimmed clip. Choose a hit inside its source range first." = "The hit is outside this trimmed clip. Choose a hit inside its source range first.";
+"The requested hit would start before the timeline. Move hit_at later or reduce hit." = "The requested hit would start before the timeline. Move hit_at later or reduce hit.";
+"Web motion needs an upper video track (V2 or higher)." = "Web motion needs an upper video track (V2 or higher).";
+"parameters must be a JSON object." = "parameters must be a JSON object.";
+"hit must be inside the motion: 0 <= hit < duration (%@ s)." = "hit must be inside the motion: 0 <= hit < duration (%@ s).";
+"fields must have at most 64 entries, with unique keys." = "fields must have at most 64 entries, with unique keys.";
+"Every field needs a key, a label, and a matching parameter value." = "Every field needs a key, a label, and a matching parameter value.";
+"Field minimum must be finite." = "Field minimum must be finite.";
+"Field maximum must be finite." = "Field maximum must be finite.";
+"Field minimum exceeds maximum." = "Field minimum exceeds maximum.";
+"Parameter %@ must be a number within its field's bounds." = "Parameter %@ must be a number within its field's bounds.";
+"Parameter %@ must be a string." = "Parameter %@ must be a string.";
+"Parameter %@ must be #RRGGBB or #RRGGBBAA." = "Parameter %@ must be #RRGGBB or #RRGGBBAA.";
+"Render length must include at least one frame and be at most %@ seconds." = "Render length must include at least one frame and be at most %@ seconds.";

@@ -27,7 +27,8 @@ done
 #    数的是时间线这一族**全部**文件，外加四套拖放各自的文件 —— 块、行拆在别的
 #    文件里，挂在那儿一样会吞。
 DROP_SITES="$(for f in "${TIMELINE_VIEWS[@]}" "$FILE_DROP" "$DRAG" \
-    Sources/SrtFlow/VideoEditFilterDrag.swift Sources/SrtFlow/AudioLibraryDrag.swift; do
+    Sources/SrtFlow/VideoEditFilterDrag.swift Sources/SrtFlow/AudioLibraryDrag.swift \
+         Sources/SrtFlow/WebMotion/WebMotionPresetDrag.swift Sources/SrtFlow/TimelineDropRouterFactory.swift; do
   [ -f "$f" ] || continue
   # 没匹配时 grep 退出码是 1：pipefail 下不兜住，整个命令替换会让脚本静默退出。
   { grep -nE '\.(onDrop|dropDestination)\(' "$f" || true; } \
@@ -39,18 +40,18 @@ DROP_COUNT="$(printf '%s\n' "$DROP_SITES" | grep -c . || true)"
 
 # 1b) 路由器认齐四种载荷，而且**卡片的自定义载荷先认、文件最后认**：卡片的
 #     provider 万一同时也给得出 file URL，排反了就会被当成从 Finder 拖进来的文件。
-grep -q 'FilterDrag.type, AudioLibraryDrag.type, TransitionDrag.type, .fileURL' "$DROP_ROUTER" \
+grep -q 'FilterDrag.type, AudioLibraryDrag.type, TransitionDrag.type, WebMotionPresetDrag.type, .fileURL' "$DROP_ROUTER" \
   || fail "TimelineDropRouter.types 没列齐四种载荷：没列上的那种拖进时间线连 validateDrop 都不会调"
 ROUTE_BODY="$(awk '/private func payload\(_ info: DropInfo\)/,/^    \}/' "$DROP_ROUTER")"
 if [ -z "$ROUTE_BODY" ]; then
   fail "找不到 TimelineDropRouter.payload（在 ${DROP_ROUTER}）：分派守卫失去目标"
 else
-  for t in FilterDrag AudioLibraryDrag TransitionDrag; do
+  for t in FilterDrag AudioLibraryDrag TransitionDrag WebMotionPresetDrag; do
     grep -q "\[$t\.type\]" <<<"$ROUTE_BODY" \
       || fail "路由器不认 ${t}：那一套卡片拖上时间线不会有任何反应"
   done
   FILE_ROUTE="$(printf '%s\n' "$ROUTE_BODY" | grep -n '\[\.fileURL\]' | head -1 | cut -d: -f1)"
-  LAST_CARD="$(printf '%s\n' "$ROUTE_BODY" | grep -nE '\[(FilterDrag|AudioLibraryDrag|TransitionDrag)\.type\]' \
+  LAST_CARD="$(printf '%s\n' "$ROUTE_BODY" | grep -nE '\[(FilterDrag|AudioLibraryDrag|TransitionDrag|WebMotionPresetDrag)\.type\]' \
     | tail -1 | cut -d: -f1)"
   if [ -z "$FILE_ROUTE" ]; then
     fail "路由器不认 .fileURL：从 Finder 拖文件进时间线会没反应"
@@ -75,7 +76,7 @@ if UPD_BODY="$(awk '/func dropUpdated\(info: DropInfo\)/,/^    \}/' "$DROP_ROUTE
     || fail "路由器的 dropUpdated 没先判 isLive：松手后补发的那一拍会把落点框画回来、把自动滚动重新拉起来"
 fi
 LIVE_BODY="$(awk '/private func isLive\(_ payload: Payload\)/,/^    \}/' "$DROP_ROUTER")"
-for flag in 'MediaFileDrag.pending' 'FilterDrag.preset' 'AudioLibraryDrag.pending' 'TransitionDrag.kind'; do
+for flag in 'MediaFileDrag.pending' 'FilterDrag.preset' 'AudioLibraryDrag.pending' 'TransitionDrag.kind' 'WebMotionPresetDrag.pending'; do
   grep -qF "$flag" <<<"$LIVE_BODY" \
     || fail "isLive 没看 ${flag}：那一套松手后补发的一拍照样会转发"
 done
@@ -85,7 +86,8 @@ done
 #     主轨那一行，路由器回了 `.cancel`，指针挪到接缝上也救不回来。整条时间线只有
 #     一个落点之后，拖动**总是**先经过不能放的地方，所以这条对四套拖放一视同仁。
 for f in "$DROP_ROUTER" "$FILE_DROP" "$DRAG" \
-         Sources/SrtFlow/VideoEditFilterDrag.swift Sources/SrtFlow/AudioLibraryDrag.swift; do
+         Sources/SrtFlow/VideoEditFilterDrag.swift Sources/SrtFlow/AudioLibraryDrag.swift \
+         Sources/SrtFlow/WebMotion/WebMotionPresetDrag.swift Sources/SrtFlow/TimelineDropRouterFactory.swift; do
   CANCELS="$({ grep -nE 'DropProposal\(operation:[^)]*\.cancel' "$f" || true; } \
     | grep -vE '^[0-9]+:[[:space:]]*//' || true)"
   [ -z "${CANCELS}" ] \
@@ -109,7 +111,8 @@ fi
 #    一次文件拖入就有四个候选接收者，谁接到全看视图树顺序。
 for f in Sources/SrtFlow/VideoEditTransitionDrag.swift \
          Sources/SrtFlow/VideoEditFilterDrag.swift \
-         Sources/SrtFlow/AudioLibraryDrag.swift; do
+         Sources/SrtFlow/AudioLibraryDrag.swift \
+         Sources/SrtFlow/WebMotion/WebMotionPresetDrag.swift Sources/SrtFlow/TimelineDropRouterFactory.swift; do
   [ "$(drag_hits "$f" 'UTType\.fileURL|\.fileURL')" -eq 0 ] \
     || fail "$f 用了 .fileURL：会和时间线的文件落点、以及 .onDropOfFiles 抢同一种拖入"
 done
@@ -121,7 +124,7 @@ done
 #    它不画框、只落地，单独数 —— 恰好一处；一处都没有反倒要红（那就是 AI 另算了一份落点）。
 AI_EDITS="Sources/SrtFlow/AITimelineEdits.swift"
 # Web motion is another consumer of the same landing rule; count it independently like the AI importer.
-LANDING_CALLS="$(grep -rhE 'mediaImportLandings\(' Sources/SrtFlow --include='*.swift' --exclude='AITimelineEdits.swift' --exclude='WebMotionActions.swift' \
+LANDING_CALLS="$(grep -rhE 'mediaImportLandings\(' Sources/SrtFlow --include='*.swift' --exclude='AITimelineEdits.swift' --exclude='WebMotionActions.swift' --exclude='WebMotionPresetDrag.swift' \
   | grep -vE '^[[:space:]]*(//|\*)' | grep -v 'func mediaImportLandings' | wc -l | tr -d ' ')"
 [ "$LANDING_CALLS" -eq 2 ] \
   || fail "mediaImportLandings 被调了 ${LANDING_CALLS} 次（应为 2：画框一处、落地一处）—— 多出来的那处就是第二份账"
@@ -133,7 +136,7 @@ MOTION_LANDING_CALLS="$(grep -vE '^[[:space:]]*(//|\*)' "$MOTION_EDITS" | grep -
 [ "$MOTION_LANDING_CALLS" -eq 1 ] \
   || fail "Web motion must call the shared mediaImportLandings exactly once; found ${MOTION_LANDING_CALLS} in ${MOTION_EDITS}"
 # 起点也只有一份账（指针对中点 / ⌘V 对播放头都在 importFirstStart 里收口）。
-START_CALLS="$(grep -rhE 'importFirstStart\(' Sources/SrtFlow --include='*.swift' \
+START_CALLS="$(grep -rhE 'importFirstStart\(' Sources/SrtFlow --include='*.swift' --exclude='WebMotionPresetDrag.swift' \
   | grep -vE '^[[:space:]]*(//|\*)' | grep -v 'func importFirstStart' | wc -l | tr -d ' ')"
 [ "$START_CALLS" -eq 2 ] \
   || fail "importFirstStart 被调了 ${START_CALLS} 次（应为 2：画框一处、落地一处）"
@@ -234,7 +237,7 @@ fi
 #     `TimelineSeams.ghostY`），`newLaneY` 只剩拖文件进来的两处：梯子「撞上就抬到最上面
 #     新开一条」和「音频都放不下、最下面新开一条」—— 那两种没有缝可开。
 #     数调用点，别数「某个文件里有没有」（那种写法抓不到偷偷写回的）。
-NEW_LANE_CALLS="$(grep -rh 'newLaneY(' Sources/SrtFlow --include='*.swift' \
+NEW_LANE_CALLS="$(grep -rh 'newLaneY(' Sources/SrtFlow --include='*.swift' --exclude='WebMotionPresetDrag.swift' \
   | grep -vE '^[[:space:]]*(//|\*)' | grep -v 'static func newLaneY' | wc -l | tr -d ' ')"
 [ "$NEW_LANE_CALLS" -eq 2 ] \
   || fail "newLaneY 的调用点有 ${NEW_LANE_CALLS} 处（应为 2：拖文件进来开新轨的上/下）—— 少一处就是有人写回了字面量，多一处就是跨轨拖动绕开了缝的几何"

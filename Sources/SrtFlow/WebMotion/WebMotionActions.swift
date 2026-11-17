@@ -17,7 +17,7 @@ enum WebMotionActions {
         let generation = project.documentGeneration
         let before = id.flatMap { project.state.clip(with: $0) }
         let sourceLane = WebMotionSourceLane.capture(id, in: project.state)
-        if id != nil, before?.webMotion == nil { throw AIToolError("clip_id must identify an existing web-motion clip.") }
+        if id != nil, before?.webMotion == nil { throw AIToolError(L10n("clip_id must identify an existing web-motion clip.")) }
         let start = try startTime(record, before: before, at: at, hitAt: hitAt)
         let requested = target ?? before.flatMap { project.state.location(of: $0.id)?.track }.flatMap { slot -> TrackDropTarget? in
             if case .overlay(let index) = slot { return .overlay(index) }
@@ -29,7 +29,7 @@ enum WebMotionActions {
            !project.state.overlayTracks[index].isHidden { laneID = project.state.overlayTracks[index].id }
         else { laneID = nil }
         let key = "\(generation):\(id?.uuidString ?? UUID().uuidString)"
-        guard WebMotionActivity.claim(key) else { throw AIToolError("This motion is already rendering. Wait for that render to finish.") }
+        guard WebMotionActivity.claim(key) else { throw AIToolError(L10n("This motion is already rendering. Wait for that render to finish.")) }
         defer { WebMotionActivity.release(key) }
         let directory = cacheDirectory(for: project)
         let rendered = try await WebMotionCache.render(record, directory: directory, force: force)
@@ -39,7 +39,7 @@ enum WebMotionActions {
         guard project.isCurrentGeneration(generation),
               id == nil || (project.state.clip(with: id!) == before
                 && WebMotionSourceLane.capture(id, in: project.state) == sourceLane) else {
-            throw AIToolError("The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied.")
+            throw AIToolError(L10n("The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied."))
         }
         let prepared = try preparedClip(before, rendered: rendered, info: info, start: start)
         let placed = try commit(prepared, replacing: id, requested: requested, laneID: laneID, explicitTarget: target, project: project)
@@ -59,7 +59,7 @@ enum WebMotionActions {
                 clip.sourceDuration = info.duration
             }
             guard clip.sourceStart + clip.sourceDuration <= info.duration + 0.000001 else {
-                throw AIToolError("The new duration does not cover this trimmed clip. Increase duration or shorten the clip first.")
+                throw AIToolError(L10n("The new duration does not cover this trimmed clip. Increase duration or shorten the clip first."))
             }
         }
         clip.timelineStart = start
@@ -75,7 +75,7 @@ enum WebMotionActions {
                 .map { TimelineSpan(start: $0.timelineStart, end: $0.timelineEnd) }
             keepsLane = TimelineState.fits(start: start, duration: prepared.timelineDuration, among: busy)
             if !keepsLane, project.state.isLaneHidden(location.track) {
-                throw AIToolError("The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track.")
+                throw AIToolError(L10n("The new motion duration overlaps another clip on its hidden track. Shorten it or choose another upper track."))
             }
         } else { keepsLane = false }
         AIUndoGrouping.step(project.effectiveUndoManager) {
@@ -99,20 +99,20 @@ enum WebMotionActions {
                 state.insertImported([prepared], at: landing)
             }
         }
-        guard let placed = project.state.clip(with: prepared.id) else { throw AIToolError("The rendered motion could not be placed.") }
+        guard let placed = project.state.clip(with: prepared.id) else { throw AIToolError(L10n("The rendered motion could not be placed.")) }
         return placed
     }
 
     static func startTime(_ record: WebMotionClipRecord, before: EditClip?, at: Double?, hitAt: Double?) throws -> Double {
-        guard at == nil || hitAt == nil else { throw AIToolError("Pass at or hit_at, not both.") }
+        guard at == nil || hitAt == nil else { throw AIToolError(L10n("Pass at or hit_at, not both.")) }
         if hitAt != nil, let before, !isWhole(before),
            record.hitTime < before.sourceStart || record.hitTime >= before.sourceStart + before.sourceDuration {
-            throw AIToolError("The hit is outside this trimmed clip. Choose a hit inside its source range first.")
+            throw AIToolError(L10n("The hit is outside this trimmed clip. Choose a hit inside its source range first."))
         }
         let localHit = (record.hitTime - (before?.sourceStart ?? 0)) / max(0.05, before?.speed ?? 1)
         let start = at ?? hitAt.map { $0 - localHit } ?? before?.timelineStart ?? 0
         guard start.isFinite, start >= 0 else {
-            throw AIToolError("The requested hit would start before the timeline. Move hit_at later or reduce hit.")
+            throw AIToolError(L10n("The requested hit would start before the timeline. Move hit_at later or reduce hit."))
         }
         return start
     }
@@ -124,7 +124,7 @@ enum WebMotionActions {
     static func requireUpperTrack(_ target: TrackDropTarget) throws {
         switch target {
         case .overlay, .newOverlayTop, .insertOverlay: return
-        default: throw AIToolError("Web motion needs an upper video track (V2 or higher).")
+        default: throw AIToolError(L10n("Web motion needs an upper video track (V2 or higher)."))
         }
     }
 

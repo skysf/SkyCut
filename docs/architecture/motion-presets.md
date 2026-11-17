@@ -32,6 +32,8 @@
 
 ## 二、只能这样做
 
+The numbered rules here and sections 3–6 describe the native text/shape designs. Web entries use the shared library and UI in sections 7–8, with the locked renderer contract.
+
 1. **放上去的就是普通的字和形状。** 一套 = 几段 `TextOverlay` + 几块 `ShapeAnnotation`，样式、动画都在它们自己的字段里，照常能一块一块地改、
    删、藏；预览和成片走现成的同一条绘制路径（`TextRenderer`、`ShapeOutline`），预设只把参数配好，**不另开渲染管线、不另造动画种类**。
    底层真缺能力（字关键帧、形状变形、发光……）就不进这一批，记进研究清单。
@@ -122,7 +124,7 @@
 
 ## 六、还没做的
 
-1. 另外 5 套（MCP-48 到 MCP-52），等透明视频（MCP-56）或各自的底层能力。
+1. The other five designs (MCP-48 through MCP-52) are not bundled native presets. The locked web renderer is available for custom project pages; official web designs are separate library content.
 2. 时间线上拖一块不带整套（整套挪用检查器的「落点」或 AI 的 `hit_at`）；框住再放开里「放开」那一下没有单独的旋钮（跟着总长走，
    要改就拖框那一块的尾巴）。
 3. 「落点」不吸附到音乐的重音上（AI 用 `listen` 找到那一下再给 `hit_at`）。
@@ -140,3 +142,47 @@ the existing two permission modes: ask once in request-approval mode, proceed in
 Parameters, portable caches, local hit alignment, system/font warnings and the six page checks are specified in
 [the renderer contract](web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17). The official web designs are added as
 library entries rather than new rendering paths.
+
+## 8. Unified panel and web parameter inspector (2026-11-17)
+
+The existing `+` → Motion Presets popover remains the only entry. `MotionPresetPanel` consumes
+`MotionPresetLibrary.entries`: native titles first, then this project's stored web templates. Native cards retain
+their existing title/shape action and hit timing. A web card previews its checked movie: an idle poster capped at
+272 × 153 pixels, and a muted looping player only while hovered. The bounded poster cache owns no players;
+leaving the hovered card tears its player down. No page runs inside the App to draw a thumbnail.
+
+Adding a web card starts it at the captured playhead; dragging chooses a timeline start on an upper video lane.
+`WebMotionPresetRequest` captures document generation, start and any existing target lane UUID before creating
+a Task. The task rejects another document, resolves a fresh template for the destination canvas/fps, then calls
+`WebMotionActions`. The timeline routes the custom payload through its existing single drop destination, via
+`TimelineDropRouterFactory`; it does not introduce another `.onDrop`. Preview/commit use the existing shared
+media landing rule, and incompatible lower/audio targets lift to upper video lanes.
+
+Selecting a web clip shows `WebMotionInspectorSection`. Text, font, color and number fields come from the stored
+form; authored names/labels remain verbatim. Fonts use the existing installed-font browser. Duration and local
+hit are separate timing fields, always synchronized with reserved `MOTION_PARAMS.duration` / `hit`.
+`WebMotionEditorModel` keeps an uncommitted draft: typing does not edit the timeline or start a render. Re-render
+validates the captured document/clip/source lane, runs the locked helper, and updates that same clip in one undo
+step while retaining its trim, speed and effects. Failed or stale work retains the preceding movie. Reload Parameters
+explicitly discards an old draft. Source OS/font warnings remain visible until the source is re-rendered.
+
+Show Page in Finder prepares the stored HTML and parameter sidecar beside the original movie through queued IO,
+then reveals the HTML with Finder. It does not execute the page in a browser or write unapplied draft values.
+Page diagnostics remain verbatim; ordinary UI refusals use the current app language. All new buttons use instant
+help and the existing theme/language presentation root; inspector rows fit the normal 220-point content width.
+
+`checks/MotionPlacement/Editor.swift` drives the real model/helper, draft isolation, typed fields, timing, trims,
+one-step undo, sidecars and stale/document rejection before helper startup. The full A+B fixture passed 197/197;
+removing the UI stale/document gates produced 6/197 failures, then exact restoration returned it to green.
+`render-motion-presets.sh <output> --web-only` renders the real panel, parameter section, selected-clip inspector
+and portability warnings in en/zh-Hans/es with light/dark themes, using an isolated bundle and synthetic source.
+
+Manual regression before a release:
+
+- [ ] Hover each web card, leave it and close the popover: playback stops; idle cards remain still.
+- [ ] Add a project template at the playhead, then drag it to an upper lane and a lower/audio row: it stays on upper
+      video lanes, the preview matches the committed start, and undo removes one insertion.
+- [ ] Drag out and back, cancel outside the timeline and drag again: the placeholder and auto-scroll stop without
+      losing the next drop. Native file/filter/audio/transition drops still work through the same destination.
+- [ ] Edit all four field kinds in each language; type first, re-render once, then undo. Show Page in Finder reveals
+      the stored page/parameters. Switch projects during queued work and retain the newer project unchanged.

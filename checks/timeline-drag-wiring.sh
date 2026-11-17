@@ -619,10 +619,8 @@ drag_hits() { grep -vE '^[[:space:]]*(//|\*)' "$1" | grep -cE "$2" || true; }
 #    挂在每条轨道行上、非主轨传空类型 —— 空类型的落点照样独占拖入，滤镜 / 音频库
 #    卡片和 Finder 的文件拖到轨道行上全被它吞掉，见 timeline-drag-gestures.md §5e-2）。
 #    藏起来的主轨不接转场：mainRow 只取**没藏**的主轨行。
-[ "$(drag_hits "$VIEW" 'spec\.slot == \.main && !\$0\.spec\.isHidden')" -ne 0 ] \
-  || fail "路由器的 mainRow 没按「主轨且没藏」取：转场会落到藏起来的主轨上，或者哪儿都落不下"
-[ "$(drag_hits "$VIEW" 'transition: TransitionDropDelegate\(')" -ne 0 ] \
-  || fail "路由器没接转场代理：拖卡片到接缝上没反应"
+# shellcheck source=checks/timeline-drag-wiring/drop-router-factory.sh
+source checks/timeline-drag-wiring/drop-router-factory.sh
 
 # 3) 两处用**同一个**类型常量。各写一个字面量的话，改一处就再也拖不上去，
 #    而且两边都「看起来是对的」。
@@ -864,10 +862,7 @@ grep -q 'guard MediaFileDrag.pending != nil else { return }' "$FILE_DROP" \
   || fail "文件落点停够之后没先看这一轮还在不在：松手后才到点的计时会把缝拉开"
 grep -q 'guard AudioLibraryDrag.pending != nil else { return }' "$AUDIO_DROP" \
   || fail "音频库落点停够之后没先看这一轮还在不在：松手后才到点的计时会把缝拉开"
-[ "$(grep -c 'dwell: seamDwell' "$VIEW")" -eq 2 ] \
-  || fail "路由器没把同一个停顿计时交给文件和音频库两个代理"
-[ "$(grep -c 'openSeam: \$openSeam' "$VIEW")" -eq 2 ] \
-  || fail "路由器没把缝的状态交给文件和音频库两个代理：它们拉开的缝画不出来"
+# Shared seam bindings are pinned through the live router factory above.
 # 音频库落进缝：落地走纯值的 placeLibraryAudio（insertAt），自检在 check-media-import.sh §9。
 grep -q 'state.placeLibraryAudio(clip, laneIndex: laneIndex, insertAt: insertAt)' "$AUDIO_DROP" \
   || fail "addLibraryAudio 没走纯值的 placeLibraryAudio：落进缝的那条规则自检够不着"
