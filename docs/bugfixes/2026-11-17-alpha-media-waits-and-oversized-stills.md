@@ -45,6 +45,8 @@ rule 8c. What changed:
   (`AlphaSourceCopies.readyURL`) and otherwise insert the original at once. After each rebuild the coordinator asks
   `CompositionSource.missingAlphaCopies`, makes those copies in the background and swaps them in by the proxies' rule (only while
   stopped). Export prerender and the AI's look still wait for the copy.
+- Follow-up (same day): stills made before this fix kept their 120 copies until macOS cleared the cache; since then they are
+  rewritten to one frame in place at launch (`StillCacheSweep`, [still pipeline](../architecture/freeze-frame.md) 4a3).
 
 ## Verification
 

@@ -162,7 +162,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 顶部工作台、图标按钮、更多工具、统一设置窗口、MCP 的 get_settings / set_settings、打开全部权限时的说明（`FullAccessConsentSheet`）和长期授权的记 / 撤 | [顶部工作台与统一设置](docs/architecture/workbench-and-settings.md)（三个设置入口同一个窗口、复用现有 Store；设置工具先全验再写、不碰密钥；选全部权限先弹说明、同意才写）、[声音库第八节第 9 条](docs/architecture/voice-library.md) |
 | 界面主题（森林色 / 经典色）、主题设置与 MCP 的 theme、窗口背景与轨道配色、AppKit 自建的窗口 / 面板（浅 / 深跟不跟主题）、切主题 / 系统切深浅色时开着的窗口跟不跟 | [界面主题](docs/architecture/app-themes.md)（浅 / 深只有 `AppThemePalette.colorScheme` 一条；交给 SwiftUI 的永远是明确的浅 / 深、不交 nil；不设 `NSApp.appearance`）、[系统深色时按钮提示深底深字](docs/bugfixes/2026-11-11-tooltip-dark-on-dark-in-forest-theme.md)、[森林色切经典色，开着的窗口只变一半](docs/bugfixes/2026-11-11-theme-switch-leaves-windows-half-light.md) |
 | 编辑器分栏、预览区 / 时间线的行结构与最小高度 | [压缩预览区时播放条压到工具栏上](docs/bugfixes/2026-08-12-preview-transport-row-overlap.md) |
-| 预览变换、叠化、上层视频轨、导出滤镜、预览合成往合成轨上接东西 | [预览自由变换](docs/architecture/preview-free-transform.md)（「一份时间账」：只从末尾接、合成完裁到总长，多一格就黑屏；切片表按格子去重、换格子别改成四舍五入）、[视频轨对等化](docs/architecture/video-tracks.md)、[关键帧动画](docs/architecture/keyframe-animation.md)、[Transform 复审](docs/bugfixes/2026-08-04-transform-review.md)、[导出预渲染复审](docs/bugfixes/2026-08-05-export-prerender-review.md) |
+| 预览变换、叠化、上层视频轨、导出滤镜、预览合成往合成轨上接东西、canvas shape changes (`CanvasReframe`, set_canvas) | [预览自由变换](docs/architecture/preview-free-transform.md)（「一份时间账」：只从末尾接、合成完裁到总长，多一格就黑屏；切片表按格子去重、换格子别改成四舍五入; a new canvas shape keeps each clip's x, y, scale）、[视频轨对等化](docs/architecture/video-tracks.md)、[关键帧动画](docs/architecture/keyframe-animation.md)、[Transform 复审](docs/bugfixes/2026-08-04-transform-review.md)、[导出预渲染复审](docs/bugfixes/2026-08-05-export-prerender-review.md) |
 | 从 Finder 拖文件 / ⌘V 粘贴文件进时间线、导入落点 | [拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md)、[拖动手势 §5e-2](docs/architecture/timeline-drag-gestures.md)（主轨保序、唯一落点）、[视频轨对等化](docs/architecture/video-tracks.md) |
 | 时间线上的复制 / 剪切 / 粘贴（⌘C ⌘X ⌘V、编辑菜单、右键菜单）、剪贴板类型、粘贴落点、从旧段构造新段（分割 / 复制，别漏字段）、分割之后的链接组（`LinkRegrouping.split`） | [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md)（剪贴板只有一套、不写纯文本；换新身份走编码往返；分割都走 `LinkRegrouping.split`）、[方案](docs/plans/2026-09-26-timeline-clipboard-and-zoom.md)、[拖文件进轨道](docs/plans/2026-09-22-media-file-drop.md) |
 | 时间线上的任何拖放落点（`.onDrop`：文件 / 滤镜 / 音频库 / 转场卡片）、新的自定义拖放 / 剪贴板类型 | [拖动手势 §5e-2](docs/architecture/timeline-drag-gestures.md)（整条时间线只许一个 `.onDrop`；自定义类型必须在 Info.plist 声明；不能放回 `.forbidden`、不回 `.cancel`）、[GUI 冒烟流程](docs/testing/gui-smoke-testing.md)（落点路由探针） |
@@ -186,7 +186,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 音量曲线（段上的音量自动化）、轨道推子 / 总推子、电平表（引擎的槽 `MeterSlot`） | [音量曲线](docs/architecture/audio-volume-curve.md)、[推子与电平表](docs/architecture/audio-mixer.md)（峰值从渲染块来、总表从混音器出口来）、[声音：音量与渐入渐出](docs/architecture/audio-fades.md)、[声音编辑方案](docs/plans/2026-09-23-audio-mixing.md) |
 | Inspector 数值框、拖调、Transform 写入、检查器里的滑杆行（`labelledSlider` / `InspectorSliderRow`）、「Shows for」、Transform 区的关键帧 ‹ ◇ › 和「曲线」菜单 | [Inspector 数值框](docs/architecture/inspector-scrub-number-field.md)（打字提交要立刻 `endLiveEdit`）、[关键帧动画「交互约定」](docs/architecture/keyframe-animation.md) |
 | 往检查器里加任何一行（标题 + 控件、下拉、滑杆行） | [检查器的排版](docs/architecture/inspector-layout.md)（一行不许比窄栏宽；菜单 Picker 不许 `.fixedSize()`） |
-| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩）、带透明的视频（`SourceAlpha`、`AlphaSourceCopies`） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比；带透明的段认文件里的预乘 / 直通标记）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md)、[带透明的视频：预览当预乘、成片当直通](docs/bugfixes/2026-11-16-alpha-video-premultiplied-or-straight.md) |
+| 定格、静帧、图片转视频、在最后一帧里定格（不到一帧的右半）、透明 PNG（`StillAlphaNaming`、`isAlphaStill`、预乘的 ProRes 4444 + 遮罩）、带透明的视频（`SourceAlpha`、`AlphaSourceCopies`）、老缓存的启动改写（`StillCacheSweep`） | [定格](docs/architecture/freeze-frame.md)（不到一帧的右半拿掉；对着时间的断言只和同一次运行里同一种活比；带透明的段认文件里的预乘 / 直通标记）、[静帧自检的耗时断言在 CI 上误报](docs/bugfixes/2026-11-11-still-clip-encode-timing-flake.md)、[定格方案](docs/plans/2026-08-08-freeze-frame.md)、[带透明的视频：预览当预乘、成片当直通](docs/bugfixes/2026-11-16-alpha-video-premultiplied-or-straight.md) |
 | 原生录屏、恢复、退出、导入、录屏的系统授权（`ScreenRecordingPermissions`、`ScreenCapturePermissionRepair`）、AI 录屏（`record_screen`；`ScreenRecordingSession` 的 AI 会话、`ScreenRecordingFileCommit`、`ScreenRecordingOptions.preset`、`AIScreenRecording*` / `AIScreenSource*`） | [录屏生命周期](docs/architecture/screen-recording-lifecycle.md)（AI 起的会话走同一条流程、从不覆盖、入轨包一步撤销）、[让 AI 录屏的方案](docs/plans/2026-10-03-screen-recording-mcp.md)、[录屏中 AI 改帧率：静默不改还回成功](docs/bugfixes/2026-10-03-set-canvas-fps-ignored-while-recording.md)、[签名与系统权限](docs/architecture/code-signing-and-permissions.md)（授权记录钉着签名；文案不写「关掉再打开」）、[实施报告](docs/reports/2026-08-06-native-screen-recording-implementation-report.md)（方案中的旧结论不得覆盖它）、[录屏 Phase 2–4 复审](docs/bugfixes/2026-08-07-screen-recording-phase2-4-review.md) |
 | 字幕生成、语言检测、翻译、任务取消、转写哪些声音（可听快照）、生成 / 翻译结束时回写工程 | [字幕语言流](docs/architecture/subtitle-language-flow.md)（可听快照与预览同一份隐藏过滤）、[AI 放素材顺带挂字幕，之后撤一步全空](docs/bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md)（回写包在 `AIUndoGrouping.step` 里）、[原生字幕生成方案](docs/plans/2026-08-06-native-subtitle-generation.md)、[字幕生成复审](docs/bugfixes/2026-08-06-subtitle-generation-review.md)、[PR #22 后续复审](docs/bugfixes/2026-08-09-pr22-review-followups.md) |
 | 生成出来的字幕长什么样：去标点、断句、一行多长（字数 + 画面宽度）、几行（默认单行；面板的「每条字幕的行数」/ AI 的 `max_lines`）、显示时间、几段素材同时有字只留一条、面板上「只用选中的片段」、机器翻译落字去标点、AI 点名 `strip_punctuation` | [生成的字幕长什么样](docs/architecture/subtitle-generation-style.md)（先断句后去标点；停顿被识别器并进相邻的词，先估开口；默认单行是用户定的）、[方案与调研](docs/plans/2026-09-26-subtitle-generation-style.md) |
@@ -258,7 +258,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-screen-recording-writer.sh` — 录屏产物的画面轨盖到结尾（尾部不黑）。
 - `scripts/check-shape-render.sh` — 形状：预览和导出逐像素重合、入场 / 出场动画。
 - `scripts/check-sky-studio.sh` — Sky Studio 账号、照授权拦、任务 / 报价 / 积分、声音的纯值检查（不碰网络和钥匙串）。
-- `scripts/check-still-clip-encode.sh` — 静帧真实编码：图只解一次缩一次、透明的图。
+- `scripts/check-still-clip-encode.sh` — 静帧真实编码：图只解一次缩一次、透明的图、老缓存改写成一帧。
 - `scripts/check-subtitle-burn-size.sh` — 预览上的字幕和烧出来的一样：大小、折行、位置、行距、阴影、字体清单。
 - `scripts/check-text-render.sh` — 画面文字：渲染图与成片逐点重合、动画、回退字体、接缝。
 - `scripts/check-timeline-clipboard.sh` — 复制 / 剪切 / 粘贴、分割不丢字段。
@@ -266,7 +266,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-timeline-zoom.sh` — 缩放的锚点、播放跟随、记住的开关。
 - `scripts/check-translation-preflight.sh` — 翻译配对预检与接线。
 - `scripts/check-upscale.sh` — 视频 upscale 的任务对着假 Sky Studio 走全程。
-- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG 和带透明的视频（预乘 / 直通）。
+- `scripts/check-video-fade.sh` — 上层轨铺满 + 画面渐变的真产物、藏起来的段、透明 PNG 和带透明的视频（预乘 / 直通）、静帧之间的叠化。
 - `scripts/check-video-inspection.sh` — 成片疑点检查（`inspect_video`）、夹帧提醒和成片逐帧扫。
 - `scripts/check-voice-recovery.sh` — 旁白 / 声音库 / 变声 / 长期授权 / `KeepAwakeChecks`：真 App 对象对着假 Sky Studio。
 - `scripts/check-voiceover-sync.sh` — 按旁白段落同步时间线。
