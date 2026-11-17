@@ -35,7 +35,7 @@ for table in "${BUILD_DIR}/SrtFlow_SrtFlow.bundle"/*.lproj; do
   ditto "${table}" "${APP}/Contents/Resources/$(basename "${table}")"
 done
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
-  checks/ProjectVersionsUI/Render.swift checks/Shared/OffscreenSnapshot.swift \
+  checks/ProjectVersionsUI/Render.swift checks/OffscreenRender/Snapshot.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ProjectVersionsRender"
 SRTFLOW_VERSIONS_RENDER_OUT="${OUT_DIR}" SRTFLOW_VERSIONS_RENDER_WORK="${ROOT}/work" SRTFLOW_VERSIONS_ROOT="${ROOT}/versions" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \

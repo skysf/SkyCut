@@ -140,4 +140,4 @@ private struct SettingsPane: View {
     }
 }
 
-// `Snapshot` (render a view off screen into a PNG) lives in checks/Shared/OffscreenSnapshot.swift since 2026-11-17.
+// 「把一个视图放进屏幕外的窗口、拍成 PNG」在 checks/OffscreenRender/Snapshot.swift（动效预设的出图也用它）。

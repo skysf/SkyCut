@@ -2,21 +2,25 @@ import AppKit
 import SwiftUI
 @testable import SrtFlow
 
-// Off-screen renders of production views for PR images (scripts/render-voice-library.sh, scripts/render-project-versions.sh).
-// Moved here from checks/VoiceLibraryUI/Render.swift when the second render tool needed it (2026-11-17).
+// 离屏出图共用的一件：把一个视图放进屏幕外的窗口、等它排好、用系统的 screencapture 按窗口号拍成 PNG。
+// 声音库（scripts/render-voice-library.sh）和动效预设（scripts/render-motion-presets.sh）的出图都用它；只是出图，不判对错。
+// 2026-11-16 从 checks/VoiceLibraryUI/Render.swift 搬出来（第二个用处）：多了固定尺寸和指定浅 / 深两个可选参数，不给时和原来一样。
 
-/// 把一个视图放进屏幕外的窗口、等它排好、存成 PNG。
 @MainActor
 enum Snapshot {
-    static func take<Content: View>(_ view: Content, to file: URL) async throws {
+    /// `size` = nil 按视图自己要的大小；`appearance` = nil 照真 App 的规矩（森林色固定浅色、经典色跟系统）。
+    static func take<Content: View>(
+        _ view: Content, to file: URL, size: CGSize? = nil, appearance: NSAppearance? = nil
+    ) async throws {
         let host = NSHostingView(rootView: view.appLanguage().background(AppThemePalette.current.window))
         // 系统截不到整个在屏幕外的窗口：摆在主屏左下角、排在所有窗口的最底下（不抢前台、不成为 key）。
         let origin = NSScreen.main?.visibleFrame.origin ?? .zero
-        let window = NSWindow(contentRect: NSRect(x: origin.x, y: origin.y, width: 600, height: 400), styleMask: [.borderless], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: origin.x, y: origin.y, width: size?.width ?? 600, height: size?.height ?? 400),
+                              styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.hasShadow = false
         // 真 App 里 sheet 的浅 / 深外观由 `.preferredColorScheme` 给（森林色固定浅色）；自建的窗口够不着它，照同一条规矩自己设。
-        window.appearance = AppThemePalette.current.isForest ? NSAppearance(named: .aqua) : nil
+        window.appearance = appearance ?? (AppThemePalette.current.isForest ? NSAppearance(named: .aqua) : nil)
         let container = NSView(frame: window.contentLayoutRect)
         window.contentView = container
         container.addSubview(host)
@@ -24,10 +28,10 @@ enum Snapshot {
         // 等 `.task` 里的取数、布局各走完几轮（假服务当场回答）。
         for _ in 0..<12 {
             try await Task.sleep(nanoseconds: 80_000_000)
-            let size = host.fittingSize
-            host.frame = NSRect(origin: .zero, size: size)
-            window.setContentSize(size)
-            container.frame = NSRect(origin: .zero, size: size)
+            let fitted = size ?? host.fittingSize
+            host.frame = NSRect(origin: .zero, size: fitted)
+            window.setContentSize(fitted)
+            container.frame = NSRect(origin: .zero, size: fitted)
             host.layoutSubtreeIfNeeded()
         }
         window.displayIfNeeded()
@@ -39,8 +43,9 @@ enum Snapshot {
         try capture.run()
         capture.waitUntilExit()
         if capture.terminationStatus != 0 || !FileManager.default.fileExists(atPath: file.path) {
-            // No Screen Recording permission for the process that started the script (an agent's shell, CI): draw the view
-            // ourselves. Text, shapes and buttons come out right; text fields and pickers may not (see above), so it says so.
+            // No Screen Recording permission for the process that started the script (an agent's shell): with
+            // SRTFLOW_RENDER_DRAW_FALLBACK=1 the view is drawn with cacheDisplay instead. Text, shapes and buttons come out right;
+            // text fields and pickers may not (see above), so it says so. Added 2026-11-17 for scripts/render-project-versions.sh.
             guard ProcessInfo.processInfo.environment["SRTFLOW_RENDER_DRAW_FALLBACK"] == "1",
                   let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
                 throw AIToolError("screencapture could not capture \(file.lastPathComponent); the terminal needs Screen Recording permission "
