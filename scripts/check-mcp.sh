@@ -510,7 +510,6 @@ xcrun swiftc \
   Sources/SrtFlow/MotionPresetDesign.swift \
   Sources/SrtFlow/MotionPresetLayout.swift \
   Sources/SrtFlow/MotionPresetGroups.swift \
-  Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/AIBatchEdit.swift \
   Sources/SrtFlow/AIBatchEditPlans.swift \
   Sources/SrtFlow/ClipFileReplacement.swift \
