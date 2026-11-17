@@ -280,6 +280,8 @@
   接口出错、别的头提交、fork、别的 workflow、不是 pull_request、没跑完、红了 / 取消了、别的仓库、超过 24 小时）、跑检查的每一步都写成 `verified != 'true'`、
   备缓存的几步只在第 1 组做、编 App 不看它、判断那一步紧跟「只改了文档？」、记号只在 PR 那一轮的汇总 job 最后留、token 有 `actions: read`：
   `checks/ci-verified-tree.sh`。规矩和上线后看的数在[构建与打包](../build/build-and-packaging.md)「CI」一节。
+  The same guard pins the workflow's `concurrency` block word for word: PR runs keyed by PR number, pushes to main by `github.ref`
+  (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
