@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 /// 一个 `.srtflowproj` 工程文件。
 ///
@@ -33,7 +34,7 @@ struct VideoEditProjectFile: Codable {
     var rowHeights: TimelineRowHeights
 
     /// reader 认识的最高版本（闸门比较对象）。
-    static let latestFormatVersion = 34
+    static let latestFormatVersion = 35
     /// writer 的基线版本：没有任何高版本 only 数据的工程一律写它，旧版照常能开。
     /// 具体判据见 `TimelineState.requiresFormatVersion4` / `...5` / `...6` /
     /// `...7` … `...14`（登记清单在那边）。
@@ -88,6 +89,7 @@ struct VideoEditProjectFile: Codable {
         _ = timeline.requiresFormatVersion32
         _ = timeline.requiresFormatVersion33
         _ = timeline.requiresFormatVersion34
+        _ = timeline.requiresFormatVersion35
         formatVersion = Self.latestFormatVersion
         savedAt = Date()
         self.timeline = timeline
@@ -202,6 +204,8 @@ enum VideoEditProjectIO {
         var didRelink: Bool
         /// 静帧缓存没了、需要重新转的图片段（带当初用的分辨率政策）。
         var stillsToRegenerate: [StillRegeneration]
+        /// Generated motion caches missing on this Mac; the project regenerates them from its stored pages.
+        var motionsToRegenerate: [UUID]
         /// 读到的素材定位表（键是**解析之后**的路径）。存盘时要拿它来兜底，
         /// 不然这次没找到的素材，书签会被下一次自动保存抹掉。
         var records: [String: MediaRecord]
@@ -220,6 +224,7 @@ enum VideoEditProjectIO {
         knownRecords: [String: MediaRecord] = [:],
         rowHeights: TimelineRowHeights = TimelineRowHeights()
     ) throws -> [String: MediaRecord] {
+        let timeline = try WebMotionProjectFiles.preparingForSave(timeline, projectURL: url)
         let directory = url.deletingLastPathComponent()
         // 换成 upscale 文件的段的原片也配书签（换回去时找得到），但它不在 mediaURLs 里：播放用不着、删了不亮「缺素材」。
         let media = (timeline.mediaURLs + timeline.upscaleOriginalURLs).map {
@@ -339,11 +344,13 @@ enum VideoEditProjectIO {
         }
 
         let stills = refreshStillClips(in: &timeline)
+        let motions = WebMotionProjectFiles.refreshWebMotionCaches(in: &timeline, projectURL: url)
         return LoadResult(
             timeline: timeline,
             missingMedia: missing,
             didRelink: didRelink,
             stillsToRegenerate: stills,
+            motionsToRegenerate: motions,
             records: records,
             rowHeights: file.rowHeights.pruned(keeping: timeline.laneIDs)
         )
@@ -576,4 +583,12 @@ enum VideoEditProjectIO {
 struct StillRegeneration: Hashable, Sendable {
     var image: URL
     var nativeResolution: Bool
+}
+
+extension UTType {
+    /// `.skycut`（改名之前的 `.srtflowproj` 也是它）。Info.plist 里声明了同一个标识符，双击工程文件才会回到 SkyCut。
+    static let srtFlowProject = UTType(
+        exportedAs: "com.srtflow.project",
+        conformingTo: .json
+    )
 }

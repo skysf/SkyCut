@@ -85,6 +85,10 @@ enum MCPGuideWorkspaceTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.openFolder, """
             open_folder sets the folder you work in; it changes no files.
+
+            Read-only. Use a folder the user named as the workspace: lists its videos, images, audio and subtitle files (with \
+            duration and size) in every subfolder; files in it import without asking again, and new files go to its SkyCut \
+            subfolder. Only pass a folder the user gave you; from_finder=true uses their Finder selection.
             """),
             MCPGuideSection(name: "listing", about: "what the result lists, and how paths look", text: """
             Listing. It lists videos, images, audio and subtitle files in the folder and every subfolder, with duration and \

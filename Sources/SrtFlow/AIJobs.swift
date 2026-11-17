@@ -26,6 +26,8 @@ final class AIJobs {
         case listen
         /// A look not done within about 25 s (AILookCall): its result and picture come with get_job.
         case look
+        /// A checked web page rendered to an upper-track clip by set_motion.
+        case motion
     }
 
     enum Status: String {

@@ -37,6 +37,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
   Sources/SrtFlow/EditLane.swift \
   Sources/SrtFlow/VideoEditCanvasRatio.swift \
@@ -94,6 +95,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditFormatVersion.swift \
   Sources/SrtFlow/VideoEditProjectFile.swift \
+  Sources/SrtFlow/WebMotionProjectFiles.swift \
   Sources/SrtFlow/LinkGroupRepair.swift \
   Sources/SrtFlow/VideoEditMediaBookmarkCache.swift \
   Sources/SrtFlow/AudioLibraryCache.swift \
@@ -138,6 +140,7 @@ xcrun swiftc \
   checks/ProjectFile/ExitCurves.swift \
   checks/ProjectFile/Regions.swift \
   checks/ProjectFile/OldFreezeTails.swift \
+  checks/ProjectFile/WebMotion.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # ---- 真实媒体素材（探针「文件存在 ≠ 音轨可读」那一组要用）----

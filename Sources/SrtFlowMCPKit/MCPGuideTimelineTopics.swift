@@ -21,6 +21,10 @@ enum MCPGuideTimelineTopics {
             MCPGuideWrittenTopics.overview(setTextPreviousCard, """
             set_text adds one text on screen (a title, caption or label) or changes one (text_id from get_timeline). Change many texts in \
             one call with set_texts. Each call is one undo step.
+
+            Add on-screen text (titles, captions, labels) or change one (text_id); omitted fields stay. Batch: set_texts. Position is \
+            the block's centre: a named spot or x/y canvas fractions. Colours #RRGGBB or #RRGGBBAA. One undo step; clamped values \
+            return requested/applied/adjustments.
             """),
             MCPGuideSection(name: "layout", about: "position, box_width, alignment, font_size, and the lines / block in the result", text: """
             Layout. position is a named spot (top, upper_third, center, lower_third, bottom) or x / y, the block's centre as canvas \

@@ -30,6 +30,7 @@ func runSplitOutGroups(root: URL) {
         ("工程文件的后缀：新存 .skycut、老的 .srtflowproj 照认", checkProjectFileExtension),  // 47：ProjectFileExtension.swift
         ("精确源画面矩形", checkSourceRegions),          // 48：Regions.swift
         ("Old freeze tails leave their clip's link group", checkOldFreezeTails),  // 49: OldFreezeTails.swift
+        ("Web-motion source and disposable project caches", checkWebMotionProjectFiles),  // 50: WebMotion.swift
     ]
     for group in groups {
         do {

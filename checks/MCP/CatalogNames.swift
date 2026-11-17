@@ -100,6 +100,9 @@ func catalogKnownNames() -> Set<String> {
     // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
     names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
                      "audio_max_reduction_db"])
+    // Web-motion library entries and accepted-render reports (AIMotionTool).
+    names.formUnion(["motion_library", "render_seconds", "look_times", "frame_entry", "same_twice", "no_blank_frames",
+                     "no_page_errors", "no_timeout"])
     return names
 }
 

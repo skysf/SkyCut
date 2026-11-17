@@ -40,6 +40,10 @@ enum MCPGuideTimelineEditTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.setTrack, """
             set_track changes a whole track; each call is one undo step.
+
+            Change a whole track: its fader (volume_db, on top of each clip's own volume) or hidden (left out of the preview and \
+            the export). track master is the fader after all tracks. Use it to duck music under a voice-over or mute a track. One \
+            undo step; clamped values return requested/applied/adjustments.
             """),
             MCPGuideSection(name: "fader", about: "track and master faders in dB", text: """
             Fader. volume_db is the track's fader in dB, on top of each clip's own volume and curve, clamped to \
@@ -112,6 +116,10 @@ enum MCPGuideTimelineEditTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.duplicateItems, """
             duplicate_items copies items; each call is one undo step.
+
+            Copy clips, texts, shapes, filters or subtitle lines (ids can be mixed) with the same spacing, the earliest at start \
+            (default: right after the last one ends). A copy that would overlap moves up a track, like paste; linked audio comes \
+            along. Returns the new ids. One undo step.
             """),
             MCPGuideSection(name: "placement", about: "where the copies land", text: """
             Placement. The copies keep their spacing; the earliest lands at start (default: right after the last of them ends). \

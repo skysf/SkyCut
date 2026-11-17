@@ -1551,3 +1551,11 @@
 "FROM" = "FROM";
 "PRESENTS" = "PRESENTS";
 "TITLE" = "TITLE";
+
+"This motion was rendered on another system. Its carried video is kept; re-rendering may change the lettering." = "This motion was rendered on another system. Its carried video is kept; re-rendering may change the lettering.";
+
+"Missing motion fonts: %@. The carried video is kept; choose installed fonts before re-rendering." = "Missing motion fonts: %@. The carried video is kept; choose installed fonts before re-rendering.";
+
+"Motion could not be rebuilt: %@" = "Motion could not be rebuilt: %@";
+
+"Motion is still being rebuilt. Wait for rendering to finish before exporting." = "Motion is still being rebuilt. Wait for rendering to finish before exporting.";

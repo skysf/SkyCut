@@ -79,6 +79,21 @@ func checkUpscaleSwap(root: URL) throws {
     still.stillImageURL = root.appendingPathComponent("a.png")
     check(!ClipSourceSwap.fits(still, replacement), "图片段不换源")
 
+    // Generated movies remain caches of their page. An imported copy of the same file can still be upscaled independently.
+    var motion = EditClip(sourceURL: original, sourceStart: 3, sourceDuration: 3, timelineStart: 25, info: clip.info)
+    motion.webMotion = WebMotionClipRecord(page: "<p>recoverable motion source</p>", fps: 24)
+    let generatedBefore = motion
+    check(!ClipSourceSwap.fits(motion, replacement), "web-motion caches cannot enter an upscale source swap")
+    check(!ClipSourceSwap.apply(replacement, to: &motion), "an upscale result cannot replace a generated motion cache")
+    checkEqual(motion, generatedBefore, "refusing an upscale preserves the page, movie and every edit")
+    var withMotion = TimelineState()
+    withMotion.mainClips = [clip]
+    withMotion.overlayTracks = [EditLane(clips: [motion])]
+    checkEqual(withMotion.clipIDs(usingPicture: original), [clip.id], "upscale coverage excludes generated uses of the same file")
+    checkEqual(withMotion.applyUpscale(replacement, to: [clip.id, motion.id]), [clip.id],
+               "a completed upscale changes only the ordinary imported use")
+    checkEqual(withMotion.clip(with: motion.id), generatedBefore, "a mixed batch leaves the regenerable source untouched")
+
     // ---- 再次 upscale：仍按原片算 ----
     let again = root.appendingPathComponent("Shot_原片_1920x1080_bytedance-standard.mp4")
     let secondRecord = ClipUpscaleRecord(originalURL: again, sourceOffset: 0, tier: "bytedance-standard")
@@ -150,7 +165,7 @@ func checkUpscaleSwap(root: URL) throws {
     let records = try VideoEditProjectIO.save(save, to: file)
     check(records[original.path] != nil && records[upscaled.path] != nil, "存盘的素材表里原片和 upscale 文件都有记录")
     let json = try String(contentsOf: file, encoding: .utf8)
-    check(json.range(of: #""formatVersion"\s*:\s*34"#, options: .regularExpression) != nil, "写出去的是 latest（v34）")
+    check(json.range(of: #""formatVersion"\s*:\s*35"#, options: .regularExpression) != nil, "写出去的是 latest（v35）")
     let loaded = try VideoEditProjectIO.load(from: file).timeline
     checkEqual(loaded.mainClips.first?.upscale?.originalURL, original, "读回来：原片路径在")
     checkClose(loaded.mainClips.first?.upscale?.sourceOffset, 2, "读回来：偏移在")

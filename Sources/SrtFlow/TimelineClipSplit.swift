@@ -56,6 +56,7 @@ enum TimelineClipSplit {
         right.soundScene = left.soundScene
         // upscale 的来源也要跟过来（从旧段构造新段漏字段的老坑：docs/bugfixes/2026-09-26-split-drops-hidden-and-library-key.md）。
         right.upscale = left.upscale
+        right.webMotion = left.webMotion
         left.sourceDuration = leftSourceLength
         // 切口是硬切，原来的转场跟着右半走。
         left.transitionAfter = .none

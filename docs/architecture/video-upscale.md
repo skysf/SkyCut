@@ -34,6 +34,10 @@ App 把原片的那一段裁出来送 Sky Studio，做完**先弹对比窗口**�
    网页上开着的本机看不见，服务器回 429 照旧在本机等着再交。
 5. **中间文件只在 `UpscaleJob.workFolder`**（临时目录），每次做完 / 取消 / 失败都删干净；成品只在原片旁边（或退路）。
 6. **不弹模态框、不进撤销分组**：任务本身不改工程；换源那一步是一次 `perform`。
+7. **Generated web-motion movies stay caches of their page**: upscale rejects them before reading a key, asking for models
+   or a quote, or uploading anything. The common panel model offers no upscale request, and `ClipSourceSwap.fits` refuses them
+   even if an older task returns or another imported clip shares the same file. Render the page at a larger size instead;
+   replacing only its movie would be undone by cache recovery or saving the stored page.
 
 ## 三、界面（2026-10-02 第四刀，mockup 定的样子）
 

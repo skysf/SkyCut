@@ -82,6 +82,8 @@ struct ClipFileReplacement: Equatable {
         // 换成了另一个文件：音乐库的身份、upscale 的来源记录都是旧文件的。
         clip.remoteKey = nil
         clip.upscale = nil
+        // The new media has no generated page: recovery must never restore the replaced movie.
+        clip.webMotion = nil
         clip.needsStillConversion = false
     }
 

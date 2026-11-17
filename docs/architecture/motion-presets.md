@@ -115,3 +115,17 @@
 2. 时间线上拖一块不带整套（整套挪用检查器的「落点」或 AI 的 `hit_at`）；框住再放开里「放开」那一下没有单独的旋钮（跟着总长走，
    要改就拖框那一块的尾巴）。
 3. 「落点」不吸附到音乐的重音上（AI 用 `listen` 找到那一下再给 `hit_at`）。
+
+## 7. One library, two kinds (2026-11-17)
+
+`MotionPresetLibrary` is the common ordering for the panel and AI: native text/shape presets first, reusable web pages stored in this
+project second. Native presets remain normal editable text/shapes and use `set_text`. A web entry uses `set_motion` and becomes a checked
+ProRes 4444 upper-track clip. Its page and parameter form are retained in the project, so the video is a disposable cache rather than
+imported media. `get_timeline.motion_library` advertises the entry id and correct tool; a custom page is available for reuse after its
+first successful placement. Do not add a competing web-only library or a separate entry point.
+
+Choose the existing native motion first, then a reusable template, and only write a new page when neither fits. New AI-written pages use
+the existing two permission modes: ask once in request-approval mode, proceed in full access. Neither mode can relax the page locks.
+Parameters, portable caches, local hit alignment, system/font warnings and the six page checks are specified in
+[the renderer contract](web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17). The official web designs are added as
+library entries rather than new rendering paths.

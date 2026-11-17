@@ -58,6 +58,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     case duplicateItems = "duplicate_items"
     case setTransition = "set_transition"
     case setText = "set_text"
+    case setMotion = "set_motion"
     case setTexts = "set_texts"
     case setShape = "set_shape"
     case setShapes = "set_shapes"
@@ -97,7 +98,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         case .setView, .generateMedia, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
              .changeVoice,
              .upscaleClip, .addClips, .editClip, .editClips, .syncVoiceover, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
-             .deleteItems, .duplicateItems, .setTransition, .setText, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,
+             .deleteItems, .duplicateItems, .setTransition, .setText, .setMotion, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,
              .translateSubtitles, .getSubtitles, .editSubtitles, .exportVideo, .exportSubtitles, .undo, .seek:
             return true
         }
@@ -109,6 +110,7 @@ public enum MCPToolName: String, CaseIterable, Sendable {
         case .listCharacters, .getCharacter, .manageCharacters: return MCPCharacterTools.definition(for: self)
         case .listVoices, .manageVoices: return MCPVoiceLibraryTools.definition(for: self)
         case .changeVoice: return MCPVoiceChangeTool.definition
+        case .setMotion: return MCPMotionTool.definition
         case .inspectVideo: return MCPInspectionTool.definition
         case .syncVoiceover: return MCPVoiceoverSyncTool.definition
         case .getSettings, .setSettings:

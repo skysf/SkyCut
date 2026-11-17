@@ -3,8 +3,8 @@
 > Covers: `skycut-web-motion` (the helper process that renders a motion web page), SkyCut's API for it
 > (`WebMotionRenderer.render`), the page contract, the locks, the time and memory limits, the page clock, the transparent
 > background, the page checks before a movie is accepted (MCP-75), versions, packaging, and the checks that pin all of it.
-> Not covered yet: the AI tool, the inspector / motion panel and storing a rendered clip in the project (MCP-74, next task);
-> where rendered movies live and how they are fingerprinted (MCP-74).
+> Also covers MCP-74's stored source, project-relative cache and `set_motion` AI call (2026-11-17).
+> The shared library and panel contract is in [motion presets](motion-presets.md).
 >
 > Origin (2026-11-16/17): the web-motion probe (internal research, `2026-11-16-web-motion-probe/report.md`) showed that an
 > AI-written page rendered with the Mac's own WebKit gives frame-exact, transparent titles whose text matches SkyCut's own.
@@ -26,7 +26,7 @@ moment; its WebKit processes (WebContent, GPU, Networking) end with it (measured
 - **Command line, not XPC**: same pattern, packaging and signing as `skycut-mcp`; no launchd plist, nothing to register.
 - **One render at a time** (`WebMotionRenderGate`): three helpers at once measured slower than one helper drawing on three pages.
 
-## 2. The API (for MCP-74)
+## 2. The renderer API
 
 `WebMotionRenderer.render(_ job: WebMotionJob) async throws -> WebMotionRender`
 
@@ -255,3 +255,66 @@ own message.
 - [ ] Real memory pressure on a spare Mac: a render under "critical" is stopped and SkyCut keeps running.
 - [ ] A non-Retina display (backing scale 1) and a Retina one give the same frame hashes for the same page.
 - [ ] A 4K, 60 s page: total time stays within its limit; SkyCut stays responsive.
+
+## 15. Stored motion and the AI call (MCP-74, 2026-11-17)
+
+`EditClip.webMotion` stores the HTML, canonical JSON parameters, editable field descriptions, duration, local hit, output geometry,
+declared fonts and render provenance. This is project format v35: an older app must refuse rather than discard the only source for
+rebuilding a missing movie. Splitting/copying retains the full source and local hit; replacing the source with imported media clears it.
+The movie is absent from the imported-media/bookmark table. See [project files](video-edit-project-file.md).
+
+`WebMotionCache` writes `SkyCut/Motion/motion-<SHA256>.mov` beside the project, plus optional HTML, parameter and check-receipt sidecars.
+The key includes the page, sorted parameters, duration/hit, output geometry/fps, renderer version, OS/build, WebKit and declared/current
+font-file identities. `MOTION_PARAMS.duration` and `MOTION_PARAMS.hit` are reserved and always match the source's timing controls.
+A changed input gets a new file so undo still has the previous render. A cache hit needs the movie and an accepted six-check receipt.
+An untitled manual project uses a temporary directory until Save/Save As carries the movie beside the project.
+
+A carried project-relative movie wins over its former absolute path. A different OS or missing original fonts produces a warning in
+`get_timeline`; UI callers use the same warning helper. It does not replace a carried movie. Fixed page fonts and editable font parameters are separate
+from historical render provenance. Only an explicit re-render/input edit or missing cache renders locally. Open and runtime revalidation
+run `WebMotionRecovery`; recovery changes no undo history, retains trims/transforms, and cannot land in another document. Visible missing
+motion makes export fail with a readiness message, rather than silently drop the picture.
+
+One library (`MotionPresetLibrary`) lists native presets first and reusable project pages second. AI discovery is
+`get_timeline.motion_library`: native entries use `set_text`, web entries use `set_motion`. A web id is `project:<clip UUID>`; the HTML is
+read from the stored record, never from a file URL. New custom pages become reusable project entries as soon as their clip is committed.
+
+`set_motion` takes a template id or full page, parameters/fields, optional `clip_id`, `at` or `hit_at`, local `hit`, duration, upper track,
+name and fixed fonts. Parameter changes merge top-level values and re-render the same clip identity, retaining its cut, speed and effects.
+The clip's length comes from the checked movie, including rounding a requested duration to whole frames; a 0.51 s request at 24 fps is
+a 0.5 s source. Parameter edits keep the existing lane, including a hidden lane, whenever the new span fits; a collision on a hidden lane
+is refused rather than making the picture visible. Reusing a template for a new clip adopts the destination canvas and project fps;
+editing an existing clip retains its source geometry. Generated caches cannot enter cloud upscale or its source swap: re-render the page.
+`hit_at` aligns the local source hit through the clip's trim and speed; a hit outside a trimmed source is refused. An expanded whole source
+may move its hit into the new range. The default track is V2, with overlap lifted by the existing import landing rule. Hidden/removed
+targets become a new upper track; the helper never lands on V1.
+
+New AI-written pages ask once in request-approval mode using the existing confirmation protocol; full access proceeds. Approval binds the
+complete resolved request and document generation. A stored page's parameter edits/template reuse need no further page approval. The
+network lock is identical in both modes. No script runs or render job starts before approval. `AIMotionTool` owns an `AIJobs.motion` task;
+after 25 s it returns the job id and finishes through `get_job`. The complete result includes clip id, render time, six checks and
+`look_times`; failures preserve the helper's original text and checks. Cancellation or a changed document/clip cannot commit stale output.
+Both AI and UI use `WebMotionActions`: asynchronous rendering, then one synchronous `AIUndoGrouping.step`/`perform` commit.
+
+`scripts/check-motion-placement.sh` links real App objects in its own bundle/defaults domain and drives the real helper with small synthetic
+pages. It covers placement, template reuse, parameter edits, undo/redo, approval modes, error atomicity, system/font warnings and missing
+cache recovery. `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by
+`check-mcp`, including scans-only. Renderer lockdown checks remain `scripts/check-web-motion.sh`.
+The timeline drop wiring guard counts `WebMotionActions` as a separate, exactly-once consumer of `mediaImportLandings`, like the
+AI importer; the file drop's preview and commit must still be its only two calls. No second landing calculation is permitted.
+
+Reverse verification (2026-11-17): the initial 72 real placement assertions pass; bypassing the clip equality gate makes the stale-render
+assertion fail (1/72), and bypassing page approval makes the approval/no-token group fail (2/46 before stopping). Both production edits
+were restored and the full assertions passed again. Additional regressions: a parameter edit on a hidden lane failed before the fix
+(1/74), and reverting movie-based source length failed both non-grid duration assertions (2/79); both were restored to green.
+The first development harness run exposed mixed incremental App objects after a
+model layout change; a clean rebuild of only the App target removed that failure. This is not evidence of a source or compiler fix.
+
+Additional manual regression before release:
+
+- [ ] Copy a project and its `SkyCut/Motion` folder to a second Mac: the carried movie plays unchanged and the OS/font warnings appear;
+      edit a parameter, re-render, and check the new lettering over the shot.
+- [ ] Delete only a cached movie while its project is open: recovery restores it without a relink prompt or an undo entry; exporting
+      during recovery reports that the motion is not ready.
+- [ ] Save As during a render, close/reopen the destination, and confirm the movie is carried beside that project; changing/closing the
+      project during a render cannot add the result to another document.

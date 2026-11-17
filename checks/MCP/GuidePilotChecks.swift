@@ -14,7 +14,7 @@ import SrtFlowMCPKit
 /// 没有可搬的原文的迁移工具：行为和迁移同一个 PR 改了，旧说明照抄进概要等于叫 AI 用已经没有的东西（add_voiceover：声音方案 4.10、4.2–4.4、
 /// 第十二节 —— 默认 gemini:Charon、去掉 clone_from、不再收 Rachel；旧说明每一句去了哪写在那个 PR 的说明里）；从第一天起就按名片 + 说明书写的
 /// 新工具（声音 PR 6 的 list_voices、manage_voices，声音 PR 9 的 change_voice）。名单写死：加一个要改这里。
-let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices, .changeVoice]
+let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion]
 
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
@@ -36,6 +36,7 @@ private let pilotPreviousCardLengths: [MCPToolName: Int] = [
 private let pilotNature: [MCPToolName: [String]] = [
     .editClip: ["One undo step", "skycut_guide topic=edit_clip"],
     .setText: ["One undo step"],
+    .setMotion: ["One undo step", "needs_confirmation", "wait with get_job", "skycut_guide topic=set_motion"],
     .addClips: ["One undo step", "needs_confirmation"],
     .look: ["Read-only", "wait with get_job", "needs_confirmation", "skycut_guide topic=look"],
     // 2026-11-10：Codex 把「画质尽量好」当成用户点名、自带 user_requested_overrides 跳过了确认 —— 名片上写死只有用户原话点名的规格才算。
@@ -128,11 +129,39 @@ func runGuidePilotChecks() {
     }
     let withoutPreviousCard = Set(MCPGuideWrittenTopics.migrated.filter { MCPGuideWrittenTopics.topic(for: $0)?.previousCard == nil })
     checkEqual(withoutPreviousCard, pilotToolsWithoutPreviousCard, "only the listed migrated tools have no pre-migration description to keep")
-    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice],
-               "the tools without a pre-migration description stay add_voiceover and the new voice tools")
+    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion],
+               "only add_voiceover and tools introduced with a guide have no pre-migration description")
     print("MCP migrated cards: \(cards.joined(separator: ", ")) (limit \(cardLimit), target 350).")
     runGuideFieldSplitChecks()
     runGuideContentsChecks()
+    runMotionCatalogChecks()
+}
+
+/// Web pages are a separate clip edit, with typed form fields and a free JSON parameter object.
+/// These assertions pin the callable discovery contract rather than mirroring rendering code.
+private func runMotionCatalogChecks() {
+    let tool = MCPToolName.setMotion
+    let properties = tool.definition.inputSchema["properties"]?.objectValue ?? [:]
+    checkEqual(Set(properties.keys), ["template", "page", "parameters", "fields", "clip_id", "at", "hit_at", "hit", "duration",
+                                     "track", "name", "fonts", "confirm_token", "project"], "web-motion call exposes the documented fields")
+    check(tool.takesProject && !tool.definition.readOnly && !tool.definition.openWorld,
+          "web motion edits the named project locally and advertises no network")
+    checkEqual(properties["fields"]?["items"]?["properties"]?["type"]?["enum"], ["text", "font", "color", "number"],
+               "editable form controls have the four supported kinds")
+    checkEqual(properties["fields"]?["items"]?["required"], ["key", "label", "type"], "each form field names its key, label and kind")
+    checkEqual(MCPArgumentCheck.problem(tool: tool, arguments: ["clip_id": "c1", "parameters": ["heading": "EXPEDITION", "amount": 5]]), nil,
+               "page parameter keys are free and a parameter-only edit is callable")
+    check(MCPArgumentCheck.problem(tool: tool, arguments: ["fields": [["key": "font", "label": "Font", "type": "font", "typo": true]]]) != nil,
+          "unknown form-field metadata is rejected instead of silently lost")
+    checkEqual(MCPArgumentCheck.problem(tool: tool, arguments: ["page": "<script>window.motion={frame(t){}}</script>", "confirm_token": "approved"]), nil,
+               "new-page confirmation can be returned through the same tool")
+    let topic = MCPGuide.answer(topic: "set_motion", section: "results")["text"]?.stringValue ?? ""
+    for checkName in ["loads", "frame_entry", "same_twice", "no_blank_frames", "no_page_errors", "no_timeout"] {
+        check(topic.contains(checkName), "the motion guide names the \(checkName) result")
+    }
+    let overview = MCPGuide.answer(topic: "set_motion", section: "overview")["text"]?.stringValue ?? ""
+    check(overview.contains("try those first") && overview.contains("then a ready-made web template"),
+          "the motion guide prefers native motion before a web template and an AI-written page")
 }
 
 /// 分节回的主题：第一次回答列出每一节讲什么（contents）、叫 AI 只读要用的那几节；迁移过的工具每个手写的节都写了讲什么；

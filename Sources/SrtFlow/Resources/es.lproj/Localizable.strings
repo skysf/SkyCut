@@ -1551,3 +1551,11 @@
 "FROM" = "DE";
 "PRESENTS" = "PRESENTA";
 "TITLE" = "TÍTULO";
+
+"This motion was rendered on another system. Its carried video is kept; re-rendering may change the lettering." = "Esta animación se renderizó en otro sistema. Se conserva el vídeo del proyecto; volver a renderizar puede cambiar las letras.";
+
+"Missing motion fonts: %@. The carried video is kept; choose installed fonts before re-rendering." = "Faltan fuentes de la animación: %@. Se conserva el vídeo del proyecto; elige fuentes instaladas antes de renderizar.";
+
+"Motion could not be rebuilt: %@" = "No se pudo reconstruir la animación: %@";
+
+"Motion is still being rebuilt. Wait for rendering to finish before exporting." = "La animación se está reconstruyendo. Espera a que termine antes de exportar.";

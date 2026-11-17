@@ -14,6 +14,9 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.undo, """
             undo reverses edits in the project, the way the user would with Command-Z.
+
+            Undo the latest edits, like Command-Z (steps, default 1). round=true puts the project back to how it was before this \
+            round of AI edits began, itself one undo step. File moves by manage_files are not undone.
             """),
             MCPGuideSection(name: "steps", about: "how many edits, and what one edit is", text: """
             Steps. steps (1–50, default 1) undoes that many edits. Every tool call that changes a project is one undo step, so \
@@ -40,6 +43,8 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.seek, """
             seek moves the playhead so the user sees a frame; it never changes the project.
+
+            Read-only for the project: move SkyCut's playhead to a timeline time so the user sees that frame in the preview.
             """),
             MCPGuideSection(name: "showing", about: "pointing the user at a moment", text: """
             Showing a moment. time is timeline seconds. The preview shows that frame, so use it to point the user at something \
