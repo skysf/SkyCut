@@ -88,6 +88,7 @@
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。
 - [2026-11-17 Ripple-deleting a freeze hold moves the clip before it](2026-11-17-freeze-tail-ripple-drags-its-clip.md) — A piece that moves away from its partners keeps no link group; a V1 ripple never moves a clip before its point.
 - [2026-09-27 GBK 字幕读出来是乱码](2026-09-27-gbk-subtitles-read-as-utf16.md) — 编码识别只走 `TextDecoding`；宽容的解码器（UTF-16）只能放最后或先用特征确认。
+- [2026-11-17 Generated media duration mismatch notice](2026-11-17-generated-duration-mismatch-notice.md) — Keep requested and server-reported lengths together, warn above 1 second, and preserve unknown duration.
 - [2026-11-07 生成图片的扩展名和实际字节不符](2026-11-07-generated-image-extension-from-bytes.md) — 下载后按实际字节定扩展名、不重编码；交付失败不重新生成。
 - [2026-10-30 生成固定首个模型且缺少多参考](2026-10-30-generation-models-and-reference-inputs.md) — 模型默认值和参考限制可查询；当时的「退款明确后替换一次」10-31 已移除，现在拒绝和未知结果都只查原单。
 - [2026-10-30 添加 Key 后旧 AI 会话仍缺生成工具](2026-10-30-generation-tools-missing-after-key-added.md) — 工具始终列全，Key、授权和积分在执行时核对。
@@ -257,6 +258,7 @@
 - [2026-08-03 时间线捏合缩放](2026-08-03-trackpad-pinch-zoom.md) — 事件序列与 Rosetta 旧产物。
 - [2026-09-26 纵向滚下去后轨道块画到钉住的标尺上面](2026-09-26-tracks-cover-pinned-ruler.md) — 叠放次序只认最外面那层 `.zIndex`；钉住的东西要在真滚过的状态下看。
 - [2026-11-10 繁体旁白合批后切不开，付过钱卡死](2026-11-10-traditional-chinese-batch-split-fails.md) — 对字要折叠繁简、转写语言带字形；假转写不能照抄稿子。
+- [2026-11-17 Black endings and large batch replies](2026-11-17-trailing-black-ending-and-large-batch-replies.md) — Save an explicit minimum ending and retain final-value exceptions in compact replies.
 - [2026-08-04 Transform 复审](2026-08-04-transform-review.md) — 格式版本、叠化与缓存原子性。
 - [2026-09-23 转场卡片拖到接缝上没反应](2026-09-23-transition-drop-cancel-ends-session.md) — 不能放时回 `.forbidden`；`.cancel` 会结束整轮拖放。
 - [2026-09-20 拖短转场时遮罩整块往右挪](2026-09-20-transition-mask-drifts-when-shortened.md) — 宽度有下限时，位置要跟着补偿。

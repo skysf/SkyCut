@@ -462,7 +462,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md) — 默认值和记忆只有 `EditorToggles` 一份；播放跟随默认关、联动默认开；磁吸跟着工程走。
 - [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — 锚点（捏合钉指针、工具栏钉播放头）从滚动几何量；纵向缩放统一行高。
 - [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 剪贴板只有一套且不写纯文本、换新身份走编码往返、落点鼠标优先、撞上往上抬。
-- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式(formats through v35)、定位、脏标记与自动保存、换成 upscale 文件的段。
+- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式(formats through v36)、定位、脏标记与自动保存、换成 upscale 文件的段。
 - [Saved project versions](docs/architecture/project-versions.md) — Versions saved around each AI round: when (only if changed), where (per project file), pruning (30, 60 days), going back in one undo step, the AI's contract.
 - [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、吸附与对齐线、唯一落点、拖动会话不进 `@State`、框选、整条时间线只许一个拖放落点、插入缝与整轨换位。
 - [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览 / 导出同账；合成的一份时间账。
