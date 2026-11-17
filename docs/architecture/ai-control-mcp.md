@@ -374,6 +374,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      is refused with the reason (a voice inside a clip's own sound can't be taken out). Report only. Same job shape as mix=true
      (`AIListenMix.queued`). Contract in [the listening engine](listening-engine.md) section 2 item 3a; the guide's listen topic has a
      `voice` section; one parameter and a few words on the card.
+   - **What is in a clip's own sound? (`describe=true`, 2026-11-17, MCP-42 / MCP-44)**: with `clip_id` (or `file`), per 3 s window
+     SkyCut's traits and their numbers, macOS's sound classifier's strongest labels each with its own score, and the words the
+     on-device speech recogniser found (an installed model only, never a download). Words, never "music / not music". Clips whose
+     source is known (our voice-overs, library music and effects, generated audio) are not described: the reply names the source.
+     At most 60 s at a time; a listen job. Contract in [the listening engine](listening-engine.md) section 2 item 4a.
      Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened
      and the wording moved into the listen guide topic; the catalog is no longer than before mix=true (99,059 vs 99,063 on 2026-11-16).
 

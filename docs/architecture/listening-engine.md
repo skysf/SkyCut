@@ -9,7 +9,8 @@
 > （能听的大模型认环境声约六成、问「什么时候、几次」基本不可用；苹果的识别器没有「轰鸣」这一类），所以在 SkyCut 里自己做一层薄的：
 > 量 + 成熟指标 + 苹果自带的识别，不加第三方依赖、不训模型。用户同意用 ESTOI 量「人声被盖住」、只报不拦。
 > 2026-11-16 合入的是第 2、3 步里不依赖第 1 步的纯计算（`Sources/SrtFlow/Listening/`），**还没接到任何地方**。
-> **2026-11-17: step 2 is wired**: `listen voice=…` (section 2 item 3 below; the lines are in code: `VoiceClarity`).
+> **2026-11-17: steps 2 and 3 are wired**: `listen voice=…` (section 2 item 3a; the lines are in code: `VoiceClarity`) and
+> `listen describe=true` (section 2 item 4a: SkyCut's traits + SoundAnalysis's per-label scores + words heard).
 
 ## 一、分层
 
@@ -18,7 +19,7 @@
 | 0 来路 | 这层声音是什么、为什么在这 | 读工程：生成时的提示词、音乐库 / 音效库的标签、旁白的文字、合成音效的预设 | 工程里本来就有，**不用听** |
 | 1 量 | 每层、每帧、每个频段多响；整条的响度、峰值 | 音频引擎按层离线渲（`AudioStemRender`、`MixMeasurement`，[成片的声音](export-audio-mixdown.md)「按层量」） | Merged 2026-11-16 (`listen mix=true`); since 2026-11-17 every peak is a true peak (`TruePeak`, dBTP, the limiter's measure) and a clip's or file's `loudest_at` is a frame |
 | 2 成熟指标 | 每句人声清不清楚；主要是谁盖住了它、压哪层最管用；ESTOI 看不见的低频有多响 | `Listening/ESTOIAnalysis`、`ESTOI`（含 `ESTOIReference`）、`MaskerAttribution` | Wired 2026-11-17: `listen voice=…` (`AIListenVoiceCheck`) |
-| 3 描述没来路的原声 | 素材自带的声音大概是什么：低沉长音 / 宽频噪声 / 有音高 / 有拍子 / 像说话 | `Listening/SourceSoundFeatures`、`SourceSoundSpectrogram`、`SourceSoundTrait`（含 `SourceSoundDescription`） | 九个特征和描述合了，没接；苹果 SoundAnalysis「每个标签自己的分数」、SpeechTranscriber「有没有字」要系统接口和真文件，没做 |
+| 3 描述没来路的原声 | 素材自带的声音大概是什么：低沉长音 / 宽频噪声 / 有音高 / 有拍子 / 像说话 | `Listening/SourceSoundFeatures`、`SourceSoundSpectrogram`、`SourceSoundTrait`（含 `SourceSoundDescription`） | Wired 2026-11-17: `listen describe=true` (`AIListenSourceSound`), with SoundAnalysis's per-label scores (`SoundLabelScores`) and the on-device speech recogniser's words |
 | 4 声音报告 | 把 1–3 拼成一张按时间的表，AI 一次读完；「要人听」的几处 | — | 没做 |
 | 5 以后 | 拆开（素材原声里的人声和别的）、认（更细的名字）、第二只耳朵（云端窄问题）、人的耳朵（一键打点） | — | 都没做；要下载模型或花钱的，先问用户 |
 
@@ -53,6 +54,20 @@
    the mix lane, `MediaReadQueue.export`, 20 s inline); read-only; never the preview's engine.
    Voice-over clips are one line each already; a long narration file is split by its pauses, not by a transcript (listen is
    read-only and starts no transcription).
+4a. **How `listen describe=true` does it (2026-11-17, MCP-42 SkyCut half + MCP-44).** With `clip_id` (or `file`): a clip whose
+   provenance is known (our voice-over, library music or effect, synthesized effect, generated audio) is not described — the reply
+   names its source (rule 1). Otherwise `AIListenSourceSound` reads the clip's window once (`AIListenAudioWindow` keeping one
+   channel, (L + R) / 2; at most 60 s, longer is refused with a `to` / `source_out` that fits) and, per 3 s window from the window's
+   start, reports: SkyCut's traits and the numbers behind them (`SourceSoundDescription`, section 5); macOS's sound classifier
+   (`SoundLabelScores`: SoundAnalysis `SNClassifySoundRequest(.version1)`, 3 s analysis windows without overlap, every label's own
+   score — the report keeps the strongest five at 0.05 or more); and how many words the on-device speech recogniser finds there
+   (`AIListenSourceWords`: a 16 kHz window via `QueuedAudioWindow`, `SpeechTranscriptionService` with `screeningLocale()` = a model
+   already installed, never a download; macOS 26; the summary quotes up to 120 characters of what it heard). A listen job (AIJobs,
+   the mix lane); the classifier's first use in a process compiles its model (measured ~90 s once on a busy M1, then 0.13 s for
+   9 s of sound), so the first call may answer with a job id.
+   Words, never "music / not music": on synthetic sound the classifier scored a 55 Hz drone "music 0.88, synthesizer 0.87",
+   white noise "music 0.14, waterfall 0.14, water 0.11", a major chord "music 0.66, bell 0.56" — the runner-ups and how close they
+   are carry the information.
 4. **没来路的原声**（每个留着原声的镜头）：那一层的采样交给 `SourceSoundDescription.describe(_:sampleRate:)`，回每 3 秒一窗的九个数和描述词。
 5. 第 4 步把这些拼成表交给 AI；**只报不拦**（第三节）。
 6. 都是纯 CPU 的计算，不读文件、不碰声卡：接线时放在后台（AI 起的走 `AIJobs`，[AI 接口](ai-control-mcp.md)第四节第 59 条），别放主线程。
@@ -117,7 +132,8 @@
 - 「像说话」多一条音高强度 < 0.65：唱的、乐器的长音比说话的周期性强（说话有清音、有抖动），研究里人声 0.42–0.63；
   前三条都占了的音乐窗（12 个）音高强度 0.64–0.82，11 个在 0.65 以上。
 - 说不出来的：「风声垫底」（一条带音高的低吼，本机识别器说是鲸叫、音乐、锣）三窗一个词都不占 —— 音高强度 0.49–0.52、集中度 0.59–0.62，
-  都在线下；它和音乐本来就挨着边。这种要等 SoundAnalysis 每个标签的分数一起看。
+  都在线下；它和音乐本来就挨着边。这种要等 SoundAnalysis 每个标签的分数一起看（since 2026-11-17 `listen describe=true` reports both
+  side by side, section 2 item 4a）。
 
 ## 六、和 Python 版对
 
@@ -186,3 +202,12 @@ lines, loud noise under the second, quiet "library music" all along → two line
 the second `probably_unintelligible` with A2 (`other`) its main masker and removing it worth most; V tracks refused with the
 reason; `auto` finds the voice-over track by its folder; two voice tracks speaking at once → `two_voices`. Not verified: real
 narration under real music (the blind-test items are not in the repo); the lines themselves (one listener).
+
+**`listen describe=true` (2026-11-17)**: on 9 s of synthetic sound (a 55 Hz drone, white noise, a major chord),
+`scripts/check-sound-labels.sh` runs the real classifier — one window per 3 s, every label's own score in 0…1, strongest first,
+more than one label scoring in a window — and `scripts/check-mix-layers.sh` group 4 checks the report: SkyCut's traits on the right
+windows (low_drone, broadband_noise, pitched), the strongest five labels at 0.05 or more, words counted per window and quoted,
+source seconds mapped to the clip's timeline (start, source start, speed), and why words were not checked. The classifier has its
+own small script with a fixed binary path because CoreML compiles the model for the Neural Engine the first time each new binary
+uses it (25–90 s measured on an M1, minutes under load; an unchanged rerun at the same path skips it). Not verified: real camera sound and generated video sound (the South Pole
+shots are not in the repo), the classifier's labels on them, the speech recogniser inside the app (it needs an installed model).
