@@ -221,27 +221,8 @@ Task {
         // B. 缩放关键帧（线性 + 缓动）：checks/PreviewComposition/ScaleKeyframes.swift
         await checkScaleKeyframes(white1: white1)
 
-        // C. 旋转关键帧要按 ≤6°/片加密（矩阵插值走弦，不加密就是缩水变形）。
-        do {
-            var state = TimelineState()
-            let info = MediaInfo(
-                duration: 4, displaySize: CGSize(width: 64, height: 36), frameRate: 10,
-                videoCodec: "h264", audioCodec: nil, hasAudio: false,
-                audioCanCopyToMP4: false, fileBytes: 1
-            )
-            var clip = EditClip(sourceURL: white1, sourceDuration: 4, timelineStart: 0, info: info)
-            var animation = ClipAnimation()
-            animation.rotation.set(0, atSourceTime: 0, tolerance: kfTol)
-            animation.rotation.set(90, atSourceTime: 4, tolerance: kfTol)
-            clip.animation = animation
-            state.mainClips = [clip]
-            if let built = await VideoEditCompositionBuilder.build(from: state) {
-                let count = built.videoComposition?.instructions.count ?? 0
-                check(count >= 15, "旋转 90° 动画至少切成 15 片（≤6°/片），实测 \(count)")
-            } else {
-                check(false, "旋转动画场景合成失败")
-            }
-        }
+        // C. Rotation keys cut into ≤ 6° slices; turned and moving pictures bare the edges the geometry says (RotatedPictures.swift).
+        try await checkRotatedPictures(white1: white1)
 
         // D. 主轨预渲染：动画段渲成黑底 ProRes 422 中间片，抽帧亮度要跟
         //    合成里的面积曲线一致（导出=预览按构造一致的直接验收）。

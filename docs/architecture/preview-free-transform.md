@@ -70,6 +70,38 @@ it: set_canvas, the canvas menu, auto following a new first V1 clip, a screen re
   rectangle is not stretched, the ring's stroke is as thick as before, the title is as big as before (longer lines wrap), the
   export matches the preview; back to 16:9 everything is as it was.
 
+### Does the picture cover the frame (2026-11-17)
+
+get_timeline / edit replies said `fills_frame: true` for a clip turned 5° at scale 1.1 while look showed a bare corner, and a keyframed
+drift bared the left edge with nothing said ([case](../bugfixes/2026-11-17-fills-frame-ignores-rotation-and-motion.md)): the old test
+looked at the static box only. Rule — **one geometry** (`PictureCoverage`) answers every "does it cover" the AI reads:
+
+- A picture is its box (`ClipPlacement.frame(in:)`) turned clockwise about the box's own centre — the order both pipelines draw it in
+  (the transform order above). Flips mirror inside the box and a crop only changes the box's shape (the default fit follows the
+  cropped picture), so neither changes what it covers; a wipe part-way draws only part of the box (on the right when flipped).
+  It covers when every canvas pixel's centre is inside (half a pixel, the tolerance the axis-aligned test always had).
+- `fills_frame` (`ClipCoverage.fill`, via `AIFrameFit.describe`) is the clip **at rest** — static placement or the default fit, position /
+  size / rotation keyframes (`animatedPlacement` / `animatedRotation`) — at every frame it is on screen: a moving clip is tested on a
+  1/120 s grid (every frame of 24, 30 and 60 fps lands on it; one test when the box does not move). When it fails: `fill_scale`, the
+  smallest steady scale that covers throughout keeping x, y, rotation and shape, measured to the canvas's own corners and rounded up
+  (the preview compositor draws edges up to about a third of a pixel off the geometry: at the pixel-centre value two corner pixels of
+  a real frame stayed dark), and `fills_except`, the [from, to] timeline seconds when it fails only part of the time (at most 8).
+  set_keyframes returns `picture` too.
+- look's `uncovered` (`AIPictureCoverage.uncovered`) is that moment's frame: the pictures on screen then (the clips `on_screen` lists,
+  `ClipCoverage.onScreen`), each with the entrance / exit motion of that moment as the builder applies it (a V1 transition takes its
+  edge), their union; a bare edge reports how deep the gap reaches, a bare corner how far it runs along each edge, canvas pixels.
+  Pictures with transparency and stills still converting do not cover. Never from pixels: dark footage is not uncovered.
+- Not counted anywhere: opacity, fades and transitions (they show what is below on purpose; at a seam each clip counts alone).
+  Entrance / exit motion is not part of `fills_frame` (framing at rest): a turned clip with rise or pop bares the frame during the
+  motion, because the builder's no-bare-edge compensation (`placementCoversCanvas`) treats any turned clip as not covering — look shows it.
+- The render path's own tests (`coversCanvasOpaquely` for the dissolve path, `placementCoversCanvas` for that compensation) stay as they
+  are: they choose drawing paths and stay conservative for turned clips. No AI file tests coverage by itself (`checks/MCP/coverage-wiring.sh`).
+- Checks: `scripts/check-mcp.sh` → `PictureCoverageChecks` (a 1,092-case rotation / scale / offset sweep against an independent
+  pixel-centre bitmap, fillFactor is the smallest growth, gaps between pictures, a half wipe) and `ClipCoverageChecks` (the walkthrough's
+  turn and drift, flips, a crop, rotation keys, a spring dipping below its keys, the sampling grid, look's uncovered with V2, hidden clips
+  and tracks, transparency, a gap, wipes, a transition, rise); real frames of the preview compositor against the same geometry in
+  `scripts/check-preview-composition.sh` (`RotatedPictures.swift`: turned, flipped, drifting, turning, and at fill_scale).
+
 Transform 面板追加的四个字段（都有「无操作」默认值，全默认走原来的轻量路径，
 `hasVisualTransform` 是统一的判定口）：
 
