@@ -156,3 +156,46 @@ for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
 assert 'hasPrefix("V")' in plan and "own sound" in plan, "✗ video-track voices must be refused with the reason: no clean voice stem"
 PY
 echo "   ✓ voice uses AIListenVoiceCheck: shared jobs, stem rendering, pause splitting, MaskerAttribution and VoiceClarity"
+
+echo "==> listen describe=true: a clip's own sound in words (MCP-42 / MCP-44): a listen job, one bounded read, installed speech models only"
+# 2026-11-17 (docs/architecture/listening-engine.md section 2 item 4a). The report and the classifier run in
+# scripts/check-mix-layers.sh group 4; this scans the wiring.
+python3 - <<'PY'
+import pathlib
+def code(path):
+    return "\n".join(line.split("//", 1)[0] for line in pathlib.Path(path).read_text().splitlines())
+tool, sound = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenSourceSound.swift")
+words, labels = code("Sources/SrtFlow/AIListenSourceWords.swift"), code("Sources/SrtFlow/SoundLabelScores.swift")
+assert tool.count('args.bool("describe")') == 1 and tool.count("AIListenSourceSound.listen(") == 1, "✗ listen must dispatch describe to AIListenSourceSound"
+assert sound.count("AIJobs.shared.start(.listen") == 1 and sound.count("AIWorkQueue.shared.submit(.mix, jobID: job.id)") == 1, \
+    "✗ describe must use AIJobs and the mix lane"
+assert sound.count("AIJobs.shared.finish(job, .done") == 1 and sound.count("AIJobs.shared.finish(job, .failed") == 1 \
+    and sound.count("AIJobs.shared.finish(job, .cancelled") == 1, "✗ every describe outcome must finish its job"
+assert sound.count("AIListenAudioWindow.read(") == 1 and "keepsSamples: true" in sound, "✗ describe must retain samples from one bounded read"
+assert "edges: target.edges, keepsSamples: true" in sound and "to: window.to, edges: .sound" in sound, \
+    "✗ clip description must keep sound edges when retaining samples"
+assert "sourceIn == nil && sourceOut == nil ? .sound : .exact" in sound, "✗ only a named file range requires exact audio coverage"
+assert "readStart: reading.sourceStart" in sound, "✗ description windows must start at the first sample's real source time"
+assert sound.count("MediaReadQueue.run(on: MediaReadQueue.analysis)") == 1, "✗ traits and classification must run on MediaReadQueue.analysis"
+assert "SourceSoundDescription.describe(" in sound and "SoundLabelScores.classify(" in sound and "AIListenSourceWords.words(" in sound, \
+    "✗ describe must report traits, label scores and words"
+assert "AIListenVoiceCheck.provenance()" in sound, "✗ known provenance must be checked before describing sound"
+assert all(name not in sound for name in ["AudioEngineIdleKeeper", "audioEngineHost", "TimelineAudioEngine", "wake(", "suspend("]), \
+    "✗ source description must not touch the preview audio graph"
+assert 'args.stringArray("layers") == nil' in sound and 'args.bool("frames")' in sound, "✗ describe must refuse mix-only fields"
+assert "screeningLocale()" in words and "reserveInstalledModel(locale: locale)" in words and "ensureModel(" not in words, \
+    "✗ describe must reserve an installed speech model without an installation fallback"
+assert all(name not in words for name in ["assetInstallationRequest", "matchedLocale", "supportedLocales"]), \
+    "✗ description must not request a speech model download"
+service = code("Sources/SrtFlow/SubtitleGen/SpeechTranscriptionService.swift")
+installed = service.split("func reserveInstalledModel(", 1)[1].split("func releaseModel(", 1)[0]
+assert "SpeechModelLeases.shared.acquire(locale)" in installed and "status == .installed" in installed \
+    and "SpeechModelLeases.shared.release(locale)" in installed, "✗ installed-only reservation must check availability and release on failure"
+assert all(name not in installed for name in ["assetInstallationRequest", "downloadAndInstall", "ensureModel("]), \
+    "✗ installed-only reservation must never install a model"
+words_end = sound.split("let words = await AIListenSourceWords.words(", 1)[1].split("var object = target.head", 1)[0]
+assert "if stop.stopped { throw CancellationError() }" in words_end, "✗ cancellation during word recognition must not publish a successful description"
+assert "SNClassifySoundRequest(classifierIdentifier: .version1)" in labels and "overlapFactor = 0" in labels, \
+    "✗ classification must use the native classifier without overlapping windows"
+PY
+echo "   ✓ describe uses listen jobs, one bounded sample read, source provenance, analysis queues and installed-only speech models"

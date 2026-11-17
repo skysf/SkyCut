@@ -18,8 +18,9 @@ enum AIListenVoiceCheck {
         guard try args.string("file") == nil, try args.string("clip_id") == nil else {
             throw AIToolError("voice checks the timeline's voice tracks: leave file and clip_id out (from/to narrow it).")
         }
-        guard try !(args.bool("mix") ?? false), try !(args.bool("beats") ?? false), try !(args.bool("cuts") ?? false) else {
-            throw AIToolError("voice is its own check: call listen again for mix, beats or cuts.")
+        guard try !(args.bool("mix") ?? false), try !(args.bool("beats") ?? false), try !(args.bool("cuts") ?? false),
+              try !(args.bool("describe") ?? false) else {
+            throw AIToolError("voice is its own check: call listen again for mix, describe, beats or cuts.")
         }
         guard try args.stringArray("layers") == nil, try !(args.bool("frames") ?? false) else {
             throw AIToolError("layers and frames go with mix=true; voice takes the voice and every other track as its layers.")

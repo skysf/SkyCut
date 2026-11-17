@@ -220,6 +220,7 @@ run_check "source-file-size（扫描守卫：代码文件行数上限，老文�
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
 run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
 run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
+run_check "sound-labels (macOS's sound classifier for listen describe=true: one window per 3 s, every label's own score)" scripts/check-sound-labels.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
 run_check "mcp-smoke-client（冒烟客户端断线、协议错误、超时和日志退出码）" python3 checks/MCP/SmokeClientChecks.py
 run_check "localization-coverage（界面文案两表配齐）" scripts/check-localization-coverage.sh
