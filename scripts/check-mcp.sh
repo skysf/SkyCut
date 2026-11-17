@@ -234,19 +234,8 @@ if grep -q '"picture_size"' Sources/SrtFlow/AILookTool.swift \
 fi
 echo "   ✓ 导出开始和做完都报宽高帧率；look 看文件报文件本身的尺寸、缩略图另写"
 
-# 合成音效（docs/architecture/sound-effect-synth.md）：合成器和工具自己不碰 AVAudioFile（写文件只经 AIAudioFileWriter，同配音）；
-# 渲染 + 写盘在 MediaReadQueue.analysis 上跑，不占 Swift 并发的线程池。
-SFX_WRITERS="$(grep -l 'AVAudioFile' Sources/SrtFlow/SoundEffects/*.swift Sources/SrtFlow/AISoundEffect*.swift || true)"
-if [ -n "${SFX_WRITERS}" ]; then
-  echo "✗ 音效的文件只能经 AIAudioFileWriter 写，这些文件自己碰了 AVAudioFile：${SFX_WRITERS}"
-  exit 1
-fi
-if [ "$(grep -c 'MediaReadQueue.run(on: MediaReadQueue.analysis)' Sources/SrtFlow/AISoundEffectTool.swift || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIAudioFileWriter.writeSoundEffect(' Sources/SrtFlow/AISoundEffectTool.swift || true)" -ne 1 ]; then
-  echo "✗ AISoundEffectTool 要在 MediaReadQueue.analysis 上渲染并经 AIAudioFileWriter.writeSoundEffect 写文件"
-  exit 1
-fi
-echo "   ✓ 合成音效：写文件只经 AIAudioFileWriter，渲染在 MediaReadQueue 上"
+# shellcheck source=checks/MCP/sound-effect-wiring.sh
+source checks/MCP/sound-effect-wiring.sh
 
 source checks/MCP/motion-wiring.sh
 
@@ -404,6 +393,7 @@ xcrun swiftc \
   Sources/SrtFlow/AISubtitleOverlaps.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
+  Sources/SrtFlow/AITrackLanding.swift \
   Sources/SrtFlow/RippleLinkPartners.swift \
   Sources/SrtFlow/AILinkageReport.swift \
   Sources/SrtFlow/ClipSoundSeparation.swift \

@@ -20,13 +20,16 @@ PLIST
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_SrtFlow.bundle"
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
-  checks/ParameterLimits/Fixture.swift checks/ParameterLimits/Main.swift \
+  checks/ParameterLimits/Fixture.swift checks/ParameterLimits/Main.swift checks/ParameterLimits/AddClipsChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ParameterLimitCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=160x90:r=24 \
   -f lavfi -i sine=frequency=440:sample_rate=48000 -t 2 -c:v libx264 -g 1 -pix_fmt yuv420p -c:a aac "${ROOT}/work/source.mp4"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=red:s=160x90 \
   -frames:v 1 "${ROOT}/work/image.png"
+# A plain tone for the audio-track scenarios of add_clips (AddClipsChecks.swift).
+"${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i sine=frequency=220:sample_rate=48000 -t 20 \
+  -c:a aac "${ROOT}/work/tone.m4a"
 SRTFLOW_PARAMETER_CHECK_DIR="${ROOT}/work" SRTFLOW_FFMPEG="${FFMPEG}" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/ParameterLimitCheck" <<'PYTHON'
