@@ -63,6 +63,7 @@
 - [2026-11-11 设计声音的报价说不出用哪个模型](2026-11-11-design-quote-model-name.md) — 假服务要照真回答的形状造（`model` 在 `voice_plan.selection` 里）。
 - [2026-11-11 设计声音连按下了好几单](2026-11-11-design-voice-ordered-twice.md) — 会花钱的按钮按下去就锁，同一件事只开一单。
 - [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.
+- [2026-11-17 A docs-only merge cancels the only run checking an earlier code merge](2026-11-17-docs-only-main-cancels-unverified-code.md) — A replacement main run must check inherited code too; a docs-only PR marker proves only scans passed.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
@@ -208,6 +209,7 @@
 - [2026-11-17 Every made sound effect reported a fake gain_limits adjustment](2026-11-17-sound-effect-fake-gain-adjustment.md) — Compare only the request fields that map to applied values; clean float noise, never round a real limit.
 - [2026-09-24 来回换声音场景，换下来的效果链攒着不放](2026-09-24-sound-scene-chains-pile-up.md) — 「等宿主释放再放」而宿主一直活着，等于不放。
 - [2026-09-24 选了声音场景却看不见选的是哪个](2026-09-24-sound-scene-row-widens-inspector.md) — 检查器一行不许比窄栏宽、菜单 Picker 不锁宽度；界面改动要在真窗口里看一眼。
+- [2026-11-17 Source description needed reader and model contracts](2026-11-17-source-description-read-and-model-contracts.md) — Keep real sound edges, reserve only installed speech models, and check cancellation after the final asynchronous stage.
 - [2026-09-21 源文件清单守卫只盯着枢纽文件](2026-09-21-source-list-guard-only-watched-the-hub.md) — 守卫要扫清单里的每一个文件；别开只有 extension 的文件。
 - [2026-09-26 分割丢了隐藏和音频库的键](2026-09-26-split-drops-hidden-and-library-key.md) — 从旧段构造新段别手写逐字段：加字段时每一处都要过一遍。
 - [2026-09-28 删掉分割出来的一块，整条素材连声音全没了](2026-09-28-split-links-every-piece-together.md) — 从旧段构造新段时身份类字段（id、组号）不能照抄：分割走 `LinkRegrouping.split`。

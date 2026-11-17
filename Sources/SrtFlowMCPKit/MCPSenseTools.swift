@@ -21,13 +21,15 @@ public enum MCPSenseTools {
     // 2026-11-16: mix=true (per-layer mix measurement) arrived with about 940 units left in the whole catalog, so the card and the
     // parameter notes were cut down and the long wording lives in the skycut_guide listen topic (what / levels / beats / cuts / mix);
     // the catalog is no longer than before mix=true.
+    // Source description keeps the same budget: clip gain/curve and mode details remain in the guide; the shorter card
+    // offsets its added parameter (2026-11-17).
     private static var listen: MCPToolDefinition {
         MCPToolDefinition(
             .listen, title: "Measure the sound",
             description: """
-            Read-only. Level, peak, silences, loudest moment and curve of a clip (with its volume, fades and faders), a file or \
-            every audible clip; mix=true: the mix itself per track, to the frame; voice=A1: is each narration line covered. \
-            beats=true finds the beat; cuts=true checks V1 cuts. Outside files may return needs_confirmation.
+            Read-only. Clip/file/timeline levels, true peak, silences, curves and loudest time. mix=true: track/frame mix; \
+            voice=A1: voice masking; describe=true: source sound. beats=true: beats; cuts=true: V1 cuts. Outside files may \
+            return needs_confirmation.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A timeline clip."),
@@ -44,6 +46,7 @@ public enum MCPSenseTools {
                 "layers": MCPSchema.array(of: ["type": "string"], "With mix: A1, V1+V2 or rest (≤ 12).", maxItems: 12),
                 "frames": MCPSchema.boolean("With mix: per frame."),
                 "voice": MCPSchema.string("Narration track(s): A1, A1+A2 or auto."),
+                "describe": MCPSchema.boolean("What a clip's own sound is, in words."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

@@ -48,6 +48,13 @@ TREE="$(git rev-parse --verify -q 'HEAD^{tree}')" || no "cannot read the tree of
 PR_HEAD="$(git rev-parse --verify -q 'HEAD^2')" || no "HEAD is not a merge commit (no second parent)"
 if git rev-parse --verify -q 'HEAD^3' >/dev/null; then no "HEAD has more than two parents"; fi
 
+# A docs-only PR's green marker covers scans, not the code inherited from main. Always check a docs-only main merge
+# in full: it may have cancelled the only run checking an earlier code merge's actual tree.
+CHANGED="$(git diff --no-renames --name-only HEAD^1 HEAD 2>/dev/null)" || no "cannot read the merge's changed paths"
+[ -n "${CHANGED}" ] || no "merge has no changed paths"
+DOCS_ONLY="$(printf '%s\n' "${CHANGED}" | /bin/bash "$(dirname "$0")/ci-docs-only.sh" -)" || no "cannot classify the merge's changed paths"
+[ "${DOCS_ONLY}" = "false" ] || no "docs-only merge needs full checks, not its scan-only PR marker"
+
 # 同名的 artifact，一行一个：上传它的那一轮的 id、头提交、仓库 id、头仓库 id。
 ARTIFACTS="$(gh api "repos/${REPO}/actions/artifacts?name=verified-tree-${TREE}&per_page=100" \
   --jq '.artifacts[] | select(.expired == false and .workflow_run != null) | [.workflow_run.id, .workflow_run.head_sha, .workflow_run.repository_id, .workflow_run.head_repository_id] | @tsv' 2>/dev/null)" \

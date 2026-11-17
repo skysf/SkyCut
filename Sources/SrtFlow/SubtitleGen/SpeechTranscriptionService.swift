@@ -113,6 +113,17 @@ final class SpeechTranscriptionService: @unchecked Sendable {
         }
     }
 
+    /// Reserve an already installed model for read-only sound description. Unlike ensureModel, this path cannot download.
+    /// A successful return owns one lease; a failed availability check releases it before throwing.
+    func reserveInstalledModel(locale: Locale) async throws {
+        try await SpeechModelLeases.shared.acquire(locale)
+        let status = await AssetInventory.status(forModules: [Self.makeTranscriber(locale: locale)])
+        guard status == .installed else {
+            await SpeechModelLeases.shared.release(locale)
+            throw ServiceError(message: "The speech model is no longer installed; sound description will not download one.")
+        }
+    }
+
     func releaseModel(locale: Locale) async {
         await SpeechModelLeases.shared.release(locale)
     }

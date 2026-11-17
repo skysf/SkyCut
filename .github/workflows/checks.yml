@@ -19,9 +19,9 @@ on:
 # 别让作废的一轮占着。
 # Pushes to main share one group too (user's call, 2026-11-17): a new merge cancels the older main runs still queued
 # or running. The newest main tree contains every earlier merge and is either checked here or was checked as-is by
-# its pull request's green run (scripts/ci-verified-tree.sh). Exception: a docs-only merge runs only the scan guards,
-# so it does not re-check code whose run it cancelled; docs/build/build-and-packaging.md "CI" says what that means
-# for releases. A re-run (run_attempt > 1) keeps a per-commit group: re-running an older main run never cancels the
+# its pull request's green run (scripts/ci-verified-tree.sh). Docs-only main merges always run the full checks: their
+# PR's scan-only marker cannot verify code from an ancestor whose main run was cancelled. See the build doc's "CI".
+# A re-run (run_attempt > 1) keeps a per-commit group: re-running an older main run never cancels the
 # newest one, and the next merge doesn't cancel a deliberate re-run. checks/ci-verified-tree.sh pins this block.
 concurrency:
   group: checks-${{ github.event.pull_request.number || (github.run_attempt > 1 && github.sha) || github.ref }}
@@ -65,7 +65,9 @@ jobs:
           sysctl -n hw.ncpu
           echo "id=$({ xcodebuild -version; swift --version; } 2>&1 | shasum -a 256 | cut -c1-16)" >> "$GITHUB_OUTPUT"
 
-      # 只改了文档（白名单和理由见 scripts/ci-docs-only.sh）：不编 App、不跑自检，第 1 组跑一遍扫描守卫就收工，
+      # Docs-only PRs take the fast path below; on push both classifiers return false for a docs-only merge, so it
+      # checks the entire main tree even if it cancelled a code run. The whitelist is in scripts/ci-docs-only.sh.
+      # Docs-only PRs skip compilation and self-checks; shard 1 runs scan guards once.
       # 其余四组到这里就绿了。下面每一步都带 `steps.changes.outputs.docs_only != 'true'`：这一步出了任何岔子
       #（没输出、输出不是 true）都照常全跑，宁可多跑不许漏跑。checks/ci-docs-only.sh 钉着。
       - name: Classify changes (docs only?)

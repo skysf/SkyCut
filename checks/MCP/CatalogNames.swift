@@ -87,6 +87,8 @@ func catalogKnownNames() -> Set<String> {
     // 每层的四个频段。
     names.formUnion(["loudness_lufs", "max_momentary", "max_short_term", "peak_at", "limited_seconds", "max_reduction_db",
                      "bands_db", "low_mid", "high_mid"])
+    // listen describe=true (AIListenSourceReport / SourceSoundTrait, 2026-11-17): SkyCut's trait words.
+    names.formUnion(["low_drone", "broadband_noise", "speech_like"])
     // set_transition 的 sound（声音怎么过一刀，2026-11-16，CutSoundReport / AICutSoundTool）结果里的字段。
     names.formUnion(["offset_frames", "fade_frames", "separated_from", "requested_gain_db", "room_frames", "moved_frames",
                      "extended_frames", "levels_db", "skipped_no_sound", "equal_power", "raised_db"])

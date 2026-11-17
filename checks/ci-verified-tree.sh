@@ -11,7 +11,9 @@
 #       缓存那几步是「没验过，或者第 1 组」；编 App 那一步不看它（验过的轮里第 1 组照样编、照样存缓存）。
 #   三、记号只在 PR 的那一轮、汇总 job 的最后（全部分组和官网检查都过了之后）才留，名字带着这一轮检出的树，
 #       留不下不许让 check-all 变红；token 有 actions: read。
-#   4. The concurrency block: a new merge cancels the older main runs (the newest main tree contains them all), PR runs
+#   4. Main docs-only merges run all checks, even with a matching PR marker: their PR only ran scan guards and cannot
+#      cover code from a cancelled ancestor. Docs-only PRs still take the fast path.
+#   5. The concurrency block: a new merge cancels the older main runs (the newest main tree contains them all), PR runs
 #      stay keyed by PR number, and a re-run keeps a per-commit group.
 #
 # 用法：checks/ci-verified-tree.sh [workflow 路径 [判断脚本路径]]   # 两个路径只给反向验证用
@@ -149,6 +151,38 @@ if [ "${CASES}" -lt 22 ]; then
   fail "判断的用例只跑了 ${CASES} 个（应该 22 个以上）：少了就是这条守卫自己没跑全"
 fi
 
+# A code merge followed by a docs-only merge, whose PR was behind the code merge.
+# Both gates must say false on push: either true would leave the ancestor's code unchecked.
+git_in branch code-merge
+git_in checkout -q -b docs-topic
+mkdir -p "${REPO}/docs"
+echo documentation >"${REPO}/docs/followup.md"
+git_in add -A
+git_in commit -q -m docs-topic
+git_in checkout -q main
+echo concurrent-code >"${REPO}/c.txt"
+git_in add -A
+git_in commit -q -m concurrent-code
+git_in merge -q --no-ff -m merge-docs docs-topic
+TREE="$(git -C "${REPO}" rev-parse 'HEAD^{tree}')"
+PR_HEAD="$(git -C "${REPO}" rev-parse 'HEAD^2')"
+CLASSIFIER="${ROOT}/scripts/ci-docs-only.sh"
+for event in push pull_request; do
+  want=false
+  [ "${event}" != "pull_request" ] || want=true
+  got="$(cd "${REPO}" && GITHUB_EVENT_NAME="${event}" /bin/bash "${CLASSIFIER}")"
+  if [ "${got}" != "${want}" ]; then
+    fail "docs-only merge on ${event}: ci-docs-only printed ${got}, expected ${want} (main must run all checks)"
+  fi
+done
+fresh; expect "docs-only main merge with a matching scan-only PR marker" false
+fresh; echo '{"artifacts":[]}' >"${FAKE_DIR}/artifacts.json"; expect "docs-only main merge without a PR marker" false
+fresh; expect "docs-only main merge when GitHub is unavailable" false FAKE_FAIL=1
+git_in checkout -q code-merge
+TREE="$(git -C "${REPO}" rev-parse 'HEAD^{tree}')"
+PR_HEAD="$(git -C "${REPO}" rev-parse 'HEAD^2')"
+fresh; expect "code merge still reuses its fully checked PR tree" true
+
 # ---- 二、workflow 的接线 ----
 # 分组 job 的每一步一行：「序号␟id␟if␟run␟uses」（␟ 是 \037；不用 TAB，空栏会被并掉）。
 read -r -d '' STEP_PROG <<'AWK' || true
@@ -268,7 +302,7 @@ if [ "$({ grep -cF 'continue-on-error: true' <<<"${SUMMARY}" || true; })" != "2"
   fail "留记号的两步都要 continue-on-error: true：留不下记号只是 main 上多跑一轮，不许让必需的 check-all 变红"
 fi
 
-# ---- 4. Concurrency: a new merge supersedes the older main runs ----
+# ---- 5. Concurrency: a new merge supersedes the older main runs ----
 # Only the newest main run matters: its tree contains every earlier merge (docs/build/build-and-packaging.md "CI").
 # Pinned word for word, because each part was chosen:
 #   - PR runs keyed by PR number: a new push cancels that PR's old run, and different PRs never cancel each other;

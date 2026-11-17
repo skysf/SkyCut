@@ -106,6 +106,16 @@ enum MCPGuideSpeechTopics {
             come from one listener, so treat them as where to listen. To fix \
             a line, lower the masker it names (set_track, edit_clip volume_db or a volume curve) and check again. from and to \
             narrow it; a long timeline may return job_id.
+            """),
+            // Since 2026-11-17 (MCP-42, MCP-44; docs/architecture/listening-engine.md section 2 item 4).
+            MCPGuideSection(name: "describe", about: "describe=true: what is in a clip's own sound, in words", text: """
+            Describe. describe=true with clip_id (or file) says what a clip's own sound is, per 3 s window: traits from \
+            SkyCut's measures (low_drone, broadband_noise, pitched, rhythmic, speech_like) with the numbers behind them, labels \
+            (macOS's sound classifier: the strongest few, each with its own score, not one verdict) and words (how many the \
+            on-device speech recogniser found; the summary quotes what it heard). Words, not a verdict: the classifier calls a \
+            low drone music, and neither says music or not. Our own voice-overs, library music and effects are not described: \
+            where they came from already says what they are. At most 60 s at a time (narrow with from/to or source_in/source_out); \
+            it may return job_id. Words are only checked with a speech model already on this Mac (macOS 26).
             """)
         ],
         examples: [
@@ -114,7 +124,8 @@ enum MCPGuideSpeechTopics {
             ["clip_id": "m1", "beats": true],
             ["mix": true, "from": 70, "to": 76],
             ["mix": true, "layers": ["A1", "rest"], "frames": true, "from": 29, "to": 31],
-            ["voice": "A1"]
+            ["voice": "A1"],
+            ["clip_id": "v3", "describe": true]
         ],
         related: ["transcribe", "cut_speech", "cut_to_beat", "inspect_video"]
     )
