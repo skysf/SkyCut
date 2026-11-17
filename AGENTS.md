@@ -247,7 +247,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-localization-coverage.sh` — 界面文案在每张字符串表都配齐、占位符一致。
 - `scripts/check-look-jobs.sh` — Slow looks: the router's lines, a look behind an edit as a queued job, cancel, two sessions' parallel looks (real App objects).
 - `scripts/check-main-thread-watchdog.sh` — 主线程心跳看门狗、挂起抓栈期间不分配。
-- `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。
+- `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。 Native preset wraps survive canvas changes.
 - `scripts/check-media-import.sh` — 拖文件进轨道的落点。
 - `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账; `listen voice=` checks.
 - `scripts/check-optimized-media.sh` — 优化媒体：判据、真转一块、缓存。
