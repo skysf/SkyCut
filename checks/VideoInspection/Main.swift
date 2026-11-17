@@ -19,6 +19,11 @@ import SrtFlowMCPKit
             count += 1
             if !condition { failures += 1; print("FAIL: \(why)") }
         }
+        await pollingRegression(require: require)
+        if ProcessInfo.processInfo.environment["SRTFLOW_INSPECTION_CASE"] == "job-polling" {
+            print("Inspection job polling: \(count) assertions, \(failures) failures")
+            exit(failures == 0 ? 0 : 1)
+        }
         if let selected = ProcessInfo.processInfo.environment["SRTFLOW_INSPECTION_CASE"] {
             do {
                 let project = OpenProjects.shared.primary
@@ -63,7 +68,7 @@ import SrtFlowMCPKit
             let args = AIToolArguments(["from": 0, "to": 8])
             let started = try await AIInspectionTool.start(args, project)
             let job = AIJobs.shared.job(started.payload["job_id"]!.stringValue!)!
-            await AIJobs.shared.wait(for: job, seconds: 30)
+            await waitForTerminalJob(job)
             let result = try await AIExportTools.job(AIToolArguments(["job_id": .string(job.id)]))
             print(result.payload.encodedString())
             guard job.status == .done else { throw AIToolError("Production inspection: \(job.status), \(job.message ?? "still running")") }
@@ -118,7 +123,7 @@ import SrtFlowMCPKit
                 "file": .string(root.appendingPathComponent("rendered.mp4").path), "from": 3, "to": 4, "image": false
             ]), project)
             let fileJob = AIJobs.shared.job(fileStart.payload["job_id"]!.stringValue!)!
-            await AIJobs.shared.wait(for: fileJob, seconds: 30)
+            await waitForTerminalJob(fileJob)
             let detail = AIJobs.shared.json(fileJob)
             require(fileJob.status == .done && detail["inspected"]?.stringValue?.hasSuffix("rendered.mp4") == true,
                     "export file inspection completes with the actual file")
@@ -126,7 +131,7 @@ import SrtFlowMCPKit
             // 真实干净范围仍采样画面/测声音，但没有疑点，因此没有请求证据截图。
             let cleanStart = try await AIInspectionTool.start(AIToolArguments(["from": 5, "to": 6]), project)
             let cleanJob = AIJobs.shared.job(cleanStart.payload["job_id"]!.stringValue!)!
-            await AIJobs.shared.wait(for: cleanJob, seconds: 30)
+            await waitForTerminalJob(cleanJob)
             let cleanResult = try await AIExportTools.job(AIToolArguments(["job_id": .string(cleanJob.id)]))
             require(cleanJob.status == .done && cleanResult.payload["coverage_complete"] == true,
                     "clean range inspection completes its actual analysis")
@@ -144,7 +149,7 @@ import SrtFlowMCPKit
             let cancelStart = try await AIInspectionTool.start(args, project)
             let cancelled = AIJobs.shared.job(cancelStart.payload["job_id"]!.stringValue!)!
             AIJobs.shared.cancel(cancelled)
-            await AIJobs.shared.wait(for: cancelled, seconds: 30)
+            await waitForTerminalJob(cancelled)
             require(cancelled.status == .cancelled && project.state == before, "cancellation leaves project untouched")
             require(MCPToolName.inspectVideo.takesProject && AIProjectBinding.usesProject(.inspectVideo, args), "inspection is bound to its calling project")
             require(!MCPToolName.inspectVideo.definition.readOnly, "temporary evidence is honestly declared as file writing")
@@ -159,5 +164,38 @@ import SrtFlowMCPKit
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }
         print("Video inspection: \(count) assertions, \(failures) failures")
         exit(failures == 0 ? 0 : 1)
+    }
+
+    // A client wait is capped at 30 seconds; it may legitimately return a running job.
+    // Match the existing delivery checks' bounded polling and keep the shell's 480-second deadline.
+    @MainActor static func waitForTerminalJob(
+        _ job: AIJobs.Job,
+        poll: @MainActor (AIJobs.Job) async -> Void = { await AIJobs.shared.wait(for: $0, seconds: 30) }
+    ) async {
+        for _ in 0..<4 where job.status == .running { await poll(job) }
+    }
+
+    // Control pending replies without sleeping or replacing the real inspection analysis.
+    @MainActor static func pollingRegression(require: (Bool, String) -> Void) async {
+        for terminal in [AIJobs.Status.done, .failed, .cancelled] {
+            let job = AIJobs.shared.start(.inspection, progress: { nil }, cancel: {})
+            var polls = 0
+            await waitForTerminalJob(job) { waiting in
+                polls += 1
+                if polls == 2 { AIJobs.shared.finish(waiting, terminal) }
+            }
+            require(AIJobs.shared.json(job)["status"]?.stringValue == terminal.rawValue,
+                    "a running reply is polled until a \(terminal.rawValue) terminal result")
+            if job.status == .running { AIJobs.shared.finish(job, .cancelled) }
+            let before = polls
+            await waitForTerminalJob(job) { _ in polls += 1 }
+            require(polls == before, "a terminal \(terminal.rawValue) job is not polled again")
+        }
+        let pending = AIJobs.shared.start(.inspection, progress: { nil }, cancel: {})
+        var polls = 0
+        await waitForTerminalJob(pending) { _ in polls += 1 }
+        require(pending.status == .running && polls == 4,
+                "an unfinished job stays running after bounded polling and cannot be reported as done")
+        AIJobs.shared.finish(pending, .cancelled)
     }
 }

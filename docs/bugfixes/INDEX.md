@@ -103,6 +103,7 @@
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。
 - [2026-11-17 Static screen recordings reported as frozen pictures](2026-11-17-inspection-frozen-screen-recordings.md) — Preserve capture provenance and exempt expected static screens.
+- [2026-11-17 Inspection check mistakes a pending job for a failure](2026-11-17-inspection-job-wait-still-running.md) — Poll bounded client waits to a terminal result; keep analysis assertions and the overall deadline.
 - [2026-11-16 成片检查把音效、音乐的起点报成「切在说话上」](2026-11-16-inspection-reports-sound-onsets-as-speech.md) — 有声不等于在说话：语义结论要有词或旁白字幕作证据，没有就说判不了；素材自己的头尾什么都没切掉。
 - [2026-08-05 Inspector 拖调](2026-08-05-inspector-scrub-field-gestures.md) — 编辑态、焦点与亚像素容差。
 - [2026-08-12 提示弹在很远的地方、还没翻译](2026-08-12-instant-tooltip-first-show-far-off.md) — `NSHostingView` 会把尺寸约束灌给面板，摆好 ≠ 摆定；本地化查不到是静默降级。
