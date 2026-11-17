@@ -176,7 +176,7 @@ enum MCPGuideTimelineEditTopics {
         previousCard: MCPGuidePreviousCardsBatch2.setCanvas,
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.setCanvas, """
-            set_canvas changes the output frame; each call is one undo step.
+            set_canvas changes the output frame or retains an explicit ending; each call is one undo step.
             """),
             MCPGuideSection(name: "shape", about: "ratios and what happens to clips, texts and shapes", text: """
             Shape. ratio is auto (follows the first V1 clip), 16:9, 9:16, 4:3, 3:4 or 1:1. 9:16 is for TikTok, Reels and \
@@ -192,11 +192,21 @@ enum MCPGuideTimelineEditTopics {
             """),
             MCPGuideSection(name: "frame_rate", about: "fps, and screen recordings", text: """
             Frame rate. fps is 24, 30 or 60. Screen recordings use the canvas fps, so it cannot change while one is recording.
+            """),
+            MCPGuideSection(name: "ending", about: "duration retains a black ending without placeholders", text: """
+            Ending. duration is a minimum total timeline length in seconds: duration=141 retains an ending at timeline \
+            141 even when the last item ends at 139.08. That tail is black and silent in preview and export; no placeholder is added. \
+            It is saved with the project and restored by one undo. Zero clears the explicit ending and follows the content \
+            again; omitting it keeps the current ending. A positive value must cover all current content and at least one \
+            project frame; shorter requests reject the whole call, so trim content first. Later content can extend beyond \
+            this minimum. The reply and get_timeline expose duration and minimum_duration. Selected-only exports follow the \
+            selected items' own lengths, without this project-wide ending.
             """)
         ],
         examples: [
             ["ratio": "9:16"],
-            ["fps": 30]
+            ["fps": 30],
+            ["duration": 141]
         ],
         related: ["edit_clips", "edit_clip", "record_screen"]
     )

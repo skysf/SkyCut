@@ -107,6 +107,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioGenerationDuration.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationName.swift \
   Sources/SrtFlow/AIVoiceoverPlacement.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift \
@@ -203,6 +204,7 @@ xcrun swiftc \
   checks/SkyStudio/ImageApprovalChecks.swift \
   checks/SkyStudio/ImageResultChecks.swift \
   checks/SkyStudio/ToolResultChecks.swift \
+  checks/SkyStudio/GenerationDurationChecks.swift \
   checks/SkyStudio/CharacterChecks.swift \
   checks/SkyStudio/CharacterApprovalChecks.swift \
   checks/SkyStudio/CharacterFixtures.swift \

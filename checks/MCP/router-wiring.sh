@@ -8,7 +8,7 @@ echo "==> 路由：改工程的工具各是一步撤销"
 # 不显式分组的话 AI 的每一步都堆进同一组，⌘Z 一按全部退光；手动关自动开的那一组又会让下一次登记
 # 抛异常、App 闪退（docs/bugfixes/2026-09-27-ai-edits-share-one-undo-group.md）。
 ROUTER="Sources/SrtFlow/AIToolRouter.swift"
-for tool in splitClip deleteItems duplicateItems setTransition setFilter setCanvas; do
+for tool in splitClip deleteItems duplicateItems setTransition setFilter; do
   if [ "$(grep -cE "case \\.${tool}: return try AIUndoGrouping\\.step\\(undo\\)" "${ROUTER}" || true)" -ne 1 ]; then
     echo "✗ ${ROUTER} 里 ${tool} 没包在 AIUndoGrouping.step 里：它的改动会和别的步并成一步撤销" >&2
     exit 1
@@ -21,7 +21,8 @@ router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
 status = Path("Sources/SrtFlow/AIProjectTools.swift").read_text()
 assert '"mcp_catalog": MCPCatalogSync.statusJSON' in status, "get_status must report the actual App catalog identity"
 for call in ["AIClipTools.apply(plan, project)", "AITimelineTools.setKeyframes(args, project)",
-             "AITimelineTools.setTrack(args, project)", "AIOverlayTools.setText(args, project)", "AIOverlayTools.setShape(args, project)"]:
+             "AITimelineTools.setTrack(args, project)", "AIOverlayTools.setText(args, project)", "AIOverlayTools.setShape(args, project)",
+             "AIOverlayTools.setCanvas(args, project)"]:
     assert f"return try {call}" in router, f"missing direct routing to validated commit: {call}"
     assert f"AIUndoGrouping.step(undo) {{ try {call}" not in router, f"opens an empty group before validation: {call}"
 for name, count in [("AIClipTools", 1), ("AITimelineTools", 2), ("AIOverlayTools", 2)]:

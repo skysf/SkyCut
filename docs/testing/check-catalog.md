@@ -225,6 +225,13 @@
 - Black-bar removal: `scripts/check-parameter-limits.sh` → `BlackBarAppChecks` exercises thin asymmetric bars, the source window
   changed by the same call, actual timeline look after removal, conservative mixed-shot voting, fill-only notices and one undo;
   `scripts/check-mcp.sh` checks bounded pixel-edge padding. Rule: [Preview transforms](../architecture/preview-free-transform.md).
+- Explicit black endings and compact batch replies: `scripts/check-parameter-limits.sh` → `EditingFeedbackChecks` runs actual
+  tools, one undo, atomic rejection, 76 edits below 2,000 JSON characters, final-value notices, and rendered preview/export black
+  endings including black-only video. `scripts/check-project-file.sh` → `ProjectDurationChecks` covers v37 persistence and
+  selected-export isolation; `scripts/check-mcp.sh` covers projection, schemas and production wiring.
+- Generated duration notices: `scripts/check-sky-studio.sh` → `GenerationDurationChecks` compares requested and server-reported
+  lengths with a strict 1-second warning threshold, unknown values and refresh clearing. `checks/sky-studio-wiring.sh` requires
+  the notice on completion and original-job refresh. No network, credits or media changes are involved.
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).

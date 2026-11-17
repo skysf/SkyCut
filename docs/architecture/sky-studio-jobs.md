@@ -24,6 +24,26 @@
 | 话 | 服务器的 `message`（英文、写给人看）原样给 AI；SkyCut 自己说的（停了、没连上、等太久）在 `SkyStudioJobError.message`。界面上的话在各自的调用方按语言换 |
 | 只经一处 | `SkyStudioAPI` 的 `submit` / `cancel` 只许 `SkyStudioJobRun` 调（满了等着再交、停的规矩只在那一处；`checks/sky-studio-wiring.sh` 第 6 条） |
 
+### Generated duration notices
+
+For generated timed media, `get_job` reports `requested_duration` and `duration` side by side.
+The requested value is the numeric duration submitted in `generation.params`, after existing
+request normalization; automatic length has no numeric target and reports null. The actual
+value comes only from the existing Sky Studio `result.duration`; absent, non-finite, or
+non-positive values remain null with `duration_note` saying the delivered length is unknown.
+The requested value must never stand in for an unknown result duration.
+
+`SkyStudioGenerationDuration` adds `duration_warning` only when both values are known and their
+absolute difference is **greater than 1 second**, in either direction. Exactly 1 second does
+not warn. `SkyStudioGenerationRun` uses this same projection at terminal completion and when
+refreshing the original job. Refreshes explicitly clear a stale warning when the original
+result changes. Image results have no duration projection. These fields only report the
+existing result: they do not measure the downloaded file or its audible content, change the
+request or media, add timeline content, consume an undo step, or submit another paid job.
+
+Regression coverage is in `GenerationDurationChecks` within `scripts/check-sky-studio.sh`;
+`checks/sky-studio-wiring.sh` requires the projection in both completion and refresh.
+
 ## 二、Sky Studio 那边实测的细节（2026-10-28 真服务器跑过 8 种活）
 
 - `/uploads`：PUT 时**原样带上回答里 `headers` 的每一项**，少带或改了签名对不上。PUT 成功后 `file_url` 马上能读。`purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`（jpeg / png / webp，≤ 30 MB）、`audio`（wav / mp3，≤ 15 MB），60 天后自动删。
