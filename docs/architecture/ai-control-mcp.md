@@ -212,8 +212,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    时间线上的改动一律不问。
 7. **长任务回任务号**（客户端对一次调用大多只等一分钟）。结局在任务结束的**那一刻**记下（导出挂在
    `isExporting` 变回 false 上 —— `@Published` 在赋值前发，那时成品路径 / 错误已经写好；导出的结果带 `audio_loudness_lufs`、
-   `audio_peak_dbfs`（限幅前），混音过了 −1 dBFS 被限幅器压过的还带 `audio_limited_seconds`、`audio_max_reduction_db`，压过 3 dB 的再带
-   一句 `note` 叫 AI 用 `set_track master volume_db` 压下去再导，[成片的声音](export-audio-mixdown.md) 第二节第 3 条；生成字幕挂在 `stage`
+   `audio_peak_dbtp`（since 2026-11-17: the exported file's own true peak, measured after encoding; before that `audio_peak_dbfs` was the
+   pre-limiter peak and read like a clipped file），混音过了 −1 dBTP 被限幅器压过的还带 `audio_peak_before_limiter_dbtp`、`audio_limited_seconds`、
+   `audio_max_reduction_db`，压过 3 dB 的再带一句 `note` 叫 AI 用 `set_track master volume_db` 压下去再导（`ExportAudioReport`），
+   [成片的声音](export-audio-mixdown.md) 第二节第 3 条；生成字幕挂在 `stage`
    上并且 `dropFirst`，订阅那一刻发的是上一次任务留下的结局；**开始和做完的结果都带 `video`：成片的宽、高、帧率**（`AIVideoSize.output`，
    和导出管线同一个 `cappedSize`：画布封短边、只降不升，帧率是工程帧率）。AI 指定的分辨率只用于这一次
    （`settingsOverride`），不写回用户在面板上记住的设置；压缩 / 烧录同理（第 24 条）。
@@ -319,17 +321,26 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      timeline frames on an idle Mac, mostly decoding each requested frame from its clip's keyframe (150–400 ms a frame) and Vision
      (50–150 ms a frame); it grows with the load (20 s for the same look at load 55–80). Checked by `scripts/check-look-jobs.sh`
      (real App objects) and `checks/MCP/router-wiring.sh`; the router's own path needs the real helper (section 8).
-13. **听（listen，方案第 31 条）**：AI 听不见，就把声音量给它。整文件/时间线的数据是画波形那一份（`WaveformStore`，一个文件读
-   一遍，峰值 + 顺手攒的均方，见 [波形与深度缩放](audio-waveform.md)）；**文件显式区间走下面的有界读取例外，不起 ffmpeg**。`AIAudioLevels`
-   （纯值）：
+13. **听（listen，方案第 31 条）**：AI 听不见，就把声音量给它。**Since 2026-11-17 a clip or a file is measured from one bounded read
+   of exactly its window per call** (`AIListenAudioWindow`, the read described below, on `MediaReadQueue.analysis`; no range = the
+   whole file): `peak_db` is the **true peak** (dBTP, `TruePeak`: the measure the export limiter holds at −1, so listen, mix=true and
+   get_job say the same thing), `loudest_at` is **the start of the loudest frame** at the project frame rate (`AIListenFrameGrid` →
+   `AIListenSampleFrames` → `AIListenPeaks`; a clip's frames are its timeline frames mapped through its speed, each with its heard
+   gain), and one clip or file also gets `peak_at`. Before that `peak_db` was the window peaks of the shared waveform and `loudest_at`
+   the middle of the loudest curve step (27.5 for an 80 s track: a 5 s step; [case](../bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md)).
+   The waveform can't give either (no samples between its buckets), and making every import pay a 4× oversampling for an AI-only
+   number was rejected, so listen pays per call: about 0.13 s per minute of stereo (M1, AAC). The whole-timeline listing reads each
+   listed clip's window; what the 40 s budget doesn't reach says "still measuring". A window's first five and last six samples
+   count only their own magnitudes (their interpolated points would read past the cut). Edges, frames and the AAC path are in
+   `checks/MCP/ListenPeakChecks.swift` and `ListenRangeChecks.swift`. `AIAudioLevels`（纯值）：
    - 窗和均方桶的边对齐（两桶一窗，48kHz 约 43ms）：不对齐的话跨在「响 / 静」交界上的桶会把能量摊进隔壁的静音窗，
      静音段两头各缩一截。
    - **电平只算有声音的部分**（静音窗不进平均：一段话停顿多，整段平均会被拉低，AI 配音乐会配得太响）；dB 走
      `AudioGain.decibels`（电平表也是它，−60 = 静音或更轻）。
    - 片段 = 成片里听到的：窗换成时间线秒，乘 `EditClip.heardGain`（段音量 / 曲线、渐入渐出、轨道推子；波形条画
      「听到的声音」也是它）。静音、藏起来的段、藏起来的轨不量（量出来的数会让 AI 以为它在响）。
-   - 三种问法：一段（带静音段列表和响度曲线）、一个文件、整条时间线（每段一行，只给静音段个数）。一次最多等波形读
-     40 秒，没读完先把读到的给出去、说一声再调一次。
+   - 三种问法：一段（带静音段列表和响度曲线）、一个文件、整条时间线（每段一行，只给静音段个数）。一次最多等 40 秒
+     （clips not measured by then say so; ask them one by one or narrow from/to）。
    - **只听某几秒**（2026-10-14 用户拍板，[剪辑美感方案](../plans/2026-10-05-editing-aesthetics.md) 第二刀）：一段片段和整条时间线收
      `from` / `to`（时间线秒）：片段只量落在里面的那一截（`AIAudioLevels.sourceWindow`：变速按源时间换算，结果带实际量的 `from` / `to`），
      整条时间线只列落在里面的片段、每段也只量那一截；点名的片段不在这几秒里就报错。文件的几秒照旧是 `source_in` / `source_out`
@@ -340,7 +351,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `AIListenReadControl` 把排队、元数据加载和读取都纳入本次截止时间：排队时取消待执行 operation，metadata 移交前可取消加载；已开读时只发停止信号，
      等当前 native copy 返回后由同一 `analysis` 读取体单点取消和释放 reader。不能硬中断不返回的 native copy，也不能跨线程 `cancelReading`；失败/超时不返回成功的部分统计。
      生命周期约束与实际等待边界见[阻塞的媒体读取](blocking-media-reads.md#读取中的取消与释放)。
-     整文件没给范围时仍可返回部分波形，并明确这是已读覆盖范围；不取消 UI/别的消费者共享的波形任务。`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
+     Since 2026-11-17 a file without a range is read the same way, whole (no partial waveform report any more); the shared
+     waveform stays for the tools that only need levels (cut_speech, cuts=true, inspect_video). **The refusal above is for a
+     named range only.** A clip's window and a whole file take the file's sound where it is (`AIListenAudioWindow.Edges.sound`):
+     what plays where a file has no sound is silence, and an audio track that stops a few ms before its picture is common
+     (2 of 7 sampled camera / generated files, by 14 and 28 ms), so such a clip is measured over its sound at its true times,
+     not refused as "incomplete coverage", and nothing is said about the part without sound. A gap inside is refused either way
+     (`checkListenSoundEdges` in `ListenRangeChecks.swift`).`beats=true` 是独立的音乐分析：短文件仍走整首共享节拍缓存（最多 15 分钟），
      结果 `beat_note` 说清不只分析请求窗；文件总长超过该限制就不给节拍解码，结果明确说明限制（电平/静音仍可有界返回）。**因此只有 `beats=false` 的显式文件窗承诺不扩展为整首/整文件解码；压缩包边界可有少量相邻采样，统计必须裁回请求范围。**
      扫描守卫在 `checks/MCP/listen-wiring.sh`（`scripts/check-mcp.sh` 里 source 进来），纯值在 `checks/MCP/ListenChecks.swift`；真实文件生产路径回归在 `ListenRangeChecks.swift`：
      本机合成的稀疏长 WAV、晚时间点短窗、暂停 overview 队列仍成功、原生实际帧数/PTS、范围统计、时长边界、原生 AAC 包边界、MOV 空编辑/偏移音轨，
@@ -366,9 +383,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      [成片的声音](export-audio-mixdown.md)第五节）。参数：`from` / `to`（时间线秒，落在帧上，不给就是整条）；`layers`（一项一层：`A1`、
      `V1+V2`、`rest`，最多 12 层；不给就每条出声的轨一层，主轨叫 V1）；`clip_id` 是「这一段的那几秒、分成它那条轨和 rest」；`frames=true`
      再给逐帧的数。`file` / `beats` / `cuts` 和它不同时用（报错说清楚）；不带 `mix` 给 `layers` / `frames` 也报错。
-     **回的东西**（`AIListenMixReport`，先摘要、逐帧的数只在要的时候）：混音的 `loudness_lufs`（限幅之后，= 导出的 `audio_loudness_lufs`）、
-     `max_momentary` / `max_short_term`（最响的 400 ms / 3 s 窗）、`peak_db` / `peak_at`（限幅之前，= 导出的 `audio_peak_dbfs`）、`loudest_at`
-     （最响那一帧的帧头）、`over`（限幅之前超过 −1 dBFS 的那几帧，连着的并成一段，带峰值和限幅器压了多少，最多列 20 段；**只报不拦**）、
+     **回的东西**（`AIListenMixReport`，先摘要、逐帧的数只在要的时候；peaks are true peaks since 2026-11-17）：混音的 `loudness_lufs`（限幅之后，= 导出的 `audio_loudness_lufs`）、
+     `max_momentary` / `max_short_term`（最响的 400 ms / 3 s 窗）、`peak_db` / `peak_at`（限幅之前，= 导出的 `audio_peak_before_limiter_dbtp`）、`loudest_at`
+     （最响那一帧的帧头）、`over`（限幅之前真峰值超过 −1 dBTP 的那几帧，连着的并成一段，带峰值和限幅器压了多少，最多列 20 段；**只报不拦**）、
      `limited_seconds` / `max_reduction_db` / `output_peak_db`、粗曲线；每层的 `level_db`、`loudness_lufs`、`peak_db`、`peak_at`、`loudest_at`、
      `bands_db`（low / low_mid / high_mid / high）。**回多大**（南极 62 秒、8 层实测）：摘要 1.6–2.4 KB；逐帧的数一次最多 2,400 个（混音每帧 4 个、
      每层每帧 5 个，层越多帧越少：8 层 54 帧、1 层 266 帧），带逐帧的结果最多约 12 KB —— 一次读得完，又够看一个切点前后一两秒；超了按

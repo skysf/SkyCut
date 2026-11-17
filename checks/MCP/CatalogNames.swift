@@ -35,6 +35,9 @@ func catalogKnownNames() -> Set<String> {
     // 说明书的通用主题提到的结果字段和报错代码（2026-11-10）：get_timeline 的 edit_limits、get_status 的 skycut_plan、
     // 没存过的工程存下来时的 project_saved_to、每日硬上限的 daily_budget_exceeded、几乎每个结果都有的 next_step、MCP 结果的 isError。
     names.formUnion(["edit_limits", "skycut_plan", "project_saved_to", "daily_budget_exceeded", "next_step", "isError"])
+    // Saved versions (2026-11-17, the undo topic's versions section): the round's first change returns before_round_version,
+    // undo version= returns saved_before_going_back (AIRoundVersions).
+    names.formUnion(["before_round_version", "saved_before_going_back"])
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
@@ -97,9 +100,9 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["no_longer_fill", "off_frame"])
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
-    // Saved versions (2026-11-17, the undo topic's versions section): the round's first change returns before_round_version,
-    // undo version= returns saved_before_going_back (AIRoundVersions).
-    names.formUnion(["before_round_version", "saved_before_going_back"])
+    // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
+    names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
+                     "audio_max_reduction_db"])
     return names
 }
 

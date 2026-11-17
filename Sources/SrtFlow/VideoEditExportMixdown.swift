@@ -26,24 +26,39 @@ enum ExportAudioMixdown {
         ["-f", "f32le", "-ar", String(sampleRate), "-ac", String(channels), "-i", file.path]
     }
 
-    /// 混音的电平（写 f32 时量的）：限幅前的峰值、超过上限压了多久多深、写出去的峰值、整段响度。导出结果和导出面板拿它告诉用户。
+    /// 混音的电平（写 f32 时量的）：限幅前的真峰值、超过上限压了多久多深、写出去的真峰值、整段响度；导出之后再加上成片文件自己的
+    /// 真峰值（`deliveredPeak`）。导出结果和导出面板拿它告诉用户。Peaks are true peaks (TruePeak, dBTP) since 2026-11-17.
     struct Levels: Equatable {
-        /// 限幅前的采样峰值（线性）。
+        /// 限幅前的真峰值（线性）。
         var peak: Float
-        /// 写进文件的采样峰值（线性，≤ 上限）。
+        /// 写进 f32 文件的真峰值（线性，≤ 上限）。
         var outputPeak: Float
-        /// 超过上限、被压下来的帧数（任一声道超过就算）。
+        /// 超过上限、被压下来的帧数（真峰值过线：任一声道的采样或它后面插出来的点）。
         var limitedFrames: Int
         /// 压得最深的那一下压了多少 dB（0 = 从没压过）。
         var maxReductionDB: Double
         /// 整段响度（BS.1770 带门限，LUFS）；全是静音时 nil。
         var loudnessLUFS: Double?
+        /// The true peak of the exported file's own sound, decoded after encoding (`ExportDeliveredPeak`): what the AAC
+        /// encoder made of the limited mix, the number a player sees. nil until the exporter has measured it, and for mixes
+        /// that never become a delivered file (listen mix=true, inspect_video).
+        var deliveredPeak: Float?
 
         /// 压过这么深（dB）就建议用户把主推子降下来：轻轻碰一下上限听不出，压 3 dB 以上就是另一种声音了。
         static let attentionThresholdDB = 3.0
 
-        var peakDBFS: Double { 20 * log10(Double(max(peak, 1e-9))) }
-        var outputPeakDBFS: Double { 20 * log10(Double(max(outputPeak, 1e-9))) }
+        init(peak: Float, outputPeak: Float, limitedFrames: Int, maxReductionDB: Double, loudnessLUFS: Double?, deliveredPeak: Float? = nil) {
+            self.peak = peak
+            self.outputPeak = outputPeak
+            self.limitedFrames = limitedFrames
+            self.maxReductionDB = maxReductionDB
+            self.loudnessLUFS = loudnessLUFS
+            self.deliveredPeak = deliveredPeak
+        }
+
+        var peakDBTP: Double { TruePeak.decibels(peak) }
+        var outputPeakDBTP: Double { TruePeak.decibels(outputPeak) }
+        var deliveredPeakDBTP: Double? { deliveredPeak.map(TruePeak.decibels) }
         var limitedSeconds: Double { Double(limitedFrames) / Double(ExportAudioMixdown.sampleRate) }
         var isLimited: Bool { limitedFrames > 0 }
         /// 压得超过 `attentionThresholdDB`：面板和 AI 的结果多说一句「把主推子降这么多更干净」。
@@ -52,10 +67,10 @@ enum ExportAudioMixdown {
         var suggestedReductionDB: Double { maxReductionDB }
     }
 
-    /// 写进 f32 的上限：−1 dBFS。混音本身是线性的、和可以过 0 dBFS（AVFoundation 的 float 不削），但交给 AAC 编码器的信号
+    /// 写进 f32 的上限：−1 dBTP（2026-11-17 之前是 −1 dBFS 的采样峰值）。混音本身是线性的、和可以过 0 dBFS（AVFoundation 的 float 不削），但交给 AAC 编码器的信号
     /// 过了 0 就不可预期：2026-09-30 探针实测两轨各 +6 dB 叠加，成片 RMS 比混音掉 4.5 dB、峰值却冒到 +12 dBFS，主推子降 3 dB
     /// 成片只降 2 dB（docs/bugfixes/2026-09-30-export-mix-over-0dbfs-into-aac.md）。所以写之前过 ExportPeakLimiter（前瞻 5 ms、
-    /// 释放 80 ms 的真峰值限幅，不是削平），留 1 dB 给编码器的过冲；限幅前的峰值、压了多久多深记在 Levels 里报给用户。
+    /// 释放 80 ms，2026-11-17 起按真峰值压，不是削平），留 1 dB 给编码器的过冲；限幅前的峰值、压了多久多深记在 Levels 里报给用户。
     static let peakCeiling: Float = ExportPeakLimiter.defaultCeiling
 
     enum Outcome: Equatable {
@@ -133,8 +148,9 @@ enum ExportAudioMixdown {
     }
 }
 
-/// 往 raw 文件里按帧写（引擎渲出来的交错 f32）：记着收了几帧，超过上限的截掉；每一帧先过限幅器（ExportPeakLimiter，延迟 5 ms）再写盘，
-/// 写出去的采样同时喂响度表（ExportLoudnessMeter）。`finish()` 把延迟线冲干净，写出去的总帧数 = 收进来的。
+/// 往 raw 文件里按帧写（引擎渲出来的交错 f32）：记着收了几帧，超过上限的截掉；每一帧先过限幅器（ExportPeakLimiter，延迟约 5 ms）再写盘，
+/// 写出去的采样同时喂响度表（ExportLoudnessMeter）和真峰值（TruePeak：写进文件的那一串，之后是静音）。`finish()` 把延迟线冲干净，
+/// 写出去的总帧数 = 收进来的。
 private struct FrameSink {
     let handle: FileHandle
     let limit: Int
@@ -144,6 +160,8 @@ private struct FrameSink {
     private(set) var failure: Error?
     private var limiter: ExportPeakLimiter
     private var meter: ExportLoudnessMeter
+    private var written: TruePeak.Stream
+    private var writtenPeak: Float = 0
     private var pending: [Float] = []
 
     init(handle: FileHandle, limit: Int, channels: Int, sampleRate: Int) {
@@ -152,6 +170,7 @@ private struct FrameSink {
         self.channels = channels
         limiter = ExportPeakLimiter(channels: channels, sampleRate: sampleRate)
         meter = ExportLoudnessMeter(channels: channels)
+        written = TruePeak.Stream(channels: channels)
     }
 
     mutating func padSilence(upTo frame: Int) {
@@ -177,8 +196,10 @@ private struct FrameSink {
         pending.removeAll(keepingCapacity: true)
         limiter.flush(into: &pending)
         write(pending)
+        var peak = writtenPeak
+        written.finish { peak = max(peak, $0.peak) }
         return .init(
-            peak: limiter.inputPeak, outputPeak: limiter.outputPeak, limitedFrames: limiter.overFrames,
+            peak: limiter.inputPeak, outputPeak: peak, limitedFrames: limiter.overFrames,
             maxReductionDB: -20 * log10(Double(max(limiter.minimumGain, 1e-9))), loudnessLUFS: meter.integratedLUFS
         )
     }
@@ -192,7 +213,12 @@ private struct FrameSink {
 
     private mutating func write(_ samples: [Float]) {
         guard !samples.isEmpty, failure == nil else { return }
-        samples.withUnsafeBufferPointer { meter.add($0, frames: samples.count / channels) }
+        var peak = writtenPeak
+        samples.withUnsafeBufferPointer { buffer in
+            meter.add(buffer, frames: samples.count / channels)
+            written.feed(buffer, frames: samples.count / channels) { peak = max(peak, $0.peak) }
+        }
+        writtenPeak = peak
         do {
             try samples.withUnsafeBytes { try handle.write(contentsOf: Data($0)) }
         } catch {

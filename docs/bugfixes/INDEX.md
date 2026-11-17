@@ -69,6 +69,7 @@
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
+- [2026-11-17 get_job reported the peak before the limiter; listen's loudest moment was a curve step's middle](2026-11-17-export-peak-before-limiter-and-binned-loudest.md) — Give the AI the delivered number under its measure's name (the file's true peak, dBTP); a time reported "at" must come from data at that resolution.
 - [2026-08-05 导出预渲染复审](2026-08-05-export-prerender-review.md) — 覆盖、alpha、取消与临时文件。
 - [2026-10-18 别的工程的导出显示在每个工程窗口里](2026-10-18-export-progress-shown-in-every-project-window.md) — 单例的状态在多开之后要问「是谁的」（`exporter.belongs(to:)`）。
 - [2026-11-02 导出反复解码静止的文字和形状](2026-11-02-export-redecodes-static-overlays.md) — 静止叠层只解码一次、按本段复制已解的帧；默认质量不变。

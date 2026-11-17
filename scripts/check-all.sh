@@ -107,9 +107,9 @@ run_check "export-profile（实际阶段计时、审阅预设、排队/取消与
 run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
+run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
 run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
-run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 
 # ---- 第 2 组 ----
 shard 2
@@ -160,6 +160,7 @@ run_check "inspector-fits-width（扫描守卫：检查器里的 Picker 不许�
 run_check "presented-views-app-language（扫描守卫：sheet / popover 套应用内语言）" checks/presented-views-app-language.sh
 run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设置在队列创建时读回来）" checks/encode-settings-memory.sh
 run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
+run_check "project-versions-wiring (scan guard: router hook, undo version=, the round's save points, one-step restore, one writer)" checks/project-versions-wiring.sh
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
 run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh
@@ -175,7 +176,6 @@ run_check "sky-studio-wiring（扫描守卫：Sky Studio 的地址、机器号�
 run_check "cloud-task-projects（扫描守卫：生成任务带工程归属，卡片和 MCP 共用分组）" checks/cloud-task-projects.sh
 run_check "region-framing-wiring（扫描守卫：源矩形取景接进现有编辑 / 批量和原生渲染）" checks/region-framing-wiring.sh
 run_check "voiceover-sync-wiring（扫描守卫：旁白同步复用生产路径、只有一处提交）" checks/voiceover-sync-wiring.sh
-run_check "project-versions-wiring (scan guard: router hook, undo version=, the round's save points, one-step restore, one writer)" checks/project-versions-wiring.sh
 run_check "check-script-source-lists（扫描守卫）" checks/check-script-source-lists.sh
 # 小包上真走一遍 CI 的 .build 缓存：改过的文件（时间拨早了）照样重编、新 checkout 按内容设时间放回 .build 重编 0 样。
 run_check "ci-build-cache（.build 缓存不拿旧目标文件测新代码，也真省得下编译）" scripts/check-ci-build-cache.sh
