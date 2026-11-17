@@ -128,6 +128,16 @@ Finder**。App 只负责「快速回到最近那几条」。
 作者 CAS、旧输出绑定和观察过期规则见 [官方原创短片](official-film.md)。
 付款恢复回执不放进工程 / undo，也不因清空计划而删除。v33 的精确裁切语义及 `<33` 迁移保持原界限。
 
+### Opening a project repairs link groups (2026-11-17)
+
+`VideoEditProjectIO.load` runs `LinkGroupRepair.unlinkStrayPieces` after sorting the main track: in one link group, the pictures of
+one file at one speed are pieces of one clip and keep one timing (the same timeline time for the file's 0 s) — the one the group's
+sound from that file plays at, else the earliest picture's; a picture off it leaves the group. Why: a freeze tail saved before
+2026-11-17 kept its clip's group although it plays the hold's length later, so deleting the tail deleted the clip and its sound
+([case](../bugfixes/2026-11-17-old-freeze-tails-stay-linked.md)). Only `linkGroup` changes, never a clip's place or media; a group with
+one picture is never touched. No format version: there is no new field, and an older build reads the repaired file as plain clips.
+Guard: `scripts/check-project-file.sh` group 49, a literal project file saved before the fix.
+
 ### 存盘必须带上一次的定位表
 
 `VideoEditProjectIO.save(_:to:knownRecords:)` 的 `knownRecords` **不是可选的优化，

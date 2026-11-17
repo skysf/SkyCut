@@ -17,7 +17,8 @@
 **When the AI pushes or pulls V1 from a point on** (`delete_items` / `edit_clip` ripple, `add_clips` insert, `cut_to_beat`:
 `AITimelineEdits.shiftMain`), a link group comes along only when none of its V1 pictures stays behind (`RippleLinkPartners`,
 2026-11-17). A V1 clip before the ripple point never moves, and a sound shared with it stays with it — a group can hold two V1 pictures
-(a split made with the switch off keeps picture–sound–picture as one chain; a freeze tail saved before that day), and dragging the
+(a split made with the switch off keeps picture–sound–picture as one chain; a freeze tail saved before that day, which opening the
+project now takes out of the group: `LinkGroupRepair`), and dragging the
 whole group put the earlier picture on top of its neighbour ([case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md)).
 A clip the ripple (or cut_to_beat's partner fitting) pushes before 0:00 loses its head the way rule 13 does (`moveForLinkage`),
 never clamped at 0, which made a J cut's sound late by its lead-in ([case](../bugfixes/2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md)).
