@@ -7,11 +7,14 @@ import SrtFlowMCPKit
 // 怎么读、落点怎么算开头；词表和 App 的预设对账、总说明里提到它。编法见 scripts/check-mcp.sh。
 
 func runSoundEffectChecks() {
+    shortDurationChecks()
     presetChecks()
     determinismChecks()
     shapeChecks()
     parameterChecks()
     soundEffectRequestChecks()
+    fileLengthChecks()
+    audibleChecks()
     checkEqual(MCPVocabulary.soundEffectPresets, SoundEffectPreset.allCases.map(\.rawValue), "the sound_effect presets match SoundEffectPreset")
     check(guideMapText().contains("add_clips sound_effect"), "the guide map points at add_clips sound_effect")
 }
@@ -109,4 +112,63 @@ private func soundEffectRequestChecks() {
     check(ahead.start == 4.4 && ahead.sourceIn == 0, "the start is hit_at minus the sound's own hit")
     let early = AISoundEffectRequest.placement(hitAt: 0.2, renderedHit: 0.6)
     check(early.start == 0 && abs(early.sourceIn - 0.4) < 1e-9, "a hit before the sound fits starts inside the sound instead")
+}
+
+/// Every preset renders at short durations. sparkle under ~0.47 s and shutter under ~0.085 s trapped on a range whose start was past
+/// the end of the sound and took the whole App down (docs/bugfixes/2026-11-17-short-sparkle-and-shutter-crash.md). Before the fix
+/// this check ends the process: scripts/check-mcp.sh exits non-zero.
+private func shortDurationChecks() {
+    for preset in SoundEffectPreset.allCases {
+        for duration in [SoundEffectParameters.durationRange.lowerBound, 0.07, 0.3] {
+            let audio = SoundEffectSynth.render(SoundEffectParameters(preset: preset, duration: duration)).audio
+            check(audio.count > 0 && !audio.left.contains { !$0.isFinite }, "\(preset.rawValue) renders at duration \(duration)")
+        }
+    }
+    for duration in [0.45, 0.46] { _ = SoundEffectSynth.render(SoundEffectParameters(preset: .sparkle, duration: duration, variation: 7)) }
+    for duration in [0.06, 0.08, 0.09] { _ = SoundEffectSynth.render(SoundEffectParameters(preset: .shutter, duration: duration, variation: 3)) }
+}
+
+/// A file is the clip it becomes: never shorter than the timeline's shortest clip (tick 0.08 s and click 0.04 s could not be placed:
+/// "source_out must be 0.1 to 0.08"), at least duration (click ignored it), and hit_at at second 0 still leaves a whole clip.
+/// A sound that is long enough is untouched (docs/bugfixes/2026-11-17-tick-and-click-cannot-be-placed.md).
+private func fileLengthChecks() {
+    let minimum = TimelineTrim.clipMinimumDuration
+    checkEqual(SoundEffectSynth.fileSeconds(sound: 0.0374, duration: 0.05, hitAt: 0.001), 0.001 + minimum, "a click is padded past the shortest clip after its hit")
+    checkEqual(SoundEffectSynth.fileSeconds(sound: 0.14, duration: 0.5, hitAt: 0.001), 0.5, "a short sound is padded to duration")
+    checkEqual(SoundEffectSynth.fileSeconds(sound: 1.214, duration: 1.2, hitAt: 1.214), 1.214, "a sound as long as duration is untouched (suction)")
+    checkEqual(SoundEffectSynth.fileSeconds(sound: 2.699, duration: 1, hitAt: 0.005), 2.699, "a tail past duration is kept (impact)")
+    for preset in SoundEffectPreset.allCases {
+        for duration in [nil, SoundEffectParameters.durationRange.lowerBound, 0.1, 0.15] as [Double?] {
+            let parameters = SoundEffectParameters(preset: preset, duration: duration)
+            let render = SoundEffectSynth.render(parameters)
+            let seconds = render.audio.seconds
+            check(seconds >= max(parameters.resolvedDuration, minimum) - 1e-9, "\(parameters.canonical) is at least its duration and the shortest clip (\(seconds) s)")
+            do {
+                _ = try AIClipSourceWindow.resolve(sourceIn: nil, sourceOut: nil, oldIn: 0, oldOut: seconds, assetDuration: seconds,
+                                                   isImage: false, stillDuration: StillImageClipFactory.stillDuration)
+            } catch { check(false, "\(parameters.canonical) can be placed: \(error)") }
+        }
+    }
+    for preset in [SoundEffectPreset.tick, .click, .pop, .beep, .shutter, .glitch] {
+        let render = SoundEffectSynth.render(SoundEffectParameters(preset: preset, duration: 0.05))
+        let atZero = AISoundEffectRequest.placement(hitAt: 0, renderedHit: render.hitAt)
+        do {
+            _ = try AIClipSourceWindow.resolve(sourceIn: atZero.sourceIn, sourceOut: nil, oldIn: atZero.sourceIn, oldOut: render.audio.seconds,
+                                               assetDuration: render.audio.seconds, isImage: false, stillDuration: StillImageClipFactory.stillDuration)
+        } catch { check(false, "\(preset.rawValue) with hit_at 0 can be placed: \(error)") }
+    }
+    let click = SoundEffectSynth.render(SoundEffectParameters(preset: .click, duration: 0.15)).audio
+    check(abs(click.seconds - 0.15) < 1.5 / SFX.sampleRate, "click honours duration 0.15 (\(click.seconds) s)")
+    check(click.left.suffix(2_000).allSatisfy { $0 == 0 }, "…with silence after the click")
+}
+
+/// audible_duration (MCP-8): how long a made sound is heard at the clip's volume, by listen's silence floor.
+private func audibleChecks() {
+    let impact = SoundEffectSynth.render(SoundEffectParameters(preset: .impact, duration: 1)).audio
+    let heard = AISoundEffectRequest.audibleEnd(impact, volumeDB: AISoundEffectRequest.defaultVolumeDB)
+    check(heard > 0.5 && heard < impact.seconds - 0.3, "an impact of duration 1 is heard for \(heard) s of its \(impact.seconds) s clip")
+    check(AISoundEffectRequest.audibleEnd(impact, volumeDB: -20) < heard, "a quieter clip is heard for less time")
+    checkEqual(AISoundEffectRequest.audibleEnd(impact, volumeDB: AudioGain.minimumDB), 0, "a silent clip is not heard at all")
+    let click = SoundEffectSynth.render(SoundEffectParameters(preset: .click, duration: 1)).audio
+    check(AISoundEffectRequest.audibleEnd(click, volumeDB: 0) < 0.1, "a click padded to 1 s is heard for a few hundredths")
 }

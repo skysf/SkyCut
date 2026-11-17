@@ -231,6 +231,14 @@
   turn and drift, flips, crop, keys, a spring's dip, look with V2 / hidden / transparent / gap / wipe / transition / rise); wiring in
   `checks/MCP/coverage-wiring.sh`; real preview frames against the same geometry in `scripts/check-preview-composition.sh`
   (`RotatedPictures.swift`). Rule: [预览自由变换](../architecture/preview-free-transform.md).
+- add_clips tracks and made sound effects (2026-11-17): `scripts/check-mcp.sh` → `TrackLandingChecks` (an audio clip on a taken or
+  hidden named track opens another new track, never one with content; 13 crowded new_audio clips; A1–A7 in one call in any order,
+  no gaps; video lifts noted; the `track` adjustment), `SoundEffectChecks` (every preset renders at 0.05–0.3 s, a trap ends the
+  self-test; every file ≥ max(duration, 0.1 s) and placeable, also with `hit_at` 0; `audibleEnd`), `ParameterLimitChecks`
+  (`sound_effect.volume_db` in range is no adjustment, dB noise cleaned, the limit never rounded). On real App objects
+  `scripts/check-parameter-limits.sh` → `checks/ParameterLimits/AddClipsChecks.swift` (the same through `addClips`: files, probe,
+  one undo, a planted version-1 click not reused, a failed call leaving no files; the trap scenario runs last). Rules:
+  [AI interface (MCP)](../architecture/ai-control-mcp.md) section 4 items 2 and 43, [synthesized sound effects](../architecture/sound-effect-synth.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；

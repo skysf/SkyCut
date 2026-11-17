@@ -20,7 +20,8 @@ PLIST
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_SrtFlow.bundle"
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
-  checks/ParameterLimits/Fixture.swift checks/ParameterLimits/BlackBarChecks.swift checks/ParameterLimits/Main.swift \
+  checks/ParameterLimits/Fixture.swift checks/ParameterLimits/BlackBarChecks.swift \
+  checks/ParameterLimits/Main.swift checks/ParameterLimits/AddClipsChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ParameterLimitCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=160x90:r=24 \
@@ -34,6 +35,9 @@ FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi \
   -i 'color=c=white:s=480x270:r=24,drawbox=x=0:y=0:w=iw:h=28:color=black:t=fill:enable=lt(t\,0.5),drawbox=x=0:y=ih-28:w=iw:h=28:color=black:t=fill:enable=lt(t\,0.5)' \
   -t 1 -an -c:v libx264 -g 1 -crf 10 -pix_fmt yuv420p "${ROOT}/work/changing-bars.mp4"
+# A plain tone for the audio-track scenarios of add_clips (AddClipsChecks.swift).
+"${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i sine=frequency=220:sample_rate=48000 -t 20 \
+  -c:a aac "${ROOT}/work/tone.m4a"
 SRTFLOW_PARAMETER_CHECK_DIR="${ROOT}/work" SRTFLOW_FFMPEG="${FFMPEG}" \
 SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/ParameterLimitCheck" <<'PYTHON'

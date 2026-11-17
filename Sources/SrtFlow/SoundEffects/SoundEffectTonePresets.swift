@@ -41,6 +41,10 @@ enum SFXTonePresets {
             let f = scale[k]
             var ph1 = SFXPhasor(), ph2 = SFXPhasor()
             let from = Int(start * SFX.sampleRate)
+            // A short sparkle ends before its later twinkles start; `from..<n` with from > n trapped and took the App down
+            // (docs/bugfixes/2026-11-17-short-sparkle-and-shutter-crash.md). Skipped after the random draws above, so every
+            // sparkle that rendered before renders the same samples.
+            guard from < n else { continue }
             for i in from..<n {
                 let t = Double(i - from) / SFX.sampleRate
                 let s = (sin(SFX.twoPi * ph1.tick(f)) + 0.35 * sin(SFX.twoPi * ph2.tick(f * 2.76)))
@@ -122,7 +126,8 @@ enum SFXTonePresets {
             band.bandpass(3500 * p.pitch, q: 1.5)
             var ph1 = SFXPhasor(), ph2 = SFXPhasor()
             let from = Int(start * SFX.sampleRate)
-            for i in from..<min(n, from + Int(0.05 * SFX.sampleRate)) {
+            // Shorter than the second click (about 85 ms): an empty range, not a trap (same bug case as sparkle above).
+            for i in from..<max(from, min(n, from + Int(0.05 * SFX.sampleRate))) {
                 let t = Double(i - from) / SFX.sampleRate
                 let s = band.process(rng.bipolar()) * SFX.decay(t, tau: 0.006)
                     + sin(SFX.twoPi * ph1.tick(1250 * p.pitch)) * SFX.decay(t, tau: 0.008) * 0.5

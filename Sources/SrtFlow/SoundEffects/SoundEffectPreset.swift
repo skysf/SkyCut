@@ -125,7 +125,9 @@ struct SoundEffectRender: Sendable {
 
 enum SoundEffectSynth {
     /// 声音设计变了就 +1：文件名跟着变，旧文件不会被当成同一个声音复用。
-    static let version = 1
+    /// 2 (2026-11-17): a file is padded with silence to the clip it becomes (`fileSeconds`). No sound changed (the samples before
+    /// the padding are the same), but a version-1 file that is too short to place (a 0.04 s click, a 0.08 s tick) must not be reused.
+    static let version = 2
     /// 峰值封顶。
     static let peakCeilingDB = -1.0
     /// K 加权最大瞬时响度的上限：定在用户点头的噪声 / 冲击类（whoosh −9.4、impact −9.0）上，它们照旧由峰值封顶；
@@ -165,6 +167,20 @@ enum SoundEffectSynth {
         result.audio.trimTail(thresholdDB: tailFloorDB)
         result.audio.normalize(peakDB: peakCeilingDB, loudnessLUFS: loudnessCeilingLUFS)
         result.audio.fadeOut(seconds: endFade)
+        let seconds = fileSeconds(sound: result.audio.seconds, duration: p.resolvedDuration, hitAt: result.hitAt)
+        result.audio.resize(max(result.audio.count, Int((seconds * SFX.sampleRate - 1e-6).rounded(.up))))
         return result
+    }
+
+    /// How long the file is (seconds). The sound itself when it is at least the requested duration and the timeline's shortest clip;
+    /// otherwise silence after it up to both, and far enough past the hit that hit_at at second 0 (the clip starts at the hit) still
+    /// leaves a whole clip. tick and click rendered 0.08 / 0.04 s and could not be placed at all, and click ignored duration
+    /// (docs/bugfixes/2026-11-17-tick-and-click-cannot-be-placed.md). A sound that is long enough is untouched: its tail past
+    /// duration is part of the preset (the reply reports audible_duration).
+    static func fileSeconds(sound: Double, duration: Double, hitAt: Double) -> Double {
+        let minimum = TimelineTrim.clipMinimumDuration
+        let floor = max(duration, minimum)
+        guard sound < floor else { return sound }
+        return max(floor, hitAt + minimum)
     }
 }
