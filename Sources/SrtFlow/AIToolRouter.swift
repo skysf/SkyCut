@@ -14,13 +14,15 @@ import SrtFlowMCPKit
 // 开 / 建 / 关（它们决定了「最后打开的那个」），再按那时落在的工程排。
 // 只读、会等很久的（get_job 最多等 30 秒）和取消不排队，免得堵住后面的活、或者取消排在被取消的后面。
 // **排到之后、动窗口之前**才定落在哪个工程、查归属（排队时前面可能正是别人的 open_project / close_project）。
+// The lines themselves are AICallLines: a look lets its line go once it has read the project, and a look not done within about
+// 25 s answers with a job (AILookCall; docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md).
 
 @MainActor
 final class AIToolRouter {
     static let shared = AIToolRouter()
 
-    /// 每条队的队尾（键："project:p2"、"session:<会话>"、"switch:<会话>"）。
-    private var tails: [String: Task<Void, Never>] = [:]
+    /// The lines (keys: "project:p2", "session:<session>", "switch:<session>").
+    private let lines = AICallLines()
 
     private init() {}
 
@@ -67,7 +69,12 @@ final class AIToolRouter {
         )
         AIProjectSessions.shared.noteCall(session: call.session)
         guard call.policy.serialized else { return await execute(call, begin) }
-        return await enqueue(await queueKeys(call)) { await self.execute(call, begin) }
+        let keys = await queueKeys(call)
+        if call.tool == .look {
+            let place = lines.join(keys, tool: call.tool.rawValue, session: call.session, client: call.client)
+            return await AILookCall.run(place, in: lines, begin: begin) { begin in await self.execute(call, begin) }
+        }
+        return await enqueue(keys, call) { await self.execute(call, begin) }
     }
 
     /// 一次调用要用的东西，排队、定工程、执行都传它。
@@ -91,21 +98,17 @@ final class AIToolRouter {
         }
         guard AIProjectBinding.usesProject(call.tool, call.arguments) else { return ["session:" + call.session] }
         if let id = call.explicitProject { return ["project:" + id] }
-        await tails["switch:" + call.session]?.value
+        await lines.waitForLast(in: "switch:" + call.session)
         let sessions = AIProjectSessions.shared
         let id = sessions.ownership.current(of: call.session) ?? OpenProjects.shared.primary.shortID
         return ["project:" + id]
     }
 
-    private func enqueue(_ keys: [String], _ work: @escaping @MainActor () async -> Answer) async -> Answer {
-        let previous = keys.compactMap { tails[$0] }
-        let task = Task { @MainActor () -> Answer in
-            for tail in previous { await tail.value }
-            return await work()
-        }
-        let done = Task { _ = await task.value }
-        for key in keys { tails[key] = done }
-        return await task.value
+    private func enqueue(_ keys: [String], _ call: Call, _ work: @escaping @MainActor () async -> Answer) async -> Answer {
+        let place = lines.join(keys, tool: call.tool.rawValue, session: call.session, client: call.client)
+        await lines.waitForTurn(place)
+        defer { place.letGo() }
+        return await AICallLines.$current.withValue(place) { await work() }
     }
 
     private func execute(_ call: Call, _ begin: @Sendable () -> Bool) async -> Answer {
