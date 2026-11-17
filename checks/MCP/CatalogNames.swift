@@ -105,6 +105,8 @@ func catalogKnownNames() -> Set<String> {
                      "audio_max_reduction_db"])
     // listen voice=… (AIListenVoiceReport / VoiceClarity, 2026-11-17): a masker's kind, the low band and the verdicts.
     names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short", "may_be_loud"])
+    // Delivery report kinds and measured layer context (AIDeliveryChecks / AIDeliveryMix).
+    names.formUnion(["source_cut_crossing", "audio_hole", "audio_limiter", "audio_overload", "audio_thin", "audio_true_peak", "loudest_layers", "sentence_cut"])
     // Does the picture cover the frame (2026-11-17, AIPictureCoverage): picture's fills_frame / fill_scale / fills_except, look's uncovered.
     names.formUnion(["fills_frame", "fill_scale", "fills_except", "top_right"])
     return names
