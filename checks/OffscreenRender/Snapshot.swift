@@ -42,8 +42,19 @@ enum Snapshot {
         capture.arguments = ["-l", String(window.windowNumber), "-o", "-x", file.path]
         try capture.run()
         capture.waitUntilExit()
-        guard capture.terminationStatus == 0, FileManager.default.fileExists(atPath: file.path) else {
-            throw AIToolError("screencapture could not capture \(file.lastPathComponent); the terminal needs Screen Recording permission")
+        if capture.terminationStatus != 0 || !FileManager.default.fileExists(atPath: file.path) {
+            // No Screen Recording permission for the process that started the script (an agent's shell): with
+            // SRTFLOW_RENDER_DRAW_FALLBACK=1 the view is drawn with cacheDisplay instead. Text, shapes and buttons come out right;
+            // text fields and pickers may not (see above), so it says so. Added 2026-11-17 for scripts/render-project-versions.sh.
+            guard ProcessInfo.processInfo.environment["SRTFLOW_RENDER_DRAW_FALLBACK"] == "1",
+                  let bitmap = host.bitmapImageRepForCachingDisplay(in: host.bounds) else {
+                throw AIToolError("screencapture could not capture \(file.lastPathComponent); the terminal needs Screen Recording permission "
+                    + "(or set SRTFLOW_RENDER_DRAW_FALLBACK=1 to draw it without)")
+            }
+            host.cacheDisplay(in: host.bounds, to: bitmap)
+            guard let png = bitmap.representation(using: .png, properties: [:]) else { throw AIToolError("could not encode \(file.lastPathComponent)") }
+            try png.write(to: file)
+            print("drew \(file.lastPathComponent) without screencapture (SRTFLOW_RENDER_DRAW_FALLBACK)")
         }
         window.orderOut(nil)
         window.close()
