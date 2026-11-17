@@ -75,7 +75,7 @@ did not change. The long-term rules are in [画面文字](../architecture/text-o
   box hugging the words) from 0.5 s and 9.5 s, a wiping rectangle from 3.36 s, a still square from 7.2 s, over seven main
   clips with cuts and two crossfades, exported at 24 / 30 / 60 fps through the real `VideoEditExportGraph.plan()` and
   ffmpeg. Every frame's lit width in three strips must equal what the preview's renderers draw for that frame's own time
-  (±2 px; a frame off by one is 4–18 px), and no frame may repeat the one before while it moves. Plus the `FrameGrid`
+  (±2 px; a frame off by one is 4–21 px), and no frame may repeat the one before while it moves. Plus the `FrameGrid`
   contract at 24 / 25 / 30 / 60 fps.
 - Before the fix (main at 5abca0d): 14 of 24 export checks red, the frames listed under Symptom. After: 37 / 37, every
   frame within 1 px (0 px on all but 9 of about 6,100 strip-frames).

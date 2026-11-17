@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import CoreImage
 import SwiftUI
+import SrtFlowCore
 
 // MARK: - 预览上的「盖一块」（模糊 / 马赛克）
 //
@@ -38,7 +39,8 @@ struct CoverStack: Equatable {
     init(entries: [Entry] = []) { self.entries = entries }
 
     init(in state: TimelineState, at time: Double) {
-        self.init(entries: state.renderedCovers.filter { $0.contains(time: time) }.map {
+        let grid = FrameGrid(state.frameRate)
+        self.init(entries: state.renderedCovers.filter { grid.contains(time, from: $0.timelineStart, to: $0.timelineEnd) }.map {
             Entry(kind: $0.kind, rect: $0.frame(in: CGSize(width: 1, height: 1)), amount: $0.coverAmount)
         })
     }

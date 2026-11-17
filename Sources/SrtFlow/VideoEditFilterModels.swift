@@ -268,7 +268,8 @@ extension TimelineState {
 
     /// 此刻生效的滤镜，按生效顺序。藏起来的不算（`renderedFilters`，VideoEditClipVisibility.swift）。
     func activeFilters(at time: Double) -> [FilterClip] {
-        renderedFilters.filter { $0.contains(time: time) }
+        let grid = FrameGrid(frameRate)
+        return renderedFilters.filter { grid.contains(time, from: $0.timelineStart, to: $0.timelineEnd) }
     }
 
     /// 时间线上要给滤镜留几行。没有滤镜时是 0（那些行整个不出现）。

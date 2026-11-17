@@ -237,7 +237,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-dmg.sh` — DMG 的真实组装、挂载和 Retina 背景。
 - `scripts/check-engine-probe.sh` — 引擎启动探测：超时、输出上限、子进程回收、单次定位。
 - `scripts/check-export-alpha-compositing.sh` — 上层轨动画段的 fill + matte。
-- `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）。
+- `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）；per-frame upper-video, cover and grade windows, including native look requests.
 - `scripts/check-export-profile.sh` — 导出阶段计时、快速审阅、排队 / 取消、PNG 只解码一次。
 - `scripts/check-export-watermark.sh` — 导出水印真的叠上了、只在该在的地方。
 - `scripts/check-film-production.sh` — 官方原创短片的公开制作状态。
@@ -316,7 +316,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/presented-views-app-language.sh` — 每个 sheet / popover / 自建 `NSHostingView` 都套 `.appLanguage()`。
 - `checks/preview-perf-wiring.sh` — 每个视图 / `updateNSView` / Canvas 接了性能计数（漏了跑 `--fix` 自动补）；时间线上的块不读工程；订阅时钟的名单。
 - `checks/product-name.sh` — 看得见的叫 SkyCut，身份类的名字沿用 SrtFlow。
-- `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它。
+- `checks/project-file-wiring.sh` — 工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线；搬代码、改名之后先跑它；cover/grade frame-window selection and timeline-look requests.
 - `checks/project-versions-wiring.sh` — Saved versions: the router hook, `undo version=`, the round's save points, the one-step restore, one writer of project files.
 - `checks/region-framing-wiring.sh` — 源矩形取景接进现有编辑 / 批量和原生渲染。
 - `checks/release-signing.sh` — 发布版用固定的签名身份签；`tccutil` 只在一处。
