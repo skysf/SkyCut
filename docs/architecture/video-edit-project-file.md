@@ -215,6 +215,10 @@ generation-checked background recovery. `refreshWebMotionCaches` also supports r
 The page, parameters and provenance survive a missing movie and subsequent saves. A clip's display name comes from the stored
 motion name, not its cache filename.
 
+Internal saved versions use the same writer with `motionCaches: .reference`: they keep the source page and existing movie URL,
+without copying videos beside the version file. Normal saves keep the default `.carry` policy. Version comparison normalizes
+only generated cache URLs; restore explicitly starts missing-cache recovery even for projects without an editor window.
+
 Checks: `scripts/check-project-file.sh` group 50 exercises source/form/provenance round trips, missing-key defaults, split
 identity, save and Save As carrying, moving to another Mac's folder while the old path still exists, missing-cache requests,
 exclusion from media bookmarks, fingerprint path safety and failed-copy preservation. `scripts/check-mcp.sh` also checks
@@ -232,6 +236,14 @@ nested manifest sandbox was rejected by macOS; these same checks ran with the us
 - [ ] Delete a motion movie while the project is closed and open it again: the stored page restores it without a missing-media
       prompt. Repeat while the editor is open and verify recovery or a visible render failure; exporting must not omit it.
 - [ ] Save As to another folder, remove the original folder, and reopen the saved copy: the title is still available.
+
+### Saved versions are project files too (2026-11-17)
+
+The versions SkyCut saves around AI rounds are complete project files written by the same `VideoEditProjectIO.save` (with the
+project's `mediaRecords` as `knownRecords`) and read back by the same `load` — no new format and no format version. They live in
+`~/Library/Application Support/SrtFlow/Versions/<project name> <hash>/`, not next to the project; going back restores the timeline
+with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore` write project files. Rules:
+[saved project versions](project-versions.md).
 
 ### 不进工程文件的东西
 

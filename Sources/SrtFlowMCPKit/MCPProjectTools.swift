@@ -99,12 +99,12 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .undo, title: "Undo",
                 description: """
-                Undo edits (steps, default 1); round=true restores this AI round's starting state as one undo step. \
-                File operations are not undone.
+                Undo steps (default 1), this round (round=true) or saved version=<id>; one undo step. File operations are not undone.
                 """,
                 input: MCPSchema.object([
                     "steps": MCPSchema.integer("How many edits to undo (default 1).", minimum: 1, maximum: 50),
-                    "round": MCPSchema.boolean("Undo everything done since this round of AI edits began.")
+                    "round": MCPSchema.boolean("Undo this whole round of AI edits."),
+                    "version": MCPSchema.string("A saved version's id (v3); get_status lists them.")
                 ]),
                 destructive: true
             )

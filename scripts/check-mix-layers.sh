@@ -31,8 +31,11 @@ OUT="$(mktemp -d)/mixlayers"
 trap 'rm -rf "$(dirname "$OUT")"' EXIT
 
 echo "==> 编译自检二进制"
+# -O (2026-11-17): listen voice=… runs ESTOI and long FFTs per line (group 3); the debug build took minutes for a few seconds of
+# sound, the optimized one seconds (same as scripts/check-listening.sh).
 xcrun swiftc \
   -target "$TRIPLE" \
+  -O \
   -wmo \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
@@ -163,6 +166,17 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/MixMeasurement.swift \
   Sources/SrtFlow/AIListenMixPlan.swift \
   Sources/SrtFlow/AIListenMixReport.swift \
+  Sources/SrtFlow/AIListenVoicePlan.swift \
+  Sources/SrtFlow/AIListenVoiceMeasure.swift \
+  Sources/SrtFlow/AIListenVoiceReport.swift \
+  Sources/SrtFlow/Listening/VoiceClarity.swift \
+  Sources/SrtFlow/Listening/VoiceLines.swift \
+  Sources/SrtFlow/Listening/MaskerAttribution.swift \
+  Sources/SrtFlow/Listening/ESTOI.swift \
+  Sources/SrtFlow/Listening/ESTOIAnalysis.swift \
+  Sources/SrtFlow/Listening/ListeningDFT.swift \
+  Sources/SrtFlow/Listening/ListeningMath.swift \
+  Sources/SrtFlow/Listening/ListeningResample.swift \
   Sources/SrtFlow/AIAudioLevels.swift \
   Sources/SrtFlow/AIListenSampleFrames.swift \
   Sources/SrtFlow/ExportAudioReport.swift \
@@ -176,6 +190,8 @@ xcrun swiftc \
   checks/MixLayers/Oracle.swift \
   checks/MixLayers/Parity.swift \
   checks/MixLayers/Plan.swift \
+  checks/MixLayers/Voice.swift \
+  checks/MixLayers/VoiceHints.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 

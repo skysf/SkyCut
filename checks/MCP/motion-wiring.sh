@@ -23,6 +23,7 @@ require("Sources/SrtFlow/WebMotion/AIMotionApproval.swift", "AIConfirmations.sha
 require("Sources/SrtFlow/WebMotion/AIMotionApproval.swift", 'values["document_generation"]')
 require("Sources/SrtFlow/WebMotion/AIMotionTool.swift", "AIJobs.shared.start(.motion")
 require("Sources/SrtFlow/WebMotion/AIMotionTool.swift", "AIJobs.shared.finish(job, .done")
+require("Sources/SrtFlow/WebMotion/AIMotionTool.swift", "AIRoundVersions.reporting(project, in: answer)")
 require("Sources/SrtFlow/WebMotion/WebMotionActions.swift", "project.isCurrentGeneration(generation)")
 require("Sources/SrtFlow/WebMotion/WebMotionActions.swift", "project.state.clip(with: id!) == before")
 require("Sources/SrtFlow/WebMotion/WebMotionActions.swift", "AIUndoGrouping.step(project.effectiveUndoManager)")

@@ -46,7 +46,8 @@ enum WebMotionCache {
         let (versions, key) = try identity.get()
         var record = original
         record.provenance = .init(fingerprint: key, renderer: versions.renderer, macOS: versions.macOS,
-                                  macOSBuild: versions.macOSBuild, webKit: versions.webKit, fonts: fonts)
+                                  macOSBuild: versions.macOSBuild, webKit: versions.webKit, fonts: fonts,
+                                  renderedAt: original.provenance?.fingerprint == key ? original.provenance!.renderedAt : Date())
         let movie = directory.appendingPathComponent("motion-\(key).mov")
         let receipt = movie.deletingPathExtension().appendingPathExtension("render.json")
         if !force, let cached = await MediaReadQueue.run(on: MediaReadQueue.analysis, {

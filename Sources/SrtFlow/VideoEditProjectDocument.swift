@@ -256,8 +256,8 @@ extension VideoEditProject {
 
     // MARK: - 图片段的静帧
 
-    /// 静帧缓存被系统清掉了就重转一遍。图片本身还在工程里记着，用户无感。
-    private func regenerateStills(_ requests: [StillRegeneration], generation: Int) async {
+    /// 静帧缓存被系统清掉了就重转一遍。图片本身还在工程里记着，用户无感。Going back to a saved version uses it too (ProjectVersionStore).
+    func regenerateStills(_ requests: [StillRegeneration], generation: Int) async {
         guard let ffmpeg = await awaitVideoEngine() else {
             guard isCurrentGeneration(generation) else { return }
             notice = L10n("The video engine isn’t available, so image clips couldn’t be prepared.")

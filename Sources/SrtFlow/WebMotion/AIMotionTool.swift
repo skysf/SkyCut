@@ -51,8 +51,14 @@ enum AIMotionTool {
                                                               at: request.at, hitAt: request.hitAt, preferring: request.target, project: project)
                 var answer = AIMotionReport.success(placed, state: project.state)
                 // A job may finish after the router has answered. Note and save the edit here exactly once in both cases.
-                AISession.shared.round(for: project).noteChange()
-                answer = AIProjectTools.saveIfNeverSaved(project, after: answer)
+                if request.expectedClip != placed.clip {
+                    AISession.shared.round(for: project).noteChange()
+                    answer = AIProjectTools.saveIfNeverSaved(project, after: answer)
+                    answer = AIRoundVersions.reporting(project, in: answer)
+                } else if case .object(var payload) = answer.payload {
+                    payload["unchanged"] = true
+                    answer.payload = .object(payload)
+                }
                 AIEditorPresenter.reveal(.init(clips: [placed.clip.id], time: placed.clip.timelineStart), project: project)
                 answer.changedProject = false
                 result = answer

@@ -29,19 +29,26 @@ import SrtFlowMCPKit
     project.revalidateMediaLocations()
     let deadline = Date().addingTimeInterval(45)
     while Date() < deadline {
-        if webURLs.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }),
-           project.state.clip(with: original.id)?.webMotion?.provenance?.renderedAt != original.webMotion?.provenance?.renderedAt { break }
+        if webURLs.allSatisfy({ FileManager.default.fileExists(atPath: $0.path) }), recoveryFinished(project) { break }
         try await Task.sleep(for: .milliseconds(100))
     }
     motionRequire(webURLs.allSatisfy { FileManager.default.fileExists(atPath: $0.path) },
                   "ordinary document revalidation regenerates deleted web-motion caches")
-    motionRequire(project.state.clip(with: original.id)?.webMotion?.provenance?.renderedAt != original.webMotion?.provenance?.renderedAt,
-                  "recovery installs the newly checked render receipt on the existing clip")
+    motionRequire(recoveryFinished(project)
+                  && project.state.clip(with: original.id)?.webMotion?.provenance == original.webMotion?.provenance,
+                  "recovery finishes without changing the provenance of identical pixels")
     motionRequire(project.missingMedia.isEmpty && project.state.mediaURLs.isEmpty,
                   "a deleted motion cache never becomes imported missing media")
     motionRequire(!project.ownUndoManager.canUndo, "automatic cache recovery is document repair, not a user undo step")
     motionRequire(project.state.clip(with: original.id)?.id == original.id,
                   "cache recovery keeps the clip's identity")
+}
+
+@MainActor private func recoveryFinished(_ project: VideoEditProject) -> Bool {
+    let key = "recovery:\(project.documentGeneration)"
+    guard WebMotionActivity.claim(key) else { return false }
+    WebMotionActivity.release(key)
+    return true
 }
 
 @MainActor private func staleRenderKeepsUserEdit(_ fixture: MotionFixture) async throws {

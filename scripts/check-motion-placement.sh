@@ -25,6 +25,7 @@ cp "${BUILD_DIR}/skycut-web-motion" "${CHECK_APP}/Contents/Helpers/skycut-web-mo
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/MotionPlacement/Main.swift checks/MotionPlacement/Fixture.swift checks/MotionPlacement/Fingerprints.swift \
   checks/MotionPlacement/Actions.swift checks/MotionPlacement/Approval.swift checks/MotionPlacement/FailureRecovery.swift \
+  checks/MotionPlacement/Versions.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${CHECK_APP}/Contents/MacOS/MotionPlacementCheck"
 SRTFLOW_WEB_MOTION_HELPER="${CHECK_APP}/Contents/Helpers/skycut-web-motion" \
 SRTFLOW_MOTION_PLACEMENT_DIR="${CHECK_ROOT}/work" SRTFLOW_SMOKE_SCRIPT="${CHECK_ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \

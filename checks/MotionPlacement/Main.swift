@@ -27,6 +27,8 @@ import Foundation
             try await runMotionApprovalChecks(fixture)
             print("motion checks: failure and recovery")
             try await runMotionFailureRecoveryChecks(fixture)
+            print("motion checks: saved versions")
+            try await runMotionVersionChecks(root)
         } catch {
             motionRequire(false, "motion placement checks stopped: \(error)")
         }

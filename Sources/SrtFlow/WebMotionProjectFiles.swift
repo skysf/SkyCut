@@ -19,6 +19,19 @@ enum WebMotionProjectFiles {
         filename(for: record).map { directory(for: projectURL).appendingPathComponent($0) }
     }
 
+    /// Version equality compares source content, not where a disposable movie currently lives. This value is comparison
+    /// only: the real project and version files keep their usable URLs, and ordinary imported media stays exact.
+    static func normalizingCacheLocations(in original: TimelineState) -> TimelineState {
+        var result = original
+        for clip in original.allClips {
+            guard let record = clip.webMotion else { continue }
+            let name = filename(for: record) ?? "unrendered-\(clip.id.uuidString.lowercased()).mov"
+            let sentinel = URL(string: "srtflow-motion-cache:///\(name)")!
+            result.update(clip.id) { $0.sourceURL = sentinel }
+        }
+        return result
+    }
+
     /// Save As carries movies into the new project folder before the JSON is committed. A cache causes a save failure only
     /// when it existed but could not be carried; a missing movie never prevents saving its recoverable source page.
     static func preparingForSave(_ original: TimelineState, projectURL: URL) throws -> TimelineState {
