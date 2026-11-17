@@ -5,7 +5,32 @@ import Foundation
 
 func runVoiceChecks() {
     checkVoiceVerdicts()
+    checkVoiceHints()
     checkVoiceLines()
+}
+
+private func checkVoiceHints() {
+    let cases: [(Double?, VoiceClarity.Verdict, Bool, Double?, Bool, String)] = [
+        (0.48, .clear, true, 0.27, true, "E34-like added rain"),
+        (0.445, .clear, true, 0.29, true, "E35-like music"),
+        (0.30, .clear, true, 0.30, true, "music can pass its tier below 0.41 and still get a hint"),
+        (0.499, .clear, true, 0.25, true, "removal gain includes 0.25"),
+        (0.50, .clear, true, 0.30, false, "ESTOI excludes 0.50"),
+        (0.553, .clear, true, 0.41, false, "E36-like clear line"),
+        (0.637, .clear, true, 0.40, false, "E39-like clear line"),
+        (0.48, .clear, false, 0.40, false, "the main masker must be one added layer"),
+        (0.48, .clear, true, 0.249, false, "removal gain below the boundary"),
+        (0.48, .clear, true, 0.20, false, "removing it helps too little"),
+        (0.39, .mayBeHard, true, 0.40, false, "no hint below the yellow tier"),
+        (0.30, .probablyUnintelligible, true, 0.40, false, "no hint below the red tier"),
+        (0.48, .twoVoices, true, 0.40, false, "overlapping voices have their own verdict"),
+        (nil, .tooShort, true, 0.40, false, "no ESTOI means no hint"),
+        (0.48, .clear, true, nil, false, "no main masker means no hint")
+    ]
+    for (estoi, verdict, added, removed, expected, label) in cases {
+        checkEqual(VoiceClarity.hint(estoi: estoi, verdict: verdict, mainMaskerIsAddedLayer: added, removalGain: removed),
+                   expected, label)
+    }
 }
 
 private func checkVoiceVerdicts() {

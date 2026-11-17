@@ -7,8 +7,8 @@ import Foundation
 // "don't add it"). Each voice clip's stretch (plus `VoiceLines.margin` both sides) is collected from every layer, one channel
 // ((L + R) / 2, as ESTOI wants); when the render has passed it, its own voice layer is cut into lines at the voice's pauses
 // (VoiceLines), and every line gets `MaskerAttribution.rank`: ESTOI against the whole mix, each other layer removed / lowered
-// 6 dB, and the 20–150 Hz level next to the voice's. Then the stretch's samples are dropped: memory stays a few seconds of
-// a few layers, however long the timeline.
+// 6 dB, and the 20–150 Hz level next to the voice's. Then the stretch's samples are dropped. Each active voice clip holds its
+// whole requested stretch per layer (~0.19 MB/s/layer); callers should narrow from/to for long narration files.
 // Rendering starts `MixMeasurement.preroll` before the first stretch on the engine's quantum (scene tails and stretched clips
 // come in as the export plays them) and stops at the last stretch.
 // Not here: which layers and clips (AIListenVoicePlan), the verdict and the result (VoiceClarity, AIListenVoiceReport), the job.

@@ -57,7 +57,7 @@ private func voiceTimeline() -> (state: TimelineState, voice: EditClip) {
 private let voiceProvenance = AIListenVoicePlan.Provenance(library: ["mus_check_chord": .music], folders: ["Voiceovers": .voice])
 
 func checkVoiceCheck() {
-    group("3. listen voice=…：每一句人声被谁盖住、盖得多厉害（MCP-39）")
+    group("3. listen voice=: who covers each narration line and by how much (MCP-39)")
     let (state, voice) = voiceTimeline()
     let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
     // The plan.

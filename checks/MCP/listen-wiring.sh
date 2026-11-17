@@ -137,21 +137,22 @@ def code(path):
 tool, check = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenVoiceCheck.swift")
 measure, report = code("Sources/SrtFlow/AIListenVoiceMeasure.swift"), code("Sources/SrtFlow/AIListenVoiceReport.swift")
 plan = code("Sources/SrtFlow/AIListenVoicePlan.swift")
-assert tool.count('args.string("voice")') == 1 and tool.count("AIListenVoiceCheck.listen(") == 1, "✗ listen 要读 voice 并交给 AIListenVoiceCheck"
-assert check.count("AIListenMix.queued(") == 1, "✗ voice 要走 mix=true 那一套任务（AIJobs、mix 道、MediaReadQueue.export）：AIListenMix.queued"
+assert tool.count('args.string("voice")') == 1 and tool.count("AIListenVoiceCheck.listen(") == 1, "✗ listen must read voice and call AIListenVoiceCheck"
+assert check.count("AIListenMix.queued(") == 1, "✗ voice must share mix=true's AIJobs, mix lane and MediaReadQueue.export through AIListenMix.queued"
 assert check.count("AIListenVoicePlan.make(") == 1 and check.count("AIListenVoiceMeasure.measure(") == 1 \
-    and check.count("AIListenVoiceReport.json(") == 1, "✗ voice 要经 AIListenVoicePlan 定、AIListenVoiceMeasure 量、AIListenVoiceReport 写"
+    and check.count("AIListenVoiceReport.json(") == 1, "✗ voice must use AIListenVoicePlan, AIListenVoiceMeasure and AIListenVoiceReport"
 assert measure.count("AudioStemRender.render(") == 1 and measure.count("MaskerAttribution.rank(") == 1 \
-    and measure.count("VoiceLines.split(") == 1, "✗ voice 要按层离线渲（成片同一份配置）、按停顿切句、每句交给 MaskerAttribution"
+    and measure.count("VoiceLines.split(") == 1, "✗ voice must render stems, split at pauses and measure each line with MaskerAttribution"
 for name, text in [("AIListenVoiceCheck", check), ("AIListenVoiceMeasure", measure)]:
     for banned in ["suspend(", "wake(", "recoverIfNeeded(", "AudioEngineIdleKeeper", "audioEngineHost", ".realtime"]:
-        assert banned not in text, f"✗ {name} 不许碰预览引擎（{banned}）"
-assert report.count("VoiceClarity.verdict(") == 1, "✗ 每句的结论只许由 VoiceClarity 定（线只写在那一处）"
+        assert banned not in text, f"✗ {name} must not touch the preview engine ({banned})"
+assert report.count("VoiceClarity.verdict(") == 1, "✗ each line's verdict must come only from VoiceClarity"
+assert report.count("VoiceClarity.hint(") == 1 and '.isAddedSound(' in report, "✗ the grey hint must use VoiceClarity and the main layer's provenance"
 for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
     if path.name != "VoiceClarity.swift":
         text = code(str(path))
-        for name in ["unintelligibleBelow", "hardBelow", "musicBelow"]:
-            assert f"let {name}" not in text, f"✗ {path} 另写了一份人声的线（{name} 只许在 VoiceClarity）"
-assert 'hasPrefix("V")' in plan and "own sound" in plan, "✗ 视频轨的声音要拒绝并说清为什么（镜头自己的声音里的人声量不了）"
+        for name in ["unintelligibleBelow", "hardBelow", "musicBelow", "hintBelow", "hintRemovalGain"]:
+            assert f"let {name}" not in text, f"✗ {path} duplicates a voice threshold ({name} belongs only in VoiceClarity)"
+assert 'hasPrefix("V")' in plan and "own sound" in plan, "✗ video-track voices must be refused with the reason: no clean voice stem"
 PY
-echo "   ✓ voice 交给 AIListenVoiceCheck：mix=true 同一套任务、按层渲、按停顿切句、每句 MaskerAttribution、结论只在 VoiceClarity"
+echo "   ✓ voice uses AIListenVoiceCheck: shared jobs, stem rendering, pause splitting, MaskerAttribution and VoiceClarity"

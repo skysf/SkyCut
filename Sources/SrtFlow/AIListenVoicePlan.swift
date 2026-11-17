@@ -43,6 +43,15 @@ struct AIListenVoicePlan: Sendable {
             }
             return best?.kind ?? .other
         }
+
+        /// A grey hint can name only one added sound, never a voice, camera sound or the combined rest layer.
+        func isAddedSound(from: Double, to: Double) -> Bool {
+            guard !isVoice, stem.name != AIListenMixPlan.rest else { return false }
+            switch kind(from: from, to: to) {
+            case .music, .effects, .other: return true
+            case .voice, .clipSound: return false
+            }
+        }
     }
 
     /// One voice clip's audible part inside from / to (timeline seconds), on voice layer `layer`.
@@ -110,7 +119,7 @@ struct AIListenVoicePlan: Sendable {
         if trimmed.lowercased() == auto {
             let found = names.indices.filter { index in
                 let clips = audioClips(names[index], state: state)
-                return names[index].hasPrefix("A") && !clips.isEmpty && clips.allSatisfy { provenance.kind(of: $0, onVideoTrack: false) == .voice }
+                return names[index].hasPrefix("A") && !clips.isEmpty && clips.allSatisfy { provenance.kind(of: $0) == .voice }
             }
             guard !found.isEmpty else {
                 throw AIToolError("No audio track holds only SkyCut voice-overs. Name the narration track: voice=A1 (or A1+A2).")
@@ -148,8 +157,9 @@ struct AIListenVoicePlan: Sendable {
             self.folders = folders
         }
 
-        func kind(of clip: EditClip, onVideoTrack: Bool) -> Kind {
-            if onVideoTrack, !clip.isAudioOnly { return .clipSound }
+        func kind(of clip: EditClip) -> Kind {
+            // Detached camera audio keeps its picture's metadata, even on an audio track.
+            if !clip.isAudioOnly || clip.info != nil { return .clipSound }
             if let key = clip.remoteKey, let kind = library[key] { return kind }
             switch folders[clip.sourceURL.deletingLastPathComponent().lastPathComponent] {
             case .voice?: return .voice
@@ -176,9 +186,8 @@ struct AIListenVoicePlan: Sendable {
     }
 
     private static func pieces(_ name: String, state: TimelineState, provenance: Provenance) -> [Piece] {
-        let videoTrack = name.hasPrefix("V")
         return audioClips(name, state: state).map {
-            Piece(from: $0.timelineStart, to: $0.timelineEnd, kind: provenance.kind(of: $0, onVideoTrack: videoTrack))
+            Piece(from: $0.timelineStart, to: $0.timelineEnd, kind: provenance.kind(of: $0))
         }
     }
 }

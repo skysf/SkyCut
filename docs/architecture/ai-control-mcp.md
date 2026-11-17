@@ -397,7 +397,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      holding SkyCut's voice-overs) measures every line of that voice against the mix: ESTOI, the verdict in the user's tiers
      (`VoiceClarity`: `probably_unintelligible` < 0.31, `may_be_hard` 0.31–0.41, music only < 0.20, `two_voices`, `too_short`), the two
      layers covering it most with what they are from where they came, and the 20–150 Hz level next to the voice's. A video track's sound
-     is refused with the reason (a voice inside a clip's own sound can't be taken out). Report only. Same job shape as mix=true
+     is refused with the reason (a voice inside a clip's own sound can't be taken out). A separate grey `hint` may suggest
+     lowering one added main masker 3–6 dB: only a `clear` line below 0.50 whose removal gain is at least 0.25; clip sound,
+     detached camera audio, other voices and `rest` are excluded. `summary.may_be_loud` counts hints separately. Report only. Same job shape as mix=true
      (`AIListenMix.queued`). Contract in [the listening engine](listening-engine.md) section 2 item 3a; the guide's listen topic has a
      `voice` section; one parameter and a few words on the card.
      Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened

@@ -17,15 +17,18 @@ enum AIListenVoiceReport {
     /// `shortIDs`: each voice clip's short id (AIShortIDs, made on the main actor when the plan was).
     static func json(_ lines: [AIListenVoiceMeasure.Line], plan: AIListenVoicePlan, shortIDs: [UUID: String]) -> [String: JSONValue] {
         var counts: [VoiceClarity.Verdict: Int] = [:]
+        var hints = 0
         let listed: [JSONValue] = lines.map { line in
             let entry = Self.line(line, plan: plan, shortIDs: shortIDs)
             counts[entry.verdict, default: 0] += 1
+            if entry.object["hint"] != nil { hints += 1 }
             return .object(entry.object)
         }
         var summary: [String: JSONValue] = ["lines": .number(Double(lines.count))]
         for verdict in VoiceClarity.Verdict.allCases where verdict != .clear {
             if let count = counts[verdict] { summary[verdict.rawValue] = .number(Double(count)) }
         }
+        if hints > 0 { summary["may_be_loud"] = .number(Double(hints)) }
         var object: [String: JSONValue] = [
             "voice": .array(plan.layers.filter(\.isVoice).map { .string($0.stem.name) }),
             "summary": .object(summary),
@@ -34,6 +37,7 @@ enum AIListenVoiceReport {
                 "Report only, never blocks. estoi (0–1) is each line against the whole mix: below 0.31 probably unintelligible, "
                     + "0.31–0.41 may be hard (listen to it); when music covers it most, only below 0.20. maskers: what removing a "
                     + "layer, or lowering it 6 dB, would add. ESTOI can't hear below ~134 Hz: compare low_150_db with voice_db. "
+                    + "A grey hint may suggest lowering one added layer 3–6 dB; it is separate from the verdict. "
                     + "A voice inside a clip's own sound (on-camera speech) can't be measured."
             )
         ]
@@ -60,14 +64,23 @@ enum AIListenVoiceReport {
                 "removed": hundredths(gain.whenRemoved), "lowered": hundredths(gain.whenLowered), "level_db": tenths(gain.levelDBFS)
             ])
         }
-        let main = result.gains.first.flatMap { layer($0.id)?.kind(from: line.from, to: line.to) }
+        let mainGain = result.gains.first
+        let mainLayer = mainGain.flatMap { layer($0.id) }
+        let main = mainLayer?.kind(from: line.from, to: line.to)
         let anotherVoice = result.gains.contains { gain in
-            layer(gain.id)?.isVoice == true && gain.levelDBFS >= VoiceClarity.speakingDBFS
+            guard let other = layer(gain.id) else { return false }
+            return (other.isVoice || other.kind(from: line.from, to: line.to) == .voice)
+                && gain.levelDBFS >= VoiceClarity.speakingDBFS
         }
         let verdict = VoiceClarity.verdict(estoi: result.estoi.score, musicIsMainMasker: main == .music,
                                            anotherVoiceSpeaking: anotherVoice)
         object["estoi"] = hundredths(result.estoi.score)
         object["verdict"] = .string(verdict.rawValue)
+        if VoiceClarity.hint(estoi: result.estoi.score, verdict: verdict,
+                             mainMaskerIsAddedLayer: mainLayer?.isAddedSound(from: line.from, to: line.to) ?? false,
+                             removalGain: mainGain?.whenRemoved), let mainGain {
+            object["hint"] = .string("clear, but \(mainGain.id) may be loud — try 3–6 dB lower")
+        }
         if !maskers.isEmpty { object["maskers"] = .array(maskers) }
         object["low_150_db"] = tenths(result.othersLowBandDBFS)
         object["voice_db"] = tenths(result.voiceDBFS)

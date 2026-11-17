@@ -42,17 +42,23 @@
    as its own layer (beyond 12 in all the rest are joined as `rest`), each with what its clips are from where they came
    (`Provenance`: our voice-overs and sound effects by folder, library music / effects by manifest id, generated audio as music,
    a video clip's sound as `clip_sound`, anything else `other`) — rule 1 above: the masker is named by its source, not guessed.
+   Detached camera audio keeps `clip_sound` on an audio track: `EditClip.detachedAudio` preserves its picture's `info`.
+   Track placement does not turn a recording into added ambience (see the [regression case](../bugfixes/2026-11-17-detached-audio-listening-provenance.md)).
    `AIListenVoiceMeasure` renders the layers with `AudioStemRender` (the export's configuration, before the limiter, so they add
    up to the mix), starting `MixMeasurement.preroll` before the first voice clip; each voice clip's stretch ± 0.2 s is kept from
    every layer as (L + R) / 2, and once the render has passed it its own voice layer is cut into lines at its pauses
    (`VoiceLines`: 20 ms frames, quiet = 40 dB under the clip's loudest frame and never above −60 dBFS, a line ends at 0.6 s of
    quiet — longer than a breath or a comma), each line padded 0.2 s and handed to `MaskerAttribution.rank` with every other
-   layer, other voices included; then the stretch's samples are dropped (memory stays a few seconds). `AIListenVoiceReport`
+   layer, other voices included; then the stretch's samples are dropped. Memory depends on overlapping voice-clip lengths
+   (about 0.19 MB per second per layer, not a fixed streaming bound); narrow `from` / `to` for a long narration file. `AIListenVoiceReport`
    writes each line (clip, where it is spoken, ESTOI, the verdict, the two strongest maskers with their kind and gains,
-   `low_150_db` next to `voice_db`) and counts the verdicts. It is a listen job like mix=true (`AIListenMix.queued`: AIJobs,
+   `low_150_db` next to `voice_db`) and counts the verdicts. A separate optional `hint` names one added main masker that may be
+   loud (section 7); `summary.may_be_loud` counts hints without adding to either warning tier. It is a listen job like mix=true (`AIListenMix.queued`: AIJobs,
    the mix lane, `MediaReadQueue.export`, 20 s inline); read-only; never the preview's engine.
    Voice-over clips are one line each already; a long narration file is split by its pauses, not by a transcript (listen is
    read-only and starts no transcription).
+   Another audible layer counts as a second voice when it is a selected voice track or its known provenance is voice-over;
+   it need not also be named in `voice`. The existing −45 dBFS speaking threshold still applies.
 4. **没来路的原声**（每个留着原声的镜头）：那一层的采样交给 `SourceSoundDescription.describe(_:sampleRate:)`，回每 3 秒一窗的九个数和描述词。
 5. 第 4 步把这些拼成表交给 AI；**只报不拦**（第三节）。
 6. 都是纯 CPU 的计算，不读文件、不碰声卡：接线时放在后台（AI 起的走 `AIJobs`，[AI 接口](ai-control-mcp.md)第四节第 59 条），别放主线程。
@@ -142,8 +148,21 @@
 
 **Since 2026-11-17 these lines are in code** (`VoiceClarity`, used by `listen voice=…`; item 3 below as written: another voice
 speaking → `two_voices` on its own; otherwise < 0.31 `probably_unintelligible`, 0.31–0.41 `may_be_hard`; with music the main masker
-only < 0.20, as `may_be_hard`; the 20–150 Hz level is numbers only). Whether to add the grey "clear, but [layer] may be loud" hint
-(FL-61) is waiting for the user. 来历：
+only < 0.20, as `may_be_hard`; the 20–150 Hz level is numbers only).
+
+**Grey hint approved 2026-11-17 (FL-61, the user's "4 加"):** a separate report-only suggestion, "clear, but [layer] may be loud —
+try 3–6 dB lower", below the yellow tier. It appears only when the verdict is `clear`, ESTOI is **below 0.50**, and the main
+masker (the first by removal gain) is **one added layer** whose removal adds **at least 0.25**. Added means music, ambience or
+an effect: not another voice, the clip's own sound (including detached camera audio), or the joined `rest` layer. Imported
+ambience has kind `other`; library or SkyCut effects have kind `effects`. It never changes the verdict or the mix.
+
+These two hint boundaries rest only on two of the user's remarks in the external research's `ear-samples.md`, E34–E39:
+E34 was clear but the added rain was too loud (ESTOI 0.48, removing rain +0.27); E35 was clear but music could be lower
+(0.445, removing music +0.29). E36 (0.553, own sound +0.41) and E39 (0.637) got no loudness remark; E37–E38 are voices in
+the camera recording, without a clean reference. These are two remarks within an existing set, not new independent blind
+tests or validated loudness thresholds. The rule matches preview-board tools v1.5's `voice_loud` / `loud_hint`.
+
+来历：
 
 1. 第一次小验证（15 句、用户一个人）：ESTOI 把用户听不清的两句（0.332、0.377）和听得清的 13 句（最低 0.445）分开了，线暂画在 0.41。
    听不清的只有同一句话的两稿，同一个东西盖住的（镜头原声的轰鸣）。
@@ -186,3 +205,7 @@ lines, loud noise under the second, quiet "library music" all along → two line
 the second `probably_unintelligible` with A2 (`other`) its main masker and removing it worth most; V tracks refused with the
 reason; `auto` finds the voice-over track by its folder; two voice tracks speaking at once → `two_voices`. Not verified: real
 narration under real music (the blind-test items are not in the repo); the lines themselves (one listener).
+
+The pure voice checks cover every grey-hint boundary and verdict; mix-layers group 3b exercises the actual report with
+controlled results, including music passing its own tier at 0.30, clip_sound / voice / rest exclusions, only the first masker,
+and hint counts separate from warnings. Its plan case uses `detachedAudio` to verify camera provenance survives an audio track.

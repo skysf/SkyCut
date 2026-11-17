@@ -190,6 +190,7 @@ xcrun swiftc \
   checks/MixLayers/Parity.swift \
   checks/MixLayers/Plan.swift \
   checks/MixLayers/Voice.swift \
+  checks/MixLayers/VoiceHints.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 
