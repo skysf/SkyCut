@@ -11,6 +11,8 @@
 #       缓存那几步是「没验过，或者第 1 组」；编 App 那一步不看它（验过的轮里第 1 组照样编、照样存缓存）。
 #   三、记号只在 PR 的那一轮、汇总 job 的最后（全部分组和官网检查都过了之后）才留，名字带着这一轮检出的树，
 #       留不下不许让 check-all 变红；token 有 actions: read。
+#   4. The concurrency block: a new merge cancels the older main runs (the newest main tree contains them all), PR runs
+#      stay keyed by PR number, and a re-run keeps a per-commit group.
 #
 # 用法：checks/ci-verified-tree.sh [workflow 路径 [判断脚本路径]]   # 两个路径只给反向验证用
 set -euo pipefail
@@ -266,7 +268,33 @@ if [ "$({ grep -cF 'continue-on-error: true' <<<"${SUMMARY}" || true; })" != "2"
   fail "留记号的两步都要 continue-on-error: true：留不下记号只是 main 上多跑一轮，不许让必需的 check-all 变红"
 fi
 
+# ---- 4. Concurrency: a new merge supersedes the older main runs ----
+# Only the newest main run matters: its tree contains every earlier merge (docs/build/build-and-packaging.md "CI").
+# Pinned word for word, because each part was chosen:
+#   - PR runs keyed by PR number: a new push cancels that PR's old run, and different PRs never cancel each other;
+#   - pushes keyed by github.ref, not the commit: keyed by commit (the old block) no main run is ever superseded;
+#   - a re-run (run_attempt > 1) keyed by its commit: in the shared group, re-running an older main run cancels the
+#     newest one (tried on a throwaway branch, 2026-11-17);
+#   - one workflow-level block and no job-level ones: a per-job group would cancel shards out of their own run.
+WANT_GROUP='  group: checks-${{ github.event.pull_request.number || (github.run_attempt > 1 && github.sha) || github.ref }}'
+WANT_CANCEL='  cancel-in-progress: true'
+TOP_LEVEL="$({ grep -c '^concurrency:' "${WORKFLOW}" || true; })"
+NESTED="$({ grep -nE '^[[:space:]]+concurrency:' "${WORKFLOW}" || true; })"
+BLOCK="$(awk '/^concurrency:/ { inside = 1; next } inside && /^[^[:space:]#]/ { inside = 0 } inside && /^  [^[:space:]#]/ { print }' "${WORKFLOW}")"
+if [ "${TOP_LEVEL}" != "1" ]; then
+  fail "${WORKFLOW} needs exactly one workflow-level concurrency: block (found ${TOP_LEVEL}): without it superseded runs keep the scarce macOS runners"
+fi
+if [ -n "${NESTED}" ]; then
+  fail "${WORKFLOW} has a job-level concurrency (${NESTED}): keep the single workflow-level block, a per-job group cancels shards of the same run"
+fi
+if [ "$(sed -n 1p <<<"${BLOCK}")" != "${WANT_GROUP}" ]; then
+  fail "the concurrency group should be '${WANT_GROUP#"  "}': PRs by number, pushes by github.ref so a new merge supersedes older main runs, re-runs by commit so re-running an older main run doesn't cancel the newest (found: $(sed -n 1p <<<"${BLOCK}"))"
+fi
+if [ "$(sed -n 2p <<<"${BLOCK}")" != "${WANT_CANCEL}" ] || [ "$({ grep -c . <<<"${BLOCK}" || true; })" != "2" ]; then
+  fail "the concurrency block should be the group line and then '${WANT_CANCEL#"  "}', nothing else: superseded runs must be cancelled while running too, not only while queued (found: $(tr '\n' '|' <<<"${BLOCK}"))"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
-echo "✓ ci-verified-tree：main 上只有树和 PR 那轮绿的 CI 测的一模一样才不跑检查（${CASES} 个用例），跑检查的步骤都看判断的结论，记号只在 PR 全绿之后留"
+echo "✓ ci-verified-tree：main 上只有树和 PR 那轮绿的 CI 测的一模一样才不跑检查（${CASES} 个用例），跑检查的步骤都看判断的结论，记号只在 PR 全绿之后留; a new merge cancels older main runs, re-runs keep their own group"

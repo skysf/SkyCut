@@ -7,8 +7,7 @@ import SrtFlowMCPKit
 // 管什么（inspect_video 的画面疑点，只报不改）：
 // - 抽帧（每 0.5 秒、最多 120 帧，结尾和范围两头优先）看黑场：连着几帧都黑的合成一条，写多长（MCP-14 B）。
 // - 给了 file：成片**每一帧**扫一遍（`AIShotScan` 同一次解码、`AIFrameScan` 判）：夹帧、闪白、6 秒以上不动、黑场（MCP-64）。
-//   扫到了，黑场就用逐帧的那一份（抽帧的不再报）。点名 from / to 时只报那一段，不点名报整个文件（默认范围是声音的接缝，
-//   夹帧可能在任何一段的头尾）。
+//   A completed frame scan replaces sampled black findings. Explicit from / to bounds it; otherwise it covers the entire file.
 // - 交片前再查一遍放素材时那一条（MCP-36）：每段看得见的画面用到的源范围，跨过素材自己的刀、刀那一头只露出不到
 //   `AIFrameScan.shortShot` 帧的，报 `source_cut`（哪一段、素材第几帧、建议的入点 / 出点）；时间线和成片两种都查。
 // 门槛和来历见 docs/architecture/stray-frames.md；合同见 docs/architecture/finished-video-inspection.md。

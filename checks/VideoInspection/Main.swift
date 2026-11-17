@@ -89,7 +89,7 @@ import SrtFlowMCPKit
             let scope = try AIInspection.scope(state: before, from: 5, to: 6)
             require(!scope.contains(8) && AIInspection.subtitles(before, style: style, scope: scope).isEmpty, "range excludes unrelated ending and subtitle findings")
             let defaults = try AIInspection.scope(state: before, from: nil, to: nil)
-            require(defaults.contains(8) && defaults.contains(3) && defaults.contains(4), "defaults prioritize all audio seams and ending")
+            require(defaults.ranges == [0...before.duration], "default delivery scope covers the whole timeline")
             var outside = before
             outside.subtitle = SubtitleDocumentModel(cues: [.init(id: UUID(), start: 9, end: 10, text: "past the end")], format: .srt)
             require(AIInspection.subtitles(outside, style: style, scope: defaults).contains { $0.kind == "subtitle_time_bounds" },

@@ -11,6 +11,8 @@ struct VideoEditProjectMenu: View {
 
     /// 每次打开菜单现查一次最近列表：别的地方存过工程，这里要能看见。
     @State private var recents: [URL] = []
+    /// The saved versions sheet (docs/architecture/project-versions.md).
+    @State private var showsVersions = false
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
@@ -34,6 +36,8 @@ struct VideoEditProjectMenu: View {
 
             Button("Save") { project.saveDocument() }
             Button("Save As…") { project.saveDocumentAs() }
+            Button("Versions…") { showsVersions = true }
+                .disabled(project.isUntitled)
 
             Divider()
 
@@ -52,6 +56,7 @@ struct VideoEditProjectMenu: View {
             }
         }
         .menuStyle(.borderlessButton)
+        .sheet(isPresented: $showsVersions) { ProjectVersionsSheet(project: project).appLanguage() }
         .onAppear { recents = RecentProjects.existing() }
         // 打开/保存都会动最近列表，跟着刷新。
         .onChange(of: project.documentURL) { _, _ in recents = RecentProjects.existing() }

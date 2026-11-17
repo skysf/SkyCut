@@ -169,8 +169,9 @@ Transitions
 
 Motion
 9. Not every shot moves. Mix still shots, slow push-ins (set_keyframes scale 1 → 1.04–1.08 over the shot), slow drifts
-   (position x or y moving 0.02–0.04 over the shot) and the footage's own movement. Never the same move on two shots in a
-   row and never a move on every shot: a still shot after moving ones is a breath.
+   (position x or y moving 0.02–0.04 over the shot) and the footage's own movement. For a drift on a picture that exactly
+   fills the frame, use scale at least 1 + 2 × the drift to avoid exposing an edge (0.03 drift needs 1.06). Never the same
+   move on two shots in a row and never a move on every shot: a still shot after moving ones is a breath.
 10. Easing carries the feeling: easeInOut for camera-like moves (a push, a drift), easeOut for things that arrive and
     settle, easeIn for things that leave, linear only for a very slow drift through a whole shot; snap for a fast push-in or
     a crash zoom (0.2–0.3 s), overshoot for a picture that pops into place (a picture-in-picture arriving), spring for

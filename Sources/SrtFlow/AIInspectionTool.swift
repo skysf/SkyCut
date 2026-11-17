@@ -16,7 +16,7 @@ enum AIInspectionTool {
         let session = AICallContext.current?.session
         let state = project.state
         let scope = try AIInspection.scope(state: state, from: args.double("from"), to: args.double("to"))
-        // AI 点名的范围（画面逐帧的那几样只报这一段；没点名报整条，默认范围是声音的接缝）。
+        // An explicit range bounds the frame scan; otherwise the entire export is inspected.
         let named = args.has("from") || args.has("to") ? scope.ranges.first : nil
         let db = try args.double("silence_db") ?? -45
         let minimum = try args.double("min_silence") ?? 0.5

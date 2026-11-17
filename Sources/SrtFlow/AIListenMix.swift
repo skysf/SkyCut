@@ -12,6 +12,7 @@ import SrtFlowMCPKit
 // 按层量一遍约 1–2 秒），没量完回任务号，AI 用 get_job 拿同一份结果。
 // 只读：不改工程、不进撤销。量的是调用这一刻的时间线（之后的改动不算）。离线引擎不碰声卡：预览的图空闲停着就一直停着、
 // 正在播的预览照常出声（docs/architecture/audio-engine.md 第二节第 11 条）。
+// `queued` is the job part on its own: listen voice=… (AIListenVoiceCheck) measures the voice the same way (2026-11-17).
 // 不管什么：量法（MixMeasurement）、参数（AIListenMixPlan）、结果的样子（AIListenMixReport）。
 
 @MainActor
@@ -35,6 +36,21 @@ enum AIListenMix {
         let plan = try AIListenMixPlan.make(
             args, state: state, config: layout, from: from, to: to, silenceDB: silenceDB, minSilence: minSilence
         )
+        return try await queued(state, failure: "Could not measure the mix") { config, token, progress in
+            let request = MixMeasurement.Request(config: config, layers: plan.layers, grid: plan.grid, frames: plan.frames)
+            let result = try MixMeasurement.measure(request, isCancelled: { token.isCancelled }) { block in
+                progress.update(block, of: request)
+            }
+            return .object(AIListenMixReport.json(result, plan: plan))
+        }
+    }
+
+    /// One offline measurement of the timeline as a listen job: AIJobs (App Nap stays off while it runs), the mix lane (one
+    /// at a time), `measure` on MediaReadQueue.export with the export's configuration of `state`; waits `inlineSeconds`.
+    static func queued(
+        _ state: TimelineState, failure: String,
+        measure: @escaping @Sendable (AudioEngineConfig, ExportCancellationToken, AIListenMixProgress) throws -> JSONValue
+    ) async throws -> AIToolResult {
         let token = ExportCancellationToken()
         let progress = AIListenMixProgress()
         let work = AIQueuedWork()
@@ -44,14 +60,14 @@ enum AIListenMix {
         work.job = job
         AIWorkQueue.shared.submit(.mix, jobID: job.id) {
             work.started = true
-            run(state, plan: plan, job: job, token: token, progress: progress)
+            run(state, job: job, token: token, progress: progress, failure: failure, measure: measure)
         }
         await AIJobs.shared.wait(for: job, seconds: inlineSeconds)
         switch job.status {
         case .done:
             return .ok(job.detail ?? .object([:]))
         case .failed:
-            throw AIToolError(job.message ?? "Could not measure the mix.")
+            throw AIToolError(job.message ?? "\(failure).")
         case .cancelled:
             throw AIToolError("Cancelled before the measurement finished.")
         case .running:
@@ -69,19 +85,13 @@ enum AIListenMix {
 
     /// 在 MediaReadQueue.export 上渲、量、写结果，记下结局。
     private static func run(
-        _ state: TimelineState, plan: AIListenMixPlan, job: AIJobs.Job, token: ExportCancellationToken, progress: AIListenMixProgress
+        _ state: TimelineState, job: AIJobs.Job, token: ExportCancellationToken, progress: AIListenMixProgress, failure: String,
+        measure: @escaping @Sendable (AudioEngineConfig, ExportCancellationToken, AIListenMixProgress) throws -> JSONValue
     ) {
         Task {
             let outcome = await MediaReadQueue.run(on: MediaReadQueue.export) { () -> Result<JSONValue, Error> in
-                Result {
-                    // 和成片同一份配置（段落、增益、场景的响度补偿、变速）：AudioEngineConfig.make 自己排序、展开转场。
-                    let config = AudioEngineConfig.make(from: state)
-                    let request = MixMeasurement.Request(config: config, layers: plan.layers, grid: plan.grid, frames: plan.frames)
-                    let result = try MixMeasurement.measure(request, isCancelled: { token.isCancelled }) { block in
-                        progress.update(block, of: request)
-                    }
-                    return .object(AIListenMixReport.json(result, plan: plan))
-                }
+                // 和成片同一份配置（段落、增益、场景的响度补偿、变速）：AudioEngineConfig.make 自己排序、展开转场。
+                Result { try measure(AudioEngineConfig.make(from: state), token, progress) }
             }
             switch outcome {
             case .success(let detail):
@@ -90,7 +100,7 @@ enum AIListenMix {
                 if token.isCancelled || error is CancellationError {
                     AIJobs.shared.finish(job, .cancelled, message: "Cancelled; nothing was changed.")
                 } else {
-                    AIJobs.shared.finish(job, .failed, message: "Could not measure the mix: \(error.localizedDescription)")
+                    AIJobs.shared.finish(job, .failed, message: "\(failure): \(error.localizedDescription)")
                 }
             }
         }
@@ -106,6 +116,9 @@ final class AIListenMixProgress: Sendable {
         let value = permille.load(ordering: .relaxed)
         return value < 0 ? nil : Double(value) / 1000
     }
+
+    /// The fraction done (0…1), for a measurement that counts it itself (listen voice=…).
+    func update(fraction: Double) { permille.store(Int(min(1, max(0, fraction)) * 1000), ordering: .relaxed) }
 
     /// 渲完一块：按渲到的位置算（前面多渲的那几秒也算在里面）。
     func update(_ block: AudioStemRender.Block, of request: MixMeasurement.Request) {

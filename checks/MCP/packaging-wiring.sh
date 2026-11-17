@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Helper packaging scan, sourced by scripts/check-mcp.sh; no builds or signing are performed here.
+# MCP helper packaging and signing-order scans, sourced by scripts/check-mcp.sh.
+# This block only inspects build scripts; it never packages or signs an app.
+
 echo "==> 打包脚本：小程序进 Helpers、先签它再签外层"
 # 签名只经 scripts/signing/sign-app.sh 一处（docs/architecture/code-signing-and-permissions.md）：
 # build-app.sh 要先把小程序拷进去再调它，它里面要先签小程序再签外层。

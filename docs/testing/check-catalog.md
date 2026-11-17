@@ -24,7 +24,7 @@
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
-- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。
+- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。 Since 2026-11-17 also the voice check's verdict table (`VoiceClarity`) and line split (`VoiceLines`); the real `listen voice=…` path is `scripts/check-mix-layers.sh` group 3 (synthetic voice, noise and music: lines, verdicts, main masker and its kind, V tracks refused, `auto`, two voices); group 3b covers the grey hint boundaries, excluded main maskers, separate counts and detached camera provenance.
 
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
@@ -32,6 +32,8 @@
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
   门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
+
+- Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
 
 - 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.66 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](../build/build-and-packaging.md)。
@@ -280,6 +282,8 @@
   接口出错、别的头提交、fork、别的 workflow、不是 pull_request、没跑完、红了 / 取消了、别的仓库、超过 24 小时）、跑检查的每一步都写成 `verified != 'true'`、
   备缓存的几步只在第 1 组做、编 App 不看它、判断那一步紧跟「只改了文档？」、记号只在 PR 那一轮的汇总 job 最后留、token 有 `actions: read`：
   `checks/ci-verified-tree.sh`。规矩和上线后看的数在[构建与打包](../build/build-and-packaging.md)「CI」一节。
+  The same guard pins the workflow's `concurrency` block word for word: PR runs keyed by PR number, pushes to main by `github.ref`
+  (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
