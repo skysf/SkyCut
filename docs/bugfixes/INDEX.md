@@ -133,6 +133,7 @@
 - [2026-10-01 播放中按空格，图标慢半拍](2026-10-01-meter-current-time-blocks-main-thread.md) — 不许同步问播放器要 `currentTime()`：读时钟外推的 `estimatedTime`。
 - [2026-09-23 一条轨上换了音频格式就没声音、预览卡住](2026-09-23-meter-tap-dies-on-audio-format-change.md) — 一条合成音轨只装一种格式；自检素材要有几种格式。
 - [2026-11-04 非零起点让原生尾帧请求落到前一个刻度](2026-11-04-native-frame-request-truncation.md) — 只有原生抽帧的请求取最近的 1/600，证据守卫不放宽；合成的时间照旧截断（预览自由变换的合同）。
+- [2026-11-17 Sound effects added with new_audio landed on the voice and music tracks](2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md) — A fallback that "fits it somewhere" suits a mouse drop, not a named request: open a new track and say so in the reply.
 - [2026-09-28 点名新开轨的第二首配乐接在了 A1 后面](2026-09-28-new-audio-lands-on-a1.md) — 要记的是意图，不是副作用。
 - [2026-09-29 新建工程后播放头停在上一个工程的位置](2026-09-29-new-project-keeps-old-playhead.md) — 卸片后晚到的时间回调要丢掉；测异步要让主循环转起来、素材要像真的。
 - [2026-09-25 老虎机数字 365 → 90 停在「090」](2026-09-25-odometer-leading-zero.md) — 缺省值替缺失的数据说了话：不存在的那一位滚成空白收掉。
@@ -188,12 +189,14 @@
 - [2026-11-11 关掉全部权限的回答里长期授权还写「已记上」](2026-11-11-set-settings-stale-standing-consent.md) — 一个回答里同一件事出现两次，两份要在同一时刻取。
 - [2026-08-16 形状叠层不跟播放头](2026-08-16-shape-overlay-ignores-playhead.md) — 按 displayTime 取内容的叠层必须直接订阅 `PlayerClock`。
 - [2026-09-24 选了简体中文，sheet 和 popover 还是英文](2026-09-24-sheets-ignore-in-app-language.md) — SwiftUI 不把语言带进 sheet / popover：每个新宿主自己套 `.appLanguage()`。
+- [2026-11-17 A short sparkle or shutter sound effect crashed SkyCut](2026-11-17-short-sparkle-and-shutter-crash.md) — Render every accepted parameter at its edges; a loop from a computed start past the end traps in Swift.
 - [2026-10-29 两种视频拿到同一个确认码](2026-10-29-sky-studio-confirmation-collides.md) — 摘要相同不等于同一件事：确认码绑定完整请求、报价、输入文件和落点。
 - [2026-10-31 七个 Sky Studio 模型与原单结算](2026-10-31-sky-studio-model-expansion.md) — 同 key 只起一单，失败只查原单，扣退费只认 billing。
 - [2026-11-04 查原任务时没核对回答里的任务号](2026-11-04-sky-studio-poll-identity.md) — GET 原单在 API 边界就验任务号，错的回答不许先改状态。
 - [2026-11-10 Sky Studio 接线守卫最后三节从来不会红](2026-11-10-sky-studio-wiring-checks-after-exit.md) — 总闸（失败就 `exit 1`）必须在脚本最后。
 - [2026-11-04 清理脚本自检删掉了活动冒烟 App 的 socket](2026-11-04-smoke-cleanup-unlinks-live-socket.md) — 清理器的测试必须隔离文件删除。
 - [2026-10-29 冒烟清理只凭陈旧 PID 停进程](2026-10-29-smoke-stop-stale-pid.md) — 持久 PID 不是进程身份：清理前核对当前命令和测试目录。
+- [2026-11-17 Every made sound effect reported a fake gain_limits adjustment](2026-11-17-sound-effect-fake-gain-adjustment.md) — Compare only the request fields that map to applied values; clean float noise, never round a real limit.
 - [2026-09-24 来回换声音场景，换下来的效果链攒着不放](2026-09-24-sound-scene-chains-pile-up.md) — 「等宿主释放再放」而宿主一直活着，等于不放。
 - [2026-09-24 选了声音场景却看不见选的是哪个](2026-09-24-sound-scene-row-widens-inspector.md) — 检查器一行不许比窄栏宽、菜单 Picker 不锁宽度；界面改动要在真窗口里看一眼。
 - [2026-09-21 源文件清单守卫只盯着枢纽文件](2026-09-21-source-list-guard-only-watched-the-hub.md) — 守卫要扫清单里的每一个文件；别开只有 extension 的文件。
@@ -228,6 +231,7 @@
 - [2026-09-29 text_scan 的裁切量被幻灯片标题拉大](2026-09-29-text-scan-crop-hint-stretched-by-slide-title.md) — 字幕的上一行要每句都换才认；会破坏内容的补救办法要在提示里说出来。
 - [2026-09-29 被切掉的字混进字幕行、字幕稀疏时选成幻灯片](2026-09-29-text-scan-cutoff-text-and-sparse-subtitles.md) — 「谁最多」在样本稀疏时不可靠：用位置先验 + 最低支撑。
 - [2026-11-11 森林色切经典色，开着的窗口只变一半](2026-11-11-theme-switch-leaves-windows-half-light.md) — `.preferredColorScheme` 交过明确值就别再交 nil。
+- [2026-11-17 The tick and click sound effects could not be placed, and failed calls left their files](2026-11-17-tick-and-click-cannot-be-placed.md) — Output must meet the consumer's minimum; roll back files when a call fails; bump the version when file content changes.
 - [2026-09-24 点一下选段卡半秒、拖块滚动跟不上手](2026-09-24-timeline-blocks-observe-whole-project.md) — 时间线上的块不读工程：只收值、`Equatable`、构造处套 `.equatable()`。
 - [2026-09-18 轨道一多就没法上下滚](2026-09-18-timeline-cannot-scroll-vertically.md) — 时间线双向滚动、轨道头 / 标尺各自钉住；裸 VStack 会替整条界面要高度。
 - [2026-08-09 时间线拖动卡顿与对齐](2026-08-09-timeline-clip-drag-lag-and-alignment.md) — 渲染偏移、吸附与唯一落点。
