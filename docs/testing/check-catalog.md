@@ -205,7 +205,9 @@
 - 动效预设（set_text 的 `motion_preset`；在 `scripts/check-mcp.sh` 的 `MotionPresetChecks` 和它编译之前的扫描）：三套各自的几块、时间和动画，框按墨迹框住、竖屏按短边、换一套字不变、`hit_at` 整套挪、标题动了别的跟着走、粘贴自成一组、存盘往返；界面上改字的两个入口都经 `MotionPresetGroups.update`、粘贴换新组号（扫描）。规矩见 [动效预设](../architecture/motion-presets.md)。
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
-  set_canvas reply's `reframed` / `no_longer_fill`); wiring in `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
+  set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
+  back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
+  `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；

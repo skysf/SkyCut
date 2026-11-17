@@ -10,12 +10,13 @@ import Foundation
 // set keeps what the inspector and the AI read: its centre (x, y on the canvas) and its size relative to the default layout (scale),
 // per axis. So its shape stays and nothing is cropped differently; a clip that filled the old frame may not fill the new one, the same
 // way the default layout letterboxes (the AI is told which: `AICanvasReframe`). Switching back restores the old numbers exactly.
-// Not: the default layout (`EditClip.defaultPlacement`), the canvas size (`TimelineRenderSize`), texts, shapes, subtitles.
+// Texts and shapes keep their size on the frame by the same rule (`OverlayReframe`, called from here).
+// Not: the default layout (`EditClip.defaultPlacement`), the canvas size (`TimelineRenderSize`), subtitles.
 // Runs at the end of `VideoEditProject.perform`. Pure value: scripts/check-mcp.sh compiles it (checks/MCP/CanvasReframeChecks.swift).
 
 enum CanvasReframe {
     /// When `state`'s canvas has another shape than `before`'s, re-expresses the framing of every picture clip whose framing this
-    /// edit left as it was. Returns the clips it changed.
+    /// edit left as it was, and the size of every text and shape it left as it was. Returns the clips, texts and shapes it changed.
     @discardableResult
     static func keepShapes(_ state: inout TimelineState, after before: TimelineState) -> [UUID] {
         let old = TimelineRenderSize.size(for: before)
@@ -30,7 +31,7 @@ enum CanvasReframe {
             state.update(clip.id) { $0 = kept }
             changed.append(clip.id)
         }
-        return changed
+        return changed + OverlayReframe.keepSizes(&state, after: before, from: old, to: new)
     }
 
     /// `clip`, framed for a canvas of size `old`, re-expressed for `new`: same centre, same size relative to the default layout on

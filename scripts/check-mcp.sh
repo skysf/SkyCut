@@ -515,6 +515,7 @@ xcrun swiftc \
   Sources/SrtFlow/ClipFileReplacement.swift \
   Sources/SrtFlow/AIFrameFit.swift \
   Sources/SrtFlow/CanvasReframe.swift \
+  Sources/SrtFlow/OverlayReframe.swift \
   Sources/SrtFlow/AICanvasReframe.swift \
   Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/AIFollowSubject.swift \
