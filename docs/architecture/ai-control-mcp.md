@@ -1155,6 +1155,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     add_clips / edit_clip 主题写着它。接线在共用文件里只有一行（add_clips）和 `AIClipTools` 的两行，逻辑都在 `AISourceCutCheck`。
     扫素材不让调用干等：短素材当场扫、一次调用最多等 10 秒，长的放的时候不扫（列进 `source_cuts_unchecked`），交片前 inspect_video 再查一遍。
 
+63. **动效预设：`set_text` 的 `motion_preset`（2026-11-16，研究清单 MCP-45，[动效预设](motion-presets.md)）**：一次调用放一套现成的动效
+    （`frame_reveal` 框住再放开、`focus_pull` 对焦出字、`title_counter` 标题 + 滚动的数字）= 一组普通的字和形状，一步撤销；`hit_at` 是落在哪一下、
+    `small_text` / `small_text_below` 是标题上下那行小字，`text`、`number`、位置、字体、颜色用 set_text 原来的参数。带某一块的 `text_id`：
+    `motion_preset` 换一套（字不变、标题 id 不变），只给 `hit_at` 整套挪；标题挪了、改了字，同一套的别的几块跟上。规则只在 `MotionPresetGroups`
+    （和界面上加字的「动效预设」、检查器「预设」同一份，`AIMotionPresetEdit` 只读参数、报结果）；结果带 `motion_preset`（哪一套、落点、尾、每一块的 id），
+    `get_timeline` 的字和形状带 `motion_preset`。不另开工具（第一节第 5 条）。Catalog kept flat (2026-11-17): the four parameters carry
+    one-line descriptions, and wording the guide already had moved out of set_text's card and of some set_text / set_shape parameter
+    descriptions, so the whole catalog went from about 99,063 to 99,051 / 100,000 and set_text's schema is 4,040 / 4,500 bytes;
+    怎么用写在说明书 `topic=set_text` 的 `motion_presets` 一节。`set_texts` 每一项也可以是一套。
+
 ## 五、这一轮、停止、撤销这一轮
 
 - **每个工程一份**（`AIRound`，2026-10-17 用户定，[方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 4、E 节）：剪 5 条时停一条，别的照剪；

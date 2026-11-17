@@ -30,7 +30,7 @@ enum MCPGuideMap {
     Speech and beat cuts: cut_speech (filler words, pauses, retakes), cut_to_beat (cut V1 to music beats)
     Picture: set_canvas (9:16, 1:1, 16:9, frame rate), set_transition (dissolves, wipes; or the sound across a cut: J/L \
     cut, crossfade, bed, on the beat), set_filter (looks, colour), set_text / set_texts \
-    (titles), set_shape / set_shapes (lines, boxes, circles, arcs; blur or mosaic to hide logos, faces, watermarks)
+    (titles; motion_preset for ready-made animated titles and credits), set_shape / set_shapes (lines, boxes, circles, arcs; blur or mosaic to hide logos, faces, watermarks)
     Audio: find_audio (music and sound effects), add_voiceover (narration spoken from text), sync_voiceover (retime \
     pictures and titles to existing narration), set_track (track volume, mute or hide a track, master fader)
     Voices: list_voices (presets, my voices), manage_voices (clone my voice from a recording, design, rename, delete), \

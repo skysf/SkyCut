@@ -1,0 +1,117 @@
+# 动效预设：一套现成的字 + 形状 + 动画，落在某一下上
+
+> 2026-11-16 起（研究清单 MCP-45 入口 + MCP-46 / 47 / 53 三套）。改 `MotionPreset*.swift`、`AIMotionPresetEdit.swift`、
+> 检查器「动画」区的「预设」（`VideoEditInspector+MotionPreset.swift`）、加字的「动效预设」一栏（`MotionPresetPanel.swift`），
+> 或者改文字 / 形状的模型、`VideoEditProject.updateTextOverlay` 之前必读。相关：[画面文字](text-overlays.md)、
+> [画面上的形状](shapes.md)、[AI 接口（MCP）](ai-control-mcp.md)。
+
+## 一、是什么
+
+用户看了南极预告片的 8 套片头字 / 片名动效样片（2026-11-16）：「这些不用剪辑」，要把它们**做进 SkyCut：AI 能一句话调用，
+用户也能在软件里自己选**。8 套里 3 套 SkyCut 现成的字和形状动画就拼得出来，只差一个入口，这次做入口和这 3 套：
+
+| 预设（AI 用的名字） | 样子 | 拼的是 |
+| --- | --- | --- |
+| 框住再放开（`frame_reveal`） | 细框从左上角顺时针画出来框住名字，到「放开」那一下倒着收回去，字留下；上面一行小字（FROM）在框里，下面一行小字（PRESENTS）压在「放开」那一下出来 | 长方形：入场、出场都是「画出来」；标题：擦除进、淡出；小字：淡入淡出 |
+| 对焦出字（`focus_pull`） | 细字、字距拉宽，从虚收清进来，出的时候继续推近、虚掉 | 标题和小字：入场、出场都是「对焦」 |
+| 标题 + 滚动的数字（`title_counter`） | 标题弹出来，下面一条细线画出来，数字像老虎机滚到一个数（带单位、千分位） | 标题：弹性缩放；线条：画出来；数字元件：老虎机，等 0.5 秒、滚 1.2 秒 |
+
+另外 5 套（字在前景后面、形状变形、沿画面里的东西描边、两个词撞到一起、从裂缝里露出来）要底层能力（透明视频 MCP-56、
+抠前景 MCP-55……），排在后面。
+
+入口（名字和位置 2026-11-16 用户定的）：
+
+- **加字时多一栏「动效预设」**：剪辑页「+」→「动效预设…」弹出一栏，三张卡带小样（停着是最好看的那一刻，鼠标放上去循环播一遍），
+  点一张就在播放头放一套，选中标题、浮出就地编辑（占位字起手全选，直接打字换掉）。
+- **选中字后，检查器「动画」区最上面一个「预设」**：换一套，字不变；选「无」拆成普通的字和形状。这段字在一套里时多一行「落点」：
+  改它整套一起挪。
+- **AI**：`set_text` 的 `motion_preset`、`hit_at`、`small_text`、`small_text_below`（`text` 是标题，`number` 给标题 + 数字用；
+  位置、字体、颜色用 set_text 原来的参数）。不另开工具：一套的主体就是一段标题字，另开一个长得像的工具违反
+  [AI 接口](ai-control-mcp.md)第一节第 5 条；参数定义仍在 4,500 字节以内。怎么用写在说明书 `skycut_guide topic=set_text` 的
+  `motion_presets` 一节。
+
+## 二、只能这样做
+
+1. **放上去的就是普通的字和形状。** 一套 = 几段 `TextOverlay` + 几块 `ShapeAnnotation`，样式、动画都在它们自己的字段里，照常能一块一块地改、
+   删、藏；预览和成片走现成的同一条绘制路径（`TextRenderer`、`ShapeOutline`），预设只把参数配好，**不另开渲染管线、不另造动画种类**。
+   底层真缺能力（字关键帧、形状变形、发光……）就不进这一批，记进研究清单。
+2. **规则只有一份**：`MotionPresetGroups`（造、放进时间线、换一套、挪落点、拆开、跟着标题走）。界面（`MotionPresetActions`）和
+   AI（`AIMotionPresetEdit`）都只调它，所以「用户在软件里选框住再放开」和「AI 一句话调同一套」做出来一样。每个动作一次 `perform` = 一步撤销；
+   AI 照 set_text 的老路一次提交（批量 `set_texts` 每一项也可以是一套）。
+3. **组只是一个标记**：`motionPreset = {group, preset, role}`（`MotionPresetTag`，文字和形状都有）。按需写键，**不抬格式版本**：
+   旧版读不懂就当普通的字和形状，成片一帧不变，丢的只是「是一组」（同 `rowHeights` 的口径，[工程文件](video-edit-project-file.md)）。
+   读不懂的标记（以后多出来的预设 / 角色）当没有，不报错。
+4. **落点 = 最早出来的那一块的起点**（框住再放开是框，另两套是标题）；整套的尾 = 最晚收走的那一块。挪落点 = 每一块平移同样多，
+   各自改过的长短、动画不动；挪过去撞上同一行别的字往上找空行（同拖文字换行）。
+5. **标题是锚**。标题挪了（预览上拖、检查器、AI 的 x / y）：同一套别的几块平移同样多，各自的微调留着。标题改了字、字号、字体、字距
+   （框住再放开里上面那行小字也算）：按标题重新排一遍 —— 框跟着字变大变小、小字和数字贴回去。所有改字的入口都经
+   `MotionPresetGroups.update`：`VideoEditProject.updateTextOverlay` / `liveUpdateTextOverlay`（检查器、就地编辑、预览上拖 / 缩放）和
+   AI 的 set_text。别的几块自己挪、自己改，不牵动谁。字和形状的选择互斥，所以在画面上整套挪就拖标题；时间线上拖一块只挪它自己，
+   整套挪用「落点」。
+6. **按短边设计**：预设的数是「短边 1080」上的像素（`MotionPresetDesign`），横屏的短边是高、竖屏是宽 —— 同一套在 9:16 上占画面宽的比例和在
+   16:9 上占高的比例一样；存进模型时按画布高换算（`MotionPresetLayout.modelSize`）。一行字太宽先收字号（最多占画面宽的 86%），
+   收到 60% 还放不下才让它折行。AI 自己给了 `font_size` 的照给的，不收。
+7. **按墨迹量、按墨迹摆**（每个字形用它自己的字体量 `CTFontGetBoundingRectsForGlyphs`），不按版面框：版面框的宽是折行宽度（画面的 80%），
+   `TextLayout.inkBounds` 也是行框，拿它们排的框和间距比看起来的大一圈。框的描边全在框内，所以框再让出半个线宽。
+8. **换一套**：标题沿用原来那段字的 id（AI 手里的 `text_id` 不失效、选中不丢）；字、小字、数字、落点、总长、整套的中心、用户自己换过的
+   字体和颜色留着；旧的几块拿掉，按新的一套重新造。一段普通的字也能直接变成一套（它的字当标题、起点当落点、时长当总长）。
+9. **粘贴 / 复制**（⌘V、AI 的 `duplicate_items`）：同一组在这一批里至少两块换成同一个新组号，粘出来的一套自成一组；只拿到一块的不留标记
+   （同链接组，`MotionPresetTag.renew`，在 `TimelinePaste.apply` 里）。
+10. **字体**：用户没有品牌字体，默认用这台 Mac 自带的 Avenir Next、DIN Alternate 一路（存字体的全名，Core Text 和字体选择器都认），
+    用户可以换；数字那一行不跟着换（老虎机要等宽的数字）。
+11. **Preset texts hug their words** (added 2026-11-17): a preset text's wrap width (`boxWidth`) is its longest line plus a small margin
+    (`MotionPresetLayout.snugBoxWidth`), because the text wipe sweeps the layout box, not the ink — in the default 0.9-wide box a short
+    centred title is wiped in a third of the entrance and looks like a cut. New words or type keep it snug (`MotionPresetGroups.update`),
+    unless that edit set the width itself or the width had already been set by hand (then it is no longer snug and stays as it is);
+    a `box_width` the AI passes with `motion_preset` stays too.
+
+## 三、三套的数（照样片量的，720p × 1.5）
+
+单位是「短边 1080」上的像素和秒；时间相对落点。改数先改 `MotionPresetDesign`，再看出图（第五节）。
+
+| | 框住再放开 | 对焦出字 | 标题 + 滚动的数字 |
+| --- | --- | --- | --- |
+| 标题 | Avenir Next 64、字距 22；+0.1 擦除 0.35、结尾淡出 0.25 | 同左；对焦进 0.45、对焦出 0.3、强度 0.4 | Avenir Next Demi Bold 120、字距 26；弹性缩放 0.5（强度 0.8）、淡出 0.4 |
+| 小字 | Avenir Next Medium 30、字距 14；上面的 +0.15 淡入；下面的在「放开」那一下淡入 | 上面的和标题一起对焦；下面的在「放开」那一下对焦进来 | — |
+| 形状 | 框：线宽 3、比字的墨迹多 40 × 26；画出来 0.4，「放开」时倒着收 0.4 | — | 细线：长 450、线宽 3、离标题 34；+0.35 画出来 0.4 |
+| 数字 | — | — | DIN Alternate 60；离细线 42；+0.3 淡入，等 0.5、滚 1.2 |
+| 默认总长 / 最短 | 3 / 1.2 秒 | 3 / 1.2 秒 | 3.5 / 2.4 秒 |
+
+「放开」= 总长的一半，至少 0.8 秒、离结尾至少 0.6 秒（样片：1.9 秒的那张 1.1 秒放开，3.2 秒的那张 1.46 秒放开）。
+对焦的强度一个旋钮同时管推近和糊的程度：样片从 0.94 倍收到 1、起手糊约字高的五分之一，SkyCut 取 0.4 是折中（从 0.88 倍收到 1、
+糊约字高的 9%）。
+
+## 四、守卫
+
+- `scripts/check-mcp.sh` 的 `MotionPresetChecks`（`checks/MCP/MotionPresetChecks.swift`）：词表和 `MotionPresetKind` 对账；三套各自的几块、时间、
+  动画；框把标题和上面那行小字框在里面、贴着字、默认居中；9:16 上字号按短边换算、每一行都在画面里；标题 + 数字没给 `number.to` 拒绝、
+  不留半套；换一套标题 id 不变、字和颜色留着、旧框没了；`hit_at` 整套挪、长短不变；一段普通的字变成一套；标题改了字框跟着变宽、标题挪了
+  框和小字跟着挪、小字自己挪不牵动标题；几种报错（`hit_at` / `small_text` 用在不是一套的字上、加的时候缺 `motion_preset` 或标题、
+  不认识的名字）一样都不改；`set_texts` 一项一套；粘贴出来的自成一组、只粘一块的不留标记；存盘往返、普通的字不写键、读不懂的当普通的字。
+  Also (2026-11-17): a short title's wrap width hugs it, grows with longer words and keeps them on one line, and a `box_width` set by hand is kept.
+- 说明书和清单的上限、名字都真的存在：`GuideChecks` / `GuidePilotChecks` / `CatalogTextChecks`（set_text 的参数定义 ≤ 4,500 字节）。
+- 界面：`checks/preview-perf-wiring.sh`（新视图第一行计数）、`checks/presented-views-app-language.sh`（「动效预设」那一栏是 popover，
+  套 `.appLanguage()`）、`checks/inspector-live-binding-wiring.sh`（「预设」下拉和「落点」的打字走离散写入）、`checks/inspector-fits-width.sh`、
+  `scripts/check-localization-coverage.sh`（三张字符串表）。
+- 出图：`scripts/render-motion-presets.sh <输出目录>`（要图形会话，**不在 check-all.sh 里**）：加字的「动效预设」一栏、检查器的「预设」
+  （英 / 中 / 西 × 森林色 / 经典色深色），三套各几帧的预览（预览叠层）和成片（真导出抽帧），16:9 和 9:16。用户 2026-11-16 定：
+  软件里看得见的新东西，合并前出离屏渲染的图给他看。
+
+## 五、人工回归清单（发版前实机过）
+
+- [ ] 「+」→「动效预设…」：一栏弹在「+」下面，三张卡的小样是三套的样子；鼠标放上去小样从头播一遍；点一张，播放头处放上一套、
+      标题浮出输入框、打字直接换掉占位字，框跟着字变宽。⌘Z 一步撤掉整套。
+- [ ] 选中标题，检查器「动画」区最上面是「预设」：换成另两套，字、位置、落点不变；选「无」，几块都还在、不再跟着标题走。
+- [ ] 「落点」打字 / 箭头 / 横着拖：整套一起挪，⌘Z 一步撤回。
+- [ ] 预览上拖标题：框、小字、细线、数字跟着走；拖框或小字只挪它自己。
+- [ ] 9:16 工程里放三套：字不出画面、大小和横屏看着一样；中文标题（苹方回退）也好看。
+- [ ] 导出一段带三套的片子，逐帧和预览比：一样。
+- [ ] ⌘C ⌘V 一整套：粘出来的那套换预设、挪落点不牵动原来那套。
+- [ ] 让 AI「在 25.25 那一下放一个框住再放开的 FROM SKY STUDIO」：一次 set_text、一步撤销，和界面上放的一样。
+
+## 六、还没做的
+
+1. 另外 5 套（MCP-48 到 MCP-52），等透明视频（MCP-56）或各自的底层能力。
+2. 时间线上拖一块不带整套（整套挪用检查器的「落点」或 AI 的 `hit_at`）；框住再放开里「放开」那一下没有单独的旋钮（跟着总长走，
+   要改就拖框那一块的尾巴）。
+3. 「落点」不吸附到音乐的重音上（AI 用 `listen` 找到那一下再给 `hit_at`）。

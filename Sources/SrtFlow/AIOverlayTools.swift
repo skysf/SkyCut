@@ -60,6 +60,10 @@ enum AIOverlayTools {
         ]
         if abs(overlay.rotationDegrees) > 0.01 { result["rotation"] = AIFormat.seconds(overlay.rotationDegrees) }
         if !warnings.isEmpty { result["warnings"] = .array(warnings.map { .string($0) }) }
+        // 一套动效预设：哪一套、落点、尾、每一块的 id（AIMotionPresetEdit）。
+        if let group = edit.presetGroup, let preset = AIMotionPresetEdit.summary(group, in: project.state) {
+            result["motion_preset"] = preset
+        }
         for (key, value) in AIOverlayParameterReport.text(edit.parameters, overlay: overlay) { result[key] = value }
         return .object(result)
     }

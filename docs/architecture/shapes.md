@@ -108,6 +108,7 @@ the four rules are in [画面文字](text-overlays.md)「Frames on the grid」, 
 入场 / 出场：`animation_in` / `animation_out`（`none` / `fade` / `pop` / `wipe` / `draw`，词表 `MCPVocabulary.shapeAnimations` 和
 `ShapeAnimationKind` 对账）、`animation_in_duration` / `animation_out_duration`（默认 0.6，夹在 0.1…5），参数名和 `set_text` 一样；
 只给一侧时另一侧不动；盖一块不收；结果里带设了的 `animation_in` / `animation_out`。规则在 `AIShapeChange`（纯值，`checks/MCP/ShapeChecks.swift`）。
+动效预设（set_text 的 `motion_preset`，2026-11-16）放上去的框和细线也是普通的形状，带 `motionPreset` 标记、照常能用 set_shape 改，见 [动效预设](motion-presets.md)。
 
 ## 六、守卫
 

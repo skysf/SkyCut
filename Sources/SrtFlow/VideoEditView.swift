@@ -35,6 +35,8 @@ struct VideoEditView: View {
     @State private var eventMonitor: Any?
     /// 预览里正在就地编辑的那条字幕（双击画面上的字幕进入）。
     @State private var previewEditingCueID: UUID?
+    /// 「+」里「动效预设…」弹出来的那一栏（MotionPresetPanel）。
+    @State private var showsMotionPresets = false
 
     init(project: VideoEditProject, host: EditorHost) {
         self.project = project
@@ -494,6 +496,12 @@ struct VideoEditView: View {
             } label: {
                 Label("Number", systemImage: "number")
             }
+            // 加字时多一栏「动效预设」（2026-11-16 用户定）：三套现成的动效带小样，点一张放在播放头。
+            Button {
+                showsMotionPresets = true
+            } label: {
+                Label("Motion Preset…", systemImage: "sparkles.rectangle.stack")
+            }
             ForEach(ShapeKind.allCases) { kind in
                 Button {
                     project.addShape(kind)
@@ -516,6 +524,9 @@ struct VideoEditView: View {
         }
         .menuStyle(.borderlessButton)
         .fixedSize()
+        .popover(isPresented: $showsMotionPresets, arrowEdge: .bottom) {
+            MotionPresetPanel(project: project) { showsMotionPresets = false }.appLanguage()
+        }
 
     }
 
