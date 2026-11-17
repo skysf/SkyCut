@@ -39,4 +39,25 @@ struct AISoundEffectRequest: Equatable {
         let start = requested - renderedHit
         return start >= 0 ? (start, 0) : (0, -start)
     }
+
+    /// Until when a made sound is heard (file seconds): the end of the last window that is not silent by listen's rule (the same
+    /// ~43 ms windows, louder than its default −45 dB silence floor) at the clip's volume. The file runs on past it: the preset's
+    /// tail past duration (an impact of duration 1 is a 2.7 s clip, heard for 1.2 s at -8 dB) and the silence a short sound is padded
+    /// with. The reply reports it as audible_duration next to the clip's start / end (MCP-8,
+    /// docs/bugfixes/2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md).
+    static func audibleEnd(_ audio: SFXBuffer, volumeDB: Double) -> Double {
+        let gain = AudioGain.linear(fromDecibels: AudioGain.clampedDecibels(volumeDB))
+        let window = AIAudioLevels.bucketsPerWindow * WaveformPowerBuilder.bucket
+        var end = 0
+        var start = 0
+        while start < audio.count {
+            let stop = min(audio.count, start + window)
+            var power = 0.0
+            for i in start..<stop { power += (audio.left[i] * audio.left[i] + audio.right[i] * audio.right[i]) / 2 }
+            let level = AudioGain.decibels(fromLinear: (power / Double(stop - start)).squareRoot() * gain)
+            if level >= AIAudioLevels.defaultSilenceDB { end = stop }
+            start = stop
+        }
+        return Double(end) / SFX.sampleRate
+    }
 }

@@ -26,29 +26,37 @@ enum AITimelineEdits {
         var start: Double?
         /// add_clips sound=separate：落地之后把声音分到音频轨上（`ClipSoundSeparation`，同界面上的分离音频）。
         var separateSound = false
+        /// add_clips A<n> past the last audio track: a track this call creates (`AITrackLanding.Request.audioNumber`).
+        var audioNumber: Int? = nil
     }
 
-    /// 按顺序放一批素材。同一批里两段都要「新开一条轨」时，第二段放进第一段开的那条。只有**自己要了新开**的那一段
-    /// 开出来的轨才记下 —— 前面一段只是因为还没有音频轨才开了 A1，后面点名 new_audio 的照样另开一条
-    /// （docs/bugfixes/2026-09-28-new-audio-lands-on-a1.md）。
-    static func place(_ plans: [PlannedClip], insert: Bool, linkage: Bool, in state: inout TimelineState) {
+    /// 按顺序放一批素材。同一批里两段都要「新开一条轨」时，第二段放进第一段开的那条。An audio clip that names a track goes on it,
+    /// or on another new track when it is taken there — never on a track that already had content (`AITrackLanding.AudioTracks`;
+    /// new A-numbers are created). Returns a note for every clip that is not on the track it asked for (the reply's adjustments).
+    @discardableResult
+    static func place(_ plans: [PlannedClip], insert: Bool, linkage: Bool, in state: inout TimelineState) -> [UUID: AITrackLanding.Note] {
+        var audio = AITrackLanding.AudioTracks(state)
         var openedVideo: Int?
-        var openedAudio: Int?
+        var notes: [UUID: AITrackLanding.Note] = [:]
         for plan in plans {
+            if plan.isAudio, let key = audio.key(for: plan) {
+                notes[plan.clip.id] = audio.land(plan, as: key, in: &state)
+                continue
+            }
             var target = plan.target ?? (plan.isAudio ? nil : .main)
             if target == .newOverlayTop, let index = openedVideo { target = .overlay(index) }
-            if target == .newAudioBottom, let index = openedAudio { target = .audio(index) }
             let start = plan.start ?? defaultStart(for: target, in: state)
             if insert, plan.start != nil, target == .main {
                 shiftMain(from: start, by: plan.clip.timelineDuration, excluding: [], linkage: linkage, in: &state)
             }
             let item = MediaImportItem(duration: plan.clip.timelineDuration, isAudio: plan.isAudio)
             let landings = state.mediaImportLandings([item], firstStart: start, preferring: target)
+            if plan.target != nil, let target { notes[plan.clip.id] = AITrackLanding.lifted(from: target, to: landings.first, in: state) }
             state.insertImported([plan.clip], at: landings)
             if plan.separateSound { ClipSoundSeparation.separate(plan.clip.id, in: &state) }
             if plan.target == .newOverlayTop, landings.first?.target == .newOverlayTop { openedVideo = state.overlayTracks.count - 1 }
-            if plan.target == .newAudioBottom, landings.first?.target == .newAudioBottom { openedAudio = state.audioTracks.count - 1 }
         }
+        return notes
     }
 
     /// 没给起点时放在哪：接在那条轨最后一段后面；新开的轨和默认的声音从 0 开始。

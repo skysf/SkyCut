@@ -480,6 +480,7 @@ xcrun swiftc \
   Sources/SrtFlow/AISubtitleOverlaps.swift \
   Sources/SrtFlow/SubtitleFallbackFont.swift \
   Sources/SrtFlow/AITimelineEdits.swift \
+  Sources/SrtFlow/AITrackLanding.swift \
   Sources/SrtFlow/RippleLinkPartners.swift \
   Sources/SrtFlow/AILinkageReport.swift \
   Sources/SrtFlow/ClipSoundSeparation.swift \

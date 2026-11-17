@@ -94,6 +94,11 @@ enum AITimelineTools {
         var library: [UUID: AudioLibraryItem] = [:]
         var effects: [UUID: AISoundEffectTool.Made] = [:]
         var requestedByID: [UUID: JSONValue] = [:]
+        var tracks: [UUID: AITrackLanding.Request] = [:]
+        // A call that fails after making sound effects removes the files it made (a failed call changes nothing).
+        let soundFiles = AISoundEffectFiles()
+        var committed = false
+        defer { soundFiles.finish(failed: !committed) }
         for (index, original) in requests.enumerated() where !original.isSubtitle {
             var request = original
             var clip: EditClip
@@ -115,7 +120,7 @@ enum AITimelineTools {
                 try trim(&clip, duration: found.item.duration, name: name, request: request, index: index)
             } else if let effect = request.soundEffect {
                 // 合成的音效：落点压在 hit_at 上（开头 = hit_at − 声音里的落点）；没给 hit_at 也没给 start 就放在播放头。
-                let made = try await AISoundEffectTool.make(effect.parameters, project: project)
+                let made = try await AISoundEffectTool.make(effect.parameters, volumeDB: effect.volumeDB, project: project, files: soundFiles)
                 guard let media = await project.probeImports([made.url]).first else {
                     throw AIToolError("clips[\(index)]: SkyCut could not read back the sound effect file \(made.url.lastPathComponent).")
                 }
@@ -156,11 +161,13 @@ enum AITimelineTools {
             guard project.isCurrentGeneration(generation) else {
                 throw AIToolError("The project changed while the files were being read. Try again.")
             }
-            let target = try request.track.map { try AITrackName.target($0, in: project.state) }
-            try check(target, isAudio: isAudio, name: name, index: index)
+            let track = try request.track.map { try AITrackLanding.request($0, in: project.state) }
+            try check(track?.target, isAudio: isAudio, name: name, index: index)
             requestedByID[clip.id] = items[index]
+            tracks[clip.id] = track
             plans.append(.init(
-                clip: clip, isAudio: isAudio, target: target, start: request.start, separateSound: request.sound == .separate
+                clip: clip, isAudio: isAudio, target: track?.target, start: request.start, separateSound: request.sound == .separate,
+                audioNumber: track?.audioNumber
             ))
         }
         let insert = try args.bool("insert") ?? false
@@ -168,6 +175,7 @@ enum AITimelineTools {
         // 挂字幕和放素材是同一步（一次调用 = 一步撤销）。挂字幕要是落在这一步外面，App 在后台收不到事件，它按事件
         // 自动开的那一组一直关不上，之后 AI 的每一步都嵌进去，撤一步全空
         // （docs/bugfixes/2026-09-27-ai-undo-swallowed-by-subtitle-attach.md）。
+        var notes: [UUID: AITrackLanding.Note] = [:]
         let report = try AIUndoGrouping.step(project.effectiveUndoManager) {
             if let subtitle = subtitles.first {
                 project.attachSubtitle(subtitle)
@@ -175,8 +183,9 @@ enum AITimelineTools {
                     throw AIToolError(project.notice ?? "SkyCut could not read \(subtitle.lastPathComponent).")
                 }
             }
-            return project.perform { AITimelineEdits.place(plans, insert: insert, linkage: linkage, in: &$0) }
+            return project.perform { notes = AITimelineEdits.place(plans, insert: insert, linkage: linkage, in: &$0) }
         }
+        committed = true
         // 图片和拖进来一样：先上轨，静帧视频在后台转，转完无感替换。
         for image in images {
             project.trackImportTask(Task { await project.convertStillClip(image.id, from: image.url, generation: generation) })
@@ -195,6 +204,9 @@ enum AITimelineTools {
                                                        state: state, canvas: VideoEditCompositionBuilder.renderSize(for: state)) {
                 entry[key] = value
             }
+            if let track = tracks[clip.id], let moved = AITrackLanding.adjustment(
+                requested: track, note: notes[clip.id], slot: location.track, in: state, ids: ids
+            ) { entry["adjustments"] = .array((entry["adjustments"]?.arrayValue ?? []) + [moved]) }
             if let item = library[clip.id] {
                 entry["library_id"] = .string(item.id)
                 entry["title"] = .string(item.title)
@@ -210,6 +222,7 @@ enum AITimelineTools {
             if let made = effects[clip.id] {
                 entry["sound_effect"] = .string(made.parameters.preset.rawValue)
                 entry["hit_at"] = AIFormat.seconds(clip.timelineStart + made.hitAt - clip.sourceStart)
+                entry["audible_duration"] = AIFormat.seconds(made.audibleDuration(of: clip))
             }
             return .object(entry)
         }
@@ -304,7 +317,7 @@ enum AITimelineTools {
             case .master: linear = project.state.masterVolume
             case .track(let slot): linear = project.state.trackVolume(for: slot)
             }
-            let actual = AIParameterReport.number(AudioGain.decibels(fromLinear: linear))
+            let actual = AIParameterReport.decibels(AudioGain.decibels(fromLinear: linear))
             result["volume_db"] = actual
             for (key, value) in AIParameterReport.make(requested: ["volume_db": .number(volumeDB)], values: ["volume_db": actual], reasons: ["volume_db": "gain_limits"]) {
                 result[key] = value

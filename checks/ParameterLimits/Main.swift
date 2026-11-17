@@ -164,6 +164,7 @@ import SrtFlowMCPKit
             f.project.effectiveUndoManager!.undo()
             require(f.project.state == converted, "converted-image edit undoes once")
             print("PASS: real pending image / video probe / unavailable media / metadata rollback")
+            await AddClipsChecks.run(f, root: root, require: require)
         } catch {
             failures += 1
             print("FAIL: production parameter check threw \(error)")
