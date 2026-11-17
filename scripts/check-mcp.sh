@@ -200,30 +200,7 @@ if grep -q 'follow: request.follow && request.focus != .text' Sources/SrtFlow/AI
 fi
 echo "   ✓ focus=text 也跟；跟的目标按 textFirst 认字"
 
-echo "==> 什么时候问：按操作权限处理文件与草稿越档；改权限 / 提高硬预算始终确认"
-# 2026-09-28 用户拍板（docs/plans/2026-09-27-mcp.md 第 34 条）：删进废纸篓先问；读点名文件夹以外的文件问一次，同意了就记住
-# 那个文件夹（AIReadGrants），以后不问；从不覆盖（撞名加编号）这一样不问。2026-10-17（AI 多开方案板 9）：fal 超每日额度 / 价格不明
-# 从提示条改成同一套确认码。2026-10-28（收费方案第 6 刀）：generate_media、upscale_clip 改走 Sky Studio（SkyStudioJobGate）；fal 那一处
-# （旧生成把关）跟着生成一起删了。2026-11-01：每日预算是硬上限（超了回 daily_budget_exceeded、不发码，配旁白也不退档），SkyStudioJobGate
-# 只为请求批准模式下超出低成本草稿的、声音库的授权和一次性费用发码；改权限 / 提高硬预算走 AISettingsApproval，全部权限下也问。
-ASKERS="$(grep -rl 'AIConfirmations.shared.ask(' Sources/SrtFlow | sort | xargs -n1 basename | tr '\n' ' ')"
-if [ "${ASKERS}" != "AIFileTools.swift AISettingsApproval.swift AIWorkspace.swift SkyStudioJobGate.swift " ]; then
-  echo "✗ 会回 needs_confirmation 的地方变了：${ASKERS}（只许删文件的 AIFileTools、读别处文件的 AIWorkspace、Sky Studio 花积分的 SkyStudioJobGate、改设置的 AISettingsApproval）" >&2
-  exit 1
-fi
-if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swift || true)" -ne 1 ]; then
-  echo "✗ AIWorkspace.confirmReading 点过头之后没记住那个文件夹：同一个文件夹里的文件会一次次地问" >&2
-  exit 1
-fi
-for wiring in "Sources/SrtFlow/AIExportTools.swift:1" "Sources/SrtFlow/AIProjectTools.swift:2" "Sources/SrtFlow/AIProjectOpenTools.swift:1"; do
-  file="${wiring%%:*}"
-  want="${wiring##*:}"
-  if [ "$(grep -c 'ExportFileName.unoccupied' "${file}" || true)" -lt "${want}" ]; then
-    echo "✗ ${file} 撞名没走 ExportFileName.unoccupied（应有 ${want} 处）：AI 会覆盖文件、或者又回头问" >&2
-    exit 1
-  fi
-done
-echo "   ✓ 确认入口为文件读取 / 废纸篓、草稿审批和设置权限；日预算不可越额；文件撞名加编号"
+source checks/MCP/approval-wiring.sh
 
 echo "==> 配音只经一处写文件（先过一道音量）"
 # Kokoro 的 am_fenrir 峰值会超过满幅，没过音量就写进文件，一声声爆音（docs/bugfixes/2026-09-28-kokoro-voiceover-clipping.md）。
@@ -260,14 +237,7 @@ echo "   ✓ 导出开始和做完都报宽高帧率；look 看文件报文件�
 # shellcheck source=checks/MCP/sound-effect-wiring.sh
 source checks/MCP/sound-effect-wiring.sh
 
-# 动效预设（docs/architecture/motion-presets.md 第二节第 5、9 条）：界面上改字的两个入口都经 MotionPresetGroups.update（标题挪了、
-# 改了字，同一套跟着走）；粘贴给预设换新组号（粘出来的一套不和原来那套连在一起）。
-if [ "$(grep -c 'MotionPresetGroups.update(id, in: &\$0, change)' Sources/SrtFlow/VideoEditProject+Text.swift || true)" -ne 2 ] \
-   || [ "$(grep -c 'MotionPresetTag.renew(' Sources/SrtFlow/VideoEditClipboardPaste.swift || true)" -ne 2 ]; then
-  echo "✗ 动效预设：VideoEditProject.updateTextOverlay / liveUpdateTextOverlay 要经 MotionPresetGroups.update，粘贴要给文字和形状都换新组号"
-  exit 1
-fi
-echo "   ✓ 动效预设：界面上改字经 MotionPresetGroups.update、粘贴换新组号"
+source checks/MCP/motion-wiring.sh
 
 # 上面全是扫描（不编译）。check-guards 推之前只跑到这儿：这些扫描以前只在 CI 上跑得到，本地挑着跑漏掉的那一条首跑就红
 #（docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md，同 PR #71、#84、#132）。
@@ -281,6 +251,7 @@ echo "==> swift build ${ARCH_FLAG}（小程序 + SrtFlowCore）"
 BUILD_OUT="$(swift build ${ARCH_FLAG} --product skycut-mcp 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_OUT="$(swift build ${ARCH_FLAG} --target SrtFlowCore 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_OUT="$(swift build ${ARCH_FLAG} --target SrtFlowKokoro 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
+BUILD_OUT="$(swift build ${ARCH_FLAG} --target SrtFlowWebMotionKit 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build ${ARCH_FLAG} --show-bin-path)"
 
 OUT="$(mktemp -d)/mcpcheck"
@@ -294,6 +265,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
@@ -365,6 +337,10 @@ xcrun swiftc \
   Sources/SrtFlow/AIBridgeCalls.swift \
   Sources/SrtFlow/AIShortIDs.swift \
   Sources/SrtFlow/AITimelineSummary.swift \
+  Sources/SrtFlow/AIMotionSummary.swift \
+  Sources/SrtFlow/MotionPresetLibrary.swift \
+  Sources/SrtFlow/WebMotion/WebMotionParameters.swift \
+  Sources/SrtFlow/WebMotion/WebMotionEnvironment.swift \
   Sources/SrtFlow/AITextEdits.swift \
   Sources/SrtFlow/AITextNumberChange.swift \
   Sources/SrtFlow/AIRecipe.swift \
@@ -526,6 +502,7 @@ xcrun swiftc \
   checks/MCP/*.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
+  "$BUILD_DIR"/SrtFlowWebMotionKit.build/*.o \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o
 
 echo "==> 运行"

@@ -2,14 +2,6 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-extension UTType {
-    /// `.skycut`（改名之前的 `.srtflowproj` 也是它）。Info.plist 里声明了同一个标识符，双击工程文件才会回到 SkyCut。
-    static let srtFlowProject = UTType(
-        exportedAs: "com.srtflow.project",
-        conformingTo: .json
-    )
-}
-
 /// 工程的打开、保存、自动保存和素材重链接。
 ///
 /// 刻意**不**用 NSDocument：那套东西要一个工程一个窗口，跟「一个主窗口 + 侧边栏
@@ -206,6 +198,7 @@ extension VideoEditProject {
 
         // 音频库素材的最后一层：本地缓存里也没有，就去 R2 按 id 重新拉。
         // 放在最后、异步跑 —— 它要走网络，不该拖着工程打不开。
+        WebMotionRecovery.start(for: self)
         recoverRemoteLibraryMedia()
     }
 
@@ -529,6 +522,7 @@ extension VideoEditProject {
     /// 跟不上的进 `missingMedia` 亮出重链接条。App 激活和每次预览重建各触发
     /// 一次；素材都在原地时就是每素材一次 fileExists 的开销。
     func revalidateMediaLocations() {
+        WebMotionRecovery.start(for: self)
         guard mediaRevalidateTask == nil else { return }
         guard !state.isEmpty else {
             if !missingMedia.isEmpty { missingMedia = [] }

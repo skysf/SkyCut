@@ -428,7 +428,7 @@ struct ClipBlockView: View, Equatable {
                 Button("Move to Main Track") { project.toggleOverlay(clip.id) }
             }
             // 送 Sky Studio 放大（图片段没有）。已经换过源的多两项：比一比、换回原片（原片不在了就提示，不在菜单里查文件：块不做 IO）。
-            if !clip.isStillImage {
+            if !clip.isStillImage, clip.webMotion == nil {
                 if clip.upscale == nil {
                     Button("Upscale…") { UpscaleActivity.shared.present(panelFor: clip.id) }
                 } else {

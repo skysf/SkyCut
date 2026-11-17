@@ -20,9 +20,7 @@ public enum MCPRecipeTools {
             return MCPToolDefinition(
                 .recipes, title: "Read editing styles",
                 description: """
-                Read-only. SkyCut's editing styles (presets and the user's own): structure, shot lengths, transitions, filters, fonts, music, \
-                checklist. No id: every style and when to use it; id: the whole style. Before cutting a whole video, pick one that fits, tell \
-                the user in one sentence which one you follow, and follow it; the user's words win.
+                Read-only. List editing styles, or read id in full; shared-rules gives common rules. Before editing a whole video, pick a style and tell the user which one you follow; their words win.
                 """,
                 input: MCPSchema.object([
                     "id": MCPSchema.string("A style's id or title; leave out to list them all; \(sharedRulesID) for only the rules every style follows.")
@@ -33,9 +31,7 @@ public enum MCPRecipeTools {
             return MCPToolDefinition(
                 .saveRecipe, title: "Save an editing style",
                 description: """
-                Save an editing style of the user's own, only when they ask. text is the whole style in Markdown, written like the \
-                preset ones (read one with recipes first). Saving under one of their names replaces it (the old file goes to the \
-                Trash); a preset's name makes their own version. Styles live in SkyCut's folder, not in the project.
+                Save the user's Markdown style only when they ask; replaces their same-named style, moving its old file to Trash. Read a preset with recipes first. Stored app-wide.
                 """,
                 input: MCPSchema.object([
                     "name": MCPSchema.string("The style's name, e.g. \"Course promo\"."),

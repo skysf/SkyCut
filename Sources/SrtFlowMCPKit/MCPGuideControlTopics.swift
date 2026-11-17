@@ -14,6 +14,12 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.undo, """
             undo reverses edits in the project, the way the user would with Command-Z.
+
+            Undo the latest edits, like Command-Z (steps, default 1). round=true puts the project back to how it was before this \
+            round of AI edits began, itself one undo step. File moves by manage_files are not undone.
+
+            Undo like Command-Z (steps, default 1), this AI round (round=true) or to a saved version (version=<id>). Each is one \
+            undo step.
             """),
             MCPGuideSection(name: "steps", about: "how many edits, and what one edit is", text: """
             Steps. steps (1–50, default 1) undoes that many edits. Every tool call that changes a project is one undo step, so \
@@ -50,6 +56,8 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.seek, """
             seek moves the playhead so the user sees a frame; it never changes the project.
+
+            Read-only for the project: move SkyCut's playhead to a timeline time so the user sees that frame in the preview.
             """),
             MCPGuideSection(name: "showing", about: "pointing the user at a moment", text: """
             Showing a moment. time is timeline seconds. The preview shows that frame, so use it to point the user at something \
@@ -68,6 +76,9 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.cancelJob, """
             cancel_job stops a job that returned job_id.
+
+            Stop a job: a running export, subtitle generation or translation stops, and a queued job is dropped. Sky Studio jobs \
+            can only be cancelled while queued; character jobs cannot. Check get_job afterwards.
             """),
             MCPGuideSection(name: "what_stops", about: "jobs on this Mac, queued jobs and Sky Studio jobs", text: """
             What stops. An export, subtitle generation or translation on this Mac stops at once, and a job still queued behind \
@@ -88,6 +99,10 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.getSettings, """
             get_settings reads app preferences; it never opens windows or changes anything.
+
+            Read-only. App preferences without opening windows: general (language, theme), ai (clients, permission mode), editing \
+            (styles, voices), cache and sky_studio (account, credits, daily limit). Returns values, writable fields and the \
+            localized mode names; never keys. Change them with set_settings.
             """),
             MCPGuideSection(name: "sections", about: "general, ai, editing, cache and sky_studio", text: """
             Sections. general has the interface language and theme; ai the connected clients and the permission mode \

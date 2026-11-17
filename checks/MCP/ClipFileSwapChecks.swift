@@ -28,6 +28,7 @@ func runClipFileSwapChecks() {
     swapChecks()
     refusalChecks()
     partnerChecks()
+    motionSourceSwapChecks()
 }
 
 private func swapChecks() {
@@ -118,4 +119,28 @@ private func partnerChecks() {
     let moved = try? AIClipEdit.apply(change, to: picture.id, linkage: true, stillDuration: 60, in: state)
     checkEqual(moved?.clip(with: sound.id)?.timelineStart, 2, "a move made with the swap still carries the linked sound")
     checkEqual(moved?.clip(with: sound.id)?.sourceStart, 10, "…without shifting what it reads")
+}
+
+
+// Replacing a generated page's movie explicitly makes this ordinary media. Refused replacements retain its source.
+private func motionSourceSwapChecks() {
+    var clip = videoClip(0, 4)
+    clip.webMotion = WebMotionClipRecord(page: "<p>original motion</p>", fps: 24)
+    let before = clip
+    do {
+        try ClipFileReplacement.apply(video(duration: 2), to: &clip, sourceStart: 0, stillDuration: 60)
+        check(false, "motion replacement too short is refused")
+    } catch {
+        checkEqual(clip.webMotion, before.webMotion, "refused motion source swap retains the recoverable page")
+    }
+    do {
+        try ClipFileReplacement.apply(video(duration: 8), to: &clip, sourceStart: 0, stillDuration: 60)
+        check(clip.webMotion == nil, "explicit file replacement clears the old motion source")
+        checkEqual(clip.sourceURL, other, "replacement remains ordinary imported media")
+        var state = TimelineState()
+        state.overlayTracks = [EditLane(clips: [clip])]
+        checkEqual(state.mediaURLs, [other], "replacement file receives normal media persistence")
+    } catch {
+        check(false, "valid motion source replacement succeeds: \(error)")
+    }
 }

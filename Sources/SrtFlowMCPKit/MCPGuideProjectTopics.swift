@@ -14,6 +14,10 @@ enum MCPGuideProjectTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.getStatus, """
             get_status reports on SkyCut and your projects; it never changes anything.
+
+            Read-only. Call it first: the project (name, path, length, unsaved), open projects with ids and owners, folders, jobs, screen \
+            recording state, permission and leftovers, and cloud_tasks grouped by project: closed ones too. models=true: Sky Studio models, \
+            prices, limits (free); screen=true: recording sources; film_contract=true: the film contract.
             """),
             MCPGuideSection(name: "status", about: "what the plain call reports", text: """
             What it reports. The open project (name, path, length, unsaved changes); every open project with its id (p1, p2…), \
@@ -41,6 +45,10 @@ enum MCPGuideProjectTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.setView, """
             set_view decides whether the user watches your edits; it never changes a project.
+
+            How the user follows your edits: visible (default) brings a project's window forward once and shows each edit; background leaves \
+            SkyCut where it is (edits still land and undo). With project, only that one; without, all yours. Ask the user once per \
+            conversation which they want, unless they said. Lasts until SkyCut quits.
             """),
             MCPGuideSection(name: "modes", about: "visible versus background", text: """
             Modes. visible (the default) brings a project's window forward once when you open it (or now), and selects and \
@@ -65,6 +73,10 @@ enum MCPGuideProjectTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.openProject, """
             open_project opens a project file and gives you its id.
+
+            Open a SkyCut project file (.skycut, or .srtflowproj from before the rename); the result's project is its id (p1, \
+            p2…). To edit several, open them all, then pass project=<id> on every call; without project a call goes to the one you \
+            opened last. A file already open is not opened twice. At most 8 projects stay open: close_project finished ones.
             """),
             MCPGuideSection(name: "ids", about: "project ids and working on several projects", text: """
             Ids. The result's project is its id (p1, p2…). To edit several projects (for example with sub-agents), open or \
@@ -89,6 +101,10 @@ enum MCPGuideProjectTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.newProject, """
             new_project creates and saves an empty project.
+
+            Start a new, empty project, saved at once as <name>.skycut so later edits autosave: in folder, else in SkyCut/Projects \
+            of the opened folder, the open project's folder or Downloads. A taken name gets a number. A second project in the same \
+            folder needs version (<name> - <version>). The result's project is its id; it opens like open_project.
             """),
             MCPGuideSection(name: "where", about: "where the file goes and how it is named", text: """
             Where. The file is <name>.skycut, saved at once so every later edit autosaves. It goes into folder when given, \
@@ -117,6 +133,10 @@ enum MCPGuideProjectTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.closeProject, """
             close_project saves and closes one of your projects.
+
+            Close one of your projects (project=p2) when you are done, for example after its export finished; it is saved first. \
+            At most 8 projects stay open. Refused while one of its jobs runs (export, subtitles, translation): wait with get_job \
+            or use cancel_job first.
             """),
             MCPGuideSection(name: "when", about: "when to close, and the 8-project limit", text: """
             When. Close a project when you are done with it, for example after its export finished. SkyCut keeps at most 8 \

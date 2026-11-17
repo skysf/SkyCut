@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import UniformTypeIdentifiers
 
 /// 一个 `.srtflowproj` 工程文件。
 ///
@@ -33,7 +34,7 @@ struct VideoEditProjectFile: Codable {
     var rowHeights: TimelineRowHeights
 
     /// reader 认识的最高版本（闸门比较对象）。
-    static let latestFormatVersion = 35
+    static let latestFormatVersion = 36
     /// writer 的基线版本：没有任何高版本 only 数据的工程一律写它，旧版照常能开。
     /// 具体判据见 `TimelineState.requiresFormatVersion4` / `...5` / `...6` /
     /// `...7` … `...14`（登记清单在那边）。
@@ -88,6 +89,7 @@ struct VideoEditProjectFile: Codable {
         _ = timeline.requiresFormatVersion32
         _ = timeline.requiresFormatVersion33
         _ = timeline.requiresFormatVersion34
+        _ = timeline.requiresFormatVersion36
         _ = timeline.requiresFormatVersion35
         formatVersion = Self.latestFormatVersion
         savedAt = Date()
@@ -121,73 +123,12 @@ struct VideoEditProjectFile: Codable {
     }
 }
 
-/// 一个素材的定位信息：存三种线索，从快到慢依次试。
-struct MediaRecord: Codable, Sendable {
-    /// 存盘时的绝对路径。素材没动过就直接命中，这是绝大多数情况。
-    var path: String
-    /// 系统书签：记的是文件的 inode + 卷标识，不是路径。素材改名、移到同一个盘
-    /// 的任何角落，甚至又改名又移动，都能靠它解回来 —— 这是 macOS 自带的能力。
-    var bookmark: Data?
-    /// 相对工程文件的位置。整个文件夹（工程 + 素材）一起搬走或拷到别的机器时，
-    /// 书签会失效（inode 变了），这条还在。
-    var relativePath: String?
-    /// 最后的线索：按文件名找，用大小验一下是不是同一个。
-    var fileName: String
-    var byteSize: Int64?
-
-    private enum CodingKeys: String, CodingKey {
-        case path, bookmark, relativePath, fileName, byteSize
-    }
-
-    /// - Parameter previous: 上次存盘时这个素材的记录。
-    ///
-    ///   **旧记录只能补，不能覆盖成 nil。** 素材此刻不可达时（在工程打开期间被
-    ///   移走、外接盘拔了），`bookmarkData()` 会失败返回 nil；要是就这么存下去，
-    ///   本来还能定位到它的那份书签就被自己抹掉了 —— 而且随便哪个素材触发一次
-    ///   自动保存，就会连带抹掉**其他**丢失素材的线索。
-    init(url: URL, projectDirectory: URL?, previous: MediaRecord? = nil) {
-        path = url.path
-        fileName = url.lastPathComponent
-        // 同一个文件（同一个 inode）这次会话里建过书签就用旧的：建书签很贵，自动保存
-        // 每次都重建的话主线程每次卡约 55ms（`MediaBookmarkCache`）。
-        let fresh = MediaBookmarkCache.bookmark(for: url)
-        bookmark = fresh ?? previous?.bookmark
-        // 相对路径纯粹是路径运算，文件在不在都算得出来，可以放心重算。
-        relativePath = projectDirectory.flatMap { MediaRecord.relativePath(from: $0, to: url) }
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
-        byteSize = size ?? previous?.byteSize
-    }
-
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        path = try c.decode(String.self, forKey: .path)
-        bookmark = try c.decodeIfPresent(Data.self, forKey: .bookmark)
-        relativePath = try c.decodeIfPresent(String.self, forKey: .relativePath)
-        fileName = try c.decodeIfPresent(String.self, forKey: .fileName)
-            ?? (path as NSString).lastPathComponent
-        byteSize = try c.decodeIfPresent(Int64.self, forKey: .byteSize)
-    }
-
-    var url: URL { URL(fileURLWithPath: path) }
-
-    /// 从工程所在目录走到素材的相对路径。最多往上走三层 —— 再远就不像是
-    /// 「一起搬走」的关系了，留着反而会误配到别的文件。
-    static func relativePath(from directory: URL, to file: URL) -> String? {
-        let base = directory.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-        let target = file.standardizedFileURL.resolvingSymlinksInPath().pathComponents
-        var shared = 0
-        while shared < base.count, shared < target.count, base[shared] == target[shared] {
-            shared += 1
-        }
-        let up = base.count - shared
-        guard up <= 3 else { return nil }
-        return (Array(repeating: "..", count: up) + target[shared...]).joined(separator: "/")
-    }
-}
-
 // MARK: - 读写
 
 enum VideoEditProjectIO {
+
+    /// Normal project saves carry their generated movies; internal versions retain the existing cache references.
+    enum MotionCacheWritePolicy { case carry, reference }
 
     struct IOError: LocalizedError {
         var message: String
@@ -203,6 +144,8 @@ enum VideoEditProjectIO {
         var didRelink: Bool
         /// 静帧缓存没了、需要重新转的图片段（带当初用的分辨率政策）。
         var stillsToRegenerate: [StillRegeneration]
+        /// Generated motion caches missing on this Mac; the project regenerates them from its stored pages.
+        var motionsToRegenerate: [UUID]
         /// 读到的素材定位表（键是**解析之后**的路径）。存盘时要拿它来兜底，
         /// 不然这次没找到的素材，书签会被下一次自动保存抹掉。
         var records: [String: MediaRecord]
@@ -216,11 +159,17 @@ enum VideoEditProjectIO {
     /// - Returns: 这次写下去的定位表，调用方要存着传给下一次。
     @discardableResult
     nonisolated static func save(
-        _ timeline: TimelineState,
+        _ original: TimelineState,
         to url: URL,
         knownRecords: [String: MediaRecord] = [:],
-        rowHeights: TimelineRowHeights = TimelineRowHeights()
+        rowHeights: TimelineRowHeights = TimelineRowHeights(),
+        motionCaches: MotionCacheWritePolicy = .carry
     ) throws -> [String: MediaRecord] {
+        let timeline: TimelineState
+        switch motionCaches {
+        case .carry: timeline = try WebMotionProjectFiles.preparingForSave(original, projectURL: url)
+        case .reference: timeline = original
+        }
         let directory = url.deletingLastPathComponent()
         // 换成 upscale 文件的段的原片也配书签（换回去时找得到），但它不在 mediaURLs 里：播放用不着、删了不亮「缺素材」。
         let media = (timeline.mediaURLs + timeline.upscaleOriginalURLs).map {
@@ -349,11 +298,13 @@ enum VideoEditProjectIO {
         }
 
         let stills = refreshStillClips(in: &timeline)
+        let motions = WebMotionProjectFiles.refreshWebMotionCaches(in: &timeline, projectURL: url)
         return LoadResult(
             timeline: timeline,
             missingMedia: missing,
             didRelink: didRelink,
             stillsToRegenerate: stills,
+            motionsToRegenerate: motions,
             records: records,
             rowHeights: file.rowHeights.pruned(keeping: timeline.laneIDs)
         )
@@ -586,4 +537,12 @@ enum VideoEditProjectIO {
 struct StillRegeneration: Hashable, Sendable {
     var image: URL
     var nativeResolution: Bool
+}
+
+extension UTType {
+    /// `.skycut`（改名之前的 `.srtflowproj` 也是它）。Info.plist 里声明了同一个标识符，双击工程文件才会回到 SkyCut。
+    static let srtFlowProject = UTType(
+        exportedAs: "com.srtflow.project",
+        conformingTo: .json
+    )
 }

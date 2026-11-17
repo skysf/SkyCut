@@ -109,14 +109,16 @@ enum ProjectVersionFiles {
     /// "changed since the last version" compares, so a state is not counted as changed by what a file cannot hold (dates keep
     /// whole seconds). nil when it cannot be written.
     static func canonical(_ state: TimelineState) -> TimelineState? {
-        guard let data = try? VideoEditProjectIO.makeEncoder().encode(state) else { return nil }
-        return try? VideoEditProjectIO.makeDecoder().decode(TimelineState.self, from: data)
+        guard let data = try? VideoEditProjectIO.makeEncoder().encode(state),
+              let decoded = try? VideoEditProjectIO.makeDecoder().decode(TimelineState.self, from: data) else { return nil }
+        return WebMotionProjectFiles.normalizingCacheLocations(in: decoded)
     }
 
     /// The timeline a version file holds, read the same way (`canonical` of what was saved). nil when it cannot be read.
     static func canonicalTimeline(ofFile url: URL) -> TimelineState? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
-        return try? VideoEditProjectIO.makeDecoder().decode(VideoEditProjectFile.self, from: data).timeline
+        guard let data = try? Data(contentsOf: url),
+              let timeline = try? VideoEditProjectIO.makeDecoder().decode(VideoEditProjectFile.self, from: data).timeline else { return nil }
+        return canonical(timeline)
     }
 
     /// The project's name, cut at a character boundary to `maxStemBytes` UTF-8 bytes; "Untitled" when nothing is left.

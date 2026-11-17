@@ -11,9 +11,7 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .getSettings, title: "Read SkyCut settings",
                 description: """
-                Read-only. App preferences without opening windows: general (language, theme), ai (clients, permission mode), editing \
-                (styles, voices), cache and sky_studio (account, credits, daily limit). Returns values, writable fields and the \
-                localized mode names; never keys. Change them with set_settings.
+                Read-only. Read app preferences, writable fields and localized permission names; never keys. Sections: general, ai, editing, cache, sky_studio. Changes: set_settings.
                 """,
                 input: MCPSchema.object([
                     "section": MCPSchema.string("Default all.", oneOf: ["all", "general", "ai", "editing", "cache", "sky_studio"])
@@ -23,9 +21,7 @@ enum MCPSettingsTools {
             return MCPToolDefinition(
                 .setSettings, title: "Change SkyCut settings",
                 description: """
-                Change preferences only when the user asks: theme, language, daily_ai_credit_limit, ai_access_mode, the optimized-media cache. \
-                Omitted fields stay; all are checked before any change. Changing ai_access_mode or raising the credit limit always returns \
-                needs_confirmation, even in full_access: ask, repeat with confirm_token. Never edits a project; keys stay in Settings.
+                Change preferences only when the user asks; all fields validate before any write. Permission-mode changes or a raised credit limit always need needs_confirmation, even in full_access: repeat with confirm_token after approval. Keys stay in Settings; no project edit.
                 """,
                 input: MCPSchema.object([
                     "language": MCPSchema.string("Interface language.", oneOf: ["system", "en", "zh-Hans", "es"]),

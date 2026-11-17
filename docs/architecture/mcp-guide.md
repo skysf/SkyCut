@@ -105,6 +105,14 @@
     它自己就超过的单独成一节；切完一行不丢、顺序不变。不手工拆：这几节是从参数定义现算的，哪个参数定义一变长，手工拆好的一节就会超。
     现在只有 `generate_media` 切成两节（整份 4,771 字）。
 
+16. **Web motion** (2026-11-17): `set_motion` has its own short card and written topic from its first version
+    (`MCPMotionTool`, `MCPGuideMotionTopic`; no pre-migration card). The guide orders native `set_text motion_preset`, reusable web
+    templates from `get_timeline.motion_library`, then an AI-written page. It explains the isolated page contract, the two permission
+    modes, parameter-only rendering of the same clip, jobs, the six page checks and their verbatim errors, suggested look times,
+    project-owned pages and portable caches. The card retains `needs_confirmation`, `One undo step`, `wait with get_job` and the
+    guide pointer. Its schema is within 4,500 bytes and the catalog remains within 100,000; full wording removed from utility cards
+    is preserved verbatim in their existing written-topic overviews.
+
 ## 四、守卫
 
 - `checks/MCP/GuideChecks.swift`（跟着 `scripts/check-mcp.sh` 跑）：清单里第一个、只读不删不联网、不收 `project`、只有它带 `alwaysLoad`、名片 ≤ 450；

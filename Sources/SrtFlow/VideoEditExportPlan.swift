@@ -8,6 +8,15 @@ import Foundation
 // 不管什么：怎么算出来（VideoEditExportGraph.plan）、怎么跑（VideoEditExporter）。
 
 extension VideoEditExportGraph {
+    /// Generated movies are recoverable caches, but an unavailable visible picture must never disappear from an export.
+    static func requireMotionCaches(_ state: TimelineState) throws {
+        let clips = ClipVisibility.visible((state.mainHidden ? [] : state.mainClips)
+            + state.overlayTracks.filter { !$0.isHidden }.flatMap(\.clips))
+        guard !clips.contains(where: { $0.webMotion != nil && !FileManager.default.fileExists(atPath: $0.sourceURL.path) }) else {
+            throw PlanError(message: L10n("Motion is still being rebuilt. Wait for rendering to finish before exporting."))
+        }
+    }
+
     struct Plan {
         var arguments: [String]
         var workspace: URL

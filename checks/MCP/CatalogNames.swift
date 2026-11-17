@@ -107,6 +107,9 @@ func catalogKnownNames() -> Set<String> {
     // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
     names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
                      "audio_max_reduction_db"])
+    // Web-motion library entries and accepted-render reports (AIMotionTool).
+    names.formUnion(["motion_library", "render_seconds", "look_times", "frame_entry", "same_twice", "no_blank_frames",
+                     "no_page_errors", "no_timeout"])
     // listen voice=… (AIListenVoiceReport / VoiceClarity, 2026-11-17): a masker's kind, the low band and the verdicts.
     names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short", "may_be_loud"])
     // Delivery report kinds and measured layer context (AIDeliveryChecks / AIDeliveryMix).

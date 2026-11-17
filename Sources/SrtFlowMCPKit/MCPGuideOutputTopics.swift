@@ -150,6 +150,10 @@ enum MCPGuideOutputTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.getJob, """
             get_job reports on any job id; it never starts or repeats work.
+
+            Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits first: keep \
+            waiting, never restart the job. Exports, transcriptions and translations run one at a time (queued: queue_position). \
+            waiting_for_user: tell the user right away. Paid jobs: billing_note explains the charge.
             """),
             MCPGuideSection(name: "waiting", about: "wait_seconds, waiting instead of restarting, the shared queue", text: """
             Waiting. wait_seconds (up to 30) waits for the job before answering; keep calling get_job instead of starting the \

@@ -149,7 +149,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | --- | --- |
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，合并 `main` 后才部署；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖）、[官网首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md)、[官网小字：手机上小于 12 px、对比度不够、标题跳级](docs/bugfixes/2026-11-11-website-small-text-contrast-headings-font-shift.md) |
 | 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`） | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
-| Web-motion renderer: the helper `skycut-web-motion` (`Sources/SrtFlowWebMotion/`), its kit (`Sources/SrtFlowWebMotionKit/`), SkyCut's side `WebMotionRenderer` (`Sources/SrtFlow/WebMotion/`); page locks, page clock, alpha calibration, page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
+| Web-motion renderer: `skycut-web-motion`, `SrtFlowWebMotionKit`, `Sources/SrtFlow/WebMotion/`, `set_motion`, stored pages and project-relative motion caches; page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红：链接只有 `[字](相对路径.md)`（可带 `#锚点`），条目只有顶格的 `- [标题](路径.md) — 一句话`、AGENTS.md 的索引小节另许成形的表格；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插，不用 `merge=union`：GitHub 不认）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
 | 工程存盘、格式版本、素材路径、自动保存、重建预览时开素材（`MediaAssetCache`）、新建 / 打开工程（切工程时清掉上一个的运行时状态、播放头归零；opening repairs link groups: `LinkGroupRepair`）; saved versions around AI rounds (`ProjectVersionStore`, `undo version=`, the Versions sheet) | [工程文件与素材重链接](docs/architecture/video-edit-project-file.md)（素材只开一次、按路径 + 文件身份认；换完整份时间线就要 `scheduleRebuild()`）、[工程文件生命周期](docs/bugfixes/2026-08-03-project-file-lifecycle.md)、[Saved project versions](docs/architecture/project-versions.md) (restore as is, one undo step; only `saveNow` and the store write project files) |
@@ -250,6 +250,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。 Native preset wraps survive canvas changes.
 - `scripts/check-media-import.sh` — 拖文件进轨道的落点。
 - `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账; `listen voice=` / `describe=` checks.
+- `scripts/check-motion-placement.sh` — Stored web motion: real rendering, template reuse, approval modes, same-clip parameter edits, undo and cache recovery.
 - `scripts/check-optimized-media.sh` — 优化媒体：判据、真转一块、缓存。
 - `scripts/check-parameter-limits.sh` — MCP 编辑参数的边界、实际生效值、素材加载重试。
 - `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾。
@@ -462,7 +463,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [剪辑页上记住的开关](docs/architecture/editor-remembered-toggles.md) — 默认值和记忆只有 `EditorToggles` 一份；播放跟随默认关、联动默认开；磁吸跟着工程走。
 - [时间线缩放](docs/architecture/timeline-pinch-zoom.md) — 锚点（捏合钉指针、工具栏钉播放头）从滚动几何量；纵向缩放统一行高。
 - [时间线上的复制 / 剪切 / 粘贴](docs/architecture/timeline-clipboard.md) — 剪贴板只有一套且不写纯文本、换新身份走编码往返、落点鼠标优先、撞上往上抬。
-- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — 格式(formats through v35)、定位、脏标记与自动保存、换成 upscale 文件的段。
+- [工程文件与素材重链接](docs/architecture/video-edit-project-file.md) — Formats through v36, media paths, dirty state, autosave and upscale source records.
 - [Saved project versions](docs/architecture/project-versions.md) — Versions saved around each AI round: when (only if changed), where (per project file), pruning (30, 60 days), going back in one undo step, the AI's contract.
 - [时间线拖动手势](docs/architecture/timeline-drag-gestures.md) — 坐标系、吸附与对齐线、唯一落点、拖动会话不进 `@State`、框选、整条时间线只许一个拖放落点、插入缝与整轨换位。
 - [预览自由变换](docs/architecture/preview-free-transform.md) — `ClipPlacement` 与预览 / 导出同账；合成的一份时间账。

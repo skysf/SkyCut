@@ -44,7 +44,6 @@ enum TimelineClipSplit {
         // 藏起来的段切开，两半都还藏着（2026-09-26 以前右半段会冒出来，进预览也进成片）。
         right.isHidden = left.isHidden
         right.isScreenRecording = left.isScreenRecording
-        right.isScreenRecording = left.isScreenRecording
         // 预设的入/出场**不抄给右半**：它的时长就是 `videoFade*`，而那两个字段
         // 切开之后本来就不跟过来（切口右边没有"头尾渐变"可言），只抄效果会留下
         // 一个时长为 0 的空壳。左半照旧留着自己那份。
@@ -58,6 +57,7 @@ enum TimelineClipSplit {
         right.soundScene = left.soundScene
         // upscale 的来源也要跟过来（从旧段构造新段漏字段的老坑：docs/bugfixes/2026-09-26-split-drops-hidden-and-library-key.md）。
         right.upscale = left.upscale
+        right.webMotion = left.webMotion
         left.sourceDuration = leftSourceLength
         // 切口是硬切，原来的转场跟着右半走。
         left.transitionAfter = .none

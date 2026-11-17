@@ -29,7 +29,7 @@ public enum MCPGuideWrittenTopics {
     /// 已经迁移的工具（方案 5.3 的试点 5 个 + 第一批 25 个 + 第二批 27 个，2026-11-10；add_voiceover 随声音 PR 3；新工具 list_voices、
     /// manage_voices 随声音 PR 6、change_voice 随声音 PR 9 从第一天起就这么写）。之后加的新工具也登记在这里。
     public static let migrated: [MCPToolName] = [.editClip, .generateMedia, .setText, .addClips, .look, .addVoiceover, .listVoices, .manageVoices,
-                                                 .changeVoice]
+                                                 .changeVoice, .setMotion]
         // 第一批（方案 PR 4，2026-11-10）：时间线、字幕、声音、录屏、导出等 25 个。
         + [.editSubtitles, .generateSubtitles, .translateSubtitles, .getSubtitles, .exportSubtitles, .transcribe, .listen, .cutSpeech, .cutToBeat,
            .syncVoiceover, .exportVideo, .inspectVideo, .compressVideos, .burnSubtitles, .getJob, .setShape, .setKeyframes, .setFilter,
@@ -43,6 +43,7 @@ public enum MCPGuideWrittenTopics {
         switch tool {
         case .editClip: return MCPGuideEditClipTopic.written
         case .setText: return MCPGuideTimelineTopics.setText
+        case .setMotion: return MCPGuideMotionTopic.written
         case .addClips: return MCPGuideTimelineTopics.addClips
         case .generateMedia: return MCPGuideMediaTopics.generateMedia
         case .look: return MCPGuideMediaTopics.look

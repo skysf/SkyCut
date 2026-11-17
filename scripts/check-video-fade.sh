@@ -38,6 +38,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoEditModels.swift \
+  Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \

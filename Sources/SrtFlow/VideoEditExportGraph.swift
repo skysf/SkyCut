@@ -47,6 +47,7 @@ enum VideoEditExportGraph {
         phase: (@Sendable (String) -> Void)? = nil
     ) async throws -> Plan {
         phase?("preparation")
+        try requireMotionCaches(state)
         // 混音要的是**用户那一份**：它走预览合成（`build` 自己排序、展开），展开只许一次。
         let requested = state
         // 主轨的黑场补齐和 xfade 链都按数组顺序算，乱序输入会算出负时长的

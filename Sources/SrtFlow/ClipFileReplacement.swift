@@ -84,6 +84,8 @@ struct ClipFileReplacement: Equatable {
         clip.isScreenRecording = sameScreenSource
         clip.remoteKey = nil
         clip.upscale = nil
+        // The new media has no generated page: recovery must never restore the replaced movie.
+        clip.webMotion = nil
         clip.needsStillConversion = false
     }
 

@@ -49,6 +49,7 @@ enum AITimelineSummary {
         ]
         // 工程文件叫什么（几个会话 / 工程时一眼看出是哪一个）；`project` 留给短 id（p2，路由加）。
         result["project_name"] = .string(context.project ?? "unsaved")
+        result["motion_library"] = AIMotionSummary.library(state)
         if abs(state.masterVolume - 1) > 0.0001 { result["master_volume_db"] = AITrackSettings.decibels(state.masterVolume) }
         if !state.shapes.isEmpty { result["shapes"] = .array(state.shapes.map { AIShapeChange.summary($0, ids: context.ids) }) }
         if !context.selection.isEmpty {
@@ -83,7 +84,9 @@ enum AITimelineSummary {
             "source_out": AIFormat.seconds(clip.sourceStart + clip.sourceDuration)
         ]
         // 音乐库的一首：文件在缓存里（路径没意义、清了缓存还会变），写它在库里的 id（署名、再找同一首都靠它）。
-        if let key = clip.remoteKey {
+        if let motion = clip.webMotion {
+            object["web_motion"] = AIMotionSummary.clip(motion)
+        } else if let key = clip.remoteKey {
             object["library_id"] = .string(key)
         } else {
             object["file"] = .string(AIFormat.path(clip.stillImageURL ?? clip.sourceURL, relativeTo: context.workspace))
