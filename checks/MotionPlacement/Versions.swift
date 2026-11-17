@@ -13,6 +13,7 @@ func runMotionVersionChecks(_ root: URL) async throws {
     guard versionsRoot.hasPrefix(temporary) || versionsRoot.hasPrefix(fixtureRoot) || versionsRoot.hasPrefix("/private/tmp/") else {
         throw AIToolError("Motion version checks require an isolated temporary versions root")
     }
+    try await laneOnlyMoveVersions(root)
     let fixture = try MotionFixture(root: root.appendingPathComponent("version-motion"))
     let project = fixture.project
     var historyFolder: URL?
@@ -130,4 +131,44 @@ private func ordinaryMediaReferencesStayExact(_ state: TimelineState, root: URL)
 @MainActor
 private func motionText(_ state: TimelineState, id: UUID) -> String? {
     state.clip(with: id)?.webMotion.flatMap { WebMotionParameters.object($0.parametersJSON)["text"]?.stringValue }
+}
+
+
+// A lane is outside EditClip: a cache-hit move with no parameter or time change still belongs to the AI round's history.
+@MainActor
+private func laneOnlyMoveVersions(_ root: URL) async throws {
+    let fixture = try MotionFixture(root: root.appendingPathComponent("lane-only-version-motion"))
+    let project = fixture.project
+    var historyFolder: URL?
+    defer {
+        _ = OpenProjects.shared.close(project)
+        if let historyFolder { try? FileManager.default.removeItem(at: historyFolder) }
+    }
+    let placed = try await WebMotionActions.place(record: fixture.record, at: 2, project: project)
+    project.applyDocumentRepair { $0.overlayTracks.append(EditLane(clips: [])) }
+    let destinationID = project.state.overlayTracks[1].id
+    motionRequire(project.saveNow(), "the lane-only AI fixture saves its unchanged motion before moving it")
+    let original = project.state.clip(with: placed.clip.id)!
+    let store = ProjectVersionStore.for(project)
+    historyFolder = store.folder
+    guard let first = store.save(project.state, kind: .afterRound).version else {
+        throw AIToolError("The lane-only AI fixture has no starting version")
+    }
+    let round = AISession.shared.round(for: project)
+    round.beginIfNeeded(project: project)
+    let answer = try await fixture.completed(fixture.call(["clip_id": .string(original.id.uuidString), "track": "V3"]))
+    motionRequire(!answer.failed, "a real set_motion call moves only the existing clip's lane")
+    motionRequire(project.state.clip(with: original.id) == original,
+                  "the successful lane-only call leaves the complete EditClip value equal")
+    let actualLane = project.state.location(of: original.id).flatMap { location -> UUID? in
+        guard case .overlay(let index) = location.track else { return nil }
+        return project.state.overlayTracks[index].id
+    }
+    motionRequire(actualLane == destinationID, "the lane-only call actually lands on the requested destination UUID")
+    motionRequire(answer.payload["unchanged"] != true, "a lane-only AI move is reported as a change")
+    motionRequire(answer.payload["before_round_version"]?["id"] == .string(first.id),
+                  "a lane-only AI move reports the version from before its round")
+    round.finishRound()
+    store.refresh()
+    motionRequire(store.versions.map(\.id) == ["v2", first.id], "a lane-only AI round saves its changed end as a new version")
 }

@@ -16,6 +16,7 @@ enum WebMotionActions {
         try WebMotionValidation.validate(record)
         let generation = project.documentGeneration
         let before = id.flatMap { project.state.clip(with: $0) }
+        let sourceLane = WebMotionSourceLane.capture(id, in: project.state)
         if id != nil, before?.webMotion == nil { throw AIToolError("clip_id must identify an existing web-motion clip.") }
         let start = try startTime(record, before: before, at: at, hitAt: hitAt)
         let requested = target ?? before.flatMap { project.state.location(of: $0.id)?.track }.flatMap { slot -> TrackDropTarget? in
@@ -35,8 +36,10 @@ enum WebMotionActions {
         let probed = await MediaProbe.probe(url: rendered.file, ffmpeg: nil)
         let info = try probed.get()
         try Task.checkCancellation()
-        guard project.isCurrentGeneration(generation), id == nil || project.state.clip(with: id!) == before else {
-            throw AIToolError("The project or clip changed during rendering. The movie was kept in the cache; no edit was applied.")
+        guard project.isCurrentGeneration(generation),
+              id == nil || (project.state.clip(with: id!) == before
+                && WebMotionSourceLane.capture(id, in: project.state) == sourceLane) else {
+            throw AIToolError("The project, clip, or source track changed during rendering. The movie was kept in the cache; no edit was applied.")
         }
         let prepared = try preparedClip(before, rendered: rendered, info: info, start: start)
         let placed = try commit(prepared, replacing: id, requested: requested, laneID: laneID, explicitTarget: target, project: project)

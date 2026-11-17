@@ -296,6 +296,14 @@ after 25 s it returns the job id and finishes through `get_job`. The complete re
 `look_times`; failures preserve the helper's original text and checks. Cancellation or a changed document/clip cannot commit stale output.
 Both AI and UI use `WebMotionActions`: asynchronous rendering, then one synchronous `AIUndoGrouping.step`/`perform` commit.
 
+For an existing clip, both request creation and service preparation capture its source lane UUID and visibility
+(`WebMotionSourceLane`). Compare that context before the queued task starts rendering and after rendering/probing, as well as
+clip values and document generation. A vertical-only move or hidden-state edit must not be overwritten; a reorder
+of the same lane is allowed. Existing destinations are captured by UUID before queuing and resolved to their current
+visible index; a removed/hidden destination uses a new upper track. New/insert targets keep their positional policy.
+A successful lane-only move still notes/saves the AI round and reports `before_round_version`; `unchanged` requires
+both clip values and source-lane context to match. See [the regression case](../bugfixes/2026-11-17-web-motion-render-overwrites-track-edits.md).
+
 `scripts/check-motion-placement.sh` links real App objects in its own bundle/defaults domain and drives the real helper with small synthetic
 pages. It covers placement, template reuse, parameter edits, undo/redo, approval modes, error atomicity, system/font warnings and missing
 cache recovery. `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by

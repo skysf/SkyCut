@@ -286,6 +286,7 @@
 - [2026-10-06 导出两次卡死：看门狗挂起主线程抓栈时分配内存](2026-10-06-watchdog-capture-deadlocks-main-thread.md) — 挂起别的线程期间不分配、不拿锁；能数不变量就去数。
 - [2026-10-14 看门狗自检在 CI 上偶发 Bus error](2026-10-14-watchdog-check-hook-recursion.md) — 钩子回调里「不分配」要算上运行时替你做的事（TLS、独占检查）。
 - [2026-09-23 打开工程后缩略图和波形全空](2026-09-23-waveform-decode-deadlocks-thread-pool.md) — 阻塞的读取循环不进 Swift 并发线程池；可能死锁的自检带普通线程上的看门狗。
+- [2026-11-17 A web-motion render overwrites track edits](2026-11-17-web-motion-render-overwrites-track-edits.md) — Async clip checks include lane identity and visibility; a vertical move need not change EditClip.
 - [2026-11-05 官网 404 被标成英文首页的副本](2026-11-05-website-404-canonical-is-home.md) — 错误页有独立 canonical，确认 / 404 页不收录。
 - [2026-11-05 官网演示停在封面且轨道像宽图](2026-11-05-website-demos-stall-on-posters.md) — 视口内主动加载、用解码器时钟；还原旧代码确认守卫变红。
 - [2026-11-05 官网未正确识别部分中文设备语言](2026-11-05-website-device-language-falls-back.md) — 根入口按首选语言匹配，所有中文变体用简中，不支持的默认英文。

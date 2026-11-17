@@ -11,6 +11,8 @@ struct AIMotionRequest {
     var target: TrackDropTarget?
     var needsPageApproval: Bool
     var expectedClip: EditClip?
+    var expectedSourceLane: WebMotionSourceLane?
+    var expectedTargetLaneID: UUID?
 
     init(_ args: AIToolArguments, state: TimelineState, playhead: Double) throws {
         let replacing = try args.string("clip_id").map { try AIShortIDs(state: state).resolve($0) }
@@ -49,14 +51,28 @@ struct AIMotionRequest {
         _ = try WebMotionActions.startTime(record, before: current, at: at, hitAt: hitAt)
         let target = try args.string("track").map { try AITrackName.target($0, in: state) }
         if let target { try WebMotionActions.requireUpperTrack(target) }
+        let targetLaneID: UUID?
+        if case .overlay(let index)? = target, state.overlayTracks.indices.contains(index) {
+            targetLaneID = state.overlayTracks[index].id
+        } else { targetLaneID = nil }
         // A successfully stored page has already passed its one approval. Parameter changes and template reuse need no new one.
         self.record = record
         self.replacing = replacing
         self.expectedClip = current
+        self.expectedSourceLane = WebMotionSourceLane.capture(replacing, in: state)
         self.at = at
         self.hitAt = hitAt
         self.target = target
+        self.expectedTargetLaneID = targetLaneID
         self.needsPageApproval = page.map { html in !state.allClips.contains(where: { $0.webMotion?.page == html }) } ?? false
+    }
+
+    /// Existing destinations follow their identity across a queued job. A missing or hidden lane takes the existing upper
+    /// fallback; an old index must never silently name a different lane. New/insert targets retain their own semantics.
+    func resolvedTarget(in state: TimelineState) -> TrackDropTarget? {
+        guard let target, case .overlay = target else { return target }
+        return expectedTargetLaneID.flatMap { id in state.overlayTracks.firstIndex { $0.id == id && !$0.isHidden } }
+            .map(TrackDropTarget.overlay) ?? .newOverlayTop
     }
 
     private static func field(_ value: JSONValue) throws -> WebMotionParameterField {

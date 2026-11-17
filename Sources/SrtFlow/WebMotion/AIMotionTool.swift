@@ -44,14 +44,16 @@ enum AIMotionTool {
             guard let job else { return }
             do {
                 guard project.isCurrentGeneration(generation), !Task.isCancelled else { throw CancellationError() }
-                guard request.replacing == nil || project.state.clip(with: request.replacing!) == request.expectedClip else {
-                    throw AIToolError("The clip changed before rendering started; no edit was applied. Read get_timeline and retry.")
+                guard request.replacing == nil || (project.state.clip(with: request.replacing!) == request.expectedClip
+                    && WebMotionSourceLane.capture(request.replacing, in: project.state) == request.expectedSourceLane) else {
+                    throw AIToolError("The clip or its source track changed before rendering started; no edit was applied. Read get_timeline and retry.")
                 }
                 let placed = try await WebMotionActions.place(record: request.record, replacing: request.replacing,
-                                                              at: request.at, hitAt: request.hitAt, preferring: request.target, project: project)
+                                                              at: request.at, hitAt: request.hitAt, preferring: request.resolvedTarget(in: project.state), project: project)
                 var answer = AIMotionReport.success(placed, state: project.state)
                 // A job may finish after the router has answered. Note and save the edit here exactly once in both cases.
-                if request.expectedClip != placed.clip {
+                if request.expectedClip != placed.clip
+                    || request.expectedSourceLane != WebMotionSourceLane.capture(placed.clip.id, in: project.state) {
                     AISession.shared.round(for: project).noteChange()
                     answer = AIProjectTools.saveIfNeverSaved(project, after: answer)
                     answer = AIRoundVersions.reporting(project, in: answer)
