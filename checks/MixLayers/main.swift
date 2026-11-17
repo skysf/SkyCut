@@ -76,6 +76,7 @@ await checkMonoVoiceMatchesExport()
 checkPlan()
 checkReport()
 checkVoiceCheck()
+checkVoiceHints()
 checkSourceSound()
 
 try? FileManager.default.removeItem(at: root)

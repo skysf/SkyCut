@@ -107,7 +107,9 @@ run_check "export-profile（实际阶段计时、审阅预设、排队/取消与
 run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
+run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
+run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
 
 # ---- 第 2 组 ----
 shard 2
@@ -158,6 +160,7 @@ run_check "inspector-fits-width（扫描守卫：检查器里的 Picker 不许�
 run_check "presented-views-app-language（扫描守卫：sheet / popover 套应用内语言）" checks/presented-views-app-language.sh
 run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设置在队列创建时读回来）" checks/encode-settings-memory.sh
 run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
+run_check "project-versions-wiring (scan guard: router hook, undo version=, the round's save points, one-step restore, one writer)" checks/project-versions-wiring.sh
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
 run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起的排队、取消先从队里拿、get_job 报排队位置）" checks/ai-work-queue-wiring.sh

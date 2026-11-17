@@ -4,7 +4,7 @@ import SrtFlowMCPKit
 // MARK: - set_transition 的结果：每条缝上的转场实际成了什么样（纯值）
 //
 // 管什么：AI 设完转场，回给它每条缝放在哪、实际多长（被两段的长度夹短了要说）、余料不够时首尾帧定格补了多少
-// （成片里那一截是静止的画面）、做不出来的说为什么。数都从渲染用的那几个函数来（`transitionWindow`、
+// （成片里那一截是静止的画面）、做不出来的说为什么。数都从渲染用的那几个函数来（`renderedTransitionWindow`、
 // `transitionExtension`，docs/architecture/transition-handles.md），不另算一份：AI 看到的就是预览和成片里的样子。
 // 不管什么：设转场本身（AITimelineEdits.setTransition）、提交（AITimelineTools）。
 //
@@ -40,7 +40,8 @@ enum AITransitionReport {
             "cut": AIFormat.seconds(outgoing.timelineEnd)
         ]
         guard kind != .none else { return .object(entry) }
-        guard let window = state.transitionWindow(afterMainIndex: index) else {
+        // Where it really plays (2026-11-17): the drawn window except where one side lacks footage for its half.
+        guard let window = state.renderedTransitionWindow(afterMainIndex: index) else {
             // 只有 all=true 会走到这里（点名的那条缝不够长时 setTransition 直接报错）。
             entry["not_shown"] = "one of the two clips is too short for a transition"
             return .object(entry)
@@ -56,10 +57,11 @@ enum AITransitionReport {
             return .object(entry)
         }
         // 首尾相接、要两段同时在画面上的那几种：余料不够的那一截用首尾帧定格补（压黑原地两道渐变，不借料）。
+        // A still's hold shows its one picture: nothing frozen to warn about (`showsOnePicture`).
         if TimelineState.needsHandles(outgoing: outgoing, incoming: incoming), !TimelineState.rendersAsDipInPlace(kind) {
             let plan = TimelineState.transitionExtension(outgoing: outgoing, incoming: incoming, duration: window.duration)
-            if plan.holdTail > 0.005 { entry["holds_last_frame"] = AIFormat.seconds(plan.holdTail) }
-            if plan.holdHead > 0.005 { entry["holds_first_frame"] = AIFormat.seconds(plan.holdHead) }
+            if plan.holdTail > 0.005, !outgoing.showsOnePicture { entry["holds_last_frame"] = AIFormat.seconds(plan.holdTail) }
+            if plan.holdHead > 0.005, !incoming.showsOnePicture { entry["holds_first_frame"] = AIFormat.seconds(plan.holdHead) }
         }
         return .object(entry)
     }

@@ -41,7 +41,7 @@ struct AIActivityBanner: View {
                 }
             }
             .popover(isPresented: $showsDetails, arrowEdge: .top) {
-                details.appLanguage()
+                AIActivityDetails(project: project) { showsDetails = false }.appLanguage()
             }
         }
     }
@@ -96,6 +96,27 @@ struct AIActivityBanner: View {
               let progress = job.progress(), progress.isFinite else { return nil }
         return min(1, max(0, progress))
     }
+}
+
+/// The details popover: what the AI did, the saved version from before the round, Undo This Round, Hide status.
+/// Its own view so it can be rendered on its own (scripts/render-project-versions.sh); it reads only AISession and the round.
+struct AIActivityDetails: View {
+    @ObservedObject private var session = AISession.shared
+    @ObservedObject private var round: AIRound
+    let project: VideoEditProject
+    /// Closes the popover (Hide status).
+    let close: () -> Void
+
+    init(project: VideoEditProject, close: @escaping () -> Void) {
+        self.project = project
+        self.close = close
+        _round = ObservedObject(wrappedValue: AISession.shared.round(for: project))
+    }
+
+    var body: some View {
+        let _ = PerfCounters.body(Self.self)
+        details
+    }
 
     private var details: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -103,13 +124,20 @@ struct AIActivityBanner: View {
                 .accessibilityIdentifier("ai-activity-details")
             Text(verbatim: message)
                 .fixedSize(horizontal: false, vertical: true)
+            // The saved version from before this round (docs/architecture/project-versions.md): the same id the AI is told.
+            if let version = round.beforeVersion {
+                Text(verbatim: String(format: L10n("Saved before this round as %@ (project menu ▸ Versions…)."), version))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if round.canUndoRound(project) {
                 Button("Undo This Round") { round.undoRound(project: project) }
                     .instantHelp("Put the project back to how it was before the AI started this round")
             }
             if round.phase != .working {
                 Button("Hide status") {
-                    showsDetails = false
+                    close()
                     round.dismiss()
                 }
             }

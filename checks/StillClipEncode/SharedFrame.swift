@@ -46,12 +46,12 @@ private func drawRamp(_ name: String) -> URL {
     return url
 }
 
-private func fileSize(_ url: URL) -> Int {
+func fileSize(_ url: URL) -> Int {
     ((try? FileManager.default.attributesOfItem(atPath: url.path))?[.size] as? NSNumber)?.intValue ?? -1
 }
 
 /// ffmpeg's frame checksums after an export-style trim (`trim`, `setpts`, `fps`): what the export graph reads from the still.
-private func trimmedFrames(_ url: URL, start: Double, end: Double, name: String) -> [String] {
+func trimmedFrames(_ url: URL, start: Double, end: Double, name: String) -> [String] {
     let out = root.appendingPathComponent("\(name).framemd5")
     let (code, output) = run(ffmpegPath, [
         "-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i", url.path,
@@ -66,14 +66,14 @@ private func trimmedFrames(_ url: URL, start: Double, end: Double, name: String)
 }
 
 /// What AVFoundation sees: duration, nominal rate, minimum frame duration, and every decoded frame's time + pixel digest.
-private struct Decoded: Equatable {
+struct Decoded: Equatable {
     var duration = 0.0
     var nominalRate: Float = 0
     var minFrame = 0.0
     var frames: [String] = []
 }
 
-private func decoded(_ url: URL) async -> Decoded? {
+func decoded(_ url: URL) async -> Decoded? {
     let asset = AVURLAsset(url: url)
     guard let track = try? await asset.loadTracks(withMediaType: .video).first,
           let (range, rate, minFrame) = try? await track.load(.timeRange, .nominalFrameRate, .minFrameDuration),

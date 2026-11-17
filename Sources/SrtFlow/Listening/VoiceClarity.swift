@@ -29,6 +29,9 @@ enum VoiceClarity {
     static let hardBelow = 0.41
     /// With music as the main masker, reported only below this.
     static let musicBelow = 0.20
+    /// A grey suggestion below the warning tiers, based only on ear marks E34 and E35 (FL-61, 2026-11-17).
+    static let hintBelow = 0.50
+    static let hintRemovalGain = 0.25
     /// Another voice counts as speaking in a line when its level there reaches this (dBFS, the window's RMS): listen's
     /// silence threshold.
     static let speakingDBFS = -45.0
@@ -39,5 +42,12 @@ enum VoiceClarity {
         if musicIsMainMasker { return estoi < musicBelow ? .mayBeHard : .clear }
         if estoi < unintelligibleBelow { return .probablyUnintelligible }
         return estoi < hardBelow ? .mayBeHard : .clear
+    }
+
+    /// Only a clear line with one added main masker can get the optional "may be loud" suggestion. The caller excludes
+    /// voices, a clip's own sound (including detached audio) and the joined rest layer. This never changes the verdict.
+    static func hint(estoi: Double?, verdict: Verdict, mainMaskerIsAddedLayer: Bool, removalGain: Double?) -> Bool {
+        guard verdict == .clear, let estoi, let removalGain else { return false }
+        return estoi < hintBelow && mainMaskerIsAddedLayer && removalGain >= hintRemovalGain
     }
 }

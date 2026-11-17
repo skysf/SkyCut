@@ -24,7 +24,7 @@
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
-- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。 Since 2026-11-17 also the voice check's verdict table (`VoiceClarity`) and line split (`VoiceLines`); the real `listen voice=…` path is `scripts/check-mix-layers.sh` group 3 (synthetic voice, noise and music: lines, verdicts, main masker and its kind, V tracks refused, `auto`, two voices). `listen describe=true` (a clip's own sound in words): group 4 of the same script checks the report (windows, traits, labels kept, words, timeline seconds); the real classifier runs in `scripts/check-sound-labels.sh` (one window per 3 s, every label's own score; its own script with a fixed binary path because CoreML compiles the model per new binary).
+- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。 Since 2026-11-17 also the voice check's verdict table (`VoiceClarity`) and line split (`VoiceLines`); the real `listen voice=…` path is `scripts/check-mix-layers.sh` group 3 (synthetic voice, noise and music: lines, verdicts, main masker and its kind, V tracks refused, `auto`, two voices); group 3b covers the grey hint boundaries, excluded main maskers, separate counts and detached camera provenance. `listen describe=true` (a clip's own sound in words): group 4 of the same script checks the report (windows, traits, labels kept, words, timeline seconds); the real classifier runs in `scripts/check-sound-labels.sh` (one window per 3 s, every label's own score; its own script with a fixed binary path because CoreML compiles the model per new binary).
 
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
@@ -32,6 +32,8 @@
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
   门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
+
+- Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
 
 - 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.66 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](../build/build-and-packaging.md)。
@@ -88,7 +90,9 @@
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
   在做不出来的机器上打 `SKIP` 明说没跑）, and the preview not waiting for a straight source's premultiplied copy (`AlphaVideoNoWait.swift`:
   on a cold cache the preview build neither makes nor waits for the copy and draws the original at once; `missingAlphaCopies` names
-  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits)：`scripts/check-video-fade.sh`。
+  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits), and a
+  crossFade between two stills centred on the cut with their keyframes kept (`StillCrossfade.swift`: the plan, preview and export a
+  quarter in and out for H.264 stills both ways, keyed H.264 and shared-frame ProRes stills)：`scripts/check-video-fade.sh`。
 - 检查器的 live 绑定只准接滑块和 scrub（离散控件没有结束信号，快照会挂着把
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
@@ -144,7 +148,11 @@
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
 - 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
   group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
-  `FreezeRippleChecks`, which also covers `RippleLinkPartners`).
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`); a J cut's sound that the AI's ripple or cut_to_beat pushes before 0:00
+  loses its head, stays in sync and is listed in the reply's `trimmed_heads` (`RippleHeadTrimChecks`).
+- Opening a project saved before the freeze fix takes the freeze tail out of its clip's link group: `scripts/check-project-file.sh` group 49
+  (`OldFreezeTails.swift`, a literal old project file through the production `load`, plus the rule's controls: a split left in place, a
+  nudged sound, a recording's mic, another speed all stay linked).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
@@ -199,6 +207,12 @@
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
 - 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
+- 动效预设（set_text 的 `motion_preset`；在 `scripts/check-mcp.sh` 的 `MotionPresetChecks` 和它编译之前的扫描）：三套各自的几块、时间和动画，框按墨迹框住、竖屏按短边、换一套字不变、`hit_at` 整套挪、标题动了别的跟着走、粘贴自成一组、存盘往返；界面上改字的两个入口都经 `MotionPresetGroups.update`、粘贴换新组号（扫描）。规矩见 [动效预设](../architecture/motion-presets.md)。
+- A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
+  stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
+  set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
+  back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
+  `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
@@ -246,7 +260,9 @@
   剪贴板只有一套且不写纯文本）：`checks/timeline-clipboard-wiring.sh`。
 - 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）, and a transparent still being one encoded frame shared by 120 samples (`SharedFrame.swift`: identical ffmpeg frames to writing
   every frame under export-style trims and identical AVFoundation decode, one frame big, layouts the rewrite does not know refused and
-  left untouched, six factory conversions at once)：`scripts/check-still-clip-encode.sh`。
+  left untouched, six factory conversions at once), and the launch rewrite of old every-frame stills (`CacheSweep.swift`: ffmpeg's three
+  chunk layouts become one frame that decodes the same; other names, a matte, a subfolder, a link out, differing frames, a cut-off
+  file stay byte for byte; a second sweep does nothing)：`scripts/check-still-clip-encode.sh`。
 - 翻译配对预检与接线：`scripts/check-translation-preflight.sh`。
 - 音频库清单：解析的宽容边界（不认识的字段忍、单条坏数据跳过、**版本号更高整份
   拒绝**）与双语搜索（中英都能命中同一个 tag、多词是「与」），以及音效清单的 `title_zh` / `hit` / `owned` 不署名 / 按中文标题搜：
@@ -266,6 +282,8 @@
   接口出错、别的头提交、fork、别的 workflow、不是 pull_request、没跑完、红了 / 取消了、别的仓库、超过 24 小时）、跑检查的每一步都写成 `verified != 'true'`、
   备缓存的几步只在第 1 组做、编 App 不看它、判断那一步紧跟「只改了文档？」、记号只在 PR 那一轮的汇总 job 最后留、token 有 `actions: read`：
   `checks/ci-verified-tree.sh`。规矩和上线后看的数在[构建与打包](../build/build-and-packaging.md)「CI」一节。
+  The same guard pins the workflow's `concurrency` block word for word: PR runs keyed by PR number, pushes to main by `github.ref`
+  (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
@@ -362,3 +380,13 @@
     `--self-test --against <另一份守卫>` 拿老守卫跑同一批场景打表（写「改之前 / 改之后」用）。
     改成白名单那一轮（2026-11-13，PR #424）：改之前的守卫（上一版）在链接和形状两组的 147 个场景里有 83 个该红的退出 0、2 个该绿的红了（顺序那一组只对新顺序有意义，没拿它跑）；改之后当时的 190 个全对。
     整份副本上 Codex 的 9 个输入（L1–L4、T1–T3、S1–S2）改之前都退出 0、改之后都红；它报的两处误报（唯一的索引带 `#锚点`、`mkdir docs/fake.md`）改之后绿。
+- Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `scripts/check-look-jobs.sh` (shard 1, real App objects, synthetic
+  one-keyframe clips; `checks/LookJobs/`): `LineChecks.swift` — the router's lines (`AICallLines`): turns in joining order, a call in two lines
+  waits for both, a read letting go from inside its call, positions and the holder, no letting go before the turn, `waitForLast`;
+  `LookCallChecks.swift` — real 12-frame looks through `AILookCall` and get_job / cancel_job (`AIExportTools`): two sessions x two parallel looks
+  all answered with their pictures (directly or through get_job, at the production 25 s), a look behind a held edit becomes a queued job
+  (positions 1 and 2, `waiting_for`) and runs after it with its 12 frames and picture, cancelled while queued it never starts, another session
+  cannot cancel it, cancelled while running it stops at its next frame, an edit behind a look gets its turn before the look's frames are done.
+  A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
+  after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
+  license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).

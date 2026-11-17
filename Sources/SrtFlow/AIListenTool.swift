@@ -130,7 +130,9 @@ enum AIListenTool {
         let reading: AIListenAudioWindow.Reading
         do {
             let bounds = frames.sourceBounds
-            reading = try await AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline, frames: { _, _ in bounds })
+            // `.sound`: past the end of the file's sound the clip plays silence (an audio track a few ms shorter than its picture).
+            reading = try await AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline, frames: { _, _ in bounds },
+                                                         edges: .sound)
         } catch {
             object["sound"] = deadline.timeIntervalSinceNow <= 0
                 ? "still measuring: listen with clip_id, or narrow from/to"

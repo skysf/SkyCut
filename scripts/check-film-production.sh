@@ -78,6 +78,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelineRowHeights.swift \
   Sources/SrtFlow/VideoEditFormatVersion.swift \
   Sources/SrtFlow/VideoEditProjectFile.swift \
+  Sources/SrtFlow/LinkGroupRepair.swift \
   Sources/SrtFlow/VideoEditMediaBookmarkCache.swift \
   Sources/SrtFlow/AudioLibraryCache.swift \
   Sources/SrtFlow/AudioLibraryManifest.swift \

@@ -23,6 +23,15 @@ enum MCPGuideControlTopics {
             Round. round=true puts the project back to how it was before this round of AI edits began, as one undo step of its \
             own. Use it when the user wants everything you did undone.
             """),
+            // Saved versions (2026-11-17): docs/architecture/project-versions.md, ai-control-mcp.md section 5.
+            MCPGuideSection(name: "versions", about: "saved versions from before and after each round, and going back to one", text: """
+            Saved versions. For a project with a file, SkyCut saves a version (v1, v2…) when a round of AI edits first changes it \
+            (the state from before the round) and when the round ends (30 seconds without calls, or the user's Stop), but only when \
+            the project changed since its newest version. The round's first change returns before_round_version: tell the user its id. \
+            version=<id> puts the whole project back to that version as one undo step; the state you leave is saved first \
+            (saved_before_going_back in the result). Unlike round=true it survives a restart and reaches older rounds. get_status \
+            lists the newest versions; each project keeps its newest 30. An unknown id lists the ones there are.
+            """),
             MCPGuideSection(name: "limits", about: "what undo cannot reverse", text: """
             Limits. File operations by manage_files (moves, renames, the Trash) and files you wrote (exports, recordings) are \
             not undone; tell the user what you did instead.
@@ -30,9 +39,10 @@ enum MCPGuideControlTopics {
         ],
         examples: [
             ["steps": 2],
-            ["round": true]
+            ["round": true],
+            ["version": "v3"]
         ],
-        related: ["get_timeline", "manage_files"]
+        related: ["get_timeline", "get_status", "manage_files"]
     )
 
     static let seek = MCPGuideWrittenTopics.Written(
@@ -63,7 +73,7 @@ enum MCPGuideControlTopics {
             What stops. An export, subtitle generation or translation on this Mac stops at once, and a job still queued behind \
             another is dropped. Sky Studio jobs (generate_media, upscale_clip) can only be cancelled while queued; once \
             started they finish, are charged and stay in the user's library. Character jobs cannot be cancelled. A recording \
-            ends with record_screen action=stop.
+            ends with record_screen action=stop. A look that became a job stops at its next frame; still queued, it never starts.
             """),
             MCPGuideSection(name: "afterwards", about: "checking the result afterwards", text: """
             Afterwards. Check get_job: it shows whether the job stopped and, for paid jobs, the billing (billing_note).

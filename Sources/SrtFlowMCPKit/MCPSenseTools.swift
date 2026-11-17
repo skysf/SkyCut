@@ -58,7 +58,7 @@ public enum MCPSenseTools {
             description: """
             Read-only. See frames, don't guess: the timeline (time/times, or count over clip_id) or a file (source seconds) as a labelled \
             contact sheet with face/people/text boxes, brightness, black bars. Also files (24 max), shots=true, text_scan=true (subtitles, \
-            watermarks). Long scans return job_id: wait with get_job. Outside files may return needs_confirmation. skycut_guide topic=look.
+            watermarks). Slow looks return job_id: wait with get_job. Outside files may return needs_confirmation. skycut_guide topic=look.
             """,
             input: MCPSchema.object([
                 "time": MCPSchema.number("One moment, seconds (≥ 0): timeline, or in the file with file.", minimum: 0),

@@ -128,6 +128,16 @@ Finder**。App 只负责「快速回到最近那几条」。
 作者 CAS、旧输出绑定和观察过期规则见 [官方原创短片](official-film.md)。
 付款恢复回执不放进工程 / undo，也不因清空计划而删除。v33 的精确裁切语义及 `<33` 迁移保持原界限。
 
+### Opening a project repairs link groups (2026-11-17)
+
+`VideoEditProjectIO.load` runs `LinkGroupRepair.unlinkStrayPieces` after sorting the main track: in one link group, the pictures of
+one file at one speed are pieces of one clip and keep one timing (the same timeline time for the file's 0 s) — the one the group's
+sound from that file plays at, else the earliest picture's; a picture off it leaves the group. Why: a freeze tail saved before
+2026-11-17 kept its clip's group although it plays the hold's length later, so deleting the tail deleted the clip and its sound
+([case](../bugfixes/2026-11-17-old-freeze-tails-stay-linked.md)). Only `linkGroup` changes, never a clip's place or media; a group with
+one picture is never touched. No format version: there is no new field, and an older build reads the repaired file as plain clips.
+Guard: `scripts/check-project-file.sh` group 49, a literal project file saved before the fix.
+
 ### 存盘必须带上一次的定位表
 
 `VideoEditProjectIO.save(_:to:knownRecords:)` 的 `knownRecords` **不是可选的优化，
@@ -180,6 +190,14 @@ Finder**。App 只负责「快速回到最近那几条」。
 - **打开时不排 V1**：文件里写着开、V1 却有缝（手改过的文件），打开也照原样；之后只有改到 V1 的排布才排（`MainMagnet`）。
 - **不开新的 formatVersion**：旧版丢掉这个键，丢的只是这个工程的开关 —— 成片一帧不变，和行高同一个口径。
 - 新建工程用上次拨的值（`VideoEditProject.newTimeline()` 读 `EditorToggles.magnet`），见 [剪辑页上记住的开关](editor-remembered-toggles.md)。
+
+### Saved versions are project files too (2026-11-17)
+
+The versions SkyCut saves around AI rounds are complete project files written by the same `VideoEditProjectIO.save` (with the
+project's `mediaRecords` as `knownRecords`) and read back by the same `load` — no new format and no format version. They live in
+`~/Library/Application Support/SrtFlow/Versions/<project name> <hash>/`, not next to the project; going back restores the timeline
+with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore` write project files. Rules:
+[saved project versions](project-versions.md).
 
 ### 不进工程文件的东西
 

@@ -390,6 +390,15 @@ require "共用不了（别的 ffmpeg 写的布局）才退回逐帧写" \
   Sources/SrtFlow/StillImageClipFactory.swift '\} catch is StillFrameSharing\.Unsupported \{'
 require "静帧转码同时最多几路（不管谁要）" \
   Sources/SrtFlow/StillImageClipFactory.swift 'await ConversionSlots\.shared\.acquire\(\)'
+# Transparent stills made before that stored their frame 120 times: at launch they are rewritten in place to one frame, only in
+# the still cache folder, off the main thread and out of the Swift concurrency pool; never deleted (behaviour:
+# scripts/check-still-clip-encode.sh → CacheSweep.swift; rule: docs/architecture/freeze-frame.md 4a3).
+require "launch rewrites the old every-frame transparent stills" Sources/SrtFlow/SrtFlowApp.swift 'StillCacheSweep\.startAtLaunch\(\)'
+require "the rewrite looks only in the still cache folder" \
+  Sources/SrtFlow/StillCacheSweep.swift 'sweep\(directory: StillImageClipFactory\.cacheDirectoryURL\)'
+require "the rewrite runs on a MediaReadQueue (blocking file IO)" Sources/SrtFlow/StillCacheSweep.swift 'MediaReadQueue\.proxy\.addOperation \{'
+forbid "the rewrite never deletes a still: only its own temporary file may go" \
+  Sources/SrtFlow/StillCacheSweep.swift 'removeItem\(at: (url|directory)|unlink\('
 # Image placeholders convert together, not one after another (a 96-frame PNG sequence waited for 96 conversions in a row).
 for f in Sources/SrtFlow/VideoEditProject.swift Sources/SrtFlow/VideoEditMediaFileDrop.swift Sources/SrtFlow/VideoEditTimelineClipboard.swift; do
   require "图片占位块一起转（StillClipBatch），不逐个 await" "$f" 'await StillClipBatch\.convert\('
