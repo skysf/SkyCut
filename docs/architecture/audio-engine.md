@@ -29,9 +29,11 @@
 | `PlaybackAudioSource.swift` | 时钟驱动引擎的那几个方法（协议，不依赖任何东西，`PlayerClock` 的自检只编它） |
 | `AudioStemRender.swift` | 按层离线渲：整条混音一个离线引擎（成片那一份）、每层一个（只留那几条轨），一块一块同步往下走（[成片的声音](export-audio-mixdown.md)第五节） |
 | `MixFrameGrid.swift` | 按工程帧率切帧：时间线的第几帧 ↔ 第几个采样 |
-| `MixBandMeter.swift` | 一层每帧的电平、峰值、四个频段（两帧长的汉宁窗 + vDSP FFT），和这一层的整体响度 |
-| `MixBusMeter.swift` | 整条混音每帧：过没过线、成片同样的限幅器压了多少、瞬时 / 短时响度；整体响度和导出报的同一个数 |
+| `MixBandMeter.swift` | 一层每帧的电平、峰值（true peak since 2026-11-17, `TruePeak`）、四个频段（两帧长的汉宁窗 + vDSP FFT），和这一层的整体响度 |
+| `MixBusMeter.swift` | 整条混音每帧：过没过线（true peak over −1 dBTP since 2026-11-17）、成片同样的限幅器压了多少、瞬时 / 短时响度；整体响度和导出报的同一个数 |
 | `MixMeasurement.swift` | 把上面几样串起来：前面多渲几秒、渲、量，给纯值的结果；`observe` 把每一块原样的采样交出去 |
+
+The same offline per-layer render feeds `listen voice=…` (each narration line's ESTOI against the mix, `AIListenVoiceMeasure`; [the listening engine](listening-engine.md) section 2 item 3a): rendered on `MediaReadQueue.export` like mix=true, never the preview's engine.
 
 ## 二、合同
 

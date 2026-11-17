@@ -126,3 +126,33 @@ for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
         raise AssertionError(f"✗ {path} 另写了一份 K 加权的系数（只许在 AudioKWeighting）")
 PY
 echo "   ✓ mix=true 交给 AIListenMix：AIJobs 任务、mix 道排队、MediaReadQueue.export 上离线渲、成片同一份配置和量法、不碰预览引擎"
+
+echo "==> listen voice=…: each narration line against the mix (MCP-39), the same job shape as mix=true, the lines only in VoiceClarity"
+# 2026-11-17 (docs/architecture/listening-engine.md section 2 item 3a, ai-control-mcp.md section 4 item 13). The real path runs in
+# scripts/check-mix-layers.sh group 3, the verdict table in scripts/check-listening.sh; this only scans that it is wired to them.
+python3 - <<'PY'
+import pathlib
+def code(path):
+    return "\n".join(line.split("//", 1)[0] for line in pathlib.Path(path).read_text().splitlines())
+tool, check = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenVoiceCheck.swift")
+measure, report = code("Sources/SrtFlow/AIListenVoiceMeasure.swift"), code("Sources/SrtFlow/AIListenVoiceReport.swift")
+plan = code("Sources/SrtFlow/AIListenVoicePlan.swift")
+assert tool.count('args.string("voice")') == 1 and tool.count("AIListenVoiceCheck.listen(") == 1, "✗ listen must read voice and call AIListenVoiceCheck"
+assert check.count("AIListenMix.queued(") == 1, "✗ voice must share mix=true's AIJobs, mix lane and MediaReadQueue.export through AIListenMix.queued"
+assert check.count("AIListenVoicePlan.make(") == 1 and check.count("AIListenVoiceMeasure.measure(") == 1 \
+    and check.count("AIListenVoiceReport.json(") == 1, "✗ voice must use AIListenVoicePlan, AIListenVoiceMeasure and AIListenVoiceReport"
+assert measure.count("AudioStemRender.render(") == 1 and measure.count("MaskerAttribution.rank(") == 1 \
+    and measure.count("VoiceLines.split(") == 1, "✗ voice must render stems, split at pauses and measure each line with MaskerAttribution"
+for name, text in [("AIListenVoiceCheck", check), ("AIListenVoiceMeasure", measure)]:
+    for banned in ["suspend(", "wake(", "recoverIfNeeded(", "AudioEngineIdleKeeper", "audioEngineHost", ".realtime"]:
+        assert banned not in text, f"✗ {name} must not touch the preview engine ({banned})"
+assert report.count("VoiceClarity.verdict(") == 1, "✗ each line's verdict must come only from VoiceClarity"
+assert report.count("VoiceClarity.hint(") == 1 and '.isAddedSound(' in report, "✗ the grey hint must use VoiceClarity and the main layer's provenance"
+for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
+    if path.name != "VoiceClarity.swift":
+        text = code(str(path))
+        for name in ["unintelligibleBelow", "hardBelow", "musicBelow", "hintBelow", "hintRemovalGain"]:
+            assert f"let {name}" not in text, f"✗ {path} duplicates a voice threshold ({name} belongs only in VoiceClarity)"
+assert 'hasPrefix("V")' in plan and "own sound" in plan, "✗ video-track voices must be refused with the reason: no clean voice stem"
+PY
+echo "   ✓ voice uses AIListenVoiceCheck: shared jobs, stem rendering, pause splitting, MaskerAttribution and VoiceClarity"

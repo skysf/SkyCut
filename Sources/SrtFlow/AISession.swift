@@ -68,6 +68,7 @@ final class AISession: ObservableObject {
     func forgetRound(of project: VideoEditProject) {
         rounds[project.shortID] = nil
         projectViews[project.shortID] = nil
+        ProjectVersionStore.forget(project)  // its saved versions stay on disk; only the open project's list goes
     }
 
     func setHint(_ text: String?) {
