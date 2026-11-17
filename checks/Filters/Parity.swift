@@ -159,7 +159,10 @@ func parity() async {
         check(joined.contains("lut3d=file=filter0.cube"), "滤镜链真的用上了 lut3d（\(preset.rawValue) 强度 \(strength)）")
         check(joined.contains("interp=trilinear"), "必须显式写 interp=trilinear（默认是 tetrahedral）")
         check(joined.contains("format=gbrp"), "lut3d 之前要把像素格式钉成 RGB")
-        check(joined.contains("enable='between(t,1,2.5)'"), "enable 区间就是滤镜段的起止")
+        let on = String(format: "%.6f", 1 - state.frameRate.halfFrameTolerance)
+        let off = String(format: "%.6f", 2.5 - state.frameRate.halfFrameTolerance)
+        check(joined.contains("enable='gte(t,\(on))*lt(t,\(off))'"),
+              "Grade edges sit half a frame before 1 s and 2.5 s, with an open end")
 
         // ① 「应该是多少」= 拿**这一份表**三线性查一次。
         //

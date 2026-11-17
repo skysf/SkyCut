@@ -54,6 +54,19 @@
    the grid either: after `concat` / `xfade` their AVTB timestamps sit microseconds before or after it (at 30 fps after a
    crossfade, 0.7 µs early). Anything ffmpeg must line up with an output frame (an overlay frame, an `enable` edge) sits
    half a frame away from the grid, never on it — see [画面文字](text-overlays.md)「Frames on the grid」.
+   This includes upper-track video (both ordinary streams and prerendered fill + matte), covers (blur / mosaic) and
+   grades: reuse `OverlayExportFile.enableWindow` for their left-closed, right-open windows. Upper video also uses
+   `OverlayExportFile.placement` and two cloned tail frames so framesync picks the current frame and EOF cannot drop
+   the last one. Cover streams keep the main stream's timestamps; only their enable edges move.
+   Preview/AI cover and grade selection uses `FrameGrid.contains(_:from:to:)` too: adding start + duration can put
+   an exact end a few ulps after its frame, so comparing raw seconds on the read side can also keep one extra frame.
+   See the [upper-video / cover / grade case](../bugfixes/2026-11-17-export-layer-frame-windows.md).
+   Native timeline-look requests use the containing project frame too (`TextAnimator.quantize`, which uses `FrameGrid`),
+   just like its overlays; a half-frame decoder tolerance must not pick the next frame for a time between frames.
+   Preserve that exact frame with `NativeSourceFrameSampler.requestedTime`, the
+   existing nearest-1/600 request policy, instead of `CMTime(seconds:preferredTimescale:)` (which can truncate a tick
+   below an exact frame at 30 / 60 fps). The generator's half-frame tolerance is unchanged. This rounds requests only;
+   composition insertion and slices still use the truncating `CompositionTime` contract.
 
 ## 回归矩阵（谁守什么）
 
@@ -65,6 +78,7 @@
 | `scripts/check-export-alpha-compositing.sh` | alpha 合成数学与帧率无关 | 只取第一帧，**帧率写错它发现不了** —— 别拿它当帧率回归 |
 | `SrtFlowCoreChecks` | `ProjectFrameRate` 纯逻辑 + v5 持久化 + 容差 | 纯逻辑 |
 | `scripts/check-text-render.sh` group 20 | every exported frame of moving text / shapes is the frame for its own time at 24 / 30 / 60 fps (constraint 7) | needs vendor/ffmpeg |
+| `scripts/check-export-frame-rate.sh` (`LayerWindowChecks`) | every frame of upper video (ordinary and fill + matte), blur, mosaic and grades at 24 / 30 / 60 fps over cuts/crossfades; native preview vs look, request ticks and stack boundaries | needs vendor/ffmpeg; AI look's request and cover selection are pinned by `checks/project-file-wiring.sh` |
 
 ## 反向验证要求
 

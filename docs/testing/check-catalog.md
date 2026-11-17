@@ -150,6 +150,12 @@
 - 生产导出帧率与分辨率（真跑导出：数帧、读成片尺寸 —— 只降不升、按短边、像素是方的）：
   `scripts/check-export-frame-rate.sh`；禁止写死帧率扫描：
   `checks/no-hardcoded-fps.sh`。
+  `LayerWindowChecks` also checks every frame of ordinary / fill + matte upper video, blur, mosaic and grades at
+  24 / 30 / 60 fps over cuts and crossfades, with native-preview moving-edge comparisons, timeline look's real generator,
+  exact/fractional native requests and preview/AI stack windows;
+  the contract and reverse verification are in [project frame rate](../architecture/project-frame-rate.md) constraint 7.
+  `checks/project-file-wiring.sh` pins preview/AI cover and grade selection to the tested `FrameGrid.contains` rule,
+  and timeline look's video to the shared project-frame quantization and native request policy.
 - 关键帧的缓动（每种曲线的值、linear 逐位一致、set / clipped / stretched / remapped 保曲线、存盘按需写键 + 老文件 + v27 / v32、冲过头时宽高留下限和最低不透明度放宽、切片按帧 / 线性一片不多 / 400 片上限）：
   `scripts/check-project-file.sh` 第 39 组；AI 的 `set_keyframes easing`（默认 easeInOut、词表对账、读回来带曲线）在 `scripts/check-mcp.sh`；缓动的缩放真合成
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。

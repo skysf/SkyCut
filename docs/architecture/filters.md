@@ -147,6 +147,15 @@ out = lerp(identity, LUT, s) 查表  ==  lerp(in, LUT(in), s)
 强度 0 的段**两边都整条跳过**（预览的 `FilterStack` 过滤掉、导出不进滤镜图）：那是
 「先关掉看看」，成片应当和原片逐像素相同，而不是白跑一遍恒等表。
 
+**Frame window** (2026-11-17): a grade's window is left-closed, right-open, matching `activeFilters(at:)` / `FilterStack`
+in preview and AI look. Export counts the first frame at or after each edge through `FrameGrid` and reuses
+`OverlayExportFile.enableWindow` (half-frame edges) for `lut3d`. Never use raw-second `between(t, …)`: its closed end
+can grade one extra frame, and microsecond AVTB drift after cuts / crossfades can lose the first one.
+`activeFilters(at:)` also uses `FrameGrid.contains(_:from:to:)`, so start + duration a few ulps beyond the end frame
+cannot leave the grade on in preview or AI look. Between frames, it returns that frame's state.
+`scripts/check-export-frame-rate.sh` measures every output frame at 24 / 30 / 60 fps and checks the preview/AI look
+stacks at the same frame times; the first and last included frames must be graded and both adjacent frames untouched.
+
 ## 回归
 
 - `scripts/check-filters.sh` —— LUT 数学、层号规则、**预览 vs 导出逐像素**（三方对齐：

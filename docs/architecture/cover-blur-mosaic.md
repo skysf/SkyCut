@@ -33,7 +33,7 @@
 
 | | 预览 | 导出（ffmpeg） | AI 的「看」 |
 | --- | --- | --- | --- |
-| 载体 | 同一个 AVPlayer 再开的 `AVPlayerLayer`，外层只有这一块大小（`masksToBounds`）、里面的播放器层平移对齐、图层滤镜挂在外层（`CoverHostView`） | `split → crop → gblur / pixelize → overlay(enable=between(t,…))`（`VideoEditCoverExport`） | CoreImage 裁出这一块 → 滤镜 → 贴回（`CoverCompositing`） |
+| 载体 | 同一个 AVPlayer 再开的 `AVPlayerLayer`，外层只有这一块大小（`masksToBounds`）、里面的播放器层平移对齐、图层滤镜挂在外层（`CoverHostView`） | `split → crop → gblur / pixelize → overlay(enable=…)` (`VideoEditCoverExport`, frame window below) | CoreImage 裁出这一块 → 滤镜 → 贴回（`CoverCompositing`） |
 | 滤镜与参数 | `CoverFilters`：`CIAffineClamp` + `CIGaussianBlur` / `CIPixellate` | `gblur=sigma:steps=3` / `pixelize=w:h:mode=avg` | 同预览（`CoverFilters`） |
 | 半径 / 格子的单位 | 点：力度 × 预览框高 / 1080 | 像素：力度 × 画布高 / 1080 | 像素，同导出 |
 | 这一块的框 | 归一化 → 视图坐标（CA 是左下原点，换一下） | `pixelRect`：取偶数往外收、收进画布 | 同 `pixelRect` |
@@ -53,6 +53,16 @@
 7. **力度按画面高换算**，不是画面宽（竖屏按 1920 高）。
 8. **没有盖一块时预览不建第二层**（`PreviewPlayerSurface` 里 `if !covers.isEmpty`，性能计数和没这个功能时一样）；有的时候它跟着 `PreviewPlayerSurface`
    已经有的那个时钟订阅更新，不新增订阅者。
+
+**Frame window** (2026-11-17): blur and mosaic are active from their first frame at or after the start up to, excluding,
+the first frame at or after the end, matching `CoverStack` and AI look's cover selection. Export gets those frame numbers
+from `FrameGrid` and reuses `OverlayExportFile.enableWindow` with half-frame edges. Never compare raw seconds with
+`between(t, …)`: its closed end can cover one extra frame, and AVTB drift after cuts / crossfades can lose the first one.
+The split/cropped stream keeps the main stream's timestamps (it is the same frame); do not shift that stream early.
+Preview (`CoverStack`) and AI look select covers with `FrameGrid.contains(_:from:to:)`, so floating-point noise in
+start + duration cannot keep the cover active on the end frame. Between frames, they show that frame's state.
+`scripts/check-export-frame-rate.sh` measures blur and mosaic on every output frame at 24 / 30 / 60 fps, including the
+frames immediately outside each window, and compares boundary states with the preview/AI look stacks.
 
 ## 实测的地基（2026-09-29 窗口探针）
 

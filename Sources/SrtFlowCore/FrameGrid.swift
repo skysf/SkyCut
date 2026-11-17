@@ -3,8 +3,8 @@ import Foundation
 // MARK: - The project's frame grid: timeline seconds <-> frame numbers
 //
 // What it does: says which frame a timeline time falls on, which frame is the first one at or after a time, and when a
-// frame starts, for one frame rate. Overlay animation times (preview, export, the AI's look) all go through it, so "which
-// frame is this" has one answer everywhere.
+// frame starts, for one frame rate. Overlay animation times and layer windows (preview, export, the AI's look) all go
+// through it, so "which frame is this" has one answer everywhere.
 // What it does not do: choose the frame rate (`ProjectFrameRate` is the only source) or round times for display.
 //
 // Why it has a tolerance: times are Doubles. `0.5 + 10.0 / 30` is 0.8333333333333333 and times 30 that is
@@ -42,5 +42,14 @@ public struct FrameGrid: Hashable, Sendable {
     /// When frame `index` starts (timeline seconds).
     public func time(ofFrame index: Int) -> Double {
         Double(index) / Double(fps)
+    }
+
+    /// Whether the frame on screen at `time` belongs to the left-closed, right-open timeline window. Compare frame
+    /// numbers on the read side too: start + duration can sit a few ulps past the exact end and keep a cover/grade on
+    /// for an extra frame in preview and AI look, even though export has the right half-frame edges.
+    public func contains(_ time: Double, from start: Double, to end: Double) -> Bool {
+        guard time.isFinite, start.isFinite, end.isFinite, end > start else { return false }
+        let frame = frame(containing: time)
+        return frame >= firstFrame(atOrAfter: start) && frame < firstFrame(atOrAfter: end)
     }
 }

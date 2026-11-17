@@ -48,7 +48,8 @@ enum AIFrameComposer {
             try Task.checkCancellation()
             var video: CGImage?
             if let generator, time < state.duration {
-                video = try? await generator.image(at: CMTime(seconds: max(0, time), preferredTimescale: 600)).image
+                let lookTime = TextAnimator.quantize(time, frameRate: state.frameRate)
+                video = try? await generator.image(at: NativeSourceFrameSampler.requestedTime(for: lookTime)).image
             }
             let subtitles = await MainActor.run { subtitleImages(state, at: time, canvas: canvas, style: subtitleStyle) }
             let still = video
@@ -75,7 +76,9 @@ enum AIFrameComposer {
         context.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
         context.fill(whole)
         if let video {
-            let covered = CoverCompositing.apply(state.renderedCovers.filter { $0.contains(time: time) }, to: graded(video, stack: FilterStack(in: state, at: time)))
+            let grid = FrameGrid(state.frameRate)
+            let covers = state.renderedCovers.filter { grid.contains(time, from: $0.timelineStart, to: $0.timelineEnd) }
+            let covered = CoverCompositing.apply(covers, to: graded(video, stack: FilterStack(in: state, at: time)))
             context.draw(covered, in: whole)
         }
         // 时刻先钉到工程帧的网格上（预览和导出的唯一入口），形状和文字的动画都按它求。
