@@ -97,6 +97,8 @@ func catalogKnownNames() -> Set<String> {
                      "audio_max_reduction_db"])
     // listen voice=… (AIListenVoiceReport / VoiceClarity, 2026-11-17): a masker's kind, the low band and the verdicts.
     names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short"])
+    // listen describe=true (AIListenSourceReport / SourceSoundTrait, 2026-11-17): SkyCut's trait words.
+    names.formUnion(["low_drone", "broadband_noise", "speech_like"])
     return names
 }
 
