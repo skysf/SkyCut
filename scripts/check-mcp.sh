@@ -127,6 +127,8 @@ source checks/MCP/batch-edit-wiring.sh
 source checks/MCP/tool-result-wiring.sh
 # shellcheck source=checks/MCP/clip-sound-wiring.sh
 source checks/MCP/clip-sound-wiring.sh
+# shellcheck source=checks/MCP/canvas-wiring.sh
+source checks/MCP/canvas-wiring.sh
 # shellcheck source=checks/MCP/voice-reference-wiring.sh
 source checks/MCP/voice-reference-wiring.sh
 
@@ -497,6 +499,9 @@ xcrun swiftc \
   Sources/SrtFlow/AIBatchEditPlans.swift \
   Sources/SrtFlow/ClipFileReplacement.swift \
   Sources/SrtFlow/AIFrameFit.swift \
+  Sources/SrtFlow/CanvasReframe.swift \
+  Sources/SrtFlow/AICanvasReframe.swift \
+  Sources/SrtFlow/TimelineRenderSize.swift \
   Sources/SrtFlow/AIFollowSubject.swift \
   Sources/SrtFlow/AIShotDetector.swift \
   Sources/SrtFlow/AIFramingRequest.swift \
