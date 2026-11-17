@@ -78,9 +78,9 @@ enum AIListenSourceSound {
         let kind = provenance.kind(of: clip, onVideoTrack: AITrackName.name(of: slot).hasPrefix("V"))
         if [.voice, .music, .effects].contains(kind) {
             head["source"] = .string(kind.rawValue)
-            head["note"] = .string("SkyCut knows what this is from where it came (\(kind.rawValue): its voice-over, library or "
-                + "sound-effect file), so it is not described. describe is for sound with no known source: a camera's or a "
-                + "generated video's own sound.")
+            head["note"] = .string("SkyCut knows what this is from where it came (\(kind.rawValue): one of its voice-overs, a "
+                + "library track or effect, a made sound effect or generated audio), so it is not described. describe is for "
+                + "sound with no known source: a camera's or a generated video's own sound.")
             return .known(head)
         }
         guard let window = AIAudioLevels.sourceWindow(of: clip, from: from, to: to) else {
