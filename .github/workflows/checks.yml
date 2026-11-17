@@ -16,10 +16,16 @@ on:
     branches: [main]
 
 # 同一个 PR 又推了新提交，旧的那一轮直接取消：macOS runner 免费但同时只有 5 台，
-# 别让作废的一轮占着。main 上的每一次都跑完（按提交分组，不会互相取消）。
+# 别让作废的一轮占着。
+# Pushes to main share one group too (user's call, 2026-11-17): a new merge cancels the older main runs still queued
+# or running. The newest main tree contains every earlier merge and is either checked here or was checked as-is by
+# its pull request's green run (scripts/ci-verified-tree.sh). Exception: a docs-only merge runs only the scan guards,
+# so it does not re-check code whose run it cancelled; docs/build/build-and-packaging.md "CI" says what that means
+# for releases. A re-run (run_attempt > 1) keeps a per-commit group: re-running an older main run never cancels the
+# newest one, and the next merge doesn't cancel a deliberate re-run. checks/ci-verified-tree.sh pins this block.
 concurrency:
-  group: checks-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: checks-${{ github.event.pull_request.number || (github.run_attempt > 1 && github.sha) || github.ref }}
+  cancel-in-progress: true
 
 # 合并之后 main 上那一轮要读本仓库的 artifact 和运行记录（scripts/ci-verified-tree.sh），所以 token 要有 actions: read。
 # 这里写了 permissions，没列出来的权限就都没有了：两个 job 用到的只有读代码这一项。
