@@ -237,14 +237,15 @@ private func transitionAndMagnetChecks() {
         checkEqual(done.outcome.cut.transition, .crossFade, "the cut knows it has a picture transition")
     } else { check(false, "cut on a transition works") }
 
-    // 另一头有转场：B|C 叠化 0.5 秒（B 的尾料够）。A|B 叠着换要把 B 的声音分出去，B 的尾巴照它原来响的样子：借尾料到 8.5、渐出 0.5。
+    // 另一头有转场：B|C 叠化 0.5 秒（B 的尾料够）。A|B 叠着换要把 B 的声音分出去，B 的尾巴照它原来响的样子：借尾料到 8.25、渐出 0.5
+    // (the dissolve is centred on the cut when both sides have footage, 2026-11-17; it used to take all 0.5 s from B's tail).
     var three = cutPair().state
     three.mainClips[1].transitionAfter = .crossFade
     three.mainClips[1].transitionDuration = 0.5
     three.mainClips.append(cutShot(cutFileC, 8, 4, source: 30))
     if let done = try? joinSound(three, after: three.mainClips[0].id, .crossfade, frames: 6) {
         let into = done.outcome.incoming.flatMap { done.state.clip(with: $0) }
-        checkNear(into?.timelineEnd, 8.5, "separating B keeps its B|C transition sound: it still runs into C's crossfade")
+        checkNear(into?.timelineEnd, 8.25, "separating B keeps its B|C transition sound: it still runs into C's crossfade")
         checkNear(into?.fadeOutDuration, 0.5, "…and still fades out over the transition")
         checkEqual(done.state.mainClips[2].isMuted, false, "C keeps its own sound and its transition fade-in")
     } else { check(false, "crossfade next to a transition works") }
