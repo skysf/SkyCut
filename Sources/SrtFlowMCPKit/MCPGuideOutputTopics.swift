@@ -45,16 +45,16 @@ enum MCPGuideOutputTopics {
         previousCard: MCPGuidePreviousCards.inspectVideo,
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.inspectVideo, """
-            inspect_video looks for problems in finished sound and picture; it never edits.
+            inspect_video gives one pre-delivery report. Inspection never edits or blocks export; explicit intentional marks save a review decision.
             """),
             MCPGuideSection(name: "range", about: "the timeline or a matching export, and the range checked", text: """
-            What it checks. By default the seams plus the last 3 seconds of the timeline; from and to choose a range in \
+            What it checks. By default the whole timeline; from and to choose a range in \
             timeline seconds. file points at a matching export (same length and timestamps). It uses the project's subtitle \
             style. Outside files may return needs_confirmation. Pictures are sampled every 0.5 s; with file every frame of the \
             export is also scanned (frame_scan) for stray_frames (a few frames of another picture), flash, frozen_picture (6 s \
-            or more without movement) and black_frame, over the whole file or the from and to range. Every visible clip is also \
+            or more without movement; stills and native screen recordings are exempt) and black_frame, over the whole file or the from and to range. Every visible clip is also \
             checked against cuts inside its own source file: a few frames of another shot come back as source_cut with \
-            suggested_source_in or suggested_source_out.
+            suggested_source_in or suggested_source_out. Longer retained joins are source_cut_crossing suspects.
             """),
             MCPGuideSection(name: "results", about: "suspect times, reasons, screenshots and WAV clips", text: """
             Results. It returns job_id: get_job gives suspect times and reasons, screenshots (image=false leaves them out) and \
@@ -63,6 +63,24 @@ enum MCPGuideOutputTopics {
             where a cached transcript or narration subtitles show words there; clips cut where sound plays without either are \
             listed in speech_unchecked: transcribe the ones with speech, then inspect again. When the file was made before the \
             project's last change, attention says so first: export again and inspect the new file.
+            """),
+            MCPGuideSection(name: "delivery", about: "mix overload, limiter, thin sound, holes and sentence cuts", text: """
+            Delivery checks. The report includes audio_overload (timeline true peak before limiting), audio_limiter (where the \
+            export limiter worked), audio_true_peak (decoded file peak), audio_thin (below -30 dBFS with at most one audible \
+            layer for 0.75 s), audio_hole (a 12 dB drop from the preceding 0.5 s, lasting 0.5 s), and sentence_cut (a source end \
+            or picture cut inside a transcript sentence). Silence uses silence_db and min_silence. Sound findings include \
+            loudest_layers from the frozen timeline. With file, mix levels describe that file; layer attribution and limiter \
+            history describe the frozen timeline and cannot prove the file matches. These thresholds are review heuristics. \
+            Missing speech evidence is listed; no recognition or paid work starts. Partial picture coverage remains explicit.
+            """),
+            MCPGuideSection(name: "intentional", about: "mark, review or clear any finding with one undo step", text: """
+            Every finding has a key. Call inspect_video intentional={job_id:<completed report>,key:<finding key>,reason:<one \
+            nonempty line, at most 240 characters>}, without inspection fields. This explicitly saves one review decision in \
+            the project, in one undo step. Matching findings leave findings and appear separately in intentional with their \
+            reason; they never block export. Repeat an inspection after editing before marking. Marks match kind, clip IDs, \
+            source-anchored bounds (two project frames of tolerance), and a content/mix fingerprint; material timing, source, \
+            clip or gain changes report the suspect again. clear_intentional=<saved key> removes one mark, also one undo step. \
+            Reports expire when SkyCut quits; project marks persist. A stale-export attention note still remains visible.
             """),
             MCPGuideSection(name: "limits", about: "what it does not do: transcription and source levels", text: """
             Limits. It does no transcription. For source levels and beats use listen; for words use transcribe.
@@ -132,6 +150,10 @@ enum MCPGuideOutputTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.getJob, """
             get_job reports on any job id; it never starts or repeats work.
+
+            Read-only. Progress and result of a long job (any call that returned a job id). wait_seconds (up to 30) waits first: keep \
+            waiting, never restart the job. Exports, transcriptions and translations run one at a time (queued: queue_position). \
+            waiting_for_user: tell the user right away. Paid jobs: billing_note explains the charge.
             """),
             MCPGuideSection(name: "waiting", about: "wait_seconds, waiting instead of restarting, the shared queue", text: """
             Waiting. wait_seconds (up to 30) waits for the job before answering; keep calling get_job instead of starting the \

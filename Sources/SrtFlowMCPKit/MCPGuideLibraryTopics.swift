@@ -42,6 +42,10 @@ enum MCPGuideLibraryTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.readDocument, """
             read_document reads a document's text; it never changes the file.
+
+            Read-only. Read the text of a document the user gave you (a script, outline, notes): PDF, Word, RTF, ODT, .txt or .md; \
+            not Pages files or scanned PDFs. Long documents come in pieces: call again with from_char = next_from_char. Files \
+            outside the opened folder may return needs_confirmation.
             """),
             MCPGuideSection(name: "formats", about: "which files work", text: """
             Formats. PDF, Word (.doc, .docx), RTF, ODT, .txt and .md. Pages files do not work (ask for PDF or Word), and scanned \
@@ -88,6 +92,10 @@ enum MCPGuideLibraryTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.recipes, """
             recipes reads editing styles; it never changes anything.
+
+            Read-only. SkyCut's editing styles (presets and the user's own): structure, shot lengths, transitions, filters, fonts, music, \
+            checklist. No id: every style and when to use it; id: the whole style. Before cutting a whole video, pick one that fits, tell \
+            the user in one sentence which one you follow, and follow it; the user's words win.
             """),
             MCPGuideSection(name: "styles", about: "what a style contains, presets and the user's own", text: """
             Styles. A style says how to cut a whole video: structure by the second, shot lengths, transitions, filters, fonts, \
@@ -112,6 +120,10 @@ enum MCPGuideLibraryTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.saveRecipe, """
             save_recipe saves one of the user's own editing styles, only when they ask.
+
+            Save an editing style of the user's own, only when they ask. text is the whole style in Markdown, written like the \
+            preset ones (read one with recipes first). Saving under one of their names replaces it (the old file goes to the \
+            Trash); a preset's name makes their own version. Styles live in SkyCut's folder, not in the project.
             """),
             MCPGuideSection(name: "writing", about: "name, use_for and the Markdown text", text: """
             Writing it. name is the style's name (for example Course promo); use_for is one sentence on when to use it; text is \

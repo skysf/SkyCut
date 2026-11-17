@@ -57,6 +57,10 @@ enum MCPGuideWorkspaceTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.manageFiles, """
             manage_files organises files in the user's folders, only when the user asks.
+
+            Move, rename, make folders or move files to the Trash, only inside folders opened with open_folder and only when the \
+            user asked you to organise. Never overwrites. Trash returns needs_confirmation in approval mode; full_access proceeds \
+            and notifies. Undo cannot revert these, so tell the user what you did.
             """),
             MCPGuideSection(name: "actions", about: "move, rename, make_folder and trash, and what each takes", text: """
             Actions. move moves files or folders into to (made if missing); rename gives file a new_name (without folders; the \
@@ -117,6 +121,10 @@ enum MCPGuideWorkspaceTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCards.setSettings, """
             set_settings changes app-wide preferences, never a project.
+
+            Change preferences only when the user asks: theme, language, daily_ai_credit_limit, ai_access_mode, the optimized-media cache. \
+            Omitted fields stay; all are checked before any change. Changing ai_access_mode or raising the credit limit always returns \
+            needs_confirmation, even in full_access: ask, repeat with confirm_token. Never edits a project; keys stay in Settings.
             """),
             MCPGuideSection(name: "preferences", about: "theme, language, cache, the daily credit limit and the access mode", text: """
             Preferences. theme is forest (default) or classic; language is the interface language (it applies now, native menus \

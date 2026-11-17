@@ -8,7 +8,7 @@
 
 ## 范围与证据
 
-- 默认检查所有实际出声段的头尾前后 0.75 秒，加最后 3 秒。`from/to` 改成明确的时间范围，
+- Since 2026-11-17 the default scope is the whole timeline.`from/to` 改成明确的时间范围，
   超出工程、反向范围先拒绝。范围只选择检查对象，不把片段截成新的素材。
 - 声音从 `ExportAudioMixdown.render` 来：与正式导出相同的引擎、增益、推子、声音场景和限幅。
   只加 WAV 容器，不重编码或归一；电平、静音判法用 `AIListenTool.waveform` 和 `AIAudioLevels`。
@@ -56,7 +56,7 @@
 波形读不完整直接失败；部分画面或源切口读不到、采样达到上限时，
 `coverage_complete:false` 加 `limitations`/遗漏数量，不能称作检查全部通过。
 逐词高亮放大的瞬时外沿、语义上重复说话仍需人工复核；没给 `file` 时画面只是抽帧，不到 0.5 秒的闪帧也要人工复核
-（交片前用导出的文件查，每一帧都过）。夹帧、闪白、不动、黑场都可能是故意的，「故意」的标记以后做。
+（交片前用导出的文件查，每一帧都过）。Stray frames, flashes, stillness and black may be intentional; project-persistent review decisions are described below.
 
 ## 验证与人工回归
 
@@ -84,3 +84,83 @@
 - [ ] 后台工程检查期间切换前台工程、取消或关原工程：证据仍属于原来的快照，原工程无修改。
 - [ ] 后台 MCP 默认 `image=true` 检查无疑点的范围：分析取样正常、`screenshot_times=[]`，
   没有“无法绘图”提示；真实疑点的证据截图照常返回，不以“无需图片”掩盖取证失败。
+
+## Pre-delivery report and intentional decisions (2026-11-17)
+
+Inspection now covers the whole timeline by default. `from/to` still selects a narrower range.
+`AIDeliveryChecks.registry` is the small extension point: each named check consumes a frozen context
+and returns findings asynchronously. Preparation supplies frame results, existing transcript sentences and the
+shared `MixMeasurement`; a later check adds a registry entry without changing job or review logic.
+There are no export gates, feature switches or automatic repairs.
+
+The first tier adds these review heuristics, alongside the existing source/frame/subtitle checks:
+
+| Kind | Measurement and provisional threshold |
+| --- | --- |
+| `audio_overload` | Timeline bus true peak exceeds `ExportPeakLimiter.defaultCeiling`, before limiting |
+| `audio_limiter` | Export limiter's per-frame minimum gain is below 0.999; report maximum reduction and output dBTP |
+| `audio_true_peak` | Actual decoded export true peak exceeds the same ceiling; never confuse it with the timeline bus |
+| `audio_silence` | Per-frame mix power below `silence_db` for `min_silence` |
+| `audio_thin` | Mix below −30 dBFS, above the silence threshold, with at most one audible layer for 0.75 s |
+| `source_cut_crossing` | A longer retained join inside a source, separate from the short-fragment `source_cut` suspect |
+| `audio_hole` | At least a 12 dB drop from the preceding 0.5 s, lasting at least 0.5 s, after a mix above −30 dBFS |
+| `sentence_cut` | Source boundary or picture cut strictly inside a cached transcript sentence or provenance-bearing narration line; one project frame of slack at either end |
+| `stale_export` | The existing freshness comparison, also retained as the leading `attention` note |
+
+Thin/hole thresholds are conservative first-tier review heuristics, motivated by the production-feedback
+examples of sparse sound and missing beds; they have not been validated across genres. They describe
+power and layer count, not sound meaning or speech intelligibility. A layer is an audible track, with
+tracks beyond the existing twelve-layer measurement limit combined as `rest`. Mixed-output power is decoded after limiting; a large drop on an already limited bus alone is not a mix hole. Sound findings identify
+the subject items/layers and show the three loudest measured timeline layers at the finding's midpoint; no active
+sound produces an empty list. File levels come from the bounded native reader with the shared true-peak
+meter. File layer attribution and limiter history explicitly remain measurements of the timeline snapshot.
+Matching lengths never prove matching content. No transcription or paid work starts automatically.
+
+Native screen recordings now retain `isScreenRecording` through import, recovery, splitting, copying
+and saving. Like stills, they are exempt from `frozen_picture` when all intersecting pictures are static
+by nature; flashes, stray frames and black still run. Imported recordings without known provenance are
+not guessed from filenames: mark an expected freeze intentional when provenance is unavailable.
+
+Every finding has a `key`. `inspect_video intentional={job_id,key,reason}` records one decision, with
+one nonempty line of at most 240 characters. `clear_intentional=<key>` removes one decision. These
+explicit mutations use the project's normal `perform`, undo and autosave, without rebuilding preview;
+ordinary inspection stays nonediting. Review requests cannot also include inspection fields. A report
+must belong to the same document generation and AI session and still match the current timeline;
+invalid/stale requests change nothing. The last 24 completed reports are retained during this run.
+
+`TimelineState.deliveryIntentions` holds anchors and reasons (empty keys are omitted, old projects
+read an empty array). Format v35 prevents older writers from discarding reviews. Each anchor records
+kind, sorted item UUIDs, a reference clip, source-time bounds (timeline bounds without a clip) and a
+stable SHA-256 fingerprint of relevant clip settings and mix settings, including other contributing clips without confusing them with the finding subject. Matching permits two project
+frames in source time, including whole-clip moves, without a quantization boundary. Changing source,
+identity, gain or a larger source-time interval invalidates a decision. Repeating the same kind on a
+different clip cannot inherit it. A mark matches at most one finding in a report; exact duplicate findings are coalesced. Matching findings leave `findings` and appear under `intentional`
+with their reason, separately for human review. The stale-export attention note remains visible even
+when its finding has been marked. Unreproduced saved marks remain in the separate intentional list with `reproduced:false`; they suppress nothing and persist until explicitly cleared.
+
+`DeliveryChecks` runs synthetic real-tool reports for overload/limiter, silence, thin sound, a mix hole,
+source/picture sentence cuts, no edits, marking/suppression/separate listing, undo/redo, project-file
+round trips, invalid reasons, stale reports, source-time tolerance and invalidation after a mix edit.
+It also verifies the screen-recording exception against the real frame scanner.
+
+Manual regression before release:
+
+- [ ] Review a real quiet passage and a cutaway during narration; mark expected findings, save/reopen,
+      inspect again, and confirm the separate intentional list and one-step undo.
+- [ ] Inspect a native screen recording with a static screen and a camera clip that freezes; only the
+      camera freeze is reported. Check an external recording with unknown provenance manually.
+- [ ] Inspect a matching export and an older export; the sound measurement labels, timeline-layer
+      attribution and stale-export attention are clear to the AI and human reviewer.
+
+Reverse controls (2026-11-17): disconnecting mix/sentence checks makes nine production assertions fail;
+disconnecting picture/freshness checks makes three file-report assertions fail. Disabling anchor matching
+makes four review/timing assertions fail. Removing the screen exemption fails the real scan assertion;
+using bus power instead of decoded output fails the limited-but-steady mix counterexample. Removing
+native provenance assignment fails the import/recovery wiring guard. Each control is restored afterward.
+
+Sentence continuity uses the audible render configuration, including track hiding and faders; an
+inaudible continuation must not conceal a truncated sentence. The configured voice gain must exceed
+0.1 at the cut, matching the existing word-cut fade gate. Active-layer counts use per-layer RMS above
+−60 dBFS; quieter contributors can still be shown in the evidence.
+
+Reverting audible-continuation filtering also fails the hidden-continuation regression (one failure in 34 rule assertions); the original source is restored afterward.

@@ -76,6 +76,9 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.cancelJob, """
             cancel_job stops a job that returned job_id.
+
+            Stop a job: a running export, subtitle generation or translation stops, and a queued job is dropped. Sky Studio jobs \
+            can only be cancelled while queued; character jobs cannot. Check get_job afterwards.
             """),
             MCPGuideSection(name: "what_stops", about: "jobs on this Mac, queued jobs and Sky Studio jobs", text: """
             What stops. An export, subtitle generation or translation on this Mac stops at once, and a job still queued behind \
@@ -96,6 +99,10 @@ enum MCPGuideControlTopics {
         sections: [
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.getSettings, """
             get_settings reads app preferences; it never opens windows or changes anything.
+
+            Read-only. App preferences without opening windows: general (language, theme), ai (clients, permission mode), editing \
+            (styles, voices), cache and sky_studio (account, credits, daily limit). Returns values, writable fields and the \
+            localized mode names; never keys. Change them with set_settings.
             """),
             MCPGuideSection(name: "sections", about: "general, ai, editing, cache and sky_studio", text: """
             Sections. general has the interface language and theme; ai the connected clients and the permission mode \

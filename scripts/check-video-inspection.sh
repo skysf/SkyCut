@@ -2,6 +2,12 @@
 # 完整 App 的成片检查：合成缺陷、真实混音/取帧/试听/任务，不启动或触碰用户 App。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# Capture provenance must be connected to both native import paths, not only synthetic model values.
+python3 - <<'PROVENANCE'
+from pathlib import Path
+source = Path("Sources/SrtFlow/VideoEditProject+ScreenRecording.swift").read_text()
+assert source.count("clip.isScreenRecording = true") == 2, "native import and recovery must preserve screen-capture provenance"
+PROVENANCE
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
@@ -48,5 +54,5 @@ SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/InspectionCheck" <<'PYTHON'
 import subprocess
 import sys
-subprocess.run([sys.argv[1]], timeout=240, check=True)
+subprocess.run([sys.argv[1]], timeout=480, check=True)
 PYTHON

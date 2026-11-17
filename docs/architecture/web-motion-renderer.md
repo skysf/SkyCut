@@ -259,7 +259,7 @@ own message.
 ## 15. Stored motion and the AI call (MCP-74, 2026-11-17)
 
 `EditClip.webMotion` stores the HTML, canonical JSON parameters, editable field descriptions, duration, local hit, output geometry,
-declared fonts and render provenance. This is project format v35: an older app must refuse rather than discard the only source for
+declared fonts and render provenance. This is project format v36: an older app must refuse rather than discard the only source for
 rebuilding a missing movie. Splitting/copying retains the full source and local hit; replacing the source with imported media clears it.
 The movie is absent from the imported-media/bookmark table. See [project files](video-edit-project-file.md).
 

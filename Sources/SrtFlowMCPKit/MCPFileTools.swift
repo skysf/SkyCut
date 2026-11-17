@@ -11,9 +11,7 @@ public enum MCPFileTools {
             return MCPToolDefinition(
                 .readDocument, title: "Read a document",
                 description: """
-                Read-only. Read the text of a document the user gave you (a script, outline, notes): PDF, Word, RTF, ODT, .txt or .md; \
-                not Pages files or scanned PDFs. Long documents come in pieces: call again with from_char = next_from_char. Files \
-                outside the opened folder may return needs_confirmation.
+                Read-only. Read a user-provided PDF, Word, RTF, ODT, txt or md; excludes Pages/scans. Continue long text with from_char=next_from_char. Outside files may need needs_confirmation.
                 """,
                 input: MCPSchema.object([
                     "file": MCPSchema.string("Path of the document (absolute, or relative to the opened folder)."),
@@ -27,9 +25,7 @@ public enum MCPFileTools {
             return MCPToolDefinition(
                 .manageFiles, title: "Organise files",
                 description: """
-                Move, rename, make folders or move files to the Trash, only inside folders opened with open_folder and only when the \
-                user asked you to organise. Never overwrites. Trash returns needs_confirmation in approval mode; full_access proceeds \
-                and notifies. Undo cannot revert these, so tell the user what you did.
+                Only when asked, move, rename, make_folder or Trash within open_folder folders; never overwrite. Trash: needs_confirmation in ask mode; full_access proceeds and notifies. No undo.
                 """,
                 input: MCPSchema.object([
                     "action": MCPSchema.string("What to do.", oneOf: ["move", "rename", "make_folder", "trash"]),

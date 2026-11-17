@@ -60,6 +60,7 @@ struct ClipFileReplacement: Equatable {
             ))
         }
 
+        let sameScreenSource = clip.isScreenRecording && clip.sourceURL == replacement.url
         ClipSourceSwap.shift(&clip, by: start - clip.sourceStart)
         clip.sourceStart = start
         clip.sourceDuration = min(clip.sourceDuration, replacement.kind == .image ? stillDuration : replacement.duration - start)
@@ -80,6 +81,7 @@ struct ClipFileReplacement: Equatable {
             clip.audioAssetDuration = replacement.duration
         }
         // 换成了另一个文件：音乐库的身份、upscale 的来源记录都是旧文件的。
+        clip.isScreenRecording = sameScreenSource
         clip.remoteKey = nil
         clip.upscale = nil
         // The new media has no generated page: recovery must never restore the replaced movie.

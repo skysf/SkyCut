@@ -140,7 +140,7 @@ extension EditClip: Codable {
         case fadeInDuration, fadeOutDuration
         case isHidden
         case volumeCurve, soundScene
-        case upscale, webMotion
+        case upscale, webMotion, isScreenRecording
     }
 
     init(from decoder: Decoder) throws {
@@ -191,6 +191,7 @@ extension EditClip: Codable {
         // v29 起才有。缺键 = 用的就是原片。认不出的记录整个不认（只有原片路径是必需的，其余缺了走默认）。
         upscale = (try? c.decodeIfPresent(ClipUpscaleRecord.self, forKey: .upscale)) ?? nil
         webMotion = try c.decodeIfPresent(WebMotionClipRecord.self, forKey: .webMotion)
+        isScreenRecording = try c.decodeIfPresent(Bool.self, forKey: .isScreenRecording) ?? false
         // v14 及更早：画面渐变只有时长、没有"效果"这个概念。合并成一个槽之后，
         // 这些段就是 In/Out = Fade —— 不认回来的话，老工程一打开，调好的淡入淡出
         // 会因为 `kind == .none` 当场失效（不变量见 `ClipPresetAnimation.isEmpty`）。
@@ -256,6 +257,7 @@ extension EditClip: Codable {
         // 没换过源的段不写这个键（判据与格式版本闸门 `requiresFormatVersion29` 同源）。
         try c.encodeIfPresent(upscale, forKey: .upscale)
         try c.encodeIfPresent(webMotion, forKey: .webMotion)
+        if isScreenRecording { try c.encode(true, forKey: .isScreenRecording) }
     }
 }
 

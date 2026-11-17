@@ -23,7 +23,12 @@ func checkWebMotionProjectFiles(_ root: URL) throws {
     var state = TimelineState()
     state.overlayTracks = [EditLane(clips: [clip])]
     checkEqual(clip.name, "Project title", "50 clip label uses the stored motion name, not the cache fingerprint")
-    check(state.requiresFormatVersion35, "50 stored web source requires v35")
+    check(state.requiresFormatVersion36, "50 stored web source requires v36")
+    check(!state.requiresFormatVersion35, "50 a web page alone does not claim the v35 delivery-review contract")
+    var withCapture = state
+    withCapture.update(clip.id) { $0.isScreenRecording = true }
+    check(withCapture.requiresFormatVersion35 && withCapture.requiresFormatVersion36,
+          "50 screen provenance and web source keep their distinct persistent version contracts")
     check(state.mediaURLs.isEmpty, "50 rendered motion movie is not imported media")
     try sourceRoundTrip(clip, record: record)
     try splitKeepsSource(clip, record: record)
@@ -34,7 +39,7 @@ func checkWebMotionProjectFiles(_ root: URL) throws {
     let expected = folder.appendingPathComponent("SkyCut/Motion/motion-\(fingerprint).mov")
     checkEqual(try Data(contentsOf: expected), movieBytes, "50 first save carries the already rendered movie beside the project")
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
-    checkEqual(raw["formatVersion"] as? Int, 35, "50 writer records v35 as an external fixed contract")
+    checkEqual(raw["formatVersion"] as? Int, 36, "50 writer records v36 as an external fixed contract")
     check((raw["media"] as? [Any])?.isEmpty == true, "50 movie does not enter the project media table")
     let firstLoad = try VideoEditProjectIO.load(from: file)
     checkEqual(firstLoad.timeline.clip(with: clip.id)?.webMotion, record, "50 page, parameters and source provenance survive ProjectIO")
@@ -76,10 +81,16 @@ private func sourceRoundTrip(_ clip: EditClip, record: WebMotionClipRecord) thro
     let decoder = JSONDecoder()
     checkEqual(try decoder.decode(EditClip.self, from: encoder.encode(clip)).webMotion, record,
                "50 Codable keeps the complete source and parameter form")
+    var captured = clip
+    captured.isScreenRecording = true
+    let captureRoundTrip = try decoder.decode(EditClip.self, from: encoder.encode(captured))
+    check(captureRoundTrip.isScreenRecording && captureRoundTrip.webMotion == record,
+          "50 the shared clip coder retains screen-capture provenance alongside the new web source")
     var plain = clip
     plain.webMotion = nil
     let raw = try JSONSerialization.jsonObject(with: encoder.encode(plain)) as! [String: Any]
     check(raw["webMotion"] == nil, "50 ordinary clips omit the new field")
+    check(raw["isScreenRecording"] == nil, "50 ordinary clips still omit false screen-capture provenance")
     check(try decoder.decode(EditClip.self, from: encoder.encode(plain)).webMotion == nil, "50 old absent field reads as nil")
     let field = try decoder.decode(WebMotionParameterField.self, from: Data(#"{"key":"future","kind":"new_control"}"#.utf8))
     checkEqual(field.kind, .text, "50 future parameter control falls back to editable text")

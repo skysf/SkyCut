@@ -102,9 +102,9 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v31 | `ShapeAnnotation.animation` —— 形状的入场 / 出场动画（2026-10-03；**按需写入**：没设动画的形状不落键） | 只认 v30 的旧版不认识这个键，读进来当没有，随手编辑触发自动保存就把动画抹掉 —— 成片里的圆环又变回突然出现。见 [画面上的形状](shapes.md) 第三节 |
 | v32 | `Keyframe.easing` 的 `snap` / `overshoot` / `spring` 三个值 —— 关键帧的急停、回弹、弹簧（2026-10-05；照旧按需写入：linear 不落键） | 只认 v31 的旧版按宽容解码把这三个值退成 linear，推近和弹进来变成直线；随手编辑触发自动保存即永久丢失。见 [关键帧动画](keyframe-animation.md)「缓动」 |
 | v33 | `EditClip.crop` 的有效精确源矩形允许单边超过 45%，并保留低于旧空裁切容差的源像素边界（2026-11-02；沿用原四个键） | 只认 v32 的旧版会夹回 45% 或吞掉微小边界，露出区域外内容，自动保存即改坏。新版保留合法四边原值；读旧工程时将当年被忽略的微小裁切迁移为无裁切，保住旧成片。检查器只改一边不夹坏其它边。见 [预览自由变换](preview-free-transform.md)「MCP 的源矩形取景」 |
-
 | v34 | `TimelineState.production`：公开故事 / 镜头图、世界状态与完成历史、输出 / 原生帧锚点、观察证据及声音 cue（2026-11-04，按需写入） | 旧版会在自动保存时抹掉制作计划与待复查记录；新版缺键默认 nil，故事板本身也算非空工程。只存公开值，不存 pin、凭据、私有配方或来源。见 [官方原创短片](official-film.md) |
-| v35 | `EditClip.webMotion`: source page, canonical parameter object, parameter form, complete source duration / local hit, render dimensions / fps, and fingerprint / renderer / OS / WebKit / font provenance (2026-11-17, optional) | Older builds would discard the only source capable of rebuilding a deleted motion cache; they must refuse the project rather than silently turn a recoverable title into missing media. See [Web-motion renderer](web-motion-renderer.md). |
+| v35 | `TimelineState.deliveryIntentions` and `EditClip.isScreenRecording` (2026-11-17, omitted when empty/false) | Older writers would discard human review reasons and native screen-capture provenance. See [finished video inspection](finished-video-inspection.md). |
+| v36 | `EditClip.webMotion`: source page, canonical parameter object, parameter form, complete source duration / local hit, render dimensions / fps, and fingerprint / renderer / OS / WebKit / font provenance (2026-11-17, optional) | Older builds would discard the only source capable of rebuilding a deleted motion cache; they must refuse the project rather than silently turn a recoverable title into missing media. See [Web-motion renderer](web-motion-renderer.md). |
 
 > 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
 > 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存
@@ -128,6 +128,14 @@ Finder**。App 只负责「快速回到最近那几条」。
 缺少 production 的旧工程默认 nil；已存内容使用前重新验证图和证据形状，损坏值不能冒充可报价计划。
 作者 CAS、旧输出绑定和观察过期规则见 [官方原创短片](official-film.md)。
 付款恢复回执不放进工程 / undo，也不因清空计划而删除。v33 的精确裁切语义及 `<33` 迁移保持原界限。
+
+### Delivery review data (v35, 2026-11-17)
+
+`TimelineState.deliveryIntentions` stores intentional finding anchors and one-line reasons, omitted when
+empty and decoded as an empty array in older projects. `EditClip.isScreenRecording` records native capture
+provenance, omitted when false and decoded as false when missing. These values were introduced in v35,
+which prevents older writers from discarding them; current writers use the latest project format. Inspection itself does not save; explicit mark/clear requests use normal
+project undo and autosave. Matching and report behavior are in [finished video inspection](finished-video-inspection.md).
 
 ### Opening a project repairs link groups (2026-11-17)
 
@@ -192,7 +200,7 @@ Guard: `scripts/check-project-file.sh` group 49, a literal project file saved be
 - **不开新的 formatVersion**：旧版丢掉这个键，丢的只是这个工程的开关 —— 成片一帧不变，和行高同一个口径。
 - 新建工程用上次拨的值（`VideoEditProject.newTimeline()` 读 `EditorToggles.magnet`），见 [剪辑页上记住的开关](editor-remembered-toggles.md)。
 
-### Generated web-motion movies are project caches (v35)
+### Generated web-motion movies are project caches (v36)
 
 A web-motion clip stores its source in `EditClip.webMotion` (`WebMotionClipRecord`), not in a media bookmark. The page and
 canonical JSON parameters are authoritative; the parameter fields describe the inspector form. Declared page `fonts` are
