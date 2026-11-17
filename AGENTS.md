@@ -243,13 +243,13 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-film-production.sh` — 官方原创短片的公开制作状态。
 - `scripts/check-filters.sh` — 调色：LUT 数学、预览与成片逐像素、纯黑不抬。
 - `scripts/check-freeze-frame.sh` — 定格的时间线变换。
-- `scripts/check-listening.sh` — 听声音的纯计算：ESTOI 和研究的 numpy 版逐数对账、论文的性质、拿掉谁涨多少、原声特征和描述、人声的线（`VoiceClarity`）。
+- `scripts/check-listening.sh` — 听声音的纯计算：ESTOI 和研究的 numpy 版逐数对账、论文的性质、拿掉谁涨多少、原声特征和描述; voice tiers and grey hints (`VoiceClarity`).
 - `scripts/check-localization-coverage.sh` — 界面文案在每张字符串表都配齐、占位符一致。
 - `scripts/check-look-jobs.sh` — Slow looks: the router's lines, a look behind an edit as a queued job, cancel, two sessions' parallel looks (real App objects).
 - `scripts/check-main-thread-watchdog.sh` — 主线程心跳看门狗、挂起抓栈期间不分配。
 - `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。
 - `scripts/check-media-import.sh` — 拖文件进轨道的落点。
-- `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账、`listen voice=`。
+- `scripts/check-mix-layers.sh` — 按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账; `listen voice=` checks.
 - `scripts/check-optimized-media.sh` — 优化媒体：判据、真转一块、缓存。
 - `scripts/check-parameter-limits.sh` — MCP 编辑参数的边界、实际生效值、素材加载重试。
 - `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾。
