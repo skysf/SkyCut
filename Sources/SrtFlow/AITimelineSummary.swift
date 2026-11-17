@@ -124,7 +124,7 @@ enum AITimelineSummary {
         guard clip.info?.displaySize != nil, canvas.width > 0, canvas.height > 0 else { return nil }
         let summary = AIFrameFit.describe(clip, canvas: canvas)
         guard always || !summary.isDefault || !summary.fillsFrame else { return nil }
-        var object: [String: JSONValue] = ["fills_frame": .bool(summary.fillsFrame)]
+        var object = AIPictureCoverage.fields(summary.fill)
         if !summary.isDefault || always {
             object["x"] = AIFormat.seconds(summary.x)
             object["y"] = AIFormat.seconds(summary.y)

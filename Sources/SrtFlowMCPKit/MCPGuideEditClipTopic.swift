@@ -55,7 +55,11 @@ enum MCPGuideEditClipTopic {
             centred from -2 to 3 so its own edges reach the canvas edges. scale is the size relative to the default fit (1 = the cropped \
             picture fits the canvas), 0.05 to 6. Changing only the crop keeps the centre and size and never stretches the picture. \
             rotation turns it clockwise in degrees (-360 to 360), opacity is 0 to 1, flip_horizontal and flip_vertical mirror it. \
-            A clip with position or scale keyframes refuses static placement: remove the keyframes with set_keyframes first.
+            A clip with position or scale keyframes refuses static placement: remove the keyframes with set_keyframes first. \
+            The reply and get_timeline say fills_frame true only when the picture covers the whole canvas at every frame it is on \
+            screen, rotation, crop, flips and keyframes included. Otherwise fill_scale is the smallest steady scale that covers it \
+            throughout, keeping x, y and rotation (a 5° turn on a frame-shaped clip needs about 1.15), and fills_except lists the \
+            [from, to] timeline seconds when it fails only part of the time.
             """),
             MCPGuideSection(name: "sound", about: "volume_db, volume_curve, fades, muted, sound_scene", text: """
             Sound. volume_db sets the clip's level in dB (0 = original), clamped to edit_limits.volume_db; on a clip with a volume_curve \
