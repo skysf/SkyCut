@@ -202,6 +202,7 @@
 - [2026-10-29 冒烟清理只凭陈旧 PID 停进程](2026-10-29-smoke-stop-stale-pid.md) — 持久 PID 不是进程身份：清理前核对当前命令和测试目录。
 - [2026-09-24 来回换声音场景，换下来的效果链攒着不放](2026-09-24-sound-scene-chains-pile-up.md) — 「等宿主释放再放」而宿主一直活着，等于不放。
 - [2026-09-24 选了声音场景却看不见选的是哪个](2026-09-24-sound-scene-row-widens-inspector.md) — 检查器一行不许比窄栏宽、菜单 Picker 不锁宽度；界面改动要在真窗口里看一眼。
+- [2026-11-17 Source description needed reader and model contracts](2026-11-17-source-description-read-and-model-contracts.md) — Keep real sound edges, reserve only installed speech models, and check cancellation after the final asynchronous stage.
 - [2026-09-21 源文件清单守卫只盯着枢纽文件](2026-09-21-source-list-guard-only-watched-the-hub.md) — 守卫要扫清单里的每一个文件；别开只有 extension 的文件。
 - [2026-09-26 分割丢了隐藏和音频库的键](2026-09-26-split-drops-hidden-and-library-key.md) — 从旧段构造新段别手写逐字段：加字段时每一处都要过一遍。
 - [2026-09-28 删掉分割出来的一块，整条素材连声音全没了](2026-09-28-split-links-every-piece-together.md) — 从旧段构造新段时身份类字段（id、组号）不能照抄：分割走 `LinkRegrouping.split`。
