@@ -283,6 +283,8 @@ enum VideoEditProjectIO {
         timeline.normalizeTextRows()
         // 老版本存盘的主轨数组可能乱序（磁吸关掉的拖动不重排），打开时治好。
         timeline.sortMainClipsByStart()
+        // A freeze tail saved before 2026-11-17 still shares its clip's link group: it leaves it (LinkGroupRepair).
+        LinkGroupRepair.unlinkStrayPieces(in: &timeline)
         // 轨道颜色：v9 及更早没有 colorIndex 键，按当时的行序补一次。补在读盘
         // 这一步而不是等第一次编辑 —— `perform` 的补号会和用户那次改动一起
         // 进撤销栈，把「打开就该有的颜色」算成用户改的，撤销一下颜色就没了。
