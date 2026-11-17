@@ -43,7 +43,17 @@ private func stereoRMS(_ samples: [Float], from: Double, to: Double) -> Double {
     return sqrt(samples[lo ..< hi].reduce(0.0) { $0 + Double($1) * Double($1) } / Double(hi - lo))
 }
 
-/// 真跑一遍导出，同时留下计划里的电平、f32 混音文件，以及 ffmpeg 量的混音响度。
+/// The true peak of interleaved stereo samples (the stream finished: silence after the end, as in the export).
+private func stereoTruePeak(_ samples: [Float]) -> Float {
+    var stream = TruePeak.Stream(channels: 2)
+    var peak: Float = 0
+    samples.withUnsafeBufferPointer { stream.feed($0, frames: samples.count / 2) { peak = max(peak, $0.peak) } }
+    stream.finish { peak = max(peak, $0.peak) }
+    return peak
+}
+
+/// 真跑一遍导出，同时留下计划里的电平、f32 混音文件，以及 ffmpeg 量的混音响度；成片自己的真峰值（导出器在 ffmpeg 之后量的那一份）
+/// 记在 `levels.deliveredPeak` 里。
 private func exportKeepingMixdown(_ state: TimelineState, name: String) async
     -> (levels: ExportAudioMixdown.Levels?, raw: [Float], exported: [Float], ffmpegLoudness: Double?)? {
     let output = root.appendingPathComponent(name)
@@ -56,7 +66,9 @@ private func exportKeepingMixdown(_ state: TimelineState, name: String) async
     let ffmpegLoudness = ffmpegIntegratedLoudness(mixdown)
     let (code, out) = run(ffmpegPath, plan.arguments)
     guard code == 0 else { check(false, "\(name) 的 ffmpeg 执行失败：\(out.suffix(300))"); return nil }
-    return (plan.audioLevels, raw, decodeStereo(plan.tempOutput), ffmpegLoudness)
+    var levels = plan.audioLevels
+    levels?.deliveredPeak = await ExportDeliveredPeak.measure(plan.tempOutput)
+    return (levels, raw, decodeStereo(plan.tempOutput), ffmpegLoudness)
 }
 
 func checkMixCeiling() async {
@@ -81,7 +93,7 @@ func checkMixCeiling() async {
     guard let one = await exportKeepingMixdown(state, name: "ceiling-one.m4a"), let single = one.levels else {
         check(false, "一条轨：导出没跑出来"); return
     }
-    check(!single.isLimited && single.peakDBFS > -4 && single.peakDBFS < 0, "一条轨 0.9 满幅的正弦不压（峰值 \(single.peakDBFS) dBFS）")
+    check(!single.isLimited && single.peakDBTP > -4 && single.peakDBTP < -1, "一条轨 0.9 满幅的正弦不压（真峰值 \(single.peakDBTP) dBTP）")
     check(single.maxReductionDB == 0 && !single.needsAttention, "没压过：压得最深是 0、不用提醒")
     check(abs(Double(single.outputPeak) - Double(single.peak)) < 1e-6, "没压过：写出去的峰值 = 限幅前的峰值")
     loudnessAgrees(single, one.ffmpegLoudness, "一条轨")
@@ -94,12 +106,23 @@ func checkMixCeiling() async {
     check(abs(Double(levels.peak) - Double(single.peak) * 4) < Double(single.peak) * 0.2,
           "限幅前的峰值照实记：两轨各 +6 dB 叠加 = 一条轨的 4 倍（得到 \(levels.peak)，一条轨 \(single.peak)）")
     check(levels.isLimited && levels.limitedSeconds > 1, "压了的时长照实记（得到 \(levels.limitedSeconds) s）")
-    check(abs(levels.maxReductionDB - (levels.peakDBFS + 1)) < 0.1, "压得最深 = 峰值到 −1 dBFS 的差（\(levels.maxReductionDB) vs \(levels.peakDBFS + 1)）")
+    check(abs(levels.maxReductionDB - (levels.peakDBTP + 1)) < 0.1, "压得最深 = 真峰值到 −1 dBTP 的差（\(levels.maxReductionDB) vs \(levels.peakDBTP + 1)）")
     check(levels.needsAttention && levels.suggestedReductionDB == levels.maxReductionDB, "压了 3 dB 以上要提醒，建议降的量就是压得最深的那一下")
     let rawPeak = Double(hot.raw.reduce(0) { max($0, abs($1)) })
     check(rawPeak <= ceiling + 1e-4, "f32 里没有一个采样超过 −1 dBFS（得到 \(decibels(rawPeak)) dBFS）")
     check(rawPeak >= ceiling - 0.01, "限幅不是别的：最响处正好贴着 −1 dBFS")
-    check(abs(Double(levels.outputPeak) - rawPeak) < 1e-6, "报出来的输出峰值就是文件里的（\(levels.outputPeak) vs \(rawPeak)）")
+    let rawTruePeak = stereoTruePeak(hot.raw)
+    check(levels.outputPeak == rawTruePeak, "报出来的输出峰值就是 f32 文件里的真峰值（\(levels.outputPeak) vs \(rawTruePeak)）")
+    check(Double(rawTruePeak) <= ceiling * 1.0012, "f32 的真峰值也在 −1 dBTP 之内（得到 \(decibels(Double(rawTruePeak))) dBTP）")
+    // The delivered peak: the exported file's own sound, measured after encoding (ExportDeliveredPeak, the decode listen
+    // uses). It agrees with ffmpeg's decode of the same file and it is not the pre-limiter peak.
+    if let delivered = levels.deliveredPeak {
+        let ffmpegDecoded = stereoTruePeak(hot.exported)
+        check(abs(decibels(Double(delivered)) - decibels(Double(ffmpegDecoded))) < 0.1,
+              "成片的真峰值（AVFoundation 解码）和 ffmpeg 解码量的一样（\(decibels(Double(delivered))) vs \(decibels(Double(ffmpegDecoded))) dBTP）")
+        check(decibels(Double(delivered)) < 0.5 && decibels(Double(delivered)) < levels.peakDBTP - 3,
+              "成片的真峰值是限幅之后、编码之后的（\(decibels(Double(delivered))) dBTP），不是限幅之前的 \(levels.peakDBTP)")
+    } else { check(false, "成片自己的真峰值没量出来") }
     // 限幅不是削平：稳态那一段还是正弦（峰值 / 均方根 = √2；削平的方波接近 1）
     let rawRMS = stereoRMS(hot.raw, from: 1, to: 3)
     let crest = rawPeak / rawRMS

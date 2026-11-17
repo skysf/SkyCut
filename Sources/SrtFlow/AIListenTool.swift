@@ -5,9 +5,10 @@ import SrtFlowMCPKit
 // MARK: - 工具：listen（「听」）
 //
 // 管什么：AI 听不见，就把声音量给它：一段片段在成片里听到的（段音量 / 曲线、渐入渐出、轨道推子都算上）、一个素材文件、
-// 或者整条时间线上每一段有声音的片段 —— 电平（有声音部分的 RMS）、峰值、静音段、最响的地方、一条粗的响度曲线；
+// 或者整条时间线上每一段有声音的片段 —— 电平（有声音部分的 RMS）、真峰值（dBTP）、静音段、最响的那一帧、一条粗的响度曲线；
 // 要鼓点时（beats，只对一段片段或一个文件）再给速度、每一拍、小节头（AIBeats，另读一遍 11025 Hz 的单声道）。
-// 整文件/时间线复用 WaveformStore；点名 source_in/source_out 交给 AIListenFileAudio，只原生解码请求窗。
+// Since 2026-11-17 a clip or a file is measured from one bounded read of exactly its window (AIListenAudioWindow): the true
+// peak and the loudest frame need the samples, at the project's frame rate (AIListenFrameGrid). Files go through AIListenFileAudio.
 // mix=true 交给 AIListenMix：用音频引擎按层离线渲，量混在一起之后的声音（每层、每帧、每个频段，整条的响度和过线），到帧。
 // 不管什么：怎么算（AIAudioLevels）、文件怎么读（AIListenFileAudio）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
 //
@@ -15,7 +16,7 @@ import SrtFlowMCPKit
 
 @MainActor
 enum AIListenTool {
-    /// 一次调用最多等波形读多久（客户端对一次调用大多只等一分钟）。没读完就把读到的先给出去，说一声再调一次。
+    /// 一次调用最多等多久（客户端对一次调用大多只等一分钟）。整条时间线没量完的段说一声，让 AI 一段一段地问。
     nonisolated static let waitSeconds = 40.0
     /// 整条时间线一次最多列多少段。
     static let maxClips = 80
@@ -24,6 +25,7 @@ enum AIListenTool {
         let silenceDB = min(max(try args.double("silence_db") ?? AIAudioLevels.defaultSilenceDB, -80), -10)
         let minSilence = min(max(try args.double("min_silence") ?? 0.5, 0.1), 10)
         var settings = Settings(silenceDB: silenceDB, minSilence: minSilence, beats: try args.bool("beats") ?? false)
+        settings.grid = AIListenFrameGrid(fps: project.state.frameRate.fps)
         // from / to：时间线上的几秒（2026-10-14 用户拍板「只听某几秒」）。文件的几秒照旧用 source_in / source_out。
         settings.from = try args.double("from").map { max(0, $0) }
         settings.to = try args.double("to")
@@ -73,6 +75,8 @@ enum AIListenTool {
     private struct Settings {
         var silenceDB: Double
         var minSilence: Double
+        /// The project's frames: `loudest_at` and `peak_at` are to the frame.
+        var grid = AIListenFrameGrid(fps: 30)
         /// 也找鼓点（速度、每一拍、小节头；AIBeats）。只对一段片段或一个文件。
         var beats = false
         /// 只听时间线上的这几秒（from / to）；nil = 不限。片段只量落在里面的那一截，整条时间线只列落在里面的片段。
@@ -106,22 +110,34 @@ enum AIListenTool {
             return object
         }
         let (from, to) = (window.from, window.to)
+        let timeline = (from: clip.timelineTime(atSource: from), to: clip.timelineTime(atSource: to))
         if settings.narrowed {
-            object["from"] = AIFormat.seconds(clip.timelineTime(atSource: from))
-            object["to"] = AIFormat.seconds(clip.timelineTime(atSource: to))
-        }
-        guard let peaks = await waveform(of: clip.sourceURL, until: deadline) else {
-            object["sound"] = "unreadable: SkyCut could not read this clip's audio"
-            return object
-        }
-        guard peaks.isComplete || peaks.duration >= to - 0.01 else {
-            object["sound"] = "still reading: SkyCut is reading this file's audio, call listen again in a moment"
-            return object
+            object["from"] = AIFormat.seconds(timeline.from)
+            object["to"] = AIFormat.seconds(timeline.to)
         }
         let trackGain = state.trackVolume(containingClip: clip.id)
-        let heard = AIAudioLevels.heard(AIAudioLevels.windows(peaks, from: from, to: to), clip: clip, trackGain: trackGain)
+        let frames = settings.grid.clip(clip, window: timeline, trackGain: trackGain)
+        let reading: AIListenAudioWindow.Reading
+        do {
+            let bounds = frames.sourceBounds
+            // `.sound`: past the end of the file's sound the clip plays silence (an audio track a few ms shorter than its picture).
+            reading = try await AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline, frames: { _, _ in bounds },
+                                                         edges: .sound)
+        } catch {
+            object["sound"] = deadline.timeIntervalSinceNow <= 0
+                ? "still measuring: listen with clip_id, or narrow from/to"
+                : .string("unreadable: SkyCut could not read this clip's audio (\(error.localizedDescription))")
+            return object
+        }
+        let heard = AIAudioLevels.heard(reading.windows, clip: clip, trackGain: trackGain)
         let report = AIAudioLevels.report(heard, silenceDB: settings.silenceDB, minSilence: settings.minSilence)
-        for (key, value) in AIAudioLevels.json(report, curve: AIAudioLevels.curve(heard), detailed: detailed) {
+        let rate = reading.peaks.sampleRate
+        let peaks = reading.frames.map { measured in
+            AIListenPeaks.measure(measured, starts: frames.starts, gains: frames.gains) { sample in
+                clip.timelineTime(atSource: reading.sourceStart + Double(sample) / rate)
+            }
+        } ?? AIListenPeaks(truePeakDB: -60, peakAt: nil, loudestAt: nil)
+        for (key, value) in AIAudioLevels.json(report, curve: AIAudioLevels.curve(heard), peaks: peaks, detailed: detailed) {
             object[key] = value
         }
         if settings.beats {
@@ -162,7 +178,7 @@ enum AIListenTool {
         }
         var result: [String: JSONValue] = [
             "clips": .array(listed),
-            "note": "Levels are what the video plays (each clip's volume, fades and track fader included). Call listen with clip_id for one clip's silences and curve."
+            "note": "Levels are what the video plays (each clip's volume, fades and track fader included); peak_db is the true peak (dBTP). Call listen with clip_id for one clip's silences and curve."
         ]
         if clips.count > maxClips { result["more_clips"] = .number(Double(clips.count - maxClips)) }
         return .object(result)
@@ -180,7 +196,7 @@ enum AIListenTool {
         }
         let object = try await AIListenFileAudio.listen(
             url, args: args, display: AIWorkspace.shared.display(url), silenceDB: settings.silenceDB,
-            minSilence: settings.minSilence, beats: settings.beats, until: Date().addingTimeInterval(waitSeconds)
+            minSilence: settings.minSilence, beats: settings.beats, frames: settings.grid, until: Date().addingTimeInterval(waitSeconds)
         )
         return .ok(.object(object))
     }

@@ -170,6 +170,11 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 「已通过 CI 的 main」= 这个提交上 main 那一轮（push）的 `check-all` 绿了就算（用户 2026-11-13 定）。那一轮是短轮时
 （树已经在 PR 那一轮原样验过，见「CI」一节「合并之后 main 上那一轮」），每组的摘要里写着是哪一轮 PR 的 CI 验的这棵树；
 不另要求发版前再完整跑一轮。
+Since 2026-11-17 a new merge cancels the older main runs (「CI」), so an older commit's run is usually cancelled: release
+the newest, or re-run that commit's run (a re-run cancels nothing) and wait for green. When the release commit's merge
+only touched docs (`docs/`, `AGENTS.md`, `README.md`, `SrtFlow-Requirements.md`), its run didn't check any code: the
+newest code merge below it (`git log --first-parent`) needs a green main run of its own too; if that run was
+cancelled, re-run it and wait for green.
 
 流程：从已通过 CI 的干净 main 显式指定 `VERSION` 打包，用原固定身份验签；核对包内版本、
 arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App。再复用 `scripts/r2.py`
@@ -539,8 +544,27 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   12.5 秒，`-wmo` 只要 4.9 秒（本机 arm64、模块缓存已热）：逐文件模式下每个文件都要把
   其余文件重新解析一遍。CI 上拆分前，各项检查里编译占了约 300 秒、运行约 160 秒。
   `-enable-batch-mode` 实测编不过，别换成它。
-- **同一个 PR 又推了新提交，旧的一轮直接取消**（`concurrency`），不白占 runner；main 上的
-  每一次都跑完。
+- **同一个 PR 又推了新提交，旧的一轮直接取消**（`concurrency`），不白占 runner。
+  **A new merge cancels the older main runs too** (since 2026-11-17, user's call): pushes to main share one group
+  (`github.ref`), so a merge cancels the main runs that are still queued or running. On 2026-11-16 GitHub ran only about
+  three macOS jobs at a time: main runs waited up to three hours, four of them queued at once, each needing five runner
+  slots, while only the newest one matters.
+  - Why that's safe: the newest main tree contains every earlier merge. Its run either checks it, or skips the checks
+    because its pull request's green run checked exactly that tree (「合并之后 main 上那一轮」 below); the cancelled
+    merges get checked as part of it.
+  - The exception is a docs-only merge: its run only does the scan guards (or nothing, when its pull request's run
+    checked that exact tree). If it cancels the run of a code merge whose tree nothing had checked (that pull request
+    was behind main), that code isn't checked as merged until a later code merge's run completes. Replaying the 141 main
+    runs from 2026-11-04 to 11-17 with their real timings: 32 would have been cancelled (29 of them full runs) and this
+    happened twice (#359 and #395, each followed by a docs-only merge). Releases check for it (「公开下载发布」).
+  - A re-run (`run_attempt` > 1) keeps a per-commit group. In the shared group, re-running an older main run cancels the
+    newest one: tried on a throwaway branch on 2026-11-17 (ubuntu only), the re-run cancelled the newer run ("Canceling
+    since a higher priority waiting request for … exists"); with the per-commit group both finished. So re-running a
+    cancelled main run, or 「关掉开关再重跑」 below, cancels nothing, and the next merge doesn't cancel it.
+  - A superseded run ends cancelled; the summary job `check-all` is skipped (`!cancelled()`), not red. It saves no
+    `.build` cache, so the next pull request restores the newest one saved and compiles the difference.
+  - `checks/ci-verified-tree.sh` pins the block word for word (PR runs by number, pushes by `github.ref`, re-runs by
+    commit, `cancel-in-progress: true`, no job-level block).
 - **只改了文档的 PR / 合并走快速通道**（2026-11-04 起）：每组第一步跑 `scripts/ci-docs-only.sh` 判一下，是就不编 App、
   不跑自检，第 1 组跑一遍 `scripts/check-guards.sh`（文档索引 docs-index-drift 在里面）就收工，其余四组到这一步就绿了，
   汇总 job `check-all` 照常给结论。原来一个只改文档的 PR 要占满 5 台 runner 两轮（PR 一轮、合并后 main 一轮），
@@ -646,7 +670,8 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   3 轮以上 25.1 分钟（48.3，21 轮）。两个同时开着，后一个多等约 4 分钟；三个，最后一个约 18 分钟出结果。
 - **合进 main 也跑一轮完整的**（给下一个 PR 备 `.build` 缓存、验真正合出来的那份）：同一时期跑完的 217 轮完整 CI 里 85 轮是 main 上的。
   合一个改代码的 PR 一共占两轮，合并之后约 7 分钟里新建的轮都得等它让出 runner。（后续：2026-11-13 起，树已经在 PR 那一轮原样验过时，
-  这一轮只占第 1 组约 1 分钟，见上面「合并之后 main 上那一轮」。）
+  这一轮只占第 1 组约 1 分钟，见上面「合并之后 main 上那一轮」。Since 2026-11-17 a new merge also cancels the older main runs
+  still queued or running, see the `concurrency` item above.）
 - **只改文档的快速通道也占名额**：一样起 5 个 macOS job，第 1 组跑扫描守卫约 2.4 分钟，其余四组各十几秒；没别的在跑时 2.5 分钟出结果，
   排在完整的轮后面时中位 5.7 分钟。占得少、可以多开，但不是不占。
 - 变 DIRTY 就要再合 main、再跑一轮：哪些文件最常撞、为什么不用 `merge=union`（GitHub 不认），见[文档索引怎么写](../architecture/doc-indexes.md)第五节。

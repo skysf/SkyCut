@@ -15,7 +15,7 @@
 | 层 | 回答什么 | 在哪 | 截至 2026-11-16 |
 | --- | --- | --- | --- |
 | 0 来路 | 这层声音是什么、为什么在这 | 读工程：生成时的提示词、音乐库 / 音效库的标签、旁白的文字、合成音效的预设 | 工程里本来就有，**不用听** |
-| 1 量 | 每层、每帧、每个频段多响；整条的响度、峰值 | 音频引擎按层离线渲（`AudioStemRender`、`MixMeasurement`，[成片的声音](export-audio-mixdown.md)「按层量」） | Merged 2026-11-16 (`listen mix=true`) |
+| 1 量 | 每层、每帧、每个频段多响；整条的响度、峰值 | 音频引擎按层离线渲（`AudioStemRender`、`MixMeasurement`，[成片的声音](export-audio-mixdown.md)「按层量」） | Merged 2026-11-16 (`listen mix=true`); since 2026-11-17 every peak is a true peak (`TruePeak`, dBTP, the limiter's measure) and a clip's or file's `loudest_at` is a frame |
 | 2 成熟指标 | 每句人声清不清楚；主要是谁盖住了它、压哪层最管用；ESTOI 看不见的低频有多响 | `Listening/ESTOIAnalysis`、`ESTOI`（含 `ESTOIReference`）、`MaskerAttribution` | 纯计算合了，没接 |
 | 3 描述没来路的原声 | 素材自带的声音大概是什么：低沉长音 / 宽频噪声 / 有音高 / 有拍子 / 像说话 | `Listening/SourceSoundFeatures`、`SourceSoundSpectrogram`、`SourceSoundTrait`（含 `SourceSoundDescription`） | 九个特征和描述合了，没接；苹果 SoundAnalysis「每个标签自己的分数」、SpeechTranscriber「有没有字」要系统接口和真文件，没做 |
 | 4 声音报告 | 把 1–3 拼成一张按时间的表，AI 一次读完；「要人听」的几处 | — | 没做 |

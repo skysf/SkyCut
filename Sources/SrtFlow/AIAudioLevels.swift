@@ -6,6 +6,9 @@ import SrtFlowMCPKit
 // 管什么：波形数据（峰值 + 均方，一个文件读一遍的那份）按约 43ms 切窗 → 电平（RMS）、峰值、静音段、一条粗的
 // 响度曲线；片段在时间线上时换成时间线秒、乘上听到的增益（段音量 / 曲线、渐入渐出、轨道推子 ——
 // `EditClip.heardGain`，波形条画「听到的声音」也是它）。纯值，自检够得着（scripts/check-mcp.sh）。
+// What listen reports as the peak and the loudest moment comes from the samples, to the frame (AIListenPeaks, since
+// 2026-11-17): `peak_db` is the true peak (dBTP), `loudest_at` the start of the loudest frame — no longer the window peaks
+// and the middle of the loudest curve step (a 5 s step on an 80 s clip).
 // 不管什么：波形怎么读（WaveformStore）、参数和权限（AIListenTool）。
 //
 // 口径：
@@ -147,18 +150,13 @@ enum AIAudioLevels {
         return Curve(from: first.start, step: step, decibels: values)
     }
 
-    /// 最响的那一格的中点（曲线的格子，不是某一个 50ms 的尖）。
-    static func loudest(_ curve: Curve) -> Double? {
-        guard let index = curve.decibels.indices.max(by: { curve.decibels[$0] < curve.decibels[$1] }) else { return nil }
-        return curve.from + (Double(index) + 0.5) * curve.step
-    }
-
     // MARK: 写给 AI 看
 
     static let maxSilences = 50
 
-    static func json(_ report: Report, curve: Curve?, detailed: Bool) -> [String: JSONValue] {
-        var object: [String: JSONValue] = ["peak_db": decibels(report.peakDB)]
+    /// `peaks`: the true peak, when it is and the loudest frame, measured from the samples (AIListenPeaks).
+    static func json(_ report: Report, curve: Curve?, peaks: AIListenPeaks, detailed: Bool) -> [String: JSONValue] {
+        var object: [String: JSONValue] = ["peak_db": decibels(peaks.truePeakDB)]
         object["level_db"] = report.levelDB.map(decibels) ?? "silent"
         if detailed {
             object["silences"] = .array(report.silences.prefix(maxSilences).map {
@@ -169,14 +167,13 @@ enum AIAudioLevels {
             object["silences"] = .number(Double(report.silences.count))
         }
         if report.silentSeconds > 0 { object["silent_seconds"] = AIFormat.seconds(report.silentSeconds) }
-        if let curve {
-            if let loudest = loudest(curve) { object["loudest_at"] = AIFormat.seconds(loudest) }
-            if detailed {
-                object["curve"] = [
-                    "from": AIFormat.seconds(curve.from), "step": AIFormat.seconds(curve.step),
-                    "db": .array(curve.decibels.map { .number(Double($0)) })
-                ]
-            }
+        if let loudest = peaks.loudestAt { object["loudest_at"] = AIFormat.seconds(loudest) }
+        if detailed, let peakAt = peaks.peakAt { object["peak_at"] = AIFormat.seconds(peakAt) }
+        if detailed, let curve {
+            object["curve"] = [
+                "from": AIFormat.seconds(curve.from), "step": AIFormat.seconds(curve.step),
+                "db": .array(curve.decibels.map { .number(Double($0)) })
+            ]
         }
         return object
     }

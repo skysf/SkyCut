@@ -19,7 +19,9 @@
 | （没读到时） | — | 先拿第 0 级的桶顶着 | 原始块读回来之前的那一两帧 |
 
 - **按文件读，不按段读**：裁切、分割、挪位置、缩放都不重读 PCM；同一个文件被几段引用只读一次。
-- **AI 点名文件短窗是例外**（`listen file + source_in/source_out`）：调用方只要几秒时不启动这里的整文件总览；
+- **AI 点名文件短窗是例外**（`listen file + source_in/source_out`；since 2026-11-17 every clip and file `listen`, ranged or not —
+  the true peak needs every sample oversampled 4× and the loudest frame needs frame-aligned sums, neither of which this waveform
+  keeps, and making every import pay for an AI-only number was rejected）：调用方只要几秒时不启动这里的整文件总览；
   `AIListenAudioWindow` 在 `MediaReadQueue.analysis` 上用原生 `timeRange` 读请求窗，复用 `ChunkBuilder` 的峰值/均方，读完即释放。
   本地波形从零开始存，结果加真实采样 PTS 回到源秒；不能把晚时间点的局部块直接塞进假装从零覆盖的 `WaveformPeaks`。
   容器时长决定参数边界，部分总览的 `duration` 只表示已经读到哪。完整合同与独立节拍范围见 [AI 接口](ai-control-mcp.md) 第 13 条。
@@ -27,6 +29,8 @@
   （48kHz 约 21ms）每声道一个均方，存在块里（`WaveformChunk.power`），块的起点对齐桶的起点、最后的零头按实际帧数
   平均；`WaveformPeaks.meanSquare` 按任意一段取回（只盖住一部分的桶按帧数算权重）。峰值只说「最响的那一下」，
   说不了「整体多响」。代价：每个采样多一次乘加，存的量是第 0 级峰值的 1/32。**不许为量响度另读一遍 PCM。**
+  (The one exception is listen's bounded read above: it reads for the true peak and the loudest frame and takes the levels from
+  the same pass. cut_speech, `listen cuts=true` and inspect_video still use this waveform.)
 - **原生采样率、最多两个声道**：更多声道读的时候让 AVAssetReader 混成立体声（要给它
   `AVChannelLayoutKey`）。
 - **粗的几级是 min/max 合并，不是平均**：单采样的尖峰在每一级都看得见（`check-waveform.sh`
@@ -92,7 +96,7 @@
 | --- | --- |
 | `scripts/check-waveform.sh` | 用 ffmpeg 现造的「每个采样都知道该是多少」的素材：声道不串、静音是 0、单采样尖峰在 8 级里都在、跨块接缝不丢峰值、均方（正弦是振幅平方的一半、声道不串、跨块的桶都算进去）、5.1 混成立体声、原始采样块的起点与内容逐采样对得上、读不了的文件照样结束流；**很多文件同时读**（至少 16 个、核数的两倍，总览和原始采样块各一轮）必须全部读完，看门狗 30 秒判红 |
 | `checks/blocking-media-reads.sh` | 读采样的循环（`copyNextSampleBuffer`）不许写在 async 函数里，见 [阻塞的媒体读取](blocking-media-reads.md) |
-| `scripts/check-mcp.sh` 的 `ListenRangeChecks` | 文件显式短窗不启动整文件总览（`WaveformStore.peaks(for:)` 收到请求的那一刻同步记进被测调用的账 `MediaReadAudit`，显式短窗的那次调用一笔都没有；没给区间的短文件 listen 记到一笔，证明登记点是活的）；晚时间点范围、原生读样帧数/PTS、源秒统计、容器边界、队列中/读取中超时及取消 |
+| `scripts/check-mcp.sh` 的 `ListenRangeChecks` | 文件显式短窗不启动整文件总览（`WaveformStore.peaks(for:)` 收到请求的那一刻同步记进被测调用的账 `MediaReadAudit`，显式短窗的那次调用一笔都没有；since 2026-11-17 a whole-file listen has none either (one bounded reader from 0), and a direct waveform request in the same check records one, proving the registration point is alive）；晚时间点范围、原生读样帧数/PTS、源秒统计、容器边界、队列中/读取中超时及取消 |
 | `checks/timeline-drag-wiring.sh` | 波形、标尺、缩略图按 `clipBoundingRect` 裁；波形走 `WaveformStore`；装饰仍 `allowsHitTesting(false)` |
 | `scripts/check-timeline-snap.sh`（深度缩放一节） | 缩放区间 4…4800（外部真值）、标尺分档（默认 5 秒、最大一帧、30fps 下 5 帧）、`mm:ss:ff` 标签不截错、缩略图网格按帧 / 2 的幂、网格在同一个 2 的幂区间里不变 |
 

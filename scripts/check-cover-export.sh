@@ -104,6 +104,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditExportFilterScript.swift \
   Sources/SrtFlow/VideoEditExportMixdown.swift \
   Sources/SrtFlow/ExportPeakLimiter.swift \
+  Sources/SrtFlow/TruePeak.swift \
   Sources/SrtFlow/ExportLoudnessMeter.swift \
   Sources/SrtFlow/AudioKWeighting.swift \
   Sources/SrtFlow/MediaReadQueue.swift \

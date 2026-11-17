@@ -5,11 +5,12 @@ import SrtFlowMCPKit
 //
 // 管什么：MixMeasurement 量出来的每一帧 → AI 一次读得完的一份：先给摘要（整条混音和每层的电平、响度、峰值、最响处、过线的时刻），
 // 逐帧的数只在 `frames=true` 时给、条数由 AIListenMixPlan 限住。口径：
-// - 时间都是时间线秒、落在帧上（`loudest_at` = 最响那一帧的帧头；`peak_at` = 最响那个采样，到采样）。
+// - 时间都是时间线秒、落在帧上（`loudest_at` = 最响那一帧的帧头；`peak_at` = 真峰值所在的那个采样，到采样）。
 // - 电平（level_db）同 listen 的老口径：有声音的部分的 RMS（两个声道平均），静音帧（低于 silence_db）不进平均；
 //   摘要的电平、峰值、静音、粗曲线都交给 AIAudioLevels 算（每帧当一个窗），和 listen clip_id 同一套规矩。
-// - 混音的 peak_db 是**限幅之前**的采样峰值（= 导出报的 audio_peak_dbfs）；响度（loudness_lufs、瞬时、短时）量的是**限幅之后**
-//   真写进成片的（= 导出报的 audio_loudness_lufs）；over = 限幅之前超过限幅器上限（−1 dBFS）的那几帧，只报不拦。
+// - Every peak is a true peak (TruePeak, dBTP, the measure the export limiter holds; 2026-11-17). 混音的 peak_db 是**限幅之前**的
+//   （= 导出报的 audio_peak_before_limiter_dbtp），output_peak_db 是限幅之后写出去的；响度（loudness_lufs、瞬时、短时）量的是**限幅之后**
+//   真写进成片的（= 导出报的 audio_loudness_lufs）；over = 限幅之前真峰值超过限幅器上限（−1 dBTP）的那几帧，只报不拦。
 // - 每层是它进总线时的样子（片段音量、曲线、渐变、场景、轨道推子、总推子都算上，限幅之前）。
 // 不管什么：量（MixMeasurement）、参数（AIListenMixPlan）、任务（AIListenMix）。
 
@@ -25,8 +26,8 @@ enum AIListenMixReport {
             "layers": .array(result.layers.map { .object(layer($0, result: result, plan: plan)) }),
             "note": .string(
                 "Rendered by SkyCut's audio engine like the export. Layers are as they enter the master bus (clip volume, "
-                    + "fades, scenes, track and master faders; before the limiter). Mix peak_db is before the limiter; "
-                    + "loudness is after it (as exported). over = above the -1 dBFS limiter ceiling: reported, not blocked."
+                    + "fades, scenes, track and master faders; before the limiter). Peaks are true peaks (dBTP). Mix peak_db is "
+                    + "before the limiter; loudness is after it (as exported). over = above the -1 dBTP limiter ceiling: reported, not blocked."
             )
         ]
         if plan.perFrame { object["frames"] = .object(frames(result, plan: plan)) }
@@ -99,10 +100,8 @@ enum AIListenMixReport {
         return object
     }
 
-    /// 峰值（线性）→ dBFS：不封顶，−60 以下当静音。
-    private static func peakDecibels(_ linear: Double) -> Double {
-        linear > 0 ? max(AudioGain.minimumDB, 20 * log10(linear)) : AudioGain.minimumDB
-    }
+    /// 真峰值（线性）→ dBTP：不封顶，−60 以下当静音（TruePeak.decibels）。
+    private static func peakDecibels(_ linear: Double) -> Double { TruePeak.decibels(Float(linear)) }
 
     /// 瞬时 / 短时响度最大的那一刻：量的那个窗（窗尾 = 那一帧的帧尾）。
     private static func loudestWindow(

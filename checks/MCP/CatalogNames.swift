@@ -97,6 +97,9 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["no_longer_fill", "off_frame"])
     // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
     names.insert("waiting_for")
+    // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
+    names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
+                     "audio_max_reduction_db"])
     // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).
     names.insert("audible_duration")
     return names
