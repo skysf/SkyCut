@@ -310,6 +310,8 @@
   `checks/ci-verified-tree.sh`。规矩和上线后看的数在[构建与打包](../build/build-and-packaging.md)「CI」一节。
   The same guard pins the workflow's `concurrency` block word for word: PR runs keyed by PR number, pushes to main by `github.ref`
   (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
+  It also constructs a docs-only merge after concurrent code lands: both push gates must return false, even with a
+  matching scan-only PR marker. Docs-only PRs keep the fast path; code merges keep full-PR exact-tree reuse.
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
   以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：

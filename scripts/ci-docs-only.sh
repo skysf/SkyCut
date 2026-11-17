@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # CI 用：这一次改动是不是「只改了文档」。是就打印 true，别的情况（包括算不出来）一律打印 false。
 #
-# 只改文档的 PR / 合并，CI 不编 App、不跑自检，第 1 组只跑一遍扫描守卫（scripts/check-guards.sh，文档索引
-# docs-index-drift 就在里面）就收工；原来要把 5 台 runner 占满两轮（PR 一轮、合并后 main 一轮），各约 10 分钟。
+# Docs-only PRs skip compilation and self-checks; one shard runs scan guards (including docs-index-drift).
+# Pushes never select this scan-only path: a docs merge must cover any ancestor's full run that it cancelled.
+# Standard-input mode only classifies paths (used by verified-tree). Originally both PR and main runs occupied all
+# five macOS runners for about ten minutes each.
 # 2026-10 下旬到 11-04 合的 60 个 PR 里有 10 个只改了文档。
 #
 # 「文档」是一份严格的白名单：docs/ 下的文件，根目录的 AGENTS.md、README.md、SrtFlow-Requirements.md。
@@ -18,6 +20,11 @@
 # 比 HEAD^1：PR 上检出的是 GitHub 造的合并提交（第一个父提交是 main 的最新提交），合并进 main 之后检出的是
 # `gh pr merge --merge` 的合并提交（第一个父提交是合并之前的 main）—— 两种都正好是「这个 PR 带来的改动」。
 set -uo pipefail
+
+if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ "${1:-}" != "-" ]; then
+  echo false
+  exit 0
+fi
 
 if [ "${1:-}" = "-" ]; then
   CHANGED="$(cat)"
