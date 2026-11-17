@@ -26,8 +26,9 @@ public enum MCPSenseTools {
             .listen, title: "Measure the sound",
             description: """
             Read-only. Level, peak, silences, loudest moment and curve of a clip (with its volume, fades and faders), a file or \
-            every audible clip; mix=true: the mix itself per track, to the frame; voice=A1: is each narration line covered. \
-            beats=true finds the beat; cuts=true checks V1 cuts. Outside files may return needs_confirmation.
+            every audible clip; mix=true: the mix itself per track, to the frame; voice=A1: is each narration line covered; \
+            describe=true: what a clip's own sound is. beats=true finds the beat; cuts=true checks V1 cuts. Outside files may \
+            return needs_confirmation.
             """,
             input: MCPSchema.object([
                 "clip_id": MCPSchema.string("A timeline clip."),
@@ -44,6 +45,7 @@ public enum MCPSenseTools {
                 "layers": MCPSchema.array(of: ["type": "string"], "With mix: A1, V1+V2 or rest (≤ 12).", maxItems: 12),
                 "frames": MCPSchema.boolean("With mix: per frame."),
                 "voice": MCPSchema.string("Narration track(s): A1, A1+A2 or auto."),
+                "describe": MCPSchema.boolean("What a clip's own sound is, in words."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

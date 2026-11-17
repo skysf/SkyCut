@@ -152,3 +152,29 @@ for path in pathlib.Path("Sources/SrtFlow").rglob("*.swift"):
 assert 'hasPrefix("V")' in plan and "own sound" in plan, "✗ 视频轨的声音要拒绝并说清为什么（镜头自己的声音里的人声量不了）"
 PY
 echo "   ✓ voice 交给 AIListenVoiceCheck：mix=true 同一套任务、按层渲、按停顿切句、每句 MaskerAttribution、结论只在 VoiceClarity"
+
+echo "==> listen describe=true: a clip's own sound in words (MCP-42 / MCP-44): a listen job, one bounded read, installed speech models only"
+# 2026-11-17 (docs/architecture/listening-engine.md section 2 item 4a). The report and the classifier run in
+# scripts/check-mix-layers.sh group 4; this scans the wiring.
+python3 - <<'PY'
+import pathlib
+def code(path):
+    return "\n".join(line.split("//", 1)[0] for line in pathlib.Path(path).read_text().splitlines())
+tool, sound = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenSourceSound.swift")
+words, labels = code("Sources/SrtFlow/AIListenSourceWords.swift"), code("Sources/SrtFlow/SoundLabelScores.swift")
+assert tool.count('args.bool("describe")') == 1 and tool.count("AIListenSourceSound.listen(") == 1, "✗ listen 要读 describe 并交给 AIListenSourceSound"
+assert sound.count("AIJobs.shared.start(.listen") == 1 and sound.count("AIWorkQueue.shared.submit(.mix, jobID: job.id)") == 1, \
+    "✗ describe 是 AI 起的长任务（AIJobs，App Nap 不降速）、排在 mix 道上"
+assert sound.count("AIJobs.shared.finish(job, .done") == 1 and sound.count("AIJobs.shared.finish(job, .failed") == 1 \
+    and sound.count("AIJobs.shared.finish(job, .cancelled") == 1, "✗ describe 每种结局都要 finish"
+assert sound.count("AIListenAudioWindow.read(") == 1 and "keepsSamples: true" in sound, "✗ describe 只读一遍那一窗（AIListenAudioWindow，留一路采样）"
+assert sound.count("MediaReadQueue.run(on: MediaReadQueue.analysis)") == 1, "✗ 描述词和识别器在 MediaReadQueue.analysis 上算（不进 Swift 并发池）"
+assert "SourceSoundDescription.describe(" in sound and "SoundLabelScores.classify(" in sound and "AIListenSourceWords.words(" in sound, \
+    "✗ describe 要给三样：SkyCut 的描述词、识别器每个标签的分数、有没有字"
+assert "AIListenVoiceCheck.provenance()" in sound, "✗ 来路已知的（我们的旁白、音乐库、音效）不描述：先问来路"
+assert "screeningLocale()" in words and "assetInstallationRequest" not in words and "matchedLocale" not in words \
+    and "supportedLocales" not in words, "✗ describe 只用已经装好的语音模型（screeningLocale），从不下载"
+assert "SNClassifySoundRequest(classifierIdentifier: .version1)" in labels and "overlapFactor = 0" in labels, \
+    "✗ 识别器用系统自带的分类器，3 秒一窗、不重叠"
+PY
+echo "   ✓ describe 交给 AIListenSourceSound：AIJobs 任务、mix 道、一遍有界读取、analysis 队列上算、先问来路、只用装好的语音模型"

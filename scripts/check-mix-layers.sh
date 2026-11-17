@@ -176,6 +176,11 @@ xcrun swiftc \
   Sources/SrtFlow/Listening/ListeningDFT.swift \
   Sources/SrtFlow/Listening/ListeningMath.swift \
   Sources/SrtFlow/Listening/ListeningResample.swift \
+  Sources/SrtFlow/Listening/SourceSoundFeatures.swift \
+  Sources/SrtFlow/Listening/SourceSoundSpectrogram.swift \
+  Sources/SrtFlow/Listening/SourceSoundTrait.swift \
+  Sources/SrtFlow/SoundLabelScores.swift \
+  Sources/SrtFlow/AIListenSourceReport.swift \
   Sources/SrtFlow/AIAudioLevels.swift \
   Sources/SrtFlow/AIListenSampleFrames.swift \
   Sources/SrtFlow/ExportAudioReport.swift \
@@ -190,6 +195,7 @@ xcrun swiftc \
   checks/MixLayers/Parity.swift \
   checks/MixLayers/Plan.swift \
   checks/MixLayers/Voice.swift \
+  checks/MixLayers/SourceSound.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o
 

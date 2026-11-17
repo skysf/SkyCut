@@ -27,6 +27,8 @@ enum AIListenAudioWindow {
         var peaks: WaveformPeaks
         /// Each frame's level and true peak, when the caller asked for frames.
         var frames: AIListenSampleFrames?
+        /// The window's samples as one channel ((L + R) / 2), when the caller asked to keep them (listen describe=true).
+        var samples: [Float]?
         /// 本地波形第零帧对应的源秒；压缩音频按真实 PTS 裁掉包边界外的采样。
         var sourceStart: Double
         var from: Double
@@ -54,7 +56,7 @@ enum AIListenAudioWindow {
     }
 
     static func read(
-        _ url: URL, from: Double?, to: Double?, until deadline: Date, frames: FrameBounds? = nil,
+        _ url: URL, from: Double?, to: Double?, until deadline: Date, frames: FrameBounds? = nil, keepsSamples: Bool = false,
         observe: (@Sendable (Event) -> Void)? = nil,
         readerFactory: ReaderFactory? = nil
     ) async throws -> Reading {
@@ -87,7 +89,7 @@ enum AIListenAudioWindow {
                 let bounds = frames?(start, end)
                 return try await control.run {
                     try read(asset, track: track, channels: Int(channels), from: start, to: end, duration: duration, bounds: bounds,
-                             control: control, observe: observe, readerFactory: readerFactory, audit: audit)
+                             keepsSamples: keepsSamples, control: control, observe: observe, readerFactory: readerFactory, audit: audit)
                 }
             } catch {
                 try control.check()
@@ -99,7 +101,7 @@ enum AIListenAudioWindow {
     /// 同步阻塞段：timeRange 限制解码，PTS 再限制进统计的采样；失败/取消不发布半份结果。
     private static func read(
         _ asset: AVURLAsset, track: AVAssetTrack, channels: Int, from: Double, to: Double,
-        duration: Double, bounds: [Double]?, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?,
+        duration: Double, bounds: [Double]?, keepsSamples: Bool, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?,
         readerFactory: ReaderFactory?, audit: MediaReadAudit?
     ) throws -> Reading {
         try control.check()
@@ -114,7 +116,7 @@ enum AIListenAudioWindow {
                                        end: CMTime(seconds: to, preferredTimescale: 600_000))
         try control.check()
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading this audio range.") }
-        var accumulation = Accumulation(bounds: bounds)
+        var accumulation = Accumulation(bounds: bounds, samples: keepsSamples ? [] : nil)
         // 记的是 reader 自己的 timeRange 和它真交出来的帧数（失败 / 被停也记），不是调用方要的那一窗。
         audit?.note(.windowStarted(asset.url, from: reader.timeRange.start.seconds, to: reader.timeRange.end.seconds))
         defer {
@@ -137,6 +139,8 @@ enum AIListenAudioWindow {
     private struct Accumulation {
         /// Frame boundaries in source seconds (nil = no frames asked for); the frames start with the first stored sample.
         let bounds: [Double]?
+        /// One channel of the stored samples, when kept.
+        var samples: [Float]?
         var builder: ChunkBuilder?
         var frameStats: AIListenSampleFrames?
         var chunks: [WaveformChunk] = []
@@ -189,6 +193,13 @@ enum AIListenAudioWindow {
                                               count: (last - first) * channels)
             builder?.append(interleaved: samples) { chunks.append($0) }
             frameStats?.append(samples, frames: last - first)
+            if self.samples != nil {
+                for frame in 0 ..< (last - first) {
+                    var sum: Float = 0
+                    for channel in 0 ..< channels { sum += samples[frame * channels + channel] }
+                    self.samples?.append(sum / Float(channels))
+                }
+            }
             storedFrames += last - first
         }
 
@@ -200,7 +211,7 @@ enum AIListenAudioWindow {
             if let tail = builder.finishChunk() { chunks.append(tail) }
             frameStats?.finish()
             return Reading(peaks: WaveformPeaks(sampleRate: sampleRate, channelCount: builder.channels,
-                                               chunks: chunks, isComplete: true), frames: frameStats,
+                                               chunks: chunks, isComplete: true), frames: frameStats, samples: samples,
                            sourceStart: sourceStart, from: from, to: to, fileDuration: duration,
                            decodedFrames: decodedFrames, decodedFrom: decodedFrom, decodedTo: decodedTo)
         }
