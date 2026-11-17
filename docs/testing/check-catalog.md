@@ -231,7 +231,8 @@
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
   set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
-  back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
+  back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); `CanvasPresetChecks` covers all three native presets on landscape/portrait and auto 4K/720p
+  round trips, snug wraps, typing afterwards, manual widths, clamping and width-only replies; wiring in
   `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - Does the picture cover the frame (`fills_frame`, `fill_scale`, `fills_except`, look's `uncovered`): `scripts/check-mcp.sh` → `PictureCoverageChecks`
   (the geometry against an independent pixel-centre bitmap over 1,092 turns / sizes / offsets) and `ClipCoverageChecks` (the walkthrough's
