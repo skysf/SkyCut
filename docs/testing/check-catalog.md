@@ -369,3 +369,13 @@
     `--self-test --against <另一份守卫>` 拿老守卫跑同一批场景打表（写「改之前 / 改之后」用）。
     改成白名单那一轮（2026-11-13，PR #424）：改之前的守卫（上一版）在链接和形状两组的 147 个场景里有 83 个该红的退出 0、2 个该绿的红了（顺序那一组只对新顺序有意义，没拿它跑）；改之后当时的 190 个全对。
     整份副本上 Codex 的 9 个输入（L1–L4、T1–T3、S1–S2）改之前都退出 0、改之后都红；它报的两处误报（唯一的索引带 `#锚点`、`mkdir docs/fake.md`）改之后绿。
+- Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `scripts/check-look-jobs.sh` (shard 1, real App objects, synthetic
+  one-keyframe clips; `checks/LookJobs/`): `LineChecks.swift` — the router's lines (`AICallLines`): turns in joining order, a call in two lines
+  waits for both, a read letting go from inside its call, positions and the holder, no letting go before the turn, `waitForLast`;
+  `LookCallChecks.swift` — real 12-frame looks through `AILookCall` and get_job / cancel_job (`AIExportTools`): two sessions x two parallel looks
+  all answered with their pictures (directly or through get_job, at the production 25 s), a look behind a held edit becomes a queued job
+  (positions 1 and 2, `waiting_for`) and runs after it with its 12 frames and picture, cancelled while queued it never starts, another session
+  cannot cancel it, cancelled while running it stops at its next frame, an edit behind a look gets its turn before the look's frames are done.
+  A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
+  after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
+  license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).

@@ -94,6 +94,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["source_cuts", "frame_scan", "stray_frames", "frozen_picture", "black_frame", "source_cut"])
     // set_canvas's reply (2026-11-17, AICanvasReframe): clips that covered the old frame but not the new one.
     names.insert("no_longer_fill")
+    // A look not done within about 25 s answers as a job (AILookCall, 2026-11-17): while queued, get_job's waiting_for names the call ahead.
+    names.insert("waiting_for")
     // get_job after an export (ExportAudioReport, 2026-11-17): the delivered true peak and the limiter's work, named in export_video's topic.
     names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
                      "audio_max_reduction_db"])

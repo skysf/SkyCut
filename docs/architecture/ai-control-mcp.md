@@ -116,6 +116,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     主线程此刻卡了多久（`MainThreadWatchdog.unresponsiveSeconds`；看门狗关着时自己投一个空块、从第一次没落地算起）、这个调用到哪了（`AIBridgeCalls`）。
   - **卡了 30 秒以上就不等**（多数客户端一个调用只等一分钟，要在那之前说出来）；主线程好好的、调用就是不回来，等满 120 秒。规则和话都在 `MCPCallWait`（纯值），
     等的那一段在小程序的 `CallWaiter`。
+    The 120 s is a wall for every call, frozen App or not: work that can take longer answers with a job id first (export, `shots`,
+    inspect_video, and since 2026-11-17 any look after 25 s, section 4 item 12), and a read must not hold its line until it is done
+    (section 4 item 3).
   - **放弃时让 App 也放弃**（`abandon`）：还没开始的就不做了（路由轮到它时 `begin()` 回 false）；已经在做的照做完、照实说「在做」。小程序断开
     （客户端关了）而调用还没开始，App 同样记成放弃。不然 App 缓过来之后照做，AI 以为它失败了、再调一次就做两遍。
   - 回给 AI 的话回答三件事：卡了多久（或忙了多久）、这一步做没做 / 以后会不会做、告诉用户可以等或强退重开、再调之前用 get_timeline 查。
@@ -153,9 +156,17 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    [案例](../bugfixes/2026-10-02-magnet-closes-v1-gaps-on-any-edit.md)）。
    同一次 add_clips 里两段都点名「新开一条轨」时第二段放进第一段开的那条；**只认点名要新开的**，前一段只是因为还没有
    音频轨才开了 A1，不算（[案例](../bugfixes/2026-09-28-new-audio-lands-on-a1.md)）。
-3. **排队**：改工程的调用按到达顺序一个接一个做（`AIToolRouter` 的 `tail`）。Claude 会在一条消息里并排发
+3. **排队**：改工程的调用按到达顺序一个接一个做（`AIToolRouter` 的 lines, `AICallLines`）。Claude 会在一条消息里并排发
    几个调用，不排队的话「接在 V1 最后」看谁先探完素材。`get_status` / `get_job`（最多等 30 秒）/ `cancel_job`
    不排队。
+   **Reads let their line go** (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the lines are
+   `AICallLines` (one per project, per session and per session's opening / closing; joined in arrival order). A read still waits for
+   the edits sent before it, but once it has read what it needs from the project it lets its line go (`AICallLines.letGo()`, after its
+   last read of the project and before its first await), so nothing behind it waits for its rendering: look does this (timeline, file,
+   files, text_scan; `shots=true` keeps the line, it reads the project at its end). Before, a look slowed by load held its project's line
+   until its last frame and everything behind it hit the helper's 120 s give-up and was dropped. A new read-only tool that decodes or
+   renders should do the same; anything that holds a line until it is done must not be able to take minutes. Two sessions' calls never
+   share a line (different projects); they do share the decoder, GPU and CPU.
 4. **看得见**：**窗口只在开工程时摆一次**（2026-10-17 用户定，[多开方案](../plans/2026-10-17-multi-project-ai-editing.md) 板 3，取代方案第 32 条
    「每一轮的第一步摆一次」—— 几个工程各自一轮一轮地往前跳会乱成一团）：开 / 建进主窗口、会话第一次在主窗口那个（这一次打开）上做要摆剪辑页的事
    （`AISession.claimFirstShow`，真摆了才记：后台、录屏中不算摆过）、
@@ -300,6 +311,16 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      2026-09-29 验收里潜水员认成水母、冰面航拍认成地图，工具说明叫 AI 以画面为准）、人脸框（大的在前）、人数、主体、
      画面上的字（accurate + 自动判语言，**连同它的框**，最多 6 块）、平均亮度、黑边。看不了图的模型传 `image=false` 只拿文字。
    - 只读：不改工程、不挪播放头、不摆窗口；排队（刚发的改动先做完再看）。
+   - **Never more than about 25 s without an answer** (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the
+     router runs look through `AILookCall`. Not done within 25 s (waiting behind edits on its project, or rendering on a busy Mac), the
+     call answers with a job (`AIJobs` kind `look`): `job_id`, status `running`, or `queued` with `queue_position` and `waiting_for`
+     (the call holding the line). The look goes on; its answer becomes the job's `result` and get_job brings the picture with it.
+     cancel_job / Stop: still queued, it never starts; running, its task is cancelled and it stops at the next frame
+     (`Task.checkCancellation()` in `AIFrameComposer` and the look loops); only its own session may cancel it. Done in time, the answer
+     is exactly as before. Where a look's time goes (measured on one-keyframe 1080p clips, like generated footage): about 4 s for 12
+     timeline frames on an idle Mac, mostly decoding each requested frame from its clip's keyframe (150–400 ms a frame) and Vision
+     (50–150 ms a frame); it grows with the load (20 s for the same look at load 55–80). Checked by `scripts/check-look-jobs.sh`
+     (real App objects) and `checks/MCP/router-wiring.sh`; the router's own path needs the real helper (section 8).
 13. **听（listen，方案第 31 条）**：AI 听不见，就把声音量给它。**Since 2026-11-17 a clip or a file is measured from one bounded read
    of exactly its window per call** (`AIListenAudioWindow`, the read described below, on `MediaReadQueue.analysis`; no range = the
    whole file): `peak_db` is the **true peak** (dBTP, `TruePeak`: the measure the export limiter holds at −1, so listen, mix=true and
@@ -1288,8 +1309,21 @@ edit_clip 2,074 字超长、清单里有汉字）。
 领和还成对（第 59 条）：活动断言只在 `AIKeepAwake` 和录屏开关、路由领了紧跟 `defer` 还、任务 `start` 领 `finish` 还；几份同时领只开一次、
 最后一份还掉才关、同一份还两次只算一次、忘了还的放掉时也还；一次真的工具调用（`skycut_guide`）开过一次、回答之后还掉；跑完全部声音检查一份都不剩。
 
+`scripts/check-look-jobs.sh` (2026-11-17, real App objects; [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the router's lines
+(`AICallLines`: joining order across several lines, a read letting go early, positions and the holder, no letting go before the turn); two
+sessions' parallel 12-frame looks all answered with their pictures (directly or through get_job); a look behind an edit becomes a queued
+job (position, `waiting_for`) and runs after it; cancelled while queued it never starts, while running it stops; another session cannot
+cancel it; an edit behind a look gets its turn before the look's frames are done. `checks/MCP/router-wiring.sh` pins the router's side:
+look goes through `AILookCall` after joining its lines, the lines are `AICallLines`, and each way of looking lets go once, after its last
+read of the project and before its first await (`shots=true` never).
+
 ## 八、人工回归清单（发版前在真机上走一遍）
 
+- [ ] Slow looks through the real router and helper (section 4 item 12; the license gate keeps this path out of CI): run
+      `scripts/gui-smoke/sky-studio/look_jobs.py` against the isolated smoke App ([GUI smoke](../testing/gui-smoke-testing.md) 四之八, 7a).
+      Every look of two sessions' four parallel 12-frame looks answers within 30 s with its picture or a job_id whose get_job brings it;
+      an edit right behind a look answers first; looks behind a long `edit_clips` answer as queued jobs with `queue_position` and
+      `waiting_for`, and `cancel_job` cancels one.
 - [ ] 让 AI 给一刀做 `set_transition sound=lead frames=16`（第 61 条）：下一场的声音在切点前淡进来、画面照旧在切点上换，分出来的声音在音频轨上、和画面链接着；⌘Z 一步回去。`all=true sound=crossfade`：一串刀的声音在 A1 / A2 交替叠着换，结果里 `room_frames` 对得上剩下的素材。
 - [ ] 素材左下角有台标的工程：让 AI `look clip_id=… text_scan=true`，结果里 `subtitle_overlaps` 列出的句子在预览里确实压在台标上、没列的不压；
       `get_subtitles` 里每句的 `box` 和预览上字幕的位置对得上（底边、左右、折成两行的高）。

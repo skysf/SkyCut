@@ -44,6 +44,8 @@ enum AIFrameComposer {
         }
         var frames: [AIFrameSampler.Frame] = []
         for time in times {
+            // A cancelled look (cancel_job, AILookCall) stops here instead of decoding the rest.
+            try Task.checkCancellation()
             var video: CGImage?
             if let generator, time < state.duration {
                 video = try? await generator.image(at: CMTime(seconds: max(0, time), preferredTimescale: 600)).image
