@@ -15,6 +15,7 @@
 - [2026-09-27 AI 的改动撤一步，整条时间线空了](2026-09-27-ai-edits-share-one-undo-group.md) — 「按事件分组」只对用户事件成立：每个改动工具包一层 `AIUndoGrouping.step`，别去关自动开的组。
 - [2026-10-18 侧边栏那一行看不到百分比、排队也写「导出中」](2026-10-18-ai-projects-sidebar-row-status.md) — 窄栏里给长短不定的字整行；「有任务」不等于「在做」。
 - [2026-10-18 侧边栏「AI 在剪的工程」只有标题、没有行](2026-10-18-ai-projects-sidebar-rows-never-shown.md) — List 里 body 带 `Section` 的视图不许套 `.equatable()`。
+- [2026-11-17 An AI ripple clamps a J cut's sound at 0:00, so it runs late by its lead-in](2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md) — A clip with source time is never clamped at 0:00: whatever moves clips in bulk trims the head (`moveForLinkage`), and the reply says so.
 - [2026-10-14 AI 以为成片是 720p](2026-10-14-ai-thinks-export-is-720p.md) — AI 会拿手边任何数字当答案：该说的事实在产出它的工具结果里说。
 - [2026-09-29 转写认不出语言，AI 被叫去「面板里选」](2026-09-29-ai-told-to-pick-language-in-panel.md) — 给界面写的报错不能原样交给 AI；要按种类换说法，错误就得有类型。
 - [2026-11-07 真积分验收后的五处 AI 工具结果](2026-11-07-ai-tool-results-after-character-smoke.md) — 列表回有界的摘要；终态清掉旧阶段；落盘图片报实测尺寸。
