@@ -101,7 +101,7 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["audio_loudness_lufs", "audio_peak_dbtp", "audio_peak_before_limiter_dbtp", "audio_limited_seconds",
                      "audio_max_reduction_db"])
     // listen voice=… (AIListenVoiceReport / VoiceClarity, 2026-11-17): a masker's kind, the low band and the verdicts.
-    names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short"])
+    names.formUnion(["clip_sound", "low_150_db", "voice_db", "probably_unintelligible", "may_be_hard", "two_voices", "too_short", "may_be_loud"])
     return names
 }
 
