@@ -178,7 +178,8 @@ enum MCPGuideTimelineEditTopics {
             the old frame but not this one). To fill the new shape, reframe those with edit_clips fit=fill (edit_clip's \
             framing section explains how). Texts and shapes keep their size on the frame (against its short side, so the \
             preset ratios keep their pixels): their font_size, width, height and line_width are redone and listed in reframed; \
-            x, y and a text's box_width stay. off_frame lists texts and shapes that now stick out of the frame: move or \
+            x and y stay. Preset text wraps still hug their words; other box_width values stay. off_frame lists texts and \
+            shapes that now stick out of the frame: move or \
             resize them with set_texts or set_shapes.
             """),
             MCPGuideSection(name: "frame_rate", about: "fps, and screen recordings", text: """

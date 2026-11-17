@@ -63,7 +63,10 @@
     (`MotionPresetLayout.snugBoxWidth`), because the text wipe sweeps the layout box, not the ink — in the default 0.9-wide box a short
     centred title is wiped in a third of the entrance and looks like a cut. New words or type keep it snug (`MotionPresetGroups.update`),
     unless that edit set the width itself or the width had already been set by hand (then it is no longer snug and stays as it is);
-    a `box_width` the AI passes with `motion_preset` stays too.
+    a `box_width` the AI passes with `motion_preset` stays too. On a canvas change, `OverlayReframe` recognizes the old snug
+    width and remeasures it after scaling and clamping the style, so a short title does not wrap just because the frame narrows.
+    Ordinary and manually set widths keep their frame fraction; the same edit's explicit sizing is respected. This does not
+    rerun `arrange`: each member keeps its normalized centre and manual offsets. See the [canvas wrap case](../bugfixes/2026-11-17-canvas-preset-wrap-width.md).
 
 ## 三、三套的数（照样片量的，720p × 1.5）
 
@@ -89,6 +92,10 @@
   框和小字跟着挪、小字自己挪不牵动标题；几种报错（`hit_at` / `small_text` 用在不是一套的字上、加的时候缺 `motion_preset` 或标题、
   不认识的名字）一样都不改；`set_texts` 一项一套；粘贴出来的自成一组、只粘一块的不留标记；存盘往返、普通的字不写键、读不懂的当普通的字。
   Also (2026-11-17): a short title's wrap width hugs it, grows with longer words and keeps them on one line, and a `box_width` set by hand is kept.
+- `CanvasPresetChecks` in the same MCP check runs all three native presets through a canvas round trip (16:9 → 9:16 → 16:9 and
+  auto 4K → 720 × 1280 → 4K): words stay snug, pixel lengths retain their share of the short side, model values return, and
+  identities, centres, timing and animations stay. It also checks typing afterwards, manual widths, the minimum-font clamp and
+  `set_canvas` reporting a width-only text change.
 - 说明书和清单的上限、名字都真的存在：`GuideChecks` / `GuidePilotChecks` / `CatalogTextChecks`（set_text 的参数定义 ≤ 4,500 字节）。
 - 界面：`checks/preview-perf-wiring.sh`（新视图第一行计数）、`checks/presented-views-app-language.sh`（「动效预设」那一栏是 popover，
   套 `.appLanguage()`）、`checks/inspector-live-binding-wiring.sh`（「预设」下拉和「落点」的打字走离散写入）、`checks/inspector-fits-width.sh`、
@@ -108,6 +115,10 @@
 - [ ] 导出一段带三套的片子，逐帧和预览比：一样。
 - [ ] ⌘C ⌘V 一整套：粘出来的那套换预设、挪落点不牵动原来那套。
 - [ ] 让 AI「在 25.25 那一下放一个框住再放开的 FROM SKY STUDIO」：一次 set_text、一步撤销，和界面上放的一样。
+
+- [ ] Manual before a release: add each native preset with a short title, switch 16:9 → 9:16 → 16:9, and compare preview and export.
+  The automatic wrap stays snug, switching back restores the preset, and typing longer words after the switch still grows the
+  wrap. A width set by hand keeps its frame fraction.
 
 ## 六、还没做的
 
