@@ -166,19 +166,36 @@ def code(path):
     return "\n".join(line.split("//", 1)[0] for line in pathlib.Path(path).read_text().splitlines())
 tool, sound = code("Sources/SrtFlow/AIListenTool.swift"), code("Sources/SrtFlow/AIListenSourceSound.swift")
 words, labels = code("Sources/SrtFlow/AIListenSourceWords.swift"), code("Sources/SrtFlow/SoundLabelScores.swift")
-assert tool.count('args.bool("describe")') == 1 and tool.count("AIListenSourceSound.listen(") == 1, "✗ listen 要读 describe 并交给 AIListenSourceSound"
+assert tool.count('args.bool("describe")') == 1 and tool.count("AIListenSourceSound.listen(") == 1, "✗ listen must dispatch describe to AIListenSourceSound"
 assert sound.count("AIJobs.shared.start(.listen") == 1 and sound.count("AIWorkQueue.shared.submit(.mix, jobID: job.id)") == 1, \
-    "✗ describe 是 AI 起的长任务（AIJobs，App Nap 不降速）、排在 mix 道上"
+    "✗ describe must use AIJobs and the mix lane"
 assert sound.count("AIJobs.shared.finish(job, .done") == 1 and sound.count("AIJobs.shared.finish(job, .failed") == 1 \
-    and sound.count("AIJobs.shared.finish(job, .cancelled") == 1, "✗ describe 每种结局都要 finish"
-assert sound.count("AIListenAudioWindow.read(") == 1 and "keepsSamples: true" in sound, "✗ describe 只读一遍那一窗（AIListenAudioWindow，留一路采样）"
-assert sound.count("MediaReadQueue.run(on: MediaReadQueue.analysis)") == 1, "✗ 描述词和识别器在 MediaReadQueue.analysis 上算（不进 Swift 并发池）"
+    and sound.count("AIJobs.shared.finish(job, .cancelled") == 1, "✗ every describe outcome must finish its job"
+assert sound.count("AIListenAudioWindow.read(") == 1 and "keepsSamples: true" in sound, "✗ describe must retain samples from one bounded read"
+assert "edges: target.edges, keepsSamples: true" in sound and "to: window.to, edges: .sound" in sound, \
+    "✗ clip description must keep sound edges when retaining samples"
+assert "sourceIn == nil && sourceOut == nil ? .sound : .exact" in sound, "✗ only a named file range requires exact audio coverage"
+assert "readStart: reading.sourceStart" in sound, "✗ description windows must start at the first sample's real source time"
+assert sound.count("MediaReadQueue.run(on: MediaReadQueue.analysis)") == 1, "✗ traits and classification must run on MediaReadQueue.analysis"
 assert "SourceSoundDescription.describe(" in sound and "SoundLabelScores.classify(" in sound and "AIListenSourceWords.words(" in sound, \
-    "✗ describe 要给三样：SkyCut 的描述词、识别器每个标签的分数、有没有字"
-assert "AIListenVoiceCheck.provenance()" in sound, "✗ 来路已知的（我们的旁白、音乐库、音效）不描述：先问来路"
-assert "screeningLocale()" in words and "assetInstallationRequest" not in words and "matchedLocale" not in words \
-    and "supportedLocales" not in words, "✗ describe 只用已经装好的语音模型（screeningLocale），从不下载"
+    "✗ describe must report traits, label scores and words"
+assert "AIListenVoiceCheck.provenance()" in sound, "✗ known provenance must be checked before describing sound"
+assert all(name not in sound for name in ["AudioEngineIdleKeeper", "audioEngineHost", "TimelineAudioEngine", "wake(", "suspend("]), \
+    "✗ source description must not touch the preview audio graph"
+assert 'args.stringArray("layers") == nil' in sound and 'args.bool("frames")' in sound, "✗ describe must refuse mix-only fields"
+assert "screeningLocale()" in words and "reserveInstalledModel(locale: locale)" in words and "ensureModel(" not in words, \
+    "✗ describe must reserve an installed speech model without an installation fallback"
+assert all(name not in words for name in ["assetInstallationRequest", "matchedLocale", "supportedLocales"]), \
+    "✗ description must not request a speech model download"
+service = code("Sources/SrtFlow/SubtitleGen/SpeechTranscriptionService.swift")
+installed = service.split("func reserveInstalledModel(", 1)[1].split("func releaseModel(", 1)[0]
+assert "SpeechModelLeases.shared.acquire(locale)" in installed and "status == .installed" in installed \
+    and "SpeechModelLeases.shared.release(locale)" in installed, "✗ installed-only reservation must check availability and release on failure"
+assert all(name not in installed for name in ["assetInstallationRequest", "downloadAndInstall", "ensureModel("]), \
+    "✗ installed-only reservation must never install a model"
+words_end = sound.split("let words = await AIListenSourceWords.words(", 1)[1].split("var object = target.head", 1)[0]
+assert "if stop.stopped { throw CancellationError() }" in words_end, "✗ cancellation during word recognition must not publish a successful description"
 assert "SNClassifySoundRequest(classifierIdentifier: .version1)" in labels and "overlapFactor = 0" in labels, \
-    "✗ 识别器用系统自带的分类器，3 秒一窗、不重叠"
+    "✗ classification must use the native classifier without overlapping windows"
 PY
-echo "   ✓ describe 交给 AIListenSourceSound：AIJobs 任务、mix 道、一遍有界读取、analysis 队列上算、先问来路、只用装好的语音模型"
+echo "   ✓ describe uses listen jobs, one bounded sample read, source provenance, analysis queues and installed-only speech models"

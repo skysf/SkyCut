@@ -8,7 +8,7 @@
 # new binary uses it (measured on an M1: 25–90 s, minutes under load). A small binary that rarely changes, at the same path,
 # keeps that cost out of every other check (it used to sit in check-mix-layers) and lets an unchanged rerun skip it.
 #
-# 用法：scripts/check-sound-labels.sh
+# Usage: scripts/check-sound-labels.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,7 +16,7 @@ TRIPLE="arm64-apple-macosx15.0"
 OUT=".build/checks/soundlabels"
 mkdir -p "$(dirname "$OUT")"
 
-echo "==> 编译自检二进制"
+echo "==> Compile the native sound-label check"
 xcrun swiftc \
   -target "$TRIPLE" \
   -O \
@@ -25,5 +25,5 @@ xcrun swiftc \
   Sources/SrtFlow/SoundLabelScores.swift \
   checks/SoundLabels/main.swift
 
-echo "==> 跑自检（第一次用分类器要先编译模型，可能要一两分钟）"
+echo "==> Run checks (the first classifier use compiles its model and can take a few minutes)"
 "$OUT"

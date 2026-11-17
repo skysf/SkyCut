@@ -29,6 +29,7 @@ enum AIListenSourceSound {
         let url: URL
         let from: Double
         let to: Double
+        let edges: AIListenAudioWindow.Edges
         let place: AIListenSourceReport.Place
         let head: [String: JSONValue]
     }
@@ -37,6 +38,9 @@ enum AIListenSourceSound {
         guard try !(args.bool("mix") ?? false), try !(args.bool("beats") ?? false), try !(args.bool("cuts") ?? false),
               try args.string("voice") == nil else {
             throw AIToolError("describe is its own question: call listen again for mix, voice, beats or cuts.")
+        }
+        guard try args.stringArray("layers") == nil, try !(args.bool("frames") ?? false) else {
+            throw AIToolError("layers and frames go with mix=true; describe examines one clip or file's own sound.")
         }
         let provenance = AIListenVoiceCheck.provenance()
         let target: Target
@@ -51,10 +55,12 @@ enum AIListenSourceSound {
             let url = AIWorkspace.shared.resolve(path)
             guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("\(path) does not exist.") }
             if let ask = try AIWorkspace.shared.confirmReading([url], verb: "listen to", args: args, project: project) { return ask }
-            let start = max(0, try args.double("source_in") ?? 0)
+            let sourceIn = try args.double("source_in"), sourceOut = try args.double("source_out")
+            let start = max(0, sourceIn ?? 0)
             let duration = try await AIListenAudioWindow.duration(of: url)
-            let end = min(duration, try args.double("source_out") ?? duration)
-            target = try capped(Target(url: url, from: start, to: end, place: AIListenSourceReport.Place(),
+            let end = min(duration, sourceOut ?? duration)
+            target = try capped(Target(url: url, from: start, to: end, edges: sourceIn == nil && sourceOut == nil ? .sound : .exact,
+                                       place: AIListenSourceReport.Place(),
                                        head: ["listened_to": .string(AIWorkspace.shared.display(url))]), field: "source_out")
         } else {
             throw AIToolError("describe needs clip_id (a clip's own sound) or file.")
@@ -75,7 +81,7 @@ enum AIListenSourceSound {
         guard let clip = state.clip(with: id), let slot = state.location(of: id)?.track else { throw AIToolError("\(text) is not a clip.") }
         var head: [String: JSONValue] = ["clip": .string(ids.short(id)), "name": .string(clip.name), "track": .string(AITrackName.name(of: slot))]
         guard clip.hasAudio else { throw AIToolError("\(ids.short(id)) has no sound.") }
-        let kind = provenance.kind(of: clip, onVideoTrack: AITrackName.name(of: slot).hasPrefix("V"))
+        let kind = provenance.kind(of: clip)
         if [.voice, .music, .effects].contains(kind) {
             head["source"] = .string(kind.rawValue)
             head["note"] = .string("SkyCut knows what this is from where it came (\(kind.rawValue): one of its voice-overs, a "
@@ -88,12 +94,14 @@ enum AIListenSourceSound {
         }
         head["source"] = .string(kind.rawValue)
         let place = AIListenSourceReport.Place(start: clip.timelineStart, sourceStart: clip.sourceStart, speed: clip.speed)
-        return .target(try capped(Target(url: clip.sourceURL, from: window.from, to: window.to, place: place, head: head), field: "to"))
+        return .target(try capped(Target(url: clip.sourceURL, from: window.from, to: window.to, edges: .sound,
+                                        place: place, head: head), field: "to"))
     }
 
     /// At most `maxSeconds` of sound read: longer is refused with a `to` / `source_out` that fits
     /// (docs/architecture/mcp-edit-parameters.md: refuse, suggest a value that works).
     private static func capped(_ target: Target, field: String) throws -> Target {
+        guard target.to > target.from else { throw AIToolError("The end must be after the start, within the file's duration.") }
         guard target.to - target.from > maxSeconds + 1e-6 else { return target }
         let suggested = field == "to" ? target.place.seconds(atSource: target.from + maxSeconds) : target.from + maxSeconds
         let rounded = JSONValue.number((suggested * 1000).rounded(.down) / 1000)
@@ -143,7 +151,7 @@ enum AIListenSourceSound {
 
     private static func describe(_ target: Target, stop: AIListenSourceStop) async throws -> [String: JSONValue] {
         let reading = try await AIListenAudioWindow.read(target.url, from: target.from, to: target.to,
-                                                         until: Date().addingTimeInterval(readSeconds), keepsSamples: true)
+                                                         until: Date().addingTimeInterval(readSeconds), edges: target.edges, keepsSamples: true)
         guard let samples = reading.samples else { throw AIToolError("SkyCut could not read this sound.") }
         if stop.stopped { throw CancellationError() }
         let rate = reading.peaks.sampleRate
@@ -153,6 +161,7 @@ enum AIListenSourceSound {
         let (traits, labels) = try measured.get()
         if stop.stopped { throw CancellationError() }
         let words = await AIListenSourceWords.words(target.url, from: reading.sourceStart, to: reading.to)
+        if stop.stopped { throw CancellationError() }
         var object = target.head
         let report = AIListenSourceReport.json(traits: traits, labels: labels, words: words,
                                                readStart: reading.sourceStart, readEnd: reading.to, place: target.place)

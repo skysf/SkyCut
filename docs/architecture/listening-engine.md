@@ -3,7 +3,7 @@
 > 管什么：SkyCut 里替 AI「听」声音的那一层薄引擎 —— 分几层、每层在哪、谁调谁；第 2 步（ESTOI、拿掉谁涨多少、150 Hz 以下另报）和
 > 第 3 步（没来路的原声的特征和描述）这两块纯计算的口径、和研究时 numpy 版怎么对账；哪几条线是盲听定的、定到什么程度。
 > 不管什么：第 1 步「按层离线渲 + 每帧分频段电平」（在音频引擎里，见[成片的声音](export-audio-mixdown.md)「按层量」一节和[音频引擎](audio-engine.md)）；
-> 检查的门槛、给 AI 的报告、接到 `listen` / `inspect_video` 上 —— 这些是接线的任务，做的时候补进这份文档。
+> Live voice thresholds, reports and `listen` wiring are covered below; the combined `inspect_video` delivery report remains separate work.
 >
 > 由来（2026-11-16）：用户问「是否还有更好的方式，或者我们自己写一个能解决听声音的引擎？」。调研的结论：没有现成的东西能替 AI 听
 > （能听的大模型认环境声约六成、问「什么时候、几次」基本不可用；苹果的识别器没有「轰鸣」这一类），所以在 SkyCut 里自己做一层薄的：
@@ -69,12 +69,21 @@
    (`SoundLabelScores`: SoundAnalysis `SNClassifySoundRequest(.version1)`, 3 s analysis windows without overlap, every label's own
    score — the report keeps the strongest five at 0.05 or more); and how many words the on-device speech recogniser finds there
    (`AIListenSourceWords`: a 16 kHz window via `QueuedAudioWindow`, `SpeechTranscriptionService` with `screeningLocale()` = a model
-   already installed, never a download; macOS 26; the summary quotes up to 120 characters of what it heard). A listen job (AIJobs,
-   the mix lane); the classifier's first use in a process compiles its model (measured ~90 s once on a busy M1, then 0.13 s for
+   already installed, never a download; macOS 26; the summary quotes up to 120 characters of what it heard). The service's
+   `reserveInstalledModel` reserves the locale and rechecks `.installed`, releasing and reporting not checked if it was removed;
+   this path has no installation fallback. Transcription success and failure both release the lease. Cancellation is checked
+   after word recognition too, before publishing success. These adapter contracts and their regressions are recorded in
+   [the integration case](../bugfixes/2026-11-17-source-description-read-and-model-contracts.md).
+   A listen job (AIJobs, the mix lane); the classifier's first use after a new binary can compile its model (measured ~90 s once on a busy M1, then 0.13 s for
    9 s of sound), so the first call may answer with a job id.
    Words, never "music / not music": on synthetic sound the classifier scored a 55 Hz drone "music 0.88, synthesizer 0.87",
    white noise "music 0.14, waterfall 0.14, water 0.11", a major chord "music 0.66, bell 0.56" — the runner-ups and how close they
    are carry the information.
+   A clip and a whole file retain the actual sound at its own source times (`edges: .sound`); a named file range keeps exact
+   coverage. Windows begin at `reading.sourceStart`, including a late-starting track, never at the requested picture start.
+   `layers` / `frames` belong only to mix=true and are refused by describe. No preview engine is created or woken.
+   Traits and labels share the retained-sample read. If an installed speech model is available, words use a separate bounded
+   `QueuedAudioWindow` extraction of the same source span to the recogniser's 16 kHz format; this is not a single decode for all three consumers.
 4. **没来路的原声**（每个留着原声的镜头）：那一层的采样交给 `SourceSoundDescription.describe(_:sampleRate:)`，回每 3 秒一窗的九个数和描述词。
 5. 第 4 步把这些拼成表交给 AI；**只报不拦**（第三节）。
 6. 都是纯 CPU 的计算，不读文件、不碰声卡：接线时放在后台（AI 起的走 `AIJobs`，[AI 接口](ai-control-mcp.md)第四节第 59 条），别放主线程。
@@ -213,7 +222,8 @@ tests or validated loudness thresholds. The rule matches preview-board tools v1.
 音高的最短周期改了（3 条），全红；改回来全绿。汉宁窗换成教科书写法、拍子的频带改成右闭这两样改了也是绿的：前者只差最后一位，
 后者这几个边界上正好没有频点（第六节），两样都不影响结果。
 
-**没验到的**：真录音、真的按层渲出来的采样（接线的任务）；SoundAnalysis、SpeechTranscriber；描述词的线在别的片子上灵不灵。
+**Not verified by the original pure-DSP checks (2026-11-16):** real recordings, rendered stems, SoundAnalysis or
+SpeechTranscriber, and the description thresholds on other films. The subsequent integration checks are listed below.
 
 **`listen voice=…` (2026-11-17)**: `scripts/check-listening.sh` checks the verdict table (`VoiceClarity`, every edge) and the line
 split (`VoiceLines`: two stretches a second apart are two lines, a 0.4 s pause inside one is not, silence has none, a quieter voice
@@ -235,3 +245,9 @@ source seconds mapped to the clip's timeline (start, source start, speed), and w
 own small script with a fixed binary path because CoreML compiles the model for the Neural Engine the first time each new binary
 uses it (25–90 s measured on an M1, minutes under load; an unchanged rerun at the same path skips it). Not verified: real camera sound and generated video sound (the South Pole
 shots are not in the repo), the classifier's labels on them, the speech recogniser inside the app (it needs an installed model).
+
+`checks/MCP/ListenSamplesChecks.swift` runs the actual bounded reader on two independent synthetic stereo channels, with
+the audit bound to that call: one read of only the requested range, mono samples equal to (L + R) / 2 at their source times,
+and no retained samples unless requested. `ListenRangeChecks` also keeps samples with short and late-starting sound tracks.
+Wiring guards reverse-check sound-edge routing, installed-only model reservation and cancellation after word recognition;
+they do not claim to test actual speech recognition or model removal on the user's Mac.

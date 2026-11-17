@@ -25,11 +25,12 @@ enum AIListenSourceWords {
             let window = try await QueuedAudioWindow.extract(
                 assetURL: url, range: SourceRange(start: from, end: to), into: directory, on: MediaReadQueue.analysis
             )
-            // An installed model: ensureModel only takes the lease (it downloads nothing for an installed locale); it must be
-            // given back on every path.
-            try await service.ensureModel(locale: locale) { _ in }
+            // Reserve first and recheck availability without an installation fallback: the model may have been removed
+            // since screeningLocale. Every successful reservation is returned on both transcription paths.
+            try await service.reserveInstalledModel(locale: locale)
             let found: [TimedWord]
             do {
+                try Task.checkCancellation()
                 found = try await service.transcribe(fileURL: window, locale: locale, sourceOffset: from)
             } catch {
                 await service.releaseModel(locale: locale)

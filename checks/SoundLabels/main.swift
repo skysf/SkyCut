@@ -47,8 +47,12 @@ do {
 } catch {
     check(false, "the sound classifier did not run: \(error)")
 }
-let short = (try? SoundLabelScores.classify([Float](repeating: 0, count: Int(rate)), sampleRate: rate)) ?? []
-check(short.allSatisfy { $0.duration > 0 }, "a sound shorter than a window does not break the classifier (\(short.count) windows)")
+do {
+    let short = try SoundLabelScores.classify([Float](repeating: 0, count: Int(rate)), sampleRate: rate)
+    check(short.allSatisfy { $0.duration > 0 }, "a sound shorter than a window does not break the classifier (\(short.count) windows)")
+} catch {
+    check(false, "short-sound classification failed: \(error)")
+}
 
 print("\(checks) checks, \(failures) failures")
 exit(failures == 0 ? 0 : 1)

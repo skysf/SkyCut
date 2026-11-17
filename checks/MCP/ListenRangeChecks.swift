@@ -37,6 +37,7 @@ func runListenRangeChecks() async {
         await checkCompressedListenRange(in: directory)
         await checkListenEditCoverage(in: directory)
         await checkListenSoundEdges(in: directory)
+        await checkListenKeptSamples(in: directory)
     } catch {
         check(false, "listen range fixture/production path failed: \(error)")
     }
@@ -280,18 +281,20 @@ private func checkListenSoundEdges(in directory: URL) async {
               "…and measured where its sound is, not refused (peak \(whole["peak_db"]?.doubleValue ?? -99), loudest at \(whole["loudest_at"]?.doubleValue ?? -1))")
         let deadline = Date().addingTimeInterval(listenCheckHangBound)
         let tail = try await AIListenAudioWindow.read(shortURL, from: 0, to: 2, until: deadline,
-                                                      frames: { from, to in [from, 0.5, 1.5, to] }, edges: .sound)
+                                                      frames: { from, to in [from, 0.5, 1.5, to] }, edges: .sound, keepsSamples: true)
         let frames = tail.frames?.frames ?? []
         check(frames.count == 3 && frames[0].meanSquare > 0 && frames[2].meanSquare == 0
               && abs((tail.windows.last?.end ?? 0) - 1) < 0.03 && abs(tail.sourceStart) < 0.001,
               "a clip's window past the end of the file's sound: the sound up to 1 s at its true times, nothing after (\(tail.sourceStart)–\(tail.windows.last?.end ?? -1))")
+        check(tail.samples?.count == Int(tail.peaks.framesAvailable), "kept description samples stop with the sound before the picture ends")
         // Picture 0–3 s, sound 1–2 s (made by checkListenEditCoverage). Some decoders fill the empty edit with zeros.
         let late = try await AIListenAudioWindow.read(directory.appendingPathComponent("synthetic-offset.mov"), from: 0.25, to: 1.5,
-                                                      until: deadline, frames: { from, to in [from, 1, to] }, edges: .sound)
+                                                      until: deadline, frames: { from, to in [from, 1, to] }, edges: .sound, keepsSamples: true)
         let lateFrames = late.frames?.frames ?? []
         check((abs(late.sourceStart - 0.25) < 0.001 || abs(late.sourceStart - 1) < 0.01) && abs((late.windows.last?.end ?? 0) - 1.5) < 0.01
               && lateFrames.count == 2 && lateFrames[0].meanSquare == 0 && lateFrames[1].meanSquare > 0,
               "a clip's window over a sound that starts late: the sound from where it starts, never moved earlier (from \(late.sourceStart))")
+        check(late.samples?.count == Int(late.peaks.framesAvailable), "kept description samples share the late sound's real source start")
     } catch { check(false, "a clip's window or a whole file with less sound than picture was refused: \(error)") }
 }
 

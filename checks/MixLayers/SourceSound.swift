@@ -19,7 +19,7 @@ private func sourceSound(rate: Double) -> [Float] {
 }
 
 func checkSourceSound() {
-    group("4. listen describe=true：一段原声每 3 秒是什么（SkyCut 的描述词 + 系统识别器每个标签自己的分数 + 有没有字）")
+    group("4. listen describe=true: source traits, each classifier label's score and words per 3-second window")
     let rate = 48_000.0
     let samples = sourceSound(rate: rate)
     // What the classifier says, per window (its real labels and scores come from Apple's model: scripts/check-sound-labels.sh).
@@ -50,4 +50,7 @@ func checkSourceSound() {
     check(unchecked["summary"]?["words"]?.stringValue == "not checked: no speech model" && unchecked["windows"]?.arrayValue?.first?["words"] == nil,
           "not asked: says why, and no word counts")
     check(unchecked["note"]?.stringValue?.contains("not a verdict") == true, "the note says these are words, not a verdict")
+    let longWords = AIListenSourceReport.json(traits: [], labels: [], words: .found([.init(start: 0, text: String(repeating: "a", count: 200))]),
+                                            readStart: 0, readEnd: 3, place: .init())
+    check(longWords["summary"]?["heard"]?.stringValue?.count == 120, "quoted recognition stays within the 120-character report budget")
 }
