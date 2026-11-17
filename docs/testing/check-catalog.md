@@ -24,7 +24,7 @@
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
-- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。
+- 听声音的引擎第 2、3 步的纯计算（ESTOI、拿掉谁涨多少、20–150 Hz 另报、原声的九个特征和描述词）：`scripts/check-listening.sh`（只编 `Sources/SrtFlow/Listening/` 和 `checks/Listening/`，不要 ffmpeg、不要 App）。论文该有的性质（同一信号 = 1、整体增益不变、加噪随信噪比单调、134 Hz 以下看不见）、地基（任意长度的 DFT 对定义式、整段 FFT 截断的重采样）、六种合成的原声各自的描述词；和研究时的 numpy 版逐数对账（同一份合成输入，容差 1e-9，实测最大 2.6e-11）：输入用 `--dump <目录>` 写出来，对照值在 `checks/Listening/PythonReference.swift`，改了信号要重算。合同、对账的办法和反向验证见 [听声音的引擎](../architecture/listening-engine.md)第六、八节。 Since 2026-11-17 also the voice check's verdict table (`VoiceClarity`) and line split (`VoiceLines`); the real `listen voice=…` path is `scripts/check-mix-layers.sh` group 3 (synthetic voice, noise and music: lines, verdicts, main masker and its kind, V tracks refused, `auto`, two voices); group 3b covers the grey hint boundaries, excluded main maskers, separate counts and detached camera provenance.
 
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
@@ -219,6 +219,11 @@
   set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
   back on the way back, and the reply lists them in `reframed` / `off_frame` (`CanvasOverlayChecks`); wiring in
   `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
+- Does the picture cover the frame (`fills_frame`, `fill_scale`, `fills_except`, look's `uncovered`): `scripts/check-mcp.sh` → `PictureCoverageChecks`
+  (the geometry against an independent pixel-centre bitmap over 1,092 turns / sizes / offsets) and `ClipCoverageChecks` (the walkthrough's
+  turn and drift, flips, crop, keys, a spring's dip, look with V2 / hidden / transparent / gap / wipe / transition / rise); wiring in
+  `checks/MCP/coverage-wiring.sh`; real preview frames against the same geometry in `scripts/check-preview-composition.sh`
+  (`RotatedPictures.swift`). Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；

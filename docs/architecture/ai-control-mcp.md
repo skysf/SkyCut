@@ -290,7 +290,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - `edit_clip` 分两步：`AIClipTools.plan` 可以 await（要看画面的在这一步抽帧、识别），`apply` 同步提交、
      包在 `AIUndoGrouping.step` 里；中途画布变了（用户换了画面比例）就不提交、请 AI 重来。
    - 读回来：`get_timeline` / `edit_clip` 的结果里每段画面带 `picture`（`fills_frame`，非默认时 x / y / scale / crop）；
-     默认布局又正好盖满的段不写，省 token。
+     默认布局又正好盖满的段不写，省 token。Since 2026-11-17 `fills_frame` counts rotation, crop, flips and position / size / rotation
+     keyframes over every frame the clip is on screen; when it is false the picture adds `fill_scale` (the smallest steady scale that
+     covers throughout) and, when it fails only part of the time, `fills_except`; set_keyframes returns `picture` too. One geometry
+     with look's `uncovered`: [预览自由变换](preview-free-transform.md) "Does the picture cover the frame".
 12. **看（look，方案第 31 条）**：AI 看不见画面，就给它看。两种看法、一次回一张图 + 每帧一段文字：
    - **时间线**（不给 file）：成片在那一刻的样子。`AIFrameComposer` 按预览的层序合成 —— 视频轨（自己调
      `VideoEditCompositionBuilder.build`，**不借播放器上挂着的那份**：AI 刚改完就看时，预览的重建可能还在防抖里）→
@@ -310,6 +313,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    - 每帧的文字（`AIFrameDescription`）：Vision 的标签（前 6 个、把握 ≥ 0.3；**只是粗猜**，AI 生成的、少见的画面常认错 ——
      2026-09-29 验收里潜水员认成水母、冰面航拍认成地图，工具说明叫 AI 以画面为准）、人脸框（大的在前）、人数、主体、
      画面上的字（accurate + 自动判语言，**连同它的框**，最多 6 块）、平均亮度、黑边。看不了图的模型传 `image=false` 只拿文字。
+   - **uncovered** (2026-11-17): a timeline frame where no picture covers part of the canvas also says where — a bare edge with how deep
+     the gap reaches, a bare corner with how far it runs along each edge, in canvas pixels (`AIPictureCoverage.uncovered`). Worked out
+     from the clips' geometry at that moment (the same clips `on_screen` lists, with their entrance / exit motion), never from pixels:
+     dark footage is not uncovered; black bars inside the footage stay under `black_bars`. Rule: [预览自由变换](preview-free-transform.md)
+     "Does the picture cover the frame".
    - 只读：不改工程、不挪播放头、不摆窗口；排队（刚发的改动先做完再看）。
    - **Never more than about 25 s without an answer** (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the
      router runs look through `AILookCall`. Not done within 25 s (waiting behind edits on its project, or rendering on a busy Mac), the
@@ -393,6 +401,15 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      建议最后一帧的帧头。**长任务**：`AIJobs` 的 `listen` 任务（第 59 条）、`AIWorkQueue` 的 `mix` 道（一次一个），离线渲在 `MediaReadQueue.export` 上；
      当场最多等 20 秒（62 秒、8 层约 1 秒，3 分钟约 3 秒），等不到回任务号，`get_job` 拿同一份结果。只读：不改工程、不进撤销、不碰预览的引擎。
      名片 + 说明书 `listen` 主题的 `mix` 一节。量法在 `scripts/check-mix-layers.sh` 真跑，接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节。
+   - **Is each narration line covered? (`voice=…`, 2026-11-17, MCP-39)**: `voice=A1` (several joined by +, or `auto` = the audio tracks
+     holding SkyCut's voice-overs) measures every line of that voice against the mix: ESTOI, the verdict in the user's tiers
+     (`VoiceClarity`: `probably_unintelligible` < 0.31, `may_be_hard` 0.31–0.41, music only < 0.20, `two_voices`, `too_short`), the two
+     layers covering it most with what they are from where they came, and the 20–150 Hz level next to the voice's. A video track's sound
+     is refused with the reason (a voice inside a clip's own sound can't be taken out). A separate grey `hint` may suggest
+     lowering one added main masker 3–6 dB: only a `clear` line below 0.50 whose removal gain is at least 0.25; clip sound,
+     detached camera audio, other voices and `rest` are excluded. `summary.may_be_loud` counts hints separately. Report only. Same job shape as mix=true
+     (`AIListenMix.queued`). Contract in [the listening engine](listening-engine.md) section 2 item 3a; the guide's listen topic has a
+     `voice` section; one parameter and a few words on the card.
      Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened
      and the wording moved into the listen guide topic; the catalog is no longer than before mix=true (99,059 vs 99,063 on 2026-11-16).
 

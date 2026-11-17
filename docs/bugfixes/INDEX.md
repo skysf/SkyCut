@@ -62,6 +62,7 @@
 - [2026-10-14 cut_speech 把量好的静音切口挪进词里](2026-10-14-cut-speech-trusts-word-times.md) — 为一个用途调过偏的数据不能当另一个用途的真相；改了调用方的值要说出来。
 - [2026-11-11 设计声音的报价说不出用哪个模型](2026-11-11-design-quote-model-name.md) — 假服务要照真回答的形状造（`model` 在 `voice_plan.selection` 里）。
 - [2026-11-11 设计声音连按下了好几单](2026-11-11-design-voice-ordered-twice.md) — 会花钱的按钮按下去就锁，同一件事只开一单。
+- [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
@@ -78,6 +79,7 @@
 - [2026-10-02 状态行上的小标折成两行](2026-10-02-fal-status-pill-wraps.md) — 一行里谁让步要明说（小件 `fixedSize`、长话去截）。
 - [2026-11-03 短导出卡在退出等待](2026-11-03-ffmpeg-exit-wait-runloop.md) — 启动前注册退出回调、排空双管道后再汇合。
 - [2026-09-23 磁吸开着时拖文件的落点框画错位置](2026-09-23-file-drop-frame-ignores-magnet.md) — 画框要在副本上把落地原样走一遍（含 `packMain`）。
+- [2026-11-17 fills_frame said a turned or moving picture fills the frame, and look never said where it was bare](2026-11-17-fills-frame-ignores-rotation-and-motion.md) — Answer "does it cover" with the renderer's geometry at every frame on screen, never from pixels; give the fix (fill_scale, fills_except) with the verdict.
 - [2026-10-14 滤镜把纯黑抬成灰](2026-10-14-filters-lift-pure-black.md) — 纯黑不抬（`FilterLUT.holdingBlack`）：调色作用于画面，不作用于编辑出来的黑。
 - [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 定格切出的右半不到一源帧（算上变速）、帧率已知、后面没接转场才拿掉；够一帧的留着，AI 定格后剩不到 1 秒的报 `tail_id`。
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。

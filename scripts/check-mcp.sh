@@ -96,28 +96,8 @@ cd "$(dirname "$0")/.."
 ARCH_FLAG="--arch arm64"
 TRIPLE="arm64-apple-macosx15.0"
 
-echo "==> 打包脚本：小程序进 Helpers、先签它再签外层"
-# 签名只经 scripts/signing/sign-app.sh 一处（docs/architecture/code-signing-and-permissions.md）：
-# build-app.sh 要先把小程序拷进去再调它，它里面要先签小程序再签外层。
-BUILD_SCRIPT="scripts/build-app.sh"
-SIGN_SCRIPT="scripts/signing/sign-app.sh"
-COPY_LINE="$(grep -n 'cp "$BUILD_DIR/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
-CALL_SIGN="$(grep -n '^scripts/signing/sign-app.sh "$APP"$' "${BUILD_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_HELPER="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}/Contents/Helpers/skycut-mcp"' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
-SIGN_APP="$(grep -n 'codesign --force "$@" --timestamp=none "${APP}"$' "${SIGN_SCRIPT}" | cut -d: -f1 || true)"
-if [ -z "${COPY_LINE}" ] || [ -z "${CALL_SIGN}" ] || [ -z "${SIGN_HELPER}" ] || [ -z "${SIGN_APP}" ]; then
-  echo "✗ ${BUILD_SCRIPT} 没把 skycut-mcp 拷进 Contents/Helpers，或 ${SIGN_SCRIPT} 没签它：AI 客户端配置里写的那个路径会不存在" >&2
-  exit 1
-fi
-if [ "${COPY_LINE}" -gt "${CALL_SIGN}" ]; then
-  echo "✗ ${BUILD_SCRIPT} 先签名再拷 skycut-mcp：拷进去的小程序没签名，外层签名也立即失效" >&2
-  exit 1
-fi
-if [ "${SIGN_HELPER}" -gt "${SIGN_APP}" ]; then
-  echo "✗ ${SIGN_SCRIPT} 先签了外层再签 skycut-mcp：嵌套的可执行文件必须先签，否则外层签名立即失效" >&2
-  exit 1
-fi
-echo "   ✓ ${BUILD_SCRIPT} 第 ${COPY_LINE} 行拷进去、第 ${CALL_SIGN} 行才签；${SIGN_SCRIPT} 第 ${SIGN_HELPER} 行签小程序、第 ${SIGN_APP} 行才签外层"
+# shellcheck source=checks/MCP/packaging-wiring.sh
+source checks/MCP/packaging-wiring.sh
 
 # shellcheck source=checks/MCP/clip-file-wiring.sh
 source checks/MCP/clip-file-wiring.sh
@@ -133,6 +113,8 @@ source checks/MCP/clip-sound-wiring.sh
 source checks/MCP/canvas-wiring.sh
 # shellcheck source=checks/MCP/voice-reference-wiring.sh
 source checks/MCP/voice-reference-wiring.sh
+# shellcheck source=checks/MCP/coverage-wiring.sh
+source checks/MCP/coverage-wiring.sh
 
 echo "==> 访达选中：Info.plist 里有控制访达的用途说明，每种界面语言都有"
 # 没有 NSAppleEventsUsageDescription，macOS 不弹「想要控制访达」、直接拒绝，from_finder 永远拿不到东西（方案第 22 条）。
@@ -150,33 +132,8 @@ for file in packaging/Info.plist "${INFOPLIST_TABLES[@]}"; do
 done
 echo "   ✓ Info.plist 和 ${#INFOPLIST_TABLES[@]} 张 InfoPlist.strings 都有控制访达的用途说明"
 
-echo "==> 用户文本文件的编码只走 TextDecoding"
-# .utf16 几乎什么都解得出来，排在 GBK 前面 GBK 就永远轮不到（docs/bugfixes/2026-09-27-gbk-subtitles-read-as-utf16.md）。
-# 规则只许在 SrtFlowCore 的 TextDecoding 一处（docs/architecture/text-file-encoding.md）。
-STRAY_UTF16="$(grep -rn 'encoding: \.utf16)' Sources | grep -v 'Sources/SrtFlowCore/TextDecoding.swift' || true)"
-if [ -n "${STRAY_UTF16}" ]; then
-  echo "✗ 这些地方自己在按 UTF-16 解码用户文件（改用 TextDecoding.decode）：" >&2
-  echo "${STRAY_UTF16}" >&2
-  exit 1
-fi
-echo "   ✓ 只有 TextDecoding 按 UTF-16 解码"
-
-echo "==> 翻译：原文语言先按字判断，判不出来才用工程里记的"
-# 反过来的话，AI 把原文改写成中文之后，系统照旧按「英文→韩文」去翻
-#（docs/bugfixes/2026-09-27-ai-translation-stale-source-language.md）。
-SUBTITLE_TOOLS="Sources/SrtFlow/AISubtitleTools.swift"
-SOURCE_BODY="$(awk '/private static func translationSource\(/,/^    \}/' "${SUBTITLE_TOOLS}")"
-DETECT_AT="$(grep -n 'AITextLanguage\.dominant' <<<"${SOURCE_BODY}" | head -1 | cut -d: -f1 || true)"
-STORED_AT="$(grep -n 'subtitleCompanion?\.sourceLanguage' <<<"${SOURCE_BODY}" | head -1 | cut -d: -f1 || true)"
-if [ -z "${DETECT_AT}" ] || [ -z "${STORED_AT}" ] || [ "${DETECT_AT}" -gt "${STORED_AT}" ]; then
-  echo "✗ ${SUBTITLE_TOOLS} 的 translationSource 没有先按字判断原文语言（判断在第 ${DETECT_AT:-?} 行、旧记录在第 ${STORED_AT:-?} 行）" >&2
-  exit 1
-fi
-if [ "$(grep -c 'let source = try translationSource(args, project)' "${SUBTITLE_TOOLS}" || true)" -ne 1 ]; then
-  echo "✗ translate_subtitles 没走 translationSource：原文语言又会信旧记录" >&2
-  exit 1
-fi
-echo "   ✓ 先判断（第 ${DETECT_AT} 行）、再退回旧记录（第 ${STORED_AT} 行）"
+# shellcheck source=checks/MCP/text-language-wiring.sh
+source checks/MCP/text-language-wiring.sh
 
 echo "==> 新东西默认放哪：点名的文件夹 → 工程的家 → 下载，没有「影片」；AI 改了没存过的工程马上存"
 # 2026-09-27 用户拍板（docs/plans/2026-09-27-mcp.md 第 29、30 条）。规则只有 DefaultFolder 一份，
@@ -506,6 +463,9 @@ xcrun swiftc \
   Sources/SrtFlow/StillImageClipFactory.swift \
   Sources/SrtFlow/StillFrameSharing.swift \
   Sources/SrtFlow/AIRegionFraming.swift \
+  Sources/SrtFlow/PictureCoverage.swift \
+  Sources/SrtFlow/ClipCoverage.swift \
+  Sources/SrtFlow/AIPictureCoverage.swift \
   Sources/SrtFlow/AIClipDetails.swift \
   Sources/SrtFlow/AITrackSettings.swift \
   Sources/SrtFlow/AIKeyframes.swift \

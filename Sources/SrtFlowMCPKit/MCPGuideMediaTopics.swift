@@ -107,14 +107,18 @@ enum MCPGuideMediaTopics {
             look is read-only: it never changes the project, the playhead or the windows. Use it before and after edits instead of guessing \
             what the picture shows.
             """),
-            MCPGuideSection(name: "timeline_and_files", about: "timeline or file frames, times and count, labels and boxes, picture sizes", text: """
+            MCPGuideSection(name: "timeline_and_files", about: "timeline or file frames, times and count, labels and boxes, sizes, bare edges", text: """
             Timeline and files. Without file, look composes the timeline exactly as the preview shows it, at time, times (up to 12) or \
             count moments (1 to 12) across clip_id, and lists the visible items per frame. With file, times are seconds in that file; \
             without times it spreads count frames (default 6) across source_in to source_out or the whole file. Each frame comes with \
             Vision's labels (rough guesses: trust the picture), face, person, subject and text boxes, brightness and black bars. For a \
             file, video and image report the file's own size; the pictures you receive are scaled down, and the export size comes from \
             export_video and get_job. image=false returns only the text (for models that cannot see images); size picks small, medium \
-            or large pictures.
+            or large pictures. A timeline frame where no picture covers part of the canvas also has uncovered: a bare edge (left, \
+            right, top, bottom) with how far in the gap reaches, or a bare corner such as top_right with [along the top or bottom \
+            edge, down the side], in canvas pixels. It comes from the clips' geometry at that moment (placement, crop, rotation, \
+            keyframes, entrance and exit motion; pictures with transparency do not count), not from pixels: dark footage is never \
+            uncovered.
             """),
             MCPGuideSection(name: "shots", about: "shot changes with shots=true and paging with from / next_from", text: """
             Shots. shots=true with a video file or clip_id lists the shot changes with a description and thumbnail of each shot's middle \
