@@ -62,3 +62,4 @@ magnet off drags all three.
   point on must never move a V1 clip that starts before it.
 - Old projects: a tail frozen before this fix still shares its clip's group. Ripples are safe now (`RippleLinkPartners`); deleting such a
   tail with linkage on still takes the clip with it — turn linkage off for that delete, or freeze again.
+  (Later the same day: opening such a project now takes the tail out of the group, [case](2026-11-17-old-freeze-tails-stay-linked.md).)
