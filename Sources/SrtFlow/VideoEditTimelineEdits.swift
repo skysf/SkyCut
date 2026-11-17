@@ -124,7 +124,11 @@ extension TimelineState {
         if time > original.timelineStart {
             guard let pieces = TimelineClipSplit.make(original, at: time) else { return }
             clips[location.clipIndex] = pieces.left
-            clips.insert(pieces.right, at: location.clipIndex + 1)
+            // The right piece resumes after the hold while its partners (separated sound, mic) stay put: it is no longer their pair,
+            // so it keeps no link group, or deleting / rippling it drags the left piece and the sound (freeze-frame.md §4).
+            var right = pieces.right
+            right.linkGroup = nil
+            clips.insert(right, at: location.clipIndex + 1)
             insertionIndex += 1
             retainedLeft = original.id
         }

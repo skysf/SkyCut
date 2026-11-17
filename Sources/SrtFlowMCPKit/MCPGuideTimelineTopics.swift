@@ -98,7 +98,9 @@ enum MCPGuideTimelineTopics {
             Source windows. source_in and source_out are seconds inside the file (default: the whole file). For an image, source_out is \
             its display length (default 5 seconds) and must fit edit_limits.image_source_duration. Every window is checked before \
             anything is inserted; clamped values come back as requested, applied and adjustments, with the new ids, hit_at and music \
-            credits.
+            credits. When a window crosses a cut inside the file itself (generated clips often switch shots), the result adds \
+            source_cuts: the source_frame, how many frames of the other shot are in and a suggested_source_in or \
+            suggested_source_out. It is only a reminder; nothing is changed. look shots=true lists every cut of a file.
             """),
             MCPGuideSection(name: "pitfalls", about: "relative paths, files outside the folder, narration recordings, changing clips afterwards", text: """
             Pitfalls. Relative paths are relative to the folder opened with open_folder. Files outside that folder ask once \

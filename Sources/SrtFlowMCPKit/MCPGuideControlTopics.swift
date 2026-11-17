@@ -73,7 +73,7 @@ enum MCPGuideControlTopics {
             What stops. An export, subtitle generation or translation on this Mac stops at once, and a job still queued behind \
             another is dropped. Sky Studio jobs (generate_media, upscale_clip) can only be cancelled while queued; once \
             started they finish, are charged and stay in the user's library. Character jobs cannot be cancelled. A recording \
-            ends with record_screen action=stop.
+            ends with record_screen action=stop. A look that became a job stops at its next frame; still queued, it never starts.
             """),
             MCPGuideSection(name: "afterwards", about: "checking the result afterwards", text: """
             Afterwards. Check get_job: it shows whether the job stopped and, for paid jobs, the billing (billing_note).

@@ -37,7 +37,8 @@ struct TransitionDropPreview: Equatable {
 }
 
 /// 一条缝上的转场让两侧各向外延伸多少（时间线秒）。`tail` / `head` 是借来的
-/// **真素材**，`holdTail` / `holdHead` 是余料不够时用尾帧 / 首帧**定格**补的那一截。
+/// **真素材**，`holdTail` / `holdHead` 是用尾帧 / 首帧**定格**补的那一截（moving footage only when the footage of
+/// both sides together falls short; a still holds whatever its centred half needs, see `EditClip.showsOnePicture`）。
 /// 两侧之和恒等于转场时长 d（见 `TimelineState.transitionExtension`）。
 struct TransitionExtension: Equatable {
     var tail: Double
@@ -60,6 +61,11 @@ extension EditClip {
     var leadingHandle: Double {
         max(0, sourceStart) / max(0.05, speed)
     }
+
+    /// Every frame of this clip is the same picture: an image clip (a photo, a freeze frame; an animated image keeps only
+    /// its first frame). Holding its first or last frame in a transition shows exactly what footage would, so the hold
+    /// is free: a transition next to a still is always centred on the cut, and set_transition never calls it frozen.
+    var showsOnePicture: Bool { isStillImage }
 }
 
 extension TimelineState {
@@ -198,12 +204,19 @@ extension TimelineState {
 
     /// 这条缝上 d 秒的转场，两侧各向外延伸多少、其中多少是**定格**补出来的。
     ///
-    /// - **余料够**（两边加起来 ≥ d）：照旧 `borrowSplit` —— 先吃出场段的尾料，不够
-    ///   再借进场段的头料，一帧都不定格。有真素材就不用静止画面。
-    /// - **余料不够**：两边的余料全用上，差额用首尾帧定格补（2026-09-23 用户拍板），
-    ///   并且让窗口尽量**跨在缝上两边各一半**，和时间线上的遮罩（`transitionWindow`：
-    ///   缝 ± d/2）一致 —— 出场段一侧先补到 d/2，剩下的归进场段。零余料时就是两边
-    ///   各定格 d/2：接缝前半程 A 照常播、B 的首帧定住淡入，后半程反过来。
+    /// **Centred on the cut** (each side reaches d/2 past it, which is what the timeline mask and set_transition draw)
+    /// whenever that freezes no moving picture (2026-11-17, docs/bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md):
+    /// - A side reaches with its footage beyond the cut; a still (`showsOnePicture`) reaches as far as needed by holding its
+    ///   first or last frame, which is the same picture.
+    /// - A side that cannot reach d/2 hands the rest to the other side's footage (`centredSplit`): no frame is frozen
+    ///   while footage is left, so the window then leans towards the side that has it.
+    /// - **余料不够**（两边的真素材加起来 < d，两边都不是静帧）：两边的余料全用上，差额用首尾帧定格补（2026-09-23
+    ///   用户拍板），窗口尽量跨在缝上两边各一半 —— 出场段一侧先补到 d/2，剩下的归进场段。零余料时就是两边各定格 d/2：
+    ///   接缝前半程 A 照常播、B 的首帧定住淡入，后半程反过来。
+    ///
+    /// Before 2026-11-17 footage was taken from the outgoing tail first: a still (60 s of tail, nothing before its first
+    /// frame) and every outgoing clip trimmed at its end put the whole transition after the cut, half a transition later
+    /// than drawn and reported.
     ///
     /// 两侧延伸之和恒等于 d：展开之后两段正好相叠 d，总长和片段位置都不变。
     static func transitionExtension(
@@ -211,10 +224,16 @@ extension TimelineState {
     ) -> TransitionExtension {
         let tailMaterial = min(outgoing.trailingHandle, d)
         let headMaterial = min(incoming.leadingHandle, d)
-        if tailMaterial + headMaterial >= d - 1e-9 {
-            let split = borrowSplit(outgoing: outgoing, incoming: incoming, duration: d)
+        // How far each side reaches without freezing a moving picture.
+        let outgoingReach = outgoing.showsOnePicture ? d : tailMaterial
+        let incomingReach = incoming.showsOnePicture ? d : headMaterial
+        if outgoingReach + incomingReach >= d - 1e-9 {
+            let split = centredSplit(outgoingReach: outgoingReach, incomingReach: incomingReach, duration: d)
+            // Footage first; what is left is a still's free hold (zero for a moving picture: its reach is its footage).
+            let tail = min(tailMaterial, split.outgoing)
+            let head = min(headMaterial, split.incoming)
             return TransitionExtension(
-                tail: split.fromTail, head: split.fromHead, holdTail: 0, holdHead: 0
+                tail: tail, head: head, holdTail: split.outgoing - tail, holdHead: split.incoming - head
             )
         }
         let shortfall = d - tailMaterial - headMaterial
@@ -225,15 +244,13 @@ extension TimelineState {
         )
     }
 
-    /// 这条缝上 d 秒的转场，各从哪一边借多少**真素材**。先吃出场段的尾料，不够再
-    /// 找进场段借头料 —— 窗口因此可能整个落在接缝一侧，那是成立的（见上面的说明）。
-    /// 余料加起来不够 d 时由 `transitionExtension` 补定格，这里只管真素材。
-    static func borrowSplit(
-        outgoing: EditClip, incoming: EditClip, duration: Double
-    ) -> (fromTail: Double, fromHead: Double) {
-        let tail = min(outgoing.trailingHandle, duration)
-        let head = min(incoming.leadingHandle, duration - tail)
-        return (tail, head)
+    /// How a d-second window is shared between the two sides when they can reach `d` together: d/2 each, and a side that
+    /// reaches less hands the rest to the other one. The two parts always add up to `d`.
+    static func centredSplit(
+        outgoingReach: Double, incomingReach: Double, duration d: Double
+    ) -> (outgoing: Double, incoming: Double) {
+        let incoming = min(incomingReach, d - min(outgoingReach, d / 2))
+        return (d - incoming, incoming)
     }
 
     /// 这条缝当下是不是**首尾相接**（需要借余料），而不是已经相叠。
@@ -269,6 +286,8 @@ extension TimelineState {
     ///   和 `duration` 无关（几何由排位说了算）。
     /// - **首尾相接**：转场跨在缝上，两边各一半 —— 借余料那条路是各借 d/2，
     ///   压黑那条路是各做 d/2 的渐变，两者的窗口一模一样。
+    ///   (The render leans off this only when one side lacks footage for its half and is not a still; where it really
+    ///   plays is `renderedTransitionWindow`, which is what set_transition reports.)
     static func transitionWindow(
         outgoing: EditClip, incoming: EditClip, duration: Double
     ) -> (start: Double, duration: Double)? {
@@ -295,6 +314,20 @@ extension TimelineState {
             outgoing: outgoing, incoming: incoming,
             duration: min(outgoing.transitionDuration, maxDuration)
         )
+    }
+
+    /// Where the transition on this seam really plays in both pipelines (timeline seconds): on touching clips the
+    /// expanded copies overlap from `cut − incoming extension` to `cut + outgoing extension`. Equal to
+    /// `transitionWindow` except where one side lacks footage for its half and is not a still (`transitionExtension`);
+    /// blackFade's two ramps and overlapping (magnet) seams are always the drawn window.
+    func renderedTransitionWindow(afterMainIndex index: Int) -> (start: Double, duration: Double)? {
+        guard let window = transitionWindow(afterMainIndex: index) else { return nil }
+        let outgoing = mainClips[index]
+        let incoming = mainClips[index + 1]
+        guard Self.needsHandles(outgoing: outgoing, incoming: incoming),
+              !Self.rendersAsDipInPlace(outgoing.transitionAfter) else { return window }
+        let plan = Self.transitionExtension(outgoing: outgoing, incoming: incoming, duration: window.duration)
+        return (outgoing.timelineEnd - plan.incomingExtension, window.duration)
     }
 
     /// 这一段后面那条缝上的转场，此刻在时间线上**画得出来**吗 —— 也就是遮罩在不在。

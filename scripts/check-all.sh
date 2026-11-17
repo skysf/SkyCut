@@ -108,6 +108,7 @@ run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频�
 run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
 run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
+run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
 run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
 
 # ---- 第 2 组 ----
@@ -140,6 +141,7 @@ run_check "preview-composition（预览合成真取帧）" scripts/check-preview
 run_check "text-render（画面文字：渲染图与成片逐点重合）" scripts/check-text-render.sh
 run_check "subtitle-burn-size（预览上的字幕和烧出来的一样大）" scripts/check-subtitle-burn-size.sh
 run_check "audio-fade（渐入渐出 / 音量曲线 / 推子的真实包络 + 音量钉点不变量）" scripts/check-audio-fade.sh
+run_check "mix-layers（按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账、单声道人声 = 成片）" scripts/check-mix-layers.sh
 
 # ---- 第 4 组 ----
 shard 4

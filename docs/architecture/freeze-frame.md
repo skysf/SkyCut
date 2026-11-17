@@ -15,6 +15,12 @@
 
 **别为定格另起一条渲染路径。** 真要加什么，先想清楚为什么图片段不够用。
 
+The one place where an image clip is not "just a video" (2026-11-17): **in a transition its first or last frame may be held
+for free** (`EditClip.showsOnePicture`: every frame is the same picture). Planned as footage, the 60-second clip has 56 s of
+tail and nothing before its first frame, and a transition next to a still played entirely after the cut. A seam next to an
+image clip is always centred on the cut ([transition handles](transition-handles.md),
+[case](../bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md)).
+
 ## 2. 提交模型：转码成功后一次性提交（和图片导入相反）
 
 图片导入是「占位块先上轨、后台转完再替换」。定格**刻意不抄这个**，原因有三：
@@ -102,6 +108,13 @@
 源帧率（算上变速）判断，`insertFreeze` 拿掉它、后面的内容少挪这一截（不留缝）；后面接着转场、不知道帧率的不动。
 够一帧的右半照旧留着 —— 那是还在动的画面和声音，删不删由人定（AI 的结果里带 `tail_id`）。
 
+**The right piece after the hold keeps no link group** (2026-11-17, [case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md)).
+The freeze cuts only its target and moves the right piece on by the hold, while that clip's partners (its separated sound, a
+recording's mic) stay where they were, so the right piece is no longer their pair. While it kept the group, deleting it (what the
+`tail_id` note suggests) also deleted the clip and its sound, and the AI's ripple dragged the clip back onto its neighbour on V1.
+The left piece and the partners stay a pair; a freeze at the first frame cuts nothing and keeps the group (linkage then moves the
+partners along with the clip). Checks: `checks/FreezeFrame/LinkChecks.swift`, `checks/MCP/FreezeRippleChecks.swift`.
+
 ## 4a. 为什么牵扯转场的主轨段不给定格
 
 禁用最初的理由是声画错位：转场时长有个「不超过两边任一段 45%」的上限
@@ -184,7 +197,15 @@ A 在 10s 结束、与 B 有 1s 转场，在 A 的 8.5s 定格 → 画面位移 
      stsz / stco with one sample, a duration that divides by 120). Anything else throws `Unsupported`, leaves the file as it
      was, and the factory writes every frame (`everyFrame: true`: the old big file, same picture) — never a broken still.
   3. **No name version bump**: the shared file decodes identically to the 120-frame one, so old caches stay valid (just bigger).
-     Changing the codec, pixel format, frame rate or geometry still bumps `StillAlphaNaming`.
+     Changing the codec, pixel format, frame rate or geometry still bumps `StillAlphaNaming`. **The old big files are rewritten at
+     launch** (2026-11-17, `StillCacheSweep` + `StillMovieLayout`, on `MediaReadQueue.proxy`): each one becomes this layout in
+     place — same name, stsd / stts and every other box as they were, the one stored frame. Only what is proven: a regular file
+     directly in `~/Library/Caches/SrtFlow/StillClips/` (no subfolders, no links), named `<32 hex>-alpha[-native]-v1.mov`,
+     ffmpeg's layout, 120 samples stored separately and byte for byte the same frame. Written to a temporary file, read back,
+     swapped in with `rename` only if the original did not change meanwhile: it decodes exactly as before, whoever has the old
+     file open keeps reading it, so open projects, undo and running exports are safe. Never deletes, never converts; anything
+     unproven stays as it was; a rewritten file is skipped next launch. Logged (subsystem `com.srtflow.SrtFlow`, category
+     `still-cache`): files, bytes before and after, freed.
   4. Image placeholders convert **together** (`StillClipBatch`: `addImages`, drops, pastes; the AI's add_clips starts one task
      per image anyway) and the factory runs at most `ConversionSlots.width` conversions at once (2–4 by core count), whoever
      asks: 96 frames at once used to be 96 ProRes encoders on 8 cores.
@@ -239,6 +260,10 @@ frame big; unknown layouts refused and left untouched; six factory conversions a
 `AlphaVideoNoWait.swift` (cold cache: the preview build neither makes nor waits for the copy and draws the original; the
 coordinator is told which source; after the copy the preview matches; the exact build still waits). Wiring: the preview-only
 flag set only by the coordinator, its prepare-and-swap, the frame sharing with its fallback, conversions together and bounded.
+The launch rewrite: `scripts/check-still-clip-encode.sh` → `CacheSweep.swift` (a scratch folder, never the app's cache: old stills
+in ffmpeg's three chunk layouts become one frame and decode the same for ffmpeg and AVFoundation; a new still, other names, a
+matte, a subfolder, a link to a file outside, differing frames and a cut-off file stay byte for byte; a second sweep does
+nothing); wiring in `checks/project-file-wiring.sh` (called at launch, only the still cache folder, on a queue, no deletion).
 
 人工回归（发版前实机）：
 
@@ -249,6 +274,9 @@ flag set only by the coordinator, its prepare-and-swap, the frame sharing with i
       playing the swap waits for the pause; other edits never wait. Clear `~/Library/Caches/SrtFlow/AlphaSources/` and play: same.
 - [ ] Drop a 96-frame transparent PNG sequence (1080p) on V2: the placeholders appear at once, all frames show within seconds,
       `~/Library/Caches/SrtFlow/StillClips/` grows by about one frame per image (under 1 MB each, not 100 MB); export matches.
+- [ ] A cache with transparent stills from before 2026-11-17 (100 MB-plus `-alpha-v1.mov` files) and a project using them open
+      at launch: the files shrink to about one frame within a minute or so, Console (category `still-cache`) says how much was
+      freed, and the project still previews, plays and exports those stills unchanged.
 
 ## 4b. 分辨率政策只有一个判据
 

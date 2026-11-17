@@ -29,6 +29,9 @@
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](../architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](../reports/2026-11-02-video-inspection.md)。
+  同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
+  add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
+  门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
 
 - 构建与打包的 Rosetta / arm64 要求、常用命令、打包和验收（含 DMG Retina 背景 / Finder 布局）、公开下载发布（含 0.18.59–0.18.66 的签名包与下载回读记录）：
   [docs/build/build-and-packaging.md](../build/build-and-packaging.md)。
@@ -85,13 +88,18 @@
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
   在做不出来的机器上打 `SKIP` 明说没跑）, and the preview not waiting for a straight source's premultiplied copy (`AlphaVideoNoWait.swift`:
   on a cold cache the preview build neither makes nor waits for the copy and draws the original at once; `missingAlphaCopies` names
-  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits)：`scripts/check-video-fade.sh`。
+  the source; with the copy the preview matches the reference; the exact build — export prerender, AI look — still waits), and a
+  crossFade between two stills centred on the cut with their keyframes kept (`StillCrossfade.swift`: the plan, preview and export a
+  quarter in and out for H.264 stills both ways, keyed H.264 and shared-frame ProRes stills)：`scripts/check-video-fade.sh`。
 - 检查器的 live 绑定只准接滑块和 scrub（离散控件没有结束信号，快照会挂着把
   下一次改动抹掉）：`checks/inspector-live-binding-wiring.sh`。
 - 画面文字：渲染图与成片**逐点重合**（同一个渲染函数是这套东西的全部前提），
   以及动画的「模型给多少、成片就是多少」、预览上的可点范围、老虎机首帧 / 末帧就是起止值，
   还有主字体里没有的字（✨、汉字）用回退字体画（和直接用那款字体画的墨迹重合），以及带动画的字切成的几段在接缝上每一帧正好贴一层（几段拼接的主轨 +
-  起点不在帧格子上，`SeamFrames.swift`）：
+  起点不在帧格子上，`SeamFrames.swift`）, and every exported frame of moving text and shapes being the frame for its own
+  time — none repeated, late or missing (wiping titles and a wiping shape, starts on and off the grid, a still square
+  starting on the grid, over cuts and crossfades, at 24 / 30 / 60 fps, each frame's lit width against the renderer at that
+  frame's time; plus the `FrameGrid` rule at 24 / 25 / 30 / 60 fps; `MovingFrames.swift`, group 20)：
   `scripts/check-text-render.sh`。
 - 形状：预览那个画法（`ShapePreviewDrawing`，离屏渲一张）和导出那张（`ShapePNGRenderer`）逐像素重合（白色形状铺黑底：最亮的一点、墨迹外框、
   重合度、平均差；五种形状 × 描边 / 实心 × 不动 / 画到一半 / 擦除 / 缩放 / 半透明，「画了 0」两边都空），以及入场 / 出场动画真跑导出抽帧
@@ -117,6 +125,9 @@
   尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）：`scripts/check-audio-fade.sh`（带看门狗：渲混音卡住
   4 分钟就判红，并说出卡在哪一组；CI 上第 7b 组「2 倍速曲线 · 导出」差 1–2 dB 偶发，认法见
   [推子与电平表](../architecture/audio-mixer.md)「已知的偶发」）。
+- 按层量混在一起之后的声音（listen mix=true 的地基）：现造的 WAV 当 oracle —— 四个频段各一个正弦（24 / 30 / 60 fps：那一段的电平 = 整体、别的段低 40 dB 以上、四段加起来 = 整体）、脉冲（峰值到采样、最响的帧到帧）、0.56 秒的音效（loudest_at 到帧、clip_id 的问法）、EBU Tech 3341 的 −23 / −33 dBFS 正弦（瞬时 / 短时 / 整体响度）；
+  整条时间线的峰值、过线、压得最深、整体响度和 `ExportAudioMixdown.render` 逐位一样（有 / 没有声音场景各一条）；每层逐采样相加 = 混音；只量 29–44、43–49 秒 = 整段里那几帧，过线标在 31.0 / 40.5 秒；单声道人声的电平 = 素材 RMS + 增益 = 真导出（ffmpeg）的成片；listen 的计划（层的写法、越界给合法建议、逐帧的数放得下才给）和结果：
+  `scripts/check-mix-layers.sh`（要 ffmpeg；接线扫描在 `checks/MCP/listen-wiring.sh` 的 mix 那一节）。合同和反向验证见 [成片的声音](../architecture/export-audio-mixdown.md)第五节。
 - 波形数据（多级峰值、原始采样块）逐采样对账，以及**很多文件同时读**必须全部读完、
   不许把线程池堵死（看门狗判红）：`scripts/check-waveform.sh`。
 - 成片的声音只有一条管线（导出图里不许出现声音滤镜，混音是预览那个音频引擎按同一份 `AudioEngineConfig`
@@ -130,7 +141,10 @@
 - 关键帧的缓动（每种曲线的值、linear 逐位一致、set / clipped / stretched / remapped 保曲线、存盘按需写键 + 老文件 + v27 / v32、冲过头时宽高留下限和最低不透明度放宽、切片按帧 / 线性一片不多 / 400 片上限）：
   `scripts/check-project-file.sh` 第 39 组；AI 的 `set_keyframes easing`（默认 easeInOut、词表对账、读回来带曲线）在 `scripts/check-mcp.sh`；缓动的缩放真合成
   （片数 = 帧数、四分之一处的面积按曲线）在 `scripts/check-preview-composition.sh`。
-- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`。
+- 定格时间线变换（含在最后一帧里定格时不到一帧的右半不留）：`scripts/check-freeze-frame.sh`；the right piece after the hold keeps no link
+  group (`LinkChecks.swift`), and deleting the hold with ripple or the tail moves / deletes only V1 from that point on (`scripts/check-mcp.sh`
+  `FreezeRippleChecks`, which also covers `RippleLinkPartners`); a J cut's sound that the AI's ripple or cut_to_beat pushes before 0:00
+  loses its head, stays in sync and is listed in the reply's `trimmed_heads` (`RippleHeadTrimChecks`).
 - 按钮提示与快捷键单一来源、提示的根在 `.appLanguage()` 外面裁成气泡的形状（气泡的形状只写一处）：`checks/instant-tooltip-wiring.sh`。
 - 检查器里的菜单 Picker 不许锁死宽度（锁了会把整列撑宽、右边被裁）：`checks/inspector-fits-width.sh`。
 - 字幕编辑期间全局快捷键让路（⌫ 不删正在编辑的 cue）：
@@ -185,6 +199,9 @@
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
 - 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
+- A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
+  stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
+  set_canvas reply's `reframed` / `no_longer_fill`); wiring in `checks/MCP/canvas-wiring.sh`. Rule: [预览自由变换](../architecture/preview-free-transform.md).
 - 文件 listen 的显式区间（`listen` 给文件 + `source_in` / `source_out`；在 `scripts/check-mcp.sh` 里，本机现造一小时的稀疏 WAV，不用用户的素材）：
   读得对不对、有没有界在 `ListenRangeChecks` —— **数的是被测的那一次文件 listen**（`ListenReadTally`，账 `MediaReadAudit` 绑在这次调用上）：恰好起一个 reader、
   它自己的 `timeRange` 就是请求的那一窗、这次调用起的 reader 原生一共交出的帧数不超过这一窗、一次都没向 `WaveformStore` 要整文件波形、没起节拍的读取；
@@ -230,7 +247,9 @@
   剪贴板只有一套且不写纯文本）：`checks/timeline-clipboard-wiring.sh`。
 - 静帧真实编码，图只解一次、缩一次（数 ffmpeg 报的解码次数；多出来那 119 帧的耗时和同一次运行里产物尺寸的小图比、上限 2.5 倍或多 0.25 秒，规则自检钉着 CI 慢 runner 的数、1.2 倍抖动不红、6 倍退化红），以及透明的图（哪张算用到了透明、预乘的 ProRes 4444 + 灰度遮罩的真产物、按图挑缓存名、老缓存不再认）, and a transparent still being one encoded frame shared by 120 samples (`SharedFrame.swift`: identical ffmpeg frames to writing
   every frame under export-style trims and identical AVFoundation decode, one frame big, layouts the rewrite does not know refused and
-  left untouched, six factory conversions at once)：`scripts/check-still-clip-encode.sh`。
+  left untouched, six factory conversions at once), and the launch rewrite of old every-frame stills (`CacheSweep.swift`: ffmpeg's three
+  chunk layouts become one frame that decodes the same; other names, a matte, a subfolder, a link out, differing frames, a cut-off
+  file stay byte for byte; a second sweep does nothing)：`scripts/check-still-clip-encode.sh`。
 - 翻译配对预检与接线：`scripts/check-translation-preflight.sh`。
 - 音频库清单：解析的宽容边界（不认识的字段忍、单条坏数据跳过、**版本号更高整份
   拒绝**）与双语搜索（中英都能命中同一个 tag、多词是「与」），以及音效清单的 `title_zh` / `hit` / `owned` 不署名 / 按中文标题搜：
@@ -346,5 +365,15 @@
     `--self-test --against <另一份守卫>` 拿老守卫跑同一批场景打表（写「改之前 / 改之后」用）。
     改成白名单那一轮（2026-11-13，PR #424）：改之前的守卫（上一版）在链接和形状两组的 147 个场景里有 83 个该红的退出 0、2 个该绿的红了（顺序那一组只对新顺序有意义，没拿它跑）；改之后当时的 190 个全对。
     整份副本上 Codex 的 9 个输入（L1–L4、T1–T3、S1–S2）改之前都退出 0、改之后都红；它报的两处误报（唯一的索引带 `#锚点`、`mkdir docs/fake.md`）改之后绿。
+- Slow looks (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): `scripts/check-look-jobs.sh` (shard 1, real App objects, synthetic
+  one-keyframe clips; `checks/LookJobs/`): `LineChecks.swift` — the router's lines (`AICallLines`): turns in joining order, a call in two lines
+  waits for both, a read letting go from inside its call, positions and the holder, no letting go before the turn, `waitForLast`;
+  `LookCallChecks.swift` — real 12-frame looks through `AILookCall` and get_job / cancel_job (`AIExportTools`): two sessions x two parallel looks
+  all answered with their pictures (directly or through get_job, at the production 25 s), a look behind a held edit becomes a queued job
+  (positions 1 and 2, `waiting_for`) and runs after it with its 12 frames and picture, cancelled while queued it never starts, another session
+  cannot cancel it, cancelled while running it stops at its next frame, an edit behind a look gets its turn before the look's frames are done.
+  A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
+  after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
+  license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).
 
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).

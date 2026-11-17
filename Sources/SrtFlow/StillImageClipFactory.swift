@@ -344,11 +344,17 @@ enum StillImageClipFactory {
     }
 
     private static func cacheDirectory() throws -> URL {
-        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        let directory = base.appendingPathComponent("SrtFlow/StillClips", isDirectory: true)
+        let directory = cacheDirectoryURL
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory
+    }
+
+    /// Where converted stills live (`~/Library/Caches/SrtFlow/StillClips/`), not created. The only folder the launch rewrite
+    /// of old transparent stills looks in (`StillCacheSweep`).
+    static var cacheDirectoryURL: URL {
+        let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return base.appendingPathComponent("SrtFlow/StillClips", isDirectory: true)
     }
 
     /// 路径 + 修改时间 + 大小的指纹。图换了内容，指纹就变，不会用到旧缓存。

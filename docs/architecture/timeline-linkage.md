@@ -14,6 +14,14 @@
 画面走 —— 画面挪到哪它挪到哪，画面被删了它也删。** 显式的链接组（视频 + 分离出来的音频、录屏画面 + 麦克风，`linkGroup`）照旧，
 而且更强（拉开了也跟）。单向：主轨带别的，别的不带主轨。
 
+**When the AI pushes or pulls V1 from a point on** (`delete_items` / `edit_clip` ripple, `add_clips` insert, `cut_to_beat`:
+`AITimelineEdits.shiftMain`), a link group comes along only when none of its V1 pictures stays behind (`RippleLinkPartners`,
+2026-11-17). A V1 clip before the ripple point never moves, and a sound shared with it stays with it — a group can hold two V1 pictures
+(a split made with the switch off keeps picture–sound–picture as one chain; a freeze tail saved before that day), and dragging the
+whole group put the earlier picture on top of its neighbour ([case](../bugfixes/2026-11-17-freeze-tail-ripple-drags-its-clip.md)).
+A clip the ripple (or cut_to_beat's partner fitting) pushes before 0:00 loses its head the way rule 13 does (`moveForLinkage`),
+never clamped at 0, which made a J cut's sound late by its lead-in ([case](../bugfixes/2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md)).
+
 ## 二、规矩（`TimelineLinkage`）
 
 | # | 规矩 | 代码 |
@@ -30,7 +38,7 @@
 | 10 | **开关关着**：以上一样都不发生，只有显式的链接组（老行为） | `perform` / `liveApply` / `linkedAttachments` 都先看 `linkageEnabled` |
 | 11 | **生成的字幕句跟着它的那段声音走**（2026-10-14）：原文字幕记着是从哪一段生成的（`CueMeta.provenance.clipID`，转写和配音都记），那段**不在主轨上**（配音、音频轨上的采访、上层轨）时，段挪了 / 裁了头 / 变了速，字幕按它在素材里的那一刻跟着挪（裁头时那一刻没动就不挪）；段被真删字幕一起删（规矩 4）。来源在主轨上的照旧只跟画面（规矩 1），两条不叠；这次碰过的不碰（规矩 5）；译文轨没有来源、不跟（两条轨独立）。这是联动里唯一按 id 认的一条：字幕本来就是那段声音说出来的（[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)） | `CaptionSourceFollow`，`follow` 收尾时调（主轨画面没变也调） |
 | 12 | **字幕句不整句平移，两头各自跟着画面换算**（2026-10-15）：一句字幕（原文、译文两条轨；规矩 11 的配音字幕也是）底下的画面只是被剪掉 / 裁掉了一部分、或者变了速（剩下的几截前后顺序不变、中间没插进别的）时，开头和结尾**分别**换算 —— 中间剪掉一截就缩短，开头 / 结尾被剪就收到剩下的那截，变速跟着伸缩，逐词高亮的词时间一起换算。**说话的那几秒剩不到一半就删**：真删删，裁切 / 变速 / 滑动让它不在画面里了也删（2026-10-15 用户拍板，[案例](../bugfixes/2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md)：以前照规矩 4 留在原地，和前移过来的下一句叠在画面上）；只有底下的段整个没了、又不是真删（少见）才留在原地、报给 AI。「说话的那几秒」有逐词时间按词、译文按它翻自的那句原文、都没有才按显示时间（显示时间里有说完多停的半秒，删停顿剪掉的正是它）。换了位置、中间插进了别的，照规矩 2 / 3 整句挪。账也细了一步：同 id 的段没盖住的那部分，再找这次新出来的同素材段（跨过 cut_speech 剪掉那截的字幕，后半在新 id 的碎片上）（[案例](../bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md)） | `LinkageCueFollow`（`VideoEditTimelineCueFollow.swift`），`followMain` 和 `CaptionSourceFollow` 都用它；写进轨道走 `SubtitleTrackEditing.setTimings` |
-| 13 | **一段画面自己分出去的声音跟着那段画面走**（2026-11-16）：音频轨上一段声音是某段画面自己分出去的（同一个链接组、同一个文件、「源 ↔ 时间线」换算对得上 —— 分离音频、`add_clips sound=separate`、`set_transition` 的 sound 分出来的都是），按**那段画面**的换算挪了多少挪，不看它底下压着哪几段（J / L 切的声音伸在隔壁镜头底下，按规矩 3 会在磁吸重排后留在原地、错开一整段）；画面被真删就删、不是真删就留着；画面变速、换文件、或换算对不上（被单独挪过）照规矩 2、3。挪到时间线开头之前的段裁掉伸出去的那截头（入点跟着挪），不整段夹在 0（[案例](../bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md)） | `LinkagePartnerSound`，`followMain` 里先问它；`EditClip.moveForLinkage` |
+| 13 | **一段画面自己分出去的声音跟着那段画面走**（2026-11-16）：音频轨上一段声音是某段画面自己分出去的（同一个链接组、同一个文件、「源 ↔ 时间线」换算对得上 —— 分离音频、`add_clips sound=separate`、`set_transition` 的 sound 分出来的都是），按**那段画面**的换算挪了多少挪，不看它底下压着哪几段（J / L 切的声音伸在隔壁镜头底下，按规矩 3 会在磁吸重排后留在原地、错开一整段）；画面被真删就删、不是真删就留着；画面变速、换文件、或换算对不上（被单独挪过）照规矩 2、3。挪到时间线开头之前的段裁掉伸出去的那截头（入点跟着挪），不整段夹在 0（[案例](../bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md)）。The AI's V1 ripple trims the same way, and the AI is told which clips lost how much (2026-11-17) | `LinkagePartnerSound`，`followMain` 里先问它；`EditClip.moveForLinkage`; `LinkageHeadTrims` → `Report.trimmedHeads` |
 
 ### 几个具体场景（也是自检的用例）
 
@@ -51,6 +59,7 @@
 | 主轨块拖去上层轨 | 它还在（同 id），压在它上面的东西按它的新位置跟；它原来的邻居合拢，邻居上的东西跟着 |
 | upscale 换源（点「替换」）、`edit_clip` 换文件 | 什么都不动、不删：压在这段上的字幕（开头、结尾、词的时间）、文字、音效、形状、滤镜、B-roll 原地；换文件的同时挪了段，它们跟着段挪、相对位置不变；配音段换了声音文件，它的字幕不动 |
 | 磁吸开，B 的声音先进半秒（J 切，伸在 A 底下），把 A 拖到最后 / 裁短 A 的尾巴 / 删掉 A（A 是第一个镜头） | B 的声音跟着 B 挪、和画面对得上；删掉第一个镜头时伸到 0 之前的那半秒头裁掉（规矩 13） |
+| Magnet off, B's sound leads by half a second; the AI ripple-deletes A, the first clip (`delete_items ripple=true`), or shortens it with `edit_clip ripple=true` | B's sound loses the half second that would be before 0:00 and stays in sync with B; the reply lists it in `linkage.trimmed_heads` |
 
 ## 三、给 AI 的那一面
 
@@ -58,6 +67,9 @@
   `linkage: {moved, deleted, note}`（什么都没动就不带，`AILinkageReport`）；字幕收短了的列在 `shortened_subtitles`（字里可能还留着剪掉的词，
   叫 AI 用 get_subtitles 看）、说的话被删掉 / 裁掉跟着没了的报几句（`deleted_subtitles`：只报一个 deleted，AI 会以为删了段）、
   底下的段整个没了又不是真删所以留在原地的列在 `left_subtitles`（少见；叫 AI 用 delete_items 删）—— 只有留在原地的也报。
+- Clips moved before 0:00 with their picture (by rule 13 or the AI's V1 ripple) lost their head to stay in sync: `trimmed_heads`
+  lists each with the seconds it lost (`LinkageHeadTrims`, computed in `follow` whenever V1 moved), so the AI knows a J cut's
+  lead-in got shorter. Only when linkage is on (cut_to_beat and cut_speech move partners with the switch off too, unreported).
 - 工具说明：`delete_items`、`freeze_frame`（`MCPTimelineTools.swift`）、`cut_speech`（`MCPSmartEditTools.swift`）写明开关开着时别的轨跟着动；
   `cut_speech` 的 `next_step` 按开关分两种说法（关着才提醒重新生成字幕）。
 - AI 的工具按用户的开关走，和手动一个口径；`cut_speech` 剪掉的那几块永远是真删（`deletesContent: true`），它本来就不管开关带着链接的声音剪。
@@ -80,6 +92,9 @@
   裁头（画面前移、被裁掉那一截上的字幕没了）、变速、定格、粘贴的同素材新段不算、撞上让开（段换轨、文字换行、滤镜换层、没撞不碰）、
   拖动计划的名单与成员（没有障碍、带宿主、不重复）。**反向验证**做过：拿掉「同 id 优先」、「跨段要一致」、「真删才删」、撞上让开，各红。
 - 同一脚本第 1j 组（`checks/TimelineSnap/LinkagePartner.swift`，规矩 13）：重排、裁隔壁、删第一个镜头（裁头）、上层轨画面的 L 切声音都和自己的画面对得上；换算对不上的声音照老规矩（对照）。反向验证（2026-11-16）：撤掉规矩 13 和裁头，8 项红。
+- `scripts/check-mcp.sh` → `checks/MCP/RippleHeadTrimChecks.swift`: the AI's ripple-delete and edit_clip ripple of the first clip and
+  cut_to_beat trim a J cut's sound at 0:00 and keep it in sync; a lead that stays after 0:00 moves whole; the report and the reply's
+  `trimmed_heads`. Reverse verification (2026-11-17): with the clamps put back 10 checks fail, without the report hook 3.
 - 同一脚本第 1i 组（`checks/TimelineSnap/LinkageSwap.swift`）：同 id 换了素材什么都不挪 —— upscale 换源（偏移 4 秒）、换成另一个文件、换文件同时挪段
   （压在上面的东西正好跟着段挪）、配音段换声音文件（字幕不动、不报）。反向验证：拿掉 `Piece.rebased`，11 条红。
 - 同一脚本第 1h 组（`checks/TimelineSnap/LinkageCues.swift`，规矩 12）：只留两句的 30 秒版（剪掉的删、保留的收到各自那截上、互不重叠）、

@@ -41,7 +41,9 @@ enum TimelineLinkage {
         var leftCues: Set<UUID> = []
         /// `deleted` 里有几句是字幕（说的话被删掉 / 裁掉了）：AI 只看到一个 deleted 会以为删了段。
         var deletedCues = 0
-        var isEmpty: Bool { moved == 0 && deleted == 0 && leftCues.isEmpty }
+        /// Clips pushed before 0:00 that lost their head to stay in sync, and how many seconds (`LinkageHeadTrims`).
+        var trimmedHeads: [UUID: Double] = [:]
+        var isEmpty: Bool { moved == 0 && deleted == 0 && leftCues.isEmpty && trimmedHeads.isEmpty }
     }
 
     // MARK: 主轨的画面账
@@ -185,8 +187,10 @@ enum TimelineLinkage {
     /// `deletesContent`：这次是真删（⌫、delete_items、cut_speech）才连带删画面没了的东西。返回挪了几样、删了几样。
     @discardableResult
     static func follow(from before: TimelineState, to after: inout TimelineState, deletesContent: Bool) -> Report {
-        var report = signature(of: before) != signature(of: after)
-            ? followMain(from: before, to: &after, deletesContent: deletesContent) : Report()
+        let mainMoved = signature(of: before) != signature(of: after)
+        var report = mainMoved ? followMain(from: before, to: &after, deletesContent: deletesContent) : Report()
+        // A clip pushed before 0:00 (by the AI's V1 ripple or by rule 13) lost its head: the AI is told which.
+        if mainMoved { report.trimmedHeads = LinkageHeadTrims.find(before: before, after: after) }
         // 主轨那条挪过的字幕不再碰（`plan` 只看这次没变过的句子）。
         let captions = CaptionSourceFollow.plan(from: before, to: after, deletesContent: deletesContent)
         CaptionSourceFollow.apply(captions, to: &after)
@@ -403,6 +407,31 @@ enum LinkagePartnerSound {
         guard abs(now.speed - was.speed) < 1e-9, now.sourceURL == was.sourceURL else { return nil }
         let delta = now.timelineTime(atSource: 0) - was.timelineTime(atSource: 0)
         return abs(delta) <= TimelineLinkage.epsilon ? .stay : .move(by: delta)
+    }
+}
+
+// MARK: - Which clips an edit pushed before 0:00 and trimmed at the head
+//
+// A clip that a move would put before 0:00 keeps its timing against its picture by losing the part before 0:00
+// (`moveForLinkage`: rule 13, the AI's V1 ripple `AITimelineEdits.shiftMain`, cut_to_beat's partners), never by being clamped,
+// which made a J cut's sound late by its lead-in (docs/bugfixes/2026-11-17-ai-ripple-clamps-j-cut-lead-at-zero.md). The lead-in
+// is shorter afterwards, so the AI is told (`Report.trimmedHeads` → `trimmed_heads`). Found by comparing before and after: started
+// after 0:00, starts at 0:00 now, same file and speed, window starts later in the file (its end may move: cut_to_beat refits it).
+// An edit that itself moves a clip to 0:00 and cuts its head counts too. Kept in this file: ~20 check scripts compile it.
+
+enum LinkageHeadTrims {
+    /// Seconds of timeline each clip lost at its head because the edit from `before` to `after` pushed it before 0:00.
+    static func find(before: TimelineState, after: TimelineState) -> [UUID: Double] {
+        let epsilon = TimelineLinkage.epsilon
+        let was = Dictionary(before.allClips.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var trims: [UUID: Double] = [:]
+        for clip in after.allClips {
+            guard let old = was[clip.id], old.sourceURL == clip.sourceURL, abs(old.speed - clip.speed) < 1e-9,
+                  old.timelineStart > epsilon, clip.timelineStart <= epsilon, clip.sourceStart - old.sourceStart > epsilon
+            else { continue }
+            trims[clip.id] = (clip.sourceStart - old.sourceStart) / max(0.05, clip.speed)
+        }
+        return trims
     }
 }
 

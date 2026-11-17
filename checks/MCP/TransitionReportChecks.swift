@@ -42,6 +42,29 @@ func runTransitionReportChecks() {
     checkEqual(report["seams"]?.arrayValue?.first?["duration"]?.doubleValue, 0.8, "clamped to what fits between the two clips")
     checkEqual(report["seams"]?.arrayValue?.first?["shortened_from"]?.doubleValue, 3, "says what was asked")
 
+    // Two stills (2026-11-17, docs/bugfixes/2026-11-17-still-crossfade-half-a-transition-late.md): centred on the cut as the
+    // timeline draws it; the incoming still holds its first frame, which is its one picture, so nothing is called frozen.
+    var stills = TimelineState()
+    stills.mainClips = [videoClip(0, 4), videoClip(4, 4)]
+    for index in stills.mainClips.indices { stills.mainClips[index].stillImageURL = media.appendingPathExtension("png") }
+    var stillIDs = AIShortIDs(state: stills)
+    report = transition(.crossFade, 0.5, after: 0, in: &stills, ids: &stillIDs)
+    let still = report["seams"]?.arrayValue?.first
+    checkEqual(still?["from"]?.doubleValue, 3.75, "two stills: the dissolve starts half its length before the cut")
+    checkEqual(still?["to"]?.doubleValue, 4.25, "…and ends half after it")
+    check(still?["holds_first_frame"] == nil && still?["holds_last_frame"] == nil && report["note"] == nil,
+          "a still's held frame is its one picture: nothing frozen to report")
+    // Footage only beyond the outgoing clip's end (the next one starts at its first frame): nothing is frozen, so the dissolve
+    // plays from the cut on, and the result says where it really is, not the drawn cut ± half.
+    var oneSided = TimelineState()
+    oneSided.mainClips = [videoClip(0, 5, sourceStart: 10), videoClip(5, 5)]
+    var oneSidedIDs = AIShortIDs(state: oneSided)
+    report = transition(.crossFade, 1, after: 0, in: &oneSided, ids: &oneSidedIDs)
+    let leaning = report["seams"]?.arrayValue?.first
+    checkEqual(leaning?["from"]?.doubleValue, 5, "footage on one side only: the dissolve really starts on the cut")
+    checkEqual(leaning?["to"]?.doubleValue, 6, "…and ends a whole transition after it")
+    check(leaning?["holds_first_frame"] == nil, "…without freezing the next clip's first frame")
+
     // all=true：太短的那条缝（0.1 秒的一段）说做不出来；藏起来的段说看不见。
     var mixed = TimelineState()
     mixed.mainClips = [videoClip(0, 4), videoClip(4, 0.1), videoClip(4.1, 4), videoClip(8.1, 4)]
