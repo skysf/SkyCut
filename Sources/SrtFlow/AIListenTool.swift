@@ -10,6 +10,7 @@ import SrtFlowMCPKit
 // Since 2026-11-17 a clip or a file is measured from one bounded read of exactly its window (AIListenAudioWindow): the true
 // peak and the loudest frame need the samples, at the project's frame rate (AIListenFrameGrid). Files go through AIListenFileAudio.
 // mix=true 交给 AIListenMix：用音频引擎按层离线渲，量混在一起之后的声音（每层、每帧、每个频段，整条的响度和过线），到帧。
+// voice=… goes to AIListenVoiceCheck: each narration line's ESTOI against the mix and who covers it (2026-11-17, MCP-39).
 // 不管什么：怎么算（AIAudioLevels）、文件怎么读（AIListenFileAudio）、说明文字（SrtFlowMCPKit/MCPSenseTools.swift）。
 //
 // 只读：不改工程、不动界面。点名文件夹以外的文件照「动硬盘才问」的规矩先问。
@@ -30,6 +31,10 @@ enum AIListenTool {
         settings.from = try args.double("from").map { max(0, $0) }
         settings.to = try args.double("to")
         if let from = settings.from, let to = settings.to, to <= from { throw AIToolError("to must be after from.") }
+        // voice=…: is each line of the narration covered? (AIListenVoiceCheck; 2026-11-17, MCP-39.)
+        if let voice = try args.string("voice") {
+            return try await AIListenVoiceCheck.listen(args, project, spec: voice, from: settings.from, to: settings.to)
+        }
         // mix=true：用引擎按层量混在一起之后的声音，到帧（AIListenMix；2026-11-16，MCP-3 / MCP-10）。
         if try args.bool("mix") ?? false {
             return try await AIListenMix.listen(
