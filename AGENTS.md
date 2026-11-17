@@ -219,7 +219,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 - 构建、打包、DMG、公开下载发布、CI 怎么分组、同时能跑几个、本地怎么跑检查：[构建与打包](docs/build/build-and-packaging.md)。素材管线（制备素材、不是检查，**不在 `check-all.sh` 里**）：[音频库素材管线](docs/build/audio-library-pipeline.md)（`scripts/audio-library/`）、[本机配音模型管线](docs/build/voice-model-pipeline.md)（`scripts/voice-models/`，R2 签名只有 `scripts/r2.py` 一份）。
 - **推之前**：`scripts/check-local.sh <相关检查>` = 全部扫描守卫（`scripts/check-guards.sh`：`checks/*.sh` + `scripts/check-mcp.sh --scans-only`，约一分钟、不编译）+ 点名的几项。本地的入口都自己换成原生 arm64 的 `/bin/bash`（`scripts/native-arch.sh`）。
-- **全部自动检查**：`scripts/check-all.sh`。CI（`.github/workflows/checks.yml`）在每个 PR 上按 `--shard N --of 5` 分到 5 台 macOS runner 跑同一入口，汇总 job `check-all` 给结论；只改了文档的 PR 走快速通道（`scripts/ci-docs-only.sh` 判，只跑扫描守卫）；合并后 main 上那一轮在树已被 PR 那轮绿的 CI 原样验过时只编译、存缓存（`scripts/ci-verified-tree.sh` 判，仓库变量 `CI_VERIFIED_TREE` 设成 `off` 就关）; a new merge cancels the older main runs still queued or running.
+- **全部自动检查**：`scripts/check-all.sh`。CI（`.github/workflows/checks.yml`）在每个 PR 上按 `--shard N --of 5` 分到 5 台 macOS runner 跑同一入口，汇总 job `check-all` 给结论；只改了文档的 PR 走快速通道（`scripts/ci-docs-only.sh` 判，只跑扫描守卫）；合并后 main 上那一轮在树已被 PR 那轮绿的 CI 原样验过时只编译、存缓存（`scripts/ci-verified-tree.sh` 判，仓库变量 `CI_VERIFIED_TREE` 设成 `off` 就关）; a new merge cancels older main runs; docs-only main merges always run full checks.
 - **新加检查**要放进 `check-all.sh` 的某个 `shard`：要链接完整 App 目标文件的放第 1 组（只有那台编了完整 App），别的放第 2–5 组里最空的那组；`checks/` 顶层的守卫没进 check-all，CI 一次都不跑（`checks/check-all-shards.sh` 钉着）。文档里提到检查时别写组号（分组只以 `check-all.sh` 为准）。
 - 下面每个脚本只留一行。每项具体验哪些情形、用例在哪个文件、偶发怎么认，见 [检查细目](docs/testing/check-catalog.md)；新加或改了检查，在这里补一行，细节写进细目或对应的架构文档。
 
@@ -288,7 +288,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/check-script-source-lists.sh` — 自检脚本的 swiftc 文件清单不漏同伴文件。
 - `checks/ci-build-cache-key.sh` — CI 的 `.build` 缓存 key 带检出目录、工具链、组号和提交，只在 main 上存。
 - `checks/ci-docs-only.sh` — 「只改了文档」快速通道只在真的只改了文档时走。
-- `checks/ci-verified-tree.sh` — 合并后 main 上那一轮只在树已被 PR 那轮绿的 CI 原样验过时才不跑检查。 Also pins `concurrency`: a new merge cancels older main runs; re-runs keep their own group.
+- `checks/ci-verified-tree.sh` — 合并后 main 上那一轮只在树已被 PR 那轮绿的 CI 原样验过时才不跑检查。 Docs-only main merges run full checks; pins concurrency and the re-run exemption.
 - `checks/client-config-backup.sh` — 连接 AI 客户端时的配置备份和原文件同样的权限。
 - `checks/cloud-task-projects.sh` — 生成任务带工程归属，卡片和 MCP 共用分组。
 - `checks/copy-project-guard.sh` — 冒烟拷工程不整夹拷「下载」这类大文件夹。
