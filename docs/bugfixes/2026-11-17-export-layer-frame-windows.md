@@ -55,8 +55,6 @@ The lasting rules are in [project frame rate](../architecture/project-frame-rate
   All seven fixed production files were then restored with SHA-256 equality.
 - Relevant local validation: scan guards, export frame rate, cover export, filters, core checks and the isolated
   cover-preview attachment check. A live MCP look request and user footage are not used by this check.
-- The inherited MCP check entry was 602 lines and failed the size guard before this task. Its Finder permission scan
-  is moved intact to `checks/MCP/finder-wiring.sh`, still sourced before the scan-only exit; no checks are removed.
 
 ## Lessons
 
