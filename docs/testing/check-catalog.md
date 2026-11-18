@@ -106,6 +106,12 @@
 - 录屏产物画面轨盖到 T1（尾部不黑）：`scripts/check-screen-recording-writer.sh`。
 - 上层视频轨动画段 fill + matte：`scripts/check-export-alpha-compositing.sh`。
 - 入场/出场动画的两条管线对账（预览取帧 vs 真导出抽帧）：`scripts/check-clip-animation.sh`。
+- Rise / pop / zoom keep a picture that fills the frame covering, turned and keyframed ones too (2026-11-18):
+  `scripts/check-preview-composition.sh` → `EntranceCover.swift` (unturned growth equals the old 1 + 2 × offset; nine filling pictures ×
+  three motions × two intensities, in and out, cover the canvas and their resting place at every 1/120 s frame; the variant follows
+  the first / last frame; real frames of turned clips keep every edge pixel covered, and the probe sees a clip that does not fill);
+  preview against export for a turned rise on V1 and a turned pop on V2 (fill + matte): `scripts/check-clip-animation.sh` →
+  `TurnedEntrances.swift`. Rule: [入场 / 出场动画](../architecture/clip-animation.md).
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
   （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
@@ -201,7 +207,7 @@
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
   同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
   挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`；subtitles sitting on a sound off V1 (narration) follow that sound, not the picture, and ride a V1 drag
-  only with it — a new source range on a screen recording keeps them, group 1k `LinkageVoiceCues.swift`）：
+  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
@@ -461,6 +467,12 @@
 - Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
   order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
+- Ducking under speech (`set_track duck_others_db`, MCP-29): `scripts/check-mcp.sh` → `SpeechDuckChecks` (windows and merging;
+  the dip on flat, sloped and bumped lines, 2× speed, the volume floor; calling again with the same / another depth / 0 and with
+  a bump drawn after the duck; windows across a clip's start and end; a clip inside a line; which clips dip; lines from pauses;
+  the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
+  file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
+  [volume curve](../architecture/audio-volume-curve.md) section 5.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered

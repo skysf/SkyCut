@@ -293,6 +293,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditVideoFade.swift \
   Sources/SrtFlow/VideoEditClipAnimation.swift \
   Sources/SrtFlow/VideoEditClipAnimator.swift \
+  Sources/SrtFlow/ClipMotionCover.swift \
   Sources/SrtFlow/VideoEditTrackPalette.swift \
   Sources/SrtFlow/VideoEditTextStyle.swift \
   Sources/SrtFlow/VideoEditTextEasing.swift \
@@ -408,6 +409,11 @@ xcrun swiftc \
   Sources/SrtFlow/CutSoundBatchGain.swift \
   Sources/SrtFlow/CutSoundLevelPlan.swift \
   Sources/SrtFlow/CutSoundReport.swift \
+  Sources/SrtFlow/SpeechDuck.swift \
+  Sources/SrtFlow/SpeechDuckCurve.swift \
+  Sources/SrtFlow/SpeechDuckPlanner.swift \
+  Sources/SrtFlow/SpeechDuckReport.swift \
+  Sources/SrtFlow/Listening/VoiceLines.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
   Sources/SrtFlow/AIClipEdit.swift \
   Sources/SrtFlow/AIClipEditPlan.swift \

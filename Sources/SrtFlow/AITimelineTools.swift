@@ -294,7 +294,7 @@ enum AITimelineTools {
         let target = try AITrackSettings.target(name, in: project.state)
         let volumeDB = try args.double("volume_db")
         let hidden = try args.bool("hidden")
-        guard volumeDB != nil || hidden != nil else { throw AIToolError("Pass volume_db and/or hidden.") }
+        guard volumeDB != nil || hidden != nil else { throw AIToolError("Pass volume_db, hidden or duck_others_db.") }
         var next = project.state
         try AITrackSettings.apply(target, volumeDB: volumeDB, hidden: hidden, in: &next)
         // 只动推子是纯声音的改动，perform 自己会走只换混音的快路径（不重建画面）。
