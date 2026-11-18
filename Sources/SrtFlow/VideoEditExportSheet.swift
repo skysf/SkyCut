@@ -387,7 +387,7 @@ struct VideoEditExportSheet: View {
         exporter.export(
             for: project,
             state: state,
-            to: outputURL,
+            to: .replacing(outputURL),
             subtitleStyle: subtitleStyle,
             subtitleFontURL: fontCatalog.font(named: subtitleStyle.fontName)?.fileURL
         )

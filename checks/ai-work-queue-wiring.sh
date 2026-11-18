@@ -8,7 +8,8 @@
 #      正在做的（别人的）那个停掉；
 #   3. get_job 在排队时报 queued 和 queue_position（AIJobs.json 先问队列）；
 #   4. 一条道上 AI 起的那个没做完就不算空（`laneIsFree` 先看 active，再看那件东西）：翻译起步是异步的，光看宿主会接连起两个；
-#   5. 排着的几个导出各占各的文件名（reservedOutputs）。
+#   5. 排着的几个导出各占各的文件名（reservedOutputs）。Since 2026-11-19: picked and reserved in one step after the listing
+#      (AIExportDestination), and the video never replaces a file (ExportTarget.newFile).
 #
 # 用法：checks/ai-work-queue-wiring.sh
 set -euo pipefail
@@ -55,14 +56,28 @@ FREE_BODY="$(awk '/    private func laneIsFree\(/,/^    \}/' "${QUEUE}")"
 grep -q 'if let id = active\[lane\], AIJobs.shared.job(id)?.status == .running { return false }' <<<"${FREE_BODY}" \
   || fail "${QUEUE}：laneIsFree 要先看这条道上 AI 起的那个做完没有（翻译起步是异步的，光看宿主会接连起两个）"
 
-# 5. 排着的导出各占各的文件名。The name is picked in AIExportDestination (off the main thread, 2026-11-19) with the
-#    reserved names passed in, and reserved the moment it is chosen.
+# 5. 排着的导出各占各的文件名。Since 2026-11-19 (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md) the
+#    name is picked against the reservations as they are once the listing is back, and reserved in that same main-actor
+#    step: in AIExportDestination.output nothing after the probe awaits, the pick reads `reserved[`, the reservation is
+#    written before the return. export_video gives it back when the job is withdrawn, fails to start or ends, and its
+#    video is delivered as a new file (never replacing: ExportTarget.newFile), never `.replacing`.
 DESTINATION="Sources/SrtFlow/AIExportDestination.swift"
-grep -q 'reserved: reservedOutputs' "${EXPORT}" && grep -q 'reservedOutputs.insert(reserved)' "${EXPORT}" \
-  && grep -q 'reserved.contains($0.standardizedFileURL.path)' "${DESTINATION}" \
-  || fail "${EXPORT} / ${DESTINATION}：算「没被占的文件名」时要算上排着队还没写出来的那几个"
+[ -f "${DESTINATION}" ] || fail "${DESTINATION} not found: renamed? Update this guard (an empty scan is a false green)"
+OUTPUT_BODY="$(awk '/    static func output\(/,/^    \}/' "${DESTINATION}")"
+AFTER_PROBE="$(awk '/await probe\.run\(/ { on = 1; next } on' <<<"${OUTPUT_BODY}" | grep -v '^[[:space:]]*//' || true)"
+PICKS_AFTER_LISTING=1
+[ -n "${AFTER_PROBE}" ] || PICKS_AFTER_LISTING=0
+if grep -q 'await' <<<"${AFTER_PROBE}"; then PICKS_AFTER_LISTING=0; fi
+grep -qF 'reserved[key($0)] != nil' <<<"${AFTER_PROBE}" || PICKS_AFTER_LISTING=0
+grep -qF 'reserved[chosen.key] = chosen.id' <<<"${AFTER_PROBE}" || PICKS_AFTER_LISTING=0
+[ "${PICKS_AFTER_LISTING}" = 1 ] \
+  || fail "${DESTINATION}: output must pick the name against the reservations as they are once the listing is back and reserve it in the same step (no await in between); otherwise two projects exporting at once pick the same name"
+[ "$(count 'AIExportDestination.release(chosen)' "${EXPORT}")" -eq 3 ] \
+  || fail "${EXPORT}: the reservation must be given back in three places (withdrawn while queued, failed to start, finished)"
+grep -q 'ExportTarget.newFile(folder: folder' "${DESTINATION}" && ! grep -n '\.replacing(' "${EXPORT}" "${DESTINATION}" \
+  || fail "${EXPORT} / ${DESTINATION}: the AI's video is delivered only as a new file (ExportTarget.newFile: a taken name moves on to the next number), never .replacing"
 
 if [ "${FAILED}" = "0" ]; then
-  echo "✓ AI 排队接线：四个入口都经 AIWorkQueue、不再回「已经在做」；取消先从队里拿；get_job 报 queued / queue_position；道上 AI 起的没做完不算空；排着的导出各占文件名"
+  echo "✓ AI 排队接线：四个入口都经 AIWorkQueue、不再回「已经在做」；取消先从队里拿；get_job 报 queued / queue_position；道上 AI 起的没做完不算空；排着的导出各占文件名 (and never replace)"
 fi
 exit "${FAILED}"

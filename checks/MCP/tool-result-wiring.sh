@@ -77,13 +77,17 @@ if [ "$(grep -c 'let peaks = readsSound ? try await soundOf(speech) : nil' "${SP
   echo "✗ ${SPEECH_TOOL} 的切口不经量出来的停顿（AISpeechHearing 拿到整个文件的电平、建判点），或结果里不报挪了多少：又会只信转写、把切口挪进词里" >&2
   exit 1
 fi
-# export_subtitles 写盘只经界面那一条（临时名 → 回读校验 → 原子替换），读的是藏起来的句子已经去掉的那份，名字和撞名经 AISubtitleFiles
-#（整组加编号、从不覆盖）。
+# export_subtitles 写盘只经界面那一条（临时名 → 回读校验），读的是藏起来的句子已经去掉的那份，名字和撞名经 AISubtitleFiles
+#（整组加编号、从不覆盖）。Since 2026-11-19 the whole set is claimed (O_EXCL) before any file is written and each file goes
+# onto its claim, never replacing, not even a file that appeared after the listing
+# (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
 EXPORT_SUBS="Sources/SrtFlow/AISubtitleFileExport.swift"
-if [ "$(grep -c 'SubtitleExportPlanner.writeValidated(document, format: format, to: target.url)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+if [ "$(grep -cF 'SubtitleExportPlanner.writeValidated(document, format: series.format, onto: claim)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+   || [ "$(grep -cE 'writeValidated\([^)]*[ (,]to:' "${EXPORT_SUBS}" || true)" -ne 0 ] \
+   || [ "$(grep -cF 'ExclusivePlacement.claimSet(from: number)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
    || [ "$(grep -c 'state.subtitleDocument(for: track)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AISubtitleFiles.targets(' "${EXPORT_SUBS}" || true)" -ne 1 ]; then
-  echo "✗ ${EXPORT_SUBS} 不经 SubtitleExportPlanner.writeValidated 写、不读去掉藏起来句子的那份、或者不经 AISubtitleFiles 起名（会覆盖已有文件）" >&2
+   || [ "$(grep -cF 'AISubtitleFiles.Series(' "${EXPORT_SUBS}" || true)" -ne 1 ]; then
+  echo "✗ ${EXPORT_SUBS} must write through SubtitleExportPlanner.writeValidated(…, onto: claim) onto names the whole set claimed first (ExclusivePlacement.claimSet), read the lines with hidden ones left out, and name the files through AISubtitleFiles.Series; otherwise it replaces existing files" >&2
   exit 1
 fi
 # 文件名里的语言标签按每条轨现在的文字判、判不出来才用记的（SubtitleFileLanguage），AI 的工具和导出面板「高级」同一份：只读记录的话，

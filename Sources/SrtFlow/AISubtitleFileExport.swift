@@ -8,10 +8,13 @@ import SrtFlowMCPKit
 // 第一版不做 ASS）：原文 / 译文各写一份，名字和撞名见 `AISubtitleFiles`、语言标签见 `SubtitleFileLanguage`（按文字判 → 记的 → 省略）；
 // 默认放 export_video 的那个文件夹、名字默认工程名
 // （同 export_video），给了 name 就用它 —— 传导出的视频的名字，字幕文件就和视频配成一对。写盘走界面那一条
-// （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验 → 原子替换），藏起来的句子不写（`subtitleDocument(for:)`，
+// （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验），藏起来的句子不写（`subtitleDocument(for:)`，
 // 和预览、烧录、界面导出同一份）。不改工程：不是一步撤销、不摆窗口。
 // The folder is made, checked and listed, and the files are written, off the main thread through ExportDestinationProbe with
 // export_video's deadline (AIExportDestination; docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md).
+// Never replacing: every file of the set is claimed (created empty, O_EXCL) before any is written, and the files are renamed
+// onto their claims. A name taken after the listing — Finder, another app, another project's export_subtitles writing the same
+// name at this moment — moves the whole set on to the next number (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
 // 不管什么：说明文字（SrtFlowMCPKit/MCPSubtitleExportTools.swift）；双语合在一个文件里（只给烧录用）、ASS。
 
 @MainActor
@@ -41,31 +44,24 @@ enum AISubtitleFileExport {
             let folder = place.folder(files)
             let report = AIExportDestination.prepareFolder(folder, fileSystem: files)
             if let problem = report.problem { return .refused(problem, folder) }
-            return .ready(AISubtitleFiles.targets(
-                tracks, stem: stem, folder: folder, format: format,
+            let series = AISubtitleFiles.Series(
+                tracks: tracks, stem: stem, folder: folder, format: format,
                 sourceLanguage: languages.source, targetLanguage: languages.target
-            ) { report.contains($0.lastPathComponent) })
+            )
+            return .ready(series, series.firstFree { report.contains($0.lastPathComponent) })
         }
-        let targets: [AISubtitleFiles.Target]
+        let series: AISubtitleFiles.Series, number: Int
         switch planned {
         case .refused(let problem, let folder): throw AIExportDestination.refusal(problem, folder: folder)
-        case .ready(let ready): targets = ready
+        case .ready(let ready, let first): (series, number) = (ready, first)
         }
-        let writes = targets.compactMap { target in documents[target.track].map { (target: target, document: $0) } }
-        // Written off the main thread too: temporary name → read back → atomic replace.
+        // Written off the main thread too: the whole set claimed, then temporary name → read back → onto its claim.
         let outcome = await probe.run(on: place.near, deadline: deadline, timedOut: Written.notResponding) { _ in
-            do {
-                return .written(try writes.map { target, document in
-                    let written = try SubtitleExportPlanner.writeValidated(document, format: format, to: target.url)
-                    return WrittenFile(track: target.track, path: written.path, lines: SubtitleSerializer.emittedCueCount(document, format: format))
-                })
-            } catch {
-                return .failed(error.localizedDescription)
-            }
+            Self.write(documents, series: series, from: number)
         }
         switch outcome {
         case .notResponding:
-            let folder = targets.first?.url.deletingLastPathComponent() ?? place.near
+            let folder = series.folder
             throw AIToolError("The drive with “\(folder.lastPathComponent)” stopped responding while SkyCut was writing the subtitle files "
                 + "into \(AIWorkspace.shared.display(folder)). They may appear there when the drive answers; check before writing them again.")
         case .failed(let message):
@@ -110,7 +106,37 @@ enum AISubtitleFileExport {
 
     enum Planned: Sendable {
         case refused(ExportDestinationProblem, URL)
-        case ready([AISubtitleFiles.Target])
+        /// The set of names and the number of the first one the listing says is free.
+        case ready(AISubtitleFiles.Series, Int)
+    }
+
+    /// Claims every file of the set from `number` on (a name taken since the listing moves the whole set on), then writes
+    /// each onto its claim; claims not written are given back. Runs off the main thread.
+    nonisolated static func write(
+        _ documents: [SubtitleTrack: SubtitleDocumentModel], series: AISubtitleFiles.Series, from number: Int
+    ) -> Written {
+        let claimed: (number: Int, claims: [ExclusivePlacement.Claim])
+        do {
+            claimed = try ExclusivePlacement.claimSet(from: number) { series.set($0).map(\.url) }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        var files: [WrittenFile] = []
+        var unwritten = claimed.claims
+        defer { unwritten.forEach(ExclusivePlacement.release) }
+        do {
+            for (target, claim) in zip(series.set(claimed.number), claimed.claims) {
+                guard let document = documents[target.track] else { continue }
+                let written = try SubtitleExportPlanner.writeValidated(document, format: series.format, onto: claim)
+                unwritten.removeAll { $0 == claim }
+                files.append(WrittenFile(
+                    track: target.track, path: written.path, lines: SubtitleSerializer.emittedCueCount(document, format: series.format)
+                ))
+            }
+        } catch {
+            return .failed(error.localizedDescription)
+        }
+        return .written(files)
     }
 
     struct WrittenFile: Sendable {
