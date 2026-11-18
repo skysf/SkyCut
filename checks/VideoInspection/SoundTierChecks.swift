@@ -10,7 +10,8 @@ import SrtFlowMCPKit
 // A5 music rising 20 dB in the middle of the line. With `sounds` naming them: a cut jump at 3.0, the clang lingering 12 frames,
 // the line masked, the music swelling. A second timeline covers its cuts (a music bed at 3.0, a music accent at 6.0) and ends the
 // clang a frame after the cut: nothing is reported. Two jobs only (the binary links the debug build and has a 480 s deadline);
-// marks on second-tier findings and roles without `sounds` are checked on values in SoundTierRuleChecks.
+// marks on second-tier findings and roles without `sounds` are checked on values in SoundTierRuleChecks. The edges review CXR2
+// found (one-frame head and tail) are DeliveryEdgeChecks, run from here with one short job.
 @MainActor
 enum SoundTierChecks {
     static let roles: JSONValue = ["A1": "ambience", "A2": "object", "A3": "voice", "A4": "ambience", "A5": "music"]
@@ -22,6 +23,8 @@ enum SoundTierChecks {
             AIWorkspace.shared.register(root)
             try await verify(project, root: root, require: require)
         }
+        // Review CXR2's edges (2026-11-19): one short job of its own.
+        try await DeliveryEdgeChecks.run(project, root: root, require: require)
     }
 
     private static func verify(_ project: VideoEditProject, root: URL, require: (Bool, String) -> Void) async throws {
@@ -86,7 +89,7 @@ enum SoundTierChecks {
         return clips
     }
 
-    private static func audio(_ url: URL, at start: Double, _ duration: Double, asset: Double) -> EditClip {
+    static func audio(_ url: URL, at start: Double, _ duration: Double, asset: Double) -> EditClip {
         EditClip(sourceURL: url, isAudioOnly: true, sourceDuration: duration, timelineStart: start, audioAssetDuration: asset)
     }
 
@@ -153,7 +156,7 @@ enum SoundTierChecks {
         return Float(0.08 * sin(Double.pi * inSyllable / 0.18) * value)
     }
 
-    private struct Noise {
+    struct Noise {
         var state: UInt64
         init(seed: UInt64) { state = seed }
         mutating func next(_ amplitude: Float) -> Float {
@@ -162,7 +165,7 @@ enum SoundTierChecks {
         }
     }
 
-    private static func wave(_ root: URL, _ name: String, _ seconds: Double, _ sample: (Double) -> Float) throws -> URL {
+    static func wave(_ root: URL, _ name: String, _ seconds: Double, _ sample: (Double) -> Float) throws -> URL {
         let url = root.appendingPathComponent(name)
         try? FileManager.default.removeItem(at: url)
         let count = Int(seconds * 48_000)
@@ -174,7 +177,7 @@ enum SoundTierChecks {
         return url
     }
 
-    private static func inspect(_ project: VideoEditProject, _ extra: [String: JSONValue] = [:]) async throws -> JSONValue {
+    static func inspect(_ project: VideoEditProject, _ extra: [String: JSONValue] = [:]) async throws -> JSONValue {
         var args = extra
         args["image"] = false
         let started = try await AIInspectionTool.start(AIToolArguments(.object(args)), project)

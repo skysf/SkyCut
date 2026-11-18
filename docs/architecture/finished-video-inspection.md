@@ -226,6 +226,10 @@ the preview's engine; it never edits the project:
   times on the attack, two hops (21 ms) later than the research's frame centre. On the research's generated tracks the accents
   are the same apart from ones at the strength line; the human film's 1:18.44 cover sits at the ±3-frame edge and can move with
   the 21 ms, so re-run the human-film acceptance below with this reading (comparison in the listening-engine doc, section 9).
+- The cut windows (`AIDeliveryCutJumps.windows`): 0.3 s on each side, clipped to the timeline. A side under one project frame is
+  not measured and that cut is left out of the jump rule (a one-frame head or tail: at 60 fps the frame is shorter than the 0.02 s
+  gap at the cut). The bounds are compared as numbers before a range is built: a reversed `ClosedRange` traps, and a trap stops
+  SkyCut, which no job can catch ([case](../bugfixes/2026-11-19-one-frame-edge-crashes-inspection.md)).
 - The voice check: `AIListenVoicePlan` / `AIListenVoiceMeasure` / `AIListenVoiceReport`, the same code as listen voice, over
   every audio track whose clips are all voice (at most 11), inside the checked range.
 - Each sound that may drag past its picture rendered on its own over its frames after the cut (`DeliveryStemPower`; at most 40;
@@ -281,6 +285,10 @@ and a swell; wrong `sounds` refused before a job, `sounds` refused next to `inte
 with two covered cuts: a music bed across 3.0 s, quiet music with a low thump 2 frames after 6.0 s, and the clang ended a frame
 after its cut — nothing reported. Only two jobs: the binary links the debug build, and its 480 s deadline was overrun on CI when
 the first version ran five (2026-11-18). `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs only these.
+`DeliveryEdgeChecks.swift` (2026-11-19, review CXR2) adds one short real job, 2 s at 60 fps with no voice: a one-frame head and
+tail between two files and a bed dropping at 1.0 s. It finishes and reports only the middle cut's jump; on values, the windows at
+the two edges are nil and a two-frame side is still measured. `SRTFLOW_INSPECTION_CASE=edges` runs only it; the full and `sound`
+cases include it. Reverse control: on main before the fix the job trapped (SIGTRAP), so the check binary failed.
 
 Reverse controls (2026-11-18), each restored afterwards: with the four second-tier entries skipped in the registry run, five
 production assertions fail (the jump, the linger, the masked line, the swell, the jump's key); with the bed cover removed, the
