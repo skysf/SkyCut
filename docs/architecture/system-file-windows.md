@@ -16,7 +16,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 ## Rules
 
 1. **Panels are made only in `SystemFileChooser.swift`** (`SystemFilePanel`, from a `FileWindowRequest`: files to open,
-   a folder, a new file to save) **and opened with `begin`, never `runModal`**. `checks/project-file-wiring.sh` fails on an
+   a folder, a new file to save) **and opened with `begin`, never `runModal`**. `checks/file-io-off-main-wiring.sh` fails on an
    `NSOpenPanel(` / `NSSavePanel(` anywhere else and on `runModal` in the chooser, the shared windows, the helper and the
    export panel. In-process `NSAlert`s are not panels of that service and may stay modal.
 2. **`SystemFileChooser` watches the window**: not on screen with no answer for 3 s, or an empty answer within 1 s, is a
@@ -53,7 +53,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | --- | --- |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`) | the chooser with fake windows: answers, a person cancels, empty at once, never appears (main thread free), appears then vanishes, stays stuck + Close It, closed when nobody waits any more, the force-quit record + Try Again |
 | `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller, Close It appears next to a window on screen and offers the fallback, Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
-| `checks/project-file-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows` |
+| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows` |
 
 ## Manual regression (real windows, before a release)
 

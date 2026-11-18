@@ -455,7 +455,7 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    `prepareToClose`, `startNewProject`, `OpenProjects.closeProject` / `createProject` / `resetPrimary` — which wait for the
    drive at most `ProjectFileWriter.deadline` (15 s). The blocking `saveNow`, `flushAutosave`, `saveDocument(as:)`,
    `prepareToCloseDocument`, `newProject()`, `OpenProjects.close` / `newProject(savingAs:)` write on the caller's thread and
-   exist for the checks and dev hooks only (`checks/project-file-wiring.sh`).
+   exist for the checks and dev hooks only (`checks/file-io-off-main-wiring.sh`).
 3. **Dirty marks**: every change goes through `noteUnsavedChange` (the `state` / row-height `didSet` and the relinks), which
    bumps the writer's change counter. A write clears `hasUnsavedChanges` only when the counter still has the value its
    snapshot was taken with; a media-table entry changed on the main thread during a write wins over the one written.

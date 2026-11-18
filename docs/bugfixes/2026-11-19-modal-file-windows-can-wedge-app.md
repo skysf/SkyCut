@@ -54,8 +54,10 @@ panel's buttons are dead; with `begin` the app stays responsive and `cancel()` c
   suggested name, a name gets the type's extension) and drops (a file means its folder; one vs several; a folder dropped on a
   save).
 - Reverse verification (each went red, then green after restoring): no fallback on failure, no Close It strip and the record
-  ignored → 8 red; a modal `NSOpenPanel` put back into the compress view → `checks/project-file-wiring.sh` red.
+  ignored → 8 red; a modal `NSOpenPanel` put back into the compress view → `checks/file-io-off-main-wiring.sh` red.
 - `scripts/check-local.sh` scan guards and localization coverage green (the strip and the helper are in all three tables).
+  The off-main rules of the export panel, the AI's export folders, project saves and these windows moved from
+  `checks/project-file-wiring.sh` (which reached the 600-line limit) into `checks/file-io-off-main-wiring.sh`.
 - Not verified: the real panels with a frozen panel service, and the helper's placement next to them (manual regression in
   system-file-windows.md); the friend's macOS 26.6.2.
 

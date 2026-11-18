@@ -202,7 +202,8 @@ never returns.
 6. **The finished video is delivered off the main thread** (`ExportDelivery`, its own queue): onto another drive the move is
    a full copy. The panel says "Saving the video into the export folder…" meanwhile. Subtitle files are written off the main
    thread too.
-7. The scan side is pinned by `checks/project-file-wiring.sh`, the behaviour by `scripts/check-export-profile.sh`
+7. The scan side is pinned by `checks/file-io-off-main-wiring.sh` (in `checks/project-file-wiring.sh` until 2026-11-19), the
+   behaviour by `scripts/check-export-profile.sh`
    (`FileChooserChecks`, `DestinationChecks`). Since 2026-11-19 every other open / save window uses the same chooser
    ([system file windows](system-file-windows.md)).
 8. **The AI's `export_video` and `export_subtitles` follow 4 and 5 too** (2026-11-19,
@@ -211,7 +212,7 @@ never returns.
    `ExportDestinationProbe.run` (`AIExportDestination`), with the 15 s deadline and the per-drive cap; the subtitle files are
    written in a second `run`. A folder that can't be used is refused before any job starts, with the sentences of 4 in
    English (`ExportDestinationText.message(…, L10n: { $0 })`). Neither file uses `FileManager.default`
-   (`checks/project-file-wiring.sh`).
+   (`checks/file-io-off-main-wiring.sh`).
 
 ## 回归矩阵
 
@@ -225,7 +226,7 @@ never returns.
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free |
-| `checks/project-file-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
+| `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
 

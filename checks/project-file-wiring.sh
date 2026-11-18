@@ -531,82 +531,8 @@ if [ -n "$STRAY_LINE_WRITES" ]; then
   WIRING_FAIL=1
 fi
 
-# Export folder window and destination (2026-11-18, docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md):
-# the macOS folder window is opened without a modal session, and nothing in the export panel or the exporter waits on
-# the destination drive on the main thread. The behaviour is checked by scripts/check-export-profile.sh; this pins
-# the production wiring it relies on.
-for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift; do
-  forbid "the export folder row drives its own chooser (its inline fallback), not the shared FilePicker" "$f" '^[^/]*FilePicker\.'
-done
-# Every macOS open / save window (2026-11-19, docs/bugfixes/2026-11-19-modal-file-windows-can-wedge-app.md): panels are
-# made only in SystemFileChooser.swift, which opens them with begin and never runs one modally; the shared ones go through
-# SystemFileWindows (the views' FilePicker). scripts/check-export-profile.sh (FileChooserChecks, FileWindowsChecks) checks
-# the behaviour.
-for f in Sources/SrtFlow/SystemFileChooser.swift Sources/SrtFlow/SystemFileWindows.swift Sources/SrtFlow/FileWindowHelper.swift \
-  Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift; do
-  forbid "a macOS open / save window is never a modal session (a hung panel service then wedges the app)" "$f" '^[^/]*runModal'
-done
-PANEL_MAKERS="$(grep -rlE '^[^/]*(NSOpenPanel|NSSavePanel)\(' Sources --include='*.swift' | grep -v '^Sources/SrtFlow/SystemFileChooser\.swift$' || true)"
-if [ -n "${PANEL_MAKERS}" ]; then
-  echo "✗ 接线守卫：macOS open / save panels are made only in SystemFileChooser.swift (non-modal, watched): ${PANEL_MAKERS}" >&2
-  WIRING_FAIL=1
-fi
-require "the system window opens with begin (no modal session)" Sources/SrtFlow/SystemFileChooser.swift 'panel\.begin \{'
-require "the chooser leaves its in-flight record before asking AppKit for the window" \
-  Sources/SrtFlow/SystemFileChooser.swift 'record\.markStarted\(\)'
-require "the views' FilePicker goes through the shared non-modal windows" \
-  Sources/SrtFlow/SystemFileWindows.swift 'SystemFileWindows\.shared\.open\(request'
-require "the folder window never starts on a drive the last check found not answering (windowStart)" \
-  Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(\.exportFolder\(startingAt: destination\.windowStart\)\)'
-for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportDestinationState.swift; do
-  forbid "the export panel never asks the destination drive itself (only ExportDestinationProbe, off the main thread)" \
-    "$f" '^[^/]*FileManager\.default'
-done
-forbid "the subtitle files' \"already there\" comes from the destination check, not from the drive during a redraw" \
-  Sources/SrtFlow/SubtitleGen/SubtitleExportSection.swift '^[^/]*FileManager\.default\.fileExists'
-forbid "the exporter never moves the finished video on the main thread (ExportDelivery does, on its own queue)" \
-  Sources/SrtFlow/VideoEditExporter.swift '^[^/]*\.(moveItem|replaceItemAt|fileExists)\('
-require "the exporter hands the finished video over through ExportDelivery" \
-  Sources/SrtFlow/VideoEditExporter.swift 'try await ExportDelivery\.deliver\('
-require "the export starts only after the look-and-write check of the folder" \
-  Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.checkBeforeWriting\(\)'
-# The AI's export_video folder (2026-11-19, docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md): made,
-# checked and listed through the same probe, off the main thread; scripts/check-export-profile.sh checks the behaviour.
-for f in Sources/SrtFlow/AIExportTools.swift Sources/SrtFlow/AIExportDestination.swift; do
-  forbid "export_video never touches its folder on the main thread (only through ExportDestinationProbe)" \
-    "$f" '^[^/]*FileManager\.default'
-done
-require "export_video picks its file and checks its folder through AIExportDestination" \
-  Sources/SrtFlow/AIExportTools.swift 'try await AIExportDestination\.output\('
-require "AIExportDestination asks the drive only through the probe (off the main thread, with a deadline)" \
-  Sources/SrtFlow/AIExportDestination.swift 'await probe\.run\(on: request\.near, deadline: deadline'
-
-# A project's own file is written off the main thread (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md):
-# production code saves through saveToFile / flushToFile / saveAs / prepareToClose / startNewProject / closeProject /
-# createProject (ProjectFileWriter's queue, with a deadline). The blocking ones that write on the caller's thread are for the
-# checks and dev hooks only; outside their own definitions nothing in Sources/ may call them. scripts/check-project-saves.sh
-# checks the behaviour.
-BLOCKING='(\b(saveNow|flushAutosave|prepareToCloseDocument)\(\)|\.saveDocument\(as:|\.newProject\(\)|OpenProjects\.shared\.(close|newProject)\(|\bwriteBlocking\()'
-BLOCKING_HITS="$(grep -rnE "${BLOCKING}" Sources --include='*.swift' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*///?' \
-  | grep -vE '^Sources/SrtFlow/(VideoEditProjectSaving|VideoEditProjectDocument|OpenProjects|ProjectFileWriter)\.swift:' || true)"
-if [ -n "${BLOCKING_HITS}" ]; then
-  echo "✗ 接线守卫：production code calls a blocking project save (it waits on the drive on the main thread; use the async one):" >&2
-  echo "${BLOCKING_HITS}" >&2
-  WIRING_FAIL=1
-fi
-for entry in 'func prepareToCloseDocument() -> Bool {' 'func newProject() {'; do
-  BODY="$(awk -v start="$entry" 'index($0, start) { on = 1; next } on && /^    \}$/ { exit } on { print }' Sources/SrtFlow/VideoEditProjectDocument.swift)"
-  [ -n "${BODY}" ] || { echo "✗ 接线守卫：VideoEditProjectDocument.swift 里找不到 ${entry}（改了名就把这条守卫跟过去）" >&2; WIRING_FAIL=1; }
-done
-require "the project file is written on the writer's queue, never on the caller's (ProjectFileWriter.startNext)" \
-  Sources/SrtFlow/ProjectFileWriter.swift 'queue\.async \{ \[weak self\] in'
-require "the write itself is nonisolated (it never runs on the main actor)" \
-  Sources/SrtFlow/ProjectFileWriter.swift 'nonisolated static func write\(_ request: ProjectFileWriteRequest\) -> ProjectFileWriteResult'
-require "a save waits for the drive at most a deadline" \
-  Sources/SrtFlow/VideoEditProjectSaving.swift 'await connectedWriter\(\)\.write\(request, deadline: deadline\)'
-require "the dirty mark is cleared only when nothing changed since the snapshot was taken" \
-  Sources/SrtFlow/VideoEditProjectSaving.swift 'if fileWriter\.revision == request\.revision \{ hasUnsavedChanges = false \}'
-
+# The export panel's folder window and destination, the AI's export folders, a project's own file and every macOS open /
+# save window: checks/file-io-off-main-wiring.sh (2026-11-19, moved out of this guard).
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "接线守卫失败" >&2
   exit 1
