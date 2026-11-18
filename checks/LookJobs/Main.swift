@@ -10,6 +10,7 @@ import SrtFlowMCPKit
 //   cancel_job (AIExportTools): every look answers with its picture or a job_id that brings the picture; a look waiting behind an edit
 //   becomes a queued job (position, waiting_for) and runs after it; cancelled while queued it never starts; cancelled while running it
 //   stops; another session cannot cancel it; an edit behind a look gets its turn before the look's frames are done.
+// RouterSwitchChecks also exercises queue selection and actual routing after the unchanged authorization gates.
 @main enum LookJobChecks {
     @MainActor static func main() async {
         let domain = Bundle.main.bundleIdentifier ?? ""
@@ -23,6 +24,7 @@ import SrtFlowMCPKit
         await runLineChecks()
         do {
             try await runLookCallChecks(root)
+            try await runRouterSwitchChecks(root)
         } catch {
             LookCheckLog.failures += 1
             print("FAIL: look call checks stopped: \(error)")
@@ -33,7 +35,7 @@ import SrtFlowMCPKit
         print("PASS: look jobs: lines keep joining order across several lines and let a look go once it has read the project; "
             + "two sessions x two parallel 12-frame looks all answered with their pictures (directly or through get_job); a look behind an "
             + "edit became a queued job with its position and what it waits for, then ran; cancelled while queued it never started, while "
-            + "running it stopped; another session could not cancel it; an edit behind a look got its turn before the look's frames")
+            + "running it stopped; another session could not cancel it; an edit behind a look got its turn before the look's frames; implicit switch waits became jobs before selection, real close_project completed and the look used the new target")
         exit(0)
     }
 }

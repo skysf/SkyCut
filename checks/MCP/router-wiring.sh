@@ -135,7 +135,7 @@ if [ "$(grep -cF 'let stamp = outcome.failed ? nil : outcome.stamp ?? target.map
   exit 1
 fi
 if [ "$(grep -cF 'return ["project:" + id]' "${ROUTER}" || true)" -lt 1 ] \
-   || [ "$(grep -cF 'await lines.waitForLast(in: "switch:" + call.session)' "${ROUTER}" || true)" -ne 1 ] \
+   || [ "$(grep -cF 'await lines.waitForLast(in: "switch:" + call.session, observe: awaitingSwitch)' "${ROUTER}" || true)" -ne 1 ] \
    || [ "$(grep -cF 'AICallContext.$current.withValue(context)' "${ROUTER}" || true)" -ne 1 ]; then
   echo "✗ ${ROUTER} 没按工程排队、不带 project 的没先等这个会话的开 / 建 / 关，或工具没在 AICallContext 里跑（几个子代理会串文件夹）" >&2
   exit 1
@@ -157,7 +157,7 @@ echo "   ✓ 路由第 ${CHECK_AT} 行定工程（摆窗口在第 ${PRESENT_AT} 
 echo "==> look: answers within about 25 s or becomes a job; a look lets its project's line go once it has read the project"
 # 2026-11-17 (docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md): a look held its project's line until its last frame, the helper's
 # 120 s give-up then dropped the calls behind it and lost the look's own result. The behaviour is checked with real App objects in
-# scripts/check-look-jobs.sh; the router itself cannot run there (the license gate), so its wiring is pinned here.
+# scripts/check-look-jobs.sh (authorized routing boundary, no account); the protocol / license gate wiring is pinned here.
 python3 - <<'PYTHON'
 from pathlib import Path
 router = Path("Sources/SrtFlow/AIToolRouter.swift").read_text()
@@ -167,9 +167,16 @@ def body(text, start):
     return text[begin:text.index("\n    }\n", begin)]
 
 handle = body(router, "private func handleRequest(")
-join_at = handle.find("let place = lines.join(keys, tool: call.tool.rawValue, session: call.session, client: call.client)")
-run_at = handle.find("return await AILookCall.run(place, in: lines, begin: begin) { begin in await self.execute(call, begin) }")
-assert "if call.tool == .look {" in handle and 0 <= join_at < run_at, "look must join its lines and go through AILookCall (it answers or becomes a job)"
+assert handle.index("SkyStudioAccount.shared.aiRefusal") < handle.index("return await routeValidated(request, tool: tool, begin: begin)"), "authorized routing must stay after the production license gate"
+route = body(router, "func routeValidated(")
+look_at = route.index("if call.tool == .look {")
+timed_at = route.find("return await AILookCall.run(in: lines,")
+prepare_at = route.find("prepare: { waiting in")
+keys_at = route.find("await self.queueKeys(call, awaitingSwitch: waiting)")
+join_at = route.find("return self.lines.join(keys,")
+assert 0 <= look_at < timed_at < prepare_at < keys_at < join_at, "look's timer must wrap asynchronous queue selection, then joining the selected lines"
+assert "await queueKeys(" not in route[:timed_at], "no queue-selection await may precede the look timer"
+assert "{ begin in await self.execute(call, begin) }" in route, "look still uses the real execute / target path"
 assert "tails" not in router, "the router's lines are AICallLines (the old Task tails held every read until it was done)"
 enqueue = body(router, "private func enqueue(")
 for line in ["await lines.waitForTurn(place)", "defer { place.letGo() }", "AICallLines.$current.withValue(place)"]:
@@ -188,7 +195,7 @@ for path, start, last_read in [
     assert "project.state" not in text[go:], f"{path} {start}: reads project.state after letting its line go"
 assert "AICallLines.letGo()" not in Path("Sources/SrtFlow/AILookShots.swift").read_text(), "shots=true reads the project at its end: it keeps the line"
 PYTHON
-echo "   ✓ look joins its lines and goes through AILookCall; the lines are AICallLines; each look lets go after its last read of the project (shots keeps it)"
+echo "   ✓ look starts its timed lifecycle before queue selection and joining; the lines are AICallLines; each look lets go after its last read of the project (shots keeps it)"
 
 echo "==> 同一个文件夹出几个版本：文件名带版本，第二个工程不给版本就拒"
 # 2026-10-17 用户定（docs/plans/2026-10-17-multi-project-ai-editing.md 板 5、L 节）：只靠撞名加编号（「南极 2」）用户分不清哪个是哪个。
