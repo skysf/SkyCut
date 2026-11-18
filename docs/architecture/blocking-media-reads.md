@@ -102,6 +102,22 @@ asset 调 `cancelLoading`。还在队列中的 operation 直接取消、立即�
 静默等待最多 3 秒，其他调用快回（期限内没回答是「慢」、叫调用方过几秒重试，回过一次慢之后再问才是需要授权，[案例](../bugfixes/2026-11-11-keychain-slow-read-told-to-click-allow.md)）；原生调用迟到成功仍可缓存，存换删后的旧结果作废。
 不能在超时线程恢复交互开关，原生调用未返回时也不能声称已经中断。见[钥匙串阻塞案例](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)。
 
+## Destination drives (2026-11-18)
+
+File-system calls on a folder the user picked — `fileExists`, listing, creating a file, moving a finished video onto it —
+can block for seconds (a sleeping USB hard drive spinning up), fail late (a read-only NTFS volume) or never return (a stuck
+or half-unplugged drive). They are not allowed on the main thread, and a caller never waits on them without a deadline:
+
+- The export panel asks only `ExportDestinationProbe`: the work runs on GCD (never the cooperative pool), the caller gets
+  "not responding" at the deadline while the stuck call stays on its own thread, and at most three such checks wait on one
+  drive (a stuck drive must not eat GCD's bounded thread pool). A native call that does not return cannot be cut short:
+  past the deadline the panel says so and the thread is left to finish; nobody claims it ended.
+- Moving the finished video onto the destination (`ExportDelivery`) runs on its own queue: it is a full copy when the
+  destination is another drive, so it has no deadline, but it never holds the main thread.
+- Rules and checks: [export settings](export-settings.md) §8; case:
+  [choosing the export folder froze SkyCut](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
+- Not covered yet: saving a project file that lives on such a drive (autosave and Quit write it on the main thread).
+
 ## 子进程的异步退出
 
 `FFmpegProcess` 的退出要在启动前注册 `Process.terminationHandler`，和 stdout / stderr 的排空一起汇合后才返回。

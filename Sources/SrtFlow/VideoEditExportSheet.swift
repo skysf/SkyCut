@@ -24,6 +24,22 @@ struct VideoEditExportSheet: View {
     @State private var confirmsReplace = false
     /// 展开 / 收起记住：大多数人从来不开，开过的人下次多半还要看。
     @AppStorage("videoEditExportAdvancedExpanded") private var advancedExpanded = false
+    /// Where the video goes and what the last check of that folder said: the drive is only ever touched off the main
+    /// thread (docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
+    @StateObject private var destination: ExportDestinationState
+    /// The macOS folder window, opened without a modal session (ExportFolderChooser).
+    @StateObject private var chooser = ExportFolderChooser()
+    /// The look-and-write check right before an export is out.
+    @State private var isCheckingBeforeExport = false
+
+    init(project: VideoEditProject, exporter: VideoEditExporter) {
+        self.project = project
+        _exporter = ObservedObject(wrappedValue: exporter)
+        // Shown at once; whether it is still there is checked off the main thread when the panel appears.
+        _destination = StateObject(wrappedValue: ExportDestinationState(
+            folder: exporter.exportFolder ?? AIWorkspace.shared.startFolder(project: project)
+        ))
+    }
 
     private var exportState: TimelineState {
         project.stateForExport(selectionOnly: selectionOnly && !project.selectedClipIDs.isEmpty)
@@ -41,10 +57,8 @@ struct VideoEditExportSheet: View {
         return ExportFileName.stem(from: raw, droppingExtension: "", fallback: "Timeline")
     }
 
-    /// 记住的文件夹 → 起点（点名的文件夹 → 工程的家 → 「下载」，DefaultFolder）。
-    private var folder: URL {
-        exporter.usableExportFolder ?? AIWorkspace.shared.startFolder(project: project)
-    }
+    /// 记住的文件夹 → 起点（点名的文件夹 → 工程的家 → 「下载」，DefaultFolder）：resolved by ExportDestinationState.
+    private var folder: URL { destination.folder }
 
     private var stem: String {
         ExportFileName.stem(from: title, droppingExtension: fileExtension, fallback: defaultTitle)
@@ -56,8 +70,9 @@ struct VideoEditExportSheet: View {
 
     /// 导出会替换一个已有文件。刚从这个面板导出去的那一份不算 —— 不然一导完就冒出
     /// 「已存在」；真要再导一次，点「导出」时照样会问。
+    /// The names come from the last off-main check of the folder, never from the drive during a redraw.
     private var showsReplaceHint: Bool {
-        FileManager.default.fileExists(atPath: outputURL.path)
+        (destination.report?.contains(outputURL.lastPathComponent) ?? false)
             && exporter.finishedURL?.standardizedFileURL.path != outputURL.standardizedFileURL.path
     }
 
@@ -102,7 +117,7 @@ struct VideoEditExportSheet: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                     }
-                    folderRow
+                    ExportFolderRow(destination: destination, chooser: chooser) { exporter.exportFolder = $0 }
                     if !isAudioOnly { resolutionRow }
                 }
                 // 只出声音（.m4a）就没有画面可烧，这一行也不该出现。
@@ -121,7 +136,7 @@ struct VideoEditExportSheet: View {
                         Section("Subtitle files") {
                             SubtitleFilesExport(
                                 options: $subtitleOptions, exportState: exportState,
-                                folder: folder, stem: stem
+                                destination: destination, stem: stem
                             )
                         }
                     }
@@ -134,7 +149,7 @@ struct VideoEditExportSheet: View {
             }
             .formStyle(.grouped)
             // 导出途中改了也不作数（参数在开始那一刻就定了），干脆锁住，免得误会。
-            .disabled(exporter.isExporting)
+            .disabled(exporter.isExporting || isCheckingBeforeExport)
             Divider()
             footer
         }
@@ -147,6 +162,15 @@ struct VideoEditExportSheet: View {
                 title = defaultTitle
             }
         }
+        .task {
+            await destination.resolve(
+                remembered: exporter.exportFolder, fallback: AIWorkspace.shared.startFolder(project: project)
+            )
+        }
+        // A finished export adds a file to the folder: look again so the names are current.
+        .onChange(of: exporter.finishedURL) { _, _ in Task { await destination.refresh() } }
+        // No folder window left open for a panel that is gone.
+        .onDisappear { chooser.cancelIfChoosing() }
         .onChange(of: title) { _, newValue in
             // 只记用户改过的；和默认一样就不记，工程改名时标题才会跟着走。
             exporter.titleOverride = newValue == defaultTitle
@@ -210,28 +234,6 @@ struct VideoEditExportSheet: View {
                 // 扩展名不归用户填：只导音频时自动变 .m4a。
                 Text(verbatim: "." + fileExtension)
                     .foregroundStyle(.secondary)
-            }
-        }
-    }
-
-    private var folderRow: some View {
-        LabeledContent("Export to") {
-            HStack(spacing: 6) {
-                // 封住理想宽度：长路径从中间截断，这一行不至于被挤成上下两行。
-                Text(verbatim: (folder.path as NSString).abbreviatingWithTildeInPath)
-                    .lineLimit(1)
-                    .truncationMode(.middle)
-                    .foregroundStyle(.secondary)
-                    .frame(maxWidth: 230, alignment: .trailing)
-                    .instantHelp(verbatim: folder.path)
-                Button {
-                    if let chosen = FilePicker.chooseDirectory(startingAt: folder) {
-                        exporter.exportFolder = chosen
-                    }
-                } label: {
-                    Image(systemName: "folder")
-                }
-                .instantHelp("Choose the folder to export into")
             }
         }
     }
@@ -331,6 +333,10 @@ struct VideoEditExportSheet: View {
                     Button("Stop") { exporter.cancel() }
                         .instantHelp("Cancel the export")
                 } else {
+                    if isCheckingBeforeExport {
+                        ProgressView().controlSize(.small)
+                        Text("Checking the folder…").font(.caption).foregroundStyle(.secondary)
+                    }
                     Button {
                         requestExport()
                     } label: {
@@ -338,7 +344,9 @@ struct VideoEditExportSheet: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .keyboardShortcut(.defaultAction)
-                    .disabled(project.state.mainClips.isEmpty || exporter.isExporting)
+                    // Not while a folder is being picked: Return in the typed-path field must not start an export.
+                    .disabled(project.state.mainClips.isEmpty || exporter.isExporting || isCheckingBeforeExport
+                              || chooser.phase != .idle)
                     .instantHelp("Render the timeline to a video file", shortcut: .defaultAction)
                 }
             }
@@ -349,11 +357,20 @@ struct VideoEditExportSheet: View {
     // MARK: - 动作
 
     /// 目标已经有同名文件就先问一句（和系统保存面板一样）；没有就直接开始。
+    /// First one look at the folder with a write test, off the main thread: a missing, read-only, unwritable or
+    /// unanswering destination is said under "Export to" before anything is encoded, not after the whole export.
     private func requestExport() {
-        if FileManager.default.fileExists(atPath: outputURL.path) {
-            confirmsReplace = true
-        } else {
-            startExport()
+        guard !isCheckingBeforeExport else { return }
+        isCheckingBeforeExport = true
+        Task { @MainActor in
+            let report = await destination.checkBeforeWriting()
+            isCheckingBeforeExport = false
+            guard report.problem == nil else { return }
+            if report.contains(outputURL.lastPathComponent) {
+                confirmsReplace = true
+            } else {
+                startExport()
+            }
         }
     }
 

@@ -18,7 +18,10 @@ struct VideoEditExportStatus: View {
         if exporter.belongs(to: project) {
             if exporter.isExporting {
                 ProgressView(value: exporter.progress) {
-                    Text(String(format: L10n("Exporting… %@"), MediaFormatting.percent(exporter.progress)))
+                    // Encoded; now the file is copied onto the destination (minutes onto a slow external drive).
+                    Text(exporter.isDelivering
+                         ? L10n("Saving the video into the export folder…")
+                         : String(format: L10n("Exporting… %@"), MediaFormatting.percent(exporter.progress)))
                         .font(.caption)
                 }
             }

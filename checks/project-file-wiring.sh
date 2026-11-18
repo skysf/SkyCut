@@ -525,6 +525,32 @@ if [ -n "$STRAY_LINE_WRITES" ]; then
   WIRING_FAIL=1
 fi
 
+# Export folder window and destination (2026-11-18, docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md):
+# the macOS folder window is opened without a modal session, and nothing in the export panel or the exporter waits on
+# the destination drive on the main thread. The behaviour is checked by scripts/check-export-profile.sh; this pins
+# the production wiring it relies on.
+for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportFolderChooser.swift; do
+  forbid "the export folder window is never a modal runModal / FilePicker (a hung panel service then wedges the app)" \
+    "$f" '^[^/]*(runModal|FilePicker\.)'
+done
+require "the export folder window opens with begin (no modal session)" Sources/SrtFlow/ExportFolderChooser.swift 'panel\.begin \{'
+require "the folder chooser leaves its in-flight record before asking AppKit for the window" \
+  Sources/SrtFlow/ExportFolderChooser.swift 'record\.markStarted\(\)'
+require "the folder window never starts on a drive the last check found not answering (windowStart)" \
+  Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(startingAt: destination\.windowStart\)'
+for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportDestinationState.swift; do
+  forbid "the export panel never asks the destination drive itself (only ExportDestinationProbe, off the main thread)" \
+    "$f" '^[^/]*FileManager\.default'
+done
+forbid "the subtitle files' \"already there\" comes from the destination check, not from the drive during a redraw" \
+  Sources/SrtFlow/SubtitleGen/SubtitleExportSection.swift '^[^/]*FileManager\.default\.fileExists'
+forbid "the exporter never moves the finished video on the main thread (ExportDelivery does, on its own queue)" \
+  Sources/SrtFlow/VideoEditExporter.swift '^[^/]*\.(moveItem|replaceItemAt|fileExists)\('
+require "the exporter hands the finished video over through ExportDelivery" \
+  Sources/SrtFlow/VideoEditExporter.swift 'try await ExportDelivery\.deliver\('
+require "the export starts only after the look-and-write check of the folder" \
+  Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.checkBeforeWriting\(\)'
+
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "接线守卫失败" >&2
   exit 1

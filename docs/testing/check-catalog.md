@@ -34,6 +34,7 @@
 - 官网首屏的静图与浏览器检查（在 `website/`）：改了场景外观后 `npm run build:hero-still` 重烤（无头 Chromium + Pillow），`tests/hero-scene.test.mjs` 的指纹钉着「改了没重烤」；浏览器级的手动检查 `npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs`（三个内核 36 格（含首屏几栏的版面哨兵）+ 版面框 + 18 项回退行为，全程无头、只在 Mac 上、Playwright 不是依赖，**不在 `check-all.sh` 里**），见 [SkyCut 官网](../architecture/skycut-website.md)「首屏的质感与渐进增强」。
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](../architecture/export-settings.md)与[子进程退出](../architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](../reports/2026-11-02-export-profile-review.md)。
+  Since 2026-11-18 also the export folder window and destination (`FolderChooserChecks`, `DestinationChecks`): a fake folder window (answers, cancelled, empty at once, never appears, vanishes, stays stuck + Close It, the force-quit record), a fake drive that never answers or is read-only, the per-drive cap, real folders and typed paths, and one real export whose delivery is held 1.2 s off the main thread; the rules are in [导出设置](../architecture/export-settings.md) §8.
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -91,7 +92,7 @@
   AI 看永远原片、停着才换、切工程作废、菜单不读工程、性能台架量原片；清空之后紧跟 reset + 重建、缓存目录和上限的键只经 Store、
   改上限立刻 enforce、启动时在 proxy 队列上过期、转不了的只在菜单里标不写提示条）：`checks/optimized-media-wiring.sh`（扫描守卫）。
 - 主线程心跳看门狗（主线程没卡不误报、卡过阈值记时长 / context / 栈、日志文件、stop 之后不记），以及挂起主线程抓栈期间
-  抓栈线程一次都不分配 / 释放内存（第 6 组：`malloc_logger` 钩子逐次数，确定性）、主线程不停分配时连续抓栈不卡死（第 7 组）：
+  抓栈线程一次都不分配 / 释放内存（第 6 组：`malloc_logger` 钩子逐次数，确定性）、主线程不停分配时连续抓栈不卡死（第 7 组）、a stall still going on is in the log before it lands (group 5b)：
   `scripts/check-main-thread-watchdog.sh`；日志在哪、怎么读见 [主线程卡顿日志](../testing/main-thread-stalls.md)。
 - 预览合成真取帧，以及素材缓存命中时合成逐帧一样、同一路径换了文件或原地改写过必须重开，
   还有往合成轨上接素材只从末尾接、合成完正好和时间线一样长（多一格视频合成就无效 → 黑屏），
