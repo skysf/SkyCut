@@ -471,7 +471,9 @@
   silence, the report's window / mapping / cap / order, the placement rule); `scripts/check-parameter-limits.sh` →
   `MusicPlacementChecks` (an AAC piece through the real `listen` and `add_clips`: the strongest accent measured back on hit_at
   within a frame, `hit`, a moved source_in, refusals that change nothing, get_job's `music` equal to listen's answer);
-  `checks/MCP/listen-wiring.sh` pins the generation run's measurement. Rules: [listening engine](../architecture/listening-engine.md) section 9.
+  `checks/MCP/listen-wiring.sh` pins the generation run's measurement. `MusicAccents` is also the delivery checks' accent reading
+  (`SoundTierRuleChecks`' thump every 0.5 s at 24 kHz, `SoundTierChecks`' covered-cuts job); `MusicShapeChecks` pins its frame and
+  hop at five rates and a stretch of playing music without an accent at its start. Rules: [listening engine](../architecture/listening-engine.md) section 9.
 - Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
   order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
