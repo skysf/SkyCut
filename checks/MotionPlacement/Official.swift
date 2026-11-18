@@ -7,6 +7,7 @@ import SrtFlowWebMotionKit
 // The shipped designs use the real registry, locked helper and AI placement path. Small output sizes keep the finite
 // two-render checks light; every default frame is compared, rather than comparing only names or source strings.
 @MainActor func runMotionOfficialChecks(_ root: URL) async throws {
+    print("motion official: project fixture and library discovery")
     let fixture = try MotionFixture(root: root.appendingPathComponent("official-motion"))
     let language = AppLanguageStore.shared.language
     defer {
@@ -24,12 +25,15 @@ import SrtFlowWebMotionKit
                   "official designs use the existing set_motion tool")
     var rendered: [OfficialWebMotionTemplate: WebMotionCache.Rendered] = [:]
     for template in OfficialWebMotionTemplate.allCases {
+        print("motion official \(template.id): metadata")
         let original = try template.record()
         try officialMetadataChecks(template, record: original, state: fixture.project.state)
         var record = original
         record.width = 320; record.height = 180
         let directory = WebMotionActions.cacheDirectory(for: fixture.project)
+        print("motion official \(template.id): defaults render 1/2")
         let first = try await WebMotionCache.render(record, directory: directory, force: true)
+        print("motion official \(template.id): defaults repeat 2/2")
         let second = try await WebMotionCache.render(record, directory: directory, force: true)
         for result in [first, second] {
             motionRequire(!result.cacheHit && result.result.accepted && result.result.frameCount == 96,
@@ -44,13 +48,17 @@ import SrtFlowWebMotionKit
                       "\(template.id) draws the same pixels in two independent complete renders")
         motionRequire(Set(first.result.frameHashes).count > 4,
                       "\(template.id) is an animated design rather than one repeated still")
+        print("motion official \(template.id): bundled preview and receipt")
         try await officialPreviewChecks(template, record: original)
         try await officialParameterRenderChecks(template, original: original, reference: first, fixture: fixture)
         rendered[template] = second
     }
     guard let first = rendered[.boxToEarth] else { throw AIToolError("The official box fixture did not render") }
+    print("motion official: placement, independent reuse and undo")
     try await officialPlacementChecks(fixture, rendered: first)
+    print("motion official: localized metadata labels")
     try officialLabelChecks()
+    print("motion official: mounted clip-name language switches")
     try await runMotionClipNameChecks()
 }
 
@@ -59,6 +67,7 @@ import SrtFlowWebMotionKit
     let directory = WebMotionActions.cacheDirectory(for: fixture.project)
     var controlRecord = original
     controlRecord.width = 320; controlRecord.height = 180; controlRecord.fps = 4
+    print("motion official \(template.id): parameter control")
     let control = try await WebMotionCache.render(controlRecord, directory: directory, force: true)
     officialRenderPassed(control, frames: 16, context: "\(template.id) four-fps control")
     let commonTimes = stride(from: 0, to: reference.result.frameHashes.count, by: 6).map { reference.result.frameHashes[$0] }
@@ -69,6 +78,7 @@ import SrtFlowWebMotionKit
                                         ("duration", 3), ("hit", 1.25)]
     if template == .wordCollision { changes.append(("second_text", "DISCOVERY")) }
     for (key, value) in changes {
+        print("motion official \(template.id): independent parameter \(key)")
         let request = try AIMotionRequest(AIToolArguments(["template": .string(template.id), "parameters": .object([key: value])]),
                                           state: fixture.project.state, playhead: 0)
         var record = request.record
@@ -83,6 +93,7 @@ import SrtFlowWebMotionKit
     }
     var portrait = controlRecord
     portrait.width = 180; portrait.height = 320
+    print("motion official \(template.id): portrait")
     let result = try await WebMotionCache.render(portrait, directory: directory, force: true)
     officialRenderPassed(result, frames: 16, context: "\(template.id) portrait")
     motionRequire(result.record.width == 180 && result.record.height == 320 && result.result.transparent,

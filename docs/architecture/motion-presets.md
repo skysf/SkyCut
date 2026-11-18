@@ -216,6 +216,15 @@ compares every frame hash. It exercises discovery, trusted template requests, pa
 independent reuse and undo through the real AI path. `OfficialPreviews.swift` verifies the bundled bytes, defaults, six-check receipt
 and actual movie size, frame rate, duration and premultiplied alpha. The existing offscreen UI harness covers all three languages
 and both themes; recognized official default names/labels follow the UI language while custom names, labels and values remain verbatim.
+
+`scripts/check-motion-placement.sh` always runs both complete groups in sequence: `core` and `official` are separate processes,
+each with the same 240-second watchdog, a separate temporary project root and cleared isolated defaults. The Swift entry requires
+an explicit group argument; it has no default or partial-success mode. The driver attempts the second group even if the first fails
+or times out, collects every failed group and returns nonzero if any group failed. The core group retains 197 assertions; the
+official group has 167, including the same two job/keep-awake cleanup assertions at each process boundary (364 total, with no
+original assertions removed). Template/default/repeat, independent parameter, portrait, placement and label stage logs identify
+the active operation. Renderer/page/helper limits remain unchanged; a growing suite never consumes another group's watchdog.
+
 The timeline clip label and the selected-clip inspector header both use `WebMotionClipName`, whose locale dependency redraws an
 already-mounted label after a language switch. This is display-only: `EditClip.name`, the stored web record, and ordinary media names
 are not rewritten or translated. `checks/MotionPlacement/ClipNames.swift` compares the same mounted view with the newly localized

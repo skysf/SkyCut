@@ -49,6 +49,17 @@ for consumer in ["VideoEditInspector.swift", "VideoEditTimelineClipBlock.swift"]
 require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "@Environment(\\.locale) private var locale")
 require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "let _ = locale.identifier")
 require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "Text(verbatim: OfficialWebMotionLabels.title(record))")
+driver = "scripts/check-motion-placement.sh"
+require(driver, 'for group in ("core", "official"):')
+require(driver, 'subprocess.Popen([sys.argv[1], group], stdin=subprocess.DEVNULL, env=env)')
+require(driver, 'env["SRTFLOW_MOTION_PLACEMENT_DIR"] = os.path.join(sys.argv[2], group)')
+require(driver, 'code = check.wait(timeout=240)')
+require(driver, 'failures.append(f"{group}: timed out after 240 s")')
+require(driver, 'failures.append(f"{group}: exit {code}")')
+require(driver, 'if failures:\n    print("FAIL: motion placement groups: " + "; ".join(failures), flush=True)\n    sys.exit(1)')
+require("checks/MotionPlacement/Main.swift", "CommandLine.arguments.count == 2")
+require("checks/MotionPlacement/Main.swift", "case .core: try await runCoreChecks(root)")
+require("checks/MotionPlacement/Main.swift", "case .official: try await runMotionOfficialChecks(root)")
 print("PASS: web motion uses the locked renderer, approval modes, jobs, document guards, one undo, cache recovery and discovery")
 PYTHON
 

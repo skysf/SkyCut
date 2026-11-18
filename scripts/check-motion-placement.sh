@@ -31,19 +31,37 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/MotionPlacement/Official.swift checks/MotionPlacement/OfficialPreviews.swift checks/MotionPlacement/ClipNames.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${CHECK_APP}/Contents/MacOS/MotionPlacementCheck"
 SRTFLOW_WEB_MOTION_HELPER="${CHECK_APP}/Contents/Helpers/skycut-web-motion" \
-SRTFLOW_MOTION_PLACEMENT_DIR="${CHECK_ROOT}/work" SRTFLOW_SMOKE_SCRIPT="${CHECK_ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
-python3 - "${CHECK_APP}/Contents/MacOS/MotionPlacementCheck" <<'PYTHON'
+SRTFLOW_SMOKE_SCRIPT="${CHECK_ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
+python3 - "${CHECK_APP}/Contents/MacOS/MotionPlacementCheck" "${CHECK_ROOT}/work" <<'PYTHON'
+import os
 import subprocess
 import sys
-# A hung helper or missing recovery must fail the check even if Swift's executor cannot make progress.
-with subprocess.Popen([sys.argv[1]], stdin=subprocess.DEVNULL) as check:
+# Always attempt both complete groups, each in a fresh process with its own finite watchdog and project root.
+failures = []
+for group in ("core", "official"):
+    env = os.environ.copy()
+    env["SRTFLOW_MOTION_PLACEMENT_DIR"] = os.path.join(sys.argv[2], group)
+    print(f"motion checks: starting {group} (240 s cap)", flush=True)
     try:
-        code = check.wait(timeout=240)
-    except subprocess.TimeoutExpired:
-        print("Motion placement checks timed out", flush=True)
-        check.kill()
-        check.wait()
-        raise
+        os.makedirs(env["SRTFLOW_MOTION_PLACEMENT_DIR"], exist_ok=True)
+        with subprocess.Popen([sys.argv[1], group], stdin=subprocess.DEVNULL, env=env) as check:
+            try:
+                code = check.wait(timeout=240)
+            except subprocess.TimeoutExpired:
+                check.kill()
+                check.wait()
+                failures.append(f"{group}: timed out after 240 s")
+                print("FAIL: " + failures[-1], flush=True)
+                continue
+    except OSError as error:
+        failures.append(f"{group}: could not start: {error}")
+        print("FAIL: " + failures[-1], flush=True)
+        continue
     if code:
-        raise subprocess.CalledProcessError(code, [sys.argv[1]])
+        failures.append(f"{group}: exit {code}")
+        print("FAIL: " + failures[-1], flush=True)
+if failures:
+    print("FAIL: motion placement groups: " + "; ".join(failures), flush=True)
+    sys.exit(1)
+print("PASS: both motion placement groups completed", flush=True)
 PYTHON

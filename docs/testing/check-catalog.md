@@ -20,6 +20,9 @@
   both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery and
   portable font/system warnings. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
+  Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
+  fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled
+  preview receipts, persistence/reuse and mounted labels across language changes. Both groups retain job/keep-awake cleanup checks.
 
 - 官网样式表的先后（构建按共用关系分块，覆盖规则不许排在基础规则前面）：`website/tests/css-cascade.test.mjs`（源码级）和 `npm run check:seo`（按每个构建出来的页面实际加载的样式块核对），都在 CI 的网站那一步里。
 
