@@ -185,7 +185,7 @@ struct OutputLocationPicker: View {
                 .lineLimit(1)
                 .truncationMode(.middle)
             Button("Choose…") {
-                if let directory = FilePicker.chooseDirectory() {
+                FilePicker.chooseDirectory { directory in
                     queue.outputDirectory = directory
                     queue.refreshOutputPaths()
                 }

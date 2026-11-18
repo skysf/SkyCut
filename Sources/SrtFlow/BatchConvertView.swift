@@ -133,22 +133,12 @@ struct BatchConvertView: View {
     }
 
     private func addFiles() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = SubtitleFileTypes.readable
-        panel.allowsMultipleSelection = true
-        panel.begin { response in
-            guard response == .OK else { return }
-            for url in panel.urls { model.add(url) }
+        FilePicker.chooseFiles(types: SubtitleFileTypes.readable) { urls in
+            for url in urls { model.add(url) }
         }
     }
 
     private func chooseOutputFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.begin { response in
-            guard response == .OK, let url = panel.url else { return }
-            model.outputDirectory = url
-        }
+        FilePicker.chooseDirectory { model.outputDirectory = $0 }
     }
 }

@@ -1656,3 +1656,17 @@
 "The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost." = "El disco “%@” no responde. Puede que esté en reposo o desconectado. SkyCut se cerrará solo en cuanto el proyecto esté guardado. Si sales ahora, se perderán los cambios desde la última vez que se guardó.";
 "Don't Quit" = "No salir";
 "Quit Anyway" = "Salir de todos modos";
+
+/* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
+"If the macOS window stops responding, close it here." = "Si la ventana de macOS deja de responder, ciérrala aquí.";
+"Close the macOS window" = "Cerrar la ventana de macOS";
+"Open the macOS window again" = "Abrir de nuevo la ventana de macOS";
+"Save Here" = "Guardar aquí";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "La última vez hubo que cerrar SkyCut mientras había una ventana de archivos de macOS abierta. Escribe abajo la ruta completa del archivo o arrástralo aquí desde el Finder.";
+"The macOS file window did not work. Type the file's full path below, or drag the file here from Finder." = "La ventana de archivos de macOS no funcionó. Escribe abajo la ruta completa del archivo o arrástralo aquí desde el Finder.";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder." = "La última vez hubo que cerrar SkyCut mientras había una ventana de archivos de macOS abierta. Escribe abajo la ruta de la carpeta o arrastra una carpeta aquí desde el Finder.";
+"The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder." = "La ventana de archivos de macOS no funcionó. Escribe abajo la ruta de la carpeta o arrastra una carpeta aquí desde el Finder.";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder." = "La última vez hubo que cerrar SkyCut mientras había una ventana de archivos de macOS abierta. Escribe abajo la ruta completa donde guardar o arrastra una carpeta aquí desde el Finder.";
+"The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "La ventana de archivos de macOS no funcionó. Escribe abajo la ruta completa donde guardar o arrastra una carpeta aquí desde el Finder.";
+"Type the full path of a file SkyCut can open here, starting with “/”." = "Escribe la ruta completa de un archivo que SkyCut pueda abrir aquí, empezando por “/”.";
+"Type the full path to save to, starting with “/”." = "Escribe la ruta completa donde guardar, empezando por “/”.";

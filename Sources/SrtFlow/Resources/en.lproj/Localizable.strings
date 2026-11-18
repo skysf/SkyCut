@@ -1656,3 +1656,17 @@
 "The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost." = "The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost.";
 "Don't Quit" = "Don't Quit";
 "Quit Anyway" = "Quit Anyway";
+
+/* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
+"If the macOS window stops responding, close it here." = "If the macOS window stops responding, close it here.";
+"Close the macOS window" = "Close the macOS window";
+"Open the macOS window again" = "Open the macOS window again";
+"Save Here" = "Save Here";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder.";
+"The macOS file window did not work. Type the file's full path below, or drag the file here from Finder." = "The macOS file window did not work. Type the file's full path below, or drag the file here from Finder.";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder." = "Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder.";
+"The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder." = "The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder.";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder." = "Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder.";
+"The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder.";
+"Type the full path of a file SkyCut can open here, starting with “/”." = "Type the full path of a file SkyCut can open here, starting with “/”.";
+"Type the full path to save to, starting with “/”." = "Type the full path to save to, starting with “/”.";

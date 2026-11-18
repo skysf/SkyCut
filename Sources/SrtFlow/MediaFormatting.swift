@@ -159,24 +159,4 @@ func revealInFinder(_ url: URL) {
     NSWorkspace.shared.activateFileViewerSelecting([url])
 }
 
-/// 选文件的面板，包一层省得到处写。
-enum FilePicker {
-    static func chooseFiles(types: [UTType], allowsMultiple: Bool = true) -> [URL] {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = types
-        panel.allowsMultipleSelection = allowsMultiple
-        panel.canChooseDirectories = false
-        // 系统认不出的容器（.mkv 等）也得能选。
-        panel.allowsOtherFileTypes = true
-        return panel.runModal() == .OK ? panel.urls : []
-    }
-
-    static func chooseDirectory(startingAt directory: URL? = nil) -> URL? {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.directoryURL = directory
-        return panel.runModal() == .OK ? panel.url : nil
-    }
-}
+// 选文件的面板（FilePicker）在 SystemFileWindows.swift：2026-11-19 起不再是模态的。

@@ -355,14 +355,14 @@ struct BurnInView: View {
     private func chooseFiles() {
         var types = MediaFileTypes.video
         types.append(contentsOf: SubtitleFileTypes.readable)
-        add(FilePicker.chooseFiles(types: types))
+        FilePicker.chooseFiles(types: types) { add($0) }
     }
 
     /// 字幕列空着时的「打开字幕」：有等着配字幕的视频就配给它，没有就独立打开。
     private func openSubtitleForEditing() {
-        let urls = FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false)
-        guard let url = urls.first else { return }
-        add([url])
+        FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false) { urls in
+            if let url = urls.first { add([url]) }
+        }
     }
 
     private func add(_ urls: [URL]) {
@@ -401,10 +401,12 @@ struct BurnInView: View {
     }
 
     private func pickSubtitle(for id: EncodeItem.ID) {
-        let urls = FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false)
-        guard let url = urls.first else { return }
-        attach(subtitle: url, to: id)
-        requestPreviewSoon()
+        FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false) { urls in
+            // The window is not modal: the video may have left the queue while it was open.
+            guard let url = urls.first, queue.items.contains(where: { $0.id == id }) else { return }
+            attach(subtitle: url, to: id)
+            requestPreviewSoon()
+        }
     }
 
     private func attach(subtitle: URL, to id: EncodeItem.ID) {

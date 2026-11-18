@@ -89,14 +89,7 @@ final class ExportDestinationState: ObservableObject {
     /// A path someone typed or pasted: quotes and Terminal's `\ ` escapes removed, `~` expanded, `file://` accepted.
     /// nil when it is not a full path.
     static func url(typed text: String) -> URL? {
-        var path = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        if path.count >= 2, let first = path.first, first == path.last, first == "\"" || first == "'" {
-            path = String(path.dropFirst().dropLast())
-        }
-        if path.hasPrefix("file://"), let url = URL(string: path), url.isFileURL { return url }
-        path = (path.replacingOccurrences(of: "\\ ", with: " ") as NSString).expandingTildeInPath
-        guard path.hasPrefix("/") else { return nil }
-        return URL(fileURLWithPath: path, isDirectory: true)
+        TypedPath.url(text, isDirectory: true)
     }
 
     private func show(_ url: URL, token: Int) async {

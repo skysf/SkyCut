@@ -1656,3 +1656,17 @@
 "The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost." = "「%@」这块磁盘没有响应，可能在休眠或已经断开。工程一存上，SkyCut 就会自己退出。现在就退出的话，上次存盘之后的改动会丢失。";
 "Don't Quit" = "不退出";
 "Quit Anyway" = "仍然退出";
+
+/* macOS open / save windows without a modal session, and the helper next to them (SystemFileWindows, 2026-11-19). */
+"If the macOS window stops responding, close it here." = "如果 macOS 的窗口没有反应了，在这里关掉它。";
+"Close the macOS window" = "关掉 macOS 的窗口";
+"Open the macOS window again" = "再打开一次 macOS 的窗口";
+"Save Here" = "存到这里";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the file's full path below, or drag the file here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件的完整路径，或者从 Finder 把文件拖到这里。";
+"The macOS file window did not work. Type the file's full path below, or drag the file here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件的完整路径，或者从 Finder 把文件拖到这里。";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the folder's path below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
+"The macOS file window did not work. Type the folder's path below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入文件夹的路径，或者从 Finder 把文件夹拖到这里。";
+"Last time SkyCut had to be closed while a macOS file window was open. Type the full path to save to below, or drag a folder here from Finder." = "上次 macOS 的文件窗口开着的时候，SkyCut 不得不被强制关闭。请在下面输入要存到的完整路径，或者从 Finder 把文件夹拖到这里。";
+"The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入要存到的完整路径，或者从 Finder 把文件夹拖到这里。";
+"Type the full path of a file SkyCut can open here, starting with “/”." = "请输入一个 SkyCut 在这里能打开的文件的完整路径，以「/」开头。";
+"Type the full path to save to, starting with “/”." = "请输入要存到的完整路径，以「/」开头。";

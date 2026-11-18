@@ -320,8 +320,6 @@ struct VideoEditSubtitlePanel: View {
     }
 
     private func pickSubtitle() {
-        let urls = FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false)
-        guard let url = urls.first else { return }
-        project.attachSubtitle(url)
+        VideoEditMediaPicker.addSubtitle(to: project)
     }
 }

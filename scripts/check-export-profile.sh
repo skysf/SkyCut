@@ -24,7 +24,8 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFl
 cp Sources/SrtFlow/Resources/watermark-logo.svg "${APP}/Contents/Resources/watermark-logo.svg"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/ExportProfile/Main.swift checks/ExportProfile/Runner.swift checks/ExportProfile/ProcessChecks.swift \
-  checks/ExportProfile/FolderChooserChecks.swift checks/ExportProfile/DestinationChecks.swift \
+  checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift \
+  checks/ExportProfile/DestinationChecks.swift \
   checks/ExportProfile/AIExportFolderChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"

@@ -145,8 +145,9 @@ struct NewVoiceSheet: View {
     }
 
     private func chooseFile() {
-        guard let file = FilePicker.chooseFiles(types: [.audio, .movie], allowsMultiple: false).first else { return }
-        model.use(file: file)
+        FilePicker.chooseFiles(types: [.audio, .movie], allowsMultiple: false) { urls in
+            if let file = urls.first { model.use(file: file) }
+        }
     }
 
     // MARK: 语言
