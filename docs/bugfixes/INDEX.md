@@ -35,6 +35,7 @@
 - [2026-09-26 自动检测语言拿音效当探针](2026-09-26-auto-detect-probes-sound-effects.md) — 「读得出来」不等于「有人说话」：探针长的先、先听有没有人声。
 - [2026-09-24 改得勤就隔一会儿卡一下：自动保存重建书签](2026-09-24-autosave-rebuilds-bookmarks-every-save.md) — 书签按「路径 + inode + 卷」缓存，同名换文件才重建。
 - [2026-09-27 批量转换字幕把同名文件悄悄盖掉](2026-09-27-batch-convert-overwrites-existing-files.md) — 写用户文件夹默认不覆盖：先问，或加编号（`ExportFileName.unoccupied`）。
+- [2026-11-18 Batch gain breaks an earlier seam](2026-11-18-batch-cut-gain-rebreaks-earlier-seams.md) — Solve shared sounds together and verify every final seam.
 - [2026-09-29 listen 说 63.5 BPM，cut_to_beat 按 95.3 切](2026-09-29-beat-analysis-window-differs-between-listen-and-cut-to-beat.md) — 同一个量两个工具各算一份迟早两个答案：落在前 15 分钟里的请求共用一份整段分析（到结尾或 15 分钟）；更晚的按自己的区间，也封顶 15 分钟。
 - [2026-11-17 Black-bar removal disagreed with look and left thin edges](2026-11-17-black-bar-removal-keeps-residual-edges.md) — Measure the requested source window at one shared resolution and include the resampled boundary in the corrective crop.
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
@@ -124,6 +125,7 @@
 - [2026-11-03 文件 listen 的短区间仍读整条音轨](2026-11-03-listen-file-range-reads-whole-audio.md) — 给了源范围就用原生 timeRange 有界读取。
 - [2026-11-13 文件 listen 的区间自检在机器满载时等不到 2 秒的截止时间](2026-11-13-listen-range-checks-timed-out-under-load.md) — 自检传给生产入口的期限只拦卡死、要证明的事数出来；一个文件里对着墙上时钟的期限一起改，别只修红过的那条。
 - [2026-11-04 取消 listen 时跨线程拆掉正在读的 reader](2026-11-04-listen-reader-cancel-during-copy.md) — 原生 copy 和取消不能并发，取消只在读取体那一处收。
+- [2026-11-18 Clip listen meters raw PCM before gain](2026-11-18-listen-sample-gain-before-true-peak.md) — Apply the actual sample envelope before interpolation and energy accumulation.
 - [2026-11-03 本地构建后缀进了版本头，模型目录被拒](2026-11-03-local-version-header.md) — 版本头只在共享的请求边界规范化。
 - [2026-11-10 一句拆两批，两种采样率接不起来](2026-11-10-long-line-halves-with-different-sample-rates.md) — 拼接前换成同一个采样率；假协议要按模型回不一样的格式。
 - [2026-11-17 look silently took minutes, the calls behind it were dropped and its result lost](2026-11-17-look-hangs-and-dropped-calls.md) — A read lets its line go once it has read the project; work that can outlast the helper's 120 s answers with a job id first.
@@ -183,6 +185,7 @@
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
 - [2026-09-25 松手重建预览把每个素材重开一遍](2026-09-25-rebuild-reopens-every-asset.md) — 素材按文件身份进程级缓存（`MediaAssetCache`）；只有一个小视图关心的状态不在工程上发。
+- [2026-11-18 Shared rules reverse the bed policy](2026-11-18-recipe-bed-policy-drift.md) — Check shipped AI instructions against the current production decision.
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。
 - [2026-09-29 风格卡给竖屏写的字号大了 1.78 倍](2026-09-29-recipe-sizes-too-big-on-vertical.md) — 写给 AI 的数字也是代码：字号按画面高度算，卡里写明画幅并真排一遍。
 - [2026-10-03 record_screen 真机首测的四处小毛病](2026-10-03-record-screen-first-device-test.md) — 新工具合并后尽早上真机走一遍：状态组合、时序自检够不着。
