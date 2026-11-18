@@ -94,7 +94,8 @@ enum MCPGuideSpeechTopics {
             // Since 2026-11-17 (MCP-39; docs/architecture/listening-engine.md section 2, ai-control-mcp.md section 4 item 13).
             MCPGuideSection(name: "voice", about: "voice=: is each narration line covered, by what, and how much", text: """
             Voice. voice checks narration against the mix: name the voice track (voice=A1; several joined by +) or voice=auto (the \
-            audio tracks holding SkyCut's voice-overs). A voice inside a clip's own sound (V1, V2: on-camera speech) can't be \
+            audio tracks holding SkyCut's voice-overs). Both accept at most 11 voice tracks, reserving a layer for other sounds. \
+            A voice inside a clip's own sound (V1, V2: on-camera speech) can't be \
             measured and is refused. Each voice clip is cut into lines at its pauses; each line gets estoi (0–1: how much of it \
             survives in the whole mix), a verdict, maskers (the two layers covering it most, with kind music, effects, clip_sound, \
             voice or other, and how much removing it or lowering it 6 dB would add) and low_150_db next to voice_db (ESTOI can't \

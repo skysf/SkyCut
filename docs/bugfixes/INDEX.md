@@ -276,6 +276,7 @@
 - [2026-10-02 AI 起的 upscale 换源后扣费一直是「—」](2026-10-02-upscale-cost-lookup-killed-by-remove.md) — 异步补账要追着已落地的数据写；remove ≠ cancel。
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](2026-10-28-upscale-inspector-still-says-fal.md) — 换提供方要连 verbatim 写死的名字一起搜。
 - [2026-10-28 Upscale 面板上不肯报价的那一行只写「—」](2026-10-28-upscale-panel-hides-why-quote-failed.md) — 会因内容失败的请求，原因要上界面；规则在服务器上的照它的话说。
+- [2026-11-18 Automatic voice selection can crash when it fills the layer budget](2026-11-18-voice-auto-layer-budget-crash.md) — Validate automatic and explicit selections against the same budget before computing remaining capacity.
 - [2026-11-10 并发检查断言了假服务没按住的完成顺序](2026-11-10-voice-concurrency-check-finish-order.md) — 只断言被按住的那一对的先后。
 - [2026-11-11 重启后不记得在建的声音库那一单](2026-11-11-voice-library-job-after-restart.md) — 账在盘上，它要结的那一单也得在盘上；能去重的在问用户之前去重。
 - [2026-11-11 声音库审查的后续](2026-11-11-voice-library-review-followups.md) — 过闸之前先看在建的那一单；费用的问题受理后才清。

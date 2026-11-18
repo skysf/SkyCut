@@ -35,6 +35,9 @@
 
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
+- Voice selection budget: `scripts/check-mix-layers.sh` → `Voice.swift` tests 11/12/13 voice tracks with zero/one/many
+  other tracks through auto and explicit selection, complete audible-track partitioning and valid voice-clip layer references.
+  Rule: [the listening engine](../architecture/listening-engine.md).
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](../architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](../reports/2026-11-02-video-inspection.md)。
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；

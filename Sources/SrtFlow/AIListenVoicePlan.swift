@@ -124,7 +124,7 @@ struct AIListenVoicePlan: Sendable {
             guard !found.isEmpty else {
                 throw AIToolError("No audio track holds only SkyCut voice-overs. Name the narration track: voice=A1 (or A1+A2).")
             }
-            return found
+            return try checkedVoiceTracks(found)
         }
         var result: [Int] = []
         for part in trimmed.split(separator: "+").map({ $0.trimmingCharacters(in: .whitespaces).uppercased() }) {
@@ -139,8 +139,13 @@ struct AIListenVoicePlan: Sendable {
             if !result.contains(index) { result.append(index) }
         }
         guard !result.isEmpty else { throw AIToolError("voice takes an audio track (A1), several (A1+A2) or auto.") }
-        guard result.count < maxLayers else { throw AIToolError("voice takes at most \(maxLayers - 1) tracks.") }
-        return result
+        return try checkedVoiceTracks(result)
+    }
+
+    /// Reserve one layer for other sounds, including auto selections and a mix with no other tracks yet.
+    private static func checkedVoiceTracks(_ tracks: [Int]) throws -> [Int] {
+        guard tracks.count < maxLayers else { throw AIToolError("voice takes at most \(maxLayers - 1) tracks.") }
+        return tracks
     }
 
     // MARK: Provenance
