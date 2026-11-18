@@ -6,7 +6,8 @@ import Synchronization
 // 管什么：实时线程上的那一小段活 —— 此刻活着的每条流，把 `[position, position + frames)` 这一截从环里取出来，
 // 乘上段自己的增益（音量 × 渐变 × 曲线，`GainTable.Sampler`），挂了声音场景的再过效果链（段尾之后继续喂零、
 // 余音散完；位置跳了就复位链），乘轨道推子，累加进输出。顺序和 tap 那条路一样：段增益 → 效果 → 推子
-// （docs/architecture/sound-scenes.md）。
+// （docs/architecture/sound-scenes.md）。Since 2026-11-18 a clip's voice-band cut (VoiceBandRendering) runs between the
+// segment gain and the scene.
 // 不管什么：读文件、开关流、建效果链（AudioTrackFeeder）；总推子（mainMixer）。
 //
 // **实时安全**：不分配、不加锁、不碰 Swift 的 Dictionary / String。草稿缓冲预分配；流的列表经 AudioPublished
@@ -60,6 +61,8 @@ final class AudioTrackRenderer: @unchecked Sendable {
             }
             let gain = stream.gain.load()?.sampler ?? stream.segment.gain
             applyGain(gain, from: from, count: audible)
+            // The voice band (300 Hz–3 kHz) of this clip's own sound, after its gain and before the scene (sound-scenes.md §5).
+            stream.band.render(scratchLeft, scratchRight, count: count, from: from, asked: stream.voiceBand.load(ordering: .relaxed))
             if let scene {
                 if stream.renderedUpTo != from { scene.chain.reset() }   // 位置跳了（seek、开播）：旧的余音不许拖进新位置
                 stream.renderedUpTo = to

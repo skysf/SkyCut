@@ -34,6 +34,7 @@
 - 官网首屏的静图与浏览器检查（在 `website/`）：改了场景外观后 `npm run build:hero-still` 重烤（无头 Chromium + Pillow），`tests/hero-scene.test.mjs` 的指纹钉着「改了没重烤」；浏览器级的手动检查 `npx -y -p playwright@1.65.0 node scripts/check-hero-browsers.mjs`（三个内核 36 格（含首屏几栏的版面哨兵）+ 版面框 + 18 项回退行为，全程无头、只在 Mac 上、Playwright 不是依赖，**不在 `check-all.sh` 里**），见 [SkyCut 官网](../architecture/skycut-website.md)「首屏的质感与渐进增强」。
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](../architecture/export-settings.md)与[子进程退出](../architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](../reports/2026-11-02-export-profile-review.md)。
+  Since 2026-11-18 also the export folder window and destination (`FolderChooserChecks`, `DestinationChecks`): a fake folder window (answers, cancelled, empty at once, never appears, vanishes, stays stuck + Close It, the force-quit record), a fake drive that never answers or is read-only, the per-drive cap, real folders and typed paths, and one real export whose delivery is held 1.2 s off the main thread; the rules are in [导出设置](../architecture/export-settings.md) §8.
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -91,7 +92,7 @@
   AI 看永远原片、停着才换、切工程作废、菜单不读工程、性能台架量原片；清空之后紧跟 reset + 重建、缓存目录和上限的键只经 Store、
   改上限立刻 enforce、启动时在 proxy 队列上过期、转不了的只在菜单里标不写提示条）：`checks/optimized-media-wiring.sh`（扫描守卫）。
 - 主线程心跳看门狗（主线程没卡不误报、卡过阈值记时长 / context / 栈、日志文件、stop 之后不记），以及挂起主线程抓栈期间
-  抓栈线程一次都不分配 / 释放内存（第 6 组：`malloc_logger` 钩子逐次数，确定性）、主线程不停分配时连续抓栈不卡死（第 7 组）：
+  抓栈线程一次都不分配 / 释放内存（第 6 组：`malloc_logger` 钩子逐次数，确定性）、主线程不停分配时连续抓栈不卡死（第 7 组）、a stall still going on is in the log before it lands (group 5b)：
   `scripts/check-main-thread-watchdog.sh`；日志在哪、怎么读见 [主线程卡顿日志](../testing/main-thread-stalls.md)。
 - 预览合成真取帧，以及素材缓存命中时合成逐帧一样、同一路径换了文件或原地改写过必须重开，
   还有往合成轨上接素材只从末尾接、合成完正好和时间线一样长（多一格视频合成就无效 → 黑屏），
@@ -202,7 +203,7 @@
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
   同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
   挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`；subtitles sitting on a sound off V1 (narration) follow that sound, not the picture, and ride a V1 drag
-  only with it — a new source range on a screen recording keeps them, group 1k `LinkageVoiceCues.swift`）：
+  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
@@ -475,9 +476,25 @@
   the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
   file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
   [volume curve](../architecture/audio-volume-curve.md) section 5.
+- A clip's voice-band cut (`edit_clip voice_band_db`, MCP-30): `scripts/check-audio-engine.sh` group 16 → `VoiceBand.swift` (the
+  filter on steady sines: lows and highs kept, 1 kHz down by the depth, gain 1 flat, blocks = one run; the engine's offline render
+  of a three-tone clip; a cut through `updateGains`, not structure); `scripts/check-project-file.sh` group 51 (cleaning, v38, round
+  trip, split, separated sound, audio-only change); `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh`
+  → `VoiceBandAppChecks` (edit_clip's real plan / apply, the export mixdown per tone, one undo). Rules in
+  [sound scenes](../architecture/sound-scenes.md) section 5.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered
   stamp, queued status / holder / position, late target / Stop binding, distinct on-screen clips and get_job pictures,
   cancel_job / Stop, explicit-project / file controls, and real close_project queued behind an edit. The gate / transport
   remain manual; `checks/MCP/router-wiring.sh` requires the timer before every queue-selection await and authorization first.
+- Sound under look's sheet (2026-11-18, MCP-66; [AI interface](../architecture/ai-control-mcp.md) section 4 item 12): `scripts/check-mcp.sh`
+  → `checks/MCP/LookSoundChecks.swift`, pure: the window for frame times (room, clamps), the frames a window covers, pixel columns (mean
+  level, highest peak, at least the frame under the middle), the summary (`loudest_at`, `peak_db`, each start once in time order, at most
+  24 listed) and the drawing read back pixel by pixel (the level at √amplitude height, red above the ceiling, a blue start line, a dashed
+  white #n line, close #n labels on a second line, the strip under a narrow sheet). Real path: `scripts/check-look-jobs.sh` →
+  `LookSoundChecks` (a background project, a synthetic burst on A1 and a tone on A2, the engine's render: rows in order, the burst's frame
+  loudest in both rows, the A2 start listed with its clip and track, the picture is the sheet plus the strip with tall level bars only at
+  the burst, clip_id spans its clip, image=false gives numbers only, four refusals); `scripts/check-video-inspection.sh` checks that the
+  evidence sheet carries the measured mix. Reverse (2026-11-18): passing no strip to `finish` from look turned 8 checks red, and from
+  inspect_video the evidence-sheet check.

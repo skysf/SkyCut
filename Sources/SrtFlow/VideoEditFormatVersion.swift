@@ -475,5 +475,8 @@ extension TimelineState {
     var requiresFormatVersion35: Bool { !deliveryIntentions.isEmpty || allClips.contains(where: \.isScreenRecording) }
     /// v37 preserves an explicit black ending; older writers would silently shorten the finished film.
     var requiresFormatVersion37: Bool { minimumDuration > 0 }
+    /// v38 keeps a clip's voice-band cut (`EditClip.voiceBandDB`, 2026-11-18, omitted at 0): an older writer would drop it
+    /// and the clip's sound in the film would change.
+    var requiresFormatVersion38: Bool { allClips.contains { $0.voiceBandDB != 0 } }
 
 }

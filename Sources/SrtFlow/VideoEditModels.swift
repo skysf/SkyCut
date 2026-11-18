@@ -92,6 +92,8 @@ struct EditClip: Identifiable, Hashable, Sendable {
     /// 声音场景（喇叭 / 室内 / 室外）；nil = 没有。模型见 VideoEditSoundScene.swift，合同见
     /// docs/architecture/sound-scenes.md。不进 `init`（同 `markers`）。
     var soundScene: SoundScene?
+    /// Its own voice band (300 Hz–3 kHz) lowered this many dB, −30…0, 0 = off (`VoiceBand`; sound-scenes.md section 5).
+    var voiceBandDB = 0.0
 
     /// 这段的素材是 upscale 出来的文件时，记着原片在哪、新文件的 0 秒对应原片的第几秒、用的哪个档位
     /// （换回原片、再次 upscale 都靠它；合同见 VideoEditClipUpscale.swift）。不进 `init`（同 `markers`）。
@@ -537,14 +539,6 @@ struct TimelineState: Hashable, Sendable {
 // 工程文件是长期格式，读旧文件不能因为「多了/少了一个字段」就整份打不开，
 // 所以这里全部手写宽容解码：缺的字段取默认值，不认识的枚举值退回兜底项。
 // 有默认值的新字段可以随便加，老工程照样能开。
-
-extension ClipTransition: LenientCodableEnum {
-    static var decodingFallback: ClipTransition { .none }
-}
-
-extension CanvasRatio: LenientCodableEnum {
-    static var decodingFallback: CanvasRatio { .auto }
-}
 
 extension TimelineState: Codable {
     private enum CodingKeys: String, CodingKey {

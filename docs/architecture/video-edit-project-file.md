@@ -106,6 +106,7 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v35 | `TimelineState.deliveryIntentions` and `EditClip.isScreenRecording` (2026-11-17, omitted when empty/false) | Older writers would discard human review reasons and native screen-capture provenance. See [finished video inspection](finished-video-inspection.md). |
 | v36 | `EditClip.webMotion`: source page, canonical parameter object, parameter form, complete source duration / local hit, render dimensions / fps, and fingerprint / renderer / OS / WebKit / font provenance (2026-11-17, optional) | Older builds would discard the only source capable of rebuilding a deleted motion cache; they must refuse the project rather than silently turn a recoverable title into missing media. See [Web-motion renderer](web-motion-renderer.md). |
 | v37 | `TimelineState.minimumDuration` (2026-11-17, omitted when zero) | Older writers would discard an explicit ending and shorten the film. Missing keys retain the old content-driven length. |
+| v38 | `EditClip.voiceBandDB` — a clip's own 300 Hz–3 kHz lowered (2026-11-18, omitted at 0) | Older writers would drop the cut and the clip's sound in the film would change. Missing key = no cut; the reader cleans it (non-finite → 0, clamped to −30…0). See [sound scenes](sound-scenes.md) section 5. |
 
 > 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
 > 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存

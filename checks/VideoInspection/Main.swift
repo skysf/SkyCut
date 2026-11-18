@@ -82,6 +82,10 @@ import SrtFlowMCPKit
                     "result is nonediting and uses the project's current style")
             require(!result.images.isEmpty && result.json["content"]?.arrayValue?.contains(where: { $0["type"] == "image" }) == true,
                     "get_job returns actual suspect screenshots as MCP image content")
+            // MCP-66: the report's measured mix goes under the screenshots, each one marked #n on it.
+            require(result.payload["sound"]?["rows"]?.arrayValue?.first?["row"] == "mix"
+                        && result.payload["image"]?.stringValue?.contains("after the export limiter") == true,
+                    "the evidence screenshots carry the measured mix under them")
             let auditions = result.payload["auditions"]!.arrayValue!
             require(!auditions.isEmpty, "audio suspicions have playable evidence")
             for entry in auditions {

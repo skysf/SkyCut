@@ -3,6 +3,8 @@ import SrtFlowCore
 import SrtFlowMCPKit
 
 // MARK: - edit_clip 的其余设置：旋转、不透明度、翻转、入场出场、音量曲线、声音场景、标记（纯值）
+// Since 2026-11-18 also voice_band_db (MCP-30): only the clip's own 300 Hz–3 kHz lowered, −30…0 dB, out of range refused
+// (VoiceBand; docs/architecture/sound-scenes.md section 5).
 //
 // 管什么：这几样参数读成类型、互相冲突的挡掉，改一段时换上去（`apply`），以及写回给 AI 看（`summary`）。
 // 能调现成规则的都调：声音场景走 `TimelineState.setSoundSceneKind / setSoundSceneValue`（检查器同一份），
@@ -41,6 +43,7 @@ struct AIClipDetails {
     /// 时间线秒 → dB。空 = 去掉曲线。
     var volumeCurve: [(time: Double, decibels: Double)]?
     var scene: Scene?
+    var voiceBand: Double?
     var markers: [Marker]?
 
     var touchesPicture: Bool {
@@ -48,7 +51,7 @@ struct AIClipDetails {
             || entranceDuration != nil || exit != nil || exitDuration != nil || intensity != nil
     }
 
-    var touchesSound: Bool { volumeCurve != nil || scene != nil }
+    var touchesSound: Bool { volumeCurve != nil || scene != nil || voiceBand != nil }
 
     static let presetNames = ClipPresetKind.allCases.map(\.rawValue)
     static let sceneNames = ["none"] + SoundSceneKind.allCases.map(\.rawValue)
@@ -65,6 +68,8 @@ struct AIClipDetails {
         intensity = try args.double("animation_intensity")
         volumeCurve = try Self.curve(args)
         scene = try Self.scene(args)
+        voiceBand = try args.double("voice_band_db")
+        try AIEditLimits.require("voice_band_db", voiceBand, in: VoiceBand.range)
         markers = try Self.markers(args)
         if volumeCurve?.isEmpty == false, args.has("volume_db") {
             throw AIToolError("Pass volume_curve or volume_db, not both (volume_db moves an existing curve up or down).")
@@ -126,6 +131,7 @@ struct AIClipDetails {
         if touchesSound, !clip.hasAudio { throw AIToolError("\(clip.name) has no sound.") }
         try applyPicture(to: &clip)
         try applyCurve(to: &clip)
+        if let voiceBand { clip.voiceBandDB = VoiceBand.sanitized(voiceBand) }
         try applyMarkers(to: &clip, frameRate: frameRate)
         state.update(id) { $0 = clip }
         switch scene {
@@ -240,6 +246,7 @@ struct AIClipDetails {
                 names.0: AIFormat.seconds(scene.first), names.1: AIFormat.seconds(scene.second)
             ]
         }
+        if clip.voiceBandDB != 0 { object["voice_band_db"] = .number(clip.voiceBandDB) }
         let visible = clip.visibleMarkers
         if !visible.isEmpty {
             object["markers"] = .array(visible.map { marker in

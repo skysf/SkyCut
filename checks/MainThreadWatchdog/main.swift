@@ -109,6 +109,30 @@ pump(0.2)
 check(watchdog.recentStalls.count == 2, "stop 之后不该再记：共 \(watchdog.recentStalls.count) 次")
 check(watchdog.unresponsiveSeconds == nil, "stop 之后说不出主线程卡了多久（nil）")
 
+// 5b. A stall still going on is in the log before it ends, with a stack taken while stuck: a hang that ends in
+//     Force Quit never lands (2026-11-18 export-folder case, docs/testing/main-thread-stalls.md). Read from another
+//     thread while the main thread is still stuck.
+let ongoingDirectory = logDirectory.appendingPathComponent("ongoing", isDirectory: true)
+let longWatch = MainThreadWatchdog(interval: 0.01, threshold: 0.15, ongoingAfter: 0.4, ongoingRepeat: 30,
+                                   logDirectory: ongoingDirectory)
+longWatch.start()
+pump(0.2)
+let midStall = StringBox()
+Thread.detachNewThread {
+    Thread.sleep(forTimeInterval: 1.3)
+    midStall.set((try? String(contentsOf: ongoingDirectory.appendingPathComponent(MainThreadWatchdog.logFileName), encoding: .utf8)) ?? "")
+}
+stallTheMainThread(milliseconds: 1800)
+pump(0.3)
+longWatch.stop()
+pump(0.1)
+check(midStall.value.contains("still stuck"), "a stall still going on is written while it lasts: \(midStall.value.prefix(200))")
+check(midStall.value.contains("stallTheMainThread"), "with the stack of where the main thread is stuck")
+check(!midStall.value.contains("卡了 "), "the finished-stall entry comes only when it lands")
+let afterLanding = (try? String(contentsOf: ongoingDirectory.appendingPathComponent(MainThreadWatchdog.logFileName), encoding: .utf8)) ?? ""
+check(afterLanding.components(separatedBy: "still stuck").count - 1 == 1, "one ongoing entry for one stall (repeat is 30 s)")
+check(afterLanding.contains("卡了 "), "and the usual entry once it lands")
+
 // 6. 挂起主线程抓栈的那几十微秒里，抓栈线程一次都不许分配 / 释放内存（确定性：malloc_logger 钩子逐次数，
 //    NoAllocationWhileSuspended.swift；约束见 docs/architecture/main-thread-stack-capture.md）。
 checkNoAllocationWhileSuspended(captures: 300)
@@ -118,6 +142,14 @@ checkCaptureUnderMallocChurn(seconds: 2)
 
 print(failures == 0 ? "✓ main-thread-watchdog：\(checks) 项全部通过" : "✗ main-thread-watchdog：\(failures)/\(checks) 项失败")
 exit(failures == 0 ? 0 : 1)
+
+/// Written on another thread, read on the main thread.
+final class StringBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored = ""
+    func set(_ value: String) { lock.lock(); stored = value; lock.unlock() }
+    var value: String { lock.lock(); defer { lock.unlock() }; return stored }
+}
 
 /// 别的线程上写一个可选的秒数，主线程上读。
 final class OptionalDoubleBox: @unchecked Sendable {

@@ -139,7 +139,7 @@ extension EditClip: Codable {
         case markers
         case fadeInDuration, fadeOutDuration
         case isHidden
-        case volumeCurve, soundScene
+        case volumeCurve, soundScene, voiceBandDB
         case upscale, webMotion, isScreenRecording
     }
 
@@ -188,6 +188,8 @@ extension EditClip: Codable {
         )
         // v20 起才有。认不出的场景（更新的版本加的）整个不认、当作没有（`SoundScene` 的解码）。
         soundScene = (try? c.decodeIfPresent(SoundScene.self, forKey: .soundScene)) ?? nil
+        // v38. Missing = no cut; non-finite or out of range is cleaned (VoiceBand.sanitized).
+        voiceBandDB = VoiceBand.sanitized(try c.decodeIfPresent(Double.self, forKey: .voiceBandDB) ?? 0)
         // v29 起才有。缺键 = 用的就是原片。认不出的记录整个不认（只有原片路径是必需的，其余缺了走默认）。
         upscale = (try? c.decodeIfPresent(ClipUpscaleRecord.self, forKey: .upscale)) ?? nil
         webMotion = try c.decodeIfPresent(WebMotionClipRecord.self, forKey: .webMotion)
@@ -254,6 +256,8 @@ extension EditClip: Codable {
         if !volumeCurve.isEmpty { try c.encode(volumeCurve, forKey: .volumeCurve) }
         // 没挂场景的段不写这个键（判据与格式版本闸门 `requiresFormatVersion20` 同源）。
         try c.encodeIfPresent(soundScene, forKey: .soundScene)
+        // No voice-band cut, no key (the same test as the format gate `requiresFormatVersion38`).
+        if voiceBandDB != 0 { try c.encode(voiceBandDB, forKey: .voiceBandDB) }
         // 没换过源的段不写这个键（判据与格式版本闸门 `requiresFormatVersion29` 同源）。
         try c.encodeIfPresent(upscale, forKey: .upscale)
         try c.encodeIfPresent(webMotion, forKey: .webMotion)

@@ -93,6 +93,7 @@ runVoiceoverSyncChecks()
 runCutSoundChecks()
 runCutSoundBatchGainChecks()
 runSpeechDuckChecks()
+runVoiceBandToolChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) MCP checks failed.")

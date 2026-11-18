@@ -14,6 +14,8 @@ final class VideoEditExporter: ObservableObject {
     static let shared = VideoEditExporter()
 
     @Published private(set) var isExporting = false
+    /// The encode is done and the file is being moved onto the destination (a copy when that is another drive).
+    @Published private(set) var isDelivering = false
     @Published private(set) var progress: Double = 0
     @Published var errorMessage: String?
     @Published private(set) var finishedURL: URL?
@@ -41,7 +43,8 @@ final class VideoEditExporter: ObservableObject {
         didSet { Self.store(settings) }
     }
 
-    /// 上次导出、或手动选过的文件夹。全局只记一个；用之前先看 `usableExportFolder`。
+    /// 上次导出、或手动选过的文件夹。全局只记一个。Whether it is still there is checked off the main thread by the
+    /// export panel (ExportDestinationState), never here: it may be on a drive that is asleep or gone.
     @Published var exportFolder: URL? {
         didSet { UserDefaults.standard.set(exportFolder?.path, forKey: Keys.folder) }
     }
@@ -71,15 +74,6 @@ final class VideoEditExporter: ObservableObject {
     private static func store(_ settings: VideoEncodeSettings) {
         guard let data = try? JSONEncoder().encode(settings) else { return }
         UserDefaults.standard.set(data, forKey: Keys.settings)
-    }
-
-    /// 记住的文件夹还在就用它；被删了、外接盘拔了就当没记过。
-    var usableExportFolder: URL? {
-        guard let folder = exportFolder else { return nil }
-        var isDirectory: ObjCBool = false
-        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
-              isDirectory.boolValue else { return nil }
-        return folder
     }
 
     /// 「恢复默认设置」只管高级区里那些；分辨率在面板外面、看得见，不动它。
@@ -178,16 +172,9 @@ final class VideoEditExporter: ObservableObject {
                 // ffmpeg 退出码 0 之后才碰用户目标：先落到 workspace 里的临时
                 // 文件，这里再原子替换过去——预渲染或 ffmpeg 中途任何失败都
                 // 还没碰过 output，用户原有文件（覆盖导出场景）不会被牵连。
-                guard FileManager.default.fileExists(atPath: plan.tempOutput.path) else {
-                    throw VideoEditExportGraph.PlanError(
-                        message: L10n("ffmpeg finished but produced no output file.")
-                    )
-                }
-                if FileManager.default.fileExists(atPath: output.path) {
-                    _ = try FileManager.default.replaceItemAt(output, withItemAt: plan.tempOutput)
-                } else {
-                    try FileManager.default.moveItem(at: plan.tempOutput, to: output)
-                }
+                // Off the main thread: onto another drive this is a full copy of the video (ExportDelivery).
+                isDelivering = true
+                try await ExportDelivery.deliver(plan.tempOutput, to: output)
                 progress = 1
                 finishedURL = output
             } catch is CancellationError {
@@ -203,6 +190,7 @@ final class VideoEditExporter: ObservableObject {
             process = nil
             cancellationToken = nil
             measured.finish()
+            isDelivering = false
             isExporting = false
         }
     }

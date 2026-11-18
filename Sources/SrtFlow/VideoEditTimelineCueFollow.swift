@@ -178,8 +178,17 @@ enum LinkageCueFollow {
         return parts.first { $0.oldStart > time }?.newStart ?? last.newEnd
     }
 
+    /// Whether every V1 clip under this stretch is known to carry no sound of its own (a screen recording without audio, a
+    /// still): a subtitle there cannot be that picture's speech, so it follows the picture like everything else — rules 2–4,
+    /// moved whole, left in place when a trim takes the picture away — not this file's rules (Master's decision on UI-3's open
+    /// question, 2026-11-19). A clip not probed yet counts as having sound.
+    static func overSilentPicture(_ span: TimelineSpan, in state: TimelineState) -> Bool {
+        let under = state.mainClips.filter { $0.timelineStart < span.end - epsilon && span.start < $0.timelineEnd - epsilon }
+        return !under.isEmpty && under.allSatisfy { !$0.isAudioOnly && $0.info?.hasAudio == false }
+    }
+
     /// 老规矩的结果换成字幕的：整句挪 `delta`（开头不早于 0，时长不变，同 `SubtitleTrackEditing.setStarts`）。
-    private static func whole(_ cue: SubtitleCue, _ outcome: TimelineLinkage.Outcome) -> Outcome {
+    static func whole(_ cue: SubtitleCue, _ outcome: TimelineLinkage.Outcome) -> Outcome {
         switch outcome {
         case .stay: return .stay
         case .delete: return .delete

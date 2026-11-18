@@ -122,6 +122,11 @@ import SrtFlowMCPKit
                 require(detail["export_settings"]?["video_codec"] == "libx264" && detail["export_settings"]?["crf"] == .number(id == secondID ? 27 : Double(remembered.crf)),
                         "result reports the exact applied encoder and quality")
             }
+            // The export panel's folder window and destination never wait on the main thread (2026-11-18 case).
+            print("DESTINATION: folder window, destination checks, delivery"); fflush(stdout)
+            await FolderChooserChecks.run(require: require)
+            for _ in 0..<600 where VideoEditExporter.shared.isExporting { try await Task.sleep(nanoseconds: 50_000_000) }
+            await DestinationChecks.run(root: root, state: state, project: project, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

@@ -35,6 +35,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditModels.swift \
   Sources/SrtFlow/TimelineDuration.swift \
   Sources/SrtFlow/VideoEditWebMotionRecord.swift \
+  Sources/SrtFlow/VideoEditVoiceBand.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
@@ -137,6 +138,7 @@ xcrun swiftc \
   Sources/SrtFlow/AudioEngine/AudioSegmentReader.swift \
   Sources/SrtFlow/AudioEngine/AudioTimeStretchReader.swift \
   Sources/SrtFlow/AudioEngine/AudioTrackFeeder.swift \
+  Sources/SrtFlow/AudioEngine/VoiceBandFilter.swift \
   Sources/SrtFlow/AudioEngine/AudioTrackRenderer.swift \
   Sources/SrtFlow/AudioEngine/TimelineAudioEngine.swift \
   Sources/SrtFlow/AudioEngine/PlaybackAnchor.swift \

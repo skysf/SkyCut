@@ -34,6 +34,11 @@
 - 最多列 150 个疑点，超出的数量另报；证据优先给结尾，最多 6 张截图、6 个不超过 3 秒的
   原声道 WAV。截图时刻和试听范围逐项列出。证据在当前进程的临时目录，不写进用户工程；
   用户 App 退出/系统清理临时目录后不能依赖这些路径，调用方需要及时查看。
+- **The sound under the screenshots** (2026-11-18, MCP-66): when the evidence sheet is drawn, the mix the report already measured
+  frame by frame (`AIInspectionMeasurement`: after the limiter, as delivered, or the supplied export's own levels) is drawn under it
+  over the checked range, as `look sound` draws it ([AI 接口](ai-control-mcp.md) section 4 item 12): each screenshot is `#n` on the
+  strip, blue lines mark where the frozen timeline's sounds start, and the result's `sound` lists the seconds, the mix's loudest frame
+  and peak, and the starts. Nothing is rendered a second time; no sheet, no strip.
 
 分析取样与疑点证据截图分开。`image=true` 表示允许返回疑点图片；没有疑点或没有
 可截图的画面时，`screenshot_times=[]` 且没有图像内容是正常结果，不添加“无法绘图”提示。

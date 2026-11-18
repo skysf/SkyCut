@@ -105,15 +105,19 @@ struct SubtitleBurnInToggle: View {
 struct SubtitleFilesExport: View {
     @Binding var options: SubtitleExportOptions
     var exportState: TimelineState
-    /// 面板上的导出位置，和已经清理成能当文件名的标题主干。
-    var folder: URL
+    /// 面板上的导出位置（the export panel's destination: the folder and its last off-main check），
+    /// 和已经清理成能当文件名的标题主干。
+    @ObservedObject var destination: ExportDestinationState
     var stem: String
 
     @State private var writtenFiles: [URL] = []
     @State private var writeError: String?
     @State private var confirmsReplace = false
+    @State private var isWriting = false
     /// 两条轨的语言标签。语言识别不在 body 里跑：句子或记录变了才重判（`onChange`）。
     @State private var languages = SubtitleFileLanguage()
+
+    private var folder: URL { destination.folder }
 
     private var hasTranslation: Bool {
         exportState.subtitleCompanion?.translation != nil
@@ -135,8 +139,9 @@ struct SubtitleFilesExport: View {
     }
 
     /// 会被替换的已有文件（点按钮时据此确认，和视频导出同一条规则）。
+    /// Names from the last off-main check of the folder, never asked of the drive during a redraw.
     private var existing: [URL] {
-        targets.map(\.url).filter { FileManager.default.fileExists(atPath: $0.path) }
+        targets.map(\.url).filter { destination.report?.contains($0.lastPathComponent) ?? false }
     }
 
     /// 提示条只报「别人的」文件：刚从这里写出去的那几份不算，不然一写完就冒出
@@ -176,7 +181,8 @@ struct SubtitleFilesExport: View {
                 Button("Export Subtitle Files") { requestWrite() }
                     .instantHelp("Write the checked subtitle files into the export folder")
                     .controlSize(.small)
-                    .disabled(targets.isEmpty)
+                    .disabled(targets.isEmpty || isWriting)
+                if isWriting { ProgressView().controlSize(.small) }
                 if !writtenFiles.isEmpty {
                     Label(
                         writtenFiles.map(\.lastPathComponent).joined(separator: ", "),
@@ -190,7 +196,7 @@ struct SubtitleFilesExport: View {
             }
             // 挂在按钮这一行上：确认的是「这几份字幕」，和视频的那个确认互不相干。
             .alert(Text(verbatim: replaceTitle), isPresented: $confirmsReplace) {
-                Button("Replace", role: .destructive) { write() }
+                Button("Replace", role: .destructive) { Task { await write() } }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 // 一份就说清楚会发生什么（和视频的确认同一句）；几份就把名字列出来。
@@ -231,25 +237,53 @@ struct SubtitleFilesExport: View {
         )
     }
 
+    /// One look at the folder with a write test first (off the main thread, like the video's): a missing, read-only or
+    /// unanswering destination is said here instead of failing half-way.
     private func requestWrite() {
-        if existing.isEmpty { write() } else { confirmsReplace = true }
+        guard !isWriting else { return }
+        isWriting = true
+        writeError = nil
+        Task { @MainActor in
+            let report = await destination.checkBeforeWriting()
+            if let problem = report.problem {
+                isWriting = false
+                writeError = ExportDestinationText.message(problem, folder: folder)
+            } else if existing.isEmpty {
+                await write()
+            } else {
+                isWriting = false
+                confirmsReplace = true
+            }
+        }
     }
 
     /// 逐份「序列化 → 临时名 → 回读校验 → 原子替换」（SubtitleExportPlanner），
-    /// 任何一份失败都不碰它原来的文件；已经写好的照样报出来。
-    private func write() {
+    /// 任何一份失败都不碰它原来的文件；已经写好的照样报出来。The writing runs off the main thread.
+    private func write() async {
+        isWriting = true
         writeError = nil
-        var written: [URL] = []
-        do {
-            for target in targets {
-                let track: SubtitleTrack = target.item.track == .translation ? .translation : .original
-                guard let document = exportState.subtitleDocument(for: track) else { continue }
-                try SubtitleExportPlanner.writeValidated(document, format: target.item.format, to: target.url)
-                written.append(target.url)
-            }
-        } catch {
-            writeError = error.localizedDescription
+        let jobs: [(document: SubtitleDocumentModel, format: SubtitleFormat, url: URL)] = targets.compactMap { target in
+            let track: SubtitleTrack = target.item.track == .translation ? .translation : .original
+            guard let document = exportState.subtitleDocument(for: track) else { return nil }
+            return (document, target.item.format, target.url)
         }
-        writtenFiles = written
+        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<([URL], String?), Never>) in
+            DispatchQueue.global(qos: .userInitiated).async {
+                var written: [URL] = []
+                do {
+                    for job in jobs {
+                        try SubtitleExportPlanner.writeValidated(job.document, format: job.format, to: job.url)
+                        written.append(job.url)
+                    }
+                    continuation.resume(returning: (written, nil))
+                } catch {
+                    continuation.resume(returning: (written, error.localizedDescription))
+                }
+            }
+        }
+        writtenFiles = outcome.0
+        writeError = outcome.1
+        isWriting = false
+        await destination.refresh()  // the folder now has these names
     }
 }

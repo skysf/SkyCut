@@ -19,6 +19,12 @@
   `SRTFLOW_STALL_LOG=0` 关掉；`SRTFLOW_STALL_THRESHOLD_MS=100` 改阈值。
 - 日志：`~/Library/Logs/SrtFlow/main-thread-stalls.log`，超过 1 MB 滚成 `.previous`。统一日志
   （Console.app）里 subsystem `com.srtflow.SrtFlow`、category `main-thread` 也有一行。
+- **Stalls that have not ended yet** (2026-11-18): once a stall has lasted `ongoingAfter` (5 s in the app) the watchdog
+  writes a `still stuck: N s so far` entry with a stack taken at that moment, and again every 30 s while it lasts. A hang
+  that ends in Force Quit never lands, so before this it left nothing in the log
+  ([case](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md)). Those entries have no context (that is read on the
+  main thread, which is the one that is stuck). The export panel's folder window also leaves `注：export folder window: …`
+  notes (opening, how long macOS took to make it, failed, closed), so a hang next to such a note points at the system panel.
 - 进程内冒烟（[GUI 冒烟流程](gui-smoke-testing.md)「四之六」）的结果 `<脚本>.out.json` 里多了
   `stalls`（每次卡顿的时刻、毫秒、context、前 12 层栈）；每个 `perf` 快照里多了 `stall:count` /
   `stall:maxMs`（自上次 `perfReset` 起）。
@@ -51,7 +57,8 @@
 - 只看主线程；别的线程卡住（解码、tap）它看不见，也不该看。
 - 靠帧指针走栈：没有帧指针的帧（手写汇编、某些系统函数的叶子）会少一两层；只在 arm64 上抓栈，
   别的架构只记时长。
-- 心跳落地才记：App 彻底死掉的那一次记不下来（那是崩溃报告的事）。
+- 心跳落地才记：App 彻底死掉的那一次记不下来（那是崩溃报告的事）。Since 2026-11-18 a stall that lasts 5 s is written
+  while it lasts ("still stuck", section 1), so a hang that ends in Force Quit leaves at least that entry.
 - **看门狗自己也能把 App 卡死**（2026-10-06 修掉的那一种）：日志突然断了、App 一直转彩球、系统随后判它无响应，
   先想到看门狗挂起主线程之后没能恢复它。那次 spindump 两次都写着「not sampling」，没抓到栈；判断靠的是卡顿记录
   断掉的时刻，详见 [导出两次卡死](../bugfixes/2026-10-06-watchdog-capture-deadlocks-main-thread.md)。
@@ -68,6 +75,10 @@ CI 的虚拟机上看门狗线程醒来能晚几十毫秒（#117 首跑：250 ms
 
 反向验证（2026-10-01）：把阈值临时改成 10 秒 → 红（忙等一次都没记到）；把 `capture()` 临时改成
 返回空 → 红（栈里没有函数名、日志里没有栈）。恢复后转绿。
+
+Group 5b (2026-11-18): a 1.8 s stall with `ongoingAfter` 0.4 s; another thread reads the log 1.3 s in, before the stall
+lands: it must hold one `still stuck` entry with `stallTheMainThread` in its stack and no finished entry yet; after landing,
+the usual entry follows. Reverse verification: the ongoing write removed → 3 red; restored → green.
 
 **第 6、7 组（2026-10-06）**：挂起主线程期间抓栈线程一次都不许分配 / 释放内存。第 6 组把 libmalloc 的 `malloc_logger`
 钩子临时指向自检的回调，逐次问内核主线程的挂起计数，300 次抓栈里挂起期间必须是 0 次（确定性）；第 7 组让主线程

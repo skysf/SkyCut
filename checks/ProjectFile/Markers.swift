@@ -169,7 +169,7 @@ func checkMarkersEverywhere(root: URL) throws {
     }
     try VideoEditProjectIO.save(save, to: project)
     let json = try String(contentsOf: project, encoding: .utf8)
-    check(json.range(of: #""formatVersion"\s*:\s*37"#, options: .regularExpression) != nil, "写出去的是 latest（v37）")
+    check(json.range(of: #""formatVersion"\s*:\s*38"#, options: .regularExpression) != nil, "写出去的是 latest（v38）")
     let loaded = try VideoEditProjectIO.load(from: project).timeline
     let pairs: [(String, [ClipMarker], [ClipMarker])] = [
         ("文字", save.textOverlays[0].markers, loaded.textOverlays.first?.markers ?? []),
