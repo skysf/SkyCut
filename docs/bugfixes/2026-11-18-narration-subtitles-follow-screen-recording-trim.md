@@ -56,3 +56,18 @@ narration itself moves with the picture (both shots ripple), its subtitles still
 "The two rules do not stack" needs one owner list both rules read; "whoever runs first wins" silently lets the general rule
 take the special case. When a subtitle is shortened or deleted, ask what its words came from before asking what is under it.
 The rule now lives in [linkage](../architecture/timeline-linkage.md) rules 8, 11 and 12.
+
+## Follow-up (2026-11-19): typed subtitles over a silent recording
+
+The first fix left one part of the symptom: a subtitle with no recorded source (typed, imported) over a screen recording
+without audio still went through rule 12, so a new source range that dropped its stretch of picture deleted it, and a trim
+cut it short — as if it were speech of a picture that has no sound. The open question went to Master, who decided
+(2026-11-19): such subtitles follow the picture the way linkage does by default.
+
+- Fix: `LinkageCueFollow.overSilentPicture` — when every V1 clip under a subtitle is known to have no sound of its own
+  (`info.hasAudio == false`: a screen recording without audio, a still), `TimelineLinkage.followMain` gives it the default
+  outcome (rules 2–4: moved whole with its picture, left in place when a trim takes the picture away, deleted only by a real
+  delete) instead of rule 12. A clip not probed yet counts as having sound; over a picture with sound nothing changes.
+- Verification: `scripts/check-timeline-snap.sh` group 1k now runs on a silent recording (as in B07) and contrasts one with
+  sound and one not probed. Before the change 3 checks fail (the typed subtitle and its translation deleted on a new source
+  range, the report counting them, and a ripple cutting it to [0,1) instead of moving it whole to [0,2)); after, 713 pass.

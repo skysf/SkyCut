@@ -38,7 +38,7 @@ never clamped at 0, which made a J cut's sound late by its lead-in ([case](../bu
 | 9 | **哪些算「任何东西」**：上层视频轨、音频轨（含分离出来的音频）、文字、形状（含盖一块）、滤镜段、字幕句（原文 / 译文两条轨各按自己的时间判）。标尺标记不算（它钉在时间线的绝对时刻）；段上的标记、转场、关键帧本来就长在段上 | `follow` 里五类各扫一遍 |
 | 10 | **开关关着**：以上一样都不发生，只有显式的链接组（老行为） | `perform` / `liveApply` / `linkedAttachments` 都先看 `linkageEnabled` |
 | 11 | **生成的字幕句跟着它的那段声音走**（2026-10-14）：原文字幕记着是从哪一段生成的（`CueMeta.provenance.clipID`，转写和配音都记），那段**不在主轨上**（配音、音频轨上的采访、上层轨）时，段挪了 / 裁了头 / 变了速，字幕按它在素材里的那一刻跟着挪（裁头时那一刻没动就不挪）；段被真删字幕一起删（规矩 4）。来源在主轨上的照旧只跟画面（规矩 1），两条不叠；这次碰过的不碰（规矩 5）。这是联动里唯一按 id 认的一条：字幕本来就是那段声音说出来的（[案例](../bugfixes/2026-10-14-voiceover-subtitles-stay-behind.md)）。**Which subtitles are rule 11's is one map, `CaptionSourceFollow.voices`** (2026-11-18): originals whose source clip is off V1, plus translations sitting on the clip all their originals came from (they show the same words). The ones sitting on their clip are left alone by rule 12 and a V1 drag (rule 8): until then rule 12 ran first on every subtitle above V1, so a new source range on a screen recording shortened or deleted its narration's subtitles ([case](../bugfixes/2026-11-18-narration-subtitles-follow-screen-recording-trim.md)). One away from the clip it names (a split narration's right half still names the left half) keeps following the picture | `CaptionSourceFollow`，`follow` 收尾时调（主轨画面没变也调） |
-| 12 | **字幕句不整句平移，两头各自跟着画面换算**（2026-10-15）：一句字幕（原文、译文两条轨，made from V1's own sound or with no recorded source; rule 11's subtitles follow their sound the same way）底下的画面只是被剪掉 / 裁掉了一部分、或者变了速（剩下的几截前后顺序不变、中间没插进别的）时，开头和结尾**分别**换算 —— 中间剪掉一截就缩短，开头 / 结尾被剪就收到剩下的那截，变速跟着伸缩，逐词高亮的词时间一起换算。**说话的那几秒剩不到一半就删**：真删删，裁切 / 变速 / 滑动让它不在画面里了也删（2026-10-15 用户拍板，[案例](../bugfixes/2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md)：以前照规矩 4 留在原地，和前移过来的下一句叠在画面上）；只有底下的段整个没了、又不是真删（少见）才留在原地、报给 AI。「说话的那几秒」有逐词时间按词、译文按它翻自的那句原文、都没有才按显示时间（显示时间里有说完多停的半秒，删停顿剪掉的正是它）。换了位置、中间插进了别的，照规矩 2 / 3 整句挪。账也细了一步：同 id 的段没盖住的那部分，再找这次新出来的同素材段（跨过 cut_speech 剪掉那截的字幕，后半在新 id 的碎片上）（[案例](../bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md)） | `LinkageCueFollow`（`VideoEditTimelineCueFollow.swift`），`followMain` 和 `CaptionSourceFollow` 都用它；写进轨道走 `SubtitleTrackEditing.setTimings` |
+| 12 | **字幕句不整句平移，两头各自跟着画面换算**（2026-10-15）：一句字幕（原文、译文两条轨，made from V1's own sound or with no recorded source; rule 11's subtitles follow their sound the same way. **Over a silent picture** — every V1 clip under it known to have no sound of its own, such as a screen recording without audio or a still — a subtitle cannot be that picture's speech and follows the picture like the rest instead, rules 2–4: moved whole, left in place when a trim takes its picture away, deleted only by a real delete (Master's decision on UI-3, 2026-11-19; a clip not probed yet counts as having sound, `LinkageCueFollow.overSilentPicture`)）底下的画面只是被剪掉 / 裁掉了一部分、或者变了速（剩下的几截前后顺序不变、中间没插进别的）时，开头和结尾**分别**换算 —— 中间剪掉一截就缩短，开头 / 结尾被剪就收到剩下的那截，变速跟着伸缩，逐词高亮的词时间一起换算。**说话的那几秒剩不到一半就删**：真删删，裁切 / 变速 / 滑动让它不在画面里了也删（2026-10-15 用户拍板，[案例](../bugfixes/2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md)：以前照规矩 4 留在原地，和前移过来的下一句叠在画面上）；只有底下的段整个没了、又不是真删（少见）才留在原地、报给 AI。「说话的那几秒」有逐词时间按词、译文按它翻自的那句原文、都没有才按显示时间（显示时间里有说完多停的半秒，删停顿剪掉的正是它）。换了位置、中间插进了别的，照规矩 2 / 3 整句挪。账也细了一步：同 id 的段没盖住的那部分，再找这次新出来的同素材段（跨过 cut_speech 剪掉那截的字幕，后半在新 id 的碎片上）（[案例](../bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md)） | `LinkageCueFollow`（`VideoEditTimelineCueFollow.swift`），`followMain` 和 `CaptionSourceFollow` 都用它；写进轨道走 `SubtitleTrackEditing.setTimings` |
 | 13 | **一段画面自己分出去的声音跟着那段画面走**（2026-11-16）：音频轨上一段声音是某段画面自己分出去的（同一个链接组、同一个文件、「源 ↔ 时间线」换算对得上 —— 分离音频、`add_clips sound=separate`、`set_transition` 的 sound 分出来的都是），按**那段画面**的换算挪了多少挪，不看它底下压着哪几段（J / L 切的声音伸在隔壁镜头底下，按规矩 3 会在磁吸重排后留在原地、错开一整段）；画面被真删就删、不是真删就留着；画面变速、换文件、或换算对不上（被单独挪过）照规矩 2、3。挪到时间线开头之前的段裁掉伸出去的那截头（入点跟着挪），不整段夹在 0（[案例](../bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md)）。The AI's V1 ripple trims the same way, and the AI is told which clips lost how much (2026-11-17) | `LinkagePartnerSound`，`followMain` 里先问它；`EditClip.moveForLinkage`; `LinkageHeadTrims` → `Report.trimmedHeads` |
 
 ### 几个具体场景（也是自检的用例）
@@ -61,7 +61,7 @@ never clamped at 0, which made a J cut's sound late by its lead-in ([case](../bu
 | upscale 换源（点「替换」）、`edit_clip` 换文件 | 什么都不动、不删：压在这段上的字幕（开头、结尾、词的时间）、文字、音效、形状、滤镜、B-roll 原地；换文件的同时挪了段，它们跟着段挪、相对位置不变；配音段换了声音文件，它的字幕不动 |
 | 磁吸开，B 的声音先进半秒（J 切，伸在 A 底下），把 A 拖到最后 / 裁短 A 的尾巴 / 删掉 A（A 是第一个镜头） | B 的声音跟着 B 挪、和画面对得上；删掉第一个镜头时伸到 0 之前的那半秒头裁掉（规矩 13） |
 | Magnet off, B's sound leads by half a second; the AI ripple-deletes A, the first clip (`delete_items ripple=true`), or shortens it with `edit_clip ripple=true` | B's sound loses the half second that would be before 0:00 and stays in sync with B; the reply lists it in `linkage.trimmed_heads` |
-| A screen recording on V1, narration on A1 across the next cut with its subtitles (and their translations); give the recording a new source range or end it earlier (`edit_clip source_in` / `source_out`, or the trim handles) | The narration does not move (it spans two shots that moved differently), so its subtitles stay on its words: not moved, shortened or deleted. Typed subtitles above the recording still follow the picture (rule 12). When both shots ripple by the same amount the narration moves and its subtitles move with it |
+| A screen recording on V1, narration on A1 across the next cut with its subtitles (and their translations); give the recording a new source range or end it earlier (`edit_clip source_in` / `source_out`, or the trim handles) | The narration does not move (it spans two shots that moved differently), so its subtitles stay on its words: not moved, shortened or deleted. Typed subtitles above a silent recording follow it like text: left in place when the new range drops their picture, moved whole on a ripple (above a recording with sound, rule 12 cuts or deletes them). When both shots ripple by the same amount the narration moves and its subtitles move with it |
 
 ## 三、给 AI 的那一面
 
@@ -88,7 +88,7 @@ and return the matching linkage counts in one undo step ([case](../bugfixes/2026
 ## 四、已知不足
 
 - 跨段的东西只按「全部画面挪同一个量」判：一句字幕跨过接缝、前一段被拖去别处时，它留在原地（没有正确答案）。画面自己分出去的声音除外（规矩 13）。
-- 裁切 / 变速让画面没了的文字、形状、音效留在原地（规矩 4），一眼看得见但要自己删（字幕句 2026-10-15 起跟着没了，规矩 12）。
+- 裁切 / 变速让画面没了的文字、形状、音效留在原地（规矩 4），一眼看得见但要自己删（字幕句 2026-10-15 起跟着没了，规矩 12；over a silent picture they stay like text since 2026-11-19）。
 - 变速只挪起点、不缩时长：段里 2 秒的文字、音效在 2 倍速下还是 2 秒（字幕句 2026-10-15 起两头换算、时长跟着变，规矩 12）。
 - 字幕剪掉一截之后字没变：收短的那句里可能还留着被剪掉的词（AI 的结果里列出来）；没有逐词时间、也没有来源的字幕（导入的、手打的）
   只能按显示时间判剩多少，删停顿时短句可能被误删。
@@ -117,7 +117,9 @@ and return the matching linkage counts in one undo step ([case](../bugfixes/2026
   a translation over a screen recording stay on the narration when the recording gets a new source range or ends earlier, move
   with it when both shots ripple or the narration is moved, go when it is deleted for real; typed subtitles keep following the
   picture; a V1 drag carries the narration's subtitles only together with the narration; a split narration's right-half subtitle
-  survives deleting the left half. Reverse verification (2026-11-18): without the wiring 10 checks fail; skipping every voiced
+  survives deleting the left half; typed subtitles over a silent recording stay when a trim takes their picture away and move whole
+  with it (over one with sound, or not probed, rule 12 still cuts or deletes them; 3 checks fail before 2026-11-19's change).
+  Reverse verification (2026-11-18): without the wiring 10 checks fail; skipping every voiced
   subtitle in rule 12, sitting on its sound or not, fails the split case.
 - `checks/timeline-drag-wiring/linkage.sh`（`checks/timeline-drag-wiring.sh` 第 12 节）：`perform` / `liveApply` 收尾调 `follow`、位置在 packMain
   之后、画面账只有一份、真删的三个入口传 `deletesContent: true` 且只有它们传、三个拖动计划带上压着的东西、`realignCompanions` 按宿主平、
@@ -139,4 +141,5 @@ and return the matching linkage counts in one undo step ([case](../bugfixes/2026
 - 开关开着：给一段压着字幕和文字的主轨块做 upscale、点「替换」（或让 AI `edit_clip file=` 换成另一个文件）—— 字幕和文字原地不动；⌘Z 一步撤回。
 - Narration with subtitles (`add_voiceover subtitles=true`) over a screen recording and the next shot: drag the recording's left
   handle, and let the AI give it a new `source_in` / `source_out` — the narration's subtitles stay on its words; dragging the
-  recording block alone leaves them with the narration; ⌘Z returns everything in one step.
+  recording block alone leaves them with the narration; ⌘Z returns everything in one step. A typed subtitle over a recording
+  without audio stays when the new range drops its picture.
