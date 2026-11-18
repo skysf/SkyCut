@@ -245,20 +245,33 @@ from the research's media table. None of it is committed.
 - Second draft: no cut jump (the research rule: none either); the metal clang lingers 7 frames past 0:10.91 (−25 to −42 dBFS;
   the research counted 6); ended 2 frames after the cut it is no longer reported. The last line is `may_be_hard` (ESTOI 0.40)
   with the music rising 11.8 dB in the voice band (the research: "12 dB in the voice band").
-- Human film: HUMAN_RESULT
+- Human film (47 picture cuts in SkyCut's reading, 45 in the research's): exactly one cut jump, 0:10.00 aerial ice field → ship
+  in the ice, +11.6 dB (the research: +13.9), the deliberate held breath the research found uncovered too; mark it intentional.
+  The run had the media table's spoken lines as provenance subtitles (what a transcript would give): the only cover at 1:01.64
+  is the driver's line ending there, so without speech evidence that cut is reported too. Two readings had to follow the research exactly to get there:
+  accents (1:18.44 is covered only by one) and "heard on that side" over 0.1 s cells (2:14.02: the music ending with its file).
+  No linger; voice clarity was not measured, the human film's voices share tracks with other sounds (listed in limitations).
+- The first draft's two narration lines that overlap by 60 ms on two tracks were both `two_voices` (ESTOI 0.85, 0.78): fixed
+  ([case](../bugfixes/2026-11-18-two-voices-from-a-neighbouring-line.md)).
 
 ### Checks
 
 `checks/VideoInspection/SoundTierRuleChecks.swift` tests the rules on controlled numbers: every cover and its edge, the 200 Hz
-reading against a 100 Hz + 1 kHz window, where the picture changes, object and camera counting, the lead belonging to the next
-shot, the swell's running median, listen's verdicts as report entries, `sounds` parsing and role precedence, and the stem split
-keeping every segment. `SoundTierChecks.swift` runs the real job on synthetic sound (noise beds cut at 3.0 s, a decaying clang,
-a speech-like line under loud noise, music rising under it): a cut jump, a 12-frame linger, a masked line and a swell; without
-`sounds` no linger and no voice check; a refused wrong `sounds`; a marked jump moved to `intentional`; a music bed across the
-cut and a clang ended a frame after it remove both. `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs
-only these.
+reading against a 100 Hz + 1 kHz window, the accent reading on a thump every 0.5 s, where the picture changes, object and
+camera counting, the lead belonging to the next shot, the swell's running median, listen's verdicts as report entries,
+`sounds` parsing and role precedence, and the stem split keeping every segment. `SoundTierChecks.swift` runs the real job on
+synthetic sound (noise beds cut at 3.0 s, a decaying clang, a speech-like line under loud noise, music rising under it): a cut
+jump, a 12-frame linger, a masked line and a swell over the whole 6 s; then around the cut only (2.5–3.5 s, to keep the job
+quick): without `sounds` the clang is part of the place and never lingers; a refused wrong `sounds`; a marked jump moved to
+`intentional`; a music bed across the cut and a clang ended a frame after it remove both; quiet music with a low thump 2 frames
+after the cut covers the jump by its accent. `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs only these.
 
-Reverse controls (2026-11-18): REVERSE_RESULT
+Reverse controls (2026-11-18), each restored afterwards: with the four registry entries removed, six production assertions
+fail (the jump, the linger, the masked line, the swell, the named checks, the mark); with the bed cover removed, the rule's bed
+case and the production "fixed" case fail; without the accent cover, the rule's accent case and the production accent case
+(quiet music with a thump 2 frames after the cut) fail; with an object belonging to the shot under its start, the lead case fails; with the
+200 Hz reading replaced by the band meter's 300 Hz, the window reading fails; without the two voices' 0.5 s overlap, the
+mix-layers hand-over case fails (`["clear", "two_voices", "two_voices"]`).
 
 Manual regression before release:
 

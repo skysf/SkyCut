@@ -9,7 +9,8 @@ import SrtFlowMCPKit
 // clang started inside the first picture, ringing 0.5 s past the cut), A3 a speech-like voice line, A4 loud noise under it,
 // A5 music rising 20 dB in the middle of the line. With `sounds` naming them: a cut jump at 3.0, the clang lingering 12 frames,
 // the line masked, the music swelling. Fixed (a music bed across the cut, the clang ended a frame after it): neither the jump nor
-// the linger. Without `sounds`: nothing SkyCut can't know (no linger, no voice check), the roles say other. Marks still apply.
+// the linger; quiet music with a low thump just after the cut covers the jump by its accent. Without `sounds` the clang is an
+// unnamed file, part of the place (no linger). Marks still apply. Only the first run checks the whole 6 s; the rest 2.5–3.5 s.
 @MainActor
 enum SoundTierChecks {
     static let roles: JSONValue = ["A1": "ambience", "A2": "object", "A3": "voice", "A4": "ambience", "A5": "music"]
@@ -50,9 +51,11 @@ enum SoundTierChecks {
                 "second-tier sound findings carry the loudest layers like the first tier")
         require(project.state == before && !project.effectiveUndoManager!.canUndo, "the second tier never edits the project")
 
-        let plain = try await inspect(project)
-        require(!kinds(plain).contains("audio_linger") && !kinds(plain).contains("audio_voice_masked") && plain["sound_roles"]?["A3"] == "other",
-                "without sounds an imported file is other: no linger, no voice check, and the roles say so")
+        // The later runs check only around the cut (2.5–3.5 s): the whole 6 s once is enough, and the job stays quick.
+        let cut: [String: JSONValue] = ["from": 2.5, "to": 3.5]
+        let plain = try await inspect(project, cut)
+        require(kinds(plain).contains("audio_cut_jump") && !kinds(plain).contains("audio_linger") && plain["sound_roles"]?["A2"] == "other",
+                "without sounds the clang is an unnamed file (other): part of the place, never an object that lingers")
         for wrong: JSONValue in [["A9": "music"], ["A1": "drums"]] {
             do { _ = try await inspect(project, ["sounds": wrong]); require(false, "\(wrong.encodedString()) must be refused") }
             catch { require(project.state == before, "a wrong sounds is refused before any job: \((error as? AIToolError)?.message ?? "")") }
@@ -65,21 +68,26 @@ enum SoundTierChecks {
             require(false, "sounds is an inspection field, refused next to intentional")
         } catch { require(project.state == before, "marking with an inspection field changes nothing") }
         _ = try await AIInspectionTool.start(AIToolArguments(["intentional": ["job_id": job, "key": .string(key), "reason": "held breath"]]), project)
-        let marked = try await inspect(project, ["sounds": roles])
+        let marked = try await inspect(project, cut.merging(["sounds": roles]) { _, new in new })
         require(!kinds(marked).contains("audio_cut_jump")
                 && (marked["intentional"]?.arrayValue ?? []).contains { $0["kind"] == "audio_cut_jump" && $0["intentional_reason"] == "held breath" },
                 "a marked cut jump moves to the intentional list with its reason")
         _ = try await AIInspectionTool.start(AIToolArguments(["clear_intentional": .string(key)]), project)
 
         project.restoreTimeline(try await timeline(project, root: root, fixed: true))
-        let fixed = try await inspect(project, ["sounds": roles.merging(["A6": "music"])])
+        let fixed = try await inspect(project, cut.merging(["sounds": roles.merging(["A6": "music"])]) { _, new in new })
         require(!kinds(fixed).contains("audio_cut_jump") && !kinds(fixed).contains("audio_linger"),
                 "a music bed across the cut covers the jump; a clang ended a frame after the cut no longer lingers (\(kinds(fixed).sorted()))")
+
+        // Quiet music (far too low to be a bed) with one low thump 2 frames after the cut: the accent alone covers the jump.
+        project.restoreTimeline(try await timeline(project, root: root, accent: true))
+        let accented = try await inspect(project, cut.merging(["sounds": roles.merging(["A6": "music"])]) { _, new in new })
+        require(!kinds(accented).contains("audio_cut_jump"), "a music accent right after the cut covers the jump (\(kinds(accented).sorted()))")
     }
 
     // MARK: The timeline
 
-    private static func timeline(_ project: VideoEditProject, root: URL, fixed: Bool = false) async throws -> TimelineState {
+    private static func timeline(_ project: VideoEditProject, root: URL, fixed: Bool = false, accent: Bool = false) async throws -> TimelineState {
         let picture = root.appendingPathComponent("source.mp4"), other = root.appendingPathComponent("cuts-source.mp4")
         guard let one = await project.mediaProbes.probeVideo(picture), let two = await project.mediaProbes.probeVideo(other) else {
             throw AIToolError("The synthetic pictures did not probe.")
@@ -110,6 +118,13 @@ enum SoundTierChecks {
         if fixed {
             let bed = try wave(root, "tier-bed.wav", 6) { t in Float(0.2 * sin(2 * .pi * 330 * t)) }
             state.audioTracks.append(EditLane(clips: [audio(bed, at: 0, 6, asset: 6)]))
+        }
+        if accent {
+            let hit = 3 + 2.0 / 24
+            let thump = try wave(root, "tier-thump.wav", 6) { t in
+                Float(0.01 * sin(2 * .pi * 220 * t) + (t >= hit ? 0.6 * sin(2 * .pi * 60 * (t - hit)) * exp(-(t - hit) / 0.03) : 0))
+            }
+            state.audioTracks.append(EditLane(clips: [audio(thump, at: 0, 6, asset: 6)]))
         }
         return state
     }
