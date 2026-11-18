@@ -109,7 +109,9 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
       建的时候真起一次图（这台机器没有能用的输出设备在这儿就知道，不挂时钟），随后照规矩停。
     - **播到头由声音主时钟自己收尾**：声音源报时间线总长（`PlaybackAudioSource.duration`，引擎给的是配置里的总长，合成
       也正好这么长）；时钟每拍读到播放头到了总长就 `finishAtEnd` —— 声音、画面都停，播放头钉在总长上。播放头已经在尽头时
-      `play()` 不开播（回到开头是 Return 的事）。**不听播放器的「播到头」通知**：它只说「播完了」不管播放头，到了头的
+      `play()` 不开播（重建预览之后接着播走的就是它）。The user's Play / space at the end (`togglePlayback`) replays from 0:
+      `goToStart()` then `play()` (UI-2, 2026-11-18; before, it did nothing and only Return played again,
+      [case](../bugfixes/2026-11-18-play-at-timeline-end-does-nothing.md)). **不听播放器的「播到头」通知**：它只说「播完了」不管播放头，到了头的
       播放器也不会再发第二次（在片尾直接再按播放，声音主时钟就带着播放头越过片尾一直走，引擎永远不算停着）；它还会
       排着队等到用户回退重播之后才被处理，把新一轮停掉。播不下去（条目出错）那个通知照听，声音和画面一起停。
     - **量出来的数**（M1 MacBookPro17,1、内置扬声器、macOS 26.5.2，机器很忙时量的，从按下播放起，毫秒，中位 / 最坏）：
@@ -273,7 +275,8 @@ clipID → 11 条红）。
 `--measure-idle [停多少秒] [几轮]`（`Measure.swift`：量停过之后第一次播放多等多久，只打印；第二节第 11 条的表就是它量的）。
 `scripts/check-player-clock.sh`（真 AVPlayer、静音）：播到头声音主时钟自己停、播放头正好钉在总长上、不再往后走；
 **在尽头不 seek 直接再按播放不开播**（连着八轮自然播完，外加注入「上一跳读数略超总长」）；**旧的「播到头」通知晚到时已经
-回退重播**（占住主线程 0.4 秒让通知排队，再回退重播）新一轮照样播；之后回去再播照常；不知道总长的声音源不替它收尾。
+回退重播**（占住主线程 0.4 秒让通知排队，再回退重播）新一轮照样播；之后回去再播照常；不知道总长的声音源不替它收尾；
+the user's Play at the end replays from 0 (peek ended, timeline told to scroll left) and the replay stops on the total length again.
 接线：`checks/audio-engine-idle-wiring.sh`（十节，含一个判断只读一次图的状态：引擎交给管空闲的、空了就收、2 分钟、后台起 / 当场起、待钉的锚点和
 「报过时间没有」的内存序、主时钟自己收尾且不听「播到头」通知、「回来了」的信号齐全且启动就看、日志不在主线程上写、
 起不来不空转）。

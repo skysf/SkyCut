@@ -436,18 +436,8 @@ Task {
                            "Fade 的不透明度必须线性（与 ffmpeg 的 fade 逐帧对齐）")
             }
 
-            // 2. 盖满画布的段：**任何时刻缩放都不许小于 1**，否则边上会露出
-            //    底下那一层（主轨是黑场）。这是产品决策第 4 条的机器守卫。
-            for kind in [ClipPresetKind.rise, .pop, .zoom] {
-                for step in 0...20 {
-                    let value = state(kind, reveal: Double(step) / 20, covers: true)
-                    check(value.scale >= 1 - 0.0001,
-                          "\(kind.title) 在铺满画布的段上不许缩到 1 以下（会露黑边），实测 \(value.scale)")
-                    // 位移多少，就得放大多少盖回去。
-                    check(value.scale >= 1 + 2 * abs(value.offset.y) - 0.0001,
-                          "\(kind.title) 的位移必须有对应的放大补偿，实测 scale \(value.scale) / offset \(value.offset.y)")
-                }
-            }
+            // 2. Pictures that fill the frame never bare it while they move — turned and keyframed too: EntranceCover.swift.
+            try await checkEntranceCover()
 
             // 3. 不铺满的段反过来：Pop 要从小弹出来（那才是"弹"），
             //    没有可露的边，也就不补放大。

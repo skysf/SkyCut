@@ -282,6 +282,11 @@ final class AIToolRouter {
         case .setTexts: return try AIBatchEditTools.setTexts(args, project)
         case .setShapes: return try AIBatchEditTools.setShapes(args, project)
         case .setKeyframes: return try AITimelineTools.setKeyframes(args, project)
+        // Ducking the other tracks under this one's speech: await its lines; apply opens its own step only when a curve
+        // changes (no empty undo step when every dip is already in place; audio-volume-curve.md §5).
+        case .setTrack where args.has("duck_others_db") || args.has("duck_tracks"):
+            let plan = try await AISpeechDuckTool.plan(args, project)
+            return try AISpeechDuckTool.apply(plan, project)
         case .setTrack: return try AITimelineTools.setTrack(args, project)
         case .splitClip: return try AIUndoGrouping.step(undo) { try AITimelineTools.split(args, project) }
         case .freezeFrame: return try await AIClipTools.freeze(args, project)

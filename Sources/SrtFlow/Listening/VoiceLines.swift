@@ -32,13 +32,21 @@ enum VoiceLines {
             for index in frame * size ..< (frame + 1) * size { sum += Double(samples[index]) * Double(samples[index]) }
             levels[frame] = 10 * log10(sum / Double(size) + 1e-24)
         }
+        return stretches(levels: levels, frameSeconds: frameSeconds).map { $0.lowerBound * size ..< $0.upperBound * size }
+    }
+
+    /// The same rule on levels a caller already has (dB of each frame's mean square, frames `frameSeconds` long): where the
+    /// voice speaks, as frame ranges. Ducking under speech reads a narration's lines this way from the waveform's windows
+    /// (SpeechDuckLines) instead of decoding the file again.
+    static func stretches(levels: [Double], frameSeconds: Double) -> [Range<Int>] {
+        guard !levels.isEmpty, frameSeconds > 0 else { return [] }
         let loudest = levels.max() ?? -240
         let threshold = max(loudest - rangeDB, floorDBFS)
         guard loudest > threshold else { return [] }
         let gap = max(1, Int((pause / frameSeconds).rounded()))
         var lines: [Range<Int>] = []
         var start: Int?, lastLoud = 0
-        for frame in 0 ..< frames where levels[frame] > threshold {
+        for frame in levels.indices where levels[frame] > threshold {
             if let begun = start, frame - lastLoud - 1 >= gap {
                 lines.append(begun ..< lastLoud + 1)
                 start = frame
@@ -48,6 +56,6 @@ enum VoiceLines {
             lastLoud = frame
         }
         if let begun = start { lines.append(begun ..< lastLoud + 1) }
-        return lines.map { $0.lowerBound * size ..< $0.upperBound * size }
+        return lines
     }
 }

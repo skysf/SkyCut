@@ -127,8 +127,9 @@
 
 1. **人声下面的音乐只在说话时压约 10 dB，不挖洞**：有人说话时，音乐只在话的头尾之间压低约 10 dB（话前 0.3–0.5 秒降、说完 0.5 秒后升），
    词和词之间不跟着掉；整体低于 −36 dBFS 超过 1.5 秒的地方，除非是故意的屏气，都不能留。压得太深、压得太长，停顿的地方像片子断了。
-   音乐段用 `volume_curve`（句子起止用 `transcribe`）；整条压用 `set_track volume_db`；找洞用 `inspect_video from=0 silence_db=-36 min_silence=1.5`
-   （它量的是混在一起之后的声音）。
+   How (2026-11-18): `set_track duck_others_db` on the voice's track dips every other layer under each line in one call (lines
+   from `transcribe`, or a narration's own pauses); `volume_curve` for other shapes; 整条压用 `set_track volume_db`；找洞用
+   `inspect_video from=0 silence_db=-36 min_silence=1.5`（它量的是混在一起之后的声音）。
 2. **人声听不清时，先找是谁盖住了它**：人声对着所有别的声音加起来量，不只对音乐；在留着原声的镜头上放旁白，先量这个镜头的原声；听不清时
    找出盖住它的那一层、只在这句话底下压那一层，不要再去压音乐。盖住那句话的是镜头自己的轰鸣时，音乐压两次都没用。现在只能一层层估：
    对这句话的几秒，每一层各 `listen clip_id=… from=… to=…` 一次比 `level_db`（全频段，粗）；拿不准就请用户听那一句。门槛不写。
