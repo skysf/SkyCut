@@ -119,6 +119,18 @@ func checkVoiceCheck() {
         let verdicts = AIListenVoiceReport.json(duetLines, plan: duetPlan, shortIDs: [:])["lines"]?.arrayValue?.compactMap { $0["verdict"]?.stringValue } ?? []
         check(!verdicts.isEmpty && verdicts.allSatisfy { $0 == "two_voices" }, "two voices speaking at once are their own item (\(verdicts))")
     } else { check(false, "the two-voice check did not run") }
+    // A line on another voice track that only reaches into this line's 0.2 s padding (0.05 s of overlap) is not a second voice
+    // (docs/bugfixes/2026-11-18-two-voices-from-a-neighbouring-line.md).
+    var relay = baseState()
+    relay.audioTracks = [EditLane(clips: [audioClip(voice.sourceURL, at: 1, duration: 3.5)]),
+                         EditLane(clips: [audioClip(voiceWAV("voice-next.wav", seed: 431), at: 4.45, duration: 1.3)])]
+    let relayConfig = AudioEngineConfig.make(from: relay, measuringSceneCompensation: false)
+    if let relayPlan = try? AIListenVoicePlan.make("A1+A2", state: relay, config: relayConfig, from: nil, to: nil, provenance: voiceProvenance),
+       let relayLines = try? AIListenVoiceMeasure.measure(relayPlan, config: AudioEngineConfig.make(from: relay)) {
+        let verdicts = AIListenVoiceReport.json(relayLines, plan: relayPlan, shortIDs: [:])["lines"]?.arrayValue?.compactMap { $0["verdict"]?.stringValue } ?? []
+        check(verdicts.count == 3 && !verdicts.contains("two_voices"),
+              "lines handing over between two voice tracks are not two voices at once (\(verdicts))")
+    } else { check(false, "the relay check did not run") }
 }
 
 /// Planning only: auto and explicit selections share the voice budget, leaving room for the rest of the mix.

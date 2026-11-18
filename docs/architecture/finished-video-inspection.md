@@ -174,3 +174,96 @@ inaudible continuation must not conceal a truncated sentence. The configured voi
 −60 dBFS; quieter contributors can still be shown in the evidence.
 
 Reverting audible-continuation filtering also fails the hidden-continuation regression (one failure in 34 rule assertions); the original source is restored afterward.
+
+## Second-tier sound checks (2026-11-18)
+
+Production feedback MCP-37 (a hard sound jump at a cut with nothing covering it), MCP-38 (a sound dragging past its picture),
+MCP-39's voice check (#456, with its grey hint) and its "music swells under speech" reminder joined the report as four registry
+entries: `cut_jumps`, `lingers`, `voice`, `music_swell`. They report only, like the first tier, and intentional marks apply to
+them the same way. All four need to know what each sound is — the second tier of MCP-40's table.
+
+### What each sound is
+
+`AIDeliverySoundRoles` gives every clip with sound one role: voice, music, effects, ambience, object, camera (a picture's own
+recording, also when detached to an audio track) or other (an imported file SkyCut can't name). First match wins:
+
+1. `sounds` on the inspect_video call: a clip id, then a track (`"A2"`) or tracks joined with + → voice, music, effects,
+   ambience or object. It is per call, not saved: the AI built the timeline or can listen, SkyCut can't tell an imported music
+   file from an imported wind bed (the trait words describe, they don't classify: [listening engine](listening-engine.md)
+   section 3). A review request (`intentional`, `clear_intentional`) refuses it like the other inspection fields.
+2. Otherwise where the clip came from: the same `AIListenVoicePlan.Provenance` listen voice uses (our voice-overs and effects by
+   folder, library music and effects by manifest id, generated audio as music, a video clip's sound as camera). Generated audio
+   that is an effect needs `sounds`.
+
+The report's `sound_roles` lists the roles per track (`"A2":"music+other"`), so the AI sees what was assumed. The voice check's
+masker kinds follow the same roles (`Provenance.known`). Measuring groups: the place (camera, ambience, object, other) is what
+jumps at a cut; voice, music and effects can cover a jump.
+
+### Measuring
+
+`AIDeliverySound.prepare` does all media reads, on `MediaReadQueue.export` with the export's audio configuration, offline, never
+the preview's engine; it never edits the project:
+
+- `AIDeliverySoundLevels`: one render split by role group (`DeliveryStemSplit`: each track split by group keeps its fader and
+  segments, so the parts add up to the export's mix), before the limiter, per project frame (`MixMeasurement`: power and the
+  four bands). In the same pass: the place group above 200 Hz in each cut window, every frequency under 200 Hz removed over
+  the 0.3 s window as a whole (`DeliveryWindowCollector`, the human film's and the preview board's reading; the band meter's
+  300 Hz edge, with its two-frame window, read 3 of the first draft's cuts differently), and the music accents: the rendered
+  music group at 24 kHz, each music clip's stretch read with `DeliveryMusicAccents` (the research's accent reading: the
+  magnitude under 200 Hz plus 0.3 × 200 Hz–4 kHz per 1024-sample frame, the rise of its log as a z-score over the stretch,
+  above 3 and the largest within ±4 frames), kept where the music is above −45 dBFS. `AudioBeatTracker`'s onset strength,
+  built to find a beat, found no accent at all in the human film's orchestral music where its cuts sit on accents.
+- The voice check: `AIListenVoicePlan` / `AIListenVoiceMeasure` / `AIListenVoiceReport`, the same code as listen voice, over
+  every audio track whose clips are all voice (at most 11), inside the checked range.
+- Each sound that may drag past its picture rendered on its own over its frames after the cut (at most 40; more is a limitation).
+
+### Rules
+
+| Kind | Rule | Where the lines come from |
+| --- | --- | --- |
+| `audio_cut_jump` | At a picture cut (the top full-frame picture changes, V1 or an upper clip; black counts; a split of one take is not a cut) the place sound in `CutSoundWindows`' 0.3 s each side jumps 6 dB or more in the full band or above 200 Hz (the larger is reported), the louder side above −45 dBFS, and nothing covers it: a voice / music / effects bed sounding 0.3 s on both sides no more than 6 dB under the louder side at the cut and above −50 dBFS (`CutSoundLevelPlan.bedMargin`, the rule set_transition sound=bed meets); a music accent within ±3 frames; music entering or stopping (end or fade-out start) within ±2 frames, heard on that side (above −45 dBFS over the 0.1 s cell one cell away from the cut, the research's cells: music ending with its file fades in the last frames before the cut); an effect starting within ±3 frames no more than 3 dB under the louder side (a hit); an effect ending within ±2 frames no more than 6 dB under it over that cell (a riser's top); a line in a picture's own sound (transcript or provenance subtitles) starting or ending within 0.35 s. A narration line starting −2 to +4 frames from the cut is noted (`voice_head_frames`), never a cover. | The human film: 23 of 24 cuts with a 6 dB jump were covered, uncovered ones differ by 3.4 dB at most; the two cuts the user named (MCP-37) |
+| `audio_linger` | An object (named in `sounds`) belongs to the shot it sounds under longest (a sound brought in early belongs to the next shot); after that shot cuts away it sounds over 2 frames above −50 dBFS (counted from the cut while it stays above). A picture's own sound detached to an audio track (its linked picture, or the picture of the same file under its start) stands 6 dB over the far side's bed (everything else except that picture's sounds) for over 2 frames. Not reported when the next picture is the same file. | The user's metal clang (MCP-38) and the board's lines; not validated on other films |
+| `audio_voice_masked`, `audio_two_voices` | listen voice's verdicts (`probably_unintelligible`, `may_be_hard`; `two_voices`) with the main maskers | The blind test ([listening engine](listening-engine.md) section 7) |
+| `audio_voice_loud` | listen voice's grey hint; listed apart from the suspects in `hints` (no evidence slot, not counted with them) | FL-61, two of the user's remarks |
+| `audio_music_swell` | During a line of the voice check, the music group's voice band (300–3000 Hz) as a running 1 s median rises 6 dB or more above its value where the line began, with music above −60 dBFS for at least 30% of the line | Preview board v1.2's `music_swell`; the second draft's last line |
+
+What these can't know: whether the next shot shows the same thing (mark it intentional), an effect's kind (a riser entering at
+a cut counts as a hit), a voice inside a camera recording (no clean voice: a limitation), a cut inside one clip's source (the
+`source_cut` checks own those). Effects, music, voice and ambience are never checked for lingering: a lag or a tail is a normal
+way across a cut.
+
+### Acceptance on the South Pole material (local only, nothing in the repo)
+
+The second draft and the first draft exist as preview boards, not projects; a local harness rebuilt each as a project (pictures
+on V1, each shot's own sound detached and linked, every board layer on audio tracks with its gain, fades and curve, `sounds`
+from the board's kinds) and ran the real preparation and rules. The human film's project was read from a copy as JSON, roles
+from the research's media table. None of it is committed.
+
+- First draft (no music): both cuts the user named are reported — incubator → subway at 7.30 s, +19.0 dB above 200 Hz (the
+  research measured +19.7), and bus → overpass at 11.10 s, −8.0 dB above 200 Hz (−8.3). In all 12 cut jumps, 10 at the same
+  cuts the research rule reported; the others are at the 6 dB line (−6.0, +6.5) or a riser entering at the cut.
+- Second draft: no cut jump (the research rule: none either); the metal clang lingers 7 frames past 0:10.91 (−25 to −42 dBFS;
+  the research counted 6); ended 2 frames after the cut it is no longer reported. The last line is `may_be_hard` (ESTOI 0.40)
+  with the music rising 11.8 dB in the voice band (the research: "12 dB in the voice band").
+- Human film: HUMAN_RESULT
+
+### Checks
+
+`checks/VideoInspection/SoundTierRuleChecks.swift` tests the rules on controlled numbers: every cover and its edge, the 200 Hz
+reading against a 100 Hz + 1 kHz window, where the picture changes, object and camera counting, the lead belonging to the next
+shot, the swell's running median, listen's verdicts as report entries, `sounds` parsing and role precedence, and the stem split
+keeping every segment. `SoundTierChecks.swift` runs the real job on synthetic sound (noise beds cut at 3.0 s, a decaying clang,
+a speech-like line under loud noise, music rising under it): a cut jump, a 12-frame linger, a masked line and a swell; without
+`sounds` no linger and no voice check; a refused wrong `sounds`; a marked jump moved to `intentional`; a music bed across the
+cut and a clang ended a frame after it remove both. `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs
+only these.
+
+Reverse controls (2026-11-18): REVERSE_RESULT
+
+Manual regression before release:
+
+- [ ] Inspect a cut where the place's sound clearly jumps and listen: the jump is reported; cover it with set_transition sound
+      (bed or crossfade), inspect again, the jump is gone.
+- [ ] Name an object with `sounds` that rings into the next shot; listen; shorten it to end within 2 frames of the cut, inspect again.
+- [ ] A narration track under loud music: the voice check's lines appear as findings and the grey hint under `hints`; mark one
+      intentional and see it move to the intentional list.

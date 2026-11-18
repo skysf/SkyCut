@@ -32,6 +32,8 @@ import SrtFlowMCPKit
                 AIWorkspace.shared.register(root)
                 if selected == "screen" {
                     try await DeliveryChecks.frozenScreen(project, root: root, require: require)
+                } else if selected == "sound" {
+                    try await SoundTierChecks.run(project, root: root, require: require)
                 } else {
                     try await DeliveryChecks.run(project, root: root, require: require, rulesOnly: selected == "rules", screen: false)
                 }
@@ -159,6 +161,8 @@ import SrtFlowMCPKit
             FrameSignalChecks.run(require: require)
             try await StrayFrameChecks.run(project, root: root, require: require)
             try await DeliveryChecks.run(project, root: root, require: require)
+            // Second-tier sound checks (MCP-37 / 38 / 39 in the report): rules on controlled numbers, then the real job.
+            try await SoundTierChecks.run(project, root: root, require: require)
             // 清掉本次的短试听，避免验收给机器留下合成媒体。
             if let path = auditions.first?["path"]?.stringValue { try? FileManager.default.removeItem(at: URL(fileURLWithPath: path).deletingLastPathComponent()) }
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

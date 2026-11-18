@@ -18,6 +18,8 @@ enum AIDeliveryChecks {
         var silenceDB: Double
         var minimum: Double
         var file: Bool
+        /// The second tier's evidence (roles, role-group levels, voice lines, sounds past their picture; AIDeliverySound).
+        var sound: AIDeliverySound = .empty
     }
     struct Check {
         var id: String
@@ -41,6 +43,16 @@ enum AIDeliveryChecks {
         Check(id: "freshness", run: {
             guard let attention = $0.attention else { return [] }
             return [.init(kind: "stale_export", from: 0, to: $0.state.duration, reason: attention)]
+        }),
+        // Second tier (MCP-37 / 38 / 39): these need to know what each sound is (AIDeliverySoundRoles).
+        Check(id: "cut_jumps", run: {
+            AIDeliveryCutJumps.findings($0.sound.cuts, levels: $0.sound.levels, sounds: $0.sound.sounds, speech: $0.sound.cameraSpeech,
+                                        duration: $0.sound.duration, scope: $0.scope)
+        }),
+        Check(id: "lingers", run: { AIDeliveryLinger.findings($0.sound.lingers, grid: $0.sound.levels.grid, scope: $0.scope) }),
+        Check(id: "voice", run: { AIDeliveryVoice.findings($0.sound.voice, scope: $0.scope) }),
+        Check(id: "music_swell", run: {
+            AIDeliveryMusicSwell.findings($0.sound.voice, levels: $0.sound.levels, sounds: $0.sound.sounds, scope: $0.scope)
         })
     ]
 

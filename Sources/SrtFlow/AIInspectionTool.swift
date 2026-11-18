@@ -24,6 +24,7 @@ enum AIInspectionTool {
             throw AIToolError("silence_db must be -80...-10; min_silence must be 0.1...10.")
         }
         let image = try args.bool("image") ?? true
+        let sounds = try AIDeliverySoundRoles.request(args, state: state)
         var file: URL?
         var attention: String?
         if let path = try args.string("file") {
@@ -48,7 +49,8 @@ enum AIInspectionTool {
             do {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let result = try await inspect(state, style: style, scope: scope, named: named, file: input, attention: attention,
-                                               db: db, minimum: minimum, image: image, folder: folder, token: token, job: job.id, generation: generation, session: session)
+                                               db: db, minimum: minimum, image: image, sounds: sounds, folder: folder, token: token,
+                                               job: job.id, generation: generation, session: session)
                 if token.isCancelled { throw CancellationError() }
                 job.images = result.images
                 AIJobs.shared.finish(job, .done, detail: result.payload)
@@ -66,8 +68,8 @@ enum AIInspectionTool {
 
     private static func inspect(
         _ state: TimelineState, style: BurnInStyle, scope: AIInspection.Scope, named: ClosedRange<Double>?, file: URL?,
-        attention: String?, db: Double, minimum: Double, image: Bool, folder: URL, token: ExportCancellationToken,
-        job: String, generation: Int, session: String?
+        attention: String?, db: Double, minimum: Double, image: Bool, sounds: AIDeliverySoundRoles.Request, folder: URL,
+        token: ExportCancellationToken, job: String, generation: Int, session: String?
     ) async throws -> AIToolResult {
         let ids = AIShortIDs(state: state)
         let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
@@ -86,12 +88,16 @@ enum AIInspectionTool {
                                       reason: "The final mixed frame is above -32 dBFS; review whether the abrupt ending is intentional."))
         }
         let spoken = try await AIDeliverySentences.collect(state, config: config, scope: scope, unchecked: &unchecked, token: token)
+        let sound = try await AIDeliverySound.prepare(state, request: sounds, scope: scope, spoken: spoken, token: token)
+        limitations += sound.limitations
         try cancelled(token)
         let all = try await AIDeliveryChecks.run(.init(state: state, scope: scope, style: style, config: config, measurement: measurement,
             spoken: spoken, picture: picture.findings, sourceSpeech: sourceSpeech, attention: attention,
-            silenceDB: db, minimum: minimum, file: file != nil))
+            silenceDB: db, minimum: minimum, file: file != nil, sound: sound))
         let reviewed = AIInspectionReview.partition(all, state: state, job: job, generation: generation, session: session)
-        let findings = reviewed.findings
+        // Grey hints are listed apart from the suspects: no evidence slots, not counted with them (FL-61).
+        let hints = reviewed.findings.filter { AIDeliveryVoice.hintKinds.contains($0.kind) }
+        let findings = reviewed.findings.filter { !AIDeliveryVoice.hintKinds.contains($0.kind) }
         var frames: [AIFrameSampler.Frame] = []
         let shown = Array(findings.prefix(150))
         let evidence = AIInspection.evidence(findings, duration: scope.duration)
@@ -130,9 +136,11 @@ enum AIInspectionTool {
             "screenshot_times": .array((image ? frames : []).map { AIFormat.seconds($0.time) }),
             "subtitle_style": ["font": .string(style.fontName), "font_size": .number(style.fontSize)],
             "limitations": .array(Array(Set(limitations)).sorted().map { .string($0) }),
-            "note": "Suspects only, not proof of defects. With file, every frame is scanned (frame_scan); without it pictures are only sampled (0.5 s spacing, up to 120) and brief flashes may be missed. Layers, limiter history, source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Cuts on speech are judged only from cached transcripts and narration subtitles; no automatic edits. Intentional findings are listed separately; mark one with intentional={job_id,key,reason}. Auditions last this session."
+            "note": "Suspects only, not proof of defects. With file, every frame is scanned (frame_scan); without it pictures are only sampled (0.5 s spacing, up to 120) and brief flashes may be missed. Layers, limiter history, source cuts and subtitle geometry use the frozen project; file pictures/audio use the supplied export. Same duration cannot prove the file matches. Cuts on speech are judged only from cached transcripts and narration subtitles; no automatic edits. Intentional findings are listed separately; mark one with intentional={job_id,key,reason}. Grey hints are suggestions, not suspects. sound_roles is what each track's sound was taken to be; correct it with sounds. Auditions last this session."
         ]
         if let scanned = picture.frameScan { payload["frame_scan"] = scanned }
+        if !hints.isEmpty { payload["hints"] = .array(hints.map { $0.json(ids: ids) }) }
+        if sound.roles.summary.objectValue?.isEmpty == false { payload["sound_roles"] = sound.roles.summary }
         // 成片比工程旧：键名排在最前面（结果按键名排序），AI 第一眼就看到（MCP-65）。
         if let attention { payload["attention"] = .string(attention) }
         if !unchecked.isEmpty {
