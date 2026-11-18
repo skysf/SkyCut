@@ -12,8 +12,8 @@ import Foundation
 // §5 item 6).
 // The blocking saves (`saveNow`, `flushAutosave`, `saveDocument(as:)`) write on the caller's thread: **checks and dev
 // hooks only**, never production code (checks/project-file-wiring.sh).
-// What it doesn't: the write (ProjectFileWriter); opening, switching and closing (VideoEditProjectDocument.swift);
-// quitting (ProjectQuit).
+// What it doesn't: the write (ProjectFileWriter); opening and switching (VideoEditProjectDocument.swift); whether a
+// project may close (ProjectClosing.swift); quitting (ProjectQuit).
 //
 // Why (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md): every save ran
 // `VideoEditProjectIO.save` on the main thread — a project on a sleeping or stuck external drive froze SkyCut, and Quit
@@ -26,15 +26,6 @@ enum ProjectSaveOutcome: Equatable {
     case failed
     /// The drive did not answer within the deadline: the write goes on, the project stays dirty.
     case notResponding
-}
-
-/// Whether a project may be closed, switched away from or quit (VideoEditProject.prepareToClose).
-enum ProjectCloseReadiness: Equatable {
-    case ready
-    /// Stay as you are: a save failed, the person cancelled, a screen recording is running (the reason is in `notice`).
-    case refused
-    /// Its file is still being written to a drive that does not answer (Quit asks whether to wait).
-    case waitingForDrive
 }
 
 extension VideoEditProject {

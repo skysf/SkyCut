@@ -61,15 +61,23 @@ fi
 
 # 4. 退出：每个开着的工程都要落定（App 的退出和录屏收尾之后的退出两条路）。Both go through ProjectQuit (2026-11-19: the
 #    files are written off the main thread; a stuck drive gets an alert, never a hang), which settles every open project and
-#    stops at the first one that stays.
+#    stops at the first one that stays. Since 2026-11-19 (docs/bugfixes/2026-11-19-close-trusts-a-stale-save.md) it settles
+#    again any project that changed after it was let through, and both replies come in the same turn as that last look (a
+#    reply closure, not an awaited Task: another main-actor job could edit a project between the two).
 QUIT=Sources/SrtFlow/ProjectQuit.swift
 grep -q 'return ProjectQuit.begin()' "$APP" \
   || fail "${APP} 退出时没经 ProjectQuit 让每个开着的工程都落定（只问一个的话，别的工程的改动和「存不存」都被跳过）"
-grep -q 'finishTerminationWait(shouldTerminate: await ProjectQuit.prepareAll())' "$RECORDING" \
-  || fail "${RECORDING} 录屏收尾之后的退出没经 ProjectQuit 让每个开着的工程都落定"
+grep -q 'ProjectQuit.prepareAll { self.finishTerminationWait(shouldTerminate: $0) }' "$RECORDING" \
+  || fail "${RECORDING}: Quit after a screen recording does not settle every open project through ProjectQuit, replying in the turn of its last look"
+grep -q 'prepareAll { NSApp.reply(toApplicationShouldTerminate: $0) }' "$QUIT" \
+  || fail "${QUIT}: the Quit reply is not given in the turn of the last look (replying after awaiting a Task lets an edit land in between)"
 EACH="$(awk '/    private static func prepareEach\(\)/,/^    \}/' "$QUIT")"
-grep -q 'for project in OpenProjects.shared.all {' <<<"${EACH}" && grep -q 'guard await settle(project) else { return false }' <<<"${EACH}" \
-  || fail "${QUIT} 没有把每个开着的工程都过一遍、有一个不放行就停"
+grep -qF 'while let project = OpenProjects.shared.all.first(where: { needsSettling($0, marks[ObjectIdentifier($0)]) }) {' <<<"${EACH}" \
+  && grep -q 'case .stays: return false' <<<"${EACH}" \
+  || fail "${QUIT}: Quit does not settle every open project (again when one changed after it was let through) and stop at the first that stays"
+NEEDS="$(awk '/    private static func needsSettling\(/,/^    \}/' "$QUIT")"
+grep -qF 'case .letThrough(let snapshot): return snapshot != QuitMark.Snapshot(project) || project.fileWriter.isBusy' <<<"${NEEDS}" \
+  || fail "${QUIT}: a project let through and edited afterwards (by the AI while another project was asked about) is not settled again; Quit loses that edit"
 
 # 5. 录屏落回开录的那个工程，不是「此刻主窗口里的那个」。
 grep -q 'targetProject = project' "$RECORDING" \

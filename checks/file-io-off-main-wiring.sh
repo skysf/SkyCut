@@ -88,15 +88,17 @@ require "AIExportDestination asks the drive only through the probe (off the main
 # checks the behaviour.
 BLOCKING='(\b(saveNow|flushAutosave|prepareToCloseDocument)\(\)|\.saveDocument\(as:|\.newProject\(\)|OpenProjects\.shared\.(close|newProject)\(|\bwriteBlocking\()'
 BLOCKING_HITS="$(grep -rnE "${BLOCKING}" Sources --include='*.swift' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*///?' \
-  | grep -vE '^Sources/SrtFlow/(VideoEditProjectSaving|VideoEditProjectDocument|OpenProjects|ProjectFileWriter)\.swift:' || true)"
+  | grep -vE '^Sources/SrtFlow/(VideoEditProjectSaving|VideoEditProjectDocument|ProjectClosing|OpenProjects|ProjectFileWriter)\.swift:' || true)"
 if [ -n "${BLOCKING_HITS}" ]; then
   echo "✗ 接线守卫：production code calls a blocking project save (it waits on the drive on the main thread; use the async one):" >&2
   echo "${BLOCKING_HITS}" >&2
   WIRING_FAIL=1
 fi
-for entry in 'func prepareToCloseDocument() -> Bool {' 'func newProject() {'; do
-  BODY="$(awk -v start="$entry" 'index($0, start) { on = 1; next } on && /^    \}$/ { exit } on { print }' Sources/SrtFlow/VideoEditProjectDocument.swift)"
-  [ -n "${BODY}" ] || { echo "✗ 接线守卫：VideoEditProjectDocument.swift 里找不到 ${entry}（改了名就把这条守卫跟过去）" >&2; WIRING_FAIL=1; }
+for pair in 'ProjectClosing|func prepareToCloseDocument() -> Bool {' 'VideoEditProjectDocument|func newProject() {'; do
+  file="Sources/SrtFlow/${pair%%|*}.swift"
+  entry="${pair#*|}"
+  BODY="$(awk -v start="$entry" 'index($0, start) { on = 1; next } on && /^    \}$/ { exit } on { print }' "$file")"
+  [ -n "${BODY}" ] || { echo "✗ 接线守卫：${file} 里找不到 ${entry}（改了名就把这条守卫跟过去）" >&2; WIRING_FAIL=1; }
 done
 require "the project file is written on the writer's queue, never on the caller's (ProjectFileWriter.startNext)" \
   Sources/SrtFlow/ProjectFileWriter.swift 'queue\.async \{ \[weak self\] in'

@@ -10,6 +10,7 @@ import SrtFlowCore
 // that runs on the main thread shows up as a long main-thread gap instead of hanging the check.
 // - SaveChecks.swift: autosave, flush at the deadline, edits during a write, coalescing, a failing drive, a moved file.
 // - CloseQuitChecks.swift: switching away, Save As, the AI's save_project, closing at once, Quit.
+// - EditWhileClosingChecks.swift: an edit made while New / close / Quit is writing; Quit looking again; a stale save window.
 
 @MainActor
 final class Checks {
@@ -43,6 +44,7 @@ final class Checks {
         let checks = Checks()
         await SaveChecks.run(checks, root: root)
         await CloseQuitChecks.run(checks, root: root)
+        await EditWhileClosingChecks.run(checks, root: root)
         print("Project saves: \(checks.count) assertions, \(checks.failures) failures")
         exit(checks.failures == 0 ? 0 : 1)
     }
