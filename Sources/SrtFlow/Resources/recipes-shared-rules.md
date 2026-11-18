@@ -107,8 +107,9 @@ override them.
 
 1. Under speech, dip the music about 10 dB only while words are spoken (down 0.3–0.5 s before a line, back 0.5 s after,
    not between words), and leave no hole where the whole mix stays under −36 dBFS for 1.5 s unless it is a held breath.
-   Why: deep, long ducking sounds like the video broke. How: volume_curve with sentence times from transcribe; set_track
-   volume_db; inspect_video from=0 silence_db=-36 min_silence=1.5 finds holes.
+   Why: deep, long ducking sounds like the video broke. How: set_track duck_others_db on the voice's track dips every
+   other layer under each line in one call (lines from transcribe, or a narration's own pauses); volume_curve for other
+   shapes; set_track volume_db; inspect_video from=0 silence_db=-36 min_silence=1.5 finds holes.
 2. A voice must be clear against everything else together, not just the music: measure a shot's own sound before laying
    narration on it, and when a line is hard to hear, lower the layer that covers it under that line instead of the music
    again. Why: music lowered twice did not help when the shot's own rumble covered the line. How: listen each clip_id

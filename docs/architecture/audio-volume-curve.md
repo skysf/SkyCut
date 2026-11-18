@@ -5,6 +5,8 @@
 > 导出那一侧的 `aeval` 实现随之退役，第二节里它的那几条留作历史说明。
 > 方案与产品决策见 [声音编辑方案](../plans/2026-09-23-audio-mixing.md)；
 > 同一条音量链上的另外两环见 [声音：音量与渐入渐出](audio-fades.md)、[推子与电平表](audio-mixer.md)。
+> **Since 2026-11-18, section 5**: ducking under speech (`set_track duck_others_db`, `SpeechDuck*`) draws its dips into these
+> curves; read it before changing ducking or anything that reads a duck out of a curve.
 
 ## 一、模型
 
@@ -116,3 +118,71 @@
 - [ ] 视频块把行拉高，底部波形带上同样能画曲线；分离音频后曲线跟着声音到了音频轨。
 - [ ] 检查器：有曲线时滑杆显示播放头处的值，拖滑杆整条线一起动；「回到 0 dB」连曲线一起去掉。
 - [ ] 分割一段带曲线的声音：切口两边的线接得上。导出后听，与预览一致。
+
+## 五、Ducking under speech: set_track duck_others_db (2026-11-18, MCP-29)
+
+Production feedback MCP-29: with dialogue or narration the AI drew every dip under a line by hand with `volume_curve` (dozens
+for a talky film), and in the South Pole draft the shot's own sound masked the last line, not the music. The shared recipe rule
+(Voice and music 1) says: under speech, dip the music about 10 dB only while words are spoken, down 0.3–0.5 s before a line,
+back 0.5 s after, not between words. `set_track track=<the voice's track> duck_others_db=-10` does it for every line in one
+call. Code: `SpeechDuck` (the numbers, windows), `SpeechDuckCurve` (one clip's curve), `SpeechDuckPlanner` (which clips),
+`SpeechDuckLines` (where the lines come from), `SpeechDuckReport` (the result), `AISpeechDuckTool` (plan / apply). Guide:
+`skycut_guide topic=set_track section=ducking`.
+
+Rules (only this way):
+
+1. **A duck is volume automation, drawn into each clip's curve.** Nothing new in the model, the engine or the export: the dip
+   is the amber line the user sees and can drag, preview and export render it through the one gain table (section 2), and the
+   edit takes the audio-only fast path (no picture rebuild). One call = one `perform` = one undo step: `AISpeechDuckTool.apply`
+   opens the `AIUndoGrouping.step` itself and only when a curve changes — a manual group left empty stays on the undo stack and
+   ⌘Z would do nothing (measured 2026-11-18), so a call that finds every dip in place commits nothing. The lines are read
+   before (await); a timeline changed meanwhile refuses.
+2. **Windows** (`SpeechDuck`): a line `[s, e]` dips over `[s − 0.4, e + 0.5]`, fully down from `s` to `e`, linear ramps.
+   Lines whose windows would leave the layer fully up for less than 1 s share one window (lines closer than 1.9 s): no pumping
+   between sentences, and never anything between words, because a line is a sentence or a stretch between 0.6 s pauses.
+   Depth −30…0 dB (`SpeechDuck.depthRange`, the schema's minimum / maximum); the shared rule asks for about −10.
+3. **Lines** (`SpeechDuckLines`): every clip on the voice track (its own sound, or its linked sound when the sound was
+   separated: `AISpeechCutTool.speechClip`) gives its lines from a cached transcript (sentences, transcribe's cache), else —
+   for a sound file of its own (narration, voice-over; no camera metadata) — from its pauses (the waveform's windows by
+   `VoiceLines`' rule: one rule, `VoiceLines.stretches`). A camera's sound without a transcript gives none (whatever else the
+   camera heard would read as one long line): it is listed and the call says to transcribe first. The speech itself never dips.
+4. **Which clips dip** (`SpeechDuckPlanner.targets`): every audible clip (sound, not muted, not hidden, track not hidden, not
+   silent) on every other track, or only `duck_tracks` (A2+V1). The shot's own sound on V1 counts: it is what masked the line
+   in the South Pole draft (MCP-39).
+5. **How deep, measured, never stacked** (`SpeechDuckCurve`): under a window a clip sits `depth` dB under its own level next to
+   the line — the edge line between its line at the window's two ends (an end beyond the clip takes the other end's level).
+   The dip already there is measured as the deepest the line goes under the edge line through the hold (an earlier duck, or a
+   duck drawn by hand), and the window moves the line by the difference times the window's shape. So calling again with the
+   same depth changes nothing, another depth replaces the dip, 0 takes it out, and a hand-drawn duck under a line becomes the
+   asked depth. Everything above the dip's floor keeps its shape and goes down with it: a crossfade's equal-power bump or a
+   bed swell from `set_transition sound` ([cut-sound](cut-sound.md) rule 6 and rule 9 compose with it in either order).
+6. **A clip wholly inside one window is left alone** (a sound effect on a word: its own level next to the line is unknown,
+   and the fix is to move or lower it on purpose). The result lists it as `inside_lines`.
+7. **Exact and bounded**: existing keys move by the offset at their time and keys go at the window's corners, so between keys
+   the line stays dB-linear (the curve's own interpolation); values stay within `AudioGain`'s limits, and where the −60 dB floor
+   stops a dip short the result says how deep it got (`adjustments`, `applied_db`).
+
+Result: `track`, `duck_db`, `lines`, `windows` (first 40, `more_windows`), `ducked` (id, track, windows), `already_at_depth`,
+`inside_lines`, `adjustments`, `lines_from` (transcript / pauses), `no_transcript`, `unreadable`, `next_step`.
+
+Known limits: dips stay where they were drawn — after speech moves, calling again sets the dips under the new lines, but a dip
+left under no line stays until removed with `edit_clip volume_curve`; when the new lines only partly overlap the old ones the
+measured dip near the overlap can be off by the old ramp. The duck is full band: to keep a shot's low hits while clearing the
+voice band, leave its track out with `duck_tracks` (a voice-band-only dip is MCP-30). A camera's speech needs a transcript
+(macOS 26).
+
+Checks: `scripts/check-mcp.sh` (`checks/MCP/SpeechDuckChecks.swift`: windows and merging, the curve on a flat / sloped /
+bumped line, 2× speed, the volume floor, calling again (same, shallower, deeper, 0, a bump drawn after the duck), windows
+across the clip's start and end, a kept key next to the start, a clip inside a line, which clips dip, lines from pauses, the
+result and the schema's range); `scripts/check-parameter-limits.sh` (`checks/ParameterLimits/SpeechDuckAppChecks.swift`: real
+App objects — a narration file's lines from its waveform, the music's curve, the exported mix 10 dB down under a line and back
+between, calling again changes nothing and leaves no empty undo step, one undo takes it all back, refusals change nothing);
+`checks/MCP/router-wiring.sh` (apply's only `perform` sits inside `AIUndoGrouping.step`, opened only on a change, and the router
+does not wrap it again).
+
+Manual regression (ears and a real window):
+
+- [ ] Narration on A1, music on A2, a talking shot's sound on V1: `set_track track=A1 duck_others_db=-10`. The amber lines of
+      the music and the shot dip under each line, the music comes up in pauses longer than about 2 s and stays down in short
+      ones; playback sounds the same as the export. ⌘Z takes it all back in one step.
+- [ ] Call again with −14: the dips get deeper, not doubled; with 0 they are gone.
