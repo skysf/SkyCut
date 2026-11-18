@@ -143,6 +143,14 @@ the engine's offline render of a three-tone clip with −10: 1 kHz down, 50 Hz a
 separated sound, audio-only change); `scripts/check-mcp.sh` (`VoiceBandToolChecks`: read, out of range refused with a
 suggestion, applied, summary, 0 takes it off, no-sound clip refused, schema range = the model's).
 
+`scripts/check-parameter-limits.sh` (`checks/ParameterLimits/VoiceBandAppChecks.swift`) runs it through the real App objects:
+edit_clip's own plan / apply sets it and reports it, the export mixdown has 1 kHz about 10 dB down and 50 Hz / 8 kHz kept, one
+undo takes it back, out of range changes nothing.
+
+Reverse verification (2026-11-18, each broken on purpose, the checks run, then restored byte for byte): the renderer not
+calling the filter → engine group 16 red (the 1 kHz tone through the engine unchanged); split not copying the cut, the
+fast-path neutralizer keeping it, the v38 gate always false → project-file group 51 red (3).
+
 Manual regression:
 
 - [ ] A shot whose own sound has a low boom and mid-range noise under a narration line: `edit_clip voice_band_db=-10`. The
