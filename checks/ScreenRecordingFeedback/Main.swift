@@ -56,7 +56,7 @@ import SrtFlowMCPKit
             await checks.checkPartialAndSources(target: target, result: result)
             checks.checkNoticeOffScreenWhileRecording(target: target, result: result)
             ProjectTeardown.stopPreview(target)
-            target.autosaveTask?.cancel()
+            target.fileWriter.cancelAutosave()
         } catch {
             checks.require(false, "recording feedback production checks: \(error)")
         }

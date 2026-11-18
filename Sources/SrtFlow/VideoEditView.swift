@@ -103,8 +103,8 @@ struct VideoEditView: View {
         .onDisappear {
             if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
             eventMonitor = nil
-            // 切去别的栏目时把挂着的自动保存写下去，别留在内存里等。
-            project.flushAutosave()
+            // 切去别的栏目时把挂着的自动保存写下去，别留在内存里等（off the main thread）。
+            Task { await project.flushToFile() }
         }
         .onDropOfFiles { urls in project.addMedia(urls: urls) }
         // ⌫ 的第二条路：monitor 放行后系统会把它解释成 delete command 送回来。

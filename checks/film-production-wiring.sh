@@ -17,7 +17,7 @@ checks = {
     'measurement branch is guarded before calling DSP': 'compensation: measuringSceneCompensation ? (clip.soundScene.map(SceneLoudness.compensation(for:)) ?? 1) : 1' in audio,
     'native geometry reuse covers borrowed picture ranges': 'return result.expandingTransitionHandles()' in snapshot and 'result.sortMainClipsByStart()' in snapshot,
     'effective canvas reuses the native render size': 'TimelineRenderSize.size(for: rendered(state))' in snapshot,
-    'production argument/CAS gate precedes ordinary save': 'guard let input = try AIFilmProductionReader.input(args) else { return try AIProjectTools.saveProject(args, project) }' in tool,
+    'production argument/CAS gate precedes ordinary save': 'guard let input = try AIFilmProductionReader.input(args) else { return try await AIProjectTools.saveProject(args, project) }' in tool,
     'save router enters production authoring': 'case .saveProject: return try await AIFilmProductionTool.save(args, project)' in router,
     'read router enters current production summary': 'case .getTimeline: return try await AIFilmProductionTool.timeline(project)' in router,
 }

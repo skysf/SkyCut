@@ -1649,3 +1649,10 @@
 "Second word" = "第二个词";
 "This template could not be loaded." = "无法载入这套模板。";
 "Preview unavailable" = "暂无预览";
+
+/* Saving a project off the main thread, and Quit while its drive does not answer (ProjectQuit, 2026-11-19). */
+"The drive with “%@” is not responding, so the project isn't saved yet. SkyCut keeps trying; keep the drive connected." = "「%@」这块磁盘没有响应，工程还没存上。SkyCut 会一直重试，请别拔掉这块盘。";
+"“%@” isn't saved yet" = "「%@」还没存上";
+"The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost." = "「%@」这块磁盘没有响应，可能在休眠或已经断开。工程一存上，SkyCut 就会自己退出。现在就退出的话，上次存盘之后的改动会丢失。";
+"Don't Quit" = "不退出";
+"Quit Anyway" = "仍然退出";

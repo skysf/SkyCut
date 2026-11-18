@@ -1649,3 +1649,10 @@
 "Second word" = "Segunda palabra";
 "This template could not be loaded." = "No se pudo cargar esta plantilla.";
 "Preview unavailable" = "Vista previa no disponible";
+
+/* Saving a project off the main thread, and Quit while its drive does not answer (ProjectQuit, 2026-11-19). */
+"The drive with “%@” is not responding, so the project isn't saved yet. SkyCut keeps trying; keep the drive connected." = "El disco “%@” no responde, así que el proyecto aún no está guardado. SkyCut lo sigue intentando; mantén el disco conectado.";
+"“%@” isn't saved yet" = "“%@” aún no está guardado";
+"The drive with “%@” is not responding. It may be asleep or disconnected. SkyCut quits by itself as soon as the project is saved. If you quit now, the changes since it was last saved are lost." = "El disco “%@” no responde. Puede que esté en reposo o desconectado. SkyCut se cerrará solo en cuanto el proyecto esté guardado. Si sales ahora, se perderán los cambios desde la última vez que se guardó.";
+"Don't Quit" = "No salir";
+"Quit Anyway" = "Salir de todos modos";

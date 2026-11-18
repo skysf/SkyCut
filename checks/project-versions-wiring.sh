@@ -27,7 +27,7 @@ def require(condition, why):
         failures.append(why)
 
 router = read('Sources/SrtFlow/AIToolRouter.swift')
-save_at = router.find('let saved = AIProjectTools.saveIfNeverSaved(project, after: result)')
+save_at = router.find('let saved = await AIProjectTools.saveIfNeverSaved(project, after: result)')
 report_at = router.find('AIRoundVersions.reporting(project, in: saved)')
 require(router.count('AIRoundVersions.reporting(') == 1 and 0 <= save_at < report_at,
         'the router reports the round\'s starting version once, after a never-saved project got its file (else it is never named)')
@@ -60,8 +60,8 @@ require('ProjectVersionStore.forget(project)' in body(read('Sources/SrtFlow/AISe
         'closing a project forgets its version store')
 
 writers = sorted(str(p) for p in Path('Sources').rglob('*.swift') if 'VideoEditProjectIO.save(' in p.read_text())
-require(writers == ['Sources/SrtFlow/ProjectVersionStore.swift', 'Sources/SrtFlow/VideoEditProjectDocument.swift'],
-        'only saveNow and ProjectVersionStore write project files: ' + ', '.join(writers))
+require(writers == ['Sources/SrtFlow/ProjectFileWriter.swift', 'Sources/SrtFlow/ProjectVersionStore.swift'],
+        'only ProjectFileWriter (a project\'s own file, off the main thread) and ProjectVersionStore write project files: ' + ', '.join(writers))
 
 menu = body(read('Sources/SrtFlow/VideoEditProjectBar.swift'), 'struct VideoEditProjectMenu')
 require('Button("Versions…") { showsVersions = true }' in menu, 'the project menu has Versions…')

@@ -59,11 +59,17 @@ if [ -n "$(sed 's,//.*,,' "$PROJECT" | grep -E 'documentGeneration[[:space:]]*(&
   fail "${PROJECT} 里工程代号又在自己数（+= / = 0）：要从 DocumentGenerations.next() 拿"
 fi
 
-# 4. 退出：每个开着的工程都要落定（App 的退出和录屏收尾之后的退出两条路）。
-for f in "$APP" "$RECORDING"; do
-  grep -q 'OpenProjects.shared.all.allSatisfy { $0.prepareToCloseDocument() }' "$f" \
-    || fail "${f} 退出时没有让每个开着的工程都落定（只问一个的话，别的工程的改动和「存不存」都被跳过）"
-done
+# 4. 退出：每个开着的工程都要落定（App 的退出和录屏收尾之后的退出两条路）。Both go through ProjectQuit (2026-11-19: the
+#    files are written off the main thread; a stuck drive gets an alert, never a hang), which settles every open project and
+#    stops at the first one that stays.
+QUIT=Sources/SrtFlow/ProjectQuit.swift
+grep -q 'return ProjectQuit.begin()' "$APP" \
+  || fail "${APP} 退出时没经 ProjectQuit 让每个开着的工程都落定（只问一个的话，别的工程的改动和「存不存」都被跳过）"
+grep -q 'finishTerminationWait(shouldTerminate: await ProjectQuit.prepareAll())' "$RECORDING" \
+  || fail "${RECORDING} 录屏收尾之后的退出没经 ProjectQuit 让每个开着的工程都落定"
+EACH="$(awk '/    private static func prepareEach\(\)/,/^    \}/' "$QUIT")"
+grep -q 'for project in OpenProjects.shared.all {' <<<"${EACH}" && grep -q 'guard await settle(project) else { return false }' <<<"${EACH}" \
+  || fail "${QUIT} 没有把每个开着的工程都过一遍、有一个不放行就停"
 
 # 5. 录屏落回开录的那个工程，不是「此刻主窗口里的那个」。
 grep -q 'targetProject = project' "$RECORDING" \
@@ -116,8 +122,9 @@ grep -qF 'clock.attachAudioSource(engine)' <<<"${REUSED_AUDIO}" \
   || fail "${AUDIO_HOST} 复用声音引擎时没重新接回 PlayerClock（卸片已经摘掉了主时钟）"
 
 # 10. 存盘前只让**这个工程的剪辑页**里的输入框辞职：后台工程自动存盘时去踢键窗口，会打断用户在别处正打的字。
-grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$DOCUMENT" \
-  || fail "${DOCUMENT} 的 endPendingTextEditing 不分是不是这个工程的窗口就让键窗口的输入框辞职"
+SAVING=Sources/SrtFlow/VideoEditProjectSaving.swift
+grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$SAVING" \
+  || fail "${SAVING} 的 endPendingTextEditing 不分是不是这个工程的窗口就让键窗口的输入框辞职"
 
 # 11. 后台工程（没有窗口，方案板 8）：不建预览（播放条目、合成、音频引擎），挂上窗口时重建一次；摘窗口只停预览、工程留着；
 #     用户关掉 AI 还在剪的工程的窗口 = 转到后台（先问这一句，再走落盘关工程那条路）。
@@ -143,7 +150,7 @@ fi
 CONTROLLER=Sources/SrtFlow/ProjectWindowController.swift
 SHOULD="$(awk '/    func windowShouldClose\(/,/^    \}/' "$CONTROLLER")"
 KEEP_AT="$(grep -n 'OpenProjects.shared.aiIsEditing(project)' <<<"${SHOULD}" | cut -d: -f1)"
-PREPARE_AT="$(grep -n 'project.prepareToCloseDocument()' <<<"${SHOULD}" | cut -d: -f1)"
+PREPARE_AT="$(grep -n 'project.closesAtOnce()' <<<"${SHOULD}" | cut -d: -f1)"
 if [ -z "${KEEP_AT}" ] || [ -z "${PREPARE_AT}" ] || [ "${KEEP_AT}" -gt "${PREPARE_AT}" ]; then
   fail "${CONTROLLER} 关窗时没先问「AI 还在剪吗」：AI 在剪的工程会被关掉（应转到后台）"
 fi

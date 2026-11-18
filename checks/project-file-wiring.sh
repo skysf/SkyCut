@@ -490,16 +490,22 @@ require "预渲染必须接收仲裁过的渐变窗口" \
   'private static func normalized\(_ clip: EditClip, fades: FadeWindow\)'
 
 # 换了整份时间线就要重排预览：打开工程、补静帧 / 重链接都这么做。新建工程漏了这一步，上一个工程还在路上的那次重建
-# 落地时会把旧工程的画面挂进新工程（docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md）。
-NEW_PROJECT="$(awk '/func newProject\(\) \{$/ { inside = 1; next } inside && /^    \}$/ { exit } inside { print }' \
+# 落地时会把旧工程的画面挂进新工程（docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md）。Both ways in
+# (startNewProject, and the blocking newProject the checks use) replace the project through replaceWithNewProject.
+NEW_PROJECT="$(awk '/func replaceWithNewProject\(\) \{$/ { inside = 1; next } inside && /^    \}$/ { exit } inside { print }' \
   Sources/SrtFlow/VideoEditProjectDocument.swift)"
 if [ -z "$NEW_PROJECT" ]; then
-  echo "✗ 接线守卫：VideoEditProjectDocument.swift 里找不到 func newProject() {（改了名就把这条守卫跟过去）" >&2
+  echo "✗ 接线守卫：VideoEditProjectDocument.swift 里找不到 func replaceWithNewProject() {（改了名就把这条守卫跟过去）" >&2
   WIRING_FAIL=1
 elif ! grep -c 'scheduleRebuild()' <<<"$NEW_PROJECT" >/dev/null; then
-  echo "✗ 接线守卫：新建工程必须重排预览（newProject 里没有 scheduleRebuild()）：上一个工程在路上的重建会落进新工程" >&2
+  echo "✗ 接线守卫：新建工程必须重排预览（replaceWithNewProject 里没有 scheduleRebuild()）：上一个工程在路上的重建会落进新工程" >&2
   WIRING_FAIL=1
 fi
+for entry in 'func startNewProject() async {' 'func newProject() {'; do
+  BODY="$(awk -v start="$entry" 'index($0, start) { on = 1; next } on && /^    \}$/ { exit } on { print }' Sources/SrtFlow/VideoEditProjectDocument.swift)"
+  grep -c 'replaceWithNewProject()' <<<"$BODY" >/dev/null \
+    || { echo "✗ 接线守卫：${entry} 没经 replaceWithNewProject()（新建工程的那几步只有一份）" >&2; WIRING_FAIL=1; }
+done
 
 # 字幕几行（2026-10-16 用户定：默认都是单行，除非面板上调成两行、或 AI 的 max_lines=2）：生成字幕、配音的字幕都按工程记的
 # `subtitleMaxLines` 切；改它只有面板（setSubtitleMaxLines，一步撤销）和 AI 的两个工具两条路；默认值不许改成两行。
@@ -550,6 +556,32 @@ require "the exporter hands the finished video over through ExportDelivery" \
   Sources/SrtFlow/VideoEditExporter.swift 'try await ExportDelivery\.deliver\('
 require "the export starts only after the look-and-write check of the folder" \
   Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.checkBeforeWriting\(\)'
+
+# A project's own file is written off the main thread (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md):
+# production code saves through saveToFile / flushToFile / saveAs / prepareToClose / startNewProject / closeProject /
+# createProject (ProjectFileWriter's queue, with a deadline). The blocking ones that write on the caller's thread are for the
+# checks and dev hooks only; outside their own definitions nothing in Sources/ may call them. scripts/check-project-saves.sh
+# checks the behaviour.
+BLOCKING='(\b(saveNow|flushAutosave|prepareToCloseDocument)\(\)|\.saveDocument\(as:|\.newProject\(\)|OpenProjects\.shared\.(close|newProject)\(|\bwriteBlocking\()'
+BLOCKING_HITS="$(grep -rnE "${BLOCKING}" Sources --include='*.swift' | grep -vE '^[^:]+:[0-9]+:[[:space:]]*///?' \
+  | grep -vE '^Sources/SrtFlow/(VideoEditProjectSaving|VideoEditProjectDocument|OpenProjects|ProjectFileWriter)\.swift:' || true)"
+if [ -n "${BLOCKING_HITS}" ]; then
+  echo "✗ 接线守卫：production code calls a blocking project save (it waits on the drive on the main thread; use the async one):" >&2
+  echo "${BLOCKING_HITS}" >&2
+  WIRING_FAIL=1
+fi
+for entry in 'func prepareToCloseDocument() -> Bool {' 'func newProject() {'; do
+  BODY="$(awk -v start="$entry" 'index($0, start) { on = 1; next } on && /^    \}$/ { exit } on { print }' Sources/SrtFlow/VideoEditProjectDocument.swift)"
+  [ -n "${BODY}" ] || { echo "✗ 接线守卫：VideoEditProjectDocument.swift 里找不到 ${entry}（改了名就把这条守卫跟过去）" >&2; WIRING_FAIL=1; }
+done
+require "the project file is written on the writer's queue, never on the caller's (ProjectFileWriter.startNext)" \
+  Sources/SrtFlow/ProjectFileWriter.swift 'queue\.async \{ \[weak self\] in'
+require "the write itself is nonisolated (it never runs on the main actor)" \
+  Sources/SrtFlow/ProjectFileWriter.swift 'nonisolated static func write\(_ request: ProjectFileWriteRequest\) -> ProjectFileWriteResult'
+require "a save waits for the drive at most a deadline" \
+  Sources/SrtFlow/VideoEditProjectSaving.swift 'await connectedWriter\(\)\.write\(request, deadline: deadline\)'
+require "the dirty mark is cleared only when nothing changed since the snapshot was taken" \
+  Sources/SrtFlow/VideoEditProjectSaving.swift 'if fileWriter\.revision == request\.revision \{ hasUnsavedChanges = false \}'
 
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "接线守卫失败" >&2

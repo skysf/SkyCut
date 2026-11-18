@@ -44,7 +44,7 @@ final class AIVoiceoverSyncTool {
             defer { if !applied { for image in self.createdImages { try? FileManager.default.removeItem(at: image) } } }
             do {
                 let plan = try await self.prepare()
-                let result = try self.apply(plan)
+                let result = try await self.apply(plan)
                 applied = true
                 AIJobs.shared.finish(job, .done, detail: result.payload)
             } catch {
@@ -118,7 +118,7 @@ final class AIVoiceoverSyncTool {
                                    canvas: VideoEditCompositionBuilder.renderSize(for: state))
     }
 
-    func apply(_ plan: AIVoiceoverSyncPlan) throws -> AIToolResult {
+    func apply(_ plan: AIVoiceoverSyncPlan) async throws -> AIToolResult {
         try checkCurrent()
         guard let project else { throw AIToolError("The project was closed. Nothing was applied.") }
         try plan.validate()
@@ -137,7 +137,7 @@ final class AIVoiceoverSyncTool {
         ], changed: plan.edit.changed)
         if plan.edit.changed {
             AISession.shared.round(for: project).noteChange()
-            result = AIProjectTools.saveIfNeverSaved(project, after: result)
+            result = await AIProjectTools.saveIfNeverSaved(project, after: result)
         }
         return result
     }

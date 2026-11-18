@@ -79,15 +79,15 @@ enum AIProjectOpenTools {
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let project: VideoEditProject
         if inFront, sessions.primaryIsFree(for: session) {
-            primary.newProject()
-            guard primary.documentURL == nil, primary.state.isEmpty, primary.saveDocument(as: url) else {
+            await primary.startNewProject()
+            guard primary.documentURL == nil, primary.state.isEmpty, await primary.saveAs(url) else {
                 throw AIToolError(primary.notice ?? "SkyCut could not save the new project to \(url.path).")
             }
             project = primary
             try await AIEditorPresenter.prepareEditor(project: project, bringForward: true)
             _ = AISession.shared.claimFirstShow(of: project, session: session)   // 摆过了：之后的调用不再摆（板 3）
         } else {
-            guard let created = OpenProjects.shared.newProject(savingAs: url, placement: inFront ? .window(inFront: true) : .background) else {
+            guard let created = await OpenProjects.shared.createProject(savingAs: url, placement: inFront ? .window(inFront: true) : .background) else {
                 throw AIToolError(OpenProjects.shared.failure ?? "SkyCut could not save the new project to \(url.path).")
             }
             project = created
@@ -95,7 +95,7 @@ enum AIProjectOpenTools {
         return landed(project, extra: ["created": .string(url.path)])
     }
 
-    static func closeProject(_ args: AIToolArguments) throws -> AIToolResult {
+    static func closeProject(_ args: AIToolArguments) async throws -> AIToolResult {
         guard let id = try args.string("project") else {
             throw AIToolError("Pass project: the id (p1, p2…) open_project or new_project gave you.")
         }
@@ -112,15 +112,15 @@ enum AIProjectOpenTools {
         let path = project.documentURL?.path
         if project === OpenProjects.shared.primary {
             // 主窗口永远有一个工程：替它存好，再换成一个空的 Untitled（换之前没存过的先存进 SrtFlow/工程，不弹框）。
-            if project.isUntitled, !project.state.isEmpty, AIProjectTools.saveUntitled(project) == nil {
+            if project.isUntitled, !project.state.isEmpty, await AIProjectTools.saveUntitled(project) == nil {
                 throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
-            guard project.flushAutosave(), OpenProjects.shared.resetPrimary() else {
+            guard await project.flushToFile() == .saved, await OpenProjects.shared.resetPrimary() else {
                 throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
             sessions.release(project)
         } else {
-            guard OpenProjects.shared.close(project) else {
+            guard await OpenProjects.shared.closeProject(project) else {
                 throw AIToolError("Not closed: SkyCut could not save \(id) (\(project.notice ?? "unknown error")).")
             }
             sessions.release(project)

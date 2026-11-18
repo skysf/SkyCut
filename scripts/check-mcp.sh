@@ -143,8 +143,8 @@ if [ -n "${MOVIES}" ]; then
   echo "✗ 这些文件又把默认位置指向「影片」：${MOVIES}（用户：不要到 Movies，没给文件夹就放下载）" >&2
   exit 1
 fi
-for wiring in "Sources/SrtFlow/VideoEditProjectDocument.swift:2" "Sources/SrtFlow/VideoEditExportSheet.swift:1" \
-              "Sources/SrtFlow/AIWorkspace.swift:1"; do
+for wiring in "Sources/SrtFlow/VideoEditProjectDocument.swift:1" "Sources/SrtFlow/VideoEditProjectSaving.swift:1" \
+              "Sources/SrtFlow/VideoEditExportSheet.swift:1" "Sources/SrtFlow/AIWorkspace.swift:1"; do
   file="${wiring%%:*}"
   want="${wiring##*:}"
   if [ "$(grep -c 'startFolder(project:' "${file}" || true)" -lt "${want}" ]; then

@@ -14,11 +14,13 @@
   `open(url, placement:)`：这个文件已经开着就回它（看得见时把它的窗口摆出来）；开到顶（`limit` = 8，主窗口那个、后台的都算）、打不开就回 nil，
   原因在 `failure`（给 AI 的英文）。新建是 `newProject(savingAs:placement:)`（建好就存到那个路径）。`Placement`：`.window(inFront:)`
   （摆到最前面一次 / 放到后面）或 `.background`（AI 的后台模式）。
-  关是 `close(_:)`（先过 `prepareToCloseDocument`，录屏中一律拒）；主窗口那个不关，`resetPrimary()` 换成空的 Untitled（AI 的 `close_project`）。
+  关是 `closeProject(_:)`（先过 `prepareToClose`，录屏中一律拒；since 2026-11-19 the save runs off the main thread, and a project
+  whose drive does not answer is not closed —— [工程文件](video-edit-project-file.md) §5；`close(_:)` is its blocking twin for the checks）；
+  主窗口那个不关，`resetPrimary()` 换成空的 Untitled（AI 的 `close_project`）。
   谁在开：AI 的 `open_project` / `new_project`（主窗口那个是没人剪的空 Untitled 时装进主窗口，否则开工程窗口）、冒烟驱动。
 - **`focused`**：键窗口是工程窗口就是它的工程（`keyProjectWindow`，窗口变成 / 不再是键窗口时更新），否则是 `primary`。
   编辑菜单的拷贝 / 剪切 / 粘贴和它们亮不亮、⌘S / 存储为作用在它身上；这几项在「主窗口停在剪辑页」**或**「键窗口是工程窗口」时可用。
-- **`all`**：开着的全部。退出时每一个都要过 `prepareToCloseDocument()`（落盘、未命名的问存不存），**有一个不放行就不退出、
+- **`all`**：开着的全部。退出时每一个都要过 `prepareToClose()`（落盘、未命名的问存不存；`ProjectQuit`），**有一个不放行就不退出、
   后面的不再问**。
 - **同一个文件只开一份**（两份同时自动存盘会互相盖掉）：主窗口要开的文件已经在某个工程窗口里开着，就把那个窗口摆出来、不载入
   （`openProject(at:)` 开头那一句）；`openInWindow` 同理。认法是 `ProjectFileIdentity.same`：规范化、跟着符号链接走之后路径一样。
@@ -60,7 +62,8 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
   标题跟着工程名（`.navigationTitle` 经 `sceneBridgingOptions` 交给窗口）。
 - 开的时候层叠排开（第一个放正中），**摆到最前面一次、不激活 App**（`orderFrontRegardless`，键盘留在用户正在打字的地方；方案板 3）。
 - 关窗：`windowShouldClose` **先问「AI 还在剪吗」**（`aiIsEditing`：归一个 5 分钟内调用过的会话、这一次打开的）—— 是就只摘窗口、
-  工程转到后台接着剪（方案 A.6，第五节之二），不问存不存；不是才过 `prepareToCloseDocument`（落盘；未命名又剪了东西的问存不存，点取消就不关），
+  工程转到后台接着剪（方案 A.6，第五节之二），不问存不存；不是才过 `prepareToClose`（落盘；未命名又剪了东西的问存不存，点取消就不关；
+  nothing to write closes at once, otherwise the window closes itself after the save），
   关了这个工程就关掉、收拾干净（第五节）。
 - **几个剪辑页同时在时，这些只认自己的**：
   - **按键**：`handleEvent` 先认 `event.window` 是不是这个剪辑页的窗口（`TimelineScrollGeometry.live(for: project)?.window`）——
@@ -107,7 +110,7 @@ SwiftUI 的 `.toolbar` 进了窗口的工具栏、`.sheet` 挂在这个窗口上
 - **挂上 / 摘下**：`showWindow(for:inFront:)` 给后台工程挂一个工程窗口并重建（AI 的 `set_view visible`、主窗口「AI 在剪的工程」里点打开）；
   `moveToBackground` 摘掉窗口（AI 的 `set_view background`）→ 控制器 `closeKeepingProject` → `windowClosed(keepsProject: true)` →
   `ProjectTeardown.stopPreview`：只停播放器、引擎、优化媒体，文档、撤销历史（工程自己的撤销管理器）、在跑的任务、自动存盘都留着。
-- **关**：`close(_:)` 有窗口的关窗口、后台的直接收拾（同第五节），都先过 `prepareToCloseDocument`。退出时后台的也要落定（在 `all` 里）。
+- **关**：`closeProject(_:)` 有窗口的关窗口、后台的直接收拾（同第五节），都先过 `prepareToClose`。退出时后台的也要落定（在 `all` 里）。
 - **工作台「更多 → AI 工程」浮层**（`AIProjectsSidebarSection`，第 ③a 刀后半，方案 I 节）：后台工程和 AI 正在剪的工程窗口各一行 —— 名字 · 短 id、
   在做什么（已停止 / 等你点一下 / 导出 42% … / 排队中 / 在剪… / 空闲；排着队、还没开始的任务问 `AIWorkQueue`，不写成「导出中」）、
   停止（`AIRound.stop`，只停这个工程）、打开窗口（`focus`：后台的先挂窗口，交出键盘）、

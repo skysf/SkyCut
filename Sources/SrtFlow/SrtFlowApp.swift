@@ -171,7 +171,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ///
     /// 必须在 shouldTerminate 这一步做而不是 willTerminate：那时已经拦不住
     /// 退出了，写盘失败（磁盘满、外接盘被拔）也只能眼睁睁丢数据。这里失败或
-    /// 用户在「未命名工程要不要保存」上点了取消，就取消退出。
+    /// 用户在「未命名工程要不要保存」上点了取消，就取消退出。The files are written off the main thread (ProjectQuit):
+    /// a stuck drive gets an alert that waits by itself or quits anyway, never a hang.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         MainActor.assumeIsolated {
             // 有录制在跑时先停录、等 finalize 和导入决策 —— 那是异步的，
@@ -188,7 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             // 每个开着的工程都要落定；有一个没放行（写盘失败、用户在「存不存」上点了取消）就不退出，后面的也不再问。
-            return OpenProjects.shared.all.allSatisfy { $0.prepareToCloseDocument() } ? .terminateNow : .terminateCancel
+            return ProjectQuit.begin()
         }
     }
 }
