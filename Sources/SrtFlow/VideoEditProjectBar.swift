@@ -128,12 +128,12 @@ struct VideoEditStartScreen: View {
     }
 
     private func promptAddMedia() {
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.prompt = L10n("Add")
-        guard panel.runModal() == .OK else { return }
-        project.addMedia(urls: panel.urls)
+        let generation = project.documentGeneration
+        FilePicker.chooseFiles(types: [], prompt: L10n("Add")) { [project] urls in
+            // The window is not modal: the project may have been switched while it was open.
+            guard project.isCurrentGeneration(generation) else { return }
+            project.addMedia(urls: urls)
+        }
     }
 }
 

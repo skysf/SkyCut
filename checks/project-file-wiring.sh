@@ -535,15 +535,29 @@ fi
 # the macOS folder window is opened without a modal session, and nothing in the export panel or the exporter waits on
 # the destination drive on the main thread. The behaviour is checked by scripts/check-export-profile.sh; this pins
 # the production wiring it relies on.
-for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportFolderChooser.swift; do
-  forbid "the export folder window is never a modal runModal / FilePicker (a hung panel service then wedges the app)" \
-    "$f" '^[^/]*(runModal|FilePicker\.)'
+for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift; do
+  forbid "the export folder row drives its own chooser (its inline fallback), not the shared FilePicker" "$f" '^[^/]*FilePicker\.'
 done
-require "the export folder window opens with begin (no modal session)" Sources/SrtFlow/ExportFolderChooser.swift 'panel\.begin \{'
-require "the folder chooser leaves its in-flight record before asking AppKit for the window" \
-  Sources/SrtFlow/ExportFolderChooser.swift 'record\.markStarted\(\)'
+# Every macOS open / save window (2026-11-19, docs/bugfixes/2026-11-19-modal-file-windows-can-wedge-app.md): panels are
+# made only in SystemFileChooser.swift, which opens them with begin and never runs one modally; the shared ones go through
+# SystemFileWindows (the views' FilePicker). scripts/check-export-profile.sh (FileChooserChecks, FileWindowsChecks) checks
+# the behaviour.
+for f in Sources/SrtFlow/SystemFileChooser.swift Sources/SrtFlow/SystemFileWindows.swift Sources/SrtFlow/FileWindowHelper.swift \
+  Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift; do
+  forbid "a macOS open / save window is never a modal session (a hung panel service then wedges the app)" "$f" '^[^/]*runModal'
+done
+PANEL_MAKERS="$(grep -rlE '^[^/]*(NSOpenPanel|NSSavePanel)\(' Sources --include='*.swift' | grep -v '^Sources/SrtFlow/SystemFileChooser\.swift$' || true)"
+if [ -n "${PANEL_MAKERS}" ]; then
+  echo "✗ 接线守卫：macOS open / save panels are made only in SystemFileChooser.swift (non-modal, watched): ${PANEL_MAKERS}" >&2
+  WIRING_FAIL=1
+fi
+require "the system window opens with begin (no modal session)" Sources/SrtFlow/SystemFileChooser.swift 'panel\.begin \{'
+require "the chooser leaves its in-flight record before asking AppKit for the window" \
+  Sources/SrtFlow/SystemFileChooser.swift 'record\.markStarted\(\)'
+require "the views' FilePicker goes through the shared non-modal windows" \
+  Sources/SrtFlow/SystemFileWindows.swift 'SystemFileWindows\.shared\.open\(request'
 require "the folder window never starts on a drive the last check found not answering (windowStart)" \
-  Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(startingAt: destination\.windowStart\)'
+  Sources/SrtFlow/ExportFolderRow.swift 'chooser\.choose\(\.exportFolder\(startingAt: destination\.windowStart\)\)'
 for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolderRow.swift Sources/SrtFlow/ExportDestinationState.swift; do
   forbid "the export panel never asks the destination drive itself (only ExportDestinationProbe, off the main thread)" \
     "$f" '^[^/]*FileManager\.default'

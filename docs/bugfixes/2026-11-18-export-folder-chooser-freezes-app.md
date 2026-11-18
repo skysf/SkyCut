@@ -120,6 +120,10 @@ path. Rules: [export settings](../architecture/export-settings.md) §8, [blockin
 
 ## Lessons
 
+Follow-up (2026-11-19): every other open / save window moved onto the same chooser, renamed `SystemFileChooser` (record key
+`SrtFlow.fileWindowInFlight`, checks `FileChooserChecks` / `FileWindowsChecks`):
+[case](2026-11-19-modal-file-windows-can-wedge-app.md), [rules](../architecture/system-file-windows.md).
+
 - A system panel is another process. Never run it as a nested modal session, never wait for it without a way out, and always
   offer a way to do the same job without it.
 - Nothing on the main thread may touch a user-chosen destination: it can be a sleeping USB disk, a read-only NTFS volume or

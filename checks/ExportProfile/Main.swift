@@ -124,7 +124,8 @@ import SrtFlowMCPKit
             }
             // The export panel's folder window and destination never wait on the main thread (2026-11-18 case).
             print("DESTINATION: folder window, destination checks, delivery"); fflush(stdout)
-            await FolderChooserChecks.run(require: require)
+            await FileChooserChecks.run(require: require)
+            await FileWindowsChecks.run(require: require)
             for _ in 0..<600 where VideoEditExporter.shared.isExporting { try await Task.sleep(nanoseconds: 50_000_000) }
             await DestinationChecks.run(root: root, state: state, project: project, require: require)
             // export_video's folder: made, checked and listed off the main thread, refused before any job (2026-11-19 case).

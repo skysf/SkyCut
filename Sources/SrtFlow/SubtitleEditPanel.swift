@@ -338,18 +338,18 @@ struct SubtitleEditPanel: View {
     }
 
     private func exportAs(_ format: SubtitleFormat) {
-        guard let document else { return }
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [format.utType]
-        let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? document.title
-        panel.nameFieldStringValue = "\(base).\(format.fileExtension)"
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try write(document, format: format, to: url)
-            // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
-            if url == subtitleURL, format == document.format { markSaved() }
-        } catch {
-            saveError = error.localizedDescription
+        guard let picked = document else { return }
+        let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? picked.title
+        FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { url in
+            // The window is not modal: write what the document holds now.
+            guard let document else { return }
+            do {
+                try write(document, format: format, to: url)
+                // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
+                if url == subtitleURL, format == document.format { markSaved() }
+            } catch {
+                saveError = error.localizedDescription
+            }
         }
     }
 

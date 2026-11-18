@@ -146,7 +146,7 @@ struct CompressView: View {
     // MARK: - 动作
 
     private func chooseFiles() {
-        add(FilePicker.chooseFiles(types: MediaFileTypes.video))
+        FilePicker.chooseFiles(types: MediaFileTypes.video) { add($0) }
     }
 
     private func add(_ urls: [URL]) {

@@ -70,7 +70,7 @@ extension VideoEditProject {
         switch untitledCloseChoice() {
         case .save:
             // 用户在存盘面板上点了取消，或者写盘失败 —— 都不能继续往下切。
-            guard let url = chooseSaveLocation() else { return .refused }
+            guard let url = await chooseSaveLocation() else { return .refused }
             return await saveAs(url) && !hasUnsavedChanges ? .ready : .refused
         case .discard: return .ready
         case .cancel: return .refused
@@ -91,9 +91,7 @@ extension VideoEditProject {
         if documentURL != nil { return flushAutosave() }
         guard !state.isEmpty else { return true }
         switch untitledCloseChoice() {
-        case .save:
-            guard let url = chooseSaveLocation() else { return false }
-            return saveDocument(as: url) && !hasUnsavedChanges
+        case .save: return false   // the save window is not modal: only `prepareToClose` can wait for it
         case .discard: return true
         case .cancel: return false
         }
@@ -157,14 +155,14 @@ extension VideoEditProject {
     // MARK: - 打开
 
     func promptOpenProject() {
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.srtFlowProject]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.directoryURL = AIWorkspace.shared.startFolder(project: self)
-        panel.prompt = L10n("Open")
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        Task { await OpenProjects.shared.userOpen(url, from: self) }   // AI 正在剪这一个：开到新窗口里
+        let request = FileWindowRequest(
+            kind: .files(types: [.srtFlowProject], multiple: false), start: AIWorkspace.shared.startFolder(project: self),
+            prompt: L10n("Open")
+        )
+        SystemFileWindows.shared.open(request) { [weak self] urls in   // not modal (SystemFileWindows)
+            guard let self, let url = urls.first else { return }
+            Task { await OpenProjects.shared.userOpen(url, from: self) }   // AI 正在剪这一个：开到新窗口里
+        }
     }
 
     /// 打开工程。
@@ -366,16 +364,19 @@ extension VideoEditProject {
     /// 让用户指认一个丢失的素材。指完之后，**同一个目录下**其他丢失的素材按
     /// 文件名自动配上 —— 素材通常整批一起搬，一次别让人点十遍。
     func promptRelink(_ missing: URL) {
-        let panel = NSOpenPanel()
-        panel.message = String(
-            format: L10n("Where is “%@”?"),
-            missing.lastPathComponent
-        )
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        panel.prompt = L10n("Relink")
-        guard panel.runModal() == .OK, let replacement = panel.url else { return }
+        let generation = documentGeneration
+        FilePicker.chooseFiles(
+            types: [], allowsMultiple: false, prompt: L10n("Relink"),
+            message: String(format: L10n("Where is “%@”?"), missing.lastPathComponent)
+        ) { [weak self] urls in
+            // Not modal: the project may have been switched, or the file found again, while the window was open.
+            guard let self, let replacement = urls.first, self.isCurrentGeneration(generation),
+                  self.missingMedia.contains(missing) else { return }
+            self.relink(missing, to: replacement)
+        }
+    }
 
+    private func relink(_ missing: URL, to replacement: URL) {
         let directory = replacement.deletingLastPathComponent()
         var relinked: [URL: URL] = [missing: replacement]
         for other in missingMedia where other != missing {

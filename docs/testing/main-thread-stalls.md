@@ -23,7 +23,7 @@
   writes a `still stuck: N s so far` entry with a stack taken at that moment, and again every 30 s while it lasts. A hang
   that ends in Force Quit never lands, so before this it left nothing in the log
   ([case](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md)). Those entries have no context (that is read on the
-  main thread, which is the one that is stuck). The export panel's folder window also leaves `注：export folder window: …`
+  main thread, which is the one that is stuck). The system open / save windows also leave `注：file window: …` (`注：export folder window: …` before 2026-11-19)
   notes (opening, how long macOS took to make it, failed, closed), so a hang next to such a note points at the system panel.
 - 进程内冒烟（[GUI 冒烟流程](gui-smoke-testing.md)「四之六」）的结果 `<脚本>.out.json` 里多了
   `stalls`（每次卡顿的时刻、毫秒、context、前 12 层栈）；每个 `perf` 快照里多了 `stall:count` /

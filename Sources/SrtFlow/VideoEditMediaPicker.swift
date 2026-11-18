@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 // 不管什么：素材进时间线之后落在哪（VideoEditProject.addMedia）、拖进来的文件（MediaFileDrop）。
 // 2026-09-27 从 VideoEditView.swift 挪出来（那个文件登记过超标、只许降）。
 
+// The window is not modal (2026-11-19, SystemFileWindows): the project may be switched while it is open, so the files go
+// into the project only when it is still the same document.
 @MainActor
 enum VideoEditMediaPicker {
     static func addMedia(to project: VideoEditProject, toOverlay: Bool) {
@@ -16,14 +18,18 @@ enum VideoEditMediaPicker {
         if !toOverlay {
             types.append(contentsOf: SubtitleFileTypes.readable)
         }
-        let urls = FilePicker.chooseFiles(types: types)
-        guard !urls.isEmpty else { return }
-        project.addMedia(urls: urls, videosToOverlay: toOverlay)
+        let generation = project.documentGeneration
+        FilePicker.chooseFiles(types: types) { urls in
+            guard project.isCurrentGeneration(generation) else { return }
+            project.addMedia(urls: urls, videosToOverlay: toOverlay)
+        }
     }
 
     static func addSubtitle(to project: VideoEditProject) {
-        let urls = FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false)
-        guard let url = urls.first else { return }
-        project.attachSubtitle(url)
+        let generation = project.documentGeneration
+        FilePicker.chooseFiles(types: SubtitleFileTypes.readable, allowsMultiple: false) { urls in
+            guard let url = urls.first, project.isCurrentGeneration(generation) else { return }
+            project.attachSubtitle(url)
+        }
     }
 }

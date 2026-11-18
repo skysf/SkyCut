@@ -27,8 +27,8 @@ struct VideoEditExportSheet: View {
     /// Where the video goes and what the last check of that folder said: the drive is only ever touched off the main
     /// thread (docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
     @StateObject private var destination: ExportDestinationState
-    /// The macOS folder window, opened without a modal session (ExportFolderChooser).
-    @StateObject private var chooser = ExportFolderChooser()
+    /// The macOS folder window, opened without a modal session (SystemFileChooser).
+    @StateObject private var chooser = SystemFileChooser()
     /// The look-and-write check right before an export is out.
     @State private var isCheckingBeforeExport = false
 

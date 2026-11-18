@@ -99,19 +99,21 @@ extension VideoEditProject {
     }
 
     func saveDocumentAs() {
-        guard let url = chooseSaveLocation() else { return }
-        Task { await saveAs(url) }
+        let generation = documentGeneration
+        Task {
+            // The window is not modal: the project may have been switched while it was open.
+            guard let url = await chooseSaveLocation(), isCurrentGeneration(generation) else { return }
+            await saveAs(url)
+        }
     }
 
-    /// 存储为的面板。
-    func chooseSaveLocation() -> URL? {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.srtFlowProject]
-        panel.nameFieldStringValue = suggestedFileName
-        panel.directoryURL = documentURL?.deletingLastPathComponent() ?? AIWorkspace.shared.startFolder(project: self)
-        panel.canCreateDirectories = true
-        panel.prompt = L10n("Save")
-        guard panel.runModal() == .OK, var url = panel.url else { return nil }
+    /// 存储为的面板 (the macOS save window, not modal: SystemFileWindows). nil when nothing was chosen.
+    func chooseSaveLocation() async -> URL? {
+        let request = FileWindowRequest(
+            kind: .save(types: [.srtFlowProject], name: suggestedFileName),
+            start: documentURL?.deletingLastPathComponent() ?? AIWorkspace.shared.startFolder(project: self), prompt: L10n("Save")
+        )
+        guard var url = await SystemFileWindows.shared.choose(request)?.first else { return nil }
         // 用户把扩展名删了也照样存成工程文件（.skycut），不然下次双击打不开。
         if !VideoEditProjectFile.isProjectFile(url) {
             url = url.appendingPathExtension(VideoEditProjectFile.fileExtension)

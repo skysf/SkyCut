@@ -2,17 +2,17 @@ import SwiftUI
 
 // MARK: - The export panel's "Export to" row
 //
-// What it does: the destination path; the folder button (the macOS folder window, non-modal, ExportFolderChooser);
+// What it does: the destination path; the folder button (the macOS folder window, non-modal, SystemFileChooser);
 // dropping a folder (or a file: its folder) from Finder; what the last off-main check of the folder said
 // (ExportDestinationState); and, when the macOS folder window failed, typing a path instead — so choosing a folder
 // never depends on the system panel service alone.
-// What it doesn't: the checks (ExportDestinationProbe), opening the window (ExportFolderChooser), remembering the
+// What it doesn't: the checks (ExportDestinationProbe), opening the window (SystemFileChooser), remembering the
 // folder (the caller's `remember`).
 // Rules: docs/architecture/export-settings.md, "Export folder window and destination checks".
 
 struct ExportFolderRow: View {
     @ObservedObject var destination: ExportDestinationState
-    @ObservedObject var chooser: ExportFolderChooser
+    @ObservedObject var chooser: SystemFileChooser
     /// A folder passed its check and is now the destination: remember it.
     let remember: (URL) -> Void
 
@@ -37,7 +37,7 @@ struct ExportFolderRow: View {
                     ProgressView().controlSize(.small)
                 }
                 Button {
-                    chooser.choose(startingAt: destination.windowStart) { take($0) }
+                    chooser.choose(.exportFolder(startingAt: destination.windowStart)) { if let url = $0?.first { take(url) } }
                 } label: {
                     Image(systemName: "folder")
                 }
@@ -109,7 +109,9 @@ struct ExportFolderRow: View {
                         .foregroundStyle(.orange)
                 }
                 HStack(spacing: 8) {
-                    Button("Try Again") { chooser.choose(startingAt: destination.windowStart, force: true) { take($0) } }
+                    Button("Try Again") {
+                        chooser.choose(.exportFolder(startingAt: destination.windowStart), force: true) { if let url = $0?.first { take(url) } }
+                    }
                         .instantHelp("Open the macOS folder window again")
                     Button("Keep This Folder") { chooser.dismissFailure() }
                         .instantHelp("Keep exporting into the folder above")
@@ -172,12 +174,19 @@ enum ExportDestinationText {
         }
     }
 
-    static func message(_ failure: ExportFolderChooser.Failure) -> String {
+    static func message(_ failure: SystemFileChooser.Failure) -> String {
         switch failure {
         case .lastRunDidNotFinish:
             return L10n("Last time SkyCut had to be closed while the macOS folder window was open. Type the folder's path below, or drag a folder here from Finder.")
         case .noWindow, .returnedAtOnce, .closedByUser:
             return L10n("The macOS folder window did not work. Type the folder's path below, or drag a folder here from Finder.")
         }
+    }
+}
+
+extension FileWindowRequest {
+    /// The export panel's folder window.
+    static func exportFolder(startingAt folder: URL) -> FileWindowRequest {
+        FileWindowRequest(kind: .folder, start: folder, prompt: L10n("Choose"), message: L10n("Choose the folder to export into"))
     }
 }

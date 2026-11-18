@@ -175,7 +175,8 @@ on a friend's Mac (macOS 26.6.2, external drive). A non-sandboxed app's `NSOpenP
 creating a panel blocks the main thread for up to 60 s when the service hangs, and a `runModal` panel whose service hangs
 never returns.
 
-1. **The folder window is never a modal session.** `ExportFolderChooser` opens it with `begin`; no `runModal` and no
+1. **The folder window is never a modal session.** `SystemFileChooser` (`ExportFolderChooser` until 2026-11-19, when every open /
+   save window moved onto it: [system file windows](system-file-windows.md)) opens it with `begin`; no `runModal` and no
    `FilePicker` in the export panel's files. It watches the window: not on screen with no answer for 3 s, or an empty answer
    within 1 s, is a failure (AppKit can give up without ever calling back). While it is open the panel offers "Close It",
    which cancels a window that stopped responding. It starts in the destination folder, except when the last check found
@@ -185,7 +186,8 @@ never returns.
    onto the "Export to" row, and after a failure typing or pasting a path. The Export button is off while a folder is being
    picked (Return in the path field must not start an export).
 3. **A force quit with the window open is remembered.** Before AppKit is asked for the window the chooser writes
-   `SrtFlow.export.folderChooserInFlight` (cleared when the window answers or SkyCut quits normally). Still there at the next
+   `SrtFlow.fileWindowInFlight` (`SrtFlow.export.folderChooserInFlight` until 2026-11-19; shared by every system file window
+   since) (cleared when the window answers or SkyCut quits normally). Still there at the next
    attempt = that run ended with the window open (most likely frozen inside AppKit): the typed path comes first, "Try Again"
    asks AppKit anyway. SkyCut cannot cut AppKit's own wait short; this is how it avoids walking into it twice.
 4. **The panel never asks the destination drive itself.** Is it there, a folder, a read-only drive, writable, which names are
@@ -201,8 +203,8 @@ never returns.
    a full copy. The panel says "Saving the video into the export folder…" meanwhile. Subtitle files are written off the main
    thread too.
 7. The scan side is pinned by `checks/project-file-wiring.sh`, the behaviour by `scripts/check-export-profile.sh`
-   (`FolderChooserChecks`, `DestinationChecks`). The same hazard is still in the other places that use `runModal` panels
-   (open / save project, add media, the compress and burn-in "Choose…"): not changed here.
+   (`FileChooserChecks`, `DestinationChecks`). Since 2026-11-19 every other open / save window uses the same chooser
+   ([system file windows](system-file-windows.md)).
 8. **The AI's `export_video` and `export_subtitles` follow 4 and 5 too** (2026-11-19,
    [case](../bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md)). Which folder (a relative path tried against two
    folders, the old `SrtFlow` folder), making it, the look-and-write check and the listing for taken names run only inside
@@ -222,7 +224,7 @@ never returns.
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
-| `scripts/check-export-profile.sh` (`FolderChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free |
+| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free |
 | `checks/project-file-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）

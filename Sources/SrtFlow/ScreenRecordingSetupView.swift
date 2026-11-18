@@ -132,14 +132,11 @@ struct ScreenRecordingSetupView: View {
 
     /// 选保存位置。默认名与上次目录都沿用既有规则。
     private func chooseOutput() {
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.quickTimeMovie]
-        // 面板打开时就停在**当前这个**位置上（预填的或用户上次改过的）。
-        panel.nameFieldStringValue = outputURL.lastPathComponent
-        panel.canCreateDirectories = true
-        panel.message = L10n("Choose where to save this screen recording.")
-        panel.directoryURL = outputURL.deletingLastPathComponent()
-        if panel.runModal() == .OK, let chosen = panel.url { outputURL = chosen }
+        // 面板打开时就停在**当前这个**位置上（预填的或用户上次改过的）。Not modal (SystemFileWindows).
+        FilePicker.chooseSaveLocation(
+            types: [.quickTimeMovie], name: outputURL.lastPathComponent, start: outputURL.deletingLastPathComponent(),
+            message: L10n("Choose where to save this screen recording.")
+        ) { outputURL = $0 }
     }
 
     private func loadMicrophones() async {
