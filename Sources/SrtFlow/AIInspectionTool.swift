@@ -151,9 +151,8 @@ enum AIInspectionTool {
         }
         // 没有疑点就没有截图请求；仅在实际请求证据后失败才报告画不出来。
         // The measured mix goes under the evidence screenshots (#n marks each one; MCP-66).
-        // `strip`, not `sound`: the delivery checks' prepared sound above has that name (#476 and #481 met here).
-        let strip = frames.isEmpty ? nil : AISoundStripMeasure.inspection(measurement.frames, state: state, config: config, scope: scope)
-        return AILookTool.finish(&payload, frames: frames, size: .medium, wantsImage: image && !wanted.isEmpty, sound: strip)
+        let sound = frames.isEmpty ? nil : AISoundStripMeasure.inspection(measurement.frames, state: state, config: config, scope: scope)
+        return AILookTool.finish(&payload, frames: frames, size: .medium, wantsImage: image && !wanted.isEmpty, sound: sound)
     }
 
     /// 素材切口：电平上切在有声处、又有人声证据说这一刻在说话，才报「切在说话上」（`AIInspectionSpeech`，MCP-14）；
