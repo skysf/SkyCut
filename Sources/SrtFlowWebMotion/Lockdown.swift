@@ -108,11 +108,19 @@ enum Lockdown {
     /// The WebKit processes behind a page (WebContent, GPU, Networking), for SkyCut's memory watch and teardown.
     /// Non-public accessors; a missing one is skipped (SkyCut then watches less, and says so).
     static func processIdentifiers(of web: WKWebView) -> [Int32] {
-        ["_webProcessIdentifier", "_gpuProcessIdentifier", "_networkProcessIdentifier"].compactMap { key in
-            guard web.responds(to: NSSelectorFromString(key)), let value = web.value(forKey: key) as? NSNumber else { return nil }
-            let pid = value.int32Value
-            return pid > 0 ? pid : nil
-        }
+        var pids = ["_webProcessIdentifier", "_gpuProcessIdentifier"].compactMap { processIdentifier($0, of: web) }
+        // WKWebView's testing network getter can assert before its first load. The configured store exists already;
+        // its non-launching existence check makes the optional PID read safe without creating a network process.
+        let store = web.configuration.websiteDataStore
+        let exists = "_networkProcessExists"
+        if store.responds(to: NSSelectorFromString(exists)), (store.value(forKey: exists) as? NSNumber)?.boolValue == true,
+           let pid = processIdentifier("_networkProcessIdentifier", of: store) { pids.append(pid) }
+        return pids
+    }
+
+    static func processIdentifier(_ key: String, of object: NSObject) -> Int32? {
+        guard object.responds(to: NSSelectorFromString(key)), let value = object.value(forKey: key) as? NSNumber else { return nil }
+        return value.int32Value > 0 ? value.int32Value : nil
     }
 }
 

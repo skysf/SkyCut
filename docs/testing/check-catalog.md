@@ -8,11 +8,14 @@
 > 找某个脚本直接搜它的名字。
 
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
-  (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory`
+  (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
   hostile pages, a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
   `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
+  `load-memory` uses fixed 32 MiB load/ready buffers and real kernel samples, one-event PID retry and process-birth/receipt guards.
+  For a focused check on the shared Mac, select `pure,normal,alpha,load-memory`; the existing `memory` group's frame hog remains
+  enabled in full CI.
 
 - Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web

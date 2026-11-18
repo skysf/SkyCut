@@ -48,6 +48,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemeAppearance.swift \
   Sources/SrtFlow/PerfCounters.swift \
   Sources/SrtFlowWebMotion/PageClock.swift \
+  Sources/SrtFlowWebMotion/PageProcessTracker.swift \
   checks/WebMotion/*.swift \
   "${BUILD_DIR}"/SrtFlowCore.build/*.o \
   "${BUILD_DIR}"/SrtFlowWebMotionKit.build/*.o

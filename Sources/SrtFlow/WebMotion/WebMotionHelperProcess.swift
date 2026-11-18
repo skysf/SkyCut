@@ -36,6 +36,11 @@ final class WebMotionHelperProcess: @unchecked Sendable {
         var interval: Double = 0.25
         /// How long the WebKit processes get to end after the helper before SkyCut kills them.
         var teardownGrace: Double = 3
+        var identityReader: @Sendable (Int32, UInt64) -> WebMotionProcessIdentity? = {
+            WebMotionProcessIdentity.current($0, bornNoLaterThan: $1)
+        }
+        /// Observes real live watch samples; final cleanup retries never call this hook.
+        var didSample: (@Sendable ([Int32], UInt64) -> Void)?
     }
 
     enum Outcome: Sendable {
@@ -47,7 +52,8 @@ final class WebMotionHelperProcess: @unchecked Sendable {
     struct Report: Sendable {
         let outcome: Outcome
         let peakFootprint: UInt64
-        /// The WebKit processes the helper reported (all ended or killed by the time this returns).
+        /// Safely identified reported WebKit processes (all ended or killed by the time this returns).
+        /// An unresolved raw PID is not ownership and never enters teardown history.
         let processes: [Int32]
         /// WebKit processes still running after the grace period, killed by SkyCut (normally none).
         let killedLeftovers: [Int32]
@@ -62,6 +68,7 @@ final class WebMotionHelperProcess: @unchecked Sendable {
     private var kill: WebMotionKill?
     private var result: WebMotionResult?
     private var processes: [WebMotionProcessIdentity] = []
+    private var firstReported: [Int32: UInt64] = [:]
     private var lastEvent = ProcessInfo.processInfo.systemUptime
     private var peakFootprint: UInt64 = 0
     private var pending = Data()
@@ -80,7 +87,7 @@ final class WebMotionHelperProcess: @unchecked Sendable {
             withLock { exited = true }
             group.leave()
         }
-        read(output, into: group) { [self] chunk in received(chunk) }
+        read(output, into: group) { [self] chunk in received(chunk, identityReader: watch.identityReader) }
         read(errors, into: group) { [self] chunk in log.append(chunk) }
         do {
             try process.run()
@@ -103,7 +110,8 @@ final class WebMotionHelperProcess: @unchecked Sendable {
             withLock { cancelled = true }
             stop()
         }
-        timer.cancel()
+        await finishWatch(timer)
+        pinReported(using: watch.identityReader)
         let status = process.terminationStatus
         let signaled = process.terminationReason == .uncaughtSignal
         let (identities, outcome, peak) = withLock { () -> ([WebMotionProcessIdentity], Outcome, UInt64) in
@@ -125,9 +133,11 @@ final class WebMotionHelperProcess: @unchecked Sendable {
         let timer = DispatchSource.makeTimerSource(queue: DispatchQueue(label: "SrtFlow.webMotion.watch", qos: .userInitiated))
         timer.schedule(deadline: .now() + watch.interval, repeating: watch.interval)
         timer.setEventHandler { [self] in
+            pinReported(using: watch.identityReader)
             let now = ProcessInfo.processInfo.systemUptime
             let pids = withLock { [process.processIdentifier] + processes.map(\.pid) }
             let footprint = WebMotionMemoryWatch.footprint(of: pids)
+            if !withLock({ exited }) { watch.didSample?(pids, footprint) }
             let verdict = watch.memory.policy.verdict(pressure: watch.memory.pressure(), footprint: footprint)
             let silent = now - withLock { lastEvent }
             let decision: WebMotionKill?
@@ -156,6 +166,15 @@ final class WebMotionHelperProcess: @unchecked Sendable {
         }
         timer.resume()
         return timer
+    }
+
+    /// The cancel handler runs after any in-flight handler on the timer's serial queue. Await it before the final
+    /// identity snapshot, so a slow lookup cannot append an owned process after teardown has taken its input.
+    private func finishWatch(_ timer: DispatchSourceTimer) async {
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            timer.setCancelHandler { done.resume() }
+            timer.cancel()
+        }
     }
 
     private func stop() {
@@ -198,7 +217,8 @@ final class WebMotionHelperProcess: @unchecked Sendable {
         }
     }
 
-    private func received(_ chunk: Data) {
+    private func received(_ chunk: Data, identityReader: @Sendable (Int32, UInt64) -> WebMotionProcessIdentity?) {
+        let receivedAt = mach_absolute_time()
         var events: [WebMotionEvent] = []
         withLock {
             pending.append(chunk)
@@ -208,17 +228,24 @@ final class WebMotionHelperProcess: @unchecked Sendable {
                 if let event = try? JSONDecoder().decode(WebMotionEvent.self, from: line) { events.append(event) }
             }
         }
-        for event in events { handle(event) }
+        for event in events { handle(event, receivedAt: receivedAt, identityReader: identityReader) }
     }
 
-    private func handle(_ event: WebMotionEvent) {
-        // Pin new processes right away, while they are surely the helper's.
-        let known = withLock { Set(processes.map(\.pid)) }
-        let new = (event.processes ?? []).filter { !known.contains($0) }.compactMap(WebMotionProcessIdentity.current)
+    private func handle(_ event: WebMotionEvent, receivedAt: UInt64,
+                        identityReader: @Sendable (Int32, UInt64) -> WebMotionProcessIdentity?) {
         withLock {
+            for pid in event.processes ?? [] where pid > 0 && firstReported[pid] == nil { firstReported[pid] = receivedAt }
             lastEvent = ProcessInfo.processInfo.systemUptime
-            processes += new
             if event.kind == .result { result = event.result }
+        }
+        pinReported(using: identityReader)
+    }
+
+    private func pinReported(using reader: @Sendable (Int32, UInt64) -> WebMotionProcessIdentity?) {
+        let candidates = withLock { firstReported.filter { pid, _ in !processes.contains(where: { $0.pid == pid }) } }
+        let found = candidates.compactMap { reader($0.key, $0.value) }
+        withLock {
+            for identity in found where !processes.contains(where: { $0.pid == identity.pid }) { processes.append(identity) }
         }
     }
 

@@ -124,6 +124,29 @@ is ever signalled).
 Real machine-wide pressure is not simulated in checks: `memory_pressure -S` would push every app on a shared Mac into
 purging. The checks inject "critical" / "warning" readings and use a real hog page against a small budget.
 
+Process discovery begins before the first calibration/load and samples the live retained-page collection every 50 ms,
+including pages awaiting fonts/ready, rejected pages and replacement processes. Positive PIDs are unique and only changes
+emit events; repeated sampling is not a progress heartbeat. A final scan stops discovery before `.result`, which remains
+the terminal protocol line. Existing exit cleanup and test linger are not moved ahead of it.
+
+A raw reported PID is not ownership. The parent retains its first monotonic receipt tick and retries unresolved identity
+lookups on live watch ticks before measuring the real footprint. A candidate must have a positive kernel start-abstime
+no later than that receipt; repeated reports never refresh the ceiling. BSD identity is read before the birth check,
+and safely pinned identities remain in teardown history. Watch cancellation drains its serial handler before the final
+snapshot. The ceiling guards post-receipt reuse; it does not introduce a helper-supplied process-identity protocol.
+WebContent/GPU identifiers come from the view; networking comes from its configured data store only when
+`_networkProcessExists` is true. The view's testing network getter can assert before first load and must not be polled:
+`responds(to:)` checks selector availability, not that getter's initialized page/data-store precondition. This discovery
+rule never shares stores or changes each view's nonpersistent configuration. Unavailable private getters retain their
+existing reduced-coverage behavior; the public alpha path does not replace them.
+
+`load-memory` is a separately selectable regression group: two sequential fixed 32 MiB pages use the first locked view
+and an unresolved ready promise, preventing earlier calibration processes from masking missing discovery. An exact native
+WebContent/held-byte/deadline probe and an observation of real live budget inputs gate the injected low budget. A finite
+one-event child fixture proves nil-first identity retry during live sampling, not merely during teardown; an independent
+identity owns test cleanup even on failure. Local reverse checks select this group instead of the existing 600 MiB frame
+hog. See [the load-memory case](../bugfixes/2026-11-18-web-motion-load-memory-window.md).
+
 ## 7. The page clock
 
 Before any page script runs, `PageClock.bootstrap` puts the page's time under the renderer:
@@ -238,8 +261,10 @@ calibration and loading three pages.
 | `checks/release-signing.sh` | `sign-app.sh` signs four things (ffmpeg, `skycut-mcp`, `skycut-web-motion`, the app) |
 
 Test-only environment variables the helper reads: `SRTFLOW_WEB_MOTION_TEST_BREAK_FAST_ALPHA=1` (skip the fast switch, as a
-macOS without it would) and `SRTFLOW_WEB_MOTION_TEST_LINGER=<s>` (keep the pages alive after the result, so a lock that
-failed has time to leak before the process is gone).
+macOS without it would), `SRTFLOW_WEB_MOTION_TEST_LINGER=<s>` (keep the pages alive after the result, so a lock that
+failed has time to leak before the process is gone), and `SRTFLOW_WEB_MOTION_TEST_LOAD_PROBE=<temporary JSON path>`
+(the negative load-memory fixture uses request HTML in the first locked calibration view and records exact WebContent,
+held bytes and load deadline without emitting a process event).
 
 **Reverse verification (2026-11-17)**: each lock and rule sabotaged on its own, the relevant group run, restored.
 

@@ -24,6 +24,7 @@ Task { @MainActor in
     if wanted("hostile") { await HostileChecks.run() }
     if wanted("reach") { await ReachChecks.run() }
     if wanted("memory") { await MemoryChecks.run() }
+    if wanted("load-memory") { await LoadMemoryChecks.run() }
     heartbeat.stop()
     section("SkyCut stayed responsive")
     check(heartbeat.longestGap < 1, "the main thread never stalled while hostile pages were rendered (longest gap "
