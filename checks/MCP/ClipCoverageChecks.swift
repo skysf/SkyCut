@@ -198,11 +198,16 @@ private func checkLookMotionAndTransitions() {
     rise.presetAnimation.entrance = .rise
     rise.videoFadeInDuration = 1
     check(AIPictureCoverage.uncovered(state([rise]), at: 0.2) == nil, "rise on a clip that fills keeps the edges covered")
-    // A turned clip gets no such compensation (`placementCoversCanvas`): look shows the bare edge during the entrance.
+    // A turned clip that fills is grown the same way (`ClipMotionCover`; until 2026-11-18 it got no growth and look showed its bare
+    // top corners). One that does not fill at rest keeps the picture-in-picture rise, and look shows its bare edges.
     var turnedRise = turned(5, scale: 1.2)
     turnedRise.presetAnimation.entrance = .rise
     turnedRise.videoFadeInDuration = 1
     check(AIFrameFit.describe(turnedRise, canvas: wide).fillsFrame, "at rest the turned clip fills (fills_frame is about framing)")
-    check(AIPictureCoverage.uncovered(state([turnedRise]), at: 0.1) != nil, "during its rise the turned clip leaves the frame bare")
-    check(AIPictureCoverage.uncovered(state([turnedRise]), at: 2) == nil, "after the rise it covers again")
+    check(AIPictureCoverage.uncovered(state([turnedRise]), at: 0.1) == nil, "a turned clip that fills keeps the frame covered while it rises")
+    check(AIPictureCoverage.uncovered(state([turnedRise]), at: 2) == nil, "after the rise it covers too")
+    var shortRise = turned(5, scale: 1.1)
+    shortRise.presetAnimation.entrance = .rise
+    shortRise.videoFadeInDuration = 1
+    check(AIPictureCoverage.uncovered(state([shortRise]), at: 0.1) != nil, "a turned clip that does not fill is bare while it rises")
 }

@@ -283,6 +283,7 @@
 - [2026-10-28 体验显示「还剩 8 天」、到期日晚一天](2026-10-28-trial-and-pro-dates-shown-a-day-late.md) — 「拿到回答 − 服务器时间」不全是钟差；日历上的哪一天照服务器给的。
 - [2026-08-03 裁切闪烁与半速](2026-08-03-trim-flicker-halved.md) — 坐标反馈、动画与去抖。
 - [2026-09-25 裁切不跟链接](2026-09-25-trim-ignores-linked-clips.md) — 裁的算法只有 `TimelineTrim` 一份：链接伙伴 / 选中的一组同一个量、一起停。
+- [2026-11-18 A turned clip that fills the frame bared its corners while it rose or popped in](2026-11-18-turned-clip-entrance-bares-edges.md) — The renderer's "does it cover" must use the AI's geometry; a moving picture grows to cover its own resting place.
 - [2026-10-28 停不下来的 upscale 没人再查](2026-10-28-uncancellable-upscale-left-unfinished.md) — 没有长轮询：取消不了的那单接着查到底（`followToEnd`）。
 - [2026-10-02 「撤销这一轮」退不回 V1](2026-10-02-undo-round-repacks-v1.md) — 「换回某一刻」不是一次编辑，别走编辑的收尾（磁吸、联动）。
 - [2026-10-27 AI 传了说明上没有的参数，悄悄丢掉、照样做](2026-10-27-unknown-tool-arguments-silently-ignored.md) — 「读得宽」只能对值、不能对名字：参数名按说明核对，有不认识的整个调用不做；null、`project`、没写字段的里层对象、登记的别名照收。

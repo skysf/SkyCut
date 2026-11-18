@@ -72,6 +72,9 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditVideoFade.swift \
   Sources/SrtFlow/VideoEditClipAnimation.swift \
   Sources/SrtFlow/VideoEditClipAnimator.swift \
+  Sources/SrtFlow/ClipMotionCover.swift \
+  Sources/SrtFlow/PictureCoverage.swift \
+  Sources/SrtFlow/ClipCoverage.swift \
   Sources/SrtFlow/VideoEditTrackPalette.swift \
   Sources/SrtFlow/VideoEditTextStyle.swift \
   Sources/SrtFlow/VideoEditTextEasing.swift \
@@ -163,6 +166,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
   checks/ClipAnimation/main.swift \
+  checks/ClipAnimation/TurnedEntrances.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 echo "==> 运行"

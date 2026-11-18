@@ -56,6 +56,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditVideoFade.swift \
   Sources/SrtFlow/VideoEditClipAnimation.swift \
   Sources/SrtFlow/VideoEditClipAnimator.swift \
+  Sources/SrtFlow/ClipMotionCover.swift \
   Sources/SrtFlow/VideoEditTrackPalette.swift \
   Sources/SrtFlow/VideoEditTextStyle.swift \
   Sources/SrtFlow/VideoEditTextEasing.swift \
@@ -126,6 +127,7 @@ xcrun swiftc \
   checks/PreviewComposition/TransitionLook.swift \
   checks/PreviewComposition/ProxySwap.swift \
   checks/PreviewComposition/RotatedPictures.swift \
+  checks/PreviewComposition/EntranceCover.swift \
   checks/OptimizedMedia/RampVideo.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

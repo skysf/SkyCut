@@ -117,8 +117,9 @@ private func compare(_ state: TimelineState, at time: Double, _ label: String) a
     }
 }
 
-/// One real frame of the composition, read as dark (< half brightness) or not.
-private struct CoverageFrame {
+/// One real frame of the composition, read as dark (below `darkBelow`: half brightness by default) or not. Also read by
+/// EntranceCover.swift, where a fading picture is dark below half its own brightness.
+struct CoverageFrame {
     let width: Int
     let height: Int
     let dark: [Bool]
@@ -159,7 +160,7 @@ private struct CoverageFrame {
     }
 }
 
-private func coverageFrame(_ state: TimelineState, at seconds: Double) async -> CoverageFrame? {
+func coverageFrame(_ state: TimelineState, at seconds: Double, darkBelow level: Int = 128) async -> CoverageFrame? {
     guard let built = await VideoEditCompositionBuilder.build(from: state) else { return nil }
     let generator = AVAssetImageGenerator(asset: built.composition)
     generator.videoComposition = built.videoComposition
@@ -175,7 +176,7 @@ private func coverageFrame(_ state: TimelineState, at seconds: Double) async -> 
     // Bitmap memory starts with the image's top row.
     let dark = (0..<(width * height)).map { index -> Bool in
         let red = Int(pixels[index * 4]), green = Int(pixels[index * 4 + 1]), blue = Int(pixels[index * 4 + 2])
-        return red + green + blue < 3 * 128
+        return red + green + blue < 3 * level
     }
     return CoverageFrame(width: width, height: height, dark: dark)
 }

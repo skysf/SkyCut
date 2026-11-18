@@ -101,6 +101,12 @@
 - 录屏产物画面轨盖到 T1（尾部不黑）：`scripts/check-screen-recording-writer.sh`。
 - 上层视频轨动画段 fill + matte：`scripts/check-export-alpha-compositing.sh`。
 - 入场/出场动画的两条管线对账（预览取帧 vs 真导出抽帧）：`scripts/check-clip-animation.sh`。
+- Rise / pop / zoom keep a picture that fills the frame covering, turned and keyframed ones too (2026-11-18):
+  `scripts/check-preview-composition.sh` → `EntranceCover.swift` (unturned growth equals the old 1 + 2 × offset; nine filling pictures ×
+  three motions × two intensities, in and out, cover the canvas and their resting place at every 1/120 s frame; the variant follows
+  the first / last frame; real frames of turned clips keep every edge pixel covered, and the probe sees a clip that does not fill);
+  preview against export for a turned rise on V1 and a turned pop on V2 (fill + matte): `scripts/check-clip-animation.sh` →
+  `TurnedEntrances.swift`. Rule: [入场 / 出场动画](../architecture/clip-animation.md).
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
   （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
