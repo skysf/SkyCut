@@ -23,7 +23,7 @@ import SrtFlowCore
 //    没了的，东西留在原地不动 —— 字幕句除外（第 5 条）。
 // 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半就删，裁切让它没了的也删（2026-10-15，`LinkageCueFollow`）；
 //    底下的段整个没了又不是真删才留在原地、报出来。A subtitle made from a sound off V1 (narration, an interview) follows
-//    that sound, not the picture (`CaptionSourceFollow.voices`, UI-3, 2026-11-18).
+//    that sound, not the picture (`CaptionSourceFollow.voices`, UI-3, 2026-11-18); over a silent picture one follows like the rest.
 // 6. 一段画面自己分出去的声音（J / L 切伸到隔壁镜头底下的也是）跟着那段画面走，不看底下压着哪几段（2026-11-16，`LinkagePartnerSound`）。
 // 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift、LinkageCues.swift）。
 
@@ -241,6 +241,11 @@ enum TimelineLinkage {
         let voiced = CaptionSourceFollow.voices(in: before)
         for cue in after.allSubtitleCues {
             guard voiced[cue.id]?.sitsOnIt != true, let old = oldCues[cue.id], old == cue else { continue }
+            // Over a silent picture a subtitle is not its speech: it follows like the rest, rules 2–4 (2026-11-19).
+            if LinkageCueFollow.overSilentPicture(old.span, in: before) {
+                plan.cues.take(LinkageCueFollow.whole(old, ledger.outcome(for: old.span, deletesContent: deletesContent)), id: cue.id)
+                continue
+            }
             plan.cues.take(LinkageCueFollow.outcome(
                 old, speech: LinkageCueFollow.speech(of: old, originals: originals, links: links),
                 hosts: ledger.before, survivors: ledger.survivors(of:), deletesContent: deletesContent,

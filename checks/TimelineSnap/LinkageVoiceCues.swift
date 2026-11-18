@@ -8,7 +8,9 @@ import SrtFlowCore
 // plays (edit_clip source_in / source_out) moved its narration subtitles off their words, shortened them or deleted them —
 // judged by a picture that never held those words (docs/bugfixes/2026-11-18-narration-subtitles-follow-screen-recording-trim.md).
 // A translation goes with the sound of the original it was translated from. Subtitles without a source (typed, imported)
-// and subtitles generated from V1's own sound still follow the picture.
+// and subtitles generated from V1's own sound still follow the picture: by rule 12 over a picture with sound, and over a
+// silent picture (a screen recording without audio) like everything else, rules 2–4 — moved whole, left in place when a
+// trim takes their picture away (Master's decision on UI-3's open question, 2026-11-19).
 
 private let recordingFile = URL(fileURLWithPath: "/tmp/srtflow-snap-check/screen-recording.mov")
 private let nextFile = URL(fileURLWithPath: "/tmp/srtflow-snap-check/next-shot.mp4")
@@ -17,9 +19,10 @@ private let narrationFile = URL(fileURLWithPath: "/tmp/srtflow-snap-check/narrat
 /// V1: a 30 s screen recording playing 0–10 s at [0,10), another shot at [10,20). A1: narration [6,14) (file 0–8 s) across
 /// the cut, with three subtitles: n1 [6.2,7.8) and n2 [8.3,9.9) over the recording, n3 [10.5,12.5) over the next shot.
 /// A typed subtitle [2,4) over the recording; the translation track has t1 (from n1) and t2 (from the typed one).
+/// `recordingSound`: does the recording file have sound (nil = not probed yet)? B07's recordings had none.
 private struct VoiceFixture {
     var state = TimelineState()
-    let recording = EditClip(sourceURL: recordingFile, sourceDuration: 10, timelineStart: 0)
+    let recording: EditClip
     let next = EditClip(sourceURL: nextFile, sourceDuration: 10, timelineStart: 10)
     let voice = EditClip(sourceURL: narrationFile, isAudioOnly: true, sourceDuration: 8, timelineStart: 6)
     let n1 = SubtitleCue(start: 6.2, end: 7.8, text: "first line")
@@ -29,7 +32,12 @@ private struct VoiceFixture {
     let t1 = SubtitleCue(start: 6.2, end: 7.8, text: "première ligne")
     let t2 = SubtitleCue(start: 2, end: 4, text: "tapé à la main")
 
-    init() {
+    init(recordingSound: Bool? = false) {
+        let info = recordingSound.map {
+            MediaInfo(duration: 30, displaySize: CGSize(width: 1920, height: 1080), frameRate: 30, videoCodec: "h264",
+                      audioCodec: $0 ? "aac" : nil, hasAudio: $0, audioCanCopyToMP4: $0, fileBytes: 0)
+        }
+        recording = EditClip(sourceURL: recordingFile, sourceDuration: 10, timelineStart: 0, info: info)
         state.mainClips = [recording, next]
         state.audioTracks = [EditLane(clips: [voice])]
         var original = SubtitleDocumentModel(format: .srt)
@@ -65,9 +73,10 @@ func checkLinkageVoiceCues() {
     checkEqual(span(slipped, base.n1.id), [6.2, 7.8], "1k: a new recording window leaves the narration's first subtitle on its words")
     checkEqual(span(slipped, base.n2.id), [8.3, 9.9], "1k: …and its second")
     checkEqual(span(slipped, base.t1.id), [6.2, 7.8], "1k: …and the translation of the first")
-    check(span(slipped, base.typed.id) == nil && span(slipped, base.t2.id) == nil,
-          "1k: a typed subtitle (and its translation) still follow the picture: theirs left the window, so they go (rule 12)")
-    check(slipReport.shortenedCues.isEmpty && slipReport.deletedCues == 2, "1k: the report counts only the two picture-led subtitles")
+    check(span(slipped, base.typed.id) == [2, 4] && span(slipped, base.t2.id) == [2, 4],
+          "1k: a typed subtitle over a silent recording (and its translation) stays when a trim takes its picture away, like text")
+    check(slipReport.shortenedCues.isEmpty && slipReport.deletedCues == 0, "1k: nothing shortened or deleted")
+    checkTypedOverSound()
 
     // End the recording 3 s earlier (source_out=7): n2's stretch of picture is gone, its words are not.
     var shortened = base.state
@@ -111,6 +120,34 @@ func checkLinkageVoiceCues() {
     check(both.cues.filter { voiced[$0.id] != nil }.allSatisfy { $0.host == both.clips[0].host },
           "1k: the narration's subtitles land where the narration lands (same host)")
     checkSplitNarration()
+}
+
+/// Typed subtitles: over a silent picture they follow it like text (rules 2–4: moved whole, never shortened, left in place
+/// when a trim takes the picture away); over a picture with sound — or one not probed yet — they may be its speech: rule 12.
+private func checkTypedOverSound() {
+    for sound in [true, nil] as [Bool?] {
+        let talking = VoiceFixture(recordingSound: sound)
+        var slipped = talking.state
+        slipped.update(talking.recording.id) { $0.sourceStart = 4 }
+        let report = TimelineLinkage.follow(from: talking.state, to: &slipped, deletesContent: false)
+        check(span(slipped, talking.typed.id) == nil && span(slipped, talking.t2.id) == nil && report.deletedCues == 2,
+              "1k: over a recording with sound (\(String(describing: sound))) a typed subtitle whose picture left the window goes (rule 12)")
+    }
+    // Trim 3 s off the head with a ripple: the typed subtitle's first second is cut.
+    func rippled(_ fixture: VoiceFixture) -> [Double]? {
+        var after = fixture.state
+        after.update(fixture.recording.id) { $0.sourceStart = 3; $0.sourceDuration = 7 }
+        after.update(fixture.next.id) { $0.timelineStart = 7 }
+        TimelineLinkage.follow(from: fixture.state, to: &after, deletesContent: false)
+        return span(after, fixture.typed.id)
+    }
+    checkEqual(rippled(VoiceFixture()), [0, 2], "1k: over a silent recording a typed subtitle moves whole with its picture, not shortened")
+    checkEqual(rippled(VoiceFixture(recordingSound: true)), [0, 1], "1k: over a recording with sound it is cut with the speech (rule 12)")
+    var deleted = VoiceFixture()
+    let state = deleted.state
+    deleted.state.remove(deleted.recording.id)
+    TimelineLinkage.follow(from: state, to: &deleted.state, deletesContent: true)
+    check(span(deleted.state, deleted.typed.id) == nil, "1k: deleting the silent recording for real deletes the typed subtitle on it")
 }
 
 /// A narration split in two keeps its right half's subtitles naming the left half (rule 11's known limit). Those do not sit
