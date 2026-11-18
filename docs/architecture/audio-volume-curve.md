@@ -180,6 +180,13 @@ between, calling again changes nothing and leaves no empty undo step, one undo t
 `checks/MCP/router-wiring.sh` (apply's only `perform` sits inside `AIUndoGrouping.step`, opened only on a change, and the router
 does not wrap it again).
 
+Reverse verification (2026-11-18, each broken on purpose, the checks run, then restored byte for byte): the measured dip set to 0
+(every call stacks) → 24 red in `SpeechDuckChecks` (same depth twice, −6 / −14 / 0 over an existing duck, a bump drawn after
+the duck, the planner's second call, a window across the clip's start); windows never merged → 2 red; the speech's own sound
+among the clips to dip → 2 red; apply's `perform` outside `AIUndoGrouping.step` → `router-wiring.sh` red. The App check caught
+the empty undo step on its first run: a call that changed nothing still opened a group, and ⌘Z then undid nothing (5 red,
+fixed by opening the step only on a change).
+
 Manual regression (ears and a real window):
 
 - [ ] Narration on A1, music on A2, a talking shot's sound on V1: `set_track track=A1 duck_others_db=-10`. The amber lines of
