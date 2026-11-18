@@ -92,14 +92,16 @@ enum AIMotionPresetEdit {
         in state: inout TimelineState
     ) throws -> (id: UUID, group: UUID) {
         // 换成标题 + 数字：没有现成的数字（这一套里的、或者这段字本身就是数字元件）就得给。
-        let existing = MotionPresetGroups.members(ofText: id, in: state)?.text(.counter)?.number
-            ?? state.textOverlays.first(where: { $0.id == id })?.number
+        let current = MotionPresetGroups.members(ofText: id, in: state)
+        let selected = state.textOverlays.first(where: { $0.id == id })
+        let anchor = current?.anchorText ?? selected
+        // Addressing a small member still reconfigures the group's anchor and its complete number.
+        let existing = current?.text(.counter)?.number ?? anchor?.number ?? selected?.number
         if kind == .titleCounter, change.number?.to == nil, existing == nil {
             throw AIToolError("title_counter needs number with at least to, e.g. {\"to\": 20004, \"suffix\": \" KM\"}.")
         }
         // 标题的字：给了用给的，没给用这一套的标题 / 这段字自己的字。数字元件没有字：换成框住再放开 / 对焦出字时它自己就是标题
         //（MotionPresetGroups.build），换成标题 + 数字时它当那个数字、标题的字得给。
-        let anchor = MotionPresetGroups.members(ofText: id, in: state)?.anchorText ?? state.textOverlays.first(where: { $0.id == id })
         let words = change.text ?? anchor.map { $0.number == nil ? $0.text : "" } ?? ""
         let numberIsTitle = kind != .titleCounter && anchor?.number != nil
         guard !words.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || numberIsTitle else {

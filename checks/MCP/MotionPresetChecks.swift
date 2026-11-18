@@ -15,6 +15,7 @@ func runMotionPresetChecks() {
     motionPresetFollowChecks()
     motionPresetErrorChecks()
     motionPresetPasteAndFileChecks()
+    runMotionPresetNumberChecks()
 }
 
 private func landscape() -> TimelineState {

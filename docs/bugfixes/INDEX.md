@@ -155,6 +155,7 @@
 - [2026-11-17 Sound effects added with new_audio landed on the voice and music tracks](2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md) — A fallback that "fits it somewhere" suits a mouse drop, not a named request: open a new track and say so in the reply.
 - [2026-09-28 点名新开轨的第二首配乐接在了 A1 后面](2026-09-28-new-audio-lands-on-a1.md) — 要记的是意图，不是副作用。
 - [2026-09-29 新建工程后播放头停在上一个工程的位置](2026-09-29-new-project-keeps-old-playhead.md) — 卸片后晚到的时间回调要丢掉；测异步要让主循环转起来、素材要像真的。
+- [2026-11-18 Native preset reapplication loses numeric titles](2026-11-18-number-title-preset-reapply.md) — Recover the displayed numeric content from the group anchor and merge partial edits into the complete roll.
 - [2026-09-25 老虎机数字 365 → 90 停在「090」](2026-09-25-odometer-leading-zero.md) — 缺省值替缺失的数据说了话：不存在的那一位滚成空白收掉。
 - [2026-11-04 官方生成把确认问题缓存成已完成](2026-11-04-official-confirmation-cached-as-completion.md) — 只缓存有真实任务号的启动结果；确认解除后重新过闸。
 - [2026-11-04 官方镜头等到名额后仍用旧提交条件](2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 之前重新核对账户 / 工程 / 文件 / 有效期。
