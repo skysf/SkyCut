@@ -113,7 +113,10 @@ Rules (only this way):
    add up to an all-pass, so at g = 1 the level is flat at every frequency; below 1 only the middle band goes down. Measured at
    −10 dB: 50 Hz 0.00, 100 Hz −0.07, 300 Hz −3.6, 500 Hz −8.1, 1 kHz −9.6, 2 kHz −7.4, 3 kHz −3.6, 8 kHz −0.08 dB (at −20:
    1 kHz −18.6, 100 Hz −0.1). Double precision (the 300 Hz sections sit near the unit circle at 48 kHz); 48 kHz only (the
-   engine's rate).
+   engine's rate). On the South Pole draft's Shot4 sound (the MCP-30 case; measured read-only on this Mac, nothing in the repo)
+   −10 lowered 300–3000 Hz by 7.5 dB on average (its rumble sits near the band's low edge, where the cut is shallower), kept
+   everything under 150 Hz within 0.1 dB, and its loudest low hit within 0.05 dB; a deeper setting gets closer to a full 10 dB
+   in that band.
 3. **Real time** (`VoiceBandRendering`): no allocation, one filter per stream, only the renderer touches it. It starts from
    zero when the position jumps (seek, start: like the scene chain) and the first time the stream needs it; once running it
    keeps running even back at g = 1 (an all-pass then: switching it off would jump the phase); a changed depth moves g
