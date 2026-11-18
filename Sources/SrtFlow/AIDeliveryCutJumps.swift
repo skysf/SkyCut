@@ -4,7 +4,9 @@ import SrtFlowMCPKit
 // MARK: - A hard sound jump at a cut with nothing covering it (MCP-37; report only)
 //
 // Owns: where the picture changes (`pictureCuts`: the top picture that fills the frame, V1 or a full-frame upper clip, differs on
-// the two sides; black counts as a picture; a split of one continuous take is not a cut) and the rule. At each cut the sound of
+// the two sides; an upper clip counts only while it is opaque there — no alpha in its media, full opacity, outside its fade /
+// entrance / exit window (`hidesBelow`) —, else the cut under it stays; black counts as a picture; a split of one continuous take
+// is not a cut) and the rule. At each cut the sound of
 // the place (AIDeliverySoundLevels' place group: a picture's own sound, ambience, objects, unnamed files) is measured in
 // CutSoundWindows' 0.3 s on each side (the windows set_transition sound measures; the human film and the preview board too),
 // over the full band and above 200 Hz (DeliveryWindowCollector). A jump of `jumpDB` or more, with the louder side heard, is
@@ -63,8 +65,12 @@ enum AIDeliveryCutJumps {
     static func pictureCuts(_ state: TimelineState) -> [Cut] {
         let canvas = VideoEditCompositionBuilder.renderSize(for: state)
         let main = state.mainHidden ? [] : ClipVisibility.visible(state.mainClips).filter { !$0.isAudioOnly }
+        // Only an upper picture that fills the frame and has no transparency in its media (`sourceAlpha`: a web motion with clear
+        // pixels, a transparent PNG, a ProRes 4444 with alpha) can hide the pictures under it; when it does is `hidesBelow`.
         let upper = state.overlayTracks.filter { !$0.isHidden }.map { lane in
-            ClipVisibility.visible(lane.clips).filter { !$0.isAudioOnly && ClipCoverage.fill($0, canvas: canvas).fillsFrame }
+            ClipVisibility.visible(lane.clips).filter {
+                !$0.isAudioOnly && $0.sourceAlpha == .opaque && ClipCoverage.fill($0, canvas: canvas).fillsFrame
+            }
         }
         let lanes: [[EditClip]] = Array(upper.reversed()) + [main]
         let duration = state.duration
@@ -74,14 +80,24 @@ enum AIDeliveryCutJumps {
             if kept.last.map({ time - $0 >= half }) ?? true { kept.append(time) }
         }
         func top(_ time: Double) -> EditClip? {
-            for lane in lanes { if let clip = lane.first(where: { $0.timelineStart <= time && $0.timelineEnd > time }) { return clip } }
-            return nil
+            func shown(_ clip: EditClip) -> Bool { clip.timelineStart <= time && clip.timelineEnd > time }
+            for lane in upper.reversed() { if let clip = lane.first(where: shown), hidesBelow(clip, at: time) { return clip } }
+            return main.first(where: shown)
         }
         return times.compactMap { time in
             let before = top(time - min(half, 0.001)), after = top(time + min(half, 0.001))
             guard before?.id != after?.id, !continues(before, after, at: time) else { return nil }
             return Cut(time: time, outgoing: before?.id, incoming: after?.id)
         }
+    }
+
+    /// Whether an upper clip that fills the frame hides the pictures under it at `time`: only at full opacity (keyframed or not) and
+    /// outside its fade-in / fade-out window, which its entrance and exit share (fade, rise, pop and zoom ramp the opacity from 0; a
+    /// wipe reveals it). Elsewhere the layer below shows, so a cut under it is still a cut (review CXR2 R7).
+    static func hidesBelow(_ clip: EditClip, at time: Double) -> Bool {
+        guard clip.animatedOpacity(atTimeline: time) >= 0.999 else { return false }
+        let local = time - clip.timelineStart, fades = clip.videoFades
+        return local >= fades.fadeIn && local <= clip.timelineDuration - fades.fadeOut
     }
 
     /// The same take carrying on (a split without a change of source time or speed) is not a cut.
