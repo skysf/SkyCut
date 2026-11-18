@@ -162,6 +162,7 @@ run_check "inspector-fits-width（扫描守卫：检查器里的 Picker 不许�
 run_check "presented-views-app-language（扫描守卫：sheet / popover 套应用内语言）" checks/presented-views-app-language.sh
 run_check "encode-settings-memory（扫描守卫：压缩 / 烧录记住的设置在队列创建时读回来）" checks/encode-settings-memory.sh
 run_check "project-file-wiring（扫描守卫：工程存盘 / 选择 / 隐藏 / 导出这批合同的生产接线）" checks/project-file-wiring.sh
+run_check "file-io-off-main-wiring (scan: export folders, the AI's export folders, project saves and every open / save window never wait on the main thread)" checks/file-io-off-main-wiring.sh
 run_check "project-versions-wiring (scan guard: router hook, undo version=, the round's save points, one-step restore, one writer)" checks/project-versions-wiring.sh
 run_check "open-projects-wiring（扫描守卫：工程不再是单例、撤销不退到键窗口、代号全 App 不重号）" checks/open-projects-wiring.sh
 run_check "legacy-generation（扫描守卫：旧 fal 退役、共用媒体接线）" bash checks/no-legacy-generation.sh
