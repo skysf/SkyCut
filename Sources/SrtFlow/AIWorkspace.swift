@@ -55,10 +55,16 @@ final class AIWorkspace {
 
     /// 相对路径按「打开的文件夹」解析；AI 的调用里先按这个工程的、那里没有再看这个会话后来点名的（规矩在 AIPathResolution）。
     func resolve(_ path: String) -> URL {
-        let sessionFolder = AICallContext.current?.session.flatMap { sessionFolders[$0] }
-        return AIPathResolution.resolve(path, preferred: current, fallback: sessionFolder) {
+        let folders = resolutionFolders()
+        return AIPathResolution.resolve(path, preferred: folders.preferred, fallback: folders.fallback) {
             FileManager.default.fileExists(atPath: $0.path)
         }
+    }
+
+    /// The folders `resolve` tries a relative path against, read without touching a drive: export_video asks
+    /// AIPathResolution with them off the main thread (AIExportDestination).
+    func resolutionFolders() -> (preferred: URL?, fallback: URL?) {
+        (current, AICallContext.current?.session.flatMap { sessionFolders[$0] })
     }
 
     func display(_ url: URL) -> String {
@@ -113,11 +119,16 @@ final class AIWorkspace {
     /// AI 做出来的文件放哪：`<起点>/SkyCut/<导出|工程|配音|音效|生成|录屏>`（起点下面已经有改名之前的 SrtFlow 就接着用它，
     /// `DefaultFolder.aiFolder`）。文件夹名跟着 App 的语言。
     func outputFolder(_ kind: Output, project: VideoEditProject) -> URL {
-        DefaultFolder.aiFolder(in: startFolder(project: project)) { url in
+        Self.outputFolder(kind, in: startFolder(project: project)) { url in
             var isDirectory: ObjCBool = false
             return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
         }
-        .appendingPathComponent(kind.folderName, isDirectory: true)
+    }
+
+    /// The same rule without the drive: `isFolder` says whether the old `SrtFlow` folder is there (export_video asks it
+    /// off the main thread, AIExportDestination).
+    nonisolated static func outputFolder(_ kind: Output, in start: URL, isFolder: (URL) -> Bool) -> URL {
+        DefaultFolder.aiFolder(in: start, isFolder: isFolder).appendingPathComponent(kind.folderName, isDirectory: true)
     }
 
     private func projectHome(_ project: VideoEditProject) -> URL? {
