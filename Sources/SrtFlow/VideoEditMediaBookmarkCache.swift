@@ -51,7 +51,7 @@ enum MediaBookmarkCache {
 
 // Persistent location clues and their bookmark-preserving writer share the cache above. Resolution stays in ProjectIO.
 /// 一个素材的定位信息：存三种线索，从快到慢依次试。
-struct MediaRecord: Codable, Sendable {
+struct MediaRecord: Codable, Equatable, Sendable {
     /// 存盘时的绝对路径。素材没动过就直接命中，这是绝大多数情况。
     var path: String
     /// 系统书签：记的是文件的 inode + 卷标识，不是路径。素材改名、移到同一个盘

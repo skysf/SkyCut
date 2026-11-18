@@ -31,7 +31,8 @@
    Generated web-motion movie URLs compare by their stored fingerprint, because cache relocation is not a timeline edit;
    `canonicalTimeline(ofFile:)` applies the same normalization. Ordinary imported media references remain exact.
 2. **Never an empty timeline** (nothing to keep) and **never a project without a file** (a version belongs to a project file).
-3. Writing is synchronous on the main actor, like `saveNow`. If it fails (full disk), that moment has no version and the round goes
+3. Writing is synchronous on the main actor (a project's own file is written off it since 2026-11-19, `ProjectFileWriter`;
+   versions are not yet). If it fails (full disk), that moment has no version and the round goes
    on; the AI's result then names no version.
 
 ## 3. Where they live and what they are called
@@ -132,7 +133,7 @@ field, media references included.
   whose media file was moved follows it.
 - `checks/project-versions-wiring.sh` (scan): the router reports after `saveIfNeverSaved`, `undo` is async and hands `version` over
   first, the three save points in `AIRound`, the restore path (`restoreTimeline` in a step, no `perform`, `load`), `get_status`,
-  forgetting a closed project's store, only `saveNow` and the store write project files, the menu item and its sheet.
+  forgetting a closed project's store, only `ProjectFileWriter` (a project's own file) and the store write project files, the menu item and its sheet.
 
 Reverse verification (2026-11-17; each broken alone, the check run, the file restored byte for byte):
 

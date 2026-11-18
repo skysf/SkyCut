@@ -76,8 +76,8 @@ final class VideoEditProject {
 
     /// 打开/新建工程期间为真：那时候改 `state` 不该算用户的改动。
     @ObservationIgnored var isLoadingDocument = false
-    /// 自动保存的防抖任务。
-    @ObservationIgnored var autosaveTask: Task<Void, Never>?
+    /// The project file's writes, off the main thread, and the autosave debounce (ProjectFileWriter).
+    @ObservationIgnored let fileWriter = ProjectFileWriter()
 
     /// 上次读/写工程时的素材定位表（键是素材路径）。
     ///
@@ -126,7 +126,7 @@ final class VideoEditProject {
 
     private func documentDidChange() {
         guard !isLoadingDocument else { return }
-        hasUnsavedChanges = true
+        noteUnsavedChange()
         scheduleAutosave()
     }
 

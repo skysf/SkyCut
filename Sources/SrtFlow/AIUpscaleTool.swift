@@ -107,7 +107,7 @@ enum AIUpscaleTool {
             }
         )
         job.aiJobID = aiJob.id
-        job.onFinished = { finished in land(finished, aiJob: aiJob, project: project) }
+        job.onFinished = { finished in Task { await land(finished, aiJob: aiJob, project: project) } }
         job.onEnded = { ended in settle(ended, aiJob: aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)
 
@@ -167,7 +167,7 @@ enum AIUpscaleTool {
     // MARK: 结局
 
     /// 做完：换源（一步撤销）、选中换了的段、没存过的工程存一下、结局记给 AI 的任务；这一行从状态行上拿掉（AI 会告诉用户）。
-    private static func land(_ finished: UpscaleJob, aiJob: AIJobs.Job, project: VideoEditProject) {
+    private static func land(_ finished: UpscaleJob, aiJob: AIJobs.Job, project: VideoEditProject) async {
         defer { UpscaleActivity.shared.remove(finished) }
         guard let outcome = finished.outcome else { return }
         guard finished.projectGeneration == project.documentGeneration else {
@@ -207,7 +207,7 @@ enum AIUpscaleTool {
         if !outcome.audioRestored {
             detail["note"] = "The original sound could not be put back (ffmpeg is missing); the upscaled file has no sound."
         }
-        let saved = AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: !done.isEmpty))
+        let saved = await AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: !done.isEmpty))
         AIJobs.shared.finish(aiJob, .done, message: done.isEmpty ? "Upscaled; nothing replaced." : "Upscaled and replaced \(done.count) clip(s).", detail: saved.payload)
     }
 

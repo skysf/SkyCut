@@ -166,7 +166,7 @@ enum AIProjectTools {
 
     // MARK: 工程
 
-    static func saveProject(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
+    static func saveProject(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let requested = try args.string("path").map { path -> URL in
             var url = AIWorkspace.shared.resolve(path)
             if !VideoEditProjectFile.isProjectFile(url) {
@@ -175,7 +175,7 @@ enum AIProjectTools {
             return url
         }
         guard requested != nil || project.isUntitled else {
-            guard project.flushAutosave() else { throw AIToolError(project.notice ?? "SkyCut could not save the project.") }
+            guard await project.flushToFile() == .saved else { throw AIToolError(project.notice ?? "SkyCut could not save the project.") }
             return .ok(["saved": .string(project.documentURL?.path ?? "")])
         }
         var url = requested ?? AIWorkspace.shared.outputFolder(.projects, project: project)
@@ -189,7 +189,7 @@ enum AIProjectTools {
             ) { FileManager.default.fileExists(atPath: $0.path) }
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard project.saveDocument(as: url) else {
+        guard await project.saveAs(url) else {
             throw AIToolError(project.notice ?? "SkyCut could not save the project to \(url.path).")
         }
         return .ok(["saved": .string(url.path)])
@@ -198,9 +198,9 @@ enum AIProjectTools {
     /// AI 改了一个**从来没存过**的工程：马上存进 `<起点>/SrtFlow/<工程>`，之后交给自动保存。
     /// 不然 App 一崩，AI 这一轮的活全丢（2026-09-27 实测：Claude 在开着的 Untitled 上改了九处，一直没存盘；
     /// 用户同意改成自动存）。撞名就换个名字、不覆盖也不问：这一步是兜底，不该打断 AI。
-    static func saveIfNeverSaved(_ project: VideoEditProject, after result: AIToolResult) -> AIToolResult {
+    static func saveIfNeverSaved(_ project: VideoEditProject, after result: AIToolResult) async -> AIToolResult {
         guard project.isUntitled, !project.state.isEmpty, case .object(var payload) = result.payload else { return result }
-        if let url = saveUntitled(project) {
+        if let url = await saveUntitled(project) {
             payload["project_saved_to"] = .string(url.path)
         } else {
             payload["warning"] = .string(
@@ -214,13 +214,13 @@ enum AIProjectTools {
     }
 
     /// 从没存过的工程存进 `<起点>/SrtFlow/<工程>`，撞名加编号。存不下回 nil（原因在 `project.notice`）。close_project 关主窗口那个之前也用它。
-    static func saveUntitled(_ project: VideoEditProject) -> URL? {
+    static func saveUntitled(_ project: VideoEditProject) async -> URL? {
         let folder = AIWorkspace.shared.outputFolder(.projects, project: project)
         let url = ExportFileName.unoccupied(
             in: folder, stem: defaultStem(project), pathExtension: VideoEditProjectFile.fileExtension
         ) { FileManager.default.fileExists(atPath: $0.path) }
         guard (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)) != nil,
-              project.saveDocument(as: url) else { return nil }
+              await project.saveAs(url) else { return nil }
         return url
     }
 

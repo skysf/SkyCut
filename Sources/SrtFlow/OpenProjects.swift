@@ -112,34 +112,67 @@ final class OpenProjects {
         return project
     }
 
-    /// 新建一个空工程、马上存成 `url`、放进它自己的窗口或者后台（AI 的 new_project 在主窗口不空的时候）。存不下回 nil（原因在 `failure`）。
-    func newProject(savingAs url: URL, placement: Placement) -> VideoEditProject? {
-        failure = nil
-        guard all.count < Self.limit else {
-            failure = "SkyCut keeps at most \(Self.limit) projects open. Close one first."
-            return nil
-        }
-        let project = VideoEditProject(shortID: shortIDs.next())
-        guard project.saveDocument(as: url) else {
-            failure = project.notice ?? "SkyCut could not save the new project to \(url.path)."
-            return nil
-        }
-        others.append(project)
-        place(project, placement)
-        return project
+    /// 新建一个空工程、马上存成 `url`（off the main thread）、放进它自己的窗口或者后台（AI 的 new_project 在主窗口不空的时候）。
+    /// 存不下回 nil（原因在 `failure`）。
+    func createProject(savingAs url: URL, placement: Placement) async -> VideoEditProject? {
+        guard let project = makeProject() else { return nil }
+        guard await project.saveAs(url) else { return refuse(project, savingAs: url) }
+        return register(project, placement)
     }
 
-    /// 关掉主窗口以外的一个工程（AI 的 close_project、用户在「AI 在剪的工程」里点关掉）：先落盘（落不下就不关、回 false，原因在工程的
-    /// `notice`），再关窗口（有的话）、收拾。主窗口那个不在这里关（它永远在，换成一个空的 Untitled 由调用方做）。
+    /// Checks and dev hooks only (the save blocks on the drive): `createProject`.
+    func newProject(savingAs url: URL, placement: Placement) -> VideoEditProject? {
+        guard let project = makeProject() else { return nil }
+        guard project.saveDocument(as: url) else { return refuse(project, savingAs: url) }
+        return register(project, placement)
+    }
+
+    /// 关掉主窗口以外的一个工程（AI 的 close_project、用户在「AI 在剪的工程」里点关掉）：先落盘（off the main thread；落不下、
+    /// 盘不应答就不关、回 false，原因在工程的 `notice`），再关窗口（有的话）、收拾。主窗口那个不在这里关（它永远在，换成一个空的
+    /// Untitled 由调用方做）。
+    func closeProject(_ project: VideoEditProject) async -> Bool {
+        guard isClosable(project), await project.prepareToClose() == .ready, isClosable(project) else { return false }
+        finishClose(project)
+        return true
+    }
+
+    /// Checks and dev hooks only (the save blocks on the drive): `closeProject`.
     func close(_ project: VideoEditProject) -> Bool {
-        guard project !== primary, others.contains(where: { $0 === project }) else { return false }
-        guard project.prepareToCloseDocument() else { return false }
+        guard isClosable(project), project.prepareToCloseDocument() else { return false }
+        finishClose(project)
+        return true
+    }
+
+    private func isClosable(_ project: VideoEditProject) -> Bool {
+        project !== primary && others.contains(where: { $0 === project })
+    }
+
+    private func finishClose(_ project: VideoEditProject) {
         if let controller = windows[ObjectIdentifier(project)] {
             controller.close()   // 程序关窗不问 windowShouldClose，windowWillClose 照来 → windowClosed 收拾
         } else {
             finishClosing(project)
         }
-        return true
+    }
+
+    private func makeProject() -> VideoEditProject? {
+        failure = nil
+        guard all.count < Self.limit else {
+            failure = "SkyCut keeps at most \(Self.limit) projects open. Close one first."
+            return nil
+        }
+        return VideoEditProject(shortID: shortIDs.next())
+    }
+
+    private func refuse(_ project: VideoEditProject, savingAs url: URL) -> VideoEditProject? {
+        failure = project.notice ?? "SkyCut could not save the new project to \(url.path)."
+        return nil
+    }
+
+    private func register(_ project: VideoEditProject, _ placement: Placement) -> VideoEditProject {
+        others.append(project)
+        place(project, placement)
+        return project
     }
 
     /// 给后台工程挂上窗口（AI 的 set_view visible、用户点「打开窗口」）：建窗口、重建一次预览；已经有窗口就看情况摆出来。
@@ -166,9 +199,9 @@ final class OpenProjects {
 
     /// 主窗口里的工程换成一个空的 Untitled（AI 关掉它在主窗口里剪的那个：主窗口永远有一个工程）。调用方先替它落好盘。
     /// 返回 false = 没换成（录屏中、存盘失败：`newProject` 的把关拒了），原因在 `primary.notice`。
-    func resetPrimary() -> Bool {
+    func resetPrimary() async -> Bool {
         let before = primary.documentGeneration
-        primary.newProject()
+        await primary.startNewProject()
         return primary.documentGeneration != before
     }
 
@@ -187,7 +220,7 @@ final class OpenProjects {
     /// 用户要新建工程：同上，AI 正在剪这个窗口里的工程就开一个新的未命名工程窗口。
     func userNew(from project: VideoEditProject) {
         guard aiIsEditing(project) else {
-            project.newProject()
+            Task { await project.startNewProject() }
             return
         }
         guard all.count < Self.limit else {
@@ -294,7 +327,7 @@ enum ProjectTeardown {
         let closing = project.documentGeneration
         project.cancelLiveEdit()
         project.invalidateDocumentGeneration()  // 作废后台导入、只取消它自己的转写和翻译
-        project.autosaveTask?.cancel()
+        project.fileWriter.cancelAutosave()
         project.clock.pause()
         project.clock.detach()
         project.audioEngineHost.stop()

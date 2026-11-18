@@ -119,7 +119,9 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
   same deadline and cap ([case](../bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md)).
 - Rules and checks: [export settings](export-settings.md) §8; case:
   [choosing the export folder froze SkyCut](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
-- Not covered yet: saving a project file that lives on such a drive (autosave and Quit write it on the main thread).
+- A project's own file (autosave, ⌘S, Save As, closing, switching, Quit) is written only by `ProjectFileWriter`, on the
+  project's own queue, with a 15 s deadline for whoever waits; Quit uses `.terminateLater` and asks instead of hanging
+  ([project file](video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md)).
 
 ## 子进程的异步退出
 
