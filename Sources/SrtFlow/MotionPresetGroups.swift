@@ -213,11 +213,13 @@ enum MotionPresetGroups {
     static func spec(from members: MotionPresetMembers, as kind: MotionPresetKind, canvas: CGSize) -> MotionPresetSpec {
         let anchor = members.anchorText
         let old = MotionPresetDesign.of(members.kind)
-        var spec = MotionPresetSpec(kind: kind, title: anchor?.text ?? "", hit: members.hit, duration: members.end - members.hit,
+        // A numeric anchor supplies the content; its ignored backing words must not become the reconstructed title.
+        let words = anchor?.number == nil ? anchor?.text ?? "" : ""
+        var spec = MotionPresetSpec(kind: kind, title: words, hit: members.hit, duration: members.end - members.hit,
                                     titleID: anchor?.id)
         spec.small = members.small?.text
         spec.smallBelow = members.text(.smallBelow) != nil
-        spec.number = members.text(.counter)?.number
+        spec.number = members.text(.counter)?.number ?? anchor?.number
         let box = MotionPresetLayout.bounds(members, canvas: canvas)
         if !box.isNull, canvas.width > 0, canvas.height > 0 {
             spec.center = CGPoint(x: box.midX / canvas.width, y: box.midY / canvas.height)

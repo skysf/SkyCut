@@ -69,6 +69,12 @@ The numbered rules here and sections 3–6 describe the native text/shape design
     width and remeasures it after scaling and clamping the style, so a short title does not wrap just because the frame narrows.
     Ordinary and manually set widths keep their frame fraction; the same edit's explicit sizing is respected. This does not
     rerun `arrange`: each member keeps its normalized centre and manual offsets. See the [canvas wrap case](../bugfixes/2026-11-17-canvas-preset-wrap-width.md).
+12. **Numeric preset anchors retain their content** (2026-11-18): reapplication recovers the complete `NumberRoll` from a dedicated
+    counter, or from the group's anchor when the number itself is the title. A numeric anchor's backing `text` is ignored even when
+    nonempty, matching lone-number conversion. Same/cross-preset changes and implicit small-line edits preserve all unmentioned roll
+    fields; partial number edits merge into that recovered value. AI preflight resolves the group anchor even when a small member was
+    addressed. A conversion to Title + Counter still requires explicit title words when the old anchor is numeric. Explicit animation
+    fields in the same call retain their existing precedence over preset defaults. See the [numeric reapply case](../bugfixes/2026-11-18-number-title-preset-reapply.md).
 
 ## 三、三套的数（照样片量的，720p × 1.5）
 
