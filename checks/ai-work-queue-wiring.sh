@@ -55,9 +55,12 @@ FREE_BODY="$(awk '/    private func laneIsFree\(/,/^    \}/' "${QUEUE}")"
 grep -q 'if let id = active\[lane\], AIJobs.shared.job(id)?.status == .running { return false }' <<<"${FREE_BODY}" \
   || fail "${QUEUE}：laneIsFree 要先看这条道上 AI 起的那个做完没有（翻译起步是异步的，光看宿主会接连起两个）"
 
-# 5. 排着的导出各占各的文件名。
-grep -q 'reservedOutputs.contains($0.standardizedFileURL.path)' "${EXPORT}" \
-  || fail "${EXPORT}：算「没被占的文件名」时要算上排着队还没写出来的那几个"
+# 5. 排着的导出各占各的文件名。The name is picked in AIExportDestination (off the main thread, 2026-11-19) with the
+#    reserved names passed in, and reserved the moment it is chosen.
+DESTINATION="Sources/SrtFlow/AIExportDestination.swift"
+grep -q 'reserved: reservedOutputs' "${EXPORT}" && grep -q 'reservedOutputs.insert(reserved)' "${EXPORT}" \
+  && grep -q 'reserved.contains($0.standardizedFileURL.path)' "${DESTINATION}" \
+  || fail "${EXPORT} / ${DESTINATION}：算「没被占的文件名」时要算上排着队还没写出来的那几个"
 
 if [ "${FAILED}" = "0" ]; then
   echo "✓ AI 排队接线：四个入口都经 AIWorkQueue、不再回「已经在做」；取消先从队里拿；get_job 报 queued / queue_position；道上 AI 起的没做完不算空；排着的导出各占文件名"

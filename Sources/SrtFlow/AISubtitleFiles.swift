@@ -10,7 +10,7 @@ import SrtFlowCore
 // 不管什么：写盘（`SubtitleExportPlanner.writeValidated`）、参数和结果（AISubtitleFileExport）。
 
 enum AISubtitleFiles {
-    struct Target: Equatable {
+    struct Target: Equatable, Sendable {
         var track: SubtitleTrack
         var url: URL
     }

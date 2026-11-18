@@ -317,7 +317,7 @@ final class AIToolRouter {
             let style = try await AISubtitleTools.style(args)
             return try AIUndoGrouping.step(undo) { try AISubtitleTools.edit(args, style: style, project) }
         case .exportVideo: return try await AIExportTools.export(args, project)
-        case .exportSubtitles: return try AISubtitleFileExport.export(args, project)
+        case .exportSubtitles: return try await AISubtitleFileExport.export(args, project)
         case .getJob: return try await AIExportTools.job(args)
         case .cancelJob: return try AIExportTools.cancel(args)
         }

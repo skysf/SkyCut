@@ -153,8 +153,10 @@ struct ExportFolderRow: View {
 }
 
 /// What the export panel says about its destination and the macOS folder window (one place, all three tables).
+/// The AI's export_video says the same sentences in English (`L10n: { $0 }`: the en table's keys are its text). The
+/// parameter is named `L10n` on purpose: the calls below stay literal `L10n("…")`, which the localization guard scans.
 enum ExportDestinationText {
-    static func message(_ problem: ExportDestinationProblem, folder: URL) -> String {
+    static func message(_ problem: ExportDestinationProblem, folder: URL, L10n: (String) -> String = SrtFlow.L10n) -> String {
         let name = folder.lastPathComponent.isEmpty ? folder.path : folder.lastPathComponent
         switch problem {
         case .missing:

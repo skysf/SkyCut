@@ -556,6 +556,16 @@ require "the exporter hands the finished video over through ExportDelivery" \
   Sources/SrtFlow/VideoEditExporter.swift 'try await ExportDelivery\.deliver\('
 require "the export starts only after the look-and-write check of the folder" \
   Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.checkBeforeWriting\(\)'
+# The AI's export_video folder (2026-11-19, docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md): made,
+# checked and listed through the same probe, off the main thread; scripts/check-export-profile.sh checks the behaviour.
+for f in Sources/SrtFlow/AIExportTools.swift Sources/SrtFlow/AIExportDestination.swift; do
+  forbid "export_video never touches its folder on the main thread (only through ExportDestinationProbe)" \
+    "$f" '^[^/]*FileManager\.default'
+done
+require "export_video picks its file and checks its folder through AIExportDestination" \
+  Sources/SrtFlow/AIExportTools.swift 'try await AIExportDestination\.output\('
+require "AIExportDestination asks the drive only through the probe (off the main thread, with a deadline)" \
+  Sources/SrtFlow/AIExportDestination.swift 'await probe\.run\(on: request\.near, deadline: deadline'
 
 # A project's own file is written off the main thread (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md):
 # production code saves through saveToFile / flushToFile / saveAs / prepareToClose / startNewProject / closeProject /

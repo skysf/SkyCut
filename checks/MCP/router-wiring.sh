@@ -215,7 +215,7 @@ GATE_AT="$(grep -n 'try refuseUnnamedVersion(version, in: folder)' <<<"${NEW_BOD
 CREATE_AT="$(grep -n 'let url = ExportFileName.unoccupied(' <<<"${NEW_BODY}" | cut -d: -f1 || true)"
 if [ -z "${GATE_AT}" ] || [ -z "${CREATE_AT}" ] || [ "${GATE_AT}" -gt "${CREATE_AT}" ] \
    || [ "$(grep -c 'AIVersionName.stem(' <<<"${NEW_BODY}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'AIVersionName.stem(' Sources/SrtFlow/AIExportTools.swift || true)" -ne 1 ]; then
+   || [ "$(grep -c 'AIVersionName.stem(' Sources/SrtFlow/AIExportDestination.swift || true)" -ne 1 ]; then
   echo "✗ new_project 没在建工程之前查「这个文件夹里已经有你的工程、却没给版本」，或 new_project / export_video 没经 AIVersionName 拼名字" >&2
   exit 1
 fi

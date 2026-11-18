@@ -203,6 +203,13 @@ never returns.
 7. The scan side is pinned by `checks/project-file-wiring.sh`, the behaviour by `scripts/check-export-profile.sh`
    (`FolderChooserChecks`, `DestinationChecks`). The same hazard is still in the other places that use `runModal` panels
    (open / save project, add media, the compress and burn-in "Choose…"): not changed here.
+8. **The AI's `export_video` and `export_subtitles` follow 4 and 5 too** (2026-11-19,
+   [case](../bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md)). Which folder (a relative path tried against two
+   folders, the old `SrtFlow` folder), making it, the look-and-write check and the listing for taken names run only inside
+   `ExportDestinationProbe.run` (`AIExportDestination`), with the 15 s deadline and the per-drive cap; the subtitle files are
+   written in a second `run`. A folder that can't be used is refused before any job starts, with the sentences of 4 in
+   English (`ExportDestinationText.message(…, L10n: { $0 })`). Neither file uses `FileManager.default`
+   (`checks/project-file-wiring.sh`).
 
 ## 回归矩阵
 
@@ -215,7 +222,7 @@ never returns.
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
-| `scripts/check-export-profile.sh` (`FolderChooserChecks`, `DestinationChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread |
+| `scripts/check-export-profile.sh` (`FolderChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free |
 | `checks/project-file-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
@@ -253,3 +260,7 @@ never returns.
     the path may show a spinner, Export says "Checking the folder…" until the drive answers.
 17. A long export onto a USB hard drive: at 100 % the status says "Saving the video into the export folder…" and the app
     stays responsive until the file is there.
+18. From an AI client (§8 item 8): `export_video` with `path` on an NTFS drive (or a locked SD card) answers at once with
+    the read-only sentence and no job; with `path` on a sleeping USB hard drive SkyCut stays responsive and the call either
+    starts the export once the drive answers or says "not responding" after about 15 s. `export_subtitles` into the same
+    folders behaves the same.
