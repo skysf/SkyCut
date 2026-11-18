@@ -271,12 +271,12 @@ with two covered cuts: a music bed across 3.0 s, quiet music with a low thump 2 
 after its cut — nothing reported. Only two jobs: the binary links the debug build, and its 480 s deadline was overrun on CI when
 the first version ran five (2026-11-18). `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs only these.
 
-Reverse controls (2026-11-18), each restored afterwards: with the four registry entries removed, six production assertions
-fail (the jump, the linger, the masked line, the swell, the named checks, the mark); with the bed cover removed, the rule's bed
-case and the production "fixed" case fail; without the accent cover, the rule's accent case and the production accent case
-(quiet music with a thump 2 frames after the cut) fail; with an object belonging to the shot under its start, the lead case fails; with the
-200 Hz reading replaced by the band meter's 300 Hz, the window reading fails; without the two voices' 0.5 s overlap, the
-mix-layers hand-over case fails (`["clear", "two_voices", "two_voices"]`).
+Reverse controls (2026-11-18), each restored afterwards: with the four second-tier entries skipped in the registry run, five
+production assertions fail (the jump, the linger, the masked line, the swell, the jump's key); with the bed cover removed, the
+rule's bed case and the covered-cuts job fail; without the accent cover, the rule's accent case and the covered-cuts job fail
+(the 6.0 s jump comes back); with an object belonging to the shot under its start, the lead case fails; with the 200 Hz reading
+replaced by the band meter's 300 Hz, the window reading fails; without the two voices' 0.5 s overlap, the mix-layers hand-over
+case fails (`["clear", "two_voices", "two_voices"]`).
 
 Manual regression before release:
 
