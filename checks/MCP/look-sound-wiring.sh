@@ -25,6 +25,6 @@ parse, go = body.find("AISoundStripRequest.parse("), body.find("AICallLines.letG
 render, finish = body.find("AISoundStripMeasure.strip("), body.find("sound: try await strip")
 assert 0 <= parse < go < render < finish, "✗ look must read sound before letting its line go, then render it and hand it to finish"
 assert "AISoundStripMeasure.strip(" not in inspect and inspect.count("AISoundStripMeasure.inspection(measurement.frames") == 1 \
-    and inspect.count("sound: sound)") == 1, "✗ inspect_video must draw the frames its report measured (no second render)"
+    and inspect.count("sound: strip)") == 1, "✗ inspect_video must draw the frames its report measured (no second render)"
 PY
 echo "   ✓ look's strip renders the export's configuration on MediaReadQueue.export; rows parse as layers; inspect_video reuses its frames"
