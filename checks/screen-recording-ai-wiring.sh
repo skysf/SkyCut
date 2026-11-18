@@ -226,6 +226,14 @@ fi
 grep -qF 'guard showsSetupSheet else { return }' "${COORDINATOR}" \
   || fail "没呈现的手动设置页不能撤销 AI 的 configuring 会话"
 
+# 16. UI-2 (2026-11-18): result notices stay off screen while the next take is set up, captured and saved (recording SkyCut's
+#     own window put the previous result into the new footage): a projection of the state, hidden and never dismissed.
+grep -qF 'if let receipt = feedback.notices.last, !Self.isHidden(during: coordinator.state) {' Sources/SrtFlow/ScreenRecordingNotice.swift \
+  || fail "ScreenRecordingNotice.swift: the result notice must stay off screen while a take is captured (isHidden(during: coordinator.state)), or the next take records it"
+if grep -nE 'feedback\.dismiss|ScreenRecordingFeedback\.shared\.dismiss|notices\.removeAll' "${COORDINATOR}" "${SETUP}"; then
+  fail "a new take hides earlier result notices and must not dismiss them (the user closes them, and reads earlier ones after closing the newest)"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   echo "AI 录屏接线守卫失败" >&2
   exit 1
