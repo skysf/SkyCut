@@ -872,6 +872,7 @@
 "Choose the folder to export into" = "选择导出到哪个文件夹";
 "“%@” is already in this folder. Exporting will replace it." = "这个文件夹里已经有「%@」了，导出会替换它。";
 "Replace “%@”?" = "替换「%@」？";
+"A file with this name is already in “%@”. Replacing it overwrites that file." = "「%@」里已经有同名的文件了。替换会覆盖那个文件。";
 "Choose the folder to export into, or drag a folder here from Finder" = "选择导出到哪个文件夹，也可以从 Finder 把文件夹拖到这里";
 "Choose" = "选择";
 "Choose a folder in the macOS window. If that window stops responding, close it here." = "请在 macOS 的窗口里选文件夹。那个窗口没反应的话，可以在这里关掉它。";
