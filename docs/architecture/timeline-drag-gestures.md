@@ -513,6 +513,13 @@ ZStack(alignment: .topLeading) { ... }
 
 ### 5e-2. 整条时间线只许有**一个**拖放落点
 
+The same constraints also apply to web-motion preset cards (2026-11-17). `TimelineDropRouterFactory` builds the
+existing delegates plus `WebMotionPresetDropDelegate`, and the timeline still owns exactly one `.onDrop`.
+The custom `com.srtflow.motion-preset` type is declared in Info.plist and routed before file URLs. Its preview calls
+`mediaImportLandings`, `importFirstStart` and the shared new-lane geometry once each; the checked render/commit
+remains in `WebMotionActions`. Guards count these positively and separately from the existing file/AI consumers.
+Manual card-drag verification remains required: synthetic `.onDrag` events do not prove native drop delivery.
+
 2026-09-23 用探针（`scripts/gui-smoke/drop-routing-probe/`：独立的 SwiftUI 小 App，
 每格只放一种落点组合，所有回调写日志）测出来的 SwiftUI 路由规则：
 

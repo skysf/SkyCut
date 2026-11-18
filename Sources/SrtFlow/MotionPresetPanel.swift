@@ -15,18 +15,36 @@ struct MotionPresetPanel: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        let entries = MotionPresetLibrary.entries(in: project.state)
         VStack(alignment: .leading, spacing: 8) {
             Text("Motion Presets").font(.headline)
-            Text("Lands on the playhead. Type your words; each piece stays an ordinary text or shape.")
+            Text("Choose a native title first, or reuse a motion from this project.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            ForEach(MotionPresetKind.allCases) { kind in
-                MotionPresetCard(kind: kind) {
-                    MotionPresetActions.add(kind, to: project)
-                    onPick()
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 8) {
+                    ForEach(entries) { entry in
+                        switch entry {
+                        case .native(let kind):
+                            MotionPresetCard(kind: kind) {
+                                MotionPresetActions.add(kind, to: project)
+                                onPick()
+                            }
+                        case .web(_, let record, let movie):
+                            if entry.id == entries.first(where: { if case .web = $0 { return true }; return false })?.id {
+                                Divider().padding(.top, 4)
+                                Text("Project Templates").font(.subheadline.weight(.semibold))
+                                Text("Rendered motions; change their words and style in the inspector.")
+                                    .font(.caption).foregroundStyle(.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            WebMotionPresetCard(project: project, entryID: entry.id, record: record, movie: movie, onPick: onPick)
+                        }
+                    }
                 }
             }
+            .frame(maxHeight: 540)
         }
         .padding(14)
         .frame(width: 380)

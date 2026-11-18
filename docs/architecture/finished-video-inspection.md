@@ -63,6 +63,16 @@
 `scripts/check-video-inspection.sh` 使用独立 bundle 与合成工程，走实际任务、混音、波形、
 画面和字幕管线，验证六种疑点、MCP 图像内容、试听文件、范围、隐藏、取消和无编辑。
 它接在 `scripts/check-all.sh` 第一组，不启动已安装 App。
+
+Test clients must distinguish a wait response from a terminal job result. `AIJobs.wait` caps each
+wait at 30 seconds to leave room in a client's request deadline; a running reply is legitimate.
+The main inspection harness polls up to four times while the job is running, like the existing
+delivery harness, and keeps the shell's 480-second outer deadline. Failed/cancelled results remain
+failures of a successful-analysis assertion, and an exhausted running job cannot count as done.
+The `job-polling` check case controls pending and terminal observations without replacing real
+analysis; the normal check still runs all real-tool assertions. See the
+[pending-job regression case](../bugfixes/2026-11-17-inspection-job-wait-still-running.md).
+
 「切在说话上」的判法另有 `SpeechRuleChecks`：纯值规则逐条测，再用一直有声的正弦音工程走真工具 ——
 没有人声证据的切口不报、列进 `speech_unchecked`，字幕记着在说话的那一刻报一次，文件自己的头尾不报。
 反向：`cuts` 换回只看电平、不跳过文件头尾的判法，守卫在前两条上变红。

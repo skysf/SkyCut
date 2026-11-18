@@ -19,6 +19,8 @@ enum Snapshot {
                               styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.hasShadow = false
+        // Keep snapshots idle while the user works: real pointer movement must not start hover previews or tooltips.
+        window.ignoresMouseEvents = true
         // 真 App 里 sheet 的浅 / 深外观由 `.preferredColorScheme` 给（森林色固定浅色）；自建的窗口够不着它，照同一条规矩自己设。
         window.appearance = appearance ?? (AppThemePalette.current.isForest ? NSAppearance(named: .aqua) : nil)
         let container = NSView(frame: window.contentLayoutRect)

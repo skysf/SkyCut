@@ -94,6 +94,7 @@ struct VideoEditTimelineView: View {
     /// 从 Finder 拖文件进来时的落点（落进哪条轨由指针的纵向位置决定），
     /// 见 VideoEditMediaFileDrop.swift。
     @State private var mediaFileDrop: MediaFileDropPlan?
+    @State private var webMotionDrop: WebMotionPresetDropPlan?
     /// 滚动量的唯一真相：手势要用的时候从 `NSScrollView` **现读**。
     ///
     /// 以前这里是一个由 preference 喂的 `@State`，而那是**异步观察**来的数 ——
@@ -226,53 +227,11 @@ struct VideoEditTimelineView: View {
     /// 文件头）。四套拖放各自的代理原样不动，由它按载荷分派；行布局只算一次，
     /// 四个代理共用同一份。
     private var timelineDropRouter: TimelineDropRouter {
-        let specs = rows
-        let layouts = Self.layouts(of: specs, open: openSeam)
-        let viewport = CGSize(width: viewportWidth, height: viewportHeight)
-        let main = layouts.first { $0.spec.slot == .main && !$0.spec.isHidden }
-        return TimelineDropRouter(
-            // 文件和音频库会拉开插入缝（§5h）：拿整份 `rows` 自己按缝开 / 关现算排布。
-            files: MediaFileDropDelegate(
-                project: project,
-                pps: pps,
-                rows: specs,
-                geometry: scrollGeometry,
-                autoScroller: autoScroller,
-                viewport: viewport,
-                dwell: seamDwell,
-                openSeam: $openSeam,
-                preview: $mediaFileDrop
-            ),
-            filter: FilterDropDelegate(
-                project: project,
-                pps: pps,
-                rowLayouts: layouts,
-                geometry: scrollGeometry,
-                autoScroller: autoScroller,
-                viewport: viewport,
-                preview: $filterDrop
-            ),
-            audio: AudioLibraryDropDelegate(
-                project: project,
-                pps: pps,
-                rows: specs,
-                geometry: scrollGeometry,
-                autoScroller: autoScroller,
-                viewport: viewport,
-                dwell: seamDwell,
-                openSeam: $openSeam,
-                preview: $audioLibraryDrop
-            ),
-            transition: TransitionDropDelegate(
-                project: project,
-                pps: pps,
-                geometry: scrollGeometry,
-                autoScroller: autoScroller,
-                viewport: viewport,
-                preview: $transitionDrop
-            ),
-            mainRow: main.map { $0.minY...$0.maxY },
-            contentWidth: contentWidth
+        TimelineDropRouterFactory.make(
+            project: project, pps: pps, rows: rows, geometry: scrollGeometry, autoScroller: autoScroller,
+            viewport: CGSize(width: viewportWidth, height: viewportHeight), dwell: seamDwell, openSeam: $openSeam,
+            files: $mediaFileDrop, filter: $filterDrop, audio: $audioLibraryDrop, transition: $transitionDrop,
+            motion: $webMotionDrop, contentWidth: contentWidth
         )
     }
 
@@ -311,6 +270,11 @@ struct VideoEditTimelineView: View {
                 MediaFileDropIndicator(plan: mediaFileDrop, pps: pps, fullWidth: contentWidth)
             }
 
+            if let webMotionDrop {
+                dropPlaceholder(span: TimelineSpan(start: webMotionDrop.start, end: webMotionDrop.end),
+                                y: webMotionDrop.rowY, height: webMotionDrop.rowHeight)
+            }
+
             // 拖滤镜卡片进来时的落点框。和滤镜块同一套几何（同一份
             // FilterBlockMetrics），所以松手之后块在哪儿、框就在哪儿。
             if let filterDrop {
@@ -342,7 +306,7 @@ struct VideoEditTimelineView: View {
                 contentWidth: contentWidth,
                 pps: pps,
                 magnet: project.magnetEnabled,
-                fallbackGuides: filterDrop?.guides ?? audioLibraryDrop?.guides ?? mediaFileDrop?.guides ?? [],
+                fallbackGuides: filterDrop?.guides ?? audioLibraryDrop?.guides ?? mediaFileDrop?.guides ?? webMotionDrop?.guides ?? [],
                 project: project
             )
 

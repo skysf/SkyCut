@@ -27,6 +27,7 @@ struct TimelineDropRouter: DropDelegate {
     let filter: FilterDropDelegate
     let audio: AudioLibraryDropDelegate
     let transition: TransitionDropDelegate
+    let motion: WebMotionPresetDropDelegate
     /// 主轨那一行的纵向范围（内容坐标）。转场只落在主轨的接缝上；`nil` = 主轨
     /// 藏着，不接转场（同原来挂在行上时「藏起来的轨不认」那条）。
     let mainRow: ClosedRange<Double>?
@@ -37,11 +38,11 @@ struct TimelineDropRouter: DropDelegate {
 
     /// 这个落点认的全部载荷。
     static let types: [UTType] = [
-        FilterDrag.type, AudioLibraryDrag.type, TransitionDrag.type, .fileURL,
+        FilterDrag.type, AudioLibraryDrag.type, TransitionDrag.type, WebMotionPresetDrag.type, .fileURL,
     ]
 
     private enum Payload {
-        case filter, audio, transition, files
+        case filter, audio, transition, motion, files
     }
 
     /// 这一次拖的是什么。**App 内的三种自定义载荷先认，文件最后认**：自定义载荷
@@ -51,6 +52,7 @@ struct TimelineDropRouter: DropDelegate {
         if info.hasItemsConforming(to: [FilterDrag.type]) { return .filter }
         if info.hasItemsConforming(to: [AudioLibraryDrag.type]) { return .audio }
         if info.hasItemsConforming(to: [TransitionDrag.type]) { return .transition }
+        if info.hasItemsConforming(to: [WebMotionPresetDrag.type]) { return .motion }
         if info.hasItemsConforming(to: [.fileURL]) { return .files }
         return nil
     }
@@ -77,6 +79,7 @@ struct TimelineDropRouter: DropDelegate {
         case .filter: FilterDrag.preset != nil
         case .audio: AudioLibraryDrag.pending != nil
         case .transition: TransitionDrag.kind != nil
+        case .motion: WebMotionPresetDrag.pending != nil
         }
     }
 
@@ -88,6 +91,7 @@ struct TimelineDropRouter: DropDelegate {
         switch payload(info) {
         case .files: files.dropEntered(info: info)
         case .audio: audio.dropEntered(info: info)
+        case .motion: motion.dropEntered(info: info)
         case .filter where withinContent(info): filter.dropEntered(info: info)
         case .transition where onMainRow(info): transition.dropEntered(info: info)
         default: break
@@ -110,6 +114,8 @@ struct TimelineDropRouter: DropDelegate {
             return files.dropUpdated(info: info)
         case .audio:
             return audio.dropUpdated(info: info)
+        case .motion:
+            return motion.dropUpdated(info: info)
         case .filter:
             guard withinContent(info) else {
                 // 出了内容区：框收起来，指针变成禁止号（拖放不断，挪回来照样能落）。
@@ -133,6 +139,7 @@ struct TimelineDropRouter: DropDelegate {
         case .audio: audio.dropExited(info: info)
         case .filter: filter.dropExited(info: info)
         case .transition: transition.dropExited(info: info)
+        case .motion: motion.dropExited(info: info)
         case nil: break
         }
     }
@@ -143,6 +150,8 @@ struct TimelineDropRouter: DropDelegate {
             return files.performDrop(info: info)
         case .audio:
             return audio.performDrop(info: info)
+        case .motion:
+            return motion.performDrop(info: info)
         case .filter:
             guard withinContent(info) else {
                 filter.dropExited(info: info)

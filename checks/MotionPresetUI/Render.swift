@@ -11,20 +11,26 @@ import SrtFlowMCPKit
 
 @main enum MotionPresetRender {
     @MainActor static func main() async {
-        let domain = "com.srtflow.SrtFlow.motionpresetrender"
-        guard Bundle.main.bundleIdentifier == domain else { fatalError("Motion preset render requires the isolated bundle") }
+        let domain = Bundle.main.bundleIdentifier ?? ""
+        guard domain == "com.srtflow.SrtFlow.motionpresetrender" || domain.hasPrefix("com.srtflow.SrtFlow.motionpresetrender.run") else {
+            fatalError("Motion preset render requires the isolated bundle")
+        }
         UserDefaults.standard.removePersistentDomain(forName: domain)
         defer { UserDefaults.standard.removePersistentDomain(forName: domain) }
         NSApplication.shared.setActivationPolicy(.accessory)
         let out = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_OUT"]!)
         do {
             try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-            let project = OpenProjects.shared.primary
-            try await renderInterface(project, out: out)
-            AppThemeStore.shared.setTheme(.forest)
-            NSApp.appearance = NSAppearance(named: .aqua)
-            AppLanguageStore.shared.language = .english
-            try await MotionPresetFrames.render(project, out: out)
+            if ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_WEB_ONLY"] == "1" {
+                try await MotionPresetWebRender.render(out: out)
+            } else {
+                let project = OpenProjects.shared.primary
+                try await renderInterface(project, out: out)
+                AppThemeStore.shared.setTheme(.forest)
+                NSApp.appearance = NSAppearance(named: .aqua)
+                AppLanguageStore.shared.language = .english
+                try await MotionPresetFrames.render(project, out: out)
+            }
         } catch {
             print("FAIL: motion preset render: \(error)")
             exit(1)

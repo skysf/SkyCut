@@ -326,3 +326,13 @@ Additional manual regression before release:
       during recovery reports that the motion is not ready.
 - [ ] Save As during a render, close/reopen the destination, and confirm the movie is carried beside that project; changing/closing the
       project during a render cannot add the result to another document.
+
+## 16. UI draft and preview boundary (2026-11-17)
+
+The unified preset panel and web parameter form are specified in [Motion presets](motion-presets.md).
+A card displays the rendered movie; no preview page executes in the App. A user tap/drop captures its document
+and requested start before creating a Task (`WebMotionPresetRequest`), rather than relying only on the service's
+later capture. The editor captures the original clip and source-lane context; a stale draft or another document
+is rejected before helper startup. Typing stays local until Re-render succeeds through `WebMotionActions`.
+Installed fonts use the existing browser, and page diagnostics retain their original text. Showing the page only
+writes the stored source/parameters through queued IO and reveals the HTML in Finder.
