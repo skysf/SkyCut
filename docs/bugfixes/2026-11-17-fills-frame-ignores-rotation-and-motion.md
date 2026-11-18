@@ -62,3 +62,9 @@ left edge in `look`, and neither `get_timeline` nor `look` said anything. The AI
 - Coverage from pixels cannot tell framing from dark footage; compute it from the clips and say so.
 - A CoreGraphics aliased fill is no pixel-centre reference: it also fills pixels a box edge only clips (6 px off along a 5° edge).
   Hold geometry against your own pixel-centre sampling, and hold it against real rendered frames separately.
+
+## Follow-up (2026-11-18)
+
+The entrance / exit no-bare-edge growth now uses this geometry too (`ClipMotionCover`): a turned or keyframed clip that fills the
+frame keeps it covered while rise and pop play, and `placementCoversCanvas` is gone
+([case](2026-11-18-turned-clip-entrance-bares-edges.md)). The dissolve path's `coversCanvasOpaquely` is unchanged.

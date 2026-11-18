@@ -76,7 +76,7 @@
   （原来接在上一个脚本末尾的编译后面，本地跑不到，[PR #84 首跑 CI](../bugfixes/2026-09-29-pr84-first-ci-run-wiring-guard-in-moved-code.md) 才红）。
 - 播放头与悬停 peek 状态机，以及播放头的慢读法 `PacedPlayhead`（只跟「放置」、播放中不跟、停下追上一次、
   不认悬停），还有「回到开头」（Return / Home）只由 `goToStart` 请时间线滚回最左、普通 seek 不许，
-  以及卸片之后晚到的时间回调不许把播放头写回旧位置（真播放器、ffmpeg 现做的带声音素材），还有播到头由声音主时钟自己收尾（播放头正好钉在总长上、不再往后走）、在尽头不 seek 直接再按播放不开播、旧的「播到头」通知晚到时已经回退重播的新一轮照样播（真播放器 + 2 秒的短素材）：
+  以及卸片之后晚到的时间回调不许把播放头写回旧位置（真播放器、ffmpeg 现做的带声音素材），还有播到头由声音主时钟自己收尾（播放头正好钉在总长上、不再往后走）、在尽头不 seek 直接 `play()` 不开播、旧的「播到头」通知晚到时已经回退重播的新一轮照样播（真播放器 + 2 秒的短素材），and the user's Play at the end replays from 0 and stops on the total length again (UI-2)：
   `scripts/check-player-clock.sh`。
 - 不许同步问播放器要时间（`currentTime()`，会被播放器的锁堵住主线程）、AVKit 的 Now Playing 必须关着、电平条读时钟外推的
   `estimatedTime`：`checks/player-time-no-sync-read.sh`；外推的算术在 `scripts/check-player-clock.sh` 第 12 组。
@@ -101,6 +101,12 @@
 - 录屏产物画面轨盖到 T1（尾部不黑）：`scripts/check-screen-recording-writer.sh`。
 - 上层视频轨动画段 fill + matte：`scripts/check-export-alpha-compositing.sh`。
 - 入场/出场动画的两条管线对账（预览取帧 vs 真导出抽帧）：`scripts/check-clip-animation.sh`。
+- Rise / pop / zoom keep a picture that fills the frame covering, turned and keyframed ones too (2026-11-18):
+  `scripts/check-preview-composition.sh` → `EntranceCover.swift` (unturned growth equals the old 1 + 2 × offset; nine filling pictures ×
+  three motions × two intensities, in and out, cover the canvas and their resting place at every 1/120 s frame; the variant follows
+  the first / last frame; real frames of turned clips keep every edge pixel covered, and the probe sees a clip that does not fill);
+  preview against export for a turned rise on V1 and a turned pop on V2 (fill + matte): `scripts/check-clip-animation.sh` →
+  `TurnedEntrances.swift`. Rule: [入场 / 出场动画](../architecture/clip-animation.md).
 - 上层视频轨铺满 + 画面渐变的真产物（真跑导出再抽帧），以及上层轨藏起来的段不进成片、透明 PNG 的透明处露出下面那一层
   （预览、静态的成片、带关键帧的成片）、上层轨带缓动的关键帧 matte 和画面按同一条曲线走、带透明的视频按文件里的预乘 / 直通标记叠
   （`AlphaVideo.swift`：AVFoundation 现做的 ProRes 4444 / HEVC 带透明，四条带压在红底上，预览和成片各和参考比；HEVC 带透明、硬件编码
@@ -195,7 +201,8 @@
 - 时间线吸附、框选命中与生产落点，以及点一下播放头落到哪（全局夹紧、点块不出这一块：`TimelineSeek`），还有**联动**（压在主轨块上的东西跟着
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
   同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
-  挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`）：
+  挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`；subtitles sitting on a sound off V1 (narration) follow that sound, not the picture, and ride a V1 drag
+  only with it — a new source range on a screen recording keeps them, group 1k `LinkageVoiceCues.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。
@@ -278,7 +285,9 @@
   期限（40 秒、整组 300 秒）只拦卡死。规矩见 [阻塞的媒体读取](../architecture/blocking-media-reads.md)「回归」，
   反向验证见[案例](../bugfixes/2026-11-13-listen-range-checks-timed-out-under-load.md)和它的「后续」。
 - AI 录屏的接线（扫描守卫）：AI 起的录制不开系统选择窗口、设置页 / 残缺框只给手动的会话、不覆盖、不写手动的偏好、入轨包 `AIUndoGrouping.step`、
-  录制中不把 SrtFlow 摆到前面、丢弃先问且进废纸篓、授权一次运行只请求一次、浮窗在左下角、录制中换工程 / 改帧率先挡：`checks/screen-recording-ai-wiring.sh`。
+  录制中不把 SrtFlow 摆到前面、丢弃先问且进废纸篓、授权一次运行只请求一次、浮窗在左下角、录制中换工程 / 改帧率先挡、result notices off screen while a take is
+  captured (section 16)：`checks/screen-recording-ai-wiring.sh`。The notice itself is laid out at every state of a take by `scripts/check-screen-recording-feedback.sh`
+  (`checks/ScreenRecordingFeedback/NoticeVisibility.swift`).
 - Sky Studio 账号与照授权拦（收费方案第 5 刀）：`scripts/check-sky-studio.sh`（`check-all` 第 2 组，不碰网络、不碰钥匙串）：Key 的整理与钥匙串那一条的名字、机器号钉死一组值（盐改了就红）、`/me` 照合同里的样例读（带毫秒的日期、读得宽、少了必须的不算回答）、假 URLSession 上的请求（地址、四个头）和三种失败、环境变量只能指到本机、此刻的授权（没有 Key / 没问到过 / 过期按免费版、钟差、往回拨）与什么时候再问、照授权拦（`GateChecks`：默认打开、测试开关关不掉它、每个工具 × 每种授权让不让且 `get_status` 永远让、水印听服务器的、被挡住时的话、`skycut_plan`）；接线（地址只在 `SkyStudioAPI`、硬件 UUID 只在 `SkyStudioMachine`、后台不弹钥匙串框、设置和启动接上了、AI 的门在核对参数名之后建调用之前、导出面板挂着「会带水印」那一行、`export_video` 和 `get_status` 说授权、交任务和取消只经 `SkyStudioJobRun`、认证头只在 `SkyStudioAPI.request()` 写一次）：`checks/sky-studio-wiring.sh`（扫描守卫）。同一个脚本还管**第 6 刀的任务**（`JobChecks` / `JobRunChecks`：`/models`、`/quote`、`/jobs` 发什么读什么、取消的两种结果、`/uploads` 之后 PUT 只带服务器给的头不带 Key、下载成品；`SkyStudioJobRun` 满了等着用同一个 idempotency_key 再交、照 `poll_after_seconds` 问、断网几次不算、停的时候排队中退钱 / 开始了取消不了且接着查到底）和 **generate_media 送 Sky Studio 的那一份**（`GenerationChecks`：种类的词表和 `SkyStudioGeneration` 对账、每种的默认值（目录没给取值时的兜底）、用不上的参数说一句不送、请求体、问句和状态行上的记号、离谁最近的画幅、成品的扩展名）；接线第 9 条钉着生成的把关在建任务之前、Key 不弹框、状态行和 get_job 的阶段与 `skystudio_job_id`。
 - 云端媒体：`scripts/check-sky-studio.sh` 验证现行接口 / 任务 / 报价 / 积分 / 配音，`VoiceSlotChecks` 验按池领槽（两个池对上服务器的名单、先来先得、对着假服务器数同时开着的单、429 看 `pool`）；`scripts/check-cloud-media.sh` 验证共用每日账与阶段；`checks/no-legacy-generation.sh` 禁止旧 fal 客户端 / Key / 设置 / 模型和网络路径回来。
   `scripts/check-voice-recovery.sh`（第 1 组）链接真实 App 对象：回任务号之前整段报价一次、每批同一个 `params.plan`、额度 / 服务器拒都在花钱之前停、服务器不答退本机（`StartChecks.swift`）；字幕时间（`TimingChecks.swift`，声音 PR 5：普通旁白合批、字幕是稿子的字、转写不了的预设整段 eleven-v4 / 别的按字数估、转写模型在第一批之前装、装不上再报价）；几批同时交、后交的先回仍照原来的顺序落地、中途换备用之后的批带备用的选择、`fallback_needs_one_time` 之后只补没做成的（`ConcurrencyChecks.swift`，声音 PR 4）；第二批云端成功而本地失败后只恢复已有音频、只补第三批（照记录的选择再报价）、字幕 / 片段不重复、原子入轨撤销与未知单不重放；付过钱的声音不卡死（`PaidAudioChecks.swift`，2026-11-10 审查：繁体稿合批而转写写成简体、长句两片 24 kHz / 44.1 kHz、转写不了的 Mac 上 eleven-v4 的 `words` 用不了按字数估句界、`get_job` 运行中和失败后带 `voice.note`），纯值的一半在 `scripts/check-sky-studio.sh` 的 `VoiceSplitChecks`。

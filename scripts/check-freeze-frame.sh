@@ -97,6 +97,9 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditVideoFade.swift \
   Sources/SrtFlow/VideoEditClipAnimation.swift \
   Sources/SrtFlow/VideoEditClipAnimator.swift \
+  Sources/SrtFlow/ClipMotionCover.swift \
+  Sources/SrtFlow/PictureCoverage.swift \
+  Sources/SrtFlow/ClipCoverage.swift \
   Sources/SrtFlow/VideoEditTrackPalette.swift \
   Sources/SrtFlow/VideoEditTextStyle.swift \
   Sources/SrtFlow/VideoEditTextEasing.swift \

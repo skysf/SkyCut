@@ -62,6 +62,9 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditVideoFade.swift \
   Sources/SrtFlow/VideoEditClipAnimation.swift \
   Sources/SrtFlow/VideoEditClipAnimator.swift \
+  Sources/SrtFlow/ClipMotionCover.swift \
+  Sources/SrtFlow/PictureCoverage.swift \
+  Sources/SrtFlow/ClipCoverage.swift \
   Sources/SrtFlow/VideoEditTrackPalette.swift \
   Sources/SrtFlow/VideoEditTextStyle.swift \
   Sources/SrtFlow/VideoEditTextEasing.swift \
@@ -118,6 +121,7 @@ xcrun swiftc \
   checks/TimelineSnap/LinkageCues.swift \
   checks/TimelineSnap/LinkageSwap.swift \
   checks/TimelineSnap/LinkagePartner.swift \
+  checks/TimelineSnap/LinkageVoiceCues.swift \
   checks/TimelineSnap/Magnet.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

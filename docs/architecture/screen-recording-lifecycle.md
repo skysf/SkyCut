@@ -184,6 +184,11 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
   提示常驻到用户关闭，展示完整路径、真实目标工程短 id / 名字、实际轨道；后台工程明确说没有窗口。
   「在访达中显示」只在用户点后打开 Finder；「打开录制工程」只在同一工程代号仍开着时可用，点后才开窗 / 切过去。
   不自动抢前台，不为收尾结果弹模态框；所有固定文案进入每张语言表。
+- **While the next take is set up, captured and saved the notices are off screen** (`ScreenRecordingNotice.isHidden(during:)`,
+  `choosingSource` … `importing`; UI-2, 2026-11-18): a notice lives inside the window, so recording SkyCut's own window recorded
+  the previous result into the new take ([case](../bugfixes/2026-11-18-recording-notice-captured-in-next-take.md)). Hidden, never
+  dismissed — they return with the new result on top. The setup sheet (`.configuring`), a pending decision (`.partialRecovery`,
+  its notice holds the buttons) and resting states show them. A projection of `state`, like the setup sheet; no second flag.
 - 成功、仅留文件、残缺、失败、未开录取消都经回执。失败必须给原因以及有无可用文件；提交后入轨失败仍要给已保存文件。
   文件按本次 journal 的阶段和精确路径核对并真实 probe；`.writing` 的最终位置可能是用户原有文件，不能认作本次结果。
   卷不可达是「无法核对」，不能说没留下文件；无法读的残留也不能说可用。
@@ -199,6 +204,8 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
 
 回归：`scripts/check-screen-recording-feedback.sh` 链接真实 App 对象，在独立 bundle / 临时目录中验证后台目标、真实 Stop / get_job / get_status、
 原会话附言、失败媒体回读和中英西文案，不捕获真实屏幕、不显示窗口。生产窗口接线由 `checks/screen-recording-ai-wiring.sh` 第 15 条守住。
+The same check lays out the real notice off screen at every state of a take (`NoticeVisibility.swift`); section 16 of the
+wiring guard pins the condition and that the coordinator never dismisses notices.
 完整案例与反向验证见 [录完了却没有清楚告知结果](../bugfixes/2026-11-06-screen-recording-completion-feedback.md)。
 
 ## 自检纪律
@@ -224,3 +231,6 @@ AI 用 `record_screen` 起的录制和手动录的**是同一条流程**，差�
    在另一个工程窗口点「加入时间线 / 仅保留文件」仍只处置原工程；双击按钮不重复处理。
 6. 英 / 中 / 西三种语言，默认窗口宽度、长路径与多条录制结果：文案可读、能滚动看全，关闭新消息后仍可看前一条；
    后台工程不因通知自动开窗，只有用户点入口才切过去。真实 GUI / TCC 矩阵仍需获准操作时实测，自动化对象回归不冒充它。
+7. With a result notice on screen, record SkyCut's own window (manual, then `record_screen`): the notice is gone once the source
+   is being chosen (before the countdown), is not in the new file, and comes back after the take with the new result on top;
+   with a partial result the Add / Keep buttons stay visible until chosen.

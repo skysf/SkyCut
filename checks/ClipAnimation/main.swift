@@ -401,6 +401,9 @@ func main() async {
               "上层轨的动画段必须走 fill + matte 双预渲染")
     }
 
+    // 6. Turned pictures that fill the frame keep it covered while they rise or pop, in both pipelines (TurnedEntrances.swift).
+    await checkTurnedEntrances(white: white, black: black, meta: meta, canvas: canvas)
+
     if failures == 0 {
         print("\(checks) checks, 0 failures")
         print("All checks passed")

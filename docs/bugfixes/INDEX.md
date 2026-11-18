@@ -151,6 +151,7 @@
 - [2026-10-01 播放中按空格，图标慢半拍](2026-10-01-meter-current-time-blocks-main-thread.md) — 不许同步问播放器要 `currentTime()`：读时钟外推的 `estimatedTime`。
 - [2026-09-23 一条轨上换了音频格式就没声音、预览卡住](2026-09-23-meter-tap-dies-on-audio-format-change.md) — 一条合成音轨只装一种格式；自检素材要有几种格式。
 - [2026-11-18 Motion placement groups shared one outer watchdog](2026-11-18-motion-placement-combined-watchdog.md) — Run both growing integration groups in mandatory bounded processes; preserve every assertion and aggregate failures.
+- [2026-11-18 Changing a screen recording's source range shortens or deletes its narration subtitles](2026-11-18-narration-subtitles-follow-screen-recording-trim.md) — A subtitle follows the sound its words came from; which subtitles a sound off V1 owns is one map every linkage rule reads.
 - [2026-11-04 非零起点让原生尾帧请求落到前一个刻度](2026-11-04-native-frame-request-truncation.md) — 只有原生抽帧的请求取最近的 1/600，证据守卫不放宽；合成的时间照旧截断（预览自由变换的合同）。
 - [2026-11-17 Sound effects added with new_audio landed on the voice and music tracks](2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md) — A fallback that "fits it somewhere" suits a mouse drop, not a named request: open a new track and say so in the reply.
 - [2026-09-28 点名新开轨的第二首配乐接在了 A1 后面](2026-09-28-new-audio-lands-on-a1.md) — 要记的是意图，不是副作用。
@@ -173,6 +174,7 @@
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
 - [2026-09-26 字幕比声音早 0.9 秒、片段开头的词丢了](2026-09-26-pause-stretches-next-word.md) — 识别器给的词时间不是开口时间（停顿被并进相邻的词）：先估开口。
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
+- [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
 - [2026-09-25 播放时每一跳整个编辑器都重算](2026-09-25-playback-wakes-whole-editor.md) — 订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`。
 - [2026-11-05 声音恢复成功，自检却因固定等待窗口报红](2026-11-05-player-clock-recovery-check-timing.md) — 异步的自检用分阶段的有界条件等待，不用一个固定窗口。
 - [2026-09-20 播放头断线、点标尺没反应](2026-09-20-playhead-line-broken-and-ruler-dead.md) — 内容比视口矮会被 SwiftUI 纵向居中，命中区不跟着 `.offset` 走。
@@ -196,6 +198,7 @@
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。
 - [2026-09-29 风格卡给竖屏写的字号大了 1.78 倍](2026-09-29-recipe-sizes-too-big-on-vertical.md) — 写给 AI 的数字也是代码：字号按画面高度算，卡里写明画幅并真排一遍。
 - [2026-10-03 record_screen 真机首测的四处小毛病](2026-10-03-record-screen-first-device-test.md) — 新工具合并后尽早上真机走一遍：状态组合、时序自检够不着。
+- [2026-11-18 The last recording's result notice is recorded into the next take](2026-11-18-recording-notice-captured-in-next-take.md) — A banner inside a window that can be recorded needs a capture-time rule: a projection of the recording state, hidden not dismissed.
 - [2026-11-05 新下载包被上传前的 404 缓存挡住](2026-11-05-release-download-cached-404.md) — 上传前别探测公开 URL（会留下 4 小时的缺失缓存）：内容寻址对象先传后验。
 - [2026-09-27 存好的字幕样式要先去烧录页转一圈才生效](2026-09-27-remembered-subtitle-style-waits-for-burn-in-page.md) — 记住的设置在队列创建时读回来，不挂在某一页的 `onAppear` 上。
 - [2026-10-01 从 40 秒起一直有沙沙声](2026-10-01-resampler-reset-every-chunk.md) — 流式转换器不能推式喂；周期性小毛刺要按块头 / 块中间分开量。
@@ -280,6 +283,7 @@
 - [2026-10-28 体验显示「还剩 8 天」、到期日晚一天](2026-10-28-trial-and-pro-dates-shown-a-day-late.md) — 「拿到回答 − 服务器时间」不全是钟差；日历上的哪一天照服务器给的。
 - [2026-08-03 裁切闪烁与半速](2026-08-03-trim-flicker-halved.md) — 坐标反馈、动画与去抖。
 - [2026-09-25 裁切不跟链接](2026-09-25-trim-ignores-linked-clips.md) — 裁的算法只有 `TimelineTrim` 一份：链接伙伴 / 选中的一组同一个量、一起停。
+- [2026-11-18 A turned clip that fills the frame bared its corners while it rose or popped in](2026-11-18-turned-clip-entrance-bares-edges.md) — The renderer's "does it cover" must use the AI's geometry; a moving picture grows to cover its own resting place.
 - [2026-10-28 停不下来的 upscale 没人再查](2026-10-28-uncancellable-upscale-left-unfinished.md) — 没有长轮询：取消不了的那单接着查到底（`followToEnd`）。
 - [2026-10-02 「撤销这一轮」退不回 V1](2026-10-02-undo-round-repacks-v1.md) — 「换回某一刻」不是一次编辑，别走编辑的收尾（磁吸、联动）。
 - [2026-10-27 AI 传了说明上没有的参数，悄悄丢掉、照样做](2026-10-27-unknown-tool-arguments-silently-ignored.md) — 「读得宽」只能对值、不能对名字：参数名按说明核对，有不认识的整个调用不做；null、`project`、没写字段的里层对象、登记的别名照收。

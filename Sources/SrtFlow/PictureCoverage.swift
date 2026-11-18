@@ -9,10 +9,11 @@ import Foundation
 // `transformSteps` scales, rotates, overlays at the centre). Flips mirror the picture inside its box and a crop only changes the box's
 // shape (the default fit follows the cropped picture), so neither changes what the box covers. A wipe part-way shows only part of the
 // box (`revealed`). From that: how much a picture would have to grow about its centre to cover the whole canvas (`fillFactor`, ≤ 1:
-// it covers), and which edges and corners of the canvas no picture covers (`gaps`), in canvas pixels.
+// it covers), which edges and corners of the canvas no picture covers (`gaps`), in canvas pixels, and how much it would have to grow
+// to cover another picture (`growth`: a moving picture over its resting place, `ClipMotionCover`).
 // Not: where a clip's box is at a moment (`ClipCoverage`), what shows where nothing covers (black on V1, V1 under V2), opacity.
-// One function for get_timeline's fills_frame and look's uncovered: docs/architecture/preview-free-transform.md
-// ("Does the picture cover the frame").
+// One geometry for get_timeline's fills_frame, look's uncovered and the entrance / exit no-bare-edge growth the preview and the export
+// draw: docs/architecture/preview-free-transform.md ("Does the picture cover the frame"), docs/architecture/clip-animation.md.
 
 enum PictureCoverage {
     /// One picture on the canvas.
@@ -43,15 +44,30 @@ enum PictureCoverage {
             CGPoint(x: canvas.width - insetX, y: canvas.height - insetY), CGPoint(x: insetX, y: canvas.height - insetY)
         ]
         // The canvas is convex: covering its four corner pixels covers all of it.
-        return corners.reduce(0) { factor, corner in
-            let point = box.local(corner)
-            return max(factor, growth(point.x, box.u), growth(point.y, box.v))
-        }
+        return growth(of: box, toReach: corners)
     }
 
     /// Covers the whole canvas.
     static func covers(_ picture: Picture, canvas: CGSize) -> Bool {
         fillFactor(picture, canvas: canvas) <= 1 + 1e-9
+    }
+
+    /// How much `picture` must grow about its centre to cover all of `other` (the drawn part of its box, turned): ≤ 1 covers it
+    /// already, `.infinity` when no growth can (`picture` draws nothing). An entrance / exit uses it to keep a moving picture over the
+    /// place it rests at (`ClipMotionCover`).
+    static func growth(_ picture: Picture, toCover other: Picture) -> Double {
+        let box = LocalBox(picture), target = LocalBox(other)
+        guard target.draws else { return 0 }
+        guard box.draws else { return .infinity }
+        // Both are convex: covering the other's four corners covers all of it.
+        return growth(of: box, toReach: target.corners)
+    }
+
+    private static func growth(of box: LocalBox, toReach points: [CGPoint]) -> Double {
+        points.reduce(0) { factor, point in
+            let local = box.local(point)
+            return max(factor, growth(local.x, box.u), growth(local.y, box.v))
+        }
     }
 
     /// How much a range around 0 must grow to reach `value`.
@@ -181,6 +197,17 @@ private struct LocalBox {
     func local(_ point: CGPoint) -> CGPoint {
         let dx = point.x - centre.x, dy = point.y - centre.y
         return CGPoint(x: dx * cosine + dy * sine, y: -dx * sine + dy * cosine)
+    }
+
+    /// A point of the box's frame on the canvas: the clockwise turn that `local` undoes.
+    func canvas(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: centre.x + point.x * cosine - point.y * sine, y: centre.y + point.x * sine + point.y * cosine)
+    }
+
+    /// The drawn part's four corners on the canvas.
+    var corners: [CGPoint] {
+        [CGPoint(x: u.lowerBound, y: v.lowerBound), CGPoint(x: u.upperBound, y: v.lowerBound),
+         CGPoint(x: u.upperBound, y: v.upperBound), CGPoint(x: u.lowerBound, y: v.upperBound)].map(canvas)
     }
 
     func contains(_ point: CGPoint) -> Bool {
