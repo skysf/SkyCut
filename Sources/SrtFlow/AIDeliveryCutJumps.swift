@@ -128,12 +128,14 @@ enum AIDeliveryCutJumps {
     }
 
     /// The 0.3 s measured on each side of a cut (CutSoundWindows), kept inside the timeline; nil when a side is under a frame.
+    /// The bounds are compared as numbers before a range is built: a cut one frame from either end (a one-frame head or tail at
+    /// 60 fps, 1/60 s, is shorter than the 0.02 s gap) leaves that side reversed, and a reversed ClosedRange stops the app.
     static func windows(at time: Double, duration: Double, fps: Int) -> (ClosedRange<Double>, ClosedRange<Double>)? {
         let out = CutSoundWindows.outgoing(time), into = CutSoundWindows.incoming(time)
-        let before = max(0, out.from) ... out.to, after = into.from ... min(duration, into.to)
+        let before = (from: max(0, out.from), to: out.to), after = (from: into.from, to: min(duration, into.to))
         let frame = 1 / Double(fps)
-        guard before.upperBound - before.lowerBound >= frame, after.upperBound - after.lowerBound >= frame else { return nil }
-        return (before, after)
+        guard before.to - before.from >= frame, after.to - after.from >= frame else { return nil }
+        return (before.from ... before.to, after.from ... after.to)
     }
 
     /// What covers the jump at `time` (empty: nothing).
