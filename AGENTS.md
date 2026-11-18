@@ -245,7 +245,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-freeze-frame.sh` — 定格的时间线变换。
 - `scripts/check-listening.sh` — 听声音的纯计算：ESTOI 和研究的 numpy 版逐数对账、论文的性质、拿掉谁涨多少、原声特征和描述; voice tiers and grey hints (`VoiceClarity`).
 - `scripts/check-localization-coverage.sh` — 界面文案在每张字符串表都配齐、占位符一致。
-- `scripts/check-look-jobs.sh` — Slow looks: the router's lines, a look behind an edit as a queued job, cancel, two sessions' parallel looks (real App objects).
+- `scripts/check-look-jobs.sh` — Slow looks: the router's lines, a look behind an edit as a queued job, cancel, two sessions' parallel looks; `sound` under a look (real App objects).
 - `scripts/check-main-thread-watchdog.sh` — 主线程心跳看门狗、挂起抓栈期间不分配。
 - `scripts/check-mcp.sh` — AI 接口（MCP）：协议、清单和说明的上限、说明书、AI 改时间线的规则、客户端配置、词表对账（`--scans-only` 只跑编译之前的扫描，含 `checks/MCP/*-wiring.sh`）。 Native preset wraps survive canvas changes.
 - `scripts/check-media-import.sh` — 拖文件进轨道的落点。
