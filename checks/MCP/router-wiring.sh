@@ -44,6 +44,16 @@ for tool in AISpeechCutTool AIBeatCutTool AIVoiceoverTool AICutSoundTool; do
     exit 1
   fi
 done
+# set_track duck_others_db (MCP-29): apply opens the step itself, only when a curve changes (an empty group would stay on the
+# undo stack and ⌘Z would do nothing); its one perform is inside that step and the router does not wrap it again.
+duck_tool="Sources/SrtFlow/AISpeechDuckTool.swift"
+duck_routed="$(grep -cE 'return try AISpeechDuckTool\.apply\(plan, project\)$' "${ROUTER}" || true)"
+duck_stepped="$(grep -cE 'if changed \{ _ = AIUndoGrouping\.step\(project\.effectiveUndoManager\) \{ project\.perform \{' "${duck_tool}" || true)"
+duck_performs="$(grep -cE 'project\.perform' "${duck_tool}" || true)"
+if [ "${duck_routed}" -ne 1 ] || [ "${duck_stepped}" -ne 1 ] || [ "${duck_performs}" -ne 1 ]; then
+  echo "✗ set_track duck_others_db: AISpeechDuckTool.apply must hold its only perform inside AIUndoGrouping.step, opened only when a curve changes" >&2
+  exit 1
+fi
 if [ "$(grep -cE 'AIUndoGrouping\.step\(project\.effectiveUndoManager\)' Sources/SrtFlow/AITimelineTools.swift || true)" -ne 1 ]; then
   echo "✗ add_clips 那一次 perform 没包在 AIUndoGrouping.step 里" >&2
   exit 1

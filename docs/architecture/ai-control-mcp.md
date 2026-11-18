@@ -1261,6 +1261,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - The new tool uses a short card and a written guide from its first version. Its schema stays below 4,500 bytes and the whole
       catalog stays below 100,000 UTF-16 units. Existing utility cards were shortened; their full previous descriptions remain verbatim
       in the corresponding written-topic overviews. No catalog budget or exception list was raised.
+65. **Ducking under speech: `set_track` `duck_others_db`** (2026-11-18, MCP-29; contract in [volume curve](audio-volume-curve.md)
+    section 5): on the track that speaks, one call dips every other track (or only `duck_tracks`) under each of its lines, drawn
+    into the clips' volume curves; one undo step (plan awaits the lines; apply opens `AIUndoGrouping.step` only when a curve
+    changes, so a call that finds every dip in place leaves no empty step). Lines come
+    from a cached transcript or, for a narration file, its pauses; a camera's sound needs a transcript first. Calling again sets
+    the dip anew (measured, never stacked); 0 takes it out. A parameter on `set_track`, not a new tool: the catalog had under
+    1 KB left, so the card gained one sentence and a guide pointer, and the rules are in the guide's `ducking` section.
 
 ## 五、这一轮、停止、撤销这一轮
 
