@@ -105,6 +105,7 @@
 - [2026-08-08 悬停影子播放头与删除键](2026-08-08-hover-ghost-playhead-and-delete-key.md) — peek 语义与统一删除入口。
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
+- [2026-11-19 main stopped building: two merged PRs each added a `sound` to inspect_video](2026-11-19-inspect-video-sound-name-clash.md) — Two PRs green on their own can clash in main: when main moved, merge it in and build before merging; a guard should count a name only the thing it means can have.
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。
 - [2026-11-17 Static screen recordings reported as frozen pictures](2026-11-17-inspection-frozen-screen-recordings.md) — Preserve capture provenance and exempt expected static screens.
 - [2026-11-17 Inspection check mistakes a pending job for a failure](2026-11-17-inspection-job-wait-still-running.md) — Poll bounded client waits to a terminal result; keep analysis assertions and the overall deadline.
