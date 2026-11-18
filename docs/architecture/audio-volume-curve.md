@@ -156,6 +156,11 @@ Rules (only this way):
    same depth changes nothing, another depth replaces the dip, 0 takes it out, and a hand-drawn duck under a line becomes the
    asked depth. Everything above the dip's floor keeps its shape and goes down with it: a crossfade's equal-power bump or a
    bed swell from `set_transition sound` ([cut-sound](cut-sound.md) rule 6 and rule 9 compose with it in either order).
+   A clip only a ramp reaches (it ends in the attack or starts in the release) has the dip read on the deeper half of the ramp
+   it covers, each point divided by how far down the ramp is there — however shallow the ramp is at the clip's edge. Never
+   only "from half way down": on a clip ending a quarter of the way down that read nothing, so every call stacked another dip
+   and 0 never took it out ([case](../bugfixes/2026-11-19-speech-duck-stacks-on-shallow-ramp.md)). A window reaching less
+   than 1 ms into a clip leaves it alone (`SpeechDuckCurve.minimumReach`): the dip's two corner keys would merge into one.
 6. **A clip wholly inside one window is left alone** (a sound effect on a word: its own level next to the line is unknown,
    and the fix is to move or lower it on purpose). The result lists it as `inside_lines`.
 7. **Exact and bounded**: existing keys move by the offset at their time and keys go at the window's corners, so between keys
@@ -173,10 +178,13 @@ voice band, leave its track out with `duck_tracks` (a voice-band-only dip is MCP
 
 Checks: `scripts/check-mcp.sh` (`checks/MCP/SpeechDuckChecks.swift`: windows and merging, the curve on a flat / sloped /
 bumped line, 2× speed, the volume floor, calling again (same, shallower, deeper, 0, a bump drawn after the duck), windows
-across the clip's start and end, a kept key next to the start, a clip inside a line, which clips dip, lines from pauses, the
-result and the schema's range); `scripts/check-parameter-limits.sh` (`checks/ParameterLimits/SpeechDuckAppChecks.swift`: real
-App objects — a narration file's lines from its waveform, the music's curve, the exported mix 10 dB down under a line and back
-between, calling again changes nothing and leaves no empty undo step, one undo takes it all back, refusals change nothing);
+across the clip's start and end, a kept key next to the start, a clip inside a line, a clip only the shallow part of a ramp
+reaches — ending a quarter or 2 ms into the attack, starting 0.4 of the way down the release: same depth changes nothing, −20
+sets, 0 takes it out — and one reaching 0.3 ms in left alone, which clips dip, lines from pauses, the result and the schema's
+range); `scripts/check-parameter-limits.sh` (`checks/ParameterLimits/SpeechDuckAppChecks.swift`: real
+App objects — a narration file's lines from its waveform, the music's curve and a sting ending in the first line's attack, the
+exported mix 10 dB down under a line and back between, calling again changes nothing and leaves no empty undo step, 0 takes
+every dip out in one step, undo takes each changing call back in one step, refusals change nothing);
 `checks/MCP/router-wiring.sh` (apply's only `perform` sits inside `AIUndoGrouping.step`, opened only on a change, and the router
 does not wrap it again).
 
