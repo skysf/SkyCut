@@ -58,7 +58,7 @@ enum ClipAnimator {
     // 小 PNG 上，位移都应当各自成比例。
     //
     // 铺满画布的段用一套更小的幅度：满屏画面挪 16% 屏高是"甩进来"，而且位移
-    // 越大、补偿放大就越狠（见 `covered`），5% 配 1.10 的补偿是实测舒服的档。
+    // 越大、补偿放大就越狠（见 `ClipMotionCover`），5% 配 1.10 的补偿是实测舒服的档。
 
     private static func riseFraction(intensity: Double, coversCanvas: Bool) -> Double {
         (coversCanvas ? 0.05 : 0.16) * intensity
@@ -77,33 +77,33 @@ enum ClipAnimator {
     /// - Parameters:
     ///   - local: 距这一段开头的秒数（时间线秒）。
     ///   - span: 这一段的时间线长度。
-    ///   - coversCanvas: 摆放框盖满画布了吗（`EditClip.placementCoversCanvas`）。
-    ///     盖满时位移/缩放要做"不露边补偿"，见下。
+    ///   - coversCanvas: the full-frame variant (the picture covers the canvas at rest: `ClipMotionCover.coversCanvas`) —
+    ///     a smaller rise, pop from big. The no-bare-edge growth is not in here: it needs the picture's geometry (rotation,
+    ///     keyframes), so `EditClip.presetState` adds it (`ClipMotionCover.keepingCovered`).
     static func state(
         resolved: ResolvedClipPreset, local: Double, span: Double, coversCanvas: Bool
     ) -> ClipAnimationState {
         var state = ClipAnimationState()
-        guard !resolved.isEmpty, span > 0 else { return state }
-
-        let window = resolved.window
-        if window.fadeIn > 0, local < window.fadeIn {
-            apply(resolved.entrance, reveal: local / window.fadeIn, phase: .entrance,
+        switch edge(resolved: resolved, local: local, span: span) {
+        case .fadeIn?:
+            apply(resolved.entrance, reveal: local / resolved.window.fadeIn, phase: .entrance,
                   intensity: resolved.intensity, coversCanvas: coversCanvas, into: &state)
-        } else if window.fadeOut > 0, local > span - window.fadeOut {
-            apply(resolved.exit, reveal: (span - local) / window.fadeOut, phase: .exit,
+        case .fadeOut?:
+            apply(resolved.exit, reveal: (span - local) / resolved.window.fadeOut, phase: .exit,
                   intensity: resolved.intensity, coversCanvas: coversCanvas, into: &state)
-        }
-
-        // 不露边（产品决策 2026-09-18 第 4 条）：盖满画布的段一旦往上浮或者缩小，
-        // 边上就会露出底下那一层（主轨是黑场、上层轨是主轨画面）。按位移量补一点
-        // 放大盖回去 —— 框往上挪 dy（框高的比例），下边要够到原位就得放大到
-        // `1 + 2·dy`。末了再兜一道 `≥ 1`：回弹曲线尾巴那点越界（最多 ~2%）
-        // 被夹掉，观感是"落到位停住"，而不是闪一帧黑边。
-        if coversCanvas {
-            let reach = 1 + 2 * max(abs(state.offset.x), abs(state.offset.y))
-            state.scale = max(state.scale, reach)
+        case nil:
+            break
         }
         return state
+    }
+
+    /// The edge whose motion plays at `local`: the entrance window, the exit window, or nil in between (they never overlap:
+    /// `FadeWindow.clamped`).
+    static func edge(resolved: ResolvedClipPreset, local: Double, span: Double) -> FadeEdge? {
+        guard !resolved.isEmpty, span > 0 else { return nil }
+        if resolved.window.fadeIn > 0, local < resolved.window.fadeIn { return .fadeIn }
+        if resolved.window.fadeOut > 0, local > span - resolved.window.fadeOut { return .fadeOut }
+        return nil
     }
 
     private enum Phase {
@@ -219,14 +219,20 @@ extension ClipPresetKind {
 extension EditClip {
     /// 这一刻的预设动画状态。`resolved` 由调用方按转场上下文仲裁好
     /// （`ClipPreset.effective`）—— 求值器不认识时间线，也就管不了转场。
+    ///
+    /// The one place the builder (preview, and the export's prerendered clips) and look's `uncovered` read the motion from: the curve
+    /// (`ClipAnimator`) in the variant this edge's resting picture asks for, grown so a covering picture keeps covering
+    /// (`ClipMotionCover`; docs/architecture/clip-animation.md "不露边").
     func presetState(
         resolved: ResolvedClipPreset, atTimeline time: Double, canvas: CGSize
     ) -> ClipAnimationState {
-        ClipAnimator.state(
-            resolved: resolved,
-            local: min(max(time - timelineStart, 0), timelineDuration),
-            span: timelineDuration,
-            coversCanvas: placementCoversCanvas(canvas: canvas)
-        )
+        let local = min(max(time - timelineStart, 0), timelineDuration)
+        guard let edge = ClipAnimator.edge(resolved: resolved, local: local, span: timelineDuration) else {
+            return ClipAnimationState()
+        }
+        let covers = ClipMotionCover.coversCanvas(self, edge: edge, canvas: canvas)
+        let motion = ClipAnimator.state(resolved: resolved, local: local, span: timelineDuration, coversCanvas: covers)
+        guard covers else { return motion }
+        return ClipMotionCover.keepingCovered(motion, rest: ClipCoverage.picture(self, atTimeline: time, canvas: canvas))
     }
 }

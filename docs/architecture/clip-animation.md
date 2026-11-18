@@ -3,7 +3,7 @@
 > 2026-09-18 引入（[方案](../plans/2026-09-18-clip-animation.md)）。改模型
 > （`VideoEditClipAnimation.swift`）、求值器（`VideoEditClipAnimator.swift`）、
 > 预览切片（`VideoEditCompositionBuilder.swift`）或导出路由
-> （`VideoEditExportGraph.swift`）之前必读。
+> （`VideoEditExportGraph.swift`）之前必读。Also before changing the no-bare-edge growth (`ClipMotionCover.swift`).
 > 相关：[画面渐入渐出](video-fades.md)、[关键帧动画](keyframe-animation.md)、
 > [预览自由变换](preview-free-transform.md)、[画面文字](text-overlays.md)。
 
@@ -57,8 +57,7 @@ Inspector 里每个画面段的 **Animation** 区：In / Out 各选一种效果 
 ## 不露边（产品决策第 4 条）
 
 盖满画布的段一旦往上浮或者缩小，边上就会露出底下那一层（主轨是黑场、
-上层轨是主轨画面）。判据是**纯几何**的 `EditClip.placementCoversCanvas`
-（旋转过的段保守算作没盖满）。盖满时：
+上层轨是主轨画面）。判据是**纯几何**的: `ClipMotionCover.coversCanvas` (since 2026-11-18, below)。盖满时：
 
 - 位移按量补放大：框往上挪 `dy`（框高的比例），下边要够回原位就放大到 `1 + 2·dy`；
 - **Pop 反过来做**：从 `1 + a` 落到位，而不是从 `1 - a` 弹出来 —— "弹"这件事
@@ -69,9 +68,30 @@ Inspector 里每个画面段的 **Animation** 区：In / Out 各选一种效果 
 不盖满的段（角落里的 PNG、比例对不上留空的图）**不补** —— 本来就没有露出来的
 边可盖，补了只是一次莫名其妙的缩放。
 
+**Turned and keyframed pictures (2026-11-18, [case](../bugfixes/2026-11-18-turned-clip-entrance-bares-edges.md))**: until then
+the test was `EditClip.placementCoversCanvas` — the static box, and any turned clip counted as not covering — so a clip turned 5° at
+scale 1.2 (fills_frame true) rose 16 % with nothing grown and popped up from small, baring the frame's corners in the preview, the
+export and look's `uncovered`. Now (`ClipMotionCover`, the geometry behind fills_frame, `PictureCoverage`):
+
+- **Which motions** use the full-frame variant (smaller rise, pop from big) and keep covering: those whose clip, at rest, covers the
+  canvas on its first frame (entrance) or its last frame (exit) — placement or default fit, crop, flips, rotation and keyframes included
+  (`ClipCoverage.picture`). Per edge: scale keys from 0.8 to 1.2 enter like a small picture and leave like a full-frame one.
+- **The growth**: the moving picture grows about its centre just enough to cover its own resting place at that moment
+  (`PictureCoverage.growth(_:toCover:)`). For an unturned picture that is exactly the growth above (`1 + 2·dy`, and `≥ 1` for pop's
+  dip), so an unturned clip without keyframes renders exactly as before; a turned one is measured along its own sides, a keyframed one
+  around where its keyframes put it. A motion therefore never shows more of what is below than the clip at rest does (a keyframed
+  clip that bares the frame at rest still bares it; look says so).
+- **One place**: `EditClip.presetState` — the curve (`ClipAnimator.state`, which no longer grows anything) in the variant this edge asks
+  for, then the growth. The builder reads it for the preview and for the export's prerendered clips (fill and matte carry the same
+  placement, rotation and keyframes, so the same decision and growth), and look's `uncovered` reads it too.
+
 `checks/PreviewComposition` 两道守卫：纯值层面逐点扫 `scale ≥ 1 + 2|offset|`；
 像素层面真取帧量"上下边不许比中心暗"（画布特意用 320×180，64×36 上那几个像素
-的黑条量不出来，守卫红不了就等于没守）。
+的黑条量不出来，守卫红不了就等于没守）。Since 2026-11-18 the pure part is `EntranceCover.swift`: unturned growth equals the old
+rule; nine pictures that fill the frame (turned, flipped, off centre, a 9:16 picture across 16:9, scale / rotation / position keys) ×
+rise, pop, zoom × two intensities, in and out, cover the canvas and their resting place at every 1/120 s frame; the variant follows
+the first / last frame; real frames of turned clips keep every edge pixel covered, and the probe sees a clip that does not fill.
+Preview against export for a turned rise on V1 and a turned pop on V2 (fill + matte): `checks/ClipAnimation/TurnedEntrances.swift`.
 
 ## 两条管线
 
@@ -132,8 +152,8 @@ Inspector 里每个画面段的 **Animation** 区：In / Out 各选一种效果 
 
 | 检查 | 守什么 |
 | --- | --- |
-| `scripts/check-clip-animation.sh` | **两条管线逐点对账**：同一份时间线，预览取帧与真导出抽帧在同一时刻、同一区域的值必须一致（五种效果 + 上层轨 fill/matte）；纯 Fade 不许走预渲染 |
-| `scripts/check-preview-composition.sh` | 求值器的曲线（Fade 线性、擦除线性、铺满时 `scale ≥ 1 + 2\|offset\|`）+ 真取帧的擦除几何与"不露边" |
+| `scripts/check-clip-animation.sh` | **两条管线逐点对账**：同一份时间线，预览取帧与真导出抽帧在同一时刻、同一区域的值必须一致（五种效果 + 上层轨 fill/matte）；纯 Fade 不许走预渲染; turned pictures that fill keep the frame's corners covered while they rise / pop, in both pipelines (`TurnedEntrances.swift`) |
+| `scripts/check-preview-composition.sh` | 求值器的曲线（Fade 线性、擦除线性、铺满时 `scale ≥ 1 + 2\|offset\|`）+ 真取帧的擦除几何与"不露边"; turned and keyframed pictures keep covering at every frame of rise / pop / zoom (`EntranceCover.swift`) |
 | `scripts/check-video-fade.sh` | 预渲染不许把该让位的渐变烤进中间片（回归守卫）+ 擦除真导出 |
 | `scripts/check-project-file.sh` | 老工程迁移、`kind ⟺ 时长` 不变量、v15 闸门、分割/定格的取舍，以及生产接线（写入收 `[UUID]`、导出路由、仲裁传参） |
 
@@ -144,3 +164,5 @@ Inspector 里每个画面段的 **Animation** 区：In / Out 各选一种效果 
 - 动画播放时预览里的**选中框不跟着飞**（动画是叠在基准上的偏移，不改存下来的
   摆放值）。
 - 主轨接缝有转场时，那一侧的入/出场不生效，且 Inspector 当场有说明。
+- A clip turned about 5° and scaled until it fills (fills_frame true), with Rise and then Pop in and out: no corner of the frame shows
+  what is below while it moves, in the preview and in the export.

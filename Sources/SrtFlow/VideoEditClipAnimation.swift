@@ -222,22 +222,9 @@ extension EditClip {
     /// **导出路由、预览切片、黑底轨判据都问它**，别再各自拼 `isAnimated || …`。
     var needsPerFrameRender: Bool { isAnimated || needsPerFrameAnimation }
 
-    /// 摆放框把画布四边都盖住了吗（**纯几何**，不看不透明度）。
-    ///
-    /// 位移/缩放类动画的"不露边补偿"靠它：盖满画布的段往上浮，下面就会露出
-    /// 底下那一层（主轨是黑场、上层轨是主轨画面），所以要按位移量补一点放大
-    /// 盖回去；没盖满的段（角落里的 PNG、比例对不上留空的图）本来就没有
-    /// "露出来的边"可盖，补了只是一次莫名其妙的缩放。
-    ///
-    /// 与 `coversCanvasOpaquely` 的区别：那个是叠化路径的判据，要求完全不透明
-    /// 且没有动画；这里只问几何。旋转过的段保守算作**没盖满**（转过角之后
-    /// 四角会探出画布，补偿量没法用一个标量表达）。
-    func placementCoversCanvas(canvas: CGSize) -> Bool {
-        guard canvas.width > 0, canvas.height > 0, abs(rotationDegrees) <= 0.01 else { return false }
-        let frame = resolvedPlacement(canvas: canvas).frame(in: canvas)
-        return frame.minX <= 0.5 && frame.minY <= 0.5
-            && frame.maxX >= canvas.width - 0.5 && frame.maxY >= canvas.height - 0.5
-    }
+    // Whether rise / pop use the full-frame variant and keep the frame covered used to be `placementCoversCanvas` here: the static
+    // box only, and any turned clip counted as not covering, so its motion bared the frame. Since 2026-11-18 that is
+    // `ClipMotionCover` (rotation and keyframes included, the geometry behind fills_frame).
 }
 
 // MARK: - 存盘（宽容解码，规则同工程文件其他部分）

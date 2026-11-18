@@ -102,10 +102,13 @@ looked at the static box only. Rule — **one geometry** (`PictureCoverage`) ans
   edge), their union; a bare edge reports how deep the gap reaches, a bare corner how far it runs along each edge, canvas pixels.
   Pictures with transparency and stills still converting do not cover. Never from pixels: dark footage is not uncovered.
 - Not counted anywhere: opacity, fades and transitions (they show what is below on purpose; at a seam each clip counts alone).
-  Entrance / exit motion is not part of `fills_frame` (framing at rest): a turned clip with rise or pop bares the frame during the
-  motion, because the builder's no-bare-edge compensation (`placementCoversCanvas`) treats any turned clip as not covering — look shows it.
-- The render path's own tests (`coversCanvasOpaquely` for the dissolve path, `placementCoversCanvas` for that compensation) stay as they
-  are: they choose drawing paths and stay conservative for turned clips. No AI file tests coverage by itself (`checks/MCP/coverage-wiring.sh`).
+  Entrance / exit motion is not part of `fills_frame` (framing at rest). Since 2026-11-18 rise and pop keep a picture covering when it
+  covers at rest on the clip's first frame (entrance) or last frame (exit), turned and keyframed ones too: the builder's no-bare-edge
+  growth uses this geometry (`ClipMotionCover`, [入场 / 出场动画](clip-animation.md) "不露边"). Before, it counted any turned clip as not
+  covering, and a turned clip that filled bared its corners during the motion
+  ([case](../bugfixes/2026-11-18-turned-clip-entrance-bares-edges.md)).
+- The dissolve path's own test (`coversCanvasOpaquely`) stays as it is: it chooses a drawing path and stays conservative for turned
+  clips. No AI file tests coverage by itself (`checks/MCP/coverage-wiring.sh`).
 - Checks: `scripts/check-mcp.sh` → `PictureCoverageChecks` (a 1,092-case rotation / scale / offset sweep against an independent
   pixel-centre bitmap, fillFactor is the smallest growth, gaps between pictures, a half wipe) and `ClipCoverageChecks` (the walkthrough's
   turn and drift, flips, a crop, rotation keys, a spring dipping below its keys, the sampling grid, look's uncovered with V2, hidden clips
