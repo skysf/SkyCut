@@ -1615,3 +1615,16 @@
 "Parameter %@ must be a string." = "El parámetro %@ debe ser una cadena de texto.";
 "Parameter %@ must be #RRGGBB or #RRGGBBAA." = "El parámetro %@ debe tener el formato #RRGGBB o #RRGGBBAA.";
 "Render length must include at least one frame and be at most %@ seconds." = "La duración debe incluir al menos un fotograma y no superar %@ segundos.";
+
+// Official motion templates.
+"Choose a native title, an official template, or a motion from this project." = "Elige un título nativo, una plantilla oficial o una animación de este proyecto.";
+"Official Templates" = "Plantillas oficiales";
+"Box to Earth" = "De caja a Tierra";
+"A title box stretches into a globe with fine latitude and longitude lines." = "El marco del título se transforma en un globo con finas líneas de latitud y longitud.";
+"Word Collision" = "Choque de palabras";
+"Two words meet in a flash with drifting fragments; the picture stays steady." = "Dos palabras chocan con un destello y fragmentos; la imagen de fondo permanece estable.";
+"Light Through Ice" = "Luz entre el hielo";
+"A jagged ice crack opens with light and reveals the title." = "Una grieta irregular en el hielo deja pasar la luz y revela el título.";
+"Second word" = "Segunda palabra";
+"This template could not be loaded." = "No se pudo cargar esta plantilla.";
+"Preview unavailable" = "Vista previa no disponible";

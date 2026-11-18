@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Light Through Ice</title>
+<style>html,body{margin:0;overflow:hidden;background:transparent}svg{display:block}</style></head><body>
+<svg id="motion" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="light" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="white" stop-opacity="0"/>
+      <stop id="tint" offset=".5" stop-opacity=".7"/>
+      <stop offset="1" stop-color="white" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="soft" x="-10%" y="-100%" width="120%" height="300%">
+      <feGaussianBlur id="softBlur"/>
+    </filter>
+    <filter id="glow" x="-10%" y="-100%" width="120%" height="300%">
+      <feGaussianBlur id="edgeBlur" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="opening" clipPathUnits="userSpaceOnUse"><path id="reveal"/></clipPath>
+  </defs>
+  <g id="all" opacity="0">
+    <path id="beam" fill="url(#light)" filter="url(#soft)"/>
+    <path id="core"/>
+    <text id="title" text-anchor="middle" dominant-baseline="central" clip-path="url(#opening)"/>
+    <g id="edges" fill="none" stroke-linejoin="round" stroke-linecap="round" filter="url(#glow)">
+      <path id="upper"/><path id="lower"/><path id="facets"/>
+    </g>
+  </g>
+</svg><script>
+// Original SkyCut geometry. Explicit SVG paths and opacities keep the reveal independent of earlier draw order.
+const p=MOTION_PARAMS,W=MOTION_RENDER.width,H=MOTION_RENDER.height,S=Math.min(W,H);
+const get=id=>document.getElementById(id),set=(id,key,value)=>get(id).setAttribute(key,value);
+const clamp=x=>Math.max(0,Math.min(1,x));
+const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
+const noise=i=>{const n=Math.sin(i*91.7+12.4)*19341.731;return n-Math.floor(n)};
+const seam=Array.from({length:100},(_,i)=>({x:W*(i/99*1.12-.06),
+  y:H/2+S*(Math.sin(i*.41)*.009+(noise(i)-.5)*.026),depth:.6+noise(i+201)*.6}));
+set('motion','width',W);set('motion','height',H);set('motion','viewBox','0 0 '+W+' '+H);
+set('tint','stop-color',p.color);set('core','fill',p.color);set('edges','stroke',p.color);
+set('edges','stroke-width',S*.002);set('softBlur','stdDeviation',S*.024);set('edgeBlur','stdDeviation',S*.006);
+const title=get('title');title.textContent=p.text;
+set('title','x',W/2);set('title','y',H/2);set('title','fill',p.color);
+title.style.fontFamily=JSON.stringify(p.font);title.style.fontSize=S*.12+'px';title.style.fontWeight='600';
+const point=(value,gap,side)=>value.x.toFixed(3)+' '+(value.y+side*gap*value.depth).toFixed(3);
+const edge=(gap,side)=>seam.map((value,i)=>(i?'L':'M')+point(value,gap,side)).join('');
+const opening=gap=>edge(gap,-1)+[...seam].reverse().map(value=>'L'+point(value,gap,1)).join('')+'Z';
+function frame(t){
+  if(t<p.hit){set('all','opacity',0);return}
+  const span=Math.max(.15,p.duration-p.hit),phase=(t-p.hit)/span;
+  const open=smooth(phase/.25),settle=smooth((phase-.3)/.35),gap=S*.12*open;
+  const fade=1-smooth((t-(p.duration-Math.min(.35,span*.2)))/Math.min(.35,span*.2));
+  const light=1-settle;
+  set('all','opacity',fade.toFixed(5));
+  set('beam','d',opening(gap));set('beam','opacity',(light*.55).toFixed(5));
+  set('core','d',opening(gap));set('core','opacity',(light*.08).toFixed(5));
+  set('reveal','d',opening(gap+settle*S*.2));
+  set('upper','d',edge(gap,-1));set('lower','d',edge(gap,1));set('edges','opacity',light.toFixed(5));
+  let branches='';
+  for(let i=9;i<seam.length;i+=13){
+    const value=seam[i],side=i%2?1:-1;
+    branches+='M'+point(value,gap,side)+'L'+(value.x+S*.025).toFixed(3)+' '+(value.y+side*(gap+S*.04)).toFixed(3)
+      +'L'+(value.x+S*.055).toFixed(3)+' '+(value.y+side*(gap+S*.055)).toFixed(3);
+  }
+  set('facets','d',branches);set('facets','opacity',.35);
+}
+window.motion={frame,ready:document.fonts.ready.then(()=>{
+  if(title.getBBox().width>W*.82){set('title','textLength',W*.82);set('title','lengthAdjust','spacingAndGlyphs')}
+})};
+</script></body></html>

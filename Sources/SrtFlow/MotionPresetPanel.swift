@@ -18,31 +18,12 @@ struct MotionPresetPanel: View {
         let entries = MotionPresetLibrary.entries(in: project.state)
         VStack(alignment: .leading, spacing: 8) {
             Text("Motion Presets").font(.headline)
-            Text("Choose a native title first, or reuse a motion from this project.")
+            Text("Choose a native title, an official template, or a motion from this project.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 8) {
-                    ForEach(entries) { entry in
-                        switch entry {
-                        case .native(let kind):
-                            MotionPresetCard(kind: kind) {
-                                MotionPresetActions.add(kind, to: project)
-                                onPick()
-                            }
-                        case .web(_, let record, let movie):
-                            if entry.id == entries.first(where: { if case .web = $0 { return true }; return false })?.id {
-                                Divider().padding(.top, 4)
-                                Text("Project Templates").font(.subheadline.weight(.semibold))
-                                Text("Rendered motions; change their words and style in the inspector.")
-                                    .font(.caption).foregroundStyle(.secondary)
-                                    .fixedSize(horizontal: false, vertical: true)
-                            }
-                            WebMotionPresetCard(project: project, entryID: entry.id, record: record, movie: movie, onPick: onPick)
-                        }
-                    }
-                }
+                MotionPresetLibraryRows(project: project, entries: entries, onPick: onPick)
             }
             .frame(maxHeight: 540)
         }

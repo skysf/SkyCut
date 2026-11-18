@@ -211,7 +211,13 @@ struct ClipBlockView: View, Equatable {
                 if clip.isStillImage {
                     Image(systemName: "photo").font(.system(size: 8))
                 }
-                Text(clip.name)
+                Group {
+                    if let record = clip.webMotion {
+                        WebMotionClipName(record: record)
+                    } else {
+                        Text(clip.name)
+                    }
+                }
                     .font(.system(size: 9, weight: .medium))
                     .lineLimit(1)
                 if abs(clip.speed - 1) > 0.001 {

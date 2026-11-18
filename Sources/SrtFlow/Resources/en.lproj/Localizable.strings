@@ -1615,3 +1615,16 @@
 "Parameter %@ must be a string." = "Parameter %@ must be a string.";
 "Parameter %@ must be #RRGGBB or #RRGGBBAA." = "Parameter %@ must be #RRGGBB or #RRGGBBAA.";
 "Render length must include at least one frame and be at most %@ seconds." = "Render length must include at least one frame and be at most %@ seconds.";
+
+// Official motion templates.
+"Choose a native title, an official template, or a motion from this project." = "Choose a native title, an official template, or a motion from this project.";
+"Official Templates" = "Official Templates";
+"Box to Earth" = "Box to Earth";
+"A title box stretches into a globe with fine latitude and longitude lines." = "A title box stretches into a globe with fine latitude and longitude lines.";
+"Word Collision" = "Word Collision";
+"Two words meet in a flash with drifting fragments; the picture stays steady." = "Two words meet in a flash with drifting fragments; the picture stays steady.";
+"Light Through Ice" = "Light Through Ice";
+"A jagged ice crack opens with light and reveals the title." = "A jagged ice crack opens with light and reveals the title.";
+"Second word" = "Second word";
+"This template could not be loaded." = "This template could not be loaded.";
+"Preview unavailable" = "Preview unavailable";

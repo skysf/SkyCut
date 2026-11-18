@@ -1,0 +1,55 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Box to Earth</title>
+<style>html,body{margin:0;overflow:hidden;background:transparent}canvas{display:block}</style></head>
+<body><canvas id="motion"></canvas><script>
+// Original SkyCut design: the title's box becomes a wire globe. Every frame is derived from its own time.
+const p=MOTION_PARAMS, W=MOTION_RENDER.width, H=MOTION_RENDER.height, S=Math.min(W,H);
+const canvas=document.getElementById('motion'), ctx=canvas.getContext('2d');
+canvas.width=MOTION_RENDER.pixelWidth;canvas.height=MOTION_RENDER.pixelHeight;
+canvas.style.width=W+'px';canvas.style.height=H+'px';
+const DX=canvas.width/W,DY=canvas.height/H,D=Math.min(DX,DY);
+const clamp=x=>Math.max(0,Math.min(1,x));
+const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
+const mix=(a,b,x)=>a+(b-a)*x;
+function outline(a,b,n){
+  ctx.beginPath();
+  for(let i=0;i<=192;i++){
+    const angle=i*Math.PI/96,c=Math.cos(angle),s=Math.sin(angle);
+    const x=a*Math.sign(c)*Math.pow(Math.abs(c),2/n),y=b*Math.sign(s)*Math.pow(Math.abs(s),2/n);
+    if(i)ctx.lineTo(x,y);else ctx.moveTo(x,y);
+  }
+  ctx.closePath();ctx.stroke();
+}
+function font(size,weight=600){ctx.font=weight+' '+size+'px '+JSON.stringify(p.font)}
+function frame(t){
+  ctx.setTransform(DX,0,0,DY,0,0);ctx.clearRect(0,0,W,H);
+  if(t<p.hit)return;
+  const age=t-p.hit,span=Math.max(.15,p.duration-p.hit),phase=age/span;
+  const fade=1-smooth((t-(p.duration-Math.min(.35,span*.2)))/Math.min(.35,span*.2));
+  const morph=smooth((phase-.12)/.43),pop=1+.13*Math.exp(-age/.11);
+  const radius=Math.min(W*.39,H*.35),cx=W/2,cy=H/2;
+  let size=S*.105;font(size);
+  size*=Math.min(1,W*.72/Math.max(1,ctx.measureText(p.text).width));font(size);
+  const half=Math.min(W*.43,ctx.measureText(p.text).width/2+S*.065);
+  ctx.save();ctx.translate(cx,cy);ctx.scale(pop,pop);
+  ctx.globalAlpha=fade;ctx.strokeStyle=p.color;ctx.lineWidth=S*.003;
+  ctx.shadowColor=p.color;ctx.shadowBlur=S*.012*(1-morph*.6)*D;
+  outline(mix(half,radius,morph),mix(size*.65,radius,morph),mix(18,2,morph));
+  ctx.shadowBlur=0;
+  ctx.globalAlpha=fade*smooth((morph-.35)/.6)*.36;
+  ctx.lineWidth=S*.0015;
+  for(const width of [.32,.68]){
+    ctx.beginPath();ctx.ellipse(0,0,radius*width,radius,0,0,Math.PI*2);ctx.stroke();
+  }
+  for(const latitude of [-.5,0,.5]){
+    const rx=radius*Math.sqrt(1-latitude*latitude);
+    ctx.beginPath();ctx.ellipse(0,radius*latitude,rx,radius*.12,0,0,Math.PI*2);ctx.stroke();
+  }
+  ctx.globalAlpha=fade;ctx.fillStyle=p.color;ctx.textAlign='center';ctx.textBaseline='middle';
+  font(size);ctx.fillText(p.text,0,0);
+  ctx.globalAlpha=fade*morph*.75;font(S*.024,500);
+  ctx.fillText('90° N',0,-radius-S*.04);ctx.fillText('90° S',0,radius+S*.04);
+  ctx.restore();
+}
+window.motion={frame,ready:document.fonts.ready};
+</script></body></html>

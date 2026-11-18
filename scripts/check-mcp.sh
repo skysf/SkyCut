@@ -340,6 +340,7 @@ xcrun swiftc \
   Sources/SrtFlow/AITimelineSummary.swift \
   Sources/SrtFlow/AIMotionSummary.swift \
   Sources/SrtFlow/MotionPresetLibrary.swift \
+  Sources/SrtFlow/WebMotion/OfficialWebMotionTemplates.swift \
   Sources/SrtFlow/WebMotion/WebMotionParameters.swift \
   Sources/SrtFlow/WebMotion/WebMotionEnvironment.swift \
   Sources/SrtFlow/AITextEdits.swift \

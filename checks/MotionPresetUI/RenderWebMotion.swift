@@ -45,7 +45,12 @@ import SrtFlowMCPKit
                 func file(_ name: String) -> URL { out.appendingPathComponent("\(name)-\(language.rawValue)-\(look).png") }
                 let library = file("1-motion-library")
                 try await Snapshot.take(MotionPresetPanel(project: project), to: library, appearance: appearance)
-                try verifyPoster(in: library)
+                let projectEntries = MotionPresetLibrary.entries(in: project.state).filter { if case .web = $0 { return true }; return false }
+                let projectLibrary = file("1b-project-motion-library")
+                try await Snapshot.take(
+                    MotionPresetLibraryRows(project: project, entries: projectEntries).padding(14).frame(width: 380),
+                    to: projectLibrary, appearance: appearance)
+                try verifyPoster(in: projectLibrary)
                 try await parameterSection(project, clip: clip, to: file("2-web-parameters"), appearance: appearance)
                 try await Snapshot.take(
                     VideoEditInspectorView(project: project, clock: project.clock, playhead: project.clock.whilePaused)

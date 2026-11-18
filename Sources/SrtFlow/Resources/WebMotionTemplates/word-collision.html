@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Word Collision</title>
+<style>html,body{margin:0;overflow:hidden;background:transparent}canvas{display:block}</style></head>
+<body><canvas id="motion"></canvas><script>
+// Original SkyCut design. Only the words recoil; no camera, page or picture-wide shake is applied.
+const p=MOTION_PARAMS,W=MOTION_RENDER.width,H=MOTION_RENDER.height,S=Math.min(W,H);
+const canvas=document.getElementById('motion'),ctx=canvas.getContext('2d');
+canvas.width=MOTION_RENDER.pixelWidth;canvas.height=MOTION_RENDER.pixelHeight;
+canvas.style.width=W+'px';canvas.style.height=H+'px';
+const DX=canvas.width/W,DY=canvas.height/H,D=Math.min(DX,DY);
+const clamp=x=>Math.max(0,Math.min(1,x));
+const smooth=x=>{x=clamp(x);return x*x*(3-2*x)};
+const noise=i=>{const n=Math.sin(i*127.1+43.7)*43758.5453;return n-Math.floor(n)};
+const pieces=Array.from({length:48},(_,i)=>({
+  angle:noise(i*5)*Math.PI*2,speed:S*(.12+noise(i*5+1)*.7),
+  size:S*(.002+noise(i*5+2)*.006),life:.5+noise(i*5+3)*.65,spin:(noise(i*5+4)-.5)*18
+}));
+function font(size){ctx.font='700 '+size+'px '+JSON.stringify(p.font)}
+function particles(age){
+  if(age<0)return;
+  ctx.fillStyle=p.color;
+  for(const piece of pieces){
+    if(age>piece.life)continue;
+    const flight=(1-Math.exp(-age*1.4))/1.4;
+    ctx.save();ctx.globalAlpha=(1-age/piece.life)*.9;
+    ctx.translate(W/2+Math.cos(piece.angle)*piece.speed*flight,
+                  H/2+Math.sin(piece.angle)*piece.speed*flight+S*.14*age*age);
+    ctx.rotate(piece.spin*age);ctx.beginPath();
+    ctx.moveTo(-piece.size,0);ctx.lineTo(piece.size,-piece.size*.4);ctx.lineTo(piece.size*.3,piece.size);ctx.closePath();
+    ctx.fill();ctx.restore();
+  }
+}
+function flash(age){
+  if(age<0||age>.45)return;
+  const pulse=Math.exp(-age*22),radius=S*(.12+age*1.4);
+  ctx.save();ctx.globalAlpha=pulse*.85;
+  const light=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,radius);
+  light.addColorStop(0,'white');light.addColorStop(.14,p.color);light.addColorStop(1,'transparent');
+  ctx.fillStyle=light;ctx.fillRect(W/2-radius,H/2-radius,radius*2,radius*2);
+  ctx.strokeStyle=p.color;ctx.lineWidth=S*.002;ctx.globalAlpha=(1-age/.45)*.6;
+  ctx.beginPath();ctx.ellipse(W/2,H/2,radius*1.7,radius*.5,0,0,Math.PI*2);ctx.stroke();ctx.restore();
+}
+function frame(t){
+  ctx.setTransform(DX,0,0,DY,0,0);ctx.clearRect(0,0,W,H);
+  const lead=Math.min(.65,Math.max(.12,p.hit)),age=t-p.hit;
+  if(t<p.hit-lead)return;
+  // Fade the canvas layer: shadowed text did not track Canvas globalAlpha in the checked WebKit renders.
+  canvas.style.opacity=String(1-smooth((t-(p.duration-.3))/.3));
+  const arrival=clamp((t-p.hit+lead)/lead);
+  let size=S*.17;font(size);
+  size*=Math.min(1,W*.83/Math.max(1,ctx.measureText(p.text).width+ctx.measureText(p.second_text).width+S*.035));font(size);
+  const gap=S*.025,travel=Math.pow(1-arrival,2)*W*.9;
+  const recoil=age>=0?S*.027*Math.exp(-age/.16)*Math.sin(age*24):0;
+  ctx.save();ctx.globalAlpha=1;ctx.fillStyle=p.color;ctx.textBaseline='middle';
+  ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=S*.012*D;ctx.shadowOffsetY=S*.004*D;
+  ctx.textAlign='right';ctx.fillText(p.text,W/2-gap/2-travel-recoil,H/2);
+  ctx.textAlign='left';ctx.fillText(p.second_text,W/2+gap/2+travel+recoil,H/2);
+  ctx.restore();particles(age);flash(age);
+}
+window.motion={frame,ready:document.fonts.ready};
+</script></body></html>

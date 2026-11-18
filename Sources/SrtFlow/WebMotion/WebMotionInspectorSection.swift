@@ -9,6 +9,7 @@ struct WebMotionInspectorSection: View {
     @State private var model: WebMotionEditorModel
     @State private var pageError: String?
     @State private var isRevealing = false
+    @Environment(\.locale) private var locale
 
     init(project: VideoEditProject, clip: EditClip) {
         self.project = project
@@ -18,9 +19,10 @@ struct WebMotionInspectorSection: View {
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        let _ = locale.identifier
         VStack(alignment: .leading, spacing: 10) {
             Text("Motion Template").font(.callout.weight(.medium))
-            Text(verbatim: model.record.name).font(.caption).foregroundStyle(.secondary)
+            Text(verbatim: OfficialWebMotionLabels.title(model.record)).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Text("Change the parameters, then re-render to update this clip.")
                 .font(.caption).foregroundStyle(.secondary)
@@ -90,11 +92,13 @@ struct WebMotionInspectorSection: View {
 private struct WebMotionParameterRow: View {
     let field: WebMotionParameterField
     let model: WebMotionEditorModel
+    @Environment(\.locale) private var locale
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        let _ = locale.identifier
         VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: field.label).font(.caption).foregroundStyle(.secondary)
+            Text(verbatim: OfficialWebMotionLabels.field(field, record: model.record)).font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             switch field.kind {
             case .text:

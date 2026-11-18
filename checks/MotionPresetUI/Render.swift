@@ -21,7 +21,9 @@ import SrtFlowMCPKit
         let out = URL(fileURLWithPath: ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_OUT"]!)
         do {
             try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
-            if ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_WEB_ONLY"] == "1" {
+            if ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_OFFICIAL_ONLY"] == "1" {
+                try await MotionPresetOfficialRender.render(out: out)
+            } else if ProcessInfo.processInfo.environment["SRTFLOW_MOTION_RENDER_WEB_ONLY"] == "1" {
                 try await MotionPresetWebRender.render(out: out)
             } else {
                 let project = OpenProjects.shared.primary

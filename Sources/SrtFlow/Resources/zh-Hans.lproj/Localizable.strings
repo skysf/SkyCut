@@ -1615,3 +1615,16 @@
 "Parameter %@ must be a string." = "参数 %@ 必须是文字。";
 "Parameter %@ must be #RRGGBB or #RRGGBBAA." = "参数 %@ 必须采用 #RRGGBB 或 #RRGGBBAA 颜色格式。";
 "Render length must include at least one frame and be at most %@ seconds." = "动效总长至少要有一帧，且不能超过 %@ 秒。";
+
+// Official motion templates.
+"Choose a native title, an official template, or a motion from this project." = "可以选原生标题、官方模板，也可以复用工程里的动效。";
+"Official Templates" = "官方模板";
+"Box to Earth" = "盒子撑成地球";
+"A title box stretches into a globe with fine latitude and longitude lines." = "标题的方框撑成地球，经纬线随之展开。";
+"Word Collision" = "双词碰撞";
+"Two words meet in a flash with drifting fragments; the picture stays steady." = "两个词撞出闪光与碎片，底下的画面保持稳定。";
+"Light Through Ice" = "冰隙透光";
+"A jagged ice crack opens with light and reveals the title." = "不规则的冰缝透出光，显露标题。";
+"Second word" = "第二个词";
+"This template could not be loaded." = "无法载入这套模板。";
+"Preview unavailable" = "暂无预览";

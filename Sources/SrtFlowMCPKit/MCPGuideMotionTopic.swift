@@ -18,7 +18,7 @@ enum MCPGuideMotionTopic {
             get_job; do not submit the same page again merely because rendering is slow.
             """),
             MCPGuideSection(name: "placing", about: "template or page, parameters, timing, upper tracks, changing the same clip", text: """
-            Choose template from get_timeline's web entries (a project: id reuses a page already stored in this project), or \
+            Choose template from get_timeline's web entries (official: is bundled; project: reuses this project's page), or \
             supply page HTML as the fallback. parameters is a JSON object exposed to the page as frozen MOTION_PARAMS. \
             Pass fields to describe its editable form: key, label and type (text, font, color or number), with optional \
             minimum and maximum for numbers. fonts lists fixed installed font dependencies used directly by the page; \
@@ -33,6 +33,22 @@ enum MCPGuideMotionTopic {
             With clip_id, omitted values stay. parameters merges its top-level keys into the stored values, and the same \
             clip id stays through the new render. Nothing changes until all checks pass; failure leaves the old clip and \
             its movie intact. A deleted clip or a project edited while rendering is never overwritten by an old result.
+            """),
+            MCPGuideSection(name: "official_templates", about: "the three bundled web designs, editable words and the collision's stable picture", text: """
+            After the native presets, the shared library contains three original SkyCut web templates. Use the exact \
+            official: id returned by get_timeline; no page HTML is needed, and trusted bundled code does not ask for \
+            AI-page approval. Each placement stores its own page and values, so changing it cannot change another \
+            placement or the bundled defaults. A successfully placed clip can also be reused through its project: id.
+
+            Box to Earth stretches a title box into a wire globe. Word Collision brings two editable words together \
+            with a local flash and drifting fragments; it never shakes the whole picture. Light Through Ice opens \
+            a jagged seam of light and reveals the title. All three expose text, font and color values; the collision \
+            has a second editable word. Their default duration is 4 seconds, with local hits of 0.6, 0.9 and 0.5 seconds \
+            respectively. Change duration or hit using the existing timing fields, and use hit_at for timeline alignment.
+
+            Use installed fonts. Native and official templates are preferable to writing page code. Inspect the result \
+            at its returned look_times, especially the impact and the settled title; page checks establish deterministic \
+            rendering, not whether the words fit the scene.
             """),
             MCPGuideSection(name: "page_contract", about: "frame entry, parameters, page time, resources, deterministic drawing and the network lock", text: """
             Define window.motion = { frame(t), duration, ready }. frame(t) draws the picture at t seconds; it may return a \
@@ -70,6 +86,7 @@ enum MCPGuideMotionTopic {
             """)
         ],
         examples: [
+            ["template": "official:box_to_earth", "parameters": ["text": "EXPEDITION"], "hit_at": 12.5],
             ["template": "project:11111111-2222-3333-4444-555555555555", "parameters": ["text": "EXPEDITION"],
              "hit_at": 58.79, "hit": 1.2, "duration": 4],
             ["clip_id": "c1", "parameters": ["text": "TO THE POLE"]]

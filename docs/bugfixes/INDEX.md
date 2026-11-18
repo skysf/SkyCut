@@ -150,6 +150,7 @@
 - [2026-09-26 播放中按 Return，App 在音频线程上崩溃](2026-09-26-meter-crash-on-go-to-start.md) — 从平台回调拿来的时间，当下标之前先问会不会是负的。
 - [2026-10-01 播放中按空格，图标慢半拍](2026-10-01-meter-current-time-blocks-main-thread.md) — 不许同步问播放器要 `currentTime()`：读时钟外推的 `estimatedTime`。
 - [2026-09-23 一条轨上换了音频格式就没声音、预览卡住](2026-09-23-meter-tap-dies-on-audio-format-change.md) — 一条合成音轨只装一种格式；自检素材要有几种格式。
+- [2026-11-18 Motion placement groups shared one outer watchdog](2026-11-18-motion-placement-combined-watchdog.md) — Run both growing integration groups in mandatory bounded processes; preserve every assertion and aggregate failures.
 - [2026-11-04 非零起点让原生尾帧请求落到前一个刻度](2026-11-04-native-frame-request-truncation.md) — 只有原生抽帧的请求取最近的 1/600，证据守卫不放宽；合成的时间照旧截断（预览自由变换的合同）。
 - [2026-11-17 Sound effects added with new_audio landed on the voice and music tracks](2026-11-17-new-audio-effects-land-on-voice-and-music-tracks.md) — A fallback that "fits it somewhere" suits a mouse drop, not a named request: open a new track and say so in the reply.
 - [2026-09-28 点名新开轨的第二首配乐接在了 A1 后面](2026-09-28-new-audio-lands-on-a1.md) — 要记的是意图，不是副作用。
@@ -157,7 +158,11 @@
 - [2026-09-25 老虎机数字 365 → 90 停在「090」](2026-09-25-odometer-leading-zero.md) — 缺省值替缺失的数据说了话：不存在的那一位滚成空白收掉。
 - [2026-11-04 官方生成把确认问题缓存成已完成](2026-11-04-official-confirmation-cached-as-completion.md) — 只缓存有真实任务号的启动结果；确认解除后重新过闸。
 - [2026-11-04 官方镜头等到名额后仍用旧提交条件](2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 之前重新核对账户 / 工程 / 文件 / 有效期。
+- [2026-11-18 Official ice page fails frame replay](2026-11-18-official-ice-frame-replay.md) — Verify exact replay after other frames and on another page; a speculative canvas reset needs the same failing check rerun.
+- [2026-11-18 Official motion clip names stay in the creation language](2026-11-18-official-motion-clip-names-stay-in-old-language.md) — Localize recognized defaults in every visible consumer and invalidate mounted labels on a locale change; keep saved names verbatim.
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
+- [2026-11-18 AI project-template reuse loses the official origin](2026-11-18-official-template-origin-on-reuse.md) — Preserve a resolved source identity separately from the ID used to find it; UI and AI copies must retain the same defaults.
+- [2026-11-18 Official collision title does not fade with its duration](2026-11-18-official-word-shadow-fade.md) — Compare actual pixels at common times; a duration change must not pass merely because its frame count changed.
 - [2026-11-17 Projects saved before the freeze fix still delete the clip with its freeze tail](2026-11-17-old-freeze-tails-stay-linked.md) — Fixing how data is made leaves the data already made: repair old files on open; pieces of one clip in one link group play in step.
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
