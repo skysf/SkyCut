@@ -45,7 +45,7 @@ enum WebMotionRecovery {
                     if project.documentURL != nil { project.saveSoon() }
                 } catch {
                     guard !Task.isCancelled, project.isCurrentGeneration(generation) else { return }
-                    project.notice = String(format: L10n("Motion could not be rebuilt: %@"), String(describing: error))
+                    project.notice = String(format: L10n("Motion could not be rebuilt: %@"), WebMotionUIError.message(error))
                 }
             }
         })

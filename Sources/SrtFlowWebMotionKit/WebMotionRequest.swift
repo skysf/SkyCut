@@ -93,9 +93,18 @@ public struct WebMotionRequest: Codable, Sendable, Equatable {
         self.limits = limits ?? .standard(frames: count)
     }
 
+    /// round(duration × fps), or 0 unless both are inside the caps (so at most 60 s × 120 fps = 7,200 frames). The caps
+    /// are checked before multiplying: a finite but huge duration or frame rate (an AI's typo, a damaged project file)
+    /// overflowed `Int` here and quit SkyCut before `problems()` could refuse it
+    /// (docs/bugfixes/2026-11-19-web-motion-huge-duration-quits-app.md).
     public static func frameCount(duration: Double, fps: Int) -> Int {
-        guard duration.isFinite, duration > 0, fps > 0 else { return 0 }
+        guard timingWithinCaps(duration: duration, fps: fps) else { return 0 }
         return Int((duration * Double(fps)).rounded())
+    }
+
+    /// Whether a duration and a frame rate are inside the caps: the only values `frameCount` turns into frames.
+    public static func timingWithinCaps(duration: Double, fps: Int) -> Bool {
+        duration.isFinite && duration > 0 && duration <= WebMotionCaps.maxDuration && WebMotionCaps.fpsRange ~= fps
     }
 
     public var frameCount: Int { WebMotionRequest.frameCount(duration: duration, fps: fps) }
@@ -124,7 +133,9 @@ public struct WebMotionRequest: Codable, Sendable, Equatable {
             found.append("The duration must be more than 0 and at most \(Int(caps.maxDuration)) seconds.")
         }
         if !(caps.fpsRange ~= fps) { found.append("The frame rate must be \(caps.fpsRange.lowerBound)–\(caps.fpsRange.upperBound).") }
-        if duration.isFinite, duration > 0, caps.fpsRange ~= fps, frameCount < 1 { found.append("The motion is shorter than one frame.") }
+        if WebMotionRequest.timingWithinCaps(duration: duration, fps: fps), frameCount < 1 {
+            found.append("The motion is shorter than one frame.")
+        }
         found += sizeProblems()
         if !(layoutHeight.isFinite && caps.layoutHeightRange ~= layoutHeight) {
             found.append("The layout height must be \(Int(caps.layoutHeightRange.lowerBound))–\(Int(caps.layoutHeightRange.upperBound)) CSS px.")
