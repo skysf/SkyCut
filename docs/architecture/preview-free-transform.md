@@ -50,6 +50,11 @@ it: set_canvas, the canvas menu, auto following a new first V1 clip, a screen re
   edit_clips fit=fill on them (`AICanvasReframe`). Re-filling on its own would have to guess the window and could bring back what a
   crop had removed (black bars, a watermark); keeping the shape never shows anything the clip did not show before.
 - A clip framed by the same edit that changes the canvas is left as that edit set it.
+- `perform` follows linkage **before** reframing, after the magnet. Reframing rewrites geometry internally; running it first
+  makes linkage mistake untouched attachments for user-edited objects and skip their moves/deletions. Linkage changes timing
+  without changing the sizing fields used here, so the moved objects still keep their shapes. The real `perform` regression
+  (`scripts/check-parameter-limits.sh`, `CanvasLinkageChecks`) checks both contracts and its report together, including undo/redo
+  ([case](../bugfixes/2026-11-18-auto-canvas-suppresses-linkage.md)).
 - **Texts and shapes** (2026-11-17, `OverlayReframe`, called from `CanvasReframe.keepShapes`;
   [case](../bugfixes/2026-11-17-canvas-change-resizes-texts-and-shapes.md)): their lengths are stored against two edges — pixels of a
   1080-high frame (font size, stroke, shadow, plate, letter spacing, a shape's line width and cover strength) and fractions of the

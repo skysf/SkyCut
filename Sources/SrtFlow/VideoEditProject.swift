@@ -439,12 +439,12 @@ final class VideoEditProject {
         mutate(&next)
         // 磁吸：只在改到了 V1 的排布（或者磁吸这次才打开）时排紧 V1 —— 改字幕、音量、别的轨永远不动 V1（`MainMagnet`）。
         let packed = MainMagnet.settle(&next, after: before)
-        // The canvas changed shape (set_canvas, auto following a new first V1 clip): clips this edit did not frame keep their shape.
-        CanvasReframe.keepShapes(&next, after: before)
         // 联动：主轨的画面挪了，压在上面、这次没被碰过的东西跟着挪 / 删 —— 磁吸合拢之后、补色之前。
         var linkage = linkageEnabled
             ? TimelineLinkage.follow(from: before, to: &next, deletesContent: deletesContent) : TimelineLinkage.Report()
         linkage.magnetPacked = packed
+        // Reframe after linkage: internal geometry changes must not look like user edits and suppress linked moves or deletions.
+        CanvasReframe.keepShapes(&next, after: before)
         next.assignMissingTrackColors()
         guard next != before else { return linkage }
         let audioOnly = next.differsOnlyInAudioMix(from: before)
