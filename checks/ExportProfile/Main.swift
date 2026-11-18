@@ -127,6 +127,9 @@ import SrtFlowMCPKit
             await FolderChooserChecks.run(require: require)
             for _ in 0..<600 where VideoEditExporter.shared.isExporting { try await Task.sleep(nanoseconds: 50_000_000) }
             await DestinationChecks.run(root: root, state: state, project: project, require: require)
+            // export_video's folder: made, checked and listed off the main thread, refused before any job (2026-11-19 case).
+            print("AI EXPORT FOLDER: made, checked, refused off the main thread"); fflush(stdout)
+            await AIExportFolderChecks.run(root: root, project: project, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

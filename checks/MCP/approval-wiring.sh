@@ -15,7 +15,7 @@ if [ "$(grep -c 'AIReadGrants.shared.remember(' Sources/SrtFlow/AIWorkspace.swif
   echo "✗ AIWorkspace.confirmReading 点过头之后没记住那个文件夹：同一个文件夹里的文件会一次次地问" >&2
   exit 1
 fi
-for wiring in "Sources/SrtFlow/AIExportTools.swift:1" "Sources/SrtFlow/AIProjectTools.swift:2" "Sources/SrtFlow/AIProjectOpenTools.swift:1"; do
+for wiring in "Sources/SrtFlow/AIExportDestination.swift:1" "Sources/SrtFlow/AIProjectTools.swift:2" "Sources/SrtFlow/AIProjectOpenTools.swift:1"; do
   file="${wiring%%:*}"
   want="${wiring##*:}"
   if [ "$(grep -c 'ExportFileName.unoccupied' "${file}" || true)" -lt "${want}" ]; then
