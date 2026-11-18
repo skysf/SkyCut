@@ -3,7 +3,8 @@
 > 管什么：SkyCut 里替 AI「听」声音的那一层薄引擎 —— 分几层、每层在哪、谁调谁；第 2 步（ESTOI、拿掉谁涨多少、150 Hz 以下另报）和
 > 第 3 步（没来路的原声的特征和描述）这两块纯计算的口径、和研究时 numpy 版怎么对账；哪几条线是盲听定的、定到什么程度。
 > 不管什么：第 1 步「按层离线渲 + 每帧分频段电平」（在音频引擎里，见[成片的声音](export-audio-mixdown.md)「按层量」一节和[音频引擎](audio-engine.md)）；
-> Live voice thresholds, reports and `listen` wiring are covered below; the combined `inspect_video` delivery report remains separate work.
+> Live voice thresholds, reports and `listen` wiring are covered below. Since 2026-11-18 `inspect_video` also runs the voice check,
+> the music swell, cut jumps and sounds past their picture: [finished-video inspection](finished-video-inspection.md), "Second-tier sound checks".
 >
 > 由来（2026-11-16）：用户问「是否还有更好的方式，或者我们自己写一个能解决听声音的引擎？」。调研的结论：没有现成的东西能替 AI 听
 > （能听的大模型认环境声约六成、问「什么时候、几次」基本不可用；苹果的识别器没有「轰鸣」这一类），所以在 SkyCut 里自己做一层薄的：
@@ -20,7 +21,7 @@
 | 1 量 | 每层、每帧、每个频段多响；整条的响度、峰值 | 音频引擎按层离线渲（`AudioStemRender`、`MixMeasurement`，[成片的声音](export-audio-mixdown.md)「按层量」） | Merged 2026-11-16 (`listen mix=true`); since 2026-11-17 every peak is a true peak (`TruePeak`, dBTP, the limiter's measure) and a clip's or file's `loudest_at` is a frame |
 | 2 成熟指标 | 每句人声清不清楚；主要是谁盖住了它、压哪层最管用；ESTOI 看不见的低频有多响 | `Listening/ESTOIAnalysis`、`ESTOI`（含 `ESTOIReference`）、`MaskerAttribution` | Wired 2026-11-17: `listen voice=…` (`AIListenVoiceCheck`) |
 | 3 描述没来路的原声 | 素材自带的声音大概是什么：低沉长音 / 宽频噪声 / 有音高 / 有拍子 / 像说话 | `Listening/SourceSoundFeatures`、`SourceSoundSpectrogram`、`SourceSoundTrait`（含 `SourceSoundDescription`） | Wired 2026-11-17: `listen describe=true` (`AIListenSourceSound`), with SoundAnalysis's per-label scores (`SoundLabelScores`) and the on-device speech recogniser's words |
-| 4 声音报告 | 把 1–3 拼成一张按时间的表，AI 一次读完；「要人听」的几处 | — | 没做 |
+| 4 声音报告 | 把 1–3 拼成一张按时间的表，AI 一次读完；「要人听」的几处 | `inspect_video`'s second tier (`AIDeliverySound`, `AIDeliveryChecks`) | Part, 2026-11-18: the delivery report carries the voice check (`audio_voice_masked`, `audio_two_voices`, the grey hint in `hints`), the music swell, cut jumps and lingers; the per-time table and the "listen here" list are not done |
 | 5 以后 | 拆开（素材原声里的人声和别的）、认（更细的名字）、第二只耳朵（云端窄问题）、人的耳朵（一键打点） | — | 都没做；要下载模型或花钱的，先问用户 |
 
 地基（只给这几层用）：`ListeningDFT`（任意长度的 DFT：vDSP 认的长度直接做，别的走 Bluestein）、`ListeningResample`（整段 FFT 截断的重采样、
@@ -64,7 +65,10 @@
    Voice-over clips are one line each already; a long narration file is split by its pauses, not by a transcript (listen is
    read-only and starts no transcription).
    Another audible layer counts as a second voice when it is a selected voice track or its known provenance is voice-over;
-   it need not also be named in `voice`. The existing −45 dBFS speaking threshold still applies.
+   it need not also be named in `voice`. The existing −45 dBFS speaking threshold still applies, and since 2026-11-18 its voice
+   clips must also sound inside the line itself (not only its 0.2 s padding) for at least 0.5 s (`VoiceClarity.overlapSeconds`,
+   the preview board's `overlap_s`): a hand-over between two voice tracks is not two voices
+   ([case](../bugfixes/2026-11-18-two-voices-from-a-neighbouring-line.md)).
 
 4a. **How `listen describe=true` does it (2026-11-17, MCP-42 SkyCut half + MCP-44).** With `clip_id` (or `file`): a clip whose
    provenance is known (our voice-over, library music or effect, synthesized effect, generated audio) is not described — the reply

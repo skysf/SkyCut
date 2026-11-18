@@ -35,6 +35,10 @@ enum VoiceClarity {
     /// Another voice counts as speaking in a line when its level there reaches this (dBFS, the window's RMS): listen's
     /// silence threshold.
     static let speakingDBFS = -45.0
+    /// …and its voice clips must sound together with the line for at least this long (seconds): the preview board's line for two
+    /// voices at once (`overlap_s`). A neighbouring line on another track that only reaches into the 0.2 s padding is not a
+    /// second voice (docs/bugfixes/2026-11-18-two-voices-from-a-neighbouring-line.md).
+    static let overlapSeconds = 0.5
 
     static func verdict(estoi: Double?, musicIsMainMasker: Bool, anotherVoiceSpeaking: Bool) -> Verdict {
         if anotherVoiceSpeaking { return .twoVoices }
