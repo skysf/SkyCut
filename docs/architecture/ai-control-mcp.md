@@ -1222,7 +1222,7 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 
 64. **Web motion inside a project** (2026-11-17, MCP-74): `set_motion` places a stored web template or an AI-written page on an
     upper video track. Native presets remain `set_text motion_preset`: try those first, then a ready-made web template, then write
-    a page. `get_timeline.motion_library` exposes that single library in that order. A project web template identifies the stored
+    a page. `get_timeline.motion_library` exposes native presets, official web designs, then project pages. A project web template identifies the stored
     page by its clip's full UUID; another placement keeps an independent parameter set. A new tool is needed because the result is
     a movie clip, not a native text id, and page parameters would exceed set_text's 4,500-byte schema limit.
 
@@ -1230,6 +1230,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
       `fields` describes the editable text / font / colour / number controls, and `fonts` records the page's installed fonts.
       `clip_id` updates the same web-motion clip. `at` is the start, while `hit_at` places the page-relative `hit` at a timeline second;
       they are exclusive. `duration` covers the full page. Only upper video tracks are allowed; overlapping additions lift to a free track.
+    - Official ids are `official:box_to_earth`, `official:word_collision` and `official:ice_crack_light`. They use the same tool,
+      locked helper, upper-track placement and project-owned source as custom pages, with independent parameters for each placement.
+      Text, installed font, colour, duration and local hit remain editable; the collision adds a second word and does not shake the
+      whole picture. Trusted bundled code needs no AI-page confirmation. The guide's `official_templates` section describes them;
+      neither the tool schema nor the catalog grows for these presets.
     - Rendering uses the existing isolated helper and its unchanged locks, page clock, memory/time limits and six page checks
       ([renderer contract](web-motion-renderer.md)). New page code follows the two permission modes (item 6); approved stored code
       and parameter-only changes do not ask again. The confirmation request is bound to the whole request, including page and parameters.

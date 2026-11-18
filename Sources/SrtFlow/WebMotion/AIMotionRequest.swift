@@ -27,7 +27,8 @@ struct AIMotionRequest {
             source = WebMotionClipRecord(page: page, width: Int(canvas.width), height: Int(canvas.height), fps: state.frameRate.fps)
         }
         guard var record = source else { throw AIToolError("Pass template, page, or an existing web-motion clip_id.") }
-        if let template { record.templateID = template }
+        // A project lookup chooses a copy; it does not replace the stored source's origin.
+        if let template, record.templateID == nil { record.templateID = template }
         if let name = try args.string("name") { record.name = name }
         guard !record.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw AIToolError("name must not be empty.") }
         var values = try WebMotionParameters.readObject(record.parametersJSON)

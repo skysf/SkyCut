@@ -112,6 +112,8 @@
     project-owned pages and portable caches. The card retains `needs_confirmation`, `One undo step`, `wait with get_job` and the
     guide pointer. Its schema is within 4,500 bytes and the catalog remains within 100,000; full wording removed from utility cards
     is preserved verbatim in their existing written-topic overviews.
+    The `official_templates` section describes the three bundled designs without expanding the tool card or schema; discovery
+    remains in the single timeline motion library, after native presets and before project-owned pages.
 
 ## 四、守卫
 

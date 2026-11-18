@@ -8,6 +8,10 @@ enum AIMotionSummary {
             switch entry {
             case .native(let kind):
                 return ["id": .string(entry.id), "kind": "native", "name": .string(kind.title), "tool": "set_text"]
+            case .official(let template):
+                return ["id": .string(entry.id), "kind": "web", "origin": "official", "name": .string(template.titleKey),
+                        "tool": "set_motion", "duration": .number(template.duration), "hit": .number(template.hit),
+                        "parameters": .object(template.parameters)]
             case .web(_, let record, _):
                 return ["id": .string(entry.id), "kind": "web", "name": .string(record.name), "tool": "set_motion",
                         "duration": .number(record.duration), "hit": .number(record.hitTime),

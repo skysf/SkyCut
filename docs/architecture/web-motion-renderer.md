@@ -5,6 +5,7 @@
 > background, the page checks before a movie is accepted (MCP-75), versions, packaging, and the checks that pin all of it.
 > Also covers MCP-74's stored source, project-relative cache and `set_motion` AI call (2026-11-17).
 > The shared library and panel contract is in [motion presets](motion-presets.md).
+> Its three original bundled pages use this same renderer and project/cache path; see the official-template contract there.
 >
 > Origin (2026-11-16/17): the web-motion probe (internal research, `2026-11-16-web-motion-probe/report.md`) showed that an
 > AI-written page rendered with the Mac's own WebKit gives frame-exact, transparent titles whose text matches SkyCut's own.
@@ -189,6 +190,22 @@ pixels: clock rules, alpha handling, zoom / layout, capture, encoding), macOS ve
 Same page + parameters + versions → the same frame hashes: two renders compared hash for hash and decoded frame for frame
 in the checks. Different macOS / WebKit versions may change text pixels (probe, inferred): MCP-74 stores the versions.
 
+Official templates are checked pages, rather than exceptions to these rules. Each shipped page is rendered completely twice in
+the App-linked motion checks and every frame hash must match; the helper's six checks also run on both renders. Their small bundled
+browser movies have receipts binding source HTML, default parameters and movie bytes to the actual helper result. Template changes
+require regenerating the corresponding preview. Canvas backing sizes use `MOTION_RENDER.pixelWidth` / `pixelHeight`; CSS geometry
+uses `width` / `height`, and device-space shadow radii/offsets scale with that ratio, so 4K output does not upscale a 1080-pixel bitmap.
+
+The ice design sets its text/font at load and its SVG paths, clip and opacity from each requested time. Its Canvas prototype failed
+frame replay on this Mac even after resetting the backing store; this observation is specific to that prototype and environment.
+The accepted SVG page passes the unchanged exact comparison. See the [replay case](../bugfixes/2026-11-18-official-ice-frame-replay.md).
+
+Official parameter checks also compare actual pixels at common times, with a lower-fps control matched to the full render.
+Names, JSON values and a changed frame count alone cannot prove a visual response. Shortening a duration places its changed
+fade in the shared sample range; extending a hold can legitimately preserve that range. The collision page applies its final
+envelope to its canvas element after a shadowed-text alpha path failed this check; see the
+[duration fade case](../bugfixes/2026-11-18-official-word-shadow-fade.md).
+
 ## 11. Speed
 
 Measured 2026-11-17 on the M1 (8 cores, 16 GB, load 8–12 from other sessions), release build, the probe's three 1080p titles
@@ -326,6 +343,11 @@ Additional manual regression before release:
       during recovery reports that the motion is not ready.
 - [ ] Save As during a render, close/reopen the destination, and confirm the movie is carried beside that project; changing/closing the
       project during a render cannot add the result to another document.
+
+The lookup ID selects a template; a nonempty `WebMotionClipRecord.templateID` retains the source's origin.
+Both UI and AI project-template reuse keep an official origin, so unchanged default names/labels still follow the UI language.
+A source with no origin receives the project lookup ID; explicit new page input constructs a fresh source. Custom names/labels
+and values remain authored. See the [origin regression](../bugfixes/2026-11-18-official-template-origin-on-reuse.md).
 
 ## 16. UI draft and preview boundary (2026-11-17)
 

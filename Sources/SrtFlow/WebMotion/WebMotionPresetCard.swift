@@ -1,39 +1,48 @@
 import SwiftUI
 
-// A project page in the same library as native presets. Add starts at the captured playhead; dragging captures a timeline drop.
+// An official or project page in the shared library. Add starts at the captured playhead; dragging captures a timeline drop.
 struct WebMotionPresetCard: View {
     let project: VideoEditProject
     let entryID: String
     let record: WebMotionClipRecord
-    let movie: URL
+    let movie: URL?
+    var blurb: String?
     var onPick: () -> Void = {}
     @State private var hovering = false
     @State private var model: WebMotionPresetModel
+    @Environment(\.locale) private var locale
 
-    init(project: VideoEditProject, entryID: String, record: WebMotionClipRecord, movie: URL, onPick: @escaping () -> Void = {}) {
+    init(project: VideoEditProject, entryID: String, record: WebMotionClipRecord, movie: URL?, blurb: String? = nil,
+         onPick: @escaping () -> Void = {}) {
         self.project = project
         self.entryID = entryID
         self.record = record
         self.movie = movie
+        self.blurb = blurb
         self.onPick = onPick
         _model = State(initialValue: WebMotionPresetModel(project: project))
     }
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
+        let _ = locale.identifier
         VStack(alignment: .leading, spacing: 6) {
             Button {
                 let request = WebMotionPresetRequest(templateID: entryID, at: max(0, project.clock.time), project: project)
                 Task { if await model.add(request) { onPick() } }
             } label: {
                 HStack(spacing: 10) {
-                    WebMotionMoviePreview(movie: movie, record: record, isPlaying: hovering && !model.isRendering)
+                    thumbnail
                         .frame(width: MotionPresetPreview.size.width, height: MotionPresetPreview.size.height)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(Color.primary.opacity(0.12)))
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(verbatim: record.name).font(.callout.weight(.medium))
+                        Text(verbatim: OfficialWebMotionLabels.title(record)).font(.callout.weight(.medium))
                             .lineLimit(2)
+                        if let blurb {
+                            Text(verbatim: blurb).font(.caption).foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
                         Text("Starts at the playhead on an upper video track.")
                             .font(.caption).foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -67,6 +76,22 @@ struct WebMotionPresetCard: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .textSelection(.enabled)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var thumbnail: some View {
+        if let movie {
+            WebMotionMoviePreview(movie: movie, record: record, isPlaying: hovering && !model.isRendering)
+        } else {
+            VStack(spacing: 4) {
+                Image(systemName: "film")
+                Text("Preview unavailable").font(.caption2).multilineTextAlignment(.center)
+            }
+            .padding(6)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .foregroundStyle(.secondary)
+            .background(AppThemePalette.current.panel)
         }
     }
 }

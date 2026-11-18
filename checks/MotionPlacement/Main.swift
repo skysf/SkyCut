@@ -31,6 +31,8 @@ import Foundation
             try await runMotionVersionChecks(root)
             print("motion checks: editor drafts, add and drop")
             try await runMotionEditorChecks(root)
+            print("motion checks: official templates and bundled previews")
+            try await runMotionOfficialChecks(root)
         } catch {
             motionRequire(false, "motion placement checks stopped: \(error)")
         }

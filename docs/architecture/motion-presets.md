@@ -124,15 +124,15 @@ The numbered rules here and sections 3–6 describe the native text/shape design
 
 ## 六、还没做的
 
-1. The other five designs (MCP-48 through MCP-52) are not bundled native presets. The locked web renderer is available for custom project pages; official web designs are separate library content.
+1. Foreground occlusion and tracing (MCP-48 / MCP-50) still need their own capabilities. MCP-49 / MCP-51 / MCP-52 use the official web templates below.
 2. 时间线上拖一块不带整套（整套挪用检查器的「落点」或 AI 的 `hit_at`）；框住再放开里「放开」那一下没有单独的旋钮（跟着总长走，
    要改就拖框那一块的尾巴）。
 3. 「落点」不吸附到音乐的重音上（AI 用 `listen` 找到那一下再给 `hit_at`）。
 
 ## 7. One library, two kinds (2026-11-17)
 
-`MotionPresetLibrary` is the common ordering for the panel and AI: native text/shape presets first, reusable web pages stored in this
-project second. Native presets remain normal editable text/shapes and use `set_text`. A web entry uses `set_motion` and becomes a checked
+`MotionPresetLibrary` is the common ordering for the panel and AI: native text/shape presets first, bundled official web designs next,
+then reusable web pages stored in this project. Native presets remain normal editable text/shapes and use `set_text`. A web entry uses `set_motion` and becomes a checked
 ProRes 4444 upper-track clip. Its page and parameter form are retained in the project, so the video is a disposable cache rather than
 imported media. `get_timeline.motion_library` advertises the entry id and correct tool; a custom page is available for reuse after its
 first successful placement. Do not add a competing web-only library or a separate entry point.
@@ -146,7 +146,7 @@ library entries rather than new rendering paths.
 ## 8. Unified panel and web parameter inspector (2026-11-17)
 
 The existing `+` → Motion Presets popover remains the only entry. `MotionPresetPanel` consumes
-`MotionPresetLibrary.entries`: native titles first, then this project's stored web templates. Native cards retain
+`MotionPresetLibrary.entries`: native titles first, official web designs next, then this project's stored web templates. Native cards retain
 their existing title/shape action and hit timing. A web card previews its checked movie: an idle poster capped at
 272 × 153 pixels, and a muted looping player only while hovered. The bounded poster cache owns no players;
 leaving the hovered card tears its player down. No page runs inside the App to draw a thumbnail.
@@ -186,3 +186,40 @@ Manual regression before a release:
       losing the next drop. Native file/filter/audio/transition drops still work through the same destination.
 - [ ] Edit all four field kinds in each language; type first, re-render once, then undo. Show Page in Finder reveals
       the stored page/parameters. Switch projects during queued work and retain the newer project unchanged.
+
+## 9. Original official web templates (2026-11-18)
+
+`OfficialWebMotionTemplate` supplies three bundled pages through the same `MotionPresetLibrary`, `set_motion`, add/drop service,
+parameter inspector and cache. The source pages are original SkyCut designs; no OpenFilm code or probe renderer is included.
+
+| Template id | Design | Default words / local hit |
+| --- | --- | --- |
+| `official:box_to_earth` | A title box stretches into a globe, then reveals meridians and parallels | EARTH / 0.6 s |
+| `official:word_collision` | Two words approach from opposite sides, with a local flash and moving fragments | NORTH, SOUTH / 0.9 s |
+| `official:ice_crack_light` | A jagged seam opens around the title, then its light recedes | THROUGH THE ICE / 0.5 s |
+
+All default to four seconds, Avenir Next and a pale blue colour. Their text, installed font and colour are editable; the collision
+adds `second_text`. Duration and local hit use the existing dedicated controls and reserved parameter values, without duplicate
+form rows. The collision moves only its two words and fragments: camera/picture shake remains an ordinary SkyCut edit.
+
+The pages draw only from `t`, use CSS short-side geometry, and run only in the locked helper. Canvas pages use output-sized backing
+stores; the ice design uses vector SVG. Each placement stores the complete page and parameters, so later bundled edits cannot
+silently change an existing project's source. Official code is trusted bundled content; new AI-written code retains its approval rule.
+
+Browsing uses the three small bundled ProRes 4444 previews; opening the library does not render template movies. Each preview has
+a generation receipt binding its HTML hash, default parameter object and movie hash to its real six-check renderer result.
+`AppResources` locates both source and previews in the installed app and SwiftPM layouts. Ordinary timeline placements still use
+project-owned fingerprinted caches, never the browser preview movie as their full-resolution source.
+
+`checks/MotionPlacement/Official.swift` renders each complete default page twice through fresh helpers at 320×180 / 24 fps and
+compares every frame hash. It exercises discovery, trusted template requests, parameter changes, project-file round trips,
+independent reuse and undo through the real AI path. `OfficialPreviews.swift` verifies the bundled bytes, defaults, six-check receipt
+and actual movie size, frame rate, duration and premultiplied alpha. The existing offscreen UI harness covers all three languages
+and both themes; recognized official default names/labels follow the UI language while custom names, labels and values remain verbatim.
+
+Manual regression before release:
+
+- [ ] Browse all three official cards, hover and leave each one; idle posters remain visible and players stop on exit.
+- [ ] Add every official design on 16:9 and 9:16 canvases, edit its words, font, colour, duration and hit, then undo once.
+- [ ] Align the collision's hit to music and confirm that only words/fragments move; the underlying picture remains steady.
+- [ ] Compare impact and settled frames in preview/export at normal and 4K output sizes; lines and lettering remain sharp.
