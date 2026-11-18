@@ -36,9 +36,9 @@ it would be under 0.1 dB. Files: `Sources/SrtFlow/SpeechDuckCurve.swift`.
 - `scripts/check-parameter-limits.sh` (`checks/ParameterLimits/SpeechDuckAppChecks.swift`): real App objects with a sting
   ending in the first line's attack — calling again changes nothing and leaves no undo step, 0 takes every dip out in one
   step, undo takes each changing call back in one step.
-- Reverse verification: with the old `existingDip` and `touching` filter restored, `SpeechDuckChecks` goes red (same depth
-  stacks, −20 adds to the stacked dip, 0 leaves it, the 0.3 ms sliver is touched) and the App check goes red (the second call
-  changes the sting); with the fix restored both are green.
+- Reverse verification: with the old `SpeechDuckCurve.swift` restored, `SpeechDuckChecks` has 19 red (same depth stacks,
+  −20 adds to the stacked dip, 0 leaves it, the 0.3 ms sliver is touched) and the App check 8 red (the second call changes
+  the sting, so 0 leaves it dipped and the undo steps no longer line up); with the fix restored both are green.
 
 ## Lessons
 

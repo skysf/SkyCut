@@ -193,7 +193,9 @@ Reverse verification (2026-11-18, each broken on purpose, the checks run, then r
 the duck, the planner's second call, a window across the clip's start); windows never merged → 2 red; the speech's own sound
 among the clips to dip → 2 red; apply's `perform` outside `AIUndoGrouping.step` → `router-wiring.sh` red. The App check caught
 the empty undo step on its first run: a call that changed nothing still opened a group, and ⌘Z then undid nothing (5 red,
-fixed by opening the step only on a change).
+fixed by opening the step only on a change). 2026-11-19 (CXR2 R9): the old ramp reading (only points at least half way down)
+restored → 19 red in `SpeechDuckChecks` (a clip ending a quarter or 2 ms into the attack or starting in the release stacks,
+0 leaves its dip, a 0.3 ms sliver is touched) and 8 in the App check (the sting changes on the second call).
 
 Manual regression (ears and a real window):
 
