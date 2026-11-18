@@ -13,6 +13,9 @@ import SrtFlowMCPKit
 //   3. listen 的参数和结果：层怎么分、越界给合法建议、逐帧的数放得下才给、结果里该有的都在。
 // 编法见 scripts/check-mix-layers.sh；长期约束 docs/architecture/export-audio-mixdown.md「五、按层量」。
 
+// Keep the active boundary fixture visible even if an optimized Array precondition traps.
+setbuf(stdout, nil)
+
 var failures = 0
 var checks = 0
 
