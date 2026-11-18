@@ -348,6 +348,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
    `AIListenSampleFrames` → `AIListenPeaks`; a clip's frames are its timeline frames mapped through its speed, each with its heard
    gain), and one clip or file also gets `peak_at`. Before that `peak_db` was the window peaks of the shared waveform and `loudest_at`
    the middle of the loudest curve step (27.5 for an 80 s track: a 5 s step; [case](../bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md)).
+   Clip gain is applied to each decoded source sample at its mapped timeline time **before** true-peak interpolation and
+   energy accumulation (`AIListenSampleGain`, reusing the engine's `AudioGainRamps` / `GainTable.Sampler`, plus the track fader).
+   A frame midpoint gain must never scale a raw frame peak. Level, curve, peak and loudest frame share those gained samples;
+   only their timestamps are then mapped to the timeline. File PCM stays raw. `ListenSampleGainChecks` covers within-frame
+   fades / curves; `ListenGainChecks` in the real App's parameter check covers the clip entry, one read and the raw-file control.
    The waveform can't give either (no samples between its buckets), and making every import pay a 4× oversampling for an AI-only
    number was rejected, so listen pays per call: about 0.13 s per minute of stereo (M1, AAC). The whole-timeline listing reads each
    listed clip's window; what the 40 s budget doesn't reach says "still measuring". A window's first five and last six samples

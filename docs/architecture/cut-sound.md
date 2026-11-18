@@ -71,12 +71,21 @@ gain_db 也能跟着 crossfade / lead / on_beat / cut（加在下一个的声音
    any curve already there (a duck stays a duck). Only if the volume limit stops the swell short is the loud side lowered, by what is still
    missing (down to the raised bed + 6 dB). A bed that already carries the cut is left alone; a second call only adds what is missing, it
    never lowers the bed. A bed that is silent at the cut changes nothing and the result says so.
+   The shipped shared recipe's Cuts rule and its plan teach the same raised-first policy through `set_transition sound=bed`;
+   they must not prescribe unconditional dipping of both sides. `RecipeSoundChecks` checks the actual recipes reply against
+   this rule; the planner checks cover the uncapped bed and the residual beyond its volume limit.
 10. **落在拍子上**：拍子来自 `AIBeats`（listen 的 beats、cut_to_beat 同一份分析），换到时间线、只留那段音乐放着的那几拍；拍子不清楚
     （可信度低于 `AudioBeatTracker.clearConfidence`）不踩，同 cut_to_beat。窗里挪不过去的拍子（余料不够、会把一边裁没）跳过、取下一个近的；
     一样近取往后的。正好落在切点上（0 帧）而且画面带着声音、没有转场时不分离，只把那一刀的渐变清掉。
 11. **调增益**: without gain_db **the louder side comes down** to the quieter side's level at the cut (2026-11-16 decision: keeps headroom and
     never lifts noise); equal levels change nothing. gain_db moves the next shot's sound by that much. 整段平移，有音量曲线就整条平移
     （同 `edit_clip volume_db`）；顶到音量上下限被夹住，结果里 `gain_db` 是实际的、`requested_gain_db` 是要的。
+    For several automatic gain cuts, shared sounds are solved together against the original heard levels (`CutSoundBatchGain`).
+    Each connected component takes the least whole-clip attenuation satisfying every seam, never a boost; disconnected
+    components remain independent. Each sound is shifted once, so later cuts cannot undo earlier matches. Every cut reports
+    its sound's total final requested / applied gain at that cut. A volume-floor residual explicitly says the sides are not
+    fully matched; inconsistent shared-sound constraints refuse the entire call. Explicit `gain_db` retains per-cut behavior.
+    `CutSoundBatchGainChecks` checks final seams and reports, reversed order, separated curves / faders, gaps and atomic refusal.
 12. **联动**：分出去的声音跟着它自己的画面走（[联动](timeline-linkage.md)规矩 13）—— J / L 切伸到隔壁镜头底下的声音，磁吸重排、裁隔壁、删第一个镜头
     之后照样和画面对得上（[案例](../bugfixes/2026-11-16-separated-sound-left-behind-on-magnet-repack.md)）。
 

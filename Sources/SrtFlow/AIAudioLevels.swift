@@ -66,6 +66,16 @@ enum AIAudioLevels {
         return (clip.sourceTime(atTimeline: start), clip.sourceTime(atTimeline: end))
     }
 
+    /// Maps statistics already measured on gained PCM to timeline seconds, without applying the gain twice.
+    static func onTimeline(_ windows: [Window], clip: EditClip) -> [Window] {
+        windows.map { window in
+            var moved = window
+            moved.start = clip.timelineTime(atSource: window.start)
+            moved.end = clip.timelineTime(atSource: window.end)
+            return moved
+        }
+    }
+
     /// 片段在时间线上听到的：窗换成时间线秒，均方乘增益的平方、峰值乘增益。
     static func heard(_ windows: [Window], clip: EditClip, trackGain: Double) -> [Window] {
         windows.map { window in

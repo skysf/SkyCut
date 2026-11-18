@@ -89,11 +89,12 @@ override them.
 ## Cuts
 
 1. Every cut gets a sound crossing, written in the beat sheet: (1) overlap (frames); (2) the next sound early or the last
-   one late (frames); (3) a bed (ambience or music) under the cut, both sides dipped toward it; (4) a deliberate hard
+   one late (frames); (3) a bed (ambience or music) under the cut, raised first to within 6 dB of the louder side; only
+   what its volume limit leaves uncovered comes off the louder side; (4) a deliberate hard
    switch on a music accent, a hit or a line's first word (say which); (5) gain so both sides meet (dB). A big jump in place
    sound (about 6 dB or more) needs one of the first four. Why: a bare switch between two places sounds broken. How:
    compare listen clip_id=… from=… to=… level_db over the half second on each side; (1) two clips, fade_out and fade_in;
-   (2) add_clips sound=separate, then edit_clip alone=true on the sound; (3) volume_curve; (4) hit_at; (5) volume_db.
+   (2) add_clips sound=separate, then edit_clip alone=true on the sound; (3) set_transition sound=bed; (4) hit_at; (5) volume_db.
 2. In and out points go by frames, not round seconds, and never cross a cut inside the source (out at least one frame
    before it, in on it at the earliest; a deliberate one is named with its frame). Why: a rounded "3.5 s" let two frames
    of another shot flash by. How: look shots=true on each file first (generated videos often hold several shots); frames

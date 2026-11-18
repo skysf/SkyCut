@@ -112,10 +112,10 @@
 ### 切点（2026-11-16）
 
 1. **每一刀都想好声音怎么过，五选一，写进分镜表**：① 两边叠着换（写叠几帧）；② 下一个地方的声先进来，或上一个拖过去（写几帧）；
-   ③ 一层底（环境或音乐）从下面穿过去，两边压到底附近；④ 故意一刀硬换，落在音乐重音、重击或一句话的头一个字上（写是哪个）；
+   ③ A bed passes underneath: raise it first to within 6 dB of the louder side; lower only what its volume limit leaves uncovered;④ 故意一刀硬换，落在音乐重音、重击或一句话的头一个字上（写是哪个）；
    ⑤ 调一边的增益让两边接近（写调了多少 dB）。地方的声前后差得多（约 6 dB 以上）时，用前四种之一。两个地方的声一刀硬换、中间什么都不垫，
    听着像断了。两边各量半秒（`listen clip_id=… from=… to=…` 比 `level_db`）；① 两条轨上的两段，前一段 `fade_out`、后一段 `fade_in`；
-   ② 视频先 `add_clips sound=separate`（原声落到链接的音轨上），再 `edit_clip alone=true` 只挪那段声音；③ `volume_curve`；④ `hit_at`；⑤ `volume_db`。
+   ② 视频先 `add_clips sound=separate`（原声落到链接的音轨上），再 `edit_clip alone=true` 只挪那段声音；③ `set_transition sound=bed`；④ `hit_at`；⑤ `volume_db`。
 2. **入点出点按帧定，不越过素材自己的切点**：入点出点按帧算，不按整数秒凑；素材里自己带切点的，出点最多到切点前一帧、入点最早从切点那一帧起；
    故意要用素材自带的那一刀，写明第几帧。按「3.5 秒」一算，夹进两帧别的画面，看缩略图根本发现不了。剪之前每条素材先 `look shots=true`
    （生成的视频常常一条里就有好几刀）；帧 = 秒 × `get_timeline` 给的 fps。
