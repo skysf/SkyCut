@@ -209,31 +209,33 @@ public enum MCPTimelineTools {
         }
     }
 
+    // 2026-11-18: hit (MCP-43) arrived when the whole catalog had no room left after three other lanes; the notes below were
+    // reworded shorter (same facts: peaks, preset durations, takes and the hit are in the skycut_guide add_clips topic).
     private static var addClips: MCPToolDefinition {
         let soundEffect = MCPSchema.object([
             "preset": MCPSchema.string(
-                "Sound; peak: whoosh 60%, suction/riser at the end, sparkle at its first twinkle.",
+                "The sound (each one's peak is in the guide).",
                 oneOf: MCPVocabulary.soundEffectPresets
             ),
-            "duration": MCPSchema.number("Seconds, 0.05-10 (default: the preset's own, 0.05-2).", minimum: 0.05, maximum: 10),
+            "duration": MCPSchema.number("Seconds, 0.05-10 (default: the preset's own).", minimum: 0.05, maximum: 10),
             "pitch": MCPSchema.number("Pitch multiplier 0.25-4 (default 1).", minimum: 0.25, maximum: 4),
             "brightness": MCPSchema.number("0 dark to 1 bright (default 0.5).", minimum: 0, maximum: 1),
             "size": MCPSchema.number("Space: 0 dry to 1 hall (default: the preset's own).", minimum: 0, maximum: 1),
-            "variation": MCPSchema.integer("0-999: another take of the same sound.", minimum: 0, maximum: 999),
+            "variation": MCPSchema.integer("0-999: another take.", minimum: 0, maximum: 999),
             "volume_db": MCPSchema.number("Clip dB (default -8), clamped to edit_limits.volume_db.")
-        ], description: "Instead of file: a sound effect made on this Mac; place it with hit_at.")
+        ], description: "Instead of file: a sound effect made on this Mac.")
         let item = MCPSchema.object([
-            "file": MCPSchema.string("Video, image, audio or subtitle file: absolute or relative to the opened folder."),
-            "library_id": MCPSchema.string("Instead of file: a music or sound effect id from find_audio."),
+            "file": MCPSchema.string("Video, image, audio or subtitle file (absolute, or in the opened folder)."),
+            "library_id": MCPSchema.string("Instead of file: an id from find_audio."),
             "sound_effect": soundEffect,
-            "hit_at": MCPSchema.number("Timeline second (≥ 0) the hit lands on; sets start.", minimum: 0),
-            "hit": MCPSchema.number("Source second (≥ 0) of the hit; default: an effect's peak, else the strongest accent.", minimum: 0),
-            "source_in": MCPSchema.number("Where to start in the file, seconds (default 0).", minimum: 0),
-            "source_out": MCPSchema.number("Where to stop in the file, seconds (default end); an image: its display length."),
+            "hit_at": MCPSchema.number("Timeline second (≥ 0) for the hit; sets start.", minimum: 0),
+            "hit": MCPSchema.number("Source second (≥ 0) of the hit (default: effect peak or strongest accent).", minimum: 0),
+            "source_in": MCPSchema.number("File start, seconds (≥ 0, default 0).", minimum: 0),
+            "source_out": MCPSchema.number("File end, seconds (default: its end); an image: display length."),
             "track": MCPSchema.string(MCPSchema.trackDescription),
             "start": MCPSchema.number("Timeline start, seconds (≥ 0).", minimum: 0),
             "sound": MCPSchema.string(
-                "Video: separate = sound on a linked audio track (J/L cuts); only = just the sound.",
+                "Video: separate = linked audio track (J/L cuts); only = just its sound.",
                 oneOf: MCPVocabulary.clipSounds
             )
         ])
@@ -241,7 +243,7 @@ public enum MCPTimelineTools {
             .addClips, title: "Add clips",
             description: """
             Put files, library music (find_audio) or local sound effects on the timeline, in order. Each item: one source (file, library_id \
-            or sound_effect), source_in/source_out (file seconds), track, start; hit_at lands a peak or accent. Video and images append \
+            or sound_effect), source_in/source_out (file seconds), track, start; hit_at lands a hit. Video and images append \
             (default V1); overlaps lift a track; insert=true pushes later V1 clips. Outside files may return needs_confirmation. One undo \
             step.
             """,

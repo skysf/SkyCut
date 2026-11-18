@@ -113,8 +113,8 @@ enum MCPGuideTimelineTopics {
             the music_credits to pass on to the user. sound_effect makes a sound on this Mac (no download, no credits): preset is whoosh \
             (peak at 60%), swoosh (short, bright), suction (rises and stops dead; peak at the end), riser (builds; peak at the end), \
             downlifter (a low swell that falls), impact (long tail), boom (deep), hit, pop, click, tick, ding, sparkle (peak at the first \
-            twinkle), beep, glitch or shutter; duration, pitch, brightness, size (dry to hall), variation (another take) and volume_db \
-            (default -8) shape it. Without hit_at a made sound effect lands at the playhead. duration is the clip length (at least 0.1 \
+            twinkle), beep, glitch or shutter; duration (default: the preset's own, 0.05–2 seconds), pitch, brightness, size (dry to \
+            hall), variation (another take of the same sound) and volume_db (default -8) shape it. Without hit_at a made sound effect lands at the playhead. duration is the clip length (at least 0.1 \
             seconds); tails (impact, boom, riser) run past it: audible_duration says how long it is heard, end where the clip ends.
             Landing a hit. hit_at is the timeline second a hit lands on (a cut, a word appearing, a title), for a sound effect, music or \
             any file with sound: SkyCut sets the start from it (overriding start). hit is the source second that lands there ("second \

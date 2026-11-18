@@ -28,7 +28,7 @@ public enum MCPSenseTools {
             .listen, title: "Measure the sound",
             description: """
             Read-only. Clip/file/timeline levels, true peak, silences, curves and loudest time. mix=true: track/frame mix; \
-            voice=A1: voice masking; describe=true: source sound. beats=true: beats, accents; cuts=true: V1 cuts. Outside files may \
+            voice=A1: voice masking; describe=true: source sound. beats=true: beats; cuts=true: V1 cuts. Outside files may \
             return needs_confirmation.
             """,
             input: MCPSchema.object([
@@ -40,13 +40,13 @@ public enum MCPSenseTools {
                 "source_out": MCPSchema.number("File end (≥ 0 s).", minimum: 0),
                 "silence_db": MCPSchema.number("Silence below this (default -45 dB).", minimum: -80, maximum: -10),
                 "min_silence": MCPSchema.number("Shortest silence (default 0.5 s).", minimum: 0.1, maximum: 10),
-                "beats": MCPSchema.boolean("Tempo, beats, accents and stops (one clip or file)."),
-                "cuts": MCPSchema.boolean("Check V1 cuts for pauses and speech."),
+                "beats": MCPSchema.boolean("Beats, accents, stops (one clip or file)."),
+                "cuts": MCPSchema.boolean("V1 cuts: pauses, speech."),
                 "mix": MCPSchema.boolean("Measure the mix itself."),
                 "layers": MCPSchema.array(of: ["type": "string"], "With mix: A1, V1+V2 or rest (≤ 12).", maxItems: 12),
                 "frames": MCPSchema.boolean("With mix: per frame."),
                 "voice": MCPSchema.string("Narration track(s): A1, A1+A2 or auto."),
-                "describe": MCPSchema.boolean("What a clip's own sound is, in words."),
+                "describe": MCPSchema.boolean("A clip's own sound, in words."),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

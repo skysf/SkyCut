@@ -948,7 +948,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     between source_in and source_out (the same analysis listen beats=true reports). start = hit_at − (hit − source_in) has one copy,
     `AIClipHit.placement`; a start before 0:00 moves source_in later instead (adjustment `hit_lands_on_hit_at`), images are refused,
     a hit outside the window is `invalid_parameter`; the reply gives `hit_at` (read back from the placed clip) and `hit`. One new
-    parameter and shorter wording elsewhere on the card; the rest is in the guide (add_clips `music_sound_effects`).
+    parameter; to fit it after three other lanes had filled the catalog (100,128 with it), the add_clips and listen notes were
+    reworded shorter with the same facts in the guide (add_clips `music_sound_effects`): 99,912 / 100,000 on 2026-11-18.
 44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
     [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
    - **始终列出来**（2026-10-30，和 `generate_media` 同一条规则，第 39 条）；总说明末尾的「Paid」那一行始终带着它，Key、授权和积分在 App 核对。
