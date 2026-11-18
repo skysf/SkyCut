@@ -3,8 +3,8 @@ import SrtFlowMCPKit
 
 // MARK: - A look never leaves the AI waiting for minutes: after `answerWithin` seconds it is a job
 //
-// What it does: one look call, from its place in the router's lines (AICallLines) to its answer. The look runs in its own task and the
-// call waits for it up to `answerWithin` (25 s). Done by then: the answer exactly as before. Not done (still waiting in its project's
+// What it does: one look call, from selecting its place in the router's lines (AICallLines) to its answer. The look runs in its own task and the
+// call waits for it up to `answerWithin` (25 s). Done by then: the answer exactly as before. Not done (still waiting for a session switch, in its project's
 // line, or still rendering): the call answers with a job (AIJobs kind `look`): job_id and status running, or queued with queue_position
 // and waiting_for (which call holds the line). The look goes on; when it is done its result (the same JSON as a direct answer) is the
 // job's `result` and its picture comes with get_job. cancel_job, or the user's Stop on that project, cancels it: still waiting, it never
@@ -26,7 +26,12 @@ final class AILookCall {
         + "is busy). Call get_job with this job_id and wait_seconds 30 until the status is done: its result and the picture come back "
         + "there. Do not send the same look again; cancel_job stops it."
 
-    private let place: AICallLines.Place
+    typealias Prepare = @MainActor (_ waiting: @escaping @MainActor (AICallLines.Place?) -> Void) async -> AICallLines.Place
+
+    private var place: AICallLines.Place?
+    private var pendingSwitch: AICallLines.Place?
+    private let session: String
+    private let client: String
     private let lines: AICallLines
     private let gate: Gate
     private var task: Task<Void, Never>?
@@ -34,8 +39,9 @@ final class AILookCall {
     private var job: AIJobs.Job?
     private var waiters: [CheckedContinuation<Void, Never>] = []
 
-    private init(place: AICallLines.Place, lines: AICallLines, begin: @escaping @Sendable () -> Bool) {
-        self.place = place
+    private init(lines: AICallLines, session: String, client: String, begin: @escaping @Sendable () -> Bool) {
+        self.session = session
+        self.client = client
         self.lines = lines
         gate = Gate(helper: begin)
     }
@@ -45,14 +51,26 @@ final class AILookCall {
     static func run(
         _ place: AICallLines.Place, in lines: AICallLines, begin: @escaping @Sendable () -> Bool, work: @escaping Work
     ) async -> AIToolRouter.Answer {
-        let call = AILookCall(place: place, lines: lines, begin: begin)
-        call.start(work)
+        await run(in: lines, session: place.session, client: place.client, begin: begin, prepare: { _ in place }, work: work)
+    }
+
+    /// Start the timer before asynchronous line selection (including an implicit project's pending switch).
+    static func run(
+        in lines: AICallLines, session: String, client: String, begin: @escaping @Sendable () -> Bool,
+        prepare: @escaping Prepare, work: @escaping Work
+    ) async -> AIToolRouter.Answer {
+        let call = AILookCall(lines: lines, session: session, client: client, begin: begin)
+        call.start(prepare, work)
         if await call.waitForAnswer(upTo: answerWithin), let answer = call.answer { return answer }
         return call.becomeJob()
     }
 
-    private func start(_ work: @escaping Work) {
-        task = Task { @MainActor [place, lines, gate] in
+    private func start(_ prepare: @escaping Prepare, _ work: @escaping Work) {
+        task = Task { @MainActor [lines, gate] in
+            let place = await prepare { [weak self] in self?.pendingSwitch = $0 }
+            self.place = place
+            self.pendingSwitch = nil
+            if let job = self.job { AIJobs.shared.bindLook(job, to: self.owner()) }
             await lines.waitForTurn(place)
             let answer = await AICallLines.$current.withValue(place) { await work(gate.begin) }
             place.letGo()
@@ -96,7 +114,7 @@ final class AILookCall {
     /// The call answers with a job; the look goes on (or keeps waiting for its turn).
     private func becomeJob() -> AIToolRouter.Answer {
         gate.becomeJob()
-        let job = AICallContext.$current.withValue(Self.owner(of: place)) {
+        let job = AICallContext.$current.withValue(owner()) {
             AIJobs.shared.start(.look, progress: { nil }, cancel: { [weak self] in self?.cancel() })
         }
         job.inLine = { [weak self] in self?.lineStanding() }
@@ -110,7 +128,7 @@ final class AILookCall {
     private func cancel() {
         guard let job, job.status == .running else { return }
         gate.cancel()
-        if place.startedAt == nil {
+        if place?.startedAt == nil {
             AIJobs.shared.finish(job, .cancelled, message: "Cancelled while waiting in line; this look never started.")
         } else {
             task?.cancel()
@@ -119,8 +137,13 @@ final class AILookCall {
     }
 
     private func lineStanding() -> (position: Int, waitingFor: String?)? {
-        guard let standing = lines.standing(of: place) else { return nil }
-        return (standing.position, standing.holder.map { Self.describe($0, for: place.session) })
+        if let place {
+            guard let standing = lines.standing(of: place) else { return nil }
+            return (standing.position, standing.holder.map { Self.describe($0, for: session) })
+        }
+        guard let pendingSwitch, !pendingSwitch.hasLetGo else { return nil }
+        let standing = lines.standing(of: pendingSwitch)
+        return ((standing?.position ?? 0) + 1, Self.describe(standing?.holder ?? pendingSwitch, for: session))
     }
 
     /// "edit_clip from this AI session, running for 41 s".
@@ -131,11 +154,12 @@ final class AILookCall {
     }
 
     /// Who the job belongs to (`AIJobs.Job` reads it from the call context): its project when the look is in a project's line, and the
-    /// project whose Stop stops it, like the router's own calls (a call without a project stops with its session's last project).
-    private static func owner(of place: AICallLines.Place) -> AICallContext {
-        let project = place.keys.first { $0.hasPrefix("project:") }.map { String($0.dropFirst("project:".count)) }
-        let stops = project ?? AIProjectSessions.shared.projects(of: place.session).last?.shortID ?? OpenProjects.shared.primary.shortID
-        return AICallContext(session: place.session, client: place.client, project: project, stopsWith: stops)
+    /// project whose Stop stops it. While switch selection is pending the target stays nil and Stop uses the session's current project;
+    /// after selection the job binds to the actual line, like the router's own calls.
+    private func owner() -> AICallContext {
+        let project = place?.keys.first { $0.hasPrefix("project:") }.map { String($0.dropFirst("project:".count)) }
+        let stops = project ?? AIProjectSessions.shared.projects(of: session).last?.shortID ?? OpenProjects.shared.primary.shortID
+        return AICallContext(session: session, client: client, project: project, stopsWith: stops)
     }
 
     /// A finished look as the job keeps it: the result JSON (or its text), its pictures, and whether it failed.

@@ -22,9 +22,10 @@ final class AIToolRouter {
     static let shared = AIToolRouter()
 
     /// The lines (keys: "project:p2", "session:<session>", "switch:<session>").
-    private let lines = AICallLines()
+    private let lines: AICallLines
 
-    private init() {}
+    private convenience init() { self.init(lines: AICallLines()) }
+    init(lines: AICallLines) { self.lines = lines }
 
     /// 一次调用的回答：结果，和这次用到（或刚开 / 建 / 关）的工程 —— 小程序据此记这个会话的一组工程（`MCPSessionProject`）。
     struct Answer {
@@ -63,17 +64,24 @@ final class AIToolRouter {
         if let refusal = await SkyStudioAccount.shared.aiRefusal(for: tool) {
             return Answer(result: MCPBridge.textResult(refusal, isError: true))
         }
+        return await routeValidated(request, tool: tool, begin: begin)
+    }
+
+    /// Authorized routing after the protocol, argument and license gates. Isolated checks exercise the real queue / target path here.
+    func routeValidated(_ request: MCPBridge.Request, tool: MCPToolName, begin: @escaping @Sendable () -> Bool) async -> Answer {
         let call = Call(
             tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
             session: request.session ?? AIProjectSessions.anonymous, client: AISession.displayName(for: request.client ?? "AI")
         )
         AIProjectSessions.shared.noteCall(session: call.session)
         guard call.policy.serialized else { return await execute(call, begin) }
-        let keys = await queueKeys(call)
         if call.tool == .look {
-            let place = lines.join(keys, tool: call.tool.rawValue, session: call.session, client: call.client)
-            return await AILookCall.run(place, in: lines, begin: begin) { begin in await self.execute(call, begin) }
+            return await AILookCall.run(in: lines, session: call.session, client: call.client, begin: begin, prepare: { waiting in
+                let keys = await self.queueKeys(call, awaitingSwitch: waiting)
+                return self.lines.join(keys, tool: call.tool.rawValue, session: call.session, client: call.client)
+            }) { begin in await self.execute(call, begin) }
         }
+        let keys = await queueKeys(call)
         return await enqueue(keys, call) { await self.execute(call, begin) }
     }
 
@@ -91,14 +99,14 @@ final class AIToolRouter {
     }
 
     /// 排在哪几条队后面（C 节）。不带 `project` 的碰工程的调用，先等这个会话还没做完的开 / 建 / 关。
-    private func queueKeys(_ call: Call) async -> [String] {
+    private func queueKeys(_ call: Call, awaitingSwitch: (@MainActor (AICallLines.Place?) -> Void)? = nil) async -> [String] {
         if call.switchesProject {
             // 关一个工程要等它自己那条队上正在做的活做完。
             return ["switch:" + call.session] + (call.tool == .closeProject ? call.explicitProject.map { ["project:" + $0] } ?? [] : [])
         }
         guard AIProjectBinding.usesProject(call.tool, call.arguments) else { return ["session:" + call.session] }
         if let id = call.explicitProject { return ["project:" + id] }
-        await lines.waitForLast(in: "switch:" + call.session)
+        await lines.waitForLast(in: "switch:" + call.session, observe: awaitingSwitch)
         let sessions = AIProjectSessions.shared
         let id = sessions.ownership.current(of: call.session) ?? OpenProjects.shared.primary.shortID
         return ["project:" + id]

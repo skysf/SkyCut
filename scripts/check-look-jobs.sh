@@ -26,7 +26,7 @@ PLIST
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_SrtFlow.bundle"
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
-  checks/LookJobs/Main.swift checks/LookJobs/LineChecks.swift checks/LookJobs/LookCallChecks.swift checks/LookJobs/Fixture.swift \
+  checks/LookJobs/Main.swift checks/LookJobs/LineChecks.swift checks/LookJobs/LookCallChecks.swift checks/LookJobs/Fixture.swift checks/LookJobs/RouterSwitchChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/LookJobCheck"
 # Footage shaped like generated clips: one keyframe per clip, so every frame a look asks for is decoded from the clip's start.
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"

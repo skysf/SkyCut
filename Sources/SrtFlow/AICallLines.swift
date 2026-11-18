@@ -75,6 +75,8 @@ final class AICallLines {
     /// Places that have not let go yet, per line, in the order they joined.
     private var holding: [String: [Place]] = [:]
     private var joined = 0
+    /// An optional phase observer for isolated checks; does not choose or change the awaited predecessor.
+    var didWaitForLast: (@MainActor (String) -> Void)?
 
     /// Join these lines (synchronously: the order of joining is the order of turns).
     func join(_ keys: [String], tool: String, session: String, client: String) -> Place {
@@ -100,8 +102,12 @@ final class AICallLines {
     }
 
     /// Wait until the last call in this line has let go (a call without `project` waits for its session's opening / closing first).
-    func waitForLast(in key: String) async {
-        await last[key]?.waitUntilLetGo()
+    func waitForLast(in key: String, observe: (@MainActor (Place?) -> Void)? = nil) async {
+        let tail = last[key]
+        didWaitForLast?(key)
+        observe?(tail)
+        await tail?.waitUntilLetGo()
+        observe?(nil)
     }
 
     /// For a place still waiting: its position (waiting places ahead of it + 1, so 1 = next) and the earliest place ahead that holds
