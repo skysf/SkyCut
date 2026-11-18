@@ -132,18 +132,18 @@ enum AIListenTool {
             let bounds = frames.sourceBounds
             // `.sound`: past the end of the file's sound the clip plays silence (an audio track a few ms shorter than its picture).
             reading = try await AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline, frames: { _, _ in bounds },
-                                                         edges: .sound)
+                                                         edges: .sound, gain: frames.sampleGain)
         } catch {
             object["sound"] = deadline.timeIntervalSinceNow <= 0
                 ? "still measuring: listen with clip_id, or narrow from/to"
                 : .string("unreadable: SkyCut could not read this clip's audio (\(error.localizedDescription))")
             return object
         }
-        let heard = AIAudioLevels.heard(reading.windows, clip: clip, trackGain: trackGain)
+        let heard = AIAudioLevels.onTimeline(reading.windows, clip: clip)
         let report = AIAudioLevels.report(heard, silenceDB: settings.silenceDB, minSilence: settings.minSilence)
         let rate = reading.peaks.sampleRate
         let peaks = reading.frames.map { measured in
-            AIListenPeaks.measure(measured, starts: frames.starts, gains: frames.gains) { sample in
+            AIListenPeaks.measure(measured, starts: frames.starts) { sample in
                 clip.timelineTime(atSource: reading.sourceStart + Double(sample) / rate)
             }
         } ?? AIListenPeaks(truePeakDB: -60, peakAt: nil, loudestAt: nil)

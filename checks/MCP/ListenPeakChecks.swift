@@ -44,7 +44,7 @@ private func measured(from: Double, to: Double, fps: Int, _ sample: (Double) -> 
 private func fileReport(from: Double, to: Double, fps: Int, _ sample: (Double) -> Double) -> AIListenPeaks {
     let frames = measured(from: from, to: to, fps: fps, sample)
     let starts = Array(AIListenFrameGrid(fps: fps).bounds(from: from, to: to).dropLast())
-    return AIListenPeaks.measure(frames, starts: starts, gains: [], time: { from + Double($0) / peakRate })
+    return AIListenPeaks.measure(frames, starts: starts, time: { from + Double($0) / peakRate })
 }
 
 private func checkFrameGrid() {
@@ -95,9 +95,10 @@ private func checkClipGainsAndSpeed() {
         buffer[2 * index] = value
         buffer[2 * index + 1] = value
     }
-    buffer.withUnsafeBufferPointer { frames.append($0, frames: count) }
+    let heard = buffer.withUnsafeBufferPointer { grid.sampleGain.applying(to: $0, from: 0, rate: peakRate, channels: 2) }
+    heard.withUnsafeBufferPointer { frames.append($0, frames: count) }
     frames.finish()
-    let peaks = AIListenPeaks.measure(frames, starts: grid.starts, gains: grid.gains) { clip.timelineTime(atSource: Double($0) / peakRate) }
+    let peaks = AIListenPeaks.measure(frames, starts: grid.starts) { clip.timelineTime(atSource: Double($0) / peakRate) }
     // Source 2.0 s at double speed from timeline 10 = timeline 11.0, a frame start at 24 fps.
     check(abs((peaks.loudestAt ?? -1) - 11.0) < 1e-9, "the louder heard hit's frame (timeline 11.0) is loudest_at (got \(String(describing: peaks.loudestAt)))")
     check(abs((peaks.peakAt ?? -1) - 11.0) < 0.03, "peak_at is on the timeline (got \(String(describing: peaks.peakAt)))")

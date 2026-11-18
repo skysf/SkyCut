@@ -10,7 +10,7 @@ import Foundation
 // (docs/bugfixes/2026-11-17-export-peak-before-limiter-and-binned-loudest.md).
 // Edges: a window starts and stops where it was asked to, not where the sound does, so the interpolated points of its first
 // five and last six samples (which would read past the window) are left out; those samples' own magnitudes count.
-// Not here: decoding (AIListenAudioWindow), gains and timeline seconds (AIListenPeaks), the rest of listen's numbers (AIAudioLevels).
+// Not here: decoding / sample gain (AIListenAudioWindow / AIListenSampleGain), timeline seconds (AIListenPeaks), or the rest of listen's numbers (AIAudioLevels).
 
 struct AIListenSampleFrames: Sendable {
     struct Frame: Sendable, Equatable {
@@ -106,19 +106,18 @@ struct AIListenPeaks: Equatable {
     var peakAt: Double?
     var loudestAt: Double?
 
-    /// `starts[k]`: when frame k starts; `gains[k]`: the linear gain heard in frame k (1 for a file); `time(sample)`: when a
-    /// window sample plays (same seconds as `starts`).
-    static func measure(_ frames: AIListenSampleFrames, starts: [Double], gains: [Double], time: (Int) -> Double) -> AIListenPeaks {
+    /// `starts[k]`: when frame k starts; `time(sample)`: when a window sample plays (same seconds as `starts`).
+    /// The samples already include the clip envelope and track fader; no post-measurement gain is valid here.
+    static func measure(_ frames: AIListenSampleFrames, starts: [Double], time: (Int) -> Double) -> AIListenPeaks {
         var peak: Float = 0, peakSample: Int?
         var loudest: (index: Int, power: Double)?
         for (index, frame) in frames.frames.enumerated() where index < starts.count {
-            let gain = index < gains.count ? gains[index] : 1
-            let heard = frame.peak * Float(gain)
+            let heard = frame.peak
             if heard > peak {
                 peak = heard
                 peakSample = frame.peakSample
             }
-            let power = frame.meanSquare * gain * gain
+            let power = frame.meanSquare
             if power > 0, power > (loudest?.power ?? 0) { loudest = (index, power) }
         }
         return AIListenPeaks(

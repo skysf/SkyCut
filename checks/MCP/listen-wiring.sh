@@ -23,7 +23,7 @@ LISTEN_CONTROL="Sources/SrtFlow/AIListenReadControl.swift"
 if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
    || [ "$(grep -c 'AIListenAudioWindow.read(url, from: sourceIn, to: sourceOut, until: deadline,' "${LISTEN_FILE}" || true)" -ne 1 ] \
    || [ "$(grep -c 'AIListenAudioWindow.read(clip.sourceURL, from: from, to: to, until: deadline,' "${LISTEN_TOOL}" || true)" -ne 1 ] \
-   || [ "$(grep -c 'edges: .sound)' "${LISTEN_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'edges: .sound, gain: frames.sampleGain)' "${LISTEN_TOOL}" || true)" -ne 1 ] \
    || [ "$(grep -c 'let edges = edges ?? (from == nil && to == nil ? .sound : .exact)' "${LISTEN_WINDOW}" || true)" -ne 1 ] \
    || ! grep -q 'checkListenSoundEdges(in: directory)' checks/MCP/ListenRangeChecks.swift \
    || [ "$(grep -c 'await waveform(of:' "${LISTEN_FILE}" || true)" -ne 0 ] \
@@ -40,6 +40,22 @@ if [ "$(grep -c 'AIListenFileAudio.listen(' "${LISTEN_TOOL}" || true)" -ne 1 ] \
 fi
 echo "   ✓ 片段和文件都是一遍有界读取（真峰值、最响的那一帧）；片段的窗和整个文件按声音在哪儿量（音轨比画面短不拒绝），点名的区间照旧要盖满；原生 timeRange、生产取消/截止时间、长文件节拍限制已接上"
 
+echo "==> clip listen applies the engine envelope before statistics"
+python3 - <<'PYTHON'
+from pathlib import Path
+code = lambda path: "\n".join(line.split("//", 1)[0] for line in Path(path).read_text().splitlines())
+tool = code("Sources/SrtFlow/AIListenTool.swift")
+window = code("Sources/SrtFlow/AIListenAudioWindow.swift")
+gain = code("Sources/SrtFlow/AIListenSampleGain.swift")
+assert "gain: frames.sampleGain" in tool, "clip read must receive its sample envelope"
+assert "AIAudioLevels.onTimeline(reading.windows, clip: clip)" in tool, "already gained levels must only map time"
+assert "AIAudioLevels.heard(reading.windows" not in tool, "clip listen must not apply gain twice"
+assert "gain.applying(to: samples, from: start, rate: rate, channels: channels)" in window, "gain must apply after PTS trimming"
+assert "heard.withUnsafeBufferPointer { accumulate(" in window, "every statistic must consume the gained samples"
+assert "AudioGainRamps.addVolumeRamps" in gain and "table.sampler()" in gain, "listen must reuse the engine gain table"
+assert "clip.timelineTime(atSource:" in gain and "envelope.gain(at: time) * trackGain" in gain, "gain must follow each sample's timeline time and track fader"
+assert "gains:" not in code("Sources/SrtFlow/AIListenSampleFrames.swift"), "metered frame maxima must never receive post-measurement gains"
+PYTHON
 echo "==> listen 原生生命周期：copy 与取消只由同一 analysis 读取体拥有"
 python3 - "${LISTEN_WINDOW}" "${LISTEN_CONTROL}" <<'PY'
 import pathlib, sys

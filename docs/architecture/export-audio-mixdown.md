@@ -56,7 +56,10 @@ ffmpeg 只负责把它编成 AAC、和画面合在一起。导出图里**不许�
      to how much the gain moves across 12 samples (white noise at +17 dBTP comes out 0.002 dB over; checks allow 0.01 dB).
      **Every peak SkyCut reports is this measure**: the limiter's input peak, the f32's peak (`FrameSink` runs its own meter on what it
      writes), each frame and layer of `listen mix=true` (section 5), and listen's clips and files ([AI interface](ai-control-mcp.md)
-     section 4 item 13).
+     section 4 item 13). Clip listen applies the engine's sample envelope and track fader before metering (`AIListenSampleGain`),
+     never a representative frame gain after metering; a full fade-in must erase a first-sample impulse before interpolation.
+     File listen remains raw. The clip adapter is checked through the actual `AIListenTool` in `ListenGainChecks`, alongside
+     pure fade / fast-curve / speed / chunk checks in `ListenSampleGainChecks`.
    - **`Levels`**：`peak`（限幅前的真峰值）、`outputPeak`（写进 f32 的真峰值）、`limitedFrames`（真峰值过线的帧）、`maxReductionDB`、`loudnessLUFS`、
      `deliveredPeak`（see below）；压得超过 `attentionThresholdDB`（3 dB）才 `needsAttention`，建议降的量 = 压得最深的那一下。
      经 `Plan.audioLevels` → `VideoEditExporter.finishedAudioLevels` 到导出面板和 AI 的 `get_job` 结果。

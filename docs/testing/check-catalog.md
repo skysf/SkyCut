@@ -440,3 +440,10 @@
   A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
   after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
   license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).
+
+- Clip listen sample gain: `scripts/check-parameter-limits.sh` → `ListenGainChecks` calls the real entry on synthetic PCM,
+  checks a faded impulse, clip / track gain exactly once, raw file control, one bounded reader and unchanged project / undo.
+  `scripts/check-mcp.sh` → `ListenSampleGainChecks` covers within-frame fades / fast curves, stereo, trim, speed and chunks.
+- Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
+  order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
+  the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
