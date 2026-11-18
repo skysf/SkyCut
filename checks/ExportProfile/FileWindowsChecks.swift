@@ -92,10 +92,12 @@ import UniformTypeIdentifiers
         require(TypedPath.answer("/Volumes/Disk/clip.mkv", for: anyKind) != nil, "files macOS doesn't know are taken where allowed")
         require(TypedPath.answer("Movies/a.mp4", for: movies) == nil, "not a full path: refused")
 
-        let save = FileWindowRequest(kind: .save(types: [.srtFlowProject], name: "Teaser.skycut"))
-        require(TypedPath.answer("/Volumes/Disk/Projects/", for: save)?.path == "/Volumes/Disk/Projects/Teaser.skycut",
+        // A type every Mac knows: SkyCut's own project type is only registered where SkyCut is installed (not on CI), and
+        // the project's Save As adds .skycut itself (chooseSaveLocation).
+        let save = FileWindowRequest(kind: .save(types: [.quickTimeMovie], name: "Teaser.mov"))
+        require(TypedPath.answer("/Volumes/Disk/Projects/", for: save)?.path == "/Volumes/Disk/Projects/Teaser.mov",
                 "a typed folder for a save gets the suggested name")
-        require(TypedPath.answer("~/Desktop/Cut", for: save)?.path == NSHomeDirectory() + "/Desktop/Cut.skycut",
+        require(TypedPath.answer("~/Desktop/Cut", for: save)?.path == NSHomeDirectory() + "/Desktop/Cut.mov",
                 "a typed name without an extension gets the type's")
 
         let folder = FileWindowRequest(kind: .folder)
@@ -105,7 +107,7 @@ import UniformTypeIdentifiers
                 && TypedPath.accepted(dropped, for: FileWindowRequest(kind: .files(types: [.movie], multiple: true))).count == 2,
                 "dropped files: one where one is asked, all where several are")
         require(TypedPath.accepted([URL(fileURLWithPath: "/Volumes/Disk/Shots", isDirectory: true)], for: save).map(\.path)
-                == ["/Volumes/Disk/Shots/Teaser.skycut"], "a folder dropped on a save gets the suggested name")
+                == ["/Volumes/Disk/Shots/Teaser.mov"], "a folder dropped on a save gets the suggested name")
     }
 
     private static func settle(_ seconds: TimeInterval) async {
