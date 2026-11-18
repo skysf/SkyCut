@@ -121,6 +121,7 @@
 - [2026-10-14 Kokoro 的 speed 调到 0.85 几乎听不出慢](2026-10-14-kokoro-speed-barely-changes.md) — 参数名叫 speed 不等于线性管语速：量结果、按结果调（按时长对准）。
 - [2026-09-28 英文男声的配音开头爆音](2026-09-28-kokoro-voiceover-clipping.md) — 合成器的采样不保证在 ±1 以内：写文件只经 `AIAudioFileWriter`、先过 `AIVoiceLevel`。
 - [2026-09-24 本地化守卫不扫 `LabeledContent`](2026-09-24-labeledcontent-missing-from-localization-guard.md) — 按调用名清单扫的守卫，清单外整类调用是静默盲区。
+- [2026-11-19 A narrower range still could not reach the 41st sound past its picture](2026-11-19-linger-cap-ignores-checked-range.md) — Apply the caller's range before a cap, never after; keep the context that decides meaning (every cut) apart from what is measured.
 - [2026-10-15 裁掉说的话的字幕留在原地、和下一句叠](2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md) — 一条规矩的理由只对一类东西成立时，别照搬给另一类。
 - [2026-10-15 换源之后压在上面的东西被挪了一个偏移](2026-10-15-linkage-follows-source-shift-after-swap.md) — 同 id 换素材按改之前的素材和入点记账（`Piece.rebased`）。
 - [2026-10-15 联动把字幕当一整块挪](2026-10-15-linkage-moves-subtitles-as-a-block.md) — 字幕句两头各自换算（`LinkageCueFollow`）；判「还剩多少」要量对东西。
@@ -286,6 +287,7 @@
 - [2026-09-20 拖短转场时遮罩整块往右挪](2026-09-20-transition-mask-drifts-when-shortened.md) — 宽度有下限时，位置要跟着补偿。
 - [2026-09-20 磁吸关着时转场预览有、成片没有](2026-09-20-transition-preview-export-divergence.md) — 「两段是否相叠」两条管线只许一套判据；断言要造不相叠的几何。
 - [2026-08-09 翻译第二次卡在 0/N](2026-08-09-translate-stuck-at-zero.md) — configuration 换代与看门狗。
+- [2026-11-19 A transparent title over a cut hid that cut from inspect_video](2026-11-19-transparent-overlay-hides-cut-from-inspection.md) — "Fills the frame" is geometry, not "hides what is under it": an upper picture hides a cut only with no alpha in its media, full opacity and no fade.
 - [2026-10-28 体验显示「还剩 8 天」、到期日晚一天](2026-10-28-trial-and-pro-dates-shown-a-day-late.md) — 「拿到回答 − 服务器时间」不全是钟差；日历上的哪一天照服务器给的。
 - [2026-08-03 裁切闪烁与半速](2026-08-03-trim-flicker-halved.md) — 坐标反馈、动画与去抖。
 - [2026-09-25 裁切不跟链接](2026-09-25-trim-ignores-linked-clips.md) — 裁的算法只有 `TimelineTrim` 一份：链接伙伴 / 选中的一组同一个量、一起停。
