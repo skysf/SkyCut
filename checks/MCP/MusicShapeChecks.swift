@@ -12,18 +12,46 @@ import SrtFlowMCPKit
 // measured there are in the listening-engine doc. Built by scripts/check-mcp.sh.
 
 func runMusicShapeChecks() {
+    checkFramesPerRate()
     checkSyntheticSong()
     checkQuieterCopy()
     checkHitAtStart()
     checkShallowGaps()
     checkSilence()
+    checkStretchStart()
     checkReport()
     checkHitPlacement()
 }
 
+/// One reading at every rate: the research's 1024 samples at 22050 Hz as the nearest power of two, every quarter frame — so the
+/// delivery checks' 24 kHz music reads exactly as the research's tool did, and listen's 11025 Hz on the same 46 ms frames.
+private func checkFramesPerRate() {
+    for (rate, frame) in [(11_025.0, 512), (22_050.0, 1024), (24_000.0, 1024), (44_100.0, 2048), (48_000.0, 2048)] {
+        checkEqual(MusicAccents.frameSize(sampleRate: rate), frame, "frame at \(Int(rate)) Hz")
+        checkEqual(MusicAccents.hop(sampleRate: rate), frame / 4, "hop at \(Int(rate)) Hz")
+    }
+}
+
+/// A stretch cut out of music that was already playing (the delivery checks' music clips) has no accent at its start; read from
+/// the start of a file it does (the sound starts there). Both find the kicks at the same times.
+private func checkStretchStart() {
+    let song = syntheticSong()
+    let first = Int(1.0 * songRate)
+    let stretch = Array(song.samples[first..<Int(7.0 * songRate)])
+    let cut = MusicAccents.find(stretch, sampleRate: songRate, startsAtSilence: false)
+    check(!cut.contains { $0.time < 0.05 }, "a stretch of playing music has no accent at its start (\(cut.first.map { $0.time } ?? -1))")
+    let file = MusicAccents.find(stretch, sampleRate: songRate, startsAtSilence: true)
+    check(file.contains { $0.time < 0.02 }, "read as a file from its start, the sound starting there is an accent")
+    for kick in song.kicks where kick > 1.1 && kick < 6.9 {
+        check(cut.contains { abs($0.time + 1.0 - kick) <= hopSeconds } && file.contains { abs($0.time + 1.0 - kick) <= hopSeconds },
+              "both find the kick at \(kick) within a hop")
+    }
+    checkEqual(MusicAccents.find([Float](repeating: 0, count: 24_000), sampleRate: 24_000, startsAtSilence: true).count, 0, "silence has no accents")
+}
+
 private let songRate = 11_025.0
 /// Accent times are on the analysis hop's grid.
-private let hopSeconds = Double(MusicAccents.hop) / songRate
+private let hopSeconds = MusicAccents.hopSeconds(sampleRate: songRate)
 
 private struct SyntheticSong {
     var samples: [Float]

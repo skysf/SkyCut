@@ -6,8 +6,8 @@ import Foundation
 // each group as it enters the master bus, before the limiter, like listen mix=true) measured per project frame
 // (DeliveryStemPower: each group's power; MixBandMeter's four bands <300, 300–800, 800–3000, >3000 Hz for the music only, whose
 // voice band a line is read against), the music accents (the rendered
-// music group at half the engine's rate, read per music clip with DeliveryMusicAccents, the research's accent reading, kept where
-// the music is heard: above `audibleDB`), and the place group above 200 Hz in each cut window (DeliveryWindowCollector, the
+// music group at half the engine's rate, read per music clip with MusicAccents, the research's accent reading and listen's, kept
+// where the music is heard: above `audibleDB`), and the place group above 200 Hz in each cut window (DeliveryWindowCollector, the
 // research's brick-wall reading). Readers: window levels in a band, a frame's level, a cut window above 200 Hz.
 // Not here: which clip is which role (AIDeliverySoundRoles), the rules that read these levels (AIDeliveryCutJumps,
 // AIDeliveryMusicSwell). Only on a MediaReadQueue queue (the engine reads files on the calling thread).
@@ -144,12 +144,13 @@ struct AIDeliverySoundLevels: Sendable {
         for (start, end) in spans {
             let from = max(0, Int(((start * engineRate - Double(music.start)) / Double(music.decimation)).rounded(.up)))
             let to = min(music.samples.count, Int(((end * engineRate - Double(music.start)) / Double(music.decimation)).rounded(.down)))
-            guard to - from > DeliveryMusicAccents.frameSize * 2 else { continue }
+            guard to - from > MusicAccents.frameSize(sampleRate: rate) * 2 else { continue }
             let origin = (Double(music.start) + Double(from * music.decimation)) / engineRate
-            for accent in DeliveryMusicAccents.accents(Array(music.samples[from ..< to]), sampleRate: rate) {
+            // A stretch cut out of the rendered music: its start is not where the music starts (music entering is its own rule).
+            for accent in MusicAccents.find(Array(music.samples[from ..< to]), sampleRate: rate, startsAtSilence: false) {
                 let time = origin + accent.time
                 guard levels.db(.music, frame: levels.grid.frame(containing: time)) > audibleDB,
-                      !found.contains(where: { abs($0.time - time) < Double(DeliveryMusicAccents.hop) / rate }) else { continue }
+                      !found.contains(where: { abs($0.time - time) < MusicAccents.hopSeconds(sampleRate: rate) }) else { continue }
                 found.append(Accent(time: time, strength: accent.strength))
             }
         }

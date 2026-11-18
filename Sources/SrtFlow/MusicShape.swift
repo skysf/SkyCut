@@ -48,14 +48,19 @@ enum MusicShape {
         }
     }
 
+    /// An accent counts when the 0.1 s level there is within this many dB of the piece's playing level (heard in this piece).
+    static let heardRange = 30.0
+
+    /// A piece read from its start (a file): its start is where its sound starts.
     static func analyze(_ samples: [Float], sampleRate: Double) -> Analysis {
         guard sampleRate > 0, !samples.isEmpty else { return .silent }
         let levels = MusicLevels(samples, sampleRate: sampleRate)
-        guard levels.playing != nil else {
+        guard let playing = levels.playing else {
             return Analysis(accents: [], stops: [], end: nil, duration: Double(samples.count) / sampleRate)
         }
         let duration = Double(samples.count) / sampleRate
-        let accents = MusicAccents.find(samples, sampleRate: sampleRate, levels: levels)
+        let accents = MusicAccents.find(samples, sampleRate: sampleRate, startsAtSilence: true)
+            .filter { levels.level(at: $0.time) >= playing - heardRange }
         let (stops, end) = MusicStops.find(levels, accents: accents)
         return Analysis(accents: accents, stops: stops, end: end.map { min($0, duration) }, duration: duration)
     }
