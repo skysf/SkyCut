@@ -82,6 +82,9 @@ enum CutSoundPlanner {
     static func run(
         _ request: CutSoundRequest, cuts: [CutSoundCut], inputs: [Inputs], skipsSilent: Bool, in state: inout TimelineState
     ) throws -> (outcomes: [CutSoundOutcome], skipped: [UUID]) {
+        if request.mode == .gain, request.gainDB == nil, cuts.count > 1 {
+            return try CutSoundBatchGain.run(request, cuts: cuts, inputs: inputs, skipsSilent: skipsSilent, in: &state)
+        }
         let original = state
         var next = state
         var outcomes: [CutSoundOutcome] = []

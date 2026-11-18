@@ -35,6 +35,9 @@
 
 - 引擎启动探测：`scripts/check-engine-probe.sh`（合成短命令的超时、双输出上限、退出码、文件描述符、退出回收窗口、候选去重和单次定位；不读取媒体或调用云端），合同见[阻塞的媒体读取](../architecture/blocking-media-reads.md)「引擎启动探测」。
 
+- Voice selection budget: `scripts/check-mix-layers.sh` → `Voice.swift` tests 11/12/13 voice tracks with zero/one/many
+  other tracks through auto and explicit selection, complete audible-track partitioning and valid voice-clip layer references.
+  Rule: [the listening engine](../architecture/listening-engine.md).
 - 成片 MCP 疑点检查：`scripts/check-video-inspection.sh`（独立合成工程、真实混音/画面/字幕与试听，不编辑工程）；合同见 [成片疑点检查](../architecture/finished-video-inspection.md)，实测见 [2026-11-02 成片检查](../reports/2026-11-02-video-inspection.md)。
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
@@ -235,6 +238,10 @@
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
+- Automatic canvas changes with linkage: `scripts/check-parameter-limits.sh` → `CanvasLinkageChecks` calls the real `perform`
+  when deleting the first V1 clip and rippling a portrait clip; text, shape and framed V2 movement, deleted-host cleanup,
+  linkage counts, preserved geometry, magnet/linkage on and off, and one-step undo/redo. `checks/MCP/canvas-wiring.sh` pins
+  magnet → linkage → reframe. Rule: [linkage](../architecture/timeline-linkage.md).
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
   set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
@@ -433,3 +440,10 @@
   A 240 s watchdog turns a look that never answers into a red run. The router's side (look through `AILookCall`, the lines, each look letting go
   after its last read of the project, `shots=true` never) is the look section of `checks/MCP/router-wiring.sh`; the router itself (behind the
   license gate) is the manual smoke `scripts/gui-smoke/sky-studio/look_jobs.py` ([GUI smoke](gui-smoke-testing.md) 四之八 7a).
+
+- Clip listen sample gain: `scripts/check-parameter-limits.sh` → `ListenGainChecks` calls the real entry on synthetic PCM,
+  checks a faded impulse, clip / track gain exactly once, raw file control, one bounded reader and unchanged project / undo.
+  `scripts/check-mcp.sh` → `ListenSampleGainChecks` covers within-frame fades / fast curves, stereo, trim, speed and chunks.
+- Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
+  order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
+  the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.

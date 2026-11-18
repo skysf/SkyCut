@@ -12,6 +12,7 @@ if [ -z "${PERFORM_BODY}" ]; then
 fi
 MAGNET_LINE="$(printf '%s\n' "${PERFORM_BODY}" | grep -n 'MainMagnet.settle(&next, after: before)' | head -1 | cut -d: -f1 || true)"
 REFRAME_LINE="$(printf '%s\n' "${PERFORM_BODY}" | grep -n 'CanvasReframe.keepShapes(&next, after: before)' | head -1 | cut -d: -f1 || true)"
+LINKAGE_LINE="$(printf '%s\n' "${PERFORM_BODY}" | grep -n 'TimelineLinkage.follow(from: before' | head -1 | cut -d: -f1 || true)"
 REFRAME_COUNT="$(printf '%s\n' "${PERFORM_BODY}" | grep -c 'CanvasReframe.keepShapes(' || true)"
 if [ -z "${REFRAME_LINE}" ] || [ "${REFRAME_COUNT}" -ne 1 ]; then
   echo "✗ ${PERFORM_FILE}: perform does not run CanvasReframe.keepShapes once: a canvas change stretches framed clips again" >&2
@@ -20,6 +21,10 @@ fi
 # After the magnet: packing V1 can change the first clip, and with it an auto canvas.
 if [ -z "${MAGNET_LINE}" ] || [ "${REFRAME_LINE}" -le "${MAGNET_LINE}" ]; then
   echo "✗ ${PERFORM_FILE}: CanvasReframe.keepShapes must run after MainMagnet.settle (the magnet can change an auto canvas)" >&2
+  exit 1
+fi
+if [ -z "${LINKAGE_LINE}" ] || [ "${REFRAME_LINE}" -le "${LINKAGE_LINE}" ]; then
+  echo "✗ ${PERFORM_FILE}: CanvasReframe.keepShapes must run after linkage; internal geometry changes must not suppress linked moves or deletions" >&2
   exit 1
 fi
 if [ "$(grep -c 'AICanvasReframe.fields(before: before, after: project.state' Sources/SrtFlow/AIOverlayTools.swift || true)" -ne 1 ]; then

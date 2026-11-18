@@ -58,6 +58,7 @@ private let voiceProvenance = AIListenVoicePlan.Provenance(library: ["mus_check_
 
 func checkVoiceCheck() {
     group("3. listen voice=: who covers each narration line and by how much (MCP-39)")
+    voiceTrackLimitChecks()
     let (state, voice) = voiceTimeline()
     let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
     // The plan.
@@ -118,4 +119,54 @@ func checkVoiceCheck() {
         let verdicts = AIListenVoiceReport.json(duetLines, plan: duetPlan, shortIDs: [:])["lines"]?.arrayValue?.compactMap { $0["verdict"]?.stringValue } ?? []
         check(!verdicts.isEmpty && verdicts.allSatisfy { $0 == "two_voices" }, "two voices speaking at once are their own item (\(verdicts))")
     } else { check(false, "the two-voice check did not run") }
+}
+
+/// Planning only: auto and explicit selections share the voice budget, leaving room for the rest of the mix.
+private func voiceTrackLimitChecks() {
+    let limit = AIListenVoicePlan.maxLayers
+    let guide = MCPGuide.answer(topic: "listen", section: "voice")
+    check(guide["text"]?.stringValue?.contains("at most \(limit - 1) voice tracks") == true,
+          "the voice guide states the same limit as the production planner")
+    check(guide.encodedString().utf16.count <= MCPGuide.answerLimit, "the voice guide remains within the section budget")
+    for voiceCount in [limit - 1, limit, limit + 1] {
+        for otherCount in [0, 1, limit + 1] {
+            var state = TimelineState()
+            for index in 0..<voiceCount {
+                let url = root.appendingPathComponent("Voiceovers/limit-\(index).wav")
+                state.audioTracks.append(EditLane(clips: [audioClip(url, at: 0, duration: 1)]))
+            }
+            for index in 0..<otherCount {
+                let url = root.appendingPathComponent("limit-other-\(index).wav")
+                state.audioTracks.append(EditLane(clips: [audioClip(url, at: 0, duration: 1)]))
+            }
+            let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
+            let explicit = (1...voiceCount).map { "A\($0)" }.joined(separator: "+")
+            for spec in ["auto", explicit] {
+                let selection = spec == "auto" ? "auto" : "explicit"
+                print("Voice budget: voices=\(voiceCount), others=\(otherCount), selection=\(selection)")
+                do {
+                    let plan = try AIListenVoicePlan.make(spec, state: state, config: config, from: nil, to: nil,
+                                                         provenance: voiceProvenance)
+                    guard voiceCount < limit else {
+                        check(false, "\(voiceCount) voice tracks + \(otherCount) others must be refused for \(spec)")
+                        continue
+                    }
+                    check(plan.layers.count <= limit && plan.layers.filter(\.isVoice).count == voiceCount,
+                          "\(spec): \(voiceCount) voices + \(otherCount) others fit the layer budget")
+                    check(plan.layers.flatMap(\.stem.tracks).sorted() == Array(config.tracks.indices),
+                          "\(spec): every audible track belongs to exactly one layer")
+                    check(plan.clips.count == voiceCount && plan.clips.allSatisfy { $0.layer < voiceCount },
+                          "\(spec): every voice clip points at its own voice layer")
+                    if otherCount > limit - voiceCount {
+                        check(plan.layers.last?.stem.name == AIListenMixPlan.rest
+                              && plan.layers.last?.stem.tracks.count == otherCount,
+                              "\(spec): excess other tracks share the reserved rest layer")
+                    }
+                } catch let error as AIToolError {
+                    check(voiceCount >= limit && error.message == "voice takes at most \(limit - 1) tracks.",
+                          "\(voiceCount) voices + \(otherCount) others return the same bounded error for \(spec): \(error.message)")
+                } catch { check(false, "voice budget threw an unexpected error: \(error)") }
+            }
+        }
+    }
 }

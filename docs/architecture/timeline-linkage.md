@@ -64,6 +64,15 @@ never clamped at 0, which made a J cut's sound late by its lead-in ([case](../bu
 
 ## 三、给 AI 的那一面
 
+**Completion order (2026-11-18):** `perform` settles the main magnet, follows linkage, then runs `CanvasReframe.keepShapes`,
+before assigning track colors. Linkage compares whole values to detect objects the user already edited (rule 5); canvas
+reframing is internal geometry maintenance and must not mark untouched attachments as edited. Following first changes timing
+without changing the framing fields used by `CanvasReframe` / `OverlayReframe`, so both contracts hold. In auto canvas, deleting
+the first landscape clip and rippling a portrait clip must move its text, shapes and framed V2, delete the removed host's title,
+and return the matching linkage counts in one undo step ([case](../bugfixes/2026-11-18-auto-canvas-suppresses-linkage.md)).
+`scripts/check-parameter-limits.sh` runs this through the real `perform`, with magnet and linkage on/off plus undo/redo;
+`checks/MCP/canvas-wiring.sh` pins the production order.
+
 - `get_timeline` 的结果带 `linkage: true/false`；`delete_items` / `cut_speech` / `edit_clip` / `cut_to_beat` 的结果里带
   `linkage: {moved, deleted, note}`（什么都没动就不带，`AILinkageReport`）；字幕收短了的列在 `shortened_subtitles`（字里可能还留着剪掉的词，
   叫 AI 用 get_subtitles 看）、说的话被删掉 / 裁掉跟着没了的报几句（`deleted_subtitles`：只报一个 deleted，AI 会以为删了段）、

@@ -405,6 +405,7 @@ xcrun swiftc \
   Sources/SrtFlow/CutSoundCurves.swift \
   Sources/SrtFlow/CutSoundLimits.swift \
   Sources/SrtFlow/CutSoundPlanner.swift \
+  Sources/SrtFlow/CutSoundBatchGain.swift \
   Sources/SrtFlow/CutSoundLevelPlan.swift \
   Sources/SrtFlow/CutSoundReport.swift \
   Sources/SrtFlow/VideoEditLinkRegrouping.swift \
@@ -474,6 +475,8 @@ xcrun swiftc \
   Sources/SrtFlow/AIListenAudioWindow.swift \
   Sources/SrtFlow/AIListenSampleFrames.swift \
   Sources/SrtFlow/AIListenFrameGrid.swift \
+  Sources/SrtFlow/AIListenSampleGain.swift \
+  Sources/SrtFlow/AudioEngine/AudioGainTable.swift \
   Sources/SrtFlow/AudioDecodeSettings.swift \
   Sources/SrtFlow/TruePeak.swift \
   Sources/SrtFlow/AIListenReadControl.swift \

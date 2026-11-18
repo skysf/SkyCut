@@ -43,6 +43,11 @@
    as its own layer (beyond 12 in all the rest are joined as `rest`), each with what its clips are from where they came
    (`Provenance`: our voice-overs and sound effects by folder, library music / effects by manifest id, generated audio as music,
    a video clip's sound as `clip_sound`, anything else `other`) — rule 1 above: the masker is named by its source, not guessed.
+   **Voice budget (2026-11-18):** auto and explicit selections pass through the same count validation before any layer is
+   allocated: at most `AIListenVoicePlan.maxLayers - 1` distinct voice tracks (currently 11), even without other tracks.
+   Reserve at least one layer for other audible tracks or their combined `rest`. Too many voices return the same `AIToolError`;
+   never clamp the remaining room or silently discard voices. The former auto path could slice `others[-1...]` and crash
+   ([case](../bugfixes/2026-11-18-voice-auto-layer-budget-crash.md)).
    Detached camera audio keeps `clip_sound` on an audio track: `EditClip.detachedAudio` preserves its picture's `info`.
    Track placement does not turn a recording into added ambience (see the [regression case](../bugfixes/2026-11-17-detached-audio-listening-provenance.md)).
    `AIListenVoiceMeasure` renders the layers with `AudioStemRender` (the export's configuration, before the limiter, so they add
@@ -232,6 +237,10 @@ lines, loud noise under the second, quiet "library music" all along → two line
 the second `probably_unintelligible` with A2 (`other`) its main masker and removing it worth most; V tracks refused with the
 reason; `auto` finds the voice-over track by its folder; two voice tracks speaking at once → `two_voices`. Not verified: real
 narration under real music (the blind-test items are not in the repo); the lines themselves (one listener).
+
+The same group's planner boundary cases cover 11, 12 and 13 voice tracks, each with zero, one or many other tracks, through
+both `auto` and explicit selection. Accepted plans stay within 12 layers and partition every audible track exactly once;
+over-budget selections are refused before slicing or allocating `rest`. Restoring the old auto return makes the check crash.
 
 The pure voice checks cover every grey-hint boundary and verdict; mix-layers group 3b exercises the actual report with
 controlled results, including music passing its own tier at 0.30, clip_sound / voice / rest exclusions, only the first masker,

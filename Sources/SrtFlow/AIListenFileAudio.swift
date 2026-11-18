@@ -50,7 +50,7 @@ enum AIListenFileAudio {
         guard let frames = reading.frames else { return AIListenPeaks(truePeakDB: -60, peakAt: nil, loudestAt: nil) }
         let starts = Array(grid.bounds(from: reading.from, to: reading.to).dropLast())
         let rate = reading.peaks.sampleRate
-        return AIListenPeaks.measure(frames, starts: starts, gains: [], time: { reading.sourceStart + Double($0) / rate })
+        return AIListenPeaks.measure(frames, starts: starts, time: { reading.sourceStart + Double($0) / rate })
     }
 
     /// UI/时间线消费者共用的整文件波形。超时只结束等待，不取消其他消费者的共享任务。

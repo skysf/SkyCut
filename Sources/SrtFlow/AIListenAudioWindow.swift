@@ -65,7 +65,7 @@ enum AIListenAudioWindow {
 
     static func read(
         _ url: URL, from: Double?, to: Double?, until deadline: Date, frames: FrameBounds? = nil, edges: Edges? = nil, keepsSamples: Bool = false,
-        observe: (@Sendable (Event) -> Void)? = nil,
+        gain: AIListenSampleGain? = nil, observe: (@Sendable (Event) -> Void)? = nil,
         readerFactory: ReaderFactory? = nil
     ) async throws -> Reading {
         // No range = the whole file: its sound is taken where it is (`.sound`); a named range must be covered.
@@ -99,7 +99,7 @@ enum AIListenAudioWindow {
                 let bounds = frames?(start, end)
                 return try await control.run {
                     try read(asset, track: track, channels: Int(channels), from: start, to: end, duration: duration, bounds: bounds,
-                             edges: edges, keepsSamples: keepsSamples, control: control, observe: observe, readerFactory: readerFactory, audit: audit)
+                             edges: edges, keepsSamples: keepsSamples, gain: gain, control: control, observe: observe, readerFactory: readerFactory, audit: audit)
                 }
             } catch {
                 try control.check()
@@ -111,7 +111,7 @@ enum AIListenAudioWindow {
     /// 同步阻塞段：timeRange 限制解码，PTS 再限制进统计的采样；失败/取消不发布半份结果。
     private static func read(
         _ asset: AVURLAsset, track: AVAssetTrack, channels: Int, from: Double, to: Double,
-        duration: Double, bounds: [Double]?, edges: Edges, keepsSamples: Bool, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?,
+        duration: Double, bounds: [Double]?, edges: Edges, keepsSamples: Bool, gain: AIListenSampleGain?, control: AIListenReadControl, observe: (@Sendable (Event) -> Void)?,
         readerFactory: ReaderFactory?, audit: MediaReadAudit?
     ) throws -> Reading {
         try control.check()
@@ -126,7 +126,7 @@ enum AIListenAudioWindow {
                                        end: CMTime(seconds: to, preferredTimescale: 600_000))
         try control.check()
         guard reader.startReading() else { throw reader.error ?? AIToolError("SkyCut could not start reading this audio range.") }
-        var accumulation = Accumulation(bounds: bounds, edges: edges, samples: keepsSamples ? [] : nil)
+        var accumulation = Accumulation(bounds: bounds, edges: edges, gain: gain, samples: keepsSamples ? [] : nil)
         // 记的是 reader 自己的 timeRange 和它真交出来的帧数（失败 / 被停也记），不是调用方要的那一窗。
         audit?.note(.windowStarted(asset.url, from: reader.timeRange.start.seconds, to: reader.timeRange.end.seconds))
         defer {
@@ -151,6 +151,8 @@ enum AIListenAudioWindow {
         let bounds: [Double]?
         /// `.sound`: the first sample may come after `from` and the last before `to` (the file's sound is shorter there).
         let edges: Edges
+        /// Nil for files; clips apply their actual envelope before both waveform and true-peak statistics.
+        let gain: AIListenSampleGain?
         /// One channel of the stored samples, when kept.
         var samples: [Float]?
         var builder: ChunkBuilder?
@@ -203,16 +205,25 @@ enum AIListenAudioWindow {
             }
             let samples = UnsafeBufferPointer(start: data.assumingMemoryBound(to: Float.self) + first * channels,
                                               count: (last - first) * channels)
+            if let gain {
+                let heard = gain.applying(to: samples, from: start, rate: rate, channels: channels)
+                heard.withUnsafeBufferPointer { accumulate($0, frames: last - first, channels: channels) }
+            } else {
+                accumulate(samples, frames: last - first, channels: channels)
+            }
+            storedFrames += last - first
+        }
+
+        private mutating func accumulate(_ samples: UnsafeBufferPointer<Float>, frames: Int, channels: Int) {
             builder?.append(interleaved: samples) { chunks.append($0) }
-            frameStats?.append(samples, frames: last - first)
+            frameStats?.append(samples, frames: frames)
             if self.samples != nil {
-                for frame in 0 ..< (last - first) {
+                for frame in 0..<frames {
                     var sum: Float = 0
                     for channel in 0 ..< channels { sum += samples[frame * channels + channel] }
                     self.samples?.append(sum / Float(channels))
                 }
             }
-            storedFrames += last - first
         }
 
         mutating func finish(from: Double, to: Double, duration: Double) throws -> Reading {

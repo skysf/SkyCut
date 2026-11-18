@@ -30,10 +30,12 @@
 - [2026-10-06 挪了一段音频，画面挪了、声音还在原地](2026-10-06-audio-engine-replace-keeps-old-segment-positions.md) — 「结构没变」按开流时抄死了什么来定，不是按 id；自检要有「换配置」这一步。
 - [2026-08-12 渐入开头爆音](2026-08-12-audio-fade-in-pop.md) — 混音器的增益有 de-zipper：别拿常量提前量赌平台的平滑窗口，断言上移到结构不变量。
 - [2026-11-05 声音主时钟停住导致预览无法播放](2026-11-05-audio-master-clock-stops-playback.md) — 播放意图不代表音频图仍在运行：开播前和播放中恢复停图、重钉锚点。
+- [2026-11-18 Automatic canvas changes suppress linked moves and deletions](2026-11-18-auto-canvas-suppresses-linkage.md) — Follow linkage before internal geometry rewrites can make untouched attachments look user-edited.
 - [2026-10-03 自动检测把英文旁白判成中文](2026-10-03-auto-detect-picks-chinese-for-english.md) — 分不开两边时找一个真能分开的特征（写成了哪种文字），别调门槛。
 - [2026-09-26 自动检测语言拿音效当探针](2026-09-26-auto-detect-probes-sound-effects.md) — 「读得出来」不等于「有人说话」：探针长的先、先听有没有人声。
 - [2026-09-24 改得勤就隔一会儿卡一下：自动保存重建书签](2026-09-24-autosave-rebuilds-bookmarks-every-save.md) — 书签按「路径 + inode + 卷」缓存，同名换文件才重建。
 - [2026-09-27 批量转换字幕把同名文件悄悄盖掉](2026-09-27-batch-convert-overwrites-existing-files.md) — 写用户文件夹默认不覆盖：先问，或加编号（`ExportFileName.unoccupied`）。
+- [2026-11-18 Batch gain breaks an earlier seam](2026-11-18-batch-cut-gain-rebreaks-earlier-seams.md) — Solve shared sounds together and verify every final seam.
 - [2026-09-29 listen 说 63.5 BPM，cut_to_beat 按 95.3 切](2026-09-29-beat-analysis-window-differs-between-listen-and-cut-to-beat.md) — 同一个量两个工具各算一份迟早两个答案：落在前 15 分钟里的请求共用一份整段分析（到结尾或 15 分钟）；更晚的按自己的区间，也封顶 15 分钟。
 - [2026-11-17 Black-bar removal disagreed with look and left thin edges](2026-11-17-black-bar-removal-keeps-residual-edges.md) — Measure the requested source window at one shared resolution and include the resampled boundary in the corrective crop.
 - [2026-08-06 构建版本与 shell 陷阱](2026-08-06-build-version-and-shell-traps.md) — 版本兜底、变量边界与 pipefail；改 shell 脚本前必读。
@@ -123,6 +125,7 @@
 - [2026-11-03 文件 listen 的短区间仍读整条音轨](2026-11-03-listen-file-range-reads-whole-audio.md) — 给了源范围就用原生 timeRange 有界读取。
 - [2026-11-13 文件 listen 的区间自检在机器满载时等不到 2 秒的截止时间](2026-11-13-listen-range-checks-timed-out-under-load.md) — 自检传给生产入口的期限只拦卡死、要证明的事数出来；一个文件里对着墙上时钟的期限一起改，别只修红过的那条。
 - [2026-11-04 取消 listen 时跨线程拆掉正在读的 reader](2026-11-04-listen-reader-cancel-during-copy.md) — 原生 copy 和取消不能并发，取消只在读取体那一处收。
+- [2026-11-18 Clip listen meters raw PCM before gain](2026-11-18-listen-sample-gain-before-true-peak.md) — Apply the actual sample envelope before interpolation and energy accumulation.
 - [2026-11-03 本地构建后缀进了版本头，模型目录被拒](2026-11-03-local-version-header.md) — 版本头只在共享的请求边界规范化。
 - [2026-11-10 一句拆两批，两种采样率接不起来](2026-11-10-long-line-halves-with-different-sample-rates.md) — 拼接前换成同一个采样率；假协议要按模型回不一样的格式。
 - [2026-11-17 look silently took minutes, the calls behind it were dropped and its result lost](2026-11-17-look-hangs-and-dropped-calls.md) — A read lets its line go once it has read the project; work that can outlast the helper's 120 s answers with a job id first.
@@ -185,6 +188,7 @@
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
 - [2026-09-25 松手重建预览把每个素材重开一遍](2026-09-25-rebuild-reopens-every-asset.md) — 素材按文件身份进程级缓存（`MediaAssetCache`）；只有一个小视图关心的状态不在工程上发。
+- [2026-11-18 Shared rules reverse the bed policy](2026-11-18-recipe-bed-policy-drift.md) — Check shipped AI instructions against the current production decision.
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。
 - [2026-09-29 风格卡给竖屏写的字号大了 1.78 倍](2026-09-29-recipe-sizes-too-big-on-vertical.md) — 写给 AI 的数字也是代码：字号按画面高度算，卡里写明画幅并真排一遍。
 - [2026-10-03 record_screen 真机首测的四处小毛病](2026-10-03-record-screen-first-device-test.md) — 新工具合并后尽早上真机走一遍：状态组合、时序自检够不着。
@@ -278,6 +282,7 @@
 - [2026-10-02 AI 起的 upscale 换源后扣费一直是「—」](2026-10-02-upscale-cost-lookup-killed-by-remove.md) — 异步补账要追着已落地的数据写；remove ≠ cancel。
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](2026-10-28-upscale-inspector-still-says-fal.md) — 换提供方要连 verbatim 写死的名字一起搜。
 - [2026-10-28 Upscale 面板上不肯报价的那一行只写「—」](2026-10-28-upscale-panel-hides-why-quote-failed.md) — 会因内容失败的请求，原因要上界面；规则在服务器上的照它的话说。
+- [2026-11-18 Automatic voice selection can crash when it fills the layer budget](2026-11-18-voice-auto-layer-budget-crash.md) — Validate automatic and explicit selections against the same budget before computing remaining capacity.
 - [2026-11-10 并发检查断言了假服务没按住的完成顺序](2026-11-10-voice-concurrency-check-finish-order.md) — 只断言被按住的那一对的先后。
 - [2026-11-11 重启后不记得在建的声音库那一单](2026-11-11-voice-library-job-after-restart.md) — 账在盘上，它要结的那一单也得在盘上；能去重的在问用户之前去重。
 - [2026-11-11 声音库审查的后续](2026-11-11-voice-library-review-followups.md) — 过闸之前先看在建的那一单；费用的问题受理后才清。
