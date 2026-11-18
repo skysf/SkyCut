@@ -453,6 +453,12 @@
 - Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
   order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
+- Ducking under speech (`set_track duck_others_db`, MCP-29): `scripts/check-mcp.sh` → `SpeechDuckChecks` (windows and merging;
+  the dip on flat, sloped and bumped lines, 2× speed, the volume floor; calling again with the same / another depth / 0 and with
+  a bump drawn after the duck; windows across a clip's start and end; a clip inside a line; which clips dip; lines from pauses;
+  the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
+  file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
+  [volume curve](../architecture/audio-volume-curve.md) section 5.
 - A clip's voice-band cut (`edit_clip voice_band_db`, MCP-30): `scripts/check-audio-engine.sh` group 16 → `VoiceBand.swift` (the
   filter on steady sines: lows and highs kept, 1 kHz down by the depth, gain 1 flat, blocks = one run; the engine's offline render
   of a three-tone clip; a cut through `updateGains`, not structure); `scripts/check-project-file.sh` group 51 (cleaning, v38, round

@@ -93,7 +93,7 @@ private let pilotNature: [MCPToolName: [String]] = [
     .cancelJob: ["queued"],
     .getSettings: ["Read-only"],
     .getTimeline: ["Read-only", "edit_limits"],
-    .setTrack: ["One undo step"],
+    .setTrack: ["One undo step", "skycut_guide topic=set_track"],
     .splitClip: ["One undo step"],
     .deleteItems: ["One undo step", "Linkage on:"],
     .duplicateItems: ["One undo step"],

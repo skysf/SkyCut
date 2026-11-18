@@ -45,13 +45,29 @@ enum MCPGuideTimelineEditTopics {
 
             Change a whole track: its fader (volume_db, on top of each clip's own volume) or hidden (left out of the preview and \
             the export). track master is the fader after all tracks. Use it to duck music under a voice-over or mute a track. One \
-            undo step; clamped values return requested/applied/adjustments.
+            undo step; clamped values return requested/applied/adjustments. duck_others_db on the track that speaks dips every \
+            other track under each of its lines in one call (section ducking).
             """),
             MCPGuideSection(name: "fader", about: "track and master faders in dB", text: """
             Fader. volume_db is the track's fader in dB, on top of each clip's own volume and curve, clamped to \
             edit_limits.volume_db (the result returns requested, applied and adjustments). track master is the fader after all \
-            tracks. Duck music under a voice-over by lowering its track; for a level that changes over time use edit_clip \
-            volume_curve instead.
+            tracks. To duck music only while someone speaks, use duck_others_db on the voice's track (section ducking); for any \
+            other level that changes over time use edit_clip volume_curve.
+            """),
+            // Source: docs/architecture/audio-volume-curve.md section 5 (MCP-29), the shared rule Voice and music 1.
+            MCPGuideSection(name: "ducking", about: "duck_others_db: dip the other tracks under this track's lines", text: """
+            Ducking. Call set_track on the track that speaks (narration on A1, a talking head on V1) with duck_others_db, \
+            usually -10 (the shared rule: about 10 dB under the voice only while words are spoken). Every other track's clips dip \
+            under each line in one call and one undo step: the dip starts 0.4 s before a line, is full when the line starts and \
+            back 0.5 s after it ends; lines closer than about 1.9 s share one dip, so nothing comes up between words or short \
+            pauses. duck_tracks names the only tracks to dip (A2+V1): leave a shot's own sound out when its low hits must keep \
+            their weight. Lines come from a cached transcript (transcribe first; a camera's sound needs one) or, for a narration \
+            file, from its pauses. The dips are drawn into the clips' volume curves: under a line a clip sits that many dB under \
+            its own level next to the line. Calling again sets the dip anew instead of stacking it; 0 takes it out. Shapes above \
+            that level, such as a crossfade's equal-power bump or a bed swell from set_transition sound, stay and go down with \
+            the rest. A sound lying wholly inside a line (an effect on a word) is not ducked; the result lists it, so move or \
+            lower it. Dips stay where they were drawn: after moving speech call again, and remove dips left under no line with \
+            edit_clip volume_curve. Check with listen.
             """),
             MCPGuideSection(name: "hiding", about: "hiding a whole track from the preview and the export", text: """
             Hiding. hidden=true leaves the whole track out of the preview and the export without deleting it (not for master). \
@@ -60,6 +76,8 @@ enum MCPGuideTimelineEditTopics {
         ],
         examples: [
             ["track": "A1", "volume_db": -12],
+            ["track": "A1", "duck_others_db": -10],
+            ["track": "V1", "duck_others_db": -10, "duck_tracks": "A2"],
             ["track": "V2", "hidden": true]
         ],
         related: ["edit_clip", "get_timeline", "listen"]

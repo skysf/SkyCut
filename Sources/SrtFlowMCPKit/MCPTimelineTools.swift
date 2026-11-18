@@ -53,16 +53,21 @@ public enum MCPTimelineTools {
                 ], required: ["clip_id"])
             )
         case .setTrack:
+            // duck_others_db (ducking under speech, 2026-11-18 MCP-29) is a parameter here, not a new tool: the catalog had under
+            // 1 KB left; the rules are in the guide's set_track topic (MCPGuideTimelineEditTopics).
             return MCPToolDefinition(
                 .setTrack, title: "Track settings",
                 description: """
-                Set track volume_db or hidden; master is the final fader. One undo step; clamping reports \
-                requested/applied/adjustments. Hidden tracks are excluded from preview and export.
+                Set track volume_db or hidden (left out of preview and export); master is the final fader. duck_others_db dips \
+                other tracks under this track's lines. One undo step; clamping reports requested/applied/adjustments. Ducking: \
+                skycut_guide topic=set_track.
                 """,
                 input: MCPSchema.object([
                     "track": MCPSchema.string("V1, V2… / A1, A2…, or master."),
                     "volume_db": MCPSchema.number("Fader dB within edit_limits.volume_db; returns requested/applied/adjustments."),
-                    "hidden": MCPSchema.boolean("Hide or show the whole track (not for master).")
+                    "hidden": MCPSchema.boolean("Hide or show the whole track (not for master)."),
+                    "duck_others_db": MCPSchema.number("Dip under this track's lines, -30 to 0 dB.", minimum: -30, maximum: 0),
+                    "duck_tracks": MCPSchema.string("Only these tracks, e.g. A2+V1.")
                 ], required: ["track"])
             )
         case .splitClip:

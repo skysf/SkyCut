@@ -91,6 +91,7 @@ runParameterLimitChecks()
 runVoiceoverSyncChecks()
 runCutSoundChecks()
 runCutSoundBatchGainChecks()
+runSpeechDuckChecks()
 runVoiceBandToolChecks()
 
 if failures > 0 {

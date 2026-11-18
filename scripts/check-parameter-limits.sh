@@ -23,7 +23,8 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ParameterLimits/Fixture.swift checks/ParameterLimits/BlackBarChecks.swift \
   checks/ParameterLimits/EditingFeedbackChecks.swift checks/ParameterLimits/Main.swift \
   checks/ParameterLimits/AddClipsChecks.swift checks/ParameterLimits/CanvasLinkageChecks.swift \
-  checks/ParameterLimits/ListenGainChecks.swift checks/ParameterLimits/VoiceBandAppChecks.swift \
+  checks/ParameterLimits/ListenGainChecks.swift checks/ParameterLimits/SpeechDuckAppChecks.swift \
+  checks/ParameterLimits/VoiceBandAppChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ParameterLimitCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=160x90:r=24 \
