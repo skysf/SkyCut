@@ -194,6 +194,7 @@
 - [2026-08-12 压缩预览区时播放条压到工具栏上](2026-08-12-preview-transport-row-overlap.md) — VStack 里谁让步必须显式声明。
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
+- [2026-11-19 Saving a project on a slow or stuck drive froze SkyCut, and Quit could hang](2026-11-19-project-save-blocks-on-slow-drive.md) — A project file is on a user-chosen drive too: write it on its own queue with a deadline, count changes so a late write can't mark newer edits saved, and let Quit wait with .terminateLater.
 - [2026-09-25 松手重建预览把每个素材重开一遍](2026-09-25-rebuild-reopens-every-asset.md) — 素材按文件身份进程级缓存（`MediaAssetCache`）；只有一个小视图关心的状态不在工程上发。
 - [2026-11-18 Shared rules reverse the bed policy](2026-11-18-recipe-bed-policy-drift.md) — Check shipped AI instructions against the current production decision.
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。
