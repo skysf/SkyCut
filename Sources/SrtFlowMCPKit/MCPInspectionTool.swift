@@ -14,6 +14,8 @@ enum MCPInspectionTool {
         "silence_db": MCPSchema.number("Silent below dBFS (default -45).", minimum: -80, maximum: -10),
         "min_silence": MCPSchema.number("Minimum silent seconds (default 0.5).", minimum: 0.1, maximum: 10),
         "image": MCPSchema.boolean("Suspect screenshots, default true."),
+        // Second-tier sound checks (2026-11-18, AIDeliverySoundRoles): what SkyCut can't tell from where a sound came from.
+        "sounds": MCPSchema.object([:], description: "Track or clip id → voice|music|effects|ambience|object where SkyCut can't tell: {\"A2\":\"music\"}."),
         "intentional": MCPSchema.object([
             "job_id": MCPSchema.string("Completed inspection job."),
             "key": MCPSchema.string("Finding key from that report."),

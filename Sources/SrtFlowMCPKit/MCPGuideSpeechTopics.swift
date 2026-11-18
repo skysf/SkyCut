@@ -107,7 +107,8 @@ enum MCPGuideSpeechTopics {
             survives in the whole mix), a verdict, maskers (the two layers covering it most, with kind music, effects, clip_sound, \
             voice or other, and how much removing it or lowering it 6 dB would add) and low_150_db next to voice_db (ESTOI can't \
             hear below ~134 Hz: compare them yourself). Verdicts: probably_unintelligible below 0.31, may_be_hard 0.31–0.41 \
-            (listen to it); when music covers it most, only below 0.20; two_voices when another voice track speaks in the line; \
+            (listen to it); when music covers it most, only below 0.20; two_voices when another voice track speaks during at least \
+            0.5 s of the line; \
             too_short. A separate grey hint says "clear, but [layer] may be loud — try 3–6 dB lower" only for a clear line with \
             estoi < 0.50 whose main masker is one added music, ambience or effects layer (never clip_sound, a voice or rest) and \
             removing it adds at least 0.25; summary.may_be_loud counts these hints. Report only: nothing blocks, and the lines \
