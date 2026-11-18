@@ -48,6 +48,11 @@
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
   门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
+  Second-tier sound checks (2026-11-18): `SoundTierRuleChecks` tests the rules on controlled numbers (every cover of a cut jump,
+  the place above 200 Hz, music accents, picture cuts, linger counting and belonging, the swell, listen's verdicts as entries,
+  `sounds` and roles, the stem split) and `SoundTierChecks` the real job on synthetic sound (jump, linger, masked line, swell,
+  marks, the fixed timeline); `SRTFLOW_INSPECTION_CASE=sound` runs only them. The two-voices hand-over case is in
+  `scripts/check-mix-layers.sh` group 3. Rules and reverse controls: [finished-video inspection](../architecture/finished-video-inspection.md).
 
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
 
