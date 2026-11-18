@@ -30,6 +30,7 @@
 - [2026-10-06 挪了一段音频，画面挪了、声音还在原地](2026-10-06-audio-engine-replace-keeps-old-segment-positions.md) — 「结构没变」按开流时抄死了什么来定，不是按 id；自检要有「换配置」这一步。
 - [2026-08-12 渐入开头爆音](2026-08-12-audio-fade-in-pop.md) — 混音器的增益有 de-zipper：别拿常量提前量赌平台的平滑窗口，断言上移到结构不变量。
 - [2026-11-05 声音主时钟停住导致预览无法播放](2026-11-05-audio-master-clock-stops-playback.md) — 播放意图不代表音频图仍在运行：开播前和播放中恢复停图、重钉锚点。
+- [2026-11-18 Automatic canvas changes suppress linked moves and deletions](2026-11-18-auto-canvas-suppresses-linkage.md) — Follow linkage before internal geometry rewrites can make untouched attachments look user-edited.
 - [2026-10-03 自动检测把英文旁白判成中文](2026-10-03-auto-detect-picks-chinese-for-english.md) — 分不开两边时找一个真能分开的特征（写成了哪种文字），别调门槛。
 - [2026-09-26 自动检测语言拿音效当探针](2026-09-26-auto-detect-probes-sound-effects.md) — 「读得出来」不等于「有人说话」：探针长的先、先听有没有人声。
 - [2026-09-24 改得勤就隔一会儿卡一下：自动保存重建书签](2026-09-24-autosave-rebuilds-bookmarks-every-save.md) — 书签按「路径 + inode + 卷」缓存，同名换文件才重建。

@@ -235,6 +235,10 @@
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
+- Automatic canvas changes with linkage: `scripts/check-parameter-limits.sh` → `CanvasLinkageChecks` calls the real `perform`
+  when deleting the first V1 clip and rippling a portrait clip; text, shape and framed V2 movement, deleted-host cleanup,
+  linkage counts, preserved geometry, magnet/linkage on and off, and one-step undo/redo. `checks/MCP/canvas-wiring.sh` pins
+  magnet → linkage → reframe. Rule: [linkage](../architecture/timeline-linkage.md).
 - A canvas change keeps every clip's shape: `scripts/check-mcp.sh` → `CanvasReframeChecks` (the walkthrough's 9:16 fill on 16:9 is not
   stretched and keeps x / y / scale, switching back restores it exactly, a corner picture, size keyframes, an auto canvas, the
   set_canvas reply's `reframed` / `no_longer_fill`); texts and shapes keep their pixels and proportions against the short side, come
