@@ -21,6 +21,8 @@ import SrtFlowMCPKit
 // A cancelled look (cancel_job on a look that became a job, AILookCall) stops between frames.
 // Timeline frames also say which edges and corners of the canvas no picture covers (`uncovered`, AIPictureCoverage: from the clips'
 // geometry, the same that decides get_timeline's fills_frame; docs/architecture/preview-free-transform.md).
+// sound=[…] draws the timeline's sound under timeline frames (MCP-66): rows and seconds in AISoundStripRequest, the engine's render
+// in AISoundStripMeasure (alongside the frames), the strip in AISoundStripDrawing; `finish` stacks it under the sheet.
 
 @MainActor
 enum AILookTool {
@@ -33,6 +35,7 @@ enum AILookTool {
         if let count = try args.int("count"), !(1...maxFrames).contains(count) {
             throw AIToolError("count must be between 1 and \(maxFrames).")
         }
+        try AISoundStripRequest.refuseOutsideTimeline(args)
         if try args.bool("shots") == true {
             // Keeps the project's line until it is done: AILookShots reads the project again at its end.
             return try await AILookShots.look(args, project, size: size, wantsImage: wantsImage)
@@ -58,10 +61,12 @@ enum AILookTool {
         guard !state.isEmpty else { throw AIToolError("The timeline is empty. Add clips first, or pass file to look at a media file.") }
         let ids = AIShortIDs(state: state)
         var times = try requestedTimes(args)
+        var clipSpan: ClosedRange<Double>?
         if times.isEmpty, let clipText = try args.string("clip_id") {
             let id = try ids.resolve(clipText)
             guard let clip = state.clip(with: id) else { throw AIToolError("\(clipText) is not a clip.") }
             times = AIFrameSampler.times(from: clip.timelineStart, to: clip.timelineEnd, count: try args.int("count") ?? 4)
+            clipSpan = clip.timelineStart...clip.timelineEnd
         }
         if times.isEmpty { times = [project.clock.time] }
         let lastFrame = max(0, state.duration - 1 / Double(max(1, state.frameRate.fps)))
@@ -69,8 +74,12 @@ enum AILookTool {
             throw AIToolError("The timeline is \(String(format: "%.2f", state.duration)) s long; \(beyond) s is past the end.")
         }
         times = times.map { min(max(0, $0), lastFrame) }
+        // sound=[…]: which rows and seconds to draw under the frames (MCP-66), checked before anything renders.
+        let sound = try AISoundStripRequest.parse(args, state: state, times: times, clipSpan: clipSpan)
         // Everything below reads only `state` and `times`: the calls behind this look may go now (AICallLines).
         AICallLines.letGo()
+        // The sound renders on its own queue while the frames are composed.
+        async let strip = AISoundStripMeasure.strip(sound, state: state)
         let frames = try await AIFrameComposer.frames(
             of: state, at: times, subtitleStyle: state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
         )
@@ -90,7 +99,7 @@ enum AILookTool {
             "canvas": ["width": .number(Double(Int(canvas.width))), "height": .number(Double(Int(canvas.height)))],
             "frames": .array(described)
         ]
-        return finish(&payload, frames: frames, size: size, wantsImage: wantsImage)
+        return finish(&payload, frames: frames, size: size, wantsImage: wantsImage, sound: try await strip)
     }
 
     /// 这一刻画面上有谁：看得见的片段（哪条轨）、文字、字幕 —— 看不了图的模型靠它对上号。
@@ -198,27 +207,39 @@ enum AILookTool {
     }
 
     /// 拼图、写上「图怎么读」，装进结果。每格标它的时刻，给了 `labels` 就标那个。
+    /// With `sound` (look sound=…, inspect_video's evidence sheet; MCP-66) the strip goes under the sheet, each tile is numbered
+    /// #1, #2, … (the strip marks where each lies), and the result carries `sound` (AISoundStrip.json) with or without the picture.
     static func finish(
         _ payload: inout [String: JSONValue], frames: [AIFrameSampler.Frame], labels: [String]? = nil,
-        size: AIContactSheet.Size, wantsImage: Bool
+        size: AIContactSheet.Size, wantsImage: Bool, sound: AISoundStrip? = nil
     ) -> AIToolResult {
+        var strip = sound
+        strip?.marks = frames.map(\.time)
+        if let strip { payload["sound"] = strip.json }
         var result = AIToolResult.ok(.object(payload))
         guard wantsImage else { return result }
         let labelled = frames.enumerated().map { index, frame in
-            (label: labels.flatMap { index < $0.count ? $0[index] : nil } ?? String(format: "%.2fs", frame.time), image: frame.image)
+            let label = labels.flatMap { index < $0.count ? $0[index] : nil } ?? String(format: "%.2fs", frame.time)
+            return (label: strip == nil ? label : "#\(index + 1) \(label)", image: frame.image)
         }
-        guard let sheet = AIContactSheet.draw(labelled, size: size), let jpeg = AIContactSheet.jpeg(sheet) else {
+        var picture = AIContactSheet.draw(labelled, size: size)
+        if let sheet = picture, let strip { picture = AISoundStripDrawing.stack(sheet, with: strip, minimumWidth: size.singleLongSide) }
+        guard let picture, let jpeg = AIContactSheet.jpeg(picture) else {
             payload["image"] = "SkyCut could not draw the picture; the descriptions above are all there is."
             return .ok(.object(payload))
         }
+        var notes: [String] = []
         if frames.count > 1 {
             let aspect = Double(frames[0].image.width) / Double(max(1, frames[0].image.height))
             let grid = AIContactSheet.grid(count: frames.count, aspect: aspect)
-            payload["image"] = .string(
+            let numbered = strip == nil ? "" : " #n"
+            notes.append(
                 "One picture: \(grid.columns) columns × \(grid.rows) rows, read left to right, top to bottom; "
-                + (labels == nil ? "each frame is labelled with its time." : "each frame is labelled as in the list above.")
+                + (labels == nil ? "each frame is labelled\(numbered) with its time." : "each frame is labelled\(numbered) as in the list above.")
             )
         }
+        if let strip { notes.append(AISoundStripDrawing.reading(strip)) }
+        if !notes.isEmpty { payload["image"] = .string(notes.joined(separator: " ")) }
         result = .ok(.object(payload))
         result.images = [jpeg]
         return result

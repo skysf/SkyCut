@@ -58,7 +58,9 @@ enum MCPGuideOutputTopics {
             """),
             MCPGuideSection(name: "results", about: "suspect times, reasons, screenshots and WAV clips", text: """
             Results. It returns job_id: get_job gives suspect times and reasons, screenshots (image=false leaves them out) and \
-            temporary WAV clips to listen to. silence_db (default -45) and min_silence (default 0.5 s) set what counts as \
+            temporary WAV clips to listen to. Under the screenshots the measured mix of the checked range is drawn as look \
+            sound draws it: each screenshot is #n on the strip, blue lines mark where sounds start, and the result's sound lists \
+            them. silence_db (default -45) and min_silence (default 0.5 s) set what counts as \
             silence. Suspects are sampled: a person should review them. A cut is reported as cutting speech (audio_cutoff) only \
             where a cached transcript or narration subtitles show words there; clips cut where sound plays without either are \
             listed in speech_unchecked: transcribe the ones with speech, then inspect again. When the file was made before the \

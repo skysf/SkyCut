@@ -475,3 +475,13 @@
   stamp, queued status / holder / position, late target / Stop binding, distinct on-screen clips and get_job pictures,
   cancel_job / Stop, explicit-project / file controls, and real close_project queued behind an edit. The gate / transport
   remain manual; `checks/MCP/router-wiring.sh` requires the timer before every queue-selection await and authorization first.
+- Sound under look's sheet (2026-11-18, MCP-66; [AI interface](../architecture/ai-control-mcp.md) section 4 item 12): `scripts/check-mcp.sh`
+  → `checks/MCP/LookSoundChecks.swift`, pure: the window for frame times (room, clamps), the frames a window covers, pixel columns (mean
+  level, highest peak, at least the frame under the middle), the summary (`loudest_at`, `peak_db`, each start once in time order, at most
+  24 listed) and the drawing read back pixel by pixel (the level at √amplitude height, red above the ceiling, a blue start line, a dashed
+  white #n line, close #n labels on a second line, the strip under a narrow sheet). Real path: `scripts/check-look-jobs.sh` →
+  `LookSoundChecks` (a background project, a synthetic burst on A1 and a tone on A2, the engine's render: rows in order, the burst's frame
+  loudest in both rows, the A2 start listed with its clip and track, the picture is the sheet plus the strip with tall level bars only at
+  the burst, clip_id spans its clip, image=false gives numbers only, four refusals); `scripts/check-video-inspection.sh` checks that the
+  evidence sheet carries the measured mix. Reverse (2026-11-18): passing no strip to `finish` from look turned 8 checks red, and from
+  inspect_video the evidence-sheet check.

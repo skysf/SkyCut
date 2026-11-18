@@ -336,6 +336,32 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      from the clips' geometry at that moment (the same clips `on_screen` lists, with their entrance / exit motion), never from pixels:
      dark footage is not uncovered; black bars inside the footage stay under `black_bars`. Rule: [预览自由变换](preview-free-transform.md)
      "Does the picture cover the frame".
+   - **The sound under the frames** (`sound`, 2026-11-18, production feedback MCP-66): the AI matched a hit to a cut by reading
+     listen's numbers against look's frames by hand. A timeline look with `sound` (a list of rows, top to bottom, at most 4: `mix`, a
+     track `A1`, tracks joined by + `V1+V2`, or `rest`; `true` = `["mix"]`) draws the timeline's sound under the sheet in the same
+     picture. Rules:
+     ① **One measurement, the export's**: `AISoundStripMeasure` runs `MixMeasurement` over the strip's frames with the rows' layers —
+       SkyCut's engine rendering `AudioEngineConfig.make(from:)` offline on `MediaReadQueue.export`, never the preview's engine — so
+       each frame's level and true peak are the numbers `listen mix=true` reports (before the limiter). Track rows parse and refuse
+       exactly like listen's `layers` (`AIListenMixPlan.layers`). It renders alongside the frames (`async let`), after the look has
+       let its line go; a cancelled look stops it between blocks.
+     ② **Which seconds**: the frames' times with half their spacing either side (at least a frame, at most a second; one frame gets a
+       second either side), or the clip's seconds when the frames are spread over `clip_id` (`AISoundStrip.window`).
+     ③ **How it reads** (`AISoundStripDrawing`): one row per sound, each pixel column the frames under it (mean level solid, highest
+       true peak light, red above the limiter's −1 dBTP ceiling), height = √amplitude (half height ≈ −12 dBFS: every 12 dB halves it);
+       a blue line where each audible segment of the row's tracks starts, labelled with the clip's short id where there is room; tiles
+       are labelled `#n` and a white dashed `#n` line marks each on the strip; the ruler is in timeline seconds with frame ticks when a
+       frame is at least 4 px wide. The result's `image` note says all of that; `sound` lists the seconds drawn, each row's
+       `loudest_at` (start of the loudest frame) and `peak_db` (listen mix=true's definitions) and the starts (≤ 24, the rest counted).
+       `image=false` returns the numbers only. How loud and when, never what a sound is (`listen describe=true`).
+     ④ **Timeline looks only**: with `file`, `files`, `shots` or `text_scan` it is refused with the reason.
+     ⑤ **inspect_video's evidence sheet** draws the same strip under its screenshots (`AISoundStripMeasure.inspection`): the mix its
+       report already measured per frame (after the limiter, as delivered, or the supplied export's own levels) over the checked range,
+       no second render ([成片疑点检查](finished-video-inspection.md)).
+     Catalog: one parameter; the other look notes were reworded shorter so the catalog does not grow; the wording is in the guide's
+     look topic (`sound` section). Checks: `checks/MCP/LookSoundChecks.swift` (window, columns, summary, the drawing read back pixel by
+     pixel) and `scripts/check-look-jobs.sh` → `LookSoundChecks` (a real project: the engine's render, the loudest frame, the starts,
+     the picture, the refusals); the inspection harness checks the evidence sheet carries the strip.
    - 只读：不改工程、不挪播放头、不摆窗口；排队（刚发的改动先做完再看）。
    - **Never more than about 25 s without an answer** (2026-11-17, [case](../bugfixes/2026-11-17-look-hangs-and-dropped-calls.md)): the
      router runs look through `AILookCall` before awaiting line selection. Not done within 25 s (waiting for a project switch, behind edits,
@@ -1505,6 +1531,9 @@ project's distinct on-screen clip and picture, cancellation / Stop, explicit-pro
 - [ ] 同时开两份 SrtFlow（正式版 + 测试版）：各自的 AI 只连自己那份。
 - [ ] 让 AI 用 look 看时间线上有文字、字幕、滤镜、裁切过的一刻：回来的图和预览里那一刻长得一样（文字位置、字幕、
       调色、铺满与否都对得上）；看一个素材文件：6 帧拼成一张、每格标着时刻。
+- [ ] On a real project with an impact on a cut (the MCP-66 acceptance: the South Pole fourth draft at 0:28–0:32), have the AI
+      `look times=[…] sound=["mix"]` across those seconds: the impact's spike is plainly in one tile's column of the strip, its
+      `loudest_at` matches what you hear, and the blue lines sit where the effects start (section 4 item 12).
 - [ ] 让 AI 把一段横屏素材 `fit=fill` 放进 9:16：人脸在画面里、没被裁掉一半；带遮幅的素材 `remove_black_bars`
       之后上下的黑边没了。
 - [ ] 在访达里选几个视频，跟 AI 说「用我在访达里选中的」：第一次弹「SrtFlow 想要控制访达」，点好之后 AI 拿到的正好是

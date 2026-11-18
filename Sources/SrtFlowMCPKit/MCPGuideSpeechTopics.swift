@@ -81,7 +81,7 @@ enum MCPGuideSpeechTopics {
             Layers. layers lists the layers, each a track (A1), tracks joined by + (V1+V2), or rest (every audible track not \
             named). The default is one layer per audible track. V1 is the main track's own sound; hidden or muted tracks are not \
             in the mix. Layers are as they enter the master bus, before the limiter, so they add up to the mix wherever nothing \
-            is over.
+            is over. To see these levels against the picture, look at timeline times with sound (rows named the same way).
             Results. The mix: loudness_lufs (integrated, after the limiter: the number export_video reports), max_momentary and \
             max_short_term (the loudest 400 ms and 3 s), peak_db and peak_at (true peak before the limiter), loudest_at (the start \
             of the loudest frame), over (frames above the -1 dBTP limiter ceiling, with the peak and how much the limiter takes off: \
