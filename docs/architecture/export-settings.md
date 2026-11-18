@@ -167,6 +167,43 @@ AAC 128 kbps 和 fast start，帧率仍跟工程。显式 encoder/quality/resolu
 发版前人工复核：同一复杂工程正式/快速审阅各导一次，查看全部阶段与实际参数；并发提交
 另一工程，等待和取消均计到自己的任务，完成后再查旧任务不串账。
 
+## 八、Export folder window and destination checks (2026-11-18)
+
+Since the [case where choosing the export folder froze SkyCut](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md)
+on a friend's Mac (macOS 26.6.2, external drive). A non-sandboxed app's `NSOpenPanel` is drawn by the out-of-process
+`com.apple.appkit.xpc.openAndSavePanelService`, and on Tahoe that service hangs and fails to connect: measured on 26.5,
+creating a panel blocks the main thread for up to 60 s when the service hangs, and a `runModal` panel whose service hangs
+never returns.
+
+1. **The folder window is never a modal session.** `ExportFolderChooser` opens it with `begin`; no `runModal` and no
+   `FilePicker` in the export panel's files. It watches the window: not on screen with no answer for 3 s, or an empty answer
+   within 1 s, is a failure (AppKit can give up without ever calling back). While it is open the panel offers "Close It",
+   which cancels a window that stopped responding. It starts in the destination folder, except when the last check found
+   that drive gone or not answering (then the home folder): pointing the system window at a stuck drive is how its service
+   gets stuck.
+2. **There is always a way that does not need the system panel**: dropping a folder (or a file: its folder) from Finder
+   onto the "Export to" row, and after a failure typing or pasting a path. The Export button is off while a folder is being
+   picked (Return in the path field must not start an export).
+3. **A force quit with the window open is remembered.** Before AppKit is asked for the window the chooser writes
+   `SrtFlow.export.folderChooserInFlight` (cleared when the window answers or SkyCut quits normally). Still there at the next
+   attempt = that run ended with the window open (most likely frozen inside AppKit): the typed path comes first, "Try Again"
+   asks AppKit anyway. SkyCut cannot cut AppKit's own wait short; this is how it avoids walking into it twice.
+4. **The panel never asks the destination drive itself.** Is it there, a folder, a read-only drive, writable, which names are
+   taken: only through `ExportDestinationProbe`, off the main thread with a deadline (5 s to look, 15 s with a write test),
+   at most three checks left waiting on one drive; past the deadline the answer is "not responding". The body reads the last
+   report (`ExportDestinationState`): the replace hint and the subtitle files' "already there" come from the folder's
+   listing, never from `fileExists` during a redraw. The remembered folder that is gone falls back to the start folder (§4);
+   one that does not answer is kept and said to be not responding.
+5. **The destination is checked before anything is written**, with a write test (a hidden `.SrtFlow-write-check-…` file,
+   removed at once): pressing Export, writing subtitle files, and taking a chosen / typed / dropped folder. Missing, a file,
+   a read-only drive (NTFS), not writable, not responding: said under "Export to" before the encode, not after it.
+6. **The finished video is delivered off the main thread** (`ExportDelivery`, its own queue): onto another drive the move is
+   a full copy. The panel says "Saving the video into the export folder…" meanwhile. Subtitle files are written off the main
+   thread too.
+7. The scan side is pinned by `checks/project-file-wiring.sh`, the behaviour by `scripts/check-export-profile.sh`
+   (`FolderChooserChecks`, `DestinationChecks`). The same hazard is still in the other places that use `runModal` panels
+   (open / save project, add media, the compress and burn-in "Choose…"): not changed here.
+
 ## 回归矩阵
 
 | 检查 | 守什么 |
@@ -178,6 +215,8 @@ AAC 128 kbps 和 fast start，帧率仍跟工程。显式 encoder/quality/resolu
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
+| `scripts/check-export-profile.sh` (`FolderChooserChecks`, `DestinationChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread |
+| `checks/project-file-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
 
@@ -199,3 +238,18 @@ AAC 128 kbps 和 fast start，帧率仍跟工程。显式 encoder/quality/resolu
     导出的成片也是；再去烧录页，样式、编码设置、「再挂一条字幕轨」都是上次的。
 12. 批量转换：旁边已经有 `a.vtt` 时把 `a.srt` 转成 VTT → 列表里显示 `✓ a 2.vtt`，原来的 `a.vtt` 没变；
     同格式转回原文件夹同理。
+13. Folder button (§8): the macOS window opens, the panel shows "Choose a folder in the macOS window…" with Close It; pick a
+    folder → it is taken; Cancel → nothing changes; while the window is open the export panel and the timeline still respond
+    and ⌘Q quits.
+14. Drag a folder, then a video file, from Finder onto the "Export to" row → the folder, then the file's folder, is taken.
+15. Freeze the panel service while the window is open: find SkyCut's instance ("Open and Save Panel Service (SkyCut)" in
+    Activity Monitor, or the `openAndSavePanelService` process that appeared when the window opened) and `kill -STOP` it in
+    Terminal. The export panel stays usable; Close It closes the window and shows the typed path. Then click the folder
+    button with the service still stopped: SkyCut may hang up to about a minute inside AppKit (not fixable), then shows the
+    typed path; force quit during that wait → reopen SkyCut → the folder button goes straight to the typed path. Kill the
+    stopped service afterwards.
+16. Export to an NTFS drive (or a locked SD card): pressing Export says the drive is read-only at once, nothing is encoded.
+    Unplug the remembered drive → the panel opens on the start folder. A sleeping USB hard drive: the panel opens at once,
+    the path may show a spinner, Export says "Checking the folder…" until the drive answers.
+17. A long export onto a USB hard drive: at 100 % the status says "Saving the video into the export folder…" and the app
+    stays responsive until the file is there.
