@@ -28,6 +28,7 @@ else
 fi
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/ScreenRecordingFeedback/Main.swift checks/ScreenRecordingFeedback/Checks.swift \
+  checks/ScreenRecordingFeedback/NoticeVisibility.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/RecordingFeedbackCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=320x180:r=24 \

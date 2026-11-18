@@ -1,4 +1,5 @@
 import AVFoundation
+import Combine
 import Foundation
 
 // 主时钟的生命周期和恢复：用可控的声音时钟驱动真实 PlayerClock / AVPlayer / Timer。
@@ -146,19 +147,27 @@ func checkAudioSourceStopsAtEnd(clip: URL) {
     pumpAudioClock(0.2)
     check(clock.time == 60, "播到头之后播放头不再往后走（0.2 秒后 \(clock.time)）")
 
-    // 在尽头不 seek、直接再按播放：没有东西可播，这一下不开播。到了头的播放器不会再报一次「播完了」，
+    // 在尽头不 seek、直接 `play()`（重建预览之后接着播走的就是它）：没有东西可播，这一下不开播。到了头的播放器不会再报一次「播完了」，
     // 开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走（审查复现：rate 0、声音源在播、播放头 2.34 → 3.20）。
     clock.play()
     pumpAudioClock(0.35)
     check(!source.isPlaying, "在尽头直接再按播放：声音主时钟不开播")
     check(clock.time == 60 && clock.player.rate == 0, "在尽头直接再按播放：播放头还在总长上、画面没动（时钟 \(clock.time)）")
 
-    // 在尽头悬停着（画面在别处扫帧）按播放：什么都不发生，悬停预览也照旧留着。
+    // The user's Play at the end (button / space: `togglePlayback`) replays from the start, even while hovering elsewhere
+    // (UI-2, 2026-11-18): the peek ends, the timeline is asked to scroll back left, sound and picture start at 0. Before,
+    // nothing happened and only Return got playback going again.
+    var starts = 0
+    let startWatch = clock.wentToStart.sink { starts += 1 }
     clock.peek(at: 10)
     clock.togglePlayback()
-    pumpAudioClock(0.1)
-    check(!source.isPlaying && clock.peekTime == 10 && clock.time == 60, "在尽头悬停着按播放：不开播，悬停预览还在（peek \(String(describing: clock.peekTime))）")
-    clock.endPeek()
+    waitForAudioClock { source.isPlaying && clock.player.rate > 0 && clock.time > 0.05 }
+    check(source.isPlaying && clock.player.rate > 0, "Play at the end replays: sound and picture both play")
+    check(clock.time > 0 && clock.time < 1, "Play at the end replays from the start, not from the hover point or the end (\(clock.time))")
+    check(clock.peekTime == nil && starts == 1, "Play at the end ends the peek and scrolls the timeline back to the start")
+    startWatch.cancel()
+    clock.pause()
+    clock.seek(to: 60)
 
     // 上一跳的读数略微超出总长（声音时钟最后一次读数比条目长一两毫秒，审查里量到 2.001864）：照样不开播。
     clock.observePlaybackTime(60.002)
@@ -227,5 +236,15 @@ func checkAudioSourceEndInterleavings(short: URL) {
     check(clock.player.rate > 0, "旧的「播到头」通知晚到：画面也在播")
     waitForAudioClock { !source.isPlaying && !clock.isPlaying }
     check(!source.isPlaying && clock.time == 2, "新一轮照常播到头、停在总长上（\(clock.time)）")
+
+    // 3. UI-2 (2026-11-18): at the end, the user's Play replays the whole timeline from 0 and the replay ends on the total
+    //    length again — the ruler never runs on past the end, and it does not take Return to play once more.
+    clock.togglePlayback()
+    waitForAudioClock { source.isPlaying && clock.time > 0.05 }
+    check(source.isPlaying && clock.time < 1, "Play at the end of a 2 s timeline replays from 0 (\(clock.time))")
+    waitForAudioClock { !source.isPlaying && !clock.isPlaying }
+    check(!source.isPlaying && !clock.isPlaying && clock.time == 2, "…and the replay stops on the total length again (\(clock.time))")
+    pumpAudioClock(0.2)
+    check(clock.time == 2, "…and stays there (\(clock.time))")
     clock.detach()
 }

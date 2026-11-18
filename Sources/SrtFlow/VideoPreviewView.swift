@@ -241,7 +241,7 @@ final class PlayerClock: ObservableObject {
     func play() {
         if let source = audioSource {
             // 播放头已经在尽头：没有东西可播，这一下不开播。照样开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走：
-            // 到了头的播放器不会再报一次「播完了」。回到开头是 Return 的事（goToStart）。
+            // 到了头的播放器不会再报一次「播完了」。The user's Play at the end replays from 0 (`togglePlayback`, UI-2).
             if isAtEnd {
                 if source.isPlaying { source.pause() }
                 return
@@ -371,12 +371,18 @@ final class PlayerClock: ObservableObject {
     func togglePlayback() {
         if player.rate > 0 {
             pause()
+        } else if isAtEnd {
+            // Play at the end replays from the start, as in other editors and players (UI-2, 2026-11-18: "when the project
+            // ends, pressing Play or going back to 0 both replay normally"). `play()` itself still never starts at the end: a
+            // rebuild that resumes playback there must not jump to 0. `goToStart` also ends a hover peek and scrolls the
+            // timeline back to the left.
+            goToStart()
+            play()
         } else {
             // 悬停预览把画面带去了别处：播放必须从**播放头**起，先precise跳回去。
             // seek 后紧跟 play 是安全的（play 不取消在飞的 seek，完成后从目标续播）。
             // 引擎驱动时不用：`play()` 里的 setRate 自带定位。
-            // 在尽头按播放什么都不发生（`play()` 不开播）：悬停预览也照旧留着。
-            if peekTime != nil, !isAtEnd {
+            if peekTime != nil {
                 peekTime = nil
                 pendingScrubTarget = nil
                 if audioSource == nil {

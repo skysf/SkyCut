@@ -22,7 +22,8 @@ import SrtFlowCore
 // 4. 画面没了只在**真删**的操作里连带删（`deletesContent`：⌫、AI 的 delete_items / cut_speech）；裁切 / 变速让画面
 //    没了的，东西留在原地不动 —— 字幕句除外（第 5 条）。
 // 5. 字幕句不整句平移：两头各自跟着画面换算，说话的那几秒剩不到一半就删，裁切让它没了的也删（2026-10-15，`LinkageCueFollow`）；
-//    底下的段整个没了又不是真删才留在原地、报出来。
+//    底下的段整个没了又不是真删才留在原地、报出来。A subtitle made from a sound off V1 (narration, an interview) follows
+//    that sound, not the picture (`CaptionSourceFollow.voices`, UI-3, 2026-11-18).
 // 6. 一段画面自己分出去的声音（J / L 切伸到隔壁镜头底下的也是）跟着那段画面走，不看底下压着哪几段（2026-11-16，`LinkagePartnerSound`）。
 // 纯值、不 import AppKit：scripts/check-timeline-snap.sh 直接编（checks/TimelineSnap/Linkage.swift、LinkageCues.swift）。
 
@@ -232,11 +233,14 @@ enum TimelineLinkage {
             Plan.take(ledger.outcome(for: old.span, deletesContent: deletesContent), id: filter.id, start: old.timelineStart, into: &plan.filters)
         }
         // 字幕句：两头各自跟着画面换算（规矩 12，`LinkageCueFollow`）；换了位置、中间插进别的才照老规矩整句挪。
+        // A subtitle sitting on the sound off V1 it was made from follows that sound instead (rule 11, `CaptionSourceFollow`),
+        // never the picture: a new window on a screen recording used to shorten or delete its narration's subtitles (UI-3).
         let oldCues = Dictionary(before.allSubtitleCues.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let originals = Dictionary(before.subtitleCues(of: .original).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         let links = before.subtitleCompanion?.translationLinks ?? [:]
+        let voiced = CaptionSourceFollow.voices(in: before)
         for cue in after.allSubtitleCues {
-            guard let old = oldCues[cue.id], old == cue else { continue }
+            guard voiced[cue.id]?.sitsOnIt != true, let old = oldCues[cue.id], old == cue else { continue }
             plan.cues.take(LinkageCueFollow.outcome(
                 old, speech: LinkageCueFollow.speech(of: old, originals: originals, links: links),
                 hosts: ledger.before, survivors: ledger.survivors(of:), deletesContent: deletesContent,
@@ -366,7 +370,13 @@ enum TimelineLinkage {
         result.clips = state.laneClips.compactMap { attachment($0.id, $0.span) }
         result.shapes = state.shapes.compactMap { attachment($0.id, $0.span) }
         result.texts = state.textOverlays.compactMap { attachment($0.id, $0.span) }
-        result.cues = state.allSubtitleCues.compactMap { attachment($0.id, $0.span) }
+        // A subtitle sitting on the sound off V1 it was made from rides along exactly when that sound does, landing with it (UI-3).
+        let voiced = CaptionSourceFollow.voices(in: state)
+        let riding = Dictionary(result.clips.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        result.cues = state.allSubtitleCues.compactMap { cue in
+            guard let voice = voiced[cue.id], voice.sitsOnIt else { return attachment(cue.id, cue.span) }
+            return riding[voice.clip].map { Attachment(id: cue.id, span: cue.span, host: $0.host) }
+        }
         result.filters = state.filters.compactMap { attachment($0.id, $0.span) }
         return result
     }
