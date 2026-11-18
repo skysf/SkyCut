@@ -329,39 +329,44 @@ struct SubtitleEditPanel: View {
             exportAs(document.format)
             return
         }
-        do {
-            _ = try SubtitleFileSave.write(document, format: document.format, to: url, replacing: true)   // its own file
-            markSaved()
-        } catch {
-            saveError = error.localizedDescription
-        }
+        write(document.format, to: SaveLocation(url: url, mayReplace: true))   // its own file
     }
 
     private func exportAs(_ format: SubtitleFormat) {
         guard let picked = document else { return }
         let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? picked.title
         FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { location in
-            export(format, to: location)
+            write(format, to: location)
         }
     }
 
-    /// Export As to where the person chose. The window is not modal: write what the document holds now. A file already
-    /// there is replaced only when the person confirmed it — in macOS's own window, or in the question asked here when the
-    /// answer was typed or dropped (SaveLocation.swift).
-    private func export(_ format: SubtitleFormat, to location: SaveLocation) {
-        var replacing = location.mayReplace
-        do {
-            while let document {
-                if try SubtitleFileSave.write(document, format: format, to: location.url, replacing: replacing) == .written {
-                    // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
-                    if location.url == subtitleURL, format == document.format { markSaved() }
-                    return
-                }
-                guard !replacing, FileReplaceQuestion.ask(location.url) else { return }
-                replacing = true
+    /// Writes what the document holds now (the save window is not modal), off the main thread (SubtitleFileSave). A file
+    /// already there is replaced only when allowed — its own file, or confirmed in macOS's own window — or when the person
+    /// answers Replace to the question asked here (a typed or dropped answer, SaveLocation.swift). The document is marked
+    /// saved when the write lands, even after "not responding", and only if it still is what was written: an edit made
+    /// meanwhile, or another document in the panel, stays unsaved.
+    private func write(_ format: SubtitleFormat, to location: SaveLocation) {
+        guard let document else { return }
+        let item = boundItem?.id
+        let data = SubtitleFileSave.data(document, format: format)
+        Task {
+            let answer = await SubtitleFileSave.write(data, to: location.url, replacing: location.mayReplace) { landed in
+                // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
+                guard landed == .written, location.url == subtitleURL, format == document.format, boundItem?.id == item,
+                      self.document == document else { return }
+                markSaved()
             }
-        } catch {
-            saveError = error.localizedDescription
+            switch answer {
+            case .written: break
+            case .occupied:
+                if FileReplaceQuestion.ask(location.url) { write(format, to: SaveLocation(url: location.url, mayReplace: true)) }
+            case .failed(let reason): saveError = reason
+            case .notResponding:
+                saveError = String(
+                    format: L10n("The drive with “%@” is not responding. It may be asleep or disconnected, or macOS may be asking for permission."),
+                    ProjectSaveText.driveName(of: location.url)
+                )
+            }
         }
     }
 
