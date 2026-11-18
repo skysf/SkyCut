@@ -120,6 +120,9 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["fills_frame", "fill_scale", "fills_except", "top_right"])
     // add_clips' reply for a made sound effect (2026-11-17, MCP-8): how long it is heard at its volume (AISoundEffectRequest.audibleEnd).
     names.insert("audible_duration")
+    // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
+    // ones past the cap, where the piece's own sound ends.
+    names.formUnion(["strongest_accents", "more_accents", "ends_at"])
     return names
 }
 
