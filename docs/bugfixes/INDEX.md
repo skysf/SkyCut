@@ -55,6 +55,7 @@
 - [2026-08-08 CI 首跑与吞错](2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) — SDK 与构建日志不许被吞。
 - [2026-10-27 连接 AI 客户端时留的配置备份谁都能读](2026-10-27-client-config-backup-world-readable.md) — 「另写一份」不等于「拷一份」：备份的权限从原文件来。
 - [2026-08-16 竖图缩略图的隐形命中区盖死标尺](2026-08-16-clipped-thumbnail-hit-area-covers-ruler.md) — `.clipped()` 只裁绘制不裁命中；块内装饰必须不吃事件。
+- [2026-11-19 Closing a project counted a write of an older snapshot as "saved", and a late save window wrote the wrong project](2026-11-19-close-trusts-a-stale-save.md) — Decide "ready" from the state when you answer: after every wait, check it is the same document with nothing left to write, then act without another await.
 - [2026-10-03 关掉主窗口就退出了 App，工程变回空的](2026-10-03-closing-window-quits-app.md) — 框架的默认生命周期要先确认；替别人兜底时把兜底这件事告诉对方。
 - [2026-10-30 多项生成横幅挤占预览](2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口 + 滚动浮层汇总任务；取消不先删状态。
 - [2026-10-31 多工程的生成任务没有工程归属](2026-10-31-cloud-tasks-without-project-context.md) — 任务卡片按原工程分组，数量只算进行中的。
