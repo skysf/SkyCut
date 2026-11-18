@@ -49,10 +49,10 @@ final class AIJobs {
         let cancelAction: @MainActor () -> Void
         /// 起它的那一次调用落在哪个工程（短 id）、哪个会话（`AICallContext`）：关工程前看它有没有在跑的任务、
         /// cancel_job 只许取消自己会话的（方案 B.5）。不碰工程的任务（压缩、烧录、转写文件……）没有 `project`。
-        let project: String?
+        fileprivate(set) var project: String?
         let session: String?
         /// 用户在哪个工程上按停止时它跟着停（方案 E 节）：碰工程的就是那个工程，不碰工程的是起它时这个会话最后打开的那个。
-        let stopsWith: String?
+        fileprivate(set) var stopsWith: String?
         fileprivate(set) var status: Status = .running
         fileprivate(set) var message: String?
         fileprivate(set) var detail: JSONValue?
@@ -103,6 +103,13 @@ final class AIJobs {
         jobs[job.id] = job
         job.awake = AIKeepAwake.shared.hold()
         return job
+    }
+
+    /// A look that became a job during switch selection binds only after its actual line is known.
+    func bindLook(_ job: Job, to context: AICallContext) {
+        guard job.kind == .look, job.status == .running, job.session == context.session, job.project == nil else { return }
+        job.project = context.project
+        job.stopsWith = context.stopsWith
     }
 
     /// 任务结束时由起它的工具调用一次。只认第一次。
