@@ -98,6 +98,24 @@ if [ "$(count 'scripts/check-web-motion.sh' scripts/check-all.sh)" -ne 1 ]; then
   fail "scripts/check-all.sh must run scripts/check-web-motion.sh (CI only runs what check-all lists)"
 fi
 
+echo "==> 8. Process discovery finishes before terminal output and live watch retries precede sampling"
+if ! python3 - <<'PYTHON'
+from pathlib import Path
+run = Path("Sources/SrtFlowWebMotion/HelperRun.swift").read_text()
+report = Path("Sources/SrtFlowWebMotion/HelperReport.swift").read_text()
+parent = Path("Sources/SrtFlow/WebMotion/WebMotionHelperProcess.swift").read_text()
+assert "self?.created.flatMap { $0.processIdentifiers }" in run, "discovery must read the live retained pages"
+assert "report.beforeFinish = { [processTracker] in processTracker.finish() }" in run, "discovery must have a before-result finalizer"
+finish = report[report.index("func finish("):]
+assert finish.index("beforeFinish?()") < finish.index("emit(WebMotionEvent(kind: .result"), "final discovery must precede the terminal event"
+watch = parent[parent.index("timer.setEventHandler"):]
+assert watch.index("pinReported(using: watch.identityReader)") < watch.index("WebMotionMemoryWatch.footprint"), "identity retry must precede live memory sampling"
+assert "await finishWatch(timer)" in parent, "watch handlers must drain before the final snapshot"
+PYTHON
+then
+  fail "web-motion process discovery/identity lifecycle wiring drifted"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi

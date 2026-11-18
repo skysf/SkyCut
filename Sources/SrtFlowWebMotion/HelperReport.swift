@@ -33,6 +33,7 @@ final class HelperReport {
     private var processes: [Int32] = []
     private var cleanups: [() -> Void] = []
     private var finished = false
+    var beforeFinish: (() -> Void)?
     let started = ProcessInfo.processInfo.systemUptime
 
     var elapsed: Double { ProcessInfo.processInfo.systemUptime - started }
@@ -54,7 +55,7 @@ final class HelperReport {
     }
 
     func addProcesses(_ pids: [Int32]) {
-        let new = pids.filter { !processes.contains($0) }
+        let new = Set(pids.filter { $0 > 0 }).subtracting(processes).sorted()
         guard !new.isEmpty else { return }
         processes += new
         emit(WebMotionEvent(kind: .processes, processes: processes))
@@ -83,6 +84,8 @@ final class HelperReport {
     func finish(_ code: Int32) -> Never {
         if !finished {
             finished = true
+            beforeFinish?()
+            beforeFinish = nil
             timing.totalSeconds = elapsed
             emit(WebMotionEvent(kind: .result, result: result(accepted: code == WebMotionExitCode.accepted)))
             cleanups.forEach { $0() }

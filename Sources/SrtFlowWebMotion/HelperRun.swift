@@ -26,12 +26,17 @@ final class HelperRun {
     /// Every page instance made, kept until the process exits: a page rejected while loading stays alive (and keeps its
     /// WebKit process) until the result is out, instead of being torn down mid-attempt by going out of scope.
     private var created: [PageWorker] = []
+    private lazy var processTracker = PageProcessTracker(
+        read: { [weak self] in self?.created.flatMap { $0.processIdentifiers } ?? [] },
+        emit: { HelperReport.shared.addProcesses($0) })
 
     init(request: WebMotionRequest) {
         self.request = request
     }
 
     func run() async -> Never {
+        processTracker.start()
+        report.beforeFinish = { [processTracker] in processTracker.finish() }
         report.versions = HelperRun.versions()
         Deadline.startTotal(request.limits.total)
         Deadline.watchParent()
@@ -78,9 +83,12 @@ final class HelperRun {
         let wantFast = request.alpha != .public
         let page = PageWorker(configuration: try configuration(), points: size, zoom: 1, pixels: pixels, transparent: wantFast)
         created.append(page)
+        processTracker.sample()
         let limit = request.limits.load
+        let loadDeadline = ProcessInfo.processInfo.systemUptime + limit
         let loaded = try await Deadline.within(limit, "The calibration page did not load within \(Deadline.format(limit)) s.") {
-            try await page.load(WebMotionPageHTML.locked(WebMotionAlphaCalibration.html))
+            try await page.load(WebMotionPageHTML.locked(LoadMemoryProbe.calibrationHTML(request)))
+            try await LoadMemoryProbe.record(page, deadline: loadDeadline)
             return try await page.finishLoading()
         }
         report.addProcesses(page.processIdentifiers)
@@ -139,6 +147,7 @@ final class HelperRun {
             let worker = PageWorker(configuration: try configuration(), points: points, zoom: zoom,
                                     pixels: (request.width, request.height), transparent: path == .fast)
             created.append(worker)
+            processTracker.sample()
             let loaded: PageWorker.Loaded
             do {
                 loaded = try await Deadline.within(limit, "The page did not finish loading within \(Deadline.format(limit)) s "

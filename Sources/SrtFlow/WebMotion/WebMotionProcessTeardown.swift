@@ -16,10 +16,19 @@ struct WebMotionProcessIdentity: Sendable, Equatable {
     let startedMicroseconds: UInt64
     let name: String
 
-    static func current(_ pid: Int32) -> WebMotionProcessIdentity? {
+    static func current(_ pid: Int32, bornNoLaterThan cutoff: UInt64? = nil) -> WebMotionProcessIdentity? {
         var info = proc_bsdinfo()
         let size = Int32(MemoryLayout<proc_bsdinfo>.size)
         guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size else { return nil }
+        // A delayed lookup must not claim a process born after this PID was first reported. Read BSD identity first:
+        // checking usage before BSD could validate the old process and then return its recycled replacement.
+        if let cutoff {
+            var usage = rusage_info_v4()
+            let status = withUnsafeMutablePointer(to: &usage) { pointer in
+                pointer.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { proc_pid_rusage(pid, RUSAGE_INFO_V4, $0) }
+            }
+            guard status == 0, usage.ri_proc_start_abstime > 0, usage.ri_proc_start_abstime <= cutoff else { return nil }
+        }
         let name = withUnsafeBytes(of: info.pbi_name) { raw in
             String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
         }
