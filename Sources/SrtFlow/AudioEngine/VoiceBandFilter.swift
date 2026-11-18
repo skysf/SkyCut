@@ -9,7 +9,8 @@ import Foundation
 // Lows under 300 Hz keep their level (a hit's weight), the voice band 300–3000 Hz goes down by g, the highs stay.
 // Double-precision state and coefficients (the 300 Hz sections sit close to the unit circle at 48 kHz). No allocation: the
 // renderer owns one per stream per channel pair, resets it when the position jumps (seek, start: like the scene chain) and
-// moves g linearly across a block when it changes (no zipper).
+// moves g linearly across a block when it changes (no zipper). Started or stopped mid-stream it crossfades with the dry sound
+// (`VoiceBandRendering`), so a stream set back to 0 dB plays exactly what the export plays.
 // Not here: when the engine runs it (AudioTrackRenderer), what a clip asks for (VoiceBand, EditClip.voiceBandDB).
 
 struct VoiceBandFilter: Sendable {
@@ -97,34 +98,72 @@ struct VoiceBandFilter: Sendable {
             rightSamples[index] = Float(right.process(Double(rightSamples[index]), gain: gain))
         }
     }
+
+    /// As `process`, mixed with the dry input: the dry share `dry` (0 = the filter's output alone, 1 = the input alone) moves
+    /// by `step` per frame toward `target`, so the filter fades in or out without a jump in phase.
+    mutating func process(_ leftSamples: UnsafeMutablePointer<Float>, _ rightSamples: UnsafeMutablePointer<Float>,
+                          count: Int, from: Float, to: Float, dry: inout Float, toward target: Float, step: Float) {
+        guard count > 0 else { return }
+        let start = Double(from), gainStep = (Double(to) - Double(from)) / Double(count)
+        for index in 0..<count {
+            let gain = start + gainStep * Double(index + 1)
+            dry = dry < target ? min(target, dry + step) : max(target, dry - step)
+            let share = Double(dry)
+            let inLeft = Double(leftSamples[index]), inRight = Double(rightSamples[index])
+            let outLeft = left.process(inLeft, gain: gain), outRight = right.process(inRight, gain: gain)
+            leftSamples[index] = Float(outLeft + share * (inLeft - outLeft))
+            rightSamples[index] = Float(outRight + share * (inRight - outRight))
+        }
+    }
 }
 
-/// One stream's voice band as the renderer runs it: the filter, the gain it last applied and where it last rendered.
-/// It starts from zero when the position jumps (seek, start) and the first time the stream needs it; once running it keeps
-/// running even back at gain 1 (an all-pass then: switching it off would jump the phase); a new gain moves linearly across
-/// the block. Only the renderer touches it.
+/// One stream's voice band as the renderer runs it: the filter, the gain it last applied, the dry sound's share while the
+/// filter fades in or out, and where it last rendered. After a jump (seek, start) it starts settled, like the export starts
+/// every stream: the filter from rest when `asked` < 1, the dry sound when not. Mid-stream a new gain moves linearly across
+/// the block; the filter started (`asked` drops below 1) fades in from the dry sound, and back at gain 1 (an all-pass then:
+/// flat level, shifted phase) it fades out to the dry sound, each over `fadeFrames`, then stops and forgets its state. So a
+/// stream set back to 0 dB plays exactly the export's samples (review CXR2 R10, 2026-11-19: it used to keep running as an
+/// all-pass, and two layers of related sound summed 17 dB apart at 300 Hz live and in the export), and starting it mid-stream
+/// no longer jumps by half the signal. Only the renderer touches it.
 struct VoiceBandRendering: Sendable {
+    /// How long the filter fades in or out against the dry sound mid-stream (frames at the engine's 48 kHz: about 21 ms).
+    static let fadeFrames = 1_024
     var filter = VoiceBandFilter()
     var gain: Float = 1
     var active = false
+    /// The dry sound's share of the output while the filter fades in or out (0 = the filter's output alone).
+    var dry: Float = 0
     var renderedUpTo: Int64 = -1
 
     /// Filters the `count` frames rendered at `[from, from + count)` in place when the stream needs it (`asked` < 1, or
-    /// already running).
+    /// still fading out).
     mutating func render(_ left: UnsafeMutablePointer<Float>, _ right: UnsafeMutablePointer<Float>, count: Int, from: Int64,
                          asked: Float) {
         if renderedUpTo != from {
             filter.reset()
             active = asked < 1
             gain = asked
+            dry = 0
         } else if !active, asked < 1 {
             filter.reset()
             active = true
             gain = 1
+            dry = 1
         }
         if active {
-            filter.process(left, right, count: count, from: gain, to: asked)
+            let target: Float = asked < 1 ? 0 : 1
+            if dry == 0, target == 0 {
+                filter.process(left, right, count: count, from: gain, to: asked)
+            } else {
+                filter.process(left, right, count: count, from: gain, to: asked, dry: &dry, toward: target,
+                               step: 1 / Float(Self.fadeFrames))
+            }
             gain = asked
+            if dry >= 1 {
+                filter.reset()
+                active = false
+                dry = 0
+            }
         }
         renderedUpTo = from + Int64(count)
     }
