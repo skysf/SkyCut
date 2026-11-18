@@ -181,6 +181,9 @@ The engine as a whole, and steps 2–3 that consume these samples (ESTOI, masker
    **离线引擎不碰声卡**：预览那个实时引擎停着就一直停着、起停只经 `AudioEngineIdleKeeper`（[音频引擎](audio-engine.md)第二节第 11 条）；
    2026-11-16 实测量的进程跑了 12 秒，`pmset -g assertions` 采了 456 次，一次都没有替它挂的断言。渲在普通线程上，比不过实时的音频线程，
    正在播的预览照常出声（真声卡上没量过，人工回归里有一条）。
+   Since 2026-11-18 a timeline `look` with `sound` measures its strip the same way (`AISoundStripMeasure`: `MixMeasurement` over the
+   strip's frames on this queue, inside the look call, not a job of its own; [AI 接口](ai-control-mcp.md) section 4 item 12): a few
+   seconds of mix and rows take tens of milliseconds, so it never holds the queue for long.
 7. **接口留给以后**：`MixMeasurement.measure(_:observe:)` 每渲一块，把混音和各层的原样采样（交错立体声 f32）交给 `observe` —— 以后的 ESTOI
    （干净人声那一层对整条混音）、声音报告直接拿；只要数的用结果（每帧的数，加上和导出同口径的 `levels`）。
 

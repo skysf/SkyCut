@@ -11,6 +11,7 @@ import SrtFlowMCPKit
 //   becomes a queued job (position, waiting_for) and runs after it; cancelled while queued it never starts; cancelled while running it
 //   stops; another session cannot cancel it; an edit behind a look gets its turn before the look's frames are done.
 // RouterSwitchChecks also exercises queue selection and actual routing after the unchanged authorization gates.
+// LookSoundChecks: look sound=… on a real project draws the engine's mix and a track under the frames (MCP-66).
 @main enum LookJobChecks {
     @MainActor static func main() async {
         let domain = Bundle.main.bundleIdentifier ?? ""
@@ -25,6 +26,8 @@ import SrtFlowMCPKit
         do {
             try await runLookCallChecks(root)
             try await runRouterSwitchChecks(root)
+            // look sound=… (MCP-66): the engine's mix drawn under the frames (LookSoundChecks).
+            try await runLookSoundPathChecks(root)
         } catch {
             LookCheckLog.failures += 1
             print("FAIL: look call checks stopped: \(error)")

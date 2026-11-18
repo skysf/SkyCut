@@ -16,6 +16,7 @@
 #      真画一张图（黑底左上角一块亮色）让 Vision 认，认出来的框必须在左上（Vision 是左下原点，换算反了窗就对错地方）。
 #   9. look（「看」）：几帧排成格子、拼图的大小、JPEG、每帧的文字描述、结果里图跟在文字后面（MCP 的 image）；
 #      大图穿过小程序 ↔ App 的通道原样回来（假 App 回一张几百 KB 的图）。
+#      The sound strip under the sheet (look sound=…, MCP-66): window, columns, summary, pixels read back (LookSoundChecks).
 #  10. listen（「听」）：用生产的 ChunkBuilder 攒一份波形，量电平（只算有声音的部分）、峰值、静音段（窗和均方桶对齐，
 #      交界不漏能量）、响度曲线、片段在时间线上听到的（变速换时间、段音量和轨道推子乘进去）。
 #  11. read_document（读文稿）：现造 GBK 的 txt、RTF、docx、带字的 PDF 读回来对文字，Pages 要说清楚读不了，分段读的边界。
@@ -160,6 +161,7 @@ echo "   ✓ 没有「影片」；三处默认位置走同一个起点；改工�
 
 # shellcheck source=checks/MCP/listen-wiring.sh
 source checks/MCP/listen-wiring.sh
+source checks/MCP/look-sound-wiring.sh
 
 echo "==> 压缩 / 烧录：AI 的条目自带设置和输出位置，不替用户开跑"
 # AI 给的参数只用于它排的那几条（不改页面上记住的设置），页面上改设置 / 输出文件夹不碰 AI 的条目；
@@ -469,6 +471,9 @@ xcrun swiftc \
   Sources/SrtFlow/MediaReadQueue.swift \
   Sources/SrtFlow/MediaReadAudit.swift \
   Sources/SrtFlow/AIContactSheet.swift \
+  Sources/SrtFlow/AISoundStrip.swift \
+  Sources/SrtFlow/AISoundStripDrawing.swift \
+  Sources/SrtFlow/AudioEngine/MixFrameGrid.swift \
   Sources/SrtFlow/AIFrameDescription.swift \
   Sources/SrtFlow/AIAudioLevels.swift \
   Sources/SrtFlow/AIListenFileAudio.swift \

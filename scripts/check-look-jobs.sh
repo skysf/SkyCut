@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # A look never leaves the AI waiting for minutes (docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md), with real App objects:
 # the router's lines (AICallLines), a look call that becomes a job (AILookCall), real looks (AILookTool) on real background projects,
-# get_job / cancel_job (AIExportTools). Isolated bundle id per run, synthetic clips; never starts the user's App or touches the keychain.
+# get_job / cancel_job (AIExportTools), and look sound=… drawing the engine's mix under the frames (MCP-66, checks/LookJobs/LookSoundChecks.swift).
+# Isolated bundle id per run, synthetic clips; never starts the user's App or touches the keychain.
 # The router's own wiring (look goes through AILookCall, the lines replace the old queue tails) is scanned in checks/MCP/router-wiring.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -27,6 +28,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_S
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/LookJobs/Main.swift checks/LookJobs/LineChecks.swift checks/LookJobs/LookCallChecks.swift checks/LookJobs/Fixture.swift checks/LookJobs/RouterSwitchChecks.swift \
+  checks/LookJobs/LookSoundChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/LookJobCheck"
 # Footage shaped like generated clips: one keyframe per clip, so every frame a look asks for is decoded from the clip's start.
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
