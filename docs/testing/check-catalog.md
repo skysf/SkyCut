@@ -35,6 +35,7 @@
 
 - 导出阶段计时与快速审阅：`scripts/check-export-profile.sh`（真实任务/排队/取消、PNG 仅解码一次，以及真实短进程退出/双管道/错误/取消的回归），合同见 [导出设置](../architecture/export-settings.md)与[子进程退出](../architecture/blocking-media-reads.md)，实测见 [2026-11-02 导出耗时与快速审阅](../reports/2026-11-02-export-profile-review.md)。
   Since 2026-11-18 also the export folder window and destination (`FolderChooserChecks`, `DestinationChecks`): a fake folder window (answers, cancelled, empty at once, never appears, vanishes, stays stuck + Close It, the force-quit record), a fake drive that never answers or is read-only, the per-drive cap, real folders and typed paths, and one real export whose delivery is held 1.2 s off the main thread; the rules are in [导出设置](../architecture/export-settings.md) §8.
+  Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 

@@ -114,6 +114,9 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
   past the deadline the panel says so and the thread is left to finish; nobody claims it ended.
 - Moving the finished video onto the destination (`ExportDelivery`) runs on its own queue: it is a full copy when the
   destination is another drive, so it has no deadline, but it never holds the main thread.
+- The AI's `export_video` and `export_subtitles` ask their folder only through `ExportDestinationProbe.run`
+  (`AIExportDestination`): choosing it, making it, checking and listing it, and writing the subtitle files, with the
+  same deadline and cap ([case](../bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md)).
 - Rules and checks: [export settings](export-settings.md) §8; case:
   [choosing the export folder froze SkyCut](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
 - Not covered yet: saving a project file that lives on such a drive (autosave and Quit write it on the main thread).

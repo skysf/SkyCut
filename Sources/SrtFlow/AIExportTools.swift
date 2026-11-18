@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 // MARK: - 工具：导出、任务进度、取消任务
 //
 // 管什么：export_video 走导出面板那同一个导出器（`VideoEditExporter`），只是不弹面板；导出器占着就排队（AIWorkQueue，2026-10-17）：
-// 文件名默认是工程名、放在打开的文件夹的 SrtFlow/导出 里，已经有同名文件就加编号（从不覆盖，所以不问，方案第 34 条）；
+// 文件名默认是工程名、放在打开的文件夹的 SrtFlow/导出 里，已经有同名文件就加编号（从不覆盖，所以不问，方案第 34 条；
+// which file, and the folder's checks, off the main thread: AIExportDestination）；
 // 烧字幕、分辨率的口径和面板一样（烧看得见的轨；分辨率封短边、只降不升）。
 // get_job / cancel_job 管所有长任务（AIJobs）。
 // 不管什么：说明文字（SrtFlowMCPKit/MCPSubtitleExportTools.swift）、导出本身。
@@ -17,7 +18,11 @@ enum AIExportTools {
     /// 排着队、还没写出来的成品路径：几个导出排在一起时各占各的名字，不会都算成同一个「没被占」的名字。
     private static var reservedOutputs: Set<String> = []
 
-    static func export(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+    /// `destination` / `deadline`: the checks pass a drive that never answers or is read-only (ExportDestinationProbe).
+    static func export(
+        _ args: AIToolArguments, _ project: VideoEditProject,
+        destination: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
+    ) async throws -> AIToolResult {
         let exporter = VideoEditExporter.shared
         guard !project.state.mainClips.isEmpty else { throw AIToolError("V1 is empty. Add clips before exporting.") }
         guard MediaToolchain.shared.runtime != nil else {
@@ -28,16 +33,17 @@ enum AIExportTools {
         let settings = choice.settings
         var state = project.stateForExport(selectionOnly: false)
         let audioOnly = VideoEditExportGraph.isAudioOnly(state)
-        let requested = try outputURL(args, project: project, fileExtension: audioOnly ? "m4a" : "mp4")
-        let output = ExportFileName.unoccupied(
-            in: requested.deletingLastPathComponent(), stem: requested.deletingPathExtension().lastPathComponent,
-            pathExtension: requested.pathExtension
-        ) { FileManager.default.fileExists(atPath: $0.path) || reservedOutputs.contains($0.standardizedFileURL.path) }
-        try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-
         // 烧不烧和面板同一个开关：烧的是时间线上看得见的那几条轨；不烧 = 两只眼睛都关。
         var options = SubtitleExportOptions()
         options.burnIn = try args.bool("burn_subtitles") ?? true
+        // The folder is made, checked and listed off the main thread (a slow, stuck or read-only drive never freezes
+        // SkyCut, and is said before anything is encoded); the name is reserved the moment it is chosen.
+        let output = try await AIExportDestination.output(
+            args, project: project, fileExtension: audioOnly ? "m4a" : "mp4", reserved: reservedOutputs,
+            probe: destination, deadline: deadline
+        )
+        let reserved = output.standardizedFileURL.path
+        reservedOutputs.insert(reserved)
         options.applyBurnChoice(to: &state)
         if audioOnly {
             state.subtitle = nil
@@ -64,8 +70,6 @@ enum AIExportTools {
             }), "downscaled_from_video_source": .bool(outputShort > 0 && Double(sourceShort) > outputShort + 0.5),
             "notification": "Report source, canvas and delivered sizes separately in the conversation language. Explain any downscale; never describe a lower-resolution export as 2K because its source was 2K. Original media remains available; do not regenerate merely to change export settings."
         ]
-        let reserved = output.standardizedFileURL.path
-        reservedOutputs.insert(reserved)
         let work = AIQueuedWork()
         timing.begin("queue")
         let job = AIJobs.shared.start(.export, progress: { work.started ? exporter.progress : nil }, liveDetail: live, cancel: {
@@ -137,22 +141,6 @@ enum AIExportTools {
     /// 没给名字时成品叫什么：工程名，没存过就是 V1 第一段的名字（export_subtitles 也用它，字幕文件和视频同名配成一对）。
     static func defaultName(_ project: VideoEditProject) -> String {
         project.documentURL?.deletingPathExtension().lastPathComponent ?? project.state.mainClips.first?.name ?? "Timeline"
-    }
-
-    /// 给了完整路径就用它（扩展名按这次导出的类型改正）；否则 = 默认文件夹 + 名字（默认工程名）。
-    private static func outputURL(_ args: AIToolArguments, project: VideoEditProject, fileExtension: String) throws -> URL {
-        if let path = try args.string("path") {
-            let url = AIWorkspace.shared.resolve(path)
-            return url.pathExtension.lowercased() == fileExtension
-                ? url : url.deletingPathExtension().appendingPathExtension(fileExtension)
-        }
-        let fallback = defaultName(project)
-        // 同一个文件夹出几个版本：成片的名字带上版本（「南极 - 30s」，方案板 5；工程名里已经带着就不再叠）。
-        let stem = AIVersionName.stem(ExportFileName.stem(
-            from: try args.string("name") ?? fallback, droppingExtension: fileExtension, fallback: fallback
-        ), version: AIVersionName.clean(try args.string("version")))
-        return AIWorkspace.shared.outputFolder(.exports, project: project)
-            .appendingPathComponent(stem).appendingPathExtension(fileExtension)
     }
 
     // MARK: get_job / cancel_job
