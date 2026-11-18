@@ -157,6 +157,7 @@
 - [2026-11-04 官方生成把确认问题缓存成已完成](2026-11-04-official-confirmation-cached-as-completion.md) — 只缓存有真实任务号的启动结果；确认解除后重新过闸。
 - [2026-11-04 官方镜头等到名额后仍用旧提交条件](2026-11-04-official-generation-slot-revalidation.md) — 每次收费 POST 之前重新核对账户 / 工程 / 文件 / 有效期。
 - [2026-11-18 Official ice page fails frame replay](2026-11-18-official-ice-frame-replay.md) — Verify exact replay after other frames and on another page; a speculative canvas reset needs the same failing check rerun.
+- [2026-11-18 Official motion clip names stay in the creation language](2026-11-18-official-motion-clip-names-stay-in-old-language.md) — Localize recognized defaults in every visible consumer and invalidate mounted labels on a locale change; keep saved names verbatim.
 - [2026-11-04 官方配方收费前被拒，本机预留没释放](2026-11-04-official-recipe-rejection-reservation.md) — 精确的「未准入」和一般 503 分开；被拒要释放预留并留证据。
 - [2026-11-18 AI project-template reuse loses the official origin](2026-11-18-official-template-origin-on-reuse.md) — Preserve a resolved source identity separately from the ID used to find it; UI and AI copies must retain the same defaults.
 - [2026-11-18 Official collision title does not fade with its duration](2026-11-18-official-word-shadow-fade.md) — Compare actual pixels at common times; a duration change must not pass merely because its frame count changed.

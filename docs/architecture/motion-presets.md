@@ -216,6 +216,10 @@ compares every frame hash. It exercises discovery, trusted template requests, pa
 independent reuse and undo through the real AI path. `OfficialPreviews.swift` verifies the bundled bytes, defaults, six-check receipt
 and actual movie size, frame rate, duration and premultiplied alpha. The existing offscreen UI harness covers all three languages
 and both themes; recognized official default names/labels follow the UI language while custom names, labels and values remain verbatim.
+The timeline clip label and the selected-clip inspector header both use `WebMotionClipName`, whose locale dependency redraws an
+already-mounted label after a language switch. This is display-only: `EditClip.name`, the stored web record, and ordinary media names
+are not rewritten or translated. `checks/MotionPlacement/ClipNames.swift` compares the same mounted view with the newly localized
+reference text and keeps a custom-name view unchanged; the motion wiring guard requires both production consumers.
 
 Manual regression before release:
 
@@ -223,3 +227,5 @@ Manual regression before release:
 - [ ] Add every official design on 16:9 and 9:16 canvases, edit its words, font, colour, duration and hit, then undo once.
 - [ ] Align the collision's hit to music and confirm that only words/fragments move; the underlying picture remains steady.
 - [ ] Compare impact and settled frames in preview/export at normal and 4K output sizes; lines and lettering remain sharp.
+- [ ] Add an official design in English, keep it selected and switch to Chinese and Spanish: its timeline label, inspector header
+      and parameter heading change together. A custom-renamed web clip and an ordinary media filename remain unchanged.

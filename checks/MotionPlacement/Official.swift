@@ -51,6 +51,7 @@ import SrtFlowWebMotionKit
     guard let first = rendered[.boxToEarth] else { throw AIToolError("The official box fixture did not render") }
     try await officialPlacementChecks(fixture, rendered: first)
     try officialLabelChecks()
+    try await runMotionClipNameChecks()
 }
 
 @MainActor private func officialParameterRenderChecks(_ template: OfficialWebMotionTemplate, original: WebMotionClipRecord,

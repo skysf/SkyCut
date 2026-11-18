@@ -292,9 +292,10 @@ from historical render provenance. Only an explicit re-render/input edit or miss
 run `WebMotionRecovery`; recovery changes no undo history, retains trims/transforms, and cannot land in another document. Visible missing
 motion makes export fail with a readiness message, rather than silently drop the picture.
 
-One library (`MotionPresetLibrary`) lists native presets first and reusable project pages second. AI discovery is
-`get_timeline.motion_library`: native entries use `set_text`, web entries use `set_motion`. A web id is `project:<clip UUID>`; the HTML is
-read from the stored record, never from a file URL. New custom pages become reusable project entries as soon as their clip is committed.
+One library (`MotionPresetLibrary`) lists native presets first, bundled official web designs next, and reusable project pages last.
+AI discovery is `get_timeline.motion_library`: native entries use `set_text`, web entries use `set_motion`. Web ids are `official:<name>`
+or `project:<clip UUID>`; the HTML comes from the bundled source or stored record, never from an arbitrary file URL. New custom pages
+become reusable project entries as soon as their clip is committed.
 
 `set_motion` takes a template id or full page, parameters/fields, optional `clip_id`, `at` or `hit_at`, local `hit`, duration, upper track,
 name and fixed fonts. Parameter changes merge top-level values and re-render the same clip identity, retaining its cut, speed and effects.

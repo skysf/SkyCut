@@ -62,7 +62,7 @@ enum MotionPresetOfficialRender {
                     to: file("6-official-template-cards"), appearance: appearance)
                 for source in sources {
                     // Stored English defaults deliberately remain unchanged while the UI language switches.
-                    var clip = EditClip(sourceURL: source.movie, sourceDuration: source.record.duration, timelineStart: 2)
+                    var clip = EditClip(sourceURL: source.movie, sourceDuration: source.record.duration, timelineStart: 0)
                     clip.webMotion = source.record
                     var state = empty
                     state.overlayTracks = [EditLane(clips: [clip])]
@@ -73,9 +73,28 @@ enum MotionPresetOfficialRender {
                             .padding(14).frame(width: 252, alignment: .topLeading)
                             .background(AppThemePalette.current.panel),
                         to: file("7-official-\(source.template.rawValue)-parameters"), appearance: appearance)
+                    try await clipNames(project, clip: clip,
+                                        inspector: file("9-official-\(source.template.rawValue)-inspector"),
+                                        timeline: file("10-official-\(source.template.rawValue)-timeline"), appearance: appearance)
                 }
             }
         }
+    }
+
+    private static func clipNames(_ project: VideoEditProject, clip: EditClip,
+                                  inspector: URL, timeline: URL, appearance: NSAppearance?) async throws {
+        try await Snapshot.take(
+            VideoEditInspectorView(project: project, clock: project.clock, playhead: project.clock.whilePaused)
+                .frame(width: 252, height: 900),
+            to: inspector, size: CGSize(width: 252, height: 900), appearance: appearance)
+        try await Snapshot.take(
+            ClipBlockView(clip: clip, slot: .overlay(0), height: 72, pps: 80, isSelected: true,
+                          drag: TimelineDragBox(), isDragMember: false,
+                          context: ClipBlockContext(slot: .overlay(0), project: project), project: project,
+                          onDragBegin: {}, onDragChange: { _, _ in }, onDragEnd: {}, onTrim: { _, _ in },
+                          onTrimEnd: {}, onMarkerPeek: { _ in })
+                .equatable().padding(8).background(AppThemePalette.current.panel),
+            to: timeline, size: CGSize(width: 336, height: 88), appearance: appearance)
     }
 
     private static func frames(_ source: Source, work: URL, out: URL) async throws {

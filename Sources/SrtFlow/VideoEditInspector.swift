@@ -209,7 +209,13 @@ struct VideoEditInspectorView: View {
             HStack(spacing: 6) {
                 Image(systemName: clip.isAudioOnly ? "music.note" : (clip.isStillImage ? "photo" : "film"))
                     .foregroundStyle(.secondary)
-                Text(clip.name)
+                Group {
+                    if let record = clip.webMotion {
+                        WebMotionClipName(record: record)
+                    } else {
+                        Text(clip.name)
+                    }
+                }
                     .fontWeight(.semibold)
                     .lineLimit(1)
                     .truncationMode(.middle)

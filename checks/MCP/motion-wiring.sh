@@ -40,6 +40,15 @@ require("Sources/SrtFlow/WebMotion/WebMotionCache.swift", "WebMotionRenderer.ren
 require("Sources/SrtFlow/VideoEditProjectDocument.swift", "WebMotionRecovery.start(for: self)")
 require("Sources/SrtFlow/VideoEditExportGraph.swift", "try requireMotionCaches(state)")
 require("Sources/SrtFlow/AITimelineSummary.swift", 'result["motion_library"] = AIMotionSummary.library(state)')
+for consumer in ["VideoEditInspector.swift", "VideoEditTimelineClipBlock.swift"]:
+    require("Sources/SrtFlow/" + consumer, """if let record = clip.webMotion {
+                        WebMotionClipName(record: record)
+                    } else {
+                        Text(clip.name)
+                    }""")
+require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "@Environment(\\.locale) private var locale")
+require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "let _ = locale.identifier")
+require("Sources/SrtFlow/WebMotion/WebMotionClipName.swift", "Text(verbatim: OfficialWebMotionLabels.title(record))")
 print("PASS: web motion uses the locked renderer, approval modes, jobs, document guards, one undo, cache recovery and discovery")
 PYTHON
 
