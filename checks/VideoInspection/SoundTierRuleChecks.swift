@@ -22,6 +22,30 @@ enum SoundTierRuleChecks {
         voiceEntries(require: require)
         roles(require: require)
         split(require: require)
+        marks(require: require)
+    }
+
+    // MARK: Intentional marks apply to second-tier findings (the real tool's marking path is DeliveryChecks')
+
+    private static func marks(require: (Bool, String) -> Void) {
+        let info = MediaInfo(duration: 20, displaySize: CGSize(width: 320, height: 180), frameRate: 24, videoCodec: "h264",
+                             audioCodec: "aac", hasAudio: true, audioCanCopyToMP4: true, fileBytes: 1)
+        var state = TimelineState()
+        state.frameRate = .fps24
+        let a = EditClip(sourceURL: URL(fileURLWithPath: "/tmp/a.mp4"), sourceDuration: 3, info: info)
+        let b = EditClip(sourceURL: URL(fileURLWithPath: "/tmp/b.mp4"), sourceDuration: 3, timelineStart: 3, info: info)
+        state.mainClips = [a, b]
+        let jump = AIInspection.Finding(kind: "audio_cut_jump", from: 3, to: 3, reason: "jump", items: [a.id, b.id])
+        let hint = AIInspection.Finding(kind: "audio_voice_loud", from: 1, to: 2, reason: "hint", items: [a.id])
+        let first = AIInspectionReview.partition([jump, hint], state: state, job: "sound-tier-marks-1", generation: 0, session: nil)
+        let keys = first.findings.compactMap { $0.details["key"]?.stringValue }
+        let anchors = keys.compactMap { AIInspectionReview.reports["sound-tier-marks-1"]?.candidates[$0] }
+        require(keys.count == 2 && anchors.count == 2, "second-tier findings and hints get keys like any finding")
+        state.deliveryIntentions = anchors.map { DeliveryIntentionalMark(anchor: $0, reason: "held breath") }
+        let second = AIInspectionReview.partition([jump, hint], state: state, job: "sound-tier-marks-2", generation: 0, session: nil)
+        require(second.findings.isEmpty && second.intentional.count == 2
+                && second.intentional.allSatisfy { $0["intentional_reason"] == "held breath" && $0["reproduced"] == true },
+                "a marked cut jump and a marked grey hint move to the intentional list with their reason")
     }
 
     // MARK: Levels made to order

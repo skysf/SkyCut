@@ -205,8 +205,10 @@ jumps at a cut; voice, music and effects can cover a jump.
 the preview's engine; it never edits the project:
 
 - `AIDeliverySoundLevels`: one render split by role group (`DeliveryStemSplit`: each track split by group keeps its fader and
-  segments, so the parts add up to the export's mix), before the limiter, per project frame (`MixMeasurement`: power and the
-  four bands). In the same pass: the place group above 200 Hz in each cut window, every frequency under 200 Hz removed over
+  segments, so the parts add up to the export's mix), before the limiter, per project frame (`DeliveryStemPower`: each group's
+  power, without `MixMeasurement`'s 3 s preroll and bus meter — loudness, true peak and the limiter come from the first tier's
+  own measurement, and running them twice made every inspection a render longer; the four bands only for the music, whose voice
+  band a line is read against). In the same pass: the place group above 200 Hz in each cut window, every frequency under 200 Hz removed over
   the 0.3 s window as a whole (`DeliveryWindowCollector`, the human film's and the preview board's reading; the band meter's
   300 Hz edge, with its two-frame window, read 3 of the first draft's cuts differently), and the music accents: the rendered
   music group at 24 kHz, each music clip's stretch read with `DeliveryMusicAccents` (the research's accent reading: the
@@ -215,7 +217,8 @@ the preview's engine; it never edits the project:
   built to find a beat, found no accent at all in the human film's orchestral music where its cuts sit on accents.
 - The voice check: `AIListenVoicePlan` / `AIListenVoiceMeasure` / `AIListenVoiceReport`, the same code as listen voice, over
   every audio track whose clips are all voice (at most 11), inside the checked range.
-- Each sound that may drag past its picture rendered on its own over its frames after the cut (at most 40; more is a limitation).
+- Each sound that may drag past its picture rendered on its own over its frames after the cut (`DeliveryStemPower`; at most 40;
+  more is a limitation).
 
 ### Rules
 
@@ -259,12 +262,14 @@ from the research's media table. None of it is committed.
 `checks/VideoInspection/SoundTierRuleChecks.swift` tests the rules on controlled numbers: every cover and its edge, the 200 Hz
 reading against a 100 Hz + 1 kHz window, the accent reading on a thump every 0.5 s, where the picture changes, object and
 camera counting, the lead belonging to the next shot, the swell's running median, listen's verdicts as report entries,
-`sounds` parsing and role precedence, and the stem split keeping every segment. `SoundTierChecks.swift` runs the real job on
-synthetic sound (noise beds cut at 3.0 s, a decaying clang, a speech-like line under loud noise, music rising under it): a cut
-jump, a 12-frame linger, a masked line and a swell over the whole 6 s; then around the cut only (2.5–3.5 s, to keep the job
-quick): without `sounds` the clang is part of the place and never lingers; a refused wrong `sounds`; a marked jump moved to
-`intentional`; a music bed across the cut and a clang ended a frame after it remove both; quiet music with a low thump 2 frames
-after the cut covers the jump by its accent. `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs only these.
+`sounds` parsing and role precedence, the stem split keeping every segment, and a cut jump and a grey hint moving to
+`intentional` once marked (`AIInspectionReview.partition`, the path the real tool's marks take; DeliveryChecks marks through the
+tool). `SoundTierChecks.swift` runs two real jobs on synthetic sound. The first, over the whole 6 s (noise beds cut at 3.0 s, a
+decaying clang, a 1.2 s speech-like line under loud noise, music rising under it): a cut jump, a 12-frame linger, a masked line
+and a swell; wrong `sounds` refused before a job, `sounds` refused next to `intentional`. The second, 2.5–6.5 s of a timeline
+with two covered cuts: a music bed across 3.0 s, quiet music with a low thump 2 frames after 6.0 s, and the clang ended a frame
+after its cut — nothing reported. Only two jobs: the binary links the debug build, and its 480 s deadline was overrun on CI when
+the first version ran five (2026-11-18). `SRTFLOW_INSPECTION_CASE=sound scripts/check-video-inspection.sh` runs only these.
 
 Reverse controls (2026-11-18), each restored afterwards: with the four registry entries removed, six production assertions
 fail (the jump, the linger, the masked line, the swell, the named checks, the mark); with the bed cover removed, the rule's bed

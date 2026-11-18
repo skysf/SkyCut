@@ -4,7 +4,8 @@ import Foundation
 //
 // Owns: one offline render of the export's configuration split by role group (DeliveryStemSplit: place, voice, music, effects;
 // each group as it enters the master bus, before the limiter, like listen mix=true) measured per project frame
-// (MixMeasurement / MixBandMeter: power and the four bands <300, 300–800, 800–3000, >3000 Hz), the music accents (the rendered
+// (DeliveryStemPower: each group's power; MixBandMeter's four bands <300, 300–800, 800–3000, >3000 Hz for the music only, whose
+// voice band a line is read against), the music accents (the rendered
 // music group at half the engine's rate, read per music clip with DeliveryMusicAccents, the research's accent reading, kept where
 // the music is heard: above `audibleDB`), and the place group above 200 Hz in each cut window (DeliveryWindowCollector, the
 // research's brick-wall reading). Readers: window levels in a band, a frame's level, a cut window above 200 Hz.
@@ -106,13 +107,26 @@ struct AIDeliverySoundLevels: Sendable {
         let music = split.layers.firstIndex { $0.key == .music }, place = split.layers.firstIndex { $0.key == .place }
         let collector = MusicCollector(decimation: accentDecimation)
         let cutWindows = DeliveryWindowCollector(windows: windows, sampleRate: Double(grid.sampleRate), cutoff: highCutoff)
-        let request = MixMeasurement.Request(config: split.config, layers: split.layers.map(\.layer), grid: grid, frames: range)
-        let result = try MixMeasurement.measure(request, isCancelled: isCancelled) { block in
-            if let music { collector.add(block.layers[music], at: block.position, frames: block.frames) }
+        // Bands are read only for the music (its voice band under a line); every group's power comes from DeliveryStemPower.
+        let limit = Int64((config.duration * Double(grid.sampleRate)).rounded())
+        let band = music.map { _ in MixBandMeter(grid: grid, frames: range, limit: limit) }
+        let powers = try DeliveryStemPower.measure(split.config, layers: split.layers.map(\.layer), grid: grid, frames: range,
+                                                   isCancelled: isCancelled) { block in
+            if let music {
+                band?.add(block.layers[music], at: block.position, frames: block.frames)
+                collector.add(block.layers[music], at: block.position, frames: block.frames)
+            }
             if let place { cutWindows.add(block.layers[place], at: block.position, frames: block.frames) }
         }
+        band?.finish()
         var frames: [Group: [MixFrameLevel]] = [:]
-        for (index, entry) in split.layers.enumerated() { frames[entry.key] = result.layers[index].frames }
+        for (index, entry) in split.layers.enumerated() {
+            if entry.key == .music, let band {
+                frames[entry.key] = band.levels
+            } else {
+                frames[entry.key] = powers[index].map { MixFrameLevel(meanSquare: $0, peak: 0, bands: SIMD4(repeating: 0)) }
+            }
+        }
         var levels = AIDeliverySoundLevels(grid: grid, first: range.lowerBound, frames: frames, accents: [])
         if music != nil {
             let spans = config.tracks.flatMap(\.segments).filter { roles.role(of: $0.clipID) == .music }.map { ($0.start, $0.end) }

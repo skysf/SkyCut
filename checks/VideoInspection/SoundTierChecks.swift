@@ -8,9 +8,9 @@ import SrtFlowMCPKit
 // Two pictures from two files cut at 3.0 s; under them A1 ambience (loud noise, then quiet noise), A2 an object (a decaying
 // clang started inside the first picture, ringing 0.5 s past the cut), A3 a speech-like voice line, A4 loud noise under it,
 // A5 music rising 20 dB in the middle of the line. With `sounds` naming them: a cut jump at 3.0, the clang lingering 12 frames,
-// the line masked, the music swelling. Fixed (a music bed across the cut, the clang ended a frame after it): neither the jump nor
-// the linger; quiet music with a low thump just after the cut covers the jump by its accent. Without `sounds` the clang is an
-// unnamed file, part of the place (no linger). Marks still apply. Only the first run checks the whole 6 s; the rest 2.5–3.5 s.
+// the line masked, the music swelling. A second timeline covers its cuts (a music bed at 3.0, a music accent at 6.0) and ends the
+// clang a frame after the cut: nothing is reported. Two jobs only (the binary links the debug build and has a 480 s deadline);
+// marks on second-tier findings and roles without `sounds` are checked on values in SoundTierRuleChecks.
 @MainActor
 enum SoundTierChecks {
     static let roles: JSONValue = ["A1": "ambience", "A2": "object", "A3": "voice", "A4": "ambience", "A5": "music"]
@@ -51,81 +51,91 @@ enum SoundTierChecks {
                 "second-tier sound findings carry the loudest layers like the first tier")
         require(project.state == before && !project.effectiveUndoManager!.canUndo, "the second tier never edits the project")
 
-        // The later runs check only around the cut (2.5–3.5 s): the whole 6 s once is enough, and the job stays quick.
-        let cut: [String: JSONValue] = ["from": 2.5, "to": 3.5]
-        let plain = try await inspect(project, cut)
-        require(kinds(plain).contains("audio_cut_jump") && !kinds(plain).contains("audio_linger") && plain["sound_roles"]?["A2"] == "other",
-                "without sounds the clang is an unnamed file (other): part of the place, never an object that lingers")
         for wrong: JSONValue in [["A9": "music"], ["A1": "drums"]] {
             do { _ = try await inspect(project, ["sounds": wrong]); require(false, "\(wrong.encodedString()) must be refused") }
             catch { require(project.state == before, "a wrong sounds is refused before any job: \((error as? AIToolError)?.message ?? "")") }
         }
+        if let key = jump?["key"]?.stringValue, let job = first["job_id"] {
+            do {
+                _ = try await AIInspectionTool.start(AIToolArguments(["intentional": ["job_id": job, "key": .string(key), "reason": "held breath"],
+                                                                      "sounds": roles]), project)
+                require(false, "sounds is an inspection field, refused next to intentional")
+            } catch { require(project.state == before, "marking with an inspection field changes nothing") }
+        } else { require(false, "the jump needs a key") }
 
-        guard let key = jump?["key"]?.stringValue, let job = first["job_id"] else { require(false, "the jump needs a key to mark"); return }
-        do {
-            _ = try await AIInspectionTool.start(AIToolArguments(["intentional": ["job_id": job, "key": .string(key), "reason": "held breath"],
-                                                                  "sounds": roles]), project)
-            require(false, "sounds is an inspection field, refused next to intentional")
-        } catch { require(project.state == before, "marking with an inspection field changes nothing") }
-        _ = try await AIInspectionTool.start(AIToolArguments(["intentional": ["job_id": job, "key": .string(key), "reason": "held breath"]]), project)
-        let marked = try await inspect(project, cut.merging(["sounds": roles]) { _, new in new })
-        require(!kinds(marked).contains("audio_cut_jump")
-                && (marked["intentional"]?.arrayValue ?? []).contains { $0["kind"] == "audio_cut_jump" && $0["intentional_reason"] == "held breath" },
-                "a marked cut jump moves to the intentional list with its reason")
-        _ = try await AIInspectionTool.start(AIToolArguments(["clear_intentional": .string(key)]), project)
-
-        project.restoreTimeline(try await timeline(project, root: root, fixed: true))
-        let fixed = try await inspect(project, cut.merging(["sounds": roles.merging(["A6": "music"])]) { _, new in new })
+        // Covered cuts, checked only from 2.5 to 6.5 s (one job keeps the check quick): at 3.0 a music bed across the cut and a
+        // clang ended a frame after it; at 6.0 quiet music (far too low to be a bed) with one low thump 2 frames after the cut.
+        project.restoreTimeline(try await covered(project, root: root))
+        let fixed = try await inspect(project, ["from": 2.5, "to": 6.5,
+                                                "sounds": ["A1": "ambience", "A2": "object", "A3": "music", "A4": "music"]])
         require(!kinds(fixed).contains("audio_cut_jump") && !kinds(fixed).contains("audio_linger"),
-                "a music bed across the cut covers the jump; a clang ended a frame after the cut no longer lingers (\(kinds(fixed).sorted()))")
-
-        // Quiet music (far too low to be a bed) with one low thump 2 frames after the cut: the accent alone covers the jump.
-        project.restoreTimeline(try await timeline(project, root: root, accent: true))
-        let accented = try await inspect(project, cut.merging(["sounds": roles.merging(["A6": "music"])]) { _, new in new })
-        require(!kinds(accented).contains("audio_cut_jump"), "a music accent right after the cut covers the jump (\(kinds(accented).sorted()))")
+                "a music bed covers the 3.0 s jump, an accent the 6.0 s one, and a clang ended a frame after its cut no longer lingers (\(kinds(fixed).sorted()))")
     }
 
     // MARK: The timeline
 
-    private static func timeline(_ project: VideoEditProject, root: URL, fixed: Bool = false, accent: Bool = false) async throws -> TimelineState {
-        let picture = root.appendingPathComponent("source.mp4"), other = root.appendingPathComponent("cuts-source.mp4")
-        guard let one = await project.mediaProbes.probeVideo(picture), let two = await project.mediaProbes.probeVideo(other) else {
-            throw AIToolError("The synthetic pictures did not probe.")
+    private static func pictures(_ project: VideoEditProject, root: URL, _ names: [String]) async throws -> [EditClip] {
+        var clips: [EditClip] = []
+        for (index, name) in names.enumerated() {
+            let url = root.appendingPathComponent(name)
+            guard let info = await project.mediaProbes.probeVideo(url) else { throw AIToolError("\(name) did not probe.") }
+            // Each picture from a second into its file: clear of rendered.mp4's black stretch (3–4 s).
+            clips.append(EditClip(sourceURL: url, sourceStart: name == "rendered.mp4" ? 5 : 0, sourceDuration: 3,
+                                  timelineStart: Double(index) * 3, isMuted: true, info: info))
         }
+        return clips
+    }
+
+    private static func audio(_ url: URL, at start: Double, _ duration: Double, asset: Double) -> EditClip {
+        EditClip(sourceURL: url, isAudioOnly: true, sourceDuration: duration, timelineStart: start, audioAssetDuration: asset)
+    }
+
+    /// Cut at 3.0 s; a 1.2 s speech-like line at 4.0 s under loud noise, music rising 20 dB at 4.6 s. The noise after the cut sits
+    /// under −60 dBFS, so the voice check measures only the masker and the music (ESTOI runs unoptimized in this build).
+    private static func timeline(_ project: VideoEditProject, root: URL) async throws -> TimelineState {
         var noise = Noise(seed: 7)
         let loud = try wave(root, "tier-loud.wav", 3) { _ in noise.next(0.17) }
-        let quiet = try wave(root, "tier-quiet.wav", 3) { _ in noise.next(0.0055) }
+        let quiet = try wave(root, "tier-quiet.wav", 3) { _ in noise.next(0.0012) }
         let clang = try wave(root, "tier-clang.wav", 1) { t in Float(0.3 * exp(-t / 0.3) * sin(2 * .pi * 600 * t)) }
-        let voice = try wave(root, "tier-voice.wav", 2) { t in syllable(t) }
-        let masker = try wave(root, "tier-masker.wav", 2) { _ in noise.next(0.8) }
+        let voice = try wave(root, "tier-voice.wav", 1.2) { t in syllable(t) }
+        let masker = try wave(root, "tier-masker.wav", 1.2) { _ in noise.next(0.8) }
         let music = try wave(root, "tier-music.wav", 2.5) { t in
             Float((t < 1.1 ? 0.0055 : 0.055) * (sin(2 * .pi * 440 * t) + sin(2 * .pi * 880 * t)))
         }
-        func audio(_ url: URL, at start: Double, _ duration: Double, asset: Double) -> EditClip {
-            EditClip(sourceURL: url, isAudioOnly: true, sourceDuration: duration, timelineStart: start, audioAssetDuration: asset)
+        var state = TimelineState()
+        state.frameRate = .fps24
+        state.mainClips = try await pictures(project, root: root, ["source.mp4", "cuts-source.mp4"])
+        state.audioTracks = [
+            EditLane(clips: [audio(loud, at: 0, 3, asset: 3), audio(quiet, at: 3, 3, asset: 3)]),
+            EditLane(clips: [audio(clang, at: 2.5, 1, asset: 1)]),
+            EditLane(clips: [audio(voice, at: 4, 1.2, asset: 1.2)]),
+            EditLane(clips: [audio(masker, at: 4, 1.2, asset: 1.2)]),
+            EditLane(clips: [audio(music, at: 3.5, 2.5, asset: 2.5)])
+        ]
+        return state
+    }
+
+    /// Cuts at 3.0 and 6.0 s, each a place jump of 20 dB or more, each covered: A3 music bed across 3.0 (−17 dBFS), A4 quiet music
+    /// (−43 dBFS) with a 60 Hz thump 2 frames after 6.0; A2's clang ends a frame after 3.0.
+    private static func covered(_ project: VideoEditProject, root: URL) async throws -> TimelineState {
+        var noise = Noise(seed: 11)
+        let loud = try wave(root, "tier-loud.wav", 3) { _ in noise.next(0.17) }
+        let quiet = try wave(root, "tier-quiet.wav", 3) { _ in noise.next(0.0012) }
+        let clang = try wave(root, "tier-clang.wav", 1) { t in Float(0.3 * exp(-t / 0.3) * sin(2 * .pi * 600 * t)) }
+        let bed = try wave(root, "tier-bed.wav", 4) { t in Float(0.2 * sin(2 * .pi * 330 * t)) }
+        let hit = 6 + 2.0 / 24 - 4.5
+        let thump = try wave(root, "tier-thump.wav", 4.5) { t in
+            Float(0.01 * sin(2 * .pi * 220 * t) + (t >= hit ? 0.6 * sin(2 * .pi * 60 * (t - hit)) * exp(-(t - hit) / 0.03) : 0))
         }
         var state = TimelineState()
         state.frameRate = .fps24
-        state.mainClips = [EditClip(sourceURL: picture, sourceDuration: 3, isMuted: true, info: one),
-                           EditClip(sourceURL: other, sourceDuration: 3, timelineStart: 3, isMuted: true, info: two)]
+        state.mainClips = try await pictures(project, root: root, ["source.mp4", "cuts-source.mp4", "rendered.mp4"])
         state.audioTracks = [
-            EditLane(clips: [audio(loud, at: 0, 3, asset: 3), audio(quiet, at: 3, 3, asset: 3)]),
-            EditLane(clips: [audio(clang, at: 2.5, fixed ? 0.54 : 1, asset: 1)]),
-            EditLane(clips: [audio(voice, at: 3.6, 2, asset: 2)]),
-            EditLane(clips: [audio(masker, at: 3.6, 2, asset: 2)]),
-            EditLane(clips: [audio(music, at: 3.5, 2.5, asset: 2.5)])
+            EditLane(clips: [audio(loud, at: 0, 3, asset: 3), audio(quiet, at: 3, 3, asset: 3), audio(loud, at: 6, 3, asset: 3)]),
+            EditLane(clips: [audio(clang, at: 2.5, 0.54, asset: 1)]),
+            EditLane(clips: [audio(bed, at: 0, 4, asset: 4)]),
+            EditLane(clips: [audio(thump, at: 4.5, 4.5, asset: 4.5)])
         ]
-        if fixed {
-            let bed = try wave(root, "tier-bed.wav", 6) { t in Float(0.2 * sin(2 * .pi * 330 * t)) }
-            state.audioTracks.append(EditLane(clips: [audio(bed, at: 0, 6, asset: 6)]))
-        }
-        if accent {
-            let hit = 3 + 2.0 / 24
-            let thump = try wave(root, "tier-thump.wav", 6) { t in
-                Float(0.01 * sin(2 * .pi * 220 * t) + (t >= hit ? 0.6 * sin(2 * .pi * 60 * (t - hit)) * exp(-(t - hit) / 0.03) : 0))
-            }
-            state.audioTracks.append(EditLane(clips: [audio(thump, at: 0, 6, asset: 6)]))
-        }
         return state
     }
 

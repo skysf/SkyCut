@@ -14,7 +14,8 @@ import SrtFlowMCPKit
 // Not reported: the next picture is the same file (the thing is still on screen); a camera sound attached to its picture (it
 // ends with it); ambience, effects, music and voice (an ambience or a hit's tail may carry on: a lag is a normal way to cross a
 // cut). Whether the next shot shows the same thing is not knowable here: mark it intentional (one line why).
-// Each candidate is rendered on its own (DeliveryStemSplit) over its frames after the cut; at most `maxCandidates`.
+// Each candidate is rendered on its own (DeliveryStemSplit, DeliveryStemPower) over its frames after the cut; at most
+// `maxCandidates`.
 // Thresholds (2 frames, −50 dBFS, 6 dB) follow the user's one case and the board's existing lines; not validated on other films.
 // Not here: the picture cuts (AIDeliveryCutJumps.pictureCuts), roles (AIDeliverySoundRoles).
 
@@ -129,11 +130,11 @@ enum AIDeliveryLinger {
             let split = DeliveryStemSplit.split(config, wanted: wanted, name: \.rawValue) { segment in
                 segment.clipID == candidate.sound ? .sound : candidate.leftOut.contains(segment.clipID) ? .rest : .bed
             }
-            let request = MixMeasurement.Request(config: split.config, layers: split.layers.map(\.layer), grid: grid, frames: first ..< last)
-            let result = try MixMeasurement.measure(request, isCancelled: isCancelled)
+            let powers = try DeliveryStemPower.measure(split.config, layers: split.layers.map(\.layer), grid: grid, frames: first ..< last,
+                                                       isCancelled: isCancelled)
             func levels(_ part: Part) -> [Double] {
                 guard let index = split.layers.firstIndex(where: { $0.key == part }) else { return Array(repeating: -120, count: last - first) }
-                return result.layers[index].frames.map { AIDeliverySoundLevels.db($0.meanSquare) }
+                return powers[index].map(AIDeliverySoundLevels.db)
             }
             return Measured(candidate: candidate, firstFrame: first, sound: levels(.sound), bed: candidate.kind == .camera ? levels(.bed) : [])
         }
