@@ -215,3 +215,28 @@ assert "SNClassifySoundRequest(classifierIdentifier: .version1)" in labels and "
     "✗ classification must use the native classifier without overlapping windows"
 PY
 echo "   ✓ describe uses listen jobs, one bounded sample read, source provenance, analysis queues and installed-only speech models"
+
+echo "==> music accents: one read with the beats; add_clips lands hits with AIClipHit; a generated music job carries listen's answer"
+# MCP-43 (2026-11-18, docs/architecture/listening-engine.md section 9): the shape comes from the same read as the beats (no second
+# decode of the song), every add_clips source lands its hit through the one placement rule, and get_job of a generated music file
+# carries exactly `listen file beats=true` (AIGeneratedMusicReport). The behaviour is checked in MusicShapeChecks and
+# checks/ParameterLimits/MusicPlacementChecks.swift; this pins the wiring those checks cannot reach (the paid generation run).
+python3 - <<'PY'
+from pathlib import Path
+code = lambda path: "\n".join(line.split("//", 1)[0] for line in Path(path).read_text().splitlines())
+beats = code("Sources/SrtFlow/AIBeats.swift")
+assert beats.count("MusicShape.analyze(pcm.samples, sampleRate: rate)") == 1 and beats.count("readMono(asset:") == 1, \
+    "✗ the music shape must be measured on the beats' one read"
+timeline = code("Sources/SrtFlow/AITimelineTools.swift")
+assert timeline.count("try await land(&request, known:") == 3 and "AISoundEffectRequest.placement" not in timeline, \
+    "✗ add_clips must land the hit of every source (library, sound effect, file) through AIClipHit"
+assert "AIClipHit.report(&entry, landing: landing, clip: clip)" in timeline, "✗ the reply must read hit_at back from the placed clip"
+effects = code("Sources/SrtFlow/AISoundEffectRequest.swift")
+assert "AIClipHit.placement(hitAt: requested, hit: renderedHit, sourceIn: 0)" in effects, "✗ the placement rule must have one copy"
+run = code("Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift")
+assert run.count("generation.kind == .music ? await AIGeneratedMusicReport.measure(editable, project: project) : nil") == 1 \
+    and 'if let music { detail["music"] = music }' in run, "✗ a generated music job's get_job must carry the listen measurement"
+report = code("Sources/SrtFlow/AIGeneratedMusicReport.swift")
+assert "AIListenFileAudio.listen(" in report and "beats: true" in report, "✗ get_job's music must be listen's own answer"
+PY
+echo "   ✓ the shape rides on the beats' read, add_clips lands every hit through AIClipHit, generated music carries listen's answer"

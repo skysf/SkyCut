@@ -221,10 +221,8 @@ public enum MCPTimelineTools {
             "file": MCPSchema.string("Video, image, audio or subtitle file: absolute or relative to the opened folder."),
             "library_id": MCPSchema.string("Instead of file: a music or sound effect id from find_audio."),
             "sound_effect": soundEffect,
-            "hit_at": MCPSchema.number(
-                "Sound effect: timeline second (≥ 0) its loudest moment lands on; sets start.",
-                minimum: 0
-            ),
+            "hit_at": MCPSchema.number("Timeline second (≥ 0) the hit lands on; sets start.", minimum: 0),
+            "hit": MCPSchema.number("Source second (≥ 0) of the hit; default: an effect's peak, else the strongest accent.", minimum: 0),
             "source_in": MCPSchema.number("Where to start in the file, seconds (default 0).", minimum: 0),
             "source_out": MCPSchema.number("Where to stop in the file, seconds (default end); an image: its display length."),
             "track": MCPSchema.string(MCPSchema.trackDescription),
@@ -238,7 +236,7 @@ public enum MCPTimelineTools {
             .addClips, title: "Add clips",
             description: """
             Put files, library music (find_audio) or local sound effects on the timeline, in order. Each item: one source (file, library_id \
-            or sound_effect), source_in/source_out (file seconds), track, start; hit_at lands an effect's peak. Video and images append \
+            or sound_effect), source_in/source_out (file seconds), track, start; hit_at lands a peak or accent. Video and images append \
             (default V1); overlaps lift a track; insert=true pushes later V1 clips. Outside files may return needs_confirmation. One undo \
             step.
             """,

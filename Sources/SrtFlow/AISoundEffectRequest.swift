@@ -35,9 +35,9 @@ struct AISoundEffectRequest: Equatable {
     }
 
     /// 开头放在哪：落点减去声音里的落点；在 0 之前就从声音中间开始（源内偏移 = 差的那一截），落点照样压在 hit_at 上。
+    /// The rule has one copy, AIClipHit.placement (add_clips lands files and library music by their hit too, MCP-43).
     static func placement(hitAt requested: Double, renderedHit: Double) -> (start: Double, sourceIn: Double) {
-        let start = requested - renderedHit
-        return start >= 0 ? (start, 0) : (0, -start)
+        AIClipHit.placement(hitAt: requested, hit: renderedHit, sourceIn: 0)
     }
 
     /// Until when a made sound is heard (file seconds): the end of the last window that is not silent by listen's rule (the same

@@ -107,16 +107,21 @@ enum MCPGuideTimelineTopics {
             goes on another new track, never on one with sound; moved items get a track entry in adjustments. sound=separate puts a \
             video's sound on a linked audio track (J/L cuts); sound=only adds just its sound. One subtitle file replaces the subtitles.
             """),
-            MCPGuideSection(name: "music_sound_effects", about: "library_id from find_audio, sound effects made on this Mac, presets, hit_at", text: """
+            // hit / hit_at for files and library music since 2026-11-18 (MCP-43; AIClipHit, ai-control-mcp.md section 4 item 43).
+            MCPGuideSection(name: "music_sound_effects", about: "library_id from find_audio, sound effects made on this Mac, presets, hit_at and hit", text: """
             Music and sound effects. library_id is a track id from find_audio; SkyCut downloads it if needed, and export_video reports \
             the music_credits to pass on to the user. sound_effect makes a sound on this Mac (no download, no credits): preset is whoosh \
             (peak at 60%), swoosh (short, bright), suction (rises and stops dead; peak at the end), riser (builds; peak at the end), \
             downlifter (a low swell that falls), impact (long tail), boom (deep), hit, pop, click, tick, ding, sparkle (peak at the first \
             twinkle), beep, glitch or shutter; duration, pitch, brightness, size (dry to hall), variation (another take) and volume_db \
-            (default -8) shape it. hit_at, for a made or a library sound effect, is the timeline second where its loudest moment lands \
-            (a cut, a word appearing): SkyCut sets the start from it (overriding start); without it a made sound effect lands at the \
-            playhead. duration is the clip length (at least 0.1 seconds); tails (impact, boom, riser) run past it: audible_duration \
-            says how long it is heard, end where the clip ends.
+            (default -8) shape it. Without hit_at a made sound effect lands at the playhead. duration is the clip length (at least 0.1 \
+            seconds); tails (impact, boom, riser) run past it: audible_duration says how long it is heard, end where the clip ends.
+            Landing a hit. hit_at is the timeline second a hit lands on (a cut, a word appearing, a title), for a sound effect, music or \
+            any file with sound: SkyCut sets the start from it (overriding start). hit is the source second that lands there ("second \
+            9.66 of the music on 7.30"); without it, a made or library sound effect's loudest moment, and for a file or library music \
+            its strongest accent between source_in and source_out (listen beats=true lists the accents and where the music stops by \
+            itself). When the start would fall before 0:00, the clip starts later in its source instead, so the hit still lands on \
+            hit_at. The reply gives hit_at and hit as placed. Images take start.
             """),
             MCPGuideSection(name: "windows", about: "source_in / source_out, image length, checks before inserting, what comes back", text: """
             Source windows. source_in and source_out are seconds inside the file (default: the whole file). For an image, source_out is \
@@ -135,7 +140,8 @@ enum MCPGuideTimelineTopics {
         ],
         examples: [
             ["clips": [["file": "intro.mp4"], ["file": "music.m4a", "track": "A1", "start": 0]]],
-            ["clips": [["sound_effect": ["preset": "whoosh"], "hit_at": 4.2]]]
+            ["clips": [["sound_effect": ["preset": "whoosh"], "hit_at": 4.2]]],
+            ["clips": [["file": "music.mp3", "track": "A1", "hit": 9.66, "hit_at": 7.3]]]
         ],
         related: ["find_audio", "edit_clip", "conventions"]
     )

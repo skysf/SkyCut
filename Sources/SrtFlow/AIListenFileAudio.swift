@@ -34,7 +34,7 @@ enum AIListenFileAudio {
                 object["beat_note"] = "No beat decoding was started. Source-range levels and silences above are independent of beat analysis."
             } else {
                 let end = sourceOut ?? fileDuration
-                let analysis = try await AIBeats.analysis(of: url, from: from, to: end)
+                let analysis = try await AIBeats.music(of: url, from: from, to: end)
                 for (key, value) in AIBeats.json(analysis, sourceFrom: from, sourceTo: end, speed: 1, timeline: { $0 }) {
                     object[key] = value
                 }

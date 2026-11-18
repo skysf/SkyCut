@@ -22,10 +22,12 @@ enum AIListenTool {
     nonisolated static let waitSeconds = 40.0
     /// 整条时间线一次最多列多少段。
     static let maxClips = 80
+    /// Shortest silence listed when min_silence is not given (also a generated music job's measurement, AIGeneratedMusicReport).
+    nonisolated static let defaultMinSilence = 0.5
 
     static func listen(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let silenceDB = min(max(try args.double("silence_db") ?? AIAudioLevels.defaultSilenceDB, -80), -10)
-        let minSilence = min(max(try args.double("min_silence") ?? 0.5, 0.1), 10)
+        let minSilence = min(max(try args.double("min_silence") ?? defaultMinSilence, 0.1), 10)
         var settings = Settings(silenceDB: silenceDB, minSilence: minSilence, beats: try args.bool("beats") ?? false)
         settings.grid = AIListenFrameGrid(fps: project.state.frameRate.fps)
         // from / to：时间线上的几秒（2026-10-14 用户拍板「只听某几秒」）。文件的几秒照旧用 source_in / source_out。
@@ -152,7 +154,7 @@ enum AIListenTool {
         }
         if settings.beats {
             do {
-                let analysis = try await AIBeats.analysis(of: clip.sourceURL, from: from, to: to)
+                let analysis = try await AIBeats.music(of: clip.sourceURL, from: from, to: to)
                 let beats = AIBeats.json(analysis, sourceFrom: from, sourceTo: to, speed: clip.speed) { clip.timelineTime(atSource: $0) }
                 for (key, value) in beats { object[key] = value }
             } catch {

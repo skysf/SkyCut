@@ -225,7 +225,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
                 } catch { captionIssue = "Video saved; optional SRT download failed. Query the original job to recover the sidecar; generation remains charged." }
             }
             try await official?.recovery.delivered(file: editable, original: destination)
-            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue, localImage: localImage)
+            // Music: get_job carries what listen beats=true says about it (accents, stops, end; MCP-43).
+            let music = generation.kind == .music ? await AIGeneratedMusicReport.measure(editable, project: project) : nil
+            succeed(editable, result, charged: charged, caption: caption, captionIssue: captionIssue, localImage: localImage, music: music)
         } catch let error as SkyStudioJobError {
             await recordRejection(error)
             switch error {
@@ -342,7 +344,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
 
     // MARK: 结局
 
-    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?, localImage: SkyStudioImageResult.Format?) {
+    private func succeed(_ file: URL, _ result: SkyStudioJobResult, charged: Double?, caption: URL?, captionIssue: String?, localImage: SkyStudioImageResult.Format?, music: JSONValue?) {
         // SkyCut 自己做的文件：AI 接着把它放上时间线时不该再问「读点名文件夹以外的文件」。
         if project.map({ AIWorkspace.shared.allowsReading(file, project: $0) }) != true { AIReadGrants.shared.remember([file]) }
         let store = SkyStudioSpendStore.shared
@@ -368,6 +370,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             detail["caption_next_step"] = "Optional SRT: add_clips with this caption_file only if the user wants subtitles. Captions may be returned even when enable_caption=false."
         }
         if let captionIssue { detail["caption_issue"] = .string(captionIssue) }
+        if let music { detail["music"] = music }
         for key in ["content_type", "fps", "seed", "billing_duration_seconds", "has_alpha", "has_transparency", "caption_status", "caption_retry_after_seconds"] {
             if let value = result.metadata[key] { detail[key] = value }
         }

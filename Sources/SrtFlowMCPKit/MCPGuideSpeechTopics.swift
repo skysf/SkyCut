@@ -62,9 +62,16 @@ enum MCPGuideSpeechTopics {
             least min_silence seconds, default 0.5), loudest_at the start of the loudest frame at the project frame rate, plus \
             peak_at (when the true peak is) and a per-step curve for one clip or file. Around -60 dBFS or lower is silent.
             """),
-            MCPGuideSection(name: "beats", about: "tempo, beats and downbeats, the analysis cut_to_beat uses", text: """
+            // Accents, stops and ends_at since 2026-11-18 (MCP-43; MusicShape, docs/architecture/listening-engine.md section 9).
+            MCPGuideSection(name: "beats", about: "tempo, beats, downbeats, accents, stops and the end; what cut_to_beat uses", text: """
             Beats. beats=true with one clip or file returns tempo_bpm, beats and downbeats; cut_to_beat uses the same analysis. \
             Music without a steady beat gives unreliable beats.
+            Accents and stops. The same call lists accents: every audible hit as [second, strength] in time order, strength being how \
+            far it stands out in this piece (about 3 barely, 10 or more a big hit; at most 240, more_accents counts the weaker ones \
+            left out); strongest_accents (the five strongest, strongest first); stops, [from, to] where the music stops by itself \
+            (at least 0.5 s quiet, 40 dB down somewhere) and comes back, to being the hit that brings it back; and ends_at, where its \
+            own sound is over. A clip gives timeline seconds for the part it plays, a file its own seconds. To land a hit on a moment \
+            use add_clips hit_at with hit; for a clip already placed, move its start by the moment minus the accent's time.
             """),
             MCPGuideSection(name: "cuts", about: "checking every V1 cut for pauses and speech", text: """
             Cuts. cuts=true with neither clip nor file checks the head and tail of every V1 clip: whether the cut sits in a \
@@ -123,6 +130,7 @@ enum MCPGuideSpeechTopics {
             ["clip_id": "c1"],
             ["cuts": true],
             ["clip_id": "m1", "beats": true],
+            ["file": "music.mp3", "beats": true],
             ["mix": true, "from": 70, "to": 76],
             ["mix": true, "layers": ["A1", "rest"], "frames": true, "from": 29, "to": 31],
             ["voice": "A1"],

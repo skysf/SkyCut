@@ -44,6 +44,9 @@ only `volume_db` is compared: its `preset`, `duration`… shape the file, not th
 `set_track`、`set_keyframes`、文字 / 形状单项与批量、`add_clips` 和定格时长同样提供实际值。
 add_clips also reports a `track` adjustment when a clip is not on the track it asked for ([AI interface](ai-control-mcp.md)
 section 4 item 2).
+add_clips `hit_at` (2026-11-18, [AI interface](ai-control-mcp.md) section 4 item 43): a `hit` outside the source window (past the
+source boundary tolerance, 0.05 s: a sound effect's hit can be its very end) is `invalid_parameter` (`allowed` is the window); a start or source_in that hit_at changed is an adjustment with reason
+`hit_lands_on_hit_at`, and the reply's `hit_at` is read back from where the clip landed.
 关键帧的 applied 从实际轨直接读取，不能复用三位小数的展示摘要再当精确值。
 
 旧的 start/end 等摘要字段保留兼容的展示精度；核对本次数值请使用 applied。后续批量条目、磁吸或联动改变了落点，
