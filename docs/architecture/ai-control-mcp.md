@@ -1294,6 +1294,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     from a cached transcript or, for a narration file, its pauses; a camera's sound needs a transcript first. Calling again sets
     the dip anew (measured, never stacked); 0 takes it out. A parameter on `set_track`, not a new tool: the catalog had under
     1 KB left, so the card gained one sentence and a guide pointer, and the rules are in the guide's `ducking` section.
+66. **A clip's voice band: `edit_clip` `voice_band_db`** (2026-11-18, MCP-30 first slice; contract in [sound scenes](sound-scenes.md)
+    section 5): lowers only 300 Hz–3 kHz of the clip's own sound, −30…0 dB (0 = off), keeping its lows and highs — for a shot
+    whose own rumble covers a voice line while its low hits must keep their weight. One parameter on `edit_clip` / `edit_clips`
+    (requested / applied; out of range refused with a suggestion), shown in get_timeline; the engine runs it in the render
+    block, so preview, export and `listen mix=true` agree (`listen clip_id` and the waveform show the clip before it).
 
 ## 五、这一轮、停止、撤销这一轮
 

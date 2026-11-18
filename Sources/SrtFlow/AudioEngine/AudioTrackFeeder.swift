@@ -51,11 +51,13 @@ struct SegmentUpdate: Sendable {
     let gain: GainTable.Sampler
     let scene: SoundScene?
     let compensation: Float
+    let voiceBand: Float
 
     init(_ segment: AudioEngineConfig.Segment) {
         gain = segment.gain
         scene = segment.scene
         compensation = segment.compensation
+        voiceBand = segment.voiceBand
     }
 }
 
@@ -75,6 +77,10 @@ final class SegmentStream: @unchecked Sendable {
     var exhausted = false
     /// 渲染块上一拍渲到哪（只有渲染块碰）：位置跳了就把效果链复位，旧的余音不许拖进新位置。
     var renderedUpTo: Int64 = -1
+    /// The voice band's gain asked for now (the feeder stores it, the renderer reads it each block; 1 = off).
+    let voiceBand: Atomic<Float>
+    /// The voice-band filter and where it stands (only the renderer touches these; VoiceBandRendering).
+    var band = VoiceBandRendering()
 
     /// 段尾之后还要渲多久（余音）；没场景是 0。
     var tailFrames: Int64 { scene?.load()?.tailFrames ?? 0 }
@@ -84,6 +90,7 @@ final class SegmentStream: @unchecked Sendable {
         self.segment = segment
         self.reader = reader
         self.gain = AudioPublished(GainBox(update.gain))
+        voiceBand = Atomic(update.voiceBand)
         if let scene = update.scene, let box = SceneBox.make(scene, compensation: update.compensation) {
             self.scene = AudioPublished(box)
         } else {
@@ -212,6 +219,7 @@ final class AudioTrackFeeder: @unchecked Sendable {
             for stream in streams {
                 guard let update = newUpdates[stream.segment.clipID] else { continue }
                 stream.gain.publish(GainBox(update.gain))
+                stream.voiceBand.store(update.voiceBand, ordering: .relaxed)
                 applyScene(update, to: stream)
             }
         }

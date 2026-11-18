@@ -139,7 +139,7 @@ func checkKeyframeEasing(root: URL) throws {
     var plain = state
     plain.mainClips[0].animation?.width = linear
     check(!plain.requiresFormatVersion27, "都是线性：不是 v27 数据（按需）")
-    checkEqual(VideoEditProjectFile.latestFormatVersion, 37, "reader 认到 v37")
+    checkEqual(VideoEditProjectFile.latestFormatVersion, 38, "reader 认到 v38")
     check(!state.requiresFormatVersion32, "只用了缓入缓出这些（v27 的）：不是 v32 数据")
     var bouncy = state
     bouncy.mainClips[0].animation?.width.setEasing(.spring, atSourceTime: 4, tolerance: tol)
