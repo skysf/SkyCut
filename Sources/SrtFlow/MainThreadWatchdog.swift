@@ -5,7 +5,9 @@ import os
 //
 // 管什么：一条后台线程每隔 `interval` 往主队列投一个心跳；心跳超过 `threshold` 还没落地，就在那一刻抓一份
 // 主线程的调用栈（MainThreadStackCapture）；心跳落地后把「卡了多久、当时在做什么（`contextProvider`）、
-// 卡在哪（栈）」记进 `recentStalls`、写进日志文件、发给 `onStall`。
+// 卡在哪（栈）」记进 `recentStalls`、写进日志文件、发给 `onStall`。A stall still going on after `ongoingAfter`
+// is also written to the log while it lasts ("still stuck", with a stack taken then): a hang that ends in Force
+// Quit never lands.
 // 不管什么：怎么修；界面；别的线程（只看主线程）；性能计数（那是 PerfCounters，而且卡顿次数不稳，
 // 不能进 ratchet 的账）。
 //
@@ -54,6 +56,11 @@ final class MainThreadWatchdog: @unchecked Sendable {
 
     let interval: TimeInterval
     let threshold: TimeInterval
+    /// A stall still going on after this long is written to the log right away, with a fresh stack, and again every
+    /// `ongoingRepeat` while it lasts: a hang that ends in Force Quit never lands, and used to leave nothing behind
+    /// (docs/testing/main-thread-stalls.md; 2026-11-18 export-folder case).
+    let ongoingAfter: TimeInterval
+    let ongoingRepeat: TimeInterval
     /// nil = 不写文件（自检要写到临时目录，App 写到 `defaultLogDirectory`）。
     let logDirectory: URL?
 
@@ -94,9 +101,12 @@ final class MainThreadWatchdog: @unchecked Sendable {
     private let logger = Logger(subsystem: "com.srtflow.SrtFlow", category: "main-thread")
 
     init(interval: TimeInterval = 0.025, threshold: TimeInterval = 0.06,
+         ongoingAfter: TimeInterval = 5, ongoingRepeat: TimeInterval = 30,
          logDirectory: URL? = MainThreadWatchdog.defaultLogDirectory) {
         self.interval = interval
         self.threshold = threshold
+        self.ongoingAfter = ongoingAfter
+        self.ongoingRepeat = ongoingRepeat
         self.logDirectory = logDirectory
     }
 
@@ -137,7 +147,16 @@ final class MainThreadWatchdog: @unchecked Sendable {
             if landed.wait(timeout: .now() + threshold) == .timedOut {
                 lock.withLock { $0.flagged = true }
                 addresses = capture.capture()
-                landed.wait()  // 等它真的落地，不管卡多久：每一拍心跳只等一次信号
+                // 等它真的落地，不管卡多久：每一拍心跳只等一次信号。While waiting, a stall past `ongoingAfter` is
+                // written down as it happens (it may never land: Force Quit).
+                var nextReport = sentAt + ongoingAfter
+                while landed.wait(timeout: .now() + 0.25) == .timedOut {
+                    let now = ProcessInfo.processInfo.systemUptime
+                    guard now >= nextReport else { continue }
+                    nextReport = now + ongoingRepeat
+                    let stack = capture.capture()
+                    appendOngoing(seconds: now - sentAt, stack: MainThreadStackCapture.symbolicate(stack.isEmpty ? addresses : stack))
+                }
             }
             let duration = ProcessInfo.processInfo.systemUptime - sentAt
             if duration > threshold {
@@ -177,6 +196,16 @@ final class MainThreadWatchdog: @unchecked Sendable {
     private func appendToLog(_ stall: Stall) {
         var text = "\(Self.timestamp.string(from: stall.startedAt))  卡了 \(stall.milliseconds) ms  \(stall.context)\n"
         for frame in stall.stack { text += "    \(frame)\n" }
+        appendToLog(text)
+    }
+
+    /// A stall that has not ended yet (`ongoingAfter`), written from the watchdog thread with a stack taken now.
+    /// No context: that is read on the main thread, which is the one that is stuck.
+    private func appendOngoing(seconds: TimeInterval, stack: [String]) {
+        let soFar = String(format: "%.1f", seconds)
+        logger.notice("main thread still stuck after \(soFar, privacy: .public) s: \(stack.first ?? "", privacy: .public)")
+        var text = "\(Self.timestamp.string(from: Date()))  still stuck: \(soFar) s so far, the main thread has not come back\n"
+        for frame in stack { text += "    \(frame)\n" }
         appendToLog(text)
     }
 
