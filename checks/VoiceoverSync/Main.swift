@@ -135,7 +135,7 @@ import SrtFlowMCPKit
         let plan = try await tool.prepare()
         f.project.perform { $0.mainClips[0].opacity = 0.33 }
         let userEdit = f.project.state
-        do { _ = try tool.apply(plan); require(false, "stale prepared plan must reject") }
+        do { _ = try await tool.apply(plan); require(false, "stale prepared plan must reject") }
         catch { require(f.project.state == userEdit, "stale plan must not overwrite a user's intervening edit") }
 
         let during = try VoiceoverSyncFixture(folder: root.appendingPathComponent("during-alignment"), video: video, lengths: [4, 6])

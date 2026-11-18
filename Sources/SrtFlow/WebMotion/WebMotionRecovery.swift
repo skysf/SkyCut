@@ -42,7 +42,7 @@ enum WebMotionRecovery {
                             clip.info = info
                         }
                     }
-                    if project.documentURL != nil { project.saveNow() }
+                    if project.documentURL != nil { project.saveSoon() }
                 } catch {
                     guard !Task.isCancelled, project.isCurrentGeneration(generation) else { return }
                     project.notice = String(format: L10n("Motion could not be rebuilt: %@"), String(describing: error))

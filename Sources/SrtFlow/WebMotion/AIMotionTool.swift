@@ -55,7 +55,7 @@ enum AIMotionTool {
                 if request.expectedClip != placed.clip
                     || request.expectedSourceLane != WebMotionSourceLane.capture(placed.clip.id, in: project.state) {
                     AISession.shared.round(for: project).noteChange()
-                    answer = AIProjectTools.saveIfNeverSaved(project, after: answer)
+                    answer = await AIProjectTools.saveIfNeverSaved(project, after: answer)
                     answer = AIRoundVersions.reporting(project, in: answer)
                 } else if case .object(var payload) = answer.payload {
                     payload["unchanged"] = true

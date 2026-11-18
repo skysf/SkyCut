@@ -109,7 +109,7 @@ private struct AIProjectSidebarRow: View {
         Button { OpenProjects.shared.focus(project) } label: { Image(systemName: "macwindow") }
             .buttonStyle(.borderless)
             .instantHelp("Show this project's window")
-        Button { _ = OpenProjects.shared.close(project) } label: { Image(systemName: "xmark.circle") }
+        Button { Task { _ = await OpenProjects.shared.closeProject(project) } } label: { Image(systemName: "xmark.circle") }
             .buttonStyle(.borderless)
             .disabled(!status.canClose)
             .instantHelp("Close this project (it is saved first)")
@@ -119,7 +119,7 @@ private struct AIProjectSidebarRow: View {
     private func actions(_ status: AIProjectSidebarStatus) -> some View {
         Button("Stop") { round.stop() }.disabled(!status.canStop)
         Button("Show Window") { OpenProjects.shared.focus(project) }
-        Button("Close Project") { _ = OpenProjects.shared.close(project) }.disabled(!status.canClose)
+        Button("Close Project") { Task { _ = await OpenProjects.shared.closeProject(project) } }.disabled(!status.canClose)
     }
 }
 

@@ -7,7 +7,7 @@ import SrtFlowMCPKit
 @MainActor
 enum AIFilmProductionTool {
     static func save(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        guard let input = try AIFilmProductionReader.input(args) else { return try AIProjectTools.saveProject(args, project) }
+        guard let input = try AIFilmProductionReader.input(args) else { return try await AIProjectTools.saveProject(args, project) }
         _ = try args.string("path") // 参数类型错不能等改了制作状态才发现。
         guard let expected = try args.int("expected_revision"), expected >= 0 else {
             throw AIToolError("production needs expected_revision from get_timeline (0 for an absent plan).")
@@ -38,7 +38,7 @@ enum AIFilmProductionTool {
             }
         }
         do {
-            var saved = try AIProjectTools.saveProject(args, project)
+            var saved = try await AIProjectTools.saveProject(args, project)
             if case .object(var payload) = saved.payload {
                 payload["production_revision"] = proposal.map { .number(Double($0.revision)) } ?? .null
                 payload["production_authored"] = .bool(changed)

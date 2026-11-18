@@ -24,7 +24,6 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
     var notes: [String] = []
     private(set) var startedAt: Date?
     private(set) var hasEnteredCoordinator = false
-    private var completionDetails: [String: JSONValue] = [:]
 
     func enteredCoordinator() { hasEnteredCoordinator = true }
 
@@ -105,11 +104,13 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
 
     // MARK: ScreenRecordingObserver
 
-    /// 发布回执前完成落地的附带事，工程名取自动保存后的真实名字；UI 和 MCP 使用同一份最终身份。
+    /// 发布回执前完成落地的附带事。A never-saved project is saved right after (off the main thread, 2026-11-19): the
+    /// receipt goes out now with the project as it is, never waiting on a drive; the next result names the saved file.
     func prepareCompletion(_ outcome: ScreenRecordingOutcome) {
         guard job.status == .running, case .added = outcome else { return }
         AISession.shared.round(for: project).noteChange()
-        completionDetails = AIProjectTools.saveIfNeverSaved(project, after: .ok([:], changed: true)).payload.objectValue ?? [:]
+        let project = project
+        Task { _ = await AIProjectTools.saveIfNeverSaved(project, after: .ok([:], changed: true)) }
     }
 
     func recordingStarted(session: UUID, alreadyRecorded: TimeInterval) {
@@ -133,7 +134,6 @@ final class AIScreenRecordingJob: ScreenRecordingObserver {
         if !notes.isEmpty { detail["note"] = .string(notes.joined(separator: " ")) }
         if case .added = outcome {
             detail["next_step"] = "It is on the timeline (one undo step). Check it with look; use edit_clip to trim if needed."
-            detail.merge(completionDetails) { current, _ in current }
             AIJobs.shared.finish(job, receipt.status.jobStatus, message: receipt.message, detail: .object(detail))
         } else {
             if receipt.waitingForDecision {

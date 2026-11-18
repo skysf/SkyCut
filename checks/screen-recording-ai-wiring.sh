@@ -169,9 +169,9 @@ NEW_BODY="$(awk '/static func newProject\(/,/^    \}/' "${PROJECT_TOOLS}")"
 CLOSE_BODY="$(awk '/static func closeProject\(/,/^    \}/' "${PROJECT_TOOLS}")"
 first_line() { grep -nF "$1" <<<"$2" | head -1 | cut -d: -f1; }
 if ! before "$(first_line 'try refuseWhileRecording()' "${OPEN_BODY}")" "$(first_line 'if let existing = OpenProjects.shared.project(openAt: url)' "${OPEN_BODY}")" \
-   || ! before "$(first_line 'try refuseWhileRecording()' "${NEW_BODY}")" "$(first_line 'primary.newProject()' "${NEW_BODY}")" \
+   || ! before "$(first_line 'try refuseWhileRecording()' "${NEW_BODY}")" "$(first_line 'primary.startNewProject()' "${NEW_BODY}")" \
    || ! before "$(first_line 'try refuseWhileRecording()' "${CLOSE_BODY}")" "$(first_line 'OpenProjects.shared.resetPrimary()' "${CLOSE_BODY}")" \
-   || ! before "$(first_line 'try refuseWhileRecording()' "${CLOSE_BODY}")" "$(first_line 'OpenProjects.shared.close(project)' "${CLOSE_BODY}")"; then
+   || ! before "$(first_line 'try refuseWhileRecording()' "${CLOSE_BODY}")" "$(first_line 'OpenProjects.shared.closeProject(project)' "${CLOSE_BODY}")"; then
   fail "${PROJECT_TOOLS}：录屏中开 / 建 / 关工程要先挡、告诉 AI 用 record_screen action=stop（open_project / new_project / close_project 都要在动手之前）"
 fi
 

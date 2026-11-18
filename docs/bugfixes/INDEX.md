@@ -105,6 +105,7 @@
 - [2026-08-08 悬停影子播放头与删除键](2026-08-08-hover-ghost-playhead-and-delete-key.md) — peek 语义与统一删除入口。
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
+- [2026-11-19 main stopped building: two merged PRs each added a `sound` to inspect_video](2026-11-19-inspect-video-sound-name-clash.md) — Two PRs green on their own can clash in main: when main moved, merge it in and build before merging; a guard should count a name only the thing it means can have.
 - [2026-11-04 成片检查没有疑点却报绘图失败](2026-11-04-inspection-empty-evidence.md) — 分析取样和疑点截图分开；真请求了证据却取不到才算失败。
 - [2026-11-17 Static screen recordings reported as frozen pictures](2026-11-17-inspection-frozen-screen-recordings.md) — Preserve capture provenance and exempt expected static screens.
 - [2026-11-17 Inspection check mistakes a pending job for a failure](2026-11-17-inspection-job-wait-still-running.md) — Poll bounded client waits to a terminal result; keep analysis assertions and the overall deadline.
@@ -195,6 +196,7 @@
 - [2026-08-12 压缩预览区时播放条压到工具栏上](2026-08-12-preview-transport-row-overlap.md) — VStack 里谁让步必须显式声明。
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
+- [2026-11-19 Saving a project on a slow or stuck drive froze SkyCut, and Quit could hang](2026-11-19-project-save-blocks-on-slow-drive.md) — A project file is on a user-chosen drive too: write it on its own queue with a deadline, count changes so a late write can't mark newer edits saved, and let Quit wait with .terminateLater.
 - [2026-09-25 松手重建预览把每个素材重开一遍](2026-09-25-rebuild-reopens-every-asset.md) — 素材按文件身份进程级缓存（`MediaAssetCache`）；只有一个小视图关心的状态不在工程上发。
 - [2026-11-18 Shared rules reverse the bed policy](2026-11-18-recipe-bed-policy-drift.md) — Check shipped AI instructions against the current production decision.
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。

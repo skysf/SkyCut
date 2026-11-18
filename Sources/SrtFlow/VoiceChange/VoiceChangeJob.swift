@@ -103,7 +103,7 @@ final class VoiceChangeJob {
             return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save the two files: "
                 + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: charges(done))
         }
-        land(files, result: result, server: done)
+        await land(files, result: result, server: done)
     }
 
     /// 传、交、等。回做完那一刻的状态。
@@ -203,7 +203,7 @@ final class VoiceChangeJob {
         return project
     }
 
-    private func land(_ files: VoiceChangeLanding.Files, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) {
+    private func land(_ files: VoiceChangeLanding.Files, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) async {
         var detail = charges(server)
         detail["voice_file"] = .string(AIWorkspace.shared.display(files.voice))
         detail["background_file"] = .string(AIWorkspace.shared.display(files.background))
@@ -251,7 +251,7 @@ final class VoiceChangeJob {
                 AISession.shared.round(for: project).noteChange()
                 AIEditorPresenter.reveal(.init(clips: [placed.voiceID, placed.backgroundID], time: project.state.clip(with: placed.voiceID)?.timelineStart),
                                          project: project)
-                let saved = AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: true))
+                let saved = await AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: true))
                 finish(.done, "The voice was changed as one undo step.", detail: saved.payload.objectValue ?? detail)
             }
         }

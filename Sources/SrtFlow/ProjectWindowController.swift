@@ -19,6 +19,8 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate {
     private let onClosed: (VideoEditProject, Bool) -> Void
     /// 这一次关窗只摘窗口、工程留着（AI 还在剪它、或者 AI 要后台）。
     private var keepsProject = false
+    /// The close button was pressed and the project is being written / asked about (off the main thread).
+    private var isPreparingToClose = false
 
     init(project: VideoEditProject, onClosed: @escaping (VideoEditProject, Bool) -> Void) {
         self.project = project
@@ -60,12 +62,23 @@ final class ProjectWindowController: NSWindowController, NSWindowDelegate {
 
     /// 关窗前落盘；未命名又剪了东西的问存不存，点了取消就不关。AI 还在剪的工程不关、转到后台（方案 A.6）：照样自动存盘，
     /// 主窗口的「AI 在剪的工程」里能打开回来、能关掉。
+    /// Nothing to write: closes at once. Otherwise the window stays while the file is written off the main thread (a drive
+    /// that does not answer keeps the window open with the notice), then closes itself.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if OpenProjects.shared.aiIsEditing(project) {
             keepsProject = true
             return true
         }
-        return project.prepareToCloseDocument()
+        if project.closesAtOnce() { return true }
+        guard !isPreparingToClose else { return false }
+        isPreparingToClose = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let ready = await self.project.prepareToClose() == .ready
+            self.isPreparingToClose = false
+            if ready { self.close() }   // 程序关窗不再问 windowShouldClose
+        }
+        return false
     }
 
     /// 只摘窗口、工程转到后台（AI 的 set_view background）。

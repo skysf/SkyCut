@@ -333,7 +333,7 @@ final class SkyStudioVoiceoverRun {
         guard projectUnchanged else { throw AIToolError("The original project changed before insertion; all voice files were kept.") }
         var result = try AIUndoGrouping.step(project.effectiveUndoManager) { try AIVoiceoverTool.apply(plan, project) }
         AISession.shared.round(for: project).noteChange()
-        result = AIProjectTools.saveIfNeverSaved(project, after: result)
+        result = await AIProjectTools.saveIfNeverSaved(project, after: result)
         extra = result.payload.objectValue ?? [:]
         extra["project"] = .string(project.shortID)
         if recovery?.value.lineModels != nil {

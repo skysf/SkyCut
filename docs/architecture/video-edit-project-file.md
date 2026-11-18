@@ -276,7 +276,8 @@ nested manifest sandbox was rejected by macOS; these same checks ran with the us
 The versions SkyCut saves around AI rounds are complete project files written by the same `VideoEditProjectIO.save` (with the
 project's `mediaRecords` as `knownRecords`) and read back by the same `load` — no new format and no format version. They live in
 `~/Library/Application Support/SrtFlow/Versions/<project name> <hash>/`, not next to the project; going back restores the timeline
-with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore` write project files. Rules:
+with `restoreTimeline` as one undo step. Only `ProjectFileWriter` (a project's own file, off the main thread, §5) and
+`ProjectVersionStore` write project files. Rules:
 [saved project versions](project-versions.md).
 
 ### 不进工程文件的东西
@@ -439,8 +440,38 @@ with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore
 - **换完整份时间线就要 `scheduleRebuild()`**：打开工程、补静帧 / 重链接都这么做，新建工程也要（上一个工程还在路上的
   那次重建靠它作废，不然落地时把旧工程的画面挂进新工程）。`check-project-file.sh` 的接线守卫钉着 `newProject`。
 - flush 的三个时机：切走 Edit Video 栏（`onDisappear`）、⌘S、退出 App
-  （`applicationWillTerminate`）。自动保存有 2 秒防抖，正好卡在那两秒里按 ⌘Q
+  （`applicationShouldTerminate` → `ProjectQuit`）。自动保存有 2 秒防抖，正好卡在那两秒里按 ⌘Q
   会丢改动。
+
+### Writing the project file off the main thread (2026-11-19)
+
+Since [saving a project on a slow or stuck drive froze SkyCut](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md):
+a project file can live on a sleeping, slow, read-only or stuck external drive, and nothing may wait on it on the main thread.
+
+1. **Only `ProjectFileWriter` writes a project's own file** (`VideoEditProjectIO.save`, the moved-file bookmark, a fresh
+   document bookmark after every write), on the project's serial queue. One write at a time; a newer snapshot of the same
+   file replaces one still waiting. `checks/project-versions-wiring.sh` pins the writers.
+2. **Production code saves only through the async calls** — `saveToFile`, `flushToFile`, `saveAs`, `saveSoon`,
+   `prepareToClose`, `startNewProject`, `OpenProjects.closeProject` / `createProject` / `resetPrimary` — which wait for the
+   drive at most `ProjectFileWriter.deadline` (15 s). The blocking `saveNow`, `flushAutosave`, `saveDocument(as:)`,
+   `prepareToCloseDocument`, `newProject()`, `OpenProjects.close` / `newProject(savingAs:)` write on the caller's thread and
+   exist for the checks and dev hooks only (`checks/project-file-wiring.sh`).
+3. **Dirty marks**: every change goes through `noteUnsavedChange` (the `state` / row-height `didSet` and the relinks), which
+   bumps the writer's change counter. A write clears `hasUnsavedChanges` only when the counter still has the value its
+   snapshot was taken with; a media-table entry changed on the main thread during a write wins over the one written.
+4. **A drive that does not answer** is "not responding": the notice says so, the project stays dirty and open, the write
+   goes on, and when it lands the project is marked saved and the notice goes away (a late failure is said). Closing,
+   switching (New / Open / Open Recent, the project window's close button, the AI's `close_project`) do not happen while a
+   project's file can't be written: `prepareToClose` answers ready / refused / waitingForDrive. A project window closes at
+   once when there is nothing to write (`closesAtOnce`), otherwise after its save.
+5. **Save As** (§ "切工程必须是事务性的" item 6 still holds): the new file is taken only when its write succeeded within the
+   deadline; a Save As that lands later never moves the project.
+6. **Quit** (`ProjectQuit`): `.terminateNow` when no project needs writing or asking; otherwise `.terminateLater` and one
+   reply. Each project gets 3 s quietly, then an alert that keeps waiting by itself (SkyCut quits once the file is written),
+   with "Don't Quit" and "Quit Anyway" (giving up only that project's unsaved changes). Quitting after a screen recording goes
+   through the same `prepareAll`, which runs once when asked twice. The atomic write keeps the file on disk whole if SkyCut
+   quits while a write is stuck.
+7. Behaviour: `scripts/check-project-saves.sh`.
 
 ### 切工程必须是事务性的
 
@@ -465,8 +496,9 @@ with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore
 6. **Save As 的新身份只有写盘成功才作数**：先暂存旧 `documentURL`/书签，
    `saveNow()` 失败就整个回滚，否则工程卡在一个写不进去的 URL 上。
 7. **退出必须走 `applicationShouldTerminate`**，**每个开着的工程都过一遍**（2026-10-17 起，[开着的工程](open-projects.md)），失败或用户点取消就
-   `.terminateCancel`。`willTerminate` 那一步已经拦不住退出，写盘失败只能眼睁睁
-   丢数据。
+   不退。`willTerminate` 那一步已经拦不住退出，写盘失败只能眼睁睁
+   丢数据。Since 2026-11-19 through `ProjectQuit` and `.terminateLater`: the files are written off the main thread (the
+   section above).
 
 ### 后台导入要带工程代号
 
@@ -496,7 +528,10 @@ with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore
 `documentURL` 是普通路径 URL，用户在访达里把**正开着的**工程改名或挪走之后，
 按旧路径保存会在旧位置重新造一个旧名字的文件 —— 用户以为在编辑的那份反而再也
 不更新。所以打开/保存时给工程文件本身也存一份书签（`documentBookmark`），
-`saveNow` 发现旧路径不在了就用它把 `documentURL` 跟过去。
+写盘时（`ProjectFileWriter`）发现旧路径不在了就用它把 `documentURL` 跟过去。
+**The bookmark is made again after every write** (2026-11-19): the atomic write gives the file a new inode, and a bookmark
+made before it no longer finds the moved file — until then this only worked before the first save after opening
+([case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md)).
 
 ## 七、回归清单
 
@@ -524,3 +559,14 @@ with `restoreTimeline` as one undo step. Only `saveNow` and `ProjectVersionStore
      新建工程时每条轨回到默认高度（不会带着上一份工程的条目）
    - 播放头停在工程后半段（在播、停着各一次）→ File ▸ New Project / 打开另一个工程 → 播放头在 0:00
      （卸片之后晚到的时间回调由 `check-player-clock.sh` 用真播放器钉着，这一条看真窗口）
+3. `scripts/check-project-saves.sh` — the project file written off the main thread (§5 "Writing the project file off the main
+   thread"): slow, stuck and failing drives, switching away, Save As, Quit. Real windows and a real drive, before a release:
+   - a project on a USB hard drive that has gone to sleep: edit, wait for the autosave — the timeline stays responsive while
+     the drive spins up; ⌘S right after — no beachball, the notice says the drive is not responding if it takes over 15 s;
+   - the same project, then ⌘Q while the drive is asleep: SkyCut quits once the drive answers, or after about 3 s shows
+     "“Name” isn't saved yet" — left alone, it quits by itself when the write lands; "Don't Quit" keeps SkyCut open
+     with the project dirty; "Quit Anyway" quits and the file on the drive is the last saved one (not half-written);
+   - close a project window with unsaved edits on a slow drive: the window stays until the save lands, then closes; with
+     nothing unsaved it closes at once;
+   - rename and then move an open project in Finder after it has been saved a few times: the next save follows it, no new
+     file appears under the old name.
