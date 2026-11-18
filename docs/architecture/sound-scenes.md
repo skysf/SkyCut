@@ -3,6 +3,8 @@
 > 2026-09-24 落地；2026-10-01 PR3b 起效果链跑在音频引擎的渲染块里（tap 那条路删了）。改 `VideoEditSoundScene*.swift`、
 > 引擎里的 `SceneBox` / `mixScene`（`AudioEngine/AudioTrackFeeder.swift`、`AudioTrackRenderer.swift`）、检查器的声音那一块
 > （`VideoEditInspector+Sound.swift`）之前必读。
+> **Since 2026-11-18, section 5**: a clip's voice-band cut (`voice_band_db`, `VoiceBandFilter`) runs in the same render
+> block, between the segment gain and the scene; read it before touching the render block's order.
 > 拍过的板与探针见 [声音场景方案](../plans/2026-09-24-sound-scenes.md)；同一条声音链上的另外几环见
 > [声音：音量与渐入渐出](audio-fades.md)、[推子与电平表](audio-mixer.md)、[成片的声音](export-audio-mixdown.md)。
 
@@ -92,3 +94,57 @@
 - [ ] 导出后听成片，和预览一样；框选几段批量套用。
 - [ ] 电平表在余音那一截还在跳。
 - [ ] 英文界面下选中挂了场景的段：下拉上显示场景名，「Mute」和每个滑杆后面的百分比都完整可见（[检查器的排版](inspector-layout.md)；2026-09-24 首测时整条右边被裁掉过）。
+
+## 五、Voice band: lowering only 300 Hz–3 kHz of a clip's own sound (2026-11-18, MCP-30 first slice)
+
+Production feedback MCP-30 / FL-55: the last line of the South Pole draft was masked by the shot's own low rumble (50–800 Hz,
+as loud as the voice inside the voice band). Lowering that clip's whole sound by 10 dB cleared the line but took the lift-off
+hit at 50 Hz down by 10 dB as well. `edit_clip voice_band_db=-10` lowers only the voice band of that clip's sound and keeps its
+lows and highs. Code: `VoiceBand` (VideoEditVoiceBand.swift: range, cleaning, the band's gain), `VoiceBandFilter` /
+`VoiceBandRendering` (AudioEngine/VoiceBandFilter.swift: the DSP and how a stream runs it), `AudioTrackRenderer` (where),
+`EditClip.voiceBandDB` (the setting), `AIClipDetails` (the AI's parameter).
+
+Rules (only this way):
+
+1. **One filter, in the engine's render block**, so preview, export (the same engine offline), `listen mix=true` / `voice=` and
+   the meters all hear the same thing. Order: segment gain → voice band → scene → fader.
+2. **The split** (`VoiceBandFilter`): Linkwitz–Riley crossovers of the 4th order at 300 Hz and 3 kHz (each two Butterworth
+   biquads in a row; the low band also goes through the 3 kHz crossover's all-pass), out = low + g · mid + high. The three bands
+   add up to an all-pass, so at g = 1 the level is flat at every frequency; below 1 only the middle band goes down. Measured at
+   −10 dB: 50 Hz 0.00, 100 Hz −0.07, 300 Hz −3.6, 500 Hz −8.1, 1 kHz −9.6, 2 kHz −7.4, 3 kHz −3.6, 8 kHz −0.08 dB (at −20:
+   1 kHz −18.6, 100 Hz −0.1). Double precision (the 300 Hz sections sit near the unit circle at 48 kHz); 48 kHz only (the
+   engine's rate).
+3. **Real time** (`VoiceBandRendering`): no allocation, one filter per stream, only the renderer touches it. It starts from
+   zero when the position jumps (seek, start: like the scene chain) and the first time the stream needs it; once running it
+   keeps running even back at g = 1 (an all-pass then: switching it off would jump the phase); a changed depth moves g
+   linearly across one block (no zipper).
+4. **A parameter, not structure**: the depth reaches a live stream through `SegmentUpdate.voiceBand` (an atomic per stream),
+   so changing it is an audio-only change (`differsOnlyInAudioMix` neutralizes it): `updateGains`, no stream reopened, no
+   picture rebuild. `Segment.Structure` does not include it.
+5. **Model**: `EditClip.voiceBandDB`, −30…0 dB (`VoiceBand.range`; 0 = off), not in `init`. Split halves both carry it,
+   separated sound carries it (the picture is muted), the clipboard / duplicate carry it through Codable; a voice-changed
+   piece does not (it is a voice: cutting its own voice band would thin it). Saved only when ≠ 0, project format **v38** (an
+   older writer would drop it and the film would change); the reader cleans it (non-finite → 0, clamped to the range).
+6. **The waveform and `listen clip_id` do not show it** (same as scenes: the waveform is "source × gain", and clip listen
+   reads the file with gain and fader but no effects); `listen mix=true` / `voice=` render through the engine and do.
+
+AI: `edit_clip` / `edit_clips` `voice_band_db` (requested / applied in the result; out of range is refused with the allowed
+range and a suggestion; a clip with no sound refuses it); get_timeline lists `voice_band_db` on clips that have one.
+
+Known limits (first slice): one constant depth per clip (split the clip to change it over time; a voice-band dip that follows
+the lines like `set_track duck_others_db` is a later slice); no control in the inspector yet (the AI sets it, get_timeline shows
+it); edges fixed at 300 Hz and 3 kHz.
+
+Checks: `scripts/check-audio-engine.sh` group 16 (`checks/AudioEngine/VoiceBand.swift`: the filter on steady sines — 50 /
+100 Hz and 8 kHz within 0.25 dB, 1 kHz down by the depth within 0.6 dB, g = 1 flat within 0.01 dB, 64-frame blocks = one run;
+the engine's offline render of a three-tone clip with −10: 1 kHz down, 50 Hz and 8 kHz kept; a cut given through
+`updateGains` sounds like an engine built with it, and is not structure); `scripts/check-project-file.sh` group 51
+(`checks/ProjectFile/VoiceBand.swift`: cleaning, v38 gate and key only when set, round trip, a tampered depth clamped, split,
+separated sound, audio-only change); `scripts/check-mcp.sh` (`VoiceBandToolChecks`: read, out of range refused with a
+suggestion, applied, summary, 0 takes it off, no-sound clip refused, schema range = the model's).
+
+Manual regression:
+
+- [ ] A shot whose own sound has a low boom and mid-range noise under a narration line: `edit_clip voice_band_db=-10`. The
+      boom keeps its weight, the line gets clearer; preview and export sound the same; ⌘Z takes it back.
+- [ ] Change it while the clip plays (−10 → −4): no click, the change is heard at once.

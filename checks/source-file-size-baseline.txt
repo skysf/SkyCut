@@ -7,14 +7,12 @@
 638 Sources/SrtFlow/ScreenRecordingWriter.swift
 833 Sources/SrtFlow/VideoEditCompositionBuilder.swift
 716 Sources/SrtFlow/VideoEditMediaFileDrop.swift
-634 Sources/SrtFlow/VideoEditModels.swift
+628 Sources/SrtFlow/VideoEditModels.swift
 1202 Sources/SrtFlow/VideoEditProject.swift
 922 Sources/SrtFlowCore/ScreenRecordingModels.swift
 1223 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
 690 Sources/SrtFlowCoreChecks/main.swift
 631 checks/PreviewComposition/main.swift
-2488 checks/ProjectFile/main.swift
-2488 checks/ProjectFile/main.swift
 2488 checks/ProjectFile/main.swift
 1778 checks/TimelineSnap/main.swift
 618 checks/VideoFade/main.swift

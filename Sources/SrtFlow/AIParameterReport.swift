@@ -41,6 +41,7 @@ enum AIParameterReport {
             values["sound_scene"] = ["kind": .string(scene.kind.rawValue), "intensity": number(scene.amount),
                                      names.0: number(scene.first), names.1: number(scene.second)]
         } else { values["sound_scene"] = "none" }
+        values["voice_band_db"] = number(clip.voiceBandDB)
         var reasons: [String: String] = [
             "source_in": clip.isStillImage ? "image_window_normalized_to_zero" : "source_boundary_tolerance",
             "source_out": clip.isStillImage ? "image_window_normalized_to_zero" : "source_boundary_tolerance",
@@ -51,7 +52,7 @@ enum AIParameterReport {
             "rotation": "rotation_limits_or_zero_tolerance", "opacity": "opacity_limits", "animation_intensity": "animation_intensity_limits",
             "x": "native_placement_tolerance_or_final_timeline_settlement", "y": "native_placement_tolerance_or_final_timeline_settlement",
             "scale": "native_placement_tolerance_or_final_timeline_settlement",
-            "sound_scene": "sound_scene_limits", "sound_effect": "gain_limits"
+            "sound_scene": "sound_scene_limits", "sound_effect": "gain_limits", "voice_band_db": "voice_band_limits"
         ]
         var curveAdjustment: JSONValue?
         if let old, clip.hasVolumeCurve, old.hasVolumeCurve, raw["volume_db"] != nil, raw["volume_curve"] == nil,

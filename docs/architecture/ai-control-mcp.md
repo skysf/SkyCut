@@ -1261,6 +1261,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     - The new tool uses a short card and a written guide from its first version. Its schema stays below 4,500 bytes and the whole
       catalog stays below 100,000 UTF-16 units. Existing utility cards were shortened; their full previous descriptions remain verbatim
       in the corresponding written-topic overviews. No catalog budget or exception list was raised.
+65. **A clip's voice band: `edit_clip` `voice_band_db`** (2026-11-18, MCP-30 first slice; contract in [sound scenes](sound-scenes.md)
+    section 5): lowers only 300 Hz–3 kHz of the clip's own sound, −30…0 dB (0 = off), keeping its lows and highs — for a shot
+    whose own rumble covers a voice line while its low hits must keep their weight. One parameter on `edit_clip` / `edit_clips`
+    (requested / applied; out of range refused with a suggestion), shown in get_timeline; the engine runs it in the render
+    block, so preview, export and `listen mix=true` agree (`listen clip_id` and the waveform show the clip before it).
 
 ## 五、这一轮、停止、撤销这一轮
 
