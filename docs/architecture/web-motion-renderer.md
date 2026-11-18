@@ -29,14 +29,16 @@ moment; its WebKit processes (WebContent, GPU, Networking) end with it (measured
 
 ## 2. The renderer API
 
-`WebMotionRenderer.render(_ job: WebMotionJob) async throws -> WebMotionRender`
+`WebMotionRenderer.render(_ job: WebMotionJob, verify:) async throws -> WebMotionRender`
 
 - `WebMotionJob`: page HTML, parameters (a JSON object), duration, output size, fps, output URL; optional layout height
   (default 1080), seed, clock epoch, page instances (default 3), sample count for "same t twice" (default 8), alpha path
   (default `.auto`), limits (default `WebMotionLimits.standard(frames:)`).
-- `WebMotionRender`: the movie (moved into place only after every check passed; written next to it first), the
-  `WebMotionResult` (checks, frame hashes, alpha path and calibration, whether any frame is translucent, versions, timing)
-  and the peak memory.
+- `WebMotionRender`: the movie, the `WebMotionResult` (checks, frame hashes, alpha path and calibration, whether any frame
+  is translucent, versions, timing) and the peak memory. The movie is written next to the output first; once the helper's
+  checks and the caller's `verify` passed, it is renamed over whatever is at the output in one step
+  (`WebMotionCacheFiles.install`, on `WebMotionCacheFiles.queue`). What was there is never removed first: a failed `verify`
+  or install leaves it as it was ([case](../bugfixes/2026-11-19-web-motion-rerender-deletes-cached-movie.md)).
 - Errors (`WebMotionRenderError`): `.rejected(result)` — the page failed a check or a time limit, `result.failure.message`
   is the page's own text (give it back to the AI verbatim); `.killed` — SkyCut stopped it (memory, or a helper that ignored
   its own limits); `.rendererFailed` — not the page's fault (a lock unavailable on this macOS, the encoder, a crash);
@@ -315,6 +317,11 @@ The movie is absent from the imported-media/bookmark table. See [project files](
 The key includes the page, sorted parameters, duration/hit, output geometry/fps, renderer version, OS/build, WebKit and declared/current
 font-file identities. `MOTION_PARAMS.duration` and `MOTION_PARAMS.hit` are reserved and always match the source's timing controls.
 A changed input gets a new file so undo still has the previous render. A cache hit needs the movie and an accepted six-check receipt.
+Every caller reuses a hit, the inspector's Re-render included (same fingerprint, same frames); only checks that compare two real
+renders pass `force`. Rendering a fingerprint again (a missing or failing receipt, or `force`) never removes the movie that clips,
+undo or a Save As may be reading: the system identity is compared and the receipt written in `verify`, then the movie is renamed
+over the old one. The cache folder's reads and writes (receipts, the install, sidecars) run only on `WebMotionCacheFiles.queue`,
+never on the main thread or in the cooperative pool.
 An untitled manual project uses a temporary directory until Save/Save As carries the movie beside the project.
 
 A carried project-relative movie wins over its former absolute path. A different OS or missing original fonts produces a warning in
@@ -355,7 +362,8 @@ both clip values and source-lane context to match. See [the regression case](../
 
 `scripts/check-motion-placement.sh` links real App objects in its own bundle/defaults domain and drives the real helper with small synthetic
 pages. It covers placement, template reuse, parameter edits, undo/redo, approval modes, error atomicity, system/font warnings, missing
-cache recovery, and over-long durations / frame rates (AI calls and a reopened project) refused before any job or render. `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by
+cache recovery, over-long durations / frame rates (AI calls and a reopened project) refused before any job or render, and
+same-fingerprint renders that keep the cached movie (reuse, a failed install, another system identity, a Save As mid-install). `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by
 `check-mcp`, including scans-only. Renderer lockdown checks remain `scripts/check-web-motion.sh`.
 The timeline drop wiring guard counts `WebMotionActions` as a separate, exactly-once consumer of `mediaImportLandings`, like the
 AI importer; the file drop's preview and commit must still be its only two calls. No second landing calculation is permitted.

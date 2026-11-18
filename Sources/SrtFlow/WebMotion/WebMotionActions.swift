@@ -11,7 +11,7 @@ enum WebMotionActions {
 
     /// The cache file changes with its inputs, so undo continues to reference the preceding render.
     static func place(record: WebMotionClipRecord, replacing id: UUID? = nil, at: Double? = nil, hitAt: Double? = nil,
-                      preferring target: TrackDropTarget? = nil, project: VideoEditProject, force: Bool = false) async throws -> Placement {
+                      preferring target: TrackDropTarget? = nil, project: VideoEditProject) async throws -> Placement {
         let record = try WebMotionParameters.normalized(record)
         try WebMotionValidation.validate(record)
         let generation = project.documentGeneration
@@ -32,7 +32,7 @@ enum WebMotionActions {
         guard WebMotionActivity.claim(key) else { throw AIToolError(L10n("This motion is already rendering. Wait for that render to finish.")) }
         defer { WebMotionActivity.release(key) }
         let directory = cacheDirectory(for: project)
-        let rendered = try await WebMotionCache.render(record, directory: directory, force: force)
+        let rendered = try await WebMotionCache.render(record, directory: directory)
         let probed = await MediaProbe.probe(url: rendered.file, ffmpeg: nil)
         let info = try probed.get()
         try Task.checkCancellation()

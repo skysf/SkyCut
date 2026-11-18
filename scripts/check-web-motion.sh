@@ -35,6 +35,7 @@ xcrun swiftc \
   -I "${BUILD_DIR}/Modules" \
   -o "${OUT}" \
   Sources/SrtFlow/WebMotion/WebMotionRenderer.swift \
+  Sources/SrtFlow/WebMotion/WebMotionCacheFiles.swift \
   Sources/SrtFlow/WebMotion/WebMotionHelperProcess.swift \
   Sources/SrtFlow/WebMotion/WebMotionMemoryWatch.swift \
   Sources/SrtFlow/WebMotion/WebMotionProcessTeardown.swift \

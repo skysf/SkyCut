@@ -122,6 +122,8 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
 - A project's own file (autosave, ⌘S, Save As, closing, switching, Quit) is written only by `ProjectFileWriter`, on the
   project's own queue, with a 15 s deadline for whoever waits; Quit uses `.terminateLater` and asks instead of hanging
   ([project file](video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md)).
+- The web-motion cache folder beside a project is read and written only on `WebMotionCacheFiles.queue`; a re-rendered
+  movie replaces the old one in a single rename, never remove-then-move ([web-motion renderer](web-motion-renderer.md) §15).
 
 ## 子进程的异步退出
 

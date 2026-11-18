@@ -3,6 +3,7 @@ import Foundation
 import SrtFlowWebMotionKit
 
 // Immutable rendered movies and page-check receipts. Project files keep the source; this cache can always be rebuilt.
+// Its folder's files are read and written only on WebMotionCacheFiles.queue.
 enum WebMotionCache {
     struct Rendered: Sendable {
         var record: WebMotionClipRecord
@@ -50,26 +51,30 @@ enum WebMotionCache {
                                   renderedAt: original.provenance?.fingerprint == key ? original.provenance!.renderedAt : Date())
         let movie = directory.appendingPathComponent("motion-\(key).mov")
         let receipt = movie.deletingPathExtension().appendingPathExtension("render.json")
-        if !force, let cached = await MediaReadQueue.run(on: MediaReadQueue.analysis, {
+        // The same fingerprint draws the same frames, so a movie with a passing receipt is reused. `force` renders anyway, for
+        // the checks that compare two real renders; a re-render never removes the movie clips and undo may be using.
+        if !force, let cached = await MediaReadQueue.run(on: WebMotionCacheFiles.queue, {
             readReceipt(receipt, movie: movie)
         }) {
             return Rendered(record: record, file: movie, result: cached, cacheHit: true)
         }
-        try await MediaReadQueue.run(on: MediaReadQueue.analysis) {
+        try await MediaReadQueue.run(on: WebMotionCacheFiles.queue) {
             Result { try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true) }
         }.get()
         let rendered = try await WebMotionRenderer.render(.init(page: record.page, parameters: Data(record.parametersJSON.utf8),
                                                                duration: record.duration, width: record.width, height: record.height,
-                                                               fps: record.fps, output: movie))
-        try Task.checkCancellation()
-        guard let actual = rendered.result.versions,
-              actual == versions else { throw WebMotionRenderError.rendererFailed("The renderer's system identity changed; render again.") }
-        let completed = record
-        try await MediaReadQueue.run(on: MediaReadQueue.analysis) {
-            Result {
-                try JSONEncoder().encode(rendered.result).write(to: receipt, options: .atomic)
-                try writePage(completed, movie: movie)
+                                                               fps: record.fps, output: movie)) { result in
+            // Before the movie replaces anything: another system identity, or a receipt that cannot be written, keeps the
+            // previous movie (docs/bugfixes/2026-11-19-web-motion-rerender-deletes-cached-movie.md).
+            guard result.versions == versions else {
+                throw WebMotionRenderError.rendererFailed("The renderer's system identity changed; render again.")
             }
+            try JSONEncoder().encode(result).write(to: receipt, options: .atomic)
+        }
+        try Task.checkCancellation()
+        let completed = record
+        try await MediaReadQueue.run(on: WebMotionCacheFiles.queue) {
+            Result { try writePage(completed, movie: movie) }
         }.get()
         return Rendered(record: record, file: movie, result: rendered.result, cacheHit: false)
     }
