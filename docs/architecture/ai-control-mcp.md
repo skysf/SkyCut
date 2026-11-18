@@ -468,6 +468,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      At most 60 s at a time; a listen job. Contract in [the listening engine](listening-engine.md) section 2 item 4a.
      Catalog budget: mix=true arrived with about 940 units left in the whole catalog, so the listen card and parameter notes were shortened
      and the wording moved into the listen guide topic; the catalog is no longer than before mix=true (99,059 vs 99,063 on 2026-11-16).
+   - **Music: accents, stops, the end (`beats=true`, 2026-11-18, MCP-43)**: the same call that gives the beats now also lists every
+     audible accent as [second, strength], the five strongest, the stops (where the music stops by itself and the hit that brings it
+     back) and `ends_at`, from the beats' one read of the song (`AIBeats` → `MusicShape`; no second decode). A clip's are timeline
+     seconds for the part it plays, a file's its own. A finished `generate_media kind=music` job's get_job carries the same answer as
+     `music` (`AIGeneratedMusicReport`). Rules and measurements in [the listening engine](listening-engine.md) section 9; flat on the
+     catalog (no new listen parameter, `beats` reworded), wording in the guide's listen `beats` section.
 
 14. **读文稿（read_document，方案第 22 条）**：用户给的讲稿、大纲、卖点清单读成文字（`AIDocumentReader`）：PDF 用 PDFKit，
    Word / RTF / ODT 用系统的富文本导入，txt / md 按 [用户文本文件的编码](text-file-encoding.md) 读；Pages 和扫描件读不了，
@@ -937,6 +943,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `duration` is the clip length of a short sound (padded with silence, never under the timeline's 0.1 s), a tail runs past it and
     the reply's `audible_duration` says how long it is heard; only `sound_effect.volume_db` is compared for `adjustments` (in range =
     none); a call that fails leaves none of the files it made. The wording is in the guide's add_clips topic, not the catalog.
+    2026-11-18 (MCP-43): `hit_at` lands a hit for **every source with sound**, not only sound effects: `hit` (new, a source second)
+    names the hit, by default a made or library sound effect's own hit and otherwise the strongest accent of a file or library music
+    between source_in and source_out (the same analysis listen beats=true reports). start = hit_at − (hit − source_in) has one copy,
+    `AIClipHit.placement`; a start before 0:00 moves source_in later instead (adjustment `hit_lands_on_hit_at`), images are refused,
+    a hit outside the window is `invalid_parameter`; the reply gives `hit_at` (read back from the placed clip) and `hit`. One new
+    parameter; to fit it after three other lanes had filled the catalog (100,128 with it), the add_clips and listen notes were
+    reworded shorter with the same facts in the guide (add_clips `music_sound_effects`): 99,912 / 100,000 on 2026-11-18.
 44. **放大片段（`upscale_clip`，2026-10-02 起；2026-10-28 起送 Sky Studio、花积分，之前送 fal）**：合同全在 [视频 upscale](video-upscale.md) 第五节和
     [Sky Studio 的任务](sky-studio-jobs.md)，这里只记它怎么接进 MCP 这一层。
    - **始终列出来**（2026-10-30，和 `generate_media` 同一条规则，第 39 条）；总说明末尾的「Paid」那一行始终带着它，Key、授权和积分在 App 核对。

@@ -493,6 +493,11 @@ xcrun swiftc \
   Sources/SrtFlow/TruePeak.swift \
   Sources/SrtFlow/AIListenReadControl.swift \
   Sources/SrtFlow/AIBeats.swift \
+  Sources/SrtFlow/MusicShape.swift \
+  Sources/SrtFlow/MusicAccents.swift \
+  Sources/SrtFlow/MusicStops.swift \
+  Sources/SrtFlow/AIMusicShapeReport.swift \
+  Sources/SrtFlow/AIClipHit.swift \
   Sources/SrtFlow/AIDocumentReader.swift \
   Sources/SrtFlow/AIFileOperations.swift \
   Sources/SrtFlow/AIFinderSelection.swift \

@@ -42,8 +42,10 @@ enum AITimelineTools {
         var url: URL?
         var libraryID: String?
         var soundEffect: AISoundEffectRequest?
-        /// 落点要压在时间线的哪一秒：合成音效和有落点的音效库素材认，别的报错。
+        /// The timeline second the hit lands on, and the source second that is the hit (nil: the sound effect's own hit, or the
+        /// strongest accent of a file or library music; AIClipHit, MCP-43). Not for images.
         var hitAt: Double?
+        var hit: Double?
         var sourceIn: Double?
         var sourceOut: Double?
         var track: String?
@@ -60,11 +62,15 @@ enum AITimelineTools {
         let requests = try items.enumerated().map { index, item -> ClipRequest in
             let entry = AIToolArguments(item)
             var request = ClipRequest(
-                hitAt: try entry.double("hit_at"), sourceIn: try entry.double("source_in"), sourceOut: try entry.double("source_out"),
+                hitAt: try entry.double("hit_at"), hit: try entry.double("hit"),
+                sourceIn: try entry.double("source_in"), sourceOut: try entry.double("source_out"),
                 track: try entry.string("track"), start: try entry.double("start"),
                 sound: try entry.choice("sound", from: MCPVocabulary.clipSounds).flatMap(ClipSoundMode.init(rawValue:))
             )
             try AIEditLimits.nonnegative("clips[\(index)].start", request.start)
+            try AIEditLimits.nonnegative("clips[\(index)].hit_at", request.hitAt)
+            try AIEditLimits.nonnegative("clips[\(index)].hit", request.hit)
+            if request.hit != nil, request.hitAt == nil { throw AIToolError("clips[\(index)]: hit goes with hit_at, the timeline second it lands on.") }
             switch (try entry.string("file"), try entry.string("library_id"), try AISoundEffectRequest.parse(entry, index: index)) {
             case (let path?, nil, nil):
                 let url = AIWorkspace.shared.resolve(path)
@@ -72,7 +78,6 @@ enum AITimelineTools {
                     throw AIToolError("clips[\(index)]: \(path) does not exist.")
                 }
                 request.url = url
-                if request.hitAt != nil { throw AIToolError("clips[\(index)]: hit_at works with sound_effect and library sound effects; place a file with start.") }
             case (nil, let id?, nil):
                 request.libraryID = id
             case (nil, nil, let effect?):
@@ -93,6 +98,7 @@ enum AITimelineTools {
         var images: [(id: UUID, url: URL)] = []
         var library: [UUID: AudioLibraryItem] = [:]
         var effects: [UUID: AISoundEffectTool.Made] = [:]
+        var landings: [UUID: AIClipHit.Landing] = [:]
         var requestedByID: [UUID: JSONValue] = [:]
         var tracks: [UUID: AITrackLanding.Request] = [:]
         // A call that fails after making sound effects removes the files it made (a failed call changes nothing).
@@ -108,15 +114,9 @@ enum AITimelineTools {
                 let found = try await AIAudioLibraryTools.libraryClip(id: id)
                 (clip, name) = (found.clip, found.item.title)
                 library[clip.id] = found.item
-                if let hit = request.hitAt {
-                    // 音效库的素材入库时量了落点：和合成音效一样按它反算开头。
-                    guard let itemHit = found.item.hit else {
-                        throw AIToolError("clips[\(index)]: \(found.item.title) has no hit point; place it with start.")
-                    }
-                    let placement = AISoundEffectRequest.placement(hitAt: hit, renderedHit: itemHit)
-                    request.start = placement.start
-                    request.sourceIn = placement.sourceIn
-                }
+                // 音效库的素材入库时量了落点：和合成音效一样按它反算开头；music has none, its strongest accent is the hit.
+                landings[clip.id] = try await land(&request, known: found.item.hit, url: found.clip.sourceURL, name: name,
+                                                   duration: found.item.duration, index: index)
                 try trim(&clip, duration: found.item.duration, name: name, request: request, index: index)
             } else if let effect = request.soundEffect {
                 // 合成的音效：落点压在 hit_at 上（开头 = hit_at − 声音里的落点）；没给 hit_at 也没给 start 就放在播放头。
@@ -126,10 +126,8 @@ enum AITimelineTools {
                 }
                 (clip, name) = (project.clip(for: media), made.url.lastPathComponent)
                 clip.volume = AudioGain.linear(fromDecibels: AudioGain.clampedDecibels(effect.volumeDB))
-                if let hit = effect.hitAt {
-                    let placement = AISoundEffectRequest.placement(hitAt: hit, renderedHit: made.hitAt)
-                    request.start = placement.start
-                    request.sourceIn = placement.sourceIn
+                if request.hitAt != nil {
+                    landings[clip.id] = try await land(&request, known: made.hitAt, url: made.url, name: name, duration: media.duration, index: index)
                 } else if request.start == nil {
                     request.start = project.clock.time
                 }
@@ -146,6 +144,8 @@ enum AITimelineTools {
                 if let sound = request.sound {
                     try soundOfVideo(&clip, &isAudio, mode: sound, kind: media.kind, name: name, index: index)
                 }
+                if request.hitAt != nil, media.kind == .image { throw AIToolError("clips[\(index)]: \(name) is an image; place it with start.") }
+                landings[clip.id] = try await land(&request, known: nil, url: media.url, name: name, duration: media.duration, index: index)
                 if media.kind == .image {
                     let window = try AIBatchItems.entry("clips", index) { try AIClipSourceWindow.resolve(
                         sourceIn: request.sourceIn, sourceOut: request.sourceOut, oldIn: 0,
@@ -224,6 +224,7 @@ enum AITimelineTools {
                 entry["hit_at"] = AIFormat.seconds(clip.timelineStart + made.hitAt - clip.sourceStart)
                 entry["audible_duration"] = AIFormat.seconds(made.audibleDuration(of: clip))
             }
+            if let landing = landings[clip.id] { AIClipHit.report(&entry, landing: landing, clip: clip) }
             return .object(entry)
         }
         let firstStart = plans.compactMap { state.clip(with: $0.clip.id)?.timelineStart }.min()
@@ -249,6 +250,17 @@ enum AITimelineTools {
         // 用到的源范围跨过素材自己的刀（夹帧）：只提醒、不改（AISourceCutCheck，MCP-36）。
         await AISourceCutCheck.note(&result, clips: plans.map(\.clip.id), in: project)
         return .ok(.object(result), changed: true)
+    }
+
+    /// hit_at: the start and source_in that land the hit there (AIClipHit); nil without hit_at.
+    private static func land(
+        _ request: inout ClipRequest, known: Double?, url: URL?, name: String, duration: Double, index: Int
+    ) async throws -> AIClipHit.Landing? {
+        guard let hitAt = request.hitAt else { return nil }
+        let landing = try await AIClipHit.land(hitAt: hitAt, hit: request.hit, known: known, url: url, name: name, sourceIn: request.sourceIn,
+                                               sourceOut: request.sourceOut, duration: duration, index: index)
+        (request.start, request.sourceIn) = (landing.start, landing.sourceIn)
+        return landing
     }
 
     /// 用素材的哪一段（图片只有「放多久」，在上面单独算）。音乐库的一首按清单上的时长。

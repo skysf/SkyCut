@@ -44,6 +44,15 @@ request or media, add timeline content, consume an undo step, or submit another 
 Regression coverage is in `GenerationDurationChecks` within `scripts/check-sky-studio.sh`;
 `checks/sky-studio-wiring.sh` requires the projection in both completion and refresh.
 
+### Generated music is measured (2026-11-18, MCP-43)
+
+When a `music` generation has downloaded its file, `SkyStudioGenerationRun` adds `music` to the job's result: exactly what
+`listen file=<that file> beats=true` answers (accents, strongest accents, stops, ends_at, tempo, levels; `AIGeneratedMusicReport`,
+[the listening engine](listening-engine.md) section 9), so the AI can place it with `add_clips hit_at`. It is measured once, on
+this Mac, after delivery: it never changes the request, the billing or the file, and a file that cannot be measured says so in
+`music` without failing the paid job. The wiring is pinned in `checks/MCP/listen-wiring.sh`; the measurement itself in
+`checks/ParameterLimits/MusicPlacementChecks.swift`.
+
 ## 二、Sky Studio 那边实测的细节（2026-10-28 真服务器跑过 8 种活）
 
 - `/uploads`：PUT 时**原样带上回答里 `headers` 的每一项**，少带或改了签名对不上。PUT 成功后 `file_url` 马上能读。`purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`（jpeg / png / webp，≤ 30 MB）、`audio`（wav / mp3，≤ 15 MB），60 天后自动删。

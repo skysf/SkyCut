@@ -8,7 +8,9 @@ import SrtFlowMCPKit
 // 在 `MediaReadQueue.analysis` 上跑，docs/architecture/blocking-media-reads.md），交给 `AudioBeatTracker` 算，
 // 按「路径 + 大小 + 修改时间 + 区间」记在内存里（同一首再问是秒回；文件换了、改了就重算）。
 // listen 的 beats 和 cut_to_beat 都从这里拿。
-// 不管什么：怎么算（AudioBeatTracker，纯计算）、换到时间线（调用方给换算）。
+// The same read also gives the music's shape (accents, stops, end: MusicShape, MCP-43, 2026-11-18): listen beats=true reports
+// it next to the beats (AIMusicShapeReport) and add_clips takes its strongest accent as the default hit (AIClipHit).
+// 不管什么：怎么算（AudioBeatTracker、MusicShape，纯计算）、换到时间线（调用方给换算）。
 
 @MainActor
 enum AIBeats {
@@ -24,12 +26,23 @@ enum AIBeats {
         var to: Double
     }
 
-    /// nil 的值 = 分析过、听不出清楚的节拍。
-    private static var cache: [Key: AudioBeatTracker.Analysis?] = [:]
+    /// One read of a song: its beat and its shape. Times are source seconds.
+    struct Music: Sendable {
+        /// nil = analysed, no clear beat.
+        var beats: AudioBeatTracker.Analysis?
+        var shape: MusicShape.Analysis
+    }
+
+    private static var cache: [Key: Music] = [:]
 
     /// 源 [from, to) 秒的鼓点，时间是源秒。听不出清楚的节拍是 nil；文件读不了抛错。
     /// 真正分析的是整首歌（`BeatAnalysisWindow`），listen 和 cut_to_beat 看同一份；调用方再按自己的区间挑拍。
     static func analysis(of url: URL, from: Double, to: Double) async throws -> AudioBeatTracker.Analysis? {
+        try await music(of: url, from: from, to: to).beats
+    }
+
+    /// The beat and the shape of the song around source [from, to), from one read (the same whole-song window as the beats).
+    static func music(of url: URL, from: Double, to: Double) async throws -> Music {
         let asset = AVURLAsset(url: url)
         let fileDuration = (try? await asset.load(.duration))?.seconds ?? to
         let window = BeatAnalysisWindow.resolve(from: from, to: to, fileDuration: fileDuration)
@@ -48,17 +61,14 @@ enum AIBeats {
         nonisolated(unsafe) let track = found
         let rate = sampleRate
         MediaReadAudit.current?.note(.beats(url, from: window.from, to: window.to))
-        let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { () -> Reading? in
+        let read = await MediaReadQueue.run(on: MediaReadQueue.analysis) { () -> Music? in
             guard let pcm = readMono(asset: asset, track: track, from: window.from, to: window.to, sampleRate: rate) else { return nil }
-            return Reading(analysis: AudioBeatTracker.analyze(pcm.samples, sampleRate: rate).map { shifted($0, by: pcm.start) })
+            return Music(beats: AudioBeatTracker.analyze(pcm.samples, sampleRate: rate).map { shifted($0, by: pcm.start) },
+                         shape: MusicShape.analyze(pcm.samples, sampleRate: rate).shifted(by: pcm.start))
         }
         guard let read else { throw AIToolError("SkyCut could not read the sound of \(url.lastPathComponent).") }
-        cache[key] = .some(read.analysis)
-        return read.analysis
-    }
-
-    private struct Reading: Sendable {
-        var analysis: AudioBeatTracker.Analysis?
+        cache[key] = read
+        return read
     }
 
     /// 分析出来的时间是从这段采样的第一帧算的；加上第一帧在文件里的时间。
@@ -119,6 +129,17 @@ enum AIBeats {
     }
 
     // MARK: 写给 AI 看
+
+    /// listen beats=true: the beats (below) and the shape (accents, stops, end; AIMusicShapeReport), same window and times.
+    nonisolated static func json(
+        _ music: Music, sourceFrom: Double, sourceTo: Double, speed: Double, timeline: (Double) -> Double
+    ) -> [String: JSONValue] {
+        var object = json(music.beats, sourceFrom: sourceFrom, sourceTo: sourceTo, speed: speed, timeline: timeline)
+        for (key, value) in AIMusicShapeReport.json(music.shape, sourceFrom: sourceFrom, sourceTo: sourceTo, timeline: timeline) {
+            object[key] = value
+        }
+        return object
+    }
 
     /// 源时间的鼓点 → 给 AI 的那几项：只列 [sourceFrom, sourceTo) 里的拍，时间用 `timeline` 换算（片段是时间线秒，
     /// 文件原样），速度乘上播放速度。

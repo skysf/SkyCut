@@ -22,7 +22,9 @@
 1. **落点 `hit_at` 是合同。** 每个预设声明自己「最响的那一刻」在第几秒（`SoundEffectRender.hitAt`）：whoosh 在 60%、
    riser / suction 在结尾、impact / hit / pop 在开头、downlifter 在涌起到顶那一刻；sparkle / glitch 这种一串的，落点是**起点**
    （`hitKind: .onset`，之后堆起来更响是设计）。AI 给的 `hit_at` 是时间线秒，工具反算开头（`AISoundEffectRequest.placement`：
-   start = hit_at − hitAt，负了就从声音中间开始放、源内偏移补上），结果里报出时间线上的 `hit_at`。自检钉着实测峰值离声明落点
+   start = hit_at − hitAt，负了就从声音中间开始放、源内偏移补上），结果里报出时间线上的 `hit_at`。Since 2026-11-18 the rule has one copy,
+   `AIClipHit.placement`, which add_clips also uses for files and library music (their hit: `hit` or the strongest accent, MCP-43);
+   `AISoundEffectRequest.placement` delegates to it.自检钉着实测峰值离声明落点
    ≤ 25 ms（噪声主导的 whoosh / swoosh / riser / downlifter ≤ 120 ms）。**改声音设计时先保住这一条。**
 2. **混响按干声峰值的比例混**（`SFX.mixReverb`：湿声峰值 = 干声峰值 × 比例 × size）。Freeverb 的湿声增益随房间大小变得很厉害
    （大房间对持续输入的稳态增益近 9 倍），按固定系数混时 impact / ding 的峰值被混响堆起来推后 100–400 ms、suction 的峰值跑到

@@ -74,7 +74,8 @@ enum MCPGuideMediaTopics {
             add_clips. Only queued jobs can be cancelled with cancel_job; started jobs finish, are charged and stay in the user's Sky \
             Studio library. Refunds need billing proof. After an unknown or delivery error, recover the original job with get_job; never \
             send the same paid request again. name sets the file name; by default it comes from the prompt, or for an image operation \
-            from the source name plus angle, x2, x3 or x4. A clashing name gets a number.
+            from the source name plus angle, x2, x3 or x4. A clashing name gets a number. A music result also carries music: what \
+            listen beats=true says about the file (accents, strongest_accents, stops, ends_at, tempo), to place it with add_clips hit_at.
             """),
             MCPGuideSection(name: "official_film", about: "the official original-film flow: film, prepared references, seam review", text: """
             Official original film. film, prepare_references, prepared_references, quote_token and seam_review belong to the official \

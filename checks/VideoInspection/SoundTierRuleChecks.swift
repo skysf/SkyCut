@@ -81,11 +81,11 @@ enum SoundTierRuleChecks {
             let thump = t >= 0.25 && since < 0.08 ? 0.6 * sin(2 * .pi * 60 * t) * exp(-since / 0.03) : 0
             return Float(0.05 * sin(2 * .pi * 440 * t) + thump)
         }
-        let found = DeliveryMusicAccents.accents(samples, sampleRate: rate)
+        let found = MusicAccents.find(samples, sampleRate: rate, startsAtSilence: false)
         let expected = stride(from: 0.25, to: 3, by: 0.5)
         require(found.count == 6 && zip(found, expected).allSatisfy { abs($0.time - $1) < 0.05 && $0.strength > 3 },
                 "a low thump every 0.5 s is one accent each, within 50 ms (\(found.map { String(format: "%.3f/%.1f", $0.time, $0.strength) }))")
-        require(DeliveryMusicAccents.accents([Float](repeating: 0, count: 48_000), sampleRate: rate).isEmpty, "silence has no accents")
+        require(MusicAccents.find([Float](repeating: 0, count: 48_000), sampleRate: rate, startsAtSilence: false).isEmpty, "silence has no accents")
     }
 
     // MARK: The place above 200 Hz in a cut window

@@ -12,7 +12,7 @@ import SrtFlowMCPKit
 // by 3.4 dB at most):
 // - a bed: voice, music or effects sounding from 0.3 s before to 0.3 s after the cut, at the cut no more than
 //   `CutSoundLevelPlan.bedMargin` under the louder side and above `bedFloorDB` (the same rule set_transition sound=bed meets);
-// - a music accent within ±3 frames (DeliveryMusicAccents); music entering or stopping (end or fade-out start) within ±2 frames,
+// - a music accent within ±3 frames (MusicAccents); music entering or stopping (end or fade-out start) within ±2 frames,
 //   heard on that side (above −45 dBFS over the 0.1 s cell one cell away from the cut, the research's cells);
 // - an effect starting within ±3 frames at most 3 dB under the louder side (a hit), or ending within ±2 frames at most 6 dB under
 //   it (a riser reaching its top);

@@ -123,6 +123,9 @@ func catalogKnownNames() -> Set<String> {
     // inspect_video's second tier (2026-11-18, AIDeliveryCutJumps / AIDeliveryLinger / AIDeliveryVoice): kinds and the roles field.
     names.formUnion(["sound_roles", "audio_cut_jump", "audio_linger", "audio_voice_masked", "audio_two_voices", "audio_music_swell",
                      "audio_voice_loud"])
+    // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
+    // ones past the cap, where the piece's own sound ends.
+    names.formUnion(["strongest_accents", "more_accents", "ends_at"])
     return names
 }
 

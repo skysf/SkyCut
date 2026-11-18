@@ -5,6 +5,8 @@
 > 不管什么：第 1 步「按层离线渲 + 每帧分频段电平」（在音频引擎里，见[成片的声音](export-audio-mixdown.md)「按层量」一节和[音频引擎](audio-engine.md)）；
 > Live voice thresholds, reports and `listen` wiring are covered below. Since 2026-11-18 `inspect_video` also runs the voice check,
 > the music swell, cut jumps and sounds past their picture: [finished-video inspection](finished-video-inspection.md), "Second-tier sound checks".
+> Since 2026-11-18 also music's own shape (section 9: accents, where it stops by itself, where it ends; MCP-43) and landing one of
+> its hits on a timeline second (`add_clips hit_at`).
 >
 > 由来（2026-11-16）：用户问「是否还有更好的方式，或者我们自己写一个能解决听声音的引擎？」。调研的结论：没有现成的东西能替 AI 听
 > （能听的大模型认环境声约六成、问「什么时候、几次」基本不可用；苹果的识别器没有「轰鸣」这一类），所以在 SkyCut 里自己做一层薄的：
@@ -264,3 +266,84 @@ the audit bound to that call: one read of only the requested range, mono samples
 and no retained samples unless requested. `ListenRangeChecks` also keeps samples with short and late-starting sound tracks.
 Wiring guards reverse-check sound-edge routing, installed-only model reservation and cancellation after word recognition;
 they do not claim to test actual speech recognition or model removal on the user's Mac.
+
+## 九、Music: accents, stops and the end (2026-11-18, production feedback MCP-43)
+
+Generated music rarely follows the seconds in its prompt (MCP-18), so before placing it the AI needs where it hits, where it stops
+by itself and where it ends; the production research measured all of it outside SkyCut and placed each track by hand so that one
+hit landed on a cut (0–1 frame). SkyCut now does both. **Layer 1 (measure) for one piece of music, report only; nothing is
+classified** (an accent is any hit that stands out, drum or not).
+
+**Who calls whom.** `AIBeats` reads a song once (11025 Hz mono on `MediaReadQueue.analysis`, the same whole-song window as the
+beats, `BeatAnalysisWindow`) and runs both `AudioBeatTracker` and `MusicShape.analyze` on those samples; the cache holds both
+(`AIBeats.Music`). Callers: `listen beats=true` on a clip or a file (`AIBeats.json` adds `AIMusicShapeReport` next to the beats),
+`add_clips hit_at` without `hit` (`AIClipHit`: the strongest accent between source_in and source_out), and a finished
+`generate_media kind=music` job (`AIGeneratedMusicReport`: get_job's `music` is exactly `listen file=… beats=true`, measured once
+when the file lands; a file it cannot measure says so and never fails the paid job). All in `Sources/SrtFlow/`, pure:
+`MusicShape` (types, 0.1 s levels `MusicLevels`), `MusicAccents`, `MusicStops`, `AIMusicShapeReport`; `AIClipHit.placement`.
+**`MusicAccents` is SkyCut's only accent reading**: the delivery checks (`inspect_video`'s cut jumps, MCP-37: a music accent
+within ±3 frames covers a jump; [finished-video inspection](finished-video-inspection.md)) read each music clip's stretch of the
+rendered music at 24 kHz with it too, `startsAtSilence` false and kept above −45 dBFS. Their own copy, `DeliveryMusicAccents`
+(#481, the research's reading taken literally), was folded in on 2026-11-18; each reader says what counts as heard.
+
+**The rules** (all relative to the piece itself, so the same piece 30 dB quieter reads the same):
+
+1. Levels: RMS of exact 0.1 s steps. The playing level is the 90th percentile of the steps within 60 dB of the loudest step;
+   a piece whose loudest step is under -90 dB is silent.
+2. Accents (`MusicAccents`): frames of the research's 46 ms (1024 samples at 22050 Hz) as the nearest power of two at the rate
+   (512 at 11025 Hz, 1024 at 24 kHz, 2048 at 48 kHz) every quarter frame, Hann window; a frame's energy is its magnitude
+   below 200 Hz plus 0.3 × 200 Hz–4 kHz (the research's weighting: hits that carry music are low, mids still count); the upward
+   rise of `log(energy + floor)`, floor 50 dB under the loud frames (90th percentile; the research's log(1 + e) depended on the
+   level), in standard deviations above the stretch's average is the strength. An accent: strength above 3 and the highest within
+   ±4 frames; for a piece (`MusicShape`) also heard in it (its 0.1 s level within 30 dB of the playing level). `startsAtSilence`
+   (a file read from its start) puts one frame of zeros first, so music that starts with a hit has an accent at its start; a
+   stretch cut out of playing music (the delivery checks) does not.
+   Time = the frame where the rise peaks + one hop + half a frame, on the hop's grid (11.6 ms at 11025 Hz): on the synthetic kicks
+   4 ms early to 7 ms late; the research put an accent at the centre of the frame before the rise, two hops (21–23 ms) earlier, and
+   so did `DeliveryMusicAccents`. A frame is 33–42 ms. Why 50 dB: at 60 dB, `music1_box`'s first note out of the file start tied
+   with the hit after its stop (21.8 each); at 40 dB attacks were found up to 35 ms late; at 50 dB 18.6 against 16.6.
+   Folding the delivery copy in, measured on the research Mac at 24 kHz (stretches not starting at silence): music1_box 90 of 90
+   accents the same, each 21 ms later (11 ms for one); music3_leap 80 of 81; music4_world_title 87 of 87, plus its opening hit at
+   0.07 s (the copy skipped a stretch's first and last 4 frames); music2_departure 126 of 137 and 4 new; title_impact 9 of 20 and
+   9 new. The ones that differ are at the line (strength 3.0–4.3): seven of music2's old-only ones are in its last 2.5 s fade
+   (−25 to −53 dBFS, four under the −45 the delivery checks drop anyway), title_impact's in its decaying tail. The human film's
+   1:18.44 cut (covered by one accent in #481's run; the research's list puts it at 1:18.51, +2 frames, but read
+   sample-accurately from the clip's source window the music's nearest accent is about 135 ms before the cut): the old reading
+   −3.2 frames, the new −2.7 frames at 24 fps — a cover at the ±3-frame edge can move either way by the 21 ms. #481's own run
+   could not be repeated here (its harness is not in the repo): re-run it when its project copy is at hand.
+3. Stops (`MusicStops`): quiet = more than 20 dB under the playing level. A stop is quiet for at least 0.5 s, at least 40 dB
+   under somewhere inside, with music before and after; it runs from its first quiet step to where the music comes back: the
+   accent that brings it back when one falls within 0.2 s of the first loud step, otherwise that step's start. The 40 dB rule
+   separates breaks from the gaps between staccato hits (on the research's four generated tracks the gaps sat 22–35 dB down, the
+   breaks 44–91 dB). Quiet before any music is the intro; quiet to the end is the ending.
+4. End: the end of the last step that is not quiet (the end of the samples when the piece plays to its end).
+5. What the AI reads (`AIMusicShapeReport`, the part asked for, a clip's timeline seconds or a file's own): `accents` as
+   [second, strength] in time order (at most 240, the weakest dropped and counted in `more_accents`), `strongest_accents` (five,
+   strongest first), `stops` as [from, to] cut to the window, `ends_at` when inside the window. Strengths compare within one piece.
+6. Placing (`AIClipHit`, the only copy of the rule; `AISoundEffectRequest.placement` delegates): start = hit_at − (hit −
+   source_in); when that is before 0:00, source_in moves later by the shortfall (an adjustment with reason `hit_lands_on_hit_at`)
+   and the hit still lands on hit_at. `hit` defaults to a made or library sound effect's hit, otherwise the strongest accent;
+   images take start; a hit outside the source window is `invalid_parameter`. The reply's hit_at is read back from where the clip
+   landed (a lifted track or the magnet can still move a V1 clip).
+
+**Measured on the research Mac** (the files are not in the repo; AVFoundation decode, which is what SkyCut plays and exports with —
+ffmpeg puts this onset 12 ms later, hence the research's 9.66): `music1_box.mp3` strongest accent 9.67 (strength 18.6, the file
+start 16.6), stop 7.5–9.67, end 79.5; `music2_departure` 72.03, stop 69.7–72.03, end 121.3; `music3_leap` 0.08 (the opening hit),
+stops 61.3–64.77 and 66.3–76.78, end 132.8; `music4_world_title` no stop, end 93.0; `title_impact.wav` 0.03 (its 75 ms swell), end
+3.9. Analysis about 20 ms per track on an M1. The beat tracker still finds no clear beat in music2 and music3 (its own rule).
+
+**Guards.** `checks/MCP/MusicShapeChecks.swift` (`scripts/check-mcp.sh`): the frame and hop at five rates; a synthetic piece with
+known times (kicks every 0.6 s, a 2 s stop, the hit that ends it, the end before the file's) — every kick within a hop, the hit the
+strongest, nothing heard in the stop, the stop and end where they are; the same piece 30 dB down identical; a sound starting with
+its hit; a stretch of playing music without an accent at its start (and with one read as a file); 25 dB gaps not stops; silence;
+the report's window, mapping, cap and order; the placement rule. The delivery checks' accent case (a low thump every 0.5 s at
+24 kHz: six accents within 50 ms, none elsewhere, silence none) and their covered-cuts job call the same reading
+(`checks/VideoInspection/SoundTierRuleChecks.swift`, `SoundTierChecks.swift`). `checks/ParameterLimits/MusicPlacementChecks.swift`
+(`scripts/check-parameter-limits.sh`, the real App): an AAC piece through `listen file beats=true`, `add_clips hit_at` (the strongest
+accent measured back on the timeline within one frame of hit_at), `hit`, a moved source_in, the refusals, and get_job's `music`
+being the listen answer. `checks/MCP/listen-wiring.sh`: the generation run measures music before it finishes.
+
+**Not done / not verified.** edit_clip has no hit_at (move a placed clip's start by the moment minus the accent); accents are not
+named (drum, orchestra hit, vocal); the 40 dB stop rule may miss stops in noisy recordings; the real files above were measured by
+hand on the research Mac, not in CI. Manual regression on that Mac: `listen file=music1_box.mp3 beats=true` gives 9.67 strongest
+and the stop 7.5–9.67; `add_clips {file, hit: 9.66, hit_at: 7.30}` then `listen clip_id beats=true` finds it on 7.30 ± 1 frame.

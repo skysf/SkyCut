@@ -216,10 +216,16 @@ the preview's engine; it never edits the project:
   band a line is read against). In the same pass: the place group above 200 Hz in each cut window, every frequency under 200 Hz removed over
   the 0.3 s window as a whole (`DeliveryWindowCollector`, the human film's and the preview board's reading; the band meter's
   300 Hz edge, with its two-frame window, read 3 of the first draft's cuts differently), and the music accents: the rendered
-  music group at 24 kHz, each music clip's stretch read with `DeliveryMusicAccents` (the research's accent reading: the
+  music group at 24 kHz, each music clip's stretch read with `MusicAccents` (the research's accent reading: the
   magnitude under 200 Hz plus 0.3 × 200 Hz–4 kHz per 1024-sample frame, the rise of its log as a z-score over the stretch,
   above 3 and the largest within ±4 frames), kept where the music is above −45 dBFS. `AudioBeatTracker`'s onset strength,
   built to find a beat, found no accent at all in the human film's orchestral music where its cuts sit on accents.
+  Since 2026-11-18 (#477) this is the one accent reading, the same as listen beats=true and add_clips hit_at
+  ([listening engine](listening-engine.md) section 9; the copy `DeliveryMusicAccents` is gone): `startsAtSilence` false (a
+  stretch's start is not the music's start), its log floor 50 dB under the stretch's loud frames instead of log(1 + e), and its
+  times on the attack, two hops (21 ms) later than the research's frame centre. On the research's generated tracks the accents
+  are the same apart from ones at the strength line; the human film's 1:18.44 cover sits at the ±3-frame edge and can move with
+  the 21 ms, so re-run the human-film acceptance below with this reading (comparison in the listening-engine doc, section 9).
 - The voice check: `AIListenVoicePlan` / `AIListenVoiceMeasure` / `AIListenVoiceReport`, the same code as listen voice, over
   every audio track whose clips are all voice (at most 11), inside the checked range.
 - Each sound that may drag past its picture rendered on its own over its frames after the cut (`DeliveryStemPower`; at most 40;

@@ -143,7 +143,8 @@ enum MCPGuideSharedTopics {
         check that every cut lands in a pause.
 
         Music. find_audio searches SkyCut's music and sound effects; add_clips library_id puts one on a track; cut_to_beat cuts V1 to \
-        its beats. Pass on the music_credits from export_video to the user.
+        its beats. listen beats=true lists a piece's accents and where it stops; add_clips hit_at lands its strongest accent (or hit) \
+        on the moment that needs it. Pass on the music_credits from export_video to the user.
 
         Vertical video. set_canvas ratio=9:16, then edit_clips with fit=fill on the clips (SkyCut aims at faces, people and text), and \
         look to check the framing.

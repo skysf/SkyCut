@@ -467,6 +467,15 @@
 - Clip listen sample gain: `scripts/check-parameter-limits.sh` → `ListenGainChecks` calls the real entry on synthetic PCM,
   checks a faded impulse, clip / track gain exactly once, raw file control, one bounded reader and unchanged project / undo.
   `scripts/check-mcp.sh` → `ListenSampleGainChecks` covers within-frame fades / fast curves, stereo, trim, speed and chunks.
+- Music accents, stops and landing a hit (2026-11-18, MCP-43): `scripts/check-mcp.sh` → `MusicShapeChecks` (a synthetic piece with
+  known kicks, a 2 s stop, the hit that ends it and an early end: every kick within a hop, the hit the strongest, nothing heard in
+  the stop, the stop and the end, the same piece 30 dB quieter identical, a sound starting with its hit, 25 dB gaps not stops,
+  silence, the report's window / mapping / cap / order, the placement rule); `scripts/check-parameter-limits.sh` →
+  `MusicPlacementChecks` (an AAC piece through the real `listen` and `add_clips`: the strongest accent measured back on hit_at
+  within a frame, `hit`, a moved source_in, refusals that change nothing, get_job's `music` equal to listen's answer);
+  `checks/MCP/listen-wiring.sh` pins the generation run's measurement. `MusicAccents` is also the delivery checks' accent reading
+  (`SoundTierRuleChecks`' thump every 0.5 s at 24 kHz, `SoundTierChecks`' covered-cuts job); `MusicShapeChecks` pins its frame and
+  hop at five rates and a stretch of playing music without an accent at its start. Rules: [listening engine](../architecture/listening-engine.md) section 9.
 - Batch cut gain: `scripts/check-mcp.sh` → `CutSoundBatchGainChecks` checks every final seam and total gain report, traversal
   order, separated curves / faders, silent components, volume-floor residuals and atomic refusal. `RecipeSoundChecks` checks
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
