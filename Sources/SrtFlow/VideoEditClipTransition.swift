@@ -1,7 +1,9 @@
 import CoreGraphics
 import Foundation
+import SrtFlowCore
 
-// Transition kinds and native geometry; clip persistence remains in VideoEditModels.
+// Transition kinds and native geometry; clip persistence remains in VideoEditModels (only the lenient decoding of the
+// kind is here, next to it: moved 2026-11-18 to make room in VideoEditModels.swift, which is on the line-count baseline).
 // MARK: - 转场
 
 /// 主轨相邻两段之间的转场。
@@ -103,4 +105,8 @@ enum ClipTransition: String, CaseIterable, Identifiable, Hashable, Sendable {
             return CGRect(x: 0, y: canvas.height * p, width: canvas.width, height: canvas.height * (1 - p))
         }
     }
+}
+
+extension ClipTransition: LenientCodableEnum {
+    static var decodingFallback: ClipTransition { .none }
 }

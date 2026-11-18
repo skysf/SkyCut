@@ -95,7 +95,7 @@ enum AIInspectionReview {
         let clear = try args.string("clear_intentional")
         guard mark != nil || clear != nil else { return nil }
         guard mark == nil || clear == nil else { throw AIToolError("Use intentional or clear_intentional, not both.") }
-        for field in ["file", "from", "to", "silence_db", "min_silence", "image"] where args.has(field) {
+        for field in ["file", "from", "to", "silence_db", "min_silence", "image", "sounds"] where args.has(field) {
             throw AIToolError("Reviewing a finding is separate from inspecting; leave \(field) out.")
         }
         var next = project.state.deliveryIntentions

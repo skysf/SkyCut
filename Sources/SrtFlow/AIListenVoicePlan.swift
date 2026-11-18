@@ -44,6 +44,11 @@ struct AIListenVoicePlan: Sendable {
             return best?.kind ?? .other
         }
 
+        /// How long its voice clips (all of a voice layer's, else the ones known to be voice) sound within [from, to) (seconds).
+        func voiceOverlap(from: Double, to: Double) -> Double {
+            pieces.filter { isVoice || $0.kind == .voice }.reduce(0) { $0 + max(0, min(to, $1.to) - max(from, $1.from)) }
+        }
+
         /// A grey hint can name only one added sound, never a voice, camera sound or the combined rest layer.
         func isAddedSound(from: Double, to: Double) -> Bool {
             guard !isVoice, stem.name != AIListenMixPlan.rest else { return false }
@@ -156,13 +161,17 @@ struct AIListenVoicePlan: Sendable {
         let library: [String: Kind]
         /// SkyCut's own output folder names (every interface language) → voice / effects / music (generated audio).
         let folders: [String: Kind]
+        /// Clips whose kind the caller was told (inspect_video `sounds`, AIDeliverySoundRoles); they win over the guesses below.
+        let known: [UUID: Kind]
 
-        init(library: [String: Kind] = [:], folders: [String: Kind] = [:]) {
+        init(library: [String: Kind] = [:], folders: [String: Kind] = [:], known: [UUID: Kind] = [:]) {
             self.library = library
             self.folders = folders
+            self.known = known
         }
 
         func kind(of clip: EditClip) -> Kind {
+            if let kind = known[clip.id] { return kind }
             // Detached camera audio keeps its picture's metadata, even on an audio track.
             if !clip.isAudioOnly || clip.info != nil { return .clipSound }
             if let key = clip.remoteKey, let kind = library[key] { return kind }

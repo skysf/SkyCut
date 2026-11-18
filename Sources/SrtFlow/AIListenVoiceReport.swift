@@ -71,6 +71,7 @@ enum AIListenVoiceReport {
             guard let other = layer(gain.id) else { return false }
             return (other.isVoice || other.kind(from: line.from, to: line.to) == .voice)
                 && gain.levelDBFS >= VoiceClarity.speakingDBFS
+                && other.voiceOverlap(from: line.from, to: line.to) >= VoiceClarity.overlapSeconds
         }
         let verdict = VoiceClarity.verdict(estoi: result.estoi.score, musicIsMainMasker: main == .music,
                                            anotherVoiceSpeaking: anotherVoice)

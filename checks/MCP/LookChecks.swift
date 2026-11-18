@@ -11,6 +11,8 @@ func runLookChecks() {
     checkSheetDrawing()
     checkFrameDescription()
     checkImageResult()
+    // The sound strip under the sheet (look sound=…, MCP-66): checks/MCP/LookSoundChecks.swift.
+    runLookSoundChecks()
 }
 
 private func checkSheetGrid() {

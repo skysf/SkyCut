@@ -124,6 +124,22 @@ enum MCPGuideMediaTopics {
             keyframes, entrance and exit motion; pictures with transparency do not count), not from pixels: dark footage is never \
             uncovered.
             """),
+            // MCP-66 (2026-11-18): docs/architecture/ai-control-mcp.md section 4 item 12; the rows parse like listen's layers.
+            MCPGuideSection(name: "sound", about: "sound=[...]: the mix or tracks drawn under timeline frames, sound starts, #n marks", text: """
+            Sound under the frames. With sound, a timeline look draws the timeline's sound under the sheet, so a hit, a cut or a \
+            silence can be matched to the frames. sound lists the rows, top to bottom, at most 4: mix (the whole mix), a track (A1), \
+            tracks joined by + (V1+V2) or rest (every audible track not named), as listen mix=true names its layers; sound=true \
+            means ["mix"]. SkyCut renders it with the engine that makes the exported sound (clip volume, curves, fades, scenes, \
+            track and master faders), frame by frame at the project frame rate, before the limiter: the levels listen mix=true \
+            reports. The strip spans the frames' times with a little room either side (with clip_id and count: that clip's \
+            seconds). The tiles are labelled #1, #2, ... and a white dashed line marks where each lies on the strip; blue lines \
+            are where a sound starts, labelled with the clip's id; the ruler is in timeline seconds, with short ticks for frames \
+            when they fit. Height is the square root of the level: half height is about -12 dBFS, a quarter about -24. The light \
+            part is each frame's true peak, the solid part its level, red is above the -1 dBTP limiter ceiling. The result's \
+            sound gives the seconds drawn, each row's loudest_at (the start of its loudest frame) and peak_db, and the starts \
+            (time, clip, track, name). It shows how loud and when, never what a sound is: listen describe=true says that. \
+            Timeline looks only (not with file, files, shots or text_scan); image=false returns the numbers without the picture.
+            """),
             MCPGuideSection(name: "shots", about: "shot changes with shots=true and paging with from / next_from", text: """
             Shots. shots=true with a video file or clip_id lists the shot changes with a description and thumbnail of each shot's middle \
             frame, 24 per call; continue with from set to the previous next_from. Long scans return job_id: wait with get_job, then call \
@@ -154,6 +170,7 @@ enum MCPGuideMediaTopics {
         ],
         examples: [
             ["time": 3],
+            ["times": [28, 28.5, 29, 29.5, 30], "sound": ["mix", "A1"]],
             ["file": "a.mp4", "shots": true],
             ["clip_id": "c1", "text_scan": true]
         ],

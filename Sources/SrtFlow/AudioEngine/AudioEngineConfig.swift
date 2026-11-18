@@ -32,6 +32,9 @@ struct AudioEngineConfig: Sendable {
         let scene: SoundScene?
         /// 场景输出乘多少才和原声一样响（`SceneLoudness`）。
         let compensation: Float
+        /// The voice band's gain (300 Hz–3 kHz, linear; 1 = off): `VoiceBandFilter` after the segment gain, before the scene.
+        /// A parameter, not structure: it changes on a live stream (sound-scenes.md section 5).
+        let voiceBand: Float
 
         var duration: Double { end - start }
 
@@ -146,7 +149,8 @@ struct AudioEngineConfig: Sendable {
         return Segment(
             clipID: clip.id, url: clip.sourceURL, start: start, end: start + sourceDuration / speed,
             sourceStart: clip.renderSourceStart, speed: speed, gain: table.sampler(),
-            scene: clip.soundScene, compensation: measuringSceneCompensation ? (clip.soundScene.map(SceneLoudness.compensation(for:)) ?? 1) : 1
+            scene: clip.soundScene, compensation: measuringSceneCompensation ? (clip.soundScene.map(SceneLoudness.compensation(for:)) ?? 1) : 1,
+            voiceBand: VoiceBand.bandGain(clip.voiceBandDB)
         )
     }
 }

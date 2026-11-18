@@ -126,6 +126,7 @@ extension EditClip {
         )
         detached.volumeCurve = volumeCurve
         detached.soundScene = soundScene
+        detached.voiceBandDB = voiceBandDB
         return detached
     }
 
@@ -169,6 +170,8 @@ extension TimelineState {
             // **有没有**场景留着 —— 引擎加上 / 去掉场景要重开那一段的流（`sameStructure`），沿用整条重建这条路
             // （docs/architecture/sound-scenes.md）。
             if clip.soundScene != nil { clip.soundScene = SoundScene(kind: .room) }
+            // The voice-band cut is a parameter of the stream's filter, never structure (sound-scenes.md section 5).
+            clip.voiceBandDB = 0
         }
         copy.mainVolume = 1
         copy.masterVolume = 1

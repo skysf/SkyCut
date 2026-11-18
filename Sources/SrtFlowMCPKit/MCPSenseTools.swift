@@ -53,28 +53,32 @@ public enum MCPSenseTools {
         )
     }
 
+    // 2026-11-18: sound (the timeline's sound under the frames, MCP-66) arrived with under 1 KB left in the whole catalog; the other
+    // notes were reworded shorter (same facts; the long wording is in the skycut_guide look topic) so the catalog does not grow.
     private static var look: MCPToolDefinition {
         MCPToolDefinition(
             .look, title: "Look at the picture",
             description: """
             Read-only. See frames, don't guess: the timeline (time/times, or count over clip_id) or a file (source seconds) as a labelled \
-            contact sheet with face/people/text boxes, brightness, black bars. Also files (24 max), shots=true, text_scan=true (subtitles, \
-            watermarks). Slow looks return job_id: wait with get_job. Outside files may return needs_confirmation. skycut_guide topic=look.
+            contact sheet with face/people/text boxes, brightness, black bars; sound draws the mix under it. Also files (24 max), \
+            shots=true, text_scan=true (subtitles, watermarks). Slow looks return job_id: wait with get_job. Outside files may return \
+            needs_confirmation. skycut_guide topic=look.
             """,
             input: MCPSchema.object([
-                "time": MCPSchema.number("One moment, seconds (≥ 0): timeline, or in the file with file.", minimum: 0),
+                "time": MCPSchema.number("One moment (≥ 0 s); file seconds with file.", minimum: 0),
                 "times": MCPSchema.array(of: MCPSchema.number("Seconds."), "Several moments (up to 12)."),
-                "clip_id": MCPSchema.string("Timeline: spread the frames over this clip's part of the timeline."),
-                "file": MCPSchema.string("A media file instead of the timeline: absolute or relative to the opened folder."),
-                "source_in": MCPSchema.number("With file and no times: spread frames from here, seconds (≥ 0).", minimum: 0),
-                "source_out": MCPSchema.number("With file and no times: stop here, seconds (≥ 0).", minimum: 0),
-                "count": MCPSchema.integer("How many frames to spread (1–12).", minimum: 1, maximum: 12),
-                "files": MCPSchema.array(of: MCPSchema.string("A media file."), "Several media files at once (up to 24)."),
+                "clip_id": MCPSchema.string("Timeline: spread frames over this clip."),
+                "file": MCPSchema.string("A media file (absolute, or in the opened folder)."),
+                "source_in": MCPSchema.number("With file, no times: spread from here (≥ 0 s).", minimum: 0),
+                "source_out": MCPSchema.number("With file, no times: stop here (≥ 0 s).", minimum: 0),
+                "count": MCPSchema.integer("Frames to spread (1–12).", minimum: 1, maximum: 12),
+                "files": MCPSchema.array(of: MCPSchema.string("A media file."), "Several media files (up to 24)."),
                 "shots": MCPSchema.boolean("Split file (a video) or clip_id into shots."),
-                "text_scan": MCPSchema.boolean("Scan file (a video) or clip_id for text that stays on screen."),
-                "from": MCPSchema.number("With shots: start at this second (≥ 0), the previous next_from.", minimum: 0),
+                "text_scan": MCPSchema.boolean("Scan file (a video) or clip_id for on-screen text."),
+                "from": MCPSchema.number("With shots: start here (≥ 0 s), the last next_from.", minimum: 0),
                 "size": MCPSchema.string("Picture size (default medium).", oneOf: ["small", "medium", "large"]),
-                "image": MCPSchema.boolean("false: text descriptions only, no picture."),
+                "image": MCPSchema.boolean("false: text only, no picture."),
+                "sound": MCPSchema.array(of: ["type": "string"], "Sound rows: mix, A1, V1+V2 or rest (≤ 4).", maxItems: 4),
                 "confirm_token": MCPSchema.confirmToken
             ]),
             readOnly: true

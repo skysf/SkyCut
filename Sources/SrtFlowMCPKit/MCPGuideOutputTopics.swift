@@ -58,7 +58,9 @@ enum MCPGuideOutputTopics {
             """),
             MCPGuideSection(name: "results", about: "suspect times, reasons, screenshots and WAV clips", text: """
             Results. It returns job_id: get_job gives suspect times and reasons, screenshots (image=false leaves them out) and \
-            temporary WAV clips to listen to. silence_db (default -45) and min_silence (default 0.5 s) set what counts as \
+            temporary WAV clips to listen to. Under the screenshots the measured mix of the checked range is drawn as look \
+            sound draws it: each screenshot is #n on the strip, blue lines mark where sounds start, and the result's sound lists \
+            them. silence_db (default -45) and min_silence (default 0.5 s) set what counts as \
             silence. Suspects are sampled: a person should review them. A cut is reported as cutting speech (audio_cutoff) only \
             where a cached transcript or narration subtitles show words there; clips cut where sound plays without either are \
             listed in speech_unchecked: transcribe the ones with speech, then inspect again. When the file was made before the \
@@ -72,6 +74,22 @@ enum MCPGuideOutputTopics {
             loudest_layers from the frozen timeline. With file, mix levels describe that file; layer attribution and limiter \
             history describe the frozen timeline and cannot prove the file matches. These thresholds are review heuristics. \
             Missing speech evidence is listed; no recognition or paid work starts. Partial picture coverage remains explicit.
+            """),
+            // Second tier (2026-11-18, MCP-37 / 38 / 39; finished-video-inspection.md "Second-tier sound checks").
+            MCPGuideSection(name: "sound", about: "cut jumps, sounds past their picture, voice clarity, music swells; sounds", text: """
+            Sound checks that need to know what each sound is. sound_roles says what SkyCut took each track's sounds to be: \
+            voice (its voice-overs), music (library or generated), effects (library or made), camera (a picture's own sound) or \
+            other (an imported file). Say what it cannot know with sounds: a track, tracks joined with + or a clip id → voice, \
+            music, effects, ambience or object, e.g. {"A1":"voice","A3":"music","c4":"object"}. audio_cut_jump: at a picture \
+            cut the sound of the place (camera, ambience, objects, other) jumps 6 dB or more (full band or above 300 Hz, 0.3 s each \
+            side) and nothing covers it: no voice, music or effect bed within 6 dB, music accent within 3 frames, music entering or \
+            stopping, hit or riser at the cut, or a line in the picture's own sound starting or ending within 0.35 s. Fix it with \
+            set_transition sound. audio_linger: an object still sounds over 2 frames above -50 dBFS after the picture it starts \
+            in cuts away, or a picture's own detached sound stays 6 dB over the next shot for over 2 frames. audio_voice_masked \
+            and audio_two_voices: listen voice's verdicts for every audio track holding only voice, with the main maskers. \
+            audio_music_swell: music rises 6 dB or more in the voice band during a line. A clear line whose one added layer may \
+            be loud is a grey hint (audio_voice_loud) in hints, not a suspect. A voice sharing its track with other sounds cannot \
+            be measured (limitations). The lines come from one human film and a few listener marks: mark expected ones intentional.
             """),
             MCPGuideSection(name: "intentional", about: "mark, review or clear any finding with one undo step", text: """
             Every finding has a key. Call inspect_video intentional={job_id:<completed report>,key:<finding key>,reason:<one \

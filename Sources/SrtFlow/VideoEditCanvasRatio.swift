@@ -3,8 +3,9 @@ import CoreGraphics
 
 // MARK: - 画布比例
 //
-// 管什么：输出画面的宽高比有哪几种、各自的标准输出尺寸。存盘的宽容解码（`LenientCodableEnum`）和
-// 别的模型的 Codable 放在一起（VideoEditModels.swift「存盘」一节）；按素材挑最接近的比例在用到它的地方。
+// 管什么：输出画面的宽高比有哪几种、各自的标准输出尺寸。按素材挑最接近的比例在用到它的地方。
+// Its lenient decoding (`LenientCodableEnum`) is at the end of this file since 2026-11-18 (moved out of VideoEditModels.swift,
+// which is on the line-count baseline, to make room for a clip field).
 // 2026-10-02 从 VideoEditModels.swift 挪出来（那个文件在行数基线上，给工程的磁吸字段腾地方）。
 
 /// 输出画面的宽高比。`auto` 跟随主轨第一段素材。
@@ -40,4 +41,8 @@ enum CanvasRatio: String, CaseIterable, Identifiable, Hashable, Sendable {
         case .square: return CGSize(width: 1080, height: 1080)
         }
     }
+}
+
+extension CanvasRatio: LenientCodableEnum {
+    static var decodingFallback: CanvasRatio { .auto }
 }

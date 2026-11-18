@@ -49,6 +49,11 @@
   同一个脚本还现做两条合成片，查「切在说话上」只拿人声判（`SpeechRuleChecks`）、夹帧提醒和成片逐帧扫（`FrameSignalChecks` 纯值、`StrayFrameChecks` 真文件真工具：
   add_clips / edit_clip 的 `source_cuts`、四种逐帧疑点、`source_cut`、成片比工程旧的 `attention`），每次打印 `MEASURED` 两行（合成片上刀和别的帧的差距）；
   门槛和反向验证见 [夹帧提醒与成片逐帧扫](../architecture/stray-frames.md)。
+  Second-tier sound checks (2026-11-18): `SoundTierRuleChecks` tests the rules on controlled numbers (every cover of a cut jump,
+  the place above 200 Hz, music accents, picture cuts, linger counting and belonging, the swell, listen's verdicts as entries,
+  `sounds` and roles, the stem split) and `SoundTierChecks` the real job on synthetic sound (jump, linger, masked line, swell,
+  marks, the fixed timeline); `SRTFLOW_INSPECTION_CASE=sound` runs only them. The two-voices hand-over case is in
+  `scripts/check-mix-layers.sh` group 3. Rules and reverse controls: [finished-video inspection](../architecture/finished-video-inspection.md).
 
 - A project's own file written off the main thread (2026-11-19): `scripts/check-project-saves.sh` (real App objects in an isolated bundle, temporary projects, shard 1; a fake drive that holds each write until the check lets it go, never longer than 3 s, or fails): the autosave with the main thread free, flush / ⌘S answering "not responding" at the deadline and landing later, an edit during a write keeping the project dirty, saves coalesced while one is held, a failing drive refused, a moved project file followed, switching away / Save As / the AI's save_project with a stuck drive, `closesAtOnce`, and Quit (a quiet wait, one question when asked twice, Don't Quit / Quit Anyway / a write ending while asking). `checks/project-file-wiring.sh` pins that production code never calls the blocking saves. Rules and reverse verification: [project file](../architecture/video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md).
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
@@ -470,9 +475,25 @@
   the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
   file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
   [volume curve](../architecture/audio-volume-curve.md) section 5.
+- A clip's voice-band cut (`edit_clip voice_band_db`, MCP-30): `scripts/check-audio-engine.sh` group 16 → `VoiceBand.swift` (the
+  filter on steady sines: lows and highs kept, 1 kHz down by the depth, gain 1 flat, blocks = one run; the engine's offline render
+  of a three-tone clip; a cut through `updateGains`, not structure); `scripts/check-project-file.sh` group 51 (cleaning, v38, round
+  trip, split, separated sound, audio-only change); `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh`
+  → `VoiceBandAppChecks` (edit_clip's real plan / apply, the export mixdown per tone, one undo). Rules in
+  [sound scenes](../architecture/sound-scenes.md) section 5.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered
   stamp, queued status / holder / position, late target / Stop binding, distinct on-screen clips and get_job pictures,
   cancel_job / Stop, explicit-project / file controls, and real close_project queued behind an edit. The gate / transport
   remain manual; `checks/MCP/router-wiring.sh` requires the timer before every queue-selection await and authorization first.
+- Sound under look's sheet (2026-11-18, MCP-66; [AI interface](../architecture/ai-control-mcp.md) section 4 item 12): `scripts/check-mcp.sh`
+  → `checks/MCP/LookSoundChecks.swift`, pure: the window for frame times (room, clamps), the frames a window covers, pixel columns (mean
+  level, highest peak, at least the frame under the middle), the summary (`loudest_at`, `peak_db`, each start once in time order, at most
+  24 listed) and the drawing read back pixel by pixel (the level at √amplitude height, red above the ceiling, a blue start line, a dashed
+  white #n line, close #n labels on a second line, the strip under a narrow sheet). Real path: `scripts/check-look-jobs.sh` →
+  `LookSoundChecks` (a background project, a synthetic burst on A1 and a tone on A2, the engine's render: rows in order, the burst's frame
+  loudest in both rows, the A2 start listed with its clip and track, the picture is the sheet plus the strip with tall level bars only at
+  the burst, clip_id spans its clip, image=false gives numbers only, four refusals); `scripts/check-video-inspection.sh` checks that the
+  evidence sheet carries the measured mix. Reverse (2026-11-18): passing no strip to `finish` from look turned 8 checks red, and from
+  inspect_video the evidence-sheet check.

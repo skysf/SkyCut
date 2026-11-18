@@ -61,11 +61,12 @@ enum MCPGuideTimelineEditTopics {
             under each line in one call and one undo step: the dip starts 0.4 s before a line, is full when the line starts and \
             back 0.5 s after it ends; lines closer than about 1.9 s share one dip, so nothing comes up between words or short \
             pauses. duck_tracks names the only tracks to dip (A2+V1): leave a shot's own sound out when its low hits must keep \
-            their weight. Lines come from a cached transcript (transcribe first; a camera's sound needs one) or, for a narration \
+            their weight, and lower only its voice band instead (edit_clip voice_band_db). Lines come from a cached transcript \
+            (transcribe first; a camera's sound needs one) or, for a narration \
             file, from its pauses. The dips are drawn into the clips' volume curves: under a line a clip sits that many dB under \
-            its own level next to the line. Calling again sets the dip anew instead of stacking it; 0 takes it out. Shapes above \
-            that level, such as a crossfade's equal-power bump or a bed swell from set_transition sound, stay and go down with \
-            the rest. A sound lying wholly inside a line (an effect on a word) is not ducked; the result lists it, so move or \
+            its own level next to the line. Calling again replaces only the dip already there instead of stacking it; 0 takes \
+            it out. Other shapes, such as a crossfade's equal-power bump or a bed swell from set_transition sound, stay and go \
+            down with the rest. A sound lying wholly inside a line (an effect on a word) is not ducked; the result lists it, so move or \
             lower it. Dips stay where they were drawn: after moving speech call again, and remove dips left under no line with \
             edit_clip volume_curve. Check with listen.
             """),

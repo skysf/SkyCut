@@ -286,6 +286,9 @@ checkEngineIdle(tone: toneA)
 checkGraphHandoff(tone: toneA)
 checkUserPresence()
 
+print("==> 16. A clip's voice-band cut: only 300 Hz-3 kHz goes down, lows and highs stay; not structure (VoiceBand.swift)")
+checkVoiceBand()
+
 print("\(checks) checks, \(failures) failures")
 if failures == 0 { print("All checks passed") }
 finish(failures == 0 ? 0 : 1)
