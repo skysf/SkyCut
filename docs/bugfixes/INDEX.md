@@ -74,6 +74,7 @@
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
+- [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
 - [2026-11-17 Upper video, covers and grades switch on the wrong export frame](2026-11-17-export-layer-frame-windows.md) — Share FrameGrid windows and native look requests; use half-frame export edges and video placement, with EOF past the last visible frame.
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
