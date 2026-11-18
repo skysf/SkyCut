@@ -12,6 +12,9 @@ import UniformTypeIdentifiers
 // the helper offers the same job without it: type or paste a path, drag the files from Finder, or try the window again.
 // What it doesn't: the window itself (SystemFileChooser); the export panel's folder row (its own chooser and UI); what a
 // caller does with the files (a caller whose project changed meanwhile checks that itself).
+// A save's answer says whether replacing a file already there was confirmed (`SaveLocation`): only macOS's own save
+// window asks that; a typed or dropped answer in the helper never did, so its callers ask (SaveLocation.swift)
+// (2026-11-19, docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md).
 // Rules: docs/architecture/system-file-windows.md.
 
 /// What the helper next to the system window can show (a seam: the checks record what would be shown).
@@ -35,8 +38,8 @@ final class SystemFileWindows {
     private let helper: FileWindowHelping
     /// How long the system window stays up before the helper offers "Close It" (most picks take less).
     private let stripDelay: TimeInterval
-    /// The caller still waiting for an answer.
-    private var answer: (([URL]?) -> Void)?
+    /// The caller still waiting for an answer; the flag says it came from macOS's own window (not the helper).
+    private var answer: (([URL]?, Bool) -> Void)?
     private var phaseWatch: AnyCancellable?
     private var stripTask: Task<Void, Never>?
 
@@ -54,7 +57,7 @@ final class SystemFileWindows {
     /// Asks for `request`; `then` gets the picked URLs (never called when nothing was picked). While a window is already
     /// up, a second request brings nothing new up and gets no answer: the open window is what the person is answering.
     func open(_ request: FileWindowRequest, then: @escaping ([URL]) -> Void) {
-        start(request) { urls in
+        start(request) { urls, _ in
             if let urls, !urls.isEmpty { then(urls) }
         }
     }
@@ -62,40 +65,54 @@ final class SystemFileWindows {
     /// The same, awaited: nil when nothing was picked.
     func choose(_ request: FileWindowRequest) async -> [URL]? {
         await withCheckedContinuation { continuation in
-            start(request) { continuation.resume(returning: $0) }
+            start(request) { urls, _ in continuation.resume(returning: urls) }
         }
     }
 
-    private func start(_ request: FileWindowRequest, answer: @escaping ([URL]?) -> Void) {
-        guard chooser.phase != .choosing else { return answer(nil) }
+    /// A save window, awaited: where, and whether replacing a file there was confirmed. nil when nothing was chosen.
+    func chooseSave(_ request: FileWindowRequest) async -> SaveLocation? {
+        await withCheckedContinuation { continuation in
+            openSave(request) { continuation.resume(returning: $0) }
+        }
+    }
+
+    /// A save window answered in a closure: `then` gets nil when nothing was chosen.
+    func openSave(_ request: FileWindowRequest, then: @escaping (SaveLocation?) -> Void) {
+        start(request) { urls, inSystemWindow in
+            then(urls?.first.map { SaveLocation(url: $0, mayReplace: inSystemWindow) })
+        }
+    }
+
+    private func start(_ request: FileWindowRequest, answer: @escaping ([URL]?, Bool) -> Void) {
+        guard chooser.phase != .choosing else { return answer(nil, false) }
         // A failed window's fallback still up for an earlier request: that caller gets nothing.
         chooser.dismissFailure()
-        finish(nil)
+        finish(nil, inSystemWindow: false)
         self.answer = answer
-        chooser.choose(request) { [weak self] urls in self?.finish(urls) }
+        chooser.choose(request) { [weak self] urls in self?.finish(urls, inSystemWindow: true) }
     }
 
     /// "Try Again" in the fallback: the system window once more, the record's detour skipped.
     private func tryAgain() {
-        guard let request = chooser.request else { return finish(nil) }
+        guard let request = chooser.request else { return finish(nil, inSystemWindow: false) }
         helper.hide()
         chooser.dismissFailure()
-        chooser.choose(request, force: true) { [weak self] urls in self?.finish(urls) }
+        chooser.choose(request, force: true) { [weak self] urls in self?.finish(urls, inSystemWindow: true) }
     }
 
-    /// Answered from the fallback (a typed path, dropped files) or given up there.
+    /// Answered from the fallback (a typed path, dropped files) or given up there. Nobody asked "Replace?".
     private func answerWithoutWindow(_ urls: [URL]?) {
         chooser.dismissFailure()
-        finish(urls)
+        finish(urls, inSystemWindow: false)
     }
 
-    private func finish(_ urls: [URL]?) {
+    private func finish(_ urls: [URL]?, inSystemWindow: Bool) {
         stripTask?.cancel()
         stripTask = nil
         helper.hide()
         let pending = answer
         answer = nil
-        pending?(urls)
+        pending?(urls, inSystemWindow)
     }
 
     private func phaseChanged(_ phase: SystemFileChooser.Phase) {
@@ -148,13 +165,14 @@ enum FilePicker {
         }
     }
 
+    /// `then` gets where, and whether a file there may be replaced (`SaveLocation`); never called when nothing was chosen.
     static func chooseSaveLocation(
         types: [UTType], name: String, start: URL? = nil, prompt: String? = nil, message: String? = nil,
-        then: @escaping (URL) -> Void
+        then: @escaping (SaveLocation) -> Void
     ) {
         let request = FileWindowRequest(kind: .save(types: types, name: name), start: start, prompt: prompt, message: message)
-        SystemFileWindows.shared.open(request) { urls in
-            if let file = urls.first { then(file) }
+        SystemFileWindows.shared.openSave(request) { location in
+            if let location { then(location) }
         }
     }
 }

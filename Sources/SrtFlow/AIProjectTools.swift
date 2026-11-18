@@ -181,15 +181,17 @@ enum AIProjectTools {
         var url = requested ?? AIWorkspace.shared.outputFolder(.projects, project: project)
             .appendingPathComponent(defaultStem(project))
             .appendingPathExtension(VideoEditProjectFile.fileExtension)
+        let ownFile = url.standardizedFileURL.path == project.documentURL?.standardizedFileURL.path
         // 撞了别的文件就加编号，从不覆盖（存回它自己原来的位置不算撞）。
-        if url.standardizedFileURL.path != project.documentURL?.standardizedFileURL.path {
+        if !ownFile {
             url = ExportFileName.unoccupied(
                 in: url.deletingLastPathComponent(), stem: url.deletingPathExtension().lastPathComponent,
                 pathExtension: url.pathExtension
             ) { FileManager.default.fileExists(atPath: $0.path) }
         }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        guard await project.saveAs(url) else {
+        // A file that appeared under the picked name meanwhile is not replaced either (only the project's own file is).
+        guard await project.saveAs(url, replacing: ownFile) else {
             throw AIToolError(project.notice ?? "SkyCut could not save the project to \(url.path).")
         }
         return .ok(["saved": .string(url.path)])
@@ -220,7 +222,7 @@ enum AIProjectTools {
             in: folder, stem: defaultStem(project), pathExtension: VideoEditProjectFile.fileExtension
         ) { FileManager.default.fileExists(atPath: $0.path) }
         guard (try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)) != nil,
-              await project.saveAs(url) else { return nil }
+              await project.saveAs(url, replacing: false) else { return nil }
         return url
     }
 

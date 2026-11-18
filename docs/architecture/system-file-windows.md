@@ -48,6 +48,16 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    written to the place chosen for the untitled one ([case](../bugfixes/2026-11-19-close-trusts-a-stale-save.md)).
 8. Diagnostics: the chooser leaves `注：file window: …` notes in the stall log (opening, how long macOS took to make it,
    came back empty, never on screen, closed from SkyCut), [main-thread stalls](../testing/main-thread-stalls.md).
+9. **A save replaces a file only when that was confirmed for exactly its URL** (since
+   [a typed or dropped answer replaced a file](../bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md)). macOS's own
+   save window asks "Replace?" before it answers; the helper's typed and dropped answers never do. So a save's answer is a
+   `SaveLocation` (`SaveLocation.swift`): the URL and `mayReplace`, true only from macOS's own window, and only for that URL —
+   a caller that changes it (the project's Save As adding `.skycut`) uses `at(_:)`, which drops the confirmation. Every save
+   written from a window writes through `NewFileClaim` (claim the name with `O_EXCL`, then write atomically over the claim)
+   unless replacing was confirmed; when a file is there, the caller asks `FileReplaceQuestion` (Cancel by default) and writes
+   again only on Replace — the project's Save As (`saveAs(chosen:)`, also from closing an untitled project) and the subtitle
+   editor's Export As (`SubtitleFileSave`) — or, for a screen recording, the commit avoids the name ("Name 2"). The AI's saves
+   pick unused names and never replace a file (only `save_project` back to the project's own file).
 
 ## Checks
 
@@ -55,7 +65,9 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | --- | --- |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`) | the chooser with fake windows: answers, a person cancels, empty at once, never appears (main thread free), appears then vanishes, stays stuck + Close It, closed when nobody waits any more, the force-quit record + Try Again |
 | `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller, Close It appears next to a window on screen and offers the fallback, Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
-| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows` |
+| `scripts/check-export-profile.sh` (`FileWindowsChecks`, saves) | an answer from macOS's own save window may replace; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
+| `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
+| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the claim, Save As and Export As asking, the recording's confirmation) |
 
 ## Manual regression (real windows, before a release)
 
@@ -76,4 +88,8 @@ The real panel service can't be driven from a check (it needs the window server,
    stopped service afterwards.
 4. While Add Media… is open, start a new project (File ▸ New Project): picking a file afterwards adds nothing to the new
    project.
-5. Chinese and Spanish UI: the strip and the helper are translated (they are in-process windows with `.appLanguage()`).
+5. With the panel service stopped (item 3), Save As… a project by dropping a folder that already holds a project of the
+   suggested name: SkyCut asks "Replace “Name.skycut”?"; Cancel leaves that file as it was, Replace saves there. The same for
+   the subtitle editor's Export As; a screen recording saved to a typed path that already exists lands as "Name 2".
+6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
+   `.appLanguage()`; the question is an `NSAlert` with SkyCut's own strings).

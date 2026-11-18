@@ -152,6 +152,9 @@ final class ScreenRecordingCoordinator: ObservableObject {
     ) async {
         guard state == .configuring else { return }
         targetProject = project
+        // A file already at the output is replaced only when the person confirmed it in macOS's own save window; a typed
+        // or dropped answer and the pre-filled name are avoided ("Name 2") like the AI's (ScreenRecordingOptions).
+        session.replacesExistingOutput = session.replacesExistingOutput && options.replacesExistingOutput
         // session 身份在这里生成**一次**，贯穿 picker 回调直到最终 request。
         let sessionID = UUID()
         let epoch = sessionEpoch
@@ -235,15 +238,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         }
 
         // 8. **先持久化 manifest，再建临时文件和 writer**
-        let manifest = ScreenRecordingManifest(
-            sessionID: sessionID,
-            startedAt: Date(),
-            mainTemporaryPath: request.temporaryURL(for: .main).path,
-            mainFinalPath: request.outputURL.path,
-            micTemporaryPath: request.microphone.isEnabled
-                ? request.temporaryURL(for: .microphone).path : nil,
-            micFinalPath: request.microphone.isEnabled ? request.microphoneURL.path : nil
-        )
+        let manifest = ScreenRecordingFileCommit.startingManifest(for: request, sessionID: sessionID)
         do {
             try store.persist(manifest)
         } catch {

@@ -20,6 +20,20 @@ struct ScreenRecordingFileCommit {
     }
 
     let store: ScreenRecordingManifestStore
+
+    /// The journal a session starts with: where its temporary and final files will be, persisted before any file is made.
+    /// (Moved here from ScreenRecordingCoordinator.swift on 2026-11-19, which may only shrink.)
+    static func startingManifest(for request: ScreenRecordingRequest, sessionID: UUID) -> ScreenRecordingManifest {
+        ScreenRecordingManifest(
+            sessionID: sessionID,
+            startedAt: Date(),
+            mainTemporaryPath: request.temporaryURL(for: .main).path,
+            mainFinalPath: request.outputURL.path,
+            micTemporaryPath: request.microphone.isEnabled
+                ? request.temporaryURL(for: .microphone).path : nil,
+            micFinalPath: request.microphone.isEnabled ? request.microphoneURL.path : nil
+        )
+    }
     let manager = FileManager.default
 
     /// journal 提交协议：persist 意向 → rename → persist 已提交。
