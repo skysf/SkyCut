@@ -100,6 +100,12 @@ way, even sizes ≥ 16, ≤ 60 s, 1–120 fps, page ≤ 2 MB, parameters ≤ 256
   (max(load, script + 2 × snapshot)) + 10 s, or past its total + 10 s → SIGKILL.
 - The helper also stops when SkyCut is gone (its parent changed).
 - Frames are drawn several at a time; when several fail, the earliest is reported.
+- **Frames only from timing inside the caps.** `WebMotionRequest.frameCount` turns a duration and frame rate into frames
+  only when both are inside the caps (`timingWithinCaps`, at most 7,200 frames) and is 0 otherwise; `problems()` refuses
+  the rest in plain words. Nothing may convert duration × fps to `Int` before that check: a finite 10^20 s duration (an AI
+  argument, `parameters.duration`, a damaged project record) overflowed inside validation and quit SkyCut and the helper
+  ([case](../bugfixes/2026-11-19-web-motion-huge-duration-quits-app.md)). A stored frame rate outside the caps is named by
+  this validation; the inspector's own message covers only its length field.
 
 ## 6. Memory
 
@@ -256,7 +262,7 @@ calibration and loading three pages.
 
 | Check | Pins |
 | --- | --- |
-| `scripts/check-web-motion.sh` (`checks/WebMotion/`) | the clock (production script driven directly in a WKWebView); normal pages pass, two renders identical, movie tagged premultiplied; alpha values, fast = public, broken fast path switches / is refused; hostile pages (loops, error, kept state, no entry, flicker, huge canvas); a listener sees no connection or datagram, no file read, no permission, no surviving storage; hog killed at budget, injected pressure kills, both backstops; the check's own main thread never stalls (it stands in for SkyCut). `SRTFLOW_WEB_MOTION_CHECKS=group,…` runs some groups |
+| `scripts/check-web-motion.sh` (`checks/WebMotion/`) | the clock (production script driven directly in a WKWebView); normal pages pass, two renders identical, movie tagged premultiplied; alpha values, fast = public, broken fast path switches / is refused; hostile pages (loops, error, kept state, no entry, flicker, huge canvas) and an out-of-bounds request the helper refuses itself; a listener sees no connection or datagram, no file read, no permission, no surviving storage; hog killed at budget, injected pressure kills, both backstops; the check's own main thread never stalls (it stands in for SkyCut). `SRTFLOW_WEB_MOTION_CHECKS=group,…` runs some groups |
 | `checks/web-motion-wiring.sh` | packaging and signing order; pages only in the helper; one HTML loader, every load locked, every configuration from `Lockdown` with its locks; the fonts rule; no probe-tool clock names; the check in check-all |
 | `checks/release-signing.sh` | `sign-app.sh` signs four things (ffmpeg, `skycut-mcp`, `skycut-web-motion`, the app) |
 
@@ -348,8 +354,8 @@ A successful lane-only move still notes/saves the AI round and reports `before_r
 both clip values and source-lane context to match. See [the regression case](../bugfixes/2026-11-17-web-motion-render-overwrites-track-edits.md).
 
 `scripts/check-motion-placement.sh` links real App objects in its own bundle/defaults domain and drives the real helper with small synthetic
-pages. It covers placement, template reuse, parameter edits, undo/redo, approval modes, error atomicity, system/font warnings and missing
-cache recovery. `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by
+pages. It covers placement, template reuse, parameter edits, undo/redo, approval modes, error atomicity, system/font warnings, missing
+cache recovery, and over-long durations / frame rates (AI calls and a reopened project) refused before any job or render. `checks/MCP/motion-wiring.sh` pins router, approval, jobs, generation guards, undo, discovery and recovery; it is sourced by
 `check-mcp`, including scans-only. Renderer lockdown checks remain `scripts/check-web-motion.sh`.
 The timeline drop wiring guard counts `WebMotionActions` as a separate, exactly-once consumer of `mediaImportLandings`, like the
 AI importer; the file drop's preview and commit must still be its only two calls. No second landing calculation is permitted.

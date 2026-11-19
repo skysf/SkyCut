@@ -45,7 +45,7 @@ import SrtFlowMCPKit
                   "cache recovery keeps the clip's identity")
 }
 
-@MainActor private func recoveryFinished(_ project: VideoEditProject) -> Bool {
+@MainActor func recoveryFinished(_ project: VideoEditProject) -> Bool {
     let key = "recovery:\(project.documentGeneration)"
     guard WebMotionActivity.claim(key) else { return false }
     WebMotionActivity.release(key)

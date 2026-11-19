@@ -80,8 +80,9 @@ final class WebMotionEditorModel {
         defer { isRendering = false }
         do {
             try validateCurrent()
-            guard record.duration.isFinite, record.duration > 0, record.duration <= WebMotionCaps.maxDuration,
-                  WebMotionRequest.frameCount(duration: record.duration, fps: record.fps) > 0 else {
+            // The length is this form's own field. A stored frame rate outside the caps is not: the shared validation in
+            // `place` names it, instead of this message blaming the length.
+            if WebMotionCaps.fpsRange ~= record.fps, WebMotionRequest.frameCount(duration: record.duration, fps: record.fps) < 1 {
                 throw AIToolError(String(format: L10n("Render length must include at least one frame and be at most %@ seconds."),
                                         String(Int(WebMotionCaps.maxDuration))))
             }

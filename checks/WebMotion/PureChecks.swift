@@ -76,6 +76,36 @@ enum PureChecks {
         check(!request(output: "relative.mov").problems().isEmpty, "a relative output path is refused")
         check(WebMotionLimits.standard(frames: 96).total == 252 && WebMotionLimits.standard(frames: 7200).total == 1800,
               "the total time limit grows with the frames and stops at 30 minutes")
+        oversizedTiming()
+    }
+
+    /// A finite but huge duration or frame rate (an AI's typo, a damaged project file) is refused in plain words: making,
+    /// checking and limiting the request never turn it into a frame count (that overflowed Int and quit SkyCut,
+    /// docs/bugfixes/2026-11-19-web-motion-huge-duration-quits-app.md).
+    private static func oversizedTiming() {
+        let duration = "The duration must be more than 0 and at most 60 seconds."
+        let rate = "The frame rate must be 1–120."
+        let cases: [(Double, Int, String, String)] = [
+            (1e20, 24, "a 10^20 s duration at 24 fps", duration),
+            (.greatestFiniteMagnitude, 120, "the largest finite duration at 120 fps", duration),
+            (3, Int.max, "3 s at Int.max fps", rate),
+            (-1e20, 24, "a huge negative duration", duration),
+        ]
+        for (seconds, fps, label, expected) in cases {
+            let request = WebMotionRequest(html: "<p>", parametersJSON: "{}", duration: seconds, width: 320, height: 180, fps: fps,
+                                           outputPath: "/tmp/x.mov")
+            let problems = request.problems()
+            check(request.frameCount == 0 && WebMotionRequest.frameCount(duration: seconds, fps: fps) == 0,
+                  "\(label): no frame count is made from it")
+            check(problems.contains(expected) && !problems.contains("The motion is shorter than one frame."),
+                  "\(label) is refused in plain words: \(problems.joined(separator: " "))")
+            check(request.limits == .standard(frames: 0), "\(label): the default time limits stay those of an empty render")
+        }
+        check(WebMotionRequest.frameCount(duration: 60, fps: 120) == 7_200 && WebMotionRequest.frameCount(duration: 0.51, fps: 24) == 12,
+              "inside the caps the frame count is still round(duration × fps), up to 7,200")
+        check(WebMotionRequest(html: "<p>", parametersJSON: "{}", duration: 0.01, width: 320, height: 180, fps: 24,
+                               outputPath: "/tmp/x.mov").problems() == ["The motion is shorter than one frame."],
+              "a duration inside the caps that rounds to no frame still says so")
     }
 
     private static func memoryPolicy() {

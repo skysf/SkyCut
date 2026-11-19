@@ -10,7 +10,7 @@
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
-  hostile pages, a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
+  hostile pages and a request out of bounds (refused by the helper itself, never a crash), a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
   `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
   `load-memory` uses fixed 32 MiB load/ready buffers and real kernel samples, one-event PID retry and process-birth/receipt guards.
@@ -20,8 +20,8 @@
 - Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
   library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
-  both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery and
-  portable font/system warnings. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery,
+  portable font/system warnings, and over-long durations / frame rates (AI calls, a reopened project) refused before any job. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
   Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
   fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled
