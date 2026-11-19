@@ -569,13 +569,22 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   这个名字，所以改 CI 不用动 ruleset。它 `needs` 全部分组，而且必须带
   `if: ${{ !cancelled() }}`：不写的话，分组一红它就被跳过，**被跳过的必需检查会被 GitHub
   当成通过**，红的 PR 也能合进去。不用 `always()`，是免得被取消的那一轮再报一个假的失败。
-- **只有第 1 组编完整 App**（单独一步，编译错误在自己的步骤里看得清；2026-11 冷编要 2 分 10 秒到
-  2 分 45 秒，2026-09 才 50–80 秒；check-all.sh 第 1 组也明写了一项「build（完整 App 编得过）」）。
-  别的组的子脚本只 `swift build --target SrtFlowCore`：它们要的只是核心库的模块和目标文件。
-  **要链接完整 App 目标文件的检查**（脚本里 `@"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList"`，
-  video-inspection、voice-recovery 这几项）**只能放第 1 组**，放到别的组那台就得为它再冷编一遍整个 App。
-  反过来，第 1 组也只放这一摊：它要背冷编和 3 分钟的性能 ratchet，本来就是最慢的一组。
-  `checks/check-all-shards.sh` 两头都钉着。
+- **Full-App checks run in shards 1–3, and every shard restores one full-App build cache** (since 2026-11-20).
+  - Shard 1 builds the complete App in its own step, "Build app": compile errors show in full there. check-all.sh also
+    lists the plain build as a check ("build（完整 App 编得过）"). On main the step's result is saved as the cache that
+    every shard of the next run restores (the cache item below).
+  - A check that links the App's object files (`@"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList"`: video-inspection,
+    motion-placement, voice-recovery and others) builds `--product SrtFlow` itself. In shards 2 and 3 the first such check
+    compiles what changed since main's cache, one to four minutes. Shards 4 and 5 hold none: there a single one would add
+    that build for one check. The other scripts build only the libraries they need (`swift build --target SrtFlowCore`).
+  - Shard 1 is the graphical shard. The playback start benchmark runs before its checks and the preview perf ratchet
+    after them, both on the App that "Build app" just built (in another shard the benchmark would compile inside its
+    six-minute limit). It holds the lightest share of check-all, about 13 minutes in all, so re-running a timing flake
+    costs that rather than the longest shard.
+  - Until 2026-11-20 every full-App check had to sit in shard 1. Shard 1 grew from 8–10 minutes (through 11-17) to
+    27–28 (11-19) while shards 2–5 took 8–11, and a flaky benchmark re-ran all of it.
+  - `checks/check-all-shards.sh` pins the full-App shards, that every command runs exactly once and no check script
+    drops out of CI, and that the graphical steps run after the App build in its shard.
 - **自检二进制用 `-wmo` 编**（整模块一次编完）。同一份 40 个文件，默认的逐文件编译要
   12.5 秒，`-wmo` 只要 4.9 秒（本机 arm64、模块缓存已热）：逐文件模式下每个文件都要把
   其余文件重新解析一遍。CI 上拆分前，各项检查里编译占了约 300 秒、运行约 160 秒。
@@ -650,6 +659,7 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
       有一次不等，马上关掉开关。
     - PR 第 1 组「Build app」的中位数（11-04 到 11-13 是 40 秒）不该涨：涨了是第 1 组的缓存没存上。
     - PR 第 2–5 组「Run checks」的中位数（同期 307 秒）涨 30 秒以内：短轮不刷新这几组的缓存（用户定），涨得多再给短轮加一步刷新。
+      Moot since 2026-11-20: every shard restores the one cache that shard 1 saves in short runs too.
     - PR 第一次红、原样重跑就绿的次数：明显变多，说明有不稳定的检查没人发现，单独去修。
 - **第 1 组多一步「预览性能 ratchet」**（`scripts/check-preview-perf.sh`，不在 check-all.sh 里：
   要图形会话）。它起第 1 组已经编好的 App，按固定场景数「做了多少件活」，和
@@ -662,21 +672,32 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   - 编译之前先跑 `scripts/ci-stable-mtimes.py`：入库文件的修改时间按内容（git 的 blob id）算。内容没变的文件每次 checkout
     都是同一个时间；变了的换一个时间、照样重编 —— 哪怕新时间比上次编译还早，因为 SwiftPM 比的是「一不一样」不是「新不新」
     （`scripts/check-ci-build-cache.sh` 在小包上每次真验一遍，哪天 SwiftPM 改了它就红，不会拿旧的目标文件测新代码）。
-  - 取用 `actions/cache/restore`、存用 `actions/cache/save`，每组一份，key 带检出目录、工具链指纹（Xcode / Swift 的版本）、
-    组号和这次的提交；restore-keys 去掉提交，恢复同一组、同一工具链最新的那份。
-  - 只在 main 上、整组绿了才存。PR 恢复 main 上最新的那份（GitHub 的缓存按分支隔开，PR 上存的只有这个 PR 自己用得上）；
-    所以 main 上合并之后那一轮也是在给下一个 PR 备缓存。缓存一份按提交存、存了不能改，旧的 GitHub 七天没人用会自己清掉。
-    树已经验过的那种 main 短轮（上面「合并之后 main 上那一轮」）里只有第 1 组取、编、存；第 2–5 组的缓存只在完整的那几轮里刷新
-    （用户 2026-11-13 定：先不刷新，上线后看它们「Run checks」的中位数）。
-  - `checks/ci-build-cache-key.sh` 钉着上面这些写法。
+  - Restored with `actions/cache/restore`, saved with `actions/cache/save`. Since 2026-11-20 there is **one cache for
+    all shards**: the complete App build (every product) of shard 1's "Build app" step, key
+    `swiftpm-<os>-<checkout>-<toolchain fingerprint>-app-<commit>`. restore-keys drop the commit, so a run restores the
+    newest App build for the same checkout and toolchain. A second restore key, the old shard-1 cache (`…-shard1-`),
+    covers the switch and stops matching once those entries expire. Before, each shard kept its own cache, keyed with
+    its shard number, and only shard 1's held the App.
+  - Saved on main only, by shard 1, right after "Build app" succeeds. A PR restores main's newest one: GitHub scopes
+    caches by branch, so a PR's cache serves that PR alone, and the run after a merge prepares the next PR's cache.
+    - Not at the end of the job, as before 2026-11-20: since 11-17 a newer merge cancels older main runs, and on busy
+      days few lasted long enough to save. On 11-19, 5 of 12 sampled PR runs restored a cache 23–42 source files behind.
+    - Only shard 1 saves, so the shared cache is always a complete App build. The 2026-11-04 bug was a shard that had
+      built only the core library winning a shared key.
+    - The verified main short runs (「合并之后 main 上那一轮」 above) restore, build and save in shard 1 as before, and that
+      now refreshes the cache for every shard.
+    - A cache entry is per commit and can't change; GitHub drops entries unused for seven days.
+  - `checks/ci-build-cache-key.sh` pins all of this.
 - **`.build` 缓存的 key 和 restore-keys 都带检出目录（`github.workspace`）**：`.build` 里的模块缓存记着编它时的绝对路径，
   换了目录恢复回来就编不过。2026-10-18 仓库改名 SkyCut、检出目录从 `…/SrtFlow/SrtFlow` 变成 `…/SkyCut/SkyCut`，旧缓存被恢复、
   五组齐红（[案例](../bugfixes/2026-10-18-ci-build-cache-breaks-after-repo-rename.md)）。`checks/ci-build-cache-key.sh` 钉着。
 
-**怎么分组**：第 1 组只放「完整 App」那一摊（上面那条）。其余的按 CI 日志里每项的耗时（`✓ 名字（N s）`）
-装箱，最慢的先放，每次放进第 2–5 组里当前最空的那一组；扫描守卫秒级、不编译，放在各组最前。加了新检查就放进
-最空的那组，改完看一眼 CI 上各组的时长。文档里提到某条检查时别写它在第几组：分组只以 check-all.sh 为准，
-写了组号的地方下次重排就过期。
+**How to group** (since 2026-11-20): pack by each check's time in the CI logs (`✓ 名字（N s）`), slowest first, each
+into the emptiest shard it may go to. Full-App checks go to shards 1–3, everything else to shards 2–5. Count shard 1's
+App build and its graphical steps (about six minutes together) and keep it the lightest, and count one App build
+(about one to two minutes) in shards 2 and 3. Scan guards are seconds and compile nothing: they run first in a shard.
+Add a new check to the emptiest shard it may go to, then look at the shard times on CI. Docs never say which shard a
+check is in: only check-all.sh does, and a shard number written elsewhere goes stale at the next rebalance.
 
 **实测**：
 

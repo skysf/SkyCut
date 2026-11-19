@@ -126,8 +126,9 @@
 - 全部自动检查：`scripts/check-all.sh`。CI 在每个 PR 上运行同一入口：
   `.github/workflows/checks.yml`，按 `--shard N --of 5` 分到 5 台免费的 macOS runner 上并行跑，
   由一个叫 `check-all` 的汇总 job 给结论（分组、组数校验、汇总 job 为什么不能被跳过，见
-  [构建与打包「CI」一节](../build/build-and-packaging.md)）。新加检查要放进某个 `shard`：要链接完整 App 目标文件的
-  放第 1 组（只有那台编了完整 App），别的放第 2–5 组里最空的那组；文档里提到检查时别写组号（分组只以 check-all.sh 为准）。
+  [构建与打包「CI」一节](../build/build-and-packaging.md)）。A new check goes in a `shard`: one that links the full App
+  in shards 1–3 (they build it; shard 1 is the light graphical shard), any other in the emptiest of shards 2–5. Docs
+  never name a check's shard (only check-all.sh says).
 - 核心库：`swift run --arch arm64 SrtFlowCoreChecks`（含字幕折行的文字规矩 `SubtitleRowBreakChecks`：中日文的词在哪、能在哪儿断、断在哪好；含逐词高亮：词对到去完标点的字上、此刻亮哪个、跟着编辑走、按词切段、ASS 标签，`SubtitleWordChecks`）。
   Since 2026-11-19 also how a new file takes its name (`ExclusivePlacementChecks`, [export settings](../architecture/export-settings.md) §5 item 9): real folders with each install step forced in turn (exclusive rename, hard link, `O_EXCL` copy) and a real exFAT disk image the check makes and attaches (it fails, not skips, when `hdiutil` can't): a name taken before or while the file is written keeps its bytes, an empty file at the name survives a failed write, a set takes back what it took and moves on whole, a series counts on from its number, nothing private is left. The subtitle export planner's checks moved to `SubtitleExportPlannerChecks.swift`.
 - 生成的字幕长什么样（去标点、断句、一行多长、显示时间、几段素材同时有字只留一条，用例是用户工程里真实转写出来的句子）：
@@ -419,8 +420,11 @@
 - 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来（不挂在页面的 `onAppear` 上），剪辑页和 AI 的字幕样式都经
   `subtitleStyle(appWide:)`（工程自己的样式优先）：`checks/encode-settings-memory.sh`。
 - 构建日志不得被吞：`checks/no-swallowed-build-output.sh`。
-- CI 的 `.build` 缓存：key 和 restore-keys 带检出目录（`github.workspace`，仓库改名 / 换目录后不捡旧目录编的缓存）、工具链指纹、组号和提交，
-  取 / 存分开且同一个 key、只在 main 上绿了才存、编译之前修改时间按内容设（`scripts/ci-stable-mtimes.py`）：`checks/ci-build-cache-key.sh`；
+- CI 的 `.build` 缓存：key 和 restore-keys 带检出目录（`github.workspace`，仓库改名 / 换目录后不捡旧目录编的缓存）、工具链指纹和提交;
+  one full-App cache for every shard (`-app-`, never the shard number; the first restore key is the key without the
+  commit, any other one a prefix for the same checkout and toolchain), restore and save separate with the same key,
+  saved on main only by the shard with the dedicated App build in the step right after it, file times set from content
+  before compiling (`scripts/ci-stable-mtimes.py`): `checks/ci-build-cache-key.sh`；
   按内容设的时间比上次编译早时照样重编（不拿旧目标文件测新代码）、新 checkout 放回 `.build` 重编 0 样，在小包上真走一遍：`scripts/check-ci-build-cache.sh`。
 - CI 的「只改了文档」快速通道（`scripts/ci-docs-only.sh` 判：只有 `docs/` 和根目录三份说明才算，改名算删旧加新；是就只跑扫描守卫）
   只在真的只改了文档时走、每一步重活都看判断的结论、触发条件里不许有 paths（必需的 check-all 会永远等不到结论）：`checks/ci-docs-only.sh`。
@@ -433,8 +437,15 @@
   (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
   It also constructs a docs-only merge after concurrent code lands: both push gates must return false, even with a
   matching scan-only PR marker. Docs-only PRs keep the fast path; code merges keep full-PR exact-tree reuse.
-- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
-  以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
+- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）;
+  every run_check command exactly once; every `scripts/check-*.sh` named by check-all or a workflow step, or listed
+  in the guard as deliberately local (graphical session, real keychain), and every `*Checks` executable and
+  `checks/*/*Checks.py` named by check-all; full-App checks (the plain build, scripts that link
+  `SrtFlow.product/Objects.LinkFileList`) only in shards 1–3; the playback start benchmark and the preview perf
+  ratchet once each, after the dedicated App build in its shard: `checks/check-all-shards.sh`. Reverse verification
+  (2026-11-20): a duplicated line, a dropped script / `SrtFlowCoreChecks` / `SmokeClientChecks.py`, a full-App check
+  in shard 4, the plain build in shard 5, a graphical step removed or moved to shard 2, no or two App build steps and
+  an orphan script each turn it red.
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。

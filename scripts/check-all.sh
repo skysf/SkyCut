@@ -88,64 +88,45 @@ run_check() {
   fi
 }
 
-# 分组按 CI 上实测的每项耗时配平（实测数字和重排的做法见 docs/build/build-and-packaging.md
-# 「CI」一节）。加了新检查：要链接完整 App 目标文件的放第 1 组，别的放进第 2–5 组里当前最空的
-# 那组（checks/check-all-shards.sh 钉着），改完看一眼 CI 上各组的时长。每组内部仍是
-# 快的在前。Rosetta 终端下必须显式 --arch arm64（见 docs/build/），各子脚本已各自处理。
+# Shards are balanced by each check's time on CI (measurements and how to rebalance: docs/build/build-and-packaging.md
+# "CI"). Every shard restores the same full-App build cache (.github/workflows/checks.yml), so a check that links the
+# full App can run in any shard. Keep those in shards 1-3, which build the App anyway: in shard 4 or 5 a single one adds
+# an App build of one to four minutes. Shard 1 is the graphical shard. CI builds the App there in its own step and runs
+# the playback start benchmark before this shard's checks and the preview perf ratchet after them, so shard 1 stays
+# light (about 13 minutes) and re-running a timing flake stays cheap. Put a new check in the emptiest other shard.
+# checks/check-all-shards.sh pins this. Faster checks run first within a shard. Rosetta terminals must pass
+# --arch arm64 (docs/build/); each script does that itself.
 
-# ---- 第 1 组：完整 App 编得过 + 要链接完整 App 目标文件的检查 ----
-# CI 上这一组的 runner 先单独编一遍完整 App（编译错误在自己的步骤里看得清），检查跑完还要起这个 App
-# 跑 3 分钟的预览性能 ratchet：是最慢的一组。其余几组只编核心库（子脚本只要 SrtFlowCore 的模块和目标文件）。
-# 所以这里只放两样：「App 编得过」这一项（子脚本不再顺手编整个 App 了），和要链接完整 App 目标文件
-# （SrtFlow.product/Objects.LinkFileList）的检查 —— 放到别的组，那台 runner 就得为它再冷编一遍整个 App。
-# 扫描守卫、纯值检查一律放第 2–5 组。checks/check-all-shards.sh 钉着这两条。
+# ---- Shard 1: the graphical shard (CI: Build app, playback start benchmark, these checks, preview perf ratchet) ----
 shard 1
 run_check "build（完整 App 编得过）" swift build --arch arm64
-run_check "screen-recording-feedback (completion notices, late Stop and session receipts)" scripts/check-screen-recording-feedback.sh
-run_check "video-inspection（成片疑点、真实混音/画面/字幕与试听证据）" scripts/check-video-inspection.sh
-run_check "export-profile（实际阶段计时、审阅预设、排队/取消与 PNG 仅解码一次）" scripts/check-export-profile.sh
-run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
-run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
-run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
-run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
-run_check "project-saves (the project file written off the main thread: a slow, stuck or failing drive; switching, Save As, Quit)" scripts/check-project-saves.sh
-run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
-run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
-run_check "motion-placement (stored web pages: real renders, approval modes, same-clip edits, undo and cache recovery)" scripts/check-motion-placement.sh
-run_check "e2e (real MCP bridge, synthetic reference cut and reviewed export measurements)" scripts/check-e2e.sh
 run_check "e2e-gui (editor folder, Versions and motion controls)" scripts/check-e2e-gui.sh
+run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
+run_check "export-profile（实际阶段计时、审阅预设、排队/取消与 PNG 仅解码一次）" scripts/check-export-profile.sh
+run_check "e2e (real MCP bridge, synthetic reference cut and reviewed export measurements)" scripts/check-e2e.sh
 
-# ---- 第 2 组 ----
+# ---- Shard 2: full-App checks ----
 shard 2
-# 只跑比对规则的自检。真正的预览性能 ratchet（起真 App 数活）**故意不在这里**：要图形
-# 会话，基线也是按 GitHub runner 的环境记的 —— 它是 CI 第 1 组里单独的一步
-#（.github/workflows/checks.yml，docs/architecture/preview-perf-ratchet.md）。
-run_check "preview-perf-compare（性能 ratchet 的比对规则）" scripts/check-preview-perf.sh --self-test
 run_check "translation-preflight（翻译配对预检）" scripts/check-translation-preflight.sh
-run_check "timeline-snap（拖动吸附与对齐线）" scripts/check-timeline-snap.sh
-run_check "timeline-zoom（缩放的锚点：钉指针 / 钉播放头 / 纵向按行认；播放跟随；记住的开关）" scripts/check-timeline-zoom.sh
-run_check "media-import（拖文件进轨道的落点）" scripts/check-media-import.sh
-run_check "optimized-media（优化媒体：判据、关键帧间隔、解码速度、真转一块、缓存）" scripts/check-optimized-media.sh
-run_check "cloud-media（共用每日额度、按天账与任务阶段）" scripts/check-cloud-media.sh
-run_check "listening（听声音的纯计算：ESTOI、拿掉谁涨多少、原声特征，和研究的 numpy 版逐数对账）" scripts/check-listening.sh
 run_check "upscale（视频 upscale 的任务：范围、Sky Studio 的档位和上限、起名、封回原声、真裁一段、流水线对着假 Sky Studio 走全程）" scripts/check-upscale.sh
-run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
-run_check "film-production (public plans, persisted evidence, sound and native anchors)" scripts/check-film-production.sh
-# Renders real pages with WebKit in the helper (about a minute): needs a logged-in session, which CI's runners have.
-run_check "web-motion (the web-motion renderer: page clock, nothing leaves a page, alpha, hostile pages, memory kills, identical renders)" scripts/check-web-motion.sh
-# 真跑好几遍 ffmpeg 导出，全场最慢的一项（CI 上约 45 秒），配的伙伴最少。
-run_check "export-frame-rate（生产导出滤镜：帧率 + 拼接链 + 分辨率）" scripts/check-export-frame-rate.sh
-
-# ---- 第 3 组 ----
-shard 3
 run_check "player-clock（悬停 peek 状态机）" scripts/check-player-clock.sh
-run_check "main-thread-watchdog（主线程心跳：没卡不误报、卡了记时长 / context / 栈、stop 之后不记；挂起抓栈期间不分配、不卡死）" scripts/check-main-thread-watchdog.sh
-run_check "freeze-frame（定格时间线变换）" scripts/check-freeze-frame.sh
-run_check "preview-composition（预览合成真取帧）" scripts/check-preview-composition.sh
-run_check "text-render（画面文字：渲染图与成片逐点重合）" scripts/check-text-render.sh
-run_check "subtitle-burn-size（预览上的字幕和烧出来的一样大）" scripts/check-subtitle-burn-size.sh
-run_check "audio-fade（渐入渐出 / 音量曲线 / 推子的真实包络 + 音量钉点不变量）" scripts/check-audio-fade.sh
-run_check "mix-layers（按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账、单声道人声 = 成片）" scripts/check-mix-layers.sh
+run_check "project-versions (saved versions around AI rounds: one step back to the start, nothing saved when nothing changed, pruning, two projects)" scripts/check-project-versions.sh
+run_check "voiceover-sync（按实际旁白时长同步全部映射，一次撤销且不重复联动）" scripts/check-voiceover-sync.sh
+run_check "project-saves (the project file written off the main thread: a slow, stuck or failing drive; switching, Save As, Quit)" scripts/check-project-saves.sh
+run_check "screen-recording-feedback (completion notices, late Stop and session receipts)" scripts/check-screen-recording-feedback.sh
+run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
+run_check "parameter-limits（参数边界、实际生效值与素材加载重试）" scripts/check-parameter-limits.sh
+run_check "voice-recovery（旁白第二批本地失败后恢复，已有音频不重新生成，不重复入轨 / 字幕）" scripts/check-voice-recovery.sh
+run_check "video-inspection（成片疑点、真实混音/画面/字幕与试听证据）" scripts/check-video-inspection.sh
+
+# ---- Shard 3: a full-App check and the export check, the two longest on CI ----
+shard 3
+run_check "cloud-media（共用每日额度、按天账与任务阶段）" scripts/check-cloud-media.sh
+run_check "timeline-snap（拖动吸附与对齐线）" scripts/check-timeline-snap.sh
+run_check "sky-studio（Sky Studio 账号：Key 的整理、机器号、/me 怎么读、假 URLSession 上的请求和错误、此刻的授权与什么时候再问、照授权拦；生成和 upscale 的任务接口、积分的每日上限）" scripts/check-sky-studio.sh
+run_check "motion-placement (stored web pages: real renders, approval modes, same-clip edits, undo and cache recovery)" scripts/check-motion-placement.sh
+# Several real ffmpeg exports: about five to six minutes on CI (2026-11-19).
+run_check "export-frame-rate（生产导出滤镜：帧率 + 拼接链 + 分辨率）" scripts/check-export-frame-rate.sh
 
 # ---- 第 4 组 ----
 shard 4
@@ -193,6 +174,11 @@ run_check "mcp（AI 接口：两代客户端的协议、改时间线的规则、
 run_check "audio-engine（音频引擎：同一条时间线，引擎离线渲染 vs 纯 Swift 的 oracle 混音器逐窗口对账）" scripts/check-audio-engine.sh
 # 这一条要按真实时间喂 5 秒采样（fragment 必须真的冲出去），所以慢。
 run_check "screen-recording-writer（录屏产物盖到 T1）" scripts/check-screen-recording-writer.sh
+run_check "preview-composition（预览合成真取帧）" scripts/check-preview-composition.sh
+run_check "mix-layers（按层量混音：频段 / 帧 / 响度的 oracle、和导出逐位对账、单声道人声 = 成片）" scripts/check-mix-layers.sh
+# Renders real pages with WebKit in the helper (about a minute): needs a logged-in session, which CI's runners have.
+run_check "web-motion (the web-motion renderer: page clock, nothing leaves a page, alpha, hostile pages, memory kills, identical renders)" scripts/check-web-motion.sh
+run_check "audio-fade（渐入渐出 / 音量曲线 / 推子的真实包络 + 音量钉点不变量）" scripts/check-audio-fade.sh
 
 # ---- 第 5 组 ----
 shard 5
@@ -236,6 +222,17 @@ run_check "localization-coverage（界面文案两表配齐）" scripts/check-lo
 # 一律走 GUI 冒烟流程（docs/testing/gui-smoke-testing.md）。
 run_check "export-alpha-compositing（上层轨动画段 fill+matte）" scripts/check-export-alpha-compositing.sh
 run_check "audio-library（清单解析的宽容边界 + 双语搜索）" scripts/check-audio-library.sh
+# 只跑比对规则的自检。真正的预览性能 ratchet（起真 App 数活）**故意不在这里**：要图形
+# 会话，基线也是按 GitHub runner 的环境记的 —— 它是 CI 第 1 组里单独的一步
+#（.github/workflows/checks.yml，docs/architecture/preview-perf-ratchet.md）。
+run_check "preview-perf-compare（性能 ratchet 的比对规则）" scripts/check-preview-perf.sh --self-test
+run_check "timeline-zoom（缩放的锚点：钉指针 / 钉播放头 / 纵向按行认；播放跟随；记住的开关）" scripts/check-timeline-zoom.sh
+run_check "main-thread-watchdog（主线程心跳：没卡不误报、卡了记时长 / context / 栈、stop 之后不记；挂起抓栈期间不分配、不卡死）" scripts/check-main-thread-watchdog.sh
+run_check "freeze-frame（定格时间线变换）" scripts/check-freeze-frame.sh
+run_check "media-import（拖文件进轨道的落点）" scripts/check-media-import.sh
+run_check "listening（听声音的纯计算：ESTOI、拿掉谁涨多少、原声特征，和研究的 numpy 版逐数对账）" scripts/check-listening.sh
+run_check "film-production (public plans, persisted evidence, sound and native anchors)" scripts/check-film-production.sh
+run_check "optimized-media（优化媒体：判据、关键帧间隔、解码速度、真转一块、缓存）" scripts/check-optimized-media.sh
 run_check "video-fade（上层视频轨铺满 + 画面渐变真产物）" scripts/check-video-fade.sh
 # 盖一块（模糊 / 马赛克）真导出抽帧：只改那一块、高斯剖面、格子从左上角起算、只在那一段、形状压在上面、不算总长。
 run_check "cover-export（盖一块：真导出抽帧）" scripts/check-cover-export.sh
@@ -247,6 +244,8 @@ run_check "shape-render（形状：预览 = 成片，入场 / 出场动画）" s
 run_check "clip-animation（入场/出场动画：预览与成片对账）" scripts/check-clip-animation.sh
 run_check "still-clip-encode（静帧真实产物）" scripts/check-still-clip-encode.sh
 run_check "timeline-clipboard（复制粘贴：拿什么、换身份、撞上了往上抬、几组保住上下关系）" scripts/check-timeline-clipboard.sh
+run_check "subtitle-burn-size（预览上的字幕和烧出来的一样大）" scripts/check-subtitle-burn-size.sh
+run_check "text-render（画面文字：渲染图与成片逐点重合）" scripts/check-text-render.sh
 
 echo ""
 echo "════════════════════════════════════════"
