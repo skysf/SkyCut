@@ -47,8 +47,9 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/merge-slot/pr-')
     runs-on: macos-26
     # Each shard takes about 13-16 minutes since the full-App checks were spread over shards 1-3 (2026-11-20); a cold
-    # build cache adds an App build of a few minutes to each of those three.
-    timeout-minutes: 30
+    # build cache adds an App build of a few minutes to each of those three. Shard 1 also runs both graphical checks:
+    # the playback benchmark (up to 15 minutes with its warm-up and confirmation) and the preview ratchet.
+    timeout-minutes: ${{ matrix.shard == 1 && 45 || 30 }}
     strategy:
       # 一组红了别的组照跑完：一次看全所有失败。
       fail-fast: false
@@ -160,8 +161,9 @@ jobs:
       # Save timing diagnostics before the longer checks, even if a later test fails.
       - name: Playback start benchmark
         if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
-        # Fixture, an unscored warm-up and five launches take about 2.5 minutes; a confirmation adds three launches.
-        timeout-minutes: 6
+        # Each launch plays eleven scenarios for two seconds each, about 50 s on the M1: the fixture, an unscored warm-up
+        # and five launches take about 6 minutes; a confirmation adds three launches.
+        timeout-minutes: 15
         env:
           PLAYBACK_START_OUT: ${{ runner.temp }}/playback-start
         run: /bin/bash scripts/check-playback-start.sh

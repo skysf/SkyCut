@@ -196,6 +196,7 @@
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
 - [2026-11-19 Play during project open could crash the preview](2026-11-19-play-before-preview-ready.md) — Keep the Play request pending through item installation and check readiness before starting the synchronized player.
+- [2026-11-19 The playback-start gate failed healthy builds on hosted runners](2026-11-19-playback-gate-failed-healthy-hosted-runs.md) — Replay a gate on every hosted run since it changed before trusting its flake rate, keep runner noise out of the bench's own measurement, and set median budgets between healthy eight-launch medians and the recorded failure.
 - [2026-11-19 Hosted playback outliers blocked unrelated changes](2026-11-19-playback-start-hosted-timing-outliers.md) — Calibrate hosted timing budgets on several runs' launches, tolerate isolated noise by count, and keep gross stalls and the recorded failure red.
 - [2026-09-25 播放时每一跳整个编辑器都重算](2026-09-25-playback-wakes-whole-editor.md) — 订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`。
 - [2026-11-05 声音恢复成功，自检却因固定等待窗口报红](2026-11-05-player-clock-recovery-check-timing.md) — 异步的自检用分阶段的有界条件等待，不用一个固定窗口。
@@ -228,6 +229,7 @@
 - [2026-09-27 存好的字幕样式要先去烧录页转一圈才生效](2026-09-27-remembered-subtitle-style-waits-for-burn-in-page.md) — 记住的设置在队列创建时读回来，不挂在某一页的 `onAppear` 上。
 - [2026-10-01 从 40 秒起一直有沙沙声](2026-10-01-resampler-reset-every-chunk.md) — 流式转换器不能推式喂；周期性小毛刺要按块头 / 块中间分开量。
 - [2026-09-24 选 1080p，竖屏视频被缩成 608×1080](2026-09-24-resolution-cap-shrinks-portrait-video.md) — 分辨率档位封的是短边；缺的输入比写错的逻辑更难发现。
+- [2026-11-19 Resuming playback or pressing Play while hovering froze the picture while the sound played](2026-11-19-resume-and-hover-froze-the-picture.md) — A start is in step only if nothing seeks after the sound starts: keep every paused state a placed, primed picture, a pause and a hover's end included.
 - [2026-08-08 运行期素材重链接](2026-08-08-runtime-media-relink.md) — 素材移动后的重核对。
 - [2026-11-19 A typed or dropped answer to a save window silently replaced a file of the same name](2026-11-19-save-window-fallback-replaces-a-file.md) — An answer that skipped the "Replace?" step must say so: write "create, don't replace" unless replacing was confirmed for exactly that URL.
 - [2026-11-04 四条扫描守卫 CI 一次都没跑过](2026-11-04-scan-guards-never-ran-in-ci.md) — 新守卫必须进 check-all 的清单（`checks/check-all-shards.sh` 钉着）。

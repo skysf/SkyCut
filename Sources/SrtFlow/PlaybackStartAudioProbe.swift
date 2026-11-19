@@ -6,14 +6,7 @@ import Synchronization
 // Captures the host and timeline times of real PCM submitted by a source node.
 // One realtime writer publishes immutable entries to the main-actor reader.
 final class PlaybackStartAudioProbe {
-    struct Block {
-        let host: Double
-        let renderedAt: Double
-        let timeline: Double
-        let duration: Double
-
-        var onset: Double { max(renderedAt, host) }
-    }
+    typealias Block = PlaybackStartAudioBlock
 
     final class Attempt: @unchecked Sendable {
         private static let capacity = 2_048
@@ -56,18 +49,15 @@ final class PlaybackStartAudioProbe {
             count.load(ordering: .acquiring) > 0 ? entries[0] : nil
         }
 
-        func timeline(at host: Double, extrapolateFirst: Bool = false) -> Double? {
-            let total = count.load(ordering: .acquiring)
-            if extrapolateFirst, total > 0, host < entries[0].host {
-                return entries[0].timeline + host - entries[0].host
-            }
-            for index in 0..<total {
-                let block = entries[index]
-                if host < block.host { return nil }
-                if host < block.host + block.duration { return block.timeline + host - block.host }
-            }
-            return nil
+        private var recorded: UnsafeBufferPointer<Block> {
+            UnsafeBufferPointer(start: entries, count: count.load(ordering: .acquiring))
         }
+
+        func timeline(at host: Double, extrapolateFirst: Bool = false) -> Double? {
+            PlaybackStartAudioTimeline.timeline(of: recorded, at: host, extrapolateFirst: extrapolateFirst)
+        }
+
+        func gap(at host: Double) -> Double? { PlaybackStartAudioTimeline.gap(of: recorded, at: host) }
     }
 
     private let attempts = AudioPublished<Attempt>()

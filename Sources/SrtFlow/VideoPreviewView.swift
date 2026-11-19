@@ -45,28 +45,27 @@ final class PlayerClock: ObservableObject {
     private var failureObserver: NSObjectProtocol?
     /// Play can be pressed as soon as a document's timeline is visible, before AVFoundation can start its item.
     private var playbackRequested = false
-    private var readiness: [NSKeyValueObservation] = []
-    private var readinessRequest: UUID?
+    private let readiness = PreviewReadiness()
     private var previewSeek: UUID?
     private var positionedTime: TimeInterval?
     private var previewIsUnprimed = false
+    /// A pause is waiting for the native picture to report where it stopped (`holdPausedPicture`).
+    private var pausedPictureRequested = false
     private weak var previewLayer: AVPlayerLayer?
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
-    /// 链式 seek（Apple QA1820）的两个状态：上一个 seek 还没完成时只记下最新目标，
-    /// 完成后再续发。主线程读写。
-    private var isScrubSeeking = false
-    private var pendingScrubTarget: TimeInterval?
+    /// 链式 seek（Apple QA1820）：上一个 seek 还没完成时只记下最新目标，完成后再续发。
+    private let scrubber = ChainedScrub()
 
     /// 声音引擎（开关开着时由工程挂上，见 PreviewAudioEngineHost）。挂着时它是主时钟：`time` 每 50 ms 从它读一次，
     /// 播放器的周期回调只用来对表（差过一帧就把视频重新钉到引擎的时间表上）。
     private(set) var audioSource: PlaybackAudioSource?
     private var audioTimer: Timer?
     /// 视频和引擎连续几拍对不上（一拍的偶差不管，连着两拍才对表）。
-    private var driftTicks = 0
+    private var drift = VideoDriftCheck()
     /// 对了几次表（冒烟看它）。
-    private(set) var driftCorrections = 0
+    var driftCorrections: Int { drift.corrections }
     /// 上一次往卡顿日志里记「对表」的时刻：连着对表只记第一次，别把日志淹了。
     private var lastDriftNote: TimeInterval = 0
 
@@ -86,6 +85,8 @@ final class PlayerClock: ObservableObject {
             guard let clock = self, clock.player.currentItem != nil else { return }
             if clock.audioSource != nil {
                 // 引擎驱动：播放头从引擎读（attachAudioSource 的 timer），这一拍只用来对表。
+                // The observer also fires when playback stops, with the time the picture stopped on.
+                if clock.pausedPictureRequested, clock.player.rate == 0 { clock.holdPausedPicture(stoppedAt: cmTime) }
                 clock.checkVideoDrift(videoTime: cmTime.seconds)
             } else {
                 self?.observePlaybackTime(cmTime.seconds)
@@ -202,7 +203,7 @@ final class PlayerClock: ObservableObject {
         audioSource = nil
         audioTimer?.invalidate()
         audioTimer = nil
-        driftTicks = 0
+        drift.reset()
     }
 
     /// Reports whether the graph restarted. A nil result leaves both streams paused after a failed recovery.
@@ -210,7 +211,7 @@ final class PlayerClock: ObservableObject {
         do {
             let restarted = try source.recoverIfNeeded()
             if restarted {
-                driftTicks = 0
+                drift.reset()
                 MainThreadWatchdog.shared.note("音频引擎已恢复，重新对齐视频时钟")
                 if source.isPlaying { anchorVideo(to: source.playhead) }
             }
@@ -225,24 +226,17 @@ final class PlayerClock: ObservableObject {
     /// 视频的周期回调报来的时间和引擎差过一帧（连着两拍）就把视频重新钉到引擎的时间表上。
     private func checkVideoDrift(videoTime: TimeInterval) {
         guard let source = audioSource, source.isPlaying, player.rate > 0 else {
-            driftTicks = 0
+            drift.reset()
             return
         }
-        let drift = abs(videoTime - source.playhead)
-        guard drift > 0.04 else {
-            driftTicks = 0
-            return
-        }
-        driftTicks += 1
-        guard driftTicks >= 2 else { return }
-        driftTicks = 0
-        driftCorrections += 1
+        let audio = source.playhead
+        guard drift.observe(video: videoTime, audio: audio) else { return }
         let now = ProcessInfo.processInfo.systemUptime
         if now - lastDriftNote > 1 {
             lastDriftNote = now
-            MainThreadWatchdog.shared.note(String(format: "视频对表：画面 %.3f s、引擎 %.3f s（差 %.0f ms），重新钉到引擎", videoTime, source.playhead, drift * 1000))
+            MainThreadWatchdog.shared.note(String(format: "视频对表：画面 %.3f s、引擎 %.3f s（差 %.0f ms），重新钉到引擎", videoTime, audio, abs(videoTime - audio) * 1000))
         }
-        anchorVideo(to: source.playhead)
+        anchorVideo(to: audio)
     }
 
     /// Start at the current host time. With no explicit target, reuse the native preview's prepared position.
@@ -253,39 +247,14 @@ final class PlayerClock: ObservableObject {
         positionedTime = nil
     }
 
-    private func clearReadiness() {
-        readinessRequest = nil
-        readiness.removeAll()
-    }
-
     func bindPreviewLayer(_ layer: AVPlayerLayer) { previewLayer = layer }
 
-    /// Only the current item and request can release a waiting seek or Play.
+    /// Only the current item and request can release a waiting seek or Play; a failed item or player stops both.
     private func observeReadiness(of item: AVPlayerItem, layer: AVPlayerLayer? = nil, then resume: @escaping () -> Void) {
-        guard readinessRequest == nil else { return }
-        let request = UUID()
-        readinessRequest = request
-        let observe: () -> Void = { [weak self, weak item, weak layer] in
-            DispatchQueue.main.async {
-                guard let self, let item, self.readinessRequest == request, self.player.currentItem === item else { return }
-                if item.status == .failed || self.player.status == .failed {
-                    self.invalidatePreviewSeek()
-                    self.pause()
-                    return
-                }
-                guard item.status == .readyToPlay, self.player.status == .readyToPlay,
-                      layer?.isReadyForDisplay != false else { return }
-                self.clearReadiness()
-                resume()
-            }
-        }
-        readiness = [
-            item.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
-            player.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
-        ]
-        if let layer {
-            readiness.append(layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { _, _ in observe() })
-        }
+        readiness.watch(item, player: player, layer: layer, failed: { [weak self] in
+            self?.invalidatePreviewSeek()
+            self?.pause()
+        }, ready: resume)
     }
 
     /// Advance the native preview and the audio clock from the placed playhead.
@@ -311,31 +280,46 @@ final class PlayerClock: ObservableObject {
             return
         }
         playbackRequested = false
-        clearReadiness()
+        readiness.clear()
         if let source = audioSource {
+            pausedPictureRequested = false
             // 播放头已经在尽头：没有东西可播，这一下不开播。照样开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走：
             // 到了头的播放器不会再报一次「播完了」。The user's Play at the end replays from 0 (`togglePlayback`, UI-2).
             if isAtEnd {
                 if source.isPlaying { source.pause() }
                 return
             }
+            if source.isPlaying {
+                // Already playing (a seek during playback re-anchored the picture): there is nothing to prepare.
+                // Only a picture that stopped while the sound went on is set moving again on the sound's timeline.
+                if player.rate == 0 { anchorVideo(to: source.playhead) }
+                return
+            }
             let start = time
-            let positioned = positionedTime == start
-            if positioned, previewIsUnprimed {
-                let request = UUID()
-                previewSeek = request
+            guard positionedTime == start, !previewIsUnprimed else {
+                // The sound never starts ahead of the picture. A playhead whose picture is not placed and primed
+                // (after a hover elsewhere, a scrub or a failed preparation) is placed first; a new item is primed now.
+                // This Play stays pending and starts both clocks once the picture can move
+                // (docs/architecture/playback-start.md).
                 playbackRequested = true
-                preparePositionedPreview(request, at: start, seekFinished: true)
+                if positionedTime == start {
+                    let request = UUID()
+                    previewSeek = request
+                    preparePositionedPreview(request, at: start, seekFinished: true)
+                } else {
+                    positionPreview(at: CMTime(seconds: start, preferredTimescale: 600), seconds: start)
+                }
                 return
             }
             guard let restarted = recoverAudioIfNeeded(source) else { return }
-            if positioned, !restarted {
-                positionedTime = nil
+            positionedTime = nil
+            if restarted {
+                // The output device restarted under the positioned picture: start it on the new audio host clock.
+                source.play(from: start)
+                anchorVideo(to: nil)
+            } else {
                 player.playImmediately(atRate: 1)
                 source.play(from: start)
-            } else {
-                source.play(from: start)
-                anchorVideo(to: positioned ? nil : start)
             }
         } else {
             player.play()
@@ -346,7 +330,7 @@ final class PlayerClock: ObservableObject {
         pause()
         invalidatePreviewSeek()
         previewIsUnprimed = false
-        pendingScrubTarget = nil
+        scrubber.cancelPending()
         peekTime = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
         hasVideo = true
@@ -363,7 +347,7 @@ final class PlayerClock: ObservableObject {
         player.pause()
         invalidatePreviewSeek()
         previewIsUnprimed = true
-        pendingScrubTarget = nil
+        scrubber.cancelPending()
         peekTime = nil
         #if DEBUG
         observePreviewItem?(item)
@@ -384,7 +368,7 @@ final class PlayerClock: ObservableObject {
         audioSource?.seek(to: 0)
         detachAudioSource()
         player.replaceCurrentItem(with: nil)
-        pendingScrubTarget = nil
+        scrubber.cancelPending()
         peekTime = nil
         hasVideo = false
         time = 0
@@ -409,14 +393,14 @@ final class PlayerClock: ObservableObject {
             // 停着就照旧精确定位 / 链式扫帧。
             source.seek(to: clamped)
             if source.isPlaying {
-                pendingScrubTarget = nil
+                scrubber.cancelPending()
                 MainThreadWatchdog.shared.note(String(format: "播放中 seek → %.3f s（引擎先跳，视频钉过去自己赶）", clamped))
                 anchorVideo(to: clamped)
                 return
             }
         }
         if precise {
-            pendingScrubTarget = nil
+            scrubber.cancelPending()
             let target = CMTime(seconds: clamped, preferredTimescale: 600)
             if audioSource != nil, player.currentItem != nil {
                 positionPreview(at: target, seconds: clamped)
@@ -429,10 +413,11 @@ final class PlayerClock: ObservableObject {
     }
 
     private func invalidatePreviewSeek() {
+        pausedPictureRequested = false
         let wasPositioning = previewSeek != nil
         previewSeek = nil
         positionedTime = nil
-        clearReadiness()
+        readiness.clear()
         if wasPositioning { player.cancelPendingPrerolls() }
     }
 
@@ -448,6 +433,8 @@ final class PlayerClock: ObservableObject {
 
     private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
         guard previewSeek == request else { return }
+        // A new item is primed only once Play asks: priming every installed composition while editing held the
+        // preview's playback buffers and broke the memory ratchet (docs/architecture/playback-start.md).
         guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem,
               !previewIsUnprimed || playbackRequested else {
             finishPreviewPosition(request, at: seekFinished ? seconds : nil)
@@ -459,8 +446,8 @@ final class PlayerClock: ObservableObject {
             }
             return
         }
-        // Prime a fresh item at playback rate only when Play needs it. A positioned item's
-        // decoder needs less data to start advancing, especially across a trim.
+        // A new item primes at playback rate for the pending Play. A positioned item's decoder needs less data to
+        // start advancing, especially across a trim.
         player.preroll(atRate: previewIsUnprimed ? 1 : 0.25) { [weak self] finished in
             DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil, primed: finished) }
         }
@@ -474,7 +461,7 @@ final class PlayerClock: ObservableObject {
            let layer = previewLayer, !layer.isReadyForDisplay {
             let resume = { [weak self] in
                 guard let self, self.previewSeek == request else { return }
-                self.clearReadiness()
+                self.readiness.clear()
                 self.finishPreviewPosition(request, at: seconds, primed: true, waitForDisplay: false)
             }
             observeReadiness(of: item, layer: layer) { resume() }
@@ -494,25 +481,9 @@ final class PlayerClock: ObservableObject {
     /// 每个 mouse move 都直发 `player.seek` 会淹死解码器（在飞的 seek 被反复取消，
     /// 帧刷新率反而不稳）。这里串行化：在飞时只记目标，完成回调里续发最新的。
     private func scrub(to seconds: TimeInterval) {
-        guard !isScrubSeeking else {
-            pendingScrubTarget = seconds
-            return
-        }
-        isScrubSeeking = true
-        player.seek(
-            to: CMTime(seconds: seconds, preferredTimescale: 600),
-            toleranceBefore: .zero, toleranceAfter: .zero
-        ) { [weak self] _ in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isScrubSeeking = false
-                if let next = self.pendingScrubTarget {
-                    self.pendingScrubTarget = nil
-                    self.scrub(to: next)
-                } else if self.playbackRequested, self.previewSeek == nil {
-                    self.play()
-                }
-            }
+        scrubber.scrub(player, to: seconds) { [weak self] in
+            guard let self, playbackRequested, previewSeek == nil else { return }
+            play()
         }
     }
 
@@ -532,7 +503,15 @@ final class PlayerClock: ObservableObject {
     func endPeek() {
         guard peekTime != nil else { return }
         peekTime = nil
-        scrub(to: time)
+        guard audioSource != nil, player.currentItem != nil else {
+            scrub(to: time)
+            return
+        }
+        // Back on the playhead with a placed picture, primed unless the item is new, ready for Play (a scrub would
+        // leave it unprimed).
+        scrubber.cancelPending()
+        invalidatePreviewSeek()
+        positionPreview(at: CMTime(seconds: time, preferredTimescale: 600), seconds: time)
     }
 
     /// Return / Home：播放头回到开头。正在播就从开头接着播（`seek` 不改播放状态），停着就停在 0，
@@ -555,10 +534,10 @@ final class PlayerClock: ObservableObject {
         } else {
             // 悬停预览把画面带去了别处：播放必须从**播放头**起，先precise跳回去。
             // seek 后紧跟 play 是安全的（play 不取消在飞的 seek，完成后从目标续播）。
-            // 引擎驱动时不用：`play()` 里的 setRate 自带定位。
+            // With the engine, `play()` places and primes the picture at the playhead before either clock starts.
             if peekTime != nil {
                 peekTime = nil
-                pendingScrubTarget = nil
+                scrubber.cancelPending()
                 if audioSource == nil {
                     player.seek(
                         to: CMTime(seconds: time, preferredTimescale: 600),
@@ -572,22 +551,32 @@ final class PlayerClock: ObservableObject {
 
     func pause() {
         playbackRequested = false
-        if previewSeek == nil { clearReadiness() }
+        if previewSeek == nil { readiness.clear() }
+        let wasPlaying = audioSource?.isPlaying == true && player.rate > 0
         audioSource?.pause()
         player.pause()
+        if wasPlaying {
+            pausedPictureRequested = true
+            holdPausedPicture(stoppedAt: nil)
+        }
     }
-}
 
-// MARK: - 播放头的外推（纯值）
-
-/// `PlayerClock.estimatedTime` 的算术：最近一跳 `tick` 是在 host 时间 `tickHost` 落地的，现在是 `now`。
-/// 播放中就把过去的这段时间补上，但最多补 `maxLead`（时钟的回调间隔）—— 回调要是晚到了，外推不许
-/// 一直往前跑；停着就是 `tick` 本身。`now` 比 `tickHost` 还早（时钟倒退）按没过时间算。
-enum PlaybackTimeEstimate {
-    static func estimate(tick: TimeInterval, tickHost: TimeInterval, now: TimeInterval,
-                         isPlaying: Bool, maxLead: TimeInterval) -> TimeInterval {
-        guard isPlaying, tickHost > 0 else { return tick }
-        let elapsed = min(max(0, now - tickHost), max(0, maxLead))
-        return tick + elapsed
+    /// Paused playback leaves a positioned picture on the frame it stopped on (`PausedPictureHold` has the rule and why),
+    /// read from the stopped timebase inside `pause()` or from the time observer's stop callback.
+    private func holdPausedPicture(stoppedAt reported: CMTime?) {
+        guard pausedPictureRequested, let source = audioSource, previewSeek == nil, player.rate == 0,
+              let timebase = player.currentItem?.timebase, reported != nil || CMTimebaseGetRate(timebase) == 0 else { return }
+        pausedPictureRequested = false
+        let stopped = reported ?? CMTimebaseGetTime(timebase)
+        let sound = max(0, source.playhead)
+        guard let seconds = PausedPictureHold.position(picture: stopped, sound: sound) else {
+            seek(to: sound)
+            return
+        }
+        source.seek(to: seconds)
+        time = seconds
+        tickHostTime = ProcessInfo.processInfo.systemUptime
+        positionedTime = seconds
+        placed.send(PlayheadPlacement(time: seconds, precise: true))
     }
 }

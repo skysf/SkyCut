@@ -7,16 +7,56 @@ composition is still being built. The clock retains the request through installa
 placement of the playhead. The current player and item must be ready for the synchronized native start. Pause, a second
 press while pending, and preview teardown cancel the request. [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
 
-After an exact paused seek, the clock waits for both the native player and its item, then prerolls asynchronously
-while audio stays paused. A new item prerolls at playback rate when Play requests it. A positioned item prerolls at a smaller rate
-to prepare less data around a trimmed cut. If the new composition has picture in a mounted preview, the
-clock also waits for the preview layer's first display-ready frame. Any newer placement or item cancels
-the earlier preparation. A surface that becomes hidden or detaches can finish the wait after 750 ms.
-Play advances an already positioned preview with the ordinary native rate start. When the output
-graph has just restarted, Play aligns video to the audio host clock. The audio engine can reuse its prepared
-samples whenever the paused anchor matches the playhead. Audio supplies the master clock.
-`PlayerClock` corrects sustained video drift against this clock. See the [audio engine](audio-engine.md) and
-the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
+**The sound never starts ahead of the picture** (2026-11-19, the user: 「声音和画面必须要同步的，我们要解决的是播放就马上响应，
+不应该让用户等待」). Play starts both clocks at once only from a *positioned* picture: placed precisely at the playhead and
+primed, so it moves the moment the sound does. Every paused state of a played item is kept that way:
+
+- After an exact paused seek, the clock waits for both the native player and its item, then prerolls asynchronously
+  while audio stays paused, at a quarter of playback rate (less data to prepare around a trimmed cut). If the new
+  composition has picture in a mounted preview, the clock also waits for the preview layer's first display-ready
+  frame. Any newer placement or item cancels the earlier preparation. A surface that becomes hidden or detaches can
+  finish the wait after 750 ms.
+- **A new item (after opening, an edit or an optimized-media swap) is primed only when Play asks**, at playback
+  rate, and both clocks start once it is primed. Priming every installed composition while editing holds the
+  preview's playback buffers: on the preview ratchet's busy scenario a full-rate preroll measured 324–344 MB on the
+  hosted runner ([case](../bugfixes/2026-11-19-preview-start-before-preroll.md)), and a quarter-rate one held about
+  50 MB more while paused on the M1 (193 instead of 140 MB after the scenario's build) and peaked at 318–321 MB
+  hosted (limit 315; other PRs that day 263–282 MB). So the first Play after an edit waits for that preroll, in
+  step: about 0.13 s on the M1 for the 4K fixture.
+- A pause holds the picture: once the item's timebase has stopped (usually inside `pause()`; otherwise the time
+  observer reports it, AVFoundation calls it when playback stops) the playhead and the sound move to the frame the
+  picture stopped on, a few milliseconds, and that counts as positioned. A stopped `CMTimebase` is read without the
+  player's queue (`currentTime()` stays banned). If picture and sound stopped more than 50 ms apart (a stall, a
+  drift correction still seeking) the picture is placed precisely at the sound instead.
+- A hover that ends places the picture back on the playhead and primes it (unless the item is new; hover preview
+  scrubs the same player).
+
+Play from a positioned picture is the ordinary native rate start plus the engine from the same position; the audio
+engine reuses its prepared samples when the paused anchor matches. When the output graph has just restarted, Play
+aligns the positioned picture to the new audio host clock without a seek. Any other Play (a hover still on, a scrub,
+a placement still preparing, a failed preparation) stays pending while the clock places and primes the picture at
+the playhead, then starts both. **Play never re-seeks the picture after the sound has started**: before 2026-11-19 a
+resume and a Play while hovering did (`setRate(_:time:atHostTime:)` with a time is a native seek), and on a long-GOP
+source the picture stayed frozen for 0.6–0.9 s while the sound played
+([case](../bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md)). Already playing, Play only sets a stopped
+picture moving again on the sound's timeline.
+
+What still waits, in step: the first Play on a new item (its preroll); a Play right after a click or a hover, while
+the picture at the playhead is still being decoded (about 0.6 s on the M1 three seconds into an eight-second 4K GOP,
+short with optimized media); a Play during project open; a Play as the first input after the two-minute idle stop (the
+output device starts). Audio supplies the master clock. `PlayerClock` corrects sustained video drift against this
+clock. See the [audio engine](audio-engine.md) and the
+[composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
+
+**Known issue, the start after the idle stop** (measured 2026-11-19, not fixed): Play starts the picture at once while
+the sound waits for the just-started device's first render. In 5 of 24 starts on the M1 the picture ran 51–154 ms ahead,
+and the drift correction then re-seeked it: stalls of 100–200 ms in the first two seconds. Starting both on the
+device's first rendered quantum removed that (no stall in 24 starts) but lost the first 58–139 ms of the sound in 6 of
+24 starts: engine underruns of 17,000–37,000 frames instead of the usual 3,348 (one quantum per track). It is not in
+this code; the audio engine's feeders after a wake are the suspect. Until it is fixed, the strict profile below skips
+this scenario. On the M1 its medians vary between runs: one five-launch run on 2026-11-19 failed them (start skew
+118 ms, stall 167 ms), the final one passed with one launch at 125 ms skew and a 183 ms stall. The hosted virtual Mac starts its device at once (skew 11 ms
+or less), so CI does not see it.
 
 Build and media work belongs to open and edit preparation. Play consumes the preview that exists or is on its way.
 The optimized-media coordinator queues swaps for paused playback. [Optimized media](optimized-media.md).
@@ -34,10 +74,17 @@ in-process media and composition cache. Filesystem caching follows the host oper
 
 The project has a 1080p opening and cut, three composited upper video tracks, six PCM tracks, and a trimmed 4K H.264
 source with an eight-second GOP. The timeline starts cold at zero, then tests the positioned start, a deep seek within
-the 4K GOP, the frame before the 1080p cut, the 4K tail, Play at the exact end, and a suspended output graph. The
-end replay waits for native placement at the tail and must start at zero. The idle case uses the production
-suspension entry and confirms the graph has suspended before Play. If focus or pointer activity wakes it during
-preparation, the check tries the setup once more. The idle-policy tests cover when the two-minute stop is due.
+the 4K GOP, the frame before the 1080p cut, a new item from the production rebuild (`fresh-item`: Play once its paused
+picture is up, as after an edit), Play right after a far click (`seek-play`), space to play, pause a
+second later and play again (`resume`), Play while the pointer hovers the 1080p opening with the playhead in the 4K
+source (`peek-play`), the 4K tail, Play at the exact end, and a suspended output graph. The scenarios are staged
+through the editor's entry points in `PlaybackStartScenarios.swift`. The end replay waits for native placement at the
+tail and must start at zero. The idle case uses the production suspension entry and confirms the graph has suspended
+before Play. If focus or pointer activity wakes it during preparation, the check tries the setup once more. The
+idle-policy tests cover when the two-minute stop is due.
+
+The window goes on the display with the highest refresh rate. On the M1 it had landed on a 25 Hz television
+(40 ms between display deadlines), which quantized every picture time and could hide a short stall.
 
 Time begins at the call to the editor's Play action. Each attempt measures the following.
 
@@ -56,6 +103,10 @@ Time begins at the call to the editor's Play action. Each attempt measures the f
 - The difference between the two onset times and how far the first sampled audio and video have moved from the requested time.
 - The signed audio timeline minus video presentation timestamp at video onset and at the first follow-up display deadline
   with audio at least one second later. The PCM sample clock supplies the audio position at the same host time.
+- The picture's first two seconds after its first advancing frame, or up to the timeline's last frame
+  (`PlaybackStartContinuity`): `stallMs`, the longest time between consecutive advancing frames including the gap to
+  the end of the window (33 ms for this 30 fps fixture on a 60 Hz display), and `maxSkewMs`, the largest
+  audio-minus-picture difference at any displayed frame with sound at the same host time.
 
 The display deadlines and the rendered PCM are in-process endpoints. Speaker latency, window compositing, lip sync in
 actual footage, and monitoring devices also belong in the manual regression.
@@ -66,31 +117,48 @@ The graphical step contributes to `check-all`. It uploads all samples, the machi
 and each scenario's median and worst result. The first launch of the freshly built editor is an unscored warm-up:
 it runs the same scenarios, may fail, and its start skews are printed in the summary. Every scored launch must
 produce first audio and advancing video and satisfy the structural limits. A cold open must build and attach once and
-open exactly three video assets. Warm and idle starts must build, attach and open zero times. Cold open and replay from
-the end each require one successful native preroll. In each scenario the median of each timing must be in budget, and
+open exactly three video assets. Warm and idle starts must build, attach and open zero times. Cold open, a new item,
+replay from the end, Play right after a click and Play while hovering each require one native preroll after Play (a
+new item primed while paused would show none). In each scenario the median of each timing must be in budget, and
 at least half of the whole launches must jointly meet the per-launch budgets in `checks/PlaybackStart/budgets.json`.
 A gross stall, an onset gap or start skew of 500 ms or more or a missed one-second follow-up, is the reported
 failure itself: none may occur in the first five launches, and at most one per scenario across the eight after
 confirmation. A median budget may not exceed its per-launch budget.
 
-The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
-340 ms audio and 380 ms picture ceilings. One hosted start needed 290 ms for audio and 314 ms for picture,
-with 16 ms onset skew or less across the five launches. The trim immediately before the cut
-has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
-Replay from the end also rewinds the item. Its median audio and picture budgets are 220 / 300 ms, capped at
-265 / 380 ms per trial, and its start skew is 48 ms median and 60 ms per trial.
-Warm onset and all one-second offsets have a 34 ms median budget on the 30 fps fixture. Individual samples
-have a 45 ms ceiling for display and audio sampling noise, with 48 ms one second after a device restart.
-Cold open includes preview construction and output startup.
-Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
-Its start skew limit is 145 ms median and 150 ms per trial, and its onset separation is 170 ms median and 330 ms per
-trial. A suspended graph has a separate 700 ms audio and
-800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 160 ms per trial.
-The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
-The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
-Cold dispatch has a 20 ms median budget and a 90 ms single-trial ceiling. In calibration the first Play
-was usually dispatched in under 2 ms. An individual launch took 61 ms without a build or native seek in
-the Play callback.
+The budgets, per launch / median in ms (`checks/PlaybackStart/budgets.json`, recalibrated on hosted samples on
+2026-11-19, see below):
+
+- Every scenario unless listed: first sound 340 / 130 and first picture 380 / 180, onset separation 160 / 105, start
+  skew and one-second offset 45 / 34 (display and audio sampling on the 30 fps fixture), longest stall in the first
+  two seconds 300 / 100, worst skew there 60 / 40.
+- Cold open (includes preview construction and output startup): sound 3.8 / 3.2 s and picture 3.9 / 3.3 s, dispatch
+  90 / 20, onset separation 330 / 220, start and worst skew 190 / 175, one-second offset 120 / 60.
+- Warm start: sound median 200, picture median 220, one-second offset 60 / 45.
+- The frame before the cut: sound 300 / 230 and picture 340 / 265, so the decoder can prepare both sides.
+- Deep in the GOP: start skew 60 per launch. The 4K tail: sound 360 per launch, picture 420 / 250, start skew
+  60 / 45, worst skew median 45.
+- Replay from the end (it rewinds, then prerolls after Play): sound 340 / 250, picture 410 / 330, start skew 60 / 55,
+  worst skew 100 / 80 (a hosted run's five-launch median reached 53 ms; three runs of data).
+- A new item (Play primes it): sound 700 / 450, picture 800 / 460, with the common skew limits (120 / 137 ms median
+  on the M1, 101–298 / 141–307 ms hosted).
+- Play right after a click and Play while hovering include decoding the picture at the playhead (about 0.6 s on the
+  M1): sound 3.5 / 2.5 s, picture 3.6 / 2.6 s; start skew 80 and worst skew 120 per launch after a click, worst skew 80
+  per launch while hovering.
+- The start after the idle stop (output device startup): sound 700 / 600, picture 800 / 650, onset separation
+  550 / 230, start and worst skew 160 / 45, one-second offset 48 per launch, lost audio 200 / 75.
+
+The JSON also caps dispatch time and how much of the timeline either stream can skip. A median budget may not exceed
+its per-launch budget, and since the worst skew includes the first frame no worst-skew budget may be below the start
+skew budget: `compare.py` rejects such a file. In calibration the first Play was usually dispatched in under 2 ms.
+
+**This Mac fails on any picture out of step** (`strict` in `budgets.json`, applied wherever the runner is not the
+hosted virtual Mac): every launch of every scenario must start the picture within 60 ms of the sound and within 45 ms
+of its timeline, never hold a frame longer than 100 ms in the first two seconds (three frames at 30 fps; the cadence
+is 33 ms) and never differ from the sound by more than 45 ms there. The start after the idle stop is skipped (the
+known issue above); its hosted limits allow 160 ms of skew per launch. On the M1 after the 2026-11-19 fix the worst
+elsewhere were 51 ms onset (a resume), 25 ms skew and one 50 ms frame hold. The hosted limits above stay looser: the virtual Mac decodes 4K in
+software and sometimes stalls for a second after a clean start, and an isolated stalled launch counts as one
+outlier under the half-of-the-launches rule.
 
 On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture put positioned picture onset at
 69–117 ms median outside the cut and at 232 ms just before it. First-open audio and video were 1.36 / 1.74 s
@@ -111,10 +179,11 @@ an outlier, not a stall: hosted runners sometimes stall decoding for a second af
 1,365 ms and 1,824 ms at the cut, while every scored start was in sync.
 
 When hosted timings need confirmation, the check starts three more processes once and scores all eight launches
-together, with the same budgets. The required graphical step stops after six minutes. It runs in shard 1 right after
-the App build, with the preview perf ratchet and the lightest share of `check-all.sh`: about 13 minutes in all, so a
-re-run after a timing flake costs that much (until 2026-11-20 shard 1 held every full-App check and took 27–31 minutes).
-Every shard has 30 minutes.
+together, with the same budgets. The required graphical step stops after 15 minutes (each launch after 120 s; watching
+the first two seconds of every start added about 4 minutes on 2026-11-19). It runs in shard 1 right after the App
+build, with the preview perf ratchet and the lightest share of `check-all.sh`, so a re-run after a timing flake costs
+that shard (until 2026-11-20 shard 1 held every full-App check and took 27–31 minutes). Shard 1 has 45 minutes, the
+others 30.
 
 The hosted budgets were recalibrated on 2026-11-19 from 55 launches in 11 runs of the merged #502 code
 (44 after the warm-up). Of those launches, 24% of cold opens and end replays and 2–11% of the other scenarios
@@ -129,16 +198,49 @@ delay at Play and a picture 300 ms late in every cold open are red in all resamp
 quarter of the cold opens is red in 64% of them. `checks/PlaybackStart/test_compare.py` pins these
 verdicts. [Hosted timing case](../bugfixes/2026-11-19-playback-start-hosted-timing-outliers.md).
 
+**Second calibration, from 25 hosted attempts (2026-11-19).** That 3% did not hold: 6 of the 23 hosted attempts
+of main's code since #517 failed the step, none of them on a regression
+([case](../bugfixes/2026-11-19-playback-gate-failed-healthy-hosted-runs.md)). The hosted virtual Mac (three cores)
+runs the benchmark at a load average of 20–50. There its cold open starts the picture about 100 ms after the sound
+(launch medians 102 ms start skew, 127 ms onset separation), and on a slow host the five-launch medians reached
+208 / 230 ms. Every other start stays within about 20 ms. Three attempts failed because no audio block covered the
+first picture and two because a staged placement took over 5 s; both are bench defects, fixed. The rest were medians
+just over budgets set from too few runs. The budgets above come from all 25 attempts (22 of main's code, 3 of the
+2026-11-19 fix) under one rule: **the first five launches of a slow host may fail, the eight with confirmation must
+pass**. Confirmation launches run cleaner: the slowest healthy cold open had 230 / 208 ms five-launch medians and
+174 / 141 ms over eight. So each median budget sits above every healthy eight-launch median with a margin and below
+the recorded hosted failure confirmed with three healthy launches (cold open onset and skew 240 / 204 ms against
+220 / 175 ms budgets, replay from the end skew 76 against 55 ms). Per-launch limits sit near the hosted 95th–99th
+percentile: 8% of cold-open launches exceed one, 12% of replays from the end, 0–8% elsewhere.
+
+Replayed on those 25 attempts (`test_compare.py` pins the slowest one), the scoring passes 24, 17 of them in the first
+five launches. The last needs a confirmation its run never made (replay from the end, 257 ms median to first sound at
+a load of 45). With the earlier budgets the same attempts, bench defects left out, passed 19 of 22 (12 in the first
+five). The recorded hosted failure, the M1 freezes of the
+[resume and hover case](../bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md) and a 350 ms delay at Play still
+fail. On the hosted runner a cold-open picture up to about 200 ms behind its sound passes, as it does on a slow host
+today; on this Mac the strict profile holds every start to 45 ms.
+
 The hosted gate cannot separate a partial regression that stays near the runner's noise. Before the final #502 fix,
 the cold-open onset gap had a 151 ms median in launches 2–5 and a single 700 ms stall in launch 1, which would pass
 today. The local M1 run, the warm-up line in each summary and the manual first-launch check cover that range.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
-pins graph starts to recovery, and checks the item installation order and CI connection.
+pins graph starts to recovery, and checks the item installation order and CI connection. It also requires that a new
+item's preroll waits for Play (the memory rule above), that Play places and primes the picture before starting the sound
+and never re-seeks it while starting, that a pause holds the stopped picture (inside `pause()` or from the time
+observer's stop callback), and that a hover's end places the picture back on the playhead.
+`scripts/check-player-clock.sh` (`SyncedStartChecks.swift`) checks the same behavior on a real AVPlayer with a
+picture-only long-GOP clip.
 
 Reverse verification injected 350 ms into the production audio start. The GUI check failed both warm onset budgets
 in every launch, and the wiring guard rejected the blocking call. Separate mutations exercised each other wiring
-rule, including a duplicate open build and removal of the graphical CI step.
+rule, including a duplicate open build and removal of the graphical CI step. On 2026-11-19 the previous
+`PlayerClock` failed 8 of the clock checks, seven mutations of the playback rules (priming every new item while
+paused, Play not priming a new item, a re-seeking start, the sound started before the placement, no hold on pause,
+the stop callback ignored, a hover end that scrubs) each turned the wiring guard red, and
+five pre-fix M1 launches failed the gate on structure, on the hosted rules (resume and Play while hovering: five
+gross stalls each) and on the strict rules.
 
 Run locally from a logged-in graphical session with the repo's ffmpeg available.
 
@@ -153,6 +255,12 @@ production playback entry and the recorded failure in `test_compare.py` still fa
 resulting budget changes visible in review.
 
 ## Manual regression before release
+
+- [ ] On a long-GOP source (a screen recording or an original without optimized media), play, pause, and press Play
+      again at once and after a few seconds: picture and sound continue together, no frozen frame under the sound.
+- [ ] Move the pointer over the timeline (the hover preview moves the picture) and press Space while it is still
+      there, and again after moving it off: playback starts from the playhead with picture and sound together.
+- [ ] Make an edit and press Play as soon as the preview has updated: no wait before both start.
 
 - [ ] Open a larger project, press Play as soon as the timeline appears, and watch the first motion while listening
       to the onset. Repeat with the playhead placed in the middle, just before a hard cut, and near the end.

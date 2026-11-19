@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
-from compare import FOLLOWUP, TIMINGS, Trial, evaluate, validate_trial
+from compare import FOLLOWUP, PREROLLS, TIMINGS, Trial, evaluate, strict, validate_trial
 
 
 BUDGETS = json.loads(Path(__file__).with_name("budgets.json").read_text())
@@ -13,9 +13,9 @@ BUDGETS = json.loads(Path(__file__).with_name("budgets.json").read_text())
 def trial(name, **changes):
     cold = name == "cold-open"
     metrics = dict.fromkeys(TIMINGS, 0)
-    metrics.update(audioMs=50, videoMs=65, oneSecondElapsedMs=1017,
+    metrics.update(audioMs=50, videoMs=65, oneSecondElapsedMs=1017, stallMs=33.3, maxSkewMs=12,
                    builds=int(cold), itemAttaches=int(cold), assetOpens=3 if cold else 0,
-                   videoPrerolls=int(cold or name == "end-replay"),
+                   videoPrerolls=PREROLLS.get(name, 0),
                    displayPeriodMs=16.67, displayGapMs=18, oneSecondTimedOut=0)
     metrics.update(changes)
     return Trial(name, metrics)
@@ -41,7 +41,87 @@ RECORDED_BUG = {
 }
 
 
+# The slowest healthy hosted run of 2026-11-19 (run 44557659527, the main branch's code): five launches and three
+# confirmation launches of the cold open. Its first five fail; all eight must pass.
+SLOW_HOSTED_COLD_OPEN = dict(
+    onsetGapMs=[140.0, 101.9, 230.5, 249.1, 251.6, 124.0, 161.3, 187.4],
+    startOffsetMs=[106.7, 79.2, 207.8, 226.4, 218.3, 101.3, 128.0, 154.1],
+    oneSecondOffsetMs=[6.7, 4.1, 107.8, 59.8, 68.3, 15.4, 78.0, 12.6],
+)
+
+
+# The M1 before the 2026-11-19 fix: a resume and a Play while hovering sent the sound first and re-seeked the 4K
+# long-GOP picture, which stayed frozen for 0.6-0.9 s (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
+RECORDED_FREEZE = {
+    "resume": dict(audioMs=[27.5, 34.4, 28.7], videoMs=[826.8, 921.1, 830.4], onsetGapMs=[799.3, 886.7, 801.7]),
+    "peek-play": dict(audioMs=[35.7, 37.6, 31.7], videoMs=[635.4, 655.0, 623.6], onsetGapMs=[599.7, 617.4, 591.9]),
+}
+
+
 class PlaybackGateTests(unittest.TestCase):
+    def test_recorded_m1_freezes_fail_hosted_and_local_scoring(self):
+        samples = batch(5)
+        for name, columns in RECORDED_FREEZE.items():
+            for index in range(3):
+                samples[name][index] = trial(name, **{metric: values[index] for metric, values in columns.items()})
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("resume: 3 of 5 launches had picture and sound 500 ms" in error for error in errors))
+        self.assertTrue(any("peek-play median: onsetGapMs" in error for error in errors))
+        self.assertEqual(len(strict(samples, BUDGETS["strict"])), 6)
+        # Before the fix a Play while hovering also skipped the placement of the picture.
+        self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
+
+    def test_the_slowest_healthy_hosted_cold_open_passes_after_confirmation(self):
+        launches = [trial("cold-open", **{metric: values[index] for metric, values in SLOW_HOSTED_COLD_OPEN.items()},
+                          maxSkewMs=SLOW_HOSTED_COLD_OPEN["startOffsetMs"][index]) for index in range(8)]
+        first = batch(5)
+        first["cold-open"] = launches[:5]
+        self.assertTrue(any("cold-open median: onsetGapMs" in error for error in evaluate(first, BUDGETS)[0]))
+        confirmed = batch(8)
+        confirmed["cold-open"] = launches
+        self.assertEqual(evaluate(confirmed, BUDGETS, confirmed=True)[0], [])
+
+    def test_a_new_item_has_room_for_its_preroll_but_not_for_skew(self):
+        # Play primes a new item: 101 / 141 ms median to sound and picture hosted, 120 / 137 ms on the M1, in step.
+        samples = batch(5)
+        samples["fresh-item"] = [trial("fresh-item", audioMs=160, videoMs=175)] * 5
+        self.assertEqual(evaluate(samples, BUDGETS)[0], [])
+        # Primed at a quarter rate while paused, the hosted runner started it 52-60 ms behind (median): too far.
+        samples["fresh-item"] = [trial("fresh-item", startOffsetMs=55, maxSkewMs=55)] * 5
+        self.assertTrue(any("fresh-item median: startOffsetMs" in error for error in evaluate(samples, BUDGETS)[0]))
+
+    def test_play_primes_a_new_item_once(self):
+        self.assertEqual(validate_trial("fresh-item", trial("fresh-item")), [])
+        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=0)))
+        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=2)))
+
+    def test_a_stall_after_a_good_start_fails(self):
+        samples = batch(5)
+        samples["cut"][0] = trial("cut", stallMs=700, maxSkewMs=690)
+        errors, outliers = evaluate(samples, BUDGETS)
+        self.assertEqual(errors, [])
+        self.assertIn("stallMs 700.0 > 300 ms", outliers[0])
+        for index in (1, 2):
+            samples["cut"][index] = trial("cut", stallMs=700)
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("cut: 2/5" in error for error in errors))
+        self.assertTrue(any("cut median: stallMs" in error for error in errors))
+
+    def test_this_mac_fails_any_stall_or_skew_the_hosted_budgets_tolerate(self):
+        samples = batch(5)
+        samples["middle"][0] = trial("middle", stallMs=140)
+        samples["warm-start"][2] = trial("warm-start", onsetGapMs=80)
+        self.assertEqual(evaluate(samples, BUDGETS)[0], [])
+        failures = strict(samples, BUDGETS["strict"])
+        self.assertEqual(len(failures), 2)
+        self.assertIn("stallMs 140.0 > 100 ms", failures[0] + failures[1])
+        self.assertEqual(strict(batch(5), BUDGETS["strict"]), [])
+        # The start after the idle stop is known to run the picture ahead (the output device's start); it is skipped here
+        # and held by the hosted budgets until that is fixed.
+        samples = batch(5)
+        samples["idle-wake"][0] = trial("idle-wake", startOffsetMs=-154, maxSkewMs=154, stallMs=200)
+        self.assertEqual(strict(samples, BUDGETS["strict"]), [])
+
     def test_two_isolated_late_followups_keep_their_raw_errors(self):
         samples = batch(5)
         cut = samples["cut"]
@@ -67,7 +147,7 @@ class PlaybackGateTests(unittest.TestCase):
     def test_even_confirmation_keeps_the_medians_and_whole_launch_count(self):
         samples = batch(8)
         replay = samples["end-replay"]
-        replay[0] = replay[1] = trial("end-replay", videoMs=400)
+        replay[0] = replay[1] = trial("end-replay", videoMs=420)
         replay[2] = replay[3] = trial("end-replay", startOffsetMs=65)
         errors, outliers = evaluate(samples, BUDGETS, confirmed=True)
         self.assertEqual(errors, [])
@@ -102,12 +182,12 @@ class PlaybackGateTests(unittest.TestCase):
 
     def test_confirmation_adds_no_margin_to_the_medians(self):
         samples = batch(8)
-        samples["end-replay"] = [trial("end-replay", audioMs=219, videoMs=299)] * 8
+        samples["end-replay"] = [trial("end-replay", audioMs=249, videoMs=329)] * 8
         self.assertEqual(evaluate(samples, BUDGETS, confirmed=True)[0], [])
-        samples["end-replay"] = [trial("end-replay", audioMs=221)] * 8
+        samples["end-replay"] = [trial("end-replay", audioMs=251)] * 8
         self.assertTrue(any("end-replay median: audioMs" in error for error in evaluate(samples, BUDGETS, confirmed=True)[0]))
         samples = batch(8)
-        samples["warm-start"] = [trial("warm-start", audioMs=139)] * 8
+        samples["warm-start"] = [trial("warm-start", audioMs=201)] * 8
         self.assertTrue(evaluate(samples, BUDGETS, confirmed=True)[0])
         samples = batch(8)
         samples["cut"] = [trial("cut", oneSecondOffsetMs=36)] * 8
@@ -143,6 +223,12 @@ class PlaybackGateTests(unittest.TestCase):
     def test_a_median_budget_above_its_per_launch_budget_is_rejected(self):
         budgets = json.loads(json.dumps(BUDGETS))
         budgets["medians"]["scenarios"]["end-replay"]["startOffsetMs"] = 61
+        with self.assertRaises(ValueError):
+            evaluate(batch(5), budgets)
+
+    def test_a_worst_skew_budget_below_the_start_skew_budget_is_rejected(self):
+        budgets = json.loads(json.dumps(BUDGETS))
+        budgets["medians"]["scenarios"]["near-end"]["maxSkewMs"] = 40
         with self.assertRaises(ValueError):
             evaluate(batch(5), budgets)
 

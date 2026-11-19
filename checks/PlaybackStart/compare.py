@@ -14,7 +14,10 @@ ONSET = (
     "dispatchMs", "audioMs", "videoMs", "onsetGapMs", "audioAdvanceMs", "videoAdvanceMs", "startOffsetMs",
 )
 FOLLOWUP = ("oneSecondOffsetMs", "oneSecondElapsedMs")
-TIMINGS = ONSET + FOLLOWUP
+# The picture's first two seconds: the longest time one frame stayed up while playing, and the worst audio-minus-picture
+# difference at any displayed frame. A stall after a good start is the reported failure too.
+CONTINUITY = ("stallMs", "maxSkewMs")
+TIMINGS = ONSET + FOLLOWUP + CONTINUITY
 CONTROL = ("displayPeriodMs", "displayGapMs")
 COUNTS = ("builds", "itemAttaches", "assetOpens", "videoPrerolls")
 # Picture and sound this far apart at the start is the reported failure itself ("the picture takes a while to
@@ -22,6 +25,10 @@ COUNTS = ("builds", "itemAttaches", "assetOpens", "videoPrerolls")
 # confirmation. Later drift is held by the one-second budgets: hosted runners stall decoding for a second at times.
 GROSS_SKEW_MS = 500
 SKEWS = ("onsetGapMs", "startOffsetMs")
+# Native prerolls counted after Play: the scenarios that place or prime the picture after Play (the open, a new item,
+# the rewind at the end, a click just before Play, a hover) prime once. A new item is primed only when Play asks:
+# priming every installed composition while editing broke the memory ratchet.
+PREROLLS = {"cold-open": 1, "end-replay": 1, "fresh-item": 1, "seek-play": 1, "peek-play": 1}
 
 
 class Trial(NamedTuple):
@@ -71,7 +78,7 @@ def read_trials(paths, scenarios, expected_count):
 
 def validate_trial(scenario, trial):
     metrics = trial.metrics
-    keys = (*ONSET, *COUNTS, *CONTROL, "oneSecondTimedOut")
+    keys = (*ONSET, *CONTINUITY, *COUNTS, *CONTROL, "oneSecondTimedOut")
     missing = [key for key in keys if not finite(metrics, key)]
     if missing:
         return [f"{trial.label}: missing or invalid {', '.join(missing)}"]
@@ -89,8 +96,8 @@ def validate_trial(scenario, trial):
 
     cold = scenario == "cold-open"
     expected = {"builds": int(cold), "itemAttaches": int(cold), "assetOpens": 3 if cold else 0}
-    if cold or scenario == "end-replay":
-        expected["videoPrerolls"] = 1
+    if scenario in PREROLLS:
+        expected["videoPrerolls"] = PREROLLS[scenario]
     return [f"{trial.label}: {key} {metrics[key]:g}, expected {count}"
             for key, count in expected.items() if metrics[key] != count]
 
@@ -111,6 +118,9 @@ def evaluate(samples, budgets, confirmed=False):
             raise ValueError(f"{name} has an invalid playback budget")
         if any(typical[key] > single[key] for key in typical):
             raise ValueError(f"{name} has a median budget above its per-launch budget")
+        # The worst skew includes the first frame, so it can never be below the start skew.
+        if any(limits["maxSkewMs"] < limits["startOffsetMs"] for limits in (single, typical)):
+            raise ValueError(f"{name} has a worst-skew budget below its start-skew budget")
         valid = 0
         stalls = 0
         for trial in trials:
@@ -133,6 +143,24 @@ def evaluate(samples, budgets, confirmed=False):
             if observed > limit:
                 errors.append(f"{name} median: {metric} {observed:.1f} exceeds {limit:g} ms")
     return errors, outliers
+
+
+def strict(samples, profile):
+    """Off the hosted runner every launch of every scenario keeps the picture in step with the sound, except the ones
+    listed under `skip` (the start after the idle stop: docs/architecture/playback-start.md)."""
+    failures = []
+    for name, trials in samples.items():
+        if name in profile.get("skip", []):
+            continue
+        limits = profile["common"]
+        if set(limits) - set(TIMINGS) or not all(finite(limits, key) and limits[key] > 0 for key in limits):
+            raise ValueError("The strict playback limits must be positive timings")
+        for trial in trials:
+            over = [f"{metric} {trial.timing(metric):.1f} > {limit:g} ms"
+                    for metric, limit in limits.items() if trial.timing(metric) > limit]
+            if over:
+                failures.append(f"{trial.label}: picture not in step with the sound: {', '.join(over)}")
+    return failures
 
 
 def warmup_note(path):
@@ -197,6 +225,8 @@ def main():
         write_report(args.summary, render(samples, errors, [], machine, media, args.warmup))
         return 1
     failures, outliers = evaluate(samples, budgets, args.confirm)
+    if not hosted:
+        failures += strict(samples, budgets["strict"])
     write_report(args.summary, render(samples, failures, outliers, machine, media, args.warmup))
     if failures and hosted and not args.confirm:
         return 2

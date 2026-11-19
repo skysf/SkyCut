@@ -57,6 +57,8 @@ enum PlaybackStartBench {
     }
 
     private static func run(_ project: VideoEditProject, directory: URL) async throws -> Report {
+        // A run with optimized media on writes its proxies next to the fixture, never into the user's cache.
+        OptimizedMediaStore.rootOverride = directory.appendingPathComponent("OptimizedMedia", isDirectory: true)
         let (file, media) = try await Task.detached(priority: .userInitiated) {
             try PlaybackStartFixture.write(in: directory)
         }.value
@@ -64,9 +66,11 @@ enum PlaybackStartBench {
             guard let window = OpenProjects.shared.window(of: project) else { return false }
             return window.isVisible && window.screen != nil
         }
-        guard let window = OpenProjects.shared.window(of: project), window.isVisible, let screen = window.screen else {
+        guard let window = OpenProjects.shared.window(of: project), window.isVisible, let opened = window.screen else {
             throw Failure("The editor needs a graphical session")
         }
+        // Sample on the fastest display: a 25 Hz television would hide a 40 ms picture stall between two refreshes.
+        let screen = NSScreen.screens.max { $0.maximumFramesPerSecond < $1.maximumFramesPerSecond } ?? opened
         let visible = screen.visibleFrame
         window.setFrame(NSRect(x: visible.minX, y: visible.minY, width: 960, height: 600), display: true)
         window.ignoresMouseEvents = true
@@ -88,53 +92,20 @@ enum PlaybackStartBench {
             throw Failure("Synthetic project did not open: \(project.notice ?? "unexpected document or duration")")
         }
         let frame = project.state.frameRate.secondsPerFrame
+        if env["SRTFLOW_PLAYBACK_START_SETTLED_OPEN"] != nil {
+            // Local diagnosis only: the person opens a project, sees its first picture, then presses Play.
+            try await wait("opened paused picture") { probe.displayed != nil && !project.clock.isPositioningPreview }
+            try await PlaybackStartScenarios.think()
+        }
         let cold = try await measure(project, probe: probe, origin: 0, frame: frame, before: beforeOpen)
         var trials = [Trial(scenario: "cold-open", metrics: cold, error: nil)]
-
-        let positions: [(String, Double)] = [
-            ("warm-start", 0),
-            ("middle", PlaybackStartFixture.deepGOP),
-            ("cut", PlaybackStartFixture.cut - frame),
-            ("near-end", project.duration - 2),
-            ("end-replay", project.duration),
-            ("idle-wake", 1),
-        ]
-        for (scenario, position) in positions {
-            trials.append(await trial(scenario) {
-                try await prepare(project, probe: probe, position: position, frame: frame)
-                if scenario == "idle-wake" { try await stopForIdle(project) }
-                let origin = scenario == "end-replay" ? 0 : position
+        for scenario in PlaybackStartScenarios.list(duration: project.duration, frame: frame) {
+            trials.append(await trial(scenario.name) {
+                let origin = try await PlaybackStartScenarios.stage(scenario, project: project, probe: probe, frame: frame)
                 return try await measure(project, probe: probe, origin: origin, frame: frame, before: PerfCounters.snapshot())
             })
         }
         return Report(media: media, trials: trials)
-    }
-
-    private static func prepare(
-        _ project: VideoEditProject, probe: PlaybackStartVideoProbe, position: Double, frame: Double
-    ) async throws {
-        project.seekFromTimeline(time: position)
-        // At the exact end AVPlayer can hold the last picture without vending a frame at that time.
-        // Let the native placement finish before testing the subsequent rewind.
-        if position == project.duration {
-            try await wait("native placement at the exact end") { !project.clock.isPositioningPreview }
-            return
-        }
-        let visible = min(position, project.duration - frame)
-        try await wait("paused picture at \(visible)") {
-            guard let displayed = probe.displayed else { return false }
-            return abs(displayed.timeline - visible) < frame * 0.95
-        }
-    }
-
-    private static func stopForIdle(_ project: VideoEditProject) async throws {
-        // Focus or pointer activity can return while a local run is preparing the idle case.
-        for _ in 0..<2 {
-            project.audioEngineHost.suspendNow()
-            try await Task.sleep(for: .seconds(2))
-            if project.audioEngineHost.graphStateName == "suspended" { return }
-        }
-        throw Failure("Idle trial did not begin with a suspended realtime output graph (\(project.audioEngineHost.graphStateName))")
     }
 
     private static func trial(_ name: String, _ body: () async throws -> [String: Double]) async -> Trial {
@@ -173,7 +144,18 @@ enum PlaybackStartBench {
         let followup = try await sampleFollowup(probe, attempt, after: max(firstVideo.host, firstAudio.onset) + 1,
                                                 deadline: deadline)
         guard let audioAtStart = attempt.timeline(at: firstVideo.host, extrapolateFirst: true) else {
-            throw Failure("No audio timeline sample at first picture")
+            let gap = attempt.gap(at: firstVideo.host).map { String(format: " (%.1f ms after the last block)", $0 * 1_000) }
+            throw Failure("No audio timeline sample at first picture" + (gap ?? ""))
+        }
+        // The picture must keep moving with the sound, not only start with it: watch the first two seconds,
+        // or up to the last frame before the timeline ends.
+        let window = min(continuitySeconds, project.duration - frame - firstVideo.timeline)
+        while CACurrentMediaTime() < firstVideo.host + window + 0.05 { try await Task.sleep(for: .milliseconds(8)) }
+        guard let continuity = PlaybackStartContinuity.measure(
+            frames: probe.playingFrames, from: firstVideo.host, seconds: window,
+            audio: { attempt.timeline(at: $0) }
+        ), continuity.skewSamples > 0 else {
+            throw Failure("No picture continuity samples after the first frame")
         }
         let cadence = probe.cadence
         guard cadence.period.isFinite, cadence.longestGap > 0 else { throw Failure("No display cadence control samples") }
@@ -187,6 +169,8 @@ enum PlaybackStartBench {
             "videoAdvanceMs": ms(firstVideo.timeline - origin),
             "startOffsetMs": ms(audioAtStart - firstVideo.timeline),
             "oneSecondTimedOut": followup == nil ? 1.0 : 0.0,
+            "stallMs": continuity.stallMs,
+            "maxSkewMs": continuity.maxSkewMs,
             "displayPeriodMs": ms(cadence.period),
             "displayGapMs": ms(cadence.longestGap),
             "firstItemPictureMs": ms(firstDisplayed.host - request),
@@ -226,8 +210,11 @@ enum PlaybackStartBench {
     }
 
     private static func ms(_ seconds: Double) -> Double { seconds * 1_000 }
+    private static let continuitySeconds = 2.0
 
-    private static func wait(_ description: String, deadline: Double = CACurrentMediaTime() + 5,
+    /// Staging waits get 20 s: the hosted virtual Mac decodes 4K in software under a load of 20-50 on three cores, and a
+    /// paused placement two seconds into a GOP took over 5 s there (2026-11-19). Play itself has its own 5 s deadline.
+    static func wait(_ description: String, deadline: Double = CACurrentMediaTime() + 20,
                              until ready: () -> Bool) async throws {
         while !ready() {
             guard CACurrentMediaTime() < deadline else { throw Failure("Timed out waiting for \(description)") }
