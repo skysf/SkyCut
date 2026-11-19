@@ -59,6 +59,7 @@
 - [2026-10-03 关掉主窗口就退出了 App，工程变回空的](2026-10-03-closing-window-quits-app.md) — 框架的默认生命周期要先确认；替别人兜底时把兜底这件事告诉对方。
 - [2026-10-30 多项生成横幅挤占预览](2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口 + 滚动浮层汇总任务；取消不先删状态。
 - [2026-10-31 多工程的生成任务没有工程归属](2026-10-31-cloud-tasks-without-project-context.md) — 任务卡片按原工程分组，数量只算进行中的。
+- [2026-11-19 Compress / Burn In overwrote one result with another and could delete a file that was not the job's](2026-11-19-compress-burn-overwrite-and-delete.md) — A writer only ever overwrites or removes a file it created: write into a claimed file of its own, rename onto an exclusive claim, and name against every writer still to come.
 - [2026-10-15 删除确认码被拒不说原因](2026-10-15-confirmation-token-refused-without-reason.md) — 凭据被拒要说原因；同一个问题等答复时回同一张码。
 - [2026-09-27 拼图函数叫 `sheet(`，被 sheet 语言守卫误判](2026-09-27-contact-sheet-name-trips-sheet-guard.md) — 按名字扫的守卫，名字就是接口：别给函数取 SwiftUI 修饰器的名字。
 - [2026-10-17 冒烟拷工程把整个「下载」拷走、写满磁盘](2026-10-17-copy-project-copied-all-of-downloads.md) — 整夹拷之前先看来源是什么文件夹；测试工具也要设防。

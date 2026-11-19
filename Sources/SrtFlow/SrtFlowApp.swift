@@ -51,6 +51,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         AIBridgeServer.shared.stop()
         MainThreadWatchdog.shared.stop()
+        // A Compress / Burn In encode still running: its ffmpeg stopped and its own unfinished file removed (EncodeJob).
+        MainActor.assumeIsolated { EncodeJob.stopAllForQuit() }
     }
 
     /// 主线程卡顿日志（docs/testing/main-thread-stalls.md）：主线程卡过阈值就记时长、在哪一栏 / 在不在播、

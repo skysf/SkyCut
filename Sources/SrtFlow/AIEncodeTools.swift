@@ -9,6 +9,8 @@ import SrtFlowMCPKit
 // convert_subtitles 当场做完。做出来的文件默认放 `<起点>/SrtFlow/导出`，AI 给了 `folder` 就放那儿（`outputFolder`，同 export_subtitles），
 // 撞名加编号、从不覆盖，所以不用问（docs/architecture/ai-control-mcp.md 第四节第 10、24 条）。
 // 不管什么：编码怎么跑（EncodeQueue）、参数怎么换算、输出怎么起名（AIEncodeOptions，纯值）、字幕怎么转（SubtitleConverter）。
+// Compress / Burn In outputs are named in the queue by the page's rule (EncodeQueue.target, since 2026-11-19), and a name
+// taken after this call answered moves the file on: get_job gives the real file with a `path_note`.
 //
 // **不替用户开跑**：队列停着、里面有用户自己排了还没开始的，就不排 —— `start()` 会把等着的一起跑掉。
 
@@ -131,15 +133,9 @@ enum AIEncodeTools {
         }
         let settings = AIEncodeOptions.apply(try AIEncodeOptions.parse(args), to: queue.settings)
         let folder = try outputFolder(args, project)
-        let outputs = AIEncodeOptions.outputs(
-            for: entries.map(\.url), in: folder, suffix: queue.outputSuffix, pathExtension: "mp4"
-        ) { url in
-            FileManager.default.fileExists(atPath: url.path)
-                || queue.items.contains { !$0.isDone && $0.outputURL.standardizedFileURL.path == url.standardizedFileURL.path }
-        }
-        let ids = zip(entries, outputs).compactMap { entry, output in
-            queue.add(entry.url, output: output, settings: settings, burnIn: entry.burnIn)
-        }
+        // Each item is named in the queue, by the page's rule, against the files there and every item still to be written.
+        let ids = entries.compactMap { entry in queue.add(entry.url, in: folder, settings: settings, burnIn: entry.burnIn) }
+        let added = ids.compactMap { id in queue.items.first { $0.id == id } }
         queue.start()
         let job = AIJobs.shared.start(kind, progress: { progress(ids, in: queue) }, cancel: { ids.forEach(queue.cancel(id:)) })
         watch(job, ids, queue)
@@ -147,8 +143,8 @@ enum AIEncodeTools {
             "job_id": .string(job.id),
             "status": "running",
             "settings": AIEncodeOptions.describe(settings),
-            "outputs": .array(zip(entries, outputs).map { entry, output in
-                ["file": .string(AIWorkspace.shared.display(entry.url)), "output": .string(output.path)]
+            "outputs": .array(added.map { item in
+                ["file": .string(AIWorkspace.shared.display(item.inputURL)), "output": .string(item.outputURL.path)]
             }),
             "next_step": "Call get_job with this job_id and wait_seconds 30 until the status is done."
         ])
@@ -212,6 +208,13 @@ enum AIEncodeTools {
             object["original_mb"] = .number((Double(original) / 1_048_576 * 10).rounded() / 10)
         }
         if let saving = item.savingFraction { object["size_change"] = .string(String(format: "%+.0f%%", -saving * 100)) }
+        // A name taken after the call answered moves the file on; nothing is replaced (EncodeJob).
+        if item.outputURL.standardizedFileURL.path != item.target.url.standardizedFileURL.path {
+            object["path_note"] = .string(
+                "\(item.target.url.lastPathComponent) appeared in the folder while encoding, so this file is "
+                    + "\(item.outputURL.lastPathComponent). Nothing was replaced; tell the user the file name."
+            )
+        }
         return .object(object)
     }
 

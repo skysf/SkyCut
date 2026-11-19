@@ -567,7 +567,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `manage_files` 挪进成品文件夹。三个工具都只在 `AIEncodeTools.outputFolder` 一处读它（`scripts/check-mcp.sh` 扫描钉着，
      定义里有这个参数由 `EncodeChecks` 钉着）。名字是页面那套（`_compressed`、`_sub`），撞了加编号：硬盘上有的、
      队列里别的条目要写的、同一批前面用掉的都算撞 —— **从不覆盖，所以不问**。读点名文件夹以外的文件照样先问
-     （`AIWorkspace.confirmReading`，读文件的工具都走它）。
+     （`AIWorkspace.confirmReading`，读文件的工具都走它）。Since 2026-11-19 the queue names the AI's items by the page's
+     own rule (`EncodeQueue.target`) and ffmpeg writes only the job's own file: a name taken after the call answered moves
+     the file on, and `get_job` gives the real file with a `path_note`
+     ([case](../bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md), [export settings](export-settings.md) §5 item 8).
    - 转字幕格式当场做完：读和转和批量转换页同一个函数（`SubtitleConverter.convertedContents`，编码只走 `TextDecoding`），
      写的时候 `.withoutOverwriting`。
 
