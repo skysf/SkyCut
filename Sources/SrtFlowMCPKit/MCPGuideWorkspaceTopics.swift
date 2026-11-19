@@ -20,8 +20,9 @@ enum MCPGuideWorkspaceTopics {
             Sources. get_status screen=true lists displays, windows and microphones. source is display (default; display picks \
             which, 1 is the main one), window (an app name, title words or a window number; the frontmost match), region (rect \
             as display fractions, 0,0 top left) or drag (the user drags the area; ratio can lock its shape). computer_audio \
-            records the Mac's sound (default true); microphone puts narration on its own track (off unless given). pointer is \
-            shown, hidden or clicks.
+            records the Mac's sound (default true); microphone puts narration on its own track (off unless given): default is \
+            the system's microphone, other words pick the one whose name has them. pointer is shown (default), hidden or clicks \
+            (shown, each click highlighted).
             """),
             MCPGuideSection(name: "start_stop", about: "countdown, the Stop panel, stopping and the receipt", text: """
             Start and stop. action=start counts down (countdown, default 3; 0 when you operate the Mac yourself), then returns \
