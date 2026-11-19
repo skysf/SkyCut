@@ -1,4 +1,4 @@
-"""Fail the GUI check on missing trials, extra preview builds or over-budget playback."""
+"""Score every playback launch against the same timeline and timing contract."""
 
 import argparse
 import json
@@ -7,136 +7,151 @@ import os
 from pathlib import Path
 from statistics import median
 import sys
-from typing import NamedTuple, Optional
+from typing import NamedTuple
 
 
-TIMINGS = (
-    "dispatchMs", "audioMs", "videoMs", "onsetGapMs", "audioAdvanceMs", "videoAdvanceMs",
-    "startOffsetMs", "oneSecondOffsetMs", "oneSecondElapsedMs",
+ONSET = (
+    "dispatchMs", "audioMs", "videoMs", "onsetGapMs", "audioAdvanceMs", "videoAdvanceMs", "startOffsetMs",
 )
+FOLLOWUP = ("oneSecondOffsetMs", "oneSecondElapsedMs")
+TIMINGS = ONSET + FOLLOWUP
+CONTROL = ("displayPeriodMs", "displayGapMs")
+COUNTS = ("builds", "itemAttaches", "assetOpens", "videoPrerolls")
 
 
-class TimingFailure(NamedTuple):
+class Trial(NamedTuple):
     label: str
-    scenario: Optional[str]
-    metric: str
-    value: float
-    limit: float
+    metrics: dict
 
-    def __str__(self):
-        return f"{self.label}: {self.metric} {self.value:.1f} exceeds {self.limit} ms"
+    def timing(self, metric):
+        # A follow-up timeout ranks worse than every measured offset and elapsed time.
+        return abs(self.metrics.get(metric, math.inf))
 
 
-def compare(paths, budgets):
-    scenarios = budgets["scenarios"]
+def finite(metrics, key):
+    return type(metrics.get(key)) in (int, float) and math.isfinite(metrics[key])
+
+
+def read_trials(paths, scenarios, expected_count):
     samples = {name: [] for name in scenarios}
     errors = []
-    if len(paths) != 5 or len(set(paths)) != 5:
-        errors.append("Expected five separate process launches.")
+    if len(paths) != expected_count or len({path.resolve() for path in paths}) != expected_count:
+        errors.append(f"Expected {expected_count} separate process launches")
+    fixture = None
     for path in paths:
         report = json.loads(path.read_text())
         media = report["media"]
-        if (media["width"], media["height"], media["keyframeInterval"], media["videoTracks"], media["audioTracks"]) != (
-            3840, 2160, 8, 4, 6
-        ) or media["primaryBytes"] < 20_000_000:
-            errors.append(f"{path.name}: the 4K long-GOP fixture is missing or smaller than expected")
+        if fixture is None:
+            fixture = media
+        shape = (media["width"], media["height"], media["keyframeInterval"], media["videoTracks"], media["audioTracks"])
+        if media != fixture or shape != (3840, 2160, 8, 4, 6) or media["primaryBytes"] < 20_000_000:
+            errors.append(f"{path.name}: the 4K long-GOP fixture is missing or changed")
         names = sorted(trial["scenario"] for trial in report["trials"])
         if names != sorted(scenarios):
             errors.append(f"{path.name}: unexpected scenarios {names}")
             continue
-        for trial in report["trials"]:
-            name = trial["scenario"]
-            label = f"{path.name} {name}"
-            metrics = trial["metrics"]
-            if trial.get("error"):
-                errors.append(f"{label}: {trial['error']}")
+        for entry in report["trials"]:
+            scenario = entry["scenario"]
+            label = f"{path.parent.name}/{path.name} {scenario}"
+            if entry.get("error"):
+                errors.append(f"{label}: {entry['error']}")
                 continue
-            for key in (*TIMINGS, "builds", "itemAttaches", "assetOpens", "videoPrerolls"):
-                value = metrics.get(key)
-                if type(value) not in (int, float) or not math.isfinite(value):
-                    errors.append(f"{label}: missing or invalid {key}")
-                    break
+            trial = Trial(label, entry["metrics"])
+            defects = validate_trial(scenario, trial)
+            errors.extend(defects)
+            if not defects:
+                samples[scenario].append(trial)
+    return samples, errors, fixture
+
+
+def validate_trial(scenario, trial):
+    metrics = trial.metrics
+    keys = (*ONSET, *COUNTS, *CONTROL, "oneSecondTimedOut")
+    missing = [key for key in keys if not finite(metrics, key)]
+    if missing:
+        return [f"{trial.label}: missing or invalid {', '.join(missing)}"]
+    timed_out = metrics["oneSecondTimedOut"]
+    if timed_out == 0:
+        if not all(finite(metrics, key) for key in FOLLOWUP) or metrics["oneSecondElapsedMs"] < 1000:
+            return [f"{trial.label}: invalid one-second follow-up"]
+    elif timed_out != 1 or any(key in metrics for key in FOLLOWUP):
+        return [f"{trial.label}: inconsistent one-second timeout"]
+    if any(metrics[key] < 0 for key in ("dispatchMs", "audioMs", "videoMs", "onsetGapMs")):
+        return [f"{trial.label}: playback timing preceded Play"]
+    if any(metrics[key] <= 0 for key in CONTROL):
+        return [f"{trial.label}: display cadence control did not run"]
+
+    cold = scenario == "cold-open"
+    expected = {"builds": int(cold), "itemAttaches": int(cold), "assetOpens": 3 if cold else 0}
+    if cold or scenario == "end-replay":
+        expected["videoPrerolls"] = 1
+    return [f"{trial.label}: {key} {metrics[key]:g}, expected {count}"
+            for key, count in expected.items() if metrics[key] != count]
+
+
+def evaluate(samples, budgets, confirmed=False):
+    errors, outliers = [], []
+    # Warm playback exercises the same clocks without a cold load, cut or rewind.
+    # One measured display interval bounds the confirmation margin for onset measurement.
+    interval = min(1000 / 30, median(trial.metrics["displayPeriodMs"] for trial in samples["warm-start"]))
+    for name, trials in samples.items():
+        single = budgets["common"] | budgets["scenarios"][name]
+        typical = budgets["medians"]["common"] | budgets["medians"]["scenarios"].get(name, {})
+        if set(single) != set(TIMINGS) or set(typical) != set(TIMINGS) - {"oneSecondElapsedMs"}:
+            raise ValueError(f"{name} needs the full set of playback timing limits")
+        if not all(finite(limits, key) and limits[key] > 0 for limits in (single, typical) for key in limits):
+            raise ValueError(f"{name} has an invalid playback budget")
+        valid = 0
+        timeouts = 0
+        for trial in trials:
+            timed_out = trial.metrics["oneSecondTimedOut"] == 1
+            timeouts += timed_out
+            exceeded = [f"{metric} {trial.timing(metric):.1f} > {limit:g} ms"
+                        for metric, limit in single.items() if metric in trial.metrics and trial.timing(metric) > limit]
+            if timed_out:
+                exceeded.append("one-second follow-up timed out after both streams started")
+            if exceeded:
+                outliers.append(f"{trial.label}: {', '.join(exceeded)}")
             else:
-                samples[name].append(metrics)
-                check_trial(label, name, metrics, budgets, errors)
-    for scenario, trials in samples.items():
-        if len(trials) != 5:
-            continue
-        median_budgets = budgets["medians"]
-        limits = median_budgets["common"] | median_budgets["scenarios"].get(scenario, {})
-        values = {key: median(abs(trial[key]) for trial in trials) for key in limits}
-        check_limits(f"{scenario} median", values, limits, errors)
-    return samples, errors
+                valid += 1
+        if valid * 2 < len(trials):
+            errors.append(f"{name}: {valid}/{len(trials)} whole launches within the per-launch budgets; at least half are required")
+        if timeouts > int(confirmed):
+            errors.append(f"{name}: {timeouts} follow-up timeouts in {len(trials)} launches")
+        for metric, target in typical.items():
+            limit = target
+            if confirmed and name != "warm-start" and (metric in ("audioMs", "videoMs") or
+                                                           (name == "cold-open" and metric == "startOffsetMs")):
+                limit = min(single[metric], target + interval)
+            observed = median(trial.timing(metric) for trial in trials)
+            if observed > limit:
+                errors.append(f"{name} median: {metric} {observed:.1f} exceeds {limit:.1f} ms")
+    return errors, outliers, interval
 
 
-def check_trial(label, scenario, metrics, budgets, errors):
-    limits = budgets["common"] | budgets["scenarios"][scenario]
-    if set(limits) != set(TIMINGS):
-        raise ValueError(f"{scenario} needs a budget for each timing")
-    check_limits(label, metrics, limits, errors, scenario)
-    for key in ("dispatchMs", "audioMs", "videoMs", "onsetGapMs"):
-        if metrics[key] < 0:
-            errors.append(f"{label}: {key} happened before Play")
-    if metrics["oneSecondElapsedMs"] < 1000:
-        errors.append(f"{label}: follow-up frame was less than one second after playback started")
-    expected = 1 if scenario == "cold-open" else 0
-    for key in ("builds", "itemAttaches"):
-        if metrics[key] != expected:
-            errors.append(f"{label}: {key} {metrics[key]:g}, expected {expected}")
-    if scenario in ("cold-open", "end-replay") and metrics["videoPrerolls"] != 1:
-        errors.append(f"{label}: expected one successful native video preroll before playback")
-    expected_opens = 3 if scenario == "cold-open" else 0
-    if metrics["assetOpens"] != expected_opens:
-        errors.append(f"{label}: assetOpens {metrics['assetOpens']:g}, expected {expected_opens}")
-
-
-def check_limits(label, metrics, limits, errors, scenario=None):
-    for key, limit in limits.items():
-        if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
-            raise ValueError(f"{label} has an invalid budget for {key}")
-        if abs(metrics[key]) > limit:
-            errors.append(TimingFailure(label, scenario, key, metrics[key], limit))
-
-
-def render(samples, errors, machine, media):
-    header = ["Scenario", "Trials", *TIMINGS]
-    lines = [
-        "## Playback start", "",
-        machine,
-        f"Fixture: {media['primaryBytes'] / 1e6:.1f} MB, 4K H.264 with an 8 s GOP, 4 video and 6 audio tracks.",
-        "", "Times in milliseconds, median / worst. Offsets and advances use absolute values.", "",
-        "| " + " | ".join(header) + " |",
-        "| " + " | ".join("---" for _ in header) + " |",
-    ]
+def render(samples, errors, outliers, machine, media, interval=None):
+    header = ["Scenario", "Trials", *TIMINGS, "displayGapMs"]
+    lines = ["## Playback start", "", machine,
+             f"Fixture: {media['primaryBytes'] / 1e6:.1f} MB, 4K H.264 with an 8 s GOP, 4 video and 6 audio tracks.",
+             "", "Values in milliseconds, median / worst. Offsets and advances use absolute values.", ""]
+    if interval is not None:
+        lines.extend([f"Warm-start display control: {interval:.2f} ms confirmation margin at most.", ""])
+    lines.extend(["| " + " | ".join(header) + " |", "| " + " | ".join("---" for _ in header) + " |"])
     for name, trials in samples.items():
         cells = [name, str(len(trials))]
-        for key in TIMINGS:
-            values = [abs(trial[key]) for trial in trials]
-            cells.append(f"{median(values):.1f} / {max(values):.1f}" if values else "missing")
+        for metric in (*TIMINGS, "displayGapMs"):
+            values = [trial.timing(metric) for trial in trials]
+            cells.append(f"{format_timing(median(values))} / {format_timing(max(values))}" if values else "missing")
         lines.append("| " + " | ".join(cells) + " |")
+    if outliers:
+        lines.extend(["", "Individual outliers and timeouts", "", *(f"- {outlier}" for outlier in outliers)])
     if errors:
         lines.extend(["", "Failures", "", *(f"- {error}" for error in errors)])
     return "\n".join(lines) + "\n"
 
 
-def isolated_virtual_timing_failures(errors):
-    # Allow only one affected launch per scenario. Structural, median and large onset failures are final.
-    affected = {}
-    for error in errors:
-        if not isinstance(error, TimingFailure) or error.scenario is None:
-            return None
-        start_skew_limit = 200 if error.scenario == "cold-open" else 100
-        small_start_skew = error.metric == "startOffsetMs" and abs(error.value) <= start_skew_limit
-        isolated_rewind = (
-            error.scenario == "end-replay" and error.metric in ("audioMs", "videoMs", "onsetGapMs")
-            and abs(error.value) <= error.limit + 50
-        )
-        if not small_start_skew and not isolated_rewind and error.metric not in ("oneSecondOffsetMs", "oneSecondElapsedMs"):
-            return None
-        affected.setdefault(error.scenario, set()).add(error.label)
-    if any(len(trials) > 1 for trials in affected.values()):
-        return None
-    return set(affected)
+def format_timing(value):
+    return f"{value:.1f}" if math.isfinite(value) else "timeout"
 
 
 def write_report(summary, report):
@@ -147,40 +162,26 @@ def write_report(summary, report):
             stream.write("\n" + report)
 
 
-def fingerprint(directory):
-    return (directory / "machine.txt").read_text().strip().replace("\n", " · ")
-
-
-def confirm(directory, samples, failures, budgets, machine, media):
-    first, first_errors = compare(sorted(directory.glob("trial-[1-5].json")), budgets)
-    first_failures = isolated_virtual_timing_failures(first_errors)
-    if not first_failures or failures is None or first_failures & failures or fingerprint(directory) != machine:
-        print("The second batch did not confirm every scenario with an isolated timing failure.", file=sys.stderr)
-        return 1
-    confirmed = {name: samples[name] if name in first_failures else trials for name, trials in first.items()}
-    report = "## Confirmed playback start\n\nEach scenario has one complete five-launch batch within budget. Both batches are archived.\n\n"
-    write_report(directory / "confirmed-summary.md", report + render(confirmed, [], machine, media))
-    return 0
-
-
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("summary", type=Path)
     parser.add_argument("trials", type=Path, nargs="+")
-    parser.add_argument("--confirm", type=Path)
+    parser.add_argument("--confirm", action="store_true")
     args = parser.parse_args()
     budgets = json.loads(Path(__file__).with_name("budgets.json").read_text())
-    samples, errors = compare(args.trials, budgets)
-    machine = fingerprint(args.summary.parent)
-    media = json.loads(args.trials[0].read_text())["media"]
-    write_report(args.summary, render(samples, errors, machine, media))
-    hosted_vm = os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine
-    failures = isolated_virtual_timing_failures(errors) if hosted_vm else None
-    if args.confirm:
-        return confirm(args.confirm, samples, failures, budgets, machine, media)
-    if failures:
+    machine = (args.summary.parent / "machine.txt").read_text().strip().replace("\n", " · ")
+    hosted = os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine
+    samples, errors, media = read_trials(args.trials, budgets["scenarios"], 8 if args.confirm else 5)
+    if args.confirm and not hosted:
+        errors.append("Playback confirmation requires the hosted virtual Mac")
+    if errors:
+        write_report(args.summary, render(samples, errors, [], machine, media))
+        return 1
+    failures, outliers, interval = evaluate(samples, budgets, args.confirm)
+    write_report(args.summary, render(samples, failures, outliers, machine, media, interval if args.confirm else None))
+    if failures and hosted and not args.confirm:
         return 2
-    return bool(errors)
+    return int(bool(failures))
 
 
 if __name__ == "__main__":

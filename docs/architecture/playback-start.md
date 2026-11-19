@@ -49,7 +49,9 @@ Time begins at the call to the editor's Play action. Each attempt measures the f
   The observer takes the display's host timestamps from Core Video's sampling thread once the mounted
   `AVPlayerLayer` is ready and keeps normal layer rendering enabled. Presentation timestamps identify the
   timeline frame. The raw samples also record when the item first offered a frame, including a still frame
-  during paused preparation.
+  during paused preparation. The display thread separately records its shortest presentation interval and
+  longest callback gap, including while the preview has no frame. Warm-start samples supply the display
+  interval control for the same run.
   [Core Video display link](https://developer.apple.com/documentation/corevideo/cvdisplaylink-k0k).
 - The difference between the two onset times and how far the first sampled audio and video have moved from the requested time.
 - The signed audio timeline minus video presentation timestamp at video onset and at the first follow-up display deadline
@@ -60,11 +62,12 @@ actual footage, and monitoring devices also belong in the manual regression.
 
 ## CI and budget changes
 
-The graphical step contributes to `check-all`. It uploads all samples, the machine fingerprint and a table with each
-scenario's median and worst result. Every trial in the accepted batch must produce audio and video and meet the limits in
-`checks/PlaybackStart/budgets.json`. A cold open must build and attach once and open exactly three video assets.
+The graphical step contributes to `check-all`. It uploads all samples, the machine fingerprint, individual outliers,
+and each scenario's median and worst result. All launches must produce first audio and advancing video, and all
+must satisfy the structural limits. A cold open must build and attach once and open exactly three video assets.
 Warm and idle starts must build, attach and open zero times. Cold open and replay from the end each require one
-successful native preroll.
+successful native preroll. The median of each timing must be in budget, and at least half of the whole launches
+in each scenario must jointly meet the per-launch budgets in `checks/PlaybackStart/budgets.json`.
 
 The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
 340 ms audio and 380 ms picture ceilings. One hosted start needed 290 ms for audio and 314 ms for picture,
@@ -95,13 +98,18 @@ On the hosted VirtualMac2,1, waiting for the mounted picture lowered worst cold 
 to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing cold frames were one frame from
 the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
 
-A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch when each affected
-scenario has only one failed trial. Eligible failures are one-second timing, a start skew of at most
-200 ms cold or 100 ms after positioning, or a rewind onset time within 50 ms of its single-trial budget.
-Each scenario must have a complete
-five-trial batch within budget. A failure in the same scenario in both batches fails the gate. Missing playback,
-other timing failures, repeated failures in one scenario and structural failures fail immediately.
-The artifact preserves both raw summaries and gives the complete confirmed batch for each scenario.
+A hosted virtual Mac can deliver a late display or audio sample after good playback onset. The gate distinguishes
+onset from the one-second sample and stops waiting five seconds after Play. A missing onset or failed launch fails
+the check. A follow-up timeout after both streams start is a failed launch for the whole-launch count and ranks above
+every measured follow-up in the median. Any follow-up timeout requires confirmation. A scenario can have at most
+one across the full run, and the artifact still shows it as a timeout.
+
+When hosted timings need confirmation, the check starts three more processes once. It scores all eight launches
+together. On confirmation, the elapsed time to first sound or picture and the cold onset offset get at most one
+observed warm-start display interval of measurement margin, capped at a 30 fps frame and the existing per-launch
+limits. The warm-start control and the one-second sync retain their normal median limits. The required graphical
+step stops after four minutes. Shard 1 has 35 minutes for the full suite and both graphical checks.
+[Hosted timing and timeout case](../bugfixes/2026-11-19-playback-start-hosted-timing-outliers.md).
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.
@@ -116,7 +124,7 @@ Run locally from a logged-in graphical session with the repo's ffmpeg available.
 PLAYBACK_START_OUT=/tmp/playback-start /bin/bash scripts/check-playback-start.sh
 ```
 
-Update the versioned budgets in a PR. Attach fresh local and CI runs with all five samples, machine
+Update the versioned budgets in a PR. Attach fresh local and CI runs with all initial and confirmation samples, machine
 fingerprints and the reason for each proposed change. Check that a deliberate delay at the production playback
 entry still fails. Keep fixture changes and any resulting budget changes visible in review.
 

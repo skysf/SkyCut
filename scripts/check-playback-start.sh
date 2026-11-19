@@ -44,17 +44,17 @@ ff -f lavfi -i "testsrc2=s=640x360:r=30:d=24" -c:v libx264 -threads:v 2 -preset 
 ff -f lavfi -i "sine=frequency=443:sample_rate=48000:duration=24" -ac 2 -c:a pcm_s16le "${media}/tone.wav"
 
 run_trials() {
-  local destination="$1" trial result log deadline status
-  for trial in 1 2 3 4 5; do
+  local destination="$1" launches="$2" trial result log deadline status
+  for ((trial = 1; trial <= launches; trial++)); do
     result="${destination}/trial-${trial}.json"
     log="${destination}/trial-${trial}.log"
     rm -f "${result}"
-    echo "Playback start trial ${trial}/5"
+    echo "Playback start trial ${trial}/${launches}"
     SRTFLOW_PLAYBACK_START_OUT="${result}" SRTFLOW_PLAYBACK_START_MEDIA="${media}" SRTFLOW_SMOKE_MUTE=1 \
       "${app}" -mainWindowSection videoEdit -ApplePersistenceIgnoreState YES -NSRecentDocumentsLimit 0 \
       -optimizedMedia.previewMode original >"${log}" 2>&1 &
     pid=$!
-    deadline=$((SECONDS + 90))
+    deadline=$((SECONDS + 45))
     while kill -0 "${pid}" 2>/dev/null; do
       if [ "${SECONDS}" -ge "${deadline}" ]; then
         echo "Playback start trial ${trial} timed out" >&2
@@ -74,26 +74,21 @@ run_trials() {
   done
 }
 
-score() {
-  local destination="$1"
-  shift
-  python3 checks/PlaybackStart/compare.py "${destination}/summary.md" "${destination}"/trial-[1-5].json "$@"
-}
-
-run_trials "${out}"
-
 {
   sw_vers
   sysctl hw.model hw.ncpu
   swift --version 2>&1
 } >"${out}/machine.txt"
+
+run_trials "${out}" 5
+
 status=0
-score "${out}" || status=$?
+python3 checks/PlaybackStart/compare.py "${out}/summary.md" "${out}"/trial-[1-5].json || status=$?
 if [ "${status}" -ne 2 ]; then exit "${status}"; fi
 
-echo "The first hosted batch had an isolated timing outlier. Running one repeat and retaining both batches."
+echo "Confirming hosted timing with three more launches. All eight count toward the verdict."
 repeat="${out}/repeat"
 mkdir -p "${repeat}"
-cp "${out}/machine.txt" "${repeat}/machine.txt"
-run_trials "${repeat}"
-score "${repeat}" --confirm "${out}"
+run_trials "${repeat}" 3
+python3 checks/PlaybackStart/compare.py "${out}/confirmed-summary.md" \
+  "${out}"/trial-[1-5].json "${repeat}"/trial-[1-3].json --confirm
