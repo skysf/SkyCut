@@ -236,6 +236,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-cloud-media.sh` — 云端媒体共用的每日账与阶段。
 - `scripts/check-cover-export.sh` — 盖一块（模糊 / 马赛克）在成片里真的盖了。
 - `scripts/check-dmg.sh` — DMG 的真实组装、挂载和 Retina 背景。
+- `scripts/check-e2e.sh` — Isolated SkyCut and its real MCP helper, from authoring synthetic projects to checking the delivered video.
 - `scripts/check-engine-probe.sh` — 引擎启动探测：超时、输出上限、子进程回收、单次定位。
 - `scripts/check-export-alpha-compositing.sh` — 上层轨动画段的 fill + matte。
 - `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）；per-frame upper-video, cover and grade windows, including native look requests.

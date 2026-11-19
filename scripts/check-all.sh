@@ -112,6 +112,7 @@ run_check "project-saves (the project file written off the main thread: a slow, 
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
 run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
 run_check "motion-placement (stored web pages: real renders, approval modes, same-clip edits, undo and cache recovery)" scripts/check-motion-placement.sh
+run_check "e2e (isolated SkyCut and real MCP helper: layer mix, AAC true peak and export destinations)" scripts/check-e2e.sh
 
 # ---- 第 2 组 ----
 shard 2
