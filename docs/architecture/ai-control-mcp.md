@@ -669,7 +669,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 
 32. **剪辑风格（recipes 只读、save_recipe 写，方案第 39–41 条）**：AI 自己挑，不做斜杠命令。中文叫「剪辑风格」、内置的叫「预设风格」
    （2026-09-28 改名，原来叫「剪辑套路」，方案第 53 条）；工具说明要求 AI 对用户也这么叫（英文 editing styles），代码和工具名里仍叫 recipe。
-   - 内置五张是 App 资源里的 `recipe-*.md`（英文；中文稿在 [配方卡](../plans/2026-09-28-mcp-recipes.md)，**改剪辑风格先改中文稿、再同步英文**），
+   - 内置五张是 App 资源里的 `recipe-*.md`（英文；中文稿在 [配方卡](../plans/2026-09-28-mcp-recipes.md)，**since 2026-11-17 a history
+     record: edit the English resources directly**, AGENTS.md），
      所有剪辑风格共用的规矩在 `recipes-shared-rules.md`，读一套全文时接在后面。
    - 读资源**不用 `Bundle.module`**：打好的 App 里没有 SrtFlow_SrtFlow.bundle（build-app.sh 把资源摊平进 Contents/Resources），
      它会直接崩。`AIBuiltInRecipes` 从 `Bundle.main.resourceURL` 找，`swift run` 时退到可执行文件旁边的那个 bundle。
@@ -727,6 +728,19 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      10 thousand tokens, so new tiers need room first (shorter paid rules, or server recipes that do not repeat the shared rules).
      `RecipeChecks` pins the four sections and checks the reserved id (any spelling, a user's style of that name winning, the parameter
      text and the workflows topic naming it).
+     ⑤ **The rules send the AI to the tools built for each job** (2026-11-19, MCP-41 / MCP-60 / FL-45): the AI uses what a rule's
+     "How:" names, so a new tool for a job a rule covers goes into that rule's How line in the same change. That day: `listen
+     describe=true` (Sound belongs to the picture 1, 6), `edit_clip voice_band_db` (Sound 6, Voice and music 2), `set_transition sound`
+     for the five crossings (Cuts 1), `source_cuts` (Cuts 2), `listen voice=` and its maskers (Voice and music 2), `listen beats=true`
+     accents, stops and `ends_at` with `add_clips hit` / `hit_at` (Voice and music 5, taste 18, 20), `listen mix=true` (rule 7, Look
+     again 5), and `inspect_video` as the step before every delivery (Look again 6, 7: every frame of a `quick_review` copy, fix and
+     inspect again, mark what was meant with `intentional`, findings mapped to the rules). Tier 2 added FL-45 (Voice and music 5: measure
+     generated music, land its own stop and return on the cut) and the title-card placement (where no one speaks, empty and dark
+     enough, company cards about 1 s after a hit, the title on a big hit; written so no style card contradicts it). Still waiting:
+     off-screen sound, placing music backwards beyond taste 18, quiet is not empty, taste 23–27, two more AI tells, a loudness target
+     (−17 LUFS, the user's call). Largest answer after it: product-promo, 32,223 characters (about 9.0 thousand tokens).
+     `RecipeChecks` pins each pointer in its section (`toolRouteChecks`) and every built-in answer, card plus rules as the App encodes
+     it, at ≤ 36,000 characters (`answerSizeChecks`, `recipeAnswerLimit`): new rules make room first, the line is not raised.
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，

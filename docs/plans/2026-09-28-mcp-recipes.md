@@ -20,6 +20,11 @@
 > 研究稿的第二、三档（整片响度目标、音乐倒推对点、生成的音乐先量、安静和重击、画面外的声音、字卡的位置和进出、品味第 23–27 条、AI 通病和交片前再加的几条）
 > 等腾出地方再进；进的时候**接在各节末尾**，别插在中间（卡里按编号引用）。品味第 26 条（旁白不念画面）进的时候带上例外：旁白的最后一句可以说出画面上的东西。
 
+> Since 2026-11-17 this Chinese draft is a history record (AGENTS.md): the English App resources are edited directly and are
+> the source of truth. 2026-11-19 (MCP-41 / MCP-60 / FL-45) went into the English resources only: the How lines name the tools
+> built since, generated music measured first (Voice and music 5), the title-card placement, and `inspect_video` before every
+> delivery (Look again 7). What still waits: [AI interface (MCP)](../architecture/ai-control-mcp.md) section 4, item 32 ⑤.
+
 ## 一、剪辑风格怎么用
 
 - **AI 自己挑**（第 39 条）：剪整片之前先调只读工具 `recipes` 看有哪几套、每套「什么时候用」，按用户的目的挑一套，
