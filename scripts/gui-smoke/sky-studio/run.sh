@@ -5,6 +5,7 @@
 # SKYSTUDIO_SMOKE_CONTROL（JSON）是假服务起手的控制项（/me 的两个池、读稿每批的字数上限这些 App 启动就读的），见 server.py。
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
+. scripts/test-app-cleanup.sh
 REPO="$PWD"
 D="${SKYSTUDIO_SMOKE_DIR:-/private/tmp/srtflow-skystudio-smoke}"
 APP="$D/SrtFlowSkyStudioSmoke.app"
@@ -14,6 +15,7 @@ SUPPORT="$HOME/Library/Application Support/$BUNDLE"
 PORT="${SKYSTUDIO_SMOKE_PORT:-18766}"
 stop() {
   pkill -f "$APP/Contents/MacOS/SrtFlowSkyStudioSmoke" 2>/dev/null || true
+  remove_test_app "$APP"
   # PID 会被系统复用；App 只按完整路径停，服务器还要核对命令和本轮素材目录。
   if [ -f "$D/server.pid" ]; then
     local server_pid server_command
@@ -35,6 +37,8 @@ stop() {
 }
 if [ "${1:-}" = stop ]; then stop; exit 0; fi
 stop
+trap stop EXIT
+test_app_exit_signals
 mkdir -p "$D/assets" "$D/work" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
 BUILD="$(swift build --arch arm64 --show-bin-path)"
 cp "$BUILD/SrtFlow" "$APP/Contents/MacOS/SrtFlowSkyStudioSmoke"
@@ -98,7 +102,11 @@ open -g -n --env "SRTFLOW_SKYSTUDIO_API_BASE=http://127.0.0.1:$PORT/api/skycut/v
   --env "SRTFLOW_SMOKE_SKYSTUDIO_KEY=sk-SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS" \
   --env "SRTFLOW_FFMPEG=$FF" --env SRTFLOW_SMOKE_MUTE=1 "$APP"
 for _ in $(seq 1 60); do
-  if [ -S "$SUPPORT/mcp.sock" ]; then echo "Local Sky Studio smoke ready: $D"; exit 0; fi
+  if [ -S "$SUPPORT/mcp.sock" ]; then
+    trap - EXIT
+    echo "Local Sky Studio smoke ready: $D"
+    exit 0
+  fi
   sleep 0.5
 done
 echo 'Test App did not start' >&2

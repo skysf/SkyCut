@@ -20,7 +20,7 @@ import SrtFlowCore
         defer { sheet.close() }
         _ = try await sheet.text("Versions")
         try await sheet.click("Go Back")
-        try await eventually("Versions did not restore the chosen cut") {
+        try await sheet.wait("Versions to restore the chosen cut") {
             project.state.textOverlays.first?.text == "Earlier title"
         }
         guard project.effectiveUndoManager?.canUndo == true else {

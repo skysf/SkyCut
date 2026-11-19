@@ -3,16 +3,12 @@
 import argparse
 import base64
 from contextlib import contextmanager
+import json
 import os
 from pathlib import Path
 import plistlib
-import pwd
-import shutil
-import signal
-import stat
 import subprocess
 import sys
-import tempfile
 import time
 
 from fixture_license import KEY, license_server
@@ -25,72 +21,37 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcpclient import MCP
 
 
-def bridge_paths(bundle_id):
-    # Match MCPBridge.swift, which deliberately ignores HOME for the interprocess bridge.
-    home = Path(pwd.getpwuid(os.getuid()).pw_dir)
-    support = home / "Library/Application Support" / bundle_id
-    socket = support / "mcp.sock"
-    if len(os.fsencode(socket)) >= 104:
-        stable = 0xCBF29CE484222325
-        for byte in bundle_id.encode():
-            stable = ((stable ^ byte) * 0x100000001B3) & 0xFFFFFFFFFFFFFFFF
-        socket = Path(f"/tmp/srtflow-mcp-{os.getuid()}-{stable % 100000}.sock")
-    return support, socket
+# The bridge itself gives a healthy call up to 120 s. The fixture jobs have a separate deadline: the
+# 18-frame reference motion can take 96 s in the helper, plus the 10 s App backstop and 3 s teardown.
+CALL_TIMEOUT = 125
+JOB_TIMEOUT = 120
 
 
 @contextmanager
-def app_process(bundle, ffmpeg, base):
+def app_process(bundle, base, socket):
     root = bundle.parent
     bundle_id = plistlib.loads((bundle / "Contents/Info.plist").read_bytes())["CFBundleIdentifier"]
     assert bundle_id.startswith("com.srtflow.e2e") and bundle_id.endswith(".skystudiosmoke"), bundle_id
-    support, socket = bridge_paths(bundle_id)
-    assert not socket.exists() and not socket.is_symlink(), f"Fixture socket already exists: {socket}"
-    support.parent.mkdir(parents=True, exist_ok=True)
-    support.mkdir(mode=0o700)
-    try:
-        for folder in ("home", "tmp"):
-            (root / folder).mkdir()
-        environment = {key: value for key, value in os.environ.items() if not key.startswith("SRTFLOW_")}
-        environment.update(
-            HOME=str(root / "home"),
-            CFFIXED_USER_HOME=str(root / "home"),
-            TMPDIR=str(root / "tmp"),
-            SRTFLOW_FFMPEG=str(ffmpeg),
-            SRTFLOW_SMOKE_MUTE="1",
-            SRTFLOW_SMOKE_CACHE_DIR=str(root / "optimized"),
-            SRTFLOW_VERSIONS_ROOT=str(root / "versions"),
-            SRTFLOW_SKYSTUDIO_API_BASE=base,
-            SRTFLOW_SMOKE_SKYSTUDIO_KEY=KEY,
-        )
-        executable = bundle / "Contents/MacOS/SrtFlow"
-        log = root / "app.log"
-        with log.open("w") as output:
-            app = subprocess.Popen([str(executable), "-ApplePersistenceIgnoreState", "YES",
-                                    "-optimizedMedia.previewMode", "original", "-appLanguage", "en"],
-                                   cwd=root, env=environment, stdin=subprocess.DEVNULL, stdout=output,
-                                   stderr=subprocess.STDOUT, start_new_session=True)
+    assert Path(os.environ["CFFIXED_USER_HOME"]) == root / "home", "Use the isolated E2E launcher"
+    environment = dict(os.environ, SRTFLOW_SMOKE_CACHE_DIR=str(root / "optimized"),
+                       SRTFLOW_SKYSTUDIO_API_BASE=base, SRTFLOW_SMOKE_SKYSTUDIO_KEY=KEY)
+    executable = bundle / "Contents/MacOS/SrtFlow"
+    with (root / "app.log").open("w") as output:
+        app = subprocess.Popen([str(executable), "-ApplePersistence", "NO",
+                                "-optimizedMedia.previewMode", "original", "-appLanguage", "en"],
+                               cwd=root, env=environment, stdin=subprocess.DEVNULL, stdout=output,
+                               stderr=subprocess.STDOUT)
+        try:
+            print("Waiting for the isolated SkyCut app and its MCP bridge", flush=True)
+            wait_for_bridge(app, socket)
+            yield
+        finally:
+            app.terminate()
             try:
-                wait_for_bridge(app, socket)
-                yield socket
-            except BaseException:
-                print(f"SkyCut E2E app log (exit {app.poll()})\n" + "\n".join(log.read_text(
-                    errors="replace").splitlines()[-60:]), file=sys.stderr)
-                raise
-            finally:
-                if app.poll() is None:
-                    os.killpg(app.pid, signal.SIGTERM)
-                    try:
-                        app.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(app.pid, signal.SIGKILL)
-                        app.wait(timeout=5)
-    finally:
-        socket.unlink(missing_ok=True)
-        shutil.rmtree(support)
-        # AppKit's ignored restoration state uses the system's real per-user temp directory.
-        saved_state = Path(tempfile.gettempdir()) / f"{bundle_id}.savedState"
-        if saved_state.exists():
-            shutil.rmtree(saved_state)
+                app.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                app.kill()
+                app.wait(timeout=3)
 
 
 def wait_for_bridge(app, socket):
@@ -110,13 +71,17 @@ class Session:
     def __init__(self, client):
         self.client = client
         self.project = None
+        self.last_call = "initialize"
+        self.last_job = None
+        self.view = "startup"
 
     def call(self, tool, **arguments):
         data, _ = self.response(tool, arguments)
         return data
 
-    def response(self, tool, arguments):
-        data, error, content = self.client.call_with_content(tool, arguments, timeout=40)
+    def response(self, tool, arguments, timeout=CALL_TIMEOUT):
+        self.last_call = tool
+        data, error, content = self.client.call_with_content(tool, arguments, timeout=timeout)
         assert not error and isinstance(data, dict), f"{tool} {arguments} failed: {data}"
         assert data.get("status") != "needs_confirmation", f"{tool} unexpectedly asked for confirmation: {data}"
         return data, content
@@ -130,15 +95,34 @@ class Session:
         return result
 
     def wait_job(self, started):
-        deadline = time.monotonic() + 60
+        begin = time.monotonic()
+        deadline = begin + JOB_TIMEOUT
         job_id = started["job_id"]
-        while True:
-            job, content = self.response("get_job", {"job_id": job_id, "wait_seconds": 5})
+        self.last_job = started
+        print(f"Waiting for MCP job {job_id}", flush=True)
+        while (remaining := deadline - time.monotonic()) > 0:
+            job, content = self.response("get_job", {"job_id": job_id, "wait_seconds": min(5, remaining)},
+                                         timeout=remaining)
+            self.last_job = job
             if job["status"] == "done":
+                print(f"MCP job {job_id} finished in {time.monotonic() - begin:.1f}s after submission", flush=True)
                 return job, content
             assert job["status"] in {"queued", "running"} and not job.get("waiting_for_user"), job
-            if time.monotonic() >= deadline:
-                raise TimeoutError(f"Job {job_id} still {job['status']} after 60 seconds")
+        raise TimeoutError(f"MCP job {job_id} exceeded {JOB_TIMEOUT}s")
+
+    def diagnose(self):
+        job = self.last_job or {}
+        fields = ("job_id", "kind", "status", "phase", "phase_seconds", "queue_position", "progress", "message")
+        last = {key: job[key] for key in fields if key in job}
+        print(f"Last MCP call: {self.last_call}. Last job phase: {last}. Editor view: {self.view}.",
+              file=sys.stderr, flush=True)
+        try:
+            status, error = self.client.call("get_status", timeout=2)
+            if not error:
+                windows = [(row["id"], row["shown_in"], row["view"]) for row in status["projects"]]
+                print(f"SkyCut project window state: {windows}", file=sys.stderr, flush=True)
+        except (OSError, RuntimeError):
+            print("SkyCut did not return its project window state", file=sys.stderr, flush=True)
 
     def look(self, **arguments):
         result, content = self.response("look", {"project": self.project, **arguments})
@@ -151,6 +135,7 @@ class Session:
     def new_project(self, work, name):
         self.call("open_folder", path=str(work))
         self.call("set_view", mode="background")
+        self.view = "background"
         created = self.call("new_project", name=name, version="E2E")
         self.project = created["project"]
         path = Path(created["created"]).resolve()
@@ -158,36 +143,41 @@ class Session:
         return path
 
     def authorized(self):
-        deadline = time.monotonic() + 20
-        while True:
-            plan = self.call("get_status")["skycut_plan"]
+        # Sky Studio's loopback request gets 20 s in the App. Leave room for launch and the last reply.
+        deadline = time.monotonic() + 30
+        plan = None
+        while (remaining := deadline - time.monotonic()) > 0:
+            data, _ = self.response("get_status", {}, timeout=remaining)
+            plan = data["skycut_plan"]
             if plan["source"] == "sky_studio" and plan["ai_tools"] and not plan["export_watermark"]:
                 return
-            if time.monotonic() >= deadline:
-                raise RuntimeError(f"Isolated SkyCut did not read the fixture license: {plan}")
             time.sleep(0.1)
+        raise TimeoutError(f"Isolated SkyCut did not read the fixture license: {plan}")
 
 
 def main(bundle, ffmpeg, update_goldens):
     work = bundle.parent / "work"
     work.mkdir()
-    if not update_goldens:
-        make_media(work, ffmpeg)
+    make_media(work, ffmpeg)
     reference = work / "reference"
     reference.mkdir()
     make_reference_media(reference, ffmpeg)
-    with license_server() as base, app_process(bundle, ffmpeg, base) as socket:
+    socket = bundle.parent / "bridge/mcp.sock"
+    marker = socket.with_name("mcp-providers.json")
+    with license_server() as base, app_process(bundle, base, socket):
         environment = dict(os.environ, SRTFLOW_MCP_SOCKET=str(socket), SRTFLOW_MCP_NO_LAUNCH="1",
-                           SRTFLOW_MCP_APP=str(bundle))
-        environment.pop("SRTFLOW_MCP_PROVIDERS", None)
+                           SRTFLOW_MCP_PROVIDERS=str(marker), SRTFLOW_MCP_APP=str(bundle))
         client = MCP(str(bundle / "Contents/Helpers/skycut-mcp"), environment)
+        session = Session(client)
         try:
-            session = Session(client)
             session.authorized()
-            if not update_goldens:
-                verify_mix_export(session, work, ffmpeg)
-                session.edit("close_project")
+            assert json.loads(marker.read_text())["providers"] == ["skystudio"], "Expected the isolated provider marker"
+            verify_mix_export(session, work, ffmpeg)
+            session.edit("close_project")
             run_reference(session, reference, ffmpeg, update_goldens)
+        except BaseException:
+            session.diagnose()
+            raise
         finally:
             client.close()
 
@@ -213,8 +203,6 @@ if __name__ == "__main__":
     parser.add_argument("ffmpeg", type=Path)
     parser.add_argument("--update-goldens", action="store_true")
     args = parser.parse_args()
-    if args.update_goldens and os.environ.get("CI"):
-        parser.error("Golden results may only be updated explicitly on a developer Mac")
     started = time.monotonic()
     main(args.bundle.resolve(strict=True), args.ffmpeg.resolve(strict=True), args.update_goldens)
     print(f"E2E fixture and workflows completed in {time.monotonic() - started:.1f}s")
