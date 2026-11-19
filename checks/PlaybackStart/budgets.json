@@ -15,9 +15,9 @@
       "dispatchMs": 50,
       "audioMs": 3800,
       "videoMs": 3900,
-      "onsetGapMs": 200,
+      "onsetGapMs": 330,
       "audioAdvanceMs": 40,
-      "videoAdvanceMs": 200,
+      "videoAdvanceMs": 300,
       "startOffsetMs": 65
     },
     "warm-start": {},

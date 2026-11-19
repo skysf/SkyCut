@@ -68,7 +68,9 @@ On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture pu
 69–88 ms median across the five warm scenarios and 129 ms worst overall. First-open audio and video were
 1.62 / 1.96 s and 1.71 / 2.04 s median / worst. Suspended-graph audio and video were 428 / 436 and
 508 / 588 ms. Busy-machine repeats reached 3.22 s to the first-open picture, 648 ms after idle and 234 ms near the
-4K tail. The worst offset one second in was 22.8 ms across the calibration runs.
+4K tail. One first-open launch reported a 271 ms onset gap with a picture 267 ms into the timeline. That sample
+sets the cold single-trial ceilings of 330 ms for the gap and 300 ms for picture advance. The worst offset one
+second in was 26.0 ms across the local calibration runs.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.
