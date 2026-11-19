@@ -11,7 +11,7 @@ func runOfficialApprovalChecks() async {
     let store = SkyStudioSpendStore(defaults: defaults)
     let access = AIAccessStore(defaults: defaults)
     store.setDailyLimit(1_000)
-    let stage = "official-submission:" + suite
+    let stage = "official-submission:" + UUID().uuidString
     let film = try! SkyStudioFilm(json: filmCheckJSON(middle: true))
     let request = SkyStudioJobRequest(kind: "image_to_video", model: "synthetic-video", prompt: "Original scene.",
         inputs: ["image_url": "https://assets.example/originals/account-a/first.png"],
