@@ -114,6 +114,14 @@
     is preserved verbatim in their existing written-topic overviews.
     The `official_templates` section describes the three bundled designs without expanding the tool card or schema; discovery
     remains in the single timeline motion library, after native presets and before project-owned pages.
+17. **Catalog diet** (2026-11-19): at 99,912 / 100,000 no lane could add a parameter. The cards and parameter descriptions of
+    tools no other lane was editing (generate_media, upscale_clip, list_voices, manage_voices, the three encode tools, the
+    project tools, the three character tools, record_screen) were shortened, and so was the shared `project` parameter
+    (`MCPProjectTools.projectParameter`: "Default: last opened."; the conventions topic explains project ids). Every fact taken
+    out is in the tool's written topic; manage_characters gained `per_action` (which action takes which field, from
+    `SkyStudioCharacterPlan.action`). No parameter, choice, range or required list changed and no limit was raised: 95,703 /
+    100,000 afterwards. The PR description has the table of removed wording and where it went (item 14). A topic that grows
+    past 6,000 is answered in parts by itself; manage_characters' whole answer is 5,829.
 
 ## 四、守卫
 
