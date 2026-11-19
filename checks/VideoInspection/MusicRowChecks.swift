@@ -6,11 +6,12 @@ import SrtFlowMCPKit
 // MCP-40's remaining second-tier rows through the production preparation (AIDeliverySound.prepare: the real render split by role
 // group, each effect or object rendered alone) and their rules as the registry runs them, on synthetic sound only, without a job
 // (the binary links the debug build and has a 480 s deadline; the real job runs the registry in SoundTierChecks).
-// One picture (no cut) over 6 s. A1 music saved as music (`EditClip.soundRole`), −35 dBFS, stopping hard at 2.0 s; A2 a voice
-// saved as voice, −30 dBFS from 2.0 to 5.0 s, sharing its track with a faint bed so the voice check (ESTOI, slow unoptimized)
-// stays out; A3 a 0.2 s burst at 1.0 s, −9 dBFS, saved as effects and named object on the call. Expected: the roles as saved
-// (the call's `sounds` winning), the music dropping out under the voice 2.0–5.0, its hard stop 48 frames from the only picture
-// event, the burst jumping out of the mix; nothing late, no stretch without music, no hint.
+// One picture (no cut) over 6 s. A1 music, −35 dBFS, stopping hard at 2.0 s; A2 a voice, −30 dBFS from 2.0 to 5.0 s, sharing its
+// track with a faint bed so the voice check (ESTOI, slow unoptimized) stays out; A3 a 0.2 s burst at 1.0 s, −9 dBFS. The roles are
+// saved through the real edit_clip (`sound_role`, one undo step each; edit_clips takes the same field): music, voice, effects,
+// and the burst named object on the call. Expected: the roles as saved (the call's `sounds` winning), the music dropping out
+// under the voice 2.0–5.0, its hard stop 48 frames from the only picture event, the burst jumping out of the mix; nothing late,
+// no stretch without music, no hint.
 @MainActor
 enum MusicRowChecks {
     static func run(_ project: VideoEditProject, root: URL, require: (Bool, String) -> Void) async throws {
@@ -26,17 +27,35 @@ enum MusicRowChecks {
         let voice = try SoundTierChecks.wave(root, "row-voice.wav", 3) { t in Float(0.0447 * sin(2 * .pi * 300 * t)) }
         let bed = try SoundTierChecks.wave(root, "row-bed.wav", 0.5) { _ in noise.next(0.0005) }
         let burst = try SoundTierChecks.wave(root, "row-burst.wav", 0.2) { t in Float(0.5 * sin(2 * .pi * 1000 * t)) }
-        var musicClip = SoundTierChecks.audio(music, at: 0, 2, asset: 2)
-        musicClip.soundRole = .music
-        var voiceClip = SoundTierChecks.audio(voice, at: 2, 3, asset: 3)
-        voiceClip.soundRole = .voice
-        var burstClip = SoundTierChecks.audio(burst, at: 1, 0.2, asset: 0.2)
-        burstClip.soundRole = .effects
-        var state = TimelineState()
-        state.frameRate = .fps24
-        state.mainClips = [EditClip(sourceURL: picture, sourceDuration: 6, isMuted: true, info: info)]
-        state.audioTracks = [EditLane(clips: [musicClip]), EditLane(clips: [voiceClip, SoundTierChecks.audio(bed, at: 5.4, 0.5, asset: 0.5)]),
+        let musicClip = SoundTierChecks.audio(music, at: 0, 2, asset: 2)
+        let voiceClip = SoundTierChecks.audio(voice, at: 2, 3, asset: 3)
+        let burstClip = SoundTierChecks.audio(burst, at: 1, 0.2, asset: 0.2)
+        var built = TimelineState()
+        built.frameRate = .fps24
+        built.mainClips = [EditClip(sourceURL: picture, sourceDuration: 6, isMuted: true, info: info)]
+        built.audioTracks = [EditLane(clips: [musicClip]), EditLane(clips: [voiceClip, SoundTierChecks.audio(bed, at: 5.4, 0.5, asset: 0.5)]),
                              EditLane(clips: [burstClip])]
+        project.restoreTimeline(built)
+        let undo = project.effectiveUndoManager!
+        undo.removeAllActions()
+        // One explicit undo group per call, as the router makes them (AIUndoGrouping.step), whatever the run loop does here.
+        let byEvent = undo.groupsByEvent
+        undo.groupsByEvent = false
+        defer { undo.groupsByEvent = byEvent }
+        let ids = AIShortIDs(state: built)
+        for (clip, role) in [(musicClip, "music"), (voiceClip, "voice"), (burstClip, "effects")] {
+            let plan = try await AIClipTools.plan(AIToolArguments(["clip_id": .string(ids.short(clip.id)), "sound_role": .string(role)]), project)
+            let reply = try AIUndoGrouping.step(undo) { try AIClipTools.apply(plan, project) }
+            require(reply.payload["sound_role"]?.stringValue == role, "edit_clip sound_role \(role) is saved and in its reply")
+        }
+        require(project.state.clip(with: musicClip.id)?.soundRole == .music && project.state.clip(with: burstClip.id)?.soundRole == .effects,
+                "edit_clip saved the roles on the clips")
+        let state = project.state
+        undo.undo()
+        require(project.state.clip(with: burstClip.id)?.soundRole == nil && project.state.clip(with: voiceClip.id)?.soundRole == .voice,
+                "one undo takes back one saved role")
+        undo.redo()
+        require(project.state == state, "redo saves it again")
         var request = AIDeliverySoundRoles.Request()
         request.clips = [burstClip.id: .object]
         let scope = try AIInspection.scope(state: state, from: nil, to: nil)

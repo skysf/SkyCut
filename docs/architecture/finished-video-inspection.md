@@ -339,8 +339,10 @@ lingers went unreported). `AIDeliverySoundRoles.assign` takes, first match wins,
 role, then provenance; the report's `sound_roles` shows the result. nil means nothing saved (inferred), never "other". Split halves and
 separated sound carry it (`TimelineClipSplit`, `detachedAudio`); copies carry it through Codable. It never changes the sound: nothing
 that renders, mixes or previews reads it. It is part of a clip's content in a review anchor, so changing a role re-reports a finding
-marked intentional on that clip. Format v39 keeps older writers from dropping it ([project file](video-edit-project-file.md)). Setting
-it is edit_clip's `sound_role`, its own change after the tool catalog made room for a parameter.
+marked intentional on that clip. Format v39 keeps older writers from dropping it ([project file](video-edit-project-file.md)). The AI
+saves one with edit_clip (or edit_clips) `sound_role`: voice, music, effects, ambience or object, auto clearing it (inferred again);
+one undo step, shown in get_timeline and the reply, refused on a clip with no sound. Saving one is no preview rebuild: it changes no
+sound, so `differsOnlyInAudioMix` leaves it out like a gain ([AI interface](ai-control-mcp.md) section 4 item 67).
 
 ## Music rows and abrupt sounds (2026-11-19)
 

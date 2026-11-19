@@ -96,6 +96,9 @@ public enum MCPVocabulary {
         "ding", "sparkle", "beep", "glitch", "shutter"
     ]
     public static let soundScenes = ["none", "telephone", "megaphone", "radio", "room", "bathroom", "hall", "outdoor", "forest", "valley"]
+    /// edit_clip sound_role: what a clip's sound is, saved for inspect_video (= `ClipSoundRole.allCases`), plus auto (nothing saved:
+    /// inferred again from where the clip came from). Reconciled in checks/MCP/SoundRoleToolChecks.swift.
+    public static let soundRoles = ["voice", "music", "effects", "ambience", "object", "auto"]
 
     /// = `MarkerColor.allCases` 的原始值。
     public static let markerColors = ["red", "orange", "yellow", "green", "blue", "purple"]
