@@ -286,7 +286,10 @@
   `invalid_parameter` naming the path (with `batch` / `index` in a list), 0–86,400, a suggestion, the guide pointer; no edit, no
   undo step, no job, no file. 0, 86,400 and "12.5" pass; a seek and a text at 86,400 s still work; `edit_limits.time` is reported.
   Tools that would start work or read a key without the bound get a missing file or unknown id, so a run without the bound fails
-  early instead. Rule: [MCP edit parameters](../architecture/mcp-edit-parameters.md).
+  early instead. `TimeBoundEdgeChecks` (same day): a timeline run past the day by a title at 86,400 s can be sought to its end,
+  looked at and edited inside, and refuses a time past its end with that end as the maximum; relative keyframe fractions a hair
+  outside 0–1 land on the clip's edges and ones outside −0.001–1.001 are refused with that range. Rule:
+  [MCP edit parameters](../architecture/mcp-edit-parameters.md).
 - Black-bar removal: `scripts/check-parameter-limits.sh` → `BlackBarAppChecks` exercises thin asymmetric bars, the source window
   changed by the same call, actual timeline look after removal, conservative mixed-shot voting, fill-only notices and one undo;
   `scripts/check-mcp.sh` checks bounded pixel-edge padding. Rule: [Preview transforms](../architecture/preview-free-transform.md).
