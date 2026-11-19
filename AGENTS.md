@@ -291,7 +291,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-waveform.sh` — 波形数据逐采样对账、很多文件同时读不死锁。
 - `scripts/check-web-motion.sh` — web-motion renderer: the page clock, nothing leaves a page, alpha, hostile pages, memory kills and backstops, identical renders.
 - `python3 checks/MCP/SmokeClientChecks.py` — 冒烟客户端的断线、协议错误、超时和退出码。
-- `python3 checks/MergeSlot/MergeSlotChecks.py` — the merge slot against an in-memory GitHub: only a tree a green run tested merges, one at a time, oldest label first; both workflows' wiring.
+- `python3 checks/MergeSlot/MergeSlotChecks.py` — the merge slot against an in-memory GitHub: only a tree a green run tested merges, one at a time, oldest label first; GitHub's own failures re-run (`rerun-infra.yml`); the workflows' wiring.
 
 ### 扫描守卫（`checks/*.sh`，都在 `check-all.sh` 里；秒级、不编译）
 
