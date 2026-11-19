@@ -107,7 +107,7 @@ enum AIFilmProductionReader {
             throw error(path, "Name existing distinct shots and music/environment/foley/silence.")
         }
         let at = try number(value["at"], path + ".at"), duration = try number(value["duration"], path + ".duration")
-        guard duration > 0, at + duration <= 86_400 else { throw error(path + ".duration", "Duration must be positive and end within 86400 seconds.") }
+        guard duration > 0, at + duration <= MCPTimeArguments.maximumSeconds else { throw error(path + ".duration", "Duration must be positive and end within 86400 seconds.") }
         let action = try value["action_id"].flatMap { $0 == .null ? nil : try text($0, path + ".action_id") }
         if layer == .foley {
             guard shotIDs.count == 1, let action, graph.first(where: { $0.film.shot.id == shotIDs[0] })?.film.shot.actions.contains(action) == true else {
@@ -161,7 +161,7 @@ enum AIFilmProductionReader {
         return values
     }
     static func number(_ value: JSONValue?, _ path: String) throws -> Double {
-        guard let value = value?.doubleValue, value.isFinite, value >= 0, value <= 86_400 else { throw error(path, "Expected finite seconds in 0...86400.") }
+        guard let value = value?.doubleValue, value.isFinite, value >= 0, value <= MCPTimeArguments.maximumSeconds else { throw error(path, "Expected finite seconds in 0...86400.") }
         return value
     }
     static func error(_ path: String, _ message: String) -> SkyStudioFilmError { SkyStudioFilmReader.error(path, message) }

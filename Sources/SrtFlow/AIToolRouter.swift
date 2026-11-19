@@ -16,6 +16,8 @@ import SrtFlowMCPKit
 // **排到之后、动窗口之前**才定落在哪个工程、查归属（排队时前面可能正是别人的 open_project / close_project）。
 // The lines themselves are AICallLines: a look lets its line go once it has read the project, and a look not done within about
 // 25 s answers with a job (AILookCall; docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md).
+// A time outside the supported timeline (MCPTimeArguments: NaN, infinite, negative or past one day) is refused first, in
+// routeValidated, before anything queues (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md).
 
 @MainActor
 final class AIToolRouter {
@@ -69,6 +71,10 @@ final class AIToolRouter {
 
     /// Authorized routing after the protocol, argument and license gates. Isolated checks exercise the real queue / target path here.
     func routeValidated(_ request: MCPBridge.Request, tool: MCPToolName, begin: @escaping @Sendable () -> Bool) async -> Answer {
+        // A time outside the supported timeline fails the call here, before it queues, starts a round or opens an undo group.
+        if let refusal = AIEditLimits.timeRefusal(tool: tool, arguments: request.arguments) {
+            return Answer(result: refusal.result(guide: tool))
+        }
         let call = Call(
             tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
             session: request.session ?? AIProjectSessions.anonymous, client: AISession.displayName(for: request.client ?? "AI")

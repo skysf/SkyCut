@@ -260,6 +260,14 @@
   `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
 - 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
 - 动效预设（set_text 的 `motion_preset`；在 `scripts/check-mcp.sh` 的 `MotionPresetChecks` 和它编译之前的扫描）：三套各自的几块、时间和动画，框按墨迹框住、竖屏按短边、换一套字不变、`hit_at` 整套挪、标题动了别的跟着走、粘贴自成一组、存盘往返；界面上改字的两个入口都经 `MotionPresetGroups.update`、粘贴换新组号（扫描）。规矩见 [动效预设](../architecture/motion-presets.md)。
+- Times in every tool: `scripts/check-parameter-limits.sh` → `TimeBoundChecks` / `TimeBoundCatalog`. The catalog walk: every number
+  in every tool's parameters (batch tools through their single tool's) is a time listed in `MCPTimeArguments` or named as not a
+  time, and every listed path exists. The calls: each listed time gets 10^20, the largest finite number, -1, 86,400.5 and "nan" /
+  "inf" / "-infinity" / "1e300" through `MCPArgumentCheck` and the real `AIToolRouter.routeValidated` on a background project:
+  `invalid_parameter` naming the path (with `batch` / `index` in a list), 0–86,400, a suggestion, the guide pointer; no edit, no
+  undo step, no job, no file. 0, 86,400 and "12.5" pass; a seek and a text at 86,400 s still work; `edit_limits.time` is reported.
+  Tools that would start work or read a key without the bound get a missing file or unknown id, so a run without the bound fails
+  early instead. Rule: [MCP edit parameters](../architecture/mcp-edit-parameters.md).
 - Black-bar removal: `scripts/check-parameter-limits.sh` → `BlackBarAppChecks` exercises thin asymmetric bars, the source window
   changed by the same call, actual timeline look after removal, conservative mixed-shot voting, fill-only notices and one undo;
   `scripts/check-mcp.sh` checks bounded pixel-edge padding. Rule: [Preview transforms](../architecture/preview-free-transform.md).
