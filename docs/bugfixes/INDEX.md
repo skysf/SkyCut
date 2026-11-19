@@ -190,7 +190,7 @@
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
 - [2026-11-19 Play during project open could crash the preview](2026-11-19-play-before-preview-ready.md) — Keep the Play request pending through item installation and check readiness before starting the synchronized player.
-- [2026-11-19 Hosted playback outliers blocked unrelated changes](2026-11-19-playback-start-hosted-timing-outliers.md) — Score all launches together and keep missing onset and repeated follow-up timeouts red.
+- [2026-11-19 Hosted playback outliers blocked unrelated changes](2026-11-19-playback-start-hosted-timing-outliers.md) — Calibrate hosted timing budgets on several runs' launches, tolerate isolated noise by count, and keep gross stalls and the recorded failure red.
 - [2026-09-25 播放时每一跳整个编辑器都重算](2026-09-25-playback-wakes-whole-editor.md) — 订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`。
 - [2026-11-05 声音恢复成功，自检却因固定等待窗口报红](2026-11-05-player-clock-recovery-check-timing.md) — 异步的自检用分阶段的有界条件等待，不用一个固定窗口。
 - [2026-09-20 播放头断线、点标尺没反应](2026-09-20-playhead-line-broken-and-ruler-dead.md) — 内容比视口矮会被 SwiftUI 纵向居中，命中区不跟着 `.offset` 走。
