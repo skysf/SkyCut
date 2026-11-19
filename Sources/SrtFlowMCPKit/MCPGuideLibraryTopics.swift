@@ -93,9 +93,9 @@ enum MCPGuideLibraryTopics {
             MCPGuideWrittenTopics.overview(MCPGuidePreviousCardsBatch2.recipes, """
             recipes reads editing styles; it never changes anything.
 
-            Read-only. SkyCut's editing styles (presets and the user's own): structure, shot lengths, transitions, filters, fonts, music, \
-            checklist. No id: every style and when to use it; id: the whole style. Before cutting a whole video, pick one that fits, tell \
-            the user in one sentence which one you follow, and follow it; the user's words win.
+            Read-only. SkyCut's editing styles (presets, Sky Studio's and the user's own): structure, shot lengths, transitions, filters, \
+            fonts, music, checklist. No id: every style and when to use it; id: the whole style. Before cutting a whole video, pick one \
+            that fits, tell the user in one sentence which one you follow, and follow it; the user's words win.
             """),
             MCPGuideSection(name: "styles", about: "what a style contains, presets and the user's own", text: """
             Styles. A style says how to cut a whole video: structure by the second, shot lengths, transitions, filters, fonts, \
@@ -107,6 +107,16 @@ enum MCPGuideLibraryTopics {
             Using one. Before editing a whole video from the user's footage, pick the style that fits their goal, tell them in \
             one sentence which one you follow, and follow it; what the user says always wins. Call them editing styles when \
             talking to the user (the built-in ones are preset styles). If they want a style again later, offer save_recipe.
+            """),
+            // SS5 plan 5.1 / 5.2 (2026-11-19): styles published on Sky Studio, AIRecipeTools / SkyStudioStyleLibrary.
+            MCPGuideSection(name: "sky_studio", about: "styles published on Sky Studio: Pro or trial, versions, this Mac's copy", text: """
+            Sky Studio's styles. Some styles come from Sky Studio (source sky_studio, with a version). Reading one needs SkyCut Pro \
+            or the SkyCut trial. available false with why means it cannot be read now (needs Pro or the trial, or Sky Studio cannot \
+            be reached and this Mac has no copy): pick another. sky_studio in the list says where the list came from. Reading one \
+            returns its version and sha256; from this Mac's copy it also says cached and fetched_at. version reads an older \
+            published version; latest or none reads the current one. When the style and the shared rules do not fit one answer, \
+            the style comes alone and next_step says to read recipes id=shared-rules before cutting. A Sky Studio style is not \
+            the user's: never save it, or a copy, with save_recipe (it refuses their names).
             """)
         ],
         examples: [
@@ -131,8 +141,8 @@ enum MCPGuideLibraryTopics {
             """),
             MCPGuideSection(name: "storage", about: "replacing, presets and where styles live", text: """
             Storage. The name of one of the user's styles replaces it (the old file goes to the Trash); a preset style's name \
-            makes the user's own version of it. Styles live in SkyCut's own folder (Settings > Editing & Voices lists them), \
-            not in the project.
+            makes the user's own version of it; a Sky Studio style's id or title is refused. Styles live in SkyCut's own folder \
+            (Settings > Editing & Voices lists them), not in the project.
             """)
         ],
         examples: [

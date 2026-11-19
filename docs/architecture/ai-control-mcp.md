@@ -743,6 +743,22 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      (−17 LUFS, the user's call). Largest answer after it: product-promo, 32,223 characters (about 9.0 thousand tokens).
      `RecipeChecks` pins each pointer in its section (`toolRouteChecks`) and every built-in answer, card plus rules as the App encodes
      it, at ≤ 36,000 characters (`answerSizeChecks`, `recipeAnswerLimit`): new rules make room first, the line is not raised.
+   - **Styles published on Sky Studio** (2026-11-19, SS-5 / MCP-61 / MCP-63; the first is `film-trailer`): nothing is bundled in the
+     App. ① `recipes` lists the presets (fixed order), then Sky Studio's (in Sky Studio's order, `source: sky_studio` with `version`),
+     then the user's. One the AI cannot read now has `available: false` and `why` (needs SkyCut Pro or the trial; or Sky Studio cannot
+     be reached and this Mac has no copy); the listing's `sky_studio` line says where that part came from (checked just now / this
+     Mac's copy from a date / unreachable). ② Reading one needs `features.recipes` (Pro and the trial). A refusal reads like the MCP
+     gate's and says the presets and the user's own still work (`SkyCutGates.styleRefusal`, asked through
+     `SkyStudioAccount.styleRefusal`). The answer adds `version`, `sha256`, and `cached` + `fetched_at` when it is this Mac's copy;
+     `version` reads another published version (`latest` = the current one) and only Sky Studio styles take it. ③ The style is
+     followed by the shared rules when both fit 36,000 characters (`AIRecipeTools.answerLimit`); otherwise it comes alone and whole,
+     with `next_step` pointing at `recipes id=shared-rules` (Sky Studio's publishing gate keeps a style ≤ 12,000, so that always fits).
+     ④ No user file shadows one: a user style with its id or title is left out of the AI's list and shown in Settings with a rename
+     hint; a Sky Studio style with a preset's id is left out; `save_recipe` refuses their ids and titles (presets stay saveable).
+     ⑤ Settings → Editing & Voices → Editing styles lists every source (Preset style; Sky Studio · version, or · needs SkyCut Pro,
+     without Show in Finder / Delete; Your style); AI still picks, the user names one in words. The answers are pure
+     (`AIRecipeSkyStudioPart` gathered first by `AIRecipeSkyStudio`); `RecipeSkyStudioChecks` builds those parts by hand. Fetching,
+     copies on this Mac and who may read them: [Sky Studio account](sky-studio-account.md), "Sky Studio's editing styles".
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -1610,6 +1626,11 @@ project's distinct on-screen clip and picture, cancellation / Stop, explicit-pro
       转场不是全叠化、不是每个镜头都慢推、字不是都卡在切点上出；导出前说了做了哪几项「交片前再看一遍」。
 - [ ] 跟 AI 说「以后都这么剪，存成我的剪辑风格，叫课程推广」：设置 → 剪辑与声音 的「剪辑风格」里出现这一行，「在 Finder 中显示」打开的 .md 读得懂；
       再让它改这一套：废纸篓里有旧的那份；点「删除」之后那一行没了，文件在废纸篓里。
+- [ ] Sky Studio styles (item 32, after one is published): with a Pro or trial key, ask for a story trailer from a footage folder.
+      AI names the style and its version; Settings → Editing & Voices lists it as "Sky Studio · <version>" between the presets and
+      your own, in English, 简体中文 and Español at the default window size. Offline after one read it reads this Mac's copy
+      (`cached`, `fetched_at`); asking it to save the style under its own name is refused. With an account without
+      `features.recipes` the row says "needs SkyCut Pro" and reading it is refused with what to do.
 - [ ] 电影开头的上下黑条（实心长方形）：预览和导出的成片里都是整块黑、上下一样高；检查器里「实心」开关打开时线宽那一行消失。
       用 0.16.1 打开这个工程：因为是 v24，它拒绝打开，不会把黑条悄悄变成一圈描边。
 - [ ] 让 AI 加一个从 0 滚到 10,000+ 的数字：预览里老虎机滚到位；让它「变回文字」之后画面上留着「10,000+」。

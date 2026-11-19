@@ -31,6 +31,11 @@
 #      对着假 Sky Studio 数同时开着的单、429 看 pool 拿着槽等、同一个 key 再交）；一段旁白几批各在哪一步（SkyStudioVoiceBatchBoard）。
 #      2026-11-10 审查（VoiceSplitChecks）：切句对字不计较繁简、转写语言按字形、没有词可对时按字数估句界、每批按自己的文字定上限。
 #      声音 PR 8：声音库界面里的纯值（VoiceLibraryUIChecks：选择器列什么、「新建」为什么还灰着、服务器的错误是哪一种）。
+#  11. Sky Studio's editing styles (2026-11-19, SS5 plan 5.1, 5.4; StyleContentChecks / StyleLibraryChecks): the manifest and a
+#      style read with their checksums, the two routes on the fake server (paths, headers, If-None-Match / 304, errors kept),
+#      the copies on this Mac, features.recipes and what the AI is told without it; the library asks the list again only when
+#      10 minutes old, offline uses this Mac's copy, serves copies only while the licence includes recipes, keeps nothing
+#      fetched while the licence ended, deletes texts on a /me without recipes and everything when the key goes.
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -73,6 +78,10 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioContent.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioContentAPI.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioContentCache.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioStyleLibrary.swift \
   Sources/SrtFlow/SkyStudio/SkyCutLicense.swift \
   Sources/SrtFlow/SkyStudio/SkyCutProNotice.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
@@ -172,6 +181,8 @@ xcrun swiftc \
   checks/SkyStudio/ProPurchaseChecks.swift \
   checks/SkyStudio/ProNoticeChecks.swift \
   checks/SkyStudio/GateChecks.swift \
+  checks/SkyStudio/StyleContentChecks.swift \
+  checks/SkyStudio/StyleLibraryChecks.swift \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \

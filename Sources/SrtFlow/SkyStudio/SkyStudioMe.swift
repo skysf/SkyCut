@@ -20,6 +20,9 @@ struct SkyStudioMe: Codable, Equatable, Sendable {
     struct Features: Codable, Equatable, Sendable {
         var mcp: Bool
         var watermark: Bool
+        /// Sky Studio's editing styles (and later craft cards) for SkyCut (2026-11-19, SS5 plan 2 "Entitlement"): free false,
+        /// trial and pro true, overridable per account. Missing (an older server) = false.
+        var recipes: Bool?
     }
 
     /// 账号的 Mac 占位信息，仅作说明；缺字段不能影响既有授权的读取。
