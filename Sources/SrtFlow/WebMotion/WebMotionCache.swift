@@ -3,7 +3,7 @@ import Foundation
 import SrtFlowWebMotionKit
 
 // Immutable rendered movies and page-check receipts. Project files keep the source; this cache can always be rebuilt.
-// Its folder's files are read and written only on WebMotionCacheFiles.queue.
+// Its receipts, folder, movie installs and sidecars are read and written on WebMotionCacheFiles.queue.
 enum WebMotionCache {
     struct Rendered: Sendable {
         var record: WebMotionClipRecord

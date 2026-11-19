@@ -320,8 +320,9 @@ A changed input gets a new file so undo still has the previous render. A cache h
 Every caller reuses a hit, the inspector's Re-render included (same fingerprint, same frames); only checks that compare two real
 renders pass `force`. Rendering a fingerprint again (a missing or failing receipt, or `force`) never removes the movie that clips,
 undo or a Save As may be reading: the system identity is compared and the receipt written in `verify`, then the movie is renamed
-over the old one. The cache folder's reads and writes (receipts, the install, sidecars) run only on `WebMotionCacheFiles.queue`,
-never on the main thread or in the cooperative pool.
+over the old one. The cache's receipt reads and writes, folder creation, the install and the sidecars (also Show Page's) run on
+`WebMotionCacheFiles.queue`, not on the main thread or in the cooperative pool. Recovery's and the project load's checks for a
+missing movie (`fileExists`) are not on it yet.
 An untitled manual project uses a temporary directory until Save/Save As carries the movie beside the project.
 
 A carried project-relative movie wins over its former absolute path. A different OS or missing original fonts produces a warning in

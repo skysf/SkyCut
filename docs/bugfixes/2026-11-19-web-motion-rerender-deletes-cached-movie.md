@@ -18,12 +18,13 @@ never reached this step. Found by review CXR2 (R13).
 - `WebMotionCache.render` compared the renderer's system identity and wrote the receipt only after the movie was in place.
 - The inspector always rendered with `force: true`, so an unchanged Re-render replaced a movie whose checked receipt said it
   was already exactly that render.
-- These file operations ran in Swift's cooperative pool, beside a folder that may be on a slow drive.
+- These file operations ran in Swift's cooperative pool, beside a folder that may be on a slow drive. (Recovery's and the
+  project load's `fileExists` checks for a missing movie are still outside the new queue.)
 
 ## Fix
 
-- `WebMotionCacheFiles` (new): one serial queue for the cache folder's files, and the install — one `rename(2)` of the
-  staged movie over the old one, so a reader sees the old movie or the new one, never none, and a failed install leaves the
+- `WebMotionCacheFiles` (new): one serial queue for the cache's receipts, installs and sidecars, and the install itself —
+  one `rename(2)` of the staged movie over the old one, so a reader sees the old movie or the new one, never none, and a failed install leaves the
   old one where it was.
 - `WebMotionRenderer.render(_:watch:verify:)`: after the helper's checks pass, `verify` runs on that queue before anything
   is replaced; then the install. The staged movie is removed on every path that does not install it.

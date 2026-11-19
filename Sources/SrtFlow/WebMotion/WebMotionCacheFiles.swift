@@ -3,12 +3,13 @@ import Foundation
 
 // MARK: - The web-motion cache folder's files, on a queue of their own
 //
-// Owns: the queue every file operation in a motion cache folder runs on (`SkyCut/Motion` beside the project, or a temporary
-// folder for an untitled one), and how a passed render takes its place there: one atomic rename(2) over the old file,
-// never "remove, then move". A reader — a clip, its undo history, a Save As carrying the movie on the project's writer
-// queue — sees the old movie or the new one, never none, and a failed install leaves the old one where it was.
-// Does not own: what is rendered or when (WebMotionCache, WebMotionRenderer), where projects carry movies
-// (WebMotionProjectFiles).
+// Owns: the queue a motion cache folder's receipts, movie installs and sidecars are read and written on (`SkyCut/Motion`
+// beside the project, or a temporary folder for an untitled one), and how a passed render takes its place there: one
+// atomic rename(2) over the old file, never "remove, then move". A reader — a clip, its undo history, a Save As carrying
+// the movie on the project's writer queue — sees the old movie or the new one, never none, and a failed install leaves the
+// old one where it was.
+// Does not own: what is rendered or when (WebMotionCache, WebMotionRenderer), where projects carry movies and which are
+// missing (WebMotionProjectFiles, WebMotionRecovery: their `fileExists` checks are not on this queue yet).
 //
 // Why (2026-11-19, docs/bugfixes/2026-11-19-web-motion-rerender-deletes-cached-movie.md): a same-fingerprint re-render
 // removed the cached movie and then moved the new one in; when the move failed (a full, slow or unplugged drive) the movie
