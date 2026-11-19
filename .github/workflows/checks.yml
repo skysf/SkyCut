@@ -14,6 +14,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # The merge slot (.github/workflows/merge-slot.yml) dispatches this workflow on merge-slot/pr-<N>, whose head is
+  # GitHub's test merge of main + the pull request (the exact tree that lands), and on main after each merge it makes:
+  # a merge made with the workflow token starts no push run. A dispatch on any other branch skips every shard, so
+  # check-all fails (a skipped shard must never count as passed).
+  workflow_dispatch:
 
 # 同一个 PR 又推了新提交，旧的那一轮直接取消：macOS runner 免费但同时只有 5 台，
 # 别让作废的一轮占着。
@@ -39,6 +44,7 @@ jobs:
     # 必须 macos-26：字幕生成用了 macOS 26 的 SpeechAnalyzer API，
     # macos-15 镜像默认 Xcode 16（SDK 15）编不过完整 app target ——
     # 首跑 6 项齐红就是它（SrtFlowCore 不碰这些 API 所以核心检查过了）。
+    if: github.event_name != 'workflow_dispatch' || github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/merge-slot/pr-')
     runs-on: macos-26
     # Each shard takes about 13-16 minutes since the full-App checks were spread over shards 1-3 (2026-11-20); a cold
     # build cache adds an App build of a few minutes to each of those three.
@@ -145,7 +151,7 @@ jobs:
       # shard of the next pull request restores this one cache. Only shard 1 saves, so the cache is always a complete
       # App build (checks/ci-build-cache-key.sh).
       - name: Save SwiftPM build products (main only, after the App build)
-        if: github.event_name == 'push' && success() && steps.changes.outputs.docs_only != 'true' && matrix.shard == 1
+        if: github.ref == 'refs/heads/main' && success() && steps.changes.outputs.docs_only != 'true' && matrix.shard == 1
         uses: actions/cache/save@v4
         with:
           path: .build
@@ -229,14 +235,14 @@ jobs:
       # continue-on-error：留不下记号只会让 main 上那一轮照常全跑，不许让必需的 check-all 因此变红。
       - name: Name the verified tree
         id: tree
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/merge-slot/pr-')
         continue-on-error: true
         run: |
           tree="$(git rev-parse 'HEAD^{tree}')"
           printf '%s\n' "${tree}" > "${RUNNER_TEMP}/verified-tree.txt"
           echo "tree=${tree}" >> "$GITHUB_OUTPUT"
       - name: Leave the verified-tree marker
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/merge-slot/pr-')
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

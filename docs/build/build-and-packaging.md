@@ -625,8 +625,10 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
 - **Docs-only PRs take a fast path** (since 2026-11-04): each shard first runs `scripts/ci-docs-only.sh`. When true,
   compilation and self-checks are skipped; shard 1 runs `scripts/check-guards.sh` (including docs-index-drift), the
   others finish, and `check-all` still reports the result. Since 2026-11-17 main pushes always return false here,
-  including docs-only merges, to cover cancelled ancestors. Standard-input mode (`-`) only classifies the supplied
-  paths, regardless of event, so `ci-verified-tree.sh` can reuse the same whitelist.
+  including docs-only merges, to cover cancelled ancestors; since 2026-11-20 so does the merge slot's dispatch on
+  main. The slot's test runs on `merge-slot/pr-<N>` check out GitHub's test merge (first parent main) and classify
+  like a pull request. Standard-input mode (`-`) only classifies the supplied paths, regardless of event, so
+  `ci-verified-tree.sh` can reuse the same whitelist.
   - **白名单是严格的**：`docs/` 下的文件，根目录的 `AGENTS.md`、`README.md`、`SrtFlow-Requirements.md`。查过
     （2026-11-04），自检里读这几样内容的只有扫描守卫 docs-index-drift，编译、跑二进制的一样都不读。白名单外的任何一个
     文件、一个文件都没改、git 算不出来、路径被 git 加了引号，都按「不是」照常全跑；改名按「删旧的 + 加新的」算
@@ -640,6 +642,10 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   [合并后 main 上那一轮的实测](../reports/2026-11-13-main-ci-verified-tree.md)）。
   - Since 2026-11-17 this reuse applies only to code merges. A docs-only merge always runs the full checks; a green
     scan-only PR marker does not prove that code inherited from a cancelled main run was tested.
+  - Since 2026-11-20 the merge slot (below) dispatches this run on main, and `ci-verified-tree.sh` treats that
+    dispatch like a push. A marker also counts when the slot's test run left it: a `workflow_dispatch` on
+    `merge-slot/pr-<N>` whose head commit has exactly the merge's two parents, so the same tree by construction.
+    `checks/ci-verified-tree.sh` pins both (30 cases).
   - 为什么：改代码的 PR 合进来，main 上要再跑一轮完整的，占满 5 台约 7.5 分钟。合出来的树和这个 PR 最后一次绿的那一轮测的树
     （GitHub 替它合的 `refs/pull/N/merge`）一模一样时，这一轮没有新东西可验：2026-08-16 到 11-13 能查到的 358 次合并里 308 次是这样，
     几件事并行的 11-04 到 11-13 是 104 次里 77 次。树不一样（ruleset 没开「合并前必须跟上 main」，PR 可以没跟上就合）照旧完整跑。
@@ -757,3 +763,49 @@ check is in: only check-all.sh does, and a shard number written elsewhere goes s
 - **只改文档的快速通道也占名额**：一样起 5 个 macOS job，第 1 组跑扫描守卫约 2.4 分钟，其余四组各十几秒；没别的在跑时 2.5 分钟出结果，
   排在完整的轮后面时中位 5.7 分钟。占得少、可以多开，但不是不占。
 - 变 DIRTY 就要再合 main、再跑一轮：哪些文件最常撞、为什么不用 `merge=union`（GitHub 不认），见[文档索引怎么写](../architecture/doc-indexes.md)第五节。
+
+## Merge slot (.github/workflows/merge-slot.yml, since 2026-11-20)
+
+The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged one at a time, each only after a green
+`checks.yml` run on the exact tree that lands. GitHub's merge queue isn't available to a personal-account repository.
+
+- **Why.** Merge-when-green let two PRs land minutes apart, neither tested on top of the other: on 11-18 #476 and #481
+  left main uncompilable for about 1.5 hours. Staying current cost even more. In the week to 11-19, authors merged main
+  into their branches 85 times; 57 of those merges had no conflict, and each cancelled the run in progress.
+- **Author procedure** (AGENTS.md 「合并与分支」): open the PR and add the label `merge-slot`. Don't push again or merge
+  main unless the slot sends the PR back; it removes the label and comments why. Red: fix, push, label again.
+  Known flake: re-run the failed jobs of the run it names, label again once green. Conflict: merge `origin/main`,
+  push, label again. Done when the PR is MERGED. `scripts/merge-slot-wait.sh N [max minutes]` waits: exit 0 merged,
+  1 sent back (it prints the slot's comment), 2 closed, 3 still queued at the time limit (run it again).
+- **What the slot does** (`scripts/merge-slot.py`), oldest label first:
+  1. It waits until `check-all` on the PR's head is green; red sends the PR back.
+  2. It waits for GitHub's test merge commit X of the PR, whose parents must be the current main and the head. A
+     conflict sends the PR back.
+  3. If a green run already tested X's tree, it merges at once. The proof is a `verified-tree-<tree>` marker: from the
+     PR's own run when main hasn't moved since, or from an earlier slot test.
+  4. Otherwise it points the branch `merge-slot/pr-<N>` at X and dispatches `checks.yml` there. That is the same
+     workflow file on the same tree as a pull_request run on main + head, docs-only fast path included. Nothing else
+     merges while it runs. A red or cancelled run sends the PR back with its link; the branch stays, so re-running the
+     run's failed jobs can still prove the tree.
+  5. It merges with `--merge`, the head pinned, only while main is still X's first parent. Then it dispatches
+     `checks.yml` on main and deletes the PR's branch and `merge-slot/pr-<N>`.
+- **The workflow token.** The slot merges with `GITHUB_TOKEN`, and a merge made with it starts no push run. So the slot
+  dispatches `checks.yml` on main itself. `scripts/ci-docs-only.sh` and `scripts/ci-verified-tree.sh` treat that run
+  like a push: never docs-only, and the usual verified short run when a marker proves the tree. The cache is saved on
+  `github.ref == 'refs/heads/main'`. `checks.yml` takes dispatches on main and on `merge-slot/pr-<N>` only. On any other
+  ref every shard is skipped, so `check-all` fails: a skipped required check would count as passed.
+- **One at a time.** The job has `concurrency: merge-slot` with `cancel-in-progress: false`, so a run that finds the
+  slot busy waits. Every run reads the whole queue from GitHub (labels, runs, markers), so nothing is lost when a newer
+  waiting run replaces an older one. The script stops after 320 minutes; a new label or the half-hourly cron starts it
+  again.
+- **Safety.** It merges only a tree that a green run tested, with the head pinned and main read just before merging. A
+  manual merge in the second between those two calls could still land an untested tree, so nobody merges by hand. It
+  never runs a pull request's code: `pull_request_target` runs main's copy of the workflow, and the job checks out main.
+  The ruleset still requires `check-all` on the head.
+- **Cost.** One ubuntu job while the queue isn't empty, polling every 90 seconds. That is about five API calls a pass,
+  under the token's 1,000 an hour. A PR whose own run tested the current main gets no second run; otherwise it gets one
+  slot test, which costs what a pull_request run does.
+- `checks/MergeSlot/MergeSlotChecks.py` runs the slot against an in-memory GitHub (`FakeGitHub.py`) and pins both
+  workflows. Reverse verification on 2026-11-20: 22 mutations of the script each turned it red. Among them: merging
+  without proof, skipping the last main check, trusting a stale test merge, an unpinned head, FIFO by number, not
+  holding the slot during a test, and squash.

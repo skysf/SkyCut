@@ -1,0 +1,45 @@
+# The merge slot (AGENTS.md 「合并与分支」, docs/build/build-and-packaging.md "Merge slot"): pull requests labeled
+# merge-slot are merged one at a time, each only after a green checks run on the exact tree that lands (main + the
+# pull request). scripts/merge-slot.py does the work; checks/MergeSlot/MergeSlotChecks.py tests it against a fake
+# GitHub and pins this file.
+#
+# The workflow token does the merges, so a merge starts no push run: the script dispatches checks.yml on main itself.
+# It never runs the pull request's code: pull_request_target runs this file from main, and the job checks out main.
+name: merge-slot
+
+on:
+  pull_request_target:
+    types: [labeled]
+  workflow_dispatch:
+  # A safety net: a run that hit its deadline, or a label event that came while the slot was busy, is picked up here.
+  schedule:
+    - cron: '17,47 * * * *'
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+  checks: read
+
+jobs:
+  slot:
+    if: github.event_name != 'pull_request_target' || github.event.label.name == 'merge-slot'
+    runs-on: ubuntu-latest
+    # One slot. A run that finds it busy waits (it never cancels the running one); a newer waiting run replaces an
+    # older waiting one, which is fine: every run reads the whole queue. Job level, so other labels' runs, which skip
+    # this job, never replace a waiting slot run.
+    concurrency:
+      group: merge-slot
+      cancel-in-progress: false
+    # The script stops itself after 320 minutes; the next run carries on (the state is all on GitHub).
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Merge the queue, one pull request at a time
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B scripts/merge-slot.py --repo "${{ github.repository }}"
