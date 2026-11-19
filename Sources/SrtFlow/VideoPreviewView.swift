@@ -47,6 +47,7 @@ final class PlayerClock: ObservableObject {
     private var readiness: [NSKeyValueObservation] = []
     private var previewSeek: UUID?
     private var positionedTime: TimeInterval?
+    private var previewNeedsPreroll = false
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
@@ -241,9 +242,9 @@ final class PlayerClock: ObservableObject {
     }
 
     /// 让视频从 `seconds` 起、从**此刻**开始跟着走：播放器自己去定位，定位要多久就晚多久赶上来，不改时间表。
-    private func anchorVideo(to seconds: TimeInterval?) {
+    private func anchorVideo(to seconds: TimeInterval) {
         guard player.status == .readyToPlay, player.currentItem?.status == .readyToPlay else { return }
-        let target = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .invalid
+        let target = CMTime(seconds: seconds, preferredTimescale: 600)
         player.setRate(1, time: target, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
         positionedTime = nil
     }
@@ -292,9 +293,15 @@ final class PlayerClock: ObservableObject {
                 return
             }
             guard recoverAudioIfNeeded(source) else { return }
-            source.play(from: time)
-            // A completed paused seek already primed its exact frame. A second exact seek would discard that work.
-            anchorVideo(to: positionedTime == time ? nil : time)
+            let start = time
+            if positionedTime == time {
+                positionedTime = nil
+                player.playImmediately(atRate: 1)
+                source.play(from: start)
+            } else {
+                source.play(from: start)
+                anchorVideo(to: start)
+            }
         } else {
             player.play()
         }
@@ -303,6 +310,7 @@ final class PlayerClock: ObservableObject {
     func attach(url: URL, autoplay: Bool = true) {
         pause()
         invalidatePreviewSeek()
+        previewNeedsPreroll = false
         pendingScrubTarget = nil
         peekTime = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
@@ -320,6 +328,7 @@ final class PlayerClock: ObservableObject {
         player.pause()
         readiness.removeAll()
         invalidatePreviewSeek()
+        previewNeedsPreroll = true
         pendingScrubTarget = nil
         peekTime = nil
         #if DEBUG
@@ -337,6 +346,7 @@ final class PlayerClock: ObservableObject {
     func detach() {
         pause()
         invalidatePreviewSeek()
+        previewNeedsPreroll = false
         audioSource?.seek(to: 0)
         detachAudioSource()
         player.replaceCurrentItem(with: nil)
@@ -385,8 +395,10 @@ final class PlayerClock: ObservableObject {
     }
 
     private func invalidatePreviewSeek() {
+        let wasPositioning = previewSeek != nil
         previewSeek = nil
         positionedTime = nil
+        if wasPositioning { player.cancelPendingPrerolls() }
     }
 
     private func positionPreview(at target: CMTime, seconds: TimeInterval) {
@@ -394,12 +406,31 @@ final class PlayerClock: ObservableObject {
         previewSeek = request
         player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
             DispatchQueue.main.async {
-                guard let self, self.previewSeek == request else { return }
-                self.previewSeek = nil
-                if finished { self.positionedTime = seconds }
-                if self.playbackRequested { self.play() }
+                self?.preparePositionedPreview(request, at: seconds, seekFinished: finished)
             }
         }
+    }
+
+    private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
+        guard previewSeek == request else { return }
+        guard previewNeedsPreroll, seekFinished, !isAtEnd, player.rate == 0, player.status == .readyToPlay,
+              player.currentItem?.status == .readyToPlay else {
+            finishPreviewPosition(request, at: seekFinished ? seconds : nil)
+            return
+        }
+        // The positioned frame can be visible before the player has enough data to advance at rate 1.
+        // Prime the pending picture while the audio anchor is still paused.
+        player.preroll(atRate: 1) { [weak self] finished in
+            DispatchQueue.main.async { self?.finishPreviewPosition(request, at: seconds, primed: finished) }
+        }
+    }
+
+    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?, primed: Bool = false) {
+        guard previewSeek == request else { return }
+        if primed { previewNeedsPreroll = false }
+        previewSeek = nil
+        positionedTime = seconds
+        if playbackRequested { play() }
     }
 
     /// 每个 mouse move 都直发 `player.seek` 会淹死解码器（在飞的 seek 被反复取消，
@@ -449,6 +480,7 @@ final class PlayerClock: ObservableObject {
     /// Return / Home：播放头回到开头。正在播就从开头接着播（`seek` 不改播放状态），停着就停在 0，
     /// 再按空格从头播。时间线听 `wentToStart` 滚回最左。
     func goToStart() {
+        if isAtEnd { previewNeedsPreroll = true }
         seek(to: 0)
         wentToStart.send()
     }

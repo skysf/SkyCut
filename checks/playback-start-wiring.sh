@@ -39,6 +39,7 @@ fast_path "${clock}" '    private func anchorVideo('
 fast_path "${clock}" '    func goToStart('
 fast_path "${clock}" '    func seek(to'
 fast_path "${clock}" '    private func positionPreview('
+fast_path "${clock}" '    private func preparePositionedPreview('
 fast_path "${engine}" '    func play(from'
 fast_path "${feeder}" '    func seek(toFrame'
 
@@ -79,6 +80,17 @@ if ! awk '
   END { exit !(ready && rate > ready) }
 ' <<<"${anchor}"; then
   fail "The synchronized native start requires both the player and its current item to be ready"
+fi
+
+preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
+if ! awk '
+  /guard previewSeek == request/ { current = NR }
+  /player.status == .readyToPlay/ { ready = NR }
+  /player.preroll\(atRate: 1\)/ { pre = NR }
+  /self\?\.finishPreviewPosition\(/ { finish = NR }
+  END { exit !(current && ready > current && pre > ready && finish > pre) }
+' <<<"${preroll}"; then
+  fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
 fi
 
 if [ "$(grep -cF 'run: /bin/bash scripts/check-playback-start.sh' "${workflow}")" -ne 1 ]; then

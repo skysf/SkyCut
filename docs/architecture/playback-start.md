@@ -7,8 +7,11 @@ composition is still being built. The clock retains the request through installa
 placement of the playhead. The current player and item must be ready for the synchronized native start. Pause, a second
 press while pending, and preview teardown cancel the request. [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
 
-An already positioned preview uses the completed native seek. The audio engine can reuse its prepared samples when
-the paused anchor matches the playhead. Audio starts on its next render quantum and supplies the master clock.
+After the first exact seek on a new item or a rewind from the end, the native player prerolls rate 1 asynchronously.
+The pending Play request waits for that preparation with audio paused. Any newer placement or item cancels the
+earlier preparation. Play advances an already positioned preview with the ordinary native rate start and the audio
+engine can reuse its prepared samples when the paused anchor matches the playhead. Audio starts on its next render
+quantum and supplies the master clock.
 `PlayerClock` corrects sustained video drift against this clock. See the [audio engine](audio-engine.md) and
 the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
 
@@ -38,7 +41,7 @@ Time begins at the call to the editor's Play action. Each attempt measures the f
 - Host time and position of the first nonzero PCM samples rendered by the first active audio track. The benchmark
   measures real source-node output after track gain. For onset it takes the later of the render callback and the
   sample's host timestamp. The master output is muted downstream.
-- Host time and position of the first frame offered for display by the production player's item while playing.
+- Host time and position of the first advancing frame offered for display by the production player's item.
   The observer samples at display-link deadlines once the editor's mounted `AVPlayerLayer` is ready and keeps
   normal layer rendering enabled. Presentation timestamps identify the timeline frame.
 - The difference between the two onset times and how far the first sampled audio and video have moved from the requested time.

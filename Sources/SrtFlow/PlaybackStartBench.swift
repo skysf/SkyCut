@@ -188,7 +188,7 @@ enum PlaybackStartBench {
     private static func firstPlayingFrame(
         in probe: PlaybackStartVideoProbe, origin: Double, frame: Double
     ) -> PlaybackStartVideoProbe.Frame? {
-        probe.playingFrames.first { $0.timeline >= origin - frame * 0.5 }
+        probe.playingFrames.first { $0.timeline > origin + frame * 0.5 }
     }
 
     private static func followupFrame(
