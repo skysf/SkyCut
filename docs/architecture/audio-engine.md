@@ -77,6 +77,14 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
     量到的；之前按「从 0 起」钉，真声卡上播放头会跳出去和图开了多久一样长，只是没被撞上）。恢复失败暂停声音和视频、
     记真实错误，下一次点击播放再试，不能持续拿停住的主时钟把视频拉回去。恢复在调用方线程上做，不在音频系统的配置
     通知回调中拆图。
+
+    During a preview install, `PlayerClock` keeps a Play request pending until the new item and its audio source are
+    installed and the playhead is placed. The synchronized native start requires both the player and the current item
+    to be ready. Play reuses the last completed precise video seek when it matches the playhead. The audio engine
+    reuses its prepared buffers when the paused anchor already points there. A second press or a preview teardown
+    cancels pending playback.
+    [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
+
 11. **图只在马上要出声时开着**（2026-11-11，[案例](../bugfixes/2026-11-11-preview-audio-engine-never-idles.md)）。图开着就占着
     声卡：coreaudiod 替它挂着 `PreventUserIdleSystemSleep`（Mac 不会空闲睡眠），App Nap 也不生效。
     - **规矩只有一份**（`AudioEngineIdlePolicy`）：时间线上没有要出声的段 → 不开（在播也不开）；在播 → 开着；停着 →

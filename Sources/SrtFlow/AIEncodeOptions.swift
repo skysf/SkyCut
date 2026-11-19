@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 //
 // 管什么：AI 给的编码参数（quality、fast、resolution、frame_rate）怎么落到 VideoEncodeSettings 上，
 // 以及一批文件的输出名（`<名字><后缀>.<扩展名>`，撞了加编号：硬盘上有的、队列里别的条目要写的、
-// 这一批前面已经用掉的都算撞）。
+// 这一批前面已经用掉的都算撞）。Since 2026-11-19 only convert_subtitles names its files here; compress_videos and
+// burn_subtitles are named in the queue, by the page's rule (EncodeQueue.target).
 // 底子是用户在那一页记住的设置（EncodeQueueMemory 读回来的）；AI 给的只改这几项、只用于这一批。
 // 不管什么：排队和跑（EncodeQueue）、任务号和结局（AIEncodeTools）。
 

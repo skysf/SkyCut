@@ -59,6 +59,7 @@
 - [2026-10-03 关掉主窗口就退出了 App，工程变回空的](2026-10-03-closing-window-quits-app.md) — 框架的默认生命周期要先确认；替别人兜底时把兜底这件事告诉对方。
 - [2026-10-30 多项生成横幅挤占预览](2026-10-30-cloud-tasks-cover-preview.md) — 工具栏单入口 + 滚动浮层汇总任务；取消不先删状态。
 - [2026-10-31 多工程的生成任务没有工程归属](2026-10-31-cloud-tasks-without-project-context.md) — 任务卡片按原工程分组，数量只算进行中的。
+- [2026-11-19 Compress / Burn In overwrote one result with another and could delete a file that was not the job's](2026-11-19-compress-burn-overwrite-and-delete.md) — A writer only ever overwrites or removes a file it created: write into a claimed file of its own, rename onto an exclusive claim, and name against every writer still to come.
 - [2026-10-15 删除确认码被拒不说原因](2026-10-15-confirmation-token-refused-without-reason.md) — 凭据被拒要说原因；同一个问题等答复时回同一张码。
 - [2026-09-27 拼图函数叫 `sheet(`，被 sheet 语言守卫误判](2026-09-27-contact-sheet-name-trips-sheet-guard.md) — 按名字扫的守卫，名字就是接口：别给函数取 SwiftUI 修饰器的名字。
 - [2026-10-17 冒烟拷工程把整个「下载」拷走、写满磁盘](2026-10-17-copy-project-copied-all-of-downloads.md) — 整夹拷之前先看来源是什么文件夹；测试工具也要设防。
@@ -185,6 +186,7 @@
 - [2026-09-26 字幕比声音早 0.9 秒、片段开头的词丢了](2026-09-26-pause-stretches-next-word.md) — 识别器给的词时间不是开口时间（停顿被并进相邻的词）：先估开口。
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
+- [2026-11-19 Play during project open could crash the preview](2026-11-19-play-before-preview-ready.md) — Keep the Play request pending through item installation and check readiness before starting the synchronized player.
 - [2026-09-25 播放时每一跳整个编辑器都重算](2026-09-25-playback-wakes-whole-editor.md) — 订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`。
 - [2026-11-05 声音恢复成功，自检却因固定等待窗口报红](2026-11-05-player-clock-recovery-check-timing.md) — 异步的自检用分阶段的有界条件等待，不用一个固定窗口。
 - [2026-09-20 播放头断线、点标尺没反应](2026-09-20-playhead-line-broken-and-ruler-dead.md) — 内容比视口矮会被 SwiftUI 纵向居中，命中区不跟着 `.offset` 走。

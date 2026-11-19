@@ -409,8 +409,12 @@ final class TimelineAudioEngine {
     /// 从 `seconds` 起播（锚点钉在下一拍上，第一拍就是这儿的声音）。
     func play(from seconds: Double) {
         let frame = Int64((max(0, seconds) * Self.sampleRate).rounded())
+        let previous = anchor.load()
+        let positionedWhilePaused = previous?.playing == false && previous?.position == frame
         publishAnchor(frame, playing: true)
-        for unit in units { unit.feeder.seek(toFrame: frame) }
+        if !positionedWhilePaused {
+            for unit in units { unit.feeder.seek(toFrame: frame) }
+        }
     }
 
     /// 从锚点停着的地方接着播。

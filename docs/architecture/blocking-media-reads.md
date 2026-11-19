@@ -117,6 +117,10 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
 - The AI's `export_video` and `export_subtitles` ask their folder only through `ExportDestinationProbe.run`
   (`AIExportDestination`): choosing it, making it, checking and listing it, and writing the subtitle files, with the
   same deadline and cap ([case](../bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md)).
+- A Compress / Burn In encode (`EncodeJob`) claims, hands over and removes its own file on GCD or `ExportDelivery`'s
+  queue, never on the main thread; at quit the main thread waits at most 2 s for the removal
+  ([case](../bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md)). The queue's name pick still asks `fileExists`
+  on the main thread, as it did before.
 - Rules and checks: [export settings](export-settings.md) §8; case:
   [choosing the export folder froze SkyCut](../bugfixes/2026-11-18-export-folder-chooser-freezes-app.md).
 - A project's own file (autosave, ⌘S, Save As, closing, switching, Quit) is written only by `ProjectFileWriter`, on the
