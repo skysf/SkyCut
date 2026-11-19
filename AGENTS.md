@@ -79,6 +79,10 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - 签名身份（私钥）在仓库外的 `~/.config/srtflow/signing/`，**永不重建**：换一把证书 = 所有用户再授权一次（`sign-app.sh` 认
   `packaging/signing-identity.sha1` 钉着的那把，对不上就拒签）。换机器把整个目录拷过去；**这个目录必须有备份**（用户的事，
   见到它不在就停下来告诉用户，别去跑 `create-identity.sh`）。细节见 [签名与系统权限](docs/architecture/code-signing-and-permissions.md)。
+- One SkyCut and one SkyCut Beta (user, 2026-11-19): only `/Applications/SkyCut.app` and `/Applications/SkyCut Beta.app` stay
+  installed; a local install, only when the user asks, replaces one while it isn't running (never quit the user's copy) and
+  deletes the old bundle; test, smoke and probe bundles are never installed and are unregistered and deleted when the run
+  ends; the LaunchServices database is never reset: [Build and packaging](docs/build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 
 ### 名字（2026-10-18 起）
 
@@ -148,7 +152,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 修改范围 | 动手前必读 |
 | --- | --- |
 | 官网 `website/`、本地网页预览、官网 Vercel 配置与部署、首屏 3D 场景（`website/src/scene*.js`、烤好的静图 `hero-still-*`、`main.js` 里加载场景的那一段） | [SkyCut 官网](docs/architecture/skycut-website.md)（开发只在本地预览，合并 `main` 后才部署；改了场景外观要 `npm run build:hero-still` 重烤并提交指纹；不加 npm 依赖）、[官网首页在手机和 iPad 上版面全乱](docs/bugfixes/2026-11-11-website-phone-layout-lost-to-stylesheet-order.md)、[官网小字：手机上小于 12 px、对比度不够、标题跳级](docs/bugfixes/2026-11-11-website-small-text-contrast-headings-font-shift.md) |
-| 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`） | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
+| 构建、打包、版本、授权、shell、CI、签名（`scripts/signing/`）、local installs and test app bundles (`lsregister`) | [签名与系统权限](docs/architecture/code-signing-and-permissions.md)（打包脚本只经 `sign-app.sh` 签；证书永不重建；退回 ad-hoc 的包不许发版）、[构建与打包](docs/build/build-and-packaging.md) (one SkyCut and one Beta installed; test bundles unregistered and deleted)、[构建版本与 shell 陷阱](docs/bugfixes/2026-08-06-build-version-and-shell-traps.md)、[包内授权声明过期](docs/bugfixes/2026-08-06-stale-bundled-license-notice.md)、[CI 首跑与吞错](docs/bugfixes/2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) |
 | Web-motion renderer: `skycut-web-motion`, `SrtFlowWebMotionKit`, `Sources/SrtFlow/WebMotion/`, `set_motion`, stored pages and project-relative motion caches (`WebMotionRecovery`); page checks (MCP-75), memory / time limits | [Web-motion renderer](docs/architecture/web-motion-renderer.md) (pages only run in the helper; the network lock is never relaxed and fails closed; the page clock is SkyCut's own, never the probe's) |
 | AGENTS.md 和 `docs/bugfixes/INDEX.md` 的索引：加 / 改 / 收短一条索引或必读表的一行、新加小节、`checks/docs-index-drift.sh` 红了或要改它（`--self-test`）、并行的 PR 撞在索引的同一行、`merge=union` | [文档索引怎么写](docs/architecture/doc-indexes.md)（只许规定的写法，别的都红：链接只有 `[字](相对路径.md)`（可带 `#锚点`），条目只有顶格的 `- [标题](路径.md) — 一句话`、AGENTS.md 的索引小节另许成形的表格；收成一句话时「只有 / 一律」写全例外、实测数字带着条件；超了不抬数；`INDEX.md` 按文件名里日期后面那一段的字母序插，不用 `merge=union`：GitHub 不认）、[索引条目的上限绕得过去，一句话丢了例外和条件](docs/bugfixes/2026-11-13-index-entry-limit-bypassed.md) |
 | App、小程序、MCP 服务器叫什么（SkyCut / `skycut-mcp` / `skycut`）；新加身份类的字符串（bundle id、UTType、数据文件夹、UserDefaults 的键、钥匙串、AI 通道、环境变量）；界面和给 AI 的话里写产品名 | [产品名与代码名](docs/architecture/product-name.md)（看得见的写 SkyCut；身份类的名字沿用 SrtFlow，新加的同类照旧用老前缀）、[改名方案](docs/plans/2026-10-18-rename-to-skycut.md) |
