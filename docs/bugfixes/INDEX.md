@@ -263,6 +263,7 @@
 - [2026-08-12 字幕编辑复审的六条后续](2026-08-12-subtitle-editing-review-followups.md) — 视图里的草稿会被「先写盘再销毁视图」漏掉；CAS 基线必须是会话快照。
 - [2026-08-12 字幕三入口首测](2026-08-12-subtitle-editing-surfaces-smoke-fixes.md) — `HSplitView` 不保护最后一栏；临时行不能给自己上焦点。
 - [2026-08-22 带空 cue 的工程字幕文件导不出](2026-08-22-subtitle-export-empty-cue-verification.md) — 「哪些 cue 会被写出去」只能是序列化器一份账；cue 文本先消毒空行。
+- [2026-11-19 The export panel's subtitle files could replace a file the replace question never listed](2026-11-19-subtitle-export-replaces-unlisted-file.md) — A confirmation covers the items it named: carry one decision per file through to the write and give everything else the write that never replaces.
 - [2026-10-15 没记语言的字幕轨，导出的文件名不带语言标签](2026-10-15-subtitle-file-export-missing-language-tag.md) — 语言按文字判 → 记的 → 省略，只有 `SubtitleFileLanguage` 一份。
 - [2026-08-06 字幕生成复审](2026-08-06-subtitle-generation-review.md) — 切窗、身份、取消、账本与缓存。
 - [2026-09-26 藏起来的片段照样被转写成字幕](2026-09-26-subtitle-generation-transcribes-hidden-clips.md) — 「复刻某某合同」的副本会漏：调同一个 `ClipVisibility.visible`。
