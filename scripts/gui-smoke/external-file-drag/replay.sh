@@ -28,11 +28,19 @@ TO_X="${2:?缺落点 x}"
 TO_Y="${3:?缺落点 y}"
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
+. "$HERE/../../test-app-cleanup.sh"
 OUT="${TMPDIR:-/tmp}/srtflow-drag-harness"
 LOG="$OUT/dragsource.log"
-mkdir -p "$OUT/DragSource.app/Contents/MacOS"
+APP="$OUT/DragSource.app"
+cleanup() {
+  pkill -f "$APP/Contents/MacOS/DragSource" 2>/dev/null || true
+  remove_test_app "$APP"
+}
+trap cleanup EXIT
+test_app_exit_signals
+mkdir -p "$APP/Contents/MacOS"
 
-cat > "$OUT/DragSource.app/Contents/Info.plist" <<'PLIST'
+cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -57,19 +65,18 @@ EOF
 SRC_X=$(( SCREEN_W - SRC_W ))
 SRC_BOTTOM=$(( SCREEN_H - 48 - SRC_H ))
 
-[ -x "$OUT/DragSource.app/Contents/MacOS/DragSource" ] && [ "$OUT/DragSource.app/Contents/MacOS/DragSource" -nt "$HERE/DragSource.swift" ] \
-  || swiftc -O -o "$OUT/DragSource.app/Contents/MacOS/DragSource" "$HERE/DragSource.swift"
+swiftc -O -o "$APP/Contents/MacOS/DragSource" "$HERE/DragSource.swift"
 [ -x "$OUT/dodrag" ] && [ "$OUT/dodrag" -nt "$HERE/DoDrag.swift" ] \
   || swiftc -O -o "$OUT/dodrag" "$HERE/DoDrag.swift"
-codesign --force --sign - "$OUT/DragSource.app" >/dev/null 2>&1
+codesign --force --sign - "$APP" >/dev/null 2>&1
 
 # 同名进程坑（见 docs/testing/gui-smoke-testing.md）：别处编出来的同一个 bundle id
 # 还活着的话，`open` 只会把它叫到前台，日志写去别处，这里就等不到。全杀。
-pkill -x DragSource 2>/dev/null || true
+pkill -f "$APP/Contents/MacOS/DragSource" 2>/dev/null || true
 sleep 0.5
 rm -f "$LOG"
 # 必须用 open 起：后台直接拉起来的进程会跟着调用方一起被收走。
-open -a "$OUT/DragSource.app" --args "$FILE" "$SRC_X" "$SRC_BOTTOM" "$LOG"
+open -n -a "$APP" --args "$FILE" "$SRC_X" "$SRC_BOTTOM" "$LOG"
 sleep 2
 
 read -r WIN_X WIN_Y <<EOF

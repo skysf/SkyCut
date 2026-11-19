@@ -6,14 +6,15 @@
 # The router's own wiring (look goes through AILookCall, the lines replace the old queue tails) is scanned in checks/MCP/router-wiring.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
 # A bundle id of its own per run (its own UserDefaults), like check-voice-recovery: several sessions on this Mac may run it at once.
 BUNDLE_ID="com.srtflow.SrtFlow.lookjobscheck.run$$"
 find "${HOME}/Library/Preferences" -maxdepth 1 -name 'com.srtflow.SrtFlow.lookjobscheck.run*.plist' -mmin +5 -delete 2>/dev/null || true
-trap 'rm -rf "${ROOT}"' EXIT
 APP="${ROOT}/LookJobCheck.app"
+test_app_cleanup_on_exit "${APP}" "${ROOT}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${ROOT}/work"
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

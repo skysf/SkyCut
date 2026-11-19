@@ -10,11 +10,12 @@
 # and read and write subtitle files, off the main thread (docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "${ROOT}"' EXIT
 APP="${ROOT}/ExportProfileCheck.app"
+test_app_cleanup_on_exit "${APP}" "${ROOT}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${ROOT}/work"
 cat > "${APP}/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -32,7 +33,8 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift checks/ExportProfile/SaveAnswerChecks.swift \
   checks/ExportProfile/DestinationChecks.swift \
   checks/ExportProfile/AIExportFolderChecks.swift checks/ExportProfile/ExportTargetChecks.swift \
-  checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/EncodeQueueChecks.swift \
+  checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/SubtitlePanelChecks.swift \
+  checks/ExportProfile/EncodeQueueChecks.swift \
   checks/ExportProfile/EncodeOffMainChecks.swift checks/ExportProfile/EncodeInputsOffMainChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"

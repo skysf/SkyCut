@@ -149,7 +149,6 @@ def tasks(label, only):
                                                   "rollout": str(rollout) if rollout else None,
                                                   "app_commit": (shared.ENV_DIR / "app-commit.txt").read_text().strip()}, ensure_ascii=False, indent=1))
         print(f"{task['id']}: exit {result['exit']} in {result['seconds']}s (thread {result['thread_id']})", flush=True)
-    shared.env_script("stop")
 
 
 def preload(label):
@@ -169,7 +168,6 @@ def preload(label):
             shutil.copyfile(rollout, base / f"{name}.rollout.jsonl")
         (base / f"{name}.run.json").write_text(json.dumps({**result, "rollout": str(rollout) if rollout else None}, ensure_ascii=False, indent=1))
         print(f"preload {name}: exit {result['exit']} in {result['seconds']}s (thread {result['thread_id']})", flush=True)
-    shared.env_script("stop")
 
 
 if __name__ == "__main__":
@@ -178,7 +176,10 @@ if __name__ == "__main__":
     parser.add_argument("--label", required=True)
     parser.add_argument("--only", default="")
     args = parser.parse_args()
-    if args.mode == "tasks":
-        tasks(args.label, set(filter(None, args.only.split(","))))
-    else:
-        preload(args.label)
+    try:
+        if args.mode == "tasks":
+            tasks(args.label, set(filter(None, args.only.split(","))))
+        else:
+            preload(args.label)
+    finally:
+        shared.env_script("stop")

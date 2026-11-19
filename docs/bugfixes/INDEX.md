@@ -75,6 +75,7 @@
 - [2026-11-17 A docs-only merge cancels the only run checking an earlier code merge](2026-11-17-docs-only-main-cancels-unverified-code.md) — A replacement main run must check inherited code too; a docs-only PR marker proves only scans passed.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
 - [2026-11-19 Web-motion recovery and Compress / Burn In still asked the drive on the main thread](2026-11-19-drive-checks-on-main-thread.md) — When one call site of a class moves off the main thread, sweep its siblings; a check that runs on every rebuild is a hot path for drive latency.
+- [2026-11-19 E2E deadlines, fixture isolation, and test bundle cleanup](2026-11-19-e2e-harness-hardening.md) — Give real work its production budget, keep fixture state scratch-only, review golden candidates, and unregister bundles on exit.
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
 - [2026-11-19 A name reserved empty before the write could be replaced, and a failed write could remove another file](2026-11-19-empty-name-reservation-replaced-or-removed.md) — An exclusive create guards only the moment of creation: write privately, then install in one step that fails when the name exists; know your own file by device and inode, read after its bytes are in.
@@ -268,6 +269,7 @@
 - [2026-08-12 字幕编辑复审的六条后续](2026-08-12-subtitle-editing-review-followups.md) — 视图里的草稿会被「先写盘再销毁视图」漏掉；CAS 基线必须是会话快照。
 - [2026-08-12 字幕三入口首测](2026-08-12-subtitle-editing-surfaces-smoke-fixes.md) — `HSplitView` 不保护最后一栏；临时行不能给自己上焦点。
 - [2026-08-22 带空 cue 的工程字幕文件导不出](2026-08-22-subtitle-export-empty-cue-verification.md) — 「哪些 cue 会被写出去」只能是序列化器一份账；cue 文本先消毒空行。
+- [2026-11-19 The export panel's subtitle files could replace a file the replace question never listed](2026-11-19-subtitle-export-replaces-unlisted-file.md) — A confirmation covers the items it named: carry one decision per file through to the write and give everything else the write that never replaces.
 - [2026-10-15 没记语言的字幕轨，导出的文件名不带语言标签](2026-10-15-subtitle-file-export-missing-language-tag.md) — 语言按文字判 → 记的 → 省略，只有 `SubtitleFileLanguage` 一份。
 - [2026-08-06 字幕生成复审](2026-08-06-subtitle-generation-review.md) — 切窗、身份、取消、账本与缓存。
 - [2026-09-26 藏起来的片段照样被转写成字幕](2026-09-26-subtitle-generation-transcribes-hidden-clips.md) — 「复刻某某合同」的副本会漏：调同一个 `ClipVisibility.visible`。

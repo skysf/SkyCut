@@ -14,19 +14,35 @@
   on a real unwritable directory followed by success with a taken output name. Run locally with `scripts/check-local.sh e2e`.
   The reference cut combines a two-frame source cut and intentional review, an audio crossfade, music accents and made effects
   aligned to picture, ducking and voice-band EQ, transparent ProRes and PNG, the native frame-reveal title, a rendered web
-  motion and a burned subtitle. It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
+  motion and a burned subtitle. It waits for the cut-bearing source scan before asserting the `add_clips` reminder.
+  It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
   Save As name collision, and single-step restore of a saved AI round. Its color patches, decoded audio, subtitle bounds and
-  canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The timeline keeps stable clip names and
-  link-group order across runs. To regenerate deliberately, run `/bin/bash scripts/check-e2e.sh --update-goldens`
-  with the same ffmpeg as CI, then review the JSON diff. The regeneration command runs the reference flow and its functional
-  assertions. The default command compares against the committed baseline.
+  canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The delivered AAC also has an independent
+  960 Hz attenuation check against the original narration, using 100 Hz and 4 kHz to account for common gain. The timeline
+  keeps stable clip names and link-group order across runs. `/bin/bash scripts/check-e2e.sh --update-goldens` runs both
+  workflows and prints the locations of a candidate JSON and unified diff in a fresh `/tmp/skycut-golden.*` directory.
+  Review the diff with the same ffmpeg as CI before manually promoting a candidate to the committed baseline.
 
 - `scripts/check-e2e-gui.sh` hosts production views in AppKit windows and injects events into those specific windows.
   It checks a folder returned by the fixture panel and a typed path after the fixture reports failure, a version restored and undone,
   a new native preset and its inspector rows, and a web template card placed on the timeline and re-rendered in the inspector.
-  It locates controls from its own window pixels using AppKit and on-device Vision. The system service, external
-  volumes, pointer gestures and visual fit still have real-machine checks in the [GUI smoke procedure](gui-smoke-testing.md).
-  The two E2E checks have a combined CI budget of three minutes after the shared App build.
+  It locates controls from its own window pixels using AppKit and on-device Vision. The row and its icon-only button
+  must be found in the same drawing. The 20 s control window covers the 15 s export destination probe and scheduling.
+  Re-render uses the helper's frame-based deadline plus teardown and commit time. The system service, external volumes,
+  pointer gestures and visual fit still have real-machine checks in the [GUI smoke procedure](gui-smoke-testing.md).
+
+- Both E2E suites launch from a clean environment under `scripts/gui-smoke/e2e/launch.py`. The App, MCP helper,
+  renderer, preferences, assets, socket and provider marker use the staged identity and scratch root. The launcher
+  makes the real home read-only for the run and checks for leaked per-bundle state after it exits. The GUI renderer
+  uses the staged helper. MCP polls each fixture job for up to 120 s, covering the 18-frame renderer's 96 s plus the
+  App backstop and teardown. A timeout prints the last job or GUI operation, the App output and window information.
+  Suite output streams live, so a CI job cancelled mid-suite still shows the last phase.
+  One 300 s watchdog bounds each suite's execution after build, within the existing CI shard timeout.
+  `checks/E2E/Harness.py` also probes late jobs and deadline diagnostics, live output, scratch-only writes and
+  candidate updates.
+
+- `checks/test-app-cleanup.sh` scans test app staging scripts for an exit trap and exercises the shared cleanup on success
+  and failure. See [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
@@ -64,6 +80,7 @@
   Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
   Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so) ([export settings](../architecture/export-settings.md) §5 item 6; `ExclusivePlacement` itself is in `SrtFlowCoreChecks`).
   Since 2026-11-19 also the export panel's write target (`PanelTargetChecks`): a folder taken while Export is pressed, with its check and the old folder's back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly it; an export nobody was asked about never replaces a file that appears during it ([export settings](../architecture/export-settings.md) §5 item 7).
+  Its subtitle files (`SubtitlePanelChecks`, since 2026-11-19), through the button's work (`SubtitleFilesWrite`: `request`, then the question's `replace`): Replace replaces only the files the question named; a VTT made while the question about the SRT is open, or a file a stale listing missed, keeps its bytes and is said ([export settings](../architecture/export-settings.md) §5 item 7).
   Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
   Their names and folders off the main thread (`EncodeOffMainChecks`, since the same day): a taken name is passed once the folder's names are back (adding, another output folder), a fake drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with the panel's sentence, nothing queued and no job ([case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)).
   The files the AI encode tools are given (`EncodeInputsOffMainChecks`, since the same day; a recording fake drive): `compress_videos` and `burn_subtitles` look at them through the probe, `burn_subtitles` reads a slow subtitle file and `convert_subtitles` reads a slow one and writes the new one there, never on the main thread (longest main-thread gap under 0.5 s), and a file on a drive that never answers, or a read that never comes back, is refused at the deadline ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
@@ -583,3 +600,9 @@
   through) and the snapshot's shape rules on made-up snapshots (prose, unknown keys and kinds refused). Reverse (2026-11-19): with
   a snapshot of that day's card drafts, renaming add_clips' `hit_at` turned the 22 entries that use it red; dropping a tool, the
   aliases or the trim from the exporter, the array step from the reader, or the option check each turned the checks red.
+- Sky Studio's editing styles (`recipes`, SS-5): `scripts/check-sky-studio.sh` → `StyleContentChecks` (the manifest and a style with
+  checksums, both routes on the fake server with If-None-Match / 304, the copies on this Mac, `features.recipes`, the refusal text) and
+  `StyleLibraryChecks` (when the list is asked, offline copies, who may read, nothing kept when the licence ends mid-fetch, deleting
+  on licence changes); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (one list, no shadowing, `available` / `why`, the read answer
+  and its split, `version`, `save_recipe` refusals, the Settings rows); wiring in `checks/sky-studio-wiring/styles.sh`. Rules:
+  [Sky Studio account](../architecture/sky-studio-account.md), [AI control](../architecture/ai-control-mcp.md) item 32.

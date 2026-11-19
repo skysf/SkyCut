@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import SrtFlowCore
 import SrtFlowMCPKit
+import SrtFlowWebMotionKit
 @testable import SrtFlow
 
 // Operate the native and web motion cards and their production inspectors in hosted windows.
@@ -33,7 +34,14 @@ import SrtFlowMCPKit
             parameterFields: [.init(key: "ink", label: "Ink", kind: .color)], duration: 0.5, hitTime: 0.25,
             width: 320, height: 180, fps: 24
         )
+        let frames = WebMotionRequest.frameCount(duration: record.duration, fps: record.fps)
+        let watch = WebMotionHelperProcess.Watch()
+        let renderWait = Duration.seconds(WebMotionLimits.standard(frames: frames).total
+            + watch.grace + watch.teardownGrace + 10)
+        note("Rendering the initial web-motion movie (\(frames) frames)")
+        let started = ContinuousClock.now
         _ = try await WebMotionActions.place(record: record, at: 0, project: project)
+        note("Initial web-motion movie rendered after \(ContinuousClock.now - started)")
         let entries = MotionPresetLibrary.entries(in: project.state).filter {
             if case .web = $0 { return true }
             return false
@@ -45,7 +53,7 @@ import SrtFlowMCPKit
         let panel = try CheckWindow(cards, width: 380, height: 230)
         defer { panel.close() }
         try await panel.click("Ink Plate")
-        try await eventually("The saved web-motion card did not place a second clip", timeout: .seconds(20)) {
+        try await panel.wait("the saved web-motion card to place a second clip", timeout: renderWait) {
             project.state.allClips.filter { $0.webMotion != nil }.count == 2
         }
         guard let clip = project.state.allClips.first(where: { $0.webMotion != nil && $0.timelineStart == 0.25 }) else {
@@ -59,7 +67,7 @@ import SrtFlowMCPKit
         _ = try await check.text("Motion Template")
         try check.type(changedInk, replacing: ink)
         try await check.click("Re-render")
-        try await eventually("Re-render did not replace the selected clip with the changed ink", timeout: .seconds(20)) {
+        try await check.wait("Re-render to replace the selected clip with the changed ink", timeout: renderWait) {
             guard let replaced = project.state.clip(with: clip.id), let motion = replaced.webMotion else { return false }
             return WebMotionParameters.object(motion.parametersJSON)["ink"] == .string(changedInk)
                 && replaced.sourceURL != clip.sourceURL

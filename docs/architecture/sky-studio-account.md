@@ -75,6 +75,24 @@
   SecurityAgent 框**，临时钥匙串密码也不是用户的 Mac 登录密码。用户已禁止继续运行会弹框
   的探针 / 测试；自动检查仅用注入读取器，真钥匙串自检全程关闭交互。实际新构建验收由用户操作。
 
+### Sky Studio's editing styles on this Mac (2026-11-19, SS-5)
+
+Sky Studio publishes editing styles for SkyCut (the recipes tool's side is [AI control](ai-control-mcp.md) section 4, item 32).
+The contract is in the Sky Studio repo's `docs/agents/skycut-api.md` ("Editing styles and craft cards", as of c9a7ce5d): `GET /content` is the current
+release's manifest (titles, versions, checksums, no text; any valid key); `GET /content/styles/{id}?version=` is one style
+(needs `features.recipes`, else `403 not_entitled`). Only ids `[a-z0-9][a-z0-9-]{0,59}` and versions of digits with up to two dots ever go
+into an address (`SkyStudioContentRules`).
+
+| Rule | How |
+| --- | --- |
+| Who may read | `SkyCutLicense.recipes` = the server's `features.recipes` (missing = false; no key, not checked or expired = false). The AI path asks `SkyStudioAccount.styleRefusal` (text in `SkyCutGates.styleRefusal`); `SkyStudioStyleLibrary.read` checks the licence again before serving a copy and after a fetch (a licence that ended meanwhile keeps nothing). `valid_until` never passes the trial's or Pro's end, so copies stop being served then, offline too. Free keys still see the titles (locked); that leak is accepted. |
+| Copies | `~/Library/Application Support/SrtFlow/SkyStudioContent/` (identity-class SrtFlow name; shared by the release, beta and smoke builds like `Recipes/`): `manifest.json` (the answer as sent, its ETag, when fetched or last confirmed) and `styles/<id>@<version>.json` (one version of one style with its own fields, when fetched). **A copy is found only by id + version (+ checksum when the caller knows it), and its contents must name that id and version**: two versions may share a text, so a checksum never names a version (Codex review CXS1 #5: the first layout kept answers by checksum and served 1.0 for 1.1). Writes are atomic; a copy whose text no longer matches its checksum is ignored. Never in a project, a log or the app bundle. |
+| Deleting | `SkyStudioAccount.replaceStored` calls `licenceChanged`: an answer without `recipes`, or none (a new or rejected key), deletes every text and keeps the manifest for the locked list; removing the key deletes everything. |
+| When to ask | The manifest is asked again when 10 minutes old, with `If-None-Match` (usually a 304). A failed ask uses this Mac's copy (dated) and does not ask again for a minute; with nothing here the list is unreachable, or, after `503 content_unavailable` (nothing published yet), simply empty. No key: no Sky Studio styles. A style is read from this Mac's copy when it holds exactly that id and version (and the checksum the list or the film's record names), else fetched by `?version=`, its checksum checked against its text and the expected one; the answer always reports the version served. The key is read silently (`SkyStudioJobKey.key(.silent)`): never a keychain prompt. |
+| No system URL cache | Content requests use `SkyStudioAPI.uncachedSession` (ephemeral, no URL cache): a URL cache would keep a copy SkyCut cannot delete and would serve an `immutable` answer without asking whether the key may still read it. |
+| Sky Studio checks too | Sky Studio sends a text only to a Mac registered within the account's limit, and every answer (a pinned version's too) is `private, no-cache` with the licence checked before a 304. So while online a copy is confirmed with its ETag on every read, and served without asking only when Sky Studio cannot be reached (offline, a 5xx); a refusal is never answered with the copy. `403 not_entitled` is said in plain words by `plan_reason`: `machine_not_registered` (Check Again registers this Mac), `machine_limit_reached` (remove a Mac, its link or the support email), otherwise the plan (`SkyStudioStyleLibrary.notEntitledWords`). On day one only `film-trailer` may be published: an empty or missing cards part reads fine. |
+| `min_skycut_version` | When this SkyCut is older, the read answer carries a `note` (a call the style suggests may fail; update SkyCut). A hint, not a gate. |
+
 ## 二、文件
 
 | 文件 | 管什么 |
@@ -94,6 +112,10 @@
 | `SkyStudio/SkyStudioSettingsSection.swift` | 设置里的「Sky Studio」一节 |
 | `SkyStudio/SkyStudioProHints.swift` | 开通正式版怎么说：设置和导出共用 `SkyStudioContactRow`（服务器购买地址 / 邮箱回退），`ExportWatermarkNotice` 挂水印说明和续约提醒 |
 | `SkyStudio/SkyStudioProNoticeRow.swift` | 设置和导出共用的到期 / 宽限本地化呈现、续约 / 更新付款方式链接及可复制邮箱 |
+| `SkyStudio/SkyStudioContent.swift` | Sky Studio's content for SkyCut (pure): the manifest, one style's text, id / version shapes, SHA-256, comparing SkyCut versions |
+| `SkyStudio/SkyStudioContentAPI.swift` | `GET /content` (with If-None-Match) and `GET /content/styles/{id}?version=` over `SkyStudioAPI.request` / `conditionalGet` |
+| `SkyStudio/SkyStudioContentCache.swift` | The copies on this Mac: manifest and texts by id + version (identity checked on every hit), atomic writes, deleting texts or everything |
+| `SkyStudio/SkyStudioStyleLibrary.swift` | When to ask, who may read, reading a style, deleting on a licence change; `@MainActor`, Settings' style list subscribes to `listing` |
 
 ## 三、还没做的
 
@@ -127,6 +149,21 @@
 - `checks/export-watermark-wiring.sh`：导出器拿 `exportsWithWatermark` 问 `WatermarkPolicy`、读不出 logo 时报错不导、每一处问 `WatermarkPolicy` 都传授权；`scripts/check-export-watermark.sh` 的纯值验加不加。
 - `checks/product-name.sh`：钥匙串的服务名 `.skystudio`、UserDefaults 的键 `SrtFlow.skystudio.me.v1`。
 - `KeychainCacheChecks` 注入卡住的读取器，验证并发快回、期限、迟到缓存、失效、交互等待与每构建一次提示；不碰系统钥匙串。
+- Sky Studio's editing styles (2026-11-19): `StyleContentChecks` (in `scripts/check-sky-studio.sh`) reads the manifest and a style
+  (checksums, shapes that may go into an address, a changed text refused), asks both routes on the fake server (paths, the four
+  headers, If-None-Match / 304, `not_entitled` kept), round-trips the copies (two versions with one text kept apart, a copy under another
+  version's name refused, a text changed on disk ignored, deleting texts or everything), reads `features.recipes` into the licence (missing / expired / no key = off) and checks what the AI is told without
+  it. `StyleLibraryChecks` runs the library on the fake server: locked titles and no fetch without the licence, the first read
+  fetched and the second this Mac's copy, the list asked again only after 10 minutes with its ETag, a new release, older versions
+  by version, offline copies dated, a minute without asking after a failure, no copy past valid_until, nothing kept when the
+  licence ends during a fetch, texts and then everything deleted on licence changes, a text that is not the listed one refused,
+  1.1 with 1.0's text read as 1.1 (and 1.0 kept), a film's pin matched on id + version + checksum, a copy confirmed with its
+  ETag while online (a 403 `machine_not_registered` refuses it in plain words, a 503 serves it). Reverse check: serving the copy
+  without asking turned five red. Reverse check (Codex #5): the
+  checksum-keyed layout failed four of these (1.1 served as 1.0); fixed, green.
+  `checks/sky-studio-wiring/styles.sh` pins the hook in `replaceStored`, the router through `AIRecipeSkyStudio`, the one library over
+  `uncachedSession` with a silent key, and `styleRefusal` only through `SkyStudioAccount`. Reverse check (2026-11-19): removing
+  the `licenceChanged` line and routing recipes straight to `AIRecipeTools` turned the scan red (three failures); restored, green.
 - 钥匙串的真读写在 `scripts/check-keychain.sh`（本机手动，不在 `check-all` 里），检查进程全程禁用交互，仅存读改删专用假项，不运行弹框变体。
 
 ## 六、人工回归（Sky Studio 的接口上线之后，发版前）
@@ -162,6 +199,11 @@ PR C（2026-11-06）在独立 `com.srtflow.SrtFlow.prc.skystudiosmoke` 真 App /
 - [ ] `get_status` 的 `keychain_permission=required` 和英文 `next_step` 能在套餐缓存仍为 Pro 时显示；正常编辑 / 水印仍按原授权判断。用户允许后真实 Key 能缓存，后续任务正常。
 - [ ] 真实 Security 调用若在无 UI 下仍迟迟不返回：首个静默调用最多等约 3 秒，其余调用快回；之后原生读取成功时可复用缓存。不得宣称看门狗或调用者超时已经硬中断系统调用。
 - [ ] 删 Key：钥匙串里那一条没了，「套餐」那几行回到粘 Key 的那一行。
+- [ ] Sky Studio's editing styles (SS5-E, the isolated smoke app and a test account; ops flips its overrides with the user's OK):
+      `mcp` on, `recipes` off → recipes lists the published style with `available: false` and reading it is refused with what to do;
+      `recipes` on → the style reads, its checksum matches and Settings shows "Sky Studio · <version>"; the forwarder stopped → this
+      Mac's copy, labelled with its date; `recipes` off again and Check Again → the copy is no longer served and
+      `~/Library/Application Support/SrtFlow/SkyStudioContent/items/` is gone.
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`；`skycut_guide` 照常回。
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。
 - [ ] 后台给账号开正式版、点「再查一次」：导出不带水印，面板那一行没了。

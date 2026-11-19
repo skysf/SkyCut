@@ -32,6 +32,9 @@ struct SkyCutLicense: Equatable, Sendable {
     var plan: Plan?
     var mcp: Bool
     var watermark: Bool
+    /// Sky Studio's editing styles may be read (and their copies on this Mac served): the server's `features.recipes`, false
+    /// whenever there is no licence (no key, not checked, expired).
+    var recipes = false
     var basis: Basis
     /// 体验的起止：本机时间（换算过钟差），拿来和本机的「现在」比。
     var trialStartedAt: Date?
@@ -88,6 +91,7 @@ struct SkyCutLicense: Equatable, Sendable {
             plan: Plan(rawValue: license.plan),
             mcp: license.features.mcp,
             watermark: license.features.watermark,
+            recipes: license.features.recipes ?? false,
             basis: .server,
             trialStartedAt: license.trialStartedAt.map(stored.local),
             trialEndsAt: license.trialEndsAt.map(stored.local),

@@ -135,6 +135,9 @@ func catalogKnownNames() -> Set<String> {
     // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
     // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
     names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
+    // Sky Studio's editing styles in recipes (2026-11-19, SS5 plan 5.1, AIRecipeTools): the source value and the listing line
+    // sky_studio, and fetched_at on a style read from this Mac's copy.
+    names.formUnion(["sky_studio", "fetched_at"])
     return names
 }
 

@@ -12,6 +12,7 @@
 #   SKIP_BUILD=1：跳过 swift build（刚编过时省半分钟）。
 set -euo pipefail
 cd "$(dirname "$0")/../../.."
+. scripts/test-app-cleanup.sh
 REPO="$(pwd)"
 
 if [ $# -lt 1 ] || [ ! -f "$1" ]; then
@@ -33,8 +34,15 @@ fi
 BIN_DIR="$(swift build --arch arm64 --show-bin-path)"
 
 # ---- 2. 组装 SrtFlowDev.app：改名、换 bundle id，避开常开着的正式版 ----
-APP="${OUT_DIR}/SrtFlowDev.app"
-rm -rf "${APP}"
+APP_ROOT="$(mktemp -d)"
+APP="${APP_ROOT}/SrtFlowDev.app"
+cleanup() {
+  pkill -f "${APP}/Contents/MacOS/SrtFlowDev" 2>/dev/null || true
+  remove_test_app "${APP}"
+  rm -rf "${APP_ROOT}"
+}
+trap cleanup EXIT
+test_app_exit_signals
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources"
 cp "${BIN_DIR}/SrtFlow" "${APP}/Contents/MacOS/SrtFlowDev"
 cp -R "${BIN_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/"

@@ -18,6 +18,7 @@ func runRecipeChecks() {
     catalogChecks()
     storeChecks()
     builtInChecks()
+    runRecipeSkyStudioChecks()
 }
 
 private func formatChecks() {

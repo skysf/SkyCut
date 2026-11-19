@@ -81,6 +81,20 @@ enum SkyCutGates {
         return sentences.joined(separator: " ")
     }
 
+    /// Reading one of Sky Studio's editing styles when the licence leaves out `features.recipes` (SS5 plan 5.1): not done,
+    /// why, what the user can do, and that the presets and the user's own styles still work. English, like aiRefusal.
+    static func styleRefusal(license: SkyCutLicense, problem: SkyStudioProblem?) -> String {
+        let planLacksThem = license.basis == .server && !license.isMachineLimited && (license.plan == .pro || license.plan == .trial)
+        var sentences = ["Not done: Sky Studio's editing styles need SkyCut Pro or a SkyCut trial, and "
+            + (planLacksThem ? "this Sky Studio account's SkyCut plan does not include them." : reason(license) + ".")]
+        if let snag = snag(problem) { sentences.append(snag) }
+        sentences.append(planLacksThem
+            ? "If the user's plan should include them, they email \(SkyStudioLinks.supportEmail)."
+            : nextStep(license, problem: problem))
+        sentences.append("The preset styles and the user's own styles still work: pick one of them from recipes.")
+        return sentences.joined(separator: " ")
+    }
+
     /// get_status 里的 `skycut_plan`（照授权拦生效时才报；关着时什么都不拦，报了反倒让 AI 以为要开通）。
     static func statusJSON(license: SkyCutLicense, problem: SkyStudioProblem?, now: Date) -> JSONValue {
         var plan: [String: JSONValue] = [

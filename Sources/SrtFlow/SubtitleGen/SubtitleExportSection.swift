@@ -7,7 +7,7 @@ import SrtFlowCore
 // **烧哪几条不在这里选** —— 一个语言一条轨，看得见的就是会被烧进去的
 // （合同见 docs/architecture/subtitle-track-visibility-and-layout.md）。
 // 独立导出不依赖视频导出，可单独执行；写盘走 SubtitleExportPlanner
-// （临时名 → 回读校验 → 原子替换，失败不碰用户文件）。
+// （临时名 → 回读校验 → 原子替换，失败不碰用户文件）, through SubtitleFilesWrite: one decision per file.
 
 struct SubtitleExportOptions {
 
@@ -101,7 +101,8 @@ struct SubtitleBurnInToggle: View {
 /// 才用工程记的（`SubtitleFileLanguage`，和 AI 的 export_subtitles 同一份）：手写、导入的轨
 /// 工程里没记语言，只读记录就写成不带标签的 `<标题>.srt`，播放器当成默认字幕（2026-10-15）。
 /// **撞名和视频同一条规则：先提示、再确认替换**（以前是追加 -2/-3，重导几次就堆出一串，
-/// 也和视频配不上对）。约束见 docs/architecture/export-settings.md。
+/// 也和视频配不上对）。Replace replaces only the files the question named; the rest are written as new files and a file
+/// that appeared meanwhile is left as it was (SubtitleFilesWrite). 约束见 docs/architecture/export-settings.md。
 struct SubtitleFilesExport: View {
     @Binding var options: SubtitleExportOptions
     var exportState: TimelineState
@@ -110,13 +111,8 @@ struct SubtitleFilesExport: View {
     @ObservedObject var destination: ExportDestinationState
     var stem: String
 
-    @State private var writtenFiles: [URL] = []
-    @State private var writeError: String?
-    @State private var confirmsReplace = false
-    @State private var isWriting = false
-    /// The files the check before writing was about: the replace question names `replaceQuestion`, the write writes these.
-    @State private var pendingTargets: [(item: SubtitleExportOptions.FileItem, url: URL)] = []
-    @State private var replaceQuestion: [URL] = []
+    /// The button's work and its question: one decision per file (SubtitleFilesWrite).
+    @StateObject private var writer = SubtitleFilesWrite()
     /// 两条轨的语言标签。语言识别不在 body 里跑：句子或记录变了才重判（`onChange`）。
     @State private var languages = SubtitleFileLanguage()
 
@@ -152,7 +148,7 @@ struct SubtitleFilesExport: View {
     /// 提示条只报「别人的」文件：刚从这里写出去的那几份不算，不然一写完就冒出
     /// 「已存在」。真要再写一次，点按钮时照样会问。
     private var existingHint: [URL] {
-        existing.filter { !writtenFiles.contains($0) }
+        existing.filter { !writer.written.contains($0) }
     }
 
     var body: some View {
@@ -186,11 +182,11 @@ struct SubtitleFilesExport: View {
                 Button("Export Subtitle Files") { requestWrite() }
                     .instantHelp("Write the checked subtitle files into the export folder")
                     .controlSize(.small)
-                    .disabled(targets.isEmpty || isWriting)
-                if isWriting { ProgressView().controlSize(.small) }
-                if !writtenFiles.isEmpty {
+                    .disabled(targets.isEmpty || writer.isWriting)
+                if writer.isWriting { ProgressView().controlSize(.small) }
+                if !writer.written.isEmpty {
                     Label(
-                        writtenFiles.map(\.lastPathComponent).joined(separator: ", "),
+                        writer.written.map(\.lastPathComponent).joined(separator: ", "),
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.caption)
@@ -200,19 +196,20 @@ struct SubtitleFilesExport: View {
                 }
             }
             // 挂在按钮这一行上：确认的是「这几份字幕」，和视频的那个确认互不相干。
-            .alert(Text(verbatim: replaceTitle), isPresented: $confirmsReplace) {
-                Button("Replace", role: .destructive) { Task { await write() } }
+            // Replace replaces exactly the files the question names; the others are written as new files (SubtitleFilesWrite).
+            .alert(Text(verbatim: replaceTitle), isPresented: $writer.asksToReplace) {
+                Button("Replace", role: .destructive) { Task { await writer.replace() } }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 // 一份就说清楚会发生什么（和视频的确认同一句）；几份就把名字列出来。
-                Text(verbatim: replaceQuestion.count == 1
+                Text(verbatim: writer.question.count == 1
                     ? String(
                         format: L10n("A file with this name is already in “%@”. Replacing it overwrites its contents."),
-                        replaceQuestion[0].deletingLastPathComponent().lastPathComponent
+                        writer.question[0].deletingLastPathComponent().lastPathComponent
                     )
-                    : replaceQuestion.map(\.lastPathComponent).joined(separator: "\n"))
+                    : writer.question.map(\.lastPathComponent).joined(separator: "\n"))
             }
-            if let writeError {
+            if let writeError = writer.error {
                 Text(writeError)
                     .font(.caption)
                     .foregroundStyle(.red)
@@ -228,9 +225,9 @@ struct SubtitleFilesExport: View {
     }
 
     private var replaceTitle: String {
-        replaceQuestion.count == 1
-            ? String(format: L10n("Replace “%@”?"), replaceQuestion.first?.lastPathComponent ?? "")
-            : String(format: L10n("Replace %d subtitle files?"), replaceQuestion.count)
+        writer.question.count == 1
+            ? String(format: L10n("Replace “%@”?"), writer.question.first?.lastPathComponent ?? "")
+            : String(format: L10n("Replace %d subtitle files?"), writer.question.count)
     }
 
     private func fileBinding(_ item: SubtitleExportOptions.FileItem) -> Binding<Bool> {
@@ -242,58 +239,18 @@ struct SubtitleFilesExport: View {
         )
     }
 
-    /// One look at the folder with a write test first (off the main thread, like the video's): a missing, read-only or
-    /// unanswering destination is said here instead of failing half-way.
+    /// The button: a look at the folder with a write test first (off the main thread, like the video's), then the files in
+    /// the folder it checked — a missing, read-only or unanswering destination is said here instead of failing half-way.
     private func requestWrite() {
-        guard !isWriting else { return }
-        isWriting = true
-        writeError = nil
-        Task { @MainActor in
-            let checked = await destination.checkBeforeWriting()
-            if let problem = checked.report.problem {
-                isWriting = false
-                writeError = ExportDestinationText.message(problem, folder: checked.folder)
-                return
-            }
-            // The files in the folder that was checked: the question names them and the write writes exactly them.
-            pendingTargets = targets(in: checked.folder)
-            replaceQuestion = pendingTargets.map(\.url).filter { checked.report.contains($0.lastPathComponent) }
-            if replaceQuestion.isEmpty {
-                await write()
-            } else {
-                isWriting = false
-                confirmsReplace = true
-            }
-        }
+        Task { await writer.request(destination: destination, files: files(in:)) }
     }
 
-    /// 逐份「序列化 → 临时名 → 回读校验 → 原子替换」（SubtitleExportPlanner），
-    /// 任何一份失败都不碰它原来的文件；已经写好的照样报出来。The writing runs off the main thread.
-    private func write() async {
-        isWriting = true
-        writeError = nil
-        let jobs: [(document: SubtitleDocumentModel, format: SubtitleFormat, url: URL)] = pendingTargets.compactMap { target in
+    /// The checked boxes' files in `folder`, with the document each one writes (the one hidden lines are left out of).
+    private func files(in folder: URL) -> [SubtitleFilesWrite.File] {
+        targets(in: folder).compactMap { target in
             let track: SubtitleTrack = target.item.track == .translation ? .translation : .original
             guard let document = exportState.subtitleDocument(for: track) else { return nil }
-            return (document, target.item.format, target.url)
+            return SubtitleFilesWrite.File(document: document, format: target.item.format, url: target.url)
         }
-        let outcome = await withCheckedContinuation { (continuation: CheckedContinuation<([URL], String?), Never>) in
-            DispatchQueue.global(qos: .userInitiated).async {
-                var written: [URL] = []
-                do {
-                    for job in jobs {
-                        try SubtitleExportPlanner.writeValidated(job.document, format: job.format, to: job.url)
-                        written.append(job.url)
-                    }
-                    continuation.resume(returning: (written, nil))
-                } catch {
-                    continuation.resume(returning: (written, error.localizedDescription))
-                }
-            }
-        }
-        writtenFiles = outcome.0
-        writeError = outcome.1
-        isWriting = false
-        await destination.refresh()  // the folder now has these names
     }
 }
