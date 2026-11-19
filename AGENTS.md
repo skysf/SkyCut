@@ -203,7 +203,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 导出水印（`Sources/SrtFlow/Watermark/`；`WatermarkPolicy`；导出图里水印的落点；`Resources/watermark-logo.svg`；`SeededRandom`） | [导出水印](docs/architecture/export-watermark.md)（加不加只问 `WatermarkPolicy`、只有导出器调 `plan()`；整段两个 overlay，不许一段一个） |
 | 读用户给的文本文件（字幕文件、讲稿、笔记）的编码 | [用户文本文件的编码](docs/architecture/text-file-encoding.md)（只走 SrtFlowCore 的 `TextDecoding`；UTF-16 不许无条件排在 GBK 前面） |
 | 任何按钮的提示文案、快捷键、hover | [即时提示](docs/architecture/instant-tooltips.md)（不许用系统 `.help`；面板的浅 / 深按主题自己设；宿主的根在 `.appLanguage()` 外面裁成气泡的形状） |
-| Playback start, `PlayerClock.play` / `togglePlayback`, preview readiness, positioned seeks, startup audio/video timing | [Playback start](docs/architecture/playback-start.md) (Play consumes the prepared preview. The graphical gate checks first sound, first motion and sync.) |
+| Playback start, `PlayerClock.play` / `togglePlayback` / `pause` / hover (`peek` / `endPeek`), preview readiness, positioned seeks, startup audio/video timing | [Playback start](docs/architecture/playback-start.md) (The sound never starts ahead of a placed, primed picture; a pause and a hover's end keep it placed. The graphical gate checks first sound, first motion, stalls and sync.) |
 | 预览性能、性能计数与基线；新写或改写任何 SwiftUI 视图 / 修饰器 / `NSViewRepresentable` / Canvas；性能那一步红了但没动编辑器界面；往时间线上加一种块 / 行里的列表项；任何要跟着播放头变的界面（订阅播放器时钟、读 `clock.time`）；在视图 body 里读工程的属性、给 `VideoEditProject` 加属性（工程是 `@Observable`） | [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（body 第一行要计数，写完跑 `checks/preview-perf-wiring.sh --fix`；计数只许降；时间线上的块不读工程、按值比较 + `.equatable()`；订阅时钟的只许是名单里的小视图）、[方案](docs/plans/2026-09-24-preview-perf-ratchet.md)、[播放丝滑方案](docs/plans/2026-09-25-smooth-playback.md) |
 | AI 的一次工具调用、AI 起的长任务从哪开始到哪结束（`AIToolRouter.handle`、`AIJobs.start` / `finish`）、App Nap / 活动断言（`AIKeepAwake`、`ProcessInfo.beginActivity`）、新写一种在后台跑的 AI 活、the router's lines (`AICallLines`), a slow look becoming a job (`AILookCall`) | [AI 接口（MCP）第四节第 59 条](docs/architecture/ai-control-mcp.md)（新的长任务走 `AIJobs.start` / `finish`；活动断言只在 `AIKeepAwake` 和录屏；items 3 and 12: a read lets its line go once it has read the project, past 25 s a look answers with a job）、[后台的 AI 活被 App Nap 降速](docs/bugfixes/2026-11-10-ai-work-throttled-by-app-nap.md)、[look silently took minutes, the calls behind it dropped](docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md) |
 | 主线程卡顿、心跳看门狗 `MainThreadWatchdog`（含 AI「探一下」读的 `unresponsiveSeconds`）、卡顿日志（stalls still going on: `still stuck`）、冒烟结果里的 `stalls`、挂起主线程抓栈（`MainThreadStackCapture`） | [主线程卡顿日志](docs/testing/main-thread-stalls.md)、[挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md)（挂起期间不分配、不拿锁；挂起和恢复只在 `walkWhileSuspended`）、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) |
@@ -261,7 +261,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-motion-placement.sh` — Stored web motion: real rendering, template reuse, approval modes, same-clip parameter edits, undo and cache recovery.
 - `scripts/check-optimized-media.sh` — 优化媒体：判据、真转一块、缓存。
 - `scripts/check-parameter-limits.sh` — MCP 编辑参数的边界、实际生效值、素材加载重试; every tool's times outside one day refused (`TimeBoundChecks`).
-- `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾。
+- `scripts/check-player-clock.sh` — 播放头与悬停 peek、`PacedPlayhead`、回到开头、卸片后晚到的回调、播到头收尾; pause / resume, hover and a new item start in step.
 - `scripts/check-preview-composition.sh` — 预览合成真取帧：素材缓存、时间账、切片表、按块换源、转场的样子。
 - `scripts/check-project-file.sh` — 工程存盘与重链接、选择模型、标记、隐藏、关键帧缓动、形状动画等纯值合同。
 - `scripts/check-project-saves.sh` — 工程文件在主线程之外写：慢、卡住、写不进的盘，切工程、另存为、退出。
@@ -322,7 +322,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/no-swallowed-build-output.sh` — 构建日志不得被吞。
 - `checks/open-projects-wiring.sh` — 工程不再是单例、撤销不退到键窗口、代号全 App 不重号、导出进度只给发起的工程。
 - `checks/optimized-media-wiring.sh` — 优化媒体只换预览、成片永远原片、停着才换、清空之后重建。
-- `checks/playback-start-wiring.sh` — Play stays off rebuild and blocking media paths. The guard checks graph recovery, preview installation order and the CI benchmark.
+- `checks/playback-start-wiring.sh` — Play stays off rebuild and blocking media paths and never starts the sound ahead of a placed, primed picture. The guard checks graph recovery, preview installation order and the CI benchmark.
 - `checks/player-time-no-sync-read.sh` — 不许同步问播放器要时间（`currentTime()`）、Now Playing 关着。
 - `checks/preference-reduce-keeps-value.sh` — `PreferenceKey.reduce` 不许写成 `value = nextValue()`。
 - `checks/presented-views-app-language.sh` — 每个 sheet / popover / 自建 `NSHostingView` 都套 `.appLanguage()`。

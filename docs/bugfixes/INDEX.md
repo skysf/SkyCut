@@ -222,6 +222,7 @@
 - [2026-09-27 存好的字幕样式要先去烧录页转一圈才生效](2026-09-27-remembered-subtitle-style-waits-for-burn-in-page.md) — 记住的设置在队列创建时读回来，不挂在某一页的 `onAppear` 上。
 - [2026-10-01 从 40 秒起一直有沙沙声](2026-10-01-resampler-reset-every-chunk.md) — 流式转换器不能推式喂；周期性小毛刺要按块头 / 块中间分开量。
 - [2026-09-24 选 1080p，竖屏视频被缩成 608×1080](2026-09-24-resolution-cap-shrinks-portrait-video.md) — 分辨率档位封的是短边；缺的输入比写错的逻辑更难发现。
+- [2026-11-19 Resuming playback or pressing Play while hovering froze the picture while the sound played](2026-11-19-resume-and-hover-froze-the-picture.md) — A start is in step only if nothing seeks after the sound starts: keep every paused state a placed, primed picture, a pause and a hover's end included.
 - [2026-08-08 运行期素材重链接](2026-08-08-runtime-media-relink.md) — 素材移动后的重核对。
 - [2026-11-19 A typed or dropped answer to a save window silently replaced a file of the same name](2026-11-19-save-window-fallback-replaces-a-file.md) — An answer that skipped the "Replace?" step must say so: write "create, don't replace" unless replacing was confirmed for exactly that URL.
 - [2026-11-04 四条扫描守卫 CI 一次都没跑过](2026-11-04-scan-guards-never-ran-in-ci.md) — 新守卫必须进 check-all 的清单（`checks/check-all-shards.sh` 钉着）。
