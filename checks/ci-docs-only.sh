@@ -9,9 +9,13 @@
 #       `steps.changes.outputs.docs_only != 'true'`（判断出岔子 = 照常全跑）；快速通道那一步跑 scripts/check-guards.sh、
 #       只在第 1 组；`on:` 里没有 paths / paths-ignore（整个 workflow 被跳过，必需的 check-all 就永远等不到结论）。
 #   三、汇总 job check-all 照旧 needs 全部分组、带 !cancelled()。
+#   4. The cases don't depend on the run that executes this check: it runs them again as main's runs see them (a push and
+#      the merge slot's dispatch, both on refs/heads/main). Main's run after a docs-only merge went red on 2026-11-19 when a
+#      case inherited GITHUB_REF=refs/heads/main (docs/bugfixes/2026-11-20-ci-docs-only-check-red-on-main.md).
 #
 # 用法：checks/ci-docs-only.sh [workflow 路径]   # 路径只给反向验证用，默认 .github/workflows/checks.yml
 set -euo pipefail
+SELF="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 CLASSIFIER="${ROOT}/scripts/ci-docs-only.sh"
@@ -25,7 +29,7 @@ fail() {
 # ---- 一、判断本身 ----
 expect() {
   local want="$1" input="$2" got
-  got="$(printf '%b' "${input}" | env GITHUB_EVENT_NAME=pull_request /bin/bash "${CLASSIFIER}" -)"
+  got="$(printf '%b' "${input}" | env GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge /bin/bash "${CLASSIFIER}" -)"
   if [ "${got}" != "${want}" ]; then
     fail "scripts/ci-docs-only.sh 对「${input}」说 ${got}，应该是 ${want}"
   fi
@@ -58,8 +62,8 @@ trap 'rm -rf "${REPO}"' EXIT
 git_in() {
   git -C "${REPO}" -c user.name=check -c user.email=check@example.invalid -c commit.gpgsign=false "$@" >/dev/null
 }
-classify_repo() {
-  (cd "${REPO}" && GITHUB_EVENT_NAME=pull_request /bin/bash "${CLASSIFIER}")
+classify_repo() {  # a pull request's run: both variables set here, never inherited from the run executing this check
+  (cd "${REPO}" && GITHUB_EVENT_NAME=pull_request GITHUB_REF=refs/pull/1/merge /bin/bash "${CLASSIFIER}")
 }
 git_in init -q -b main
 mkdir -p "${REPO}/Sources" "${REPO}/docs"
@@ -96,6 +100,9 @@ fi
 classify_as() { (cd "${REPO}" && GITHUB_EVENT_NAME="$1" GITHUB_REF="$2" /bin/bash "${CLASSIFIER}"); }
 if [ "$(classify_as workflow_dispatch refs/heads/main)" != "false" ]; then
   fail "the merge slot's dispatch on main is a main run: a docs-only merge there must run every check (false)"
+fi
+if [ "$(classify_as push refs/heads/main)" != "false" ]; then
+  fail "a push to main after a docs-only merge is a main run: it must run every check (false)"
 fi
 if [ "$(classify_as workflow_dispatch refs/heads/merge-slot/pr-3)" != "true" ]; then
   fail "a merge slot test run of a docs-only pull request should take the docs-only path like its pull_request run (true)"
@@ -186,6 +193,15 @@ if [ "$({ grep -cE '^[[:space:]]*needs:[[:space:]]*shard[[:space:]]*$' <<<"${SUM
 fi
 if [ "$({ grep -cF 'if: ${{ !cancelled() }}' <<<"${SUMMARY}" || true; })" != "1" ]; then
   fail "${WORKFLOW} 的汇总 job check-all 不带 if: \${{ !cancelled() }}：分组红了它会被跳过，被跳过的必需检查算通过"
+fi
+
+# ---- 4. the cases set their own GitHub variables ----
+if [ -z "${CI_DOCS_ONLY_AS_MAIN:-}" ]; then
+  for event in push workflow_dispatch; do
+    if ! out="$(CI_DOCS_ONLY_AS_MAIN=1 GITHUB_EVENT_NAME="${event}" GITHUB_REF=refs/heads/main /bin/bash "${SELF}" "$@" 2>&1)"; then
+      fail "run as main's ${event} run (GITHUB_REF=refs/heads/main), the cases fail: a case inherits the run's GITHUB_* variables instead of setting its own: $(printf '%s\n' "${out}" | grep -m2 '✗' | tr '\n' ' ')"
+    fi
+  done
 fi
 
 if [ "${FAILED}" -ne 0 ]; then
