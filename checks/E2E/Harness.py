@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/gui-smoke/e2e"))
 import launch
+import reference_edits as edits
 import reference_output as output
 import run
 
@@ -50,6 +51,35 @@ class HarnessChecks(unittest.TestCase):
         self.assertEqual(client.seconds, 62)
         self.assertIn("'phase': 'rendering'", log.getvalue())
         self.assertIn("background (no window)", log.getvalue())
+
+    def test_reference_waits_for_source_scan_before_placement(self):
+        class Session:
+            ready = False
+
+            def edit(self, tool, **arguments):
+                if tool == "set_canvas":
+                    return {}
+                if tool == "look":
+                    assert arguments == {"file": "amber.mp4", "shots": True, "image": False}
+                    return {"job_id": "look-1"}
+                assert tool == "add_clips"
+                reply = {"added": [{"track": track, "id": f"c{index}"} for index, track in
+                                   enumerate(("V1", "V1", "V1", "V2", "V2"), 1)]}
+                if self.ready:
+                    reply["source_cuts"] = [{"clip": "c1", "source_frame": 58, "frames_after_cut": 2,
+                                             "suggested_source_out": 2.417}]
+                else:
+                    reply["source_cuts_unchecked"] = {"clips": ["c1"]}
+                return reply
+
+            def job(self, started):
+                if started["job_id"] == "look-1":
+                    return {"result": {"job_id": "shots-2"}}
+                assert started["job_id"] == "shots-2"
+                self.ready = True
+                return {"shots": 2}
+
+        self.assertEqual(edits.add_picture(Session()), "c1")
 
     def test_candidate_keeps_baseline_and_emits_diff(self):
         with tempfile.TemporaryDirectory() as root:

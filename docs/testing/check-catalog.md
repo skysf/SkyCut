@@ -14,7 +14,8 @@
   on a real unwritable directory followed by success with a taken output name. Run locally with `scripts/check-local.sh e2e`.
   The reference cut combines a two-frame source cut and intentional review, an audio crossfade, music accents and made effects
   aligned to picture, ducking and voice-band EQ, transparent ProRes and PNG, the native frame-reveal title, a rendered web
-  motion and a burned subtitle. It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
+  motion and a burned subtitle. It waits for the cut-bearing source scan before asserting the `add_clips` reminder.
+  It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
   Save As name collision, and single-step restore of a saved AI round. Its color patches, decoded audio, subtitle bounds and
   canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The delivered AAC also has an independent
   960 Hz attenuation check against the original narration, using 100 Hz and 4 kHz to account for common gain. The timeline
