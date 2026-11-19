@@ -42,6 +42,9 @@ fast_path "${clock}" '    func goToStart('
 fast_path "${clock}" '    func seek(to'
 fast_path "${clock}" '    private func positionPreview('
 fast_path "${clock}" '    private func preparePositionedPreview('
+fast_path "${clock}" '    func pause('
+fast_path "${clock}" '    private func holdPausedPicture('
+fast_path "${clock}" '    func endPeek('
 fast_path "${engine}" '    func play(from'
 fast_path "${feeder}" '    func seek(toFrame'
 
@@ -87,17 +90,49 @@ fi
 preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
 if ! awk '
   /guard previewSeek == request/ { current = NR }
-  /!previewIsUnprimed \|\| playbackRequested/ { requested = NR }
+  /guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem else/ { placed = NR }
   /guard player.status == .readyToPlay, item.status == .readyToPlay/ { ready = NR }
   /observeReadiness\(of: item\)/ { observe = NR }
   /player.preroll\(atRate: / { pre = NR }
   /self\?\.finishPreviewPosition\(/ { finish = NR }
-  END { exit !(current && requested > current && ready > requested && observe > ready && pre > observe && finish > pre) }
+  END { exit !(current && placed > current && ready > placed && observe > ready && pre > observe && finish > pre) }
 ' <<<"${preroll}"; then
   fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
 fi
-if ! body "${clock}" '    func play(' | grep -F 'preparePositionedPreview(request, at: start, seekFinished: true)' >/dev/null; then
-  fail "Defer a new item's full preroll until Play requests it"
+# Every paused placement primes, a new item's first one included: a pending Play must not decide whether to preroll.
+if sed 's,//.*,,' <<<"${preroll}" | grep -E 'guard seekFinished.*playbackRequested|playbackRequested[^?]*else [{]' >/dev/null; then
+  fail "Prime every paused placement, a new item included, instead of waiting for Play to request the preroll"
+fi
+
+# The sound never starts ahead of the picture: Play starts the clocks only with a positioned, primed picture, never
+# with a native seek (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
+start="$(body "${clock}" '    func play(')"
+if ! awk '
+  /guard positionedTime == start, !previewIsUnprimed else [{]/ { gate = NR }
+  /preparePositionedPreview\(request, at: start, seekFinished: true\)/ { prime = NR }
+  /positionPreview\(at: CMTime\(seconds: start/ { place = NR }
+  /source.play\(from: start\)/ { if (!first) first = NR }
+  gate && /anchorVideo\(to: / { if ($0 !~ /anchorVideo\(to: nil\)/) seeking = 1 }
+  END { exit !(gate && prime > gate && place > gate && first > place && !seeking) }
+' <<<"$(sed 's,//.*,,' <<<"${start}")"; then
+  fail "Play must place and prime the picture before starting the sound, and never re-seek it while starting"
+fi
+
+# A pause leaves the picture positioned where it stopped; a hover that ends places it back on the playhead.
+hold="$(body "${clock}" '    private func holdPausedPicture(')"
+if ! body "${clock}" '    func pause(' | grep -F 'holdPausedPicture(stoppedAt: nil)' >/dev/null ||
+  ! grep -F 'if clock.pausedPictureRequested, clock.player.rate == 0 { clock.holdPausedPicture(stoppedAt: cmTime) }' \
+    "${clock}" >/dev/null || ! awk '
+  /CMTimebaseGetRate\(timebase\) == 0/ { stopped = NR }
+  /let stopped = reported \?\? CMTimebaseGetTime\(timebase\)/ { read = NR }
+  /source.seek\(to: seconds\)/ { sound = NR }
+  /positionedTime = seconds/ { positioned = NR }
+  END { exit !(stopped && read > stopped && sound > read && positioned > sound) }
+' <<<"${hold}"; then
+  fail "Pausing playback must keep the playhead, the sound and a positioned picture on the paused frame"
+fi
+if ! body "${clock}" '    func endPeek(' | grep -F 'positionPreview(at: CMTime(seconds: time' >/dev/null; then
+  fail "Ending a hover must place and prime the picture back on the playhead"
 fi
 
 finish="$(body "${clock}" '    private func finishPreviewPosition(')"

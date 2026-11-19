@@ -76,6 +76,9 @@ checkDetachDropsLateTicks(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
 checkPlayDuringPreviewInstallation(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
+// Play starts the sound only with a picture that moves at once: after a pause, a hover and on a new item.
+checkSyncedStarts(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
+
 // 声音主时钟被系统停掉、恢复失败、换引擎和卸片之后的生命周期。
 checkAudioSourceRecovery(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 

@@ -28,9 +28,14 @@ echo "==> 编译自检二进制"
 xcrun swiftc \
   -target "$TRIPLE" \
   -wmo \
+  -D DEBUG \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoPreviewView.swift \
+  Sources/SrtFlow/PreviewReadiness.swift \
+  Sources/SrtFlow/ChainedScrub.swift \
+  Sources/SrtFlow/VideoDriftCheck.swift \
+  Sources/SrtFlow/PlaybackTimeEstimate.swift \
   Sources/SrtFlow/MainThreadWatchdog.swift \
   Sources/SrtFlow/MainThreadStackCapture.swift \
   Sources/SrtFlow/PacedPlayhead.swift \
@@ -41,6 +46,7 @@ xcrun swiftc \
   checks/PlayerClock/GoToStartChecks.swift \
   checks/PlayerClock/DetachChecks.swift \
   checks/PlayerClock/AudioSourceChecks.swift \
+  checks/PlayerClock/SyncedStartChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # 卸片那一项要真的播放器和素材：现做一段 60 秒带声音的小视频（ffmpeg 同 check-text-render：vendor/ffmpeg 或
@@ -54,5 +60,10 @@ CLIP="$(dirname "$OUT")/clip.mp4"
 SHORT="$(dirname "$OUT")/short.mp4"
 "$FFMPEG" -hide_banner -loglevel error -y -f lavfi -i testsrc2=s=64x64:r=10:d=2 -c:v libx264 -pix_fmt yuv420p -an "$SHORT"
 
+# Play's start checks need a picture-only item like the preview's composition (no native audio pipeline to start),
+# with a long GOP so that a native re-seek has to decode from a keyframe (SyncedStartChecks.swift).
+PICTURE="$(dirname "$OUT")/picture.mp4"
+"$FFMPEG" -hide_banner -loglevel error -y -f lavfi -i testsrc2=s=64x64:r=30:d=20 -c:v libx264 -g 150 -pix_fmt yuv420p -an "$PICTURE"
+
 echo "==> 运行"
-"$OUT" "$CLIP" "$SHORT"
+"$OUT" "$CLIP" "$SHORT" "$PICTURE"
