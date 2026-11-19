@@ -7,9 +7,9 @@ import SrtFlowCore
 // 「高级」里的独立字幕文件同一个起名函数（`SubtitleExportPlanner.fileName`），和视频同名放在一起，播放器会自动挂上。
 // 两条轨的语言标签一样（或者都没有）时，译文那份用 `translation` 当标签，免得两份同名、后一份盖掉前一份。
 // 任何一份已经有了，就整组换成 `<名字> 2`、`<名字> 3`……：几份还是同一个名字，认得出是一套；从不覆盖（方案第 34 条）。
-// The numbered sets are a `Series`: the write claims a whole set before writing and moves on to the next set when a name
-// was taken after the listing (AISubtitleFileExport, ExclusivePlacement.claimSet).
-// 不管什么：写盘（`SubtitleExportPlanner.writeValidated`）、参数和结果（AISubtitleFileExport）。
+// The numbered sets are a `Series`: the write makes the whole set under private names first and moves on to the next set
+// when a name was taken after the listing (AISubtitleFileExport, ExclusivePlacement.createSet).
+// 不管什么：写盘（`SubtitleExportPlanner.writeNewSet`）、参数和结果（AISubtitleFileExport）。
 
 enum AISubtitleFiles {
     struct Target: Equatable, Sendable {

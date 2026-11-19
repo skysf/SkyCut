@@ -1,4 +1,5 @@
 import Foundation
+import SrtFlowCore
 
 // MARK: - Writing one project's file off the main thread
 //
@@ -38,8 +39,8 @@ struct ProjectFileWriteRequest: Sendable {
     /// The project's document generation when this was taken: a result for an older document is not applied.
     var generation: Int
     /// Save As only: replacing a file already at `url` was confirmed (the person in macOS's own window or in the replace
-    /// question; the AI saving the project back to its own file). Otherwise the name is claimed first and a file already
-    /// there is never touched: `.occupied` (NewFileClaim).
+    /// question; the AI saving the project back to its own file). Otherwise a file already there, or one that appears during
+    /// the write, is never touched: `.occupied` (ExclusivePlacement.create).
     var replacesExisting = true
     /// Stamped by the writer: a result older than one already applied is dropped.
     fileprivate(set) var sequence = 0
@@ -227,26 +228,30 @@ final class ProjectFileWriter {
            let moved = movedFile(request.documentBookmark) {
             url = moved
         }
-        // A Save As that may not replace a file already there claims the name before anything is written, so that file is
-        // left as it was — not even the web-motion movies are carried next to it.
-        let claimed = request.kind == .saveAs && !request.replacesExisting
-        if claimed {
-            do {
-                guard try NewFileClaim.claim(url) else { return .occupied(NewFileClaim.occupiedReason(url)) }
-            } catch {
-                return .failed(error.localizedDescription)
-            }
+        // A Save As that may not replace a file already there never writes at that name: the whole project file is written
+        // under a private hidden name in the same folder (so the media's relative paths and the carried web-motion movies
+        // are the same), then takes the name in one step that fails when the name is taken (ExclusivePlacement.create). A
+        // file there is seen first and left as it was — not even the web-motion movies are carried next to it.
+        let exclusive = request.kind == .saveAs && !request.replacesExisting
+        if exclusive, NewFileClaim.isTaken(url) { return .occupied(NewFileClaim.occupiedReason(url)) }
+        let save = { (target: URL) in
+            try VideoEditProjectIO.save(request.state, to: target, knownRecords: request.knownRecords, rowHeights: request.rowHeights)
         }
         do {
-            let records = try VideoEditProjectIO.save(
-                request.state, to: url, knownRecords: request.knownRecords, rowHeights: request.rowHeights
-            )
+            let records: [String: MediaRecord]
+            if exclusive {
+                guard let written = try ExclusivePlacement.create(url, writing: save) else {
+                    return .occupied(NewFileClaim.occupiedReason(url))
+                }
+                records = written
+            } else {
+                records = try save(url)
+            }
             // A fresh bookmark after every write: the atomic write gives the file a new inode, and a bookmark made before it
             // can't find the file once it is moved in Finder (2026-11-19: it used to be made once, at the first save).
             let bookmark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
             return .saved(url: url, records: records, bookmark: bookmark)
         } catch {
-            if claimed { NewFileClaim.release(url) }
             return .failed(error.localizedDescription)
         }
     }

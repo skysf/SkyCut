@@ -473,8 +473,9 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
 5. **Save As** (§ "切工程必须是事务性的" item 6 still holds): the new file is taken only when its write succeeded within the
    deadline; a Save As that lands later never moves the project. A file already at the URL is replaced only when that was
    confirmed for exactly that URL (macOS's own save window, the replace question, the AI's `save_project` back to the
-   project's own file); otherwise the name is claimed before anything is written and the old file stays as it was
-   (`.occupied`; [open and save windows](system-file-windows.md) rule 9).
+   project's own file); otherwise the project file is written under a private name in the same folder and takes the name in
+   one step that fails when it is taken, so a file there, or one that appears meanwhile, stays as it was (`.occupied`;
+   [open and save windows](system-file-windows.md) rule 9, [export settings](export-settings.md) §5 item 9).
 6. **Quit** (`ProjectQuit`): `.terminateNow` when no project needs writing or asking; otherwise `.terminateLater` and one
    reply. Each project gets 3 s quietly, then an alert that keeps waiting by itself (SkyCut quits once the file is written),
    with "Don't Quit" and "Quit Anyway" (giving up only that project's unsaved changes). Quitting after a screen recording goes
