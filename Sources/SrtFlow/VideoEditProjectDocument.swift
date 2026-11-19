@@ -140,7 +140,7 @@ extension VideoEditProject {
         mediaRecords = result.records
         missingMedia = result.missingMedia
         RecentProjects.note(url)
-        scheduleRebuild()
+        scheduleRebuild(immediately: true)
 
         // 丢失的素材由预览区顶上的 MissingMediaBar 长期显示（那里还带重链接入口），
         // 不再往 notice 里塞一遍 —— 同一句话说两遍。

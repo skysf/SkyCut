@@ -5,7 +5,7 @@ import Foundation
 // 与 docs/architecture/preview-perf-ratchet.md 第十二节：只跟「放置」；播放中不跟、停下追上一次；
 // 悬停预览和播放把它带着走的时间回调都叫不醒它。
 
-func checkPacedPlayhead() {
+func checkPacedPlayhead(clip: URL) {
     // 规则本身（纯函数）。
     let precise = PlayheadPlacement(time: 1, precise: true)
     let scrub = PlayheadPlacement(time: 1, precise: false)
@@ -18,6 +18,8 @@ func checkPacedPlayhead() {
 
     // 接在真时钟上：谁叫得醒它、谁叫不醒。
     let clock = PlayerClock()
+    clock.player.isMuted = true
+    clock.attach(url: clip, autoplay: false)
     let paused = clock.whilePaused
     let rest = clock.atRest
     var pausedSends = 0
@@ -47,6 +49,7 @@ func checkPacedPlayhead() {
 
     // 播放中：放置不跟；停下来按停下的位置追上一次。
     clock.togglePlayback()
+    waitForAudioClock { clock.isPlaying }
     check(clock.isPlaying, "（前提）togglePlayback 之后在播放")
     clock.seek(to: 8)
     clock.observePlaybackTime(8.5)

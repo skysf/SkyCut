@@ -136,7 +136,7 @@ grep -q 'guard OpenProjects.shared.editorIsKey(self) else { return }' "$SAVING" 
 
 # 11. 后台工程（没有窗口，方案板 8）：不建预览（播放条目、合成、音频引擎），挂上窗口时重建一次；摘窗口只停预览、工程留着；
 #     用户关掉 AI 还在剪的工程的窗口 = 转到后台（先问这一句，再走落盘关工程那条路）。
-REBUILD="$(awk '/    func scheduleRebuild\(\) \{/,/^    \}/' "$PROJECT")"
+REBUILD="$(awk '/    func scheduleRebuild\(/,/^    \}/' "$PROJECT")"
 [ "$(sed -n 2,3p <<<"${REBUILD}" | grep -c 'guard OpenProjects.shared.showsEditor(self) else { return }')" -eq 1 ] \
   || fail "${PROJECT} 的 scheduleRebuild 开头没挡后台工程（没有窗口也建播放条目、合成、音频引擎）"
 grep -q 'guard !Task.isCancelled, generation == self.rebuildGeneration, OpenProjects.shared.showsEditor(self) else { return }' <<<"${REBUILD}" \
@@ -144,7 +144,7 @@ grep -q 'guard !Task.isCancelled, generation == self.rebuildGeneration, OpenProj
 for body in 'private func place(' 'func showWindow(for project'; do
   BLOCK="$(awk -v start="$body" 'index($0, start) { on = 1 } on { print } on && /^    \}/ { exit }' "$REGISTRY")"
   ATTACH_AT="$(grep -n 'attachWindow(to: project, inFront: inFront)' <<<"${BLOCK}" | head -1 | cut -d: -f1)"
-  REBUILT_AT="$(grep -n 'project.scheduleRebuild()' <<<"${BLOCK}" | head -1 | cut -d: -f1)"
+  REBUILT_AT="$(grep -nF 'project.scheduleRebuild(' <<<"${BLOCK}" | head -1 | cut -d: -f1)"
   if [ -z "${ATTACH_AT}" ] || [ -z "${REBUILT_AT}" ] || [ "${ATTACH_AT}" -gt "${REBUILT_AT}" ]; then
     fail "${REGISTRY} 的 ${body}… 挂上窗口之后没重建预览（开的时候它还没窗口，重建被跳过了）"
   fi

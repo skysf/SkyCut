@@ -1162,7 +1162,7 @@ final class VideoEditProject {
     // MARK: - 预览重建
 
     /// 不然每改一刀就跳回 0:00 没法干活。
-    func scheduleRebuild() {
+    func scheduleRebuild(immediately: Bool = false) {
         // 后台工程（没有窗口）不建预览：播放条目、合成、音频引擎都不要；挂上窗口时 OpenProjects 重建一次（方案 H 节）。
         guard OpenProjects.shared.showsEditor(self) else { return }
         // 重建按旧路径开素材，文件被挪走的话对应时段会静默变黑（builder 对加载失败的 clip 只能跳过）——先把素材位置
@@ -1173,7 +1173,7 @@ final class VideoEditProject {
         rebuildTask?.cancel()
         rebuildStatus.set(true)
         rebuildTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 120_000_000)  // 防抖只为并掉一阵子里的连续改动；250 时松手到预览回来白等 130ms（2026-09-25）
+            if !immediately { try? await Task.sleep(for: .milliseconds(120)) }  // Batch edits made in quick succession.
             guard let self, !Task.isCancelled else { return }
             let snapshot = self.state
             // 画面按优化媒体转好的块换源（只有这一处传 proxies：成片、预渲染、AI 看永远原片）。
@@ -1195,7 +1195,7 @@ final class VideoEditProject {
             self.clock.attachItem(item)
             self.audioEngineHost.apply(AudioEngineConfig.make(from: snapshot), clock: self.clock, meters: meters)
             self.clock.seek(to: min(time, snapshot.duration), precise: true)
-            if wasPlaying { self.clock.play() }
+            self.clock.resumeAfterPreviewRebuild(wasPlaying: wasPlaying)
             self.optimizedMedia.sync(state: snapshot, playhead: time)
         }
     }

@@ -182,7 +182,7 @@ final class OpenProjects {
             return
         }
         attachWindow(to: project, inFront: inFront)
-        project.scheduleRebuild()
+        project.scheduleRebuild(immediately: true)
     }
 
     /// 摘掉工程窗口、工程转到后台接着开着（AI 的 set_view background）：预览的播放器、音频引擎、优化媒体停掉，照样自动存盘。
@@ -259,7 +259,7 @@ final class OpenProjects {
     private func place(_ project: VideoEditProject, _ placement: Placement) {
         guard case .window(let inFront) = placement else { return }
         attachWindow(to: project, inFront: inFront)
-        project.scheduleRebuild()
+        project.scheduleRebuild(immediately: true)
     }
 
     private func attachWindow(to project: VideoEditProject, inFront: Bool) {
