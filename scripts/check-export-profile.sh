@@ -6,7 +6,8 @@
 # share a name and never replace a file (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md); the export
 # panel writes the file it checked (docs/bugfixes/2026-11-19-export-panel-checks-one-folder-writes-another.md).
 # Compress / Burn In never overwrite or delete a file that is not the job's own
-# (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
+# (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md). The AI encode tools look at the files they are given,
+# and read and write subtitle files, off the main thread (docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
@@ -28,11 +29,11 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFl
 cp Sources/SrtFlow/Resources/watermark-logo.svg "${APP}/Contents/Resources/watermark-logo.svg"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/ExportProfile/Main.swift checks/ExportProfile/Runner.swift checks/ExportProfile/ProcessChecks.swift \
-  checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift \
+  checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift checks/ExportProfile/SaveAnswerChecks.swift \
   checks/ExportProfile/DestinationChecks.swift \
   checks/ExportProfile/AIExportFolderChecks.swift checks/ExportProfile/ExportTargetChecks.swift \
   checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/EncodeQueueChecks.swift \
-  checks/ExportProfile/EncodeOffMainChecks.swift \
+  checks/ExportProfile/EncodeOffMainChecks.swift checks/ExportProfile/EncodeInputsOffMainChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=320x180:r=30 \

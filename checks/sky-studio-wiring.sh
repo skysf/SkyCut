@@ -38,6 +38,7 @@
 #   13. **变声（声音 PR 9）**：AI 的 change_voice 和片段右键的面板同一条路（VoiceChangeSource.prepare → VoiceChangeOrder.draft → 先过每日
 #       硬预算 → VoiceChangeOrder.start，VoiceChangeJob 只在那里造）；只判每日硬预算、不用确认码；落地恰好一次 perform、规则只有
 #       VoiceChangeLanding.land 一份；上传用途只写一处；块只往 VoiceChangeActivity 写目标，面板的视图不读工程。
+#   15. Music length and a generated video's sound (2026-11-19), in checks/sky-studio-wiring/generation-length-sound.sh.
 # 规矩见 docs/architecture/sky-studio-account.md（账号、授权）和 docs/architecture/sky-studio-jobs.md（任务）。
 #
 # 用法：checks/sky-studio-wiring.sh
@@ -541,7 +542,10 @@ source checks/sky-studio-wiring/voice-library-orders.sh
 # 14. 变声（声音 PR 9）：同样拆出去，checks/sky-studio-wiring/voice-change.sh。
 source checks/sky-studio-wiring/voice-change.sh
 
-# 15. Sky Studio's editing styles on this Mac (2026-11-19, SS-5): checks/sky-studio-wiring/styles.sh.
+# 15. Music length, delivered length and a generated video's sound (2026-11-19): checks/sky-studio-wiring/generation-length-sound.sh.
+source checks/sky-studio-wiring/generation-length-sound.sh
+
+# 16. Sky Studio's editing styles on this Mac (2026-11-19, SS-5): checks/sky-studio-wiring/styles.sh.
 source checks/sky-studio-wiring/styles.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。

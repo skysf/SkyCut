@@ -55,6 +55,7 @@ import SrtFlowMCPKit
             checks.checkPresentation(receipt: receipt)
             await checks.checkPartialAndSources(target: target, result: result)
             checks.checkNoticeOffScreenWhileRecording(target: target, result: result)
+            RecordingCommitChecks.run(root: root, require: checks.require)
             ProjectTeardown.stopPreview(target)
             target.fileWriter.cancelAutosave()
         } catch {

@@ -75,7 +75,7 @@ struct AIRecipeSkyStudioPart: Sendable {
         case .unreachable:
             return "Sky Studio could not be reached and this Mac has no copy of its styles: only the presets and the user's own are listed."
         case .unavailable:
-            return "Sky Studio has no editing styles to list now: only the presets and the user's own are listed."
+            return "No Sky Studio editing styles are available yet: only the presets and the user's own are listed."
         case .none:
             return nil
         }

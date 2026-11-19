@@ -56,6 +56,10 @@ final class ExportDestinationProbe: @unchecked Sendable {
                 return ExportDestinationProbe.problem(creating: error)
             }
         }
+        /// A file's bytes (the AI encode tools' subtitle files, AIEncodeInputs).
+        var read: @Sendable (URL) throws -> Data = { url in try Data(contentsOf: url) }
+        /// Writes a new file; never replaces one that is there (convert_subtitles' outputs, AIEncodeInputs).
+        var writeNew: @Sendable (Data, URL) throws -> Void = { data, url in try data.write(to: url, options: .withoutOverwriting) }
 
         static let live = FileSystem(
             kind: { url in

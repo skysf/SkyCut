@@ -96,13 +96,17 @@ enum BurnInWorkspace {
 /// 读字幕文件，编码探测跟文档窗口那边保持一致。
 enum SubtitleLoader {
     static func load(_ url: URL) throws -> SubtitleDocumentModel {
-        let data = try Data(contentsOf: url)
+        try document(from: try Data(contentsOf: url), named: url.lastPathComponent)
+    }
+
+    /// The same for bytes already read (burn_subtitles reads them off the main thread, AIEncodeInputs).
+    static func document(from data: Data, named fileName: String) throws -> SubtitleDocumentModel {
         // UTF-8 → UTF-16 → GBK，规则只在 SrtFlowCore 的 TextDecoding 一处（批量转换、AI 读文稿同一份）。
         guard let content = TextDecoding.decode(data) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
-        let format = SubtitleFormat.detect(from: url.lastPathComponent) ?? .text
-        return SubtitleParser.parse(content, format: format, filename: url.lastPathComponent)
+        let format = SubtitleFormat.detect(from: fileName) ?? .text
+        return SubtitleParser.parse(content, format: format, filename: fileName)
     }
 
     /// 按文件名给视频配字幕：`lesson01.mp4` ↔ `lesson01.srt`。

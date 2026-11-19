@@ -13,8 +13,9 @@ import UniformTypeIdentifiers
 // What it doesn't: the window itself (SystemFileChooser); the export panel's folder row (its own chooser and UI); what a
 // caller does with the files (a caller whose project changed meanwhile checks that itself).
 // A save's answer says whether replacing a file already there was confirmed (`SaveLocation`): only macOS's own save
-// window asks that; a typed or dropped answer in the helper never did, so its callers ask (SaveLocation.swift)
-// (2026-11-19, docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md).
+// window asks that, and only about a file that is there when it answers; a typed or dropped answer in the helper never
+// did, so its callers ask (SaveLocation.swift) (2026-11-19, docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md,
+// docs/bugfixes/2026-11-19-free-save-name-treated-as-replace-consent.md).
 // Rules: docs/architecture/system-file-windows.md.
 
 /// What the helper next to the system window can show (a seam: the checks record what would be shown).
@@ -38,17 +39,25 @@ final class SystemFileWindows {
     private let helper: FileWindowHelping
     /// How long the system window stays up before the helper offers "Close It" (most picks take less).
     private let stripDelay: TimeInterval
+    /// Asks the answered save location's drive whether a file is there (the checks pass a drive that never answers).
+    private let probe: ExportDestinationProbe
+    /// How long that look may take (the export panel's look at its folder; the checks shorten it).
+    static var replaceLookDeadline: TimeInterval = 5
     /// The caller still waiting for an answer; the flag says it came from macOS's own window (not the helper).
     private var answer: (([URL]?, Bool) -> Void)?
     private var phaseWatch: AnyCancellable?
     private var stripTask: Task<Void, Never>?
 
     /// nil: the real window and helper (the checks pass fakes).
-    init(chooser: SystemFileChooser? = nil, helper: FileWindowHelping? = nil, stripDelay: TimeInterval = 5) {
+    init(
+        chooser: SystemFileChooser? = nil, helper: FileWindowHelping? = nil, stripDelay: TimeInterval = 5,
+        probe: ExportDestinationProbe = .shared
+    ) {
         let chooser = chooser ?? SystemFileChooser()
         self.chooser = chooser
         self.helper = helper ?? FileWindowHelper()
         self.stripDelay = stripDelay
+        self.probe = probe
         phaseWatch = chooser.$phase.dropFirst().sink { [weak self] phase in
             MainActor.assumeIsolated { self?.phaseChanged(phase) }
         }
@@ -76,10 +85,20 @@ final class SystemFileWindows {
         }
     }
 
-    /// A save window answered in a closure: `then` gets nil when nothing was chosen.
+    /// A save window answered in a closure: `then` gets nil when nothing was chosen. Replacing is allowed only for a file
+    /// that is at the answered URL when macOS's own window answers — the only case in which that window asked "Replace?".
+    /// A free name was never a decision to replace: a file that appears there before the write is not replaced. Whether a
+    /// file is there is asked off the main thread with a deadline (`ExportDestinationProbe`); no answer = not allowed.
     func openSave(_ request: FileWindowRequest, then: @escaping (SaveLocation?) -> Void) {
-        start(request) { urls, inSystemWindow in
-            then(urls?.first.map { SaveLocation(url: $0, mayReplace: inSystemWindow) })
+        start(request) { [probe] urls, inSystemWindow in
+            guard let url = urls?.first else { return then(nil) }
+            guard inSystemWindow else { return then(SaveLocation(url: url, mayReplace: false)) }
+            Task { @MainActor in
+                let asked = await probe.run(
+                    on: url.deletingLastPathComponent(), deadline: Self.replaceLookDeadline, timedOut: false
+                ) { files in files.kind(url) != .missing }
+                then(SaveLocation(url: url, mayReplace: asked))
+            }
         }
     }
 

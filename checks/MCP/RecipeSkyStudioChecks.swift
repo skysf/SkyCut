@@ -95,8 +95,23 @@ private func skyListChecks(_ store: AIRecipeStore) {
     let unreachable = list(part(origin: .unreachable, styles: []))
     check(unreachable?["sky_studio"]?.stringValue?.contains("only the presets and the user's own are listed") == true,
           "unreachable with nothing here: said plainly")
-    check(list(part(origin: .unavailable, styles: []))?["sky_studio"]?.stringValue?.contains("no editing styles to list now") == true,
-          "nothing published yet: said as such, not as unreachable")
+    // Nothing published yet (Sky Studio answers 503 content_unavailable): said plainly, the presets still listed and readable.
+    let none = list(part(origin: .unavailable, styles: []))
+    checkEqual(none?["sky_studio"]?.stringValue, "No Sky Studio editing styles are available yet: only the presets and the user's own are listed.",
+               "nothing published yet: said plainly, not as unreachable")
+    checkEqual(none?["recipes"]?.arrayValue?.compactMap { $0["source"]?.stringValue }, ["built_in", "built_in"], "and the presets are listed")
+    checkEqual((try? AIRecipeTools.recipes(args(["id": "product-promo"]), store: store, builtIn: presets, sharedRules: "",
+                                           skyStudio: part(origin: .unavailable, styles: [])))?.payload["text"]?.stringValue,
+               "promo body", "and a preset still reads")
+    checkThrows("a Sky Studio name before anything is published says none is available yet") {
+        do {
+            _ = try AIRecipeTools.recipes(args(["id": "film-trailer"]), store: store, builtIn: presets, sharedRules: "",
+                                          skyStudio: part(origin: .unavailable, styles: []))
+        } catch let error as AIToolError {
+            check(error.message.hasSuffix("No Sky Studio editing styles are available yet."), "the error says none is available yet")
+            throw error
+        }
+    }
     check(list(part(origin: .none, styles: []))?["sky_studio"] == nil, "no key: nothing about Sky Studio")
     checkThrows("an unknown style while Sky Studio is unreachable says so") {
         do {
