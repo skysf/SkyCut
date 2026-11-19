@@ -91,7 +91,7 @@ status=0
 score "${out}" || status=$?
 if [ "${status}" -ne 2 ]; then exit "${status}"; fi
 
-echo "The hosted VM supplied isolated late frames. Running one repeat and retaining both batches."
+echo "The first hosted batch had an isolated timing outlier. Running one repeat and retaining both batches."
 repeat="${out}/repeat"
 mkdir -p "${repeat}"
 cp "${out}/machine.txt" "${repeat}/machine.txt"

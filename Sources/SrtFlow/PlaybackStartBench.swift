@@ -17,7 +17,7 @@ enum PlaybackStartBench {
     static var audioObserver: TimelineAudioEngine.SampleObserver? { isRequested ? audio.observer : nil }
 
     static func previewMounted(_ view: PlayerLayerView) {
-        if let clock, view.player === clock.player { video?.surface = view }
+        if let clock, view.player === clock.player { video?.mount(view) }
     }
 
     struct Failure: LocalizedError {
@@ -60,8 +60,11 @@ enum PlaybackStartBench {
         let (file, media) = try await Task.detached(priority: .userInitiated) {
             try PlaybackStartFixture.write(in: directory)
         }.value
-        try await wait("editor window") { OpenProjects.shared.window(of: project)?.screen != nil }
-        guard let window = OpenProjects.shared.window(of: project), let screen = window.screen else {
+        try await wait("editor window") {
+            guard let window = OpenProjects.shared.window(of: project) else { return false }
+            return window.isVisible && window.screen != nil
+        }
+        guard let window = OpenProjects.shared.window(of: project), window.isVisible, let screen = window.screen else {
             throw Failure("The editor needs a graphical session")
         }
         let visible = screen.visibleFrame
@@ -75,7 +78,7 @@ enum PlaybackStartBench {
         clock = project.clock
         video = probe
         project.clock.observePreviewItem = { probe.attach(to: $0) }
-        probe.start(on: screen)
+        try probe.start(on: screen)
         defer { probe.stop() }
         AppUserPresence.shared.note(at: ProcessInfo.processInfo.systemUptime)
 

@@ -85,10 +85,9 @@ def check_trial(label, scenario, metrics, budgets, errors):
             errors.append(f"{label}: {key} {metrics[key]:g}, expected {expected}")
     if scenario in ("cold-open", "end-replay") and metrics["videoPrerolls"] != 1:
         errors.append(f"{label}: expected one successful native video preroll before playback")
-    if scenario == "cold-open" and metrics["assetOpens"] < 3:
-        errors.append(f"{label}: expected uncached opens for all three video sources")
-    if scenario != "cold-open" and metrics["assetOpens"] != 0:
-        errors.append(f"{label}: Play opened a new source asset")
+    expected_opens = 3 if scenario == "cold-open" else 0
+    if metrics["assetOpens"] != expected_opens:
+        errors.append(f"{label}: assetOpens {metrics['assetOpens']:g}, expected {expected_opens}")
 
 
 def check_limits(label, metrics, limits, errors, scenario=None):

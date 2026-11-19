@@ -46,9 +46,11 @@ Time begins at the call to the editor's Play action. Each attempt measures the f
   measures real source-node output after track gain. For onset it takes the later of the render callback and the
   sample's host timestamp. The master output is muted downstream.
 - Host time and position of the first advancing frame offered for display by the production player's item.
-  The observer samples at display-link deadlines once the editor's mounted `AVPlayerLayer` is ready and keeps
-  normal layer rendering enabled. Presentation timestamps identify the timeline frame. The raw samples also
-  record when the item first offered a frame, including a still frame during paused preparation.
+  The observer takes the display's host timestamps from Core Video's sampling thread once the mounted
+  `AVPlayerLayer` is ready and keeps normal layer rendering enabled. Presentation timestamps identify the
+  timeline frame. The raw samples also record when the item first offered a frame, including a still frame
+  during paused preparation.
+  [Core Video display link](https://developer.apple.com/documentation/corevideo/cvdisplaylink-k0k).
 - The difference between the two onset times and how far the first sampled audio and video have moved from the requested time.
 - The signed audio timeline minus video presentation timestamp at video onset and at the first follow-up display deadline
   with audio at least one second later. The PCM sample clock supplies the audio position at the same host time.
@@ -60,9 +62,9 @@ actual footage, and monitoring devices also belong in the manual regression.
 
 The graphical step contributes to `check-all`. It uploads all samples, the machine fingerprint and a table with each
 scenario's median and worst result. Every trial in the accepted batch must produce audio and video and meet the limits in
-`checks/PlaybackStart/budgets.json`. A cold open must build and attach just once and open the source assets. Warm and
-idle starts must build, attach and open zero times. Cold open and replay from the end each require one successful
-native preroll.
+`checks/PlaybackStart/budgets.json`. A cold open must build and attach once and open exactly three video assets.
+Warm and idle starts must build, attach and open zero times. Cold open and replay from the end each require one
+successful native preroll.
 
 The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
 340 ms audio and 380 ms picture ceilings. One hosted start needed 290 ms for audio and 314 ms for picture,
