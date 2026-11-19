@@ -575,6 +575,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      ([case](../bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md), [export settings](export-settings.md) §5 item 8).
    - 转字幕格式当场做完：读和转和批量转换页同一个函数（`SubtitleConverter.convertedContents`，编码只走 `TextDecoding`），
      写的时候 `.withoutOverwriting`。
+   - Since 2026-11-19 the files the three tools are given are found and checked, burn_subtitles' subtitle files read and
+     convert_subtitles' files read and written off the main thread (`AIEncodeInputs`, through the probe with the folder's
+     15 s deadline); a drive that does not answer is refused with the panel's sentence before anything is queued
+     ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
 
 25. **词级时间（transcribe，第 3 块的原始数据）**：转写和生成字幕是**同一套**（`TranscriptHarvester`：定语言含自动检测、
    备模型租约、按 2 分钟一窗转写、合进按素材指纹存的缓存），缓存也是同一份 —— 用户在面板上生成过字幕的素材，AI 不用再转。
