@@ -12,16 +12,32 @@ import Foundation
 // Why: a finite but huge time (10^20 s, a typo or a unit mix-up) was stored with an undo step and quit SkyCut at the next export
 // or look (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md). Every number in the catalog is either listed here or known
 // not to be a time; checks/ParameterLimits/TimeBoundChecks.swift keeps both lists whole and calls every listed one.
+// Two edges (2026-11-19, docs/bugfixes/2026-11-19-time-bound-refuses-relative-keyframes-and-timeline-end.md): a project whose
+// timeline the tools made run past the day (a title at 86,400 s) keeps every time inside it usable (`allowed`, given the
+// project's end), and set_keyframes' `relative: true` times are clip fractions with their own narrow rule (`relativeFractions`).
 public enum MCPTimeArguments {
     /// One day of seconds: the longest timeline SkyCut supports.
     public static let maximumSeconds: Double = 86_400
     public static let seconds: ClosedRange<Double> = 0...maximumSeconds
+    /// The clip fractions set_keyframes takes with `relative: true`: a hair outside 0–1 (a computed fraction's rounding) is the
+    /// clip's edge, which the tool clamps it to (AIKeyframes).
+    public static let relativeFractions: ClosedRange<Double> = -0.001...1.001
 
-    /// The first time-valued argument outside `seconds`: where (`clips[0].start`, `times[2]`) and the number as read
-    /// (it may be NaN or infinite when it was written as text).
+    /// The range every listed time of a call must be in: the supported timeline, or up to the project's own end when that
+    /// already runs past the day (`timelineEnd`: the project the call lands on, nil when it has none); clip fractions for
+    /// set_keyframes' times with `relative: true` (read as the tools read a yes / no, `JSONValue.flagValue`).
+    public static func allowed(tool: MCPToolName, arguments: JSONValue, timelineEnd: Double? = nil) -> ClosedRange<Double> {
+        if tool == .setKeyframes, arguments["relative"]?.flagValue == true { return relativeFractions }
+        guard let timelineEnd, timelineEnd.isFinite, timelineEnd > maximumSeconds else { return seconds }
+        return 0...timelineEnd
+    }
+
+    /// The first time-valued argument outside `allowed`: where (`clips[0].start`, `times[2]`), the number as read
+    /// (it may be NaN or infinite when it was written as text) and the range it is outside.
     public struct Finding: Equatable, Sendable {
         public let path: String
         public let requested: Double
+        public let allowed: ClosedRange<Double>
 
         /// The list and entry a path starts in (`clips[0].start` → clips, 0); nil for a top-level parameter.
         public var entry: (list: String, index: Int)? {
@@ -79,27 +95,29 @@ public enum MCPTimeArguments {
                                     "number.seconds"]
     private static let shapeTimes = ["start", "duration", "animation_in_duration", "animation_out_duration"]
 
-    /// The first time in `arguments` that is not a finite number of seconds inside `seconds`, in the order of `paths(for:)`.
-    /// Numbers written as text count ("1e20", "nan", "inf"); other types are left to the tool, which reports them.
-    public static func firstOutOfBounds(tool: MCPToolName, arguments: JSONValue) -> Finding? {
+    /// The first time in `arguments` that is not a finite number inside `allowed` (`timelineEnd`: the end of the project the call
+    /// lands on), in the order of `paths(for:)`. Numbers written as text count ("1e20", "nan", "inf"); other types are left to the
+    /// tool, which reports them.
+    public static func firstOutOfBounds(tool: MCPToolName, arguments: JSONValue, timelineEnd: Double? = nil) -> Finding? {
+        let range = allowed(tool: tool, arguments: arguments, timelineEnd: timelineEnd)
         for path in paths(for: tool) {
-            if let found = first(in: arguments, path.split(separator: ".").map(String.init)[...], at: "") { return found }
+            if let found = first(in: arguments, path.split(separator: ".").map(String.init)[...], at: "", range: range) { return found }
         }
         return nil
     }
 
-    private static func first(in value: JSONValue, _ steps: ArraySlice<String>, at path: String) -> Finding? {
+    private static func first(in value: JSONValue, _ steps: ArraySlice<String>, at path: String, range: ClosedRange<Double>) -> Finding? {
         guard let step = steps.first else {
-            guard let number = number(value), !seconds.contains(number) else { return nil }
-            return Finding(path: path, requested: number)
+            guard let number = number(value), !range.contains(number) else { return nil }
+            return Finding(path: path, requested: number, allowed: range)
         }
         let isList = step.hasSuffix("[]")
         let key = isList ? String(step.dropLast(2)) : step
         guard let child = value[key], !child.isNull else { return nil }
         let here = path.isEmpty ? key : path + "." + key
-        guard isList else { return first(in: child, steps.dropFirst(), at: here) }
+        guard isList else { return first(in: child, steps.dropFirst(), at: here, range: range) }
         for (index, item) in (child.arrayValue ?? []).enumerated() {
-            if let found = first(in: item, steps.dropFirst(), at: "\(here)[\(index)]") { return found }
+            if let found = first(in: item, steps.dropFirst(), at: "\(here)[\(index)]", range: range) { return found }
         }
         return nil
     }

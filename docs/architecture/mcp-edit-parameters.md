@@ -11,7 +11,7 @@
 
 | 参数 | 唯一范围来源 | 政策 |
 | --- | --- | --- |
-| Times (every time-valued parameter of every tool) | `MCPTimeArguments.seconds`: 0–86,400 s, the supported timeline | Refused by the router before the call queues (below); each tool's own rule still applies inside |
+| Times (every time-valued parameter of every tool) | `MCPTimeArguments.allowed`: 0–86,400 s, the supported timeline (up to the project's end when it already runs longer); set_keyframes' relative fractions −0.001–1.001 | Refused by the router before the call starts anything (below); each tool's own rule still applies inside |
 | 速度 | `TimelineTrim.clipSpeedRange`（检查器 / 原生写入同用） | 越界拒绝 |
 | 源窗口最短长度 | `TimelineTrim.clipMinimumDuration` | 越界拒绝 |
 | 图片源窗口最大长度 | `StillImageClipFactory.stillDuration`（真实循环素材） | 越界拒绝，不再悄悄截短 |
@@ -32,15 +32,27 @@ Every time an AI passes (a timeline time, a file second, a duration, a wait) is 
 `MCPTimeArguments.seconds`, the supported timeline the official-film records already used (they, their `save_project` schema
 and the inspector's motion-preset hit field read the same constant). `MCPTimeArguments.paths(for:)` names each tool's time
 parameters (an exhaustive switch; `list[]` is every entry of a list, `a.b` a field of an object), and the router refuses a call
-with any of them outside the range, NaN or infinite (also when written as text: "nan", "inf", "1e300") at the top of
-`routeValidated` (`AIEditLimits.timeRefusal`), with the error fields below plus `batch` / `index` for a time inside a list entry.
-It runs there, not in each tool, for two reasons: nothing has happened yet (no queue, no round, no undo group, no job), and a
-refusal inside a tool that the router wraps whole in `AIUndoGrouping.step` left an empty undo step (`UndoManager` keeps an empty
-group; the next ⌘Z did nothing). Each tool's narrower rule (a source window, a transition's 0.1–3 s, web motion's 60 s, a
+with any of them outside the range, NaN or infinite (also when written as text: "nan", "inf", "1e300") in `execute`, as soon as
+the call's project is known (`AIEditLimits.timeRefusal`), with the error fields below plus `batch` / `index` for a time inside a
+list entry. It runs in the router, not in each tool, for two reasons: nothing has started yet (no round, no undo group, no job),
+and a refusal inside a tool that the router wraps whole in `AIUndoGrouping.step` left an empty undo step (`UndoManager` keeps an
+empty group; the next ⌘Z did nothing). Each tool's narrower rule (a source window, a transition's 0.1–3 s, web motion's 60 s, a
 recording's 1–14,400 s) still applies inside the bound; values in range keep their old clamps or refusals.
 `get_timeline` reports `edit_limits.time`. A new number parameter must be listed as a time or named as not a time in
 `checks/ParameterLimits/TimeBoundCatalog.swift`, or the check fails. Not covered: a project file that already holds such a time
 ([case](../bugfixes/2026-11-19-huge-times-in-timeline-tools.md)).
+
+Two edges (2026-11-19, [case](../bugfixes/2026-11-19-time-bound-refuses-relative-keyframes-and-timeline-end.md)), both decided
+by `MCPTimeArguments.allowed`:
+
+- **A timeline already past the day.** The tools can make one (a 2 s title at 86,400 s ends at 86,402 s), so the bound for a
+  call on a project is up to that project's end when it runs longer: every time inside it can be sought, looked at and edited,
+  a time past it is refused with that end as `allowed.maximum`. The check waits for the project, which is why it runs after the
+  call's turn instead of before it queues; a refused call has only waited in its line. Calls without a project keep the day.
+- **Relative keyframe fractions.** set_keyframes' times with `relative: true` (read as the tools read any yes / no,
+  `JSONValue.flagValue`, so `"true"` counts too) are fractions of the clip, not seconds: their range is
+  `MCPTimeArguments.relativeFractions`, −0.001–1.001, the one AIKeyframes clamps to the clip's edges. Before, the seconds bound
+  refused a computed −0.0005 that the tool always accepted.
 
 ## 错误与成功反馈
 
@@ -105,7 +117,7 @@ explicit canvas intent for recording import without creating an empty undo step.
 ## 回归
 
 - `scripts/check-mcp.sh`：各类边界 / 越界 / 正常值、合法建议、原生限幅与精确反馈、后项失败、单项 / 批量共用。
-- `scripts/check-parameter-limits.sh` `TimeBoundChecks` (2026-11-19): every listed time of every catalog tool, through the real router, with 10^20, the largest finite number, -1, 86,400.5 and NaN / ±infinity / 10^300 as text: a plain refusal, no edit, undo step, job or file; the catalog walk keeps the time list whole.
+- `scripts/check-parameter-limits.sh` `TimeBoundChecks` (2026-11-19): every listed time of every catalog tool, through the real router, with 10^20, the largest finite number, -1, 86,400.5 and NaN / ±infinity / 10^300 as text: a plain refusal, no edit, undo step, job or file; the catalog walk keeps the time list whole. `TimeBoundEdgeChecks`: a timeline run to 86,402 s by a title at 86,400 s can be sought to its end, looked at and edited inside, and refuses a time past its end with that end as the maximum; relative keyframe fractions -0.0005 / 1.0005 (also with `relative: "true"`) land on the clip's edges, -0.002 / 1.002 / 10^20 are refused with -0.001–1.001.
 - `scripts/check-parameter-limits.sh`：完整 App 对象、临时工程与合成视频 / 图片；失败零修改、成功一次提交 / 撤销、
   实际 gain/fades、真实探测、图片转换前后相同请求重试，缺失与不支持素材区分。Since 2026-11-17 also add_clips with made
   sound effects and audio tracks (`AddClipsChecks`): clean `volume_db` feedback, `track` adjustments, A1–A7 in one call, a failed

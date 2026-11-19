@@ -88,7 +88,7 @@ enum AIKeyframes {
         func source(_ given: Double) throws -> Double {
             var time = given
             if request.relative {
-                guard (-0.001...1.001).contains(given) else { throw AIToolError("With relative=true, keyframe times are fractions of the clip from 0 to 1; got \(given).") }
+                guard MCPTimeArguments.relativeFractions.contains(given) else { throw AIToolError("With relative=true, keyframe times are fractions of the clip from 0 to 1; got \(given).") }
                 time = current.timelineStart + min(max(given, 0), 1) * current.timelineDuration
             }
             guard time >= current.timelineStart - 0.001, time <= current.timelineEnd + 0.001 else {
