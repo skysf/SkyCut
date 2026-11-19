@@ -125,8 +125,13 @@ pressure (`kern.memorystatus_vm_pressure_level`). `WebMotionMemoryPolicy` decide
 | critical (out of memory) | always: the render is the one thing SkyCut can give back right away |
 
 Measured: the check pages (320 × 180) peak at 45–80 MB in all; the probe measured 300–400 MB at 1080p (helper 70–130,
-GPU process 200–280, each page about 25). The hog check is killed at 610–770 MB against a 600 MB budget (it grows 128 MB a
-frame; the watch looks every 50 ms there). After the helper ends, SkyCut waits until every reported WebKit process is really
+GPU process 200–280, each page about 25). The hog check (it grows 128 MB a frame; the watch looks every 50 ms there) has
+used a 320 MB budget since 2026-11-20 ([case](../bugfixes/2026-11-20-web-motion-hog-budget-at-its-edge.md)).
+- Against the earlier 600 MB, CI's runs from 11-18 to 11-19 were killed at 601–970 MB in 106 of 107; a quarter of those
+  were within 20 MB of the budget, and one stalled at 509 MB and finished unkilled.
+- With 320 MB, an M1 kills it at 529–626 MB after about 1 s (three runs).
+
+After the helper ends, SkyCut waits until every reported WebKit process is really
 gone (an exiting process can no longer be described while its pid still exists: that counts as not gone yet) and kills any
 still running as the same process after 3 s (`WebMotionProcessTeardown`; only a process still identifiable as the same one
 is ever signalled).
@@ -154,8 +159,8 @@ existing reduced-coverage behavior; the public alpha path does not replace them.
 and an unresolved ready promise, preventing earlier calibration processes from masking missing discovery. An exact native
 WebContent/held-byte/deadline probe and an observation of real live budget inputs gate the injected low budget. A finite
 one-event child fixture proves nil-first identity retry during live sampling, not merely during teardown; an independent
-identity owns test cleanup even on failure. Local reverse checks select this group instead of the existing 600 MiB frame
-hog. See [the load-memory case](../bugfixes/2026-11-18-web-motion-load-memory-window.md).
+identity owns test cleanup even on failure. Local reverse checks select this group instead of the existing frame hog
+(320 MiB budget since 2026-11-20). See [the load-memory case](../bugfixes/2026-11-18-web-motion-load-memory-window.md).
 
 ## 7. The page clock
 

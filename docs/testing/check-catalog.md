@@ -60,7 +60,9 @@
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
   `load-memory` uses fixed 32 MiB load/ready buffers and real kernel samples, one-event PID retry and process-birth/receipt guards.
   For a focused check on the shared Mac, select `pure,normal,alpha,load-memory`; the existing `memory` group's frame hog remains
-  enabled in full CI.
+  enabled in full CI. Its budget has been 320 MB since 2026-11-20
+  ([case](../bugfixes/2026-11-20-web-motion-hog-budget-at-its-edge.md)): with 600 MB a runner could stall below it. It still
+  goes red if the budget is ignored, SkyCut never kills, or the WebKit processes are left uncounted (each tried).
 
 - Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
