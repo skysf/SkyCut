@@ -199,6 +199,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 | 导出水印（`Sources/SrtFlow/Watermark/`；`WatermarkPolicy`；导出图里水印的落点；`Resources/watermark-logo.svg`；`SeededRandom`） | [导出水印](docs/architecture/export-watermark.md)（加不加只问 `WatermarkPolicy`、只有导出器调 `plan()`；整段两个 overlay，不许一段一个） |
 | 读用户给的文本文件（字幕文件、讲稿、笔记）的编码 | [用户文本文件的编码](docs/architecture/text-file-encoding.md)（只走 SrtFlowCore 的 `TextDecoding`；UTF-16 不许无条件排在 GBK 前面） |
 | 任何按钮的提示文案、快捷键、hover | [即时提示](docs/architecture/instant-tooltips.md)（不许用系统 `.help`；面板的浅 / 深按主题自己设；宿主的根在 `.appLanguage()` 外面裁成气泡的形状） |
+| Playback start, `PlayerClock.play` / `togglePlayback`, preview readiness, positioned seeks, startup audio/video timing | [Playback start](docs/architecture/playback-start.md) (Play consumes the prepared preview. The graphical gate checks first sound, first motion and sync.) |
 | 预览性能、性能计数与基线；新写或改写任何 SwiftUI 视图 / 修饰器 / `NSViewRepresentable` / Canvas；性能那一步红了但没动编辑器界面；往时间线上加一种块 / 行里的列表项；任何要跟着播放头变的界面（订阅播放器时钟、读 `clock.time`）；在视图 body 里读工程的属性、给 `VideoEditProject` 加属性（工程是 `@Observable`） | [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md)（body 第一行要计数，写完跑 `checks/preview-perf-wiring.sh --fix`；计数只许降；时间线上的块不读工程、按值比较 + `.equatable()`；订阅时钟的只许是名单里的小视图）、[方案](docs/plans/2026-09-24-preview-perf-ratchet.md)、[播放丝滑方案](docs/plans/2026-09-25-smooth-playback.md) |
 | AI 的一次工具调用、AI 起的长任务从哪开始到哪结束（`AIToolRouter.handle`、`AIJobs.start` / `finish`）、App Nap / 活动断言（`AIKeepAwake`、`ProcessInfo.beginActivity`）、新写一种在后台跑的 AI 活、the router's lines (`AICallLines`), a slow look becoming a job (`AILookCall`) | [AI 接口（MCP）第四节第 59 条](docs/architecture/ai-control-mcp.md)（新的长任务走 `AIJobs.start` / `finish`；活动断言只在 `AIKeepAwake` 和录屏；items 3 and 12: a read lets its line go once it has read the project, past 25 s a look answers with a job）、[后台的 AI 活被 App Nap 降速](docs/bugfixes/2026-11-10-ai-work-throttled-by-app-nap.md)、[look silently took minutes, the calls behind it dropped](docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md) |
 | 主线程卡顿、心跳看门狗 `MainThreadWatchdog`（含 AI「探一下」读的 `unresponsiveSeconds`）、卡顿日志（stalls still going on: `still stuck`）、冒烟结果里的 `stalls`、挂起主线程抓栈（`MainThreadStackCapture`） | [主线程卡顿日志](docs/testing/main-thread-stalls.md)、[挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md)（挂起期间不分配、不拿锁；挂起和恢复只在 `walkWhileSuspended`）、[预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) |
@@ -315,6 +316,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/no-swallowed-build-output.sh` — 构建日志不得被吞。
 - `checks/open-projects-wiring.sh` — 工程不再是单例、撤销不退到键窗口、代号全 App 不重号、导出进度只给发起的工程。
 - `checks/optimized-media-wiring.sh` — 优化媒体只换预览、成片永远原片、停着才换、清空之后重建。
+- `checks/playback-start-wiring.sh` — Play stays off rebuild and blocking media paths. The guard checks graph recovery, preview installation order and the CI benchmark.
 - `checks/player-time-no-sync-read.sh` — 不许同步问播放器要时间（`currentTime()`）、Now Playing 关着。
 - `checks/preference-reduce-keeps-value.sh` — `PreferenceKey.reduce` 不许写成 `value = nextValue()`。
 - `checks/presented-views-app-language.sh` — 每个 sheet / popover / 自建 `NSHostingView` 都套 `.appLanguage()`。
@@ -346,6 +348,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 要图形会话的按 [GUI 冒烟流程](docs/testing/gui-smoke-testing.md) 跑（无图形会话会假红）。
 
 - `scripts/check-preview-perf.sh` — 预览性能 ratchet：**CI 独有的一步、要图形会话**；check-all 只跑它的 `--self-test`。偶发误报的认法见预览性能 ratchet。
+- `scripts/check-playback-start.sh` — Graphical CI gate for playback onset and sync, with synthetic media and raw trial artifacts. It also runs locally in a graphical session.
 - `scripts/check-filter-preview-attach.sh` — 滤镜挂到播放器上（拍窗口数像素）。要图形会话；改 `VideoEditFilterPreview.swift` 时跑。
 - `scripts/check-cover-preview-attach.sh` — 预览上的盖一块真的盖上了。要图形会话；改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时跑。
 - `scripts/check-instant-tooltip-panel.sh` — 提示面板的落点、浅 / 深、四角透明。要图形会话；改 `InstantTooltip.swift` 时跑。
@@ -501,6 +504,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - [本地化](docs/architecture/localization.md) — 写死的文案每张表都要有、sheet / popover 不继承应用内语言、加一种语言只做两件事。
 - [阻塞的媒体读取](docs/architecture/blocking-media-reads.md) — 会卡住线程的读取不许进 Swift 并发线程池；`MediaReadQueue`；引擎启动探测。
 - [挂起主线程抓栈](docs/architecture/main-thread-stack-capture.md) — 挂起期间只做系统调用和裸读写：不分配、不拿锁；挂起和恢复只在 `walkWhileSuspended`。
+- [Playback start](docs/architecture/playback-start.md) — Preview readiness, first audio and picture, A/V sync, CI timing budgets and manual regression.
 - [预览性能 ratchet](docs/architecture/preview-perf-ratchet.md) — 量的是活不是 CPU、每个视图 body 第一行计数、基线只许降、已知的偶发误报、块不读工程、订阅时钟的名单。
 - [导出设置](docs/architecture/export-settings.md) — 分辨率档位封的是短边、只降不升；面板上只放管线真消费的设置；文件名与撞名。
 - [导出水印](docs/architecture/export-watermark.md) — 只加在剪辑导出的成片上、加不加只问 `WatermarkPolicy`、落在烧字幕之后缩小之前。
