@@ -74,4 +74,7 @@ every picture time was quantized to 40 ms and a short stall could hide between t
 - One native player serves hover and playback: after a hover the picture must be decoded at the playhead again,
   and on an eight-second GOP that wait is about 0.6 s on the M1. Optimized media makes it short.
 - Measure the picture where it can show a short stall: the fastest display, and the whole first seconds.
+- Measure both streams when changing how one starts: starting the picture on the device's first quantum after the idle
+  stop looked right on the picture's numbers, and only the sound's first audible sample and the engine's underrun
+  count showed that it cost the sound its first 60–140 ms.
 - The rules live in [playback start](../architecture/playback-start.md).
