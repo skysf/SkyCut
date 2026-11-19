@@ -149,7 +149,7 @@ enum MCPGuideLibraryTopics {
             """),
             MCPGuideSection(name: "paging", about: "status filters, page size and cursors", text: """
             Paging. status is ready (default), draft, generating, failed or all; limit is 1–100 (default 50); pass the previous \
-            page's next_cursor as cursor.
+            page's next_cursor (an opaque UUID) as cursor.
             """),
             MCPGuideSection(name: "entries", about: "what each summary holds, and get_character", text: """
             Entries. Each summary has id, name, status, revision, available_roles, the saved model and tier and dates; at most \
@@ -174,8 +174,8 @@ enum MCPGuideLibraryTopics {
             get_character reads one Sky Studio character; it is free.
             """),
             MCPGuideSection(name: "views", about: "views, the revision, and other accounts' ids", text: """
-            Views. It returns the character's available views (front, headshot, side, back) and its revision. An id from \
-            another account comes back as not_found.
+            Views. character_id is the full UUID from list_characters or a Character job. It returns the character's available \
+            views (front, headshot, side, back) and its revision. An id from another account comes back as not_found.
             """),
             MCPGuideSection(name: "using", about: "using a character with generate_media, and revisions", text: """
             Using it. Pass character_id to generate_media; Sky Studio uses the views directly, without downloading or uploading \

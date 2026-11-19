@@ -23,12 +23,12 @@ enum MCPGuidePaidTopics {
             clip). A job is at most 30 s including handles, at most 30 fps.
             """),
             MCPGuideSection(name: "spending", about: "price, approval, the daily limit and cancelling", text: """
-            Spending. The upscale goes beyond the draft settings, so in ask_for_approval mode it returns needs_confirmation with \
-            the price: ask the user, then repeat with confirm_token (approval_scope=project only with explicit project-wide \
-            agreement). full_access proceeds and notifies. Set user_requested_overrides=true only when the user asked for this paid \
-            upscale, and quote their words in user_request ("upscale this to 4K"); otherwise SkyCut asks anyway. The daily credit \
-            limit is a hard cap in both modes: if it blocks the job, tell the user they \
-            can raise it in Settings. cancel_job can only cancel a queued job; check the original billing afterwards.
+            Spending. The upscale goes beyond the draft settings, so in ask_for_approval mode it returns needs_confirmation with the \
+            price: ask the user, then repeat with confirm_token (approval_scope is once by default; project only with explicit \
+            project-wide agreement). full_access proceeds and notifies. Set user_requested_overrides=true only when the user asked \
+            for this paid upscale, and quote their words in user_request ("upscale this to 4K"); otherwise SkyCut asks anyway. The \
+            daily credit limit is a hard cap in both modes: if it blocks the job, tell the user they can raise it in Settings. \
+            cancel_job can only cancel a queued job; check the original billing afterwards.
             """),
             MCPGuideSection(name: "results", about: "progress fields, replacing clips, reverting and the library", text: """
             Results. It returns job_id: get_job reports phase, queue_position, transfer_percent, phase_seconds and \
@@ -52,7 +52,7 @@ enum MCPGuidePaidTopics {
             Actions. action=create makes a character from text (source_type=text with prompt and no media) or a photo \
             (source_type=reference_upload with one still image; prompt optional); import adds separate existing views (roles \
             front, side and back, headshot optional; not one sheet) with name, notes and voice_description; update renames it or \
-            edits notes and voice_description; replace_view swaps one role's image; headshot regenerates the headshot; delete \
+            edits voice_description and locale; replace_view swaps one role's image; headshot regenerates the headshot; delete \
             removes the character. Read list_characters capabilities=true first: it gives the models, limits and required roles.
             """),
             MCPGuideSection(name: "files_limits", about: "images, sizes and text limits", text: """
@@ -61,11 +61,27 @@ enum MCPGuidePaidTopics {
             comes from capabilities. model and resolution come from capabilities too; never pass aspect_ratio.
             """),
             MCPGuideSection(name: "spending", about: "which actions are paid, quotes, approval and the daily limit", text: """
-            Spending. create and headshot are paid with Sky Studio credits: quote_only=true prices them without uploading, \
-            creating, reserving or spending; then the shared approval rules and the hard daily budget apply (needs_confirmation, \
+            Spending. create and headshot are paid with Sky Studio credits: quote_only=true prices them without uploading, creating, \
+            reserving or spending; then the shared approval rules and the hard daily budget apply (needs_confirmation, \
             confirm_token, approval_scope). Other writes are free; a delete follows the permission mode and may ask first. Set \
             user_requested_overrides=true only when the user asked for it, quoting their words in user_request ("make a character \
-            from this photo"); otherwise SkyCut asks anyway.
+            from this photo"); otherwise SkyCut asks anyway. approval_scope is once by default; project needs the user's explicit \
+            approval for this exact character operation.
+            """),
+            // Moved from the parameter descriptions (2026-11-19, catalog diet); which action takes which field is
+            // SkyStudioCharacterPlan.action, the model and tier defaults SkyStudioCharacterCapabilities.select.
+            MCPGuideSection(name: "per_action", about: "which fields each action takes, defaults, recovering with resume", text: """
+            Fields by action. create: source_type, prompt, image, model, resolution, locale, quote_only, approval_scope, \
+            user_requested_overrides, user_request. import: roles, name, voice_description, notes, locale, quote_only. update: \
+            character_id, character_revision, name, voice_description, locale. replace_view: character_id, character_revision, \
+            image, role. headshot: character_id, character_revision, model, resolution, quote_only, approval_scope, \
+            user_requested_overrides, user_request (no prompt). delete: character_id, character_revision. Every action also takes \
+            idempotency_key, resume and confirm_token; any other field is refused. character_id is the full UUID of an existing \
+            character. source_type defaults from whether image is given. A created character gets the server's untitled name. model \
+            and resolution are the Character model id and tier from capabilities: the server's defaults, or for headshot the saved \
+            character's; the source and headshot shapes are fixed. quote_only prices create, headshot or import without uploading, \
+            inserting, reserving or spending. To recover a job, pass only action and resume (the original job_id): it reads the job \
+            and never charges.
             """),
             MCPGuideSection(name: "jobs", about: "idempotency_key, revisions, recovering with resume, no cancelling", text: """
             Jobs and recovery. Give create, import, headshot and replace_view a stable idempotency_key (1–128 characters) and \
