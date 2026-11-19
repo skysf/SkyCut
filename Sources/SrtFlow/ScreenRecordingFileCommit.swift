@@ -5,8 +5,11 @@ import SrtFlowCore
 //
 // 管什么：主文件、麦克风 sidecar 从隐藏的 `.partial` 临时文件变成用户看得见的文件 —— 每次 rename 之前先把意向
 // （阶段 + 最终路径）持久化，之后再推进到「已提交」（docs/architecture/screen-recording-lifecycle.md「提交 journal」）。
-// 不管什么：提交之前的验证（协调者先 probe 临时文件）、提交之后的回读和入轨（协调者）、崩溃恢复那一份提交（`commitRecovered`）。
+// 不管什么：提交之前的验证（协调者先 probe 临时文件）、提交之后的回读和入轨（协调者）、崩溃恢复那一份提交（`commitRecovered`，
+// which renames through the same `commitNew`）。
 // 2026-10-03 从 ScreenRecordingCoordinator.swift 搬出来（那个文件超过 600 行，只许降），同时加了 AI 起的录制「从不覆盖」。
+// 2026-11-19 (docs/bugfixes/2026-11-19-free-save-name-treated-as-replace-consent.md): the replacing branch is chosen by the
+// person's confirmation only, never because a file is at the name; every other commit renames without replacing.
 
 @available(macOS 15.0, *)
 struct ScreenRecordingFileCommit {
@@ -65,19 +68,24 @@ struct ScreenRecordingFileCommit {
             )
         }
 
-        var mainURL = request.outputURL
-        if !replacesExistingOutput, manager.fileExists(atPath: mainURL.path) {
-            mainURL = ScreenRecordingFileNaming.availableURL(
-                like: mainURL, isTaken: { manager.fileExists(atPath: $0.path) }
-            )
-            manifest = manifest.retargetingMain(to: mainURL.path)
-        }
-        try persist(.committingMain)
-        if manager.fileExists(atPath: mainURL.path) {
-            // 只有手动的会走到这里：主文件的覆盖是用户在 Save 面板里明确确认过的。
-            _ = try manager.replaceItemAt(mainURL, withItemAt: mainTemp)
+        let mainURL: URL
+        if replacesExistingOutput {
+            // 只有手动的会走到这里：the person confirmed replacing this very file in macOS's own save window, which asks
+            // only about a file that is there when it answers (SystemFileWindows.openSave).
+            mainURL = request.outputURL
+            try persist(.committingMain)
+            if manager.fileExists(atPath: mainURL.path) {
+                _ = try manager.replaceItemAt(mainURL, withItemAt: mainTemp)
+            } else {
+                try manager.moveItem(at: mainTemp, to: mainURL)
+            }
         } else {
-            try manager.moveItem(at: mainTemp, to: mainURL)
+            // Nobody agreed to replace anything (a free name, a typed answer, the AI's session): never replaced, not even a
+            // file that appears after the name was picked.
+            mainURL = try Self.commitNew(mainTemp, like: request.outputURL) { target in
+                manifest = manifest.retargetingMain(to: target.path)
+                try persist(.committingMain)
+            }
         }
         try persist(.mainCommitted)
 
@@ -99,15 +107,32 @@ struct ScreenRecordingFileCommit {
         }
 
         // **先冻结最终目标、写进 manifest、持久化，然后才 rename。**
-        // 顺序反了就是 journal 身份被破坏（复审二 P1-3）。
-        let target = ScreenRecordingFileNaming.availableURL(
-            like: request.microphoneURL,
-            isTaken: { manager.fileExists(atPath: $0.path) }
-        )
-        manifest = manifest.retargetingMicrophone(to: target.path)
-        try persist(.committingMicrophone)
-        try manager.moveItem(at: micTemp, to: target)
+        // 顺序反了就是 journal 身份被破坏（复审二 P1-3）。Never replaced: nobody confirmed anything for the sidecar.
+        let target = try Self.commitNew(micTemp, like: request.microphoneURL) { target in
+            manifest = manifest.retargetingMicrophone(to: target.path)
+            try persist(.committingMicrophone)
+        }
         try persist(.allCommitted)
         return Committed(manifest: manifest, mainURL: mainURL, microphoneURL: target)
+    }
+
+    /// Renames `temp` to the first free name of `like`'s series ("Name", "Name 2"…) without replacing a file: each name goes
+    /// into the journal first (`persistTarget`), and a name taken after that moves on to the next one — one rename that
+    /// fails when the name is taken (ExclusiveInstall.renameIfFree). A drive without that rename (exFAT) gets a look, then
+    /// `moveItem`, which refuses a taken name too: a file appearing in the instant between them could still be replaced. A
+    /// copy can't stand in for the rename: after a crash mid-copy the journal could not tell the half-written file at the
+    /// name from a finished one. Returns where the file went. Also the crash recovery's commit (`commitRecovered`).
+    static func commitNew(_ temp: URL, like target: URL, persistTarget: (URL) throws -> Void) throws -> URL {
+        for _ in 0..<1000 {
+            let candidate = ScreenRecordingFileNaming.availableURL(like: target, isTaken: NewFileClaim.isTaken)
+            try persistTarget(candidate)
+            if let renamed = try ExclusiveInstall.renameIfFree(temp, to: candidate) {
+                if renamed { return candidate }
+            } else if !NewFileClaim.isTaken(candidate) {
+                try FileManager.default.moveItem(at: temp, to: candidate)
+                return candidate
+            }
+        }
+        throw CocoaError(.fileWriteFileExists, userInfo: [NSFilePathErrorKey: target.path])
     }
 }

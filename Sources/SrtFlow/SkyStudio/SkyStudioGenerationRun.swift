@@ -382,10 +382,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             detail["file_content_type"] = "video/mp4"
             detail["import_note"] = "Original WebM bytes are preserved. file is an H.264/AAC editing copy because macOS cannot play this WebM; import the copy using its measured geometry/duration."
         }
-        if generation.kind.isVideo {
-            detail["note"] = .string("Generated clips may carry their own sound; it plays with the clip. "
-                + "Lower or mute the clip's volume (edit_clip) when you add your own music or narration.")
-        }
+        // Sky Studio's `audio` block and what to do before laying narration over it (MCP-42); the general note without one.
+        if generation.kind.isVideo { detail.merge(SkyStudioVideoSound.resultDetail(result)) { _, sound in sound } }
         finish(.done, "Made \(file.lastPathComponent).", detail: .object(detail))
     }
 

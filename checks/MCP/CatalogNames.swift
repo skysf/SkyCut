@@ -42,6 +42,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["max_duration", "shortened_from", "shortened_reason"])
     // Saved project ending and timed generation feedback (MCP-17 / MCP-9).
     names.formUnion(["minimum_duration", "requested_duration", "duration_warning", "duration_note"])
+    // Sky Studio's delivered-length source and a generated video's audio block (2026-11-19, MCP-9 / MCP-42; SkyStudioVideoSound).
+    names.formUnion(["duration_source", "has_track", "can_turn_off", "may_carry_bed"])
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
@@ -126,6 +128,9 @@ func catalogKnownNames() -> Set<String> {
     // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
     // ones past the cap, where the piece's own sound ends.
     names.formUnion(["strongest_accents", "more_accents", "ends_at"])
+    // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
+    // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
+    names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
     // Sky Studio's editing styles in recipes (2026-11-19, SS5 plan 5.1, AIRecipeTools): the source value and the listing line
     // sky_studio, and fetched_at on a style read from this Mac's copy.
     names.formUnion(["sky_studio", "fetched_at"])

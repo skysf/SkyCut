@@ -500,7 +500,7 @@ extension ScreenRecordingCoordinator {
     /// 1. 最终路径已有文件时**避让到空位**，不覆盖：用户在上一次会话里同意的
     ///    是那一次的覆盖，不能拿来授权这一次（复审 P1-3）。
     /// 2. **避让后的目标要先写进 manifest 再持久化意向，然后才动文件**
-    ///    —— 反过来会让账本记的路径和文件实际去处不一致（复审二 P1-3）。
+    ///    —— 反过来会让账本记的路径和文件实际去处不一致（复审二 P1-3）。Both go through `ScreenRecordingFileCommit.commitNew`.
     /// 3. **只提交实际存在的临时文件。** 主文件早已提交、只剩 mic 可救时，
     ///    无条件重新提交缺失的 main temp 会直接抛错，把整个恢复毁掉
     ///    （复审二 P1-2）。
@@ -508,7 +508,6 @@ extension ScreenRecordingCoordinator {
         let manager = FileManager.default
         var manifest = pending.manifest
         var result = pending.result
-        let isTaken: (URL) -> Bool = { manager.fileExists(atPath: $0.path) }
 
         // 纯音频恢复时主临时文件已被 probe 判为无效 —— **不能提交它**，
         // 提交等于把一个打不开的文件塞给用户（复审三 P1-3）。
@@ -519,31 +518,28 @@ extension ScreenRecordingCoordinator {
         }
         if pending.kind == .recording,
            manager.fileExists(atPath: manifest.mainTemporaryPath) {
-            let target = ScreenRecordingFileNaming.availableURL(
-                like: URL(fileURLWithPath: manifest.mainFinalPath), isTaken: isTaken
-            )
-            manifest = manifest.retargetingMain(to: target.path)
-            manifest.stage = .committingMain
-            try store.persist(manifest)      // ← 栅栏：目标已冻结并落账
-            try manager.moveItem(at: URL(fileURLWithPath: manifest.mainTemporaryPath), to: target)
-            result.mainURL = target
+            let temp = URL(fileURLWithPath: manifest.mainTemporaryPath), original = URL(fileURLWithPath: manifest.mainFinalPath)
+            result.mainURL = try ScreenRecordingFileCommit.commitNew(temp, like: original) {
+                manifest = manifest.retargetingMain(to: $0.path)
+                manifest.stage = .committingMain
+                try store.persist(manifest)      // ← 栅栏：目标已冻结并落账
+            }
             manifest.stage = .mainCommitted
             try store.persist(manifest)
         }
 
         if let micTemp = manifest.micTemporaryPath, let micFinal = manifest.micFinalPath,
            manager.fileExists(atPath: micTemp) {
-            let target = ScreenRecordingFileNaming.availableURL(
-                like: URL(fileURLWithPath: micFinal), isTaken: isTaken
-            )
-            manifest = manifest.retargetingMicrophone(to: target.path)
             // **纯 mic 用独立阶段。** 复用 `committingMicrophone` / `allCommitted`
             // 会让 `mainResolution` 无条件认定主文件已提交，而这条流程恰恰
             // 从没提交过主文件（复审四 P1-1）。
             let isMicrophoneOnly = pending.kind == .microphoneOnly
-            manifest.stage = isMicrophoneOnly ? .microphoneOnlyCommitting : .committingMicrophone
-            try store.persist(manifest)
-            try manager.moveItem(at: URL(fileURLWithPath: micTemp), to: target)
+            let micURL = URL(fileURLWithPath: micTemp)
+            let target = try ScreenRecordingFileCommit.commitNew(micURL, like: URL(fileURLWithPath: micFinal)) {
+                manifest = manifest.retargetingMicrophone(to: $0.path)
+                manifest.stage = isMicrophoneOnly ? .microphoneOnlyCommitting : .committingMicrophone
+                try store.persist(manifest)
+            }
             result.microphoneURL = target
             // 纯 mic 时 result.mainURL 原本指向那个**已经被移走**的临时 .m4a，
             // 「saved as」文案会报一个不存在的路径（复审四 P2）。

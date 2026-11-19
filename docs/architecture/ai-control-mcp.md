@@ -577,6 +577,10 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      ([case](../bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md), [export settings](export-settings.md) §5 item 8).
    - 转字幕格式当场做完：读和转和批量转换页同一个函数（`SubtitleConverter.convertedContents`，编码只走 `TextDecoding`），
      写的时候 `.withoutOverwriting`。
+   - Since 2026-11-19 the files the three tools are given are found and checked, burn_subtitles' subtitle files read and
+     convert_subtitles' files read and written off the main thread (`AIEncodeInputs`, through the probe with the folder's
+     15 s deadline); a drive that does not answer is refused with the panel's sentence before anything is queued
+     ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
 
 25. **词级时间（transcribe，第 3 块的原始数据）**：转写和生成字幕是**同一套**（`TranscriptHarvester`：定语言含自动检测、
    备模型租约、按 2 分钟一窗转写、合进按素材指纹存的缓存），缓存也是同一份 —— 用户在面板上生成过字幕的素材，AI 不用再转。
@@ -743,6 +747,18 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      (−17 LUFS, the user's call). Largest answer after it: product-promo, 32,223 characters (about 9.0 thousand tokens).
      `RecipeChecks` pins each pointer in its section (`toolRouteChecks`) and every built-in answer, card plus rules as the App encodes
      it, at ≤ 36,000 characters (`answerSizeChecks`, `recipeAnswerLimit`): new rules make room first, the line is not raised.
+   - **Sky Studio's styles and craft cards name only what SkyCut has** (2026-11-19, MCP-62, SkyCut's half). ① Sky Studio's publish
+     gate checks every published text against the vocabulary of the build users have: at each release `VERSION=x.y.z
+     scripts/export-tool-vocabulary.sh <file>` (format `skycut-tool-vocabulary/1`: every tool with the schema the App checks
+     arguments against, `MCPArgumentCheck.acceptedSchema`, and its aliases; `project`; the guide's topics and sections; every name
+     `catalogKnownNames` accepts; version, commit, the shared rules' size). Without VERSION `skycut_version` is null: not a file to
+     publish against. A result field new content uses goes into `CatalogNames.swift`, not into a list kept beside the gate.
+     ② After each publish the names-only snapshot replaces `checks/MCP/published-content-names.json` (`skycut-published-names/1`:
+     release, and per item kind, id, version and each code span or name its text uses, never the text; release null with no items
+     until the first publish). ③ `scripts/check-mcp.sh` exports the vocabulary on every PR and compares it with the live catalog
+     (`ToolVocabularyChecks`), and checks every snapshot name with the gate's rules (`PublishedNamesChecks`: the tool exists, the
+     name is its parameter at any depth, the value is one of its options and in range). A change that renames or removes a
+     published name turns red: keep the old name working, or publish content without it first and refresh the snapshot.
    - **Styles published on Sky Studio** (2026-11-19, SS-5 / MCP-61 / MCP-63; the first is `film-trailer`): nothing is bundled in the
      App. ① `recipes` lists the presets (fixed order), then Sky Studio's (in Sky Studio's order, `source: sky_studio` with `version`),
      then the user's. One the AI cannot read now has `available: false` and `why` (needs SkyCut Pro or the trial; or Sky Studio cannot
@@ -915,7 +931,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `get_job.file_content_type` 报本机格式；原单、扣退费规则照旧。完整合同和上线后人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)第十二节。
     给 AI 的英文工具说明前 512 字写清两种用途、单图输入、禁用字段及 get_job / add_clips；角度与倍率字段都进入 schema，
     没有新增别名，受清单的上限守着（当时每工具 2,048 / 全清单 110,000；2026-11-10 起名片 ≤ 450、全清单 ≤ 100,000，第一节）。
-    音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
+    Music (2026-11-19, MCP-18): the length follows each music model's `length` in `/models` (none written in SkyCut): the first model in the
+    server's order that takes it (Lyria 3 Pro: 60–180 s or its own; Stable Audio 3 Medium: an exact 1–380 s, instrumental only;
+    `exact_length=true` asks for an exact one); `instrumental=false` may carry `lyrics`. Video `audio_mode` (full / ambient / none, `none`
+    only where the model lists it) and the result's `audio` block: [Sky Studio 的任务](sky-studio-jobs.md)「Music length and video sound」.
+    结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
     真人参考拒绝和未知状态不自动切模型或重交；退款晚到只查原单。替换是新的明确操作，重新核对完整参考、规格、报价及批准。
     官方原创短片的公开 `film`、真实引用准备、报价锁定和双侧审查见 [官方原创短片](official-film.md)；普通 `quote_only` 仍不上传。
     `save_project.production` / `expected_revision` 原子作者提交一次本工程 undo；get_timeline 回传 plan、当前快照与派生待办。
@@ -1472,6 +1492,10 @@ edit_clip 2,074 字超长、清单里有汉字）。
 （走一遍真实清单：fields 写全每个参数的事实；例子、related、不含凭据，各配坏样本）、`checks/MCP/GuidePilotChecks.swift`（迁移过的工具：名片 ≤ 450 和固定说法、
 参数说明 ≤ 120 且写范围、参数定义 ≤ 4,500 字节、迁移前的原文还在、fields 切节不丢行）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
 `checks/SkyStudio/GateChecks.swift` + `checks/sky-studio-wiring.sh`（没开通也照答、不等授权）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
+
+**Sky Studio content (section 4 item 32)**: `scripts/check-mcp.sh` runs `scripts/export-tool-vocabulary.sh` on every PR;
+`ToolVocabularyChecks` compares the file with the live catalog and `PublishedNamesChecks` checks every published name
+(details and the reverse verification in the [check catalog](../testing/check-catalog.md)).
 
 **云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。
 
