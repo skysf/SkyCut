@@ -698,11 +698,11 @@ fi
 # 以前它挂在剪辑块自己身上（于是只有视频块本体能预览，标尺/空白/音频轨都没有），
 # 现在挂在容器上。两处都在的话，容器和块两圈 hover 都写 `peekTime`，谁后到谁赢
 # —— 那是竞态，不是行为。所以这里按**文件**钉：全 Sources 下只准这一个文件出现
-# 扫帧入口和 peek 的写入。
+# 扫帧入口和 peek 的写入（the DEBUG playback-start bench stands in for a hovering pointer: not a second source）。
 HOVER_FILES="$(grep -rlE '^[[:space:]]*\.onContinuousHover' --include='*.swift' Sources | sort | tr '\n' ' ' | sed 's/ $//')"
 [ "$HOVER_FILES" = "$VIEW" ] \
   || fail "扫帧入口 .onContinuousHover 出现在 [${HOVER_FILES}]，应当只有 ${VIEW}：多一处就是两圈 hover 抢着写 peekTime 的竞态"
-PEEK_FILES="$(grep -rlE '^[^/]*clock\.peek\(at:' --include='*.swift' Sources | sort | tr '\n' ' ' | sed 's/ $//')"
+PEEK_FILES="$(grep -rlE '^[^/]*clock\.peek\(at:' --include='*.swift' Sources | grep -v '/PlaybackStartScenarios\.swift$' | sort | tr '\n' ' ' | sed 's/ $//')"
 [ "$PEEK_FILES" = "$VIEW" ] \
   || fail "peek(at:) 的写入出现在 [${PEEK_FILES}]，应当只有 ${VIEW}（endPeek 不受限：收掉已经亮着的影子到处都该能做）"
 

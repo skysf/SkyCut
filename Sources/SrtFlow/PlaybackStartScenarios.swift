@@ -88,9 +88,8 @@ enum PlaybackStartScenarios {
     ) async throws {
         let previous = project.clock.player.currentItem
         project.scheduleRebuild()
-        try await PlaybackStartBench.wait("rebuilt preview item") {
-            project.clock.player.currentItem !== previous && !project.rebuildStatus.isRebuilding
-        }
+        // The rebuild attaches the item, installs the sound and starts the placement in one main-actor turn.
+        try await PlaybackStartBench.wait("rebuilt preview item") { project.clock.player.currentItem !== previous }
         try await PlaybackStartBench.wait("rebuilt and prepared paused picture at \(position)") {
             guard let displayed = probe.displayed, !project.clock.isPositioningPreview else { return false }
             return abs(displayed.timeline - position) < frame * 0.95
