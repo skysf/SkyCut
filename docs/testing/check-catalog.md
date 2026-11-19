@@ -592,3 +592,9 @@
   through) and the snapshot's shape rules on made-up snapshots (prose, unknown keys and kinds refused). Reverse (2026-11-19): with
   a snapshot of that day's card drafts, renaming add_clips' `hit_at` turned the 22 entries that use it red; dropping a tool, the
   aliases or the trim from the exporter, the array step from the reader, or the option check each turned the checks red.
+- Sky Studio's editing styles (`recipes`, SS-5): `scripts/check-sky-studio.sh` → `StyleContentChecks` (the manifest and a style with
+  checksums, both routes on the fake server with If-None-Match / 304, the copies on this Mac, `features.recipes`, the refusal text) and
+  `StyleLibraryChecks` (when the list is asked, offline copies, who may read, nothing kept when the licence ends mid-fetch, deleting
+  on licence changes); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (one list, no shadowing, `available` / `why`, the read answer
+  and its split, `version`, `save_recipe` refusals, the Settings rows); wiring in `checks/sky-studio-wiring/styles.sh`. Rules:
+  [Sky Studio account](../architecture/sky-studio-account.md), [AI control](../architecture/ai-control-mcp.md) item 32.

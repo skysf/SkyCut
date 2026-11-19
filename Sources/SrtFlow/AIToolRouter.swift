@@ -226,9 +226,9 @@ final class AIToolRouter {
         case .openFolder: return try await AIProjectTools.openFolder(args, project)
         case .readDocument: return try await AIFileTools.readDocument(args, project)
         case .skycutGuide: return try AIGuideTools.guide(args)
-        case .recipes: return try AIRecipeTools.recipes(args)
+        case .recipes: return try await AIRecipeSkyStudio.recipes(args)
         case .saveRecipe:
-            let result = try AIRecipeTools.save(args)
+            let result = try await AIRecipeSkyStudio.save(args)
             AIRecipeLibrary.shared.refresh()
             return result
         case .manageFiles: return try AIFileTools.manageFiles(args, project)

@@ -1028,7 +1028,13 @@
 "Editing styles" = "Editing styles";
 "Open Folder" = "Open Folder";
 "Show the folder with your own editing styles in Finder" = "Show the folder with your own editing styles in Finder";
-"When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here." = "When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here.";
+"AI picks one of these when it edits a whole video, and follows the one you name. Ask it to save a style you like as your own." = "AI picks one of these when it edits a whole video, and follows the one you name. Ask it to save a style you like as your own.";
+"Preset style" = "Preset style";
+"Sky Studio · %@" = "Sky Studio · %@";
+"Sky Studio · needs SkyCut Pro" = "Sky Studio · needs SkyCut Pro";
+"Sky Studio's editing styles come with SkyCut Pro or the SkyCut trial" = "Sky Studio's editing styles come with SkyCut Pro or the SkyCut trial";
+"Your style" = "Your style";
+"A Sky Studio style has this name, so AI follows that one. Rename this file to use yours." = "A Sky Studio style has this name, so AI follows that one. Rename this file to use yours.";
 "Replaces the preset style" = "Replaces the preset style";
 "Open this style's file in Finder; any text editor can change it" = "Open this style's file in Finder; any text editor can change it";
 "Move this style to the Trash" = "Move this style to the Trash";
