@@ -163,6 +163,7 @@
 - [2026-09-29 婚礼工程之后的五处工具小毛病](2026-09-29-mcp-tool-followups-from-wedding-session.md) — 共用串行槽的任务取消要分清谁的；整批拒绝要说「一个都没做」。
 - [2026-11-03 MCP 最小示例与真实参数提示](2026-11-03-mcp-usage-guidance.md) — 示例要过参数定义的校验；写错的参数名在结果里提示对的。
 - [2026-11-10 实测证据里漏了本机路径](2026-11-10-measurement-evidence-local-paths.md) — 脱敏按形状换（临时目录、家目录）；进仓库的证据有守卫扫。
+- [2026-11-20 The merge slot called a workflow change a conflict](2026-11-20-merge-slot-cannot-write-workflow-files.md) — The workflow token can't write .github/workflows/: list what a bot token may not do before giving it a person's job, and show the platform's message, not one meaning per status.
 - [2026-11-20 The merge slot waited forever on GitHub's stale test merge](2026-11-20-merge-slot-waits-for-stale-test-merge.md) — GitHub recomputes a PR's test merge for new commits, not when main moves: build the merge you test yourself, and make the fake copy the quirk.
 - [2026-11-19 A merged translation was kept or deleted by its first original alone](2026-11-19-merged-translation-follows-first-source-only.md) — A reader that takes `.first` of a list assumes one element: test it with the operation that makes the list longer, and check head and tail trims as a pair.
 - [2026-09-26 播放中按 Return，App 在音频线程上崩溃](2026-09-26-meter-crash-on-go-to-start.md) — 从平台回调拿来的时间，当下标之前先问会不会是负的。
