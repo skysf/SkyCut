@@ -134,6 +134,7 @@
 - [2026-10-15 裁掉说的话的字幕留在原地、和下一句叠](2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md) — 一条规矩的理由只对一类东西成立时，别照搬给另一类。
 - [2026-10-15 换源之后压在上面的东西被挪了一个偏移](2026-10-15-linkage-follows-source-shift-after-swap.md) — 同 id 换素材按改之前的素材和入点记账（`Piece.rebased`）。
 - [2026-10-15 联动把字幕当一整块挪](2026-10-15-linkage-moves-subtitles-as-a-block.md) — 字幕句两头各自换算（`LinkageCueFollow`）；判「还剩多少」要量对东西。
+- [2026-11-19 listen cuts=true reports music, effect and noise-floor cuts as on speech](2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md) — When one tool moves to better evidence, the tool sharing its old step moves too; a level says sound, never speech.
 - [2026-10-16 listen cuts=true 建议的那一格，照做后又被报成切到字](2026-10-16-listen-cuts-suggested-spot-reported-on-speech.md) — 检查类的工具要和自己的建议闭环。
 - [2026-11-03 文件 listen 的短区间仍读整条音轨](2026-11-03-listen-file-range-reads-whole-audio.md) — 给了源范围就用原生 timeRange 有界读取。
 - [2026-11-13 文件 listen 的区间自检在机器满载时等不到 2 秒的截止时间](2026-11-13-listen-range-checks-timed-out-under-load.md) — 自检传给生产入口的期限只拦卡死、要证明的事数出来；一个文件里对着墙上时钟的期限一起改，别只修红过的那条。
@@ -269,6 +270,7 @@
 - [2026-08-12 字幕编辑复审的六条后续](2026-08-12-subtitle-editing-review-followups.md) — 视图里的草稿会被「先写盘再销毁视图」漏掉；CAS 基线必须是会话快照。
 - [2026-08-12 字幕三入口首测](2026-08-12-subtitle-editing-surfaces-smoke-fixes.md) — `HSplitView` 不保护最后一栏；临时行不能给自己上焦点。
 - [2026-08-22 带空 cue 的工程字幕文件导不出](2026-08-22-subtitle-export-empty-cue-verification.md) — 「哪些 cue 会被写出去」只能是序列化器一份账；cue 文本先消毒空行。
+- [2026-11-19 The export panel's subtitle files could replace a file the replace question never listed](2026-11-19-subtitle-export-replaces-unlisted-file.md) — A confirmation covers the items it named: carry one decision per file through to the write and give everything else the write that never replaces.
 - [2026-10-15 没记语言的字幕轨，导出的文件名不带语言标签](2026-10-15-subtitle-file-export-missing-language-tag.md) — 语言按文字判 → 记的 → 省略，只有 `SubtitleFileLanguage` 一份。
 - [2026-08-06 字幕生成复审](2026-08-06-subtitle-generation-review.md) — 切窗、身份、取消、账本与缓存。
 - [2026-09-26 藏起来的片段照样被转写成字幕](2026-09-26-subtitle-generation-transcribes-hidden-clips.md) — 「复刻某某合同」的副本会漏：调同一个 `ClipVisibility.visible`。

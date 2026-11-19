@@ -443,6 +443,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `suggested_source_out`（= cut_speech 落刀的地方、对齐到工程的帧，换回这一段 V1 片段自己的源时间，AI 直接拿去 edit_clip；落到素材外面的不给）。
      转写**只读缓存、不起任务**（listen 是只读工具），没有就说一句；波形要读完整个文件，没读完的那几头报「还在读」；一个素材文件只听一遍；一次最多
      80 个剪辑点。纯值在 `checks/MCP/CutCheckChecks.swift`、`checks/MCP/SpeechHearingChecks.swift`（L16 原片真量的电平），接线扫描在 `checks/MCP/listen-wiring.sh`。
+     **Since 2026-11-19 (MCP-14) speech needs evidence** (`AICutCheck.speechJudged`, the rule inspect_video's `audio_cutoff` uses:
+     `AIInspectionSpeech`): a side the levels put on speech stays `on_speech` only where the sound clip's cached transcript has a word
+     or narration subtitles a line; otherwise it is `on_sound` with no suggestion (music, an effect, ambience, a noise floor), its clip
+     listed in `speech_unchecked` when there is no evidence at all, and `file_edge` at the file's own first or last second (nothing is
+     cut). The result counts `on_speech` and `on_sound` apart ([case](../bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md)).
    - **混在一起之后的声音（`mix=true`，2026-11-16，待办总清单 MCP-3、MCP-10）**：前面几种都是一段一段各量各的、0.5 秒一格；`mix=true`
      量整条混音和每一层、到帧，用的是 SkyCut 自己的音频引擎按层离线渲（和成片同一份配置、同一套限幅和响度量法，合同在
      [成片的声音](export-audio-mixdown.md)第五节）。参数：`from` / `to`（时间线秒，落在帧上，不给就是整条）；`layers`（一项一层：`A1`、
@@ -762,6 +767,22 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      (`ToolVocabularyChecks`), and checks every snapshot name with the gate's rules (`PublishedNamesChecks`: the tool exists, the
      name is its parameter at any depth, the value is one of its options and in range). A change that renames or removes a
      published name turns red: keep the old name working, or publish content without it first and refresh the snapshot.
+   - **Styles published on Sky Studio** (2026-11-19, SS-5 / MCP-61 / MCP-63; the first is `film-trailer`): nothing is bundled in the
+     App. ① `recipes` lists the presets (fixed order), then Sky Studio's (in Sky Studio's order, `source: sky_studio` with `version`),
+     then the user's. One the AI cannot read now has `available: false` and `why` (needs SkyCut Pro or the trial; or Sky Studio cannot
+     be reached and this Mac has no copy); the listing's `sky_studio` line says where that part came from (checked just now / this
+     Mac's copy from a date / unreachable). ② Reading one needs `features.recipes` (Pro and the trial). A refusal reads like the MCP
+     gate's and says the presets and the user's own still work (`SkyCutGates.styleRefusal`, asked through
+     `SkyStudioAccount.styleRefusal`). The answer adds `version`, `sha256`, and `cached` + `fetched_at` when it is this Mac's copy;
+     `version` reads another published version (`latest` = the current one) and only Sky Studio styles take it. ③ The style is
+     followed by the shared rules when both fit 36,000 characters (`AIRecipeTools.answerLimit`); otherwise it comes alone and whole,
+     with `next_step` pointing at `recipes id=shared-rules` (Sky Studio's publishing gate keeps a style ≤ 12,000, so that always fits).
+     ④ No user file shadows one: a user style with its id or title is left out of the AI's list and shown in Settings with a rename
+     hint; a Sky Studio style with a preset's id is left out; `save_recipe` refuses their ids and titles (presets stay saveable).
+     ⑤ Settings → Editing & Voices → Editing styles lists every source (Preset style; Sky Studio · version, or · needs SkyCut Pro,
+     without Show in Finder / Delete; Your style); AI still picks, the user names one in words. The answers are pure
+     (`AIRecipeSkyStudioPart` gathered first by `AIRecipeSkyStudio`); `RecipeSkyStudioChecks` builds those parts by hand. Fetching,
+     copies on this Mac and who may read them: [Sky Studio account](sky-studio-account.md), "Sky Studio's editing styles".
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -1357,6 +1378,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     whose own rumble covers a voice line while its low hits must keep their weight. One parameter on `edit_clip` / `edit_clips`
     (requested / applied; out of range refused with a suggestion), shown in get_timeline; the engine runs it in the render
     block, so preview, export and `listen mix=true` agree (`listen clip_id` and the waveform show the clip before it).
+67. **A clip's saved sound role: `edit_clip` `sound_role`** (2026-11-19, MCP-40; contract in [finished-video inspection](finished-video-inspection.md),
+    "Saved sound roles"): voice, music, effects, ambience or object saved on the clip (`EditClip.soundRole`, project format v39) for
+    inspect_video's sound checks, so a role SkyCut can't infer is said once instead of in `sounds` on every call (`sounds` still wins
+    for that call); `auto` clears it. One parameter on `edit_clip` / `edit_clips` (vocabulary `MCPVocabulary.soundRoles` =
+    `ClipSoundRole` + auto, reconciled in `SoundRoleToolChecks`), one undo step, shown in get_timeline and the reply; it changes no
+    sound and never rebuilds the preview. It waited for the tool catalog's room (#511).
 
 ## 五、这一轮、停止、撤销这一轮
 
@@ -1637,6 +1664,11 @@ project's distinct on-screen clip and picture, cancellation / Stop, explicit-pro
       转场不是全叠化、不是每个镜头都慢推、字不是都卡在切点上出；导出前说了做了哪几项「交片前再看一遍」。
 - [ ] 跟 AI 说「以后都这么剪，存成我的剪辑风格，叫课程推广」：设置 → 剪辑与声音 的「剪辑风格」里出现这一行，「在 Finder 中显示」打开的 .md 读得懂；
       再让它改这一套：废纸篓里有旧的那份；点「删除」之后那一行没了，文件在废纸篓里。
+- [ ] Sky Studio styles (item 32, after one is published): with a Pro or trial key, ask for a story trailer from a footage folder.
+      AI names the style and its version; Settings → Editing & Voices lists it as "Sky Studio · <version>" between the presets and
+      your own, in English, 简体中文 and Español at the default window size. Offline after one read it reads this Mac's copy
+      (`cached`, `fetched_at`); asking it to save the style under its own name is refused. With an account without
+      `features.recipes` the row says "needs SkyCut Pro" and reading it is refused with what to do.
 - [ ] 电影开头的上下黑条（实心长方形）：预览和导出的成片里都是整块黑、上下一样高；检查器里「实心」开关打开时线宽那一行消失。
       用 0.16.1 打开这个工程：因为是 v24，它拒绝打开，不会把黑条悄悄变成一圈描边。
 - [ ] 让 AI 加一个从 0 滚到 10,000+ 的数字：预览里老虎机滚到位；让它「变回文字」之后画面上留着「10,000+」。

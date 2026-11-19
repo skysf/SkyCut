@@ -14,6 +14,7 @@ func runCutCheckChecks() {
     checkCutDipInWordTail()
     checkCutLinkedSound()
     checkCutJSON()
+    checkCutSpeechEvidence()
 }
 
 private func checkCutBoundaries() {
@@ -224,4 +225,72 @@ private func checkCutJSON() {
     let unheard = AICutCheck.json(AICutCheck.Side(clipID: a.id, end: .end, at: 4, verdict: .unheard("muted: nothing to hear at this cut")), ids: ids)
     checkEqual(unheard["status"]?.stringValue, "unheard", "a side that could not be heard")
     check(unheard["note"]?.stringValue?.hasPrefix("muted") == true, "…says why")
+}
+
+/// MCP-14 (2026-11-19): a side the levels put on speech is judged on speech evidence the way inspect_video does
+/// (AIInspectionSpeech): no transcript and no narration subtitles → on_sound, the clip unchecked, no suggestion; a transcript word
+/// or a narration line at that source second → on_speech; a transcript without a word there (music, an effect, a noise floor) →
+/// on_sound; the file's own first or last second → file_edge. Before, all of these but the word were on_speech with a suggestion
+/// (docs/bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md).
+private func checkCutSpeechEvidence() {
+    let frame = 1.0 / 24
+    let soundOnly = AISpeechCutPoints(words: [], levels: cutLevels(from: 40, to: 43.2, loud: [40...41.48, 41.96...42.48]), silenceDB: -40)
+    let late = videoClip(10, 2, sourceStart: 42.1)
+    let onSound = AICutCheck.side(of: late, end: .start, at: 10, sound: late, points: soundOnly)
+    guard case .onSpeech = onSound.verdict, onSound.suggestedSource != nil else {
+        return check(false, "the levels alone put a head at source 42.1 on sound with a suggestion (got \(onSound.verdict))")
+    }
+    let unknown = AICutCheck.speechJudged(onSound, sound: late, words: nil, subtitles: nil, tolerance: frame)
+    checkEqual(unknown.side.verdict, .onSound(checked: false), "no transcript, no narration subtitles: on_sound, never on_speech")
+    check(unknown.unchecked && unknown.side.suggestedSource == nil && unknown.side.suggestedAt == nil,
+          "…its clip goes to speech_unchecked and nothing is suggested")
+
+    let word = AICutCheck.speechJudged(onSound, sound: late, words: [TimedWord(text: "When", start: 41.96, end: 42.3)],
+                                       subtitles: nil, tolerance: frame)
+    checkEqual(word.side.verdict, .onSpeech(word: "When", why: onSoundWhy(onSound)), "a transcript word at that moment: on_speech, naming it")
+    check(!word.unchecked && word.side.suggestedSource == onSound.suggestedSource, "…with the same suggestion as before")
+
+    let music = AICutCheck.speechJudged(onSound, sound: late, words: [TimedWord(text: "later", start: 50, end: 50.4)],
+                                        subtitles: nil, tolerance: frame)
+    checkEqual(music.side.verdict, .onSound(checked: true), "a transcript with no word at that moment (music, an effect, a noise floor): on_sound")
+    check(!music.unchecked && music.side.suggestedSource == nil, "…not unchecked, no suggestion")
+
+    let narrated = AIInspectionSpeech.Subtitled(lines: [.init(span: 41.9...42.5, text: "When I got")], heard: [40...44])
+    let line = AICutCheck.speechJudged(onSound, sound: late, words: nil, subtitles: narrated, tolerance: frame)
+    guard case .onSpeech(let said, _) = line.side.verdict else { return check(false, "a narration line over it: on_speech (got \(line.side.verdict))") }
+    checkEqual(said, "When I got", "…naming the line")
+    let elsewhere = AIInspectionSpeech.Subtitled(lines: [.init(span: 1...2, text: "Earlier")], heard: [0...3])
+    checkEqual(AICutCheck.speechJudged(onSound, sound: late, words: nil, subtitles: elsewhere, tolerance: frame).side.verdict,
+               .onSound(checked: false), "subtitles heard only elsewhere in the file say nothing here: unchecked on_sound")
+
+    let fromStart = videoClip(10, 2, sourceStart: 0)
+    let opening = AISpeechCutPoints(words: [], levels: cutLevels(from: 0, to: 3, loud: [0...3]), silenceDB: -40)
+    let head = AICutCheck.side(of: fromStart, end: .start, at: 10, sound: fromStart, points: opening)
+    checkEqual(AICutCheck.speechJudged(head, sound: fromStart, words: nil, subtitles: nil, tolerance: frame).side.verdict, .fileEdge,
+               "a head at the file's own first second cuts nothing: file_edge (a sound effect, a narration file, music from 0)")
+    let toEnd = videoClip(0, 2, asset: 60, sourceStart: 58)
+    let ending = AISpeechCutPoints(words: [], levels: cutLevels(from: 57, to: 60, loud: [57...60]), silenceDB: -40)
+    let tail = AICutCheck.side(of: toEnd, end: .end, at: 2, sound: toEnd, points: ending)
+    checkEqual(AICutCheck.speechJudged(tail, sound: toEnd, words: nil, subtitles: nil, tolerance: frame).side.verdict, .fileEdge,
+               "a tail at the file's own last second: file_edge")
+    let pause = AICutCheck.side(of: videoClip(10, 2, sourceStart: 41.7), end: .start, at: 10, sound: videoClip(10, 2, sourceStart: 41.7), points: soundOnly)
+    checkEqual(AICutCheck.speechJudged(pause, sound: late, words: nil, subtitles: nil, tolerance: frame).side.verdict, .inPause,
+               "a side in a pause passes through unchanged")
+
+    var state = TimelineState()
+    state.mainClips = [late]
+    let ids = AIShortIDs(state: state)
+    let json = AICutCheck.json(unknown.side, ids: ids)
+    checkEqual(json["status"]?.stringValue, "on_sound", "on_sound is its own status")
+    check(json["why"]?.stringValue?.contains("transcribe") == true && json["word"] == nil && json["suggested_source_in"] == nil,
+          "…saying to transcribe, with no word and no suggestion")
+    checkEqual(AICutCheck.json(AICutCheck.Side(clipID: late.id, end: .start, at: 10, verdict: .fileEdge), ids: ids)["status"]?.stringValue,
+               "file_edge", "file_edge is its own status")
+    let edges = [AICutCheck.Edge(at: 10, outgoing: music.side, incoming: word.side)]
+    check(AICutCheck.onSpeechCount(edges) == 1 && AICutCheck.onSoundCount(edges) == 1, "on_speech and on_sound are counted apart")
+}
+
+private func onSoundWhy(_ side: AICutCheck.Side) -> String {
+    if case .onSpeech(_, let why) = side.verdict { return why }
+    return ""
 }

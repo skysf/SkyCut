@@ -1028,7 +1028,13 @@
 "Editing styles" = "剪辑风格";
 "Open Folder" = "打开文件夹";
 "Show the folder with your own editing styles in Finder" = "在访达里打开放你自己剪辑风格的文件夹";
-"When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here." = "AI 剪整条片子时，会照 SkyCut 的一种预设风格来剪（带货、电影开头、科幻、纪录片、vlog）。喜欢哪种风格，让它存成你自己的剪辑风格，就会出现在这里。";
+"AI picks one of these when it edits a whole video, and follows the one you name. Ask it to save a style you like as your own." = "AI 剪整条片子时从这里挑一种剪辑风格；你点名哪一种，它就照哪一种剪。喜欢哪种风格，让它存成你自己的。";
+"Preset style" = "预设风格";
+"Sky Studio · %@" = "Sky Studio · %@";
+"Sky Studio · needs SkyCut Pro" = "Sky Studio · 需要 SkyCut Pro";
+"Sky Studio's editing styles come with SkyCut Pro or the SkyCut trial" = "Sky Studio 的剪辑风格随 SkyCut Pro 或 SkyCut 体验期提供";
+"Your style" = "你的风格";
+"A Sky Studio style has this name, so AI follows that one. Rename this file to use yours." = "Sky Studio 有同名的剪辑风格，AI 会照那一个剪。把这个文件改个名字，才会用你的。";
 "Replaces the preset style" = "替换了同名的预设风格";
 "Open this style's file in Finder; any text editor can change it" = "在访达里显示这个风格的文件，用任何文本编辑器都能改";
 "Move this style to the Trash" = "把这个风格移到废纸篓";

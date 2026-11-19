@@ -27,7 +27,7 @@ SwiftUI `Settings` 场景只装 `SettingsWindowView().appLanguage()`；工具栏
 | --- | --- | --- |
 | general | 通用 | AppLanguagePicker / AppLanguageStore；AppThemePicker / AppThemeStore |
 | ai | 连接 AI | AIConnectSection / AIClientSetup / AIReadGrants |
-| editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary；KokoroVoiceSettingsRow / KokoroVoicePack；VoiceLibrarySettingsSection / VoiceLibraryStore（声音库：我的声音、新建 / 设计、浏览预设，见[声音库](voice-library.md)第九节） |
+| editing | 剪辑与声音 | AIRecipesList / AIRecipeLibrary (every editing style with its source: presets, Sky Studio's, the user's own; [AI control](ai-control-mcp.md) item 32)；KokoroVoiceSettingsRow / KokoroVoicePack；VoiceLibrarySettingsSection / VoiceLibraryStore（声音库：我的声音、新建 / 设计、浏览预设，见[声音库](voice-library.md)第九节） |
 | cache | 媒体缓存 | OptimizedMediaSettingsSection / OptimizedMediaCacheSettings |
 | sky_studio | Sky Studio | SkyStudioSettingsSection / SkyStudioAccount / SkyStudioSpendStore |
 

@@ -310,7 +310,9 @@ rendered music at 24 kHz with it too, `startsAtSilence` false and kept above −
    1:18.44 cut (covered by one accent in #481's run; the research's list puts it at 1:18.51, +2 frames, but read
    sample-accurately from the clip's source window the music's nearest accent is about 135 ms before the cut): the old reading
    −3.2 frames, the new −2.7 frames at 24 fps — a cover at the ±3-frame edge can move either way by the 21 ms. #481's own run
-   could not be repeated here (its harness is not in the repo): re-run it when its project copy is at hand.
+   could not be repeated here (its harness is not in the repo): re-run it when its project copy is at hand. Re-run on 2026-11-19
+   with this reading (the same local harness and project copy, nothing committed): still exactly one cut jump (0:10.00, +11.6 dB),
+   and 1:18.44 is still covered by a music accent ([finished-video inspection](finished-video-inspection.md), acceptance).
 3. Stops (`MusicStops`): quiet = more than 20 dB under the playing level. A stop is quiet for at least 0.5 s, at least 40 dB
    under somewhere inside, with music before and after; it runs from its first quiet step to where the music comes back: the
    accent that brings it back when one falls within 0.2 s of the first loud step, otherwise that step's start. The 40 dB rule

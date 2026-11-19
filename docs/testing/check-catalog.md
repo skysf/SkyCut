@@ -80,6 +80,7 @@
   Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
   Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so) ([export settings](../architecture/export-settings.md) §5 item 6; `ExclusivePlacement` itself is in `SrtFlowCoreChecks`).
   Since 2026-11-19 also the export panel's write target (`PanelTargetChecks`): a folder taken while Export is pressed, with its check and the old folder's back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly it; an export nobody was asked about never replaces a file that appears during it ([export settings](../architecture/export-settings.md) §5 item 7).
+  Its subtitle files (`SubtitlePanelChecks`, since 2026-11-19), through the button's work (`SubtitleFilesWrite`: `request`, then the question's `replace`): Replace replaces only the files the question named; a VTT made while the question about the SRT is open, or a file a stale listing missed, keeps its bytes and is said ([export settings](../architecture/export-settings.md) §5 item 7).
   Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
   Their names and folders off the main thread (`EncodeOffMainChecks`, since the same day): a taken name is passed once the folder's names are back (adding, another output folder), a fake drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with the panel's sentence, nothing queued and no job ([case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)).
   The files the AI encode tools are given (`EncodeInputsOffMainChecks`, since the same day; a recording fake drive): `compress_videos` and `burn_subtitles` look at them through the probe, `burn_subtitles` reads a slow subtitle file and `convert_subtitles` reads a slow one and writes the new one there, never on the main thread (longest main-thread gap under 0.5 s), and a file on a drive that never answers, or a read that never comes back, is refused at the deadline ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
@@ -105,6 +106,13 @@
   `DeliveryEdgeChecks` (2026-11-19, review CXR2) adds one short real job for a one-frame head and tail at 60 fps, and checks
   picture cuts under a transparent or fading upper clip and the linger cap inside a range through the production preparation;
   `SRTFLOW_INSPECTION_CASE=edges` runs only these.
+  MCP-40's remaining rows and saved sound roles (2026-11-19): `MusicRowRuleChecks` (music dropping out, late, no score, the no-music
+  hint, hard music edges, abrupt sounds, the 0.1 s cells, `sounds` over a saved role over provenance, each on both sides of its line)
+  and `MusicRowChecks` (the real `AIDeliverySound.prepare` on synthetic sound with saved roles); `SoundTierChecks`' jobs also report
+  late music and a bed stopping hard. `SRTFLOW_INSPECTION_CASE=music` runs the first two; saved roles in the project file are
+  `scripts/check-project-file.sh` group 52 (v39, the key only when saved, an unknown value read as nothing saved, split, separated sound,
+  a role-only change taking the audio-mix path). `edit_clip sound_role`: `scripts/check-mcp.sh` → `SoundRoleToolChecks` (reading,
+  save / auto, summary, refusals, the vocabulary = `ClipSoundRole` + auto); `MusicRowChecks` saves its roles through the real edit_clip.
 
 - A project's own file written off the main thread (2026-11-19): `scripts/check-project-saves.sh` (real App objects in an isolated bundle, temporary projects, shard 1; a fake drive that holds each write until the check lets it go, never longer than 3 s, or fails): the autosave with the main thread free, flush / ⌘S answering "not responding" at the deadline and landing later, an edit during a write keeping the project dirty, saves coalesced while one is held, a failing drive refused, a moved project file followed, switching away / Save As / the AI's save_project with a stuck drive, `closesAtOnce`, and Quit (a quiet wait, one question when asked twice, Don't Quit / Quit Anyway / a write ending while asking). `checks/file-io-off-main-wiring.sh` pins that production code never calls the blocking saves. Rules and reverse verification: [project file](../architecture/video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md).
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
@@ -120,8 +128,9 @@
 - 全部自动检查：`scripts/check-all.sh`。CI 在每个 PR 上运行同一入口：
   `.github/workflows/checks.yml`，按 `--shard N --of 5` 分到 5 台免费的 macOS runner 上并行跑，
   由一个叫 `check-all` 的汇总 job 给结论（分组、组数校验、汇总 job 为什么不能被跳过，见
-  [构建与打包「CI」一节](../build/build-and-packaging.md)）。新加检查要放进某个 `shard`：要链接完整 App 目标文件的
-  放第 1 组（只有那台编了完整 App），别的放第 2–5 组里最空的那组；文档里提到检查时别写组号（分组只以 check-all.sh 为准）。
+  [构建与打包「CI」一节](../build/build-and-packaging.md)）。A new check goes in a `shard`: one that links the full App
+  in shards 1–3 (they build it; shard 1 is the light graphical shard), any other in the emptiest of shards 2–5. Docs
+  never name a check's shard (only check-all.sh says).
 - 核心库：`swift run --arch arm64 SrtFlowCoreChecks`（含字幕折行的文字规矩 `SubtitleRowBreakChecks`：中日文的词在哪、能在哪儿断、断在哪好；含逐词高亮：词对到去完标点的字上、此刻亮哪个、跟着编辑走、按词切段、ASS 标签，`SubtitleWordChecks`）。
   Since 2026-11-19 also how a new file takes its name (`ExclusivePlacementChecks`, [export settings](../architecture/export-settings.md) §5 item 9): real folders with each install step forced in turn (exclusive rename, hard link, `O_EXCL` copy) and a real exFAT disk image the check makes and attaches (it fails, not skips, when `hdiutil` can't): a name taken before or while the file is written keeps its bytes, an empty file at the name survives a failed write, a set takes back what it took and moves on whole, a series counts on from its number, nothing private is left. The subtitle export planner's checks moved to `SubtitleExportPlannerChecks.swift`.
 - 生成的字幕长什么样（去标点、断句、一行多长、显示时间、几段素材同时有字只留一条，用例是用户工程里真实转写出来的句子）：
@@ -294,7 +303,7 @@
   set_text 补的零件（字距、动画时长、强调、数字滚动）和实心形状、add_voiceover（挑声音、语速表、标记 → 词、配音的字幕不覆盖已有的）、
   字幕的 style（只改工程自己的样式、给了位置收掉拖框的布局、逐词高亮的开关和倍数、烧录用不了的字体报错、烧录一批自带的样式）、
   扫画面里的字（字幕带、固定的字、满屏的字互不混，字幕带的框不被贴在字幕上面的幻灯片标题拉大、被画面底边切掉的字不算字幕行、字幕稀疏而幻灯片字多时仍选字幕，没人字多按字对准）；**合成音效**（16 个预设的结构自检：峰值 / 响度 / 落点 / 末尾 / 确定性 / 同参数同文件名 / 频谱走向、`sound_effect` 条目怎么读、落点怎么算开头、词表对账；扫描：写文件只经 `AIAudioFileWriter`、渲染在 `MediaReadQueue.analysis` 上）：
-  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
+  `scripts/check-mcp.sh`；**录屏**（参数怎么读、窗口 / 屏幕 / 麦克风怎么挑、区域的比例换成点、词表和 `RegionAspectRatio` 对账，`ScreenRecordingToolChecks`）也在这里；**几个工程、几个会话**（小程序记一组工程、真起小程序验子代理各带各的 `project`、每个工具碰不碰 / 收不收 `project`，`ProjectBindingChecks`；落在哪 / 归谁 / 什么时候拒、5 分钟放手、到顶列出能关的，`ProjectTargetingChecks`）也在这里；**App 卡住的时候**（什么时候放弃、怎么说、放弃了的不做，真起小程序接卡死 / 忙的假 App，`HangChecks`）也在这里；**画面多大**（导出报成片的宽高帧率、look 报文件本身的尺寸，`VideoSizeChecks`）也在这里；**导出字幕文件**（写哪几条轨、`<名字>.<语言>.srt`、撞名整组加编号从不覆盖，`SubtitleFileChecks`）也在这里；**一次查完 V1 的剪辑点**（listen cuts=true：每一段的头尾都是剪辑点、挨着的合成一个、跨转场带 transition、开着缝的各报各的，在它声音的源时间轴上判、建议换回这一段自己的源时间，`CutCheckChecks`；since 2026-11-19 speech needs evidence like inspect_video's (on_sound / file_edge / speech_unchecked, `checkCutSpeechEvidence`)；**判的输入和 cut_speech 同一份**（`AISpeechHearing`：整个文件的电平、门限、词），L16 原片真量的电平上两边判得一样、建议就是 cut_speech 的落点，`SpeechHearingChecks`）也在这里；**参数名按说明核对**（说明上没有的名字整个调用不做、里层也查、每个工具说明上的全部名字都过，`ArgumentCheckChecks`；核对在路由排队之前，`checks/MCP/router-wiring.sh`）也在这里。
 - 声音怎么过一刀（`set_transition` 的 `sound`）：`scripts/check-mcp.sh` 的 `CutSoundChecks` / `CutSoundLevelChecks` —— 七种过法的时间、渐变、轨道、增益逐项断言，场景含余料不够（整个不做、报最多几帧）、两边是同一素材、切点在转场上、另一头有转场、磁吸开着、联动开着、上层轨、几刀一起、参数核对、词表对账、默认帧数、结果的样子；提交包在 step 里（`checks/MCP/router-wiring.sh`）; the 2026-11-16 decisions in `CutSoundDecisionChecks` (equal-power crossfades within 0.5 dB of flat, the bed raised before any side is lowered, gain brings the louder side down)。规矩见 [声音怎么过一刀](../architecture/cut-sound.md)。
 - 动效预设（set_text 的 `motion_preset`；在 `scripts/check-mcp.sh` 的 `MotionPresetChecks` 和它编译之前的扫描）：三套各自的几块、时间和动画，框按墨迹框住、竖屏按短边、换一套字不变、`hit_at` 整套挪、标题动了别的跟着走、粘贴自成一组、存盘往返；界面上改字的两个入口都经 `MotionPresetGroups.update`、粘贴换新组号（扫描）。规矩见 [动效预设](../architecture/motion-presets.md)。
 - Times in every tool: `scripts/check-parameter-limits.sh` → `TimeBoundChecks` / `TimeBoundCatalog`. The catalog walk: every number
@@ -413,8 +422,11 @@
 - 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来（不挂在页面的 `onAppear` 上），剪辑页和 AI 的字幕样式都经
   `subtitleStyle(appWide:)`（工程自己的样式优先）：`checks/encode-settings-memory.sh`。
 - 构建日志不得被吞：`checks/no-swallowed-build-output.sh`。
-- CI 的 `.build` 缓存：key 和 restore-keys 带检出目录（`github.workspace`，仓库改名 / 换目录后不捡旧目录编的缓存）、工具链指纹、组号和提交，
-  取 / 存分开且同一个 key、只在 main 上绿了才存、编译之前修改时间按内容设（`scripts/ci-stable-mtimes.py`）：`checks/ci-build-cache-key.sh`；
+- CI 的 `.build` 缓存：key 和 restore-keys 带检出目录（`github.workspace`，仓库改名 / 换目录后不捡旧目录编的缓存）、工具链指纹和提交;
+  one full-App cache for every shard (`-app-`, never the shard number; the first restore key is the key without the
+  commit, any other one a prefix for the same checkout and toolchain), restore and save separate with the same key,
+  saved on main only by the shard with the dedicated App build in the step right after it, file times set from content
+  before compiling (`scripts/ci-stable-mtimes.py`): `checks/ci-build-cache-key.sh`；
   按内容设的时间比上次编译早时照样重编（不拿旧目标文件测新代码）、新 checkout 放回 `.build` 重编 0 样，在小包上真走一遍：`scripts/check-ci-build-cache.sh`。
 - CI 的「只改了文档」快速通道（`scripts/ci-docs-only.sh` 判：只有 `docs/` 和根目录三份说明才算，改名算删旧加新；是就只跑扫描守卫）
   只在真的只改了文档时走、每一步重活都看判断的结论、触发条件里不许有 paths（必需的 check-all 会永远等不到结论）：`checks/ci-docs-only.sh`。
@@ -427,8 +439,15 @@
   (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
   It also constructs a docs-only merge after concurrent code lands: both push gates must return false, even with a
   matching scan-only PR marker. Docs-only PRs keep the fast path; code merges keep full-PR exact-tree reuse.
-- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿），
-  以及第 1 组正好是「完整 App」那一摊（App 编得过 + 链接完整 App 目标文件的检查，这种检查也只许在第 1 组）：`checks/check-all-shards.sh`。
+- `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）;
+  every run_check command exactly once; every `scripts/check-*.sh` named by check-all or a workflow step, or listed
+  in the guard as deliberately local (graphical session, real keychain), and every `*Checks` executable and
+  `checks/*/*Checks.py` named by check-all; full-App checks (the plain build, scripts that link
+  `SrtFlow.product/Objects.LinkFileList`) only in shards 1–3; the playback start benchmark and the preview perf
+  ratchet once each, after the dedicated App build in its shard: `checks/check-all-shards.sh`. Reverse verification
+  (2026-11-20): a duplicated line, a dropped script / `SrtFlowCoreChecks` / `SmokeClientChecks.py`, a full-App check
+  in shard 4, the plain build in shard 5, a graphical step removed or moved to shard 2, no or two App build steps and
+  an orphan script each turn it red.
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。
@@ -596,3 +615,9 @@
   through) and the snapshot's shape rules on made-up snapshots (prose, unknown keys and kinds refused). Reverse (2026-11-19): with
   a snapshot of that day's card drafts, renaming add_clips' `hit_at` turned the 22 entries that use it red; dropping a tool, the
   aliases or the trim from the exporter, the array step from the reader, or the option check each turned the checks red.
+- Sky Studio's editing styles (`recipes`, SS-5): `scripts/check-sky-studio.sh` → `StyleContentChecks` (the manifest and a style with
+  checksums, both routes on the fake server with If-None-Match / 304, the copies on this Mac, `features.recipes`, the refusal text) and
+  `StyleLibraryChecks` (when the list is asked, offline copies, who may read, nothing kept when the licence ends mid-fetch, deleting
+  on licence changes); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (one list, no shadowing, `available` / `why`, the read answer
+  and its split, `version`, `save_recipe` refusals, the Settings rows); wiring in `checks/sky-studio-wiring/styles.sh`. Rules:
+  [Sky Studio account](../architecture/sky-studio-account.md), [AI control](../architecture/ai-control-mcp.md) item 32.

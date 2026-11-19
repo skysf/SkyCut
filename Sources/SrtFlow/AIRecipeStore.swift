@@ -40,7 +40,7 @@ struct AIRecipeStore: Sendable {
 
     /// 这一套在硬盘上的文件（只有用户的有）。
     func fileURL(for recipe: AIRecipe) -> URL? {
-        guard recipe.source != .builtIn else { return nil }
+        guard recipe.source != .builtIn, recipe.source != .skyStudio else { return nil }
         return userRecipeFiles()[recipe.id]
     }
 
@@ -71,6 +71,11 @@ struct AIRecipeStore: Sendable {
         let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedBody.isEmpty else { throw AIToolError("text is empty: write the whole recipe.") }
         let existing = catalog.find(name)
+        // A Sky Studio style's id or title is never saved as the user's own (SS5 plan 5.2): it would be hidden by the style anyway.
+        if let existing, existing.source == .skyStudio {
+            throw AIToolError("\(existing.title) is an editing style from Sky Studio (read with SkyCut Pro or the SkyCut trial); it "
+                + "is not saved as the user's own. Save the user's style under another name.")
+        }
         guard let id = existing?.id ?? AIRecipe.slug(name) else {
             throw AIToolError("name needs at least one letter or digit.")
         }

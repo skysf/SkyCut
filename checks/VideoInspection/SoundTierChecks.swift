@@ -25,6 +25,8 @@ enum SoundTierChecks {
         }
         // Review CXR2's edges (2026-11-19): one short job of its own.
         try await DeliveryEdgeChecks.run(project, root: root, require: require)
+        // MCP-40's remaining rows (2026-11-19): rules on values, then the real preparation without a job.
+        try await MusicRowChecks.run(project, root: root, require: require)
     }
 
     private static func verify(_ project: VideoEditProject, root: URL, require: (Bool, String) -> Void) async throws {
@@ -47,7 +49,12 @@ enum SoundTierChecks {
         let swell = findings.first { $0["kind"] == "audio_music_swell" }
         require((swell?["rise_db"]?.doubleValue ?? 0) >= 15, "music rising under the line is reminded (\(swell?.encodedString() ?? "none"))")
         let checks = Set((first["checks"]?.arrayValue ?? []).compactMap(\.stringValue))
-        require(checks.isSuperset(of: ["cut_jumps", "lingers", "voice", "music_swell"]), "the report names the second-tier checks")
+        require(checks.isSuperset(of: ["cut_jumps", "lingers", "voice", "music_swell", "music_drops", "music_timing", "music_edges", "abrupt"]),
+                "the report names the second-tier checks")
+        // MCP-40's remaining rows through the real job: the music here first plays at 3.5 s, quietly, under a picture from 0.
+        let late = findings.first { $0["kind"] == "audio_music_late" }
+        require(late.map { ($0["from"]?.doubleValue ?? 1) == 0 && ($0["to"]?.doubleValue ?? 0) > 3 } == true,
+                "music first heard after 3 s of picture is late through the real tool (\(late?.encodedString() ?? "none"))")
         require(first["sound_roles"]?["A2"] == "object" && first["sound_roles"]?["V1"] == nil,
                 "sound_roles shows what each track was taken to be (muted pictures have no sound)")
         require(findings.allSatisfy { $0["kind"]?.stringValue?.hasPrefix("audio_") != true || $0["loudest_layers"] != nil },
@@ -73,6 +80,10 @@ enum SoundTierChecks {
                                                 "sounds": ["A1": "ambience", "A2": "object", "A3": "music", "A4": "music"]])
         require(!kinds(fixed).contains("audio_cut_jump") && !kinds(fixed).contains("audio_linger"),
                 "a music bed covers the 3.0 s jump, an accent the 6.0 s one, and a clang ended a frame after its cut no longer lingers (\(kinds(fixed).sorted()))")
+        // The same bed stops hard at 4.0 s, 24 frames after the cut at 3.0: a hard music stop off the picture (MCP-40).
+        let stop = (fixed["findings"]?.arrayValue ?? []).first { $0["kind"] == "audio_music_edge" }
+        require(stop.map { abs(($0["at"]?.doubleValue ?? 0) - 4) < 0.001 && $0["edge"] == "out" } == true,
+                "a music bed stopping hard between cuts is reported through the real tool (\(stop?.encodedString() ?? "none"))")
     }
 
     // MARK: The timeline

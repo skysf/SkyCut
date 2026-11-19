@@ -23,7 +23,8 @@ public enum MCPRecipeTools {
                 Read-only. List editing styles, or read id in full; shared-rules gives common rules. Before editing a whole video, pick a style and tell the user which one you follow; their words win.
                 """,
                 input: MCPSchema.object([
-                    "id": MCPSchema.string("A style's id or title; leave out to list them all; \(sharedRulesID) for only the rules every style follows.")
+                    "id": MCPSchema.string("A style's id or title; leave out to list them all; \(sharedRulesID) for only the rules every style follows."),
+                    "version": MCPSchema.string("Sky Studio styles only: a published version, e.g. 1.0; latest or none for the current one.")
                 ]),
                 readOnly: true
             )

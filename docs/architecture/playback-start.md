@@ -181,8 +181,10 @@ an outlier, not a stall: hosted runners sometimes stall decoding for a second af
 1,365 ms and 1,824 ms at the cut, while every scored start was in sync.
 
 When hosted timings need confirmation, the check starts three more processes once and scores all eight launches
-together, with the same budgets. The required graphical step stops after six minutes. Shard 1 has 40 minutes for
-the full suite and both graphical checks, which took about 30 minutes with a cold build cache.
+together, with the same budgets. The required graphical step stops after six minutes. It runs in shard 1 right after
+the App build, with the preview perf ratchet and the lightest share of `check-all.sh`: about 13 minutes in all, so a
+re-run after a timing flake costs that much (until 2026-11-20 shard 1 held every full-App check and took 27–31 minutes).
+Every shard has 30 minutes.
 
 The hosted budgets were recalibrated on 2026-11-19 from 55 launches in 11 runs of the merged #502 code
 (44 after the warm-up). Of those launches, 24% of cold opens and end replays and 2–11% of the other scenarios

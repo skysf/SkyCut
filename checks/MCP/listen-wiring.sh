@@ -102,6 +102,20 @@ if [ "$(grep -c 'args.bool("cuts")' "${LISTEN_TOOL}" || true)" -ne 1 ] \
 fi
 echo "   ✓ listen 读 cuts；剪辑点检查和 cut_speech 判切口的输入同一份（AISpeechHearing）、转写只读缓存、建议对齐到帧"
 
+echo "==> listen cuts=true judges speech the way inspect_video does (MCP-14): words or narration lines, never the levels alone"
+# 2026-11-19 (docs/bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md): a side on sound became on_speech by its levels
+# alone, so music, effect and noise-floor starts came back as cuts on speech. Every side goes through AICutCheck.speechJudged, which
+# asks AIInspectionSpeech (the evidence inspect_video's audio_cutoff uses); the values are in checks/MCP/CutCheckChecks.swift.
+if [ "$(grep -c 'AICutCheck.speechJudged(' "${CUTS_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIInspectionSpeech.subtitled(in: state)' "${CUTS_TOOL}" || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIInspectionSpeech.voice(atSource:' Sources/SrtFlow/AICutCheck.swift || true)" -ne 1 ] \
+   || [ "$(grep -c 'AIInspectionSpeech.voice(atSource:' Sources/SrtFlow/AIInspectionTool.swift || true)" -ne 1 ] \
+   || [ "$(grep -c '"speech_unchecked"' "${CUTS_TOOL}" || true)" -ne 1 ]; then
+  echo "✗ listen cuts=true must judge each side on speech evidence through AICutCheck.speechJudged (AIInspectionSpeech, the same rule as inspect_video's audio_cutoff) and list clips without evidence in speech_unchecked" >&2
+  exit 1
+fi
+echo "   ✓ listen cuts=true and inspect_video judge speech with the same evidence (AIInspectionSpeech); unchecked clips are listed"
+
 echo "==> listen mix=true：用引擎按层离线渲（和成片同一份配置、同一套限幅和响度量法），是排队的 AI 任务、不碰预览的引擎"
 # 2026-11-16（MCP-3 / MCP-10；docs/architecture/export-audio-mixdown.md「五、按层量」、ai-control-mcp.md 第四节第 13、59 条）。
 # 量法本身在 scripts/check-mix-layers.sh 真跑（oracle、和导出逐位对账）；这里只扫「真的接上了、接的是那一份」。

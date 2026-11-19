@@ -39,7 +39,7 @@ func checkWebMotionProjectFiles(_ root: URL) throws {
     let expected = folder.appendingPathComponent("SkyCut/Motion/motion-\(fingerprint).mov")
     checkEqual(try Data(contentsOf: expected), movieBytes, "50 first save carries the already rendered movie beside the project")
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as! [String: Any]
-    checkEqual(raw["formatVersion"] as? Int, 38, "50 writer records latest v38 (includes the v36 gate) as an external fixed contract")
+    checkEqual(raw["formatVersion"] as? Int, 39, "50 writer records latest v39 (includes the v36 gate) as an external fixed contract")
     check((raw["media"] as? [Any])?.isEmpty == true, "50 movie does not enter the project media table")
     let firstLoad = try VideoEditProjectIO.load(from: file)
     checkEqual(firstLoad.timeline.clip(with: clip.id)?.webMotion, record, "50 page, parameters and source provenance survive ProjectIO")

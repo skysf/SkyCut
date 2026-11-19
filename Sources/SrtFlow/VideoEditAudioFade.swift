@@ -127,6 +127,7 @@ extension EditClip {
         detached.volumeCurve = volumeCurve
         detached.soundScene = soundScene
         detached.voiceBandDB = voiceBandDB
+        detached.soundRole = soundRole
         return detached
     }
 
@@ -172,6 +173,8 @@ extension TimelineState {
             if clip.soundScene != nil { clip.soundScene = SoundScene(kind: .room) }
             // The voice-band cut is a parameter of the stream's filter, never structure (sound-scenes.md section 5).
             clip.voiceBandDB = 0
+            // A saved sound role changes no sound at all (VideoEditClipSoundRole.swift): saving one must not rebuild the preview.
+            clip.soundRole = nil
         }
         copy.mainVolume = 1
         copy.masterVolume = 1

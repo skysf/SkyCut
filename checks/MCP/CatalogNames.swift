@@ -128,9 +128,16 @@ func catalogKnownNames() -> Set<String> {
     // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
     // ones past the cap, where the piece's own sound ends.
     names.formUnion(["strongest_accents", "more_accents", "ends_at"])
+    // MCP-40's remaining rows and MCP-14 (2026-11-19, AIDeliveryMusic / AIDeliveryMusicEdges / AIDeliveryAbrupt, AICutCheck.speechJudged):
+    // the kinds, a music edge's nearest event, and listen cuts=true's statuses.
+    names.formUnion(["audio_music_drops", "audio_music_late", "audio_no_score", "audio_no_music", "audio_music_edge", "audio_abrupt",
+                     "event_at", "frames_from_event", "on_speech", "on_sound", "file_edge"])
     // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
     // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
     names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
+    // Sky Studio's editing styles in recipes (2026-11-19, SS5 plan 5.1, AIRecipeTools): the source value and the listing line
+    // sky_studio, and fetched_at on a style read from this Mac's copy.
+    names.formUnion(["sky_studio", "fetched_at"])
     return names
 }
 

@@ -4,8 +4,9 @@ import Foundation
 // MARK: - 画面段的自由摆放（ClipPlacement）
 //
 // 管什么：摆放框的值（中心 + 宽高，相对画布的 0…1）、换算成画布像素框、兜住失控的值、存盘的宽容解码。
-// 不管什么：默认布局怎么算、此刻实际生效的框（`EditClip.defaultPlacement` / `resolvedPlacement`）、预览和导出怎么用它
-// （docs/architecture/preview-free-transform.md）。
+// Since 2026-11-19 also a clip's default layout and the frame in effect (`EditClip.defaultPlacement` / `resolvedPlacement`, at the
+// end of this file), moved out of VideoEditModels.swift unchanged when `EditClip.soundRole` was added there.
+// 不管什么：预览和导出怎么用它（docs/architecture/preview-free-transform.md）。
 // 2026-11-16 从 VideoEditModels.swift 原样搬出来（那个文件在行数基线里只许降，见 docs/architecture/coding-standards.md）。
 
 /// 画面段在输出画布上的自由摆放：中心和宽高都是相对画布的 0…1 归一化值。
@@ -84,5 +85,37 @@ extension ClipPlacement: Codable {
         try c.encode(centerY, forKey: .centerY)
         try c.encode(width, forKey: .width)
         try c.encode(height, forKey: .height)
+    }
+}
+
+extension EditClip {
+    /// 此刻实际生效的画面摆放：用户摆过的优先；没摆过按默认布局换算。
+    /// 预览里的选中框和拖动起点都从这里取，跟合成/导出的默认摆法一致。
+    func resolvedPlacement(canvas: CGSize) -> ClipPlacement {
+        placement ?? defaultPlacement(canvas: canvas)
+    }
+
+    /// 默认布局：等比铺满画布、居中，**不分轨道**。
+    ///
+    /// 上层视频轨和主轨走完全同一份账（2026-09-17 起）—— 上层轨不再是「画中画」，
+    /// 它就是另一条对等的视频轨，内容一样铺满画面。等比是 contain：比例对不上
+    /// 的素材两侧留空，**留空处不画黑**，露出的是下面那一层（主轨的下面是画布
+    /// 黑底，上层轨的下面是主轨画面）—— 这来自 overlay 合成本身，不要额外补
+    /// `pad`，补了就会把下层遮死。
+    ///
+    /// 裁切过的段按**裁后的宽高比**摆（裁成 1:1 就显示成正方形）。
+    /// Inspector 的 Scale/Position 以它为 100%/原点基准。
+    func defaultPlacement(canvas: CGSize) -> ClipPlacement {
+        guard let display = croppedDisplaySize,
+              canvas.width > 0, canvas.height > 0 else {
+            return ClipPlacement(centerX: 0.5, centerY: 0.5, width: 1, height: 1)
+        }
+        let scale = min(canvas.width / display.width, canvas.height / display.height)
+        return ClipPlacement(
+            centerX: 0.5,
+            centerY: 0.5,
+            width: display.width * scale / canvas.width,
+            height: display.height * scale / canvas.height
+        )
     }
 }
