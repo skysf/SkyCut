@@ -447,6 +447,19 @@
   (a new merge cancels the older main runs), a re-run (`run_attempt` > 1) by its commit, `cancel-in-progress: true`, no job-level block.
   It also constructs a docs-only merge after concurrent code lands: both push gates must return false, even with a
   matching scan-only PR marker. Docs-only PRs keep the fast path; code merges keep full-PR exact-tree reuse.
+  Since 2026-11-20 (the merge slot): the slot's dispatch on main counts as a main run in both gates (never docs-only);
+  a slot test run's marker counts only when its head commit has exactly the merge's parents, and not from a dispatch
+  on another branch, a red run, a commit that can't be read, another head or another main; the summary job leaves
+  markers for pull requests and the slot's test runs. Reverse verification: each of those turned red when broken.
+- The merge slot (2026-11-20): `python3 checks/MergeSlot/MergeSlotChecks.py` runs `scripts/merge-slot.py` against an
+  in-memory GitHub (`checks/MergeSlot/FakeGitHub.py`, no network). It merges only after a green run on the exact tree:
+  the PR's own run while main hasn't moved, else its own test on `merge-slot/pr-<N>`, a green re-run of it, or a green
+  test whose marker upload failed. One test at a time, oldest label first. Red, cancelled, a conflict, a red head, a
+  draft, a fork or three refusals send the PR back with a comment; a pending head waits while the next goes. A human
+  merge, a new head, a stale test merge or a last-second main move means testing again, never merging; closed PRs'
+  test branches are swept. It also pins `merge-slot.yml` (triggers, one waiting job-level slot, permissions, main's
+  script only) and `checks.yml` (takes the slot's dispatches, skips every shard on other refs). Reverse verification:
+  22 mutations of the script each turned it red. Rules: [build doc "Merge slot"](../build/build-and-packaging.md).
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）;
   every run_check command exactly once; every `scripts/check-*.sh` named by check-all or a workflow step, or listed
   in the guard as deliberately local (graphical session, real keychain), and every `*Checks` executable and

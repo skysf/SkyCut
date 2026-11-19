@@ -16,6 +16,9 @@
 #      cover code from a cancelled ancestor. Docs-only PRs still take the fast path.
 #   5. The concurrency block: a new merge cancels the older main runs (the newest main tree contains them all), PR runs
 #      stay keyed by PR number, and a re-run keeps a per-commit group.
+#   6. The merge slot (2026-11-20): its dispatch on main is a main run; a marker may come from its test run on
+#      merge-slot/pr-<N> only when that run's head commit has exactly HEAD's parents; a dispatch elsewhere is not a
+#      main run. The summary job leaves markers for pull requests and for the slot's test runs.
 #
 # 用法：checks/ci-verified-tree.sh [workflow 路径 [判断脚本路径]]   # 两个路径只给反向验证用
 set -euo pipefail
@@ -79,6 +82,9 @@ case "${endpoint}" in
     echo "${asked%%&*}" >>"${FAKE_DIR}/asked-names"
     file="${FAKE_DIR}/artifacts.json"
     ;;
+  */commits/*)
+    file="${FAKE_DIR}/commit-${endpoint##*/}.json"
+    ;;
   */actions/runs/*)
     id="${endpoint##*/}"
     n="$(cat "${FAKE_DIR}/calls-${id}" 2>/dev/null || echo 0)"
@@ -101,9 +107,9 @@ artifacts() { # 头提交 仓库 id 头仓库 id 过期没有
   printf '{"artifacts":[{"name":"verified-tree-%s","expired":%s,"workflow_run":{"id":77,"head_sha":"%s","repository_id":%s,"head_repository_id":%s}}]}\n' \
     "${TREE}" "$4" "$1" "$2" "$3" >"${FAKE_DIR}/artifacts.json"
 }
-run_record() { # 文件名 workflow 事件 状态 结论 头提交 仓库 头仓库 建出来的时间
-  printf '{"path":"%s","event":"%s","status":"%s","conclusion":%s,"head_sha":"%s","repository":{"full_name":"%s"},"head_repository":{"full_name":"%s"},"created_at":"%s"}\n' \
-    "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" >"${FAKE_DIR}/$1"
+run_record() { # 文件名 workflow 事件 状态 结论 头提交 仓库 头仓库 建出来的时间 [head branch]
+  printf '{"path":"%s","event":"%s","status":"%s","conclusion":%s,"head_sha":"%s","repository":{"full_name":"%s"},"head_repository":{"full_name":"%s"},"created_at":"%s","head_branch":"%s"}\n' \
+    "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10:-topic}" >"${FAKE_DIR}/$1"
 }
 GOOD_PATH=".github/workflows/checks.yml"
 fresh() { # 全部对得上的一套
@@ -148,8 +154,29 @@ fresh; run_record run-77.json "${GOOD_PATH}" pull_request completed '"success"' 
 fresh; run_record run-77.json "${GOOD_PATH}" pull_request completed '"success"' "${PR_HEAD}" o/r x/y "${NOW}"; expect "那一轮的头在别的仓库" false
 fresh; run_record run-77.json "${GOOD_PATH}" pull_request completed '"success"' "${PR_HEAD}" o/r o/r "${OLD}"; expect "那一轮是 30 小时前的" false
 fresh; git_in checkout -q topic; expect "HEAD 不是合并提交" false; git_in checkout -q main
-if [ "${CASES}" -lt 22 ]; then
-  fail "判断的用例只跑了 ${CASES} 个（应该 22 个以上）：少了就是这条守卫自己没跑全"
+# 6. The merge slot: a dispatch on main is a main run; a test run on merge-slot/pr-<N> counts only for HEAD's exact parents.
+BASE="$(git -C "${REPO}" rev-parse 'HEAD^1')"
+SLOT_HEAD=1234567890123456789012345678901234567890
+slot_run() { # the parents of the slot run's head commit
+  FAKE_DIR="$(mktemp -d "${WORK}/fake.XXXXXX")"
+  artifacts "${SLOT_HEAD}" 1 1 false
+  run_record run-77.json "${GOOD_PATH}" workflow_dispatch completed '"success"' "${SLOT_HEAD}" o/r o/r "${NOW}" merge-slot/pr-7
+  printf '{"parents":[{"sha":"%s"},{"sha":"%s"}]}\n' "$1" "$2" >"${FAKE_DIR}/commit-${SLOT_HEAD}.json"
+}
+fresh; expect "the merge slot's dispatch on main" true GITHUB_EVENT_NAME=workflow_dispatch GITHUB_REF=refs/heads/main
+fresh; expect "a dispatch on another branch" false GITHUB_EVENT_NAME=workflow_dispatch GITHUB_REF=refs/heads/merge-slot/pr-7
+slot_run "${BASE}" "${PR_HEAD}"; expect "the slot's test run of HEAD's parents" true
+slot_run "${BASE}" 0000000000000000000000000000000000000000; expect "a slot test run of another head" false
+slot_run 0000000000000000000000000000000000000000 "${PR_HEAD}"; expect "a slot test run on another main" false
+slot_run "${BASE}" "${PR_HEAD}"; rm "${FAKE_DIR}/commit-${SLOT_HEAD}.json"; expect "reading the slot run's commit fails" false
+slot_run "${BASE}" "${PR_HEAD}"
+run_record run-77.json "${GOOD_PATH}" workflow_dispatch completed '"success"' "${SLOT_HEAD}" o/r o/r "${NOW}" topic-7
+expect "a dispatch run on a branch that isn't the slot's" false
+slot_run "${BASE}" "${PR_HEAD}"
+run_record run-77.json "${GOOD_PATH}" workflow_dispatch completed '"failure"' "${SLOT_HEAD}" o/r o/r "${NOW}" merge-slot/pr-7
+expect "a red slot test run" false
+if [ "${CASES}" -lt 30 ]; then
+  fail "判断的用例只跑了 ${CASES} 个（应该 30 个以上）：少了就是这条守卫自己没跑全"
 fi
 
 # A code merge followed by a docs-only merge, whose PR was behind the code merge.
@@ -168,10 +195,11 @@ git_in merge -q --no-ff -m merge-docs docs-topic
 TREE="$(git -C "${REPO}" rev-parse 'HEAD^{tree}')"
 PR_HEAD="$(git -C "${REPO}" rev-parse 'HEAD^2')"
 CLASSIFIER="${ROOT}/scripts/ci-docs-only.sh"
-for event in push pull_request; do
+for event in push pull_request workflow_dispatch; do
   want=false
-  [ "${event}" != "pull_request" ] || want=true
-  got="$(cd "${REPO}" && GITHUB_EVENT_NAME="${event}" /bin/bash "${CLASSIFIER}")"
+  ref=refs/heads/main  # workflow_dispatch here is the merge slot's run on main: a main run like a push
+  if [ "${event}" = "pull_request" ]; then want=true; ref=refs/pull/1/merge; fi
+  got="$(cd "${REPO}" && GITHUB_EVENT_NAME="${event}" GITHUB_REF="${ref}" /bin/bash "${CLASSIFIER}")"
   if [ "${got}" != "${want}" ]; then
     fail "docs-only merge on ${event}: ci-docs-only printed ${got}, expected ${want} (main must run all checks)"
   fi
@@ -179,6 +207,7 @@ done
 fresh; expect "docs-only main merge with a matching scan-only PR marker" false
 fresh; echo '{"artifacts":[]}' >"${FAKE_DIR}/artifacts.json"; expect "docs-only main merge without a PR marker" false
 fresh; expect "docs-only main merge when GitHub is unavailable" false FAKE_FAIL=1
+fresh; expect "docs-only main merge dispatched by the slot" false GITHUB_EVENT_NAME=workflow_dispatch GITHUB_REF=refs/heads/main
 git_in checkout -q code-merge
 TREE="$(git -C "${REPO}" rev-parse 'HEAD^{tree}')"
 PR_HEAD="$(git -C "${REPO}" rev-parse 'HEAD^2')"
@@ -293,9 +322,10 @@ elif [ "${TREE_LINE}" -lt "${GATE_LINE}" ] || [ "${NAME_LINE}" -lt "${TREE_LINE}
 fi
 MARKER_STEPS="$(awk -v job=check-all "${STEP_PROG}" "${WORKFLOW}" | awk -F '\037' '$2 == "tree" || $5 ~ /actions\/upload-artifact/ { print $3 }')"
 MARKER_COUNT="$({ grep -c . <<<"${MARKER_STEPS}" || true; })"
-MARKER_PR_ONLY="$({ grep -cxF "github.event_name == 'pull_request'" <<<"${MARKER_STEPS}" || true; })"
+MARKER_IF="github.event_name == 'pull_request' || startsWith(github.ref, 'refs/heads/merge-slot/pr-')"
+MARKER_PR_ONLY="$({ grep -cxF "${MARKER_IF}" <<<"${MARKER_STEPS}" || true; })"
 if [ "${MARKER_COUNT}" != "2" ] || [ "${MARKER_PR_ONLY}" != "2" ]; then
-  fail "留记号的两步（id: tree 和上传）的 if 都应该正好是 github.event_name == 'pull_request'（main 上那一轮不留：它自己可能就是没跑检查的那种）"
+  fail "留记号的两步（id: tree 和上传）的 if 都应该正好是 ${MARKER_IF}（main 上那一轮不留：它自己可能就是没跑检查的那种; the slot's test runs leave one like a pull request）"
 fi
 for want in 'retention-days: 1' 'overwrite: true'; do
   if [ "$({ grep -cF "${want}" <<<"${SUMMARY}" || true; })" != "1" ]; then

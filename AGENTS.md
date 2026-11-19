@@ -46,19 +46,22 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
    没有的文档它们永远不会打开 —— 由 `checks/docs-index-drift.sh` 钉住（漏一份
    或留一条死链就红）。
 
-### 合并与分支（2026-09-29 用户定）
+### 合并与分支（2026-09-29 用户定；merge slot since 2026-11-20）
 
-- 一个 PR 只做一件事、尽量小；CI 的汇总 job `check-all` 绿了就**马上合并**（`gh pr merge N --merge`，绝不 squash），
-  不攒着等人看。任务说明里写了由谁合并的，照任务说明。下一件事从合并后的最新 main 开分支，别在旧分支上叠。
-- 合并后删分支：`gh pr view N --json state` 是 MERGED 之后才 `git push origin --delete <分支>`。不用 `--delete-branch`：它会把检出着
-  这条分支的 worktree 整个删掉（2026-11-05）。merge 报错时先看 state，别接着删分支（2026-11-11 #394 就这样被 GitHub 关掉过）。
-  本地的 worktree 和分支照任务说明收尾；没写就留着，别删自己正开着的 worktree。
-- 「绿」指 CI 的结论，本地跑过不算。红了先看是不是已知的偶发（性能 ratchet、`check-audio-fade` 第 7b 组，认法见对应
-  文档），是就 `gh run rerun --failed`，不是就修；不许带红合。
-- 合掉一个之后别的 PR 变 DIRTY（常见于本文件必读表的同一行；`docs/bugfixes/INDEX.md` 按文件名里日期后面那一段排之后基本不撞）：把新 main 合进那条分支、两边都留、推上去等 CI 绿再合；撞在同一行的把两边并进同一行，别留两行。
+- One PR does one thing and stays small. Before opening it, `git fetch origin`, merge the newest `origin/main` once,
+  resolve every conflict and verify again: nothing merged in parallel (the user's other windows too) may be lost. Start
+  the next task from the newest main, never on an old branch.
+- Label the PR as you open it: `gh pr edit N --add-label merge-slot`. The merge slot merges labeled PRs one at a time
+  (`--merge`), each after a green run on the exact tree that lands (main + PR), and deletes the branch (build doc,
+  "Merge slot"). Never merge it yourself, never squash; a task that names who merges wins.
+- Then don't push or merge main into it (a push restarts its checks) until the slot removes the label and comments why.
+  Red: fix, push, label again. A known flake (perf ratchet, playback benchmark, `check-audio-fade` group 7b; see their
+  docs): `gh run rerun <run> --failed` on the run it names, label again once green. Conflict: merge `origin/main`,
+  keep both sides (two edits of one line become one line), push, label again. Never merge red.
+- Done when it is MERGED: `scripts/merge-slot-wait.sh N` waits (0 merged, 1 sent back with the slot's comment, 3 run it
+  again). Local worktree and branch as the task says; if it says nothing, keep them; never delete a worktree you're in.
 - 往索引、必读表、名单里加的那一行放在最后一个 commit；同一行、同一块的几件事别同时开 PR。
 - 合进 main 不等于发给用户：发版（打 tag、`gh release create`、DMG）仍然另外拍板。
-- 开 PR 前必须重新 `git fetch origin`，把当时最新的 `origin/main` 合入当前分支，逐处处理冲突并重新验证；不能只沿用开始任务时的 main，尤其用户在另一个窗口并行优化时，不得覆盖或遗漏那些已合并的改动。
 
 ### 官网本地预览与部署成本（2026-11-04 用户定）
 
@@ -287,6 +290,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-waveform.sh` — 波形数据逐采样对账、很多文件同时读不死锁。
 - `scripts/check-web-motion.sh` — web-motion renderer: the page clock, nothing leaves a page, alpha, hostile pages, memory kills and backstops, identical renders.
 - `python3 checks/MCP/SmokeClientChecks.py` — 冒烟客户端的断线、协议错误、超时和退出码。
+- `python3 checks/MergeSlot/MergeSlotChecks.py` — the merge slot against an in-memory GitHub: only a tree a green run tested merges, one at a time, oldest label first; both workflows' wiring.
 
 ### 扫描守卫（`checks/*.sh`，都在 `check-all.sh` 里；秒级、不编译）
 
@@ -416,7 +420,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 报告（docs/reports/）
 
-- [CI: full-App checks over three shards, cheap flakes](docs/reports/2026-11-20-ci-rebalance.md) — the longest shard 26.9 → 14.5 min (11-19 median vs #523, cache still the old one), the same 118 checks; uploads can't fail a shard.
+- [CI: full-App checks over three shards, cheap flakes](docs/reports/2026-11-20-ci-rebalance.md) — the longest shard 26.9 → 14.5–15.7 min (11-19 median vs #523's and #525's runs), the same 118 checks; uploads can't fail a shard.
 - [合并后 main 上那一轮：树已经验过就不再跑检查](docs/reports/2026-11-13-main-ci-verified-tree.md) — 到 11-13 能还原的 358 次合并里 308 次的树和 PR 那轮绿的 CI 测的一模一样（11-04 起 104 次里 77 次）；main 上红过的 24 轮没有一次是 PR 没跟上 main；几种做法的比较、GitHub 上试出来的行为。
 - [声音功能的真实冒烟：界面 + AI 工具（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 新建 / 设计 / 删声音、变声、读稿、长期授权全过，74.2 积分和账单逐笔对上；撞出的问题修在 #379、#383，音频引擎一直开着当时待拍板。
 - [变声（声音 PR 9）：离屏渲染和免费冒烟](docs/reports/2026-11-11-change-voice.md) — 面板三种语言的图、假 Sky Studio 上走全程；没验到真 Sky Studio 和真窗口。

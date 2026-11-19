@@ -9,7 +9,8 @@
 #    把恢复回来的 .build 全当过期 —— 整个 App 每次冷编。现在钉着：
 #    - 编译和恢复之前先跑 scripts/ci-stable-mtimes.py（修改时间按内容设），工具链那一步给出指纹（id: toolchain）；
 #    - 取用 actions/cache/restore、存用 actions/cache/save，不用会自己存的 actions/cache (exactly one step each);
-#    - saved on main only (github.event_name == 'push') and only after a successful build (success()).
+#    - saved on main only (github.ref == 'refs/heads/main': a push, or the merge slot's dispatch on main) and only
+#      after a successful build (success()).
 # 3. One cache for every shard (since 2026-11-20, docs/build/build-and-packaging.md "CI"): the complete App build, so a
 #    check that links the full App can run in any shard after an incremental build.
 #    - The key carries the checkout, the toolchain fingerprint, `-app-` and this commit, never matrix.shard; the save
@@ -119,7 +120,7 @@ else
       fail "every restore key must be a prefix ending in - that carries the checkout and the toolchain fingerprint: ${fallback}"
     fi
   done <<<"$(tr '\036' '\n' <<<"${RESTORE_KEYS}")"
-  for part in "github.event_name == 'push'" 'success()' 'matrix.shard == '; do
+  for part in "github.ref == 'refs/heads/main'" 'success()' 'matrix.shard == '; do
     if [ "${SAVE_IF}" = "${SAVE_IF#*"${part}"}" ]; then
       fail "存 .build 的那一步的 if 不带「${part}」：只在 main 上、编译成功之后、在编完整 App 的那一组存（${SAVE_IF}）"
     fi

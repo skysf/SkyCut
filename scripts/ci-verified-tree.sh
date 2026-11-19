@@ -14,6 +14,9 @@
 #   - 那一轮的 workflow 文件是 .github/workflows/checks.yml、事件是 pull_request、状态 completed、结论 success
 #     （重跑过的看最后一次）、仓库是本仓库、建出来不到 24 小时。
 # 查不到、接口出错、gh 不在、不是 push、仓库变量 CI_VERIFIED_TREE 设成了 off：一律 false。宁可多跑一轮，不许漏跑。
+# Since 2026-11-20 (the merge slot): the slot's dispatch on main is a main run like a push, and a marker may also come
+# from the slot's test run, a workflow_dispatch on merge-slot/pr-<N> whose head commit has exactly HEAD's two parents
+# (the same main and the same pull request head, so the same tree by construction).
 # 别的 workflow、红了的那一轮、别的 PR 留下的同名 artifact 都过不了上面的核对（checks/ci-verified-tree.sh 逐条钉着）。
 #
 # 用法（在仓库根目录跑，PATH 上有 gh，环境里有 GH_TOKEN）：
@@ -27,9 +30,13 @@ MAX_AGE_HOURS="${VERIFIED_TREE_MAX_AGE_HOURS:-24}"
 WAIT_SECONDS="${VERIFIED_TREE_WAIT_SECONDS:-30}"
 POLL_SECONDS="${VERIFIED_TREE_POLL_SECONDS:-5}"
 
+MAIN_RUN=no
+if [ "${GITHUB_EVENT_NAME:-}" = "push" ] || { [ "${GITHUB_EVENT_NAME:-}" = "workflow_dispatch" ] && [ "${GITHUB_REF:-}" = "refs/heads/main" ]; }; then
+  MAIN_RUN=yes
+fi
 note() {
   echo "ci-verified-tree: $*" >&2
-  if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ "${GITHUB_EVENT_NAME:-}" = "push" ]; then
+  if [ -n "${GITHUB_STEP_SUMMARY:-}" ] && [ "${MAIN_RUN}" = "yes" ]; then
     echo "ci-verified-tree: $*" >>"${GITHUB_STEP_SUMMARY}" 2>/dev/null || true
   fi
 }
@@ -39,13 +46,14 @@ no() {
   exit 0
 }
 
-[ "${GITHUB_EVENT_NAME:-}" = "push" ] || no "event is ${GITHUB_EVENT_NAME:-unset}, not push"
+[ "${MAIN_RUN}" = "yes" ] || no "event is ${GITHUB_EVENT_NAME:-unset} on ${GITHUB_REF:-unset}, not a main run"
 [ "${VERIFIED_TREE_SWITCH:-}" != "off" ] || no "switched off (repository variable CI_VERIFIED_TREE)"
 REPO="${GITHUB_REPOSITORY:-}"
 [ -n "${REPO}" ] || no "GITHUB_REPOSITORY is not set"
 command -v gh >/dev/null 2>&1 || no "gh is not on PATH"
 TREE="$(git rev-parse --verify -q 'HEAD^{tree}')" || no "cannot read the tree of HEAD"
 PR_HEAD="$(git rev-parse --verify -q 'HEAD^2')" || no "HEAD is not a merge commit (no second parent)"
+BASE="$(git rev-parse --verify -q 'HEAD^1')" || no "cannot read HEAD's first parent"
 if git rev-parse --verify -q 'HEAD^3' >/dev/null; then no "HEAD has more than two parents"; fi
 
 # A docs-only PR's green marker covers scans, not the code inherited from main. Always check a docs-only main merge
@@ -64,18 +72,17 @@ ARTIFACTS="$(gh api "repos/${REPO}/actions/artifacts?name=verified-tree-${TREE}&
 run_facts() {
   # workflow 文件、事件、状态、结论、头提交、仓库、头仓库、建出来多少个整小时
   gh api "repos/${REPO}/actions/runs/$1" \
-    --jq '[.path, .event, .status, (.conclusion // "-"), .head_sha, .repository.full_name, (.head_repository.full_name // "-"), ((now - (.created_at | fromdateiso8601)) / 3600 | floor | tostring)] | @tsv' 2>/dev/null
+    --jq '[.path, .event, .status, (.conclusion // "-"), .head_sha, .repository.full_name, (.head_repository.full_name // "-"), ((now - (.created_at | fromdateiso8601)) / 3600 | floor | tostring), (.head_branch // "-")] | @tsv' 2>/dev/null
 }
 
 REASON="no marker left by a green ${WORKFLOW} run for ${PR_HEAD}"
 while IFS="$(printf '\t')" read -r run_id run_head repo_id head_repo_id; do
   [ -n "${run_id}" ] || continue
-  if [ "${run_head}" != "${PR_HEAD}" ]; then REASON="marker from run ${run_id} is for head ${run_head}, merged head is ${PR_HEAD}"; continue; fi
   if [ "${repo_id}" != "${head_repo_id}" ]; then REASON="marker from run ${run_id} comes from a fork"; continue; fi
   waited=0
   while :; do
     FACTS="$(run_facts "${run_id}")" || { REASON="reading run ${run_id} failed"; FACTS=""; break; }
-    IFS="$(printf '\t')" read -r path event status conclusion head_sha repo head_repo age <<<"${FACTS}"
+    IFS="$(printf '\t')" read -r path event status conclusion head_sha repo head_repo age head_branch <<<"${FACTS}"
     # 必需的检查一绿就能合，GitHub 把那一轮的记录收成 completed 可能晚一两秒：等一小会儿。
     if [ "${status}" = "completed" ] || [ "${waited}" -ge "${WAIT_SECONDS}" ]; then break; fi
     sleep "${POLL_SECONDS}"
@@ -83,14 +90,22 @@ while IFS="$(printf '\t')" read -r run_id run_head repo_id head_repo_id; do
   done
   [ -n "${FACTS}" ] || continue
   if [ "${path}" != "${WORKFLOW}" ]; then REASON="run ${run_id} is ${path}, not ${WORKFLOW}"; continue; fi
-  if [ "${event}" != "pull_request" ]; then REASON="run ${run_id} was triggered by ${event}"; continue; fi
   if [ "${status}" != "completed" ]; then REASON="run ${run_id} is still ${status}"; continue; fi
   if [ "${conclusion}" != "success" ]; then REASON="run ${run_id} ended ${conclusion}"; continue; fi
-  if [ "${head_sha}" != "${PR_HEAD}" ]; then REASON="run ${run_id} head is ${head_sha}"; continue; fi
+  if [ "${run_head}" != "${head_sha}" ]; then REASON="marker from run ${run_id} names head ${run_head}, the run's is ${head_sha}"; continue; fi
+  case "${event}:${head_branch}" in
+    pull_request:*)
+      if [ "${head_sha}" != "${PR_HEAD}" ]; then REASON="run ${run_id} head is ${head_sha}, merged head is ${PR_HEAD}"; continue; fi ;;
+    workflow_dispatch:merge-slot/pr-*)
+      parents="$(gh api "repos/${REPO}/commits/${head_sha}" --jq '[.parents[].sha] | join(" ")' 2>/dev/null)" \
+        || { REASON="reading commit ${head_sha} of run ${run_id} failed"; continue; }
+      if [ "${parents}" != "${BASE} ${PR_HEAD}" ]; then REASON="slot run ${run_id} tested ${head_sha} on ${parents:-nothing}, not ${BASE} + ${PR_HEAD}"; continue; fi ;;
+    *) REASON="run ${run_id} was triggered by ${event} on ${head_branch}"; continue ;;
+  esac
   if [ "${repo}" != "${REPO}" ] || [ "${head_repo}" != "${REPO}" ]; then REASON="run ${run_id} belongs to ${repo} / ${head_repo}"; continue; fi
   case "${age}" in '' | *[!0-9]*) REASON="run ${run_id} has no readable age"; continue ;; esac
   if [ "${age}" -ge "${MAX_AGE_HOURS}" ]; then REASON="run ${run_id} is ${age} h old (limit ${MAX_AGE_HOURS})"; continue; fi
-  note "tree ${TREE} was verified by run ${run_id} (${WORKFLOW}, pull_request, success, head ${PR_HEAD}, ${age} h old): checks skipped"
+  note "tree ${TREE} was verified by run ${run_id} (${WORKFLOW}, ${event} on ${head_branch}, success, head ${PR_HEAD}, ${age} h old): checks skipped"
   echo true
   exit 0
 done <<<"${ARTIFACTS}"

@@ -21,7 +21,8 @@
 # `gh pr merge --merge` 的合并提交（第一个父提交是合并之前的 main）—— 两种都正好是「这个 PR 带来的改动」。
 set -uo pipefail
 
-if [ "${GITHUB_EVENT_NAME:-}" = "push" ] && [ "${1:-}" != "-" ]; then
+# Main runs are a push or, since 2026-11-20, the merge slot's dispatch on main: never the scan-only path.
+if { [ "${GITHUB_EVENT_NAME:-}" = "push" ] || [ "${GITHUB_REF:-}" = "refs/heads/main" ]; } && [ "${1:-}" != "-" ]; then
   echo false
   exit 0
 fi

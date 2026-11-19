@@ -91,6 +91,15 @@ git_in merge -q --no-ff -m merge-topic topic
 if [ "$(classify_repo)" != "true" ]; then
   fail "合并提交带进来的只有文档（main 那边改的代码在第一个父提交里）应该判 true"
 fi
+# The merge slot (2026-11-20): its dispatch on main is a main run, never docs-only; its test run on merge-slot/pr-<N>
+# checks out GitHub's test merge (first parent main), so it classifies like a pull request.
+classify_as() { (cd "${REPO}" && GITHUB_EVENT_NAME="$1" GITHUB_REF="$2" /bin/bash "${CLASSIFIER}"); }
+if [ "$(classify_as workflow_dispatch refs/heads/main)" != "false" ]; then
+  fail "the merge slot's dispatch on main is a main run: a docs-only merge there must run every check (false)"
+fi
+if [ "$(classify_as workflow_dispatch refs/heads/merge-slot/pr-3)" != "true" ]; then
+  fail "a merge slot test run of a docs-only pull request should take the docs-only path like its pull_request run (true)"
+fi
 
 # ---- 二、workflow 的接线 ----
 if [ ! -f "${WORKFLOW}" ]; then

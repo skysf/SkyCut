@@ -25,13 +25,19 @@ Job minutes per shard (runner time, not counting the wait for a runner):
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | Before: median of 25 green PR runs, 11-19 | 26.9 | 11.0 | 9.2 | 8.3 | 8.6 | 26.9 | 62.5 |
 | #523's run (cache: the old shard-1 one, 7c5fd36c) | 13.7 | 13.9 | 14.1 | 14.5 | 14.2 | 14.5 | 70.4 |
+| #525's run (the shared `-app-` cache main saved after #523) | 12.4 | 9.8 | 15.7 | 12.3 | 12.1 | 15.7 | 62.3 |
 
 - Shard 1 in #523's run: restore 8 s, Build app 67 s, playback benchmark 135 s, its checks 409 s, preview perf ratchet
   172 s. A timing flake re-runs this job: about 14 minutes instead of about 28.
 - Shards 2 and 3 compile the App inside their first full-App check (project-versions 53 s, motion-placement 394 s
   including it).
-- Runner minutes per run go up by about two App builds. The early cache save should take some of that back: shard 1's
-  Build app was 1.6 minutes (median) on 11-19, because a busy main rarely lasted long enough to save.
+- With a stale cache, runner minutes per run go up by about two App builds (#523's run). With the fresh shared cache
+  they don't (#525's run: 62.3, against 62.5 before). Shard 1's Build app took 16 s there, against a median of
+  1.6 minutes on 11-19, when a busy main rarely lasted long enough to save. Main's run after #523 saved the cache
+  about two minutes after it started, and was later cancelled by the next merge.
+- The two runs' longest shards were 14.5 and 15.7 minutes, on different shards: hosted runners differ by 1.5–2×, so a
+  shard's time moves by minutes from run to run. #525's run executed the same 118 checks (none missing, none extra,
+  none twice).
 
 ## 4. Coverage is the same
 
