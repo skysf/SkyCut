@@ -73,10 +73,15 @@ enum MCPGuideSpeechTopics {
             own sound is over. A clip gives timeline seconds for the part it plays, a file its own seconds. To land a hit on a moment \
             use add_clips hit_at with hit; for a clip already placed, move its start by the moment minus the accent's time.
             """),
+            // Speech evidence since 2026-11-19 (MCP-14; docs/bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md).
             MCPGuideSection(name: "cuts", about: "checking every V1 cut for pauses and speech", text: """
             Cuts. cuts=true with neither clip nor file checks the head and tail of every V1 clip: whether the cut sits in a \
             pause or on speech, which words (from transcribe) it cuts, and suggested_source_in / suggested_source_out for \
-            edit_clip. It uses the same measurements as cut_speech. Apply a suggestion, then check again.
+            edit_clip. It uses the same measurements as cut_speech. Apply a suggestion, then check again. A cut counts as \
+            on_speech only where a cached transcript has a word or narration subtitles a line, as inspect_video judges it; \
+            elsewhere a cut where sound plays is on_sound (music, an effect, ambience) with no suggestion, and clips with neither \
+            are listed in speech_unchecked: transcribe the ones with speech. file_edge: the file's own first or last second, \
+            nothing is cut.
             """),
             // 出处：docs/architecture/export-audio-mixdown.md「五、按层量」、ai-control-mcp.md 第四节第 13 条（mix=true）。
             MCPGuideSection(name: "mix", about: "mix=true: the mixed timeline per track layer and per frame, as exported", text: """

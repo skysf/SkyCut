@@ -438,6 +438,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      `suggested_source_out`（= cut_speech 落刀的地方、对齐到工程的帧，换回这一段 V1 片段自己的源时间，AI 直接拿去 edit_clip；落到素材外面的不给）。
      转写**只读缓存、不起任务**（listen 是只读工具），没有就说一句；波形要读完整个文件，没读完的那几头报「还在读」；一个素材文件只听一遍；一次最多
      80 个剪辑点。纯值在 `checks/MCP/CutCheckChecks.swift`、`checks/MCP/SpeechHearingChecks.swift`（L16 原片真量的电平），接线扫描在 `checks/MCP/listen-wiring.sh`。
+     **Since 2026-11-19 (MCP-14) speech needs evidence** (`AICutCheck.speechJudged`, the rule inspect_video's `audio_cutoff` uses:
+     `AIInspectionSpeech`): a side the levels put on speech stays `on_speech` only where the sound clip's cached transcript has a word
+     or narration subtitles a line; otherwise it is `on_sound` with no suggestion (music, an effect, ambience, a noise floor), its clip
+     listed in `speech_unchecked` when there is no evidence at all, and `file_edge` at the file's own first or last second (nothing is
+     cut). The result counts `on_speech` and `on_sound` apart ([case](../bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md)).
    - **混在一起之后的声音（`mix=true`，2026-11-16，待办总清单 MCP-3、MCP-10）**：前面几种都是一段一段各量各的、0.5 秒一格；`mix=true`
      量整条混音和每一层、到帧，用的是 SkyCut 自己的音频引擎按层离线渲（和成片同一份配置、同一套限幅和响度量法，合同在
      [成片的声音](export-audio-mixdown.md)第五节）。参数：`from` / `to`（时间线秒，落在帧上，不给就是整条）；`layers`（一项一层：`A1`、
