@@ -26,6 +26,10 @@
 #    Elsewhere the benchmark would build the App inside its six-minute timeout. That shard holds the lightest load in
 #    check-all.sh, so re-running a timing flake costs about 13 minutes, not the longest shard.
 #
+# 6. Every actions/upload-artifact step in the workflow, in any job, has continue-on-error: true. Uploads are diagnostics;
+#    on 2026-11-17 an artifact service timeout turned a shard whose checks had all passed red
+#    (docs/bugfixes/2026-11-20-ci-artifact-upload-fails-green-shard.md).
+#
 # 用法：checks/check-all-shards.sh [check-all.sh 的路径 [workflow 路径]]
 #       路径只给反向验证用（拿一份改过的副本来试）；不给就读 scripts/check-all.sh 和 .github/workflows/checks.yml。
 set -euo pipefail
@@ -222,8 +226,34 @@ for gui in scripts/check-playback-start.sh scripts/check-preview-perf.sh; do
   fi
 done
 
+# ---- 6. An upload never decides a result ----
+# Every upload-artifact step of every job: job␟name␟continue-on-error.
+UPLOADS="$(awk '
+  /^  [A-Za-z][A-Za-z0-9_-]*:[[:space:]]*$/ { flush(); job = $1; sub(/:$/, "", job); next }
+  /^      - / { flush(); cur = 1; line = $0; sub(/^      - /, "        ", line); $0 = line }
+  cur && /^        uses:/ { uses = $2 }
+  cur && /^        name:/ { name = $0; sub(/^        name:[[:space:]]*/, "", name) }
+  cur && /^        continue-on-error:/ { coe = $2 }
+  END { flush() }
+  function flush() {
+    if (cur && uses ~ /^actions\/upload-artifact@/) print job "\037" name "\037" coe
+    cur = 0; uses = ""; name = ""; coe = ""
+  }
+' "${WORKFLOW}")"
+UPLOAD_COUNT=0
+while IFS="${US}" read -r job name coe; do
+  [ -n "${job}" ] || continue
+  UPLOAD_COUNT=$((UPLOAD_COUNT + 1))
+  if [ "${coe}" != "true" ]; then
+    fail "the upload「${name:-unnamed}」in job ${job} of ${WORKFLOW} needs continue-on-error: true: an upload is a diagnostic, and an artifact service timeout must not turn a run whose checks passed red"
+  fi
+done <<<"${UPLOADS}"
+if [ "${UPLOAD_COUNT}" -eq 0 ]; then
+  fail "no actions/upload-artifact step found in ${WORKFLOW}: if the layout changed, change this guard (an empty scan passes everything)"
+fi
+
 if [ "${FAILED}" -ne 0 ]; then
   exit 1
 fi
 SHARD_COUNTS="$(tr ' ' '\n' <<<"${PER_SHARD}" | grep . | LC_ALL=C sort | uniq -c | awk '{ printf "%sshard %s: %s", sep, $2, $1; sep = ", " }')"
-echo "✓ check-all-shards：checks/ 下 ${GUARDS} 条守卫都在 check-all 里; every command once; all ${SCRIPTS} scripts/check-*.sh run on CI or are listed as local-only; ${FULL_APP} full-App checks in shards ${APP_SHARDS} (${SHARD_COUNTS}); graphical steps once each, after the App build in shard ${BUILD_SHARD}"
+echo "✓ check-all-shards：checks/ 下 ${GUARDS} 条守卫都在 check-all 里; every command once; all ${SCRIPTS} scripts/check-*.sh run on CI or are listed as local-only; ${FULL_APP} full-App checks in shards ${APP_SHARDS} (${SHARD_COUNTS}); graphical steps once each, after the App build in shard ${BUILD_SHARD}; ${UPLOAD_COUNT} uploads can't fail a run"

@@ -295,7 +295,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/app-theme-wiring.sh` — 主题的浅 / 深：不交 nil、只有一处 `.preferredColorScheme`、不设 `NSApp.appearance`。
 - `checks/audio-engine-idle-wiring.sh` — 音频引擎空闲停图、用户回来先起、换工程收引擎、主时钟自己收尾。
 - `checks/blocking-media-reads.sh` — 读采样的阻塞循环不许写在 async 函数里；`AudioWindowReader.extract` 只许字幕生成调。
-- `checks/check-all-shards.sh` — every guard and check script runs on CI exactly once; full-App checks in shards 1–3; the graphical steps after the App build.
+- `checks/check-all-shards.sh` — every guard and check script runs on CI exactly once; full-App checks in shards 1–3; the graphical steps after the App build; uploads can't fail a run.
 - `checks/check-script-source-lists.sh` — 自检脚本的 swiftc 文件清单不漏同伴文件。
 - `checks/ci-build-cache-key.sh` — one full-App `.build` cache for all shards, keyed by checkout, toolchain and commit, saved on main right after the App build.
 - `checks/ci-docs-only.sh` — 「只改了文档」快速通道只在真的只改了文档时走。
@@ -416,6 +416,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 
 ### 报告（docs/reports/）
 
+- [CI: full-App checks over three shards, cheap flakes](docs/reports/2026-11-20-ci-rebalance.md) — the longest shard 26.9 → 14.5 min (11-19 median vs #523, cache still the old one), the same 118 checks; uploads can't fail a shard.
 - [合并后 main 上那一轮：树已经验过就不再跑检查](docs/reports/2026-11-13-main-ci-verified-tree.md) — 到 11-13 能还原的 358 次合并里 308 次的树和 PR 那轮绿的 CI 测的一模一样（11-04 起 104 次里 77 次）；main 上红过的 24 轮没有一次是 PR 没跟上 main；几种做法的比较、GitHub 上试出来的行为。
 - [声音功能的真实冒烟：界面 + AI 工具（2026-11-11）](docs/reports/2026-11-11-voice-real-smoke.md) — 新建 / 设计 / 删声音、变声、读稿、长期授权全过，74.2 积分和账单逐笔对上；撞出的问题修在 #379、#383，音频引擎一直开着当时待拍板。
 - [变声（声音 PR 9）：离屏渲染和免费冒烟](docs/reports/2026-11-11-change-voice.md) — 面板三种语言的图、假 Sky Studio 上走全程；没验到真 Sky Studio 和真窗口。

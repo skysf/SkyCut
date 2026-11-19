@@ -52,6 +52,7 @@
 - [2026-09-18 自检脚本的源文件清单漏掉新依赖](2026-09-18-check-script-source-list-drift.md) — 手抄的清单会漂。
 - [2026-09-29 没下载苹方的 Mac 上中文字幕烧成方框](2026-09-29-chinese-burns-as-boxes-without-pingfang.md) — CoreText 找得到不等于 libass 找得到：回退到私有字体时两边一起换内置字体。
 - [2026-10-15 没有空格的长中文字幕，成片整行溢出](2026-10-15-chinese-subtitles-overflow-without-spaces.md) — 渲染器做不到的，App 算好写成 `\N`、把它的折行关彻底（WrapStyle 2）。
+- [2026-11-20 An artifact upload timeout turned a green shard red](2026-11-20-ci-artifact-upload-fails-green-shard.md) — A step that only reports but can fail the job is a gate in disguise: diagnostics get continue-on-error, pinned by a guard.
 - [2026-10-18 仓库改名后 CI 五组全部编不过](2026-10-18-ci-build-cache-breaks-after-repo-rename.md) — 记着绝对路径的缓存，key 里就得有那个路径。
 - [2026-11-04 CI 的 .build 缓存从没省下过一次编译](2026-11-04-ci-build-cache-never-saved-a-compile.md) — 修改时间按内容设、每组一份按提交存、只在 main 上存。
 - [2026-08-08 CI 首跑与吞错](2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) — SDK 与构建日志不许被吞。
