@@ -35,9 +35,14 @@ enum AIRecipeTools {
             // Only the shared rules, for edits in no style (2026-11-16). A style with this id or title wins above.
             if AIRecipe.slug(name) == MCPRecipeTools.sharedRulesID, version == nil { return sharedRulesOnly(sharedRules) }
             let ids = catalog.recipes.map(\.id).joined(separator: ", ")
-            let unreachable = skyStudio.origin == .unreachable ? " Sky Studio could not be reached, so its styles are not listed now." : ""
+            let missing: String
+            switch skyStudio.origin {
+            case .unreachable: missing = " Sky Studio could not be reached, so its styles are not listed now."
+            case .unavailable: missing = " No Sky Studio editing styles are available yet."
+            default: missing = ""
+            }
             throw AIToolError("There is no editing style called \(name). Styles: \(ids); \(MCPRecipeTools.sharedRulesID) "
-                + "has only the rules every style follows." + unreachable)
+                + "has only the rules every style follows." + missing)
         }
         if recipe.source == .skyStudio {
             guard let read = skyStudio.read, read.id == recipe.id else {
