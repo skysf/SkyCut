@@ -463,6 +463,12 @@
   test branches are swept. It also pins `merge-slot.yml` (triggers, one waiting job-level slot, permissions, main's
   script only) and `checks.yml` (takes the slot's dispatches, skips every shard on other refs). Reverse verification:
   24 mutations of the script each turned it red. Rules: [build doc "Merge slot"](../build/build-and-packaging.md).
+  - One PR under test at a time (2026-11-20, [case](../bugfixes/2026-11-20-merge-slot-tested-two-prs-at-once.md)):
+    slot tests last 12 polls (longer than the ten-minute window) and can be listed late. An older PR turning green
+    during a younger one's test, the workflow's next job arriving mid-test, and two tests left running by an older slot
+    never overlap, and the PR tested first merges first. Red with the slot from before the fix and with each of five
+    mutations of `holder()` / `serve` (run with `PYTHONDONTWRITEBYTECODE=1`: an in-place mutation of the same size can
+    otherwise run a stale `__pycache__`).
   - Since 2026-11-20 the same check runs `checks/MergeSlot/InfraRerunCases.py`: the verdict of `scripts/ci-infra-rerun.py`
     on runs whose jobs are built from checks.yml's own step names and GitHub's own messages (`FakeJobs.py`). Re-run: a
     shard or check-all that never got a runner, a runner lost or shut down during a setup step that was the last to

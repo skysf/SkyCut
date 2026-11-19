@@ -13,8 +13,9 @@ A labeled pull request, oldest label first:
 3. merges at once if a green checks run already tested X's tree: the marker verified-tree-<tree> of its own
    pull_request run (main hasn't moved since) or of an earlier slot run;
 4. else dispatches checks.yml on merge-slot/pr-<N>, which runs the same workflow file on the same tree as a
-   pull_request run on main + head; red or cancelled leaves the slot with a comment. While that run is going,
-   nothing else merges;
+   pull_request run on main + head; red or cancelled leaves the slot with a comment. While that run is going, that
+   pull request holds the slot: no other is tested or merged, even one with an older label whose own check turns
+   green meanwhile (holder(): read from GitHub every pass, so a new job of the workflow keeps holding it);
 5. merges (--merge, head pinned) only while main is still X's first parent, then dispatches checks.yml on main (a
    merge made with the workflow token starts no push run) and deletes the pull request's branch and merge-slot/pr-<N>.
 A pull request that changes .github/workflows/ leaves at once with the by-hand path: GitHub doesn't let the workflow
@@ -310,6 +311,28 @@ class Slot:
                                 f"(`gh run rerun {run['id']} --failed`) and add the label again: a green re-run of "
                                 "that run counts while main hasn't moved.")
 
+    def holder(self, waiting):
+        """The waiting pull request that holds the slot, the earliest if several, or None. A pull request holds it
+        while its slot test runs and for ten minutes after the test ends or this job dispatches one (GitHub lists a
+        dispatched run a little later; a green test merges next, a red one sends its pull request back). Read from
+        GitHub every pass, so the workflow's next job holds the same one. Only the holder moves: on 2026-11-19 the slot
+        dispatched #531's test while #532's ran, because each pass started again from the oldest label."""
+        by_number = {pull["number"]: pull for pull in waiting}
+        recent = self.now() - dt.timedelta(minutes=10)
+        found = []
+        runs = self.gh.call("GET", f"repos/{{repo}}/actions/workflows/{WORKFLOW}/runs?event=workflow_dispatch"
+                                   "&per_page=50")["workflow_runs"]
+        for run in runs:
+            number = run["head_branch"][len(SLOT_PREFIX):] if run["head_branch"].startswith(SLOT_PREFIX) else ""
+            if not (number.isdigit() and int(number) in by_number):
+                continue
+            if run["status"] != "completed" or when(run.get("updated_at") or run["created_at"]) > recent:
+                found.append((when(run["created_at"]), int(number)))
+        for (number, _), sent in self.dispatched.items():
+            if number in by_number and sent > recent:
+                found.append((sent, number))
+        return by_number[min(found)[1]] if found else None
+
     def sweep(self):
         """Deletes merge-slot/pr-<N> branches of pull requests that are no longer open."""
         open_numbers = {p["number"] for p in self.gh.call("GET", "repos/{repo}/pulls?state=open&per_page=100")}
@@ -333,7 +356,8 @@ class Slot:
             if not waiting:
                 self.log("only pull requests that left are labeled (their label couldn't be removed)")
                 return
-            for pull in waiting:  # one that left comes back with a new head or a new label
+            held = self.holder(waiting)
+            for pull in [held] if held else waiting:  # one that left comes back with a new head or a new label
                 state = self.advance(pull)
                 if state in ("merged", "left", "gone", "moved"):
                     moved = True

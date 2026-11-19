@@ -49,6 +49,8 @@ class FakeGitHub:
         self.plans, self.trees = {}, {}  # run id -> outcome per attempt (the last repeats); run id -> marker tree
         self.reruns = []  # run ids whose failed jobs were re-run (POST rerun-failed-jobs)
         self.refuse_rerun = False  # GitHub refuses re-runs (403) even of completed runs
+        self.slow_tests = 0  # polls a dispatched slot test stays in progress before it ends
+        self.list_delay = 0  # polls before GitHub lists a dispatched run (it does so a little later)
 
     # ---- building the world ----
     def commit(self, parents, tree):
@@ -97,6 +99,7 @@ class FakeGitHub:
             "id": run_id, "path": ".github/workflows/checks.yml", "event": event, "head_sha": head_sha,
             "head_branch": head_branch, "status": "completed" if conclusion else "queued",
             "conclusion": conclusion, "created_at": stamp(created or self.clock), "run_attempt": 1,
+            "updated_at": stamp(created or self.clock),
             "run_started_at": stamp(created or self.clock),
             "repository": {"full_name": REPO}, "head_repository": {"full_name": REPO},
             "html_url": f"https://example.invalid/runs/{run_id}",
@@ -137,6 +140,7 @@ class FakeGitHub:
         jobs = self.make.run(outcome)
         self.set_jobs(run["id"], run["run_attempt"], jobs)
         run["status"], run["conclusion"] = "completed", conclusion_of(jobs)
+        run["updated_at"] = stamp(self.clock)
         if run["conclusion"] == "success" and run["head_branch"] not in self.lost_markers:
             tree = self.trees.get(run["id"]) or self.commits[run["head_sha"]]["tree"]
             self.markers.setdefault(f"verified-tree-{tree}", []).append(run["id"])
@@ -165,8 +169,13 @@ class FakeGitHub:
         self.clock += dt.timedelta(seconds=seconds)
         self.frozen = max(0, self.frozen - 1)
         for run in list(self.runs.values()):
+            run["unlisted"] = max(0, run.get("unlisted", 0) - 1)
             if run["status"] != "completed" and (run["run_attempt"] > 1 or (
                     run["event"] == "workflow_dispatch" and run["head_branch"] != "main")):
+                if run.get("ticks_left", 0) > 0:  # a slow slot test: still running
+                    run["ticks_left"] -= 1
+                    run["status"] = "in_progress"
+                    continue
                 self.finish(run, self.planned(run))
         if self.on_tick:
             self.on_tick(self)
@@ -237,12 +246,12 @@ class FakeGitHub:
             if run["status"] != "completed" or self.refuse_rerun:
                 raise self.error(403, "This workflow is already running")
             run.update(run_attempt=run["run_attempt"] + 1, status="queued", conclusion=None,
-                       run_started_at=stamp(self.clock))
+                       run_started_at=stamp(self.clock), updated_at=stamp(self.clock))
             self.reruns.append(run["id"])
             return None
         if route == "actions/workflows/checks.yml/runs":  # newest first, like GitHub
-            found = [r for r in self.runs.values() if r["head_branch"] == query.get("branch")
-                     and query.get("event") in (None, r["event"])]
+            found = [r for r in self.runs.values() if query.get("branch") in (None, r["head_branch"])
+                     and query.get("event") in (None, r["event"]) and not r.get("unlisted")]
             found.sort(key=lambda r: -r["id"])
             return {"workflow_runs": found[:int(query.get("per_page", "30"))]}
         if route == "actions/workflows/checks.yml/dispatches" and method == "POST":
@@ -254,6 +263,8 @@ class FakeGitHub:
             self.dispatches.append(ref)
             head = self.main if ref == "main" else self.refs[ref]
             run_id = self.add_run("workflow_dispatch", head, ref, None)
+            self.runs[run_id]["ticks_left"] = self.slow_tests if ref != "main" else 0
+            self.runs[run_id]["unlisted"] = self.list_delay
             if ref == "main":
                 self.runs[run_id]["status"] = "completed"
             return None
