@@ -122,6 +122,10 @@
     `SkyStudioCharacterPlan.action`). No parameter, choice, range or required list changed and no limit was raised: 95,703 /
     100,000 afterwards. The PR description has the table of removed wording and where it went (item 14). A topic that grows
     past 6,000 is answered in parts by itself; manage_characters' whole answer is 5,829.
+18. **Music length and video sound** (2026-11-19, MCP-18 / MCP-42): generate_media gained two parameters with one-line notes,
+    `exact_length` and `audio_mode` (its three modes are `MCPVocabulary.videoAudioModes`), and two written sections,
+    `music_length` and `video_sound`, which the reading tip names after `spending`; `jobs_results` names `duration_source`.
+    No limit was raised: the catalog is 95,996 / 100,000 afterwards.
 
 ## 四、守卫
 

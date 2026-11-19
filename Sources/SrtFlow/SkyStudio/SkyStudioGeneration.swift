@@ -7,6 +7,9 @@ import SrtFlowMCPKit
 // - 默认值：从选中模型读；画幅跟画布 / 首帧；音效 5 秒 wav；音乐纯音乐、长度让模型定。旧目录缺默认值时保留旧 H3 的 5 秒 768p。
 // - 换成 Sky Studio 的写法：视频和音乐的秒数取整。
 // - 给了但这一种用不上的参数说一句。
+// - Since 2026-11-19 (MCP-18, MCP-42): a music length follows the chosen model's `length` (its steps, its default; nothing for an
+//   automatic length; SkyStudioMusicLength) instead of whole seconds; a video's `audio_mode` is sent only when asked
+//   (SkyStudioVideoSound).
 // 限制从 `/models` 读，交任务前由 ModelPolicy / GenerationControls / ReferencePolicy 检查；价只问 `/quote`，服务端错误原话交给 AI。
 // 取值见 Sky Studio 仓库 docs/agents/skycut-api.md「Per kind」。
 // 不管什么：问价、把关、跑任务、下载（SkyStudioGenerateTool / SkyStudioGenerationRun）；模型偏好（SkyStudioModelPolicy）。
@@ -44,6 +47,10 @@ struct SkyStudioGeneration: Equatable, Sendable {
         var generateAudio: Bool?
         var controls: [String: JSONValue] = [:]
         var smartDuration = false
+        /// Music: the file must be exactly `duration` long (a model whose `length.control` is exact; SkyStudioMusicLength).
+        var exactLength = false
+        /// Video: full / ambient / none (SkyStudioVideoSound); nil = not asked, nothing sent.
+        var audioMode: String?
         var operation = "generate"
         var cameraAngle: SkyStudioCameraAngle?
         var upscaleFactor: String?
@@ -103,9 +110,10 @@ struct SkyStudioGeneration: Equatable, Sendable {
             if model?.params["generate_audio"] != nil {
                 params["generate_audio"] = .bool(ask.generateAudio ?? model?.defaults["generate_audio"]?.boolValue ?? true)
             } else if ask.generateAudio != nil { ignored("generate_audio", "this model has no audio toggle") }
+            SkyStudioVideoSound.apply(ask, model: model, to: &params)
         case .music:
-            // 不给时长就让模型自己定（Sky Studio 的 auto）。
-            if let seconds = ask.duration { params["duration"] = .number(seconds.rounded()) }
+            // The asked length in the model's steps; none asked: the model's own default, or nothing when it picks its own (auto).
+            if let seconds = SkyStudioMusicLength.seconds(for: ask, model: model) { params["duration"] = .number(seconds) }
             let instrumental = ask.instrumental ?? true
             params["instrumental"] = .bool(instrumental)
             if let lyrics = ask.lyrics?.trimmingCharacters(in: .whitespacesAndNewlines), !lyrics.isEmpty {
@@ -133,6 +141,10 @@ struct SkyStudioGeneration: Equatable, Sendable {
         if kind != .music, ask.instrumental != nil { ignored("instrumental", "it only applies to music") }
         if kind != .music, ask.lyrics != nil { ignored("lyrics", "it only applies to music") }
         if !kind.isVideo, ask.generateAudio != nil { ignored("generate_audio", "it only applies to video") }
+        if kind != .music, ask.exactLength { ignored("exact_length", "it only applies to music") }
+        if kind != .textToVideo, kind != .imageToVideo, ask.audioMode != nil {
+            ignored("audio_mode", "it only applies to text_to_video and image_to_video")
+        }
         if !kind.isSound, let references {
             if kind == .lipsync {
                 for file in references.files where file.type == "video" || file.type == "audio" {
@@ -170,8 +182,9 @@ struct SkyStudioGeneration: Equatable, Sendable {
         case .imageToVideo, .textToVideo:
             parts.append(params["duration"]?.doubleValue.map { "\(Int($0)) s" } ?? "auto")
             parts.append(params["resolution"]?.stringValue ?? Self.defaultResolution)
+            if let mode = params["audio_mode"]?.stringValue, mode != "full" { parts.append(mode == "none" ? "no sound" : "ambient sound") }
         case .music:
-            parts.append(params["duration"]?.doubleValue.map { "\(Int($0)) s" } ?? "auto")
+            parts.append(params["duration"]?.doubleValue.map { "\(SkyStudioMusicLength.text($0)) s" } ?? "auto")
             if params["instrumental"]?.boolValue == false { parts.append("vocals") }
         case .soundEffect:
             parts.append(String(format: "%.1f s", params["duration"]?.doubleValue ?? 0))

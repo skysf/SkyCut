@@ -12,10 +12,16 @@ public enum SubtitleConverter {
     /// Reads a subtitle file (format from its extension, text via `TextDecoding`) and returns it converted to
     /// `target`, without writing anything. Batch conversion and the AI's convert_subtitles both go through here.
     public static func convertedContents(of url: URL, to target: SubtitleFormat) throws -> String {
-        guard let source = SubtitleFormat.detect(from: url.lastPathComponent) else {
+        // An unsupported name is refused before the file is read.
+        guard SubtitleFormat.detect(from: url.lastPathComponent) != nil else { throw CocoaError(.fileReadUnsupportedScheme) }
+        return try convertedContents(of: try Data(contentsOf: url), named: url.lastPathComponent, to: target)
+    }
+
+    /// The same for bytes already read (the AI's convert_subtitles reads them off the main thread, AIEncodeInputs).
+    public static func convertedContents(of data: Data, named fileName: String, to target: SubtitleFormat) throws -> String {
+        guard let source = SubtitleFormat.detect(from: fileName) else {
             throw CocoaError(.fileReadUnsupportedScheme)
         }
-        let data = try Data(contentsOf: url)
         guard let content = TextDecoding.decode(data) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }

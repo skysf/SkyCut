@@ -134,7 +134,9 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
   against the other items at once and again once its folder's names are back from `ExportDestinationProbe`
   (`EncodeOutputFolder`, 5 s deadline), and the finished file's size is read there too; `compress_videos`, `burn_subtitles`
   and `convert_subtitles` make, check and list their folder through the probe before anything is queued or written
-  (`AIEncodeFolder`, 15 s) ([export settings](export-settings.md) §5 item 8).
+  (`AIEncodeFolder`, 15 s) ([export settings](export-settings.md) §5 item 8). The files they are given go through it too
+  (`AIEncodeInputs`, 15 s): found, checked, burn_subtitles' subtitles read, convert_subtitles' files read and written
+  ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
 - The subtitle editor's Save and Export As (since
   [subtitle and version saves touched drives on the main thread](../bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md)):
   the bytes are made from the document on the main thread, the write runs on `SubtitleFileSave`'s queue with the same 15 s

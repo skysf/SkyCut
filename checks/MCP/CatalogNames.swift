@@ -42,6 +42,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["max_duration", "shortened_from", "shortened_reason"])
     // Saved project ending and timed generation feedback (MCP-17 / MCP-9).
     names.formUnion(["minimum_duration", "requested_duration", "duration_warning", "duration_note"])
+    // Sky Studio's delivered-length source and a generated video's audio block (2026-11-19, MCP-9 / MCP-42; SkyStudioVideoSound).
+    names.formUnion(["duration_source", "has_track", "can_turn_off", "may_carry_bed"])
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
@@ -130,6 +132,9 @@ func catalogKnownNames() -> Set<String> {
     // the kinds, a music edge's nearest event, and listen cuts=true's statuses.
     names.formUnion(["audio_music_drops", "audio_music_late", "audio_no_score", "audio_no_music", "audio_music_edge", "audio_abrupt",
                      "event_at", "frames_from_event", "on_speech", "on_sound", "file_edge"])
+    // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
+    // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
+    names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
     return names
 }
 
