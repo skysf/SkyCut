@@ -46,5 +46,26 @@ for expected in 0 37; do
     failed=1
   fi
 done
+
+# The synthetic App can be removed even if detaching its read-only DMG fails.
+stage="${scratch}/dmg"
+mkdir -p "${stage}/fixture/SkyCut.app"
+status=0
+/bin/bash -e -c '
+  . scripts/test-app-cleanup.sh
+  WORK="$1"
+  FIXTURE_APP="${WORK}/fixture/SkyCut.app"
+  MOUNT="${WORK}/mount"
+  MOUNTED=1
+  unregister_test_app() { :; }
+  hdiutil() { return 37; }
+  eval "$2"
+  cleanup
+' -- "${stage}" "$(sed -n '/^cleanup() {$/,/^}$/p' scripts/check-dmg.sh)" || status=$?
+if [ "${status}" -ne 37 ] || [ -e "${stage}/fixture/SkyCut.app" ]; then
+  echo '✗ The DMG test left its fixture app when detach failed' >&2
+  failed=1
+fi
+
 [ "${failed}" -eq 0 ] || exit 1
 echo "✓ ${count} test app staging scripts use cleanup. The trap preserves both success and failure."

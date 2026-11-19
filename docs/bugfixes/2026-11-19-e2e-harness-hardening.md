@@ -46,6 +46,7 @@ The watchdog is 300 s for the suite. The CI shard still has its 30-minute limit.
 The login-home guard detected the real preference leak before the in-process preference fix.
 `checks/test-app-cleanup.sh` exercises success and failure with a scratch bundle and rejected the original
 `check-motion-placement.sh` trap when temporarily restored.
+It also checks that a DMG detach failure still removes the separately staged fixture app.
 
 ## Lessons
 

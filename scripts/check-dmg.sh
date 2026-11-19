@@ -13,11 +13,11 @@ MOUNT="${WORK}/mount"
 FIXTURE_APP="${WORK}/fixture/SkyCut.app"
 MOUNTED=0
 cleanup() {
+    remove_test_app "${FIXTURE_APP}"
     if [ "${MOUNTED}" -eq 1 ]; then
         unregister_test_app "${MOUNT}/SkyCut.app"
         hdiutil detach "${MOUNT}" >/dev/null
     fi
-    remove_test_app "${FIXTURE_APP}"
     rm -rf "${WORK}"
 }
 trap cleanup EXIT
