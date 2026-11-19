@@ -131,6 +131,9 @@ import SrtFlowMCPKit
             // export_video's folder: made, checked and listed off the main thread, refused before any job (2026-11-19 case).
             print("AI EXPORT FOLDER: made, checked, refused off the main thread"); fflush(stdout)
             await AIExportFolderChecks.run(root: root, project: project, require: require)
+            // Parallel AI exports never share a name; nothing that appears after a listing is replaced (2026-11-19 case).
+            print("EXPORT TARGETS: one name per export, never replacing"); fflush(stdout)
+            await ExportTargetChecks.run(root: root, ffmpeg: ffmpeg, project: project, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

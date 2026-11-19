@@ -7,7 +7,8 @@ import SrtFlowMCPKit
 //
 // 管什么：export_video 走导出面板那同一个导出器（`VideoEditExporter`），只是不弹面板；导出器占着就排队（AIWorkQueue，2026-10-17）：
 // 文件名默认是工程名、放在打开的文件夹的 SrtFlow/导出 里，已经有同名文件就加编号（从不覆盖，所以不问，方案第 34 条；
-// which file, and the folder's checks, off the main thread: AIExportDestination）；
+// which file, and the folder's checks, off the main thread, the name reserved until the video is written: AIExportDestination;
+// a file that appears meanwhile is never replaced either, the video gets a later number: ExportTarget.newFile）；
 // 烧字幕、分辨率的口径和面板一样（烧看得见的轨；分辨率封短边、只降不升）。
 // get_job / cancel_job 管所有长任务（AIJobs）。
 // 不管什么：说明文字（SrtFlowMCPKit/MCPSubtitleExportTools.swift）、导出本身。
@@ -15,8 +16,6 @@ import SrtFlowMCPKit
 @MainActor
 enum AIExportTools {
     private static var subscriptions: [String: AnyCancellable] = [:]
-    /// 排着队、还没写出来的成品路径：几个导出排在一起时各占各的名字，不会都算成同一个「没被占」的名字。
-    private static var reservedOutputs: Set<String> = []
 
     /// `destination` / `deadline`: the checks pass a drive that never answers or is read-only (ExportDestinationProbe).
     static func export(
@@ -37,13 +36,11 @@ enum AIExportTools {
         var options = SubtitleExportOptions()
         options.burnIn = try args.bool("burn_subtitles") ?? true
         // The folder is made, checked and listed off the main thread (a slow, stuck or read-only drive never freezes
-        // SkyCut, and is said before anything is encoded); the name is reserved the moment it is chosen.
-        let output = try await AIExportDestination.output(
-            args, project: project, fileExtension: audioOnly ? "m4a" : "mp4", reserved: reservedOutputs,
-            probe: destination, deadline: deadline
+        // SkyCut, and is said before anything is encoded); the name is picked and reserved in one step, until the video
+        // is written (AIExportDestination.release).
+        let chosen = try await AIExportDestination.output(
+            args, project: project, fileExtension: audioOnly ? "m4a" : "mp4", probe: destination, deadline: deadline
         )
-        let reserved = output.standardizedFileURL.path
-        reservedOutputs.insert(reserved)
         options.applyBurnChoice(to: &state)
         if audioOnly {
             state.subtitle = nil
@@ -74,7 +71,7 @@ enum AIExportTools {
         timing.begin("queue")
         let job = AIJobs.shared.start(.export, progress: { work.started ? exporter.progress : nil }, liveDetail: live, cancel: {
             if !work.started { timing.finish() }
-            work.cancel(withdrawn: { reservedOutputs.remove(reserved) }, stop: { exporter.cancel() })
+            work.cancel(withdrawn: { AIExportDestination.release(chosen) }, stop: { exporter.cancel() })
             if !work.started, let job = work.job { AIJobs.shared.updateDetail(job, live()) }
         })
         work.job = job
@@ -82,9 +79,9 @@ enum AIExportTools {
         let position = AIWorkQueue.shared.submit(.export, jobID: job.id) {
             work.started = true
             timing.begin("preparation")
-            exporter.export(for: project, state: state, to: output, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings, timing: timing)
+            exporter.export(for: project, state: state, to: chosen.target, subtitleStyle: style, subtitleFontURL: fontURL, settingsOverride: settings, timing: timing)
             guard exporter.isExporting else {
-                reservedOutputs.remove(reserved)
+                AIExportDestination.release(chosen)
                 timing.finish()
                 AIJobs.shared.finish(job, .failed, message: exporter.errorMessage ?? "The export could not start.", detail: .object(live()))
                 return
@@ -92,10 +89,16 @@ enum AIExportTools {
             // 结局在 isExporting 变回 false 的那一刻记下（@Published 在赋值之前发，那时成品路径 / 错误已经写好了）。
             subscriptions[job.id] = exporter.$isExporting.dropFirst().filter { !$0 }.first().sink { _ in
                 MainActor.assumeIsolated {
-                    reservedOutputs.remove(reserved)
-                    if exporter.finishedURL?.standardizedFileURL.path == output.standardizedFileURL.path {
+                    AIExportDestination.release(chosen)
+                    if exporter.finishedTarget == chosen.target, let output = exporter.finishedURL {
                         var detail = finishedDetail(output, video: video, levels: exporter.finishedAudioLevels, watermarked: exporter.watermarked)
                         detail["resolution_report"] = resolutionReport
+                        if output.standardizedFileURL.path != chosen.target.url.standardizedFileURL.path {
+                            detail["path_note"] = .string(
+                                "\(chosen.target.url.lastPathComponent) appeared in the folder while exporting, so this video is "
+                                    + "\(output.lastPathComponent). Nothing was replaced; tell the user the file name."
+                            )
+                        }
                         detail.merge(live()) { current, _ in current }
                         AIJobs.shared.finish(job, .done, detail: .object(detail))
                     } else if let error = exporter.errorMessage {
@@ -111,7 +114,7 @@ enum AIExportTools {
         var result: [String: JSONValue] = [
             "job_id": .string(job.id), "resolution_report": resolutionReport, "export_settings": reported,
             "status": position == nil ? "running" : "queued",
-            "path": .string(output.path),
+            "path": .string(chosen.target.url.path),
             "next_step": .string(position == nil
                 ? "Call get_job with this job_id and wait_seconds 30 until the status is done."
                 : "Another export is running; this one starts after it (queue_position). Wait with get_job.")

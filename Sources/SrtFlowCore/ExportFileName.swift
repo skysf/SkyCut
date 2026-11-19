@@ -11,13 +11,23 @@ public enum ExportFileName {
     public static func unoccupied(
         in folder: URL, stem: String, pathExtension: String, exists: (URL) -> Bool
     ) -> URL {
-        var candidate = folder.appendingPathComponent(stem).appendingPathExtension(pathExtension)
-        var number = 2
-        while exists(candidate) {
-            candidate = folder.appendingPathComponent("\(stem) \(number)").appendingPathExtension(pathExtension)
-            number += 1
-        }
-        return candidate
+        numbered(unoccupiedNumber(in: folder, stem: stem, pathExtension: pathExtension, exists: exists),
+                 in: folder, stem: stem, pathExtension: pathExtension)
+    }
+
+    /// Which name of the series `unoccupied` answers (1 = no number). A file that must never replace anything carries on
+    /// from there when that name is taken by the time it is written (ExclusivePlacement.place).
+    public static func unoccupiedNumber(
+        in folder: URL, stem: String, pathExtension: String, exists: (URL) -> Bool
+    ) -> Int {
+        var number = 1
+        while exists(numbered(number, in: folder, stem: stem, pathExtension: pathExtension)) { number += 1 }
+        return number
+    }
+
+    /// The names `unoccupied` walks: 1 → `stem.ext`, n → `stem n.ext`.
+    public static func numbered(_ number: Int, in folder: URL, stem: String, pathExtension: String) -> URL {
+        folder.appendingPathComponent(number > 1 ? "\(stem) \(number)" : stem).appendingPathExtension(pathExtension)
     }
 
     /// - 去掉首尾空白；

@@ -11,12 +11,17 @@ import SrtFlowMCPKit
 // that touches the drive runs through ExportDestinationProbe: off the main thread, with the export panel's deadline for a
 // check that writes, at most three checks left waiting on one drive. A folder that can't be used is refused with the
 // export panel's sentence (in English) before a job is started.
+// The name is picked and reserved in one main-actor step after the listing comes back, against the reservations as they
+// are then (`reserved`): two projects exporting into one folder at once never get the same name. The delivery itself
+// never replaces either (ExportTarget.newFile): a file that appears after the listing moves the video on to a later number.
 // What it doesn't: the export itself (AIExportTools, VideoEditExporter); the export panel's folder (ExportDestinationState).
 //
 // Why (2026-11-19, docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md): export_video created the folder
 // and asked `fileExists` for each candidate name on the main thread — the same freeze as the export panel's
 // (docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md) — and a read-only or unwritable folder was only found
 // out when the finished video was delivered, after the whole encode. Rules: docs/architecture/export-settings.md §8.
+// Picking against a copy of the reservations taken before the listing let two parallel exports pick one name, and the
+// second delivery replaced the first (2026-11-19, docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
 
 @MainActor
 enum AIExportDestination {
@@ -24,21 +29,46 @@ enum AIExportDestination {
     /// hard drive can take this long to spin up, ExportDestinationState).
     static let deadline: TimeInterval = 15
 
+    /// The names picked by export_video calls whose video is not written yet (queued or exporting), folded the way the
+    /// default macOS volumes compare names; the value tells reservations apart (a late release never frees another's).
+    private static var reserved: [String: UUID] = [:]
+
+    /// The file export_video writes, reserved for it until `release`.
+    struct Chosen: Sendable {
+        var target: ExportTarget
+        fileprivate var key: String
+        fileprivate var id: UUID
+    }
+
     /// The file export_video writes: its folder is there and writable, and the name is free (not in the folder, not
-    /// `reserved` by an export still queued). Throws the export panel's sentence when the folder can't be used.
+    /// reserved by an export still queued or exporting). Throws the export panel's sentence when the folder can't be used.
     static func output(
-        _ args: AIToolArguments, project: VideoEditProject, fileExtension: String, reserved: Set<String>,
+        _ args: AIToolArguments, project: VideoEditProject, fileExtension: String,
         probe: ExportDestinationProbe = .shared, deadline: TimeInterval = deadline
-    ) async throws -> URL {
+    ) async throws -> Chosen {
         let request = try Request(args, project: project, fileExtension: fileExtension)
         let timedOut = Found(file: request.withoutAsking, report: ExportDestinationReport(problem: .noResponse))
         let found = await probe.run(on: request.near, deadline: deadline, timedOut: timedOut) { request.prepare($0) }
         let folder = found.file.deletingLastPathComponent()
         if let problem = found.report.problem { throw refusal(problem, folder: folder) }
-        return ExportFileName.unoccupied(
-            in: folder, stem: found.file.deletingPathExtension().lastPathComponent, pathExtension: found.file.pathExtension
-        ) { found.report.contains($0.lastPathComponent) || reserved.contains($0.standardizedFileURL.path) }
+        // From here to the return there is no `await`: the name is picked against the reservations as they are now and
+        // reserved before any other call can pick (one main-actor step).
+        let stem = found.file.deletingPathExtension().lastPathComponent, pathExtension = found.file.pathExtension
+        let number = ExportFileName.unoccupiedNumber(in: folder, stem: stem, pathExtension: pathExtension) {
+            found.report.contains($0.lastPathComponent) || reserved[key($0)] != nil
+        }
+        let target = ExportTarget.newFile(folder: folder, stem: stem, pathExtension: pathExtension, number: number)
+        let chosen = Chosen(target: target, key: key(target.url), id: UUID())
+        reserved[chosen.key] = chosen.id
+        return chosen
     }
+
+    /// The video is written, failed or will not be: its name is free for the next export.
+    static func release(_ chosen: Chosen) {
+        if reserved[chosen.key] == chosen.id { reserved[chosen.key] = nil }
+    }
+
+    private static func key(_ url: URL) -> String { ExportDestinationReport.fold(url.standardizedFileURL.path) }
 
     /// export_video's and export_subtitles' folder: made when it is missing, then the export panel's look-and-write check.
     /// Runs off the main thread (inside `ExportDestinationProbe.run`).

@@ -145,7 +145,7 @@ import Foundation
         }
         defer { ExportDelivery.beforeMoveForChecks = nil }
         let exporter = VideoEditExporter.shared
-        exporter.export(for: project, state: state, to: output, subtitleStyle: .default, subtitleFontURL: nil)
+        exporter.export(for: project, state: state, to: .replacing(output), subtitleStyle: .default, subtitleFontURL: nil)
         var sawDelivering = false
         for _ in 0..<1200 where exporter.isExporting {
             sawDelivering = sawDelivering || exporter.isDelivering
