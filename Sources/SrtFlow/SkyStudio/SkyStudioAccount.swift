@@ -108,7 +108,9 @@ final class SkyStudioAccount: ObservableObject {
         if Bundle.main.bundleIdentifier?.hasSuffix(".skystudiosmoke") == true,
            let host = SkyStudioAPI.configuredBase(environment).host, SkyStudioAPI.isLoopback(host),
            let key = environment["SRTFLOW_SMOKE_SKYSTUDIO_KEY"] {
-            Task { await saveKey(key) }
+            // A fresh smoke identity uses its loopback fixture in memory, including while the first /me is pending.
+            keychainChecked = true
+            Task { await installKey(key, secret: nil) }
         } else {
             Task {
                 await prepareKeychain()
@@ -198,6 +200,10 @@ final class SkyStudioAccount: ObservableObject {
 
     /// 存一把新 Key：整理、存进钥匙串、马上问一次 /me。Sky Studio 不认（`invalid_key`）就不留着它；没连上就先留着，之后再问。
     func saveKey(_ raw: String) async {
+        await installKey(raw, secret: SkyStudioKey.secret)
+    }
+
+    private func installKey(_ raw: String, secret: KeychainSecret?) async {
         guard !checking, !authorizingKeychain else { return }
         guard let key = SkyStudioKey.normalized(raw) else {
             problem = .notAKey
@@ -206,7 +212,7 @@ final class SkyStudioAccount: ObservableObject {
         checking = true
         defer { checking = false }
         do {
-            try await SkyStudioKey.secret.save(key)
+            try await secret?.save(key)
         } catch {
             problem = .keychain((error as? KeychainSecret.StoreError)?.message ?? error.localizedDescription)
             return
@@ -224,7 +230,7 @@ final class SkyStudioAccount: ObservableObject {
         problem = nil
         await ask(with: key)
         if case .keyRejected? = problem {
-            try? await SkyStudioKey.secret.delete()
+            try? await secret?.delete()
             await SkyStudioKey.cache.remember(nil)
             hasKey = false
         } else {
