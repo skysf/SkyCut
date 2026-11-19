@@ -107,7 +107,7 @@ enum SkyStudioCharacterError {
         }
         var fields = value.fields
         fields["code"] = .string(value.code)
-        fields["next_step"] = .string(nextStep(value.code))
+        fields["next_step"] = .string(SkyStudioGenerationRefusal.nextStep(value) ?? nextStep(value.code))
         return AIToolError(value.message, details: fields)
     }
 

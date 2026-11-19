@@ -31,10 +31,16 @@ enum AIDraftPolicy {
             result.append(.init(reason: "Resolution \(actual) exceeds this model's draft setting \(draft).", names: AIOverrideQuote.resolutionNames(actual)))
         }
         if let seconds = generation.params["duration"]?.doubleValue,
-           let base = model.defaults["duration"]?.doubleValue, seconds > base {
+           let base = model.defaults["duration"]?.doubleValue, seconds > base, !lengthIsFree(model) {
             result.append(.init(reason: "Duration \(seconds)s exceeds the default \(base)s.", names: AIOverrideQuote.durationNames(seconds)))
         }
         return result
+    }
+
+    /// A music model priced per song or per clip (`/models` `price.per`) costs the same at any length, so a longer piece is not
+    /// beyond the draft (2026-11-19: the exact-length model defaults to 30 s at one price per clip; MCP-18).
+    static func lengthIsFree(_ model: SkyStudioModel) -> Bool {
+        model.kind == "music" && ["song", "clip"].contains(model.price["per"]?.stringValue ?? "")
     }
 
     // 项目放行只覆盖同模型 / 规格和价格上限；不把整段提示词或随机 seed 绑成同一条镜头。

@@ -14,6 +14,8 @@ enum SkyStudioGenerationControls {
             aspectRatio: try args.string("aspect_ratio"), instrumental: try args.bool("instrumental"), lyrics: try args.string("lyrics"),
             generateAudio: try args.bool("generate_audio"))
         ask.smartDuration = smart
+        ask.exactLength = try args.bool("exact_length") ?? false
+        ask.audioMode = try args.choice("audio_mode", from: MCPVocabulary.videoAudioModes)
         ask.operation = try args.choice("operation", from: SkyStudioImageOperation.names) ?? "generate"
         try SkyStudioImageOperation.validateRoute(args)
         if let angle = args.raw["camera_angle"], !angle.isNull { ask.cameraAngle = try SkyStudioCameraAngle.read(angle) }
@@ -41,14 +43,18 @@ enum SkyStudioGenerationControls {
         if ask.resolution != nil, model.params["resolution"] == nil { return "This model does not expose a resolution selector." }
         if audioDriven || remove || camera || upscale {
             if !prompt.isEmpty { return "This operation takes media, not a prompt." }
-            if ask.duration != nil || ask.smartDuration || (!camera && ask.aspectRatio != nil) || ask.generateAudio != nil || ask.instrumental != nil || ask.lyrics != nil {
-                return "This operation does not accept duration, aspect_ratio, generate_audio, instrumental or lyrics. Output duration follows the supplied audio/video."
+            if ask.duration != nil || ask.smartDuration || (!camera && ask.aspectRatio != nil) || ask.generateAudio != nil || ask.audioMode != nil
+                || ask.instrumental != nil || ask.lyrics != nil {
+                return "This operation does not accept duration, aspect_ratio, generate_audio, audio_mode, instrumental or lyrics. Output duration follows the supplied audio/video."
             }
             if remove && ask.resolution != nil { return "Background removal has no resolution selector; use the actual output dimensions." }
         } else if prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                   model.kind != "image_to_video" || model.params["smart_duration"] == nil { return "prompt is required for this model." }
         if let max = model.limit("max_prompt_characters"), Double(prompt.unicodeScalars.count) > max { return "prompt exceeds \(Int(max)) Unicode characters." }
-        if ask.smartDuration && model.params["smart_duration"] == nil { return "This model does not offer smart duration (null/auto)." }
+        // A music model's own length (auto) is judged from its `length` in SkyStudioModelPolicy.problem (SkyStudioMusicLength).
+        if ask.smartDuration && model.kind != "music" && model.params["smart_duration"] == nil { return "This model does not offer smart duration (null/auto)." }
+        // audio_mode is not judged here: it never moves the choice to another (pricier) model; the generate tools check it on the
+        // chosen model (SkyStudioVideoSound.problem).
         if model.params["smart_duration"] != nil, let seconds = ask.duration, seconds.rounded() != seconds { return "duration must be whole seconds or auto for this model." }
         if let ratio = ask.aspectRatio, !model.choices("aspect_ratio").isEmpty, !model.choices("aspect_ratio").contains(ratio) {
             return "aspect_ratio must be one of: \(model.choices("aspect_ratio").joined(separator: ", "))."
