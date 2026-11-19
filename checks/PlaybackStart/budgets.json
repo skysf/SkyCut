@@ -29,7 +29,8 @@
     "near-end": {},
     "end-replay": {
       "audioMs": 265,
-      "videoMs": 310
+      "videoMs": 380,
+      "startOffsetMs": 60
     },
     "idle-wake": {
       "dispatchMs": 650,
@@ -58,17 +59,18 @@
         "dispatchMs": 20,
         "audioMs": 3200,
         "videoMs": 3300,
-        "onsetGapMs": 150,
+        "onsetGapMs": 170,
         "videoAdvanceMs": 150,
-        "startOffsetMs": 120
+        "startOffsetMs": 145
       },
       "cut": {
         "audioMs": 230,
         "videoMs": 265
       },
       "end-replay": {
-        "audioMs": 190,
-        "videoMs": 250
+        "audioMs": 220,
+        "videoMs": 300,
+        "startOffsetMs": 48
       },
       "idle-wake": {
         "dispatchMs": 550,

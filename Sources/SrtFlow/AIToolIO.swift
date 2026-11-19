@@ -87,12 +87,9 @@ struct AIToolArguments {
 
     func bool(_ key: String) throws -> Bool? {
         guard let value = raw[key], !value.isNull else { return nil }
-        switch value {
-        case .bool(let flag): return flag
-        case .string(let text) where ["true", "false"].contains(text.lowercased()): return text.lowercased() == "true"
-        case .number(let number) where number == 0 || number == 1: return number == 1
-        default: throw AIToolError("\(key) must be true or false.")
-        }
+        // Read like the router reads it (JSONValue.flagValue): a time bound must agree with the tool on `relative`.
+        guard let flag = value.flagValue else { throw AIToolError("\(key) must be true or false.") }
+        return flag
     }
 
     func array(_ key: String) throws -> [JSONValue]? {

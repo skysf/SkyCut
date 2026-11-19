@@ -35,13 +35,14 @@ enum AIEditLimits {
         }
     }
 
-    /// The refusal for a call with a time outside `time` (NaN, infinite, negative or past one day), or nil. The router answers
-    /// with it before the call queues, starts a round or opens an undo group: a refusal inside a wrapped tool left an empty
-    /// undo step (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md). A time inside a list entry also names the list
-    /// and the entry (`batch`, `index`), like the other per-entry errors.
-    static func timeRefusal(tool: MCPToolName, arguments: JSONValue) -> AIToolError? {
-        guard let found = MCPTimeArguments.firstOutOfBounds(tool: tool, arguments: arguments) else { return nil }
-        let error = invalid(found.path, found.requested, minimum: time.lowerBound, maximum: time.upperBound)
+    /// The refusal for a call with a time outside `time` (NaN, infinite, negative or past one day; past the project's own end
+    /// when that runs longer, `timelineEnd`; set_keyframes' relative fractions outside theirs, MCPTimeArguments.allowed), or nil.
+    /// The router answers with it once the call's project is known and before it starts a round or opens an undo group: a
+    /// refusal inside a wrapped tool left an empty undo step (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md). A time
+    /// inside a list entry also names the list and the entry (`batch`, `index`), like the other per-entry errors.
+    static func timeRefusal(tool: MCPToolName, arguments: JSONValue, timelineEnd: Double? = nil) -> AIToolError? {
+        guard let found = MCPTimeArguments.firstOutOfBounds(tool: tool, arguments: arguments, timelineEnd: timelineEnd) else { return nil }
+        let error = invalid(found.path, found.requested, minimum: found.allowed.lowerBound, maximum: found.allowed.upperBound)
         guard let entry = found.entry else { return error }
         var details = error.details
         details["batch"] = .string(entry.list)

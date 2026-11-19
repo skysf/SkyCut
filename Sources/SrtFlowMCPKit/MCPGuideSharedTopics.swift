@@ -57,7 +57,8 @@ enum MCPGuideSharedTopics {
         Time. All times are seconds. start, time, duration and seek use timeline seconds. source_in and source_out are seconds inside \
         the media file; look, listen and transcribe with file= also use file seconds. Changing source_in or source_out with edit_clip \
         keeps the clip's timeline start and moves its end, unless you also pass start. Every time is a number from 0 to 86400 \
-        seconds (one day, edit_limits.time); a negative, infinite or larger one fails the whole call before anything changes.
+        seconds (one day, edit_limits.time; up to the project's end when it already runs longer); a negative, infinite or larger \
+        one fails the whole call before anything changes. set_keyframes times with relative=true are fractions from -0.001 to 1.001.
 
         Tracks. V1 is the main video track: its clips play one after another. V2, V3… are video tracks above it (pictures over V1). \
         A1, A2… are audio tracks; add_clips creates the A-numbers it is given that do not exist yet. track=new_video or new_audio \

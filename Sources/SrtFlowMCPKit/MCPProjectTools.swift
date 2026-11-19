@@ -6,7 +6,7 @@ import Foundation
 
 public enum MCPProjectTools {
     /// 每个碰工程的工具都收的 `project` 参数的说明（`MCPToolDefinition.addProjectParameter` 统一加）。
-    static let projectParameter = "Project; default last opened."
+    static let projectParameter = "Default: last opened."
 
     static func definition(for name: MCPToolName) -> MCPToolDefinition {
         switch name {
@@ -14,14 +14,13 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .getStatus, title: "SkyCut status",
                 description: """
-                Read-only. Projects, folders, jobs, screen recording, and cloud_tasks grouped by project: closed ones too. \
-                models=true: free model catalog; screen=true: recording sources; film_contract=true: public film contract.
+                Read-only. Projects, folders, jobs, screen recording, and cloud_tasks grouped by project: closed ones too.
                 """,
                 input: MCPSchema.object([
-                    "screen": MCPSchema.boolean("Also list the displays, windows and microphones record_screen can use."),
-                    "models": MCPSchema.boolean("Also list Sky Studio's models and reference limits (free, read-only)."),
-                    "model": MCPSchema.string("With models=true, return only this model id, for example minimax-h3."),
-                    "film_contract": MCPSchema.boolean("Public film/production contracts; local, free; no deployment proof.")
+                    "screen": MCPSchema.boolean("Also record_screen's sources."),
+                    "models": MCPSchema.boolean("Also Sky Studio's model catalog (free)."),
+                    "model": MCPSchema.string("With models=true: only this id (minimax-h3)."),
+                    "film_contract": MCPSchema.boolean("Public film contracts; local, free.")
                 ]),
                 readOnly: true, openWorld: true
             )
@@ -29,8 +28,7 @@ public enum MCPProjectTools {
             return MCPToolDefinition(
                 .setView, title: "View mode",
                 description: """
-                Ask the user once per conversation: visible (default) shows edits; background leaves SkyCut where it is. \
-                With project: only that one; without: all yours. Lasts until SkyCut quits.
+                Ask the user once per conversation: visible (default) shows edits; background leaves SkyCut where it is.
                 """,
                 input: MCPSchema.object([
                     "mode": MCPSchema.string("How the user follows your edits.", oneOf: ["visible", "background"])
@@ -44,9 +42,9 @@ public enum MCPProjectTools {
                 from_finder=true for their Finder selection. Files inside import without asking again.
                 """,
                 input: MCPSchema.object([
-                    "path": MCPSchema.string("Absolute path of the folder. ~ means the user's home folder."),
+                    "path": MCPSchema.string("Absolute folder path; ~ is home."),
                     "from_finder": MCPSchema.boolean("Use what the user selected in Finder instead of path."),
-                    "max_files": MCPSchema.integer("Stop listing after this many files (default 400).", minimum: 1, maximum: 2000)
+                    "max_files": MCPSchema.integer("Default 400, at most 2000.", minimum: 1, maximum: 2000)
                 ]),
                 readOnly: true
             )
@@ -58,7 +56,7 @@ public enum MCPProjectTools {
                 omitted means last opened. At most 8 open; close_project finished ones.
                 """,
                 input: MCPSchema.object([
-                    "path": MCPSchema.string("Absolute path of the project file (.skycut or .srtflowproj).")
+                    "path": MCPSchema.string("Absolute path of the project file.")
                 ], required: ["path"])
             )
         case .newProject:
@@ -69,9 +67,9 @@ public enum MCPProjectTools {
                 folder needs version. Returns project id. Locations: skycut_guide topic=new_project.
                 """,
                 input: MCPSchema.object([
-                    "name": MCPSchema.string("Project name without extension. Default: the workspace folder's name."),
-                    "version": MCPSchema.string("Short version label (30s, vertical, v2): the file is <name> - <version>."),
-                    "folder": MCPSchema.string("Folder to save the project in, when there is no workspace yet.")
+                    "name": MCPSchema.string("No extension; default: workspace folder's name."),
+                    "version": MCPSchema.string("Short label (30s, v2): <name> - <version>."),
+                    "folder": MCPSchema.string("Save folder when there is no workspace.")
                 ])
             )
         case .closeProject:
