@@ -86,9 +86,9 @@ into an address (`SkyStudioContentRules`).
 | Rule | How |
 | --- | --- |
 | Who may read | `SkyCutLicense.recipes` = the server's `features.recipes` (missing = false; no key, not checked or expired = false). The AI path asks `SkyStudioAccount.styleRefusal` (text in `SkyCutGates.styleRefusal`); `SkyStudioStyleLibrary.read` checks the licence again before serving a copy and after a fetch (a licence that ended meanwhile keeps nothing). `valid_until` never passes the trial's or Pro's end, so copies stop being served then, offline too. Free keys still see the titles (locked); that leak is accepted. |
-| Copies | `~/Library/Application Support/SrtFlow/SkyStudioContent/` (identity-class SrtFlow name; shared by the release, beta and smoke builds like `Recipes/`): `manifest.json` (the answer as sent, its ETag, when fetched or last confirmed) and `items/<sha256>.json` (one text per checksum, when fetched). Writes are atomic; a copy whose text no longer matches its checksum is ignored. Never in a project, a log or the app bundle. |
+| Copies | `~/Library/Application Support/SrtFlow/SkyStudioContent/` (identity-class SrtFlow name; shared by the release, beta and smoke builds like `Recipes/`): `manifest.json` (the answer as sent, its ETag, when fetched or last confirmed) and `styles/<id>@<version>.json` (one version of one style with its own fields, when fetched). **A copy is found only by id + version (+ checksum when the caller knows it), and its contents must name that id and version**: two versions may share a text, so a checksum never names a version (Codex review CXS1 #5: the first layout kept answers by checksum and served 1.0 for 1.1). Writes are atomic; a copy whose text no longer matches its checksum is ignored. Never in a project, a log or the app bundle. |
 | Deleting | `SkyStudioAccount.replaceStored` calls `licenceChanged`: an answer without `recipes`, or none (a new or rejected key), deletes every text and keeps the manifest for the locked list; removing the key deletes everything. |
-| When to ask | The manifest is asked again when 10 minutes old, with `If-None-Match` (usually a 304). A failed ask uses this Mac's copy (dated) and does not ask again for a minute; with nothing here the list is unreachable, or, after `503 content_unavailable` (nothing published yet), simply empty. No key: no Sky Studio styles. A style is read from this Mac's copy when it holds that version (by the manifest's checksum, or by id and version), else fetched by `?version=`, its checksum checked against its text and the manifest. The key is read silently (`SkyStudioJobKey.key(.silent)`): never a keychain prompt. |
+| When to ask | The manifest is asked again when 10 minutes old, with `If-None-Match` (usually a 304). A failed ask uses this Mac's copy (dated) and does not ask again for a minute; with nothing here the list is unreachable, or, after `503 content_unavailable` (nothing published yet), simply empty. No key: no Sky Studio styles. A style is read from this Mac's copy when it holds exactly that id and version (and the checksum the list or the film's record names), else fetched by `?version=`, its checksum checked against its text and the expected one; the answer always reports the version served. The key is read silently (`SkyStudioJobKey.key(.silent)`): never a keychain prompt. |
 | No system URL cache | Content requests use `SkyStudioAPI.uncachedSession` (ephemeral, no URL cache): a URL cache would keep a copy SkyCut cannot delete and would serve an `immutable` answer without asking whether the key may still read it. |
 | `min_skycut_version` | When this SkyCut is older, the read answer carries a `note` (a call the style suggests may fail; update SkyCut). A hint, not a gate. |
 
@@ -113,7 +113,7 @@ into an address (`SkyStudioContentRules`).
 | `SkyStudio/SkyStudioProNoticeRow.swift` | 设置和导出共用的到期 / 宽限本地化呈现、续约 / 更新付款方式链接及可复制邮箱 |
 | `SkyStudio/SkyStudioContent.swift` | Sky Studio's content for SkyCut (pure): the manifest, one style's text, id / version shapes, SHA-256, comparing SkyCut versions |
 | `SkyStudio/SkyStudioContentAPI.swift` | `GET /content` (with If-None-Match) and `GET /content/styles/{id}?version=` over `SkyStudioAPI.request` / `conditionalGet` |
-| `SkyStudio/SkyStudioContentCache.swift` | The copies on this Mac: manifest and texts by checksum, atomic writes, deleting texts or everything |
+| `SkyStudio/SkyStudioContentCache.swift` | The copies on this Mac: manifest and texts by id + version (identity checked on every hit), atomic writes, deleting texts or everything |
 | `SkyStudio/SkyStudioStyleLibrary.swift` | When to ask, who may read, reading a style, deleting on a licence change; `@MainActor`, Settings' style list subscribes to `listing` |
 
 ## 三、还没做的
@@ -150,12 +150,14 @@ into an address (`SkyStudioContentRules`).
 - `KeychainCacheChecks` 注入卡住的读取器，验证并发快回、期限、迟到缓存、失效、交互等待与每构建一次提示；不碰系统钥匙串。
 - Sky Studio's editing styles (2026-11-19): `StyleContentChecks` (in `scripts/check-sky-studio.sh`) reads the manifest and a style
   (checksums, shapes that may go into an address, a changed text refused), asks both routes on the fake server (paths, the four
-  headers, If-None-Match / 304, `not_entitled` kept), round-trips the copies (a text changed on disk ignored, deleting texts or
-  everything), reads `features.recipes` into the licence (missing / expired / no key = off) and checks what the AI is told without
+  headers, If-None-Match / 304, `not_entitled` kept), round-trips the copies (two versions with one text kept apart, a copy under another
+  version's name refused, a text changed on disk ignored, deleting texts or everything), reads `features.recipes` into the licence (missing / expired / no key = off) and checks what the AI is told without
   it. `StyleLibraryChecks` runs the library on the fake server: locked titles and no fetch without the licence, the first read
   fetched and the second this Mac's copy, the list asked again only after 10 minutes with its ETag, a new release, older versions
   by version, offline copies dated, a minute without asking after a failure, no copy past valid_until, nothing kept when the
-  licence ends during a fetch, texts and then everything deleted on licence changes, a text that is not the listed one refused.
+  licence ends during a fetch, texts and then everything deleted on licence changes, a text that is not the listed one refused,
+  1.1 with 1.0's text read as 1.1 (and 1.0 kept), a film's pin matched on id + version + checksum. Reverse check (Codex #5): the
+  checksum-keyed layout failed four of these (1.1 served as 1.0); fixed, green.
   `checks/sky-studio-wiring/styles.sh` pins the hook in `replaceStored`, the router through `AIRecipeSkyStudio`, the one library over
   `uncachedSession` with a silent key, and `styleRefusal` only through `SkyStudioAccount`. Reverse check (2026-11-19): removing
   the `licenceChanged` line and routing recipes straight to `AIRecipeTools` turned the scan red (three failures); restored, green.

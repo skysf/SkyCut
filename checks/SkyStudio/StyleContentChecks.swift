@@ -8,9 +8,9 @@ import SrtFlowMCPKit
 
 /// One style as Sky Studio would send it, with a checksum that matches its text.
 func styleAnswer(_ id: String = "film-trailer", version: String = "1.0", text: String = "# Film trailer\n\nThree acts.",
-                 minSkyCut: String? = "0.18.60") -> JSONValue {
+                 useFor: String = "A story trailer from footage.", minSkyCut: String? = "0.18.60") -> JSONValue {
     var object: [String: JSONValue] = [
-        "id": .string(id), "title": "Film trailer", "use_for": "A story trailer from footage.", "version": .string(version),
+        "id": .string(id), "title": "Film trailer", "use_for": .string(useFor), "version": .string(version),
         "sha256": .string(SkyStudioContentRules.sha256(text)), "first_release": 1, "text": .string(text)
     ]
     if let minSkyCut { object["min_skycut_version"] = .string(minSkyCut) }
@@ -141,7 +141,7 @@ private func cacheChecks() {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("skycut-content-\(UUID().uuidString)")
     defer { try? FileManager.default.removeItem(at: root) }
     let cache = SkyStudioContentCache(directory: root)
-    check(cache.manifest() == nil && cache.storedChecksums().isEmpty, "an empty cache")
+    check(cache.manifest() == nil && cache.storedVersions().isEmpty, "an empty cache")
     guard let manifest = SkyStudioContentManifest(json: manifestAnswer(release: 2)),
           let style = SkyStudioStyleText(json: styleAnswer(), id: "film-trailer", version: nil),
           let older = SkyStudioStyleText(json: styleAnswer(version: "0.9", text: "# Film trailer\n\nOld."), id: "film-trailer", version: nil)
@@ -151,17 +151,35 @@ private func cacheChecks() {
                "the manifest, its ETag and when it was fetched read back (cards part too)")
     try? cache.store(style, fetchedAt: moment(60))
     try? cache.store(older, fetchedAt: moment(120))
-    checkEqual(cache.style(sha256: style.sha256), SkyStudioContentCache.Style(style: style, fetchedAt: moment(60)), "a style by checksum")
+    checkEqual(cache.style(id: "film-trailer", version: "1.0"), SkyStudioContentCache.Style(style: style, fetchedAt: moment(60)),
+               "a style by id and version")
     checkEqual(cache.style(id: "film-trailer", version: "0.9")?.style.text, "# Film trailer\n\nOld.", "an older version by id and version")
-    checkEqual(cache.storedChecksums(), [style.sha256, older.sha256], "the checksums held")
+    checkEqual(cache.storedVersions(), ["film-trailer@1.0", "film-trailer@0.9"], "the versions held")
+    // Two versions with the same text (1.1 changes only use_for) are two copies: keeping one never overwrites the other, and a
+    // copy is found only by its own id and version (Codex review CXS1 #5: the cache once keyed whole answers by the text checksum).
+    if let same = SkyStudioStyleText(json: styleAnswer(version: "1.1", useFor: "A story trailer with a teaser cut."), id: "film-trailer", version: nil) {
+        try? cache.store(same, fetchedAt: moment(180))
+        checkEqual(cache.style(id: "film-trailer", version: "1.0")?.style.useFor, "A story trailer from footage.",
+                   "keeping 1.1 with the same text did not overwrite 1.0")
+        checkEqual(cache.style(id: "film-trailer", version: "1.1")?.style.useFor, "A story trailer with a teaser cut.", "1.1 is its own copy")
+        check(cache.style(id: "film-trailer", version: "1.1", sha256: style.sha256) != nil, "id, version and checksum all match: found")
+        check(cache.style(id: "film-trailer", version: "1.1", sha256: older.sha256) == nil, "a checksum that is not this version's: not found")
+        check(cache.style(id: "other", version: "1.0") == nil, "another id with the same version: not found")
+        // A copy under another version's name is not that version (identity is checked on every hit, not only the file name).
+        let source = root.appendingPathComponent("styles/film-trailer@1.0.json")
+        try? FileManager.default.copyItem(at: source, to: root.appendingPathComponent("styles/film-trailer@2.0.json"))
+        check(cache.style(id: "film-trailer", version: "2.0") == nil, "1.0's copy under 2.0's name is not 2.0")
+    } else {
+        check(false, "the same-text sample reads")
+    }
     // A copy whose text was changed on disk is never served.
-    let file = root.appendingPathComponent("items/\(style.sha256).json")
+    let file = root.appendingPathComponent("styles/film-trailer@1.0.json")
     if let text = try? String(contentsOf: file, encoding: .utf8) {
         try? text.replacingOccurrences(of: "Three acts", with: "Two acts").write(to: file, atomically: true, encoding: .utf8)
     }
-    check(cache.style(sha256: style.sha256) == nil, "a copy whose text no longer matches its checksum is ignored")
+    check(cache.style(id: "film-trailer", version: "1.0") == nil, "a copy whose text no longer matches its checksum is ignored")
     cache.removeTexts()
-    check(cache.storedChecksums().isEmpty && cache.manifest() != nil, "removing texts keeps the manifest (titles only)")
+    check(cache.storedVersions().isEmpty && cache.manifest() != nil, "removing texts keeps the manifest (titles only)")
     cache.removeAll()
     check(cache.manifest() == nil && !FileManager.default.fileExists(atPath: root.path), "removing everything leaves nothing")
 }

@@ -61,7 +61,7 @@ func runStyleLibraryChecks() async {
     let second = try? await library.read("film-trailer", version: "latest")
     checkEqual(second?.cachedAt, moment(1_000), "the second read is this Mac's copy, with when it was fetched")
     checkEqual(styleRequests().count, 1, "and asks nothing")
-    check(library.listing.stored.contains(SkyStudioContentRules.sha256("# Film trailer\n\nThree acts.")), "the list knows the copy is here")
+    check(library.listing.stored.contains("film-trailer@1.0"), "the list knows the copy of 1.0 is here")
 
     // The list is asked again only when 10 minutes old, with its ETag; a 304 keeps it and counts as live.
     SkyStudioStub.reset { _ in .http(500, "{}") }
@@ -91,6 +91,43 @@ func runStyleLibraryChecks() async {
     await revokedDuringFetchChecks(library, env, newer: newer)
     await licenceChangeChecks(library, env, root: root)
     await mismatchAndMissingChecks(root.appendingPathComponent("second"))
+    await sameTextVersionsChecks(root.appendingPathComponent("third"))
+}
+
+/// Two versions with the same text, 1.1 changing only use_for (Codex review CXS1 #5): asking for 1.1 reads 1.1 with its own fields,
+/// never the 1.0 copy with the same checksum, and keeping 1.1 leaves 1.0 readable as 1.0.
+@MainActor
+private func sameTextVersionsChecks(_ root: URL) async {
+    let env = StyleEnvironment(entitled: true)
+    let library = makeLibrary(root, env)
+    let first = styleAnswer(version: "1.0")
+    let second = styleAnswer(version: "1.1", useFor: "A story trailer with a teaser cut.")
+    serve(manifest: manifestAnswer([first]).encodedString(), styles: [first, second])
+    _ = await library.refreshedListing()
+    checkEqual((try? await library.read("film-trailer", version: nil))?.style.version, "1.0", "1.0 is read and kept")
+    env.now = moment(1_000 + 601)
+    serve(manifest: manifestAnswer(release: 2, [second]).encodedString(), styles: [first, second])
+    _ = await library.refreshedListing()
+    let current = try? await library.read("film-trailer", version: nil)
+    checkEqual(current?.style.version, "1.1", "the same text under a new version is read as that version")
+    checkEqual(current?.style.useFor, "A story trailer with a teaser cut.", "with that version's own fields")
+    check(current != nil && current?.cachedAt == nil, "fetched from Sky Studio, not the 1.0 copy with the same checksum")
+    let kept = try? await library.read("film-trailer", version: "1.0")
+    checkEqual(kept?.style.version, "1.0", "keeping 1.1 did not overwrite 1.0")
+    checkEqual(kept?.style.useFor, "A story trailer from footage.", "1.0 keeps its own fields")
+    check(kept?.cachedAt != nil, "and still comes from this Mac")
+    // A film's pin names its checksum too: the copy with that id, version and checksum is served; a checksum this version does not
+    // have is never answered with this Mac's copy, and Sky Studio's text for it is refused.
+    let pinned = try? await library.read("film-trailer", version: "1.0", sha256: SkyStudioContentRules.sha256("# Film trailer\n\nThree acts."))
+    check(pinned?.style.version == "1.0" && pinned?.cachedAt != nil, "a film's pin (id, version, checksum) is served from this Mac")
+    do {
+        _ = try await library.read("film-trailer", version: "1.0", sha256: String(repeating: "f", count: 64))
+        check(false, "a pin whose checksum is not this version's is refused")
+    } catch let problem as SkyStudioStyleLibrary.ReadProblem {
+        check(problem.message.contains("different text"), "a pin whose checksum is not this version's is refused: \(problem.message)")
+    } catch {
+        check(false, "a ReadProblem, got \(error)")
+    }
 }
 
 @MainActor
@@ -127,7 +164,7 @@ private func revokedDuringFetchChecks(_ library: SkyStudioStyleLibrary, _ env: S
     }
     _ = await library.refreshedListing()
     await expectReadProblem(library, "film-trailer", "1.1", .notEntitled, "a licence that ends during the fetch: refused")
-    check(!library.listing.stored.contains(SkyStudioContentRules.sha256("# Film trailer\n\nThree acts, sharper.")),
+    check(!library.listing.stored.contains("film-trailer@1.1"),
           "and the text was not kept")
     env.licence = StyleEnvironment.licence(true)
 }
@@ -135,11 +172,11 @@ private func revokedDuringFetchChecks(_ library: SkyStudioStyleLibrary, _ env: S
 @MainActor
 private func licenceChangeChecks(_ library: SkyStudioStyleLibrary, _ env: StyleEnvironment, root: URL) async {
     let cache = SkyStudioContentCache(directory: root)
-    check(!cache.storedChecksums().isEmpty, "copies are here before the licence changes")
+    check(!cache.storedVersions().isEmpty, "copies are here before the licence changes")
     // A fresh /me without recipes: every text goes, the titles stay (locked).
     env.licence = StyleEnvironment.licence(false)
     library.licenceChanged(hasKey: true, entitled: false)
-    check(cache.storedChecksums().isEmpty, "a fresh /me without recipes deletes every text")
+    check(cache.storedVersions().isEmpty, "a fresh /me without recipes deletes every text")
     check(cache.manifest() != nil && !library.listing.styles.isEmpty, "the titles stay for the locked list")
     check(!library.listing.entitled && library.listing.stored.isEmpty, "the list says locked")
     // The key is removed: everything goes and nothing is listed.
@@ -181,7 +218,7 @@ private func mismatchAndMissingChecks(_ root: URL) async {
     } catch {
         check(false, "a ReadProblem, got \(error)")
     }
-    check(SkyStudioContentCache(directory: root).storedChecksums().isEmpty, "and nothing was kept")
+    check(SkyStudioContentCache(directory: root).storedVersions().isEmpty, "and nothing was kept")
     SkyStudioStub.reset { _ in .http(404, #"{"error": {"code": "not_found", "message": "No such version."}}"#) }
     await expectReadProblem(library, "film-trailer", "3.0", .notFound(id: "film-trailer", version: "3.0"), "an unknown version: not found")
 }
