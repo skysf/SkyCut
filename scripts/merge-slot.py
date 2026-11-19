@@ -17,6 +17,8 @@ A labeled pull request, oldest label first:
    nothing else merges;
 5. merges (--merge, head pinned) only while main is still X's first parent, then dispatches checks.yml on main (a
    merge made with the workflow token starts no push run) and deletes the pull request's branch and merge-slot/pr-<N>.
+A pull request that changes .github/workflows/ leaves at once with the by-hand path: GitHub doesn't let the workflow
+token create or update workflow files, so the slot can neither build its test merge nor merge it (2026-11-19, #527).
 """
 import argparse
 import datetime as dt
@@ -69,6 +71,7 @@ class Slot:
         self.dispatched = {}  # (number, merge commit) -> when this job dispatched its test
         self.refusals = {}  # number -> merges GitHub refused in a row
         self.left = {}  # number -> (head, label time) when it left: skipped until either changes
+        self.workflows = {}  # (number, head) -> the .github/workflows/ files it changes
 
     # ---- reading GitHub ----
     def queue(self):
@@ -90,6 +93,20 @@ class Slot:
         runs = self.gh.call("GET", f"repos/{{repo}}/commits/{sha}/check-runs?check_name=check-all&filter=latest")
         runs = sorted(runs["check_runs"], key=lambda r: (r.get("started_at") or "", r["id"]))
         return (runs[-1]["status"], runs[-1]["conclusion"], runs[-1].get("details_url", "")) if runs else None
+
+    def workflow_files(self, number, head):
+        """The .github/workflows/ files the pull request changes (read once per head)."""
+        if (number, head) not in self.workflows:
+            found, page = [], 1
+            while True:
+                files = self.gh.call("GET", f"repos/{{repo}}/pulls/{number}/files?per_page=100&page={page}") or []
+                found += [name for f in files for name in (f["filename"], f.get("previous_filename") or "")
+                          if name.startswith(".github/workflows/")]
+                if len(files) < 100:
+                    break
+                page += 1
+            self.workflows[(number, head)] = sorted(set(found))
+        return self.workflows[(number, head)]
 
     def run_is_green(self, run_id, head, base):
         """A completed green checks.yml run of this repository that tested base + head, under a day old."""
@@ -176,7 +193,7 @@ class Slot:
                 "base": ref, "head": head, "commit_message": f"Merge slot test: #{number} {head[:10]} on main {base[:10]}"})
         except GitHubError as error:
             if error.status == 409:
-                return "conflict"
+                return "conflict", str(error)
             raise
         if not made:  # 204: nothing to merge
             return "contained"
@@ -229,6 +246,13 @@ class Slot:
         if pull["draft"]:
             return self.leave(pull, "it is a draft: mark it ready for review first.")
         head = pull["head"]["sha"]
+        workflow_files = self.workflow_files(number, head)
+        if workflow_files:
+            return self.leave(pull, f"it changes {', '.join(f'`{f}`' for f in workflow_files)}. GitHub doesn't let the "
+                                    "slot's workflow token create or update workflow files, so it can neither test-merge "
+                                    "nor merge this pull request. Merge it by hand: merge origin/main into the branch, "
+                                    f"push, and once check-all is green run `gh pr merge {number} --merge` at once (if "
+                                    "main moved meanwhile, merge main again first). Don't add the label again.")
         check = self.head_check(head)
         if check is None or check[0] != "completed":
             return "waiting"
@@ -238,9 +262,9 @@ class Slot:
                                     "and add the label once it's green.")
         base = self.main_sha()
         built = self.test_merge(number, base, head)
-        if built == "conflict":
+        if isinstance(built, tuple) and built[0] == "conflict":
             return self.leave(pull, "it conflicts with main: merge origin/main into the branch, resolve, push, wait "
-                                    "for check-all to be green.")
+                                    f"for check-all to be green. (GitHub: {built[1]})")
         if built == "contained":
             return self.leave(pull, f"main `{base[:10]}` already contains its head `{head[:10]}`: nothing to merge.")
         merge_sha, tree = built

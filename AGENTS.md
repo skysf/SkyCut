@@ -57,7 +57,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - Then don't push or merge main into it (a push restarts its checks) until the slot removes the label and comments why.
   Red: fix, push, label again. A known flake (perf ratchet, playback benchmark, `check-audio-fade` group 7b; see their
   docs): `gh run rerun <run> --failed` on the run it names, label again once green. Conflict: merge `origin/main`,
-  keep both sides (two edits of one line become one line), push, label again. Never merge red.
+  keep both sides (two edits of one line become one line), push, label again. Never merge red. PRs changing
+  `.github/workflows/` can't use the slot: merge main in, merge by hand once green.
 - Done when it is MERGED: `scripts/merge-slot-wait.sh N` waits (0 merged, 1 sent back with the slot's comment, 3 run it
   again). Local worktree and branch as the task says; if it says nothing, keep them; never delete a worktree you're in.
 - 往索引、必读表、名单里加的那一行放在最后一个 commit；同一行、同一块的几件事别同时开 PR。
