@@ -814,9 +814,9 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
      PR's own run when main hasn't moved since, or from an earlier slot test.
   4. Otherwise it dispatches `checks.yml` on `merge-slot/pr-<N>`, which holds X. That is the same
      workflow file on the same tree as a pull_request run on main + head, docs-only fast path included. Nothing else
-     merges while it runs. A red or cancelled run sends the PR back with its link; the branch stays, so re-running the
-     run's failed jobs can still prove the tree. A run GitHub's infrastructure failed is re-run in place first, as in 1.,
-     and holds the slot meanwhile.
+     is tested or merges while it runs ("One at a time" below). A red or cancelled run sends the PR back with its link;
+     the branch stays, so re-running the run's failed jobs can still prove the tree. A run GitHub's infrastructure
+     failed is re-run in place first, as in 1., and holds the slot meanwhile.
   5. It merges with `--merge`, the head pinned, only while main is still X's first parent. Then it dispatches
      `checks.yml` on main and deletes the PR's branch and `merge-slot/pr-<N>`.
 - **PRs that change `.github/workflows/` can't use the slot.** GitHub doesn't let the workflow token create or update
@@ -834,11 +834,18 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   slot busy waits. Every run reads the whole queue from GitHub (labels, runs, markers), so nothing is lost when a newer
   waiting run replaces an older one. The script stops after 320 minutes; a new label or the half-hourly cron starts it
   again.
+  - **One PR is under test at a time.** A PR holds the slot while a `merge-slot/pr-<N>` run of it is queued or in
+    progress, for ten minutes after that run ends (a green test merges next, a red one sends the PR back), and for ten
+    minutes after the job dispatched it (GitHub lists a dispatched run a little later). Only the holder moves, even
+    when a PR with an older label turns green meanwhile. Of several holders, the earliest test holds.
+  - `holder()` reads the runs from GitHub every pass, so the workflow's next job keeps the same holder. Until 2026-11-20
+    each pass started again from the oldest label, and on 11-19 #531's test was dispatched while #532's ran
+    ([case](../bugfixes/2026-11-20-merge-slot-tested-two-prs-at-once.md)).
 - **Safety.** It merges only a tree that a green run tested, with the head pinned and main read just before merging. A
   manual merge in the second between those two calls could still land an untested tree, so nobody merges by hand. It
   never runs a pull request's code: `pull_request_target` runs main's copy of the workflow, and the job checks out main.
   The ruleset still requires `check-all` on the head.
-- **Cost.** One ubuntu job while the queue isn't empty, polling every 90 seconds. That is about five API calls a pass,
+- **Cost.** One ubuntu job while the queue isn't empty, polling every 90 seconds. That is about six API calls a pass,
   under the token's 1,000 an hour. A PR whose own run tested the current main gets no second run; otherwise it gets one
   slot test, which costs what a pull_request run does.
 - `checks/MergeSlot/MergeSlotChecks.py` runs the slot against an in-memory GitHub (`FakeGitHub.py`) and pins both
@@ -846,4 +853,5 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   moves, and its token can't write workflow files. Reverse verification on 2026-11-20: 24 mutations of the script each
   turned it red. Among them: merging without proof, skipping the last main check, reusing a test merge for another main
   or head, rebuilding it every pass, not detecting a workflow PR, an unpinned head, FIFO by number, not holding the
-  slot during a test, and squash. It also runs `InfraRerunCases.py` (the automatic re-runs in "CI" above).
+  slot during a test, and squash. It also runs `InfraRerunCases.py` (the automatic re-runs in "CI" above). Since
+  2026-11-20 its slot tests can last 12 polls and be listed late, like GitHub's, so overlapping tests show.

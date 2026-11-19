@@ -165,6 +165,50 @@ serve(slot, gh)
 check("a pending head waits, the next one goes", [n for n, _ in gh.merged] == [2, 1], gh.merged)
 never_merged_untested("pending head", gh)
 
+# 2026-11-19 (#531, #532): an older PR's head turned green while a younger PR's slot test ran, and the slot tested it
+# at once, since each pass started again from the oldest label. The PR under test holds the slot until its test ends.
+gh, slot = world()
+gh.slow_tests = 12  # a slot test takes 12 polls, longer than the 10-minute window, like a real one (13-16 min)
+gh.list_delay = 2  # and GitHub lists it two polls late: the job remembers what it dispatched
+gh.open_pull(1, check=None)  # its own run still going
+gh.open_pull(2, labeled_minutes=1)
+gh.human_merge()  # both need a slot test
+def green_during_test(g):
+    head = g.pulls[1]["head"]["sha"]
+    if "merge-slot/pr-2" in g.dispatches and g.checks[head][-1]["status"] != "completed":
+        g.set_check(head, "success")
+gh.on_tick = green_during_test
+serve(slot, gh)
+check("an older PR turning green during a younger PR's test waits: one test at a time, the tested one merges first",
+      not gh.overlaps and [n for n, _ in gh.merged] == [2, 1], (gh.overlaps, gh.merged, gh.dispatches))
+never_merged_untested("older head green during a test", gh)
+
+gh, slot = world()
+gh.slow_tests = 12
+gh.open_pull(1, check=None)
+gh.open_pull(2, labeled_minutes=1)
+gh.human_merge()
+slot.serve(gh.clock + dt.timedelta(seconds=30), poll=60)  # dispatches #2's test, then the job's deadline passes
+gh.set_check(gh.pulls[1]["head"]["sha"], "success")
+fresh = slot_module.Slot(gh, now=lambda: gh.clock, sleep=gh.tick, log=lambda *_: None)  # the workflow's next job
+serve(fresh, gh)
+check("a new job of the workflow keeps the PR under test holding the slot (read from GitHub, not memory)",
+      not gh.overlaps and [n for n, _ in gh.merged] == [2, 1], (gh.overlaps, gh.merged, gh.dispatches))
+never_merged_untested("new job during a test", gh)
+
+gh, slot = world()
+gh.open_pull(1)
+gh.open_pull(2, labeled_minutes=1)
+gh.human_merge()
+for number in (2, 1):  # two tests left running by a slot from before the fix; #2's started first
+    merge_sha, _ = slot.test_merge(number, gh.main, gh.pulls[number]["head"]["sha"])
+    gh.runs[gh.add_run("workflow_dispatch", merge_sha, f"merge-slot/pr-{number}", None)]["ticks_left"] = 12
+    gh.tick(60)
+serve(slot, gh)
+check("two tests already running: the earlier holds and merges first, the other is tested again on the new main",
+      [n for n, _ in gh.merged] == [2, 1] and gh.dispatches.count("merge-slot/pr-1") == 1, (gh.merged, gh.dispatches))
+never_merged_untested("two tests left running", gh)
+
 gh, slot = world()
 gh.open_pull(1)
 def human_during_test(g):
