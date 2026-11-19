@@ -174,6 +174,7 @@ import SrtFlowMCPKit
             print("PASS: real pending image / video probe / unavailable media / metadata rollback")
             await MusicPlacementChecks.run(f, root: root, require: require)
             await AddClipsChecks.run(f, root: root, require: require)
+            try await TimeBoundChecks.run(root: root, require: require)
         } catch {
             failures += 1
             print("FAIL: production parameter check threw \(error)")

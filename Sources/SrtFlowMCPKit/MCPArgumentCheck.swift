@@ -8,6 +8,7 @@ import Foundation
 // 值是 null 的不算（等于没传）。里层对象的说明没写字段就照收（以前 generate_media 的 `options` 原样转给 fal 的模型；2026-10-28 起清单里没有这样的参数了）；
 // 第一层没写字段说的是「这个工具不收参数」，照查。
 // 不管什么：值的类型和范围（各工具读参数时自己管，AIToolArguments）。
+// Times are the one exception with a shared range: MCPTimeArguments, checked by the App's router.
 
 public enum MCPArgumentCheck {
     /// 哪个工具都可以带的名字：`project`。不收 project 的工具（get_job、open_folder……）带了也不碍事 ——

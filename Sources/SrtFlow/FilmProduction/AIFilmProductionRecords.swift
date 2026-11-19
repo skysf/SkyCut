@@ -34,7 +34,7 @@ enum AIFilmProductionRecords {
                   Set(cue.shotIDs).isSubset(of: ids) else { throw error("Sound cues must reference distinct existing shots.") }
             try seconds(cue.at)
             try seconds(cue.duration)
-            guard cue.duration > 0, cue.at + cue.duration <= 86_400 else { throw error("Cue duration/end is outside the supported timeline.") }
+            guard cue.duration > 0, cue.at + cue.duration <= MCPTimeArguments.maximumSeconds else { throw error("Cue duration/end is outside the supported timeline.") }
             if let action = cue.actionID { try actionID(action) }
             if cue.layer == .foley {
                 guard cue.shotIDs.count == 1, let action = cue.actionID,
@@ -91,7 +91,7 @@ enum AIFilmProductionRecords {
     }
 
     private static func seconds(_ value: Double) throws {
-        guard value.isFinite, value >= 0, value <= 86_400 else { throw error("Stored timeline seconds must be finite and bounded.") }
+        guard value.isFinite, value >= 0, value <= MCPTimeArguments.maximumSeconds else { throw error("Stored timeline seconds must be finite and bounded.") }
     }
 
     private static func text(_ value: String, maximum: Int) throws {

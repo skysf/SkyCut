@@ -1,5 +1,6 @@
 import SwiftUI
 import SrtFlowCore
+import SrtFlowMCPKit
 
 // MARK: - 文字检查器：「动画」区最上面的「预设」
 //
@@ -36,7 +37,7 @@ struct MotionPresetInspectorRow: View {
                     InspectorScrubbableNumberField(
                         // `value` 是离散通道（打字、步进箭头 → 一步撤销），横向拖动走下面三个回调（同动画时长那一格）。
                         value: hitBinding(members.hit),
-                        range: 0...86_400,
+                        range: MCPTimeArguments.seconds,
                         fractionDigits: 2,
                         width: 64,
                         onScrubBegin: { project.beginLiveEdit() },

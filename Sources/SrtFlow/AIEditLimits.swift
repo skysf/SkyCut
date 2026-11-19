@@ -8,9 +8,12 @@ import SrtFlowMCPKit
 enum AIEditLimits {
     static var volume: ClosedRange<Double> { AudioGain.minimumDB...AudioGain.maximumDB }
     static var imageDuration: ClosedRange<Double> { TimelineTrim.clipMinimumDuration...StillImageClipFactory.stillDuration }
+    /// Every time an AI passes, in seconds: the supported timeline (MCPTimeArguments, the one shared bound).
+    static var time: ClosedRange<Double> { MCPTimeArguments.seconds }
 
     static var json: JSONValue {
-        ["speed": bounds(TimelineTrim.clipSpeedRange, policy: "reject"),
+        ["time": bounds(time, policy: "reject"),
+         "speed": bounds(TimelineTrim.clipSpeedRange, policy: "reject"),
          "image_source_duration": bounds(imageDuration, policy: "reject"),
          "source_window_minimum": value(TimelineTrim.clipMinimumDuration),
          "source_boundary_tolerance": value(AIClipEdit.tolerance),
@@ -30,6 +33,20 @@ enum AIEditLimits {
         guard number.isFinite, range.contains(number) else {
             throw invalid(field, number, minimum: range.lowerBound, maximum: range.upperBound)
         }
+    }
+
+    /// The refusal for a call with a time outside `time` (NaN, infinite, negative or past one day), or nil. The router answers
+    /// with it before the call queues, starts a round or opens an undo group: a refusal inside a wrapped tool left an empty
+    /// undo step (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md). A time inside a list entry also names the list
+    /// and the entry (`batch`, `index`), like the other per-entry errors.
+    static func timeRefusal(tool: MCPToolName, arguments: JSONValue) -> AIToolError? {
+        guard let found = MCPTimeArguments.firstOutOfBounds(tool: tool, arguments: arguments) else { return nil }
+        let error = invalid(found.path, found.requested, minimum: time.lowerBound, maximum: time.upperBound)
+        guard let entry = found.entry else { return error }
+        var details = error.details
+        details["batch"] = .string(entry.list)
+        details["index"] = .number(Double(entry.index))
+        return AIToolError(error.message, details: details)
     }
 
     static func nonnegative(_ field: String, _ number: Double?) throws {

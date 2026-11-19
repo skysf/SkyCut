@@ -72,7 +72,7 @@ public enum MCPProductionSchema {
             "id": text(80),
             "shot_ids": array(text(80), minimum: 1, maximum: 100, unique: true, description: "Existing shots; foley must name exactly one."),
             "layer": choice(["music", "environment", "foley", "silence"]), "purpose": text(400),
-            "at": seconds, "duration": ["type": "number", "exclusiveMinimum": 0, "maximum": 86400],
+            "at": seconds, "duration": ["type": "number", "exclusiveMinimum": 0, "maximum": .number(MCPTimeArguments.maximumSeconds)],
             "action_id": nullable(actionID), "audio_clip_id": nullable(text(80)),
             "silence_reason": nullable(text(400)), "recovery_at": nullable(seconds),
             "alignment": nullable(object([
@@ -132,7 +132,7 @@ public enum MCPProductionSchema {
     private static let truth: JSONValue = ["type": "boolean", "enum": [true]]
     private static let fingerprint: JSONValue = ["type": "string", "pattern": "^[a-f0-9]{64}$"]
     private static let actionID: JSONValue = ["type": "string", "pattern": "^[a-z0-9_-]{1,48}$"]
-    private static let seconds = MCPSchema.number("Finite seconds.", minimum: 0, maximum: 86400)
+    private static let seconds = MCPSchema.number("Finite seconds.", minimum: 0, maximum: MCPTimeArguments.maximumSeconds)
     private static var times: JSONValue { array(seconds, maximum: 128, unique: true, description: "Distinct finite sample requests in ascending order.") }
     private static func text(_ maximum: Int) -> JSONValue { ["type": "string", "minLength": 1, "maxLength": .number(Double(maximum))] }
     private static func choice(_ values: [String]) -> JSONValue { ["type": "string", "enum": .array(values.map(JSONValue.string))] }
