@@ -3,9 +3,10 @@ import Foundation
 
 // Closing while the project still changes (docs/bugfixes/2026-11-19-close-trusts-a-stale-save.md): an edit made while New
 // Project, closing a project or Quit is writing the file is written too before the project goes away; Quit looks again at a
-// project it let through when that project changed while another one was asked about; and a save window answered after
-// another document replaced the untitled one it was opened for writes nothing and moves nothing. The drive holds each first
-// write until the check has edited, so "ready after the write it asked for" shows up as an edit missing from the file.
+// project it let through when that project changed while another one was asked about; "Quit Anyway" gives up only the
+// document its alert showed (docs/bugfixes/2026-11-19-quit-anyway-covers-a-replaced-document.md); and a save window answered
+// after another document replaced the untitled one it was opened for writes nothing and moves nothing. The drive holds each
+// first write until the check has edited, so "ready after the write it asked for" shows up as an edit missing from the file.
 @MainActor enum EditWhileClosingChecks {
     static func run(_ checks: Checks, root: URL) async {
         // The check holds the drive while it edits: give the closes a deadline a slow runner can't reach.
@@ -15,6 +16,7 @@ import Foundation
         await closeProject(checks, root: root)
         await quit(checks, root: root)
         await quitLooksAgain(checks, root: root)
+        await quitAnywayThenReplaced(checks, root: root)
         await staleSaveWindow(checks, root: root)
         ProjectFileWriter.deadline = deadline
     }
@@ -111,6 +113,53 @@ import Foundation
         second.fileWriter.perform = ProjectFileWriter.write
         _ = OpenProjects.shared.close(first)
         _ = OpenProjects.shared.close(second)
+    }
+
+    /// Quit with two projects: the main window's project A does not answer and the person chooses "Quit Anyway"; while the
+    /// second project's drive is asked about, A's write lands, an Open replaces A with B in the same main window project, and
+    /// B is edited (an AI tool call inside the alert's modal loop). "Quit Anyway" was about A: Quit writes B before it says yes.
+    private static func quitAnywayThenReplaced(_ checks: Checks, root: URL) async {
+        let opened = makeProject("Opened after Quit Anyway", in: root)
+        guard let openedURL = opened.documentURL else { return checks.require(false, "the project to open has a file") }
+        _ = OpenProjects.shared.close(opened)
+        let primary = OpenProjects.shared.primary
+        guard await primary.saveAs(root.appendingPathComponent("Given up.skycut"), replacing: false) else {
+            return checks.require(false, "the main window's project is saved")
+        }
+        let second = makeProject("Asked after Quit Anyway", in: root)
+        let primaryDrive = FakeDrive()
+        let secondDrive = FakeDrive()
+        primary.fileWriter.perform = primaryDrive.perform
+        second.fileWriter.perform = secondDrive.perform
+        edit(primary, "given up")
+        edit(second, "second before Quit")
+        let grace = ProjectQuit.grace
+        ProjectQuit.grace = 0.3
+        var asked: [VideoEditProject] = []
+        ProjectQuit.askAboutDrive = { project in
+            asked.append(project)
+            guard project === second else { return .quitAnyway }
+            primaryDrive.open()                          // A's write lands; an Open waits for it, then goes ahead
+            await primary.openProject(at: openedURL)
+            guard primary.documentURL == openedURL else { return .stay }
+            edit(primary, "edited after the Open")
+            primary.fileWriter.cancelAutosave()          // SkyCut quits at the reply: no autosave comes after it
+            secondDrive.open()
+            _ = await project.fileWriter.waitUntilIdle(deadline: 5)
+            return .written
+        }
+        let quits = await ProjectQuit.prepareAll()
+        let written = fileHolds(openedURL, "edited after the Open")
+        checks.require(quits && asked.count == 2 && asked.first === primary && primary.documentURL == openedURL,
+                       "Quit Anyway for the main window's project, then the second one written (quits \(quits), asked \(asked.count))")
+        checks.require(written, "\"Quit Anyway\" gives up only the document its alert showed: a document opened in the same project since is written before Quit says yes")
+        ProjectQuit.grace = grace
+        ProjectQuit.askAboutDrive = { ProjectQuit.waitForDrive($0) }
+        primary.fileWriter.perform = ProjectFileWriter.write
+        second.fileWriter.perform = ProjectFileWriter.write
+        _ = OpenProjects.shared.close(second)
+        await primary.startNewProject()                  // the main window back to an untitled, empty project
+        checks.require(primary.isUntitled && primary.state.isEmpty, "the main window's project is left untitled and empty")
     }
 
     /// New Project on an untitled project asks Save…; while its save window is open, another project is opened in the same
