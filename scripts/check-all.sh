@@ -6,8 +6,8 @@
 # 分到几台 runner 上并行跑（仓库是公开的，macOS runner 免费；分组的理由和实测见
 # docs/build/build-and-packaging.md「CI」一节），绿了才合。本地改完代码跑 scripts/check-local.sh
 # <和改动直接相关的检查> 就行（2026-11-04 用户定：本地全跑满载十几到三十分钟、笔记本烫；每一项照样在 CI 上跑，
-# 步骤一样不少）。想在本地全跑也可以，入口还是这一个。GUI 冒烟（真窗口）自动化够不着，
-# 不在此列 —— 见 docs/testing/gui-smoke-testing.md。
+# 步骤一样不少）。想在本地全跑也可以，入口还是这一个。
+# The editor GUI E2E check uses the runner's graphical session. Manual steps live in docs/testing/gui-smoke-testing.md.
 #
 # 用法：
 #   scripts/check-all.sh                     # 全部（本地也能这么跑，不再要求）
@@ -112,7 +112,8 @@ run_check "project-saves (the project file written off the main thread: a slow, 
 run_check "region-framing（源矩形取景的 look / 预览 / 生产导出）" scripts/check-region-framing.sh
 run_check "look-jobs (slow looks become jobs: the router's lines, queued / running / cancel, two sessions' parallel 12-frame looks)" scripts/check-look-jobs.sh
 run_check "motion-placement (stored web pages: real renders, approval modes, same-clip edits, undo and cache recovery)" scripts/check-motion-placement.sh
-run_check "e2e (isolated SkyCut and real MCP helper: layer mix, AAC true peak and export destinations)" scripts/check-e2e.sh
+run_check "e2e (real MCP bridge, synthetic reference cut and reviewed export measurements)" scripts/check-e2e.sh
+run_check "e2e-gui (editor folder, Versions and motion controls)" scripts/check-e2e-gui.sh
 
 # ---- 第 2 组 ----
 shard 2

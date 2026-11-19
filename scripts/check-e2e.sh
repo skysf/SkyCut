@@ -12,6 +12,7 @@ fi
 # These products are already built in CI. Build here too for check-local runs.
 built="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${built}"; exit 1; }
 swift build --arch arm64 --product skycut-mcp
+swift build --arch arm64 --product skycut-web-motion
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 root="$(mktemp -d /tmp/skycut-e2e.XXXXXX)"
 trap 'rm -rf "${root}"' EXIT
@@ -20,6 +21,7 @@ app="${root}/SkyCutE2E.app"
 mkdir -p "${app}/Contents/"{MacOS,Resources,Helpers}
 cp "${BUILD_DIR}/SrtFlow" "${app}/Contents/MacOS/"
 cp "${BUILD_DIR}/skycut-mcp" "${app}/Contents/Helpers/"
+cp "${BUILD_DIR}/skycut-web-motion" "${app}/Contents/Helpers/"
 resources="${BUILD_DIR}/SrtFlow_SrtFlow.bundle"
 if [ -d "${resources}/Contents/Resources" ]; then
   ditto "${resources}/Contents/Resources" "${app}/Contents/Resources"
@@ -33,4 +35,4 @@ cp packaging/Info.plist "${app}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SrtFlow" "${app}/Contents/Info.plist"
 codesign --force --deep --sign - "${app}"
 
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/gui-smoke/e2e/run.py "${app}" "${FFMPEG}"
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/gui-smoke/e2e/run.py "${app}" "${FFMPEG}" "$@"
