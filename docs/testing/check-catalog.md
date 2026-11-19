@@ -16,17 +16,30 @@
   aligned to picture, ducking and voice-band EQ, transparent ProRes and PNG, the native frame-reveal title, a rendered web
   motion and a burned subtitle. It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
   Save As name collision, and single-step restore of a saved AI round. Its color patches, decoded audio, subtitle bounds and
-  canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The timeline keeps stable clip names and
-  link-group order across runs. To regenerate deliberately, run `/bin/bash scripts/check-e2e.sh --update-goldens`
-  with the same ffmpeg as CI, then review the JSON diff. The regeneration command runs the reference flow and its functional
-  assertions. The default command compares against the committed baseline.
+  canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The delivered AAC also has an independent
+  960 Hz attenuation check against the original narration, using 100 Hz and 4 kHz to account for common gain. The timeline
+  keeps stable clip names and link-group order across runs. `/bin/bash scripts/check-e2e.sh --update-goldens` runs both
+  workflows and prints the locations of a candidate JSON and unified diff in a fresh `/tmp/skycut-golden.*` directory.
+  Review the diff with the same ffmpeg as CI before manually promoting a candidate to the committed baseline.
 
 - `scripts/check-e2e-gui.sh` hosts production views in AppKit windows and injects events into those specific windows.
   It checks a folder returned by the fixture panel and a typed path after the fixture reports failure, a version restored and undone,
   a new native preset and its inspector rows, and a web template card placed on the timeline and re-rendered in the inspector.
-  It locates controls from its own window pixels using AppKit and on-device Vision. The system service, external
-  volumes, pointer gestures and visual fit still have real-machine checks in the [GUI smoke procedure](gui-smoke-testing.md).
-  The two E2E checks have a combined CI budget of three minutes after the shared App build.
+  It locates controls from its own window pixels using AppKit and on-device Vision. The row and its icon-only button
+  must be found in the same drawing. The 20 s control window covers the 15 s export destination probe and scheduling.
+  Re-render uses the helper's frame-based deadline plus teardown and commit time. The system service, external volumes,
+  pointer gestures and visual fit still have real-machine checks in the [GUI smoke procedure](gui-smoke-testing.md).
+
+- Both E2E suites launch from a clean environment under `scripts/gui-smoke/e2e/launch.py`. The App, MCP helper,
+  renderer, preferences, assets, socket and provider marker use the staged identity and scratch root. The launcher
+  makes the real home read-only for the run and checks for leaked per-bundle state after it exits. The GUI renderer
+  uses the staged helper. MCP polls each fixture job for up to 120 s, covering the 18-frame renderer's 96 s plus the
+  App backstop and teardown. A timeout prints the last job or GUI operation, the App output and window information.
+  One 180 s watchdog bounds each suite's execution after build, within the existing CI shard timeout.
+  `checks/E2E/Harness.py` also probes late jobs and deadline diagnostics, scratch-only writes and candidate updates.
+
+- `checks/test-app-cleanup.sh` scans test app staging scripts for an exit trap and exercises the shared cleanup on success
+  and failure. See [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`

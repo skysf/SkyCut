@@ -3,24 +3,31 @@
 # 不带参数：CI 用小型夹具生成 DMG；带路径：验收 build-app 打出来的完整安装包。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 if [ "$#" -gt 1 ]; then
     echo "用法：scripts/check-dmg.sh [SkyCut-version-arm64.dmg]" >&2
     exit 2
 fi
 WORK="$(mktemp -d)"
 MOUNT="${WORK}/mount"
+FIXTURE_APP="${WORK}/fixture/SkyCut.app"
 MOUNTED=0
 cleanup() {
-    if [ "${MOUNTED}" -eq 1 ]; then hdiutil detach "${MOUNT}" >/dev/null; fi
+    if [ "${MOUNTED}" -eq 1 ]; then
+        unregister_test_app "${MOUNT}/SkyCut.app"
+        hdiutil detach "${MOUNT}" >/dev/null
+    fi
+    remove_test_app "${FIXTURE_APP}"
     rm -rf "${WORK}"
 }
 trap cleanup EXIT
+test_app_exit_signals
 mkdir -p "${MOUNT}"
 if [ "$#" -eq 0 ]; then
-    mkdir -p "${WORK}/fixture/SkyCut.app/Contents"
-    echo 'DMG packaging fixture' > "${WORK}/fixture/SkyCut.app/Contents/fixture"
+    mkdir -p "${FIXTURE_APP}/Contents"
+    echo 'DMG packaging fixture' > "${FIXTURE_APP}/Contents/fixture"
     DMG="${WORK}/fixture.dmg"
-    /bin/bash scripts/build-dmg.sh "${WORK}/fixture/SkyCut.app" "${DMG}"
+    /bin/bash scripts/build-dmg.sh "${FIXTURE_APP}" "${DMG}"
 else
     DMG="$1"
 fi

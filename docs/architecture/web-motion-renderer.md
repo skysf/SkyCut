@@ -101,6 +101,8 @@ way, even sizes ≥ 16, ≤ 60 s, 1–120 fps, page ≤ 2 MB, parameters ≤ 256
 - **SkyCut backstops a helper that does not**: no event for longer than its slowest single step allows
   (max(load, script + 2 × snapshot)) + 10 s, or past its total + 10 s → SIGKILL.
 - The helper also stops when SkyCut is gone (its parent changed).
+- End-to-end checks wait through the frame-based total, the App's backstop and teardown before treating a live
+  render as stuck. Record the last operation and window state when a test's deadline expires.
 - Frames are drawn several at a time; when several fail, the earliest is reported.
 - **Frames only from timing inside the caps.** `WebMotionRequest.frameCount` turns a duration and frame rate into frames
   only when both are inside the caps (`timingWithinCaps`, at most 7,200 frames) and is 0 otherwise; `problems()` refuses

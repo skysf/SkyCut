@@ -100,6 +100,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
 - **socket 按 bundle id 分开**：`~/Library/Application Support/<bundle id>/mcp.sock`（路径超过 103 字节退到
   `/tmp`，用 FNV 哈希区分 —— **不能用 `hashValue`**，每个进程的种子不同，两边算出两个路径）。测试版和正式版
   同时开着各连各的。目录 0700、socket 0600，连进来的再用 `getpeereid` 核一次用户号。
+- For the staged `com.srtflow.e2e<PID>.skystudiosmoke` identity, `AIBridgeLocation` puts both the socket and
+  provider marker in `bridge/` beside the bundle. The E2E helper gets those two exact paths and launches no App.
+  See the [check catalog](../testing/check-catalog.md) for the scratch home's write guard.
 - **还有人在听就不抢**：`MCPUnixSocket.listen` 先试着连一下，连得上说明同一个 App 开了两份，后开的那份不删
   前一份的 socket（删了等于把正在用的那份掐断）。
 - **阻塞收发只在自己开的 `Thread` 上**，不进 Swift 并发的协作线程池（同

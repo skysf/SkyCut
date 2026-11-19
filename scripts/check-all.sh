@@ -224,6 +224,7 @@ run_check "sfx-catalog（扫描守卫：音效目录 id 连号不改、tag 在�
 run_check "source-file-size（扫描守卫：代码文件行数上限，老文件只许降）" checks/source-file-size.sh
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
 run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
+run_check "test-app-cleanup (scratch bundles are unregistered on exit)" checks/test-app-cleanup.sh
 run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
 run_check "sound-labels (macOS's sound classifier for listen describe=true: one window per 3 s, every label's own score)" scripts/check-sound-labels.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks

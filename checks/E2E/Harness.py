@@ -1,0 +1,92 @@
+"""Exercise E2E job deadlines, the home boundary, and candidate updates without launching the App."""
+
+import contextlib
+import io
+import json
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import unittest
+from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts/gui-smoke/e2e"))
+import launch
+import reference_output as output
+import run
+
+
+class RenderJob:
+    def __init__(self):
+        self.seconds = 0
+
+    def call_with_content(self, tool, arguments, timeout):
+        assert tool == "get_job" and arguments["wait_seconds"] <= timeout
+        self.seconds += arguments["wait_seconds"]
+        status = "done" if self.seconds >= 100 else "running"
+        return {"job_id": arguments["job_id"], "status": status, "phase": "rendering"}, False, []
+
+    def call(self, tool, timeout):
+        assert tool == "get_status"
+        return {"projects": [{"id": "p2", "shown_in": "background (no window)", "view": "background"}]}, False
+
+
+class HarnessChecks(unittest.TestCase):
+    def test_render_can_finish_after_the_old_deadline(self):
+        client = RenderJob()
+        with patch.object(run.time, "monotonic", lambda: client.seconds), contextlib.redirect_stdout(io.StringIO()):
+            job = run.Session(client).job({"job_id": "motion-1"})
+        self.assertEqual(job["status"], "done")
+        self.assertEqual(client.seconds, 100)
+
+    def test_deadline_keeps_the_last_phase_and_window_state(self):
+        client = RenderJob()
+        session = run.Session(client)
+        with patch.object(run.time, "monotonic", lambda: client.seconds), patch.object(run, "JOB_TIMEOUT", 62), \
+                contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as log:
+            with self.assertRaisesRegex(TimeoutError, "motion-1.*62s"):
+                session.job({"job_id": "motion-1"})
+            session.diagnose()
+        self.assertEqual(client.seconds, 62)
+        self.assertIn("'phase': 'rendering'", log.getvalue())
+        self.assertIn("background (no window)", log.getvalue())
+
+    def test_candidate_keeps_baseline_and_emits_diff(self):
+        with tempfile.TemporaryDirectory() as root:
+            baseline = Path(root) / "reference_golden.json"
+            baseline.write_text(output.encode({"measurement": -12}))
+            expected = baseline.read_bytes()
+            with patch.object(output, "GOLDEN", baseline), patch.object(output.tempfile, "mkdtemp", return_value=root), \
+                    contextlib.redirect_stdout(io.StringIO()):
+                paths = output.record_or_compare({"measurement": -2}, update=True)
+            self.assertEqual(baseline.read_bytes(), expected)
+            candidate, diff = paths
+            self.assertEqual(json.loads(candidate.read_text()), {"measurement": -2})
+            self.assertIn('-  "measurement": -12', diff.read_text())
+            self.assertIn('+  "measurement": -2', diff.read_text())
+
+    def test_delivery_oracle_refuses_a_missing_cut(self):
+        source = [-16, -13, -20]
+        output.require_voice_band_cut([-13, -22, -17], source)
+        with self.assertRaisesRegex(AssertionError, "960 Hz voice cut"):
+            output.require_voice_band_cut([-13, -10, -17], source)
+
+    def test_real_home_boundary_denies_writes_and_reports_daemon_artifacts(self):
+        with tempfile.TemporaryDirectory() as root:
+            home = Path(root).resolve()
+            target = home / "outside"
+            result = subprocess.run(launch.sandbox_command(home, ["/usr/bin/touch", str(target)]),
+                                    env={"LC_ALL": "C"}, text=True, capture_output=True, timeout=10)
+            self.assertNotIn("sandbox_apply", result.stderr)
+            self.assertIn("Operation not permitted", result.stderr)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(target.exists())
+            profile = home / "Library/Preferences/com.srtflow.e2egui123.plist"
+            profile.parent.mkdir(parents=True)
+            profile.touch()
+            with self.assertRaisesRegex(RuntimeError, "real home.*e2egui123"):
+                launch.assert_no_home_artifacts(home, "com.srtflow.e2egui123")
+
+
+if __name__ == "__main__":
+    unittest.main()

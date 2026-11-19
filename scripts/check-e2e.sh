@@ -2,6 +2,7 @@
 # Drive a built SkyCut and its real MCP helper with synthetic media in CI's graphical session.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 if [ ! -x "${FFMPEG}" ]; then
@@ -13,11 +14,12 @@ fi
 built="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${built}"; exit 1; }
 swift build --arch arm64 --product skycut-mcp
 swift build --arch arm64 --product skycut-web-motion
+python3 -I -B checks/E2E/Harness.py
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 root="$(mktemp -d /tmp/skycut-e2e.XXXXXX)"
-trap 'rm -rf "${root}"' EXIT
 
 app="${root}/SkyCutE2E.app"
+test_app_cleanup_on_exit "${app}" "${root}"
 mkdir -p "${app}/Contents/"{MacOS,Resources,Helpers}
 cp "${BUILD_DIR}/SrtFlow" "${app}/Contents/MacOS/"
 cp "${BUILD_DIR}/skycut-mcp" "${app}/Contents/Helpers/"
@@ -35,4 +37,4 @@ cp packaging/Info.plist "${app}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable SrtFlow" "${app}/Contents/Info.plist"
 codesign --force --deep --sign - "${app}"
 
-PYTHONDONTWRITEBYTECODE=1 python3 scripts/gui-smoke/e2e/run.py "${app}" "${FFMPEG}" "$@"
+python3 -I -B scripts/gui-smoke/e2e/launch.py mcp "${app}" "${FFMPEG}" "$@"

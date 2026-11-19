@@ -215,6 +215,8 @@
 `replay.sh` 往格子里拖文件，看 op 和日志里是哪一格收到了回调；顶上两张卡片是
 `.onDrag` 拖源，App 内拖动那一半人手拖。
 
+Keep the probe command running while testing. Quit the probe or press Ctrl-C to unregister and remove its bundle.
+
 **改时间线的 `.onDrop` 结构之前，先在这儿把想法测一遍。** 在 SrtFlow 里二分，
 被测的落点常常被别的落点盖着 —— 「代理式收不到外部拖入」这条错误结论就是这么测
 出来的（每次代理都被滤镜 / 音频库的落点挡在外面）。各格的实测结果见
@@ -699,10 +701,8 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 
 ## 六、收尾
 
-- 杀掉 SrtFlowDev 进程，删临时 .app。
-- When the run ends, unregister (`lsregister -u`) and delete every app bundle it assembled: `SrtFlowDev.app` (the in-process
-  harness leaves it next to the steps file), the `.skystudiosmoke` and measurement apps (their `stop` leaves them on disk).
-  Logs and results may stay for review, bundles don't, and none is ever installed into `/Applications`:
-  [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
+- Exit traps unregister and remove the staged app bundles for one-shot smoke, render and probe commands.
+  Use `stop` with the same scratch directory and identity to end a successful Sky Studio or measurement session.
+  Scripts keep their logs and results available for review. See [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 - 正式交付走 `scripts/build-app.sh`，并对 dist 产物重复第一步的
   arch + strings 验证。

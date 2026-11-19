@@ -163,11 +163,11 @@ enough; don't install so many versions on this Mac). So the Mac keeps exactly tw
     its DMG goes too (previous section).
 - **Test, smoke and probe bundles** (`SrtFlowDev.app`, harness and check bundles, `.skystudiosmoke` and measurement apps,
   repro apps) are built under a temporary or scratch folder, never installed into `/Applications`, and unregistered and
-  deleted when the run ends; a fixture a failed check keeps for debugging goes once it has been read. As of 2026-11-19
-  no script unregisters anything, the smoke harnesses leave their app bundle on disk (the in-process `run.sh` keeps
-  `SrtFlowDev.app` next to the steps file; `stop` of the Sky Studio and measurement harnesses keeps theirs), and a failed
-  `scripts/check-motion-placement.sh` keeps its `MotionPlacementCheck.app`: until the harnesses are fixed, unregister and
-  delete what they leave behind by hand.
+  deleted when the run ends. Install the cleanup trap before staging the bundle. Use `scripts/test-app-cleanup.sh`
+  for the unregister and removal, including on errors. Keep any needed logs or project fixtures outside the bundle.
+  For a multi-command smoke session, a failed start cleans up immediately and `stop` ends a successful session and
+  removes its bundle. The measurement harness can stage a new bundle from its prepared template on the next start.
+  `checks/test-app-cleanup.sh` scans this wiring and exercises cleanup in both exit paths.
 - **Never reset the LaunchServices database** (`lsregister -kill`, `-delete`, `-seed` and the like): it holds every app
   on the Mac, not only SkyCut.
 

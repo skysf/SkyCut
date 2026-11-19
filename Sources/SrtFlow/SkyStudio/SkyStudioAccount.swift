@@ -121,7 +121,7 @@ final class SkyStudioAccount: ObservableObject {
 
     /// 启动与 Key 变化时同步工具提供方标记：只有名字，没有密钥；保持既有目录与文件身份。
     private func syncProviders() {
-        let url = MCPProviderMarker.url(bundleIdentifier: Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow")
+        let url = AIBridgeLocation.providerMarker
         do { try MCPProviderMarker.write(hasKey ? [.skystudio] : [], to: url) }
         catch { FileHandle.standardError.write(Data("SkyCut: could not update provider marker.\n".utf8)) }
     }

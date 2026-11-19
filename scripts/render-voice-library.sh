@@ -8,11 +8,12 @@ OUT_DIR="${1:?用法：scripts/render-voice-library.sh <输出目录>}"
 mkdir -p "${OUT_DIR}"
 OUT_DIR="$(cd "${OUT_DIR}" && pwd)"
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "${ROOT}"' EXIT
 APP="${ROOT}/VoiceLibraryRender.app"
+test_app_cleanup_on_exit "${APP}" "${ROOT}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${ROOT}/work"
 cat > "${APP}/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
