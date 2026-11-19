@@ -319,9 +319,16 @@ final class PlayerClock: ObservableObject {
                 if source.isPlaying { source.pause() }
                 return
             }
-            guard let restarted = recoverAudioIfNeeded(source) else { return }
             let start = time
             let positioned = positionedTime == start
+            if positioned, previewIsUnprimed {
+                let request = UUID()
+                previewSeek = request
+                playbackRequested = true
+                preparePositionedPreview(request, at: start, seekFinished: true)
+                return
+            }
+            guard let restarted = recoverAudioIfNeeded(source) else { return }
             if positioned, !restarted {
                 positionedTime = nil
                 player.playImmediately(atRate: 1)
@@ -441,7 +448,8 @@ final class PlayerClock: ObservableObject {
 
     private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
         guard previewSeek == request else { return }
-        guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem else {
+        guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem,
+              !previewIsUnprimed || playbackRequested else {
             finishPreviewPosition(request, at: seekFinished ? seconds : nil)
             return
         }
@@ -451,8 +459,8 @@ final class PlayerClock: ObservableObject {
             }
             return
         }
-        // Prime a fresh item at playback rate while its audio anchor is paused. After a seek,
-        // the existing decoder needs less data before advancing, especially across a trim.
+        // Prime a fresh item at playback rate only when Play needs it. A positioned item's
+        // decoder needs less data to start advancing, especially across a trim.
         player.preroll(atRate: previewIsUnprimed ? 1 : 0.25) { [weak self] finished in
             DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil, primed: finished) }
         }

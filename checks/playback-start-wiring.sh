@@ -87,13 +87,17 @@ fi
 preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
 if ! awk '
   /guard previewSeek == request/ { current = NR }
+  /!previewIsUnprimed \|\| playbackRequested/ { requested = NR }
   /guard player.status == .readyToPlay, item.status == .readyToPlay/ { ready = NR }
   /observeReadiness\(of: item\)/ { observe = NR }
   /player.preroll\(atRate: / { pre = NR }
   /self\?\.finishPreviewPosition\(/ { finish = NR }
-  END { exit !(current && ready > current && observe > ready && pre > observe && finish > pre) }
+  END { exit !(current && requested > current && ready > requested && observe > ready && pre > observe && finish > pre) }
 ' <<<"${preroll}"; then
   fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
+fi
+if ! body "${clock}" '    func play(' | grep -F 'preparePositionedPreview(request, at: start, seekFinished: true)' >/dev/null; then
+  fail "Defer a new item's full preroll until Play requests it"
 fi
 
 finish="$(body "${clock}" '    private func finishPreviewPosition(')"

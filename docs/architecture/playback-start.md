@@ -8,7 +8,7 @@ placement of the playhead. The current player and item must be ready for the syn
 press while pending, and preview teardown cancel the request. [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
 
 After an exact paused seek, the clock waits for both the native player and its item, then prerolls asynchronously
-while audio stays paused. A new item prerolls at playback rate. A positioned item prerolls at a smaller rate
+while audio stays paused. A new item prerolls at playback rate when Play requests it. A positioned item prerolls at a smaller rate
 to prepare less data around a trimmed cut. If the new composition has picture in a mounted preview, the
 clock also waits for the preview layer's first display-ready frame. Any newer placement or item cancels
 the earlier preparation. A surface that becomes hidden or detaches can finish the wait after 750 ms.
@@ -36,8 +36,8 @@ The project has a 1080p opening and cut, three composited upper video tracks, si
 source with an eight-second GOP. The timeline starts cold at zero, then tests the positioned start, a deep seek within
 the 4K GOP, the frame before the 1080p cut, the 4K tail, Play at the exact end, and a suspended output graph. The
 end replay waits for native placement at the tail and must start at zero. The idle case uses the production
-suspension entry and confirms the graph has suspended
-before Play. The idle-policy tests cover when the two-minute stop is due.
+suspension entry and confirms the graph has suspended before Play. If focus or pointer activity wakes it during
+preparation, the check tries the setup once more. The idle-policy tests cover when the two-minute stop is due.
 
 Time begins at the call to the editor's Play action. Each attempt measures the following.
 
@@ -75,7 +75,7 @@ have a 45 ms ceiling for display and audio sampling noise, with 48 ms one second
 Cold open includes preview construction and output startup.
 Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
 Its onset skew limit is 120 ms median and 150 ms per trial. A suspended graph has a separate 700 ms audio and
-800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
+800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 160 ms per trial.
 The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
 The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
 Cold dispatch has a 20 ms median budget and a 90 ms single-trial ceiling. In calibration the first Play
@@ -85,8 +85,8 @@ the Play callback.
 On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture put positioned picture onset at
 69–117 ms median outside the cut and at 232 ms just before it. First-open audio and video were 1.36 / 1.74 s
 and 1.38 / 1.75 s median / worst, with a 16 ms maximum onset skew. The suspended graph took 335 / 402 ms
-for audio and 373 / 515 ms for picture. Device startup skew reached 104 ms at onset and settled within
-17 ms one second later. Calibration repeats reached 41 ms after one second on a device restart, 3.22 s
+for audio and 373 / 515 ms for picture. Calibration repeats reached 138 ms of device startup skew and
+41 ms one second later. They also reached 3.22 s
 to the first-open picture, and 648 ms to a picture after idle.
 
 On the hosted VirtualMac2,1, waiting for the mounted picture lowered worst cold onset separation from 750 ms
@@ -94,8 +94,9 @@ to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing col
 the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
 
 A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch when each affected
-scenario has only one failed trial. Eligible failures are one-second timing, a positioned start skew of at most
-100 ms, or a rewind onset time within 50 ms of its single-trial budget. Each scenario must have a complete
+scenario has only one failed trial. Eligible failures are one-second timing, a start skew of at most
+200 ms cold or 100 ms after positioning, or a rewind onset time within 50 ms of its single-trial budget.
+Each scenario must have a complete
 five-trial batch within budget. A failure in the same scenario in both batches fails the gate. Missing playback,
 other timing failures, repeated failures in one scenario and structural failures fail immediately.
 The artifact preserves both raw summaries and gives the complete confirmed batch for each scenario.

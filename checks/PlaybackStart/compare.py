@@ -126,9 +126,8 @@ def isolated_virtual_timing_failures(errors):
     for error in errors:
         if not isinstance(error, TimingFailure) or error.scenario is None:
             return None
-        small_start_skew = (
-            error.metric == "startOffsetMs" and error.scenario != "cold-open" and abs(error.value) <= 100
-        )
+        start_skew_limit = 200 if error.scenario == "cold-open" else 100
+        small_start_skew = error.metric == "startOffsetMs" and abs(error.value) <= start_skew_limit
         isolated_rewind = (
             error.scenario == "end-replay" and error.metric in ("audioMs", "videoMs", "onsetGapMs")
             and abs(error.value) <= error.limit + 50

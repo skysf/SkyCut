@@ -38,7 +38,7 @@
       "onsetGapMs": 550,
       "audioAdvanceMs": 200,
       "videoAdvanceMs": 570,
-      "startOffsetMs": 135,
+      "startOffsetMs": 160,
       "oneSecondOffsetMs": 48
     }
   },

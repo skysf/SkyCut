@@ -22,6 +22,11 @@ first picture can display. A positioned item prerolls with a smaller rate to pre
 The Play request stays pending until preparation completes. A later seek or a new item invalidates the
 previous placement, readiness observation and preroll.
 
+Starting a full preroll on every newly installed composition also staged playback buffers while the user was
+editing. The existing preview ratchet measured 344.2 MB and 324.0 MB across two hosted attempts. The clock
+now primes a new item at playback rate when a Play is pending. The usual paused placement still decodes its
+still picture and Play reuses that location.
+
 A positioned preview starts with `playImmediately(atRate:)`. Reanchoring to a host time after a full preroll
 caused the first 4K picture to arrive more than two seconds into playback on the M1 test. After an audio
 device restart, startup uses a fresh synchronized host anchor. Both the current item and the native player

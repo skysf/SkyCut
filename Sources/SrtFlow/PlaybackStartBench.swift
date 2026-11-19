@@ -129,11 +129,13 @@ enum PlaybackStartBench {
     }
 
     private static func stopForIdle(_ project: VideoEditProject) async throws {
-        project.audioEngineHost.suspendNow()
-        try await Task.sleep(for: .seconds(2))
-        guard project.audioEngineHost.graphStateName == "suspended" else {
-            throw Failure("Idle trial did not begin with a suspended realtime output graph (\(project.audioEngineHost.graphStateName))")
+        // Focus or pointer activity can return while a local run is preparing the idle case.
+        for _ in 0..<2 {
+            project.audioEngineHost.suspendNow()
+            try await Task.sleep(for: .seconds(2))
+            if project.audioEngineHost.graphStateName == "suspended" { return }
         }
+        throw Failure("Idle trial did not begin with a suspended realtime output graph (\(project.audioEngineHost.graphStateName))")
     }
 
     private static func trial(_ name: String, _ body: () async throws -> [String: Double]) async -> Trial {
