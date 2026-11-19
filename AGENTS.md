@@ -241,8 +241,8 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/check-cloud-media.sh` — 云端媒体共用的每日账与阶段。
 - `scripts/check-cover-export.sh` — 盖一块（模糊 / 马赛克）在成片里真的盖了。
 - `scripts/check-dmg.sh` — DMG 的真实组装、挂载和 Retina 背景。
-- `scripts/check-e2e.sh` — Isolated SkyCut and its real MCP helper, from authoring synthetic projects to checking the delivered video.
-- `scripts/check-e2e-gui.sh` — In-process editor windows for the export folder, Versions and native and web motion controls.
+- `scripts/check-e2e.sh` — Scratch-only SkyCut and real MCP helper, with job deadlines, synthetic editing, and independent delivered AAC checks.
+- `scripts/check-e2e-gui.sh` — Isolated editor windows for export folders, Versions, and motion, with control and render diagnostics.
 - `scripts/check-engine-probe.sh` — 引擎启动探测：超时、输出上限、子进程回收、单次定位。
 - `scripts/check-export-alpha-compositing.sh` — 上层轨动画段的 fill + matte。
 - `scripts/check-export-frame-rate.sh` — 生产导出的帧率与分辨率（真跑导出数帧）；per-frame upper-video, cover and grade windows, including native look requests.
@@ -342,6 +342,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/sky-studio-wiring.sh` — Sky Studio 的地址、机器号、钥匙串、照授权拦、任务、声音库和变声只在该在的地方（分节在 `checks/sky-studio-wiring/`）。
 - `checks/source-file-size.sh` — 单文件超过 600 行就红、老文件只许降（变短了跑 `--update`）。
 - `checks/subtitle-editing-wiring.sh` — 字幕编辑期间全局快捷键让路。
+- `checks/test-app-cleanup.sh` — Check, render, and smoke bundles are unregistered and removed on exit, including failures.
 - `checks/timeline-clipboard-wiring.sh` — 复制粘贴的接线、落点鼠标优先、剪贴板只有一套。
 - `checks/timeline-drag-wiring.sh` — 时间线拖动 / 框选 / 缩放 / 联动 / 开关的接线，整条时间线只许一个 `.onDrop`（分节在 `checks/timeline-drag-wiring/`）。
 - `checks/transition-handles-wiring.sh` — 主轨转场借余料、定格补足、可点选可删除的接线。

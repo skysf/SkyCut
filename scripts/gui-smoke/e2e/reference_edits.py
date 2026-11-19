@@ -24,6 +24,11 @@ def inspect(session, **arguments):
 
 def add_picture(session):
     session.edit("set_canvas", fps=FPS)
+    # add_clips allows only 10 s for inline source scanning. Warm the shared cache through the read-only
+    # MCP entry point so a busy runner still tests the exact add_clips reminder for this source.
+    scan = session.edit("look", file="amber.mp4", shots=True, image=False)
+    while "job_id" in scan:
+        scan = session.job(scan).get("result", {})
     added = session.edit("add_clips", clips=[
         {"file": "amber.mp4", "track": "V1", "source_in": 0.5, "source_out": 2.5},
         {"file": "blue.mp4", "track": "V1", "source_in": 0.5, "source_out": 2.5},
@@ -33,7 +38,9 @@ def add_picture(session):
         {"file": "caption.srt"},
     ])
     assert [row["track"] for row in added["added"]] == ["V1", "V1", "V1", "V2", "V2"], added
-    reminder, = added["source_cuts"]
+    reminders = added.get("source_cuts", [])
+    assert len(reminders) == 1, f"Expected the amber source reminder, got {reminders}; unchecked: {added.get('source_cuts_unchecked')}"
+    reminder, = reminders
     assert reminder["clip"] == added["added"][0]["id"] and reminder["source_frame"] == 58, reminder
     assert reminder["frames_after_cut"] == 2 and reminder["suggested_source_out"] == 2.417, reminder
     return added["added"][0]["id"]

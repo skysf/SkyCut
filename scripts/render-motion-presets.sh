@@ -20,6 +20,7 @@ esac
 mkdir -p "${OUT_DIR}"
 OUT_DIR="$(cd "${OUT_DIR}" && pwd)"
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 FFMPEG="${SRTFLOW_FFMPEG:-$(pwd)/vendor/ffmpeg}"
 if [ "${WEB_ONLY}" -eq 0 ] && [ "${OFFICIAL_ONLY}" -eq 0 ]; then
   [ -x "${FFMPEG}" ] || { echo "找不到 ffmpeg：${FFMPEG}（设 SRTFLOW_FFMPEG）" >&2; exit 1; }
@@ -30,8 +31,8 @@ if [ "${WEB_ONLY}" -eq 1 ]; then
 fi
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
-trap 'rm -rf "${ROOT}"' EXIT
 APP="${ROOT}/MotionPresetRender.app"
+test_app_cleanup_on_exit "${APP}" "${ROOT}"
 BUNDLE_ID="com.srtflow.SrtFlow.motionpresetrender.run$$"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${APP}/Contents/Helpers" "${ROOT}/web-project"
 cat > "${APP}/Contents/Info.plist" <<PLIST

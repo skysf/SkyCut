@@ -9,16 +9,18 @@
 # 可选：MEASURE_BUNDLE（默认 com.srtflow.SrtFlow.measure.skystudiosmoke，必须以 .skystudiosmoke 结尾：假 Key 只认这种身份）、
 #      MEASURE_PORT（默认 18797）。不碰正式版、测试版、用户的工程和钥匙串里别的项；不发任何收费请求。
 set -euo pipefail
+. "$(dirname "$0")/../../test-app-cleanup.sh"
 D="${MEASURE_DIR:?set MEASURE_DIR}"
 BUNDLE="${MEASURE_BUNDLE:-com.srtflow.SrtFlow.measure.skystudiosmoke}"
 PORT="${MEASURE_PORT:-18797}"
 NAME=SrtFlowMeasureSmoke
 APP="$D/$NAME.app"
+TEMPLATE="$D/app-template"
 SUPPORT="$HOME/Library/Application Support/$BUNDLE"
 KEY="sk-SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS"
 case "$BUNDLE" in *.skystudiosmoke) ;; *) echo "MEASURE_BUNDLE must end with .skystudiosmoke" >&2; exit 2 ;; esac
 
-stop() {
+stop_runtime() {
   pkill -f "$APP/Contents/MacOS/$NAME" 2>/dev/null || true
   if [ -f "$D/server.pid" ]; then
     local pid command
@@ -37,23 +39,28 @@ stop() {
   rm -rf "$SUPPORT" "$HOME/Library/Caches/$BUNDLE" "$HOME/Library/Saved Application State/$BUNDLE.savedState"
 }
 
+stop() {
+  local status=0
+  stop_runtime || status=$?
+  remove_test_app "$APP"
+  return "$status"
+}
+
 assemble() {
   local repo="$1" build res plist
   build="$(cd "$repo" && swift build --arch arm64 --show-bin-path)"
-  rm -rf "$APP"
-  mkdir -p "$D/assets" "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Helpers"
-  cp "$build/SrtFlow" "$APP/Contents/MacOS/$NAME"
+  rm -rf "$TEMPLATE"
+  mkdir -p "$D/assets" "$TEMPLATE/Contents/MacOS" "$TEMPLATE/Contents/Resources" "$TEMPLATE/Contents/Helpers"
+  cp "$build/SrtFlow" "$TEMPLATE/Contents/MacOS/$NAME"
   res="$build/SrtFlow_SrtFlow.bundle"
-  if [ -d "$res/Contents/Resources" ]; then ditto "$res/Contents/Resources" "$APP/Contents/Resources"; else ditto "$res" "$APP/Contents/Resources"; fi
-  ditto "$res" "$APP/Contents/Resources/SrtFlow_SrtFlow.bundle"
-  ditto "$res" "$APP/Contents/MacOS/SrtFlow_SrtFlow.bundle"
-  cp "$repo/packaging/Info.plist" "$APP/Contents/Info.plist"
-  plist="$APP/Contents/Info.plist"
+  if [ -d "$res/Contents/Resources" ]; then ditto "$res/Contents/Resources" "$TEMPLATE/Contents/Resources"; else ditto "$res" "$TEMPLATE/Contents/Resources"; fi
+  ditto "$res" "$TEMPLATE/Contents/Resources/SrtFlow_SrtFlow.bundle"
+  ditto "$res" "$TEMPLATE/Contents/MacOS/SrtFlow_SrtFlow.bundle"
+  cp "$repo/packaging/Info.plist" "$TEMPLATE/Contents/Info.plist"
+  plist="$TEMPLATE/Contents/Info.plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleExecutable $NAME" "$plist"
-  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE" "$plist"
   /usr/libexec/PlistBuddy -c "Set :CFBundleName $NAME" "$plist"
-  cp "$build/skycut-mcp" "$APP/Contents/Helpers/skycut-mcp"
-  codesign --force --deep --sign - "$APP" >/dev/null 2>&1
+  cp "$build/skycut-mcp" "$TEMPLATE/Contents/Helpers/skycut-mcp"
   # 引擎拷一份到本轮目录、显式指过去（2026-11-03：测试包不带引擎、覆盖路径又指向 Downloads 时只得到 not ready）。
   cp "$repo/vendor/ffmpeg" "$D/ffmpeg"
   # 假服务按仓库的布局找夹具（parents[3]/checks/SkyStudio/Fixtures），所以拷一份最小的仓库布局。
@@ -75,11 +82,17 @@ assemble() {
   "$D/ffmpeg" -y -v error -f lavfi -i color=c=steelblue:s=640x640 -frames:v 1 -update 1 "$D/assets/picture.png"
   cp "$D/assets/video.mp4" "$D/work/motion.mp4"
   cp "$D/assets/picture.png" "$D/work/subject.png"
-  echo "assembled $APP from $(cat "$D/app-commit.txt")"
+  echo "Staged the measurement App from $(cat "$D/app-commit.txt") in $TEMPLATE"
 }
 
 start() {
-  stop
+  trap stop EXIT
+  test_app_exit_signals
+  stop_runtime
+  remove_test_app "$APP"
+  ditto "$TEMPLATE" "$APP"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier $BUNDLE" "$APP/Contents/Info.plist"
+  codesign --force --deep --sign - "$APP" >/dev/null 2>&1
   mkdir -p "$D/optimized-media"
   python3 - "$PORT" "$D" <<'SERVER'
 import subprocess, sys
@@ -106,7 +119,11 @@ READY
     --env "SRTFLOW_SMOKE_CACHE_DIR=$D/optimized-media" --env "SRTFLOW_SMOKE_SKYSTUDIO_KEY=$KEY" \
     --env "SRTFLOW_FFMPEG=$D/ffmpeg" --env SRTFLOW_SMOKE_MUTE=1 "$APP"
   for _ in $(seq 1 90); do
-    if [ -S "$SUPPORT/mcp.sock" ]; then echo "ready: $APP (socket $SUPPORT/mcp.sock, port $PORT)"; return 0; fi
+    if [ -S "$SUPPORT/mcp.sock" ]; then
+      trap - EXIT
+      echo "ready: $APP (socket $SUPPORT/mcp.sock, port $PORT)"
+      return 0
+    fi
     sleep 0.5
   done
   echo "test App did not start" >&2

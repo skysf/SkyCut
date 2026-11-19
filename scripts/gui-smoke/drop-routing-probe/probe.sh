@@ -14,9 +14,16 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-OUT="${TMPDIR:-/tmp}/srtflow-drop-probe"
+. "$HERE/../../test-app-cleanup.sh"
+OUT="$(mktemp -d "${TMPDIR:-/tmp}/srtflow-drop-probe.XXXXXX")"
 APP="$OUT/DropProbe.app"
 LOG="$OUT/probe.log"
+cleanup() {
+  pkill -f "$APP/Contents/MacOS/DropProbe" 2>/dev/null || true
+  remove_test_app "$APP"
+}
+trap cleanup EXIT
+test_app_exit_signals
 mkdir -p "$APP/Contents/MacOS"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
@@ -41,17 +48,13 @@ PLIST
 #（2026-09-23 踩过，docs/bugfixes/2026-09-23-custom-drag-types-not-declared.md）。
 
 # Rosetta 终端下显式编 arm64（见 docs/build/）。
-[ -x "$APP/Contents/MacOS/DropProbe" ] && [ "$APP/Contents/MacOS/DropProbe" -nt "$HERE/Probe.swift" ] \
-  || xcrun swiftc -target arm64-apple-macosx15.0 -O -o "$APP/Contents/MacOS/DropProbe" "$HERE/Probe.swift"
+xcrun swiftc -target arm64-apple-macosx15.0 -O -o "$APP/Contents/MacOS/DropProbe" "$HERE/Probe.swift"
 codesign --force --sign - "$APP" >/dev/null 2>&1
 
-# 同名进程坑（docs/testing/gui-smoke-testing.md）：旧的还活着的话 open 只会把它叫到前台。
-pkill -x DropProbe 2>/dev/null || true
-sleep 0.5
-rm -f "$LOG"
-# 必须用 open 起：后台直接拉起来的进程会跟着调用方一起被收走。
-open -a "$APP" --args "$LOG"
+open -n -a "$APP" --args "$LOG"
 sleep 3
 
 echo "探针日志：${LOG}"
 grep 'REGION' "$LOG" | sed 's/^[0-9.]* REGION /  /' | sort
+echo "Leave this command running while probing. Quit the probe or press Ctrl-C to clean up."
+while pgrep -f "$APP/Contents/MacOS/DropProbe" >/dev/null; do sleep 1; done
