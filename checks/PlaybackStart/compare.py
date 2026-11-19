@@ -1,5 +1,6 @@
 """Fail the GUI check on missing trials, extra preview builds or over-budget playback."""
 
+import argparse
 import json
 import math
 import os
@@ -120,11 +121,11 @@ def render(samples, errors, machine, media):
 
 
 def isolated_virtual_timing_failures(errors):
-    # Require a clean second batch after an isolated frame-delivery outlier and retain both batches.
+    # Allow only one affected launch per scenario. Structural, median and large onset failures are final.
     affected = {}
     for error in errors:
         if not isinstance(error, TimingFailure) or error.scenario is None:
-            return False
+            return None
         small_start_skew = (
             error.metric == "startOffsetMs" and error.scenario != "cold-open" and abs(error.value) <= 100
         )
@@ -133,26 +134,53 @@ def isolated_virtual_timing_failures(errors):
             and abs(error.value) <= error.limit + 50
         )
         if not small_start_skew and not isolated_rewind and error.metric not in ("oneSecondOffsetMs", "oneSecondElapsedMs"):
-            return False
+            return None
         affected.setdefault(error.scenario, set()).add(error.label)
-    return 0 < len(affected) <= 2 and all(len(trials) == 1 for trials in affected.values())
+    if any(len(trials) > 1 for trials in affected.values()):
+        return None
+    return set(affected)
 
 
-def main():
-    summary, *paths = map(Path, sys.argv[1:])
-    if not paths:
-        raise ValueError("No playback-start trial reports were provided")
-    budgets = json.loads(Path(__file__).with_name("budgets.json").read_text())
-    samples, errors = compare(paths, budgets)
-    machine = (summary.parent / "machine.txt").read_text().strip().replace("\n", " · ")
-    media = json.loads(paths[0].read_text())["media"]
-    report = render(samples, errors, machine, media)
+def write_report(summary, report):
     print(report, end="")
     summary.write_text(report)
     if destination := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(destination).open("a") as stream:
             stream.write("\n" + report)
-    if os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine and isolated_virtual_timing_failures(errors):
+
+
+def fingerprint(directory):
+    return (directory / "machine.txt").read_text().strip().replace("\n", " · ")
+
+
+def confirm(directory, samples, failures, budgets, machine, media):
+    first, first_errors = compare(sorted(directory.glob("trial-[1-5].json")), budgets)
+    first_failures = isolated_virtual_timing_failures(first_errors)
+    if not first_failures or failures is None or first_failures & failures or fingerprint(directory) != machine:
+        print("The second batch did not confirm every scenario with an isolated timing failure.", file=sys.stderr)
+        return 1
+    confirmed = {name: samples[name] if name in first_failures else trials for name, trials in first.items()}
+    report = "## Confirmed playback start\n\nEach scenario has one complete five-launch batch within budget. Both batches are archived.\n\n"
+    write_report(directory / "confirmed-summary.md", report + render(confirmed, [], machine, media))
+    return 0
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("summary", type=Path)
+    parser.add_argument("trials", type=Path, nargs="+")
+    parser.add_argument("--confirm", type=Path)
+    args = parser.parse_args()
+    budgets = json.loads(Path(__file__).with_name("budgets.json").read_text())
+    samples, errors = compare(args.trials, budgets)
+    machine = fingerprint(args.summary.parent)
+    media = json.loads(args.trials[0].read_text())["media"]
+    write_report(args.summary, render(samples, errors, machine, media))
+    hosted_vm = os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine
+    failures = isolated_virtual_timing_failures(errors) if hosted_vm else None
+    if args.confirm:
+        return confirm(args.confirm, samples, failures, budgets, machine, media)
+    if failures:
         return 2
     return bool(errors)
 

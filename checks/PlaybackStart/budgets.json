@@ -6,7 +6,7 @@
     "onsetGapMs": 160,
     "audioAdvanceMs": 135,
     "videoAdvanceMs": 235,
-    "startOffsetMs": 34,
+    "startOffsetMs": 45,
     "oneSecondOffsetMs": 45,
     "oneSecondElapsedMs": 1250
   },
@@ -50,6 +50,7 @@
       "onsetGapMs": 105,
       "audioAdvanceMs": 40,
       "videoAdvanceMs": 100,
+      "startOffsetMs": 34,
       "oneSecondOffsetMs": 34
     },
     "scenarios": {

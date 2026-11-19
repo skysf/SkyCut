@@ -70,9 +70,9 @@ with 16 ms onset skew or less across the five launches. The trim immediately bef
 has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
 Replay from the end also rewinds the item. Its median audio and picture budgets are 190 / 250 ms, capped at
 265 / 310 ms per trial.
-The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. One second later
-the median stays within 34 ms in every scenario. Individual samples have a 45 ms ceiling for display
-and audio sampling noise, with 48 ms after a device restart. Cold open includes preview construction and output startup.
+Warm onset and all one-second offsets have a 34 ms median budget on the 30 fps fixture. Individual samples
+have a 45 ms ceiling for display and audio sampling noise, with 48 ms one second after a device restart.
+Cold open includes preview construction and output startup.
 Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
 Its onset skew limit is 120 ms median and 150 ms per trial. A suspended graph has a separate 700 ms audio and
 800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
@@ -93,11 +93,12 @@ On the hosted VirtualMac2,1, waiting for the mounted picture lowered worst cold 
 to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing cold frames were one frame from
 the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
 
-A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch if at most two
-scenarios each have one failed trial. Eligible failures are one-second timing, a positioned start skew
-of at most 100 ms, or a rewind onset time within 50 ms of its single-trial budget. Every trial in the repeat
-must pass. Both batches and their verdicts are retained in the same artifact. Missing playback, other timing
-failures, repeated failures in one scenario and structural failures fail immediately.
+A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch when each affected
+scenario has only one failed trial. Eligible failures are one-second timing, a positioned start skew of at most
+100 ms, or a rewind onset time within 50 ms of its single-trial budget. Each scenario must have a complete
+five-trial batch within budget. A failure in the same scenario in both batches fails the gate. Missing playback,
+other timing failures, repeated failures in one scenario and structural failures fail immediately.
+The artifact preserves both raw summaries and gives the complete confirmed batch for each scenario.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.

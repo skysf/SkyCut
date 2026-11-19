@@ -18,6 +18,7 @@ trap cleanup EXIT
 out="${PLAYBACK_START_OUT:-${work}/out}"
 media="${work}/media"
 mkdir -p "${out}" "${media}"
+rm -f "${out}/confirmed-summary.md"
 
 ffmpeg="${SRTFLOW_FFMPEG:-$(pwd)/vendor/ffmpeg}"
 if [ ! -x "${ffmpeg}" ]; then
@@ -75,7 +76,8 @@ run_trials() {
 
 score() {
   local destination="$1"
-  python3 checks/PlaybackStart/compare.py "${destination}/summary.md" "${destination}"/trial-[1-5].json
+  shift
+  python3 checks/PlaybackStart/compare.py "${destination}/summary.md" "${destination}"/trial-[1-5].json "$@"
 }
 
 run_trials "${out}"
@@ -94,4 +96,4 @@ repeat="${out}/repeat"
 mkdir -p "${repeat}"
 cp "${out}/machine.txt" "${repeat}/machine.txt"
 run_trials "${repeat}"
-score "${repeat}"
+score "${repeat}" --confirm "${out}"
