@@ -20,7 +20,8 @@
       "onsetGapMs": 330,
       "audioAdvanceMs": 40,
       "videoAdvanceMs": 300,
-      "startOffsetMs": 150
+      "startOffsetMs": 150,
+      "maxSkewMs": 150
     },
     "warm-start": {},
     "middle": {},
@@ -28,7 +29,11 @@
       "audioMs": 300,
       "videoMs": 340
     },
-    "fresh-item": {},
+    "fresh-item": {
+      "onsetGapMs": 200,
+      "startOffsetMs": 150,
+      "maxSkewMs": 150
+    },
     "seek-play": {
       "audioMs": 3500,
       "videoMs": 3600
@@ -42,7 +47,8 @@
     "end-replay": {
       "audioMs": 265,
       "videoMs": 380,
-      "startOffsetMs": 60
+      "startOffsetMs": 60,
+      "maxSkewMs": 60
     },
     "idle-wake": {
       "dispatchMs": 650,
@@ -76,7 +82,8 @@
         "videoMs": 3300,
         "onsetGapMs": 170,
         "videoAdvanceMs": 150,
-        "startOffsetMs": 145
+        "startOffsetMs": 145,
+        "maxSkewMs": 145
       },
       "cut": {
         "audioMs": 230,
@@ -85,7 +92,8 @@
       "end-replay": {
         "audioMs": 220,
         "videoMs": 300,
-        "startOffsetMs": 48
+        "startOffsetMs": 48,
+        "maxSkewMs": 48
       },
       "idle-wake": {
         "dispatchMs": 550,
@@ -94,7 +102,8 @@
         "onsetGapMs": 230,
         "audioAdvanceMs": 75,
         "videoAdvanceMs": 250,
-        "startOffsetMs": 45
+        "startOffsetMs": 45,
+        "maxSkewMs": 45
       },
       "seek-play": {
         "audioMs": 2500,
@@ -103,6 +112,10 @@
       "peek-play": {
         "audioMs": 2500,
         "videoMs": 2600
+      },
+      "fresh-item": {
+        "startOffsetMs": 75,
+        "maxSkewMs": 75
       }
     }
   },

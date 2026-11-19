@@ -62,6 +62,15 @@ class PlaybackGateTests(unittest.TestCase):
         # Before the fix a Play while hovering also skipped the placement of the picture.
         self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
 
+    def test_a_rebuilt_item_has_hosted_room_but_not_on_this_mac(self):
+        # The hosted virtual Mac decodes 4K in software: a new item primed at a quarter rate started 137 ms behind at worst.
+        samples = batch(5)
+        samples["fresh-item"][0] = trial("fresh-item", startOffsetMs=137, maxSkewMs=137, onsetGapMs=159)
+        self.assertEqual(evaluate(samples, BUDGETS)[0], [])
+        self.assertEqual(len(strict(samples, BUDGETS["strict"])), 1)
+        samples["fresh-item"] = [trial("fresh-item", startOffsetMs=160, maxSkewMs=160)] * 5
+        self.assertTrue(any("fresh-item median: startOffsetMs" in error for error in evaluate(samples, BUDGETS)[0]))
+
     def test_a_new_item_must_be_primed_before_play(self):
         self.assertEqual(validate_trial("fresh-item", trial("fresh-item")), [])
         self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=1)))

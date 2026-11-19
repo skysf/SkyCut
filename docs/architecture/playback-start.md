@@ -136,7 +136,13 @@ was usually dispatched in under 2 ms. An individual launch took 61 ms without a 
 the Play callback.
 Play right after a click and Play while hovering include decoding the picture at the playhead: 3.5 / 3.6 s per
 launch and 2.5 / 2.6 s median to first sound and picture (about 0.6 s on the M1). In every scenario the first two
-seconds allow a 300 ms stall and 60 ms skew per launch, 100 ms and 40 ms median.
+seconds allow a 300 ms stall and 60 ms skew per launch, 100 ms and 40 ms median; the worst skew includes the first
+frame, so no scenario's skew limit is tighter than its start skew limit (cold open 150 / 145 ms, replay from the end
+60 / 48 ms, the idle start 160 / 45 ms). On the hosted virtual Mac a new 4K item primed at a quarter of playback rate
+starts behind its sound (software decode): in the first eight hosted launches (run 44540586891) its start skew had a
+52–60 ms median and a 137 ms worst, onset separation 159 ms worst, so the rebuilt item allows 150 ms skew per launch
+and 75 ms median, and 200 ms onset separation per launch. On the M1 it starts within 15 ms, and the strict profile
+holds it to 45 ms.
 
 **This Mac fails on any picture out of step** (`strict` in `budgets.json`, applied wherever the runner is not the
 hosted virtual Mac): every launch of every scenario must start the picture within 60 ms of the sound and within 45 ms
