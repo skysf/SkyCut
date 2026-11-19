@@ -269,7 +269,7 @@ rule, including a duplicate open build and removal of the graphical CI step. On 
 paused, Play not priming a new item, a re-seeking start, the sound started before the placement, no hold on pause,
 the stop callback ignored, a hover end that scrubs) each turned the wiring guard red, and
 five pre-fix M1 launches failed the gate on structure, on the hosted rules (resume and Play while hovering: five
-gross stalls each) and on the strict rules. On 2026-11-20 the previous `PlayerClock` failed 11 of the new clock checks
+gross stalls each) and on the strict rules. On 2026-11-20 the previous `PlayerClock` failed 12 of the new clock checks
 (the cold start, a click and a drag while playing, drift both ways and a too-large drift), the engine without the
 paused sync failed group 17 (a whole first quantum silent), and `test_compare.py` pins the recorded idle starts and
 clicks while playing red.
