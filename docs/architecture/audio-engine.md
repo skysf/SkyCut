@@ -84,6 +84,10 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
     reuses its prepared buffers when the paused anchor already points there. A second press or a preview teardown
     cancels pending playback.
     [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
+    The sound never starts ahead of the picture: a pause moves the engine to the frame the picture stopped on, and a
+    Play without a positioned, primed picture keeps the sound paused until the picture is placed
+    ([playback start](playback-start.md)).
+    [Resuming or Play while hovering froze the picture](../bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
 
 11. **图只在马上要出声时开着**（2026-11-11，[案例](../bugfixes/2026-11-11-preview-audio-engine-never-idles.md)）。图开着就占着
     声卡：coreaudiod 替它挂着 `PreventUserIdleSystemSleep`（Mac 不会空闲睡眠），App Nap 也不生效。
