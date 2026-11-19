@@ -287,7 +287,10 @@
   `invalid_parameter` naming the path (with `batch` / `index` in a list), 0–86,400, a suggestion, the guide pointer; no edit, no
   undo step, no job, no file. 0, 86,400 and "12.5" pass; a seek and a text at 86,400 s still work; `edit_limits.time` is reported.
   Tools that would start work or read a key without the bound get a missing file or unknown id, so a run without the bound fails
-  early instead. Rule: [MCP edit parameters](../architecture/mcp-edit-parameters.md).
+  early instead. `TimeBoundEdgeChecks` (same day): a timeline run past the day by a title at 86,400 s can be sought to its end,
+  looked at and edited inside, and refuses a time past its end with that end as the maximum; relative keyframe fractions a hair
+  outside 0–1 land on the clip's edges and ones outside −0.001–1.001 are refused with that range. Rule:
+  [MCP edit parameters](../architecture/mcp-edit-parameters.md).
 - Black-bar removal: `scripts/check-parameter-limits.sh` → `BlackBarAppChecks` exercises thin asymmetric bars, the source window
   changed by the same call, actual timeline look after removal, conservative mixed-shot voting, fill-only notices and one undo;
   `scripts/check-mcp.sh` checks bounded pixel-edge padding. Rule: [Preview transforms](../architecture/preview-free-transform.md).
@@ -432,6 +435,9 @@
   跑 `checks/preview-perf-wiring.sh --fix` 自动补上。同一个守卫还钉着**时间线上的块不许
   读工程的属性、必须 `Equatable` 且构造处套 `.equatable()`**，以及**订阅播放器时钟的只许是名单里跟着播放头动的
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
+- `scripts/check-playback-start.sh` uses the real editor, a fresh project and a 4K long-GOP source to measure first sound,
+  first motion and sync at onset and one second later. The graphical CI step gates timing and one-time preview work.
+  `checks/playback-start-wiring.sh` checks the Play path and the workflow connection. [Playback start](../architecture/playback-start.md).
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（扫描守卫）。
 - AI 在干活时不让 App Nap 降速、领和还成对（活动断言只在 `AIKeepAwake` 和录屏开关、路由领了紧跟 `defer` 还、任务 `start` 领 `finish` 还）：`checks/ai-keep-awake.sh`（扫描守卫）；计数、重复还、兜底还、真走一次工具调用和任务都还回来在 `scripts/check-voice-recovery.sh` 的 `KeepAwakeChecks`。

@@ -172,6 +172,7 @@ run_check "ai-work-queue-wiring（扫描守卫：导出 / 转写 / 翻译 AI 起
 run_check "ai-keep-awake（扫描守卫：AI 的工具调用和任务领不降速的那一份、领和还成对，活动断言只在两处开关）" checks/ai-keep-awake.sh
 run_check "screen-recording-ai-wiring（扫描守卫：AI 录屏不开系统选择窗口、不覆盖、入轨包 step、录制中不摆窗口、丢弃先问）" checks/screen-recording-ai-wiring.sh
 run_check "preview-perf-wiring（扫描守卫：预览性能计数接满）" checks/preview-perf-wiring.sh
+run_check "playback-start-wiring (Play stays off the rebuild and blocking media paths)" checks/playback-start-wiring.sh
 run_check "optimized-media-wiring（扫描守卫：优化媒体只换预览、成片永远原片、停着才换）" checks/optimized-media-wiring.sh
 run_check "player-time-no-sync-read（扫描守卫：不许同步问播放器要时间、Now Playing 关着）" checks/player-time-no-sync-read.sh
 run_check "audio-engine-idle-wiring（扫描守卫：预览的音频引擎不是一直开着的 —— 空闲停图、用户回来先起、换工程收引擎、片尾停主时钟）" checks/audio-engine-idle-wiring.sh

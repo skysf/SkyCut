@@ -47,6 +47,7 @@ import SrtFlowMCPKit
         }
         record([(paths >= 60 && calls == paths * values.count, "walked every listed time (\(paths) paths, \(calls) calls)")])
         record(await boundaryStillWorks(fixture))
+        record(await TimeBoundEdgeChecks.run(fixture))   // a timeline run past the day, relative keyframe fractions
         print(failed == 0
             ? "PASS: \(calls) calls with times no tool can mean on \(paths) time parameters: plain refusals, no edit, undo step, job or file"
             : "FAIL: times no tool can mean: \(failed) of the checks above failed")

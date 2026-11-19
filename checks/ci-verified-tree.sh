@@ -228,7 +228,7 @@ while IFS="$(printf '\037')" read -r index id cond run uses; do
     fail "第 ${index} 步的 if 写成了 verified == 'true'：一律写成「${NOT_VERIFIED}」，判断出岔子才会照常全跑（${cond}）"
   fi
   kind=""
-  for marker in 'scripts/check-all.sh' 'scripts/check-preview-perf.sh' 'scripts/check-guards.sh' 'actions/upload-artifact'; do
+  for marker in 'scripts/check-all.sh' 'scripts/check-preview-perf.sh' 'scripts/check-playback-start.sh' 'scripts/check-guards.sh' 'actions/upload-artifact'; do
     if [ "${step}" != "${step#*"${marker}"}" ]; then kind="check"; fi
   done
   for marker in 'scripts/ci-stable-mtimes.py' 'actions/cache' 'scripts/vendor-ffmpeg.sh'; do

@@ -47,6 +47,17 @@ public enum JSONValue: Hashable, Sendable {
         return nil
     }
 
+    /// A yes / no the way the tools read one (AIToolArguments.bool, the router's time bounds): true / false, "true" / "false"
+    /// in any case, 1 / 0. nil for anything else.
+    public var flagValue: Bool? {
+        switch self {
+        case .bool(let flag): return flag
+        case .string(let text) where ["true", "false"].contains(text.lowercased()): return text.lowercased() == "true"
+        case .number(let number) where number == 0 || number == 1: return number == 1
+        default: return nil
+        }
+    }
+
     public var arrayValue: [JSONValue]? {
         if case .array(let value) = self { return value }
         return nil

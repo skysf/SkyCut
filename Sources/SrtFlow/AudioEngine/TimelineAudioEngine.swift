@@ -24,6 +24,10 @@ final class TimelineAudioEngine {
 
     enum Mode { case realtime, offline }
     struct RenderError: Error { let status: AVAudioEngineManualRenderingStatus }
+    /// The debug probe can read the buffers for the duration of the source-node callback.
+    typealias SampleObserver = @Sendable (
+        _ position: Int64, _ host: UInt64, _ frames: Int, _ left: UnsafePointer<Float>, _ right: UnsafePointer<Float>
+    ) -> Void
 
     let mode: Mode
     let engine = AVAudioEngine()
@@ -63,6 +67,9 @@ final class TimelineAudioEngine {
     /// 试听让路时压的那一份（线性），乘在总推子上。
     private var duckGain: Float = 1
     private let anchor = AudioPublished<PlaybackAnchor>()
+    #if DEBUG
+    private let observeFirstTrack: SampleObserver?
+    #endif
     private struct TrackUnit {
         let feeder: AudioTrackFeeder
         let renderer: AudioTrackRenderer
@@ -74,10 +81,14 @@ final class TimelineAudioEngine {
     /// 离线渲用的那一块缓冲（`beginOffline` 时建）。
     private var offlineBuffer: AVAudioPCMBuffer?
 
-    init(config: AudioEngineConfig, mode: Mode, meters: AudioMeterEngine? = nil) throws {
+    init(config: AudioEngineConfig, mode: Mode, meters: AudioMeterEngine? = nil,
+         observeFirstTrack: SampleObserver? = nil) throws {
         self.mode = mode
         self.config = config
         self.meters = meters
+        #if DEBUG
+        self.observeFirstTrack = observeFirstTrack
+        #endif
         if mode == .offline {
             try engine.enableManualRenderingMode(
                 .offline, format: Self.format, maximumFrameCount: AVAudioFrameCount(Self.offlineQuantum)
@@ -132,6 +143,9 @@ final class TimelineAudioEngine {
         let renderer = AudioTrackRenderer(feeder: feeder, fader: track.fader)
         let anchor = self.anchor
         let clock = renderClock
+        #if DEBUG
+        let observe = units.isEmpty ? observeFirstTrack : nil
+        #endif
         let node = AVAudioSourceNode(format: Self.format) { _, timestamp, frameCount, outputData -> OSStatus in
             let buffers = UnsafeMutableAudioBufferListPointer(outputData)
             let frames = Int(frameCount)
@@ -144,6 +158,10 @@ final class TimelineAudioEngine {
             guard let anchor = anchor.load(), anchor.playing else { return noErr }
             let position = anchor.position(sampleTime: Int64(timestamp.pointee.mSampleTime), hostTime: timestamp.pointee.mHostTime)
             let missing = renderer.render(position: position, frames: frames, into: left, right)
+            #if DEBUG
+            // The benchmark reads samples from the first source node, upstream of speaker mute.
+            observe?(position, timestamp.pointee.mHostTime, frames, left, right)
+            #endif
             if missing > 0 {
                 clock.underruns.wrappingAdd(missing, ordering: .relaxed)
                 feeder.poke()
