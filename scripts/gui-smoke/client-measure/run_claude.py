@@ -120,7 +120,6 @@ def tasks(label, only):
         (run / "run.json").write_text(json.dumps({**result, "task": task, "project": str(project), "folder": str(work),
                                                   "app_commit": (ENV_DIR / "app-commit.txt").read_text().strip()}, ensure_ascii=False, indent=1))
         print(f"{task['id']}: exit {result['exit']} in {result['seconds']}s", flush=True)
-    env_script("stop")
 
 
 def preload(label):
@@ -138,7 +137,6 @@ def preload(label):
                                 base / f"{name}.jsonl", base / f"{name}.debug.log", extra)
             (base / f"{name}.run.json").write_text(json.dumps(result, indent=1))
             print(f"{name}: exit {result['exit']} in {result['seconds']}s", flush=True)
-    env_script("stop")
 
 
 if __name__ == "__main__":
@@ -147,7 +145,10 @@ if __name__ == "__main__":
     parser.add_argument("--label", required=True)
     parser.add_argument("--only", default="")
     args = parser.parse_args()
-    if args.mode == "tasks":
-        tasks(args.label, set(filter(None, args.only.split(","))))
-    else:
-        preload(args.label)
+    try:
+        if args.mode == "tasks":
+            tasks(args.label, set(filter(None, args.only.split(","))))
+        else:
+            preload(args.label)
+    finally:
+        env_script("stop")

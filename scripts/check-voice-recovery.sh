@@ -3,6 +3,7 @@
 # 复用完整 App 的目标文件，避免另编一份业务流程；独立 bundle 隔离设置和积分账。
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 ROOT="$(mktemp -d)"
@@ -12,8 +13,8 @@ ROOT="$(mktemp -d)"
 # 五分钟以前留下的（正在跑的那一份一直在被写，碰不到）。
 BUNDLE_ID="com.srtflow.SrtFlow.voicerecoverycheck.run$$"
 find "${HOME}/Library/Preferences" -maxdepth 1 -name 'com.srtflow.SrtFlow.voicerecoverycheck.run*.plist' -mmin +5 -delete 2>/dev/null || true
-trap 'rm -rf "${ROOT}"' EXIT
 APP="${ROOT}/VoiceRecoveryCheck.app"
+test_app_cleanup_on_exit "${APP}" "${ROOT}"
 mkdir -p "${APP}/Contents/MacOS" "${APP}/Contents/Resources" "${ROOT}/work"
 cat > "${APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

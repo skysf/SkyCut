@@ -2,13 +2,24 @@
 # Real App + real renderer integration, using an isolated bundle id and synthetic pages; no user app, media, keychain or cloud.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-app-cleanup.sh
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_OUT="$(swift build --arch arm64 --product skycut-web-motion 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
 BUILD_DIR="$(swift build --arch arm64 --show-bin-path)"
 CHECK_ROOT="$(mktemp -d)"
-trap 'CHECK_EXIT=$?; if [ "${CHECK_EXIT}" -eq 0 ]; then rm -rf "${CHECK_ROOT}"; else printf "Motion check fixture retained at %s\n" "${CHECK_ROOT}"; fi' EXIT
 BUNDLE_ID="com.srtflow.SrtFlow.motionplacementcheck.run$$"
 CHECK_APP="${CHECK_ROOT}/MotionPlacementCheck.app"
+cleanup() {
+  local status=$?
+  remove_test_app "${CHECK_APP}"
+  if [ "${status}" -eq 0 ]; then
+    rm -rf "${CHECK_ROOT}"
+  else
+    printf 'Motion check evidence retained at %s\n' "${CHECK_ROOT}"
+  fi
+}
+trap cleanup EXIT
+test_app_exit_signals
 mkdir -p "${CHECK_APP}/Contents/MacOS" "${CHECK_APP}/Contents/Helpers" "${CHECK_APP}/Contents/Resources" "${CHECK_ROOT}/work"
 cat > "${CHECK_APP}/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

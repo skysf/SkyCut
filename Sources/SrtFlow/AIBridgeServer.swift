@@ -31,8 +31,7 @@ final class AIBridgeServer: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         guard socketPath == nil else { return }
-        let bundleID = Bundle.main.bundleIdentifier ?? "com.srtflow.SrtFlow"
-        let path = MCPBridge.socketPath(bundleIdentifier: bundleID)
+        let path = AIBridgeLocation.socketPath
         do {
             let fd = try MCPUnixSocket.listen(path: path)
             socketPath = path
