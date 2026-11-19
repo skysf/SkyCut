@@ -562,3 +562,7 @@
   on licence changes); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (one list, no shadowing, `available` / `why`, the read answer
   and its split, `version`, `save_recipe` refusals, the Settings rows); wiring in `checks/sky-studio-wiring/styles.sh`. Rules:
   [Sky Studio account](../architecture/sky-studio-account.md), [AI control](../architecture/ai-control-mcp.md) item 32.
+- The film's editing style (`TimelineState.editingStyle`, v39, SS-5): `scripts/check-project-file.sh` group 52 (`EditingStyle.swift`: gate,
+  key only with a record, round trips, a broken record dropped), `scripts/check-parameter-limits.sh` → `EditingStyleAppChecks` (a real
+  edit_clip records it in the same undo step; another session, a user edit or a no-op records nothing; get_timeline reports it) and
+  `RecipeSkyStudioChecks` (`newer_version`, recipes takes project). Rule: [project file](../architecture/video-edit-project-file.md).

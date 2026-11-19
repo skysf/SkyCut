@@ -129,6 +129,8 @@ func catalogKnownNames() -> Set<String> {
     // Sky Studio's editing styles in recipes (2026-11-19, SS5 plan 5.1, AIRecipeTools): the source value and the listing line
     // sky_studio, and fetched_at on a style read from this Mac's copy.
     names.formUnion(["sky_studio", "fetched_at"])
+    // The film's editing style (2026-11-19, SS5 plan 5.5): get_timeline's editing_style, recipes' newer_version.
+    names.formUnion(["editing_style", "newer_version"])
     return names
 }
 
