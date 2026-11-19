@@ -79,12 +79,28 @@ struct MediaRecord: Codable, Equatable, Sendable {
         fileName = url.lastPathComponent
         // 同一个文件（同一个 inode）这次会话里建过书签就用旧的：建书签很贵，自动保存
         // 每次都重建的话主线程每次卡约 55ms（`MediaBookmarkCache`）。
-        let fresh = MediaBookmarkCache.bookmark(for: url)
-        bookmark = fresh ?? previous?.bookmark
+        let found = MediaRecord.lookUp(url)
+        bookmark = found.bookmark ?? previous?.bookmark
         // 相对路径纯粹是路径运算，文件在不在都算得出来，可以放心重算。
         relativePath = projectDirectory.flatMap { MediaRecord.relativePath(from: $0, to: url) }
-        let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init)
-        byteSize = size ?? previous?.byteSize
+        byteSize = found.size ?? previous?.byteSize
+    }
+
+    /// A record made without touching the media file (a saved version, written on the main thread): the project's last
+    /// record of it — bookmark, size — or only its path and name. No relative path: that one was relative to the project's
+    /// folder, not to the version's.
+    init(known previous: MediaRecord?, for url: URL) {
+        path = url.path
+        fileName = url.lastPathComponent
+        bookmark = previous?.bookmark
+        relativePath = nil
+        byteSize = previous?.byteSize
+    }
+
+    /// What `init(url:projectDirectory:previous:)` asks the media file: its bookmark (MediaBookmarkCache, which stats the
+    /// file first) and its size. A seam: the checks pass a slow drive to prove a saved version never asks on the main thread.
+    nonisolated(unsafe) static var lookUp: @Sendable (URL) -> (bookmark: Data?, size: Int64?) = { url in
+        (MediaBookmarkCache.bookmark(for: url), (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize.map(Int64.init))
     }
 
     init(from decoder: Decoder) throws {

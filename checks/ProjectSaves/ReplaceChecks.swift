@@ -17,7 +17,7 @@ import SrtFlowCore
         await confirmed(checks, folder: folder)
         await closingUntitled(checks, folder: folder)
         await aiSaves(checks, folder: folder)
-        subtitles(checks, folder: folder)
+        await subtitles(checks, folder: folder)
         FileReplaceQuestion.ask = question
     }
 
@@ -113,17 +113,17 @@ import SrtFlowCore
     }
 
     /// The subtitle editor's Export As writes through SubtitleFileSave: a file there is replaced only when confirmed.
-    private static func subtitles(_ checks: Checks, folder: URL) {
-        let document = SubtitleDocumentModel(cues: [SubtitleCue(start: 1, end: 2, text: "Hello there")])
+    private static func subtitles(_ checks: Checks, folder: URL) async {
+        let data = SubtitleFileSave.data(SubtitleDocumentModel(cues: [SubtitleCue(start: 1, end: 2, text: "Hello there")]), format: .srt)
         let taken = folder.appendingPathComponent("Taken.srt")
         plant(taken)
-        let refused = try? SubtitleFileSave.write(document, format: .srt, to: taken, replacing: false)
+        let refused = await SubtitleFileSave.write(data, to: taken, replacing: false)
         checks.require(refused == .occupied && untouched(taken), "Export As to a subtitle file nobody agreed to replace keeps its bytes")
-        let replaced = try? SubtitleFileSave.write(document, format: .srt, to: taken, replacing: true)
+        let replaced = await SubtitleFileSave.write(data, to: taken, replacing: true)
         let text = (try? String(contentsOf: taken, encoding: .utf8)) ?? ""
         checks.require(replaced == .written && text.contains("Hello there"), "a confirmed Export As replaces it")
         let fresh = folder.appendingPathComponent("Fresh.srt")
-        let made = try? SubtitleFileSave.write(document, format: .srt, to: fresh, replacing: false)
+        let made = await SubtitleFileSave.write(data, to: fresh, replacing: false)
         checks.require(made == .written && ((try? String(contentsOf: fresh, encoding: .utf8)) ?? "").contains("Hello there"),
                        "Export As to a new name writes the file (the claim is filled, not left empty)")
     }

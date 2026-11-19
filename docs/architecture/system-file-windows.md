@@ -91,5 +91,7 @@ The real panel service can't be driven from a check (it needs the window server,
 5. With the panel service stopped (item 3), Save As… a project by dropping a folder that already holds a project of the
    suggested name: SkyCut asks "Replace “Name.skycut”?"; Cancel leaves that file as it was, Replace saves there. The same for
    the subtitle editor's Export As; a screen recording saved to a typed path that already exists lands as "Name 2".
+   The subtitle editor's Export As onto a USB hard drive that has gone to sleep: SkyCut stays responsive while it spins
+   up, and says the drive is not responding if it takes over 15 s.
 6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
    `.appLanguage()`; the question is an `NSAlert` with SkyCut's own strings).

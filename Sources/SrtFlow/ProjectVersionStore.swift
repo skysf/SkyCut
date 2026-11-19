@@ -101,8 +101,10 @@ final class ProjectVersionStore: ObservableObject {
         let url = folder.appendingPathComponent(ProjectVersionFiles.fileName(projectStem: project.projectName, number: number, kind: kind))
         do {
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            // Media records as the project last wrote them: nothing here asks a media file anything (it may be on a
+            // sleeping drive, and this runs on the main thread).
             try VideoEditProjectIO.save(state, to: url, knownRecords: project.mediaRecords, rowHeights: project.rowHeights,
-                                        motionCaches: .reference)
+                                        motionCaches: .reference, mediaRecords: .known)
         } catch {
             return .notSaved(.failed(error.localizedDescription))
         }

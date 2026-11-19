@@ -7,6 +7,12 @@
 > 分组只以 `scripts/check-all.sh` 为准，下面提到的组号是写下那一条时的位置。条目的顺序是当时往 AGENTS.md 里加的顺序，没有重排；
 > 找某个脚本直接搜它的名字。
 
+- `scripts/check-e2e.sh` requires a macOS graphical session like the CI runner's. It launches the built SkyCut executable and its real
+  MCP helper with a per-run bundle identity, temporary media, and the repository's Pro response fixture served on loopback.
+  The fake key lives in memory. The export flow creates and edits a project through MCP, checks frame-level layer gains and
+  limiter reduction, compares `get_job`'s decoded true peak against an independent ffmpeg measurement, and exercises failure
+  on a real unwritable directory followed by success with a taken output name. Run locally with `scripts/check-local.sh e2e`.
+
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
