@@ -11,8 +11,8 @@ import SrtFlowCore
 // ExportDestinationProbe, as export_video's folder does (AIExportDestination): off the main thread, with the 15 s deadline for
 // a check that writes, at most three checks left waiting on one drive. A folder that can't be used is refused with the export
 // panel's sentence (in English) before anything is queued or written.
-// What it doesn't: naming the files (EncodeOutputFolder.target) or writing them (EncodeJob; convert_subtitles still reads and
-// writes its small subtitle files on the main thread, `.withoutOverwriting`).
+// What it doesn't: naming the files (EncodeOutputFolder.target) or writing them (EncodeJob; convert_subtitles' files and the
+// files the tools name: AIEncodeInputs, also off the main thread through the probe).
 //
 // Why (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md): these tools made the folder and the queue asked
 // `fileExists` for each candidate name on the main thread, the class of the export panel's freeze on a sleeping or stuck

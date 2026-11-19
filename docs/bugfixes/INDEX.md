@@ -13,6 +13,7 @@
 - [2026-10-14 App 卡住时 AI 只会干等两分钟](2026-10-14-ai-calls-time-out-silently-when-app-hangs.md) — 等不到要去问、问的路不经过卡住的线程；调用方放弃了被调方要知道。
 - [2026-10-14 几个 AI 会话共用一个 App，改动落进别人的工程](2026-10-14-ai-edits-land-in-another-sessions-project.md) — 共享的东西要么每个会话各一份、要么每次核对。
 - [2026-09-27 AI 的改动撤一步，整条时间线空了](2026-09-27-ai-edits-share-one-undo-group.md) — 「按事件分组」只对用户事件成立：每个改动工具包一层 `AIUndoGrouping.step`，别去关自动开的组。
+- [2026-11-19 The AI encode tools looked at, read and wrote the files they were given on the main thread](2026-11-19-ai-encode-inputs-on-main-thread.md) — Inputs are drive calls too: when a tool's output side moves off the main thread, move what it reads in the same pass.
 - [2026-11-19 The AI's export tools touched the export folder on the main thread](2026-11-19-ai-export-folder-checked-on-main-thread.md) — A tool that does a panel's job shares the panel's hazards: route its drive calls through the same off-main probe and refuse before the long job.
 - [2026-10-18 侧边栏那一行看不到百分比、排队也写「导出中」](2026-10-18-ai-projects-sidebar-row-status.md) — 窄栏里给长短不定的字整行；「有任务」不等于「在做」。
 - [2026-10-18 侧边栏「AI 在剪的工程」只有标题、没有行](2026-10-18-ai-projects-sidebar-rows-never-shown.md) — List 里 body 带 `Section` 的视图不许套 `.equatable()`。
