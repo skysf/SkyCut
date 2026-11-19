@@ -78,16 +78,16 @@ if [ "$(grep -c 'let peaks = readsSound ? try await soundOf(speech) : nil' "${SP
   exit 1
 fi
 # export_subtitles 写盘只经界面那一条（临时名 → 回读校验），读的是藏起来的句子已经去掉的那份，名字和撞名经 AISubtitleFiles
-#（整组加编号、从不覆盖）。Since 2026-11-19 the whole set is claimed (O_EXCL) before any file is written and each file goes
-# onto its claim, never replacing, not even a file that appeared after the listing
-# (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
+#（整组加编号、从不覆盖）。Since 2026-11-19 the whole set is written under private names first and then takes its names in
+# steps that fail when a name is taken, never replacing, not even a file that appeared after the listing
+# (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md,
+# docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md).
 EXPORT_SUBS="Sources/SrtFlow/AISubtitleFileExport.swift"
-if [ "$(grep -cF 'SubtitleExportPlanner.writeValidated(document, format: series.format, onto: claim)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
-   || [ "$(grep -cE 'writeValidated\([^)]*[ (,]to:' "${EXPORT_SUBS}" || true)" -ne 0 ] \
-   || [ "$(grep -cF 'ExclusivePlacement.claimSet(from: number)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+if [ "$(grep -cF 'try SubtitleExportPlanner.writeNewSet(' "${EXPORT_SUBS}" || true)" -ne 1 ] \
+   || [ "$(grep -cE 'writeValidated\(' "${EXPORT_SUBS}" || true)" -ne 0 ] \
    || [ "$(grep -c 'state.subtitleDocument(for: track)' "${EXPORT_SUBS}" || true)" -ne 1 ] \
    || [ "$(grep -cF 'AISubtitleFiles.Series(' "${EXPORT_SUBS}" || true)" -ne 1 ]; then
-  echo "✗ ${EXPORT_SUBS} must write through SubtitleExportPlanner.writeValidated(…, onto: claim) onto names the whole set claimed first (ExclusivePlacement.claimSet), read the lines with hidden ones left out, and name the files through AISubtitleFiles.Series; otherwise it replaces existing files" >&2
+  echo "✗ ${EXPORT_SUBS} must write the whole set through SubtitleExportPlanner.writeNewSet (never writeValidated, which replaces), read the lines with hidden ones left out, and name the files through AISubtitleFiles.Series; otherwise it replaces existing files" >&2
   exit 1
 fi
 # 文件名里的语言标签按每条轨现在的文字判、判不出来才用记的（SubtitleFileLanguage），AI 的工具和导出面板「高级」同一份：只读记录的话，

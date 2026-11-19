@@ -95,6 +95,14 @@ func checkPlayDuringPreviewInstallation(clip: URL) {
 
     clock.detach()
     clock.togglePlayback()
+    installPreview(at: 3)
+    clock.togglePlayback()
+    waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }
+    pumpAudioClock(0.25)
+    check(!source.isPlaying && !clock.isPlaying, "Completing native preparation cannot resurrect a cancelled Play")
+
+    clock.detach()
+    clock.togglePlayback()
     clock.detach()
     installPreview(at: 4)
     waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }

@@ -18,12 +18,14 @@ enum PerfCounters {
     /// 键写在这里而不是 PreviewBench 里：好几个自检只编模型和合成构建器，
     /// 引用到 PreviewBench 就得把整个编辑器一起编进去。
     static let outputKey = "SRTFLOW_BENCH_OUT"
+    static let playbackStartOutputKey = "SRTFLOW_PLAYBACK_START_OUT"
     /// 进程内冒烟脚本（SmokeDriver.swift）。它的 `perf` 步骤也要读计数，所以设了它也记账。
     static let smokeScriptKey = "SRTFLOW_SMOKE_SCRIPT"
 
     /// 记不记账（性能测试或冒烟脚本开着）。进程启动时定下，之后不变。
     static let isEnabled = ProcessInfo.processInfo.environment[outputKey] != nil
         || ProcessInfo.processInfo.environment[smokeScriptKey] != nil
+        || ProcessInfo.processInfo.environment[playbackStartOutputKey] != nil
 
     /// 视图的 body 被求值了一次。**每个** SwiftUI 视图和修饰器的 body 第一行都是
     /// `let _ = PerfCounters.body(Self.self)`（`checks/preview-perf-wiring.sh` 钉着）：
@@ -58,6 +60,8 @@ enum PerfCounters {
         case clockTick = "clock.tick"
         /// 预览换上了一个新的播放条目（`replaceCurrentItem`，画面会闪一下）。
         case playerItemAttach = "player.itemAttach"
+        /// A precise paused placement completed its native playback preroll.
+        case previewPreroll = "player.previewPreroll"
         /// 建了一次预览合成。
         case compositionBuild = "composition.build"
         /// 建合成时开了一个素材文件（`AVURLAsset`）。

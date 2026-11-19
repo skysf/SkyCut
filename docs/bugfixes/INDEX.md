@@ -77,6 +77,7 @@
 - [2026-11-19 Web-motion recovery and Compress / Burn In still asked the drive on the main thread](2026-11-19-drive-checks-on-main-thread.md) — When one call site of a class moves off the main thread, sweep its siblings; a check that runs on every rebuild is a hot path for drive latency.
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
+- [2026-11-19 A name reserved empty before the write could be replaced, and a failed write could remove another file](2026-11-19-empty-name-reservation-replaced-or-removed.md) — An exclusive create guards only the moment of creation: write privately, then install in one step that fails when the name exists; know your own file by device and inode, read after its bytes are in.
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
 - [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
@@ -205,10 +206,12 @@
 - [2026-09-29 叠化 + 关键帧之后预览全黑](2026-09-29-preview-black-slice-boundaries-straddle-a-tick.md) — 切片边界先落格子再去重（`CompositionSlices`）；主轨不到 0.01 秒的缝两条管线同一个常量。
 - [2026-10-01 配乐比画面长的工程播到画面结尾就停住](2026-10-01-preview-item-shorter-than-timeline-without-audio-tracks.md) — 拆掉一样东西之前先问它顺手撑着什么（合成的长度）：垫黑底到总长。
 - [2026-09-24 主轨转场处预览的声音掉下去一截](2026-09-24-preview-mix-ignores-transition-expansion.md) — 两份结果互相比，比不出它们一起错：要有绝对期望，自检走生产入口。
+- [2026-11-19 Preview sound advanced before video was ready to move](2026-11-19-preview-start-before-preroll.md) — Prime the positioned preview asynchronously before releasing the pending Play request.
 - [2026-08-12 压缩预览区时播放条压到工具栏上](2026-08-12-preview-transport-row-overlap.md) — VStack 里谁让步必须显式声明。
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
 - [2026-11-19 Saving a project on a slow or stuck drive froze SkyCut, and Quit could hang](2026-11-19-project-save-blocks-on-slow-drive.md) — A project file is on a user-chosen drive too: write it on its own queue with a deadline, count changes so a late write can't mark newer edits saved, and let Quit wait with .terminateLater.
+- [2026-11-19 "Quit Anyway" for one document also gave up another document opened in the same project](2026-11-19-quit-anyway-covers-a-replaced-document.md) — A decision about what an alert showed belongs to that document generation: keep the generation with it and compare before applying it again, never key it by the object alone.
 - [2026-09-25 松手重建预览把每个素材重开一遍](2026-09-25-rebuild-reopens-every-asset.md) — 素材按文件身份进程级缓存（`MediaAssetCache`）；只有一个小视图关心的状态不在工程上发。
 - [2026-11-18 Shared rules reverse the bed policy](2026-11-18-recipe-bed-policy-drift.md) — Check shipped AI instructions against the current production decision.
 - [2026-11-13 剪辑风格的共用规矩还在教 AI 用确认码越过每日预算](2026-11-13-recipe-rules-teach-budget-bypass.md) — 剪辑风格卡也是给 AI 的合同文字：改花钱的合同、目录时一起改；卡里不写死档位，守卫对着事实查、不钉原词。

@@ -11,7 +11,6 @@
 1202 Sources/SrtFlow/VideoEditProject.swift
 922 Sources/SrtFlowCore/ScreenRecordingModels.swift
 1223 Sources/SrtFlowCoreChecks/ScreenRecordingChecks.swift
-690 Sources/SrtFlowCoreChecks/main.swift
 621 checks/PreviewComposition/main.swift
 2488 checks/ProjectFile/main.swift
 1778 checks/TimelineSnap/main.swift

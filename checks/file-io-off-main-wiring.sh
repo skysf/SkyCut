@@ -15,6 +15,8 @@
 #   docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md);
 # - a Compress / Burn In encode: ffmpeg writes only the job's own file, handed over and cleaned up off the main thread
 #   (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md);
+# - a new file never reserves its final name; it takes it in one exclusive step
+#   (2026-11-19, docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md);
 # - web-motion recovery's movie checks, Compress / Burn In's names and sizes, compress_videos / burn_subtitles' folder
 #   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md);
 # - the files the AI encode tools name, burn_subtitles' subtitle reads, convert_subtitles' reads and writes
@@ -132,8 +134,8 @@ require "the dirty mark is cleared only when nothing changed since the snapshot 
 # scripts/check-project-saves.sh (ReplaceChecks) and scripts/check-export-profile.sh (FileWindowsChecks) check the behaviour.
 require "a typed or dropped answer in the helper is not a confirmed replace" \
   Sources/SrtFlow/SystemFileWindows.swift 'finish\(urls, inSystemWindow: false\)'
-require "a Save As that may not replace claims the name before writing" \
-  Sources/SrtFlow/ProjectFileWriter.swift 'guard try NewFileClaim\.claim\(url\) else \{ return \.occupied'
+require "a Save As that may not replace never writes at the name: it takes it in one step that fails when it is taken" \
+  Sources/SrtFlow/ProjectFileWriter.swift 'guard let written = try ExclusivePlacement\.create\(url, writing: save\) else \{'
 require "the project's Save As from a window asks before replacing" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'await saveAs\(chosen: location\)'
 require "the subtitle editor's Save and Export As write with the answer's permission, off the main thread" \
@@ -220,6 +222,20 @@ forbid "AIEncodeInputs reads and writes only through the probe's file system (th
   '^[^/]*(FileManager\.default|AIWorkspace\.shared\.resolve\(|Data\(contentsOf:|\.write\(to:|SubtitleLoader\.load\(|convertedContents\(of: [a-z]+, to)'
 require "AIEncodeInputs asks the drive only inside the probe's work" \
   Sources/SrtFlow/AIEncodeInputs.swift 'await probe\.run\(on: near, deadline: deadline'
+
+# A new file never reserves its final name (2026-11-19, docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md):
+# its bytes are written under a private name, then it takes the name in one step that fails when the name is taken
+# (ExclusiveInstall); no plain rename onto a final name, and writes nobody agreed may replace go through ExclusivePlacement.
+# SrtFlowCoreChecks (ExclusivePlacementChecks) checks the behaviour, also on a real exFAT volume.
+for placement in Sources/SrtFlowCore/ExclusiveInstall.swift Sources/SrtFlowCore/ExclusivePlacement.swift; do
+  forbid "a file takes its name only in a step that fails when the name is taken (rename / moveItem / replaceItemAt replace)" \
+    "${placement}" '^[^/]*((^|[^A-Za-z_])rename\(|\.moveItem\(|\.replaceItemAt\()'
+done
+require "the install's first step is the exclusive rename" \
+  Sources/SrtFlowCore/ExclusiveInstall.swift 'renamex_np\(own\.url\.path, url\.path, UInt32\(RENAME_EXCL\)\)'
+forbid "nothing reserves a chosen name empty before the write" Sources/SrtFlow/NewFileClaim.swift 'O_EXCL'
+require "a write nobody agreed may replace goes through ExclusivePlacement.create" \
+  Sources/SrtFlow/NewFileClaim.swift 'try ExclusivePlacement\.create\(url, writing:'
 
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "file-io-off-main-wiring 失败" >&2
