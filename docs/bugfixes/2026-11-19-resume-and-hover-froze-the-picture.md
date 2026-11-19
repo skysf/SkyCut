@@ -60,8 +60,10 @@ every picture time was quantized to 40 ms and a short stall could hide between t
 
 - M1, interleaved launches under the same load, before / after (first sound / first moving picture, ms):
   resume 31 / 874 → 25 / 26; fresh item 126 / 135 → 29 / 45. Play while hovering 37 / 645 → 602 / 616: in step now,
-  and the remaining wait is the decode at the playhead (see Lessons). No stall over the 33 ms frame cadence and no
-  skew over 21 ms in any scenario. Details: [playback start](../architecture/playback-start.md).
+  and the remaining wait is the decode at the playhead (see Lessons). The final local gate (five launches and a
+  warm-up): no stall over the 33 ms frame cadence in any scenario, the idle start included; worst skew 24 ms, and
+  49 ms after the idle stop in the one start whose first audible sample came 128 ms into its timeline (the sound
+  side, not explained yet). Details: [playback start](../architecture/playback-start.md).
 - `scripts/check-player-clock.sh`, `SyncedStartChecks.swift` (real AVPlayer on a picture-only long-GOP clip): a new
   item starts inside the Play call, a pause puts playhead and sound on the stopped picture, a resume and a Play
   after a hover cause no native jump, Play while hovering does not start the sound before the picture is back, a
