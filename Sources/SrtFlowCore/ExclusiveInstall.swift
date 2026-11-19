@@ -64,6 +64,17 @@ public enum ExclusiveInstall {
         throw ExclusivePlacement.failure(ENOTSUP, url)
     }
 
+    /// The exclusive rename alone, for a caller whose file may only ever be renamed (a screen recording's journal decides
+    /// after a crash by which of the two names is there): true = renamed, false = the name is taken, nil = this drive has no
+    /// exclusive rename (exFAT) and the caller decides what to do instead.
+    public static func renameIfFree(_ file: URL, to url: URL) throws -> Bool? {
+        if renamex_np(file.path, url.path, UInt32(RENAME_EXCL)) == 0 { return true }
+        let code = errno
+        if code == EEXIST { return false }
+        if unsupported(code) { return nil }
+        throw ExclusivePlacement.failure(code, url)
+    }
+
     /// The install is final: the private name left by a link or a copy is removed (only while it is still the caller's).
     static func finish(_ installed: Installed) {
         guard installed.step != .exclusiveRename else { return }

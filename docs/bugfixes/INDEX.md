@@ -94,6 +94,7 @@
 - [2026-09-23 磁吸开着时拖文件的落点框画错位置](2026-09-23-file-drop-frame-ignores-magnet.md) — 画框要在副本上把落地原样走一遍（含 `packMain`）。
 - [2026-11-17 fills_frame said a turned or moving picture fills the frame, and look never said where it was bare](2026-11-17-fills-frame-ignores-rotation-and-motion.md) — Answer "does it cover" with the renderer's geometry at every frame on screen, never from pixels; give the fix (fill_scale, fills_except) with the verdict.
 - [2026-10-14 滤镜把纯黑抬成灰](2026-10-14-filters-lift-pure-black.md) — 纯黑不抬（`FilterLUT.holdingBlack`）：调色作用于画面，不作用于编辑出来的黑。
+- [2026-11-19 Picking a free name in macOS's save window counted as consent to replace a file that appeared there later](2026-11-19-free-save-name-treated-as-replace-consent.md) — A confirmation exists only for the file it was about: allow replacing only what was there when the window answered, and choose a replacing write by that decision, never by looking at the folder.
 - [2026-09-29 在最后一帧上定格，静帧后面剩一截原片](2026-09-29-freeze-leaves-sliver-after-still.md) — 定格切出的右半不到一源帧（算上变速）、帧率已知、后面没接转场才拿掉；够一帧的留着，AI 定格后剩不到 1 秒的报 `tail_id`。
 - [2026-11-04 定格拒绝首个使用帧](2026-11-04-freeze-rejects-first-used-frame.md) — 定格用自己的半开区间，段首前插保留完整原段。
 - [2026-11-17 Ripple-deleting a freeze hold moves the clip before it](2026-11-17-freeze-tail-ripple-drags-its-clip.md) — A piece that moves away from its partners keeps no link group; a V1 ripple never moves a clip before its point.
@@ -190,6 +191,7 @@
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
 - [2026-11-19 Play during project open could crash the preview](2026-11-19-play-before-preview-ready.md) — Keep the Play request pending through item installation and check readiness before starting the synchronized player.
+- [2026-11-19 Hosted playback outliers blocked unrelated changes](2026-11-19-playback-start-hosted-timing-outliers.md) — Calibrate hosted timing budgets on several runs' launches, tolerate isolated noise by count, and keep gross stalls and the recorded failure red.
 - [2026-09-25 播放时每一跳整个编辑器都重算](2026-09-25-playback-wakes-whole-editor.md) — 订阅时钟的只许是名单里的小视图，停着才有意义的读 `PacedPlayhead`。
 - [2026-11-05 声音恢复成功，自检却因固定等待窗口报红](2026-11-05-player-clock-recovery-check-timing.md) — 异步的自检用分阶段的有界条件等待，不用一个固定窗口。
 - [2026-09-20 播放头断线、点标尺没反应](2026-09-20-playhead-line-broken-and-ruler-dead.md) — 内容比视口矮会被 SwiftUI 纵向居中，命中区不跟着 `.offset` 走。

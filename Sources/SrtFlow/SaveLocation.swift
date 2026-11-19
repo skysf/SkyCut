@@ -15,7 +15,9 @@ import Foundation
 // of the same name. Rules: docs/architecture/system-file-windows.md rule 9.
 
 /// Where the person chose to save, and whether a file already at `url` may be replaced: true only when macOS's own save
-/// window asked "Replace?" about exactly this URL. A typed or dropped answer in the helper never asked, so it may not.
+/// window asked "Replace?" about exactly this URL — it asks only about a file that is there, so an answer naming a free
+/// name is no decision to replace (SystemFileWindows.openSave). A typed or dropped answer in the helper never asked, so it
+/// may not.
 struct SaveLocation: Equatable {
     let url: URL
     /// The person confirmed replacing a file at exactly `url`.

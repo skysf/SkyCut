@@ -2,6 +2,7 @@
 import AppKit
 import AVFoundation
 import CoreVideo
+import QuartzCore
 import os
 
 // Observes the production item's decoded frames at the playback layer's display opportunities.
@@ -20,6 +21,10 @@ final class PlaybackStartVideoProbe: @unchecked Sendable {
         var firstDisplayed: Frame?
         var displayed: Frame?
         var playingFrames: [Frame] = []
+        var previousDeadline: Double?
+        var previousCallback: Double?
+        var displayPeriod = Double.infinity
+        var longestCallbackGap = 0.0
     }
 
     private let output = AVPlayerItemVideoOutput(outputSettings: nil)
@@ -30,6 +35,9 @@ final class PlaybackStartVideoProbe: @unchecked Sendable {
     var firstDisplayed: Frame? { capture.withLock { $0.firstDisplayed } }
     var displayed: Frame? { capture.withLock { $0.displayed } }
     var playingFrames: [Frame] { capture.withLock { $0.playingFrames } }
+    var cadence: (period: Double, longestGap: Double) {
+        capture.withLock { ($0.displayPeriod, $0.longestCallbackGap) }
+    }
 
     @MainActor
     func start(on screen: NSScreen) throws {
@@ -94,13 +102,32 @@ final class PlaybackStartVideoProbe: @unchecked Sendable {
     }
 
     func resetPlayingFrames() {
-        capture.withLock { $0.playingFrames.removeAll(keepingCapacity: true) }
+        capture.withLock {
+            $0.playingFrames.removeAll(keepingCapacity: true)
+            $0.previousDeadline = nil
+            $0.previousCallback = nil
+            $0.displayPeriod = .infinity
+            $0.longestCallbackGap = 0
+        }
     }
 
     private func displayTick(hostTime: UInt64) {
-        let (item, player, displayReady) = capture.withLock { ($0.item, $0.player, $0.displayReady) }
-        guard hostTime != 0, displayReady, let item, let player, player.currentItem === item else { return }
+        guard hostTime != 0 else { return }
         let host = AVAudioTime.seconds(forHostTime: hostTime)
+        let callback = CACurrentMediaTime()
+        let (item, player, displayReady) = capture.withLock { state in
+            // The display thread also ticks before the preview can supply a picture.
+            if let previous = state.previousDeadline, host > previous {
+                state.displayPeriod = min(state.displayPeriod, host - previous)
+            }
+            if let previous = state.previousCallback {
+                state.longestCallbackGap = max(state.longestCallbackGap, callback - previous)
+            }
+            state.previousDeadline = host
+            state.previousCallback = callback
+            return (state.item, state.player, state.displayReady)
+        }
+        guard displayReady, let item, let player, player.currentItem === item else { return }
         let time = output.itemTime(forHostTime: host)
         guard time.isNumeric, output.hasNewPixelBuffer(forItemTime: time) else { return }
         var presentation = CMTime.invalid

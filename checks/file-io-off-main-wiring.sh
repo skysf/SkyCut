@@ -145,6 +145,10 @@ require "the dirty mark is cleared only when nothing changed since the snapshot 
 # scripts/check-project-saves.sh (ReplaceChecks) and scripts/check-export-profile.sh (FileWindowsChecks) check the behaviour.
 require "a typed or dropped answer in the helper is not a confirmed replace" \
   Sources/SrtFlow/SystemFileWindows.swift 'finish\(urls, inSystemWindow: false\)'
+require "macOS's own save window allows replacing only a file at the answered URL (the only case it asked about)" \
+  Sources/SrtFlow/SystemFileWindows.swift 'then\(SaveLocation\(url: url, mayReplace: asked\)\)'
+forbid "an answer from macOS's own window is not by itself consent to replace (a free name was never asked about)" \
+  Sources/SrtFlow/SystemFileWindows.swift 'mayReplace: inSystemWindow'
 require "a Save As that may not replace never writes at the name: it takes it in one step that fails when it is taken" \
   Sources/SrtFlow/ProjectFileWriter.swift 'guard let written = try ExclusivePlacement\.create\(url, writing: save\) else \{'
 require "the project's Save As from a window asks before replacing" \
