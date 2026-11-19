@@ -1,0 +1,84 @@
+{
+  "common": {
+    "dispatchMs": 185,
+    "audioMs": 340,
+    "videoMs": 380,
+    "onsetGapMs": 160,
+    "audioAdvanceMs": 135,
+    "videoAdvanceMs": 235,
+    "startOffsetMs": 45,
+    "oneSecondOffsetMs": 45,
+    "oneSecondElapsedMs": 1250
+  },
+  "scenarios": {
+    "cold-open": {
+      "dispatchMs": 90,
+      "audioMs": 3800,
+      "videoMs": 3900,
+      "onsetGapMs": 330,
+      "audioAdvanceMs": 40,
+      "videoAdvanceMs": 300,
+      "startOffsetMs": 150
+    },
+    "warm-start": {},
+    "middle": {},
+    "cut": {
+      "audioMs": 300,
+      "videoMs": 340
+    },
+    "near-end": {},
+    "end-replay": {
+      "audioMs": 265,
+      "videoMs": 310
+    },
+    "idle-wake": {
+      "dispatchMs": 650,
+      "audioMs": 700,
+      "videoMs": 800,
+      "onsetGapMs": 550,
+      "audioAdvanceMs": 200,
+      "videoAdvanceMs": 570,
+      "startOffsetMs": 160,
+      "oneSecondOffsetMs": 48
+    }
+  },
+  "medians": {
+    "common": {
+      "dispatchMs": 50,
+      "audioMs": 130,
+      "videoMs": 180,
+      "onsetGapMs": 105,
+      "audioAdvanceMs": 40,
+      "videoAdvanceMs": 100,
+      "startOffsetMs": 34,
+      "oneSecondOffsetMs": 34
+    },
+    "scenarios": {
+      "cold-open": {
+        "dispatchMs": 20,
+        "audioMs": 3200,
+        "videoMs": 3300,
+        "onsetGapMs": 150,
+        "videoAdvanceMs": 150,
+        "startOffsetMs": 120
+      },
+      "cut": {
+        "audioMs": 230,
+        "videoMs": 265
+      },
+      "end-replay": {
+        "audioMs": 190,
+        "videoMs": 250
+      },
+      "idle-wake": {
+        "dispatchMs": 550,
+        "audioMs": 600,
+        "videoMs": 650,
+        "onsetGapMs": 230,
+        "audioAdvanceMs": 75,
+        "videoAdvanceMs": 250,
+        "startOffsetMs": 45
+      }
+    }
+  }
+}

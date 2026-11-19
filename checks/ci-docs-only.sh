@@ -136,7 +136,7 @@ while IFS="$(printf '\037')" read -r index id cond run uses; do
   fi
   heavy=0
   step="${run} ${uses}"
-  for marker in 'scripts/check-all.sh' 'swift build' 'scripts/check-preview-perf.sh' 'scripts/vendor-ffmpeg.sh' \
+  for marker in 'scripts/check-all.sh' 'swift build' 'scripts/check-preview-perf.sh' 'scripts/check-playback-start.sh' 'scripts/vendor-ffmpeg.sh' \
     'actions/cache' 'actions/upload-artifact'; do
     if [ "${step}" != "${step#*"${marker}"}" ]; then heavy=1; fi
   done
