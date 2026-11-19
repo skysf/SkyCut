@@ -51,14 +51,19 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 9. **A save replaces a file only when that was confirmed for exactly its URL** (since
    [a typed or dropped answer replaced a file](../bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md)). macOS's own
    save window asks "Replace?" before it answers; the helper's typed and dropped answers never do. So a save's answer is a
-   `SaveLocation` (`SaveLocation.swift`): the URL and `mayReplace`, true only from macOS's own window, and only for that URL —
-   a caller that changes it (the project's Save As adding `.skycut`) uses `at(_:)`, which drops the confirmation. Every save
+   `SaveLocation` (`SaveLocation.swift`): the URL and `mayReplace`, true only from macOS's own window, only for that URL, and
+   only when a file is at that URL when the window answers — the window asks only about a file that is there, so a free name
+   it answers is no decision ([case](../bugfixes/2026-11-19-free-save-name-treated-as-replace-consent.md)); the look runs off
+   the main thread within 5 s, and a drive that doesn't answer allows nothing. A caller that changes the URL (the project's
+   Save As adding `.skycut`) uses `at(_:)`, which drops the confirmation. Every save
    written from a window writes through `NewFileClaim` (the bytes under a private name, then the name taken in one step that
    fails when it is taken: [export settings](export-settings.md) §5 item 9) unless replacing was confirmed; when a file is
    there, or appears during the write, the caller asks `FileReplaceQuestion` (Cancel by default) and writes
    again only on Replace — the project's Save As (`saveAs(chosen:)`, also from closing an untitled project) and the subtitle
-   editor's Export As (`SubtitleFileSave`) — or, for a screen recording, the commit avoids the name ("Name 2"). The AI's saves
-   pick unused names and never replace a file (only `save_project` back to the project's own file).
+   editor's Export As (`SubtitleFileSave`) — or, for a screen recording, the commit avoids the name ("Name 2"): it replaces only
+   in the branch the person confirmed and commits every other name with one rename that fails when the name is taken,
+   journaled first ([recording lifecycle](screen-recording-lifecycle.md) "文件覆盖与命名"). The AI's saves pick unused names
+   and never replace a file (only `save_project` back to the project's own file).
 
 ## Checks
 
@@ -66,7 +71,8 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | --- | --- |
 | `scripts/check-export-profile.sh` (`FileChooserChecks`) | the chooser with fake windows: answers, a person cancels, empty at once, never appears (main thread free), appears then vanishes, stays stuck + Close It, closed when nobody waits any more, the force-quit record + Try Again |
 | `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller, Close It appears next to a window on screen and offers the fallback, Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
-| `scripts/check-export-profile.sh` (`FileWindowsChecks`, saves) | an answer from macOS's own save window may replace; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
+| `scripts/check-export-profile.sh` (`SaveAnswerChecks`) | an answer from macOS's own save window may replace a file that is there, never a free name (a file saved there after the answer keeps its bytes), nothing when the drive doesn't answer the look; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
+| `scripts/check-screen-recording-feedback.sh` (`RecordingCommitChecks`) | a recording's commit: a file that appears at a free name or at the sidecar's name after the intent was journaled keeps its bytes, the file takes the next name and the journal names it; a confirmed commit replaces (rule 9) |
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
 | `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
 
@@ -91,7 +97,9 @@ The real panel service can't be driven from a check (it needs the window server,
    project.
 5. With the panel service stopped (item 3), Save As… a project by dropping a folder that already holds a project of the
    suggested name: SkyCut asks "Replace “Name.skycut”?"; Cancel leaves that file as it was, Replace saves there. The same for
-   the subtitle editor's Export As; a screen recording saved to a typed path that already exists lands as "Name 2".
+   the subtitle editor's Export As; a screen recording saved to a typed path that already exists lands as "Name 2". With the
+   service running: start a manual recording to a free name, make a file of that name in Finder while it records, stop — the
+   recording lands as "Name 2" and the Finder file is untouched.
    The subtitle editor's Export As onto a USB hard drive that has gone to sleep: SkyCut stays responsive while it spins
    up, and says the drive is not responding if it takes over 15 s.
 6. Chinese and Spanish UI: the strip, the helper and the replace question are translated (in-process windows with
