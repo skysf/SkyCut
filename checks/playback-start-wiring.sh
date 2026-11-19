@@ -8,6 +8,8 @@ project=Sources/SrtFlow/VideoEditProject.swift
 document=Sources/SrtFlow/VideoEditProjectDocument.swift
 engine=Sources/SrtFlow/AudioEngine/TimelineAudioEngine.swift
 feeder=Sources/SrtFlow/AudioEngine/AudioTrackFeeder.swift
+surface=Sources/SrtFlow/VideoEditPlayheadFollowers.swift
+layerHost=Sources/SrtFlow/PlayerViewRepresentable.swift
 workflow=.github/workflows/checks.yml
 failed=0
 
@@ -92,6 +94,17 @@ if ! awk '
   END { exit !(current && ready > current && observe > ready && pre > observe && finish > pre) }
 ' <<<"${preroll}"; then
   fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
+fi
+
+finish="$(body "${clock}" '    private func finishPreviewPosition(')"
+if ! awk '
+  /!layer.isReadyForDisplay/ { display = NR }
+  /observeReadiness\(of: item, layer: layer\)/ { observe = NR }
+  /if playbackRequested [{] play\(\) [}]/ { play = NR }
+  END { exit !(display && observe > display && play > observe) }
+' <<<"${finish}" || ! grep -qF 'previewClock: clock' "${surface}" ||
+  ! grep -qF 'previewClock?.bindPreviewLayer(view.playerLayer)' "${layerHost}"; then
+  fail "Wait for the first mounted preview picture before releasing a cold Play"
 fi
 
 if [ "$(grep -cF 'run: /bin/bash scripts/check-playback-start.sh' "${workflow}")" -ne 1 ]; then

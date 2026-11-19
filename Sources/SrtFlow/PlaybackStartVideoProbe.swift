@@ -16,6 +16,7 @@ final class PlaybackStartVideoProbe: NSObject {
     private weak var item: AVPlayerItem?
     private var link: CADisplayLink?
     weak var surface: PlayerLayerView?
+    private(set) var firstDisplayed: Frame?
     private(set) var displayed: Frame?
     private(set) var playingFrames: [Frame] = []
 
@@ -32,6 +33,7 @@ final class PlaybackStartVideoProbe: NSObject {
 
     func attach(to item: AVPlayerItem) {
         self.item?.remove(output)
+        firstDisplayed = nil
         displayed = nil
         item.add(output)
         self.item = item
@@ -49,6 +51,7 @@ final class PlaybackStartVideoProbe: NSObject {
         guard output.copyPixelBuffer(forItemTime: time, itemTimeForDisplay: &presentation) != nil,
               presentation.isNumeric else { return }
         let frame = Frame(host: host, timeline: presentation.seconds)
+        if firstDisplayed == nil { firstDisplayed = frame }
         displayed = frame
         if player.timeControlStatus == .playing, playingFrames.count < 300 {
             if (playingFrames.last?.timeline ?? -.infinity) < frame.timeline {

@@ -49,6 +49,7 @@ final class PlayerClock: ObservableObject {
     private var previewSeek: UUID?
     private var positionedTime: TimeInterval?
     private var previewIsUnprimed = false
+    private weak var previewLayer: AVPlayerLayer?
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
@@ -256,12 +257,14 @@ final class PlayerClock: ObservableObject {
         readiness.removeAll()
     }
 
+    func bindPreviewLayer(_ layer: AVPlayerLayer) { previewLayer = layer }
+
     /// Only the current item and request can release a waiting seek or Play.
-    private func observeReadiness(of item: AVPlayerItem, then resume: @escaping () -> Void) {
+    private func observeReadiness(of item: AVPlayerItem, layer: AVPlayerLayer? = nil, then resume: @escaping () -> Void) {
         guard readinessRequest == nil else { return }
         let request = UUID()
         readinessRequest = request
-        let observe: () -> Void = { [weak self, weak item] in
+        let observe: () -> Void = { [weak self, weak item, weak layer] in
             DispatchQueue.main.async {
                 guard let self, let item, self.readinessRequest == request, self.player.currentItem === item else { return }
                 if item.status == .failed || self.player.status == .failed {
@@ -269,7 +272,8 @@ final class PlayerClock: ObservableObject {
                     self.pause()
                     return
                 }
-                guard item.status == .readyToPlay, self.player.status == .readyToPlay else { return }
+                guard item.status == .readyToPlay, self.player.status == .readyToPlay,
+                      layer?.isReadyForDisplay != false else { return }
                 self.clearReadiness()
                 resume()
             }
@@ -278,6 +282,9 @@ final class PlayerClock: ObservableObject {
             item.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
             player.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
         ]
+        if let layer {
+            readiness.append(layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { _, _ in observe() })
+        }
     }
 
     /// Advance the native preview and the audio clock from the placed playhead.
@@ -445,13 +452,27 @@ final class PlayerClock: ObservableObject {
         }
         // Prime a fresh item at playback rate while its audio anchor is paused. After a seek,
         // the existing decoder needs less data before advancing, especially across a trim.
-        player.preroll(atRate: previewIsUnprimed ? 1 : 0.5) { [weak self] finished in
+        player.preroll(atRate: previewIsUnprimed ? 1 : 0.25) { [weak self] finished in
             DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil, primed: finished) }
         }
     }
 
-    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?, primed: Bool = false) {
+    private func finishPreviewPosition(
+        _ request: UUID, at seconds: TimeInterval?, primed: Bool = false, waitForDisplay: Bool = true
+    ) {
         guard previewSeek == request else { return }
+        if primed, waitForDisplay, previewIsUnprimed, let item = player.currentItem, item.videoComposition != nil,
+           let layer = previewLayer, !layer.isReadyForDisplay {
+            let resume = { [weak self] in
+                guard let self, self.previewSeek == request else { return }
+                self.clearReadiness()
+                self.finishPreviewPosition(request, at: seconds, primed: true, waitForDisplay: false)
+            }
+            observeReadiness(of: item, layer: layer) { resume() }
+            // A closed or hidden surface may never report its first frame.
+            DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(750)) { resume() }
+            return
+        }
         if primed {
             previewIsUnprimed = false
             PerfCounters.event(.previewPreroll)

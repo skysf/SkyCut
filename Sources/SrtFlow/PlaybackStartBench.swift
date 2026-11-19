@@ -164,6 +164,7 @@ enum PlaybackStartBench {
 
         guard let firstVideo = firstPlayingFrame(in: probe, origin: origin, frame: frame), let firstAudio = attempt.first,
               let followup = followupFrame(in: probe, audio: attempt, after: max(firstVideo.host, firstAudio.onset) + 1),
+              let firstDisplayed = probe.firstDisplayed,
               let audioAtStart = attempt.timeline(at: firstVideo.host, extrapolateFirst: true),
               let audioLater = attempt.timeline(at: followup.host) else {
             throw Failure("Playback measurements were incomplete")
@@ -183,6 +184,7 @@ enum PlaybackStartBench {
             "itemAttaches": count(.playerItemAttach, from: before, to: after),
             "assetOpens": count(.compositionAssetOpen, from: before, to: after),
             "videoPrerolls": count(.previewPreroll, from: before, to: after),
+            "firstItemPictureMs": ms(firstDisplayed.host - request),
         ]
     }
 

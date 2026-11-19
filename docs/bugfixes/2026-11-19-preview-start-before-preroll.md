@@ -17,9 +17,10 @@ anchor moved. Measuring only after drift correction missed the delay.
 ## Fix
 
 An exact paused seek uses asynchronous `AVPlayer.preroll` while the audio anchor is paused. A new item
-primes after both readiness signals and uses playback rate. A positioned item prerolls with a smaller rate
-to prepare fewer frames at a cut. The Play request stays pending until preparation completes. A later seek
-or a new item invalidates the previous placement, readiness observation and preroll.
+primes after both readiness signals and uses playback rate. Its mounted preview layer reports when its
+first picture can display. A positioned item prerolls with a smaller rate to prepare fewer frames at a cut.
+The Play request stays pending until preparation completes. A later seek or a new item invalidates the
+previous placement, readiness observation and preroll.
 
 A positioned preview starts with `playImmediately(atRate:)`. Reanchoring to a host time after a full preroll
 caused the first 4K picture to arrive more than two seconds into playback on the M1 test. After an audio

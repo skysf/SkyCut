@@ -9,7 +9,9 @@ press while pending, and preview teardown cancel the request. [Play during proje
 
 After an exact paused seek, the clock waits for both the native player and its item, then prerolls asynchronously
 while audio stays paused. A new item prerolls at playback rate. A positioned item prerolls at a smaller rate
-to prepare less data around a trimmed cut. Any newer placement or item cancels the earlier preparation.
+to prepare less data around a trimmed cut. If the new composition has picture in a mounted preview, the
+clock also waits for the preview layer's first display-ready frame. Any newer placement or item cancels
+the earlier preparation. A surface that becomes hidden or detaches can finish the wait after 750 ms.
 Play advances an already positioned preview with the ordinary native rate start. When the output
 graph has just restarted, Play aligns video to the audio host clock. The audio engine can reuse its prepared
 samples whenever the paused anchor matches the playhead. Audio supplies the master clock.
@@ -44,7 +46,8 @@ Time begins at the call to the editor's Play action. Each attempt measures the f
   sample's host timestamp. The master output is muted downstream.
 - Host time and position of the first advancing frame offered for display by the production player's item.
   The observer samples at display-link deadlines once the editor's mounted `AVPlayerLayer` is ready and keeps
-  normal layer rendering enabled. Presentation timestamps identify the timeline frame.
+  normal layer rendering enabled. Presentation timestamps identify the timeline frame. The raw samples also
+  record when the item first offered a frame, including a still frame during paused preparation.
 - The difference between the two onset times and how far the first sampled audio and video have moved from the requested time.
 - The signed audio timeline minus video presentation timestamp at video onset and at the first follow-up display deadline
   with audio at least one second later. The PCM sample clock supplies the audio position at the same host time.
