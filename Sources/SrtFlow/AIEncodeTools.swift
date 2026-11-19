@@ -10,7 +10,9 @@ import SrtFlowMCPKit
 // 撞名加编号、从不覆盖，所以不用问（docs/architecture/ai-control-mcp.md 第四节第 10、24 条）。
 // 不管什么：编码怎么跑（EncodeQueue）、参数怎么换算、输出怎么起名（AIEncodeOptions，纯值）、字幕怎么转（SubtitleConverter）。
 // Compress / Burn In outputs are named in the queue by the page's rule (EncodeQueue.target, since 2026-11-19), and a name
-// taken after this call answered moves the file on: get_job gives the real file with a `path_note`.
+// taken after this call answered moves the file on: get_job gives the real file with a `path_note`. All three tools read
+// `folder` in one place, AIEncodeFolder, which makes, checks and lists it off the main thread before anything is queued or
+// written (2026-11-19; `outputFolder` until then).
 //
 // **不替用户开跑**：队列停着、里面有用户自己排了还没开始的，就不排 —— `start()` 会把等着的一起跑掉。
 
@@ -21,12 +23,17 @@ enum AIEncodeTools {
 
     // MARK: compress_videos
 
-    static func compress(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+    /// `probe` / `deadline`: the output folder is made, checked and listed through it (AIEncodeFolder; the checks pass a drive
+    /// that does not answer).
+    static func compress(
+        _ args: AIToolArguments, _ project: VideoEditProject,
+        probe: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
+    ) async throws -> AIToolResult {
         let urls = try files(args, limit: maxVideos, kind: "video", accepts: MediaFileTypes.isVideo)
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "read", args: args, project: project) {
             return ask
         }
-        return try await enqueue(urls.map { ($0, nil) }, on: .compress, kind: .compress, args, project)
+        return try await enqueue(urls.map { ($0, nil) }, on: .compress, kind: .compress, args, project, probe: probe, deadline: deadline)
     }
 
     // MARK: burn_subtitles
@@ -81,7 +88,7 @@ enum AIEncodeTools {
 
     // MARK: convert_subtitles
 
-    static func convert(_ args: AIToolArguments, _ project: VideoEditProject) throws -> AIToolResult {
+    static func convert(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
         let urls = try files(args, limit: maxSubtitleFiles, kind: "subtitle", accepts: MediaFileTypes.isSubtitle)
         guard let name = try args.choice("to", from: MCPVocabulary.subtitleFormats), let target = SubtitleFormat(rawValue: name) else {
             throw AIToolError("to is required: one of \(MCPVocabulary.subtitleFormats.joined(separator: ", ")).")
@@ -89,9 +96,12 @@ enum AIEncodeTools {
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "read", args: args, project: project) {
             return ask
         }
-        let folder = try outputFolder(args, project)
+        // The folder is made, checked and listed off the main thread (AIEncodeFolder); names are picked past its listing, and the
+        // write below never replaces a file that appeared since (.withoutOverwriting).
+        let ready = try await AIEncodeFolder.prepare(args, project: project, refusing: "Nothing was converted.")
+        let folder = ready.folder
         let outputs = AIEncodeOptions.outputs(for: urls, in: folder, suffix: "", pathExtension: target.fileExtension) {
-            FileManager.default.fileExists(atPath: $0.path)
+            ready.taken.contains(ExportDestinationReport.fold($0.lastPathComponent))
         }
         var converted: [JSONValue] = []
         var failed: [JSONValue] = []
@@ -113,7 +123,8 @@ enum AIEncodeTools {
 
     private static func enqueue(
         _ entries: [(url: URL, burnIn: BurnInRequest?)], on queue: EncodeQueue, kind: AIJobs.Kind,
-        _ args: AIToolArguments, _ project: VideoEditProject
+        _ args: AIToolArguments, _ project: VideoEditProject,
+        probe: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
     ) async throws -> AIToolResult {
         let runtime = try await ffmpeg()
         if kind == .burnIn, !runtime.canBurnInSubtitles {
@@ -132,9 +143,18 @@ enum AIEncodeTools {
             throw AIToolError("Already in SkyCut's \(page) queue: \(names). Wait for it with get_job or cancel it first.")
         }
         let settings = AIEncodeOptions.apply(try AIEncodeOptions.parse(args), to: queue.settings)
-        let folder = try outputFolder(args, project)
-        // Each item is named in the queue, by the page's rule, against the files there and every item still to be written.
-        let ids = entries.compactMap { entry in queue.add(entry.url, in: folder, settings: settings, burnIn: entry.burnIn) }
+        // The folder is made, checked and listed off the main thread; a folder that can't be used is refused before queueing.
+        let ready = try await AIEncodeFolder.prepare(args, project: project, refusing: "Nothing was queued.", probe: probe, deadline: deadline)
+        // The queue may have changed while the folder was looked at: the checks above are made again on what is there now.
+        let late = entries.map(\.url).filter { url in queue.items.contains { $0.inputURL == url && !$0.isDone } }
+        guard late.isEmpty else {
+            let names = late.map(\.lastPathComponent).joined(separator: ", ")
+            throw AIToolError("Already in SkyCut's \(page) queue: \(names). Wait for it with get_job or cancel it first.")
+        }
+        // Each item is named in the queue, by the page's rule, against the folder's files and every item still to be written.
+        let ids = entries.compactMap { entry in
+            queue.add(entry.url, in: ready.folder, settings: settings, burnIn: entry.burnIn, taken: ready.taken)
+        }
         let added = ids.compactMap { id in queue.items.first { $0.id == id } }
         queue.start()
         let job = AIJobs.shared.start(kind, progress: { progress(ids, in: queue) }, cancel: { ids.forEach(queue.cancel(id:)) })
@@ -219,16 +239,6 @@ enum AIEncodeTools {
     }
 
     // MARK: 参数
-
-    /// 做出来的文件放哪：AI 给了 `folder`（绝对路径，或相对打开的文件夹；和 export_subtitles 同名同义）就放那儿，没给就是
-    /// `<起点>/SrtFlow/导出`（第 10 条）。不存在就建；撞名照样加编号、从不覆盖，所以不问。三个工具都只经这里读
-    /// （2026-10-15 用户转来的反馈：转出来的字幕文件固定落在导出文件夹里，还得再调一次 manage_files 挪进成品文件夹）。
-    private static func outputFolder(_ args: AIToolArguments, _ project: VideoEditProject) throws -> URL {
-        let folder = try args.string("folder").map { AIWorkspace.shared.resolve($0) }
-            ?? AIWorkspace.shared.outputFolder(.exports, project: project)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        return folder
-    }
 
     private static func files(
         _ args: AIToolArguments, limit: Int, kind: String, accepts: (URL) -> Bool

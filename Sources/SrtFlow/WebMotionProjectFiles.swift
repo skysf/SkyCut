@@ -54,21 +54,36 @@ enum WebMotionProjectFiles {
 
     /// The project-relative carried movie takes precedence over an absolute path from the original Mac. Existing movies
     /// remain valid across OS/font changes; the rendering service reports provenance differences without replacing them.
+    /// Asks the drive on the caller's thread: the project load runs off the main thread; recovery asks `cache` on the cache
+    /// folder's queue instead (WebMotionRecovery).
     @discardableResult
     static func refreshWebMotionCaches(in timeline: inout TimelineState, projectURL: URL) -> [UUID] {
-        let manager = FileManager.default
         var missing: [UUID] = []
         for clip in timeline.allClips {
-            guard let record = clip.webMotion else { continue }
-            if let carried = movieURL(for: record, projectURL: projectURL), manager.fileExists(atPath: carried.path) {
-                if clip.sourceURL != carried { timeline.update(clip.id) { $0.sourceURL = carried } }
-            } else if !manager.fileExists(atPath: clip.sourceURL.path) {
-                if let destination = movieURL(for: record, projectURL: projectURL) {
-                    timeline.update(clip.id) { $0.sourceURL = destination }
-                }
-                missing.append(clip.id)
-            }
+            guard let found = cache(for: clip, projectURL: projectURL, exists: onDrive) else { continue }
+            if found.sourceURL != clip.sourceURL { timeline.update(clip.id) { $0.sourceURL = found.sourceURL } }
+            if found.missing { missing.append(clip.id) }
         }
         return missing
+    }
+
+    /// Where a web-motion clip's movie is: the carried movie beside the project when it is there, else the stored file; a
+    /// missing movie points where it belongs beside the project (where recovery renders it).
+    struct Cache: Equatable, Sendable {
+        var sourceURL: URL
+        var missing: Bool
+    }
+
+    /// Whether a movie is on the drive: asked on the caller's thread, so never call it on the main thread.
+    static let onDrive: @Sendable (URL) -> Bool = { FileManager.default.fileExists(atPath: $0.path) }
+
+    /// The rule of `refreshWebMotionCaches` for one clip; `exists` asks the drive, on whatever thread the caller chose. nil for
+    /// a clip without web motion.
+    static func cache(for clip: EditClip, projectURL: URL?, exists: (URL) -> Bool) -> Cache? {
+        guard let record = clip.webMotion else { return nil }
+        let carried = projectURL.flatMap { movieURL(for: record, projectURL: $0) }
+        if let carried, exists(carried) { return Cache(sourceURL: carried, missing: false) }
+        if exists(clip.sourceURL) { return Cache(sourceURL: clip.sourceURL, missing: false) }
+        return Cache(sourceURL: carried ?? clip.sourceURL, missing: true)
     }
 }

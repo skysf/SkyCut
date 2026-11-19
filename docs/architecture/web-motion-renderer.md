@@ -321,8 +321,10 @@ Every caller reuses a hit, the inspector's Re-render included (same fingerprint,
 renders pass `force`. Rendering a fingerprint again (a missing or failing receipt, or `force`) never removes the movie that clips,
 undo or a Save As may be reading: the system identity is compared and the receipt written in `verify`, then the movie is renamed
 over the old one. The cache's receipt reads and writes, folder creation, the install and the sidecars (also Show Page's) run on
-`WebMotionCacheFiles.queue`, not on the main thread or in the cooperative pool. Recovery's and the project load's checks for a
-missing movie (`fileExists`) are not on it yet.
+`WebMotionCacheFiles.queue`, not on the main thread or in the cooperative pool. Recovery's checks for a missing movie run on it
+too (since 2026-11-19; recovery runs on every preview rebuild and app activation, [case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)):
+the rule is `WebMotionProjectFiles.cache(for:projectURL:exists:)`, shared with the project load (which runs off the main thread
+with the load), and the answer lands only on clips still as they were looked at; a clip that changed meanwhile is looked at again.
 An untitled manual project uses a temporary directory until Save/Save As carries the movie beside the project.
 
 A carried project-relative movie wins over its former absolute path. A different OS or missing original fonts produces a warning in

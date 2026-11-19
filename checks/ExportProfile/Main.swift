@@ -140,6 +140,9 @@ import SrtFlowMCPKit
             // Compress / Burn In never overwrite or delete a file that is not the job's own (2026-11-19 case).
             print("ENCODE QUEUE: one name per job, ffmpeg writes only the job's own file"); fflush(stdout)
             await EncodeQueueChecks.run(root: root, ffmpeg: ffmpeg, project: project, require: require)
+            // ...and never wait on a drive on the main thread to name their files (2026-11-19 case).
+            print("ENCODE OFF MAIN: names and folders looked at off the main thread"); fflush(stdout)
+            await EncodeOffMainChecks.run(root: root, input: source, project: project, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

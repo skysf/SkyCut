@@ -55,6 +55,8 @@ private enum MotionCheckGroup: String { case core, official }
         try await runMotionDurationBoundsChecks(fixture)
         print("motion checks: failure and recovery")
         try await runMotionFailureRecoveryChecks(fixture)
+        print("motion checks: recovery asks the drive off the main thread")
+        try await runMotionRecoveryOffMainChecks(fixture)
         print("motion checks: cache commits")
         try await runMotionCacheCommitChecks(root)
         print("motion checks: saved versions")
