@@ -1028,7 +1028,13 @@
 "Editing styles" = "Estilos de edición";
 "Open Folder" = "Abrir carpeta";
 "Show the folder with your own editing styles in Finder" = "Mostrar en el Finder la carpeta con tus propios estilos de edición";
-"When AI edits a whole video it follows one of SkyCut's preset editing styles (promo, cinematic opening, sci-fi, documentary, vlog). Ask it to save a style you like as your own and it shows up here." = "Cuando la IA edita un video entero sigue uno de los estilos de edición predefinidos de SkyCut (promoción, apertura cinematográfica, ciencia ficción, documental, vlog). Pídele que guarde un estilo que te guste como tuyo y aparecerá aquí.";
+"AI picks one of these when it edits a whole video, and follows the one you name. Ask it to save a style you like as your own." = "La IA elige uno de estos cuando edita un video entero y sigue el que tú nombres. Pídele que guarde como tuyo un estilo que te guste.";
+"Preset style" = "Estilo predefinido";
+"Sky Studio · %@" = "Sky Studio · %@";
+"Sky Studio · needs SkyCut Pro" = "Sky Studio · requiere SkyCut Pro";
+"Sky Studio's editing styles come with SkyCut Pro or the SkyCut trial" = "Los estilos de edición de Sky Studio vienen con SkyCut Pro o la prueba de SkyCut";
+"Your style" = "Tu estilo";
+"A Sky Studio style has this name, so AI follows that one. Rename this file to use yours." = "Un estilo de Sky Studio tiene este nombre, así que la IA sigue ese. Cambia el nombre de este archivo para usar el tuyo.";
 "Replaces the preset style" = "Reemplaza el estilo predefinido";
 "Open this style's file in Finder; any text editor can change it" = "Abrir el archivo de este estilo en el Finder; cualquier editor de texto puede cambiarlo";
 "Move this style to the Trash" = "Mover este estilo a la Papelera";

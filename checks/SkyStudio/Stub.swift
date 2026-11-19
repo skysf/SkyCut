@@ -13,6 +13,8 @@ struct StubSeen {
 final class SkyStudioStub: URLProtocol {
     enum Reply {
         case http(Int, String)
+        /// A JSON answer with more response headers (content answers carry an ETag; a 304 has an empty body).
+        case headers(Int, String, [String: String])
         /// 成品文件那种：任意字节，带 Content-Length（下载的进度要它）。
         case data(Int, Data)
         /// 连不上（断网、超时……）。
@@ -70,12 +72,9 @@ final class SkyStudioStub: URLProtocol {
         Self.lock.unlock()
         switch handler(seen) {
         case .http(let status, let body):
-            let response = HTTPURLResponse(
-                url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: ["Content-Type": "application/json"]
-            )!
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: Data(body.utf8))
-            client?.urlProtocolDidFinishLoading(self)
+            reply(status, body, [:])
+        case .headers(let status, let body, let headers):
+            reply(status, body, headers)
         case .data(let status, let data):
             let response = HTTPURLResponse(
                 url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
@@ -87,6 +86,16 @@ final class SkyStudioStub: URLProtocol {
         case .failure(let code):
             client?.urlProtocol(self, didFailWithError: URLError(code))
         }
+    }
+
+    private func reply(_ status: Int, _ body: String, _ headers: [String: String]) {
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+            headerFields: headers.merging(["Content-Type": "application/json"]) { mine, _ in mine }
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data(body.utf8))
+        client?.urlProtocolDidFinishLoading(self)
     }
 
     override func stopLoading() {}

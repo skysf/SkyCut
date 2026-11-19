@@ -10,6 +10,7 @@ import SrtFlowMCPKit
 // `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
 // 声音库的 `/voices`、`/voices/consent-grant` 在 SkyStudioVoiceAPI（用这里的 request / send）。
+// Content for SkyCut (`/content`, `/content/styles/{id}`) is in SkyStudioContentAPI (request + conditionalGet, uncachedSession).
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
 //
 // 自检和冒烟用 `SRTFLOW_SKYSTUDIO_API_BASE` 把地址指到本机的假服务器，**只认回环地址**（Key 不会因此发到别处）。
@@ -216,10 +217,39 @@ struct SkyStudioAPI: Sendable {
 
     /// 发出去、拿回 2xx 的正文；别的都换成 `SkyStudioFailure`（取消照旧是 CancellationError）。
     func send(_ request: URLRequest) async throws -> Data {
-        let data: Data
-        let response: URLResponse
+        let (data, response) = try await exchange(request)
+        let status = response?.statusCode ?? 0
+        guard (200..<300).contains(status) else { throw Self.failure(status: status, data: data) }
+        return data
+    }
+
+    /// Content for SkyCut (editing styles, later craft cards) never goes into the system URL cache: SkyCut's own copy
+    /// (SkyStudioContentCache) is the only one on this Mac and is deleted when the licence ends; a URL cache would also hand back
+    /// an `immutable` answer without asking the server whether this key may still read it.
+    static let uncachedSession: URLSession = {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        return URLSession(configuration: configuration)
+    }()
+
+    /// A GET that may answer 304 Not Modified: `etag` goes out as If-None-Match and a 304 comes back as a nil body (the copy
+    /// held is still current). Every other answer reads as `send` reads it; a 2xx returns its body and its ETag.
+    func conditionalGet(_ request: URLRequest, etag: String?) async throws -> (body: Data?, etag: String?) {
+        var request = request
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        if let etag { request.setValue(etag, forHTTPHeaderField: "If-None-Match") }
+        let (data, response) = try await exchange(request)
+        let status = response?.statusCode ?? 0
+        if status == 304 { return (nil, etag) }
+        guard (200..<300).contains(status) else { throw Self.failure(status: status, data: data) }
+        return (data, response?.value(forHTTPHeaderField: "ETag"))
+    }
+
+    private func exchange(_ request: URLRequest) async throws -> (Data, HTTPURLResponse?) {
         do {
-            (data, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
+            return (data, response as? HTTPURLResponse)
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
         } catch is CancellationError {
@@ -227,9 +257,6 @@ struct SkyStudioAPI: Sendable {
         } catch {
             throw SkyStudioFailure.network(error.localizedDescription)
         }
-        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw Self.failure(status: status, data: data) }
-        return data
     }
 
     /// 跑一个传文件的任务：Task 被取消 / URLSession 报 cancelled 都换成 CancellationError，别的网络错换成「没连上」。
