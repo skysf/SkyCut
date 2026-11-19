@@ -56,6 +56,39 @@ import Vision
         try await SmokeEvents(window: window).click(point, count: 1, flags: [])
     }
 
+    /// Finds the filled, icon-only button on a labelled row. Text strokes are too narrow to satisfy the band test.
+    func trailingButton(onRow label: String) async throws -> CGPoint {
+        let row = try await textBounds(label)
+        let drawing = NSBitmapImageRep(cgImage: try capture())
+        let scaleX = CGFloat(drawing.pixelsWide) / host.bounds.width
+        let scaleY = CGFloat(drawing.pixelsHigh) / host.bounds.height
+        let y = Int(row.midY * scaleY)
+        guard let background = luminance(drawing, x: drawing.pixelsWide - 3, y: y) else {
+            throw CheckFailure("Could not sample the window background beside '\(label)'")
+        }
+        var spans: [Range<Int>] = []
+        var start: Int?
+        for x in Int((row.maxX + 4) * scaleX)..<drawing.pixelsWide {
+            let values = [y - 2, y, y + 2].compactMap { luminance(drawing, x: x, y: $0) }
+            let filled = values.count == 3 && values.allSatisfy { abs($0 - background) > 0.045 }
+            if filled {
+                if start == nil { start = x }
+            } else if let lower = start {
+                if CGFloat(x - lower) / scaleX >= 18 { spans.append(lower..<x) }
+                start = nil
+            }
+        }
+        guard let button = spans.last else {
+            throw CheckFailure("Could not locate the icon button on '\(label)' (row: \(row), scale: \(scaleX))")
+        }
+        return CGPoint(x: CGFloat(button.lowerBound + button.upperBound) / (2 * scaleX), y: row.midY)
+    }
+
+    private func luminance(_ image: NSBitmapImageRep, x: Int, y: Int) -> CGFloat? {
+        guard let rgb = image.colorAt(x: x, y: y)?.usingColorSpace(.deviceRGB) else { return nil }
+        return (rgb.redComponent + rgb.greenComponent + rgb.blueComponent) / 3
+    }
+
     func type(_ value: String, replacing current: String) throws {
         guard let field = textField(with: current, in: host), window.makeFirstResponder(field),
               let editor = field.currentEditor() as? NSTextView else {

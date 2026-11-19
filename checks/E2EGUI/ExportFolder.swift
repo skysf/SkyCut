@@ -15,7 +15,7 @@ import SwiftUI
         var requests: [FileWindowRequest] = []
         let chooser = SystemFileChooser(makePanel: { request in
             defer { requests.append(request) }
-            return panels[requests.count]
+            return panels[min(requests.count, panels.count - 1)]
         }, appearDeadline: 0.5)
         let destination = ExportDestinationState(folder: initial)
         var remembered: [String] = []
@@ -25,16 +25,21 @@ import SwiftUI
         let check = try CheckWindow(row, width: 550, height: 235)
         defer { check.close() }
 
-        _ = try await check.text("Export to")
-        try await choose(check, after: "Initial")
-        try await eventually("The chosen folder did not reach the export destination") {
-            destination.folder.path == fromPanel.path && remembered == [fromPanel.path]
+        let first = try await check.trailingButton(onRow: "Export to")
+        try await check.click(first)
+        do {
+            try await eventually("The chosen folder did not reach the export destination") {
+                destination.folder.path == fromPanel.path && remembered == [fromPanel.path]
+            }
+        } catch {
+            throw CheckFailure("\(error). Click at \(first), requests \(requests), phase \(chooser.phase), "
+                + "destination \(destination.folder.path), report \(String(describing: destination.report)).")
         }
         guard requests == [.exportFolder(startingAt: initial)] else {
             throw CheckFailure("The folder control made the wrong request: \(requests)")
         }
 
-        try await choose(check, after: "Chosen")
+        try await check.click(check.trailingButton(onRow: "Export to"))
         try await eventually("The empty panel callback did not offer a fallback") { chooser.phase == .failed(.returnedAtOnce) }
         _ = try await check.text("Use This Folder")
         try check.type(fromText.path, replacing: fromPanel.path)
@@ -51,11 +56,6 @@ import SwiftUI
         print("GUI export folder: picked in the panel, then recovered a failing panel with a typed path")
     }
 
-    private static func choose(_ window: CheckWindow, after folderName: String) async throws {
-        let path = try await window.textBounds(folderName)
-        // The icon-only folder button is the next control after the trailing end of the displayed path.
-        try await window.click(CGPoint(x: path.maxX + 25, y: path.midY))
-    }
 }
 
 @MainActor private final class FolderPanel: FileChooserPanel {
