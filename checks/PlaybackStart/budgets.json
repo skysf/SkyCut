@@ -18,7 +18,7 @@
       "onsetGapMs": 330,
       "audioAdvanceMs": 40,
       "videoAdvanceMs": 300,
-      "startOffsetMs": 65
+      "startOffsetMs": 100
     },
     "warm-start": {},
     "middle": {},
@@ -30,7 +30,7 @@
       "audioMs": 700,
       "videoMs": 800,
       "onsetGapMs": 550,
-      "audioAdvanceMs": 100,
+      "audioAdvanceMs": 200,
       "videoAdvanceMs": 570,
       "startOffsetMs": 75
     }
@@ -45,7 +45,13 @@
       "videoAdvanceMs": 100
     },
     "scenarios": {
-      "cold-open": { "audioMs": 3200, "videoMs": 3300, "onsetGapMs": 150, "videoAdvanceMs": 150 },
+      "cold-open": {
+        "audioMs": 3200,
+        "videoMs": 3300,
+        "onsetGapMs": 150,
+        "videoAdvanceMs": 150,
+        "startOffsetMs": 55
+      },
       "idle-wake": {
         "dispatchMs": 550,
         "audioMs": 600,

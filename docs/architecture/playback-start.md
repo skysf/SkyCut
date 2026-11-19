@@ -59,10 +59,11 @@ The warm budget is 130 ms to first audio and 180 ms to the first video presentat
 Single trials have 220 ms audio and 280 ms picture ceilings for occasional scheduling noise. The picture and sound
 clocks must agree within 34 ms at onset and one second later on the 30 fps fixture. Cold open includes first-preview
 construction and output startup. Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s
-and 3.9 s per trial. Its sync limit is 65 ms skew at
-onset and 34 ms one second later. A suspended graph has a separate 700 ms audio and 800 ms video budget for output
+and 3.9 s per trial. Its onset skew limit is 55 ms median and 100 ms per trial, with 34 ms one second later.
+A suspended graph has a separate 700 ms audio and 800 ms video budget for output
 device startup, with 75 ms skew at onset and 34 ms one second later. The JSON also caps onset separation, dispatch
-time and how much of the timeline either stream can skip.
+time and how much of the timeline either stream can skip. A cold device can lose early samples while its output
+starts. The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
 
 On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture put positioned picture onset at
 69–88 ms median across the five warm scenarios and 129 ms worst overall. First-open audio and video were
