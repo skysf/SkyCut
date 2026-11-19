@@ -44,6 +44,14 @@
 - `checks/test-app-cleanup.sh` scans test app staging scripts for an exit trap and exercises the shared cleanup on success
   and failure. See [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 
+- `checks/test-defaults-cleanup.sh` keeps checks' preferences out of the login home: no Swift check (in `checks/` or
+  `scripts/`) opens a UserDefaults suite by name or calls `CFPreferencesSet…`; each `ScratchDefaults` is removed in its file;
+  every app a `scripts/check-*.sh` or `scripts/render-*.sh` stages has a check app's bundle id (E2E's sandboxed apps excepted),
+  so `remove_test_app` deletes its domain; `check-all.sh` and `check-local.sh` collect and remove those domains and
+  `check-all.sh` compares the home on CI. On a fake home (the wait recorded, not taken) it removes a check app's plist after
+  the wait, alone or collected, never the real apps', and the comparison reports only new SkyCut-looking names.
+  Case: [checks left preference files in the home](../bugfixes/2026-11-19-check-defaults-leftovers.md).
+
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,

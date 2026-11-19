@@ -168,12 +168,21 @@ enough; don't install so many versions on this Mac). So the Mac keeps exactly tw
   For a multi-command smoke session, a failed start cleans up immediately and `stop` ends a successful session and
   removes its bundle. The measurement harness can stage a new bundle from its prepared template on the next start.
   `checks/test-app-cleanup.sh` scans this wiring and exercises cleanup in both exit paths.
+- **No preferences in the login home.** A check never leaves a domain in `~/Library/Preferences`: removing a domain
+  (`removePersistentDomain`, `defaults delete`) leaves its plist, and cfprefsd rewrites a plist deleted within about 10 s
+  of the domain's last change. A Swift check's own suite is a `ScratchDefaults` (`checks/Shared/ScratchDefaults.swift`):
+  named by a path in a temporary folder, so cfprefsd stores it there. A staged check or render app is
+  `com.srtflow.SrtFlow.<name>check` or `<name>render` (`.run<pid>` when parallel runs need their own), and
+  `remove_test_app` deletes that domain 15 s after the app exits (`scripts/test-defaults-cleanup.sh`); `check-all.sh` and
+  `check-local.sh` collect them and wait once. On CI, `check-all.sh` fails if new SkyCut-looking preferences are left.
+  `checks/test-defaults-cleanup.sh` scans this and exercises the removal.
 - **Never reset the LaunchServices database** (`lsregister -kill`, `-delete`, `-seed` and the like): it holds every app
   on the Mac, not only SkyCut.
 
 Why: on 2026-11-19 macOS still knew 17 extra SkyCut-type bundles (build outputs, smoke and probe apps) and 100 dead
 registrations. They show up in Spotlight and "Open With", and a project file can open in a test build. Later that day,
 24 `MotionPlacementCheck.app` fixtures kept by failed check runs (2026-11-17 to 11-19) were still on disk and registered.
+`~/Library/Preferences` held about 2,400 plists from checks ([case](../bugfixes/2026-11-19-check-defaults-leftovers.md)).
 The release records below that moved old bundles to the Trash or kept a backup predate this rule.
 
 ## 产物验收清单

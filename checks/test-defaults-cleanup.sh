@@ -37,7 +37,8 @@ while IFS= read -r hit; do
   if ! /usr/bin/grep -Eq "(^|[^A-Za-z0-9_])${name}\.remove\(\)" "${file}"; then
     fail "${file}: ScratchDefaults ${name} is never removed (defer { ${name}.remove() })"
   fi
-done <<< "$(/usr/bin/grep -rn -E 'let [A-Za-z0-9_]+ = ScratchDefaults\(' --include='*.swift' checks scripts || true)"
+done <<< "$(/usr/bin/grep -rn -E 'let [A-Za-z0-9_]+ = ScratchDefaults\(' --include='*.swift' checks scripts \
+  | /usr/bin/grep -v "^${HELPER}:" || true)"
 [ "${made}" -gt 0 ] || fail "no check makes a ScratchDefaults: the scan above found nothing to check"
 
 # ---- 2. Bundle ids of the apps check and render scripts stage ----
