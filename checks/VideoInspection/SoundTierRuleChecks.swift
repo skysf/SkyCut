@@ -255,7 +255,7 @@ enum SoundTierRuleChecks {
                 "listen's verdicts become masked / two voices / a grey hint; clear and too short lines add nothing (\(found.map(\.kind)))")
         require(found.first?.details["maskers"]?.arrayValue?.first?["layer"] == "A2" && found.first?.items == [clip.id]
                 && found.first?.reason.contains("A2 (other)") == true, "the masked entry names the main masker and the voice clip")
-        require(AIDeliveryVoice.hintKinds.contains(found.last?.kind ?? ""), "the hint kind is listed apart from the suspects")
+        require(AIDeliveryChecks.hintKinds.contains(found.last?.kind ?? ""), "the hint kind is listed apart from the suspects")
     }
 
     // MARK: The AI's sounds and the roles

@@ -36,6 +36,8 @@ import SrtFlowMCPKit
                     try await SoundTierChecks.run(project, root: root, require: require)
                 } else if selected == "edges" {
                     try await DeliveryEdgeChecks.run(project, root: root, require: require)
+                } else if selected == "music" {
+                    try await MusicRowChecks.run(project, root: root, require: require)
                 } else {
                     try await DeliveryChecks.run(project, root: root, require: require, rulesOnly: selected == "rules", screen: false)
                 }

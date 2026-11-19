@@ -53,14 +53,34 @@ enum AIDeliveryChecks {
         Check(id: "voice", run: { AIDeliveryVoice.findings($0.sound.voice, scope: $0.scope) }),
         Check(id: "music_swell", run: {
             AIDeliveryMusicSwell.findings($0.sound.voice, levels: $0.sound.levels, sounds: $0.sound.sounds, scope: $0.scope)
-        })
+        }),
+        // MCP-40's remaining second-tier rows (2026-11-19): music missing, late, dropping out under a line, starting or stopping
+        // hard off the picture, and a sound jumping out of the mix.
+        Check(id: "music_drops", run: { AIDeliveryMusic.drops($0.sound.levels, sounds: $0.sound.sounds, scope: $0.scope) }),
+        Check(id: "music_timing", run: {
+            AIDeliveryMusic.late($0.sound.levels, sounds: $0.sound.sounds, firstPicture: $0.sound.firstPicture, lines: $0.sound.lines,
+                                 duration: $0.sound.duration, scope: $0.scope)
+                + AIDeliveryMusic.noScore($0.sound.levels, sounds: $0.sound.sounds, scope: $0.scope)
+                + AIDeliveryMusic.noMusic(sounds: $0.sound.sounds, duration: $0.sound.duration, scope: $0.scope)
+        }),
+        Check(id: "music_edges", run: {
+            AIDeliveryMusicEdges.findings($0.sound.musicClips, events: $0.sound.events, levels: $0.sound.levels,
+                                          duration: $0.sound.duration, scope: $0.scope)
+        }),
+        Check(id: "abrupt", run: { AIDeliveryAbrupt.findings($0.sound.abrupt, levels: $0.sound.levels, events: $0.sound.events, scope: $0.scope) })
     ]
+
+    /// Report kinds that are grey hints, listed apart from the suspects (`hints`: no evidence slot, not counted with them).
+    static let hintKinds: Set<String> = ["audio_voice_loud", "audio_no_music"]
+    /// Kinds about the whole film rather than any clip: no clips are attached (a mark on one stays put while clips change).
+    static let wholeFilmKinds: Set<String> = ["audio_no_music"]
 
     static func run(_ context: Context) async throws -> [AIInspection.Finding] {
         var findings: [AIInspection.Finding] = []
         for check in registry { findings += try await check.run(context) }
         return findings.map { raw in
             var finding = raw
+            if wholeFilmKinds.contains(finding.kind) { return finding }
             let audio = finding.kind.hasPrefix("audio_") || finding.kind == "sentence_cut"
             if audio {
                 let involved = context.config.tracks.flatMap(\.segments).filter {

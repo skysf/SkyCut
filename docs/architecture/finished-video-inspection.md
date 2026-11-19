@@ -19,6 +19,10 @@
     `CueMeta.provenance`），只在出处那一段用到的源秒范围里算数。有声又落在词 / 句里面才报 `audio_cutoff`；有证据但没在说话
     （音乐、音效、环境声、底噪）不报。
   - 没有证据的不当成切在说话上：片段 id 列进 `speech_unchecked`，叫 AI 先对有人声的几段 transcribe。不启动转写或收费生成。
+  - Since 2026-11-19 `listen cuts=true` judges its V1 cuts by the same evidence (`AICutCheck.speechJudged`): a cut where sound plays
+    is `on_speech` only with a word or a narration line there, otherwise `on_sound` (no suggestion) or, at the file's own first or last
+    second, `file_edge`; clips without evidence go into its own `speech_unchecked`
+    ([case](../bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md)).
   渐变已把边界声音压低时不报截断。
 - 音频重叠只报同轨或重复源的并发段；原生主轨互补交叉淡变不报。不同源跨轨的同时说话
   无法仅凭几何可靠判断，这一版不报；它不做语义上的语音分离。
@@ -193,12 +197,13 @@ them the same way. All four need to know what each sound is — the second tier 
 recording, also when detached to an audio track) or other (an imported file SkyCut can't name). First match wins:
 
 1. `sounds` on the inspect_video call: a clip id, then a track (`"A2"`) or tracks joined with + → voice, music, effects,
-   ambience or object. It is per call, not saved: the AI built the timeline or can listen, SkyCut can't tell an imported music
+   ambience or object. It is per call: the AI built the timeline or can listen, SkyCut can't tell an imported music
    file from an imported wind bed (the trait words describe, they don't classify: [listening engine](listening-engine.md)
    section 3). A review request (`intentional`, `clear_intentional`) refuses it like the other inspection fields.
-2. Otherwise where the clip came from: the same `AIListenVoicePlan.Provenance` listen voice uses (our voice-overs and effects by
+2. Otherwise the role saved on the clip (`EditClip.soundRole`, since 2026-11-19; "Saved sound roles" below).
+3. Otherwise where the clip came from: the same `AIListenVoicePlan.Provenance` listen voice uses (our voice-overs and effects by
    folder, library music and effects by manifest id, generated audio as music, a video clip's sound as camera). Generated audio
-   that is an effect needs `sounds`.
+   that is an effect needs `sounds` or a saved role.
 
 The report's `sound_roles` lists the roles per track (`"A2":"music+other"`), so the AI sees what was assumed. The voice check's
 masker kinds follow the same roles (`Provenance.known`). Measuring groups: the place (camera, ambience, object, other) is what
@@ -316,3 +321,61 @@ Manual regression before release:
 - [ ] Name an object with `sounds` that rings into the next shot; listen; shorten it to end within 2 frames of the cut, inspect again.
 - [ ] A narration track under loud music: the voice check's lines appear as findings and the grey hint under `hints`; mark one
       intentional and see it move to the intentional list.
+
+## Saved sound roles (2026-11-19, project format v39)
+
+`EditClip.soundRole` (`ClipSoundRole`: voice, music, effects, ambience, object; `VideoEditClipSoundRole.swift`) saves what a clip's
+sound is, so a role SkyCut cannot infer from where the clip came from (an imported music file, a wind bed, the clang of a thing in
+the picture) is said once instead of on every inspect_video call (production feedback MCP-40: per-call `sounds` is easy to forget, so
+lingers went unreported). `AIDeliverySoundRoles.assign` takes, first match wins, the call's `sounds` (clip id, then track), the saved
+role, then provenance; the report's `sound_roles` shows the result. nil means nothing saved (inferred), never "other". Split halves and
+separated sound carry it (`TimelineClipSplit`, `detachedAudio`); copies carry it through Codable. It never changes the sound: nothing
+that renders, mixes or previews reads it. It is part of a clip's content in a review anchor, so changing a role re-reports a finding
+marked intentional on that clip. Format v39 keeps older writers from dropping it ([project file](video-edit-project-file.md)). Setting
+it is edit_clip's `sound_role`, its own change after the tool catalog made room for a parameter.
+
+## Music rows and abrupt sounds (2026-11-19)
+
+The rest of MCP-40's second tier: four rows of the production research's `check_project.py` (rules 5, 6, 11, 12; the preview board's
+`music_late`, `no_score`, `music_edge`, `music_drops`, `pop`), registry entries `music_drops`, `music_timing`, `music_edges`,
+`abrupt`. Music is whatever the roles above say is music. Report only; intentional marks apply.
+
+| Kind | Rule | Where the line comes from |
+| --- | --- | --- |
+| `audio_music_drops` | Music heard (above −45 dBFS) within the last 3 s, a voice speaking (voice group above −35 dBFS) and the music more than 22 dB under it, for 2 s or more | Rule 11; the user on the fourth draft's 0:57 ("like the music suddenly died"); the shared rules dip about 10 dB |
+| `audio_music_late` | The video has music, but it is first heard more than 3 s after the first picture; an opening line (a transcript or narration sentence, or a line of the voice check) starting inside those 3 s moves the deadline to 3 s after the line ends. Judged only when the measured frames reach the deadline | Rule 5; the shared rules' Voice and music 4 for the opening line |
+| `audio_no_score` | The video has music somewhere, and for 15 s or more there is neither music nor a long tone or riser: an effect lasting 3 s or more, heard above −50 dBFS within 0.5 s (SkyCut can't name an effect's kind; length stands in for it). A reminder | Rule 5 |
+| `audio_no_music` | No music anywhere in a video of 15 s or more: a grey hint in `hints`, attached to no clip (`AIDeliveryChecks.wholeFilmKinds`), never a suspect. Fine for a talk, an interview or a tutorial | The shared rules make music optional ("With music…") |
+| `audio_music_edge` | A music clip starting or stopping without a fade of 0.3 s or more, above −40 dBFS over the 0.3 s inside the edge, more than 6 frames from the nearest picture event: a picture cut (to or from black too), the first picture appearing, a title (visible text) appearing. Not judged in the film's first 0.05 s or last 0.1 s, where the same file carries on in the next clip, or where another music clip plays across the edge (0.3 s each side) and is heard there above −40 dBFS | Rule 6; the human film's one case (1:37.23, a piece entering 17 frames before a cut: maybe on a hit in the music itself) |
+| `audio_abrupt` | An effect or an object whose loudest 0.1 s cell is at least −30 dBFS and 15 dB or more over the median, across the 3 s each side, of everything else (the role groups added up, minus the sound itself), more than 6 frames from a picture event. A reminder | Rule 12; the research counted cuts only, titles count here too because the shared rules land a title on a big hit |
+
+Measuring. The music rows read the role-group levels the second tier already renders, in the research's 0.1 s cells
+(`DeliveryCells`, `AIDeliverySoundLevels.swift`); a cell is read only where it lies wholly inside the measured frames, and the groups
+are measured 3.2 s past the checked range (`AIDeliverySound.marginSeconds`) so the 3 s look-backs and windows stay inside. Each
+candidate for `audio_abrupt` is rendered alone, one segment with its track's fader and the master (`DeliveryStemPower`), over its own
+span: at most 40 inside the checked range, the rest in limitations. The picture events, the first picture, the music clips' fades and
+the spoken lines are frozen in `AIDeliverySound.prepare`; the rules are pure (`AIDeliveryMusic`, `AIDeliveryMusicEdges`,
+`AIDeliveryAbrupt`).
+
+What these can't know: an effect's kind (a riser is "long", a hit is not), events inside a shot (MCP-40's third tier), whether a hard
+music edge sits on a hit in the music itself, whether a stretch without music is a dialogue scene that should have none.
+
+Checks. `checks/VideoInspection/MusicRowRuleChecks.swift` tests each rule on controlled numbers on both sides of its line (the
+cells, a 1 s look-back leaving exactly 2 s, a 10 dB dip, the opening line, a narrowed range, a long and a short and an inaudible
+effect, a fade, a bed, a split piece, an event 2 and 7 frames away, a busy mix) and the saved-role precedence;
+`MusicRowChecks.swift` runs `AIDeliverySound.prepare` on 6 s of synthetic sound with saved roles (music stopping hard at 2.0 s, a
+voice 2.0–5.0 s, a burst at 1.0 s named object on the call): one drop 2.0–5.0, the stop 48 frames off the picture, the burst, nothing
+late. `SoundTierChecks`' two real jobs now also report the first job's late music and the second job's bed stopping hard at 4.0 s.
+`SRTFLOW_INSPECTION_CASE=music` runs only the first two. Saved roles in the project file: `scripts/check-project-file.sh` group 52.
+
+Reverse controls (2026-11-19), each restored afterwards: with the four new registry entries skipped, the dropped music's look-back
+ignored, the opening line ignored, a bed under an edge ignored and abrupt sounds counted on cuts, eight assertions fail, each its own
+(the real job's late music and hard stop, the 1 s and 1.5 s look-backs, music never heard, the opening line, the bed, the cut);
+without the saved role in `assign`, six fail (the precedence on values, the real preparation's roles, its drop and its hard stop).
+
+Manual regression before release:
+
+- [ ] A trailer whose music stops under a line for 2 s or more, and one that enters 5 s in: both reported; dip the music instead,
+      start it earlier, inspect again.
+- [ ] A piece entering hard between two cuts: reported with its frames from the nearest cut; move it onto the cut or fade it in.
+- [ ] A loud hit away from any cut or title: a reminder; put it on the cut, or mark it intentional.
