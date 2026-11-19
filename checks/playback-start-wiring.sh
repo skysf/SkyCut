@@ -115,5 +115,9 @@ if [ "$(grep -cF 'run: /bin/bash scripts/check-playback-start.sh' "${workflow}")
   fail "The graphical benchmark must run in the required checks workflow"
 fi
 
+if ! python3 -B checks/PlaybackStart/test_compare.py; then
+  fail "Playback timing consensus must preserve failures and bound confirmation"
+fi
+
 if [ "${failed}" -eq 0 ]; then echo "✓ Playback start wiring"; fi
 exit "${failed}"
