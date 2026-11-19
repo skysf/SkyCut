@@ -131,6 +131,10 @@ enum VideoEditProjectIO {
 
     /// Normal project saves carry their generated movies; internal versions retain the existing cache references.
     enum MotionCacheWritePolicy { case carry, reference }
+    /// Where the media records come from: asked of each media file now (`fresh`: a project's own file, written off the main
+    /// thread), or the project's last record of each, without touching the media (`known`: a saved version, written on the
+    /// main thread while the media may sit on a sleeping drive; docs/architecture/project-versions.md).
+    enum MediaRecordSource { case fresh, known }
 
     struct IOError: LocalizedError {
         var message: String
@@ -165,7 +169,8 @@ enum VideoEditProjectIO {
         to url: URL,
         knownRecords: [String: MediaRecord] = [:],
         rowHeights: TimelineRowHeights = TimelineRowHeights(),
-        motionCaches: MotionCacheWritePolicy = .carry
+        motionCaches: MotionCacheWritePolicy = .carry,
+        mediaRecords: MediaRecordSource = .fresh
     ) throws -> [String: MediaRecord] {
         let timeline: TimelineState
         switch motionCaches {
@@ -174,8 +179,11 @@ enum VideoEditProjectIO {
         }
         let directory = url.deletingLastPathComponent()
         // 换成 upscale 文件的段的原片也配书签（换回去时找得到），但它不在 mediaURLs 里：播放用不着、删了不亮「缺素材」。
-        let media = (timeline.mediaURLs + timeline.upscaleOriginalURLs).map {
-            MediaRecord(url: $0, projectDirectory: directory, previous: knownRecords[$0.path])
+        let media = (timeline.mediaURLs + timeline.upscaleOriginalURLs).map { media -> MediaRecord in
+            switch mediaRecords {
+            case .fresh: return MediaRecord(url: media, projectDirectory: directory, previous: knownRecords[media.path])
+            case .known: return MediaRecord(known: knownRecords[media.path], for: media)
+            }
         }
         let file = VideoEditProjectFile(timeline: timeline, media: media, rowHeights: rowHeights)
         let data = try makeEncoder().encode(file)

@@ -33,7 +33,11 @@
 2. **Never an empty timeline** (nothing to keep) and **never a project without a file** (a version belongs to a project file).
 3. Writing is synchronous on the main actor (a project's own file is written off it since 2026-11-19, `ProjectFileWriter`;
    versions are not yet). If it fails (full disk), that moment has no version and the round goes
-   on; the AI's result then names no version.
+   on; the AI's result then names no version. A version goes into the local Application Support folder, but its media may
+   sit on a sleeping or stuck external drive, so writing it asks the media files nothing: the media records are the
+   project's last ones (`mediaRecords: .known`; a media file the project has not saved yet gets only its path and name).
+   Since [subtitle and version saves touched drives on the main thread](../bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md):
+   before it, every version asked each media file for a bookmark and its size, on the main thread.
 
 ## 3. Where they live and what they are called
 

@@ -10,7 +10,9 @@
 # - every macOS open / save window: made only in SystemFileChooser.swift, never modal
 #   (2026-11-19, docs/bugfixes/2026-11-19-modal-file-windows-can-wedge-app.md);
 # - a save's answer replaces a file only when macOS's own window asked (2026-11-19,
-#   docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md).
+#   docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md);
+# - the subtitle editor's writes and the media records of saved versions (2026-11-19,
+#   docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md).
 # Rules: docs/architecture/export-settings.md §8, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
@@ -128,14 +130,25 @@ require "a Save As that may not replace claims the name before writing" \
   Sources/SrtFlow/ProjectFileWriter.swift 'guard try NewFileClaim\.claim\(url\) else \{ return \.occupied'
 require "the project's Save As from a window asks before replacing" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'await saveAs\(chosen: location\)'
-require "the subtitle editor's Export As writes with the answer's permission" \
-  Sources/SrtFlow/SubtitleEditPanel.swift 'SubtitleFileSave\.write\(document, format: format, to: location\.url, replacing: replacing\)'
-forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there)" \
+require "the subtitle editor's Save and Export As write with the answer's permission, off the main thread" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'await SubtitleFileSave\.write\(data, to: location\.url, replacing: location\.mayReplace\)'
+forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there, on the main thread)" \
   Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*\.write\(to:'
 require "a manual screen recording replaces a file only when macOS's own window confirmed it" \
   Sources/SrtFlow/ScreenRecordingCoordinator.swift 'session\.replacesExistingOutput = session\.replacesExistingOutput && options\.replacesExistingOutput'
 require "the recording setup carries the save window's confirmation" \
   Sources/SrtFlow/ScreenRecordingSetupView.swift 'replacesOutput = location\.mayReplace'
+
+# The subtitle editor's writes and saved versions (2026-11-19,
+# docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md): subtitle files are written on
+# SubtitleFileSave's queue with a deadline; a saved version takes the media records the project already has and asks no
+# media file anything on the main thread. scripts/check-project-saves.sh (OffMainWriteChecks) checks the behaviour.
+require "subtitle files are written on their own queue, never on the caller's" \
+  Sources/SrtFlow/SubtitleFileSave.swift '^            queue\.async \{'
+require "a saved version takes the project's media records without asking the media files" \
+  Sources/SrtFlow/ProjectVersionStore.swift 'motionCaches: \.reference, mediaRecords: \.known\)'
+forbid "a saved version never makes a fresh media record (that stats the media file, maybe on a sleeping drive)" \
+  Sources/SrtFlow/ProjectVersionStore.swift '^[^/]*MediaRecord\(url:'
 
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "file-io-off-main-wiring 失败" >&2
