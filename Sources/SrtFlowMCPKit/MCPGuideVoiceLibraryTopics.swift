@@ -21,7 +21,8 @@ enum MCPGuideVoiceLibraryTopics {
             presets for a language. It is free and changes nothing. Call it before naming a voice the user described ("my \
             voice", "a calm female narrator"), and pass the script's language: a preset's gender and description belong to one \
             language, and the same preset can sound like another person in another language. Local voices (SkyCut's own and this \
-            Mac's) are not listed here; roles (en_male, zh_female_warm…) are in the add_voiceover topic.
+            Mac's) are not listed here; roles (en_male, zh_female_warm…) are in the add_voiceover topic. include picks mine, \
+            presets or all (the default).
             """),
             MCPGuideSection(name: "mine", about: "the user's voices: voice_… ids, names, languages and their MiniMax versions", text: """
             mine lists the user's voice library, at most 50 voices: id (voice_ followed by 32 hex digits; pass it as \
