@@ -779,11 +779,13 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   1 sent back (it prints the slot's comment), 2 closed, 3 still queued at the time limit (run it again).
 - **What the slot does** (`scripts/merge-slot.py`), oldest label first:
   1. It waits until `check-all` on the PR's head is green; red sends the PR back.
-  2. It waits for GitHub's test merge commit X of the PR, whose parents must be the current main and the head. A
-     conflict sends the PR back.
+  2. It builds the test merge X itself: `merge-slot/pr-<N>` is pointed at the current main and the head is merged into
+     it with the Merges API, so X's parents are (main, head). A 409 (conflict) sends the PR back. X is built once per
+     main and head. It never uses GitHub's own test merge (`merge_commit_sha`): GitHub recomputes that for new commits
+     on the PR, not when main moves ([case](../bugfixes/2026-11-20-merge-slot-waits-for-stale-test-merge.md)).
   3. If a green run already tested X's tree, it merges at once. The proof is a `verified-tree-<tree>` marker: from the
      PR's own run when main hasn't moved since, or from an earlier slot test.
-  4. Otherwise it points the branch `merge-slot/pr-<N>` at X and dispatches `checks.yml` there. That is the same
+  4. Otherwise it dispatches `checks.yml` on `merge-slot/pr-<N>`, which holds X. That is the same
      workflow file on the same tree as a pull_request run on main + head, docs-only fast path included. Nothing else
      merges while it runs. A red or cancelled run sends the PR back with its link; the branch stays, so re-running the
      run's failed jobs can still prove the tree.
@@ -806,6 +808,7 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   under the token's 1,000 an hour. A PR whose own run tested the current main gets no second run; otherwise it gets one
   slot test, which costs what a pull_request run does.
 - `checks/MergeSlot/MergeSlotChecks.py` runs the slot against an in-memory GitHub (`FakeGitHub.py`) and pins both
-  workflows. Reverse verification on 2026-11-20: 22 mutations of the script each turned it red. Among them: merging
-  without proof, skipping the last main check, trusting a stale test merge, an unpinned head, FIFO by number, not
-  holding the slot during a test, and squash.
+  workflows. The fake copies GitHub's quirk that broke the first version: the test merge isn't recomputed when main
+  moves. Reverse verification on 2026-11-20: 23 mutations of the script each turned it red. Among them: merging without
+  proof, skipping the last main check, reusing a test merge for another main or head, rebuilding it every pass, an
+  unpinned head, FIFO by number, not holding the slot during a test, and squash.
