@@ -226,6 +226,12 @@ class PlaybackGateTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             evaluate(batch(5), budgets)
 
+    def test_a_worst_skew_budget_below_the_start_skew_budget_is_rejected(self):
+        budgets = json.loads(json.dumps(BUDGETS))
+        budgets["medians"]["scenarios"]["near-end"]["maxSkewMs"] = 40
+        with self.assertRaises(ValueError):
+            evaluate(batch(5), budgets)
+
 
 if __name__ == "__main__":
     unittest.main()

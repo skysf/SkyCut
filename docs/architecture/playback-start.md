@@ -125,33 +125,31 @@ A gross stall, an onset gap or start skew of 500 ms or more or a missed one-seco
 failure itself: none may occur in the first five launches, and at most one per scenario across the eight after
 confirmation. A median budget may not exceed its per-launch budget.
 
-The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
-340 ms audio and 380 ms picture ceilings. One hosted start needed 290 ms for audio and 314 ms for picture,
-with 16 ms onset skew or less across the five launches. The trim immediately before the cut
-has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
-Replay from the end also rewinds the item. Its median audio and picture budgets are 220 / 300 ms, capped at
-265 / 380 ms per trial, and its start skew is 48 ms median and 60 ms per trial.
-Warm onset and all one-second offsets have a 34 ms median budget on the 30 fps fixture. Individual samples
-have a 45 ms ceiling for display and audio sampling noise, with 48 ms one second after a device restart.
-Cold open includes preview construction and output startup.
-Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
-Its start skew limit is 145 ms median and 150 ms per trial, and its onset separation is 170 ms median and 330 ms per
-trial. A suspended graph has a separate 700 ms audio and
-800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 160 ms per trial.
-The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
-The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
-Cold dispatch has a 20 ms median budget and a 90 ms single-trial ceiling. In calibration the first Play
-was usually dispatched in under 2 ms. An individual launch took 61 ms without a build or native seek in
-the Play callback.
-Play right after a click and Play while hovering include decoding the picture at the playhead: 3.5 / 3.6 s per
-launch and 2.5 / 2.6 s median to first sound and picture (about 0.6 s on the M1). In every scenario the first two
-seconds allow a 300 ms stall and 60 ms skew per launch, 100 ms and 40 ms median; the worst skew includes the first
-frame, so no scenario's skew limit is tighter than its start skew limit (cold open 150 / 145 ms, replay from the end
-60 / 48 ms, the idle start 160 / 45 ms). A new item's first sound and picture include its preroll at playback rate,
-like replay from the end, and share its budgets: 265 / 380 ms per launch and 220 / 300 ms median (101 / 141 ms median
-hosted in run 44551846020, 120 / 137 ms on the M1). Its skew keeps the common limits: primed by Play it started within
-12 ms on both. Primed at a quarter rate while paused (reverted, above), the hosted runner had started it 52–60 ms
-behind its sound (median; 137 ms worst, run 44540586891), which these limits reject.
+The budgets, per launch / median in ms (`checks/PlaybackStart/budgets.json`, recalibrated on hosted samples on
+2026-11-19, see below):
+
+- Every scenario unless listed: first sound 340 / 130 and first picture 380 / 180, onset separation 160 / 105, start
+  skew and one-second offset 45 / 34 (display and audio sampling on the 30 fps fixture), longest stall in the first
+  two seconds 300 / 100, worst skew there 60 / 40.
+- Cold open (includes preview construction and output startup): sound 3.8 / 3.2 s and picture 3.9 / 3.3 s, dispatch
+  90 / 20, onset separation 330 / 220, start and worst skew 190 / 175, one-second offset 120 / 60.
+- Warm start: sound median 200, picture median 220, one-second offset 60 / 45.
+- The frame before the cut: sound 300 / 230 and picture 340 / 265, so the decoder can prepare both sides.
+- Deep in the GOP: start skew 60 per launch. The 4K tail: sound 360 per launch, picture 420 / 250, start skew
+  60 / 45, worst skew median 45.
+- Replay from the end (it rewinds, then prerolls after Play): sound 340 / 250, picture 410 / 330, start and worst skew
+  60 / 55.
+- A new item (Play primes it): sound 700 / 450, picture 800 / 460, with the common skew limits (120 / 137 ms median
+  on the M1, 101–298 / 141–307 ms hosted).
+- Play right after a click and Play while hovering include decoding the picture at the playhead (about 0.6 s on the
+  M1): sound 3.5 / 2.5 s, picture 3.6 / 2.6 s; start skew 80 and worst skew 120 per launch after a click, worst skew 80
+  per launch while hovering.
+- The start after the idle stop (output device startup): sound 700 / 600, picture 800 / 650, onset separation
+  550 / 230, start and worst skew 160 / 45, one-second offset 48 per launch, lost audio 200 / 75.
+
+The JSON also caps dispatch time and how much of the timeline either stream can skip. A median budget may not exceed
+its per-launch budget, and since the worst skew includes the first frame no worst-skew budget may be below the start
+skew budget: `compare.py` rejects such a file. In calibration the first Play was usually dispatched in under 2 ms.
 
 **This Mac fails on any picture out of step** (`strict` in `budgets.json`, applied wherever the runner is not the
 hosted virtual Mac): every launch of every scenario must start the picture within 60 ms of the sound and within 45 ms
@@ -181,10 +179,11 @@ an outlier, not a stall: hosted runners sometimes stall decoding for a second af
 1,365 ms and 1,824 ms at the cut, while every scored start was in sync.
 
 When hosted timings need confirmation, the check starts three more processes once and scores all eight launches
-together, with the same budgets. The required graphical step stops after six minutes. It runs in shard 1 right after
-the App build, with the preview perf ratchet and the lightest share of `check-all.sh`: about 13 minutes in all, so a
-re-run after a timing flake costs that much (until 2026-11-20 shard 1 held every full-App check and took 27–31 minutes).
-Every shard has 30 minutes.
+together, with the same budgets. The required graphical step stops after 15 minutes (each launch after 120 s; watching
+the first two seconds of every start added about 4 minutes on 2026-11-19). It runs in shard 1 right after the App
+build, with the preview perf ratchet and the lightest share of `check-all.sh`, so a re-run after a timing flake costs
+that shard (until 2026-11-20 shard 1 held every full-App check and took 27–31 minutes). Shard 1 has 45 minutes, the
+others 30.
 
 The hosted budgets were recalibrated on 2026-11-19 from 55 launches in 11 runs of the merged #502 code
 (44 after the warm-up). Of those launches, 24% of cold opens and end replays and 2–11% of the other scenarios
@@ -198,6 +197,29 @@ The recorded hosted failure from before the fix stays red even with three health
 delay at Play and a picture 300 ms late in every cold open are red in all resamples. A picture 1 s late in a
 quarter of the cold opens is red in 64% of them. `checks/PlaybackStart/test_compare.py` pins these
 verdicts. [Hosted timing case](../bugfixes/2026-11-19-playback-start-hosted-timing-outliers.md).
+
+**Second calibration, from 25 hosted attempts (2026-11-19).** That 3% did not hold: 6 of the 23 hosted attempts
+of main's code since #517 failed the step, none of them on a regression
+([case](../bugfixes/2026-11-19-playback-gate-failed-healthy-hosted-runs.md)). The hosted virtual Mac (three cores)
+runs the benchmark at a load average of 20–50. There its cold open starts the picture about 100 ms after the sound
+(launch medians 102 ms start skew, 127 ms onset separation), and on a slow host the five-launch medians reached
+208 / 230 ms. Every other start stays within about 20 ms. Three attempts failed because no audio block covered the
+first picture and two because a staged placement took over 5 s; both are bench defects, fixed. The rest were medians
+just over budgets set from too few runs. The budgets above come from all 25 attempts (22 of main's code, 3 of the
+2026-11-19 fix) under one rule: **the first five launches of a slow host may fail, the eight with confirmation must
+pass**. Confirmation launches run cleaner: the slowest healthy cold open had 230 / 208 ms five-launch medians and
+174 / 141 ms over eight. So each median budget sits above every healthy eight-launch median with a margin and below
+the recorded hosted failure confirmed with three healthy launches (cold open onset and skew 240 / 204 ms against
+220 / 175 ms budgets, replay from the end skew 76 against 55 ms). Per-launch limits sit near the hosted 95th–99th
+percentile: 8% of cold-open launches exceed one, 12% of replays from the end, 0–8% elsewhere.
+
+Replayed on those 25 attempts (`test_compare.py` pins the slowest one), the scoring passes 24, 17 of them in the first
+five launches. The last needs a confirmation its run never made (replay from the end, 257 ms median to first sound at
+a load of 45). With the earlier budgets the same attempts, bench defects left out, passed 19 of 22 (12 in the first
+five). The recorded hosted failure, the M1 freezes of the
+[resume and hover case](../bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md) and a 350 ms delay at Play still
+fail. On the hosted runner a cold-open picture up to about 200 ms behind its sound passes, as it does on a slow host
+today; on this Mac the strict profile holds every start to 45 ms.
 
 The hosted gate cannot separate a partial regression that stays near the runner's noise. Before the final #502 fix,
 the cold-open onset gap had a 151 ms median in launches 2–5 and a single 700 ms stall in launch 1, which would pass

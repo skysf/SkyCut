@@ -136,7 +136,8 @@
       },
       "near-end": {
         "videoMs": 250,
-        "startOffsetMs": 45
+        "startOffsetMs": 45,
+        "maxSkewMs": 45
       }
     }
   },

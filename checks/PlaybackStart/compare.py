@@ -118,6 +118,9 @@ def evaluate(samples, budgets, confirmed=False):
             raise ValueError(f"{name} has an invalid playback budget")
         if any(typical[key] > single[key] for key in typical):
             raise ValueError(f"{name} has a median budget above its per-launch budget")
+        # The worst skew includes the first frame, so it can never be below the start skew.
+        if any(limits["maxSkewMs"] < limits["startOffsetMs"] for limits in (single, typical)):
+            raise ValueError(f"{name} has a worst-skew budget below its start-skew budget")
         valid = 0
         stalls = 0
         for trial in trials:
