@@ -2,42 +2,75 @@
 
 ## Symptom
 
-The playback-start step failed on main and on #507. At a cut in #507, the initial audio and picture offset was
-15.5 ms, then the first paired follow-up measured 1,364.8 ms of skew at 1,980.2 ms after the first picture. The
-other four cut trials were within 20 ms. A shard also exhausted its 30 minutes while the existing preview
-performance check was still running. [Main run](https://github.com/skysf/SkyCut/actions/runs/44489035493).
-[First #507 samples](https://github.com/skysf/SkyCut/actions/runs/44487715508/artifacts/14511856729).
+After #502 merged, the playback-start step failed in every CI run that included it: main's run on `4f60b09b` and
+ten attempts on #507 and four other branches, while #502's own run had passed. On main, cold open failed in three of
+five launches. One launch had a 163.8 ms start skew against a 150 ms limit, and another a 233.9 ms one-second skew
+against 45 ms. In a third, the picture appeared 1.1 s after the sound. Near-end and middle each had one launch at
+66–92 ms of start skew. On #507 the cut's picture was 1,364.8 ms behind its sound at the one-second sample. Shard 1
+also reached its 30-minute limit during the preview performance step. [Main run](https://github.com/skysf/SkyCut/actions/runs/44489035493).
+[Main samples](https://github.com/skysf/SkyCut/actions/runs/44489035493/artifacts/14512853021).
 
 ## Root cause
 
-#507 already showed the failure on the #502 base, before #509 and #511. Those two merges touched the AI input
-and tool paths, which the graphical check does not use. #506, #508 and #510 were already included in the #502
-merge. They changed Quit, exclusive placement and shared AI instructions. The same graphical probe on the
-green #502 PR had a 935.1 ms idle follow-up outlier in one launch. On the #507 rerun, all five cut follow-ups
-were again within 21 ms. The differing failures on repeated runs point to sampling and scheduling variability.
-[Green #502 samples](https://github.com/skysf/SkyCut/actions/runs/44479258634/artifacts/14509238313).
-[Second #507 samples](https://github.com/skysf/SkyCut/actions/runs/44487715508/artifacts/14515330440).
+The play path did not regress. Between the tree #502's green run tested (`04c79320`) and main, #508, #510, #509
+and #511 merged. They changed Save As placement, AI tools and MCP text, none of which runs at launch, project open
+or Play. The 55 hosted launches after the merge, from 11 runs, matched the 15 before it for warm start, middle, cut
+and idle wake. The two scenarios that preroll after Play were slower: the median cold-open first audio went from
+925 to 1,174 ms, and the end-replay start skew from 7 to 18 ms. Those runs also rebuilt for 148–213 s just before
+the step, because main had saved no cache since #506, against 71 s for #502.
 
-The old checker required a complete five-launch batch with each individual sample in budget. A late follow-up
-could turn an otherwise measured start into a missing trial. The confirmation rule also failed a scenario if
-both batches contained an outlier, and could add five more launches to an already long shard.
+The gate had been calibrated in one favourable window. Its per-launch budgets came from the first 15 hosted
+launches, and every launch had to meet them. In the 55 launches, 24% of cold opens and end replays and 2–11% of
+the other scenarios missed a per-launch budget, so a five-launch batch passed less than 1% of the time. The old
+repeat rule only rescued single small failures. Five median budgets sat inside the runner's own spread: cold-open
+onset gap and start skew, and end-replay first audio, first picture and start skew.
+
+The first launch of each fresh build was the noisiest. Two of the three cold-open failures happened there: a
+picture frozen at frame 0 for 4.5 s while sound played, and a picture that stopped advancing after one second. The
+same process recovered within seconds, with warm-start skews of 219 and 253 ms and later scenarios in sync. The M1
+showed none of this in five launches.
+
+A follow-up exactly one second after the first picture can come out as 999.9999999999432 ms after subtracting host
+times. The checker treated that as a structural error, which fails without confirmation. It happened once in 385
+launch scenarios.
+
+#517 as first pushed required half of the launches in budget plus the medians, with a display-interval margin on
+confirmation. A bootstrap of that rule over the 55 launches was still red in 45% of runs.
 
 ## Fix
 
-The probe records startup before waiting for the one-second pair and measures display callback cadence separately.
-The gate requires median timings, at least half of whole launches within the existing per-launch budgets, and
-structural checks on every launch. One bounded hosted confirmation adds three launches to the original five.
-A missed follow-up ranks as the worst observation, and missing onset or a repeat timeout fails. The warm-start
-display control caps the confirmation margin on onset. Shard 1 has five additional minutes for the two graphical
-steps, with a four-minute deadline for this benchmark. The other shards still have 30 minutes.
+- `scripts/check-playback-start.sh`: the first launch is an unscored warm-up that runs the same scenarios. It may
+  fail or hang without failing the step, and its start skews appear in the summary. Each launch log records the
+  load average.
+- `checks/PlaybackStart/compare.py`: an onset gap or start skew of 500 ms or more, or a missed one-second follow-up,
+  is a gross stall. None may occur in the first five launches, and at most one per scenario across all eight after
+  confirmation. Confirmation no longer adds a margin. A median budget may not exceed its per-launch budget. A follow-up
+  1e-6 ms short of a second still counts as one second.
+- `checks/PlaybackStart/budgets.json`: cold-open medians move from 150 to 170 ms for onset gap and from 120 to
+  145 ms for start skew. End-replay medians move from 190 to 220 ms for first audio and from 250 to 300 ms for first
+  picture, with a 380 ms per-launch picture limit instead of 310 ms. End-replay start skew gets 48 ms median and
+  60 ms per launch instead of the shared 34 and 45 ms. Every other limit is unchanged.
+- `.github/workflows/checks.yml`: the step has 6 minutes and shard 1 has 40.
+- #517 also split onset from the one-second follow-up in the probe and recorded the display cadence. Both stay.
 
 ## Verification
 
-The normal wiring check runs `checks/PlaybackStart/test_compare.py`. Its cases include two isolated stalls, three
-late trials, all five original cold starts over budget followed by good retries, missing onset, extra builds, a
-follow-up timeout, and the unchanged one-second median limit.
+- A bootstrap over the 44 scored hosted launches is red in 3% of runs.
+- `checks/PlaybackStart/test_compare.py` keeps the recorded pre-fix hosted samples red even with three healthy
+  confirmation launches. In the bootstrap, Play delayed by 100, 200 or 350 ms is always red. A picture 300 ms
+  late in every cold open is always red. A picture 1 s late in a quarter or half of the cold opens is red in 64% or
+  95% of runs. [Pre-fix samples](https://github.com/skysf/SkyCut/actions/runs/44446600269/artifacts/14494172744).
+- Removing the rounding tolerance or the stall rule turns the tests red. Allowing two stalls, raising the cold-open
+  onset-gap median to 250 ms or accepting a quarter of the launches also turns them red.
+- With a stub editor under `/bin/bash` 3.2, a warm-up that exits 1 or hangs does not stop the step, and the hang is
+  killed. A scored launch that fails stops the step. A scored launch that exits non-zero still fails, so removing
+  the #499 fix keeps the step red as before.
 
 ## Lessons
 
-Keep late samples, timeouts and first-stream acquisition visible. A repeat contributes evidence to the original
-batch under the [playback-start contract](../architecture/playback-start.md).
+- Calibrate a hosted timing gate on several runs' launches. Before merging, compare each median budget with the
+  spread of resampled medians.
+- Tolerate isolated noise by count and keep a hard ceiling on gross failures. Keep the recorded failure as test data
+  so a budget change cannot let it through.
+- Leave the first launch of a fresh CI build unscored but visible. The rules and the update procedure are in
+  [Playback start](../architecture/playback-start.md).

@@ -43,32 +43,41 @@ ff -f lavfi -i "testsrc2=s=640x360:r=30:d=24" -c:v libx264 -threads:v 2 -preset 
   -pix_fmt yuv420p "${media}/overlay.mp4"
 ff -f lavfi -i "sine=frequency=443:sample_rate=48000:duration=24" -ac 2 -c:a pcm_s16le "${media}/tone.wav"
 
+# One editor process: writes its result JSON, returns its exit status (124 when it hangs past the deadline).
+launch() {
+  local result="$1" log="$2" deadline status=0
+  rm -f "${result}"
+  echo "Started $(date -u +%H:%M:%S), load average $(sysctl -n vm.loadavg)" >"${log}"
+  SRTFLOW_PLAYBACK_START_OUT="${result}" SRTFLOW_PLAYBACK_START_MEDIA="${media}" SRTFLOW_SMOKE_MUTE=1 \
+    "${app}" -mainWindowSection videoEdit -ApplePersistenceIgnoreState YES -NSRecentDocumentsLimit 0 \
+    -optimizedMedia.previewMode original >>"${log}" 2>&1 &
+  pid=$!
+  deadline=$((SECONDS + 45))
+  while kill -0 "${pid}" 2>/dev/null; do
+    if [ "${SECONDS}" -ge "${deadline}" ]; then
+      kill "${pid}" 2>/dev/null || true
+      wait "${pid}" 2>/dev/null || true
+      pid=""
+      echo "Timed out after 45 s" >>"${log}"
+      return 124
+    fi
+    sleep 1
+  done
+  wait "${pid}" || status=$?
+  pid=""
+  if [ "${status}" -eq 0 ] && [ ! -s "${result}" ]; then status=1; fi
+  return "${status}"
+}
+
 run_trials() {
-  local destination="$1" launches="$2" trial result log deadline status
+  local destination="$1" launches="$2" trial status
   for ((trial = 1; trial <= launches; trial++)); do
-    result="${destination}/trial-${trial}.json"
-    log="${destination}/trial-${trial}.log"
-    rm -f "${result}"
     echo "Playback start trial ${trial}/${launches}"
-    SRTFLOW_PLAYBACK_START_OUT="${result}" SRTFLOW_PLAYBACK_START_MEDIA="${media}" SRTFLOW_SMOKE_MUTE=1 \
-      "${app}" -mainWindowSection videoEdit -ApplePersistenceIgnoreState YES -NSRecentDocumentsLimit 0 \
-      -optimizedMedia.previewMode original >"${log}" 2>&1 &
-    pid=$!
-    deadline=$((SECONDS + 45))
-    while kill -0 "${pid}" 2>/dev/null; do
-      if [ "${SECONDS}" -ge "${deadline}" ]; then
-        echo "Playback start trial ${trial} timed out" >&2
-        tail -n 50 "${log}" >&2
-        exit 1
-      fi
-      sleep 1
-    done
     status=0
-    wait "${pid}" || status=$?
-    pid=""
-    if [ "${status}" -ne 0 ] || [ ! -s "${result}" ]; then
+    launch "${destination}/trial-${trial}.json" "${destination}/trial-${trial}.log" || status=$?
+    if [ "${status}" -ne 0 ]; then
       echo "Playback start trial ${trial} did not write a result (exit ${status})" >&2
-      tail -n 50 "${log}" >&2
+      tail -n 50 "${destination}/trial-${trial}.log" >&2
       exit 1
     fi
   done
@@ -80,10 +89,20 @@ run_trials() {
   swift --version 2>&1
 } >"${out}/machine.txt"
 
+# The first launch of a freshly linked binary carries one-time system costs that opening a project never does again.
+# On hosted runners it froze or delayed the picture for seconds while later launches started in sync, so it runs the
+# same scenarios unscored. Its samples stay in the artifact and the summary (docs/architecture/playback-start.md).
+mkdir -p "${out}/warmup"
+warmup=0
+echo "Playback start warm-up launch (not scored)"
+launch "${out}/warmup/trial-1.json" "${out}/warmup/trial-1.log" || warmup=$?
+echo "Warm-up launch exit status ${warmup}"
+
 run_trials "${out}" 5
 
 status=0
-python3 checks/PlaybackStart/compare.py "${out}/summary.md" "${out}"/trial-[1-5].json || status=$?
+python3 checks/PlaybackStart/compare.py "${out}/summary.md" "${out}"/trial-[1-5].json \
+  --warmup "${out}/warmup/trial-1.json" || status=$?
 if [ "${status}" -ne 2 ]; then exit "${status}"; fi
 
 echo "Confirming hosted timing with three more launches. All eight count toward the verdict."
@@ -91,4 +110,4 @@ repeat="${out}/repeat"
 mkdir -p "${repeat}"
 run_trials "${repeat}" 3
 python3 checks/PlaybackStart/compare.py "${out}/confirmed-summary.md" \
-  "${out}"/trial-[1-5].json "${repeat}"/trial-[1-3].json --confirm
+  "${out}"/trial-[1-5].json "${repeat}"/trial-[1-3].json --confirm --warmup "${out}/warmup/trial-1.json"
