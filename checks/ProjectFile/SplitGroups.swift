@@ -33,6 +33,7 @@ func runSplitOutGroups(root: URL) {
         ("Web-motion source and disposable project caches", checkWebMotionProjectFiles),  // 50: WebMotion.swift
         ("Voice band: a clip's own 300 Hz-3 kHz lowered", checkVoiceBand),  // 51: VoiceBand.swift
         ("Sound role: what a clip's sound is, saved", checkSoundRole),  // 52: SoundRole.swift
+        ("The editing style a film was cut with", checkEditingStyle),  // 53: EditingStyle.swift
     ]
     for group in groups {
         do {

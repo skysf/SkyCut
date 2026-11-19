@@ -90,6 +90,7 @@ import SrtFlowMCPKit
             try await ListenGainChecks.run(f, root: root, require: require)
             try await SpeechDuckAppChecks.run(f, root: root, require: require)
             try await VoiceBandAppChecks.run(f, root: root, require: require)
+            try await EditingStyleAppChecks.run(f, require: require)
             CanvasLinkageChecks.run(f, require: require)
             try await EditingFeedbackChecks.run(f, root: root, ffmpeg: ffmpeg, require: require)
             try await BlackBarAppChecks.run(f, root: root, ffmpeg: ffmpeg, require: require)

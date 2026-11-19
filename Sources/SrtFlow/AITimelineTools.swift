@@ -30,6 +30,7 @@ enum AITimelineTools {
             // 这个工程的磁吸（跟着工程走）：开着时 V1 一改就合拢空隙，AI 放到 V1 的起点会被排紧。
             object["magnet"] = .bool(project.magnetEnabled)
             if !credits.isEmpty { object["music_credits"] = .array(credits.map { .string($0) }) }
+            object["editing_style"] = AIEditingStyleStamp.report(state)  // the style this film was cut with (SS5 plan 5.5)
             summary = .object(object)
         }
         return .ok(summary)

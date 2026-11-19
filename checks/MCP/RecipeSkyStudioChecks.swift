@@ -41,9 +41,10 @@ private func part(entitled: Bool = true, origin: AIRecipeSkyStudioPart.Origin = 
 }
 
 private func trailerRead(text: String = "# Film trailer\n\nThree acts.", cachedAt: Date? = nil,
-                         newer: String? = nil) -> AIRecipeSkyStudioPart.Read {
+                         newer: String? = nil, newerVersion: String? = nil) -> AIRecipeSkyStudioPart.Read {
     AIRecipeSkyStudioPart.Read(id: "film-trailer", title: "Film trailer", useFor: "A story trailer.", version: "1.0",
-                               sha256: String(repeating: "a", count: 64), text: text, cachedAt: cachedAt, checkedAgainstNewer: newer)
+                               sha256: String(repeating: "a", count: 64), text: text, cachedAt: cachedAt, checkedAgainstNewer: newer,
+                               newerVersion: newerVersion)
 }
 
 private func skyCatalogChecks() {
@@ -137,6 +138,16 @@ private func skyReadChecks(_ store: AIRecipeStore) {
     let cached = try? AIRecipeTools.recipes(args(["id": "film-trailer"]), store: store, builtIn: presets, sharedRules: shared,
                                             skyStudio: part(read: trailerRead(cachedAt: Date(timeIntervalSince1970: 1_795_000_000), newer: "0.20.0")))
     checkEqual(cached?.payload["cached"], .bool(true), "this Mac's copy says cached")
+    check(cached?.payload["newer_version"] == nil, "a film on the newest version hears of nothing newer")
+    // A film keeps the version it was cut with (SS5 plan 5.5): an older one read for it says newer_version and how to move.
+    let pinned = try? AIRecipeTools.recipes(args(["id": "film-trailer"]), store: store, builtIn: presets, sharedRules: shared,
+                                            skyStudio: part(read: trailerRead(newerVersion: "1.1")))
+    checkEqual(pinned?.payload["newer_version"]?.stringValue, "1.1", "a film on an older version hears of the newer one")
+    check(pinned?.payload["next_step"]?.stringValue?.contains("only if the user asks: recipes id=film-trailer version=latest") == true,
+          "and moves to it only when the user asks")
+    check(MCPToolName.recipes.takesProject, "recipes takes project: whose film's editing style it reads")
+    check(AIProjectBinding.usesProject(.recipes, args(["project": "p2"])), "recipes with project checks that project like any project call")
+    check(!AIProjectBinding.usesProject(.recipes, args(["id": "documentary"])), "recipes without project reads for the session's default film")
     checkEqual(cached?.payload["fetched_at"]?.stringValue, "2026-11-18T11:06:40Z", "and when it was fetched")
     check(cached?.payload["note"]?.stringValue?.contains("SkyCut 0.20.0") == true, "checked against a newer SkyCut: a note")
 

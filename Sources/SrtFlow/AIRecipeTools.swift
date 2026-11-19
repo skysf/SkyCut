@@ -9,7 +9,8 @@ import SrtFlowMCPKit
 // `recipes id=shared-rules` (MCPRecipeTools.sharedRulesID) returns only the shared rules, for edits in no style (2026-11-16).
 // Sky Studio's styles (2026-11-19, SS5 plan 5.1, 5.2) are listed with their version and, when one cannot be read now, why;
 // reading one returns its version, checksum and whether it came from this Mac's copy, followed by the shared rules when both
-// fit one answer (`answerLimit`), else alone with a pointer to recipes id=shared-rules. save_recipe refuses their names.
+// fit one answer (`answerLimit`), else alone with a pointer to recipes id=shared-rules. save_recipe refuses their names. A film
+// keeps the version it was cut with: reading an older one says `newer_version` (SS5 plan 5.5).
 // These answers are pure: the Sky Studio side is gathered first (AIRecipeSkyStudioPart, by AIRecipeSkyStudio).
 // 不管什么：卡的格式和合并（AIRecipe）、读写文件（AIRecipeStore）、设置里的列表（AIRecipeSettingsList，存完由路由叫它刷新）、
 // asking Sky Studio and the licence (AIRecipeSkyStudio, SkyStudioStyleLibrary).
@@ -115,8 +116,13 @@ enum AIRecipeTools {
             object["note"] = .string("This style was checked against SkyCut \(newer) and this SkyCut is older: a call it suggests may "
                 + "fail. If one does, tell the user to update SkyCut.")
         }
-        let follow = "This style is from Sky Studio (\(read.title) \(read.version)): follow it for this video, and the user's own "
+        var follow = "This style is from Sky Studio (\(read.title) \(read.version)): follow it for this video, and the user's own "
             + "words win. It is not the user's: never save it, or a copy of it, with save_recipe."
+        if let newer = read.newerVersion {
+            object["newer_version"] = .string(newer)
+            follow += " This film keeps \(read.version); Sky Studio has \(newer). Move to it only if the user asks: recipes id=\(read.id) "
+                + "version=latest."
+        }
         object["text"] = .string(sharedRules.isEmpty ? read.text : read.text + "\n\n" + sharedRules)
         object["next_step"] = .string(follow)
         if !sharedRules.isEmpty, JSONValue.object(object).encodedString().utf16.count > answerLimit {

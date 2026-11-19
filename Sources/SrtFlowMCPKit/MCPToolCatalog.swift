@@ -91,11 +91,11 @@ public enum MCPToolName: String, CaseIterable, Sendable {
     /// 改 / 读工程内容的、默认值跟着工程走的都收。只碰文件、设置、任务的不收；open_project / new_project 是开工程的，回 id、不收。
     public var takesProject: Bool {
         switch self {
-        case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
+        case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .saveRecipe, .manageFiles, .openProject, .newProject, .findAudio,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .listVoices, .manageVoices:
             return false
-        // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。
-        case .setView, .generateMedia, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
+        // set_view：带 project 只改那一个，不带改这个会话的默认（方案 F 节）。recipes: whose film's editing style (SS5 plan 5.5).
+        case .setView, .recipes, .generateMedia, .closeProject, .saveProject, .getTimeline, .look, .listen, .inspectVideo, .transcribe, .addVoiceover, .recordScreen,
              .changeVoice,
              .upscaleClip, .addClips, .editClip, .editClips, .syncVoiceover, .setKeyframes, .setTrack, .splitClip, .freezeFrame, .cutSpeech, .cutToBeat,
              .deleteItems, .duplicateItems, .setTransition, .setText, .setMotion, .setTexts, .setShape, .setShapes, .setFilter, .setCanvas, .generateSubtitles,

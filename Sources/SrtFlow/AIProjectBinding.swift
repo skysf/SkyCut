@@ -22,14 +22,15 @@ enum AIProjectBinding {
     /// open_project / new_project / close_project 是开、关工程的：另走一条（AIProjectOpenTools），做成了小程序跟着记。只碰文件、设置、任务的不查。
     static func usesProject(_ tool: MCPToolName, _ args: AIToolArguments) -> Bool {
         switch tool {
-        case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio,
+        case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .saveRecipe, .manageFiles, .findAudio,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .listVoices, .manageVoices,
              .openProject, .newProject, .closeProject:
             return false
         case .generateMedia:
             return (try? args.bool("prepare_references")) == true || ["film", "prepared_references", "quote_token", "seam_review"].contains(where: args.has)
-        case .setView:
+        case .setView, .recipes:
             // 带 project 只改那一个（要核对是这个会话的）；不带改这个会话的默认和它开着的工程，不落在某一个上。
+            // recipes: an explicit project is checked like any project call; without one it reads for the session's default film.
             return args.has("project")
         case .look:
             return !args.has("file") && !args.has("files")

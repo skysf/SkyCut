@@ -30,7 +30,7 @@ func checkSoundRole(root: URL) throws {
     let text = try String(contentsOf: file, encoding: .utf8)
     checkEqual(text.components(separatedBy: "\"soundRole\"").count - 1, 1, "only the clip with a saved role writes the key")
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-    checkEqual(raw?["formatVersion"] as? Int, 39, "a project with a saved sound role writes v39")
+    checkEqual(raw?["formatVersion"] as? Int, 40, "a project with a saved sound role writes the latest v40 (includes the v39 gate)")
     let loaded = try VideoEditProjectIO.load(from: file).timeline
     checkEqual(loaded.clip(with: clang.id)?.soundRole, .object, "the saved role survives a round trip")
     check(loaded.clip(with: plain.id)?.soundRole == nil, "a clip without the key has nothing saved (inferred)")

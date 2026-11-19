@@ -783,6 +783,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      without Show in Finder / Delete; Your style); AI still picks, the user names one in words. The answers are pure
      (`AIRecipeSkyStudioPart` gathered first by `AIRecipeSkyStudio`); `RecipeSkyStudioChecks` builds those parts by hand. Fetching,
      copies on this Mac and who may read them: [Sky Studio account](sky-studio-account.md), "Sky Studio's editing styles".
+     ⑥ **The film records its style** (FL-15, D8): `recipes` takes the shared `project` (whose film; an explicit one is checked like
+     any project call). The session's next change to that film records the style it read (`TimelineState.editingStyle`, v40) in
+     the change's own undo step, never a read-only call ([project file](video-edit-project-file.md), "The editing style a film was
+     cut with"). Reading a Sky Studio style again for that film returns the recorded version (even one Sky Studio no longer lists),
+     with `newer_version` and a pointer to `version=latest`, used only when the user asks; `get_timeline` reports `editing_style`.
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -1668,7 +1673,9 @@ project's distinct on-screen clip and picture, cancellation / Stop, explicit-pro
       AI names the style and its version; Settings → Editing & Voices lists it as "Sky Studio · <version>" between the presets and
       your own, in English, 简体中文 and Español at the default window size. Offline after one read it reads this Mac's copy
       (`cached`, `fetched_at`); asking it to save the style under its own name is refused. With an account without
-      `features.recipes` the row says "needs SkyCut Pro" and reading it is refused with what to do.
+      `features.recipes` the row says "needs SkyCut Pro" and reading it is refused with what to do. Ask which style and version
+      the project uses: `get_timeline`'s `editing_style` names it; after Sky Studio publishes a newer version, reading the style
+      again for that project stays on the old one and mentions the newer.
 - [ ] 电影开头的上下黑条（实心长方形）：预览和导出的成片里都是整块黑、上下一样高；检查器里「实心」开关打开时线宽那一行消失。
       用 0.16.1 打开这个工程：因为是 v24，它拒绝打开，不会把黑条悄悄变成一圈描边。
 - [ ] 让 AI 加一个从 0 滚到 10,000+ 的数字：预览里老虎机滚到位；让它「变回文字」之后画面上留着「10,000+」。

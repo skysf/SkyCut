@@ -26,7 +26,7 @@ enum ProjectDurationChecks {
         let destination = root.appendingPathComponent("explicit-ending.skycut")
         try VideoEditProjectIO.save(state, to: destination)
         let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: destination)) as! [String: Any]
-        checkEqual(raw["formatVersion"] as? Int, 39, "the explicit ending is protected from older writers (latest v39 includes the v37 gate)")
+        checkEqual(raw["formatVersion"] as? Int, 40, "the explicit ending is protected from older writers (latest v40 includes the v37 gate)")
         checkEqual((raw["timeline"] as? [String: Any])?["minimumDuration"] as? Double, 141,
                    "the explicit ending is stored in the timeline")
         let restored = try VideoEditProjectIO.load(from: destination).timeline
@@ -47,8 +47,8 @@ enum ProjectDurationChecks {
               "clearing the ending removes its optional key and follows content again")
 
         // Keep this an external version truth, rather than comparing the writer's constant to itself.
-        let future = root.appendingPathComponent("v40.skycut")
-        try Data("{\"formatVersion\":40,\"timeline\":{},\"media\":[]}".utf8).write(to: future)
-        check((try? VideoEditProjectIO.load(from: future)) == nil, "the reader rejects the next unsupported format v40")
+        let future = root.appendingPathComponent("v41.skycut")
+        try Data("{\"formatVersion\":41,\"timeline\":{},\"media\":[]}".utf8).write(to: future)
+        check((try? VideoEditProjectIO.load(from: future)) == nil, "the reader rejects the next unsupported format v41")
     }
 }

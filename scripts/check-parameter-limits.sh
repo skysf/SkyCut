@@ -25,7 +25,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ParameterLimits/EditingFeedbackChecks.swift checks/ParameterLimits/Main.swift \
   checks/ParameterLimits/AddClipsChecks.swift checks/ParameterLimits/CanvasLinkageChecks.swift \
   checks/ParameterLimits/ListenGainChecks.swift checks/ParameterLimits/SpeechDuckAppChecks.swift \
-  checks/ParameterLimits/VoiceBandAppChecks.swift \
+  checks/ParameterLimits/VoiceBandAppChecks.swift checks/ParameterLimits/EditingStyleAppChecks.swift \
   checks/ParameterLimits/MusicPlacementChecks.swift \
   checks/ParameterLimits/TimeBoundChecks.swift checks/ParameterLimits/TimeBoundCatalog.swift \
   checks/ParameterLimits/TimeBoundEdgeChecks.swift \

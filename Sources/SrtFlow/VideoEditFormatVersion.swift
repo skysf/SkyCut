@@ -481,5 +481,8 @@ extension TimelineState {
     /// v39 keeps a clip's saved sound role (`EditClip.soundRole`, 2026-11-19, omitted when nil): an older writer would drop it
     /// and the delivery checks would fall back to guessing what that sound is.
     var requiresFormatVersion39: Bool { allClips.contains { $0.soundRole != nil } }
+    /// v40 keeps the editing style the film was cut with (`TimelineState.editingStyle`, 2026-11-19, omitted when nil): an older
+    /// writer would drop it, and the film would silently move to a Sky Studio style's newest version (SS5 plan D8, FL-15).
+    var requiresFormatVersion40: Bool { editingStyle != nil }
 
 }

@@ -108,6 +108,7 @@ Finder**。App 只负责「快速回到最近那几条」。
 | v37 | `TimelineState.minimumDuration` (2026-11-17, omitted when zero) | Older writers would discard an explicit ending and shorten the film. Missing keys retain the old content-driven length. |
 | v38 | `EditClip.voiceBandDB` — a clip's own 300 Hz–3 kHz lowered (2026-11-18, omitted at 0) | Older writers would drop the cut and the clip's sound in the film would change. Missing key = no cut; the reader cleans it (non-finite → 0, clamped to −30…0). See [sound scenes](sound-scenes.md) section 5. |
 | v39 | `EditClip.soundRole` — what a clip's sound is, saved (voice / music / effects / ambience / object; 2026-11-19, omitted when nothing is saved) | Older writers would drop the saved roles and the delivery checks would fall back to guessing from where each clip came from; the film itself never changes. Missing key or a value this build doesn't know = nothing saved (inferred). Split halves and separated sound carry it. See [finished-video inspection](finished-video-inspection.md), "Saved sound roles". |
+| v40 | `TimelineState.editingStyle` — the editing style the film was cut with (2026-11-19, omitted when nil; `EditingStyleRecord` in SrtFlowCore) | Older writers would drop it and the film would silently move to a Sky Studio style's newest version (the user's decision D8: a film keeps its version). Missing key = no record; a record without id, source or checksum is dropped and the project still opens. See below. |
 
 > 2026-10-16 `BurnInStyle.lineSpacing`（字幕行距，见 [字幕轨可见性与布局](subtitle-track-visibility-and-layout.md)「工程自己的样式」第 3 条）
 > 加进了 `projectSubtitleStyle` 的 JSON 里，**没有 +1 版本**：缺键读 1 就是以前的样子（成片不变），老版本读到不认识的键忽略、随手保存
@@ -163,6 +164,19 @@ audio/preview/version data flow, and real preview/export black frames and durati
 
 - [ ] Before a release, retain a black ending from the editor's AI connection, scrub to the end, export, undo/redo, save and
   reopen. The displayed/project length and the export agree, with no placeholder block on the timeline.
+
+### The editing style a film was cut with (v40, 2026-11-19)
+
+`TimelineState.editingStyle` records the editing style the AI followed (SS-5, FL-15; [AI control](ai-control-mcp.md) item 32): a
+Sky Studio style's id, version and text checksum (pinned: reading it again for this film returns exactly that version, matched on id,
+version and checksum and never on the text alone, until the user moves it with `version=latest`), or a preset's / the user's own id, source, SkyCut version and checksum (recorded, never pinned).
+It is part of the timeline, so it goes with undo, the round's undo and saved versions. It is written only inside an AI change:
+`recipes` notes what a session read for a project (`AIEditingStyleStamp.noteRead`), and that session's next `perform` on the project
+that changes something puts the record into the same final state (`AIEditingStyleStamp.stamped`), one undo step with the change.
+No read-only call, user edit or later asynchronous landing writes it. `get_timeline` reports it as `editing_style`, with
+`newer_version` when Sky Studio lists a newer one. Guards: `scripts/check-project-file.sh` group 53 (gate, key only with a record,
+round trips, missing key, a broken record dropped), `scripts/check-parameter-limits.sh` `EditingStyleAppChecks` (real edit_clip:
+recorded in the same undo step; another session, a user edit or a no-op records nothing), `checks/sky-studio-wiring/styles.sh`.
 
 ### Opening a project repairs link groups (2026-11-17)
 

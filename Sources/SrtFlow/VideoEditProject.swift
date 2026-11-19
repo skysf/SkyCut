@@ -424,7 +424,7 @@ final class VideoEditProject {
 
     // MARK: - 所有修改的必经之路
 
-    /// 一步到位的修改：登记撤销、磁吸排列、联动、重建预览。
+    /// 一步到位的修改：登记撤销、磁吸排列、联动、重建预览；an AI change also records the editing style it followed (AIEditingStyleStamp).
     /// `rebuildsPreview: false` 给只影响叠层（形状）不影响 AV 合成的改动。
     /// `deletesContent`：这次是真删（⌫、AI 的 delete_items / cut_speech）—— 联动开着时压在被删画面上的东西一起删；
     /// 别的改动（裁切、变速）让画面没了的留在原地，只有说的话被裁掉的字幕句照样删（docs/architecture/timeline-linkage.md）。返回联动挪了 / 删了几样。
@@ -449,7 +449,7 @@ final class VideoEditProject {
         guard next != before else { return linkage }
         let audioOnly = next.differsOnlyInAudioMix(from: before)
         registerUndo(before)
-        state = next
+        state = AIEditingStyleStamp.stamped(next, project: shortID)
         if rebuildsPreview {
             // 只动了音量/渐变就别重建：重建要 replaceCurrentItem，画面会闪一下。
             if audioOnly, refreshAudioMix() { return linkage }
