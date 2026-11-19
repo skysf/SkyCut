@@ -28,7 +28,7 @@ import SwiftUI
         let first = try await check.trailingButton(onRow: "Export to")
         try await check.click(first)
         do {
-            try await eventually("The chosen folder did not reach the export destination") {
+            try await check.wait("the chosen folder to reach the export destination") {
                 destination.folder.path == fromPanel.path && remembered == [fromPanel.path]
             }
         } catch {
@@ -40,11 +40,11 @@ import SwiftUI
         }
 
         try await check.click(check.trailingButton(onRow: "Export to"))
-        try await eventually("The empty panel callback did not offer a fallback") { chooser.phase == .failed(.returnedAtOnce) }
+        try await check.wait("the empty panel callback to offer a fallback") { chooser.phase == .failed(.returnedAtOnce) }
         _ = try await check.text("Use This Folder")
         try check.type(fromText.path, replacing: fromPanel.path)
         try await check.click("Use This Folder")
-        try await eventually("The typed fallback did not set and remember its folder") {
+        try await check.wait("the typed fallback to set and remember its folder") {
             destination.folder.path == fromText.path && chooser.phase == .idle && remembered == [fromPanel.path, fromText.path]
         }
         let occupied = fromText.appendingPathComponent("Cut.mp4")

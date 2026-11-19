@@ -11,9 +11,13 @@ import Foundation
             AppLanguageStore.shared.language = .english
             let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
             let page = try String(contentsOfFile: CommandLine.arguments[2], encoding: .utf8)
+            note("Starting export folder")
             try await ExportFolderGUI.check(root)
+            note("Starting Versions")
             try await VersionsGUI.check(project("versions", in: root))
+            note("Starting native motion")
             try await MotionGUI.native(project("native-motion", in: root))
+            note("Starting web motion")
             try await MotionGUI.web(project("web-motion", in: root), page: page)
         } catch {
             FileHandle.standardError.write(Data("SkyCut GUI E2E failed: \(error)\n".utf8))

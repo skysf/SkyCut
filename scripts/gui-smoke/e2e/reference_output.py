@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import subprocess
+import tempfile
 
 from mix_export import ff, near
 from reference_edits import inspect, read, read_mix, subtitles
@@ -115,6 +116,24 @@ def tone_db(samples, start, frequency):
     return round(20 * math.log10(max(0.001, 2 * magnitude / len(wave))), 2)
 
 
+def decoded_audio(ffmpeg, movie):
+    raw = ff(ffmpeg, "-v", "error", "-i", movie, "-vn", "-ac", 1, "-ar", RATE, "-f", "f32le", "pipe:1",
+             stdout=subprocess.PIPE).stdout
+    samples = array("f")
+    samples.frombytes(raw)
+    return samples
+
+
+def require_voice_band_cut(delivered, source):
+    # The outer tones account for the common gain of the mix, limiter and channel conversion.
+    low, middle, high = [out - original for out, original in zip(delivered, source)]
+    attenuation = (low + high) / 2 - middle
+    assert 8 <= attenuation <= 16, (
+        f"Delivered 960 Hz voice cut should be 8–16 dB relative to 100 and 4000 Hz, got {attenuation:.2f} dB "
+        f"(decoded AAC {delivered}, original narration {source})"
+    )
+
+
 def read_sound_evidence(session, finished, movie, ffmpeg):
     # Four layers with per-frame bands fit on the wire over the four seconds containing both hits.
     result = read_mix(session, ["A3", "A4", "A5", "rest"], **{"from": 0, "to": 4})
@@ -123,22 +142,23 @@ def read_sound_evidence(session, finished, movie, ffmpeg):
     a5 = frames["A5"]["db"]
     assert abs(a4.index(max(a4)) - 48) <= 1, "The music accent does not sound on the requested frame"
     assert max(a5) > -40 and max(a5[82:87]) == max(a5), "The made effect did not sound at its requested hit"
-    raw = ff(ffmpeg, "-v", "error", "-i", movie, "-vn", "-ac", 1, "-ar", RATE, "-f", "f32le", "pipe:1",
-             stdout=subprocess.PIPE).stdout
-    samples = array("f")
-    samples.frombytes(raw)
+    samples = decoded_audio(ffmpeg, movie)
+    voice_frequencies = (100, 960, 4000)
     # The two camera tones are both audible before and after the picture cut, only inside the fade.
     bands = {
         "before cut": [tone_db(samples, 1.6, hz) for hz in (240, 360)],
         "fade into cut": [tone_db(samples, 1.875, hz) for hz in (240, 360)],
         "fade out of cut": [tone_db(samples, 2.025, hz) for hz in (240, 360)],
         "after cut": [tone_db(samples, 2.3, hz) for hz in (240, 360)],
-        "voice band": [tone_db(samples, 0.65, hz) for hz in (100, 960, 4000)],
+        "voice band": [tone_db(samples, 0.65, hz) for hz in voice_frequencies],
         "ducking": [tone_db(samples, at, 120) for at in (0.65, 5.30)],
     }
     assert bands["fade into cut"][1] > bands["before cut"][1] + 12, bands
     assert bands["fade out of cut"][0] > bands["after cut"][0] + 12, bands
     assert bands["ducking"][1] > bands["ducking"][0] + 7, bands["ducking"]
+    narrator = decoded_audio(ffmpeg, movie.with_name("narrator.wav"))
+    # Narration starts at 0.25 s in the cut, so these windows cover the same samples.
+    require_voice_band_cut(bands["voice band"], [tone_db(narrator, 0.40, hz) for hz in voice_frequencies])
     return {
         "range": [result["mix"]["from"], result["mix"]["to"]],
         "levels": {layer["name"]: [layer["level_db"], layer["peak_db"]] for layer in result["layers"]},
@@ -186,11 +206,19 @@ def encode(value):
 
 
 def record_or_compare(measured, update):
+    baseline = GOLDEN.read_text(encoding="utf-8")
     if update:
-        GOLDEN.write_text(encode(measured), encoding="utf-8")
-        print(f"Wrote {GOLDEN}; review the diff", flush=True)
-        return
-    expected = json.loads(GOLDEN.read_text())
+        candidate = encode(measured)
+        folder = Path(tempfile.mkdtemp(prefix="skycut-golden.", dir="/tmp"))
+        new_file = folder / "reference_golden.candidate.json"
+        diff_file = folder / "reference_golden.diff"
+        difference = difflib.unified_diff(baseline.splitlines(keepends=True), candidate.splitlines(keepends=True),
+                                          fromfile=GOLDEN.name, tofile=new_file.name)
+        new_file.write_text(candidate, encoding="utf-8")
+        diff_file.write_text("".join(difference) or "Candidate matches the committed golden.\n", encoding="utf-8")
+        print(f"Golden candidate: {new_file}\nReview diff: {diff_file}", flush=True)
+        return new_file, diff_file
+    expected = json.loads(baseline)
     if measured["timeline"] != expected["timeline"]:
         difference = difflib.unified_diff(encode(expected["timeline"]).splitlines(), encode(measured["timeline"]).splitlines())
         raise AssertionError("Reference timeline changed\n" + "\n".join(difference))
