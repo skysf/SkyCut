@@ -35,6 +35,10 @@ struct ScreenRecordingOptions {
     /// 那个顺序是「先被系统 picker 的 Cancel / Share Entire Screen 问一次，
     /// 再被保存面板问一次」，用户不知道自己走到哪一步了（真机首测反馈）。
     var outputURL: URL?
+    /// The person confirmed replacing a file already at exactly `outputURL` (macOS's own save window asked). Not for a
+    /// typed or dropped answer in the file-window helper, nor for the pre-filled name: a file there is then avoided
+    /// ("Name 2") instead of replaced (docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md).
+    var replacesExistingOutput = false
 }
 
 /// AI 已经挑好的来源。

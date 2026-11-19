@@ -80,7 +80,7 @@ enum AIProjectOpenTools {
         let project: VideoEditProject
         if inFront, sessions.primaryIsFree(for: session) {
             await primary.startNewProject()
-            guard primary.documentURL == nil, primary.state.isEmpty, await primary.saveAs(url) else {
+            guard primary.documentURL == nil, primary.state.isEmpty, await primary.saveAs(url, replacing: false) else {
                 throw AIToolError(primary.notice ?? "SkyCut could not save the new project to \(url.path).")
             }
             project = primary

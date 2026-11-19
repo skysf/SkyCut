@@ -872,6 +872,7 @@
 "Choose the folder to export into" = "Choose the folder to export into";
 "“%@” is already in this folder. Exporting will replace it." = "“%@” is already in this folder. Exporting will replace it.";
 "Replace “%@”?" = "Replace “%@”?";
+"A file with this name is already in “%@”. Replacing it overwrites that file." = "A file with this name is already in “%@”. Replacing it overwrites that file.";
 "Choose the folder to export into, or drag a folder here from Finder" = "Choose the folder to export into, or drag a folder here from Finder";
 "Choose" = "Choose";
 "Choose a folder in the macOS window. If that window stops responding, close it here." = "Choose a folder in the macOS window. If that window stops responding, close it here.";
