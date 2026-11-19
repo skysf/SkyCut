@@ -485,16 +485,18 @@
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
 - Ducking under speech (`set_track duck_others_db`, MCP-29): `scripts/check-mcp.sh` → `SpeechDuckChecks` (windows and merging;
   the dip on flat, sloped and bumped lines, 2× speed, the volume floor; calling again with the same / another depth / 0 and with
-  a bump drawn after the duck; windows across a clip's start and end; a clip inside a line; which clips dip; lines from pauses;
-  the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
-  file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
+  a bump drawn after the duck; windows across a clip's start and end; a clip only the shallow start of a ramp reaches, set and
+  never stacked; a clip inside a line; which clips dip; lines from pauses; the result; the schema's range);
+  `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration file's lines from its waveform, the
+  exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
   [volume curve](../architecture/audio-volume-curve.md) section 5.
 - A clip's voice-band cut (`edit_clip voice_band_db`, MCP-30): `scripts/check-audio-engine.sh` group 16 → `VoiceBand.swift` (the
   filter on steady sines: lows and highs kept, 1 kHz down by the depth, gain 1 flat, blocks = one run; the engine's offline render
-  of a three-tone clip; a cut through `updateGains`, not structure); `scripts/check-project-file.sh` group 51 (cleaning, v38, round
-  trip, split, separated sound, audio-only change); `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh`
-  → `VoiceBandAppChecks` (edit_clip's real plan / apply, the export mixdown per tone, one undo). Rules in
-  [sound scenes](../architecture/sound-scenes.md) section 5.
+  of a three-tone clip; a cut through `updateGains`, not structure), group 16b → `VoiceBandLive.swift` (the cut set on and back
+  to 0 between continuous blocks: back at 0 the live mix is the export's sample for sample, no click either way);
+  `scripts/check-project-file.sh` group 51 (cleaning, v38, round trip, split, separated sound, audio-only change);
+  `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh` → `VoiceBandAppChecks` (edit_clip's real
+  plan / apply, the export mixdown per tone, one undo). Rules in [sound scenes](../architecture/sound-scenes.md) section 5.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered
