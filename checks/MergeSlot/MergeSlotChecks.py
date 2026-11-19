@@ -133,6 +133,14 @@ check("one at a time: every merge was tested on the main it landed on", len(gh.m
 never_merged_untested("order", gh)
 
 gh, slot = world()
+gh.open_pull(1, workflow=True)  # 2026-11-19, #527: the workflow token can't write .github/workflows/
+gh.open_pull(2, labeled_minutes=1)
+serve(slot, gh)
+check("a PR that changes .github/workflows/ leaves with the by-hand path, before any test merge",
+      any("workflow" in c and "by hand" in c for c in gh.comments.get(1, [])) and gh.merges_made == 1, (gh.comments, gh.merges_made))
+check("…and the next PR goes on", [n for n, _ in gh.merged] == [2], gh.merged)
+
+gh, slot = world()
 gh.open_pull(1, mergeable=False)
 gh.open_pull(2, labeled_minutes=1, check="failure")
 gh.open_pull(3, labeled_minutes=2, draft=True)

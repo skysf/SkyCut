@@ -791,6 +791,12 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
      run's failed jobs can still prove the tree.
   5. It merges with `--merge`, the head pinned, only while main is still X's first parent. Then it dispatches
      `checks.yml` on main and deletes the PR's branch and `merge-slot/pr-<N>`.
+- **PRs that change `.github/workflows/` can't use the slot.** GitHub doesn't let the workflow token create or update
+  workflow files, so the slot can neither build their test merge nor merge them. It reads each PR's files and sends
+  such a PR back at once with the by-hand path: merge origin/main into the branch, push, and once `check-all` is green
+  run `gh pr merge N --merge` at once; merge main again first if main moved in between
+  ([case](../bugfixes/2026-11-20-merge-slot-cannot-write-workflow-files.md)). These are rare (CI changes). The window
+  between their green run and the hand merge is the one place two merges can still race.
 - **The workflow token.** The slot merges with `GITHUB_TOKEN`, and a merge made with it starts no push run. So the slot
   dispatches `checks.yml` on main itself. `scripts/ci-docs-only.sh` and `scripts/ci-verified-tree.sh` treat that run
   like a push: never docs-only, and the usual verified short run when a marker proves the tree. The cache is saved on
@@ -809,6 +815,7 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   slot test, which costs what a pull_request run does.
 - `checks/MergeSlot/MergeSlotChecks.py` runs the slot against an in-memory GitHub (`FakeGitHub.py`) and pins both
   workflows. The fake copies GitHub's quirk that broke the first version: the test merge isn't recomputed when main
-  moves. Reverse verification on 2026-11-20: 23 mutations of the script each turned it red. Among them: merging without
-  proof, skipping the last main check, reusing a test merge for another main or head, rebuilding it every pass, an
-  unpinned head, FIFO by number, not holding the slot during a test, and squash.
+  moves, and its token can't write workflow files. Reverse verification on 2026-11-20: 24 mutations of the script each
+  turned it red. Among them: merging without proof, skipping the last main check, reusing a test merge for another main
+  or head, rebuilding it every pass, not detecting a workflow PR, an unpinned head, FIFO by number, not holding the
+  slot during a test, and squash.

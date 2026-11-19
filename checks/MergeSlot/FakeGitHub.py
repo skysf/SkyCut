@@ -46,7 +46,8 @@ class FakeGitHub:
         self.commits[sha] = {"parents": parents, "tree": tree}
         return sha
 
-    def open_pull(self, number, check="success", labeled_minutes=0, fork=False, draft=False, mergeable=True):
+    def open_pull(self, number, check="success", labeled_minutes=0, fork=False, draft=False, mergeable=True,
+                  workflow=False):
         head = self.commit([self.main], f"tree-head-{number}")
         self.pulls[number] = {
             "number": number, "state": "open", "draft": draft, "merged": False,
@@ -54,6 +55,7 @@ class FakeGitHub:
             "head": {"sha": head, "ref": f"topic-{number}", "repo": {"full_name": "fork/r" if fork else REPO}},
             "base": {"ref": "main", "repo": {"full_name": REPO}},
             "mergeable": mergeable, "merge_commit_sha": None,
+            "files": [".github/workflows/checks.yml"] if workflow else [f"docs/change-{number}.md"],
         }
         self.label_events[number] = [stamp(START + dt.timedelta(minutes=labeled_minutes))]
         self.set_check(head, check)
@@ -134,6 +136,10 @@ class FakeGitHub:
         route = route[len(prefix):]
         if method == "GET" and route == "pulls":
             return [p for p in self.pulls.values() if p["state"] == "open"]
+        if m := re.fullmatch(r"pulls/(\d+)/files", route):
+            page = int(query.get("page", "1"))
+            files = self.pulls[int(m.group(1))]["files"]
+            return [{"filename": f} for f in files[(page - 1) * 100:page * 100]]
         if m := re.fullmatch(r"pulls/(\d+)", route):
             # Like GitHub: the test merge (merge_commit_sha) is recomputed for new commits, not when main moves.
             return self.pulls[int(m.group(1))]
@@ -229,6 +235,9 @@ class FakeGitHub:
         number = self.number_of(body["head"])
         if self.pulls[number]["mergeable"] is False:
             raise self.error(409, "Merge conflict")
+        if any(f.startswith(".github/workflows/") for f in self.pulls[number]["files"]):
+            # Like GitHub: the workflow token may not create or update workflow files (2026-11-19, #527).
+            raise self.error(409, "refusing to allow a GitHub App to create or update workflow without workflows permission")
         self.merges_made += 1
         sha = self.commit([base, body["head"]], self.merged_tree(base, body["head"]))
         self.refs[body["base"]] = sha
@@ -240,6 +249,8 @@ class FakeGitHub:
         assert body["merge_method"] == "merge", body
         if body.get("sha", pull["head"]["sha"]) != pull["head"]["sha"]:  # without sha, GitHub merges the head it has
             raise self.error(409, "Head branch was modified")
+        if any(f.startswith(".github/workflows/") for f in pull["files"]):
+            raise self.error(403, "Resource not accessible by integration")
         if self.refuse_merge:
             self.refuse_merge -= 1
             raise self.error(405, "Required status check check-all is failing")
