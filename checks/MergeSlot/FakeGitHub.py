@@ -32,9 +32,10 @@ class FakeGitHub:
         self.dispatches, self.merged, self.deleted, self.overlaps = [], [], [], []
         self.outcomes = {}  # ref -> conclusion its next dispatched runs get
         self.refuse_merge = 0  # how many merges GitHub refuses with 405 before accepting
-        self.race = False  # move main (unseen) right after the slot reads a test merge commit
-        self.head_race = False  # push a new head right after the slot reads a test merge commit
+        self.race = False  # someone merges by hand right before the slot merges
+        self.head_race = False  # a new head is pushed right before the slot merges
         self.frozen = 0  # ticks during which GitHub doesn't recompute test merge commits
+        self.merges_made = 0  # POST /merges calls that made a commit
         self.lost_markers = set()  # refs whose green runs fail to upload their marker (the upload is continue-on-error)
         self.on_tick = None  # a scenario hook: called with this fake on every tick
         self.calls = []
@@ -45,7 +46,8 @@ class FakeGitHub:
         self.commits[sha] = {"parents": parents, "tree": tree}
         return sha
 
-    def open_pull(self, number, check="success", labeled_minutes=0, fork=False, draft=False, mergeable=True):
+    def open_pull(self, number, check="success", labeled_minutes=0, fork=False, draft=False, mergeable=True,
+                  workflow=False):
         head = self.commit([self.main], f"tree-head-{number}")
         self.pulls[number] = {
             "number": number, "state": "open", "draft": draft, "merged": False,
@@ -53,6 +55,7 @@ class FakeGitHub:
             "head": {"sha": head, "ref": f"topic-{number}", "repo": {"full_name": "fork/r" if fork else REPO}},
             "base": {"ref": "main", "repo": {"full_name": REPO}},
             "mergeable": mergeable, "merge_commit_sha": None,
+            "files": [".github/workflows/checks.yml"] if workflow else [f"docs/change-{number}.md"],
         }
         self.label_events[number] = [stamp(START + dt.timedelta(minutes=labeled_minutes))]
         self.set_check(head, check)
@@ -64,7 +67,7 @@ class FakeGitHub:
         pull = self.pulls[number]
         if pull["mergeable"] is not False:
             pull["merge_commit_sha"] = self.commit([self.main, pull["head"]["sha"]],
-                                                   f"tree-{self.commits[self.main]['tree']}+{number}")
+                                                   self.merged_tree(self.main, pull["head"]["sha"]))
 
     def set_check(self, sha, conclusion):
         status = "in_progress" if conclusion is None else "completed"
@@ -133,34 +136,42 @@ class FakeGitHub:
         route = route[len(prefix):]
         if method == "GET" and route == "pulls":
             return [p for p in self.pulls.values() if p["state"] == "open"]
+        if m := re.fullmatch(r"pulls/(\d+)/files", route):
+            page = int(query.get("page", "1"))
+            files = self.pulls[int(m.group(1))]["files"]
+            return [{"filename": f} for f in files[(page - 1) * 100:page * 100]]
         if m := re.fullmatch(r"pulls/(\d+)", route):
-            pull = self.pulls[int(m.group(1))]
-            merge = pull["merge_commit_sha"]
-            if pull["state"] == "open" and merge and not self.frozen and self.commits[merge]["parents"][:2] != [
-                    self.main, pull["head"]["sha"]]:
-                self.refresh(pull["number"])  # GitHub recomputes the test merge when the pull request is read
-            return pull
+            # Like GitHub: the test merge (merge_commit_sha) is recomputed for new commits, not when main moves.
+            return self.pulls[int(m.group(1))]
         if m := re.fullmatch(r"issues/(\d+)/events", route):
             return [{"event": "labeled", "label": {"name": "merge-slot"}, "created_at": t}
                     for t in self.label_events[int(m.group(1))]]
-        if route == "git/ref/heads/main":
-            return {"object": {"sha": self.main}}
+        if m := re.fullmatch(r"git/ref/heads/(.+)", route):
+            ref = m.group(1)
+            if ref == "main":
+                return {"object": {"sha": self.main}}
+            if ref not in self.refs:
+                raise self.error(404, "Not Found")
+            return {"object": {"sha": self.refs[ref]}}
+        if route == "merges" and method == "POST":
+            return self.merge_api(body)
         if m := re.fullmatch(r"commits/([0-9a-f]+)/check-runs", route):
             assert query.get("check_name") == "check-all", path
             return {"check_runs": self.checks.get(m.group(1), [])}
         if m := re.fullmatch(r"commits/([0-9a-f]+)", route):
             c = self.commits[m.group(1)]
-            if self.race and len(c["parents"]) == 2:
-                self.race = False
-                self.main = self.commit([self.main], "tree-raced")  # a human merge GitHub hasn't propagated yet
-            if self.head_race and len(c["parents"]) == 2:
-                self.head_race = False
-                for pull in self.pulls.values():
-                    if pull["merge_commit_sha"] == m.group(1):
-                        pull["head"]["sha"] = self.commit([self.main], "tree-raced-head")
-                        self.set_check(pull["head"]["sha"], "success")
             return {"sha": m.group(1), "parents": [{"sha": p} for p in c["parents"]], "commit": {"tree": {"sha": c["tree"]}}}
         if route == "actions/artifacts":
+            # The marker lookup is the slot's last read before it merges: the races strike here.
+            if self.race:
+                self.race = False
+                self.main = self.commit([self.main], "tree-raced")  # someone merges by hand
+            if self.head_race:
+                self.head_race = False
+                for pull in self.pulls.values():
+                    if pull["state"] == "open":
+                        pull["head"]["sha"] = self.commit([self.main], f"tree-raced-head-{pull['number']}")
+                        self.set_check(pull["head"]["sha"], "success")
             ids = self.markers.get(query["name"], [])
             return {"artifacts": [{"expired": False, "workflow_run": {"id": i, "repository_id": 1, "head_repository_id": 1}}
                                   for i in ids]}
@@ -211,22 +222,42 @@ class FakeGitHub:
             return None
         raise AssertionError(f"the fake doesn't know {method} {path}")
 
+    def merged_tree(self, base, head):
+        """A merge's tree is named by both sides' trees, so a different main or head is a different tree."""
+        return f"({self.commits[base]['tree']}+{self.commits[head]['tree']})"
+
+    def number_of(self, head):
+        return next(n for n, p in self.pulls.items() if p["head"]["sha"] == head)
+
+    def merge_api(self, body):
+        """POST /merges: merge a head into a branch (here merge-slot/pr-<N>), as GitHub's PR merge would."""
+        base = self.refs[body["base"]]
+        number = self.number_of(body["head"])
+        if self.pulls[number]["mergeable"] is False:
+            raise self.error(409, "Merge conflict")
+        if any(f.startswith(".github/workflows/") for f in self.pulls[number]["files"]):
+            # Like GitHub: the workflow token may not create or update workflow files (2026-11-19, #527).
+            raise self.error(409, "refusing to allow a GitHub App to create or update workflow without workflows permission")
+        self.merges_made += 1
+        sha = self.commit([base, body["head"]], self.merged_tree(base, body["head"]))
+        self.refs[body["base"]] = sha
+        return {"sha": sha, "commit": {"tree": {"sha": self.commits[sha]["tree"]}},
+                "parents": [{"sha": base}, {"sha": body["head"]}]}
+
     def merge(self, number, body):
         pull = self.pulls[number]
         assert body["merge_method"] == "merge", body
         if body.get("sha", pull["head"]["sha"]) != pull["head"]["sha"]:  # without sha, GitHub merges the head it has
             raise self.error(409, "Head branch was modified")
+        if any(f.startswith(".github/workflows/") for f in pull["files"]):
+            raise self.error(403, "Resource not accessible by integration")
         if self.refuse_merge:
             self.refuse_merge -= 1
             raise self.error(405, "Required status check check-all is failing")
         if self.checks[pull["head"]["sha"]][-1]["conclusion"] != "success":
             raise self.error(405, "Required status check check-all is failing")
-        tested = self.commits[pull["merge_commit_sha"]]
-        # What really lands is main (now) + head: the test merge's tree only if main is still its first parent.
-        if tested["parents"] != [self.main, pull["head"]["sha"]]:
-            landed = f"untested-{self.main[-6:]}+{pull['head']['sha'][-6:]}"
-        else:
-            landed = tested["tree"]
+        # What lands is main as it is now + the head as it is now, whatever any test merge said.
+        landed = self.merged_tree(self.main, pull["head"]["sha"])
         self.main = self.commit([self.main, pull["head"]["sha"]], landed)
         pull.update(state="closed", merged=True)
         self.merged.append((number, landed))

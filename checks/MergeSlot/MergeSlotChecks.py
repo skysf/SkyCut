@@ -133,6 +133,14 @@ check("one at a time: every merge was tested on the main it landed on", len(gh.m
 never_merged_untested("order", gh)
 
 gh, slot = world()
+gh.open_pull(1, workflow=True)  # 2026-11-19, #527: the workflow token can't write .github/workflows/
+gh.open_pull(2, labeled_minutes=1)
+serve(slot, gh)
+check("a PR that changes .github/workflows/ leaves with the by-hand path, before any test merge",
+      any("workflow" in c and "by hand" in c for c in gh.comments.get(1, [])) and gh.merges_made == 1, (gh.comments, gh.merges_made))
+check("…and the next PR goes on", [n for n, _ in gh.merged] == [2], gh.merged)
+
+gh, slot = world()
 gh.open_pull(1, mergeable=False)
 gh.open_pull(2, labeled_minutes=1, check="failure")
 gh.open_pull(3, labeled_minutes=2, draft=True)
@@ -177,7 +185,7 @@ def new_head(g):
 gh.on_tick = new_head
 serve(slot, gh)
 check("new head during the test: tested again", gh.dispatches.count("merge-slot/pr-1") == 2, gh.dispatches)
-check("new head during the test: the new head merged", gh.merged and gh.merged[0][1].endswith("+1"), gh.merged)
+check("new head during the test: the new head merged", gh.merged and gh.merged[0][1].endswith("+tree-head-1b)"), gh.merged)
 never_merged_untested("new head", gh)
 
 gh, slot = world()
@@ -188,8 +196,11 @@ other = gh.commit([gh.main], "tree-head-x")
 gh.add_run("pull_request", other, "topic-x", "success", gh.commits[gh.pulls[1]["merge_commit_sha"]]["tree"])
 stale = gh.add_run("pull_request", gh.pulls[1]["head"]["sha"], "topic-1", "success",
                    gh.commits[gh.pulls[1]["merge_commit_sha"]]["tree"], created=gh.clock - dt.timedelta(hours=30))
+odd = gh.commit([gh.main, other], "tree-odd")  # a slot run on other parents whose marker names this tree
+gh.add_run("workflow_dispatch", odd, "merge-slot/pr-1", "success", gh.commits[gh.pulls[1]["merge_commit_sha"]]["tree"],
+           forced=True)
 serve(slot, gh)
-check("markers from a red run, another head or a day-old run don't count", gh.dispatches[:1] == ["merge-slot/pr-1"], gh.dispatches)
+check("markers from a red run, another head, a day-old run or a slot run on other parents don't count", gh.dispatches[:1] == ["merge-slot/pr-1"], gh.dispatches)
 never_merged_untested("bad markers", gh)
 
 gh, slot = world()
@@ -204,17 +215,17 @@ gh.open_pull(1)
 gh.pr_run(1)
 gh.race = True  # a human merges between the slot's read of the test merge and its merge
 serve(slot, gh)
-check("main moved in the last moment: not merged onto it", all(not t.startswith("untested") for _, t in gh.merged), gh.merged)
+check("main moved in the last moment: tested again, then merged", [n for n, _ in gh.merged] == [1], gh.merged)
 never_merged_untested("race", gh)
 
 gh, slot = world()
 gh.open_pull(1)
 gh.pr_run(1)
-gh.human_merge(refresh=False)  # GitHub still shows the old test merge (on the old main) for a few minutes
-gh.frozen = 3
+gh.human_merge(refresh=False)  # 2026-11-19, #527: GitHub's test merge stays on the old main after main moves
 serve(slot, gh)
-check("a stale test merge is never trusted", [n for n, _ in gh.merged] == [1] and "merge-slot/pr-1" in gh.dispatches,
-      (gh.merged, gh.dispatches))
+check("main moved and GitHub's test merge stayed stale: the slot tests main + head itself and merges",
+      [n for n, _ in gh.merged] == [1] and gh.dispatches[:1] == ["merge-slot/pr-1"], (gh.merged, gh.dispatches))
+check("one test merge per main and head, not one per pass", gh.merges_made == 1, gh.merges_made)
 never_merged_untested("stale test merge", gh)
 
 gh, slot = world()
@@ -222,8 +233,7 @@ gh.open_pull(1)
 gh.pr_run(1)
 gh.head_race = True  # a push lands between the slot's last read and its merge
 serve(slot, gh)
-check("a head pushed at the last moment is not merged untested", all(not t.startswith("untested") for _, t in gh.merged),
-      gh.merged)
+check("a head pushed at the last moment is tested before it merges", [n for n, _ in gh.merged] == [1], gh.merged)
 never_merged_untested("head race", gh)
 
 gh, slot = world()

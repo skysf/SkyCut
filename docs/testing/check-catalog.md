@@ -456,10 +456,13 @@
   the PR's own run while main hasn't moved, else its own test on `merge-slot/pr-<N>`, a green re-run of it, or a green
   test whose marker upload failed. One test at a time, oldest label first. Red, cancelled, a conflict, a red head, a
   draft, a fork or three refusals send the PR back with a comment; a pending head waits while the next goes. A human
-  merge, a new head, a stale test merge or a last-second main move means testing again, never merging; closed PRs'
+  merge, a new head, a last-second main move, or GitHub's own test merge staying on the old main (2026-11-20,
+  [case](../bugfixes/2026-11-20-merge-slot-waits-for-stale-test-merge.md)) means testing main + head again, never merging; a PR
+  changing `.github/workflows/` leaves at once with the by-hand path, since the token can't write those files
+  ([case](../bugfixes/2026-11-20-merge-slot-cannot-write-workflow-files.md)); closed PRs'
   test branches are swept. It also pins `merge-slot.yml` (triggers, one waiting job-level slot, permissions, main's
   script only) and `checks.yml` (takes the slot's dispatches, skips every shard on other refs). Reverse verification:
-  22 mutations of the script each turned it red. Rules: [build doc "Merge slot"](../build/build-and-packaging.md).
+  24 mutations of the script each turned it red. Rules: [build doc "Merge slot"](../build/build-and-packaging.md).
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）;
   every run_check command exactly once; every `scripts/check-*.sh` named by check-all or a workflow step, or listed
   in the guard as deliberately local (graphical session, real keychain), and every `*Checks` executable and

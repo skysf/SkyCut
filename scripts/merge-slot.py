@@ -6,14 +6,19 @@ it against a fake GitHub.
 
 A labeled pull request, oldest label first:
 1. waits until check-all on its head is green (red leaves the slot with a comment);
-2. waits for GitHub's test merge commit X with parents (main, head); a conflict leaves the slot with a comment;
+2. builds the test merge X of the head into the current main on the branch merge-slot/pr-<N> with the Merges API
+   (parents: main, head), once per main and head; a conflict leaves the slot with a comment. GitHub's own test merge
+   (merge_commit_sha) isn't used: GitHub recomputes it when the pull request gets new commits, not when main moves
+   (2026-11-19: #527 waited 20 minutes on one built on the old main);
 3. merges at once if a green checks run already tested X's tree: the marker verified-tree-<tree> of its own
    pull_request run (main hasn't moved since) or of an earlier slot run;
-4. else points the branch merge-slot/pr-<N> at X and dispatches checks.yml there, which runs the same workflow file
-   on the same tree as a pull_request run on main + head; red or cancelled leaves the slot with a comment. While that
-   run is going, nothing else merges;
+4. else dispatches checks.yml on merge-slot/pr-<N>, which runs the same workflow file on the same tree as a
+   pull_request run on main + head; red or cancelled leaves the slot with a comment. While that run is going,
+   nothing else merges;
 5. merges (--merge, head pinned) only while main is still X's first parent, then dispatches checks.yml on main (a
    merge made with the workflow token starts no push run) and deletes the pull request's branch and merge-slot/pr-<N>.
+A pull request that changes .github/workflows/ leaves at once with the by-hand path: GitHub doesn't let the workflow
+token create or update workflow files, so the slot can neither build its test merge nor merge it (2026-11-19, #527).
 """
 import argparse
 import datetime as dt
@@ -66,6 +71,7 @@ class Slot:
         self.dispatched = {}  # (number, merge commit) -> when this job dispatched its test
         self.refusals = {}  # number -> merges GitHub refused in a row
         self.left = {}  # number -> (head, label time) when it left: skipped until either changes
+        self.workflows = {}  # (number, head) -> the .github/workflows/ files it changes
 
     # ---- reading GitHub ----
     def queue(self):
@@ -87,6 +93,20 @@ class Slot:
         runs = self.gh.call("GET", f"repos/{{repo}}/commits/{sha}/check-runs?check_name=check-all&filter=latest")
         runs = sorted(runs["check_runs"], key=lambda r: (r.get("started_at") or "", r["id"]))
         return (runs[-1]["status"], runs[-1]["conclusion"], runs[-1].get("details_url", "")) if runs else None
+
+    def workflow_files(self, number, head):
+        """The .github/workflows/ files the pull request changes (read once per head)."""
+        if (number, head) not in self.workflows:
+            found, page = [], 1
+            while True:
+                files = self.gh.call("GET", f"repos/{{repo}}/pulls/{number}/files?per_page=100&page={page}") or []
+                found += [name for f in files for name in (f["filename"], f.get("previous_filename") or "")
+                          if name.startswith(".github/workflows/")]
+                if len(files) < 100:
+                    break
+                page += 1
+            self.workflows[(number, head)] = sorted(set(found))
+        return self.workflows[(number, head)]
 
     def run_is_green(self, run_id, head, base):
         """A completed green checks.yml run of this repository that tested base + head, under a day old."""
@@ -146,16 +166,43 @@ class Slot:
                              "again; don't merge it yourself.")
         return "left"
 
-    def test(self, pull, merge_sha):
-        """Point merge-slot/pr-<N> at the merge commit and dispatch checks.yml there."""
-        number = pull["number"]
-        ref = f"{SLOT_PREFIX}{number}"
+    def point(self, ref, sha):
+        """Moves (or creates) a branch to a commit."""
         try:
-            self.gh.call("PATCH", f"repos/{{repo}}/git/refs/heads/{ref}", {"sha": merge_sha, "force": True})
+            self.gh.call("PATCH", f"repos/{{repo}}/git/refs/heads/{ref}", {"sha": sha, "force": True})
         except GitHubError as error:
             if error.status not in (404, 422):
                 raise
-            self.gh.call("POST", "repos/{repo}/git/refs", {"ref": f"refs/heads/{ref}", "sha": merge_sha})
+            self.gh.call("POST", "repos/{repo}/git/refs", {"ref": f"refs/heads/{ref}", "sha": sha})
+
+    def test_merge(self, number, base, head):
+        """The merge of head into base on merge-slot/pr-<N>, built once per base and head: (sha, tree). "conflict"
+        when they conflict, "contained" when main already has the head."""
+        ref = f"{SLOT_PREFIX}{number}"
+        try:
+            current = self.gh.call("GET", f"repos/{{repo}}/git/ref/heads/{ref}")["object"]["sha"]
+            commit = self.gh.call("GET", f"repos/{{repo}}/commits/{current}")
+            if [p["sha"] for p in commit["parents"]] == [base, head]:
+                return current, commit["commit"]["tree"]["sha"]
+        except GitHubError as error:
+            if error.status != 404:
+                raise
+        self.point(ref, base)
+        try:
+            made = self.gh.call("POST", "repos/{repo}/merges", {
+                "base": ref, "head": head, "commit_message": f"Merge slot test: #{number} {head[:10]} on main {base[:10]}"})
+        except GitHubError as error:
+            if error.status == 409:
+                return "conflict", str(error)
+            raise
+        if not made:  # 204: nothing to merge
+            return "contained"
+        return made["sha"], made["commit"]["tree"]["sha"]
+
+    def test(self, pull, merge_sha):
+        """Dispatches checks.yml on merge-slot/pr-<N>, which test_merge left at the merge commit."""
+        number = pull["number"]
+        ref = f"{SLOT_PREFIX}{number}"
         self.gh.call("POST", f"repos/{{repo}}/actions/workflows/{WORKFLOW}/dispatches", {"ref": ref})
         self.dispatched[(number, merge_sha)] = self.now()
         self.log(f"#{number}: testing {merge_sha} on {ref}")
@@ -199,6 +246,13 @@ class Slot:
         if pull["draft"]:
             return self.leave(pull, "it is a draft: mark it ready for review first.")
         head = pull["head"]["sha"]
+        workflow_files = self.workflow_files(number, head)
+        if workflow_files:
+            return self.leave(pull, f"it changes {', '.join(f'`{f}`' for f in workflow_files)}. GitHub doesn't let the "
+                                    "slot's workflow token create or update workflow files, so it can neither test-merge "
+                                    "nor merge this pull request. Merge it by hand: merge origin/main into the branch, "
+                                    f"push, and once check-all is green run `gh pr merge {number} --merge` at once (if "
+                                    "main moved meanwhile, merge main again first). Don't add the label again.")
         check = self.head_check(head)
         if check is None or check[0] != "completed":
             return "waiting"
@@ -206,17 +260,14 @@ class Slot:
             return self.leave(pull, f"check-all on the head `{head[:10]}` is {check[1]} ({check[2]}). Fix it; if "
                                     "it's a known flake, re-run that run's failed jobs (`gh run rerun <run> --failed`) "
                                     "and add the label once it's green.")
-        if pull["mergeable"] is False:
-            return self.leave(pull, "it conflicts with main: merge origin/main into the branch, resolve, push, wait "
-                                    "for check-all to be green.")
         base = self.main_sha()
-        merge_sha = pull["merge_commit_sha"]
-        if pull["mergeable"] is None or not merge_sha:
-            return "waiting"
-        commit = self.gh.call("GET", f"repos/{{repo}}/commits/{merge_sha}")
-        if [p["sha"] for p in commit["parents"]] != [base, head]:
-            return "waiting"  # GitHub hasn't recomputed the test merge for the newest main or head yet
-        tree = commit["commit"]["tree"]["sha"]
+        built = self.test_merge(number, base, head)
+        if isinstance(built, tuple) and built[0] == "conflict":
+            return self.leave(pull, "it conflicts with main: merge origin/main into the branch, resolve, push, wait "
+                                    f"for check-all to be green. (GitHub: {built[1]})")
+        if built == "contained":
+            return self.leave(pull, f"main `{base[:10]}` already contains its head `{head[:10]}`: nothing to merge.")
+        merge_sha, tree = built
         proof = self.verified(tree, head, base)
         if proof:
             return self.merge(pull, head, base, proof)
