@@ -2,11 +2,11 @@
 
 ## Symptom
 
-On 2026-11-19 `~/Library/Preferences` on the developer Mac held about 2,400 plists that checks had written, almost all
+On 2026-11-19 `~/Library/Preferences` on the developer Mac held 2,353 plists that checks had written, almost all
 empty: 337 `com.srtflow.approval-check-<UUID>`, 333 `com.srtflow.voice-budget-check-<UUID>`, 308
 `com.srtflow.ai-access-check-<UUID>`, 267 `com.srtflow.official-approval-check-<UUID>`, 239 `com.srtflow.image-approval-<UUID>`,
-236 `com.srtflow.character-approval-<UUID>`, 231 `keychain-notice-checks-<UUID>`, 100 `com.srtflow.voice-gate-check-<UUID>`,
-90 `srtflow-optimizedmedia-*-<pid>`, 77 `com.srtflow.standing-migration-<UUID>`, 72 `com.srtflow.SrtFlow.motionplacementcheck.run<pid>`
+236 `com.srtflow.character-approval-<UUID>`, 223 `keychain-notice-checks-<UUID>`, 100 `com.srtflow.voice-gate-check-<UUID>`,
+90 `srtflow-optimizedmedia-*-<pid>`, 77 `com.srtflow.standing-migration-<UUID>`, 68 `com.srtflow.SrtFlow.motionplacementcheck.run<pid>`
 and more. Each local `check-sky-studio.sh` run added nine. Checks must not touch the user's real data.
 
 ## Root cause

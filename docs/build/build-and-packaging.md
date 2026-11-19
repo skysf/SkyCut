@@ -182,7 +182,7 @@ enough; don't install so many versions on this Mac). So the Mac keeps exactly tw
 Why: on 2026-11-19 macOS still knew 17 extra SkyCut-type bundles (build outputs, smoke and probe apps) and 100 dead
 registrations. They show up in Spotlight and "Open With", and a project file can open in a test build. Later that day,
 24 `MotionPlacementCheck.app` fixtures kept by failed check runs (2026-11-17 to 11-19) were still on disk and registered.
-`~/Library/Preferences` held about 2,400 plists from checks ([case](../bugfixes/2026-11-19-check-defaults-leftovers.md)).
+`~/Library/Preferences` held 2,353 plists from checks ([case](../bugfixes/2026-11-19-check-defaults-leftovers.md)).
 The release records below that moved old bundles to the Trash or kept a backup predate this rule.
 
 ## 产物验收清单
