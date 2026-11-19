@@ -63,7 +63,7 @@ class PlaybackGateTests(unittest.TestCase):
         self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
 
     def test_a_rebuilt_item_has_hosted_room_but_not_on_this_mac(self):
-        # The hosted virtual Mac decodes 4K in software: a new item primed at a quarter rate started 137 ms behind at worst.
+        # The hosted virtual Mac decodes 4K in software: a new item started up to 137 ms behind its sound.
         samples = batch(5)
         samples["fresh-item"][0] = trial("fresh-item", startOffsetMs=137, maxSkewMs=137, onsetGapMs=159)
         self.assertEqual(evaluate(samples, BUDGETS)[0], [])
@@ -71,9 +71,10 @@ class PlaybackGateTests(unittest.TestCase):
         samples["fresh-item"] = [trial("fresh-item", startOffsetMs=160, maxSkewMs=160)] * 5
         self.assertTrue(any("fresh-item median: startOffsetMs" in error for error in evaluate(samples, BUDGETS)[0]))
 
-    def test_a_new_item_must_be_primed_before_play(self):
+    def test_play_primes_a_new_item_once(self):
         self.assertEqual(validate_trial("fresh-item", trial("fresh-item")), [])
-        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=1)))
+        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=0)))
+        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=2)))
 
     def test_a_stall_after_a_good_start_fails(self):
         samples = batch(5)

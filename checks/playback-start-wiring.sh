@@ -90,18 +90,19 @@ fi
 preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
 if ! awk '
   /guard previewSeek == request/ { current = NR }
-  /guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem else/ { placed = NR }
+  /!previewIsUnprimed \|\| playbackRequested/ { requested = NR }
   /guard player.status == .readyToPlay, item.status == .readyToPlay/ { ready = NR }
   /observeReadiness\(of: item\)/ { observe = NR }
   /player.preroll\(atRate: / { pre = NR }
   /self\?\.finishPreviewPosition\(/ { finish = NR }
-  END { exit !(current && placed > current && ready > placed && observe > ready && pre > observe && finish > pre) }
+  END { exit !(current && requested > current && ready > requested && observe > ready && pre > observe && finish > pre) }
 ' <<<"${preroll}"; then
   fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
 fi
-# Every paused placement primes, a new item's first one included: a pending Play must not decide whether to preroll.
-if sed 's,//.*,,' <<<"${preroll}" | grep -E 'guard seekFinished.*playbackRequested|playbackRequested[^?]*else [{]' >/dev/null; then
-  fail "Prime every paused placement, a new item included, instead of waiting for Play to request the preroll"
+# Priming every installed composition while editing held the preview's playback buffers past the memory ratchet
+# (docs/bugfixes/2026-11-19-preview-start-before-preroll.md); Play primes a new item.
+if ! body "${clock}" '    func play(' | grep -F 'preparePositionedPreview(request, at: start, seekFinished: true)' >/dev/null; then
+  fail "Defer a new item's full preroll until Play requests it"
 fi
 
 # The sound never starts ahead of the picture: Play starts the clocks only with a positioned, primed picture, never

@@ -30,6 +30,8 @@
       "videoMs": 340
     },
     "fresh-item": {
+      "audioMs": 700,
+      "videoMs": 800,
       "onsetGapMs": 200,
       "startOffsetMs": 150,
       "maxSkewMs": 150
@@ -114,6 +116,8 @@
         "videoMs": 2600
       },
       "fresh-item": {
+        "audioMs": 400,
+        "videoMs": 450,
         "startOffsetMs": 75,
         "maxSkewMs": 75
       }

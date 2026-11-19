@@ -298,7 +298,7 @@ final class PlayerClock: ObservableObject {
             let start = time
             guard positionedTime == start, !previewIsUnprimed else {
                 // The sound never starts ahead of the picture. A playhead whose picture is not placed and primed
-                // (after a hover elsewhere, a scrub or a failed preparation) is placed first; a new item is primed.
+                // (after a hover elsewhere, a scrub or a failed preparation) is placed first; a new item is primed now.
                 // This Play stays pending and starts both clocks once the picture can move
                 // (docs/architecture/playback-start.md).
                 playbackRequested = true
@@ -433,8 +433,10 @@ final class PlayerClock: ObservableObject {
 
     private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
         guard previewSeek == request else { return }
-        // Every paused placement primes the picture, a new item's first one included, so Play only starts the clocks.
-        guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem else {
+        // A new item is primed only once Play asks: priming every installed composition while editing held the
+        // preview's playback buffers and broke the memory ratchet (docs/architecture/playback-start.md).
+        guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem,
+              !previewIsUnprimed || playbackRequested else {
             finishPreviewPosition(request, at: seekFinished ? seconds : nil)
             return
         }
@@ -444,9 +446,9 @@ final class PlayerClock: ObservableObject {
             }
             return
         }
-        // A new item with Play already pending primes at playback rate. A paused placement primes at a quarter: on the
-        // M1 a new item primed that way started as fast as one primed at full rate, with less decoded ahead and held.
-        player.preroll(atRate: previewIsUnprimed && playbackRequested ? 1 : 0.25) { [weak self] finished in
+        // A new item primes at playback rate for the pending Play. A positioned item's decoder needs less data to
+        // start advancing, especially across a trim.
+        player.preroll(atRate: previewIsUnprimed ? 1 : 0.25) { [weak self] finished in
             DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil, primed: finished) }
         }
     }
@@ -505,7 +507,8 @@ final class PlayerClock: ObservableObject {
             scrub(to: time)
             return
         }
-        // Back on the playhead with a placed and primed picture, ready for Play (a scrub would leave it unprimed).
+        // Back on the playhead with a placed picture, primed unless the item is new, ready for Play (a scrub would
+        // leave it unprimed).
         scrubber.cancelPending()
         invalidatePreviewSeek()
         positionPreview(at: CMTime(seconds: time, preferredTimescale: 600), seconds: time)

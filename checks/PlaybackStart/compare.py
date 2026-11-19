@@ -25,9 +25,10 @@ COUNTS = ("builds", "itemAttaches", "assetOpens", "videoPrerolls")
 # confirmation. Later drift is held by the one-second budgets: hosted runners stall decoding for a second at times.
 GROSS_SKEW_MS = 500
 SKEWS = ("onsetGapMs", "startOffsetMs")
-# Native prerolls counted after Play. A new item is primed while paused (fresh-item: none left for Play); the scenarios
-# that have to place the picture after Play (the open, the rewind at the end, a click just before Play, a hover) prime once.
-PREROLLS = {"cold-open": 1, "end-replay": 1, "fresh-item": 0, "seek-play": 1, "peek-play": 1}
+# Native prerolls counted after Play: the scenarios that place or prime the picture after Play (the open, a new item,
+# the rewind at the end, a click just before Play, a hover) prime once. A new item is primed only when Play asks:
+# priming every installed composition while editing broke the memory ratchet.
+PREROLLS = {"cold-open": 1, "end-replay": 1, "fresh-item": 1, "seek-play": 1, "peek-play": 1}
 
 
 class Trial(NamedTuple):

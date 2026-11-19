@@ -3,8 +3,8 @@ import CoreMedia
 import Foundation
 
 // Play starts the sound only with a picture that can move at once (docs/architecture/playback-start.md): a pause
-// keeps the picture positioned, a hover sends the picture back to the playhead before Play, and a new item is
-// primed while paused. Real PlayerClock and AVPlayer on the ffmpeg clip; the sound source runs on the host clock like
+// keeps the picture positioned, a hover sends the picture back to the playhead before Play, and Play primes a new
+// item before the sound starts. Real PlayerClock and AVPlayer on the ffmpeg clip; the sound source runs on the host clock like
 // the engine. The clock ticks every half second, so its drift correction (two late ticks in a row) cannot re-seek
 // the picture inside these short windows and every native jump counted comes from starting playback. Before
 // 2026-11-19 a resume and a Play after hovering re-seeked the picture after the sound had started
@@ -88,11 +88,18 @@ func checkSyncedStarts(clip: URL) {
     clock.seek(to: 3)
     clock.resumeAfterPreviewRebuild(wasPlaying: false)
     settle(clock)
-    check(!clock.isPositioningPreview, "The new item's paused placement finishes, priming included")
+    check(!clock.isPositioningPreview, "The new item's paused placement finishes")
 
-    // A new item is primed while paused: Play starts both clocks inside the call.
+    // A new item is primed when Play asks (priming while editing breaks the memory ratchet): the sound waits for it,
+    // then both start from the playhead without a native seek.
+    let firstJumps = JumpCounter(item)
     clock.togglePlayback()
-    check(source.isPlaying && source.playedFrom == 3, "A new item primed while paused starts at once from the playhead")
+    check(!source.isPlaying, "Play on a new item primes the picture before the sound starts")
+    waitForAudioClock { source.isPlaying }
+    check(source.playedFrom == 3 && abs((source.pictureAtStart ?? -1) - 3) < 0.05,
+          "A new item starts from the playhead once primed: picture \(source.pictureAtStart ?? -1)")
+    pump(0.2)
+    check(firstJumps.count == 0, "Starting a new item does not re-seek the picture (\(firstJumps.count) native jumps)")
 
     // Pause, then Play: the sound continues from the paused picture and the picture continues without a native seek.
     pump(0.4)
