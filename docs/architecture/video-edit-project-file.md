@@ -483,6 +483,11 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    tool call while another project's alert was up) is settled again, and so is a project opened meanwhile; one given up
    with "Quit Anyway" is not. The reply is a closure called in the same main-thread turn as that last look
    (`prepareAll(reply:)`), never after awaiting another task, which would leave a gap for an edit.
+   **"Quit Anyway" belongs to the document its alert showed**, not to the project object (since
+   ["Quit Anyway" covered a replaced document](../bugfixes/2026-11-19-quit-anyway-covers-a-replaced-document.md)): the
+   mark carries the document generation taken right before asking, and another document opened in that project since (an
+   Open that waited for the write, the AI's `open_project`) is settled like any other. Whatever Quit remembers about a
+   project is compared by document generation, never by object identity alone.
 7. Behaviour: `scripts/check-project-saves.sh`.
 
 ### 切工程必须是事务性的
@@ -575,8 +580,8 @@ made before it no longer finds the moved file — until then this only worked be
      （卸片之后晚到的时间回调由 `check-player-clock.sh` 用真播放器钉着，这一条看真窗口）
 3. `scripts/check-project-saves.sh` — the project file written off the main thread (§5 "Writing the project file off the main
    thread"): slow, stuck and failing drives, switching away, Save As, Quit; an edit made while New / a close / Quit is
-   writing, Quit looking again at a project it let through, a save window answered too late. Real windows and a real drive,
-   before a release:
+   writing, Quit looking again at a project it let through, a document opened in a project after "Quit Anyway" was chosen
+   for the one before it, a save window answered too late. Real windows and a real drive, before a release:
    - a project on a USB hard drive that has gone to sleep: edit, wait for the autosave — the timeline stays responsive while
      the drive spins up; ⌘S right after — no beachball, the notice says the drive is not responding if it takes over 15 s;
    - the same project, then ⌘Q while the drive is asleep: SkyCut quits once the drive answers, or after about 3 s shows
