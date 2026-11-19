@@ -100,19 +100,16 @@ public enum SubtitleExportPlanner {
         return url
     }
 
-    /// Never replacing (the AI's export_subtitles, docs/architecture/export-settings.md §5 item 6): the same temporary
-    /// name and read-back, then renamed onto `claim` — a name this process claimed empty (ExclusivePlacement.claim), so a
-    /// file that appeared after the folder was listed is never touched. On failure the claim is left for the caller to
-    /// give back.
-    @discardableResult
-    public static func writeValidated(
-        _ document: SubtitleDocumentModel, format: SubtitleFormat, onto claim: ExclusivePlacement.Claim
-    ) throws -> URL {
-        let temp = temporaryName(for: claim.url)
-        defer { try? FileManager.default.removeItem(at: temp) }
-        try writeChecked(document, format: format, to: temp, named: claim.url)
-        try ExclusivePlacement.fill(claim, with: temp)
-        return claim.url
+    /// Never replacing (the AI's export_subtitles, docs/architecture/export-settings.md §5 items 6 and 9): every file of
+    /// the set is serialized and read back under a private name first, then the set takes the names of set `number` of
+    /// `names`, or of the next set none of whose names is taken at that moment (ExclusivePlacement.createSet). A file that
+    /// appeared after the folder was listed is never touched. `documents` in the order `names` gives the files.
+    public static func writeNewSet(
+        _ documents: [SubtitleDocumentModel], format: SubtitleFormat, from number: Int, names: (Int) -> [URL]
+    ) throws -> (number: Int, urls: [URL]) {
+        try ExclusivePlacement.createSet(from: number, names) { index, path in
+            try writeChecked(documents[index], format: format, to: path, named: names(number)[index])
+        }
     }
 
     private static func temporaryName(for url: URL) -> URL {

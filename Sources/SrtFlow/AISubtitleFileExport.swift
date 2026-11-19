@@ -7,14 +7,16 @@ import SrtFlowMCPKit
 // 管什么：导出面板「高级」里「导出字幕文件」的 AI 版（2026-10-15，用户转来的反馈：AI 没有导出字幕文件的路；用户定做独立工具、
 // 第一版不做 ASS）：原文 / 译文各写一份，名字和撞名见 `AISubtitleFiles`、语言标签见 `SubtitleFileLanguage`（按文字判 → 记的 → 省略）；
 // 默认放 export_video 的那个文件夹、名字默认工程名
-// （同 export_video），给了 name 就用它 —— 传导出的视频的名字，字幕文件就和视频配成一对。写盘走界面那一条
-// （`SubtitleExportPlanner.writeValidated`：临时名 → 回读校验），藏起来的句子不写（`subtitleDocument(for:)`，
+// （同 export_video），给了 name 就用它 —— 传导出的视频的名字，字幕文件就和视频配成一对。写盘和界面同一个规划器
+// （`SubtitleExportPlanner.writeNewSet`：临时名 → 回读校验），藏起来的句子不写（`subtitleDocument(for:)`，
 // 和预览、烧录、界面导出同一份）。不改工程：不是一步撤销、不摆窗口。
 // The folder is made, checked and listed, and the files are written, off the main thread through ExportDestinationProbe with
 // export_video's deadline (AIExportDestination; docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md).
-// Never replacing: every file of the set is claimed (created empty, O_EXCL) before any is written, and the files are renamed
-// onto their claims. A name taken after the listing — Finder, another app, another project's export_subtitles writing the same
-// name at this moment — moves the whole set on to the next number (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
+// Never replacing: every file of the set is written and read back under a private name first, then the set takes its names in
+// steps that fail when a name is taken (SubtitleExportPlanner.writeNewSet → ExclusivePlacement.createSet). A name taken after the
+// listing — Finder, another app, another project's export_subtitles writing the same name at this moment — moves the whole set
+// on to the next number (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md,
+// docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md).
 // 不管什么：说明文字（SrtFlowMCPKit/MCPSubtitleExportTools.swift）；双语合在一个文件里（只给烧录用）、ASS。
 
 @MainActor
@@ -55,7 +57,7 @@ enum AISubtitleFileExport {
         case .refused(let problem, let folder): throw AIExportDestination.refusal(problem, folder: folder)
         case .ready(let ready, let first): (series, number) = (ready, first)
         }
-        // Written off the main thread too: the whole set claimed, then temporary name → read back → onto its claim.
+        // Written off the main thread too: each file to a private name → read back, then the set takes its names.
         let outcome = await probe.run(on: place.near, deadline: deadline, timedOut: Written.notResponding) { [documents] _ in
             Self.write(documents, series: series, from: number)
         }
@@ -110,33 +112,27 @@ enum AISubtitleFileExport {
         case ready(AISubtitleFiles.Series, Int)
     }
 
-    /// Claims every file of the set from `number` on (a name taken since the listing moves the whole set on), then writes
-    /// each onto its claim; claims not written are given back. Runs off the main thread.
+    /// Writes every file of the set under a private name, then the set takes the names of set `number`, or of the next set
+    /// none of whose names is taken at that moment (a name taken since the listing moves the whole set on); nothing is ever
+    /// replaced. Runs off the main thread.
     nonisolated static func write(
         _ documents: [SubtitleTrack: SubtitleDocumentModel], series: AISubtitleFiles.Series, from number: Int
     ) -> Written {
-        let claimed: (number: Int, claims: [ExclusivePlacement.Claim])
+        let tracks = series.tracks.filter { documents[$0] != nil }
+        let written: (number: Int, urls: [URL])
         do {
-            claimed = try ExclusivePlacement.claimSet(from: number) { series.set($0).map(\.url) }
+            written = try SubtitleExportPlanner.writeNewSet(
+                tracks.compactMap { documents[$0] }, format: series.format, from: number,
+                names: { set in series.set(set).filter { documents[$0.track] != nil }.map(\.url) }
+            )
         } catch {
             return .failed(error.localizedDescription)
         }
-        var files: [WrittenFile] = []
-        var unwritten = claimed.claims
-        defer { unwritten.forEach(ExclusivePlacement.release) }
-        do {
-            for (target, claim) in zip(series.set(claimed.number), claimed.claims) {
-                guard let document = documents[target.track] else { continue }
-                let written = try SubtitleExportPlanner.writeValidated(document, format: series.format, onto: claim)
-                unwritten.removeAll { $0 == claim }
-                files.append(WrittenFile(
-                    track: target.track, path: written.path, lines: SubtitleSerializer.emittedCueCount(document, format: series.format)
-                ))
+        return .written(zip(tracks, written.urls).compactMap { track, url in
+            documents[track].map {
+                WrittenFile(track: track, path: url.path, lines: SubtitleSerializer.emittedCueCount($0, format: series.format))
             }
-        } catch {
-            return .failed(error.localizedDescription)
-        }
-        return .written(files)
+        })
     }
 
     struct WrittenFile: Sendable {

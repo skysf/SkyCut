@@ -53,8 +53,9 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    save window asks "Replace?" before it answers; the helper's typed and dropped answers never do. So a save's answer is a
    `SaveLocation` (`SaveLocation.swift`): the URL and `mayReplace`, true only from macOS's own window, and only for that URL —
    a caller that changes it (the project's Save As adding `.skycut`) uses `at(_:)`, which drops the confirmation. Every save
-   written from a window writes through `NewFileClaim` (claim the name with `O_EXCL`, then write atomically over the claim)
-   unless replacing was confirmed; when a file is there, the caller asks `FileReplaceQuestion` (Cancel by default) and writes
+   written from a window writes through `NewFileClaim` (the bytes under a private name, then the name taken in one step that
+   fails when it is taken: [export settings](export-settings.md) §5 item 9) unless replacing was confirmed; when a file is
+   there, or appears during the write, the caller asks `FileReplaceQuestion` (Cancel by default) and writes
    again only on Replace — the project's Save As (`saveAs(chosen:)`, also from closing an untitled project) and the subtitle
    editor's Export As (`SubtitleFileSave`) — or, for a screen recording, the commit avoids the name ("Name 2"). The AI's saves
    pick unused names and never replace a file (only `save_project` back to the project's own file).
@@ -67,7 +68,7 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
 | `scripts/check-export-profile.sh` (`FileWindowsChecks`) | the shared windows with a recording helper: an answer reaches the caller, a cancel is not a failure, a window that never comes offers the fallback and a typed answer there reaches the caller, Close It appears next to a window on screen and offers the fallback, Try Again, one window at a time, the record sends the next request to the fallback; `TypedPath` for files, saves and drops |
 | `scripts/check-export-profile.sh` (`FileWindowsChecks`, saves) | an answer from macOS's own save window may replace; a typed folder, a dropped folder and a typed path from the helper may not; a confirmation covers only its URL (rule 9) |
 | `scripts/check-project-saves.sh` (`ReplaceChecks`) | a file under the answered name keeps its bytes until the person answers Replace: the project's Save As for each helper answer, closing an untitled project, the AI's saves, the subtitle file write (rule 9) |
-| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the claim, Save As and Export As asking, the recording's confirmation) |
+| `checks/file-io-off-main-wiring.sh` | panels only in `SystemFileChooser.swift`, `begin`, no `runModal` in the chooser / shared windows / helper / export panel, the record before AppKit, `FilePicker` through `SystemFileWindows`; rule 9's wiring (helper answers unconfirmed, the exclusive install, Save As and Export As asking, the recording's confirmation) |
 
 ## Manual regression (real windows, before a release)
 
