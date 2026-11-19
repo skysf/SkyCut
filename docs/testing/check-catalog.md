@@ -561,3 +561,13 @@
   the burst, clip_id spans its clip, image=false gives numbers only, four refusals); `scripts/check-video-inspection.sh` checks that the
   evidence sheet carries the measured mix. Reverse (2026-11-18): passing no strip to `finish` from look turned 8 checks red, and from
   inspect_video the evidence-sheet check.
+- Sky Studio content names (2026-11-19, MCP-62; [AI interface](../architecture/ai-control-mcp.md) section 4 item 32): `scripts/check-mcp.sh`
+  runs `scripts/export-tool-vocabulary.sh` and `ToolVocabularyChecks` compares its file with the live catalog: exactly the format's
+  keys, every tool once with `MCPArgumentCheck.acceptedSchema` and its aliases, `project`, the guide's topics and sections in order,
+  `result_fields` = `catalogKnownNames`, a reader of the file (`ToolVocabulary`, the content gate's reader ported) accepts exactly this
+  build's names, `skycut_version` = the VERSION given (null without), and the shared rules' size measured on the App's own recipes
+  answer. `PublishedNamesChecks` checks every name in `checks/MCP/published-content-names.json` with the gate's rules
+  (`PublishedNameEntry`), runs the rules on a made-up vocabulary (18 wrong entries caught with their reason, 21 right ones let
+  through) and the snapshot's shape rules on made-up snapshots (prose, unknown keys and kinds refused). Reverse (2026-11-19): with
+  a snapshot of that day's card drafts, renaming add_clips' `hit_at` turned the 22 entries that use it red; dropping a tool, the
+  aliases or the trim from the exporter, the array step from the reader, or the option check each turned the checks red.

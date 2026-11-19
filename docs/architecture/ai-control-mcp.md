@@ -747,6 +747,18 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      (−17 LUFS, the user's call). Largest answer after it: product-promo, 32,223 characters (about 9.0 thousand tokens).
      `RecipeChecks` pins each pointer in its section (`toolRouteChecks`) and every built-in answer, card plus rules as the App encodes
      it, at ≤ 36,000 characters (`answerSizeChecks`, `recipeAnswerLimit`): new rules make room first, the line is not raised.
+   - **Sky Studio's styles and craft cards name only what SkyCut has** (2026-11-19, MCP-62, SkyCut's half). ① Sky Studio's publish
+     gate checks every published text against the vocabulary of the build users have: at each release `VERSION=x.y.z
+     scripts/export-tool-vocabulary.sh <file>` (format `skycut-tool-vocabulary/1`: every tool with the schema the App checks
+     arguments against, `MCPArgumentCheck.acceptedSchema`, and its aliases; `project`; the guide's topics and sections; every name
+     `catalogKnownNames` accepts; version, commit, the shared rules' size). Without VERSION `skycut_version` is null: not a file to
+     publish against. A result field new content uses goes into `CatalogNames.swift`, not into a list kept beside the gate.
+     ② After each publish the names-only snapshot replaces `checks/MCP/published-content-names.json` (`skycut-published-names/1`:
+     release, and per item kind, id, version and each code span or name its text uses, never the text; release null with no items
+     until the first publish). ③ `scripts/check-mcp.sh` exports the vocabulary on every PR and compares it with the live catalog
+     (`ToolVocabularyChecks`), and checks every snapshot name with the gate's rules (`PublishedNamesChecks`: the tool exists, the
+     name is its parameter at any depth, the value is one of its options and in range). A change that renames or removes a
+     published name turns red: keep the old name working, or publish content without it first and refresh the snapshot.
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
@@ -1460,6 +1472,10 @@ edit_clip 2,074 字超长、清单里有汉字）。
 （走一遍真实清单：fields 写全每个参数的事实；例子、related、不含凭据，各配坏样本）、`checks/MCP/GuidePilotChecks.swift`（迁移过的工具：名片 ≤ 450 和固定说法、
 参数说明 ≤ 120 且写范围、参数定义 ≤ 4,500 字节、迁移前的原文还在、fields 切节不丢行）；`checks/MCP/router-wiring.sh`（和 recipes 同一行 Policy）；
 `checks/SkyStudio/GateChecks.swift` + `checks/sky-studio-wiring.sh`（没开通也照答、不等授权）。细节和反向验证见 [MCP 说明书](mcp-guide.md)第四节。
+
+**Sky Studio content (section 4 item 32)**: `scripts/check-mcp.sh` runs `scripts/export-tool-vocabulary.sh` on every PR;
+`ToolVocabularyChecks` compares the file with the live catalog and `PublishedNamesChecks` checks every published name
+(details and the reverse verification in the [check catalog](../testing/check-catalog.md)).
 
 **云端媒体**：`scripts/check-sky-studio.sh` 验证现行接口 / 报价 / 任务 / 积分 / 配音；`scripts/check-cloud-media.sh` 验证共用每日账和阶段；`scripts/check-mcp.sh` 的 ProviderChecks / SkyStudioVoiceChecks 验证工具清单、选声、词时间与 WAV；`checks/no-legacy-generation.sh` 禁止旧 fal 运行路径回来。`scripts/check-keychain.sh` 为本机真实钥匙串回归，免费端到端见 [GUI 冒烟](../testing/gui-smoke-testing.md)四之八。
 

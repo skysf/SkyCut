@@ -126,6 +126,9 @@ func catalogKnownNames() -> Set<String> {
     // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
     // ones past the cap, where the piece's own sound ends.
     names.formUnion(["strongest_accents", "more_accents", "ends_at"])
+    // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
+    // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
+    names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
     return names
 }
 
