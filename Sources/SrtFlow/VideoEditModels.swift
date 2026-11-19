@@ -356,6 +356,8 @@ struct TimelineState: Hashable, Sendable {
     var deliveryIntentions: [DeliveryIntentionalMark] = []
     /// Explicit project ending, in timeline seconds. Zero follows the content; later content can extend beyond it.
     var minimumDuration = 0.0
+    /// The editing style this film was cut with (v39, SS5 plan 5.5): a Sky Studio style keeps its version here. Nil until AI follows one.
+    var editingStyle: EditingStyleRecord?
 
     var isEmpty: Bool {
         mainClips.isEmpty && overlayTracks.allSatisfy(\.clips.isEmpty)
@@ -515,22 +517,9 @@ struct TimelineState: Hashable, Sendable {
     }
 
     /// 把剪辑放进某类自由轨：塞进第一条放得下的（隐藏的不塞），
-    /// 都放不下就新开一条。返回落进了哪条轨。
+    /// 都放不下就新开一条。返回落进了哪条轨（the rule is `EditLane.place`）。
     mutating func place(_ clip: EditClip, intoAudio: Bool) -> Int {
-        var lanes = intoAudio ? audioTracks : overlayTracks
-        for index in lanes.indices where !lanes[index].isHidden && fits(clip, in: lanes[index].clips) {
-            lanes[index].clips.append(clip)
-            lanes[index].clips.sort { $0.timelineStart < $1.timelineStart }
-            if intoAudio { audioTracks = lanes } else { overlayTracks = lanes }
-            return index
-        }
-        lanes.append(EditLane(clips: [clip]))
-        if intoAudio { audioTracks = lanes } else { overlayTracks = lanes }
-        return lanes.count - 1
-    }
-
-    private func fits(_ clip: EditClip, in track: [EditClip]) -> Bool {
-        !track.contains { $0.timelineStart < clip.timelineEnd - 0.001 && clip.timelineStart < $0.timelineEnd - 0.001 }
+        intoAudio ? EditLane.place(clip, in: &audioTracks) : EditLane.place(clip, in: &overlayTracks)
     }
 }
 
@@ -545,7 +534,7 @@ extension TimelineState: Codable {
         case minimumDuration
         case mainClips, mainHidden, overlayTracks, audioTracks
         case mainVolume, masterVolume
-        case production, deliveryIntentions
+        case production, deliveryIntentions, editingStyle
         case subtitle, subtitleHidden, translationHidden
         case subtitleLayout, translationLayout, subtitleURL, subtitleCompanion, shapes, textOverlays, canvasRatio
         case frameRate, filters, projectSubtitleStyle, subtitleHighlight, rulerMarkers, mainMagnet, subtitleMaxLines
@@ -557,6 +546,7 @@ extension TimelineState: Codable {
         minimumDuration = TimelineDuration.sanitized(try c.decodeIfPresent(Double.self, forKey: .minimumDuration) ?? 0)
         production = try c.decodeIfPresent(FilmProductionState.self, forKey: .production)
         deliveryIntentions = try c.decodeIfPresent([DeliveryIntentionalMark].self, forKey: .deliveryIntentions) ?? []
+        editingStyle = try? c.decodeIfPresent(EditingStyleRecord.self, forKey: .editingStyle)   // v39; a record that does not read is dropped
         mainClips = try c.decodeIfPresent([EditClip].self, forKey: .mainClips) ?? []
         mainHidden = try c.decodeIfPresent(Bool.self, forKey: .mainHidden) ?? false
         mainMagnet = try c.decodeIfPresent(Bool.self, forKey: .mainMagnet) ?? false   // 2026-10-02 起才有：缺键 = 关
@@ -591,6 +581,7 @@ extension TimelineState: Codable {
         try c.encodeIfPresent(production, forKey: .production)
         if minimumDuration > 0 { try c.encode(minimumDuration, forKey: .minimumDuration) }
         if !deliveryIntentions.isEmpty { try c.encode(deliveryIntentions, forKey: .deliveryIntentions) }
+        try c.encodeIfPresent(editingStyle, forKey: .editingStyle)
         try c.encode(mainClips, forKey: .mainClips)
         try c.encode(mainHidden, forKey: .mainHidden)
         if mainMagnet { try c.encode(true, forKey: .mainMagnet) }   // 按需写键：磁吸关着的工程存一轮 diff 是空的

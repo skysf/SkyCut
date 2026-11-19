@@ -478,5 +478,8 @@ extension TimelineState {
     /// v38 keeps a clip's voice-band cut (`EditClip.voiceBandDB`, 2026-11-18, omitted at 0): an older writer would drop it
     /// and the clip's sound in the film would change.
     var requiresFormatVersion38: Bool { allClips.contains { $0.voiceBandDB != 0 } }
+    /// v39 keeps the editing style the film was cut with (`TimelineState.editingStyle`, 2026-11-19, omitted when nil): an older
+    /// writer would drop it, and the film would silently move to a Sky Studio style's newest version (SS5 plan D8, FL-15).
+    var requiresFormatVersion39: Bool { editingStyle != nil }
 
 }

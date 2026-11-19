@@ -116,7 +116,10 @@ enum MCPGuideLibraryTopics {
             returns its version and sha256; from this Mac's copy it also says cached and fetched_at. version reads an older \
             published version; latest or none reads the current one. When the style and the shared rules do not fit one answer, \
             the style comes alone and next_step says to read recipes id=shared-rules before cutting. A Sky Studio style is not \
-            the user's: never save it, or a copy, with save_recipe (it refuses their names).
+            the user's: never save it, or a copy, with save_recipe (it refuses their names). A film keeps the version it was \
+            cut with: your first change to a project after reading a style records it (get_timeline's editing_style), and \
+            reading it again for that project returns that version, with newer_version when Sky Studio has a newer one; use \
+            version latest only when the user asks.
             """)
         ],
         examples: [

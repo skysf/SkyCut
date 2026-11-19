@@ -3,8 +3,9 @@ import SrtFlowCore
 
 // 一条上层视频轨或音频轨（`EditLane`）。2026-10-16 从 VideoEditModels.swift 拆出来（那个文件只许降不许涨）。
 //
-// 管什么：轨的身份、段、整轨隐藏、颜色号、轨道头推子，以及它怎么存盘（缺键的默认值）。
-// 不管什么：主轨（`TimelineState.mainClips`，主轨不是 EditLane）、轨道的增删和颜色补号（TimelineState）。
+// 管什么：轨的身份、段、整轨隐藏、颜色号、轨道头推子，以及它怎么存盘（缺键的默认值）；putting a clip into the first lane with
+// room (`place`, moved here from VideoEditModels.swift on 2026-11-19, which may only shrink).
+// 不管什么：主轨（`TimelineState.mainClips`，主轨不是 EditLane）、轨道的删除和颜色补号（TimelineState）。
 
 /// 一条上层视频轨或音频轨：有身份（行的增删不串号）、可整轨隐藏、有自己的颜色。
 struct EditLane: Identifiable, Hashable, Sendable {
@@ -31,6 +32,22 @@ struct EditLane: Identifiable, Hashable, Sendable {
         self.isHidden = isHidden
         self.colorIndex = colorIndex
         self.volume = volume
+    }
+
+    /// Puts a clip into the first lane that is not hidden and has room for it (kept in time order), or a new lane when none has.
+    /// Returns the lane's index (`TimelineState.place`).
+    static func place(_ clip: EditClip, in lanes: inout [EditLane]) -> Int {
+        for index in lanes.indices where !lanes[index].isHidden && fits(clip, in: lanes[index].clips) {
+            lanes[index].clips.append(clip)
+            lanes[index].clips.sort { $0.timelineStart < $1.timelineStart }
+            return index
+        }
+        lanes.append(EditLane(clips: [clip]))
+        return lanes.count - 1
+    }
+
+    private static func fits(_ clip: EditClip, in track: [EditClip]) -> Bool {
+        !track.contains { $0.timelineStart < clip.timelineEnd - 0.001 && clip.timelineStart < $0.timelineEnd - 0.001 }
     }
 }
 

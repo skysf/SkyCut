@@ -47,6 +47,8 @@ struct AIRecipeSkyStudioPart: Sendable {
         var cachedAt: Date?
         /// The SkyCut version the style was checked against, when this SkyCut is older.
         var checkedAgainstNewer: String?
+        /// Sky Studio lists a newer version than the one read (the film is pinned to an older one, SS5 plan 5.5).
+        var newerVersion: String? = nil
     }
 
     var styles: [Style] = []

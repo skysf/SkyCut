@@ -11,6 +11,8 @@
 #   - the App has one library, asking only over SkyStudioAPI.uncachedSession (no system URL cache keeping copies SkyCut cannot
 #     delete) and reading the key silently (never a keychain prompt); only the library asks the content routes;
 #   - what the AI is told when the licence refuses is asked only through SkyStudioAccount (styleRefusal), like aiRefusal.
+#   - the film's record (SS5 plan 5.5) is stamped only inside VideoEditProject.perform's final state (the change's own undo step),
+#     the reads it stamps are noted only by AIRecipeSkyStudio, and get_timeline reports it.
 
 STYLE_LIBRARY="Sources/SrtFlow/SkyStudio/SkyStudioStyleLibrary.swift"
 STYLE_GLUE="Sources/SrtFlow/AIRecipeSkyStudio.swift"
@@ -22,7 +24,7 @@ REPLACE_BODY="$(awk '/private func replaceStored\(/,/^    \}/' "${ACCOUNT}")"
 grep -qF 'SkyStudioStyles.shared.licenceChanged(hasKey: hasKey, entitled: answer?.me.skycut.features.recipes == true)' <<<"${REPLACE_BODY}" \
   || fail "${ACCOUNT}: replaceStored must tell the style library about every stored answer (texts go without recipes, all without a key)"
 
-grep -qF 'case .recipes: return try await AIRecipeSkyStudio.recipes(args)' "${ROUTER}" \
+grep -qF 'case .recipes: return try await AIRecipeSkyStudio.recipes(args, project)' "${ROUTER}" \
   && grep -qF 'let result = try await AIRecipeSkyStudio.save(args)' "${ROUTER}" \
   || fail "${ROUTER}: recipes and save_recipe go through AIRecipeSkyStudio (Sky Studio's list and the licence first)"
 others="$(code_files_with 'AIRecipeTools\.(recipes|save)\(' | grep -v "^${STYLE_GLUE}\$" || true)"
@@ -41,3 +43,14 @@ others="$(code_files_with '\.content(Style|Manifest)\(' | grep -v "^${STYLE_LIBR
 
 others="$(code_files_with 'SkyCutGates\.styleRefusal\(' | grep -v "^${ACCOUNT}\$" || true)"
 [ -z "${others}" ] || fail "these files call SkyCutGates.styleRefusal: $(tr '\n' ' ' <<<"${others}")- only through SkyStudioAccount.styleRefusal"
+
+PROJECT_FILE="Sources/SrtFlow/VideoEditProject.swift"
+PERFORM_BODY="$(awk '/    func perform\(/,/^    \}/' "${PROJECT_FILE}")"
+grep -qF 'state = AIEditingStyleStamp.stamped(next, project: shortID)' <<<"${PERFORM_BODY}" \
+  || fail "${PROJECT_FILE}: perform stamps the film's editing style into its final state (the change's own undo step)"
+others="$(code_files_with 'AIEditingStyleStamp\.stamped\(' | grep -v "^${PROJECT_FILE}\$" || true)"
+[ -z "${others}" ] || fail "these files stamp the editing style outside perform: $(tr '\n' ' ' <<<"${others}")- a read-only call must never write it"
+others="$(code_files_with 'AIEditingStyleStamp\.noteRead\(' | grep -v "^${STYLE_GLUE}\$" || true)"
+[ -z "${others}" ] || fail "these files note style reads: $(tr '\n' ' ' <<<"${others}")- only recipes (AIRecipeSkyStudio) does"
+grep -qF 'object["editing_style"] = AIEditingStyleStamp.report(state)' Sources/SrtFlow/AITimelineTools.swift \
+  || fail "get_timeline does not report editing_style"

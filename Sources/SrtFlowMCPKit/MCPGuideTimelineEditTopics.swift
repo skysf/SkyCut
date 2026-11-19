@@ -21,7 +21,8 @@ enum MCPGuideTimelineEditTopics {
             each with its id, timing and settings; the canvas, the frame rate, and the linkage and magnet switches. Ids can \
             change after edits that recreate items (split_clip, cut_speech, freeze_frame), so read it again before editing. \
             A picture that does not cover the whole canvas at every frame carries picture with fills_frame false, fill_scale and \
-            fills_except (edit_clip section=placement).
+            fills_except (edit_clip section=placement). editing_style is the editing style the film was cut with (recipes; a Sky \
+            Studio style keeps its version, newer_version when Sky Studio has a newer one).
             """),
             MCPGuideSection(name: "limits", about: "edit_limits: native ranges and whether values fail or clamp", text: """
             Limits. edit_limits gives the native ranges SkyCut enforces and whether an out-of-range value is rejected or \

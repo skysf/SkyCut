@@ -15,7 +15,7 @@ func runProductionPersistenceChecks(root: URL) throws {
     let path = root.appendingPathComponent("public-production.skycut")
     try VideoEditProjectIO.save(state, to: path)
     let saved = try JSONSerialization.jsonObject(with: Data(contentsOf: path)) as! [String: Any]
-    check(saved["formatVersion"] as? Int == 38, "production writer hard-codes the expected v38 contract")
+    check(saved["formatVersion"] as? Int == 39, "production writer hard-codes the expected v39 contract")
     let loaded = try VideoEditProjectIO.load(from: path).timeline
     check(loaded.production == state.production, "normal ProjectIO reopens every public production record")
     check(try AIFilmProductionGraph.decode(loaded.production!).count == 3, "reopened declarations pass the same strict graph adapter")
