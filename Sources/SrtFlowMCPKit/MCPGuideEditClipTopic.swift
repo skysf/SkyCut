@@ -64,7 +64,7 @@ enum MCPGuideEditClipTopic {
             throughout, keeping x, y and rotation (a 5° turn on a frame-shaped clip needs about 1.15), and fills_except lists the \
             [from, to] timeline seconds when it fails only part of the time.
             """),
-            MCPGuideSection(name: "sound", about: "volume_db, volume_curve, fades, muted, sound_scene, voice_band_db", text: """
+            MCPGuideSection(name: "sound", about: "volume_db, volume_curve, fades, muted, sound_scene, voice_band_db, sound_role", text: """
             Sound. volume_db sets the clip's level in dB (0 = original), clamped to edit_limits.volume_db; on a clip with a volume_curve \
             it shifts the whole curve and reports saturation. volume_curve replaces the whole curve with points in timeline seconds and \
             dB ([] removes it), joined by straight lines. fade_in and fade_out are audio fades in seconds. muted silences the clip. \
@@ -72,7 +72,10 @@ enum MCPGuideEditClipTopic {
             hall, outdoor, forest or valley: set room_size and distance); intensity is how much of the effect, all 0 to 1; kind=none \
             removes it. voice_band_db lowers only 300-3000 Hz of the clip's own sound (-30 to 0 dB, 0 = off): for a shot whose own \
             rumble covers a voice line while its low hits must keep their weight; lows and highs stay, preview and export alike. \
-            listen mix=true or voice= hears it; listen clip_id and the waveform show the clip before it.
+            listen mix=true or voice= hears it; listen clip_id and the waveform show the clip before it. sound_role saves what the \
+            clip's sound is for inspect_video's sound checks (voice, music, effects, ambience or object; auto clears it and SkyCut \
+            infers it again from where the clip came from): name an imported track music, a wind bed ambience or a clang object \
+            once instead of in sounds on every call. Split halves and separated sound keep it; it changes no sound.
             """),
             MCPGuideSection(name: "animation_markers", about: "entrance and exit animations, markers, hidden", text: """
             Entrance, exit, markers and hiding. entrance and exit are none, fade, rise, pop, zoom or wipe; entrance_duration and \

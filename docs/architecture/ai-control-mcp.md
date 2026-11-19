@@ -1378,6 +1378,12 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     whose own rumble covers a voice line while its low hits must keep their weight. One parameter on `edit_clip` / `edit_clips`
     (requested / applied; out of range refused with a suggestion), shown in get_timeline; the engine runs it in the render
     block, so preview, export and `listen mix=true` agree (`listen clip_id` and the waveform show the clip before it).
+67. **A clip's saved sound role: `edit_clip` `sound_role`** (2026-11-19, MCP-40; contract in [finished-video inspection](finished-video-inspection.md),
+    "Saved sound roles"): voice, music, effects, ambience or object saved on the clip (`EditClip.soundRole`, project format v39) for
+    inspect_video's sound checks, so a role SkyCut can't infer is said once instead of in `sounds` on every call (`sounds` still wins
+    for that call); `auto` clears it. One parameter on `edit_clip` / `edit_clips` (vocabulary `MCPVocabulary.soundRoles` =
+    `ClipSoundRole` + auto, reconciled in `SoundRoleToolChecks`), one undo step, shown in get_timeline and the reply; it changes no
+    sound and never rebuilds the preview. It waited for the tool catalog's room (#511).
 
 ## 五、这一轮、停止、撤销这一轮
 

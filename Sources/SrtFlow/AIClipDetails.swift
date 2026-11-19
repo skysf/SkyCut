@@ -5,6 +5,8 @@ import SrtFlowMCPKit
 // MARK: - edit_clip 的其余设置：旋转、不透明度、翻转、入场出场、音量曲线、声音场景、标记（纯值）
 // Since 2026-11-18 also voice_band_db (MCP-30): only the clip's own 300 Hz–3 kHz lowered, −30…0 dB, out of range refused
 // (VoiceBand; docs/architecture/sound-scenes.md section 5).
+// Since 2026-11-19 also sound_role (MCP-40): what the clip's sound is, saved for inspect_video (`EditClip.soundRole`); auto clears it
+// (inferred again). It describes the sound and changes none of it (docs/architecture/finished-video-inspection.md, "Saved sound roles").
 //
 // 管什么：这几样参数读成类型、互相冲突的挡掉，改一段时换上去（`apply`），以及写回给 AI 看（`summary`）。
 // 能调现成规则的都调：声音场景走 `TimelineState.setSoundSceneKind / setSoundSceneValue`（检查器同一份），
@@ -44,14 +46,21 @@ struct AIClipDetails {
     var volumeCurve: [(time: Double, decibels: Double)]?
     var scene: Scene?
     var voiceBand: Double?
+    /// sound_role: save what the sound is, or (auto) clear what was saved.
+    var soundRole: SoundRole?
     var markers: [Marker]?
+
+    enum SoundRole: Equatable {
+        case save(ClipSoundRole)
+        case clear
+    }
 
     var touchesPicture: Bool {
         rotation != nil || opacity != nil || flipHorizontal != nil || flipVertical != nil || entrance != nil
             || entranceDuration != nil || exit != nil || exitDuration != nil || intensity != nil
     }
 
-    var touchesSound: Bool { volumeCurve != nil || scene != nil || voiceBand != nil }
+    var touchesSound: Bool { volumeCurve != nil || scene != nil || voiceBand != nil || soundRole != nil }
 
     static let presetNames = ClipPresetKind.allCases.map(\.rawValue)
     static let sceneNames = ["none"] + SoundSceneKind.allCases.map(\.rawValue)
@@ -70,6 +79,9 @@ struct AIClipDetails {
         scene = try Self.scene(args)
         voiceBand = try args.double("voice_band_db")
         try AIEditLimits.require("voice_band_db", voiceBand, in: VoiceBand.range)
+        soundRole = try args.choice("sound_role", from: MCPVocabulary.soundRoles).map { name in
+            ClipSoundRole(rawValue: name).map(SoundRole.save) ?? .clear
+        }
         markers = try Self.markers(args)
         if volumeCurve?.isEmpty == false, args.has("volume_db") {
             throw AIToolError("Pass volume_curve or volume_db, not both (volume_db moves an existing curve up or down).")
@@ -132,6 +144,11 @@ struct AIClipDetails {
         try applyPicture(to: &clip)
         try applyCurve(to: &clip)
         if let voiceBand { clip.voiceBandDB = VoiceBand.sanitized(voiceBand) }
+        switch soundRole {
+        case .save(let role)?: clip.soundRole = role
+        case .clear?: clip.soundRole = nil
+        case nil: break
+        }
         try applyMarkers(to: &clip, frameRate: frameRate)
         state.update(id) { $0 = clip }
         switch scene {
@@ -247,6 +264,7 @@ struct AIClipDetails {
             ]
         }
         if clip.voiceBandDB != 0 { object["voice_band_db"] = .number(clip.voiceBandDB) }
+        if let role = clip.soundRole { object["sound_role"] = .string(role.rawValue) }
         let visible = clip.visibleMarkers
         if !visible.isEmpty {
             object["markers"] = .array(visible.map { marker in

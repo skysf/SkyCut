@@ -323,6 +323,7 @@ public enum MCPTimelineTools {
                     "distance": MCPSchema.number("Room and outdoor scenes, 0–1.", minimum: 0, maximum: 1)
                 ], description: "A speaker or place effect on the sound; kind none removes it."),
                 "voice_band_db": MCPSchema.number("Lower only its 300-3000 Hz, -30 to 0 dB; 0 = off.", minimum: -30, maximum: 0),
+                "sound_role": MCPSchema.string("What its sound is, saved for inspect_video; auto = inferred again.", oneOf: MCPVocabulary.soundRoles),
                 "markers": MCPSchema.array(of: MCPSchema.object([
                     "time": MCPSchema.number("Timeline seconds (≥ 0), inside the clip.", minimum: 0),
                     "note": MCPSchema.string("Note shown on the marker."),

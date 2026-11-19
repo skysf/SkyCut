@@ -4,7 +4,7 @@ import SrtFlowCore
 // 52: a clip's saved sound role (EditClip.soundRole, MCP-40, 2026-11-19; VideoEditClipSoundRole.swift,
 // docs/architecture/video-edit-project-file.md v39) — the v39 gate and the key written only when saved, a round trip, an old
 // project without the key and a role this build doesn't know (both: nothing saved), split halves and separated sound carrying
-// it, and the reader refusing the next version.
+// it, and saving one taking the audio-only path (no preview rebuild: it changes no sound).
 
 func checkSoundRole(root: URL) throws {
     let dir = root.appendingPathComponent("sound-role")
@@ -23,6 +23,7 @@ func checkSoundRole(root: URL) throws {
     var none = state
     none.audioTracks[0].clips[1].soundRole = nil
     check(!none.requiresFormatVersion39, "no saved role, no v39 data")
+    check(state.differsOnlyInAudioMix(from: none), "saving a role is no structural change (edit_clip sound_role never rebuilds the preview)")
 
     let file = dir.appendingPathComponent("sound-role.skycut")
     try VideoEditProjectIO.save(state, to: file)

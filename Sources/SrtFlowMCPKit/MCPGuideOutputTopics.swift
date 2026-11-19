@@ -79,9 +79,10 @@ enum MCPGuideOutputTopics {
             MCPGuideSection(name: "sound", about: "cut jumps, sounds past their picture, voice clarity, music swells; sounds", text: """
             Sound checks that need to know what each sound is. sound_roles says what SkyCut took each track's sounds to be: \
             voice (its voice-overs), music (library or generated), effects (library or made), camera (a picture's own sound) or \
-            other (an imported file). Say what it cannot know with sounds: a track, tracks joined with + or a clip id → voice, \
-            music, effects, ambience or object, e.g. {"A1":"voice","A3":"music","c4":"object"}. audio_cut_jump: at a picture \
-            cut the sound of the place (camera, ambience, objects, other) jumps 6 dB or more (full band or above 300 Hz, 0.3 s each \
+            other (an imported file). Say what it cannot know once with edit_clip sound_role (saved on the clip), or for one call \
+            with sounds: a track, tracks joined with + or a clip id → voice, music, effects, ambience or object, e.g. \
+            {"A1":"voice","A3":"music","c4":"object"}; sounds wins over a saved role. audio_cut_jump: at a picture \
+            cut the sound of the place (camera, ambience, objects, other) jumps 6 dB or more (full band or above 200 Hz, 0.3 s each \
             side) and nothing covers it: no voice, music or effect bed within 6 dB, music accent within 3 frames, music entering or \
             stopping, hit or riser at the cut, or a line in the picture's own sound starting or ending within 0.35 s. Fix it with \
             set_transition sound. audio_linger: an object still sounds over 2 frames above -50 dBFS after the picture it starts \
