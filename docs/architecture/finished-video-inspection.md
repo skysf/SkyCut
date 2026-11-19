@@ -233,7 +233,9 @@ the preview's engine; it never edits the project:
 - The voice check: `AIListenVoicePlan` / `AIListenVoiceMeasure` / `AIListenVoiceReport`, the same code as listen voice, over
   every audio track whose clips are all voice (at most 11), inside the checked range.
 - Each sound that may drag past its picture rendered on its own over its frames after the cut (`DeliveryStemPower`; at most 40;
-  more is a limitation).
+  more is a limitation). Which shot a sound belongs to is read against every cut of the timeline; the checked range is applied
+  before the cap, so the 40 are the first ones inside from/to and a narrower range reaches the rest
+  ([case](../bugfixes/2026-11-19-linger-cap-ignores-checked-range.md)).
 
 ### Rules
 
@@ -244,6 +246,12 @@ the preview's engine; it never edits the project:
 | `audio_voice_masked`, `audio_two_voices` | listen voice's verdicts (`probably_unintelligible`, `may_be_hard`; `two_voices`) with the main maskers | The blind test ([listening engine](listening-engine.md) section 7) |
 | `audio_voice_loud` | listen voice's grey hint; listed apart from the suspects in `hints` (no evidence slot, not counted with them) | FL-61, two of the user's remarks |
 | `audio_music_swell` | During a line of the voice check, the music group's voice band (300–3000 Hz) as a running 1 s median rises 6 dB or more above its value where the line began, with music above −60 dBFS for at least 30% of the line | Preview board v1.2's `music_swell`; the second draft's last line |
+
+Where the picture changes (`AIDeliveryCutJumps.pictureCuts`, both rules above): an upper clip hides the cut under it only where it
+is confirmed opaque — no transparency in its media (`sourceAlpha`: a web motion with any clear pixel, a transparent PNG, ProRes 4444
+with alpha), full opacity at that moment, and outside its fade-in / fade-out window, which entrance and exit animations share.
+Anywhere else the picture below decides, so the V1 cut stays a cut; a transparent clip's own edges and an opaque clip's faded edge are
+none. "Fills the frame" alone is geometry and is not enough ([case](../bugfixes/2026-11-19-transparent-overlay-hides-cut-from-inspection.md)).
 
 What these can't know: whether the next shot shows the same thing (mark it intentional), an effect's kind (a riser entering at
 a cut counts as a hit), a voice inside a camera recording (no clean voice: a limitation), a cut inside one clip's source (the
@@ -289,6 +297,10 @@ the first version ran five (2026-11-18). `SRTFLOW_INSPECTION_CASE=sound scripts/
 tail between two files and a bed dropping at 1.0 s. It finishes and reports only the middle cut's jump; on values, the windows at
 the two edges are nil and a two-frame side is still measured. `SRTFLOW_INSPECTION_CASE=edges` runs only it; the full and `sound`
 cases include it. Reverse control: on main before the fix the job trapped (SIGTRAP), so the check binary failed.
+The same file checks, without a job, picture cuts under an upper clip (opaque, clear pixels, half opacity, fading or wiping in) and
+the pair through `AIDeliverySound.prepare` and the cut_jumps rule (an opaque V2 hides the V1 jump, a transparent one of the same
+size does not), and the linger cap inside a range (41 objects; a range holding the last cut measures and reports that one).
+Reverse controls: the old upper-track filter fails five of these assertions, a cap before the range three.
 
 Reverse controls (2026-11-18), each restored afterwards: with the four second-tier entries skipped in the registry run, five
 production assertions fail (the jump, the linger, the masked line, the swell, the jump's key); with the bed cover removed, the
