@@ -47,6 +47,7 @@
 - [2026-11-17 Changing the canvas silently stretches clips framed for the old shape](2026-11-17-canvas-change-stretches-framed-clips.md) — Values stored relative to the canvas need a rule for when it changes: keep x, y and scale, never re-crop, and tell the AI.
 - [2026-11-17 A canvas change narrows preset text boxes and loses their snug width](2026-11-17-canvas-preset-wrap-width.md) — Automatic wraps need the final scaled and clamped style; test the narrow canvas and the next edit as well as the round trip.
 - [2026-11-04 换 Key 后旧模型目录回填](2026-11-04-catalog-cache-key-change.md) — 缓存失效要带 epoch，拦住迟到的写回。
+- [2026-11-19 Checks left thousands of preference files in the developer's home](2026-11-19-check-defaults-leftovers.md) — Removing a defaults domain leaves its plist, and cfprefsd rewrites one deleted within about 10 s: name test suites by a temporary path; delete a staged app's domain only after it settles.
 - [2026-10-03 一条扫描被 bash 3.2 花括号展开拆开，从没生效](2026-10-03-check-mcp-undo-scan-split-by-brace-expansion.md) — 守卫里先把命令替换赋给变量再比；反向验证用 `/bin/bash`。
 - [2026-09-18 自检脚本的源文件清单漏掉新依赖](2026-09-18-check-script-source-list-drift.md) — 手抄的清单会漂。
 - [2026-09-29 没下载苹方的 Mac 上中文字幕烧成方框](2026-09-29-chinese-burns-as-boxes-without-pingfang.md) — CoreText 找得到不等于 libass 找得到：回退到私有字体时两边一起换内置字体。

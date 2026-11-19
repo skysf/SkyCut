@@ -343,6 +343,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/source-file-size.sh` — 单文件超过 600 行就红、老文件只许降（变短了跑 `--update`）。
 - `checks/subtitle-editing-wiring.sh` — 字幕编辑期间全局快捷键让路。
 - `checks/test-app-cleanup.sh` — Check, render, and smoke bundles are unregistered and removed on exit, including failures.
+- `checks/test-defaults-cleanup.sh` — Checks leave no preferences in the login home: suites only via `ScratchDefaults`, staged check apps' domains removed once cfprefsd wrote them.
 - `checks/timeline-clipboard-wiring.sh` — 复制粘贴的接线、落点鼠标优先、剪贴板只有一套。
 - `checks/timeline-drag-wiring.sh` — 时间线拖动 / 框选 / 缩放 / 联动 / 开关的接线，整条时间线只许一个 `.onDrop`（分节在 `checks/timeline-drag-wiring/`）。
 - `checks/transition-handles-wiring.sh` — 主轨转场借余料、定格补足、可点选可删除的接线。
