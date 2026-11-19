@@ -21,7 +21,8 @@
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
   library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
   both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery,
-  portable font/system warnings, and over-long durations / frame rates (AI calls, a reopened project) refused before any job. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  portable font/system warnings, over-long durations / frame rates (AI calls, a reopened project) refused before any job, and
+  same-fingerprint renders that keep the cached movie (reuse, a failed install, another system identity, a Save As mid-install). `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
   Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
   fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled

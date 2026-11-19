@@ -320,6 +320,7 @@
 - [2026-11-19 An over-long web-motion duration quit SkyCut before it could be refused](2026-11-19-web-motion-huge-duration-quits-app.md) — Range-check before converting: a finite number is not an in-range one, and a value read back from a project file is input too.
 - [2026-11-18 Web-motion memory accounting missed pages that had not finished loading](2026-11-18-web-motion-load-memory-window.md) — Discover live pages before ready and retry identities with an immutable birth ceiling; retain safe cleanup history.
 - [2026-11-17 A web-motion render overwrites track edits](2026-11-17-web-motion-render-overwrites-track-edits.md) — Async clip checks include lane identity and visibility; a vertical move need not change EditClip.
+- [2026-11-19 A same-fingerprint web-motion re-render could delete the movie a clip was using](2026-11-19-web-motion-rerender-deletes-cached-movie.md) — Replace a file others may be reading with one rename of a staged copy after every check, never remove-then-move; reuse a checked cache instead of forcing a render.
 - [2026-11-05 官网 404 被标成英文首页的副本](2026-11-05-website-404-canonical-is-home.md) — 错误页有独立 canonical，确认 / 404 页不收录。
 - [2026-11-05 官网演示停在封面且轨道像宽图](2026-11-05-website-demos-stall-on-posters.md) — 视口内主动加载、用解码器时钟；还原旧代码确认守卫变红。
 - [2026-11-05 官网未正确识别部分中文设备语言](2026-11-05-website-device-language-falls-back.md) — 根入口按首选语言匹配，所有中文变体用简中，不支持的默认英文。
