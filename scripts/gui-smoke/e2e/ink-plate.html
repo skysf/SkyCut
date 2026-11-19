@@ -1,0 +1,10 @@
+<!doctype html>
+<html><body style="margin:0;background:transparent">
+<div id="mark" style="position:absolute;left:8%;top:12%;width:18%;height:22%"></div>
+<script>
+const mark = document.getElementById('mark');
+window.motion = { frame(t) {
+  mark.style.background = window.MOTION_PARAMS.ink;
+  mark.style.opacity = t < 0.25 ? '0.5' : '1';
+}};
+</script></body></html>

@@ -84,12 +84,17 @@ class MCP:
         return [t["name"] for t in self.request("tools/list")["result"]["tools"]]
 
     def call(self, name, args=None, timeout=180):
+        data, error, _ = self.call_with_content(name, args, timeout)
+        return data, error
+
+    def call_with_content(self, name, args=None, timeout=180):
         reply = self.request("tools/call", {"name": name, "arguments": args or {}}, timeout=timeout)
         result = reply.get("result") or {}
-        text = next((c["text"] for c in result.get("content", []) if c.get("type") == "text"), "")
+        content = result.get("content", [])
+        text = next((c["text"] for c in content if c.get("type") == "text"), "")
         try: data = json.loads(text)
         except Exception: data = text
-        return data, bool(result.get("isError"))
+        return data, bool(result.get("isError")), content
 
     def wait_job(self, job_id, seconds=120):
         end = time.time() + seconds

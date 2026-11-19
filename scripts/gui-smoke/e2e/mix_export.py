@@ -76,6 +76,11 @@ def verify_mix_export(session, work, ffmpeg):
     decoded_peak = float(re.search(r"Peak:\s+(-?[0-9.]+) dBFS", measured)[1])
     near(finished["audio_peak_dbtp"], decoded_peak, 0.4, "export reports the delivered AAC true peak")
     assert decoded_peak < -0.2, f"Export clipped after limiting: {decoded_peak} dBTP"
+    report = session.job(session.edit("inspect_video", image=False, **{"from": 1, "to": 1.5}))
+    findings = {item["kind"]: item for item in report["findings"]}
+    assert {"audio_overload", "audio_limiter"} <= findings.keys(), report["findings"]
+    overload = findings["audio_overload"]
+    assert overload["loudest_layers"] and overload["peak_dbtp"] > 0 > overload["output_peak_dbtp"], overload
     print("MCP mix/export passed: layer gains, bus overload, limiter, AAC true peak and destination preflight", flush=True)
 
 
