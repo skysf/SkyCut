@@ -8,6 +8,8 @@ import SrtFlowCore
 // the user said Replace (docs/architecture/export-settings.md §5), otherwise never replacing anything — a name taken since
 // the folder was listed moves the video on to the next free number (ExclusivePlacement). When the destination is another
 // drive that is a full copy of a file that can be gigabytes, so it runs on its own queue and never on the main thread.
+// A Compress / Burn In encode hands its finished file over the same way, always as a new file (EncodeJob: ffmpeg wrote it
+// next to the target, so the move is a rename).
 // What it doesn't: checking the destination before the export (ExportDestinationProbe); picking the name
 // (AIExportDestination, the export panel); cleaning the workspace (VideoEditExporter).
 //
