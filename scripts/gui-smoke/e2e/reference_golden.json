@@ -1,0 +1,686 @@
+{
+  "frames": {
+    "after subtitle": {
+      "rgb": [
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ]
+      ],
+      "white_ink": []
+    },
+    "alpha still": {
+      "preview_rgb": [
+        [
+          195,
+          79,
+          56
+        ],
+        [
+          219,
+          144,
+          57
+        ],
+        [
+          236,
+          194,
+          56
+        ],
+        [
+          195,
+          79,
+          56
+        ]
+      ],
+      "rgb": [
+        [
+          195,
+          65,
+          50
+        ],
+        [
+          218,
+          134,
+          52
+        ],
+        [
+          236,
+          185,
+          50
+        ],
+        [
+          195,
+          65,
+          50
+        ]
+      ]
+    },
+    "alpha video": {
+      "preview_rgb": [
+        [
+          195,
+          79,
+          56
+        ],
+        [
+          124,
+          145,
+          56
+        ],
+        [
+          62,
+          207,
+          54
+        ],
+        [
+          195,
+          79,
+          56
+        ]
+      ],
+      "rgb": [
+        [
+          195,
+          65,
+          50
+        ],
+        [
+          112,
+          135,
+          50
+        ],
+        [
+          30,
+          203,
+          47
+        ],
+        [
+          195,
+          65,
+          50
+        ]
+      ]
+    },
+    "base": {
+      "rgb": [
+        [
+          195,
+          65,
+          50
+        ],
+        [
+          195,
+          65,
+          50
+        ],
+        [
+          195,
+          65,
+          50
+        ],
+        [
+          195,
+          65,
+          50
+        ]
+      ]
+    },
+    "native title": {
+      "rgb": [
+        [
+          37,
+          74,
+          146
+        ],
+        [
+          50,
+          84,
+          147
+        ],
+        [
+          37,
+          74,
+          146
+        ],
+        [
+          37,
+          74,
+          146
+        ]
+      ],
+      "white_ink": [
+        117,
+        81,
+        201,
+        98
+      ]
+    },
+    "stray": {
+      "rgb": [
+        [
+          41,
+          195,
+          61
+        ],
+        [
+          41,
+          195,
+          61
+        ],
+        [
+          41,
+          195,
+          61
+        ],
+        [
+          41,
+          195,
+          61
+        ]
+      ]
+    },
+    "subtitle": {
+      "rgb": [
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ],
+        [
+          40,
+          63,
+          87
+        ]
+      ],
+      "white_ink": [
+        131,
+        163,
+        188,
+        167
+      ]
+    },
+    "web motion": {
+      "preview_rgb": [
+        [
+          42,
+          85,
+          157
+        ],
+        [
+          56,
+          94,
+          159
+        ],
+        [
+          42,
+          85,
+          157
+        ],
+        [
+          227,
+          41,
+          186
+        ]
+      ],
+      "rgb": [
+        [
+          37,
+          74,
+          146
+        ],
+        [
+          50,
+          84,
+          147
+        ],
+        [
+          37,
+          74,
+          146
+        ],
+        [
+          221,
+          24,
+          175
+        ]
+      ]
+    }
+  },
+  "sound": {
+    "aac_bands": {
+      "after cut": [
+        -60.0,
+        -9.04
+      ],
+      "before cut": [
+        -25.07,
+        -60.0
+      ],
+      "ducking": [
+        -40.99,
+        -30.98
+      ],
+      "fade into cut": [
+        -26.4,
+        -14.69
+      ],
+      "fade out of cut": [
+        -28.91,
+        -10.42
+      ],
+      "voice band": [
+        -13.55,
+        -21.66,
+        -18.67
+      ]
+    },
+    "delivered": [
+      -15,
+      -1.1
+    ],
+    "levels": {
+      "A3": [
+        -17.9,
+        -10.8
+      ],
+      "A4": [
+        -23.7,
+        -0.9
+      ],
+      "A5": [
+        -27.4,
+        -11
+      ],
+      "rest": [
+        -18,
+        -12
+      ]
+    },
+    "mix": [
+      -16.2,
+      -0.8,
+      -13.8
+    ],
+    "range": [
+      0,
+      4
+    ]
+  },
+  "subtitle": {
+    "box": [
+      0.4,
+      0.89,
+      0.19,
+      0.06
+    ],
+    "end": 4.75,
+    "start": 4.25,
+    "text": "FIELD CAPTION"
+  },
+  "timeline": {
+    "canvas": {
+      "height": 180,
+      "ratio": "auto",
+      "width": 320
+    },
+    "duration": 6,
+    "fps": 24,
+    "shapes": [
+      {
+        "animation_in": "draw",
+        "animation_out": "draw",
+        "color": "#FFFFFFEB",
+        "end": 3.7,
+        "height": 0.143,
+        "kind": "rectangle",
+        "line_width": 3,
+        "motion_preset": "frame_reveal",
+        "start": 2.5,
+        "width": 0.312,
+        "x": 0.5,
+        "y": 0.5
+      }
+    ],
+    "subtitles": {
+      "original": {
+        "lines": 1
+      }
+    },
+    "texts": [
+      {
+        "animation_in": "wipe",
+        "animation_out": "fade",
+        "color": "#FFFFFF",
+        "end": 4,
+        "font": "Avenir Next",
+        "font_size": 64,
+        "letter_spacing": 22,
+        "motion_preset": "frame_reveal",
+        "start": 2.6,
+        "text": "CUT STUDY",
+        "x": 0.505,
+        "y": 0.526
+      },
+      {
+        "animation_in": "fade",
+        "animation_out": "fade",
+        "color": "#FFFFFF",
+        "end": 4,
+        "font": "Avenir Next Medium",
+        "font_size": 30,
+        "letter_spacing": 14,
+        "motion_preset": "frame_reveal",
+        "start": 2.65,
+        "text": "TAKE ONE",
+        "x": 0.504,
+        "y": 0.466
+      }
+    ],
+    "tracks": [
+      {
+        "clips": [
+          {
+            "end": 2,
+            "file": "amber.mp4",
+            "kind": "video",
+            "link_group": 1,
+            "muted": true,
+            "name": "amber",
+            "source_in": 0.5,
+            "source_out": 2.5,
+            "source_size": "320\u00d7180",
+            "start": 0
+          },
+          {
+            "end": 4,
+            "file": "blue.mp4",
+            "kind": "video",
+            "link_group": 2,
+            "muted": true,
+            "name": "blue",
+            "source_in": 0.5,
+            "source_out": 2.5,
+            "source_size": "320\u00d7180",
+            "start": 2
+          },
+          {
+            "end": 6,
+            "file": "slate.mp4",
+            "kind": "video",
+            "name": "slate",
+            "source_in": 0.5,
+            "source_out": 2.5,
+            "source_size": "320\u00d7180",
+            "start": 4
+          }
+        ],
+        "kind": "video",
+        "track": "V1"
+      },
+      {
+        "clips": [
+          {
+            "end": 1.25,
+            "file": "alpha.mov",
+            "has_audio": false,
+            "kind": "video",
+            "name": "alpha",
+            "source_in": 0,
+            "source_out": 0.75,
+            "source_size": "320\u00d7180",
+            "start": 0.5
+          },
+          {
+            "end": 1.875,
+            "file": "still.png",
+            "kind": "image",
+            "name": "still",
+            "source_in": 0,
+            "source_out": 0.5,
+            "source_size": "320\u00d7180",
+            "start": 1.375
+          }
+        ],
+        "kind": "video",
+        "track": "V2"
+      },
+      {
+        "clips": [
+          {
+            "end": 4,
+            "has_audio": false,
+            "kind": "video",
+            "name": "Ink plate",
+            "source_in": 0,
+            "source_out": 0.75,
+            "source_size": "320\u00d7180",
+            "start": 3.25,
+            "web_motion": {
+              "duration": 0.75,
+              "fields": [
+                {
+                  "key": "ink",
+                  "label": "Ink",
+                  "type": "color"
+                }
+              ],
+              "fonts": [],
+              "hit": 0.25,
+              "parameters": {
+                "duration": 0.75,
+                "hit": 0.25,
+                "ink": "#DE18B0"
+              },
+              "renderer": 1
+            }
+          }
+        ],
+        "kind": "video",
+        "track": "V3"
+      },
+      {
+        "clips": [
+          {
+            "end": 2.25,
+            "fade_out": 0.5,
+            "file": "amber.mp4",
+            "kind": "audio",
+            "link_group": 1,
+            "name": "amber",
+            "source_in": 0.5,
+            "source_out": 2.75,
+            "start": 0,
+            "volume_curve": [
+              {
+                "db": 0,
+                "time": 1.75
+              },
+              {
+                "db": 1,
+                "time": 1.813
+              },
+              {
+                "db": 1.8,
+                "time": 1.875
+              },
+              {
+                "db": 2.5,
+                "time": 1.938
+              },
+              {
+                "db": 3,
+                "time": 2
+              },
+              {
+                "db": 3.4,
+                "time": 2.063
+              },
+              {
+                "db": 3.7,
+                "time": 2.125
+              },
+              {
+                "db": 3.9,
+                "time": 2.188
+              },
+              {
+                "db": 0,
+                "time": 2.25
+              }
+            ],
+            "volume_db": 0,
+            "volume_db_at": "clip_start"
+          }
+        ],
+        "kind": "audio",
+        "track": "A1"
+      },
+      {
+        "clips": [
+          {
+            "end": 4,
+            "fade_in": 0.5,
+            "file": "blue.mp4",
+            "kind": "audio",
+            "link_group": 2,
+            "name": "blue",
+            "source_in": 0.25,
+            "source_out": 2.5,
+            "start": 1.75,
+            "volume_curve": [
+              {
+                "db": 0,
+                "time": 1.75
+              },
+              {
+                "db": 3.9,
+                "time": 1.813
+              },
+              {
+                "db": 3.7,
+                "time": 1.875
+              },
+              {
+                "db": 3.4,
+                "time": 1.938
+              },
+              {
+                "db": 3,
+                "time": 2
+              },
+              {
+                "db": 2.5,
+                "time": 2.063
+              },
+              {
+                "db": 1.8,
+                "time": 2.125
+              },
+              {
+                "db": 1,
+                "time": 2.188
+              },
+              {
+                "db": 0,
+                "time": 2.25
+              }
+            ],
+            "volume_db": 0,
+            "volume_db_at": "clip_start"
+          }
+        ],
+        "kind": "audio",
+        "track": "A2"
+      },
+      {
+        "clips": [
+          {
+            "end": 1.25,
+            "file": "narrator.wav",
+            "kind": "audio",
+            "name": "narrator",
+            "source_in": 0,
+            "source_out": 1,
+            "start": 0.25,
+            "voice_band_db": -12
+          }
+        ],
+        "kind": "audio",
+        "track": "A3"
+      },
+      {
+        "clips": [
+          {
+            "end": 5.75,
+            "file": "accents.wav",
+            "kind": "audio",
+            "name": "accents",
+            "source_in": 0,
+            "source_out": 5.25,
+            "start": 0.5,
+            "volume_curve": [
+              {
+                "db": -10,
+                "time": 0.5
+              },
+              {
+                "db": -10,
+                "time": 1.25
+              },
+              {
+                "db": 0,
+                "time": 1.75
+              }
+            ],
+            "volume_db": -10,
+            "volume_db_at": "clip_start"
+          }
+        ],
+        "kind": "audio",
+        "track": "A4"
+      },
+      {
+        "clips": [
+          {
+            "end": 3.6,
+            "file": "tick-5c65b1e1.m4a",
+            "kind": "audio",
+            "name": "tick-5c65b1e1",
+            "source_in": 0,
+            "source_out": 0.101,
+            "start": 3.499,
+            "volume_db": -10
+          }
+        ],
+        "kind": "audio",
+        "track": "A5"
+      }
+    ]
+  }
+}

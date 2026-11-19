@@ -1,5 +1,7 @@
 """Launch and clean up an isolated SkyCut, then run production MCP workflows."""
 
+import argparse
+import base64
 from contextlib import contextmanager
 import os
 from pathlib import Path
@@ -15,6 +17,9 @@ import time
 
 from fixture_license import KEY, license_server
 from mix_export import make_media, verify_mix_export
+from reference_edits import add_picture, add_titles, check_delivery_marks, check_freeze_and_ripple, check_save_and_versions, edit_sound
+from reference_media import make_reference_media
+from reference_output import check_reference_output
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcpclient import MCP
@@ -107,25 +112,41 @@ class Session:
         self.project = None
 
     def call(self, tool, **arguments):
-        data, error = self.client.call(tool, arguments, timeout=40)
-        assert not error and isinstance(data, dict), f"{tool} {arguments} failed: {data}"
-        assert not data.get("needs_confirmation"), f"{tool} unexpectedly asked for confirmation: {data}"
+        data, _ = self.response(tool, arguments)
         return data
+
+    def response(self, tool, arguments):
+        data, error, content = self.client.call_with_content(tool, arguments, timeout=40)
+        assert not error and isinstance(data, dict), f"{tool} {arguments} failed: {data}"
+        assert data.get("status") != "needs_confirmation", f"{tool} unexpectedly asked for confirmation: {data}"
+        return data, content
 
     def edit(self, tool, **arguments):
         assert self.project is not None
         return self.call(tool, project=self.project, **arguments)
 
     def job(self, started):
+        result, _ = self.wait_job(started)
+        return result
+
+    def wait_job(self, started):
         deadline = time.monotonic() + 60
         job_id = started["job_id"]
         while True:
-            job = self.call("get_job", job_id=job_id, wait_seconds=5)
+            job, content = self.response("get_job", {"job_id": job_id, "wait_seconds": 5})
             if job["status"] == "done":
-                return job
+                return job, content
             assert job["status"] in {"queued", "running"} and not job.get("waiting_for_user"), job
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"Job {job_id} still {job['status']} after 60 seconds")
+
+    def look(self, **arguments):
+        result, content = self.response("look", {"project": self.project, **arguments})
+        if "job_id" in result:
+            finished, content = self.wait_job(result)
+            result = finished["result"]
+        image, = [item for item in content if item["type"] == "image"]
+        return result, base64.b64decode(image["data"], validate=True)
 
     def new_project(self, work, name):
         self.call("open_folder", path=str(work))
@@ -147,10 +168,14 @@ class Session:
             time.sleep(0.1)
 
 
-def main(bundle, ffmpeg):
+def main(bundle, ffmpeg, update_goldens):
     work = bundle.parent / "work"
     work.mkdir()
-    make_media(work, ffmpeg)
+    if not update_goldens:
+        make_media(work, ffmpeg)
+    reference = work / "reference"
+    reference.mkdir()
+    make_reference_media(reference, ffmpeg)
     with license_server() as base, app_process(bundle, ffmpeg, base) as socket:
         environment = dict(os.environ, SRTFLOW_MCP_SOCKET=str(socket), SRTFLOW_MCP_NO_LAUNCH="1",
                            SRTFLOW_MCP_APP=str(bundle))
@@ -159,14 +184,37 @@ def main(bundle, ffmpeg):
         try:
             session = Session(client)
             session.authorized()
-            verify_mix_export(session, work, ffmpeg)
+            if not update_goldens:
+                verify_mix_export(session, work, ffmpeg)
+                session.edit("close_project")
+            run_reference(session, reference, ffmpeg, update_goldens)
         finally:
             client.close()
+
+
+def run_reference(session, work, ffmpeg, update_goldens):
+    document = session.new_project(work, "Reference")
+    picture = add_picture(session)
+    check_delivery_marks(session)
+    check_freeze_and_ripple(session, picture)
+    print("MCP reference cut: source reminders, intentional findings and ripple passed", flush=True)
+    edit_sound(session, picture)
+    add_titles(session)
+    check_save_and_versions(session, document)
+    print("MCP reference cut: sound edits, motion and saved versions passed", flush=True)
+    check_reference_output(session, work, ffmpeg, update_goldens)
 
 
 if __name__ == "__main__":
     if not __debug__:
         raise SystemExit("E2E assertions require Python without optimization")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("bundle", type=Path)
+    parser.add_argument("ffmpeg", type=Path)
+    parser.add_argument("--update-goldens", action="store_true")
+    args = parser.parse_args()
+    if args.update_goldens and os.environ.get("CI"):
+        parser.error("Golden results may only be updated explicitly on a developer Mac")
     started = time.monotonic()
-    main(*(Path(value).resolve(strict=True) for value in sys.argv[1:]))
+    main(args.bundle.resolve(strict=True), args.ffmpeg.resolve(strict=True), args.update_goldens)
     print(f"E2E fixture and workflows completed in {time.monotonic() - started:.1f}s")

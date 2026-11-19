@@ -600,9 +600,14 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 
 ## 五、要真实窗口、但已经自动化了的检查
 
+- `scripts/check-e2e-gui.sh` runs in the CI graphical session. It presses the folder chooser and fallback controls with a
+  fixture panel, restores a saved version, adds a native motion preset, and places and re-renders a project web motion.
+  Use the real-machine lists for the system's open/save service and removable drives, sheet and menu presentation,
+  scrolling or dragging cards, and visual fit across languages and themes. Coverage and local invocation are in the [check catalog](check-catalog.md).
+
 - 工作台 AI 徽章：`scripts/check-workbench-toolbar.sh` 真正渲染生产背景，浅色 / 深色、运行 / 完成时都不能让后景透过；与小窗口真实截图一起核对，见 [工作台](../architecture/workbench-and-settings.md)。
 
-有些检查**不需要人来操作**，只是需要一个图形会话（会建真实的 `NSWindow` /
+下面这些独立检查**不需要人来操作**，只是需要一个图形会话（会建真实的 `NSWindow` /
 `NSPanel`）。它们**故意不进 `scripts/check-all.sh`** —— 那条是本地与 CI 的统一入口，
 无图形会话的环境（SSH、别的 runner）跑起来会假红。改到对应模块时在本机跑一遍：
 
