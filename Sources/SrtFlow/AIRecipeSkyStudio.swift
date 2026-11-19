@@ -37,10 +37,12 @@ enum AIRecipeSkyStudio {
         if let style = found, style.source == .skyStudio {
             if let refusal = SkyStudioAccount.shared.styleRefusal { throw AIToolError(refusal) }
             let asked = try args.string("version")
-            // The film keeps the version it was cut with (D8, FL-15): no version asked = the one it records.
-            let pinned = record.flatMap { $0.isPinned && $0.id == style.id ? $0.version : nil }
+            // The film keeps the version it was cut with (D8, FL-15): no version asked = the one it records, matched on id + version
+            // + the checksum it records (Codex review CXS1 #5), so the film gets exactly that version and the answer says which.
+            let pin = record.flatMap { $0.isPinned && $0.id == style.id ? $0 : nil }
+            let version = asked ?? pin?.version
             do {
-                let read = try await library.read(style.id, version: asked ?? pinned)
+                let read = try await library.read(style.id, version: version, sha256: version == pin?.version ? pin?.sha256 : nil)
                 let newest = listing.styles.first { $0.id == style.id }?.version
                 sky.read = Self.read(read, newer: newest == read.style.version ? nil : newest)
                 if newest == nil {

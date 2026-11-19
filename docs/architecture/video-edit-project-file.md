@@ -167,8 +167,8 @@ audio/preview/version data flow, and real preview/export black frames and durati
 ### The editing style a film was cut with (v39, 2026-11-19)
 
 `TimelineState.editingStyle` records the editing style the AI followed (SS-5, FL-15; [AI control](ai-control-mcp.md) item 32): a
-Sky Studio style's id, version and text checksum (pinned: reading it again for this film returns that version until the user moves
-it with `version=latest`), or a preset's / the user's own id, source, SkyCut version and checksum (recorded, never pinned).
+Sky Studio style's id, version and text checksum (pinned: reading it again for this film returns exactly that version, matched on id,
+version and checksum and never on the text alone, until the user moves it with `version=latest`), or a preset's / the user's own id, source, SkyCut version and checksum (recorded, never pinned).
 It is part of the timeline, so it goes with undo, the round's undo and saved versions. It is written only inside an AI change:
 `recipes` notes what a session read for a project (`AIEditingStyleStamp.noteRead`), and that session's next `perform` on the project
 that changes something puts the record into the same final state (`AIEditingStyleStamp.stamped`), one undo step with the change.

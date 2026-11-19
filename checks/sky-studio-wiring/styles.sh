@@ -54,3 +54,5 @@ others="$(code_files_with 'AIEditingStyleStamp\.noteRead\(' | grep -v "^${STYLE_
 [ -z "${others}" ] || fail "these files note style reads: $(tr '\n' ' ' <<<"${others}")- only recipes (AIRecipeSkyStudio) does"
 grep -qF 'object["editing_style"] = AIEditingStyleStamp.report(state)' Sources/SrtFlow/AITimelineTools.swift \
   || fail "get_timeline does not report editing_style"
+grep -qF 'library.read(style.id, version: version, sha256: version == pin?.version ? pin?.sha256 : nil)' "${STYLE_GLUE}" \
+  || fail "${STYLE_GLUE}: a film's pinned version is read by id + version + the checksum it records (Codex review CXS1 #5)"
