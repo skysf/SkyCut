@@ -122,6 +122,7 @@
 - [2026-10-14 Kokoro 的 speed 调到 0.85 几乎听不出慢](2026-10-14-kokoro-speed-barely-changes.md) — 参数名叫 speed 不等于线性管语速：量结果、按结果调（按时长对准）。
 - [2026-09-28 英文男声的配音开头爆音](2026-09-28-kokoro-voiceover-clipping.md) — 合成器的采样不保证在 ±1 以内：写文件只经 `AIAudioFileWriter`、先过 `AIVoiceLevel`。
 - [2026-09-24 本地化守卫不扫 `LabeledContent`](2026-09-24-labeledcontent-missing-from-localization-guard.md) — 按调用名清单扫的守卫，清单外整类调用是静默盲区。
+- [2026-11-19 A narrower range still could not reach the 41st sound past its picture](2026-11-19-linger-cap-ignores-checked-range.md) — Apply the caller's range before a cap, never after; keep the context that decides meaning (every cut) apart from what is measured.
 - [2026-10-15 裁掉说的话的字幕留在原地、和下一句叠](2026-10-15-linkage-deletes-subtitles-whose-speech-was-trimmed.md) — 一条规矩的理由只对一类东西成立时，别照搬给另一类。
 - [2026-10-15 换源之后压在上面的东西被挪了一个偏移](2026-10-15-linkage-follows-source-shift-after-swap.md) — 同 id 换素材按改之前的素材和入点记账（`Piece.rebased`）。
 - [2026-10-15 联动把字幕当一整块挪](2026-10-15-linkage-moves-subtitles-as-a-block.md) — 字幕句两头各自换算（`LinkageCueFollow`）；判「还剩多少」要量对东西。
@@ -171,12 +172,14 @@
 - [2026-11-18 AI project-template reuse loses the official origin](2026-11-18-official-template-origin-on-reuse.md) — Preserve a resolved source identity separately from the ID used to find it; UI and AI copies must retain the same defaults.
 - [2026-11-18 Official collision title does not fade with its duration](2026-11-18-official-word-shadow-fade.md) — Compare actual pixels at common times; a duration change must not pass merely because its frame count changed.
 - [2026-11-17 Projects saved before the freeze fix still delete the clip with its freeze tail](2026-11-17-old-freeze-tails-stay-linked.md) — Fixing how data is made leaves the data already made: repair old files on open; pieces of one clip in one link group play in step.
+- [2026-11-19 A one-frame head or tail at 60 fps crashed inspect_video](2026-11-19-one-frame-edge-crashes-inspection.md) — Check a window's bounds as numbers before building a range: a trap stops the app and no job can catch it; test edges at every frame rate.
 - [2026-08-04 半透明绿底](2026-08-04-opacity-green-background.md) — 默认合成器背景陷阱。
 - [2026-10-17 open_folder 的结果里 output_folder 还是上一个](2026-10-17-open-folder-reports-previous-output-folder.md) — task-local 里只放整个调用里不变的身份，会变的状态现查。
 - [2026-11-17 Exported text and shape animations repeat a frame now and then](2026-11-17-overlay-export-repeats-a-frame.md) — Count overlay frames as frame numbers (`FrameGrid`), never floor time × fps; nothing ffmpeg matches to an output frame may sit exactly on the grid.
 - [2026-10-05 上层轨带缓动的关键帧，成片里边缘错开](2026-10-05-overlay-matte-drops-keyframe-easing.md) — 从旧关键帧构造新关键帧只走 remapped / clipped / stretched。
 - [2026-11-10 AI 把「画质尽量好」当成点名规格，跳过确认](2026-11-10-overrides-best-quality-skips-approval.md) — 普通生成 / upscale / 角色越档要在 `user_request` 的原话里找得到规格的名字；官方原创短片只查带没带原话。
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
+- [2026-11-19 Two AI exports into one folder could pick the same name, and the second replaced the first](2026-11-19-parallel-ai-exports-pick-the-same-name.md) — A copy of shared state taken before an `await` is a snapshot: pick and reserve after it in one step, and claim the name atomically when writing.
 - [2026-09-26 字幕比声音早 0.9 秒、片段开头的词丢了](2026-09-26-pause-stretches-next-word.md) — 识别器给的词时间不是开口时间（停顿被并进相邻的词）：先估开口。
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
@@ -237,6 +240,7 @@
 - [2026-09-24 选了声音场景却看不见选的是哪个](2026-09-24-sound-scene-row-widens-inspector.md) — 检查器一行不许比窄栏宽、菜单 Picker 不锁宽度；界面改动要在真窗口里看一眼。
 - [2026-11-17 Source description needed reader and model contracts](2026-11-17-source-description-read-and-model-contracts.md) — Keep real sound edges, reserve only installed speech models, and check cancellation after the final asynchronous stage.
 - [2026-09-21 源文件清单守卫只盯着枢纽文件](2026-09-21-source-list-guard-only-watched-the-hub.md) — 守卫要扫清单里的每一个文件；别开只有 extension 的文件。
+- [2026-11-19 A clip only the shallow start of a duck's ramp reaches stacks another dip on every call](2026-11-19-speech-duck-stacks-on-shallow-ramp.md) — A measure-then-set rule must read every case the drawing reaches: a filter on the reader (only points half way down) left a whole case reading 0.
 - [2026-09-26 分割丢了隐藏和音频库的键](2026-09-26-split-drops-hidden-and-library-key.md) — 从旧段构造新段别手写逐字段：加字段时每一处都要过一遍。
 - [2026-09-28 删掉分割出来的一块，整条素材连声音全没了](2026-09-28-split-links-every-piece-together.md) — 从旧段构造新段时身份类字段（id、组号）不能照抄：分割走 `LinkRegrouping.split`。
 - [2026-09-26 字幕叠在一起时点英文落到中文上](2026-09-26-stacked-subtitle-frame-lands-on-translation.md) — `PreferenceKey.reduce` 不许写成 `value = nextValue()`。
@@ -287,6 +291,7 @@
 - [2026-09-20 拖短转场时遮罩整块往右挪](2026-09-20-transition-mask-drifts-when-shortened.md) — 宽度有下限时，位置要跟着补偿。
 - [2026-09-20 磁吸关着时转场预览有、成片没有](2026-09-20-transition-preview-export-divergence.md) — 「两段是否相叠」两条管线只许一套判据；断言要造不相叠的几何。
 - [2026-08-09 翻译第二次卡在 0/N](2026-08-09-translate-stuck-at-zero.md) — configuration 换代与看门狗。
+- [2026-11-19 A transparent title over a cut hid that cut from inspect_video](2026-11-19-transparent-overlay-hides-cut-from-inspection.md) — "Fills the frame" is geometry, not "hides what is under it": an upper picture hides a cut only with no alpha in its media, full opacity and no fade.
 - [2026-10-28 体验显示「还剩 8 天」、到期日晚一天](2026-10-28-trial-and-pro-dates-shown-a-day-late.md) — 「拿到回答 − 服务器时间」不全是钟差；日历上的哪一天照服务器给的。
 - [2026-08-03 裁切闪烁与半速](2026-08-03-trim-flicker-halved.md) — 坐标反馈、动画与去抖。
 - [2026-09-25 裁切不跟链接](2026-09-25-trim-ignores-linked-clips.md) — 裁的算法只有 `TimelineTrim` 一份：链接伙伴 / 选中的一组同一个量、一起停。
@@ -299,6 +304,7 @@
 - [2026-10-28 检查器 Upscale 那一节还写着「fal.ai」](2026-10-28-upscale-inspector-still-says-fal.md) — 换提供方要连 verbatim 写死的名字一起搜。
 - [2026-10-28 Upscale 面板上不肯报价的那一行只写「—」](2026-10-28-upscale-panel-hides-why-quote-failed.md) — 会因内容失败的请求，原因要上界面；规则在服务器上的照它的话说。
 - [2026-11-18 Automatic voice selection can crash when it fills the layer budget](2026-11-18-voice-auto-layer-budget-crash.md) — Validate automatic and explicit selections against the same budget before computing remaining capacity.
+- [2026-11-19 A voice-band cut set back to 0 while playing kept filtering, so the preview no longer matched the export](2026-11-19-voice-band-stays-all-pass-at-zero.md) — Flat in level is not the same sound: back at its neutral setting a filter must fade out to the dry samples, and a setting changed mid-stream needs a check across continuous blocks.
 - [2026-11-10 并发检查断言了假服务没按住的完成顺序](2026-11-10-voice-concurrency-check-finish-order.md) — 只断言被按住的那一对的先后。
 - [2026-11-11 重启后不记得在建的声音库那一单](2026-11-11-voice-library-job-after-restart.md) — 账在盘上，它要结的那一单也得在盘上；能去重的在问用户之前去重。
 - [2026-11-11 声音库审查的后续](2026-11-11-voice-library-review-followups.md) — 过闸之前先看在建的那一单；费用的问题受理后才清。
@@ -318,6 +324,7 @@
 - [2026-10-06 导出两次卡死：看门狗挂起主线程抓栈时分配内存](2026-10-06-watchdog-capture-deadlocks-main-thread.md) — 挂起别的线程期间不分配、不拿锁；能数不变量就去数。
 - [2026-10-14 看门狗自检在 CI 上偶发 Bus error](2026-10-14-watchdog-check-hook-recursion.md) — 钩子回调里「不分配」要算上运行时替你做的事（TLS、独占检查）。
 - [2026-09-23 打开工程后缩略图和波形全空](2026-09-23-waveform-decode-deadlocks-thread-pool.md) — 阻塞的读取循环不进 Swift 并发线程池；可能死锁的自检带普通线程上的看门狗。
+- [2026-11-19 An over-long web-motion duration quit SkyCut before it could be refused](2026-11-19-web-motion-huge-duration-quits-app.md) — Range-check before converting: a finite number is not an in-range one, and a value read back from a project file is input too.
 - [2026-11-18 Web-motion memory accounting missed pages that had not finished loading](2026-11-18-web-motion-load-memory-window.md) — Discover live pages before ready and retry identities with an immutable birth ceiling; retain safe cleanup history.
 - [2026-11-17 A web-motion render overwrites track edits](2026-11-17-web-motion-render-overwrites-track-edits.md) — Async clip checks include lane identity and visibility; a vertical move need not change EditClip.
 - [2026-11-05 官网 404 被标成英文首页的副本](2026-11-05-website-404-canonical-is-home.md) — 错误页有独立 canonical，确认 / 404 页不收录。

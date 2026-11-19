@@ -49,5 +49,25 @@ enum HostileChecks {
             + "(\(hugeResult?.failure?.message ?? (hugeResult?.accepted == true ? "accepted" : String(describing: huge.error)))); "
             + huge.processSummary)
         check(huge.report.peakFootprint < 2 << 30, "…and the render stayed under 2 GB (peak \(huge.report.peakFootprint >> 20) MB)")
+        await oversizedRequest()
+    }
+
+    /// The helper re-checks every request itself: a duration whose frame count overflows Int is refused in plain words,
+    /// not a crash SkyCut can only report as "stopped by the system" (docs/bugfixes/2026-11-19-web-motion-huge-duration-quits-app.md).
+    /// The duration is changed after the request is made, so only the helper ever sees it.
+    private static func oversizedRequest() async {
+        let job = Fixture.job(Pages.plain, name: "huge-duration", limits: Fixture.tight)
+        var request = job.request(writingTo: job.output)
+        request.duration = 1e20
+        let report = await WebMotionHelperProcess().run(request, helper: URL(fileURLWithPath: Fixture.helper), watch: .init())
+        guard case .finished(let result, let status, let signaled, let log) = report.outcome else {
+            return check(false, "a 10^20 s request ends with a result, not \(report.outcome)")
+        }
+        let message = result?.failure?.message ?? ""
+        check(!signaled && status == WebMotionExitCode.invalidRequest
+              && message.contains("The duration must be more than 0 and at most 60 seconds."),
+              "the helper refuses a 10^20 s request in plain words (exit \(status), signaled \(signaled)): "
+              + (message.isEmpty ? String(log.suffix(200)) : message))
+        check(!FileManager.default.fileExists(atPath: job.output.path), "…and writes no movie")
     }
 }

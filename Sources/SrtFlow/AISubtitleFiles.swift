@@ -7,6 +7,8 @@ import SrtFlowCore
 // 「高级」里的独立字幕文件同一个起名函数（`SubtitleExportPlanner.fileName`），和视频同名放在一起，播放器会自动挂上。
 // 两条轨的语言标签一样（或者都没有）时，译文那份用 `translation` 当标签，免得两份同名、后一份盖掉前一份。
 // 任何一份已经有了，就整组换成 `<名字> 2`、`<名字> 3`……：几份还是同一个名字，认得出是一套；从不覆盖（方案第 34 条）。
+// The numbered sets are a `Series`: the write claims a whole set before writing and moves on to the next set when a name
+// was taken after the listing (AISubtitleFileExport, ExclusivePlacement.claimSet).
 // 不管什么：写盘（`SubtitleExportPlanner.writeValidated`）、参数和结果（AISubtitleFileExport）。
 
 enum AISubtitleFiles {
@@ -42,10 +44,26 @@ enum AISubtitleFiles {
         _ tracks: [SubtitleTrack], stem: String, folder: URL, format: SubtitleFormat,
         sourceLanguage: String?, targetLanguage: String?, exists: (URL) -> Bool
     ) -> [Target] {
-        // 两份要是同一个标签（同一种语言、或者都不知道是什么语言），译文那份换成 translation。
-        let translationTag = tracks.count > 1 && targetLanguage == sourceLanguage ? "translation" : targetLanguage
-        func named(_ base: String) -> [Target] {
-            tracks.map { track in
+        let series = Series(tracks: tracks, stem: stem, folder: folder, format: format,
+                            sourceLanguage: sourceLanguage, targetLanguage: targetLanguage)
+        return series.set(series.firstFree(exists: exists))
+    }
+
+    /// The sets of one export: set 1 is named after `stem`, set n after `stem n` — every file of a set shares the number.
+    struct Series: Sendable {
+        var tracks: [SubtitleTrack]
+        var stem: String
+        var folder: URL
+        var format: SubtitleFormat
+        var sourceLanguage: String?
+        var targetLanguage: String?
+
+        /// The files of set `number`, one per track, in the order of `tracks`.
+        func set(_ number: Int) -> [Target] {
+            // 两份要是同一个标签（同一种语言、或者都不知道是什么语言），译文那份换成 translation。
+            let translationTag = tracks.count > 1 && targetLanguage == sourceLanguage ? "translation" : targetLanguage
+            let base = number > 1 ? "\(stem) \(number)" : stem
+            return tracks.map { track in
                 let name = SubtitleExportPlanner.fileName(
                     base: base, choice: track == .original ? .original : .translation,
                     sourceLanguage: sourceLanguage, targetLanguage: translationTag, format: format
@@ -53,12 +71,12 @@ enum AISubtitleFiles {
                 return Target(track: track, url: folder.appendingPathComponent(name))
             }
         }
-        var base = stem
-        var number = 2
-        while named(base).contains(where: { exists($0.url) }) {
-            base = "\(stem) \(number)"
-            number += 1
+
+        /// The first set none of whose files `exists` says is there.
+        func firstFree(exists: (URL) -> Bool) -> Int {
+            var number = 1
+            while set(number).contains(where: { exists($0.url) }) { number += 1 }
+            return number
         }
-        return named(base)
     }
 }

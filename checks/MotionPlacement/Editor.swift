@@ -279,7 +279,7 @@ import SrtFlowMCPKit
                   "new and insert UI destinations retain their positional policies")
 }
 
-@MainActor private func withRendererSentinel(root: URL, _ body: (URL) async throws -> Void) async throws {
+@MainActor func withRendererSentinel(root: URL, _ body: (URL) async throws -> Void) async throws {
     let folder = root.appendingPathComponent("renderer-sentinel-\(UUID().uuidString)")
     try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: folder) }

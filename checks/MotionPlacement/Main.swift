@@ -51,6 +51,8 @@ private enum MotionCheckGroup: String { case core, official }
         try await runMotionActionChecks(fixture)
         print("motion checks: approval")
         try await runMotionApprovalChecks(fixture)
+        print("motion checks: duration and frame-rate bounds")
+        try await runMotionDurationBoundsChecks(fixture)
         print("motion checks: failure and recovery")
         try await runMotionFailureRecoveryChecks(fixture)
         print("motion checks: saved versions")

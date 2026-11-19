@@ -55,7 +55,7 @@ struct AIDeliverySound: Sendable {
         }
         let voicePlan = AIDeliveryVoice.plan(roles, state: state, layout: layout, scope: scope)
         if let note = voicePlan.limitation { prepared.limitations.append(note) }
-        let lingers = AIDeliveryLinger.candidates(state, config: layout, roles: roles, cuts: prepared.cuts)
+        let lingers = AIDeliveryLinger.candidates(state, config: layout, roles: roles, cuts: prepared.cuts, scope: scope)
         if lingers.more > 0 {
             prepared.limitations.append("Only the first \(AIDeliveryLinger.maxCandidates) sounds past their picture were measured; inspect a narrower from/to for the other \(lingers.more).")
         }

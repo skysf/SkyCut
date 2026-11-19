@@ -9,6 +9,7 @@ import SrtFlowCore
 // 2. Through the engine's offline render (the export's): a clip of 50 Hz + 1 kHz + 8 kHz with voice_band_db −10 against the
 //    same clip without it — the 1 kHz tone drops, 50 Hz and 8 kHz stay.
 // 3. Not structure: an engine built without the cut and given it through `updateGains` renders like one built with it.
+// 4. Changed while the stream plays (VoiceBandLive.swift, 16b): back at 0 the live mix is the export's, no click either way.
 
 func checkVoiceBand() {
     voiceBandFilterChecks()
@@ -19,6 +20,7 @@ func checkVoiceBand() {
         return check(false, "could not write the three-tone file")
     }
     voiceBandEngineChecks(tones)
+    checkVoiceBandLive(in: folder)
 }
 
 /// Level change (dB) of a steady sine at `frequency` through the filter at `gain`, measured on the last half second.

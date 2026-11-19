@@ -88,15 +88,45 @@ public enum SubtitleExportPlanner {
         _ document: SubtitleDocumentModel, format: SubtitleFormat, to url: URL
     ) throws -> URL {
         let manager = FileManager.default
+        let temp = temporaryName(for: url)
+        defer { try? manager.removeItem(at: temp) }
+        try writeChecked(document, format: format, to: temp, named: url)
+
+        if manager.fileExists(atPath: url.path) {
+            _ = try manager.replaceItemAt(url, withItemAt: temp)
+        } else {
+            try manager.moveItem(at: temp, to: url)
+        }
+        return url
+    }
+
+    /// Never replacing (the AI's export_subtitles, docs/architecture/export-settings.md §5 item 6): the same temporary
+    /// name and read-back, then renamed onto `claim` — a name this process claimed empty (ExclusivePlacement.claim), so a
+    /// file that appeared after the folder was listed is never touched. On failure the claim is left for the caller to
+    /// give back.
+    @discardableResult
+    public static func writeValidated(
+        _ document: SubtitleDocumentModel, format: SubtitleFormat, onto claim: ExclusivePlacement.Claim
+    ) throws -> URL {
+        let temp = temporaryName(for: claim.url)
+        defer { try? FileManager.default.removeItem(at: temp) }
+        try writeChecked(document, format: format, to: temp, named: claim.url)
+        try ExclusivePlacement.fill(claim, with: temp)
+        return claim.url
+    }
+
+    private static func temporaryName(for url: URL) -> URL {
+        url.deletingLastPathComponent().appendingPathComponent(".\(url.lastPathComponent).partial-\(UUID().uuidString)")
+    }
+
+    /// 序列化 → 写临时名 → 回读能解析且 cue 数一致。
+    private static func writeChecked(
+        _ document: SubtitleDocumentModel, format: SubtitleFormat, to temp: URL, named url: URL
+    ) throws {
         var output = document
         output.format = format
         output.reindex()
         let content = SubtitleSerializer.serialize(output, format: format)
-
-        let temp = url.deletingLastPathComponent()
-            .appendingPathComponent(".\(url.lastPathComponent).partial-\(UUID().uuidString)")
-        defer { try? manager.removeItem(at: temp) }
-
         try Data(content.utf8).write(to: temp, options: .atomic)
         let readBack = try String(contentsOf: temp, encoding: .utf8)
         let parsed = SubtitleParser.parse(readBack, format: format, filename: url.lastPathComponent)
@@ -109,12 +139,5 @@ public enum SubtitleExportPlanner {
                 message: "Subtitle file verification failed for “\(url.lastPathComponent)”."
             )
         }
-
-        if manager.fileExists(atPath: url.path) {
-            _ = try manager.replaceItemAt(url, withItemAt: temp)
-        } else {
-            try manager.moveItem(at: temp, to: url)
-        }
-        return url
     }
 }
