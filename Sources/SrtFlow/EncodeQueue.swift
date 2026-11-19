@@ -32,7 +32,12 @@ struct EncodeItem: Identifiable {
 
     let id = UUID()
     var inputURL: URL
-    var outputURL: URL
+    /// Where the finished file goes: name `number` of `<input name><suffix>.mp4` in its folder. While the item is waiting
+    /// or running no other item is given that name (`EncodeQueue.target`); it is written as a new file, never replacing
+    /// anything (EncodeJob).
+    var target: ExportTarget
+    /// Where the finished file went: a name taken after it was planned moves the file on to a later number.
+    var deliveredURL: URL?
     var info: MediaInfo?
     var status: Status = .waiting
     var progress: Double = 0
@@ -44,6 +49,9 @@ struct EncodeItem: Identifiable {
     /// AI 排进来的条目自带设置（只用于这一条，不动页面上记住的那套），输出位置也是它自己定的：
     /// 页面上改设置、改输出文件夹都不碰它。nil = 用户自己加的，跟着队列走。
     var ownSettings: VideoEncodeSettings?
+
+    /// The file: where it went once it is finished, the planned name until then.
+    var outputURL: URL { deliveredURL ?? target.url }
 
     var isActive: Bool { status == .probing || status == .running }
     var isDone: Bool { status == .finished || status == .failed || status == .cancelled }
@@ -59,6 +67,10 @@ struct EncodeItem: Identifiable {
 ///
 /// 刻意不做并行：`libx264 -preset slow` 本身就会吃满所有性能核，同时跑两个只会
 /// 互相抢核，总时间不会变短，还让进度看起来忽快忽慢。硬件编码器同理，只有一个。
+///
+/// Each item's output name is picked against the files in its folder and every other item still to be written, and held
+/// until the item ends (`target`); the encode writes only the job's own file and never replaces or removes anything else
+/// (EncodeJob; docs/architecture/export-settings.md §5 item 8).
 @MainActor
 final class EncodeQueue: ObservableObject {
 
@@ -80,7 +92,7 @@ final class EncodeQueue: ObservableObject {
     /// 这个队列是不是必须给每个视频配字幕。
     let requiresSubtitles: Bool
 
-    private var currentProcess: FFmpegProcess?
+    private var currentJob: EncodeJob?
     private var currentItemID: EncodeItem.ID?
 
     /// `memory`：这个队列记住的设置存在哪；创建时就读回来（EncodeQueueMemory）。
@@ -121,7 +133,7 @@ final class EncodeQueue: ObservableObject {
             guard !items.contains(where: { $0.inputURL == url && !$0.isDone }) else { continue }
             var item = EncodeItem(
                 inputURL: url,
-                outputURL: proposedOutputURL(for: url),
+                target: target(for: url, in: outputDirectory ?? url.deletingLastPathComponent()),
                 burnIn: burnIn
             )
             item.status = .waiting
@@ -130,10 +142,10 @@ final class EncodeQueue: ObservableObject {
         }
     }
 
-    /// AI 用：带着自己的设置和输出位置排一条（输出位置由调用方挑好、不撞）。同一个文件已经在排队就 nil。
-    func add(_ url: URL, output: URL, settings: VideoEncodeSettings, burnIn: BurnInRequest? = nil) -> EncodeItem.ID? {
+    /// AI 用：带着自己的设置排一条，成品放进 `folder`（名字和页面上排的同一条规矩，`target`）。同一个文件已经在排队就 nil。
+    func add(_ url: URL, in folder: URL, settings: VideoEncodeSettings, burnIn: BurnInRequest? = nil) -> EncodeItem.ID? {
         guard !items.contains(where: { $0.inputURL == url && !$0.isDone }) else { return nil }
-        var item = EncodeItem(inputURL: url, outputURL: output, burnIn: burnIn)
+        var item = EncodeItem(inputURL: url, target: target(for: url, in: folder), burnIn: burnIn)
         item.ownSettings = settings
         items.append(item)
         probeInfo(for: item.id)
@@ -189,21 +201,30 @@ final class EncodeQueue: ObservableObject {
         items[index].errorMessage = message
     }
 
-    /// 设置变了要重算输出名（比如从压缩切到烧字幕），但只动还没跑的。
+    /// 设置变了要重算输出名（比如从压缩切到烧字幕），但只动还没跑的。Each is picked again against the others in turn.
     func refreshOutputPaths() {
         for index in items.indices where items[index].status == .waiting && items[index].ownSettings == nil {
-            items[index].outputURL = proposedOutputURL(for: items[index].inputURL)
+            let input = items[index].inputURL
+            items[index].target = target(for: input, in: outputDirectory ?? input.deletingLastPathComponent(), for: items[index].id)
         }
     }
 
-    private func proposedOutputURL(for input: URL) -> URL {
-        let directory = outputDirectory ?? input.deletingLastPathComponent()
-        let base = input.deletingPathExtension().lastPathComponent
+    /// The name an item gets in `folder`: also never one planned by another item still to be written (waiting, probing,
+    /// running; `id`: the item being named again). The item holds the name until it ends, so two inputs with one file name
+    /// never get one output (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
+    private func target(for input: URL, in folder: URL, for id: EncodeItem.ID? = nil) -> ExportTarget {
+        let stem = input.deletingPathExtension().lastPathComponent + outputSuffix
+        let planned = Set(items.filter { !$0.isDone && $0.id != id }.map { Self.key($0.target.url) })
         // 撞名加编号（规则只有 ExportFileName 一份）；绝不能写到源文件上：ffmpeg 同时读写一个文件会把源文件毁掉。
-        return ExportFileName.unoccupied(in: directory, stem: base + outputSuffix, pathExtension: "mp4") { candidate in
-            candidate.standardizedFileURL == input.standardizedFileURL || FileManager.default.fileExists(atPath: candidate.path)
+        let number = ExportFileName.unoccupiedNumber(in: folder, stem: stem, pathExtension: "mp4") { candidate in
+            planned.contains(Self.key(candidate)) || candidate.standardizedFileURL == input.standardizedFileURL
+                || FileManager.default.fileExists(atPath: candidate.path)
         }
+        return .newFile(folder: folder, stem: stem, pathExtension: "mp4", number: number)
     }
+
+    /// Names compared the way the default macOS volumes compare them (`Clip` and `clip` are one file).
+    private static func key(_ url: URL) -> String { ExportDestinationReport.fold(url.standardizedFileURL.path) }
 
     private func probeInfo(for id: EncodeItem.ID) {
         Task {
@@ -236,7 +257,7 @@ final class EncodeQueue: ObservableObject {
         defer {
             isRunning = false
             currentItemID = nil
-            currentProcess = nil
+            currentJob = nil
         }
         // 按 id 找下一个，因为跑的过程中用户可能删掉某几行。
         while let next = items.first(where: { $0.status == .waiting })?.id {
@@ -271,6 +292,10 @@ final class EncodeQueue: ObservableObject {
         items[index].progress = 0
         items[index].errorMessage = nil
         currentItemID = id
+        // The job writes only its own file and gives it the planned name when it is finished (EncodeJob).
+        let job = EncodeJob(target: item.target)
+        currentJob = job
+        defer { currentJob = nil }
 
         // 烧字幕的临时工作目录：ASS 和字体都放进去，进程的工作目录设成它。
         var jobDirectory: URL?
@@ -293,76 +318,47 @@ final class EncodeQueue: ObservableObject {
             if let jobDirectory { try? FileManager.default.removeItem(at: jobDirectory) }
         }
 
-        var command = FFmpegCommand(
-            inputPath: item.inputURL.path,
-            outputPath: item.outputURL.path,
-            settings: item.ownSettings ?? settings,
-            burnIn: burnInPaths,
-            softSubtitlePath: softSubtitlePath,
-            hasAudio: info.hasAudio,
-            audioCanCopy: info.audioCanCopyToMP4,
-            useHardwareDecode: true,
-            sourceWidth: info.width,
-            sourceHeight: info.height,
-            sourceFrameRate: info.frameRate > 0 ? info.frameRate : nil
-        )
-
-        var lastError: Error?
-        // 硬件解码偶尔会在某些奇怪的编码上失败，那就退回纯软解再试一次。
-        for attempt in 0..<2 {
-            if attempt == 1 {
-                guard command.useHardwareDecode else { break }
-                command.useHardwareDecode = false
-            }
-            do {
-                try await execute(command: command, runtime: runtime, jobDirectory: jobDirectory, id: id, duration: info.duration)
-                lastError = nil
-                break
-            } catch FFmpegProcessError.cancelled {
-                finish(id: id, status: .cancelled, message: nil)
-                removePartialOutput(at: item.outputURL)
-                return
-            } catch {
-                lastError = error
-            }
+        let outcome = await job.run(executable: runtime.url, workingDirectory: jobDirectory, progress: { [weak self] progress in
+            self?.report(progress, for: id, duration: info.duration)
+        }) { output in
+            FFmpegCommand(
+                inputPath: item.inputURL.path,
+                outputPath: output,
+                settings: item.ownSettings ?? settings,
+                burnIn: burnInPaths,
+                softSubtitlePath: softSubtitlePath,
+                hasAudio: info.hasAudio,
+                audioCanCopy: info.audioCanCopyToMP4,
+                useHardwareDecode: true,
+                sourceWidth: info.width,
+                sourceHeight: info.height,
+                sourceFrameRate: info.frameRate > 0 ? info.frameRate : nil
+            )
         }
 
-        if let lastError {
-            finish(id: id, status: .failed, message: lastError.localizedDescription)
-            removePartialOutput(at: item.outputURL)
-        } else {
+        switch outcome {
+        case .finished(let output):
             guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-            items[index].outputBytes = MediaProbe.byteSize(of: items[index].outputURL)
+            items[index].deliveredURL = output
+            items[index].outputBytes = MediaProbe.byteSize(of: output)
             items[index].progress = 1
             items[index].speed = nil
             items[index].etaSeconds = nil
             items[index].status = .finished
+        case .cancelled:
+            finish(id: id, status: .cancelled, message: nil)
+        case .failed(let message):
+            finish(id: id, status: .failed, message: message)
         }
     }
 
-    private func execute(
-        command: FFmpegCommand,
-        runtime: FFmpegRuntime,
-        jobDirectory: URL?,
-        id: EncodeItem.ID,
-        duration: Double
-    ) async throws {
-        let process = FFmpegProcess()
-        currentProcess = process
-        defer { currentProcess = nil }
-
-        try await process.run(
-            executable: runtime.url,
-            arguments: FFmpegArgumentBuilder.arguments(for: command),
-            workingDirectory: jobDirectory
-        ) { [weak self] progress in
-            guard let self, let index = self.items.firstIndex(where: { $0.id == id }) else { return }
-            if let fraction = progress.fraction(duration: duration) {
-                self.items[index].progress = fraction
-            }
-            self.items[index].speed = progress.speed
-            self.items[index].etaSeconds = progress.remainingSeconds(duration: duration)
+    private func report(_ progress: FFmpegProgress, for id: EncodeItem.ID, duration: Double) {
+        guard let index = items.firstIndex(where: { $0.id == id }) else { return }
+        if let fraction = progress.fraction(duration: duration) {
+            items[index].progress = fraction
         }
+        items[index].speed = progress.speed
+        items[index].etaSeconds = progress.remainingSeconds(duration: duration)
     }
 
     private func finish(id: EncodeItem.ID, status: EncodeItem.Status, message: String?) {
@@ -373,16 +369,11 @@ final class EncodeQueue: ObservableObject {
         items[index].etaSeconds = nil
     }
 
-    /// 失败或取消后留下的半截文件没有意义，直接删掉，免得被当成成品。
-    private func removePartialOutput(at url: URL) {
-        try? FileManager.default.removeItem(at: url)
-    }
-
     // MARK: - 取消
 
     func cancel(id: EncodeItem.ID) {
         if currentItemID == id {
-            currentProcess?.cancel()
+            currentJob?.cancel()
         } else if let index = items.firstIndex(where: { $0.id == id }), items[index].status == .waiting {
             items[index].status = .cancelled
         }
@@ -392,7 +383,7 @@ final class EncodeQueue: ObservableObject {
         for index in items.indices where items[index].status == .waiting {
             items[index].status = .cancelled
         }
-        currentProcess?.cancel()
+        currentJob?.cancel()
     }
 
     // MARK: - 烧字幕的准备工作

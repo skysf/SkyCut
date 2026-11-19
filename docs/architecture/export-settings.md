@@ -129,6 +129,18 @@
    nobody was asked about is a new file (`ExportTarget.newFile`): a file that appears in the folder during the export is
    never replaced, the video gets the next number (item 6). The subtitle files fix their files the same way when the
    check comes back.
+8. **Compress / Burn In write only their own file** (2026-11-19,
+   [case](../bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md)). An item's name is picked by one rule for the
+   page and the AI (`EncodeQueue.target`): not on the drive, not the input, and not planned by any other item still to be
+   written (waiting, probing, running; names compared like the volume does); the item holds it until it ends, and
+   choosing another output folder names the waiting items again against each other. ffmpeg never writes the name: the
+   job (`EncodeJob`) claims a hidden file of its own next to it (`ExclusivePlacement.scratch`), ffmpeg writes only that,
+   and the finished file is handed over as `ExportTarget.newFile` (`ExportDelivery`, item 6): a name taken meanwhile moves
+   it on to the next number, the row shows the real file and `compress_videos` / `burn_subtitles`' `get_job` add a
+   `path_note`. A failed or cancelled job removes only its own file (`ExclusivePlacement.discard`: still the file it
+   created), never the name; quitting SkyCut stops ffmpeg and removes it (an ffmpeg left running would finish a hidden
+   file). All of the job's file work is off the main thread (§8 item 4's rule; the name pick's `fileExists` still runs on
+   the main thread, as before).
 
 ## 六、记住与恢复默认
 
@@ -246,8 +258,8 @@ never returns.
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
-| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`, `PanelTargetChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced, `ExclusivePlacement` on real files; §5 item 7: a folder taken while Export is pressed, its check and the old folder's coming back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly that file; an export nobody was asked about never replaces |
-| `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
+| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`, `PanelTargetChecks`, `EncodeQueueChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced, `ExclusivePlacement` on real files; §5 item 7: a folder taken while Export is pressed, its check and the old folder's coming back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly that file; an export nobody was asked about never replaces; §5 item 8: real Compress encodes — two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), a failed, a cancelled and a quit job leave the file at their name alone and nothing of their own |
+| `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first; §5 item 8: the encode's ffmpeg writes the job's claim, delivery through `ExportDelivery`, cleanup only through `discard`, no output path or removal in the queue, the quit hook |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
 
@@ -291,3 +303,9 @@ never returns.
 19. Same name in a newly dropped folder (§5 item 7): put a file named like the export's title into a second folder, drag
     that folder onto "Export to" and press Export straight away. The question names that folder's file; Cancel leaves it;
     Replace replaces exactly it, and nothing appears in the first folder.
+20. Compress (and Burn In) with an output folder (§5 item 8): queue two videos with the same file name from two folders
+    and start. The rows show `…_compressed.mp4` and `…_compressed 2.mp4`; Finder shows no half-written file under either
+    name while they run, and both are there at the end, each playing its own video. Cancel a long one halfway: nothing is
+    left in the folder, and a file you put at its name beforehand is untouched.
+21. Quit SkyCut (⌘Q) while a long Compress runs: no `ffmpeg` process is left in Activity Monitor and no hidden
+    `.….partial-….mp4` in the folder (`ls -a`).

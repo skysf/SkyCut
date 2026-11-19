@@ -7,6 +7,12 @@
 > 分组只以 `scripts/check-all.sh` 为准，下面提到的组号是写下那一条时的位置。条目的顺序是当时往 AGENTS.md 里加的顺序，没有重排；
 > 找某个脚本直接搜它的名字。
 
+- `scripts/check-e2e.sh` requires a macOS graphical session like the CI runner's. It launches the built SkyCut executable and its real
+  MCP helper with a per-run bundle identity, temporary media, and the repository's Pro response fixture served on loopback.
+  The fake key lives in memory. The export flow creates and edits a project through MCP, checks frame-level layer gains and
+  limiter reduction, compares `get_job`'s decoded true peak against an independent ffmpeg measurement, and exercises failure
+  on a real unwritable directory followed by success with a taken output name. Run locally with `scripts/check-local.sh e2e`.
+
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
@@ -40,6 +46,7 @@
   Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
   Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so); `ExclusivePlacement` on real files ([export settings](../architecture/export-settings.md) §5 item 6).
   Since 2026-11-19 also the export panel's write target (`PanelTargetChecks`): a folder taken while Export is pressed, with its check and the old folder's back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly it; an export nobody was asked about never replaces a file that appears during it ([export settings](../architecture/export-settings.md) §5 item 7).
+  Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 

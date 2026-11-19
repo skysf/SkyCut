@@ -10,10 +10,14 @@ import Foundation
 // export in SkyCut) is never replaced: the next name of the series is claimed instead (`name 2.ext`, `name 3.ext`…; a
 // set of subtitle files moves on together). Onto another drive the file is first copied next to its target under a
 // hidden temporary name, so the empty claim exists only for the instant of the rename.
+// A long write that must not go into the finished name itself (a Compress / Burn In encode) goes into a scratch file of the
+// caller's own, hidden next to the target and claimed the same way (`scratch`); it is placed when it is finished, and when
+// it fails or is cancelled only that file is removed (`discard`: only while it is still the file the caller created).
 // What it doesn't: picking the first name from the folder's listing and other exports' reservations (the callers, with
 // ExportFileName.unoccupiedNumber); replacing a file the user said to replace (ExportDelivery's `.replacing`,
 // SubtitleExportPlanner.writeValidated(_:format:to:)).
-// Why (2026-11-19): docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md.
+// Why (2026-11-19): docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md; the scratch file:
+// docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md.
 
 public enum ExclusivePlacement {
     /// A name this process holds: the empty file it created there, known by its inode.
@@ -33,20 +37,49 @@ public enum ExclusivePlacement {
 
     /// Claims `url` for a new file: creates it empty, atomically, only when nothing is there. nil = something already is.
     public static func claim(_ url: URL) throws -> Claim? {
+        try claim(url, naming: "“\(url.lastPathComponent)”")
+    }
+
+    /// `naming`: what a failure says could not be written.
+    private static func claim(_ url: URL, naming: String) throws -> Claim? {
         let descriptor = open(url.path, O_WRONLY | O_CREAT | O_EXCL, 0o644)
         guard descriptor >= 0 else {
             let code = errno
             if code == EEXIST { return nil }
-            throw failure(code, url)
+            throw failure(code, naming: naming)
         }
         defer { close(descriptor) }
         var info = stat()
         guard fstat(descriptor, &info) == 0 else {
             let code = errno
             unlink(url.path)
-            throw failure(code, url)
+            throw failure(code, naming: naming)
         }
         return Claim(url: url, device: info.st_dev, inode: info.st_ino)
+    }
+
+    /// A file of the caller's own for a long write, hidden in `folder` next to where the finished file will go (same drive:
+    /// placing it is a rename): claimed under a name nobody else uses, so whatever is there later was written by the caller.
+    /// `pathExtension` stays last (ffmpeg picks the container from it). Place it when it is finished (`place`), `discard` it
+    /// when the write fails or is cancelled.
+    public static func scratch(in folder: URL, stem: String, pathExtension: String) throws -> Claim {
+        let naming = "into “\(folder.lastPathComponent)”"
+        for _ in 0..<3 {
+            // A short piece of the name: the file's own name must stay within the file system's 255 bytes.
+            let name = ".\(stem.prefix(40)).partial-\(UUID().uuidString)"
+            if let claim = try claim(folder.appendingPathComponent(name).appendingPathExtension(pathExtension), naming: naming) {
+                return claim
+            }
+        }
+        throw Failure(message: "SkyCut could not write \(naming): its temporary names are taken.")
+    }
+
+    /// Removes the caller's own file at a claim whatever it holds by now (a write that failed or was cancelled), and only
+    /// while it is still the file the caller created there (same device and inode): never a file someone else put there.
+    public static func discard(_ claim: Claim) {
+        var info = stat()
+        guard lstat(claim.url.path, &info) == 0, info.st_dev == claim.device, info.st_ino == claim.inode else { return }
+        unlink(claim.url.path)
     }
 
     /// Gives a claim back: removes the empty file, and only while it is still the one this process created.
@@ -120,7 +153,9 @@ public enum ExclusivePlacement {
         return info.st_dev
     }
 
-    private static func failure(_ code: Int32, _ url: URL) -> Failure {
-        Failure(message: "SkyCut could not write “\(url.lastPathComponent)”: \(String(cString: strerror(code))).")
+    private static func failure(_ code: Int32, _ url: URL) -> Failure { failure(code, naming: "“\(url.lastPathComponent)”") }
+
+    private static func failure(_ code: Int32, naming: String) -> Failure {
+        Failure(message: "SkyCut could not write \(naming): \(String(cString: strerror(code))).")
     }
 }

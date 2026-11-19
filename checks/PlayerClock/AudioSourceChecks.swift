@@ -12,6 +12,7 @@ private final class RecoverableAudioSource: PlaybackAudioSource {
     private(set) var stopped = false
     private(set) var recoveries = 0
     private(set) var attempts = 0
+    private(set) var playedFrom: Double?
     var canRecover = true
     var recoveryDelay = 0.0
     /// 时间线总长（0 = 不知道）：时钟按它收尾。
@@ -38,6 +39,7 @@ private final class RecoverableAudioSource: PlaybackAudioSource {
     }
 
     func play(from seconds: Double) {
+        playedFrom = seconds
         position = seconds
         host = ProcessInfo.processInfo.systemUptime
         isPlaying = true
@@ -58,9 +60,47 @@ private func pumpAudioClock(_ seconds: Double) {
     RunLoop.main.run(until: Date().addingTimeInterval(seconds))
 }
 
-private func waitForAudioClock(until done: () -> Bool) {
+func waitForAudioClock(until done: () -> Bool) {
     let deadline = ProcessInfo.processInfo.systemUptime + 5
     while !done(), ProcessInfo.processInfo.systemUptime < deadline { pumpAudioClock(0.02) }
+}
+
+func checkPlayDuringPreviewInstallation(clip: URL) {
+    let clock = PlayerClock(observationInterval: 0.02)
+    clock.player.isMuted = true
+    let source = RecoverableAudioSource()
+    func installPreview(at time: Double) {
+        clock.attachItem(AVPlayerItem(url: clip))
+        clock.attachAudioSource(source)
+        clock.seek(to: time)
+        clock.resumeAfterPreviewRebuild(wasPlaying: false)
+    }
+
+    clock.togglePlayback()
+    check(clock.player.rate == 0, "Early Play leaves the empty native player paused")
+    installPreview(at: 2)
+    check(source.playedFrom == nil || clock.player.status == .readyToPlay,
+          "Audio cannot start before the native player is ready")
+    waitForAudioClock { clock.isPlaying && clock.time > 2.05 }
+    check(source.playedFrom == 2 && clock.isPlaying && clock.time > 2.05,
+          "The early request plays once the new preview is ready, from the placed time")
+
+    clock.detach()
+    clock.togglePlayback()
+    clock.togglePlayback()
+    installPreview(at: 3)
+    waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }
+    pumpAudioClock(0.15)
+    check(!source.isPlaying && !clock.isPlaying, "A second press cancels pending playback")
+
+    clock.detach()
+    clock.togglePlayback()
+    clock.detach()
+    installPreview(at: 4)
+    waitForAudioClock { clock.player.currentItem?.status == .readyToPlay }
+    pumpAudioClock(0.15)
+    check(!source.isPlaying && !clock.isPlaying, "Closing the preview discards its pending Play")
+    clock.detach()
 }
 
 func checkAudioSourceRecovery(clip: URL) {
@@ -75,6 +115,7 @@ func checkAudioSourceRecovery(clip: URL) {
     clock.seek(to: 2)
     old.interrupt()
     clock.play()
+    waitForAudioClock { old.recoveries == 1 }
     check(old.recoveries == 1, "开播前恢复已经停掉的声音图")
     waitForAudioClock { clock.time > 2.1 }
     check(clock.time > 2.1, "恢复后播放头继续向前，实测 \(clock.time)")
@@ -211,6 +252,7 @@ func checkAudioSourceEndInterleavings(short: URL) {
     for _ in 0..<8 {
         clock.seek(to: 1.7)
         clock.play()
+        waitForAudioClock { source.isPlaying }
         waitForAudioClock { !source.isPlaying && !clock.isPlaying }
         if clock.time != 2 { overshoot += 1 }
         clock.play()
@@ -230,7 +272,7 @@ func checkAudioSourceEndInterleavings(short: URL) {
     Thread.sleep(forTimeInterval: 0.4)
     clock.seek(to: 1.6)
     clock.play()
-    pumpAudioClock(0.1)
+    waitForAudioClock { source.isPlaying && clock.time > 1.62 }
     check(source.isPlaying, "旧的「播到头」通知晚到：新一轮的声音主时钟照样在播")
     check(clock.time > 1.62, "旧的「播到头」通知晚到：新一轮的播放头在走（\(clock.time)）")
     check(clock.player.rate > 0, "旧的「播到头」通知晚到：画面也在播")

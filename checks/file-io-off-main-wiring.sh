@@ -12,8 +12,10 @@
 # - a save's answer replaces a file only when macOS's own window asked (2026-11-19,
 #   docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md);
 # - the subtitle editor's writes and the media records of saved versions (2026-11-19,
-#   docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md).
-# Rules: docs/architecture/export-settings.md §8, docs/architecture/video-edit-project-file.md §5,
+#   docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md);
+# - a Compress / Burn In encode: ffmpeg writes only the job's own file, handed over and cleaned up off the main thread
+#   (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
+# Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
 #
@@ -150,8 +152,30 @@ require "a saved version takes the project's media records without asking the me
 forbid "a saved version never makes a fresh media record (that stats the media file, maybe on a sleeping drive)" \
   Sources/SrtFlow/ProjectVersionStore.swift '^[^/]*MediaRecord\(url:'
 
+# Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
+# job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or
+# cancelled job removes only that file, and quitting stops ffmpeg and removes it. scripts/check-export-profile.sh
+# (EncodeQueueChecks) checks the behaviour.
+require "the encode's ffmpeg writes the job's own claimed file, never the planned name" \
+  Sources/SrtFlow/EncodeJob.swift 'command: command\(claim\.url\.path\)'
+require "the finished encode is handed over through ExportDelivery as a new file (off the main thread, never replacing)" \
+  Sources/SrtFlow/EncodeJob.swift 'try await ExportDelivery\.deliver\(claim\.url, to: target\)'
+require "a failed or cancelled encode removes only its own file (off the main thread)" \
+  Sources/SrtFlow/EncodeJob.swift 'try\? await Self\.offMain \{ ExclusivePlacement\.discard\(claim\) \}'
+forbid "the encode job never touches the destination through FileManager (only its own claim, off the main thread)" \
+  Sources/SrtFlow/EncodeJob.swift '^[^/]*FileManager\.default'
+forbid "the queue never gives ffmpeg the planned name as its output path (EncodeJob gives its own file)" \
+  Sources/SrtFlow/EncodeQueue.swift '^[^/]*outputPath: item\.'
+QUEUE_REMOVALS="$(grep -nE '^[^/]*removeItem\(' Sources/SrtFlow/EncodeQueue.swift | grep -vF 'removeItem(at: jobDirectory)' || true)"
+if [ -n "${QUEUE_REMOVALS}" ]; then
+  echo "✗ 接线守卫：the queue removes nothing but the burn-in workspace; an encode's own file is removed only by EncodeJob: ${QUEUE_REMOVALS}" >&2
+  WIRING_FAIL=1
+fi
+require "quitting stops a running encode and removes its own file" \
+  Sources/SrtFlow/SrtFlowApp.swift 'EncodeJob\.stopAllForQuit\(\)'
+
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "file-io-off-main-wiring 失败" >&2
   exit 1
 fi
-echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务"
+echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务; Compress / Burn In write only their own file"
