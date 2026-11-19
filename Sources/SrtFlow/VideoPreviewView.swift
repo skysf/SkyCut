@@ -39,6 +39,11 @@ final class PlayerClock: ObservableObject {
     private var timeObserver: Any?
     private var rateObservation: NSKeyValueObservation?
     private var failureObserver: NSObjectProtocol?
+    /// Play can be pressed as soon as a document's timeline is visible, before AVFoundation can start its item.
+    private var playbackRequested = false
+    private var readiness: [NSKeyValueObservation] = []
+    private var previewSeek: UUID?
+    private var positionedTime: TimeInterval?
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
@@ -233,12 +238,49 @@ final class PlayerClock: ObservableObject {
     }
 
     /// 让视频从 `seconds` 起、从**此刻**开始跟着走：播放器自己去定位，定位要多久就晚多久赶上来，不改时间表。
-    private func anchorVideo(to seconds: TimeInterval) {
-        player.setRate(1, time: CMTime(seconds: seconds, preferredTimescale: 600), atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
+    private func anchorVideo(to seconds: TimeInterval?) {
+        guard player.status == .readyToPlay, player.currentItem?.status == .readyToPlay else { return }
+        let target = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .invalid
+        player.setRate(1, time: target, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
+        positionedTime = nil
+    }
+
+    /// Subscribe once for this item. Delivery on the main queue lets item installation finish before Play resumes.
+    private func playWhenReady(_ item: AVPlayerItem) {
+        playbackRequested = true
+        guard readiness.isEmpty else { return }
+        let resume: () -> Void = { [weak self, weak item] in
+            DispatchQueue.main.async {
+                guard let self, let item, self.playbackRequested, self.player.currentItem === item else { return }
+                self.play()
+            }
+        }
+        readiness = [
+            item.observe(\.status, options: [.initial, .new]) { _, _ in resume() },
+            player.observe(\.status, options: [.initial, .new]) { _, _ in resume() },
+        ]
     }
 
     /// 开播（空格、重建之后接着播）：引擎驱动时声音先起、视频钉到同一个时刻；否则就是播放器自己播。
     func play() {
+        guard let item = player.currentItem else {
+            playbackRequested = true
+            return
+        }
+        if item.status == .failed || player.status == .failed {
+            pause()
+            return
+        }
+        if audioSource != nil, item.status != .readyToPlay || player.status != .readyToPlay {
+            playWhenReady(item)
+            return
+        }
+        if previewSeek != nil {
+            playbackRequested = true
+            return
+        }
+        playbackRequested = false
+        readiness.removeAll()
         if let source = audioSource {
             // 播放头已经在尽头：没有东西可播，这一下不开播。照样开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走：
             // 到了头的播放器不会再报一次「播完了」。The user's Play at the end replays from 0 (`togglePlayback`, UI-2).
@@ -248,13 +290,16 @@ final class PlayerClock: ObservableObject {
             }
             guard recoverAudioIfNeeded(source) else { return }
             source.play(from: time)
-            anchorVideo(to: time)
+            // A completed paused seek already primed its exact frame. A second exact seek would discard that work.
+            anchorVideo(to: positionedTime == time ? nil : time)
         } else {
             player.play()
         }
     }
 
     func attach(url: URL, autoplay: Bool = true) {
+        pause()
+        invalidatePreviewSeek()
         pendingScrubTarget = nil
         peekTime = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
@@ -268,17 +313,26 @@ final class PlayerClock: ObservableObject {
     /// 播放头交给调用方自己恢复。
     func attachItem(_ item: AVPlayerItem) {
         PerfCounters.event(.playerItemAttach)
+        audioSource?.pause()
+        player.pause()
+        readiness.removeAll()
+        invalidatePreviewSeek()
         pendingScrubTarget = nil
         peekTime = nil
         player.replaceCurrentItem(with: item)
         hasVideo = true
     }
 
+    /// Called after the new picture and sound are installed and positioned.
+    func resumeAfterPreviewRebuild(wasPlaying: Bool) {
+        if wasPlaying || playbackRequested { play() }
+    }
+
     func detach() {
-        audioSource?.pause()
+        pause()
+        invalidatePreviewSeek()
         audioSource?.seek(to: 0)
         detachAudioSource()
-        player.pause()
         player.replaceCurrentItem(with: nil)
         pendingScrubTarget = nil
         peekTime = nil
@@ -299,11 +353,12 @@ final class PlayerClock: ObservableObject {
         time = clamped
         tickHostTime = ProcessInfo.processInfo.systemUptime
         placed.send(PlayheadPlacement(time: clamped, precise: precise))
+        invalidatePreviewSeek()
         if let source = audioSource {
             // 引擎驱动：声音先跳过去（一个 IO 缓冲就出声）；视频在播就钉到同一个时刻（播放器自己定位、赶上来），
             // 停着就照旧精确定位 / 链式扫帧。
             source.seek(to: clamped)
-            if player.rate > 0 {
+            if source.isPlaying {
                 pendingScrubTarget = nil
                 MainThreadWatchdog.shared.note(String(format: "播放中 seek → %.3f s（引擎先跳，视频钉过去自己赶）", clamped))
                 anchorVideo(to: clamped)
@@ -312,12 +367,32 @@ final class PlayerClock: ObservableObject {
         }
         if precise {
             pendingScrubTarget = nil
-            player.seek(
-                to: CMTime(seconds: clamped, preferredTimescale: 600),
-                toleranceBefore: .zero, toleranceAfter: .zero
-            )
+            let target = CMTime(seconds: clamped, preferredTimescale: 600)
+            if audioSource != nil, player.currentItem != nil {
+                positionPreview(at: target, seconds: clamped)
+            } else {
+                player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
+            }
         } else {
             scrub(to: clamped)
+        }
+    }
+
+    private func invalidatePreviewSeek() {
+        previewSeek = nil
+        positionedTime = nil
+    }
+
+    private func positionPreview(at target: CMTime, seconds: TimeInterval) {
+        let request = UUID()
+        previewSeek = request
+        player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] finished in
+            DispatchQueue.main.async {
+                guard let self, self.previewSeek == request else { return }
+                self.previewSeek = nil
+                if finished { self.positionedTime = seconds }
+                if self.playbackRequested { self.play() }
+            }
         }
     }
 
@@ -339,6 +414,8 @@ final class PlayerClock: ObservableObject {
                 if let next = self.pendingScrubTarget {
                     self.pendingScrubTarget = nil
                     self.scrub(to: next)
+                } else if self.playbackRequested, self.previewSeek == nil {
+                    self.play()
                 }
             }
         }
@@ -349,6 +426,8 @@ final class PlayerClock: ObservableObject {
     /// 画面滚到指的那一帧看一眼，但**不动播放头**。走链式 seek 防洪，
     /// 和拖动扫帧同一条路（docs/bugfixes/2026-08-03-scrub-preview-keyframe-snap.md）。
     func peek(at seconds: TimeInterval) {
+        guard !playbackRequested else { return }
+        invalidatePreviewSeek()
         let clamped = max(0, seconds)
         peekTime = clamped
         scrub(to: clamped)
@@ -369,7 +448,7 @@ final class PlayerClock: ObservableObject {
     }
 
     func togglePlayback() {
-        if player.rate > 0 {
+        if playbackRequested || player.rate > 0 {
             pause()
         } else if isAtEnd {
             // Play at the end replays from the start, as in other editors and players (UI-2, 2026-11-18: "when the project
@@ -397,6 +476,8 @@ final class PlayerClock: ObservableObject {
     }
 
     func pause() {
+        playbackRequested = false
+        readiness.removeAll()
         audioSource?.pause()
         player.pause()
     }

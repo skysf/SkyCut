@@ -66,13 +66,15 @@ check(clock.peekTime == 0, "peek 负数收口到 0")
 clock.endPeek()
 
 // 9. 播放头的慢读法（检查器、素材库那一栏读它，不被播放一跳一跳叫醒）
-checkPacedPlayhead()
+checkPacedPlayhead(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
 // 10. 回到开头（Return / Home）：只有它请时间线滚回最左
 checkGoToStart()
 
 // 11. 卸片之后晚到的时间回调不许把播放头写回旧位置（新建 / 打开工程）
 checkDetachDropsLateTicks(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
+
+checkPlayDuringPreviewInstallation(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
 // 声音主时钟被系统停掉、恢复失败、换引擎和卸片之后的生命周期。
 checkAudioSourceRecovery(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
