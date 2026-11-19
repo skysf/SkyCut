@@ -129,6 +129,16 @@ or half-unplugged drive). They are not allowed on the main thread, and a caller 
 - The web-motion cache's receipts, installs and sidecars beside a project run on `WebMotionCacheFiles.queue` (recovery's
   `fileExists` checks not yet); a re-rendered movie replaces the old one in a single rename, never remove-then-move
   ([web-motion renderer](web-motion-renderer.md) §15).
+- The subtitle editor's Save and Export As (since
+  [subtitle and version saves touched drives on the main thread](../bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md)):
+  the bytes are made from the document on the main thread, the write runs on `SubtitleFileSave`'s queue with the same 15 s
+  deadline; past it the person is told the drive is not responding, and a write that lands later still marks the document
+  saved — only if it still is what was written (the result goes to the request that asked, never to whatever is open
+  now).
+- A saved version around an AI round is written on the main thread into the local Application Support folder
+  ([saved versions](project-versions.md)), so it asks the media files nothing: their records come from what the project last
+  wrote (`VideoEditProjectIO.save(..., mediaRecords: .known)`). A fresh media record stats the file and makes a bookmark,
+  which waits on a sleeping drive; only the project's own file, off the main thread, makes those.
 
 ## 子进程的异步退出
 
