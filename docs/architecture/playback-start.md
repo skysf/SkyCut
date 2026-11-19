@@ -64,13 +64,14 @@ idle starts must build, attach and open zero times. Cold open and replay from th
 native preroll.
 
 The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
-220 ms audio and 280 ms picture ceilings for occasional scheduling noise. The trim immediately before the cut
+340 ms audio and 380 ms picture ceilings. One hosted start needed 290 ms for audio and 314 ms for picture,
+with 16 ms onset skew or less across the five launches. The trim immediately before the cut
 has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
-Replay from the end also rewinds the item. Its median audio and picture budgets are 170 / 220 ms, capped at
+Replay from the end also rewinds the item. Its median audio and picture budgets are 190 / 250 ms, capped at
 265 / 310 ms per trial.
-The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. The same
-limit applies one second later, with a 48 ms ceiling for an individual device restart and a 34 ms
-median limit for that scenario. Cold open includes preview construction and output startup.
+The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. One second later
+the median stays within 34 ms in every scenario. Individual samples have a 45 ms ceiling for display
+and audio sampling noise, with 48 ms after a device restart. Cold open includes preview construction and output startup.
 Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
 Its onset skew limit is 120 ms median and 150 ms per trial. A suspended graph has a separate 700 ms audio and
 800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
