@@ -5,6 +5,8 @@ import SrtFlowMCPKit
 // 管什么：用户 2026-10-30 定的顺序；只从服务器实际提供且能收完整输入的模型里挑（id 不在 `/models` 里的就跳过，所以这里写旧 id 会悄悄跳过那个模型）。
 // 2026-11-10（Sky Studio PR #245）：Omni 的公开 id 换成 gemini-omni-1.2-flash；veo-pro（Veo 3.1）下架，最高质量只剩 Seedance 2.5。
 // 不管什么：猜人物国籍 / 文化背景（由理解需求的 AI 填 image_context）、模型能力或价格（只读 /models）、付费和重试。
+// Music (2026-11-19, MCP-18): no order is written here; the first music model in the server's order whose `length` and vocals take
+// the ask (SkyStudioMusicLength) is chosen, so a short or exact cue goes to an exact-length model and a song stays on the first.
 enum SkyStudioModelPolicy {
     static let videoOrder = ["minimax-h3", "gemini-omni-1.2-flash", "veo-fast", "seedance-2-pro", "seedance-2-5"]
     static let qualityOrder = ["seedance-2-5", "minimax-h3", "gemini-omni-1.2-flash", "veo-fast", "seedance-2-pro"]
@@ -12,6 +14,8 @@ enum SkyStudioModelPolicy {
         + "Judge the subject, not the prompt language. Video: minimax-h3, then gemini-omni-1.2-flash, veo-fast, seedance-2-pro. "
         + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5. "
         + "Select lip-sync by its image/audio or video/audio inputs; use image operation=remove_background for cutouts. "
+        + "Music: leave model out; SkyCut takes the first music model whose length takes duration (exact_length=true: an exact one; "
+        + "vocals: one that takes instrumental=false). Video sound: audio_mode none only where params.audio_mode lists it. "
         + "After failure query the original job and billing. Unknown outcomes or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. Read each model's input modes and limits."
 
     static func ordered(kind: String, imageContext: String, quality: String) -> [String] {
@@ -30,6 +34,7 @@ enum SkyStudioModelPolicy {
 
     static func problem(model: SkyStudioModel, ask: SkyStudioGeneration.Ask, references: SkyStudioReferencePlan) -> String? {
         if let problem = references.problem(model: model) { return problem }
+        if let problem = SkyStudioMusicLength.problem(model: model, ask: ask) { return problem }
         if let resolution = ask.resolution {
             let choices = model.resolutions(mode: references.mode)
             if !choices.isEmpty, !choices.contains(where: { $0.caseInsensitiveCompare(resolution) == .orderedSame }) { return "\(model.title) accepts resolution \(choices.joined(separator: ", ")) in \(references.mode) mode." }

@@ -72,8 +72,9 @@ enum MCPGuideMediaTopics {
             """),
             MCPGuideSection(name: "jobs_results", about: "job_id and get_job, where files land, cancelling, refunds, file names", text: """
             Jobs and results. The call returns job_id; wait with get_job, which reports the phase, queue position and credits_charged. \
-            For timed media, requested_duration is the submitted numeric target (null for automatic length), and duration is the \
-            length Sky Studio reports in its result (null when unknown). A difference greater than 1 second adds duration_warning; \
+            For timed media, requested_duration is what Sky Studio was asked (null for an automatic length), duration is the length \
+            Sky Studio measured in the delivered file or got from the provider (null when unknown) and duration_source says which. \
+            A difference greater than 1 second adds duration_warning; \
             tell the user before placing the file. This notice never trims, pads or regenerates it. The reported duration is not a \
             local measurement of the file or of its audible sound. \
             Finished files land in the project's SkyCut folder and never change the timeline: add them with \
@@ -82,6 +83,35 @@ enum MCPGuideMediaTopics {
             send the same paid request again. name sets the file name; by default it comes from the prompt, or for an image operation \
             from the source name plus angle, x2, x3 or x4. A clashing name gets a number. A music result also carries music: what \
             listen beats=true says about the file (accents, strongest_accents, stops, ends_at, tempo), to place it with add_clips hit_at.
+            """),
+            // docs/architecture/sky-studio-jobs.md "Music length and video sound" (2026-11-19, MCP-18); Sky Studio's "Music length".
+            MCPGuideSection(name: "music_length", about: "how long music comes back: duration, auto, exact_length, which model SkyCut picks", text: """
+            Music length. get_status models=true gives each music model's length: whether it makes the file exactly the length \
+            asked or only aims at it, whether it can choose its own length, its range and steps. Give duration in seconds for a set \
+            length, or leave it out (or auto) to let the model choose. Leave model out and SkyCut takes the first music model, in Sky \
+            Studio's order, that can make the request: a song with vocals or an automatic length stays on the song model (Lyria 3 \
+            Pro, which aims at the length written in its prompt and lands within a few seconds, from about a minute up); a length \
+            outside its range, or exact_length=true, goes to an exact-length model (Stable Audio 3 Medium: the file is exactly that \
+            long, in its steps; instrumental only, and with no length given it makes its default). exact_length=true needs \
+            duration. A cue cut to picture wants exact_length=true; a whole song does not. A request no music model can make (an \
+            exact length with vocals, a length outside every range) is refused before any quote with each model's reason, and \
+            nothing is charged. In an exact-length file the music itself can fade or ring out before the file ends: the job's music \
+            gives ends_at.
+            """),
+            // docs/architecture/sky-studio-jobs.md "Music length and video sound" (2026-11-19, MCP-42); Sky Studio's "Video sound".
+            MCPGuideSection(name: "video_sound", about: "audio_mode full, ambient or none; the result's audio; listen before narration over a bed", text: """
+            Video sound. A generated video carries the model's own sound, which can include a music, drone or low-rumble bed under \
+            the action that buries narration laid over it. audio_mode (text_to_video and image_to_video) chooses: full (the default) \
+            keeps it; ambient asks for the sound of what is on screen only, a direction Sky Studio adds to the prompt, so a bed can \
+            still come back; none makes no sound, only on models whose get_status models=true lists none in params.audio_mode \
+            (Seedance and Wan; MiniMax H3, Gemini Omni and Veo always make sound, so none on them is refused before the quote: use \
+            ambient, or mute the clip after it arrives). With none and no model named, SkyCut takes the first default video model \
+            that can turn sound off; quote_only=true shows which and its price. The mode never changes the price. A finished \
+            video's get_job carries audio (mode, has_track, can_turn_off, may_carry_bed, note). When may_carry_bed is true, listen \
+            before laying narration over it: listen describe=true with the file (or its clip_id once placed) names a low_drone, \
+            broadband_noise or music; lower the clip with edit_clip volume_db or mute it, then check the line with listen voice. \
+            generate_audio is the older switch: false turns sound off only on a model that has it and is ignored (with a note) on \
+            the rest, so prefer audio_mode, which is refused instead.
             """),
             MCPGuideSection(name: "official_film", about: "the official original-film flow: film, prepared references, seam review", text: """
             Official original film. film, prepare_references, prepared_references, quote_token and seam_review belong to the official \
@@ -98,7 +128,8 @@ enum MCPGuideMediaTopics {
             ["kind": "image", "operation": "camera_angle", "image": "photo.png", "camera_angle": ["rotate": 45]]
         ],
         related: ["paid", "upscale_clip", "add_clips", "get_job"],
-        readingTip: "To quote and ask the user before spending, read only section=spending."
+        readingTip: "To quote and ask the user before spending, read only section=spending; for music length, section=music_length; "
+            + "for a video's own sound, section=video_sound."
     )
 
     // MARK: look

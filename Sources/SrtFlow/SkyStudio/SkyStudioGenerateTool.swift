@@ -76,6 +76,7 @@ enum SkyStudioGenerateTool {
                     let plan = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
                     throw AIToolError(SkyStudioCharacterGeneration.problem(plan, model: model) ?? SkyStudioModelPolicy.problem(model: model, ask: ask, references: plan) ?? SkyStudioGenerationControls.problem(model: model, ask: ask, prompt: prompt, references: references) ?? "This model cannot accept the request.")
                 }
+                if requested == nil, kind == .music, let refusal = SkyStudioMusicLength.refusal(catalog.models(kind: kind.rawValue), ask: ask) { throw AIToolError(refusal) }
                 throw AIToolError("No offered model accepts the complete request. Read get_status models=true for model ids, modes and reference limits. Available: "
                     + catalog.models(kind: kind.rawValue).map(\.id).joined(separator: ", "))
             }
@@ -102,6 +103,7 @@ enum SkyStudioGenerateTool {
         var draftAsk = ask
         draftAsk.resolution = nil
         draftAsk.duration = nil
+        draftAsk.exactLength = false
         if let preferred = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: nil, imageContext: imageContext,
             accepts: { candidate in
                 let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
