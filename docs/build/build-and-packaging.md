@@ -569,7 +569,8 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   这个名字，所以改 CI 不用动 ruleset。它 `needs` 全部分组，而且必须带
   `if: ${{ !cancelled() }}`：不写的话，分组一红它就被跳过，**被跳过的必需检查会被 GitHub
   当成通过**，红的 PR 也能合进去。不用 `always()`，是免得被取消的那一轮再报一个假的失败。
-- **Full-App checks run in shards 1–3, and every shard restores one full-App build cache** (since 2026-11-20).
+- **Full-App checks run in shards 1–3, and every shard restores one full-App build cache** (since 2026-11-20,
+  [measurements](../reports/2026-11-20-ci-rebalance.md)).
   - Shard 1 builds the complete App in its own step, "Build app": compile errors show in full there. check-all.sh also
     lists the plain build as a check ("build（完整 App 编得过）"). On main the step's result is saved as the cache that
     every shard of the next run restores (the cache item below).
@@ -661,6 +662,16 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     - PR 第 2–5 组「Run checks」的中位数（同期 307 秒）涨 30 秒以内：短轮不刷新这几组的缓存（用户定），涨得多再给短轮加一步刷新。
       Moot since 2026-11-20: every shard restores the one cache that shard 1 saves in short runs too.
     - PR 第一次红、原样重跑就绿的次数：明显变多，说明有不稳定的检查没人发现，单独去修。
+- **Uploads are diagnostics, never gates** (since 2026-11-20, [case](../bugfixes/2026-11-20-ci-artifact-upload-fails-green-shard.md)):
+  every `actions/upload-artifact` step has `continue-on-error: true`, so an artifact service timeout shows on that step
+  and leaves the run's result to its checks. The measuring steps stay gates. `checks/check-all-shards.sh` pins it.
+- **Step failure rates** (a signal, never a gate): `scripts/ci-step-failure-rates.py [--days N | --since … --until …]
+  [--exclude-branch B]` counts, per step of the shard jobs, how often it failed in pull request and main runs. It is
+  read-only and needs any collaborator's `gh` login. The coordinator runs it daily. When the playback start benchmark fails
+  in more than 5% of pull-request executions on branches that don't touch playback, recalibrate it
+  ([playback start](../architecture/playback-start.md)). On the CI analysis' snapshot of 11-19 (to 15:10 UTC) it gives
+  that analysis' count: the benchmark failed in 20 of 30 executions on other pull requests' branches
+  ([measurements](../reports/2026-11-20-ci-rebalance.md)).
 - **第 1 组多一步「预览性能 ratchet」**（`scripts/check-preview-perf.sh`，不在 check-all.sh 里：
   要图形会话）。它起第 1 组已经编好的 App，按固定场景数「做了多少件活」，和
   `checks/PreviewPerf/baseline.json` 比，只许降不许涨；结果和 App 日志作为附件 `preview-perf`

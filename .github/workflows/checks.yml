@@ -160,8 +160,12 @@ jobs:
           PLAYBACK_START_OUT: ${{ runner.temp }}/playback-start
         run: /bin/bash scripts/check-playback-start.sh
 
+      # Uploads are diagnostics: the measuring steps are the gates. An artifact service timeout turned a green shard red
+      # on 2026-11-17 (docs/bugfixes/2026-11-20-ci-artifact-upload-fails-green-shard.md); checks/check-all-shards.sh
+      # pins continue-on-error on every upload.
       - name: Upload playback start samples
         if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: playback-start
@@ -183,6 +187,7 @@ jobs:
 
       - name: Upload preview performance results
         if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: preview-perf

@@ -445,7 +445,9 @@
   ratchet once each, after the dedicated App build in its shard: `checks/check-all-shards.sh`. Reverse verification
   (2026-11-20): a duplicated line, a dropped script / `SrtFlowCoreChecks` / `SmokeClientChecks.py`, a full-App check
   in shard 4, the plain build in shard 5, a graphical step removed or moved to shard 2, no or two App build steps and
-  an orphan script each turn it red.
+  an orphan script each turn it red. The same guard pins `continue-on-error: true` on every `actions/upload-artifact`
+  step: an upload is a diagnostic ([case](../bugfixes/2026-11-20-ci-artifact-upload-fails-green-shard.md); red on the
+  workflow before the fix, on either shard upload or the marker upload without it, and on a new upload without it).
 - 「连接」AI 客户端时第一次改配置前存的备份，一建出来就和原文件同样的权限（只有 `AIClientConfigWrite` 写 `.skycut-backup`、`AIClientSetup` 经过它）：
   `checks/client-config-backup.sh`；行为（600 的备份还是 600、照原文件不一律 600、链接按目标算、再改不动备份）在 `scripts/check-mcp.sh` 的 `ConfigBackupChecks`。
 - DMG 安装引导的接线 / 模板：`checks/dmg-packaging.sh`；真实组装、挂载和 Retina 背景：`scripts/check-dmg.sh`。

@@ -295,7 +295,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `checks/app-theme-wiring.sh` — 主题的浅 / 深：不交 nil、只有一处 `.preferredColorScheme`、不设 `NSApp.appearance`。
 - `checks/audio-engine-idle-wiring.sh` — 音频引擎空闲停图、用户回来先起、换工程收引擎、主时钟自己收尾。
 - `checks/blocking-media-reads.sh` — 读采样的阻塞循环不许写在 async 函数里；`AudioWindowReader.extract` 只许字幕生成调。
-- `checks/check-all-shards.sh` — every guard and check script runs on CI exactly once; full-App checks in shards 1–3; the graphical steps after the App build.
+- `checks/check-all-shards.sh` — every guard and check script runs on CI exactly once; full-App checks in shards 1–3; the graphical steps after the App build; uploads can't fail a run.
 - `checks/check-script-source-lists.sh` — 自检脚本的 swiftc 文件清单不漏同伴文件。
 - `checks/ci-build-cache-key.sh` — one full-App `.build` cache for all shards, keyed by checkout, toolchain and commit, saved on main right after the App build.
 - `checks/ci-docs-only.sh` — 「只改了文档」快速通道只在真的只改了文档时走。
