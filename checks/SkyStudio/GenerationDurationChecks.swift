@@ -69,4 +69,38 @@ func runGenerationDurationChecks() {
     checkEqual(unknown["duration"], .null, "a refresh without a valid result cannot retain a stale known duration")
     checkEqual(SkyStudioGenerationDuration.fields(for: generation(.image, nil), result: result(4)), [:],
         "images have no duration report even when unexpected duration metadata is present")
+    runDeliveredLengthChecks(music: music)
+}
+
+/// Sky Studio's own asked and delivered lengths (2026-11-19, Sky Studio "Lengths: asked and delivered", MCP-9): `requested_duration`
+/// is preferred to the submitted params, `duration_source` passes through, and a refresh clears a stale source.
+private func runDeliveredLengthChecks(music: SkyStudioGeneration) {
+    func delivered(_ fields: [String: JSONValue]) -> SkyStudioJobResult {
+        var json: [String: JSONValue] = ["url": "https://example.invalid/synthetic.mp3"]
+        json.merge(fields) { _, new in new }
+        return SkyStudioJobResult(json: .object(json))!
+    }
+    let exact = SkyStudioGeneration.make(.music, prompt: "x", ask: .init(duration: 12), canvas: 1)
+    let padded = SkyStudioGenerationDuration.fields(for: exact, result: delivered(["duration": 12.04, "requested_duration": 12, "duration_source": "file"]))
+    checkEqual(padded["duration"], 12.04, "an exact-length MP3 reads its encoder padding")
+    checkEqual(padded["duration_source"], "file", "where the delivered length came from")
+    checkEqual(padded["duration_warning"], .null, "MP3 padding is not a difference")
+    let set = SkyStudioGenerationDuration.fields(for: music, result: delivered(["duration": 73.4, "requested_duration": 76, "duration_source": "file"]))
+    check(set["duration_warning"]?.stringValue?.contains("76.000 s") == true, "an approximate set length more than 1 s off warns")
+    let serverRounded = SkyStudioGenerationDuration.fields(for: exact, result: delivered(["duration": 12.3, "requested_duration": 12.3]))
+    checkEqual(serverRounded["requested_duration"], 12.3, "Sky Studio's own asked length is preferred to the submitted params")
+    let automatic = SkyStudioGenerationDuration.fields(for: SkyStudioGeneration.make(.music, prompt: "x", ask: .init(), canvas: 1),
+        result: delivered(["duration": 158, "requested_duration": .null, "duration_source": "file"]))
+    checkEqual(automatic["requested_duration"], .null, "an automatic length has nothing asked")
+    checkEqual(automatic["duration_warning"], .null, "and nothing to compare")
+    let unknown = SkyStudioGenerationDuration.fields(for: exact, result: delivered(["duration": .null, "requested_duration": 12, "duration_source": "file"]))
+    checkEqual(unknown["duration"], .null, "an unread file stays unknown, never the request")
+    checkEqual(unknown["duration_source"], .null, "an unknown length has no source")
+    check(unknown["duration_note"]?.stringValue?.contains("add_clips places the file at its own measured length") == true,
+          "the unknown note says how the real length is found")
+    let older = SkyStudioGenerationDuration.fields(for: exact, result: delivered(["duration": 12.04]))
+    checkEqual(older["requested_duration"], 12, "a result from before 2026-11-19 falls back to the submitted length")
+    checkEqual(older["duration_source"], .null, "and says nothing of its source")
+    let refreshed = padded.merging(older) { _, current in current }
+    checkEqual(refreshed["duration_source"], .null, "a refresh without a source clears the old one")
 }

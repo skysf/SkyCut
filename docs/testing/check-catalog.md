@@ -67,6 +67,7 @@
   Its subtitle files (`SubtitlePanelChecks`, since 2026-11-19), through the button's work (`SubtitleFilesWrite`: `request`, then the question's `replace`): Replace replaces only the files the question named; a VTT made while the question about the SRT is open, or a file a stale listing missed, keeps its bytes and is said ([export settings](../architecture/export-settings.md) §5 item 7).
   Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
   Their names and folders off the main thread (`EncodeOffMainChecks`, since the same day): a taken name is passed once the folder's names are back (adding, another output folder), a fake drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with the panel's sentence, nothing queued and no job ([case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)).
+  The files the AI encode tools are given (`EncodeInputsOffMainChecks`, since the same day; a recording fake drive): `compress_videos` and `burn_subtitles` look at them through the probe, `burn_subtitles` reads a slow subtitle file and `convert_subtitles` reads a slow one and writes the new one there, never on the main thread (longest main-thread gap under 0.5 s), and a file on a drive that never answers, or a read that never comes back, is refused at the deadline ([case](../bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md)).
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -302,6 +303,11 @@
 - Generated duration notices: `scripts/check-sky-studio.sh` → `GenerationDurationChecks` compares requested and server-reported
   lengths with a strict 1-second warning threshold, unknown values and refresh clearing. `checks/sky-studio-wiring.sh` requires
   the notice on completion and original-job refresh. No network, credits or media changes are involved.
+- Music length and video sound (MCP-18 / MCP-9 / MCP-42): `scripts/check-sky-studio.sh` → `MusicLengthChecks` and `VideoSoundChecks`
+  read Sky Studio's own catalog records (`Fixtures/models-music-video-2026-11-19.json`): each music model's `length`, the first
+  model in the server's order that takes the ask, steps and defaults, refusals in plain words, flat-priced lengths not beyond the
+  draft, `audio_mode` none only where listed, the `audio` block and note in get_job; request bodies go through `SkyStudioStub`.
+  `checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
@@ -561,3 +567,13 @@
   the burst, clip_id spans its clip, image=false gives numbers only, four refusals); `scripts/check-video-inspection.sh` checks that the
   evidence sheet carries the measured mix. Reverse (2026-11-18): passing no strip to `finish` from look turned 8 checks red, and from
   inspect_video the evidence-sheet check.
+- Sky Studio content names (2026-11-19, MCP-62; [AI interface](../architecture/ai-control-mcp.md) section 4 item 32): `scripts/check-mcp.sh`
+  runs `scripts/export-tool-vocabulary.sh` and `ToolVocabularyChecks` compares its file with the live catalog: exactly the format's
+  keys, every tool once with `MCPArgumentCheck.acceptedSchema` and its aliases, `project`, the guide's topics and sections in order,
+  `result_fields` = `catalogKnownNames`, a reader of the file (`ToolVocabulary`, the content gate's reader ported) accepts exactly this
+  build's names, `skycut_version` = the VERSION given (null without), and the shared rules' size measured on the App's own recipes
+  answer. `PublishedNamesChecks` checks every name in `checks/MCP/published-content-names.json` with the gate's rules
+  (`PublishedNameEntry`), runs the rules on a made-up vocabulary (18 wrong entries caught with their reason, 21 right ones let
+  through) and the snapshot's shape rules on made-up snapshots (prose, unknown keys and kinds refused). Reverse (2026-11-19): with
+  a snapshot of that day's card drafts, renaming add_clips' `hit_at` turned the 22 entries that use it red; dropping a tool, the
+  aliases or the trim from the exporter, the array step from the reader, or the option check each turned the checks red.
