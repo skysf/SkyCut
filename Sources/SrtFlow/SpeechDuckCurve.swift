@@ -6,8 +6,9 @@ import Foundation
 // layer sits `depth` dB under its own level next to the line. "Its own level" is the edge line: a straight line between the
 // clip's line at the window's two ends (an end beyond the clip takes the other end's level).
 // - The dip already there is measured, not assumed: the deepest the line goes under the edge line through the window's hold
-//   (an earlier duck, or one drawn by hand with volume_curve). The window then moves the line by the difference times the
-//   window's shape, so ducking again sets the dip instead of stacking it, and depth 0 takes it out.
+//   (an earlier duck, or one drawn by hand with volume_curve); where only a ramp reaches the clip, read on the deeper half of
+//   the ramp it covers. The window then moves the line by the difference times the window's shape, so ducking again sets the
+//   dip instead of stacking it, and depth 0 takes it out.
 // - Everything else keeps its shape, moved with the dip: a cut's equal-power bump or a bed's swell (CutSoundCurves) rises
 //   above the dip's floor and never counts as the dip, whether it was drawn before or after the duck.
 // A clip lying wholly inside one window (a sound placed on a line) is left alone: its own level next to the line is unknown,
@@ -31,12 +32,16 @@ enum SpeechDuckCurve {
     static let epsilon = 1e-6
     /// Points per window where the line is read (measuring the dip already there, and what the dip reached).
     static let samples = 64
+    /// A window reaching less than this into a clip (seconds) leaves it alone: the dip's two corner keys there would merge
+    /// into one (VolumeCurveEditing keeps keys half a millisecond apart), so it could not be drawn exactly nor read back, and
+    /// it would be under 0.1 dB anyway.
+    static let minimumReach = 2 * VolumeCurveEditing.timelineTolerance
 
     /// Draws the dip of `windows` (timeline seconds) into `clip`'s curve.
     static func duck(_ clip: inout EditClip, under windows: [SpeechDuck.Window], depth: Double) -> Result {
         let start = clip.timelineStart, end = clip.timelineEnd
         guard end - start > epsilon else { return .untouched }
-        let touching = windows.filter { $0.from < end - epsilon && $0.to > start + epsilon }
+        let touching = windows.filter { $0.from < end - minimumReach && $0.to > start + minimumReach }
         guard !touching.isEmpty else { return .untouched }
         if touching.contains(where: { $0.from <= start + epsilon && $0.to >= end - epsilon }) { return .insideLine }
         let before = clip
@@ -67,15 +72,19 @@ enum SpeechDuckCurve {
     }
 
     /// How deep (dB, ≥ 0) the clip already dips under the edge line through the window's hold: the deepest point, so a bump
-    /// or a swell above the dip's floor never reads as the dip. Where only a ramp reaches the clip, the ramp's points count
-    /// in proportion to how far down the ramp is.
+    /// or a swell above the dip's floor never reads as the dip. Where only a ramp reaches the clip (it ends in the attack or
+    /// starts in the release), the dip is read on the deeper half of the ramp the clip covers, each point divided by how far
+    /// down the ramp is there: a dip drawn there is exactly that share of its depth, however shallow the ramp is at the clip's
+    /// edge. (CXR2 R9, 2026-11-19: reading only points at least half way down found nothing on a clip ending a quarter of the
+    /// way down, so every call stacked another dip and 0 never took it out.)
     static func existingDip(of window: SpeechDuck.Window, in clip: EditClip) -> Double {
         let edge = edgeLine(of: window, in: clip)
-        var times = holdTimes(window, in: clip)
-        if times.isEmpty { times = sampleTimes(window, in: clip).filter { window.fraction(at: $0) >= 0.5 } }
-        let dips = times.map { time in
-            (edge(time) - clip.volumeLineDecibels(atTimeline: time)) / max(window.fraction(at: time), 0.5)
-        }
+        let dip = { (time: Double) in edge(time) - clip.volumeLineDecibels(atTimeline: time) }
+        let hold = holdTimes(window, in: clip)
+        if !hold.isEmpty { return max(0, hold.map(dip).max() ?? 0) }
+        let ramp = sampleTimes(window, in: clip).map { (time: $0, fraction: window.fraction(at: $0)) }
+        guard let deepest = ramp.map(\.fraction).max(), deepest > 0 else { return 0 }
+        let dips = ramp.filter { $0.fraction >= deepest / 2 }.map { dip($0.time) / $0.fraction }
         return max(0, dips.max() ?? 0)
     }
 

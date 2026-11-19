@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 //    1 s share one window (nothing comes up between words or short pauses).
 // 2. The curve: under a line a clip sits the depth under its own level next to the line (the edge line); calling again sets
 //    the dip instead of stacking it, 0 takes it out; shapes above the edge line (a crossfade bump) stay; a window crossing the
-//    clip's start takes its level from the other end; a clip wholly inside a line is left alone; the volume floor is reported.
+//    clip's start takes its level from the other end; a clip wholly inside a line is left alone; the volume floor is reported;
+//    a clip only the shallow start of a ramp reaches (ending in the attack, starting in the release) is set, never stacked.
 // 3. Which clips dip: every audible clip on the other tracks (or only the named ones), never the speech itself.
 // 4. A narration's lines from its waveform's windows (VoiceLines' rule), the result, and the schema matching the rule's range.
 
@@ -15,6 +16,7 @@ func runSpeechDuckChecks() {
     duckCurveChecks()
     duckRepeatChecks()
     duckEdgeChecks()
+    duckShallowRampChecks()
     duckTargetChecks()
     duckPauseChecks()
     duckReportChecks()
@@ -158,6 +160,34 @@ private func duckEdgeChecks() {
     check(inside == effect, "an effect lying on the line keeps its line")
     let (_, away) = ducked(duckBed(6, 2), lines: [2...4])
     checkEqual(away, .untouched, "a clip no window reaches is untouched")
+}
+
+/// A clip only the shallow part of a ramp reaches (less than half way down; CXR2 R9, 2026-11-19): the dip is read from the
+/// part the clip covers, so calling again never stacks and 0 takes it out. Before the fix a bed ending a quarter of the way
+/// down the attack went -2.5 / -5 / -5 dB for -10 / -10 / 0. The line [2, 2.5] dips over [1.6, 3].
+private func duckShallowRampChecks() {
+    for (name, bed, edge, fraction) in [("ending in the attack", duckBed(0, 1.7), 1.7, 0.25),
+                                         ("ending 2 ms into the attack", duckBed(0, 1.602), 1.602, 0.005),
+                                         ("starting in the release", duckBed(2.8, 4), 2.8, 0.4)] {
+        let (once, result) = ducked(bed, lines: [2...2.5])
+        checkEqual(result, .ducked(windows: 1, reached: nil), "a bed \(name) dips (only a ramp reaches it)")
+        near(once.volumeLineDecibels(atTimeline: edge), -10 * fraction, "a bed \(name) is \(fraction) of the way down at its edge")
+        let (twice, _) = ducked(once, lines: [2...2.5])
+        check(SpeechDuckPlanner.sameLine(once.volumeCurve, twice.volumeCurve, tolerance: 1e-6),
+              "a bed \(name): ducking again with the same depth changes nothing (got \(twice.volumeLineDecibels(atTimeline: edge)) dB)")
+        let (deeper, _) = ducked(twice, lines: [2...2.5], depth: -20)
+        near(deeper.volumeLineDecibels(atTimeline: edge), -20 * fraction, "a bed \(name): -20 after -10 sets the dip, never stacks")
+        let (lifted, _) = ducked(deeper, lines: [2...2.5], depth: 0)
+        for time in [edge, (edge + (edge < 2 ? 1.6 : 3)) / 2] + Array(stride(from: bed.timelineStart, through: bed.timelineEnd, by: 0.05)) {
+            near(lifted.volumeLineDecibels(atTimeline: time), 0, "a bed \(name): duck_others_db 0 takes the dip out, at \(time) s")
+        }
+    }
+    // A window reaching less than a millisecond in: its corner keys would merge, so the clip is left alone (never nudged by
+    // a few thousandths of a dB on every call).
+    let sliver = duckBed(0, 1.6003)
+    let (touched, sliverResult) = ducked(sliver, lines: [2...2.5])
+    checkEqual(sliverResult, .untouched, "a window reaching 0.3 ms into a clip leaves it alone")
+    check(touched == sliver, "a window reaching 0.3 ms into a clip draws nothing")
 }
 
 private func duckTargetChecks() {
