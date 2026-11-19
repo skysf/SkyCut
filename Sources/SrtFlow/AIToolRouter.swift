@@ -16,8 +16,10 @@ import SrtFlowMCPKit
 // **排到之后、动窗口之前**才定落在哪个工程、查归属（排队时前面可能正是别人的 open_project / close_project）。
 // The lines themselves are AICallLines: a look lets its line go once it has read the project, and a look not done within about
 // 25 s answers with a job (AILookCall; docs/bugfixes/2026-11-17-look-hangs-and-dropped-calls.md).
-// A time outside the supported timeline (MCPTimeArguments: NaN, infinite, negative or past one day) is refused first, in
-// routeValidated, before anything queues (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md).
+// A time outside the supported timeline (MCPTimeArguments: NaN, infinite, negative or past one day, or past the end of the
+// call's project when that runs longer) is refused as soon as the call's project is known, in execute, before a round, an undo
+// group or a job (docs/bugfixes/2026-11-19-huge-times-in-timeline-tools.md,
+// docs/bugfixes/2026-11-19-time-bound-refuses-relative-keyframes-and-timeline-end.md).
 
 @MainActor
 final class AIToolRouter {
@@ -71,10 +73,6 @@ final class AIToolRouter {
 
     /// Authorized routing after the protocol, argument and license gates. Isolated checks exercise the real queue / target path here.
     func routeValidated(_ request: MCPBridge.Request, tool: MCPToolName, begin: @escaping @Sendable () -> Bool) async -> Answer {
-        // A time outside the supported timeline fails the call here, before it queues, starts a round or opens an undo group.
-        if let refusal = AIEditLimits.timeRefusal(tool: tool, arguments: request.arguments) {
-            return Answer(result: refusal.result(guide: tool))
-        }
         let call = Call(
             tool: tool, arguments: AIToolArguments(request.arguments), policy: Policy(tool), request: request,
             session: request.session ?? AIProjectSessions.anonymous, client: AISession.displayName(for: request.client ?? "AI")
@@ -141,6 +139,11 @@ final class AIToolRouter {
             case .failure(let refusal): return Answer(result: MCPBridge.textResult(refusal.message, isError: true))
             case .success(let project): target = project
             }
+        }
+        // A time outside the supported timeline (past the project's own end only when that runs longer) fails the call here,
+        // before it starts a round, opens an undo group or starts a job.
+        if let refusal = AIEditLimits.timeRefusal(tool: call.tool, arguments: call.request.arguments, timelineEnd: target?.state.duration) {
+            return Answer(result: refusal.result(guide: call.tool))
         }
         // 用户在这个工程上按了停止（排队期间按的也算）：AI 安静下来之前落在它上面的调用都不做（AIRound）。别的工程照剪。
         if let target {
