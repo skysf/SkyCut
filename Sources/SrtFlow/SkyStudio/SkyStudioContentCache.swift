@@ -31,6 +31,8 @@ struct SkyStudioContentCache: Sendable {
     struct Style: Equatable, Sendable {
         var style: SkyStudioStyleText
         var fetchedAt: Date
+        /// The answer's ETag: sent back to ask whether the copy is still current and still allowed on this Mac.
+        var etag: String? = nil
     }
 
     private var manifestURL: URL { directory.appendingPathComponent("manifest.json") }
@@ -66,12 +68,13 @@ struct SkyStudioContentCache: Sendable {
         return copy
     }
 
-    func store(_ style: SkyStudioStyleText, fetchedAt: Date) throws {
+    func store(_ style: SkyStudioStyleText, etag: String? = nil, fetchedAt: Date) throws {
         guard let key = Self.key(id: style.id, version: style.version) else {
             throw SkyStudioContentRequestProblem(message: "\(style.id) \(style.version) cannot be kept on this Mac.")
         }
-        let object: JSONValue = ["style": style.json, "fetched_at": .string(Self.text(fetchedAt))]
-        try write(object, to: stylesURL.appendingPathComponent(key + ".json"))
+        var object: [String: JSONValue] = ["style": style.json, "fetched_at": .string(Self.text(fetchedAt))]
+        if let etag { object["etag"] = .string(etag) }
+        try write(.object(object), to: stylesURL.appendingPathComponent(key + ".json"))
     }
 
     /// The versions with a copy here, as `key(id:version:)` names (not opened: `style(id:version:sha256:)` checks each when read).
@@ -112,7 +115,7 @@ struct SkyStudioContentCache: Sendable {
         guard let json = read(url), let fields = json["style"], let id = fields["id"]?.stringValue,
               let style = SkyStudioStyleText(json: fields, id: id, version: nil),
               let fetchedAt = json["fetched_at"]?.stringValue.flatMap(SkyStudioJSON.parseDate) else { return nil }
-        return Style(style: style, fetchedAt: fetchedAt)
+        return Style(style: style, fetchedAt: fetchedAt, etag: json["etag"]?.stringValue)
     }
 
     private static func text(_ date: Date) -> String {

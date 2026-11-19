@@ -66,6 +66,12 @@ private func contractChecks() {
     checkEqual(SkyStudioContentManifest(json: odd)?.styles.map(\.id), ["film-trailer"],
                "a repeated id or an id / version / checksum of the wrong shape is left out, the rest is read")
     check(SkyStudioContentManifest(json: ["release": 1]) == nil, "no styles: not a manifest")
+    // Day one publishes the trailer alone (per-item publishing, contract of c9a7ce5d): no cards, no entry page.
+    let onlyTrailer = manifestAnswer().objectValue!.merging(["cards": ["entry": .null, "groups": [], "items": []]]) { _, new in new }
+    checkEqual(SkyStudioContentManifest(json: .object(onlyTrailer))?.styles.map(\.id), ["film-trailer"], "an empty card catalogue reads")
+    var noCards = manifestAnswer().objectValue!
+    noCards["cards"] = nil
+    checkEqual(SkyStudioContentManifest(json: .object(noCards))?.styles.map(\.id), ["film-trailer"], "and so does no cards part at all")
     check(SkyStudioContentManifest(json: ["release": 0, "styles": []]) == nil, "release 0: not a manifest")
 
     let style = SkyStudioStyleText(json: styleAnswer(), id: "film-trailer", version: "1.0")
@@ -104,22 +110,49 @@ private func routeChecks() async {
     checkEqual(SkyStudioStub.log.first?.headers["If-None-Match"], "\"m1\"", "the ETag held goes out as If-None-Match")
 
     let style = styleAnswer().encodedString()
-    SkyStudioStub.reset { _ in .headers(200, style, ["ETag": "\"s1\"", "Cache-Control": "private, max-age=31536000, immutable"]) }
-    checkEqual(try? await api.contentStyle("film-trailer", version: "1.0", key: key).version, "1.0", "a style is read")
+    SkyStudioStub.reset { _ in .headers(200, style, ["ETag": "\"s1\"", "Cache-Control": "private, no-cache"]) }
+    if case .changed(let read, let etag)? = try? await api.contentStyle("film-trailer", version: "1.0", key: key) {
+        checkEqual(read.version, "1.0", "a style is read")
+        checkEqual(etag, "\"s1\"", "with its ETag")
+    } else {
+        check(false, "a 200 is a style")
+    }
     checkEqual(SkyStudioStub.log.first?.url, "http://127.0.0.1:8123/api/skycut/v1/content/styles/film-trailer?version=1.0",
                "a style is asked by id and version")
+    // Every answer is private, no-cache (contract of c9a7ce5d): a copy is confirmed with its ETag, Sky Studio checking the licence
+    // before its 304.
+    SkyStudioStub.reset { _ in .headers(304, "", ["ETag": "\"s1\"", "Cache-Control": "private, no-cache"]) }
+    checkEqual(try? await api.contentStyle("film-trailer", version: "1.0", key: key, etag: "\"s1\""), SkyStudioStyleAnswer.notModified,
+               "a 304 confirms the copy held")
+    checkEqual(SkyStudioStub.log.first?.headers["If-None-Match"], "\"s1\"", "the copy's ETag goes out as If-None-Match")
+    checkEqual(await expectFailure("304 unasked", { _ = try await api.contentStyle("film-trailer", version: "1.0", key: key) }),
+               .badAnswer(status: 304), "a 304 to a question without an ETag is a bad answer")
     var tampered = styleAnswer()
     if case .object(var object) = tampered { object["text"] = "changed"; tampered = .object(object) }
     let tamperedText = tampered.encodedString()
     SkyStudioStub.reset { _ in .http(200, tamperedText) }
     checkEqual(await expectFailure("tampered", { _ = try await api.contentStyle("film-trailer", version: nil, key: key) }),
                .badAnswer(status: 200), "a text that does not match its checksum is a bad answer")
-    SkyStudioStub.reset { _ in .http(403, #"{"error": {"code": "not_entitled", "message": "Needs Pro.", "feature": "recipes"}}"#) }
+    SkyStudioStub.reset { _ in .http(403, #"{"error": {"code": "not_entitled", "message": "Needs Pro.", "feature": "recipes", "plan_reason": "machine_not_registered"}}"#) }
     if case .server(let error)? = await expectFailure("403", { _ = try await api.contentStyle("film-trailer", version: nil, key: key) }) {
         checkEqual(error.code, "not_entitled", "not_entitled keeps its code")
         checkEqual(error.fields["feature"]?.stringValue, "recipes", "and its extra fields")
+        let words = SkyStudioStyleLibrary.notEntitledWords(error)
+        check(words.hasPrefix("Not done: Sky Studio has not registered this Mac") && words.contains("Check Again"),
+              "machine_not_registered in plain words: Check Again registers this Mac (\(words))")
     } else {
         check(false, "403 is a server error")
+    }
+    let limit = SkyStudioServerError(status: 403, code: "not_entitled", message: "Mac limit.", fields: [
+        "plan_reason": "machine_limit_reached", "manage_machines_url": "https://skystudioai.com/app?machines=1"])
+    check(SkyStudioStyleLibrary.notEntitledWords(limit).contains("all of its Macs")
+          && SkyStudioStyleLibrary.notEntitledWords(limit).contains("https://skystudioai.com/app?machines=1"),
+          "machine_limit_reached in plain words, with where to remove a Mac")
+    let plan = SkyStudioServerError(status: 403, code: "not_entitled", message: "Needs Pro.", fields: ["plan_reason": .null])
+    check(SkyStudioStyleLibrary.notEntitledWords(plan).contains("SkyCut Pro and the SkyCut trial include them"),
+          "a plan without recipes in plain words")
+    for words in [limit, plan].map(SkyStudioStyleLibrary.notEntitledWords) {
+        check(words.hasSuffix("The preset styles and the user's own styles still work."), "every refusal says what still works")
     }
     SkyStudioStub.reset { _ in .http(200, "{}") }
     do {

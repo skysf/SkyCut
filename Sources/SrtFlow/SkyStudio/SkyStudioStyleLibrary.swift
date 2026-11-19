@@ -7,7 +7,10 @@ import SrtFlowMCPKit
 // - the list: the manifest kept on this Mac, asked again when it is 10 minutes old (with its ETag, so usually a 304). When Sky
 //   Studio cannot be reached the copy here is used and says when it was fetched; nothing here and unreachable = no Sky Studio
 //   styles. After a failed ask, the next minute uses the copy without asking again;
-// - reading one: this Mac's copy when it holds that version, else Sky Studio (checksum checked, then kept by checksum);
+// - reading one: exactly that id and version. Online, Sky Studio is asked with the ETag of the copy held (it checks this Mac's
+//   licence before a 304, contract of c9a7ce5d: every answer is `private, no-cache`), so a refusal there is never answered with
+//   the copy; the copy is served without asking only when Sky Studio cannot be reached. A new answer is checked (id, version,
+//   checksum) and kept by id and version. `403 not_entitled` is said in plain words (not registered yet, the Mac limit, the plan);
 // - who may read: only while the licence includes `recipes` (SkyCutLicense.recipes). A licence's valid_until never passes the
 //   trial's end, so the copies stop being served when the trial ends, offline too;
 // - deleting (licenceChanged, from SkyStudioAccount): every text when a fresh /me leaves `recipes` out or the key is invalid,
@@ -183,44 +186,85 @@ final class SkyStudioStyleLibrary: ObservableObject {
     /// id and version: a copy is matched on id + version (+ checksum), never on the text alone (Codex review CXS1 #5).
     func read(_ id: String, version: String?, sha256: String? = nil) async throws -> Read {
         guard licence().recipes else { throw ReadProblem.notEntitled }
+        let observed = generation
         let listed = listing.styles.first { $0.id == id }
         let asked = version.flatMap { $0.lowercased() == "latest" ? nil : $0 }
         guard let wanted = asked ?? listed?.version else { throw ReadProblem.notListed(id: id) }
         let expected = sha256 ?? (listed?.version == wanted ? listed?.sha256 : nil)
-        if let copy = cache.style(id: id, version: wanted, sha256: expected) { return Read(style: copy.style, cachedAt: copy.fetchedAt) }
+        let copy = cache.style(id: id, version: wanted, sha256: expected)
+        let offline = copy.map { Read(style: $0.style, cachedAt: $0.fetchedAt) }
         let key: String
         switch await self.key() {
         case .success(let value): key = value
-        case .failure(let problem): throw ReadProblem.key(problem.message)
+        case .failure(let problem):
+            if let offline { return try served(offline, observed) }
+            throw ReadProblem.key(problem.message)
         }
-        let observed = generation
-        let style: SkyStudioStyleText
+        let answer: SkyStudioStyleAnswer
         do {
-            style = try await api().contentStyle(id, version: wanted, key: key)
+            answer = try await api().contentStyle(id, version: wanted, key: key, etag: copy?.etag)
         } catch let failure as SkyStudioFailure {
+            if let offline, Self.unreachable(failure) { return try served(offline, observed) }
             throw Self.problem(failure, id: id, version: wanted)
         } catch let refused as SkyStudioContentRequestProblem {
             throw ReadProblem.server(refused.message)
+        }
+        guard case .changed(let style, let etag) = answer else {
+            // 304: still current, and Sky Studio checked this Mac's licence before saying so.
+            guard let offline else { throw ReadProblem.server("Sky Studio answered \(id) \(wanted) without a text; try again later.") }
+            return try served(offline, observed)
         }
         if let expected, expected != style.sha256 {
             throw ReadProblem.server("Sky Studio sent a different text for \(id) \(wanted) than its list names; try again later.")
         }
         // The licence ended or the copies were deleted while this was asked: never keep or serve it.
-        guard observed == generation, licence().recipes else { throw ReadProblem.notEntitled }
-        try? cache.store(style, fetchedAt: now())
+        _ = try served(Read(style: style, cachedAt: nil), observed)
+        try? cache.store(style, etag: etag, fetchedAt: now())
         publish(listing.origin)
         return Read(style: style, cachedAt: nil)
+    }
+
+    /// Served only while nothing was deleted since the read began and the licence still includes `recipes`.
+    private func served(_ read: Read, _ observed: Int) throws -> Read {
+        guard observed == generation, licence().recipes else { throw ReadProblem.notEntitled }
+        return read
+    }
+
+    /// Sky Studio could not answer (offline, a 5xx, `content_unavailable`): a copy held is served instead. A refusal is not this.
+    private static func unreachable(_ failure: SkyStudioFailure) -> Bool {
+        switch failure {
+        case .network: return true
+        case .badAnswer(let status): return status >= 500
+        case .server(let error): return error.status >= 500
+        }
     }
 
     private static func problem(_ failure: SkyStudioFailure, id: String, version: String) -> ReadProblem {
         switch failure {
         case .network: return .unreachable(id: id, version: version)
         case .server(let error) where error.code == "not_found": return .notFound(id: id, version: version)
-        case .server(let error) where error.code == "not_entitled":
-            return .server("Sky Studio says this account cannot read its editing styles on this Mac: \(error.message) Ask the user to "
-                + "click Check Again in SkyCut Settings → Sky Studio.")
+        case .server(let error) where error.code == "not_entitled": return .server(notEntitledWords(error))
         case .server(let error): return .server("Sky Studio did not send \(id): \(error.message)")
         case .badAnswer: return .server("Sky Studio sent an answer SkyCut does not understand for \(id) \(version); try again later.")
+        }
+    }
+
+    /// `403 not_entitled` in plain words (contract of c9a7ce5d: a text goes only to a Mac registered within the account's limit).
+    nonisolated static func notEntitledWords(_ error: SkyStudioServerError) -> String {
+        let still = " The preset styles and the user's own styles still work."
+        switch error.fields["plan_reason"]?.stringValue {
+        case "machine_not_registered":
+            return "Not done: Sky Studio has not registered this Mac for this account yet, so it does not send its editing styles here. "
+                + "Ask the user to click Check Again in SkyCut Settings → Sky Studio (that registers this Mac), then try again." + still
+        case "machine_limit_reached":
+            let action = SkyStudioLinks.webURL(error.fields["manage_machines_url"]?.stringValue).map {
+                "Ask the user to open \($0.absoluteString) and remove a Mac in Sky Studio to use this account here."
+            } ?? "Ask the user to email \(SkyStudioLinks.supportEmail) to use this account on this Mac."
+            return "Not done: this account is already using SkyCut on all of its Macs, so this Mac is on the free plan and does not get "
+                + "Sky Studio's editing styles. " + action + still
+        default:
+            return "Not done: Sky Studio says this account's plan does not include its editing styles on this Mac (\(error.message)) "
+                + "SkyCut Pro and the SkyCut trial include them; ask the user to click Check Again in SkyCut Settings → Sky Studio." + still
         }
     }
 
