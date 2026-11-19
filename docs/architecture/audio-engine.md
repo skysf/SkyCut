@@ -86,7 +86,9 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
     [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
     The sound never starts ahead of the picture: a pause moves the engine to the frame the picture stopped on, and a
     Play without a positioned, primed picture keeps the sound paused until the picture is placed
-    ([playback start](playback-start.md)).
+    ([playback start](playback-start.md)). After a device start the clock waits until the graph has rendered once
+    (`isRendering`), then the sound is pinned to the next quantum and the picture starts at its host time
+    (`startHostTime`).
     [Resuming or Play while hovering froze the picture](../bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
 
 11. **图只在马上要出声时开着**（2026-11-11，[案例](../bugfixes/2026-11-11-preview-audio-engine-never-idles.md)）。图开着就占着

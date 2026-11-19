@@ -27,7 +27,14 @@ primed, so it moves the moment the sound does. Every paused state is kept that w
 
 Play from a positioned picture is the ordinary native rate start plus the engine from the same position; the audio
 engine reuses its prepared samples when the paused anchor matches. When the output graph has just restarted, Play
-aligns the positioned picture to the new audio host clock without a seek. Any other Play (a hover still on, a scrub,
+aligns the positioned picture to the new audio host clock without a seek. A device that has just started (the idle
+stop, a system stop) renders for the first time an unknown while after Play (`PlaybackAudioSource.isRendering`). The
+Play stays pending until it has rendered once, silently (`OutputStartWait`, checked every 2 ms, given up after a
+second); then the sound is pinned to the next quantum, whose host time is known (`startHostTime`), and the picture
+starts at that same host time with `setRate(1, time: .invalid, atHostTime:)`, without a seek. Before, the picture
+started at once while the sound waited for the first render: on the M1 it ran up to 151 ms ahead, and the drift
+correction then re-seeked it, a stall of up to 183 ms; waiting only for the picture left the picture's first frame up
+to 97 ms behind the sound. Any other Play (a hover still on, a scrub,
 a placement still preparing, a failed preparation) stays pending while the clock places and primes the picture at
 the playhead, then starts both. **Play never re-seeks the picture after the sound has started**: before 2026-11-19 a
 resume and a Play while hovering did (`setRate(_:time:atHostTime:)` with a time is a native seek), and on a long-GOP
@@ -181,14 +188,15 @@ today. The local M1 run, the warm-up line in each summary and the manual first-l
 pins graph starts to recovery, and checks the item installation order and CI connection. It also requires that every
 paused placement primes without waiting for Play, that Play places and primes the picture before starting the sound
 and never re-seeks it while starting, that a pause holds the stopped picture (inside `pause()` or from the time
-observer's stop callback), and that a hover's end places the picture back on the playhead.
+observer's stop callback), that a hover's end places the picture back on the playhead, and that after a device start
+both clocks wait for it to render and start on the same quantum.
 `scripts/check-player-clock.sh` (`SyncedStartChecks.swift`) checks the same behavior on a real AVPlayer with a
 picture-only long-GOP clip.
 
 Reverse verification injected 350 ms into the production audio start. The GUI check failed both warm onset budgets
 in every launch, and the wiring guard rejected the blocking call. Separate mutations exercised each other wiring
 rule, including a duplicate open build and removal of the graphical CI step. On 2026-11-19 the previous
-`PlayerClock` failed 9 of the clock checks, six mutations of the new rules each turned the wiring guard red, and
+`PlayerClock` failed 9 of the clock checks, nine mutations of the new rules each turned the wiring guard red, and
 five pre-fix M1 launches failed the gate on structure, on the hosted rules (resume and Play while hovering: five
 gross stalls each) and on the strict rules.
 
