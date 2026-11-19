@@ -205,6 +205,7 @@
 - [2026-09-29 叠化 + 关键帧之后预览全黑](2026-09-29-preview-black-slice-boundaries-straddle-a-tick.md) — 切片边界先落格子再去重（`CompositionSlices`）；主轨不到 0.01 秒的缝两条管线同一个常量。
 - [2026-10-01 配乐比画面长的工程播到画面结尾就停住](2026-10-01-preview-item-shorter-than-timeline-without-audio-tracks.md) — 拆掉一样东西之前先问它顺手撑着什么（合成的长度）：垫黑底到总长。
 - [2026-09-24 主轨转场处预览的声音掉下去一截](2026-09-24-preview-mix-ignores-transition-expansion.md) — 两份结果互相比，比不出它们一起错：要有绝对期望，自检走生产入口。
+- [2026-11-19 Preview sound advanced before video was ready to move](2026-11-19-preview-start-before-preroll.md) — Prime the positioned preview asynchronously before releasing the pending Play request.
 - [2026-08-12 压缩预览区时播放条压到工具栏上](2026-08-12-preview-transport-row-overlap.md) — VStack 里谁让步必须显式声明。
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
@@ -282,6 +283,7 @@
 - [2026-09-29 被切掉的字混进字幕行、字幕稀疏时选成幻灯片](2026-09-29-text-scan-cutoff-text-and-sparse-subtitles.md) — 「谁最多」在样本稀疏时不可靠：用位置先验 + 最低支撑。
 - [2026-11-11 森林色切经典色，开着的窗口只变一半](2026-11-11-theme-switch-leaves-windows-half-light.md) — `.preferredColorScheme` 交过明确值就别再交 nil。
 - [2026-11-17 The tick and click sound effects could not be placed, and failed calls left their files](2026-11-17-tick-and-click-cannot-be-placed.md) — Output must meet the consumer's minimum; roll back files when a call fails; bump the version when file content changes.
+- [2026-11-19 The one-day time bound refused relative keyframes a hair below 0 and times the tools had just made](2026-11-19-time-bound-refuses-relative-keyframes-and-timeline-end.md) — A bound needs the units of what it bounds, and must accept every time it lets the API create.
 - [2026-09-24 点一下选段卡半秒、拖块滚动跟不上手](2026-09-24-timeline-blocks-observe-whole-project.md) — 时间线上的块不读工程：只收值、`Equatable`、构造处套 `.equatable()`。
 - [2026-09-18 轨道一多就没法上下滚](2026-09-18-timeline-cannot-scroll-vertically.md) — 时间线双向滚动、轨道头 / 标尺各自钉住；裸 VStack 会替整条界面要高度。
 - [2026-08-09 时间线拖动卡顿与对齐](2026-08-09-timeline-clip-drag-lag-and-alignment.md) — 渲染偏移、吸附与唯一落点。

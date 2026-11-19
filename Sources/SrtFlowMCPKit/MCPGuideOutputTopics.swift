@@ -134,10 +134,11 @@ enum MCPGuideOutputTopics {
             compress_videos makes smaller copies of video files; it does not touch the project.
             """),
             MCPGuideSection(name: "settings", about: "the remembered page settings and per-batch options", text: """
-            Settings. Without options it uses the settings the user keeps on SkyCut's Compress Video page. quality (small, \
-            balanced, high), resolution (a short-side cap such as 1080p), frame_rate and fast (the Mac's hardware encoder: about \
-            ten times faster, but a bigger file at the same quality) apply to this batch only. Resolution and frame rate are only \
-            ever lowered.
+            Settings. Without options it uses the settings the user keeps on SkyCut's Compress Video page. quality (small: \
+            smaller, slightly softer; balanced: looks like the original; high: bigger), resolution (a short-side cap such as \
+            1080p), frame_rate (a cap) and fast (the Mac's hardware encoder: about ten times faster, but a bigger file at the \
+            same quality) apply to this batch only; original keeps the source's size or frame rate. Resolution and frame rate \
+            are only ever lowered.
             """),
             MCPGuideSection(name: "output", about: "file names, the folder and the page's queue", text: """
             Output. One H.264 MP4 per file, named <name>_compressed.mp4, in SkyCut/Exports inside the opened folder, or in \
@@ -170,9 +171,11 @@ enum MCPGuideOutputTopics {
             same fields as edit_subtitles style); the word highlight does not apply because subtitle files have no word times.
             """),
             MCPGuideSection(name: "output", about: "file names, the folder, encoding options and the job", text: """
-            Output. One output per video, named <name>_sub.mp4, in SkyCut/Exports inside the opened folder or in folder; it \
-            never overwrites. quality, resolution, frame_rate and fast apply to this batch only. Files outside the opened folder \
-            may return needs_confirmation. It returns job_id: wait with get_job.
+            Output. One output per video, named <name>_sub.mp4, in SkyCut/Exports inside the opened folder or in folder \
+            (absolute, or relative to the opened folder; made if missing); it never overwrites. quality (small, balanced, high), \
+            resolution and frame_rate (caps; original keeps the source's) and fast (the hardware encoder: faster, bigger file) \
+            apply to this batch only. Files outside the opened folder may return needs_confirmation. It returns job_id: wait \
+            with get_job.
             """)
         ],
         examples: [["items": [["video": "talk.mp4", "subtitles": "talk.srt"]]]],

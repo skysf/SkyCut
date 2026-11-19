@@ -32,37 +32,43 @@ enum MCPGuideMediaTopics {
             MCPGuideSection(name: "kinds", about: "what each kind and image operation makes, the default video model, tools for other jobs", text: """
             What it makes. kind is image, image_to_video, text_to_video, music, sound_effect or lipsync. With kind=image, operation picks \
             the job: generate (default), remove_background (a cutout with transparency), camera_angle (a new viewpoint of one image with \
-            the qwen-angles model: camera_angle {rotate, tilt, zoom}, omitted axes are 0 and all zero is refused; a rotation of 135 or \
-            -135 degrees runs as two steps on Sky Studio and its price comes only from the quote) or upscale (one image enlarged by \
-            upscale_factor x2, x3 or x4 with the image-upscale model; the model may reduce the factor, so read the result's size). Both \
-            take one image or one reference_images entry, no prompt, and never film. Video clips already on the timeline are upscaled with \
-            upscale_clip instead. The default video model is MiniMax H3. get_status models=true lists the current models with prices, \
-            defaults and reference limits for free; model picks one by its public id, otherwise SkyCut picks a compatible low-cost \
-            default. Narration is add_voiceover and subtitles are generate_subtitles, not this tool.
+            the qwen-angles model: camera_angle {rotate, tilt, zoom}, rotate and tilt in degrees and zoom in steps, omitted axes are 0 and \
+            all zero is refused; a rotation of 135 or -135 degrees runs as two steps on Sky Studio and its price comes only from the \
+            quote) or upscale (one image enlarged by upscale_factor x2 (default), x3 or x4 with the image-upscale model; the model may \
+            reduce the factor, so read the result's size). Both take one image or one reference_images entry, no prompt, and never film. \
+            Video clips already on the timeline are upscaled with upscale_clip instead. The default video model is MiniMax H3. get_status \
+            models=true lists the current models with prices, defaults and reference limits for free; model picks one by its public id, \
+            otherwise SkyCut picks a compatible low-cost default. Narration is add_voiceover and subtitles are generate_subtitles, not \
+            this tool.
             """),
             MCPGuideSection(name: "inputs", about: "prompt, frames, references, characters, aspect ratio, resolution, model-specific fields", text: """
             Inputs. prompt drives the generators; camera_angle, upscale, remove_background and lipsync take no prompt. image_to_video uses \
             image as the first frame and optional last_image (frames mode); input_mode=multimodal uses the reference_images, \
-            reference_videos and reference_audio lists within the model's limits. lipsync takes a local video and audio (MP3 or WAV). \
-            character_id uses a Sky Studio character (list_characters; an id, never a file path) for images and videos. character_roles \
-            picks views: without it the server chooses within the combined reference limits, and roles you name are never dropped. A quote \
-            returns character_revision, which goes back unchanged; if the character's views change, read it again with get_character and \
-            quote again (an old confirm_token no longer works). aspect_ratio defaults to the canvas; resolution defaults to the lowest \
-            image or 720p-class video tier; duration follows the model's catalog. Music is instrumental by default; lyrics need \
-            instrumental=false. Some fields belong to one model family (HeyGen: title, enable_caption, start_time, end_time and others; \
-            Wan: document, web_url, enable_thinking, enable_prompt_expansion). HeyGen's end_time must be after start_time and within the \
-            source; a shorter window does not lower the price.
+            reference_videos and reference_audio lists within the model's limits. lipsync takes a local video and audio (MP3 or WAV; its \
+            length is measured for the quote). character_id uses a Sky Studio character (list_characters; an id, never a file path) for \
+            images and videos. character_roles picks views: without it the server chooses within the combined reference limits, and roles \
+            you name are never dropped. A quote returns character_revision, which goes back unchanged; if the character's views change, \
+            read it again with get_character and quote again (an old confirm_token no longer works). aspect_ratio defaults to the canvas \
+            (a frames-mode video follows its image); resolution defaults to the lowest image or 720p-class video tier; duration follows \
+            the model's catalog. Music is instrumental by default; lyrics need instrumental=false. Some fields belong to one model family \
+            (HeyGen: title, enable_caption, start_time, end_time and others; Wan: document, web_url, enable_thinking, \
+            enable_prompt_expansion). HeyGen's end_time must be after start_time and within the source; a shorter window does not lower \
+            the price. HeyGen's switches default to false; enable_caption does not guarantee captions or burn-in, and \
+            enable_dynamic_duration keeps HeyGen's own length limits. auto_fallback is deprecated: only false is accepted, and nothing is \
+            ever replaced automatically.
             """),
             MCPGuideSection(name: "spending", about: "quote_only, when the user must approve, confirm_token, the daily credit limit", text: """
             Spending. quote_only=true returns the exact price and the approval reasons without uploading, reserving or charging. The \
             low-cost draft (default model and settings) goes ahead in both permission modes. In ask_for_approval mode, going beyond the \
             draft (a higher resolution, a longer duration, quality=highest, a pricier model) returns needs_confirmation with the price and \
-            the reason: ask the user, and only if they agree repeat the same call with confirm_token (approval_scope=project approves that \
-            model and specification for the project up to that price). Set user_requested_overrides=true only when the user's own words \
-            name that setting ("4K", "use GPT Image 2", "10 seconds"), and put those words in user_request. Wishes such as "best quality" \
-            or "as good as possible" name no setting: choose a specification, quote it and ask. If user_request does not name every \
-            setting beyond the draft, SkyCut asks anyway (needs_confirmation with overrides_not_applied). The daily hard credit limit applies in every mode: over \
-            it nothing starts (daily_budget_exceeded); tell the user. Keep the same idempotency_key when retrying after a lost answer.
+            the reason: ask the user, and only if they agree repeat the same call with confirm_token (approval_scope is once by default; \
+            project, only on the user's explicit approval, approves that model and specification for the project up to that price). Set \
+            user_requested_overrides=true only when the user's own words name that setting ("4K", "use GPT Image 2", "10 seconds"), and \
+            put those words in user_request. Wishes such as "best quality" or "as good as possible" name no setting: choose a \
+            specification, quote it and ask. If user_request does not name every setting beyond the draft, SkyCut asks anyway \
+            (needs_confirmation with overrides_not_applied). The daily hard credit limit applies in every mode: over it nothing starts \
+            (daily_budget_exceeded); tell the user. Keep the same idempotency_key (stable, 1-128 characters) when retrying after a lost \
+            answer.
             """),
             MCPGuideSection(name: "jobs_results", about: "job_id and get_job, where files land, cancelling, refunds, file names", text: """
             Jobs and results. The call returns job_id; wait with get_job, which reports the phase, queue position and credits_charged. \
@@ -80,10 +86,11 @@ enum MCPGuideMediaTopics {
             MCPGuideSection(name: "official_film", about: "the official original-film flow: film, prepared references, seam review", text: """
             Official original film. film, prepare_references, prepared_references, quote_token and seam_review belong to the official \
             original-film flow: read get_status film_contract=true first for the shot, context and sound contract and its steps. \
-            prepare_references=true only prepares and uploads the references (no quote, no reservation; leave out film, quote_only and \
-            the tokens) and returns a job: wait with get_job. Then pass its token as prepared_references and repeat the same paths and \
-            roles; the token stops working after an account, project or file change. Keep a stable idempotency_key per shot and do a \
-            fresh seam_review before each submission.
+            prepare_references=true only prepares and uploads the references (no quote, no reservation; leave out film, quote_only and the \
+            tokens) and returns a job: wait with get_job. Then pass its token as prepared_references and repeat the same paths and roles; \
+            the token stops working after an account, project or file change. Keep a stable idempotency_key per shot and do a fresh \
+            seam_review before each submission. The film flow only generates (operation generate): no remove_background, camera_angle, \
+            upscale or lipsync.
             """)
         ],
         examples: [

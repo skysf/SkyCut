@@ -132,8 +132,23 @@ jobs:
         if: steps.changes.outputs.docs_only != 'true' && matrix.shard == 1
         run: swift build --arch arm64
 
+      # Save timing diagnostics before the longer checks, even if a later test fails.
+      - name: Playback start benchmark
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        env:
+          PLAYBACK_START_OUT: ${{ runner.temp }}/playback-start
+        run: /bin/bash scripts/check-playback-start.sh
+
+      - name: Upload playback start samples
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playback-start
+          path: ${{ runner.temp }}/playback-start
+          if-no-files-found: ignore
+
       - name: Run checks (shard ${{ matrix.shard }} of ${{ strategy.job-total }})
-        if: steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true'
+        if: ${{ !cancelled() && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
         run: scripts/check-all.sh --shard ${{ matrix.shard }} --of ${{ strategy.job-total }}
 
       # 预览性能 ratchet：起真 App 按固定场景数「做了多少件活」，只许降不许涨
