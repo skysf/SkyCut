@@ -20,6 +20,9 @@ enum DevHooks {
     }
 
     static func editorAppeared(project: VideoEditProject) {
+        #if DEBUG
+        if PlaybackStartBench.startIfRequested(project: project) { return }
+        #endif
         let env = ProcessInfo.processInfo.environment
         // 导入钩子：可以用 : 分隔多个路径（PATH 惯例），addMedia 按类型分流 —— 想验
         // 字幕相关的界面就再挂一个 .srt，否则拿不到「有字幕」的状态。

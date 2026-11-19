@@ -7,10 +7,10 @@ import SrtFlowMCPKit
 // (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md): two projects' export_video / export_subtitles into one
 // folder with one name, held at a barrier until both have listed the folder (the race the review found), must end as two
 // files that each read back as their own export; a file that appears after the listing (a listing that does not show it)
-// is never replaced — the export moves on to the next number and says so. Plus ExclusivePlacement on real files.
+// is never replaced — the export moves on to the next number and says so. ExclusivePlacement itself on real folders (and a
+// real exFAT volume) is checked in SrtFlowCoreChecks (ExclusivePlacementChecks.swift).
 @MainActor enum ExportTargetChecks {
     static func run(root: URL, ffmpeg: URL, project: VideoEditProject, require: (Bool, String) -> Void) async {
-        placement(root: root, require: require)
         // Two more projects (the primary one's timeline, but their own subtitles): the parallel calls come from two projects.
         let others = ["export-target-b", "export-target-c"].compactMap {
             OpenProjects.shared.newProject(savingAs: root.appendingPathComponent("\($0).skycut"), placement: .background)
@@ -22,50 +22,6 @@ import SrtFlowMCPKit
         await lateVideo(root: root, project: project, require: require)
         await parallelSubtitles(root: root, projects: (others[0], others[1]), require: require)
         await lateSubtitles(root: root, project: others[1], require: require)
-    }
-
-    /// ExclusivePlacement on real files: a claim never takes an existing file, a release removes only its own empty
-    /// file, a move carries on from the number it was given, a copy leaves nothing hidden behind, a set moves on together.
-    private static func placement(root: URL, require: (Bool, String) -> Void) {
-        let folder = root.appendingPathComponent("placement", isDirectory: true)
-        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let kept = folder.appendingPathComponent("Cut.mp4"), second = folder.appendingPathComponent("Cut 2.mp4")
-        FileManager.default.createFile(atPath: kept.path, contents: Data("keep".utf8))
-        FileManager.default.createFile(atPath: second.path, contents: Data("keep 2".utf8))
-        require((try? ExclusivePlacement.claim(kept)) == .some(nil) && read(kept) == "keep",
-                "a claim on an existing file is refused and the file is untouched")
-        let fresh = folder.appendingPathComponent("Fresh.mp4")
-        if let claim = try? ExclusivePlacement.claim(fresh) {
-            require(FileManager.default.fileExists(atPath: fresh.path), "a claim is an empty file at the name")
-            ExclusivePlacement.release(claim)
-            require(!FileManager.default.fileExists(atPath: fresh.path), "a release removes the empty claim")
-        } else {
-            require(false, "a free name can be claimed")
-        }
-        if let claim = try? ExclusivePlacement.claim(fresh) {
-            try? Data("someone else's".utf8).write(to: fresh)
-            ExclusivePlacement.release(claim)
-            require(read(fresh) == "someone else's", "a release never removes a file that is no longer its empty claim")
-        }
-        let moved = folder.appendingPathComponent("finished.tmp")
-        FileManager.default.createFile(atPath: moved.path, contents: Data("new".utf8))
-        let placed = try? ExclusivePlacement.place(moved, in: folder, stem: "Cut", pathExtension: "mp4", from: 2)
-        require(placed?.lastPathComponent == "Cut 3.mp4" && read(second) == "keep 2" && read(kept) == "keep"
-                && placed.map(read) == "new" && !FileManager.default.fileExists(atPath: moved.path),
-                "a taken name moves the file on from the number it was given (Cut 3, not Cut 2 2): \(placed?.lastPathComponent ?? "nil")")
-        let copied = folder.appendingPathComponent("copied.tmp")
-        FileManager.default.createFile(atPath: copied.path, contents: Data("copy".utf8))
-        let copy = try? ExclusivePlacement.place(copied, in: folder, stem: "Cut", pathExtension: "mp4", from: 1, copying: true)
-        let hidden = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasPrefix(".") }
-        require(copy?.lastPathComponent == "Cut 4.mp4" && copy.map(read) == "copy" && hidden.isEmpty,
-                "onto another drive: copied next to the target first, nothing hidden left: \(copy?.lastPathComponent ?? "nil") \(hidden)")
-        FileManager.default.createFile(atPath: folder.appendingPathComponent("Talk.zh.srt").path, contents: Data("keep".utf8))
-        let set = try? ExclusivePlacement.claimSet(from: 1) { number in
-            ["en", "zh"].map { folder.appendingPathComponent((number > 1 ? "Talk \(number)" : "Talk") + ".\($0).srt") }
-        }
-        require(set?.number == 2 && !FileManager.default.fileExists(atPath: folder.appendingPathComponent("Talk.en.srt").path),
-                "one taken name moves the whole set on, and the set's other claim is given back")
-        set?.claims.forEach(ExclusivePlacement.release)
     }
 
     /// Two projects' export_video into one folder with one name, both past the listing before either picks.

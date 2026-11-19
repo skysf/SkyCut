@@ -18,18 +18,26 @@ struct PlayerViewRepresentable: NSViewRepresentable {
     /// 此刻要挂的调色（时间轴上的滤镜段）。默认空 —— 烧字幕预览那个宿主
     /// 不认识滤镜，也不该被它影响。
     var filterStack: FilterStack = .empty
+    var previewClock: PlayerClock?
 
     func makeCoordinator() -> FilterStackAttachment { FilterStackAttachment() }
 
     func makeNSView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = player
+        previewClock?.bindPreviewLayer(view.playerLayer)
+        #if DEBUG
+        PlaybackStartBench.previewMounted(view)
+        #endif
         return view
     }
 
     func updateNSView(_ nsView: PlayerLayerView, context: Context) {
         PerfCounters.update(Self.self)
-        if nsView.player !== player { nsView.player = player }
+        if nsView.player !== player {
+            nsView.player = player
+            previewClock?.bindPreviewLayer(nsView.playerLayer)
+        }
         // 每秒会被调二十次（时钟 0.05s 一跳），所以「挂的还是不是上次那套」
         // 的判断在 attachment 里做，这里无条件调。
         context.coordinator.apply(filterStack, to: nsView)

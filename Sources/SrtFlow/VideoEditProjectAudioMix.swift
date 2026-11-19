@@ -49,7 +49,13 @@ final class PreviewAudioEngineHost {
             idle.reconcile()
             return
         }
-        guard let engine = try? TimelineAudioEngine(config: config, mode: .realtime, meters: meters) else { return }
+        var observer: TimelineAudioEngine.SampleObserver?
+        #if DEBUG
+        observer = PlaybackStartBench.audioObserver
+        #endif
+        guard let engine = try? TimelineAudioEngine(
+            config: config, mode: .realtime, meters: meters, observeFirstTrack: observer
+        ) else { return }
         self.engine = engine
         // GUI 冒烟的静音钩子（和 PlayerClock 同一个开关）：验播放时别往正在用机器的人耳朵里外放。
         if ProcessInfo.processInfo.environment["SRTFLOW_SMOKE_MUTE"] != nil { engine.mute() }

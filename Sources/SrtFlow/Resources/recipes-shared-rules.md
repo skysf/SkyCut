@@ -13,7 +13,8 @@
    (taste rule 20 below) or fades out (fade_out) — never a hard stop.
 6. Never invent numbers, reviews, student counts, prices or links; use only what the footage and the user give.
 7. Before exporting, go through the recipe's checklist: look at the key moments of the timeline (the start, the first frame of
-   each part, the end) and listen to the whole timeline. Then do "Look again before export" below.
+   each part, the end) and measure the whole mix with listen mix=true. Then do "Look again before export" below, which ends
+   with the inspect_video report every delivery needs.
 8. When done, tell the user which recipe you followed, the length, the shape and where the video is; with library music, give
    the credit lines (music_credits).
 9. Subtitles: set how they look with edit_subtitles style before generate_subtitles or add_voiceover subtitles=true (lines are
@@ -63,8 +64,8 @@ override them.
 
 1. What makes a sound on screen is heard: cars, ships, water, animals, fire, drums, rain, machines, breathing (a thing
    heard in the last 8 s may give way to a voice or the music). Why: a silent car makes the place feel fake. How:
-   add_clips keeps a video's own sound, so check it with listen; when there is none, add one under that shot
-   (find_audio kind=sound_effect, else generate_media under rule 11).
+   add_clips keeps a video's own sound, so check it with listen (describe=true says what it holds); when there is none,
+   add one under that shot (find_audio kind=sound_effect, else generate_media under rule 11).
 2. A scene in one place keeps its own sound, mostly as it is, and may push its key action up 4–6 dB. Mute it only for
    lip-sync replaced by a clean take of the same line, a montage carried by narration and music, or near-silent footage,
    and replace what you mute with a sound that belongs to the picture. Why: without it only music and narration remain.
@@ -84,7 +85,9 @@ override them.
 6. Generated video usually has its own sound, which can carry a low drone the picture does not show, as loud as a voice.
    Measure it before deciding what stays: keep what belongs to the picture, lower or mute the rest and anything covering
    speech; when you cannot tell what it is, ask the user to listen. Why: a shot of wind can hide a drone that buries the
-   narration. How: listen file=….
+   narration. How: listen file=… or clip_id=… with describe=true says what it holds every 3 s (low_drone, broadband_noise,
+   speech_like…), in words, not a verdict; edit_clip voice_band_db lowers only the voice band of a rumble whose low hits
+   must stay.
 
 ## Cuts
 
@@ -93,12 +96,14 @@ override them.
    what its volume limit leaves uncovered comes off the louder side; (4) a deliberate hard
    switch on a music accent, a hit or a line's first word (say which); (5) gain so both sides meet (dB). A big jump in place
    sound (about 6 dB or more) needs one of the first four. Why: a bare switch between two places sounds broken. How:
-   compare listen clip_id=… from=… to=… level_db over the half second on each side; (1) two clips, fade_out and fade_in;
-   (2) add_clips sound=separate, then edit_clip alone=true on the sound; (3) set_transition sound=bed; (4) hit_at; (5) volume_db.
+   compare listen clip_id=… from=… to=… level_db over the half second on each side; set_transition after_clip_id=… makes
+   each in one undo step, the picture never moving (all=true: every V1 cut): (1) sound=crossfade; (2) sound=lead or lag;
+   (3) set_transition sound=bed; (4) sound=cut or on_beat, a hit placed with add_clips hit_at; (5) sound=gain.
 2. In and out points go by frames, not round seconds, and never cross a cut inside the source (out at least one frame
    before it, in on it at the earliest; a deliberate one is named with its frame). Why: a rounded "3.5 s" let two frames
-   of another shot flash by. How: look shots=true on each file first (generated videos often hold several shots); frames
-   are seconds × the fps in get_timeline.
+   of another shot flash by. How: look shots=true on each file first (generated videos often hold several shots); add_clips
+   and edit_clip return source_cuts when a window still crosses one, with a suggested_source_in or suggested_source_out;
+   frames are seconds × the fps in get_timeline.
 3. A speaking shot holds at least the whole line; never cut someone else's short shot into a line (show the listener after
    it); quick cutting only where no one speaks or only narration runs. Why: a face cut into a sentence appears from
    nowhere. How: transcribe; listen cuts=true.
@@ -112,8 +117,11 @@ override them.
    shapes; set_track volume_db; inspect_video from=0 silence_db=-36 min_silence=1.5 finds holes.
 2. A voice must be clear against everything else together, not just the music: measure a shot's own sound before laying
    narration on it, and when a line is hard to hear, lower the layer that covers it under that line instead of the music
-   again. Why: music lowered twice did not help when the shot's own rumble covered the line. How: listen each clip_id
-   from/to over the line (whole-band level_db); when unsure, ask the user to listen.
+   again. Why: music lowered twice did not help when the shot's own rumble covered the line. How: listen voice=A1 (or auto)
+   scores each narration line against the whole mix and names the layers covering it most (maskers); lower that one under
+   the line (volume_curve, edit_clip volume_db, or voice_band_db for a rumble whose low hits must stay) and check again.
+   A voice in a clip's own sound is not scored: compare listen clip_id=… from/to levels over the line. For may_be_hard, or
+   when unsure, ask the user to listen.
 3. One piece of music per chapter, changing where the story changes (a new piece may enter 0.5–1.2 s early, or everything
    switches on one frame); after the opening, a dialogue scene starts without music, which enters on the laugh or the
    event (under narration or a talking head the music just dips, 1); a piece with no job you can name (carry, mood,
@@ -122,11 +130,24 @@ override them.
 4. With music, it is heard within 3 s of the first picture, quiet but with some melody, not a bare drone; a video opening
    on dialogue, a talking head or narration may hold it until that first line ends. Why: a bare opening is flat. How:
    start the music at 0 and raise it with volume_curve.
+5. Generated music does not follow the seconds in its prompt: ask for more than the chapter needs, naming the mood, the
+   instruments, where it builds, stops and comes back, and how it ends; then measure it and put the place where it stops
+   and comes back by itself on the cut that must go from quiet to loud, in two pieces when needed. Why: four generated
+   tracks came back 3–9× too long, none on its seconds; their own stops then landed three cuts within a frame. How:
+   generate_media kind=music under rule 11; its get_job music (or listen file=… beats=true) gives stops ([from, to], to
+   being the hit that brings it back) and strongest_accents; add_clips hit=<that second> hit_at=<the cut>; a second piece
+   is the same file added again from the stop.
 
 ## Title cards
 
-Opening, company and title cards stay readable at least 3 s each (set_text duration); a call to action on the last frame
-keeps its style's own minimum. Taste rule 11 is for labels, not these cards. Why: a card that flashes by is not read.
+Opening, company, title and end cards go where no one speaks (never over the hook line or the tightest stretch), on an
+empty, dark enough part of the picture (white text leaves bright ones), and stay readable at least 3 s each (set_text
+duration); a call to action on the last frame follows its style instead. Company and name cards: thin, widely spaced
+type, in slowly and out quickly, about 1 s after a hit (short of room: in on an accent, out on a cut), company and names
+on separate cards. A title lands on a big hit of the music, the heaviest when it closes the video. Taste rule 11 is for
+labels, not these cards. Why: a card over speech, or one that flashes by, is neither heard nor read. How: set_text
+motion_preset (focus_pull or frame_reveal for credits, title_counter) with hit_at where it comes in, or start,
+letter_spacing and animation_in focus or fade; look at that moment.
 
 ## Plan before you cut
 
@@ -198,11 +219,14 @@ Text
 Sound
 17. Sound starts the video: the first sound comes with or before the first picture.
 18. The music's strongest moment is the video's peak: slide the music (its start, or source_in) so its hit or drop lands on
-    the peak, rather than cutting the pictures to wherever the music happens to peak.
+    the peak, rather than cutting the pictures to wherever the music happens to peak. listen beats=true lists its
+    strongest_accents; add_clips hit_at=<the peak> lands the strongest one there (hit=<a second> picks another); for a
+    placed clip, move its start by the peak minus the accent's time.
 19. A breath before the peak when no one is speaking: 0.3–1 s of near-silence before the biggest moment (volume_curve, or
     a stop in the track itself), then the hit on the action's cut. If the moment falls inside a line, keep the music
     level until the line ends: a dip mid-line sounds as if the music just died.
-20. End on the music's own ending: place the track so its last note ends with the video. If it is too long, keep its start
+20. End on the music's own ending: place the track so its last note ends with the video (listen beats=true gives ends_at,
+    where its own sound is over: add_clips hit=<ends_at> hit_at=<the video's end>). If it is too long, keep its start
     and its real ending and take out a middle part: split_clip at two downbeats (listen beats=true gives them) a whole
     number of bars apart (4, 8 or 16), delete the middle with delete_items, move the ending to a new_audio track so it
     starts where the first part stops, and give the first part fade_out 0.1 and the ending fade_in 0.1. Fade out in the
@@ -237,9 +261,17 @@ the user in one line what you checked.
    most are within 0.3 s of each other, recut.
 4. Rests or gaps: find the stretches with no new shot, text or sound event. Are they rests you planned, or gaps where the
    video just stops?
-5. Sound: listen around the peak and the end. Is there a breath before the peak, and does the music end with the picture?
-6. Cuts frame by frame: look at the 4 frames before and after every cut (look times=[those 8] size=small, one cut a call;
-   or file=… on an export_video preset=quick_review copy). Why: a 2-frame flash hides between samples 0.25 s apart.
+5. Sound: listen mix=true around the peak and the end. Is there a breath before the peak, and does the music end with the
+   picture?
+6. Cuts frame by frame: given file=… on an export_video preset=quick_review copy, inspect_video (7) scans every frame for
+   stray_frames, flashes and black_frame, and each clip against its source's own cuts (source_cut); look at the 4 frames
+   before and after each cut it reports (look times=[those 8] size=small, one cut a call), or at every cut without a
+   copy. Why: a 2-frame flash hides between samples 0.25 s apart.
+7. Before delivering, run inspect_video over the whole timeline (with file=… on that copy) and wait with get_job. Fix what
+   is wrong and inspect again; then mark each finding you meant (a hard switch or a held breath from the beat sheet) with
+   intentional={job_id, key, reason} and tell the user what you marked and why. Findings point at the rules above:
+   audio_cut_jump (Cuts, 1), audio_linger (Sound belongs to the picture, 3), audio_voice_masked (Voice and music, 2),
+   audio_hole (Voice and music, 1), sentence_cut (Cuts, 3). Why: it is the last check before the user listens.
 
 ## Learning a style from a reference video
 

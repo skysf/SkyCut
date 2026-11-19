@@ -77,6 +77,7 @@
 - [2026-11-19 E2E deadlines, fixture isolation, and test bundle cleanup](2026-11-19-e2e-harness-hardening.md) — Give real work its production budget, keep fixture state scratch-only, review golden candidates, and unregister bundles on exit.
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
+- [2026-11-19 A name reserved empty before the write could be replaced, and a failed write could remove another file](2026-11-19-empty-name-reservation-replaced-or-removed.md) — An exclusive create guards only the moment of creation: write privately, then install in one step that fails when the name exists; know your own file by device and inode, read after its bytes are in.
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
 - [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
@@ -205,6 +206,7 @@
 - [2026-09-29 叠化 + 关键帧之后预览全黑](2026-09-29-preview-black-slice-boundaries-straddle-a-tick.md) — 切片边界先落格子再去重（`CompositionSlices`）；主轨不到 0.01 秒的缝两条管线同一个常量。
 - [2026-10-01 配乐比画面长的工程播到画面结尾就停住](2026-10-01-preview-item-shorter-than-timeline-without-audio-tracks.md) — 拆掉一样东西之前先问它顺手撑着什么（合成的长度）：垫黑底到总长。
 - [2026-09-24 主轨转场处预览的声音掉下去一截](2026-09-24-preview-mix-ignores-transition-expansion.md) — 两份结果互相比，比不出它们一起错：要有绝对期望，自检走生产入口。
+- [2026-11-19 Preview sound advanced before video was ready to move](2026-11-19-preview-start-before-preroll.md) — Prime the positioned preview asynchronously before releasing the pending Play request.
 - [2026-08-12 压缩预览区时播放条压到工具栏上](2026-08-12-preview-transport-row-overlap.md) — VStack 里谁让步必须显式声明。
 - [2026-11-06 Pro 快到期和续费宽限没有提醒](2026-11-06-pro-renewal-and-payment-grace-notices.md) — 设置 / 导出 / AI 共用同一份提醒；说明字段不改功能授权。
 - [2026-08-03 工程文件生命周期](2026-08-03-project-file-lifecycle.md) — 数据丢失路径与失败分支。
