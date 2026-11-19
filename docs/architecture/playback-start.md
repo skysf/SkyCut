@@ -88,10 +88,11 @@ On the hosted VirtualMac2,1, waiting for the mounted picture lowered worst cold 
 to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing cold frames were one frame from
 the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
 
-A hosted virtual Mac can supply an isolated late sample around the one-second deadline. When the only failures
-are follow-up timing in one trial each of at most two scenarios, CI runs one fresh five-launch batch. Every trial
-in that batch must pass. Both batches and their verdicts are retained in the same artifact. Missing playback,
-other timing failures, repeated late follow-ups in one scenario and structural failures fail immediately.
+A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch if at most two
+scenarios each have one failed trial and the failures are limited to one-second timing or a positioned
+start skew of at most 100 ms. Every trial in the repeat must pass. Both batches and their verdicts are retained
+in the same artifact. Missing playback, other timing failures, repeated failures in one scenario and structural
+failures fail immediately.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.

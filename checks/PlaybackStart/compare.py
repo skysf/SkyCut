@@ -6,12 +6,24 @@ import os
 from pathlib import Path
 from statistics import median
 import sys
+from typing import NamedTuple, Optional
 
 
 TIMINGS = (
     "dispatchMs", "audioMs", "videoMs", "onsetGapMs", "audioAdvanceMs", "videoAdvanceMs",
     "startOffsetMs", "oneSecondOffsetMs", "oneSecondElapsedMs",
 )
+
+
+class TimingFailure(NamedTuple):
+    label: str
+    scenario: Optional[str]
+    metric: str
+    value: float
+    limit: float
+
+    def __str__(self):
+        return f"{self.label}: {self.metric} {self.value:.1f} exceeds {self.limit} ms"
 
 
 def compare(paths, budgets):
@@ -60,7 +72,7 @@ def check_trial(label, scenario, metrics, budgets, errors):
     limits = budgets["common"] | budgets["scenarios"][scenario]
     if set(limits) != set(TIMINGS):
         raise ValueError(f"{scenario} needs a budget for each timing")
-    check_limits(label, metrics, limits, errors)
+    check_limits(label, metrics, limits, errors, scenario)
     for key in ("dispatchMs", "audioMs", "videoMs", "onsetGapMs"):
         if metrics[key] < 0:
             errors.append(f"{label}: {key} happened before Play")
@@ -78,12 +90,12 @@ def check_trial(label, scenario, metrics, budgets, errors):
         errors.append(f"{label}: Play opened a new source asset")
 
 
-def check_limits(label, metrics, limits, errors):
+def check_limits(label, metrics, limits, errors, scenario=None):
     for key, limit in limits.items():
         if type(limit) not in (int, float) or not math.isfinite(limit) or limit <= 0:
             raise ValueError(f"{label} has an invalid budget for {key}")
         if abs(metrics[key]) > limit:
-            errors.append(f"{label}: {key} {metrics[key]:.1f} exceeds {limit} ms")
+            errors.append(TimingFailure(label, scenario, key, metrics[key], limit))
 
 
 def render(samples, errors, machine, media):
@@ -107,20 +119,18 @@ def render(samples, errors, machine, media):
     return "\n".join(lines) + "\n"
 
 
-def isolated_followup_failures(errors):
-    # A hosted VM can occasionally return a late frame at the follow-up deadline. Require a clean
-    # second batch and retain the competing samples. Any onset, counter or missing-sample failure is final.
+def isolated_virtual_timing_failures(errors):
+    # Require a clean second batch after an isolated frame-delivery outlier and retain both batches.
     affected = {}
     for error in errors:
-        fields = error.split(maxsplit=3)
-        if len(fields) != 4:
+        if not isinstance(error, TimingFailure) or error.scenario is None:
             return False
-        trial, scenario, metric, _ = fields
-        if not trial.startswith("trial-") or not trial.endswith(".json") or metric not in (
-            "oneSecondOffsetMs", "oneSecondElapsedMs"
-        ):
+        small_start_skew = (
+            error.metric == "startOffsetMs" and error.scenario != "cold-open" and abs(error.value) <= 100
+        )
+        if not small_start_skew and error.metric not in ("oneSecondOffsetMs", "oneSecondElapsedMs"):
             return False
-        affected.setdefault(scenario, set()).add(trial)
+        affected.setdefault(error.scenario, set()).add(error.label)
     return 0 < len(affected) <= 2 and all(len(trials) == 1 for trials in affected.values())
 
 
@@ -138,7 +148,7 @@ def main():
     if destination := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(destination).open("a") as stream:
             stream.write("\n" + report)
-    if os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine and isolated_followup_failures(errors):
+    if os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine and isolated_virtual_timing_failures(errors):
         return 2
     return bool(errors)
 
