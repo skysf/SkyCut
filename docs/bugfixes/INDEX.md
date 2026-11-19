@@ -76,6 +76,7 @@
 - [2026-11-19 Web-motion recovery and Compress / Burn In still asked the drive on the main thread](2026-11-19-drive-checks-on-main-thread.md) — When one call site of a class moves off the main thread, sweep its siblings; a check that runs on every rebuild is a hot path for drive latency.
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
+- [2026-11-19 A name reserved empty before the write could be replaced, and a failed write could remove another file](2026-11-19-empty-name-reservation-replaced-or-removed.md) — An exclusive create guards only the moment of creation: write privately, then install in one step that fails when the name exists; know your own file by device and inode, read after its bytes are in.
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
 - [2026-10-14 出场动画先快后慢](2026-10-14-exit-animations-front-loaded.md) — 倒数的进度上套缓动方向会反；检查的期望值从意图来，不照实现抄。
 - [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
