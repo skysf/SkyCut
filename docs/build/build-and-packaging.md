@@ -680,6 +680,31 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
 - **Uploads are diagnostics, never gates** (since 2026-11-20, [case](../bugfixes/2026-11-20-ci-artifact-upload-fails-green-shard.md)):
   every `actions/upload-artifact` step has `continue-on-error: true`, so an artifact service timeout shows on that step
   and leaves the run's result to its checks. The measuring steps stay gates. `checks/check-all-shards.sh` pins it.
+- **GitHub's own failures are re-run automatically, at most twice; a check's never** (since 2026-11-20,
+  `.github/workflows/rerun-infra.yml` + `scripts/ci-infra-rerun.py`). On 11-19 GitHub gave up on queued macOS jobs
+  after 48–76 minutes ("The job was not acquired by Runner of type hosted even after multiple attempts": the job ends
+  cancelled, with no runner and no steps; runs 44557659527 and 44561816873), people re-ran them by hand, and the
+  merge slot sent such PRs back.
+  - When a checks run ends red, rerun-infra re-runs its failed jobs (check-all with them) only if every job that failed
+    or was cancelled carries one of GitHub's own messages for a job that never got a runner or lost it ("was not
+    acquired by Runner", "lost communication with the server", "runner has received a shutdown signal") and none
+    that a step failed, a timeout, a newer push or a person cancelled; and if it started no step but the setup steps
+    before the first check (`SETUP_STEPS` in the script: checkout, toolchain, the docs-only and verified-tree
+    classifiers, file times, the two caches, fetching ffmpeg), at most one of them unfinished: the last, cut off.
+    check-all may fail at "All shards passed" alone, since it only reports the shards.
+  - Never re-run: a check that failed or timed out, a setup step that failed by itself, a runner lost during a check
+    (the check may have starved it), a run a newer push or a person cancelled, a fork's run, a run whose branch has
+    moved on or that isn't its branch's newest run (re-running a superseded PR run would cancel the newer one: same
+    concurrency group). A run ends at attempt 3; after that it stays red for a person.
+  - Replayed over every red or cancelled attempt from 11-19 00:00 to 20:48 UTC (89 attempts, 365 failed jobs): exactly
+    the two not-acquired attempts qualify; every superseded, cancelled, timed-out and failed one doesn't.
+  - The merge slot uses the same verdict and re-runs the runs it waits on itself ("Merge slot" below). When both try,
+    GitHub takes the first re-run and the other finds it in progress.
+  - `workflow_run` runs main's copy of rerun-infra with a write token for every checks run, pull requests from forks
+    included, so the job skips forks' runs, checks out main and passes only the run's id and attempt to the script.
+  - `checks/MergeSlot/InfraRerunCases.py` (run by `MergeSlotChecks.py`) tests the verdict on jobs built from this
+    workflow's own step names and GitHub's own messages, and pins `SETUP_STEPS` to checks.yml (each a step of its job
+    whose commands run no check) and rerun-infra's wiring. Rename a setup step in both files together.
 - **Step failure rates** (a signal, never a gate): `scripts/ci-step-failure-rates.py [--days N | --since … --until …]
   [--exclude-branch B]` counts, per step of the shard jobs, how often it failed in pull request and main runs. It is
   read-only and needs any collaborator's `gh` login. The coordinator runs it daily. When the playback start benchmark fails
@@ -778,7 +803,9 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   push, label again. Done when the PR is MERGED. `scripts/merge-slot-wait.sh N [max minutes]` waits: exit 0 merged,
   1 sent back (it prints the slot's comment), 2 closed, 3 still queued at the time limit (run it again).
 - **What the slot does** (`scripts/merge-slot.py`), oldest label first:
-  1. It waits until `check-all` on the PR's head is green; red sends the PR back.
+  1. It waits until `check-all` on the PR's head is green; red sends the PR back, unless GitHub's infrastructure failed
+     the run before any check started: then the slot re-runs it, at most twice ("GitHub's own failures" in "CI"
+     above), and waits; after two re-runs it sends the PR back with the by-hand re-run.
   2. It builds the test merge X itself: `merge-slot/pr-<N>` is pointed at the current main and the head is merged into
      it with the Merges API, so X's parents are (main, head). A 409 (conflict) sends the PR back. X is built once per
      main and head. It never uses GitHub's own test merge (`merge_commit_sha`): GitHub recomputes that for new commits
@@ -788,7 +815,8 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   4. Otherwise it dispatches `checks.yml` on `merge-slot/pr-<N>`, which holds X. That is the same
      workflow file on the same tree as a pull_request run on main + head, docs-only fast path included. Nothing else
      merges while it runs. A red or cancelled run sends the PR back with its link; the branch stays, so re-running the
-     run's failed jobs can still prove the tree.
+     run's failed jobs can still prove the tree. A run GitHub's infrastructure failed is re-run in place first, as in 1.,
+     and holds the slot meanwhile.
   5. It merges with `--merge`, the head pinned, only while main is still X's first parent. Then it dispatches
      `checks.yml` on main and deletes the PR's branch and `merge-slot/pr-<N>`.
 - **PRs that change `.github/workflows/` can't use the slot.** GitHub doesn't let the workflow token create or update
@@ -818,4 +846,4 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
   moves, and its token can't write workflow files. Reverse verification on 2026-11-20: 24 mutations of the script each
   turned it red. Among them: merging without proof, skipping the last main check, reusing a test merge for another main
   or head, rebuilding it every pass, not detecting a workflow PR, an unpinned head, FIFO by number, not holding the
-  slot during a test, and squash.
+  slot during a test, and squash. It also runs `InfraRerunCases.py` (the automatic re-runs in "CI" above).

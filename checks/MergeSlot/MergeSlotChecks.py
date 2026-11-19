@@ -8,6 +8,8 @@
 2. The workflows' wiring: merge-slot.yml's triggers, one job-level slot that waits instead of cancelling, the token's
    permissions, main's script only (pull_request_target never checks out the pull request); checks.yml takes the
    slot's dispatches and skips every shard on a dispatch elsewhere, so check-all fails there.
+3. Runs GitHub's infrastructure failed (InfraRerunCases.py): scripts/ci-infra-rerun.py re-runs only those, never a
+   check's failure; the slot waits for such a re-run instead of sending the pull request back; rerun-infra.yml's wiring.
 Usage: python3 checks/MergeSlot/MergeSlotChecks.py   (no network, a few seconds)
 """
 import datetime as dt
@@ -242,6 +244,10 @@ gh.outcomes["merge-slot/pr-1"] = "cancelled"
 serve(slot, gh)
 check("a cancelled test is not green", not gh.merged and any("cancelled" in c for c in gh.comments.get(1, [])), gh.comments)
 
+# ---- 3. runs GitHub's infrastructure failed ----
+import InfraRerunCases  # noqa: E402
+InfraRerunCases.run_all(check, slot_module, world, serve, never_merged_untested)
+
 # ---- 2. the workflow ----
 workflow = open(os.path.join(ROOT, ".github", "workflows", "merge-slot.yml"), encoding="utf-8").read()
 code = "\n".join(line for line in workflow.splitlines() if not line.lstrip().startswith("#"))
@@ -276,4 +282,5 @@ if FAILURES:
         print(f"✗ merge slot: {failure}", file=sys.stderr)
     sys.exit(1)
 print(f"✓ merge slot: {CASES} cases (merges only a tree a green run tested, one at a time, oldest label first; red, "
-      "conflicts, drafts, forks and refusals leave with a comment; workflow wiring)")
+      "conflicts, drafts, forks and refusals leave with a comment; only GitHub's infrastructure failures are re-run, at "
+      "most twice, never a check's; workflow wiring)")

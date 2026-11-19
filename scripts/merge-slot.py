@@ -19,14 +19,23 @@ A labeled pull request, oldest label first:
    merge made with the workflow token starts no push run) and deletes the pull request's branch and merge-slot/pr-<N>.
 A pull request that changes .github/workflows/ leaves at once with the by-hand path: GitHub doesn't let the workflow
 token create or update workflow files, so the slot can neither build its test merge nor merge it (2026-11-19, #527).
+A red run (in 1. or 4.) that GitHub's infrastructure failed before any check started, a job that never got a runner
+or lost it, doesn't send the pull request back: scripts/ci-infra-rerun.py re-runs it, at most twice, and the slot waits.
 """
 import argparse
 import datetime as dt
-import json
+import importlib.util
+import os
 import re
-import subprocess
 import sys
 import time
+
+# The shared verdict on red runs and the `gh api` wrapper, loaded by path (the workflow runs this with python3 -I).
+_spec = importlib.util.spec_from_file_location(
+    "ci_infra_rerun", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ci-infra-rerun.py"))
+infra = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(infra)
+GitHub, GitHubError = infra.GitHub, infra.GitHubError
 
 LABEL = "merge-slot"
 WORKFLOW = "checks.yml"
@@ -36,28 +45,10 @@ MARKER_MAX_AGE = dt.timedelta(hours=24)  # same limit as scripts/ci-verified-tre
 TEST_TIMEOUT = dt.timedelta(hours=3)
 
 
-class GitHubError(Exception):
-    def __init__(self, status, message):
-        super().__init__(f"HTTP {status}: {message}")
-        self.status = status
-
-
-class GitHub:
-    """`gh api` with JSON in and out."""
-
-    def __init__(self, repo):
-        self.repo = repo
-
-    def call(self, method, path, body=None):
-        args = ["gh", "api", "-X", method, path.replace("{repo}", self.repo)]
-        if body is not None:
-            args += ["--input", "-"]
-        done = subprocess.run(args, input=json.dumps(body) if body is not None else None,
-                              capture_output=True, text=True)
-        if done.returncode != 0:  # gh says "gh: Not Found (HTTP 404)" on stderr
-            found = re.search(r"\(HTTP (\d{3})\)", done.stderr)
-            raise GitHubError(int(found.group(1)) if found else 0, (done.stderr or done.stdout).strip()[:300])
-        return json.loads(done.stdout) if done.stdout.strip() else None
+def run_of(details_url):
+    """The workflow run id in a check run's details URL (…/actions/runs/<id>/job/<job id>), or None."""
+    found = re.search(r"/actions/runs/(\d+)/job/", details_url or "")
+    return int(found.group(1)) if found else None
 
 
 def when(text):
@@ -199,6 +190,20 @@ class Slot:
             return "contained"
         return made["sha"], made["commit"]["tree"]["sha"]
 
+    def retry(self, run_id):
+        """The shared verdict on a red run (scripts/ci-infra-rerun.py), re-running it when GitHub's infrastructure
+        failed it before any check started; None when the check names no run."""
+        if run_id is None:
+            return None
+        verdict = infra.decide(self.gh, run_id)
+        if verdict.kind == "rerun":
+            try:
+                verdict = infra.rerun(self.gh, verdict)
+            except GitHubError as error:
+                return infra.Verdict("real", f"{verdict.why}; the automatic re-run failed: {error}", verdict.run)
+            self.log(f"run {run_id}: {verdict}")
+        return verdict
+
     def test(self, pull, merge_sha):
         """Dispatches checks.yml on merge-slot/pr-<N>, which test_merge left at the merge commit."""
         number = pull["number"]
@@ -257,6 +262,14 @@ class Slot:
         if check is None or check[0] != "completed":
             return "waiting"
         if check[1] != "success":
+            verdict = self.retry(run_of(check[2]))
+            if verdict and verdict.kind in ("rerunning", "pending", "green", "stale"):
+                return "waiting"  # being re-run, or a newer check-all is on its way
+            if verdict and verdict.kind == "exhausted":
+                return self.leave(pull, f"check-all on the head `{head[:10]}` failed because GitHub's runners did, not a "
+                                        f"check ({verdict.why}): {check[2]}. Once GitHub has recovered, re-run its failed "
+                                        f"jobs (`gh run rerun {verdict.run['id']} --failed`) and add the label once it's "
+                                        "green.")
             return self.leave(pull, f"check-all on the head `{head[:10]}` is {check[1]} ({check[2]}). Fix it; if "
                                     "it's a known flake, re-run that run's failed jobs (`gh run rerun <run> --failed`) "
                                     "and add the label once it's green.")
@@ -284,6 +297,14 @@ class Slot:
             return "testing"
         if run["conclusion"] == "success" and self.run_is_green(run["id"], head, base):
             return self.merge(pull, head, base, run["html_url"])
+        verdict = self.retry(run["id"]) if run["conclusion"] != "success" else None
+        if verdict and verdict.kind in ("rerunning", "pending"):
+            return "testing"  # the slot stays held while GitHub's failure is re-run
+        if verdict and verdict.kind == "exhausted":
+            return self.leave(pull, f"the run {run['html_url']} that tested this pull request on main `{base[:10]}` "
+                                    f"failed because GitHub's runners did, not a check ({verdict.why}). Once GitHub has "
+                                    f"recovered, re-run its failed jobs (`gh run rerun {run['id']} --failed`) and add the "
+                                    "label again: a green re-run of that run counts while main hasn't moved.")
         return self.leave(pull, f"the run {run['html_url']} that tested this pull request on main `{base[:10]}` "
                                 f"ended {run['conclusion']}. Fix it; if it's a known flake, re-run its failed jobs "
                                 f"(`gh run rerun {run['id']} --failed`) and add the label again: a green re-run of "

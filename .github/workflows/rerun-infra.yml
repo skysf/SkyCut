@@ -1,0 +1,33 @@
+# Re-runs the failed jobs of a checks run that GitHub's infrastructure failed before any check started: a job that
+# never got a runner ("not acquired"), or lost it during setup. Never a check that failed or timed out, nor a run a
+# person or a newer push cancelled; at most twice per run. scripts/ci-infra-rerun.py decides and re-runs; the merge
+# slot uses the same verdict. docs/build/build-and-packaging.md "CI"; checks/MergeSlot/InfraRerunCases.py pins this.
+#
+# workflow_run runs this file from main, in the base repository with a write token, so it never runs a pull request's
+# code: the job checks out main, and only the run's id and attempt (numbers) reach the shell.
+name: rerun-infra
+
+on:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: write
+  checks: read
+
+jobs:
+  rerun:
+    if: github.event.workflow_run.conclusion != 'success' && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Re-run the jobs GitHub's infrastructure failed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 -I -B scripts/ci-infra-rerun.py --repo "${{ github.repository }}" --run "${{ github.event.workflow_run.id }}" --attempt "${{ github.event.workflow_run.run_attempt }}"
