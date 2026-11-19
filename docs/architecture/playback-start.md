@@ -37,7 +37,9 @@ picture moving again on the sound's timeline.
 
 What still waits, in step: a Play right after a click or a hover, while the picture at the playhead is still being
 decoded (about 0.6 s on the M1 three seconds into an eight-second 4K GOP, short with optimized media); a Play during
-project open; a Play as the first input after the two-minute idle stop (the output device starts).
+project open; a Play as the first input after the two-minute idle stop (the output device starts). Audio supplies
+the master clock. `PlayerClock` corrects sustained video drift against this clock. See the
+[audio engine](audio-engine.md) and the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
 
 **Known issue, the start after the idle stop** (measured 2026-11-19, not fixed): Play starts the picture at once while
 the sound waits for the just-started device's first render. In 5 of 24 starts on the M1 the picture ran 51–154 ms ahead,
@@ -45,9 +47,9 @@ and the drift correction then re-seeked it: stalls of 100–200 ms in the first 
 device's first rendered quantum removed that (no stall in 24 starts) but lost the first 58–139 ms of the sound in 6 of
 24 starts: engine underruns of 17,000–37,000 frames instead of the usual 3,348 (one quantum per track). It is not in
 this code; the audio engine's feeders after a wake are the suspect. Until it is fixed, the strict profile below skips
-this scenario. Audio supplies
-the master clock. `PlayerClock` corrects sustained video drift against this clock. See the
-[audio engine](audio-engine.md) and the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
+this scenario, and a local run on the M1 still fails its medians (start skew 118 ms, stall 167 ms in the five launches
+of 2026-11-19): the gate reports the stall that is there. The hosted virtual Mac starts its device at once (skew 11 ms
+or less), so CI does not see it.
 
 Build and media work belongs to open and edit preparation. Play consumes the preview that exists or is on its way.
 The optimized-media coordinator queues swaps for paused playback. [Optimized media](optimized-media.md).
@@ -149,7 +151,7 @@ hosted virtual Mac): every launch of every scenario must start the picture withi
 of its timeline, never hold a frame longer than 100 ms in the first two seconds (three frames at 30 fps; the cadence
 is 33 ms) and never differ from the sound by more than 45 ms there. The start after the idle stop is skipped (the
 known issue above); its hosted limits allow 160 ms of skew per launch. On the M1 after the 2026-11-19 fix the worst
-elsewhere were 25 ms onset, 24 ms skew and the 33 ms cadence. The hosted limits above stay looser: the virtual Mac decodes 4K in
+elsewhere were 35 ms onset, 26 ms skew and the 33 ms cadence. The hosted limits above stay looser: the virtual Mac decodes 4K in
 software and sometimes stalls for a second after a clean start, and an isolated stalled launch counts as one
 outlier under the half-of-the-launches rule.
 
