@@ -421,6 +421,8 @@ scripts/gui-smoke/mcp-client/client.py <scratchpad>/calls.json <scratchpad>/out
 
 1. **测的是装好的测试版**（`scripts/build-beta-app.sh` 出、装进「应用程序」），不是 `.build` 里的调试版：小程序按自己所在的
    App 包找 socket，调试版没有包。App 没开时小程序会 `open -g` 把它拉起来；之后要换版本就得等用户自己退出它。
+   Since 2026-11-19 the installed beta is replaced only when the user asks for a beta
+   ([installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac)).
 2. **素材复制到 scratchpad**，别用符号链接指回 `~/Downloads`：新签名的测试版读 Downloads 可能重新弹系统的权限框（要用户点），
    复制出来的只在临时目录里。需要特殊素材（遮幅、纯色）用仓库的 `vendor/ffmpeg` 现做 —— 那是测试夹具，不是 AI 该用的东西。
 3. AI 第一次改工程、开 / 建工程时 SrtFlow 的窗口会摆到前面一次（2026-10-17 起只在开工程时摆一次，之后的每一轮都不摆），用户正在用电脑时
@@ -698,5 +700,9 @@ App 的支持目录；测试 `run.sh stop` 时不能让真实 `rm` 删除正在�
 ## 六、收尾
 
 - 杀掉 SrtFlowDev 进程，删临时 .app。
+- When the run ends, unregister (`lsregister -u`) and delete every app bundle it assembled: `SrtFlowDev.app` (the in-process
+  harness leaves it next to the steps file), the `.skystudiosmoke` and measurement apps (their `stop` leaves them on disk).
+  Logs and results may stay for review, bundles don't, and none is ever installed into `/Applications`:
+  [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).
 - 正式交付走 `scripts/build-app.sh`，并对 dist 产物重复第一步的
   arch + strings 验证。

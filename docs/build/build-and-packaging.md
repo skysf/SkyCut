@@ -144,6 +144,38 @@ designated requirement 是「bundle id + 这把证书」，换版本不变。来
 
 没合并的功能要给用户在自己机器上实测时：`VERSION=x.y.z scripts/build-app.sh && scripts/build-beta-app.sh`，得到 `dist/SkyCut Beta.app`。换了名字和 bundle id（`com.srtflow.SrtFlow.beta`：bundle id 沿用旧名），设置、AI 的通道都和正式版分开；每种文档类型都只做「备选」，双击工程文件仍由正式版打开。`build-app.sh` 会顺手打一个同版本号的 DMG、覆盖 `dist/SkyCut.app` —— 只出测试版时记得把它们删掉 / 换回去，别让 `dist/` 里留着贴了未发布版本号的包。
 
+## Installed copies on the developer Mac
+
+The user, 2026-11-19: 「本机就保留一个正式版，一个beta 就够了，不要那么多版本都安装在本机」 (one official copy and one beta are
+enough; don't install so many versions on this Mac). So the Mac keeps exactly two installed copies, `/Applications/SkyCut.app`
+(official) and `/Applications/SkyCut Beta.app` (beta), and no other SkyCut bundle outlives the run that built it.
+
+- **Unregister, then delete.** A SkyCut bundle that goes away is unregistered first, so it leaves no dead registration:
+  `/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -u <path>`,
+  then deleted outright: no backup copy, nothing left in the Trash.
+- **A local install** happens only when the user asks for one, and the beta is replaced only when the user asks for a beta.
+  - Build with `VERSION=x.y.z scripts/build-app.sh` (official), then `scripts/build-beta-app.sh` for the beta, signed with
+    the fixed identity: a build that fell back to ad-hoc is never installed (signing section above).
+  - Only while the copy being replaced isn't running. Never quit the user's SkyCut or SkyCut Beta: wait, and ask.
+  - Move the old bundle aside, put the new one at the same path and verify it (version, `codesign --verify --deep --strict`,
+    the pinned certificate leaf: acceptance checklist below); if it fails, put the old one back and stop. Then unregister
+    and delete the old bundle and the build's `dist/*.app`. `dist/` keeps only the newest DMG; after a beta-only build
+    its DMG goes too (previous section).
+- **Test, smoke and probe bundles** (`SrtFlowDev.app`, harness and check bundles, `.skystudiosmoke` and measurement apps,
+  repro apps) are built under a temporary or scratch folder, never installed into `/Applications`, and unregistered and
+  deleted when the run ends; a fixture a failed check keeps for debugging goes once it has been read. As of 2026-11-19
+  no script unregisters anything, the smoke harnesses leave their app bundle on disk (the in-process `run.sh` keeps
+  `SrtFlowDev.app` next to the steps file; `stop` of the Sky Studio and measurement harnesses keeps theirs), and a failed
+  `scripts/check-motion-placement.sh` keeps its `MotionPlacementCheck.app`: until the harnesses are fixed, unregister and
+  delete what they leave behind by hand.
+- **Never reset the LaunchServices database** (`lsregister -kill`, `-delete`, `-seed` and the like): it holds every app
+  on the Mac, not only SkyCut.
+
+Why: on 2026-11-19 macOS still knew 17 extra SkyCut-type bundles (build outputs, smoke and probe apps) and 100 dead
+registrations. They show up in Spotlight and "Open With", and a project file can open in a test build. Later that day,
+24 `MotionPlacementCheck.app` fixtures kept by failed check runs (2026-11-17 to 11-19) were still on disk and registered.
+The release records below that moved old bundles to the Trash or kept a backup predate this rule.
+
 ## 产物验收清单
 
 - `lipo -archs dist/SkyCut.app/Contents/MacOS/SkyCut` → `arm64`
