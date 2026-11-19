@@ -44,6 +44,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      都是用户定的）。上下文跟着说明总量走、不跟着个数走（合并工具省不了多少），用户那边还开着别的 MCP。**以后加工具只能先把说明挪进说明书，
      不再为说明文字抬上限**。上限和量法只有一份：`checks/MCP/CatalogBudget.swift`（ProtocolChecks 量小程序真发出去的那一份、UsageExampleChecks /
      ProductionSchemaChecks 量清单本身，都调它；以前三处各写一个 110,000、口径还不一样）。
+     2026-11-19: 95,703 after moving card and parameter wording of tools no other lane was editing into their guide topics
+     ([MCP guide](mcp-guide.md) item 17); keep new wording in the guide so this headroom lasts.
 6. **按客户端怎么读来写：总说明是目录**（2026-09-30 用户拍板，[案例](../bugfixes/2026-09-30-mcp-text-truncated-at-2048.md)）：
    - **Claude Code**（默认开 tool search）会话开始只加载**工具名 + 总说明**（加上预先加载的 `skycut_guide`），每个工具的完整定义用到才搜出来加载。
      2.1.296 起总说明和预先加载的工具留 4,096 个字符、按需加载的工具留 16,384（之前一律 2,048，超了静默截掉）。

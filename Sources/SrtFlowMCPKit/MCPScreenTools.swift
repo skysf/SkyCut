@@ -15,39 +15,31 @@ public enum MCPScreenTools {
             return MCPToolDefinition(
                 .recordScreen, title: "Record the screen",
                 description: """
-                Record the Mac's screen to .mov at the end of V1 (mic on its own track), one undo step. Source: get_status screen=true. \
+                Record the Mac's screen to .mov at the end of V1, one undo step. Source: get_status screen=true. \
                 action=start returns while recording; action=stop returns the job id, file, clip ids, stopped_by and stop_method; a user Stop \
                 appears in your next tool result. action=resolve settles an unfinished one (discard may return needs_confirmation). Read \
                 skycut_guide topic=record_screen first.
                 """,
                 input: MCPSchema.object([
-                    "action": MCPSchema.string(
-                        "start, stop (returns the result if already stopped), or resolve a leftover.", oneOf: MCPVocabulary.recordingActions
-                    ),
-                    "source": MCPSchema.string(
-                        "What to record (default display). drag: the user drags the area.", oneOf: MCPVocabulary.recordingSources
-                    ),
-                    "display": MCPSchema.integer("Display number from get_status screen=true (default 1, the main one).", minimum: 1),
-                    "window": MCPSchema.string("window: app name, title words or window number (get_status); the frontmost match."),
+                    "action": MCPSchema.string("start, stop or resolve a leftover.", oneOf: MCPVocabulary.recordingActions),
+                    "source": MCPSchema.string("Default display.", oneOf: MCPVocabulary.recordingSources),
+                    "display": MCPSchema.integer("Default 1, the main one.", minimum: 1),
+                    "window": MCPSchema.string("App name, title words or window number."),
                     "rect": MCPSchema.object([
                         "x": MCPSchema.number("Left edge, 0–1.", minimum: 0, maximum: 1),
                         "y": MCPSchema.number("Top edge, 0–1.", minimum: 0, maximum: 1),
                         "width": MCPSchema.number("Width, 0–1.", minimum: 0, maximum: 1),
                         "height": MCPSchema.number("Height, 0–1.", minimum: 0, maximum: 1)
-                    ], required: ["x", "y", "width", "height"], description: "For region: the area as fractions of the display, 0,0 top left."),
+                    ], required: ["x", "y", "width", "height"], description: "region: display fractions, 0,0 top left."),
                     "ratio": MCPSchema.string("For drag: lock the area's shape.", oneOf: MCPVocabulary.recordingRatios),
-                    "computer_audio": MCPSchema.boolean("Record the computer's sound (default true)."),
-                    "microphone": MCPSchema.string("Mic track: default or a name from get_status screen=true; omitted = off."),
-                    "pointer": MCPSchema.string(
-                        "shown (default), hidden, or clicks (shown, clicks highlighted).", oneOf: MCPVocabulary.recordingPointers
-                    ),
-                    "countdown": MCPSchema.integer("Seconds before it starts (default 3; 0 when you operate the Mac yourself).", minimum: 0, maximum: 10),
-                    "duration": MCPSchema.number("Stop by itself after this many seconds (1–14400).", minimum: 1, maximum: 14_400),
-                    "title": MCPSchema.string("Name in SkyCut/Screen Recordings (default: date and time); taken names get a number."),
-                    "add_to_timeline": MCPSchema.boolean("Put it on the timeline when it stops (default true); false keeps only the file."),
-                    "decision": MCPSchema.string(
-                        "resolve: add to timeline, keep file only, or discard (asks in approval mode).", oneOf: MCPVocabulary.recordingDecisions
-                    ),
+                    "computer_audio": MCPSchema.boolean("The Mac's sound; default true."),
+                    "microphone": MCPSchema.string("default or a mic name; omitted = off."),
+                    "pointer": MCPSchema.string("Default shown.", oneOf: MCPVocabulary.recordingPointers),
+                    "countdown": MCPSchema.integer("Seconds, 0-10; default 3.", minimum: 0, maximum: 10),
+                    "duration": MCPSchema.number("Auto-stop after seconds, 1-14400.", minimum: 1, maximum: 14_400),
+                    "title": MCPSchema.string("File name; default: date and time."),
+                    "add_to_timeline": MCPSchema.boolean("Default true; false keeps only the file."),
+                    "decision": MCPSchema.string("For resolve; discard may ask first.", oneOf: MCPVocabulary.recordingDecisions),
                     "confirm_token": MCPSchema.confirmToken
                 ], required: ["action"]),
                 destructive: true

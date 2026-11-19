@@ -20,14 +20,13 @@ enum MCPVoiceLibraryTools {
         MCPToolDefinition(
             .listVoices, title: "List voices",
             description: """
-            Read-only, free. Voices for add_voiceover: mine (the user's recorded and designed voices, voice_… ids, with their \
-            languages) and Sky Studio presets for one language (gemini:Name, gender, description; the default is marked). Pass \
-            language: a preset can sound different per language; omitted lists zh and en. If the voice library is unavailable, \
-            presets still come back. Details: skycut_guide topic=list_voices.
+            Read-only, free. Voices for add_voiceover: mine (the user's voices, voice_… ids) and Sky Studio presets for one \
+            language (gemini:Name). Pass language: a preset can sound different per language; omitted lists zh and en. If the \
+            voice library is unavailable, presets still come back. Details: skycut_guide topic=list_voices.
             """,
             input: MCPSchema.object([
-                "language": MCPSchema.string("ISO 639-1 code (zh, en, ja…) whose presets to list; omitted: zh and en."),
-                "include": MCPSchema.string("mine, presets or all (default).", oneOf: MCPVocabulary.voiceListIncludes)
+                "language": MCPSchema.string("Presets' ISO 639-1 code; omitted: zh and en."),
+                "include": MCPSchema.string("Default all.", oneOf: MCPVocabulary.voiceListIncludes)
             ]),
             readOnly: true, openWorld: true
         )
@@ -44,16 +43,14 @@ enum MCPVoiceLibraryTools {
             """,
             input: MCPSchema.object([
                 "action": MCPSchema.string("What to do.", oneOf: MCPVocabulary.voiceLibraryActions),
-                "voice": MCPSchema.string("voice_… id from list_voices: add_reference, rename, delete."),
-                "file": MCPSchema.string("create / add_reference: a recording (audio or video) of one speaker."),
-                "start": MCPSchema.number("Seconds into file where the sample may start, 0 or more (default 0).", minimum: 0),
-                "end": MCPSchema.number("Seconds into file where it stops, 0 or more (default: end; 3 minutes are used at most).",
-                                        minimum: 0),
-                "language": MCPSchema.string(
-                    "create, add_reference: optional ISO 639-1 code of what is said (zh, en…); omitted, SkyCut detects it or asks for it."),
-                "name": MCPSchema.string("Voice name, 1 to 80 characters: create, design, rename."),
-                "description": MCPSchema.string("design: how the voice sounds, up to 2000 characters."),
-                "sample_text": MCPSchema.string("design: optional sentence the sample reads, up to 500 characters; counts toward the price."),
+                "voice": MCPSchema.string("voice_… id from list_voices."),
+                "file": MCPSchema.string("Recording of one speaker."),
+                "start": MCPSchema.number("Sample start in file, seconds; default 0.", minimum: 0),
+                "end": MCPSchema.number("Sample end in file, seconds (0 or more); default: its end.", minimum: 0),
+                "language": MCPSchema.string("optional ISO 639-1 code of what is said; omitted, SkyCut detects it or asks for it."),
+                "name": MCPSchema.string("Voice name, 1 to 80 characters."),
+                "description": MCPSchema.string("design: how it sounds, up to 2000 characters."),
+                "sample_text": MCPSchema.string("design: the sample's sentence, up to 500 characters."),
                 "confirm_token": MCPSchema.confirmToken
             ], required: ["action"]),
             destructive: true, openWorld: true
