@@ -10,17 +10,17 @@ import Foundation
 // server and the user's panel service. The shared windows and their helper: FileWindowsChecks.swift.
 @MainActor enum FileChooserChecks {
     static func run(require: (Bool, String) -> Void) async {
-        let suite = "com.srtflow.SrtFlow.exportprofilecheck.chooser"
-        UserDefaults().removePersistentDomain(forName: suite)
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
-        let record = SystemFileWindowRecord(suiteName: suite)
+        let scratch = ScratchDefaults("exportprofilecheck-chooser")
+        defer { scratch.remove() }
+        let defaults = scratch.defaults
+        let record = SystemFileWindowRecord(suiteName: scratch.name)
         let start = URL(fileURLWithPath: "/tmp/start", isDirectory: true)
         let picked = URL(fileURLWithPath: "/tmp/picked", isDirectory: true)
 
         // A folder comes back: taken, record cleared; the record existed while AppKit was being asked for the window.
         var recordWhileMaking = false
         let answering = Harness(record: record) { _ in
-            recordWhileMaking = UserDefaults(suiteName: suite)?.dictionary(forKey: SystemFileWindowRecord.key) != nil
+            recordWhileMaking = defaults.dictionary(forKey: SystemFileWindowRecord.key) != nil
             return FakeFolderPanel(.answers(picked, after: 0.2))
         }
         answering.chooser.choose(.exportFolder(startingAt: start)) { answering.chosen = $0?.first }
@@ -28,7 +28,7 @@ import Foundation
         await answering.settle(seconds: 1)
         require(answering.chosen == picked && answering.chooser.phase == .idle, "a chosen folder is handed over")
         require(recordWhileMaking, "the in-flight record is written before AppKit is asked for the window")
-        require(!hasRecord(suite), "the record is cleared once the window answered")
+        require(!hasRecord(defaults), "the record is cleared once the window answered")
 
         // A person cancels after looking: no folder, no failure.
         let cancelling = Harness(record: record) { _ in FakeFolderPanel(.answers(nil, after: 1.4)) }
@@ -51,7 +51,7 @@ import Foundation
         let gap = meter.stop()
         require(never.chooser.phase == .failed(.noWindow), "a window that never appears is a failure after the deadline")
         require(never.panels.first?.cancels == 1, "the window that never came is cancelled, nothing left behind")
-        require(!hasRecord(suite), "the record is cleared after a failure SkyCut lived through")
+        require(!hasRecord(defaults), "the record is cleared after a failure SkyCut lived through")
         require(gap < 0.5, "waiting for a window that never comes keeps the main thread free: longest gap \(gap) s")
 
         // Appears, then vanishes without an answer (service crash).
@@ -68,7 +68,7 @@ import Foundation
         stuck.chooser.closeStuckWindow()
         require(stuck.chooser.phase == .failed(.closedByUser) && stuck.panels.first?.cancels == 1,
                 "Close It cancels the stuck window and shows the typed path")
-        require(stuck.chosen == nil && !hasRecord(suite), "closing it hands nothing over and clears the record")
+        require(stuck.chosen == nil && !hasRecord(defaults), "closing it hands nothing over and clears the record")
 
         // The panel went away while choosing: no window left for nobody.
         let leaving = Harness(record: record) { _ in FakeFolderPanel(.staysStuck) }
@@ -84,14 +84,14 @@ import Foundation
         detour.chooser.choose(.exportFolder(startingAt: start)) { detour.chosen = $0?.first }
         require(detour.chooser.phase == .failed(.lastRunDidNotFinish) && detour.panels.isEmpty,
                 "after a run that ended with the window open, the typed path comes first and AppKit is not asked")
-        require(!hasRecord(suite), "the old record is used once")
+        require(!hasRecord(defaults), "the old record is used once")
         detour.chooser.choose(.exportFolder(startingAt: start), force: true) { detour.chosen = $0?.first }
         await detour.settle(seconds: 0.6)
         require(detour.panels.count == 1 && detour.chosen == picked, "Try Again asks AppKit after all")
     }
 
-    private static func hasRecord(_ suite: String) -> Bool {
-        UserDefaults(suiteName: suite)?.dictionary(forKey: SystemFileWindowRecord.key) != nil
+    private static func hasRecord(_ defaults: UserDefaults) -> Bool {
+        defaults.dictionary(forKey: SystemFileWindowRecord.key) != nil
     }
 
     /// One chooser with short deadlines and a factory that keeps every fake window it made.

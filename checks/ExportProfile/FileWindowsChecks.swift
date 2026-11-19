@@ -12,10 +12,9 @@ import UniformTypeIdentifiers
 // may replace: SaveAnswerChecks. Then the typed and dropped answers (TypedPath), which never touch a drive.
 @MainActor enum FileWindowsChecks {
     static func run(require: (Bool, String) -> Void) async {
-        let suite = "com.srtflow.SrtFlow.exportprofilecheck.filewindows"
-        UserDefaults().removePersistentDomain(forName: suite)
-        defer { UserDefaults().removePersistentDomain(forName: suite) }
-        let record = SystemFileWindowRecord(suiteName: suite)
+        let scratch = ScratchDefaults("exportprofilecheck-filewindows")
+        defer { scratch.remove() }
+        let record = SystemFileWindowRecord(suiteName: scratch.name)
         let a = URL(fileURLWithPath: "/tmp/a.mp4"), b = URL(fileURLWithPath: "/tmp/b.mov")
         let files = FileWindowRequest(kind: .files(types: [.movie], multiple: true), start: URL(fileURLWithPath: "/tmp"))
 

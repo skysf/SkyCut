@@ -5,13 +5,13 @@ import SrtFlowMCPKit
 // 生产入口接同一个 completeStarted，由 sky-studio-wiring 与后台 MCP 场景共同守住。
 @MainActor
 func runOfficialApprovalChecks() async {
-    let suite = "com.srtflow.official-approval-check-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("official-approval-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults)
     let access = AIAccessStore(defaults: defaults)
     store.setDailyLimit(1_000)
-    let stage = "official-submission:" + suite
+    let stage = "official-submission:" + UUID().uuidString
     let film = try! SkyStudioFilm(json: filmCheckJSON(middle: true))
     let request = SkyStudioJobRequest(kind: "image_to_video", model: "synthetic-video", prompt: "Original scene.",
         inputs: ["image_url": "https://assets.example/originals/account-a/first.png"],

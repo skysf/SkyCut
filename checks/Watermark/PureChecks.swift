@@ -15,13 +15,9 @@ func runPureChecks(logo: WatermarkImage.Logo) {
 
 /// 加不加 = 授权说要加 || 测试开关；不加时连 logo 都不读；要加却读不出 logo 就抛错（导出器据此不导，删掉包里的 logo 换不来没水印的成片）。
 private func policyChecks(_ logo: WatermarkImage.Logo) {
-    let suite = "watermark-policy-checks"
-    guard let defaults = UserDefaults(suiteName: suite) else {
-        check(false, "要一个临时的 UserDefaults")
-        return
-    }
-    defaults.removePersistentDomain(forName: suite)
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("watermark-policy-checks")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     check(!WatermarkPolicy.required(byLicence: false, defaults: defaults), "授权不要、测试开关关着：不加")
     check(WatermarkPolicy.required(byLicence: true, defaults: defaults), "授权要加：加")
     defaults.set(true, forKey: WatermarkPolicy.testingKey)

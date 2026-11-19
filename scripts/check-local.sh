@@ -15,6 +15,13 @@
 set -euo pipefail
 . "$(dirname "$0")/native-arch.sh"
 cd "$(dirname "$0")/.."
+# Staged check apps hand their UserDefaults domains to the end of the run, which deletes them after one wait for cfprefsd
+# (scripts/test-defaults-cleanup.sh).
+. scripts/test-defaults-cleanup.sh
+test_defaults_collect
+trap test_defaults_remove_collected EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 FAILED=""
 run_one() {
@@ -50,6 +57,7 @@ for name in "$@"; do
     FAILED="${FAILED} ${name}"
   fi
 done
+test_defaults_remove_collected
 
 echo ""
 if [ -n "${FAILED}" ]; then

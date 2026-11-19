@@ -85,9 +85,9 @@ private func approvalIdentityChecks() {
 
 @MainActor
 private func gateChecks() {
-    let suite = "com.srtflow.voice-gate-check-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("voice-gate-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let access = AIAccessStore(defaults: defaults)
     let spend = SkyStudioSpendStore(defaults: defaults)
 

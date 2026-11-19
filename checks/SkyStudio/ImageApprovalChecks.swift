@@ -4,9 +4,9 @@ import SrtFlowMCPKit
 // 图片操作必须真正过共享预算 / 确认闸；换角度、倍率、文件、模型或精确报价都不能复用旧令牌。
 @MainActor
 func runImageApprovalChecks() {
-    let suite = "com.srtflow.image-approval-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("image-approval")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults), access = AIAccessStore(defaults: defaults)
     store.setDailyLimit(1_000)
     let file = FileManager.default.temporaryDirectory.appendingPathComponent("image-approval-\(UUID().uuidString).png")

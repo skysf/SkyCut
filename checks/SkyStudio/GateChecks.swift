@@ -8,13 +8,9 @@ func runGateChecks() {
     // 1. 默认打开（2026-10-28：接口上线、用户给自己开了正式版、真服务器回归走完）。测试开关只能打开，不能用它关掉。
     checkEqual(SkyCutGates.enforcedByDefault, true, "the gates are on: Sky Studio's API is live and the owner has Pro")
     checkEqual(SkyCutGates.testingKey, "skystudio.testGates", "the testing switch's key")
-    let suite = "skycut-gate-checks"
-    guard let defaults = UserDefaults(suiteName: suite) else {
-        check(false, "a scratch UserDefaults suite")
-        return
-    }
-    defaults.removePersistentDomain(forName: suite)
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("gate-checks")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     check(SkyCutGates.enforced(defaults), "on by default")
     defaults.set(false, forKey: SkyCutGates.testingKey)
     check(SkyCutGates.enforced(defaults), "the testing switch cannot turn them off")

@@ -160,6 +160,7 @@ xcrun swiftc \
   Sources/SrtFlow/AppTheme.swift \
   Sources/SrtFlow/AppThemePalette.swift \
   Sources/SrtFlow/AppThemeAppearance.swift \
+  checks/Shared/ScratchDefaults.swift \
   checks/Watermark/main.swift \
   checks/Watermark/PureChecks.swift \
   checks/Watermark/ExportChecks.swift \

@@ -38,6 +38,7 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaPolicy.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaStore.swift \
   Sources/SrtFlow/OptimizedMedia/OptimizedMediaTranscoder.swift \
+  checks/Shared/ScratchDefaults.swift \
   checks/OptimizedMedia/main.swift \
   checks/OptimizedMedia/RampVideo.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o

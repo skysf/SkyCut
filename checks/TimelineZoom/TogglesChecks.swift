@@ -2,17 +2,13 @@ import Foundation
 
 // 剪辑页上记住的开关（EditorToggles，Sources/SrtFlow/EditorToggles.swift）：默认值是产品口径、记住的读回来、
 // 记坏的当没记、脚本驱动（性能测试 / 冒烟）时永远默认值且写不落盘。由 main.swift 调。
-// 用一个自己的 suite 读写，开头和结尾都清掉，不碰这台机器上 App 真正的设置。
+// Reads and writes a scratch suite of its own (ScratchDefaults), never the Mac's real App settings.
 
 func runEditorTogglesChecks() {
     typealias Key = EditorToggles.Key
-    let suiteName = "com.srtflow.checks.EditorToggles"
-    guard let suite = UserDefaults(suiteName: suiteName) else {
-        check(false, "开不出自检用的 UserDefaults suite")
-        return
-    }
-    suite.removePersistentDomain(forName: suiteName)
-    defer { suite.removePersistentDomain(forName: suiteName) }
+    let scratch = ScratchDefaults("editor-toggles")
+    defer { scratch.remove() }
+    let suite = scratch.defaults
 
     // 1. 默认值 = 产品口径：只开吸附（2026-09-18），播放跟随、字幕列表跟随默认关（2026-10-01）。
     check(Key.allCases.count == 5, "五个开关，一个不多一个不少（加开关要同步这里和文档）")

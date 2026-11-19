@@ -31,6 +31,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoEditTimelinePlayheadFollow.swift \
   Sources/SrtFlow/EditorToggles.swift \
   Sources/SrtFlow/PerfCounters.swift \
+  checks/Shared/ScratchDefaults.swift \
   checks/TimelineZoom/main.swift \
   checks/TimelineZoom/FollowChecks.swift \
   checks/TimelineZoom/TogglesChecks.swift

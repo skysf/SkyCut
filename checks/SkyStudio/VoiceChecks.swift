@@ -53,9 +53,9 @@ func runVoiceChecks() {
 
 @MainActor
 func runVoiceBudgetChecks() {
-    let suite = "com.srtflow.voice-budget-check-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("voice-budget-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults)
     store.setDailyLimit(5)
     let quotes: [Double] = [2, 2, 1]

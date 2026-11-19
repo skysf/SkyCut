@@ -53,6 +53,16 @@ if [ ! -x "${FFMPEG_BIN}" ]; then
 fi
 export SRTFLOW_FFMPEG="${FFMPEG_BIN}"
 
+# Staged check apps hand their UserDefaults domains to the end of the run, which deletes them after one wait for cfprefsd
+# (scripts/test-defaults-cleanup.sh, docs/bugfixes/2026-11-19-check-defaults-leftovers.md). CI's runner starts with no
+# SkyCut preferences in its home, so one there after the run is a check's leak: compared at the end.
+. scripts/test-defaults-cleanup.sh
+PREFERENCES_BEFORE="$(test_defaults_snapshot)"
+test_defaults_collect
+trap test_defaults_remove_collected EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 PASS=0
 FAIL=0
 FAILED_NAMES=""
@@ -212,6 +222,7 @@ run_check "source-file-size（扫描守卫：代码文件行数上限，老文�
 run_check "copy-project-guard（冒烟拷工程不整夹拷「下载」这类大文件夹，真跑脚本）" checks/copy-project-guard.sh
 run_check "check-all-shards（扫描守卫：checks/ 下每一条守卫都在 check-all 里）" checks/check-all-shards.sh
 run_check "test-app-cleanup (scratch bundles are unregistered on exit)" checks/test-app-cleanup.sh
+run_check "test-defaults-cleanup (checks leave no preferences in the login home: scratch suites, staged apps' domains)" checks/test-defaults-cleanup.sh
 run_check "engine-probe (bounded discovery, output and native child lifecycle)" scripts/check-engine-probe.sh
 run_check "sound-labels (macOS's sound classifier for listen describe=true: one window per 3 s, every label's own score)" scripts/check-sound-labels.sh
 run_check "SrtFlowCoreChecks（核心库）" swift run --arch arm64 SrtFlowCoreChecks
@@ -246,6 +257,17 @@ run_check "still-clip-encode（静帧真实产物）" scripts/check-still-clip-e
 run_check "timeline-clipboard（复制粘贴：拿什么、换身份、撞上了往上抬、几组保住上下关系）" scripts/check-timeline-clipboard.sh
 run_check "subtitle-burn-size（预览上的字幕和烧出来的一样大）" scripts/check-subtitle-burn-size.sh
 run_check "text-render（画面文字：渲染图与成片逐点重合）" scripts/check-text-render.sh
+
+test_defaults_remove_collected
+if [ -n "${CI:-}" ]; then
+  LEFT="$(test_defaults_left_since "${PREFERENCES_BEFORE}")"
+  if [ -n "${LEFT}" ]; then
+    echo "✗ preferences-left: these checks' preferences stayed in ~/Library/Preferences (docs/build/build-and-packaging.md):" >&2
+    printf '%s\n' "${LEFT}" | sed 's/^/    /' >&2
+    FAIL=$((FAIL + 1))
+    FAILED_NAMES="${FAILED_NAMES} preferences-left"
+  fi
+fi
 
 echo ""
 echo "════════════════════════════════════════"

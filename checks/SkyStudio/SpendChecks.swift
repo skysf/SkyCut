@@ -5,13 +5,9 @@ import Foundation
 
 @MainActor
 func runSpendChecks() {
-    let suite = "skycut-spend-checks"
-    guard let defaults = UserDefaults(suiteName: suite) else {
-        check(false, "a scratch UserDefaults suite")
-        return
-    }
-    defaults.removePersistentDomain(forName: suite)
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("spend-checks")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
 
     let store = SkyStudioSpendStore(defaults: defaults)
     let day = moment()
