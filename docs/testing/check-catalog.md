@@ -21,7 +21,8 @@
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
   library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
   both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery,
-  portable font/system warnings, and over-long durations / frame rates (AI calls, a reopened project) refused before any job. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  portable font/system warnings, over-long durations / frame rates (AI calls, a reopened project) refused before any job, and
+  same-fingerprint renders that keep the cached movie (reuse, a failed install, another system identity, a Save As mid-install). `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
   Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
   fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled
@@ -38,6 +39,7 @@
   Since 2026-11-19 also every other macOS open / save window (`FileWindowsChecks`, [system file windows](../architecture/system-file-windows.md)): the shared windows with fake panels and a recording helper (an answer arrives, a cancel is not a failure, a window that never comes offers the fallback with the main thread free, Close It next to a window on screen, Try Again, one window at a time, the force-quit record) and `TypedPath` for typed and dropped answers.
   Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
   Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so); `ExclusivePlacement` on real files ([export settings](../architecture/export-settings.md) §5 item 6).
+  Since 2026-11-19 also the export panel's write target (`PanelTargetChecks`): a folder taken while Export is pressed, with its check and the old folder's back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly it; an export nobody was asked about never replaces a file that appears during it ([export settings](../architecture/export-settings.md) §5 item 7).
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -215,7 +217,7 @@
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
   同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
   挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`；subtitles sitting on a sound off V1 (narration) follow that sound, not the picture, and ride a V1 drag
-  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`）：
+  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`; a merged translation goes by all its originals' speech, head or tail trims alike — group 1l `LinkageMergedTranslation.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。

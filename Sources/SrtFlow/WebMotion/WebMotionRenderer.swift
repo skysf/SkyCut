@@ -20,7 +20,8 @@ struct WebMotionJob: Sendable {
     var width: Int
     var height: Int
     var fps: Int
-    /// Where the movie goes (replaced if it exists). Written next to it first, moved in only when the page passed.
+    /// Where the movie goes. Written next to it first, renamed over whatever is there in one step only when the page and the
+    /// caller's `verify` passed.
     var output: URL
     var layoutHeight = WebMotionCaps.referenceLayoutHeight
     var seed = WebMotionCaps.defaultSeed
@@ -71,7 +72,11 @@ enum WebMotionRenderError: Error, CustomStringConvertible {
 }
 
 enum WebMotionRenderer {
-    static func render(_ job: WebMotionJob, watch: WebMotionHelperProcess.Watch = .init()) async throws -> WebMotionRender {
+    /// `verify` runs on `WebMotionCacheFiles.queue` once the helper passed every check and before anything at `job.output`
+    /// is replaced: throwing there, like a failed install, leaves what was at `job.output` as it was. The movie then takes
+    /// its place in one rename (`WebMotionCacheFiles.install`); what was there is never removed first.
+    static func render(_ job: WebMotionJob, watch: WebMotionHelperProcess.Watch = .init(),
+                       verify: @escaping @Sendable (WebMotionResult) throws -> Void = { _ in }) async throws -> WebMotionRender {
         guard let helper = helperURL() else { throw WebMotionRenderError.helperMissing }
         let work = job.output.deletingLastPathComponent()
             .appendingPathComponent(".skycut-web-motion-\(UUID().uuidString).mov")
@@ -81,17 +86,24 @@ enum WebMotionRenderer {
         await WebMotionRenderGate.shared.enter()
         defer { Task { await WebMotionRenderGate.shared.leave() } }
         if Task.isCancelled { throw WebMotionRenderError.cancelled }
-        defer { try? FileManager.default.removeItem(at: work) }
         Quarantine.repairOwnBundleIfNeeded()
         let report = await WebMotionHelperProcess().run(request, helper: helper, watch: watch)
-        let result = try accepted(report.outcome)
-        do {
-            if FileManager.default.fileExists(atPath: job.output.path) { try FileManager.default.removeItem(at: job.output) }
-            try FileManager.default.moveItem(at: work, to: job.output)
-        } catch {
-            throw WebMotionRenderError.rendererFailed("The movie could not be moved into place: \(error.localizedDescription)")
+        let output = job.output
+        let installed = await MediaReadQueue.run(on: WebMotionCacheFiles.queue) {
+            Result<WebMotionResult, Error> {
+                // Gone once renamed into place; a rejected, refused or failed render leaves nothing staged behind.
+                defer { try? FileManager.default.removeItem(at: work) }
+                let result = try accepted(report.outcome)
+                try verify(result)
+                do {
+                    try WebMotionCacheFiles.install(work, at: output)
+                } catch {
+                    throw WebMotionRenderError.rendererFailed("The movie could not be moved into place: \(error.localizedDescription)")
+                }
+                return result
+            }
         }
-        return WebMotionRender(file: job.output, result: result, peakFootprint: report.peakFootprint)
+        return WebMotionRender(file: output, result: try installed.get(), peakFootprint: report.peakFootprint)
     }
 
     /// The result of a run that passed, or the error that says why not.

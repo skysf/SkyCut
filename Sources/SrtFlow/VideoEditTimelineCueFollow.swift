@@ -12,6 +12,9 @@ import SrtFlowCore
 //    只有底下的段整个没了、又不是真删（少见：转静帧失败收回占位块那一类）才留在原地、报出来让人 / AI 收拾。
 //    「说话的那几秒」有逐词时间就按词，译文按它翻自的那句原文，都没有才按整句的显示时间
 //    —— 显示时间里有说完之后多停的半秒（`SubtitleCueTiming`），删停顿时剪掉的正是它，按显示时间算会把「OK.」这种短句误删。
+//    A translation goes by all the originals it was translated from: a merged one says every one of their lines, so its
+//    speech is all of them together (review CXR2 R11, 2026-11-19: reading only the first deleted a merged translation whose
+//    later, longer line was kept, and kept one whose later line was cut away).
 // 3. 别的情况（换了位置、中间插进了别的东西、底下没有画面）照老规矩：整句跟着挪，或者不动（调用方给的 `fallback`）。
 // 为什么（2026-10-15，docs/bugfixes/2026-10-15-linkage-moves-subtitles-as-a-block.md）：以前整句平移、时长不变 ——
 // 剪掉的那句只要尾巴蹭进保留段几帧就整句留下、挂到前一段上；保留的那句开头被剪掉几帧，整句就往前挪到片段开始之前；
@@ -45,10 +48,10 @@ enum LinkageCueFollow {
     static let keepFraction = 0.5
     static let epsilon = TimelineLinkage.epsilon
 
-    /// 这句字幕怎么跟。`speech`：说话的那几秒（`speech(of:originals:links:)`）；`hosts`：改之前它可能压着的画面；
-    /// `survivors`：一段画面改之后还在哪几段里（同 id 的在前）；`fallback`：照老规矩（整句挪多少 / 不动 / 删）。
+    /// 这句字幕怎么跟。`speech`：说话的那几秒（`speech(of:originals:links:)`；a merged translation's are several stretches）；
+    /// `hosts`：改之前它可能压着的画面；`survivors`：一段画面改之后还在哪几段里（同 id 的在前）；`fallback`：照老规矩（整句挪多少 / 不动 / 删）。
     static func outcome(
-        _ cue: SubtitleCue, speech: TimelineSpan, hosts: [Piece], survivors: (Piece) -> [Piece],
+        _ cue: SubtitleCue, speech: [TimelineSpan], hosts: [Piece], survivors: (Piece) -> [Piece],
         deletesContent: Bool, fallback: () -> TimelineLinkage.Outcome
     ) -> Outcome {
         let span = cue.span
@@ -56,7 +59,7 @@ enum LinkageCueFollow {
         guard !under.isEmpty else { return whole(cue, fallback()) }
         let parts = segments(of: span, hosts: under, survivors: survivors)
         guard !parts.isEmpty else { return gone(deletesContent, hosts: under, survivors: survivors) }
-        let kept = survived(speech, hosts: hosts, survivors: survivors) ?? survived(span, hosts: hosts, survivors: survivors) ?? 1
+        let kept = survived(speech, hosts: hosts, survivors: survivors) ?? survived([span], hosts: hosts, survivors: survivors) ?? 1
         if kept < keepFraction - 1e-9 { return gone(deletesContent, hosts: under, survivors: survivors) }
         guard inOrder(parts) else { return whole(cue, fallback()) }
 
@@ -96,13 +99,27 @@ enum LinkageCueFollow {
     // MARK: 说话的那几秒
 
     /// 这句说话的那几秒（时间线，改之前）：有逐词时间就是第一个词的开头到最后一个词的结尾；译文没有词就看它翻自的那句原文；
-    /// 都没有就是整句的显示时间。
-    static func speech(of cue: SubtitleCue, originals: [UUID: SubtitleCue], links: [UUID: TranslationLink]) -> TimelineSpan {
-        if let span = wordSpan(of: cue) { return span }
-        if let source = links[cue.id]?.sourceIDs.first, let original = originals[source], let span = wordSpan(of: original) {
-            return span
+    /// 都没有就是整句的显示时间。A translation reads every original it was translated from, not only the first (a merged
+    /// translation says all their lines): each one's words, or its display time when it has no word timing; only when none of
+    /// them has word timing does the translation's own display time count. Overlapping stretches are joined.
+    static func speech(of cue: SubtitleCue, originals: [UUID: SubtitleCue], links: [UUID: TranslationLink]) -> [TimelineSpan] {
+        if let span = wordSpan(of: cue) { return [span] }
+        let sources = (links[cue.id]?.sourceIDs ?? []).compactMap { originals[$0] }
+        guard sources.contains(where: { wordSpan(of: $0) != nil }) else { return [cue.span] }
+        return joined(sources.map { wordSpan(of: $0) ?? $0.span })
+    }
+
+    /// The stretches with overlapping ones joined, in time order (no second of speech counts twice).
+    private static func joined(_ spans: [TimelineSpan]) -> [TimelineSpan] {
+        var result: [TimelineSpan] = []
+        for span in spans.sorted(by: { $0.start < $1.start }) {
+            if let last = result.last, span.start <= last.end {
+                result[result.count - 1].end = max(last.end, span.end)
+            } else {
+                result.append(span)
+            }
         }
-        return cue.span
+        return result
     }
 
     private static func wordSpan(of cue: SubtitleCue) -> TimelineSpan? {
@@ -141,12 +158,16 @@ enum LinkageCueFollow {
         return result.sorted { $0.oldStart < $1.oldStart }
     }
 
-    /// 这一段底下的画面还剩几成；底下本来就没画面是 nil。
-    private static func survived(_ span: TimelineSpan, hosts: [Piece], survivors: (Piece) -> [Piece]) -> Double? {
-        let under = hosts.filter { $0.overlaps(span) }
-        let total = hosted(span.start, span.end, by: under)
+    /// 这几段底下的画面合起来还剩几成（by length, all stretches together）；底下本来就没画面是 nil。
+    private static func survived(_ spans: [TimelineSpan], hosts: [Piece], survivors: (Piece) -> [Piece]) -> Double? {
+        var total = 0.0, kept = 0.0
+        for span in spans {
+            let under = hosts.filter { $0.overlaps(span) }
+            total += hosted(span.start, span.end, by: under)
+            kept += segments(of: span, hosts: under, survivors: survivors).reduce(0) { $0 + $1.oldLength }
+        }
         guard total > epsilon else { return nil }
-        return segments(of: span, hosts: under, survivors: survivors).reduce(0) { $0 + $1.oldLength } / total
+        return kept / total
     }
 
     /// [from, to) 里改之前有画面的长度。

@@ -79,6 +79,7 @@
 - [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
 - [2026-11-17 Upper video, covers and grades switch on the wrong export frame](2026-11-17-export-layer-frame-windows.md) — Share FrameGrid windows and native look requests; use half-frame export edges and video placement, with EOF past the last visible frame.
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
+- [2026-11-19 The export panel checked one folder and replaced a file in another](2026-11-19-export-panel-checks-one-folder-writes-another.md) — An async check answers about one thing: carry what it checked with the answer, and confirm and write exactly that.
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
 - [2026-11-17 get_job reported the peak before the limiter; listen's loudest moment was a curve step's middle](2026-11-17-export-peak-before-limiter-and-binned-loudest.md) — Give the AI the delivered number under its measure's name (the file's true peak, dBTP); a time reported "at" must come from data at that resolution.
 - [2026-08-05 导出预渲染复审](2026-08-05-export-prerender-review.md) — 覆盖、alpha、取消与临时文件。
@@ -152,6 +153,7 @@
 - [2026-09-29 婚礼工程之后的五处工具小毛病](2026-09-29-mcp-tool-followups-from-wedding-session.md) — 共用串行槽的任务取消要分清谁的；整批拒绝要说「一个都没做」。
 - [2026-11-03 MCP 最小示例与真实参数提示](2026-11-03-mcp-usage-guidance.md) — 示例要过参数定义的校验；写错的参数名在结果里提示对的。
 - [2026-11-10 实测证据里漏了本机路径](2026-11-10-measurement-evidence-local-paths.md) — 脱敏按形状换（临时目录、家目录）；进仓库的证据有守卫扫。
+- [2026-11-19 A merged translation was kept or deleted by its first original alone](2026-11-19-merged-translation-follows-first-source-only.md) — A reader that takes `.first` of a list assumes one element: test it with the operation that makes the list longer, and check head and tail trims as a pair.
 - [2026-09-26 播放中按 Return，App 在音频线程上崩溃](2026-09-26-meter-crash-on-go-to-start.md) — 从平台回调拿来的时间，当下标之前先问会不会是负的。
 - [2026-10-01 播放中按空格，图标慢半拍](2026-10-01-meter-current-time-blocks-main-thread.md) — 不许同步问播放器要 `currentTime()`：读时钟外推的 `estimatedTime`。
 - [2026-09-23 一条轨上换了音频格式就没声音、预览卡住](2026-09-23-meter-tap-dies-on-audio-format-change.md) — 一条合成音轨只装一种格式；自检素材要有几种格式。
@@ -328,6 +330,7 @@
 - [2026-11-19 An over-long web-motion duration quit SkyCut before it could be refused](2026-11-19-web-motion-huge-duration-quits-app.md) — Range-check before converting: a finite number is not an in-range one, and a value read back from a project file is input too.
 - [2026-11-18 Web-motion memory accounting missed pages that had not finished loading](2026-11-18-web-motion-load-memory-window.md) — Discover live pages before ready and retry identities with an immutable birth ceiling; retain safe cleanup history.
 - [2026-11-17 A web-motion render overwrites track edits](2026-11-17-web-motion-render-overwrites-track-edits.md) — Async clip checks include lane identity and visibility; a vertical move need not change EditClip.
+- [2026-11-19 A same-fingerprint web-motion re-render could delete the movie a clip was using](2026-11-19-web-motion-rerender-deletes-cached-movie.md) — Replace a file others may be reading with one rename of a staged copy after every check, never remove-then-move; reuse a checked cache instead of forcing a render.
 - [2026-11-05 官网 404 被标成英文首页的副本](2026-11-05-website-404-canonical-is-home.md) — 错误页有独立 canonical，确认 / 404 页不收录。
 - [2026-11-05 官网演示停在封面且轨道像宽图](2026-11-05-website-demos-stall-on-posters.md) — 视口内主动加载、用解码器时钟；还原旧代码确认守卫变红。
 - [2026-11-05 官网未正确识别部分中文设备语言](2026-11-05-website-device-language-falls-back.md) — 根入口按首选语言匹配，所有中文变体用简中，不支持的默认英文。

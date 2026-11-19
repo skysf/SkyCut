@@ -91,7 +91,8 @@ final class WebMotionEditorModel {
                     throw AIToolError(L10n("Choose an installed typeface before re-rendering."))
                 }
             }
-            let placed = try await WebMotionActions.place(record: record, replacing: original.id, project: project, force: true)
+            // An unchanged draft has the same fingerprint as the clip's checked movie: that movie is reused, not rendered again.
+            let placed = try await WebMotionActions.place(record: record, replacing: original.id, project: project)
             original = placed.clip
             sourceLane = WebMotionSourceLane.capture(original.id, in: project.state)
             record = placed.rendered.record
@@ -107,7 +108,7 @@ final class WebMotionEditorModel {
         try validateCurrent()
         let stored = original.webMotion!
         let movie = original.sourceURL
-        try await MediaReadQueue.run(on: MediaReadQueue.analysis) {
+        try await MediaReadQueue.run(on: WebMotionCacheFiles.queue) {
             Result {
                 try FileManager.default.createDirectory(at: movie.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try WebMotionCache.writePage(stored, movie: movie)

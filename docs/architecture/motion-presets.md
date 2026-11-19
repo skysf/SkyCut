@@ -168,8 +168,8 @@ Selecting a web clip shows `WebMotionInspectorSection`. Text, font, color and nu
 form; authored names/labels remain verbatim. Fonts use the existing installed-font browser. Duration and local
 hit are separate timing fields, always synchronized with reserved `MOTION_PARAMS.duration` / `hit`.
 `WebMotionEditorModel` keeps an uncommitted draft: typing does not edit the timeline or start a render. Re-render
-validates the captured document/clip/source lane, runs the locked helper, and updates that same clip in one undo
-step while retaining its trim, speed and effects. Failed or stale work retains the preceding movie. Reload Parameters
+validates the captured document/clip/source lane, reuses the checked movie when the draft's fingerprint is unchanged or
+runs the locked helper, and updates that same clip in one undo step while retaining its trim, speed and effects. Failed or stale work retains the preceding movie. Reload Parameters
 explicitly discards an old draft. Source OS/font warnings remain visible until the source is re-rendered.
 
 Show Page in Finder prepares the stored HTML and parameter sidecar beside the original movie through queued IO,
