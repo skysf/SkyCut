@@ -73,6 +73,7 @@
 - [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.
 - [2026-11-17 A docs-only merge cancels the only run checking an earlier code merge](2026-11-17-docs-only-main-cancels-unverified-code.md) — A replacement main run must check inherited code too; a docs-only PR marker proves only scans passed.
 - [2026-09-25 拖块 / 拉框每一拍整条时间线重算](2026-09-25-drag-session-in-timeline-state.md) — 拖动会话不进时间线的 `@State`：`TimelineDragBox` 持有不订阅。
+- [2026-11-19 Web-motion recovery and Compress / Burn In still asked the drive on the main thread](2026-11-19-drive-checks-on-main-thread.md) — When one call site of a class moves off the main thread, sweep its siblings; a check that runs on every rebuild is a hot path for drive latency.
 - [2026-10-16 edit_clip 改入点的语义只写在注释里](2026-10-16-edit-clip-trim-semantics-undocumented.md) — 和界面惯例不一样的行为要写进给 AI 的说明。
 - [2026-08-04 编辑器工具复审](2026-08-04-editor-tools-review.md) — 工具模式、升轨和旋转包络。
 - [2026-11-04 后台引擎短探测无限等待且重复启动](2026-11-04-engine-probe-hangs.md) — 短探测共享截止时间和输出上限、唯一父进程回收、定位只跑一次。
