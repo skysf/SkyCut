@@ -10,7 +10,8 @@ import SrtFlowCore
 // that runs on the main thread shows up as a long main-thread gap instead of hanging the check.
 // - SaveChecks.swift: autosave, flush at the deadline, edits during a write, coalescing, a failing drive, a moved file.
 // - CloseQuitChecks.swift: switching away, Save As, the AI's save_project, closing at once, Quit.
-// - EditWhileClosingChecks.swift: an edit made while New / close / Quit is writing; Quit looking again; a stale save window.
+// - EditWhileClosingChecks.swift: an edit made while New / close / Quit is writing; Quit looking again; "Quit Anyway" and a
+//   document opened since in the same project; a stale save window.
 // - ReplaceChecks.swift: a file already at a chosen place is replaced only when the person confirmed it for that URL.
 // - OffMainWriteChecks.swift: the subtitle editor's writes and a saved version's media never wait on the main thread.
 
