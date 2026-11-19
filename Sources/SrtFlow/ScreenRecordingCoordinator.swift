@@ -733,7 +733,7 @@ final class ScreenRecordingCoordinator: ObservableObject {
         guard terminationPending else { return }
         // partial / 恢复待决时不能退：用户还没决定那份文件怎么处理。
         guard !state.isBusy, pendingPartial == nil, pendingRecovery == nil else { return }
-        Task { self.finishTerminationWait(shouldTerminate: await ProjectQuit.prepareAll()) }  // files off the main thread
+        ProjectQuit.prepareAll { self.finishTerminationWait(shouldTerminate: $0) }  // files off the main thread
     }
 
     /// **只 reply 一次** —— 反复按 Quit、Stop 与 Quit 同时发生都靠它幂等。

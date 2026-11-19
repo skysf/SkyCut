@@ -464,13 +464,22 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    switching (New / Open / Open Recent, the project window's close button, the AI's `close_project`) do not happen while a
    project's file can't be written: `prepareToClose` answers ready / refused / waitingForDrive. A project window closes at
    once when there is nothing to write (`closesAtOnce`), otherwise after its save.
+   **`.ready` is decided at the moment it is answered** (`ProjectClosing.swift`, since
+   [closing trusted a write of an older snapshot](../bugfixes/2026-11-19-close-trusts-a-stale-save.md)): the same document
+   generation as when the close started, nothing unsaved, nothing being written. A write that lands only says that *its*
+   snapshot is on the drive; an edit made meanwhile (typing, an AI tool call) is written too, within what is left of the
+   same deadline, before the answer is ready. Callers act on `.ready` at once, with no other wait in between
+   (`replaceWithNewProject`, the window's `close()`, `finishClose`).
 5. **Save As** (§ "切工程必须是事务性的" item 6 still holds): the new file is taken only when its write succeeded within the
    deadline; a Save As that lands later never moves the project.
 6. **Quit** (`ProjectQuit`): `.terminateNow` when no project needs writing or asking; otherwise `.terminateLater` and one
    reply. Each project gets 3 s quietly, then an alert that keeps waiting by itself (SkyCut quits once the file is written),
    with "Don't Quit" and "Quit Anyway" (giving up only that project's unsaved changes). Quitting after a screen recording goes
    through the same `prepareAll`, which runs once when asked twice. The atomic write keeps the file on disk whole if SkyCut
-   quits while a write is stuck.
+   quits while a write is stuck. Before it replies, Quit looks again: a project it let through that changed since (an AI
+   tool call while another project's alert was up) is settled again, and so is a project opened meanwhile; one given up
+   with "Quit Anyway" is not. The reply is a closure called in the same main-thread turn as that last look
+   (`prepareAll(reply:)`), never after awaiting another task, which would leave a gap for an edit.
 7. Behaviour: `scripts/check-project-saves.sh`.
 
 ### 切工程必须是事务性的
@@ -492,7 +501,9 @@ a project file can live on a sleeping, slow, read-only or stuck external drive, 
    下一次编辑把新状态从磁盘上也抹掉。Open Recent 里永远有当前工程，这条路是
    真实可点的。
 5. **每个 await（含模态框的嵌套 runloop）之后要验 `openRequestToken`。** 连点
-   两个最近工程时，慢的那个后回来会把先打开的顶掉。
+   两个最近工程时，慢的那个后回来会把先打开的顶掉。The close itself checks the document generation after every wait
+   (`prepareToClose`): a save window answered after another document replaced the untitled project it was opened for
+   writes nothing — the check comes before the write, not after it.
 6. **Save As 的新身份只有写盘成功才作数**：先暂存旧 `documentURL`/书签，
    `saveNow()` 失败就整个回滚，否则工程卡在一个写不进去的 URL 上。
 7. **退出必须走 `applicationShouldTerminate`**，**每个开着的工程都过一遍**（2026-10-17 起，[开着的工程](open-projects.md)），失败或用户点取消就
@@ -560,13 +571,16 @@ made before it no longer finds the moved file — until then this only worked be
    - 播放头停在工程后半段（在播、停着各一次）→ File ▸ New Project / 打开另一个工程 → 播放头在 0:00
      （卸片之后晚到的时间回调由 `check-player-clock.sh` 用真播放器钉着，这一条看真窗口）
 3. `scripts/check-project-saves.sh` — the project file written off the main thread (§5 "Writing the project file off the main
-   thread"): slow, stuck and failing drives, switching away, Save As, Quit. Real windows and a real drive, before a release:
+   thread"): slow, stuck and failing drives, switching away, Save As, Quit; an edit made while New / a close / Quit is
+   writing, Quit looking again at a project it let through, a save window answered too late. Real windows and a real drive,
+   before a release:
    - a project on a USB hard drive that has gone to sleep: edit, wait for the autosave — the timeline stays responsive while
      the drive spins up; ⌘S right after — no beachball, the notice says the drive is not responding if it takes over 15 s;
    - the same project, then ⌘Q while the drive is asleep: SkyCut quits once the drive answers, or after about 3 s shows
      "“Name” isn't saved yet" — left alone, it quits by itself when the write lands; "Don't Quit" keeps SkyCut open
      with the project dirty; "Quit Anyway" quits and the file on the drive is the last saved one (not half-written);
    - close a project window with unsaved edits on a slow drive: the window stays until the save lands, then closes; with
-     nothing unsaved it closes at once;
+     nothing unsaved it closes at once; type into a subtitle while it waits: the window closes only after a save that
+     includes the typing (reopen the project from Open Recent: the typing is there);
    - rename and then move an open project in Finder after it has been saved a few times: the next save follows it, no new
      file appears under the old name.

@@ -43,7 +43,9 @@ and fails to connect in the field. A modal panel turns that into a frozen SkyCut
    subtitle for a video).
 7. Save As is awaited (`chooseSaveLocation() async`), so closing an untitled project (`prepareToClose`) can ask "Save…" and
    wait for the window. The blocking `prepareToCloseDocument` (checks only, [project file](video-edit-project-file.md) §5)
-   cannot wait for a non-modal window and refuses "Save…".
+   cannot wait for a non-modal window and refuses "Save…". The close uses the window's answer only while the project is
+   still the document it was asked for, checked before anything is written: a New / Open meanwhile would otherwise get
+   written to the place chosen for the untitled one ([case](../bugfixes/2026-11-19-close-trusts-a-stale-save.md)).
 8. Diagnostics: the chooser leaves `注：file window: …` notes in the stall log (opening, how long macOS took to make it,
    came back empty, never on screen, closed from SkyCut), [main-thread stalls](../testing/main-thread-stalls.md).
 
