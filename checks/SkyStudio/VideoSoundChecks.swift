@@ -23,7 +23,8 @@ func runVideoSoundChecks() async {
               "\(record.id) lists only modes the AI can name")
     }
 
-    // 2. Which model: none moves to the first default video model that can turn sound off; a named one is never swapped.
+    // 2. Which model: the sound mode never moves the choice (a model that can turn sound off costs several times more, and muting
+    //    is free); it is checked on the chosen model, and a refusal says how to get silence.
     func ask(_ mode: String?, generateAudio: Bool? = nil) -> SkyStudioGeneration.Ask {
         var value = SkyStudioGeneration.Ask(generateAudio: generateAudio)
         value.audioMode = mode
@@ -34,11 +35,15 @@ func runVideoSoundChecks() async {
     }
     checkEqual(pick(ask(nil)), "minimax-h3", "no mode: the usual default model")
     checkEqual(pick(ask("ambient")), "minimax-h3", "ambient: the usual default model")
-    checkEqual(pick(ask("none")), "seedance-2-pro", "none: the first default video model that lists it")
-    checkEqual(pick(ask("none"), requested: "minimax-h3"), nil, "none on a named H3 is not swapped for another model")
+    checkEqual(pick(ask("none")), "minimax-h3", "none does not buy a pricier model: the usual default model is still chosen")
+    checkEqual(pick(ask("none"), requested: "seedance-2-pro"), "seedance-2-pro", "a named model that can turn sound off")
+    check(SkyStudioVideoSound.problem(model: h3, ask: ask("none")) != nil, "and then none on the chosen H3 is refused before the quote")
+    checkEqual(SkyStudioVideoSound.problem(model: seedance, ask: ask("none")), nil, "none on a model that lists it is taken")
+    let price = { (model: SkyStudioModel) in model.price["credits_by_resolution"]?["720p"]?.doubleValue ?? model.price["credits_by_resolution"]?["768p"]?.doubleValue ?? 0 }
+    check(price(seedance) > 4 * price(h3), "why: on 2026-11-19 the first default model that turns sound off costs over 4x the default one")
     let refusal = SkyStudioVideoSound.problem(model: h3, ask: ask("none")) ?? ""
-    check(refusal.contains("always makes its own sound") && refusal.contains("lists none in params.audio_mode") && refusal.contains("edit_clip"),
-          "none on H3: plain words and what to do instead (\(refusal))")
+    check(refusal.contains("always makes its own sound") && refusal.contains("edit_clip muted=true") && refusal.contains("lists none in params.audio_mode"),
+          "none on H3: plain words, muting for free, or naming a model that can (\(refusal))")
     check(SkyStudioVideoSound.problem(model: seedance, ask: ask("none", generateAudio: true))?.contains("disagree") == true,
           "audio_mode none with generate_audio true is refused (Sky Studio would refuse it too)")
     checkEqual(SkyStudioVideoSound.problem(model: seedance, ask: ask("none", generateAudio: false)), nil, "the two agreeing is fine")

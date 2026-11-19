@@ -81,11 +81,14 @@ PR #256). On SkyCut's side these rules hold:
 5. **A video's `audio_mode` is sent only when the AI asks for one** (`SkyStudioVideoSound.apply`), so a default request stays
    exactly what it was (an official shot's pinned digest too). `none` is accepted only where the model's
    `params.audio_mode` lists it (Seedance 2.0 Pro / 2.5 and Wan 3.0 on 2026-11-19; H3, Omni and Veo always make sound; Veo is
-   not offered `none`, the user chose not to test it); elsewhere it is refused before the quote in plain words. With `none`
-   and no model named, the default video order's first model that lists it is chosen; the draft price comparison uses the
-   same constraint. Where the model also has `generate_audio`, it is sent agreeing with the mode (Sky Studio refuses the two
-   disagreeing); `generate_audio` alone keeps its old meaning. Lip-sync takes no mode. A catalog without `audio_mode` gets
-   nothing new: `full` is accepted without being sent, `ambient` / `none` are refused.
+   not offered `none`, the user chose not to test it); elsewhere it is refused before the quote in plain words. **The mode
+   never takes part in choosing the model**: both generate tools check it on the model already chosen. Otherwise `none` with
+   no model named would move to a model several times the price (Seedance 2.0 Pro 720p 76 credits/s against MiniMax H3 768p 16
+   on 2026-11-19) while muting the clip gives the same silence for nothing; the refusal says so, and a named model that lists
+   `none` goes through the draft price comparison like any pricier model. Where the model also has `generate_audio`, it is
+   sent agreeing with the mode (Sky Studio refuses the two disagreeing); `generate_audio` alone keeps its old meaning (on a
+   model without that switch it is ignored with a note). Lip-sync takes no mode. A catalog without `audio_mode` gets nothing
+   new: `full` is accepted without being sent, `ambient` / `none` are refused.
 6. **A finished video's `audio` block reaches `get_job`** with a note (`SkyStudioVideoSound.resultDetail`, merged in
    `SkyStudioGenerationRun.succeed`): when `may_carry_bed` is true, Sky Studio's note plus "listen describe=true with this file
    before laying narration over it, then lower or mute the clip"; Sky Studio's own note otherwise; without a block (an older

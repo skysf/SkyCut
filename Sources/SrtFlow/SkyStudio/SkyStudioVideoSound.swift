@@ -8,6 +8,9 @@ import SrtFlowMCPKit
 //   direction to the prompt: on-screen sound only, no music or bed; not a switch) and `none` (the provider's own switch). Which ones
 //   a model takes is its `/models` record (`params.audio_mode`): `none` only where it is listed (Seedance 2.0 Pro / 2.5, Wan 3.0 on
 //   2026-11-19; MiniMax H3, Gemini Omni and Veo 3.1 Fast always make sound). A mode the model does not take is refused before quoting.
+//   The mode never moves the choice to another model: the generate tools check it on the model already chosen, because a model
+//   that can turn sound off costs several times the default one (Seedance 2.0 Pro 720p 76 credits/s against MiniMax H3 768p 16
+//   on 2026-11-19) while muting the clip gives the same silence for nothing.
 // - The request: `audio_mode` is sent only when the AI asks for one, so a default request stays exactly what it was (an official
 //   shot's pinned request digest too); where the model also has `generate_audio`, it is sent agreeing with the mode (Sky Studio
 //   refuses the two disagreeing).
@@ -31,9 +34,9 @@ enum SkyStudioVideoSound {
         if offered.contains(mode) || (offered.isEmpty && mode == "full") { return nil }
         if offered.isEmpty { return "Sky Studio does not offer audio_mode for \(model.title) yet; leave audio_mode out." }
         if mode == "none" {
-            return "\(model.title) always makes its own sound, so audio_mode=none is not available. Use full or ambient (on-screen sound, "
-                + "asked in the prompt) and lower or mute the clip after it arrives (edit_clip), or choose a model whose get_status "
-                + "models=true lists none in params.audio_mode."
+            return "\(model.title) always makes its own sound, so audio_mode=none is not available. For silence, mute the clip after it "
+                + "arrives (edit_clip muted=true; nothing extra to pay); ambient asks for on-screen sound only (a direction in the prompt); "
+                + "or name a model whose get_status models=true lists none in params.audio_mode (its quote shows the price)."
         }
         return "\(model.title) takes audio_mode \(offered.joined(separator: ", "))."
     }

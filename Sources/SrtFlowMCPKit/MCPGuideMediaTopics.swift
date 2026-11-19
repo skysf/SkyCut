@@ -104,9 +104,10 @@ enum MCPGuideMediaTopics {
             the action that buries narration laid over it. audio_mode (text_to_video and image_to_video) chooses: full (the default) \
             keeps it; ambient asks for the sound of what is on screen only, a direction Sky Studio adds to the prompt, so a bed can \
             still come back; none makes no sound, only on models whose get_status models=true lists none in params.audio_mode \
-            (Seedance and Wan; MiniMax H3, Gemini Omni and Veo always make sound, so none on them is refused before the quote: use \
-            ambient, or mute the clip after it arrives). With none and no model named, SkyCut takes the first default video model \
-            that can turn sound off; quote_only=true shows which and its price. The mode never changes the price. A finished \
+            (Seedance and Wan; MiniMax H3, Gemini Omni and Veo always make sound). The mode never switches the model: none on the \
+            default MiniMax H3 is refused before the quote, because a model that can turn sound off costs several times more while \
+            muting the clip after it arrives (edit_clip muted=true) gives the same silence for nothing. To use one anyway, name it \
+            (its quote shows the price). The mode never changes a model's price. A finished \
             video's get_job carries audio (mode, has_track, can_turn_off, may_carry_bed, note). When may_carry_bed is true, listen \
             before laying narration over it: listen describe=true with the file (or its clip_id once placed) names a low_drone, \
             broadband_noise or music; lower the clip with edit_clip volume_db or mute it, then check the line with listen voice. \

@@ -7,8 +7,9 @@
 # Sky Studio's own catalog records); this section pins the wiring those pure checks cannot see:
 #   - each music model's length is judged where every model choice asks (SkyStudioModelPolicy.problem), and the request's length
 #     comes from SkyStudioMusicLength only; no music model id is written in App code (the catalog's order and `length` decide);
-#   - a video's audio_mode is judged where every model choice asks (SkyStudioGenerationControls.problem), read from the tool's
-#     arguments with the shared vocabulary, and written into a request only by SkyStudioVideoSound.apply;
+#   - a video's audio_mode never takes part in choosing a model (none would otherwise buy a model several times the price, while
+#     muting is free): both generate tools check it on the chosen model before quoting; it is read from the tool's arguments with
+#     the shared vocabulary and written into a request only by SkyStudioVideoSound.apply;
 #   - the finished job's `audio` block and note reach get_job (SkyStudioGenerationRun.succeed), with no second, hard-coded note;
 #   - the tool refuses an impossible music request with each model's reason, and Sky Studio's own refusals get a plain next step;
 #   - a flat-priced music model's length is not counted as going beyond the draft.
@@ -21,11 +22,12 @@ POLICY_FILE="Sources/SrtFlow/SkyStudio/SkyStudioModelPolicy.swift"
 CONTROLS_FILE="Sources/SrtFlow/SkyStudio/SkyStudioGenerationControls.swift"
 GENERATION_FILE="Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift"
 TOOL_FILE="Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift"
+OFFICIAL_FILE="Sources/SrtFlow/SkyStudio/SkyStudioOfficialGenerateTool.swift"
 RUN_FILE="Sources/SrtFlow/SkyStudio/SkyStudioGenerationRun.swift"
 CHARACTER_FILE="Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift"
 DRAFT_FILE="Sources/SrtFlow/AIDraftPolicy.swift"
 for file in "${LENGTH_FILE}" "${SOUND_FILE}" "${REFUSAL_FILE}" "${POLICY_FILE}" "${CONTROLS_FILE}" "${GENERATION_FILE}" "${TOOL_FILE}" \
-            "${RUN_FILE}" "${CHARACTER_FILE}" "${DRAFT_FILE}"; do
+            "${OFFICIAL_FILE}" "${RUN_FILE}" "${CHARACTER_FILE}" "${DRAFT_FILE}"; do
   [ -f "${file}" ] || fail "${file} is missing: a rename must be followed here (an empty scan is a false green)"
 done
 
@@ -36,8 +38,12 @@ grep -qF 'SkyStudioMusicLength.seconds(for: ask, model: model)' "${GENERATION_FI
 others="$(code_files_with '"(lyria-3-pro|stable-audio-3-medium)"' || true)"
 [ -z "${others}" ] || fail "these files write a music model id in code: $(tr '\n' ' ' <<<"${others}")— the catalog's order and length decide"
 
-grep -qF 'if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { return problem }' "${CONTROLS_FILE}" \
-  || fail "${CONTROLS_FILE}: every model choice must ask SkyStudioVideoSound.problem (none only where the model lists it)"
+! grep -qF 'SkyStudioVideoSound.problem(' "${CONTROLS_FILE}" \
+  || fail "${CONTROLS_FILE}: the sound mode must not take part in choosing a model (none would buy a pricier one; muting is free)"
+for file in "${TOOL_FILE}" "${OFFICIAL_FILE}"; do
+  grep -qF 'if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }' "${file}" \
+    || fail "${file}: the sound mode must be checked on the chosen model before quoting (none only where the model lists it)"
+done
 grep -qF 'ask.audioMode = try args.choice("audio_mode", from: MCPVocabulary.videoAudioModes)' "${CONTROLS_FILE}" \
   && grep -qF 'ask.exactLength = try args.bool("exact_length") ?? false' "${CONTROLS_FILE}" \
   || fail "${CONTROLS_FILE}: audio_mode (shared vocabulary) and exact_length must be read from the tool's arguments"

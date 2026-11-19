@@ -15,7 +15,8 @@ enum SkyStudioModelPolicy {
         + "Only when the user explicitly wants maximum quality without cost/time limits use highest: seedance-2-5. "
         + "Select lip-sync by its image/audio or video/audio inputs; use image operation=remove_background for cutouts. "
         + "Music: leave model out; SkyCut takes the first music model whose length takes duration (exact_length=true: an exact one; "
-        + "vocals: one that takes instrumental=false). Video sound: audio_mode none only where params.audio_mode lists it. "
+        + "vocals: one that takes instrumental=false). Video sound: audio_mode none only on a model whose params.audio_mode lists it; "
+        + "it never switches the model (for silence on the default model, mute the clip: free). "
         + "After failure query the original job and billing. Unknown outcomes or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. Read each model's input modes and limits."
 
     static func ordered(kind: String, imageContext: String, quality: String) -> [String] {

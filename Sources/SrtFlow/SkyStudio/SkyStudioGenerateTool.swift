@@ -81,6 +81,8 @@ enum SkyStudioGenerateTool {
                     + catalog.models(kind: kind.rawValue).map(\.id).joined(separator: ", "))
             }
             model = offered
+            // The sound mode is checked on the chosen model only: none never buys a pricier model (muting the clip is free; MCP-42).
+            if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }
             references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
             generation = SkyStudioGeneration.make(kind, prompt: prompt, ask: ask, canvas: canvasRatio, frame: frameRatio,
                                                   model: model, inputMode: references.mode, references: references)

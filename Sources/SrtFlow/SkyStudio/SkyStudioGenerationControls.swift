@@ -53,7 +53,8 @@ enum SkyStudioGenerationControls {
         if let max = model.limit("max_prompt_characters"), Double(prompt.unicodeScalars.count) > max { return "prompt exceeds \(Int(max)) Unicode characters." }
         // A music model's own length (auto) is judged from its `length` in SkyStudioModelPolicy.problem (SkyStudioMusicLength).
         if ask.smartDuration && model.kind != "music" && model.params["smart_duration"] == nil { return "This model does not offer smart duration (null/auto)." }
-        if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { return problem }
+        // audio_mode is not judged here: it never moves the choice to another (pricier) model; the generate tools check it on the
+        // chosen model (SkyStudioVideoSound.problem).
         if model.params["smart_duration"] != nil, let seconds = ask.duration, seconds.rounded() != seconds { return "duration must be whole seconds or auto for this model." }
         if let ratio = ask.aspectRatio, !model.choices("aspect_ratio").isEmpty, !model.choices("aspect_ratio").contains(ratio) {
             return "aspect_ratio must be one of: \(model.choices("aspect_ratio").joined(separator: ", "))."
