@@ -141,15 +141,19 @@ def evaluate(samples, budgets, confirmed=False):
     return errors, outliers
 
 
-def strict(samples, limits):
+def strict(samples, profile):
     """Off the hosted runner every launch of every scenario keeps the picture in step with the sound."""
-    if set(limits) - set(TIMINGS) or not all(finite(limits, key) and limits[key] > 0 for key in limits):
-        raise ValueError("The strict playback limits must be positive timings")
-    return [f"{trial.label}: picture not in step with the sound: "
-            + ", ".join(f"{metric} {trial.timing(metric):.1f} > {limit:g} ms" for metric, limit in limits.items()
-                        if trial.timing(metric) > limit)
-            for trials in samples.values() for trial in trials
-            if any(trial.timing(metric) > limit for metric, limit in limits.items())]
+    failures = []
+    for name, trials in samples.items():
+        limits = profile["common"] | profile["scenarios"].get(name, {})
+        if set(limits) - set(TIMINGS) or not all(finite(limits, key) and limits[key] > 0 for key in limits):
+            raise ValueError("The strict playback limits must be positive timings")
+        for trial in trials:
+            over = [f"{metric} {trial.timing(metric):.1f} > {limit:g} ms"
+                    for metric, limit in limits.items() if trial.timing(metric) > limit]
+            if over:
+                failures.append(f"{trial.label}: picture not in step with the sound: {', '.join(over)}")
+    return failures
 
 
 def warmup_note(path):

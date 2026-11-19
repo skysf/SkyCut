@@ -106,9 +106,17 @@
     }
   },
   "strict": {
-    "onsetGapMs": 60,
-    "startOffsetMs": 45,
-    "stallMs": 100,
-    "maxSkewMs": 45
+    "common": {
+      "onsetGapMs": 60,
+      "startOffsetMs": 45,
+      "stallMs": 100,
+      "maxSkewMs": 45
+    },
+    "scenarios": {
+      "idle-wake": {
+        "startOffsetMs": 60,
+        "maxSkewMs": 60
+      }
+    }
   }
 }
