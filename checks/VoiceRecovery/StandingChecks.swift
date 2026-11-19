@@ -217,9 +217,9 @@ private func settingsChecks(_ root: URL) async throws {
 @MainActor
 private func migrationChecks(_ root: URL) async throws {
     let fixture = try VoiceLibraryFixture(folder: root.appendingPathComponent("standing-migration"))
-    let suite = "com.srtflow.standing-migration-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("standing-migration")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let access = AIAccessStore(defaults: defaults)
     let standing = SkyStudioVoiceStanding(defaults: defaults, access: access)
     standing.services = fixture.services

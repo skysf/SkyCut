@@ -4,9 +4,9 @@ import SrtFlowMCPKit
 // 真正经过权限 / 收费闸，使用隔离偏好与假请求，不接触账户或媒体服务。
 @MainActor
 func runAccessChecks() {
-    let suite = "com.srtflow.ai-access-check-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("ai-access-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let access = AIAccessStore(defaults: defaults)
     let spend = SkyStudioSpendStore(defaults: defaults)
     checkEqual(access.mode, .ask, "approval is the initial mode")

@@ -163,6 +163,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/DailySpend.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
+  checks/Shared/ScratchDefaults.swift \
   checks/SkyStudio/main.swift \
   checks/SkyStudio/Harness.swift \
   checks/SkyStudio/Stub.swift \

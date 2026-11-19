@@ -29,10 +29,9 @@ func runAdmissionChecks() async {
     check(rejected?.message.contains("project was closed") == true, "preflight failure preserves its specific cause")
     check(rejected?.canRefund(beforeAccepted: true) == true && rejected?.canRefund(beforeAccepted: false) == false,
           "local rejection can release only an unaccepted reservation")
-    let suite = "com.srtflow.SrtFlow.admission-check"
-    let defaults = UserDefaults(suiteName: suite)!
-    defaults.removePersistentDomain(forName: suite)
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("admission-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults)
     let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: 8, store: store)!
     var held = SkyStudioHeldCredits(reservation, store: store)

@@ -4,9 +4,9 @@ import SrtFlowMCPKit
 // 真过现有确认 / 预算闸，角色、revision、视图、模式、报价任一变化都不能消费旧令牌。
 @MainActor
 func runCharacterApprovalChecks() {
-    let suite = "com.srtflow.character-approval-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("character-approval")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults), access = AIAccessStore(defaults: defaults)
     store.setDailyLimit(1000)
     let original = SkyStudioJobRequest(kind: "image_to_video", model: "video", prompt: "Pilot turns", params: ["mode": "multimodal"],

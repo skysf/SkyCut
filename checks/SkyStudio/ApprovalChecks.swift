@@ -4,9 +4,9 @@ import SrtFlowMCPKit
 // 真正过 SkyStudioJobGate：同价同摘要的两种视频不能共用确认码；不是自己的码也不能消费或记账。
 @MainActor
 func runApprovalChecks() {
-    let suite = "com.srtflow.approval-check-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("approval-check")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let store = SkyStudioSpendStore(defaults: defaults)
     let access = AIAccessStore(defaults: defaults)
     store.setDailyLimit(1_000)

@@ -29,6 +29,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_S
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 cp Sources/SrtFlow/Resources/watermark-logo.svg "${APP}/Contents/Resources/watermark-logo.svg"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
+  checks/Shared/ScratchDefaults.swift \
   checks/ExportProfile/Main.swift checks/ExportProfile/Runner.swift checks/ExportProfile/ProcessChecks.swift \
   checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift checks/ExportProfile/SaveAnswerChecks.swift \
   checks/ExportProfile/DestinationChecks.swift \

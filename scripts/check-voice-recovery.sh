@@ -30,6 +30,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_S
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   -I "${BUILD_DIR}/Modules" \
+  checks/Shared/ScratchDefaults.swift \
   checks/VoiceRecovery/Fixture.swift checks/VoiceRecovery/StartChecks.swift checks/VoiceRecovery/TimingChecks.swift \
   checks/VoiceRecovery/ConcurrencyChecks.swift \
   checks/VoiceRecovery/Main.swift checks/VoiceRecovery/LibraryFixture.swift checks/VoiceRecovery/LibraryChecks.swift \

@@ -110,10 +110,13 @@ Task {
     let fps = await DecodeSpeedProbe.measure(sample: longGOP, frames: 120)
     check((fps ?? 0) > 30, "解码速度量到 \(fps ?? -1) fps（该远大于实时）")
     check(DecodeSpeedProbe.machineKey.hasPrefix("optimizedMedia.decodeFPS."), "键的前缀对")
-    let defaults = UserDefaults(suiteName: "srtflow-optimizedmedia-check-\(ProcessInfo.processInfo.processIdentifier)")!
+    // Removed right after use, not in a defer: the main thread exits as soon as this task signals.
+    let decodeScratch = ScratchDefaults("optimizedmedia-decode")
+    let defaults = decodeScratch.defaults
     check(DecodeSpeedProbe.remembered(defaults: defaults) == nil, "没量过就是 nil")
     DecodeSpeedProbe.remember(421, defaults: defaults)
     check(DecodeSpeedProbe.remembered(defaults: defaults) == 421, "记住的读得回来")
+    decodeScratch.remove()
 
     // ---- 4. 转一块 ----
     print("==> 4. 转一块：0.5 秒内必有关键帧、没有 B 帧、尺寸 / 时长 / 帧数对、首尾帧和源一样、不带声音；最后一块到源的结尾")
@@ -317,9 +320,8 @@ Task {
 
     // ---- 5b. V3：上限从设置读、几档、过期的天数、清空 ----
     print("==> 5b. 上限：没设过是默认 10 GB、设了读得回来、低于下限按下限；几档含默认；过期 30 天；清空之后总量 0、目录没了、再落块照样行")
-    let capacitySuite = "srtflow-optimizedmedia-capacity-\(ProcessInfo.processInfo.processIdentifier)"
-    let capacityDefaults = UserDefaults(suiteName: capacitySuite)!
-    capacityDefaults.removePersistentDomain(forName: capacitySuite)
+    let capacityScratch = ScratchDefaults("optimizedmedia-capacity")
+    let capacityDefaults = capacityScratch.defaults
     check(OptimizedMediaStore.defaultCapacityBytes == 10_000_000_000, "默认 10 GB（十进制：设置里显示的、访达里看到的都是十进制）")
     check(OptimizedMediaStore.capacityBytes(in: capacityDefaults) == OptimizedMediaStore.defaultCapacityBytes, "没设过就是默认")
     OptimizedMediaStore.setCapacityBytes(5_000_000_000, in: capacityDefaults)
@@ -330,6 +332,7 @@ Task {
     capacityDefaults.set(Int64(0), forKey: OptimizedMediaStore.capacityDefaultsKey)
     check(OptimizedMediaStore.capacityBytes(in: capacityDefaults) == OptimizedMediaStore.minimumCapacityBytes,
           "别处直接写了 0 也按下限（0 会把刚转好的块当场丢掉）")
+    capacityScratch.remove()
     check(OptimizedMediaStore.capacityPresets.contains(OptimizedMediaStore.defaultCapacityBytes), "几档里有默认那一档")
     check(OptimizedMediaStore.capacityPresets == OptimizedMediaStore.capacityPresets.sorted()
               && OptimizedMediaStore.capacityPresets.allSatisfy { $0 >= OptimizedMediaStore.minimumCapacityBytes },

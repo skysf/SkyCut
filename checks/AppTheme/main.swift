@@ -9,9 +9,8 @@ struct AppThemeChecks {
         func check(_ condition: Bool, _ message: String) {
             if !condition { failures += 1; print("FAIL: \(message)") }
         }
-        let domain = "com.srtflow.theme-checks.\(UUID().uuidString)"
-        let defaults = UserDefaults(suiteName: domain)!
-        defer { defaults.removePersistentDomain(forName: domain) }
+        let scratch = ScratchDefaults("theme-checks")
+        let defaults = scratch.defaults
         check(AppTheme.restored(from: nil) == .forest, "fresh installations default to Forest")
         check(AppTheme.restored(from: "future-value") == .forest, "unknown themes fall back to Forest")
         check(AppTheme.allCases.map(\.rawValue) == ["forest", "classic"], "theme identities are stable")
@@ -26,6 +25,7 @@ struct AppThemeChecks {
         check(AppThemeStore(defaults: defaults).theme == .forest, "Forest survives a new store")
         defaults.set("broken", forKey: AppThemePreference.storageKey)
         check(AppThemeStore(defaults: defaults).theme == .forest, "the store rejects invalid persisted values")
+        scratch.remove() // before the failure exit below, which skips defer
         let scripted = AppThemeStore(defaults: nil)
         scripted.setTheme(.classic)
         check(scripted.theme == .classic, "isolated tests can switch themes in memory")

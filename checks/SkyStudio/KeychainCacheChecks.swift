@@ -220,9 +220,9 @@ private func runInteractiveCacheChecks() async {
 }
 
 private func runKeychainNoticeChecks() {
-    let suite = "keychain-notice-checks-\(UUID().uuidString)"
-    let defaults = UserDefaults(suiteName: suite)!
-    defer { defaults.removePersistentDomain(forName: suite) }
+    let scratch = ScratchDefaults("keychain-notice-checks")
+    defer { scratch.remove() }
+    let defaults = scratch.defaults
     let first = SkyStudioKeychainNoticePolicy(build: "build-A")
     check(first.shouldPresent(in: defaults), "a new build can show its notice")
     check(first.shouldPresent(in: defaults), "a background app does not consume an unshown notice")
