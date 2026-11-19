@@ -77,6 +77,17 @@ final class AudioRing: @unchecked Sendable {
         return readerPosition
     }
 
+    /// The reader takes up a new round while playback is paused (the render block calls it on every paused quantum) and
+    /// says whether there was one. Until the reader moves to the round, the writer's space still counts the old round's
+    /// frames: after a paused seek a full ring took no new data and Play started on an empty ring, one quantum of
+    /// silence on every start and 60–140 ms when the feeder ran late after an output start
+    /// (docs/bugfixes/2026-11-20-idle-start-picture-ahead-and-lost-sound.md).
+    func syncReader() -> Bool {
+        let before = readerEpoch
+        syncEpoch()
+        return readerEpoch != before
+    }
+
     private func syncEpoch() {
         let current = epoch.load(ordering: .acquiring)
         guard current != readerEpoch else { return }

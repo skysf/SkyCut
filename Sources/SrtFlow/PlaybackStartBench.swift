@@ -99,11 +99,18 @@ enum PlaybackStartBench {
         }
         let cold = try await measure(project, probe: probe, origin: 0, frame: frame, before: beforeOpen)
         var trials = [Trial(scenario: "cold-open", metrics: cold, error: nil)]
-        for scenario in PlaybackStartScenarios.list(duration: project.duration, frame: frame) {
-            trials.append(await trial(scenario.name) {
-                let origin = try await PlaybackStartScenarios.stage(scenario, project: project, probe: probe, frame: frame)
-                return try await measure(project, probe: probe, origin: origin, frame: frame, before: PerfCounters.snapshot())
-            })
+        // Local diagnosis only: some scenarios, each repeated in one launch (the gate runs every scenario once).
+        let only = env["SRTFLOW_PLAYBACK_START_ONLY"].map { Set($0.split(separator: ",").map(String.init)) }
+        let repeats = max(1, env["SRTFLOW_PLAYBACK_START_REPEAT"].flatMap(Int.init) ?? 1)
+        for scenario in PlaybackStartScenarios.list(duration: project.duration, frame: frame)
+        where only?.contains(scenario.name) ?? true {
+            for _ in 0..<repeats {
+                trials.append(await trial(scenario.name) {
+                    let origin = try await PlaybackStartScenarios.stage(scenario, project: project, probe: probe, frame: frame)
+                    return try await measure(project, probe: probe, origin: origin, frame: frame, before: PerfCounters.snapshot(),
+                                             action: PlaybackStartScenarios.action(for: scenario, project: project))
+                })
+            }
         }
         return Report(media: media, trials: trials)
     }
@@ -116,15 +123,18 @@ enum PlaybackStartBench {
         }
     }
 
+    /// Times `action` (Play unless a scenario says otherwise) until both streams move from `origin`.
     private static func measure(
         _ project: VideoEditProject, probe: PlaybackStartVideoProbe, origin: Double, frame: Double,
-        before: [String: Int]
+        before: [String: Int], action: (() -> Void)? = nil
     ) async throws -> [String: Double] {
         probe.resetPlayingFrames()
+        let underrunsBefore = project.audioEngineHost.underrunFrames
+        let correctionsBefore = project.clock.driftCorrections
         let request = CACurrentMediaTime()
         let deadline = request + 5
         let attempt = audio.begin(request: request, origin: origin)
-        project.clock.togglePlayback()
+        if let action { action() } else { project.clock.togglePlayback() }
         let returned = CACurrentMediaTime()
         defer { project.clock.pause() }
         do {
@@ -178,6 +188,9 @@ enum PlaybackStartBench {
             "itemAttaches": count(.playerItemAttach, from: before, to: after),
             "assetOpens": count(.compositionAssetOpen, from: before, to: after),
             "videoPrerolls": count(.previewPreroll, from: before, to: after),
+            // Reported, not budgeted: silent frames the engine rendered for want of data, and picture re-anchorings.
+            "underrunFrames": Double(project.audioEngineHost.underrunFrames - underrunsBefore),
+            "driftCorrections": Double(project.clock.driftCorrections - correctionsBefore),
         ]
         if let followup {
             metrics["oneSecondOffsetMs"] = ms(followup.audio - followup.video.timeline)

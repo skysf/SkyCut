@@ -78,6 +78,11 @@ checkPlayDuringPreviewInstallation(clip: URL(fileURLWithPath: CommandLine.argume
 
 // Play starts the sound only with a picture that moves at once: after a pause, a hover and on a new item.
 checkSyncedStarts(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
+// After the idle stop, after a click while playing and when they drift: picture and sound start and stay together.
+checkOutputStartWaits(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
+checkStalledStartPinsTheSound()
+checkSeekWhilePlayingLandsTogether(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
+checkDriftCorrectionKeepsThePictureMoving(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
 // The benchmark's sound position at a picture: a sliver between two audio blocks is not missing sound.
 checkAudioTimeline()
 

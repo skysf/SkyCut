@@ -40,9 +40,7 @@ final class PlayerClock: ObservableObject {
     let observationInterval: TimeInterval
     /// 最近一次时间回调落地（或 seek）时的 host 时间，给 `estimatedTime` 外推用。主线程读写。
     private var tickHostTime: TimeInterval = 0
-    private var timeObserver: Any?
-    private var rateObservation: NSKeyValueObservation?
-    private var failureObserver: NSObjectProtocol?
+    private var observers: PlayerClockObservers?
     /// Play can be pressed as soon as a document's timeline is visible, before AVFoundation can start its item.
     private var playbackRequested = false
     private let readiness = PreviewReadiness()
@@ -51,6 +49,11 @@ final class PlayerClock: ObservableObject {
     private var previewIsUnprimed = false
     /// A pause is waiting for the native picture to report where it stopped (`holdPausedPicture`).
     private var pausedPictureRequested = false
+    /// A Play holding sound and picture until an output that is not rendering renders (`OutputStartWait`).
+    private let outputStart = OutputStartWait()
+    /// Both clocks are starting: the rate observation leaves `isPlaying` to `startClocks`, so its subscribers (5–28 ms of
+    /// SwiftUI and Combine work in the debug build) run after both starts, not between them.
+    private var startingClocks = false
     private weak var previewLayer: AVPlayerLayer?
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
@@ -66,8 +69,6 @@ final class PlayerClock: ObservableObject {
     private var drift = VideoDriftCheck()
     /// 对了几次表（冒烟看它）。
     var driftCorrections: Int { drift.corrections }
-    /// 上一次往卡顿日志里记「对表」的时刻：连着对表只记第一次，别把日志淹了。
-    private var lastDriftNote: TimeInterval = 0
 
     /// - Parameter observationInterval: 时间回调的间隔。烧字幕预览要靠它切换叠在
     ///   画面上的那句字幕，所以给得比字幕编辑器密一些。
@@ -76,10 +77,7 @@ final class PlayerClock: ObservableObject {
         // GUI 冒烟的静音钩子：验播放时别往正在用机器的人耳朵里外放。
         // 环境变量不设就完全不生效（docs/testing/gui-smoke-testing.md）。
         if ProcessInfo.processInfo.environment["SRTFLOW_SMOKE_MUTE"] != nil { player.volume = 0 }
-        timeObserver = player.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: observationInterval, preferredTimescale: 600),
-            queue: .main
-        ) { [weak self] cmTime in
+        observers = PlayerClockObservers(player: player, interval: observationInterval, tick: { [weak self] cmTime in
             // 卸了片（detach）之后还会晚到一拍、报旧条目的时间：新建 / 打开工程先卸片、播放头归零，这一拍把它写回
             // 上一个工程的位置（2026-09-29，docs/bugfixes/2026-09-29-new-project-keeps-old-playhead.md）。没有条目就没有播放时间。
             guard let clock = self, clock.player.currentItem != nil else { return }
@@ -91,24 +89,15 @@ final class PlayerClock: ObservableObject {
             } else {
                 self?.observePlaybackTime(cmTime.seconds)
             }
-        }
-        // 播放/暂停按钮要跟着实际状态走：播到片尾时 rate 会自己变 0，
-        // 光靠自己按下去的那一下记状态会不准。
-        rateObservation = player.observe(\.rate, options: [.initial, .new]) { [weak self] player, _ in
-            let playing = player.rate > 0
-            if Thread.isMainThread {
-                self?.isPlaying = playing
-            } else {
-                DispatchQueue.main.async { self?.isPlaying = playing }
-            }
-        }
-        // 播放器播不下去了（条目出错）：声音和画面一起停。正常播到头不靠通知，声音主时钟自己按总长收尾（finishAtEnd）。
-        failureObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemFailedToPlayToEndTime, object: nil, queue: .main
-        ) { [weak self] notification in
-            guard let self, (notification.object as? AVPlayerItem) === player.currentItem, audioSource?.isPlaying == true else { return }
+        }, playing: { [weak self] playing in
+            // 播放/暂停按钮要跟着实际状态走：播到片尾时 rate 会自己变 0，光靠自己按下去的那一下记状态会不准。
+            guard let self, !startingClocks else { return }
+            isPlaying = playing
+        }, item: .AVPlayerItemFailedToPlayToEndTime, posted: { [weak self] item in
+            // 播放器播不下去了（条目出错）：声音和画面一起停。正常播到头不靠通知，声音主时钟自己按总长收尾（finishAtEnd）。
+            guard let self, item === player.currentItem, audioSource?.isPlaying == true else { return }
             pause()
-        }
+        })
     }
 
     // MARK: 播到头
@@ -166,9 +155,6 @@ final class PlayerClock: ObservableObject {
     }
 
     deinit {
-        if let timeObserver { player.removeTimeObserver(timeObserver) }
-        rateObservation?.invalidate()
-        if let failureObserver { NotificationCenter.default.removeObserver(failureObserver) }
         audioTimer?.invalidate()
         // 视图被销毁（比如切走了侧边栏那一栏）时别让声音还在响。
         player.pause()
@@ -181,7 +167,7 @@ final class PlayerClock: ObservableObject {
         guard audioSource !== source else { return }
         detachAudioSource()
         audioSource = source
-        // `setRate(_:time:atHostTime:)` 要求关掉「等缓冲」（开着会抛异常）；本地文件本来也不用等。
+        // Local files never wait to minimize stalling: a start or a rate change takes effect at once.
         player.automaticallyWaitsToMinimizeStalling = false
         let timer = Timer(timeInterval: observationInterval, repeats: true) { [weak self] _ in
             guard let self, let source = audioSource, source.isPlaying else { return }
@@ -211,9 +197,10 @@ final class PlayerClock: ObservableObject {
         do {
             let restarted = try source.recoverIfNeeded()
             if restarted {
-                drift.reset()
+                resetDrift()
                 MainThreadWatchdog.shared.note("音频引擎已恢复，重新对齐视频时钟")
-                if source.isPlaying { anchorVideo(to: source.playhead) }
+                // The output restarted under a moving picture: place it at the sound and start both together.
+                if source.isPlaying { seek(to: source.playhead) }
             }
             return restarted
         } catch {
@@ -223,28 +210,30 @@ final class PlayerClock: ObservableObject {
         }
     }
 
-    /// 视频的周期回调报来的时间和引擎差过一帧（连着两拍）就把视频重新钉到引擎的时间表上。
+    /// The picture drifted from the sound for two ticks in a row (over a frame): run it slower or faster until it is
+    /// back on the sound, never a re-seek (`VideoDriftCheck` has the rule and why); too far apart, land both again.
     private func checkVideoDrift(videoTime: TimeInterval) {
         guard let source = audioSource, source.isPlaying, player.rate > 0 else {
-            drift.reset()
+            resetDrift()
             return
         }
+        // The picture's timebase is read next to the sound: the observer's own time is late on a busy main thread.
+        let video = player.currentItem?.timebase.map { CMTimebaseGetTime($0).seconds } ?? videoTime
         let audio = source.playhead
-        guard drift.observe(video: videoTime, audio: audio) else { return }
         let now = ProcessInfo.processInfo.systemUptime
-        if now - lastDriftNote > 1 {
-            lastDriftNote = now
-            MainThreadWatchdog.shared.note(String(format: "视频对表：画面 %.3f s、引擎 %.3f s（差 %.0f ms），重新钉到引擎", videoTime, audio, abs(videoTime - audio) * 1000))
+        let action = drift.observe(video: video, audio: audio, now: now)
+        switch action {
+        case .none: return
+        case .rate(let rate): player.rate = rate
+        case .replace: seek(to: audio)
         }
-        anchorVideo(to: audio)
+        if let text = drift.note(action, video: video, audio: audio, now: now) { MainThreadWatchdog.shared.note(text) }
     }
 
-    /// Start at the current host time. With no explicit target, reuse the native preview's prepared position.
-    private func anchorVideo(to seconds: TimeInterval?) {
-        guard player.status == .readyToPlay, player.currentItem?.status == .readyToPlay else { return }
-        let target = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .invalid
-        player.setRate(1, time: target, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
-        positionedTime = nil
+    /// Ends a rate correction in flight (back to normal speed if still playing) and forgets the drift ticks.
+    private func resetDrift() {
+        if drift.isCorrecting, player.rate > 0 { player.rate = 1 }
+        drift.reset()
     }
 
     func bindPreviewLayer(_ layer: AVPlayerLayer) { previewLayer = layer }
@@ -290,9 +279,9 @@ final class PlayerClock: ObservableObject {
                 return
             }
             if source.isPlaying {
-                // Already playing (a seek during playback re-anchored the picture): there is nothing to prepare.
-                // Only a picture that stopped while the sound went on is set moving again on the sound's timeline.
-                if player.rate == 0 { anchorVideo(to: source.playhead) }
+                // Already playing: there is nothing to prepare. Only a picture that stopped while the sound went on is
+                // placed again, with the sound held, and both start together.
+                if player.rate == 0, !outputStart.isWaiting { seek(to: source.playhead) }
                 return
             }
             let start = time
@@ -311,19 +300,31 @@ final class PlayerClock: ObservableObject {
                 }
                 return
             }
-            guard let restarted = recoverAudioIfNeeded(source) else { return }
-            positionedTime = nil
-            if restarted {
-                // The output device restarted under the positioned picture: start it on the new audio host clock.
-                source.play(from: start)
-                anchorVideo(to: nil)
-            } else {
-                player.playImmediately(atRate: 1)
-                source.play(from: start)
+            // An output that is not rendering (stopped by the idle rule, or restarted) starts cold: sound and picture wait
+            // until it renders and the main thread is back from the device's start (`OutputStartWait`).
+            let cold = !outputStart.ended && !source.isRendering
+            guard recoverAudioIfNeeded(source) != nil else { return }
+            if cold {
+                playbackRequested = true
+                outputStart.begin(until: { [weak source] in source?.isRendering ?? true }) { [weak self] in
+                    if self?.playbackRequested == true { self?.play() }
+                }
+                return
             }
+            outputStart.cancel()
+            startClocks(from: start, source: source)
         } else {
             player.play()
         }
+    }
+
+    /// Picture and sound from the placed, primed `start` (`PictureStart.begin`); `isPlaying` is published after both.
+    private func startClocks(from start: TimeInterval, source: PlaybackAudioSource) {
+        positionedTime = nil
+        startingClocks = true
+        PictureStart.begin(player, with: source, from: start)
+        startingClocks = false
+        isPlaying = player.rate > 0
     }
 
     func attach(url: URL, autoplay: Bool = true) {
@@ -389,15 +390,13 @@ final class PlayerClock: ObservableObject {
         placed.send(PlayheadPlacement(time: clamped, precise: precise))
         invalidatePreviewSeek()
         if let source = audioSource {
-            // 引擎驱动：声音先跳过去（一个 IO 缓冲就出声）；视频在播就钉到同一个时刻（播放器自己定位、赶上来），
-            // 停着就照旧精确定位 / 链式扫帧。
-            source.seek(to: clamped)
             if source.isPlaying {
-                scrubber.cancelPending()
-                MainThreadWatchdog.shared.note(String(format: "播放中 seek → %.3f s（引擎先跳，视频钉过去自己赶）", clamped))
-                anchorVideo(to: clamped)
-                return
+                // Playing: picture and sound land on the new position together (`holdForLanding`).
+                MainThreadWatchdog.shared.note(String(format: "Seek while playing → %.3f s: the sound waits, both land together", clamped))
+                holdForLanding()
             }
+            // 声音跳过去（停着），画面精确定位 / 链式扫帧；播放中按住的 Play 等画面能动了再一起开播。
+            source.seek(to: clamped)
         }
         if precise {
             scrubber.cancelPending()
@@ -414,11 +413,23 @@ final class PlayerClock: ObservableObject {
 
     private func invalidatePreviewSeek() {
         pausedPictureRequested = false
+        outputStart.cancel()
         let wasPositioning = previewSeek != nil
         previewSeek = nil
         positionedTime = nil
         readiness.clear()
         if wasPositioning { player.cancelPendingPrerolls() }
+    }
+
+    /// Playing, and the picture must be placed again (a click on the timeline, a drift too far to run back, an output
+    /// restarted under it): hold the sound with the picture and keep a Play pending. The placement that follows (`seek`)
+    /// starts both together once the picture can move. Before 2026-11-20 the sound went on at the new position at once
+    /// while a re-seek froze the picture under it, 0.6 s at 4K mid-GOP (docs/architecture/playback-start.md).
+    private func holdForLanding() {
+        audioSource?.pause()
+        player.pause()
+        resetDrift()
+        playbackRequested = true
     }
 
     private func positionPreview(at target: CMTime, seconds: TimeInterval) {
@@ -551,10 +562,12 @@ final class PlayerClock: ObservableObject {
 
     func pause() {
         playbackRequested = false
+        outputStart.cancel()
         if previewSeek == nil { readiness.clear() }
         let wasPlaying = audioSource?.isPlaying == true && player.rate > 0
         audioSource?.pause()
         player.pause()
+        drift.reset()
         if wasPlaying {
             pausedPictureRequested = true
             holdPausedPicture(stoppedAt: nil)

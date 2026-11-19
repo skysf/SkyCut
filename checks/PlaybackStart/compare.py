@@ -26,9 +26,9 @@ COUNTS = ("builds", "itemAttaches", "assetOpens", "videoPrerolls")
 GROSS_SKEW_MS = 500
 SKEWS = ("onsetGapMs", "startOffsetMs")
 # Native prerolls counted after Play: the scenarios that place or prime the picture after Play (the open, a new item,
-# the rewind at the end, a click just before Play, a hover) prime once. A new item is primed only when Play asks:
-# priming every installed composition while editing broke the memory ratchet.
-PREROLLS = {"cold-open": 1, "end-replay": 1, "fresh-item": 1, "seek-play": 1, "peek-play": 1}
+# the rewind at the end, a click just before Play, a hover, a click while playing) prime once. A new item is primed
+# only when Play asks: priming every installed composition while editing broke the memory ratchet.
+PREROLLS = {"cold-open": 1, "end-replay": 1, "fresh-item": 1, "seek-play": 1, "peek-play": 1, "play-seek": 1}
 
 
 class Trial(NamedTuple):
@@ -147,7 +147,7 @@ def evaluate(samples, budgets, confirmed=False):
 
 def strict(samples, profile):
     """Off the hosted runner every launch of every scenario keeps the picture in step with the sound, except the ones
-    listed under `skip` (the start after the idle stop: docs/architecture/playback-start.md)."""
+    listed under `skip` (none since the start after the idle stop was fixed: docs/architecture/playback-start.md)."""
     failures = []
     for name, trials in samples.items():
         if name in profile.get("skip", []):

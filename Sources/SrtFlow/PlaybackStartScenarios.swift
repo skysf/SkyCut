@@ -20,6 +20,7 @@ enum PlaybackStartScenarios {
             Scenario(name: "seek-play", position: PlaybackStartFixture.farSeek),
             Scenario(name: "resume", position: PlaybackStartFixture.freshItem),
             Scenario(name: "peek-play", position: PlaybackStartFixture.freshItem),
+            Scenario(name: "play-seek", position: PlaybackStartFixture.farSeek),
             Scenario(name: "near-end", position: duration - 2),
             Scenario(name: "end-replay", position: duration),
             Scenario(name: "idle-wake", position: 1),
@@ -54,6 +55,13 @@ enum PlaybackStartScenarios {
                 guard let displayed = probe.displayed else { return false }
                 return abs(displayed.timeline - PlaybackStartFixture.peek) < frame * 0.95
             }
+        case "play-seek":
+            // Playing in the 4K source, then a click far ahead into a later GOP (`action`): picture and sound land
+            // there together, the decode at the click included.
+            try await place(project, probe: probe, at: PlaybackStartFixture.freshItem, frame: frame)
+            project.clock.togglePlayback()
+            try await PlaybackStartBench.wait("playback before the click") { project.clock.isPlaying }
+            try await Task.sleep(for: .seconds(1))
         case "idle-wake":
             try await place(project, probe: probe, at: position, frame: frame)
             try await stopForIdle(project)
@@ -61,6 +69,12 @@ enum PlaybackStartScenarios {
             try await place(project, probe: probe, at: position, frame: frame)
         }
         return scenario.name == "end-replay" ? 0 : position
+    }
+
+    /// What the person does at the measured moment: Play, or for `play-seek` the click while playing.
+    static func action(for scenario: Scenario, project: VideoEditProject) -> () -> Void {
+        guard scenario.name == "play-seek" else { return { project.clock.togglePlayback() } }
+        return { project.seekFromTimeline(time: scenario.position) }
     }
 
     /// A click on the timeline; Play follows as soon as the paused picture is on screen.
@@ -106,9 +120,11 @@ enum PlaybackStartScenarios {
 
     private static func stopForIdle(_ project: VideoEditProject) async throws {
         // Focus or pointer activity can return while a local run is preparing the idle case.
+        // Local diagnosis only: a longer stop lets the output device cool down as after the real two-minute stop.
+        let seconds = ProcessInfo.processInfo.environment["SRTFLOW_PLAYBACK_START_IDLE_SECONDS"].flatMap(Double.init) ?? 2
         for _ in 0..<2 {
             project.audioEngineHost.suspendNow()
-            try await Task.sleep(for: .seconds(2))
+            try await Task.sleep(for: .seconds(seconds))
             if project.audioEngineHost.graphStateName == "suspended" { return }
         }
         throw PlaybackStartBench.Failure(

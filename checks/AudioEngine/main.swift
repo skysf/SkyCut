@@ -289,6 +289,9 @@ checkUserPresence()
 print("==> 16. A clip's voice-band cut: only 300 Hz-3 kHz goes down, lows and highs stay; not structure (VoiceBand.swift)")
 checkVoiceBand()
 
+print("==> 17. A paused seek fills the new position before Play: sound from the first sample (PausedSeek.swift)")
+checkPausedSeekFillsRing(tone: toneA)
+
 print("\(checks) checks, \(failures) failures")
 if failures == 0 { print("All checks passed") }
 finish(failures == 0 ? 0 : 1)

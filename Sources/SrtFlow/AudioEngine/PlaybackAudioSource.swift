@@ -4,8 +4,8 @@ import Foundation
 //
 // 管什么：`PlayerClock` 驱动引擎只经这几个方法（`TimelineAudioEngine` 实现它）。单独一个文件、不依赖任何东西：
 // 时钟的自检（check-player-clock.sh）只编这一个小文件，不必把整个引擎编进去。
-// 挂上它之后**声音是主时钟**：播放头从它读，视频用 `setRate(_:time:atHostTime:)` 钉到它的时间表上
-// （docs/architecture/audio-engine.md）。
+// 挂上它之后**声音是主时钟**：播放头从它读，画面和它一起开播（docs/architecture/playback-start.md），播放中画面差了
+// 就调画面的速度追上它（VideoDriftCheck，docs/architecture/audio-engine.md）。
 
 protocol PlaybackAudioSource: AnyObject {
     /// 此刻播放头在时间线的第几秒。
@@ -19,4 +19,16 @@ protocol PlaybackAudioSource: AnyObject {
     func play(from seconds: Double)
     func pause()
     func seek(to seconds: Double)
+    /// False while the output is not rendering: stopped by the idle rule, or started and not yet rendered. Play then
+    /// waits for it with sound and picture held, and pins the sound to the picture's start
+    /// (`play(from:alignedToHostTime:)`, docs/architecture/playback-start.md).
+    var isRendering: Bool { get }
+    /// Plays from `seconds` as of host time `host` (the picture's start): the first render places the sound at
+    /// `seconds` plus the time since `host`, so a stall before that render cannot separate it from the picture.
+    func play(from seconds: Double, alignedToHostTime host: UInt64)
+}
+
+extension PlaybackAudioSource {
+    var isRendering: Bool { true }
+    func play(from seconds: Double, alignedToHostTime host: UInt64) { play(from: seconds) }
 }
