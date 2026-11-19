@@ -1,0 +1,151 @@
+"""Pin the playback gate's verdict on isolated stalls, bounded confirmation, broken startup and the recorded bug."""
+
+import json
+from pathlib import Path
+import unittest
+
+from compare import FOLLOWUP, TIMINGS, Trial, evaluate, validate_trial
+
+
+BUDGETS = json.loads(Path(__file__).with_name("budgets.json").read_text())
+
+
+def trial(name, **changes):
+    cold = name == "cold-open"
+    metrics = dict.fromkeys(TIMINGS, 0)
+    metrics.update(audioMs=50, videoMs=65, oneSecondElapsedMs=1017,
+                   builds=int(cold), itemAttaches=int(cold), assetOpens=3 if cold else 0,
+                   videoPrerolls=int(cold or name == "end-replay"),
+                   displayPeriodMs=16.67, displayGapMs=18, oneSecondTimedOut=0)
+    metrics.update(changes)
+    return Trial(name, metrics)
+
+
+def batch(launches):
+    return {name: [trial(name) for _ in range(launches)] for name in BUDGETS["scenarios"]}
+
+
+def timeout(name):
+    result = trial(name, oneSecondTimedOut=1)
+    for field in FOLLOWUP:
+        del result.metrics[field]
+    return result
+
+
+# The hosted runner before the #502 fix (run 44446600269): sound started first and the picture caught up later.
+RECORDED_BUG = {
+    "cold-open": dict(startOffsetMs=[617, 283, 237, 212, 196], onsetGapMs=[750, 450, 260, 368, 219],
+                      audioMs=[1764, 955, 830, 849, 553], videoMs=[2514, 1404, 1090, 1216, 772]),
+    "end-replay": dict(startOffsetMs=[235, 126, 93, 70, 82], onsetGapMs=[401, 215, 93, 104, 104],
+                       audioMs=[54, 74, 50, 26, 39], videoMs=[455, 290, 143, 130, 144]),
+}
+
+
+class PlaybackGateTests(unittest.TestCase):
+    def test_two_isolated_late_followups_keep_their_raw_errors(self):
+        samples = batch(5)
+        cut = samples["cut"]
+        cut[0] = trial("cut", oneSecondOffsetMs=1364.8, oneSecondElapsedMs=1980.2)
+        cut[1] = trial("cut", oneSecondOffsetMs=229, oneSecondElapsedMs=1305)
+        errors, outliers = evaluate(samples, BUDGETS)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(outliers), 2)
+        self.assertIn("1364.8", outliers[0])
+        cut[2] = trial("cut", oneSecondOffsetMs=200)
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("cut: 2/5" in error for error in errors))
+
+    def test_confirmed_samples_cannot_replace_bad_cold_starts(self):
+        samples = batch(8)
+        for index in range(5):
+            samples["cold-open"][index] = trial("cold-open", startOffsetMs=617)
+        errors, _ = evaluate(samples, BUDGETS, confirmed=True)
+        self.assertTrue(any("cold-open: 3/8" in error for error in errors))
+        self.assertTrue(any("cold-open median: startOffsetMs" in error for error in errors))
+        self.assertTrue(any("cold-open: 5 of 8 launches" in error for error in errors))
+
+    def test_even_confirmation_keeps_the_medians_and_whole_launch_count(self):
+        samples = batch(8)
+        replay = samples["end-replay"]
+        replay[0] = replay[1] = trial("end-replay", videoMs=400)
+        replay[2] = replay[3] = trial("end-replay", startOffsetMs=65)
+        errors, outliers = evaluate(samples, BUDGETS, confirmed=True)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(outliers), 4)
+        replay[4] = trial("end-replay", audioMs=350)
+        self.assertTrue(any("end-replay: 3/8" in error for error in evaluate(samples, BUDGETS, confirmed=True)[0]))
+
+    def test_followup_timeout_requires_confirmation_and_counts_against_it(self):
+        first = batch(5)
+        first["cold-open"][0] = timeout("cold-open")
+        self.assertEqual(validate_trial("cold-open", first["cold-open"][0]), [])
+        errors, _ = evaluate(first, BUDGETS)
+        self.assertTrue(any("cold-open: 1 of 5 launches" in error for error in errors))
+        second = batch(3)
+        combined = {name: trials + second[name] for name, trials in first.items()}
+        errors, outliers = evaluate(combined, BUDGETS, confirmed=True)
+        self.assertEqual(errors, [])
+        self.assertIn("timed out", outliers[0])
+        combined["cold-open"][-1] = timeout("cold-open")
+        self.assertTrue(evaluate(combined, BUDGETS, confirmed=True)[0])
+
+    def test_one_gross_start_skew_needs_confirmation_and_two_fail(self):
+        # A picture a second behind its sound is the reported failure, even in one launch.
+        first = batch(5)
+        first["cut"][0] = trial("cut", startOffsetMs=1100, onsetGapMs=1100)
+        errors, _ = evaluate(first, BUDGETS)
+        self.assertTrue(any("cut: 1 of 5 launches" in error for error in errors))
+        combined = {name: trials + batch(3)[name] for name, trials in first.items()}
+        self.assertEqual(evaluate(combined, BUDGETS, confirmed=True)[0], [])
+        combined["cut"][6] = trial("cut", onsetGapMs=520)
+        self.assertTrue(any("cut: 2 of 8 launches" in error for error in evaluate(combined, BUDGETS, confirmed=True)[0]))
+
+    def test_confirmation_adds_no_margin_to_the_medians(self):
+        samples = batch(8)
+        samples["end-replay"] = [trial("end-replay", audioMs=219, videoMs=299)] * 8
+        self.assertEqual(evaluate(samples, BUDGETS, confirmed=True)[0], [])
+        samples["end-replay"] = [trial("end-replay", audioMs=221)] * 8
+        self.assertTrue(any("end-replay median: audioMs" in error for error in evaluate(samples, BUDGETS, confirmed=True)[0]))
+        samples = batch(8)
+        samples["warm-start"] = [trial("warm-start", audioMs=139)] * 8
+        self.assertTrue(evaluate(samples, BUDGETS, confirmed=True)[0])
+        samples = batch(8)
+        samples["cut"] = [trial("cut", oneSecondOffsetMs=36)] * 8
+        self.assertTrue(any("cut median" in error for error in evaluate(samples, BUDGETS, confirmed=True)[0]))
+
+    def test_recorded_bug_and_a_delayed_play_stay_red_after_healthy_confirmation(self):
+        # Even if every confirmation launch were healthy, the recorded failure must not pass.
+        bug = batch(5)
+        for name, columns in RECORDED_BUG.items():
+            bug[name] = [trial(name, **{metric: values[index] for metric, values in columns.items()}) for index in range(5)]
+        self.assertTrue(evaluate(bug, BUDGETS)[0])
+        healthy = batch(3)
+        errors, _ = evaluate({name: trials + healthy[name] for name, trials in bug.items()}, BUDGETS, confirmed=True)
+        self.assertTrue(any("cold-open median: onsetGapMs" in error for error in errors))
+        self.assertTrue(any("end-replay median: startOffsetMs" in error for error in errors))
+        # 350 ms injected at the production Play entry delays both streams in every positioned start.
+        delayed = {name: [trial(name, audioMs=50 + 350, videoMs=65 + 350) for _ in range(8)] for name in BUDGETS["scenarios"]}
+        errors, _ = evaluate(delayed, BUDGETS, confirmed=True)
+        self.assertTrue(any("warm-start median: audioMs" in error for error in errors))
+        self.assertTrue(any("middle median: videoMs" in error for error in errors))
+
+    def test_followup_exactly_one_second_later_survives_host_time_rounding(self):
+        self.assertEqual(validate_trial("idle-wake", trial("idle-wake", oneSecondElapsedMs=999.9999999999432)), [])
+        self.assertTrue(validate_trial("idle-wake", trial("idle-wake", oneSecondElapsedMs=983.3)))
+
+    def test_missing_onset_and_extra_cold_work_are_hard_errors(self):
+        missing = trial("cold-open")
+        del missing.metrics["videoMs"]
+        self.assertTrue(validate_trial("cold-open", missing))
+        self.assertTrue(validate_trial("cold-open", trial("cold-open", builds=2)))
+        self.assertTrue(validate_trial("cold-open", trial("cold-open", displayGapMs=0)))
+
+    def test_a_median_budget_above_its_per_launch_budget_is_rejected(self):
+        budgets = json.loads(json.dumps(BUDGETS))
+        budgets["medians"]["scenarios"]["end-replay"]["startOffsetMs"] = 61
+        with self.assertRaises(ValueError):
+            evaluate(batch(5), budgets)
+
+
+if __name__ == "__main__":
+    unittest.main()
