@@ -1,15 +1,20 @@
-"""An in-memory GitHub for checks/MergeSlot/MergeSlotChecks.py: just the calls scripts/merge-slot.py makes.
+"""An in-memory GitHub for checks/MergeSlot/: just the calls scripts/merge-slot.py and scripts/ci-infra-rerun.py make.
 
-Pull requests, refs, commits, check runs, workflow runs and markers live in dictionaries. A dispatch on
-merge-slot/pr-<N> queues a checks run for that ref's head; tick() (the slot's sleep) moves time on and finishes queued
-runs with the outcome a scenario set, leaving a marker for green ones like checks.yml's summary job does.
+Pull requests, refs, commits, check runs, workflow runs with their jobs (FakeJobs.py) and markers live in
+dictionaries. A dispatch on merge-slot/pr-<N> queues a checks run for that ref's head, and a re-run queues the run's
+next attempt; tick() (the slot's sleep) moves time on and finishes queued runs with the outcome a scenario set, leaving
+a marker for green ones like checks.yml's summary job does.
 """
 import datetime as dt
 import itertools
 import re
+import urllib.parse
+
+from FakeJobs import Jobs, conclusion_of
 
 REPO = "o/r"
 START = dt.datetime(2026, 11, 20, 8, 0, tzinfo=dt.timezone.utc)
+OUTCOMES = {"success": "success", "failure": "failure", "cancelled": "cancelled"}  # a run's conclusion -> its jobs
 
 
 class HTTPError(Exception):
@@ -39,6 +44,11 @@ class FakeGitHub:
         self.lost_markers = set()  # refs whose green runs fail to upload their marker (the upload is continue-on-error)
         self.on_tick = None  # a scenario hook: called with this fake on every tick
         self.calls = []
+        self.make = Jobs()
+        self.jobs, self.notes = {}, {}  # run id -> {attempt: [job]}; job id -> its annotation messages
+        self.plans, self.trees = {}, {}  # run id -> outcome per attempt (the last repeats); run id -> marker tree
+        self.reruns = []  # run ids whose failed jobs were re-run (POST rerun-failed-jobs)
+        self.refuse_rerun = False  # GitHub refuses re-runs (403) even of completed runs
 
     # ---- building the world ----
     def commit(self, parents, tree):
@@ -69,35 +79,75 @@ class FakeGitHub:
             pull["merge_commit_sha"] = self.commit([self.main, pull["head"]["sha"]],
                                                    self.merged_tree(self.main, pull["head"]["sha"]))
 
-    def set_check(self, sha, conclusion):
+    def set_check(self, sha, conclusion, run_id=None):
+        """check-all on a commit; with run_id its details URL names that run, as GitHub's does."""
         status = "in_progress" if conclusion is None else "completed"
-        self.checks[sha] = [{"id": next(self.ids), "status": status, "conclusion": conclusion,
-                             "started_at": stamp(self.clock), "details_url": "https://example.invalid/job"}]
+        check_id = next(self.ids)
+        url = f"https://example.invalid/{REPO}/actions/runs/{run_id}/job/{check_id}" if run_id else "https://example.invalid/job"
+        self.checks[sha] = [{"id": check_id, "status": status, "conclusion": conclusion,
+                             "started_at": stamp(self.clock), "details_url": url}]
 
-    def add_run(self, event, head_sha, head_branch, conclusion, tree=None, marker=True, created=None, forced=False):
+    def add_run(self, event, head_sha, head_branch, conclusion, tree=None, marker=True, created=None, forced=False,
+                jobs=None):
+        """A checks run; jobs: its first attempt's jobs (else made to fit the conclusion)."""
         run_id = next(self.ids)
+        if jobs is not None:
+            conclusion = conclusion_of(jobs)
         self.runs[run_id] = {
             "id": run_id, "path": ".github/workflows/checks.yml", "event": event, "head_sha": head_sha,
             "head_branch": head_branch, "status": "completed" if conclusion else "queued",
-            "conclusion": conclusion, "created_at": stamp(created or self.clock),
+            "conclusion": conclusion, "created_at": stamp(created or self.clock), "run_attempt": 1,
+            "run_started_at": stamp(created or self.clock),
             "repository": {"full_name": REPO}, "head_repository": {"full_name": REPO},
             "html_url": f"https://example.invalid/runs/{run_id}",
         }
+        if conclusion:
+            self.set_jobs(run_id, 1, jobs if jobs is not None else self.make.run(OUTCOMES[conclusion]))
+        if tree:
+            self.trees[run_id] = tree
         if tree and ((conclusion == "success" and marker) or forced):  # forced: a marker a green run never left
             self.markers.setdefault(f"verified-tree-{tree}", []).append(run_id)
         return run_id
 
-    def pr_run(self, number, conclusion="success"):
-        """The pull request's own run on its current test merge commit (its marker names that tree)."""
+    def set_jobs(self, run_id, attempt, jobs):
+        self.jobs.setdefault(run_id, {})[attempt] = [job for job, _ in jobs]
+        for job, messages in jobs:
+            self.notes[job["id"]] = messages
+
+    def pr_run(self, number, conclusion="success", plan=None, jobs=None):
+        """The pull request's own run on its current test merge commit (its marker names that tree). plan: outcomes
+        per attempt (FakeJobs.Jobs.run keywords, the last repeats); then check-all on the head is this run's."""
         pull = self.pulls[number]
         tree = self.commits[pull["merge_commit_sha"]]["tree"]
-        return self.add_run("pull_request", pull["head"]["sha"], pull["head"]["ref"], conclusion, tree)
+        run_id = self.add_run("pull_request", pull["head"]["sha"], pull["head"]["ref"], conclusion, tree,
+                              jobs=jobs if jobs is not None else (self.make.run(plan[0]) if plan else None))
+        if plan or jobs is not None:
+            self.plans[run_id] = plan or ["success"]
+            self.set_check(pull["head"]["sha"], self.runs[run_id]["conclusion"], run_id)
+        return run_id
+
+    def planned(self, run):
+        """The outcome of the run's current attempt: its plan, else its ref's outcome; re-runs default to green."""
+        plan = self.plans.get(run["id"]) or self.outcomes.get(run["head_branch"], "success")
+        plan = [plan, "success"] if isinstance(plan, str) else plan
+        return plan[min(run["run_attempt"], len(plan)) - 1]
+
+    def finish(self, run, outcome):
+        """A queued attempt ends like `outcome`; a green one leaves its marker; a pull request's sets check-all."""
+        jobs = self.make.run(outcome)
+        self.set_jobs(run["id"], run["run_attempt"], jobs)
+        run["status"], run["conclusion"] = "completed", conclusion_of(jobs)
+        if run["conclusion"] == "success" and run["head_branch"] not in self.lost_markers:
+            tree = self.trees.get(run["id"]) or self.commits[run["head_sha"]]["tree"]
+            self.markers.setdefault(f"verified-tree-{tree}", []).append(run["id"])
+        if run["event"] == "pull_request":
+            self.set_check(run["head_sha"], run["conclusion"], run["id"])
 
     def rerun_green(self, run_id):
         """An author re-runs a red run's failed jobs and they pass: the same run turns green and leaves its marker."""
         run = self.runs[run_id]
-        run.update(status="completed", conclusion="success")
-        self.markers.setdefault(f"verified-tree-{self.commits[run['head_sha']]['tree']}", []).append(run_id)
+        run["run_attempt"] += 1
+        self.finish(run, "success")
 
     def relabel(self, number):
         self.pulls[number]["labels"] = [{"name": "merge-slot"}]
@@ -115,11 +165,9 @@ class FakeGitHub:
         self.clock += dt.timedelta(seconds=seconds)
         self.frozen = max(0, self.frozen - 1)
         for run in list(self.runs.values()):
-            if run["status"] != "completed" and run["event"] == "workflow_dispatch" and run["head_branch"] != "main":
-                run["status"], run["conclusion"] = "completed", self.outcomes.get(run["head_branch"], "success")
-                if run["conclusion"] == "success" and run["head_branch"] not in self.lost_markers:
-                    tree = self.commits[run["head_sha"]]["tree"]
-                    self.markers.setdefault(f"verified-tree-{tree}", []).append(run["id"])
+            if run["status"] != "completed" and (run["run_attempt"] > 1 or (
+                    run["event"] == "workflow_dispatch" and run["head_branch"] != "main")):
+                self.finish(run, self.planned(run))
         if self.on_tick:
             self.on_tick(self)
 
@@ -130,7 +178,7 @@ class FakeGitHub:
         path = path.replace("{repo}", REPO)
         self.calls.append((method, path))
         route = path.split("?")[0]
-        query = dict(re.findall(r"[?&]([^=&]+)=([^&]*)", path))
+        query = {k: urllib.parse.unquote(v) for k, v in re.findall(r"[?&]([^=&]+)=([^&]*)", path)}
         prefix = f"repos/{REPO}/"
         assert route.startswith(prefix), path
         route = route[len(prefix):]
@@ -150,6 +198,9 @@ class FakeGitHub:
             ref = m.group(1)
             if ref == "main":
                 return {"object": {"sha": self.main}}
+            heads = [p["head"]["sha"] for p in self.pulls.values() if p["head"]["ref"] == ref and p["state"] == "open"]
+            if heads:  # a pull request's branch
+                return {"object": {"sha": heads[0]}}
             if ref not in self.refs:
                 raise self.error(404, "Not Found")
             return {"object": {"sha": self.refs[ref]}}
@@ -177,9 +228,23 @@ class FakeGitHub:
                                   for i in ids]}
         if m := re.fullmatch(r"actions/runs/(\d+)", route):
             return self.runs[int(m.group(1))]
-        if route == "actions/workflows/checks.yml/runs":
-            found = [r for r in self.runs.values() if r["event"] == query.get("event") and r["head_branch"] == query.get("branch")]
-            return {"workflow_runs": found}
+        if m := re.fullmatch(r"actions/runs/(\d+)/attempts/(\d+)/jobs", route):
+            return {"jobs": self.jobs[int(m.group(1))][int(m.group(2))]}
+        if m := re.fullmatch(r"check-runs/(\d+)/annotations", route):
+            return [{"annotation_level": "failure", "message": text} for text in self.notes.get(int(m.group(1)), [])]
+        if (m := re.fullmatch(r"actions/runs/(\d+)/rerun-failed-jobs", route)) and method == "POST":
+            run = self.runs[int(m.group(1))]
+            if run["status"] != "completed" or self.refuse_rerun:
+                raise self.error(403, "This workflow is already running")
+            run.update(run_attempt=run["run_attempt"] + 1, status="queued", conclusion=None,
+                       run_started_at=stamp(self.clock))
+            self.reruns.append(run["id"])
+            return None
+        if route == "actions/workflows/checks.yml/runs":  # newest first, like GitHub
+            found = [r for r in self.runs.values() if r["head_branch"] == query.get("branch")
+                     and query.get("event") in (None, r["event"])]
+            found.sort(key=lambda r: -r["id"])
+            return {"workflow_runs": found[:int(query.get("per_page", "30"))]}
         if route == "actions/workflows/checks.yml/dispatches" and method == "POST":
             ref = body["ref"]
             busy = [r["head_branch"] for r in self.runs.values() if r["status"] != "completed"
