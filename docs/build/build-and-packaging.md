@@ -216,6 +216,11 @@ arm64、MCP 初始化与 ffmpeg 可运行，挂载 DMG 核对实际携带的 App
 也会踩中；需要探测时用存储 API。发布对象带 DMG 内容哈希前缀，先上传、再访问公开 URL。
 遇到已缓存的 404 时使用未被探测过的内容寻址版本对象，不扩大令牌权限或清空整个站点缓存。
 
+**Tool vocabulary for Sky Studio** (since 2026-11-19, MCP-62): from the same commit and with the same VERSION as the package,
+`VERSION=x.y.z scripts/export-tool-vocabulary.sh skycut-x.y.z.json` writes the file Sky Studio's content gate checks
+published editing styles and craft cards against. Hand it to ops for the content root's `vocab/` folder, so new content is
+checked against the build users have. Rules: [AI interface (MCP)](../architecture/ai-control-mcp.md) section 4 item 32.
+
 发布守卫 `python3 scripts/check-release-download.py <本地已验证的.dmg> --url <候选直链>`
 核对实际 HTTP 200、下载域名、大小和全文件 SHA-256；切换入口后不带 `--url` 再跑一次，
 会经正式入口验证 302 后拿到的完整内容。任一不符非零退出，不把 206 局部下载算完整验证。

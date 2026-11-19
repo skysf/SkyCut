@@ -100,6 +100,18 @@ reportMissing / discardTemporaries`。只按主文件裁决分支会把「主文
    旧文件会被当成本次录制导入。
 4. 按钮文案就是合同：「Keep file only」不得删除文件。删除只能由明确的
    Discard 触发。
+5. **The replacing commit is chosen by the person's decision, never by a file being at the name** (2026-11-19,
+   [case](../bugfixes/2026-11-19-free-save-name-treated-as-replace-consent.md)). `replacesExistingOutput` is true only when the
+   save window asked about a file that was there ([system file windows](system-file-windows.md) rule 9). Then
+   `replaceItemAt` runs, in `ScreenRecordingFileCommit` only. Every other commit goes through
+   `ScreenRecordingFileCommit.commitNew`: the main file, each numbered name, the microphone sidecar, and the crash recovery's
+   two (`commitRecovered`). It journals each name first, then makes one rename that fails when the name is taken
+   (`ExclusiveInstall.renameIfFree`); a name taken meanwhile moves on and is journaled again. On a drive without the
+   exclusive rename (exFAT) it looks and then calls `moveItem`, which refuses a taken name too; a file appearing in the
+   instant between the two could still be replaced. **The commit is always a rename, never a copy**: after a crash
+   mid-copy, the journal (temporary file still there = not committed) could not tell a half-written file at the name from
+   a finished one. Checked by `scripts/check-screen-recording-feedback.sh` (`RecordingCommitChecks`) and pinned by
+   `checks/screen-recording-ai-wiring.sh` section 3.
 
 ## 退出协调
 

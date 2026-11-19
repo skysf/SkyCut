@@ -12,7 +12,7 @@
 #   2. 设置页、残缺框只给手动的会话：设置页的显隐是 showsSetupSheet（含 asksTheUser）、残缺结果 `if recording.isPartial, session.asksTheUser`；
 #      AI 叫用户拖区域时不激活 App（激活会把 SrtFlow 的窗口拎到最前面、盖住要录的地方）。
 #   3. **从不覆盖**：AI 的会话 replacesExistingOutput = false；提交时撞上已有文件先避让、落进 manifest，之后才轮到 replaceItemAt，
-#      replaceItemAt 只在 ScreenRecordingFileCommit 一处。
+#      replaceItemAt 只在 ScreenRecordingFileCommit 一处。Since 2026-11-19 only in the confirmed branch; the rest via commitNew.
 #   4. 手动记住的偏好 AI 不写：lastDirectory 只在 `if session.asksTheUser` 里写；AI 的文件不写 ScreenRecordingPreferences。
 #   5. **入轨那一下包一步撤销**（异步落账，docs/architecture/ai-control-mcp.md 第四节第 1 条）：AI 的 landing 是
 #      `AIUndoGrouping.step(project.effectiveUndoManager, body)`，开录、接手手动的录制、处置残留都用它；两条入轨的 perform 都在
@@ -92,12 +92,23 @@ grep -q 'panel.present(activatingApp: session.asksTheUser)' "${SETUP}" \
 # 3. 从不覆盖。
 grep -q 'plan.replacesExistingOutput = false' "${TOOL}" || fail "${TOOL}：AI 起的会话必须 replacesExistingOutput = false（从不覆盖）"
 grep -q 'replacesExistingOutput: session.replacesExistingOutput' "${COORDINATOR}" || fail "${COORDINATOR}：提交没按会话决定能不能替换"
-RETARGET_AT="$(line_of 'if !replacesExistingOutput, manager.fileExists(atPath: mainURL.path) {' "${COMMIT}")"
-PERSIST_AT="$(line_of 'try persist(.committingMain)' "${COMMIT}")"
+# Since 2026-11-19 (docs/bugfixes/2026-11-19-free-save-name-treated-as-replace-consent.md) the replacing branch is chosen by the
+# confirmation alone, never by a file being at the name; every other target (the main file, each numbered name, the sidecar,
+# the crash recovery's two) goes through commitNew, which journals each name before one rename that never replaces.
+CONFIRMED_AT="$(line_of 'if replacesExistingOutput {' "${COMMIT}")"
 REPLACE_AT="$(line_of 'replaceItemAt(' "${COMMIT}")"
-if ! before "${RETARGET_AT}" "${PERSIST_AT}" || ! before "${PERSIST_AT}" "${REPLACE_AT}"; then
-  fail "${COMMIT}：不许替换时要先避让、把新目标落进 manifest（committingMain），之后才轮到 replaceItemAt"
+UNCONFIRMED_AT="$(line_of 'mainURL = try Self.commitNew(mainTemp, like: request.outputURL)' "${COMMIT}")"
+if ! before "${CONFIRMED_AT}" "${REPLACE_AT}" || ! before "${REPLACE_AT}" "${UNCONFIRMED_AT}" \
+   || [ "$(count 'replaceItemAt(' "${COMMIT}")" -ne 1 ]; then
+  fail "${COMMIT}：replaceItemAt only in the branch the person confirmed (if replacesExistingOutput); otherwise commitNew"
 fi
+grep -q 'let target = try Self.commitNew(micTemp, like: request.microphoneURL)' "${COMMIT}" \
+  || fail "${COMMIT}：the microphone sidecar goes through commitNew (nobody confirmed replacing it)"
+before "$(line_of 'try persistTarget(candidate)' "${COMMIT}")" "$(line_of 'ExclusiveInstall.renameIfFree(temp, to: candidate)' "${COMMIT}")" \
+  || fail "${COMMIT}：commitNew journals each name before the rename that fails when the name is taken"
+[ "$(count 'ScreenRecordingFileCommit.commitNew(' "${SETUP}")" -eq 2 ] \
+  || fail "${SETUP}：the crash recovery commits both files through ScreenRecordingFileCommit.commitNew"
+if grep -nE '(^|[^A-Za-z])moveItem\(' "${SETUP}"; then fail "${SETUP}：the crash recovery moves files only through commitNew"; fi
 others="$(grep -ln 'replaceItemAt(' Sources/SrtFlow/ScreenRecording*.swift Sources/SrtFlow/AIScreen*.swift | grep -v "^${COMMIT}\$" || true)"
 [ -z "${others}" ] || fail "这些文件也在替换文件：$(tr '\n' ' ' <<<"${others}")—— 替换只许在 ScreenRecordingFileCommit（手动的、用户确认过的那一次）"
 

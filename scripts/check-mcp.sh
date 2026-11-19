@@ -83,6 +83,8 @@
 #      真读真写成 44.1 kHz 单声道 16-bit WAV、立体声取平均、AAC 时间对得上、不够 10 秒说差几秒（VoiceReferenceChecks / VoiceReferenceFileChecks）。
 #  39. 动效预设（set_text 的 motion_preset，2026-11-16，docs/architecture/motion-presets.md）：一次放一套普通的字和形状、三套的几块和时间、
 #      框按墨迹框住、竖屏按短边、换一套字不变、hit_at 整套挪、标题动了别的跟着走、粘贴自成一组、存盘（MotionPresetChecks + 扫描）。
+#  40. Sky Studio content (MCP-62, 2026-11-19): scripts/export-tool-vocabulary.sh runs on every PR and its file matches the
+#      live catalog (ToolVocabularyChecks); every name in checks/MCP/published-content-names.json still exists (PublishedNamesChecks).
 #
 # 用法：
 #   scripts/check-mcp.sh
@@ -262,6 +264,10 @@ BUILD_DIR="$(swift build ${ARCH_FLAG} --show-bin-path)"
 
 OUT="$(mktemp -d)/mcpcheck"
 trap 'rm -rf "$(dirname "$OUT")"' EXIT
+
+echo "==> Tool vocabulary for Sky Studio's content gate (the file a release hands to ops; item 40)"
+VOCABULARY="$(dirname "$OUT")/tool-vocabulary.json"
+/bin/bash scripts/export-tool-vocabulary.sh "${VOCABULARY}"
 
 echo "==> 编译自检二进制"
 # checks/MCP 下的 Swift 文件全是同一个自检程序，统一编入，避免新加一组检查却漏了编译。
@@ -533,4 +539,4 @@ xcrun swiftc \
   "$BUILD_DIR"/SrtFlowKokoro.build/*.o
 
 echo "==> 运行"
-SRTFLOW_MCP_HELPER="$BUILD_DIR/skycut-mcp" "$OUT"
+SRTFLOW_MCP_HELPER="$BUILD_DIR/skycut-mcp" SRTFLOW_TOOL_VOCABULARY="${VOCABULARY}" "$OUT"

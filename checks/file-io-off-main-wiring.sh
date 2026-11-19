@@ -18,7 +18,9 @@
 # - a new file never reserves its final name; it takes it in one exclusive step
 #   (2026-11-19, docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md);
 # - web-motion recovery's movie checks, Compress / Burn In's names and sizes, compress_videos / burn_subtitles' folder
-#   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md).
+#   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md);
+# - the files the AI encode tools name, burn_subtitles' subtitle reads, convert_subtitles' reads and writes
+#   (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md).
 # Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
@@ -132,6 +134,10 @@ require "the dirty mark is cleared only when nothing changed since the snapshot 
 # scripts/check-project-saves.sh (ReplaceChecks) and scripts/check-export-profile.sh (FileWindowsChecks) check the behaviour.
 require "a typed or dropped answer in the helper is not a confirmed replace" \
   Sources/SrtFlow/SystemFileWindows.swift 'finish\(urls, inSystemWindow: false\)'
+require "macOS's own save window allows replacing only a file at the answered URL (the only case it asked about)" \
+  Sources/SrtFlow/SystemFileWindows.swift 'then\(SaveLocation\(url: url, mayReplace: asked\)\)'
+forbid "an answer from macOS's own window is not by itself consent to replace (a free name was never asked about)" \
+  Sources/SrtFlow/SystemFileWindows.swift 'mayReplace: inSystemWindow'
 require "a Save As that may not replace never writes at the name: it takes it in one step that fails when it is taken" \
   Sources/SrtFlow/ProjectFileWriter.swift 'guard let written = try ExclusivePlacement\.create\(url, writing: save\) else \{'
 require "the project's Save As from a window asks before replacing" \
@@ -202,6 +208,25 @@ require "the AI encode folder is made, checked and listed through the probe" \
 require "compress_videos / burn_subtitles queue only into a folder prepared off the main thread" \
   Sources/SrtFlow/AIEncodeTools.swift 'try await AIEncodeFolder\.prepare\(args, project: project'
 
+# The files the AI encode tools name (2026-11-19, docs/bugfixes/2026-11-19-ai-encode-inputs-on-main-thread.md): which file a
+# path is, whether it is there and a video, burn_subtitles' subtitle reads and convert_subtitles' reads and writes go through
+# the probe (AIEncodeInputs), never on the main thread; AIEncodeInputs reads and writes only through the probe's file system.
+# scripts/check-export-profile.sh (EncodeInputsOffMainChecks) checks the behaviour.
+forbid "the AI encode tools never ask the drive on the main thread (only AIEncodeInputs and AIEncodeFolder, through the probe)" \
+  Sources/SrtFlow/AIEncodeTools.swift \
+  '^[^/]*(FileManager\.default|AIWorkspace\.shared\.resolve\(|MediaFileTypes\.isVideo\(|SubtitleLoader\.load\(|convertedContents\(|\.write\(to:|Data\(contentsOf:)'
+require "the files the AI names are found and checked off the main thread" \
+  Sources/SrtFlow/AIEncodeTools.swift 'try await AIEncodeInputs\.find\('
+require "burn_subtitles reads its subtitle files off the main thread" \
+  Sources/SrtFlow/AIEncodeTools.swift 'try await AIEncodeInputs\.subtitles\('
+require "convert_subtitles reads and writes its files off the main thread" \
+  Sources/SrtFlow/AIEncodeTools.swift 'try await AIEncodeInputs\.convert\('
+forbid "AIEncodeInputs reads and writes only through the probe's file system (the seam the checks replace)" \
+  Sources/SrtFlow/AIEncodeInputs.swift \
+  '^[^/]*(FileManager\.default|AIWorkspace\.shared\.resolve\(|Data\(contentsOf:|\.write\(to:|SubtitleLoader\.load\(|convertedContents\(of: [a-z]+, to)'
+require "AIEncodeInputs asks the drive only inside the probe's work" \
+  Sources/SrtFlow/AIEncodeInputs.swift 'await probe\.run\(on: near, deadline: deadline'
+
 # A new file never reserves its final name (2026-11-19, docs/bugfixes/2026-11-19-empty-name-reservation-replaced-or-removed.md):
 # its bytes are written under a private name, then it takes the name in one step that fails when the name is taken
 # (ExclusiveInstall); no plain rename onto a final name, and writes nobody agreed may replace go through ExclusivePlacement.
@@ -220,4 +245,4 @@ if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "file-io-off-main-wiring 失败" >&2
   exit 1
 fi
-echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务; Compress / Burn In write only their own file; motion recovery, encode names and folders are asked off the main thread"
+echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务; Compress / Burn In write only their own file; motion recovery, encode names and folders, and the AI encode tools' files are asked off the main thread"

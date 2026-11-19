@@ -13,17 +13,23 @@ import Foundation
 public enum MCPArgumentCheck {
     /// 哪个工具都可以带的名字：`project`。不收 project 的工具（get_job、open_folder……）带了也不碍事 ——
     /// 子代理被要求每次都带（docs/architecture/ai-control-mcp.md 第四节第 46 条），不能因为这个挡掉。
-    static let anywhere: Set<String> = ["project"]
+    public static let anywhere: Set<String> = ["project"]
 
     /// 实现里认、说明上没写的别名（只列真在读的）：set_shape 把 `length` 当成 `width`（线的长度，说明里写在 width 那一句）。
-    static let aliases: [MCPToolName: Set<String>] = [.setShape: ["length"]]
+    public static let aliases: [MCPToolName: Set<String>] = [.setShape: ["length"]]
+
+    /// The schema a call's names are checked against: production, film and batch tools validate deeper than their card.
+    /// Public so the tool vocabulary exported for Sky Studio's content gate is this exact schema
+    /// (scripts/export-tool-vocabulary.sh; docs/architecture/ai-control-mcp.md section 4 item 32).
+    public static func acceptedSchema(for tool: MCPToolName) -> JSONValue {
+        MCPProductionSchema.validationSchema(for: tool) ?? MCPFilmSchema.validationSchema(for: tool)
+            ?? MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema
+    }
 
     /// 有说明上没有的名字，回一句写给 AI 的话（英文）；都认识回 nil。
     public static func problem(tool: MCPToolName, arguments: JSONValue) -> String? {
-        let schema = MCPProductionSchema.validationSchema(for: tool) ?? MCPFilmSchema.validationSchema(for: tool)
-            ?? MCPBatchTools.validationSchema(for: tool) ?? tool.definition.inputSchema
         let extra = anywhere.union(aliases[tool] ?? [])
-        guard let finding = firstUnknown(in: arguments, schema: schema, path: nil, extra: extra) else { return nil }
+        guard let finding = firstUnknown(in: arguments, schema: acceptedSchema(for: tool), path: nil, extra: extra) else { return nil }
         return message(tool: tool, finding)
     }
 
