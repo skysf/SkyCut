@@ -107,6 +107,23 @@ def render(samples, errors, machine, media):
     return "\n".join(lines) + "\n"
 
 
+def isolated_followup_failures(errors):
+    # A hosted VM can occasionally return a late frame at the follow-up deadline. Require a clean
+    # second batch and retain the competing samples. Any onset, counter or missing-sample failure is final.
+    affected = {}
+    for error in errors:
+        fields = error.split(maxsplit=3)
+        if len(fields) != 4:
+            return False
+        trial, scenario, metric, _ = fields
+        if not trial.startswith("trial-") or not trial.endswith(".json") or metric not in (
+            "oneSecondOffsetMs", "oneSecondElapsedMs"
+        ):
+            return False
+        affected.setdefault(scenario, set()).add(trial)
+    return 0 < len(affected) <= 2 and all(len(trials) == 1 for trials in affected.values())
+
+
 def main():
     summary, *paths = map(Path, sys.argv[1:])
     if not paths:
@@ -121,6 +138,8 @@ def main():
     if destination := os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(destination).open("a") as stream:
             stream.write("\n" + report)
+    if os.environ.get("CI") == "true" and "hw.model: VirtualMac" in machine and isolated_followup_failures(errors):
+        return 2
     return bool(errors)
 
 

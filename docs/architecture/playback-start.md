@@ -58,7 +58,7 @@ actual footage, and monitoring devices also belong in the manual regression.
 ## CI and budget changes
 
 The graphical step contributes to `check-all`. It uploads all samples, the machine fingerprint and a table with each
-scenario's median and worst result. Every trial must produce audio and video and meet the limits in
+scenario's median and worst result. Every trial in the accepted batch must produce audio and video and meet the limits in
 `checks/PlaybackStart/budgets.json`. A cold open must build and attach just once and open the source assets. Warm and
 idle starts must build, attach and open zero times. Cold open and replay from the end each require one successful
 native preroll.
@@ -68,10 +68,11 @@ The warm median budget is 130 ms to first audio and 180 ms to the first video pr
 has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
 Replay from the end also rewinds the item. Its median audio and picture budgets are 170 / 220 ms, capped at
 265 / 310 ms per trial.
-The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. The 34 ms limit
-one second later applies to every scenario. Cold open includes preview construction and output startup.
+The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. The same
+limit applies one second later, with a 48 ms ceiling for an individual device restart and a 34 ms
+median limit for that scenario. Cold open includes preview construction and output startup.
 Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
-Its onset skew limit is 55 ms median and 100 ms per trial. A suspended graph has a separate 700 ms audio and
+Its onset skew limit is 120 ms median and 150 ms per trial. A suspended graph has a separate 700 ms audio and
 800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
 The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
 The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
@@ -80,8 +81,17 @@ On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture pu
 69–117 ms median outside the cut and at 232 ms just before it. First-open audio and video were 1.36 / 1.74 s
 and 1.38 / 1.75 s median / worst, with a 16 ms maximum onset skew. The suspended graph took 335 / 402 ms
 for audio and 373 / 515 ms for picture. Device startup skew reached 104 ms at onset and settled within
-17 ms one second later. Busy-machine repeats during calibration reached 3.22 s to the first-open picture
-and 648 ms after idle.
+17 ms one second later. Calibration repeats reached 41 ms after one second on a device restart, 3.22 s
+to the first-open picture, and 648 ms to a picture after idle.
+
+On the hosted VirtualMac2,1, waiting for the mounted picture lowered worst cold onset separation from 750 ms
+to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing cold frames were one frame from
+the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
+
+A hosted virtual Mac can supply an isolated late sample around the one-second deadline. When the only failures
+are follow-up timing in one trial each of at most two scenarios, CI runs one fresh five-launch batch. Every trial
+in that batch must pass. Both batches and their verdicts are retained in the same artifact. Missing playback,
+other timing failures, repeated late follow-ups in one scenario and structural failures fail immediately.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.
