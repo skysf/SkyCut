@@ -49,12 +49,18 @@ private func checkCatalog() {
         "instrumental", "lyrics", "name", "confirm_token", "operation", "idempotency_key", "video", "audio", "document", "web_url",
         "title", "enable_caption", "enable_dynamic_duration", "disable_music_track", "enable_speech_enhancement", "start_time", "end_time",
         "enable_transcription", "enable_prompt_expansion", "enable_thinking", "enable_safety_checker", "sync_mode", "seed", "quote_only", "approval_scope", "user_requested_overrides", "user_request",
-        "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project", "camera_angle", "upscale_factor"], "the parameters")
+        "prepare_references", "prepared_references", "film", "quote_token", "seam_review", "project", "camera_angle", "upscale_factor",
+        "exact_length", "audio_mode"], "the parameters")
+    // 2026-11-19 (MCP-18, MCP-42): an exact music length and a video's own sound; the modes are the App's (SkyStudioVideoSound).
+    checkEqual(properties["audio_mode"]?["enum"], .array(MCPVocabulary.videoAudioModes.map(JSONValue.string)), "the three video sound modes are discoverable")
+    checkEqual(MCPVocabulary.videoAudioModes, ["full", "ambient", "none"], "the video sound modes are Sky Studio's three")
+    checkEqual(properties["exact_length"]?["type"], "boolean", "exact_length is a yes / no")
     // 2026-11-10 名片迁移（方案 5.2 的分类）：会调错 / 花错钱的留在名片，怎么用好的进说明书（topic=generate_media）。
     let opening = String(definition.description.prefix(512))
     for term in ["upscale", "upscale_clip", "get_job", "add_clips"] { check(opening.contains(term), "first 512 characters route \(term)") }
     let guide = (MCPGuideTopics.topic(named: "generate_media")?.sections ?? []).map(\.text).joined(separator: "\n")
-    for term in ["camera_angle", "MiniMax H3", "image_to_video", "library", "generate_subtitles", "add_voiceover"] {
+    for term in ["camera_angle", "MiniMax H3", "image_to_video", "library", "generate_subtitles", "add_voiceover",
+                 "exact_length=true", "duration_source", "audio_mode", "may_carry_bed", "listen describe=true"] {
         check(guide.contains(term), "the generate_media guide topic mentions \(term)")
     }
     checkEqual(properties["operation"]?["enum"], ["generate", "remove_background", "camera_angle", "upscale"], "all image operations are discoverable")
