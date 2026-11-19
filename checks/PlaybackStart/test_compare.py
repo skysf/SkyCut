@@ -41,6 +41,15 @@ RECORDED_BUG = {
 }
 
 
+# The slowest healthy hosted run of 2026-11-19 (run 44557659527, the main branch's code): five launches and three
+# confirmation launches of the cold open. Its first five fail; all eight must pass.
+SLOW_HOSTED_COLD_OPEN = dict(
+    onsetGapMs=[140.0, 101.9, 230.5, 249.1, 251.6, 124.0, 161.3, 187.4],
+    startOffsetMs=[106.7, 79.2, 207.8, 226.4, 218.3, 101.3, 128.0, 154.1],
+    oneSecondOffsetMs=[6.7, 4.1, 107.8, 59.8, 68.3, 15.4, 78.0, 12.6],
+)
+
+
 # The M1 before the 2026-11-19 fix: a resume and a Play while hovering sent the sound first and re-seeked the 4K
 # long-GOP picture, which stayed frozen for 0.6-0.9 s (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
 RECORDED_FREEZE = {
@@ -61,6 +70,16 @@ class PlaybackGateTests(unittest.TestCase):
         self.assertEqual(len(strict(samples, BUDGETS["strict"])), 6)
         # Before the fix a Play while hovering also skipped the placement of the picture.
         self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
+
+    def test_the_slowest_healthy_hosted_cold_open_passes_after_confirmation(self):
+        launches = [trial("cold-open", **{metric: values[index] for metric, values in SLOW_HOSTED_COLD_OPEN.items()},
+                          maxSkewMs=SLOW_HOSTED_COLD_OPEN["startOffsetMs"][index]) for index in range(8)]
+        first = batch(5)
+        first["cold-open"] = launches[:5]
+        self.assertTrue(any("cold-open median: onsetGapMs" in error for error in evaluate(first, BUDGETS)[0]))
+        confirmed = batch(8)
+        confirmed["cold-open"] = launches
+        self.assertEqual(evaluate(confirmed, BUDGETS, confirmed=True)[0], [])
 
     def test_a_new_item_has_room_for_its_preroll_but_not_for_skew(self):
         # Play primes a new item: 101 / 141 ms median to sound and picture hosted, 120 / 137 ms on the M1, in step.
@@ -128,7 +147,7 @@ class PlaybackGateTests(unittest.TestCase):
     def test_even_confirmation_keeps_the_medians_and_whole_launch_count(self):
         samples = batch(8)
         replay = samples["end-replay"]
-        replay[0] = replay[1] = trial("end-replay", videoMs=400)
+        replay[0] = replay[1] = trial("end-replay", videoMs=420)
         replay[2] = replay[3] = trial("end-replay", startOffsetMs=65)
         errors, outliers = evaluate(samples, BUDGETS, confirmed=True)
         self.assertEqual(errors, [])
@@ -163,12 +182,12 @@ class PlaybackGateTests(unittest.TestCase):
 
     def test_confirmation_adds_no_margin_to_the_medians(self):
         samples = batch(8)
-        samples["end-replay"] = [trial("end-replay", audioMs=219, videoMs=299)] * 8
+        samples["end-replay"] = [trial("end-replay", audioMs=249, videoMs=329)] * 8
         self.assertEqual(evaluate(samples, BUDGETS, confirmed=True)[0], [])
-        samples["end-replay"] = [trial("end-replay", audioMs=221)] * 8
+        samples["end-replay"] = [trial("end-replay", audioMs=251)] * 8
         self.assertTrue(any("end-replay median: audioMs" in error for error in evaluate(samples, BUDGETS, confirmed=True)[0]))
         samples = batch(8)
-        samples["warm-start"] = [trial("warm-start", audioMs=139)] * 8
+        samples["warm-start"] = [trial("warm-start", audioMs=201)] * 8
         self.assertTrue(evaluate(samples, BUDGETS, confirmed=True)[0])
         samples = batch(8)
         samples["cut"] = [trial("cut", oneSecondOffsetMs=36)] * 8

@@ -144,7 +144,8 @@ enum PlaybackStartBench {
         let followup = try await sampleFollowup(probe, attempt, after: max(firstVideo.host, firstAudio.onset) + 1,
                                                 deadline: deadline)
         guard let audioAtStart = attempt.timeline(at: firstVideo.host, extrapolateFirst: true) else {
-            throw Failure("No audio timeline sample at first picture")
+            let gap = attempt.gap(at: firstVideo.host).map { String(format: " (%.1f ms after the last block)", $0 * 1_000) }
+            throw Failure("No audio timeline sample at first picture" + (gap ?? ""))
         }
         // The picture must keep moving with the sound, not only start with it: watch the first two seconds,
         // or up to the last frame before the timeline ends.
@@ -211,7 +212,9 @@ enum PlaybackStartBench {
     private static func ms(_ seconds: Double) -> Double { seconds * 1_000 }
     private static let continuitySeconds = 2.0
 
-    static func wait(_ description: String, deadline: Double = CACurrentMediaTime() + 5,
+    /// Staging waits get 20 s: the hosted virtual Mac decodes 4K in software under a load of 20-50 on three cores, and a
+    /// paused placement two seconds into a GOP took over 5 s there (2026-11-19). Play itself has its own 5 s deadline.
+    static func wait(_ description: String, deadline: Double = CACurrentMediaTime() + 20,
                              until ready: () -> Bool) async throws {
         while !ready() {
             guard CACurrentMediaTime() < deadline else { throw Failure("Timed out waiting for \(description)") }

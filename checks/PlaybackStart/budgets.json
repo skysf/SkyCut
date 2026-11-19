@@ -20,32 +20,44 @@
       "onsetGapMs": 330,
       "audioAdvanceMs": 40,
       "videoAdvanceMs": 300,
-      "startOffsetMs": 150,
-      "maxSkewMs": 150
+      "startOffsetMs": 190,
+      "maxSkewMs": 190,
+      "oneSecondOffsetMs": 120
     },
-    "warm-start": {},
-    "middle": {},
+    "warm-start": {
+      "oneSecondOffsetMs": 60
+    },
+    "middle": {
+      "startOffsetMs": 60
+    },
     "cut": {
       "audioMs": 300,
       "videoMs": 340
     },
     "fresh-item": {
-      "audioMs": 265,
-      "videoMs": 380
+      "audioMs": 700,
+      "videoMs": 800
     },
     "seek-play": {
       "audioMs": 3500,
-      "videoMs": 3600
+      "videoMs": 3600,
+      "startOffsetMs": 80,
+      "maxSkewMs": 120
     },
     "resume": {},
     "peek-play": {
       "audioMs": 3500,
-      "videoMs": 3600
+      "videoMs": 3600,
+      "maxSkewMs": 80
     },
-    "near-end": {},
+    "near-end": {
+      "audioMs": 360,
+      "videoMs": 420,
+      "startOffsetMs": 60
+    },
     "end-replay": {
-      "audioMs": 265,
-      "videoMs": 380,
+      "audioMs": 340,
+      "videoMs": 410,
       "startOffsetMs": 60,
       "maxSkewMs": 60
     },
@@ -79,20 +91,21 @@
         "dispatchMs": 20,
         "audioMs": 3200,
         "videoMs": 3300,
-        "onsetGapMs": 170,
+        "onsetGapMs": 220,
         "videoAdvanceMs": 150,
-        "startOffsetMs": 145,
-        "maxSkewMs": 145
+        "startOffsetMs": 175,
+        "maxSkewMs": 175,
+        "oneSecondOffsetMs": 60
       },
       "cut": {
         "audioMs": 230,
         "videoMs": 265
       },
       "end-replay": {
-        "audioMs": 220,
-        "videoMs": 300,
-        "startOffsetMs": 48,
-        "maxSkewMs": 48
+        "audioMs": 250,
+        "videoMs": 330,
+        "startOffsetMs": 55,
+        "maxSkewMs": 55
       },
       "idle-wake": {
         "dispatchMs": 550,
@@ -113,8 +126,17 @@
         "videoMs": 2600
       },
       "fresh-item": {
-        "audioMs": 220,
-        "videoMs": 300
+        "audioMs": 450,
+        "videoMs": 460
+      },
+      "warm-start": {
+        "audioMs": 200,
+        "videoMs": 220,
+        "oneSecondOffsetMs": 45
+      },
+      "near-end": {
+        "videoMs": 250,
+        "startOffsetMs": 45
       }
     }
   },

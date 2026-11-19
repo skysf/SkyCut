@@ -37,6 +37,7 @@ xcrun swiftc \
   Sources/SrtFlow/VideoDriftCheck.swift \
   Sources/SrtFlow/PlaybackTimeEstimate.swift \
   Sources/SrtFlow/PlaybackStartSync.swift \
+  Sources/SrtFlow/PlaybackStartAudioTimeline.swift \
   Sources/SrtFlow/MainThreadWatchdog.swift \
   Sources/SrtFlow/MainThreadStackCapture.swift \
   Sources/SrtFlow/PacedPlayhead.swift \
@@ -48,6 +49,7 @@ xcrun swiftc \
   checks/PlayerClock/DetachChecks.swift \
   checks/PlayerClock/AudioSourceChecks.swift \
   checks/PlayerClock/SyncedStartChecks.swift \
+  checks/PlayerClock/AudioTimelineChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
 # 卸片那一项要真的播放器和素材：现做一段 60 秒带声音的小视频（ffmpeg 同 check-text-render：vendor/ffmpeg 或
