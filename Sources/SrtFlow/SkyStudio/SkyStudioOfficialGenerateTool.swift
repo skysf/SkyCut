@@ -103,6 +103,7 @@ enum SkyStudioOfficialGenerateTool {
             }) else {
             throw AIToolError("No offered model accepts this complete official shot request. Read get_status models=true; references and duration will not be dropped to make it fit.")
         }
+        if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }
         references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
         references = try await SkyStudioCharacterFilm.resolve(references, model: model, key: key)
         let canvas = project.renderSize

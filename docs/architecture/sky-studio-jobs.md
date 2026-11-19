@@ -27,11 +27,15 @@
 ### Generated duration notices
 
 For generated timed media, `get_job` reports `requested_duration` and `duration` side by side.
-The requested value is the numeric duration submitted in `generation.params`, after existing
+The requested value is Sky Studio's own `result.requested_duration` when the result carries one
+(since 2026-11-19), otherwise the numeric duration submitted in `generation.params`, after existing
 request normalization; automatic length has no numeric target and reports null. The actual
 value comes only from the existing Sky Studio `result.duration`; absent, non-finite, or
 non-positive values remain null with `duration_note` saying the delivered length is unknown.
-The requested value must never stand in for an unknown result duration.
+The requested value must never stand in for an unknown result duration. Since 2026-11-19 Sky
+Studio's `duration` is the delivered length only (the file's track, or the provider's report;
+never the request standing in), and `duration_source` (`file` / `provider`) is passed on beside
+it; an unknown length has no source.
 
 `SkyStudioGenerationDuration` adds `duration_warning` only when both values are known and their
 absolute difference is **greater than 1 second**, in either direction. Exactly 1 second does
@@ -52,6 +56,52 @@ When a `music` generation has downloaded its file, `SkyStudioGenerationRun` adds
 this Mac, after delivery: it never changes the request, the billing or the file, and a file that cannot be measured says so in
 `music` without failing the paid job. The wiring is pinned in `checks/MCP/listen-wiring.sh`; the measurement itself in
 `checks/ParameterLimits/MusicPlacementChecks.swift`.
+
+### Music length and video sound (2026-11-19, MCP-18 / MCP-42)
+
+Sky Studio's contract is in its `docs/agents/skycut-api.md`, "Music length, delivered lengths and video sound" (Sky Studio
+PR #256). On SkyCut's side these rules hold:
+
+1. **No music range or model id is written in SkyCut.** Each music record's `length` block (`control` exact or approximate,
+   `auto`, `default`, `min_seconds` / `max_seconds` / `step_seconds`, `typical_error_seconds`) is read by `SkyStudioMusicLength`;
+   a catalog without the block falls back to `params.duration` (["auto", 60, 180]). The scan guard refuses a music model id
+   written in App code.
+2. **The model is the first in the server's order that takes the ask** (`SkyStudioModelPolicy.problem` asks
+   `SkyStudioMusicLength.problem` for every candidate): a length inside its range, `auto` only where `length.auto`,
+   `exact_length=true` only on an exact model (it needs `duration`), vocals (`instrumental=false`) only where
+   `params.instrumental` lists false. So with Lyria 3 Pro first and Stable Audio 3 Medium second: no length, `auto`, a song,
+   or a 60-180 s piece stays on Lyria; a cue under a minute, past three minutes, or exact goes to Stable Audio. A named model
+   is never swapped. When no music model takes the ask, the tool refuses before any quote with each model's reason, said once
+   (`SkyStudioMusicLength.refusal`); nothing is charged.
+3. **The request's length is in the chosen model's steps** (whole seconds for Lyria, 0.1 s for Stable Audio, rounded as Sky
+   Studio rounds), and with none asked the model's own `length.default` is sent unless it chooses its own length (Lyria's Auto
+   sends nothing, as before). `instrumental` keeps SkyCut's default of true.
+4. **A music model priced per song or per clip costs the same at any length**, so its length never counts as going beyond the
+   draft (`AIDraftPolicy.lengthIsFree`); a music model priced by the second would still need approval past its default.
+5. **A video's `audio_mode` is sent only when the AI asks for one** (`SkyStudioVideoSound.apply`), so a default request stays
+   exactly what it was (an official shot's pinned digest too). `none` is accepted only where the model's
+   `params.audio_mode` lists it (Seedance 2.0 Pro / 2.5 and Wan 3.0 on 2026-11-19; H3, Omni and Veo always make sound; Veo is
+   not offered `none`, the user chose not to test it); elsewhere it is refused before the quote in plain words. **The mode
+   never takes part in choosing the model**: both generate tools check it on the model already chosen. Otherwise `none` with
+   no model named would move to a model several times the price (Seedance 2.0 Pro 720p 76 credits/s against MiniMax H3 768p 16
+   on 2026-11-19) while muting the clip gives the same silence for nothing; the refusal says so, and a named model that lists
+   `none` goes through the draft price comparison like any pricier model. Where the model also has `generate_audio`, it is
+   sent agreeing with the mode (Sky Studio refuses the two disagreeing); `generate_audio` alone keeps its old meaning (on a
+   model without that switch it is ignored with a note). Lip-sync takes no mode. A catalog without `audio_mode` gets nothing
+   new: `full` is accepted without being sent, `ambient` / `none` are refused.
+6. **A finished video's `audio` block reaches `get_job`** with a note (`SkyStudioVideoSound.resultDetail`, merged in
+   `SkyStudioGenerationRun.succeed`): when `may_carry_bed` is true, Sky Studio's note plus "listen describe=true with this file
+   before laying narration over it, then lower or mute the clip"; Sky Studio's own note otherwise; without a block (an older
+   server) the general note as before.
+7. **Sky Studio's own refusals** of these (`auto_not_supported`, a length outside `limit`, vocals on an instrumental-only model,
+   `audio_always_on`) only come back when SkyCut's cached catalog is older than Sky Studio's; their message goes to the AI as
+   it is and `SkyStudioGenerationRefusal` gives a plain next step instead of "inspect the billing".
+
+Checks: `MusicLengthChecks` and `VideoSoundChecks` in `scripts/check-sky-studio.sh` read Sky Studio's own catalog records
+(`checks/SkyStudio/Fixtures/models-music-video-2026-11-19.json`, written by PR #256's `buildSkycutModelCatalog()`) and send
+requests through the fake Sky Studio (`SkyStudioStub`); `GenerationDurationChecks` covers the asked / delivered fields;
+`checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. No full App run against a fake server was done for
+this change; nothing paid was called.
 
 ## 二、Sky Studio 那边实测的细节（2026-10-28 真服务器跑过 8 种活）
 

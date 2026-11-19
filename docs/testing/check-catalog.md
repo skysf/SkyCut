@@ -302,6 +302,11 @@
 - Generated duration notices: `scripts/check-sky-studio.sh` → `GenerationDurationChecks` compares requested and server-reported
   lengths with a strict 1-second warning threshold, unknown values and refresh clearing. `checks/sky-studio-wiring.sh` requires
   the notice on completion and original-job refresh. No network, credits or media changes are involved.
+- Music length and video sound (MCP-18 / MCP-9 / MCP-42): `scripts/check-sky-studio.sh` → `MusicLengthChecks` and `VideoSoundChecks`
+  read Sky Studio's own catalog records (`Fixtures/models-music-video-2026-11-19.json`): each music model's `length`, the first
+  model in the server's order that takes the ask, steps and defaults, refusals in plain words, flat-priced lengths not beyond the
+  draft, `audio_mode` none only where listed, the `audio` block and note in get_job; request bodies go through `SkyStudioStub`.
+  `checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
