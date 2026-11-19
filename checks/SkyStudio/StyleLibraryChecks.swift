@@ -60,7 +60,8 @@ func runStyleLibraryChecks() async {
     env.now = moment(1_100)
     let second = try? await library.read("film-trailer", version: "latest")
     checkEqual(second?.cachedAt, moment(1_000), "the second read is this Mac's copy, with when it was fetched")
-    checkEqual(styleRequests().count, 1, "and asks nothing")
+    checkEqual(styleRequests().count, 2, "online, it is confirmed with Sky Studio (which checks this Mac's licence before a 304)")
+    checkEqual(SkyStudioStub.log.last?.headers["If-None-Match"], "\"film-trailer@1.0\"", "asking with the copy's ETag, no text sent again")
     check(library.listing.stored.contains("film-trailer@1.0"), "the list knows the copy of 1.0 is here")
 
     // The list is asked again only when 10 minutes old, with its ETag; a 304 keeps it and counts as live.
@@ -82,10 +83,24 @@ func runStyleLibraryChecks() async {
     checkEqual(listing.release, 2, "the new release is listed")
     checkEqual(listing.styles.map(\.version), ["1.1"], "with the new version")
     checkEqual((try? await library.read("film-trailer", version: "1.0"))?.cachedAt, moment(1_000), "1.0 by version: this Mac's copy")
-    check(styleRequests().isEmpty, "without asking")
+    checkEqual(SkyStudioStub.log.last?.headers["If-None-Match"], "\"film-trailer@1.0\"", "confirmed with its own ETag")
     let draft = try? await library.read("film-trailer", version: "0.9")
     checkEqual(draft?.style.text, "# Film trailer\n\nThe 0.9 draft.", "a version no longer listed is fetched by version")
-    checkEqual(styleRequests(), ["/content/styles/film-trailer?version=0.9"], "asked with ?version=0.9")
+    checkEqual(styleRequests(), ["/content/styles/film-trailer?version=1.0", "/content/styles/film-trailer?version=0.9"], "asked with ?version=0.9")
+    // Online, Sky Studio's refusal wins over the copy held, in plain words (contract of c9a7ce5d: a registered Mac only); Sky Studio
+    // failing (a 503) is not a refusal, so the copy is served.
+    SkyStudioStub.reset { _ in .http(403, #"{"error": {"code": "not_entitled", "message": "Not registered.", "feature": "recipes", "plan_reason": "machine_not_registered"}}"#) }
+    do {
+        _ = try await library.read("film-trailer", version: "1.0")
+        check(false, "a Mac Sky Studio has not registered is not served the copy")
+    } catch let problem as SkyStudioStyleLibrary.ReadProblem {
+        check(problem.message.contains("has not registered this Mac") && problem.message.contains("Check Again"),
+              "a Mac Sky Studio has not registered is not served the copy and hears what to do: \(problem.message)")
+    } catch {
+        check(false, "a ReadProblem, got \(error)")
+    }
+    SkyStudioStub.reset { _ in .http(503, #"{"error": {"code": "content_unavailable", "message": "Try later."}}"#) }
+    checkEqual((try? await library.read("film-trailer", version: "1.0"))?.cachedAt, moment(1_000), "Sky Studio failing (503): this Mac's copy")
 
     await offlineChecks(library, env)
     await revokedDuringFetchChecks(library, env, newer: newer)
@@ -234,15 +249,19 @@ private func makeLibrary(_ root: URL, _ env: StyleEnvironment) -> SkyStudioStyle
         licence: { env.licence }, now: { env.now })
 }
 
-/// The fake Sky Studio: the manifest at /content (ETag "m1"), each style by its version.
+/// The fake Sky Studio (contract of c9a7ce5d): the manifest at /content (ETag "m1"), each style by its version with its own ETag
+/// (`"<id>@<version>"`: a version's ETag never changes, two versions with one text have two), a 304 for the ETag held, and every
+/// answer `private, no-cache`.
 private func serve(manifest: String, styles: [JSONValue]) {
     SkyStudioStub.reset { seen in
-        if seen.url.hasSuffix("/content") { return .headers(200, manifest, ["ETag": "\"m1\""]) }
+        if seen.url.hasSuffix("/content") { return .headers(200, manifest, ["ETag": "\"m1\"", "Cache-Control": "private, no-cache"]) }
         let version = URLComponents(string: seen.url)?.queryItems?.first { $0.name == "version" }?.value
         guard let style = styles.first(where: { $0["version"]?.stringValue == version }) else {
             return .http(404, #"{"error": {"code": "not_found", "message": "No such version."}}"#)
         }
-        return .headers(200, style.encodedString(), ["ETag": "\"\(style["sha256"]?.stringValue ?? "")\""])
+        let tag = "\"" + (style["id"]?.stringValue ?? "") + "@" + (version ?? "") + "\""
+        if seen.headers["If-None-Match"] == tag { return .headers(304, "", ["ETag": tag, "Cache-Control": "private, no-cache"]) }
+        return .headers(200, style.encodedString(), ["ETag": tag, "Cache-Control": "private, no-cache"])
     }
 }
 

@@ -78,7 +78,7 @@
 ### Sky Studio's editing styles on this Mac (2026-11-19, SS-5)
 
 Sky Studio publishes editing styles for SkyCut (the recipes tool's side is [AI control](ai-control-mcp.md) section 4, item 32).
-The contract is in the Sky Studio repo's `docs/agents/skycut-api.md` ("Editing styles and craft cards"): `GET /content` is the current
+The contract is in the Sky Studio repo's `docs/agents/skycut-api.md` ("Editing styles and craft cards", as of c9a7ce5d): `GET /content` is the current
 release's manifest (titles, versions, checksums, no text; any valid key); `GET /content/styles/{id}?version=` is one style
 (needs `features.recipes`, else `403 not_entitled`). Only ids `[a-z0-9][a-z0-9-]{0,59}` and versions of digits with up to two dots ever go
 into an address (`SkyStudioContentRules`).
@@ -90,6 +90,7 @@ into an address (`SkyStudioContentRules`).
 | Deleting | `SkyStudioAccount.replaceStored` calls `licenceChanged`: an answer without `recipes`, or none (a new or rejected key), deletes every text and keeps the manifest for the locked list; removing the key deletes everything. |
 | When to ask | The manifest is asked again when 10 minutes old, with `If-None-Match` (usually a 304). A failed ask uses this Mac's copy (dated) and does not ask again for a minute; with nothing here the list is unreachable, or, after `503 content_unavailable` (nothing published yet), simply empty. No key: no Sky Studio styles. A style is read from this Mac's copy when it holds exactly that id and version (and the checksum the list or the film's record names), else fetched by `?version=`, its checksum checked against its text and the expected one; the answer always reports the version served. The key is read silently (`SkyStudioJobKey.key(.silent)`): never a keychain prompt. |
 | No system URL cache | Content requests use `SkyStudioAPI.uncachedSession` (ephemeral, no URL cache): a URL cache would keep a copy SkyCut cannot delete and would serve an `immutable` answer without asking whether the key may still read it. |
+| Sky Studio checks too | Sky Studio sends a text only to a Mac registered within the account's limit, and every answer (a pinned version's too) is `private, no-cache` with the licence checked before a 304. So while online a copy is confirmed with its ETag on every read, and served without asking only when Sky Studio cannot be reached (offline, a 5xx); a refusal is never answered with the copy. `403 not_entitled` is said in plain words by `plan_reason`: `machine_not_registered` (Check Again registers this Mac), `machine_limit_reached` (remove a Mac, its link or the support email), otherwise the plan (`SkyStudioStyleLibrary.notEntitledWords`). On day one only `film-trailer` may be published: an empty or missing cards part reads fine. |
 | `min_skycut_version` | When this SkyCut is older, the read answer carries a `note` (a call the style suggests may fail; update SkyCut). A hint, not a gate. |
 
 ## 二、文件
@@ -156,7 +157,9 @@ into an address (`SkyStudioContentRules`).
   fetched and the second this Mac's copy, the list asked again only after 10 minutes with its ETag, a new release, older versions
   by version, offline copies dated, a minute without asking after a failure, no copy past valid_until, nothing kept when the
   licence ends during a fetch, texts and then everything deleted on licence changes, a text that is not the listed one refused,
-  1.1 with 1.0's text read as 1.1 (and 1.0 kept), a film's pin matched on id + version + checksum. Reverse check (Codex #5): the
+  1.1 with 1.0's text read as 1.1 (and 1.0 kept), a film's pin matched on id + version + checksum, a copy confirmed with its
+  ETag while online (a 403 `machine_not_registered` refuses it in plain words, a 503 serves it). Reverse check: serving the copy
+  without asking turned five red. Reverse check (Codex #5): the
   checksum-keyed layout failed four of these (1.1 served as 1.0); fixed, green.
   `checks/sky-studio-wiring/styles.sh` pins the hook in `replaceStored`, the router through `AIRecipeSkyStudio`, the one library over
   `uncachedSession` with a silent key, and `styleRefusal` only through `SkyStudioAccount`. Reverse check (2026-11-19): removing
