@@ -7,6 +7,8 @@ import SrtFlowMCPKit
 // 选项值都真的存在**（工具改了名、卡没跟着改，AI 照着卡调就会报错），每张卡都是「导演手册」（标杆 / 品味 / 别这样三节，
 // 共用规矩里有先出分镜表、品味、AI 剪片的通病、交片前再看一遍、从参考片学风格，docs/plans/2026-10-05-editing-aesthetics.md）。
 // 卡里讲生成素材、花积分的话（条件句、报价、确认码、每日硬上限、档位）和现行合同对不对得上在 RecipeContractChecks.swift。
+// Since 2026-11-19 (MCP-41): the shared rules keep pointing at the tools built for each job (toolRouteChecks), and no recipes
+// answer outgrows Claude Code's 10,000-token warning (answerSizeChecks).
 // 编法见 scripts/check-mcp.sh。
 
 func runRecipeChecks() {
@@ -157,4 +159,47 @@ private func builtInChecks() {
     for section in ["## Sound belongs to the picture", "## Cuts", "## Voice and music", "## Title cards"] {
         check(shared.contains("\n" + section + "\n"), "the shared rules have \(section)")
     }
+    toolRouteChecks(shared: shared)
+    answerSizeChecks(builtIn: builtIn, shared: shared)
+}
+
+/// The shared rules send the AI to the tools built for each job (2026-11-19, MCP-41): the AI uses what the rules point at,
+/// so a rewrite that drops a pointer quietly brings back the old guesswork (whole-band levels for a covered line, music
+/// slid by ear, no report before delivery). Each phrase is pinned in the section whose rule needs it.
+private func toolRouteChecks(shared: String) {
+    let routes: [(section: String, phrases: [String])] = [
+        ("Sound belongs to the picture", ["describe=true", "voice_band_db"]),
+        ("Cuts", ["set_transition after_clip_id", "source_cuts"]),
+        ("Voice and music", ["listen voice=", "voice_band_db", "stops", "hit_at"]),
+        ("Title cards", ["motion_preset", "hit_at"]),
+        ("Taste for every style", ["strongest_accents", "ends_at", "hit_at"]),
+        ("Look again before export", ["listen mix=true", "inspect_video", "preset=quick_review", "intentional="])
+    ]
+    for route in routes {
+        let text = shared.components(separatedBy: "\n## \(route.section)\n").dropFirst().first?
+            .components(separatedBy: "\n## ").first ?? ""
+        for phrase in route.phrases {
+            check(text.contains(phrase), "the shared rules' \(route.section) section still sends the AI to \(phrase)")
+        }
+    }
+}
+
+/// One recipes answer is a card plus the whole shared rules, as one JSON text (docs/architecture/ai-control-mcp.md section 4,
+/// item 32): Claude Code warns above 10,000 tokens, about 36,000 characters at this repo's 3.6 characters a token. New rules
+/// make room first; the line is not raised.
+let recipeAnswerLimit = 36_000
+
+private func answerSizeChecks(builtIn: [AIRecipe], shared: String) {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-recipe-size-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: folder) }
+    var largest = (id: "", size: 0)
+    for id in builtIn.map(\.id) + [MCPRecipeTools.sharedRulesID] {
+        let reply = try? AIRecipeTools.recipes(args(["id": .string(id)]), store: AIRecipeStore(directory: folder),
+                                               builtIn: builtIn, sharedRules: shared)
+        let size = reply?.payload.encodedString().utf16.count ?? 0
+        check(size > 0 && size <= recipeAnswerLimit,
+              "recipes id=\(id) answers in at most \(recipeAnswerLimit) characters (got \(size)): make room before adding rules")
+        if size > largest.size { largest = (id, size) }
+    }
+    print("MCP recipes: largest answer \(largest.size)/\(recipeAnswerLimit) UTF-16 units (\(largest.id)).")
 }
