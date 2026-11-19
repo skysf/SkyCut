@@ -88,12 +88,8 @@ enum PlaybackStartBench {
             throw Failure("Synthetic project did not open: \(project.notice ?? "unexpected document or duration")")
         }
         let frame = project.state.frameRate.secondsPerFrame
-        var trials = [await trial("cold-open") {
-            try await measure(project, probe: probe, origin: 0, frame: frame, before: beforeOpen)
-        }]
-        try await wait("opened preview") {
-            project.clock.player.currentItem?.status == .readyToPlay && probe.displayed != nil
-        }
+        let cold = try await measure(project, probe: probe, origin: 0, frame: frame, before: beforeOpen)
+        var trials = [Trial(scenario: "cold-open", metrics: cold, error: nil)]
 
         let positions: [(String, Double)] = [
             ("warm-start", 0),
@@ -155,15 +151,14 @@ enum PlaybackStartBench {
     ) async throws -> [String: Double] {
         probe.resetPlayingFrames()
         let request = CACurrentMediaTime()
+        let deadline = request + 5
         let attempt = audio.begin(request: request, origin: origin)
         project.clock.togglePlayback()
         let returned = CACurrentMediaTime()
         defer { project.clock.pause() }
         do {
-            try await wait("advancing video and real audio for one second") {
-                guard let firstVideo = firstPlayingFrame(in: probe, origin: origin, frame: frame),
-                      let firstAudio = attempt.first else { return false }
-                return followupFrame(in: probe, audio: attempt, after: max(firstVideo.host, firstAudio.onset) + 1) != nil
+            try await wait("first advancing video and real audio", deadline: deadline) {
+                firstPlayingFrame(in: probe, origin: origin, frame: frame) != nil && attempt.first != nil
             }
         } catch {
             throw Failure("Timed out getting playback at \(origin)s. Item: \(project.clock.player.currentItem?.status.rawValue ?? -1), "
@@ -172,14 +167,18 @@ enum PlaybackStartBench {
         }
 
         guard let firstVideo = firstPlayingFrame(in: probe, origin: origin, frame: frame), let firstAudio = attempt.first,
-              let followup = followupFrame(in: probe, audio: attempt, after: max(firstVideo.host, firstAudio.onset) + 1),
-              let firstDisplayed = probe.firstDisplayed,
-              let audioAtStart = attempt.timeline(at: firstVideo.host, extrapolateFirst: true),
-              let audioLater = attempt.timeline(at: followup.host) else {
-            throw Failure("Playback measurements were incomplete")
+              let firstDisplayed = probe.firstDisplayed, firstVideo.host <= deadline, firstAudio.onset <= deadline else {
+            throw Failure("Playback onset measurements were incomplete")
         }
+        let followup = try await sampleFollowup(probe, attempt, after: max(firstVideo.host, firstAudio.onset) + 1,
+                                                deadline: deadline)
+        guard let audioAtStart = attempt.timeline(at: firstVideo.host, extrapolateFirst: true) else {
+            throw Failure("No audio timeline sample at first picture")
+        }
+        let cadence = probe.cadence
+        guard cadence.period.isFinite, cadence.longestGap > 0 else { throw Failure("No display cadence control samples") }
         let after = PerfCounters.snapshot()
-        return [
+        var metrics = [
             "dispatchMs": ms(returned - request),
             "audioMs": ms(firstAudio.onset - request),
             "videoMs": ms(firstVideo.host - request),
@@ -187,14 +186,20 @@ enum PlaybackStartBench {
             "audioAdvanceMs": ms(firstAudio.timeline - origin),
             "videoAdvanceMs": ms(firstVideo.timeline - origin),
             "startOffsetMs": ms(audioAtStart - firstVideo.timeline),
-            "oneSecondOffsetMs": ms(audioLater - followup.timeline),
-            "oneSecondElapsedMs": ms(followup.host - firstVideo.host),
+            "oneSecondTimedOut": followup == nil ? 1.0 : 0.0,
+            "displayPeriodMs": ms(cadence.period),
+            "displayGapMs": ms(cadence.longestGap),
+            "firstItemPictureMs": ms(firstDisplayed.host - request),
             "builds": count(.compositionBuild, from: before, to: after),
             "itemAttaches": count(.playerItemAttach, from: before, to: after),
             "assetOpens": count(.compositionAssetOpen, from: before, to: after),
             "videoPrerolls": count(.previewPreroll, from: before, to: after),
-            "firstItemPictureMs": ms(firstDisplayed.host - request),
         ]
+        if let followup {
+            metrics["oneSecondOffsetMs"] = ms(followup.audio - followup.video.timeline)
+            metrics["oneSecondElapsedMs"] = ms(followup.video.host - firstVideo.host)
+        }
+        return metrics
     }
 
     private static func firstPlayingFrame(
@@ -203,10 +208,16 @@ enum PlaybackStartBench {
         probe.playingFrames.first { $0.timeline > origin + frame * 0.5 }
     }
 
-    private static func followupFrame(
-        in probe: PlaybackStartVideoProbe, audio: PlaybackStartAudioProbe.Attempt, after host: Double
-    ) -> PlaybackStartVideoProbe.Frame? {
-        probe.playingFrames.first { $0.host >= host && audio.timeline(at: $0.host) != nil }
+    private static func sampleFollowup(
+        _ probe: PlaybackStartVideoProbe, _ audio: PlaybackStartAudioProbe.Attempt, after host: Double, deadline: Double
+    ) async throws -> (video: PlaybackStartVideoProbe.Frame, audio: Double)? {
+        while CACurrentMediaTime() <= deadline {
+            for frame in probe.playingFrames where frame.host >= host && frame.host <= deadline {
+                if let time = audio.timeline(at: frame.host) { return (frame, time) }
+            }
+            try await Task.sleep(for: .milliseconds(8))
+        }
+        return nil
     }
 
     private static func count(_ event: PerfCounters.Event, from before: [String: Int], to after: [String: Int]) -> Double {
@@ -216,8 +227,8 @@ enum PlaybackStartBench {
 
     private static func ms(_ seconds: Double) -> Double { seconds * 1_000 }
 
-    private static func wait(_ description: String, until ready: () -> Bool) async throws {
-        let deadline = CACurrentMediaTime() + 5
+    private static func wait(_ description: String, deadline: Double = CACurrentMediaTime() + 5,
+                             until ready: () -> Bool) async throws {
         while !ready() {
             guard CACurrentMediaTime() < deadline else { throw Failure("Timed out waiting for \(description)") }
             try await Task.sleep(for: .milliseconds(8))
