@@ -872,6 +872,7 @@
 "Choose the folder to export into" = "Elegir la carpeta a la que exportar";
 "“%@” is already in this folder. Exporting will replace it." = "“%@” ya está en esta carpeta. Al exportar se reemplazará.";
 "Replace “%@”?" = "¿Reemplazar “%@”?";
+"A file with this name is already in “%@”. Replacing it overwrites that file." = "Ya hay un archivo con este nombre en “%@”. Al reemplazarlo se sobrescribe ese archivo.";
 "Choose the folder to export into, or drag a folder here from Finder" = "Elegir la carpeta a la que exportar, o arrastrar aquí una carpeta desde el Finder";
 "Choose" = "Elegir";
 "Choose a folder in the macOS window. If that window stops responding, close it here." = "Elige una carpeta en la ventana de macOS. Si esa ventana deja de responder, ciérrala aquí.";

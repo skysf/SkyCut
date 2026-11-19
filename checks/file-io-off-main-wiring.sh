@@ -9,6 +9,8 @@
 #   (2026-11-19, docs/bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md);
 # - every macOS open / save window: made only in SystemFileChooser.swift, never modal
 #   (2026-11-19, docs/bugfixes/2026-11-19-modal-file-windows-can-wedge-app.md);
+# - a save's answer replaces a file only when macOS's own window asked (2026-11-19,
+#   docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md);
 # - a Compress / Burn In encode: ffmpeg writes only the job's own file, handed over and cleaned up off the main thread
 #   (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
 # Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
@@ -117,6 +119,25 @@ require "a save waits for the drive at most a deadline" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'await connectedWriter\(\)\.write\(request, deadline: deadline\)'
 require "the dirty mark is cleared only when nothing changed since the snapshot was taken" \
   Sources/SrtFlow/VideoEditProjectSaving.swift 'if fileWriter\.revision == request\.revision \{ hasUnsavedChanges = false \}'
+
+# Replacing a file at a chosen place (2026-11-19, docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md): only
+# macOS's own save window asks "Replace?", so only its answers may replace; a typed or dropped answer in the helper may not,
+# and every save written from a window claims the name first (NewFileClaim) or asks (FileReplaceQuestion).
+# scripts/check-project-saves.sh (ReplaceChecks) and scripts/check-export-profile.sh (FileWindowsChecks) check the behaviour.
+require "a typed or dropped answer in the helper is not a confirmed replace" \
+  Sources/SrtFlow/SystemFileWindows.swift 'finish\(urls, inSystemWindow: false\)'
+require "a Save As that may not replace claims the name before writing" \
+  Sources/SrtFlow/ProjectFileWriter.swift 'guard try NewFileClaim\.claim\(url\) else \{ return \.occupied'
+require "the project's Save As from a window asks before replacing" \
+  Sources/SrtFlow/VideoEditProjectSaving.swift 'await saveAs\(chosen: location\)'
+require "the subtitle editor's Export As writes with the answer's permission" \
+  Sources/SrtFlow/SubtitleEditPanel.swift 'SubtitleFileSave\.write\(document, format: format, to: location\.url, replacing: replacing\)'
+forbid "the subtitle editor writes files only through SubtitleFileSave (a plain Data.write replaces what is there)" \
+  Sources/SrtFlow/SubtitleEditPanel.swift '^[^/]*\.write\(to:'
+require "a manual screen recording replaces a file only when macOS's own window confirmed it" \
+  Sources/SrtFlow/ScreenRecordingCoordinator.swift 'session\.replacesExistingOutput = session\.replacesExistingOutput && options\.replacesExistingOutput'
+require "the recording setup carries the save window's confirmation" \
+  Sources/SrtFlow/ScreenRecordingSetupView.swift 'replacesOutput = location\.mayReplace'
 
 # Compress / Burn In (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md): ffmpeg writes only the
 # job's own claimed file, which is handed over through ExportDelivery as a new file (never replacing); a failed or

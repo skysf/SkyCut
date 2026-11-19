@@ -44,14 +44,14 @@ import SrtFlowMCPKit
         let drive = FakeDrive()
         project.fileWriter.perform = drive.perform
         edit(project, "copied")
-        let tooLate = await project.saveAs(late, deadline: 0.5)
+        let tooLate = await project.saveAs(late, replacing: false, deadline: 0.5)
         checks.require(!tooLate && project.documentURL == old, "Save As on a drive that does not answer keeps the old file")
         drive.open()
         _ = await until(5) { !project.fileWriter.isBusy }
         checks.require(project.documentURL == old, "a Save As that lands after its deadline does not move the project")
         project.fileWriter.perform = ProjectFileWriter.write
         let copy = root.appendingPathComponent("Copy.skycut")
-        let saved = await project.saveAs(copy, deadline: 5)
+        let saved = await project.saveAs(copy, replacing: false, deadline: 5)
         checks.require(saved && project.documentURL == copy && !project.hasUnsavedChanges && fileHolds(copy, "copied"),
                        "Save As in time takes the new file and marks the project saved")
     }

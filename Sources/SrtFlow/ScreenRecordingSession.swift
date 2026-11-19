@@ -26,7 +26,8 @@ struct ScreenRecordingSession {
     /// 停下来之后放上时间线；false = 只留文件（record_screen 的 add_to_timeline=false）。
     var addsToTimeline = true
     /// 主文件撞上已有文件时能不能替换：手动的在保存面板里点过「替换」才会走到这一步；AI 起的**从不覆盖**，
-    /// 提交时撞上了就避让到「名字 2」（MCP 方案第 34 条）。
+    /// 提交时撞上了就避让到「名字 2」（MCP 方案第 34 条）。A manual session keeps it only when the person confirmed it
+    /// for that file in macOS's own save window (`ScreenRecordingOptions.replacesExistingOutput`, applied at `start`).
     var replacesExistingOutput = true
     /// 控制浮窗放哪：手动的在顶部正中；AI 起的放主屏左下角 —— 浮窗在截屏里看不见，AI 一边截屏一边操作时
     /// 顶部正中正好压在浏览器的地址栏上。

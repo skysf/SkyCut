@@ -37,6 +37,10 @@ struct ProjectFileWriteRequest: Sendable {
     var revision: Int
     /// The project's document generation when this was taken: a result for an older document is not applied.
     var generation: Int
+    /// Save As only: replacing a file already at `url` was confirmed (the person in macOS's own window or in the replace
+    /// question; the AI saving the project back to its own file). Otherwise the name is claimed first and a file already
+    /// there is never touched: `.occupied` (NewFileClaim).
+    var replacesExisting = true
     /// Stamped by the writer: a result older than one already applied is dropped.
     fileprivate(set) var sequence = 0
 }
@@ -48,6 +52,9 @@ enum ProjectFileWriteResult: Sendable {
     case saved(url: URL, records: [String: MediaRecord], bookmark: Data?)
     /// Not written; the system's reason. The file on disk is untouched (atomic write).
     case failed(String)
+    /// Save As: a file is already at the URL and replacing it was not confirmed. Nothing written, that file untouched; the
+    /// system's reason for the notice.
+    case occupied(String)
 }
 
 @MainActor
@@ -220,6 +227,16 @@ final class ProjectFileWriter {
            let moved = movedFile(request.documentBookmark) {
             url = moved
         }
+        // A Save As that may not replace a file already there claims the name before anything is written, so that file is
+        // left as it was — not even the web-motion movies are carried next to it.
+        let claimed = request.kind == .saveAs && !request.replacesExisting
+        if claimed {
+            do {
+                guard try NewFileClaim.claim(url) else { return .occupied(NewFileClaim.occupiedReason(url)) }
+            } catch {
+                return .failed(error.localizedDescription)
+            }
+        }
         do {
             let records = try VideoEditProjectIO.save(
                 request.state, to: url, knownRecords: request.knownRecords, rowHeights: request.rowHeights
@@ -229,6 +246,7 @@ final class ProjectFileWriter {
             let bookmark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil)
             return .saved(url: url, records: records, bookmark: bookmark)
         } catch {
+            if claimed { NewFileClaim.release(url) }
             return .failed(error.localizedDescription)
         }
     }

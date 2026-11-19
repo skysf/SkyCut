@@ -25,7 +25,7 @@ ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_S
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/ProjectSaves/Main.swift checks/ProjectSaves/SaveChecks.swift checks/ProjectSaves/CloseQuitChecks.swift \
-  checks/ProjectSaves/EditWhileClosingChecks.swift \
+  checks/ProjectSaves/EditWhileClosingChecks.swift checks/ProjectSaves/ReplaceChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ProjectSavesCheck"
 SRTFLOW_PROJECT_SAVES_CHECK_DIR="${ROOT}/work" SRTFLOW_SMOKE_SCRIPT="${ROOT}/isolated" SRTFLOW_SMOKE_MUTE=1 \
 python3 - "${APP}/Contents/MacOS/ProjectSavesCheck" <<'PYTHON'

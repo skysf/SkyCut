@@ -15,6 +15,8 @@ struct ScreenRecordingSetupView: View {
     /// 用户不点 Choose 也能直接开录。
     @State private var outputURL: URL = ScreenRecordingPreferences.lastDirectory
         .appendingPathComponent(ScreenRecordingCoordinator.suggestedName())
+    /// Replacing a file at `outputURL` was confirmed in macOS's own save window (never for the pre-filled name).
+    @State private var replacesOutput = false
     @State private var microphoneDevices: [(id: String, name: String)] = []
     @State private var microphoneEnabled = false
     @State private var selectedMicrophoneID: String = ""
@@ -136,7 +138,10 @@ struct ScreenRecordingSetupView: View {
         FilePicker.chooseSaveLocation(
             types: [.quickTimeMovie], name: outputURL.lastPathComponent, start: outputURL.deletingLastPathComponent(),
             message: L10n("Choose where to save this screen recording.")
-        ) { outputURL = $0 }
+        ) { location in
+            outputURL = location.url
+            replacesOutput = location.mayReplace
+        }
     }
 
     private func loadMicrophones() async {
@@ -166,6 +171,7 @@ struct ScreenRecordingSetupView: View {
             options.microphone = .disabled
         }
         options.outputURL = outputURL
+        options.replacesExistingOutput = replacesOutput
         ScreenRecordingPreferences.microphoneEnabled = microphoneEnabled
         if microphoneEnabled, !selectedMicrophoneID.isEmpty {
             ScreenRecordingPreferences.microphoneDeviceID = selectedMicrophoneID

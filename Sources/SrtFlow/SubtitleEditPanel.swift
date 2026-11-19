@@ -330,7 +330,7 @@ struct SubtitleEditPanel: View {
             return
         }
         do {
-            try write(document, format: document.format, to: url)
+            _ = try SubtitleFileSave.write(document, format: document.format, to: url, replacing: true)   // its own file
             markSaved()
         } catch {
             saveError = error.localizedDescription
@@ -340,24 +340,29 @@ struct SubtitleEditPanel: View {
     private func exportAs(_ format: SubtitleFormat) {
         guard let picked = document else { return }
         let base = subtitleURL?.deletingPathExtension().lastPathComponent ?? picked.title
-        FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { url in
-            // The window is not modal: write what the document holds now.
-            guard let document else { return }
-            do {
-                try write(document, format: format, to: url)
-                // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
-                if url == subtitleURL, format == document.format { markSaved() }
-            } catch {
-                saveError = error.localizedDescription
-            }
+        FilePicker.chooseSaveLocation(types: [format.utType], name: "\(base).\(format.fileExtension)") { location in
+            export(format, to: location)
         }
     }
 
-    private func write(_ document: SubtitleDocumentModel, format: SubtitleFormat, to url: URL) throws {
-        var copy = document
-        copy.reindex()
-        let content = SubtitleSerializer.serialize(copy, format: format)
-        try Data(content.utf8).write(to: url)
+    /// Export As to where the person chose. The window is not modal: write what the document holds now. A file already
+    /// there is replaced only when the person confirmed it — in macOS's own window, or in the question asked here when the
+    /// answer was typed or dropped (SaveLocation.swift).
+    private func export(_ format: SubtitleFormat, to location: SaveLocation) {
+        var replacing = location.mayReplace
+        do {
+            while let document {
+                if try SubtitleFileSave.write(document, format: format, to: location.url, replacing: replacing) == .written {
+                    // 导出成同一个文件（等于就是保存），未保存标记也该消掉。
+                    if location.url == subtitleURL, format == document.format { markSaved() }
+                    return
+                }
+                guard !replacing, FileReplaceQuestion.ask(location.url) else { return }
+                replacing = true
+            }
+        } catch {
+            saveError = error.localizedDescription
+        }
     }
 
     private func markSaved() {
