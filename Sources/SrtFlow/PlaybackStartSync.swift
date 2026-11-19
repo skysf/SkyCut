@@ -2,8 +2,8 @@ import AVFoundation
 
 // MARK: - Picture and sound start together (docs/architecture/playback-start.md)
 //
-// What it does: the two decisions PlayerClock needs so that the sound never starts ahead of the picture: where a pause
-// leaves both (`PausedPictureHold`), and when a just-started output device can start both (`OutputStartWait`).
+// What it does: where a pause leaves the playhead, the sound and the picture (`PausedPictureHold`), so that the next Play
+// starts the sound with a picture that moves at once.
 // Split out of VideoPreviewView.swift on 2026-11-19.
 // What it does not do: seek, preroll or start the player (PlayerClock).
 
@@ -27,32 +27,5 @@ enum PausedPictureHold {
     static func position(picture: CMTime, sound: TimeInterval) -> TimeInterval? {
         guard picture.isNumeric, abs(picture.seconds - sound) <= tolerance else { return nil }
         return max(0, picture.seconds)
-    }
-}
-
-/// After Play on an output device that has just started (the idle stop, a system stop), waits until the device has
-/// rendered once, silently: from then on the sound's start is a known host time, the next quantum, and the clock
-/// starts the sound and the picture together there. Before 2026-11-19 the picture started at once while the sound
-/// waited for the device's first render: on the M1 the picture ran up to 151 ms ahead, and the drift correction then
-/// re-seeked it, a stall of up to 183 ms. Checked every 2 ms on the main run loop; after a second the start goes ahead.
-final class OutputStartWait {
-    private var timer: Timer?
-
-    func cancel() {
-        timer?.invalidate()
-        timer = nil
-    }
-
-    /// `start` runs once, when `ready` holds or the second is over, unless cancelled first.
-    func begin(until ready: @escaping () -> Bool, then start: @escaping () -> Void) {
-        cancel()
-        let deadline = ProcessInfo.processInfo.systemUptime + 1
-        let timer = Timer(timeInterval: 0.002, repeats: true) { [weak self] _ in
-            guard ready() || ProcessInfo.processInfo.systemUptime > deadline else { return }
-            self?.cancel()
-            start()
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        self.timer = timer
     }
 }

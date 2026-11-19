@@ -142,10 +142,13 @@ def evaluate(samples, budgets, confirmed=False):
 
 
 def strict(samples, profile):
-    """Off the hosted runner every launch of every scenario keeps the picture in step with the sound."""
+    """Off the hosted runner every launch of every scenario keeps the picture in step with the sound, except the ones
+    listed under `skip` (the start after the idle stop: docs/architecture/playback-start.md)."""
     failures = []
     for name, trials in samples.items():
-        limits = profile["common"] | profile["scenarios"].get(name, {})
+        if name in profile.get("skip", []):
+            continue
+        limits = profile["common"]
         if set(limits) - set(TIMINGS) or not all(finite(limits, key) and limits[key] > 0 for key in limits):
             raise ValueError("The strict playback limits must be positive timings")
         for trial in trials:

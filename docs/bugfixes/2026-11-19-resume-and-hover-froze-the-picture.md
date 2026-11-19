@@ -26,10 +26,10 @@ resumed and never hovered, so its gate was green.
    scrubbed back without preparing playback, and Play while hovering took the same re-seeking start.
 3. **A new item was primed only by Play.** After opening, an edit or an optimized-media swap, the first Play paid
    the full preroll (124–129 ms at the 4K source's second GOP) before either stream started. In sync, but a wait.
-4. **After the idle stop the picture started ahead of the sound.** Play started the output device and then the
-   picture at once, while the sound waited for the device's first render (an anchor pinned by that render). In 3 of
-   5 launches the picture ran 51–151 ms ahead, and the drift correction re-seeked it: a stall of 100–183 ms in the
-   first two seconds.
+
+Not fixed here: after the two-minute idle stop the picture can start ahead of the sound and is then re-seeked. Starting
+both on the device's first rendered quantum fixed the picture but cost the sound its first 60–140 ms in a quarter of
+the starts, so it was left out; the numbers are in [playback start](../architecture/playback-start.md) (known issue).
 
 The bench also sampled the picture on the wrong display: on this Mac the window landed on a 25 Hz television, so
 every picture time was quantized to 40 ms and a short stall could hide between two refreshes.
@@ -44,14 +44,10 @@ every picture time was quantized to 40 ms and a short stall could hide between t
   frame and that position counts as positioned. A picture that did not stop where the sound did (over 50 ms apart:
   a stall or a drift correction in flight) is placed precisely at the sound instead.
 - A hover that ends places and primes the picture back on the playhead instead of scrubbing.
-- When the output device has just started, Play waits until it has rendered once (`isRendering` on the audio source,
-  `OutputStartWait` in the clock), then pins the sound to the next quantum and starts the picture at that quantum's
-  host time: both begin together. (Starting the picture when the first render was noticed still left its first frame
-  up to 97 ms behind the sound.)
 - Every paused placement primes the picture, a new item's first one included, at a quarter rate (rate 1 only when
   Play is already pending). On the M1 a new item primed that way started as fast as one primed at full rate.
 - `PlayerClock` shed named helpers to stay under 600 lines: `PreviewReadiness`, `ChainedScrub`, `VideoDriftCheck`,
-  `PlaybackTimeEstimate`, and `PausedPictureHold` / `SoundStartWait` (`PlaybackStartSync.swift`).
+  `PlaybackTimeEstimate`, and `PausedPictureHold` (`PlaybackStartSync.swift`).
 - The benchmark samples on the fastest display, watches the first two seconds (longest stall, worst skew) and adds
   fresh-item, seek-play, resume and peek-play scenarios. Off the hosted runner every launch must keep the picture in
   step (`strict` in `checks/PlaybackStart/budgets.json`).
@@ -60,19 +56,15 @@ every picture time was quantized to 40 ms and a short stall could hide between t
 
 - M1, interleaved launches under the same load, before / after (first sound / first moving picture, ms):
   resume 31 / 874 → 25 / 26; fresh item 126 / 135 → 29 / 45. Play while hovering 37 / 645 → 602 / 616: in step now,
-  and the remaining wait is the decode at the playhead (see Lessons). The final local gate (five launches and a
-  warm-up): no stall over the 33 ms frame cadence in any scenario, the idle start included; worst skew 24 ms, and
-  49 ms after the idle stop in the one start whose first audible sample came 128 ms into its timeline (the sound
-  side, not explained yet). Details: [playback start](../architecture/playback-start.md).
+  and the remaining wait is the decode at the playhead (see Lessons). The local gate (five launches and a warm-up):
+  outside the idle start no stall over the 33 ms frame cadence and no skew over 24 ms. Details:
+  [playback start](../architecture/playback-start.md).
 - `scripts/check-player-clock.sh`, `SyncedStartChecks.swift` (real AVPlayer on a picture-only long-GOP clip): a new
   item starts inside the Play call, a pause puts playhead and sound on the stopped picture, a resume and a Play
   after a hover cause no native jump, Play while hovering does not start the sound before the picture is back, a
-  pause with the picture elsewhere places it at the sound, neither clock starts before a just-started device renders
-  and then both start together. The previous `PlayerClock` fails 9 of these checks; ignoring the device fails 1.
-- `checks/playback-start-wiring.sh`: nine mutations (the old preroll condition, a re-seeking start, the sound started
-  before the placement, no hold on pause, the stop callback ignored, a hover end that scrubs, a start that does not
-  wait for a just-started device, an engine that always reports rendering, a picture not started on the sound's
-  quantum) each turn it red.
+  pause with the picture elsewhere places it at the sound. The previous `PlayerClock` fails 9 of these checks.
+- `checks/playback-start-wiring.sh`: six mutations (the old preroll condition, a re-seeking start, the sound started
+  before the placement, no hold on pause, the stop callback ignored, a hover end that scrubs) each turn it red.
 - `checks/PlaybackStart/test_compare.py` pins the recorded M1 freezes red under hosted and local scoring.
 
 ## Lessons

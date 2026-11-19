@@ -18,11 +18,6 @@ private final class RecordingAudioSource: PlaybackAudioSource {
     private(set) var pictureAtStart: Double?
     /// Moves the sound this far from the picture when it pauses (a picture that stalled behind the sound).
     var pauseOffset = 0.0
-    /// A just-started output device renders for the first time at this moment (uptime seconds).
-    var renderFrom = 0.0
-    var isRendering: Bool { ProcessInfo.processInfo.systemUptime >= renderFrom }
-    /// Pinned on the quantum after Play: the sound starts at the moment `play(from:)` is called.
-    var startHostTime: UInt64? { isPlaying ? AVAudioTime.hostTime(forSeconds: host) : nil }
     weak var player: AVPlayer?
     let duration = 0.0
 
@@ -112,22 +107,6 @@ func checkSyncedStarts(clip: URL) {
     check(source.isPlaying && source.playedFrom == clock.time, "Resuming starts at once from the paused picture")
     pump(0.2)
     check(resumeJumps.count == 0, "Resuming does not re-seek the picture (\(resumeJumps.count) native jumps)")
-
-    // After the idle stop the device renders for the first time a while after Play: neither clock starts before it,
-    // then both start on the same quantum.
-    clock.pause()
-    clock.seek(to: 5)
-    settle(clock)
-    source.renderFrom = ProcessInfo.processInfo.systemUptime + 0.15
-    clock.togglePlayback()
-    pump(0.05)
-    check(!source.isPlaying && clock.player.rate == 0,
-          "Neither sound nor picture starts before a just-started device renders (rate \(clock.player.rate))")
-    waitForAudioClock { source.isPlaying }
-    check(source.isPlaying && clock.player.rate > 0 && source.playedFrom == 5, "Both start once the device renders")
-    pump(0.2)
-    let together = abs((pictureTime(clock) ?? -1) - source.playhead)
-    check(together < 0.03, "Picture and sound started on the same quantum: \(Int(together * 1000)) ms apart")
 
     // A picture that did not stop where the sound did is placed again at the sound, before the next Play.
     source.pauseOffset = 0.5

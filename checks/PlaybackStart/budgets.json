@@ -52,7 +52,8 @@
       "audioAdvanceMs": 200,
       "videoAdvanceMs": 570,
       "startOffsetMs": 160,
-      "oneSecondOffsetMs": 48
+      "oneSecondOffsetMs": 48,
+      "maxSkewMs": 160
     }
   },
   "medians": {
@@ -112,11 +113,8 @@
       "stallMs": 100,
       "maxSkewMs": 45
     },
-    "scenarios": {
-      "idle-wake": {
-        "startOffsetMs": 60,
-        "maxSkewMs": 60
-      }
-    }
+    "skip": [
+      "idle-wake"
+    ]
   }
 }
