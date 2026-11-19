@@ -60,6 +60,8 @@ enum PerfCounters {
         case clockTick = "clock.tick"
         /// 预览换上了一个新的播放条目（`replaceCurrentItem`，画面会闪一下）。
         case playerItemAttach = "player.itemAttach"
+        /// A precise paused placement completed its native playback preroll.
+        case previewPreroll = "player.previewPreroll"
         /// 建了一次预览合成。
         case compositionBuild = "composition.build"
         /// 建合成时开了一个素材文件（`AVURLAsset`）。

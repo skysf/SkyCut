@@ -38,7 +38,7 @@ def compare(paths, budgets):
             if trial.get("error"):
                 errors.append(f"{label}: {trial['error']}")
                 continue
-            for key in (*TIMINGS, "builds", "itemAttaches", "assetOpens"):
+            for key in (*TIMINGS, "builds", "itemAttaches", "assetOpens", "videoPrerolls"):
                 value = metrics.get(key)
                 if type(value) not in (int, float) or not math.isfinite(value):
                     errors.append(f"{label}: missing or invalid {key}")
@@ -70,6 +70,8 @@ def check_trial(label, scenario, metrics, budgets, errors):
     for key in ("builds", "itemAttaches"):
         if metrics[key] != expected:
             errors.append(f"{label}: {key} {metrics[key]:g}, expected {expected}")
+    if scenario in ("cold-open", "end-replay") and metrics["videoPrerolls"] != 1:
+        errors.append(f"{label}: expected one successful native video preroll before playback")
     if scenario == "cold-open" and metrics["assetOpens"] < 3:
         errors.append(f"{label}: expected uncached opens for all three video sources")
     if scenario != "cold-open" and metrics["assetOpens"] != 0:

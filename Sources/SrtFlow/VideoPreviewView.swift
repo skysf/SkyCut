@@ -45,8 +45,10 @@ final class PlayerClock: ObservableObject {
     /// Play can be pressed as soon as a document's timeline is visible, before AVFoundation can start its item.
     private var playbackRequested = false
     private var readiness: [NSKeyValueObservation] = []
+    private var readinessRequest: UUID?
     private var previewSeek: UUID?
     private var positionedTime: TimeInterval?
+    private var previewIsUnprimed = false
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
@@ -249,19 +251,32 @@ final class PlayerClock: ObservableObject {
         positionedTime = nil
     }
 
-    /// Subscribe once for this item. Delivery on the main queue lets item installation finish before Play resumes.
-    private func playWhenReady(_ item: AVPlayerItem) {
-        playbackRequested = true
-        guard readiness.isEmpty else { return }
-        let resume: () -> Void = { [weak self, weak item] in
+    private func clearReadiness() {
+        readinessRequest = nil
+        readiness.removeAll()
+    }
+
+    /// Only the current item and request can release a waiting seek or Play.
+    private func observeReadiness(of item: AVPlayerItem, then resume: @escaping () -> Void) {
+        guard readinessRequest == nil else { return }
+        let request = UUID()
+        readinessRequest = request
+        let observe: () -> Void = { [weak self, weak item] in
             DispatchQueue.main.async {
-                guard let self, let item, self.playbackRequested, self.player.currentItem === item else { return }
-                self.play()
+                guard let self, let item, self.readinessRequest == request, self.player.currentItem === item else { return }
+                if item.status == .failed || self.player.status == .failed {
+                    self.invalidatePreviewSeek()
+                    self.pause()
+                    return
+                }
+                guard item.status == .readyToPlay, self.player.status == .readyToPlay else { return }
+                self.clearReadiness()
+                resume()
             }
         }
         readiness = [
-            item.observe(\.status, options: [.initial, .new]) { _, _ in resume() },
-            player.observe(\.status, options: [.initial, .new]) { _, _ in resume() },
+            item.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
+            player.observe(\.status, options: [.initial, .new]) { _, _ in observe() },
         ]
     }
 
@@ -272,19 +287,23 @@ final class PlayerClock: ObservableObject {
             return
         }
         if item.status == .failed || player.status == .failed {
+            invalidatePreviewSeek()
             pause()
-            return
-        }
-        if audioSource != nil, item.status != .readyToPlay || player.status != .readyToPlay {
-            playWhenReady(item)
             return
         }
         if previewSeek != nil {
             playbackRequested = true
             return
         }
+        if audioSource != nil, item.status != .readyToPlay || player.status != .readyToPlay {
+            playbackRequested = true
+            observeReadiness(of: item) { [weak self] in
+                if self?.playbackRequested == true { self?.play() }
+            }
+            return
+        }
         playbackRequested = false
-        readiness.removeAll()
+        clearReadiness()
         if let source = audioSource {
             // 播放头已经在尽头：没有东西可播，这一下不开播。照样开播的话声音主时钟从尽头起步、带着播放头越过片尾一直走：
             // 到了头的播放器不会再报一次「播完了」。The user's Play at the end replays from 0 (`togglePlayback`, UI-2).
@@ -311,6 +330,7 @@ final class PlayerClock: ObservableObject {
     func attach(url: URL, autoplay: Bool = true) {
         pause()
         invalidatePreviewSeek()
+        previewIsUnprimed = false
         pendingScrubTarget = nil
         peekTime = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
@@ -326,8 +346,8 @@ final class PlayerClock: ObservableObject {
         PerfCounters.event(.playerItemAttach)
         audioSource?.pause()
         player.pause()
-        readiness.removeAll()
         invalidatePreviewSeek()
+        previewIsUnprimed = true
         pendingScrubTarget = nil
         peekTime = nil
         #if DEBUG
@@ -345,6 +365,7 @@ final class PlayerClock: ObservableObject {
     func detach() {
         pause()
         invalidatePreviewSeek()
+        previewIsUnprimed = false
         audioSource?.seek(to: 0)
         detachAudioSource()
         player.replaceCurrentItem(with: nil)
@@ -396,6 +417,7 @@ final class PlayerClock: ObservableObject {
         let wasPositioning = previewSeek != nil
         previewSeek = nil
         positionedTime = nil
+        clearReadiness()
         if wasPositioning { player.cancelPendingPrerolls() }
     }
 
@@ -411,19 +433,29 @@ final class PlayerClock: ObservableObject {
 
     private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
         guard previewSeek == request else { return }
-        guard seekFinished, !isAtEnd, player.rate == 0, player.status == .readyToPlay else {
+        guard seekFinished, !isAtEnd, player.rate == 0, let item = player.currentItem else {
             finishPreviewPosition(request, at: seekFinished ? seconds : nil)
             return
         }
-        // A short preroll lets the decoder prepare advancing frames while the audio anchor is paused.
-        // AVPlayer can accept this request as its current item finishes loading.
-        player.preroll(atRate: 0.25) { [weak self] finished in
-            DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil) }
+        guard player.status == .readyToPlay, item.status == .readyToPlay else {
+            observeReadiness(of: item) { [weak self] in
+                self?.preparePositionedPreview(request, at: seconds, seekFinished: true)
+            }
+            return
+        }
+        // Prime a fresh item at playback rate while its audio anchor is paused. After a seek,
+        // the existing decoder needs less data before advancing, especially across a trim.
+        player.preroll(atRate: previewIsUnprimed ? 1 : 0.5) { [weak self] finished in
+            DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil, primed: finished) }
         }
     }
 
-    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?) {
+    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?, primed: Bool = false) {
         guard previewSeek == request else { return }
+        if primed {
+            previewIsUnprimed = false
+            PerfCounters.event(.previewPreroll)
+        }
         previewSeek = nil
         positionedTime = seconds
         if playbackRequested { play() }
@@ -510,7 +542,7 @@ final class PlayerClock: ObservableObject {
 
     func pause() {
         playbackRequested = false
-        readiness.removeAll()
+        if previewSeek == nil { clearReadiness() }
         audioSource?.pause()
         player.pause()
     }

@@ -7,9 +7,10 @@ composition is still being built. The clock retains the request through installa
 placement of the playhead. The current player and item must be ready for the synchronized native start. Pause, a second
 press while pending, and preview teardown cancel the request. [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
 
-After an exact paused seek, the ready native player prerolls asynchronously while audio stays paused.
-The smaller preroll rate prepares less data at a trimmed cut. Any newer placement or item cancels the earlier
-preparation. Play advances an already positioned preview with the ordinary native rate start. When the output
+After an exact paused seek, the clock waits for both the native player and its item, then prerolls asynchronously
+while audio stays paused. A new item prerolls at playback rate. A positioned item prerolls at a smaller rate
+to prepare less data around a trimmed cut. Any newer placement or item cancels the earlier preparation.
+Play advances an already positioned preview with the ordinary native rate start. When the output
 graph has just restarted, Play aligns video to the audio host clock. The audio engine can reuse its prepared
 samples whenever the paused anchor matches the playhead. Audio supplies the master clock.
 `PlayerClock` corrects sustained video drift against this clock. See the [audio engine](audio-engine.md) and
@@ -56,11 +57,14 @@ actual footage, and monitoring devices also belong in the manual regression.
 The graphical step contributes to `check-all`. It uploads all samples, the machine fingerprint and a table with each
 scenario's median and worst result. Every trial must produce audio and video and meet the limits in
 `checks/PlaybackStart/budgets.json`. A cold open must build and attach just once and open the source assets. Warm and
-idle starts must build, attach and open zero times.
+idle starts must build, attach and open zero times. Cold open and replay from the end each require one successful
+native preroll.
 
 The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
 220 ms audio and 280 ms picture ceilings for occasional scheduling noise. The trim immediately before the cut
 has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
+Replay from the end also rewinds the item. Its median audio and picture budgets are 170 / 220 ms, capped at
+265 / 310 ms per trial.
 The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. The 34 ms limit
 one second later applies to every scenario. Cold open includes preview construction and output startup.
 Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.

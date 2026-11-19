@@ -33,7 +33,7 @@ fast_path() {
 
 fast_path "${clock}" '    func togglePlayback('
 fast_path "${clock}" '    func play('
-fast_path "${clock}" '    private func playWhenReady('
+fast_path "${clock}" '    private func observeReadiness('
 fast_path "${clock}" '    private func recoverAudioIfNeeded('
 fast_path "${clock}" '    private func anchorVideo('
 fast_path "${clock}" '    func goToStart('
@@ -85,10 +85,11 @@ fi
 preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
 if ! awk '
   /guard previewSeek == request/ { current = NR }
-  /player.status == .readyToPlay/ { ready = NR }
+  /guard player.status == .readyToPlay, item.status == .readyToPlay/ { ready = NR }
+  /observeReadiness\(of: item\)/ { observe = NR }
   /player.preroll\(atRate: / { pre = NR }
   /self\?\.finishPreviewPosition\(/ { finish = NR }
-  END { exit !(current && ready > current && pre > ready && finish > pre) }
+  END { exit !(current && ready > current && observe > ready && pre > observe && finish > pre) }
 ' <<<"${preroll}"; then
   fail "Prime a positioned preview on the asynchronous preroll path before releasing Play"
 fi

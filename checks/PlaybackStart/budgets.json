@@ -27,7 +27,10 @@
       "videoMs": 340
     },
     "near-end": {},
-    "end-replay": {},
+    "end-replay": {
+      "audioMs": 265,
+      "videoMs": 310
+    },
     "idle-wake": {
       "dispatchMs": 650,
       "audioMs": 700,
@@ -58,6 +61,10 @@
       "cut": {
         "audioMs": 230,
         "videoMs": 265
+      },
+      "end-replay": {
+        "audioMs": 170,
+        "videoMs": 220
       },
       "idle-wake": {
         "dispatchMs": 550,

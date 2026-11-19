@@ -182,6 +182,7 @@ enum PlaybackStartBench {
             "builds": count(.compositionBuild, from: before, to: after),
             "itemAttaches": count(.playerItemAttach, from: before, to: after),
             "assetOpens": count(.compositionAssetOpen, from: before, to: after),
+            "videoPrerolls": count(.previewPreroll, from: before, to: after),
         ]
     }
 
