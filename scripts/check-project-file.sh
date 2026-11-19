@@ -40,6 +40,7 @@ xcrun swiftc \
   Sources/SrtFlow/TimelineDuration.swift \
   Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditVoiceBand.swift \
+  Sources/SrtFlow/VideoEditClipSoundRole.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \
@@ -150,6 +151,7 @@ xcrun swiftc \
   checks/ProjectFile/OldFreezeTails.swift \
   checks/ProjectFile/WebMotion.swift \
   checks/ProjectFile/VoiceBand.swift \
+  checks/ProjectFile/SoundRole.swift \
   checks/ProjectFile/EditingStyle.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

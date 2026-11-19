@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - The editing style a film was cut with (SS5 plan 5.5, FL-15; `TimelineState.editingStyle`, project format v39)
+// MARK: - The editing style a film was cut with (SS5 plan 5.5, FL-15; `TimelineState.editingStyle`, project format v40)
 //
 // What this owns: what a project remembers about the editing style the AI followed when it changed the film. For a Sky Studio
 // style: its id, the version the film stays on (and that text's checksum) until the user moves it to a newer one. For a preset or

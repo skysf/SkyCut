@@ -33,7 +33,7 @@ func checkVoiceBand(root: URL) throws {
     let text = try String(contentsOf: file, encoding: .utf8)
     checkEqual(text.components(separatedBy: "\"voiceBandDB\"").count - 1, 1, "only the clip with a cut writes the key")
     let raw = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]
-    checkEqual(raw?["formatVersion"] as? Int, 39, "a project with a voice-band cut writes the latest, v39 (it includes the v38 gate)")
+    checkEqual(raw?["formatVersion"] as? Int, 40, "a project with a voice-band cut writes the latest v40 (includes the v38 gate)")
     let loaded = try VideoEditProjectIO.load(from: file).timeline
     checkEqual(loaded.clip(with: shot.id)?.voiceBandDB, -10, "the cut survives a round trip")
     checkEqual(loaded.clip(with: plain.id)?.voiceBandDB, 0, "a clip without the key reads as no cut")

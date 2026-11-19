@@ -76,6 +76,19 @@ for f in Sources/SrtFlow/VideoEditExportSheet.swift Sources/SrtFlow/ExportFolder
 done
 forbid "the subtitle files' \"already there\" comes from the destination check, not from the drive during a redraw" \
   Sources/SrtFlow/SubtitleGen/SubtitleExportSection.swift '^[^/]*FileManager\.default\.fileExists'
+# The panel's subtitle files (2026-11-19, docs/bugfixes/2026-11-19-subtitle-export-replaces-unlisted-file.md): Replace replaces
+# only the files the question named, every other file is written as a new file; scripts/check-export-profile.sh
+# (SubtitlePanelChecks) checks the behaviour through the button's work.
+require "a subtitle file is replaced only when the question named it" \
+  Sources/SrtFlow/SubtitleGen/SubtitleFilesWrite.swift 'if replacing\.contains\(file\.url\) \{'
+require "every other subtitle file is written as a new file" \
+  Sources/SrtFlow/SubtitleGen/SubtitleFilesWrite.swift 'try !SubtitleExportPlanner\.writeNew\(file\.document'
+require "Replace replaces exactly the files the question named" \
+  Sources/SrtFlow/SubtitleGen/SubtitleFilesWrite.swift 'await write\(replacing: Set\(question\)\)'
+forbid "the panel's view never writes subtitle files itself (SubtitleFilesWrite does, off the main thread)" \
+  Sources/SrtFlow/SubtitleGen/SubtitleExportSection.swift '^[^/]*writeValidated\('
+forbid "the panel's subtitle writes never touch the drive on the main thread" \
+  Sources/SrtFlow/SubtitleGen/SubtitleFilesWrite.swift '^[^/]*FileManager\.default'
 forbid "the exporter never moves the finished video on the main thread (ExportDelivery does, on its own queue)" \
   Sources/SrtFlow/VideoEditExporter.swift '^[^/]*\.(moveItem|replaceItemAt|fileExists)\('
 require "the exporter hands the finished video over through ExportDelivery" \

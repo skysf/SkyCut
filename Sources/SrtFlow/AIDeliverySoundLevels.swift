@@ -8,7 +8,8 @@ import Foundation
 // voice band a line is read against), the music accents (the rendered
 // music group at half the engine's rate, read per music clip with MusicAccents, the research's accent reading and listen's, kept
 // where the music is heard: above `audibleDB`), and the place group above 200 Hz in each cut window (DeliveryWindowCollector, the
-// research's brick-wall reading). Readers: window levels in a band, a frame's level, a cut window above 200 Hz.
+// research's brick-wall reading). Readers: window levels in a band, a frame's level, a cut window above 200 Hz, the frames that
+// were measured, and the research's 0.1 s cells over them (DeliveryCells: the music rows and the abrupt-sound row read those).
 // Not here: which clip is which role (AIDeliverySoundRoles), the rules that read these levels (AIDeliveryCutJumps,
 // AIDeliveryMusicSwell). Only on a MediaReadQueue queue (the engine reads files on the calling thread).
 
@@ -76,16 +77,34 @@ struct AIDeliverySoundLevels: Sendable {
 
     /// Mean power over [from, to) timeline seconds (each frame weighted by its overlap), in dBFS.
     func db(_ group: Group, from: Double, to: Double, band: Band = .full) -> Double {
-        guard to > from else { return Self.db(0) }
+        Self.db(meanPower(group, from: from, to: to, band: band))
+    }
+
+    /// Mean power (mean square) over [from, to) timeline seconds, each frame weighted by its overlap.
+    func meanPower(_ group: Group, from: Double, to: Double, band: Band = .full) -> Double {
+        Self.meanPower(grid: grid, from: from, to: to) { power(group, frame: $0, band: band) }
+    }
+
+    /// Every group together over [from, to): the timeline's mix as the groups add up to it (before the limiter).
+    func meanPower(from: Double, to: Double) -> Double {
+        Group.allCases.reduce(0) { $0 + meanPower($1, from: from, to: to) }
+    }
+
+    /// Mean power over [from, to) of any per-frame power (each frame weighted by its overlap; frames it lacks read 0).
+    static func meanPower(grid: MixFrameGrid, from: Double, to: Double, power: (Int) -> Double) -> Double {
+        guard to > from else { return 0 }
         var total = 0.0
         var frame = grid.frame(containing: from)
         while grid.seconds(ofFrame: frame) < to {
             let a = max(from, grid.seconds(ofFrame: frame)), b = min(to, grid.seconds(ofFrame: frame + 1))
-            if b > a { total += power(group, frame: frame, band: band) * (b - a) }
+            if b > a { total += power(frame) * (b - a) }
             frame += 1
         }
-        return Self.db(total / (to - from))
+        return total / (to - from)
     }
+
+    /// The frames the groups were rendered over (timeline frame numbers); outside them every group reads silent.
+    var measured: Range<Int> { first ..< first + (frames.values.map(\.count).max() ?? 0) }
 
     static func db(_ power: Double) -> Double { 10 * log10(max(power, 1e-12)) }
 
@@ -180,5 +199,47 @@ private final class MusicCollector {
                 count = 0
             }
         }
+    }
+}
+
+// MARK: - The research's 0.1 s cells over the measured frames (check_project.py's GRID; the music rows and abrupt sounds)
+
+/// Cell `i` is [i·0.1, (i+1)·0.1) timeline seconds; `range` holds the cells lying wholly inside the measured frames (a cell
+/// outside them would read as silence that was never measured).
+struct DeliveryCells: Sendable {
+    static let seconds = 0.1
+    let range: Range<Int>
+
+    init(_ levels: AIDeliverySoundLevels) {
+        let from = levels.grid.seconds(ofFrame: levels.measured.lowerBound), to = levels.grid.seconds(ofFrame: levels.measured.upperBound)
+        let first = Int((from / Self.seconds - 1e-6).rounded(.up)), last = Int((to / Self.seconds + 1e-6).rounded(.down))
+        range = levels.measured.isEmpty ? 0 ..< 0 : first ..< max(first, last)
+    }
+
+    static func from(_ cell: Int) -> Double { Double(cell) * seconds }
+    static func to(_ cell: Int) -> Double { Double(cell + 1) * seconds }
+    /// The cell holding `time` (its start counts as inside).
+    static func cell(containing time: Double) -> Int { Int((time / seconds + 1e-6).rounded(.down)) }
+    /// How many cells make `seconds` (2.0 s = 20 cells).
+    static func count(_ duration: Double) -> Int { Int((duration / seconds).rounded()) }
+
+    /// A group's level over cell `cell` (dBFS).
+    func db(_ levels: AIDeliverySoundLevels, _ group: AIDeliverySoundLevels.Group, _ cell: Int,
+            band: AIDeliverySoundLevels.Band = .full) -> Double {
+        levels.db(group, from: Self.from(cell), to: Self.to(cell), band: band)
+    }
+
+    /// The runs of true cells at least `minimum` cells long, as offsets into `flags` (half-open).
+    static func runs(_ flags: [Bool], minimum: Int) -> [Range<Int>] {
+        var result: [Range<Int>] = []
+        var start: Int?
+        for (index, flag) in (flags + [false]).enumerated() {
+            if flag, start == nil { start = index }
+            if !flag, let begun = start {
+                if index - begun >= minimum { result.append(begun ..< index) }
+                start = nil
+            }
+        }
+        return result
     }
 }

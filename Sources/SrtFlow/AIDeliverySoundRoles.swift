@@ -9,7 +9,9 @@ import SrtFlowMCPKit
 // 1. inspect_video `sounds`: a clip id, then a track ("A2") or tracks joined with + ("A2+A3") → role. The AI built the timeline
 //    or can listen; SkyCut can't tell an imported music file from an imported wind bed (listening-engine.md section 3: the
 //    trait words describe, they don't classify).
-// 2. Otherwise where the clip came from (AIListenVoicePlan.Provenance, the same reading as listen voice=…): our voice-overs and
+// 2. Otherwise the role saved on the clip (`EditClip.soundRole`, project format v39; VideoEditClipSoundRole.swift): said once,
+//    it holds for every later report, split halves and separated sound included.
+// 3. Otherwise where the clip came from (AIListenVoicePlan.Provenance, the same reading as listen voice=…): our voice-overs and
 //    effects by folder, library music / effects by manifest id, generated audio as music, a video clip's sound as camera.
 // Measuring groups: the place (camera, ambience, object, other) is what jumps at a cut (MCP-37); voice, music and effects may
 // cover a jump. Also: the audio tracks the voice check can take (every clip with sound on it is voice), and a per-track summary
@@ -20,11 +22,22 @@ import SrtFlowMCPKit
 enum DeliverySoundRole: String, CaseIterable, Sendable {
     case voice, music, effects, ambience, object, camera, other
 
-    /// The values `sounds` takes (camera and other are what SkyCut itself knows or doesn't).
-    static let named: [DeliverySoundRole] = [.voice, .music, .effects, .ambience, .object]
+    /// The values `sounds` takes and a clip can be saved as (ClipSoundRole; camera and other are what SkyCut itself knows or
+    /// doesn't).
+    static let named: [DeliverySoundRole] = ClipSoundRole.allCases.map(DeliverySoundRole.init)
 
     /// The sound of the place: a picture's own recording and whatever was added to sound like that place.
     var isPlace: Bool { self == .camera || self == .ambience || self == .object || self == .other }
+
+    init(_ saved: ClipSoundRole) {
+        switch saved {
+        case .voice: self = .voice
+        case .music: self = .music
+        case .effects: self = .effects
+        case .ambience: self = .ambience
+        case .object: self = .object
+        }
+    }
 
     init(_ kind: AIListenVoicePlan.Kind) {
         switch kind {
@@ -113,7 +126,8 @@ struct AIDeliverySoundRoles: Sendable {
             let clips = AIListenVoicePlan.audioClips(name, state: state)
             perTrack.append((name, clips))
             for clip in clips {
-                roles[clip.id] = request.clips[clip.id] ?? request.tracks[name] ?? DeliverySoundRole(provenance.kind(of: clip))
+                roles[clip.id] = request.clips[clip.id] ?? request.tracks[name] ?? clip.soundRole.map(DeliverySoundRole.init)
+                    ?? DeliverySoundRole(provenance.kind(of: clip))
             }
         }
         var voiceTracks: [String] = []

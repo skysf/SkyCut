@@ -94,6 +94,8 @@ struct EditClip: Identifiable, Hashable, Sendable {
     var soundScene: SoundScene?
     /// Its own voice band (300 Hz–3 kHz) lowered this many dB, −30…0, 0 = off (`VoiceBand`; sound-scenes.md section 5).
     var voiceBandDB = 0.0
+    /// What its sound is, saved (v39); nil = inferred from where it came from (VideoEditClipSoundRole.swift).
+    var soundRole: ClipSoundRole?
 
     /// 这段的素材是 upscale 出来的文件时，记着原片在哪、新文件的 0 秒对应原片的第几秒、用的哪个档位
     /// （换回原片、再次 upscale 都靠它；合同见 VideoEditClipUpscale.swift）。不进 `init`（同 `markers`）。
@@ -248,36 +250,6 @@ struct EditClip: Identifiable, Hashable, Sendable {
         if isAlphaStill { return .premultiplied }
         return stillImageURL == nil ? info?.alpha ?? .opaque : .opaque
     }
-
-    /// 此刻实际生效的画面摆放：用户摆过的优先；没摆过按默认布局换算。
-    /// 预览里的选中框和拖动起点都从这里取，跟合成/导出的默认摆法一致。
-    func resolvedPlacement(canvas: CGSize) -> ClipPlacement {
-        placement ?? defaultPlacement(canvas: canvas)
-    }
-
-    /// 默认布局：等比铺满画布、居中，**不分轨道**。
-    ///
-    /// 上层视频轨和主轨走完全同一份账（2026-09-17 起）—— 上层轨不再是「画中画」，
-    /// 它就是另一条对等的视频轨，内容一样铺满画面。等比是 contain：比例对不上
-    /// 的素材两侧留空，**留空处不画黑**，露出的是下面那一层（主轨的下面是画布
-    /// 黑底，上层轨的下面是主轨画面）—— 这来自 overlay 合成本身，不要额外补
-    /// `pad`，补了就会把下层遮死。
-    ///
-    /// 裁切过的段按**裁后的宽高比**摆（裁成 1:1 就显示成正方形）。
-    /// Inspector 的 Scale/Position 以它为 100%/原点基准。
-    func defaultPlacement(canvas: CGSize) -> ClipPlacement {
-        guard let display = croppedDisplaySize,
-              canvas.width > 0, canvas.height > 0 else {
-            return ClipPlacement(centerX: 0.5, centerY: 0.5, width: 1, height: 1)
-        }
-        let scale = min(canvas.width / display.width, canvas.height / display.height)
-        return ClipPlacement(
-            centerX: 0.5,
-            centerY: 0.5,
-            width: display.width * scale / canvas.width,
-            height: display.height * scale / canvas.height
-        )
-    }
 }
 
 // MARK: - 时间线整体状态
@@ -356,7 +328,7 @@ struct TimelineState: Hashable, Sendable {
     var deliveryIntentions: [DeliveryIntentionalMark] = []
     /// Explicit project ending, in timeline seconds. Zero follows the content; later content can extend beyond it.
     var minimumDuration = 0.0
-    /// The editing style this film was cut with (v39, SS5 plan 5.5): a Sky Studio style keeps its version here. Nil until AI follows one.
+    /// The editing style this film was cut with (v40, SS5 plan 5.5): a Sky Studio style keeps its version here. Nil until AI follows one.
     var editingStyle: EditingStyleRecord?
 
     var isEmpty: Bool {
@@ -546,7 +518,7 @@ extension TimelineState: Codable {
         minimumDuration = TimelineDuration.sanitized(try c.decodeIfPresent(Double.self, forKey: .minimumDuration) ?? 0)
         production = try c.decodeIfPresent(FilmProductionState.self, forKey: .production)
         deliveryIntentions = try c.decodeIfPresent([DeliveryIntentionalMark].self, forKey: .deliveryIntentions) ?? []
-        editingStyle = try? c.decodeIfPresent(EditingStyleRecord.self, forKey: .editingStyle)   // v39; a record that does not read is dropped
+        editingStyle = try? c.decodeIfPresent(EditingStyleRecord.self, forKey: .editingStyle)   // v40; a record that does not read is dropped
         mainClips = try c.decodeIfPresent([EditClip].self, forKey: .mainClips) ?? []
         mainHidden = try c.decodeIfPresent(Bool.self, forKey: .mainHidden) ?? false
         mainMagnet = try c.decodeIfPresent(Bool.self, forKey: .mainMagnet) ?? false   // 2026-10-02 起才有：缺键 = 关

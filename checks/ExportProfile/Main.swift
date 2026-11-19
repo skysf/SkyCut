@@ -137,6 +137,9 @@ import SrtFlowMCPKit
             // The export panel writes the file it checked and asked about (2026-11-19 case).
             print("PANEL TARGET: the file checked, asked about and written is one"); fflush(stdout)
             await PanelTargetChecks.run(root: root, project: project, require: require)
+            // ...and its subtitle files replace only what the replace question named (2026-11-19 case).
+            print("SUBTITLE PANEL: one replace decision per file"); fflush(stdout)
+            await SubtitlePanelChecks.run(root: root, require: require)
             // Compress / Burn In never overwrite or delete a file that is not the job's own (2026-11-19 case).
             print("ENCODE QUEUE: one name per job, ffmpeg writes only the job's own file"); fflush(stdout)
             await EncodeQueueChecks.run(root: root, ffmpeg: ffmpeg, project: project, require: require)

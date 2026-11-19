@@ -56,6 +56,7 @@ enum TimelineClipSplit {
         // 声音场景跟着声音走：两半各带同一个（余音越过段尾，切开前后听起来一样）。
         right.soundScene = left.soundScene
         right.voiceBandDB = left.voiceBandDB   // the voice-band cut follows the sound too (sound-scenes.md section 5)
+        right.soundRole = left.soundRole       // so does what the sound is (VideoEditClipSoundRole.swift)
         // upscale 的来源也要跟过来（从旧段构造新段漏字段的老坑：docs/bugfixes/2026-09-26-split-drops-hidden-and-library-key.md）。
         right.upscale = left.upscale
         right.webMotion = left.webMotion
