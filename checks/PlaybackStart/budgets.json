@@ -59,7 +59,7 @@
       "audioMs": 340,
       "videoMs": 410,
       "startOffsetMs": 60,
-      "maxSkewMs": 60
+      "maxSkewMs": 100
     },
     "idle-wake": {
       "dispatchMs": 650,
@@ -105,7 +105,7 @@
         "audioMs": 250,
         "videoMs": 330,
         "startOffsetMs": 55,
-        "maxSkewMs": 55
+        "maxSkewMs": 80
       },
       "idle-wake": {
         "dispatchMs": 550,

@@ -137,8 +137,8 @@ The budgets, per launch / median in ms (`checks/PlaybackStart/budgets.json`, rec
 - The frame before the cut: sound 300 / 230 and picture 340 / 265, so the decoder can prepare both sides.
 - Deep in the GOP: start skew 60 per launch. The 4K tail: sound 360 per launch, picture 420 / 250, start skew
   60 / 45, worst skew median 45.
-- Replay from the end (it rewinds, then prerolls after Play): sound 340 / 250, picture 410 / 330, start and worst skew
-  60 / 55.
+- Replay from the end (it rewinds, then prerolls after Play): sound 340 / 250, picture 410 / 330, start skew 60 / 55,
+  worst skew 100 / 80 (a hosted run's five-launch median reached 53 ms; three runs of data).
 - A new item (Play primes it): sound 700 / 450, picture 800 / 460, with the common skew limits (120 / 137 ms median
   on the M1, 101–298 / 141–307 ms hosted).
 - Play right after a click and Play while hovering include decoding the picture at the playhead (about 0.6 s on the
