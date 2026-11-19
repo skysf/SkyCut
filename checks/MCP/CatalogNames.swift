@@ -126,6 +126,9 @@ func catalogKnownNames() -> Set<String> {
     // listen beats=true and a generated music job's music (2026-11-18, MCP-43, AIMusicShapeReport): the strongest accents, the weaker
     // ones past the cap, where the piece's own sound ends.
     names.formUnion(["strongest_accents", "more_accents", "ends_at"])
+    // Sky Studio's editing styles in recipes (2026-11-19, SS5 plan 5.1, AIRecipeTools): the source value and the listing line
+    // sky_studio, and fetched_at on a style read from this Mac's copy.
+    names.formUnion(["sky_studio", "fetched_at"])
     return names
 }
 
