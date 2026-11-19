@@ -6,12 +6,20 @@ import SrtFlowMCPKit
 // Owns `audio_music_edge`, the production research's check_project.py rule 6 (the preview board's music_edge), and the picture
 // events it reads, which the abrupt-sound row reads too (`pictureEvents`): every picture cut (AIDeliveryCutJumps.pictureCuts,
 // cuts to and from black included), where the first picture appears, and where a title (a visible text) appears. The research
-// also counted events inside a shot (a ship hitting ice), which SkyCut can't know (MCP-40's third tier).
+// also counted events inside a shot (a ship hitting ice), which SkyCut can't know (MCP-40's third tier); for music edges a line
+// spoken in a picture's own sound starting or ending stands in for one (`musicEvents`; the shared rules let music enter on the
+// laugh). In the human film the one in-shot event a music entry sat on was a person starting to speak (1:03.19), but in a
+// lip-synced recording on an audio track, which this does not see: SkyCut reports that entry, mark it intentional.
 // The rule, per music clip (what AIDeliverySoundRoles takes as music), at its start and at its end:
 // - not judged where it fades (0.3 s or more), at the film's first 0.05 s or last 0.1 s, where the same file carries on in the
 //   next clip (one piece split in two), or where another music clip plays across the edge (0.3 s each side) and is heard there
 //   above −40 dBFS (a layer added or taken away over a bed);
 // - not judged where it is quiet: the music group stays under −40 dBFS over the 0.3 s inside the edge;
+// - not judged where the music's own hit is at the edge (a music accent within 3 frames, `AIDeliveryCutJumps.accentFrames`,
+//   AIDeliverySoundLevels.accents): music entering or stopping on its hit was placed there (add_clips hit_at, the shared rules'
+//   taste 18), most likely on something in the picture SkyCut can't see. On the research's material this is what told the
+//   deliberate entries apart: the second draft's two (on the board's in-shot moments) and the human film's 1:03.20 start on a hit
+//   1–2 frames in; the human film's 1:37.23, the research's one case, has none within 0.7 s;
 // - otherwise the nearest picture event more than 6 frames away is reported. The human film had one (1:37.23, a piece entering
 //   17 frames before a cut, the research: "maybe on a hit in the music itself — listen"): mark such ones intentional.
 // Thresholds are the research's (delivery-checks.md in the research folder); not validated across genres.
@@ -53,6 +61,10 @@ enum AIDeliveryMusicEdges {
         return times.sorted()
     }
 
+    /// What a music edge may sit on: the picture events and where a line spoken in a picture's own sound starts or ends
+    /// (transcripts or narration subtitles; AIDeliverySound.cameraSpeech).
+    static func musicEvents(_ sound: AIDeliverySound) -> [Double] { (sound.events + sound.cameraSpeech).sorted() }
+
     /// The music clips among the sounds the export plays.
     static func clips(_ state: TimelineState, sounds: [AIDeliveryCutJumps.Sound]) -> [Clip] {
         sounds.filter { $0.role == .music }.compactMap { sound in
@@ -78,12 +90,13 @@ enum AIDeliveryMusicEdges {
                 let inside = entering ? (time, time + edgeSeconds) : (time - edgeSeconds, time)
                 let loudest = stride(from: inside.0, to: inside.1 - 1e-9, by: DeliveryCells.seconds)
                     .map { levels.db(.music, from: $0, to: min(inside.1, $0 + DeliveryCells.seconds)) }.max() ?? -120
-                guard loudest >= loudDB else { continue }
+                guard loudest >= loudDB,
+                      !levels.accents.contains(where: { abs($0.time - time) * fps <= AIDeliveryCutJumps.accentFrames }) else { continue }
                 let nearest = events.min { abs($0 - time) < abs($1 - time) }
                 let frames = nearest.map { ((time - $0) * fps).rounded() }
                 if let frames, abs(frames) <= eventFrames { continue }
-                let near = nearest.map { String(format: "%+.0f frames from the nearest picture event (%.2f s: a cut or a title)", frames ?? 0, $0) }
-                    ?? "with no cut or title anywhere"
+                let near = nearest.map { String(format: "%+.0f frames from the nearest event in the picture (%.2f s: a cut, a title or a line "
+                    + "spoken in the picture)", frames ?? 0, $0) } ?? "with no cut, title or line anywhere"
                 var details: [String: JSONValue] = ["edge": .string(entering ? "in" : "out")]
                 if let nearest, let frames { details["event_at"] = AIFormat.seconds(nearest); details["frames_from_event"] = .number(frames) }
                 result.append(AIInspection.Finding(

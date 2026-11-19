@@ -99,11 +99,13 @@ enum MCPGuideOutputTopics {
             opening line starting inside those 3 s lets it wait until 3 s after the line ends. audio_no_score: 15 s or more with \
             neither music nor an effect of 3 s or more (a long tone or a riser), a reminder; a video with no music at all gets only \
             the grey hint audio_no_music in hints. audio_music_edge: music starting or stopping without a fade of 0.3 s, above -40 \
-            dBFS, more than 6 frames from a picture cut, the first picture or a title appearing (edge in or out, event_at, \
-            frames_from_event); not where another music plays across it or the same file carries on. audio_abrupt: an effect or an \
-            object peaking above -30 dBFS and 15 dB over the rest of the mix (the median of 3 s each side), more than 6 frames from a \
-            cut or a title. The lines are the production research's, from one human film and two AI drafts: mark deliberate ones \
-            intentional (a music edge on a hit in the music itself, a held breath before a big hit).
+            dBFS, more than 6 frames from a picture cut, the first picture, a title appearing or a line spoken in the picture \
+            starting or ending (edge in or out, event_at, frames_from_event); not where another music plays across it, the same \
+            file carries on, or the music's own hit is at the edge (an accent within 3 frames: placed there on purpose, as with \
+            add_clips hit_at). audio_abrupt: an effect or an object peaking above -30 dBFS and 15 dB over the rest of the mix (the \
+            median of 3 s each side), more than 6 frames from a cut or a title. The lines are the production research's, from one \
+            human film and two AI drafts: mark deliberate ones intentional (a music edge on a hit in the music itself, a held breath \
+            before a big hit).
             """),
             MCPGuideSection(name: "intentional", about: "mark, review or clear any finding with one undo step", text: """
             Every finding has a key. Call inspect_video intentional={job_id:<completed report>,key:<finding key>,reason:<one \

@@ -64,7 +64,7 @@ enum AIDeliveryChecks {
                 + AIDeliveryMusic.noMusic(sounds: $0.sound.sounds, duration: $0.sound.duration, scope: $0.scope)
         }),
         Check(id: "music_edges", run: {
-            AIDeliveryMusicEdges.findings($0.sound.musicClips, events: $0.sound.events, levels: $0.sound.levels,
+            AIDeliveryMusicEdges.findings($0.sound.musicClips, events: AIDeliveryMusicEdges.musicEvents($0.sound), levels: $0.sound.levels,
                                           duration: $0.sound.duration, scope: $0.scope)
         }),
         Check(id: "abrupt", run: { AIDeliveryAbrupt.findings($0.sound.abrupt, levels: $0.sound.levels, events: $0.sound.events, scope: $0.scope) })

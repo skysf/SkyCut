@@ -151,6 +151,15 @@ enum MusicRowRuleChecks {
         require(found([AIDeliveryMusicEdges.Clip(id: clip.id, url: file, start: 2, end: 5, fadeIn: 0.5, fadeOut: 0.3)]).isEmpty,
                 "a fade of 0.3 s or more is not a hard edge")
         require(found([clip], level: -45).isEmpty, "music under -40 dBFS at its edge is not a hard edge")
+        func accented(_ at: Double) -> [AIInspection.Finding] {
+            var made = levels(8, [.music: { t in clip.start <= t && clip.end > t ? -20 : -120 }])
+            made = AIDeliverySoundLevels(grid: made.grid, first: made.first, frames: made.frames, accents: [.init(time: at, strength: 8)])
+            return AIDeliveryMusicEdges.findings([clip], events: [0, 3], levels: made, duration: 8, scope: scope(8))
+        }
+        require(accented(2 + 2.0 / 24).map { $0.details["edge"]?.stringValue ?? "" } == ["out"],
+                "music entering on its own hit (an accent 2 frames in) was placed there: only its stop is hard")
+        require(accented(2 + 5.0 / 24).count == 2, "a hit 5 frames in is not the entry's")
+        require(accented(5 - 1.0 / 24).map { $0.details["edge"]?.stringValue ?? "" } == ["in"], "a stop on the music's hit was placed there too")
         let next = AIDeliveryMusicEdges.Clip(id: UUID(), url: file, start: 5, end: 7, fadeIn: 0, fadeOut: 0.5)
         require(found([clip, next]).count == 1 && found([clip, next])[0].details["edge"] == "in",
                 "the same file carrying on in the next clip is one piece split in two: only its first entry")
@@ -159,6 +168,12 @@ enum MusicRowRuleChecks {
         require(found([bed]).isEmpty, "music from the film's first moment to its end has no edge to judge")
         require(found([clip], events: []).count == 2 && found([clip], events: [])[0].details["frames_from_event"] == nil,
                 "with no cut or title anywhere every hard edge is reported")
+        var spoken = AIDeliverySound()
+        spoken.events = [0, 3]
+        spoken.cameraSpeech = [2.05, 4.5]
+        require(AIDeliveryMusicEdges.musicEvents(spoken) == [0, 2.05, 3, 4.5] && found([clip], events: AIDeliveryMusicEdges.musicEvents(spoken))
+                    .map { $0.details["edge"]?.stringValue ?? "" } == ["out"],
+                "a line in the picture's own sound starting at 2.05 is something to enter on; the stop is still hard")
     }
 
     // MARK: A sound jumping out of the mix (rule 12, a reminder)
