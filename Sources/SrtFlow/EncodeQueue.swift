@@ -70,7 +70,8 @@ struct EncodeItem: Identifiable {
 ///
 /// Each item's output name is picked against the files in its folder and every other item still to be written, and held
 /// until the item ends (`target`); the encode writes only the job's own file and never replaces or removes anything else
-/// (EncodeJob; docs/architecture/export-settings.md §5 item 8).
+/// (EncodeJob; docs/architecture/export-settings.md §5 item 8). The folder's names and the finished file's size are asked
+/// only off the main thread (EncodeOutputFolder): the queue never waits on a drive on the main thread.
 @MainActor
 final class EncodeQueue: ObservableObject {
 
@@ -94,6 +95,8 @@ final class EncodeQueue: ObservableObject {
 
     private var currentJob: EncodeJob?
     private var currentItemID: EncodeItem.ID?
+    /// The only way the queue asks a drive (EncodeOutputFolder), off the main thread; the checks pass one that does not answer.
+    var probe: ExportDestinationProbe = .shared
 
     /// `memory`：这个队列记住的设置存在哪；创建时就读回来（EncodeQueueMemory）。
     init(outputSuffix: String, requiresSubtitles: Bool = false, memory: EncodeQueueMemory.Keys? = nil) {
@@ -128,6 +131,7 @@ final class EncodeQueue: ObservableObject {
     // MARK: - 队列维护
 
     func add(urls: [URL], burnIn: BurnInRequest? = nil) {
+        var added: [EncodeItem.ID] = []
         for url in urls {
             // 同一个文件不重复排队。
             guard !items.contains(where: { $0.inputURL == url && !$0.isDone }) else { continue }
@@ -138,14 +142,17 @@ final class EncodeQueue: ObservableObject {
             )
             item.status = .waiting
             items.append(item)
+            added.append(item.id)
             probeInfo(for: item.id)
         }
+        nameAgainstDrive(added)
     }
 
     /// AI 用：带着自己的设置排一条，成品放进 `folder`（名字和页面上排的同一条规矩，`target`）。同一个文件已经在排队就 nil。
-    func add(_ url: URL, in folder: URL, settings: VideoEncodeSettings, burnIn: BurnInRequest? = nil) -> EncodeItem.ID? {
+    /// `taken`: the folder's names, which the AI tool looked at off the main thread before (AIEncodeFolder).
+    func add(_ url: URL, in folder: URL, settings: VideoEncodeSettings, burnIn: BurnInRequest? = nil, taken: Set<String>) -> EncodeItem.ID? {
         guard !items.contains(where: { $0.inputURL == url && !$0.isDone }) else { return nil }
-        var item = EncodeItem(inputURL: url, target: target(for: url, in: folder), burnIn: burnIn)
+        var item = EncodeItem(inputURL: url, target: target(for: url, in: folder, taken: taken), burnIn: burnIn)
         item.ownSettings = settings
         items.append(item)
         probeInfo(for: item.id)
@@ -203,28 +210,42 @@ final class EncodeQueue: ObservableObject {
 
     /// 设置变了要重算输出名（比如从压缩切到烧字幕），但只动还没跑的。Each is picked again against the others in turn.
     func refreshOutputPaths() {
+        var renamed: [EncodeItem.ID] = []
         for index in items.indices where items[index].status == .waiting && items[index].ownSettings == nil {
             let input = items[index].inputURL
             items[index].target = target(for: input, in: outputDirectory ?? input.deletingLastPathComponent(), for: items[index].id)
+            renamed.append(items[index].id)
         }
+        nameAgainstDrive(renamed)
     }
 
     /// The name an item gets in `folder`: also never one planned by another item still to be written (waiting, probing,
     /// running; `id`: the item being named again). The item holds the name until it ends, so two inputs with one file name
-    /// never get one output (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
-    private func target(for input: URL, in folder: URL, for id: EncodeItem.ID? = nil) -> ExportTarget {
-        let stem = input.deletingPathExtension().lastPathComponent + outputSuffix
-        let planned = Set(items.filter { !$0.isDone && $0.id != id }.map { Self.key($0.target.url) })
-        // 撞名加编号（规则只有 ExportFileName 一份）；绝不能写到源文件上：ffmpeg 同时读写一个文件会把源文件毁掉。
-        let number = ExportFileName.unoccupiedNumber(in: folder, stem: stem, pathExtension: "mp4") { candidate in
-            planned.contains(Self.key(candidate)) || candidate.standardizedFileURL == input.standardizedFileURL
-                || FileManager.default.fileExists(atPath: candidate.path)
-        }
-        return .newFile(folder: folder, stem: stem, pathExtension: "mp4", number: number)
+    /// never get one output (docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md). `taken`: the folder's names as
+    /// last looked at off the main thread; this never asks the drive itself.
+    private func target(for input: URL, in folder: URL, for id: EncodeItem.ID? = nil, taken: Set<String> = []) -> ExportTarget {
+        let planned = Set(items.filter { !$0.isDone && $0.id != id }.map { EncodeOutputFolder.key($0.target.url) })
+        return EncodeOutputFolder.target(for: input, in: folder, suffix: outputSuffix, planned: planned, taken: taken)
     }
 
-    /// Names compared the way the default macOS volumes compare them (`Clip` and `clip` are one file).
-    private static func key(_ url: URL) -> String { ExportDestinationReport.fold(url.standardizedFileURL.path) }
+    /// Names `ids` again against their folders' names once the look at each folder is back (off the main thread, with a
+    /// deadline): until then an item is named against the other items and its input only. Items that started, ended or moved
+    /// to another folder meanwhile keep their names; a folder that is missing or does not answer keeps them too. A name taken
+    /// on the drive after all this is still never replaced: the encode moves on to the next number (EncodeJob).
+    private func nameAgainstDrive(_ ids: [EncodeItem.ID]) {
+        let folders = Set(ids.compactMap { id in items.first { $0.id == id }?.target.url.deletingLastPathComponent() })
+        for folder in folders {
+            Task {
+                guard let taken = await EncodeOutputFolder.names(in: folder, probe: probe) else { return }
+                for id in ids {
+                    guard let index = items.firstIndex(where: { $0.id == id }),
+                          items[index].status == .waiting || items[index].status == .probing,
+                          items[index].target.url.deletingLastPathComponent() == folder else { continue }
+                    items[index].target = target(for: items[index].inputURL, in: folder, for: id, taken: taken)
+                }
+            }
+        }
+    }
 
     private func probeInfo(for id: EncodeItem.ID) {
         Task {
@@ -338,9 +359,10 @@ final class EncodeQueue: ObservableObject {
 
         switch outcome {
         case .finished(let output):
+            let bytes = await EncodeOutputFolder.size(of: output, probe: probe)
             guard let index = items.firstIndex(where: { $0.id == id }) else { return }
             items[index].deliveredURL = output
-            items[index].outputBytes = MediaProbe.byteSize(of: output)
+            items[index].outputBytes = bytes
             items[index].progress = 1
             items[index].speed = nil
             items[index].etaSeconds = nil

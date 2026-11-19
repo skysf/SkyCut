@@ -564,7 +564,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      用户先开始或移掉。同一个文件已经在队列里（没跑完）也不重复排。
    - 做出来的文件默认放 `<起点>/SkyCut/导出`（第 10 条）；AI 给了 `folder`（绝对路径或相对打开的文件夹、不存在就建，和
      `export_subtitles` 的同名同义）就放那儿 —— 2026-10-15 用户转来的反馈：转出来的字幕文件固定落在导出文件夹里，还得再调一次
-     `manage_files` 挪进成品文件夹。三个工具都只在 `AIEncodeTools.outputFolder` 一处读它（`scripts/check-mcp.sh` 扫描钉着，
+     `manage_files` 挪进成品文件夹。三个工具都只在 `AIEncodeTools.outputFolder` 一处读它（since 2026-11-19 `AIEncodeFolder`, which
+     makes, checks and lists the folder off the main thread and refuses an unusable one before anything is queued or written,
+     [case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)；`scripts/check-mcp.sh` 扫描钉着，
      定义里有这个参数由 `EncodeChecks` 钉着）。名字是页面那套（`_compressed`、`_sub`），撞了加编号：硬盘上有的、
      队列里别的条目要写的、同一批前面用掉的都算撞 —— **从不覆盖，所以不问**。读点名文件夹以外的文件照样先问
      （`AIWorkspace.confirmReading`，读文件的工具都走它）。Since 2026-11-19 the queue names the AI's items by the page's

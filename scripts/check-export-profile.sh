@@ -32,6 +32,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ExportProfile/DestinationChecks.swift \
   checks/ExportProfile/AIExportFolderChecks.swift checks/ExportProfile/ExportTargetChecks.swift \
   checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/EncodeQueueChecks.swift \
+  checks/ExportProfile/EncodeOffMainChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=320x180:r=30 \
