@@ -36,6 +36,7 @@ xcrun swiftc \
   Sources/SrtFlow/ChainedScrub.swift \
   Sources/SrtFlow/VideoDriftCheck.swift \
   Sources/SrtFlow/PlaybackTimeEstimate.swift \
+  Sources/SrtFlow/PlaybackStartSync.swift \
   Sources/SrtFlow/MainThreadWatchdog.swift \
   Sources/SrtFlow/MainThreadStackCapture.swift \
   Sources/SrtFlow/PacedPlayhead.swift \

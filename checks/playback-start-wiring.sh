@@ -112,10 +112,22 @@ if ! awk '
   /preparePositionedPreview\(request, at: start, seekFinished: true\)/ { prime = NR }
   /positionPreview\(at: CMTime\(seconds: start/ { place = NR }
   /source.play\(from: start\)/ { if (!first) first = NR }
-  gate && /anchorVideo\(to: / { if ($0 !~ /anchorVideo\(to: nil\)/) seeking = 1 }
+  gate && /anchorVideo\(to: / { if ($0 !~ /anchorVideo\(to: nil[,)]/) seeking = 1 }
   END { exit !(gate && prime > gate && place > gate && first > place && !seeking) }
 ' <<<"$(sed 's,//.*,,' <<<"${start}")"; then
   fail "Play must place and prime the picture before starting the sound, and never re-seek it while starting"
+fi
+
+# A just-started output device renders a while after Play: both clocks wait for it, then start on its next quantum.
+if ! awk '
+  /guard source.isRendering else [{]/ { waiting = NR }
+  /outputStart.begin\(until: / { wait = NR }
+  /source.play\(from: start\)/ { if (wait && !sound) sound = NR }
+  /anchorVideo\(to: nil, atHostTime: host\)/ { picture = NR }
+  END { exit !(waiting && wait > waiting && sound > wait && picture > sound) }
+' <<<"$(sed 's,//.*,,' <<<"${start}")" ||
+  ! grep -F 'var isRendering: Bool { mode != .realtime || !config.hasSound || renderClock.hasTicked }' "${engine}" >/dev/null; then
+  fail "After the idle stop both clocks must wait for the output device to render and start on the same quantum"
 fi
 
 # A pause leaves the picture positioned where it stopped; a hover that ends places it back on the playhead.

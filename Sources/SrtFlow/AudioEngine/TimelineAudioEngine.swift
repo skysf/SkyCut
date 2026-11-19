@@ -454,6 +454,20 @@ final class TimelineAudioEngine {
     /// 自检用：喂样线程是不是都歇着（图故意停着时该歇着；后台起图没起来之后也要歇回去）。
     var feedersResting: Bool { units.allSatisfy(\.feeder.isResting) }
 
+    /// The graph has rendered since it (re)started, so a Play is pinned to its next quantum (known sample and host time).
+    /// A timeline without sound never starts the graph: its playhead runs on the host clock and has nothing to wait for.
+    var isRendering: Bool { mode != .realtime || !config.hasSound || renderClock.hasTicked }
+
+    /// The host time at which the playing anchor's position reaches the output: the latest render's host time plus the
+    /// frames from that render to the anchor's sample time (the next quantum after a Play). Nil while not pinned.
+    var startHostTime: UInt64? {
+        guard let anchor = anchor.load(), anchor.playing, let start = anchor.sampleTime, renderClock.hasTicked else { return nil }
+        let sample = currentSampleTime
+        let host = renderClock.hostTime.load(ordering: .relaxed)
+        guard host > 0 else { return nil }
+        return AVAudioTime.hostTime(forSeconds: AVAudioTime.seconds(forHostTime: host) + Double(start - sample) / Self.sampleRate)
+    }
+
     /// 自检和实测用（量「按下播放到第一拍」）：在播的锚点被渲染块渲到了没有；渲到了给最近一拍出声卡的 host 时间。
     var renderedHostTime: UInt64? {
         guard let anchor = anchor.load(), anchor.playing, let start = anchor.sampleTime,

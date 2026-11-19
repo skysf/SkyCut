@@ -19,4 +19,15 @@ protocol PlaybackAudioSource: AnyObject {
     func play(from seconds: Double)
     func pause()
     func seek(to seconds: Double)
+    /// False while an output device that has just started (the idle stop, a system stop) has not rendered yet: when the
+    /// sound would begin is unknown. Once it renders, a Play is pinned to its next quantum, a known host time, and the
+    /// clock starts the picture there too (docs/architecture/playback-start.md).
+    var isRendering: Bool { get }
+    /// The host time at which the playing position reaches the output, once it is pinned to a rendered quantum.
+    var startHostTime: UInt64? { get }
+}
+
+extension PlaybackAudioSource {
+    var isRendering: Bool { true }
+    var startHostTime: UInt64? { nil }
 }

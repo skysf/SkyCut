@@ -51,6 +51,8 @@ final class PlayerClock: ObservableObject {
     private var previewIsUnprimed = false
     /// A pause is waiting for the native picture to report where it stopped (`holdPausedPicture`).
     private var pausedPictureRequested = false
+    /// A Play waiting for a just-started output device to render, so that both clocks can start on a known quantum.
+    private let outputStart = OutputStartWait()
     private weak var previewLayer: AVPlayerLayer?
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
@@ -239,11 +241,12 @@ final class PlayerClock: ObservableObject {
         anchorVideo(to: audio)
     }
 
-    /// Start at the current host time. With no explicit target, reuse the native preview's prepared position.
-    private func anchorVideo(to seconds: TimeInterval?) {
+    /// Start at `host` (now when nil). With no explicit target, reuse the native preview's prepared position.
+    private func anchorVideo(to seconds: TimeInterval?, atHostTime host: UInt64? = nil) {
         guard player.status == .readyToPlay, player.currentItem?.status == .readyToPlay else { return }
         let target = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .invalid
-        player.setRate(1, time: target, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
+        let start = host.map { CMClockMakeHostTimeFromSystemUnits($0) } ?? CMClockGetTime(CMClockGetHostTimeClock())
+        player.setRate(1, time: target, atHostTime: start)
         positionedTime = nil
     }
 
@@ -312,14 +315,27 @@ final class PlayerClock: ObservableObject {
                 return
             }
             guard let restarted = recoverAudioIfNeeded(source) else { return }
+            guard source.isRendering else {
+                // The output device has just started (the idle stop, a system stop) and not rendered yet: both clocks
+                // start together on its first known quantum, the picture never ahead of the sound.
+                playbackRequested = true
+                outputStart.begin(until: { [weak source] in source?.isRendering ?? true }) { [weak self, weak source] in
+                    guard let self, let source, playbackRequested, audioSource === source else { return }
+                    playbackRequested = false
+                    positionedTime = nil
+                    source.play(from: start)
+                    // The sound is pinned to the output's next quantum; the picture starts at its host time, no seek.
+                    if let host = source.startHostTime { anchorVideo(to: nil, atHostTime: host) } else { player.playImmediately(atRate: 1) }
+                }
+                return
+            }
+            positionedTime = nil
+            source.play(from: start)
             if restarted {
                 // The output device restarted under the positioned picture: start it on the new audio host clock.
-                source.play(from: start)
                 anchorVideo(to: nil)
             } else {
-                positionedTime = nil
                 player.playImmediately(atRate: 1)
-                source.play(from: start)
             }
         } else {
             player.play()
@@ -414,6 +430,7 @@ final class PlayerClock: ObservableObject {
 
     private func invalidatePreviewSeek() {
         pausedPictureRequested = false
+        outputStart.cancel()
         let wasPositioning = previewSeek != nil
         previewSeek = nil
         positionedTime = nil
@@ -548,6 +565,7 @@ final class PlayerClock: ObservableObject {
 
     func pause() {
         playbackRequested = false
+        outputStart.cancel()
         if previewSeek == nil { readiness.clear() }
         let wasPlaying = audioSource?.isPlaying == true && player.rate > 0
         audioSource?.pause()
@@ -558,35 +576,22 @@ final class PlayerClock: ObservableObject {
         }
     }
 
-    /// Paused playback leaves a positioned picture: the playhead and the sound move to the frame the picture stopped on,
-    /// so the next Play continues it without a native seek. Before 2026-11-19 the next Play sent the sound from the
-    /// clock's last tick and re-seeked the picture there; on a long-GOP source the picture stayed frozen for 0.8 s
-    /// while the sound played (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
-    /// The stopped time comes from the item's timebase once it has stopped (usually inside `pause()`), or else from
-    /// the time observer, which AVFoundation also calls when playback stops. A stopped `CMTimebase` is read without
-    /// the player's queue (`currentTime()` waits on it: checks/player-time-no-sync-read.sh). A picture that did not
-    /// stop where the sound did (a stall, a drift correction still seeking) is placed precisely at the sound instead,
-    /// and a Play pressed meanwhile waits for it.
+    /// Paused playback leaves a positioned picture on the frame it stopped on (`PausedPictureHold` has the rule and why),
+    /// read from the stopped timebase inside `pause()` or from the time observer's stop callback.
     private func holdPausedPicture(stoppedAt reported: CMTime?) {
         guard pausedPictureRequested, let source = audioSource, previewSeek == nil, player.rate == 0,
-              let timebase = player.currentItem?.timebase else { return }
-        guard reported != nil || CMTimebaseGetRate(timebase) == 0 else { return }
+              let timebase = player.currentItem?.timebase, reported != nil || CMTimebaseGetRate(timebase) == 0 else { return }
         pausedPictureRequested = false
         let stopped = reported ?? CMTimebaseGetTime(timebase)
         let sound = max(0, source.playhead)
-        guard stopped.isNumeric, abs(stopped.seconds - sound) <= Self.pausedPictureTolerance else {
+        guard let seconds = PausedPictureHold.position(picture: stopped, sound: sound) else {
             seek(to: sound)
             return
         }
-        let seconds = max(0, stopped.seconds)
         source.seek(to: seconds)
         time = seconds
         tickHostTime = ProcessInfo.processInfo.systemUptime
         positionedTime = seconds
         placed.send(PlayheadPlacement(time: seconds, precise: true))
     }
-
-    /// Picture and sound this close at a pause are the same moment; beyond it (1.5 frames at 30 fps) the picture is
-    /// placed again. Drift correction acts beyond 40 ms.
-    private static let pausedPictureTolerance: TimeInterval = 0.05
 }
