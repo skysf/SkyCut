@@ -9,6 +9,7 @@
 #   二、workflow 的接线：判断那一步紧跟在「只改了文档」那一步后面、写法一字不差；跑检查的每一步都带
 #       `steps.verified.outputs.verified != 'true'`（判断出岔子 = 照常全跑），没有一步写成 `== 'true'`；
 #       缓存那几步是「没验过，或者第 1 组」；编 App 那一步不看它（验过的轮里第 1 组照样编、照样存缓存）。
+#       The cache save is limited to shard 1 alone, which keeps that promise.
 #   三、记号只在 PR 的那一轮、汇总 job 的最后（全部分组和官网检查都过了之后）才留，名字带着这一轮检出的树，
 #       留不下不许让 check-all 变红；token 有 actions: read。
 #   4. Main docs-only merges run all checks, even with a matching PR marker: their PR only ran scan guards and cannot
@@ -248,8 +249,11 @@ while IFS="$(printf '\037')" read -r index id cond run uses; do
       ;;
     cache)
       CACHE_STEPS=$((CACHE_STEPS + 1))
-      if [ "${cond}" = "${cond#*"${OR_SHARD_ONE}"}" ]; then
-        fail "第 ${index} 步（${step}）是备缓存的：if 要带「${OR_SHARD_ONE}」，验过的轮里只有第 1 组做（${cond}）"
+      # A step limited to shard 1 (the cache save, since 2026-11-20) keeps the same promise: in a verified run only
+      # shard 1 does cache work.
+      if [ "${cond}" = "${cond#*"${OR_SHARD_ONE}"}" ] \
+        && { [ "${cond}" = "${cond%"&& matrix.shard == 1"}" ] || [ "${cond}" != "${cond#*||}" ]; }; then
+        fail "第 ${index} 步（${step}）是备缓存的：if 要带「${OR_SHARD_ONE}」，验过的轮里只有第 1 组做; or end with && matrix.shard == 1 and have no || (${cond})"
       fi
       ;;
     build)
