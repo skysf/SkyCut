@@ -134,6 +134,9 @@ import SrtFlowMCPKit
             // Parallel AI exports never share a name; nothing that appears after a listing is replaced (2026-11-19 case).
             print("EXPORT TARGETS: one name per export, never replacing"); fflush(stdout)
             await ExportTargetChecks.run(root: root, ffmpeg: ffmpeg, project: project, require: require)
+            // The export panel writes the file it checked and asked about (2026-11-19 case).
+            print("PANEL TARGET: the file checked, asked about and written is one"); fflush(stdout)
+            await PanelTargetChecks.run(root: root, project: project, require: require)
             require(project.state == state && !project.effectiveUndoManager!.canUndo && VideoEditExporter.shared.settings == remembered,
                     "exports preserve project, undo stack and remembered formal quality")
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

@@ -79,6 +79,7 @@
 - [2026-11-18 Choosing the export folder froze SkyCut on a friend's MacBook Air](2026-11-18-export-folder-chooser-freezes-app.md) — Never run a system panel as a nested modal session or touch the user's destination drive on the main thread; always offer a way to pick without the panel, and check the destination before a long job.
 - [2026-11-17 Upper video, covers and grades switch on the wrong export frame](2026-11-17-export-layer-frame-windows.md) — Share FrameGrid windows and native look requests; use half-frame export edges and video placement, with EOF past the last visible frame.
 - [2026-09-30 成片的声音过了 0 dBFS 交给 AAC](2026-09-30-export-mix-over-0dbfs-into-aac.md) — 两份结果互相比之前把每一级单独量一遍；有损编码器不是透明的管子。
+- [2026-11-19 The export panel checked one folder and replaced a file in another](2026-11-19-export-panel-checks-one-folder-writes-another.md) — An async check answers about one thing: carry what it checked with the answer, and confirm and write exactly that.
 - [2026-09-24 导出面板说「音频原样复制」，其实重新编码](2026-09-24-export-panel-promised-audio-copy.md) — 面板上只放这条管线真消费的设置（按管线声明）。
 - [2026-11-17 get_job reported the peak before the limiter; listen's loudest moment was a curve step's middle](2026-11-17-export-peak-before-limiter-and-binned-loudest.md) — Give the AI the delivered number under its measure's name (the file's true peak, dBTP); a time reported "at" must come from data at that resolution.
 - [2026-08-05 导出预渲染复审](2026-08-05-export-prerender-review.md) — 覆盖、alpha、取消与临时文件。
@@ -215,6 +216,7 @@
 - [2026-10-01 从 40 秒起一直有沙沙声](2026-10-01-resampler-reset-every-chunk.md) — 流式转换器不能推式喂；周期性小毛刺要按块头 / 块中间分开量。
 - [2026-09-24 选 1080p，竖屏视频被缩成 608×1080](2026-09-24-resolution-cap-shrinks-portrait-video.md) — 分辨率档位封的是短边；缺的输入比写错的逻辑更难发现。
 - [2026-08-08 运行期素材重链接](2026-08-08-runtime-media-relink.md) — 素材移动后的重核对。
+- [2026-11-19 A typed or dropped answer to a save window silently replaced a file of the same name](2026-11-19-save-window-fallback-replaces-a-file.md) — An answer that skipped the "Replace?" step must say so: write "create, don't replace" unless replacing was confirmed for exactly that URL.
 - [2026-11-04 四条扫描守卫 CI 一次都没跑过](2026-11-04-scan-guards-never-ran-in-ci.md) — 新守卫必须进 check-all 的清单（`checks/check-all-shards.sh` 钉着）。
 - [2026-11-06 录屏已保存却没清楚告知界面和 MCP](2026-11-06-screen-recording-completion-feedback.md) — 完成要有非模态的通知，原会话下一次工具结果里附言。
 - [2026-08-07 录屏地基复审](2026-08-07-screen-recording-foundation-review.md) — 假绿、外部真值与状态机。

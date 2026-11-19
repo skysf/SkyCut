@@ -37,7 +37,7 @@ enum ProjectCloseQuestions {
     /// "Save this project before closing it?" for a never-saved project with content (an in-process alert).
     static var untitled: @MainActor (VideoEditProject) -> UntitledChoice = { _ in askAboutUntitled() }
     /// Where to save it: the macOS save window (not modal). nil when nothing was chosen.
-    static var saveLocation: @MainActor (VideoEditProject) async -> URL? = { await $0.chooseSaveLocation() }
+    static var saveLocation: @MainActor (VideoEditProject) async -> SaveLocation? = { await $0.chooseSaveLocation() }
 
     private static func askAboutUntitled() -> UntitledChoice {
         let alert = NSAlert()
@@ -84,8 +84,9 @@ extension VideoEditProject {
             case .save:
                 // 用户在存盘面板上点了取消，或者写盘失败 —— 都不能继续往下切。An answer that comes after another document
                 // replaced this one is dropped before anything is written: it would put that document in this one's place.
-                guard let url = await ProjectCloseQuestions.saveLocation(self), stillClosing(generation),
-                      await saveAs(url) else { return .refused }
+                // A file already there is replaced only when the person confirmed it (saveAs(chosen:) asks otherwise).
+                guard let location = await ProjectCloseQuestions.saveLocation(self), stillClosing(generation),
+                      await saveAs(chosen: location) else { return .refused }
             }
         }
         return await writeForClosing(generation, deadline: deadline)

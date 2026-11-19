@@ -114,6 +114,9 @@ struct SubtitleFilesExport: View {
     @State private var writeError: String?
     @State private var confirmsReplace = false
     @State private var isWriting = false
+    /// The files the check before writing was about: the replace question names `replaceQuestion`, the write writes these.
+    @State private var pendingTargets: [(item: SubtitleExportOptions.FileItem, url: URL)] = []
+    @State private var replaceQuestion: [URL] = []
     /// 两条轨的语言标签。语言识别不在 body 里跑：句子或记录变了才重判（`onChange`）。
     @State private var languages = SubtitleFileLanguage()
 
@@ -124,7 +127,9 @@ struct SubtitleFilesExport: View {
     }
 
     /// 勾上的每一份要写到哪。没有对应文档的（比如还没翻译）跳过。
-    private var targets: [(item: SubtitleExportOptions.FileItem, url: URL)] {
+    private var targets: [(item: SubtitleExportOptions.FileItem, url: URL)] { targets(in: folder) }
+
+    private func targets(in folder: URL) -> [(item: SubtitleExportOptions.FileItem, url: URL)] {
         options.files.sorted { $0.id < $1.id }.compactMap { item in
             if item.track == .translation, !hasTranslation { return nil }
             let name = SubtitleExportPlanner.fileName(
@@ -200,12 +205,12 @@ struct SubtitleFilesExport: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 // 一份就说清楚会发生什么（和视频的确认同一句）；几份就把名字列出来。
-                Text(verbatim: existing.count == 1
+                Text(verbatim: replaceQuestion.count == 1
                     ? String(
                         format: L10n("A file with this name is already in “%@”. Replacing it overwrites its contents."),
-                        folder.lastPathComponent
+                        replaceQuestion[0].deletingLastPathComponent().lastPathComponent
                     )
-                    : existing.map(\.lastPathComponent).joined(separator: "\n"))
+                    : replaceQuestion.map(\.lastPathComponent).joined(separator: "\n"))
             }
             if let writeError {
                 Text(writeError)
@@ -223,9 +228,9 @@ struct SubtitleFilesExport: View {
     }
 
     private var replaceTitle: String {
-        existing.count == 1
-            ? String(format: L10n("Replace “%@”?"), existing.first?.lastPathComponent ?? "")
-            : String(format: L10n("Replace %d subtitle files?"), existing.count)
+        replaceQuestion.count == 1
+            ? String(format: L10n("Replace “%@”?"), replaceQuestion.first?.lastPathComponent ?? "")
+            : String(format: L10n("Replace %d subtitle files?"), replaceQuestion.count)
     }
 
     private func fileBinding(_ item: SubtitleExportOptions.FileItem) -> Binding<Bool> {
@@ -244,11 +249,16 @@ struct SubtitleFilesExport: View {
         isWriting = true
         writeError = nil
         Task { @MainActor in
-            let report = await destination.checkBeforeWriting()
-            if let problem = report.problem {
+            let checked = await destination.checkBeforeWriting()
+            if let problem = checked.report.problem {
                 isWriting = false
-                writeError = ExportDestinationText.message(problem, folder: folder)
-            } else if existing.isEmpty {
+                writeError = ExportDestinationText.message(problem, folder: checked.folder)
+                return
+            }
+            // The files in the folder that was checked: the question names them and the write writes exactly them.
+            pendingTargets = targets(in: checked.folder)
+            replaceQuestion = pendingTargets.map(\.url).filter { checked.report.contains($0.lastPathComponent) }
+            if replaceQuestion.isEmpty {
                 await write()
             } else {
                 isWriting = false
@@ -262,7 +272,7 @@ struct SubtitleFilesExport: View {
     private func write() async {
         isWriting = true
         writeError = nil
-        let jobs: [(document: SubtitleDocumentModel, format: SubtitleFormat, url: URL)] = targets.compactMap { target in
+        let jobs: [(document: SubtitleDocumentModel, format: SubtitleFormat, url: URL)] = pendingTargets.compactMap { target in
             let track: SubtitleTrack = target.item.track == .translation ? .translation : .original
             guard let document = exportState.subtitleDocument(for: track) else { return nil }
             return (document, target.item.format, target.url)

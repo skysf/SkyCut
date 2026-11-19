@@ -116,7 +116,7 @@ final class OpenProjects {
     /// 存不下回 nil（原因在 `failure`）。
     func createProject(savingAs url: URL, placement: Placement) async -> VideoEditProject? {
         guard let project = makeProject() else { return nil }
-        guard await project.saveAs(url) else { return refuse(project, savingAs: url) }
+        guard await project.saveAs(url, replacing: false) else { return refuse(project, savingAs: url) }
         return register(project, placement)
     }
 

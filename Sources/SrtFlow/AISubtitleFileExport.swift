@@ -56,7 +56,7 @@ enum AISubtitleFileExport {
         case .ready(let ready, let first): (series, number) = (ready, first)
         }
         // Written off the main thread too: the whole set claimed, then temporary name → read back → onto its claim.
-        let outcome = await probe.run(on: place.near, deadline: deadline, timedOut: Written.notResponding) { _ in
+        let outcome = await probe.run(on: place.near, deadline: deadline, timedOut: Written.notResponding) { [documents] _ in
             Self.write(documents, series: series, from: number)
         }
         switch outcome {
