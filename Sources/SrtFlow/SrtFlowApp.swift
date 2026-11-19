@@ -18,6 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 开始听 AI 小程序的调用（docs/architecture/ai-control-mcp.md）。一启动就听：
     /// 小程序可能正是为了一次调用才把 App 拉起来的，它在等着连。
     func applicationDidFinishLaunching(_ notification: Notification) {
+        #if DEBUG
+        if PlaybackStartBench.isRequested {
+            AppUserPresence.shared.start()
+            return
+        }
+        #endif
         DevHooks.prepareIsolatedCache()
         AIBridgeServer.shared.start()
         startMainThreadWatchdog()

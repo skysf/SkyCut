@@ -32,6 +32,9 @@ final class PlayerClock: ObservableObject {
     var displayTime: TimeInterval { peekTime ?? time }
 
     let player = AVPlayer()
+    #if DEBUG
+    var observePreviewItem: ((AVPlayerItem) -> Void)?
+    #endif
     /// 时间回调的间隔（init 时定）：`estimatedTime` 最多往前补这么长。
     let observationInterval: TimeInterval
     /// 最近一次时间回调落地（或 seek）时的 host 时间，给 `estimatedTime` 外推用。主线程读写。
@@ -319,6 +322,9 @@ final class PlayerClock: ObservableObject {
         invalidatePreviewSeek()
         pendingScrubTarget = nil
         peekTime = nil
+        #if DEBUG
+        observePreviewItem?(item)
+        #endif
         player.replaceCurrentItem(with: item)
         hasVideo = true
     }

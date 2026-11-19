@@ -153,6 +153,20 @@ jobs:
           path: ${{ runner.temp }}/preview-perf
           if-no-files-found: ignore
 
+      - name: Playback start benchmark
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        env:
+          PLAYBACK_START_OUT: ${{ runner.temp }}/playback-start
+        run: /bin/bash scripts/check-playback-start.sh
+
+      - name: Upload playback start samples
+        if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playback-start
+          path: ${{ runner.temp }}/playback-start
+          if-no-files-found: ignore
+
       - name: Save SwiftPM build products (main only)
         if: github.event_name == 'push' && success() && steps.changes.outputs.docs_only != 'true' && (steps.verified.outputs.verified != 'true' || matrix.shard == 1)
         uses: actions/cache/save@v4

@@ -24,6 +24,9 @@ struct PlayerViewRepresentable: NSViewRepresentable {
     func makeNSView(context: Context) -> PlayerLayerView {
         let view = PlayerLayerView()
         view.player = player
+        #if DEBUG
+        PlaybackStartBench.previewMounted(view)
+        #endif
         return view
     }
 

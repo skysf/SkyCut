@@ -1,0 +1,59 @@
+{
+  "common": {
+    "dispatchMs": 185,
+    "audioMs": 220,
+    "videoMs": 280,
+    "onsetGapMs": 160,
+    "audioAdvanceMs": 135,
+    "videoAdvanceMs": 235,
+    "startOffsetMs": 34,
+    "oneSecondOffsetMs": 34,
+    "oneSecondElapsedMs": 1250
+  },
+  "scenarios": {
+    "cold-open": {
+      "dispatchMs": 50,
+      "audioMs": 3800,
+      "videoMs": 3900,
+      "onsetGapMs": 200,
+      "audioAdvanceMs": 40,
+      "videoAdvanceMs": 200,
+      "startOffsetMs": 65
+    },
+    "warm-start": {},
+    "middle": {},
+    "cut": {},
+    "near-end": {},
+    "end-replay": {},
+    "idle-wake": {
+      "dispatchMs": 650,
+      "audioMs": 700,
+      "videoMs": 800,
+      "onsetGapMs": 550,
+      "audioAdvanceMs": 100,
+      "videoAdvanceMs": 570,
+      "startOffsetMs": 75
+    }
+  },
+  "medians": {
+    "common": {
+      "dispatchMs": 50,
+      "audioMs": 130,
+      "videoMs": 180,
+      "onsetGapMs": 105,
+      "audioAdvanceMs": 40,
+      "videoAdvanceMs": 100
+    },
+    "scenarios": {
+      "cold-open": { "audioMs": 3200, "videoMs": 3300, "onsetGapMs": 150, "videoAdvanceMs": 150 },
+      "idle-wake": {
+        "dispatchMs": 550,
+        "audioMs": 600,
+        "videoMs": 650,
+        "onsetGapMs": 230,
+        "audioAdvanceMs": 75,
+        "videoAdvanceMs": 250
+      }
+    }
+  }
+}
