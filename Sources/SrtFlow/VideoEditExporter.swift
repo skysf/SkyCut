@@ -18,7 +18,10 @@ final class VideoEditExporter: ObservableObject {
     @Published private(set) var isDelivering = false
     @Published private(set) var progress: Double = 0
     @Published var errorMessage: String?
+    /// Where the last export's file went (a new file may be under a later number than asked: ExportTarget.newFile).
     @Published private(set) var finishedURL: URL?
+    /// What the last finished export was asked to write (the AI's job tells its own export from another one by this).
+    private(set) var finishedTarget: ExportTarget?
     /// 这次导出混音的电平（封顶前的峰值、削了多久）：面板和 AI 的结果用它提醒「过 0 了」。
     @Published private(set) var finishedAudioLevels: ExportAudioMixdown.Levels?
     /// 这次导出带不带水印（AI 的结果用它说带了、为什么，SkyCutGates.watermarkNote）。
@@ -90,10 +93,11 @@ final class VideoEditExporter: ObservableObject {
     }
 
     /// - Parameter project: 导的是哪个工程（面板和 AI 都传）：进度、停止、成片只给它的窗口看。
+    /// - Parameter target: where the file goes: replacing what is there only when the user said Replace (ExportTarget).
     /// - Parameter settingsOverride: 这一次用的编码设置（AI 指定了分辨率时传）。nil = 面板上记住的那份。
     ///   **不写回 `settings`**：AI 导一次 720p，不该把用户记住的导出设置悄悄改掉。
     func export(
-        for project: VideoEditProject, state: TimelineState, to output: URL, subtitleStyle: BurnInStyle, subtitleFontURL: URL?,
+        for project: VideoEditProject, state: TimelineState, to target: ExportTarget, subtitleStyle: BurnInStyle, subtitleFontURL: URL?,
         settingsOverride: VideoEncodeSettings? = nil,
         timing: ExportTimings? = nil
     ) {
@@ -119,6 +123,7 @@ final class VideoEditExporter: ObservableObject {
         measured.begin("preparation")
         errorMessage = nil
         finishedURL = nil
+        finishedTarget = nil
         finishedAudioLevels = nil
         watermarked = watermark != nil
         progress = 0
@@ -134,7 +139,7 @@ final class VideoEditExporter: ObservableObject {
                     settings: settings,
                     subtitleStyle: subtitleStyle,
                     subtitleFontURL: subtitleFontURL,
-                    output: output,
+                    output: target.url,
                     watermark: watermark,
                     cancellation: token,
                     phase: { measured.begin($0) }
@@ -172,11 +177,13 @@ final class VideoEditExporter: ObservableObject {
                 // ffmpeg 退出码 0 之后才碰用户目标：先落到 workspace 里的临时
                 // 文件，这里再原子替换过去——预渲染或 ffmpeg 中途任何失败都
                 // 还没碰过 output，用户原有文件（覆盖导出场景）不会被牵连。
-                // Off the main thread: onto another drive this is a full copy of the video (ExportDelivery).
+                // Off the main thread: onto another drive this is a full copy of the video (ExportDelivery). Only a
+                // `.replacing` target replaces; a new file never does (a name taken meanwhile gets a number).
                 isDelivering = true
-                try await ExportDelivery.deliver(plan.tempOutput, to: output)
+                let delivered = try await ExportDelivery.deliver(plan.tempOutput, to: target)
                 progress = 1
-                finishedURL = output
+                finishedTarget = target
+                finishedURL = delivered
             } catch is CancellationError {
                 // 用户点了 Stop（预渲染或 ffmpeg 阶段）：临时产物随 workspace
                 // 一起清掉，不设 errorMessage，也不碰用户原有文件。

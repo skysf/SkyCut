@@ -219,7 +219,8 @@ enum SoundTierRuleChecks {
         state.audioTracks = [EditLane(clips: [tail]), EditLane(clips: [lead]), EditLane(clips: [detached])]
         let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
         let roles = AIDeliverySoundRoles.assign(.init(clips: [tail.id: .object, lead.id: .object]), state: state, config: config, provenance: .init())
-        let found = AIDeliveryLinger.candidates(state, config: config, roles: roles, cuts: AIDeliveryCutJumps.pictureCuts(state)).found
+        let found = AIDeliveryLinger.candidates(state, config: config, roles: roles, cuts: AIDeliveryCutJumps.pictureCuts(state),
+                                                scope: .init(ranges: [0 ... state.duration], duration: state.duration)).found
         require(found.map(\.sound) == [tail.id, detached.id] && found.allSatisfy { $0.cut == 3 && $0.picture == first.id },
                 "an object mostly under the first shot and the first shot's detached sound are checked at its cut; a lead is not")
         require(found.last?.kind == .camera && found.first?.kind == .object, "detached camera sound is the camera kind")

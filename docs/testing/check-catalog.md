@@ -10,7 +10,7 @@
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
   runs some groups): the page clock driven directly in a WKWebView, normal pages and identical renders, alpha values and fast = public,
-  hostile pages, a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
+  hostile pages and a request out of bounds (refused by the helper itself, never a crash), a local listener that must see nothing, files and permissions, memory kills and the two backstops, the main-thread heartbeat.
   `checks/web-motion-wiring.sh` pins packaging / signing order and the locks in the source. Contract, test-only variables and the reverse
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
   `load-memory` uses fixed 32 MiB load/ready buffers and real kernel samples, one-event PID retry and process-birth/receipt guards.
@@ -20,8 +20,8 @@
 - Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
   library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
-  both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery and
-  portable font/system warnings. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery,
+  portable font/system warnings, and over-long durations / frame rates (AI calls, a reopened project) refused before any job. `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
   Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
   fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled
@@ -37,6 +37,7 @@
   Since 2026-11-18 also the export folder window and destination (`FolderChooserChecks`, renamed `FileChooserChecks` on 2026-11-19, `DestinationChecks`): a fake folder window (answers, cancelled, empty at once, never appears, vanishes, stays stuck + Close It, the force-quit record), a fake drive that never answers or is read-only, the per-drive cap, real folders and typed paths, and one real export whose delivery is held 1.2 s off the main thread; the rules are in [导出设置](../architecture/export-settings.md) §8.
   Since 2026-11-19 also every other macOS open / save window (`FileWindowsChecks`, [system file windows](../architecture/system-file-windows.md)): the shared windows with fake panels and a recording helper (an answer arrives, a cancel is not a failure, a window that never comes offers the fallback with the main thread free, Close It next to a window on screen, Try Again, one window at a time, the force-quit record) and `TypedPath` for typed and dropped answers.
   Since 2026-11-19 also the AI's export folders (`AIExportFolderChecks`): `export_video` / `export_subtitles` make a missing folder, number taken names, and refuse a fake stuck or read-only drive or a `chmod 555` folder with the export panel's sentence before any job, at the deadline, with the main thread free.
+  Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so); `ExclusivePlacement` on real files ([export settings](../architecture/export-settings.md) §5 item 6).
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 
@@ -56,6 +57,9 @@
   `sounds` and roles, the stem split) and `SoundTierChecks` the real job on synthetic sound (jump, linger, masked line, swell,
   marks, the fixed timeline); `SRTFLOW_INSPECTION_CASE=sound` runs only them. The two-voices hand-over case is in
   `scripts/check-mix-layers.sh` group 3. Rules and reverse controls: [finished-video inspection](../architecture/finished-video-inspection.md).
+  `DeliveryEdgeChecks` (2026-11-19, review CXR2) adds one short real job for a one-frame head and tail at 60 fps, and checks
+  picture cuts under a transparent or fading upper clip and the linger cap inside a range through the production preparation;
+  `SRTFLOW_INSPECTION_CASE=edges` runs only these.
 
 - A project's own file written off the main thread (2026-11-19): `scripts/check-project-saves.sh` (real App objects in an isolated bundle, temporary projects, shard 1; a fake drive that holds each write until the check lets it go, never longer than 3 s, or fails): the autosave with the main thread free, flush / ⌘S answering "not responding" at the deadline and landing later, an edit during a write keeping the project dirty, saves coalesced while one is held, a failing drive refused, a moved project file followed, switching away / Save As / the AI's save_project with a stuck drive, `closesAtOnce`, and Quit (a quiet wait, one question when asked twice, Don't Quit / Quit Anyway / a write ending while asking). `checks/file-io-off-main-wiring.sh` pins that production code never calls the blocking saves. Rules and reverse verification: [project file](../architecture/video-edit-project-file.md) §5, [case](../bugfixes/2026-11-19-project-save-blocks-on-slow-drive.md).
 - Saved project versions around AI rounds (2026-11-17): `scripts/check-project-versions.sh` (real App objects in an isolated bundle, temporary projects / media / versions root, shard 1) and `checks/project-versions-wiring.sh` (scan); what each verifies and the reverse verification are in [saved project versions](../architecture/project-versions.md) section 9. `scripts/render-project-versions.sh <folder>` draws the Versions sheet and the AI banner's version line off screen (graphical session; **not in `check-all.sh`**; without Screen Recording permission set `SRTFLOW_RENDER_DRAW_FALLBACK=1`).
@@ -482,16 +486,18 @@
   the real recipes reply teaches raising the bed first and routes through the tool, alongside the existing planner controls.
 - Ducking under speech (`set_track duck_others_db`, MCP-29): `scripts/check-mcp.sh` → `SpeechDuckChecks` (windows and merging;
   the dip on flat, sloped and bumped lines, 2× speed, the volume floor; calling again with the same / another depth / 0 and with
-  a bump drawn after the duck; windows across a clip's start and end; a clip inside a line; which clips dip; lines from pauses;
-  the result; the schema's range); `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration
-  file's lines from its waveform, the exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
+  a bump drawn after the duck; windows across a clip's start and end; a clip only the shallow start of a ramp reaches, set and
+  never stacked; a clip inside a line; which clips dip; lines from pauses; the result; the schema's range);
+  `scripts/check-parameter-limits.sh` → `SpeechDuckAppChecks` (real App objects: a narration file's lines from its waveform, the
+  exported mix 10 dB down under a line, no empty undo step, one undo, refusals). Rules in
   [volume curve](../architecture/audio-volume-curve.md) section 5.
 - A clip's voice-band cut (`edit_clip voice_band_db`, MCP-30): `scripts/check-audio-engine.sh` group 16 → `VoiceBand.swift` (the
   filter on steady sines: lows and highs kept, 1 kHz down by the depth, gain 1 flat, blocks = one run; the engine's offline render
-  of a three-tone clip; a cut through `updateGains`, not structure); `scripts/check-project-file.sh` group 51 (cleaning, v38, round
-  trip, split, separated sound, audio-only change); `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh`
-  → `VoiceBandAppChecks` (edit_clip's real plan / apply, the export mixdown per tone, one undo). Rules in
-  [sound scenes](../architecture/sound-scenes.md) section 5.
+  of a three-tone clip; a cut through `updateGains`, not structure), group 16b → `VoiceBandLive.swift` (the cut set on and back
+  to 0 between continuous blocks: back at 0 the live mix is the export's sample for sample, no click either way);
+  `scripts/check-project-file.sh` group 51 (cleaning, v38, round trip, split, separated sound, audio-only change);
+  `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh` → `VoiceBandAppChecks` (edit_clip's real
+  plan / apply, the export mixdown per tone, one undo). Rules in [sound scenes](../architecture/sound-scenes.md) section 5.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered

@@ -20,29 +20,35 @@ import SrtFlowMCPKit
         let folder = root.appendingPathComponent("ai-exports/deeper", isDirectory: true)
         let wanted = folder.appendingPathComponent("cut.mp4")
         let made = try? await AIExportDestination.output(
-            AIToolArguments(["path": .string(wanted.path)]), project: project, fileExtension: "mp4", reserved: []
+            AIToolArguments(["path": .string(wanted.path)]), project: project, fileExtension: "mp4"
         )
+        made.map(AIExportDestination.release)
         var isFolder: ObjCBool = false
-        require(made?.path == wanted.path && FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder)
-                && isFolder.boolValue, "a missing export folder is made, with its parents: \(made?.path ?? "nil")")
+        require(made?.target.url.path == wanted.path && FileManager.default.fileExists(atPath: folder.path, isDirectory: &isFolder)
+                && isFolder.boolValue, "a missing export folder is made, with its parents: \(made?.target.url.path ?? "nil")")
         FileManager.default.createFile(atPath: wanted.path, contents: Data())
-        let reserved = folder.appendingPathComponent("cut 2.mp4").standardizedFileURL.path
-        let numbered = try? await AIExportDestination.output(
-            AIToolArguments(["path": .string(wanted.path)]), project: project, fileExtension: "mp4", reserved: [reserved]
+        // cut.mp4 is in the folder; the first call reserves cut 2.mp4 (its export still queued), so the next gets cut 3.mp4.
+        let queued = try? await AIExportDestination.output(
+            AIToolArguments(["path": .string(wanted.path)]), project: project, fileExtension: "mp4"
         )
-        require(numbered?.lastPathComponent == "cut 3.mp4",
-                "a name in the folder or reserved by a queued export gets a number: \(numbered?.lastPathComponent ?? "nil")")
+        let numbered = try? await AIExportDestination.output(
+            AIToolArguments(["path": .string(wanted.path)]), project: project, fileExtension: "mp4"
+        )
+        [queued, numbered].compactMap { $0 }.forEach(AIExportDestination.release)
+        require(queued?.target.url.lastPathComponent == "cut 2.mp4" && numbered?.target.url.lastPathComponent == "cut 3.mp4",
+                "a name in the folder or reserved by a queued export gets a number: \(numbered?.target.url.lastPathComponent ?? "nil")")
         let leftovers = ((try? FileManager.default.contentsOfDirectory(atPath: folder.path)) ?? []).filter { $0.hasPrefix(".SrtFlow-") }
         require(leftovers.isEmpty, "the write test leaves nothing in the export folder: \(leftovers)")
 
         // No path: <the project's home>/SkyCut/Exports, made off the main thread too.
         let named = try? await AIExportDestination.output(
-            AIToolArguments(["name": "Teaser"]), project: project, fileExtension: "mp4", reserved: []
+            AIToolArguments(["name": "Teaser"]), project: project, fileExtension: "mp4"
         )
+        named.map(AIExportDestination.release)
         let exports = AIWorkspace.shared.outputFolder(.exports, project: project)
-        require(named?.path == exports.appendingPathComponent("Teaser.mp4").path
+        require(named?.target.url.path == exports.appendingPathComponent("Teaser.mp4").path
                 && FileManager.default.fileExists(atPath: exports.path),
-                "without a path the default export folder is made: \(named?.path ?? "nil")")
+                "without a path the default export folder is made: \(named?.target.url.path ?? "nil")")
 
         let locked = root.appendingPathComponent("ai-locked", isDirectory: true)
         try? FileManager.default.createDirectory(at: locked, withIntermediateDirectories: true)

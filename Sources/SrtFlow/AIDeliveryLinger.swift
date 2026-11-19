@@ -15,7 +15,7 @@ import SrtFlowMCPKit
 // ends with it); ambience, effects, music and voice (an ambience or a hit's tail may carry on: a lag is a normal way to cross a
 // cut). Whether the next shot shows the same thing is not knowable here: mark it intentional (one line why).
 // Each candidate is rendered on its own (DeliveryStemSplit, DeliveryStemPower) over its frames after the cut; at most
-// `maxCandidates`.
+// `maxCandidates` among the cuts inside the checked range.
 // Thresholds (2 frames, −50 dBFS, 6 dB) follow the user's one case and the board's existing lines; not validated on other films.
 // Not here: the picture cuts (AIDeliveryCutJumps.pictureCuts), roles (AIDeliverySoundRoles).
 
@@ -48,9 +48,12 @@ enum AIDeliveryLinger {
 
     // MARK: Candidates
 
+    /// The sounds this report measures. Which shot a sound belongs to is read against every cut of the timeline (`cuts`); then
+    /// only the candidates whose cut is inside the checked range are sorted and capped, so `more` counts what this range leaves
+    /// out and a narrower from/to reaches a cut the cap dropped from a wider one (review CXR2 R8: the 41st was never measured).
     @MainActor
     static func candidates(_ state: TimelineState, config: AudioEngineConfig, roles: AIDeliverySoundRoles,
-                           cuts: [AIDeliveryCutJumps.Cut]) -> (found: [Candidate], more: Int) {
+                           cuts: [AIDeliveryCutJumps.Cut], scope: AIInspection.Scope) -> (found: [Candidate], more: Int) {
         let pictures = AIInspectionPicture.visiblePictures(state, from: 0, to: state.duration)
         let half = state.frameRate.secondsPerFrame / 2
         let shots = spans(cuts, duration: state.duration)
@@ -87,8 +90,9 @@ enum AIDeliveryLinger {
                 }
             }
         }
-        // By cut, then in timeline order (tracks top to bottom): the same report every time.
-        found = found.enumerated().sorted { ($0.element.cut, $0.offset) < ($1.element.cut, $1.offset) }.map(\.element)
+        // Inside the checked range first; then by cut and in timeline order (tracks top to bottom): the same report every time.
+        found = found.filter { scope.contains($0.cut) }
+            .enumerated().sorted { ($0.element.cut, $0.offset) < ($1.element.cut, $1.offset) }.map(\.element)
         return (Array(found.prefix(maxCandidates)), max(0, found.count - maxCandidates))
     }
 

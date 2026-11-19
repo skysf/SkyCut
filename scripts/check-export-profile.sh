@@ -2,7 +2,8 @@
 # 真实进程收尾/双管道/错误/取消，以及导出任务、阶段计时、编码与 PNG 解码计数；只用合成测试工程。
 # Also the export panel's folder window and destination (fake panel / fake stuck drive / one slowed real delivery):
 # nothing there waits on the main thread (docs/bugfixes/2026-11-18-export-folder-chooser-freezes-app.md); the same for
-# export_video's folder (docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md).
+# export_video's folder (docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md). Parallel AI exports never
+# share a name and never replace a file (docs/bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 BUILD_OUT="$(swift build --arch arm64 --product SrtFlow 2>&1)" || { printf '%s\n' "${BUILD_OUT}"; exit 1; }
@@ -26,7 +27,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ExportProfile/Main.swift checks/ExportProfile/Runner.swift checks/ExportProfile/ProcessChecks.swift \
   checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift \
   checks/ExportProfile/DestinationChecks.swift \
-  checks/ExportProfile/AIExportFolderChecks.swift \
+  checks/ExportProfile/AIExportFolderChecks.swift checks/ExportProfile/ExportTargetChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"
 "${FFMPEG}" -hide_banner -loglevel error -nostdin -f lavfi -i color=c=blue:s=320x180:r=30 \

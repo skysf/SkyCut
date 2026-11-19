@@ -111,6 +111,17 @@
    工程存的盘 —— `名字.后缀` 占了就 `名字 2.后缀`、`名字 3.后缀`。规则只有 SrtFlowCore 的 `ExportFileName.unoccupied` 一份；
    写的时候再带 `.withoutOverwriting`。同格式转回源文件夹也只会另起名字，不会盖源文件
    （[案例](../bugfixes/2026-09-27-batch-convert-overwrites-existing-files.md)）。
+6. **The AI's `export_video` and `export_subtitles` never replace, not even a file that appears after the listing**
+   (2026-11-19, [case](../bugfixes/2026-11-19-parallel-ai-exports-pick-the-same-name.md)). `export_video` picks its name
+   once the folder's listing is back, against the names other AI exports have reserved at that moment, and reserves it in
+   the same main-actor step (`AIExportDestination.output`: no `await` between the pick and the reservation); the
+   reservation lasts until the job is withdrawn, fails to start or ends. The video is delivered as `ExportTarget.newFile`:
+   `ExclusivePlacement.place` claims the name with `open(O_CREAT | O_EXCL)` and renames the video over the empty claim, so a
+   name taken since the listing moves the video on to the next number (counting on from its own: `Cut 3`, not `Cut 2 2`)
+   and `get_job` reports the real path with a `path_note`. `export_subtitles` claims the whole set
+   (`ExclusivePlacement.claimSet`) before writing any file and writes each onto its claim
+   (`SubtitleExportPlanner.writeValidated(_:format:onto:)`). `ExportTarget.replacing` is only for the export panel after
+   the user said Replace.
 
 ## 六、记住与恢复默认
 
@@ -225,7 +236,7 @@ never returns.
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
-| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free |
+| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced, `ExclusivePlacement` on real files |
 | `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）

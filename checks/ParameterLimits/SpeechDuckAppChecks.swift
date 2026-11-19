@@ -6,7 +6,8 @@ import SrtFlowMCPKit
 // set_track duck_others_db through the real App objects (MCP-29, docs/architecture/audio-volume-curve.md section 5): a
 // narration file with two lines (tone bursts with a pause between) on A1 and music on A2. The narration's lines come from its
 // waveform (no transcript), the music's curve dips under them in one undo step, the exported mix (the audio engine's offline
-// render, the same one the preview plays) is 10 dB quieter under a line than between them, calling again changes nothing,
+// render, the same one the preview plays) is 10 dB quieter under a line than between them, calling again changes nothing
+// (also for a sting only the shallow start of the first line's attack reaches), 0 takes every dip out in one more undo step,
 // and the refusals leave the project as it was. Synthetic files only.
 @MainActor enum SpeechDuckAppChecks {
     static func run(_ fixture: ParameterFixture, root: URL, require: (Bool, String) -> Void) async throws {
@@ -20,7 +21,9 @@ import SrtFlowMCPKit
         state.mainMagnet = false
         let voice = EditClip(sourceURL: narration, isAudioOnly: true, sourceDuration: 7, timelineStart: 0, audioAssetDuration: 7)
         let bed = EditClip(sourceURL: music, isAudioOnly: true, sourceDuration: 8, timelineStart: 0, audioAssetDuration: 8)
-        state.audioTracks = [EditLane(clips: [voice]), EditLane(clips: [bed])]
+        // A sting ending about a quarter of the way down the first line's attack (CXR2 R9: it stacked another dip per call).
+        let sting = EditClip(sourceURL: music, isAudioOnly: true, sourceDuration: 0.7, timelineStart: 0, audioAssetDuration: 8)
+        state.audioTracks = [EditLane(clips: [voice]), EditLane(clips: [bed]), EditLane(clips: [sting])]
         fixture.reset(state)
         let before = fixture.project.state
         let undo = fixture.project.effectiveUndoManager!
@@ -33,6 +36,9 @@ import SrtFlowMCPKit
         require(abs(ducked?.volumeLineDecibels(atTimeline: 3) ?? -1) < 1e-6, "the music is back up between the lines")
         require(abs((ducked?.volumeLineDecibels(atTimeline: 4.5) ?? 0) + 10) < 1e-6, "the music sits 10 dB down under the second line")
         require(fixture.project.state.clip(with: voice.id) == voice, "the narration itself does not dip")
+        let stingEnd = fixture.project.state.clip(with: sting.id)?.volumeLineDecibels(atTimeline: 0.7) ?? 0
+        require(stingEnd < -0.5 && stingEnd > -5, "the sting dips less than half way at its end (got \(stingEnd) dB)")
+        let duckedState = fixture.project.state
 
         var musicOnly = fixture.project.state
         musicOnly.audioTracks[0].isHidden = true
@@ -41,11 +47,21 @@ import SrtFlowMCPKit
         require(abs(between - under - 10) < 0.3, "the engine's mix is 10 dB quieter under a line (got \(between - under) dB)")
 
         let again = try await duck(fixture, ["track": "A1", "duck_others_db": -10])
-        require(!again.changedProject && again.payload["already_at_depth"]?.arrayValue?.count == 1,
-                "calling again with the same depth changes nothing")
+        require(!again.changedProject && again.payload["already_at_depth"]?.arrayValue?.count == 2,
+                "calling again with the same depth changes nothing (the bed and the sting)")
+        let off = try await duck(fixture, ["track": "A1", "duck_others_db": 0])
+        let flat = [bed.id, sting.id].allSatisfy { id in
+            stride(from: 0.0, through: 7, by: 0.05).allSatisfy { time in
+                let clip = fixture.project.state.clip(with: id)
+                return clip.map { time > $0.timelineEnd || abs($0.volumeLineDecibels(atTimeline: time)) < 1e-6 } ?? false
+            }
+        }
+        require(off.changedProject && flat, "duck_others_db 0 takes every dip out, the sting's too")
+        undo.undo()
+        require(fixture.project.state == duckedState, "one undo takes the 0 back")
         undo.undo()
         require(fixture.project.state == before && !undo.canUndo,
-                "one undo takes the whole duck back (the call that changed nothing left no empty step)")
+                "one more undo takes the whole duck back (the call that changed nothing left no empty step)")
 
         for (fields, why) in [(["track": "A1", "duck_others_db": -40] as [String: JSONValue], "out of range"),
                               (["track": "master", "duck_others_db": -10], "master"),

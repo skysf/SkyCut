@@ -209,7 +209,8 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      列出来、能删）。文件夹太大（根目录、顶层文件夹、卷的根、个人文件夹本身）时只记那个文件 —— 不然同意读一个文件
      就放开了整个家目录。问题里写明「同意之后记住这个文件夹」。
    - **从不覆盖**：导出、新建、另存撞名都加编号（`ExportFileName.unoccupied`），所以不问；AI 要替换旧文件就先用
-     `manage_files` 把它删进废纸篓（会问）。
+     `manage_files` 把它删进废纸篓（会问）。 This holds when the file is written, not only when the folder was listed:
+     export_video reserves its name and both export tools claim names atomically ([export settings](export-settings.md) §5 item 6).
    - `generate_media`、`upscale_clip` 超了每日积分硬上限：当场回 `daily_budget_exceeded`，不发越额确认码。
      预算内的草稿越档按批准模式在 `SkyStudioJobGate.decide` 发码；全部权限也不跳过硬上限。都不在提示条上问。
      改这几条（什么时候问、硬上限、草稿怎么挑）时，同一次改动里一起改剪辑风格共用规矩第 11、13 条（中文稿和英文资源，第 32 条），

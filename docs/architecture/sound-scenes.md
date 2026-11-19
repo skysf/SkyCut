@@ -117,10 +117,14 @@ Rules (only this way):
    −10 lowered 300–3000 Hz by 7.5 dB on average (its rumble sits near the band's low edge, where the cut is shallower), kept
    everything under 150 Hz within 0.1 dB, and its loudest low hit within 0.05 dB; a deeper setting gets closer to a full 10 dB
    in that band.
-3. **Real time** (`VoiceBandRendering`): no allocation, one filter per stream, only the renderer touches it. It starts from
-   zero when the position jumps (seek, start: like the scene chain) and the first time the stream needs it; once running it
-   keeps running even back at g = 1 (an all-pass then: switching it off would jump the phase); a changed depth moves g
-   linearly across one block (no zipper).
+3. **Real time** (`VoiceBandRendering`): no allocation, one filter per stream, only the renderer touches it. After a jump
+   (seek, start: like the scene chain) it starts settled, as the export starts every stream: from rest when the clip has a
+   cut, off when not. A changed depth moves g linearly across one block (no zipper). Mid-stream, a cut that starts fades in
+   from the dry sound and a cut set back to 0 fades out to the dry sound, each over 1,024 frames (about 21 ms,
+   `VoiceBandRendering.fadeFrames`), after which the filter stops and forgets its state: a stream back at 0 plays exactly the
+   export's samples. Never keep it running as an all-pass at g = 1 — flat in level but phase-shifted, it summed with a related
+   layer 17 dB away from the export at 300 Hz ([case](../bugfixes/2026-11-19-voice-band-stays-all-pass-at-zero.md)) — and never
+   start it from rest mid-stream without the fade (a jump of about half the signal).
 4. **A parameter, not structure**: the depth reaches a live stream through `SegmentUpdate.voiceBand` (an atomic per stream),
    so changing it is an audio-only change (`differsOnlyInAudioMix` neutralizes it): `updateGains`, no stream reopened, no
    picture rebuild. `Segment.Structure` does not include it.
@@ -141,7 +145,10 @@ it); edges fixed at 300 Hz and 3 kHz.
 Checks: `scripts/check-audio-engine.sh` group 16 (`checks/AudioEngine/VoiceBand.swift`: the filter on steady sines — 50 /
 100 Hz and 8 kHz within 0.25 dB, 1 kHz down by the depth within 0.6 dB, g = 1 flat within 0.01 dB, 64-frame blocks = one run;
 the engine's offline render of a three-tone clip with −10: 1 kHz down, 50 Hz and 8 kHz kept; a cut given through
-`updateGains` sounds like an engine built with it, and is not structure); `scripts/check-project-file.sh` group 51
+`updateGains` sounds like an engine built with it, and is not structure), group 16b (`checks/AudioEngine/VoiceBandLive.swift`:
+two in-phase layers of a 300 Hz tone, A1's cut set to −10 and back to 0 through `updateGains` between continuous blocks — heard
+at once, and once faded out the live mix is the export's sample for sample; no step around either change larger than the
+tone's own); `scripts/check-project-file.sh` group 51
 (`checks/ProjectFile/VoiceBand.swift`: cleaning, v38 gate and key only when set, round trip, a tampered depth clamped, split,
 separated sound, audio-only change); `scripts/check-mcp.sh` (`VoiceBandToolChecks`: read, out of range refused with a
 suggestion, applied, summary, 0 takes it off, no-sound clip refused, schema range = the model's).
@@ -152,10 +159,14 @@ undo takes it back, out of range changes nothing.
 
 Reverse verification (2026-11-18, each broken on purpose, the checks run, then restored byte for byte): the renderer not
 calling the filter → engine group 16 red (the 1 kHz tone through the engine unchanged); split not copying the cut, the
-fast-path neutralizer keeping it, the v38 gate always false → project-file group 51 red (3).
+fast-path neutralizer keeping it, the v38 gate always false → project-file group 51 red (3). 2026-11-19 (CXR2 R10): the old
+`VoiceBandRendering` (kept running at g = 1, started from rest) → group 16b red twice (back at 0 the live mix −28.07 dBFS
+against the export's −10.97; a step of 0.119 against the tone's 0.016 when the cut starts mid-stream).
 
 Manual regression:
 
 - [ ] A shot whose own sound has a low boom and mid-range noise under a narration line: `edit_clip voice_band_db=-10`. The
       boom keeps its weight, the line gets clearer; preview and export sound the same; ⌘Z takes it back.
 - [ ] Change it while the clip plays (−10 → −4): no click, the change is heard at once.
+- [ ] With the same sound on two tracks (a shot's sound duplicated), set one clip's cut to −10 and back to 0 while playing: no
+      click either way, and back at 0 it sounds like the export at once (no thin, phasey sum).
