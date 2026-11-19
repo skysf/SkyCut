@@ -115,8 +115,12 @@ enum PlaybackStartBench {
         _ project: VideoEditProject, probe: PlaybackStartVideoProbe, position: Double, frame: Double
     ) async throws {
         project.seekFromTimeline(time: position)
-        // AVPlayer can hold the last decoded picture without vending a sample at the exact end time.
-        if position == project.duration { return }
+        // At the exact end AVPlayer can hold the last picture without vending a frame at that time.
+        // Let the native placement finish before testing the subsequent rewind.
+        if position == project.duration {
+            try await wait("native placement at the exact end") { !project.clock.isPositioningPreview }
+            return
+        }
         let visible = min(position, project.duration - frame)
         try await wait("paused picture at \(visible)") {
             guard let displayed = probe.displayed else { return false }

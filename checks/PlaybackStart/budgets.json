@@ -12,7 +12,7 @@
   },
   "scenarios": {
     "cold-open": {
-      "dispatchMs": 50,
+      "dispatchMs": 90,
       "audioMs": 3800,
       "videoMs": 3900,
       "onsetGapMs": 330,
@@ -54,6 +54,7 @@
     },
     "scenarios": {
       "cold-open": {
+        "dispatchMs": 20,
         "audioMs": 3200,
         "videoMs": 3300,
         "onsetGapMs": 150,

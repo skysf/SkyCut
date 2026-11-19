@@ -35,7 +35,8 @@ in-process media and composition cache. Filesystem caching follows the host oper
 The project has a 1080p opening and cut, three composited upper video tracks, six PCM tracks, and a trimmed 4K H.264
 source with an eight-second GOP. The timeline starts cold at zero, then tests the positioned start, a deep seek within
 the 4K GOP, the frame before the 1080p cut, the 4K tail, Play at the exact end, and a suspended output graph. The
-end replay must start at zero. The idle case uses the production suspension entry and confirms the graph has suspended
+end replay waits for native placement at the tail and must start at zero. The idle case uses the production
+suspension entry and confirms the graph has suspended
 before Play. The idle-policy tests cover when the two-minute stop is due.
 
 Time begins at the call to the editor's Play action. Each attempt measures the following.
@@ -77,6 +78,9 @@ Its onset skew limit is 120 ms median and 150 ms per trial. A suspended graph ha
 800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
 The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
 The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
+Cold dispatch has a 20 ms median budget and a 90 ms single-trial ceiling. In calibration the first Play
+was usually dispatched in under 2 ms. An individual launch took 61 ms without a build or native seek in
+the Play callback.
 
 On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture put positioned picture onset at
 69–117 ms median outside the cut and at 232 ms just before it. First-open audio and video were 1.36 / 1.74 s
@@ -90,10 +94,10 @@ to 137 ms and worst timeline skew from 617 ms to 114 ms. All first advancing col
 the requested position. [Hosted calibration samples](https://github.com/skysf/SkyCut/actions/runs/44456515780/artifacts/14498244162).
 
 A hosted virtual Mac can supply an isolated late frame. CI runs one fresh five-launch batch if at most two
-scenarios each have one failed trial and the failures are limited to one-second timing or a positioned
-start skew of at most 100 ms. Every trial in the repeat must pass. Both batches and their verdicts are retained
-in the same artifact. Missing playback, other timing failures, repeated failures in one scenario and structural
-failures fail immediately.
+scenarios each have one failed trial. Eligible failures are one-second timing, a positioned start skew
+of at most 100 ms, or a rewind onset time within 50 ms of its single-trial budget. Every trial in the repeat
+must pass. Both batches and their verdicts are retained in the same artifact. Missing playback, other timing
+failures, repeated failures in one scenario and structural failures fail immediately.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.

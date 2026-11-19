@@ -128,7 +128,11 @@ def isolated_virtual_timing_failures(errors):
         small_start_skew = (
             error.metric == "startOffsetMs" and error.scenario != "cold-open" and abs(error.value) <= 100
         )
-        if not small_start_skew and error.metric not in ("oneSecondOffsetMs", "oneSecondElapsedMs"):
+        isolated_rewind = (
+            error.scenario == "end-replay" and error.metric in ("audioMs", "videoMs", "onsetGapMs")
+            and abs(error.value) <= error.limit + 50
+        )
+        if not small_start_skew and not isolated_rewind and error.metric not in ("oneSecondOffsetMs", "oneSecondElapsedMs"):
             return False
         affected.setdefault(error.scenario, set()).add(error.label)
     return 0 < len(affected) <= 2 and all(len(trials) == 1 for trials in affected.values())

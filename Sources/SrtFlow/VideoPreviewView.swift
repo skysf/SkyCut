@@ -34,6 +34,7 @@ final class PlayerClock: ObservableObject {
     let player = AVPlayer()
     #if DEBUG
     var observePreviewItem: ((AVPlayerItem) -> Void)?
+    var isPositioningPreview: Bool { previewSeek != nil }
     #endif
     /// 时间回调的间隔（init 时定）：`estimatedTime` 最多往前补这么长。
     let observationInterval: TimeInterval
