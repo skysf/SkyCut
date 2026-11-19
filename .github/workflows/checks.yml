@@ -104,8 +104,7 @@ jobs:
       # - One cache for all shards: the complete App build (every product) of shard 1's "Build app" step. Any shard can
       #   then run checks that link the full App after an incremental build (since 2026-11-20; before, each shard kept its
       #   own cache and those checks could only run in shard 1). The key carries the toolchain fingerprint and this
-      #   commit; restore-keys drop the commit, so a run gets the newest App build for this checkout and toolchain. The
-      #   -shard1- line is the old shard-1 cache, a fallback for the switch that stops matching once those entries expire.
+      #   commit; restore-keys drop the commit, so a run gets the newest App build for this checkout and toolchain.
       # - Saved on main only (a PR's cache serves that PR alone), by shard 1, right after "Build app" succeeds: a shard
       #   that built only the core library must never win the key (the 2026-11-04 bug), and a newer merge that cancels
       #   this run later must not cost the save.
@@ -122,9 +121,7 @@ jobs:
         with:
           path: .build
           key: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-app-${{ github.sha }}
-          restore-keys: |
-            swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-app-
-            swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-shard1-
+          restore-keys: swiftpm-${{ runner.os }}-${{ github.workspace }}-${{ steps.toolchain.outputs.id }}-app-
 
       # 已经验过的那种轮里第 1 组照样过一遍这两步（命中只要 2 秒）：PR 上存的缓存别的 PR 取不到，改了 vendor-ffmpeg.sh
       # 的那次合并之后，要靠 main 上这一轮把新的 ffmpeg 存进大家都取得到的那一份。

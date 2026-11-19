@@ -15,7 +15,8 @@
 #    check that links the full App can run in any shard after an incremental build.
 #    - The key carries the checkout, the toolchain fingerprint, `-app-` and this commit, never matrix.shard; the save
 #      step uses the same key. The first restore key is the key without the commit (the newest App build); any further
-#      one is a fallback prefix for the same checkout and toolchain (the old -shard1- cache, for the switch).
+#      one may only be a fallback prefix for the same checkout and toolchain (the switch's -shard1- one was removed on
+#      2026-11-20, once the shared cache existed).
 #    - Only the shard with the dedicated full App build step (plain `swift build`, no --target / --product) saves, in the
 #      step right after it, limited to that shard: a shard that built only the core library must never win the key
 #      (the 2026-11-04 bug), and saving early survives a newer merge cancelling the rest of the run.

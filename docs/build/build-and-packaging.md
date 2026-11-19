@@ -701,9 +701,9 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
   - Restored with `actions/cache/restore`, saved with `actions/cache/save`. Since 2026-11-20 there is **one cache for
     all shards**: the complete App build (every product) of shard 1's "Build app" step, key
     `swiftpm-<os>-<checkout>-<toolchain fingerprint>-app-<commit>`. restore-keys drop the commit, so a run restores the
-    newest App build for the same checkout and toolchain. A second restore key, the old shard-1 cache (`…-shard1-`),
-    covers the switch and stops matching once those entries expire. Before, each shard kept its own cache, keyed with
-    its shard number, and only shard 1's held the App.
+    newest App build for the same checkout and toolchain. Before, each shard kept its own cache, keyed with its shard
+    number, and only shard 1's held the App. For the switch a second restore key fell back to the old shard-1 cache
+    (`…-shard1-`); it was removed once main had saved the shared one (2026-11-20).
   - Saved on main only, by shard 1, right after "Build app" succeeds. A PR restores main's newest one: GitHub scopes
     caches by branch, so a PR's cache serves that PR alone, and the run after a merge prepares the next PR's cache.
     - Not at the end of the job, as before 2026-11-20: since 11-17 a newer merge cancels older main runs, and on busy
