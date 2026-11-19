@@ -215,7 +215,7 @@
   它的画面走：删 / 换位 / 切删 / 裁头 / 变速 / 定格 / 粘贴的同素材新段不算 / 撞上让开 / 拖动计划的名单，第 1f 组 `checks/TimelineSnap/Linkage.swift`；
   同 id 换了素材（upscale 换源、edit_clip 换文件）什么都不挪，第 1i 组 `LinkageSwap.swift`；画面自己分出去的声音（J / L 切）跟着那段画面走、
   挪到 0 之前的裁头，第 1j 组 `LinkagePartner.swift`；subtitles sitting on a sound off V1 (narration) follow that sound, not the picture, and ride a V1 drag
-  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`）：
+  only with it — a new source range on a screen recording keeps them; typed subtitles over a silent picture follow it like text — group 1k `LinkageVoiceCues.swift`; a merged translation goes by all its originals' speech, head or tail trims alike — group 1l `LinkageMergedTranslation.swift`）：
   `scripts/check-timeline-snap.sh`；拖动/框选接线扫描：`checks/timeline-drag-wiring.sh`（拆在 `checks/timeline-drag-wiring/` 下的几节一起
   `source` 进来，含「拖动会话不进时间线的 @State」`drag-box.sh`、联动的接线 `linkage.sh`：`perform` / `liveApply` 收尾调 `TimelineLinkage.follow`、
   只有 ⌫ / delete_items / cut_speech 传 `deletesContent: true`、三个拖动计划带上压着的东西）。

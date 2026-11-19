@@ -122,6 +122,7 @@ xcrun swiftc \
   checks/TimelineSnap/LinkageSwap.swift \
   checks/TimelineSnap/LinkagePartner.swift \
   checks/TimelineSnap/LinkageVoiceCues.swift \
+  checks/TimelineSnap/LinkageMergedTranslation.swift \
   checks/TimelineSnap/Magnet.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

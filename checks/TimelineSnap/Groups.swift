@@ -15,5 +15,6 @@ func runSplitOutGroups() {
     checkLinkageSwap()      // 1i：同 id 换了素材（upscale 换源、edit_clip 换文件）联动不动任何东西（LinkageSwap.swift）
     checkLinkagePartner()   // 1j：一段画面自己分出去的声音跟着它的画面走（LinkagePartner.swift）
     checkLinkageVoiceCues() // 1k: subtitles made from a sound off V1 follow that sound, never the picture (LinkageVoiceCues.swift)
+    checkLinkageMergedTranslations() // 1l: a merged translation goes by all its originals' speech (LinkageMergedTranslation.swift)
     checkMagnet()           // 1g：磁吸跟着工程走、只在改到 V1 的排布时排紧（Magnet.swift）
 }
