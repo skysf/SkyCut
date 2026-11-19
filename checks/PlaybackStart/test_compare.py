@@ -62,13 +62,13 @@ class PlaybackGateTests(unittest.TestCase):
         # Before the fix a Play while hovering also skipped the placement of the picture.
         self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
 
-    def test_a_rebuilt_item_has_hosted_room_but_not_on_this_mac(self):
-        # The hosted virtual Mac decodes 4K in software: a new item started up to 137 ms behind its sound.
+    def test_a_new_item_has_room_for_its_preroll_but_not_for_skew(self):
+        # Play primes a new item: 101 / 141 ms median to sound and picture hosted, 120 / 137 ms on the M1, in step.
         samples = batch(5)
-        samples["fresh-item"][0] = trial("fresh-item", startOffsetMs=137, maxSkewMs=137, onsetGapMs=159)
+        samples["fresh-item"] = [trial("fresh-item", audioMs=160, videoMs=175)] * 5
         self.assertEqual(evaluate(samples, BUDGETS)[0], [])
-        self.assertEqual(len(strict(samples, BUDGETS["strict"])), 1)
-        samples["fresh-item"] = [trial("fresh-item", startOffsetMs=160, maxSkewMs=160)] * 5
+        # Primed at a quarter rate while paused, the hosted runner started it 52-60 ms behind (median): too far.
+        samples["fresh-item"] = [trial("fresh-item", startOffsetMs=55, maxSkewMs=55)] * 5
         self.assertTrue(any("fresh-item median: startOffsetMs" in error for error in evaluate(samples, BUDGETS)[0]))
 
     def test_play_primes_a_new_item_once(self):

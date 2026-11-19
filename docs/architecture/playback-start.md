@@ -42,10 +42,11 @@ source the picture stayed frozen for 0.6–0.9 s while the sound played
 picture moving again on the sound's timeline.
 
 What still waits, in step: the first Play on a new item (its preroll); a Play right after a click or a hover, while
-the picture at the playhead is still being decoded (about 0.6 s on the M1 three seconds into an eight-second 4K GOP, short with optimized media); a Play during
-project open; a Play as the first input after the two-minute idle stop (the output device starts). Audio supplies
-the master clock. `PlayerClock` corrects sustained video drift against this clock. See the
-[audio engine](audio-engine.md) and the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
+the picture at the playhead is still being decoded (about 0.6 s on the M1 three seconds into an eight-second 4K GOP,
+short with optimized media); a Play during project open; a Play as the first input after the two-minute idle stop (the
+output device starts). Audio supplies the master clock. `PlayerClock` corrects sustained video drift against this
+clock. See the [audio engine](audio-engine.md) and the
+[composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
 
 **Known issue, the start after the idle stop** (measured 2026-11-19, not fixed): Play starts the picture at once while
 the sound waits for the just-started device's first render. In 5 of 24 starts on the M1 the picture ran 51–154 ms ahead,
@@ -146,14 +147,11 @@ Play right after a click and Play while hovering include decoding the picture at
 launch and 2.5 / 2.6 s median to first sound and picture (about 0.6 s on the M1). In every scenario the first two
 seconds allow a 300 ms stall and 60 ms skew per launch, 100 ms and 40 ms median; the worst skew includes the first
 frame, so no scenario's skew limit is tighter than its start skew limit (cold open 150 / 145 ms, replay from the end
-60 / 48 ms, the idle start 160 / 45 ms). A new item's first sound and picture include its preroll at playback rate:
-700 / 800 ms per launch and 400 / 450 ms median (120 / 137 ms median on the M1; set before any hosted sample of it,
-from replay from the end, which also prerolls after Play: 112–129 / 165–199 ms median and 222 / 266 ms worst hosted).
-On the hosted virtual Mac a new 4K item starts behind its sound (software decode): in the first eight hosted launches
-of run 44540586891 cold open, primed at playback rate on Play, had a 52–78 ms median start skew, and a rebuilt item
-primed at a quarter rate while paused 52–60 ms (137 ms worst, 159 ms worst onset separation). So a new item allows
-150 ms skew per launch and 75 ms median there, and 200 ms onset separation per launch. On the M1 it starts within
-12 ms, and the strict profile holds it to 45 ms.
+60 / 48 ms, the idle start 160 / 45 ms). A new item's first sound and picture include its preroll at playback rate,
+like replay from the end, and share its budgets: 265 / 380 ms per launch and 220 / 300 ms median (101 / 141 ms median
+hosted in run 44551846020, 120 / 137 ms on the M1). Its skew keeps the common limits: primed by Play it started within
+12 ms on both. Primed at a quarter rate while paused (reverted, above), the hosted runner had started it 52–60 ms
+behind its sound (median; 137 ms worst, run 44540586891), which these limits reject.
 
 **This Mac fails on any picture out of step** (`strict` in `budgets.json`, applied wherever the runner is not the
 hosted virtual Mac): every launch of every scenario must start the picture within 60 ms of the sound and within 45 ms
