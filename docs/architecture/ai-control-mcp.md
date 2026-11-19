@@ -899,7 +899,11 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     `get_job.file_content_type` 报本机格式；原单、扣退费规则照旧。完整合同和上线后人工清单见 [Sky Studio 的任务](sky-studio-jobs.md)第十二节。
     给 AI 的英文工具说明前 512 字写清两种用途、单图输入、禁用字段及 get_job / add_clips；角度与倍率字段都进入 schema，
     没有新增别名，受清单的上限守着（当时每工具 2,048 / 全清单 110,000；2026-11-10 起名片 ≤ 450、全清单 ≤ 100,000，第一节）。
-    音乐 60–180 秒或让模型定、`instrumental=false` 可带 `lyrics`。结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
+    Music (2026-11-19, MCP-18): the length follows each music model's `length` in `/models` (none written in SkyCut): the first model in the
+    server's order that takes it (Lyria 3 Pro: 60–180 s or its own; Stable Audio 3 Medium: an exact 1–380 s, instrumental only;
+    `exact_length=true` asks for an exact one); `instrumental=false` may carry `lyrics`. Video `audio_mode` (full / ambient / none, `none`
+    only where the model lists it) and the result's `audio` block: [Sky Studio 的任务](sky-studio-jobs.md)「Music length and video sound」.
+    结果报 `credits`（开始时）、`credits_charged`、实际 `model_id` 和任务号（做完时），成品留作品库。
     真人参考拒绝和未知状态不自动切模型或重交；退款晚到只查原单。替换是新的明确操作，重新核对完整参考、规格、报价及批准。
     官方原创短片的公开 `film`、真实引用准备、报价锁定和双侧审查见 [官方原创短片](official-film.md)；普通 `quote_only` 仍不上传。
     `save_project.production` / `expected_revision` 原子作者提交一次本工程 undo；get_timeline 回传 plan、当前快照与派生待办。
