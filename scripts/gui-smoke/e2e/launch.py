@@ -12,7 +12,8 @@ import sys
 import time
 
 
-SUITE_TIMEOUT = 180
+# Multiple healthy fixture jobs can take more than three minutes on a shared Mac.
+SUITE_TIMEOUT = 300
 HOME_PROFILE = '(version 1) (allow default) (deny file-write* (subpath (param "REAL_HOME")))'
 
 

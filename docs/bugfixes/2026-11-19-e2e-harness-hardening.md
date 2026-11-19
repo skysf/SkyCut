@@ -41,6 +41,8 @@ the entire bundle on failure.
 before mounting the export row failed with the old four-second wait and passed with the new wait. Reinstating
 the 60 s polling deadline, baseline overwrite, and a bypassed delivery oracle each made their focused probe fail.
 Removing the scan wait also reproduced the missing source reminder in the focused MCP fixture check.
+On a shared Mac, a real inspection completed in 66.4 s and the 180 s watchdog fired during active video encoding.
+The watchdog is 300 s for the suite. The CI shard still has its 30-minute limit.
 The login-home guard detected the real preference leak before the in-process preference fix.
 `checks/test-app-cleanup.sh` exercises success and failure with a scratch bundle and rejected the original
 `check-motion-placement.sh` trap when temporarily restored.
