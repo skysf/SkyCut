@@ -96,8 +96,8 @@ enum AIInspectionTool {
             silenceDB: db, minimum: minimum, file: file != nil, sound: sound))
         let reviewed = AIInspectionReview.partition(all, state: state, job: job, generation: generation, session: session)
         // Grey hints are listed apart from the suspects: no evidence slots, not counted with them (FL-61).
-        let hints = reviewed.findings.filter { AIDeliveryVoice.hintKinds.contains($0.kind) }
-        let findings = reviewed.findings.filter { !AIDeliveryVoice.hintKinds.contains($0.kind) }
+        let hints = reviewed.findings.filter { AIDeliveryChecks.hintKinds.contains($0.kind) }
+        let findings = reviewed.findings.filter { !AIDeliveryChecks.hintKinds.contains($0.kind) }
         var frames: [AIFrameSampler.Frame] = []
         let shown = Array(findings.prefix(150))
         let evidence = AIInspection.evidence(findings, duration: scope.duration)

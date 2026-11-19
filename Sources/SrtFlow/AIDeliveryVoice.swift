@@ -22,9 +22,6 @@ enum AIDeliveryVoice {
         let entries: [JSONValue]
     }
 
-    /// Report kinds that are grey hints, listed apart from the suspects.
-    static let hintKinds: Set<String> = ["audio_voice_loud"]
-
     /// The voice plan over the checked range, or why there is none (nil, nil: no voice to check).
     @MainActor
     static func plan(_ roles: AIDeliverySoundRoles, state: TimelineState, layout: AudioEngineConfig,

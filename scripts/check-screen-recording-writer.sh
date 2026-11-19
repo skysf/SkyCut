@@ -33,6 +33,7 @@ xcrun swiftc \
   Sources/SrtFlow/TimelineDuration.swift \
   Sources/SrtFlow/VideoEditWebMotionRecord.swift \
   Sources/SrtFlow/VideoEditVoiceBand.swift \
+  Sources/SrtFlow/VideoEditClipSoundRole.swift \
   Sources/SrtFlow/VideoEditClipTransition.swift \
   Sources/SrtFlow/DeliveryIntentionalMark.swift \
   Sources/SrtFlow/VideoEditClipPlacement.swift \

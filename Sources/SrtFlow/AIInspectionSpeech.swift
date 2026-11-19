@@ -13,6 +13,7 @@ import SrtFlowCore
 // - 两样都没有：判不了，不当成切在说话上，由调用方列进 `speech_unchecked`（叫 AI 先 transcribe 有人声的那几段）。
 // 由来：MCP-14，两条 AI 剪的南极预告片里音效、音乐、环境声的起点被报成「切在说话上」，真问题淹在里面
 // （docs/bugfixes/2026-11-16-inspection-reports-sound-onsets-as-speech.md）。合同见 docs/architecture/finished-video-inspection.md。
+// Since 2026-11-19 listen cuts=true judges its V1 cuts with the same evidence (`AICutCheck.speechJudged`): one rule, two tools.
 // 不管什么：电平上在不在停顿里（`AICutCheck.side`，和 listen cuts=true 同一份）；转写缓存怎么读（`AISpeechCutTool.transcript`）。
 
 enum AIInspectionSpeech {
@@ -40,9 +41,15 @@ enum AIInspectionSpeech {
     /// 这一头切的是不是素材自己的头 / 尾：入点在文件开头（`start`）、出点在文件结尾 —— 什么都没切掉。
     /// 文件多长不知道（没探到时长）时，出点那一头不算。
     static func isFileEdge(_ clip: EditClip, start: Bool, tolerance: Double) -> Bool {
-        if start { return clip.sourceStart <= tolerance }
-        guard let length = clip.info?.duration ?? clip.audioAssetDuration, length > 0 else { return false }
-        return clip.sourceStart + clip.sourceDuration >= length - tolerance
+        isFileEdge(clip, atSource: start ? clip.sourceStart : clip.sourceStart + clip.sourceDuration, start: start, tolerance: tolerance)
+    }
+
+    /// The same at a source second of `sound`'s file: listen cuts=true asks it on the sound a V1 cut is heard from, which may be
+    /// a linked clip whose own edges sit elsewhere.
+    static func isFileEdge(_ sound: EditClip, atSource time: Double, start: Bool, tolerance: Double) -> Bool {
+        if start { return time <= tolerance }
+        guard let length = sound.info?.duration ?? sound.audioAssetDuration, length > 0 else { return false }
+        return time >= length - tolerance
     }
 
     /// 原文字幕里记着出处的句子，按素材文件归（分割出来的右半段 id 不一样，文件和源秒是同一份）。出处那一段已经不在时间线上的不算。

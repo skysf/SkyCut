@@ -18,6 +18,12 @@ import SrtFlowMCPKit
 //   docs/bugfixes/2026-10-18-cut-check-disagrees-with-cut-speech.md）。
 // - 建议的入出点就是 cut_speech 落刀的地方（对齐到工程的帧），换回这一段 V1 片段自己的源时间（声音从链接的那段来时两条源时间轴
 //   可能不一样），AI 直接拿去 edit_clip；落到素材外面的不给。
+// - On speech only with speech evidence (2026-11-19, production feedback MCP-14; `speechJudged`): the same rule inspect_video
+//   uses (AIInspectionSpeech). A cut where sound plays is on_speech only when the transcript has a word there (or narration
+//   subtitles a line); with that evidence but no word it is on_sound (music, an effect, ambience, a noise floor), without any
+//   evidence on_sound too and its clip goes into speech_unchecked; at the file's own first or last second nothing is cut
+//   (file_edge). Only on_speech carries a suggestion: moving a cut on music into "the nearest pause" fixes nothing.
+//   Before, the car cabin's noise floor came back as three cuts on speech (docs/bugfixes/2026-11-19-listen-cuts-reports-sound-onsets-as-speech.md).
 // 不管什么：波形和转写缓存怎么读、参数（AIListenCuts）；判法本身（AISpeechCutPoints）。
 
 struct AICutCheck {
@@ -69,6 +75,11 @@ struct AICutCheck {
         case quietSpot
         /// 落在声音上：切到的词（转写缓存里有才有）、为什么这么判（`AISpeechCutPoints.Point.why`）。
         case onSpeech(word: String?, why: String)
+        /// Where sound plays, but not on speech: `checked` = the transcript or narration subtitles show no word there; false = this
+        /// sound has no speech evidence at all (transcribe it to know).
+        case onSound(checked: Bool)
+        /// At the file's own first or last second: nothing is cut.
+        case fileEdge
         /// 这一头量不了：没声音 / 静音 / 藏起来了 / 波形还没读完。
         case unheard(String)
     }
@@ -117,6 +128,31 @@ struct AICutCheck {
             side.suggestedAt = suggestedAt
         }
         return side
+    }
+
+    /// A side the levels put on speech, judged on speech evidence the way inspect_video does (AIInspectionSpeech): the file's own
+    /// edge cuts nothing; a word (transcript) or a line (narration subtitles) at that source second keeps it on_speech; evidence
+    /// without a word, or no evidence at all, makes it on_sound with no suggestion. `words`: the sound clip's cached transcript
+    /// (the recogniser's source seconds; nil = never transcribed). Other verdicts pass through. Returns whether the sound had no
+    /// speech evidence (its clip belongs in speech_unchecked).
+    static func speechJudged(_ side: Side, sound: EditClip, words: [TimedWord]?, subtitles: AIInspectionSpeech.Subtitled?,
+                             tolerance: Double) -> (side: Side, unchecked: Bool) {
+        guard case .onSpeech(let word, let why) = side.verdict else { return (side, false) }
+        let sourceAt = sound.sourceTime(atTimeline: side.at)
+        var judged = Side(clipID: side.clipID, end: side.end, at: side.at, verdict: .fileEdge)
+        if AIInspectionSpeech.isFileEdge(sound, atSource: sourceAt, start: side.end == .start, tolerance: tolerance) { return (judged, false) }
+        switch AIInspectionSpeech.voice(atSource: sourceAt, words: words, subtitles: subtitles) {
+        case .on(let said):
+            judged = side
+            judged.verdict = .onSpeech(word: word ?? said, why: why)
+            return (judged, false)
+        case .off:
+            judged.verdict = .onSound(checked: true)
+            return (judged, false)
+        case .unknown:
+            judged.verdict = .onSound(checked: false)
+            return (judged, true)
+        }
     }
 
     /// 这一刻在不在这一段里（贴着边也算：listen 报的静音边就是电平窗的边，同 `AISpeechCutPoints.edgeTolerance`）。
@@ -169,6 +205,14 @@ struct AICutCheck {
             object["status"] = "on_speech"
             if let word { object["word"] = .string(word) }
             object["why"] = .string(why)
+        case .onSound(let checked):
+            object["status"] = "on_sound"
+            object["why"] = .string(checked
+                ? "sound plays here, but the transcript has no word at this moment: music, an effect or ambience, not speech"
+                : "sound plays here and this clip has no transcript or narration subtitles: transcribe it to know whether it is speech")
+        case .fileEdge:
+            object["status"] = "file_edge"
+            object["why"] = "the cut is at the file's own first or last second: nothing is cut off"
         case .unheard(let reason):
             object["status"] = "unheard"
             object["note"] = .string(reason)
@@ -184,6 +228,14 @@ struct AICutCheck {
     static func onSpeechCount(_ edges: [Edge]) -> Int {
         edges.flatMap { [$0.outgoing, $0.incoming] }.filter { side in
             if case .onSpeech? = side?.verdict { return true }
+            return false
+        }.count
+    }
+
+    /// How many sides are cut where sound plays but not on speech (on_sound).
+    static func onSoundCount(_ edges: [Edge]) -> Int {
+        edges.flatMap { [$0.outgoing, $0.incoming] }.filter { side in
+            if case .onSound? = side?.verdict { return true }
             return false
         }.count
     }
