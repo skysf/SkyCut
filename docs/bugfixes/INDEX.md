@@ -284,6 +284,7 @@
 - [2026-09-29 被切掉的字混进字幕行、字幕稀疏时选成幻灯片](2026-09-29-text-scan-cutoff-text-and-sparse-subtitles.md) — 「谁最多」在样本稀疏时不可靠：用位置先验 + 最低支撑。
 - [2026-11-11 森林色切经典色，开着的窗口只变一半](2026-11-11-theme-switch-leaves-windows-half-light.md) — `.preferredColorScheme` 交过明确值就别再交 nil。
 - [2026-11-17 The tick and click sound effects could not be placed, and failed calls left their files](2026-11-17-tick-and-click-cannot-be-placed.md) — Output must meet the consumer's minimum; roll back files when a call fails; bump the version when file content changes.
+- [2026-11-19 The one-day time bound refused relative keyframes a hair below 0 and times the tools had just made](2026-11-19-time-bound-refuses-relative-keyframes-and-timeline-end.md) — A bound needs the units of what it bounds, and must accept every time it lets the API create.
 - [2026-09-24 点一下选段卡半秒、拖块滚动跟不上手](2026-09-24-timeline-blocks-observe-whole-project.md) — 时间线上的块不读工程：只收值、`Equatable`、构造处套 `.equatable()`。
 - [2026-09-18 轨道一多就没法上下滚](2026-09-18-timeline-cannot-scroll-vertically.md) — 时间线双向滚动、轨道头 / 标尺各自钉住；裸 VStack 会替整条界面要高度。
 - [2026-08-09 时间线拖动卡顿与对齐](2026-08-09-timeline-clip-drag-lag-and-alignment.md) — 渲染偏移、吸附与唯一落点。
