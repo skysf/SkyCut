@@ -42,7 +42,8 @@ final class SkyStudioStyleLibrary: ObservableObject {
         var origin: Origin = .none
         /// The licence included `recipes` when this list was made (the AI path asks the licence again at the moment it reads).
         var entitled = false
-        /// Checksums of the texts on this Mac (only while entitled): what can be read without Sky Studio.
+        /// The versions with a copy on this Mac (`SkyStudioContentCache.key(id:version:)`, only while entitled): what can be read
+        /// without Sky Studio.
         var stored: Set<String> = []
     }
 
@@ -171,22 +172,22 @@ final class SkyStudioStyleLibrary: ObservableObject {
             next.styles = held.manifest.styles
             next.release = held.manifest.release
         }
-        if next.entitled { next.stored = cache.storedChecksums() }
+        if next.entitled { next.stored = cache.storedVersions() }
         if next != listing { listing = next }
     }
 
     // MARK: Reading one
 
-    /// One style at `version` (nil or `latest` = the version the list names now).
-    func read(_ id: String, version: String?) async throws -> Read {
+    /// One style at exactly `version` (nil or `latest` = the version the list names now). `sha256`: the checksum that version must
+    /// have when the caller knows it (a film's record); the list's own is used for the version it names. The answer is always that
+    /// id and version: a copy is matched on id + version (+ checksum), never on the text alone (Codex review CXS1 #5).
+    func read(_ id: String, version: String?, sha256: String? = nil) async throws -> Read {
         guard licence().recipes else { throw ReadProblem.notEntitled }
         let listed = listing.styles.first { $0.id == id }
         let asked = version.flatMap { $0.lowercased() == "latest" ? nil : $0 }
         guard let wanted = asked ?? listed?.version else { throw ReadProblem.notListed(id: id) }
-        if let listed, listed.version == wanted, let copy = cache.style(sha256: listed.sha256) {
-            return Read(style: copy.style, cachedAt: copy.fetchedAt)
-        }
-        if let copy = cache.style(id: id, version: wanted) { return Read(style: copy.style, cachedAt: copy.fetchedAt) }
+        let expected = sha256 ?? (listed?.version == wanted ? listed?.sha256 : nil)
+        if let copy = cache.style(id: id, version: wanted, sha256: expected) { return Read(style: copy.style, cachedAt: copy.fetchedAt) }
         let key: String
         switch await self.key() {
         case .success(let value): key = value
@@ -201,7 +202,7 @@ final class SkyStudioStyleLibrary: ObservableObject {
         } catch let refused as SkyStudioContentRequestProblem {
             throw ReadProblem.server(refused.message)
         }
-        if let listed, listed.version == wanted, listed.sha256 != style.sha256 {
+        if let expected, expected != style.sha256 {
             throw ReadProblem.server("Sky Studio sent a different text for \(id) \(wanted) than its list names; try again later.")
         }
         // The licence ended or the copies were deleted while this was asked: never keep or serve it.

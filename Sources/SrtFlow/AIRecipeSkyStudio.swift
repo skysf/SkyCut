@@ -86,7 +86,7 @@ enum AIRecipeSkyStudio {
         }
         let styles = listing.styles.map {
             AIRecipeSkyStudioPart.Style(id: $0.id, title: $0.title, useFor: $0.useFor, version: $0.version,
-                                        onThisMac: listing.stored.contains($0.sha256))
+                                        onThisMac: SkyStudioContentCache.key(id: $0.id, version: $0.version).map(listing.stored.contains) ?? false)
         }
         return AIRecipeSkyStudioPart(styles: styles, origin: origin, entitled: entitled)
     }
