@@ -127,6 +127,7 @@ extension EditClip {
         detached.volumeCurve = volumeCurve
         detached.soundScene = soundScene
         detached.voiceBandDB = voiceBandDB
+        detached.soundRole = soundRole
         return detached
     }
 

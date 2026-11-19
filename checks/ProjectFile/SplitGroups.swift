@@ -32,6 +32,7 @@ func runSplitOutGroups(root: URL) {
         ("Old freeze tails leave their clip's link group", checkOldFreezeTails),  // 49: OldFreezeTails.swift
         ("Web-motion source and disposable project caches", checkWebMotionProjectFiles),  // 50: WebMotion.swift
         ("Voice band: a clip's own 300 Hz-3 kHz lowered", checkVoiceBand),  // 51: VoiceBand.swift
+        ("Sound role: what a clip's sound is, saved", checkSoundRole),  // 52: SoundRole.swift
     ]
     for group in groups {
         do {
