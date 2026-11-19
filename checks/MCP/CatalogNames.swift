@@ -130,6 +130,9 @@ func catalogKnownNames() -> Set<String> {
     // the kinds, a music edge's nearest event, and listen cuts=true's statuses.
     names.formUnion(["audio_music_drops", "audio_music_late", "audio_no_score", "audio_no_music", "audio_music_edge", "audio_abrupt",
                      "event_at", "frames_from_event", "on_speech", "on_sound", "file_edge"])
+    // Result fields craft cards use (2026-11-19, exported to Sky Studio's content gate, MCP-62): get_timeline's volume_db_at for
+    // a clip with a volume curve (AITimelineSummary), listen's silent_seconds and more_silences (AIAudioLevels).
+    names.formUnion(["volume_db_at", "silent_seconds", "more_silences"])
     return names
 }
 

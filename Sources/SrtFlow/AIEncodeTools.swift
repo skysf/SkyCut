@@ -12,7 +12,9 @@ import SrtFlowMCPKit
 // Compress / Burn In outputs are named in the queue by the page's rule (EncodeQueue.target, since 2026-11-19), and a name
 // taken after this call answered moves the file on: get_job gives the real file with a `path_note`. All three tools read
 // `folder` in one place, AIEncodeFolder, which makes, checks and lists it off the main thread before anything is queued or
-// written (2026-11-19; `outputFolder` until then).
+// written (2026-11-19; `outputFolder` until then). The files they name are found and checked, burn_subtitles' subtitle
+// files read and convert_subtitles' files read and written off the main thread too (AIEncodeInputs, 2026-11-19): nothing
+// here asks a drive.
 //
 // **不替用户开跑**：队列停着、里面有用户自己排了还没开始的，就不排 —— `start()` 会把等着的一起跑掉。
 
@@ -23,13 +25,13 @@ enum AIEncodeTools {
 
     // MARK: compress_videos
 
-    /// `probe` / `deadline`: the output folder is made, checked and listed through it (AIEncodeFolder; the checks pass a drive
-    /// that does not answer).
+    /// `probe` / `deadline`: the files it names and the output folder are looked at through it (AIEncodeInputs,
+    /// AIEncodeFolder; the checks pass a drive that does not answer). The same for the other two tools.
     static func compress(
         _ args: AIToolArguments, _ project: VideoEditProject,
         probe: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
     ) async throws -> AIToolResult {
-        let urls = try files(args, limit: maxVideos, kind: "video", accepts: MediaFileTypes.isVideo)
+        let urls = try await files(args, limit: maxVideos, kind: "video", refusing: "Nothing was queued.", probe: probe, deadline: deadline)
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "read", args: args, project: project) {
             return ask
         }
@@ -38,18 +40,30 @@ enum AIEncodeTools {
 
     // MARK: burn_subtitles
 
-    static func burnIn(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
+    static func burnIn(
+        _ args: AIToolArguments, _ project: VideoEditProject,
+        probe: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
+    ) async throws -> AIToolResult {
         guard let items = try args.array("items"), !items.isEmpty else { throw AIToolError("items is required.") }
         guard items.count <= maxVideos else { throw AIToolError("Burn at most \(maxVideos) videos per call.") }
-        let pairs = try items.enumerated().map { index, item -> (video: URL, subtitles: URL) in
+        let named = try items.map { item -> (video: String, subtitles: String) in
             let entry = AIToolArguments(item)
-            let video = try existing(entry.requiredString("video"))
-            let subtitles = try existing(entry.requiredString("subtitles"))
-            guard MediaFileTypes.isVideo(video) else { throw AIToolError("items[\(index)]: \(video.lastPathComponent) is not a video.") }
-            guard MediaFileTypes.isSubtitle(subtitles) else {
-                throw AIToolError("items[\(index)]: \(subtitles.lastPathComponent) is not a subtitle file (.srt, .vtt, .ass, .ssa, .txt).")
+            return (try entry.requiredString("video"), try entry.requiredString("subtitles"))
+        }
+        // Found off the main thread (AIEncodeInputs): each video, then its subtitle file.
+        let found = try await AIEncodeInputs.find(
+            named.flatMap { [$0.video, $0.subtitles] }, videos: Set(named.indices.map { $0 * 2 }),
+            refusing: "Nothing was queued.", probe: probe, deadline: deadline
+        )
+        let pairs = try named.enumerated().map { index, item -> (video: URL, subtitles: URL) in
+            let video = found[index * 2], subtitles = found[index * 2 + 1]
+            guard video.exists else { throw AIToolError("\(item.video) does not exist.") }
+            guard subtitles.exists else { throw AIToolError("\(item.subtitles) does not exist.") }
+            guard video.isVideo else { throw AIToolError("items[\(index)]: \(video.url.lastPathComponent) is not a video.") }
+            guard MediaFileTypes.isSubtitle(subtitles.url) else {
+                throw AIToolError("items[\(index)]: \(subtitles.url.lastPathComponent) is not a subtitle file (.srt, .vtt, .ass, .ssa, .txt).")
             }
-            return (video, subtitles)
+            return (video.url, subtitles.url)
         }
         guard Set(pairs.map(\.video.standardizedFileURL.path)).count == pairs.count else {
             throw AIToolError("The same video appears twice in items.")
@@ -70,48 +84,57 @@ enum AIEncodeTools {
         if let ask = try AIWorkspace.shared.confirmReading(all, verb: "read", args: args, project: project) {
             return ask
         }
-        // 字幕和烧录页同一个读法（SubtitleLoader：编码只走 TextDecoding）。
-        let entries = try pairs.map { pair -> (URL, BurnInRequest?) in
+        // 字幕和烧录页同一个读法（SubtitleLoader：编码只走 TextDecoding）, read off the main thread (AIEncodeInputs).
+        let documents = try await AIEncodeInputs.subtitles(
+            pairs.map(\.subtitles), refusing: "Nothing was queued.", probe: probe, deadline: deadline
+        )
+        let entries = try zip(pairs, documents).map { pair, read -> (URL, BurnInRequest?) in
             let document: SubtitleDocumentModel
-            do {
-                document = try SubtitleLoader.load(pair.subtitles)
-            } catch {
-                throw AIToolError("\(pair.subtitles.lastPathComponent) could not be read: \(error.localizedDescription)")
+            switch read {
+            case .success(let loaded): document = loaded
+            case .failure(let failure): throw AIToolError("\(pair.subtitles.lastPathComponent) could not be read: \(failure.message)")
             }
             guard !document.cues.isEmpty else { throw AIToolError("\(pair.subtitles.lastPathComponent) has no subtitle lines.") }
             return (pair.video, BurnInRequest(
                 subtitleURL: pair.subtitles, document: document, style: batchStyle, styleFontURL: batchFontURL
             ))
         }
-        return try await enqueue(entries, on: .burnIn, kind: .burnIn, args, project)
+        return try await enqueue(entries, on: .burnIn, kind: .burnIn, args, project, probe: probe, deadline: deadline)
     }
 
     // MARK: convert_subtitles
 
-    static func convert(_ args: AIToolArguments, _ project: VideoEditProject) async throws -> AIToolResult {
-        let urls = try files(args, limit: maxSubtitleFiles, kind: "subtitle", accepts: MediaFileTypes.isSubtitle)
+    static func convert(
+        _ args: AIToolArguments, _ project: VideoEditProject,
+        probe: ExportDestinationProbe = .shared, deadline: TimeInterval = AIExportDestination.deadline
+    ) async throws -> AIToolResult {
+        let urls = try await files(
+            args, limit: maxSubtitleFiles, kind: "subtitle", refusing: "Nothing was converted.", probe: probe, deadline: deadline
+        )
         guard let name = try args.choice("to", from: MCPVocabulary.subtitleFormats), let target = SubtitleFormat(rawValue: name) else {
             throw AIToolError("to is required: one of \(MCPVocabulary.subtitleFormats.joined(separator: ", ")).")
         }
         if let ask = try AIWorkspace.shared.confirmReading(urls, verb: "read", args: args, project: project) {
             return ask
         }
-        // The folder is made, checked and listed off the main thread (AIEncodeFolder); names are picked past its listing, and the
-        // write below never replaces a file that appeared since (.withoutOverwriting).
-        let ready = try await AIEncodeFolder.prepare(args, project: project, refusing: "Nothing was converted.")
+        // The folder is made, checked and listed off the main thread (AIEncodeFolder); names are picked past its listing, and
+        // the files are read, converted and written off the main thread (AIEncodeInputs), never replacing a file there now.
+        let ready = try await AIEncodeFolder.prepare(args, project: project, refusing: "Nothing was converted.", probe: probe, deadline: deadline)
         let folder = ready.folder
         let outputs = AIEncodeOptions.outputs(for: urls, in: folder, suffix: "", pathExtension: target.fileExtension) {
             ready.taken.contains(ExportDestinationReport.fold($0.lastPathComponent))
         }
+        let failures = try await AIEncodeInputs.convert(
+            zip(urls, outputs).map { AIEncodeInputs.Conversion(input: $0, output: $1) }, to: target, folder: folder,
+            probe: probe, deadline: deadline
+        )
         var converted: [JSONValue] = []
         var failed: [JSONValue] = []
-        for (url, output) in zip(urls, outputs) {
-            do {
-                let text = try SubtitleConverter.convertedContents(of: url, to: target)
-                try Data(text.utf8).write(to: output, options: .withoutOverwriting)
+        for ((url, output), failure) in zip(zip(urls, outputs), failures) {
+            if let failure {
+                failed.append(["file": .string(AIWorkspace.shared.display(url)), "error": .string(failure.message)])
+            } else {
                 converted.append(["file": .string(AIWorkspace.shared.display(url)), "output": .string(output.path)])
-            } catch {
-                failed.append(["file": .string(AIWorkspace.shared.display(url)), "error": .string(error.localizedDescription)])
             }
         }
         var result: [String: JSONValue] = ["converted": .array(converted), "folder": .string(folder.path)]
@@ -240,22 +263,25 @@ enum AIEncodeTools {
 
     // MARK: 参数
 
+    /// `files`, found off the main thread (AIEncodeInputs): each one there and a `kind` file ("video": its content type,
+    /// then its name; "subtitle": its name), the same file named twice kept once.
     private static func files(
-        _ args: AIToolArguments, limit: Int, kind: String, accepts: (URL) -> Bool
-    ) throws -> [URL] {
+        _ args: AIToolArguments, limit: Int, kind: String, refusing ending: String,
+        probe: ExportDestinationProbe, deadline: TimeInterval
+    ) async throws -> [URL] {
         guard let paths = try args.stringArray("files"), !paths.isEmpty else { throw AIToolError("files is required.") }
         guard paths.count <= limit else { throw AIToolError("At most \(limit) files per call.") }
+        let videos = kind == "video"
+        let found = try await AIEncodeInputs.find(
+            paths, videos: videos ? Set(paths.indices) : [], refusing: ending, probe: probe, deadline: deadline
+        )
         var seen = Set<String>()
-        return try paths.compactMap { path in
-            let url = try existing(path)
-            guard accepts(url) else { throw AIToolError("\(url.lastPathComponent) is not a \(kind) file.") }
-            return seen.insert(url.standardizedFileURL.path).inserted ? url : nil
+        return try zip(paths, found).compactMap { path, file in
+            guard file.exists else { throw AIToolError("\(path) does not exist.") }
+            guard videos ? file.isVideo : MediaFileTypes.isSubtitle(file.url) else {
+                throw AIToolError("\(file.url.lastPathComponent) is not a \(kind) file.")
+            }
+            return seen.insert(file.url.standardizedFileURL.path).inserted ? file.url : nil
         }
-    }
-
-    private static func existing(_ path: String) throws -> URL {
-        let url = AIWorkspace.shared.resolve(path)
-        guard FileManager.default.fileExists(atPath: url.path) else { throw AIToolError("\(path) does not exist.") }
-        return url
     }
 }
