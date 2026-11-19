@@ -36,8 +36,10 @@
   makes the real home read-only for the run and checks for leaked per-bundle state after it exits. The GUI renderer
   uses the staged helper. MCP polls each fixture job for up to 120 s, covering the 18-frame renderer's 96 s plus the
   App backstop and teardown. A timeout prints the last job or GUI operation, the App output and window information.
+  Suite output streams live, so a CI job cancelled mid-suite still shows the last phase.
   One 300 s watchdog bounds each suite's execution after build, within the existing CI shard timeout.
-  `checks/E2E/Harness.py` also probes late jobs and deadline diagnostics, scratch-only writes and candidate updates.
+  `checks/E2E/Harness.py` also probes late jobs and deadline diagnostics, live output, scratch-only writes and
+  candidate updates.
 
 - `checks/test-app-cleanup.sh` scans test app staging scripts for an exit trap and exercises the shared cleanup on success
   and failure. See [installed copies](../build/build-and-packaging.md#installed-copies-on-the-developer-mac).

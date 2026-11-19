@@ -9,6 +9,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import threading
 import time
 
 
@@ -69,20 +70,28 @@ def stop_group(check):
     check.wait()
 
 
+def relay(stream):
+    # Forward each line as it arrives. A CI job cancelled mid-suite kills this launcher before any summary prints.
+    for line in iter(stream.readline, b""):
+        sys.stdout.buffer.write(line)
+        sys.stdout.buffer.flush()
+
+
 def supervise(command, env, root):
-    log = root / "suite.log"
     started = time.monotonic()
-    with log.open("w") as output:
-        check = subprocess.Popen(command, env=env, cwd=root, stdin=subprocess.DEVNULL, stdout=output,
-                                 stderr=subprocess.STDOUT, start_new_session=True)
-        try:
-            code = check.wait(timeout=SUITE_TIMEOUT)
-        except (subprocess.TimeoutExpired, KeyboardInterrupt):
-            stop_group(check)
-            output_tail(log)
-            output_tail(root / "app.log")
-            raise
-    print(log.read_text(errors="replace"), end="", flush=True)
+    # The sandboxed suite writes into this launcher's pipe, never into a file the caller opened in the real home.
+    check = subprocess.Popen(command, env=env, cwd=root, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, start_new_session=True)
+    pump = threading.Thread(target=relay, args=(check.stdout,), daemon=True)
+    pump.start()
+    try:
+        code = check.wait(timeout=SUITE_TIMEOUT)
+    except (subprocess.TimeoutExpired, KeyboardInterrupt):
+        stop_group(check)
+        pump.join(timeout=5)
+        output_tail(root / "app.log")
+        raise
+    pump.join(timeout=5)
     if code:
         output_tail(root / "app.log")
         raise SystemExit(f"E2E check exited with status {code}")

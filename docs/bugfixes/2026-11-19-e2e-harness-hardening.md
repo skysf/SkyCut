@@ -25,7 +25,8 @@ the entire bundle on failure.
 ## Fix
 
 - Poll windows and jobs within phase-specific budgets. Locate the row and icon in one drawing. Report the last
-  job or GUI operation, App output, and available window evidence when a wait fails.
+  job or GUI operation, App output, and available window evidence when a wait fails. Relay suite output line by
+  line, because a CI job that hits its own time limit kills the launcher before it can print a buffered log.
 - Finish the cut-bearing source scan before placing reference media. Keep the exact `add_clips` reminder assertion.
 - Share the clean E2E supervisor and block writes into the login home. Use in-process preferences, disable
   AppKit restoration for the fixture and keep the socket and provider marker beside the staged bundle.
@@ -43,6 +44,8 @@ the 60 s polling deadline, baseline overwrite, and a bypassed delivery oracle ea
 Removing the scan wait also reproduced the missing source reminder in the focused MCP fixture check.
 On a shared Mac, a real inspection completed in 66.4 s and the 180 s watchdog fired during active video encoding.
 The watchdog is 300 s for the suite. The CI shard still has its 30-minute limit.
+The first full CI run hit that shard limit just after the GUI suite started, and the buffered launcher showed nothing of it.
+Restoring the buffered launcher made the live-output probe fail: no output while the suite was still running.
 The login-home guard detected the real preference leak before the in-process preference fix.
 `checks/test-app-cleanup.sh` exercises success and failure with a scratch bundle and rejected the original
 `check-motion-placement.sh` trap when temporarily restored.

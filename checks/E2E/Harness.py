@@ -1,4 +1,4 @@
-"""Exercise E2E job deadlines, the home boundary, and candidate updates without launching the App."""
+"""Exercise E2E job deadlines, live suite output, the home boundary, and candidate updates without launching the App."""
 
 import contextlib
 import io
@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 
@@ -51,6 +53,26 @@ class HarnessChecks(unittest.TestCase):
         self.assertEqual(client.seconds, 62)
         self.assertIn("'phase': 'rendering'", log.getvalue())
         self.assertIn("background (no window)", log.getvalue())
+
+    def test_suite_output_streams_while_the_suite_runs(self):
+        # A cancelled CI job never reaches the end of supervise(), so only lines already relayed reach its log.
+        with tempfile.TemporaryDirectory() as root:
+            release = Path(root) / "release"
+            suite = ("import pathlib, time\nprint('Waiting for MCP job motion-1', flush=True)\n"
+                     f"while not pathlib.Path({str(release)!r}).exists(): time.sleep(0.05)\n")
+            captured = io.TextIOWrapper(io.BytesIO(), write_through=True)
+            with contextlib.redirect_stdout(captured):
+                worker = threading.Thread(target=launch.supervise, args=([sys.executable, "-c", suite], {}, Path(root)),
+                                          daemon=True)
+                worker.start()
+                deadline = time.monotonic() + 10
+                while b"motion-1" not in captured.buffer.getvalue() and time.monotonic() < deadline:
+                    time.sleep(0.05)
+                live = captured.buffer.getvalue()
+                release.touch()
+                worker.join(timeout=10)
+            self.assertIn(b"Waiting for MCP job motion-1", live, "Suite output appeared only after the suite ended")
+            self.assertFalse(worker.is_alive())
 
     def test_reference_waits_for_source_scan_before_placement(self):
         class Session:
