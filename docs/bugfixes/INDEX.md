@@ -107,6 +107,7 @@
 - [2026-09-26 上层轨藏起来的段，成片里画面还在](2026-09-26-hidden-upper-clip-still-exported.md) — 过滤清单算出来了，就让每个消费者都走它；要有真导出抽帧。
 - [2026-09-20 悬停光标卡住](2026-09-20-hover-cursor-stack.md) — 全 App 共用一个 `NSCursor` 栈，漏押 / 错弹一次就全局卡住。
 - [2026-08-08 悬停影子播放头与删除键](2026-08-08-hover-ghost-playhead-and-delete-key.md) — peek 语义与统一删除入口。
+- [2026-11-19 A huge time in a timeline tool was stored with an undo step, and the next export or look quit SkyCut](2026-11-19-huge-times-in-timeline-tools.md) — "Finite" is not "in range": every time an AI passes goes through one bound (the supported day, `MCPTimeArguments`), checked before the undo group opens.
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-19 main stopped building: two merged PRs each added a `sound` to inspect_video](2026-11-19-inspect-video-sound-name-clash.md) — Two PRs green on their own can clash in main: when main moved, merge it in and build before merging; a guard should count a name only the thing it means can have.

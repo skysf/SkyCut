@@ -49,13 +49,15 @@ enum MCPGuideSharedTopics {
     ])
 
     // 出处：ai-control-mcp.md 第四节第 2、9、10、11 条，mcp-edit-parameters.md，timeline-linkage.md，editor-remembered-toggles.md（磁吸跟着工程走）。
+    // The one-day bound on every time: MCPTimeArguments (mcp-edit-parameters.md "Times in every tool").
     static let conventions = MCPGuideTopic(name: "conventions", sections: [
         MCPGuideSection(name: MCPGuideSection.overview, text: """
         Conventions shared by SkyCut tools.
 
         Time. All times are seconds. start, time, duration and seek use timeline seconds. source_in and source_out are seconds inside \
         the media file; look, listen and transcribe with file= also use file seconds. Changing source_in or source_out with edit_clip \
-        keeps the clip's timeline start and moves its end, unless you also pass start.
+        keeps the clip's timeline start and moves its end, unless you also pass start. Every time is a number from 0 to 86400 \
+        seconds (one day, edit_limits.time); a negative, infinite or larger one fails the whole call before anything changes.
 
         Tracks. V1 is the main video track: its clips play one after another. V2, V3… are video tracks above it (pictures over V1). \
         A1, A2… are audio tracks; add_clips creates the A-numbers it is given that do not exist yet. track=new_video or new_audio \
