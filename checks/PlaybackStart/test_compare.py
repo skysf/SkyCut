@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 import unittest
 
-from compare import FOLLOWUP, TIMINGS, Trial, evaluate, validate_trial
+from compare import FOLLOWUP, PREROLLS, TIMINGS, Trial, evaluate, strict, validate_trial
 
 
 BUDGETS = json.loads(Path(__file__).with_name("budgets.json").read_text())
@@ -13,9 +13,9 @@ BUDGETS = json.loads(Path(__file__).with_name("budgets.json").read_text())
 def trial(name, **changes):
     cold = name == "cold-open"
     metrics = dict.fromkeys(TIMINGS, 0)
-    metrics.update(audioMs=50, videoMs=65, oneSecondElapsedMs=1017,
+    metrics.update(audioMs=50, videoMs=65, oneSecondElapsedMs=1017, stallMs=33.3, maxSkewMs=12,
                    builds=int(cold), itemAttaches=int(cold), assetOpens=3 if cold else 0,
-                   videoPrerolls=int(cold or name == "end-replay"),
+                   videoPrerolls=PREROLLS.get(name, 0),
                    displayPeriodMs=16.67, displayGapMs=18, oneSecondTimedOut=0)
     metrics.update(changes)
     return Trial(name, metrics)
@@ -41,7 +41,53 @@ RECORDED_BUG = {
 }
 
 
+# The M1 before the 2026-11-19 fix: a resume and a Play while hovering sent the sound first and re-seeked the 4K
+# long-GOP picture, which stayed frozen for 0.6-0.9 s (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
+RECORDED_FREEZE = {
+    "resume": dict(audioMs=[27.5, 34.4, 28.7], videoMs=[826.8, 921.1, 830.4], onsetGapMs=[799.3, 886.7, 801.7]),
+    "peek-play": dict(audioMs=[35.7, 37.6, 31.7], videoMs=[635.4, 655.0, 623.6], onsetGapMs=[599.7, 617.4, 591.9]),
+}
+
+
 class PlaybackGateTests(unittest.TestCase):
+    def test_recorded_m1_freezes_fail_hosted_and_local_scoring(self):
+        samples = batch(5)
+        for name, columns in RECORDED_FREEZE.items():
+            for index in range(3):
+                samples[name][index] = trial(name, **{metric: values[index] for metric, values in columns.items()})
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("resume: 3 of 5 launches had picture and sound 500 ms" in error for error in errors))
+        self.assertTrue(any("peek-play median: onsetGapMs" in error for error in errors))
+        self.assertEqual(len(strict(samples, BUDGETS["strict"])), 6)
+        # Before the fix a Play while hovering also skipped the placement of the picture.
+        self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
+
+    def test_a_new_item_must_be_primed_before_play(self):
+        self.assertEqual(validate_trial("fresh-item", trial("fresh-item")), [])
+        self.assertTrue(validate_trial("fresh-item", trial("fresh-item", videoPrerolls=1)))
+
+    def test_a_stall_after_a_good_start_fails(self):
+        samples = batch(5)
+        samples["cut"][0] = trial("cut", stallMs=700, maxSkewMs=690)
+        errors, outliers = evaluate(samples, BUDGETS)
+        self.assertEqual(errors, [])
+        self.assertIn("stallMs 700.0 > 300 ms", outliers[0])
+        for index in (1, 2):
+            samples["cut"][index] = trial("cut", stallMs=700)
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("cut: 2/5" in error for error in errors))
+        self.assertTrue(any("cut median: stallMs" in error for error in errors))
+
+    def test_this_mac_fails_any_stall_or_skew_the_hosted_budgets_tolerate(self):
+        samples = batch(5)
+        samples["middle"][0] = trial("middle", stallMs=140)
+        samples["warm-start"][2] = trial("warm-start", onsetGapMs=80)
+        self.assertEqual(evaluate(samples, BUDGETS)[0], [])
+        failures = strict(samples, BUDGETS["strict"])
+        self.assertEqual(len(failures), 2)
+        self.assertIn("stallMs 140.0 > 100 ms", failures[0] + failures[1])
+        self.assertEqual(strict(batch(5), BUDGETS["strict"]), [])
+
     def test_two_isolated_late_followups_keep_their_raw_errors(self):
         samples = batch(5)
         cut = samples["cut"]

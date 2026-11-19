@@ -52,13 +52,13 @@ launch() {
     "${app}" -mainWindowSection videoEdit -ApplePersistenceIgnoreState YES -NSRecentDocumentsLimit 0 \
     -optimizedMedia.previewMode original >>"${log}" 2>&1 &
   pid=$!
-  deadline=$((SECONDS + 45))
+  deadline=$((SECONDS + 120))
   while kill -0 "${pid}" 2>/dev/null; do
     if [ "${SECONDS}" -ge "${deadline}" ]; then
       kill "${pid}" 2>/dev/null || true
       wait "${pid}" 2>/dev/null || true
       pid=""
-      echo "Timed out after 45 s" >>"${log}"
+      echo "Timed out after 120 s" >>"${log}"
       return 124
     fi
     sleep 1

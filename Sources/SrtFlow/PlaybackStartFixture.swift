@@ -6,6 +6,12 @@ import Foundation
 enum PlaybackStartFixture {
     static let cut = 4.0
     static let deepGOP = 14.5
+    /// A rebuilt item placed three seconds into the 4K source's second GOP.
+    static let freshItem = 10.0
+    /// A far click into the 4K source's third GOP (source 19 s, keyframe at 16 s).
+    static let farSeek = 18.0
+    /// Where the pointer hovers (in the 1080p opening) while the playhead waits in the 4K source.
+    static let peek = 6.0
     static let duration = 23.0
     private static let sourceDuration = 24.0
 

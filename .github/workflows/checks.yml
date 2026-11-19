@@ -41,8 +41,8 @@ jobs:
     # 首跑 6 项齐红就是它（SrtFlowCore 不碰这些 API 所以核心检查过了）。
     runs-on: macos-26
     # Shard 1 also runs both graphical checks: about 30 minutes with a cold build cache (2026-11-19), more with the
-    # playback warm-up and confirmation.
-    timeout-minutes: ${{ matrix.shard == 1 && 40 || 30 }}
+    # playback warm-up and confirmation, which grew by about 4 minutes when each launch began watching two seconds.
+    timeout-minutes: ${{ matrix.shard == 1 && 45 || 30 }}
     strategy:
       # 一组红了别的组照跑完：一次看全所有失败。
       fail-fast: false
@@ -137,8 +137,9 @@ jobs:
       # Save timing diagnostics before the longer checks, even if a later test fails.
       - name: Playback start benchmark
         if: ${{ !cancelled() && matrix.shard == 1 && steps.changes.outputs.docs_only != 'true' && steps.verified.outputs.verified != 'true' }}
-        # Fixture, an unscored warm-up and five launches take about 2.5 minutes; a confirmation adds three launches.
-        timeout-minutes: 6
+        # Each launch plays eleven scenarios for two seconds each, about 50 s on the M1: the fixture, an unscored warm-up
+        # and five launches take about 6 minutes; a confirmation adds three launches.
+        timeout-minutes: 15
         env:
           PLAYBACK_START_OUT: ${{ runner.temp }}/playback-start
         run: /bin/bash scripts/check-playback-start.sh
