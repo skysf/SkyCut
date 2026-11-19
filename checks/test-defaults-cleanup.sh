@@ -10,6 +10,7 @@
 #  4. The removal itself, against a fake home: a check app's plist goes after the wait, the real apps' plists never.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+. scripts/test-defaults-cleanup.sh
 . scripts/test-app-cleanup.sh
 
 failed=0
