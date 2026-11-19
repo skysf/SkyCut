@@ -12,6 +12,21 @@
   The fake key lives in memory. The export flow creates and edits a project through MCP, checks frame-level layer gains and
   limiter reduction, compares `get_job`'s decoded true peak against an independent ffmpeg measurement, and exercises failure
   on a real unwritable directory followed by success with a taken output name. Run locally with `scripts/check-local.sh e2e`.
+  The reference cut combines a two-frame source cut and intentional review, an audio crossfade, music accents and made effects
+  aligned to picture, ducking and voice-band EQ, transparent ProRes and PNG, the native frame-reveal title, a rendered web
+  motion and a burned subtitle. It checks a ripple with subtitle linkage, portrait canvas reframe, project save and reopen,
+  Save As name collision, and single-step restore of a saved AI round. Its color patches, decoded audio, subtitle bounds and
+  canonical timeline are pinned in `scripts/gui-smoke/e2e/reference_golden.json`. The timeline keeps stable clip names and
+  link-group order across runs. To regenerate deliberately, run `/bin/bash scripts/check-e2e.sh --update-goldens`
+  with the same ffmpeg as CI, then review the JSON diff. The regeneration command runs the reference flow and its functional
+  assertions. The default command compares against the committed baseline.
+
+- `scripts/check-e2e-gui.sh` hosts production views in AppKit windows and injects events into those specific windows.
+  It checks a folder returned by the fixture panel and a typed path after the fixture reports failure, a version restored and undone,
+  a new native preset and its inspector rows, and a web template card placed on the timeline and re-rendered in the inspector.
+  It locates controls from its own window pixels using AppKit and on-device Vision. The system service, external
+  volumes, pointer gestures and visual fit still have real-machine checks in the [GUI smoke procedure](gui-smoke-testing.md).
+  The two E2E checks have a combined CI budget of three minutes after the shared App build.
 
 - Web-motion renderer: `scripts/check-web-motion.sh` builds the helper, compiles SkyCut's side with `checks/WebMotion/` and renders real pages
   (needs a logged-in session for WebKit, as on CI; about a minute; `SRTFLOW_WEB_MOTION_CHECKS=pure,clock,normal,alpha,hostile,reach,memory,load-memory`
