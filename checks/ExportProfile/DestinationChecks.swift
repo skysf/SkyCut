@@ -113,7 +113,8 @@ import Foundation
         let readOnly = await sleepy.use(URL(fileURLWithPath: "/Volumes/ReadOnly/Videos", isDirectory: true))
         require(readOnly == .readOnlyVolume && sleepy.folder == asleep, "a read-only folder is refused and the old one kept")
         let before = await state.checkBeforeWriting()
-        require(before.problem == nil && before.contains("Taken.mp4"), "the check before writing looks and writes again")
+        require(before.report.problem == nil && before.report.contains("Taken.mp4") && before.folder == state.folder,
+                "the check before writing looks and writes again, and says which folder it checked")
     }
 
     private static func typedPaths(require: (Bool, String) -> Void) {

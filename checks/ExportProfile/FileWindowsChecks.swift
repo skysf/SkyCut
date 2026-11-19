@@ -8,8 +8,9 @@ import UniformTypeIdentifiers
 // would show: an answer reaches the caller; a cancel answers nothing; a window that never comes is given up with the main
 // thread free and the fallback offered, and a typed answer there reaches the caller; a window that stays up gets "Close
 // It" next to it, which closes it and offers the fallback; "Try Again" asks AppKit again; a second request while one window
-// is up opens nothing; a record left by a force quit sends the next request to the fallback first. Then the typed and
-// dropped answers (TypedPath), which never touch a drive.
+// is up opens nothing; a record left by a force quit sends the next request to the fallback first. A save's answer may
+// replace a file only when it came from macOS's own window. Then the typed and dropped answers (TypedPath), which never
+// touch a drive.
 @MainActor enum FileWindowsChecks {
     static func run(require: (Bool, String) -> Void) async {
         let suite = "com.srtflow.SrtFlow.exportprofilecheck.filewindows"
@@ -78,7 +79,36 @@ import UniformTypeIdentifiers
                 "after a run that ended with a window open, the fallback comes first")
         detour.helper.answer?(nil)
 
+        await saveAnswers(require: require, record: record)
         typedAndDropped(require: require)
+    }
+
+    /// A save's answer says whether replacing a file there was confirmed: macOS's own window asked, the helper never did
+    /// (docs/bugfixes/2026-11-19-save-window-fallback-replaces-a-file.md); a confirmation covers only the URL it was for.
+    private static func saveAnswers(require: (Bool, String) -> Void, record: SystemFileWindowRecord) async {
+        let save = FileWindowRequest(kind: .save(types: [.quickTimeMovie], name: "Teaser.mov"))
+        let picked = URL(fileURLWithPath: "/Volumes/Disk/Teaser.mov")
+        let window = Rig(record: record) { FakeFolderPanel(.answers(picked, after: 0.1)) }
+        let asked = await window.windows.chooseSave(save)
+        require(asked == SaveLocation(url: picked, mayReplace: true),
+                "an answer from macOS's own save window may replace (it asked): \(String(describing: asked))")
+
+        let folder = URL(fileURLWithPath: "/Volumes/Disk/Shots", isDirectory: true)
+        let helperAnswers = [("typed folder", TypedPath.answer(folder.path + "/", for: save)),
+                             ("dropped folder", TypedPath.accepted([folder], for: save).first),
+                             ("typed path", TypedPath.answer(folder.path + "/Teaser.mov", for: save))]
+        for (label, answer) in helperAnswers {
+            let failing = Rig(record: record) { FakeFolderPanel(.neverShows) }
+            var got: SaveLocation?
+            failing.windows.openSave(save) { got = $0 }
+            await settle(1.5)
+            failing.helper.answer?(answer.map { [$0] })
+            require(answer != nil && got == answer.map { SaveLocation(url: $0, mayReplace: false) },
+                    "a \(label) in the helper never asked about replacing, so it may not replace: \(String(describing: got))")
+        }
+        let confirmed = SaveLocation(url: picked, mayReplace: true)
+        require(confirmed.at(picked).mayReplace && !confirmed.at(picked.appendingPathExtension("skycut")).mayReplace,
+                "a confirmation covers only the URL it was asked about, not a name the caller completes")
     }
 
     /// Typed paths and dropped files decide the answer without a drive.

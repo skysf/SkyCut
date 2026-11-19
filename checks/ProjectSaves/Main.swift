@@ -11,6 +11,7 @@ import SrtFlowCore
 // - SaveChecks.swift: autosave, flush at the deadline, edits during a write, coalescing, a failing drive, a moved file.
 // - CloseQuitChecks.swift: switching away, Save As, the AI's save_project, closing at once, Quit.
 // - EditWhileClosingChecks.swift: an edit made while New / close / Quit is writing; Quit looking again; a stale save window.
+// - ReplaceChecks.swift: a file already at a chosen place is replaced only when the person confirmed it for that URL.
 
 @MainActor
 final class Checks {
@@ -45,6 +46,7 @@ final class Checks {
         await SaveChecks.run(checks, root: root)
         await CloseQuitChecks.run(checks, root: root)
         await EditWhileClosingChecks.run(checks, root: root)
+        await ReplaceChecks.run(checks, root: root)
         print("Project saves: \(checks.count) assertions, \(checks.failures) failures")
         exit(checks.failures == 0 ? 0 : 1)
     }

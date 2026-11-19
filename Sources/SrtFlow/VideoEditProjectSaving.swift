@@ -55,7 +55,7 @@ extension VideoEditProject {
         guard let request = writeRequest(.save) else { return .failed }
         switch await connectedWriter().write(request, deadline: deadline) {
         case .saved?: return .saved      // applied by `applyWrite` before this caller resumed
-        case .failed?: return .failed    // said by `applyWrite`
+        case .failed?, .occupied?: return .failed    // said by `applyWrite` (a project's own file is never `.occupied`)
         case nil: return notResponding(request.url)
         }
     }
@@ -93,34 +93,61 @@ extension VideoEditProject {
         let generation = documentGeneration
         Task {
             // The window is not modal: the project may have been switched while it was open.
-            guard let url = await chooseSaveLocation(), isCurrentGeneration(generation) else { return }
-            await saveAs(url)
+            guard let location = await chooseSaveLocation(), isCurrentGeneration(generation) else { return }
+            await saveAs(chosen: location)
         }
     }
 
     /// 存储为的面板 (the macOS save window, not modal: SystemFileWindows). nil when nothing was chosen.
-    func chooseSaveLocation() async -> URL? {
+    func chooseSaveLocation() async -> SaveLocation? {
         let request = FileWindowRequest(
             kind: .save(types: [.srtFlowProject], name: suggestedFileName),
             start: documentURL?.deletingLastPathComponent() ?? AIWorkspace.shared.startFolder(project: self), prompt: L10n("Save")
         )
-        guard var url = await SystemFileWindows.shared.choose(request)?.first else { return nil }
-        // 用户把扩展名删了也照样存成工程文件（.skycut），不然下次双击打不开。
-        if !VideoEditProjectFile.isProjectFile(url) {
-            url = url.appendingPathExtension(VideoEditProjectFile.fileExtension)
+        guard let chosen = await SystemFileWindows.shared.chooseSave(request) else { return nil }
+        // 用户把扩展名删了也照样存成工程文件（.skycut），不然下次双击打不开。A "Replace" confirmed for the name without it
+        // does not cover the name with it.
+        guard !VideoEditProjectFile.isProjectFile(chosen.url) else { return chosen }
+        return chosen.at(chosen.url.appendingPathExtension(VideoEditProjectFile.fileExtension))
+    }
+
+    /// Save As to where the person chose (the save window, closing an untitled project). A file already there is replaced
+    /// only when the person confirmed it for exactly that URL — in macOS's own window, or in the question asked here
+    /// (`FileReplaceQuestion`); otherwise it stays as it was and nothing is written.
+    @discardableResult
+    func saveAs(chosen location: SaveLocation, deadline: TimeInterval = ProjectFileWriter.deadline) async -> Bool {
+        let generation = documentGeneration
+        switch await writeSaveAs(location.url, replacing: location.mayReplace, deadline: deadline) {
+        case .saved: return true
+        case .notSaved: return false
+        case .occupied:
+            // The question is a modal alert: the answer counts only for the document it was asked about.
+            guard FileReplaceQuestion.ask(location.url), isCurrentGeneration(generation) else { return false }
+            return await saveAs(location.url, replacing: true, deadline: deadline)
         }
-        return url
     }
 
     /// 存到 `url` 并从此以它为准（另存为、AI 新建 / 存工程共用这一份），off the main thread. 新身份只有写盘成功才作数：
     /// 写失败或盘不应答（目标盘只读、满了、睡着了）时工程原样留在原来的位置，不会卡在一个写不进去的 URL 上。
+    /// `replacing`: a file already at `url` may be replaced (the AI saving back to its own file; a confirmed answer).
+    /// Otherwise nothing is written over it, and the notice says the file is already there.
     @discardableResult
-    func saveAs(_ url: URL, deadline: TimeInterval = ProjectFileWriter.deadline) async -> Bool {
+    func saveAs(_ url: URL, replacing: Bool, deadline: TimeInterval = ProjectFileWriter.deadline) async -> Bool {
+        switch await writeSaveAs(url, replacing: replacing, deadline: deadline) {
+        case .saved: return true
+        case .notSaved: return false
+        case .occupied(let reason):
+            notice = String(format: L10n("Could not save the project: %@"), reason)
+            return false
+        }
+    }
+
+    private func writeSaveAs(_ url: URL, replacing: Bool, deadline: TimeInterval) async -> SaveAsEnd {
         endPendingTextEditing()
-        guard let request = writeRequest(.saveAs, to: url) else { return false }
+        guard let request = writeRequest(.saveAs, to: url, replacing: replacing) else { return .notSaved }
         guard let result = await connectedWriter().write(request, deadline: deadline) else {
             _ = notResponding(url)
-            return false
+            return .notSaved
         }
         return adoptSaveAs(request, result)
     }
@@ -169,22 +196,24 @@ extension VideoEditProject {
         return saveNow()
     }
 
-    /// Checks and dev hooks only: `saveAs` on the caller's thread.
+    /// Checks and dev hooks only: `saveAs(_:replacing: true)` on the caller's thread.
     @discardableResult
     func saveDocument(as url: URL) -> Bool {
         endPendingTextEditing()
         guard let request = writeRequest(.saveAs, to: url) else { return false }
-        return adoptSaveAs(request, connectedWriter().writeBlocking(request))
+        return adoptSaveAs(request, connectedWriter().writeBlocking(request)) == .saved
     }
 
     // MARK: - Taking a snapshot, applying what the drive said
 
-    private func writeRequest(_ kind: ProjectFileWriteRequest.Kind, to target: URL? = nil) -> ProjectFileWriteRequest? {
+    private func writeRequest(
+        _ kind: ProjectFileWriteRequest.Kind, to target: URL? = nil, replacing: Bool = true
+    ) -> ProjectFileWriteRequest? {
         guard let url = target ?? documentURL else { return nil }
         return ProjectFileWriteRequest(
             kind: kind, state: state, url: url, knownRecords: mediaRecords, rowHeights: rowHeights,
             documentBookmark: kind == .save ? documentBookmark : nil,
-            revision: fileWriter.revision, generation: documentGeneration
+            revision: fileWriter.revision, generation: documentGeneration, replacesExisting: kind == .save || replacing
         )
     }
 
@@ -203,20 +232,31 @@ extension VideoEditProject {
         switch result {
         case .saved(let url, let records, let bookmark):
             adoptWritten(url, records: records, bookmark: bookmark, taken: request)
-        case .failed(let reason):
+        case .failed(let reason), .occupied(let reason):
             notice = String(format: L10n("Could not save the project: %@"), reason)
         }
     }
 
-    private func adoptSaveAs(_ request: ProjectFileWriteRequest, _ result: ProjectFileWriteResult) -> Bool {
-        guard isCurrentGeneration(request.generation) else { return false }
+    /// How a Save As ended for its caller.
+    private enum SaveAsEnd: Equatable {
+        case saved
+        /// A file is already there and replacing it was not confirmed: nothing written (the reason for the notice).
+        case occupied(String)
+        /// Not written, or not in time (said in the notice), or the project became another document meanwhile.
+        case notSaved
+    }
+
+    private func adoptSaveAs(_ request: ProjectFileWriteRequest, _ result: ProjectFileWriteResult) -> SaveAsEnd {
+        guard isCurrentGeneration(request.generation) else { return .notSaved }
         switch result {
         case .saved(let url, let records, let bookmark):
             adoptWritten(url, records: records, bookmark: bookmark, taken: request)
-            return true
+            return .saved
         case .failed(let reason):
             notice = String(format: L10n("Could not save the project: %@"), reason)
-            return false
+            return .notSaved
+        case .occupied(let reason):
+            return .occupied(reason)
         }
     }
 

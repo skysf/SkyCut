@@ -131,14 +131,14 @@ import Foundation
         let saveLocationDefault = ProjectCloseQuestions.saveLocation
         var untitledAnswers: [ProjectCloseQuestions.UntitledChoice] = [.save, .discard]
         ProjectCloseQuestions.untitled = { _ in untitledAnswers.isEmpty ? .cancel : untitledAnswers.removeFirst() }
-        var saveWindow: CheckedContinuation<URL?, Never>?
+        var saveWindow: CheckedContinuation<SaveLocation?, Never>?
         ProjectCloseQuestions.saveLocation = { _ in await withCheckedContinuation { saveWindow = $0 } }
 
         let switching = Task { await project.startNewProject() }   // "Save…": the save window stays open
         checks.require(await until(3) { saveWindow != nil }, "New Project asks where to save the untitled project")
         await project.openProject(at: otherURL)                    // meanwhile Open Recent, and "Discard"
         let chosen = root.appendingPathComponent("Chosen for the untitled one.skycut")
-        saveWindow?.resume(returning: chosen)
+        saveWindow?.resume(returning: SaveLocation(url: chosen, mayReplace: false))
         await switching.value
 
         checks.require(!FileManager.default.fileExists(atPath: chosen.path),
