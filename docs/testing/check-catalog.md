@@ -483,9 +483,12 @@
   first motion and sync at onset and one second later, and the longest picture stall and worst skew over the first two
   seconds; scenarios include a rebuilt item, Play right after a click, a resume and Play while hovering. The graphical CI
   step gates timing and one-time preview work; off the hosted runner every launch must keep the picture in step (`strict`).
+  Hosted budgets come from 25 runs: a slow host's first five launches may fail, the eight with confirmation must pass
+  (`test_compare.py` pins the slowest healthy run and the recorded failures).
   `checks/playback-start-wiring.sh` checks the Play path and the workflow connection, and that Play never starts the
   sound ahead of a placed, primed picture; `scripts/check-player-clock.sh` (`SyncedStartChecks.swift`) checks pause,
-  resume, hover and a new item on a real AVPlayer. [Playback start](../architecture/playback-start.md).
+  resume, hover and a new item on a real AVPlayer, and (`AudioTimelineChecks.swift`) that the benchmark reads the
+  sound across a sliver between audio blocks. [Playback start](../architecture/playback-start.md).
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（扫描守卫）。
 - AI 在干活时不让 App Nap 降速、领和还成对（活动断言只在 `AIKeepAwake` 和录屏开关、路由领了紧跟 `defer` 还、任务 `start` 领 `finish` 还）：`checks/ai-keep-awake.sh`（扫描守卫）；计数、重复还、兜底还、真走一次工具调用和任务都还回来在 `scripts/check-voice-recovery.sh` 的 `KeepAwakeChecks`。
