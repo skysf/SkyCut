@@ -14,7 +14,9 @@
 # - the subtitle editor's writes and the media records of saved versions (2026-11-19,
 #   docs/bugfixes/2026-11-19-subtitle-and-version-saves-touch-drives-on-main.md);
 # - a Compress / Burn In encode: ffmpeg writes only the job's own file, handed over and cleaned up off the main thread
-#   (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md).
+#   (2026-11-19, docs/bugfixes/2026-11-19-compress-burn-overwrite-and-delete.md);
+# - web-motion recovery's movie checks, Compress / Burn In's names and sizes, compress_videos / burn_subtitles' folder
+#   (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md).
 # Rules: docs/architecture/export-settings.md §8 and §5 item 8, docs/architecture/video-edit-project-file.md §5,
 # docs/architecture/system-file-windows.md, docs/architecture/blocking-media-reads.md "Destination drives".
 # Moved out of checks/project-file-wiring.sh on 2026-11-19 (that file reached the 600-line limit).
@@ -174,8 +176,32 @@ fi
 require "quitting stops a running encode and removes its own file" \
   Sources/SrtFlow/SrtFlowApp.swift 'EncodeJob\.stopAllForQuit\(\)'
 
+# Drive checks that ran on the main thread (2026-11-19, docs/bugfixes/2026-11-19-drive-checks-on-main-thread.md): web-motion
+# recovery asks which movies are there on the cache folder's queue (it ran on every preview rebuild); Compress / Burn In name
+# an item without the drive and again once the folder's names are back off the main thread, and read the finished file's
+# size there too; compress_videos / burn_subtitles make, check and list their folder through the probe before queueing.
+# scripts/check-motion-placement.sh (RecoveryOffMain) and scripts/check-export-profile.sh (EncodeOffMainChecks) check the
+# behaviour.
+forbid "web-motion recovery never asks the drive on the main thread (only on WebMotionCacheFiles.queue)" \
+  Sources/SrtFlow/WebMotion/WebMotionRecovery.swift '^[^/]*(FileManager\.default|refreshWebMotionCaches\()'
+require "web-motion recovery asks which movies are there on the cache folder's queue" \
+  Sources/SrtFlow/WebMotion/WebMotionRecovery.swift 'await MediaReadQueue\.run\(on: WebMotionCacheFiles\.queue\)'
+forbid "the Compress / Burn In queue never asks the drive itself (only through EncodeOutputFolder, off the main thread)" \
+  Sources/SrtFlow/EncodeQueue.swift '^[^/]*(\.fileExists\(|MediaProbe\.byteSize\(|contentsOfDirectory\(|attributesOfItem\()'
+require "the queue names items again once the folder's names are back from off the main thread" \
+  Sources/SrtFlow/EncodeQueue.swift 'await EncodeOutputFolder\.names\(in: folder, probe: probe\)'
+require "the finished file's size is read off the main thread" \
+  Sources/SrtFlow/EncodeQueue.swift 'await EncodeOutputFolder\.size\(of: output, probe: probe\)'
+forbid "EncodeOutputFolder asks the drive only through the probe" Sources/SrtFlow/EncodeOutputFolder.swift '^[^/]*FileManager\.default'
+forbid "compress_videos / burn_subtitles' folder is never made or checked on the main thread" \
+  Sources/SrtFlow/AIEncodeFolder.swift '^[^/]*FileManager\.default'
+require "the AI encode folder is made, checked and listed through the probe" \
+  Sources/SrtFlow/AIEncodeFolder.swift 'await probe\.run\(on: near, deadline: deadline'
+require "compress_videos / burn_subtitles queue only into a folder prepared off the main thread" \
+  Sources/SrtFlow/AIEncodeTools.swift 'try await AIEncodeFolder\.prepare\(args, project: project'
+
 if [ "$WIRING_FAIL" -ne 0 ]; then
   echo "file-io-off-main-wiring 失败" >&2
   exit 1
 fi
-echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务; Compress / Burn In write only their own file"
+echo "✓ file-io-off-main-wiring：导出文件夹、AI 导出、工程存盘、系统的打开 / 存储窗口都不在主线程上等盘或面板服务; Compress / Burn In write only their own file; motion recovery, encode names and folders are asked off the main thread"

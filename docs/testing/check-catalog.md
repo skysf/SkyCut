@@ -43,7 +43,9 @@
   library, parameter-only same-clip replacement, preserved trims/speed/effects, one-step undo/redo, canonical/version/font fingerprints,
   both page-approval modes and exact request-bound tokens, verbatim page failures without timeline mutation, missing-cache recovery,
   portable font/system warnings, over-long durations / frame rates (AI calls, a reopened project) refused before any job, and
-  same-fingerprint renders that keep the cached movie (reuse, a failed install, another system identity, a Save As mid-install). `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
+  same-fingerprint renders that keep the cached movie (reuse, a failed install, another system identity, a Save As mid-install),
+  and recovery asking the drive off the main thread (`RecoveryOffMain`: a drive slow for its first answers, no question on the main
+  thread, main-thread gaps under 0.5 s, the movie back without undo). `checks/MCP/motion-wiring.sh` and `approval-wiring.sh` are sourced by `check-mcp` scans-only; the former
   pins the production router, jobs, document guards, undo, export readiness and discovery. Contract: [web motion](../architecture/web-motion-renderer.md#15-stored-motion-and-the-ai-call-mcp-74-2026-11-17).
   Core placement and the official-template suite run in mandatory separate processes, each capped at 240 seconds; either failure
   fails the script. The official group also checks every default twice, independent parameter pixels, portrait output, bundled
@@ -62,6 +64,7 @@
   Since 2026-11-19 also one name per export (`ExportTargetChecks`): two projects' `export_video` / `export_subtitles` into one folder, held at a barrier inside the listing, get two names and each file reads back as its own; a stale listing never lets either tool replace a file (the export moves on and says so); `ExclusivePlacement` on real files ([export settings](../architecture/export-settings.md) §5 item 6).
   Since 2026-11-19 also the export panel's write target (`PanelTargetChecks`): a folder taken while Export is pressed, with its check and the old folder's back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly it; an export nobody was asked about never replaces a file that appears during it ([export settings](../architecture/export-settings.md) §5 item 7).
   Since 2026-11-19 also Compress / Burn In (`EncodeQueueChecks`, real encodes): two inputs with one file name get two names and read back as their own, a new output folder names them apart, a file that appears at a planned name is kept and the encode moves on (also through `compress_videos` and its `get_job`), and a failed, cancelled or quit job leaves the file at its name alone and nothing of its own; the rules are in [导出设置](../architecture/export-settings.md) §5 item 8.
+  Their names and folders off the main thread (`EncodeOffMainChecks`, since the same day): a taken name is passed once the folder's names are back (adding, another output folder), a fake drive that never answers leaves adding immediate and the main thread free, `compress_videos` names past a taken file before answering and refuses a stuck or read-only folder with the panel's sentence, nothing queued and no job ([case](../bugfixes/2026-11-19-drive-checks-on-main-thread.md)).
 
 - 公开制作状态：`scripts/check-film-production.sh` / `checks/film-production-wiring.sh`（真实模型的图 / CAS、绑定与审查失效、实际转场 / 画布 / 混音、原生帧角色、目录换 Key；完整工具 / undo / 后台媒体另经 MCP 验收），合同见[官方原创短片](../architecture/official-film.md)。
 

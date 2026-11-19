@@ -15,7 +15,7 @@ func runEncodeChecks() {
 }
 
 /// 2026-10-15 用户转来的反馈：convert_subtitles 固定落在导出文件夹里，还得再调一次 manage_files 挪到位。四个写文件的工具
-/// 都收同名同义的 folder；读法在 AIEncodeTools.outputFolder 一处（scripts/check-mcp.sh 扫描钉着）。
+/// 都收同名同义的 folder；读法在 AIEncodeFolder 一处（2026-11-19 起；scripts/check-mcp.sh 扫描钉着）。
 private func checkOutputFolderParameter() {
     for name in [MCPToolName.compressVideos, .burnSubtitles, .convertSubtitles, .exportSubtitles] {
         let folder = name.definition.inputSchema["properties"]?["folder"]?["description"]?.stringValue

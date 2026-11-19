@@ -275,7 +275,7 @@ final class AIToolRouter {
             return try await AITranscribeTool.transcribe(args, project)
         case .compressVideos: return try await AIEncodeTools.compress(args, project)
         case .burnSubtitles: return try await AIEncodeTools.burnIn(args, project)
-        case .convertSubtitles: return try AIEncodeTools.convert(args, project)
+        case .convertSubtitles: return try await AIEncodeTools.convert(args, project)
         case .addClips: return try await AITimelineTools.addClips(args, project)
         case .editClip:
             // 先看画面、再校验；和批量共用提交点，通过后才开撤销组（失败不留空组）。
