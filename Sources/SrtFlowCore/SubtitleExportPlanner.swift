@@ -100,6 +100,13 @@ public enum SubtitleExportPlanner {
         return url
     }
 
+    /// Never replacing, at exactly `url` (an export panel file nobody asked to replace, docs/architecture/export-settings.md
+    /// §5 item 7): the same serialization and read-back under a private name, then the name taken in one step that fails
+    /// when it is taken (ExclusivePlacement.create). false = taken: that file is left as it was.
+    public static func writeNew(_ document: SubtitleDocumentModel, format: SubtitleFormat, to url: URL) throws -> Bool {
+        try ExclusivePlacement.create(url) { try writeChecked(document, format: format, to: $0, named: url) } != nil
+    }
+
     /// Never replacing (the AI's export_subtitles, docs/architecture/export-settings.md §5 items 6 and 9): every file of
     /// the set is serialized and read back under a private name first, then the set takes the names of set `number` of
     /// `names`, or of the next set none of whose names is taken at that moment (ExclusivePlacement.createSet). A file that

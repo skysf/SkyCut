@@ -33,7 +33,8 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/M
   checks/ExportProfile/FileChooserChecks.swift checks/ExportProfile/FileWindowsChecks.swift checks/ExportProfile/SaveAnswerChecks.swift \
   checks/ExportProfile/DestinationChecks.swift \
   checks/ExportProfile/AIExportFolderChecks.swift checks/ExportProfile/ExportTargetChecks.swift \
-  checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/EncodeQueueChecks.swift \
+  checks/ExportProfile/PanelTargetChecks.swift checks/ExportProfile/SubtitlePanelChecks.swift \
+  checks/ExportProfile/EncodeQueueChecks.swift \
   checks/ExportProfile/EncodeOffMainChecks.swift checks/ExportProfile/EncodeInputsOffMainChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" -o "${APP}/Contents/MacOS/ExportProfileCheck"
 FFMPEG="${SRTFLOW_FFMPEG:-${PWD}/vendor/ffmpeg}"

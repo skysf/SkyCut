@@ -76,6 +76,12 @@ func runSubtitleExportPlannerChecks() throws {
             !FileManager.default.fileExists(atPath: bogus.path),
             "写盘：失败不留半截文件"
         )
+        // Never replacing at an exact name (the export panel's files nobody asked about, export-settings.md §5 item 7).
+        let mine = dir.appendingPathComponent("movie.fr.srt")
+        check(try SubtitleExportPlanner.writeNew(original, format: .srt, to: mine)
+              && (try String(contentsOf: mine, encoding: .utf8)).contains("hello"), "writeNew: a free name gets the file")
+        check(try !SubtitleExportPlanner.writeNew(translation, format: .srt, to: mine)
+              && !(try String(contentsOf: mine, encoding: .utf8)).contains("你好"), "writeNew: a taken name is left as it was")
         // 既有文件在失败场景下原样保留。
         let precious = dir.appendingPathComponent("movie.srt")
         checkEqual(
