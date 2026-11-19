@@ -78,6 +78,10 @@ grep -qF 'while let project = OpenProjects.shared.all.first(where: { needsSettli
 NEEDS="$(awk '/    private static func needsSettling\(/,/^    \}/' "$QUIT")"
 grep -qF 'case .letThrough(let snapshot): return snapshot != QuitMark.Snapshot(project) || project.fileWriter.isBusy' <<<"${NEEDS}" \
   || fail "${QUIT}: a project let through and edited afterwards (by the AI while another project was asked about) is not settled again; Quit loses that edit"
+# "Quit Anyway" belongs to the document its alert showed (docs/bugfixes/2026-11-19-quit-anyway-covers-a-replaced-document.md):
+# a project given up holds another document once an Open (or the AI) replaced it, and that one is settled like any other.
+grep -qF 'case .gaveUp(let generation): return project.documentGeneration != generation' <<<"${NEEDS}" \
+  || fail "${QUIT}: \"Quit Anyway\" is kept for the project object, not for the document its alert showed; a document opened in that project since quits unsaved"
 
 # 5. 录屏落回开录的那个工程，不是「此刻主窗口里的那个」。
 grep -q 'targetProject = project' "$RECORDING" \
