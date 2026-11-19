@@ -140,7 +140,7 @@ grep -qF 'if let end = Self.end(of: source), position >= end {' <<<"${CLOCK_CODE
   || fail "${CLOCK}：声音主时钟的计时器走到总长要自己收尾（finishAtEnd）—— 不然播放头越过片尾一直走、引擎永远不算停着"
 PLAY="$(awk '/    func play\(\) \{/,/^    \}/' <<<"${CLOCK_CODE}")"
 AT_END_LINE="$({ grep -n 'if isAtEnd {' <<<"${PLAY}" || true; } | head -1 | cut -d: -f1)"
-RECOVER_LINE="$({ grep -nF 'guard let restarted = recoverAudioIfNeeded(source) else { return }' <<<"${PLAY}" || true; } | head -1 | cut -d: -f1)"
+RECOVER_LINE="$({ grep -nF 'guard recoverAudioIfNeeded(source) != nil else { return }' <<<"${PLAY}" || true; } | head -1 | cut -d: -f1)"
 [ -n "${AT_END_LINE}" ] && [ -n "${RECOVER_LINE}" ] && [ "${AT_END_LINE}" -lt "${RECOVER_LINE}" ] \
   || fail "${CLOCK}：play() 要先看播放头是不是已经在尽头（在就不开播）—— 到了头的播放器不会再报一次「播完了」，声音主时钟会带着播放头越过片尾一直走"
 grep -qF 'return time >= end - Self.endSlack' <<<"${CLOCK_CODE}" \

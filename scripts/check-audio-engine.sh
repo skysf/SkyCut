@@ -171,6 +171,7 @@ xcrun swiftc \
   checks/AudioEngine/Replace.swift \
   checks/AudioEngine/VoiceBand.swift \
   checks/AudioEngine/VoiceBandLive.swift \
+  checks/AudioEngine/PausedSeek.swift \
   checks/AudioEngine/Recovery.swift \
   checks/AudioEngine/Idle.swift \
   checks/AudioEngine/IdleEngine.swift \

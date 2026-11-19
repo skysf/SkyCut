@@ -58,6 +58,30 @@ RECORDED_FREEZE = {
 }
 
 
+# The M1 before the 2026-11-20 fix, eight starts after a 20 s idle stop: the picture started ahead of the sound and the
+# drift correction re-seeked it, or the sound lost its start (docs/bugfixes/2026-11-20-idle-start-picture-ahead-and-lost-sound.md).
+RECORDED_IDLE_START = [
+    dict(startOffsetMs=-96.8, stallMs=133.3, maxSkewMs=96.8, onsetGapMs=75.1),
+    dict(startOffsetMs=-18.6, stallMs=33.3, maxSkewMs=18.6, onsetGapMs=3.1),
+    dict(startOffsetMs=-22.9, stallMs=33.3, maxSkewMs=22.8, onsetGapMs=1.2),
+    dict(startOffsetMs=-78.6, stallMs=116.7, maxSkewMs=78.6, onsetGapMs=56.9),
+    dict(startOffsetMs=-8.5, stallMs=33.3, maxSkewMs=8.5, onsetGapMs=13.2),
+    dict(startOffsetMs=-19.1, stallMs=33.3, maxSkewMs=19.1, onsetGapMs=94.8),
+    dict(startOffsetMs=-41.5, stallMs=66.7, maxSkewMs=41.5, onsetGapMs=19.8),
+    dict(startOffsetMs=-12.8, stallMs=33.3, maxSkewMs=12.8, onsetGapMs=26.0),
+]
+
+
+# The M1 before the 2026-11-20 fix: a click far ahead while playing (11 s to 18 s, three seconds into an 8 s 4K GOP) sent
+# the sound there at once and re-seeked the picture under it, frozen for about a second.
+RECORDED_CLICK_WHILE_PLAYING = dict(
+    audioMs=[33.8, 32.4, 31.8, 31.3, 34.1],
+    videoMs=[1036.8, 1046.2, 1039.5, 1028.0, 1025.0],
+    onsetGapMs=[1003.0, 1013.7, 1007.8, 996.8, 990.8],
+    startOffsetMs=[15.9, -6.7, -12.6, 9.7, 3.7],
+)
+
+
 class PlaybackGateTests(unittest.TestCase):
     def test_recorded_m1_freezes_fail_hosted_and_local_scoring(self):
         samples = batch(5)
@@ -116,11 +140,24 @@ class PlaybackGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 2)
         self.assertIn("stallMs 140.0 > 100 ms", failures[0] + failures[1])
         self.assertEqual(strict(batch(5), BUDGETS["strict"]), [])
-        # The start after the idle stop is known to run the picture ahead (the output device's start); it is skipped here
-        # and held by the hosted budgets until that is fixed.
+
+    def test_recorded_idle_start_and_click_while_playing_fail_on_this_mac(self):
+        # Before 2026-11-20 the start after the idle stop ran the picture ahead and its drift correction re-seeked it,
+        # and a click while playing sent the sound at once over a picture frozen for the decode
+        # (docs/bugfixes/2026-11-20-idle-start-picture-ahead-and-lost-sound.md).
         samples = batch(5)
-        samples["idle-wake"][0] = trial("idle-wake", startOffsetMs=-154, maxSkewMs=154, stallMs=200)
-        self.assertEqual(strict(samples, BUDGETS["strict"]), [])
+        samples["idle-wake"] = [trial("idle-wake", **launch) for launch in RECORDED_IDLE_START]
+        failures = strict(samples, BUDGETS["strict"])
+        self.assertEqual(len(failures), 3)
+        self.assertTrue(all("idle-wake" in failure for failure in failures))
+        samples = batch(5)
+        for index in range(5):
+            samples["play-seek"][index] = trial("play-seek", **{metric: values[index] for metric, values in RECORDED_CLICK_WHILE_PLAYING.items()})
+        errors, _ = evaluate(samples, BUDGETS)
+        self.assertTrue(any("play-seek: 5 of 5 launches had picture and sound 500 ms" in error for error in errors))
+        self.assertEqual(len(strict(samples, BUDGETS["strict"])), 5)
+        # The re-seek under the running sound also skipped the placement of the picture.
+        self.assertTrue(validate_trial("play-seek", trial("play-seek", videoPrerolls=0)))
 
     def test_two_isolated_late_followups_keep_their_raw_errors(self):
         samples = batch(5)

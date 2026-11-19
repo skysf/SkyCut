@@ -32,6 +32,7 @@ xcrun swiftc \
   -I "$BUILD_DIR/Modules" \
   -o "$OUT" \
   Sources/SrtFlow/VideoPreviewView.swift \
+  Sources/SrtFlow/PlayerClockObservers.swift \
   Sources/SrtFlow/PreviewReadiness.swift \
   Sources/SrtFlow/ChainedScrub.swift \
   Sources/SrtFlow/VideoDriftCheck.swift \
@@ -49,6 +50,7 @@ xcrun swiftc \
   checks/PlayerClock/DetachChecks.swift \
   checks/PlayerClock/AudioSourceChecks.swift \
   checks/PlayerClock/SyncedStartChecks.swift \
+  checks/PlayerClock/LandingChecks.swift \
   checks/PlayerClock/AudioTimelineChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 

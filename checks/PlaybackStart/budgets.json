@@ -50,6 +50,12 @@
       "videoMs": 3600,
       "maxSkewMs": 80
     },
+    "play-seek": {
+      "audioMs": 3500,
+      "videoMs": 3600,
+      "startOffsetMs": 80,
+      "maxSkewMs": 120
+    },
     "near-end": {
       "audioMs": 360,
       "videoMs": 420,
@@ -125,6 +131,10 @@
         "audioMs": 2500,
         "videoMs": 2600
       },
+      "play-seek": {
+        "audioMs": 2500,
+        "videoMs": 2600
+      },
       "fresh-item": {
         "audioMs": 450,
         "videoMs": 460
@@ -148,8 +158,6 @@
       "stallMs": 100,
       "maxSkewMs": 45
     },
-    "skip": [
-      "idle-wake"
-    ]
+    "skip": []
   }
 }

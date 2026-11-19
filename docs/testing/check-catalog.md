@@ -527,14 +527,19 @@
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
 - `scripts/check-playback-start.sh` uses the real editor, a fresh project and a 4K long-GOP source to measure first sound,
   first motion and sync at onset and one second later, and the longest picture stall and worst skew over the first two
-  seconds; scenarios include a rebuilt item, Play right after a click, a resume and Play while hovering. The graphical CI
-  step gates timing and one-time preview work; off the hosted runner every launch must keep the picture in step (`strict`).
+  seconds; scenarios include a rebuilt item, Play right after a click, a resume, Play while hovering, a click while
+  playing (`play-seek`, since 2026-11-20) and the start after the idle stop. The graphical CI step gates timing and
+  one-time preview work; off the hosted runner every launch of every scenario must keep the picture in step (`strict`).
+  Local knobs (not used by the gate): `SRTFLOW_PLAYBACK_START_ONLY` / `_REPEAT` run some scenarios repeatedly in one
+  launch, `_IDLE_SECONDS` lengthens the idle stop (20 s reproduced the idle start's failures that 2 s hid).
   Hosted budgets come from 25 runs: a slow host's first five launches may fail, the eight with confirmation must pass
   (`test_compare.py` pins the slowest healthy run and the recorded failures).
   `checks/playback-start-wiring.sh` checks the Play path and the workflow connection, and that Play never starts the
-  sound ahead of a placed, primed picture; `scripts/check-player-clock.sh` (`SyncedStartChecks.swift`) checks pause,
-  resume, hover and a new item on a real AVPlayer, and (`AudioTimelineChecks.swift`) that the benchmark reads the
-  sound across a sliver between audio blocks. [Playback start](../architecture/playback-start.md).
+  sound ahead of a placed, primed picture nor re-seeks the picture under running sound; `scripts/check-player-clock.sh`
+  (`SyncedStartChecks.swift`) checks pause, resume, hover and a new item on a real AVPlayer, (`LandingChecks.swift`) the
+  start on an output that is not rendering, a click and a drag while playing and drift corrections without a native
+  jump, and (`AudioTimelineChecks.swift`) that the benchmark reads the sound across a sliver between audio blocks.
+  [Playback start](../architecture/playback-start.md).
 - AI 起的导出 / 转写 / 翻译排队（四个入口都经 `AIWorkQueue`、不再回「已经在做」、取消先从队里拿、`get_job` 报 `queued` / `queue_position`）：
   `checks/ai-work-queue-wiring.sh`（扫描守卫）。
 - AI 在干活时不让 App Nap 降速、领和还成对（活动断言只在 `AIKeepAwake` 和录屏开关、路由领了紧跟 `defer` 还、任务 `start` 领 `finish` 还）：`checks/ai-keep-awake.sh`（扫描守卫）；计数、重复还、兜底还、真走一次工具调用和任务都还回来在 `scripts/check-voice-recovery.sh` 的 `KeepAwakeChecks`。
@@ -638,6 +643,9 @@
   `scripts/check-project-file.sh` group 51 (cleaning, v38, round trip, split, separated sound, audio-only change);
   `scripts/check-mcp.sh` → `VoiceBandToolChecks`; `scripts/check-parameter-limits.sh` → `VoiceBandAppChecks` (edit_clip's real
   plan / apply, the export mixdown per tone, one undo). Rules in [sound scenes](../architecture/sound-scenes.md) section 5.
+- A paused seek fills the new position before Play (2026-11-20): `scripts/check-audio-engine.sh` group 17 →
+  `PausedSeek.swift` (manual rendering: play, pause, render a paused quantum, seek, render paused quanta, Play: the first
+  quantum has data and sound from its first sample). [Audio engine](../architecture/audio-engine.md) 第三节.
 
 - Project-switch waits in look: `scripts/check-look-jobs.sh` → `RouterSwitchChecks` uses the actual authorized router, queue
   selection, target and look tool with synthetic background projects. It checks implicit calls with / without a remembered

@@ -37,6 +37,15 @@ final class AudioTrackRenderer: @unchecked Sendable {
         scratchRight.deallocate()
     }
 
+    /// Paused quantum: each stream's ring takes up a new round (`AudioRing.syncReader`), so its feeder can fill the new
+    /// position before Play. True when one did: the caller wakes the feeder.
+    func syncWhilePaused() -> Bool {
+        guard let set = published.load() else { return false }
+        var changed = false
+        for stream in set.streams where stream.ring.syncReader() { changed = true }
+        return changed
+    }
+
     /// 把这一拍混进 `outLeft` / `outRight`（调用方已清零）。返回环里没有、只能当静音的帧数（欠载）。
     func render(position: Int64, frames: Int, into outLeft: UnsafeMutablePointer<Float>,
                 _ outRight: UnsafeMutablePointer<Float>) -> Int {

@@ -114,6 +114,7 @@
 - [2026-09-20 悬停光标卡住](2026-09-20-hover-cursor-stack.md) — 全 App 共用一个 `NSCursor` 栈，漏押 / 错弹一次就全局卡住。
 - [2026-08-08 悬停影子播放头与删除键](2026-08-08-hover-ghost-playhead-and-delete-key.md) — peek 语义与统一删除入口。
 - [2026-11-19 A huge time in a timeline tool was stored with an undo step, and the next export or look quit SkyCut](2026-11-19-huge-times-in-timeline-tools.md) — "Finite" is not "in range": every time an AI passes goes through one bound (the supported day, `MCPTimeArguments`), checked before the undo group opens.
+- [2026-11-20 After the idle stop, Play started the picture ahead of the sound, and starts lost their first sound](2026-11-20-idle-start-picture-ahead-and-lost-sound.md) — A device start slows the whole process for a while: hold both clocks until the output renders and start them back to back; let the ring take up a paused seek so Play has sound from its first sample.
 - [2026-09-23 滤镜 / 音频库 / 转场卡片拖不进时间线](2026-09-23-in-app-drops-swallowed-by-file-underlay.md) — 整条时间线只挂一个落点 `TimelineDropRouter`；两边都落不下去的 A/B 不是证据。
 - [2026-11-13 索引条目的上限绕得过去，一句话丢了例外和条件](2026-11-13-index-entry-limit-bypassed.md) — 守一种格式要写白名单（只许这几种写法、别的都红），「认出不许的才红」被绕过三轮；负例留在仓库里跟着守卫跑；收成一句话时「只有 / 一律」写全例外、实测数字带着条件、修法写明适用范围。
 - [2026-11-19 main stopped building: two merged PRs each added a `sound` to inspect_video](2026-11-19-inspect-video-sound-name-clash.md) — Two PRs green on their own can clash in main: when main moved, merge it in and build before merging; a guard should count a name only the thing it means can have.
@@ -196,6 +197,7 @@
 - [2026-11-10 转写不了的 Mac 上合批旁白卡死](2026-11-10-packed-batch-without-word-times-stuck.md) — 拿不到字的时间就按字数估句界并报出来，不无限重试。
 - [2026-11-19 Two AI exports into one folder could pick the same name, and the second replaced the first](2026-11-19-parallel-ai-exports-pick-the-same-name.md) — A copy of shared state taken before an `await` is a snapshot: pick and reserve after it in one step, and claim the name atomically when writing.
 - [2026-09-26 字幕比声音早 0.9 秒、片段开头的词丢了](2026-09-26-pause-stretches-next-word.md) — 识别器给的词时间不是开口时间（停顿被并进相邻的词）：先估开口。
+- [2026-11-20 A click while playing and every drift correction re-seeked the picture under the running sound](2026-11-20-picture-reseeked-under-running-sound.md) — `setRate(_:time:atHostTime:)` is a seek in every form: keep a playing picture moving with `rate`; to move it elsewhere, hold the sound and place the picture.
 - [2026-09-26 捏合放大时鼠标底下的内容跑掉](2026-09-26-pinch-zoom-anchor-never-applied.md) — `hitTest` 吃父视图坐标；已有唯一真相（滚动几何）时别按坐标找第二份。
 - [2026-11-18 Pressing Play at the end of the timeline does nothing](2026-11-18-play-at-timeline-end-does-nothing.md) — Keep the guard at the lowest layer (`play()` never starts at the end) and give the user's gesture its meaning above it.
 - [2026-11-19 Play during project open could crash the preview](2026-11-19-play-before-preview-ready.md) — Keep the Play request pending through item installation and check readiness before starting the synchronized player.

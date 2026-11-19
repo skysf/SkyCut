@@ -108,7 +108,9 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
          按播放时图已经在跑，和一直开着一样。**App 一启动就开始看**（等第一次建引擎才看的话，打开工程的那一下已经错过，
          刚起的图当场被当成没人用停掉）；「上一次有动作」只往后走（时间戳更早的事件不算数）。
       2. 时钟要出声时图还停着（回来的第一下就是播放）→ `recoverIfNeeded()` **当场起、等声卡起来、再从原处开播**。
-         后台正在起就等它起完。
+         后台正在起就等它起完。Since 2026-11-20 `PlayerClock` then holds sound and picture until the output renders
+         (`isRendering`) and starts both back to back: started at once, the picture ran up to 170 ms ahead
+         ([playback start](playback-start.md)).
     - **一个判断只读一次图的状态。** 状态是原子的，后台那一次起完随时把 starting 改成 running；同一句里读两次
       （`state == .running || state == .starting`）会在交接的那一下两头都比不上、答成「没在跑」，管空闲的据此把计时器撤了，
       之后图一直开着、没人在两分钟后停它（2026-11-11 复审复现：30 万次交接里答错 786 次）。要问「在跑或者正在起」，
@@ -156,11 +158,15 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
 
 - **声音是主时钟。** `PreviewAudioEngineHost`（VideoEditProjectAudioMix.swift）在第一次重建预览时建引擎、起图、
   `PlayerClock.attachAudioSource`，然后把引擎交给管空闲的那一位（第二节第 11 条：用不着就当场停）；从此播放头每 50 ms 从引擎读（`observePlaybackTime` 仍是唯一入口），
-  播放器的周期回调只用来对表：视频和引擎差过一帧、连着两拍，就 `setRate(_:time:atHostTime:)` 把视频重新钉到
-  引擎的时间表上（`driftCorrections` 计数，冒烟结果里有；修完时钟之后 32 秒 4 次 seek 是 0 次）。
-- **开播 / seek 都只是改几个数**：`PlayerClock.play()` 先让引擎从播放头起播，再 `setRate` 让视频从此刻起跟；
-  播放中 seek 同样 —— 引擎一个 IO 缓冲就出声，视频自己定位、定位要多久就晚多久赶上来（不改时间表）；
-  停着 seek 照旧精确定位 / 链式扫帧。暂停 = 引擎锚点钉住 + 播放器 pause。
+  播放器的周期回调只用来对表（`driftCorrections` 计数，冒烟结果里有；修完时钟之后 32 秒 4 次 seek 是 0 次）。
+  Picture and sound more than a frame apart on two ticks in a row: since 2026-11-20 the picture runs 0.75–1.25× until it
+  is back on the sound, and beyond 0.25 s both land again; never a re-seek under running sound (before, every correction
+  was `setRate(_:time:atHostTime:)`, a native seek that froze a long-GOP picture: [playback start](playback-start.md)).
+- **Play and seek only change a few numbers** (2026-11-20 wording): Play starts the placed, primed picture and then the
+  engine from the same position on its next quantum (`PlayerClock.startClocks`); a seek while playing holds the sound
+  with the picture until the picture is placed there, then both start together (before, the sound jumped at once and
+  the picture re-seeked under it); a paused seek places precisely / scrubs as before. Pause = the anchor pinned + the
+  player paused. The start rules are in [playback start](playback-start.md).
 - **主时钟跟着预览的生命周期**：`detach()` 同时摘掉声音源和它的 Timer；换源先暂停旧源。
   `PreviewAudioEngineHost.apply` 新建或复用引擎之后都要重新接到时钟上，不能继续读已经停止的旧引擎。
   换工程、时间线空了走 `unloadPreview()`：卸片之外把引擎整个收掉（2026-11-11 之前主窗口换成空工程，上一个工程的图还开着）。
@@ -192,7 +198,11 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
   时间线上的长度还是 `sourceDuration ÷ speed`。预览和成片是同一份（自检第 12 组：包络对得上 oracle 的线性重采样、
   换音的时刻按倍速落位、音高不变）。
 - 已知：每次 seek / 开播之后头一拍（约 10 ms）环里还没有数据，当静音（欠载计数里能看到，32 秒 6 次 seek
-  共 2505 帧）。
+  共 2505 帧）。Fixed 2026-11-20: the paused branch of each source node takes up a paused seek's new round
+  (`AudioTrackRenderer.syncWhilePaused`, `AudioRing.syncReader`) and wakes the feeder, so the new position is filled
+  before Play; a seek while playing is a paused seek now (it holds the sound), so starts have sound from their first
+  sample. Before, a full ring took no new data until the first playing render, and after a device start the feeder could
+  be late enough to lose 50–140 ms ([case](../bugfixes/2026-11-20-idle-start-picture-ahead-and-lost-sound.md)).
 
 ## 三之二、读素材：按块读必须和一口气读逐采样相同（2026-10-01）
 
@@ -208,7 +218,8 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
 
 ## 四、还没做的
 
-- seek 后头一拍约 8 ms 的静音：只是起声晚一拍，耳朵听不出，不值得在主线程上做同步预读；先不做。
+- ~~seek 后头一拍约 8 ms 的静音~~: done 2026-11-20 without reading on the main thread (the paused render takes up the
+  seek, see 第三节「已知」).
 - 加 / 去掉场景仍走整条预览重建（`differsOnlyInAudioMix` 把「有没有场景」算结构，那是合成音轨要垫载体的年代定的）；
   引擎本身只需重开那一段的流，改成快路径是后续一刀。
 - 没有音频输出设备的机器（托管 CI 的虚拟机可能就是）：实时引擎 `start()` 失败时宿主不挂时钟，播放头照旧由播放器走、
@@ -227,7 +238,8 @@ The same offline per-layer render feeds `listen voice=…` (each narration line'
 （总表的槽 = 渲出来的峰值、主轨的槽 × 总推子 = 总表、静音段的轨是 0、隐藏轨没有槽）；第 11 组声音场景（强度 0 = 原声对着
 oracle 比；场景本身验结构，见第三节）；第 12 组变速（2 倍速和 0.5 倍速：包络对得上、时长正好、过零数出来的音高仍是 880 Hz）；**第 13 组换配置**（`Replace.swift`：按 A 建引擎、`replace(B)`、离线渲 = 直接按 B 建的，
 B 分别是挪一段 / 裁头 / 裁尾 / 变速 / 换文件（数过零），只改音量的 B 仍是同一个结构且快路径压 6 dB；反向验证：`sameStructure` 换回只比
-clipID → 11 条红）。
+clipID → 11 条红）。**Group 17 (2026-11-20, `PausedSeek.swift`)**: a paused seek, then Play: the first quantum has data
+and sound from its first sample (reverse check: without the paused sync, 4,096 frames underrun and the quantum silent).
 
 **oracle**（`checks/AudioEngine/Oracle.swift`，2026-10-01 PR3b 起）：PR1a–PR3a 期间参照是 AVFoundation 那份混音
 （`AVAssetReaderAudioMixOutput`）；删掉那条路之后，参照换成几十行、一眼看得完的纯 Swift 混音器 —— 源文件让 ffmpeg 解成

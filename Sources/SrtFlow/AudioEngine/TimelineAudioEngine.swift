@@ -155,7 +155,11 @@ final class TimelineAudioEngine {
             left.update(repeating: 0, count: frames)
             right.update(repeating: 0, count: frames)
             clock.tick(timestamp, frames: frames)
-            guard let anchor = anchor.load(), anchor.playing else { return noErr }
+            guard let anchor = anchor.load(), anchor.playing else {
+                // Paused: take up a paused seek now so the feeder fills that position before Play (AudioRing.syncReader).
+                if renderer.syncWhilePaused() { feeder.poke() }
+                return noErr
+            }
             let position = anchor.position(sampleTime: Int64(timestamp.pointee.mSampleTime), hostTime: timestamp.pointee.mHostTime)
             let missing = renderer.render(position: position, frames: frames, into: left, right)
             #if DEBUG
@@ -435,6 +439,18 @@ final class TimelineAudioEngine {
         }
     }
 
+    /// From `seconds` as of host time `host` (the picture's start after an output start): a pending anchor carrying `host`,
+    /// so the first render places the sound where the picture is by then (`PlaybackAnchor`).
+    func play(from seconds: Double, alignedToHostTime host: UInt64) {
+        let frame = Int64((max(0, seconds) * Self.sampleRate).rounded())
+        let previous = anchor.load()
+        let positionedWhilePaused = previous?.playing == false && previous?.position == frame
+        anchor.publish(.pending(position: frame, hostTime: host, playing: true))
+        if !positionedWhilePaused {
+            for unit in units { unit.feeder.seek(toFrame: frame) }
+        }
+    }
+
     /// 从锚点停着的地方接着播。
     func resume() {
         publishAnchor(anchor.load()?.position ?? 0, playing: true)
@@ -453,6 +469,10 @@ final class TimelineAudioEngine {
 
     /// 自检用：喂样线程是不是都歇着（图故意停着时该歇着；后台起图没起来之后也要歇回去）。
     var feedersResting: Bool { units.allSatisfy(\.feeder.isResting) }
+
+    /// False while the graph is stopped by the idle rule or (re)started and not yet rendered (`PlaybackAudioSource`). A
+    /// timeline without sound never starts the graph and never waits.
+    var isRendering: Bool { mode != .realtime || !config.hasSound || renderClock.hasTicked }
 
     /// 自检和实测用（量「按下播放到第一拍」）：在播的锚点被渲染块渲到了没有；渲到了给最近一拍出声卡的 host 时间。
     var renderedHostTime: UInt64? {

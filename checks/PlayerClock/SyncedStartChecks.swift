@@ -48,7 +48,7 @@ private final class RecordingAudioSource: PlaybackAudioSource {
 }
 
 /// Counts the native picture's discontinuous time changes (seeks, including `setRate(_:time:atHostTime:)` with a time).
-private final class JumpCounter {
+final class JumpCounter {
     private(set) var count = 0
     private var token: NSObjectProtocol?
 
@@ -61,7 +61,7 @@ private final class JumpCounter {
     deinit { if let token { NotificationCenter.default.removeObserver(token) } }
 }
 
-private func pictureTime(_ clock: PlayerClock) -> Double? {
+func pictureTime(_ clock: PlayerClock) -> Double? {
     clock.player.currentItem?.timebase.map { CMTimebaseGetTime($0).seconds }
 }
 
@@ -73,7 +73,7 @@ private func stoppedPicture(_ clock: PlayerClock) -> Double? {
 
 private func pump(_ seconds: Double) { RunLoop.main.run(until: Date().addingTimeInterval(seconds)) }
 
-private func settle(_ clock: PlayerClock) {
+func settle(_ clock: PlayerClock) {
     waitForAudioClock { clock.player.currentItem?.status == .readyToPlay && !clock.isPositioningPreview }
 }
 
