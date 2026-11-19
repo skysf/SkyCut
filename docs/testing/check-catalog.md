@@ -463,6 +463,20 @@
   test branches are swept. It also pins `merge-slot.yml` (triggers, one waiting job-level slot, permissions, main's
   script only) and `checks.yml` (takes the slot's dispatches, skips every shard on other refs). Reverse verification:
   24 mutations of the script each turned it red. Rules: [build doc "Merge slot"](../build/build-and-packaging.md).
+  - Since 2026-11-20 the same check runs `checks/MergeSlot/InfraRerunCases.py`: the verdict of `scripts/ci-infra-rerun.py`
+    on runs whose jobs are built from checks.yml's own step names and GitHub's own messages (`FakeJobs.py`). Re-run: a
+    shard or check-all that never got a runner, a runner lost or shut down during a setup step that was the last to
+    start. Never re-run, alone or next to those: a failed check, App build or benchmark, a runner lost during a check,
+    the App build, the docs-only scan guards or the perf ratchet, a timeout inside a check or in setup, a setup step
+    that failed by itself or was cut off while the job went on, a newer push, a person, a failed step's message next
+    to GitHub's, a job without any message or with only "The operation was canceled.", check-all failing at the
+    website step, a fork, a moved branch, a newer run on the branch, a third attempt. Late events and two re-runners
+    racing re-run once. The slot re-runs such a head run or its own test run instead of sending the PR back, merges
+    after the green re-run, and sends the PR back after two re-runs, on a check's failure (never re-run) or when GitHub
+    refuses the re-run. Pins: `SETUP_STEPS` name steps of checks.yml, in its order, whose commands run no check;
+    `rerun-infra.yml`'s trigger, `if:`, permissions, main-only checkout and arguments. Reverse verification: 25
+    mutations of the verdict, the slot, `rerun-infra.yml` and checks.yml each turned it red. Rules: [build doc
+    "CI"](../build/build-and-packaging.md).
 - `checks/` 顶层的每一条扫描守卫都在 `scripts/check-all.sh` 里（CI 只跑 check-all 列着的；check-guards 按通配符跑，漏进 check-all 的本地照样绿）;
   every run_check command exactly once; every `scripts/check-*.sh` named by check-all or a workflow step, or listed
   in the guard as deliberately local (graphical session, real keychain), and every `*Checks` executable and
