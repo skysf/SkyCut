@@ -69,7 +69,14 @@ forbid "the exporter never moves the finished video on the main thread (ExportDe
 require "the exporter hands the finished video over through ExportDelivery" \
   Sources/SrtFlow/VideoEditExporter.swift 'try await ExportDelivery\.deliver\('
 require "the export starts only after the look-and-write check of the folder" \
-  Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.checkBeforeWriting\(\)'
+  Sources/SrtFlow/VideoEditExportSheet.swift 'await destination\.exportDecision\('
+# The file checked, named in the replace question and written is one URL (2026-11-19,
+# docs/bugfixes/2026-11-19-export-panel-checks-one-folder-writes-another.md): the decision comes from the check before
+# writing, and the sheet never exports to the folder shown at that moment.
+require "pressing Export is decided from the check before writing" \
+  Sources/SrtFlow/ExportDestinationState.swift 'let checked = await checkBeforeWriting\(\)'
+forbid "the export writes the file the check was about, never the panel's current outputURL" \
+  Sources/SrtFlow/VideoEditExportSheet.swift 'to: (\.replacing\()?outputURL'
 # The AI's export_video folder (2026-11-19, docs/bugfixes/2026-11-19-ai-export-folder-checked-on-main-thread.md): made,
 # checked and listed through the same probe, off the main thread; scripts/check-export-profile.sh checks the behaviour.
 for f in Sources/SrtFlow/AIExportTools.swift Sources/SrtFlow/AIExportDestination.swift; do

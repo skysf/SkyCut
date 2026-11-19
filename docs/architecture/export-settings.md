@@ -122,6 +122,13 @@
    (`ExclusivePlacement.claimSet`) before writing any file and writes each onto its claim
    (`SubtitleExportPlanner.writeValidated(_:format:onto:)`). `ExportTarget.replacing` is only for the export panel after
    the user said Replace.
+7. **The export panel writes the file it checked and asked about** (2026-11-19,
+   [case](../bugfixes/2026-11-19-export-panel-checks-one-folder-writes-another.md)). Pressing Export is decided by
+   `ExportDestinationState.exportDecision` from the check before writing (§8 item 5), which names the folder it checked;
+   the replace question names that folder's file and Replace writes exactly it (`ExportTarget.replacing`). An export
+   nobody was asked about is a new file (`ExportTarget.newFile`): a file that appears in the folder during the export is
+   never replaced, the video gets the next number (item 6). The subtitle files fix their files the same way when the
+   check comes back.
 
 ## 六、记住与恢复默认
 
@@ -210,6 +217,9 @@ never returns.
 5. **The destination is checked before anything is written**, with a write test (a hidden `.SrtFlow-write-check-…` file,
    removed at once): pressing Export, writing subtitle files, and taking a chosen / typed / dropped folder. Missing, a file,
    a read-only drive (NTFS), not writable, not responding: said under "Export to" before the encode, not after it.
+   The check before writing waits for a folder still being taken (and the panel's first look), drops an answer that came
+   back for a folder that is no longer the destination, and returns the folder it checked (`WriteCheck`): the export and
+   the subtitle files are written into that folder, whatever the row shows by then (§5 item 7).
 6. **The finished video is delivered off the main thread** (`ExportDelivery`, its own queue): onto another drive the move is
    a full copy. The panel says "Saving the video into the export folder…" meanwhile. Subtitle files are written off the main
    thread too.
@@ -236,7 +246,7 @@ never returns.
 | `SrtFlowCoreChecks`（`SubtitleConvertChecks`） | 批量转换撞名加编号：旁边手改过的同名文件一个字不动、同格式转回源文件夹不盖源文件 |
 | `checks/encode-settings-memory.sh`（第一组） | 压缩 / 烧录记住的设置和字幕样式在队列创建时读回来；键和读法只有 `EncodeQueueMemory` 一处，页面不自己读；剪辑页和 AI 的字幕样式都经 `subtitleStyle(appWide:)` |
 | `scripts/check-export-frame-rate.sh`（第三组） | 剪辑导出**真跑一遍**读成片尺寸：16:9 / 9:16 选 720p、跟随工程、档位不小于画布时不缩；奇怪比例下像素是方的（守 `setsar=1`） |
-| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced, `ExclusivePlacement` on real files |
+| `scripts/check-export-profile.sh` (`FileChooserChecks`, `DestinationChecks`, `AIExportFolderChecks`, `ExportTargetChecks`, `PanelTargetChecks`) | §8: a fake folder window that answers / is cancelled / comes back empty at once / never appears / vanishes / stays stuck + Close It, the force-quit record; a fake drive that never answers (deadline, main thread free), read-only, the per-drive cap; real folders (missing, a file, not writable only by the write test); typed paths; a real export whose delivery is held 1.2 s stays off the main thread; item 8: `export_video` / `export_subtitles` make a missing folder, number taken names, refuse a stuck, read-only or locked folder with the panel's sentence before any job, main thread free; §5 item 6: two projects' exports held at a listing barrier get two names and each reads back as its own, a file that appeared after the listing is never replaced, `ExclusivePlacement` on real files; §5 item 7: a folder taken while Export is pressed, its check and the old folder's coming back in the reverse order, ends in the question about the new folder's file, which stays until Replace; Replace writes exactly that file; an export nobody was asked about never replaces |
 | `checks/file-io-off-main-wiring.sh` | §8 wiring: no `runModal` / `FilePicker` and no `FileManager.default` in the export panel's files, `begin`, the record before AppKit, the exporter delivers through `ExportDelivery`, Export checks the folder first |
 
 ## 人工回归清单（自动化够不着，发版前实机过）
@@ -278,3 +288,6 @@ never returns.
     the read-only sentence and no job; with `path` on a sleeping USB hard drive SkyCut stays responsive and the call either
     starts the export once the drive answers or says "not responding" after about 15 s. `export_subtitles` into the same
     folders behaves the same.
+19. Same name in a newly dropped folder (§5 item 7): put a file named like the export's title into a second folder, drag
+    that folder onto "Export to" and press Export straight away. The question names that folder's file; Cancel leaves it;
+    Replace replaces exactly it, and nothing appears in the first folder.

@@ -22,6 +22,8 @@ struct VideoEditExportSheet: View {
     /// 标题框里的字。打开面板时取「这个工程里改过的」，没改过就是默认标题。
     @State private var title = ""
     @State private var confirmsReplace = false
+    /// The file the replace question names and Replace writes (the one the check before writing was about).
+    @State private var replaceTarget: URL?
     /// 展开 / 收起记住：大多数人从来不开，开过的人下次多半还要看。
     @AppStorage("videoEditExportAdvancedExpanded") private var advancedExpanded = false
     /// Where the video goes and what the last check of that folder said: the drive is only ever touched off the main
@@ -178,15 +180,15 @@ struct VideoEditExportSheet: View {
         }
         .onExitCommand { dismiss() }
         .alert(
-            Text(verbatim: String(format: L10n("Replace “%@”?"), outputURL.lastPathComponent)),
+            Text(verbatim: String(format: L10n("Replace “%@”?"), replaceTarget?.lastPathComponent ?? "")),
             isPresented: $confirmsReplace
         ) {
-            Button("Replace", role: .destructive) { startExport() }
+            Button("Replace", role: .destructive) { if let replaceTarget { startExport(to: .replacing(replaceTarget)) } }
             Button("Cancel", role: .cancel) {}
         } message: {
             Text(verbatim: String(
                 format: L10n("A file with this name is already in “%@”. Replacing it overwrites its contents."),
-                folder.lastPathComponent
+                replaceTarget?.deletingLastPathComponent().lastPathComponent ?? ""
             ))
         }
     }
@@ -359,35 +361,36 @@ struct VideoEditExportSheet: View {
     /// 目标已经有同名文件就先问一句（和系统保存面板一样）；没有就直接开始。
     /// First one look at the folder with a write test, off the main thread: a missing, read-only, unwritable or
     /// unanswering destination is said under "Export to" before anything is encoded, not after the whole export.
+    /// The decision is about the folder that check was about, and so is the export (ExportDestinationState.exportDecision).
     private func requestExport() {
         guard !isCheckingBeforeExport else { return }
         isCheckingBeforeExport = true
+        let (name, pathExtension) = (stem, fileExtension)
         Task { @MainActor in
-            let report = await destination.checkBeforeWriting()
+            let decision = await destination.exportDecision(stem: name, pathExtension: pathExtension)
             isCheckingBeforeExport = false
-            guard report.problem == nil else { return }
-            if report.contains(outputURL.lastPathComponent) {
-                confirmsReplace = true
-            } else {
-                startExport()
+            switch decision {
+            case .refused: break
+            case .askToReplace(let file): (replaceTarget, confirmsReplace) = (file, true)
+            case .export(let target): startExport(to: target)
             }
         }
     }
 
-    private func startExport() {
+    private func startExport(to target: ExportTarget) {
         var state = exportState
         // 烧不烧：关掉烧录就把两只眼睛都关上（导出图只烧看得见的，和预览同一份合同）。只出声音时
         // 没有画面可烧（面板上也没有那一行），字幕整个拿掉。
         subtitleOptions.applyBurnChoice(to: &state)
         if isAudioOnly { state.subtitle = nil; state.subtitleCompanion = nil }
         // 这次用的文件夹就是「上次导出的文件夹」，下次打开面板还在这儿。
-        exporter.exportFolder = folder
+        exporter.exportFolder = target.url.deletingLastPathComponent()
         // 这个工程有自己的字幕样式（AI 改过）就用它，没有就是烧录页的那套 —— 和预览同一个函数。
         let subtitleStyle = state.subtitleStyle(appWide: burnInQueue.burnInStyle)
         exporter.export(
             for: project,
             state: state,
-            to: .replacing(outputURL),
+            to: target,
             subtitleStyle: subtitleStyle,
             subtitleFontURL: fontCatalog.font(named: subtitleStyle.fontName)?.fileURL
         )
