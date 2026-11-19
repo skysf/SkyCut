@@ -16,15 +16,15 @@ anchor moved. Measuring only after drift correction missed the delay.
 
 ## Fix
 
-The first paused seek on a new item and the rewind from the end use asynchronous `AVPlayer.preroll` for rate 1
-while the audio anchor is paused.
-The Play request remains pending until preparation completes. A later seek or a new item invalidates the previous
-positioning request and cancels its preroll. The current item's readiness guards still cover both preroll and
-synchronized start.
+An exact paused seek uses short asynchronous `AVPlayer.preroll` while the audio anchor is paused. The
+player can accept the preroll as its new item finishes loading. The short preroll limits how much of the next
+segment the decoder prepares at a cut. The Play request stays pending until preparation completes. A later
+seek or a new item invalidates the previous positioning request and cancels its preroll.
 
-A positioned preview starts with `playImmediately(atRate:)`. Reanchoring to a host time after preroll caused
-the first 4K frame near the tail to arrive almost two seconds into playback on the M1 test. Ordinary seeks
-reuse their prepared position and start directly at rate 1.
+A positioned preview starts with `playImmediately(atRate:)`. Reanchoring to a host time after a full preroll
+caused the first 4K picture to arrive more than two seconds into playback on the M1 test. After an audio
+device restart, startup uses a fresh synchronized host anchor. Both the current item and the native player
+must be ready for synchronized start.
 
 ## Verification
 

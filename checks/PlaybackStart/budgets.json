@@ -22,7 +22,10 @@
     },
     "warm-start": {},
     "middle": {},
-    "cut": {},
+    "cut": {
+      "audioMs": 300,
+      "videoMs": 340
+    },
     "near-end": {},
     "end-replay": {},
     "idle-wake": {
@@ -32,7 +35,7 @@
       "onsetGapMs": 550,
       "audioAdvanceMs": 200,
       "videoAdvanceMs": 570,
-      "startOffsetMs": 75
+      "startOffsetMs": 135
     }
   },
   "medians": {
@@ -52,13 +55,18 @@
         "videoAdvanceMs": 150,
         "startOffsetMs": 55
       },
+      "cut": {
+        "audioMs": 230,
+        "videoMs": 265
+      },
       "idle-wake": {
         "dispatchMs": 550,
         "audioMs": 600,
         "videoMs": 650,
         "onsetGapMs": 230,
         "audioAdvanceMs": 75,
-        "videoAdvanceMs": 250
+        "videoAdvanceMs": 250,
+        "startOffsetMs": 45
       }
     }
   }

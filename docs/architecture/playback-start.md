@@ -7,11 +7,11 @@ composition is still being built. The clock retains the request through installa
 placement of the playhead. The current player and item must be ready for the synchronized native start. Pause, a second
 press while pending, and preview teardown cancel the request. [Play during project open could crash the preview](../bugfixes/2026-11-19-play-before-preview-ready.md).
 
-After the first exact seek on a new item or a rewind from the end, the native player prerolls rate 1 asynchronously.
-The pending Play request waits for that preparation with audio paused. Any newer placement or item cancels the
-earlier preparation. Play advances an already positioned preview with the ordinary native rate start and the audio
-engine can reuse its prepared samples when the paused anchor matches the playhead. Audio starts on its next render
-quantum and supplies the master clock.
+After an exact paused seek, the ready native player prerolls asynchronously while audio stays paused.
+The smaller preroll rate prepares less data at a trimmed cut. Any newer placement or item cancels the earlier
+preparation. Play advances an already positioned preview with the ordinary native rate start. When the output
+graph has just restarted, Play aligns video to the audio host clock. The audio engine can reuse its prepared
+samples whenever the paused anchor matches the playhead. Audio supplies the master clock.
 `PlayerClock` corrects sustained video drift against this clock. See the [audio engine](audio-engine.md) and
 the [composition time ledger](preview-free-transform.md#两条渲染管线一份时间账).
 
@@ -58,23 +58,23 @@ scenario's median and worst result. Every trial must produce audio and video and
 `checks/PlaybackStart/budgets.json`. A cold open must build and attach just once and open the source assets. Warm and
 idle starts must build, attach and open zero times.
 
-The warm budget is 130 ms to first audio and 180 ms to the first video presentation for each scenario's median.
-Single trials have 220 ms audio and 280 ms picture ceilings for occasional scheduling noise. The picture and sound
-clocks must agree within 34 ms at onset and one second later on the 30 fps fixture. Cold open includes first-preview
-construction and output startup. Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s
-and 3.9 s per trial. Its onset skew limit is 55 ms median and 100 ms per trial, with 34 ms one second later.
-A suspended graph has a separate 700 ms audio and 800 ms video budget for output
-device startup, with 75 ms skew at onset and 34 ms one second later. The JSON also caps onset separation, dispatch
-time and how much of the timeline either stream can skip. A cold device can lose early samples while its output
-starts. The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
+The warm median budget is 130 ms to first audio and 180 ms to the first video presentation. Single trials have
+220 ms audio and 280 ms picture ceilings for occasional scheduling noise. The trim immediately before the cut
+has a 230 / 265 ms median budget and 300 / 340 ms single-trial ceiling so the decoder can prepare both sides.
+The warm picture and sound clocks must agree within 34 ms at onset on the 30 fps fixture. The 34 ms limit
+one second later applies to every scenario. Cold open includes preview construction and output startup.
+Its median budgets are 3.2 s to first audio and 3.3 s to first video, capped at 3.8 s and 3.9 s per trial.
+Its onset skew limit is 55 ms median and 100 ms per trial. A suspended graph has a separate 700 ms audio and
+800 ms video ceiling for output device startup. Its onset skew limit is 45 ms median and 135 ms per trial.
+The JSON also caps onset separation, dispatch time and how much of the timeline either stream can skip.
+The idle median limit on lost audio is 75 ms and the single-trial limit is 200 ms.
 
 On the M1 MacBookPro17,1 with macOS 26.5.2, five runs of the 111.5 MB fixture put positioned picture onset at
-69–88 ms median across the five warm scenarios and 129 ms worst overall. First-open audio and video were
-1.62 / 1.96 s and 1.71 / 2.04 s median / worst. Suspended-graph audio and video were 428 / 436 and
-508 / 588 ms. Busy-machine repeats reached 3.22 s to the first-open picture, 648 ms after idle and 234 ms near the
-4K tail. One first-open launch reported a 271 ms onset gap with a picture 267 ms into the timeline. That sample
-sets the cold single-trial ceilings of 330 ms for the gap and 300 ms for picture advance. The worst offset one
-second in was 26.0 ms across the local calibration runs.
+69–117 ms median outside the cut and at 232 ms just before it. First-open audio and video were 1.36 / 1.74 s
+and 1.38 / 1.75 s median / worst, with a 16 ms maximum onset skew. The suspended graph took 335 / 402 ms
+for audio and 373 / 515 ms for picture. Device startup skew reached 104 ms at onset and settled within
+17 ms one second later. Busy-machine repeats during calibration reached 3.22 s to the first-open picture
+and 648 ms after idle.
 
 `checks/playback-start-wiring.sh` guards the Play entry against rebuilding, proxy work and synchronous media reads,
 pins graph starts to recovery, and checks the item installation order and CI connection.

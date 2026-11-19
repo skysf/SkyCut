@@ -47,7 +47,6 @@ final class PlayerClock: ObservableObject {
     private var readiness: [NSKeyValueObservation] = []
     private var previewSeek: UUID?
     private var positionedTime: TimeInterval?
-    private var previewNeedsPreroll = false
     /// 离总长不到这么多就算已经在尽头：没有东西可播了。
     private static let endSlack: TimeInterval = 0.001
 
@@ -181,7 +180,7 @@ final class PlayerClock: ObservableObject {
         player.automaticallyWaitsToMinimizeStalling = false
         let timer = Timer(timeInterval: observationInterval, repeats: true) { [weak self] _ in
             guard let self, let source = audioSource, source.isPlaying else { return }
-            guard recoverAudioIfNeeded(source) else { return }
+            guard recoverAudioIfNeeded(source) != nil else { return }
             let position = source.playhead
             if let end = Self.end(of: source), position >= end {
                 finishAtEnd(end, source: source)
@@ -202,19 +201,20 @@ final class PlayerClock: ObservableObject {
         driftTicks = 0
     }
 
-    /// 系统停图不能只改播放锚点：恢复失败就明确暂停，下一次点击播放再试，避免每拍重试或反复拉回视频。
-    private func recoverAudioIfNeeded(_ source: PlaybackAudioSource) -> Bool {
+    /// Reports whether the graph restarted. A nil result leaves both streams paused after a failed recovery.
+    private func recoverAudioIfNeeded(_ source: PlaybackAudioSource) -> Bool? {
         do {
-            if try source.recoverIfNeeded() {
+            let restarted = try source.recoverIfNeeded()
+            if restarted {
                 driftTicks = 0
                 MainThreadWatchdog.shared.note("音频引擎已恢复，重新对齐视频时钟")
                 if source.isPlaying { anchorVideo(to: source.playhead) }
             }
-            return true
+            return restarted
         } catch {
             pause()
             MainThreadWatchdog.shared.note("音频引擎恢复失败，已暂停播放：\(error.localizedDescription)")
-            return false
+            return nil
         }
     }
 
@@ -241,10 +241,10 @@ final class PlayerClock: ObservableObject {
         anchorVideo(to: source.playhead)
     }
 
-    /// 让视频从 `seconds` 起、从**此刻**开始跟着走：播放器自己去定位，定位要多久就晚多久赶上来，不改时间表。
-    private func anchorVideo(to seconds: TimeInterval) {
+    /// Start at the current host time. With no explicit target, reuse the native preview's prepared position.
+    private func anchorVideo(to seconds: TimeInterval?) {
         guard player.status == .readyToPlay, player.currentItem?.status == .readyToPlay else { return }
-        let target = CMTime(seconds: seconds, preferredTimescale: 600)
+        let target = seconds.map { CMTime(seconds: $0, preferredTimescale: 600) } ?? .invalid
         player.setRate(1, time: target, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
         positionedTime = nil
     }
@@ -265,7 +265,7 @@ final class PlayerClock: ObservableObject {
         ]
     }
 
-    /// 开播（空格、重建之后接着播）：引擎驱动时声音先起、视频钉到同一个时刻；否则就是播放器自己播。
+    /// Advance the native preview and the audio clock from the placed playhead.
     func play() {
         guard let item = player.currentItem else {
             playbackRequested = true
@@ -292,15 +292,16 @@ final class PlayerClock: ObservableObject {
                 if source.isPlaying { source.pause() }
                 return
             }
-            guard recoverAudioIfNeeded(source) else { return }
+            guard let restarted = recoverAudioIfNeeded(source) else { return }
             let start = time
-            if positionedTime == time {
+            let positioned = positionedTime == start
+            if positioned, !restarted {
                 positionedTime = nil
                 player.playImmediately(atRate: 1)
                 source.play(from: start)
             } else {
                 source.play(from: start)
-                anchorVideo(to: start)
+                anchorVideo(to: positioned ? nil : start)
             }
         } else {
             player.play()
@@ -310,7 +311,6 @@ final class PlayerClock: ObservableObject {
     func attach(url: URL, autoplay: Bool = true) {
         pause()
         invalidatePreviewSeek()
-        previewNeedsPreroll = false
         pendingScrubTarget = nil
         peekTime = nil
         player.replaceCurrentItem(with: AVPlayerItem(url: url))
@@ -328,7 +328,6 @@ final class PlayerClock: ObservableObject {
         player.pause()
         readiness.removeAll()
         invalidatePreviewSeek()
-        previewNeedsPreroll = true
         pendingScrubTarget = nil
         peekTime = nil
         #if DEBUG
@@ -346,7 +345,6 @@ final class PlayerClock: ObservableObject {
     func detach() {
         pause()
         invalidatePreviewSeek()
-        previewNeedsPreroll = false
         audioSource?.seek(to: 0)
         detachAudioSource()
         player.replaceCurrentItem(with: nil)
@@ -413,21 +411,19 @@ final class PlayerClock: ObservableObject {
 
     private func preparePositionedPreview(_ request: UUID, at seconds: TimeInterval, seekFinished: Bool) {
         guard previewSeek == request else { return }
-        guard previewNeedsPreroll, seekFinished, !isAtEnd, player.rate == 0, player.status == .readyToPlay,
-              player.currentItem?.status == .readyToPlay else {
+        guard seekFinished, !isAtEnd, player.rate == 0, player.status == .readyToPlay else {
             finishPreviewPosition(request, at: seekFinished ? seconds : nil)
             return
         }
-        // The positioned frame can be visible before the player has enough data to advance at rate 1.
-        // Prime the pending picture while the audio anchor is still paused.
-        player.preroll(atRate: 1) { [weak self] finished in
-            DispatchQueue.main.async { self?.finishPreviewPosition(request, at: seconds, primed: finished) }
+        // A short preroll lets the decoder prepare advancing frames while the audio anchor is paused.
+        // AVPlayer can accept this request as its current item finishes loading.
+        player.preroll(atRate: 0.25) { [weak self] finished in
+            DispatchQueue.main.async { self?.finishPreviewPosition(request, at: finished ? seconds : nil) }
         }
     }
 
-    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?, primed: Bool = false) {
+    private func finishPreviewPosition(_ request: UUID, at seconds: TimeInterval?) {
         guard previewSeek == request else { return }
-        if primed { previewNeedsPreroll = false }
         previewSeek = nil
         positionedTime = seconds
         if playbackRequested { play() }
@@ -480,7 +476,6 @@ final class PlayerClock: ObservableObject {
     /// Return / Home：播放头回到开头。正在播就从开头接着播（`seek` 不改播放状态），停着就停在 0，
     /// 再按空格从头播。时间线听 `wentToStart` 滚回最左。
     func goToStart() {
-        if isAtEnd { previewNeedsPreroll = true }
         seek(to: 0)
         wentToStart.send()
     }

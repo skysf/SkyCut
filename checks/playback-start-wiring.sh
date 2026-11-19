@@ -86,7 +86,7 @@ preroll="$(body "${clock}" '    private func preparePositionedPreview(')"
 if ! awk '
   /guard previewSeek == request/ { current = NR }
   /player.status == .readyToPlay/ { ready = NR }
-  /player.preroll\(atRate: 1\)/ { pre = NR }
+  /player.preroll\(atRate: / { pre = NR }
   /self\?\.finishPreviewPosition\(/ { finish = NR }
   END { exit !(current && ready > current && pre > ready && finish > pre) }
 ' <<<"${preroll}"; then
