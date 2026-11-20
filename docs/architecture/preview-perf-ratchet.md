@@ -383,8 +383,18 @@ tolerance as the other memory items. `<scenario>.hover.beforeMB` (reported only)
 first stop.
 
 **Why one PR, against section 七.** The phase came with the product change it measures, because the old hover
-(scrubbing the editing player) had no item of its own to compare. The local A/B below stands in for its value; the
-baseline holds the hosted value measured with the hover player (basic HOVER_BASIC MB, busy HOVER_BUSY MB).
+(scrubbing the editing player) had no item of its own to compare. The local A/B below stands in for its value. The
+baseline holds the hosted values measured with the hover player in PR #539's first run: basic 148.7 MB, busy 350.3 MB
+(two runs: 148.7 / 148.6 and 350.3 / 332.1 MB).
+
+On the hosted runner the phase rose further above the footprint before the first stop than on the M1:
+
+- basic: +15 / +18 MB (before: 133.5 / 130.3 MB);
+- busy: +71 / +70 MB (before: 279.1 / 262.6 MB).
+
+The virtual Mac decodes in software, so the decoders' buffers count in the footprint. The scenarios' `memory.peakMB`
+in that run stayed within their baselines: basic 137.6 / 134.6 MB (baseline 141.2), busy 282.3 / 262.6 MB (baseline
+286.4).
 
 **Numbers** (M1, the same bench on both builds, 1 s at each stop):
 

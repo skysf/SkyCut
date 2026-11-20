@@ -95,7 +95,8 @@ policy and measured hardware behavior are in the [audio-engine contract](audio-e
 `PlayerClock.peek` shows the pointer's frame on `HoverPreview`'s player. The editing player stays placed and primed at
 the playhead, so Play while hovering or right after a hover starts at once, like a resume. Before, the hover scrubbed
 the editing player, and Play waited until the playhead's frame was decoded again: 0.59 / 0.61 s median to sound and
-picture on the M1, three seconds into the fixture's eight-second 4K GOP. Now it is 17–22 / 40–49 ms.
+picture on the M1, three seconds into the fixture's eight-second 4K GOP (0.58 / 0.61 s hosted). Now it is 23 / 36 ms
+while hovering and 24 / 42 ms right after (M1 gate medians), 16 / 43 and 15 / 42 ms hosted
 ([case](../bugfixes/2026-11-20-play-after-hover-waited-for-decode.md)).
 
 - **The hover item is the preview's own.** It is built on the preview item's asset and video composition, so upper
@@ -111,8 +112,9 @@ picture on the M1, three seconds into the fixture's eight-second 4K GOP. Now it 
 - **Memory only around a hover.** The item is created at the first hover and dropped
   `HoverPreview.releaseDelay` (3 s) after the hover ends. A new preview item ends the hover, and the next hover builds
   on the new item. On the M1 the first hover cost 43 MB over the 4K fixture and 12 MB over its 1080p opening. On the
-  preview ratchet's busy 1080p scenario it cost 10 / 48 MB in two launches against 10 / 1 MB for the old hover. The
-  preview ratchet gates it as its own item, `<scenario>.hover.peakMB`
+  preview ratchet's busy 1080p scenario it cost 18 / 48 MB in two launches against 10 / 1 MB for the old hover. On
+  the hosted runner, which decodes in software, the same phase rose 70 MB. The preview ratchet gates it as its own
+  item, `<scenario>.hover.peakMB`
   ([preview perf ratchet, section 15](preview-perf-ratchet.md)).
 - **Without the engine** (the burn-in preview, or before the first item) a hover still scrubs the one player. `endPeek`
   scrubs it back.

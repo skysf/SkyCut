@@ -36,9 +36,15 @@ The user approved a second player for the hover on 2026-11-20 (「做，多 50 M
 
 ## Verification
 
-- **Gate, M1:** `peek-play` (Play while hovering) and the new `peek-end-play` (Play right after the hover) went from
-  0.59 / 0.61 s median to sound and picture to 17–22 / 40–49 ms. They stay in step: start skew −2 to −15 ms, no
-  preroll after Play.
+- **Gate:** `peek-play` (Play while hovering) and the new `peek-end-play` (Play right after the hover), median to sound
+  and picture:
+
+  | Where | Before | `peek-play` | `peek-end-play` |
+  | --- | --- | --- | --- |
+  | M1 | 0.59 / 0.61 s | 23 / 36 ms | 24 / 42 ms |
+  | Hosted | 0.58 / 0.61 s | 16 / 43 ms | 15 / 42 ms |
+
+  They stay in step (start skew under 22 ms) with no preroll after Play.
 - **Gate rules:** both scenarios now have the common budgets (130 / 180 ms median) and no preroll after Play.
   `test_compare.py` pins the recorded old launches as red, on medians, whole launches and the preroll.
 - **Clock check:** `scripts/check-player-clock.sh` (`HoverChecks.swift`, a real AVPlayer on a long-GOP clip) checks:
@@ -54,7 +60,9 @@ The user approved a second player for the hover on 2026-11-20 (「做，多 50 M
 - **Guard:** `checks/playback-start-wiring.sh` pins the routing in `peek`, the hide on `peekTime` nil, the hover end
   that leaves the editing player alone and the hover item built on the preview item.
 - **Memory, M1:** the first hover over 4K costs 43 MB, over 1080p 12 MB. On the ratchet's busy scenario, 18 / 48 MB
-  above the footprint before hovering, against 10 / 1 MB for the old hover. The rule and the hosted numbers are in
+  above the footprint before hovering, against 10 / 1 MB for the old hover.
+- **Memory, hosted:** the software-decoding runner's busy hover rose 70 MB, basic 15–18 MB. The new items' baselines are
+  148.7 and 350.3 MB. The other items are unchanged. The rule is in
   [preview perf ratchet, section 15](../architecture/preview-perf-ratchet.md).
 
 ## Lessons
