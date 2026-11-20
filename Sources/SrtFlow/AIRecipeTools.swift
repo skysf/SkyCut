@@ -10,7 +10,8 @@ import SrtFlowMCPKit
 // Sky Studio's styles (2026-11-19, SS5 plan 5.1, 5.2) are listed with their version and, when one cannot be read now, why;
 // reading one returns its version, checksum and whether it came from this Mac's copy, followed by the shared rules when both
 // fit one answer (`answerLimit`), else alone with a pointer to recipes id=shared-rules. save_recipe refuses their names. A film
-// keeps the version it was cut with: reading an older one says `newer_version` (SS5 plan 5.5).
+// keeps the version it was cut with: reading an older one says `newer_version` (SS5 plan 5.5). When Sky Studio lists craft
+// cards (and the licence includes them), every style's read answer points at craft_cards in its next_step (SS5 plan 5.6).
 // These answers are pure: the Sky Studio side is gathered first (AIRecipeSkyStudioPart, by AIRecipeSkyStudio).
 // 不管什么：卡的格式和合并（AIRecipe）、读写文件（AIRecipeStore）、设置里的列表（AIRecipeSettingsList，存完由路由叫它刷新）、
 // asking Sky Studio and the licence (AIRecipeSkyStudio, SkyStudioStyleLibrary).
@@ -49,20 +50,22 @@ enum AIRecipeTools {
             guard let read = skyStudio.read, read.id == recipe.id else {
                 throw AIToolError("\(recipe.title) is a Sky Studio style SkyCut could not read just now; call recipes again.")
             }
-            return skyStudioAnswer(read, sharedRules: sharedRules)
+            return skyStudioAnswer(read, sharedRules: sharedRules, cards: skyStudio.cardsPointer)
         }
         if version != nil {
             throw AIToolError("version is only for Sky Studio styles (source sky_studio); \(recipe.id) has no versions.")
         }
         var text = recipe.body
         if !sharedRules.isEmpty { text += "\n\n" + sharedRules }
-        return .ok([
+        var object: [String: JSONValue] = [
             "id": .string(recipe.id),
             "title": .string(recipe.title),
             "use_for": .string(recipe.useFor),
             "source": .string(recipe.source.rawValue),
             "text": .string(text)
-        ])
+        ]
+        if let cards = skyStudio.cardsPointer { object["next_step"] = .string(cards) }
+        return .ok(.object(object))
     }
 
     private static func list(_ catalog: AIRecipeCatalog, skyStudio: AIRecipeSkyStudioPart, folder: URL) -> AIToolResult {
@@ -98,8 +101,9 @@ enum AIRecipeTools {
         return .ok(.object(object))
     }
 
-    /// One Sky Studio style: its text and version, followed by the shared rules when both fit one answer.
-    private static func skyStudioAnswer(_ read: AIRecipeSkyStudioPart.Read, sharedRules: String) -> AIToolResult {
+    /// One Sky Studio style: its text and version, followed by the shared rules when both fit one answer. `cards`: the pointer to
+    /// craft_cards when Sky Studio lists craft cards.
+    private static func skyStudioAnswer(_ read: AIRecipeSkyStudioPart.Read, sharedRules: String, cards: String?) -> AIToolResult {
         var object: [String: JSONValue] = [
             "id": .string(read.id),
             "title": .string(read.title),
@@ -123,6 +127,7 @@ enum AIRecipeTools {
             follow += " This film keeps \(read.version); Sky Studio has \(newer). Move to it only if the user asks: recipes id=\(read.id) "
                 + "version=latest."
         }
+        if let cards { follow += " " + cards }
         object["text"] = .string(sharedRules.isEmpty ? read.text : read.text + "\n\n" + sharedRules)
         object["next_step"] = .string(follow)
         if !sharedRules.isEmpty, JSONValue.object(object).encodedString().utf16.count > answerLimit {

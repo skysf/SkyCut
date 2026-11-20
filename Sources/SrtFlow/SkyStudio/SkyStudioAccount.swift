@@ -76,6 +76,12 @@ final class SkyStudioAccount: ObservableObject {
         return license.recipes ? nil : SkyCutGates.styleRefusal(license: license, problem: problem)
     }
 
+    /// Reading Sky Studio's craft cards (craft_cards): the same licence rule as the styles (SS5 plan 5.6).
+    var cardRefusal: String? {
+        let license = self.license
+        return license.recipes ? nil : SkyCutGates.cardRefusal(license: license, problem: problem)
+    }
+
     /// 此刻的授权不作数（没问到过、过期了）又有 Key 时，先问一次再算：刚启动、离线好几天之后的第一个调用，不该因为还没问完就被挡。
     /// 正在问就等它；该问了就问（没问成过不到 5 分钟的不再问，照 SkyStudioRefresh）。最多等 `limit` 秒，到了按那时的算。
     func settledLicense(waitingUpTo limit: TimeInterval) async -> SkyCutLicense {

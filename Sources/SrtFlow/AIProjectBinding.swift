@@ -24,7 +24,7 @@ enum AIProjectBinding {
         switch tool {
         case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .openFolder, .readDocument, .saveRecipe, .manageFiles, .findAudio,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .listVoices, .manageVoices,
-             .openProject, .newProject, .closeProject:
+             .openProject, .newProject, .closeProject, .craftCards:
             return false
         case .generateMedia:
             return (try? args.bool("prepare_references")) == true || ["film", "prepared_references", "quote_token", "seam_review"].contains(where: args.has)

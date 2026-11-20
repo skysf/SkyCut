@@ -5,7 +5,8 @@ import SrtFlowMCPKit
 //
 // What this owns: the files. `manifest.json` = the last manifest exactly as Sky Studio sent it, with its ETag and when it was
 // fetched or last confirmed by a 304; `styles/<id>@<version>.json` = one version of one style (its own fields and text), with when
-// it was fetched. **A copy is found only by its id and version**, and by its checksum too when the caller knows it: two versions
+// it was fetched; `cards/<kind>/<id>@<version>.json` = one version of one craft-card page (kind entry / group / card, SS5 plan
+// 5.6), the same way. **A copy is found only by its kind, id and version**, and by its checksum too when the caller knows it: two versions
 // may share a text (1.1 changing only use_for), so a checksum alone never names a version (Codex review CXS1 #5; the first layout
 // kept whole answers by checksum and served 1.0 for 1.1). Every write is atomic; a copy whose text no longer matches its checksum
 // is ignored when read. The folder keeps the identity-class SrtFlow name (docs/architecture/product-name.md) and is never inside a
@@ -35,8 +36,15 @@ struct SkyStudioContentCache: Sendable {
         var etag: String? = nil
     }
 
+    struct CardPage: Equatable, Sendable {
+        var page: SkyStudioCardPage
+        var fetchedAt: Date
+        var etag: String? = nil
+    }
+
     private var manifestURL: URL { directory.appendingPathComponent("manifest.json") }
     private var stylesURL: URL { directory.appendingPathComponent("styles", isDirectory: true) }
+    private var cardsURL: URL { directory.appendingPathComponent("cards", isDirectory: true) }
 
     // MARK: The manifest
 
@@ -81,6 +89,33 @@ struct SkyStudioContentCache: Sendable {
     func storedVersions() -> Set<String> {
         let files = (try? FileManager.default.contentsOfDirectory(at: stylesURL, includingPropertiesForKeys: nil)) ?? []
         return Set(files.filter { $0.pathExtension == "json" }.map { $0.deletingPathExtension().lastPathComponent })
+    }
+
+    // MARK: Craft-card pages
+
+    /// The copy of exactly this page at exactly this version (and checksum, when the caller knows it); nil when there is none,
+    /// it is another page or version, or its text no longer matches its checksum.
+    func cardPage(_ request: SkyStudioCardRequest, version: String, sha256: String? = nil) -> CardPage? {
+        guard let url = cardURL(request, version: version), let json = Self.read(url), let fields = json["page"],
+              let page = SkyStudioCardPage(json: fields, request: request, version: version),
+              sha256 == nil || page.sha256 == sha256,
+              let fetchedAt = json["fetched_at"]?.stringValue.flatMap(SkyStudioJSON.parseDate) else { return nil }
+        return CardPage(page: page, fetchedAt: fetchedAt, etag: json["etag"]?.stringValue)
+    }
+
+    func store(_ page: SkyStudioCardPage, etag: String? = nil, fetchedAt: Date) throws {
+        guard let url = cardURL(page.request, version: page.version) else {
+            throw SkyStudioContentRequestProblem(message: "\(page.request.label) \(page.version) cannot be kept on this Mac.")
+        }
+        var object: [String: JSONValue] = ["page": page.json, "fetched_at": .string(Self.text(fetchedAt))]
+        if let etag { object["etag"] = .string(etag) }
+        try write(.object(object), to: url)
+    }
+
+    /// `cards/<kind>/<id>@<version>.json`; nil for a page or version that may not name a file.
+    private func cardURL(_ request: SkyStudioCardRequest, version: String) -> URL? {
+        guard let key = Self.key(id: request.id, version: version) else { return nil }
+        return cardsURL.appendingPathComponent(request.kind, isDirectory: true).appendingPathComponent(key + ".json")
     }
 
     // MARK: Deleting

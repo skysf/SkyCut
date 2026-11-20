@@ -6,6 +6,8 @@ import SrtFlowMCPKit
 // list came from, the read answer (version, sha256, this Mac's copy, the shared rules when they fit, else a pointer and the style
 // whole), version only for Sky Studio styles, save_recipe refuses their names, the Settings rows. The answers are pure: the Sky
 // Studio side is built by hand here (AIRecipeSkyStudioPart); fetching, copies and the licence are in check-sky-studio.sh.
+// Craft cards (2026-11-20, SS5 plan 5.6): a style's read answer points at craft_cards only while cards are listed; craft_cards'
+// catalog entry (read-only, no project, id / group). Reading cards and the craft_cards answer are in check-sky-studio.sh.
 
 func runRecipeSkyStudioChecks() {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent("srtflow-recipes-sky-\(UUID().uuidString)")
@@ -24,6 +26,41 @@ func runRecipeSkyStudioChecks() {
     skySaveChecks(store)
     skySettingsRowChecks()
     skyGuideChecks()
+    craftCardsPointerChecks(store)
+    craftCardsCatalogChecks()
+}
+
+/// After a style is read, recipes points at craft_cards when Sky Studio lists craft cards and the licence includes them (SS5 plan
+/// 5.6); otherwise it says nothing about them (no wasted call before the first card release).
+private func craftCardsPointerChecks(_ store: AIRecipeStore) {
+    let listed = part(read: trailerRead(), cardsListed: true)
+    let sky = try? AIRecipeTools.recipes(args(["id": "film-trailer"]), store: store, builtIn: presets, sharedRules: "SHARED", skyStudio: listed)
+    check(sky?.payload["next_step"]?.stringValue?.contains("craft_cards") == true, "a Sky Studio style's read answer points at craft_cards")
+    check(sky?.payload["next_step"]?.stringValue?.contains("never save it") == true, "and still says it is not the user's to save")
+    let preset = try? AIRecipeTools.recipes(args(["id": "product-promo"]), store: store, builtIn: presets, sharedRules: "SHARED", skyStudio: listed)
+    check(preset?.payload["next_step"]?.stringValue?.contains("craft_cards") == true, "a preset's read answer points at craft_cards too")
+    let none = try? AIRecipeTools.recipes(args(["id": "film-trailer"]), store: store, builtIn: presets, sharedRules: "SHARED",
+                                          skyStudio: part(read: trailerRead()))
+    check(none?.payload["next_step"]?.stringValue?.contains("craft_cards") == false, "no cards listed: nothing about craft_cards")
+    let plain = try? AIRecipeTools.recipes(args(["id": "product-promo"]), store: store, builtIn: presets, sharedRules: "SHARED", skyStudio: part())
+    check(plain?.payload["next_step"] == nil, "no cards listed: a preset's answer has no next_step, as before")
+    check(AIRecipeSkyStudioPart(cardsListed: false).cardsPointer == nil, "the pointer only when cards are listed")
+}
+
+/// craft_cards in the catalog (SS5 plan 5.6, D10): read-only, stays on this Mac like recipes, no project, two optional parameters.
+private func craftCardsCatalogChecks() {
+    let tool = MCPToolName.craftCards
+    checkEqual(tool.rawValue, "craft_cards", "the tool is called craft_cards (D10)")
+    let definition = tool.definition
+    check(definition.readOnly && !definition.destructive && !definition.openWorld, "craft_cards is read-only and declares no outside world, like recipes")
+    check(!tool.takesProject && !AIProjectBinding.usesProject(tool, args([:])), "craft_cards takes no project")
+    checkEqual(Set(definition.inputSchema["properties"]?.objectValue?.keys.map { $0 } ?? []), ["id", "group"], "its parameters: id and group")
+    check(definition.inputSchema["required"] == nil, "both optional: no arguments reads the entry page")
+    check(tool.provider == nil, "craft_cards is always listed")
+    checkEqual(MCPArgumentCheck.problem(tool: tool, arguments: ["group": "sound"]), nil, "group is accepted")
+    check(MCPArgumentCheck.problem(tool: tool, arguments: ["card": "512"]) != nil, "a wrong argument name is refused")
+    let topic = MCPGuide.answer(topic: "craft_cards", section: nil)["text"]?.stringValue ?? ""
+    check(topic.contains("SkyCut Pro or the SkyCut trial") && topic.contains("entry page"), "the guide topic explains the pages and the licence")
 }
 
 private let presets = [
@@ -36,8 +73,9 @@ private func trailer(onThisMac: Bool = false) -> AIRecipeSkyStudioPart.Style {
 }
 
 private func part(entitled: Bool = true, origin: AIRecipeSkyStudioPart.Origin = .live(release: 1),
-                  styles: [AIRecipeSkyStudioPart.Style] = [trailer()], read: AIRecipeSkyStudioPart.Read? = nil) -> AIRecipeSkyStudioPart {
-    AIRecipeSkyStudioPart(styles: styles, origin: origin, entitled: entitled, read: read)
+                  styles: [AIRecipeSkyStudioPart.Style] = [trailer()], read: AIRecipeSkyStudioPart.Read? = nil,
+                  cardsListed: Bool = false) -> AIRecipeSkyStudioPart {
+    AIRecipeSkyStudioPart(styles: styles, origin: origin, entitled: entitled, read: read, cardsListed: cardsListed)
 }
 
 private func trailerRead(text: String = "# Film trailer\n\nThree acts.", cachedAt: Date? = nil,
