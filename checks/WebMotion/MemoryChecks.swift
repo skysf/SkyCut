@@ -16,14 +16,20 @@ enum MemoryChecks {
         await backstops()
     }
 
+    /// The budget sits two allocations above a normal render (45-80 MB), well under where a hosted runner's hog footprint
+    /// can stall: with 600 MB, a quarter of 106 green runs (11-18 to 11-19) were killed within 20 MB of the budget, and
+    /// main's run of 11-19 peaked at 509 MB and finished unkilled (docs/bugfixes/2026-11-20-web-motion-hog-budget-at-its-edge.md).
+    /// A watch that ignores the budget, never kills, or leaves the WebKit processes uncounted still lets the hog finish.
+    static let hogBudget: UInt64 = 320 << 20
+
     private static func hog() async {
         var watch = WebMotionHelperProcess.Watch()
         watch.interval = 0.05
-        watch.memory.policy = WebMotionMemoryPolicy(budget: 600 << 20, warningBudget: 600 << 20)
+        watch.memory.policy = WebMotionMemoryPolicy(budget: hogBudget, warningBudget: hogBudget)
         let run = await runHelper(Fixture.job(Pages.memoryHog, name: "hog", limits: Fixture.tight, workers: 1), watch: watch,
                                   within: 40)
-        check(run.killed?.reason == .memoryBudget && (run.killed?.footprint ?? 0) > 600 << 20 && run.report.helperSignal == SIGKILL,
-              "a page eating 128 MB a frame is killed (SIGKILL) past its budget: \(run.killed?.message ?? run.outcome)")
+        check(run.killed?.reason == .memoryBudget && (run.killed?.footprint ?? 0) > hogBudget && run.report.helperSignal == SIGKILL,
+              "a page eating 128 MB a frame is killed (SIGKILL) past its \(hogBudget >> 20) MB budget: \(run.killed?.message ?? run.outcome)")
         check(run.processesEnded && run.report.killedLeftovers.isEmpty && !run.report.processes.isEmpty,
               "…its \(run.report.processes.count) WebKit processes ended with the helper (peak \(run.report.peakFootprint >> 20) MB, "
               + String(format: "%.1f", run.seconds) + " s; " + run.processSummary + ")")

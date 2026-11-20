@@ -60,7 +60,9 @@
   verification: [web-motion renderer](../architecture/web-motion-renderer.md) sections 13–14.
   `load-memory` uses fixed 32 MiB load/ready buffers and real kernel samples, one-event PID retry and process-birth/receipt guards.
   For a focused check on the shared Mac, select `pure,normal,alpha,load-memory`; the existing `memory` group's frame hog remains
-  enabled in full CI.
+  enabled in full CI. Its budget has been 320 MB since 2026-11-20
+  ([case](../bugfixes/2026-11-20-web-motion-hog-budget-at-its-edge.md)): with 600 MB a runner could stall below it. It still
+  goes red if the budget is ignored, SkyCut never kills, or the WebKit processes are left uncounted (each tried).
 
 - Web-motion placement: `scripts/check-motion-placement.sh` links real App objects in an isolated bundle and uses its own helper,
   defaults and temporary project. Small synthetic pages exercise checked upper-track placement, local hit alignment, the shared native/web
@@ -438,6 +440,9 @@
   按内容设的时间比上次编译早时照样重编（不拿旧目标文件测新代码）、新 checkout 放回 `.build` 重编 0 样，在小包上真走一遍：`scripts/check-ci-build-cache.sh`。
 - CI 的「只改了文档」快速通道（`scripts/ci-docs-only.sh` 判：只有 `docs/` 和根目录三份说明才算，改名算删旧加新；是就只跑扫描守卫）
   只在真的只改了文档时走、每一步重活都看判断的结论、触发条件里不许有 paths（必需的 check-all 会永远等不到结论）：`checks/ci-docs-only.sh`。
+  Since 2026-11-20 it also runs its cases again with `GITHUB_REF=refs/heads/main` (a push, the slot's dispatch), so a
+  case that inherits the run's GitHub variables fails on every run, not only on main
+  ([case](../bugfixes/2026-11-20-ci-docs-only-check-red-on-main.md); red with the old `classify_repo`).
 - 合并之后 main 上那一轮「树已经验过就不再跑检查」（`scripts/ci-verified-tree.sh` 判：认的不是 `verified-tree-<树>` 这个 artifact，是上传它的那一轮的记录）
   只在真的验过时走：判断本身的用例（临时仓库里真的合并提交 + 假的 `gh`，每个用例只改一个事实：不是 push、开关关了、不是合并提交、没有 / 过期的记号、
   接口出错、别的头提交、fork、别的 workflow、不是 pull_request、没跑完、红了 / 取消了、别的仓库、超过 24 小时）、跑检查的每一步都写成 `verified != 'true'`、

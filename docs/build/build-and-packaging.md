@@ -638,6 +638,10 @@ CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runne
     输出不是 true）就照常全跑。
   - `checks/ci-docs-only.sh` 钉着：判断本身（含在临时仓库里真提交的改名、合并提交、根提交）、每一步重活的条件、
     快速通道只在第 1 组、触发条件里没有 paths、汇总 job 照旧。
+  - Its cases set every GitHub variable the classifier reads (`GITHUB_EVENT_NAME`, `GITHUB_REF`) themselves, and never
+    inherit them from the run executing the check. The check runs its cases again as main's push and the merge slot's
+    dispatch on main see them. Until 2026-11-20 a case inherited `GITHUB_REF=refs/heads/main`, and main's run after a
+    docs-only merge went red ([case](../bugfixes/2026-11-20-ci-docs-only-check-red-on-main.md)).
 - **合并之后 main 上那一轮：树已经验过就不再跑检查**（2026-11-13 起，用户定；量了什么、几种做法比下来怎样见
   [合并后 main 上那一轮的实测](../reports/2026-11-13-main-ci-verified-tree.md)）。
   - Since 2026-11-17 this reuse applies only to code merges. A docs-only merge always runs the full checks; a green
