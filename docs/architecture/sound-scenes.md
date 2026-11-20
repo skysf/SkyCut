@@ -138,9 +138,19 @@ Rules (only this way):
 AI: `edit_clip` / `edit_clips` `voice_band_db` (requested / applied in the result; out of range is refused with the allowed
 range and a suggestion; a clip with no sound refuses it); get_timeline lists `voice_band_db` on clips that have one.
 
+Inspector (2026-11-20, `ClipSoundSection.voiceBand` in VideoEditInspector+Sound.swift): a "Voice band" block between Volume
+and Sound scene (the signal order) for one selected clip with sound: a −30…0 dB slider (off at its right end), the depth in
+Volume's label format, and a caption saying what it does. Dragging replays from the gesture's snapshot (`liveApply`), hands
+the engine each new depth through `previewAudioLive` (heard at once, no stream reopened) and ends as one undo step on the
+audio-only fast path; the slider stores whole dB, and a depth the AI set shows as set until dragged; disabled while the clip is
+muted, like Volume. It is built inline in the section's body from plain SwiftUI controls — no view of its own, no number
+field, no tooltip: the preview-perf ratchet counts each of those on every clip selection
+([preview-perf ratchet](preview-perf-ratchet.md) section 13). Images in every UI language:
+`scripts/render-inspector-sound.sh <folder>` (graphical session, not in check-all).
+
 Known limits (first slice): one constant depth per clip (split the clip to change it over time; a voice-band dip that follows
-the lines like `set_track duck_others_db` is a later slice); no control in the inspector yet (the AI sets it, get_timeline shows
-it); edges fixed at 300 Hz and 3 kHz.
+the lines like `set_track duck_others_db` is a later slice); the inspector sets one clip at a time (no batch over a multiple
+selection) and has no typed field; edges fixed at 300 Hz and 3 kHz.
 
 Checks: `scripts/check-audio-engine.sh` group 16 (`checks/AudioEngine/VoiceBand.swift`: the filter on steady sines — 50 /
 100 Hz and 8 kHz within 0.25 dB, 1 kHz down by the depth within 0.6 dB, g = 1 flat within 0.01 dB, 64-frame blocks = one run;
@@ -170,3 +180,8 @@ Manual regression:
 - [ ] Change it while the clip plays (−10 → −4): no click, the change is heard at once.
 - [ ] With the same sound on two tracks (a shot's sound duplicated), set one clip's cut to −10 and back to 0 while playing: no
       click either way, and back at 0 it sounds like the export at once (no thin, phasey sum).
+- [ ] Select a clip the AI set to −10: the inspector's Voice band reads −10.0 dB. Drag the slider while the clip plays: heard at
+      once, no click, the picture does not flicker; after release one ⌘Z takes the whole drag back; the right end is off
+      (0.0 dB, dimmed).
+- [ ] English, Simplified Chinese and Spanish at the narrowest inspector width (252 pt): the Voice band title, its dB value and
+      caption are whole, and Mute and the scene sliders' values are still visible.

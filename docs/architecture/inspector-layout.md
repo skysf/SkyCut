@@ -16,6 +16,9 @@
 4. 固定宽度只给短而定长的东西：标签列（`frame(width: 68)`）、滑杆行的数值框（50，单位 10）、
    「Shows for」的秒数框（54）。滑杆行的预算：68 + 6 + 滑杆 + 6 + 50 + 6 + 10 —— 滑杆至少还剩
    70 多 pt，别再往这一行里塞东西。
+5. A block shown for a selected clip is paid for on every clip selection: a view of its own, a number field or a tooltip
+   there turns the preview-perf ratchet's select phase red. Build it inline from plain SwiftUI controls
+   ([preview-perf ratchet](preview-perf-ratchet.md) section 13; the voice band, 2026-11-20, is the example).
 
 ## 回归
 
