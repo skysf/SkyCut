@@ -124,6 +124,8 @@ tap、audioMix 快路径。守卫也钉着这几处。
 4. **基线只许降。** 比的是合并提交第一个父提交里的基线（所以 checkout 要 `fetch-depth: 2`）。
    任何一项被改大了，这个 PR 就**不许动产品代码**（`Sources/` 下除 `PreviewBench*.swift`
    以外的文件）。要加开销，得先在别处省回同样多（用户拍板）。
+   Since 2026-11-20 a change that makes the editor smoother is the exception: section 七, "Smoothness first", which
+   also says what the comparator lets through today.
 
 比对器红了会打印两份基线：「改好的基线」（进步、新增、删除都写进去了，退步的项保留旧值）
 给改代码的 PR 用；「全部实测值」给重定基线的 PR 用。CI 的汇总页有逐项对比、CPU 时间和
@@ -155,7 +157,7 @@ CI 虚拟机上偶尔有一个**不发任何窗口 / App 通知**的系统事件
 
 ## 七、什么时候可以重定基线（数字往上走）
 
-只有两种，都**单独开 PR、不碰产品代码**：
+Two kinds go in a PR of their own that touches no product code:
 
 - **runner 的镜像换了**（macOS / Xcode 版本变了，SwiftUI 的内部行为可能跟着变）。汇总页
   会同时打出基线记的环境和这台 runner 的环境。
@@ -163,8 +165,24 @@ CI 虚拟机上偶尔有一个**不发任何窗口 / App 通知**的系统事件
 
 两种都用比对器打印的「全部实测值」整份替换 `baseline.json`。
 
-One exception so far: the hover memory item of section 十五 was registered together with the product change it
-measures (2026-11-20, approved by the user).
+**Smoothness first** (2026-11-20, the user: 「要优先保证 用户体验的流畅度」). A change that makes the editor smoother for
+the user (instant Play, no frozen frames, no waits or hitches) may raise the items it needs, and only those:
+
+- scoped to the change, preferably as an item of its own that measures only where the change acts, so nothing else
+  can spend the room;
+- only as far as the improvement needs;
+- with the measured numbers (before and after the change) and the reason written in this doc in the same PR.
+
+Every unrelated item still only goes down. Anything large, or any trade-off against picture / sound sync, goes to the
+user first.
+
+What the comparator lets through today (unchanged as of 2026-11-20) is a new item registered in the PR that changes
+product code: a new item has no older value to compare. The hover memory item of section 十五 was the first such case
+(2026-11-20, approved by the user). An existing item still cannot go up in a PR that changes product code (section 五,
+item 4). Raised ahead in a PR of its own, a count fails, because the code before the change measures lower and a lower
+count stays red until it is written in (item 2); a memory item passes (lower memory only gives a notice, item 3) but
+leaves the room open to any change merged before the one that needs it. So a smoothness change that has to raise an
+existing item needs item 4 changed in the comparator first, in a PR of its own.
 
 ## 八、已知盲区
 
@@ -373,13 +391,18 @@ slider and label, no number field or tooltip), or save as much elsewhere in the 
 ## 十五、Hovering: its own player and its memory (2026-11-20, approved by the user)
 
 **What the user approved.** On 2026-11-20 the user chose a separate player for the hover preview: Play after a hover
-starts at once instead of waiting for the playhead's frame, at about 50 MB more memory while hovering. The verbatim
-answer was 「做，多 50 MB 可以 (Recommended)」
-([playback start, "Hover"](playback-start.md#hover)). That approval covers **only the hover**:
+starts at once instead of waiting for the playhead's frame ([playback start, "Hover"](playback-start.md#hover)). The
+approval is now **up to 80 MB more memory while hovering**, the user's answer later on 2026-11-20:
+「可以提高一些 memory，我觉得80MB都可以，毕竟也没有多少」. The first answer allowed about 50 MB:
+「做，多 50 MB 可以 (Recommended)」. The hosted rises measured in PR #539's first run fit inside 80 MB (the largest,
+busy +71 / +70 MB, below). That approval covers **only the hover**:
 
 - the hover's memory is a gated item of its own, `<scenario>.hover.peakMB`;
 - every other item keeps the rule of section 五: it only goes down. The scenarios' `memory.peakMB` is read before
   the hover phase and means what it always did.
+
+The 80 MB is read as `<scenario>.hover.peakMB` minus `<scenario>.hover.beforeMB`. CI gates the peak itself within the
+10% tolerance, not this rise, so a hover change that takes the rise past 80 MB goes to the user even when CI is green.
 
 **The hover phase** (`PreviewBenchHover`) runs last in both scenarios. The pointer stops at 8 evenly spaced points
 through the timeline's own entry, `PlayerClock.peek`. Each stop waits for its frame on the hover player, then the
@@ -388,10 +411,10 @@ playback. `<scenario>.hover.peakMB` is the highest footprint sampled every 20 ms
 tolerance as the other memory items. `<scenario>.hover.beforeMB` (reported only) is the footprint just before the
 first stop.
 
-**Why one PR, against section 七.** The phase came with the product change it measures, because the old hover
-(scrubbing the editing player) had no item of its own to compare. The local A/B below stands in for its value. The
-baseline holds the hosted values measured with the hover player in PR #539's first run: basic 148.7 MB, busy 350.3 MB
-(two runs: 148.7 / 148.6 and 350.3 / 332.1 MB).
+**Why one PR** (the first case of section 七, "Smoothness first"). The phase came with the product change it
+measures, because the old hover (scrubbing the editing player) had no item of its own to compare. The local A/B below
+stands in for its value. The baseline holds the hosted values measured with the hover player in PR #539's first run:
+basic 148.7 MB, busy 350.3 MB (two runs: 148.7 / 148.6 and 350.3 / 332.1 MB).
 
 On the hosted runner the phase rose further above the footprint before the first stop than on the M1:
 

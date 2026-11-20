@@ -91,7 +91,8 @@ policy and measured hardware behavior are in the [audio-engine contract](audio-e
 
 ## Hover
 
-**A hover runs on its own player** (2026-11-20, approved by the user: 「做，多 50 MB 可以」). With the engine,
+**A hover runs on its own player** (2026-11-20, approved by the user for up to 80 MB more memory while hovering:
+「可以提高一些 memory，我觉得80MB都可以，毕竟也没有多少」, after a first answer, 「做，多 50 MB 可以」). With the engine,
 `PlayerClock.peek` shows the pointer's frame on `HoverPreview`'s player. The editing player stays placed and primed at
 the playhead, so Play while hovering or right after a hover starts at once, like a resume. Before, the hover scrubbed
 the editing player, and Play waited until the playhead's frame was decoded again: 0.59 / 0.61 s median to sound and
@@ -113,8 +114,8 @@ while hovering and 24 / 42 ms right after (M1 gate medians), 16 / 43 and 15 / 42
   `HoverPreview.releaseDelay` (3 s) after the hover ends. A new preview item ends the hover, and the next hover builds
   on the new item. On the M1 the first hover cost 43 MB over the 4K fixture and 12 MB over its 1080p opening. On the
   preview ratchet's busy 1080p scenario it cost 18 / 48 MB in two launches against 10 / 1 MB for the old hover. On
-  the hosted runner, which decodes in software, the same phase rose 70 MB. The preview ratchet gates it as its own
-  item, `<scenario>.hover.peakMB`
+  the hosted runner, which decodes in software, the same phase rose 71 / 70 MB in two runs, inside the 80 MB
+  approved. The preview ratchet gates it as its own item, `<scenario>.hover.peakMB`
   ([preview perf ratchet, section 15](preview-perf-ratchet.md)).
 - **Without the engine** (the burn-in preview, or before the first item) a hover still scrubs the one player. `endPeek`
   scrubs it back.
