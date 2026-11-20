@@ -538,7 +538,8 @@
   Local knobs (not used by the gate): `SRTFLOW_PLAYBACK_START_ONLY` / `_REPEAT` run some scenarios repeatedly in one
   launch, `_IDLE_SECONDS` lengthens the idle stop (20 s reproduced the idle start's failures that 2 s hid).
   Hosted budgets come from 25 runs: a slow host's first five launches may fail, the eight with confirmation must pass
-  (`test_compare.py` pins the slowest healthy run and the recorded failures).
+  (`test_compare.py` pins the slowest healthy run and the recorded failures). Each scenario is staged from a settled
+  pause (since 2026-11-20); a staging timeout names the player's state.
   `checks/playback-start-wiring.sh` checks the Play path and the workflow connection, and that Play never starts the
   sound ahead of a placed, primed picture nor re-seeks the picture under running sound; `scripts/check-player-clock.sh`
   (`SyncedStartChecks.swift`) checks pause, resume, hover and a new item on a real AVPlayer, (`LandingChecks.swift`) the
