@@ -126,6 +126,12 @@
     `exact_length` and `audio_mode` (its three modes are `MCPVocabulary.videoAudioModes`), and two written sections,
     `music_length` and `video_sound`, which the reading tip names after `spending`; `jobs_results` names `duration_source`.
     No limit was raised: the catalog is 95,996 / 100,000 afterwards.
+19. **craft_cards** (2026-11-20, SS5 plan 5.6): a new read-only tool, written card + guide from its first version
+    (`MCPCraftCardsTool`, `MCPGuideCraftCardsTopic`; no pre-migration card, listed in `pilotToolsWithoutPreviousCard`). The card
+    keeps only the three pages, the licence and "the user's words and the editing style win" (two optional parameters, `id` and
+    `group`); the topic has `using` (when to read cards, how many, what comes first, never save them) and `availability` (Pro or the
+    trial, this Mac's copy, nothing published yet, refusals); the map lists it on the "Whole video" line beside recipes. Card text
+    itself is never in the guide (item 2: the guide answers without a licence). No limit was raised.
 
 ## 四、守卫
 

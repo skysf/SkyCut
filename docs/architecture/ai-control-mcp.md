@@ -788,6 +788,22 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      the change's own undo step, never a read-only call ([project file](video-edit-project-file.md), "The editing style a film was
      cut with"). Reading a Sky Studio style again for that film returns the recorded version (even one Sky Studio no longer lists),
      with `newer_version` and a pointer to `version=latest`, used only when the user asks; `get_timeline` reports `editing_style`.
+   - **Craft cards: `craft_cards`** (2026-11-20, SS5 plan 5.6, decision D10; 知识卡 when speaking to the user; no UI): Sky Studio's
+     film-craft cards from the same manifest and the same store as its styles. ① A read-only tool of its own beside recipes (same
+     Policy row: no queue, no window, no round; no `project`; nothing written to a film; not `openWorld`, like recipes): no
+     arguments = the entry page (its answer adds the list's `groups` with their keys), `group=<key>` = that group's catalogue,
+     `id=<number>` = one card (three digits; one or two digits are padded) with `related`. Every page is read at the version the
+     list names now (cards are not pinned to a film yet; plan 5.5 leaves recording the cards' release for later). ② Gated like the
+     styles: the router's MCP gate, then `features.recipes` (`SkyStudioAccount.cardRefusal`, text in `SkyCutGates.cardRefusal`:
+     not done, why, what the user can do, "Editing works without them."). ③ One read flow for styles and card pages
+     (`SkyStudioStyleLibrary.readText`): this Mac's copy confirmed with its ETag online, served alone only when Sky Studio cannot be
+     reached (`cached` + `fetched_at`), a refusal never answered with the copy, a text not the listed one refused, nothing kept when
+     the licence ends mid-fetch. ④ Nothing published (the list answers 503, or lists no cards: on day one only `film-trailer` is
+     published), an unknown group or card, and `403 not_entitled` by `plan_reason` are said in plain words without asking for a
+     page (`SkyStudioCardWords`). ⑤ After any style is read, recipes' `next_step` points at craft_cards, but only while Sky Studio
+     lists cards and the licence includes them. ⑥ The card stays short (catalog headroom); how to use the cards is in the guide's
+     craft_cards topic, and card text never goes into `skycut_guide` (it answers without a licence). Copies on this Mac and who may
+     read them: [Sky Studio account](sky-studio-account.md), "Sky Studio's editing styles on this Mac".
 33. **配方卡要用的零件（第 5 块第 ① 刀补的）**：
    - `set_text`：`letter_spacing`（字距）、`animation_in_duration` / `animation_out_duration`、`animation_intensity`、`emphasis`（breathe）、
      `number`（数字滚动：一个对象，只改给了的字段；没有数字的文字从检查器那一套默认值 `NumberRoll.default` 起；`remove` 变回普通文字，
