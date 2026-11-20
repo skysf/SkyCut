@@ -19,7 +19,9 @@ back took 0.81 s.
 
 ## Fix
 
-The user approved a second player for the hover on 2026-11-20 (「做，多 50 MB 可以 (Recommended)」).
+The user approved a second player for the hover on 2026-11-20 (「做，多 50 MB 可以 (Recommended)」). Later that day
+the user raised the memory allowance to up to 80 MB while hovering
+([preview perf ratchet, section 15](../architecture/preview-perf-ratchet.md)).
 
 - `HoverPreview` owns the hover's own AVPlayer. Its item is built on the preview item's asset and video composition.
   `PlayerClock.peek` sends the hover there whenever the engine drives playback. The editing player stays placed and
