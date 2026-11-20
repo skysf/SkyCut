@@ -60,7 +60,7 @@ def check(path):
         pos += length
 
     window = plistlib.loads(decoded[".", b"bwsp"])
-    assert window["WindowBounds"] == "{{120, 120}, {760, 648}}", "window bounds drifted"
+    assert window["WindowBounds"] == "{{120, 120}, {760, 776}}", "window bounds drifted"
     for key in ("ShowSidebar", "ShowToolbar", "ShowStatusBar", "ShowPathbar", "ShowTabView"):
         assert window[key] is False, f"{key} must stay hidden"
     icons = plistlib.loads(decoded[".", b"icvp"])

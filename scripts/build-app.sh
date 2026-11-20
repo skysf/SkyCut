@@ -111,7 +111,8 @@ rm -rf "$(dirname "$ICONSET")"
 echo "==> codesign"
 scripts/signing/sign-app.sh "$APP"
 
-# DMG：真实 App / Applications 图标 + 双语引导背景 + 固定 Finder 布局（不控制 Finder）。
+# DMG: the real App / Applications icons, the six-language install background and the fixed Finder layout (no Finder
+# automation).
 echo "==> 生成 DMG"
 DMG="$DIST/$APP_NAME-$VERSION-arm64.dmg"
 /bin/bash scripts/build-dmg.sh "$APP" "$DMG"

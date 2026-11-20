@@ -28,7 +28,7 @@ with DSStore.open(str(path), "w+") as store:
     store["."]["bwsp"] = {
         "ShowSidebar": False, "ContainerShowSidebar": False, "ShowToolbar": False,
         "ShowStatusBar": False, "ShowPathbar": False, "ShowTabView": False,
-        "WindowBounds": "{{120, 120}, {760, 648}}", "PreviewPaneVisibility": False,
+        "WindowBounds": "{{120, 120}, {760, 776}}", "PreviewPaneVisibility": False,
     }
     store["."]["icvp"] = {
         "viewOptionsVersion": 1, "backgroundType": 2,
