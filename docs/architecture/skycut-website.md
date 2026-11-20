@@ -38,6 +38,10 @@
 - `tests/language.test.mjs` 调用实际 `applyLanguage()`，覆盖首页重定向、全部中文设备
   变体、不支持的首选语言、缺失语言列表、手动偏好、存储失败和深链接稳定性。
   人工回归：全新浏览器打开根域名应匹配首选语言，手动换语言后回根域名仍保留所选版本。
+- One docs address (user, 2026-11-20; the DMG install window prints only `www.skycut.app/docs`): `/docs` and `/docs/` are temporary
+  `vercel.json` redirects (307, the query kept) by the primary `Accept-Language` entry, mapped like `browserLanguage()`: zh* → `/zh/docs/`,
+  de* → `/de/docs/`, es* → `/es/docs/`, anything else or none → `/en/docs/`. Each pattern anchors itself (Vercel doesn't say whole or
+  partial match); `tests/docs-redirect.test.mjs` pins the rules, their order and the default, and a new docs language needs its rule.
 
 浏览器语言顺序与空列表回退依据 [MDN Navigator.languages](https://developer.mozilla.org/en-US/docs/Web/API/Navigator/languages)；
 明确语言 URL 不互相自动跳转依据 [Google 多语言站点说明](https://developers.google.com/search/docs/specialty/international/managing-multi-regional-sites)。

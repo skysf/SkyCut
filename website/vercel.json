@@ -17,7 +17,15 @@
     { "source": "/zh-hant", "destination": "/zh-hant/guides/", "permanent": false },
     { "source": "/zh-hant/", "destination": "/zh-hant/guides/", "permanent": false },
     { "source": "/ja", "destination": "/ja/guides/", "permanent": false },
-    { "source": "/ja/", "destination": "/ja/guides/", "permanent": false }
+    { "source": "/ja/", "destination": "/ja/guides/", "permanent": false },
+    { "source": "/docs", "has": [{ "type": "header", "key": "accept-language", "value": "^[Zz][Hh](?:[-_;,\\s].*)?$" }], "destination": "/zh/docs/", "permanent": false },
+    { "source": "/docs/", "has": [{ "type": "header", "key": "accept-language", "value": "^[Zz][Hh](?:[-_;,\\s].*)?$" }], "destination": "/zh/docs/", "permanent": false },
+    { "source": "/docs", "has": [{ "type": "header", "key": "accept-language", "value": "^[Dd][Ee](?:[-_;,\\s].*)?$" }], "destination": "/de/docs/", "permanent": false },
+    { "source": "/docs/", "has": [{ "type": "header", "key": "accept-language", "value": "^[Dd][Ee](?:[-_;,\\s].*)?$" }], "destination": "/de/docs/", "permanent": false },
+    { "source": "/docs", "has": [{ "type": "header", "key": "accept-language", "value": "^[Ee][Ss](?:[-_;,\\s].*)?$" }], "destination": "/es/docs/", "permanent": false },
+    { "source": "/docs/", "has": [{ "type": "header", "key": "accept-language", "value": "^[Ee][Ss](?:[-_;,\\s].*)?$" }], "destination": "/es/docs/", "permanent": false },
+    { "source": "/docs", "destination": "/en/docs/", "permanent": false },
+    { "source": "/docs/", "destination": "/en/docs/", "permanent": false }
   ],
   "headers": [
     {
