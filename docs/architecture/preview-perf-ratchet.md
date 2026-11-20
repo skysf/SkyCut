@@ -356,6 +356,12 @@ Observation。以前工程上任何一个 `@Published` 一写，33 个 `@Observe
 （每换一下约 125 次，和用户工程上点一下约 120 次对得上）、basic 512 次（检查器在那一段和工程总览之间整个换），
 两遍一模一样。加了这一段，basic 的内存峰值从 128 升到 141.2 MB（超了 10% 的容差），按第七节随场景一起重定。
 
+**A new block in the clip inspector is paid for on every selection.** Both scenarios select a picture clip with its own sound,
+so a block there re-runs with each switch: a view of its own (+1 body), an `InspectorScrubbableNumberField` (+1 body,
++1 update) or an `instantHelp` (an `NSViewRepresentable`) turns the select phase red. Build such a block inline in an existing
+view's body from plain SwiftUI controls (Upscale, 2026-10-02: no view, no tooltip on its button; the voice band, 2026-11-20:
+slider and label, no number field or tooltip), or save as much elsewhere in the same PR.
+
 ## 十四、优化媒体：台架量的是原片那条路（2026-10-01）
 
 性能台架起 App 时带参数域 `-optimizedMedia.previewMode original`（`scripts/check-preview-perf.sh`）：台架的素材是 libx264 默认 250 帧

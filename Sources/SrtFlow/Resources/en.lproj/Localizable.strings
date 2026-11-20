@@ -941,6 +941,10 @@
 "Put this scene’s sliders back to their defaults" = "Put this scene’s sliders back to their defaults";
 "Applies to all %d clips with sound selected" = "Applies to all %d clips with sound selected";
 
+/* Voice band: lowering only 300 Hz–3 kHz of a clip's own sound (VideoEditInspector+Sound.swift) */
+"Voice band" = "Voice band";
+"Lowers only 300 Hz–3 kHz of this clip’s sound, where voices sit, so a voice over it comes through. Lows and highs stay." = "Lowers only 300 Hz–3 kHz of this clip’s sound, where voices sit, so a voice over it comes through. Lows and highs stay.";
+
 /* 播放键的提示：回到开头（Return / Home）没有自己的按钮 */
 "Pause (Return goes back to the start)" = "Pause (Return goes back to the start)";
 "Play (Return goes back to the start)" = "Play (Return goes back to the start)";

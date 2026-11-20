@@ -375,6 +375,7 @@ Copilot 等所有 AI 代理、它们委派的子代理，以及人类贡献者�
 - `scripts/gui-smoke/external-file-drag/replay.sh`、`scripts/gui-smoke/drop-routing-probe/probe.sh` — 跨 App 文件拖放重放、SwiftUI 落点路由探针。要图形会话。
 - `scripts/render-voice-library.sh <输出目录>`、`scripts/render-motion-presets.sh <输出目录>` — 声音库 / 变声、动效预设的离屏出图（动效预设还要 ffmpeg）。要图形会话。
 - `scripts/render-project-versions.sh <folder>` — Off-screen images of the Versions sheet and the AI banner's version line. Needs a graphical session.
+- `scripts/render-inspector-sound.sh <folder>` — Off-screen images of the clip inspector's sound section (volume, voice band, scene). Needs a graphical session.
 - `scripts/signing/create-identity.sh` — 建签名身份，一次性的；见到签名目录不在先停下来告诉用户，别去跑它。
 - 官网（在 `website/`）：`tests/*.test.mjs` 和 `npm run check:seo` 在 CI 的网站那一步里；浏览器级的 `scripts/check-hero-browsers.mjs`、`scripts/check-legibility-browsers.mjs`（`npx -y -p playwright@1.65.0 node …`）是手动的、无头、只在 Mac 上；改了首屏场景的外观要 `npm run build:hero-still` 重烤。
 

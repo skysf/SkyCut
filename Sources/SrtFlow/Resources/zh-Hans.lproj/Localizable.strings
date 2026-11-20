@@ -941,6 +941,10 @@
 "Put this scene’s sliders back to their defaults" = "把这个场景的滑杆恢复成默认值";
 "Applies to all %d clips with sound selected" = "套用到选中的 %d 个有声音的段";
 
+/* Voice band: lowering only 300 Hz–3 kHz of a clip's own sound (VideoEditInspector+Sound.swift) */
+"Voice band" = "人声频段";
+"Lowers only 300 Hz–3 kHz of this clip’s sound, where voices sit, so a voice over it comes through. Lows and highs stay." = "只压低这段声音里人声所在的 300 Hz–3 kHz，叠在上面的人声会更清楚；低频和高频不变。";
+
 /* 播放键的提示：回到开头（Return / Home）没有自己的按钮 */
 "Pause (Return goes back to the start)" = "暂停（按回车回到开头）";
 "Play (Return goes back to the start)" = "播放（按回车回到开头）";

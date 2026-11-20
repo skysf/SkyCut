@@ -10,8 +10,10 @@ import SwiftUI
 // - 声音场景：下拉是离散控件，直接 perform 一步（离散控件不许接 live 绑定，
 //   checks/inspector-live-binding-wiring.sh）；滑杆走 liveApply + 松手 endLiveEdit，拖动中用
 //   `previewAudioLive` 换一份 audioMix，当场听得见。合同见 docs/architecture/sound-scenes.md。
+// - Voice band (2026-11-20, MCP-30): between the two, in signal order (gain → voice band → scene). Its slider writes
+//   `EditClip.voiceBandDB`, the setting the AI's edit_clip voice_band_db writes; rules in sound-scenes.md section 5.
 
-/// 选中一段有声音的剪辑时，检查器里「音量」和「声音场景」这两块。
+/// 选中一段有声音的剪辑时，检查器里「音量」「人声频段」「声音场景」这三块。
 struct ClipSoundSection: View {
     let project: VideoEditProject
     let clip: EditClip
@@ -24,7 +26,39 @@ struct ClipSoundSection: View {
         VStack(alignment: .leading, spacing: 16) {
             volume
             Divider()
+            voiceBand
+            Divider()
             SoundSceneControls(project: project, ids: [clip.id])
+        }
+    }
+
+    /// Voice band: lowers only 300 Hz–3 kHz of this clip's own sound (−30…0 dB, 0 = off). Built inline from plain SwiftUI
+    /// controls — no view of its own, no number field, no tooltip: each of those re-runs on every clip selection, which the
+    /// preview-perf ratchet's select phase counts (docs/architecture/preview-perf-ratchet.md section 13). Off is the slider's
+    /// right end, so it needs no reset button.
+    private var voiceBand: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Voice band").font(.callout).fontWeight(.medium)
+            HStack(spacing: 6) {
+                Slider(
+                    value: liveVoiceBandBinding,
+                    in: VoiceBand.range,
+                    onEditingChanged: { editing in
+                        if !editing { project.endLiveEdit() }
+                    }
+                )
+                // Volume's label (one decimal, U+2212 minus), so a depth the AI set (−7.5) reads as set.
+                Text(AudioGain.label(forLinear: AudioGain.linear(fromDecibels: clip.voiceBandDB)))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundStyle(clip.isMuted || clip.voiceBandDB == 0 ? .tertiary : .secondary)
+                    .frame(width: 58, alignment: .trailing)
+            }
+            .disabled(clip.isMuted)
+            Text("Lowers only 300 Hz–3 kHz of this clip’s sound, where voices sit, so a voice over it comes through. Lows and highs stay.")
+                .font(.caption2)
+                .foregroundStyle(.tertiary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -156,6 +190,25 @@ struct ClipSoundSection: View {
                         }
                     }
                 }
+            }
+        )
+    }
+
+    /// The voice band slider: each drag tick replays from the gesture's snapshot (`liveApply`) and hands the engine the new
+    /// depth at once (`previewAudioLive`, as the scene sliders do — a parameter, never structure); release ends it as one undo
+    /// step on the audio-only fast path. Whole dB while dragging (−10 is easy to hit); a depth the AI set stays until dragged.
+    private var liveVoiceBandBinding: Binding<Double> {
+        let id = clip.id
+        let fallback = clip.voiceBandDB
+        return Binding(
+            get: { project.state.clip(with: id)?.voiceBandDB ?? fallback },
+            set: { newValue in
+                let rounded = VoiceBand.sanitized(newValue.rounded())
+                let depth = rounded == 0 ? 0 : rounded   // never store −0.0
+                project.liveApply { state in
+                    state.update(id) { $0.voiceBandDB = depth }
+                }
+                project.previewAudioLive { _ in }
             }
         )
     }
