@@ -677,6 +677,14 @@ Safari 检查中文桌面，Chrome for Testing 检查英文桌面和中英文 39
   `npm run indexnow` 交了 64 个地址（202）；robots、`llms.txt`、404 正常；首页和一篇文章页引用的脚本、样式、图片全部 200。
   真的 Safari、iPhone、iPad 没有实测。CLI 存的登录令牌大约 8 小时过期（过期了 API 回 403 `invalidToken`），
   调 API 之前先跑一次 `vercel whoami` 刷新（只读、不部署）。
+- The one docs address `/docs` (PR #544) went live on 2026-11-20: main commit
+  `d728ab341e1aa942914aa584dfee7db87dfbf993`, deployed through the same `POST /v13/deployments` path, Vercel deployment
+  `dpl_CoYJTHX8prYHYbveYMgK3zxX7rvD` READY. Checked live: all 64 sitemap addresses 200 with self canonicals, the live
+  sitemap byte-identical to main's `public/sitemap.xml`; `/ja`, `/zh-hant` 307 to their guides; robots, `llms.txt` and the
+  404 page as before; every script, style, font and image on the home page, an article page and `/zh/docs/` 200;
+  `npm run indexnow` accepted 64 addresses (200). `/docs` on `skycut.app` and `www` (which first 308s to the apex):
+  zh-CN and zh-TW → `/zh/docs/`, es-ES → `/es/docs/`, de-DE → `/de/docs/`, ja-JP, ru-RU and no header → `/en/docs/`,
+  each 307 to a 200 page in that language; the query string is kept.
 - `.vercel/`、`node_modules/` 和生成的语言 HTML 不入库。源是 `content/*.js` 和
   `scripts/*.mjs`，不能直接改生成页。
 - 下载沿用 `https://skylu.ai/download/skycut`。2026-11-05 用户单独授权更新 App，
