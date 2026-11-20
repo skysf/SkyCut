@@ -140,6 +140,11 @@ class PlaybackGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 2)
         self.assertIn("stallMs 140.0 > 100 ms", failures[0] + failures[1])
         self.assertEqual(strict(batch(5), BUDGETS["strict"]), [])
+        # Since 2026-11-20 the first sound is at the playhead itself; a cold open whose first advancing picture is the
+        # second frame is in step at an onset gap of up to two frames (M1: 47-64 ms, start skew -2 to -19 ms).
+        samples = batch(5)
+        samples["cold-open"] = [trial("cold-open", onsetGapMs=64.2, startOffsetMs=-2.4, maxSkewMs=12)] * 5
+        self.assertEqual(strict(samples, BUDGETS["strict"]), [])
 
     def test_recorded_idle_start_and_click_while_playing_fail_on_this_mac(self):
         # Before 2026-11-20 the start after the idle stop ran the picture ahead and its drift correction re-seeked it,

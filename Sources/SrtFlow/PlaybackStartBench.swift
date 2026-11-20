@@ -105,6 +105,7 @@ enum PlaybackStartBench {
         for scenario in PlaybackStartScenarios.list(duration: project.duration, frame: frame)
         where only?.contains(scenario.name) ?? true {
             for _ in 0..<repeats {
+                await PlaybackStartScenarios.settle(project)
                 trials.append(await trial(scenario.name) {
                     let origin = try await PlaybackStartScenarios.stage(scenario, project: project, probe: probe, frame: frame)
                     return try await measure(project, probe: probe, origin: origin, frame: frame, before: PerfCounters.snapshot(),

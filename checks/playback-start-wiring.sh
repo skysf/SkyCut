@@ -11,6 +11,8 @@ engine=Sources/SrtFlow/AudioEngine/TimelineAudioEngine.swift
 feeder=Sources/SrtFlow/AudioEngine/AudioTrackFeeder.swift
 surface=Sources/SrtFlow/VideoEditPlayheadFollowers.swift
 layerHost=Sources/SrtFlow/PlayerViewRepresentable.swift
+bench=Sources/SrtFlow/PlaybackStartBench.swift
+scenarios=Sources/SrtFlow/PlaybackStartScenarios.swift
 workflow=.github/workflows/checks.yml
 failed=0
 
@@ -203,6 +205,21 @@ if ! awk '
 ' <<<"${finish}" || ! grep -qF 'previewClock: clock' "${surface}" ||
   ! grep -qF 'previewClock?.bindPreviewLayer(view.playerLayer)' "${layerHost}"; then
   fail "Wait for the first mounted preview picture before releasing a cold Play"
+fi
+
+# The bench stages each scenario from a settled pause: no seek a millisecond after the last measurement's pause, no
+# pending Play left by a failed trial, and a new item staged without waiting for the replaced item's picture
+# (docs/bugfixes/2026-11-20-playback-gate-staging-after-pause.md).
+settle="$(body "${scenarios}" '    static func settle(')"
+fresh="$(awk '/case "fresh-item":/ { found = 1 } found && /case "resume":/ { exit } found { print }' "${scenarios}")"
+if ! awk '
+  /await PlaybackStartScenarios\.settle\(project\)/ { settle = NR }
+  /trials\.append\(await trial\(scenario\.name\)/ { trial = NR }
+  END { exit !(settle && trial == settle + 1) }
+' "${bench}" || ! grep -qF 'project.clock.pause()' <<<"${settle}" || ! grep -qF 'CMTimebaseGetRate' <<<"${settle}" ||
+  ! grep -qF '!project.clock.isPositioningPreview' <<<"${settle}" || ! grep -qF 'try await rebuild(' <<<"${fresh}" ||
+  [ "$(grep -cF 'try await place(' <<<"${fresh}")" -ne 0 ]; then
+  fail "Stage each scenario from a settled pause, and a new item without waiting for the replaced item's picture"
 fi
 
 if [ "$(grep -cF 'run: /bin/bash scripts/check-playback-start.sh' "${workflow}")" -ne 1 ]; then
