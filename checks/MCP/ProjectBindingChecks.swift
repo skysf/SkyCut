@@ -170,7 +170,7 @@ private func runUsesProjectChecks() {
         switch tool {
         case .skycutGuide, .getStatus, .getSettings, .setSettings, .listCharacters, .getCharacter, .manageCharacters, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .findAudio, .generateMedia,
              .compressVideos, .burnSubtitles, .convertSubtitles, .getJob, .cancelJob, .openProject, .newProject, .closeProject,
-             .recordScreen, .listVoices, .manageVoices:
+             .recordScreen, .listVoices, .manageVoices, .craftCards:
             expected = false
         default:
             expected = true

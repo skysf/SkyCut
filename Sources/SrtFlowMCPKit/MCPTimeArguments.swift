@@ -80,7 +80,7 @@ public enum MCPTimeArguments {
         case .getSubtitles: return ["start", "end"]
         case .editSubtitles: return ["add[].start", "add[].end", "changes[].start", "changes[].end"]
         case .getJob: return ["wait_seconds"]
-        case .skycutGuide, .getStatus, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .manageFiles, .openProject,
+        case .skycutGuide, .getStatus, .setView, .openFolder, .readDocument, .recipes, .saveRecipe, .craftCards, .manageFiles, .openProject,
              .newProject, .closeProject, .saveProject, .getTimeline, .findAudio, .listVoices, .changeVoice, .listCharacters,
              .getCharacter, .manageCharacters, .upscaleClip, .setTrack, .cutToBeat, .deleteItems, .generateSubtitles,
              .translateSubtitles, .exportVideo, .exportSubtitles, .compressVideos, .burnSubtitles, .convertSubtitles, .cancelJob,

@@ -23,7 +23,7 @@ enum MCPGuideMap {
     bars), listen (levels, silence, beats, cut check, mixed loudness and peaks per track to the frame), transcribe (words \
     with times)
     Whole video: recipes (editing styles: pick one before cutting a whole video, tell the user which), save_recipe (keep \
-    the user's own style)
+    the user's own style), craft_cards (Sky Studio's film-craft cards: shots, cuts, sound, music, looks)
     Clips: add_clips (files, library music, add_clips sound_effect for local sound effects), edit_clip (trim, speed, \
     volume, fades, crop, 9:16 reframe, position, animation, file swap), edit_clips (batch), split_clip, delete_items, \
     duplicate_items, freeze_frame, set_keyframes (animate position, size, rotation, opacity)

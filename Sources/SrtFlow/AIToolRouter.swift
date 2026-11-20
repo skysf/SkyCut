@@ -231,6 +231,7 @@ final class AIToolRouter {
             let result = try await AIRecipeSkyStudio.save(args)
             AIRecipeLibrary.shared.refresh()
             return result
+        case .craftCards: return try await AICraftCardsTool.read(args)
         case .manageFiles: return try AIFileTools.manageFiles(args, project)
         case .openProject: return try await AIProjectOpenTools.openProject(args, inFront: Self.opensInFront)
         case .newProject: return try await AIProjectOpenTools.newProject(args, inFront: Self.opensInFront)
@@ -343,7 +344,8 @@ final class AIToolRouter {
             case .getStatus, .getSettings, .getJob, .cancelJob, .listCharacters, .getCharacter, .listVoices:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
             // 套路和说明书不碰工程：不排队、不摆窗口、不算这一轮的改动（说明书照 recipes 的路子答，docs/architecture/mcp-guide.md）。
-            case .recipes, .saveRecipe, .skycutGuide:
+            // craft_cards reads Sky Studio's craft cards the way recipes reads its styles (SS5 plan 5.6).
+            case .recipes, .saveRecipe, .skycutGuide, .craftCards:
                 (serialized, presentsEditor, startsRound) = (false, false, false)
             case .setView, .setSettings, .manageCharacters, .manageVoices:
                 (serialized, presentsEditor, startsRound) = (true, false, false)

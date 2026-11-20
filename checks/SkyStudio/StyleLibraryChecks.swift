@@ -8,7 +8,8 @@ import SrtFlowMCPKit
 // deletes the texts, removing the key deletes everything. Contract shapes are in StyleContentChecks.swift.
 
 /// What the library is given: the licence, the key and the clock, changed by the checks (and by the fake server mid-request).
-private final class StyleEnvironment: @unchecked Sendable {
+/// CardLibraryChecks use it too.
+final class StyleEnvironment: @unchecked Sendable {
     private let lock = NSLock()
     private var _licence: SkyCutLicense
     private var _hasKey = true
@@ -239,7 +240,7 @@ private func mismatchAndMissingChecks(_ root: URL) async {
 }
 
 @MainActor
-private func makeLibrary(_ root: URL, _ env: StyleEnvironment) -> SkyStudioStyleLibrary {
+func makeLibrary(_ root: URL, _ env: StyleEnvironment) -> SkyStudioStyleLibrary {
     let base = URL(string: "http://127.0.0.1:8123/api/skycut/v1")!
     let key = "sk-" + String(repeating: "D", count: 43)
     return SkyStudioStyleLibrary(
