@@ -1,5 +1,6 @@
 #if DEBUG
 import AppKit
+import AVFoundation
 
 // The playback-start benchmark's scenarios after the cold open: where the playhead is and what the person did just
 // before pressing Play, staged through the editor's own entry points. The bench (PlaybackStartBench) times Play;
@@ -37,7 +38,13 @@ enum PlaybackStartScenarios {
             // Play straight after a far click on the timeline, while the paused seek is still on its way.
             project.seekFromTimeline(time: position)
         case "fresh-item":
-            try await place(project, probe: probe, at: position, frame: frame)
+            // An edit right after a click: the click only places the playhead (the rebuild replaces the item it placed
+            // the picture on), then the production rebuild installs a new item and Play follows once its paused
+            // picture is up. Waiting for the old item's paused picture timed out 8 times on 2026-11-19/20, hosted and
+            // local, always right after the `cut` scenario's pause: AVFoundation reported that seek and its preroll
+            // finished within 10-20 ms and never vended the frame; a same-time re-seek changed nothing.
+            project.seekFromTimeline(time: position)
+            try await PlaybackStartBench.wait("placement at \(position)") { !project.clock.isPositioningPreview }
             try await rebuild(project, probe: probe, at: position, frame: frame)
         case "resume":
             // Space to play, space to pause a second later, space again: playback continues where it paused.
@@ -77,6 +84,31 @@ enum PlaybackStartScenarios {
         return { project.seekFromTimeline(time: scenario.position) }
     }
 
+    /// Between two scenarios: the previous one's pause (and a failed trial's pending Play) has settled before the next
+    /// one touches the playhead, with the gap a person leaves before the next action. The scenarios used to follow one
+    /// another within a millisecond of the measurement's pause; every staging failure in the gate followed such a
+    /// pause and a seek to 10.0 (docs/bugfixes/2026-11-20-playback-gate-staging-after-pause.md).
+    static func settle(_ project: VideoEditProject) async {
+        project.clock.pause()
+        let deadline = CACurrentMediaTime() + 5
+        while CACurrentMediaTime() < deadline {
+            let rate = project.clock.player.currentItem?.timebase.map(CMTimebaseGetRate) ?? 0
+            if rate == 0, !project.clock.isPositioningPreview { break }
+            try? await Task.sleep(for: .milliseconds(8))
+        }
+        try? await Task.sleep(for: .milliseconds(250))
+    }
+
+    /// The player's state for a staging failure's message: enough to tell a stuck seek from a slow one.
+    static func state(_ project: VideoEditProject, probe: PlaybackStartVideoProbe) -> String {
+        let clock = project.clock
+        let item = clock.player.currentItem
+        let timebase = item?.timebase.map { String(format: "%.3f@%.2f", CMTimebaseGetTime($0).seconds, CMTimebaseGetRate($0)) } ?? "none"
+        return String(format: "playhead %.3f, timebase %@, rate %.2f, item %d, placing %@, picture %@", clock.time, timebase,
+                      clock.player.rate, item?.status.rawValue ?? -1, clock.isPositioningPreview ? "yes" : "no",
+                      probe.displayed.map { String(format: "%.3f", $0.timeline) } ?? "none")
+    }
+
     /// A click on the timeline; Play follows as soon as the paused picture is on screen.
     static func place(
         _ project: VideoEditProject, probe: PlaybackStartVideoProbe, at position: Double, frame: Double
@@ -89,9 +121,13 @@ enum PlaybackStartScenarios {
             return
         }
         let visible = min(position, project.duration - frame)
-        try await PlaybackStartBench.wait("paused picture at \(visible)") {
-            guard let displayed = probe.displayed else { return false }
-            return abs(displayed.timeline - visible) < frame * 0.95
+        do {
+            try await PlaybackStartBench.wait("paused picture at \(visible)") {
+                guard let displayed = probe.displayed else { return false }
+                return abs(displayed.timeline - visible) < frame * 0.95
+            }
+        } catch {
+            throw PlaybackStartBench.Failure("\(error.localizedDescription) (\(state(project, probe: probe)))")
         }
     }
 
