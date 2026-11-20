@@ -93,6 +93,7 @@ into an address (`SkyStudioContentRules`).
 | Sky Studio checks too | Sky Studio sends a text only to a Mac registered within the account's limit, and every answer (a pinned version's too) is `private, no-cache` with the licence checked before a 304. So while online a copy is confirmed with its ETag on every read, and served without asking only when Sky Studio cannot be reached (offline, a 5xx); a refusal is never answered with the copy. `403 not_entitled` is said in plain words by `plan_reason`: `machine_not_registered` (Check Again registers this Mac), `machine_limit_reached` (remove a Mac, its link or the support email), otherwise the plan (`SkyStudioStyleLibrary.notEntitledWords`). On day one only `film-trailer` may be published: an empty or missing cards part reads fine. |
 | `min_skycut_version` | When this SkyCut is older, the read answer carries a `note` (a call the style suggests may fail; update SkyCut). A hint, not a gate. |
 | `expects_music` | Read from a manifest entry when it is a JSON boolean (2026-11-20; Sky Studio does not publish it yet): whether a film cut in that style with no music is inspect_video's suspect. Until then SkyCut's list by id decides ([finished-video inspection](finished-video-inspection.md), "No music where the style expects it"). |
+| Craft cards (2026-11-20, SS5 plan 5.6) | The same manifest's `cards` part (`SkyStudioCardCatalog`: the entry page, each group's catalogue, each card, versions and checksums) and the card routes: `GET /content/cards` (entry page), `?group=<key>` (catalogue), `/content/cards/{id}` (card; three digits), each asked with `?version=` from the list. Same licence (`features.recipes`, `SkyStudioAccount.cardRefusal`), same read flow as a style (`SkyStudioStyleLibrary.readText`: ETag, copy only when unreachable, refusal never answered with the copy), copies at `cards/<kind>/<id>@<version>.json` (kind entry / group / card) deleted with the texts. A page's identity is checked on every answer and hit (the entry page carries no `id` / `group`, a catalogue no `id`). Nothing published (503, or a list without cards: day one publishes only `film-trailer`, and the server then answers a card route with 404) and unknown pages are said without asking for a page (`SkyStudioCardWords`). |
 
 ## 二、文件
 
@@ -116,7 +117,10 @@ into an address (`SkyStudioContentRules`).
 | `SkyStudio/SkyStudioContent.swift` | Sky Studio's content for SkyCut (pure): the manifest, one style's text, id / version shapes, SHA-256, comparing SkyCut versions |
 | `SkyStudio/SkyStudioContentAPI.swift` | `GET /content` (with If-None-Match) and `GET /content/styles/{id}?version=` over `SkyStudioAPI.request` / `conditionalGet` |
 | `SkyStudio/SkyStudioContentCache.swift` | The copies on this Mac: manifest and texts by id + version (identity checked on every hit), atomic writes, deleting texts or everything |
-| `SkyStudio/SkyStudioStyleLibrary.swift` | When to ask, who may read, reading a style, deleting on a licence change; `@MainActor`, Settings' style list subscribes to `listing` |
+| `SkyStudio/SkyStudioStyleLibrary.swift` | When to ask, who may read, reading a style or a craft-card page (one flow), deleting on a licence change; `@MainActor`, Settings' style list subscribes to `listing` |
+| `SkyStudio/SkyStudioCards.swift` | Craft cards (pure): the manifest's cards part, what craft_cards may ask for (shapes, padding), one page read and written back |
+| `SkyStudio/SkyStudioCardWords.swift` | What the AI is told when a card page is not read (nothing published, unknown page, unreachable, refused, withdrawn) |
+| `AICraftCardsTool.swift` / `AICraftCardsAnswer.swift` | craft_cards: the order of one call (licence, shape, list, page) / the answer (pure) |
 
 ## 三、还没做的
 
@@ -165,6 +169,15 @@ into an address (`SkyStudioContentRules`).
   `checks/sky-studio-wiring/styles.sh` pins the hook in `replaceStored`, the router through `AIRecipeSkyStudio`, the one library over
   `uncachedSession` with a silent key, and `styleRefusal` only through `SkyStudioAccount`. Reverse check (2026-11-19): removing
   the `licenceChanged` line and routing recipes straight to `AIRecipeTools` turned the scan red (three failures); restored, green.
+- Craft cards (2026-11-20): `CardContentChecks` (the cards part and each page with checksums and identity, the request shapes and
+  padding, the card routes on the fake server with `?group=` / `?version=` / 304, copies by kind / id / version incl. two revs with
+  one text, the refusal text) and `CardLibraryChecks` (readCard on every path: not entitled, nothing published as 503 or as a list
+  without cards, the three pages fetched and kept, read again by ETag, unknown group / card without asking, offline copy or plain
+  words, 403 `machine_not_registered` / `machine_limit_reached` over the copy, 503 serving the copy, 404 withdrawn, a text not the
+  listed one, the licence ending mid-fetch, licence changes, a new rev; the craft_cards answer) in `scripts/check-sky-studio.sh`;
+  `RecipeSkyStudioChecks` (the recipes pointer only while cards are listed; craft_cards' catalog entry) in `scripts/check-mcp.sh`;
+  `checks/sky-studio-wiring/cards.sh` (router and Policy row, licence → list → page order, one library, `cardRefusal` only through
+  `SkyStudioAccount`, the card routes only in the library).
 - 钥匙串的真读写在 `scripts/check-keychain.sh`（本机手动，不在 `check-all` 里），检查进程全程禁用交互，仅存读改删专用假项，不运行弹框变体。
 
 ## 六、人工回归（Sky Studio 的接口上线之后，发版前）
@@ -203,8 +216,12 @@ PR C（2026-11-06）在独立 `com.srtflow.SrtFlow.prc.skystudiosmoke` 真 App /
 - [ ] Sky Studio's editing styles (SS5-E, the isolated smoke app and a test account; ops flips its overrides with the user's OK):
       `mcp` on, `recipes` off → recipes lists the published style with `available: false` and reading it is refused with what to do;
       `recipes` on → the style reads, its checksum matches and Settings shows "Sky Studio · <version>"; the forwarder stopped → this
-      Mac's copy, labelled with its date; `recipes` off again and Check Again → the copy is no longer served and
-      `~/Library/Application Support/SrtFlow/SkyStudioContent/items/` is gone.
+      Mac's copy, labelled with its date; `recipes` off again and Check Again → the copy is no longer served and the texts under
+      `~/Library/Application Support/SrtFlow/SkyStudioContent/` (`styles/`, `cards/`) are gone.
+- [ ] Craft cards (once Sky Studio publishes the first cards; same isolated smoke app and test account): `craft_cards` → the entry page
+      with its `groups`; `group=<key>` → that catalogue; `id=<number>` → the card and `related`; read again → `cached` + `fetched_at`;
+      the forwarder stopped → this Mac's copy; `recipes` off → refused with what to do. Before the first card release: "Sky Studio has
+      not published any craft cards yet", and recipes' read answer says nothing about craft_cards.
 - [ ] 照授权拦打开（测试开关，或打开它的 PR 之后）、没有 Key：让 AI 剪一下，回「Not done」说去哪建 Key、粘到哪；`get_status` 照常回、带 `skycut_plan`；`skycut_guide` 照常回。
 - [ ] 粘体验账号的 Key：AI 照常剪；导出面板底栏有「会带水印」那一行、「复制邮箱」粘出来对；导出的成片带水印，AI 的 `get_job` 里有 `watermark`。
 - [ ] 后台给账号开正式版、点「再查一次」：导出不带水印，面板那一行没了。

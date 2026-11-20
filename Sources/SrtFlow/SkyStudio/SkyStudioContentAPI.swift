@@ -1,10 +1,12 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - Sky Studio's content routes for SkyCut (`GET /content`, `GET /content/styles/{id}`)
+// MARK: - Sky Studio's content routes for SkyCut (`GET /content`, `/content/styles/{id}`, `/content/cards[?group=]`, `/content/cards/{id}`)
 //
-// What this owns: the paths (only ids and versions SkyStudioContentRules accepts ever become part of an address) and reading
-// the answers into SkyStudioContentManifest / SkyStudioStyleText. Authentication, version, machine and how errors read stay in
+// What this owns: the paths (only ids, groups and versions SkyStudioContentRules accepts ever become part of an address) and
+// reading the answers into SkyStudioContentManifest / SkyStudioStyleText / SkyStudioCardPage (craft cards since 2026-11-20,
+// SS5 plan 5.6: the entry page and a group's catalogue at `content/cards`, a group as `?group=`; a card at `content/cards/{id}`).
+// Authentication, version, machine and how errors read stay in
 // SkyStudioAPI's `request` / `conditionalGet` (checks/sky-studio-wiring.sh). The manifest and a style are both asked with the ETag
 // held (304 = still current). Every answer is `private, no-cache` (contract of c9a7ce5d): Sky Studio checks this Mac's licence
 // before a 304, so asking again with the ETag is how a copy kept on this Mac is confirmed while online.
@@ -18,6 +20,22 @@ enum SkyStudioContentPath {
     static func style(_ id: String) throws -> String {
         guard SkyStudioContentRules.isItemID(id) else { throw SkyStudioContentRequestProblem(message: "\(id) is not a Sky Studio style id.") }
         return "content/styles/" + id
+    }
+
+    /// A craft-card page: its path and the query that names it (a group's catalogue is `content/cards?group=`).
+    static func cardPage(_ request: SkyStudioCardRequest) throws -> (path: String, query: [URLQueryItem]) {
+        switch request {
+        case .entry:
+            return ("content/cards", [])
+        case .group(let key):
+            guard SkyStudioContentRules.isItemID(key) else {
+                throw SkyStudioContentRequestProblem(message: "\(key) is not a craft-card group.")
+            }
+            return ("content/cards", [URLQueryItem(name: "group", value: key)])
+        case .card(let id):
+            guard SkyStudioContentRules.isCardID(id) else { throw SkyStudioContentRequestProblem(message: "\(id) is not a craft card id.") }
+            return ("content/cards/" + id, [])
+        }
     }
 }
 
@@ -36,6 +54,12 @@ enum SkyStudioManifestAnswer: Equatable, Sendable {
 enum SkyStudioStyleAnswer: Equatable, Sendable {
     case notModified
     case changed(SkyStudioStyleText, etag: String?)
+}
+
+/// A craft-card page asked with the ETag of the copy held, like a style.
+enum SkyStudioCardAnswer: Equatable, Sendable {
+    case notModified
+    case changed(SkyStudioCardPage, etag: String?)
 }
 
 extension SkyStudioAPI {
@@ -71,5 +95,34 @@ extension SkyStudioAPI {
             throw SkyStudioFailure.badAnswer(status: 200)
         }
         return .changed(style, etag: answer.etag)
+    }
+
+    /// `GET /content/cards[?group=]` / `GET /content/cards/{id}`, with `?version=`: one version of one craft-card page (needs
+    /// `features.recipes` on this Mac, and a registered Mac, like a style). `version` nil = the current release's; `etag` = the copy
+    /// held. A 200 must be that page and version and match its checksum, or it is a bad answer.
+    func contentCardPage(_ page: SkyStudioCardRequest, version: String?, key: String, etag: String? = nil) async throws -> SkyStudioCardAnswer {
+        let address = try SkyStudioContentPath.cardPage(page)
+        var call = request(address.path, key: key)
+        var query = address.query
+        if let version {
+            guard SkyStudioContentRules.isVersion(version) else {
+                throw SkyStudioContentRequestProblem(message: "\(version) is not a card version (like 2).")
+            }
+            query.append(URLQueryItem(name: "version", value: version))
+        }
+        if !query.isEmpty {
+            var components = URLComponents(url: call.url!, resolvingAgainstBaseURL: false)!
+            components.queryItems = query
+            call.url = components.url
+        }
+        let answer = try await conditionalGet(call, etag: etag)
+        guard let body = answer.body else {
+            guard etag != nil else { throw SkyStudioFailure.badAnswer(status: 304) }
+            return .notModified
+        }
+        guard let json = try? JSONValue.decode(body), let read = SkyStudioCardPage(json: json, request: page, version: version) else {
+            throw SkyStudioFailure.badAnswer(status: 200)
+        }
+        return .changed(read, etag: answer.etag)
     }
 }

@@ -36,6 +36,10 @@
 #      the copies on this Mac, features.recipes and what the AI is told without it; the library asks the list again only when
 #      10 minutes old, offline uses this Mac's copy, serves copies only while the licence includes recipes, keeps nothing
 #      fetched while the licence ended, deletes texts on a /me without recipes and everything when the key goes.
+#  12. Sky Studio's craft cards (2026-11-20, SS5 plan 5.6; CardContentChecks / CardLibraryChecks): the cards part of the manifest and
+#      each page (entry, catalogue, card) read with their checksums, the card routes on the fake server (?group=, ?version=, 304),
+#      the copies by kind / id / version, the refusal text; readCard on every path (not entitled, nothing published, unknown page,
+#      offline, 403 / 404 / 503, a text not the listed one, the licence ending mid-fetch, licence changes) and the craft_cards answer.
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -79,9 +83,14 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioContent.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCards.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioCardWords.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioContentAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioContentCache.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioStyleLibrary.swift \
+  Sources/SrtFlow/AICraftCardsAnswer.swift \
+  Sources/SrtFlow/AIRecipeSkyStudioPart.swift \
+  Sources/SrtFlow/AIRecipe.swift \
   Sources/SrtFlow/SkyStudio/SkyCutLicense.swift \
   Sources/SrtFlow/SkyStudio/SkyCutProNotice.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioProblem.swift \
@@ -187,6 +196,8 @@ xcrun swiftc \
   checks/SkyStudio/GateChecks.swift \
   checks/SkyStudio/StyleContentChecks.swift \
   checks/SkyStudio/StyleLibraryChecks.swift \
+  checks/SkyStudio/CardContentChecks.swift \
+  checks/SkyStudio/CardLibraryChecks.swift \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \

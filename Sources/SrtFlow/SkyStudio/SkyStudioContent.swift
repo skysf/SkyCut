@@ -9,8 +9,9 @@ import SrtFlowMCPKit
 // text is checked against; comparing SkyCut versions for `min_skycut_version`. Read leniently like /me: unknown fields are
 // ignored, a style entry with an unusable id / version / checksum is left out of the list rather than spoiling it.
 // The contract is in the Sky Studio repo, docs/agents/skycut-api.md ("Editing styles and craft cards", 2026-11-19).
-// Not this file: asking (SkyStudioContentAPI), keeping copies on this Mac (SkyStudioContentCache), when to ask and who may
-// read (SkyStudioStyleLibrary), the recipes tool (AIRecipeSkyStudio).
+// Not this file: the craft cards' part of the manifest and their pages (SkyStudioCards), asking (SkyStudioContentAPI), keeping
+// copies on this Mac (SkyStudioContentCache), when to ask and who may read (SkyStudioStyleLibrary), the recipes tool
+// (AIRecipeSkyStudio).
 
 enum SkyStudioContentRules {
     /// A published item's id: `film-trailer`, `512`. The only shape that may become part of an address.
@@ -21,6 +22,11 @@ enum SkyStudioContentRules {
     /// A version (`1.0`, `2`, `1.0.1`): digits with up to two dots, so a version never brings `&`, `/` or `..` into a query.
     static func isVersion(_ text: String) -> Bool {
         text.range(of: #"\A[0-9]{1,6}(\.[0-9]{1,6}){0,2}\z"#, options: .regularExpression) != nil
+    }
+
+    /// A craft card's id: three digits (`512`, `001`), as Sky Studio numbers them.
+    static func isCardID(_ text: String) -> Bool {
+        text.range(of: #"\A[0-9]{3}\z"#, options: .regularExpression) != nil
     }
 
     static func isChecksum(_ text: String) -> Bool {
@@ -50,8 +56,8 @@ enum SkyStudioContentRules {
     }
 }
 
-/// `GET /content`: the current release. `raw` keeps the whole answer (the cards part included) so the cache can write it
-/// back unchanged for the card tool that reads the same manifest later.
+/// `GET /content`: the current release. `raw` keeps the whole answer so the cache writes it back unchanged; `cards` is its cards
+/// part as craft_cards reads it (SkyStudioCards.swift).
 struct SkyStudioContentManifest: Equatable, Sendable {
     struct Style: Equatable, Sendable {
         var id: String
@@ -68,6 +74,7 @@ struct SkyStudioContentManifest: Equatable, Sendable {
     var release: Int
     var publishedAt: Date?
     var styles: [Style]
+    var cards: SkyStudioCardCatalog
     var raw: JSONValue
 
     init?(json: JSONValue) {
@@ -84,6 +91,7 @@ struct SkyStudioContentManifest: Equatable, Sendable {
                          version: version, sha256: sha, minSkyCutVersion: entry["min_skycut_version"]?.stringValue,
                          expectsMusic: entry["expects_music"]?.boolValue)
         }
+        cards = SkyStudioCardCatalog(json: json["cards"])
         raw = json
     }
 }

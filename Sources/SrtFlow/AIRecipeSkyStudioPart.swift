@@ -5,7 +5,8 @@ import Foundation
 // What this owns: what the answers in AIRecipeTools need to know about Sky Studio's editing styles, gathered before the answer
 // is built (by AIRecipeSkyStudio from SkyStudioStyleLibrary) so the answer stays a pure function that RecipeChecks build by hand:
 // the styles Sky Studio lists now, where that list came from, whether the licence includes them, and the one style read for
-// this call. Also the sentences the AI reads about them (where the list came from, why one cannot be read).
+// this call. Also the sentences the AI reads about them (where the list came from, why one cannot be read), and whether craft
+// cards can be read (a style's read answer then points at craft_cards, SS5 plan 5.6).
 // Not this file: asking Sky Studio, the copies, the licence (SkyStudioStyleLibrary, SkyStudioAccount).
 
 struct AIRecipeSkyStudioPart: Sendable {
@@ -56,6 +57,14 @@ struct AIRecipeSkyStudioPart: Sendable {
     /// The licence includes Sky Studio's styles now (`features.recipes`).
     var entitled = false
     var read: Read?
+    /// Sky Studio lists craft cards and the licence includes them (the same `features.recipes`; SS5 plan 5.6).
+    var cardsListed = false
+
+    /// After a style is read: where the craft behind its steps is (nil while no craft cards can be read).
+    var cardsPointer: String? {
+        cardsListed ? "For the craft behind a step (shots, cuts, sound, music, looks), read Sky Studio's craft cards: craft_cards "
+            + "(the entry page first)." : nil
+    }
 
     /// Why the AI cannot read this style now; nil = it can.
     func unavailable(_ style: Style) -> String? {
