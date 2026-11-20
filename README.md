@@ -146,7 +146,7 @@ holding the helper. This clears it for good:
 xattr -dr com.apple.quarantine /Applications/SkyCut.app
 ```
 
-The DMG ships a bilingual `Read Me First` with the same steps, and the app shows
+The DMG's install window shows the same steps in six languages, and the app shows
 the command plus a button that opens System Settings when it detects the
 situation. Handing the app over on a USB drive or over `scp` avoids the flag
 entirely.
@@ -287,7 +287,7 @@ macOS 第一次打开时就会拦。这个拦截不只是弹窗那么简单：�
 xattr -dr com.apple.quarantine /Applications/SkyCut.app
 ```
 
-DMG 里附了一份中英文的《首次打开必读》写着同样的步骤；App 识别到这种情况时，
+DMG 的安装窗口用六种语言写着同样的步骤；App 识别到这种情况时，
 会把命令和一个「打开系统设置」的按钮一起显示出来。用 U 盘或 `scp` 传则完全
 不会被打上这个标记。
 
