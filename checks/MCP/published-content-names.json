@@ -1,5 +1,30 @@
 {
   "format": "skycut-published-names/1",
-  "release": null,
-  "items": []
+  "release": 1,
+  "published_at": "2026-11-19T22:09:41.092Z",
+  "items": [
+    {
+      "kind": "style",
+      "id": "film-trailer",
+      "version": "1.0",
+      "names": [
+        "camera_angle",
+        "edit_clip fit=fill",
+        "find_audio",
+        "flip_horizontal",
+        "focus_x",
+        "generate_media",
+        "generate_media kind=image_to_video",
+        "generate_media kind=music",
+        "generate_media model=<value>",
+        "generate_media operation=camera_angle",
+        "hit_at",
+        "image_to_video",
+        "listen beats=true",
+        "set_keyframes",
+        "set_transition",
+        "set_transition sound=cut"
+      ]
+    }
+  ]
 }
