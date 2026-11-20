@@ -16,7 +16,8 @@ import SrtFlowMCPKit
 // - `audio_no_score` (rule 5, a reminder): 15 s or more with neither music nor a long tone or riser (an effect lasting 3 s or
 //   more, heard above −50 dBFS within 0.5 s; SkyCut can't name an effect's kind, so length stands in for it). Only when the
 //   video has music somewhere; a video with none gets one grey hint instead (`audio_no_music`, listed in `hints`): fine for a
-//   talk, an interview or a tutorial, the shared rules make music optional.
+//   talk, an interview or a tutorial, the shared rules make music optional. Since 2026-11-20 (the user: by style) it is the
+//   suspect `audio_music_missing` when the editing style the film was cut with expects music (AIDeliveryStyleMusic).
 // Thresholds are the research's (one human film and two AI drafts; delivery-checks.md in the research folder), not validated
 // across genres: report only, and intentional marks apply. Hard music starts and stops are AIDeliveryMusicEdges.
 // Not here: measuring (AIDeliverySoundLevels), roles (AIDeliverySoundRoles), music under a line rising (AIDeliveryMusicSwell).
@@ -131,10 +132,21 @@ enum AIDeliveryMusic {
         }
     }
 
-    /// A grey hint when nothing anywhere is music (listed in `hints`, not counted with the suspects).
-    static func noMusic(sounds: [AIDeliveryCutJumps.Sound], duration: Double, scope: AIInspection.Scope) -> [AIInspection.Finding] {
+    /// Nothing anywhere is music: the suspect `audio_music_missing` when `style` (the film's editing style, AIDeliveryStyleMusic)
+    /// expects music, else a grey hint (listed in `hints`, not counted with the suspects). Both are about the whole film.
+    static func noMusic(sounds: [AIDeliveryCutJumps.Sound], duration: Double, scope: AIInspection.Scope,
+                        style: AIDeliveryStyleMusic.Style? = nil) -> [AIInspection.Finding] {
         guard !sounds.isEmpty, !sounds.contains(where: { $0.role == .music }), duration >= noMusicSeconds,
               let from = scope.ranges.map(\.lowerBound).min(), let to = scope.ranges.map(\.upperBound).max() else { return [] }
+        if let style {
+            let name = style.title == style.id ? style.id : "\(style.title) (\(style.id))"
+            return [AIInspection.Finding(
+                kind: "audio_music_missing", from: from, to: to,
+                reason: "Nothing here is music, and the editing style this film was cut with, \(name), expects music from the first "
+                    + "3 s. Bring music in (find_audio, or a track of the user's), or mark it intentional. An imported music file "
+                    + "counts once it is named music (edit_clip sound_role music, or sounds).",
+                details: ["style": .string(style.id)])]
+        }
         return [AIInspection.Finding(
             kind: "audio_no_music", from: from, to: to,
             reason: "Grey hint, not a suspect: nothing here is music (library or generated music, or what sounds names music). Fine "

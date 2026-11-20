@@ -98,8 +98,10 @@ enum MCPGuideOutputTopics {
             last 3 s sits more than 22 dB under a speaking voice for 2 s or more, so it all but vanishes; keep it about 10 dB under \
             words (set_track duck_others_db). audio_music_late: music is first heard more than 3 s after the first picture; an \
             opening line starting inside those 3 s lets it wait until 3 s after the line ends. audio_no_score: 15 s or more with \
-            neither music nor an effect of 3 s or more (a long tone or a riser), a reminder; a video with no music at all gets only \
-            the grey hint audio_no_music in hints. audio_music_edge: music starting or stopping without a fade of 0.3 s, above -40 \
+            neither music nor an effect of 3 s or more (a long tone or a riser), a reminder. A video with no music at all gets the \
+            grey hint audio_no_music in hints, or the suspect audio_music_missing when the editing style it was cut with expects \
+            music (get_timeline editing_style; the trailer-like ones). audio_music_edge: music starting or stopping without a fade \
+            of 0.3 s, above -40 \
             dBFS, more than 6 frames from a picture cut, the first picture, a title appearing or a line spoken in the picture \
             starting or ending (edge in or out, event_at, frames_from_event); not where another music plays across it, the same \
             file carries on, or the music's own hit is at the edge (an accent within 3 frames: placed there on purpose, as with \

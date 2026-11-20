@@ -92,6 +92,7 @@ into an address (`SkyStudioContentRules`).
 | No system URL cache | Content requests use `SkyStudioAPI.uncachedSession` (ephemeral, no URL cache): a URL cache would keep a copy SkyCut cannot delete and would serve an `immutable` answer without asking whether the key may still read it. |
 | Sky Studio checks too | Sky Studio sends a text only to a Mac registered within the account's limit, and every answer (a pinned version's too) is `private, no-cache` with the licence checked before a 304. So while online a copy is confirmed with its ETag on every read, and served without asking only when Sky Studio cannot be reached (offline, a 5xx); a refusal is never answered with the copy. `403 not_entitled` is said in plain words by `plan_reason`: `machine_not_registered` (Check Again registers this Mac), `machine_limit_reached` (remove a Mac, its link or the support email), otherwise the plan (`SkyStudioStyleLibrary.notEntitledWords`). On day one only `film-trailer` may be published: an empty or missing cards part reads fine. |
 | `min_skycut_version` | When this SkyCut is older, the read answer carries a `note` (a call the style suggests may fail; update SkyCut). A hint, not a gate. |
+| `expects_music` | Read from a manifest entry when it is a JSON boolean (2026-11-20; Sky Studio does not publish it yet): whether a film cut in that style with no music is inspect_video's suspect. Until then SkyCut's list by id decides ([finished-video inspection](finished-video-inspection.md), "No music where the style expects it"). |
 
 ## 二、文件
 

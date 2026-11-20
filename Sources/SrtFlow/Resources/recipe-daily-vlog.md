@@ -2,6 +2,7 @@
 id: daily-vlog
 title: Daily vlog
 use_for: Everyday life, travel vlogs, a day in the life, visiting shops and cafés (for unboxing that sells, use the product promo).
+music: optional
 ---
 # Daily vlog
 

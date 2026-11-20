@@ -2,6 +2,7 @@
 id: cinematic-opening
 title: Cinematic opening
 use_for: The opening of a short film or travel film, a trailer feel, a portfolio or brand-story opening; for a whole story trailer, the Film trailer style (film-trailer) when recipes lists it.
+music: expected
 ---
 # Cinematic opening
 

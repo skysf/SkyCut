@@ -26,6 +26,8 @@ cat > "${APP}/Contents/Info.plist" <<'PLIST'
 PLIST
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/Resources/SrtFlow_SrtFlow.bundle"
 ditto "${BUILD_DIR}/SrtFlow_SrtFlow.bundle" "${APP}/Contents/MacOS/SrtFlow_SrtFlow.bundle"
+# The presets where the packaged App has them (build-app.sh flattens the resources): StyleMusicChecks reads their headers.
+cp Sources/SrtFlow/Resources/recipe-*.md "${APP}/Contents/Resources/"
 xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 -I "${BUILD_DIR}/Modules" \
   checks/VideoInspection/*.swift @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/InspectionCheck"

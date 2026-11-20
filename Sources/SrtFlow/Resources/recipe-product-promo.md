@@ -2,6 +2,7 @@
 id: product-promo
 title: Product or course promo
 use_for: Selling a product, promoting a course or a service, app demos, live-stream highlights, unboxing that sells.
+music: optional
 ---
 # Product or course promo
 

@@ -20,6 +20,8 @@ enum AIDeliveryChecks {
         var file: Bool
         /// The second tier's evidence (roles, role-group levels, voice lines, sounds past their picture; AIDeliverySound).
         var sound: AIDeliverySound = .empty
+        /// The film's editing style when it expects music (AIDeliveryStyleMusic, asked when the inspection starts).
+        var musicStyle: AIDeliveryStyleMusic.Style? = nil
     }
     struct Check {
         var id: String
@@ -61,7 +63,7 @@ enum AIDeliveryChecks {
             AIDeliveryMusic.late($0.sound.levels, sounds: $0.sound.sounds, firstPicture: $0.sound.firstPicture, lines: $0.sound.lines,
                                  duration: $0.sound.duration, scope: $0.scope)
                 + AIDeliveryMusic.noScore($0.sound.levels, sounds: $0.sound.sounds, scope: $0.scope)
-                + AIDeliveryMusic.noMusic(sounds: $0.sound.sounds, duration: $0.sound.duration, scope: $0.scope)
+                + AIDeliveryMusic.noMusic(sounds: $0.sound.sounds, duration: $0.sound.duration, scope: $0.scope, style: $0.musicStyle)
         }),
         Check(id: "music_edges", run: {
             AIDeliveryMusicEdges.findings($0.sound.musicClips, events: AIDeliveryMusicEdges.musicEvents($0.sound), levels: $0.sound.levels,
@@ -73,7 +75,7 @@ enum AIDeliveryChecks {
     /// Report kinds that are grey hints, listed apart from the suspects (`hints`: no evidence slot, not counted with them).
     static let hintKinds: Set<String> = ["audio_voice_loud", "audio_no_music"]
     /// Kinds about the whole film rather than any clip: no clips are attached (a mark on one stays put while clips change).
-    static let wholeFilmKinds: Set<String> = ["audio_no_music"]
+    static let wholeFilmKinds: Set<String> = ["audio_no_music", "audio_music_missing"]
 
     static func run(_ context: Context) async throws -> [AIInspection.Finding] {
         var findings: [AIInspection.Finding] = []

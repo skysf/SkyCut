@@ -690,6 +690,9 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
      它会直接崩。`AIBuiltInRecipes` 从 `Bundle.main.resourceURL` 找，`swift run` 时退到可执行文件旁边的那个 bundle。
    - 用户的存在 `~/Library/Application Support/SrtFlow/Recipes/`（测试版和正式版共用，同音乐库缓存），一套一个 .md，格式和内置的一样
      （开头两行 `---` 之间写 id / title / use_for，缺了照收）；按文件里写的 id 认，不按文件名。
+   - Each preset's header also says `music: expected` or `optional` (2026-11-20): a film cut in one that expects music
+     (cinematic-opening, sci-fi) and has none gets inspect_video's suspect `audio_music_missing`, not the grey hint; only a preset's
+     line is read ([finished-video inspection](finished-video-inspection.md), "No music where the style expects it").
    - 合并（`AIRecipeCatalog`）：用户的和内置同一个 id = 用户改过的那一版，盖住内置的；内置按固定顺序在前，用户的按标题在后。
      找的时候认 id 或标题，不分大小写。
    - `save_recipe`：同名 = 改那一套，旧文件先进废纸篓再写新的，**不问**（剪辑风格是 SrtFlow 的设置，不是用户的素材；第 34 条管的是用户的文件）；

@@ -56,6 +56,15 @@ private func contractChecks() {
     checkEqual(manifest?.styles.first?.minSkyCutVersion, "0.18.60", "min_skycut_version is read")
     check(manifest?.publishedAt != nil, "published_at with milliseconds is read")
     check(manifest?.raw["cards"] != nil, "the cards part is kept as it came")
+    // Whether a style expects music (2026-11-20, inspect_video's no-music row): read when Sky Studio says it, as a JSON boolean.
+    func music(_ value: JSONValue?) -> Bool?? {
+        var entry = manifestAnswer().objectValue!["styles"]!.arrayValue![0].objectValue!
+        entry["expects_music"] = value
+        let answer = manifestAnswer().objectValue!.merging(["styles": [.object(entry)]]) { _, new in new }
+        return SkyStudioContentManifest(json: .object(answer))?.styles.first.map(\.expectsMusic)
+    }
+    check(music(true) == .some(true) && music(false) == .some(false), "expects_music true / false is read")
+    check(music(nil) == .some(nil) && music("yes") == .some(nil), "no expects_music, or one that is not a boolean, says nothing")
     var odd = manifestAnswer()
     if case .object(var object) = odd {
         let good = object["styles"]!.arrayValue![0]
