@@ -55,6 +55,7 @@
 - [2026-11-20 An artifact upload timeout turned a green shard red](2026-11-20-ci-artifact-upload-fails-green-shard.md) — A step that only reports but can fail the job is a gate in disguise: diagnostics get continue-on-error, pinned by a guard.
 - [2026-10-18 仓库改名后 CI 五组全部编不过](2026-10-18-ci-build-cache-breaks-after-repo-rename.md) — 记着绝对路径的缓存，key 里就得有那个路径。
 - [2026-11-04 CI 的 .build 缓存从没省下过一次编译](2026-11-04-ci-build-cache-never-saved-a-compile.md) — 修改时间按内容设、每组一份按提交存、只在 main 上存。
+- [2026-11-20 The docs-only check turned main red after a docs-only merge](2026-11-20-ci-docs-only-check-red-on-main.md) — A check of code that reads CI variables must set every one in every case; when the code learns a new variable, update every helper that calls it.
 - [2026-08-08 CI 首跑与吞错](2026-08-08-ci-first-run-sdk-and-swallowed-errors.md) — SDK 与构建日志不许被吞。
 - [2026-10-27 连接 AI 客户端时留的配置备份谁都能读](2026-10-27-client-config-backup-world-readable.md) — 「另写一份」不等于「拷一份」：备份的权限从原文件来。
 - [2026-08-16 竖图缩略图的隐形命中区盖死标尺](2026-08-16-clipped-thumbnail-hit-area-covers-ruler.md) — `.clipped()` 只裁绘制不裁命中；块内装饰必须不吃事件。
