@@ -684,6 +684,12 @@
   on licence changes); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (one list, no shadowing, `available` / `why`, the read answer
   and its split, `version`, `save_recipe` refusals, the Settings rows); wiring in `checks/sky-studio-wiring/styles.sh`. Rules:
   [Sky Studio account](../architecture/sky-studio-account.md), [AI control](../architecture/ai-control-mcp.md) item 32.
+- Sky Studio's craft cards (`craft_cards`, SS5 plan 5.6): `scripts/check-sky-studio.sh` → `CardContentChecks` (the cards part and each
+  page with checksums and identity, request shapes and padding, the card routes on the fake server, copies by kind / id / version,
+  the refusal text) and `CardLibraryChecks` (readCard on every path: not entitled, nothing published, the three pages fetched and read
+  again by ETag, unknown pages without asking, offline, 403 / 404 / 503, a text not the listed one, the licence ending mid-fetch,
+  licence changes, a new rev; the craft_cards answer); `scripts/check-mcp.sh` → `RecipeSkyStudioChecks` (the recipes pointer only
+  while cards are listed, the catalog entry); wiring in `checks/sky-studio-wiring/cards.sh`. Rules: the same two docs.
 - The film's editing style (`TimelineState.editingStyle`, v40, SS-5): `scripts/check-project-file.sh` group 53 (`EditingStyle.swift`: gate,
   key only with a record, round trips, a broken record dropped), `scripts/check-parameter-limits.sh` → `EditingStyleAppChecks` (a real
   edit_clip records it in the same undo step; another session, a user edit or a no-op records nothing; get_timeline reports it) and

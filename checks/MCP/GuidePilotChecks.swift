@@ -13,8 +13,8 @@ import SrtFlowMCPKit
 
 /// 没有可搬的原文的迁移工具：行为和迁移同一个 PR 改了，旧说明照抄进概要等于叫 AI 用已经没有的东西（add_voiceover：声音方案 4.10、4.2–4.4、
 /// 第十二节 —— 默认 gemini:Charon、去掉 clone_from、不再收 Rachel；旧说明每一句去了哪写在那个 PR 的说明里）；从第一天起就按名片 + 说明书写的
-/// 新工具（声音 PR 6 的 list_voices、manage_voices，声音 PR 9 的 change_voice）。名单写死：加一个要改这里。
-let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion]
+/// 新工具（声音 PR 6 的 list_voices、manage_voices，声音 PR 9 的 change_voice; craft_cards, 2026-11-20）。名单写死：加一个要改这里。
+let pilotToolsWithoutPreviousCard: Set<MCPToolName> = [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion, .craftCards]
 
 /// 迁移前的说明原文有多长（2026-11-10 从迁移前的清单量的，main 8b0d2a5）。overview 以 previousCard 开头是拼出来的、永远成立；
 /// 原文一个字不丢靠这里钉住长度（PR 里另有逐字比对的记录），以后有人删改原文就红。
@@ -107,6 +107,8 @@ private let pilotNature: [MCPToolName: [String]] = [
     .convertSubtitles: ["never overwrites", "needs_confirmation", "or in folder"],
     .recipes: ["Read-only", "which one you follow"],
     .saveRecipe: ["only when they ask", "Trash"],
+    // craft_cards (2026-11-20, SS5 plan 5.6): read-only like recipes; the licence it needs and the order of authority.
+    .craftCards: ["Read-only", "SkyCut Pro or trial", "The user's words"],
     .listCharacters: ["Read-only", "compact summaries", "1 KiB"],
     .getCharacter: ["Read-only"]
 ]
@@ -129,7 +131,7 @@ func runGuidePilotChecks() {
     }
     let withoutPreviousCard = Set(MCPGuideWrittenTopics.migrated.filter { MCPGuideWrittenTopics.topic(for: $0)?.previousCard == nil })
     checkEqual(withoutPreviousCard, pilotToolsWithoutPreviousCard, "only the listed migrated tools have no pre-migration description to keep")
-    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion],
+    checkEqual(pilotToolsWithoutPreviousCard, [.addVoiceover, .listVoices, .manageVoices, .changeVoice, .setMotion, .craftCards],
                "only add_voiceover and tools introduced with a guide have no pre-migration description")
     print("MCP migrated cards: \(cards.joined(separator: ", ")) (limit \(cardLimit), target 350).")
     runGuideFieldSplitChecks()
