@@ -84,14 +84,25 @@ enum SkyCutGates {
     /// Reading one of Sky Studio's editing styles when the licence leaves out `features.recipes` (SS5 plan 5.1): not done,
     /// why, what the user can do, and that the presets and the user's own styles still work. English, like aiRefusal.
     static func styleRefusal(license: SkyCutLicense, problem: SkyStudioProblem?) -> String {
+        contentRefusal("Sky Studio's editing styles", license: license, problem: problem,
+                       still: "The preset styles and the user's own styles still work: pick one of them from recipes.")
+    }
+
+    /// Reading Sky Studio's craft cards (craft_cards, SS5 plan 5.6) without `features.recipes`: the same rule as the styles.
+    static func cardRefusal(license: SkyCutLicense, problem: SkyStudioProblem?) -> String {
+        contentRefusal("Sky Studio's craft cards", license: license, problem: problem, still: "Editing works without them.")
+    }
+
+    /// Sky Studio's content for SkyCut (`what`) needs `features.recipes`: not done, why, what the user can do, what still works.
+    private static func contentRefusal(_ what: String, license: SkyCutLicense, problem: SkyStudioProblem?, still: String) -> String {
         let planLacksThem = license.basis == .server && !license.isMachineLimited && (license.plan == .pro || license.plan == .trial)
-        var sentences = ["Not done: Sky Studio's editing styles need SkyCut Pro or a SkyCut trial, and "
+        var sentences = ["Not done: \(what) need SkyCut Pro or a SkyCut trial, and "
             + (planLacksThem ? "this Sky Studio account's SkyCut plan does not include them." : reason(license) + ".")]
         if let snag = snag(problem) { sentences.append(snag) }
         sentences.append(planLacksThem
             ? "If the user's plan should include them, they email \(SkyStudioLinks.supportEmail)."
             : nextStep(license, problem: problem))
-        sentences.append("The preset styles and the user's own styles still work: pick one of them from recipes.")
+        sentences.append(still)
         return sentences.joined(separator: " ")
     }
 
