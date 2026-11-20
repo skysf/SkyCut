@@ -7,6 +7,8 @@ import Foundation
 // recipe-*.md）和用户存的（~/Library/Application Support/SrtFlow/Recipes/*.md）是同一种格式。
 // Styles published on Sky Studio (2026-11-19, SS5 plan 5.1) join the same list between the presets and the user's own; they
 // carry a version and no body here (the text is read when asked, SkyStudioStyleLibrary), and none of the user's files can shadow one.
+// A header may also say `music: expected` or `music: optional` (2026-11-20): every preset says which; only a preset's is read, by
+// inspect_video (AIDeliveryStyleMusic).
 // 不管什么：从哪读、往哪写（AIRecipeStore）、给 AI 的工具（AIRecipeTools）。
 // 产品决定见 docs/plans/2026-09-27-mcp.md 第 39–41 条，中文稿见 docs/plans/2026-09-28-mcp-recipes.md。
 
@@ -30,6 +32,9 @@ struct AIRecipe: Equatable, Sendable {
     var source: Source
     /// A Sky Studio style's current version (`1.0`); presets and the user's styles have none.
     var version: String? = nil
+    /// The header's `music`: `expected` = true, `optional` = false, absent or anything else = nil. A film cut in a preset that
+    /// expects music and has none at all gets inspect_video's suspect instead of its grey hint (AIDeliveryStyleMusic).
+    var expectsMusic: Bool? = nil
 
     /// 读一份 .md。开头没有 `---` 那一段也照收：标题取第一个「# 」标题，没有就用文件名，id 用文件名。
     /// 正文空的不算一张卡（nil）。
@@ -53,7 +58,9 @@ struct AIRecipe: Equatable, Sendable {
         let heading = lines.first { $0.hasPrefix("# ") }.map { String($0.dropFirst(2)).trimmingCharacters(in: .whitespaces) }
         let id = fields["id"].flatMap(slug) ?? slug(stem) ?? stem
         let title = [fields["title"], heading, stem].compactMap { $0 }.first { !$0.isEmpty } ?? id
-        return AIRecipe(id: id, title: title, useFor: fields["use_for"] ?? fields["when"] ?? "", body: body, source: source)
+        let music: Bool? = ["expected": true, "optional": false][fields["music"]?.lowercased() ?? ""]
+        return AIRecipe(id: id, title: title, useFor: fields["use_for"] ?? fields["when"] ?? "", body: body, source: source,
+                        expectsMusic: music)
     }
 
     /// 写回文件的样子（`parse` 读得回来）。
@@ -61,7 +68,8 @@ struct AIRecipe: Equatable, Sendable {
         func oneLine(_ text: String) -> String {
             text.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespaces)
         }
-        return "---\nid: \(id)\ntitle: \(oneLine(title))\nuse_for: \(oneLine(useFor))\n---\n\(body.trimmingCharacters(in: .whitespacesAndNewlines))\n"
+        let music = expectsMusic.map { "music: \($0 ? "expected" : "optional")\n" } ?? ""
+        return "---\nid: \(id)\ntitle: \(oneLine(title))\nuse_for: \(oneLine(useFor))\n\(music)---\n\(body.trimmingCharacters(in: .whitespacesAndNewlines))\n"
     }
 
     /// 名字 → id（也是文件名）：小写、空白换成短横，只留字母（任何文字）、数字和短横，去掉文件名里不能有的字符。

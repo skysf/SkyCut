@@ -38,6 +38,7 @@ import SrtFlowMCPKit
                     try await DeliveryEdgeChecks.run(project, root: root, require: require)
                 } else if selected == "music" {
                     try await MusicRowChecks.run(project, root: root, require: require)
+                    try await StyleMusicChecks.run(project, root: root, require: require)
                 } else {
                     try await DeliveryChecks.run(project, root: root, require: require, rulesOnly: selected == "rules", screen: false)
                 }
@@ -171,6 +172,8 @@ import SrtFlowMCPKit
             try await DeliveryChecks.run(project, root: root, require: require)
             // Second-tier sound checks (MCP-37 / 38 / 39 in the report): rules on controlled numbers, then the real job.
             try await SoundTierChecks.run(project, root: root, require: require)
+            // No music where the film's editing style expects it (2026-11-20): values, then one short real job.
+            try await StyleMusicChecks.run(project, root: root, require: require)
             // 清掉本次的短试听，避免验收给机器留下合成媒体。
             if let path = auditions.first?["path"]?.stringValue { try? FileManager.default.removeItem(at: URL(fileURLWithPath: path).deletingLastPathComponent()) }
         } catch { failures += 1; print("FAIL: \((error as? AIToolError)?.message ?? error.localizedDescription)") }

@@ -140,6 +140,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["sky_studio", "fetched_at"])
     // The film's editing style (2026-11-19, SS5 plan 5.5): get_timeline's editing_style, recipes' newer_version.
     names.formUnion(["editing_style", "newer_version"])
+    // No music where the film's editing style expects it (2026-11-20, AIDeliveryStyleMusic): inspect_video's suspect kind.
+    names.insert("audio_music_missing")
     return names
 }
 

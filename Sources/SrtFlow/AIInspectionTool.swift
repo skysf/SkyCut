@@ -39,6 +39,8 @@ enum AIInspectionTool {
             attention = AIInspectionFreshness.note(file: url, project: project)
         }
         let style = state.subtitleStyle(appWide: EncodeQueue.burnIn.burnInStyle)
+        // Frozen with the rest: does the editing style the film was cut with expect music (no music = suspect, not hint)?
+        let musicStyle = AIDeliveryStyleMusic.expecting(state.editingStyle)
         let token = ExportCancellationToken()
         let run = Run()
         let job = AIJobs.shared.start(.inspection, progress: { nil }, cancel: { token.cancel(); run.task?.cancel() })
@@ -49,8 +51,8 @@ enum AIInspectionTool {
             do {
                 try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
                 let result = try await inspect(state, style: style, scope: scope, named: named, file: input, attention: attention,
-                                               db: db, minimum: minimum, image: image, sounds: sounds, folder: folder, token: token,
-                                               job: job.id, generation: generation, session: session)
+                                               db: db, minimum: minimum, image: image, sounds: sounds, musicStyle: musicStyle,
+                                               folder: folder, token: token, job: job.id, generation: generation, session: session)
                 if token.isCancelled { throw CancellationError() }
                 job.images = result.images
                 AIJobs.shared.finish(job, .done, detail: result.payload)
@@ -68,8 +70,9 @@ enum AIInspectionTool {
 
     private static func inspect(
         _ state: TimelineState, style: BurnInStyle, scope: AIInspection.Scope, named: ClosedRange<Double>?, file: URL?,
-        attention: String?, db: Double, minimum: Double, image: Bool, sounds: AIDeliverySoundRoles.Request, folder: URL,
-        token: ExportCancellationToken, job: String, generation: Int, session: String?
+        attention: String?, db: Double, minimum: Double, image: Bool, sounds: AIDeliverySoundRoles.Request,
+        musicStyle: AIDeliveryStyleMusic.Style?, folder: URL, token: ExportCancellationToken, job: String, generation: Int,
+        session: String?
     ) async throws -> AIToolResult {
         let ids = AIShortIDs(state: state)
         let config = AudioEngineConfig.make(from: state, measuringSceneCompensation: false)
@@ -93,7 +96,7 @@ enum AIInspectionTool {
         try cancelled(token)
         let all = try await AIDeliveryChecks.run(.init(state: state, scope: scope, style: style, config: config, measurement: measurement,
             spoken: spoken, picture: picture.findings, sourceSpeech: sourceSpeech, attention: attention,
-            silenceDB: db, minimum: minimum, file: file != nil, sound: sound))
+            silenceDB: db, minimum: minimum, file: file != nil, sound: sound, musicStyle: musicStyle))
         let reviewed = AIInspectionReview.partition(all, state: state, job: job, generation: generation, session: session)
         // Grey hints are listed apart from the suspects: no evidence slots, not counted with them (FL-61).
         let hints = reviewed.findings.filter { AIDeliveryChecks.hintKinds.contains($0.kind) }

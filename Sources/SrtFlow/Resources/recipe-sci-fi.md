@@ -2,6 +2,7 @@
 id: sci-fi
 title: Sci-fi
 use_for: Tech products, AI and future topics, space, cyberpunk cities, game promos.
+music: expected
 ---
 # Sci-fi
 

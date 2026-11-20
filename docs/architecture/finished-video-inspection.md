@@ -355,7 +355,8 @@ The rest of MCP-40's second tier: four rows of the production research's `check_
 | `audio_music_drops` | Music heard (above −45 dBFS) within the last 3 s, a voice speaking (voice group above −35 dBFS) and the music more than 22 dB under it, for 2 s or more | Rule 11; the user on the fourth draft's 0:57 ("like the music suddenly died"); the shared rules dip about 10 dB |
 | `audio_music_late` | The video has music, but it is first heard more than 3 s after the first picture; an opening line (a transcript or narration sentence, or a line of the voice check) starting inside those 3 s moves the deadline to 3 s after the line ends. Judged only when the measured frames reach the deadline | Rule 5; the shared rules' Voice and music 4 for the opening line |
 | `audio_no_score` | The video has music somewhere, and for 15 s or more there is neither music nor a long tone or riser: an effect lasting 3 s or more, heard above −50 dBFS within 0.5 s (SkyCut can't name an effect's kind; length stands in for it). A reminder | Rule 5 |
-| `audio_no_music` | No music anywhere in a video of 15 s or more: a grey hint in `hints`, attached to no clip (`AIDeliveryChecks.wholeFilmKinds`), never a suspect. Fine for a talk, an interview or a tutorial | The shared rules make music optional ("With music…") |
+| `audio_no_music` | No music anywhere in a video of 15 s or more: a grey hint in `hints`, attached to no clip (`AIDeliveryChecks.wholeFilmKinds`). Fine for a talk, an interview or a tutorial. When the film's editing style expects music it is `audio_music_missing` instead (next row) | The shared rules make music optional ("With music…") |
+| `audio_music_missing` | The same, when the editing style the film was cut with expects music: a suspect, attached to no clip, naming the style (`style`) | The user, 2026-11-20 (by style); "No music where the style expects it" below |
 | `audio_music_edge` | A music clip starting or stopping without a fade of 0.3 s or more, above −40 dBFS over the 0.3 s inside the edge, more than 6 frames from the nearest event: a picture cut (to or from black too), the first picture appearing, a title (visible text) appearing, or a line spoken in a picture's own sound starting or ending (transcripts or narration subtitles: SkyCut's stand-in for the research's events inside a shot). Not judged in the film's first 0.05 s or last 0.1 s, where the same file carries on in the next clip, where another music clip plays across the edge (0.3 s each side) and is heard there above −40 dBFS, or where the music's own hit is at the edge (a music accent within 3 frames: placed on purpose, most likely on something in the picture SkyCut can't see) | Rule 6; the human film's one case (1:37.23, a piece entering 17 frames before a cut, no accent within 0.7 s). The own-hit exception is what matches the research on its other entries: the human film's 1:03.20 (on Sky starting to speak, the research's in-shot event) and the second draft's 39.43 and 46.73 (on the board's moments) each start on a hit 1–2 frames in |
 | `audio_abrupt` | An effect or an object whose loudest 0.1 s cell is at least −30 dBFS and 15 dB or more over the median, across the 3 s each side, of everything else (the role groups added up, minus the sound itself), more than 6 frames from a picture event. A reminder | Rule 12; the research counted cuts only, titles count here too because the shared rules land a title on a big hit |
 
@@ -389,3 +390,49 @@ Manual regression before release:
       start it earlier, inspect again.
 - [ ] A piece entering hard between two cuts: reported with its frames from the nearest cut; move it onto the cut or fade it in.
 - [ ] A loud hit away from any cut or title: a reminder; put it on the cut, or mark it intentional.
+
+## No music where the style expects it (2026-11-20)
+
+The user's decision on V2's open question (「按风格定」): a film with no music at all is a suspect when the style it was cut with expects
+music — trailer-like styles — and stays the grey hint otherwise (a documentary, an interview, a tutorial, a film in no style). Same
+rule as `audio_no_music` (no music anywhere, at least one sound, 15 s or more; `AIDeliveryMusic.noMusic`), another kind:
+`audio_music_missing`, listed with the suspects, attached to no clip (`wholeFilmKinds`), with the style in `style` and in the reason,
+and marked intentional like any finding (its own kind, so a mark on the hint never hides the suspect, nor the reverse).
+
+Which style: the one the film records (`TimelineState.editingStyle`, [project file](video-edit-project-file.md) v40), read once when
+the inspection starts (`AIDeliveryStyleMusic.expecting`, frozen with the rest of the job). Each style says whether it expects music in
+one place:
+
+- A preset in its header, `music: expected` or `music: optional` (`AIRecipe.expectsMusic`): cinematic-opening and sci-fi expect
+  music (both trailers by their own bar: "a trailer feel", "a game or tech-launch trailer"; titles land on the music's accents);
+  documentary, daily-vlog and product-promo say optional (the latter two use no music when nothing fits).
+- A Sky Studio style in the manifest's `expects_music` (a JSON boolean) when Sky Studio publishes it; it does not yet (a style's
+  allowlisted meta is `use_for` and `min_skycut_version`). Until then `AIDeliveryStyleMusic.skyStudioExpectingMusic`, by id:
+  `film-trailer`. What the manifest says wins over the list, either way.
+- The user's own styles, a preset the user replaced (their text is what was followed, and save_recipe never writes a music line),
+  a style SkyCut no longer knows, and no recorded style: no expectation, the grey hint.
+
+An imported music file SkyCut can't name is "other", so the reason tells the AI that music counts once it is named
+(`edit_clip sound_role music`, or `sounds`).
+
+Checks. `checks/VideoInspection/StyleMusicChecks.swift` (`SRTFLOW_INSPECTION_CASE=music` and the full run): which records expect
+music on values (both preset answers, a preset that is gone, film-trailer by the list listed or not, the manifest winning either way,
+an unknown Sky Studio style, the user's styles, none), the rule's suspect and its lines, the App's own answer from its presets
+(`scripts/check-video-inspection.sh` copies them into the check App where the packaged App has them), and one real job on 16 s of
+sound that is not music in a cinematic-opening film: the suspect in findings with no clip and no grey hint, marked intentional
+through the tool, then out of findings and in the intentional list through the report's partition. One job only: the binary links
+the debug build and has a 480 s deadline; the documentary film's hint is the rule without a style with the App's answer for it.
+`scripts/check-mcp.sh` (`RecipeChecks`): the header's two words, `fileText` keeping the line, every preset saying one, and exactly
+cinematic-opening and sci-fi expecting music. `scripts/check-sky-studio.sh` (`StyleContentChecks`): `expects_music` read only as a
+boolean.
+
+Reverse controls (2026-11-20), each restored afterwards: the registry not passing the style fails the real job's suspect and its
+mark (2); cinematic-opening without its music line fails the App's answer, the job's suspect and its mark (3) and `RecipeChecks`'
+header and pinned set (2); the manifest's `expects_music` ignored fails "the manifest wins" (1) and, not read at all, the manifest
+check (1); `audio_music_missing` listed as a hint fails the rule's listing, the job's suspect and its mark (3). Without its name in
+`catalogKnownNames` the guide's music section fails `scripts/check-mcp.sh`.
+
+Manual regression before release:
+
+- [ ] Ask the AI for a trailer from footage without music (film-trailer or cinematic-opening) and inspect: `audio_music_missing`
+      names the style; add music and it is gone. The same footage cut as a documentary: only the grey hint.

@@ -9,6 +9,7 @@ import SrtFlowMCPKit
 // 卡里讲生成素材、花积分的话（条件句、报价、确认码、每日硬上限、档位）和现行合同对不对得上在 RecipeContractChecks.swift。
 // Since 2026-11-19 (MCP-41): the shared rules keep pointing at the tools built for each job (toolRouteChecks), and no recipes
 // answer outgrows Claude Code's 10,000-token warning (answerSizeChecks).
+// Since 2026-11-20 every preset's header says music: expected or optional, and the ones expecting it are pinned (builtInChecks).
 // 编法见 scripts/check-mcp.sh。
 
 func runRecipeChecks() {
@@ -38,6 +39,16 @@ private func formatChecks() {
     var multiLine = AIRecipe(id: "a", title: "A\nB", useFor: "one\ntwo", body: "x", source: .user)
     multiLine = AIRecipe.parse(multiLine.fileText, fileName: "a.md", source: .user) ?? multiLine
     checkEqual(multiLine.useFor, "one two", "use_for is written on one line")
+    // A header's music (2026-11-20, inspect_video's no-music row by style, AIDeliveryStyleMusic): only the two words count.
+    func music(_ line: String) -> Bool?? {
+        AIRecipe.parse("---\nid: m\n\(line)\n---\nCut.", fileName: "m.md", source: .builtIn).map(\.expectsMusic)
+    }
+    check(music("music: expected") == .some(true) && music("Music: Optional") == .some(false), "music: expected / optional is read")
+    check(music("music: yes") == .some(nil) && music("use_for: x") == .some(nil), "any other word, or no music line, says nothing")
+    if var scored = recipe {
+        scored.expectsMusic = true
+        checkEqual(AIRecipe.parse(scored.fileText, fileName: "x.md", source: .user), scored, "fileText keeps a music line")
+    }
     checkEqual(AIRecipe.slug("Course Promo!"), "course-promo", "slug: lower case, spaces to dashes, symbols dropped")
     checkEqual(AIRecipe.slug("课程推广"), "课程推广", "slug keeps Chinese")
     checkEqual(AIRecipe.slug("a/b:c"), "abc", "slug drops characters a file name cannot have")
@@ -135,7 +146,12 @@ private func builtInChecks() {
     checkEqual(builtIn.map(\.id).sorted(), AIRecipeCatalog.builtInOrder.sorted(), "the five built-in recipes are in the app")
     for recipe in builtIn {
         check(!recipe.useFor.isEmpty && !recipe.title.isEmpty, "\(recipe.id) says when to use it and has a title")
+        check(recipe.expectsMusic != nil, "\(recipe.id) says music: expected or optional in its header")
     }
+    // The user's decision (2026-11-20): the trailer-like presets expect music, so a film cut in one with no music at all is
+    // inspect_video's suspect; the documentary, the vlog and the promo keep the grey hint (music optional there).
+    checkEqual(builtIn.filter { $0.expectsMusic == true }.map(\.id).sorted(), ["cinematic-opening", "sci-fi"],
+               "the presets that expect music are the trailer-like ones")
     let shared = AIBuiltInRecipes.sharedRules(from: [resources])
     check(shared.contains("Rules for every recipe"), "the shared rules are in the app")
     let known = catalogKnownNames()

@@ -2,6 +2,7 @@
 id: documentary
 title: Documentary
 use_for: Travel, nature, culture, expeditions, interview stories, stories about people and companies.
+music: optional
 ---
 # Documentary
 

@@ -66,6 +66,9 @@ struct SkyStudioContentManifest: Equatable, Sendable {
         var version: String
         var sha256: String
         var minSkyCutVersion: String?
+        /// `expects_music` when Sky Studio publishes it (a JSON true or false; not yet): inspect_video's no-music row
+        /// (AIDeliveryStyleMusic). nil = not said.
+        var expectsMusic: Bool? = nil
     }
 
     var release: Int
@@ -85,7 +88,8 @@ struct SkyStudioContentManifest: Equatable, Sendable {
                   let sha = entry["sha256"]?.stringValue, SkyStudioContentRules.isChecksum(sha) else { return nil }
             let title = entry["title"]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             return Style(id: id, title: title.isEmpty ? id : title, useFor: entry["use_for"]?.stringValue ?? "",
-                         version: version, sha256: sha, minSkyCutVersion: entry["min_skycut_version"]?.stringValue)
+                         version: version, sha256: sha, minSkyCutVersion: entry["min_skycut_version"]?.stringValue,
+                         expectsMusic: entry["expects_music"]?.boolValue)
         }
         cards = SkyStudioCardCatalog(json: json["cards"])
         raw = json
