@@ -82,6 +82,17 @@ RECORDED_CLICK_WHILE_PLAYING = dict(
 )
 
 
+# The M1 before the 2026-11-20 hover player (gate run of PR #536's bench on main's code): Play while hovering waited for
+# the playhead's 4K mid-GOP frame to be decoded again, in step but 0.6 s late, after re-priming the picture.
+RECORDED_HOVER_WAIT = dict(
+    audioMs=[584.2, 593.4, 591.1, 590.7, 585.1],
+    videoMs=[606.3, 616.7, 605.7, 615.8, 605.6],
+    onsetGapMs=[22.1, 23.3, 14.6, 25.1, 20.6],
+    startOffsetMs=[-11.2, -10.0, -18.7, -8.2, -12.7],
+    maxSkewMs=[11.2, 10.0, 18.7, 8.2, 12.7],
+)
+
+
 class PlaybackGateTests(unittest.TestCase):
     def test_recorded_m1_freezes_fail_hosted_and_local_scoring(self):
         samples = batch(5)
@@ -92,8 +103,21 @@ class PlaybackGateTests(unittest.TestCase):
         self.assertTrue(any("resume: 3 of 5 launches had picture and sound 500 ms" in error for error in errors))
         self.assertTrue(any("peek-play median: onsetGapMs" in error for error in errors))
         self.assertEqual(len(strict(samples, BUDGETS["strict"])), 6)
-        # Before the fix a Play while hovering also skipped the placement of the picture.
-        self.assertTrue(validate_trial("peek-play", trial("peek-play", videoPrerolls=0)))
+
+    def test_play_after_a_hover_starts_without_waiting_for_a_decode(self):
+        # Since 2026-11-20 a hover runs on its own player: Play during or right after it primes nothing and starts like a
+        # placed playhead. Before, it waited for the playhead's frame, in step but 0.6 s late: in budget then, red now.
+        samples = batch(5)
+        for name in ("peek-play", "peek-end-play"):
+            samples[name] = [trial(name, **{metric: values[index] for metric, values in RECORDED_HOVER_WAIT.items()},
+                                   videoPrerolls=1) for index in range(5)]
+        errors, _ = evaluate(samples, BUDGETS)
+        for name in ("peek-play", "peek-end-play"):
+            self.assertTrue(any(f"{name} median: audioMs" in error for error in errors))
+            self.assertTrue(any(f"{name}: 0/5 whole launches" in error for error in errors))
+            self.assertTrue(validate_trial(name, samples[name][0]))
+            self.assertEqual(validate_trial(name, trial(name)), [])
+        self.assertEqual(strict(samples, BUDGETS["strict"]), [])
 
     def test_the_slowest_healthy_hosted_cold_open_passes_after_confirmation(self):
         launches = [trial("cold-open", **{metric: values[index] for metric, values in SLOW_HOSTED_COLD_OPEN.items()},

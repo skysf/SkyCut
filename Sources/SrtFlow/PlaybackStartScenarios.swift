@@ -21,6 +21,7 @@ enum PlaybackStartScenarios {
             Scenario(name: "seek-play", position: PlaybackStartFixture.farSeek),
             Scenario(name: "resume", position: PlaybackStartFixture.freshItem),
             Scenario(name: "peek-play", position: PlaybackStartFixture.freshItem),
+            Scenario(name: "peek-end-play", position: PlaybackStartFixture.freshItem),
             Scenario(name: "play-seek", position: PlaybackStartFixture.farSeek),
             Scenario(name: "near-end", position: duration - 2),
             Scenario(name: "end-replay", position: duration),
@@ -54,14 +55,12 @@ enum PlaybackStartScenarios {
             project.clock.togglePlayback()
             try await Task.sleep(for: .milliseconds(400))
             return project.clock.time
-        case "peek-play":
-            // The pointer hovers an earlier part of the timeline when Play is pressed: play from the playhead.
+        case "peek-play", "peek-end-play":
+            // The pointer hovers the 1080p opening with the playhead in the 4K source, and Play is pressed while it is
+            // still there (`peek-play`) or right after it left the timeline (`peek-end-play`): play from the playhead.
             try await place(project, probe: probe, at: position, frame: frame)
-            project.clock.peek(at: PlaybackStartFixture.peek)
-            try await PlaybackStartBench.wait("hover picture at \(PlaybackStartFixture.peek)") {
-                guard let displayed = probe.displayed else { return false }
-                return abs(displayed.timeline - PlaybackStartFixture.peek) < frame * 0.95
-            }
+            try await hover(project, probe: probe, at: PlaybackStartFixture.peek, playhead: position, frame: frame)
+            if scenario.name == "peek-end-play" { project.clock.endPeek() }
         case "play-seek":
             // Playing in the 4K source, then a click far ahead into a later GOP (`action`): picture and sound land
             // there together, the decode at the click included.
@@ -82,6 +81,23 @@ enum PlaybackStartScenarios {
     static func action(for scenario: Scenario, project: VideoEditProject) -> () -> Void {
         guard scenario.name == "play-seek" else { return { project.clock.togglePlayback() } }
         return { project.seekFromTimeline(time: scenario.position) }
+    }
+
+    /// A hover shows on its own player (`HoverPreview`): its frame is on screen, and the editing picture is still the
+    /// playhead's, placed and primed for Play (docs/architecture/playback-start.md "Hover").
+    private static func hover(
+        _ project: VideoEditProject, probe: PlaybackStartVideoProbe, at peek: Double, playhead: Double, frame: Double
+    ) async throws {
+        project.clock.peek(at: peek)
+        let hover = project.clock.hover
+        try await PlaybackStartBench.wait("hover picture at \(peek)") {
+            hover.isShowing && abs((hover.shownTime ?? -1) - peek) < 0.001
+        }
+        // The click's placement goes on under the hover and primes the editing picture for Play.
+        try await PlaybackStartBench.wait("placement under the hover") { !project.clock.isPositioningPreview }
+        guard let displayed = probe.displayed, abs(displayed.timeline - playhead) < frame * 0.95, hover.isShowing else {
+            throw PlaybackStartBench.Failure("The hover moved the editing picture (\(state(project, probe: probe)))")
+        }
     }
 
     /// Between two scenarios: the previous one's pause (and a failed trial's pending Play) has settled before the next

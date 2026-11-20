@@ -15,7 +15,9 @@ final class PlayerClock: ObservableObject {
     @Published private(set) var isPlaying = false
     /// 悬停预览（peek）此刻指着哪：非 nil 时画面显示的是这里的帧，而 `time`
     /// （真播放头）原地不动。时间线用它画那根半透明的影子指针。
-    @Published private(set) var peekTime: TimeInterval?
+    @Published private(set) var peekTime: TimeInterval? { didSet { if peekTime == nil { hover.hide() } } }
+    /// With the engine a hover has its own player (`HoverPreview`): this one stays placed and primed at the playhead.
+    let hover = HoverPreview()
 
     /// 播放头被放到了哪儿（`seek`、换片、卸片）。播放把它带着走的时间回调不发这里。
     let placed = PassthroughSubject<PlayheadPlacement, Never>()
@@ -504,8 +506,14 @@ final class PlayerClock: ObservableObject {
     /// 和拖动扫帧同一条路（docs/bugfixes/2026-08-03-scrub-preview-keyframe-snap.md）。
     func peek(at seconds: TimeInterval) {
         guard !playbackRequested else { return }
-        invalidatePreviewSeek()
         let clamped = max(0, seconds)
+        // With the engine the hover has its own player, so Play after a hover starts at once (playback-start.md "Hover").
+        if audioSource != nil, let item = player.currentItem {
+            hover.show(at: clamped, of: item)
+            peekTime = clamped
+            return
+        }
+        invalidatePreviewSeek()
         peekTime = clamped
         scrub(to: clamped)
     }
@@ -513,16 +521,11 @@ final class PlayerClock: ObservableObject {
     /// 悬停结束：影子指针消失，画面滚回播放头。没在 peek 时是无害的 no-op。
     func endPeek() {
         guard peekTime != nil else { return }
+        let ownPlayer = hover.isHovering
         peekTime = nil
-        guard audioSource != nil, player.currentItem != nil else {
-            scrub(to: time)
-            return
-        }
-        // Back on the playhead with a placed picture, primed unless the item is new, ready for Play (a scrub would
-        // leave it unprimed).
-        scrubber.cancelPending()
-        invalidatePreviewSeek()
-        positionPreview(at: CMTime(seconds: time, preferredTimescale: 600), seconds: time)
+        // A hover on its own player never moved this one: it is still placed and primed at the playhead. Without the
+        // engine (or before the first item) the hover moved this player, and the scrub brings it back.
+        if !ownPlayer { scrub(to: time) }
     }
 
     /// Return / Home：播放头回到开头。正在播就从开头接着播（`seek` 不改播放状态），停着就停在 0，
@@ -545,7 +548,7 @@ final class PlayerClock: ObservableObject {
         } else {
             // 悬停预览把画面带去了别处：播放必须从**播放头**起，先precise跳回去。
             // seek 后紧跟 play 是安全的（play 不取消在飞的 seek，完成后从目标续播）。
-            // With the engine, `play()` places and primes the picture at the playhead before either clock starts.
+            // With the engine the hover was on its own player: clearing `peekTime` hides it, this picture never moved.
             if peekTime != nil {
                 peekTime = nil
                 scrubber.cancelPending()

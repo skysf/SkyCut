@@ -35,6 +35,7 @@ xcrun swiftc \
   Sources/SrtFlow/PlayerClockObservers.swift \
   Sources/SrtFlow/PreviewReadiness.swift \
   Sources/SrtFlow/ChainedScrub.swift \
+  Sources/SrtFlow/HoverPreview.swift \
   Sources/SrtFlow/VideoDriftCheck.swift \
   Sources/SrtFlow/PlaybackTimeEstimate.swift \
   Sources/SrtFlow/PlaybackStartSync.swift \
@@ -50,6 +51,7 @@ xcrun swiftc \
   checks/PlayerClock/DetachChecks.swift \
   checks/PlayerClock/AudioSourceChecks.swift \
   checks/PlayerClock/SyncedStartChecks.swift \
+  checks/PlayerClock/HoverChecks.swift \
   checks/PlayerClock/LandingChecks.swift \
   checks/PlayerClock/AudioTimelineChecks.swift \
   "$BUILD_DIR"/SrtFlowCore.build/*.o

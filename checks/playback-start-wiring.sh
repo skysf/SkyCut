@@ -13,6 +13,7 @@ surface=Sources/SrtFlow/VideoEditPlayheadFollowers.swift
 layerHost=Sources/SrtFlow/PlayerViewRepresentable.swift
 bench=Sources/SrtFlow/PlaybackStartBench.swift
 scenarios=Sources/SrtFlow/PlaybackStartScenarios.swift
+hover=Sources/SrtFlow/HoverPreview.swift
 workflow=.github/workflows/checks.yml
 failed=0
 
@@ -179,7 +180,7 @@ if ! awk '
   fail "Play must place and prime the picture before starting the sound, and never re-seek it while starting"
 fi
 
-# A pause leaves the picture positioned where it stopped; a hover that ends places it back on the playhead.
+# A pause leaves the picture positioned where it stopped.
 hold="$(body "${clock}" '    private func holdPausedPicture(')"
 if ! body "${clock}" '    func pause(' | grep -F 'holdPausedPicture(stoppedAt: nil)' >/dev/null ||
   ! grep -F 'if clock.pausedPictureRequested, clock.player.rate == 0 { clock.holdPausedPicture(stoppedAt: cmTime) }' \
@@ -192,8 +193,22 @@ if ! body "${clock}" '    func pause(' | grep -F 'holdPausedPicture(stoppedAt: n
 ' <<<"${hold}"; then
   fail "Pausing playback must keep the playhead, the sound and a positioned picture on the paused frame"
 fi
-if ! body "${clock}" '    func endPeek(' | grep -F 'positionPreview(at: CMTime(seconds: time' >/dev/null; then
-  fail "Ending a hover must place and prime the picture back on the playhead"
+# With the engine a hover runs on its own player, built on the preview item's asset and video composition: the editing
+# picture stays placed and primed at the playhead, and the hover's end only hides the hover picture
+# (docs/architecture/playback-start.md "Hover").
+peek="$(body "${clock}" '    func peek(')"
+if ! awk '
+  /if audioSource != nil, let item = player.currentItem [{]/ { routed = NR }
+  /hover\.show\(at: clamped, of: item\)/ { show = NR }
+  /return/ { if (show && !back) back = NR }
+  /invalidatePreviewSeek\(\)|scrub\(to: clamped\)/ { if (!touched) touched = NR }
+  END { exit !(routed && show > routed && back > show && touched > back) }
+' <<<"${peek}" ||
+  ! grep -qF '@Published private(set) var peekTime: TimeInterval? { didSet { if peekTime == nil { hover.hide() } } }' "${clock}" ||
+  ! body "${clock}" '    func endPeek(' | grep -F 'if !ownPlayer { scrub(to: time) }' >/dev/null ||
+  ! grep -qF 'let hoverItem = AVPlayerItem(asset: item.asset)' "${hover}" ||
+  ! grep -qF 'hoverItem.videoComposition = item.videoComposition' "${hover}"; then
+  fail "A hover with the engine must run on its own player and leave the editing picture placed at the playhead"
 fi
 
 finish="$(body "${clock}" '    private func finishPreviewPosition(')"

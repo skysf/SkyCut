@@ -62,6 +62,10 @@ xcrun swiftc \
   Sources/SrtFlow/PlayerLayerView.swift \
   Sources/SrtFlow/VideoEditCoverFilters.swift \
   Sources/SrtFlow/VideoEditCoverPreview.swift \
+  Sources/SrtFlow/HoverPreview.swift \
+  Sources/SrtFlow/HoverPreviewSurface.swift \
+  Sources/SrtFlow/ChainedScrub.swift \
+  Sources/SrtFlow/PreviewReadiness.swift \
   Sources/SrtFlow/VideoEditClipVisibility.swift \
   Sources/SrtFlow/VideoEditTransitionHandles.swift \
   Sources/SrtFlow/VideoEditFadeWindow.swift \

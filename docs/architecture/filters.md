@@ -122,6 +122,11 @@ out = lerp(identity, LUT, s) 查表  ==  lerp(in, LUT(in), s)
 **盖一块（模糊 / 马赛克）在调色之后、形状之前**（[盖一块](cover-blur-mosaic.md)）：预览里它是同一个播放器再开的第二层，这一层看不到播放器视图上的
 `contentFilters`，所以它的滤镜链先带上调色再盖；导出里它接在 `lut3d` 链后面（`VideoEditCoverExport`，调色那段已搬到 `VideoEditGradeExport`）。
 
+**The hover picture is graded the same way** (since 2026-11-20). A hover runs on its own player
+([playback start, "Hover"](playback-start.md#hover)). `HoverPreviewSurface` puts the grade at the hover's time on its
+own `PlayerLayerView` with its own `FilterStackAttachment`. Each surface needs its own attachment: the attachment
+skips a stack equal to the one it last applied. `scripts/check-cover-preview-attach.sh` compares the two pictures.
+
 ## 两条管线的对齐点
 
 | | 预览 | 导出 |

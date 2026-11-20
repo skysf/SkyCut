@@ -163,6 +163,9 @@ CI 虚拟机上偶尔有一个**不发任何窗口 / App 通知**的系统事件
 
 两种都用比对器打印的「全部实测值」整份替换 `baseline.json`。
 
+One exception so far: the hover memory item of section 十五 was registered together with the product change it
+measures (2026-11-20, approved by the user).
+
 ## 八、已知盲区
 
 - 数的是「件数」，不是「每件多贵」：一次重算一个小图标和一次重算整条时间线记一样的数。
@@ -360,3 +363,37 @@ Observation。以前工程上任何一个 `@Published` 一写，33 个 `@Observe
 原片同样的层数（`scripts/check-preview-composition.sh` 第 0d 组钉着），所以计数不因为换源而变。冒烟不关：转码、补探、量解码速度都
 登记了 `PerfCounters.backgroundReadBegan / Ended`，`settle` 会等它们做完再量；转码的进度只有工具条的 `OptimizedMediaMenu` 订阅
 （第十节：只有一个小视图关心的状态不放在工程上发）。见 [优化媒体](optimized-media.md)。
+
+## 十五、Hovering: its own player and its memory (2026-11-20, approved by the user)
+
+**What the user approved.** On 2026-11-20 the user chose a separate player for the hover preview: Play after a hover
+starts at once instead of waiting for the playhead's frame, at about 50 MB more memory while hovering. The verbatim
+answer was 「做，多 50 MB 可以 (Recommended)」
+([playback start, "Hover"](playback-start.md#hover)). That approval covers **only the hover**:
+
+- the hover's memory is a gated item of its own, `<scenario>.hover.peakMB`;
+- every other item keeps the rule of section 五: it only goes down. The scenarios' `memory.peakMB` is read before
+  the hover phase and means what it always did.
+
+**The hover phase** (`PreviewBenchHover`) runs last in both scenarios. The pointer stops at 8 evenly spaced points
+through the timeline's own entry, `PlayerClock.peek`. Each stop waits for its frame on the hover player, then the
+pointer leaves (`endPeek`). The phase's body / update / canvas counts and CPU time are reported only, like the real
+playback. `<scenario>.hover.peakMB` is the highest footprint sampled every 20 ms while hovering, with the same 10%
+tolerance as the other memory items. `<scenario>.hover.beforeMB` (reported only) is the footprint just before the
+first stop.
+
+**Why one PR, against section 七.** The phase came with the product change it measures, because the old hover
+(scrubbing the editing player) had no item of its own to compare. The local A/B below stands in for its value; the
+baseline holds the hosted value measured with the hover player (basic HOVER_BASIC MB, busy HOVER_BUSY MB).
+
+**Numbers** (M1, the same bench on both builds, 1 s at each stop):
+
+| Measure | Old hover (editing player) | Hover player |
+| --- | --- | --- |
+| busy, peak while hovering | 205.5 / 228.0 MB | 215.1 / 276.3 MB |
+| busy, above the footprint before hovering | +9.7 / +0.6 MB | +18.0 / +48.0 MB |
+| playback-start fixture, first hover over 4K | −1.2 MB | +43.0 MB |
+| playback-start fixture, first hover over 1080p | −8.1 MB | +11.5 MB |
+
+The hover item is released `HoverPreview.releaseDelay` (3 s) after a hover ends; scenarios that do not hover never
+create it.
