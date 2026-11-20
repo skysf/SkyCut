@@ -1,7 +1,7 @@
 {
   "format": "skycut-published-names/1",
-  "release": 1,
-  "published_at": "2026-11-19T22:09:41.092Z",
+  "release": 2,
+  "published_at": "2026-11-20T05:27:11.259Z",
   "items": [
     {
       "kind": "style",
@@ -24,6 +24,1284 @@
         "set_keyframes",
         "set_transition",
         "set_transition sound=cut"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "110",
+      "version": "1",
+      "names": [
+        "look",
+        "look files=<value>",
+        "look times=<value>",
+        "set_filter preset=coldWhite|flatGrey strength=0.4–0.8",
+        "set_filter preset=nightGold|inkShadow strength=0.4–0.8",
+        "set_shape kind=rectangle filled=true color=#00000080"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "111",
+      "version": "1",
+      "names": [
+        "edit_clip flip_horizontal=true",
+        "generate_media film.shot.entry.lighting",
+        "generate_media film.shot.exit.lighting",
+        "get_status film_contract=true",
+        "look files=<value>",
+        "look times=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "112",
+      "version": "1",
+      "names": [
+        "generate_media character_id=<id>",
+        "set_filter preset=coldIron|inkShadow",
+        "set_filter preset=mistBlue"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "113",
+      "version": "1",
+      "names": [
+        "generate_media film.context.light_source=practical|daylight|mixed|none",
+        "lighting",
+        "look files=<value>",
+        "look times=<value>",
+        "set_filter"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "201",
+      "version": "4",
+      "names": [
+        "add_clips",
+        "edit_clip rotation=5 scale=1.16",
+        "edit_clip speed=0.5 ripple=true",
+        "edit_clip volume_curve",
+        "look files=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "202",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "edit_clip flip_horizontal=true",
+        "edit_clip source_out ripple=true",
+        "generate_media film.shot.exit.gaze film.shot.exit.screen_direction",
+        "get_status film_contract=true",
+        "get_timeline",
+        "look times=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "203",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "edit_clip region=<rect> fit=fill",
+        "edit_clip source_in",
+        "look size=large",
+        "source_out",
+        "upscale_clip"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "204",
+      "version": "1",
+      "names": [
+        "edit_clip rotation=5 scale=1.16",
+        "edit_clip rotation=<degrees>",
+        "look",
+        "look size=large",
+        "region",
+        "scale"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "205",
+      "version": "1",
+      "names": [
+        "edit_clip region=<rect>",
+        "look",
+        "look size=large",
+        "set_keyframes",
+        "set_shape kind=rectangle filled=true color=#00000080"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "206",
+      "version": "1",
+      "names": [
+        "edit_clip source_in",
+        "look clip_id=<id> count=6",
+        "look file=<path> count=6",
+        "look size=large",
+        "set_shape kind=blur",
+        "source_out"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "207",
+      "version": "1",
+      "names": [
+        "edit_clip region=<rect> fit=fill",
+        "look size=large",
+        "set_shape kind=rectangle filled=true color=#000000 x=0.06 y=0.5 width=0.12 height=1"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "208",
+      "version": "1",
+      "names": [
+        "edit_clip source_in=<s> source_out=<s>",
+        "look clip_id=<id> count=6",
+        "look file=<path> count=6"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "209",
+      "version": "1",
+      "names": [
+        "easeInOut",
+        "set_keyframes clip_id=<id> relative=true scale=<value> position=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "210",
+      "version": "2",
+      "names": [
+        "generate_media kind=image operation=camera_angle camera_angle.zoom=<value>",
+        "generate_media kind=image_to_video",
+        "image",
+        "last_image",
+        "set_keyframes clip_id=<id> relative=true scale=<value>",
+        "set_keyframes easing=snap"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "211",
+      "version": "1",
+      "names": [
+        "edit_clip exit=fade exit_duration=1–2",
+        "generate_media kind=image_to_video",
+        "image",
+        "last_image",
+        "set_keyframes clip_id=<id> relative=true scale=<value>",
+        "set_transition type=blackFade"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "212",
+      "version": "1",
+      "names": [
+        "edit_clip region=<rect> fit=fill",
+        "look",
+        "position",
+        "scale",
+        "set_keyframes clip_id=<id> relative=true scale=<value>",
+        "set_text x=<x> y=<y>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "213",
+      "version": "1",
+      "names": [
+        "add_clips track=new_video",
+        "edit_clip source_out=<s> ripple=true",
+        "edit_clip x=<x> y=<y> scale=<s>",
+        "generate_media kind=image operation=remove_background image=<file>",
+        "generate_media quote_only=true",
+        "get_timeline",
+        "set_keyframes position"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "214",
+      "version": "1",
+      "names": [
+        "add_clips track=new_video",
+        "edit_clip opacity=0.25–0.4 fit=fill",
+        "look size=large"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "215",
+      "version": "1",
+      "names": [
+        "edit_clip source_out=<s>",
+        "scale",
+        "set_keyframes position=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "216",
+      "version": "1",
+      "names": [
+        "generate_media kind=image operation=camera_angle image=<file> camera_angle.tilt=<value> quote_only=true",
+        "generate_media kind=image_to_video image=<file>",
+        "look"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "217",
+      "version": "1",
+      "names": [
+        "set_filter preset=warmSun|mistBlue|fadedFilm strength=0.4–0.8"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "218",
+      "version": "1",
+      "names": [
+        "look file=<path> size=large",
+        "look files=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "219",
+      "version": "1",
+      "names": [
+        "add_clips library_id=<id>",
+        "cut_to_beat music_clip_id=<id> beats_per_clip=<n>",
+        "edit_clip muted=true",
+        "edit_clip speed=<s> ripple=true",
+        "edit_limits",
+        "find_audio",
+        "generate_media kind=text_to_video quote_only=true",
+        "get_timeline",
+        "set_transition after_clip_id=<id> type=crossFade"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "220",
+      "version": "1",
+      "names": [
+        "edit_clip entrance=fade entrance_duration=1.5",
+        "set_keyframes opacity",
+        "set_keyframes relative=true",
+        "set_shape kind=rectangle filled=true color=#000000A0 x=0.5 y=0.5 width=1 height=1 animation_in=fade animation_in_duration=1.5"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "221",
+      "version": "2",
+      "names": [
+        "add_clips",
+        "edit_clip region=<value> fit=fill",
+        "edit_clip source_out ripple=true",
+        "generate_media film.context.shot_task=read_reaction|show_consequence",
+        "look times=<value>",
+        "split_clip time=<t>",
+        "upscale_clip"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "222",
+      "version": "2",
+      "names": [
+        "edit_clip fit=fill focus=subject",
+        "edit_clip fit=fill focus_x=<0–1>",
+        "edit_clip flip_horizontal=true",
+        "edit_clip region=<rect> fit=fill",
+        "focus_x",
+        "look"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "301",
+      "version": "1",
+      "names": [
+        "add_clips source_in=<in> source_out=<out>",
+        "edit_clip file=<path>",
+        "generate_media quote_only=true",
+        "generate_media seed=<n>",
+        "listen file=<clip>",
+        "look file=<clip> shots=true",
+        "look files=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "302",
+      "version": "1",
+      "names": [
+        "generate_media film.next.cut.type=continuous|time_jump|location_change|time_location_jump|montage",
+        "inspect_video",
+        "listen cuts=true",
+        "look file=<clip> shots=true",
+        "look times=<value>",
+        "reset_fields"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "303",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "edit_clip region=<value> fit=fill",
+        "edit_clip source_out ripple=true",
+        "generate_media film.context.shot_task=read_reaction",
+        "listen cuts=true",
+        "split_clip time=<t>",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "304",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.preset=impact hit_at=<landing>",
+        "edit_clip",
+        "edit_clip source_in ripple=true",
+        "edit_clip source_out ripple=true",
+        "get_timeline",
+        "listen cuts=true",
+        "look clip_id=<id> count=6",
+        "set_transition after_clip_id=<id> type=blackFade",
+        "suggested_source_in",
+        "suggested_source_out"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "305",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "add_clips sound=separate",
+        "edit_clip region=<value> fit=fill",
+        "edit_clip volume_db",
+        "look times=<value>",
+        "upscale_clip"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "306",
+      "version": "2",
+      "names": [
+        "edit_clip source_out",
+        "freeze_frame time=<t>",
+        "generate_media kind=image_to_video image=<png>",
+        "generate_media quote_only=true",
+        "get_status models=true",
+        "inspect_video",
+        "look times=<value>",
+        "undo"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "307",
+      "version": "1",
+      "names": [
+        "edit_clip region=<value>",
+        "edit_clip x=<x> y=<y> scale=<s>",
+        "look times=<value>",
+        "set_filter preset=<preset> start=<t> duration=<s>",
+        "set_transition after_clip_id=<id> type=crossFade duration=0.5–1"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "308",
+      "version": "2",
+      "names": [
+        "edit_clip entrance=fade",
+        "edit_clip entrance=fade entrance_duration=<seconds>",
+        "edit_clip exit=fade",
+        "entrance",
+        "exit",
+        "max_duration",
+        "pushDown",
+        "pushLeft",
+        "pushRight",
+        "pushUp",
+        "set_transition after_clip_id=<id> type=crossFade|blackFade|whiteFade duration=0.1–2",
+        "set_transition all=true",
+        "set_transition type=none",
+        "shortened_from",
+        "wipeDown",
+        "wipeLeft",
+        "wipeRight",
+        "wipeUp"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "309",
+      "version": "1",
+      "names": [
+        "cut_to_beat beats_per_clip=<n>",
+        "cut_to_beat music_clip_id=<id> on=downbeats",
+        "edit_clip source_out ripple=true",
+        "get_timeline",
+        "look file=<video> shots=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "310",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "add_clips library_id=<id>",
+        "add_clips sound=separate",
+        "edit_clip source_out alone=true",
+        "edit_clip source_out ripple=true",
+        "look times=<value>",
+        "set_filter preset=<preset> start=<t> duration=<s>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "311",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=impact hit_at=<cut>",
+        "edit_clip region=<value> fit=fill",
+        "edit_clip scale=1.12–1.2",
+        "look files=<value>",
+        "look times=<value>",
+        "split_clip",
+        "upscale_clip"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "312",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "add_clips library_id=<id>",
+        "cut_to_beat music_clip_id=<id>",
+        "edit_clip opacity=0.3–0.5",
+        "find_audio kind=sound_effect",
+        "generate_media film.next.cut.type=montage",
+        "set_transition after_clip_id=<id> type=crossFade duration=0.5–1"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "313",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.preset=riser sound_effect.duration=2–3 hit_at=<result>",
+        "add_clips start=<t> insert=true",
+        "edit_clip source_in=<s> ripple=true",
+        "look times=<value>",
+        "split_clip time=<t>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "314",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "cut_speech clip_id=<id> remove_pauses=0.6 remove_fillers=true remove_repeats=true",
+        "cut_to_beat music_clip_id=<id> beats_per_clip=1",
+        "delete_items ids=<value> ripple=true",
+        "edit_clip scale=1.15",
+        "listen cuts=true",
+        "set_transition after_clip_id=<id> type=crossFade",
+        "split_clip time=<t>",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "315",
+      "version": "1",
+      "names": [
+        "add_clips",
+        "freeze_frame",
+        "freeze_frame time=<t> duration=2–4",
+        "set_filter preset=inkShadow|fadedFilm start=<t> duration=<s>",
+        "set_keyframes clip_id=<id> relative=true scale=<value>",
+        "set_keyframes position=<value>",
+        "set_transition after_clip_id=<id> type=crossFade",
+        "source_out"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "316",
+      "version": "2",
+      "names": [
+        "edit_clip flip_horizontal=true",
+        "edit_clip region=<value>",
+        "edit_clip x=<x> y=<y>",
+        "generate_media film.shot.exit.screen_direction film.shot.exit.gaze",
+        "look times=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "317",
+      "version": "3",
+      "names": [
+        "edit_clip muted=true",
+        "edit_clip speed=0.4 ripple=true",
+        "edit_clip speed=<s> ripple=true",
+        "edit_clip volume_curve",
+        "edit_limits",
+        "get_timeline",
+        "set_transition after_clip_id=<id> type=crossFade",
+        "split_clip time=<t>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "501",
+      "version": "3",
+      "names": [
+        "A2",
+        "add_clips library_id hit_at=<cut>",
+        "add_clips sound_effect.preset=impact|boom hit_at=<cut>",
+        "add_clips track=new_audio",
+        "bands_db",
+        "edit_clip track",
+        "edit_clip volume_curve",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "level_db",
+        "listen clip_id",
+        "listen mix=true",
+        "peak_db",
+        "set_track track=master volume_db",
+        "set_track volume_db"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "502",
+      "version": "2",
+      "names": [
+        "add_clips track=new_audio",
+        "edit_clip muted=true",
+        "edit_clip sound_scene.kind=hall sound_scene.room_size=0.8–1",
+        "edit_clip sound_scene.kind=telephone|radio sound_scene.distortion=0.3–0.6",
+        "edit_clip volume_curve",
+        "listen mix=true from=<before> to=<after> frames=true",
+        "split_clip time=<cut> clip_ids=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "503",
+      "version": "1",
+      "names": [
+        "add_clips library_id=<id> track=new_audio start=<time>",
+        "add_clips sound_effect.preset=boom|impact|hit sound_effect.size=0.6–1 hit_at=<moment>",
+        "edit_clip sound_scene.kind=outdoor|room sound_scene.distance=0.6–1",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "504",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.size=0–1",
+        "distance",
+        "edit_clip sound_scene.kind=room|bathroom|hall|outdoor|forest|valley",
+        "edit_clip volume_curve",
+        "edit_clip volume_db",
+        "intensity",
+        "listen clip_id",
+        "room_size"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "505",
+      "version": "1",
+      "names": [
+        "add_clips sound=only track=new_audio",
+        "add_clips sound=separate",
+        "add_voiceover lines=<value>",
+        "cut_speech clip_id=<id> remove_pauses=0.6 remove_fillers=true remove_repeats=true",
+        "cut_speech keep=<value>",
+        "edit_clip alone=true",
+        "edit_clip sound_scene.kind=room sound_scene.distance=0.5–0.8",
+        "edit_clip volume_db",
+        "generate_media kind=lipsync",
+        "listen cuts=true",
+        "transcribe words=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "506",
+      "version": "2",
+      "names": [
+        "add_clips library_id=<id> track=new_audio",
+        "add_clips sound_effect.preset=riser sound_effect.duration=3–5 hit_at=<line>",
+        "edit_clip fade_out=0.2–0.5",
+        "edit_clip source_out",
+        "edit_clip volume_curve",
+        "find_audio kind=sound_effect",
+        "inspect_video",
+        "intentional",
+        "listen voice=<audio-track>",
+        "probably_unintelligible",
+        "transcribe",
+        "volume_curve"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "507",
+      "version": "1",
+      "names": [
+        "add_clips library_id=<id> track=new_audio",
+        "add_clips sound=separate",
+        "edit_clip muted=true",
+        "edit_clip sound_scene.kind=room sound_scene.distance=0.5–0.8",
+        "edit_clip volume_curve",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "generate_media quote_only=true",
+        "level_db",
+        "listen clip_id from=<cut-1> to=<cut>",
+        "listen clip_id from=<cut> to=<cut+1>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "508",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.preset=beep sound_effect.pitch=0.5 sound_effect.brightness=0.2 sound_effect.size=0.6",
+        "add_clips sound_effect.preset=beep sound_effect.pitch=1.6 sound_effect.brightness=0.8",
+        "brightness",
+        "edit_clip sound_scene.kind=radio|megaphone",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "pitch",
+        "preset",
+        "variation"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "509",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=impact|boom hit_at=<cut>",
+        "audio_cut_jump",
+        "inspect_video",
+        "inspect_video intentional=<value>",
+        "set_transition after_clip_id=<id> sound=bed",
+        "set_transition after_clip_id=<id> sound=crossfade|gain",
+        "set_transition after_clip_id=<id> sound=lead|lag frames=<n>",
+        "set_transition after_clip_id=<id> sound=on_beat"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "510",
+      "version": "2",
+      "names": [
+        "add_clips",
+        "add_voiceover lines=<value>",
+        "add_voiceover subtitles=true",
+        "edit_clip sound_scene.kind=radio|telephone",
+        "list_voices",
+        "look times=<value>",
+        "manage_voices action=design",
+        "start",
+        "sync_voiceover",
+        "transcribe",
+        "voice"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "511",
+      "version": "2",
+      "names": [
+        "add_clips hit_at=<time>",
+        "add_clips sound_effect.preset=impact|boom hit_at=<moment>",
+        "edit_clip volume_db",
+        "listen mix=true from=<s> to=<e>",
+        "peak_db",
+        "set_canvas duration=<seconds>",
+        "set_shape kind=rectangle filled=true color=#000000 width=1 height=1 x=0.5 y=0.5 start=<time> duration=<seconds>",
+        "set_track track=master volume_db",
+        "set_track volume_db"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "512",
+      "version": "3",
+      "names": [
+        "add_clips sound_effect.preset=impact hit_at=<cut>",
+        "audio_hole",
+        "edit_clip muted=true",
+        "edit_clip volume_curve",
+        "get_timeline",
+        "inspect_video",
+        "inspect_video intentional=<value>",
+        "listen clip_id silence_db=-45",
+        "listen mix=true from=<s> to=<e> frames=true",
+        "split_clip",
+        "volume_db",
+        "volume_db_at"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "513",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=boom sound_effect.pitch=0.4–0.6 sound_effect.duration=0.15–0.3",
+        "add_clips sound_effect.preset=tick sound_effect.duration=0.15",
+        "edit_clip sound_scene.kind=hall|bathroom sound_scene.room_size=0.8–1",
+        "edit_clip sound_scene.kind=telephone sound_scene.distortion=0.4–0.8",
+        "edit_clip volume_curve",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "hit_at"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "514",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.brightness=0.7–1",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "515",
+      "version": "1",
+      "names": [
+        "add_clips library_id=<id> hit_at=<moment>",
+        "add_clips sound_effect.preset=boom|impact sound_effect.pitch=0.3–0.5 sound_effect.duration=3–6 sound_effect.size=0.8 hit_at=<moment>",
+        "downlifter",
+        "edit_clip muted=true",
+        "edit_clip speed",
+        "edit_clip volume_curve",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "generate_media quote_only=true",
+        "pitch",
+        "whoosh"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "516",
+      "version": "1",
+      "names": [
+        "add_voiceover lines=<value>",
+        "box",
+        "change_voice clip_id=<id> voice=<voice-id>",
+        "edit_clip sound_scene.kind=room|hall|outdoor sound_scene.distance=0.3–0.8",
+        "edit_clip volume_db",
+        "edit_subtitles style=<value>",
+        "generate_media kind=lipsync",
+        "generate_subtitles",
+        "get_subtitles",
+        "inspect_video",
+        "look clip_id=<id> text_scan=true",
+        "subtitle_overlaps",
+        "translate_subtitles target_language=<lang>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "517",
+      "version": "2",
+      "names": [
+        "add_clips library_id=<id> track=new_audio start=<time>",
+        "audio_cut_jump",
+        "duplicate_items ids=<value> start=<time>",
+        "edit_clip fade_in=0.5–1",
+        "edit_clip fade_out=0.5–1",
+        "edit_clip volume_curve",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "get_timeline",
+        "inspect_video"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "518",
+      "version": "2",
+      "names": [
+        "add_clips file=<file> hit=<s> hit_at=<cut>",
+        "add_clips sound_effect.pitch=0.5–0.7 sound_effect.size=0.7–1",
+        "add_clips sound_effect.preset=downlifter",
+        "add_clips sound_effect.preset=impact|boom hit_at=<cut>",
+        "add_clips sound_effect.preset=riser sound_effect.duration=0.5–2.5 hit_at=<cut>",
+        "add_clips track=<audio-track>",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "hit_at",
+        "listen file=<file>",
+        "look times=<value> sound=<value>",
+        "loudest_at"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "519",
+      "version": "2",
+      "names": [
+        "add_clips",
+        "audio_linger",
+        "edit_clip muted=true",
+        "edit_clip start",
+        "edit_clip volume_db",
+        "fade_in",
+        "fade_out",
+        "find_audio kind=sound_effect",
+        "generate_media kind=sound_effect",
+        "get_timeline",
+        "inspect_video sounds=<value>",
+        "listen clip_id",
+        "listen file=<file>",
+        "start",
+        "transcribe",
+        "volume_curve"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "520",
+      "version": "2",
+      "names": [
+        "audio_cut_jump",
+        "edit_clip start",
+        "inspect_video",
+        "listen beats=true",
+        "set_transition after_clip_id=<id> sound=bed|on_beat",
+        "set_transition after_clip_id=<id> sound=gain",
+        "set_transition after_clip_id=<id> sound=gain gain_db=-6–-4",
+        "set_transition after_clip_id=<id> sound=lead frames=<n>",
+        "source_in",
+        "strongest_accents"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "521",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=boom hit_at=<moment>",
+        "bands_db",
+        "edit_clip clip_id=<shot> voice_band_db=-12–-6",
+        "high_mid",
+        "listen mix=true",
+        "listen voice=<voice-track>",
+        "low_mid",
+        "set_track track=<voice-track> duck_others_db=-10 duck_tracks=<music-track>",
+        "split_clip time=<t> clip_ids=<value>",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "601",
+      "version": "4",
+      "names": [
+        "add_clips library_id=<id> hit=<s> hit_at=<peak>",
+        "add_clips library_id=<id> hit_at=<peak>",
+        "cut_to_beat music_clip_id=<id>",
+        "find_audio kind=music query=<words>",
+        "generate_media kind=music duration=<s> exact_length=true",
+        "generate_media quote_only=true",
+        "intensity",
+        "listen clip_id=<music> beats=true",
+        "strongest_accents",
+        "tempo_bpm"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "602",
+      "version": "3",
+      "names": [
+        "add_clips library_id=<id> hit=<s> hit_at=<cut>",
+        "add_clips library_id=<id> hit_at=<action>",
+        "add_clips sound_effect.preset=hit|pop|whoosh hit_at=<action>",
+        "cut_to_beat music_clip_id=<id> clip_ids=<value>",
+        "cut_to_beat music_clip_id=<id> on=downbeats",
+        "edit_clip source_out=<s> ripple=true",
+        "find_audio kind=sound_effect",
+        "listen clip_id=<music> beats=true",
+        "strongest_accents"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "603",
+      "version": "1",
+      "names": [
+        "add_clips file=<path>",
+        "edit_clip file=<path>",
+        "find_audio kind=music query=<words>",
+        "generate_media kind=music",
+        "get_timeline",
+        "music_credits",
+        "source_in",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "604",
+      "version": "1",
+      "names": [
+        "add_clips track=new_audio",
+        "edit_clip fade_in",
+        "edit_clip fade_out",
+        "edit_clip sound_scene.kind=radio",
+        "edit_clip sound_scene.kind=room sound_scene.distance=0.5–0.8",
+        "edit_clip start=<s>",
+        "find_audio kind=music query=<period-or-instrument>",
+        "generate_media kind=music",
+        "generate_media quote_only=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "605",
+      "version": "1",
+      "names": [
+        "add_clips sound_effect.pitch=0.5–0.8",
+        "add_clips sound_effect.preset=riser sound_effect.duration=3–6 hit_at=<event>",
+        "add_clips track=new_audio start=<s>",
+        "edit_clip volume_curve",
+        "find_audio kind=sound_effect query=riser",
+        "generate_media kind=music",
+        "generate_media quote_only=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "606",
+      "version": "3",
+      "names": [
+        "add_clips file=<theme> track=<audio-track> start=<s>",
+        "edit_clip fade_in=0.3–0.5 fade_out=0.3–0.5",
+        "edit_clip sound_scene.kind=room|hall",
+        "edit_clip speed=0.9–1.1",
+        "generate_media kind=music",
+        "generate_media quote_only=true",
+        "get_status models=true",
+        "reference_audio"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "607",
+      "version": "1",
+      "names": [
+        "edit_clip sound_scene.kind=room sound_scene.distance=0.6–0.8",
+        "edit_clip volume_curve",
+        "generate_media kind=music instrumental=false lyrics=<words>",
+        "generate_media quote_only=true",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "608",
+      "version": "3",
+      "names": [
+        "edit_clip fade_in=1.5–3",
+        "edit_clip volume_curve",
+        "inspect_video silence_db=-36 min_silence=1.5",
+        "listen voice=<voice-track>",
+        "set_track track=<voice-track> duck_others_db=-10",
+        "set_track track=<voice-track> duck_others_db=-10 duck_tracks=<music-track>",
+        "set_track volume_db",
+        "transcribe"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "609",
+      "version": "1",
+      "names": [
+        "cut_to_beat music_clip_id=<id> on=downbeats",
+        "edit_clip muted=true",
+        "edit_clip volume_db",
+        "find_audio kind=music query=<words>",
+        "generate_media kind=music",
+        "generate_media quote_only=true",
+        "listen clip_id",
+        "listen clip_id=<music> beats=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "610",
+      "version": "3",
+      "names": [
+        "clip_ids",
+        "cut_to_beat music_clip_id=<id>",
+        "delete_items",
+        "edit_clip fade_out=0.1",
+        "edit_clip source_in",
+        "edit_clip speed=1.1–1.5 ripple=true",
+        "edit_clip volume_db",
+        "listen clip_id",
+        "listen clip_id=<music> beats=true",
+        "split_clip time=<downbeat> clip_ids=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "611",
+      "version": "4",
+      "names": [
+        "edit_clip muted=true",
+        "edit_clip speed=0.4–0.6 ripple=true",
+        "edit_clip start=<s>",
+        "edit_clip volume_db",
+        "fade_in",
+        "listen clip_id"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "612",
+      "version": "3",
+      "names": [
+        "add_clips library_id=<id> track=new_audio hit=<s> hit_at=<cut>",
+        "add_clips sound_effect.preset=ding sound_effect.size=0.7–1 sound_effect.pitch=0.5–0.8 hit_at=<cut>",
+        "blackFade",
+        "crossFade",
+        "delete_items",
+        "edit_clip fade_in",
+        "edit_clip fade_out",
+        "find_audio kind=music",
+        "generate_media kind=music duration=<s> exact_length=true",
+        "listen beats=true",
+        "set_transition after_clip_id=<id> type=crossFade|blackFade duration=0.5–2",
+        "split_clip time=<time> clip_ids=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "613",
+      "version": "2",
+      "names": [
+        "edit_clip clip_id=<music> start=0",
+        "edit_clip start=0.5–1 ripple=true",
+        "edit_clip volume_curve",
+        "listen clip_id=<music> beats=true",
+        "listen clip_id=<music> from=0 to=3",
+        "set_text start=<downbeat> duration=3"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "614",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=boom|whoosh",
+        "add_clips sound_effect.preset=tick sound_effect.duration=0.15",
+        "duplicate_items ids=<value> start=<s>",
+        "find_audio kind=sound_effect query=<place>",
+        "generate_media kind=sound_effect",
+        "generate_media quote_only=true",
+        "listen file=<f> beats=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "615",
+      "version": "4",
+      "names": [
+        "add_clips library_id=<id> hit=<X> hit_at=<Y>",
+        "cut_to_beat music_clip_id=<id>",
+        "cut_to_beat music_clip_id=<id> beats_per_clip=<n>",
+        "cut_to_beat music_clip_id=<id> on=downbeats",
+        "edit_clip sound_scene.kind=radio|room",
+        "edit_clip source_in=<s> ripple=true",
+        "edit_clip speed=0.9–1.15 ripple=true",
+        "listen beats=true",
+        "strongest_accents",
+        "tempo_bpm"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "616",
+      "version": "2",
+      "names": [
+        "add_clips sound_effect.preset=impact hit_at=<join>",
+        "add_clips sound_effect.preset=riser hit_at=<join>",
+        "duration_warning",
+        "edit_clip fade_in",
+        "edit_clip volume_curve",
+        "ends_at",
+        "find_audio kind=music query=<value>",
+        "generate_media kind=music duration=<s> exact_length=true",
+        "generate_media quote_only=true"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "617",
+      "version": "1",
+      "names": [
+        "delete_items",
+        "edit_clip volume_curve",
+        "export_video preset=quick_review",
+        "get_timeline",
+        "inspect_video from=0 silence_db=-36 min_silence=1.5",
+        "set_track track=<audio-track> hidden=false",
+        "set_track track=<audio-track> hidden=true",
+        "split_clip"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "901",
+      "version": "2",
+      "names": [
+        "add_clips",
+        "edit_clip",
+        "edit_clip source_in=<seconds> source_out=<seconds>",
+        "get_timeline",
+        "inspect_video file=<export>",
+        "look file=<clip> shots=true",
+        "look file=<clip> times=<value>",
+        "look times=<value>",
+        "source_cut",
+        "source_cuts",
+        "stray_frames",
+        "suggested_source_in",
+        "suggested_source_out"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "902",
+      "version": "4",
+      "names": [
+        "broadband_noise",
+        "edit_clip muted=true",
+        "edit_clip voice_band_db",
+        "edit_clip volume_curve",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "generate_media audio_mode=ambient|none",
+        "get_job",
+        "listen describe=true clip_id=<clip>",
+        "listen file=<clip>",
+        "listen file=<clip> beats=true",
+        "low_drone",
+        "may_carry_bed",
+        "speech_like"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "951",
+      "version": "2",
+      "names": [
+        "edit_clip markers=<value>",
+        "get_timeline",
+        "look file=<clip> count=6",
+        "look files=<value>"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "952",
+      "version": "3",
+      "names": [
+        "add_clips",
+        "add_clips source_in=<in> source_out=<out>",
+        "edit_clip",
+        "edit_clip flip_horizontal=true",
+        "edit_clip muted=true",
+        "edit_clip region=<rect> fit=fill",
+        "edit_clip source_in",
+        "edit_clip volume_db",
+        "find_audio kind=sound_effect",
+        "generate_media quote_only=true",
+        "generate_media seed=<n>",
+        "listen describe=true file=<take>",
+        "listen file=<take>",
+        "look file=<take>",
+        "look file=<take> count=6",
+        "look file=<take> shots=true",
+        "look file=<take> times=<value> size=large",
+        "look files=<value>",
+        "look size=large",
+        "low_drone",
+        "source_cuts",
+        "source_out",
+        "suggested_source_in",
+        "suggested_source_out",
+        "upscale_clip",
+        "volume_curve"
+      ]
+    },
+    {
+      "kind": "card",
+      "id": "953",
+      "version": "2",
+      "names": [
+        "audio_loudness_lufs",
+        "audio_peak_dbtp",
+        "export_video preset=quick_review",
+        "get_job",
+        "inspect_video",
+        "inspect_video file=<copy>",
+        "inspect_video silence_db=-36 min_silence=1.5",
+        "listen cuts=true",
+        "look times=<value>",
+        "recipes id=<style>",
+        "transcribe"
       ]
     }
   ]
