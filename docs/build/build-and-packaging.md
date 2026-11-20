@@ -582,6 +582,80 @@ CDN 缓存属于外部状态，每次发布都要执行这条真实网络检查�
 
 没有打 git tag，也没有创建 GitHub release，做法同前。
 
+2026-11-20, nine days and 143 merges after 0.18.66, publish **0.18.67**. The user's OK that evening: 「发布 0.18.67 (Recommended)」
+(the public link still served 0.18.66 from 11-11). Release and verification facts by Claude.
+
+Build:
+- Source: main `ea1beed540cf6b8674957c392345291ed845133a` (#546). That commit's own main run (all five shards and
+  `check-all`, full checks) was green. Client changes since 0.18.66, PRs #392–#546, in short:
+  - sound: joins across a cut with `set_transition` `sound` (#435, #439); ducking under speech with `set_track`
+    `duck_others_db` (#475, #486); a clip's voice-band cut, `edit_clip` `voice_band_db` and its inspector slider (#479,
+    #491, #537); `listen` per layer, voice masking and source-sound words (#431, #433, #456, #458); music accents and
+    `hit_at` (#477); saved sound roles (#515, #524); true peaks (#448);
+  - the web-motion renderer, helper `skycut-web-motion`, and stored motion clips (#443, #460, #465, #470, #472, #489,
+    #494); motion presets (#434); canvas shape changes keep clips, texts and shapes (#445, #451, #463, #466);
+  - saved project versions around AI rounds (#440); `inspect_video` delivery checks and stray frames (#438, #459, #481,
+    #540); Sky Studio's editing styles and craft cards (#519, #538);
+  - files: project writes, export folders and every open / save window off the main thread, and nothing replaced or
+    deleted without confirmation (#478, #482, #484, #485, #488, #490, #495–#497, #500, #504, #507, #508, #512, #516);
+  - playback: picture and sound start together after a pause, a hover, an edit and the idle stop (#499, #521, #531,
+    #539);
+  - the DMG install window in six languages with one guide link (#545).
+- Packaged in its own worktree: `VERSION=0.18.67 arch -arm64 /bin/bash scripts/build-app.sh`. The Release compile took
+  403 s, the whole script about 7.5 minutes; free disk went from 7.8 GiB to 6.8 GiB.
+- `vendor/ffmpeg` came from the main checkout through `FFMPEG_LOCAL=… scripts/vendor-ffmpeg.sh`. Its SHA-256 matches the
+  main checkout's: the same ffmpeg 8.1.
+
+Product:
+- `SkyCut-0.18.67-arm64.dmg`, 42,359,249 bytes; SHA-256
+  `2fac9551c5ec3e59f2cc66ad78d007693c6b2fbdd6f0097f4cfad786bc4acdc9`; the App's CDHash `ce7941d5…`.
+
+Checks:
+- Package:
+  - `hdiutil verify` passes;
+  - Info.plist version `0.18.67` (build 1);
+  - the main binary, ffmpeg, `skycut-mcp` and `skycut-web-motion` are all arm64;
+  - the App in the mounted DMG is byte for byte the same as `dist/SkyCut.app` (`diff -r`).
+- Signing:
+  - the App and its three helpers are signed with the pinned certificate `76d2…90ef`;
+  - the deep, strict signature check passes locally and in the mounted DMG; the build log has no ad-hoc warning;
+  - `TeamIdentifier=not set`, as before.
+- Running:
+  - the mounted `skycut-mcp` initializes as `skycut` / `0.18.67`. Its socket pointed at a missing path and it was not
+    allowed to launch the App, so it never reached the SkyCut that was running;
+  - the catalog has 64 tools, `skycut_guide` first;
+  - ffmpeg 8.1 runs;
+  - names from this batch are in the new main binary and absent from 0.18.66's: `duck_others_db`, `voice_band_db`,
+    `craft_cards`, `sound_role`, `set_motion`, `ProjectVersionStore`.
+- DMG: `scripts/check-dmg.sh <dmg>` passes. The background TIFF, read out of the mounted DMG, shows all six languages
+  and `www.skycut.app/docs`.
+- Not done: the manual checklists that need a real mouse were not run for this release.
+
+Publish:
+- Public object: `skycut/SkyCut-0.18.67-2fac9551c5ec-arm64.dmg`, immutable cache.
+- Uploaded first (10 s), then read back in full from the public direct link with `--url`: the same size and SHA-256.
+- Personal site [skystudio PR #22](https://github.com/skysf/skystudio/pull/22) (merge commit `3283885`) switched both
+  entries; Cloudflare Pages deployed it about 30 s after the merge.
+- Without `--url`, the full download through the stable entry matches; the trailing-slash entry 302s to the same object.
+
+Tool vocabulary for Sky Studio:
+- `VERSION=0.18.67 scripts/export-tool-vocabulary.sh skycut-0.18.67.json` from the same commit: 64 tools, 69 guide
+  topics, 788 known names, sources not dirty.
+- The file is in the content root's `vocab/` folder; that folder was new, and it holds only this file.
+
+Install:
+- `/Applications/SkyCut.app` was not replaced: it was running (a local build, `0.18.66-local.20261120.81bb330e`, started
+  23:09), and SkyCut is never quit for the user. The Beta stays 0.18.66; this release did not ask for it.
+- `mdfind` for `com.srtflow.SrtFlow` listed nothing. Spotlight on this Mac was dropping apps that day; the packaging
+  is not the cause.
+
+升级时的钥匙串：
+- When 0.18.67 replaces the installed copy, its first read of the Sky Studio Key needs the user to click the banner's
+  「允许…」, enter the login password and choose 「始终允许」, as for 0.18.63 (see the
+  [keychain bugfix](../bugfixes/2026-11-07-keychain-prompt-blocks-ai-calls.md)).
+
+No git tag and no GitHub release, as before.
+
 ## CI（.github/workflows/checks.yml）
 
 CI 跑的就是 `scripts/check-all.sh`，只是拆成几组、分到几台 runner 上并行跑。
