@@ -351,6 +351,7 @@
 - [2026-10-06 导出两次卡死：看门狗挂起主线程抓栈时分配内存](2026-10-06-watchdog-capture-deadlocks-main-thread.md) — 挂起别的线程期间不分配、不拿锁；能数不变量就去数。
 - [2026-10-14 看门狗自检在 CI 上偶发 Bus error](2026-10-14-watchdog-check-hook-recursion.md) — 钩子回调里「不分配」要算上运行时替你做的事（TLS、独占检查）。
 - [2026-09-23 打开工程后缩略图和波形全空](2026-09-23-waveform-decode-deadlocks-thread-pool.md) — 阻塞的读取循环不进 Swift 并发线程池；可能死锁的自检带普通线程上的看门狗。
+- [2026-11-20 The web-motion hog check sat at the edge of its budget](2026-11-20-web-motion-hog-budget-at-its-edge.md) — A budget a check sets for itself needs margin against the runner's readings: a quarter of green runs within 20 MB of the line means the next red is the runner.
 - [2026-11-19 An over-long web-motion duration quit SkyCut before it could be refused](2026-11-19-web-motion-huge-duration-quits-app.md) — Range-check before converting: a finite number is not an in-range one, and a value read back from a project file is input too.
 - [2026-11-18 Web-motion memory accounting missed pages that had not finished loading](2026-11-18-web-motion-load-memory-window.md) — Discover live pages before ready and retry identities with an immutable birth ceiling; retain safe cleanup history.
 - [2026-11-17 A web-motion render overwrites track edits](2026-11-17-web-motion-render-overwrites-track-edits.md) — Async clip checks include lane identity and visibility; a vertical move need not change EditClip.
