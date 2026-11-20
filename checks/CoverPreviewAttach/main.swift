@@ -14,6 +14,8 @@ import Foundation
 //   · 调色和盖一块同时有时，块里的颜色和「只调色」的参照一样（这一层带上了调色 —— 调色挂在播放器视图上，这一层看不到）；
 //   · 马赛克的格子从这一块的左上角起算（水平格线落在块左边 + k × 格宽，竖直格线落在块上边 + k × 格高）；
 //   · 两块同时盖；盖一块撤掉之后（`CoverStack.empty`），画面回到和参照一样。
+//   · The hover preview's own view (`HoverPreviewView`, since 2026-11-20) draws the same grade and covers as the editing
+//     picture's layers; hidden, it shows nothing; shown again, it draws the current frame.
 // 需要图形会话，所以**故意不在 check-all.sh 里**，同 scripts/check-filter-preview-attach.sh。跑法见 scripts/check-cover-preview-attach.sh。
 
 var failures = 0
@@ -38,6 +40,13 @@ let shotDirectory = URL(fileURLWithPath: arguments[6])
 
 let panelWidth = 200.0, panelHeight = 112.5, gap = 10.0
 let columns = 3, rows = 3
+/// The hover panels (9, 10, 11) are a fourth column to the right, so the nine panels above keep their places on screen.
+let windowColumns = 4
+
+/// Where panel `index` sits, by column and row from the top-left.
+func cell(_ index: Int) -> (col: Int, row: Int) {
+    index < columns * rows ? (index % columns, index / columns) : (columns, index - columns * rows)
+}
 
 /// 盖在哪一块（画布 0…1、左上原点）。**上下故意不对称**（0.15…0.60）：对称的框（0.25…0.75）翻不翻转上下都一样，
 /// CA 是左下原点、归一化的框是左上原点，换算漏了这一步就抓不到。
@@ -47,6 +56,8 @@ struct PanelPlan {
     var video: URL
     var covers: [CoverStack.Entry]
     var graded: Bool = false
+    /// Drawn by the hover preview's production view instead of the editing picture's layers.
+    var hover = false
 }
 
 @MainActor
@@ -55,6 +66,9 @@ final class Panel {
     let cover: CoverHostView
     let attachment = FilterStackAttachment()
     let player: AVPlayer
+    private(set) var hover: HoverPreviewView?
+    /// The hover's own grade attachment, as `HoverPreviewSurface` has its own coordinator.
+    let hoverAttachment = FilterStackAttachment()
 
     init(plan: PanelPlan, frame: NSRect) {
         player = AVPlayer(url: plan.video)
@@ -66,6 +80,13 @@ final class Panel {
         let grade = plan.graded ? FilterStack(entries: [.init(preset: .coldIron, strength: 1)]) : FilterStack.empty
         attachment.apply(grade, to: view)
         cover.apply(CoverStack(entries: plan.covers), grade: grade)
+        guard plan.hover else { return }
+        let hover = HoverPreviewView(player: player)
+        hover.frame = frame
+        hoverAttachment.apply(grade, to: hover.picture)
+        hover.apply(CoverStack(entries: plan.covers), grade: grade)
+        hover.showHoverPicture(true)
+        self.hover = hover
     }
 }
 
@@ -75,7 +96,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
     var panels: [Panel] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let width = panelWidth * Double(columns) + gap * Double(columns + 1)
+        let width = panelWidth * Double(windowColumns) + gap * Double(windowColumns + 1)
         let height = panelHeight * Double(rows) + gap * Double(rows + 1)
         // 无边框：截图就是内容本身，不用去扣标题栏。
         window = NSWindow(contentRect: NSRect(x: 60, y: 60, width: width, height: height), styleMask: [.borderless], backing: .buffered, defer: false)
@@ -98,15 +119,26 @@ final class Delegate: NSObject, NSApplicationDelegate {
             ]),
             PanelPlan(video: redBlue, covers: [blur]),                                                      // 7 盖了又撤
             PanelPlan(video: redBlue, covers: []),                                                          // 8 参照（和 7 撤掉之后比）
+            PanelPlan(video: redBlue, covers: [blur], graded: true, hover: true),                           // 9 hover of 2
+            PanelPlan(video: hramp, covers: [mosaic], hover: true),                                         // 10 hover of 4
+            PanelPlan(video: redBlue, covers: [                                                             // 11 hover of 6,
+                .init(kind: .blur, rect: CGRect(x: 0.35, y: 0.1, width: 0.3, height: 0.3), amount: 96),     //    hidden in
+                .init(kind: .blur, rect: CGRect(x: 0.4, y: 0.6, width: 0.3, height: 0.3), amount: 96)       //    the first shot
+            ], hover: true),
         ]
         for (index, plan) in plans.enumerated() {
-            let col = index % columns, row = index / columns
+            let (col, row) = cell(index)
             let frame = NSRect(x: gap + (panelWidth + gap) * Double(col), y: gap + (panelHeight + gap) * Double(rows - 1 - row), width: panelWidth, height: panelHeight)
             let panel = Panel(plan: plan, frame: frame)
-            root.addSubview(panel.view)
-            if !plan.covers.isEmpty { root.addSubview(panel.cover) }
+            if let hover = panel.hover {
+                root.addSubview(hover)
+            } else {
+                root.addSubview(panel.view)
+                if !plan.covers.isEmpty { root.addSubview(panel.cover) }
+            }
             panels.append(panel)
         }
+        panels[11].hover?.showHoverPicture(false)
         window.orderFrontRegardless()
         panels.forEach { $0.player.play() }
         Task { await self.drive() }
@@ -126,6 +158,7 @@ final class Delegate: NSObject, NSApplicationDelegate {
         await handshake()
         // 第二拍：面板 7 的盖一块撤掉（走生产里「播放头出了这一段」那条路）。
         panels[7].cover.apply(CoverStack.empty, grade: FilterStack.empty)
+        panels[11].hover?.showHoverPicture(true)
         try? await Task.sleep(nanoseconds: 600_000_000)
         await handshake()
         report()

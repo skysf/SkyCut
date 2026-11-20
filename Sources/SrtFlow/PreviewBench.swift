@@ -184,10 +184,21 @@ enum PreviewBench {
         for (key, value) in ungated { report[key] = Double(value) }
         report["\(name).playback.ticks"] = Double(playback.counts["event:\(PerfCounters.Event.clockTick.rawValue)"] ?? 0)
 
+        // Hovering, last and with a memory item of its own (`PreviewBenchHover`): the hover's own player was approved
+        // by the user on 2026-11-20 for about 50 MB while hovering. The scenario's peak is read before it; the hover's
+        // work is only reported.
+        let peak = peakFootprintMB()
+        var hover = PreviewBenchHover.Memory()
+        let hovering = try await measure { hover = try await PreviewBenchHover.sweep(project) }
+        var hoverWork: [String: Int] = [:]
+        record(hovering, as: "\(name).hover", into: &hoverWork, &report, &breakdown)
+        for (key, value) in hoverWork { report[key] = Double(value) }
+        report["\(name).hover.beforeMB"] = hover.before
+
         return [
             "scenario": name,
             "gated": gated,
-            "memory": ["\(name).memory.peakMB": peakFootprintMB()],
+            "memory": ["\(name).memory.peakMB": peak, "\(name).hover.peakMB": hover.peak],
             "report": report,
             "breakdown": breakdown,
         ]

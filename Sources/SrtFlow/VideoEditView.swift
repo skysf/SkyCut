@@ -256,7 +256,7 @@ struct VideoEditView: View {
                 if !project.state.isEmpty {
                     // 播放器画面 + 此刻的调色。滤镜挂在播放器视图自己身上，所以 ZStack 里
                     // 它**上面**的叠层天然不吃调色（见 PreviewPlayerSurface）。
-                    PreviewPlayerSurface(project: project, clock: clock)
+                    PreviewPlayerSurface(project: project, clock: clock, hover: clock.hover)
                     // 点选画面内容 + 变换框。放在形状叠层下面：形状的点击优先。
                     ClipTransformCanvas(project: project, clock: clock, boxSize: size)
                 } else {

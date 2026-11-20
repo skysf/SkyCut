@@ -15,8 +15,11 @@ final class ChainedScrub {
     /// Forgets a target that has not been sent yet.
     func cancelPending() { pending = nil }
 
-    /// `idle` runs once the last seek completes with no newer target waiting.
-    func scrub(_ player: AVPlayer, to seconds: TimeInterval, idle: @escaping () -> Void) {
+    /// `landed` runs after every seek that finished, with its target; `idle` once the last seek completes with no newer
+    /// target waiting.
+    func scrub(
+        _ player: AVPlayer, to seconds: TimeInterval, landed: ((TimeInterval) -> Void)? = nil, idle: @escaping () -> Void
+    ) {
         guard !isSeeking else {
             pending = seconds
             return
@@ -25,13 +28,14 @@ final class ChainedScrub {
         player.seek(
             to: CMTime(seconds: seconds, preferredTimescale: 600),
             toleranceBefore: .zero, toleranceAfter: .zero
-        ) { [weak self, weak player] _ in
+        ) { [weak self, weak player] finished in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isSeeking = false
+                if finished { landed?(seconds) }
                 if let next = self.pending, let player {
                     self.pending = nil
-                    self.scrub(player, to: next, idle: idle)
+                    self.scrub(player, to: next, landed: landed, idle: idle)
                 } else {
                     idle()
                 }

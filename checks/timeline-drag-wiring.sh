@@ -702,7 +702,7 @@ fi
 HOVER_FILES="$(grep -rlE '^[[:space:]]*\.onContinuousHover' --include='*.swift' Sources | sort | tr '\n' ' ' | sed 's/ $//')"
 [ "$HOVER_FILES" = "$VIEW" ] \
   || fail "扫帧入口 .onContinuousHover 出现在 [${HOVER_FILES}]，应当只有 ${VIEW}：多一处就是两圈 hover 抢着写 peekTime 的竞态"
-PEEK_FILES="$(grep -rlE '^[^/]*clock\.peek\(at:' --include='*.swift' Sources | grep -v '/PlaybackStartScenarios\.swift$' | sort | tr '\n' ' ' | sed 's/ $//')"
+PEEK_FILES="$(grep -rlE '^[^/]*clock\.peek\(at:' --include='*.swift' Sources | grep -vE '/(PlaybackStartScenarios|PreviewBenchHover)\.swift$' | sort | tr '\n' ' ' | sed 's/ $//')"
 [ "$PEEK_FILES" = "$VIEW" ] \
   || fail "peek(at:) 的写入出现在 [${PEEK_FILES}]，应当只有 ${VIEW}（endPeek 不受限：收掉已经亮着的影子到处都该能做）"
 

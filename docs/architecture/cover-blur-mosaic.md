@@ -53,6 +53,10 @@
 7. **力度按画面高换算**，不是画面宽（竖屏按 1920 高）。
 8. **没有盖一块时预览不建第二层**（`PreviewPlayerSurface` 里 `if !covers.isEmpty`，性能计数和没这个功能时一样）；有的时候它跟着 `PreviewPlayerSurface`
    已经有的那个时钟订阅更新，不新增订阅者。
+9. **The hover picture covers the same way** (since 2026-11-20). A hover runs on its own player
+   ([playback start, "Hover"](playback-start.md#hover)). `HoverPreviewSurface` draws it with its own `CoverHostView`
+   on that player, with the covers and grade at the hover's time. The editing picture under it keeps the playhead's.
+   No cover layer is built while nothing is covered there either.
 
 **Frame window** (2026-11-17): blur and mosaic are active from their first frame at or after the start up to, excluding,
 the first frame at or after the end, matching `CoverStack` and AI look's cover selection. Export gets those frame numbers
@@ -96,6 +100,9 @@ frames immediately outside each window, and compares boundary states with the pr
   **反向验证**做过：不裁块、不限时段、力度不按画布换算、先做效果再裁（格子对不齐）、不取偶数、盖一块挪到形状之后，各红。
 - `scripts/check-cover-preview-attach.sh`（**要图形会话，不在 `check-all.sh` 里**）：生产的 `CoverHostView` 放进真窗口拍屏 —— 块里糊成混色、块外还是硬的、
   改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照。改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时跑。
+  Since 2026-11-20 it also compares the hover view (`HoverPreviewView`, a fourth column) with the editing picture's
+  layers: grade and blur, mosaic, and two covers once shown again. A hidden hover view must show nothing. Run it when
+  changing `HoverPreviewSurface.swift` too. The comparison went red with the hover's covers left ungraded.
 - `checks/ProjectFile/CoverShapes.swift`（存取往返、v26 判据与写键同源、缺键读默认、清单、总长）、`checks/MCP/CoverChecks.swift`（`set_shape` 的两个新种类、
   种类词表对账、源画面框换画布框的几何、`text_scan` 补的 `cover`）。
 - **人工回归**（发版前实机）：

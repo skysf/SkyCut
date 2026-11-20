@@ -115,19 +115,29 @@ struct TransportTimeLabel: View {
 ///
 /// 盖一块（模糊 / 马赛克，`CoverPreviewLayer`）：同一个播放器再开一层，叠在播放器上面、别的叠层下面，盖的是调完色的画面。
 /// **没有盖一块时不建这一层**（性能计数和以前一样）。
+///
+/// A hover on its own player (`HoverPreview`) is drawn over all of it by `HoverPreviewSurface`, with the grade and covers at
+/// the hover's time; the editing picture under it keeps the playhead's. Nothing is built for it before the first hover.
 struct PreviewPlayerSurface: View {
     let project: VideoEditProject
     @ObservedObject var clock: PlayerClock
+    @ObservedObject var hover: HoverPreview
 
     var body: some View {
         let _ = PerfCounters.body(Self.self)
-        let time = clock.displayTime
+        let time = clock.hover.isHovering ? clock.time : clock.displayTime
         let grade = FilterStack(in: project.state, at: time)
         let covers = CoverStack(in: project.state, at: time)
         ZStack {
             PlayerViewRepresentable(player: clock.player, filterStack: grade, previewClock: clock)
             if !covers.isEmpty {
                 CoverPreviewLayer(player: clock.player, covers: covers, grade: grade)
+                    .allowsHitTesting(false)
+            }
+            if hover.hasItem {
+                let peek = clock.displayTime
+                HoverPreviewSurface(hover: hover, grade: FilterStack(in: project.state, at: peek),
+                                    covers: CoverStack(in: project.state, at: peek))
                     .allowsHitTesting(false)
             }
         }

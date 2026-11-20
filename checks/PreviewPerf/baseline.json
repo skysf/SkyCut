@@ -37,7 +37,9 @@
     "busy.video.megapixelFrames" : 1983
   },
   "memory" : {
+    "basic.hover.peakMB" : 148.7,
     "basic.memory.peakMB" : 141.2,
+    "busy.hover.peakMB" : 350.3,
     "busy.memory.peakMB" : 286.4
   },
   "memoryTolerance" : 0.1

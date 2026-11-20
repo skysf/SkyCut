@@ -24,7 +24,7 @@ struct Shot {
         width = image.width
         height = image.height
         bytes = raw
-        scale = Double(image.width) / (panelWidth * Double(columns) + gap * Double(columns + 1))
+        scale = Double(image.width) / (panelWidth * Double(windowColumns) + gap * Double(windowColumns + 1))
     }
 
     func rgb(_ x: Int, _ y: Int) -> (r: Int, g: Int, b: Int) {
@@ -34,7 +34,7 @@ struct Shot {
 
     /// 第 i 块面板在截图里的左上角和大小（像素）。
     func panel(_ index: Int) -> (x: Int, y: Int, width: Int, height: Int) {
-        let col = index % columns, row = index / columns
+        let (col, row) = cell(index)
         return (Int((gap + (panelWidth + gap) * Double(col)) * scale), Int((gap + (panelHeight + gap) * Double(row)) * scale),
                 Int(panelWidth * scale), Int(panelHeight * scale))
     }
@@ -117,4 +117,26 @@ func runAssertions(first: Shot, second: Shot) {
     let before = first.at(7, 0.5, 0.5), after = second.at(7, 0.5, 0.5), reference = second.at(8, 0.5, 0.5)
     check(min(before.r, before.b) >= 45, "面板 7 的第一拍是糊的：\(before)")
     check(second.difference(after, reference) <= 20 && min(after.r, after.b) < 45, "盖一块撤掉之后画面回到和参照一样：\(after) 对 \(reference)")
+
+    // 6. The hover preview's own view draws what the editing picture's layers draw: grade and blur (9 against 2), mosaic
+    //    (10 against 4). Hidden (11 in the first shot) it shows nothing; shown, two covers as in 6.
+    let graded = sameness(first, 2, 9), mosaic = sameness(first, 4, 10), shown = sameness(second, 6, 11)
+    check(graded.mean <= 4 && graded.p95 <= 20, "The hover view draws the grade and the blur like the editing picture: \(graded)")
+    check(mosaic.mean <= 4 && mosaic.p95 <= 20, "The hover view draws the mosaic like the editing picture: \(mosaic)")
+    let hidden = first.at(11, 0.25, 0.5), visible = first.at(6, 0.25, 0.5)
+    check(max(hidden.r, max(hidden.g, hidden.b)) <= 16 && visible.r > 100, "A hidden hover view shows nothing: \(hidden)")
+    check(shown.mean <= 4 && shown.p95 <= 20, "Shown again, the hover view draws the current frame with its covers: \(shown)")
+}
+
+/// How alike two panels look: the mean and 95th percentile of the largest channel difference on a 24 x 14 grid.
+private func sameness(_ shot: Shot, _ a: Int, _ b: Int) -> (mean: Double, p95: Int) {
+    var differences: [Int] = []
+    for row in 0..<14 {
+        for col in 0..<24 {
+            let fx = 0.03 + 0.94 * Double(col) / 23, fy = 0.03 + 0.94 * Double(row) / 13
+            differences.append(shot.difference(shot.at(a, fx, fy), shot.at(b, fx, fy)))
+        }
+    }
+    let sorted = differences.sorted()
+    return (Double(differences.reduce(0, +)) / Double(differences.count), sorted[Int(Double(sorted.count) * 0.95)])
 }

@@ -28,12 +28,11 @@ primed, so it moves the moment the sound does. Every paused state of a played it
   picture stopped on, a few milliseconds, and that counts as positioned. A stopped `CMTimebase` is read without the
   player's queue (`currentTime()` stays banned). If picture and sound stopped more than 50 ms apart (a stall, a
   drift correction still seeking) the picture is placed precisely at the sound instead.
-- A hover that ends places the picture back on the playhead and primes it (unless the item is new; hover preview
-  scrubs the same player).
+- A hover never moves this picture (since 2026-11-20): it runs on its own player, see [Hover](#hover) below.
 
 Play from a positioned picture is the ordinary native rate start plus the engine from the same position; the audio
-engine reuses its prepared samples when the paused anchor matches. Any other Play (a hover still on, a scrub, a
-placement still preparing, a failed preparation) stays pending while the clock places and primes the picture at the
+engine reuses its prepared samples when the paused anchor matches. Any other Play (a scrub, a placement still preparing,
+a failed preparation) stays pending while the clock places and primes the picture at the
 playhead, then starts both. **Play never re-seeks the picture after the sound has started**: before 2026-11-19 a resume
 and a Play while hovering did (`setRate(_:time:atHostTime:)` with a time is a native seek), and on a long-GOP source the
 picture stayed frozen for 0.6–0.9 s while the sound played
@@ -75,7 +74,7 @@ and every positioned start lost its first quantum (11.6 ms per track), 50–140 
 start. The source node's paused branch now takes up the new round on every quantum and wakes the feeder
 ([audio engine](audio-engine.md)).
 
-What still waits, in step: the first Play on a new item (its preroll); a Play right after a click or a hover, while
+What still waits, in step: the first Play on a new item (its preroll); a Play right after a click, while
 the picture at the playhead is still being decoded (about 0.6 s on the M1 three seconds into an eight-second 4K GOP,
 short with optimized media); a click while playing (the same decode at the click); a Play during project open; a Play
 as the first input after the two-minute idle stop (the output device starts). Audio supplies the master clock. See the
@@ -90,6 +89,36 @@ starts the device before advancing the playhead, and the cold start above holds 
 user-presence signal can wake it ahead of Play. The two-minute
 policy and measured hardware behavior are in the [audio-engine contract](audio-engine.md).
 
+## Hover
+
+**A hover runs on its own player** (2026-11-20, approved by the user: 「做，多 50 MB 可以」). With the engine,
+`PlayerClock.peek` shows the pointer's frame on `HoverPreview`'s player. The editing player stays placed and primed at
+the playhead, so Play while hovering or right after a hover starts at once, like a resume. Before, the hover scrubbed
+the editing player, and Play waited until the playhead's frame was decoded again: 0.59 / 0.61 s median to sound and
+picture on the M1, three seconds into the fixture's eight-second 4K GOP (0.58 / 0.61 s hosted). Now it is 23 / 36 ms
+while hovering and 24 / 42 ms right after (M1 gate medians), 16 / 43 and 15 / 42 ms hosted
+([case](../bugfixes/2026-11-20-play-after-hover-waited-for-decode.md)).
+
+- **The hover item is the preview's own.** It is built on the preview item's asset and video composition, so upper
+  tracks, alpha sources and web-motion movies are composed exactly as in the preview. `HoverPreviewSurface` draws it over the editing
+  picture with the grade and covers at the hover's time: a `PlayerLayerView` with its own `FilterStackAttachment`
+  and a `CoverHostView`, the same classes as the preview. The overlays above (shapes, texts, subtitles) read
+  `displayTime` as before. The editing picture under it keeps the playhead's grade and covers.
+- **Visibility.** The hover picture is shown once its first seek has landed (a frame composed at the hover time:
+  `seekingWaitsForVideoCompositionRendering`). A frame left from an earlier hover never flashes. It is hidden in the
+  same turn as the hover's end: `peekTime` set to nil hides it, from `endPeek`, Play, a seek, a new item or a teardown.
+  `HoverPreview` sets the view's `alphaValue` directly, never through SwiftUI. The layer's background is clear, so a
+  frame not drawn yet shows the editing picture, not black.
+- **Memory only around a hover.** The item is created at the first hover and dropped
+  `HoverPreview.releaseDelay` (3 s) after the hover ends. A new preview item ends the hover, and the next hover builds
+  on the new item. On the M1 the first hover cost 43 MB over the 4K fixture and 12 MB over its 1080p opening. On the
+  preview ratchet's busy 1080p scenario it cost 18 / 48 MB in two launches against 10 / 1 MB for the old hover. On
+  the hosted runner, which decodes in software, the same phase rose 70 MB. The preview ratchet gates it as its own
+  item, `<scenario>.hover.peakMB`
+  ([preview perf ratchet, section 15](preview-perf-ratchet.md)).
+- **Without the engine** (the burn-in preview, or before the first item) a hover still scrubs the one player. `endPeek`
+  scrubs it back.
+
 ## Measurements
 
 `scripts/check-playback-start.sh` launches the debug editor five times in a graphical session. Each launch opens a
@@ -101,9 +130,9 @@ source with an eight-second GOP. The timeline starts cold at zero, then tests th
 the 4K GOP, the frame before the 1080p cut, a new item from the production rebuild (`fresh-item`: Play once its paused
 picture is up, as after an edit), Play right after a far click (`seek-play`), space to play, pause a
 second later and play again (`resume`), Play while the pointer hovers the 1080p opening with the playhead in the 4K
-source (`peek-play`), a click far ahead while playing in the 4K source (`play-seek`: the click is the measured action),
-the 4K tail, Play at the exact end, and a suspended output graph. The scenarios are staged
-through the editor's entry points in `PlaybackStartScenarios.swift`. The end replay waits for native placement at the
+source (`peek-play`) and right after it leaves the timeline (`peek-end-play`), a click far ahead while playing in the 4K
+source (`play-seek`: the click is the measured action), the 4K tail, Play at the exact end, and a suspended output
+graph. The scenarios are staged through the editor's entry points in `PlaybackStartScenarios.swift`. The end replay waits for native placement at the
 tail and must start at zero. The idle case uses the production suspension entry and confirms the graph has suspended
 before Play. If focus or pointer activity wakes it during preparation, the check tries the setup once more. The
 idle-policy tests cover when the two-minute stop is due.
@@ -154,8 +183,9 @@ and each scenario's median and worst result. The first launch of the freshly bui
 it runs the same scenarios, may fail, and its start skews are printed in the summary. Every scored launch must
 produce first audio and advancing video and satisfy the structural limits. A cold open must build and attach once and
 open exactly three video assets. Warm and idle starts must build, attach and open zero times. Cold open, a new item,
-replay from the end, Play right after a click and Play while hovering each require one native preroll after Play (a
-new item primed while paused would show none). In each scenario the median of each timing must be in budget, and
+replay from the end, Play right after a click and a click while playing each require one native preroll after Play (a
+new item primed while paused would show none). Play during or right after a hover requires none: the picture stayed
+placed and primed. In each scenario the median of each timing must be in budget, and
 at least half of the whole launches must jointly meet the per-launch budgets in `checks/PlaybackStart/budgets.json`.
 A gross stall, an onset gap or start skew of 500 ms or more or a missed one-second follow-up, is the reported
 failure itself: none may occur in the first five launches, and at most one per scenario across the eight after
@@ -177,9 +207,11 @@ The budgets, per launch / median in ms (`checks/PlaybackStart/budgets.json`, rec
   worst skew 100 / 80 (a hosted run's five-launch median reached 53 ms; three runs of data).
 - A new item (Play primes it): sound 700 / 450, picture 800 / 460, with the common skew limits (120 / 137 ms median
   on the M1, 101–298 / 141–307 ms hosted).
-- Play right after a click, Play while hovering and a click while playing include decoding the picture at the playhead
-  (about 0.6 s on the M1): sound 3.5 / 2.5 s, picture 3.6 / 2.6 s; start skew 80 and worst skew 120 per launch after a
-  click and for a click while playing, worst skew 80 per launch while hovering.
+- Play right after a click and a click while playing include decoding the picture at the playhead (about 0.6 s on the
+  M1): sound 3.5 / 2.5 s, picture 3.6 / 2.6 s; start skew 80 and worst skew 120 per launch.
+- Play while hovering and right after a hover (since 2026-11-20): the common budgets, with start skew 60 per launch as
+  deep in the GOP. The same placed 4K start, `middle`, measured 26 / 58 ms median to sound and picture hosted.
+  Before the hover player these scenarios waited for the decode (581 / 606 ms hosted, 590 / 606 ms on the M1).
 - The start after the idle stop (output device startup): sound 700 / 600, picture 800 / 650, onset separation
   550 / 230, start and worst skew 160 / 45, one-second offset 48 per launch, lost audio 200 / 75.
 
@@ -268,7 +300,8 @@ today. The local M1 run, the warm-up line in each summary and the manual first-l
 pins graph starts to recovery, and checks the item installation order and CI connection. It also requires that a new
 item's preroll waits for Play (the memory rule above), that Play places and primes the picture before starting the sound
 and never re-seeks it while starting, that a pause holds the stopped picture (inside `pause()` or from the time
-observer's stop callback), and that a hover's end places the picture back on the playhead. Since 2026-11-20 it also
+observer's stop callback), and that a hover with the engine runs on its own player, built on the preview item's asset
+and video composition, leaving the editing picture placed. Since 2026-11-20 it also
 requires that `PlayerClock` never calls `setRate(_:time:atHostTime:)`, that drift is corrected by the picture's rate
 and a too-large drift lands both again, that a seek while playing holds the sound with the picture, that a Play on an
 output that is not rendering waits for it, that both clocks start back to back in `startClocks` (`PictureStart.begin`:
@@ -306,8 +339,10 @@ resulting budget changes visible in review.
 
 - [ ] On a long-GOP source (a screen recording or an original without optimized media), play, pause, and press Play
       again at once and after a few seconds: picture and sound continue together, no frozen frame under the sound.
-- [ ] Move the pointer over the timeline (the hover preview moves the picture) and press Space while it is still
-      there, and again after moving it off: playback starts from the playhead with picture and sound together.
+- [ ] Move the pointer over the timeline (the hover picture follows it) and press Space while it is still there, and
+      again right after moving it off: playback starts at once from the playhead, picture and sound together, and the
+      hover picture is gone. Hover over a graded part, a blur or mosaic and a web-motion clip: the hover picture
+      looks like the preview there.
 - [ ] Make an edit and press Play as soon as the preview has updated: no wait before both start.
 - [ ] While a long-GOP source plays in original mode, click far ahead on the timeline, and drag the playhead: the sound
       stops until the picture there moves, then both run together; no sound over a frozen picture.

@@ -3,13 +3,12 @@ import CoreMedia
 import Foundation
 
 // Play starts the sound only with a picture that can move at once (docs/architecture/playback-start.md): a pause
-// keeps the picture positioned, a hover sends the picture back to the playhead before Play, and Play primes a new
-// item before the sound starts. Real PlayerClock and AVPlayer on the ffmpeg clip; the sound source runs on the host clock like
+// keeps the picture positioned and Play primes a new item before the sound starts (a hover: HoverChecks.swift). Real PlayerClock and AVPlayer on the ffmpeg clip; the sound source runs on the host clock like
 // the engine. The clock ticks every half second, so its drift correction (two late ticks in a row) cannot re-seek
 // the picture inside these short windows and every native jump counted comes from starting playback. Before
 // 2026-11-19 a resume and a Play after hovering re-seeked the picture after the sound had started
 // (docs/bugfixes/2026-11-19-resume-and-hover-froze-the-picture.md).
-private final class RecordingAudioSource: PlaybackAudioSource {
+final class RecordingAudioSource: PlaybackAudioSource {
     private var position = 0.0
     private var host = ProcessInfo.processInfo.systemUptime
     private(set) var isPlaying = false
@@ -124,31 +123,5 @@ func checkSyncedStarts(clip: URL) {
     check(abs(clock.time - sound) < 0.0005, "A pause with the picture elsewhere keeps the sound's position: \(clock.time), sound \(sound)")
     settle(clock)
     check(abs((pictureTime(clock) ?? -1) - sound) < 0.05, "The picture is placed at the sound before the next Play")
-
-    // Play while the pointer hovers elsewhere: the sound waits until the picture is back on the playhead.
-    clock.seek(to: 2)
-    settle(clock)
-    clock.peek(at: 10)
-    waitForAudioClock { abs((pictureTime(clock) ?? 0) - 10) < 0.05 }
-    clock.togglePlayback()
-    check(!source.isPlaying, "Play while hovering does not start the sound before the picture returns to the playhead")
-    waitForAudioClock { source.isPlaying }
-    check(source.playedFrom == 2 && abs((source.pictureAtStart ?? -1) - 2) < 0.05,
-          "The sound starts from the playhead with the picture there: picture \(source.pictureAtStart ?? -1)")
-    clock.pause()
-
-    // A hover that ends puts the picture back on the playhead, primed: the next Play needs no native seek.
-    clock.seek(to: 4)
-    settle(clock)
-    clock.peek(at: 12)
-    waitForAudioClock { abs((pictureTime(clock) ?? 0) - 12) < 0.05 }
-    clock.endPeek()
-    settle(clock)
-    check(abs((pictureTime(clock) ?? -1) - 4) < 0.05, "Ending a hover places the picture back on the playhead")
-    let hoverJumps = JumpCounter(item)
-    clock.togglePlayback()
-    check(source.isPlaying && source.playedFrom == 4, "Play after a hover starts at once from the playhead")
-    pump(0.2)
-    check(hoverJumps.count == 0, "Play after a hover does not re-seek the picture (\(hoverJumps.count) native jumps)")
     clock.detach()
 }

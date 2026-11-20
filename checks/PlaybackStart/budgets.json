@@ -46,9 +46,10 @@
     },
     "resume": {},
     "peek-play": {
-      "audioMs": 3500,
-      "videoMs": 3600,
-      "maxSkewMs": 80
+      "startOffsetMs": 60
+    },
+    "peek-end-play": {
+      "startOffsetMs": 60
     },
     "play-seek": {
       "audioMs": 3500,
@@ -124,10 +125,6 @@
         "maxSkewMs": 45
       },
       "seek-play": {
-        "audioMs": 2500,
-        "videoMs": 2600
-      },
-      "peek-play": {
         "audioMs": 2500,
         "videoMs": 2600
       },

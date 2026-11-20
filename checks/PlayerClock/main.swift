@@ -76,8 +76,10 @@ checkDetachDropsLateTicks(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
 checkPlayDuringPreviewInstallation(clip: URL(fileURLWithPath: CommandLine.arguments[1]))
 
-// Play starts the sound only with a picture that moves at once: after a pause, a hover and on a new item.
+// Play starts the sound only with a picture that moves at once: after a pause and on a new item.
 checkSyncedStarts(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
+// A hover on its own player leaves the editing picture placed and primed: Play during or after it starts at once.
+checkHoverKeepsTheEditingPicture(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
 // After the idle stop, after a click while playing and when they drift: picture and sound start and stay together.
 checkOutputStartWaits(clip: URL(fileURLWithPath: CommandLine.arguments[3]))
 checkStalledStartPinsTheSound()

@@ -226,7 +226,7 @@
   时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
 - 盖一块（模糊 / 马赛克）在成片里真的盖了（真跑生产导出再抽帧：只改那一块、块外和基线一致、外接框就是那块、高斯剖面贴着理想的阶跃响应、马赛克格子边长对且从左上角起算、只在那一段时间里盖、形状压在它上面不被糊、调色在它前面、藏起来的不导出、不算总长）：`scripts/check-cover-export.sh`（`check-all.sh` 第 5 组）。
 - 导出水印真的叠上了、只在该在的地方（纯值：logo 的路径、PNG 白字带阴影 70%、跳的表不连续同一处、四角 / 正中多大放哪、分段表达式逐时刻求值一致且平衡；真导出开着 / 不开各导一遍抽帧比：每一段落在表上那一处、4 秒边界上正好换、盖满画面的形状上面照样有、不加时参数里没有水印、缩到 480p 之后还在那一角）：`scripts/check-export-watermark.sh`（`check-all.sh` 第 5 组）；加不加只问 `WatermarkPolicy`（纯值里验：授权要加 / 测试开关才加、要加却读不出 logo 抛错）、导出器拿授权问且读不出 logo 不导、每一处问它都传授权、只有导出器调 `plan()`、叠在烧字幕之后缩小之前：`checks/export-watermark-wiring.sh`（第 1 组）。
-- 预览上的盖一块真的盖上了（生产的 `CoverHostView` 放进真窗口、拍屏数像素：块里糊成混色块外还是硬的、改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照）：`scripts/check-cover-preview-attach.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
+- 预览上的盖一块真的盖上了（生产的 `CoverHostView` 放进真窗口、拍屏数像素：块里糊成混色块外还是硬的、改动的行正好是块的上下沿、调色带上了、马赛克格线从块的左上角起算、两块同时盖、撤掉之后回到参照；since 2026-11-20 the hover view against the editing picture: grade and covers alike, nothing while hidden）：`scripts/check-cover-preview-attach.sh`。**要图形会话，故意不在 `check-all.sh` 里**，改 `VideoEditCoverPreview.swift` / `VideoEditCoverFilters.swift` 时按 [GUI 冒烟流程](../testing/gui-smoke-testing.md) 跑。
 - 声音渐入渐出、音量曲线与推子的真实包络（预览 = 引擎离线渲、导出 = 真跑 ffmpeg 两条管线），电平表（挂着表离线渲，
   对账轨道表 / 总表 / 红灯），以及过 0 dBFS 的混音过真峰值限幅器（没过顶逐采样原样、过顶一个采样不超上限、稳态正弦不削成方波、
   尖峰时刻不变、总长不变）、整段响度按 BS.1770 且和 ffmpeg 的 `ebur128` 一致、成片响度和混音一致（第 10 组）；true peak (group 10c, since 2026-11-17:
@@ -534,10 +534,13 @@
   跑 `checks/preview-perf-wiring.sh --fix` 自动补上。同一个守卫还钉着**时间线上的块不许
   读工程的属性、必须 `Equatable` 且构造处套 `.equatable()`**，以及**订阅播放器时钟的只许是名单里跟着播放头动的
   小视图**（根视图、时间线本体、检查器、素材库、字幕列表都持有不订阅）。
+  Since 2026-11-20 each scenario ends with a hover phase (`PreviewBenchHover`, 8 stops on the hover player). Its memory is
+  gated as `<scenario>.hover.peakMB`, approved by the user; its counts are reported only.
 - `scripts/check-playback-start.sh` uses the real editor, a fresh project and a 4K long-GOP source to measure first sound,
   first motion and sync at onset and one second later, and the longest picture stall and worst skew over the first two
-  seconds; scenarios include a rebuilt item, Play right after a click, a resume, Play while hovering, a click while
-  playing (`play-seek`, since 2026-11-20) and the start after the idle stop. The graphical CI step gates timing and
+  seconds; scenarios include a rebuilt item, Play right after a click, a resume, Play while hovering and right after a
+  hover (`peek-play` / `peek-end-play`: the hover runs on its own player, so no preroll and the common budgets since
+  2026-11-20), a click while playing (`play-seek`, since 2026-11-20) and the start after the idle stop. The graphical CI step gates timing and
   one-time preview work; off the hosted runner every launch of every scenario must keep the picture in step (`strict`).
   Local knobs (not used by the gate): `SRTFLOW_PLAYBACK_START_ONLY` / `_REPEAT` run some scenarios repeatedly in one
   launch, `_IDLE_SECONDS` lengthens the idle stop (20 s reproduced the idle start's failures that 2 s hid).
@@ -546,7 +549,8 @@
   pause (since 2026-11-20); a staging timeout names the player's state.
   `checks/playback-start-wiring.sh` checks the Play path and the workflow connection, and that Play never starts the
   sound ahead of a placed, primed picture nor re-seeks the picture under running sound; `scripts/check-player-clock.sh`
-  (`SyncedStartChecks.swift`) checks pause, resume, hover and a new item on a real AVPlayer, (`LandingChecks.swift`) the
+  (`SyncedStartChecks.swift`) checks pause, resume and a new item on a real AVPlayer, (`HoverChecks.swift`) that a hover
+  on its own player leaves the editing picture placed and Play during or after it starts at once, (`LandingChecks.swift`) the
   start on an output that is not rendering, a click and a drag while playing and drift corrections without a native
   jump, and (`AudioTimelineChecks.swift`) that the benchmark reads the sound across a sliver between audio blocks.
   [Playback start](../architecture/playback-start.md).
