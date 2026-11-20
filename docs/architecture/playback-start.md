@@ -108,6 +108,17 @@ tail and must start at zero. The idle case uses the production suspension entry 
 before Play. If focus or pointer activity wakes it during preparation, the check tries the setup once more. The
 idle-policy tests cover when the two-minute stop is due.
 
+**Each scenario starts from a settled pause** (`PlaybackStartScenarios.settle`). Before staging, the bench pauses, which
+also drops a failed trial's pending Play. It waits until the item's timebase has stopped and no placement runs, then
+250 ms more, the gap a person leaves before the next action. Until 2026-11-20 each staging seek followed the previous
+measurement's pause within a millisecond. In about 1 of 10 gate launches the seek to 10.0 after the `cut` scenario then
+reported done without the frame ever arriving, and one failed trial's leftover Play turned the next scenario's Play into a
+pause ([case](../bugfixes/2026-11-20-playback-gate-staging-after-pause.md)).
+
+A staging step waits only for what its measurement needs. `fresh-item` waits for the click's placement and then for the
+rebuilt item's paused picture, never for the paused picture of the item the rebuild replaces. A staging timeout names
+the player's state: playhead, timebase, rate, item status, placement and last picture.
+
 The window goes on the display with the highest refresh rate. On the M1 it had landed on a 25 Hz television
 (40 ms between display deadlines), which quantized every picture time and could hide a short stall.
 
@@ -177,11 +188,14 @@ its per-launch budget, and since the worst skew includes the first frame no wors
 skew budget: `compare.py` rejects such a file. In calibration the first Play was usually dispatched in under 2 ms.
 
 **This Mac fails on any picture out of step** (`strict` in `budgets.json`, applied wherever the runner is not the
-hosted virtual Mac): every launch of every scenario must start the picture within 60 ms of the sound and within 45 ms
+hosted virtual Mac): every launch of every scenario must start the picture within 70 ms of the sound and within 45 ms
 of its timeline, never hold a frame longer than 100 ms in the first two seconds (three frames at 30 fps; the cadence
 is 33 ms) and never differ from the sound by more than 45 ms there. Since 2026-11-20 no scenario is skipped; until then
 the start after the idle stop was (its hosted limits still allow 160 ms of skew per launch). On the M1 after the
-2026-11-19 fix the worst elsewhere were 51 ms onset (a resume), 25 ms skew and one 50 ms frame hold. The hosted limits above stay looser: the virtual Mac decodes 4K in
+2026-11-19 fix the worst elsewhere were 51 ms onset (a resume), 25 ms skew and one 50 ms frame hold. The onset limit was
+60 ms until 2026-11-20. Since then the first sound is the playhead's own sample instead of one 11.6 ms quantum later. A
+cold open whose first advancing picture is the second frame is in step at 47–64 ms onset gaps (start skew −2 to
+−19 ms), and it failed the old limit in 2 of 5 launches twice. The hosted limits above stay looser: the virtual Mac decodes 4K in
 software and sometimes stalls for a second after a clean start, and an isolated stalled launch counts as one
 outlier under the half-of-the-launches rule.
 
@@ -258,7 +272,9 @@ observer's stop callback), and that a hover's end places the picture back on the
 requires that `PlayerClock` never calls `setRate(_:time:atHostTime:)`, that drift is corrected by the picture's rate
 and a too-large drift lands both again, that a seek while playing holds the sound with the picture, that a Play on an
 output that is not rendering waits for it, that both clocks start back to back in `startClocks` (`PictureStart.begin`:
-the sound pinned to a stalled picture's start), and that the engine's paused render takes up a paused seek.
+the sound pinned to a stalled picture's start), and that the engine's paused render takes up a paused seek. It also
+requires that the bench stages every scenario from a settled pause and `fresh-item` without waiting for the replaced
+item's picture.
 `scripts/check-player-clock.sh` (`SyncedStartChecks.swift`, `LandingChecks.swift`) checks the same behavior on a real
 AVPlayer with a picture-only long-GOP clip; `scripts/check-audio-engine.sh` group 17 checks the paused seek.
 
