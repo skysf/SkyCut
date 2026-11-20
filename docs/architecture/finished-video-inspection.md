@@ -426,7 +426,11 @@ the debug build and has a 480 s deadline; the documentary film's hint is the rul
 cinematic-opening and sci-fi expecting music. `scripts/check-sky-studio.sh` (`StyleContentChecks`): `expects_music` read only as a
 boolean.
 
-Reverse controls (2026-11-20), each restored afterwards: see the report of the change (impl-briefs are local); recorded in the PR.
+Reverse controls (2026-11-20), each restored afterwards: the registry not passing the style fails the real job's suspect and its
+mark (2); cinematic-opening without its music line fails the App's answer, the job's suspect and its mark (3) and `RecipeChecks`'
+header and pinned set (2); the manifest's `expects_music` ignored fails "the manifest wins" (1) and, not read at all, the manifest
+check (1); `audio_music_missing` listed as a hint fails the rule's listing, the job's suspect and its mark (3). Without its name in
+`catalogKnownNames` the guide's music section fails `scripts/check-mcp.sh`.
 
 Manual regression before release:
 
