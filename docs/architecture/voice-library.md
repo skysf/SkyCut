@@ -483,6 +483,26 @@ Which clips failed at the separation is remembered only while the App runs (the 
 
 全部恢复后转绿（`check-voice-recovery` 连跑两遍都绿）。
 
+Reverse checks for item 12 (2026-11-21): each fix undone alone, the check run, red seen, the file restored byte for byte.
+
+| Undone | Red |
+| --- | --- |
+| The job drops `skip_separation` (sends another value than the quote) | `check-voice-recovery` 8: the default job's "false as quoted", the direct quote / job pair, get_job's one voice clip, the books, the direct retry, the panel's job and its landing |
+| `change_voice` ignores `skip_separation` | 9: the direct price and one-track `next_step`, the quote / job pair, get_job, voice-only download, one track, the unconfirmed-quote refusal (3), the direct retry |
+| A conversion needs `background_url` again | 6: the direct get_job and landing, "a default result without its background fails and says so", the direct retry, the panel's landing (2) |
+| A direct landing adds an empty background track | 3: "exactly one new track" (pure), the tool's one track, the panel's landing |
+| `separation_failed` handled like any failure | 8: code, charge and `next_step`; remembered for a retry; the task row's localized line; the panel's notice line; the panel opened again with the checkbox on, and its quotes (3) |
+| A failed job keeps the whole quote (the rule before) | 1: "only the separation's part, 6.5 of the 9 reserved" (it kept 9.0) |
+| An unconfirmed direct quote passes | 5: the AI's refusal (3), the panel's "no price, starts nothing" (2) |
+| A default result without its background lands | 2: "fails and says so", "nothing lands and the source is not muted" |
+| The checkbox does not re-quote | 4: switching drops the price, asks again, the panel's unconfirmed quote (2) |
+| The panel does not preselect the checkbox after a failed separation | 4: "opens with the direct option on", the direct quote, the switch (2) |
+| A landed change keeps the failed-separation mark | 2: the AI's direct retry and the panel's landing forget it |
+| The user sees the server's English instead of the localized line | 2: the task row, the notice bar |
+| Requests never carry `skip_separation: true`; a conversion needs a background; an unconfirmed quote passes (one run, three edits) | `check-sky-studio` 5, one or more each: "true goes in the quote and in the job"; "a direct change needs voice_plan.skip_separation true"; a voice-only and a null-background conversion read, a voice-only job finishes |
+| `change_voice` without the `skip_separation` parameter | `check-mcp` 13: the argument check, the boolean type, the description's five when-to-use words, the example, the card's / overview's / result's / direct_change's names |
+| No `direct_change` section, and the card without the one-track clause (one run) | `check-mcp` 14: the section list, the section's eleven must-haves, the reading tip's section, the card clause |
+
 人工回归（自动化够不着的；真 Sky Studio 的变声**要花积分，每次先请用户批准预算**，方案 9.3）：
 
 - [ ] 右键一段有声音的视频段、一段音频段：都有「换成我的声音…」；静音了的段、图片段没有。
