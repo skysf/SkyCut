@@ -11,6 +11,8 @@ import SrtFlowMCPKit
 // 3. 把关：只判每日硬预算（不是一次性费用，两种权限模式都不问；超了回 daily_budget_exceeded、什么都不起）。
 // 4. 起任务、**回任务号**；做完那一刻的落地是异步落账，任务里自己包一层 `AIUndoGrouping.step`（VoiceChangeJob.land）。
 // Key 只静默读（AI 起的，没人在看）；声音库用不了（503 voice_library_unavailable）照实说、一分不花。
+// `skip_separation` (optional, default false, 2026-11-21): a direct change, in the draft and so in the quote and the job; a
+// direct quote Sky Studio does not confirm is refused before anything is reserved.
 // 不管什么：说明文字（MCPVoiceChangeTool / MCPGuideVoiceChangeTopic）、面板（VoiceChangePanelModel）。
 
 @MainActor
@@ -26,6 +28,7 @@ enum VoiceChangeTool {
         if let problem = VoiceChangeSource.refusal(for: clip) { throw AIToolError(problem.message) }
         let requested = try args.requiredString("voice").trimmingCharacters(in: .whitespacesAndNewlines)
         let given = try args.string("language")
+        let direct = try args.bool("skip_separation") ?? false
         guard !VoiceChangeActivity.shared.isChanging(id) else {
             throw AIToolError("\(clip.name) is already having its voice changed; wait for that job with get_job.")
         }
@@ -51,12 +54,16 @@ enum VoiceChangeTool {
         catch let problem as VoiceChangeProblem { throw AIToolError(problem.message) }
         let spoken = try await VoiceChangeOrder.spokenLanguage(given: given, source: source, services: services)
         let draft: SkyStudioJobRequest
-        do { draft = try VoiceChangeOrder.draft(target: target, seconds: source.seconds, spoken: spoken) }
+        do { draft = try VoiceChangeOrder.draft(target: target, seconds: source.seconds, spoken: spoken, skipSeparation: direct) }
         catch let problem as SkyStudioVoiceRequestProblem { throw AIToolError(problem.message + " Nothing was sent.") }
         let quote: SkyStudioQuote
         do { quote = try await services.api.quote(draft, key: key) }
         catch is CancellationError { throw CancellationError() }
         catch { throw AIToolError(SkyStudioVoiceLibraryErrors.uncharged(error)) }
+        guard SkyStudioVoiceRequests.quoteConfirms(quote, skipSeparation: direct) else {
+            throw AIToolError("Sky Studio's quote does not confirm skip_separation, so it would separate the clip and charge for it. "
+                + "Nothing was started or charged. Call change_voice without skip_separation, or try again later.")
+        }
 
         // 问 Sky Studio 的这几秒里工程可能换了、这一段可能没了、别的调用可能已经起了这一段。
         guard project.documentGeneration == generation, let current = project.state.clip(with: id),
@@ -79,10 +86,13 @@ enum VoiceChangeTool {
             "seconds_sent": AIFormat.seconds(source.seconds),
             "credits": .number(SkyStudioCredits.number(quote.credits)),
             "daily_limit_credits": .number(spend.dailyLimit), "spent_today_credits": .number(SkyStudioCredits.number(spend.spentToday())),
+            "skip_separation": .bool(direct),
             "next_step": .string(
                 "Tell the user it costs up to \(SkyStudioCredits.text(quote.credits)) Sky Studio credits"
-                    + (minutes.map { " and usually takes about \($0) min" } ?? "") + ". Wait with get_job. When it is done the changed voice "
-                    + "and the separated background are on two new linked audio tracks and the original clip is muted (one undo step)."
+                    + (minutes.map { " and usually takes about \($0) min" } ?? "") + ". Wait with get_job. When it is done "
+                    + (direct ? "the changed voice is on one new linked audio track (nothing was separated, so there is no background)"
+                        : "the changed voice and the separated background are on two new linked audio tracks")
+                    + " and the original clip is muted (one undo step)."
             )
         ]
         if let expected = quote.creditsExpected { result["credits_expected"] = .number(SkyStudioCredits.number(expected)) }

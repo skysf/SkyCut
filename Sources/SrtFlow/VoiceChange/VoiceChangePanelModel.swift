@@ -10,6 +10,10 @@ import Foundation
 //    手里的报价作废、重新问。
 // 5. 按下「开始」**就是确认**（和 upscale 面板同一个口径，不走确认码）：照报价先过每日硬预算、记账、起任务（VoiceChangeJob，做完
 //    自动落地、提示条说一句）。关掉面板不取消已经起的任务；没起任务就把截好的那段声音删掉。
+// 6. The direct option (skip the separation, 2026-11-21) is part of what is quoted: turning it on or off drops the quote in hand
+//    and asks again, and the job sends the quoted draft, so the quote and the job carry the same value. A direct quote Sky
+//    Studio does not confirm is not offered. When this clip's last change failed at the separation, the panel says so and
+//    opens with the option on (VoiceChangeActivity), so the retry is one click.
 // 视图只订阅这一份和声音库、试听、积分的账；工程只在这里的方法里读（开面板、按下「开始」那一下），视图的 body 不读。
 // 不管什么：界面（VoiceChangePanel）、任务（VoiceChangeJob）、价（服务器的 /quote，这里不写数）。
 
@@ -37,6 +41,10 @@ final class VoiceChangePanelModel: ObservableObject {
 
     /// 选中的声音（`voice_…` / `gemini:<名字>`）。
     @Published var selection: String? { didSet { if selection != oldValue { requote() } } }
+    /// Direct change: skip the separation (a clip that is already a clean voice). Changing it asks for a new price.
+    @Published var skipSeparation = false { didSet { if skipSeparation != oldValue { requote() } } }
+    /// This clip's last change stopped because the separation failed: the panel says so (and opened with the direct option on).
+    let separationFailedBefore: Bool
     @Published private(set) var source: Source = .preparing
     /// 这一段说的是什么语言（检测出来的；检测不出来是 nil）。
     @Published private(set) var spoken: String?
@@ -64,6 +72,8 @@ final class VoiceChangePanelModel: ObservableObject {
         self.store = store ?? VoiceLibraryStore.shared
         clipName = clip.name
         clipSeconds = clip.sourceDuration
+        separationFailedBefore = VoiceChangeActivity.shared.separationFailed(clipID)
+        skipSeparation = separationFailedBefore
     }
 
     // MARK: 给界面读的
@@ -174,7 +184,8 @@ final class VoiceChangePanelModel: ObservableObject {
         problem = nil
         quoted = nil
         guard case .ready(let prepared) = source, let target,
-              let draft = try? VoiceChangeOrder.draft(target: target, seconds: prepared.seconds, spoken: spoken) else {
+              let draft = try? VoiceChangeOrder.draft(target: target, seconds: prepared.seconds, spoken: spoken,
+                                                      skipSeparation: skipSeparation) else {
             if offer != .none { offer = .none }
             return
         }
@@ -194,6 +205,10 @@ final class VoiceChangePanelModel: ObservableObject {
         do {
             let quote = try await store.api.quote(draft, key: key)
             guard !Task.isCancelled else { return }
+            guard SkyStudioVoiceRequests.quoteConfirms(quote, skipSeparation: SkyStudioVoiceRequests.skipsSeparation(draft)) else {
+                offer = .failed(L10n("Sky Studio cannot change this clip's voice directly right now. Turn off Change directly to use the separation."))
+                return
+            }
             quoted = (draft, target, key)
             offer = .ready(quote)
         } catch is CancellationError {

@@ -392,11 +392,14 @@
 5. **钱**：先 `/quote`（按源秒数，免费、不建任务），交任务时报价当 `max_credits`。**只判每日硬预算**——变声不是一次性费用，两种权限模式都不问、
    不发确认码（超了回 `daily_budget_exceeded`、什么都不起）；面板上的报价就是确认（那一行标红、按钮灰着）。交和等只经 `SkyStudioJobRun`（声音池领槽、
    满了等、**不重放收费 POST**：提交的回答丢了就是结果不明，那一笔留在账上、照实说；只有排着队的能取消）。做完按服务器的结算证据改账，没做成它退了的退回。
+   A failed job that Sky Studio settles above zero (`billing.credits_charged`, such as `separation_failed` keeping the separation) is settled at that
+   charge, not kept at the whole quote (item 12).
 6. **落地**（`VoiceChangeLanding`，纯值）：原片段**静音、不删**；**新开两条音频轨**（接在现有音频轨后面），人声、背景各一段，放在原片段同一时间；
    带上原片段的变速、音量、渐入渐出、音量曲线（曲线锚在源时间上，平移到新文件自己的时间）、声音场景；三段同一个链接组（原片段本来就在组里就沿用）；
    人声比原片段长的那几毫秒（Chatterbox HD 实测长 5–35 ms）只在时间线上裁到原长、文件不动。两段都用原片段的音量、不另加增益（导出的限幅器兜底）。
    任务跑了几分钟，这一段可能被动过：**照它现在的样子落**（挪了落到新位置、裁短了只取还用着的那一截）；不在了、换了素材、往外拉出了没送去变声的
    部分、工程换了 / 关了：**只留文件**，结果里 `landed: false`、说为什么，**不落到别的工程**（`CloudTaskOwner`）。
+   A direct change (item 12) lands the voice alone by the same rules: one new track and one new clip, the original muted and linked.
 7. **一步撤销**（方案 4.9）：落地是异步落账（不是用户事件）——`VoiceChangeJob.land` 里**恰好一次** `perform`、外面包一层 `AIUndoGrouping.step`，
    AI 起的、面板起的都走这一份：⌘Z 一步回到原声，⇧⌘Z 再来。路由只起任务、不包撤销分组。撤销不退钱、不删文件。
 8. **联动**：落地本身不动主轨画面，联动什么都不挪。之后照[联动](timeline-linkage.md)的规矩：原片段在主轨上时，两段新音频压在它上面——挪它跟着挪、
@@ -414,19 +417,47 @@
 11. **AI 那一面**：参数 `clip_id`（方案写的是 `clip`，照全清单的习惯改了）、`voice`（`voice_…` 或预设名）、`language`、`project`；回任务号（种类
     `voice_change`），`get_job` 做完报两段新音频的 id 和轨、两个文件、`model` / `fallback_used`、实收。名片 + 说明书主题（`MCPGuideVoiceChangeTopic`）
     都不写价和上限的数。
+12. **Direct change and a failed separation** (2026-11-21, the user's request after the B07 clip whose speech Sky Studio's separation left in
+    the background, so the "changed" voice had no speech and the job still landed as a success; [case](../bugfixes/2026-11-21-voice-change-success-without-speech.md);
+    the API contract is Sky Studio's `docs/agents/skycut-api.md` "voice_convert"):
+    - **One ordering path, one value.** The panel's checkbox 「直接换声（跳过人声分离）」 and `change_voice`'s optional `skip_separation` (default false)
+      go into the one draft (`VoiceChangeOrder.draft` → `SkyStudioVoiceRequests.convert`, `params.skip_separation` always sent as a JSON boolean).
+      The job is that draft plus the upload, so the quote and the job carry the same value (Sky Studio prices `/jobs` from the job's own params; a
+      direct quote followed by a job without it is `price_changed`). Switching the checkbox drops the quote in hand and asks again.
+    - **What a direct change is.** Sky Studio runs only the conversion (Chatterbox HD; charged alone, much less than separation + conversion) on
+      the clip's sound as it is: nothing can fail at the separation, but music, noise or a second voice go through the conversion too. So it is
+      for a clip that is already a clean voice (AI or TTS speech, an isolated dialogue track); the panel's line and the AI's guide say so.
+    - **The quote must confirm it.** `voice_plan.skip_separation: true` (`SkyStudioVoiceRequests.quoteConfirms`): a server that ignored the
+      parameter would separate, charge for it and return two files, so the AI's call is refused and the panel offers no price, before anything
+      is reserved.
+    - **Results.** A direct change returns `voice_url` alone (`SkyStudioVoiceConversion.backgroundURL` is optional); only the voice is downloaded
+      and it lands on one track (get_job has `skip_separation` and no `background_clip_id` / `background_file` / `background_track`). A default
+      change still needs both files: one without `background_url` lands nothing (the background would vanish from the mix) and fails with
+      "check this job with Sky Studio".
+    - **`separation_failed`** (job end code, default changes only: after the separation the source clearly had speech, the voice stem almost
+      none and the background still had speech; the conversion is never called): the job **fails**, never done; nothing lands and the source
+      keeps playing. The cloud task row and, for a change started in the panel, the notice bar show 「人声分离失败，可改用直接换声」 (localized
+      by the code, `SkyStudioVoiceCodes.separationFailed`; the server's English is not shown). get_job carries `code`, `failure`,
+      `credits_charged` and a `next_step` to call again with `skip_separation=true` only for a clean voice. The panel opened again on that clip
+      says so above the checkbox and opens with it on (`VoiceChangeActivity`, for this run of the App; a change of that clip that lands forgets it).
+    - **Books.** A failed job settles at Sky Studio's final net charge when it reports one above zero (`separation_failed` keeps the separation's
+      part and returns the conversion's); otherwise the refund rule of item 5. Before 2026-11-21 a failed job that kept the separation (Sky Studio
+      already did this when both conversion models failed) stayed on this Mac's daily books at the whole quote.
 
 **还没做的 / 已知不足**：没有恢复记录——SkyCut 中途退出，这一单在服务器上照样做完、成品留 60 天，但本机不会再落地（同 upscale），
 本机账上那一笔照报价留在那一天、不按实收换（声音库的两种收费单重启后会接着跟，第十节第 11 条；变声没有）；
 下载两次都失败时任务以失败结束、只报 Sky Studio 的任务号。背景是单声道（决定第三节第 8 条已接受）。分割出来的右半段不继承「正在变声」。
-每次变声都新开两条轨（照约定第 4 条），一条时间线上变很多段时轨会很多：先变声再分割。
+每次变声都新开两条轨（照约定第 4 条；a direct change opens one），一条时间线上变很多段时轨会很多：先变声再分割。
+Which clips failed at the separation is remembered only while the App runs (the panel opened after a restart starts with the separation again).
 
 | 检查 | 守什么 |
 | --- | --- |
-| `scripts/check-voice-recovery.sh` 的 `VoiceChangeChecks`（真 App 对象 + 假协议 `VoiceChangeHTTP`，方案 9.1 第 7、11 项） | 落地的规则（纯值）：原段静音、两条新轨接在后面、三段一个链接组（已有的组沿用）、变速 / 音量 / 渐变照抄、曲线平移、长 20 ms 裁到原长、背景短一点不拉长、被裁短挪走照现在的样子落、不在了 / 换了素材 / 往外拉长了什么都不改；联动开着挪 / 真删主轨的原片段两段跟着。下单的规则：上限从 `/models`（300）、正好等于上限的收、静音 / 没声音的不收、采样率最高 48 kHz、`target_language` 只在知道语言且目标有这种参考时带、文件名和撞名、放不进原文件夹的退路、面板默认选谁。`change_voice` 全程：先报价后上传、单声道 16-bit 48 kHz 正好 4 秒、`voice_convert_source`、一次 `/jobs`（`max_credits` 是报价）、落地的每一样、两个文件、get_job 的字段、账按实收、截好的那段删掉；预设当目标不问声音库；AI 给的语言优先于检测、检测出目标没有的语言不带、检测不出来不带；超上限 / 静音 / 几乎没声音 / 不认识的声音 / 声音库用不了 / 每日额度不够都在收费之前停；**一步撤销 / 重做**、之后的改动是另一步；这一段被删了 / 工程换了只留文件、同一段不交第二次；服务器说没做成退回那一笔、留在任务浮层里；提交的回答丢了不重交、那一笔留在账上。面板：默认选谁、选了才问价、换声音报价作废、超额度按不下去、按下去起同一个任务并自动落地、提示条、记住上次的声音、没有自己的声音不替用户选、超上限说上限 |
-| `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` / `ProviderChecks` | 参数名（`clip_id` / `voice` / `language` / `project`，不收 `confirm_token`、不收 `clip`）、名片必含（花积分、任务号、两条新轨、原段静音、一步撤销、每日上限、先读说明书）且不许诺确认、说明书的分节和必含、不写数、地图的 Voices 一行和 Paid 一行、paid 主题 |
+| `scripts/check-voice-recovery.sh` 的 `VoiceChangeChecks`（真 App 对象 + 假协议 `VoiceChangeHTTP`，方案 9.1 第 7、11 项） | 落地的规则（纯值）：原段静音、两条新轨接在后面、三段一个链接组（已有的组沿用）、变速 / 音量 / 渐变照抄、曲线平移、长 20 ms 裁到原长、背景短一点不拉长、被裁短挪走照现在的样子落、不在了 / 换了素材 / 往外拉长了什么都不改；联动开着挪 / 真删主轨的原片段两段跟着。下单的规则：上限从 `/models`（300）、正好等于上限的收、静音 / 没声音的不收、采样率最高 48 kHz、`target_language` 只在知道语言且目标有这种参考时带、文件名和撞名、放不进原文件夹的退路、面板默认选谁。`change_voice` 全程：先报价后上传、单声道 16-bit 48 kHz 正好 4 秒、`voice_convert_source`、一次 `/jobs`（`max_credits` 是报价）、落地的每一样、两个文件、get_job 的字段、账按实收、截好的那段删掉；预设当目标不问声音库；AI 给的语言优先于检测、检测出目标没有的语言不带、检测不出来不带；超上限 / 静音 / 几乎没声音 / 不认识的声音 / 声音库用不了 / 每日额度不够都在收费之前停；**一步撤销 / 重做**、之后的改动是另一步；这一段被删了 / 工程换了只留文件、同一段不交第二次；服务器说没做成退回那一笔、留在任务浮层里；提交的回答丢了不重交、那一笔留在账上。面板：默认选谁、选了才问价、换声音报价作废、超额度按不下去、按下去起同一个任务并自动落地、提示条、记住上次的声音、没有自己的声音不替用户选、超上限说上限。Both orders carry `skip_separation` false. `VoiceChangeDirectChecks` (item 12): a voice-only result lands on one track (pure); `change_voice skip_separation=true` sends true in the quote and the job, downloads only the voice, lands one track with the original muted, get_job without background fields, one undo / redo; an unconfirmed direct quote starts and charges nothing; a default result without its background lands nothing; `separation_failed` fails with nothing landed, the source unmuted, only the separation on the books, the localized line in the task row, a direct retry that lands and forgets the failure; the panel: the localized notice, opened again with the checkbox on, switching re-quotes, an unconfirmed quote offers no price, Start sends the quoted value, one undo |
+| `scripts/check-mcp.sh` 的 `SkyStudioVoiceChecks` / `GuidePilotChecks` / `ProviderChecks` | 参数名（`clip_id` / `voice` / `language` / `project` / `skip_separation` (a boolean)，不收 `confirm_token`、不收 `clip`）、名片必含（花积分、任务号、两条新轨、原段静音、一步撤销、每日上限、先读说明书）且不许诺确认、说明书的分节和必含、不写数、地图的 Voices 一行和 Paid 一行、paid 主题；the card's one-track clause, `skip_separation`'s when-to-use words, the `direct_change` section's must-haves (clean voice only, cheaper, same value in quote and job, `separation_failed` and the direct retry) |
+| `scripts/check-sky-studio.sh` 的 `VoiceJobChecks` | `skip_separation` false by default and true in a direct quote and its job; `quoteConfirms`; a voice-only (or null-background) conversion is a result, a background that is not a link or no voice is none, also at the job-run level; `separation_failed` reads as a failed job keeping the separation on the bill |
 | `checks/sky-studio-wiring.sh` 第 14 节（`checks/sky-studio-wiring/voice-change.sh`）和 `checks/MCP/router-wiring.sh` 的异步落账扫描 | 两个入口都经 `prepare` / `draft` / `spokenLanguage`、都是先过每日硬预算再 `start`；`VoiceChangeJob` 只在 `VoiceChangeOrder` 里造；这一摊不用确认码、不弹框、不直接动账；落地恰好一次 `perform`、上一行是 `AIUndoGrouping.step`、规则只有 `VoiceChangeLanding.land` 一份；路由只起任务；上传用途只写一处；阻塞读在 `MediaReadQueue.analysis`；块只往 Activity 写目标；Presenter 挂在检查器底下且 `.equatable()`；面板的视图不读工程、用共用的选择器 |
 | `scripts/gui-smoke/sky-studio/voice_change.py`（真 App + 真 MCP + 本机假 Sky Studio，免费，**不在 check-all 里**） | `change_voice` 走全程：报价 → 上传（不带 Key）→ 一次任务 → 两条新轨、原段静音 → 撤销一步回去；账按实收；不认识的声音收费前拒 |
-| `scripts/render-voice-library.sh <输出目录>` 的第 9、10 张（要图形会话，**不在 check-all 里**） | 不判对错，只出图：变声面板（选了声音带报价 / 还没有自己的声音），英 / 中 / 西 |
+| `scripts/render-voice-library.sh <输出目录>` 的第 9、10、11 张（要图形会话，**不在 check-all 里**） | 不判对错，只出图：变声面板（选了声音带报价 / 还没有自己的声音 / after a failed separation: the line, the direct checkbox on, the direct quote），英 / 中 / 西 |
 
 反向验证（2026-11-11，每一处临时改坏、跑、看红、再恢复）：
 
@@ -452,6 +483,26 @@
 
 全部恢复后转绿（`check-voice-recovery` 连跑两遍都绿）。
 
+Reverse checks for item 12 (2026-11-21): each fix undone alone, the check run, red seen, the file restored byte for byte.
+
+| Undone | Red |
+| --- | --- |
+| The job drops `skip_separation` (sends another value than the quote) | `check-voice-recovery` 8: the default job's "false as quoted", the direct quote / job pair, get_job's one voice clip, the books, the direct retry, the panel's job and its landing |
+| `change_voice` ignores `skip_separation` | 9: the direct price and one-track `next_step`, the quote / job pair, get_job, voice-only download, one track, the unconfirmed-quote refusal (3), the direct retry |
+| A conversion needs `background_url` again | 6: the direct get_job and landing, "a default result without its background fails and says so", the direct retry, the panel's landing (2) |
+| A direct landing adds an empty background track | 3: "exactly one new track" (pure), the tool's one track, the panel's landing |
+| `separation_failed` handled like any failure | 8: code, charge and `next_step`; remembered for a retry; the task row's localized line; the panel's notice line; the panel opened again with the checkbox on, and its quotes (3) |
+| A failed job keeps the whole quote (the rule before) | 1: "only the separation's part, 6.5 of the 9 reserved" (it kept 9.0) |
+| An unconfirmed direct quote passes | 5: the AI's refusal (3), the panel's "no price, starts nothing" (2) |
+| A default result without its background lands | 2: "fails and says so", "nothing lands and the source is not muted" |
+| The checkbox does not re-quote | 4: switching drops the price, asks again, the panel's unconfirmed quote (2) |
+| The panel does not preselect the checkbox after a failed separation | 4: "opens with the direct option on", the direct quote, the switch (2) |
+| A landed change keeps the failed-separation mark | 2: the AI's direct retry and the panel's landing forget it |
+| The user sees the server's English instead of the localized line | 2: the task row, the notice bar |
+| Requests never carry `skip_separation: true`; a conversion needs a background; an unconfirmed quote passes (one run, three edits) | `check-sky-studio` 5, one or more each: "true goes in the quote and in the job"; "a direct change needs voice_plan.skip_separation true"; a voice-only and a null-background conversion read, a voice-only job finishes |
+| `change_voice` without the `skip_separation` parameter | `check-mcp` 13: the argument check, the boolean type, the description's five when-to-use words, the example, the card's / overview's / result's / direct_change's names |
+| No `direct_change` section, and the card without the one-track clause (one run) | `check-mcp` 14: the section list, the section's eleven must-haves, the reading tip's section, the card clause |
+
 人工回归（自动化够不着的；真 Sky Studio 的变声**要花积分，每次先请用户批准预算**，方案 9.3）：
 
 - [ ] 右键一段有声音的视频段、一段音频段：都有「换成我的声音…」；静音了的段、图片段没有。
@@ -469,4 +520,11 @@
 - [ ] AI：让它对一段调 `change_voice`（先 `list_voices` 挑我的声音）：回任务号和价、`get_job` 的阶段在走、做完时间线上是两条新轨；
       每日额度调到比报价低再调：回 `daily_budget_exceeded`、什么都没起；请求批准和全部权限两种模式都不问。
 - [ ] Sky Studio 没配声音桶时（或断网）：面板和 AI 都说「声音库暂时用不了 / 一分没花」。
-- [ ] 英 / 中 / 西三种界面：菜单项、面板、提示条无截字、无漏翻（`scripts/render-voice-library.sh` 的第 9、10 张先看一遍）。
+- [ ] 英 / 中 / 西三种界面：菜单项、面板、提示条无截字、无漏翻（`scripts/render-voice-library.sh` 的第 9、10、11 张先看一遍）。
+- [ ] Direct change (item 12), in English / Chinese / Spanish: the checkbox 「直接换声（跳过人声分离）」 and its line fit the panel; turning it on
+      changes the top line to one track and asks again for a lower price; turning it off asks again for the default price.
+- [ ] A clean AI / TTS clip changed directly (real Sky Studio, spends credits: ask the user for a budget first): one new track holds the voice,
+      the original is muted, ⌘Z is one step back to the original sound; the files next to the source are the voice alone.
+- [ ] After a 「人声分离失败，可改用直接换声」 (a default change of a clip whose speech the separation leaves in the background, such as the
+      user's B07 clip): the cloud task row and the notice bar say it, nothing landed, the source plays; right-click the clip → 「换成我的声音…」
+      opens with the checkbox on and the line above it; the day's spend went up by the separation alone.

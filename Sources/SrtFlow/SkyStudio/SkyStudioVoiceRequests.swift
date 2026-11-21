@@ -148,22 +148,36 @@ enum SkyStudioVoiceRequests {
     /// 把一段的人声换成 `targetVoice`（声音库的 `voice_…` 或预设 `gemini:<名字>`）。`sourceSeconds` 只用来报价（服务器自己再量一遍
     /// 上传的文件）；报价时还没传，`sourceAudioURL` 给 nil，传完再交 `/jobs`。`targetLanguage`：知道这段说什么语言、目标声音又有
     /// 这种语言的参考时才给（SkyCut 声音方案 4.8）。
+    /// `skipSeparation` (a direct change, 2026-11-21): `params.skip_separation` is always sent as a JSON boolean, and the job is
+    /// this same request plus the upload, so the quote and the job carry the same value (Sky Studio prices `/jobs` from the
+    /// job's own params; a direct quote followed by a job without it is `price_changed`).
     static func convert(
-        targetVoice: String, sourceSeconds: Double, sourceAudioURL: URL? = nil, targetLanguage: String? = nil, model: String = autoModel,
-        maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased()
+        targetVoice: String, sourceSeconds: Double, sourceAudioURL: URL? = nil, targetLanguage: String? = nil, skipSeparation: Bool = false,
+        model: String = autoModel, maxCredits: Double? = nil, idempotencyKey: String = UUID().uuidString.lowercased()
     ) throws -> SkyStudioJobRequest {
         guard SkyStudioVoice.isVoiceID(targetVoice) || isPreset(targetVoice, prefix: "gemini:") else {
             throw problem("Change the voice to a library voice (voice_…) or a preset (gemini:Name).")
         }
         guard sourceSeconds.isFinite, sourceSeconds > 0 else { throw problem("The clip has no sound to re-voice.") }
         var params: [String: JSONValue] = [
-            "target_voice": .string(targetVoice), "source": ["seconds": .number((sourceSeconds * 1000).rounded() / 1000)]
+            "target_voice": .string(targetVoice), "source": ["seconds": .number((sourceSeconds * 1000).rounded() / 1000)],
+            "skip_separation": .bool(skipSeparation)
         ]
         if let targetLanguage { params["target_language"] = .string(try SkyStudioVoiceNaming.checkedLanguage(targetLanguage)) }
         var inputs: [String: String] = [:]
         if let sourceAudioURL { inputs["source_audio_url"] = sourceAudioURL.absoluteString }
         return SkyStudioJobRequest(kind: SkyStudioVoiceKind.convert, model: try checkedModel(model), inputs: inputs, params: params,
                                    maxCredits: maxCredits, idempotencyKey: idempotencyKey)
+    }
+
+    /// Whether a `voice_convert` request (the quote's draft or the job) is a direct change.
+    static func skipsSeparation(_ request: SkyStudioJobRequest) -> Bool { request.params["skip_separation"]?.boolValue == true }
+
+    /// A direct change goes ahead only when the quote confirms it (`voice_plan.skip_separation: true`, always present for
+    /// `voice_convert` once Sky Studio supports it): a server that ignored the parameter would separate, charge for it and
+    /// return two files. A default change needs no confirmation.
+    static func quoteConfirms(_ quote: SkyStudioQuote, skipSeparation: Bool) -> Bool {
+        !skipSeparation || quote.voice?.plan?.json["skip_separation"]?.boolValue == true
     }
 
     // MARK: 核对

@@ -9,6 +9,8 @@ import SwiftUI
 // 看得见，做完自动落地（两条新音频轨、原声静音）、提示条说一句。
 // 数和规矩在 VoiceChangePanelModel（和 AI 的 change_voice 同一条路）；这里只画。只订阅那一份、声音库和积分的账；不读工程、不订阅
 // 播放器的时钟。本地化：sheet 不继承应用内语言，调用处套 `.appLanguage()`。
+// The direct option (2026-11-21) is a checkbox just above the price it changes, with one line on when to use it; the line on
+// top says what lands in each mode. After a failed separation an orange line above the checkbox says so.
 
 struct VoiceChangePanel: View {
     @StateObject private var model: VoiceChangePanelModel
@@ -32,10 +34,11 @@ struct VoiceChangePanel: View {
                 Text(verbatim: model.clipName + " · " + VoiceReferenceSample.clock(model.clipSeconds))
                     .font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
             }
-            Text("Sky Studio separates the speech from the background and gives the speech the voice you pick. The new voice and the background go on two new audio tracks; the original sound is muted, not deleted.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            if model.skipSeparation {
+                caption(Text("Sky Studio gives the clip's whole sound the voice you pick, without separating it first. The new voice goes on one new audio track; the original sound is muted, not deleted."))
+            } else {
+                caption(Text("Sky Studio separates the speech from the background and gives the speech the voice you pick. The new voice and the background go on two new audio tracks; the original sound is muted, not deleted."))
+            }
             libraryStatus
             if model.hasNoVoiceOfMine {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -58,6 +61,7 @@ struct VoiceChangePanel: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            directOption
             offer
             if let problem = model.problem {
                 Text(verbatim: problem)
@@ -161,5 +165,27 @@ struct VoiceChangePanel: View {
             ProgressView().controlSize(.small)
             Text(text).font(.caption).foregroundStyle(.secondary)
         }
+    }
+
+    /// Direct change: skip the separation. Turning it on or off asks for a new price (VoiceChangePanelModel).
+    private var directOption: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            if model.separationFailedBefore {
+                Text("Voice separation failed; you can change the voice directly instead.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Toggle("Change directly (skip voice separation)", isOn: $model.skipSeparation)
+                .accessibilityIdentifier("voice-change-skip-separation")
+            caption(Text("Only for a clip that is already a clean voice: AI or text-to-speech speech, or an isolated dialogue track with no music or noise. It costs less and cannot fail at the separation."))
+        }
+    }
+
+    private func caption(_ text: Text) -> some View {
+        text
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

@@ -41,11 +41,12 @@ private func landingChecks() {
     state.audioTracks = [EditLane(clips: [music])]
     let before = state
     let origin = VoiceChangeLanding.Origin(clipID: main.id, sourceURL: source, sourceStart: 2, sourceDuration: 6)
+    let backgroundFile = URL(fileURLWithPath: "/media/interview - background.wav")
     let files = VoiceChangeLanding.Files(voice: URL(fileURLWithPath: "/media/interview - Sky.wav"), voiceSeconds: 6.02,
-                                         background: URL(fileURLWithPath: "/media/interview - background.wav"), backgroundSeconds: 6)
+                                         background: .init(file: backgroundFile, seconds: 6))
     guard case .success(let landed) = VoiceChangeLanding.land(files, origin: origin, in: &state),
           let original = state.clip(with: main.id), let voice = state.clip(with: landed.voiceID),
-          let background = state.clip(with: landed.backgroundID) else {
+          let background = landed.backgroundID.flatMap(state.clip(with:)) else {
         return require(false, "the two files land on a clip that is still there")
     }
     require(original.isMuted && original.sourceStart == 2 && original.sourceDuration == 6 && state.mainClips.count == 1,
@@ -55,7 +56,7 @@ private func landingChecks() {
             && state.audioTracks[0].clips == [music], "voice and background each get a new audio track after the existing ones")
     require(original.linkGroup != nil && voice.linkGroup == original.linkGroup && background.linkGroup == original.linkGroup
             && state.linkedClipIDs(of: main.id) == [main.id, voice.id, background.id], "the three clips share one link group")
-    for (piece, file) in [(voice, files.voice), (background, files.background)] {
+    for (piece, file) in [(voice, files.voice), (background, backgroundFile)] {
         require(piece.isAudioOnly && piece.sourceURL == file && piece.sourceStart == 0 && piece.timelineStart == 4
                 && abs(piece.timelineEnd - original.timelineEnd) < 1e-9, "\(file.lastPathComponent) sits at the clip's place on the timeline")
         require(piece.speed == 1.5 && piece.volume == 0.8 && piece.fadeInDuration == 0.3 && piece.fadeOutDuration == 0.4 && !piece.isMuted,
@@ -83,10 +84,10 @@ private func landingChecks() {
 
     // 背景比这一段短一点：那一段就短一点，不许比文件长。
     var shortFiles = files
-    shortFiles.backgroundSeconds = 5.9
+    shortFiles.background?.seconds = 5.9
     var short = before
     if case .success(let part) = VoiceChangeLanding.land(shortFiles, origin: origin, in: &short) {
-        require(short.clip(with: part.backgroundID)?.sourceDuration == 5.9, "a background shorter than the clip is not stretched past its file")
+        require(part.backgroundID.flatMap(short.clip(with:))?.sourceDuration == 5.9, "a background shorter than the clip is not stretched past its file")
     } else { require(false, "a slightly short background still lands") }
 
     // 落不了的三种：什么都不改。
@@ -145,11 +146,12 @@ private func orderChecks() {
     require(VoiceChangeOrder.targetLanguage(spoken: "en", target: sky) == "en" && VoiceChangeOrder.targetLanguage(spoken: "ja", target: sky) == nil
             && VoiceChangeOrder.targetLanguage(spoken: nil, target: sky) == nil,
             "target_language only when the clip's language is known and the voice has a recording in it")
-    let draft = try? VoiceChangeOrder.draft(target: sky, seconds: 4.00049, spoken: "en")
+    let draft = try? VoiceChangeOrder.draft(target: sky, seconds: 4.00049, spoken: "en", skipSeparation: false)
     require(draft?.kind == "voice_convert" && draft?.model == "auto" && draft?.params["target_voice"] == .string(sky.id)
-            && draft?.params["source"]?["seconds"] == 4 && draft?.params["target_language"] == "en" && draft?.inputs.isEmpty == true,
-            "the quote names the voice, the source seconds and the language; nothing is uploaded for it")
-    require((try? VoiceChangeOrder.draft(target: sky, seconds: 4, spoken: "ja"))?.params["target_language"] == nil,
+            && draft?.params["source"]?["seconds"] == 4 && draft?.params["target_language"] == "en" && draft?.inputs.isEmpty == true
+            && draft?.params["skip_separation"] == false,
+            "the quote names the voice, the source seconds, the language and skip_separation false; nothing is uploaded for it")
+    require((try? VoiceChangeOrder.draft(target: sky, seconds: 4, spoken: "ja", skipSeparation: false))?.params["target_language"] == nil,
             "a language the voice has no recording in is not sent")
     if let voices = catalog?.voices, let charon = voices.preset("gemini:Charon") {
         let preset = VoiceChangeTarget(preset: charon)
@@ -207,8 +209,9 @@ private func toolChecks(_ root: URL) async throws {
     require(fixture.detections == 0, "a language given by the AI is used as is: nothing is detected")
     let quote = VoiceChangeHTTP.calls("POST", "/quote").first
     require(quote?["kind"] == "voice_convert" && quote?["model"] == "auto" && quote?["params"]?["target_voice"] == .string(VoiceChangeHTTP.voiceID)
-            && quote?["params"]?["source"]?["seconds"] == 4 && quote?["params"]?["target_language"] == "en" && quote?["inputs"]?["source_audio_url"] == nil,
-            "the quote is asked by source seconds before anything is uploaded: \(String(describing: quote))")
+            && quote?["params"]?["source"]?["seconds"] == 4 && quote?["params"]?["target_language"] == "en" && quote?["inputs"]?["source_audio_url"] == nil
+            && quote?["params"]?["skip_separation"] == false,
+            "the quote is asked by source seconds before anything is uploaded, skip_separation false: \(String(describing: quote))")
     let done = try await fixture.wait(started)
     require(done["status"] == "done", "the job finishes: \(done)")
     let log = VoiceChangeHTTP.log
@@ -225,7 +228,8 @@ private func toolChecks(_ root: URL) async throws {
     require(jobs.count == 1 && jobs[0]["kind"] == "voice_convert" && jobs[0]["model"] == "auto" && jobs[0]["max_credits"] == 9
             && jobs[0]["inputs"]?["source_audio_url"] == "skystudio-private://voice/uploads/u/1.wav"
             && jobs[0]["params"]?["target_voice"] == .string(VoiceChangeHTTP.voiceID) && jobs[0]["params"]?["source"]?["seconds"] == 4
-            && jobs[0]["params"]?["target_language"] == "en", "one voice_convert job, with the upload, the voice and the quote as max_credits: \(jobs)")
+            && jobs[0]["params"]?["target_language"] == "en" && jobs[0]["params"]?["skip_separation"] == false,
+            "one voice_convert job, with the upload, the voice, skip_separation false as quoted and the quote as max_credits: \(jobs)")
 
     // 落地：原段静音、两条新轨、链接、声音设置照抄、长的那 20 毫秒不上时间线。
     let state = fixture.project.state

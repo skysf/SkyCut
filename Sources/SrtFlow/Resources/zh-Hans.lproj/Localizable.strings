@@ -1577,6 +1577,12 @@
 "macOS needs your permission before SkyCut can read the key. Open Settings > Sky Studio and click Allow." = "macOS 要你先允许 SkyCut 读取密钥。打开「设置 → Sky Studio」点「允许…」。";
 "Preparing this clip's sound…" = "正在准备这一段的声音…";
 "Pick a voice to see the price. The price comes from Sky Studio; a change that fails is refunded." = "选一个声音就能看到价格。价格来自 Sky Studio；没做成会退回。";
+"Sky Studio gives the clip's whole sound the voice you pick, without separating it first. The new voice goes on one new audio track; the original sound is muted, not deleted." = "Sky Studio 不先分离人声，直接把这一段的整个声音换成你选的声音。新的人声放一条新音频轨；原声只是静音，不删。";
+"Change directly (skip voice separation)" = "直接换声（跳过人声分离）";
+"Only for a clip that is already a clean voice: AI or text-to-speech speech, or an isolated dialogue track with no music or noise. It costs less and cannot fail at the separation." = "只用于本来就只有干净人声的片段：AI 或语音合成读出来的话，或者单独的对白轨，没有配乐、没有噪声。更便宜，也不会卡在人声分离上。";
+"Voice separation failed; you can change the voice directly instead." = "人声分离失败，可改用直接换声。";
+"Sky Studio cannot change this clip's voice directly right now. Turn off Change directly to use the separation." = "Sky Studio 现在不能直接给这一段换声。关掉「直接换声」，先分离人声再换。";
+"The voice was changed, but the clip was edited meanwhile; the new voice file was saved next to the original and nothing on the timeline was changed." = "声音换好了，可这一段在这期间被改过：新的人声文件存在原素材旁边，时间线没有动。";
 "Motion Preset…" = "动效预设…";
 "Motion Presets" = "动效预设";
 "Lands on the playhead. Type your words; each piece stays an ordinary text or shape." = "放在播放头上。直接打你的字；每一块都还是普通的字和形状，照样能改。";

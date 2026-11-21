@@ -7,7 +7,7 @@ import SrtFlowMCPKit
 // - 读稿 / 克隆的结果照旧有 `url`（SkyStudioJobResult），另带「实际怎么做的」（SkyStudioVoiceOutcome）：实际跑的 `model`、
 //   有没有自动换备用（`fallback_used`）、整段的 `voice_plan`。结果要说清楚用了哪个模型（决定第三节第 1 条）。
 // - 三种没有 `url` 的结果（SkyStudioVoiceJobResult）：变声回两个文件（变声后的人声 `voice_url`、分离出来的背景 `background_url`，
-//   混音在 SkyCut 里做，约定第 4 条）；建 MiniMax 版回更新后的声音；设计回新声音 + 一段样音的临时链接。
+//   混音在 SkyCut 里做，约定第 4 条; a direct change returns `voice_url` alone）；建 MiniMax 版回更新后的声音；设计回新声音 + 一段样音的临时链接。
 // - 错误码（SkyStudioVoiceCodes）：界面和 AI 按它说人话（声音 PR 6）；这里只认得、读得出附加字段。
 // 读得严：少了必须的（变声少一个文件、声音的 id 不像 Sky Studio 的）就不算结果（SkyStudioJobRun 当「做完了却没有成品」）。
 // 不管什么：下载、入轨、撤销（声音 PR 9）；怎么跟用户说（声音 PR 6）。
@@ -32,9 +32,12 @@ struct SkyStudioVoiceOutcome: Equatable, Sendable {
 }
 
 /// 变声的两个文件（人声已在结尾补静音补到源音频那么长；长了不裁）。成品地址 60 天，不带 Key。
+/// A direct change (skip_separation, 2026-11-21) runs no separation and returns the voice alone: `background_url` is absent
+/// or null. A background that is there but is not a link is no result (read strictly, like a missing voice).
 struct SkyStudioVoiceConversion: Equatable, Sendable {
     var voiceURL: URL
-    var backgroundURL: URL
+    /// The separated background; nil after a direct change (nothing was separated).
+    var backgroundURL: URL?
     /// 人声的类型（`audio/wav`）；背景不是 WAV 时另有 `backgroundContentType`（下载落盘时按它起扩展名）。
     var contentType: String?
     var backgroundContentType: String?
@@ -46,9 +49,14 @@ struct SkyStudioVoiceConversion: Equatable, Sendable {
     var expiresAt: Date?
 
     init?(json: JSONValue) {
-        guard let voice = Self.link(json["voice_url"]), let background = Self.link(json["background_url"]) else { return nil }
+        guard let voice = Self.link(json["voice_url"]) else { return nil }
+        if let background = json["background_url"], !background.isNull {
+            guard let link = Self.link(background) else { return nil }
+            backgroundURL = link
+        } else {
+            backgroundURL = nil
+        }
         voiceURL = voice
-        backgroundURL = background
         contentType = json["content_type"]?.stringValue
         backgroundContentType = json["background_content_type"]?.stringValue
         sampleRate = json["sample_rate"]?.doubleValue
@@ -116,6 +124,10 @@ enum SkyStudioVoiceCodes {
     static let libraryUnavailable = "voice_library_unavailable"
     /// 任务结束码：默认失败、备用要先花一次性费用；附 `one_time`、`refunded`。
     static let fallbackNeedsOneTime = "fallback_needs_one_time"
+    /// Job end code of a default `voice_convert` (2026-11-21): after the separation the speech stayed in the background, so
+    /// nothing was converted; only the separation is charged (`refunded: false`, `credits_refunded`, diagnostic
+    /// `separation_check`). A direct change (`params.skip_separation`) never ends with it.
+    static let separationFailed = "separation_failed"
 
     /// `invalid_request` 的 `reason`（附 `limit`、`field`；`unsupported_language` 另附 `language`）。
     enum Reason {

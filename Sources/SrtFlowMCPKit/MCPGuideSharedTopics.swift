@@ -114,7 +114,7 @@ enum MCPGuideSharedTopics {
 
         Results. generate_media never edits the timeline: add the result with add_clips. upscale_clip replaces the clip's source \
         when it finishes, as one undo step. change_voice mutes the clip and adds the new voice and the background on two audio \
-        tracks when it finishes, as one undo step.
+        tracks (with skip_separation, the voice alone on one) when it finishes, as one undo step.
         """)
     ])
 
