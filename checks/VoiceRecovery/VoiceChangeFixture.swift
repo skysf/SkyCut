@@ -6,6 +6,10 @@ import SrtFlowMCPKit
 // 变声（声音 PR 9）的假 Sky Studio：`/models`（Sky Studio 导出的目录快照，voice_convert 的上限 300 秒）、`/voices` 和 `/voices/{id}`、
 // `/uploads` + PUT（收下传上来的字节）、`voice_convert` 的 `/quote` 和 `/jobs`（可以先回 queued、等回归放行再 done；可以回失败、断网）、
 // 两个成品文件。生产的工具、面板背后的那一份、任务、下载、落地、撤销照常执行。和别的几份假协议分开写，场景互不影响。
+// The direct change (2026-11-21, Sky Studio's skycut-api.md "voice_convert"): a quote with `params.skip_separation: true` is the
+// conversion alone (5 credits, `voice_plan.skip_separation: true`) and its job returns `voice_url` without `background_url`;
+// `separationFails` ends a default job with `separation_failed` keeping the separation's part; `quoteIgnoresSkip` is a server
+// that does not know the parameter; `omitBackground` a default result without its background.
 
 final class VoiceChangeHTTP: URLProtocol {
     static let lock = NSLock()
@@ -28,6 +32,14 @@ final class VoiceChangeHTTP: URLProtocol {
     static var backgroundSeconds: Double?
     static var sourceSeconds = 4.0
     static var charged = 7.5
+    /// A default job ends `separation_failed`: 6.5 of the 9 reserved kept (the separation), 2.5 returned.
+    static var separationFails = false
+    /// The quote leaves `voice_plan.skip_separation` out (a server that ignores the parameter).
+    static var quoteIgnoresSkip = false
+    /// A default job's result has no `background_url`.
+    static var omitBackground = false
+    /// Whether the last POST /jobs asked for a direct change (GET /jobs/{id} answers for that job).
+    static var jobDirect = false
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -42,6 +54,7 @@ final class VoiceChangeHTTP: URLProtocol {
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["zh", "en"])]
         libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
+        separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
     }
 
     static var log: [(method: String, path: String, body: JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -114,16 +127,26 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         if path.hasSuffix("/quote") {
             if let (status, value) = quoteFailure { return (status, value, nil) }
-            return (200, ["credits": 9, "credits_expected": 6, "settlement": "actual_output", "typical_seconds": 90, "model": "chatterbox-hd"], nil)
+            let direct = body["params"]?["skip_separation"]?.boolValue == true
+            var plan: [String: JSONValue] = [
+                "selection": ["model": "chatterbox-hd", "reference_language": "en"], "requested_model": "auto", "warnings": [],
+                "skip_separation": .bool(direct),
+                "stages": direct ? [["stage": "convert", "credits": 5]] : [["stage": "separate", "credits": 6.5], ["stage": "convert", "credits": 2.5]]
+            ]
+            if quoteIgnoresSkip { plan["skip_separation"] = nil; plan["stages"] = nil }
+            let credits: JSONValue = direct && !quoteIgnoresSkip ? 5 : 9, expected: JSONValue = direct && !quoteIgnoresSkip ? 5 : 6
+            return (200, ["credits": credits, "credits_expected": expected, "settlement": direct ? "exact" : "actual_output", "typical_seconds": 90,
+                          "model": "chatterbox-hd", "voice_plan": .object(plan), "one_time": []], nil)
         }
         if path.hasSuffix("/jobs"), method == "POST" {
             if submitNetworkFailure { return nil }
+            jobDirect = body["params"]?["skip_separation"]?.boolValue == true
             if holdJob { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "queued", "queue_position": 1, "poll_after_seconds": 2], nil) }
-            return (200, finished(body), nil)
+            return (200, finished(), nil)
         }
         if path.hasSuffix("/jobs/convert-1"), method == "GET" {
             if !released { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "running", "poll_after_seconds": 2], nil) }
-            return (200, finished(body), nil)
+            return (200, finished(), nil)
         }
         guard let range = path.range(of: "/voices") else { return error(404, "not_found") }
         if let (status, value) = libraryFailure { return (status, value, nil) }
@@ -136,17 +159,28 @@ final class VoiceChangeHTTP: URLProtocol {
         return (200, ["voice": voice], nil)
     }
 
-    private static func finished(_ body: JSONValue) -> JSONValue {
+    private static func finished() -> JSONValue {
         if jobFails {
             return ["job_id": "convert-1", "kind": "voice_convert", "status": "failed", "error": "The separation model failed.",
                     "billing": ["status": "refunded", "credits_charged": 0, "credits_reserved": 9, "credits_returned": 9]]
         }
-        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(charged),
-                "billing": ["status": "charged", "credits_charged": .number(charged)],
-                "result": ["voice_url": "http://127.0.0.1/files/voice.wav", "background_url": "http://127.0.0.1/files/background.wav",
-                           "content_type": "audio/wav", "sample_rate": 44_100, "channels": 1,
-                           "duration": .number(sourceSeconds + voiceExtraSeconds), "source_duration": .number(sourceSeconds),
-                           "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false]]
+        if separationFails && !jobDirect {
+            // VC contract 5 and 6: the separation ran and is kept; the conversion part is returned.
+            return ["job_id": "convert-1", "kind": "voice_convert", "status": "failed", "credits_charged": 6.5,
+                    "error": ["code": "separation_failed", "message": "Voice separation failed: the speech stayed in the background, so nothing was converted.",
+                              "refunded": false, "credits_refunded": 2.5,
+                              "separation_check": ["source_speech_seconds": 3.8, "voice_speech_seconds": 0, "background_speech_seconds": 3.6]],
+                    "billing": ["status": "charged", "credits_reserved": 9, "credits_charged": 6.5, "credits_refunded": 2.5]]
+        }
+        let charge = jobDirect ? 5 : charged
+        var result: [String: JSONValue] = [
+            "voice_url": "http://127.0.0.1/files/voice.wav", "content_type": "audio/wav", "sample_rate": 44_100, "channels": 1,
+            "duration": .number(sourceSeconds + voiceExtraSeconds), "source_duration": .number(sourceSeconds),
+            "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false, "skip_separation": .bool(jobDirect)
+        ]
+        if !jobDirect && !omitBackground { result["background_url"] = "http://127.0.0.1/files/background.wav" }
+        return ["job_id": "convert-1", "kind": "voice_convert", "status": "done", "credits_charged": .number(charge),
+                "billing": ["status": "charged", "credits_charged": .number(charge)], "result": .object(result)]
     }
 }
 

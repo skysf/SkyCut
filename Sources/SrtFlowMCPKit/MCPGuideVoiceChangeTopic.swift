@@ -8,6 +8,9 @@ import Foundation
 // 价、一次最长多少秒都不写数（只在 Sky Studio 的 /models、/quote；现在是 5 分钟，写「get_status models=true 列着」）。
 // 出处：docs/plans/2026-11-09-voice-features.md 4.8、4.9；docs/architecture/voice-library.md 第十一节；Sky Studio 仓库
 // docs/agents/skycut-api.md「voice_convert」。
+// direct_change (2026-11-21, the user's request after the B07 clip whose speech SAM left in the background): when to pass
+// skip_separation, what it costs and returns, and what separation_failed means (voice-library.md section 11, item 12; the
+// contract is Sky Studio's docs/agents/skycut-api.md "voice_convert").
 // 不管什么：名片（MCPVoiceChangeTool）、声音库（MCPGuideVoiceLibraryTopics）、配旁白（MCPGuideVoiceTopics）、怎么答（MCPGuide）。
 
 enum MCPGuideVoiceChangeTopic {
@@ -19,7 +22,8 @@ enum MCPGuideVoiceChangeTopic {
             Studio separates the speech from the background, re-voices the speech with the target voice at the same timing, and \
             returns two files. Use it to dub a clip in the user's own voice, or to give a speaker another voice. It works on a \
             video or audio clip that has sound and is not muted. It is paid and runs as a job; nothing on the timeline changes \
-            until the job is done.
+            until the job is done. For a clip that is already a clean voice, skip_separation=true re-voices it without the \
+            separation: read the direct change section first.
 
             Which voice. Prefer the user's own voice: a voice_… id from list_voices mine (create one with manage_voices if there \
             is none). A preset (gemini:Name) also works as the target, but that is untested: a preset's sample is only a few \
@@ -29,7 +33,8 @@ enum MCPGuideVoiceChangeTopic {
             Cost. SkyCut quotes the clip's source seconds first and returns credits (the most it can cost) with job_id; tell \
             the user the price. It never returns needs_confirmation: the only gate is the daily credit limit, in every \
             permission mode. Over it, the result is status blocked with daily_budget_exceeded and nothing starts. The charge is \
-            settled when the job ends (credits_charged); a job that fails is refunded by Sky Studio.
+            settled when the job ends (credits_charged): Sky Studio keeps only what ran and refunds the rest, so a job that \
+            fails costs nothing, or only the separation after separation_failed.
 
             Limits. One call changes one clip, and a clip can use only so many seconds of its source (the voice_convert limit in \
             get_status models=true). A longer clip is refused before anything is charged: split it with split_clip and change \
@@ -40,12 +45,26 @@ enum MCPGuideVoiceChangeTopic {
             (voice_clip_id) and the separated background (background_clip_id) at the clip's place, with the clip's speed, \
             volume, fades and volume curve. The three clips share one link group, so with linkage on they move, trim and delete \
             together. All of it is one undo step: one undo brings the original sound back. The user can turn the background \
-            down on its own track. model and fallback_used say which model ran.
+            down on its own track. model and fallback_used say which model ran. After skip_separation there is no background: \
+            one new track holds the voice, and get_job has no background_clip_id or background_file.
 
             The two files (voice_file, background_file) are saved next to the clip's source file and never replace a file. If \
             the clip was moved or shortened while the job ran, the result lands on the clip as it is now. If the clip was \
             deleted, got another source file, was trimmed outwards, or its project was closed, the files are kept and nothing on \
             the timeline changes (landed is false): add them with add_clips and mute the clip yourself.
+            """),
+            MCPGuideSection(name: "direct_change", about: "skip_separation: when to use it, its price and one-track result, separation_failed", text: """
+            skip_separation=true is a direct change: Sky Studio converts the clip's sound as it is, without separating the \
+            speech from the background first. Use it only when the clip is already a clean voice: AI or TTS speech, an \
+            isolated dialogue track, nothing but one voice with no music or noise. It costs less (only the conversion is \
+            charged) and cannot fail at the separation. Music, noise or a second voice would go through the conversion too, so \
+            never use it for speech over music. The quote and the job carry the same value; if Sky Studio's quote does not \
+            confirm it, change_voice starts nothing and charges nothing.
+
+            separation_failed (get_job, status failed): the default change separated the clip, but the speech stayed in the \
+            background, so nothing was converted and nothing changed on the timeline; only the separation was charged \
+            (credits_charged). Do not send the same change again. If the clip is a clean voice, call change_voice again with \
+            skip_separation=true; otherwise tell the user the separation did not work for this clip.
             """),
             MCPGuideSection(name: "language", about: "language, and which of the target voice's recordings Sky Studio uses", text: """
             language is the ISO 639-1 code of what the clip says. A library voice can hold one recording per language, and the \
@@ -65,8 +84,10 @@ enum MCPGuideVoiceChangeTopic {
         ],
         examples: [
             ["clip_id": "c1", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"],
-            ["clip_id": "c1", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "language": "en"]
+            ["clip_id": "c1", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "language": "en"],
+            ["clip_id": "c1", "voice": "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d", "language": "en", "skip_separation": true]
         ],
-        related: ["list_voices", "manage_voices", "split_clip", "paid", "get_job"]
+        related: ["list_voices", "manage_voices", "split_clip", "paid", "get_job"],
+        readingTip: "For a clean voice or after separation_failed, read only section=direct_change."
     )
 }

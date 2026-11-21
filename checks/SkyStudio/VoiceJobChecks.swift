@@ -46,12 +46,29 @@ private func runVoiceRequestChecks() {
 
     let quoted = try? SkyStudioVoiceRequests.convert(targetVoice: sampleVoiceID, sourceSeconds: 10.0049, targetLanguage: "en")
     checkEqual(quoted?.quoteBody, ["kind": "voice_convert", "model": "auto",
-                                   "params": ["target_voice": .string(sampleVoiceID), "source": ["seconds": 10.005], "target_language": "en"]],
-               "voice_convert is quoted by source seconds (to the millisecond), before uploading")
+                                   "params": ["target_voice": .string(sampleVoiceID), "source": ["seconds": 10.005], "target_language": "en",
+                                              "skip_separation": false]],
+               "voice_convert is quoted by source seconds (to the millisecond), before uploading, skip_separation false by default")
     var submitted = try? SkyStudioVoiceRequests.convert(targetVoice: "gemini:Charon", sourceSeconds: 10.005,
         sourceAudioURL: URL(string: "https://r2.example/uploads/u/clip.wav")!, maxCredits: 17.5, idempotencyKey: "convert-1")
     checkEqual(submitted?.jobBody["inputs"], ["source_audio_url": "https://r2.example/uploads/u/clip.wav"], "/jobs carries the uploaded source")
     check(submitted?.jobBody["params"]?["target_language"] == nil, "no target_language unless known")
+    // A direct change (VC contract 1): a JSON boolean in the quote and in the job, which is the same request plus the upload.
+    if let direct = try? SkyStudioVoiceRequests.convert(targetVoice: sampleVoiceID, sourceSeconds: 15, skipSeparation: true) {
+        var job = direct
+        job.inputs["source_audio_url"] = "skystudio-private://voice/uploads/u/1.wav"
+        job.maxCredits = 5
+        check(direct.quoteBody["params"]?["skip_separation"] == true && job.jobBody["params"]?["skip_separation"] == true
+              && SkyStudioVoiceRequests.skipsSeparation(direct) && SkyStudioVoiceRequests.skipsSeparation(job),
+              "skip_separation true goes in the quote and in the job")
+        check(quoted.map(SkyStudioVoiceRequests.skipsSeparation) == false, "a default request is not a direct change")
+    } else { check(false, "a direct voice_convert request builds") }
+    let directQuote = SkyStudioQuote(json: ["credits": 5, "voice_plan": ["selection": ["model": "chatterbox-hd"], "skip_separation": true], "one_time": []])
+    let ignoringQuote = SkyStudioQuote(json: ["credits": 17.5, "voice_plan": ["selection": ["model": "chatterbox-hd"]], "one_time": []])
+    check(directQuote.map { SkyStudioVoiceRequests.quoteConfirms($0, skipSeparation: true) } == true
+          && ignoringQuote.map { SkyStudioVoiceRequests.quoteConfirms($0, skipSeparation: true) } == false
+          && ignoringQuote.map { SkyStudioVoiceRequests.quoteConfirms($0, skipSeparation: false) } == true,
+          "a direct change needs voice_plan.skip_separation true in the quote; a default one needs nothing")
     submitted?.maxCredits = nil
     check(submitted?.quoteBody["inputs"] == nil, "the source never goes to /quote")
     for (voice, seconds) in [("eleven:Daniel", 10.0), ("Voice123", 10.0), (sampleVoiceID, 0.0), (sampleVoiceID, .nan), (sampleVoiceID, .infinity)] {
@@ -67,7 +84,7 @@ private func runVoiceResultChecks() {
     check(status.result == nil, "a conversion has no single url")
     guard case .conversion(let files)? = status.voiceResult else { check(false, "a voice_convert result reads as two files"); return }
     checkEqual(files.voiceURL.lastPathComponent, "voice.wav", "the new voice")
-    checkEqual(files.backgroundURL.lastPathComponent, "background.wav", "the separated background")
+    checkEqual(files.backgroundURL?.lastPathComponent, "background.wav", "the separated background")
     checkEqual(files.sampleRate, 48000, "48 kHz")
     checkEqual(files.channels, 1, "mono")
     checkEqual(files.sourceDuration, 10.005, "the source's length")
@@ -83,9 +100,29 @@ private func runVoiceResultChecks() {
     checkEqual(status.voiceOutcome?.model, "chatterbox-hd", "the model that actually ran")
     checkEqual(status.voiceOutcome?.fallbackUsed, false, "no fallback")
 
-    let half = done("convert-2", result: ["voice_url": "https://assets.example/voice.wav", "model": "chatterbox-hd"])
-    let halfStatus = (try? JSONValue.decode(Data(half.utf8))).flatMap(SkyStudioJobStatus.init(json:))
-    check(halfStatus != nil && halfStatus?.voiceResult == nil && halfStatus?.result == nil, "a conversion missing its background is no result")
+    // A direct change (VC contract 4) returns the voice alone: no background_url (or null) is still a result; a background that
+    // is not a link, or no voice, is none.
+    func conversion(_ result: JSONValue) -> SkyStudioVoiceConversion? {
+        guard case .conversion(let files)? = (try? JSONValue.decode(Data(done("convert-2", result: result).utf8))).flatMap(SkyStudioJobStatus.init(json:))?.voiceResult
+        else { return nil }
+        return files
+    }
+    let voiceOnly = conversion(["voice_url": "https://assets.example/voice.wav", "model": "chatterbox-hd", "skip_separation": true])
+    check(voiceOnly?.voiceURL.lastPathComponent == "voice.wav" && voiceOnly != nil && voiceOnly?.backgroundURL == nil,
+          "a voice-only conversion (direct change) reads, with no background")
+    check(conversion(["voice_url": "https://assets.example/voice.wav", "background_url": .null])?.backgroundURL == nil
+          && conversion(["voice_url": "https://assets.example/voice.wav", "background_url": .null]) != nil, "a null background is no background")
+    check(conversion(["voice_url": "https://assets.example/voice.wav", "background_url": "not a link"]) == nil
+          && conversion(["background_url": "https://assets.example/background.wav"]) == nil,
+          "a background that is not a link, or a background without the voice, is no result")
+    // separation_failed (VC contract 5, 6): a failed job with its code and the separation kept on the bill.
+    let separation = JSONValue.object(["job_id": "convert-3", "status": "failed", "credits_charged": 12.5,
+        "error": ["code": "separation_failed", "message": "Voice separation failed.", "refunded": false, "credits_refunded": 5],
+        "billing": ["status": "charged", "credits_reserved": 17.5, "credits_charged": 12.5, "credits_refunded": 5]])
+    let separated = SkyStudioJobStatus(json: separation)
+    check(separated?.state == .failed && separated?.failure?.code == SkyStudioVoiceCodes.separationFailed
+          && separated?.failure?.billing?.netCharged == 12.5 && separated?.failure?.refunded == false,
+          "separation_failed reads as a failed job keeping the separation's 12.5 of 17.5")
 
     var enrolled = sampleVoice
     if case .object(var object) = enrolled, case .array(var languages)? = object["languages"], case .object(var english) = languages[1] {
@@ -150,12 +187,21 @@ private func runVoiceJobRunChecks() async {
     if case .conversion? = finished?.voiceResult { check(true, "a conversion job runs to its two files") } else { check(false, "a conversion job finishes") }
     checkEqual(SkyStudioStub.log.map(\.method), ["POST", "GET"], "submitted once, asked once")
 
+    // The voice alone is a finished conversion (a direct change, 2026-11-21; whether a default change may land without its
+    // background is VoiceChangeJob's call); a background without the voice is still a finished job without a result.
     SkyStudioStub.reset { seen in
         seen.method == "POST" ? .http(202, #"{"job_id": "convert-2", "status": "queued"}"#)
-            : .http(200, done("convert-2", result: ["voice_url": "https://assets.example/voice.wav"]))
+            : .http(200, done("convert-2", result: ["voice_url": "https://assets.example/voice.wav", "skip_separation": true]))
+    }
+    if case .conversion(let files)? = (try? await run.run(request))?.voiceResult, files.backgroundURL == nil {} else {
+        check(false, "a conversion done with the voice alone finishes, with no background")
+    }
+    SkyStudioStub.reset { seen in
+        seen.method == "POST" ? .http(202, #"{"job_id": "convert-4", "status": "queued"}"#)
+            : .http(200, done("convert-4", result: ["background_url": "https://assets.example/background.wav"]))
     }
     if case .badAnswer? = await jobFailure({ _ = try await run.run(request) }) {} else {
-        check(false, "a conversion done without both files is a finished job without a result")
+        check(false, "a conversion done without the voice is a finished job without a result")
     }
 
     // 409 one_time_required：交的时候被拒、一分不扣 —— 本机记的那笔能退，一次性费用读得出来。

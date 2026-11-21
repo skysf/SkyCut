@@ -13,6 +13,9 @@ import SrtFlowMCPKit
 //   `SkyStudioVoiceServices.detectLanguage`，只在已装的语言里裁决、不下载模型，收费之前做），等太久、检测不出来、macOS 15 都算不知道。
 // - 报价用的那一份（kind `voice_convert`、`model: auto`、`params.target_voice`、`params.source.seconds`）；钱的事过了之后拿记上账的
 //   那一笔起任务（VoiceChangeJob）。花钱只判每日硬预算：不是一次性费用，两种权限模式都不问；面板上的报价就是确认。
+// - Direct change (2026-11-21, the panel's checkbox and change_voice's skip_separation): `params.skip_separation` in the draft,
+//   so the quote and the job carry the same value; Sky Studio runs only the conversion (cheaper, no separation to fail) and
+//   returns the voice alone. A direct quote that does not confirm it (`quoteConfirms`) starts nothing.
 // 不管什么：截声音（VoiceChangeSource）、任务怎么跑和落地（VoiceChangeJob / VoiceChangeLanding）、参数怎么读（VoiceChangeTool）、界面。
 
 /// 变声的目标声音。
@@ -77,9 +80,10 @@ enum VoiceChangeOrder {
     }
 
     /// 报价用的那一份（还没传，`inputs` 空着）。拼不出来抛 `SkyStudioVoiceRequestProblem`：一分不花、不碰服务器。
-    nonisolated static func draft(target: VoiceChangeTarget, seconds: Double, spoken: String?) throws -> SkyStudioJobRequest {
+    /// `skipSeparation`: a direct change (the job sends this same draft, so it carries the same value).
+    nonisolated static func draft(target: VoiceChangeTarget, seconds: Double, spoken: String?, skipSeparation: Bool) throws -> SkyStudioJobRequest {
         try SkyStudioVoiceRequests.convert(targetVoice: target.id, sourceSeconds: seconds,
-                                           targetLanguage: targetLanguage(spoken: spoken, target: target))
+                                           targetLanguage: targetLanguage(spoken: spoken, target: target), skipSeparation: skipSeparation)
     }
 
     /// 这段说的是什么语言：给了就用（核对成 ISO 639-1），没给就本机检测、最多等 `detectionTimeout` 秒。

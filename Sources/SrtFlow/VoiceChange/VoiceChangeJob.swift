@@ -16,6 +16,11 @@ import SrtFlowMCPKit
 // 任务号立刻回（AI 用 get_job 等）；工具栏的云端任务浮层里有这一行（SkyStudioMediaStatus：上传 / 排队 / 处理 / 下载 / 收尾），
 // 没做成留在浮层里等用户关掉。面板起的做完 / 没做成在工程的提示条上说一句；AI 起的由 AI 转告。
 // 成品在服务器上留 60 天；本机没有恢复记录（SkyCut 中途退出，这一单的成品要去 Sky Studio 找，见 docs/architecture/voice-library.md）。
+// Direct change (skip_separation in the draft, 2026-11-21): only the voice comes back, one file and one new track. A default
+// change without its background lands nothing (strict, like a missing voice). separation_failed ends the job failed with
+// nothing landed and the source still playing; the message is localized for the user, the AI gets the code and when to retry
+// with skip_separation, and the panel opened again on that clip offers the direct change. A failed job's books follow Sky
+// Studio's final net charge (separation_failed keeps the separation's part), not the whole reservation.
 // 不管什么：问不问、报价（VoiceChangeTool / VoiceChangePanelModel）、请求怎么拼（VoiceChangeOrder / SkyStudioVoiceRequests）。
 
 @MainActor
@@ -37,6 +42,8 @@ final class VoiceChangeJob {
     private var serverID: String?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
+    /// A direct change: read from the draft that was quoted and is sent, so the job can never disagree with the quote.
+    private var direct: Bool { SkyStudioVoiceRequests.skipsSeparation(draft) }
 
     init(origin: VoiceChangeLanding.Origin, source: VoiceChangeSource.Prepared, draft: SkyStudioJobRequest, quote: SkyStudioQuote,
          target: VoiceChangeTarget, clipName: String, key: String, reservation: SkyStudioJobGate.Reservation, project: VideoEditProject,
@@ -81,7 +88,8 @@ final class VoiceChangeJob {
         do {
             done = try await convert()
         } catch let error as SkyStudioJobError {
-            if error.canRefund(beforeAccepted: serverID == nil) { held.refund() }
+            settle(failed: error)
+            if error.failure?.code == SkyStudioVoiceCodes.separationFailed { return separationFailed(error) }
             return finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error))
         } catch {
             // 传的时候、交上之前出的错：一分没花。
@@ -96,14 +104,42 @@ final class VoiceChangeJob {
             return finish(.failed, "Sky Studio finished but returned no voice and background files; do not start the same change again "
                 + "before checking this job with Sky Studio.", detail: charges(done))
         }
+        guard direct || result.backgroundURL != nil else {
+            return finish(.failed, "Sky Studio finished without the separated background file, so SkyCut changed nothing on the timeline; "
+                + "do not start the same change again before checking this job with Sky Studio.", detail: charges(done))
+        }
         let files: VoiceChangeLanding.Files
         do {
             files = try await download(result)
         } catch {
-            return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save the two files: "
+            return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save "
+                + (direct ? "the voice file" : "the two files") + ": "
                 + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: charges(done))
         }
         await land(files, result: result, server: done)
+    }
+
+    /// A failed or stopped job: the books follow Sky Studio's final net charge when it reports one above zero (separation_failed
+    /// keeps the separation's part and returns the rest); otherwise only a refund the error proves (the rule before 2026-11-21).
+    private func settle(failed error: SkyStudioJobError) {
+        if let charged = error.failure?.billing?.netCharged, charged > 0 { held.settle(charged: charged) }
+        else if error.canRefund(beforeAccepted: serverID == nil) { held.refund() }
+    }
+
+    /// separation_failed: the speech stayed in the background, so Sky Studio converted nothing. Nothing lands and the source keeps
+    /// playing; the user reads the localized line, the AI the code and when to retry with skip_separation; the panel opened again
+    /// on this clip starts with the direct change on (VoiceChangeActivity).
+    private func separationFailed(_ error: SkyStudioJobError) {
+        VoiceChangeActivity.shared.noteSeparationFailed(origin.clipID)
+        var detail: [String: JSONValue] = ["code": .string(SkyStudioVoiceCodes.separationFailed)]
+        if let failure = error.failure { detail["failure"] = failure.json }
+        if let charged = error.failure?.billing?.netCharged { detail["credits_charged"] = .number(SkyStudioCredits.number(charged)) }
+        detail["next_step"] = .string("Sky Studio separated the clip, but the speech stayed in the background, so nothing was converted and "
+            + "nothing changed on the timeline; only the separation was charged (credits_charged). Do not send the same change again. If the "
+            + "clip is a clean voice (AI or TTS speech, an isolated dialogue track, no music or noise), call change_voice again with "
+            + "skip_separation=true; otherwise tell the user the separation did not work for this clip.")
+        finish(.failed, "Voice separation failed: the speech stayed in the background, so nothing was converted. Only the separation was charged.",
+               detail: detail, shown: L10n("Voice separation failed; you can change the voice directly instead."))
     }
 
     /// 传、交、等。回做完那一刻的状态。
@@ -143,12 +179,14 @@ final class VoiceChangeJob {
     private func remember(_ id: String) { if serverID == nil { serverID = id } }
 
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
+    /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).
     private func download(_ result: SkyStudioVoiceConversion) async throws -> VoiceChangeLanding.Files {
+        let background = direct ? nil : result.backgroundURL
         let places = VoiceChangeOutputName.destinations(
             original: origin.sourceURL, voiceName: target.name, backgroundLabel: L10n("background (file name)"),
             voiceExtension: VoiceChangeOutputName.pathExtension(contentType: result.contentType, url: result.voiceURL),
             backgroundExtension: VoiceChangeOutputName.pathExtension(contentType: result.backgroundContentType ?? result.contentType,
-                                                                     url: result.backgroundURL),
+                                                                     url: background ?? result.voiceURL),
             fallbacks: fallbackFolders
         )
         let typical = quote.typicalSeconds
@@ -159,17 +197,17 @@ final class VoiceChangeJob {
             Task { @MainActor in self?.status.advance(to: phase, typicalSeconds: typical) }
         }
         status.advance(to: .downloading(fraction: nil), typicalSeconds: typical)
+        let voiceShare = background == nil ? 1.0 : 0.5
         do {
-            try await fetch(result.voiceURL, to: places.voice) { report($0 / 2) }
-            try await fetch(result.backgroundURL, to: places.background) { report(0.5 + $0 / 2) }
+            try await fetch(result.voiceURL, to: places.voice) { report($0 * voiceShare) }
+            if let background { try await fetch(background, to: places.background) { report(0.5 + $0 / 2) } }
             status.advance(to: .finishing, typicalSeconds: typical)
-            let voiceSeconds = try await Self.seconds(of: places.voice)
-            let backgroundSeconds = try await Self.seconds(of: places.background)
-            return VoiceChangeLanding.Files(voice: places.voice, voiceSeconds: voiceSeconds,
-                                            background: places.background, backgroundSeconds: backgroundSeconds)
+            var files = VoiceChangeLanding.Files(voice: places.voice, voiceSeconds: try await Self.seconds(of: places.voice))
+            if background != nil { files.background = .init(file: places.background, seconds: try await Self.seconds(of: places.background)) }
+            return files
         } catch {
             try? FileManager.default.removeItem(at: places.voice)
-            try? FileManager.default.removeItem(at: places.background)
+            if background != nil { try? FileManager.default.removeItem(at: places.background) }
             throw error
         }
     }
@@ -206,7 +244,8 @@ final class VoiceChangeJob {
     private func land(_ files: VoiceChangeLanding.Files, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) async {
         var detail = charges(server)
         detail["voice_file"] = .string(AIWorkspace.shared.display(files.voice))
-        detail["background_file"] = .string(AIWorkspace.shared.display(files.background))
+        if let background = files.background { detail["background_file"] = .string(AIWorkspace.shared.display(background.file)) }
+        detail["skip_separation"] = .bool(direct)
         detail["voice"] = .string(target.id)
         detail["voice_name"] = .string(target.name)
         if let language = draft.params["target_language"]?.stringValue { detail["target_language"] = .string(language) }
@@ -216,9 +255,10 @@ final class VoiceChangeJob {
             if let warnings = outcome.plan?.warnings, !warnings.isEmpty { detail["warnings"] = .array(warnings.map(JSONValue.string)) }
         }
         if let padded = result.paddedSeconds, padded > 0 { detail["padded_seconds"] = .number(padded) }
-        AIReadGrants.shared.remember([files.voice, files.background])
+        let made = [files.voice] + (files.background.map { [$0.file] } ?? [])
+        AIReadGrants.shared.remember(made)
         guard let project = ownProject else {
-            return keepFiles(detail, why: "the project it was started in is no longer open")
+            return keepFiles(detail, files: made.count, why: "the project it was started in is no longer open")
         }
         let voiceID = UUID(), backgroundID = UUID()
         var landed: Result<VoiceChangeLanding.Landed, VoiceChangeLanding.Refusal> = .failure(.clipGone)
@@ -230,41 +270,49 @@ final class VoiceChangeJob {
         }
         switch landed {
         case .failure(let refusal):
-            keepFiles(detail, why: Self.reason(refusal))
+            keepFiles(detail, files: made.count, why: Self.reason(refusal))
         case .success(let placed):
+            VoiceChangeActivity.shared.noteLanded(origin.clipID)
             let ids = AIShortIDs(state: project.state)
             detail["clip_id"] = .string(ids.short(origin.clipID))
             detail["voice_clip_id"] = .string(ids.short(placed.voiceID))
-            detail["background_clip_id"] = .string(ids.short(placed.backgroundID))
+            if let id = placed.backgroundID { detail["background_clip_id"] = .string(ids.short(id)) }
             detail["voice_track"] = .string(AITrackName.name(of: .audio(placed.voiceTrack)))
-            detail["background_track"] = .string(AITrackName.name(of: .audio(placed.backgroundTrack)))
+            if let track = placed.backgroundTrack { detail["background_track"] = .string(AITrackName.name(of: .audio(track))) }
             detail["project"] = .string(project.shortID)
             detail["next_step"] = .string(
-                "The clip's voice now plays from two new linked audio clips (voice_clip_id, background_clip_id); the original clip is "
-                    + "muted, not deleted. One undo step puts everything back. Tell the user to listen; the background can be turned down "
-                    + "on its own track." + (detail["warnings"] == nil ? "" : " Also tell them what warnings says.")
+                (placed.backgroundID == nil
+                    ? "The clip's voice now plays from one new linked audio clip (voice_clip_id); nothing was separated, so there is no "
+                        + "background clip. The original clip is muted, not deleted. One undo step puts everything back. Tell the user to listen."
+                    : "The clip's voice now plays from two new linked audio clips (voice_clip_id, background_clip_id); the original clip is "
+                        + "muted, not deleted. One undo step puts everything back. Tell the user to listen; the background can be turned down "
+                        + "on its own track.") + (detail["warnings"] == nil ? "" : " Also tell them what warnings says.")
             )
             if notifies {
                 project.notice = String(format: L10n("Changed to the voice “%@”. The original sound is muted; press ⌘Z to undo."), target.name)
                 finish(.done, "The voice was changed as one undo step.", detail: detail)
             } else {
                 AISession.shared.round(for: project).noteChange()
-                AIEditorPresenter.reveal(.init(clips: [placed.voiceID, placed.backgroundID], time: project.state.clip(with: placed.voiceID)?.timelineStart),
-                                         project: project)
+                AIEditorPresenter.reveal(.init(clips: Set([placed.voiceID] + (placed.backgroundID.map { [$0] } ?? [])),
+                                               time: project.state.clip(with: placed.voiceID)?.timelineStart), project: project)
                 let saved = await AIProjectTools.saveIfNeverSaved(project, after: .ok(.object(detail), changed: true))
                 finish(.done, "The voice was changed as one undo step.", detail: saved.payload.objectValue ?? detail)
             }
         }
     }
 
-    /// 落不了：文件留着，照实说。
-    private func keepFiles(_ detail: [String: JSONValue], why: String) {
+    /// 落不了：文件留着，照实说。`files`: how many were made (1 after a direct change).
+    private func keepFiles(_ detail: [String: JSONValue], files: Int, why: String) {
         var value = detail
         value["landed"] = false
-        value["next_step"] = .string("The two files were made and kept (voice_file, background_file), but nothing on the timeline was "
-            + "changed because \(why). To use them, add them with add_clips and mute the original clip.")
+        value["next_step"] = .string((files == 1 ? "The voice file was made and kept (voice_file)"
+                                                 : "The two files were made and kept (voice_file, background_file)")
+            + ", but nothing on the timeline was changed because \(why). To use \(files == 1 ? "it, add it" : "them, add them") "
+            + "with add_clips and mute the original clip.")
         if notifies, let project = ownProject {
-            project.notice = L10n("The voice was changed, but the clip was edited meanwhile; the two audio files were saved next to the original and nothing on the timeline was changed.")
+            project.notice = files == 1
+                ? L10n("The voice was changed, but the clip was edited meanwhile; the new voice file was saved next to the original and nothing on the timeline was changed.")
+                : L10n("The voice was changed, but the clip was edited meanwhile; the two audio files were saved next to the original and nothing on the timeline was changed.")
         }
         finish(.done, "The voice was changed; the files were kept but the timeline was not changed (\(why)).", detail: value)
     }
@@ -297,14 +345,16 @@ final class VoiceChangeJob {
         return value
     }
 
-    private func finish(_ outcome: AIJobs.Status, _ message: String, detail: [String: JSONValue] = [:]) {
+    /// `shown`: what the user reads in the cloud task row and the notice bar when it differs from the AI's English (a localized
+    /// line, such as the separation failure's).
+    private func finish(_ outcome: AIJobs.Status, _ message: String, detail: [String: JSONValue] = [:], shown: String? = nil) {
         guard let job else { return }
         var value = detail
         if let serverID, value["skystudio_job_id"] == nil { value["skystudio_job_id"] = .string(serverID) }
         if outcome == .failed {
             // 没做成：留在云端任务浮层里等用户看（有 issue 的那一行不自动拿掉）；面板起的再在提示条上说一句。
-            status.issue = message
-            if notifies { ownProject?.notice = String(format: L10n("Changing the voice of “%@” did not finish. %@"), clipName, message) }
+            status.issue = shown ?? message
+            if notifies { ownProject?.notice = String(format: L10n("Changing the voice of “%@” did not finish. %@"), clipName, shown ?? message) }
         }
         AIJobs.shared.finish(job, outcome, message: message, detail: value.isEmpty ? nil : .object(value))
     }

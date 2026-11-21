@@ -4,7 +4,7 @@ import SrtFlowCore
 import SrtFlowMCPKit
 @testable import SrtFlow
 
-// 变声面板的离屏渲染（scripts/render-voice-library.sh 的后两张，声音 PR 9）：生产的 VoiceChangePanel + 面板背后的那一份 + 假 Sky Studio
+// 变声面板的离屏渲染（scripts/render-voice-library.sh 的后两张，声音 PR 9; a third since 2026-11-21: the direct retry）：生产的 VoiceChangePanel + 面板背后的那一份 + 假 Sky Studio
 // （VoiceChangeHTTP：目录快照、`/voices`、变声的 `/quote`）。出的是：选了自己的声音、报价回来了（带「用哪种语言的录音」那一句）；
 // 还没有自己的声音（顶上有「新建声音…」、什么都没选）。只是出图，不判对错；规矩由 scripts/check-voice-recovery.sh 的 VoiceChangeChecks 钉着。
 
@@ -55,5 +55,19 @@ func renderVoiceChange(_ language: String, file: (String) -> URL, work: URL) asy
     await blank.open()
     try await Snapshot.take(VoiceChangePanel(model: blank, store: emptyLibrary), to: file("10-change-voice-no-voice"))
     blank.close()
+
+    // 11. After a failed separation (2026-11-21): the orange line, the direct checkbox already on, the direct quote, one track on top.
+    let direct = try VoiceChangeFixture(folder: work.appendingPathComponent("change-direct-\(language)"))
+    VoiceChangeHTTP.lock.withLock { VoiceChangeHTTP.voices = Dictionary(uniqueKeysWithValues: [sky]) }
+    let failed = direct.placeClip(try direct.stereoSource("omni-intro.wav", seconds: 15), sourceStart: 0, sourceDuration: 15, assetSeconds: 15)
+    direct.detected = "en"
+    VoiceChangeActivity.shared.noteSeparationFailed(failed)
+    let directLibrary = store(direct)
+    guard let retry = VoiceChangePanelModel(project: direct.project, clipID: failed, store: directLibrary) else { throw AIToolError("No panel for the clip") }
+    retry.services = direct.services
+    await retry.open()
+    try await wait("the direct quote") { retry.quote != nil }
+    try await Snapshot.take(VoiceChangePanel(model: retry, store: directLibrary), to: file("11-change-voice-direct"))
+    retry.close()
     UserDefaults.standard.removeObject(forKey: VoiceChangeActivity.lastVoiceKey)
 }

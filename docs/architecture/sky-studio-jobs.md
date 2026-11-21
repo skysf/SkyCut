@@ -182,6 +182,9 @@ this change; nothing paid was called.
   `params.target_language`），过每日硬预算（只判这一样、不问），再传 `voice_convert_source`（单声道 WAV，≤ 35 MB）、交一次 `/jobs`
   （`inputs.source_audio_url`、`max_credits` = 报价）；在声音池领槽；结果是两个文件（`voice_url`、`background_url`，留 60 天），下到原素材旁边；
   账按结算证据改。任务浮层里是一行 `SkyStudioMediaStatus`（音频）；没有恢复记录。
+  2026-11-21: `params.skip_separation` (a direct change: only Chatterbox HD runs and is charged, the result is `voice_url` alone, the quote's
+  `voice_plan.skip_separation` must confirm it) and the job end code `separation_failed` (the separation kept, the conversion returned; a failed
+  job is settled at its net charge): [voice library](voice-library.md) section 11 item 12.
 - **清单**（2026-10-30）：`generate_media`、`upscale_clip` 都属于 `skystudio` 提供方，但不再按 Key 隐藏；工具及总说明末尾的「Paid」一行始终存在。
   Key、套餐、积分都在执行时核对；不能要求客户端在会话中添加 Key 后重新发现工具。`SkyStudioAccount.hasKey` 仍同步小文件供旧 helper 使用；
   新清单给旧 helper 不携带过滤条件，新 helper 读取旧清单也不隐藏。旧 fal Key、模型、设置、网络路径已删除。

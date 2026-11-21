@@ -29,6 +29,7 @@ import SrtFlowMCPKit
             try await runVoiceStandingChecks(root)
             await runVoicePaidAudioChecks(root)
             try await runVoiceChangeChecks(root)
+            try await runVoiceChangeDirectChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -54,7 +55,10 @@ import SrtFlowMCPKit
             + "the charge, refunded when it failed, a lost POST answer merged into the order Sky Studio returns, stale / other-Key orders left alone"
             + "; voice change: quote before a mono WAV upload, one voice_convert job, target_language only for a known language the voice has, "
             + "refusals before paying, two new linked tracks with the clip muted as one undo / redo step, files only when the clip or project "
-            + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job")
+            + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job"
+            + "; direct change: skip_separation in the quote and the job, the voice alone on one new track as one undo step, an unconfirmed "
+            + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
+            + "nothing landed and only the separation charged, the panel's localized line and its direct retry")
         exit(0)
     }
 

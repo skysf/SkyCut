@@ -1336,6 +1336,13 @@ AI 客户端 ──(MCP：stdio，一行一条 JSON)──▶ skycut-mcp ──(
     这一段没了 / 被动得盖不住了 / 工程换了：只留文件、`landed: false`，不落到别的工程。和片段右键的面板同一条路（[声音库](voice-library.md)第十一节第 1 条）。
     路由：排队、摆剪辑页、算这一轮的改动（同 `upscale_clip`）；碰工程、收 `project`、属于 `skystudio`。名片 + 说明书主题
     （`MCPGuideVoiceChangeTopic`，新工具没有迁移前的原文；价和上限都不写数）；全清单 2026-11-11（说明书 PR 6 把参数说明收短、上限收到 100,000 之后）是 98,443 / 100,000。
+    **Direct change (2026-11-21, [voice library](voice-library.md) section 11 item 12)**: optional `skip_separation` (boolean, default false) for a clip
+    that is already a clean voice (AI or TTS speech, an isolated dialogue track, no music or noise). The quote and the job both carry
+    `params.skip_separation`; only the conversion is charged, nothing can fail at the separation, and the voice lands alone on one new track (one undo
+    step; get_job has `skip_separation` and no `background_clip_id` / `background_file`). A direct quote Sky Studio does not confirm
+    (`voice_plan.skip_separation`) is refused before anything is reserved. A default job ending `separation_failed` fails with nothing landed and
+    only the separation charged; get_job carries `code` and a `next_step` to call again with `skip_separation=true` only for a clean voice. The card
+    gained one clause, the schema one parameter, the topic the `direct_change` section; no limit was raised.
 61. **声音怎么过一刀：`set_transition` 的 `sound`（2026-11-16，生产反馈 MCP-32；合同全在 [声音怎么过一刀](cut-sound.md)）**：
     以前 J / L 切、叠着换只能 `add_clips sound=separate` + `edit_clip alone` 一段一段对帧，24 个接点就是 24 次手工。现在选一刀（`after_clip_id`，V1 或上层轨；
     或 `all=true`）、一种过法（crossfade / lead / lag / bed / on_beat / gain / cut）、给帧数，一次调用 = 一步撤销，画面一帧不动；

@@ -12,6 +12,8 @@ import Foundation
 // 换了素材、往外拉出了当初没送去变声的部分，就不落（文件留着，调用方照实说）。新文件的 0 秒 = 当初那一段的入点（`Origin.sourceStart`），
 // 音量曲线锚在源时间上，跟着平移过去。
 // 调用方把 `land` 放进**一次** `perform`、外面包一层 `AIUndoGrouping.step`：静音 + 两条新轨 + 两段新音频 + 链接是一步撤销（方案 4.9）。
+// A direct change (skip_separation, 2026-11-21) returns the voice alone: the same rules with one new track and one new clip (the
+// original muted and linked, no background), still one undo step.
 // 不管什么：文件怎么来（VoiceChangeJob）、撤销怎么包（VoiceChangeJob.land）。
 
 enum VoiceChangeLanding {
@@ -27,16 +29,22 @@ enum VoiceChangeLanding {
     struct Files: Equatable, Sendable {
         var voice: URL
         var voiceSeconds: Double
-        var background: URL
-        var backgroundSeconds: Double
+        /// The separated background; nil after a direct change, which returns the voice alone.
+        var background: Background?
+
+        struct Background: Equatable, Sendable {
+            var file: URL
+            var seconds: Double
+        }
     }
 
     struct Landed: Equatable, Sendable {
         let voiceID: UUID
-        let backgroundID: UUID
+        /// nil after a direct change (no background clip).
+        let backgroundID: UUID?
         /// 两段各落在第几条音频轨（从 0 起）。
         let voiceTrack: Int
-        let backgroundTrack: Int
+        let backgroundTrack: Int?
     }
 
     enum Refusal: Error, Equatable {
@@ -56,12 +64,13 @@ enum VoiceChangeLanding {
         guard let clip = state.clip(with: origin.clipID) else { return .failure(.clipGone) }
         guard clip.sourceURL == origin.sourceURL else { return .failure(.sourceChanged) }
         let offset = clip.sourceStart - origin.sourceStart
+        let shortest = min(files.voiceSeconds, files.background?.seconds ?? files.voiceSeconds)
         guard offset >= -slack, clip.sourceStart + clip.sourceDuration <= origin.sourceStart + origin.sourceDuration + slack,
-              min(files.voiceSeconds, files.backgroundSeconds) - max(0, offset) > slack else { return .failure(.notCovered) }
+              shortest - max(0, offset) > slack else { return .failure(.notCovered) }
         return .success(clip)
     }
 
-    /// 落地：原片段静音、两条新音频轨、两段新音频、链接。落不了什么都不改。
+    /// 落地：原片段静音、两条新音频轨、两段新音频、链接（a direct change: one track, one clip）。落不了什么都不改。
     static func land(_ files: Files, origin: Origin, voiceID: UUID = UUID(), backgroundID: UUID = UUID(),
                      in state: inout TimelineState) -> Result<Landed, Refusal> {
         let clip: EditClip
@@ -71,15 +80,16 @@ enum VoiceChangeLanding {
         }
         let group = clip.linkGroup ?? UUID()
         let voice = piece(files.voice, seconds: files.voiceSeconds, id: voiceID, of: clip, origin: origin, group: group)
-        let background = piece(files.background, seconds: files.backgroundSeconds, id: backgroundID, of: clip, origin: origin, group: group)
+        let background = files.background.map { piece($0.file, seconds: $0.seconds, id: backgroundID, of: clip, origin: origin, group: group) }
         state.update(clip.id) { original in
             original.isMuted = true
             original.linkGroup = group
         }
         let first = state.audioTracks.count
         state.audioTracks.append(EditLane(clips: [voice]))
-        state.audioTracks.append(EditLane(clips: [background]))
-        return .success(Landed(voiceID: voiceID, backgroundID: backgroundID, voiceTrack: first, backgroundTrack: first + 1))
+        if let background { state.audioTracks.append(EditLane(clips: [background])) }
+        return .success(Landed(voiceID: voiceID, backgroundID: background?.id, voiceTrack: first,
+                               backgroundTrack: background == nil ? nil : first + 1))
     }
 
     /// 一段新音频：和原片段同一时间、同样的变速和声音设置，只取声音；比原片段长的那几毫秒不上时间线。

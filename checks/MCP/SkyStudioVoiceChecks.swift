@@ -239,8 +239,10 @@ private func voiceLibraryGuideChecks() {
 /// 变声（声音 PR 9，SkyCut 声音方案 4.8、4.10）：参数名、名片必含、说明书必含、地图。只判每日硬预算：不收 confirm_token。
 private func voiceChangeGuideChecks() {
     let definition = MCPToolName.changeVoice.definition
-    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "language": "en", "project": "p1"]) == nil,
-          "change_voice takes clip_id, voice, language and project")
+    check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "language": "en", "project": "p1",
+                                                                   "skip_separation": true]) == nil,
+          "change_voice takes clip_id, voice, language, project and skip_separation")
+    checkEqual(definition.inputSchema["properties"]?["skip_separation"]?["type"], "boolean", "skip_separation is a boolean (the direct change)")
     check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip_id": "c1", "voice": "voice_x", "confirm_token": "t"]) != nil,
           "change_voice never asks, so it takes no confirm_token")
     check(MCPArgumentCheck.problem(tool: .changeVoice, arguments: ["clip": "c1", "voice": "voice_x"]) != nil,
@@ -251,12 +253,17 @@ private func voiceChangeGuideChecks() {
     checkEqual(MCPToolName.changeVoice.provider, .skystudio, "change_voice belongs to Sky Studio")
     let card = definition.description
     for phrase in ["Paid (Sky Studio credits)", "Returns job_id; wait with get_job", "two new linked audio tracks", "original clip is muted",
+                   "with skip_separation, the voice alone on one",
                    "One undo step", "The daily credit limit always applies", "Read skycut_guide topic=change_voice before the first call."] {
         check(card.contains(phrase), "the change_voice card says \"\(phrase)\"")
     }
     check(!card.contains("needs_confirmation"), "the change_voice card promises no question: the daily limit is the only gate")
+    let skip = definition.inputSchema["properties"]?["skip_separation"]?["description"]?.stringValue ?? ""
+    for phrase in ["skips separation", "clean voice", "AI/TTS", "no music or noise", "costs less"] {
+        check(skip.contains(phrase), "the skip_separation description says \"\(phrase)\" (when to use it)")
+    }
     let topic = MCPGuideTopics.topic(for: .changeVoice)
-    checkEqual(topic.sections.map(\.name), ["overview", "cost_and_limits", "result", "language", "pitfalls", "fields"],
+    checkEqual(topic.sections.map(\.name), ["overview", "cost_and_limits", "result", "direct_change", "language", "pitfalls", "fields"],
                "the change_voice topic has its sections, fields last")
     let text = topic.sections.map(\.text).joined(separator: "\n")
     for phrase in ["list_voices mine", "untested", "daily_budget_exceeded", "split_clip", "muted, not deleted", "one undo step",
@@ -264,6 +271,14 @@ private func voiceChangeGuideChecks() {
                    "voice_library_unavailable"] {
         check(text.contains(phrase), "the change_voice topic says \"\(phrase)\"")
     }
+    // The direct change (2026-11-21): when to use it, its price and one-track result, and what separation_failed asks of the AI.
+    let direct = topic.sections.first { $0.name == "direct_change" }?.text ?? ""
+    for phrase in ["skip_separation=true", "already a clean voice", "AI or TTS speech", "no music or noise", "only the conversion is",
+                   "never use it for speech over music", "The quote and the job carry the same value", "separation_failed",
+                   "only the separation was charged", "call change_voice again with skip_separation=true", "Do not send the same change again"] {
+        check(direct.contains(phrase), "the direct_change section says \"\(phrase)\"")
+    }
+    check(text.contains("no background_clip_id or background_file"), "the result section says a direct change has no background clip or file")
     check(!text.contains("5 minutes") && !text.contains("300"), "the topic names no source limit: it comes from Sky Studio's catalog")
     let map = guideMapText()
     check(map.contains("change_voice (re-voice a clip, dub it in my voice)"), "the guide map's Voices line lists change_voice")
