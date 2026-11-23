@@ -113,41 +113,80 @@ upload by itself. The uplink to that storage can be slow and unstable with or wi
 1. **The PUT exists once, in `SkyStudioAPI.upload`, and a try the network breaks is tried again** on a fresh task after 1 s, then
    2 s: three tries in all (`SkyStudioUploadRetry`). "Broken by the network" is URLError -1005 (connection lost, also a reset
    mid-transfer), -1001 (timed out) and -1009 (offline: Wi-Fi or VPN changing), or POSIX ECONNRESET, ECONNABORTED, EPIPE, ETIMEDOUT,
-   ENETDOWN, ENETUNREACH or ENETRESET. **Never tried again:** a storage answer (4xx / 5xx), a cancel (during the PUT or the pause),
-   an address that cannot be found or connected to, a certificate or TLS failure, a file that cannot be read.
-2. **The same signed address while it stays valid** (a PUT to it is idempotent: another try overwrites the same object). It is
-   renewed from `/uploads` before a try when less is left than the last try took plus 60 s. `expires_at` is on Sky Studio's clock,
-   so it moves onto this Mac's clock with the answer's `Date` header. An answer without `expires_at` keeps its address. A renewal
-   the network breaks counts as a broken try. The `file_url` returned is the one from the ticket whose PUT worked. The first
-   `/uploads` is an ordinary request and is not retried.
+   ENETDOWN, ENETUNREACH or ENETRESET (`classify`: `Broken`). **Never tried again:**
+   - **an answer the storage gave.** It stands even when its body then broke (the review of PR #549 found a 403 whose body stalled being
+     retried and the second try's 200 taken as success). The answer is read before the error that followed it: a 2xx is success,
+     anything else ends the upload as refused;
+   - a cancel (during the PUT or the pause);
+   - a connection that does not work at all (`Unreachable`): an address that cannot be found or connected to, a certificate or TLS
+     failure, on the PUT or while renewing the address;
+   - a file that cannot be read.
+2. **The same signed address while it is known to stay valid** (a PUT to it is idempotent: another try overwrites the same object).
+   - It is renewed from `/uploads` before a try when less is left than the last try took plus 60 s. `expires_at` is on Sky Studio's
+     clock, so it moves onto this Mac's clock with the answer's `Date` header.
+   - **An answer without a readable `expires_at` is renewed before every new try**: an address of unknown validity is never reused.
+   - A renewal the network broke costs one of the three tries but is not a PUT: **`upload_attempts` counts PUTs only**.
+   - The `file_url` returned is the one from the ticket whose PUT worked. The first `/uploads` ask is not retried.
 3. **Progress starts again from 0** after a broken try (those bytes are lost). No progress is invented.
-4. **After the last try: `SkyStudioFailure.uploadInterrupted`.** Nothing was submitted, so nothing was charged, and every job
-   releases its reservation as before. The AI gets the English `message` and `code: upload_network`, `upload_attempts`,
-   `upload_error`, `charged: false` and a `next_step` that never says to query an original job (generate_media: call again with a
-   new idempotency_key or none; this one stays bound to the failed job). The user reads one line in every UI language
-   (`SkyStudioUploadWords`): which file, after how many tries, that nothing was charged, and to check the network. **It names the
-   network, never a proxy.** A cut sent under a temporary name is named after the file the user knows (`upload(named:)`: upscale,
-   voice change, voice samples).
-5. **Every job that uploads says it:** generate_media (the task row and get_job, where the upload fields go in after the generic next
-   step), upscale_clip and the upscale panel, change_voice and its panel / notice, the voice library and manage_voices,
-   manage_characters, and the official film's reference preparation.
+4. **Giving up is `SkyStudioFailure.uploadFailed(SkyStudioUploadFailure)`**, of three kinds, also when the first `/uploads` ask could
+   not connect. Sky Studio's own refusals of `/uploads` (`.server`, such as a file too large) keep their code and words.
+   - The kinds and their codes:
+     - **interrupted:** the network broke every try (`upload_network`);
+     - **could not connect** (`upload_network`);
+     - **refused by the storage**, with its HTTP status (`upload_refused`).
+   - Nothing was submitted, so nothing was charged, and every job releases its reservation as before.
+   - The AI gets the English `message`, the code, `upload_attempts`, `upload_error` (the system's code, or "HTTP 403"),
+     `charged: false`, and a `next_step` that never says to query an original job.
+   - The user reads one line per kind in every UI language (`SkyStudioUploadWords`): which file, what happened (after how many tries
+     when it was interrupted more than once), that nothing was charged, and what to do. **It names the network, never a proxy.**
+   - A cut sent under a temporary name is named after the file the user knows (`upload(named:)`: upscale, voice change, voice
+     samples).
+5. **Every job that uploads says it:**
+   - generate_media: the task row and get_job. **Any generate_media that ended before its request left this Mac** (an upload, the key,
+     a frame, a check) gets a next step that says nothing was submitted, instead of "query this original job"; the upload fields then
+     go in last;
+   - upscale_clip and the upscale panel;
+   - change_voice and its panel / notice;
+   - the voice library and manage_voices;
+   - manage_characters;
+   - the official film's reference preparation, whose task row stays with the line.
 
-Checks: `UploadRetryChecks` in `scripts/check-sky-studio.sh` runs the real transfer against a local 127.0.0.1 server
-(`checks/SkyStudio/UploadServer.swift`, no proxy) that reads the whole body and then drops or resets the connection. It covers one
-or two drops then success at the same address with pauses of 1 s and 2 s and progress back to 0, three drops ending with
-`upload_network`, a 403 and a cancel tried once, renewal near expiry, and a skewed server clock. `checks/sky-studio-wiring/upload-retry.sh`
-pins the single PUT and each job's wiring.
+Checks in `scripts/check-sky-studio.sh` run the real transfer against a local 127.0.0.1 server (`checks/SkyStudio/UploadServer.swift`,
+no proxy):
+- `UploadRetryChecks`:
+  - one or two drops (or a reset) after the body, then success at the same address with pauses of 1 s and 2 s and progress back to 0;
+  - three drops ending as interrupted;
+  - the pure rules and words.
+- `UploadAnswerChecks`:
+  - a 403, and a 403 whose body was reset or stalled into a timeout, each refused after one PUT;
+  - a 200 whose body was reset or stalled counts as success after one PUT;
+  - a TLS failure on the PUT (an https address on the plain server) ends the upload as could not connect, with no second try;
+  - a cancel and a stop during the pause;
+  - renewal near expiry, an unknown expiry renewed, a skewed server clock;
+  - a renewal broken once (the next try renews and sends) or twice (interrupted, `upload_attempts` 1);
+  - a renewal refused (the server stops listening) ends the upload.
 
-**Smoke tests against the real Sky Studio: `SRTFLOW_TEST_UPLOAD_DROPS=N`, debug builds only** (2026-11-23, for the post-merge
-smoke). In a debug build such as the smoke app, the first N PUT tries of the process lose their connection after part of the body
-went out (`CloudUploadFault`, reached only from `SkyStudioAPI.transfer` inside `#if DEBUG`). The real PUT is cut as soon as bytes have
-gone out, and the try ends as URLError -1005 through the same classification as a real lost connection. On a fast link the whole body
-may already be out; the next try overwrites the same object. With `N=1` the next try works; with `N=3` the upload ends with the
-localized line and `upload_network`, and nothing is charged. Uploads after the N tries are not touched, the variable is read once per
-process (relaunch to change it), and no network setting is ever touched. **Release builds carry none of it:** the file is inside
-`#if DEBUG` from its first line to its last. `scripts/check-sky-studio.sh` searches a build without DEBUG for the hook's names with
-`strings`, using the debug build as the control, and runs the hook's own checks (`checks/UploadFault/main.swift`, compiled with
-`-D DEBUG`). `scripts/build-app.sh` refuses a release binary that names it.
+`checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, the answer read first, each job's wiring and the next-step order.
+
+**Smoke tests against the real Sky Studio: `SRTFLOW_TEST_UPLOAD_DROPS=N`, debug builds only** (2026-11-23, for the post-merge smoke).
+- In a debug build such as the smoke app, the first N PUT tries of the process lose their connection after part of the body went
+  out (`CloudUploadFault`, reached only from `SkyStudioAPI.put` inside `#if DEBUG`).
+- A dropped try is the same PUT sent as a stream that holds only the first quarter of the file (at most 256 KB), while its
+  Content-Length is the whole file's, so the storage can never take it as complete on any link.
+- The try is cancelled once that part is out (or after 5 s) and ends as URLError -1005, through the same classification as a real
+  lost connection.
+- With `N=1` the next try works; with `N=3` the upload ends with the localized line and `upload_network`, and nothing is charged.
+- Uploads after the N tries are not touched, the variable is read once per process (relaunch to change it), and no network setting
+  is ever touched.
+
+**Release builds carry none of it.** The file is inside `#if DEBUG` from its first line to its last. `scripts/debug-hook-probe.sh`
+refuses a binary in which `strings` finds the hook's names:
+- `scripts/build-app.sh` runs it on the release binary before packaging;
+- `scripts/check-sky-studio.sh` runs it on its build without DEBUG, which must pass, and on a debug build, which must be refused. That
+  control turns red if the probe ever stops refusing.
+
+The hook's own checks (`checks/UploadFault/main.swift`, compiled with `-D DEBUG`, against a slow-reading server) check that a cut try
+arrives with at most its part and never whole, that the next try arrives whole, and that three cuts end as interrupted.
 
 Manual regression before a release (the checks cannot cut a real uplink):
 
