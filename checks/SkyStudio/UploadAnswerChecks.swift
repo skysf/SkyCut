@@ -4,9 +4,10 @@ import SrtFlowMCPKit
 // Uploads to Sky Studio's storage, the cases that must not be tried again and the signed address (2026-11-23, PR #549 and its two
 // reviews): an answer the storage began stands, even when its body then broke or stalled, and even when only its head came (a 403 is
 // refused after one PUT; a 200 is success); a redirect is not followed (one try is one PUT); a TLS failure, a cancel and a stop during
-// the pause end the upload; a `/uploads` refusal or an answer without an address is declined (Sky Studio's own refusal kept); the
-// address is renewed when it would run out or its validity is unknown, a renewal the network broke costs a try but is not counted as a
-// PUT, and a renewal whose connection does not work ends the upload. Same local server and helpers as UploadRetryChecks.
+// the pause end the upload; a `/uploads` refusal or an answer without an address is declined (Sky Studio's own refusal kept; a 413 or
+// its `upload_too_large` is called too large); the address is renewed when it would run out or its validity is unknown, a renewal
+// the network broke costs a try but is not counted as a PUT, and a renewal whose connection does not work ends the upload. Same
+// local server and helpers as UploadRetryChecks.
 
 func runUploadAnswerChecks(_ server: UploadServer, file: URL) async {
     // The review's case: a 403 whose body then stalled until the PUT timed out (here after 1.5 s) was tried again and the second
@@ -52,9 +53,12 @@ func runUploadAnswerChecks(_ server: UploadServer, file: URL) async {
     }
 
     // `/uploads` refused or answered without an address: declined, before any PUT, with Sky Studio's own refusal kept.
-    for (reply, what, status) in [(UploadServer.TicketReply.status(413), "a 413 from /uploads", 413),
-                                  (.noAddress, "a /uploads answer without an address", 200),
-                                  (.refusal(503, code: "voice_library_unavailable"), "Sky Studio's own refusal", 503)] {
+    // A file too large (a 413, or Sky Studio's reason upload_too_large) is said so, and only that.
+    for (reply, what, status, tooLarge) in [(UploadServer.TicketReply.status(413), "a 413 from /uploads", 413, true),
+                                            (.noAddress, "a /uploads answer without an address", 200, false),
+                                            (.refusal(503, code: "voice_library_unavailable"), "Sky Studio's own refusal", 503, false),
+                                            (.refusal(400, code: "invalid_request", reason: "upload_too_large"),
+                                             "Sky Studio's own too-large refusal", 400, true)] {
         server.configure(puts: [.ok], tickets: [reply])
         var thrown: Error?
         let declined = await uploadFailure(what) {
@@ -65,10 +69,12 @@ func runUploadAnswerChecks(_ server: UploadServer, file: URL) async {
         checkEqual(declined?.code, "upload_declined", "\(what): upload_declined")
         checkEqual(declined?.attempts, 0, "\(what): no PUT")
         check(!server.log.contains { $0.method == "PUT" }, "\(what): nothing was sent to the storage")
-        if case .refusal = reply {
-            checkEqual(declined?.server?.code, "voice_library_unavailable", "Sky Studio's refusal is kept")
-            checkEqual(declined?.fields(retry: "x")["server_code"], "voice_library_unavailable", "and its code reaches the AI")
-            checkEqual(thrown.flatMap(SkyStudioVoiceLibraryErrors.kind), .unavailable, "the voice library still names it")
+        checkEqual(declined?.isTooLarge, tooLarge, "\(what): too large \(tooLarge ? "is" : "is not") what it is called")
+        if case .refusal(_, let code, _) = reply {
+            checkEqual(declined?.server?.code, code, "\(what): Sky Studio's refusal is kept")
+            checkEqual(declined?.fields(retry: "x")["server_code"], .string(code), "\(what): and its code reaches the AI")
+            checkEqual(thrown.flatMap(SkyStudioVoiceLibraryErrors.kind), tooLarge ? .uploadTooLarge : .unavailable,
+                       "\(what): the voice library still names it in its own words")
         }
     }
 
@@ -166,21 +172,47 @@ func runUploadAddressChecks(_ server: UploadServer, file: URL) async {
         check(false, "renewals broken twice end as an upload failure")
     }
 
-    // A renewal whose connection does not work (as a certificate the Mac does not trust): on a server of its own that stops listening
-    // during the pause before the next try, so the renewal is refused. It ends the upload: no other ask, no second PUT.
-    guard let closing = try? UploadServer() else { return check(false, "a second local upload server starts") }
-    defer { closing.stop() }
-    closing.configure(puts: [.drop, .ok], tickets: [.ticket(life: 30)])
+    // A renewal whose connection does not work (the review's case: a certificate the Mac does not trust). The pause arms a fault that
+    // fails the next `/uploads` ask with -1202 before it leaves this Mac; the error still takes the API's own path. It ends the upload:
+    // no other ask, no second PUT. A server that stops listening is no stand-in: the system reports a refused loopback connection as
+    // -1005 ("connection lost") in a few tries out of a hundred, so that renewal read as broken now and then (2026-11-23).
+    server.configure(puts: [.drop, .ok], tickets: [.ticket(life: 30)])
     var retry = SkyStudioUploadRetry()
-    retry.sleep = { _ in closing.stop() }
-    let api = SkyStudioAPI(session: uploadSession, base: URL(string: "http://127.0.0.1:\(closing.port)/api/skycut/v1")!,
+    retry.sleep = { _ in RenewalCertificateFault.armed = true }
+    let api = SkyStudioAPI(session: renewalFaultSession, base: URL(string: "http://127.0.0.1:\(server.port)/api/skycut/v1")!,
                            version: "0.18.50", machine: nil, uploadRetry: retry)
-    let refused = await uploadFailure("a renewal whose connection is refused") {
+    let refused = await uploadFailure("a renewal whose certificate is not trusted") {
         _ = try await api.upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
     }
-    checkEqual(refused?.kind, .unreachable, "a renewal whose connection does not work ends the upload as could not connect")
+    RenewalCertificateFault.armed = false
+    checkEqual(refused?.kind, .unreachable, "a renewal whose connection does not work ends the upload as could not connect "
+        + "(\(refused?.lastError ?? "no upload failure"))")
     checkEqual(refused?.attempts, 1, "upload_attempts counts the one PUT")
-    check(refused?.lastError.hasPrefix("POST /uploads") == false && refused?.lastError.hasPrefix("NSURLErrorDomain") == true,
-          "the system's error is kept: \(refused?.lastError ?? "")")
-    checkEqual(uploadPaths(closing), ["POST /uploads", put1], "it is not tried again: no other ask, no second PUT")
+    checkEqual(refused?.lastError, "NSURLErrorDomain -1202", "the system's error is kept")
+    checkEqual(uploadPaths(server), ["POST /uploads", put1], "it is not tried again: no other ask, no second PUT")
 }
+
+/// While armed, fails every `/uploads` ask with an untrusted certificate (-1202) before it leaves this Mac; everything else reaches the
+/// local server. Only `renewalFaultSession` carries it.
+final class RenewalCertificateFault: URLProtocol {
+    private static let lock = NSLock()
+    private static var isArmed = false
+    static var armed: Bool {
+        get { lock.lock(); defer { lock.unlock() }; return isArmed }
+        set { lock.lock(); isArmed = newValue; lock.unlock() }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { armed && request.url?.path.hasSuffix("/uploads") == true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.serverCertificateUntrusted)) }
+    override func stopLoading() {}
+}
+
+/// The checks' session (no proxy) with RenewalCertificateFault in front.
+let renewalFaultSession: URLSession = {
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.connectionProxyDictionary = [:]
+    configuration.urlCache = nil
+    configuration.protocolClasses = [RenewalCertificateFault.self] + (configuration.protocolClasses ?? [])
+    return URLSession(configuration: configuration)
+}()

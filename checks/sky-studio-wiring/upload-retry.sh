@@ -13,6 +13,7 @@
 #   - generate_media's get_job never ends with "query this original job" for a request that never left this Mac: the next step for an
 #     unsubmitted job and then the upload fields come after the generic one;
 #   - a cut sent under a temporary name is reported by the name the user knows;
+#   - a file too large for Sky Studio reads "use a smaller file", never "try again later";
 #   - the user's lines name the network, never a proxy (on 2026-11-23 the uplink was just as unstable without one);
 #   - SRTFLOW_TEST_UPLOAD_DROPS exists only in debug builds, and scripts/debug-hook-probe.sh guards the release binary.
 # Long-term rules: docs/architecture/sky-studio-jobs.md, "Uploads that the network interrupts".
@@ -30,7 +31,8 @@ UPLOAD_CHARACTER="Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift"
 UPLOAD_CHARACTER_RUN="Sources/SrtFlow/SkyStudio/SkyStudioCharacterRun.swift"
 UPLOAD_OFFICIAL="Sources/SrtFlow/SkyStudio/SkyStudioOfficialPreparation.swift"
 UPLOAD_FAULT="Sources/SrtFlow/CloudMedia/CloudUploadFault.swift"
-for file in "${UPLOAD_API}" "${UPLOAD_RUN}" "${UPLOAD_UPSCALE_JOB}" "${UPLOAD_UPSCALE_TOOL}" "${UPLOAD_UPSCALE_PIPELINE}" "${UPLOAD_CHANGE_JOB}" \
+UPLOAD_WORDS="Sources/SrtFlow/SkyStudio/SkyStudioUploadWords.swift"
+for file in "${UPLOAD_WORDS}" "${UPLOAD_API}" "${UPLOAD_RUN}" "${UPLOAD_UPSCALE_JOB}" "${UPLOAD_UPSCALE_TOOL}" "${UPLOAD_UPSCALE_PIPELINE}" "${UPLOAD_CHANGE_JOB}" \
             "${UPLOAD_LIBRARY_TEXT}" "${UPLOAD_RECORDING_TOOL}" "${UPLOAD_RECORDING}" "${UPLOAD_CHARACTER}" "${UPLOAD_CHARACTER_RUN}" \
             "${UPLOAD_OFFICIAL}" "${UPLOAD_FAULT}" scripts/debug-hook-probe.sh; do
   [ -f "${file}" ] || fail "${file} is missing: a rename must be followed here (an empty scan is a false green)"
@@ -93,6 +95,14 @@ grep -qF 'named: file.lastPathComponent' "${UPLOAD_RECORDING}" || fail "${UPLOAD
 # The user's lines name the network, never a proxy.
 proxy_lines="$(grep -hE '"(The upload of|Sky Studio.s storage refused the upload)' Sources/SrtFlow/Resources/*.lproj/Localizable.strings | grep -iE 'proxy|代理' || true)"
 [ -z "${proxy_lines}" ] || fail "an upload line names a proxy in a string table: ${proxy_lines} — say the network (the direct path was just as unstable)"
+
+# A file too large for Sky Studio reads "use a smaller file", never "try again later": the localized line asks isTooLarge before
+# anything else (UploadRetryChecks / UploadAnswerChecks pin the rule and the AI's words; no check compiles the localized line).
+words_head="$(grep -A3 -F 'static func shown(_ failure: SkyStudioUploadFailure) -> String {' "${UPLOAD_WORDS}" || true)"
+case "${words_head}" in
+  *'if failure.isTooLarge {'*) ;;
+  *) fail "${UPLOAD_WORDS}: shown() must answer a file too large (failure.isTooLarge) first, with the smaller-file line" ;;
+esac
 
 # SRTFLOW_TEST_UPLOAD_DROPS exists only in debug builds: its file is fenced whole, the API reaches it only inside #if DEBUG, and the
 # probe that refuses a binary naming it runs on the release binary (scripts/build-app.sh). That the probe still refuses is tested in

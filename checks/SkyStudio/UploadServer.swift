@@ -22,7 +22,7 @@ final class UploadServer: @unchecked Sendable {
     /// What a `POST …/uploads` gets: a ticket (`life`: seconds from the answer's `Date` to `expires_at`, nil = no `expires_at`; `tls`:
     /// the signed address is https, which this plain server cannot speak), or the connection dropped after the request.
     /// `status`: an HTTP error with a plain body; `refusal`: Sky Studio's own error answer; `noAddress`: a 200 without `upload_url`.
-    enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop, status(Int), refusal(Int, code: String), noAddress }
+    enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop, status(Int), refusal(Int, code: String, reason: String? = nil), noAddress }
 
     struct Seen: Sendable {
         let method: String
@@ -169,8 +169,10 @@ final class UploadServer: @unchecked Sendable {
                 close(client)
             case .status(let status):
                 respond(client, status: "\(status) Error", body: "<html>Request Entity Too Large</html>", extra: ["Content-Type: text/html"])
-            case .refusal(let status, let code):
-                respond(client, status: "\(status) Error", body: "{\"error\": {\"code\": \"\(code)\", \"message\": \"Refused by the test server.\"}}",
+            case .refusal(let status, let code, let reason):
+                let why = reason.map { ", \"reason\": \"\($0)\"" } ?? ""
+                respond(client, status: "\(status) Error",
+                        body: "{\"error\": {\"code\": \"\(code)\", \"message\": \"Refused by the test server.\"\(why)}}",
                         extra: ["Content-Type: application/json"])
             case .noAddress:
                 respond(client, status: "200 OK", body: "{\"method\": \"PUT\"}", extra: ["Content-Type: application/json"])

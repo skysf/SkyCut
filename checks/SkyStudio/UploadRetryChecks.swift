@@ -148,10 +148,25 @@ private func runUploadFailureWordsChecks() {
           "a refusal: plain words, upload_refused")
     let unread = SkyStudioUploadFailure(fileName: "a.png", kind: .refused(status: 0), attempts: 1, lastError: "HTTP 0")
     check(unread.message.contains("did not come through") && unread.code == "upload_refused", "an answer whose status never came through")
-    let declined = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 413), attempts: 0, lastError: "HTTP 413")
-    check(declined.message.contains("did not accept the upload of a.png (HTTP 413)") && declined.code == "upload_declined",
+    let declined = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 503), attempts: 0, lastError: "HTTP 503")
+    check(declined.message.contains("did not accept the upload of a.png (HTTP 503)") && declined.code == "upload_declined",
           "a /uploads refusal: plain words, upload_declined")
-    for failure in [interrupted, unreachable, refused, unread, declined] {
+    // Too large: a 413 from /uploads or the storage, or Sky Studio's reason upload_too_large. Only a smaller file helps.
+    let tooLarge = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 413), attempts: 0, lastError: "HTTP 413")
+    let tooLargeRefusal = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 400), attempts: 0, lastError: "invalid_request: Big.",
+        server: SkyStudioServerError(status: 400, code: "invalid_request", message: "Big.", fields: ["reason": "upload_too_large"]))
+    let storageTooLarge = SkyStudioUploadFailure(fileName: "a.png", kind: .refused(status: 413), attempts: 1, lastError: "HTTP 413")
+    let otherRefusal = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 400), attempts: 0, lastError: "invalid_request: No.",
+        server: SkyStudioServerError(status: 400, code: "invalid_request", message: "No.", fields: ["reason": "unsupported_type"]))
+    for failure in [tooLarge, tooLargeRefusal, storageTooLarge] {
+        check(failure.isTooLarge && failure.message.contains("because the file is too large (\(failure.lastError))"),
+              "\(failure.kind): a file too large is said so: \(failure.message)")
+        check(failure.fields(retry: "x")["next_step"]?.stringValue?.contains("too large for Sky Studio (\(failure.lastError)), so they need a "
+              + "smaller file") == true, "\(failure.kind): the next step asks for a smaller file")
+    }
+    check(![interrupted, unreachable, refused, unread, declined, otherRefusal].contains { $0.isTooLarge },
+          "nothing else is called too large (another invalid_request, a 503, a 403)")
+    for failure in [interrupted, unreachable, refused, unread, declined, tooLarge, tooLargeRefusal, storageTooLarge, otherRefusal] {
         let fields = failure.fields(retry: "call generate_media again.")
         let next = fields["next_step"]?.stringValue ?? ""
         check(fields["code"]?.stringValue == failure.code && fields["upload_attempts"] == .number(Double(failure.attempts))
