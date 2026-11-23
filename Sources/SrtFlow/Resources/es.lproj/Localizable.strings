@@ -1558,6 +1558,7 @@
 "Changed to the voice “%@”. The original sound is muted; press ⌘Z to undo." = "Voz cambiada a «%@». El sonido original está silenciado; pulsa ⌘Z para deshacer.";
 "The voice was changed, but the clip was edited meanwhile; the two audio files were saved next to the original and nothing on the timeline was changed." = "La voz se cambió, pero el clip se editó mientras tanto; los dos archivos de audio se guardaron junto al original y no se cambió nada en la línea de tiempo.";
 "Changing the voice of “%@” did not finish. %@" = "No se pudo terminar el cambio de voz de «%@». %@";
+"The upload of “%1$@” was interrupted by the network after %2$d tries. Nothing was charged. Check your network connection and try again." = "La red interrumpió la subida de «%1$@» tras %2$d intentos. No se cobró nada. Revisa tu conexión de red e inténtalo de nuevo.";
 "This clip has no sound to change." = "Este clip no tiene sonido que cambiar.";
 "This clip is muted. Unmute it first, then change its voice." = "Este clip está silenciado. Quita el silencio primero y luego cambia la voz.";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "Este clip usa %1$@ de su original; un cambio de voz admite como máximo %2$@ cada vez. Divide el clip primero y cambia cada parte.";
