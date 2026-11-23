@@ -40,11 +40,13 @@
 #      each page (entry, catalogue, card) read with their checksums, the card routes on the fake server (?group=, ?version=, 304),
 #      the copies by kind / id / version, the refusal text; readCard on every path (not entitled, nothing published, unknown page,
 #      offline, 403 / 404 / 503, a text not the listed one, the licence ending mid-fetch, licence changes) and the craft_cards answer.
-#  13. Uploads the network interrupts (2026-11-23; UploadRetryChecks against a local 127.0.0.1 server, no proxy): a PUT whose
-#      connection drops after the body is tried again at the same signed address (works on try 2 or 3), three tries in all,
-#      then `upload_network` in plain words; a 403 and a cancel are never tried again; an address about to run out is renewed.
-#      The debug-only hook SRTFLOW_TEST_UPLOAD_DROPS (CloudUploadFault): no trace of it in this build without DEBUG (strings, with
-#      the debug build as the control); its own checks (checks/UploadFault/main.swift) run in a second binary built with -D DEBUG.
+#  13. Uploads to Sky Studio's storage (2026-11-23; UploadRetryChecks / UploadAnswerChecks against a local 127.0.0.1 server, no
+#      proxy): a PUT whose connection drops after the body is tried again at the same signed address (works on try 2 or 3), three
+#      tries in all, then `upload_network` in plain words; an answer stands even when its body stalls (a 403 is refused after one
+#      PUT); a TLS failure, a cancel and a refused renewal end it; an address about to run out or of unknown validity is renewed.
+#      The debug-only hook SRTFLOW_TEST_UPLOAD_DROPS (CloudUploadFault): scripts/debug-hook-probe.sh passes this build without DEBUG
+#      and refuses the debug build (the control); the hook's own checks (checks/UploadFault/main.swift) run in a second binary built
+#      with -D DEBUG.
 #
 # 不碰真的网络、不碰真的钥匙串（钥匙串的读写只有一份 KeychainSecret，真钥匙串在 scripts/check-keychain.sh，本机手动）。
 # 合同在 Sky Studio 仓库的 docs/agents/skycut-api.md；规矩见 docs/architecture/sky-studio-account.md。
@@ -88,6 +90,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioContent.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCards.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCardWords.swift \
@@ -208,6 +211,7 @@ xcrun swiftc \
   checks/SkyStudio/JobChecks.swift \
   checks/SkyStudio/UploadServer.swift \
   checks/SkyStudio/UploadRetryChecks.swift \
+  checks/SkyStudio/UploadAnswerChecks.swift \
   checks/SkyStudio/FilmChecks.swift \
   checks/SkyStudio/OfficialQuoteChecks.swift \
   checks/SkyStudio/OfficialReceiptChecks.swift \
@@ -254,21 +258,10 @@ echo "==> 跑自检"
 "$OUT"
 
 # SRTFLOW_TEST_UPLOAD_DROPS (Sources/SrtFlow/CloudMedia/CloudUploadFault.swift) exists only in debug builds. The binary above is built
-# without DEBUG, as release is, and lists the hook's file: it must carry no trace of it. scripts/build-app.sh checks the real release
-# binary the same way. docs/architecture/sky-studio-jobs.md, "Uploads that the network interrupts".
-debug_hook_traces() { # debug_hook_traces <binary>: the hook's names found in it (strings fails loudly, a miss is empty)
-  local found
-  found="$(mktemp)"
-  strings -a "$1" > "${found}"
-  grep -F -e SRTFLOW_TEST_UPLOAD_DROPS -e CloudUploadFault "${found}" || true
-  rm -f "${found}"
-}
+# without DEBUG, as release is, and lists the hook's file: scripts/debug-hook-probe.sh must pass it. scripts/build-app.sh runs the same
+# probe on the real release binary. docs/architecture/sky-studio-jobs.md, "Uploads that the network interrupts".
 echo "==> 调试钩子不进非调试构建"
-LEAKED="$(debug_hook_traces "$OUT")"
-if [ -n "${LEAKED}" ]; then
-  printf '✗ A build without DEBUG carries the debug-only upload hook; it must stay inside #if DEBUG:\n%s\n' "${LEAKED}" >&2
-  exit 1
-fi
+/bin/bash scripts/debug-hook-probe.sh "$OUT"
 
 echo "==> 编译上传断线钩子的自检（-D DEBUG，同冒烟用的调试构建）"
 DEBUG_OUT="$(dirname "$OUT")/uploadfaultcheck"
@@ -283,6 +276,7 @@ xcrun swiftc \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioBilling.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioCharacterAPI.swift \
@@ -308,9 +302,10 @@ xcrun swiftc \
   checks/UploadFault/main.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
-# The control: the same probe does see the hook in the debug build, so its silence above means something.
-if [ -z "$(debug_hook_traces "$DEBUG_OUT")" ]; then
-  echo "✗ strings finds no trace of the upload hook even in the debug build: the check above would be blind" >&2
+# The control: the probe refuses the debug build, which carries the hook, so its pass above means something (a probe that no longer
+# refuses, say without its exit 1, turns red here).
+if /bin/bash scripts/debug-hook-probe.sh "$DEBUG_OUT" > /dev/null 2>&1; then
+  echo "✗ scripts/debug-hook-probe.sh passed the debug build, which carries the upload hook: the release check would be blind" >&2
   exit 1
 fi
 echo "==> 跑上传断线钩子的自检"

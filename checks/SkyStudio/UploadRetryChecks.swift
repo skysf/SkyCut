@@ -1,18 +1,17 @@
 import Foundation
 import SrtFlowMCPKit
 
-// Uploads the network interrupts (2026-11-23, generate-34 / generate-35; docs/bugfixes/2026-11-23-upload-lost-connection-no-retry.md):
-// SkyStudioAPI.upload tries a PUT the network broke again on a fresh task, three tries in all, at the same signed address while it
-// stays valid (a new ticket when it would run out), with progress starting again from 0; a storage answer (403) and a cancel are
-// never tried again; after the last try the error is `SkyStudioFailure.uploadInterrupted` with the code `upload_network`, the count
-// and plain words. Run against a real local server (UploadServer) that reads the whole body and then drops the connection, with no
-// proxy: the system's own transfer code is what is tested. Plus the pure rules: which errors are retried, when an address must be
-// renewed, the words for the AI.
+// Uploads to Sky Studio's storage (2026-11-23, generate-34 / generate-35; docs/bugfixes/2026-11-23-upload-lost-connection-no-retry.md):
+// SkyStudioAPI.upload tries a PUT the network broke again on a fresh task, three tries in all, at the same signed address while it is
+// known to stay valid, with progress starting again from 0. An answer the storage gave stands (a 403 even when its body then broke),
+// and a connection that does not work and a cancel are never tried again. Giving up is `SkyStudioFailure.uploadFailed`
+// (`upload_network` / `upload_refused`, the PUT count, plain words). Run against a real local server (UploadServer) with no proxy: the
+// system's own transfer code is what is tested. The pure rules are here; the address and answer cases are in UploadAnswerChecks.
 
 func runUploadRetryChecks() async {
     runTransientErrorChecks()
     runUploadTicketChecks()
-    runInterruptionWordsChecks()
+    runUploadFailureWordsChecks()
     let server: UploadServer
     do { server = try UploadServer() } catch {
         check(false, "the local upload server starts: \(error)")
@@ -26,8 +25,8 @@ func runUploadRetryChecks() async {
     let bytes = Data((0..<200_000).map { UInt8($0 % 241) })
     try? bytes.write(to: file)
     await runDropChecks(server, file: file, size: bytes.count)
-    await runNotRetriedChecks(server, file: file)
-    await runAddressChecks(server, file: file)
+    await runUploadAnswerChecks(server, file: file)
+    await runUploadAddressChecks(server, file: file)
 }
 
 /// Progress reports and the waits between tries, in the order they happened (waits are recorded, not slept).
@@ -47,32 +46,49 @@ final class UploadEvents: @unchecked Sendable {
     }
 }
 
-private func uploadAPI(_ server: UploadServer, events: UploadEvents) -> SkyStudioAPI {
+/// `putTimeout`: how long a PUT may sit without a byte moving (short only where an answer that stalls is the case).
+func uploadAPI(_ server: UploadServer, events: UploadEvents, putTimeout: TimeInterval = 600) -> SkyStudioAPI {
     var retry = SkyStudioUploadRetry()
     retry.sleep = { seconds in events.add(.pause(seconds)) }
+    retry.putTimeout = putTimeout
     return SkyStudioAPI(session: uploadSession, base: URL(string: "http://127.0.0.1:\(server.port)/api/skycut/v1")!, version: "0.18.50",
                         machine: String(repeating: "a", count: 64), uploadRetry: retry)
 }
 
 /// No proxy at all: the system's proxy settings are never read or used by these checks.
-private let uploadSession: URLSession = {
+let uploadSession: URLSession = {
     let configuration = URLSessionConfiguration.ephemeral
     configuration.connectionProxyDictionary = [:]
     configuration.urlCache = nil
     return URLSession(configuration: configuration)
 }()
 
-private func paths(_ server: UploadServer) -> [String] {
+func uploadPaths(_ server: UploadServer) -> [String] {
     server.log.map { "\($0.method) " + ($0.path.hasSuffix("/uploads") ? "/uploads" : String($0.path.prefix { $0 != "?" })) }
+}
+
+/// The failure an upload ended with, or nil (a failure that is not an upload failure is recorded).
+func uploadFailure(_ message: String, file: String = #fileID, line: Int = #line, _ body: () async throws -> Void) async -> SkyStudioUploadFailure? {
+    guard let failure = await expectFailure(message, file: file, line: line, body) else { return nil }
+    guard let upload = SkyStudioUploadFailure.from(failure) else {
+        check(false, "\(message): expected uploadFailed, got \(failure)", file: file, line: line)
+        return nil
+    }
+    return upload
 }
 
 private func runTransientErrorChecks() {
     for code in [URLError.Code.networkConnectionLost, .timedOut, .notConnectedToInternet] {
         check(SkyStudioUploadRetry.isTransient(URLError(code)), "a PUT that ended with URLError \(code.rawValue) is tried again")
+        check(SkyStudioUploadRetry.classify(URLError(code)) is SkyStudioUploadRetry.Broken, "URLError \(code.rawValue) is a broken try")
     }
     for code in [URLError.Code.cancelled, .badServerResponse, .cannotFindHost, .cannotConnectToHost, .secureConnectionFailed,
                  .serverCertificateUntrusted, .fileDoesNotExist, .noPermissionsToReadFile, .badURL, .userAuthenticationRequired] {
         check(!SkyStudioUploadRetry.isTransient(URLError(code)), "URLError \(code.rawValue) is never tried again")
+    }
+    for code in [URLError.Code.serverCertificateUntrusted, .secureConnectionFailed, .cannotFindHost, .cannotParseResponse] {
+        check(SkyStudioUploadRetry.classify(URLError(code)) is SkyStudioUploadRetry.Unreachable,
+              "URLError \(code.rawValue) (on a PUT or while renewing the address) ends the upload")
     }
     check(SkyStudioUploadRetry.isTransient(NSError(domain: NSPOSIXErrorDomain, code: Int(ECONNRESET))), "a connection reset is tried again")
     check(SkyStudioUploadRetry.isTransient(NSError(domain: NSPOSIXErrorDomain, code: Int(EPIPE))), "a broken pipe is tried again")
@@ -108,30 +124,41 @@ private func runUploadTicketChecks() {
     checkEqual(local, SkyStudioJSON.parseDate("2026-11-23T07:15:00Z"), "without Date, expires_at is taken as it is")
     let garbled = SkyStudioUploadTicket.deadline(expiresAt: "2026-11-23T07:15:00Z", received: received, serverDate: "yesterday")
     checkEqual(garbled, SkyStudioJSON.parseDate("2026-11-23T07:15:00Z"), "an unreadable Date is ignored")
-    var open = answer
-    if case .object(var fields) = open { fields["expires_at"] = nil; open = .object(fields) }
-    let forever = SkyStudioUploadTicket(open, received: received, serverDate: nil)
-    check(forever?.deadline == nil && forever?.needsRenewal(now: received.addingTimeInterval(86_400), lastTry: 600, margin: 60) == false,
-          "an answer without expires_at keeps its address for every try")
+    for expires in [nil, "next week"] as [JSONValue?] {
+        var unknown = answer
+        if case .object(var fields) = unknown { fields["expires_at"] = expires; unknown = .object(fields) }
+        let ticket = SkyStudioUploadTicket(unknown, received: received, serverDate: nil)
+        check(ticket?.deadline == nil && ticket?.needsRenewal(now: received.addingTimeInterval(1), lastTry: 0, margin: 60) == true,
+              "an address of unknown validity (expires_at \(expires?.stringValue ?? "missing")) is never reused")
+    }
     check(SkyStudioUploadTicket(["method": "PUT"], received: received, serverDate: nil) == nil, "no addresses, no ticket")
 }
 
-private func runInterruptionWordsChecks() {
-    let interruption = SkyStudioUploadInterruption(fileName: "cabin.png", attempts: 3, lastError: "NSURLErrorDomain -1005")
-    checkEqual(interruption.message, "The upload of cabin.png to Sky Studio was interrupted by the network after 3 tries; nothing was "
+private func runUploadFailureWordsChecks() {
+    let interrupted = SkyStudioUploadFailure(fileName: "cabin.png", kind: .interrupted, attempts: 3, lastError: "NSURLErrorDomain -1005")
+    checkEqual(interrupted.message, "The upload of cabin.png to Sky Studio was interrupted by the network after 3 tries; nothing was "
         + "submitted and nothing was charged.", "the AI is told what happened in plain words")
-    check(!interruption.message.lowercased().contains("proxy"), "the words name the network, never a proxy")
-    let fields = interruption.fields(retry: "call generate_media again.")
-    checkEqual(fields["code"], "upload_network", "the stable code")
-    checkEqual(fields["upload_attempts"], 3, "the count")
-    checkEqual(fields["charged"], false, "nothing was charged")
-    checkEqual(fields["upload_error"], "NSURLErrorDomain -1005", "the last error")
-    let next = fields["next_step"]?.stringValue ?? ""
-    check(next.hasPrefix("Nothing was submitted to Sky Studio and nothing was charged.") && next.hasSuffix("call generate_media again.")
-          && !next.contains("original job"), "the next step never sends the AI to query a job that was never submitted: \(next)")
-    checkEqual(SkyStudioUploadInterruption.from(SkyStudioFailure.uploadInterrupted(interruption)), interruption, "read back from the error")
-    checkEqual(SkyStudioUploadInterruption.from(SkyStudioFailure.network("lost")), nil, "another failure is not an interruption")
-    checkEqual(SkyStudioJobError.request(.uploadInterrupted(interruption)).message, interruption.message, "a job's message is the same")
+    check(SkyStudioUploadFailure(fileName: "a.png", kind: .interrupted, attempts: 1, lastError: "x").message.contains("on its only try"),
+          "one PUT is not called three tries")
+    let unreachable = SkyStudioUploadFailure(fileName: "a.png", kind: .unreachable, attempts: 1, lastError: "NSURLErrorDomain -1202")
+    check(unreachable.message.contains("could not connect (NSURLErrorDomain -1202)") && unreachable.code == "upload_network",
+          "a connection that does not work: plain words, upload_network")
+    let refused = SkyStudioUploadFailure(fileName: "a.png", kind: .refused(status: 403), attempts: 1, lastError: "HTTP 403")
+    check(refused.message.contains("refused the upload of a.png (HTTP 403)") && refused.code == "upload_refused",
+          "a refusal: plain words, upload_refused")
+    for failure in [interrupted, unreachable, refused] {
+        let fields = failure.fields(retry: "call generate_media again.")
+        let next = fields["next_step"]?.stringValue ?? ""
+        check(fields["code"]?.stringValue == failure.code && fields["upload_attempts"] == .number(Double(failure.attempts))
+              && fields["charged"] == false && fields["upload_error"]?.stringValue == failure.lastError,
+              "\(failure.kind): the code, the PUT count, nothing charged, the last error")
+        check(next.hasPrefix("Nothing was submitted to Sky Studio and nothing was charged.") && next.hasSuffix("call generate_media again.")
+              && !next.contains("original job"), "\(failure.kind): the next step never points at a job that was never submitted: \(next)")
+        check(!(failure.message + next).lowercased().contains("proxy"), "\(failure.kind): the words name the network, never a proxy")
+    }
+    checkEqual(SkyStudioUploadFailure.from(SkyStudioFailure.uploadFailed(refused)), refused, "read back from the error")
+    checkEqual(SkyStudioUploadFailure.from(SkyStudioFailure.network("lost")), nil, "another failure is not an upload failure")
+    checkEqual(SkyStudioJobError.request(.uploadFailed(refused)).message, refused.message, "a job's message is the same")
 }
 
 /// The server reads the whole body, then drops the connection N times: the upload works on try N + 1, at the same address.
@@ -149,7 +176,7 @@ private func runDropChecks(_ server: UploadServer, file: URL, size: Int) async {
             continue
         }
         checkEqual(link?.absoluteString, server.fileURL(1), "\(drops) drop(s) (\(reply)): the first ticket's file_url comes back")
-        checkEqual(paths(server), ["POST /uploads"] + Array(repeating: "PUT /r2/originals/u/skycut/1.png", count: drops + 1),
+        checkEqual(uploadPaths(server), ["POST /uploads"] + Array(repeating: "PUT /r2/originals/u/skycut/1.png", count: drops + 1),
                    "\(drops) drop(s) (\(reply)): the same signed address, tried \(drops + 1) times, no new ticket")
         check(server.log.dropFirst().allSatisfy { $0.bodyBytes == size }, "every try sends the whole file")
         check(server.log.dropFirst().allSatisfy { $0.headers["authorization"] == nil }, "no try carries the key")
@@ -159,93 +186,21 @@ private func runDropChecks(_ server: UploadServer, file: URL, size: Int) async {
 
     server.configure(puts: [.drop])
     let events = UploadEvents()
-    let failure = await expectFailure("three dropped PUTs") {
+    let failure = await uploadFailure("three dropped PUTs") {
         _ = try await uploadAPI(server, events: events).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
     }
-    guard case .uploadInterrupted(let interruption)? = failure else {
-        check(false, "three dropped PUTs end as uploadInterrupted, got \(String(describing: failure))")
-        return
-    }
-    checkEqual(interruption.attempts, 3, "three tries")
-    checkEqual(interruption.fileName, "reference.png", "the file is named")
-    checkEqual(interruption.lastError, "NSURLErrorDomain -1005", "a dropped connection is URLError -1005")
+    checkEqual(failure?.kind, .interrupted, "three drops: interrupted")
+    checkEqual(failure?.attempts, 3, "three PUTs")
+    checkEqual(failure?.fileName, "reference.png", "the file is named")
+    checkEqual(failure?.lastError, "NSURLErrorDomain -1005", "a dropped connection is URLError -1005")
+    checkEqual(failure?.code, "upload_network", "the code for tool results and get_job")
     checkEqual(server.log.filter { $0.method == "PUT" }.count, 3, "never a fourth try")
     checkEqual(events.pauses, [1, 2], "two pauses")
-    checkEqual(interruption.fields(retry: "x")["code"], "upload_network", "the code for tool results and get_job")
 
     server.configure(puts: [.drop])
-    let named = await expectFailure("a cut sent under a temporary name") {
+    let named = await uploadFailure("a cut sent under a temporary name") {
         _ = try await uploadAPI(server, events: UploadEvents()).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey,
                                                                         named: "beach.mp4")
     }
-    if case .uploadInterrupted(let interruption)? = named {
-        checkEqual(interruption.fileName, "beach.mp4", "the words name the file as the user knows it")
-    } else {
-        check(false, "a named upload ends as uploadInterrupted")
-    }
-}
-
-/// A storage answer and a cancel are never tried again.
-private func runNotRetriedChecks(_ server: UploadServer, file: URL) async {
-    server.configure(puts: [.forbidden, .ok])
-    let refusedEvents = UploadEvents()
-    let refused = await expectFailure("a refused PUT") {
-        _ = try await uploadAPI(server, events: refusedEvents).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
-    }
-    if case .badAnswer(let status)? = refused {
-        checkEqual(status, 403, "a refused PUT says its status")
-    } else {
-        check(false, "a refused PUT is a bad answer, got \(String(describing: refused))")
-    }
-    checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "a 403 is never tried again")
-    checkEqual(refusedEvents.pauses, [], "no pause after a 403")
-
-    server.configure(puts: [.hold, .ok])
-    let held = UploadEvents()
-    let api = uploadAPI(server, events: held)
-    let upload = Task { try await api.upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey) }
-    let deadline = Date().addingTimeInterval(10)
-    while !server.log.contains(where: { $0.method == "PUT" }), Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
-    upload.cancel()
-    var cancelled = false
-    do { _ = try await upload.value } catch is CancellationError { cancelled = true } catch {
-        check(false, "a cancelled upload throws CancellationError, got \(error)")
-    }
-    check(cancelled, "a cancel during the PUT ends the upload")
-    try? await Task.sleep(nanoseconds: 300_000_000)
-    checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "a cancel is never tried again")
-    checkEqual(held.pauses, [], "no pause after a cancel")
-
-    // A stop during the pause before the next try ends it at once: one PUT, no second.
-    server.configure(puts: [.drop, .ok])
-    var retry = SkyStudioUploadRetry()
-    retry.sleep = { _ in try await Task.sleep(nanoseconds: 30_000_000_000) }
-    let waiting = SkyStudioAPI(session: uploadSession, base: URL(string: "http://127.0.0.1:\(server.port)/api/skycut/v1")!,
-                               version: "0.18.50", machine: nil, uploadRetry: retry)
-    let paused = Task { try await waiting.upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey) }
-    let pauseDeadline = Date().addingTimeInterval(10)
-    while !server.log.contains(where: { $0.method == "PUT" }), Date() < pauseDeadline { try? await Task.sleep(nanoseconds: 20_000_000) }
-    try? await Task.sleep(nanoseconds: 200_000_000)
-    paused.cancel()
-    var stopped = false
-    do { _ = try await paused.value } catch is CancellationError { stopped = true } catch {
-        check(false, "a stop during the pause throws CancellationError, got \(error)")
-    }
-    check(stopped, "a stop during the pause ends the upload")
-    checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "no try after a stop during the pause")
-}
-
-/// An address about to run out is renewed before the next try; a Mac clock an hour off still reuses a fresh one.
-private func runAddressChecks(_ server: UploadServer, file: URL) async {
-    server.configure(puts: [.drop, .ok], ticketLife: 30)
-    let renewed = try? await uploadAPI(server, events: UploadEvents()).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
-    checkEqual(paths(server), ["POST /uploads", "PUT /r2/originals/u/skycut/1.png", "POST /uploads", "PUT /r2/originals/u/skycut/2.png"],
-               "an address with 30 s left is renewed before the next try")
-    checkEqual(renewed?.absoluteString, server.fileURL(2), "the file_url of the ticket whose PUT worked comes back")
-
-    server.configure(puts: [.drop, .ok], clockOffset: -3_600)
-    let skewed = try? await uploadAPI(server, events: UploadEvents()).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
-    checkEqual(paths(server), ["POST /uploads", "PUT /r2/originals/u/skycut/1.png", "PUT /r2/originals/u/skycut/1.png"],
-               "Sky Studio's clock an hour behind this Mac's: the fresh address is reused, not renewed")
-    checkEqual(skewed?.absoluteString, server.fileURL(1), "and its file_url comes back")
+    checkEqual(named?.fileName, "beach.mp4", "the words name the file as the user knows it")
 }

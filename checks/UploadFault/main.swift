@@ -43,9 +43,10 @@ do {
     let link = try? await api(server).upload(fileURL: file, contentType: "image/png", purpose: "image", key: key)
     checkEqual(link?.absoluteString, server.fileURL(1), "one drop: the next try works at the same address")
     let first = puts(server)
-    check(first.count == 2 && !first[0].complete && first[0].bodyBytes > 0 && first[0].bodyBytes < size
+    let part = CloudUploadFault.partSize(of: size)
+    check(first.count == 2 && !first[0].complete && first[0].bodyBytes > 0 && first[0].bodyBytes <= part
             && first[1].complete && first[1].bodyBytes == size,
-          "the cut try arrived with part of its body, the next one whole: \(first.map { ($0.bodyBytes, $0.complete) })")
+          "the cut try arrived with part of its body (at most \(part) bytes), the next one whole: \(first.map { ($0.bodyBytes, $0.complete) })")
     check(!CloudUploadFault.claimDrop(), "the one drop is used up")
 
     // Three drops: three cut tries, the plain error, and the next upload in the process goes through.
@@ -54,14 +55,20 @@ do {
     let failure = await expectFailure("three drops") {
         _ = try await api(server).upload(fileURL: file, contentType: "image/png", purpose: "image", key: key)
     }
-    if case .uploadInterrupted(let interruption)? = failure {
-        checkEqual(interruption.attempts, 3, "three tries")
-        checkEqual(interruption.lastError, "NSURLErrorDomain -1005", "a cut try is a lost connection, as on the wire")
-        checkEqual(interruption.fields(retry: "x")["code"], "upload_network", "the code the smoke test reads in get_job")
+    if case .uploadFailed(let upload)? = failure {
+        checkEqual(upload.kind, .interrupted, "three cut tries: interrupted")
+        checkEqual(upload.attempts, 3, "three tries")
+        checkEqual(upload.lastError, "NSURLErrorDomain -1005", "a cut try is a lost connection, as on the wire")
+        checkEqual(upload.code, "upload_network", "the code the smoke test reads in get_job")
     } else {
-        check(false, "three drops end as uploadInterrupted, got \(String(describing: failure))")
+        check(false, "three drops end as uploadFailed, got \(String(describing: failure))")
     }
-    checkEqual(puts(server).filter(\.complete).count, 0, "no try arrived whole")
+    // The client gives up at once after the third cut while the slow server is still reading what arrived: wait for its log.
+    let logged = Date().addingTimeInterval(5)
+    while puts(server).count < 3, Date() < logged { try? await Task.sleep(nanoseconds: 20_000_000) }
+    let cut = puts(server)
+    check(cut.count == 3 && cut.allSatisfy { !$0.complete && $0.bodyBytes <= part },
+          "no cut try arrived whole, none sent more than its part: \(cut.map { ($0.bodyBytes, $0.complete) })")
     let after = try? await api(server).upload(fileURL: file, contentType: "image/png", purpose: "image", key: key)
     checkEqual(after?.absoluteString, server.fileURL(2), "after the N drops, uploads work again")
 

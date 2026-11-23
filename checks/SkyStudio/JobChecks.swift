@@ -217,10 +217,10 @@ private func runTransferChecks() async {
             ? .http(200, #"{"upload_url": "http://127.0.0.1:8124/r2/x", "method": "PUT", "headers": {}, "file_url": "https://r2.example/x"}"#)
             : .http(403, "<Error>SignatureDoesNotMatch</Error>")
     }
-    if case .badAnswer(let status)? = await expectFailure("a refused PUT", {
+    if case .uploadFailed(let failure)? = await expectFailure("a refused PUT", {
         _ = try await api.upload(fileURL: clip, contentType: "video/mp4", purpose: "video", key: jobKey)
     }) {
-        checkEqual(status, 403, "a refused PUT says its status")
+        checkEqual(failure.kind, .refused(status: 403), "a refused PUT says its status")
     } else {
         check(false, "a refused PUT fails")
     }

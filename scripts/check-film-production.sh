@@ -118,6 +118,7 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioJobAccess.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \

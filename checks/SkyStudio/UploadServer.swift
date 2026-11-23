@@ -1,16 +1,22 @@
 import Darwin
 import Foundation
 
-// A local HTTP/1.1 server on 127.0.0.1 for the upload retry checks (UploadRetryChecks). It answers `POST …/uploads` with a ticket
-// whose signed address points back at itself, and treats each `PUT /r2/…` the way the scenario says: read the whole body, then drop
-// the connection without an answer (FIN) or reset it (RST); answer 200; answer 403; or hold the connection open until the client goes
-// away. Every request is logged once its body is read, or once the client cut it short (`complete: false`, how many bytes arrived;
+// A local HTTP/1.1 server on 127.0.0.1 for the upload retry checks (UploadRetryChecks). It answers `POST …/uploads` the way the
+// scenario says (a ticket whose signed address points back at itself, with or without `expires_at`, over http or, to make the PUT's TLS
+// fail on this plain server, https; or a dropped connection) and treats each `PUT /r2/…` likewise: read the whole body, then drop the
+// connection without an answer (FIN) or reset it (RST); answer 200 or 403; start a 403 or 200 answer and drop it mid-body; or hold the
+// connection open until the client goes away. It can stop listening (a refused connection). Every request is logged once its body is read, or once the client cut it short (`complete: false`, how many bytes arrived;
 // with `slowRead` the server reads 32 KB every 10 ms, so a client that cuts early is seen mid-body). Each connection carries one
 // request (`Connection: close`), so the client never reuses a connection and never replays a request on its own. Real sockets, so
 // the system's own transfer code is what is tested; no proxy and no real network.
 
 final class UploadServer: @unchecked Sendable {
-    enum PutReply: Sendable { case drop, reset, ok, forbidden, hold }
+    /// `…ThenStall` / `…ThenReset`: the answer's head and 1 KB of its body go out, then the connection hangs (the client times out) or
+    /// is reset.
+    enum PutReply: Sendable { case drop, reset, ok, forbidden, hold, forbiddenThenStall, forbiddenThenReset, okThenStall, okThenReset }
+    /// What a `POST …/uploads` gets: a ticket (`life`: seconds from the answer's `Date` to `expires_at`, nil = no `expires_at`; `tls`:
+    /// the signed address is https, which this plain server cannot speak), or the connection dropped after the request.
+    enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop }
 
     struct Seen: Sendable {
         let method: String
@@ -28,7 +34,8 @@ final class UploadServer: @unchecked Sendable {
     private var puts: [PutReply] = [.ok]
     private var putsServed = 0
     private var tickets = 0
-    private var ticketLife: TimeInterval = 900
+    private var ticketReplies: [TicketReply] = [.ticket(life: 900)]
+    private var ticketsServed = 0
     private var clockOffset: TimeInterval = 0
     private var slowRead = false
     private var seen: [Seen] = []
@@ -54,16 +61,17 @@ final class UploadServer: @unchecked Sendable {
         Thread { [self] in acceptLoop() }.start()
     }
 
-    /// The next scenario: what the PUTs get in order (the last one repeats), how long a ticket lives after the answer's `Date`, and how
-    /// far Sky Studio's clock is from this Mac's (the `Date` header and `expires_at` both move by it). Clears the log.
-    func configure(puts: [PutReply], ticketLife: TimeInterval = 900, clockOffset: TimeInterval = 0, slowRead: Bool = false) {
+    /// The next scenario: what the PUTs and the `/uploads` asks get in order (the last one repeats), and how far Sky Studio's clock is
+    /// from this Mac's (the `Date` header and `expires_at` both move by it). Clears the log.
+    func configure(puts: [PutReply], tickets: [TicketReply] = [.ticket(life: 900)], clockOffset: TimeInterval = 0, slowRead: Bool = false) {
         lock.lock()
         self.slowRead = slowRead
         self.puts = puts.isEmpty ? [.ok] : puts
-        self.ticketLife = ticketLife
+        ticketReplies = tickets.isEmpty ? [.ticket(life: 900)] : tickets
         self.clockOffset = clockOffset
         putsServed = 0
-        tickets = 0
+        ticketsServed = 0
+        self.tickets = 0
         seen = []
         lock.unlock()
     }
@@ -78,10 +86,14 @@ final class UploadServer: @unchecked Sendable {
     func uploadURL(_ n: Int) -> String { "http://127.0.0.1:\(port)/r2/originals/u/skycut/\(n).png?X-Amz-Signature=s\(n)" }
     func fileURL(_ n: Int) -> String { "https://r2.example/originals/u/skycut/\(n).png" }
 
+    /// Stops listening (a new connection is then refused). Only the first call closes the socket: a second close could hit a descriptor
+    /// the process has reused since.
     func stop() {
         lock.lock()
+        let wasRunning = running
         running = false
         lock.unlock()
+        guard wasRunning else { return }
         shutdown(listener, SHUT_RDWR)
         close(listener)
     }
@@ -117,40 +129,66 @@ final class UploadServer: @unchecked Sendable {
         lock.lock()
         seen.append(request)
         guard request.complete else { lock.unlock(); close(client); return }
+        if request.method == "TLS" {
+            // A TLS client on this plain server (an https address): a plain answer makes its handshake fail.
+            lock.unlock()
+            respond(client, status: "400 Bad Request", body: "", extra: [])
+            return
+        }
         let reply: PutReply?
-        var ticket: (n: Int, date: Date, life: TimeInterval)?
+        var ticket: (reply: TicketReply, n: Int, date: Date)?
         if request.method == "PUT" {
             reply = puts[min(putsServed, puts.count - 1)]
             putsServed += 1
         } else {
             reply = nil
             if request.path.hasSuffix("/uploads") {
-                tickets += 1
-                ticket = (tickets, Date().addingTimeInterval(clockOffset), ticketLife)
+                let answer = ticketReplies[min(ticketsServed, ticketReplies.count - 1)]
+                ticketsServed += 1
+                if case .ticket = answer { tickets += 1 }
+                ticket = (answer, tickets, Date().addingTimeInterval(clockOffset))
             }
         }
         lock.unlock()
         if let ticket {
-            let body = """
-            {"upload_url": "\(uploadURL(ticket.n))", "method": "PUT", "headers": {"Content-Type": "image/png", "x-amz-meta-app": "skycut"}, \
-            "file_url": "\(fileURL(ticket.n))", "expires_at": "\(Self.iso(ticket.date.addingTimeInterval(ticket.life)))"}
-            """
-            respond(client, status: "200 OK", body: body, extra: ["Date: " + Self.httpDate(ticket.date), "Content-Type: application/json"])
+            switch ticket.reply {
+            case .ticket(let life, let tls):
+                let expires = life.map { ", \"expires_at\": \"\(Self.iso(ticket.date.addingTimeInterval($0)))\"" } ?? ""
+                let address = tls ? uploadURL(ticket.n).replacingOccurrences(of: "http://", with: "https://") : uploadURL(ticket.n)
+                let body = "{\"upload_url\": \"\(address)\", \"method\": \"PUT\", "
+                    + "\"headers\": {\"Content-Type\": \"image/png\", \"x-amz-meta-app\": \"skycut\"}, "
+                    + "\"file_url\": \"\(fileURL(ticket.n))\"\(expires)}"
+                respond(client, status: "200 OK", body: body, extra: ["Date: " + Self.httpDate(ticket.date), "Content-Type: application/json"])
+            case .drop:
+                close(client)
+            }
             return
         }
         switch reply {
         case .drop?:
             close(client)
         case .reset?:
-            var linger = Darwin.linger(l_onoff: 1, l_linger: 0)
-            setsockopt(client, SOL_SOCKET, SO_LINGER, &linger, socklen_t(MemoryLayout<Darwin.linger>.size))
-            close(client)
+            resetAndClose(client)
         case .ok?:
             respond(client, status: "200 OK", body: "", extra: [])
         case .forbidden?:
             respond(client, status: "403 Forbidden", body: "<Error><Code>AccessDenied</Code></Error>", extra: ["Content-Type: application/xml"])
         case .hold?:
             hold(client)
+        case .forbiddenThenStall?:
+            begin(client, status: "403 Forbidden", declaredLength: 65_536)
+            hold(client)
+        case .forbiddenThenReset?:
+            begin(client, status: "403 Forbidden", declaredLength: 65_536)
+            usleep(200_000)   // the client reads the head first: a reset right behind it could take the head with it
+            resetAndClose(client)
+        case .okThenStall?:
+            begin(client, status: "200 OK", declaredLength: 65_536)
+            hold(client)
+        case .okThenReset?:
+            begin(client, status: "200 OK", declaredLength: 65_536)
+            usleep(200_000)
+            resetAndClose(client)
         case nil:
             respond(client, status: "404 Not Found", body: "", extra: [])
         }
@@ -170,7 +208,25 @@ final class UploadServer: @unchecked Sendable {
     private func respond(_ client: Int32, status: String, body: String, extra: [String]) {
         let payload = Data(body.utf8)
         let head = (["HTTP/1.1 " + status, "Content-Length: \(payload.count)", "Connection: close"] + extra).joined(separator: "\r\n") + "\r\n\r\n"
-        let bytes = Data(head.utf8) + payload
+        write(client, Data(head.utf8) + payload)
+        shutdown(client, SHUT_WR)
+        close(client)
+    }
+
+    /// An answer that starts: its head (declaring `declaredLength`) and 1 KB of body, with the connection left open.
+    private func begin(_ client: Int32, status: String, declaredLength: Int) {
+        let head = "HTTP/1.1 \(status)\r\nContent-Length: \(declaredLength)\r\nContent-Type: application/xml\r\nConnection: close\r\n\r\n"
+        write(client, Data(head.utf8) + Data(repeating: 0x78, count: 1_024))
+    }
+
+    /// An abortive close: the client sees the connection reset.
+    private func resetAndClose(_ client: Int32) {
+        var linger = Darwin.linger(l_onoff: 1, l_linger: 0)
+        setsockopt(client, SOL_SOCKET, SO_LINGER, &linger, socklen_t(MemoryLayout<Darwin.linger>.size))
+        close(client)
+    }
+
+    private func write(_ client: Int32, _ bytes: Data) {
         bytes.withUnsafeBytes { raw in
             var sent = 0
             while sent < raw.count {
@@ -179,8 +235,6 @@ final class UploadServer: @unchecked Sendable {
                 sent += count
             }
         }
-        shutdown(client, SHUT_WR)
-        close(client)
     }
 
     /// One request: the head up to the blank line, then exactly Content-Length bytes of body (fewer when the client cut it short).
@@ -193,6 +247,8 @@ final class UploadServer: @unchecked Sendable {
             let count = recv(client, &buffer, buffer.count, 0)
             guard count > 0 else { return nil }
             data.append(buffer, count: count)
+            // A TLS handshake record (0x16) instead of an HTTP request: an https client on this plain server.
+            if data.first == 0x16 { return Seen(method: "TLS", path: "", bodyBytes: 0, headers: [:]) }
             headEnd = data.range(of: blank)
         }
         guard let end = headEnd, let head = String(data: data[..<end.lowerBound], encoding: .utf8) else { return nil }
