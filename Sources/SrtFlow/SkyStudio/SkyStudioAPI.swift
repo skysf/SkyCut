@@ -309,7 +309,16 @@ struct SkyStudioAPI: Sendable {
     /// `retryable` (an upload's PUT): an error the network caused this time is `SkyStudioUploadRetry.Broken` instead, for another try.
     private func transfer(_ task: URLSessionTask, delegate: CloudTransferDelegate, retryable: Bool = false) async throws {
         do {
+            #if DEBUG
+            // SRTFLOW_TEST_UPLOAD_DROPS (debug builds only): this PUT loses its connection after part of the body went out.
+            if retryable, CloudUploadFault.claimDrop() {
+                try await CloudUploadFault.perform(task, delegate: delegate)
+            } else {
+                try await CloudTransfer.perform(task, delegate: delegate)
+            }
+            #else
             try await CloudTransfer.perform(task, delegate: delegate)
+            #endif
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
