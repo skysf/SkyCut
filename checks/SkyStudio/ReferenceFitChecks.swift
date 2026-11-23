@@ -126,6 +126,26 @@ func runReferenceFitChecks() {
                                           accepts: { twelve.problem(model: $0) == nil }).map(\.id), ["nano2"],
                "a fallback that cannot take the request (12 images, Seedream takes 10) is not in the chain")
 
+    // Sky Studio's own image records (PR #262's buildSkycutModelCatalog, checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json).
+    let fixture = URL(fileURLWithPath: "checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json")
+    if let data = try? Data(contentsOf: fixture), let json = try? JSONValue.decode(data), let published = SkyStudioCatalog(json: json) {
+        for id in ["nano2", "nano2-lite", "nano-banana-pro", "gpt-image-2", "seedream5-flash", "seedream5-pro", "qwen-angles", "ideogram-remove-background"] {
+            check(published.model(id, kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") } != nil, "\(id)'s record lets SkyCut fit images")
+        }
+        check(published.model("image-upscale", kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") } == nil,
+              "image upscale's record does not: a source to enlarge is never shrunk")
+        let removal = published.model("ideogram-remove-background", kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") }
+        checkEqual(removal?.maxBytes, 10_000_000, "background removal's flat limits are read (decimal 10 MB)")
+        if let nano2 = published.model("nano2", kind: "image") {
+            let chain = SkyStudioModelPolicy.chain(catalog: published, kind: "image", requested: nil, chosen: nano2)
+            checkEqual(chain.map(\.id), ["nano2", "seedream5-flash"], "the published catalog's default chain")
+            let target = SkyStudioReferenceFit.strictest(chain, mode: "images")
+            checkEqual(target?.maxBytes, 30_000_000, "fitted to Seedream's published 30,000,000 bytes")
+            checkEqual(target?.maxPixels, 36_000_000, "and its 36,000,000 pixels")
+            checkEqual(SkyStudioReferenceFit.strictest([nano2], mode: "images")?.maxBytes, 31_457_280, "Nano Banana 2 named alone: its 30 MiB")
+        } else { check(false, "the published catalog lists nano2") }
+    } else { check(false, "Sky Studio's 2026-11-23 image records load") }
+
     // What the AI is told.
     var planned = big
     planned.fit = both
