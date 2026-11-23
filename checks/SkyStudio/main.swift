@@ -56,6 +56,8 @@ runCharacterApprovalChecks()
 await runCharacterNativeChecks()
 await runCharacterRecoveryChecks()
 runGenerationFrameChecks()
+runReferenceFitChecks()
+await runReferenceImageFitChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) Sky Studio checks failed.")

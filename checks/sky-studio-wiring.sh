@@ -551,6 +551,9 @@ source checks/sky-studio-wiring/styles.sh
 # 17. Sky Studio's craft cards (craft_cards, 2026-11-20, SS5 plan 5.6): checks/sky-studio-wiring/cards.sh.
 source checks/sky-studio-wiring/cards.sh
 
+# 18. Reference images fitted to the published limits (2026-11-23): checks/sky-studio-wiring/reference-fit.sh.
+source checks/sky-studio-wiring/reference-fit.sh
+
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"
 grep -qF 'SkyStudioGenerationName.stem(' Sources/SrtFlow/SkyStudio/SkyStudioGenerateTool.swift || fail "图片操作未按源图起名"
