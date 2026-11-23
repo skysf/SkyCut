@@ -3,8 +3,8 @@ import Foundation
 // MARK: - What the user reads when a reference image could not be fitted (localized)
 //
 // What it covers: the one line the cloud task row shows (`status.issue`, drawn verbatim) when a generation stopped before
-// uploading because a reference image cannot meet the chosen model's limits: which file, which limit, and that nothing was
-// charged. What it does not cover: the AI's English (SkyStudioReferenceFitFailure.message), the decision itself
+// uploading because a reference image (or the images together) cannot meet the chosen model's limits: which file, which limit,
+// and that nothing was charged. What it does not cover: the AI's English (SkyStudioReferenceFitFailure.message), the decision itself
 // (SkyStudioReferenceFit).
 
 enum SkyStudioReferenceFitWords {
@@ -23,6 +23,9 @@ enum SkyStudioReferenceFitWords {
             return String(format: L10n("“%@” could not be fitted to this model's limits. Nothing was charged."), failure.file)
         case .unreadable:
             return String(format: L10n("“%@” changed and is no longer a readable image. Nothing was charged."), failure.file)
+        case .tooLargeTogether(let total, _):
+            return String(format: L10n("The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged."),
+                          text(total))
         }
     }
 }

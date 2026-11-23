@@ -9,7 +9,7 @@ import SrtFlowMCPKit
 // same), then the copy SkyCut would upload is read back: size, format, alpha, orientation, colour profile, and the PUT to the
 // fake Sky Studio carries the fitted bytes. Nothing here reads the user's files.
 
-private struct FitFixture {
+struct FitFixture {
     let folder: URL
 
     /// A width × height picture: noise (JPEG-hostile, so bytes stay high) or a flat colour with a red top-left marker.
@@ -58,11 +58,11 @@ private func fitLimits(bytes: Double? = nil, pixels: Double? = nil, minSide: Dou
     return SkyStudioReferenceFit(model: fitRecord("model", title: "Model", references), mode: "images")!
 }
 
-private struct ReadBack {
+struct ReadBack {
     var width: Int, height: Int, type: String?, alpha: Bool, space: String?, orientation: Int, topLeftRed: Bool, topRightRed: Bool
 }
 
-private func readBack(_ url: URL) -> ReadBack? {
+func readBack(_ url: URL) -> ReadBack? {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
     /// Whether the image's top-left (or top-right) pixel is red: drawn into a 1×1 context (Core Graphics' origin is bottom-left).

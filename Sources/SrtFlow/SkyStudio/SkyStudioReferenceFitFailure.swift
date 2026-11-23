@@ -1,11 +1,11 @@
 import Foundation
 
 // MARK: - Why a reference image cannot go to the chosen model and its fallbacks (pure value)
-// What it does: one value per refusal (too small, outside the aspect range, animated, not fittable, changed into a non-image),
-// with the file, the models and the limit it misses. `message` is the AI's English (the reference check, get_job, the
-// official preparation's job); the user's words for the cloud task row are SkyStudioReferenceFitWords (localized).
-// Thrown or returned before anything is uploaded or charged.
-// Not here: deciding (SkyStudioReferenceFit), writing pixels (SkyStudioReferenceImageFit).
+// What it does: one value per refusal (too small, outside the aspect range, animated, not fittable, changed into a non-image,
+// a set over the total for all reference images together), with the file (or the files), the models and the limit it misses.
+// `message` is the AI's English (the reference check, get_job, the official preparation's job); the user's words for the cloud
+// task row are SkyStudioReferenceFitWords (localized). Thrown or returned before anything is uploaded or charged.
+// Not here: deciding (SkyStudioReferenceFit, SkyStudioReferenceTotal), writing pixels (SkyStudioReferenceImageFit).
 
 struct SkyStudioReferenceFitFailure: Error, Equatable, Sendable, LocalizedError {
     enum Reason: Equatable, Sendable {
@@ -16,6 +16,9 @@ struct SkyStudioReferenceFitFailure: Error, Equatable, Sendable, LocalizedError 
         case cannotFit(detail: String)
         /// The file was rewritten after it was measured and is no longer an image.
         case unreadable
+        /// The images together pass the models' total for all of them even at the smallest size SkyCut allows
+        /// (SkyStudioReferenceTotal.floorEdge); `file` lists them.
+        case tooLargeTogether(total: Double, count: Int)
     }
 
     var file: String
@@ -38,6 +41,10 @@ struct SkyStudioReferenceFitFailure: Error, Equatable, Sendable, LocalizedError 
             return "\(file) cannot be fitted for \(to): \(detail)."
         case .unreadable:
             return "\(file) changed after it was measured and is no longer a readable image. Nothing was sent or charged."
+        case .tooLargeTogether(let total, let count):
+            return "The \(count) reference images (\(file)) are too large together for \(to): at most \(text(total)) bytes for all of them, "
+                + "and even at the smallest size SkyCut allows (a \(text(SkyStudioReferenceTotal.floorEdge)) px long side) they need more. "
+                + "Send fewer or smaller images. Nothing was sent or charged."
         }
     }
 

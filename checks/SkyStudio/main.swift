@@ -59,6 +59,7 @@ await runCharacterRecoveryChecks()
 runGenerationFrameChecks()
 runReferenceFitChecks()
 await runReferenceImageFitChecks()
+await runReferenceTotalChecks()
 
 if failures > 0 {
     print("✗ \(failures) of \(checks) Sky Studio checks failed.")

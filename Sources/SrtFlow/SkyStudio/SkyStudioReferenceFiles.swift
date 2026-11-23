@@ -115,11 +115,12 @@ enum SkyStudioReferenceFiles {
         var inputs: [String: String] = [:]
         if let webURL = plan.webURL { inputs["web_url"] = webURL }
         var references: [JSONValue] = []
-        for (index, file) in plan.files.enumerated() {
+        // Every reference is prepared before the first upload: an image over the published limits of the model and its fallbacks
+        // goes up as a fitted copy, and images over a total for all of them together share it (reference-image-fitting.md).
+        let prepared = try await SkyStudioReferenceImageFit.prepare(plan.files, fit: plan.fit)
+        defer { prepared.forEach { $0.cleanUp() } }
+        for (index, (file, sent)) in zip(plan.files, prepared).enumerated() {
             try Task.checkCancellation()
-            // An image over the published limits of the model and its fallbacks goes up as a fitted copy (reference-image-fitting.md).
-            let sent = try await SkyStudioReferenceImageFit.prepare(file, fit: plan.fit)
-            defer { sent.cleanUp() }
             guard let type = sent.contentType else { throw AIToolError("Cannot determine input format: \(file.file.lastPathComponent).") }
             let purpose = model.inputs[file.role]?["upload_purpose"]?.stringValue ?? file.type
             let count = Double(plan.files.count)
