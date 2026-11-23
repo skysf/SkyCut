@@ -9,6 +9,7 @@ import SrtFlowMCPKit
 // 接口：`GET /me`（授权，收费方案第 5 刀）；生成、upscale、克隆的 `/models`、`/quote`、`/uploads`（+ 把文件 PUT 到它给的地址）、`/jobs`、
 // `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
+// An upload's PUT that the network breaks is tried again, up to three tries (SkyStudioUploadRetry; 2026-11-23).
 // 声音库的 `/voices`、`/voices/consent-grant` 在 SkyStudioVoiceAPI（用这里的 request / send）。
 // Content for SkyCut (`/content`, `/content/styles/{id}`) is in SkyStudioContentAPI (request + conditionalGet, uncachedSession).
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
@@ -27,15 +28,18 @@ struct SkyStudioAPI: Sendable {
     let base: URL
     let version: String
     let machine: String?
+    /// How a PUT the network breaks is tried again (`upload`; checks shorten the pauses).
+    let uploadRetry: SkyStudioUploadRetry
 
     init(
         session: URLSession = .shared, base: URL = SkyStudioAPI.configuredBase(ProcessInfo.processInfo.environment),
-        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current
+        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current, uploadRetry: SkyStudioUploadRetry = .standard
     ) {
         self.session = session
         self.base = base
         self.version = version
         self.machine = machine
+        self.uploadRetry = uploadRetry
     }
 
     /// 显示用的完整构建版本；请求头在 `request` 边界只取数字三段，不改包里的来源标记。
@@ -140,8 +144,13 @@ struct SkyStudioAPI: Sendable {
     /// `POST /uploads` 拿到地址，把文件 PUT 上去（流着发，不整个读进内存）；回 `/jobs` 的 inputs 要的那个 `file_url`。
     /// `purpose`：`video`（mp4 / mov，≤ 200 MB）、`image`、`audio`，声音的 `voice_reference`（VoiceReferenceSample）、
     /// `voice_convert_source`（SkyStudioVoiceUpload；两种各 ≤ 35 MB）。PUT 只带服务器给的头，**不带 Key**（那是存储桶的签名地址）。
+    /// A PUT the network breaks (`SkyStudioUploadRetry.isTransient`) is tried again on a fresh task, `uploadRetry.attempts` tries in
+    /// all after a short pause, at the same signed address while it stays valid (a new ticket from `/uploads` when it would run out);
+    /// progress starts again from 0. A storage answer (4xx / 5xx) and a cancel are never tried again. After the last try:
+    /// `SkyStudioFailure.uploadInterrupted` (nothing was submitted). `named`: the file as the user knows it, when the file sent is a cut.
     func upload(
-        fileURL: URL, contentType: String, purpose: String, key: String, onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+        fileURL: URL, contentType: String, purpose: String, key: String, named: String? = nil,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
     ) async throws -> URL {
         guard let size = (try? FileManager.default.attributesOfItem(atPath: fileURL.path))?[.size] as? Int else {
             throw SkyStudioFailure.network("could not read \(fileURL.lastPathComponent)")
@@ -152,24 +161,56 @@ struct SkyStudioAPI: Sendable {
         ]
         if purpose == "character_role" { fields["filename"] = nil }
         let body = try JSONValue.object(fields).encodedData()
-        let answer = try Self.json(try await send(request("uploads", key: key, method: "POST", body: body)))
-        guard let target = answer["upload_url"]?.stringValue.flatMap(URL.init(string:)), target.scheme != nil,
-              let link = answer["file_url"]?.stringValue.flatMap(URL.init(string:)), link.scheme != nil else {
+        var ticket = try await uploadTicket(body, key: key)
+        let attempts = max(1, uploadRetry.attempts)
+        var lastTry: TimeInterval = 0
+        var lastError = ""
+        for attempt in 1...attempts {
+            if attempt > 1 {
+                try Task.checkCancellation()
+                onProgress(0)   // the broken try's bytes are lost: progress starts again
+                try await uploadRetry.pause(before: attempt)
+            }
+            let started = Date()
+            do {
+                if attempt > 1, ticket.needsRenewal(now: started, lastTry: lastTry, margin: uploadRetry.renewalMargin) {
+                    ticket = try await uploadTicket(body, key: key, renewing: true)
+                }
+                try await put(fileURL, ticket: ticket, onProgress: onProgress)
+                onProgress(1)
+                return ticket.fileURL
+            } catch let broken as SkyStudioUploadRetry.Broken {
+                lastTry = Date().timeIntervalSince(started)
+                lastError = broken.detail
+            }
+        }
+        try Task.checkCancellation()
+        throw SkyStudioFailure.uploadInterrupted(
+            SkyStudioUploadInterruption(fileName: named ?? fileURL.lastPathComponent, attempts: attempts, lastError: lastError))
+    }
+
+    /// `POST /uploads`: the signed address and the `file_url`. A renewal the network breaks counts as a broken try.
+    private func uploadTicket(_ body: Data, key: String, renewing: Bool = false) async throws -> SkyStudioUploadTicket {
+        let answer: (data: Data, response: HTTPURLResponse?)
+        do {
+            answer = try await respond(request("uploads", key: key, method: "POST", body: body))
+        } catch SkyStudioFailure.network(let detail) where renewing {
+            throw SkyStudioUploadRetry.Broken(detail: "POST /uploads: " + detail)
+        }
+        guard let ticket = SkyStudioUploadTicket(try Self.json(answer.data), received: Date(),
+                                                 serverDate: answer.response?.value(forHTTPHeaderField: "Date")) else {
             throw SkyStudioFailure.badAnswer(status: 200)
         }
-        var put = URLRequest(url: target)
-        put.httpMethod = answer["method"]?.stringValue ?? "PUT"
-        put.timeoutInterval = 600
-        for (name, value) in answer["headers"]?.objectValue ?? [:] {
-            if let text = value.stringValue { put.setValue(text, forHTTPHeaderField: name) }
-        }
+        return ticket
+    }
+
+    /// One PUT on a fresh task with fresh progress. A try the network breaks comes back as `SkyStudioUploadRetry.Broken`.
+    private func put(_ file: URL, ticket: SkyStudioUploadTicket, onProgress: @escaping @Sendable (Double) -> Void) async throws {
         let delegate = CloudTransferDelegate(moveDestination: nil, onProgress: onProgress)
-        let task = session.uploadTask(with: put, fromFile: fileURL)
-        try await transfer(task, delegate: delegate)
+        let task = session.uploadTask(with: ticket.request, fromFile: file)
+        try await transfer(task, delegate: delegate, retryable: true)
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw SkyStudioFailure.badAnswer(status: status) }
-        onProgress(1)
-        return link
     }
 
     /// 把成品下载到 `destination`（先下到它旁边的临时文件再挪过去，下到一半断了不留半个文件）。成品地址不带 Key。
@@ -217,10 +258,15 @@ struct SkyStudioAPI: Sendable {
 
     /// 发出去、拿回 2xx 的正文；别的都换成 `SkyStudioFailure`（取消照旧是 CancellationError）。
     func send(_ request: URLRequest) async throws -> Data {
+        try await respond(request).data
+    }
+
+    /// `send` that keeps the answer's headers too (the upload ticket reads `Date`).
+    private func respond(_ request: URLRequest) async throws -> (data: Data, response: HTTPURLResponse?) {
         let (data, response) = try await exchange(request)
         let status = response?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw Self.failure(status: status, data: data) }
-        return data
+        return (data, response)
     }
 
     /// Content for SkyCut (editing styles, later craft cards) never goes into the system URL cache: SkyCut's own copy
@@ -260,13 +306,16 @@ struct SkyStudioAPI: Sendable {
     }
 
     /// 跑一个传文件的任务：Task 被取消 / URLSession 报 cancelled 都换成 CancellationError，别的网络错换成「没连上」。
-    private func transfer(_ task: URLSessionTask, delegate: CloudTransferDelegate) async throws {
+    /// `retryable` (an upload's PUT): an error the network caused this time is `SkyStudioUploadRetry.Broken` instead, for another try.
+    private func transfer(_ task: URLSessionTask, delegate: CloudTransferDelegate, retryable: Bool = false) async throws {
         do {
             try await CloudTransfer.perform(task, delegate: delegate)
         } catch is CancellationError {
             throw CancellationError()
         } catch let error as URLError where error.code == .cancelled {
             throw CancellationError()
+        } catch where retryable && SkyStudioUploadRetry.isTransient(error) {
+            throw SkyStudioUploadRetry.Broken(detail: SkyStudioUploadRetry.describe(error))
         } catch {
             throw SkyStudioFailure.network(error.localizedDescription)
         }
@@ -331,4 +380,6 @@ enum SkyStudioFailure: Error, Equatable, Sendable {
     case network(String)
     /// 回的不是约好的样子（不是 JSON、少了字段）。
     case badAnswer(status: Int)
+    /// The network broke every try of one file's upload to Sky Studio's storage (`upload`). Nothing was submitted, nothing charged.
+    case uploadInterrupted(SkyStudioUploadInterruption)
 }

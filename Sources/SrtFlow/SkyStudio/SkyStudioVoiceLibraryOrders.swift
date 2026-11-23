@@ -82,7 +82,7 @@ enum SkyStudioVoiceLibraryOrders {
             return false
         }
         switch error {
-        case .failed, .stopped(.nothingCharged), .stopped(.characterContinuing), .notSubmitted, .badAnswer:
+        case .failed, .stopped(.nothingCharged), .stopped(.characterContinuing), .notSubmitted, .badAnswer, .request(.uploadInterrupted):
             return false
         case .request(.server(let server)):
             return server.code != "not_found"
