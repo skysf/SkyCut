@@ -25,7 +25,7 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
     enum Decision: Equatable, Sendable {
         case asIs
         case fit(Plan)
-        case refuse(String)
+        case refuse(SkyStudioReferenceFitFailure)
     }
 
     /// How to fit one image: the format to write and the largest scale the pixel limits allow (at most 1).
@@ -63,21 +63,16 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
         return pick(a, b)
     }
 
-    /// What happens to one measured image. Only too small, too narrow, animated or unconvertible images are refused.
+    /// What happens to one measured image. Only too small, too narrow, animated or unfittable images are refused.
     func decide(_ image: SkyStudioReference) -> Decision {
-        let name = image.file.lastPathComponent
-        let models = modelTitles.joined(separator: " / ")
-        guard let width = image.width, let height = image.height, width > 0, height > 0 else { return .refuse("\(name) has no readable size.") }
+        let refuse = { (reason: SkyStudioReferenceFitFailure.Reason) in
+            Decision.refuse(SkyStudioReferenceFitFailure(file: image.file.lastPathComponent, models: modelTitles, reason: reason))
+        }
+        guard let width = image.width, let height = image.height, width > 0, height > 0 else { return refuse(.unreadable) }
         let ratio = width / height
-        if let low = minAspect, ratio < low {
-            return .refuse("\(name) is too tall for \(models): width / height must be at least \(Self.text(low)) (it is \(Self.text(ratio))). SkyCut does not crop.")
-        }
-        if let high = maxAspect, ratio > high {
-            return .refuse("\(name) is too wide for \(models): width / height must be at most \(Self.text(high)) (it is \(Self.text(ratio))). SkyCut does not crop.")
-        }
-        if let minSide, min(width, height) < minSide {
-            return .refuse("\(name) is too small for \(models): each side must be at least \(Self.text(minSide)) px (it is \(Self.text(width))×\(Self.text(height))). SkyCut never upscales.")
-        }
+        if let low = minAspect, ratio < low { return refuse(.aspect(min: minAspect, max: maxAspect, ratio: ratio)) }
+        if let high = maxAspect, ratio > high { return refuse(.aspect(min: minAspect, max: maxAspect, ratio: ratio)) }
+        if let minSide, min(width, height) < minSide { return refuse(.tooSmall(minSide: minSide, width: width, height: height)) }
         var scale = 1.0
         var reasons: [String] = []
         if let maxPixels, width * height > maxPixels {
@@ -92,16 +87,38 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
         if let mimeTypes, !mimeTypes.contains(type) { reasons.append("\(type.isEmpty ? "its format" : type) is not one of \(mimeTypes.joined(separator: ", "))") }
         if let maxBytes, image.bytes > maxBytes { reasons.append("over \(Self.text(maxBytes)) bytes") }
         if reasons.isEmpty { return .asIs }
-        if image.imageCount > 1, Self.animated.contains(type) {
-            return .refuse("\(name) is animated (\(image.imageCount) frames); \(models) take one still image. Send a single frame.")
-        }
-        if let minSide, (min(width, height) * scale).rounded(.down) < minSide {
-            return .refuse("\(name) cannot be fitted for \(models): the pixel limits would take a side below \(Self.text(minSide)) px.")
+        if image.imageCount > 1, Self.animated.contains(type) { return refuse(.animated(frames: image.imageCount)) }
+        guard size(width: width, height: height, scale: scale) != nil else {
+            return refuse(.cannotFit(detail: "the pixel limits would take a side below \(Self.text(minSide ?? 0)) px"))
         }
         guard let output = outputType(type, transparent: image.hasTransparency) else {
-            return .refuse("\(name) cannot be converted to a format \(models) take (\((mimeTypes ?? []).joined(separator: ", "))).")
+            return refuse(.cannotFit(detail: "no format they take (\((mimeTypes ?? []).joined(separator: ", "))) can be written"))
         }
         return .fit(Plan(contentType: output, scale: scale, reasons: reasons))
+    }
+
+    /// The integer size of a copy at `scale` (at most 1, never an upscale) of a width × height picture that meets every pixel
+    /// limit: the long side rounded down, the short side rounded to keep the shape, then nudged a pixel so the final integer
+    /// width / height stays inside the aspect range (a 16:1 picture never becomes 16.005:1). Nil when only a side below the
+    /// minimum would meet the limits.
+    func size(width: Double, height: Double, scale: Double) -> (width: Int, height: Int)? {
+        let landscape = width >= height
+        let long = max(width, height), short = min(width, height)
+        var edge = max(1, Int((long * min(scale, 1)).rounded(.down)))
+        while edge >= 1 {
+            let across = max(1, min(Int(short), Int((Double(edge) * short / long).rounded())))
+            var w = landscape ? edge : across, h = landscape ? across : edge
+            if let maxAspect, Double(w) / Double(h) > maxAspect { w = Int((Double(h) * maxAspect).rounded(.down)) }
+            if let minAspect, Double(w) / Double(h) < minAspect { h = Int((Double(w) / minAspect).rounded(.down)) }
+            let tooMany = maxPixels.map { Double(w * h) > $0 } ?? false
+            let tooLong = maxSide.map { Double(max(w, h)) > $0 } ?? false
+            if !tooMany && !tooLong {
+                if let minSide, Double(min(w, h)) < minSide { return nil }
+                return w >= 1 && h >= 1 ? (w, h) : nil
+            }
+            edge -= max(1, edge / 2000)
+        }
+        return nil
     }
 
     /// JPEG and PNG stay as they are when taken; anything else becomes PNG if it has transparency (and PNG is taken), else JPEG.
@@ -145,6 +162,27 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
 }
 
 extension SkyStudioReferenceFit {
+    /// The largest copy at or below scale `high` that comes under `maxBytes`, to within 1 % of scale: an estimate from
+    /// √(limit / bytes) first, smaller steps until one fits, then halving the gap to the smallest size that did not.
+    /// `encode` gives the copy at a scale, or nil when that size would break a pixel limit (a side below the minimum).
+    /// Generic over the copy so the search itself is checked; the writer passes encoded images.
+    static func largestFitting<Copy>(below high: Double, firstBytes: Int, maxBytes: Double, bytesOf: (Copy) -> Int,
+                                     encode: (Double) throws -> Copy?) rethrows -> Copy? {
+        var high = high
+        var low = high * (maxBytes / Double(max(1, firstBytes))).squareRoot()
+        var found: Copy?
+        for _ in 0 ..< 12 where found == nil {
+            guard let next = try encode(low) else { return nil }
+            if Double(bytesOf(next)) <= maxBytes { found = next } else { high = low; low *= min(0.97, (maxBytes / Double(bytesOf(next))).squareRoot()) }
+        }
+        guard var best = found else { return nil }
+        while (high - low) / high > 0.01 {
+            let middle = (low + high) / 2
+            if let next = try encode(middle), Double(bytesOf(next)) <= maxBytes { best = next; low = middle } else { high = middle }
+        }
+        return best
+    }
+
     /// One model's limits, when its record allows fitting; nil for an older Sky Studio, a model without `fit_images`
     /// (video models, image upscale) or one with no reference limits.
     init?(model: SkyStudioModel, mode: String) {

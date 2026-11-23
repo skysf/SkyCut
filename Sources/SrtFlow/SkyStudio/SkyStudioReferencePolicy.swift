@@ -72,7 +72,7 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
         for file in files {
             if file.bytes <= 0 { return "Reference file is empty." }
             let fitted = fitting != nil && file.type == "image"
-            if fitted, case .refuse(let message)? = fitting?.decide(file) { return message }
+            if fitted, case .refuse(let failure)? = fitting?.decide(file) { return failure.message }
             let mimes = limits["\(file.type)_mime_types"]?.arrayValue?.compactMap(\.stringValue) ?? []
             if !fitted, !mimes.isEmpty, let mime = file.contentType, !mimes.contains(mime) {
                 return "\(file.file.lastPathComponent) has an unsupported format for \(model.title): \(mime) (accepted: \(mimes.joined(separator: ", ")))."
