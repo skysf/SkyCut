@@ -1687,3 +1687,8 @@
 "The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder.";
 "Type the full path of a file SkyCut can open here, starting with “/”." = "Type the full path of a file SkyCut can open here, starting with “/”.";
 "Type the full path to save to, starting with “/”." = "Type the full path to save to, starting with “/”.";
+"“%1$@” is too small for this model: each side must be at least %2$@ px. Nothing was charged." = "“%1$@” is too small for this model: each side must be at least %2$@ px. Nothing was charged.";
+"“%1$@” is too narrow for this model: width / height must be between %2$@ and %3$@. Nothing was charged." = "“%1$@” is too narrow for this model: width / height must be between %2$@ and %3$@. Nothing was charged.";
+"“%@” is animated; this model takes one still image. Nothing was charged." = "“%@” is animated; this model takes one still image. Nothing was charged.";
+"“%@” could not be fitted to this model's limits. Nothing was charged." = "“%@” could not be fitted to this model's limits. Nothing was charged.";
+"“%@” changed and is no longer a readable image. Nothing was charged." = "“%@” changed and is no longer a readable image. Nothing was charged.";

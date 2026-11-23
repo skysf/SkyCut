@@ -346,12 +346,15 @@
   model in the server's order that takes the ask, steps and defaults, refusals in plain words, flat-priced lengths not beyond the
   draft, `audio_mode` none only where listed, the `audio` block and note in get_job; request bodies go through `SkyStudioStub`.
   `checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
-- Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, the strictest
-  limits of a chain, each limit met exactly / one over / one under, refusals naming the limit, the chain, the reference check,
+- Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky
+  Studio's own records; the strictest limits of a chain, each limit met exactly / one over / one under, refusals naming the
+  limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,
   the AI's note) and `ReferenceImageFitChecks` (real ImageIO files: bytes, size, JPEG / PNG and alpha, upright orientation,
-  Display P3 kept, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes).
-  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path, both tools' chain target, the official identity and that
-  SkyCut writes no limit number. Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
+  Display P3 kept, a 16:1 PNG over its byte limit stays 16:1 at the largest size that fits, a file rewritten after the quote
+  measured again, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes).
+  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path, the second measurement, both tools' chain target and
+  refusal list, the official identity, the task row's localized words and that SkyCut writes no limit number.
+  Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
