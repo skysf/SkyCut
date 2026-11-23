@@ -34,15 +34,18 @@ Nothing was charged: no `/jobs` was sent. The second job (another model, the sam
   - The address is renewed from `/uploads` when less is left than the last try took plus 60 s, or when the answer had no readable
     `expires_at`. `expires_at` moves onto this Mac's clock with the answer's `Date` header.
   - Never tried again:
-    - an answer the storage gave, even when its body then broke (it is read before the error: a 2xx is success, anything else is
-      refused);
+    - an answer the storage began, even when its body then broke or stalled, and even when only its head came, which the system
+      holds back: the task's metrics show it. The answer is read before the error: a 2xx is success, anything else is refused;
+    - a redirect: the signed PUT never follows one, so one try is one PUT;
     - a cancel;
     - a connection that does not work at all (address, certificate, TLS), on the PUT or while renewing;
     - an unreadable file.
-- **Giving up is `SkyStudioFailure.uploadFailed`** (`SkyStudioUploadFailure`), of three kinds:
+- **Giving up is `SkyStudioFailure.uploadFailed`** (`SkyStudioUploadFailure`), of four kinds:
   - interrupted (`upload_network`);
   - could not connect (`upload_network`), also when the first `/uploads` ask could not connect;
-  - refused by the storage, with its status (`upload_refused`).
+  - refused by the storage, with its status, or 0 when the answer did not come through (`upload_refused`);
+  - declined by Sky Studio (`upload_declined`): `/uploads` refused it or answered without an address. Sky Studio's own refusal is
+    kept, so the voice library still names it.
   - What the AI gets: plain English words, the code, `upload_attempts` (PUTs only, never renewals), `upload_error`, `charged: false`,
     and a `next_step` that says nothing was submitted.
   - What the user reads: one localized line per kind (`SkyStudioUploadWords`; English, 简体中文, Español), naming the network and
@@ -79,15 +82,29 @@ Nothing was charged: no `/jobs` was sent. The second job (another model, the sam
      - the packaging guard grepped for lines, so removing the refusal's `exit 1` stayed green;
      - the debug-hook check cut the real PUT by watching the bytes sent, so on a fast link the whole body could already be out (it
        once delivered all 2,000,000 bytes).
+- **What the second version missed.** Codex re-checked `4b636f4e` (reproduced on a loopback) and found five gaps, all fixed above:
+  1. A 403 whose head came and whose body never did was still retried. The system holds such an answer back while it waits for body
+     bytes to sniff, so `task.response` was nil. A local probe confirmed that only the metrics' `responseStartDate` shows the answer
+     began (with 1 KB of body the 403 is delivered, which is all the earlier check sent).
+  2. A 307 / 308 was followed, so two PUTs went out and `upload_attempts` said 1. Now redirects are not followed: a signed address does
+     not redirect.
+  3. A `/uploads` 413, or a 200 without an address, bypassed the upload error. The generation row was in English, and the film
+     preparation's row and next step were skipped. Those failures are now "declined".
+  4. The guard did not see the unsubmitted-job next step removed while its `if` stayed. The step is now pinned as the line right
+     inside the `if`.
+  5. When a dropped try failed before its body, the hook's watcher spun until its 5 s deadline: `try?` swallowed the cancelled sleep,
+     at about 5 CPU s each time. It now stops when the try has ended and honours cancellation.
 
 Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry.swift`, `SkyStudioUploadFailure.swift`,
 `SkyStudioUploadWords.swift`, `SkyStudioGenerationRun.swift`, `SkyStudioOfficialPreparation.swift`, `Upscale/UpscaleJob.swift`,
-`AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `CloudMedia/CloudUploadFault.swift`, `scripts/debug-hook-probe.sh`.
+`AIUpscaleTool.swift`, `VoiceChange/VoiceChangeJob.swift`, `CloudMedia/CloudTransfer.swift` (redirects, the answer from the metrics),
+`CloudMedia/CloudUploadFault.swift`, `SkyStudioVoiceLibraryErrors.swift` / `VoiceLibrary/VoiceLibraryText.swift` (a kept refusal),
+`scripts/debug-hook-probe.sh`.
 
 ## Verification
 
 - `scripts/check-sky-studio.sh` runs the real transfer against a local 127.0.0.1 server (`checks/SkyStudio/UploadServer.swift`, no
-  proxy). 8,396 checks pass (8,388 passed five runs in a row of one binary before the stall cases were added).
+  proxy). 8,436 checks pass, three runs in a row of one binary.
   - `UploadRetryChecks`:
     - one or two drops, or one reset, after the body, then 200: the first ticket's `file_url`, the same address tried 2 or 3 times,
       pauses `[1]` or `[1, 2]`, and progress at 0 right before each pause and ending at 1. Progress and pauses are logged in one
@@ -99,6 +116,10 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
   - `UploadAnswerChecks`:
     - a 403, and a 403 whose body was reset or stalled into a timeout (a 1.5 s PUT timeout in the check): refused after one PUT, no
       pause;
+    - a 403 whose head came and whose body never did: refused (status unread) after one PUT, no pause;
+    - a 307 and a 308: refused, with no second PUT to the new address;
+    - `/uploads` answering 413, a 200 without an address, or Sky Studio's own 503 `voice_library_unavailable`: declined before any
+      PUT. The refusal is kept (`server_code`), and `SkyStudioVoiceLibraryErrors.kind` still says unavailable;
     - a 200 whose body was reset or stalled: success after one PUT;
     - a TLS failure on the PUT (an https address on the plain server): could not connect, one PUT, no pause. The system itself may
       open a second connection inside its handshake, so SkyCut's tries are what is counted;
@@ -107,11 +128,12 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
     - renewals: one broken renewal costs a try and the next renews and sends; two broken renewals end as interrupted with
       `upload_attempts` 1; a refused renewal (the server stops listening during the pause) ends as could not connect, with no other
       ask and no second PUT.
-- The debug-only hook (`checks/UploadFault/main.swift`, compiled with `-D DEBUG`, the server reading 32 KB every 10 ms), 15 checks,
-  10 runs in a row:
+- The debug-only hook (`checks/UploadFault/main.swift`, compiled with `-D DEBUG`, the server reading 32 KB every 10 ms), 16 checks,
+  stable over repeated runs:
   - with one drop, the cut try arrives with more than 0 and at most 262,144 bytes of the 2 MB body, and the next arrives whole;
   - with three drops, the upload ends as interrupted after three cut tries, none whole and none over its part (the check waits for
     the slow server to log the last one), and the next upload goes through;
+  - a drop whose connection failed before the body (its TLS fails) leaves nothing spinning: under 0.3 CPU s in the next second;
   - garbage values drop nothing;
   - the probe passes the build without DEBUG and refuses the debug build.
 - A real `swift build -c release` (first round, on `8f0ca09f`): `strings -a` finds no trace of the hook in the release binary, also
@@ -141,6 +163,12 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
     - generate_media's next step for an unsubmitted job removed, and the official row's line removed: the wiring guard red for each;
     - the probe without its `exit 1`: the control red ("passed the debug build");
     - the hook streaming the whole file: 2 red (cut tries arrived whole).
+  - After the second review (five mutations):
+    - an answer whose head alone came, no longer counted as an answer: 6 red (retried, and the second try's 200 taken as success);
+    - redirects followed: 8 red (a 307 or 308 sent a second PUT and "worked");
+    - `/uploads` failures left unwrapped: 10 red (the 413 and Sky Studio's own refusal escaped the upload error);
+    - the unsubmitted-job next step removed with its `if` kept: the wiring guard red;
+    - the hook's watcher spinning again: 0.83 CPU s in 1 s, red.
 - `checks/sky-studio-wiring.sh` (section `checks/sky-studio-wiring/upload-retry.sh`) is green. It pins:
   - the single PUT inside the retry loop, with the answer read first;
   - each job's wiring;
