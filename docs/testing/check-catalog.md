@@ -346,6 +346,23 @@
   model in the server's order that takes the ask, steps and defaults, refusals in plain words, flat-priced lengths not beyond the
   draft, `audio_mode` none only where listed, the `audio` block and note in get_job; request bodies go through `SkyStudioStub`.
   `checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+- Uploads to Sky Studio's storage (2026-11-23): `scripts/check-sky-studio.sh` runs real transfers against a local 127.0.0.1 server
+  (`UploadServer.swift`, no proxy, no real network).
+  - `UploadRetryChecks`: one or two drops (or a reset) after the body, then success at the same signed address (pauses 1 s, 2 s;
+    progress back to 0); three drops end as interrupted (`upload_network`) after three PUTs; the pure rules and words.
+  - `UploadAnswerChecks`: a 403, and a 403 whose body was reset or stalled into a timeout, each refused after one PUT; a 403 whose
+    head came without its body is refused (status unread); a 307 / 308 is refused with no second PUT; `/uploads` answering 413, a 200
+    without an address or Sky Studio's own refusal is declined (the refusal kept; a 413 or `upload_too_large` is too large); a 200
+    whose body broke is success after one PUT; a TLS failure on the PUT ends as could not connect; a cancel and a stop during the
+    pause; renewal near expiry, unknown expiry and a skewed clock; one or two broken renewals (`upload_attempts` counts PUTs); a
+    renewal whose certificate is not trusted ends the upload.
+  - The same script runs `scripts/debug-hook-probe.sh` on its build without DEBUG (must pass) and on a debug build (must be
+    refused). It also runs the debug-only hook's checks, compiled with `-D DEBUG` (`checks/UploadFault/main.swift`: a cut try arrives
+    with at most its part, three cuts end as interrupted, a drop that failed before the body leaves nothing spinning, garbage values
+    drop nothing).
+  - `checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, the answer read first, each job's wiring, the hook's `#if DEBUG`
+    fence and the probe calls.
+  - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).

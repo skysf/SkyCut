@@ -353,6 +353,8 @@ enum SkyStudioJobError: Error, Equatable, Sendable {
             return error.message
         case .request(.network(let detail)):
             return "Could not reach Sky Studio: \(detail)"
+        case .request(.uploadFailed(let failure)):
+            return failure.message
         case .request(.badAnswer(let status)):
             return "Sky Studio's answer was not what SkyCut expected (HTTP \(status))."
         case .badAnswer(let detail):

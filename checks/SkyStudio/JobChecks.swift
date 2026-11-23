@@ -217,18 +217,18 @@ private func runTransferChecks() async {
             ? .http(200, #"{"upload_url": "http://127.0.0.1:8124/r2/x", "method": "PUT", "headers": {}, "file_url": "https://r2.example/x"}"#)
             : .http(403, "<Error>SignatureDoesNotMatch</Error>")
     }
-    if case .badAnswer(let status)? = await expectFailure("a refused PUT", {
+    if case .uploadFailed(let failure)? = await expectFailure("a refused PUT", {
         _ = try await api.upload(fileURL: clip, contentType: "video/mp4", purpose: "video", key: jobKey)
     }) {
-        checkEqual(status, 403, "a refused PUT says its status")
+        checkEqual(failure.kind, .refused(status: 403), "a refused PUT says its status")
     } else {
         check(false, "a refused PUT fails")
     }
     SkyStudioStub.reset { _ in .http(200, #"{"method": "PUT"}"#) }
-    if case .badAnswer? = await expectFailure("/uploads without addresses", {
+    if case .uploadFailed(let failure)? = await expectFailure("/uploads without addresses", {
         _ = try await api.upload(fileURL: clip, contentType: "video/mp4", purpose: "video", key: jobKey)
-    }) {} else {
-        check(false, "/uploads without upload_url / file_url is not an answer")
+    }), case .declined = failure.kind {} else {
+        check(false, "/uploads without upload_url / file_url is not an answer: the upload is declined")
     }
 
     // 2. 下载成品：不带 Key、文件原样、进度到 1；404 时目的地上什么都不留。

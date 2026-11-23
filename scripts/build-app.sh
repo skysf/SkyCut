@@ -45,6 +45,10 @@ echo "==> swift build -c release (arm64, -O)"
 swift build -c release --arch arm64
 BUILD_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
 
+# Debug-only test hooks never ship: a release binary that still names one is refused here (SRTFLOW_TEST_UPLOAD_DROPS lives in
+# Sources/SrtFlow/CloudMedia/CloudUploadFault.swift inside #if DEBUG; docs/architecture/sky-studio-jobs.md).
+scripts/debug-hook-probe.sh "$BUILD_DIR/$PRODUCT"
+
 APP="$DIST/$APP_NAME.app"
 echo "==> 组装 $APP"
 rm -rf "$APP"

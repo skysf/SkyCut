@@ -129,7 +129,9 @@ enum UpscalePipeline {
 
         // 2. 传上去、交任务、等它做完、下载。
         phase(.uploading(fraction: nil))
-        let link = try await api.upload(fileURL: input, contentType: "video/mp4", purpose: "video", key: key) { fraction in
+        // A cut is sent under a temporary name: an interrupted upload names the original file.
+        let link = try await api.upload(fileURL: input, contentType: "video/mp4", purpose: "video", key: key,
+                                        named: request.originalURL.lastPathComponent) { fraction in
             phase(.uploading(fraction: CloudJobPhase.quantized(fraction)))
         }
         var job = UpscaleRequest.job(

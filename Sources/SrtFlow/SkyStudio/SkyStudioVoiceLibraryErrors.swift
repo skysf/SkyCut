@@ -148,6 +148,8 @@ enum SkyStudioVoiceLibraryErrors {
 
     private static func server(_ error: Error) -> SkyStudioServerError? {
         if case .server(let server)? = error as? SkyStudioFailure { return server }
+        // An upload that Sky Studio's `/uploads` refused keeps that refusal (SkyStudioUploadFailure.server).
+        if let refusal = SkyStudioUploadFailure.from(error)?.server { return refusal }
         if case .request(.server(let server))? = error as? SkyStudioJobError { return server }
         return nil
     }
