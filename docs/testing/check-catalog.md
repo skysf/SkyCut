@@ -346,15 +346,20 @@
   model in the server's order that takes the ask, steps and defaults, refusals in plain words, flat-priced lengths not beyond the
   draft, `audio_mode` none only where listed, the `audio` block and note in get_job; request bodies go through `SkyStudioStub`.
   `checks/sky-studio-wiring/generation-length-sound.sh` pins the wiring. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
-- Uploads the network interrupts (2026-11-23): `scripts/check-sky-studio.sh` → `UploadRetryChecks` against a real local 127.0.0.1
-  server (`UploadServer.swift`, no proxy, no real network) that reads the whole body and then drops or resets the connection: one or
-  two drops then success at the same signed address (pauses 1 s, 2 s; progress back to 0), three drops end as `upload_network` with
-  the count and never a fourth PUT, a 403 and a cancel are tried once, renewal near expiry, a skewed server clock; pure: retried
-  errors, deadline, the AI's words. The same script searches its build without DEBUG for the debug-only hook
-  `SRTFLOW_TEST_UPLOAD_DROPS` (`strings`, with the debug build as the control) and runs the hook's checks compiled with `-D DEBUG`
-  (`checks/UploadFault/main.swift`: one drop cut mid-body then success, three drops then `upload_network`, unset / garbage drops
-  nothing). `checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, each job's wiring, the hook's `#if DEBUG` fence and the
-  release binary's probe in `scripts/build-app.sh`. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+- Uploads to Sky Studio's storage (2026-11-23): `scripts/check-sky-studio.sh` runs real transfers against a local 127.0.0.1 server
+  (`UploadServer.swift`, no proxy, no real network).
+  - `UploadRetryChecks`: one or two drops (or a reset) after the body, then success at the same signed address (pauses 1 s, 2 s;
+    progress back to 0); three drops end as interrupted (`upload_network`) after three PUTs; the pure rules and words.
+  - `UploadAnswerChecks`: a 403, and a 403 whose body was reset or stalled into a timeout, each refused after one PUT; a 200 whose
+    body broke is success after one PUT; a TLS
+    failure on the PUT ends as could not connect; a cancel and a stop during the pause; renewal near expiry, unknown expiry and a
+    skewed clock; one or two broken renewals (`upload_attempts` counts PUTs); a refused renewal ends the upload.
+  - The same script runs `scripts/debug-hook-probe.sh` on its build without DEBUG (must pass) and on a debug build (must be
+    refused). It also runs the debug-only hook's checks, compiled with `-D DEBUG` (`checks/UploadFault/main.swift`: a cut try arrives
+    with at most its part, three cuts end as interrupted, garbage values drop nothing).
+  - `checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, the answer read first, each job's wiring, the hook's `#if DEBUG`
+    fence and the probe calls.
+  - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).
