@@ -1699,3 +1699,4 @@
 "“%@” is animated; this model takes one still image. Nothing was charged." = "“%@” es animada; este modelo acepta una sola imagen fija. No se cobró nada.";
 "“%@” could not be fitted to this model's limits. Nothing was charged." = "“%@” no se pudo ajustar a los límites de este modelo. No se cobró nada.";
 "“%@” changed and is no longer a readable image. Nothing was charged." = "“%@” cambió y ya no es una imagen legible. No se cobró nada.";
+"The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged." = "Las imágenes de referencia son demasiado grandes en conjunto para este modelo: como máximo %@ bytes entre todas. Envía menos imágenes o más pequeñas. No se cobró nada.";

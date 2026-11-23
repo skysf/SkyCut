@@ -368,9 +368,13 @@
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,
   the AI's note) and `ReferenceImageFitChecks` (real ImageIO files: bytes, size, JPEG / PNG and alpha, upright orientation,
   Display P3 kept, a 16:1 PNG over its byte limit stays 16:1 at the largest size that fits, a file rewritten after the quote
-  measured again, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes).
-  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path, the second measurement, both tools' chain target and
-  refusal list, the official identity, the task row's localized words and that SkyCut writes no limit number.
+  measured again, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes) and
+  `ReferenceTotalChecks` (a total for all the images: the common cap, the largest first, the rest byte-identical, an image
+  held at its smallest copy, the 512 px floor in the byte search, a set that cannot be met refused; real files for one image
+  over the total, three whose sum is over, one that cannot come down and a set that cannot be met).
+  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path (the whole set prepared first, the total shared), the second
+  measurement, both tools' chain target and refusal list, the official identity, the task row's localized words and that
+  SkyCut writes no limit number.
   Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the

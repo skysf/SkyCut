@@ -1699,3 +1699,4 @@
 "“%@” is animated; this model takes one still image. Nothing was charged." = "「%@」是动图；这个模型只收一张静态图片。没有扣积分。";
 "“%@” could not be fitted to this model's limits. Nothing was charged." = "「%@」没法调整到这个模型的上限以内。没有扣积分。";
 "“%@” changed and is no longer a readable image. Nothing was charged." = "「%@」已经被改动，不再是能读的图片。没有扣积分。";
+"The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged." = "参考图片合起来对这个模型来说太大：全部加起来最多 %@ 字节。请少放几张或换小一点的图片。没有扣积分。";
