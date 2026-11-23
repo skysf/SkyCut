@@ -46,6 +46,8 @@ Nothing was charged: no `/jobs` was sent. The second job (another model, the sam
   - refused by the storage, with its status, or 0 when the answer did not come through (`upload_refused`);
   - declined by Sky Studio (`upload_declined`): `/uploads` refused it or answered without an address. Sky Studio's own refusal is
     kept, so the voice library still names it.
+  - A file too large (a 413, or Sky Studio's reason `upload_too_large`) is said so, whatever the kind, with a smaller file as the
+    next step: never "try again later".
   - What the AI gets: plain English words, the code, `upload_attempts` (PUTs only, never renewals), `upload_error`, `charged: false`,
     and a `next_step` that says nothing was submitted.
   - What the user reads: one localized line per kind (`SkyStudioUploadWords`; English, 简体中文, Español), naming the network and
@@ -94,6 +96,13 @@ Nothing was charged: no `/jobs` was sent. The second job (another model, the sam
      inside the `if`.
   5. When a dropped try failed before its body, the hook's watcher spun until its 5 s deadline: `try?` swallowed the cancelled sleep,
      at about 5 CPU s each time. It now stops when the try has ended and honours cancellation.
+- **Found in the author's own re-check of the third version:**
+  - A 413 from `/uploads` read "did not accept … try again later". Trying the same file again can never help, so a file too large is
+    now named as such.
+  - The refused-renewal check flaked under load: 2 failures in 5 runs. URLSession reports a refused loopback connection as -1005
+    ("connection lost"), which counts as broken, in some tries: 2 of 60 on fresh ports and 9 of 60 on a reused port, measured at
+    load 2. The check now fails the renewal's certificate instead (-1202, Codex's own case), through a `URLProtocol` that the pause
+    arms. The error still travels the API's own path.
 
 Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry.swift`, `SkyStudioUploadFailure.swift`,
 `SkyStudioUploadWords.swift`, `SkyStudioGenerationRun.swift`, `SkyStudioOfficialPreparation.swift`, `Upscale/UpscaleJob.swift`,
@@ -104,7 +113,7 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
 ## Verification
 
 - `scripts/check-sky-studio.sh` runs the real transfer against a local 127.0.0.1 server (`checks/SkyStudio/UploadServer.swift`, no
-  proxy). 8,436 checks pass, three runs in a row of one binary.
+  proxy). 8,467 checks pass, three runs in a row.
   - `UploadRetryChecks`:
     - one or two drops, or one reset, after the body, then 200: the first ticket's `file_url`, the same address tried 2 or 3 times,
       pauses `[1]` or `[1, 2]`, and progress at 0 right before each pause and ending at 1. Progress and pauses are logged in one
@@ -118,16 +127,19 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
       pause;
     - a 403 whose head came and whose body never did: refused (status unread) after one PUT, no pause;
     - a 307 and a 308: refused, with no second PUT to the new address;
-    - `/uploads` answering 413, a 200 without an address, or Sky Studio's own 503 `voice_library_unavailable`: declined before any
-      PUT. The refusal is kept (`server_code`), and `SkyStudioVoiceLibraryErrors.kind` still says unavailable;
+    - `/uploads` answering 413, a 200 without an address, Sky Studio's own 503 `voice_library_unavailable`, or its 400
+      `invalid_request` with reason `upload_too_large`: declined before any PUT. The refusal is kept (`server_code`), and
+      `SkyStudioVoiceLibraryErrors.kind` still names it (unavailable, too large). Only the 413 and `upload_too_large` are too large;
     - a 200 whose body was reset or stalled: success after one PUT;
     - a TLS failure on the PUT (an https address on the plain server): could not connect, one PUT, no pause. The system itself may
       open a second connection inside its handshake, so SkyCut's tries are what is counted;
     - a cancel during the PUT, and a stop during the pause: CancellationError after one PUT;
     - addresses: 30 s left renews, an unknown expiry renews, and a server clock an hour behind reuses;
     - renewals: one broken renewal costs a try and the next renews and sends; two broken renewals end as interrupted with
-      `upload_attempts` 1; a refused renewal (the server stops listening during the pause) ends as could not connect, with no other
-      ask and no second PUT.
+      `upload_attempts` 1; a renewal whose certificate is not trusted (-1202, from a fault the pause arms) ends as could not
+      connect, with no other ask and no second PUT;
+    - pure: a 413 from `/uploads` or the storage and the reason `upload_too_large` are too large, with "because the file is too
+      large" and a next step asking for a smaller file. Another `invalid_request`, a 503 and a 403 are not.
 - The debug-only hook (`checks/UploadFault/main.swift`, compiled with `-D DEBUG`, the server reading 32 KB every 10 ms), 16 checks,
   stable over repeated runs:
   - with one drop, the cut try arrives with more than 0 and at most 262,144 bytes of the 2 MB body, and the next arrives whole;
@@ -169,6 +181,11 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
     - `/uploads` failures left unwrapped: 10 red (the 413 and Sky Studio's own refusal escaped the upload error);
     - the unsubmitted-job next step removed with its `if` kept: the wiring guard red;
     - the hook's watcher spinning again: 0.83 CPU s in 1 s, red.
+  - After the author's own re-check (three mutations):
+    - `isTooLarge` always false: 8 red (both 413s, `upload_too_large`, their words and next steps);
+    - every transport error treated as transient, again: 21 red. They include the certificate renewal, which now fails every time
+      rather than now and then;
+    - the localized line's too-large branch removed: the wiring guard red.
 - `checks/sky-studio-wiring.sh` (section `checks/sky-studio-wiring/upload-retry.sh`) is green. It pins:
   - the single PUT inside the retry loop, with the answer read first;
   - each job's wiring;
@@ -193,4 +210,7 @@ Key files: `Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift`, `SkyStudioUploadRetry
   a construction that cannot succeed (a body that cannot complete), not a race it usually wins.
 - Name the step that failed. "Could not reach Sky Studio" for a storage PUT that broke sent people looking in the wrong place. A
   failure before submission must not get the "query the original job" next step.
+- A refused loopback connection is no deterministic stand-in for "cannot connect": URLSession sometimes reports it as a lost
+  connection. When a check needs one exact error, inject that error (a `URLProtocol` in front of the session) and let it travel the
+  real path.
 - Long-term rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md), section 1, "Uploads that the network interrupts".

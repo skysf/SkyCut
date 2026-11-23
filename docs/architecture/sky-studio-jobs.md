@@ -146,6 +146,8 @@ upload by itself. The uplink to that storage can be slow and unstable with or wi
      `charged: false`, and a `next_step` that never says to query an original job.
    - The user reads one line per kind in every UI language (`SkyStudioUploadWords`): which file, what happened (after how many tries
      when it was interrupted more than once), that nothing was charged, and what to do. **It names the network, never a proxy.**
+   - **A file too large for Sky Studio is said so**, whatever the kind: a 413 from `/uploads` or the storage, or Sky Studio's reason
+     `upload_too_large` (`isTooLarge`). The user's line and the AI's next step ask for a smaller file, never "try again later".
    - A cut sent under a temporary name is named after the file the user knows (`upload(named:)`: upscale, voice change, voice
      samples).
 5. **Every job that uploads says it:**
@@ -169,14 +171,17 @@ no proxy):
   - a 403, and a 403 whose body was reset or stalled into a timeout, each refused after one PUT;
   - a 403 whose head came and whose body never did: refused (status unread) after one PUT;
   - a 307 and a 308, each refused with no second PUT;
-  - `/uploads` answering 413, a 200 without an address, or Sky Studio's own 503 refusal: declined before any PUT. The refusal is
-    kept, and the voice library still names it;
+  - `/uploads` answering 413, a 200 without an address, Sky Studio's own 503 refusal, or its 400 `invalid_request` with reason
+    `upload_too_large`: declined before any PUT. The refusal is kept, and the voice library still names it. The 413 and
+    `upload_too_large` are too large, and the others are not;
   - a 200 whose body was reset or stalled counts as success after one PUT;
   - a TLS failure on the PUT (an https address on the plain server) ends the upload as could not connect, with no second try;
   - a cancel and a stop during the pause;
   - renewal near expiry, an unknown expiry renewed, a skewed server clock;
   - a renewal broken once (the next try renews and sends) or twice (interrupted, `upload_attempts` 1);
-  - a renewal refused (the server stops listening) ends the upload.
+  - a renewal whose certificate is not trusted (-1202, from a fault the pause arms in front of the session) ends the upload. A server
+    that stops listening is no stand-in: the system reports a refused loopback connection as -1005 ("connection lost") in a few tries
+    out of a hundred.
 
 `checks/sky-studio-wiring/upload-retry.sh` pins:
 - the single PUT, never redirected, with any answer that began read first;
