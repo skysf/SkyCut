@@ -264,6 +264,13 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             await recordRejection()
             held?.refund()
             finish(.failed, problem.message)
+        } catch let failure as SkyStudioReferenceFitFailure {
+            // A reference image could not be fitted before upload: nothing left this Mac. get_job keeps the AI's English;
+            // the task row shows the user's words (reference-image-fitting.md).
+            await recordRejection()
+            held?.refund()
+            finish(.failed, failure.message)
+            status.issue = SkyStudioReferenceFitWords.shown(failure)
         } catch let failure as SkyStudioFailure {
             await recordRejection(SkyStudioJobError.request(failure))
             if !requestSent { held?.refund() }
