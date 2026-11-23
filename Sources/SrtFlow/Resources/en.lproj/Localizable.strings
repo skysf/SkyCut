@@ -1564,6 +1564,7 @@
 "Sky Studio's storage refused the upload of “%1$@” (HTTP %2$d). Nothing was charged. Try again later." = "Sky Studio's storage refused the upload of “%1$@” (HTTP %2$d). Nothing was charged. Try again later.";
 "Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later." = "Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later.";
 "Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later." = "Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later.";
+"“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file." = "“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file.";
 "This clip has no sound to change." = "This clip has no sound to change.";
 "This clip is muted. Unmute it first, then change its voice." = "This clip is muted. Unmute it first, then change its voice.";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part.";

@@ -352,9 +352,10 @@
     progress back to 0); three drops end as interrupted (`upload_network`) after three PUTs; the pure rules and words.
   - `UploadAnswerChecks`: a 403, and a 403 whose body was reset or stalled into a timeout, each refused after one PUT; a 403 whose
     head came without its body is refused (status unread); a 307 / 308 is refused with no second PUT; `/uploads` answering 413, a 200
-    without an address or Sky Studio's own refusal is declined (the refusal kept); a 200 whose body broke is success after one PUT; a TLS
-    failure on the PUT ends as could not connect; a cancel and a stop during the pause; renewal near expiry, unknown expiry and a
-    skewed clock; one or two broken renewals (`upload_attempts` counts PUTs); a refused renewal ends the upload.
+    without an address or Sky Studio's own refusal is declined (the refusal kept; a 413 or `upload_too_large` is too large); a 200
+    whose body broke is success after one PUT; a TLS failure on the PUT ends as could not connect; a cancel and a stop during the
+    pause; renewal near expiry, unknown expiry and a skewed clock; one or two broken renewals (`upload_attempts` counts PUTs); a
+    renewal whose certificate is not trusted ends the upload.
   - The same script runs `scripts/debug-hook-probe.sh` on its build without DEBUG (must pass) and on a debug build (must be
     refused). It also runs the debug-only hook's checks, compiled with `-D DEBUG` (`checks/UploadFault/main.swift`: a cut try arrives
     with at most its part, three cuts end as interrupted, a drop that failed before the body leaves nothing spinning, garbage values

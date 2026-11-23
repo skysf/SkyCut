@@ -1564,6 +1564,7 @@
 "Sky Studio's storage refused the upload of “%1$@” (HTTP %2$d). Nothing was charged. Try again later." = "El almacenamiento de Sky Studio rechazó la subida de «%1$@» (HTTP %2$d). No se cobró nada. Inténtalo de nuevo más tarde.";
 "Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later." = "El almacenamiento de Sky Studio respondió a la subida de «%@», pero la respuesta no llegó. No se cobró nada. Inténtalo de nuevo más tarde.";
 "Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later." = "Sky Studio no aceptó la subida de «%@». No se cobró nada. Inténtalo de nuevo más tarde.";
+"“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file." = "«%@» es demasiado grande para Sky Studio. No se cobró nada. Usa un archivo más pequeño.";
 "This clip has no sound to change." = "Este clip no tiene sonido que cambiar.";
 "This clip is muted. Unmute it first, then change its voice." = "Este clip está silenciado. Quita el silencio primero y luego cambia la voz.";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "Este clip usa %1$@ de su original; un cambio de voz admite como máximo %2$@ cada vez. Divide el clip primero y cambia cada parte.";
