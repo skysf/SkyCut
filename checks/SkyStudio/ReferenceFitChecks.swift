@@ -85,20 +85,45 @@ func runReferenceFitChecks() {
     } else { check(false, "a multi-image HEIC is not an animation") }
     checkEqual(both.decide(fitImage(800, 600, name: "loop.webp", bytes: 900_000, type: "image/webp", frames: 12)), .asIs,
                "an animated WebP within every limit goes as it is (as before)")
-    if case .refuse(let message) = both.decide(fitImage(800, 600, name: "loop.gif", type: "image/gif", frames: 12)) {
-        check(message.contains("animated") && message.contains("one still image"), "an animated GIF that would need converting is refused: \(message)")
+    if case .refuse(let failure) = both.decide(fitImage(800, 600, name: "loop.gif", type: "image/gif", frames: 12)) {
+        check(failure.message.contains("animated") && failure.message.contains("one still image"), "an animated GIF that would need converting is refused: \(failure.message)")
     } else { check(false, "an animated GIF is not turned into a still behind the user's back") }
     checkEqual(both.decide(fitImage(16_000, 1_000)), .asIs, "aspect exactly 16: taken")
-    if case .refuse(let message) = both.decide(fitImage(16_100, 1_000)) {
-        check(message.contains("too wide") && message.contains("at most 16") && message.contains("does not crop"), "aspect over 16 is refused with the limit: \(message)")
+    if case .refuse(let failure) = both.decide(fitImage(16_100, 1_000)) {
+        check(failure.message.contains("too wide") && failure.message.contains("at most 16") && failure.message.contains("does not crop"), "aspect over 16 is refused with the limit: \(failure.message)")
     } else { check(false, "an aspect beyond the range cannot be fitted") }
-    if case .refuse(let message) = both.decide(fitImage(1_000, 16_100)) {
-        check(message.contains("too tall") && message.contains("at least 0.0625"), "aspect under 1/16 is refused with the limit: \(message)")
+    if case .refuse(let failure) = both.decide(fitImage(1_000, 16_100)) {
+        check(failure.message.contains("too tall") && failure.message.contains("at least 0.0625"), "aspect under 1/16 is refused with the limit: \(failure.message)")
     } else { check(false, "a tall aspect beyond the range cannot be fitted") }
     checkEqual(both.decide(fitImage(15, 15, bytes: 900)), .asIs, "15 px sides: taken")
-    if case .refuse(let message) = both.decide(fitImage(14, 20, bytes: 900)) {
-        check(message.contains("too small") && message.contains("at least 15 px") && message.contains("never upscales"), "a 14 px side is refused with the limit: \(message)")
+    if case .refuse(let failure) = both.decide(fitImage(14, 20, bytes: 900)) {
+        check(failure.message.contains("too small") && failure.message.contains("at least 15 px") && failure.message.contains("never upscales"), "a 14 px side is refused with the limit: \(failure.message)")
     } else { check(false, "SkyCut never upscales a small image") }
+
+    // The final integer size keeps the aspect inside the range and every pixel limit (Codex review of #550: a 16:1 picture
+    // shrunk to 12,084 × 755 was 16.0053:1 and refused).
+    if let sized = both.size(width: 12_720, height: 795, scale: 0.95) {
+        check(Double(sized.width) / Double(sized.height) <= 16, "a 16:1 picture shrunk stays at most 16:1 (\(sized.width)×\(sized.height))")
+        check(sized.width >= 12_080 && sized.height == 755, "losing only the pixel the rounding cost (\(sized.width)×\(sized.height))")
+    } else { check(false, "a 16:1 picture has a size at 0.95") }
+    if let sized = both.size(width: 795, height: 12_720, scale: 0.95) {
+        check(Double(sized.width) / Double(sized.height) >= 0.0625, "a 1:16 picture shrunk stays at least 1:16 (\(sized.width)×\(sized.height))")
+    } else { check(false, "a 1:16 picture has a size at 0.95") }
+    if case .fit(let plan) = both.decide(fitImage(6000, 6001)), let sized = both.size(width: 6000, height: 6001, scale: plan.scale) {
+        check(sized.width * sized.height <= 36_000_000 && sized.width * sized.height > 35_900_000, "one row over 36 MP: just under it (\(sized.width)×\(sized.height))")
+    } else { check(false, "one row over the pixel limit has a size") }
+    checkEqual(both.size(width: 320, height: 200, scale: 1)?.width, 320, "a converted-only picture keeps its own size")
+    check(both.size(width: 30, height: 20, scale: 0.4) == nil, "no size when only a side below the minimum would do")
+
+    // The byte search keeps as much size as fits: a copy whose bytes fall off a cliff just below full size (a resampled
+    // picture compresses better) is found near the cliff, not at the √(limit / bytes) estimate.
+    let cliff = { (scale: Double) -> (scale: Double, bytes: Int)? in
+        scale < 0.2 ? nil : (scale, scale >= 0.995 ? 1_000 : Int(880 * scale * scale))
+    }
+    let searched = SkyStudioReferenceFit.largestFitting(below: 1, firstBytes: 1_000, maxBytes: 900, bytesOf: { $0.bytes }, encode: cliff)
+    check((searched?.scale ?? 0) >= 0.98 && (searched?.bytes ?? .max) <= 900, "the largest copy that fits, within 1 % (got \(searched?.scale ?? 0))")
+    check(SkyStudioReferenceFit.largestFitting(below: 1, firstBytes: 1_000, maxBytes: 10, bytesOf: { $0.bytes }, encode: cliff) == nil,
+          "no copy fits above the smallest allowed size: nil, never a copy over the limit")
 
     // The reference check: a fit_images model takes what SkyCut can fit; an older record still refuses.
     let big = SkyStudioReferencePlan(mode: "images", files: [fitImage(9000, 9000, bytes: 45_000_000)])
@@ -126,6 +151,12 @@ func runReferenceFitChecks() {
                                           accepts: { twelve.problem(model: $0) == nil }).map(\.id), ["nano2"],
                "a fallback that cannot take the request (12 images, Seedream takes 10) is not in the chain")
 
+    // No model takes 15 images: the refusal names each model's own limit, in the order SkyCut tries them.
+    let fifteenRefusal = SkyStudioModelPolicy.refusal(catalog: catalog, kind: "image", operation: "generate", reason: { fifteen.problem(model: $0) })
+    check(fifteenRefusal.contains("nano2: Nano Banana 2 accepts at most 14") && fifteenRefusal.contains("seedream5-flash: Seedream 5.0 Flash accepts at most 10"),
+          "the refusal states each model's limit: \(fifteenRefusal)")
+    check(!fifteenRefusal.contains("qwen-angles"), "only models for the asked operation are listed")
+
     // Sky Studio's own image records (PR #262's buildSkycutModelCatalog, checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json).
     let fixture = URL(fileURLWithPath: "checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json")
     if let data = try? Data(contentsOf: fixture), let json = try? JSONValue.decode(data), let published = SkyStudioCatalog(json: json) {
@@ -143,6 +174,11 @@ func runReferenceFitChecks() {
             checkEqual(target?.maxBytes, 30_000_000, "fitted to Seedream's published 30,000,000 bytes")
             checkEqual(target?.maxPixels, 36_000_000, "and its 36,000,000 pixels")
             checkEqual(SkyStudioReferenceFit.strictest([nano2], mode: "images")?.maxBytes, 31_457_280, "Nano Banana 2 named alone: its 30 MiB")
+            let scan = fitImage(1000, 800, name: "scan.bmp", bytes: 2_400_000, type: "image/bmp")
+            if case .fit(let plan)? = target?.decide(scan) { checkEqual(plan.contentType, "image/jpeg", "a BMP for the default chain becomes JPEG (Nano Banana 2 takes no BMP)") }
+            else { check(false, "a BMP for the default chain is converted") }
+            let flash = published.model("seedream5-flash", kind: "image").flatMap { SkyStudioReferenceFit.strictest([$0], mode: "images") }
+            checkEqual(flash?.decide(scan), .asIs, "Seedream 5.0 Flash named alone takes a BMP as it is (Ark lists BMP)")
         } else { check(false, "the published catalog lists nano2") }
     } else { check(false, "Sky Studio's 2026-11-23 image records load") }
 

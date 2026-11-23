@@ -156,15 +156,46 @@ func runReferenceImageFitChecks() async {
     do {
         _ = try await SkyStudioReferenceImageFit.prepare(fixture.measured(small), fit: fitLimits(minSide: 15), folder: output)
         check(false, "an image below the minimum side is refused")
-    } catch let error as AIToolError {
-        check(error.message.contains("at least 15 px"), "the refusal names the limit: \(error.message)")
-    } catch { check(false, "a refusal is an AIToolError: \(error)") }
+    } catch let failure as SkyStudioReferenceFitFailure {
+        check(failure.message.contains("at least 15 px"), "the refusal names the limit: \(failure.message)")
+        check(failure.reason == .tooSmall(minSide: 15, width: 12, height: 40), "and carries it for the user's words (the task row)")
+    } catch { check(false, "a refusal is a SkyStudioReferenceFitFailure: \(error)") }
     do {
         _ = try await SkyStudioReferenceImageFit.prepare(noisyImage, fit: fitLimits(bytes: 2_000, minSide: 300), folder: output)
         check(false, "a byte limit only reachable below the minimum side is refused, not met by breaking the other limit")
-    } catch let error as AIToolError {
-        check(error.message.contains("2,000 bytes") && error.message.contains("300 px"), "it says both limits: \(error.message)")
-    } catch { check(false, "a refusal is an AIToolError: \(error)") }
+    } catch let failure as SkyStudioReferenceFitFailure {
+        check(failure.message.contains("2,000 bytes") && failure.message.contains("300 px"), "it says both limits: \(failure.message)")
+    } catch { check(false, "a refusal is a SkyStudioReferenceFitFailure: \(error)") }
+
+    // A 16:1 picture over only its byte limit keeps exactly 16:1 and as much of its size as fits (within the 1 % search),
+    // not a step below it (Codex review of #550: 12,720 × 795 became 12,084 × 755 = 16.0053:1 and was refused).
+    let banner = fixture.write(fixture.picture(1600, 100, noise: true), "banner.png", type: .png)
+    let bannerImage = fixture.measured(banner)
+    var aspectLimits = fitLimits(bytes: (bannerImage.bytes * 0.85).rounded())
+    aspectLimits.minAspect = 0.0625
+    aspectLimits.maxAspect = 16
+    if let sent = try? await SkyStudioReferenceImageFit.prepare(bannerImage, fit: aspectLimits, folder: output), let back = readBack(sent.url) {
+        check(Double(back.width) / Double(back.height) <= 16 && Double(back.width) / Double(back.height) >= 15.9, "the copy stays at 16:1 (\(back.width)×\(back.height))")
+        check(Double(sent.bytes ?? .max) <= (bannerImage.bytes * 0.85).rounded(), "within the byte limit")
+        check(back.width >= 1456, "as large as fits: a 15 % byte cut costs about 8 % of the width, not more (\(back.width) px)")
+        sent.cleanUp()
+    } else { check(false, "a 16:1 PNG over its byte limit is fitted") }
+
+    // The file is measured again at upload time: rewritten after the quote, it is judged as it is now.
+    let rewritten = fixture.write(fixture.picture(40, 30), "rewritten.png", type: .png)
+    let stale = fixture.measured(rewritten)
+    _ = fixture.write(fixture.picture(900, 600, noise: true), "rewritten.png", type: .png)
+    if let sent = try? await SkyStudioReferenceImageFit.prepare(stale, fit: fitLimits(bytes: 200_000), folder: output) {
+        check(sent.temporary && (sent.bytes ?? .max) <= 200_000, "a reference rewritten bigger after it was measured is fitted, not sent as it was measured")
+        sent.cleanUp()
+    } else { check(false, "a rewritten reference is fitted") }
+    try? Data("not an image".utf8).write(to: rewritten)
+    do {
+        _ = try await SkyStudioReferenceImageFit.prepare(stale, fit: fitLimits(bytes: 200_000), folder: output)
+        check(false, "a reference rewritten into something else is refused")
+    } catch let failure as SkyStudioReferenceFitFailure {
+        checkEqual(failure.reason, .unreadable, "it is refused as no longer readable")
+    } catch { check(false, "a refusal is a SkyStudioReferenceFitFailure: \(error)") }
     var audio = SkyStudioReference(type: "audio", file: noisy, role: "reference_audio", bytes: 50_000_000)
     audio.contentType = "audio/wav"
     checkEqual((try? await SkyStudioReferenceImageFit.prepare(audio, fit: fitLimits(bytes: 10), folder: output))?.url, noisy, "only images are fitted")
