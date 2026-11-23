@@ -174,7 +174,10 @@ this change; nothing paid was called.
   图片生成也能收多张参考图。所有路径先过同一份 `confirmReading`，再测量、按目录检查数量 / 字节 / 长度 / 组合限制；图片转码走 `MediaReadQueue.analysis`。
   例：H3 多模态最多 9 图 / 3 视频 / 3 音频，但总数最多 12，音频不能独用；首尾帧只有 2 图。H3 多模态支持 2K / 4K，首尾帧不支持。
   限制只从服务端读，不能抄一份常量冒充模型能力。报价带实际图片数量、参考视频总秒数；有序上传后经 `inputs.references` 原样发；审批身份绑所有本机文件与顺序。
-  服务端自己探真实素材并在扣费前核对 `max_credits`；输入不改写、不缩小；原始字节按目录约束上传。成品下载到「生成」文件夹，作品库也永久保留。
+  服务端自己探真实素材并在扣费前核对 `max_credits`。成品下载到「生成」文件夹，作品库也永久保留。
+  Since 2026-11-23 a reference image goes up unchanged when it meets the strictest published limits of the chosen model and its
+  fallbacks (`fit_images` in `/models`), and is otherwise converted, re-encoded or downscaled just enough, never upscaled
+  ([Reference-image fitting](reference-image-fitting.md)); videos, audio and documents go up as they are.
 - **不自动替换**（2026-10-31 用户要求，覆盖 10-30 的自动切模型策略）：任何模型失败、拒绝或状态未知都不自动重生成、切模型或重放收费 POST。
   `auto_fallback=true` 明确拒绝，false 只为旧客户端兼容。用户另行批准的新生成使用新 key / 新预算。`get_job` 在本机任务结束后也只 GET 原服务器任务，更新 billing 与原结果地址。
 - **变声**（声音 PR 9，2026-11-11）：`change_voice` 和片段右键的面板，规矩见 [声音库](voice-library.md)第十一节。kind `voice_convert`、`model: auto`
