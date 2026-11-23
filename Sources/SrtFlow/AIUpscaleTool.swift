@@ -217,7 +217,13 @@ enum AIUpscaleTool {
         let detail = ended.skyStudioJobID.map { JSONValue.object(["skystudio_job_id": .string($0)]) }
         switch ended.state {
         case .failed(let message):
-            AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
+            if let interruption = ended.uploadInterruption {
+                // The state holds the user's localized line; the AI gets the English, the code and the count (nothing was submitted).
+                AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + interruption.message,
+                                     detail: .object(interruption.fields(retry: "call upscale_clip again.")))
+            } else {
+                AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
+            }
         case .cancelled(let stop):
             AIJobs.shared.finish(aiJob, .cancelled, message: "The upscale was stopped. " + SkyStudioJobError.stopped(stop).message, detail: detail)
         case .running, .done:

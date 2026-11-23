@@ -117,7 +117,10 @@ enum SkyStudioVoiceRecordingTool {
             }
             return SkyStudioVoiceRecordingLanguage.adding(language, to: renewedStatement(asked))
         }
-        catch { throw AIToolError(SkyStudioVoiceLibraryErrors.message(error)) }
+        catch {
+            throw AIToolError(SkyStudioVoiceLibraryErrors.message(error),
+                              details: SkyStudioUploadInterruption.from(error)?.fields(retry: "make the same manage_voices call again.") ?? [:])
+        }
     }
 
     private static func submission(file: URL, sample: VoiceReferenceSample.Sample, language: String, target: SkyStudioVoiceRecordingSubmission.Target,

@@ -16,6 +16,8 @@ final class SkyStudioCharacterRun {
     private var job: AIJobs.Job?
     private var refreshing = false
     private var recoveryEvidenceSaved: Bool?
+    /// The network broke every try of a photo's upload: nothing was submitted (the task row and get_job say so).
+    private var uploadInterruption: SkyStudioUploadInterruption?
 
     init(receipt: SkyStudioCharacterReceipt, key: String, project: VideoEditProject?, plan: SkyStudioCharacterPlan? = nil,
          approvedFiles: [JSONValue] = [], reservation: SkyStudioJobGate.Reservation? = nil, retryFreeImport: Bool = false) {
@@ -111,6 +113,7 @@ final class SkyStudioCharacterRun {
                 held?.refund(); receipt.rejectionCode = "local_not_sent"
                 await saveFailureEvidence()
             }
+            uploadInterruption = SkyStudioUploadInterruption.from(error)
             finish(Task.isCancelled ? .cancelled : .failed, SkyStudioCharacterError.tool(error).message)
         }
     }
@@ -194,8 +197,12 @@ final class SkyStudioCharacterRun {
 
     private func finish(_ status: AIJobs.Status, _ message: String) {
         guard let job else { return }
-        if status != .done { activity?.issue = message }
-        AIJobs.shared.finish(job, status, message: message, detail: .object(payload()))
+        if status != .done { activity?.issue = uploadInterruption.map(SkyStudioUploadWords.interrupted) ?? message }
+        var detail = payload()
+        if let uploadInterruption {
+            detail.merge(uploadInterruption.fields(retry: "call manage_characters again with a new idempotency_key.")) { _, upload in upload }
+        }
+        AIJobs.shared.finish(job, status, message: message, detail: .object(detail))
     }
 
     private func refresh() async {

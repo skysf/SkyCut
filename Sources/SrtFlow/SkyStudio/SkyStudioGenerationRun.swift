@@ -52,6 +52,8 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private var deliveryStatus: String?
     private var remoteResult: SkyStudioJobResult?
     private var savedOriginal: URL?
+    /// The network broke every try of a reference's upload: nothing was submitted (the task row and get_job say so).
+    private var uploadInterruption: SkyStudioUploadInterruption?
 
     private func settle(_ value: SkyStudioBilling) {
         billing = value
@@ -268,6 +270,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             await recordRejection(SkyStudioJobError.request(failure))
             if !requestSent { held?.refund() }
             creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
+            uploadInterruption = SkyStudioUploadInterruption.from(failure)
             finish(.failed, SkyStudioJobError.request(failure).message)
         } catch {
             await recordRejection()
@@ -390,7 +393,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private func finish(_ status: AIJobs.Status, _ message: String, detail: JSONValue? = nil) {
         guard let job else { return }
         if status == .failed || creditsUnconfirmed {
-            self.status.issue = message
+            self.status.issue = uploadInterruption.map(SkyStudioUploadWords.interrupted) ?? message
         }
         var payload = detail?.objectValue ?? [:]
         payload.merge(SkyStudioGenerationDuration.fields(for: generation, result: remoteResult)) { _, current in current }
@@ -424,6 +427,10 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if lastFailure?.code == "insufficient_credits" {
             payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."
+        }
+        // Last, over the generic next step: an upload the network broke was never submitted, so there is no original job to query.
+        if let uploadInterruption {
+            payload.merge(uploadInterruption.fields(retry: "call generate_media again without idempotency_key or with a new one (this one stays bound to this failed job).")) { _, upload in upload }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
     }
