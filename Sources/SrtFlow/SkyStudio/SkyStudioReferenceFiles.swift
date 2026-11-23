@@ -123,7 +123,8 @@ enum SkyStudioReferenceFiles {
             guard let type = sent.contentType else { throw AIToolError("Cannot determine input format: \(file.file.lastPathComponent).") }
             let purpose = model.inputs[file.role]?["upload_purpose"]?.stringValue ?? file.type
             let count = Double(plan.files.count)
-            let url = try await api.upload(fileURL: sent.url, contentType: type, purpose: purpose, key: key) { fraction in
+            // A fitted copy has a temporary name: an upload failure names the user's file.
+            let url = try await api.upload(fileURL: sent.url, contentType: type, purpose: purpose, key: key, named: file.file.lastPathComponent) { fraction in
                 progress((Double(index) + fraction) / count)
             }
             if file.role == "first_frame" { inputs["image_url"] = url.absoluteString }
