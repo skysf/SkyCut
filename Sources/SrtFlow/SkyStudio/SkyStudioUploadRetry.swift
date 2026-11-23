@@ -77,6 +77,14 @@ struct SkyStudioUploadRetry: Sendable {
     struct Refused: Error {
         let status: Int
     }
+
+    /// Sky Studio did not hand out an address (`/uploads` refused, or answered something with no address): the upload ends. Its own
+    /// refusal is kept (`server`). Only inside SkyStudioAPI.upload.
+    struct Declined: Error {
+        let status: Int
+        let server: SkyStudioServerError?
+        let detail: String
+    }
 }
 
 /// What `POST /uploads` answered: where to PUT the file (a signed address, valid for a while) and the `file_url` that jobs take.

@@ -71,9 +71,13 @@ enum CloudUploadFault {
         // A data task sends `httpBodyStream` as the body (a streamed upload task would ask the delegate for it instead).
         let task = session.dataTask(with: streamed)
         let sent = Int64(head.count)
+        // Waits (sleeping, never spinning) until the part is out, then cuts. It ends at once when the try already ended (a connection that
+        // failed before the body) or the try is over (cancelled by the defer below).
         let cutter = Task {
             let deadline = Date().addingTimeInterval(5)
-            while task.countOfBytesSent < sent, Date() < deadline { try? await Task.sleep(nanoseconds: 20_000_000) }
+            while task.state != .completed, task.state != .canceling, task.countOfBytesSent < sent, Date() < deadline {
+                do { try await Task.sleep(nanoseconds: 20_000_000) } catch { return }
+            }
             task.cancel()
         }
         defer { cutter.cancel() }

@@ -94,8 +94,11 @@ enum VoiceLibraryText {
            let have = tool.details["voiced_seconds"]?.doubleValue {
             return String(format: L10n("Only %@ s of clear speech so far. A voice needs at least 10 s of one person talking."), String(format: "%.1f", have))
         }
-        if let failure = SkyStudioUploadFailure.from(error) { return SkyStudioUploadWords.shown(failure) }
-        guard let kind = SkyStudioVoiceLibraryErrors.kind(error) else { return SkyStudioVoiceLibraryErrors.message(error) }
+        // A refusal the voice library knows (too large, unavailable…) keeps its own words, even inside an upload failure.
+        guard let kind = SkyStudioVoiceLibraryErrors.kind(error) else {
+            if let failure = SkyStudioUploadFailure.from(error) { return SkyStudioUploadWords.shown(failure) }
+            return SkyStudioVoiceLibraryErrors.message(error)
+        }
         func name(_ language: String?) -> String { language.map { languageName($0) } ?? L10n("that language") }
         switch kind {
         case .unavailable:

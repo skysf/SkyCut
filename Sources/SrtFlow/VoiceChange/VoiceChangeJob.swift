@@ -95,7 +95,8 @@ final class VoiceChangeJob {
             // 传的时候、交上之前出的错：一分没花。
             if serverID == nil { held.refund() }
             let stopped = Task.isCancelled || error is CancellationError
-            if !stopped, let failure = SkyStudioUploadFailure.from(error) {
+            // A refusal the voice library knows (unavailable, too large…) keeps its own words below.
+            if !stopped, SkyStudioVoiceLibraryErrors.kind(error) == nil, let failure = SkyStudioUploadFailure.from(error) {
                 return finish(.failed, failure.message, detail: failure.fields(retry: "call change_voice again."),
                               shown: SkyStudioUploadWords.shown(failure))
             }

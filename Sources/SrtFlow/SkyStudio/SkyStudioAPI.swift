@@ -163,8 +163,8 @@ struct SkyStudioAPI: Sendable {
         if purpose == "character_role" { fields["filename"] = nil }
         let body = try JSONValue.object(fields).encodedData()
         let name = named ?? fileURL.lastPathComponent
-        func failed(_ kind: SkyStudioUploadFailure.Kind, puts: Int, _ detail: String) -> SkyStudioFailure {
-            .uploadFailed(SkyStudioUploadFailure(fileName: name, kind: kind, attempts: puts, lastError: detail))
+        func failed(_ kind: SkyStudioUploadFailure.Kind, puts: Int, _ detail: String, server: SkyStudioServerError? = nil) -> SkyStudioFailure {
+            .uploadFailed(SkyStudioUploadFailure(fileName: name, kind: kind, attempts: puts, lastError: detail, server: server))
         }
         var ticket: SkyStudioUploadTicket
         do {
@@ -173,6 +173,8 @@ struct SkyStudioAPI: Sendable {
             throw failed(.interrupted, puts: 0, broken.detail)
         } catch let unreachable as SkyStudioUploadRetry.Unreachable {
             throw failed(.unreachable, puts: 0, unreachable.detail)
+        } catch let declined as SkyStudioUploadRetry.Declined {
+            throw failed(.declined(status: declined.status), puts: 0, declined.detail, server: declined.server)
         }
         var puts = 0
         var lastTry: TimeInterval = 0
@@ -199,6 +201,8 @@ struct SkyStudioAPI: Sendable {
                 throw failed(.unreachable, puts: puts, unreachable.detail)
             } catch let refused as SkyStudioUploadRetry.Refused {
                 throw failed(.refused(status: refused.status), puts: puts, "HTTP \(refused.status)")
+            } catch let declined as SkyStudioUploadRetry.Declined {
+                throw failed(.declined(status: declined.status), puts: puts, declined.detail, server: declined.server)
             }
         }
         try Task.checkCancellation()
@@ -206,34 +210,42 @@ struct SkyStudioAPI: Sendable {
     }
 
     /// `POST /uploads`: the signed address and the `file_url`. A transport error comes back classified (`Broken`, `Unreachable`);
-    /// Sky Studio's own refusals and odd answers pass as they are.
+    /// a refusal, an HTTP error or an answer without an address is `Declined` (Sky Studio's own refusal kept inside).
     private func uploadTicket(_ body: Data, key: String) async throws -> SkyStudioUploadTicket {
-        let answer = try await respond(request("uploads", key: key, method: "POST", body: body), retryable: true)
-        guard let ticket = SkyStudioUploadTicket(try Self.json(answer.data), received: Date(),
-                                                 serverDate: answer.response?.value(forHTTPHeaderField: "Date")) else {
-            throw SkyStudioFailure.badAnswer(status: 200)
+        let answer: (data: Data, response: HTTPURLResponse?)
+        do {
+            answer = try await respond(request("uploads", key: key, method: "POST", body: body), retryable: true)
+        } catch SkyStudioFailure.server(let refusal) {
+            throw SkyStudioUploadRetry.Declined(status: refusal.status, server: refusal, detail: refusal.code + ": " + refusal.message)
+        } catch SkyStudioFailure.badAnswer(let status) {
+            throw SkyStudioUploadRetry.Declined(status: status, server: nil, detail: "HTTP \(status)")
+        }
+        guard let json = try? JSONValue.decode(answer.data), let ticket = SkyStudioUploadTicket(json, received: Date(),
+              serverDate: answer.response?.value(forHTTPHeaderField: "Date")) else {
+            throw SkyStudioUploadRetry.Declined(status: answer.response?.statusCode ?? 200, server: nil, detail: "no upload address in the answer")
         }
         return ticket
     }
 
-    /// One PUT on a fresh task with fresh progress: `Broken` when the network broke it, `Unreachable` when the connection does not
-    /// work. Once the storage has answered (say a 403 whose body then stalled), that answer stands: success or `Refused`, never retried.
+    /// One PUT on a fresh task with fresh progress, never redirected (a signed address does not redirect; following would be a second
+    /// PUT): `Broken` when the network broke it, `Unreachable` when the connection does not work. Once the storage began to answer
+    /// (even only its head, which the system then holds back), that answer stands: success or `Refused`, never retried.
     private func put(_ file: URL, ticket: SkyStudioUploadTicket, onProgress: @escaping @Sendable (Double) -> Void) async throws {
         #if DEBUG
         // SRTFLOW_TEST_UPLOAD_DROPS (debug builds only): this try loses its connection after part of the body went out.
         if CloudUploadFault.claimDrop() {
-            let cut = CloudTransferDelegate(moveDestination: nil, onProgress: onProgress)
+            let cut = CloudTransferDelegate(moveDestination: nil, followsRedirects: false, onProgress: onProgress)
             try await transported(retryable: true) { try await CloudUploadFault.drop(ticket.request, file: file, session: session, delegate: cut) }
         }
         #endif
-        let delegate = CloudTransferDelegate(moveDestination: nil, onProgress: onProgress)
+        let delegate = CloudTransferDelegate(moveDestination: nil, followsRedirects: false, onProgress: onProgress)
         var request = ticket.request
         request.timeoutInterval = uploadRetry.putTimeout
         let task = session.uploadTask(with: request, fromFile: file)
         do {
             try await transfer(task, delegate: delegate, retryable: true)
-        } catch where !(error is CancellationError) && task.response is HTTPURLResponse {
-            // The storage answered before the error: the status below decides.
+        } catch where !(error is CancellationError) && (task.response is HTTPURLResponse || delegate.answerStarted) {
+            // The storage answered before the error: its status below decides (0 when only its head came and was held back).
         }
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
         guard (200..<300).contains(status) else { throw SkyStudioUploadRetry.Refused(status: status) }

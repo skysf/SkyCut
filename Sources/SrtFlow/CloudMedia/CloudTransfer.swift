@@ -36,11 +36,23 @@ final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionD
     private var moveError: Error?
     private var lastStep = -1
     private var continuation: CheckedContinuation<Void, Error>?
+    private let followsRedirects: Bool
+    private var answerBegan = false
 
     /// `moveDestination`：下载完挪到哪（上传传 nil）。`onProgress`：0…1，按 1% 一格。
-    init(moveDestination: URL?, onProgress: @escaping @Sendable (Double) -> Void) {
+    /// `followsRedirects`: false for an upload's PUT to a signed address (one never redirects; following would send a second PUT).
+    init(moveDestination: URL?, followsRedirects: Bool = true, onProgress: @escaping @Sendable (Double) -> Void) {
         self.moveDestination = moveDestination
+        self.followsRedirects = followsRedirects
         self.onProgress = onProgress
+    }
+
+    /// The server began to answer (its first bytes arrived), from the task's metrics. True even when the system held the answer back
+    /// (with only its head in, `task.response` stays nil while it waits for body bytes to sniff).
+    var answerStarted: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return answerBegan
     }
 
     /// 答复的正文（上传时是存储桶回的话；下载时正文进了文件，这里是空的）。
@@ -113,6 +125,21 @@ final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionD
             moveError = error
             lock.unlock()
         }
+    }
+
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(followsRedirects ? request : nil)
+    }
+
+    /// Delivered before `didCompleteWithError`.
+    func urlSession(_ session: URLSession, task: URLSessionTask, didFinishCollecting metrics: URLSessionTaskMetrics) {
+        let began = metrics.transactionMetrics.contains { $0.responseStartDate != nil }
+        lock.lock()
+        answerBegan = began
+        lock.unlock()
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
