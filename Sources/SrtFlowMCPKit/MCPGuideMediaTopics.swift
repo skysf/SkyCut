@@ -44,10 +44,11 @@ enum MCPGuideMediaTopics {
             MCPGuideSection(name: "inputs", about: "prompt, frames, references, characters, aspect ratio, resolution, model-specific fields", text: """
             Inputs. prompt drives the generators; camera_angle, upscale, remove_background and lipsync take no prompt. image_to_video uses \
             image as the first frame and optional last_image (frames mode); input_mode=multimodal uses the reference_images, \
-            reference_videos and reference_audio lists within the model's limits. SkyCut fits each reference image to the chosen model's \
-            published limits (get_status models=true: count, formats, bytes, pixels; fit_images) by converting, re-encoding or \
-            downscaling it, never upscaling; only too many images, an image too small or too narrow, or one it cannot convert (an \
-            animation) is refused, and the error states the limit. lipsync takes a local video and audio (MP3 or WAV; its \
+            reference_videos and reference_audio lists within the model's limits. Where a model's record says fit_images (get_status \
+            models=true lists count, formats, bytes and pixels), SkyCut fits each reference image to the strictest limits of the chosen \
+            model and, with no model named, the defaults after it (so a fallback can tighten them): converted, re-encoded or downscaled, \
+            never upscaled; an image-upscale source is never shrunk. Too many images, an image too small or too narrow, or an animation \
+            it cannot convert is refused, and the error states each model's limit. lipsync takes a local video and audio (MP3 or WAV; its \
             length is measured for the quote). character_id uses a Sky Studio character (list_characters; an id, never a file path) for \
             images and videos. character_roles picks views: without it the server chooses within the combined reference limits, and roles \
             you name are never dropped. A quote returns character_revision, which goes back unchanged; if the character's views change, \
