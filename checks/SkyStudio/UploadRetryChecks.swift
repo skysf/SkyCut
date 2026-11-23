@@ -146,7 +146,12 @@ private func runUploadFailureWordsChecks() {
     let refused = SkyStudioUploadFailure(fileName: "a.png", kind: .refused(status: 403), attempts: 1, lastError: "HTTP 403")
     check(refused.message.contains("refused the upload of a.png (HTTP 403)") && refused.code == "upload_refused",
           "a refusal: plain words, upload_refused")
-    for failure in [interrupted, unreachable, refused] {
+    let unread = SkyStudioUploadFailure(fileName: "a.png", kind: .refused(status: 0), attempts: 1, lastError: "HTTP 0")
+    check(unread.message.contains("did not come through") && unread.code == "upload_refused", "an answer whose status never came through")
+    let declined = SkyStudioUploadFailure(fileName: "a.png", kind: .declined(status: 413), attempts: 0, lastError: "HTTP 413")
+    check(declined.message.contains("did not accept the upload of a.png (HTTP 413)") && declined.code == "upload_declined",
+          "a /uploads refusal: plain words, upload_declined")
+    for failure in [interrupted, unreachable, refused, unread, declined] {
         let fields = failure.fields(retry: "call generate_media again.")
         let next = fields["next_step"]?.stringValue ?? ""
         check(fields["code"]?.stringValue == failure.code && fields["upload_attempts"] == .number(Double(failure.attempts))

@@ -5,8 +5,8 @@
 # **Not run on its own**: sky-studio-wiring.sh loads it with `source` (before its final gate) and shares fail / code_files_with / line_of.
 # The behaviour is pinned by scripts/check-sky-studio.sh (UploadRetryChecks / UploadAnswerChecks against a local server, and the
 # debug-only hook's checks); this section pins the wiring those checks cannot see:
-#   - the PUT exists once, in SkyStudioAPI.upload (and the debug-only hook), inside the retry loop; an answer the storage gave is
-#     read before the error that followed it; only the API builds `uploadFailed`;
+#   - the PUT exists once, in SkyStudioAPI.upload (and the debug-only hook), inside the retry loop, never redirected; an answer the
+#     storage began is read before the error that followed it; only the API builds `uploadFailed`;
 #   - every job that uploads tells the user the localized line (SkyStudioUploadWords) and the AI the code and the PUT count
 #     (SkyStudioUploadFailure.fields): generation, upscale, voice change, the voice library (界面 and manage_voices), characters, the
 #     official film's references (whose row keeps the line);
@@ -45,8 +45,10 @@ if [ -z "${loop_line}" ] || [ -z "${put_line}" ] || [ "${loop_line}" -ge "${put_
   fail "${UPLOAD_API}: the PUT must run inside upload's retry loop"
 fi
 grep -qF 'try await transfer(task, delegate: delegate, retryable: true)' "${UPLOAD_API}" \
-  && grep -qF '} catch where !(error is CancellationError) && task.response is HTTPURLResponse {' "${UPLOAD_API}" \
-  || fail "${UPLOAD_API}: a PUT the storage answered must be judged by that answer, never tried again for the error that followed"
+  && grep -qF '} catch where !(error is CancellationError) && (task.response is HTTPURLResponse || delegate.answerStarted) {' "${UPLOAD_API}" \
+  || fail "${UPLOAD_API}: a PUT the storage began to answer must be judged by that answer, never tried again for the error that followed"
+[ "$(grep -cF 'CloudTransferDelegate(moveDestination: nil, followsRedirects: false, onProgress: onProgress)' "${UPLOAD_API}")" -eq 2 ] \
+  || fail "${UPLOAD_API}: a PUT to a signed address never follows a redirect (one try is one PUT), the drop hook's included"
 others="$(code_files_with '\.uploadFailed\(SkyStudioUploadFailure\(' | grep -v "^${UPLOAD_API}\$" || true)"
 [ -z "${others}" ] || fail "these files build an upload failure: $(tr '\n' ' ' <<<"${others}")— only SkyStudioAPI.upload, when it gives up"
 
@@ -56,10 +58,12 @@ grep -qF 'self.status.issue = uploadFailure.map(SkyStudioUploadWords.shown) ?? m
   || fail "${UPLOAD_RUN}: the task row must show the localized upload line, not the English message"
 generic_line="$(line_of 'payload["next_step"] = .string("Query this original job with get_job' "${UPLOAD_RUN}")"
 unsent_line="$(line_of 'if status != .done, !requestSent {' "${UPLOAD_RUN}")"
+unsent_step_line="$(line_of 'payload["next_step"] = .string("Nothing was submitted to Sky Studio and nothing was charged, so there is no original job to query.' "${UPLOAD_RUN}")"
 merge_line="$(line_of 'payload.merge(uploadFailure.fields(retry:' "${UPLOAD_RUN}")"
-if [ -z "${generic_line}" ] || [ -z "${unsent_line}" ] || [ -z "${merge_line}" ] \
-   || [ "${unsent_line}" -le "${generic_line}" ] || [ "${merge_line}" -le "${unsent_line}" ]; then
-  fail "${UPLOAD_RUN}: an unsubmitted job's next step, then the upload fields, must come after the generic 'query this original job'"
+if [ -z "${generic_line}" ] || [ -z "${unsent_line}" ] || [ -z "${unsent_step_line}" ] || [ -z "${merge_line}" ] \
+   || [ "${unsent_line}" -le "${generic_line}" ] || [ "${unsent_step_line}" -ne "$((unsent_line + 1))" ] \
+   || [ "${merge_line}" -le "${unsent_step_line}" ]; then
+  fail "${UPLOAD_RUN}: an unsubmitted job's next step (set right inside its if), then the upload fields, must come after the generic 'query this original job'"
 fi
 grep -qF 'uploadFailure.map(SkyStudioUploadWords.shown) ?? SkyStudioJobError.request(failure).message' "${UPLOAD_UPSCALE_JOB}" \
   || fail "${UPLOAD_UPSCALE_JOB}: the upscale's failed state must hold the localized upload line"

@@ -225,10 +225,10 @@ private func runTransferChecks() async {
         check(false, "a refused PUT fails")
     }
     SkyStudioStub.reset { _ in .http(200, #"{"method": "PUT"}"#) }
-    if case .badAnswer? = await expectFailure("/uploads without addresses", {
+    if case .uploadFailed(let failure)? = await expectFailure("/uploads without addresses", {
         _ = try await api.upload(fileURL: clip, contentType: "video/mp4", purpose: "video", key: jobKey)
-    }) {} else {
-        check(false, "/uploads without upload_url / file_url is not an answer")
+    }), case .declined = failure.kind {} else {
+        check(false, "/uploads without upload_url / file_url is not an answer: the upload is declined")
     }
 
     // 2. 下载成品：不带 Key、文件原样、进度到 1；404 时目的地上什么都不留。

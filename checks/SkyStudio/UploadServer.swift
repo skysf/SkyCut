@@ -13,10 +13,16 @@ import Foundation
 final class UploadServer: @unchecked Sendable {
     /// `…ThenStall` / `…ThenReset`: the answer's head and 1 KB of its body go out, then the connection hangs (the client times out) or
     /// is reset.
-    enum PutReply: Sendable { case drop, reset, ok, forbidden, hold, forbiddenThenStall, forbiddenThenReset, okThenStall, okThenReset }
+    /// `forbiddenHeadersThenStall`: only the head goes out (its declared body never comes).
+    enum PutReply: Sendable {
+        case drop, reset, ok, forbidden, hold, forbiddenThenStall, forbiddenHeadersThenStall, forbiddenThenReset, okThenStall, okThenReset
+        /// A redirect (307 / 308) to another address on this server.
+        case redirect(Int)
+    }
     /// What a `POST …/uploads` gets: a ticket (`life`: seconds from the answer's `Date` to `expires_at`, nil = no `expires_at`; `tls`:
     /// the signed address is https, which this plain server cannot speak), or the connection dropped after the request.
-    enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop }
+    /// `status`: an HTTP error with a plain body; `refusal`: Sky Studio's own error answer; `noAddress`: a 200 without `upload_url`.
+    enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop, status(Int), refusal(Int, code: String), noAddress }
 
     struct Seen: Sendable {
         let method: String
@@ -161,6 +167,13 @@ final class UploadServer: @unchecked Sendable {
                 respond(client, status: "200 OK", body: body, extra: ["Date: " + Self.httpDate(ticket.date), "Content-Type: application/json"])
             case .drop:
                 close(client)
+            case .status(let status):
+                respond(client, status: "\(status) Error", body: "<html>Request Entity Too Large</html>", extra: ["Content-Type: text/html"])
+            case .refusal(let status, let code):
+                respond(client, status: "\(status) Error", body: "{\"error\": {\"code\": \"\(code)\", \"message\": \"Refused by the test server.\"}}",
+                        extra: ["Content-Type: application/json"])
+            case .noAddress:
+                respond(client, status: "200 OK", body: "{\"method\": \"PUT\"}", extra: ["Content-Type: application/json"])
             }
             return
         }
@@ -175,6 +188,9 @@ final class UploadServer: @unchecked Sendable {
             respond(client, status: "403 Forbidden", body: "<Error><Code>AccessDenied</Code></Error>", extra: ["Content-Type: application/xml"])
         case .hold?:
             hold(client)
+        case .forbiddenHeadersThenStall?:
+            begin(client, status: "403 Forbidden", declaredLength: 65_536, bodyBytes: 0)
+            hold(client)
         case .forbiddenThenStall?:
             begin(client, status: "403 Forbidden", declaredLength: 65_536)
             hold(client)
@@ -185,6 +201,8 @@ final class UploadServer: @unchecked Sendable {
         case .okThenStall?:
             begin(client, status: "200 OK", declaredLength: 65_536)
             hold(client)
+        case .redirect(let code)?:
+            respond(client, status: "\(code) Redirect", body: "", extra: ["Location: http://127.0.0.1:\(port)/r2/moved"])
         case .okThenReset?:
             begin(client, status: "200 OK", declaredLength: 65_536)
             usleep(200_000)
@@ -214,9 +232,9 @@ final class UploadServer: @unchecked Sendable {
     }
 
     /// An answer that starts: its head (declaring `declaredLength`) and 1 KB of body, with the connection left open.
-    private func begin(_ client: Int32, status: String, declaredLength: Int) {
+    private func begin(_ client: Int32, status: String, declaredLength: Int, bodyBytes: Int = 1_024) {
         let head = "HTTP/1.1 \(status)\r\nContent-Length: \(declaredLength)\r\nContent-Type: application/xml\r\nConnection: close\r\n\r\n"
-        write(client, Data(head.utf8) + Data(repeating: 0x78, count: 1_024))
+        write(client, Data(head.utf8) + Data(repeating: 0x78, count: bodyBytes))
     }
 
     /// An abortive close: the client sees the connection reset.

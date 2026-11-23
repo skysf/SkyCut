@@ -28,6 +28,14 @@ func drops(_ value: String?) {
 
 func puts(_ server: UploadServer) -> [UploadServer.Seen] { server.log.filter { $0.method == "PUT" } }
 
+/// CPU seconds this process has used (user + system).
+func cpuSeconds() -> Double {
+    var usage = rusage()
+    getrusage(RUSAGE_SELF, &usage)
+    func seconds(_ time: timeval) -> Double { Double(time.tv_sec) + Double(time.tv_usec) / 1_000_000 }
+    return seconds(usage.ru_utime) + seconds(usage.ru_stime)
+}
+
 let folder = FileManager.default.temporaryDirectory.appendingPathComponent("skystudio-upload-fault-\(UUID().uuidString)")
 try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
 let file = folder.appendingPathComponent("reference.png")
@@ -71,6 +79,16 @@ do {
           "no cut try arrived whole, none sent more than its part: \(cut.map { ($0.bodyBytes, $0.complete) })")
     let after = try? await api(server).upload(fileURL: file, contentType: "image/png", purpose: "image", key: key)
     checkEqual(after?.absoluteString, server.fileURL(2), "after the N drops, uploads work again")
+
+    // A dropped try whose connection fails before any of the body went out (its TLS fails on this plain server): the hook ends at
+    // once and its watcher stops instead of spinning until its 5 s deadline (it once burned about a CPU second each second).
+    drops("1")
+    server.configure(puts: [.ok], tickets: [.ticket(life: 900, tls: true)])
+    _ = try? await api(server).upload(fileURL: file, contentType: "image/png", purpose: "image", key: key)
+    let before = cpuSeconds()
+    try? await Task.sleep(nanoseconds: 1_000_000_000)
+    let spent = cpuSeconds() - before
+    check(spent < 0.3, "after a drop that failed before the body, nothing spins: \(String(format: "%.2f", spent)) CPU s in 1 s")
 
     // Unset, zero or garbage: nothing is dropped.
     for value in [nil, "", "0", "abc", "-2"] as [String?] {

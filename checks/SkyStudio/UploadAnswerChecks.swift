@@ -1,11 +1,12 @@
 import Foundation
 import SrtFlowMCPKit
 
-// Uploads to Sky Studio's storage, the cases that must not be tried again and the signed address (2026-11-23, PR #549 and its review):
-// an answer the storage gave stands, even when its body then broke or stalled (a 403 is refused after one PUT; a 200 is success); a
-// TLS failure, a cancel and a stop during the pause end the upload; the address is renewed when it would run out or its validity is unknown,
-// a renewal the network broke costs a try but is not counted as a PUT, and a renewal whose connection does not work ends the upload.
-// Same local server and helpers as UploadRetryChecks.
+// Uploads to Sky Studio's storage, the cases that must not be tried again and the signed address (2026-11-23, PR #549 and its two
+// reviews): an answer the storage began stands, even when its body then broke or stalled, and even when only its head came (a 403 is
+// refused after one PUT; a 200 is success); a redirect is not followed (one try is one PUT); a TLS failure, a cancel and a stop during
+// the pause end the upload; a `/uploads` refusal or an answer without an address is declined (Sky Studio's own refusal kept); the
+// address is renewed when it would run out or its validity is unknown, a renewal the network broke costs a try but is not counted as a
+// PUT, and a renewal whose connection does not work ends the upload. Same local server and helpers as UploadRetryChecks.
 
 func runUploadAnswerChecks(_ server: UploadServer, file: URL) async {
     // The review's case: a 403 whose body then stalled until the PUT timed out (here after 1.5 s) was tried again and the second
@@ -23,6 +24,52 @@ func runUploadAnswerChecks(_ server: UploadServer, file: URL) async {
         checkEqual(refused?.attempts, 1, "\(what): one PUT")
         checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "\(what) is never tried again")
         checkEqual(events.pauses, [], "\(what): no pause")
+    }
+
+    // Only the head of a 403 came, and its body never: the system holds such an answer back (task.response stays nil, waiting for body
+    // bytes), so the answer is known from the task's metrics. It is refused (status unknown) after one PUT, never tried again.
+    server.configure(puts: [.forbiddenHeadersThenStall, .ok])
+    let headEvents = UploadEvents()
+    let headOnly = await uploadFailure("a 403 whose head came and whose body never did") {
+        _ = try await uploadAPI(server, events: headEvents, putTimeout: 1.5).upload(fileURL: file, contentType: "image/png", purpose: "image",
+                                                                                   key: jobKey)
+    }
+    checkEqual(headOnly?.kind, .refused(status: 0), "a head without a body: refused, its status unread")
+    checkEqual(headOnly?.attempts, 1, "a head without a body: one PUT")
+    checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "a head without a body is never tried again")
+    checkEqual(headEvents.pauses, [], "a head without a body: no pause")
+    check(headOnly?.message.contains("did not come through") == true, "the words say the answer did not come through")
+
+    // A redirect is never followed: one try is one PUT, and upload_attempts says so.
+    for code in [307, 308] {
+        server.configure(puts: [.redirect(code), .ok])
+        let redirected = await uploadFailure("a \(code) redirect") {
+            _ = try await uploadAPI(server, events: UploadEvents()).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey)
+        }
+        checkEqual(redirected?.kind, .refused(status: code), "a \(code): refused, not followed")
+        checkEqual(redirected?.attempts, 1, "a \(code): one PUT")
+        checkEqual(server.log.filter { $0.method == "PUT" }.count, 1, "a \(code): no second PUT to the new address")
+    }
+
+    // `/uploads` refused or answered without an address: declined, before any PUT, with Sky Studio's own refusal kept.
+    for (reply, what, status) in [(UploadServer.TicketReply.status(413), "a 413 from /uploads", 413),
+                                  (.noAddress, "a /uploads answer without an address", 200),
+                                  (.refusal(503, code: "voice_library_unavailable"), "Sky Studio's own refusal", 503)] {
+        server.configure(puts: [.ok], tickets: [reply])
+        var thrown: Error?
+        let declined = await uploadFailure(what) {
+            do { _ = try await uploadAPI(server, events: UploadEvents()).upload(fileURL: file, contentType: "image/png", purpose: "image", key: jobKey) }
+            catch { thrown = error; throw error }
+        }
+        checkEqual(declined?.kind, .declined(status: status), "\(what): declined, with its status")
+        checkEqual(declined?.code, "upload_declined", "\(what): upload_declined")
+        checkEqual(declined?.attempts, 0, "\(what): no PUT")
+        check(!server.log.contains { $0.method == "PUT" }, "\(what): nothing was sent to the storage")
+        if case .refusal = reply {
+            checkEqual(declined?.server?.code, "voice_library_unavailable", "Sky Studio's refusal is kept")
+            checkEqual(declined?.fields(retry: "x")["server_code"], "voice_library_unavailable", "and its code reaches the AI")
+            checkEqual(thrown.flatMap(SkyStudioVoiceLibraryErrors.kind), .unavailable, "the voice library still names it")
+        }
     }
 
     for (reply, what) in [(UploadServer.PutReply.okThenStall, "a 200 whose body then stalled into a timeout"),
