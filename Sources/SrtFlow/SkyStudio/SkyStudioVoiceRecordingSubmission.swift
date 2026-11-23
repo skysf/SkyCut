@@ -83,7 +83,7 @@ struct SkyStudioVoiceRecordingSubmission: Sendable {
         let source = SkyStudioVoiceReferenceSource(fileName: file.lastPathComponent, startSeconds: sample.sourceStart,
                                                    endSeconds: sample.sourceEnd, autoSelected: sample.autoSelected)
         let link = try await api.upload(fileURL: sample.url, contentType: VoiceReferenceSample.contentType,
-                                        purpose: VoiceReferenceSample.uploadPurpose, key: key)
+                                        purpose: VoiceReferenceSample.uploadPurpose, key: key, named: file.lastPathComponent)
         let voice: SkyStudioVoice
         switch target {
         case .create(let name):

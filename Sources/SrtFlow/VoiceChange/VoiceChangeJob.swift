@@ -95,6 +95,11 @@ final class VoiceChangeJob {
             // 传的时候、交上之前出的错：一分没花。
             if serverID == nil { held.refund() }
             let stopped = Task.isCancelled || error is CancellationError
+            // A refusal the voice library knows (unavailable, too large…) keeps its own words below.
+            if !stopped, SkyStudioVoiceLibraryErrors.kind(error) == nil, let failure = SkyStudioUploadFailure.from(error) {
+                return finish(.failed, failure.message, detail: failure.fields(retry: "call change_voice again."),
+                              shown: SkyStudioUploadWords.shown(failure))
+            }
             return finish(stopped ? .cancelled : .failed, stopped && serverID == nil
                 ? "The voice change was stopped before Sky Studio accepted it; nothing was charged."
                 : SkyStudioVoiceLibraryErrors.uncharged(error))
@@ -153,7 +158,8 @@ final class VoiceChangeJob {
         }
         report(.uploading(fraction: nil))
         let link = try await services.api.upload(
-            fileURL: source.url, contentType: VoiceChangeSource.contentType, purpose: SkyStudioVoiceUpload.conversionSourcePurpose, key: key
+            fileURL: source.url, contentType: VoiceChangeSource.contentType, purpose: SkyStudioVoiceUpload.conversionSourcePurpose, key: key,
+            named: clipName
         ) { fraction in report(.uploading(fraction: CloudJobPhase.quantized(fraction))) }
         var request = draft
         request.inputs["source_audio_url"] = link.absoluteString

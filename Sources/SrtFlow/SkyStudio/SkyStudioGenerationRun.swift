@@ -52,6 +52,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private var deliveryStatus: String?
     private var remoteResult: SkyStudioJobResult?
     private var savedOriginal: URL?
+    /// A reference's upload did not happen (interrupted, could not connect, refused): nothing was submitted (the task row and get_job
+    /// say so).
+    private var uploadFailure: SkyStudioUploadFailure?
 
     private func settle(_ value: SkyStudioBilling) {
         billing = value
@@ -275,6 +278,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             await recordRejection(SkyStudioJobError.request(failure))
             if !requestSent { held?.refund() }
             creditsUnconfirmed = requestSent && !serverFinished && lastFailure?.creditsReturned != true
+            uploadFailure = SkyStudioUploadFailure.from(failure)
             finish(.failed, SkyStudioJobError.request(failure).message)
         } catch {
             await recordRejection()
@@ -397,7 +401,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
     private func finish(_ status: AIJobs.Status, _ message: String, detail: JSONValue? = nil) {
         guard let job else { return }
         if status == .failed || creditsUnconfirmed {
-            self.status.issue = message
+            self.status.issue = uploadFailure.map(SkyStudioUploadWords.shown) ?? message
         }
         var payload = detail?.objectValue ?? [:]
         payload.merge(SkyStudioGenerationDuration.fields(for: generation, result: remoteResult)) { _, current in current }
@@ -425,12 +429,20 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if status != .done {
             payload["next_step"] = .string("Query this original job with get_job and preserve idempotency_key. Unknown or delivery failures must recover the original operation, never regenerate. A terminal generation failure with confirmed refund/no-charge evidence may use a new operation under the current approval mode and hard budget. " + SkyStudioBilling.policyMessage)
         }
+        // Nothing left this Mac (an upload, the key, a frame, a check before submitting): there is no original job to query.
+        if status != .done, !requestSent {
+            payload["next_step"] = .string("Nothing was submitted to Sky Studio and nothing was charged, so there is no original job to query. Tell the user what stopped it (message); once that is fixed, call generate_media again without idempotency_key or with a new one (this one stays bound to this failed job).")
+        }
         if let code = lastFailure?.code, code.hasPrefix("character_") || code == "price_changed" || code == "not_found" {
             payload["next_step"] = .string(SkyStudioCharacterError.nextStep(code))
         }
         if lastFailure?.code == "insufficient_credits" {
             payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."
+        }
+        // Last, over the generic next step: an upload that did not happen was never submitted, so there is no original job to query.
+        if let uploadFailure {
+            payload.merge(uploadFailure.fields(retry: "call generate_media again without idempotency_key or with a new one (this one stays bound to this failed job).")) { _, upload in upload }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(payload))
     }

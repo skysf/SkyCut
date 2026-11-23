@@ -1558,6 +1558,13 @@
 "Changed to the voice “%@”. The original sound is muted; press ⌘Z to undo." = "已换成「%@」的声音，原声已静音，⌘Z 撤回。";
 "The voice was changed, but the clip was edited meanwhile; the two audio files were saved next to the original and nothing on the timeline was changed." = "声音换好了，可这一段在这期间被改过：两个音频文件存在原素材旁边，时间线没有动。";
 "Changing the voice of “%@” did not finish. %@" = "「%@」的变声没做成。%@";
+"The upload of “%1$@” was interrupted by the network after %2$d tries. Nothing was charged. Check your network connection and try again." = "上传「%1$@」时网络中断，已试 %2$d 次。没有扣积分。请检查网络连接后再试。";
+"The upload of “%@” was interrupted by the network. Nothing was charged. Check your network connection and try again." = "上传「%@」时网络中断。没有扣积分。请检查网络连接后再试。";
+"The upload of “%@” could not connect. Nothing was charged. Check your network connection and try again." = "上传「%@」时无法建立连接。没有扣积分。请检查网络连接后再试。";
+"Sky Studio's storage refused the upload of “%1$@” (HTTP %2$d). Nothing was charged. Try again later." = "Sky Studio 的存储拒绝了「%1$@」的上传（HTTP %2$d）。没有扣积分。请稍后再试。";
+"Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later." = "Sky Studio 的存储回应了「%@」的上传，但回应没能传回来。没有扣积分。请稍后再试。";
+"Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later." = "Sky Studio 没有接受「%@」的上传。没有扣积分。请稍后再试。";
+"“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file." = "「%@」太大了，Sky Studio 不接收。没有扣积分。请换一个小一些的文件。";
 "This clip has no sound to change." = "这一段没有声音，变不了声。";
 "This clip is muted. Unmute it first, then change its voice." = "这一段静音了。先取消静音，再变声。";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "这一段用了素材的 %1$@；变声一次最长 %2$@。先把它分割开，再一段一段变。";

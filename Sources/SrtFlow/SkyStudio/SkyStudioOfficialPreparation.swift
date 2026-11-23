@@ -68,8 +68,13 @@ enum SkyStudioOfficialPreparation {
                 let cancelled = error is CancellationError
                 let message = (error as? AIToolError)?.message ?? (error as? SkyStudioFilmError)?.localizedDescription
                     ?? (error as? SkyStudioFailure).map { SkyStudioJobError.request($0).message } ?? error.localizedDescription
-                AIJobs.shared.finish(job, cancelled ? .cancelled : .failed, message: message,
-                    detail: ["charged": false, "generation_started": false, "idempotency_key": .string(operationKey)])
+                var detail: [String: JSONValue] = ["charged": false, "generation_started": false, "idempotency_key": .string(operationKey)]
+                if let failure = SkyStudioUploadFailure.from(error) {
+                    // The row stays with the user's localized line (a row with an issue is not taken away), get_job has the rest.
+                    status.issue = SkyStudioUploadWords.shown(failure)
+                    detail.merge(failure.fields(retry: "repeat the same generate_media call with a new idempotency_key.")) { _, upload in upload }
+                }
+                AIJobs.shared.finish(job, cancelled ? .cancelled : .failed, message: message, detail: .object(detail))
             }
         }
         return .ok(["status": "preparing_references", "job_id": .string(job.id), "idempotency_key": .string(operationKey), "charged": false,
