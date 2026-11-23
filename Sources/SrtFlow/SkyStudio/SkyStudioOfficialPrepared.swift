@@ -70,7 +70,7 @@ final class SkyStudioOfficialPrepared {
             throw AIToolError("prepared_references is missing, expired or from an earlier App run. Prepare original references again; no generation was started.")
         }
         guard found.scope == scope, found.sources == sources else {
-            throw AIToolError("The prepared references belong to different files, roles, order, account or project. Prepare this exact image set again; no generation was started.")
+            throw AIToolError("The prepared references belong to different files, roles, order, image limits, account or project. Prepare this exact image set again; no generation was started.")
         }
         return found
     }

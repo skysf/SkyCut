@@ -33,6 +33,18 @@ enum SkyStudioModelPolicy {
         return ordered(kind: kind, imageContext: imageContext, quality: quality).compactMap { id in offered.first { $0.id == id } }.first(where: accepts)
     }
 
+    /// The models a request's reference images may still go to: the chosen one and, when SkyCut picked it (no model named, an
+    /// ordinary generation), the models after it in the automatic order that take the same request. SkyCut fits each image to the
+    /// strictest of them (SkyStudioReferenceFit.strictest), so the same upload suits a later call on the next default.
+    static func chain(catalog: SkyStudioCatalog, kind: String, requested: String?, imageContext: String = "other", quality: String = "standard",
+                      chosen: SkyStudioModel, accepts: (SkyStudioModel) -> Bool = { _ in true }) -> [SkyStudioModel] {
+        guard requested == nil, chosen.operation == "generate" else { return [chosen] }
+        let offered = catalog.models(kind: kind)
+        let order = ordered(kind: kind, imageContext: imageContext, quality: quality).compactMap { id in offered.first { $0.id == id } }
+        guard let start = order.firstIndex(where: { $0.id == chosen.id }) else { return [chosen] }
+        return [chosen] + order[(start + 1)...].filter(accepts)
+    }
+
     static func problem(model: SkyStudioModel, ask: SkyStudioGeneration.Ask, references: SkyStudioReferencePlan) -> String? {
         if let problem = references.problem(model: model) { return problem }
         if let problem = SkyStudioMusicLength.problem(model: model, ask: ask) { return problem }

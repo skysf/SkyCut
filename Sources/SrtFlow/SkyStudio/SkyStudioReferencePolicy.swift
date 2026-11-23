@@ -26,6 +26,8 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
     var character: SkyStudioCharacterReference? = nil
     var characterImageCount = 0
     var characterAssets: SkyStudioCharacterAssets? = nil
+    /// The strictest published limits of the chosen model and its fallbacks; nil: upload as before (SkyStudioReferenceFit).
+    var fit: SkyStudioReferenceFit? = nil
     var uploads: Bool { !files.isEmpty }
     var firstFrame: URL? { files.first { $0.role == "first_frame" }?.file }
     var videoSeconds: Double { files.filter { $0.type == "video" }.reduce(0) { $0 + ($1.duration ?? 0) } }
@@ -65,10 +67,16 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
             return "\(model.title) requires an image or video together with audio references."
         }
         let tolerance = limits["duration_tolerance_seconds"]?.doubleValue ?? 0
+        // A model that publishes fit_images takes any image SkyCut can fit to it: only what fitting cannot fix is refused here.
+        let fitting = SkyStudioReferenceFit(model: model, mode: mode)
         for file in files {
             if file.bytes <= 0 { return "Reference file is empty." }
+            let fitted = fitting != nil && file.type == "image"
+            if fitted, case .refuse(let message)? = fitting?.decide(file) { return message }
             let mimes = limits["\(file.type)_mime_types"]?.arrayValue?.compactMap(\.stringValue) ?? []
-            if !mimes.isEmpty, let mime = file.contentType, !mimes.contains(mime) { return "\(file.file.lastPathComponent) has an unsupported format for \(model.title): \(mime)." }
+            if !fitted, !mimes.isEmpty, let mime = file.contentType, !mimes.contains(mime) {
+                return "\(file.file.lastPathComponent) has an unsupported format for \(model.title): \(mime) (accepted: \(mimes.joined(separator: ", ")))."
+            }
             if file.type == "document" {
                 let extensions = limits["document_extensions"]?.arrayValue?.compactMap(\.stringValue) ?? []
                 if extensions.isEmpty || !extensions.contains(file.file.pathExtension.lowercased()) { return "This document format is not offered by the model." }
@@ -77,9 +85,9 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
             if file.type == "image" {
                 if limits["transparent_images"] == false && file.hasTransparency { return "\(model.title) does not accept transparent images." }
                 if limits["still_images_only"] == true && file.imageCount != 1 { return "This model accepts still images only." }
-                if let width = file.width, let height = file.height, let max = limits["max_image_pixels"]?.doubleValue, width * height > max { return "Image exceeds \(Int(max)) pixels." }
+                if !fitted, let width = file.width, let height = file.height, let max = limits["max_image_pixels"]?.doubleValue, width * height > max { return "Image exceeds \(Int(max)) pixels." }
             }
-            if let max = limits["max_\(file.type)_bytes"]?.doubleValue, file.bytes > max { return "\(file.file.lastPathComponent) exceeds \(model.title)'s \(file.type) size limit (\(Int(max)) bytes)." }
+            if !fitted, let max = limits["max_\(file.type)_bytes"]?.doubleValue, file.bytes > max { return "\(file.file.lastPathComponent) exceeds \(model.title)'s \(file.type) size limit (\(Int(max)) bytes)." }
             if let seconds = file.duration {
                 if let min = (limits["min_\(file.type)_clip_seconds"] ?? limits["min_\(file.type)_seconds"])?.doubleValue, seconds < min { return "\(file.file.lastPathComponent) must be at least \(min) seconds for \(model.title)." }
                 if let max = (limits["max_\(file.type)_clip_seconds"] ?? limits["max_\(file.type)_seconds"])?.doubleValue, seconds > max + tolerance { return "\(file.file.lastPathComponent) exceeds \(model.title)'s \(max)-second reference limit." }
@@ -87,7 +95,7 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
             if let width = file.width, let height = file.height, height > 0 {
                 let dimensions = limits["\(file.type)_dimensions"] ?? limits["media_dimensions"]
                 if let minSide = dimensions?["min_side"]?.doubleValue, min(width, height) < minSide { return "\(file.file.lastPathComponent) is too small for \(model.title)." }
-                if let maxSide = dimensions?["max_side"]?.doubleValue, max(width, height) > maxSide { return "\(file.file.lastPathComponent) is too large for \(model.title)." }
+                if !fitted, let maxSide = dimensions?["max_side"]?.doubleValue, max(width, height) > maxSide { return "\(file.file.lastPathComponent) is too large for \(model.title)." }
                 let ratio = width / height
                 let exclusive = file.type == "image" && limits["media_aspect_ratio"]?["image_bounds_exclusive"]?.boolValue == true
                 if let low = limits["media_aspect_ratio"]?["min"]?.doubleValue, exclusive ? ratio <= low : ratio < low { return "\(file.file.lastPathComponent) is too tall for \(model.title)." }

@@ -95,17 +95,22 @@ enum SkyStudioOfficialGenerateTool {
         let requested = try args.string("model")
         let imageContext = try args.choice("image_context", from: ["asian", "other"]) ?? "other"
         let quality = try args.choice("quality", from: ["standard", "highest"]) ?? "standard"
+        let measured = references
+        let accepts: (SkyStudioModel) -> Bool = { candidate in
+            let plan = SkyStudioCharacterGeneration.references(measured, model: candidate, explicitMode: explicitMode)
+            return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil
+                && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
+        }
         guard let model = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
-            accepts: { candidate in
-                let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
-                return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil
-                    && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
-            }) else {
+            accepts: accepts) else {
             throw AIToolError("No offered model accepts this complete official shot request. Read get_status models=true; references and duration will not be dropped to make it fit.")
         }
         if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }
         references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
         references = try await SkyStudioCharacterFilm.resolve(references, model: model, key: key)
+        // Fitted to the strictest limits of the model and its fallbacks; part of the prepared references' identity (sources).
+        references.fit = SkyStudioReferenceFit.strictest(SkyStudioModelPolicy.chain(catalog: catalog, kind: kind.rawValue, requested: requested,
+            imageContext: imageContext, quality: quality, chosen: model, accepts: accepts), mode: references.mode)
         let canvas = project.renderSize
         var generation = SkyStudioGeneration.make(kind, prompt: prompt, ask: ask, canvas: canvas.width / max(canvas.height, 1),
             frame: references.firstFrame.flatMap(SkyStudioGenerationFrame.aspect(of:)), model: model, inputMode: references.mode, references: references)

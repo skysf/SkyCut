@@ -10,6 +10,8 @@ enum SkyStudioOfficialPreparation {
             ["role": .string(file.role), "type": .string(file.type), "file": try SkyStudioApproval.file(file.file)]
         }
         if let assets = plan.characterAssets { sources.append(["character": assets.json]) }
+        // Images fitted for other limits are other uploads: a token prepared under them is not reused (reference-image-fitting.md).
+        if let fit = plan.fit, plan.files.contains(where: { $0.type == "image" }) { sources.append(["fit": fit.json]) }
         return .array(sources)
     }
 
