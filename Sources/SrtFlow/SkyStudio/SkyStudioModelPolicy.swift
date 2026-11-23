@@ -45,6 +45,18 @@ enum SkyStudioModelPolicy {
         return [chosen] + order[(start + 1)...].filter(accepts)
     }
 
+    /// When no offered model takes a request: every candidate for its operation with its own reason (which names the limit),
+    /// in the order SkyCut tries them, so "too many images" says how many each model takes.
+    static func refusal(catalog: SkyStudioCatalog, kind: String, operation: String, imageContext: String = "other", quality: String = "standard",
+                        reason: (SkyStudioModel) -> String?) -> String {
+        let offered = catalog.models(kind: kind).filter { $0.operation == operation }
+        let order = ordered(kind: kind, imageContext: imageContext, quality: quality)
+        let tried = offered.sorted { (order.firstIndex(of: $0.id) ?? order.count) < (order.firstIndex(of: $1.id) ?? order.count) }
+        let reasons = tried.compactMap { model in reason(model).map { "\(model.id): \($0)" } }
+        return "No offered model accepts the complete request. " + reasons.joined(separator: " ")
+            + " Read get_status models=true for model ids, modes and reference limits."
+    }
+
     static func problem(model: SkyStudioModel, ask: SkyStudioGeneration.Ask, references: SkyStudioReferencePlan) -> String? {
         if let problem = references.problem(model: model) { return problem }
         if let problem = SkyStudioMusicLength.problem(model: model, ask: ask) { return problem }

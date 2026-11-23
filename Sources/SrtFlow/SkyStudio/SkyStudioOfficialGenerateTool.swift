@@ -96,14 +96,17 @@ enum SkyStudioOfficialGenerateTool {
         let imageContext = try args.choice("image_context", from: ["asian", "other"]) ?? "other"
         let quality = try args.choice("quality", from: ["standard", "highest"]) ?? "standard"
         let measured = references
-        let accepts: (SkyStudioModel) -> Bool = { candidate in
+        let reason: (SkyStudioModel) -> String? = { candidate in
             let plan = SkyStudioCharacterGeneration.references(measured, model: candidate, explicitMode: explicitMode)
-            return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil
-                && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
+            return SkyStudioCharacterGeneration.problem(plan, model: candidate) ?? SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan)
+                ?? SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan)
         }
+        let accepts: (SkyStudioModel) -> Bool = { reason($0) == nil }
         guard let model = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
             accepts: accepts) else {
-            throw AIToolError("No offered model accepts this complete official shot request. Read get_status models=true; references and duration will not be dropped to make it fit.")
+            let named = requested.flatMap { catalog.model($0, kind: kind.rawValue) }.flatMap(reason)
+            throw AIToolError((named ?? SkyStudioModelPolicy.refusal(catalog: catalog, kind: kind.rawValue, operation: ask.operation, imageContext: imageContext,
+                quality: quality, reason: reason)) + " References and duration are never dropped to make it fit.")
         }
         if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }
         references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
