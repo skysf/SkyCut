@@ -44,6 +44,8 @@ func catalogKnownNames() -> Set<String> {
     names.formUnion(["minimum_duration", "requested_duration", "duration_warning", "duration_note"])
     // Sky Studio's delivered-length source and a generated video's audio block (2026-11-19, MCP-9 / MCP-42; SkyStudioVideoSound).
     names.formUnion(["duration_source", "has_track", "can_turn_off", "may_carry_bed"])
+    // The reference limits generate_media's guide points at (get_status models=true; 2026-11-23, reference-image-fitting.md).
+    names.insert("fit_images")
     // 试点迁移的工具主题提到的结果字段（2026-11-10）：edit_limits 里的 image_source_duration（AIEditLimits）、look shots / transcribe
     // 读不完时的 next_from（AILookShots、AITranscriptFormat）、look text_scan 带 clip_id 时的 subtitle_overlaps（AISubtitleOverlaps）。
     names.formUnion(["image_source_duration", "next_from", "subtitle_overlaps"])
