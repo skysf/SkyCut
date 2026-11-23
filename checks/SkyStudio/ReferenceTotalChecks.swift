@@ -172,9 +172,19 @@ private func runReferenceTotalImageChecks() async {
     let tight = fixture.write(fixture.picture(500, 400, noise: true), "tight.png", type: .png)
     let wide = fixture.write(fixture.picture(1600, 1200, noise: true), "wide.jpg", type: .jpeg)
     let pair = [tight, wide].map(fixture.measured)
-    let wideFloor = Double((try? SkyStudioReferenceImageFit.smallestCopy(pair[1], fit: totalLimits(total: 1)))??.copy.data.count ?? 0)
+    let wideFloor = Double((try? SkyStudioReferenceImageFit.smallestCopy(pair[1], fit: totalLimits(total: 1)))?.copy.data.count ?? 0)
     let pairTotal = (pair[0].bytes + 1.2 * wideFloor).rounded()
     check(wideFloor > 0 && 1.2 * wideFloor < pair[0].bytes && pair[1].bytes > pair[0].bytes, "the fixture holds the PNG (its share is under its size)")
+    // A large JPEG lands on its very smallest copy too (ImageIO may decode a small thumbnail of a JPEG at a reduced scale, so a
+    // smallest copy decoded that way would differ from what the byte search writes).
+    let wideTotal = totalLimits(total: 1)
+    if case .fit(let plan) = wideTotal.capped(0).decide(pair[1]) {
+        let exact = try? SkyStudioReferenceImageFit.write(pair[1], plan: plan, fit: wideTotal.capped(wideFloor), folder: output,
+                                                          lowest: SkyStudioReferenceImageFit.floorScale(pair[1], plan: plan, fit: wideTotal))
+        checkEqual(exact.map { [Double($0.bytes ?? -1), Double($0.width ?? -1), Double($0.height ?? -1)] }, [wideFloor, 512, 384],
+                   "capped at a large JPEG's smallest copy, the search finds that very copy")
+        exact?.cleanUp()
+    } else { check(false, "a large JPEG has a plan to come down") }
     if let sent = try? await SkyStudioReferenceImageFit.prepare(pair, fit: totalLimits(total: pairTotal), folder: output), sent.count == 2 {
         check(readBack(sent[0].url).map { $0.width == 500 && $0.height == 400 } == true && (sent[0].bytes ?? .max) <= Int(pair[0].bytes),
               "the PNG that cannot come down keeps its size (as it is, or the same pixels written smaller)")
@@ -186,14 +196,18 @@ private func runReferenceTotalImageChecks() async {
 
     // A set that cannot be met: three noisy PNGs whose smallest copies (a 512 px long side) are together over the total.
     let heavy = (1 ... 3).map { fixture.measured(fixture.write(fixture.picture(900, 600, noise: true), "heavy\($0).png", type: .png)) }
-    let floorBytes = Double((try? SkyStudioReferenceImageFit.smallestCopy(heavy[0], fit: totalLimits(total: 1)))??.copy.data.count ?? 0)
+    let floorBytes = Double((try? SkyStudioReferenceImageFit.smallestCopy(heavy[0], fit: totalLimits(total: 1)))?.copy.data.count ?? 0)
     check(floorBytes > 0 && floorBytes * 3 < heavy.map(\.bytes).reduce(0, +), "the fixture's smallest copies are smaller than the originals")
-    // The byte search reaches that smallest copy: capped at its bytes, a copy is still found (one decode path for both).
+    let smallestHeavy = try? SkyStudioReferenceImageFit.smallestCopy(heavy[0], fit: totalLimits(total: 1))
+    checkEqual(smallestHeavy.map { [$0.copy.width, $0.copy.height] }, [512, 341], "the smallest copy SkyCut allows: a 512 px long side, the same shape")
+    // The byte search lands exactly on that smallest copy when capped at its bytes: one decode path for both, so a cap the plan
+    // found the floor copy within is always met (a copy decoded another way differs in bytes, one way or the other).
     let anyTotal = totalLimits(total: 1)
     if case .fit(let plan) = anyTotal.capped(0).decide(heavy[0]) {
         let exact = try? SkyStudioReferenceImageFit.write(heavy[0], plan: plan, fit: anyTotal.capped(floorBytes), folder: output,
                                                           lowest: SkyStudioReferenceImageFit.floorScale(heavy[0], plan: plan, fit: anyTotal))
-        check((exact?.bytes).map { Double($0) <= floorBytes } == true, "capped at the smallest copy's bytes, the search finds a copy (\(exact?.bytes ?? -1) ≤ \(Int(floorBytes)))")
+        checkEqual(exact.map { [Double($0.bytes ?? -1), Double($0.width ?? -1), Double($0.height ?? -1)] }, [floorBytes, 512, 341],
+                   "capped at the smallest copy's bytes, the search finds that very copy")
         exact?.cleanUp()
     } else { check(false, "a heavy PNG has a plan to come down") }
     let unmet = (floorBytes * 3 * 0.9).rounded()
