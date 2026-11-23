@@ -45,16 +45,9 @@ echo "==> swift build -c release (arm64, -O)"
 swift build -c release --arch arm64
 BUILD_DIR="$(swift build -c release --arch arm64 --show-bin-path)"
 
-# Debug-only test hooks never ship. A release binary that still names one is refused: SRTFLOW_TEST_UPLOAD_DROPS lives in
-# Sources/SrtFlow/CloudMedia/CloudUploadFault.swift inside #if DEBUG (docs/architecture/sky-studio-jobs.md). strings fails loudly.
-HOOK_STRINGS="$(mktemp)"
-strings -a "$BUILD_DIR/$PRODUCT" > "${HOOK_STRINGS}"
-DEBUG_HOOK_TRACES="$(grep -F -e SRTFLOW_TEST_UPLOAD_DROPS -e CloudUploadFault "${HOOK_STRINGS}" || true)"
-rm -f "${HOOK_STRINGS}"
-if [ -n "${DEBUG_HOOK_TRACES}" ]; then
-    printf '✗ The release binary carries a debug-only test hook; it must stay inside #if DEBUG:\n%s\n' "${DEBUG_HOOK_TRACES}" >&2
-    exit 1
-fi
+# Debug-only test hooks never ship: a release binary that still names one is refused here (SRTFLOW_TEST_UPLOAD_DROPS lives in
+# Sources/SrtFlow/CloudMedia/CloudUploadFault.swift inside #if DEBUG; docs/architecture/sky-studio-jobs.md).
+scripts/debug-hook-probe.sh "$BUILD_DIR/$PRODUCT"
 
 APP="$DIST/$APP_NAME.app"
 echo "==> 组装 $APP"
