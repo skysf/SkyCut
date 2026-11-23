@@ -67,25 +67,32 @@ enum SkyStudioGenerateTool {
         let quote: SkyStudioQuote
         do {
             catalog = try await SkyStudioCatalogCache.shared.catalog(key: key, api: api)
+            let measured = references
+            let reason: (SkyStudioModel) -> String? = { candidate in
+                let plan = SkyStudioCharacterGeneration.references(measured, model: candidate, explicitMode: explicitMode)
+                return SkyStudioCharacterGeneration.problem(plan, model: candidate) ?? SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) ?? SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan)
+            }
+            let accepts: (SkyStudioModel) -> Bool = { reason($0) == nil }
             guard let offered = SkyStudioModelPolicy.select(catalog: catalog, kind: kind.rawValue, requested: requested, imageContext: imageContext, quality: quality,
-                accepts: { candidate in
-                    let plan = SkyStudioCharacterGeneration.references(references, model: candidate, explicitMode: explicitMode)
-                    return SkyStudioCharacterGeneration.problem(plan, model: candidate) == nil && SkyStudioModelPolicy.problem(model: candidate, ask: ask, references: plan) == nil && SkyStudioGenerationControls.problem(model: candidate, ask: ask, prompt: prompt, references: plan) == nil
-                }) else {
+                accepts: accepts) else {
                 if let requested, let model = catalog.model(requested, kind: kind.rawValue) {
                     let plan = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
                     throw AIToolError(SkyStudioCharacterGeneration.problem(plan, model: model) ?? SkyStudioModelPolicy.problem(model: model, ask: ask, references: plan) ?? SkyStudioGenerationControls.problem(model: model, ask: ask, prompt: prompt, references: references) ?? "This model cannot accept the request.")
                 }
                 if requested == nil, kind == .music, let refusal = SkyStudioMusicLength.refusal(catalog.models(kind: kind.rawValue), ask: ask) { throw AIToolError(refusal) }
-                throw AIToolError("No offered model accepts the complete request. Read get_status models=true for model ids, modes and reference limits. Available: "
-                    + catalog.models(kind: kind.rawValue).map(\.id).joined(separator: ", "))
+                // Each candidate's own reason, with its limit (15 images: Nano Banana 2 takes at most 14, Seedream 10).
+                throw AIToolError(SkyStudioModelPolicy.refusal(catalog: catalog, kind: kind.rawValue, operation: ask.operation, imageContext: imageContext,
+                                                               quality: quality, reason: reason))
             }
             model = offered
             // The sound mode is checked on the chosen model only: none never buys a pricier model (muting the clip is free; MCP-42).
             if let problem = SkyStudioVideoSound.problem(model: model, ask: ask) { throw AIToolError(problem) }
             references = SkyStudioCharacterGeneration.references(references, model: model, explicitMode: explicitMode)
+            references.fit = SkyStudioReferenceFit.strictest(SkyStudioModelPolicy.chain(catalog: catalog, kind: kind.rawValue, requested: requested,
+                imageContext: imageContext, quality: quality, chosen: model, accepts: accepts), mode: references.mode)
             generation = SkyStudioGeneration.make(kind, prompt: prompt, ask: ask, canvas: canvasRatio, frame: frameRatio,
                                                   model: model, inputMode: references.mode, references: references)
+            generation.notes += SkyStudioReferenceFit.notes(references)
             quote = try await api.quote(generation.job(model: model.id), key: key)
             try SkyStudioCharacterGeneration.accept(quote, generation: &generation, references: &references, model: model)
             guard SkyStudioCharacterAccess.stamp(key) == accountStamp else { throw SkyStudioCharacterError.changed }

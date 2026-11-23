@@ -117,10 +117,14 @@ enum SkyStudioReferenceFiles {
         var references: [JSONValue] = []
         for (index, file) in plan.files.enumerated() {
             try Task.checkCancellation()
-            guard let type = file.contentType else { throw AIToolError("Cannot determine input format: \(file.file.lastPathComponent).") }
+            // An image over the published limits of the model and its fallbacks goes up as a fitted copy (reference-image-fitting.md).
+            let sent = try await SkyStudioReferenceImageFit.prepare(file, fit: plan.fit)
+            defer { sent.cleanUp() }
+            guard let type = sent.contentType else { throw AIToolError("Cannot determine input format: \(file.file.lastPathComponent).") }
             let purpose = model.inputs[file.role]?["upload_purpose"]?.stringValue ?? file.type
             let count = Double(plan.files.count)
-            let url = try await api.upload(fileURL: file.file, contentType: type, purpose: purpose, key: key) { fraction in
+            // A fitted copy has a temporary name: an upload failure names the user's file.
+            let url = try await api.upload(fileURL: sent.url, contentType: type, purpose: purpose, key: key, named: file.file.lastPathComponent) { fraction in
                 progress((Double(index) + fraction) / count)
             }
             if file.role == "first_frame" { inputs["image_url"] = url.absoluteString }

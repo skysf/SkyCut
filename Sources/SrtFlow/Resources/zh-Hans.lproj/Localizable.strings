@@ -1694,3 +1694,8 @@
 "The macOS file window did not work. Type the full path to save to below, or drag a folder here from Finder." = "macOS 的文件窗口没能正常工作。请在下面输入要存到的完整路径，或者从 Finder 把文件夹拖到这里。";
 "Type the full path of a file SkyCut can open here, starting with “/”." = "请输入一个 SkyCut 在这里能打开的文件的完整路径，以「/」开头。";
 "Type the full path to save to, starting with “/”." = "请输入要存到的完整路径，以「/」开头。";
+"“%1$@” is too small for this model: each side must be at least %2$@ px. Nothing was charged." = "「%1$@」对这个模型来说太小：每条边至少要 %2$@ 像素。没有扣积分。";
+"“%1$@” is too narrow for this model: width / height must be between %2$@ and %3$@. Nothing was charged." = "「%1$@」对这个模型来说太窄：宽 / 高要在 %2$@ 到 %3$@ 之间。没有扣积分。";
+"“%@” is animated; this model takes one still image. Nothing was charged." = "「%@」是动图；这个模型只收一张静态图片。没有扣积分。";
+"“%@” could not be fitted to this model's limits. Nothing was charged." = "「%@」没法调整到这个模型的上限以内。没有扣积分。";
+"“%@” changed and is no longer a readable image. Nothing was charged." = "「%@」已经被改动，不再是能读的图片。没有扣积分。";

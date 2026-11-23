@@ -131,6 +131,9 @@ xcrun swiftc \
   Sources/SrtFlow/SkyStudio/SkyStudioModels.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioModelPolicy.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioReferencePolicy.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReferenceFit.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReferenceFitFailure.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioReferenceImageFit.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobRun.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJobSlots.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioGeneration.swift \
@@ -251,6 +254,8 @@ xcrun swiftc \
   checks/SkyStudio/CharacterFixtures.swift \
   checks/SkyStudio/CharacterNativeChecks.swift \
   checks/SkyStudio/CharacterRecoveryChecks.swift \
+  checks/SkyStudio/ReferenceFitChecks.swift \
+  checks/SkyStudio/ReferenceImageFitChecks.swift \
   "$BUILD_DIR"/SrtFlowMCPKit.build/*.o \
   "$BUILD_DIR"/SrtFlowCore.build/*.o
 
