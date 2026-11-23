@@ -94,7 +94,7 @@ enum VoiceLibraryText {
            let have = tool.details["voiced_seconds"]?.doubleValue {
             return String(format: L10n("Only %@ s of clear speech so far. A voice needs at least 10 s of one person talking."), String(format: "%.1f", have))
         }
-        if let interruption = SkyStudioUploadInterruption.from(error) { return SkyStudioUploadWords.interrupted(interruption) }
+        if let failure = SkyStudioUploadFailure.from(error) { return SkyStudioUploadWords.shown(failure) }
         guard let kind = SkyStudioVoiceLibraryErrors.kind(error) else { return SkyStudioVoiceLibraryErrors.message(error) }
         func name(_ language: String?) -> String { language.map { languageName($0) } ?? L10n("that language") }
         switch kind {

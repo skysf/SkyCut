@@ -58,8 +58,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
     private let submitted = SkyStudioSubmission()
     /// Sky Studio 的任务号，交上了才有：upscale_clip 的 get_job 报给 AI（对账、找客服时说得出是哪一单，停不下来的那单也一样）。
     var skyStudioJobID: String? { submitted.jobID }
-    /// The network broke every try of the upload: `state` carries the user's localized line, upscale_clip tells the AI this in English.
-    private(set) var uploadInterruption: SkyStudioUploadInterruption?
+    /// The upload did not happen: `state` carries the user's localized line, upscale_clip tells the AI this in English.
+    private(set) var uploadFailure: SkyStudioUploadFailure?
 
     init(request: UpscaleRequest, clipIDs: [UUID], owner: CloudTaskOwner, title: String, approval: Approval = .panel) {
         self.request = request
@@ -146,8 +146,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
         } catch let error as UpscalePipelineError {
             end(.failed(error.message), refunding: !submitted.value)
         } catch let failure as SkyStudioFailure {
-            uploadInterruption = SkyStudioUploadInterruption.from(failure)
-            end(.failed(uploadInterruption.map(SkyStudioUploadWords.interrupted) ?? SkyStudioJobError.request(failure).message),
+            uploadFailure = SkyStudioUploadFailure.from(failure)
+            end(.failed(uploadFailure.map(SkyStudioUploadWords.shown) ?? SkyStudioJobError.request(failure).message),
                 refunding: !submitted.value)
         } catch {
             end(.failed(error.localizedDescription), refunding: !submitted.value)

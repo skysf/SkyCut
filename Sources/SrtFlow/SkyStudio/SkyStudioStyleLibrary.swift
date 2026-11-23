@@ -306,7 +306,7 @@ final class SkyStudioStyleLibrary: ObservableObject {
     /// Sky Studio could not answer (offline, a 5xx, `content_unavailable`): a copy held is served instead. A refusal is not this.
     private static func unreachable(_ failure: SkyStudioFailure) -> Bool {
         switch failure {
-        case .network, .uploadInterrupted: return true
+        case .network, .uploadFailed: return true
         case .badAnswer(let status): return status >= 500
         case .server(let error): return error.status >= 500
         }
@@ -314,7 +314,7 @@ final class SkyStudioStyleLibrary: ObservableObject {
 
     private static func problem(_ failure: SkyStudioFailure, id: String, version: String) -> ReadProblem {
         switch failure {
-        case .network, .uploadInterrupted: return .unreachable(id: id, version: version)
+        case .network, .uploadFailed: return .unreachable(id: id, version: version)
         case .server(let error) where error.code == "not_found": return .notFound(id: id, version: version)
         case .server(let error) where error.code == "not_entitled": return .server(notEntitledWords(error))
         case .server(let error): return .server("Sky Studio did not send \(id): \(error.message)")

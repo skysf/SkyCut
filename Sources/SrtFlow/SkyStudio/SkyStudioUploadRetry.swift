@@ -1,14 +1,15 @@
 import Foundation
 import SrtFlowMCPKit
 
-// MARK: - An upload the network interrupts: when SkyStudioAPI.upload tries the PUT again, and what it says after the last try
+// MARK: - An upload to Sky Studio's storage: when SkyStudioAPI.upload tries the PUT again, and what it says when it gives up
 //
 // What it covers (2026-11-23, generate-34 / generate-35: the reference image's PUT to Sky Studio's storage lost its connection on a
 // slow, unstable uplink and the job ended at once; the system never replays a body upload by itself):
-// - which errors mean "the network broke this try" (`SkyStudioUploadRetry.isTransient`), how many tries and the pauses between them;
+// - what a transport error means inside an upload (`classify`): the network broke this try (worth another), or the connection does not
+//   work at all (another try would only repeat it); how many tries and the pauses between them;
 // - the `/uploads` ticket and when its signed address must be renewed before the next try (`SkyStudioUploadTicket`);
-// - the error after the last try (`SkyStudioUploadInterruption`): English for the AI, the stable code and the count for tool results
-//   and get_job. Nothing was submitted, so nothing was charged.
+// - the error when the upload gives up (`SkyStudioUploadFailure`): interrupted, could not connect, or refused by the storage. English
+//   for the AI, the stable code and the PUT count for tool results and get_job. Nothing was submitted, so nothing was charged.
 // What it does not cover: sending anything (SkyStudioAPI.upload owns the loop), the words the user reads (SkyStudioUploadWords,
 // localized), what each job does with the error (generation, upscale, voice change, voice library, characters).
 // Rules: docs/architecture/sky-studio-jobs.md, "Uploads that the network interrupts".
@@ -18,8 +19,10 @@ struct SkyStudioUploadRetry: Sendable {
     var attempts = 3
     /// Seconds to wait before the second, third… try (the last one repeats).
     var pauses: [TimeInterval] = [1, 2]
-    /// The signed address is renewed before the next try when less than this is left of it, plus what the last try took.
+    /// The signed address is renewed before the next try when less is left of it than the last try took plus this.
     var renewalMargin: TimeInterval = 60
+    /// How long a PUT may go without a byte moving before it times out (the system's idle timeout; checks shorten it).
+    var putTimeout: TimeInterval = 600
     /// Waits between tries; a cancelled task ends the wait at once (checks record the pauses instead of waiting).
     var sleep: @Sendable (TimeInterval) async throws -> Void = { seconds in
         try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
@@ -49,15 +52,30 @@ struct SkyStudioUploadRetry: Sendable {
                                            URLError.notConnectedToInternet.rawValue]
     static let transientPOSIXCodes: Set<Int32> = [ECONNRESET, ECONNABORTED, EPIPE, ETIMEDOUT, ENETDOWN, ENETUNREACH, ENETRESET]
 
+    /// What a transport error means inside an upload (a cancel is sorted out before): `Broken` or `Unreachable`.
+    static func classify(_ error: Error) -> Error {
+        isTransient(error) ? Broken(detail: describe(error)) : Unreachable(detail: describe(error))
+    }
+
     /// "NSURLErrorDomain -1005": the last error, the same in every language.
     static func describe(_ error: Error) -> String {
         let system = error as NSError
         return "\(system.domain) \(system.code)"
     }
 
-    /// One try the network broke. Only inside SkyStudioAPI.upload: it never leaves it.
+    /// One try the network broke: worth another. Only inside SkyStudioAPI.upload: it never leaves it.
     struct Broken: Error {
         let detail: String
+    }
+
+    /// The connection does not work at all (address, certificate, TLS): the upload ends. Only inside SkyStudioAPI.upload.
+    struct Unreachable: Error {
+        let detail: String
+    }
+
+    /// The storage answered with an error: that answer stands and the upload ends. Only inside SkyStudioAPI.upload.
+    struct Refused: Error {
+        let status: Int
     }
 }
 
@@ -67,7 +85,8 @@ struct SkyStudioUploadTicket: Sendable {
     let method: String
     let headers: [String: String]
     let fileURL: URL
-    /// When the signed address stops working, on this Mac's clock; nil when the answer did not say (every try then reuses it).
+    /// When the signed address stops working, on this Mac's clock; nil when the answer did not say (it is then renewed before every
+    /// new try: an address of unknown validity is never reused).
     let deadline: Date?
 
     /// `received`: when the answer arrived, on this Mac's clock; `serverDate`: the answer's HTTP `Date` header.
@@ -90,10 +109,10 @@ struct SkyStudioUploadTicket: Sendable {
         return put
     }
 
-    /// Renew before the next try when the address would run out before that try is done: less is left than the last try took
-    /// plus `margin`. An address without a deadline is kept.
+    /// Renew before the next try when the address would run out before that try is done (less is left than the last try took plus
+    /// `margin`) or when its validity is unknown.
     func needsRenewal(now: Date, lastTry: TimeInterval, margin: TimeInterval) -> Bool {
-        guard let deadline else { return false }
+        guard let deadline else { return true }
         return deadline.timeIntervalSince(now) < lastTry + margin
     }
 
@@ -112,39 +131,5 @@ struct SkyStudioUploadTicket: Sendable {
         formatter.timeZone = TimeZone(identifier: "GMT")
         formatter.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
         return formatter.date(from: text)
-    }
-}
-
-/// After the last try: the network interrupted the upload of one file every time. Nothing was submitted, so nothing was charged.
-struct SkyStudioUploadInterruption: Equatable, Sendable {
-    /// The stable code in tool results and get_job.
-    static let code = "upload_network"
-
-    /// The file as the user knows it (a clip's or recording's own name when SkyCut uploaded a cut of it).
-    let fileName: String
-    /// Tries made, the first one included.
-    let attempts: Int
-    /// The last try's error ("NSURLErrorDomain -1005").
-    let lastError: String
-
-    /// What the AI is told (English; the user reads SkyStudioUploadWords).
-    var message: String {
-        "The upload of \(fileName) to Sky Studio was interrupted by the network after \(attempts) tries; nothing was submitted "
-            + "and nothing was charged."
-    }
-
-    /// The fields a tool result or get_job carries: the code, the count, nothing charged and what to do next.
-    /// `retry`: how this tool is called again.
-    func fields(retry: String) -> [String: JSONValue] {
-        ["code": .string(Self.code), "upload_attempts": .number(Double(attempts)), "upload_error": .string(lastError), "charged": false,
-         "next_step": .string("Nothing was submitted to Sky Studio and nothing was charged. Tell the user, in their language, that the "
-            + "network interrupted the upload of \(fileName) \(attempts) times and ask them to check their network connection. When they "
-            + "want to try again, " + retry)]
-    }
-
-    /// The interruption inside an upload's error, if that is what it is.
-    static func from(_ error: Error) -> SkyStudioUploadInterruption? {
-        if case .uploadInterrupted(let interruption)? = error as? SkyStudioFailure { return interruption }
-        return nil
     }
 }

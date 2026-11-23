@@ -119,7 +119,7 @@ enum SkyStudioVoiceRecordingTool {
         }
         catch {
             throw AIToolError(SkyStudioVoiceLibraryErrors.message(error),
-                              details: SkyStudioUploadInterruption.from(error)?.fields(retry: "make the same manage_voices call again.") ?? [:])
+                              details: SkyStudioUploadFailure.from(error)?.fields(retry: "make the same manage_voices call again.") ?? [:])
         }
     }
 

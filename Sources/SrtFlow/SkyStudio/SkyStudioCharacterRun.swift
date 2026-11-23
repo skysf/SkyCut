@@ -16,8 +16,8 @@ final class SkyStudioCharacterRun {
     private var job: AIJobs.Job?
     private var refreshing = false
     private var recoveryEvidenceSaved: Bool?
-    /// The network broke every try of a photo's upload: nothing was submitted (the task row and get_job say so).
-    private var uploadInterruption: SkyStudioUploadInterruption?
+    /// A photo's upload did not happen: nothing was submitted (the task row and get_job say so).
+    private var uploadFailure: SkyStudioUploadFailure?
 
     init(receipt: SkyStudioCharacterReceipt, key: String, project: VideoEditProject?, plan: SkyStudioCharacterPlan? = nil,
          approvedFiles: [JSONValue] = [], reservation: SkyStudioJobGate.Reservation? = nil, retryFreeImport: Bool = false) {
@@ -113,7 +113,7 @@ final class SkyStudioCharacterRun {
                 held?.refund(); receipt.rejectionCode = "local_not_sent"
                 await saveFailureEvidence()
             }
-            uploadInterruption = SkyStudioUploadInterruption.from(error)
+            uploadFailure = SkyStudioUploadFailure.from(error)
             finish(Task.isCancelled ? .cancelled : .failed, SkyStudioCharacterError.tool(error).message)
         }
     }
@@ -197,10 +197,10 @@ final class SkyStudioCharacterRun {
 
     private func finish(_ status: AIJobs.Status, _ message: String) {
         guard let job else { return }
-        if status != .done { activity?.issue = uploadInterruption.map(SkyStudioUploadWords.interrupted) ?? message }
+        if status != .done { activity?.issue = uploadFailure.map(SkyStudioUploadWords.shown) ?? message }
         var detail = payload()
-        if let uploadInterruption {
-            detail.merge(uploadInterruption.fields(retry: "call manage_characters again with a new idempotency_key.")) { _, upload in upload }
+        if let uploadFailure {
+            detail.merge(uploadFailure.fields(retry: "call manage_characters again with a new idempotency_key.")) { _, upload in upload }
         }
         AIJobs.shared.finish(job, status, message: message, detail: .object(detail))
     }

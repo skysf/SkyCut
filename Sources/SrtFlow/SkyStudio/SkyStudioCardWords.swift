@@ -40,7 +40,7 @@ enum SkyStudioCardWords {
     /// Sky Studio did not send a listed page (asked by the version the list names) and no copy here could stand in.
     static func problem(_ failure: SkyStudioFailure, page: SkyStudioCardRequest, version: String) -> String {
         switch failure {
-        case .network, .uploadInterrupted:
+        case .network, .uploadFailed:
             return "Sky Studio cannot be reached and this Mac has no copy of \(page.label) (version \(version)); try again when SkyCut "
                 + "is online." + still
         case .server(let error) where error.code == "not_found":

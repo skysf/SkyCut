@@ -296,8 +296,8 @@ final class SkyStudioAccount: ObservableObject {
             return .unreachable(error.message)
         case .network(let detail):
             return .unreachable(String(format: L10n("Could not reach Sky Studio (%@)."), detail))
-        case .uploadInterrupted(let interruption):
-            return .unreachable(SkyStudioUploadWords.interrupted(interruption))
+        case .uploadFailed(let failure):
+            return .unreachable(SkyStudioUploadWords.shown(failure))
         case .badAnswer(let status):
             return .unreachable(String(format: L10n("Sky Studio sent an answer SkyCut does not understand (HTTP %d)."), status))
         }

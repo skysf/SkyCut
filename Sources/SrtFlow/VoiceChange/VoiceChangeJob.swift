@@ -95,9 +95,9 @@ final class VoiceChangeJob {
             // 传的时候、交上之前出的错：一分没花。
             if serverID == nil { held.refund() }
             let stopped = Task.isCancelled || error is CancellationError
-            if !stopped, let interruption = SkyStudioUploadInterruption.from(error) {
-                return finish(.failed, interruption.message, detail: interruption.fields(retry: "call change_voice again."),
-                              shown: SkyStudioUploadWords.interrupted(interruption))
+            if !stopped, let failure = SkyStudioUploadFailure.from(error) {
+                return finish(.failed, failure.message, detail: failure.fields(retry: "call change_voice again."),
+                              shown: SkyStudioUploadWords.shown(failure))
             }
             return finish(stopped ? .cancelled : .failed, stopped && serverID == nil
                 ? "The voice change was stopped before Sky Studio accepted it; nothing was charged."

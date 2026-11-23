@@ -99,8 +99,8 @@ enum SkyStudioCharacterError {
             if let failure = error as? SkyStudioFailure {
                 switch failure {
                 case .network(let detail): return AIToolError("Could not reach Sky Studio: \(detail)")
-                case .uploadInterrupted(let interruption):
-                    return AIToolError(interruption.message, details: interruption.fields(retry: "call manage_characters again with a new idempotency_key."))
+                case .uploadFailed(let failure):
+                    return AIToolError(failure.message, details: failure.fields(retry: "call manage_characters again with a new idempotency_key."))
                 case .badAnswer(let status): return AIToolError("Sky Studio returned an unexpected answer (HTTP \(status)).")
                 case .server(let server): return AIToolError(server.message)
                 }
