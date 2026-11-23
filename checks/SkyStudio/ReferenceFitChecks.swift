@@ -77,6 +77,9 @@ func runReferenceFitChecks() {
     if case .fit(let plan) = both.decide(fitImage(9000, 9000, name: "cutout.png", bytes: 50_000_000, type: "image/png", alpha: true)) {
         checkEqual(plan.contentType, "image/png", "a PNG stays PNG when the models take PNG")
     } else { check(false, "an oversize PNG is fitted") }
+    if case .fit(let plan) = both.decide(fitImage(9000, 9000, name: "screen.png", bytes: 50_000_000, type: "image/png")) {
+        checkEqual(plan.contentType, "image/png", "an opaque PNG stays PNG too: only shrunk, not turned into JPEG")
+    } else { check(false, "an oversize opaque PNG is fitted") }
     if case .fit(let plan) = both.decide(fitImage(4032, 3024, name: "burst.heic", type: "image/heic", frames: 2)) {
         checkEqual(plan.contentType, "image/jpeg", "a HEIC holding two images: its first image is converted")
     } else { check(false, "a multi-image HEIC is not an animation") }
