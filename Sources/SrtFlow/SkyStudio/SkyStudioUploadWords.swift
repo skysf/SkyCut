@@ -4,12 +4,16 @@ import Foundation
 //
 // What it covers: the one line the cloud task row, the upscale and voice change panels, the voice library and a project's notice
 // show after SkyStudioAPI.upload gave up (SkyStudioUploadFailure): which file, what happened (interrupted by the network, after how
-// many tries; could not connect; refused by the storage; not accepted by Sky Studio), that nothing was charged and what to do. It
-// names the network, never a proxy: on 2026-11-23 the uplink was just as unstable without one.
+// many tries; could not connect; refused by the storage; not accepted by Sky Studio; too large, so a smaller file), that nothing
+// was charged and what to do. It names the network, never a proxy: on 2026-11-23 the uplink was just as unstable without one.
 // What it does not cover: the AI's English (SkyStudioUploadFailure.message and fields), when to try again (SkyStudioUploadRetry).
 
 enum SkyStudioUploadWords {
     static func shown(_ failure: SkyStudioUploadFailure) -> String {
+        // Too large first: only a smaller file helps, so it never says "try again later".
+        if failure.isTooLarge {
+            return String(format: L10n("“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file."), failure.fileName)
+        }
         switch failure.kind {
         case .interrupted where failure.attempts > 1:
             return String(format: L10n("The upload of “%1$@” was interrupted by the network after %2$d tries. Nothing was charged. Check your network connection and try again."),

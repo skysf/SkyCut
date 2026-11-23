@@ -41,8 +41,22 @@ struct SkyStudioUploadFailure: Equatable, Sendable {
         }
     }
 
+    /// The file is bigger than Sky Studio takes (a 413, or its refusal's reason `upload_too_large`): only a smaller file helps, so
+    /// the words never say "try again later".
+    var isTooLarge: Bool {
+        if server?.fields["reason"]?.stringValue == SkyStudioVoiceCodes.Reason.uploadTooLarge { return true }
+        switch kind {
+        case .refused(413), .declined(413): return true
+        default: return false
+        }
+    }
+
     /// What the AI is told (English; the user reads SkyStudioUploadWords).
     var message: String {
+        if isTooLarge {
+            return "Sky Studio did not accept the upload of \(fileName) because the file is too large (\(lastError)); nothing was submitted "
+                + "and nothing was charged."
+        }
         switch kind {
         case .interrupted:
             let when = attempts > 1 ? "after \(attempts) tries" : attempts == 1 ? "on its only try" : "before the file could be sent"
@@ -67,6 +81,7 @@ struct SkyStudioUploadFailure: Equatable, Sendable {
     func fields(retry: String) -> [String: JSONValue] {
         let what: String
         switch kind {
+        case _ where isTooLarge: what = "\(fileName) is too large for Sky Studio (\(lastError)), so they need a smaller file"
         case .interrupted: what = "the network interrupted the upload of \(fileName), and ask them to check their network connection"
         case .unreachable: what = "the upload of \(fileName) could not connect, and ask them to check their network connection"
         case .refused(0): what = "Sky Studio's storage answered the upload of \(fileName), but its answer did not come through"
