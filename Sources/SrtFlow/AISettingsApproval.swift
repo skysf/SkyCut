@@ -23,7 +23,11 @@ enum AISettingsApproval {
         guard redemption != .accepted else { return nil }
         var changes: [String] = []
         if let mode, mode != access.mode { changes.append("permission mode: \(access.mode.title) -> \(mode.title)") }
-        if let limit, limit > beforeLimit { changes.append("daily hard budget: \(beforeLimit) -> \(limit) credits") }
+        // Named as the user finds it (MSG1): SkyCut's own setting, not the Sky Studio balance; whole credits, not "1000.0".
+        if let limit, limit > beforeLimit {
+            changes.append("SkyCut's daily credit limit for AI (a SkyCut setting at \(SkyCutDailyLimit.settingsPath { $0 }), not the "
+                + "Sky Studio balance): \(SkyStudioCredits.text(beforeLimit)) -> \(SkyStudioCredits.text(limit)) credits a day")
+        }
         var question = "Ask the user in their conversation language to approve these settings changes: \(changes.joined(separator: "; ")). "
             + "Use the localized permission names (Chinese: request approval / all permissions); only after explicit agreement repeat this exact call with confirm_token. No settings have changed."
         if turningOn, let fullAccess { question += " " + fullAccess.turnOnText }

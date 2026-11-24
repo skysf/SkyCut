@@ -60,6 +60,8 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var skyStudioJobID: String? { submitted.jobID }
     /// The upload did not happen: `state` carries the user's localized line, upscale_clip tells the AI this in English.
     private(set) var uploadFailure: SkyStudioUploadFailure?
+    /// Sky Studio refused it for the balance (MSG1): the state holds the user's line; the AI gets the fields (AIUpscaleTool.settle).
+    private(set) var balanceFailure: SkyStudioJobFailure?
 
     init(request: UpscaleRequest, clipIDs: [UUID], owner: CloudTaskOwner, title: String, approval: Approval = .panel) {
         self.request = request
@@ -93,7 +95,7 @@ final class UpscaleJob: ObservableObject, Identifiable {
         switch approval {
         case .panel:
             guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: request.credits) else {
-                return end(.failed(L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")), refunding: false)
+                return end(.failed(SkyCutDailyLimit.userLine(needed: request.credits, store: .shared, localized: L10n)), refunding: false)
             }
             held = SkyStudioHeldCredits(reservation)
         case .ai(let reservation):
@@ -134,11 +136,12 @@ final class UpscaleJob: ObservableObject, Identifiable {
             switch error {
             case .stopped(let stop):
                 end(.cancelled(stop), refunding: stop == .nothingCharged)
-            case .failed:
-                end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
-            case .request, .badAnswer, .timedOut, .notSubmitted:
+            case .failed, .request, .badAnswer, .timedOut, .notSubmitted:
                 // 交上之前出的错没花钱；交上之后断了的，活在服务器上照做、做完进作品库。
-                end(.failed(error.message), refunding: error.canRefund(beforeAccepted: !submitted.value))
+                // The Sky Studio balance is said in the app's language, with the numbers and where to add credits.
+                balanceFailure = SkyStudioBalanceRefusal.failure(of: error)
+                end(.failed(balanceFailure.map(SkyStudioBalanceRefusal.shown) ?? error.message),
+                    refunding: error.canRefund(beforeAccepted: !submitted.value))
             }
         } catch is CancellationError {
             // 裁、传的时候停的没花钱；下载、封声的时候停的，活已经做完了（积分花了，成品在作品库里）。

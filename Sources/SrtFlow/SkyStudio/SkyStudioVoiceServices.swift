@@ -35,6 +35,7 @@ struct SkyStudioVoiceServices {
 struct SkyStudioVoiceBudgetProblem: LocalizedError {
     let credits: Double
     var errorDescription: String? {
-        "Daily AI budget reached. Raise it in Settings > Sky Studio to generate the remaining batches; existing audio is preserved."
+        "SkyCut's own daily credit limit for AI (a SkyCut setting, not the Sky Studio balance) stops the remaining batches; "
+            + "existing audio is preserved. next_step has the numbers and the options."
     }
 }

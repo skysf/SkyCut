@@ -68,7 +68,7 @@ final class DesignVoiceModel: ObservableObject {
         // 这一份已经有一单开着（别处重入）：不预留、不再起。
         guard SkyStudioVoiceDesignOrder.running(draft) == nil else { return false }
         guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: quote.credits) else {
-            problem = L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")
+            problem = SkyCutDailyLimit.userLine(needed: quote.credits, store: .shared, localized: L10n)
             return false
         }
         ordered = true

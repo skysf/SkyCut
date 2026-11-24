@@ -139,8 +139,9 @@ private struct SkyStudioAccountRows: View {
             } label: {
                 Text("Sky Studio credits")
             }
-            SkyStudioCreditLimitRow()
         }
+        // SkyCut's own setting, shown with any key (not only after a /me answer): a daily-limit refusal sends the user here (MSG1).
+        SkyStudioCreditLimitRow()
     }
 
     @ViewBuilder
@@ -179,7 +180,8 @@ private struct SkyStudioAccountRows: View {
     }
 }
 
-/// AI 一天最多花多少积分（SkyStudioSpendStore，默认 1,000）：超了 AI 要先在聊天里问用户；面板起的 upscale 面板本身就是确认。
+/// SkyCut's daily credit limit for AI (SkyStudioSpendStore, 1,000 by default): a hard limit for the AI and the paid panels alike;
+/// only the user raises it, here or by approving set_settings in the chat (it always asks).
 private struct SkyStudioCreditLimitRow: View {
     @ObservedObject private var spend = SkyStudioSpendStore.shared
     @State private var limitText = ""

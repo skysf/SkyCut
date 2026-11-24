@@ -440,9 +440,12 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
             payload["next_step"] = .string(SkyStudioCharacterError.nextStep(code))
         }
         if together { payload["next_step"] = .string(SkyStudioReferenceFitFailure.togetherNextStep(limit: lastFailure?.limit)) }
-        if lastFailure?.code == "insufficient_credits" {
-            payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
-            payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."
+        // The Sky Studio balance (not SkyCut's daily limit): the numbers, where only the user adds credits, and the row in the app's
+        // language (MSG1, SkyStudioBalanceRefusal).
+        if let balance = lastFailure, balance.code == SkyStudioBalanceRefusal.code {
+            payload.merge(SkyStudioBalanceRefusal.fields(balance, retry: "call generate_media again without idempotency_key or with a new one "
+                + "(this one stays bound to this failed job)")) { _, new in new }
+            self.status.issue = SkyStudioBalanceRefusal.shown(balance)
         }
         // Last, over the generic next step: an upload that did not happen was never submitted, so there is no original job to query.
         if let uploadFailure {

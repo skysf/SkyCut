@@ -17,8 +17,8 @@ final class SkyStudioSpendStore: ObservableObject {
     static let limitKey = "SrtFlow.skystudio.dailyCreditLimit"
     static let ledgerKey = "SrtFlow.skystudio.creditLedger.v1"
     static let defaultLimit: Double = 1_000
-    /// 设得下的范围（0 = 暂停收费任务）。
-    static let limitRange: ClosedRange<Double> = 0...1_000_000
+    /// 设得下的范围（0 = 暂停收费任务）。Not actor-bound: a refusal's suggested limit reads it as a pure value (SkyCutDailyLimit).
+    nonisolated static let limitRange: ClosedRange<Double> = 0...1_000_000
 
     @Published private(set) var dailyLimit: Double
     @Published private(set) var ledger: DailySpendLedger

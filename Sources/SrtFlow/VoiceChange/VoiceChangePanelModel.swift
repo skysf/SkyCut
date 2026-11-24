@@ -161,7 +161,7 @@ final class VoiceChangePanelModel: ObservableObject {
             return false
         }
         guard let reservation = SkyStudioJobGate.reserveWithoutAsking(credits: quote.credits) else {
-            problem = L10n("Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.")
+            problem = SkyCutDailyLimit.userLine(needed: quote.credits, store: .shared, localized: L10n)
             return false
         }
         started = true

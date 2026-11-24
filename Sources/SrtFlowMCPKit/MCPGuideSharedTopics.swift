@@ -103,9 +103,11 @@ enum MCPGuideSharedTopics {
         quote them in user_request; "best quality" names nothing, so quote and ask. Without such words SkyCut asks anyway \
         (overrides_not_applied). full_access skips these questions.
 
-        The daily budget. A hard daily credit limit applies in every mode: over it, the result is status blocked with \
-        daily_budget_exceeded and nothing starts. Tell the user; they can raise it in SkyCut Settings or ask you to change it with \
-        set_settings. Never split or reshape a request to get under it.
+        The daily budget. SkyCut's own daily credit limit (a SkyCut setting, not the Sky Studio balance) applies in every mode: over \
+        it, the result is status blocked with daily_budget_exceeded and nothing starts. Tell the user plainly; next_step has the \
+        numbers and their options (raise it with set_settings, which asks them; change it in Settings; wait for midnight). Never \
+        split or reshape a request to get under it. A low Sky Studio balance is the user's account instead: the job fails with \
+        recharge_url, and only the user can add credits.
 
         Jobs. Paid calls return job_id; wait with get_job, which reports the phase, queue position, credits_charged and refunds. Only \
         queued jobs can be cancelled with cancel_job; started jobs finish, are charged and land in the Sky Studio library. If a paid \

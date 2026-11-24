@@ -14,7 +14,8 @@ enum DailySpendPolicy {
     }
 
     /// 一单位的千分之一以内的误差不算（浮点加出来的 9.999999999 不该算超）。
-    private static let slack = 0.0005
+    /// A refusal's suggested higher limit rounds with the same slack (SkyCutDailyLimit.suggestedLimit).
+    static let slack = 0.0005
 
     static func decide(estimate: Double, spentToday: Double, dailyLimit: Double) -> Decision {
         if spentToday + estimate <= dailyLimit + slack { return .allow }

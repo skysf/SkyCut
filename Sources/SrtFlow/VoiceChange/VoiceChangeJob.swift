@@ -90,6 +90,13 @@ final class VoiceChangeJob {
         } catch let error as SkyStudioJobError {
             settle(failed: error)
             if error.failure?.code == SkyStudioVoiceCodes.separationFailed { return separationFailed(error) }
+            if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) {
+                // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
+                var fields = SkyStudioBalanceRefusal.fields(balance, retry: "call change_voice again")
+                fields["failure"] = balance.json
+                fields["code"] = .string(SkyStudioBalanceRefusal.code)
+                return finish(.failed, SkyStudioVoiceLibraryErrors.message(error), detail: fields, shown: SkyStudioBalanceRefusal.shown(balance))
+            }
             return finish(Task.isCancelled ? .cancelled : .failed, SkyStudioVoiceLibraryErrors.message(error))
         } catch {
             // 传的时候、交上之前出的错：一分没花。

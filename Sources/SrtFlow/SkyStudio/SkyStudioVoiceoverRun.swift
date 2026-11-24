@@ -195,8 +195,10 @@ final class SkyStudioVoiceoverRun {
         }
         if let failure = (error as? SkyStudioJobError)?.failure {
             extra["failure"] = failure.json
-            if failure.code == "insufficient_credits" {
-                extra["recharge_url"] = (failure.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
+            if failure.code == SkyStudioBalanceRefusal.code {
+                // The Sky Studio balance, not SkyCut's daily limit: the numbers and where only the user adds credits (MSG1).
+                extra.merge(SkyStudioBalanceRefusal.fields(failure, retry: recovery == nil ? "retry the original add_voiceover call"
+                    : "resume with add_voiceover resume=recovery_file generate_missing=true")) { _, new in new }
             }
             if failure.code == SkyStudioVoiceCodes.fallbackNeedsOneTime, let recovery {
                 // 默认模型出错、备用要先花一次性费用（SkyCut 声音方案 4.5）：这一批停下、没扣钱，别的批照常收好；补上价、记下、问用户
@@ -213,10 +215,18 @@ final class SkyStudioVoiceoverRun {
         }
         // 结构化的原因（比如参考录音人声不够的 reason / voiced_seconds / missing_seconds）照样交给 get_job，不只留一句话。
         if let tool = error as? AIToolError { extra.merge(tool.details) { current, _ in current } }
-        if let blocked = error as? SkyStudioVoiceBudgetProblem {
-            extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
+        let budget = cancelled ? nil : error as? SkyStudioVoiceBudgetProblem
+        if let budget {
+            // Which limit, the numbers and the options (MSG1); the retry is this voiceover's own and finished batches are kept.
+            extra.merge(SkyStudioJobGate.budgetBlocked(credits: budget.credits, store: .shared,
+                outcome: recovery == nil ? "Nothing was started or charged." : "Finished batches are kept; the missing ones were not started or charged.",
+                retry: recovery == nil ? "retry the original add_voiceover call" : "resume with add_voiceover resume=recovery_file generate_missing=true"
+            ).payload.objectValue ?? [:]) { _, new in new }
         }
         finish(cancelled ? .cancelled : .failed, text)
+        // The task card says which limit or balance stopped it, in the app's language, with the numbers and where to act.
+        if let budget { status.issue = SkyCutDailyLimit.userLine(needed: budget.credits, store: .shared, localized: L10n) }
+        if !cancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) { status.issue = SkyStudioBalanceRefusal.shown(balance) }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac

@@ -76,11 +76,13 @@ enum SkyStudioJobGate {
         return .reserved(record(store, credits))
     }
 
-    static func budgetBlocked(credits: Double, store: SkyStudioSpendStore) -> AIToolResult {
-        .ok(["status": "blocked", "code": "daily_budget_exceeded", "credits_needed": .number(credits),
-             "spent_today_credits": .number(store.spentToday()), "daily_limit_credits": .number(store.dailyLimit),
-             "settings_section": "sky_studio", "settings_field": "daily_ai_credit_limit",
-             "next_step": "Nothing started or charged. Notify the user in their conversation language that the daily hard budget is exhausted. They can raise it in SkyCut Settings > Sky Studio, or explicitly ask you to help change it with set_settings. Do not ask for a one-off budget bypass or silently raise it. Full access obeys the same cap."])
+    /// Over the daily hard budget: nothing reserved, no token. The result says it is SkyCut's own limit (not the Sky Studio
+    /// balance), with the numbers and the three ways on (SkyCutDailyLimit; the settings path in the app's language).
+    static func budgetBlocked(credits: Double, store: SkyStudioSpendStore, now: Date = Date(),
+                              outcome: String = "Nothing was started or charged.", retry: String = "repeat this call") -> AIToolResult {
+        let numbers = SkyCutDailyLimit.Numbers(limit: store.dailyLimit, spent: store.spentToday(now: now), needed: credits, now: now)
+        return .ok(.object(SkyCutDailyLimit.aiResult(numbers, appPath: SkyCutDailyLimit.settingsPath(L10n),
+                                                     englishPath: SkyCutDailyLimit.settingsPath { $0 }, outcome: outcome, retry: retry)))
     }
 
     /// 不停下来问、只守每日硬上限：额度内一次预留；超了回 nil，调用方回 daily_budget_exceeded（AI 起的）或不起任务（面板、按钮），

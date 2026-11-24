@@ -164,6 +164,8 @@ final class SkyStudioVoiceLibraryJob {
                 if refund { held.refund() }
             }
             let outcome: AIJobs.Status = Task.isCancelled ? .cancelled : .failed
+            // The Sky Studio balance (MSG1): the task row stays with the user's line (a row with an issue is not removed).
+            if outcome == .failed, let balance = SkyStudioBalanceRefusal.failure(of: error) { status?.issue = SkyStudioBalanceRefusal.shown(balance) }
             finish(outcome, SkyStudioVoiceLibraryErrors.message(error), detail: await failureDetail(error))
         } catch {
             // 不是 Sky Studio 说的：没受理的退回；受理了的留着记录接着跟。
@@ -201,6 +203,11 @@ final class SkyStudioVoiceLibraryJob {
             if let approved = request.maxCredits { value["credits_approved"] = .number(approved) }
         }
         if let onFailure { value.merge(await onFailure(error.failure?.code, priced)) { _, new in new } }
+        // The Sky Studio balance, not SkyCut's daily limit (MSG1): the numbers and where only the user adds credits win over the
+        // caller's next step.
+        if !Task.isCancelled, let balance = SkyStudioBalanceRefusal.failure(of: error) {
+            value.merge(SkyStudioBalanceRefusal.fields(balance, retry: Self.retryCall(kind))) { _, new in new }
+        }
         return value
     }
 
@@ -221,6 +228,13 @@ final class SkyStudioVoiceLibraryJob {
         }) else { return }
         held.refund()
         held = SkyStudioHeldCredits(SkyStudioJobGate.Reservation(credits: earlier.reservedCredits, day: earlier.reservedDay))
+    }
+
+    /// How to try again once the user has added Sky Studio credits (the balance refusal's next step).
+    private static func retryCall(_ kind: AIJobs.Kind) -> String {
+        kind == .voiceDesign
+            ? "call manage_voices action=design again (it quotes the current price and asks the user again)"
+            : "call add_voiceover again with the same lines and voice, or resume the narration's recovery file (it quotes again)"
     }
 
     /// 重启之后接着跟的那一单没做成：起它的那次调用早没了，按种类说下一步。
