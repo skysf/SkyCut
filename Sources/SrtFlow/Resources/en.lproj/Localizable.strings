@@ -1368,7 +1368,15 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it.";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets." = "SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets.";
+
+"Change Limit…" = "Change Limit…";
+
+"Open Settings at Sky Studio, where the daily limit for AI is set" = "Open Settings at Sky Studio, where the daily limit for AI is set";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@.";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@.";
 
 "Theme" = "Theme";
 

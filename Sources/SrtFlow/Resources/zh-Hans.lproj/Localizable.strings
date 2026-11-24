@@ -1368,7 +1368,15 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "达到日预算后 AI 会暂停；可在设置里提高日预算后继续，任何权限模式都不会绕过预算。";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "已达到 AI 日预算。请在「设置 → Sky Studio」提高日预算后继续。";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets." = "挡住这次的是 SkyCut 自己的每日积分上限，不是 Sky Studio 余额：今天已用 %1$@ / %2$@ 积分，这次需要 %3$@。可以在「%4$@」提高上限，或等到午夜重置。";
+
+"Change Limit…" = "修改上限…";
+
+"Open Settings at Sky Studio, where the daily limit for AI is set" = "打开设置里的 Sky Studio，在那里设置 AI 每日上限";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "Sky Studio 积分不够：余额 %1$@，这次需要 %2$@。这是你的 Sky Studio 余额，不是 SkyCut 的每日上限。可以在「%3$@」充值。";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "Sky Studio 积分不够。这是你的 Sky Studio 余额，不是 SkyCut 的每日上限。可以在「%@」充值。";
 
 "Theme" = "主题";
 

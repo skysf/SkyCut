@@ -379,6 +379,14 @@
   identity, the task row's localized words (the official preparation and a `/jobs` refusal too) and that SkyCut writes no
   limit number.
   Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
+- SkyCut's daily limit and Sky Studio's balance, as refusals (2026-11-24, MSG1): `scripts/check-sky-studio.sh` → `DailyLimitChecks`
+  (the numbers and the local-midnight reset in a fixed time zone; the suggested limit's friendly steps, float noise and the highest
+  limit; every field and the three options with the exact `set_settings` arguments; `budgetBlocked` / `decide` from a real store; the
+  raise asking through `AISettingsApproval` in full access; the settings path and the panels' line from every real string table)
+  and `BalanceRefusalChecks` (the refusal in request and job errors; the account, the numbers only when sent, the recharge address
+  fallback, the retry; the line and its path in every table). `checks/sky-studio-wiring/daily-limit.sh` pins one builder for each,
+  the three panels' note, the race paths, `SettingsNavigator` and the six paid jobs. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md)
+  section 11.
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the
   rendered brightness and total length in both pipelines (`LongCrossfade.swift`). Rule: [Transitions](../architecture/transition-handles.md).

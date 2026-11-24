@@ -72,6 +72,7 @@
 - [2026-09-23 滤镜卡片、音频库素材拖不进时间线（类型没声明）](2026-09-23-custom-drag-types-not-declared.md) — 自定义拖放类型必须在 Info.plist 声明。
 - [2026-10-18 listen cuts=true 说可以不改，cut_speech 却说切在字上](2026-10-18-cut-check-disagrees-with-cut-speech.md) — 检查类工具说「X 会怎么做」就用 X 的输入、读 X 的决定（`AISpeechHearing`）。
 - [2026-10-14 cut_speech 把量好的静音切口挪进词里](2026-10-14-cut-speech-trusts-word-times.md) — 为一个用途调过偏的数据不能当另一个用途的真相；改了调用方的值要说出来。
+- [2026-11-24 A request stopped by SkyCut's daily limit read like an empty Sky Studio balance](2026-11-24-daily-limit-refusal-unclear.md) — A refusal names the system that stopped it, the numbers and what the user can do, with the exact call when the AI can help; two refusals users confuse name each other.
 - [2026-11-11 设计声音的报价说不出用哪个模型](2026-11-11-design-quote-model-name.md) — 假服务要照真回答的形状造（`model` 在 `voice_plan.selection` 里）。
 - [2026-11-11 设计声音连按下了好几单](2026-11-11-design-voice-ordered-twice.md) — 会花钱的按钮按下去就锁，同一件事只开一单。
 - [2026-11-17 Detached camera audio was treated as an added sound](2026-11-17-detached-audio-listening-provenance.md) — Retained picture metadata identifies camera sound after detachment; moving it to an audio track does not make it an added layer.

@@ -1368,7 +1368,15 @@
 
 "AI pauses at this daily budget. Raise it in Settings to continue; permission mode never bypasses it." = "La IA se pausa al alcanzar este presupuesto diario. Auméntalo en Ajustes para continuar; ningún modo de permisos lo omite.";
 
-"Daily AI budget reached. Raise the daily budget in Settings > Sky Studio to continue." = "Se alcanzó el presupuesto diario de IA. Auméntalo en Ajustes > Sky Studio para continuar.";
+"SkyCut's own daily credit limit stops this, not your Sky Studio balance: %1$@ of %2$@ credits used today, and this needs %3$@. Raise it in %4$@, or wait until midnight, when it resets." = "Lo detiene el límite diario de créditos de SkyCut, no tu saldo de Sky Studio: hoy llevas %1$@ de %2$@ créditos y esto necesita %3$@. Súbelo en %4$@ o espera a la medianoche, cuando se reinicia.";
+
+"Change Limit…" = "Cambiar límite…";
+
+"Open Settings at Sky Studio, where the daily limit for AI is set" = "Abre Ajustes en Sky Studio, donde se fija el límite diario para la IA";
+
+"Not enough Sky Studio credits: your balance is %1$@ and this needs %2$@. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %3$@." = "No hay suficientes créditos de Sky Studio: tu saldo es %1$@ y esto necesita %2$@. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %3$@.";
+
+"Not enough Sky Studio credits. This is your Sky Studio balance, not SkyCut's daily limit. Add credits in %@." = "No hay suficientes créditos de Sky Studio. Es tu saldo de Sky Studio, no el límite diario de SkyCut. Añade créditos en %@.";
 
 "Theme" = "Tema";
 
