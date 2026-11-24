@@ -43,11 +43,12 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
     /// Formats that may hold an animation: several frames there are not one still image to take the first of.
     static let animated = ["image/gif", "image/png", "image/webp"]
 
-    /// The strictest limits of the models an image may be sent to; nil when none of them allows fitting (upload as before).
+    /// The strictest limits of the models an image may be sent to; nil when the chosen model (the first) does not allow fitting
+    /// (upload as before). Fitting is the chosen model's switch, but every model of the chain that publishes reference limits
+    /// bounds the copy, with `fit_images` or without: a fallback that took the original must take the copy too.
     static func strictest(_ models: [SkyStudioModel], mode: String) -> SkyStudioReferenceFit? {
-        let all = models.compactMap { SkyStudioReferenceFit(model: $0, mode: mode) }
-        guard var result = all.first else { return nil }
-        for next in all.dropFirst() {
+        guard let chosen = models.first, var result = SkyStudioReferenceFit(model: chosen, mode: mode) else { return nil }
+        for next in models.dropFirst().compactMap({ SkyStudioReferenceFit(limitsOf: $0, mode: mode) }) {
             result.maxBytes = stricter(result.maxBytes, next.maxBytes, by: min)
             result.maxTotalBytes = stricter(result.maxTotalBytes, next.maxTotalBytes, by: min)
             result.maxPixels = stricter(result.maxPixels, next.maxPixels, by: min)
@@ -221,7 +222,14 @@ extension SkyStudioReferenceFit {
     /// One model's limits, when its record allows fitting; nil for an older Sky Studio, a model without `fit_images`
     /// (video models, image upscale) or one with no reference limits.
     init?(model: SkyStudioModel, mode: String) {
-        guard let limits = model.referenceLimits(mode: mode), limits["fit_images"]?.boolValue == true else { return nil }
+        guard model.referenceLimits(mode: mode)?["fit_images"]?.boolValue == true else { return nil }
+        self.init(limitsOf: model, mode: mode)
+    }
+
+    /// One model's published limits whether or not it allows fitting (a fallback in the chain without `fit_images` still bounds
+    /// the copy it would be sent); nil only when the record has no reference limits.
+    init?(limitsOf model: SkyStudioModel, mode: String) {
+        guard let limits = model.referenceLimits(mode: mode) else { return nil }
         let sides = limits["image_dimensions"] ?? limits["media_dimensions"]
         let aspect = limits["media_aspect_ratio"]
         self.init(maxBytes: limits["max_image_bytes"]?.doubleValue, maxTotalBytes: limits["max_total_image_bytes"]?.doubleValue,

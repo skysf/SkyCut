@@ -47,10 +47,12 @@ enum MCPGuideMediaTopics {
             reference_videos and reference_audio lists within the model's limits. Where a model's record says fit_images (get_status \
             models=true lists count, formats, bytes, total and pixels), SkyCut fits each reference image to the strictest limits of the \
             chosen model and, with no model named, the defaults after it (so a fallback can tighten them): converted, re-encoded or \
-            downscaled, never upscaled; with max_total_image_bytes (all reference images together) the largest come down first, as \
-            little as needed and never below a 512 px long side; an image-upscale source is never shrunk. Too many images, an image too \
-            small or too narrow, an animation it cannot convert, or images too large together even at that floor is refused, and the \
-            error states each model's limit. lipsync takes a local video and audio (MP3 or WAV; its \
+            downscaled, never upscaled; with max_total_image_bytes (all reference images together) it re-encodes at full size first, \
+            then shrinks the largest, as little as needed and never below a 512 px long side; an image-upscale source is never shrunk. \
+            Too many images, an image too small or too narrow, or an animation it cannot convert is refused with each model's limit; \
+            images too large together even at that floor are refused with the combined limit. A character's views also count toward \
+            that total on the server (Seedream today) though SkyCut counts only your files: with a character, use fewer or smaller \
+            images. lipsync takes a local video and audio (MP3 or WAV; its \
             length is measured for the quote). character_id uses a Sky Studio character (list_characters; an id, never a file path) for \
             images and videos. character_roles picks views: without it the server chooses within the combined reference limits, and roles \
             you name are never dropped. A quote returns character_revision, which goes back unchanged; if the character's views change, \

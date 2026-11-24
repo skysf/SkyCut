@@ -74,6 +74,12 @@ enum SkyStudioOfficialPreparation {
                     status.issue = SkyStudioUploadWords.shown(failure)
                     detail.merge(failure.fields(retry: "repeat the same generate_media call with a new idempotency_key.")) { _, upload in upload }
                 }
+                if let failure = error as? SkyStudioReferenceFitFailure {
+                    // An image that cannot be fitted (reference-image-fitting.md): the row keeps the user's localized words, get_job
+                    // the English and what to change.
+                    status.issue = SkyStudioReferenceFitWords.shown(failure)
+                    detail["next_step"] = .string(SkyStudioReferenceFitFailure.preparedNextStep)
+                }
                 AIJobs.shared.finish(job, cancelled ? .cancelled : .failed, message: message, detail: .object(detail))
             }
         }

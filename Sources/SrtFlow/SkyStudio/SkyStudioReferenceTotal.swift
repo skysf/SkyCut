@@ -1,62 +1,59 @@
 import Foundation
 
 // MARK: - A request's reference images sharing a model's total byte limit (pure values)
-// What it does: where a model publishes `max_total_image_bytes` (every reference image of one request together; Seedream 5.0:
-// Sky Studio's inline budget), decides what happens to each image once each one meets its own limits. The largest come down
-// first, all to one common cap (the largest with Σ min(size, cap) within the total), and an image at or under the cap stays
-// byte-identical. An image whose smallest allowed copy is still over the cap (SkyCut's floor below) is held at that copy and the
-// others share what is left; when the held copies alone pass the total, the set is refused before anything is uploaded.
-// Not here: each image's own limits (SkyStudioReferenceFit), pixels and files (SkyStudioReferenceImageFit). The total comes from
-// /models; the floor is SkyCut's own rule for a reference that is still useful, not a model's limit.
+// What it does: where the models publish `max_total_image_bytes` (every reference image of one request together; Seedream 5.0:
+// Sky Studio's inline budget), brings a set whose images each meet their own limits within the total. It decides with real
+// encoded sizes, measured again after every step, and stops as soon as the set fits. First full-size steps: the largest image
+// takes its next one (a PNG written again, no pixel lost; a JPEG's next lower quality), kept only when smaller. Then sizes:
+// the largest image that can still shrink comes down to the common cap (the largest c with Σ min(size, c) within what is
+// left), never below SkyCut's floor. An image that cannot come down further keeps its smallest copy and the others make up for
+// it; when nothing can come down any more and the set is still over, it is refused before anything is uploaded. An image never
+// asked to step keeps its upload byte-identical.
+// Not here: encoding (SkyStudioReferenceImageFit gives each image its steps), each image's own limits (SkyStudioReferenceFit).
+// The total comes from /models; the floor is SkyCut's own rule for a reference that is still useful, not a model's limit.
 // Rules: docs/architecture/reference-image-fitting.md.
+
+/// One image of a set that shares a total, as the sharing sees it. The ImageIO side encodes real copies; checks pass synthetic
+/// ones. A step or a shrink keeps a new copy only when it is smaller than what the image has.
+protocol SkyStudioReferenceTotalImage {
+    /// Bytes of what goes up for it now.
+    var bytes: Double { get }
+    /// Its next full-size step (a PNG written again at full size; a JPEG's next lower quality): false when none is left.
+    mutating func step() throws -> Bool
+    /// The largest size within `cap` bytes, never below SkyCut's floor: false when even the floor is over (it then keeps
+    /// whichever of its copies is smallest, and comes down no further).
+    mutating func shrink(to cap: Double) throws -> Bool
+}
 
 enum SkyStudioReferenceTotal {
     /// SkyCut's floor for a copy made smaller to share a total: its long side stays at least this many pixels (an image already
-    /// smaller keeps its size: never upscaled) and a JPEG keeps at least the quality the byte search starts from. Below it a
-    /// reference loses most of its detail, so a set that would need less is refused instead.
+    /// smaller keeps its size: never upscaled) and a JPEG never goes below the lowest quality of its own fitting (0.8). Below it
+    /// a reference loses most of its detail, so a set that would need less is refused instead (user, 2026-11-24: keep it).
     static let floorEdge = 512.0
 
-    /// What one image of the set goes up as.
-    enum Target: Equatable, Sendable {
-        /// Its upload as it is: the original, or its copy fitted to its own limits.
-        case keep
-        /// A copy of at most this many bytes, as large as that allows.
-        case cap(Double)
-        /// Its smallest allowed copy: still over the cap there, so the others make up for it.
-        case smallest
-    }
-
-    /// The targets for uploads of `sizes` bytes that must share `total`, in order; nil when even the smallest allowed copies of
-    /// the images that must come down pass it. `smallest(i)` is image i's smallest allowed size in bytes, asked at most once
-    /// and only for an image over the cap (it encodes a copy).
-    static func share(_ sizes: [Double], total: Double, smallest: (Int) throws -> Double) rethrows -> [Target]? {
-        var floors: [Int: Double] = [:]
-        var held: [Int: Double] = [:]
-        // Each pass holds at least one more image or ends: at most one pass per image. Holding an image above the cap only lowers
-        // the cap of the others, so an image held once stays held.
-        while true {
-            let free = sizes.indices.filter { held[$0] == nil }
-            let budget = total - held.values.reduce(0, +)
-            guard budget >= 0 else { return nil }
-            let cap = level(free.map { sizes[$0] }, budget: budget)
-            var holding = false
-            for index in free where sizes[index] > cap {
-                if floors[index] == nil { floors[index] = min(sizes[index], try smallest(index)) }
-                if let floor = floors[index], floor > cap {
-                    held[index] = floor
-                    holding = true
-                }
-            }
-            if holding { continue }
-            return sizes.indices.map { index in
-                if let floor = held[index] { return floor < sizes[index] ? .smallest : .keep }
-                return sizes[index] > cap ? .cap(cap) : .keep
-            }
+    /// Brings `images` within `total`, as little as needed and the largest first; false when they cannot be brought within it.
+    static func share<Image: SkyStudioReferenceTotalImage>(_ images: inout [Image], total: Double) throws -> Bool {
+        func over() -> Bool { images.reduce(0) { $0 + $1.bytes } > total }
+        func largest(_ among: Set<Int>) -> Int? { among.max { images[$0].bytes < images[$1].bytes } }
+        // Full size first: every step is bounded (a PNG has one, a JPEG three), so this ends.
+        var stepping = Set(images.indices)
+        while over(), let index = largest(stepping) {
+            if try !images[index].step() { stepping.remove(index) }
         }
+        // Then sizes. Within one cap the caps only rise (a shrunk image leaves room), so an image shrinks at most once until
+        // another is held at its floor; the bound only guards against an encoder that does not keep its word.
+        var shrinking = Set(images.indices)
+        for _ in 0 ..< 4 * max(1, images.count * images.count) where over() {
+            let held = images.indices.filter { !shrinking.contains($0) }.reduce(0) { $0 + images[$1].bytes }
+            let cap = level(shrinking.map { images[$0].bytes }, budget: total - held)
+            guard let index = largest(shrinking), images[index].bytes > cap else { break }
+            if try !images[index].shrink(to: cap) { shrinking.remove(index) }
+        }
+        return !over()
     }
 
     /// The largest cap with Σ min(size, cap) ≤ budget: the largest sizes come down to it and the rest stay as they are;
-    /// infinity when every size fits as it is.
+    /// infinity when every size fits as it is, 0 when the budget is gone.
     static func level(_ sizes: [Double], budget: Double) -> Double {
         let sorted = sizes.sorted()
         var below = 0.0

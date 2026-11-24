@@ -403,6 +403,9 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if status == .failed || creditsUnconfirmed {
             self.status.issue = uploadFailure.map(SkyStudioUploadWords.shown) ?? message
         }
+        // Sky Studio refused the reference images as too large together (a character's views count there): the user's words.
+        let together = lastFailure?.reason == "too_large_together"
+        if together, let limit = lastFailure?.limit { self.status.issue = SkyStudioReferenceFitWords.together(limit: limit) }
         var payload = detail?.objectValue ?? [:]
         payload.merge(SkyStudioGenerationDuration.fields(for: generation, result: remoteResult)) { _, current in current }
         // 交上了就带任务号（停不下来的那单、没做成的那单也说得出是哪一单）。
@@ -436,6 +439,7 @@ final class SkyStudioGenerationRun: ObservableObject, Identifiable {
         if let code = lastFailure?.code, code.hasPrefix("character_") || code == "price_changed" || code == "not_found" {
             payload["next_step"] = .string(SkyStudioCharacterError.nextStep(code))
         }
+        if together { payload["next_step"] = .string(SkyStudioReferenceFitFailure.togetherNextStep(limit: lastFailure?.limit)) }
         if lastFailure?.code == "insufficient_credits" {
             payload["recharge_url"] = (lastFailure?.rechargeURL ?? SkyStudioAccount.shared.stored?.me.skycut.rechargeURL).map { .string($0.absoluteString) } ?? .null
             payload["next_step"] = "Nothing further will be generated. Notify the user in their conversation language of insufficient credits and provide recharge_url. Keep the original task identity; do not repeatedly ask for approval or retry payments."

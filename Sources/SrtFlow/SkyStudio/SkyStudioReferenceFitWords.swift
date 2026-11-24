@@ -24,8 +24,13 @@ enum SkyStudioReferenceFitWords {
         case .unreadable:
             return String(format: L10n("“%@” changed and is no longer a readable image. Nothing was charged."), failure.file)
         case .tooLargeTogether(let total, _):
-            return String(format: L10n("The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged."),
-                          text(total))
+            return together(limit: total)
         }
+    }
+
+    /// The images too large together: SkyCut's own refusal, or Sky Studio's (`too_large_together`, a character's views counted).
+    static func together(limit: Double) -> String {
+        String(format: L10n("The reference images are too large together for this model: at most %@ bytes for all of them. Send fewer or smaller images. Nothing was charged."),
+               SkyStudioReferenceFit.text(limit))
     }
 }

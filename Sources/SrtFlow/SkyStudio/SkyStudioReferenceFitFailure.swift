@@ -50,4 +50,17 @@ struct SkyStudioReferenceFitFailure: Error, Equatable, Sendable, LocalizedError 
 
     /// Paths that read `localizedDescription` (the official preparation's job) get the AI's English too.
     var errorDescription: String? { message }
+
+    /// get_job's next step when official references could not be prepared because an image cannot be fitted.
+    static let preparedNextStep = "Nothing was uploaded, reserved or charged. Tell the user what stopped it (message) and what to change: "
+        + "fewer or smaller images, or images the models take. Then prepare again (prepare_references=true) with a new idempotency_key."
+
+    /// get_job's next step when Sky Studio's /jobs refused the reference images as too large together, before creating a job.
+    static func togetherNextStep(limit: Double?) -> String {
+        "Sky Studio refused the reference images before creating a job: together they pass the model's limit of "
+            + (limit.map { "\(SkyStudioReferenceFit.text($0)) bytes" } ?? "bytes") + " for all of them, a character's views included. "
+            + "Nothing was submitted or charged, so there is no original job to query. Tell the user and change the request: fewer or "
+            + "smaller images, fewer character views (character_roles), or a model without that total; then call generate_media again "
+            + "with a new idempotency_key."
+    }
 }

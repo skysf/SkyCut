@@ -115,8 +115,9 @@ enum SkyStudioReferenceFiles {
         var inputs: [String: String] = [:]
         if let webURL = plan.webURL { inputs["web_url"] = webURL }
         var references: [JSONValue] = []
-        // Every reference is prepared before the first upload: an image over the published limits of the model and its fallbacks
-        // goes up as a fitted copy, and images over a total for all of them together share it (reference-image-fitting.md).
+        // Every reference is prepared before the first upload: each image from a stable copy taken before it is measured (what was
+        // checked is what goes up), one over the published limits of the model and its fallbacks as a fitted copy, and images over
+        // a total for all of them together sharing it (reference-image-fitting.md).
         let prepared = try await SkyStudioReferenceImageFit.prepare(plan.files, fit: plan.fit)
         defer { prepared.forEach { $0.cleanUp() } }
         for (index, (file, sent)) in zip(plan.files, prepared).enumerated() {
