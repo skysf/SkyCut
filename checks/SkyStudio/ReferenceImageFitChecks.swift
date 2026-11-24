@@ -9,11 +9,13 @@ import SrtFlowMCPKit
 // same), then the copy SkyCut would upload is read back: size, format, alpha, orientation, colour profile, and the PUT to the
 // fake Sky Studio carries the fitted bytes. Nothing here reads the user's files.
 
-private struct FitFixture {
+struct FitFixture {
     let folder: URL
 
-    /// A width × height picture: noise (JPEG-hostile, so bytes stay high) or a flat colour with a red top-left marker.
-    func picture(_ width: Int, _ height: Int, noise: Bool = false, alpha: Bool = false, space: CFString = CGColorSpace.sRGB) -> CGImage {
+    /// A width × height picture: noise (JPEG-hostile, so bytes stay high), a smooth gradient (a PNG's filters matter), or a flat
+    /// colour with a red top-left marker.
+    func picture(_ width: Int, _ height: Int, noise: Bool = false, alpha: Bool = false, space: CFString = CGColorSpace.sRGB,
+                 gradient: Bool = false) -> CGImage {
         let info = alpha ? CGImageAlphaInfo.premultipliedLast.rawValue : CGImageAlphaInfo.noneSkipLast.rawValue
         let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8, bytesPerRow: 0,
                                 space: CGColorSpace(name: space)!, bitmapInfo: info)!
@@ -22,6 +24,16 @@ private struct FitFixture {
             for index in 0 ..< context.bytesPerRow * height {
                 seed = seed &* 1_664_525 &+ 1_013_904_223
                 pixels[index] = UInt8(truncatingIfNeeded: seed >> 24)
+            }
+        } else if gradient, let pixels = context.data?.assumingMemoryBound(to: UInt8.self) {
+            for y in 0 ..< height {
+                for x in 0 ..< width {
+                    let index = y * context.bytesPerRow + x * 4
+                    pixels[index] = UInt8(x * 255 / width)
+                    pixels[index + 1] = UInt8(y * 255 / height)
+                    pixels[index + 2] = UInt8((x + y) * 127 / (width + height))
+                    pixels[index + 3] = 255
+                }
             }
         } else {
             context.setFillColor(red: 0.2, green: 0.4, blue: 0.9, alpha: alpha ? 0.5 : 1)
@@ -32,12 +44,14 @@ private struct FitFixture {
         return context.makeImage()!
     }
 
-    /// Writes `image` as `type`; `orientation` goes into the file's metadata (the pixels stay as stored).
-    func write(_ image: CGImage, _ name: String, type: UTType, quality: Double = 1, orientation: Int? = nil) -> URL {
+    /// Writes `image` as `type`; `orientation` goes into the file's metadata (the pixels stay as stored); `pngFilter` picks the
+    /// PNG filter (0x08: none, so a smooth picture comes out about ten times larger than ImageIO writes it by default).
+    func write(_ image: CGImage, _ name: String, type: UTType, quality: Double = 1, orientation: Int? = nil, pngFilter: Int? = nil) -> URL {
         let url = folder.appendingPathComponent(name)
         let destination = CGImageDestinationCreateWithURL(url as CFURL, type.identifier as CFString, 1, nil)!
         var properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
         if let orientation { properties[kCGImagePropertyOrientation] = orientation }
+        if let pngFilter { properties[kCGImagePropertyPNGDictionary] = [kCGImagePropertyPNGCompressionFilter: pngFilter] }
         CGImageDestinationAddImage(destination, image, properties as CFDictionary)
         _ = CGImageDestinationFinalize(destination)
         return url
@@ -58,11 +72,11 @@ private func fitLimits(bytes: Double? = nil, pixels: Double? = nil, minSide: Dou
     return SkyStudioReferenceFit(model: fitRecord("model", title: "Model", references), mode: "images")!
 }
 
-private struct ReadBack {
+struct ReadBack {
     var width: Int, height: Int, type: String?, alpha: Bool, space: String?, orientation: Int, topLeftRed: Bool, topRightRed: Bool
 }
 
-private func readBack(_ url: URL) -> ReadBack? {
+func readBack(_ url: URL) -> ReadBack? {
     guard let source = CGImageSourceCreateWithURL(url as CFURL, nil), let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
           let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any] else { return nil }
     /// Whether the image's top-left (or top-right) pixel is red: drawn into a 1×1 context (Core Graphics' origin is bottom-left).
@@ -90,8 +104,9 @@ func runReferenceImageFitChecks() async {
     let noisy = fixture.write(fixture.picture(900, 600, noise: true), "noisy.jpg", type: .jpeg)
     let noisyImage = fixture.measured(noisy)
     let atLimit = try? await SkyStudioReferenceImageFit.prepare(noisyImage, fit: fitLimits(bytes: noisyImage.bytes), folder: output)
-    checkEqual(atLimit?.url, noisy, "a JPEG exactly at the byte limit is uploaded as it is (the original file)")
-    checkEqual(atLimit?.temporary, false, "and nothing temporary is made")
+    check(atLimit.flatMap { try? Data(contentsOf: $0.url) } == (try? Data(contentsOf: noisy)), "a JPEG exactly at the byte limit is uploaded as it is (its bytes)")
+    check(atLimit.map { $0.temporary && $0.url != noisy } == true, "from a stable copy (a snapshot), never the user's path again")
+    atLimit?.cleanUp()
     let target = (noisyImage.bytes * 0.5).rounded()
     if let sent = try? await SkyStudioReferenceImageFit.prepare(noisyImage, fit: fitLimits(bytes: target), folder: output), let back = readBack(sent.url) {
         check(sent.temporary && sent.url != noisy, "a JPEG over the byte limit goes up as a fitted copy")
@@ -105,7 +120,8 @@ func runReferenceImageFitChecks() async {
     // Pixels: a transparent PNG one row over / at the pixel limit stays PNG with its alpha.
     let cutout = fixture.write(fixture.picture(600, 400, alpha: true), "cutout.png", type: .png)
     let cutoutImage = fixture.measured(cutout)
-    checkEqual((try? await SkyStudioReferenceImageFit.prepare(cutoutImage, fit: fitLimits(pixels: 240_000), folder: output))?.url, cutout,
+    checkEqual((try? await SkyStudioReferenceImageFit.prepare(cutoutImage, fit: fitLimits(pixels: 240_000), folder: output)).flatMap { try? Data(contentsOf: $0.url) },
+               try? Data(contentsOf: cutout),
                "exactly at the pixel limit: the original")
     if let sent = try? await SkyStudioReferenceImageFit.prepare(cutoutImage, fit: fitLimits(pixels: 239_999), folder: output), let back = readBack(sent.url) {
         checkEqual(back.type, "image/png", "a transparent PNG stays PNG")

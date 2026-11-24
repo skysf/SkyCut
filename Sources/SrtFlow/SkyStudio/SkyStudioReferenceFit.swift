@@ -3,15 +3,18 @@ import SrtFlowMCPKit
 
 // MARK: - Fitting a reference image to the models' published limits (pure values)
 // What it does: reads a model's reference-image limits from /models, but only when its record says `fit_images: true`
-// (`max_image_bytes`, `max_image_pixels`, `image_dimensions` / `media_dimensions` min and max side, the aspect range,
-// `image_mime_types`); merges the limits of the chosen model and its fallbacks into the strictest; and decides for one
-// measured image: upload it unchanged, fit it (convert, re-encode, downscale; never upscale), or refuse it with the limit.
-// Not here: pixels and files (SkyStudioReferenceImageFit), which models form the chain (SkyStudioModelPolicy.fallbacks),
-// uploading (SkyStudioReferenceFiles). Every number comes from the server's catalog; none is written here.
+// (`max_image_bytes`, `max_total_image_bytes`, `max_image_pixels`, `image_dimensions` / `media_dimensions` min and max side,
+// the aspect range, `image_mime_types`); merges the limits of the chosen model and its fallbacks into the strictest; and decides
+// for one measured image: upload it unchanged, fit it (convert, re-encode, downscale; never upscale), or refuse it with the limit.
+// Not here: pixels and files (SkyStudioReferenceImageFit), sharing a total among the images (SkyStudioReferenceTotal), which
+// models form the chain (SkyStudioModelPolicy.fallbacks), uploading (SkyStudioReferenceFiles). Every number comes from the
+// server's catalog; none is written here.
 // Rules: docs/architecture/reference-image-fitting.md.
 
 struct SkyStudioReferenceFit: Equatable, Sendable {
     var maxBytes: Double?
+    /// Every reference image of one request together; nil: no total (SkyStudioReferenceTotal shares it).
+    var maxTotalBytes: Double?
     var maxPixels: Double?
     var maxSide: Double?
     var minSide: Double?
@@ -40,12 +43,14 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
     /// Formats that may hold an animation: several frames there are not one still image to take the first of.
     static let animated = ["image/gif", "image/png", "image/webp"]
 
-    /// The strictest limits of the models an image may be sent to; nil when none of them allows fitting (upload as before).
+    /// The strictest limits of the models an image may be sent to; nil when the chosen model (the first) does not allow fitting
+    /// (upload as before). Fitting is the chosen model's switch, but every model of the chain that publishes reference limits
+    /// bounds the copy, with `fit_images` or without: a fallback that took the original must take the copy too.
     static func strictest(_ models: [SkyStudioModel], mode: String) -> SkyStudioReferenceFit? {
-        let all = models.compactMap { SkyStudioReferenceFit(model: $0, mode: mode) }
-        guard var result = all.first else { return nil }
-        for next in all.dropFirst() {
+        guard let chosen = models.first, var result = SkyStudioReferenceFit(model: chosen, mode: mode) else { return nil }
+        for next in models.dropFirst().compactMap({ SkyStudioReferenceFit(limitsOf: $0, mode: mode) }) {
             result.maxBytes = stricter(result.maxBytes, next.maxBytes, by: min)
+            result.maxTotalBytes = stricter(result.maxTotalBytes, next.maxTotalBytes, by: min)
             result.maxPixels = stricter(result.maxPixels, next.maxPixels, by: min)
             result.maxSide = stricter(result.maxSide, next.maxSide, by: min)
             result.minSide = stricter(result.minSide, next.minSide, by: max)
@@ -129,21 +134,44 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
         return allowed.contains("image/jpeg") ? "image/jpeg" : allowed.first
     }
 
-    /// One line per image that will be fitted, for the tool's answer: the AI tells the user before delivery.
+    /// One line per image that will be fitted, for the tool's answer: the AI tells the user before delivery. Plus one line when the
+    /// images look over a total for all of them together (a copy's exact size is only known once it is written).
     static func notes(_ plan: SkyStudioReferencePlan) -> [String] {
         guard let fit = plan.fit else { return [] }
-        return plan.files.compactMap { file in
+        let titles = fit.modelTitles.joined(separator: " / ")
+        var notes = plan.files.compactMap { file -> String? in
             guard file.type == "image", case .fit(let how) = fit.decide(file) else { return nil }
-            return "\(file.file.lastPathComponent) is fitted to the reference limits of \(fit.modelTitles.joined(separator: " / ")) before upload "
+            return "\(file.file.lastPathComponent) is fitted to the reference limits of \(titles) before upload "
                 + "(\(how.reasons.joined(separator: "; "))): sent as \(how.contentType)\(how.scale < 1 ? ", downscaled" : ""); the original file is unchanged."
         }
+        let images = plan.files.filter { $0.type == "image" }
+        let about = images.reduce(0) { $0 + fit.uploadEstimate($1) }
+        if let total = fit.maxTotalBytes, about > total {
+            notes.append("Together the \(images.count) reference images come to about \(text(about.rounded())) bytes, over the \(text(total)) bytes \(titles) "
+                + "take for all of them: before upload SkyCut makes the largest smaller still, as little as needed and never below a "
+                + "\(text(SkyStudioReferenceTotal.floorEdge)) px long side; the original files are unchanged.")
+        }
+        return notes
+    }
+
+    /// About how many bytes an image goes up as after its own limits: a pixel cut shrinks it with the area, a byte limit caps it.
+    func uploadEstimate(_ image: SkyStudioReference) -> Double {
+        guard case .fit(let plan) = decide(image) else { return image.bytes }
+        return min(image.bytes * plan.scale * plan.scale, maxBytes ?? .infinity)
+    }
+
+    /// These limits with the byte limit lowered to `bytes`: an image's share of a total for all the images together.
+    func capped(_ bytes: Double) -> SkyStudioReferenceFit {
+        var capped = self
+        capped.maxBytes = min(maxBytes ?? bytes, bytes)
+        return capped
     }
 
     /// The limits as one value: an upload prepared for other limits must not be reused (official prepared references).
     var json: JSONValue {
         var value: [String: JSONValue] = [:]
-        for (key, number) in [("max_bytes", maxBytes), ("max_pixels", maxPixels), ("max_side", maxSide), ("min_side", minSide),
-                              ("min_aspect", minAspect), ("max_aspect", maxAspect)] {
+        for (key, number) in [("max_bytes", maxBytes), ("max_total_bytes", maxTotalBytes), ("max_pixels", maxPixels), ("max_side", maxSide),
+                              ("min_side", minSide), ("min_aspect", minAspect), ("max_aspect", maxAspect)] {
             if let number { value[key] = .number(number) }
         }
         if let mimeTypes { value["mime_types"] = .array(mimeTypes.map(JSONValue.string)) }
@@ -163,17 +191,25 @@ struct SkyStudioReferenceFit: Equatable, Sendable {
 
 extension SkyStudioReferenceFit {
     /// The largest copy at or below scale `high` that comes under `maxBytes`, to within 1 % of scale: an estimate from
-    /// √(limit / bytes) first, smaller steps until one fits, then halving the gap to the smallest size that did not.
+    /// √(limit / bytes) first, smaller steps until one fits, then halving the gap to the smallest size that did not. Never below
+    /// `lowest` (SkyCut's floor when the images share a total): a step that would pass it, or steps that run out above it, try
+    /// `lowest` itself last, so a copy that fits at the floor is always found.
     /// `encode` gives the copy at a scale, or nil when that size would break a pixel limit (a side below the minimum).
     /// Generic over the copy so the search itself is checked; the writer passes encoded images.
-    static func largestFitting<Copy>(below high: Double, firstBytes: Int, maxBytes: Double, bytesOf: (Copy) -> Int,
+    static func largestFitting<Copy>(below high: Double, lowest: Double = 0, firstBytes: Int, maxBytes: Double, bytesOf: (Copy) -> Int,
                                      encode: (Double) throws -> Copy?) rethrows -> Copy? {
         var high = high
-        var low = high * (maxBytes / Double(max(1, firstBytes))).squareRoot()
+        var low = max(lowest, high * (maxBytes / Double(max(1, firstBytes))).squareRoot())
         var found: Copy?
         for _ in 0 ..< 12 where found == nil {
             guard let next = try encode(low) else { return nil }
-            if Double(bytesOf(next)) <= maxBytes { found = next } else { high = low; low *= min(0.97, (maxBytes / Double(bytesOf(next))).squareRoot()) }
+            if Double(bytesOf(next)) <= maxBytes { found = next }
+            else if low <= lowest { return nil }
+            else { high = low; low = max(lowest, low * min(0.97, (maxBytes / Double(bytesOf(next))).squareRoot())) }
+        }
+        if found == nil, lowest > 0 {
+            guard let floor = try encode(lowest), Double(bytesOf(floor)) <= maxBytes else { return nil }
+            (found, low) = (floor, lowest)
         }
         guard var best = found else { return nil }
         while (high - low) / high > 0.01 {
@@ -186,10 +222,18 @@ extension SkyStudioReferenceFit {
     /// One model's limits, when its record allows fitting; nil for an older Sky Studio, a model without `fit_images`
     /// (video models, image upscale) or one with no reference limits.
     init?(model: SkyStudioModel, mode: String) {
-        guard let limits = model.referenceLimits(mode: mode), limits["fit_images"]?.boolValue == true else { return nil }
+        guard model.referenceLimits(mode: mode)?["fit_images"]?.boolValue == true else { return nil }
+        self.init(limitsOf: model, mode: mode)
+    }
+
+    /// One model's published limits whether or not it allows fitting (a fallback in the chain without `fit_images` still bounds
+    /// the copy it would be sent); nil only when the record has no reference limits.
+    init?(limitsOf model: SkyStudioModel, mode: String) {
+        guard let limits = model.referenceLimits(mode: mode) else { return nil }
         let sides = limits["image_dimensions"] ?? limits["media_dimensions"]
         let aspect = limits["media_aspect_ratio"]
-        self.init(maxBytes: limits["max_image_bytes"]?.doubleValue, maxPixels: limits["max_image_pixels"]?.doubleValue,
+        self.init(maxBytes: limits["max_image_bytes"]?.doubleValue, maxTotalBytes: limits["max_total_image_bytes"]?.doubleValue,
+                  maxPixels: limits["max_image_pixels"]?.doubleValue,
                   maxSide: sides?["max_side"]?.doubleValue, minSide: sides?["min_side"]?.doubleValue,
                   minAspect: Self.stricter(limits["min_image_aspect_ratio"]?.doubleValue, aspect?["min"]?.doubleValue, by: max),
                   maxAspect: Self.stricter(limits["max_image_aspect_ratio"]?.doubleValue, aspect?["max"]?.doubleValue, by: min),

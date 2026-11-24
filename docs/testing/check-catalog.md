@@ -368,9 +368,16 @@
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,
   the AI's note) and `ReferenceImageFitChecks` (real ImageIO files: bytes, size, JPEG / PNG and alpha, upright orientation,
   Display P3 kept, a 16:1 PNG over its byte limit stays 16:1 at the largest size that fits, a file rewritten after the quote
-  measured again, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes).
-  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path, the second measurement, both tools' chain target and
-  refusal list, the official identity, the task row's localized words and that SkyCut writes no limit number.
+  measured again, never upscaled, the copy removed, the PUT to the fake Sky Studio carries the fitted bytes),
+  `ReferenceTotalChecks` (a total for all the images, pure: every chain model bounding the copy, the exact 512 px floor, sharing
+  by real sizes over synthetic images: full size first and the largest first, then sizes to the common cap, held at the floor,
+  a set that cannot be met; the refusals' next steps and the guide's clause) and `ReferenceTotalImageChecks` (real files: a JPEG
+  step that spares the PNG beside it, a PNG written again at full size, an image held at exactly 512 × 438, an unmet set, a
+  fallback without `fit_images`, a file replaced after the check still uploaded as checked).
+  `checks/sky-studio-wiring/reference-fit.sh` pins the upload path (the whole set prepared first from snapshots, the total
+  shared with real copies), the measurement from the snapshot, both tools' chain target and refusal list, the official
+  identity, the task row's localized words (the official preparation and a `/jobs` refusal too) and that SkyCut writes no
+  limit number.
   Rule: [Reference-image fitting](../architecture/reference-image-fitting.md).
 - Picture transitions: `scripts/check-mcp.sh` → `TransitionReportChecks` preserves 1.042 seconds when both handles suffice,
   reports shortening limits and reasons, and preserves legacy overlapping seams; `scripts/check-video-fade.sh` checks the

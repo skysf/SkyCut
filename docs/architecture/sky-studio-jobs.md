@@ -294,7 +294,8 @@ Manual regression before a release (the checks cannot cut a real uplink):
   限制只从服务端读，不能抄一份常量冒充模型能力。报价带实际图片数量、参考视频总秒数；有序上传后经 `inputs.references` 原样发；审批身份绑所有本机文件与顺序。
   服务端自己探真实素材并在扣费前核对 `max_credits`。成品下载到「生成」文件夹，作品库也永久保留。
   Since 2026-11-23 a reference image goes up unchanged when it meets the strictest published limits of the chosen model and its
-  fallbacks (`fit_images` in `/models`), and is otherwise converted, re-encoded or downscaled just enough, never upscaled
+  fallbacks (`fit_images` in `/models`), and is otherwise converted, re-encoded or downscaled just enough, never upscaled; since
+  2026-11-24 a total for all the images of a request (`max_total_image_bytes`) is shared, the largest made smaller first
   ([Reference-image fitting](reference-image-fitting.md)); videos, audio and documents go up as they are.
 - **不自动替换**（2026-10-31 用户要求，覆盖 10-30 的自动切模型策略）：任何模型失败、拒绝或状态未知都不自动重生成、切模型或重放收费 POST。
   `auto_fallback=true` 明确拒绝，false 只为旧客户端兼容。用户另行批准的新生成使用新 key / 新预算。`get_job` 在本机任务结束后也只 GET 原服务器任务，更新 billing 与原结果地址。

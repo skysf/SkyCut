@@ -157,8 +157,8 @@ func runReferenceFitChecks() {
           "the refusal states each model's limit: \(fifteenRefusal)")
     check(!fifteenRefusal.contains("qwen-angles"), "only models for the asked operation are listed")
 
-    // Sky Studio's own image records (PR #262's buildSkycutModelCatalog, checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json).
-    let fixture = URL(fileURLWithPath: "checks/SkyStudio/Fixtures/models-reference-images-2026-11-23.json")
+    // Sky Studio's own image records (PR #263's catalog, checks/SkyStudio/Fixtures/models-reference-images-2026-11-24.json).
+    let fixture = URL(fileURLWithPath: "checks/SkyStudio/Fixtures/models-reference-images-2026-11-24.json")
     if let data = try? Data(contentsOf: fixture), let json = try? JSONValue.decode(data), let published = SkyStudioCatalog(json: json) {
         for id in ["nano2", "nano2-lite", "nano-banana-pro", "gpt-image-2", "seedream5-flash", "seedream5-pro", "qwen-angles", "ideogram-remove-background"] {
             check(published.model(id, kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") } != nil, "\(id)'s record lets SkyCut fit images")
@@ -167,20 +167,36 @@ func runReferenceFitChecks() {
               "image upscale's record does not: a source to enlarge is never shrunk")
         let removal = published.model("ideogram-remove-background", kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") }
         checkEqual(removal?.maxBytes, 10_000_000, "background removal's flat limits are read (decimal 10 MB)")
+        let gpt = published.model("gpt-image-2", kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") }
+        checkEqual(gpt?.maxBytes, 25_000_000, "GPT Image 2: fal's 25,000,000 bytes a file")
+        checkEqual(gpt?.maxTotalBytes, nil, "and no total")
+        for id in ["seedream5-flash", "seedream5-pro"] {
+            let seedream = published.model(id, kind: "image").flatMap { SkyStudioReferenceFit(model: $0, mode: "images") }
+            checkEqual(seedream?.maxBytes, 7_340_032, "\(id): Sky Studio's inline budget per image")
+            checkEqual(seedream?.maxTotalBytes, 7_340_032, "\(id): and for all reference images together")
+            checkEqual(seedream?.mimeTypes, ["image/jpeg", "image/png", "image/webp"], "\(id): JPEG, PNG and WebP (no BMP inline)")
+        }
+        if let flashRecord = published.model("seedream5-flash", kind: "image") {
+            checkEqual(flashRecord.json["limits"]?["references"]?["max_total_image_bytes"]?.doubleValue, 7_340_032,
+                       "get_status models=true shows the AI the total (the record passes through unchanged)")
+        } else { check(false, "the published catalog lists seedream5-flash") }
         if let nano2 = published.model("nano2", kind: "image") {
             let chain = SkyStudioModelPolicy.chain(catalog: published, kind: "image", requested: nil, chosen: nano2)
             checkEqual(chain.map(\.id), ["nano2", "seedream5-flash"], "the published catalog's default chain")
             let target = SkyStudioReferenceFit.strictest(chain, mode: "images")
-            checkEqual(target?.maxBytes, 30_000_000, "fitted to Seedream's published 30,000,000 bytes")
+            checkEqual(target?.maxBytes, 7_340_032, "fitted to Seedream's published 7,340,032 bytes")
+            checkEqual(target?.maxTotalBytes, 7_340_032, "and its total for all reference images together")
             checkEqual(target?.maxPixels, 36_000_000, "and its 36,000,000 pixels")
             checkEqual(SkyStudioReferenceFit.strictest([nano2], mode: "images")?.maxBytes, 31_457_280, "Nano Banana 2 named alone: its 30 MiB")
+            checkEqual(SkyStudioReferenceFit.strictest([nano2], mode: "images")?.maxTotalBytes, nil, "and no total")
             let scan = fitImage(1000, 800, name: "scan.bmp", bytes: 2_400_000, type: "image/bmp")
             if case .fit(let plan)? = target?.decide(scan) { checkEqual(plan.contentType, "image/jpeg", "a BMP for the default chain becomes JPEG (Nano Banana 2 takes no BMP)") }
             else { check(false, "a BMP for the default chain is converted") }
             let flash = published.model("seedream5-flash", kind: "image").flatMap { SkyStudioReferenceFit.strictest([$0], mode: "images") }
-            checkEqual(flash?.decide(scan), .asIs, "Seedream 5.0 Flash named alone takes a BMP as it is (Ark lists BMP)")
+            if case .fit(let plan)? = flash?.decide(scan) { checkEqual(plan.contentType, "image/jpeg", "Seedream 5.0 Flash named alone: a BMP becomes JPEG too (#263 sends inline, no BMP)") }
+            else { check(false, "a BMP for Seedream 5.0 Flash is converted") }
         } else { check(false, "the published catalog lists nano2") }
-    } else { check(false, "Sky Studio's 2026-11-23 image records load") }
+    } else { check(false, "Sky Studio's 2026-11-24 image records load") }
 
     // What the AI is told.
     var planned = big

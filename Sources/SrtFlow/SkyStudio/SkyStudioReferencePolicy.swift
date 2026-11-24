@@ -116,6 +116,12 @@ struct SkyStudioReferencePlan: Equatable, Sendable {
         }
         let allBytes = files.reduce(0) { $0 + $1.bytes }
         if let max = limits["max_total_bytes"]?.doubleValue, allBytes > max { return "The reference files exceed \(model.title)'s total size limit." }
+        // A fit_images model's total for all reference images is shared at upload time (SkyStudioReferenceTotal); without
+        // fit_images it is refused here, like its other limits.
+        let imageBytes = files.filter { $0.type == "image" }.reduce(0) { $0 + $1.bytes }
+        if fitting == nil, let max = limits["max_total_image_bytes"]?.doubleValue, imageBytes > max {
+            return "The reference images exceed \(model.title)'s total image size limit (\(Int(max)) bytes)."
+        }
         let videoBytes = files.filter { $0.type == "video" }.reduce(0) { $0 + $1.bytes }
         if let max = limits["max_total_video_bytes_exclusive"]?.doubleValue, videoBytes >= max { return "The reference videos must total less than \(Int(max)) bytes for \(model.title)." }
         return nil

@@ -46,6 +46,8 @@ struct SkyStudioJobFailure: Equatable, Sendable {
     var balance: Double?
     var needed: Double?
     var rechargeURL: URL?
+    /// The limit a refusal names (`too_large_together`: the model's total for all reference images, a character's views included).
+    var limit: Double?
     /// 声音：`one_time_required`（409）、`fallback_needs_one_time`（任务结束码）附带的一次性费用；没有是空的。
     var oneTime: [SkyStudioVoiceOneTime] = []
 
@@ -61,6 +63,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         balance = fields["balance"]?.doubleValue
         needed = fields["needed"]?.doubleValue
         rechargeURL = SkyStudioLinks.webURL(fields["recharge_url"]?.stringValue)
+        limit = fields["limit"]?.doubleValue
         oneTime = SkyStudioVoiceOneTime.list(fields["one_time"]) ?? []
     }
 
@@ -78,6 +81,7 @@ struct SkyStudioJobFailure: Equatable, Sendable {
         if let balance { value["balance"] = .number(balance) }
         if let needed { value["needed"] = .number(needed) }
         if let rechargeURL { value["recharge_url"] = .string(rechargeURL.absoluteString) }
+        if let limit { value["limit"] = .number(limit) }
         if !oneTime.isEmpty { value["one_time"] = .array(oneTime.map(\.json)) }
         return .object(value)
     }
