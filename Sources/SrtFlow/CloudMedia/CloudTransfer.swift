@@ -111,6 +111,12 @@ final class CloudTransferDelegate: NSObject, URLSessionDataDelegate, URLSessionD
         report(totalBytesWritten, of: totalBytesExpectedToWrite)
     }
 
+    /// A resumed download (SkyStudioAPI.download): progress goes on from the bytes already on disk (0 when the server sent it all
+    /// again); `didWriteData` then counts from there.
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didResumeAtOffset fileOffset: Int64, expectedTotalBytes: Int64) {
+        report(fileOffset, of: expectedTotalBytes)
+    }
+
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         // 这个回调一返回，系统就删 `location`：当场挪走。
         guard let destination = moveDestination else { return }

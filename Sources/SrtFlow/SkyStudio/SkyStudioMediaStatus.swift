@@ -23,6 +23,9 @@ final class SkyStudioMediaStatus: ObservableObject, Identifiable {
     @Published var stepNote: String?
     /// 分几批交的配旁白：几批好了 / 共几批、几批在跑、几批等空位（状态行照它写，不造百分比）；一批的、别的生成是 nil。
     @Published private(set) var batches: SkyStudioVoiceBatchBoard?
+    /// Set while a paid result whose download gave up can be downloaded again (the row's Download again button; generate_media with
+    /// the same idempotency_key): it downloads the same result, nothing is submitted or charged. nil otherwise.
+    @Published var retryDownload: (() -> Void)?
     var onCancel: () -> Void = {}
 
     init(kindLabel: String, modelTitle: String, credits: Double?, uploads: Bool, title: String? = nil,

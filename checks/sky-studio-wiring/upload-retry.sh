@@ -120,5 +120,5 @@ fenced="$(awk '
 grep -qxF 'scripts/debug-hook-probe.sh "$BUILD_DIR/$PRODUCT"' scripts/build-app.sh \
   || fail "scripts/build-app.sh: the release binary must go through scripts/debug-hook-probe.sh before it is packaged"
 grep -qxF '/bin/bash scripts/debug-hook-probe.sh "$OUT"' scripts/check-sky-studio.sh \
-  && grep -qF 'if /bin/bash scripts/debug-hook-probe.sh "$DEBUG_OUT" > /dev/null 2>&1; then' scripts/check-sky-studio.sh \
+  && grep -qF 'if PROBE_OUT="$(/bin/bash scripts/debug-hook-probe.sh "$DEBUG_OUT" 2>&1)"; then' scripts/check-sky-studio.sh \
   || fail "scripts/check-sky-studio.sh: the probe must pass the build without DEBUG and refuse the debug build (the control)"

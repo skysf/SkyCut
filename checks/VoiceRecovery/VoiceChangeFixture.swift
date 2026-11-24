@@ -10,6 +10,8 @@ import SrtFlowMCPKit
 // conversion alone (5 credits, `voice_plan.skip_separation: true`) and its job returns `voice_url` without `background_url`;
 // `separationFails` ends a default job with `separation_failed` keeping the separation's part; `quoteIgnoresSkip` is a server
 // that does not know the parameter; `omitBackground` a default result without its background.
+// Downloads (2026-11-24, VoiceChangeDownloadChecks): `fileDrops` loses the connection of that many result GETs; `expireVoiceFile`
+// answers the voice file's first GET 403, after which the job's result names a fresh address (`voice-fresh.wav`).
 
 final class VoiceChangeHTTP: URLProtocol {
     static let lock = NSLock()
@@ -40,6 +42,11 @@ final class VoiceChangeHTTP: URLProtocol {
     static var omitBackground = false
     /// Whether the last POST /jobs asked for a direct change (GET /jobs/{id} answers for that job).
     static var jobDirect = false
+    /// Result GETs still to lose their connection.
+    static var fileDrops = 0
+    /// The voice file's first GET is refused (403, an expired address); the job's result then names a fresh one.
+    static var expireVoiceFile = false
+    static var voiceRenamed = false
 
     static let voiceID = "voice_9b1deb4d3b7d4bad9bdd2b0d7b3dcb6d"
     static let session: URLSession = {
@@ -55,6 +62,7 @@ final class VoiceChangeHTTP: URLProtocol {
         libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
+        fileDrops = 0; expireVoiceFile = false; voiceRenamed = false
     }
 
     static var log: [(method: String, path: String, body: JSONValue)] { lock.lock(); defer { lock.unlock() }; return requests }
@@ -118,7 +126,11 @@ final class VoiceChangeHTTP: URLProtocol {
     // 调用时已经拿着锁。nil = 断网。
     private static func answer(_ method: String, _ path: String, _ body: JSONValue, _ data: Data) -> (Int, JSONValue, Data?)? {
         if path.hasSuffix("/models") { return (200, VoiceRecoveryHTTP.catalog, nil) }
-        if path.hasSuffix("/files/voice.wav") { return (200, [:], wave(seconds: sourceSeconds + voiceExtraSeconds)) }
+        if path.contains("/files/"), fileDrops > 0 { fileDrops -= 1; return nil }
+        if path.hasSuffix("/files/voice.wav"), expireVoiceFile { expireVoiceFile = false; voiceRenamed = true; return (403, [:], Data("expired".utf8)) }
+        if path.hasSuffix("/files/voice.wav") || path.hasSuffix("/files/voice-fresh.wav") {
+            return (200, [:], wave(seconds: sourceSeconds + voiceExtraSeconds))
+        }
         if path.hasSuffix("/files/background.wav") { return (200, [:], wave(seconds: backgroundSeconds ?? sourceSeconds)) }
         if path.hasPrefix("/put/") { uploads.append(data); return (200, [:], Data()) }
         if path.hasSuffix("/uploads") {
@@ -174,7 +186,8 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         let charge = jobDirect ? 5 : charged
         var result: [String: JSONValue] = [
-            "voice_url": "http://127.0.0.1/files/voice.wav", "content_type": "audio/wav", "sample_rate": 44_100, "channels": 1,
+            "voice_url": .string("http://127.0.0.1/files/\(voiceRenamed ? "voice-fresh" : "voice").wav"), "content_type": "audio/wav",
+            "sample_rate": 44_100, "channels": 1,
             "duration": .number(sourceSeconds + voiceExtraSeconds), "source_duration": .number(sourceSeconds),
             "padded_seconds": 0, "model": "chatterbox-hd", "fallback_used": false, "skip_separation": .bool(jobDirect)
         ]
@@ -208,7 +221,12 @@ final class VoiceChangeFixture {
         UserDefaults.standard.removeObject(forKey: VoiceChangeActivity.lastVoiceKey)
     }
 
-    var api: SkyStudioAPI { SkyStudioAPI(session: VoiceChangeHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil) }
+    /// Downloads wait 10 ms between tries instead of 1 s and 2 s (VoiceChangeDownloadChecks).
+    var api: SkyStudioAPI {
+        var downloads = SkyStudioDownloadRetry()
+        downloads.pauses = [0.01]
+        return SkyStudioAPI(session: VoiceChangeHTTP.session, base: URL(string: "http://127.0.0.1/api/skycut/v1")!, machine: nil, downloadRetry: downloads)
+    }
 
     var services: VoiceChangeServices {
         var services = VoiceChangeServices()

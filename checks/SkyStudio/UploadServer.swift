@@ -9,6 +9,9 @@ import Foundation
 // with `slowRead` the server reads 32 KB every 10 ms, so a client that cuts early is seen mid-body). Each connection carries one
 // request (`Connection: close`), so the client never reuses a connection and never replays a request on its own. Real sockets, so
 // the system's own transfer code is what is tested; no proxy and no real network.
+// Downloads (DownloadRetryChecks, 2026-11-24): each `GET /files/…` gets the next `GetReply`: the whole result (200 with an ETag and
+// Accept-Ranges, so the system can resume; a resumed try's Range, with a matching If-Range, gets 206 and the rest), part of the body
+// then the connection closed or reset, an HTTP error, or its head then a stall until the client goes away.
 
 final class UploadServer: @unchecked Sendable {
     /// `…ThenStall` / `…ThenReset`: the answer's head and 1 KB of its body go out, then the connection hangs (the client times out) or
@@ -23,6 +26,13 @@ final class UploadServer: @unchecked Sendable {
     /// the signed address is https, which this plain server cannot speak), or the connection dropped after the request.
     /// `status`: an HTTP error with a plain body; `refusal`: Sky Studio's own error answer; `noAddress`: a 200 without `upload_url`.
     enum TicketReply: Sendable { case ticket(life: TimeInterval?, tls: Bool = false), drop, status(Int), refusal(Int, code: String, reason: String? = nil), noAddress }
+
+    /// What a `GET /files/…` gets. `slow`: the whole result in 32 KB pieces every 10 ms (a client that cuts early is seen mid-body).
+    /// `cut` / `cutReset`: the head (the whole length declared) and that many body bytes from where the Range starts, then the
+    /// connection closed (FIN) or reset. `stall`: the head and 1 KB, then nothing until the client goes away. `statusCut`: an HTTP error
+    /// whose head declares 64 KB, then 1 KB of it and the connection closed.
+    enum GetReply: Sendable { case file, slow, cut(Int), cutReset(Int), status(Int), statusCut(Int), stall }
+    static let etag = "\"skycut-check-1\""
 
     struct Seen: Sendable {
         let method: String
@@ -45,6 +55,10 @@ final class UploadServer: @unchecked Sendable {
     private var clockOffset: TimeInterval = 0
     private var slowRead = false
     private var seen: [Seen] = []
+    private var gets: [GetReply] = [.file]
+    private var getsServed = 0
+    private var result = Data()
+    private var validators = true
 
     init() throws {
         let socket = Darwin.socket(AF_INET, SOCK_STREAM, 0)
@@ -81,6 +95,21 @@ final class UploadServer: @unchecked Sendable {
         seen = []
         lock.unlock()
     }
+
+    /// The next download scenario: what the GETs get in order (the last one repeats), the result's bytes, and whether its answers carry
+    /// an ETag / Accept-Ranges / Last-Modified (without them the system cannot resume). Clears the log.
+    func configureDownload(gets: [GetReply], result: Data, validators: Bool = true) {
+        lock.lock()
+        self.gets = gets.isEmpty ? [.file] : gets
+        getsServed = 0
+        self.result = result
+        self.validators = validators
+        seen = []
+        lock.unlock()
+    }
+
+    /// The result's address on this server (`tls`: https, which this plain server cannot speak).
+    func resultURL(_ name: String, tls: Bool = false) -> URL { URL(string: "\(tls ? "https" : "http")://127.0.0.1:\(port)/files/\(name)")! }
 
     var log: [Seen] {
         lock.lock()
@@ -139,6 +168,14 @@ final class UploadServer: @unchecked Sendable {
             // A TLS client on this plain server (an https address): a plain answer makes its handshake fail.
             lock.unlock()
             respond(client, status: "400 Bad Request", body: "", extra: [])
+            return
+        }
+        if request.method == "GET", request.path.hasPrefix("/files/") {
+            let answer = gets[min(getsServed, gets.count - 1)]
+            getsServed += 1
+            let (body, validated) = (result, validators)
+            lock.unlock()
+            serveGet(client, answer, body: body, validators: validated, headers: request.headers)
             return
         }
         let reply: PutReply?
@@ -214,6 +251,56 @@ final class UploadServer: @unchecked Sendable {
         }
     }
 
+    /// A download's answer: a resumed try's Range is honoured only with validators and a matching If-Range (else the whole body again).
+    private func serveGet(_ client: Int32, _ reply: GetReply, body: Data, validators: Bool, headers: [String: String]) {
+        if case .status(let code) = reply {
+            respond(client, status: "\(code) Error", body: "<Error><Code>AccessDenied</Code></Error>", extra: ["Content-Type: application/xml"])
+            return
+        }
+        if case .statusCut(let code) = reply {
+            begin(client, status: "\(code) Error", declaredLength: 65_536)
+            usleep(200_000)
+            shutdown(client, SHUT_WR)
+            close(client)
+            return
+        }
+        var start = 0
+        if validators, let range = headers["range"], range.hasPrefix("bytes="), headers["if-range"].map({ $0 == Self.etag }) ?? true,
+           let offset = Int(range.dropFirst(6).prefix { $0 != "-" }), offset < body.count {
+            start = offset
+        }
+        var head = [start > 0 ? "HTTP/1.1 206 Partial Content" : "HTTP/1.1 200 OK", "Content-Length: \(body.count - start)",
+                    "Content-Type: video/mp4", "Connection: close"]
+        if validators { head += ["ETag: \(Self.etag)", "Accept-Ranges: bytes", "Last-Modified: Mon, 23 Nov 2026 07:00:00 GMT"] }
+        if start > 0 { head.append("Content-Range: bytes \(start)-\(body.count - 1)/\(body.count)") }
+        write(client, Data((head.joined(separator: "\r\n") + "\r\n\r\n").utf8))
+        switch reply {
+        case .file:
+            write(client, body.subdata(in: start..<body.count))
+            shutdown(client, SHUT_WR)
+            close(client)
+        case .slow:
+            var at = start
+            while at < body.count, isRunning {
+                let end = min(body.count, at + 32_768)
+                guard write(client, body.subdata(in: at..<end)) else { break }
+                at = end
+                usleep(10_000)
+            }
+            shutdown(client, SHUT_WR)
+            close(client)
+        case .cut(let bytes), .cutReset(let bytes):
+            write(client, body.subdata(in: start..<min(body.count, start + bytes)))
+            usleep(200_000)   // the client takes in what arrived before the connection goes
+            if case .cutReset = reply { resetAndClose(client) } else { shutdown(client, SHUT_WR); close(client) }
+        case .stall:
+            write(client, body.subdata(in: start..<min(body.count, start + 1_024)))
+            hold(client)
+        case .status, .statusCut:
+            break
+        }
+    }
+
     /// Keep the connection open without answering until the client closes it (a cancel) or the server stops.
     private func hold(_ client: Int32) {
         var buffer = [UInt8](repeating: 0, count: 256)
@@ -246,14 +333,17 @@ final class UploadServer: @unchecked Sendable {
         close(client)
     }
 
-    private func write(_ client: Int32, _ bytes: Data) {
+    /// False when the client went away before all of it was sent.
+    @discardableResult
+    private func write(_ client: Int32, _ bytes: Data) -> Bool {
         bytes.withUnsafeBytes { raw in
             var sent = 0
             while sent < raw.count {
                 let count = send(client, raw.baseAddress!.advanced(by: sent), raw.count - sent, 0)
-                if count <= 0 { break }
+                if count <= 0 { return false }
                 sent += count
             }
+            return true
         }
     }
 

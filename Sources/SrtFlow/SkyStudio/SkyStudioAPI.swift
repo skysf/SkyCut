@@ -10,7 +10,8 @@ import SrtFlowMCPKit
 // `/jobs/{id}`、`/jobs/{id}/cancel`，和把成品下载下来（第 6 刀）。传文件流着发 / 收、带字节进度，借 fal 那边的传输代理（CloudTransferDelegate，
 // 第 7 刀删 fal 时改名留下）；**Key 只发给 Sky Studio**，上传的签名地址和成品地址都不带它。
 // An upload's PUT that the network breaks is tried again, up to three tries; an answer the storage gave stands (SkyStudioUploadRetry;
-// 2026-11-23).
+// 2026-11-23). A paid result's download the network breaks is resumed or tried again, up to three GETs; an expired address is renewed
+// once from the original job (SkyStudioDownloadRetry; 2026-11-24).
 // 声音库的 `/voices`、`/voices/consent-grant` 在 SkyStudioVoiceAPI（用这里的 request / send）。
 // Content for SkyCut (`/content`, `/content/styles/{id}`) is in SkyStudioContentAPI (request + conditionalGet, uncachedSession).
 // 不管什么：Key 存哪（SkyStudioKey）、回答还算不算数（SkyCutLicense）、什么时候问（SkyStudioAccount）、等一个任务做完（SkyStudioJobRun）。
@@ -31,16 +32,20 @@ struct SkyStudioAPI: Sendable {
     let machine: String?
     /// How a PUT the network breaks is tried again (`upload`; checks shorten the pauses).
     let uploadRetry: SkyStudioUploadRetry
+    /// How a result's GET the network breaks is resumed or tried again (`download`; checks shorten the pauses).
+    let downloadRetry: SkyStudioDownloadRetry
 
     init(
         session: URLSession = .shared, base: URL = SkyStudioAPI.configuredBase(ProcessInfo.processInfo.environment),
-        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current, uploadRetry: SkyStudioUploadRetry = .standard
+        version: String = SkyStudioAPI.appVersion, machine: String? = SkyStudioMachine.current, uploadRetry: SkyStudioUploadRetry = .standard,
+        downloadRetry: SkyStudioDownloadRetry = .standard
     ) {
         self.session = session
         self.base = base
         self.version = version
         self.machine = machine
         self.uploadRetry = uploadRetry
+        self.downloadRetry = downloadRetry
     }
 
     /// 显示用的完整构建版本；请求头在 `request` 边界只取数字三段，不改包里的来源标记。
@@ -253,28 +258,107 @@ struct SkyStudioAPI: Sendable {
 
     /// 把成品下载到 `destination`（先下到它旁边的临时文件再挪过去，下到一半断了不留半个文件）。成品地址不带 Key。
     /// `onProgress`：收到的字节比例（服务器说了总长才有），做完一定报 1。
-    func download(_ url: URL, to destination: URL, onProgress: @escaping @Sendable (Double) -> Void = { _ in }) async throws {
+    /// A GET the network breaks (SkyStudioUploadRetry.isTransient) is tried again after a short pause, `downloadRetry.attempts` GETs
+    /// in all: resumed where it stopped when the system kept what arrived (its own resume data, never anyone else's), otherwise from
+    /// the start (progress back to 0). An HTTP answer is never tried again as it is: a 403 / 404 / 410 asks `renew` once for a fresh
+    /// address (the original job's GET; nothing is ever submitted) and tries it when it differs; any other answer, a cancel and a
+    /// connection that does not work end the download. Giving up is `SkyStudioDownloadFailure`: Sky Studio made and charged the
+    /// result, nothing more was charged, and downloading it again is free.
+    func download(
+        _ url: URL, to destination: URL, renew: (@Sendable () async throws -> URL?)? = nil,
+        onProgress: @escaping @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         let partial = destination.deletingLastPathComponent()
             .appendingPathComponent(".\(destination.lastPathComponent).part-\(UUID().uuidString.prefix(8))")
         defer { try? FileManager.default.removeItem(at: partial) }
+        var address = url
+        var resumeData: Data?
+        var renewed = false
+        var gets = 0
+        var lastError = ""
+        var pausesFirst = false
+        func failed(_ kind: SkyStudioDownloadFailure.Kind) -> SkyStudioDownloadFailure {
+            SkyStudioDownloadFailure(kind: kind, attempts: gets, lastError: lastError, renewed: renewed)
+        }
+        let attempts = max(1, downloadRetry.attempts)
+        for attempt in 1...attempts {
+            if pausesFirst {
+                try Task.checkCancellation()
+                try await downloadRetry.pause(before: attempt)
+            }
+            gets += 1
+            switch try await fetch(address, resuming: resumeData, into: partial, onProgress: onProgress) {
+            case .done:
+                do {
+                    try? FileManager.default.removeItem(at: destination)
+                    try FileManager.default.moveItem(at: partial, to: destination)
+                } catch {
+                    throw SkyStudioFailure.network(error.localizedDescription)
+                }
+                onProgress(1)
+                return
+            case .broken(let detail, let kept):
+                lastError = detail
+                resumeData = kept
+                if kept == nil { onProgress(0) }   // nothing was kept: the next try starts from the beginning
+                pausesFirst = true
+            case .answered(let status):
+                lastError = "HTTP \(status)"
+                guard SkyStudioDownloadRetry.renewableStatuses.contains(status), !renewed, attempt < attempts, let renew else {
+                    throw failed(.refused(status: status))
+                }
+                renewed = true
+                let fresh: URL?
+                do { fresh = try await renew() } catch is CancellationError { throw CancellationError() } catch { fresh = nil }
+                try Task.checkCancellation()
+                guard let fresh, fresh != address else { throw failed(.refused(status: status)) }
+                address = fresh
+                resumeData = nil
+                onProgress(0)
+                pausesFirst = false
+            case .unreachable(let detail):
+                lastError = detail
+                throw failed(.unreachable)
+            }
+        }
+        try Task.checkCancellation()
+        throw failed(.interrupted)
+    }
+
+    /// One GET on a fresh task with fresh progress (resumed from `resumeData` when the system kept the last try's bytes), the result
+    /// moved into `partial` once whole. `.broken` when the network broke it (with the system's resume data, if any), `.answered` for a
+    /// status that is not 2xx (even when its body then broke), `.unreachable` when the connection does not work; a cancel stays one.
+    private func fetch(
+        _ url: URL, resuming resumeData: Data?, into partial: URL, onProgress: @escaping @Sendable (Double) -> Void
+    ) async throws -> SkyStudioDownloadRetry.Try {
         let delegate = CloudTransferDelegate(moveDestination: partial, onProgress: onProgress)
         var get = URLRequest(url: url)
-        get.timeoutInterval = 600
-        let task = session.downloadTask(with: get)
-        try await transfer(task, delegate: delegate)
+        get.timeoutInterval = downloadRetry.getTimeout
+        let task = resumeData.map { session.downloadTask(withResumeData: $0) } ?? session.downloadTask(with: get)
+        var transfer: () async throws -> Void = { try await CloudTransfer.perform(task, delegate: delegate) }
+        #if DEBUG
+        // SRTFLOW_TEST_DOWNLOAD_DROPS (debug builds only): this try is cut once part of the body arrived.
+        if CloudDownloadFault.claimDrop() { transfer = { try await CloudDownloadFault.drop(task, delegate: delegate) } }
+        #endif
+        do {
+            try await transfer()
+        } catch {
+            if error is CancellationError || (error as? URLError)?.code == .cancelled { throw CancellationError() }
+            // An answer that began before the error stands as that answer: a 403 whose body broke is a 403, never a broken try.
+            if let status = (task.response as? HTTPURLResponse)?.statusCode, !(200..<300).contains(status) {
+                return .answered(status: status)
+            }
+            let detail = SkyStudioUploadRetry.describe(error)
+            guard SkyStudioUploadRetry.isTransient(error) else { return .unreachable(detail: detail) }
+            return .broken(detail: detail, resumeData: (error as NSError).userInfo[NSURLSessionDownloadTaskResumeData] as? Data)
+        }
         let status = (task.response as? HTTPURLResponse)?.statusCode ?? 0
-        guard (200..<300).contains(status) else { throw SkyStudioFailure.badAnswer(status: status) }
+        guard (200..<300).contains(status) else { return .answered(status: status) }
         guard let file = delegate.downloadedFile,
               let size = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.size] as? Int, size > 0 else {
             throw SkyStudioFailure.network("the download did not produce a file")
         }
-        do {
-            try? FileManager.default.removeItem(at: destination)
-            try FileManager.default.moveItem(at: file, to: destination)
-        } catch {
-            throw SkyStudioFailure.network(error.localizedDescription)
-        }
-        onProgress(1)
+        return .done
     }
 
     // MARK: 发请求

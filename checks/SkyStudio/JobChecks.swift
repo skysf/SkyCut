@@ -249,12 +249,14 @@ private func runTransferChecks() async {
 
     SkyStudioStub.reset { _ in .data(404, Data("gone".utf8)) }
     let missing = folder.appendingPathComponent("missing.mp4")
-    if case .badAnswer(let status)? = await expectFailure("a missing result", {
+    do {
         try await api.download(URL(string: "https://cdn.skystudioai.com/generations/gone.mp4")!, to: missing)
-    }) {
-        checkEqual(status, 404, "a missing result says its status")
-    } else {
         check(false, "a missing result fails")
+    } catch let failure as SkyStudioDownloadFailure {
+        // No fresh address to ask for here (no renew): the answer stands after one GET (DownloadRetryChecks has the rest).
+        check(failure.kind == .refused(status: 404) && failure.attempts == 1, "a missing result says its status: \(failure)")
+    } catch {
+        check(false, "a missing result is a download failure, got \(error)")
     }
     check(!FileManager.default.fileExists(atPath: missing.path), "nothing is left where the missing file would go")
 }

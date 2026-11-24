@@ -109,6 +109,8 @@ enum AIUpscaleTool {
         job.aiJobID = aiJob.id
         job.onFinished = { finished in Task { await land(finished, aiJob: aiJob, project: project) } }
         job.onEnded = { ended in settle(ended, aiJob: aiJob) }
+        // Download again (the task row's button): the same AI job runs again under its id until the result lands or fails again.
+        job.onRetry = { _ in AIJobs.shared.reopen(aiJob) }
         UpscaleActivity.shared.add(job, opensCompare: false)
 
         let spend = SkyStudioSpendStore.shared
@@ -221,6 +223,11 @@ enum AIUpscaleTool {
                 // The state holds the user's localized line; the AI gets the English, the code and the count (nothing was submitted).
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: " + failure.message,
                                      detail: .object(failure.fields(retry: "call upscale_clip again.")))
+            } else if let failure = ended.downloadFailure {
+                // Made and charged, only its download gave up: the user's Download again gets it at no charge, never a new upscale.
+                var fields = failure.fields(retry: SkyStudioDownloadFailure.taskListRetry + " Never call upscale_clip again for it.")
+                if let id = ended.skyStudioJobID { fields["skystudio_job_id"] = .string(id) }
+                AIJobs.shared.finish(aiJob, .failed, message: failure.message, detail: .object(fields))
             } else {
                 AIJobs.shared.finish(aiJob, .failed, message: "Upscale failed: \(message)", detail: detail)
             }

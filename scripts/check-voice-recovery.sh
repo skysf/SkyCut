@@ -41,7 +41,7 @@ xcrun swiftc -parse-as-library -target arm64-apple-macosx15.0 \
   checks/VoiceRecovery/LibraryUIChecks.swift checks/VoiceRecovery/LibraryOrderChecks.swift \
   checks/VoiceRecovery/LibraryRestartChecks.swift \
   checks/VoiceRecovery/VoiceChangeFixture.swift checks/VoiceRecovery/VoiceChangeChecks.swift \
-  checks/VoiceRecovery/VoiceChangeDirectChecks.swift \
+  checks/VoiceRecovery/VoiceChangeDirectChecks.swift checks/VoiceRecovery/VoiceChangeDownloadChecks.swift \
   @"${BUILD_DIR}/SrtFlow.product/Objects.LinkFileList" \
   -o "${APP}/Contents/MacOS/VoiceRecoveryCheck"
 # 外层看门狗不能放在 Swift 协作线程池里；脚本超时明确红。

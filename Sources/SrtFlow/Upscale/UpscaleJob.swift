@@ -10,6 +10,8 @@ import Foundation
 // 没花出去的退回账上：没交上（裁、传的时候停了 / 出错）、排队中取消了、Sky Studio 说没做成（它自己退钱）。账的那一笔是 `SkyStudioHeldCredits`（和生成共用）。
 // 交上之后停不下来的（已经开始了、取消没送到）照实说：积分花了，成品照样进用户的 Sky Studio 作品库。
 // 做完**不替换**：对比窗口里用户点了 Replace 才换（upscale 方案第 15 条）。2026-10-28 起走 Sky Studio（收费方案第 6 刀），之前走 fal。
+// A download that gave up (UpscaleUndelivered) ends the job failed with the localized line and keeps the result: Download again (the
+// task row's button, `retryDownload`) gets the same result, puts the sound back and saves it; nothing is submitted (2026-11-24).
 // 不管什么：裁 / 传 / 等 / 下 / 封声（UpscalePipeline）、换源（VideoEditProject+Upscale）、界面。
 
 @MainActor
@@ -60,6 +62,14 @@ final class UpscaleJob: ObservableObject, Identifiable {
     var skyStudioJobID: String? { submitted.jobID }
     /// The upload did not happen: `state` carries the user's localized line, upscale_clip tells the AI this in English.
     private(set) var uploadFailure: SkyStudioUploadFailure?
+    /// The paid result's download gave up: `state` carries the user's localized line, upscale_clip gives the AI the code.
+    private(set) var downloadFailure: SkyStudioDownloadFailure?
+    /// Download again can get the paid result (the task row's button).
+    @Published private(set) var canRetryDownload = false
+    /// Called when Download again starts (upscale_clip runs its AI job again under the same id).
+    var onRetry: ((UpscaleJob) -> Void)?
+    /// What Download again needs; nil once it starts.
+    private var undelivered: UpscaleDelivery?
 
     init(request: UpscaleRequest, clipIDs: [UUID], owner: CloudTaskOwner, title: String, approval: Approval = .panel) {
         self.request = request
@@ -116,20 +126,12 @@ final class UpscaleJob: ObservableObject, Identifiable {
         // 3. 流水线。
         let submitted = self.submitted
         do {
-            let result = try await UpscalePipeline.run(
+            complete(try await UpscalePipeline.run(
                 request, api: SkyStudioAPI(), key: key, ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder,
-                onSubmitted: { submitted.mark($0) }
-            ) { [weak self] phase in
-                Task { @MainActor in
-                    guard let self, case .running(let progress) = self.state else { return }
-                    self.state = .running(progress.advanced(to: phase))
-                }
-            }
-            held?.settle(charged: result.creditsCharged)
-            outcome = result
-            state = .done
-            onFinished?(self)
-            onEnded?(self)
+                onSubmitted: { submitted.mark($0) }, phase: reporter
+            ))
+        } catch let undelivered as UpscaleUndelivered {
+            hold(undelivered)
         } catch let error as SkyStudioJobError {
             switch error {
             case .stopped(let stop):
@@ -158,6 +160,60 @@ final class UpscaleJob: ObservableObject, Identifiable {
         if refunding { held?.refund() }
         state = final
         onEnded?(self)
+    }
+
+    /// Phases go to the UI (on the main actor; only while running).
+    private var reporter: @Sendable (CloudJobPhase) -> Void {
+        { [weak self] phase in
+            Task { @MainActor in
+                guard let self, case .running(let progress) = self.state else { return }
+                self.state = .running(progress.advanced(to: phase))
+            }
+        }
+    }
+
+    private func complete(_ result: UpscaleOutcome) {
+        held?.settle(charged: result.creditsCharged)
+        outcome = result
+        state = .done
+        onFinished?(self)
+        onEnded?(self)
+    }
+
+    /// The download gave up after SkyStudioAPI.download's own tries: failed with the localized line, the result kept for Download
+    /// again. The credits stay spent (Sky Studio made it); nothing more was charged.
+    private func hold(_ undelivered: UpscaleUndelivered) {
+        self.undelivered = undelivered.delivery
+        downloadFailure = undelivered.failure
+        canRetryDownload = true
+        end(.failed(SkyStudioDownloadWords.shown(undelivered.failure)), refunding: false)
+    }
+
+    /// Download again: the same paid result (only GETs; nothing quoted, uploaded or submitted), its sound put back and saved as the
+    /// first try would have.
+    func retryDownload() {
+        guard case .failed = state, let delivery = undelivered else { return }
+        undelivered = nil
+        downloadFailure = nil
+        canRetryDownload = false
+        state = .running(CloudJobProgress(phase: .downloading(fraction: nil), typicalSeconds: request.typicalSeconds))
+        onRetry?(self)
+        task = Task { @MainActor in
+            var key: String?
+            if case .success(let found) = await SkyStudioJobKey.key(.silent) { key = found }
+            do {
+                complete(try await UpscalePipeline.deliver(request, delivery, api: SkyStudioAPI(), key: key,
+                                                           ffmpeg: MediaToolchain.shared.runtime?.url, workFolder: Self.workFolder, phase: reporter))
+            } catch let undelivered as UpscaleUndelivered {
+                hold(undelivered)
+            } catch is CancellationError {
+                end(.cancelled(.alreadyStarted), refunding: false)
+            } catch let error as UpscalePipelineError {
+                end(.failed(error.message), refunding: false)
+            } catch {
+                end(.failed(error.localizedDescription), refunding: false)
+            }
+        }
     }
 }
 

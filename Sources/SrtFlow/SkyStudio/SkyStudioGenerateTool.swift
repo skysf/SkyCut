@@ -37,7 +37,7 @@ enum SkyStudioGenerateTool {
         arguments["confirm_token"] = nil
         let requestIdentity: JSONValue = ["arguments": .object(arguments), "project": .string(String(describing: ObjectIdentifier(project))),
             "generation": .number(Double(project.documentGeneration)), "account": .string(SkyStudioAccount.shared.stored?.me.account.id ?? "")]
-        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return cached }
+        if let cached = try SkyStudioGenerationRequests.begin(idempotencyKey, identity: requestIdentity) { return downloadAgain(cached) ?? cached }
         defer { SkyStudioGenerationRequests.abandonPreparation(idempotencyKey) }
         let picked = try SkyStudioReferenceFiles.picks(args, kind: kind)
         if let approval = try AIWorkspace.shared.confirmReading(picked.files.map(\.file), verb: "send to Sky Studio", args: args, project: project) { return approval }
@@ -188,6 +188,17 @@ enum SkyStudioGenerateTool {
         let response = AIToolResult.ok(.object(result))
         SkyStudioGenerationRequests.complete(idempotencyKey, result: response)
         return response
+    }
+
+    /// generate_media called again with the same idempotency_key after its paid result's download gave up: the same result is downloaded
+    /// again under the same job id (nothing quoted, uploaded or submitted; SkyStudioGenerationRun.retryDownload). nil when that job has
+    /// nothing waiting to be downloaded (its first answer stands, as before).
+    private static func downloadAgain(_ cached: AIToolResult) -> AIToolResult? {
+        guard let id = cached.payload["job_id"]?.stringValue,
+              let retry = SkyStudioGenerationActivity.shared.runs.first(where: { $0.aiJobID == id })?.retryDownload else { return nil }
+        retry()
+        return .ok(["status": "downloading_again", "job_id": .string(id), "submitted_again": false,
+                    "next_step": "Sky Studio made this result earlier and charged for it once; SkyCut is downloading the same result again, at no charge. Wait with get_job."])
     }
 
     /// 给 get_status 的一段：存了 Sky Studio 的 Key 才有。AI 看了就知道生成和 upscale 花的是积分、今天还剩多少。

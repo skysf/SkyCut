@@ -4,6 +4,8 @@ import SrtFlowMCPKit
 
 // 重启后的官方原单恢复：只 GET 已知任务/原成品，复用下载与可编辑副本逻辑，不报价、不上传、不调用 run/submit。
 // 本机聚合预算不二次结算；服务器 billing 与保守留存的本机预留分别报告。
+// A download that gave up (SkyStudioDownloadFailure) keeps the row with the localized line and Download again, which runs this
+// recovery once more (only GETs); get_job carries the code and the next step.
 @MainActor
 final class SkyStudioOfficialRecoveryRun {
     private let recovery: SkyStudioOfficialRecovery
@@ -53,7 +55,9 @@ final class SkyStudioOfficialRecoveryRun {
                 ?? ExportFileName.unoccupied(in: value.folder, stem: value.stem, pathExtension: pathExtension) { FileManager.default.fileExists(atPath: $0.path) }
             if !FileManager.default.fileExists(atPath: original.path) {
                 status.advance(to: .downloading(fraction: nil), typicalSeconds: nil)
-                try await SkyStudioAPI().download(result.url, to: original) { [weak self] fraction in
+                let key = key
+                let renew: @Sendable () async throws -> URL? = { try await SkyStudioAPI().job(serverID, key: key).result?.url }
+                try await SkyStudioAPI().download(result.url, to: original, renew: renew) { [weak self] fraction in
                     Task { @MainActor in self?.status.advance(to: .downloading(fraction: CloudJobPhase.quantized(fraction)), typicalSeconds: nil) }
                 }
             }
@@ -68,11 +72,20 @@ final class SkyStudioOfficialRecoveryRun {
         } catch {
             let message = (error as? AIToolError)?.message ?? (error as? SkyStudioJobError)?.message
                 ?? (error as? SkyStudioFailure).map { SkyStudioJobError.request($0).message } ?? error.localizedDescription
-            finish(job, error is CancellationError ? .cancelled : .failed, message: message)
+            finish(job, error is CancellationError ? .cancelled : .failed, message: message, download: SkyStudioDownloadFailure.from(error))
         }
     }
 
-    private func finish(_ job: AIJobs.Job, _ result: AIJobs.Status, file: URL? = nil, message: String) {
+    /// Download again: this recovery runs once more under the same job id (it only reads the original job and its output).
+    private func retryDownload(_ job: AIJobs.Job) {
+        status.retryDownload = nil
+        status.issue = nil
+        AIJobs.shared.reopen(job)
+        task = Task { @MainActor in await self.execute(job) }
+    }
+
+    private func finish(_ job: AIJobs.Job, _ result: AIJobs.Status, file: URL? = nil, message: String,
+                        download: SkyStudioDownloadFailure? = nil) {
         let value = recovery.value
         var detail: [String: JSONValue] = ["idempotency_key": .string(value.idempotencyKey), "submitted_again": false,
             "model_id": .string(value.modelID), "recovery_state": .string(file == nil ? "original_job_pending" : "recovered"),
@@ -84,6 +97,14 @@ final class SkyStudioOfficialRecoveryRun {
         if let remote = value.remoteResult { detail["remote_result"] = remote }
         if let file { detail["file"] = .string(file.path); AIReadGrants.shared.remember([file]) }
         if let original = value.savedOriginal { detail["original_file"] = .string(original.path); AIReadGrants.shared.remember([original]) }
+        if let download {
+            detail.merge(download.fields(retry: "call generate_media again with the same arguments and idempotency_key (that only reads "
+                + "the original job and downloads its output), or " + SkyStudioDownloadFailure.taskListRetry)) { _, new in new }
+        }
         AIJobs.shared.finish(job, result, message: message, detail: .object(detail))
+        if let download {
+            status.issue = SkyStudioDownloadWords.shown(download)
+            status.retryDownload = { [self] in retryDownload(job) }
+        }
     }
 }

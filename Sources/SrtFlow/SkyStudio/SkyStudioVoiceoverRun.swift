@@ -216,7 +216,12 @@ final class SkyStudioVoiceoverRun {
         if let blocked = error as? SkyStudioVoiceBudgetProblem {
             extra.merge(SkyStudioJobGate.budgetBlocked(credits: blocked.credits, store: .shared).payload.objectValue ?? [:]) { _, new in new }
         }
+        // A batch Sky Studio made whose download gave up: the code and the GET count (resume=recovery_file downloads it again, at no
+        // charge); the task row reads the localized line.
+        let download = SkyStudioDownloadFailure.from((error as? SkyStudioVoiceProcessingError)?.underlying ?? error)
+        if let download { extra.merge(download.fields()) { _, new in new } }
         finish(cancelled ? .cancelled : .failed, text)
+        if let download, !cancelled { status.issue = SkyStudioDownloadWords.shown(download) }
     }
 
     /// 回任务号时说好要先装本机转写模型的：交第一批之前装（状态行「准备本机转写」，get_job 的 local_step）。装不上就当这台 Mac

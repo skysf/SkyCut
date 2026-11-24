@@ -47,10 +47,13 @@ xcrun swiftc \
   Sources/SrtFlow/OptimizedMedia/MediaKeyframeProbe.swift \
   Sources/SrtFlow/CloudMedia/CloudTransfer.swift \
   Sources/SrtFlow/CloudMedia/CloudUploadFault.swift \
+  Sources/SrtFlow/CloudMedia/CloudDownloadFault.swift \
   Sources/SrtFlow/CloudMedia/CloudJobPhase.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioAPI.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadRetry.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioUploadFailure.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadRetry.swift \
+  Sources/SrtFlow/SkyStudio/SkyStudioDownloadFailure.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMe.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioMachine.swift \
   Sources/SrtFlow/SkyStudio/SkyStudioJob.swift \

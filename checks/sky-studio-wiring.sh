@@ -354,8 +354,10 @@ fi
 grep -qF 'if let id = self.submitted.jobID { detail["skystudio_job_id"] = .string(id) }' "${GEN_RUN}" \
   || fail "${GEN_RUN}：get_job 跑着时要报阶段和 skystudio_job_id（liveDetail）"
 grep -qF 'cancel: { [weak self] in self?.cancel() }' "${GEN_RUN}" || fail "${GEN_RUN}：任务没有取消动作（停止按钮、cancel_job 停不了）"
-[ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 1 ] \
-  || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；各恰好一处）"
+# Since 2026-11-24 Download again (retryDownload) ends with a second remove: the row is still listed when it is pressed, so no second add.
+[ "$(count 'SkyStudioGenerationActivity.shared.add(status)' "${GEN_RUN}")" -eq 1 ] && [ "$(count 'SkyStudioGenerationActivity.shared.remove(status)' "${GEN_RUN}")" -eq 2 ] \
+  && grep -qF 'defer { SkyStudioGenerationActivity.shared.remove(status) }' <<<"$(awk '/    func retryDownload\(\) \{/,/^    \}/' "${GEN_RUN}")" \
+  || fail "${GEN_RUN}：生成任务起手要登记进 SkyStudioGenerationActivity、结束拿掉（状态行从它读；起手一处，execute 和 Download again 各拿掉一处）"
 grep -qF 'let generation = SkyStudioGenerationActivity.shared' "${STATUS_ROWS}" || fail "${STATUS_ROWS}：任务入口没订阅 Sky Studio 的生成任务"
 for file in "${GEN_TOOL}" "${GEN_RUN}" "${GEN_ACTIVITY}"; do
   if grep -nE 'NSAlert|runModal|beginSheetModal|NSOpenPanel|NSSavePanel|\.alert\(|confirmationDialog' "${file}"; then
@@ -558,6 +560,9 @@ source checks/sky-studio-wiring/upload-retry.sh
 
 # 19. Reference images fitted to the published limits (2026-11-23): checks/sky-studio-wiring/reference-fit.sh.
 source checks/sky-studio-wiring/reference-fit.sh
+
+# 20. Downloads of paid results the network interrupts (2026-11-24): checks/sky-studio-wiring/download-retry.sh.
+source checks/sky-studio-wiring/download-retry.sh
 
 # 0.18.62 真积分验收后的结果边界：下面每份纯值规则都必须接到实际工具 / 下载 / 刷新路径。
 grep -qF 'characters.map(SkyStudioCharacterSummary.json)' Sources/SrtFlow/SkyStudio/SkyStudioCharacter.swift || fail "角色列表绕过有界摘要"

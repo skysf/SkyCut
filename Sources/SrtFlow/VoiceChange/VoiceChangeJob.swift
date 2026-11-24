@@ -16,6 +16,9 @@ import SrtFlowMCPKit
 // 任务号立刻回（AI 用 get_job 等）；工具栏的云端任务浮层里有这一行（SkyStudioMediaStatus：上传 / 排队 / 处理 / 下载 / 收尾），
 // 没做成留在浮层里等用户关掉。面板起的做完 / 没做成在工程的提示条上说一句；AI 起的由 AI 转告。
 // 成品在服务器上留 60 天；本机没有恢复记录（SkyCut 中途退出，这一单的成品要去 Sky Studio 找，见 docs/architecture/voice-library.md）。
+// A download that gave up (SkyStudioDownloadFailure, after SkyStudioAPI.download's own resume / retries) ends the job failed with the
+// localized line and keeps the result while SkyCut runs: Download again (the task row's button) gets the same files and lands them;
+// nothing is uploaded or submitted again (2026-11-24).
 // Direct change (skip_separation in the draft, 2026-11-21): only the voice comes back, one file and one new track. A default
 // change without its background lands nothing (strict, like a missing voice). separation_failed ends the job failed with
 // nothing landed and the source still playing; the message is localized for the user, the AI gets the code and when to retry
@@ -42,6 +45,8 @@ final class VoiceChangeJob {
     private var serverID: String?
     private var task: Task<Void, Never>?
     private var job: AIJobs.Job?
+    /// The paid result whose download gave up, kept for Download again; nil once it starts.
+    private var undelivered: (result: SkyStudioVoiceConversion, server: SkyStudioJobStatus)?
     /// A direct change: read from the draft that was quoted and is sent, so the job can never disagree with the quote.
     private var direct: Bool { SkyStudioVoiceRequests.skipsSeparation(draft) }
 
@@ -113,15 +118,51 @@ final class VoiceChangeJob {
             return finish(.failed, "Sky Studio finished without the separated background file, so SkyCut changed nothing on the timeline; "
                 + "do not start the same change again before checking this job with Sky Studio.", detail: charges(done))
         }
+        await deliver(result, server: done)
+    }
+
+    /// Downloads the result and lands it. A download that gave up is held for Download again (`hold`).
+    private func deliver(_ result: SkyStudioVoiceConversion, server done: SkyStudioJobStatus) async {
         let files: VoiceChangeLanding.Files
         do {
-            files = try await download(result)
+            files = try await download(result, jobID: done.jobID)
+        } catch let failure as SkyStudioDownloadFailure {
+            return hold(failure, result: result, server: done)
         } catch {
             return finish(.failed, "Sky Studio changed the voice (the credits were spent), but SkyCut could not save "
                 + (direct ? "the voice file" : "the two files") + ": "
                 + "\(SkyStudioVoiceLibraryErrors.message(error)) The result stays on Sky Studio for 60 days.", detail: charges(done))
         }
         await land(files, result: result, server: done)
+    }
+
+    /// The download gave up after SkyStudioAPI.download's own tries: failed with the code and the localized line, the result kept for
+    /// Download again. Nothing more was charged.
+    private func hold(_ failure: SkyStudioDownloadFailure, result: SkyStudioVoiceConversion, server: SkyStudioJobStatus) {
+        undelivered = (result, server)
+        var detail = charges(server)
+        detail.merge(failure.fields(retry: SkyStudioDownloadFailure.taskListRetry + " The result is kept on Sky Studio for 60 days. "
+            + "Never call change_voice again for it.")) { _, new in new }
+        finish(.failed, failure.message, detail: detail, shown: SkyStudioDownloadWords.shown(failure))
+        // Strong: the row's button keeps this job until it is pressed or the row is dismissed.
+        status.retryDownload = { [self] in retryDownload() }
+    }
+
+    /// Download again: the same files (only GETs; nothing uploaded or submitted), landed as one undo step as the first try would have.
+    func retryDownload() {
+        guard let pending = undelivered, let job else { return }
+        undelivered = nil
+        status.retryDownload = nil
+        status.issue = nil
+        AIJobs.shared.reopen(job)
+        VoiceChangeActivity.shared.began(origin.clipID)
+        task = Task { @MainActor in
+            defer {
+                SkyStudioGenerationActivity.shared.remove(status)
+                VoiceChangeActivity.shared.ended(origin.clipID)
+            }
+            await deliver(pending.result, server: pending.server)
+        }
     }
 
     /// A failed or stopped job: the books follow Sky Studio's final net charge when it reports one above zero (separation_failed
@@ -186,7 +227,8 @@ final class VoiceChangeJob {
 
     /// 下载两个文件到原素材旁边，量出各自多长。下到一半断了不留半个文件（SkyStudioAPI.download）；只下成一个就把它也删掉。
     /// A direct change downloads the voice alone (no background was made; one sent anyway is not what was asked for).
-    private func download(_ result: SkyStudioVoiceConversion) async throws -> VoiceChangeLanding.Files {
+    /// SkyStudioAPI.download resumes or tries a broken GET again and renews an expired address from the original job (`jobID`).
+    private func download(_ result: SkyStudioVoiceConversion, jobID: String) async throws -> VoiceChangeLanding.Files {
         let background = direct ? nil : result.backgroundURL
         let places = VoiceChangeOutputName.destinations(
             original: origin.sourceURL, voiceName: target.name, backgroundLabel: L10n("background (file name)"),
@@ -205,8 +247,12 @@ final class VoiceChangeJob {
         status.advance(to: .downloading(fraction: nil), typicalSeconds: typical)
         let voiceShare = background == nil ? 1.0 : 0.5
         do {
-            try await fetch(result.voiceURL, to: places.voice) { report($0 * voiceShare) }
-            if let background { try await fetch(background, to: places.background) { report(0.5 + $0 / 2) } }
+            try await services.api.download(result.voiceURL, to: places.voice, renew: renewal(jobID) { $0.voiceURL }) { report($0 * voiceShare) }
+            if let background {
+                try await services.api.download(background, to: places.background, renew: renewal(jobID) { $0.backgroundURL }) {
+                    report(0.5 + $0 / 2)
+                }
+            }
             status.advance(to: .finishing, typicalSeconds: typical)
             var files = VoiceChangeLanding.Files(voice: places.voice, voiceSeconds: try await Self.seconds(of: places.voice))
             if background != nil { files.background = .init(file: places.background, seconds: try await Self.seconds(of: places.background)) }
@@ -218,17 +264,12 @@ final class VoiceChangeJob {
         }
     }
 
-    /// 钱已经花了：下载断了再试两次（成品地址 60 天有效、不带 Key）。
-    private func fetch(_ url: URL, to destination: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
-        var attempt = 0
-        while true {
-            do {
-                return try await services.api.download(url, to: destination, onProgress: progress)
-            } catch {
-                attempt += 1
-                guard attempt < 3 else { throw error }
-                try? await Task.sleep(nanoseconds: 1_000_000_000)
-            }
+    /// An expired address: a fresh one from the original job (only `GET /jobs/{id}`; nothing is submitted again).
+    private func renewal(_ id: String, _ pick: @escaping @Sendable (SkyStudioVoiceConversion) -> URL?) -> @Sendable () async throws -> URL? {
+        let api = services.api, key = key
+        return {
+            guard case .conversion(let result)? = try await api.job(id, key: key).voiceResult else { return nil }
+            return pick(result)
         }
     }
 

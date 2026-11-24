@@ -193,8 +193,17 @@ final class SkyStudioVoiceCloudBatches {
         let ext = result.url.pathExtension.isEmpty ? (result.contentType == "audio/mpeg" ? "mp3" : "wav") : result.url.pathExtension
         let file = recovery.file.deletingLastPathComponent().appendingPathComponent("batch-\(index).\(ext)")
         report(.downloading(fraction: nil))
+        // An expired address: a fresh one from this batch's original job (only GET; never submitted again).
+        var renew: (@Sendable () async throws -> URL?)?
+        if let id = recovery.value.batches[index].serverID {
+            let api = api
+            renew = { [weak self] in
+                guard let key = try await self?.resolvedKey() else { return nil }
+                return try await api.job(id, key: key).result?.url
+            }
+        }
         do {
-            try await api.download(result.url, to: file) { fraction in
+            try await api.download(result.url, to: file, renew: renew) { fraction in
                 Task { @MainActor in report(.downloading(fraction: CloudJobPhase.quantized(fraction))) }
             }
             recovery.value.batches[index].rawFile = file

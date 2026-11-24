@@ -30,6 +30,7 @@ import SrtFlowMCPKit
             await runVoicePaidAudioChecks(root)
             try await runVoiceChangeChecks(root)
             try await runVoiceChangeDirectChecks(root)
+            try await runVoiceChangeDownloadChecks(root)
         } catch {
             VoiceCheckLog.failures += 1
             print("FAIL: production voice recovery checks: \(error)")
@@ -58,7 +59,9 @@ import SrtFlowMCPKit
             + "changed, refund on failure, no resend after an unknown submit, the panel's default voice / re-quote / budget / same job"
             + "; direct change: skip_separation in the quote and the job, the voice alone on one new track as one undo step, an unconfirmed "
             + "direct quote refused before paying, a default result without its background not landed, separation_failed failing with "
-            + "nothing landed and only the separation charged, the panel's localized line and its direct retry")
+            + "nothing landed and only the separation charged, the panel's localized line and its direct retry"
+            + "; a voice change whose download gave up: download_network after three GETs, Download again lands the byte-identical files "
+            + "under the same job id with no new upload or job, an expired address renewed once from the original job")
         exit(0)
     }
 
