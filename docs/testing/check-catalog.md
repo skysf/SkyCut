@@ -363,6 +363,21 @@
   - `checks/sky-studio-wiring/upload-retry.sh` pins the single PUT, the answer read first, each job's wiring, the hook's `#if DEBUG`
     fence and the probe calls.
   - Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
+- Downloads of paid results (2026-11-24): `scripts/check-sky-studio.sh` → `DownloadRetryChecks`, real GETs against the same local
+  server (results served with an ETag and Range support).
+  - One drop mid-body is resumed (Range, If-Range; progress never goes back; the file byte-identical); without validators the next GET
+    starts again; three drops end as interrupted (`download_network`) after three GETs, with nothing left, and a later download gets
+    the identical file.
+  - A 403 renewed once to a fresh address that works; a 404 without renewal, the same address again, a second refusal and a 500 end
+    refused after one or two GETs; a TLS failure ends as could not connect; a cancel mid-body or during the pause stops promptly.
+  - The download hook's checks run in the `-D DEBUG` binary (`checks/UploadFault/DownloadFaultChecks.swift`: one cut resumes, three
+    end as interrupted, a body whole before the cut is still dropped, an HTTP answer stands, nothing spins); the probe's refusal of the
+    debug build must name both hooks.
+  - `scripts/check-voice-recovery.sh` → `VoiceChangeDownloadChecks` (real App objects): a voice change whose download gave up fails
+    with `download_network`, Download again lands the byte-identical files under the same job id with no new upload or `/jobs`; an
+    expired address is renewed with one `GET /jobs/{id}`.
+  - `checks/sky-studio-wiring/download-retry.sh` pins the single GET in the loop, `renew:` on every paid download, each flow's held
+    result and line, the rows' Download again, the hook's fence and the probe. Rule: [Sky Studio jobs](../architecture/sky-studio-jobs.md).
 - Reference-image fitting: `scripts/check-sky-studio.sh` → `ReferenceFitChecks` (which records allow fitting, also on Sky
   Studio's own records; the strictest limits of a chain, each limit met exactly / one over / one under, refusals naming the
   limit, the exact copy size inside the aspect range, the chain, the reference check, the refusal listing each model's limit,

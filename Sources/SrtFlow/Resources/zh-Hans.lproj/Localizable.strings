@@ -1565,6 +1565,12 @@
 "Sky Studio's storage answered the upload of “%@”, but the answer did not come through. Nothing was charged. Try again later." = "Sky Studio 的存储回应了「%@」的上传，但回应没能传回来。没有扣积分。请稍后再试。";
 "Sky Studio did not accept the upload of “%@”. Nothing was charged. Try again later." = "Sky Studio 没有接受「%@」的上传。没有扣积分。请稍后再试。";
 "“%@” is too large for Sky Studio. Nothing was charged. Use a smaller file." = "「%@」太大了，Sky Studio 不接收。没有扣积分。请换一个小一些的文件。";
+"The result is ready on Sky Studio, but its download was interrupted by the network after %d tries. Nothing more was charged; trying again downloads the same result." = "成品已在 Sky Studio 上做好，但下载时网络中断，已试 %d 次。没有再扣积分；再试一次会重新下载同一份成品。";
+"The result is ready on Sky Studio, but its download was interrupted by the network. Nothing more was charged; trying again downloads the same result." = "成品已在 Sky Studio 上做好，但下载时网络中断。没有再扣积分；再试一次会重新下载同一份成品。";
+"The result is ready on Sky Studio, but its download could not connect. Nothing more was charged; check your network connection and try again." = "成品已在 Sky Studio 上做好，但下载时无法建立连接。没有再扣积分；请检查网络连接后再试。";
+"The result is ready on Sky Studio, but its storage refused the download (HTTP %d). Nothing more was charged." = "成品已在 Sky Studio 上做好，但存储拒绝了下载（HTTP %d）。没有再扣积分。";
+"Download again" = "重新下载";
+"Download the finished result again; nothing more is charged" = "重新下载已经做好的成品，不会再扣积分";
 "This clip has no sound to change." = "这一段没有声音，变不了声。";
 "This clip is muted. Unmute it first, then change its voice." = "这一段静音了。先取消静音，再变声。";
 "This clip uses %1$@ of its source; a voice change takes at most %2$@ at a time. Split the clip first, then change each part." = "这一段用了素材的 %1$@；变声一次最长 %2$@。先把它分割开，再一段一段变。";
