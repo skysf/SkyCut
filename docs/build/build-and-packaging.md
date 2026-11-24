@@ -897,8 +897,10 @@ The user's call on 2026-11-20 ("改成排队合并"): pull requests are merged o
 - **Why.** Merge-when-green let two PRs land minutes apart, neither tested on top of the other: on 11-18 #476 and #481
   left main uncompilable for about 1.5 hours. Staying current cost even more. In the week to 11-19, authors merged main
   into their branches 85 times; 57 of those merges had no conflict, and each cancelled the run in progress.
-- **Author procedure** (AGENTS.md 「合并与分支」): open the PR and add the label `merge-slot`. Don't push again or merge
-  main unless the slot sends the PR back; it removes the label and comments why. Red: fix, push, label again.
+- **Author procedure** (AGENTS.md 「合并与分支」): add the label `merge-slot` when the PR is ready to merge: as you
+  open it if no review is pending, otherwise once the review (Codex, or the coordinator's read under
+  [Code review rounds](../testing/code-review.md)) clears it. From then on, don't push or merge main unless the slot
+  sends the PR back; it removes the label and comments why. Red: fix, push, label again.
   Known flake: re-run the failed jobs of the run it names, label again once green. Conflict: merge `origin/main`,
   push, label again. Done when the PR is MERGED. `scripts/merge-slot-wait.sh N [max minutes]` waits: exit 0 merged,
   1 sent back (it prints the slot's comment), 2 closed, 3 still queued at the time limit (run it again).
