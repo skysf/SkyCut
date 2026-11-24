@@ -482,6 +482,7 @@ private func failureChecks(_ root: URL) async throws {
     require(unknown.project.state.clip(with: other)?.isMuted == false && unknown.project.state.audioTracks.count == 1, "and the timeline is untouched")
     for row in SkyStudioGenerationActivity.shared.runs where row.issue != nil { SkyStudioGenerationActivity.shared.dismiss(row) }
     SkyStudioSpendStore.shared.refund(9, on: Date())
+    try await voiceChangeBalanceChecks(root)
 }
 
 // MARK: 面板背后的那一份

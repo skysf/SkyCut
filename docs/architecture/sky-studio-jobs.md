@@ -570,7 +570,8 @@ account's), and a next step with the job's own retry. Only the user adds credits
 have. The task row shows the localized line with the numbers and the path to Add Credits (SkyCut → Settings → Sky Studio → Add
 Credits, or the pane when Sky Studio sent no address). Only `SkyStudioBalanceRefusal` names the code, apart from
 `SkyStudioJobAdmission`'s list (`checks/sky-studio-wiring/daily-limit.sh`). BalanceRefusalChecks checks the words and the line in
-every string table.
+every string table; `scripts/check-voice-recovery.sh` (`VoiceChangeBalanceChecks`) runs change_voice into a 402 with real App
+objects.
 
 Manual regression for both (before a release; no automated check opens a real window or client):
 

@@ -22,6 +22,8 @@ final class VoiceChangeHTTP: URLProtocol {
     static var quoteFailure: (Int, JSONValue)?
     /// POST /jobs：断网（结果不明）。
     static var submitNetworkFailure = false
+    /// POST /jobs answers this refusal (a 402 insufficient_credits: nothing admitted or charged).
+    static var submitRefusal: (Int, JSONValue)?
     /// POST /jobs 先回 queued；GET /jobs/{id} 等这个变成 true 才回 done。
     static var holdJob = false
     static var released = true
@@ -52,7 +54,7 @@ final class VoiceChangeHTTP: URLProtocol {
         lock.lock(); defer { lock.unlock() }
         requests = []; uploads = []
         voices = [voiceID: voice(voiceID, name: "Sky", languages: ["zh", "en"])]
-        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; holdJob = false; released = true; jobFails = false
+        libraryFailure = nil; quoteFailure = nil; submitNetworkFailure = false; submitRefusal = nil; holdJob = false; released = true; jobFails = false
         voiceExtraSeconds = 0.02; backgroundSeconds = nil; sourceSeconds = 4.0; charged = 7.5
         separationFails = false; quoteIgnoresSkip = false; omitBackground = false; jobDirect = false
     }
@@ -140,6 +142,7 @@ final class VoiceChangeHTTP: URLProtocol {
         }
         if path.hasSuffix("/jobs"), method == "POST" {
             if submitNetworkFailure { return nil }
+            if let (status, value) = submitRefusal { return (status, value, nil) }
             jobDirect = body["params"]?["skip_separation"]?.boolValue == true
             if holdJob { return (200, ["job_id": "convert-1", "kind": "voice_convert", "status": "queued", "queue_position": 1, "poll_after_seconds": 2], nil) }
             return (200, finished(), nil)

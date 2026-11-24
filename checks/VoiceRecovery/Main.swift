@@ -103,6 +103,9 @@ import SrtFlowMCPKit
         let blocked = try await fixture.resume(file, generate: true)
         require(blocked["status"] == "failed" && blocked["code"] == "daily_budget_exceeded" && VoiceRecoveryHTTP.posts == 3,
                 "a hard budget blocks missing generation while retaining all recovered audio")
+        require(blocked["blocked_by"] == "skycut_daily_credit_limit" && blocked["options"]?.arrayValue?.count == 3
+                && blocked["next_step"]?.stringValue?.contains("resume with add_voiceover resume=recovery_file generate_missing=true") == true,
+                "the budget stop names SkyCut's own limit, offers the options and resumes its own missing batches (MSG1): \(blocked)")
         SkyStudioSpendStore.shared.setDailyLimit(1_000)
         // 恢复补批次：照记录的选择再报价（params.plan）。服务器这次要是自己选，会选成别的模型（rechoose）—— 不带选择就被认出来。
         VoiceRecoveryHTTP.rechoose = true

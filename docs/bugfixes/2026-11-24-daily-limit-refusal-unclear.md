@@ -108,8 +108,12 @@ numbers, and what the user can do?
   - the three panels show the note, the three race paths use the line, the note's button goes through `SettingsNavigator`, and
     the path's labels are the window's own;
   - the six jobs give the AI the balance fields and the row the user's line.
-- `scripts/check-voice-recovery.sh` (real App objects against a fake Sky Studio) passes: the voiceover's budget stop, the voice
-  library and change voice.
+- `scripts/check-voice-recovery.sh` (real App objects against a fake Sky Studio):
+  - `VoiceChangeBalanceChecks`: change_voice refused at `/jobs` with a 402. get_job names the Sky Studio account, the balance and
+    the need, `recharge_url` and the retry; the reservation goes back; nothing is sent again; the row shows the user's line, not
+    Sky Studio's English.
+  - The voiceover's budget stop has `blocked_by`, the three options and its own resume.
+  - The rest of the voiceover, voice library and change-voice checks still pass.
 - Reverse checks, each red and then restored:
   - In `check-sky-studio.sh` (17 failures in all):
     - the suggested value unrounded;
@@ -122,6 +126,8 @@ numbers, and what the user can do?
     - the Settings window not following `SettingsNavigator`;
     - the voice library job without the balance fields.
   - The old `budgetBlocked` body turned both checks red.
+  - In `check-voice-recovery.sh` (3 failures): change_voice without its balance branch; the voiceover's retry back to "repeat this
+    call".
 - Not verified in a real window: Change Limit… opening the Sky Studio pane, and the panels' layout in each language. Both are on
   the manual list ([Sky Studio jobs](../architecture/sky-studio-jobs.md) section 11).
 
